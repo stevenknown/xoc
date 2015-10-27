@@ -34,90 +34,104 @@ author: Su Zhenyu
 #ifndef _IR_LICM_H_
 #define _IR_LICM_H_
 
+namespace xoc {
+
 //Loop Invariant code Motion.
-class IR_LICM : public IR_OPT {
+class IR_LICM : public Pass {
 protected:
-	REGION * m_ru;
-	IR_AA * m_aa;
-	IR_DU_MGR * m_du;
-	IR_CFG * m_cfg;
-	CIR_ITER m_iriter;
-	MD_ITER m_mditer;
-	DT_MGR * m_dm;
-	MD_SYS * m_md_sys;
-	SMEM_POOL * m_pool;
-	LIST<IR*> m_analysable_stmt_list;
-	TMAP<MD const*, UINT*> m_md2num;
+    Region * m_ru;
+    IR_AA * m_aa;
+    IR_DU_MGR * m_du;
+    IR_CFG * m_cfg;
+    ConstIRIter m_iriter;
+    ConstMDIter m_mditer;
+    TypeMgr * m_dm;
+    MDSystem * m_md_sys;
+    SMemPool * m_pool;
+    List<IR*> m_analysable_stmt_list;
+    TMap<MD const*, UINT*> m_md2num;
 
-	bool do_loop_tree(LI<IR_BB> * li,
-					OUT bool & du_set_info_changed,
-					OUT bool & insert_bb,
-					TTAB<IR*> & invariant_stmt,
-					TTAB<IR*> & invariant_exp);
+    //Indicate whether current IR is tranformed to ssa form.
+    bool m_is_in_ssa_form;
+    IR_SSA_MGR * m_ssamgr;
 
-	bool is_dom_all_use_in_loop(IR const* ir, LI<IR_BB> * li);
+protected:
+    bool doLoopTree(LI<IRBB> * li,
+                    OUT bool & du_set_info_changed,
+                    OUT bool & insert_bb,
+                    TTab<IR*> & invariant_stmt,
+                    TTab<IR*> & invariant_exp);
 
-	bool hoist_cand(TTAB<IR*> & invariant_exp,
-					TTAB<IR*> & invariant_stmt,
-					IN IR_BB * prehead,
-					IN LI<IR_BB> * li);
+    inline bool is_stmt_dom_its_use(
+                    IR const* stmt,
+                    IR const* use,
+                    LI<IRBB> const* li,
+                    IRBB const* stmtbb) const;
+    bool is_dom_all_use_in_loop(IR const* ir, LI<IRBB> * li);
 
-	bool mark_exp_and_stmt(IR * ir, TTAB<IR*> & invariant_exp);
+    bool hoistCand(TTab<IR*> & invariant_exp,
+                   TTab<IR*> & invariant_stmt,
+                   IN IRBB * prehead,
+                   IN LI<IRBB> * li);
 
-	bool scan_opnd(IN LI<IR_BB> * li,
-					OUT TTAB<IR*> & invariant_exp,
-					TTAB<IR*> & invariant_stmt,
-					bool * is_legal, bool first_scan);
-	bool scan_result(OUT TTAB<IR*> & invariant_stmt);
-	bool stmt_can_be_hoisted(IR * stmt, TTAB<IR*> & invariant_stmt,
-							LI<IR_BB> * li, IR_BB * backedge_bb);
+    bool markExpAndStmt(IR * ir, TTab<IR*> & invariant_exp);
 
-	bool unique_def(MD const* md);
-	void update_md2num(IR * ir);
+    bool scanOpnd(IN LI<IRBB> * li,
+                  OUT TTab<IR*> & invariant_exp,
+                  TTab<IR*> & invariant_stmt,
+                  bool * is_legal, bool first_scan);
+    bool scanResult(OUT TTab<IR*> & invariant_stmt);
+    bool isStmtCanBeHoisted(IR * stmt, IRBB * backedge_bb);
+    bool isUniqueDef(MD const* md);
+    void updateMD2Num(IR * ir);
 
-	void * xmalloc(UINT size)
-	{
-		IS_TRUE0(m_pool != NULL);
-		void * p = smpool_malloc_h_const_size(sizeof(UINT), m_pool);
-		IS_TRUE0(p != NULL);
-		memset(p, 0, size);
-		return p;
-	}
+    void * xmalloc(UINT size)
+    {
+        ASSERT0(m_pool != NULL);
+        void * p = smpoolMallocConstSize(sizeof(UINT), m_pool);
+        ASSERT0(p != NULL);
+        memset(p, 0, size);
+        return p;
+    }
 public:
-	IR_LICM(REGION * ru)
-	{
-		IS_TRUE0(ru != NULL);
-		m_ru = ru;
-		m_aa = ru->get_aa();
-		m_du = ru->get_du_mgr();
-		m_cfg = ru->get_cfg();
-		m_dm = ru->get_dm();
-		m_md_sys = ru->get_md_sys();
-		m_pool = smpool_create_handle(4 * sizeof(UINT), MEM_CONST_SIZE);
-	}
-	virtual ~IR_LICM() { smpool_free_handle(m_pool); }
+    explicit IR_LICM(Region * ru)
+    {
+        ASSERT0(ru != NULL);
+        m_ru = ru;
+        m_aa = ru->get_aa();
+        m_du = ru->get_du_mgr();
+        m_cfg = ru->get_cfg();
+        m_dm = ru->get_type_mgr();
+        m_md_sys = ru->get_md_sys();
+        m_pool = smpoolCreate(4 * sizeof(UINT), MEM_CONST_SIZE);
+        m_is_in_ssa_form = false;
+        m_ssamgr = NULL;
+    }
+    COPY_CONSTRUCTOR(IR_LICM);
+    virtual ~IR_LICM() { smpoolDelete(m_pool); }
 
-	bool analysis(IN LI<IR_BB> * li,
-				OUT TTAB<IR*> & invariant_stmt,
-				OUT TTAB<IR*> & invariant_exp);
+    bool analysis(IN LI<IRBB> * li,
+                  OUT TTab<IR*> & invariant_stmt,
+                  OUT TTab<IR*> & invariant_exp);
 
-	//Given loop info li, dump the invariant stmt and invariant expression.
-	void dump(LI<IR_BB> const* li,
-			TTAB<IR*> const& invariant_stmt,
-			TTAB<IR*> const& invariant_exp);
+    //Given loop info li, dump the invariant stmt and invariant expression.
+    void dump(TTab<IR*> const& invariant_stmt, TTab<IR*> const& invariant_exp);
 
-	//Consider whether exp is worth hoisting.
-	bool is_worth_hoist(IR * exp)
-	{
-		IS_TRUE0(exp->is_exp());
-		return true;
-	}
+    //Consider whether exp is worth hoisting.
+    bool is_worth_hoist(IR * exp)
+    {
+        CK_USE(exp);
+        ASSERT0(exp->is_exp());
+        return true;
+    }
 
-	virtual CHAR const* get_opt_name() const
-	{ return "Loop Invariant Code Motion"; }
+    virtual CHAR const* get_pass_name() const
+    { return "Loop Invariant Code Motion"; }
 
-	OPT_TYPE get_opt_type() const { return OPT_LICM; }
+    PASS_TYPE get_pass_type() const { return PASS_LICM; }
 
-	virtual bool perform(OPT_CTX & oc);
+    virtual bool perform(OptCTX & oc);
 };
+
+} //namespace xoc
 #endif

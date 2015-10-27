@@ -34,230 +34,234 @@ author: Su Zhenyu
 #ifndef _IR_ALIAS_ANALYSIS_H_
 #define _IR_ALIAS_ANALYSIS_H_
 
+namespace xoc {
+
 class IR_CFG;
 
-//PT_PAIR
-#define PP_id(pp)		((pp)->id)
-#define PP_from(pp)		((pp)->from)
-#define PP_to(pp)		((pp)->to)
-class PT_PAIR {
+//PtPair
+#define PP_id(pp)        ((pp)->id)
+#define PP_from(pp)      ((pp)->from)
+#define PP_to(pp)        ((pp)->to)
+class PtPair {
 public:
-	UINT id;
-	MD const* from;
-	MD const* to;
+    UINT id;
+    MD const* from;
+    MD const* to;
 };
 
 
-//PT_PAIR_SET
-typedef BITSET PT_PAIR_SET;
+//PtPairSet
+typedef BitSet PtPairSet;
 
 
 //MD Addendum
-#define MDA_md(m)		((m)->md)
-#define MDA_mds(m)		((m)->mds)
+#define MDA_md(m)        ((m)->md)
+#define MDA_mds(m)       ((m)->mds)
 class MDA {
 public:
-	MD const* md; //record single MD for IR such like, PR, LD, ST, ID.
-	MD_SET * mds; //record multpile MD for IR such like, ILD, IST, ARRAY.
+    MD const* md; //record single MD for IR such like, PR, LD, ST, ID.
+    MDSet * mds; //record multpile MD for IR such like, ILD, IST, ARRAY.
 };
 
 
-//PP_SET_MGR
-class PP_SET_MGR {
+//PPSetMgr
+class PPSetMgr {
 protected:
-	SMEM_POOL * m_pool;
-	SLIST<PT_PAIR_SET*> m_free_pp_set;
-	SLIST<PT_PAIR_SET*> m_pp_set_list;
+    SMemPool * m_pool;
+    SList<PtPairSet*> m_free_pp_set;
+    SList<PtPairSet*> m_pp_set_list;
 public:
-	PP_SET_MGR()
-	{
-		m_pool = smpool_create_handle(sizeof(SC<PT_PAIR_SET*>) * 4,
-									  MEM_CONST_SIZE);
-		m_free_pp_set.set_pool(m_pool);
-		m_pp_set_list.set_pool(m_pool);
-	}
+    PPSetMgr()
+    {
+        m_pool = smpoolCreate(sizeof(SC<PtPairSet*>) * 4,
+                              MEM_CONST_SIZE);
+        m_free_pp_set.set_pool(m_pool);
+        m_pp_set_list.set_pool(m_pool);
+    }
+    COPY_CONSTRUCTOR(PPSetMgr);
+    ~PPSetMgr()
+    {
+        for (SC<PtPairSet*> * sc = m_pp_set_list.get_head();
+             sc != m_pp_set_list.end(); sc = m_pp_set_list.get_next(sc)) {
+            PtPairSet * pps = sc->val();
+            ASSERT0(pps);
+            delete pps;
+        }
+        smpoolDelete(m_pool);
+    }
 
-	~PP_SET_MGR()
-	{
-		SC<PT_PAIR_SET*> * sct;
-		for (PT_PAIR_SET * pps = m_pp_set_list.get_head(&sct);
-			 pps != NULL; pps = m_pp_set_list.get_next(&sct)) {
-			delete pps;
-		}
-		smpool_free_handle(m_pool);
-	}
+    UINT count_mem();
 
-	UINT count_mem();
+    void free(PtPairSet * pps)
+    {
+        pps->clean();
+        m_free_pp_set.append_head(pps);
+    }
 
-	void free(PT_PAIR_SET * pps)
-	{
-		pps->clean();
-		m_free_pp_set.append_head(pps);
-	}
-
-	inline PT_PAIR_SET * new_pps()
-	{
-		PT_PAIR_SET * pps = m_free_pp_set.remove_head();
-		if (pps == NULL) {
-			pps = new PT_PAIR_SET();
-			m_pp_set_list.append_head(pps);
-		}
-		return pps;
-	}
+    inline PtPairSet * newPtPairSet()
+    {
+        PtPairSet * pps = m_free_pp_set.remove_head();
+        if (pps == NULL) {
+            pps = new PtPairSet();
+            m_pp_set_list.append_head(pps);
+        }
+        return pps;
+    }
 };
 
 
-//PT_PAIR_MGR
-class PT_PAIR_MGR {
-	TMAP<UINT, TMAP<UINT, PT_PAIR*>*>  m_from_tmap;
-	SVECTOR<PT_PAIR*> m_id2pt_pair;
-	SMEM_POOL * m_pool_pt_pair; //pool of PT_PAIR
-	SMEM_POOL * m_pool_tmap; //pool of TMAP<UINT, PT_PAIR*>
-	UINT m_pp_count;
+//PtPairMgr
+class PtPairMgr {
+    TMap<UINT, TMap<UINT, PtPair*>*> m_from_tmap;
+    Vector<PtPair*> m_id2pt_pair;
+    SMemPool * m_pool_pt_pair; //pool of PtPair
+    SMemPool * m_pool_tmap; //pool of TMap<UINT, PtPair*>
+    UINT m_pp_count;
 
-	inline PT_PAIR * xmalloc_pt_pair()
-	{
-		PT_PAIR * p = (PT_PAIR*)smpool_malloc_h_const_size(sizeof(PT_PAIR),
-															m_pool_pt_pair);
-		IS_TRUE0(p);
-		memset(p, 0, sizeof(PT_PAIR));
-		return p;
-	}
+    inline PtPair * xmalloc_pt_pair()
+    {
+        PtPair * p = (PtPair*)smpoolMallocConstSize(sizeof(PtPair),
+                                                    m_pool_pt_pair);
+        ASSERT0(p);
+        memset(p, 0, sizeof(PtPair));
+        return p;
+    }
 
-	inline TMAP<UINT, PT_PAIR*> * xmalloc_tmap()
-	{
-		TMAP<UINT, PT_PAIR*> * p =
-			(TMAP<UINT, PT_PAIR*>*)smpool_malloc_h_const_size(
-												sizeof(TMAP<UINT, PT_PAIR*>),
-												m_pool_tmap);
-		IS_TRUE0(p);
-		memset(p, 0, sizeof(TMAP<UINT, PT_PAIR*>));
-		return p;
-	}
+    inline TMap<UINT, PtPair*> * xmalloc_tmap()
+    {
+        TMap<UINT, PtPair*> * p =
+            (TMap<UINT, PtPair*>*)smpoolMallocConstSize(
+                                    sizeof(TMap<UINT, PtPair*>),
+                                    m_pool_tmap);
+        ASSERT0(p);
+        memset(p, 0, sizeof(TMap<UINT, PtPair*>));
+        return p;
+    }
 public:
-	PT_PAIR_MGR()
-	{
-		m_pool_pt_pair = NULL;
-		m_pool_tmap = NULL;
-		init();
-	}
-	~PT_PAIR_MGR() { destroy();	}
+    PtPairMgr()
+    {
+        m_pool_pt_pair = NULL;
+        m_pool_tmap = NULL;
+        init();
+    }
+    COPY_CONSTRUCTOR(PtPairMgr);
+    ~PtPairMgr() { destroy(); }
 
-	void init()
-	{
-		if (m_pool_pt_pair != NULL) { return; }
-		m_pp_count = 1;
-		m_pool_pt_pair = smpool_create_handle(sizeof(PT_PAIR),
-											MEM_CONST_SIZE);
-		m_pool_tmap = smpool_create_handle(sizeof(TMAP<UINT, PT_PAIR*>),
-											MEM_CONST_SIZE);
-	}
+    void init()
+    {
+        if (m_pool_pt_pair != NULL) { return; }
+        m_pp_count = 1;
+        m_pool_pt_pair = smpoolCreate(sizeof(PtPair), MEM_CONST_SIZE);
+        m_pool_tmap = smpoolCreate(sizeof(TMap<UINT, PtPair*>),
+                                   MEM_CONST_SIZE);
+    }
 
-	void destroy()
-	{
-		if (m_pool_pt_pair == NULL) { return; }
+    void destroy()
+    {
+        if (m_pool_pt_pair == NULL) { return; }
 
-		TMAP_ITER<UINT, TMAP<UINT, PT_PAIR*>*> ti;
-		TMAP<UINT, PT_PAIR*> * v = NULL;
-		for (m_from_tmap.get_first(ti, &v);
-			 v != NULL; m_from_tmap.get_next(ti, &v)) {
-			v->destroy();
-		}
+        TMapIter<UINT, TMap<UINT, PtPair*>*> ti;
+        TMap<UINT, PtPair*> * v = NULL;
+        for (m_from_tmap.get_first(ti, &v);
+             v != NULL; m_from_tmap.get_next(ti, &v)) {
+            v->destroy();
+        }
+        m_pp_count = 0;
 
-		smpool_free_handle(m_pool_pt_pair);
-		smpool_free_handle(m_pool_tmap);
-		m_pool_pt_pair = NULL;
-		m_pool_tmap = NULL;
-	}
+        smpoolDelete(m_pool_pt_pair);
+        smpoolDelete(m_pool_tmap);
+        m_pool_pt_pair = NULL;
+        m_pool_tmap = NULL;
+    }
 
-	inline void clobber()
-	{
-		destroy();
-		m_from_tmap.clean();
-		m_id2pt_pair.clean();
-	}
+    inline void clobber()
+    {
+        destroy();
+        m_from_tmap.clean();
+        m_id2pt_pair.clean();
+    }
 
-	//Get PT PAIR from 'id'.
-	PT_PAIR * get(UINT id) { return m_id2pt_pair.get(id); }
+    //Get PT PAIR from 'id'.
+    PtPair * get(UINT id) { return m_id2pt_pair.get(id); }
 
-	PT_PAIR * add(MD const* from, MD const* to);
+    PtPair * add(MD const* from, MD const* to);
 
-	UINT count_mem() const;
+    UINT count_mem() const;
 };
 
 
 //IRAA_CTX
-#define AC_is_mds_mod(c)		((c)->u1.s1.is_mds_modify)
-#define AC_is_lda_base(c)		((c)->u1.s1.is_lda_base)
-#define AC_has_comp_lda(c)		((c)->u1.s1.has_comp_lda)
-#define AC_comp_pt(c)			((c)->u1.s1.comp_pt)
-class AA_CTX {
+#define AC_is_mds_mod(c)        ((c)->u1.s1.is_mds_modify)
+#define AC_is_lda_base(c)       ((c)->u1.s1.is_lda_base)
+#define AC_has_comp_lda(c)      ((c)->u1.s1.has_comp_lda)
+#define AC_comp_pt(c)           ((c)->u1.s1.comp_pt)
+class AACTX {
 public:
-	union {
-		struct {
-			//Transfer flag bottom up to indicate whether new
-			//MDS generate while processing kids.
-			UINT is_mds_modify:1; //Analysis context for IR_AA.
+    union {
+        struct {
+            //Transfer flag bottom up to indicate whether new
+            //MDS generate while processing kids.
+            UINT is_mds_modify:1; //Analysis context for IR_AA.
 
-			/* Transfer flag top down to indicate the Parent or Grandfather
-			IR (or Parent of grandfather ...) is IR_LDA/IR_ARRAY.
-			This flag tell the current process whether if we are processing
-			the base of LDA/ARRAY. */
-			UINT is_lda_base:1; //Set true to indicate we are
-								//analysing the base of LDA.
+            /* Transfer flag top down to indicate the Parent or Grandfather
+            IR (or Parent of grandfather ...) is IR_LDA/IR_ARRAY.
+            This flag tell the current process whether if we are processing
+            the base of LDA/ARRAY. */
+            UINT is_lda_base:1; //Set true to indicate we are
+                                //analysing the base of LDA.
 
-			/* Transfer flag bottom up to indicate whether we has taken address
-			of ID.
-			e.g: If p=q,q->x; We would propagate q and get p->x.
-				But if p=&a; We should get p->a, with offset is 0.
-				Similarly, if p=(&a)+n+m+z; We also get p->a,
-				but with offset is INVALID. */
-			UINT has_comp_lda:1;
+            /* Transfer flag bottom up to indicate whether we has taken address
+            of ID.
+            e.g: If p=q,q->x; We would propagate q and get p->x.
+                But if p=&a; We should get p->a, with offset is 0.
+                Similarly, if p=(&a)+n+m+z; We also get p->a,
+                but with offset is INVALID. */
+            UINT has_comp_lda:1;
 
-			/* Transfer flag top down to indicate that we need
-			current function to compute the MD that the IR
-			expression may pointed to.
-			e.g: Given (p+1), we want to know the expression pointed to.
-			Presumedly, p->&a[0], we can figure out MD that dereferencing
-			the expression *(p+1) is a[1]. */
-			UINT comp_pt:1;
-		} s1;
-		UINT i1;
-	} u1;
+            /* Transfer flag top down to indicate that we need
+            current function to compute the MD that the IR
+            expression may pointed to.
+            e.g: Given (p+1), we want to know the expression pointed to.
+            Presumedly, p->&a[0], we can figure out MD that dereferencing
+            the expression *(p+1) is a[1]. */
+            UINT comp_pt:1;
+        } s1;
+        UINT i1;
+    } u1;
 
-	AA_CTX() { clean(); }
-	AA_CTX(AA_CTX const& ic) { copy(ic); }
+    AACTX() { clean(); }
+    AACTX(AACTX const& ic) { copy(ic); }
 
-	inline void copy(AA_CTX const& ic) { u1.i1 = ic.u1.i1; }
+    inline void copy(AACTX const& ic) { u1.i1 = ic.u1.i1; }
 
-	//Only copy top down flag.
-	inline void copy_top_down_flag(AA_CTX const& ic)
-	{
-		AC_comp_pt(this) = AC_comp_pt(&ic);
-		AC_is_lda_base(this) = AC_is_lda_base(&ic);
-	}
+    //Only copy top down flag.
+    inline void copyTopDownFlag(AACTX const& ic)
+    {
+        AC_comp_pt(this) = AC_comp_pt(&ic);
+        AC_is_lda_base(this) = AC_is_lda_base(&ic);
+    }
 
-	void clean() { u1.i1 = 0; }
+    void clean() { u1.i1 = 0; }
 
-	//Clean these flag when processing each individiual IR trees.
-	inline void clean_bottom_up_flag()
-	{
-		AC_has_comp_lda(this) = 0;
-		AC_is_mds_mod(this) = 0;
-	}
+    //Clean these flag when processing each individiual IR trees.
+    inline void cleanBottomUpFlag()
+    {
+        AC_has_comp_lda(this) = 0;
+        AC_is_mds_mod(this) = 0;
+    }
 
-	//Collect the bottom-up flag and use them to direct parent action.
-	//Clean these flag when processing each individiual IR trees.
-	inline void copy_bottom_up_flag(AA_CTX const& ic)
-	{
-		AC_has_comp_lda(this) = AC_has_comp_lda(&ic);
-		AC_is_mds_mod(this) = AC_is_mds_mod(&ic);
-	}
+    //Collect the bottom-up flag and use them to direct parent action.
+    //Clean these flag when processing each individiual IR trees.
+    inline void copyBottomUpFlag(AACTX const& ic)
+    {
+        AC_has_comp_lda(this) = AC_has_comp_lda(&ic);
+        AC_is_mds_mod(this) = AC_is_mds_mod(&ic);
+    }
 };
 
 
-typedef TMAP<UINT, MD*> VARID2MD;
-typedef TMAP<IR const*, MD*> IR2HEAPOBJ;
+typedef TMap<VAR*, MD const*, CompareVar> Var2MD;
+typedef TMap<IR const*, MD const*> IR2Heapobj;
 
 
 /* Alias Analysis.
@@ -268,357 +272,422 @@ NOTICE:
 Heap is a unique object. That means the whole
 HEAP is modified/referrenced if a LOAD/STORE operates
 MD that describes variable belongs to HEAP. */
-class IR_AA {
+class IR_AA : public Pass {
 protected:
-	IR_CFG * m_cfg;
-	VAR_MGR * m_var_mgr;
-	DT_MGR * m_dm;
-	REGION * m_ru;
-	MD_SYS * m_md_sys;
-	SMEM_POOL * m_pool;
-	MD_SET_MGR * m_mds_mgr; //MD_SET manager.
-	MD_SET_HASH * m_mds_hash; //MD_SET hash table.
+    IR_CFG * m_cfg;
+    VarMgr * m_var_mgr;
+    TypeMgr * m_dm;
+    Region * m_ru;
+    MDSystem * m_md_sys;
+    SMemPool * m_pool;
+    MDSetMgr * m_mds_mgr; //MDSet manager.
+    MDSetHash * m_mds_hash; //MDSet hash table.
+    DefMiscBitSetMgr * m_misc_bs_mgr;
 
-	//This is a dummy global variable.
-	//It is used used as a placeholder if there
-	//is not any effect global variable.
-	MD * m_dummy_global;
+    //This is a dummy global variable.
+    //It is used used as a placeholder if there
+    //is not any effect global variable.
+    MD * m_dummy_global;
 
-	IR2HEAPOBJ m_ir2heapobj;
-	SVECTOR<PT_PAIR_SET*> m_in_pp_set;
-	SVECTOR<PT_PAIR_SET*> m_out_pp_set;
-	VARID2MD m_varid2md;
-	PT_PAIR_MGR m_pt_pair_mgr;
-	BITSET m_is_visit;
+    IR2Heapobj m_ir2heapobj;
+    Vector<PtPairSet*> m_in_pp_set;
+    Vector<PtPairSet*> m_out_pp_set;
+    Var2MD m_var2md;
+    PtPairMgr m_pt_pair_mgr;
+    BitSet m_is_visit;
 
-	//This class contains those variables that can be referenced by
-	//pointers (address-taken variables)
-	MD_SET const* m_hashed_maypts; //initialized by init_may_ptset()
+    //This class contains those variables that can be referenced by
+    //pointers (address-taken variables)
+    MDSet const* m_hashed_maypts; //initialized by initMayPointToSet()
 
-	//Analysis context. Record MD->MD_SET for each BB.
-	SVECTOR<MD2MDS*> m_md2mds_vec;
-	BITSET m_id2heap_md_map;
-	MD2MDS m_unique_md2mds;
+    //Analysis context. Record MD->MDSet for each BB.
+    Vector<MD2MDSet*> m_md2mds_vec;
+    BitSet m_id2heap_md_map;
+    MD2MDSet m_unique_md2mds;
 
-	//If the flag is true, flow sensitive analysis is performed.
-	//Or perform flow insensitive.
-	BYTE m_flow_sensitive:1;
+    //If the flag is true, flow sensitive analysis is performed.
+    //Or perform flow insensitive.
+    BYTE m_flow_sensitive:1;
 
-	//If the flag is true, PR may have relative to multiple MD.
-	BYTE m_is_pr_unique_for_same_no:1;
-
-	//Set flag to indicate that SSA du chain has been available.
-	BYTE m_is_ssa_available:1;
+    //If the flag is true, PR is correspond to a unique MD.
+    BYTE m_is_pr_unique_for_same_no:1;
 
 protected:
-	MD * alloc_heap_obj(IR * ir);
-	MD const* assign_string_const(IN IR * ir, IN OUT MD_SET * mds,
-								  IN OUT AA_CTX * ic);
-	MD const* assign_string_identifier(IN IR * ir, IN OUT MD_SET * mds,
-									   IN OUT AA_CTX * ic);
-	MD const* assign_id_md(IN IR * ir, IN OUT MD_SET * mds,
-						   IN OUT AA_CTX * ic);
-	MD const* assign_ld_md(IN IR * ir, IN OUT MD_SET * mds,
-						   IN OUT AA_CTX * ic, IN OUT MD2MDS * mx);
-	MD const* assign_pr_md(IN IR * ir, IN OUT MD_SET * mds,
-						   IN OUT AA_CTX * ic, IN OUT MD2MDS * mx);
+    MD const* allocHeapobj(IR * ir);
+    MD const* assignStringConst(
+                    IN IR * ir,
+                    IN OUT MDSet * mds,
+                    IN OUT AACTX * ic);
+    MD const* assignStringIdentifier(
+                    IN IR * ir,
+                    IN OUT MDSet * mds,
+                    IN OUT AACTX * ic);
+    MD const* assignIdMD(
+                    IN IR * ir,
+                    IN OUT MDSet * mds,
+                    IN OUT AACTX * ic);
+    MD const* assignLoadMD(
+                    IN IR * ir,
+                    IN OUT MDSet * mds,
+                    IN OUT AACTX * ic,
+                    IN OUT MD2MDSet * mx);
+    MD const* assignPRMD(
+                    IN IR * ir,
+                    IN OUT MDSet * mds,
+                    IN OUT AACTX * ic,
+                    IN OUT MD2MDSet * mx);
+    MD const* allocIdMD(IR * ir);
+    MD const* allocLoadMD(IR * ir);
+    MD const* allocStoreMD(IR * ir);
+    MD const* allocPRMD(IR * ir);
+    MD const* allocPhiMD(IR * phi);
+    MD const* allocStorePRMD(IR * ir);
+    MD const* allocCallResultPRMD(IR * ir);
+    MD const* allocSetelemMD(IR * ir);
+    MD const* allocGetelemMD(IR * ir);
+    MD const* allocStringMD(IR * ir);
 
-	MD const* alloc_id_md(IR * ir);
-	MD const* alloc_ld_md(IR * ir);
-	MD const* alloc_st_md(IR * ir);
-	MD const* alloc_pr_md(IR * ir);
-	MD const* alloc_phi_md(IR * phi);
-	MD const* alloc_stpr_md(IR * ir);
-	MD const* alloc_call_pr_md(IR * ir);
-	MD const* alloc_setepr_md(IR * ir);
-	MD const* alloc_getepr_md(IR * ir);
-	MD const* alloc_string_md(IR * ir);
+    void convertPT2MD2MDSet(
+            PtPairSet const& pps,
+            IN PtPairMgr & pt_pair_mgr,
+            IN OUT MD2MDSet * ctx);
+    void convertMD2MDSet2PT(
+            OUT PtPairSet & pps,
+            IN PtPairMgr & pt_pair_mgr,
+            IN MD2MDSet * mx);
 
-	bool evaluate_from_lda(IR const* ir);
+    bool evaluateFromLda(IR const* ir);
 
-	void init_entry_ptset(PT_PAIR_SET ** ptset_arr);
-	void init_vpts(VAR * v, MD2MDS * mx, MD_ITER & iter);
-	void infer_pt_arith(IR const* ir, IN OUT MD_SET & mds,
-						IN OUT MD_SET & opnd0_mds,
-						IN OUT AA_CTX * opnd0_ic,
-						IN OUT MD2MDS * mx);
-	void infer_stv(IN IR * ir, IN IR * rhs, MD const* lhs_md,
-				   IN AA_CTX * ic, IN MD2MDS * mx);
-	void infer_istv(IN IR * ir, IN AA_CTX * ic,
-					IN MD2MDS * mx);
+    void initEntryPtset(PtPairSet ** ptset_arr);
+    void initGlobalAndParameterVarPtset(
+            VAR * v,
+            MD2MDSet * mx,
+            ConstMDIter & iter);
+    void inferPtArith(
+            IR const* ir, IN OUT MDSet & mds,
+            IN OUT MDSet & opnd0_mds,
+            IN OUT AACTX * opnd0_ic,
+            IN OUT MD2MDSet * mx);
+    void inferStoreValue(
+            IN IR * ir,
+            IN IR * rhs,
+            MD const* lhs_md,
+            IN AACTX * ic,
+            IN MD2MDSet * mx);
+    void inferStoreArrayValue(IN IR * ir, IN AACTX * ic, IN MD2MDSet * mx);
+    void inferIstoreValue(IN IR * ir, IN AACTX * ic, IN MD2MDSet * mx);
+    void inferArrayInfinite(
+            INT ofst,
+            bool is_ofst_pred,
+            UINT md_size,
+            MDSet const& in,
+            OUT MDSet & out);
+    void inferArrayLdabase(
+            IR * ir,
+            IR * array_base,
+            bool is_ofst_pred,
+            UINT ofst,
+            OUT MDSet & mds,
+            IN OUT AACTX * ic,
+            IN OUT MD2MDSet * mx);
+    void inferExpression(
+            IR * ir,
+            IN OUT MDSet & mds,
+            IN OUT AACTX * ic,
+            IN OUT MD2MDSet * mx);
 
-	void infer_array_inf(INT ofst, bool is_ofst_pred, UINT md_size,
-						 MD_SET const& in, OUT MD_SET & out);
-	void infer_array_ldabase(IR * ir, IR * array_base,
-							 bool is_ofst_pred, UINT ofst,
-							 OUT MD_SET & mds, IN OUT AA_CTX * ic,
-							 IN OUT MD2MDS * mx);
-	void infer_exp(IR * ir, IN OUT MD_SET & mds,
-				   IN OUT AA_CTX * ic, IN OUT MD2MDS * mx);
+    void processLda(
+            IR * ir,
+            IN OUT MDSet & mds,
+            IN OUT AACTX * ic,
+            IN OUT MD2MDSet * mx);
+    void processArrayLdabase(
+            IR * ir,
+            IN OUT MDSet & mds,
+            IN OUT AACTX * ic,
+            IN OUT MD2MDSet * mx);
+    void processCvt(
+            IR const* ir,
+            IN OUT MDSet & mds,
+            IN OUT AACTX * ic,
+            IN OUT MD2MDSet * mx);
+    void processGetelem(
+            IR * ir,
+            IN OUT MDSet & mds,
+            IN OUT AACTX * ic,
+            IN OUT MD2MDSet * mx);
+    void processGetelem(IR * ir, IN MD2MDSet * mx);
+    void processSetelem(IR * ir, IN MD2MDSet * mx);
+    void processIload(
+            IR * ir,
+            IN OUT MDSet & mds,
+            IN OUT AACTX * ic,
+            IN OUT MD2MDSet * mx);
+    void processPointerArith(
+            IR * ir,
+            IN OUT MDSet & mds,
+            IN OUT AACTX * ic,
+            IN OUT MD2MDSet * mx);
+    void processArray(
+            IR * ir,
+            IN OUT MDSet & mds,
+            IN OUT AACTX * ic,
+            IN OUT MD2MDSet * mx);
+    void processConst(
+            IR * ir,
+            IN OUT MDSet & mds,
+            IN OUT AACTX * ic);
+    void processStore(IN IR * ir, IN OUT MD2MDSet * mx);
+    void processStorePR(IN IR * ir, IN MD2MDSet * mx);
+    void processIstore(IN IR * ir, IN OUT MD2MDSet * mx);
+    void processStoreArray(IN IR * ir, IN MD2MDSet * mx);
+    void processPhi(IN IR * ir, IN MD2MDSet * mx);
+    void processCallSideeffect(
+            IN OUT MD2MDSet & mx,
+            bool by_addr,
+            MDSet const& by_addr_mds);
+    void processCall(IN IR * ir, IN OUT MD2MDSet * mx);
+    void processReturn(IN IR * ir, IN MD2MDSet * mx);
+    void processRegionSideeffect(IN OUT MD2MDSet & mx);
+    void processRegion(IR const* ir, IN MD2MDSet * mx);
+    void inferArrayExpBase(
+            IR * ir,
+            IR * array_base,
+            bool is_ofst_predicable,
+            UINT ofst,
+            OUT MDSet & mds,
+            OUT bool mds_is_may_pt,
+            IN OUT AACTX * ic,
+            IN OUT MD2MDSet * mx);
 
-	void process_lda(IR * ir, IN OUT MD_SET & mds,
-					 IN OUT AA_CTX * ic, IN OUT MD2MDS * mx);
-	void process_array_lda_base(IR * ir, IN OUT MD_SET & mds,
-								IN OUT AA_CTX * ic, IN OUT MD2MDS * mx);
-	void process_cvt(IR const* ir, IN OUT MD_SET & mds,
-					 IN OUT AA_CTX * ic, IN OUT MD2MDS * mx);
-	void process_getepr(IR * ir, IN OUT MD_SET & mds,
-						IN OUT AA_CTX * ic, IN OUT MD2MDS * mx);
-	void process_setepr(IR * ir, IN MD2MDS * mx);
-	void process_getepr(IR * ir, IN MD2MDS * mx);
-	void process_ild(IR * ir, IN OUT MD_SET & mds,
-					 IN OUT AA_CTX * ic, IN OUT MD2MDS * mx);
-	void process_pointer_arith(IR * ir, IN OUT MD_SET & mds,
-							   IN OUT AA_CTX * ic, IN OUT MD2MDS * mx);
-	void process_array(IR * ir, IN OUT MD_SET & mds,
-					   IN OUT AA_CTX * ic, IN OUT MD2MDS * mx);
-	void process_cst(IR * ir, IN OUT MD_SET & mds,
-					 IN OUT AA_CTX * ic);
-	void process_st(IN IR * ir, IN OUT MD2MDS * mx);
-	void process_stpr(IN IR * ir, IN MD2MDS * mx);
-	void process_ist(IN IR * ir, IN OUT MD2MDS * mx);
-	void process_phi(IN IR * ir, IN MD2MDS * mx);
-	void process_call_sideeffect(IN OUT MD2MDS & mx, bool by_addr,
-								MD_SET const& by_addr_mds);
-	void process_call(IN IR * ir, IN OUT MD2MDS * mx);
-	void process_return(IN IR * ir, IN MD2MDS * mx);
-	void process_region(IR const* ir, IN MD2MDS * mx);
-	void predict_array_ptrbase(IR * ir,
-							   IR * array_base,
-							   bool is_ofst_predicable,
-							   UINT ofst,
-							   OUT MD_SET & mds,
-							   OUT bool mds_is_may_pt,
-							   IN OUT AA_CTX * ic,
-							   IN OUT MD2MDS * mx);
-	void pt2md2mds(PT_PAIR_SET const& pps, IN PT_PAIR_MGR & pt_pair_mgr,
-				   IN OUT MD2MDS * ctx);
+    void reviseMDsize(IN OUT MDSet & mds, UINT size);
 
-	void revise_md_size(IN OUT MD_SET & mds, UINT size);
-
-	void md2mds2pt(OUT PT_PAIR_SET & pps, IN PT_PAIR_MGR & pt_pair_mgr,
-				   IN MD2MDS * mx);
-
-	inline void * xmalloc(size_t size)
-	{
-		void * p = smpool_malloc_h(size, m_pool);
-		IS_TRUE0(p);
-		memset(p, 0, size);
-		return p;
-	}
+    inline void * xmalloc(size_t size)
+    {
+        void * p = smpoolMalloc(size, m_pool);
+        ASSERT0(p);
+        memset(p, 0, size);
+        return p;
+    }
 public:
-	explicit IR_AA(REGION * ru);
-	virtual ~IR_AA();
+    explicit IR_AA(Region * ru);
+    virtual ~IR_AA();
 
-	//Attemp to compute the type based may point to MD set.
-	//Return true if this function find the point-to MD set, otherwise
-	//return false.
-	virtual MD * comp_point_to_via_type(IR const* ir)
-	{ return NULL; }
+    //Attemp to compute the type based may point to MD set.
+    //Return true if this function find the point-to MD set, otherwise
+    //return false.
+    virtual MD const* computePointToViaType(IR const*) { return NULL; }
 
-	void clean();
-	void clean_point_to(MD const* md, IN OUT MD2MDS & ctx)
-	{ ctx.set(MD_id(md), NULL); }
+    void clean();
+    void cleanPointTo(MD const* md, IN OUT MD2MDSet & ctx)
+    { ctx.setAlways(MD_id(md), NULL); }
 
-	void compute_flowsenpt(LIST<IR_BB*> const& bbl);
-	void compute_stmt_pt(IR_BB const* bb,
-						 IN OUT MD2MDS * mx);
-	void compute_flowinsenpt();
-	void compute_may_point_to(IR * pointer, IN MD2MDS * mx, OUT MD_SET & mds);
-	void compute_may_point_to(IR * pointer, OUT MD_SET & mds);
-	UINT count_mem();
-	UINT count_md2mds_mem();
+    void computeFlowSensitive(List<IRBB*> const& bbl);
+    void computeStmt(IRBB const* bb, IN OUT MD2MDSet * mx);
+    void computeFlowInsensitive();
+    void computeMayPointTo(IR * pointer, IN MD2MDSet * mx, OUT MDSet & mds);
+    void computeMayPointTo(IR * pointer, OUT MDSet & mds);
+    UINT count_mem();
+    UINT countMD2MDSetMemory();
 
-	void dump_md2mds(IN MD2MDS * mx, bool dump_ptg);
-	void dump_md2mds(MD const* md, IN MD2MDS * mx);
-	void dump_ir_point_to(IN IR * ir, bool dump_kid, IN MD2MDS * mx);
-	void dump_bb_ir_point_to(IR_BB * bb, bool dump_kid);
-	void dump_all_ir_point_to(bool dump_kid);
-	void dump_pps(PT_PAIR_SET & pps);
-	void dump_bb_in_out_pt_set();
-	void dump_all_md2mds(bool dump_pt_graph);
-	void dump_may_point_to();
+    void dumpMD2MDSet(IN MD2MDSet * mx, bool dump_ptg);
+    void dumpMD2MDSet(MD const* md, IN MD2MDSet * mx);
+    void dumpIRPointTo(IN IR * ir, bool dump_kid, IN MD2MDSet * mx);
+    void dumpIRPointToForBB(IRBB * bb, bool dump_kid);
+    void dumpIRPointToForRegion(bool dump_kid);
+    void dumpPtPairSet(PtPairSet & pps);
+    void dumpInOutPointToSetForBB();
+    void dumpMD2MDSetForRegion(bool dump_pt_graph);
+    void dumpMayPointTo();
 
-	void elem_bunion_pt(MD_SET const& mds, IN MD_SET & in_set, IN MD2MDS * mx);
-	void elem_bunion_pt(MD_SET const& mds, IN MD * in_elem, IN MD2MDS * mx);
-	void elem_copy_pt(MD_SET const& mds, IN MD_SET & in_set, IN MD2MDS * mx);
-	void elem_copy_pt_maypts(MD_SET const& mds, IN MD2MDS * mx);
-	void elem_copy_union_pt(MD_SET const& mds, IN MD_SET & pt_set,
-							IN MD2MDS * mx);
-	void elem_clean_pt(MD_SET const& mds, IN MD2MDS * mx);
-	void elem_clean_exact_pt(MD_SET const& mds, IN MD2MDS * mx);
+    void ElemUnionPointTo(MDSet const& mds, IN MDSet & in_set, IN MD2MDSet * mx);
+    void ElemUnionPointTo(MDSet const& mds, IN MD * in_elem, IN MD2MDSet * mx);
+    void ElemCopyPointTo(MDSet const& mds, IN MDSet & in_set, IN MD2MDSet * mx);
+    void ElemCopyPointToAndMayPointTo(MDSet const& mds, IN MD2MDSet * mx);
+    void ElemCopyAndUnionPointTo(
+            MDSet const& mds,
+            IN MDSet & pt_set,
+            IN MD2MDSet * mx);
+    void ElemCleanPointTo(MDSet const& mds, IN MD2MDSet * mx);
+    void ElemCleanExactPointTo(MDSet const& mds, IN MD2MDSet * mx);
 
-	CHAR const* get_opt_name() const { return "Alias Analysis"; }
-	OPT_TYPE get_opt_type() const { return OPT_AA; }
-	inline IR_CFG * get_cfg() const { return m_cfg; }
+    virtual CHAR const* get_pass_name() const { return "Alias Analysis"; }
+    virtual PASS_TYPE get_pass_type() const { return PASS_AA; }
+    inline PtPairSet * getInPtPairSet(IRBB const* bb)
+    {
+        PtPairSet * pps = m_in_pp_set.get(BB_id(bb));
+        ASSERT(pps, ("IN set is not yet initialized for BB%d", BB_id(bb)));
+        return pps;
+    }
 
-	inline PT_PAIR_SET * get_in_pp_set(IR_BB const* bb)
-	{
-		PT_PAIR_SET * pps = m_in_pp_set.get(IR_BB_id(bb));
-		IS_TRUE(pps, ("IN set is not yet initialized for BB%d", IR_BB_id(bb)));
-		return pps;
-	}
+    inline PtPairSet * getOutPtPairSet(IRBB const* bb)
+    {
+        PtPairSet * pps = m_out_pp_set.get(BB_id(bb));
+        ASSERT(pps, ("OUT set is not yet initialized for BB%d", BB_id(bb)));
+        return pps;
+    }
 
-	inline PT_PAIR_SET * get_out_pp_set(IR_BB const* bb)
-	{
-		PT_PAIR_SET * pps = m_out_pp_set.get(IR_BB_id(bb));
-		IS_TRUE(pps, ("OUT set is not yet initialized for BB%d", IR_BB_id(bb)));
-		return pps;
-	}
+    //For given MD2MDSet, return the MDSet that 'md' pointed to.
+    //ctx: context of point-to analysis.
+    inline MDSet const* getPointTo(MD const* md, MD2MDSet & ctx) const
+    {
+        ASSERT0(md);
+        return getPointTo(MD_id(md), ctx);
+    }
 
-	//For given MD2MDS, return the MD_SET that 'md' pointed to.
-	//ctx: context of point-to analysis.
-	inline MD_SET const* get_point_to(MD const* md, MD2MDS & ctx) const
-	{
-		IS_TRUE0(md);
-		return get_point_to(MD_id(md), ctx);
-	}
+    //For given MD2MDSet, return the MDSet that 'md' pointed to.
+    //ctx: context of point-to analysis.
+    inline MDSet const* getPointTo(UINT mdid, MD2MDSet & ctx) const
+    { return ctx.get(mdid); }
 
-	//For given MD2MDS, return the MD_SET that 'md' pointed to.
-	//ctx: context of point-to analysis.
-	inline MD_SET const* get_point_to(UINT mdid, MD2MDS & ctx) const
-	{ return ctx.get(mdid); }
+    //Return the Memory Descriptor Set for given ir may describe.
+    MDSet const* get_may_addr(IR const* ir) { return ir->get_ref_mds(); }
 
-	//Return the MemoryAddr set for 'ir' may describe.
-	MD_SET const* get_may_addr(IR const* ir)
-	{ return ir->get_ref_mds(); }
+    //Return the MemoryAddr for 'ir' must be.
+    MD const* get_must_addr(IR const* ir) { return ir->get_ref_md(); }
 
-	//Return the MemoryAddr for 'ir' must be.
-	MD const* get_must_addr(IR const* ir)
-	{ return ir->get_ref_md(); }
+    MD2MDSet * get_unique_md2mds() { return &m_unique_md2mds; }
 
-	MD2MDS * get_unique_md2mds() { return &m_unique_md2mds; }
+    void initAliasAnalysis();
+    bool is_flow_sensitive() const { return m_flow_sensitive; }
+    bool isValidStmtToAA(IR * ir);
 
-	bool is_flow_sensitive() const { return m_flow_sensitive; }
-	bool is_valid_stmt_to_aa(IR * ir);
+    bool is_all_mem(MD const* md) const
+    { return (MD_id(md) == MD_ALL_MEM) ? true : false; }
 
-	bool is_all_mem(MD const* md) const
-	{ return (MD_id(md) == MD_ALL_MEM) ? true : false; }
+    bool is_heap_mem(MD const*) const
+    { //return (MD_id(md) == MD_HEAP_MEM) ? true : false;
+        return false;
+    }
 
-	bool is_heap_mem(MD const* md) const
-	{ //return (MD_id(md) == MD_HEAP_MEM) ? true : false;
-		return false;
-	}
+    //Return true if the MD of each PR corresponded is unique.
+    bool isPRUniqueForSameNo() const { return m_is_pr_unique_for_same_no; }
+    void initMayPointToSet();
 
-	bool is_pr_unique_for_same_no() const { return m_is_pr_unique_for_same_no; }
-	void init_may_ptset();
+    void cleanContext(OptCTX & oc);
+    void destroyContext(OptCTX & oc);
 
-	void clean_context(OPT_CTX & oc);
-	void destroy_context(OPT_CTX & oc);
+    void set_must_addr(IR * ir, MD const* md)
+    {
+        ASSERT0(ir != NULL && md);
+        ir->set_ref_md(md, m_ru);
+    }
+    void set_may_addr(IR * ir, MDSet const* mds)
+    {
+        ASSERT0(ir && mds && !mds->is_empty());
+        ir->set_ref_mds(mds, m_ru);
+    }
 
-	void set_must_addr(IR * ir, MD const* md)
-	{
-		IS_TRUE0(ir != NULL && md);
-		ir->set_ref_md(md, m_ru);
-	}
-	void set_may_addr(IR * ir, MD_SET const* mds)
-	{
-		IS_TRUE0(ir && mds && !mds->is_empty());
-		ir->set_ref_mds(mds, m_ru);
-	}
+    //For given MD2MDSet, set the point-to set to 'md'.
+    //ctx: context of point-to analysis.
+    inline void setPointTo(MD const* md, MD2MDSet & ctx, MDSet const* ptset)
+    {
+        ASSERT0(md && ptset);
+        ASSERT(m_mds_hash->find(*ptset), ("ptset should be in hash"));
+        ctx.setAlways(MD_id(md), ptset);
+    }
 
-	//For given MD2MDS, set the point-to set to 'md'.
-	//ctx: context of point-to analysis.
-	inline void set_point_to(MD const* md, MD2MDS & ctx, MD_SET const* ptset)
-	{
-		IS_TRUE0(md && ptset);
-		IS_TRUE(m_mds_hash->find(*ptset), ("ptset should be in hash"));
-		ctx.set(MD_id(md), ptset);
-	}
+    //Set pointer points to 'target'.
+    inline void setPointToUniqueMD(
+                    MD const* pointer,
+                    MD2MDSet & ctx,
+                    MD const* target)
+    {
+        ASSERT0(pointer && target);
+        MDSet tmp;
+        tmp.bunion(target, *m_misc_bs_mgr);
+        MDSet const* hashed = m_mds_hash->append(tmp);
+        setPointTo(pointer, ctx, hashed);
+        tmp.clean(*m_misc_bs_mgr);
+    }
 
-	//Set pointer points to 'target'.
-	inline void set_point_to_unique_md(MD const* pointer, MD2MDS & ctx,
-										MD const* target)
-	{
-		IS_TRUE0(pointer && target);
-		MD_SET * tmp = m_mds_mgr->create();
-		tmp->bunion(target);
-		MD_SET const* hashed = m_mds_hash->append(*tmp);
-		set_point_to(pointer, ctx, hashed);
-		m_mds_mgr->free(tmp);
-	}
+    //Set pointer points to 'target_set' in the context.
+    inline void setPointToMDSet(
+                   MD const* pointer,
+                   MD2MDSet & ctx,
+                   MDSet const& target_set)
+    {
+        ASSERT0(pointer);
+        MDSet const* hashed = m_mds_hash->append(target_set);
+        setPointTo(pointer, ctx, hashed);
+    }
 
-	//Set pointer points to 'target_set'.
-	inline void set_point_to_set(MD const* pointer, MD2MDS & ctx,
-								MD_SET const& target_set)
-	{
-		IS_TRUE0(pointer);
-		MD_SET const* hashed = m_mds_hash->append(target_set);
-		set_point_to(pointer, ctx, hashed);
-	}
+    //Set pointer points to new MDSet by appending a new element 'newmd'
+    //in the context.
+    inline void setPointToMDSetByAddMD(
+                    MD const* pointer,
+                    MD2MDSet & ctx,
+                    MD const* newmd)
+    {
+        MDSet tmp;
+        tmp.bunion(newmd, *m_misc_bs_mgr);
 
-	//Set pointer points to MD set by appending a new element 'target'.
-	inline void set_point_to_set_add_md(MD const* pointer, MD2MDS & ctx,
-										MD const* target)
-	{
-		MD_SET * tmp = m_mds_mgr->create();
-		tmp->bunion(target);
+        MDSet const* pts = getPointTo(pointer, ctx);
+        if (pts != NULL) {
+            tmp.bunion(*pts, *m_misc_bs_mgr);
+        }
 
-		MD_SET const* pts = get_point_to(pointer, ctx);
-		if (pts != NULL) {
-			tmp->bunion(*pts);
-		}
+        MDSet const* hashed = m_mds_hash->append(tmp);
+        setPointTo(pointer, ctx, hashed);
+        tmp.clean(*m_misc_bs_mgr);
+    }
 
-		MD_SET const* hashed = m_mds_hash->append(*tmp);
-		set_point_to(pointer, ctx, hashed);
-		m_mds_mgr->free(tmp);
-	}
+    //Set pointer points to MD set by appending a MDSet.
+    inline void setPointToMDSetByAddMDSet(
+                    MD const* pointer,
+                    MD2MDSet & ctx,
+                    MDSet const& set)
+    {
+        MDSet const* pts = getPointTo(pointer, ctx);
+        if (pts == NULL) {
+            MDSet const* hashed = m_mds_hash->append(set);
+            setPointTo(pointer, ctx, hashed);
+            return;
+        }
 
-	//Set pointer points to MD set by appending a MD set.
-	inline void set_point_to_set_add_set(MD const* pointer, MD2MDS & ctx,
-										MD_SET const& set)
-	{
-		MD_SET const* pts = get_point_to(pointer, ctx);
-		if (pts == NULL) {
-			MD_SET const* hashed = m_mds_hash->append(set);
-			set_point_to(pointer, ctx, hashed);
-			return;
-		}
+        MDSet tmp;
+        tmp.copy(*pts, *m_misc_bs_mgr);
+        tmp.bunion(set, *m_misc_bs_mgr);
 
-		MD_SET * tmp = m_mds_mgr->create();
-		tmp->copy(*pts);
-		tmp->bunion(set);
+        MDSet const* hashed = m_mds_hash->append(tmp);
+        setPointTo(pointer, ctx, hashed);
+        tmp.clean(*m_misc_bs_mgr);
+    }
 
-		MD_SET const* hashed = m_mds_hash->append(*tmp);
-		set_point_to(pointer, ctx, hashed);
-		m_mds_mgr->free(tmp);
-	}
+    //Set 'md' points to whole memory.
+    void setPointToAllMem(MD const* md, OUT MD2MDSet & ctx)
+    { setPointToMDSetByAddMD(md, ctx, m_md_sys->get_md(MD_ALL_MEM)); }
 
-	//Set 'md' points to whole memory.
-	void set_pt_all_mem(MD const* md, OUT MD2MDS & ctx)
-	{ set_point_to_set_add_md(md, ctx, m_md_sys->get_md(MD_ALL_MEM)); }
+    //Set md points to whole global memory.
+    void setPointToGlobalMem(MD const* md, OUT MD2MDSet & ctx)
+    { setPointToMDSetByAddMD(md, ctx, m_md_sys->get_md(MD_GLOBAL_MEM)); }
 
-	//Set md points to whole global memory.
-	void set_pt_global_mem(MD const* md, OUT MD2MDS & ctx)
-	{ set_point_to_set_add_md(md, ctx, m_md_sys->get_md(MD_GLOBAL_MEM)); }
+    void set_flow_sensitive(bool is_sensitive)
+    { m_flow_sensitive = (BYTE)is_sensitive; }
 
-	void set_flow_sensitive(bool is_sensitive)
-	{ m_flow_sensitive = is_sensitive; }
+    //Function return the POINT-TO pair for each BB.
+    //Only used in flow-sensitive analysis.
+    MD2MDSet * mapBBtoMD2MDSet(IRBB const* bb) const
+    { return m_md2mds_vec.get(BB_id(bb)); }
 
-	void set_ssa_available(bool is_avail)
-	{ m_is_ssa_available = is_avail; }
+    //Function return the POINT-TO pair for each BB.
+    //Only used in flow-sensitive analysis.
+    inline MD2MDSet * allocMD2MDSetForBB(IRBB const* bb)
+    {
+        MD2MDSet * mx = m_md2mds_vec.get(BB_id(bb));
+        if (mx == NULL) {
+            mx = (MD2MDSet*)xmalloc(sizeof(MD2MDSet));
+            mx->init();
+            m_md2mds_vec.set(BB_id(bb), mx);
+        }
+        return mx;
+    }
 
-	//Function return the POINT-TO pair for each BB.
-	//Only used in flow-sensitive analysis.
-	MD2MDS * map_bb_to_md2mds(IR_BB const* bb) const
-	{ return m_md2mds_vec.get(IR_BB_id(bb)); }
-
-	//Function return the POINT-TO pair for each BB.
-	//Only used in flow-sensitive analysis.
-	inline MD2MDS * alloc_md2mds_for_bb(IR_BB const* bb)
-	{
-		MD2MDS * mx = m_md2mds_vec.get(IR_BB_id(bb));
-		if (mx == NULL) {
-			mx = (MD2MDS*)xmalloc(sizeof(MD2MDS));
-			mx->init();
-			m_md2mds_vec.set(IR_BB_id(bb), mx);
-		}
-		return mx;
-	}
-
-	void mark_may_alias(IN IR_BB * bb, IN MD2MDS * mx);
-	bool verify_ir(IR * ir);
-	bool verify();
-	bool perform(OPT_CTX & oc);
+    void markMayAlias(IN IRBB * bb, IN MD2MDSet * mx);
+    bool verifyIR(IR * ir);
+    bool verify();
+    bool perform(OptCTX & oc);
 };
+
+} //namespace xoc
 #endif

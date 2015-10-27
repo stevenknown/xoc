@@ -34,23 +34,21 @@ author: Su Zhenyu
 #include "cominc.h"
 #include "ipa.h"
 
+namespace xoc {
+
 //
 //START IPA
 //
-/*
-NOTE: IPA should only be performed in top level region,
-since it might incur the memory blow up.
-*/
-bool IPA::perform(OPT_CTX & oc)
+//NOTE: IPA should only be performed in top level region,
+//since it might incur the memory blow up.
+bool IPA::perform(OptCTX & oc)
 {
-	IS_TRUE0(OPTC_is_callg_valid(oc));
-	REGION * top = m_ru_mgr->get_top_region();
-	if (top == NULL) return false;
-	IS_TRUE0(RU_type(top) == RU_PROGRAM);
-	//start do cp_prop
-	//...
-	//
-	return true;
+    UNUSED(oc);
+    ASSERT0(OC_is_callg_valid(oc));
+    ASSERT0(m_program && m_program->is_program());
+
+    return true;
 }
 //END IPA
 
+} //namespace xoc

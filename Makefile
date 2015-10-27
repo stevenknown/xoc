@@ -2,8 +2,12 @@ COM_OBJS +=\
       com/ltype.o \
       com/comf.o \
       com/smempool.o \
+      com/agraph.o \
       com/sgraph.o \
       com/rational.o \
+      com/linsys.o \
+      com/xmat.o \
+      com/testbs.o \
       com/flty.o \
       com/bs.o
 
@@ -15,6 +19,7 @@ OPT_OBJS +=\
       opt/ir.o\
       opt/ir_bb.o\
       opt/ir_du.o\
+      opt/du.o\
       opt/ir_cfg.o\
       opt/ir_simp.o\
       opt/ir_gvn.o\
@@ -37,6 +42,7 @@ OPT_OBJS +=\
       opt/data_type.o \
       opt/option.o\
       opt/region.o\
+      opt/region_mgr.o\
       opt/util.o\
       opt/var.o\
       opt/md.o\
@@ -45,24 +51,26 @@ OPT_OBJS +=\
       opt/inliner.o\
       opt/ipa.o\
       opt/callg.o\
+      opt/loop.o\
+      opt/ir_loop_cvt.o\
       opt/prdf.o
 
-CFLAGS = -DFOR_DEX -D_DEBUG_ -D_LINUX_ -Wno-write-strings -Wsign-promo \
+CFLAGS = -DFOR_DEX -D_DEBUG_ -O0 -g2 -Wno-write-strings -Wsign-promo \
         -Wsign-compare -Wpointer-arith -Wno-multichar -Winit-self \
         -Wstrict-aliasing=3 -finline-limit=10000000 -Wswitch #-Wall
         #-Werror=overloaded-virtual \
 
-INC=-I opt -I com -I dex -I .
-%.o:%.cpp
-	@echo "build $<"
-	gcc $(CFLAGS) $(INC) -O2 -c -g2 $< -o $@
-
-com_objs: $(COM_OBJS)
-opt_objs: $(OPT_OBJS)
-
 all: com_objs opt_objs
 	ar rcs libxoc.a $(COM_OBJS) $(OPT_OBJS)
 	@echo "success!!"
+
+INC=-I opt -I com -I dex -I .
+%.o:%.cpp
+	@echo "build $<"
+	gcc $(CFLAGS) $(INC) -c $< -o $@
+
+com_objs: $(COM_OBJS)
+opt_objs: $(OPT_OBJS)
 
 clean:
 	@find -name "*.o" | xargs rm -f
@@ -75,4 +83,7 @@ clean:
 	@find -name "*.vcg" | xargs rm -f
 	@find -name "*.cxx" | xargs rm -f
 	@find -name "*.asm" | xargs rm -f
+	@find -name "*.swp" | xargs rm -f
+	@find -name "*.swo" | xargs rm -f
+	@find -name "*.LOGLOG" | xargs rm -f
 

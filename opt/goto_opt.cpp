@@ -33,8 +33,12 @@ author: Su Zhenyu
 @*/
 #include "cominc.h"
 
-bool IR_CFG::goto_opt(IR_BB * bb)
+namespace xoc {
+
+bool IR_CFG::goto_opt(IRBB * bb)
 {
-	return false;
+    UNUSED(bb);
+    return false;
 }
 
+} //namespace xoc

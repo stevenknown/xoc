@@ -33,76 +33,82 @@ author: Su Zhenyu
 @*/
 #include "cominc.h"
 
-DBG_MGR * g_dbg_mgr = NULL;
+namespace xoc {
 
-void set_lineno(IR * ir, UINT lineno, REGION * ru)
+DbxMgr * g_dbg_mgr = NULL;
+
+void set_lineno(IR * ir, UINT lineno, Region * ru)
 {
-	DBX_AI * da;
-	IS_TRUE0(ru);
-	if (IR_ai(ir) == NULL) {
-		IR_ai(ir) = ru->new_ai();
-		da = (DBX_AI*)smpool_malloc_h(sizeof(DBX_AI), ru->get_pool());
-		IS_TRUE0(da);
-		da->init();
-		IR_ai(ir)->set(IRAI_DBX, (AI_BASE*)da);
-	} else {
-		IR_ai(ir)->init();
-		da = (DBX_AI*)IR_ai(ir)->get(IRAI_DBX);
-		if (da == NULL) {
-			da = (DBX_AI*)smpool_malloc_h(sizeof(DBX_AI), ru->get_pool());
-			IS_TRUE0(da);
-			da->init();
-			IS_TRUE0(da);
-			IR_ai(ir)->set(IRAI_DBX, (AI_BASE*)da);
-		}
-	}
-	DBX_lineno(&da->dbx) = lineno;
+    DbxAttachInfo * da;
+    ASSERT0(ru);
+    if (IR_ai(ir) == NULL) {
+        IR_ai(ir) = ru->newAI();
+        da = (DbxAttachInfo*)smpoolMalloc(
+                        sizeof(DbxAttachInfo), ru->get_pool());
+        ASSERT0(da);
+        da->init();
+        IR_ai(ir)->set((BaseAttachInfo*)da);
+    } else {
+        IR_ai(ir)->init();
+        da = (DbxAttachInfo*)IR_ai(ir)->get(AI_DBX);
+        if (da == NULL) {
+            da = (DbxAttachInfo*)smpoolMalloc(
+                        sizeof(DbxAttachInfo), ru->get_pool());
+            ASSERT0(da);
+            da->init();
+            ASSERT0(da);
+            IR_ai(ir)->set((BaseAttachInfo*)da);
+        }
+    }
+    DBX_lineno(&da->dbx) = lineno;
 }
 
 
 //Line number of source code that corresponding to the IR.
 UINT get_lineno(IR const* ir)
 {
-	if (IR_ai(ir) == NULL || !IR_ai(ir)->is_init()) { return 0; }
-	DBX_AI * da = (DBX_AI*)IR_ai(ir)->get(IRAI_DBX);
-	if (da == NULL) { return 0; }
+    if (IR_ai(ir) == NULL || !IR_ai(ir)->is_init()) { return 0; }
+    DbxAttachInfo * da = (DbxAttachInfo*)IR_ai(ir)->get(AI_DBX);
+    if (da == NULL) { return 0; }
 
-	return DBX_lineno(&da->dbx);
+    return DBX_lineno(&da->dbx);
 }
 
 
 //Copy dbx from 'src' to 'tgt'.
-void copy_dbx(IR * tgt, IR const* src, REGION * ru)
+void copyDbx(IR * tgt, IR const* src, Region * ru)
 {
-	IS_TRUE0(ru);
-	if (IR_ai(src) == NULL) { return; }
+    ASSERT0(ru);
+    if (IR_ai(src) == NULL) { return; }
 
-	DBX_AI * src_da = (DBX_AI*)IR_ai(src)->get(IRAI_DBX);
-	if (IR_ai(tgt) == NULL) {
-		if (src_da == NULL) { return; }
-		IR_ai(tgt) = ru->new_ai();
-	}
-	IS_TRUE0(IR_ai(tgt));
-	if (src_da == NULL) {
-		IR_ai(tgt)->set(IRAI_DBX, NULL);
-		return;
-	}
+    DbxAttachInfo * src_da = (DbxAttachInfo*)IR_ai(src)->get(AI_DBX);
+    if (IR_ai(tgt) == NULL) {
+        if (src_da == NULL) { return; }
+        IR_ai(tgt) = ru->newAI();
+    }
+    ASSERT0(IR_ai(tgt));
+    if (src_da == NULL) {
+        IR_ai(tgt)->clean(AI_DBX);
+        return;
+    }
 
-	DBX_AI * tgt_da = (DBX_AI*)IR_ai(tgt)->get(IRAI_DBX);
-	if (tgt_da == NULL) {
-		tgt_da = (DBX_AI*)smpool_malloc_h(sizeof(DBX_AI), ru->get_pool());
-		IS_TRUE0(tgt_da);
-		tgt_da->init();
-		IR_ai(tgt)->set(IRAI_DBX, (AI_BASE*)tgt_da);
-	}
-	tgt_da->dbx.copy(src_da->dbx);
+    DbxAttachInfo * tgt_da = (DbxAttachInfo*)IR_ai(tgt)->get(AI_DBX);
+    if (tgt_da == NULL) {
+        tgt_da = (DbxAttachInfo*)smpoolMalloc(sizeof(DbxAttachInfo), ru->get_pool());
+        ASSERT0(tgt_da);
+        tgt_da->init();
+        IR_ai(tgt)->set((BaseAttachInfo*)tgt_da);
+    }
+    tgt_da->dbx.copy(src_da->dbx);
 }
 
 
-DBX * get_dbx(IR * ir)
+Dbx * get_dbx(IR const* ir)
 {
-	if (IR_ai(ir) == NULL) { return NULL; }
-	DBX_AI * da = (DBX_AI*)IR_ai(ir)->get(IRAI_DBX);
-	if (da == NULL) { return NULL; }
-	return &da->dbx;
+    if (IR_ai(ir) == NULL) { return NULL; }
+    DbxAttachInfo * da = (DbxAttachInfo*)IR_ai(ir)->get(AI_DBX);
+    if (da == NULL) { return NULL; }
+    return &da->dbx;
 }
+
+} //namespace xoc

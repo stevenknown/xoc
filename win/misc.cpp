@@ -39,9 +39,9 @@ static LARGE_INTEGER li = {0}, li2 = {0};
 
 void tstart()
 {
-	QueryPerformanceFrequency(&li);
-	__int64 freq = li.QuadPart;
-	QueryPerformanceCounter(&li);
+    QueryPerformanceFrequency(&li);
+    __int64 freq = li.QuadPart;
+    QueryPerformanceCounter(&li);
 }
 
 
@@ -91,14 +91,14 @@ char * format_elapsed(double d)
 //Return time, in ps, ns, ms, or h:min:sec.
 char * tend()
 {
-	clock_t start = clock();
-	/*Do something*/
-	clock_t end = clock();
-	float seconds = (float)(end - start) / CLOCKS_PER_SEC;
+    clock_t start = clock();
+    /*Do something*/
+    clock_t end = clock();
+    float seconds = (float)(end - start) / CLOCKS_PER_SEC;
 
-	long long freq = 4294967296;
-	QueryPerformanceCounter(&li2);
-	__int64 ticks = li2.QuadPart-li.QuadPart;
-	char * s = format_elapsed((double)ticks/(double)freq);
-	return s;
+    long long freq = 4294967296;
+    QueryPerformanceCounter(&li2);
+    __int64 ticks = li2.QuadPart-li.QuadPart;
+    char * s = format_elapsed((double)ticks/(double)freq);
+    return s;
 }

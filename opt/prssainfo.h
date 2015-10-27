@@ -34,95 +34,101 @@ author: Su Zhenyu
 #ifndef _PRSSAINFO_H_
 #define _PRSSAINFO_H_
 
-class IR_SET : public SBITSET {
+namespace xoc {
+
+class IRSet : public DefSBitSet {
 public:
-	IR_SET(SEG_MGR * sm) : SBITSET(sm) {}
+    IRSet(DefSegMgr * sm) : DefSBitSet(sm) {}
 
-	void append(IR const* v)
-	{ SBITSET::bunion(IR_id(v)); }
+    void append(IR const* v)
+    { DefSBitSet::bunion(IR_id(v)); }
 
-	bool find(IR const* v) const
-	{
-		IS_TRUE0(v);
-		return SBITSET::is_contain(IR_id(v));
-	}
+    bool find(IR const* v) const
+    {
+        ASSERT0(v);
+        return DefSBitSet::is_contain(IR_id(v));
+    }
 
-	void remove(IR const* v)
-	{
-		IS_TRUE0(v);
-		SBITSET::diff(IR_id(v));
-	}
+    void remove(IR const* v)
+    {
+        ASSERT0(v);
+        DefSBitSet::diff(IR_id(v));
+    }
 };
 
 
 //Verisoned Presentation.
 //For each version of each prno, VP is unique.
-typedef SC<SEG*> * SSAUSE_ITER;
+typedef SEGIter * SSAUseIter;
 
-#define SSA_id(ssainfo)			((ssainfo)->id)
-#define SSA_def(ssainfo)		((ssainfo)->def_stmt)
-#define SSA_uses(ssainfo)		((ssainfo)->use_exp_set)
-class SSAINFO {
+#define SSA_id(ssainfo)         ((ssainfo)->id)
+#define SSA_def(ssainfo)        ((ssainfo)->def_stmt)
+#define SSA_uses(ssainfo)       ((ssainfo)->use_exp_set)
+class SSAInfo {
 protected:
-	void clean_member()
-	{
-		id = 0;
-		def_stmt = NULL;
-	}
+    void cleanMember()
+    {
+        id = 0;
+        def_stmt = NULL;
+    }
 public:
-	UINT id;
-	IR * def_stmt;
-	IR_SET use_exp_set;
+    UINT id;
+    IR * def_stmt;
+    IRSet use_exp_set;
 
-	SSAINFO(SEG_MGR * sm) : use_exp_set(sm) { clean_member(); }
+public:
+    SSAInfo(DefSegMgr * sm) : use_exp_set(sm) { cleanMember(); }
 
-	inline void clean_du()
-	{
-		SSA_def(this) = NULL;
-		SSA_uses(this).clean();
-	}
+    inline void cleanDU()
+    {
+        SSA_def(this) = NULL;
+        SSA_uses(this).clean();
+    }
 
-	inline void init(SEG_MGR * sm)
-	{
-		clean_member();
-		use_exp_set.init(sm);
-	}
+    inline void init(DefSegMgr * sm)
+    {
+        cleanMember();
+        use_exp_set.init(sm);
+    }
 
-	void init_no_clean(SEG_MGR * sm) { use_exp_set.init(sm); }
+    void initNoClean(DefSegMgr * sm) { use_exp_set.init(sm); }
 
-	void destroy() { use_exp_set.destroy(); }
+    void destroy() { use_exp_set.destroy(); }
+
+    IR const* get_def() const { return def_stmt; }
+    IRSet const& get_uses() const { return use_exp_set; }
 };
 
 
 //Version PR.
-#define VP_prno(v)			((v)->prno)
-#define VP_ver(v)			((v)->version)
-class VP : public SSAINFO {
+#define VP_prno(v)           ((v)->prno)
+#define VP_ver(v)            ((v)->version)
+class VP : public SSAInfo {
 public:
-	UINT version;
-	UINT prno;
+    UINT version;
+    UINT prno;
 
-	VP(SEG_MGR * sm) : SSAINFO(sm) { clean_member(); }
+    VP(DefSegMgr * sm) : SSAInfo(sm) { cleanMember(); }
 
-	inline void clean_member()
-	{
-		SSAINFO::clean_member();
-		prno = 0;
-		version = 0;
-	}
+    inline void cleanMember()
+    {
+        SSAInfo::cleanMember();
+        prno = 0;
+        version = 0;
+    }
 
-	void init(SEG_MGR * sm)
-	{
-		clean_member();
-		SSAINFO::init(sm);
-	}
+    void init(DefSegMgr * sm)
+    {
+        cleanMember();
+        SSAInfo::init(sm);
+    }
 };
 
-
 //Mapping from PRNO to vector of VP.
-typedef SVECTOR<SVECTOR<VP*>*> UINT2VPVEC;
+typedef Vector<Vector<VP*>*> UINT2VPvec;
 
+//Mapping from PRNO to Stack of VP.
+typedef Vector<Stack<VP*>*> UINT2VPstack;
 
-//Mapping from PRNO to SSTACK of VP.
-typedef SVECTOR<SSTACK<VP*>*> UINT2VPSTACK;
+} //namespace xoc
 #endif

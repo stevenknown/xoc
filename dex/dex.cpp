@@ -34,22 +34,36 @@ author: Su Zhenyu
 #include "../opt/cominc.h"
 #include "dex.h"
 
-BLTIN_INFO g_builtin_info[] = {
-	{BLTIN_UNDEF, 				""					},
-	{BLTIN_INVOKE, 				"invoke"			},
-	{BLTIN_NEW,					"#new"				},
-	{BLTIN_NEW_ARRAY,           "#new_array"		},
-	{BLTIN_MOVE_EXP,            "#move_exception"	},
-	{BLTIN_MOVE_RES,            "#move_result"		},
-	{BLTIN_THROW,               "#throw"			},
-	{BLTIN_CHECK_CAST,          "#check_cast"		},
-	{BLTIN_FILLED_NEW_ARRAY,    "#filled_new_array"	},
-	{BLTIN_FILL_ARRAY_DATA,     "#fill_array_data"	},
-	{BLTIN_CONST_CLASS,         "#const_class"		},
-	{BLTIN_ARRAY_LENGTH,        "#array_length"		},
-	{BLTIN_MONITOR_ENTER,       "#monitor_enter"	},
-	{BLTIN_MONITOR_EXIT,        "#monitor_exit"		},
-	{BLTIN_INSTANCE_OF,         "#instance_of"		},
-	{BLTIN_CMP_BIAS,			"#cmp_bias"			},
+BuiltInInfo g_builtin_info[] = {
+    {BLTIN_UNDEF,               ""                  },
+    {BLTIN_NEW,                 "#new"              },
+    {BLTIN_NEW_ARRAY,           "#new_array"        },
+    {BLTIN_MOVE_EXP,            "#move_exception"   },
+    {BLTIN_MOVE_RES,            "#move_result"      },
+    {BLTIN_THROW,               "#throw"            },
+    {BLTIN_CHECK_CAST,          "#check_cast"       },
+    {BLTIN_FILLED_NEW_ARRAY,    "#filled_new_array" },
+    {BLTIN_FILL_ARRAY_DATA,     "#fill_array_data"  },
+    {BLTIN_CONST_CLASS,         "#const_class"      },
+    {BLTIN_ARRAY_LENGTH,        "#array_length"     },
+    {BLTIN_MONITOR_ENTER,       "#monitor_enter"    },
+    {BLTIN_MONITOR_EXIT,        "#monitor_exit"     },
+    {BLTIN_INSTANCE_OF,         "#instance_of"      },
+    {BLTIN_CMP_BIAS,            "#cmp_bias"         },
+    {BLTIN_LAST,                ""                  },
 };
 UINT g_builtin_num = sizeof(g_builtin_info) / sizeof(g_builtin_info[0]);
+
+
+//Perform Dex register allocation.
+bool g_do_dex_ra = false;
+
+//Set true to collect debug info.
+bool g_collect_debuginfo = false;
+bool g_dump_ir2dex = false;
+bool g_dump_dex2ir = false;
+bool g_dump_classdefs = false;
+bool g_dump_lirs = false;
+bool g_is_pretty_print_method_name = true;
+bool g_dump_dex_file_path = false;
+bool g_record_region_for_classs = false;

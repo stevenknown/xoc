@@ -32,99 +32,100 @@ IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 author: Su Zhenyu
 @*/
 #ifndef _IR_EXPR_TAB_
-#define	_IR_EXPR_TAB_
+#define    _IR_EXPR_TAB_
 
-class IR_EXPR {
+namespace xoc {
+
+#define EXPR_id(i)                  (i)->id
+#define EXPR_ir(i)                  (i)->ir
+#define EXPR_next(i)                (i)->next
+#define EXPR_prev(i)                (i)->prev
+#define EXPR_occ_list(i)            (i)->occ_list
+class ExpRep {
 public:
-	UINT id;
-	IR * registered_ir;
-	MD_SET * referred_mds;
-	IR_EXPR * next;
-	IR_EXPR * prev;
-	IR_LIST occ_list;
+    UINT id;
+    IR * ir;
+    ExpRep * next;
+    ExpRep * prev;
+    IRList occ_list;
 
-	IR_EXPR()
-	{
-		id = 0;
-		next = prev = NULL;
-		registered_ir = NULL;
-		referred_mds = NULL;
-	}
-
-	~IR_EXPR() {}
+    ExpRep()
+    {
+        id = 0;
+        next = prev = NULL;
+    }
+    COPY_CONSTRUCTOR(ExpRep);
+    ~ExpRep() {}
 };
-#define IR_EXPR_id(i)				(i)->id
-#define IR_EXPR_ir(i)				(i)->registered_ir
-#define IR_EXPR_referred_mds(i)		(i)->referred_mds
-#define IR_EXPR_next(i)				(i)->next
-#define IR_EXPR_prev(i)				(i)->prev
-#define IR_EXPR_occ_list(i)			(i)->occ_list
 
 
-/* IR Expression Table, scanning statement to
-evaluate the hash value of expression.
-Compute LIVE IN and LIVE OUT IR expressions for each BB. */
-#define IR_EXPR_TAB_LEVEL1_HASH_BUCKET	256
-#define IR_EXPR_TAB_LEVEL2_HASH_BUCKET	128
-class IR_EXPR_TAB : public IR_OPT {
-	UINT m_expr_count; //the encode-number expression.
-	REGION * m_ru;
-	DT_MGR * m_dm;
-	BVEC<IR_EXPR*> m_ir_expr_vec;
+//IR Expression Table, scanning statement to
+//evaluate the hash value of expression.
+//Compute LIVE IN and LIVE OUT IR expressions for each BB.
+#define IR_EXPR_TAB_LEVEL1_HASH_BUCKET    256
+#define IR_EXPR_TAB_LEVEL2_HASH_BUCKET    128
+class IR_EXPR_TAB : public Pass {
+    UINT m_expr_count; //the encode-number expression.
+    Region * m_ru;
+    TypeMgr * m_dm;
+    BSVec<ExpRep*> m_ir_expr_vec;
 
-	//Record allocated object. used by destructor.
-	SLIST<IR_EXPR*> m_ir_expr_lst;
+    //Record allocated object. used by destructor.
+    SList<ExpRep*> m_ir_expr_lst;
 
-	CIR_ITER m_iter; //for tmp use.
-	SMEM_POOL * m_pool;
-	SMEM_POOL * m_sc_pool;
-	IR_EXPR ** m_level1_hash_tab[IR_EXPR_TAB_LEVEL1_HASH_BUCKET];
-	SVECTOR<IR_EXPR*> m_map_ir2ir_expr;
-	MD_SET_MGR m_md_set_mgr; //alloca MS_SET.
-	BITSET_MGR m_bs_mgr;
+    ConstIRIter m_iter; //for tmp use.
+    SMemPool * m_pool;
+    SMemPool * m_sc_pool;
+    ExpRep ** m_level1_hash_tab[IR_EXPR_TAB_LEVEL1_HASH_BUCKET];
+    Vector<ExpRep*> m_map_ir2ir_expr;
+    MDSetMgr * m_md_set_mgr; //alloca MS_SET.
+    BitSetMgr * m_bs_mgr;
 
-	void * xmalloc(INT size);
-	inline UINT compute_hash_key(IR const* ir);
-	inline UINT compute_hash_key_for_tree(IR * ir);
-	inline IR_EXPR * encode_istore_memaddr(IN IR * ir, IN IR_BB * bb)
-	{
-		IS_TRUE0(IR_type(IR_parent(ir)) == IR_IST);
-		if (IR_type(ir) == IR_ARRAY) {
-			return NULL;
-		}
-		return encode_expr(ir, bb);
-	}
+    void * xmalloc(INT size);
+    inline UINT compute_hash_key(IR const* ir);
+    inline UINT compute_hash_key_for_tree(IR * ir);
+    inline ExpRep * encode_istore_memaddr(IN IR * ir)
+    {
+        ASSERT0(IR_parent(ir)->is_ist());
+        if (ir->is_array()) {
+            return NULL;
+        }
+        return encode_expr(ir);
+    }
 public:
-	IR_EXPR_TAB(REGION * ru);
-	~IR_EXPR_TAB();
+    explicit IR_EXPR_TAB(Region * ru);
+    COPY_CONSTRUCTOR(IR_EXPR_TAB);
+    ~IR_EXPR_TAB();
 
-	IR_EXPR * append_expr(IR * ir);
-	void clean_occ_list();
-	UINT count_mem();
+    ExpRep * append_expr(IR * ir);
+    void clean_occ_list();
+    UINT count_mem();
 
-	void dump_ir_expr_tab();
-	IR_EXPR * encode_expr(IN IR * ir, IN IR_BB * bb);
-	void encode_bb(IR_BB * bb);
+    void dump_ir_expr_tab();
+    ExpRep * encode_expr(IN IR * ir);
+    void encode_bb(IRBB * bb);
 
-	IR_EXPR * find_expr(IR * ir);
+    ExpRep * find_expr(IR * ir);
 
-	IR_EXPR * get_expr(UINT id) { return m_ir_expr_vec.get(id); }
-	BVEC<IR_EXPR*> * get_expr_vec() { return &m_ir_expr_vec; }
+    ExpRep * get_expr(UINT id) { return m_ir_expr_vec.get(id); }
+    BSVec<ExpRep*> * get_expr_vec() { return &m_ir_expr_vec; }
 
-	IR_EXPR * map_ir2ir_expr(IR const* ir);
-	IR_EXPR * new_ir_expr();
+    ExpRep * map_ir2ir_expr(IR const* ir);
+    ExpRep * new_ir_expr();
 
-	IR * remove_occ(IR * occ);
-	void remove_occs(IR * ir);
-	IR_EXPR * remove_expr(IR * ir);
-	void reperform(IN OUT OPT_CTX & oc);
+    IR * remove_occ(IR * occ);
+    void remove_occs(IR * ir);
+    ExpRep * remove_expr(IR * ir);
+    void reperform(IN OUT OptCTX & oc);
 
-	void set_map_ir2ir_expr(IR const* ir, IR_EXPR * ie);
+    void set_map_ir2ir_expr(IR const* ir, ExpRep * ie);
 
-	OPT_TYPE get_opt_type() const { return OPT_EXPR_TAB; }
+    PASS_TYPE get_pass_type() const { return PASS_EXPR_TAB; }
 
-	virtual CHAR const* get_opt_name() const { return "IR Expr Tabel"; }
+    virtual CHAR const* get_pass_name() const { return "IR Expr Tabel"; }
 
-	virtual bool perform(IN OUT OPT_CTX & oc);
+    virtual bool perform(IN OUT OptCTX & oc);
 };
+
+} //namespace xoc
 #endif

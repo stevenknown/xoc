@@ -34,6 +34,8 @@ author: Su Zhenyu
 #ifndef _IF_OPT_H_
 #define _IF_OPT_H_
 
+namespace xoc {
+
 /*
 1.  This moves certain 'if' nodes up in the code under
     some cirumstances that can allow the test for the if
@@ -57,56 +59,58 @@ author: Su Zhenyu
     eliminated in both parts.
 
 2.  Do simple optimizations on unstructured control flow
-	(branches and labels).  The optimizations are done
-	simultaneously in such a way that the result cannot
-	benefit from any more of these optimizations -- the
-	output run through this pass again will not change.
-	The following optimizations are performed:
-	  * Labels that are not the target of any possible
-		branch are removed.
-	  * Uses of labels that are followed by unconditional
-		jumps or other labels without any intervening
-		executable code are changed to uses of the last
-		label that must always be executed before some
-		executable code, and those labels are removed.
-	  * Unreachable code is removed.
-	  * Branches that would end up in the same place
-		before any code is executed as they would if they
-		were not taken are removed.
-	  * Conditional branches followed in the code by
-		unconditional branches without any intervening
-		executable code, followed without any intervening
-		executable code by the label that is the target of
-		the conditional branch, are changed to reverse the
-		condition, change its target to that of the
-		unconditional branch, and remove the conditional
-		branch.  That is,
+    (branches and labels).  The optimizations are done
+    simultaneously in such a way that the result cannot
+    benefit from any more of these optimizations -- the
+    output run through this pass again will not change.
+    The following optimizations are performed:
+      * Labels that are not the target of any possible
+        branch are removed.
+      * Uses of labels that are followed by unconditional
+        jumps or other labels without any intervening
+        executable code are changed to uses of the last
+        label that must always be executed before some
+        executable code, and those labels are removed.
+      * Unreachable code is removed.
+      * Branches that would end up in the same place
+        before any code is executed as they would if they
+        were not taken are removed.
+      * Conditional branches followed in the code by
+        unconditional branches without any intervening
+        executable code, followed without any intervening
+        executable code by the label that is the target of
+        the conditional branch, are changed to reverse the
+        condition, change its target to that of the
+        unconditional branch, and remove the conditional
+        branch.  That is,
 
-			if (cond){
-				t=1
-				goto L1;
-			}
-			f=1
-			goto L2;
-			L1:
+            if (cond){
+                t=1
+                goto L1;
+            }
+            f=1
+            goto L2;
+            L1:
 
-		is replaced by
+        is replaced by
 
-			if (!cond){
-				f=1
-				goto L2;
-			}
-			t=1
-			L1:
+            if (!cond){
+                f=1
+                goto L2;
+            }
+            t=1
+            L1:
 
-		'goto L1' is removed
-		(and L1 is removed if it is not a target of some
-		other instruction).
+        'goto L1' is removed
+        (and L1 is removed if it is not a target of some
+        other instruction).
 */
 typedef enum  {
-	NOT_SIMP_IF = 0,
-	SIMP_IF_THEN_TYPE,
-	SIMP_IF_ELSE_TYPE,
+    NOT_SIMP_IF = 0,
+    SIMP_IF_THEN_TYPE,
+    SIMP_IF_ELSE_TYPE,
 
 } IF_TYPE;
+
+} //namespace xoc
 #endif

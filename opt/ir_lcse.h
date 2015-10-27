@@ -34,55 +34,63 @@ author: Su Zhenyu
 #ifndef _IR_LCSE_H_
 #define _IR_LCSE_H_
 
-/*
-IR_LCSE
-Perform Local Common Subexpression Elimination.
-*/
-class IR_LCSE : public IR_OPT {
+namespace xoc {
+
+//IR_LCSE
+//Perform Local Common Subexpression Elimination.
+class IR_LCSE : public Pass {
 protected:
-	bool m_enable_filter; //filter determines which expression can be CSE.
-	REGION * m_ru;
-	DT_MGR * m_dm;
-	IR_EXPR_TAB * m_expr_tab;
-	IR_DU_MGR * m_du;
-	BVEC<IR_EXPR*> * m_expr_vec;
+    bool m_enable_filter; //filter determines which expression can be CSE.
+    Region * m_ru;
+    TypeMgr * m_dm;
+    IR_EXPR_TAB * m_expr_tab;
+    IR_DU_MGR * m_du;
+    BSVec<ExpRep*> * m_expr_vec;
+    DefMiscBitSetMgr * m_misc_bs_mgr;
 
-	IR * hoist_cse(IR_BB * bb,  IR * ir_pos, IR_EXPR * ie);
-	bool process_use(IN IR_BB * bb, IN IR * ir,
-					 IN OUT BITSET & avail_ir_expr,
-					 IN OUT SVECTOR<IR*> & map_expr2avail_pos,
-					 IN OUT SVECTOR<IR*> & map_expr2avail_pr);
-	bool process_def(IN IR_BB * bb, IN IR * ir,
-					 IN OUT BITSET & avail_ir_expr,
-					 IN OUT SVECTOR<IR*> & map_expr2avail_pos,
-					 IN OUT SVECTOR<IR*> & map_expr2avail_pr,
-					 IN MD_SET & tmp);
-	bool process_br(IN IR_BB * bb, IN IR * ir,
-					IN OUT BITSET & avail_ir_expr,
-					IN OUT SVECTOR<IR*> & map_expr2avail_pos,
-					IN OUT SVECTOR<IR*> & map_expr2avail_pr);
-	IR * process_exp(IN IR_BB * bb, IN IR_EXPR * ie,
-					 IN IR * stmt, IN OUT BITSET & avail_ir_expr,
-					 IN OUT SVECTOR<IR*> & map_expr2avail_pos,
-					 IN OUT SVECTOR<IR*> & map_expr2avail_pr);
-	bool process_param_list(IN IR_BB * bb, IN IR * ir,
-							IN OUT BITSET & avail_ir_expr,
-							IN OUT SVECTOR<IR*> & map_expr2avail_pos,
-							IN OUT SVECTOR<IR*> & map_expr2avail_pr);
-	bool process_st_rhs(IN IR_BB * bb, IN IR * ir,
-						IN OUT BITSET & avail_ir_expr,
-						IN OUT SVECTOR<IR*> & map_expr2avail_pos,
-						IN OUT SVECTOR<IR*> & map_expr2avail_pr);
+    IR * hoist_cse(IRBB * bb,  IR * ir_pos, ExpRep * ie);
+    bool processUse(IN IRBB * bb, IN IR * ir,
+                    IN OUT BitSet & avail_ir_expr,
+                    IN OUT Vector<IR*> & map_expr2avail_pos,
+                    IN OUT Vector<IR*> & map_expr2avail_pr);
+    bool processDef(IN IRBB * bb, IN IR * ir,
+                    IN OUT BitSet & avail_ir_expr,
+                    IN OUT Vector<IR*> & map_expr2avail_pos,
+                    IN OUT Vector<IR*> & map_expr2avail_pr,
+                    IN MDSet & tmp);
+    bool processBranch(
+                    IN IRBB * bb, IN IR * ir,
+                    IN OUT BitSet & avail_ir_expr,
+                    IN OUT Vector<IR*> & map_expr2avail_pos,
+                    IN OUT Vector<IR*> & map_expr2avail_pr);
+    IR * processExp(IN IRBB * bb, IN ExpRep * ie,
+                    IN IR * stmt, IN OUT BitSet & avail_ir_expr,
+                    IN OUT Vector<IR*> & map_expr2avail_pos,
+                    IN OUT Vector<IR*> & map_expr2avail_pr);
+    bool processParamList(
+                    IN IRBB * bb, IN IR * ir,
+                    IN OUT BitSet & avail_ir_expr,
+                    IN OUT Vector<IR*> & map_expr2avail_pos,
+                    IN OUT Vector<IR*> & map_expr2avail_pr);
+    bool processRhsOfStore(
+                    IN IRBB * bb, IN IR * ir,
+                    IN OUT BitSet & avail_ir_expr,
+                    IN OUT Vector<IR*> & map_expr2avail_pos,
+                    IN OUT Vector<IR*> & map_expr2avail_pr);
 public:
-	IR_LCSE(REGION * ru);
-	virtual ~IR_LCSE() {}
-	bool can_be_candidate(IR * ir);
-	virtual CHAR const* get_opt_name() const
-	{ return "Local Command Subscript Elimination"; }
+    explicit IR_LCSE(Region * ru);
+    COPY_CONSTRUCTOR(IR_LCSE);
+    virtual ~IR_LCSE() {}
 
-	OPT_TYPE get_opt_type() const { return OPT_LCSE; }
+    bool canBeCandidate(IR * ir);
+    virtual CHAR const* get_pass_name() const
+    { return "Local Command Subscript Elimination"; }
 
-	inline void set_enable_filter(bool is_enable) { m_enable_filter = is_enable; }
-	bool perform(OPT_CTX & oc);
+    PASS_TYPE get_pass_type() const { return PASS_LCSE; }
+
+    inline void set_enable_filter(bool is_enable) { m_enable_filter = is_enable; }
+    bool perform(OptCTX & oc);
 };
+
+} //namespace xoc
 #endif

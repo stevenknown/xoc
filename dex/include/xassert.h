@@ -37,13 +37,6 @@ author: GongKai, JinYue
     do {\
         *(UInt32*)(0x0)=0xdeaddaad;\
     } while (0)
-
-#define ASSERT(x) \
-    do {\
-  	   if(!(x)){\
-          abort();\
-       }\
-    } while (0)
 #endif
 
 #include "trace/ctrace.h"

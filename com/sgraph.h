@@ -34,172 +34,173 @@ author: Su Zhenyu
 #ifndef __GRAPH_H_
 #define __GRAPH_H_
 
+namespace xcom {
+
 #define MAGIC_METHOD
 
-class VERTEX;
-class EDGE;
-class GRAPH;
+class Vertex;
+class Edge;
+class Graph;
 
-#define EDGE_next(e)		(e)->next
-#define EDGE_prev(e)		(e)->prev
-#define EDGE_from(e)		(e)->from
-#define EDGE_to(e)			(e)->to
-#define EDGE_info(e)		(e)->info
-class EDGE {
+#define EDGE_next(e)        (e)->next
+#define EDGE_prev(e)        (e)->prev
+#define EDGE_from(e)        (e)->from
+#define EDGE_to(e)          (e)->to
+#define EDGE_info(e)        (e)->info
+class Edge {
 public:
-	EDGE()
-	{
-		prev = next = NULL;
-		from = to = NULL;
-		info = NULL;
-	}
-	EDGE * prev; //used by FREE_LIST and EDGE_HASH
-	EDGE * next; //used by FREE_LIST and EDGE_HASH
-	VERTEX * from;
-	VERTEX * to;
-	void * info;
+    Edge()
+    {
+        prev = next = NULL;
+        from = to = NULL;
+        info = NULL;
+    }
+    Edge * prev; //used by FreeList and EdgeHash
+    Edge * next; //used by FreeList and EdgeHash
+    Vertex * from;
+    Vertex * to;
+    void * info;
 };
 
 
 //The container of EDEG.
-#define EC_next(el)		(el)->next
-#define EC_prev(el)		(el)->prev
-#define EC_edge(el)		(el)->edge
-class EDGE_C {
+#define EC_next(el)        (el)->next
+#define EC_prev(el)        (el)->prev
+#define EC_edge(el)        (el)->edge
+class EdgeC {
 public:
-	EDGE_C()
-	{
-		next = prev = NULL;
-		edge = NULL;
-	}
-	EDGE_C * next;
-	EDGE_C * prev;
-	EDGE * edge;
+    EdgeC()
+    {
+        next = prev = NULL;
+        edge = NULL;
+    }
+    EdgeC * next;
+    EdgeC * prev;
+    Edge * edge;
 };
 
 
 
-#define VERTEX_next(v)			(v)->next
-#define VERTEX_prev(v)			(v)->prev
-#define VERTEX_id(v)			(v)->id
-#define VERTEX_rpo(v)			(v)->rpo
-#define VERTEX_in_list(v)		(v)->in_list
-#define VERTEX_out_list(v)		(v)->out_list
-#define VERTEX_info(v)			(v)->info
-class VERTEX {
+#define VERTEX_next(v)         (v)->next
+#define VERTEX_prev(v)         (v)->prev
+#define VERTEX_id(v)           (v)->id
+#define VERTEX_rpo(v)          (v)->rpo
+#define VERTEX_in_list(v)      (v)->in_list
+#define VERTEX_out_list(v)     (v)->out_list
+#define VERTEX_info(v)         (v)->info
+class Vertex {
 public:
-	VERTEX()
-	{
-		prev = next = NULL;
-		in_list = out_list = NULL;
-		info = NULL;
-		id = 0;
-	}
+    Vertex()
+    {
+        prev = next = NULL;
+        in_list = out_list = NULL;
+        info = NULL;
+        id = 0;
+    }
 
-	VERTEX * prev; //used by FREE_LIST and HASH
-	VERTEX * next; //used by FREE_LIST and HASH
-	EDGE_C * in_list; //incoming edge list
-	EDGE_C * out_list;//outgoing edge list
-	UINT id;
-	UINT rpo;
-	void * info;
+    Vertex * prev; //used by FreeList and HASH
+    Vertex * next; //used by FreeList and HASH
+    EdgeC * in_list; //incoming edge list
+    EdgeC * out_list;//outgoing edge list
+    UINT id;
+    UINT rpo;
+    void * info;
 };
 
 
 #define MAKE_VALUE(from, to) (((from)<<16)|(to))
-class EDGE_HF {
+class EdgeHashFunc {
 public:
-	UINT get_hash_value(EDGE * e, UINT bs) const
-	{
-		IS_TRUE0(is_power_of_2(bs));
-		return hash32bit(MAKE_VALUE(VERTEX_id(EDGE_from(e)),
-									VERTEX_id(EDGE_to(e)))) & (bs - 1);
-	}
+    UINT get_hash_value(Edge * e, UINT bs) const
+    {
+        ASSERT0(isPowerOf2(bs));
+        return hash32bit(MAKE_VALUE(VERTEX_id(EDGE_from(e)),
+                                    VERTEX_id(EDGE_to(e)))) & (bs - 1);
+    }
 
-	UINT get_hash_value(OBJTY val, UINT bs) const
-	{ return get_hash_value((EDGE*)val, bs); }
+    UINT get_hash_value(OBJTY val, UINT bs) const
+    { return get_hash_value((Edge*)val, bs); }
 
-	bool compare(EDGE * e1, EDGE * e2) const
-	{
-		return (VERTEX_id(EDGE_from(e1)) == VERTEX_id(EDGE_from(e2))) &&
-			   (VERTEX_id(EDGE_to(e1)) == VERTEX_id(EDGE_to(e2)));
-	}
+    bool compare(Edge * e1, Edge * e2) const
+    {
+        return (VERTEX_id(EDGE_from(e1)) == VERTEX_id(EDGE_from(e2))) &&
+               (VERTEX_id(EDGE_to(e1)) == VERTEX_id(EDGE_to(e2)));
+    }
 
-	bool compare(EDGE * t1, OBJTY val) const
-	{
-		EDGE * t2 = (EDGE*)val;
-		return VERTEX_id(EDGE_from(t1)) == VERTEX_id(EDGE_from(t2)) &&
-			   VERTEX_id(EDGE_to(t1)) == VERTEX_id(EDGE_to(t2));
-	}
+    bool compare(Edge * t1, OBJTY val) const
+    {
+        Edge * t2 = (Edge*)val;
+        return VERTEX_id(EDGE_from(t1)) == VERTEX_id(EDGE_from(t2)) &&
+               VERTEX_id(EDGE_to(t1)) == VERTEX_id(EDGE_to(t2));
+    }
 };
 
 
-class EDGE_HASH : public SHASH<EDGE*, EDGE_HF> {
-	GRAPH * m_g;
+class EdgeHash : public Hash<Edge*, EdgeHashFunc> {
+    Graph * m_g;
 public:
-	EDGE_HASH(UINT bsize = 64) : SHASH<EDGE*, EDGE_HF>(bsize) {}
-	virtual ~EDGE_HASH() {}
+    EdgeHash(UINT bsize = 64) : Hash<Edge*, EdgeHashFunc>(bsize) {}
+    virtual ~EdgeHash() {}
 
-	void init_g(GRAPH * g) { m_g = g; }
-	void init(GRAPH * g, UINT bsize)
-	{
-		m_g = g;
-		SHASH<EDGE*, EDGE_HF>::init(bsize);
-	}
+    void init(Graph * g, UINT bsize)
+    {
+        m_g = g;
+        Hash<Edge*, EdgeHashFunc>::init(bsize);
+    }
 
-	void destroy()
-	{
-		m_g = NULL;
-		SHASH<EDGE*, EDGE_HF>::destroy();
-	}
+    void destroy()
+    {
+        m_g = NULL;
+        Hash<Edge*, EdgeHashFunc>::destroy();
+    }
 
-	virtual EDGE * create(OBJTY v);
+    virtual Edge * create(OBJTY v);
 };
 
 
-class VERTEX_HF {
+class VertexHashFunc {
 public:
-	UINT get_hash_value(OBJTY val, UINT bs) const
-	{
-		IS_TRUE0(is_power_of_2(bs));
-		return hash32bit((UINT)(size_t)val) & (bs - 1);
-	}
+    UINT get_hash_value(OBJTY val, UINT bs) const
+    {
+        ASSERT0(isPowerOf2(bs));
+        return hash32bit((UINT)(size_t)val) & (bs - 1);
+    }
 
-	UINT get_hash_value(VERTEX const* vex, UINT bs) const
-	{
-		IS_TRUE0(is_power_of_2(bs));
-		return hash32bit(VERTEX_id(vex)) & (bs - 1);
-	}
+    UINT get_hash_value(Vertex const* vex, UINT bs) const
+    {
+        ASSERT0(isPowerOf2(bs));
+        return hash32bit(VERTEX_id(vex)) & (bs - 1);
+    }
 
-	bool compare(VERTEX * v1, VERTEX * v2) const
-	{ return (VERTEX_id(v1) == VERTEX_id(v2)); }
+    bool compare(Vertex * v1, Vertex * v2) const
+    { return (VERTEX_id(v1) == VERTEX_id(v2)); }
 
-	bool compare(VERTEX * v1, OBJTY val) const
-	{ return (VERTEX_id(v1) == (UINT)(size_t)val); }
+    bool compare(Vertex * v1, OBJTY val) const
+    { return (VERTEX_id(v1) == (UINT)(size_t)val); }
 };
 
 
-class VERTEX_HASH : public SHASH<VERTEX*, VERTEX_HF> {
+class VertexHash : public Hash<Vertex*, VertexHashFunc> {
 protected:
-	SMEM_POOL * m_ec_pool;
+    SMemPool * m_ec_pool;
 public:
-	VERTEX_HASH(UINT bsize = 64) : SHASH<VERTEX*, VERTEX_HF>(bsize)
-	{
-		m_ec_pool = smpool_create_handle(sizeof(VERTEX) * 4, MEM_CONST_SIZE);
-	}
+    VertexHash(UINT bsize = 64) : Hash<Vertex*, VertexHashFunc>(bsize)
+    {
+        m_ec_pool = smpoolCreate(sizeof(Vertex) * 4, MEM_CONST_SIZE);
+    }
 
-	virtual ~VERTEX_HASH()
-	{ smpool_free_handle(m_ec_pool); }
+    virtual ~VertexHash()
+    { smpoolDelete(m_ec_pool); }
 
-	virtual VERTEX * create(OBJTY v)
-	{
-		VERTEX * vex = (VERTEX*)smpool_malloc_h_const_size(sizeof(VERTEX),
-														   m_ec_pool);
-		IS_TRUE0(vex);
-		memset(vex, 0, sizeof(VERTEX));
-		VERTEX_id(vex) = (UINT)(size_t)v;
-		return vex;
-	}
+    virtual Vertex * create(OBJTY v)
+    {
+        Vertex * vex =
+            (Vertex*)smpoolMallocConstSize(sizeof(Vertex), m_ec_pool);
+        ASSERT0(vex);
+        memset(vex, 0, sizeof(Vertex));
+        VERTEX_id(vex) = (UINT)(size_t)v;
+        return vex;
+    }
 };
 
 
@@ -214,390 +215,414 @@ Sometimes an edge has a third component, known as either a weight or a cost.
 NOTICE: for accelerating perform operation of each vertex, e.g
 compute dominator, please try best to add vertex with
 topological order. */
-class GRAPH {
-	friend class EDGE_HASH;
-	friend class VERTEX_HASH;
+class Graph {
+    friend class EdgeHash;
+    friend class VertexHash;
 protected:
-	//it is true if the number of edges between any two
-	//vertices are not more than one.
-	BYTE m_is_unique:1;
-	BYTE m_is_direction:1; //true if graph is direction.
-	UINT m_edge_hash_size;
-	UINT m_vex_hash_size;
-	EDGE_HASH m_edges; //record all edges.
-	VERTEX_HASH m_vertices; //record all vertices.
-	FREE_LIST<EDGE> m_e_free_list; //record freed EDGE for reuse.
-	FREE_LIST<EDGE_C> m_el_free_list; //record freed EDGE_C for reuse.
-	FREE_LIST<VERTEX> m_v_free_list; //record freed VERTEX for reuse.
-	SMEM_POOL * m_vertex_pool;
-	SMEM_POOL * m_edge_pool;
-	SMEM_POOL * m_ec_pool;
+    //it is true if the number of edges between any two
+    //vertices are not more than one.
+    BYTE m_is_unique:1;
+    BYTE m_is_direction:1; //true if graph is direction.
+    UINT m_edge_hash_size;
+    UINT m_vex_hash_size;
+    EdgeHash m_edges; //record all edges.
+    VertexHash m_vertices; //record all vertices.
+    FreeList<Edge> m_e_free_list; //record freed Edge for reuse.
+    FreeList<EdgeC> m_el_free_list; //record freed EdgeC for reuse.
+    FreeList<Vertex> m_v_free_list; //record freed Vertex for reuse.
+    SMemPool * m_vertex_pool;
+    SMemPool * m_edge_pool;
+    SMemPool * m_ec_pool;
 
-	//record vertex if vertex id is densen distribution.
-	//map vertex id to vertex.
-	SVECTOR<VERTEX*> * m_dense_vertex;
+    //record vertex if vertex id is densen distribution.
+    //map vertex id to vertex.
+    Vector<Vertex*> * m_dense_vertex;
 
-	//Add 'e' into out-edges of 'vex'
-	inline void add_out_list(VERTEX * vex, EDGE * e)
-	{
-		IS_TRUE(m_ec_pool != NULL, ("not yet initialized."));
-		if (vex == NULL || e == NULL)return;
+protected:
+    //Add 'e' into out-edges of 'vex'
+    inline void addOutList(Vertex * vex, Edge * e)
+    {
+        ASSERT(m_ec_pool != NULL, ("not yet initialized."));
+        if (vex == NULL || e == NULL)return;
 
-		EDGE_C * el = VERTEX_out_list(vex);
-		while (el != NULL) {
-			if (EC_edge(el) == e) return;
-			el = EC_next(el);
-		}
-		el = new_ec(e);
-		add_next(&VERTEX_out_list(vex), el);
-	}
+        EdgeC * el = VERTEX_out_list(vex);
+        while (el != NULL) {
+            if (EC_edge(el) == e) return;
+            el = EC_next(el);
+        }
+        el = newEdgeC(e);
+        add_next(&VERTEX_out_list(vex), el);
+    }
 
-	//Add 'e' into in-edges of 'vex'
-	inline void add_in_list(VERTEX * vex, EDGE * e)
-	{
-		IS_TRUE(m_ec_pool != NULL, ("not yet initialized."));
-		if (vex == NULL || e == NULL) return;
+    //Add 'e' into in-edges of 'vex'
+    inline void addInList(Vertex * vex, Edge * e)
+    {
+        ASSERT(m_ec_pool != NULL, ("not yet initialized."));
+        if (vex == NULL || e == NULL) return;
 
-		EDGE_C * el = VERTEX_in_list(vex);
-		while (el != NULL) {
-			if (EC_edge(el) == e) return;
-			el = EC_next(el);
-		}
-		el = new_ec(e);
-		add_next(&VERTEX_in_list(vex), el);
-	}
+        EdgeC * el = VERTEX_in_list(vex);
+        while (el != NULL) {
+            if (EC_edge(el) == e) return;
+            el = EC_next(el);
+        }
+        el = newEdgeC(e);
+        add_next(&VERTEX_in_list(vex), el);
+    }
 
-	virtual void * clone_edge_info(EDGE * e)
-	{ IS_TRUE(0, ("should be overloaded")); return NULL; }
+    virtual void * cloneEdgeInfo(Edge*)
+    { ASSERT(0, ("should be overloaded")); return NULL; }
 
-	virtual void * clone_vertex_info(VERTEX * v)
-	{ IS_TRUE(0, ("should be overloaded")); return NULL; }
+    virtual void * cloneVertexInfo(Vertex*)
+    { ASSERT(0, ("should be overloaded")); return NULL; }
 
-	inline VERTEX * new_vertex()
-	{
-		VERTEX * vex = (VERTEX*)smpool_malloc_h_const_size(sizeof(VERTEX),
-													  m_vertex_pool);
-		IS_TRUE0(vex);
-		memset(vex, 0, sizeof(VERTEX));
-		return vex;
-	}
+    inline Vertex * newVertex()
+    {
+        Vertex * vex = (Vertex*)smpoolMallocConstSize(sizeof(Vertex),
+                                                      m_vertex_pool);
+        ASSERT0(vex);
+        memset(vex, 0, sizeof(Vertex));
+        return vex;
+    }
 
-	inline EDGE * new_edge(UINT from, UINT to)
-	{
-		IS_TRUE(m_ec_pool != NULL, ("not yet initialized."));
-		VERTEX * fp = add_vertex(from);
-		VERTEX * tp = add_vertex(to);
-		return new_edge(fp, tp);
-	}
-	EDGE * new_edge(VERTEX * from, VERTEX * to);
-	VERTEX * new_vertex(UINT vid);
+    inline Edge * newEdge(UINT from, UINT to)
+    {
+        ASSERT(m_ec_pool != NULL, ("not yet initialized."));
+        Vertex * fp = addVertex(from);
+        Vertex * tp = addVertex(to);
+        return newEdge(fp, tp);
+    }
+    Edge * newEdge(Vertex * from, Vertex * to);
+    Vertex * newVertex(UINT vid);
 
-	inline EDGE * new_edge_impl(VERTEX * from, VERTEX * to)
-	{
-		EDGE * e = m_e_free_list.get_free_elem();
-		if (e == NULL) {
-			e = (EDGE*)smpool_malloc_h_const_size(sizeof(EDGE), m_edge_pool);
-			memset(e, 0, sizeof(EDGE));
-		}
-		EDGE_from(e) = from;
-		EDGE_to(e) = to;
-		add_in_list(to, e);
-		add_out_list(from, e);
-		return e;
-	}
+    inline Edge * newEdgeImpl(Vertex * from, Vertex * to)
+    {
+        Edge * e = m_e_free_list.get_free_elem();
+        if (e == NULL) {
+            e = (Edge*)smpoolMallocConstSize(sizeof(Edge), m_edge_pool);
+            memset(e, 0, sizeof(Edge));
+        }
+        EDGE_from(e) = from;
+        EDGE_to(e) = to;
+        addInList(to, e);
+        addOutList(from, e);
+        return e;
+    }
 
-	inline EDGE_C * new_ec(EDGE * e)
-	{
-		IS_TRUE(m_ec_pool != NULL, ("not yet initialized."));
-		if (e == NULL) { return NULL; }
+    inline EdgeC * newEdgeC(Edge * e)
+    {
+        ASSERT(m_ec_pool != NULL, ("not yet initialized."));
+        if (e == NULL) { return NULL; }
 
-		EDGE_C * el = m_el_free_list.get_free_elem();
-		if (el == NULL) {
-			el = (EDGE_C*)smpool_malloc_h_const_size(sizeof(EDGE_C),
-													 m_ec_pool);
-			memset(el, 0, sizeof(EDGE_C));
-		}
-		EC_edge(el) = e;
-		return el;
-	}
+        EdgeC * el = m_el_free_list.get_free_elem();
+        if (el == NULL) {
+            el = (EdgeC*)smpoolMallocConstSize(sizeof(EdgeC), m_ec_pool);
+            memset(el, 0, sizeof(EdgeC));
+        }
+        EC_edge(el) = e;
+        return el;
+    }
 public:
-	GRAPH(UINT edge_hash_size = 64, UINT vex_hash_size = 64);
-	GRAPH(GRAPH & g);
-	virtual ~GRAPH() { destroy(); }
-	void init();
-	void destroy();
-	inline EDGE * add_edge(UINT from, UINT to)
-	{
-		IS_TRUE(m_ec_pool != NULL, ("not yet initialized."));
-		return new_edge(from, to);
-	}
-	inline EDGE * add_edge(VERTEX * from, VERTEX * to)
-	{
-		IS_TRUE(m_ec_pool != NULL, ("not yet initialized."));
-		return new_edge(from, to);
-	}
-	inline VERTEX * add_vertex(UINT vid)
-	{
-		IS_TRUE(m_ec_pool != NULL, ("not yet initialized."));
-		return m_vertices.append(new_vertex(vid));
-	}
+    Graph(UINT edge_hash_size = 64, UINT vex_hash_size = 64);
+    Graph(Graph const& g);
+    Graph const& operator = (Graph const&);
 
-	void compute_rpo_norec(IN OUT VERTEX * root, OUT LIST<VERTEX const*> & vlst);
-	bool clone(GRAPH & src);
-	UINT count_mem() const;
+    virtual ~Graph() { destroy(); }
+    void init();
+    void destroy();
+    inline Edge * addEdge(UINT from, UINT to)
+    {
+        ASSERT(m_ec_pool != NULL, ("not yet initialized."));
+        return newEdge(from, to);
+    }
+    inline Edge * addEdge(Vertex * from, Vertex * to)
+    {
+        ASSERT(m_ec_pool != NULL, ("not yet initialized."));
+        return newEdge(from, to);
+    }
+    inline Vertex * addVertex(UINT vid)
+    {
+        ASSERT(m_ec_pool != NULL, ("not yet initialized."));
+        return m_vertices.append(newVertex(vid));
+    }
 
-	void dump_dot(CHAR const* name = NULL);
-	void dump_vcg(CHAR const* name = NULL);
+    void computeRpoNoRecursive(IN OUT Vertex * root,
+                               OUT List<Vertex const*> & vlst);
+    bool clone(Graph const& src);
+    UINT count_mem() const;
 
-	bool is_succ(VERTEX * v, VERTEX * succ);
-	bool is_pred(VERTEX * v, VERTEX * pred);
-	bool is_equal(GRAPH & g);
-	bool is_unique() const { return m_is_unique; }
-	bool is_direction() const { return m_is_direction; }
+    void dump_dot(CHAR const* name = NULL);
+    void dump_vcg(CHAR const* name = NULL);
 
-	//Is there exist a path connect 'from' and 'to'.
-	inline bool is_reachable(UINT from, UINT to)
-	{
-		IS_TRUE(m_ec_pool != NULL, ("not yet initialized."));
-		return is_reachable(get_vertex(from), get_vertex(to));
-	}
-	bool is_reachable(VERTEX * from, VERTEX * to);
-	void insert_vertex_between(IN VERTEX * v1, IN VERTEX * v2,
-							   IN VERTEX * newv, OUT EDGE ** e1 = NULL,
-							   OUT EDGE ** e2 = NULL);
-	void insert_vertex_between(UINT v1, UINT v2, UINT newv,
-							   OUT EDGE ** e1 = NULL, OUT EDGE ** e2 = NULL);
-	bool is_graph_entry(VERTEX const* v) const
-	{ return VERTEX_in_list(v) == NULL;	}
+    //Return true if 'succ' is successor of 'v'.
+    bool is_succ(Vertex * v, Vertex * succ) const
+    {
+        EdgeC * e = VERTEX_out_list(v);
+        while (e != NULL) {
+            if (EDGE_to(EC_edge(e)) == succ) {
+                return true;
+            }
+            e = EC_next(e);
+        }
+        return false;
+    }
 
-	//Return true if vertex is exit node of graph.
-	bool is_graph_exit(VERTEX const* v) const
-	{ return VERTEX_out_list(v) == NULL; }
+    //Return true if 'pred' is predecessor of 'v'.
+    bool is_pred(Vertex * v, Vertex * pred) const
+    {
+        EdgeC * e = VERTEX_in_list(v);
+        while (e != NULL) {
+            if (EDGE_from(EC_edge(e)) == pred) {
+                return true;
+            }
+            e = EC_next(e);
+        }
+        return false;
+    }
 
-	void erase();
+    bool is_equal(Graph & g) const;
+    bool is_unique() const { return m_is_unique; }
+    bool is_direction() const { return m_is_direction; }
 
-	bool get_neighbor_list(IN OUT LIST<UINT> & ni_list, UINT vid) const;
-	bool get_neighbor_set(OUT SBITSET & niset, UINT vid) const;
-	inline UINT get_degree(UINT vid)
-	{
-		IS_TRUE(m_ec_pool != NULL, ("not yet initialized."));
-		return get_degree(get_vertex(vid));
-	}
-	UINT get_degree(VERTEX const* vex) const;
-	UINT get_in_degree(VERTEX const* vex) const;
-	UINT get_out_degree(VERTEX const* vex) const;
-	inline UINT get_vertex_num()
-	{
-		IS_TRUE(m_ec_pool != NULL, ("not yet initialized."));
-		return m_vertices.get_elem_count();
-	}
-	inline UINT get_edge_num()
-	{
-		IS_TRUE(m_ec_pool != NULL, ("not yet initialized."));
-		return m_edges.get_elem_count();
-	}
-	inline VERTEX * get_vertex(UINT vid)
-	{
-		IS_TRUE(m_ec_pool != NULL, ("not yet initialized."));
-		if (m_dense_vertex != NULL) {
-			return m_dense_vertex->get(vid);
-		}
-		return (VERTEX*)m_vertices.find((OBJTY)(size_t)vid);
-	}
-	EDGE * get_edge(UINT from, UINT to);
-	EDGE * get_edge(VERTEX const* from, VERTEX const* to);
-	inline EDGE * get_first_edge(INT & cur)
-	{
-		IS_TRUE(m_ec_pool != NULL, ("not yet initialized."));
-		return m_edges.get_first(cur);
-	}
-	inline EDGE * get_next_edge(INT & cur)
-	{
-		IS_TRUE(m_ec_pool != NULL, ("not yet initialized."));
-		return m_edges.get_next(cur);
-	}
-	inline VERTEX * get_first_vertex(INT & cur)
-	{
-		IS_TRUE(m_ec_pool != NULL, ("not yet initialized."));
-		return m_vertices.get_first(cur);
-	}
-	inline VERTEX * get_next_vertex(INT & cur)
-	{
-		IS_TRUE(m_ec_pool != NULL, ("not yet initialized."));
-		return m_vertices.get_next(cur);
-	}
+    //Is there exist a path connect 'from' and 'to'.
+    inline bool is_reachable(UINT from, UINT to) const
+    {
+        ASSERT(m_ec_pool != NULL, ("not yet initialized."));
+        return is_reachable(get_vertex(from), get_vertex(to));
+    }
+    bool is_reachable(Vertex * from, Vertex * to) const;
+    void insertVertexBetween(
+            IN Vertex * v1, IN Vertex * v2,
+            IN Vertex * newv, OUT Edge ** e1 = NULL,
+            OUT Edge ** e2 = NULL);
+    void insertVertexBetween(
+            UINT v1, UINT v2, UINT newv,
+            OUT Edge ** e1 = NULL, OUT Edge ** e2 = NULL);
+    bool is_graph_entry(Vertex const* v) const
+    { return VERTEX_in_list(v) == NULL;    }
 
-	void resize(UINT vertex_hash_sz, UINT edge_hash_sz);
-	EDGE * rev_edge(EDGE * e); //Reverse edge direction.(e.g: a->b => b->a)
-	void rev_edges(); //Reverse all edges.
-	EDGE * remove_edge(EDGE * e);
-	void remove_edges_between(VERTEX * v1, VERTEX * v2);
-	VERTEX * remove_vertex(VERTEX * vex);
-	inline VERTEX * remove_vertex(UINT vid)
-	{
-		IS_TRUE(m_ec_pool != NULL, ("not yet initialized."));
-		return remove_vertex(get_vertex(vid));
-	}
-	void remove_transitive_edge();
+    //Return true if vertex is exit node of graph.
+    bool is_graph_exit(Vertex const* v) const
+    { return VERTEX_out_list(v) == NULL; }
 
-	bool sort_in_toplog_order(OUT SVECTOR<UINT> & vex_vec, bool is_topdown);
-	void set_unique(bool is_unique)
-	{
-		IS_TRUE(m_ec_pool != NULL, ("not yet initialized."));
-		m_is_unique = is_unique;
-	}
-	void set_direction(bool has_direction)
-	{
-		IS_TRUE(m_ec_pool != NULL, ("not yet initialized."));
-		m_is_direction = has_direction;
-	}
-	void set_dense(bool is_dense)
-	{
-		if (is_dense) {
-			if (m_dense_vertex == NULL) {
-				m_dense_vertex = new SVECTOR<VERTEX*>();
-			}
-			return;
-		}
-		if (m_dense_vertex == NULL) {
-			delete m_dense_vertex;
-			m_dense_vertex = NULL;
-		}
-	}
-};
+    void erase();
 
+    bool get_neighbor_list(IN OUT List<UINT> & ni_list, UINT vid) const;
+    bool get_neighbor_set(OUT DefSBitSet & niset, UINT vid) const;
+    inline UINT get_degree(UINT vid) const
+    {
+        ASSERT(m_ec_pool != NULL, ("not yet initialized."));
+        return get_degree(get_vertex(vid));
+    }
+    UINT get_degree(Vertex const* vex) const;
+    UINT get_in_degree(Vertex const* vex) const;
+    UINT get_out_degree(Vertex const* vex) const;
+    inline UINT get_vertex_num() const
+    {
+        ASSERT(m_ec_pool != NULL, ("not yet initialized."));
+        return m_vertices.get_elem_count();
+    }
+    inline UINT get_edge_num() const
+    {
+        ASSERT(m_ec_pool != NULL, ("not yet initialized."));
+        return m_edges.get_elem_count();
+    }
+    inline Vertex * get_vertex(UINT vid) const
+    {
+        ASSERT(m_ec_pool != NULL, ("not yet initialized."));
+        if (m_dense_vertex != NULL) {
+            return m_dense_vertex->get(vid);
+        }
+        return (Vertex*)m_vertices.find((OBJTY)(size_t)vid);
+    }
+    Edge * get_edge(UINT from, UINT to) const;
+    Edge * get_edge(Vertex const* from, Vertex const* to) const;
+    inline Edge * get_first_edge(INT & cur) const
+    {
+        ASSERT(m_ec_pool != NULL, ("not yet initialized."));
+        return m_edges.get_first(cur);
+    }
+    inline Edge * get_next_edge(INT & cur) const
+    {
+        ASSERT(m_ec_pool != NULL, ("not yet initialized."));
+        return m_edges.get_next(cur);
+    }
+    inline Vertex * get_first_vertex(INT & cur) const
+    {
+        ASSERT(m_ec_pool != NULL, ("not yet initialized."));
+        return m_vertices.get_first(cur);
+    }
+    inline Vertex * get_next_vertex(INT & cur) const
+    {
+        ASSERT(m_ec_pool != NULL, ("not yet initialized."));
+        return m_vertices.get_next(cur);
+    }
 
-class ITER_DOM_TREE {
-public:
-	BITSET is_visited;
-	SSTACK<VERTEX*> stk;
-	UINT is_preorder:1;
-	UINT is_postorder:1;
+    void resize(UINT vertex_hash_sz, UINT edge_hash_sz);
+    Edge * reverseEdge(Edge * e); //Reverse edge direction.(e.g: a->b => b->a)
+    void reverseEdges(); //Reverse all edges.
+    Edge * removeEdge(Edge * e);
+    void removeEdgeBetween(Vertex * v1, Vertex * v2);
+    Vertex * removeVertex(Vertex * vex);
+    inline Vertex * removeVertex(UINT vid)
+    {
+        ASSERT(m_ec_pool != NULL, ("not yet initialized."));
+        return removeVertex(get_vertex(vid));
+    }
+    void removeTransitiveEdge();
 
-	ITER_DOM_TREE()
-	{
-		is_preorder = 0;
-		is_postorder = 0;
-	}
-	void clean() { is_visited.clean(); stk.clean(); }
-	void set_preorder() { is_preorder = 1; }
-	void set_postorder() { is_postorder = 1; }
+    bool sortInToplogOrder(OUT Vector<UINT> & vex_vec, bool is_topdown);
+    void set_unique(bool is_unique)
+    {
+        ASSERT(m_ec_pool != NULL, ("not yet initialized."));
+        m_is_unique = (BYTE)is_unique;
+    }
+    void set_direction(bool has_direction)
+    {
+        ASSERT(m_ec_pool != NULL, ("not yet initialized."));
+        m_is_direction = (BYTE)has_direction;
+    }
+    void set_dense(bool is_dense)
+    {
+        if (is_dense) {
+            if (m_dense_vertex == NULL) {
+                m_dense_vertex = new Vector<Vertex*>();
+            }
+            return;
+        }
+        if (m_dense_vertex == NULL) {
+            delete m_dense_vertex;
+            m_dense_vertex = NULL;
+        }
+    }
 };
 
 
 //This class indicate a Dominator Tree.
-class DOM_TREE : public GRAPH {
+class DomTree : public Graph {
 public:
-	DOM_TREE()
-	{ set_dense(true); }
+    DomTree()
+    { set_dense(true); }
 };
 
 
 //
-//GRAPH with Dominator info.
+//Graph with Dominator info.
 //
-class DGRAPH : public GRAPH {
+class DGraph : public Graph {
 protected:
-	SVECTOR<BITSET*> m_dom_set; //record dominator-set of each vertex.
-	SVECTOR<BITSET*> m_pdom_set; //record post-dominator-set of each vertex.
-	SVECTOR<INT> m_idom_set; //immediate dominator.
-	SVECTOR<INT> m_ipdom_set; //immediate post dominator.
-	BITSET_MGR * m_bs_mgr;
-	void _remove_unreach_node(UINT id, BITSET & visited);
+    Vector<BitSet*> m_dom_set; //record dominator-set of each vertex.
+    Vector<BitSet*> m_pdom_set; //record post-dominator-set of each vertex.
+    Vector<INT> m_idom_set; //immediate dominator.
+    Vector<INT> m_ipdom_set; //immediate post dominator.
+    BitSetMgr * m_bs_mgr;
+    void _removeUnreachNode(UINT id, BitSet & visited);
 public:
-	DGRAPH(UINT edge_hash_size = 64, UINT vex_hash_size = 64);
-	DGRAPH(DGRAPH & g);
+    DGraph(UINT edge_hash_size = 64, UINT vex_hash_size = 64);
+    DGraph(DGraph const& g);
+    DGraph const& operator = (DGraph const&);
 
-	inline bool clone(DGRAPH & g)
-	{
-		m_bs_mgr = g.m_bs_mgr;
-		return GRAPH::clone(g);
-	}
-	bool clone_bs(DGRAPH & src);
-	bool compute_dom3(LIST<VERTEX const*> const* vlst, BITSET const* uni);
-	bool compute_dom2(LIST<VERTEX const*> const& vlst);
-	bool compute_dom(LIST<VERTEX const*> const* vlst = NULL,
-					 BITSET const* uni = NULL);
-	bool compute_pdom_by_rpo(VERTEX * root, BITSET const* uni);
-	bool compute_pdom(LIST<VERTEX const*> const* vlst);
-	bool compute_pdom(LIST<VERTEX const*> const* vlst, BITSET const* uni);
-	bool compute_idom();
-	bool compute_idom2(LIST<VERTEX const*> const& vlst);
-	bool compute_ipdom();
-	UINT count_mem() const;
+    inline bool clone(DGraph const& g)
+    {
+        m_bs_mgr = g.m_bs_mgr;
+        return Graph::clone(g);
+    }
+    bool cloneDomAndPdom(DGraph const& src);
+    bool computeDom3(List<Vertex const*> const* vlst, BitSet const* uni);
+    bool computeDom2(List<Vertex const*> const& vlst);
+    bool computeDom(List<Vertex const*> const* vlst = NULL,
+                    BitSet const* uni = NULL);
+    bool computePdomByRpo(Vertex * root, BitSet const* uni);
+    bool computePdom(List<Vertex const*> const* vlst);
+    bool computePdom(List<Vertex const*> const* vlst, BitSet const* uni);
+    bool computeIdom();
+    bool computeIdom2(List<Vertex const*> const& vlst);
+    bool computeIpdom();
+    UINT count_mem() const;
 
-	void dump_dom(FILE * h, bool dump_dom_tree = true);
+    void dump_dom(FILE * h, bool dump_dom_tree = true);
 
-	//idom must be positive
-	//NOTE: Entry does not have idom.
-	//'id': vertex id.
-	inline UINT get_idom(UINT id) { return m_idom_set.get(id); }
+    //idom must be positive
+    //NOTE: Entry does not have idom.
+    //'id': vertex id.
+    inline UINT get_idom(UINT id) { return (UINT)m_idom_set.get(id); }
 
-	//ipdom must be positive
-	//NOTE: Exit does not have idom.
-	//'id': vertex id.
-	inline UINT get_ipdom(UINT id) { return m_ipdom_set.get(id); }
+    //ipdom must be positive
+    //NOTE: Exit does not have idom.
+    //'id': vertex id.
+    inline UINT get_ipdom(UINT id) { return (UINT)m_ipdom_set.get(id); }
 
-	void get_dom_tree(OUT GRAPH & dom);
-	void get_pdom_tree(OUT GRAPH & pdom);
+    void get_dom_tree(OUT Graph & dom);
+    void get_pdom_tree(OUT Graph & pdom);
 
-	//Get vertices who dominate vertex 'id'.
-	//NOTE: set does NOT include 'v' itself.
-	inline BITSET * get_dom_set(UINT id)
-	{
-		IS_TRUE0(m_bs_mgr != NULL);
-		BITSET * set = m_dom_set.get(id);
-		if (set == NULL) {
-			set = m_bs_mgr->create();
-			m_dom_set.set(id, set);
-		}
-		return set;
-	}
+    BitSet * get_dom_set_c(UINT id) const { return m_dom_set.get(id); }
 
-	//Get vertices who dominate vertex 'v'.
-	//NOTE: set does NOT include 'v' itself.
-	BITSET * get_dom_set(VERTEX const* v)
-	{
-		IS_TRUE0(v != NULL);
-		return get_dom_set(VERTEX_id(v));
-	}
+    //Get vertices who dominate vertex 'id'.
+    //NOTE: set does NOT include 'v' itself.
+    inline BitSet * get_dom_set(UINT id)
+    {
+        ASSERT0(m_bs_mgr != NULL);
+        BitSet * set = m_dom_set.get(id);
+        if (set == NULL) {
+            set = m_bs_mgr->create();
+            m_dom_set.set(id, set);
+        }
+        return set;
+    }
 
-	//Get vertices who post dominated by vertex 'id'.
-	//NOTE: set does NOT include 'v' itself.
-	inline BITSET * get_pdom_set(UINT id)
-	{
-		IS_TRUE0(m_bs_mgr != NULL);
-		BITSET * set = m_pdom_set.get(id);
-		if (set == NULL) {
-			set = m_bs_mgr->create();
-			m_pdom_set.set(id, set);
-		}
-		return set;
-	}
+    //Get vertices who dominate vertex 'v'.
+    //NOTE: set does NOT include 'v' itself.
+    BitSet * get_dom_set(Vertex const* v)
+    {
+        ASSERT0(v != NULL);
+        return get_dom_set(VERTEX_id(v));
+    }
 
-	//Get vertices who post dominated by vertex 'v'.
-	//NOTE: set does NOT include 'v' itself.
-	BITSET * get_pdom_set(VERTEX const* v)
-	{
-		IS_TRUE0(v != NULL);
-		return get_pdom_set(VERTEX_id(v));
-	}
+    BitSet * get_pdom_set_c(UINT id) const { return m_pdom_set.get(id); }
 
-	//Return true if 'v1' dominate 'v2'.
-	bool is_dom(UINT v1, UINT v2)
-	{ return get_dom_set(v2)->is_contain(v1); }
+    //Get vertices who post dominated by vertex 'id'.
+    //NOTE: set does NOT include 'v' itself.
+    inline BitSet * get_pdom_set(UINT id)
+    {
+        ASSERT0(m_bs_mgr != NULL);
+        BitSet * set = m_pdom_set.get(id);
+        if (set == NULL) {
+            set = m_bs_mgr->create();
+            m_pdom_set.set(id, set);
+        }
+        return set;
+    }
 
-	//Return true if 'v1' post dominate 'v2'.
-	bool is_pdom(UINT v1, UINT v2)
-	{ return get_pdom_set(v2)->is_contain(v1); }
+    //Get vertices who post dominated by vertex 'v'.
+    //NOTE: set does NOT include 'v' itself.
+    BitSet * get_pdom_set(Vertex const* v)
+    {
+        ASSERT0(v != NULL);
+        return get_pdom_set(VERTEX_id(v));
+    }
 
-	void sort_in_bfs_order(SVECTOR<UINT> & order_buf, VERTEX * root,
-						   BITSET & visit);
-	void sort_dom_tree_in_preorder(IN GRAPH & dom_tree, IN VERTEX * root,
-								   OUT LIST<VERTEX*> & lst);
-	void sort_dom_tree_in_postorder(IN GRAPH & dom_tree, IN VERTEX * root,
-									OUT LIST<VERTEX*> & lst);
-	void set_bs_mgr(BITSET_MGR * bs_mgr) { m_bs_mgr = bs_mgr; }
-	bool remove_unreach_node(UINT entry_id);
+    //Return true if 'v1' dominate 'v2'.
+    bool is_dom(UINT v1, UINT v2) const
+    {
+        ASSERT0(get_dom_set_c(v2));
+        return get_dom_set_c(v2)->is_contain(v1);
+    }
+
+    //Return true if 'v1' post dominate 'v2'.
+    bool is_pdom(UINT v1, UINT v2) const
+    {
+        ASSERT0(get_pdom_set_c(v2));
+        return get_pdom_set_c(v2)->is_contain(v1);
+    }
+
+    void sortInBfsOrder(Vector<UINT> & order_buf, Vertex * root,
+                           BitSet & visit);
+    void sortDomTreeInPreorder(IN Vertex * root,
+                                   OUT List<Vertex*> & lst);
+    void sortDomTreeInPostrder(IN Vertex * root,
+                                    OUT List<Vertex*> & lst);
+    void set_bs_mgr(BitSetMgr * bs_mgr) { m_bs_mgr = bs_mgr; }
+    bool removeUnreachNode(UINT entry_id);
 };
+
+} //namespace xcom
 #endif

@@ -36,87 +36,103 @@ author: Su Zhenyu
 #ifndef _IR_GCSE_H_
 #define _IR_GCSE_H_
 
-class TG : public DGRAPH {
-	REGION * m_ru;
-	virtual void * clone_edge_info(EDGE * e)
-	{ return NULL; }
-	virtual void * clone_vertex_info(VERTEX * v)
-	{ return NULL; }
-public:
-	TG(REGION * ru) { m_ru = ru; }
-	void pick_eh()
-	{
-		LIST<IR_BB*> * bbs = m_ru->get_bb_list();
-		for (IR_BB * bb = bbs->get_head(); bb != NULL; bb = bbs->get_next()) {
-			if (bb->is_exp_handling()) {
-				remove_vertex(IR_BB_id(bb));
-			}
-		}
-	}
+namespace xoc {
 
-	inline void compute_dom_idom()
-	{
-		if (!compute_dom()) { IS_TRUE0(0); }
-		if (!compute_idom()) { IS_TRUE0(0); }
-	}
-
-	inline void compute_pdom_ipdom(VERTEX * root)
-	{
-		if (!compute_pdom_by_rpo(root, NULL)) { IS_TRUE0(0); }
-		if (!compute_ipdom()) { IS_TRUE0(0); }
-	}
-};
-
-
-class IR_GCSE : public IR_OPT {
+class TG : public DGraph {
 protected:
-	bool m_enable_filter; //filter determines which expression can be CSE.
-	REGION * m_ru;
-	IR_CFG * m_cfg;
-	IR_DU_MGR * m_du;
-	IR_AA * m_aa;
-	IR_EXPR_TAB * m_expr_tab;
-	DT_MGR * m_dm;
-	IR_GVN * m_gvn;
-	TG * m_tg;
-	TMAP<IR*, IR*> m_exp2pr;
-	TMAP<VN const*, IR*> m_vn2exp;
-	LIST<IR*> m_newst_lst;
+    Region * m_ru;
 
-	bool do_prop(IR_BB * bb, LIST<IR*> & livexp);
-	bool do_prop_vn(IR_BB * bb, UINT entry_id, MD_SET & tmp);
-	bool elim(IR * use, IR * use_stmt, IR * gen, IR * gen_stmt);
-	bool find_and_elim(IR * exp, VN const* vn, IR * gen);
-	void handle_cand(IR * exp, IR_BB * bb, UINT entry_id, bool & change);
-	bool is_cse_cand(IR * ir);
-	void elim_cse_at_store(IR * use, IR * use_stmt, IR * gen);
-	void elim_cse_at_call(IR * use, IR * use_stmt, IR * gen);
-	void elim_cse_at_return(IR * use, IR * use_stmt, IR * gen);
-	void elim_cse_at_br(IR * use, IR * use_stmt, IR * gen);
-	void process_cse_gen(IR * cse, IR * cse_stmt, bool & change);
-	bool process_cse(IR * ir, LIST<IR*> & livexp);
-	bool should_be_cse(IR * det);
+protected:
+    virtual void * cloneEdgeInfo(Edge *)
+    { return NULL; }
+
+    virtual void * cloneVertexInfo(Vertex *)
+    { return NULL; }
+
 public:
-	IR_GCSE(REGION * ru, IR_GVN * gvn)
-	{
-		IS_TRUE0(ru);
-		m_ru = ru;
-		m_cfg = ru->get_cfg();
-		m_du = ru->get_du_mgr();
-		m_aa = ru->get_aa();
-		IS_TRUE0(m_du && m_aa);
-		m_expr_tab = NULL;
-		m_dm = ru->get_dm();
-		m_gvn = gvn;
-		m_tg = NULL;
-	}
-	virtual ~IR_GCSE() {}
-	virtual CHAR const* get_opt_name() const
-	{ return "Global Command Subscript Elimination"; }
+    explicit TG(Region * ru) { m_ru = ru; }
+    COPY_CONSTRUCTOR(TG);
 
-	OPT_TYPE get_opt_type() const { return OPT_GCSE; }
+    void pick_eh()
+    {
+        List<IRBB*> * bbs = m_ru->get_bb_list();
+        for (IRBB * bb = bbs->get_head(); bb != NULL; bb = bbs->get_next()) {
+            if (bb->is_exp_handling()) {
+                removeVertex(BB_id(bb));
+            }
+        }
+    }
 
-	bool perform(OPT_CTX & oc);
+    inline void computeDomAndIdom()
+    {
+        if (!computeDom()) { ASSERT0(0); }
+        if (!computeIdom()) { ASSERT0(0); }
+    }
+
+    inline void computePdomAndIpdom(Vertex * root)
+    {
+        if (!computePdomByRpo(root, NULL)) { ASSERT0(0); }
+        if (!computeIpdom()) { ASSERT0(0); }
+    }
 };
-#endif
 
+
+class IR_GCSE : public Pass {
+protected:
+    bool m_enable_filter; //filter determines which expression can be CSE.
+    bool m_is_in_ssa_form; //Set to true if PR is in SSA form.
+    Region * m_ru;
+    IR_CFG * m_cfg;
+    IR_DU_MGR * m_du;
+    IR_AA * m_aa;
+    IR_SSA_MGR * m_ssamgr;
+    IR_EXPR_TAB * m_expr_tab;
+    TypeMgr * m_dm;
+    IR_GVN * m_gvn;
+    TG * m_tg;
+    DefMiscBitSetMgr * m_misc_bs_mgr;
+    TMap<IR*, IR*> m_exp2pr;
+    TMap<VN const*, IR*> m_vn2exp;
+    List<IR*> m_newst_lst;
+
+    bool doProp(IRBB * bb, List<IR*> & livexp);
+    bool doPropVN(IRBB * bb, UINT entry_id);
+    bool elim(IR * use, IR * use_stmt, IR * gen, IR * gen_stmt);
+    bool findAndElim(IR * exp, IR * gen);
+    void handleCandidate(IR * exp, IRBB * bb, UINT entry_id, bool & change);
+    bool isCseCandidate(IR * ir);
+    void elimCseAtStore(IR * use, IR * use_stmt, IR * gen);
+    void elimCseAtCall(IR * use, IR * use_stmt, IR * gen);
+    void elimCseAtReturn(IR * use, IR * use_stmt, IR * gen);
+    void elimCseAtBranch(IR * use, IR * use_stmt, IR * gen);
+    void prcessCseGen(IR * cse, IR * cse_stmt, bool & change);
+    bool prcessCse(IR * ir, List<IR*> & livexp);
+    bool shouldBeCse(IR * det);
+public:
+    IR_GCSE(Region * ru, IR_GVN * gvn)
+    {
+        ASSERT0(ru);
+        m_ru = ru;
+        m_cfg = ru->get_cfg();
+        m_du = ru->get_du_mgr();
+        m_aa = ru->get_aa();
+        ASSERT0(m_du && m_aa);
+        m_expr_tab = NULL;
+        m_dm = ru->get_type_mgr();
+        m_gvn = gvn;
+        m_misc_bs_mgr = ru->getMiscBitSetMgr();
+        m_tg = NULL;
+        m_is_in_ssa_form = false;
+        m_ssamgr = NULL;
+    }
+    virtual ~IR_GCSE() {}
+    virtual CHAR const* get_pass_name() const
+    { return "Global Command Subscript Elimination"; }
+
+    PASS_TYPE get_pass_type() const { return PASS_GCSE; }
+
+    bool perform(OptCTX & oc);
+};
+
+} //namespace xoc
+#endif

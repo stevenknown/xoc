@@ -34,69 +34,73 @@ author: Su Zhenyu
 #ifndef __RATIONAL_H__
 #define __RATIONAL_H__
 
+namespace xcom {
+
 #define FRAC_TYPE INT
-class RATIONAL {
-	friend bool operator != (RATIONAL const& a, RATIONAL const& b);
-	friend bool operator == (RATIONAL const& a, RATIONAL const& b);
-	friend bool operator < (RATIONAL const& a, RATIONAL const& b);
-	friend bool operator <= (RATIONAL const& a, RATIONAL const& b);
-	friend bool operator > (RATIONAL const& a, RATIONAL const& b);
-	friend bool operator >= (RATIONAL const& a, RATIONAL const& b);
-	friend RATIONAL operator * (RATIONAL const& a, RATIONAL const& b);
-	friend RATIONAL operator / (RATIONAL const& a, RATIONAL const& b);
-	friend RATIONAL operator + (RATIONAL const& a, RATIONAL const& b);
-	friend RATIONAL operator - (RATIONAL const& a, RATIONAL const& b);
-	friend RATIONAL operator - (RATIONAL const& a);
+class Rational {
+    friend bool operator != (Rational const& a, Rational const& b);
+    friend bool operator == (Rational const& a, Rational const& b);
+    friend bool operator < (Rational const& a, Rational const& b);
+    friend bool operator <= (Rational const& a, Rational const& b);
+    friend bool operator > (Rational const& a, Rational const& b);
+    friend bool operator >= (Rational const& a, Rational const& b);
+    friend Rational operator * (Rational const& a, Rational const& b);
+    friend Rational operator / (Rational const& a, Rational const& b);
+    friend Rational operator + (Rational const& a, Rational const& b);
+    friend Rational operator - (Rational const& a, Rational const& b);
+    friend Rational operator - (Rational const& a);
 
-	FRAC_TYPE m_num;
-	FRAC_TYPE m_den;
+    FRAC_TYPE m_num;
+    FRAC_TYPE m_den;
 
-	FRAC_TYPE _gcd(FRAC_TYPE x, FRAC_TYPE y);
+    FRAC_TYPE _gcd(FRAC_TYPE x, FRAC_TYPE y);
 public:
-	RATIONAL();
-	RATIONAL(RATIONAL const& r);
-	RATIONAL(INT num, INT den = 1);
-	RATIONAL & operator = (RATIONAL const& a);
-	inline INT typecast2int() { return m_num / m_den; }
-	inline bool is_int() { return m_den == 1; }
-	void reduce();
-	RATIONAL rabs();
-	FRAC_TYPE num() const {return m_num;}
-	FRAC_TYPE& num() {return m_num;}
-	FRAC_TYPE den() const {return m_den;}
-	FRAC_TYPE& den() {return m_den;}
-	CHAR * format(CHAR * buf);
+    Rational();
+    Rational(Rational const& r);
+    Rational(INT num, INT den = 1);
+    Rational & operator = (Rational const& a);
+    inline INT typecast2int() { return m_num / m_den; }
+    inline bool is_int() { return m_den == 1; }
+    void reduce();
+    Rational rabs();
+    FRAC_TYPE num() const {return m_num;}
+    FRAC_TYPE& num() {return m_num;}
+    FRAC_TYPE den() const {return m_den;}
+    FRAC_TYPE& den() {return m_den;}
+    CHAR * format(CHAR * buf);
 };
 
 
 #ifndef INT_MAX
-#define INT_MAX		0x7fffFFFF
+#define INT_MAX        0x7fffFFFF
 #endif
 
 
 //Exported Functions
-inline bool operator == (RATIONAL const& a, RATIONAL const& b)
+inline bool operator == (Rational const& a, Rational const& b)
 { return (a.m_num == b.m_num && a.m_den == b.m_den); }
-inline bool operator != (RATIONAL const& a, RATIONAL const& b)
+inline bool operator != (Rational const& a, Rational const& b)
 { return (a.m_num != b.m_num || a.m_den != b.m_den); }
-bool operator == (RATIONAL const& a, RATIONAL const& b);
-bool operator != (RATIONAL const& a, RATIONAL const& b);
-bool operator < (RATIONAL const& a, RATIONAL const& b);
-bool operator <= (RATIONAL const& a, RATIONAL const& b);
-bool operator > (RATIONAL const& a, RATIONAL const& b);
-bool operator >= (RATIONAL const& a, RATIONAL const& b);
-RATIONAL operator * (RATIONAL const& a, RATIONAL const& b);
-RATIONAL operator / (RATIONAL const& a, RATIONAL const& b);
-RATIONAL operator + (RATIONAL const& a, RATIONAL const& b);
-RATIONAL operator - (RATIONAL const& a, RATIONAL const& b);
-RATIONAL operator - (RATIONAL const& a);
+bool operator == (Rational const& a, Rational const& b);
+bool operator != (Rational const& a, Rational const& b);
+bool operator < (Rational const& a, Rational const& b);
+bool operator <= (Rational const& a, Rational const& b);
+bool operator > (Rational const& a, Rational const& b);
+bool operator >= (Rational const& a, Rational const& b);
+Rational operator * (Rational const& a, Rational const& b);
+Rational operator / (Rational const& a, Rational const& b);
+Rational operator + (Rational const& a, Rational const& b);
+Rational operator - (Rational const& a, Rational const& b);
+Rational operator - (Rational const& a);
 //Subtraction
-inline RATIONAL operator - (RATIONAL const& a, RATIONAL const& b) { return a + (-b); }
+inline Rational operator - (Rational const& a, Rational const& b) { return a + (-b); }
 //Minus
-inline RATIONAL operator - (RATIONAL const& a)
+inline Rational operator - (Rational const& a)
 {
-	RATIONAL b = a;
-	b.m_num = -b.m_num;
-	return b;
+    Rational b = a;
+    b.m_num = -b.m_num;
+    return b;
 }
+
+} //namespace xcom
 #endif

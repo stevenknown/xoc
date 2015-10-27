@@ -32,257 +32,283 @@ IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 author: Su Zhenyu
 @*/
 #include "cominc.h"
+#include "prdf.h"
+#include "prssainfo.h"
+#include "ir_ssa.h"
 #include "ir_gvn.h"
 #include "ir_rce.h"
+
+namespace xoc {
 
 //
 //START IR_RCE
 //
 void IR_RCE::dump()
 {
-	if (g_tfile == NULL) return;
-	fprintf(g_tfile, "\n\n==---- DUMP IR_RCE ----==\n");
+    if (g_tfile == NULL) return;
+    fprintf(g_tfile, "\n\n==---- DUMP IR_RCE ----==\n");
 
-	IR_BB_LIST * bbl = m_ru->get_bb_list();
-	for (IR_BB * bb = bbl->get_head(); bb != NULL; bb = bbl->get_next()) {
-		//TODO:
-	}
-	fflush(g_tfile);
+    BBList * bbl = m_ru->get_bb_list();
+    for (IRBB * bb = bbl->get_head(); bb != NULL; bb = bbl->get_next()) {
+        //TODO:
+    }
+    fflush(g_tfile);
 }
 
 
-/*
-If 'ir' is always true, set 'must_true', or if it is
-always false, set 'must_false'.
-*/
-IR * IR_RCE::calc_cond_must_val(IN IR * ir, OUT bool & must_true,
-								OUT bool & must_false)
+//If 'ir' is always true, set 'must_true', or if it is
+//always false, set 'must_false'.
+IR * IR_RCE::calcCondMustVal(IN IR * ir, OUT bool & must_true,
+                                OUT bool & must_false)
 {
-	must_true = false;
-	must_false = false;
-	IS_TRUE0(ir->is_judge());
-	switch (IR_type(ir)) {
-	case IR_LT:
-	case IR_LE:
-	case IR_GT:
-	case IR_GE:
-	case IR_NE:
-	case IR_EQ:
-	case IR_LAND:
-	case IR_LOR:
-	case IR_LNOT:
-		{
-			bool change = false;
-			ir = m_ru->fold_const(ir, change);
-			if (change) {
-				IS_TRUE0(IR_is_const(ir) &&
-						 (CONST_int_val(ir) == 0 || CONST_int_val(ir) == 1));
-				if (CONST_int_val(ir) == 1) {
-					must_true = true;
-				} else if (CONST_int_val(ir) == 0) {
-					must_false = true;
-				}
-				return ir;
-			}
-			if (m_gvn != NULL) {
-				change = m_gvn->calc_cond_must_val(ir, must_true, must_false);
-				if (change) {
-					if (must_true) {
-						IS_TRUE0(!must_false);
-						UINT tyid = IR_dt(ir);
-						m_ru->free_irs(ir);
-						ir = m_ru->build_imm_int(1, tyid);
-						return ir;
-					} else {
-						IS_TRUE0(must_false);
-						UINT tyid = IR_dt(ir);
-						m_ru->free_irs(ir);
-						ir = m_ru->build_imm_int(0, tyid);
-						return ir;
-					}
-				}
-			}
-		}
-		break;
-	default: IS_TRUE0(0);
-	}
-	return ir;
+    must_true = false;
+    must_false = false;
+    ASSERT0(ir->is_judge());
+    switch (IR_code(ir)) {
+    case IR_LT:
+    case IR_LE:
+    case IR_GT:
+    case IR_GE:
+    case IR_NE:
+    case IR_EQ:
+    case IR_LAND:
+    case IR_LOR:
+    case IR_LNOT:
+        {
+            bool change = false;
+            ir = m_ru->foldConst(ir, change);
+            if (change) {
+                ASSERT0(ir->is_const() &&
+                         (CONST_int_val(ir) == 0 || CONST_int_val(ir) == 1));
+                if (CONST_int_val(ir) == 1) {
+                    must_true = true;
+                } else if (CONST_int_val(ir) == 0) {
+                    must_false = true;
+                }
+                return ir;
+            }
+            if (m_gvn != NULL && m_gvn->is_valid()) {
+                change = m_gvn->calcCondMustVal(ir, must_true, must_false);
+                if (change) {
+                    if (must_true) {
+                        ASSERT0(!must_false);
+                        Type const* type = IR_dt(ir);
+                        ir->removeSSAUse();
+                        m_ru->freeIRTree(ir);
+                        ir = m_ru->buildImmInt(1, type);
+                        return ir;
+                    } else {
+                        ASSERT0(must_false);
+                        Type const* type = IR_dt(ir);
+
+                        ir->removeSSAUse();
+                        m_ru->freeIRTree(ir);
+
+                        ir = m_ru->buildImmInt(0, type);
+                        return ir;
+                    }
+                }
+            }
+        }
+        break;
+    default: ASSERT0(0);
+    }
+    return ir;
 }
 
 
-IR * IR_RCE::process_branch(IR * ir, IN OUT bool & cfg_mod)
+IR * IR_RCE::processBranch(IR * ir, IN OUT bool & cfg_mod)
 {
-	IS_TRUE0(IR_type(ir) == IR_FALSEBR || IR_type(ir) == IR_TRUEBR);
-	bool must_true, must_false;
-	BR_det(ir) = calc_cond_must_val(BR_det(ir), must_true, must_false);
-	if (IR_type(ir) == IR_TRUEBR) {
-		if (must_true) {
-			//TRUEBR(0x1)
-			IR_BB * from = ir->get_bb();
-			IR_BB * to = m_cfg->get_fallthrough_bb(from);
-			IS_TRUE0(from != NULL && to != NULL);
+    ASSERT0(ir->is_cond_br());
+    bool must_true, must_false;
+    BR_det(ir) = calcCondMustVal(BR_det(ir), must_true, must_false);
+    if (ir->is_truebr()) {
+        if (must_true) {
+            //TRUEBR(0x1)
+            IRBB * from = ir->get_bb();
+            IRBB * to = m_cfg->get_fallthrough_bb(from);
+            ASSERT0(from != NULL && to != NULL);
 
-			IR * old = ir;
-			ir = m_ru->build_goto(BR_lab(old));
-			m_ru->free_irs(old);
+            IR * old = ir;
+            ir = m_ru->buildGoto(BR_lab(old));
 
-			//Revise m_cfg. remove fallthrough edge.
-			m_cfg->remove_edge(from, to);
-			cfg_mod = true;
-		} else if (must_false) {
-			//TRUEBR(0x0)
+            old->removeSSAUse();
+            m_ru->freeIRTree(old);
 
-			//Revise m_cfg. remove branch edge.
-			IR_BB * from = ir->get_bb();
-			IR_BB * to = m_cfg->get_target_bb(from);
-			IS_TRUE0(from != NULL && to != NULL);
-			m_cfg->remove_edge(from, to);
+            //Revise cfg. remove fallthrough edge.
+            m_cfg->removeEdge(from, to);
+            cfg_mod = true;
+        } else if (must_false) {
+            //TRUEBR(0x0)
 
-			m_ru->free_irs(ir);
-			ir = NULL;
-			cfg_mod = true;
-		}
-	} else {
-		if (must_true) {
-			//FALSEBR(0x1)
-			//Revise m_cfg. remove branch edge.
-			IR_BB * from = ir->get_bb();
-			IR_BB * to = m_cfg->get_target_bb(from);
-			IS_TRUE0(from != NULL && to != NULL);
-			m_cfg->remove_edge(from, to);
+            //Revise cfg. remove branch edge.
+            IRBB * from = ir->get_bb();
+            IRBB * to = m_cfg->findBBbyLabel(BR_lab(ir));
+            ASSERT0(from && to);
+            m_cfg->removeEdge(from, to);
 
-			m_ru->free_irs(ir);
-			ir = NULL;
-			cfg_mod = true;
-		} else if (must_false) {
-			//FALSEBR(0x0)
-			IR_BB * from = ir->get_bb();
-			IR_BB * to = m_cfg->get_fallthrough_bb(from);
-			IS_TRUE0(from != NULL && to != NULL);
+            ir->removeSSAUse();
+            m_ru->freeIRTree(ir);
 
-			IR * old = ir;
-			ir = m_ru->build_goto(BR_lab(old));
-			m_ru->free_irs(old);
+            ir = NULL;
+            cfg_mod = true;
+        }
+    } else {
+        if (must_true) {
+            //FALSEBR(0x1)
+            //Revise m_cfg. remove branch edge.
+            IRBB * from = ir->get_bb();
+            IRBB * to = m_cfg->get_target_bb(from);
+            ASSERT0(from != NULL && to != NULL);
+            m_cfg->removeEdge(from, to);
 
-			//Revise m_cfg. remove fallthrough edge.
-			m_cfg->remove_edge(from, to);
-			cfg_mod = true;
-		}
-	}
-	return ir;
+            ir->removeSSAUse();
+            m_ru->freeIRTree(ir);
+
+            ir = NULL;
+            cfg_mod = true;
+        } else if (must_false) {
+            //FALSEBR(0x0)
+            IRBB * from = ir->get_bb();
+            IRBB * to = m_cfg->get_fallthrough_bb(from);
+            ASSERT0(from != NULL && to != NULL);
+
+            IR * old = ir;
+            ir = m_ru->buildGoto(BR_lab(old));
+
+            old->removeSSAUse();
+            m_ru->freeIRTree(old);
+
+            //Revise m_cfg. remove fallthrough edge.
+            m_cfg->removeEdge(from, to);
+            cfg_mod = true;
+        }
+    }
+    return ir;
 }
 
 
 //Perform dead store elmination: x = x;
-IR * IR_RCE::process_st(IR * ir)
+IR * IR_RCE::processStore(IR * ir)
 {
-	IS_TRUE0(IR_type(ir) == IR_ST);
-	if (ST_rhs(ir)->get_exact_ref() == ir->get_exact_ref()) {
-		m_ru->free_irs(ir);
-		return NULL;
-	}
-	return ir;
+    ASSERT0(ir->is_st());
+    if (ST_rhs(ir)->get_exact_ref() == ir->get_exact_ref()) {
+        ir->removeSSAUse();
+        m_ru->freeIRTree(ir);
+        return NULL;
+    }
+    return ir;
 }
 
 
 //Perform dead store elmination: x = x;
-IR * IR_RCE::process_stpr(IR * ir)
+IR * IR_RCE::processStorePR(IR * ir)
 {
-	IS_TRUE0(IR_type(ir) == IR_STPR);
-	if (STPR_rhs(ir)->get_exact_ref() == ir->get_exact_ref()) {
-		m_ru->free_irs(ir);
-		return NULL;
-	}
-	return ir;
+    ASSERT0(ir->is_stpr());
+    if (STPR_rhs(ir)->get_exact_ref() == ir->get_exact_ref()) {
+        ir->removeSSAUse();
+        m_ru->freeIRTree(ir);
+        return NULL;
+    }
+    return ir;
 }
 
 
 /*
 e.g:
-	1. if (a == a) { ... } , remove redundant comparation.
-	2. b = b; remove redundant store.
+    1. if (a == a) { ... } , remove redundant comparation.
+    2. b = b; remove redundant store.
 */
-bool IR_RCE::perform_simply_rce(IN OUT bool & cfg_mod)
+bool IR_RCE::performSimplyRCE(IN OUT bool & cfg_mod)
 {
-	IR_BB_LIST * bbl = m_ru->get_bb_list();
-	bool change = false;
-	C<IR_BB*> * ct_bb;
-	for (IR_BB * bb = bbl->get_head(&ct_bb);
-		 bb != NULL; bb = bbl->get_next(&ct_bb)) {
-		BBIR_LIST * ir_list = &IR_BB_ir_list(bb);
-		C<IR*> * ct, * next_ct;
-		for (ir_list->get_head(&next_ct), ct = next_ct;
-			 ct != NULL; ct = next_ct) {
-			IR * ir = C_val(ct);
-			ir_list->get_next(&next_ct);
-			IR * new_ir = ir;
-			switch (IR_type(ir)) {
-			case IR_TRUEBR:
-			case IR_FALSEBR:
-				new_ir = process_branch(ir, cfg_mod);
-				break;
-			case IR_ST:
-				new_ir = process_st(ir);
-				break;
-			default:
-				;
-			}
-			if (new_ir != ir) {
-				ir_list->remove(ct);
-				if (next_ct != NULL) {
-					ir_list->insert_before(new_ir, next_ct);
-				} else {
-					ir_list->append_tail(new_ir);
-				}
-				change = true;
-			}
-		}
-	}
-	return change;
+    BBList * bbl = m_ru->get_bb_list();
+    bool change = false;
+    C<IRBB*> * ct_bb;
+    for (IRBB * bb = bbl->get_head(&ct_bb);
+         bb != NULL; bb = bbl->get_next(&ct_bb)) {
+        BBIRList * ir_list = &BB_irlist(bb);
+        C<IR*> * ct, * next_ct;
+        for (ir_list->get_head(&next_ct), ct = next_ct;
+             ct != NULL; ct = next_ct) {
+            IR * ir = C_val(ct);
+            ir_list->get_next(&next_ct);
+            IR * newIR = ir;
+            switch (IR_code(ir)) {
+            case IR_TRUEBR:
+            case IR_FALSEBR:
+                newIR = processBranch(ir, cfg_mod);
+                break;
+
+            //This case has been dealt in ir_refine.
+            //case IR_ST:
+            //    newIR = processStore(ir);
+            //    break;
+            default:;
+            }
+
+            if (newIR != ir) {
+                ir_list->remove(ct);
+                if (newIR != NULL) {
+                    if (next_ct != NULL) {
+                        ir_list->insert_before(newIR, next_ct);
+                    } else {
+                        ir_list->append_tail(newIR);
+                    }
+                }
+                change = true;
+            }
+        }
+    }
+    return change;
 }
 
 
-bool IR_RCE::perform(OPT_CTX & oc)
+bool IR_RCE::perform(OptCTX & oc)
 {
-	START_TIMER_AFTER();
-	m_ru->check_valid_and_recompute(&oc, OPT_DU_REF, OPT_DU_CHAIN,
-									OPT_UNDEF);
-	if (!m_gvn->is_valid()) {
-		m_gvn->reperform(oc);
-	}
+    START_TIMER_AFTER();
+    m_ru->checkValidAndRecompute(&oc, PASS_CFG, PASS_DU_REF, PASS_DU_CHAIN,
+                                 PASS_UNDEF);
+    if (!m_gvn->is_valid() && is_use_gvn()) {
+        m_gvn->reperform(oc);
+    }
 
-	bool cfg_mod = false;
-	bool change = perform_simply_rce(cfg_mod);
-	if (cfg_mod) {
-		//m_gvn->set_valid(false); //rce do not violate gvn for now.
-		bool lchange;
-		do {
-			lchange = false;
-			lchange |= m_cfg->remove_unreach_bb();
-			lchange |= m_cfg->remove_empty_bb(oc);
-			lchange |= m_cfg->remove_redundant_branch();
-			lchange |= m_cfg->remove_tramp_edge();
-			if (lchange) {
-				OPTC_is_cdg_valid(oc) = false;
-				OPTC_is_dom_valid(oc) = false;
-				OPTC_is_pdom_valid(oc) = false;
-			}
-		} while (lchange);
+    bool cfg_mod = false;
+    bool change = performSimplyRCE(cfg_mod);
+    if (cfg_mod) {
+        //m_gvn->set_valid(false); //rce do not violate gvn for now.
+        bool lchange;
+        do {
+            lchange = false;
+            lchange |= m_cfg->removeUnreachBB();
+            lchange |= m_cfg->removeEmptyBB(oc);
+            lchange |= m_cfg->removeRedundantBranch();
+            lchange |= m_cfg->removeTrampolinEdge();
+        } while (lchange);
 
-		//TODO: May be the change of CFG does not influence the
-		//usage while we utilize du-chain and ir2mds.
+        m_cfg->computeEntryAndExit(true, true);
 
-		OPTC_is_expr_tab_valid(oc) = false;
-		OPTC_is_du_chain_valid(oc) = false;
-		OPTC_is_ref_valid(oc) = false;
-		OPTC_is_aa_valid(oc) = false;
-		OPTC_is_expr_tab_valid(oc) = false;
-		OPTC_is_dom_valid(oc) = false;
-		OPTC_is_pdom_valid(oc) = false;
-		OPTC_is_reach_def_valid(oc) = false;
-		OPTC_is_avail_reach_def_valid(oc) = false;
-	}
-	END_TIMER_AFTER(get_opt_name());
-	return change;
+        //TODO: May be the change of CFG does not influence the
+        //usage while we utilize du-chain and ir2mds.
+        oc.set_flag_if_cfg_changed();
+
+        OC_is_expr_tab_valid(oc) = false;
+        OC_is_du_chain_valid(oc) = false;
+        OC_is_ref_valid(oc) = false;
+        OC_is_aa_valid(oc) = false;
+        OC_is_expr_tab_valid(oc) = false;
+        OC_is_reach_def_valid(oc) = false;
+        OC_is_avail_reach_def_valid(oc) = false;
+
+        OC_is_cfg_valid(oc) = true; //CFG has been maintained.
+    }
+
+    if (change) {
+        ASSERT0(verifySSAInfo(m_ru));
+    }
+
+    END_TIMER_AFTER(get_pass_name());
+    return change;
 }
 //END IR_RCE
+
+} //namespace xoc

@@ -32,66 +32,70 @@ IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 author: Su Zhenyu
 @*/
 #include "ltype.h"
+#include "comf.h"
 #include "smempool.h"
 #include "sstl.h"
 #include "matt.h"
 #include "bs.h"
+#include "sbs.h"
 #include "sgraph.h"
 #include "agraph.h"
 
+namespace xcom {
+
 //Build matrix to describe edge-weight.
-void AGRAPH::build_adj_matrix(MATRIX<UINT> & adj_mat)
+void AGraph::buildAdjacentMatrix(Matrix<UINT> & adj_mat)
 {
-	IS_TRUE(0, ("Target Dependent Code"));
-	//Like: adj_mat.set(i, j, EDGE-WEIGHT);
+    UNUSED(adj_mat);
+    ASSERT(0, ("Target Dependent Code"));
+    //Like: adj_mat.set(i, j, Edge-WEIGHT);
 }
 
 
-/*
-Nonrecursive algo to compute the shorest-path.
+/* Nonrecursive algo to compute the shorest-path.
 See <Shortest_Path-Dijkstra.txt>
-'infinite': the value indiates infinity.
-*/
-void AGRAPH::shortest_path(UINT infinite)
+'infinite': the value indiates infinity. */
+void AGraph::ShortestPath(UINT infinite)
 {
-	IS_TRUE(m_pool != NULL, ("not yet initialized."));
-	MATRIX<UINT> adj_mat;
-	build_adj_matrix(adj_mat);
-	UINT row = adj_mat.get_row_size();
-	UINT col = adj_mat.get_col_size();
-	UINT i,j,k,min,v1,v2;
-	if (m_spath_mat != NULL) { delete m_spath_mat; }
-	m_spath_mat = new MATRIX<UINT>(row, col);
-	m_spath_mat->set_all(infinite);
+    ASSERT(m_ec_pool != NULL, ("not yet initialized."));
+    Matrix<UINT> adj_mat;
+    buildAdjacentMatrix(adj_mat);
+    UINT row = adj_mat.get_row_size();
+    UINT col = adj_mat.get_col_size();
+    UINT i,j,k,min,v1,v2;
+    if (m_spath_mat != NULL) { delete m_spath_mat; }
+    m_spath_mat = new Matrix<UINT>(row, col);
+    m_spath_mat->set_all(infinite);
 
-	//Init path matrix
-	for (i = 0; i < row; i++) {
-		for (j = 0; j < col; j++) {
-			v1 = adj_mat.get(i,j);
-			if (v1 != infinite) {
-				m_spath_mat->set(i, j, i);
-			}
-		}
-	}
-	for (i = 0; i < row; i++) {
-		min = infinite;
-		for (j = 0; j < col; j++) {
-			for (k = 0; k < row; k++) {
-				v1 = adj_mat.get(k, j);
-				v2 = adj_mat.get(i, k);
-				if ((v1 != infinite) && (v2 != infinite)) {
-					if (min > (v1 + v2)) {
-						min = v1 + v2;
-						m_spath_mat->set(i, j, k);
-					}
-				}
-			}
-			IS_TRUE(min <= infinite, ("exception occur in shortest_path"));
-			if (min != infinite) {
-				adj_mat.set(i, j, min);
-			}
-			min = infinite;
-		}
-	}
+    //Init path matrix
+    for (i = 0; i < row; i++) {
+        for (j = 0; j < col; j++) {
+            v1 = adj_mat.get(i,j);
+            if (v1 != infinite) {
+                m_spath_mat->set(i, j, i);
+            }
+        }
+    }
+    for (i = 0; i < row; i++) {
+        min = infinite;
+        for (j = 0; j < col; j++) {
+            for (k = 0; k < row; k++) {
+                v1 = adj_mat.get(k, j);
+                v2 = adj_mat.get(i, k);
+                if ((v1 != infinite) && (v2 != infinite)) {
+                    if (min > (v1 + v2)) {
+                        min = v1 + v2;
+                        m_spath_mat->set(i, j, k);
+                    }
+                }
+            }
+            ASSERT(min <= infinite, ("exception occur in ShortestPath"));
+            if (min != infinite) {
+                adj_mat.set(i, j, min);
+            }
+            min = infinite;
+        }
+    }
 }
 
+} //namespace xcom

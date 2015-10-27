@@ -34,93 +34,98 @@ author: Su Zhenyu
 #ifndef _IR_DCE_H_
 #define _IR_DCE_H_
 
-class EFFECT_STMT : public BITSET {
+namespace xoc {
+
+class EFFECT_STMT : public BitSet {
 public:
-	void bunion(INT elem)
-	{
-		BITSET::bunion(elem);
-	}
+    void bunion(INT elem)
+    {
+        BitSet::bunion(elem);
+    }
 };
 
 //Perform dead code and redundant control flow elimination.
-class IR_DCE : public IR_OPT {
+class IR_DCE : public Pass {
 protected:
-	MD_SYS * m_md_sys;
-	DT_MGR * m_dm;
-	REGION * m_ru;
-	IR_CFG * m_cfg;
-	CDG * m_cdg;
-	IR_DU_MGR * m_du;
-	CIR_ITER m_citer;
-	bool m_is_elim_cfs; //Eliminate control flow structure.
-	bool m_is_ssa_available; //indicate if SSA info is available.
+    MDSystem * m_md_sys;
+    TypeMgr * m_dm;
+    Region * m_ru;
+    IR_CFG * m_cfg;
+    CDG * m_cdg;
+    IR_DU_MGR * m_du;
+    ConstIRIter m_citer;
+    bool m_is_elim_cfs; //Eliminate control flow structure if necessary.
 
-	void fix_control_flow(LIST<IR_BB*> & bblst, LIST<C<IR_BB*>*> & ctlst);
-	bool find_effect_kid(IN IR_BB * bb, IN IR * ir,
-						 IN EFFECT_STMT & is_stmt_effect);
-	bool preserve_cd(IN OUT BITSET & is_bb_effect,
-					 IN OUT EFFECT_STMT & is_stmt_effect,
-					 IN OUT LIST<IR const*> & act_ir_lst);
-	void mark_effect_ir(IN OUT EFFECT_STMT & is_stmt_effect,
-						IN OUT BITSET & is_bb_effect,
-						IN OUT LIST<IR const*> & work_list);
+    //Whether utilize MD du chain to find effect stmt.
+    //If the value is false, all memory operations are considered used
+    //except the operations which operate on PR.
+    bool m_is_use_md_du;
 
-	bool is_effect_write(VAR * v) const
-	{ return VAR_is_global(v) || VAR_is_volatile(v); }
+    void fix_control_flow(List<IRBB*> & bblst, List<C<IRBB*>*> & ctlst);
+    bool find_effect_kid(IN IRBB * bb, IN IR * ir,
+                         IN EFFECT_STMT & is_stmt_effect);
+    bool preserve_cd(IN OUT BitSet & is_bb_effect,
+                     IN OUT EFFECT_STMT & is_stmt_effect,
+                     IN OUT List<IR const*> & act_ir_lst);
+    void mark_effect_ir(IN OUT EFFECT_STMT & is_stmt_effect,
+                        IN OUT BitSet & is_bb_effect,
+                        IN OUT List<IR const*> & work_list);
 
-	bool is_effect_read(VAR * v) const
-	{ return VAR_is_volatile(v); }
+    bool is_effect_write(VAR * v) const
+    { return VAR_is_global(v) || VAR_is_volatile(v); }
 
-	bool is_cfs(IR const* ir) const
-	{
-		switch (IR_type(ir)) {
-		case IR_TRUEBR:
-		case IR_FALSEBR:
-		case IR_GOTO:
-		case IR_IGOTO:
-			return true;
-		default: IS_TRUE0(ir->is_stmt_in_bb());
-		}
-		return false;
-	}
+    bool is_effect_read(VAR * v) const
+    { return VAR_is_volatile(v); }
 
-	bool is_ssa_available() const { return m_is_ssa_available; }
+    bool is_cfs(IR const* ir) const
+    {
+        switch (IR_code(ir)) {
+        case IR_TRUEBR:
+        case IR_FALSEBR:
+        case IR_GOTO:
+        case IR_IGOTO:
+            return true;
+        default: ASSERT0(ir->isStmtInBB());
+        }
+        return false;
+    }
 
-	void iter_collect(IN OUT EFFECT_STMT & is_stmt_effect,
-					  IN OUT BITSET & is_bb_effect,
-					  IN OUT LIST<IR const*> & work_list);
-	void record_all_ir(IN OUT SVECTOR<SVECTOR<IR*>*> & all_ir);
-	void revise_successor(IR_BB * bb, C<IR_BB*> * bbct, IR_BB_LIST * bbl);
+    void iter_collect(IN OUT EFFECT_STMT & is_stmt_effect,
+                      IN OUT BitSet & is_bb_effect,
+                      IN OUT List<IR const*> & work_list);
+    void record_all_ir(IN OUT Vector<Vector<IR*>*> & all_ir);
+    void revise_successor(IRBB * bb, C<IRBB*> * bbct, BBList * bbl);
 
-	bool check_stmt(IR const* ir);
-	bool check_call(IR const* ir);
+    bool check_stmt(IR const* ir);
+    bool check_call(IR const* ir);
 public:
-	IR_DCE(REGION * ru)
-	{
-		IS_TRUE0(ru != NULL);
-		m_ru = ru;
-		m_dm = ru->get_dm();
-		m_cfg = ru->get_cfg();
-		m_du = ru->get_du_mgr();
-		m_md_sys = ru->get_md_sys();
-		m_is_elim_cfs = false;
-		m_is_ssa_available = false;
-		m_cdg = NULL;
-	}
-	virtual ~IR_DCE() {}
+    explicit IR_DCE(Region * ru)
+    {
+        ASSERT0(ru != NULL);
+        m_ru = ru;
+        m_dm = ru->get_type_mgr();
+        m_cfg = ru->get_cfg();
+        m_du = ru->get_du_mgr();
+        m_md_sys = ru->get_md_sys();
+        m_is_elim_cfs = false;
+        m_is_use_md_du = true;
+        m_cdg = NULL;
+    }
+    virtual ~IR_DCE() {}
 
-	void dump(IN EFFECT_STMT const& is_stmt_effect,
-			  IN BITSET const& is_bb_effect,
-			  IN SVECTOR<SVECTOR<IR*>*> & all_ir);
+    void dump(IN EFFECT_STMT const& is_stmt_effect,
+              IN BitSet const& is_bb_effect,
+              IN Vector<Vector<IR*>*> & all_ir);
 
-	virtual CHAR const* get_opt_name() const { return "Dead Code Eliminiation"; }
+    virtual CHAR const* get_pass_name() const
+    { return "Dead Code Eliminiation"; }
+    virtual PASS_TYPE get_pass_type() const { return PASS_DCE; }
 
-	OPT_TYPE get_opt_type() const { return OPT_DCE; }
+    void set_elim_cfs(bool doit) { m_is_elim_cfs = doit; }
+    void set_use_md_du(bool use_md_du) { m_is_use_md_du = use_md_du; }
 
-	void set_elim_cfs(bool doit) { m_is_elim_cfs = doit; }
-
-	void set_ssa_available(bool avail) { m_is_ssa_available = avail; }
-
-	virtual bool perform(OPT_CTX & oc);
+    virtual bool perform(OptCTX & oc);
 };
+
+} //namespace xoc
 #endif

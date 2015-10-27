@@ -33,64 +33,80 @@ author: Su Zhenyu
 @*/
 #ifndef _INLINER_H_
 #define _INLINER_H_
-#define INLINFO_need_el(i)		((i)->need_el)
-#define INLINFO_has_ret(i)		((i)->has_ret)
-class INLINE_INFO {
+
+namespace xoc {
+
+#define INLINFO_need_el(i)        ((i)->need_el)
+#define INLINFO_has_ret(i)        ((i)->has_ret)
+class InlineInfo {
 public:
-	BYTE need_el:1;
-	BYTE has_ret:1;
+    BYTE need_el:1;
+    BYTE has_ret:1;
 };
 
 
-class INLINER {
+class Inliner {
 protected:
-	REGION_MGR * m_ru_mgr;
-	SMEM_POOL * m_pool;
-	CALLG * m_callg;
-	TMAP<REGION*, INLINE_INFO*> m_ru2inl;
+    RegionMgr * m_ru_mgr;
+    SMemPool * m_pool;
+    CallGraph * m_call_graph;
+    Region * m_program;
+    TMap<Region*, InlineInfo*> m_ru2inl;
 
-	void ck_ru(IN REGION * ru, OUT bool & need_el, OUT bool & has_ret) const;
+    void checkRegion(IN Region * ru,
+                     OUT bool & need_el,
+                     OUT bool & has_ret) const;
 
-	void * xmalloc(UINT size)
-	{
-		void * p = smpool_malloc_h(size, m_pool);
-		IS_TRUE0(p);
-		memset(p, 0, size);
-		return p;
-	}
+    void * xmalloc(UINT size)
+    {
+        void * p = smpoolMalloc(size, m_pool);
+        ASSERT0(p);
+        memset(p, 0, size);
+        return p;
+    }
 
-	INLINE_INFO * map_ru2ii(REGION * ru, bool alloc)
-	{
-		INLINE_INFO * ii = m_ru2inl.get(ru);
-		if (ii == NULL && alloc) {
-			ii = (INLINE_INFO*)xmalloc(sizeof(INLINE_INFO));
-			m_ru2inl.set(ru, ii);
-		}
-		return ii;
-	}
+    InlineInfo * mapRegion2InlineInfo(Region * ru, bool alloc)
+    {
+        InlineInfo * ii = m_ru2inl.get(ru);
+        if (ii == NULL && alloc) {
+            ii = (InlineInfo*)xmalloc(sizeof(InlineInfo));
+            m_ru2inl.set(ru, ii);
+        }
+        return ii;
+    }
+
+    IR * replaceReturnImpl(
+            Region * caller,
+            IR * caller_call,
+            IR * new_irs,
+            LabelInfo * el);
 public:
-	INLINER(REGION_MGR * ru_mgr)
-	{
-		m_ru_mgr = ru_mgr;
-		m_callg = ru_mgr->get_callg();
-		m_pool = smpool_create_handle(16, MEM_COMM);
-	}
-	virtual ~INLINER() { smpool_free_handle(m_pool); }
+    Inliner(RegionMgr * rumgr, Region * program)
+    {
+        ASSERT0(rumgr && program);
+        m_ru_mgr = rumgr;
+        m_program = program;
+        m_call_graph = rumgr->get_call_graph();
+        m_pool = smpoolCreate(16, MEM_COMM);
+    }
+    virtual ~Inliner() { smpoolDelete(m_pool); }
 
-	bool can_be_cand(REGION * ru);
+    bool can_be_cand(Region * ru);
 
-	bool do_inline_c(REGION * caller, REGION * callee);
-	void do_inline(REGION * cand);
+    bool do_inline_c(Region * caller, Region * callee);
+    void do_inline(Region * cand);
 
-	inline bool is_call_site(IR * call, REGION * ru);
+    inline bool is_call_site(IR * call, Region * ru);
 
-	virtual CHAR const* get_opt_name() const { return "INLINER"; }
+    virtual CHAR const* get_pass_name() const { return "Inliner"; }
 
-	IR * replace_return_c(REGION * caller, IR * caller_call,
-						  IR * new_irs, LABEL_INFO * el);
-	IR * replace_return(REGION * caller, IR * caller_call,
-						IR * new_irs, INLINE_INFO * ii);
-	virtual bool perform(OPT_CTX & oc);
+    IR * replaceReturn(
+            Region * caller,
+            IR * caller_call,
+            IR * new_irs,
+            InlineInfo * ii);
+    virtual bool perform(OptCTX & oc);
 };
-#endif
 
+} //namespace xoc
+#endif

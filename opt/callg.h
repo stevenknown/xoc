@@ -34,97 +34,117 @@ author: Su Zhenyu
 #ifndef _CALLG_H_
 #define _CALLG_H_
 
+namespace xoc {
+
 //CALL NODE
-#define CN_id(c)		((c)->id)
-#define CN_sym(c)		((c)->ru_name)
-#define CN_ru(c)		((c)->ru)
-#define CN_is_used(c)	((c)->u1.s1.is_used)
-class CALL_NODE {
+#define CN_id(c)         ((c)->id)
+#define CN_sym(c)        ((c)->ru_name)
+#define CN_ru(c)         ((c)->ru)
+#define CN_is_used(c)    ((c)->u1.s1.is_used)
+class CallNode {
 public:
-	UINT id;
-	SYM * ru_name; //record the REGION name.
-	REGION * ru; //record the REGION that callnode corresponds to.
-	union {
-		struct {
-			/*
-			It is marked by attribute used, which usually means
-			that it is called in inline assembly code.
-			*/
-			BYTE is_used:1;
-		} s1;
-		BYTE u1b1;
-	} u1;
+    UINT id;
+    SYM const* ru_name; //record the Region name.
+    Region * ru; //record the Region that callnode corresponds to.
+    union {
+        struct {
+            //It is marked by attribute used, which usually means
+            //that it is called in inline assembly code.
+            BYTE is_used:1;
+        } s1;
+        BYTE u1b1;
+    } u1;
 };
 
 
-//Mapping from SYM to CALL_NODE.
-typedef TMAP<SYM*, CALL_NODE*> SYM2CN;
+//Mapping from SYM to CallNode.
+typedef TMap<SYM const*, CallNode*> SYM2CN;
 
 
 //Call Graph
-#define CALLG_DUMP_IR	1
-class CALLG : public DGRAPH {
-	REGION_MGR * m_ru_mgr;
-	DT_MGR * m_dm;
-	SMEM_POOL * m_cn_pool; //pool for call node.
-	UINT m_cn_count;
-	SVECTOR<CALL_NODE*> m_cnid2cn_map;
-	SVECTOR<CALL_NODE*> m_ruid2cn_map;
-	SYM2CN m_sym2cn_map;
+#define CALLG_DUMP_IR    1
+class CallGraph : public DGraph {
+    RegionMgr * m_ru_mgr;
+    TypeMgr * m_dm;
+    SMemPool * m_cn_pool; //pool for call node.
+    UINT m_cn_count;
+    Vector<CallNode*> m_cnid2cn;
+    Vector<CallNode*> m_ruid2cn;
+    SYM2CN m_sym2cn_map;
 
-	CALL_NODE * new_call_node()
-	{
-		IS_TRUE0(m_cn_pool);
-		CALL_NODE * p =
-			(CALL_NODE*)smpool_malloc_h_const_size(
-							sizeof(CALL_NODE), m_cn_pool);
-		IS_TRUE0(p);
-		memset(p, 0, sizeof(CALL_NODE));
-		return p;
-	}
+    CallNode * newCallNode()
+    {
+        ASSERT0(m_cn_pool);
+        CallNode * p = (CallNode*)smpoolMallocConstSize(
+                            sizeof(CallNode), m_cn_pool);
+        ASSERT0(p);
+        memset(p, 0, sizeof(CallNode));
+        return p;
+    }
 public:
-	CALLG(UINT edge_hash, UINT vex_hash, REGION_MGR * rumgr):
-		  DGRAPH(edge_hash, vex_hash)
-	{
-		IS_TRUE0(edge_hash > 0 && vex_hash > 0);
-		m_ru_mgr = rumgr;
-		m_dm = rumgr->get_dm();
-		m_cn_count = 1;
-		m_cn_pool = smpool_create_handle(sizeof(CALL_NODE) * 2, MEM_CONST_SIZE);
-	}
+    CallGraph(UINT edge_hash, UINT vex_hash, RegionMgr * rumgr):
+          DGraph(edge_hash, vex_hash)
+    {
+        ASSERT0(edge_hash > 0 && vex_hash > 0);
+        m_ru_mgr = rumgr;
+        m_dm = rumgr->get_type_mgr();
+        m_cn_count = 1;
+        m_cn_pool = smpoolCreate(sizeof(CallNode) * 2, MEM_CONST_SIZE);
+    }
+    COPY_CONSTRUCTOR(CallGraph);
+    virtual ~CallGraph() { smpoolDelete(m_cn_pool); }
 
-	~CALLG() { smpool_free_handle(m_cn_pool); }
+    void add_node(CallNode * cn)
+    {
+        m_cnid2cn.set(CN_id(cn), cn);
+        addVertex(CN_id(cn));
+    }
+    void build(Region * top);
+    void computeEntryList(List<CallNode*> & elst);
+    void computeExitList(List<CallNode*> & elst);
 
-	void add_node(CALL_NODE * cn)
-	{
-		m_cnid2cn_map.set(CN_id(cn), cn);
-		add_vertex(CN_id(cn));
-	}
-	void build(REGION * top);
-	void compute_entry_list(LIST<CALL_NODE*> & elst);
-	void compute_exit_list(LIST<CALL_NODE*> & elst);
-	void dump_vcg(DT_MGR * dm, CHAR const* name = NULL, INT flag = -1);
+    //name: file name if you want to dump VCG to specified file.
+    //flag: default is 0xFFFFffff(-1) means doing dumping
+    //        with completely information.
+    void dump_vcg(CHAR const* name = NULL, INT flag = -1);
 
-	CALL_NODE * map_id2cn(UINT id) { return m_cnid2cn_map.get(id); }
-	CALL_NODE * map_vex2cn(VERTEX * v) { return m_cnid2cn_map.get(VERTEX_id(v)); }
-	CALL_NODE * map_ru2cn(REGION * ru) { return m_ruid2cn_map.get(RU_id(ru)); }
-	CALL_NODE * map_sym2cn(SYM * name) { return m_sym2cn_map.get(name); }
-	REGION * map_ir2ru(IR const* ir)
-	{
-		IS_TRUE0(IR_type(ir) == IR_CALL || IR_type(ir) == IR_ICALL);
-		SYM * name = VAR_name(CALL_idinfo(ir));
-		CALL_NODE * cn = map_sym2cn(name);
-		if (cn == NULL) return NULL;
-		return CN_ru(cn);
-	}
+    CallNode * map_id2cn(UINT id) const { return m_cnid2cn.get(id); }
+    CallNode * map_vex2cn(Vertex const* v) const
+    { return m_cnid2cn.get(VERTEX_id(v)); }
 
-	CALL_NODE * new_call_node(IR * ir);
-	CALL_NODE * new_call_node(REGION * ru);
+    CallNode * map_ru2cn(Region const* ru) const
+    { return m_ruid2cn.get(REGION_id(ru)); }
 
-	void erase()
-	{
-		m_cnid2cn_map.clean();
-		GRAPH::erase();
-	}
+    CallNode * map_sym2cn(SYM const* name) const
+    { return m_sym2cn_map.get(name); }
+
+    Region * map_ir2ru(IR const* ir)
+    {
+        ASSERT0(ir->is_calls_stmt());
+        SYM * name = VAR_name(CALL_idinfo(ir));
+        CallNode * cn = map_sym2cn(name);
+        if (cn == NULL) return NULL;
+        return CN_ru(cn);
+    }
+
+    CallNode * newCallNode(IR * ir);
+    CallNode * newCallNode(Region * ru);
+
+    void erase()
+    {
+        m_cnid2cn.clean();
+        Graph::erase();
+    }
+
+    //This is an interface.
+    //Return true if an edge is needed bewteen the caller and the ir.
+    //Note ir must be a function call.
+    virtual bool shouldAddEdge(IR const* ir) const
+    {
+        ASSERT0(ir->is_calls_stmt());
+        return true;
+    }
 };
+
+} //namespace xoc
 #endif

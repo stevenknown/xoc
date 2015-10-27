@@ -34,225 +34,240 @@ author: Su Zhenyu
 #include "cominc.h"
 #include "callg.h"
 
+namespace xoc {
+
 //
-//START CALLG
+//START CallGraph
 //
-void CALLG::compute_entry_list(LIST<CALL_NODE*> & elst)
+void CallGraph::computeEntryList(List<CallNode*> & elst)
 {
-	elst.clean();
-	INT c;
-	for (VERTEX * v = get_first_vertex(c);
-		 v != NULL; v = get_next_vertex(c)) {
-		if (VERTEX_in_list(v) == NULL) {
-			CALL_NODE * cn = m_cnid2cn_map.get(VERTEX_id(v));
-			IS_TRUE0(cn != NULL);
-			elst.append_tail(cn);
-		}
-	}
+    elst.clean();
+    INT c;
+    for (Vertex * v = get_first_vertex(c);
+         v != NULL; v = get_next_vertex(c)) {
+        if (VERTEX_in_list(v) == NULL) {
+            CallNode * cn = m_cnid2cn.get(VERTEX_id(v));
+            ASSERT0(cn != NULL);
+            elst.append_tail(cn);
+        }
+    }
 }
 
 
-void CALLG::compute_exit_list(LIST<CALL_NODE*> & elst)
+void CallGraph::computeExitList(List<CallNode*> & elst)
 {
-	elst.clean();
-	INT c;
-	for (VERTEX * v = get_first_vertex(c);
-		 v != NULL; v = get_next_vertex(c)) {
-		if (VERTEX_out_list(v) == NULL) {
-			CALL_NODE * cn = m_cnid2cn_map.get(VERTEX_id(v));
-			IS_TRUE0(cn != NULL);
-			elst.append_tail(cn);
-		}
-	}
+    elst.clean();
+    INT c;
+    for (Vertex * v = get_first_vertex(c);
+         v != NULL; v = get_next_vertex(c)) {
+        if (VERTEX_out_list(v) == NULL) {
+            CallNode * cn = m_cnid2cn.get(VERTEX_id(v));
+            ASSERT0(cn != NULL);
+            elst.append_tail(cn);
+        }
+    }
 }
 
 
-void CALLG::dump_vcg(DT_MGR * dm, CHAR const* name, INT flag)
+//name: file name if you want to dump VCG to specified file.
+//flag: default is 0xFFFFffff(-1) means doing dumping
+//      with completely information.
+void CallGraph::dump_vcg(CHAR const* name, INT flag)
 {
-	if (name == NULL) {
-		name = "graph_call_graph.vcg";
-	}
-	unlink(name);
-	FILE * h = fopen(name, "a+");
-	IS_TRUE(h != NULL, ("%s create failed!!!",name));
+    if (name == NULL) {
+        name = "graph_call_graph.vcg";
+    }
+    unlink(name);
+    FILE * h = fopen(name, "a+");
+    ASSERT(h != NULL, ("%s create failed!!!",name));
 
-	//Print comment
-	fprintf(h, "\n/*");
-	FILE * old = g_tfile;
-	g_tfile = h;
-	//....
-	g_tfile = old;
-	fprintf(h, "\n*/\n");
+    //Print comment
+    fprintf(h, "\n/*");
+    FILE * old = g_tfile;
+    g_tfile = h;
+    //....
+    g_tfile = old;
+    fprintf(h, "\n*/\n");
 
-	//Print graph structure description.
-	fprintf(h, "graph: {"
-			  "title: \"GRAPH\"\n"
-			  "shrink:  15\n"
-			  "stretch: 27\n"
-			  "layout_downfactor: 1\n"
-			  "layout_upfactor: 1\n"
-			  "layout_nearfactor: 1\n"
-			  "layout_splinefactor: 70\n"
-			  "spreadlevel: 1\n"
-			  "treefactor: 0.500000\n"
-			  "node_alignment: center\n"
-			  "orientation: top_to_bottom\n"
-			  "late_edge_labels: no\n"
-			  "display_edge_labels: yes\n"
-			  "dirty_edge_labels: no\n"
-			  "finetuning: no\n"
-			  "nearedges: no\n"
-			  "splines: yes\n"
-			  "ignoresingles: no\n"
-			  "straight_phase: no\n"
-			  "priority_phase: no\n"
-			  "manhatten_edges: no\n"
-			  "smanhatten_edges: no\n"
-			  "port_sharing: no\n"
-			  "crossingphase2: yes\n"
-			  "crossingoptimization: yes\n"
-			  "crossingweight: bary\n"
-			  "arrow_mode: free\n"
-			  "layoutalgorithm: mindepthslow\n"
-			  "node.borderwidth: 2\n"
-			  "node.color: lightcyan\n"
-			  "node.textcolor: black\n"
-			  "node.bordercolor: blue\n"
-			  "edge.color: darkgreen\n");
+    //Print graph structure description.
+    fprintf(h, "graph: {"
+              "title: \"Graph\"\n"
+              "shrink:  15\n"
+              "stretch: 27\n"
+              "layout_downfactor: 1\n"
+              "layout_upfactor: 1\n"
+              "layout_nearfactor: 1\n"
+              "layout_splinefactor: 70\n"
+              "spreadlevel: 1\n"
+              "treefactor: 0.500000\n"
+              "node_alignment: center\n"
+              "orientation: top_to_bottom\n"
+              "late_edge_labels: no\n"
+              "display_edge_labels: yes\n"
+              "dirty_edge_labels: no\n"
+              "finetuning: no\n"
+              "nearedges: no\n"
+              "splines: yes\n"
+              "ignoresingles: no\n"
+              "straight_phase: no\n"
+              "priority_phase: no\n"
+              "manhatten_edges: no\n"
+              "smanhatten_edges: no\n"
+              "port_sharing: no\n"
+              "crossingphase2: yes\n"
+              "crossingoptimization: yes\n"
+              "crossingweight: bary\n"
+              "arrow_mode: free\n"
+              "layoutalgorithm: mindepthslow\n"
+              "node.borderwidth: 2\n"
+              "node.color: lightcyan\n"
+              "node.textcolor: black\n"
+              "node.bordercolor: blue\n"
+              "edge.color: darkgreen\n");
 
-	//Print node
-	old = g_tfile;
-	g_tfile = h;
-	INT c;
-	for (VERTEX * v = m_vertices.get_first(c);
-		 v != NULL; v = m_vertices.get_next(c)) {
-		INT id = VERTEX_id(v);
-		CALL_NODE * cn = m_cnid2cn_map.get(id);
-		IS_TRUE0(cn != NULL);
-		fprintf(h, "\nnode: { title:\"%d\" shape:box color:gold "
-				   "fontname:\"courB\" label:\"", id);
-		CHAR const* ss = SYM_name(CN_sym(cn));
-		fprintf(h, "FUNC(%d):%s\n", CN_id(cn), SYM_name(CN_sym(cn)));
+    //Print node
+    old = g_tfile;
+    g_tfile = h;
+    INT c;
+    for (Vertex * v = m_vertices.get_first(c);
+         v != NULL; v = m_vertices.get_next(c)) {
+        INT id = VERTEX_id(v);
+        CallNode * cn = m_cnid2cn.get(id);
+        ASSERT0(cn != NULL);
+        fprintf(h, "\nnode: { title:\"%d\" shape:box color:gold "
+                   "fontname:\"courB\" label:\"", id);
+        fprintf(h, "FUNC(%d):%s\n", CN_id(cn), SYM_name(CN_sym(cn)));
 
-		//
-		fprintf(h, "\n");
-		if (HAVE_FLAG(flag, CALLG_DUMP_IR) && CN_ru(cn) != NULL) {
-			g_indent = 0;
-			IR * irs = CN_ru(cn)->get_ir_list();
-			for (; irs != NULL; irs = IR_next(irs)) {
-				//fprintf(h, "%s\n", dump_ir_buf(ir, buf));
-				//TODO: implement dump_ir_buf();
-				dump_ir(irs, m_dm, NULL, true, false);
-			}
-		}
-		//
+        //
+        fprintf(h, "\n");
+        if (HAVE_FLAG(flag, CALLG_DUMP_IR) && CN_ru(cn) != NULL) {
+            g_indent = 0;
+            IR * irs = CN_ru(cn)->get_ir_list();
+            for (; irs != NULL; irs = IR_next(irs)) {
+                //fprintf(h, "%s\n", dump_ir_buf(ir, buf));
+                //TODO: implement dump_ir_buf();
+                dump_ir(irs, m_dm, NULL, true, false);
+            }
+        }
+        //
 
-		fprintf(h, "\"}");
-	}
+        fprintf(h, "\"}");
+    }
 
-	//Print edge
-	for (EDGE * e = m_edges.get_first(c); e != NULL; e = m_edges.get_next(c)) {
-		VERTEX * from = EDGE_from(e);
-		VERTEX * to = EDGE_to(e);
-		fprintf(h, "\nedge: { sourcename:\"%d\" targetname:\"%d\" %s}",
-				VERTEX_id(from), VERTEX_id(to),  "");
-	}
-	g_tfile = old;
-	fprintf(h, "\n}\n");
-	fclose(h);
+    //Print edge
+    for (Edge * e = m_edges.get_first(c); e != NULL; e = m_edges.get_next(c)) {
+        Vertex * from = EDGE_from(e);
+        Vertex * to = EDGE_to(e);
+        fprintf(h, "\nedge: { sourcename:\"%d\" targetname:\"%d\" %s}",
+                VERTEX_id(from), VERTEX_id(to),  "");
+    }
+    g_tfile = old;
+    fprintf(h, "\n}\n");
+    fclose(h);
 
 }
 
 
-/*
-Insure CALL_NODE for function is unique.
-Do NOT modify ir' content.
-*/
-CALL_NODE * CALLG::new_call_node(IR * ir)
+//Insure CallNode for function is unique.
+//Do NOT modify ir' content.
+CallNode * CallGraph::newCallNode(IR * ir)
 {
-	IS_TRUE0(IR_type(ir) == IR_CALL);
-	SYM * name = VAR_name(CALL_idinfo(ir));
-	CALL_NODE * cn  = m_sym2cn_map.get(name);
-	if (cn != NULL) return cn;
+    ASSERT0(ir->is_call());
+    SYM const* name = VAR_name(CALL_idinfo(ir));
+    CallNode * cn  = m_sym2cn_map.get(name);
+    if (cn != NULL) return cn;
 
-	cn = new_call_node();
-	CN_sym(cn) = name;
-	CN_id(cn) = m_cn_count++;
-	m_sym2cn_map.set(name, cn);
-	return cn;
+    cn = newCallNode();
+    CN_sym(cn) = name;
+    CN_id(cn) = m_cn_count++;
+    m_sym2cn_map.set(name, cn);
+    return cn;
 }
 
 
-//To guarantee CALL_NODE of function is unique.
-CALL_NODE * CALLG::new_call_node(REGION * ru)
+//To guarantee CallNode of function is unique.
+CallNode * CallGraph::newCallNode(Region * ru)
 {
-	IS_TRUE0(RU_type(ru) == RU_FUNC);
-	SYM * name = VAR_name(ru->get_ru_var());
-	CALL_NODE * cn = m_sym2cn_map.get(name);
-	if (cn != NULL) {
-		if (CN_ru(cn) == NULL) {
-			CN_ru(cn) = ru;
-			m_ruid2cn_map.set(RU_id(ru), cn);
-		}
-		IS_TRUE(CN_ru(cn) == ru, ("more than 2 ru with same name"));
-		return cn;
-	}
+    ASSERT0(ru->is_function());
+    SYM const* name = VAR_name(ru->get_ru_var());
+    CallNode * cn = m_sym2cn_map.get(name);
+    if (cn != NULL) {
+        if (CN_ru(cn) == NULL) {
+            CN_ru(cn) = ru;
+            m_ruid2cn.set(REGION_id(ru), cn);
+        }
+        ASSERT(CN_ru(cn) == ru, ("more than 2 ru with same name"));
+        return cn;
+    }
 
-	cn = new_call_node();
-	CN_sym(cn) = name;
-	CN_id(cn) = m_cn_count++;
-	CN_ru(cn) = ru;
-	m_sym2cn_map.set(name, cn);
-	m_ruid2cn_map.set(RU_id(ru), cn);
-	return cn;
+    cn = newCallNode();
+    CN_sym(cn) = name;
+    CN_id(cn) = m_cn_count++;
+    CN_ru(cn) = ru;
+    m_sym2cn_map.set(name, cn);
+    m_ruid2cn.set(REGION_id(ru), cn);
+    return cn;
 }
 
 
 //Build call graph.
-void CALLG::build(REGION * top)
+void CallGraph::build(Region * top)
 {
-	IS_TRUE0(RU_type(top) == RU_PROGRAM);
-	IR * irs = top->get_ir_list();
-	LIST<CALL_NODE*> ic;
-	while (irs != NULL) {
-		if (IR_type(irs) == IR_REGION) {
-			REGION * ru = REGION_ru(irs);
-			IS_TRUE0(ru && RU_type(ru) == RU_FUNC);
-			CALL_NODE * cn = new_call_node(ru);
-			add_node(cn);
-			LIST<IR const*> * call_list = ru->get_call_list();
-			if (call_list->get_elem_count() == 0) {
-				irs = IR_next(irs);
-				continue;
-			}
-			for (IR const* ir = call_list->get_head();
-				 ir != NULL; ir = call_list->get_next()) {
-				IS_TRUE0(IR_type(ir) == IR_CALL || IR_type(ir) == IR_ICALL);
-				if (IR_type(ir) == IR_CALL) {
-					//Direct call.
-					CALL_NODE * cn2 = new_call_node(const_cast<IR*>(ir));
-					add_node(cn2);
-					add_edge(CN_id(cn), CN_id(cn2));
-				} else {
-					//Indirect call.
-					CALL_NODE * cn3 = new_call_node(const_cast<IR*>(ir));
-					ic.append_tail(cn3);
-					add_node(cn3);
-				}
-			}
-		}
-		irs = IR_next(irs);
-	}
-	for (CALL_NODE * i = ic.get_head(); i != NULL; i = ic.get_next()) {
-		INT c;
-		for (VERTEX * v = get_first_vertex(c);
-			 v != NULL; v = get_next_vertex(c)) {
-			CALL_NODE * j = map_id2cn(VERTEX_id(v));
-			IS_TRUE0(j);
-			add_edge(CN_id(i), CN_id(j));
-		}
-	}
-	//dump_vcg(m_ru_mgr->get_dt_mgr());
-	set_bs_mgr(m_ru_mgr->get_bs_mgr());
+    ASSERT0(top->is_program());
+    IR * irs = top->get_ir_list();
+    List<CallNode*> indirect_call;
+    while (irs != NULL) {
+        if (irs->is_region()) {
+            Region * ru = REGION_ru(irs);
+            ASSERT0(ru && ru->is_function());
+            CallNode * cn = newCallNode(ru);
+            add_node(cn);
+            List<IR const*> * call_list = ru->get_call_list();
+            if (call_list->get_elem_count() == 0) {
+                irs = IR_next(irs);
+                continue;
+            }
+
+            C<IR const*> * ct;
+            for (call_list->get_head(&ct);
+                 ct != NULL; ct = call_list->get_next(ct)) {
+                IR const* ir = ct->val();
+                ASSERT0(ir && ir->is_calls_stmt());
+
+                if (CALL_is_intrinsic(ir)) { continue; }
+                if (!shouldAddEdge(ir)) { continue; }
+
+                if (ir->is_call()) {
+                    //Direct call.
+                    CallNode * cn2 = newCallNode(const_cast<IR*>(ir));
+                    add_node(cn2);
+                    addEdge(CN_id(cn), CN_id(cn2));
+                } else {
+                    ASSERT(ir->is_icall(), ("Indirect call."));
+                    CallNode * cn3 = newCallNode(const_cast<IR*>(ir));
+                    indirect_call.append_tail(cn3);
+                    add_node(cn3);
+                }
+            }
+        }
+        irs = IR_next(irs);
+    }
+
+    C<CallNode*> * ct;
+    for (indirect_call.get_head(&ct);
+         ct != indirect_call.end();
+         ct = indirect_call.get_next(ct)) {
+        CallNode * i = ct->val();
+        ASSERT0(i);
+        INT c;
+        for (Vertex * v = get_first_vertex(c);
+             v != NULL; v = get_next_vertex(c)) {
+            CallNode * j = map_id2cn(VERTEX_id(v));
+            ASSERT0(j);
+            addEdge(CN_id(i), CN_id(j));
+        }
+    }
 }
-//END CALLG
+//END CallGraph
+
+} //namespace xoc

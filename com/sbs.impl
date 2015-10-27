@@ -1,0 +1,714 @@
+/*@
+Copyright (c) 2013-2014, Su Zhenyu steven.known@gmail.com
+All rights reserved.
+
+Redistribution and use in source and binary forms, with or without
+modification, are permitted provided that the following conditions are met:
+
+    * Redistributions of source code must retain the above copyright
+      notice, this list of conditions and the following disclaimer.
+    * Redistributions in binary form must reproduce the above copyright
+      notice, this list of conditions and the following disclaimer in the
+      documentation and/or other materials provided with the distribution.
+    * Neither the name of the Su Zhenyu nor the names of its contributors
+      may be used to endorse or promote products derived from this software
+      without specific prior written permission.
+
+THIS SOFTWARE IS PROVIDED "AS IS" AND ANY
+EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
+FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE
+USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+@*/
+#include "ltype.h"
+#include "comf.h"
+#include "smempool.h"
+#include "sstl.h"
+
+//
+//START MiscBitSetMgr
+//
+//'h': dump mem usage detail to file.
+template <UINT BitsPerSeg>
+UINT MiscBitSetMgr<BitsPerSeg>::count_mem(FILE * h) const
+{
+	UINT count = 0;
+	for (SC<SBitSet<BitsPerSeg>*> * st = m_sbitset_list.get_head();
+		 st != m_sbitset_list.end(); st = m_sbitset_list.get_next(st)) {
+		ASSERT0(st->val());
+		count += st->val()->count_mem();
+	}
+
+	for (SC<DBitSet<BitsPerSeg>*> * dt = m_dbitset_list.get_head();
+		 dt != m_dbitset_list.end(); dt = m_dbitset_list.get_next(dt)) {
+		ASSERT0(dt->val());
+		count += dt->val()->count_mem();
+	}
+
+	//DBitSetCore and SBitSetCore are allocated in the pool.
+	count += smpoolGetPoolSize(m_sbitsetcore_pool);
+	count += smpoolGetPoolSize(m_dbitsetcore_pool);
+	count += smpoolGetPoolSize(ptr_pool);
+	count += sm.count_mem();
+
+	UNUSED(h);
+	#ifdef _DEBUG_
+	if (h != NULL) {
+		//Dump mem usage into file.
+		List<UINT> lst;
+		for (SC<SBitSet<BitsPerSeg>*> * st = m_sbitset_list.get_head();
+			 st != m_sbitset_list.end(); st = m_sbitset_list.get_next(st)) {
+			SBitSet<BitsPerSeg> const* bs = st->val(); 
+			ASSERT0(bs);
+
+			UINT c = bs->count_mem();
+			C<UINT> * ct;
+			UINT n = lst.get_elem_count();
+			lst.get_head(&ct);
+			UINT i;
+			for (i = 0; i < n; i++, ct = lst.get_next(ct)) {
+				if (c >= ct->val()) {
+					lst.insert_before(c, ct);
+					break;
+				}
+			}
+			if (i == n) {
+				lst.append_head(c);
+			}
+		}
+		
+		UINT v = lst.get_head();
+		fprintf(h, "\n== DUMP BitSetMgr: total %d "
+					"bitsets, mem usage are:\n",
+					m_sbitset_list.get_elem_count());
+		
+		UINT b = 0;
+		UINT n = lst.get_elem_count();
+		for (UINT i = 0; i < n; i++, v = lst.get_next(), b++) {
+			if (b == 20) {
+				fprintf(h, "\n");
+				b = 0;
+			}
+			if (v < 1024) {
+				fprintf(h, "%dB,", v);
+			} else if (v < 1024 * 1024) {
+				fprintf(h, "%dKB,", v/1024);
+			} else {
+				fprintf(h, "%dMB,", v/1024/1024);
+			}
+		}
+		fflush(h);
+	}
+	#endif
+	return count;
+}
+//END MiscBitSetMgr
+
+
+//
+//START SBitSetCore
+//
+//'free_list': free list for TSEGIter
+//'pool': be used to alloc TSEGIter
+template <UINT BitsPerSeg>
+void SBitSetCore<BitsPerSeg>::bunion(
+			SBitSetCore<BitsPerSeg> const& src, 
+			SegMgr<BitsPerSeg> * sm,
+			TSEGIter ** free_list, 
+			SMemPool * pool)
+{
+	ASSERT(this != &src, ("operate on same set"));
+	TSEGIter * tgtst = segs.get_head();
+	TSEGIter * prev_st = NULL;
+	for (TSEGIter * srcst = src.segs.get_head();
+		 srcst != src.segs.end(); srcst = src.segs.get_next(srcst)) {
+		SEG<BitsPerSeg> * s = srcst->val();
+		ASSERT0(s);
+		
+		UINT src_start = s->start;
+
+		bool handled = false;
+		for (; tgtst != segs.end(); 
+			 prev_st = tgtst, tgtst = segs.get_next(tgtst)) {
+			SEG<BitsPerSeg> * t = tgtst->val();
+			UINT tgt_start = t->start;
+			if (src_start < tgt_start) {
+				/*
+				s: |----|
+				t:       |----|
+				*/
+				SEG<BitsPerSeg> * x = sm->new_seg();
+				x->copy(*s);
+				if (prev_st == NULL) {
+					prev_st = segs.append_head(x, free_list, pool);
+				} else {
+					prev_st = segs.insert_after(x, prev_st, free_list, pool);
+				}
+				handled = true; //current tgt segment has been handled.
+				break;
+			} else if (src_start == tgt_start) {
+				t->bs.bunion(s->bs);
+				prev_st = tgtst;
+
+				tgtst = segs.get_next(tgtst);
+
+				handled = true; //current tgt segment has been handled.
+				break;
+			}
+		}
+
+		if (tgtst == NULL && !handled) {
+			//Append rest of src segments to tail.
+			SEG<BitsPerSeg> * x = sm->new_seg();
+			x->copy(*s);
+			segs.append_tail(x, free_list, pool);
+		}
+	}
+}
+
+
+//'free_list': free list for TSEGIter
+//'pool': be used to alloc TSEGIter
+template <UINT BitsPerSeg>
+void SBitSetCore<BitsPerSeg>::bunion(
+		UINT elem, 
+		SegMgr<BitsPerSeg> * sm, 
+		TSEGIter ** free_list, 
+		SMemPool * pool)
+{
+	TSEGIter * prev_sct = NULL;
+	TSEGIter * sct = segs.get_head();
+	TSEGIter * next_sct = sct;
+	for (; sct != segs.end(); prev_sct = sct, sct = next_sct) {
+		SEG<BitsPerSeg> * s = SC_val(sct);
+		next_sct = segs.get_next(next_sct);
+
+		UINT start = s->get_start();
+		if (elem < start) { break; }
+		
+		UINT last = s->get_end();
+		if (elem <= last) {
+			s->bs.bunion(elem - start);
+			return;
+		}
+	}
+
+	SEG<BitsPerSeg> * x = sm->new_seg();
+	if (sct != NULL) {
+		if (prev_sct == NULL) {
+			segs.append_head(x, free_list, pool);
+		} else {
+			segs.insert_after(x, prev_sct, free_list, pool);
+		}
+	} else {
+		segs.append_tail(x, free_list, pool);
+	}
+	x->start = elem / BitsPerSeg * BitsPerSeg;
+	x->bs.bunion(elem - x->start);
+}
+
+
+template <UINT BitsPerSeg>
+void SBitSetCore<BitsPerSeg>::clean(
+		SegMgr<BitsPerSeg> * sm, 
+		TSEGIter ** free_list)
+{
+	for (TSEGIter * st = segs.get_head(); 
+		 st != segs.end(); st = segs.get_next(st)) {
+		SEG<BitsPerSeg> * s = st->val();
+		ASSERT0(s);
+		
+		sm->free(s);
+	}
+
+	//Free the list of container of SEG* back to SegMgr<BitsPerSeg>.
+	segs.clean(free_list);
+}
+
+
+template <UINT BitsPerSeg>
+void SBitSetCore<BitsPerSeg>::destroy_seg_and_clean(
+		SegMgr<BitsPerSeg> * sm, 
+		TSEGIter ** free_list)
+{
+	for (TSEGIter * st = segs.get_head(); 
+		 st != segs.end(); st = segs.get_next(st)) {
+		//Delete it here, and we are not going to 
+		//give it back to SegMgr<BitsPerSeg>.
+		SEG<BitsPerSeg> * s = st->val();
+		ASSERT0(s);
+
+		UNUSED(sm);
+		#ifdef _DEBUG_
+		sm->dec_seg_count();
+		
+		#ifdef DEBUG_SEG
+		sm->allocated.diff(s->id);
+		#endif
+		
+		#endif
+		
+		delete s;
+	}
+
+	//Because TSEGIter is always allocated from pool, recycle
+	//it to free_list, at last give it back to the pool.
+	segs.clean(free_list);
+}
+
+
+template <UINT BitsPerSeg>
+UINT SBitSetCore<BitsPerSeg>::count_mem() const
+{
+	UINT c = 0;
+	for (TSEGIter * st = segs.get_head(); 
+		 st != segs.end(); st = segs.get_next(st)) {
+		SEG<BitsPerSeg> * s = st->val();
+		ASSERT0(s);
+		c += s->count_mem();
+	}
+	c += segs.count_mem();
+	return c;
+}
+
+
+template <UINT BitsPerSeg>
+void SBitSetCore<BitsPerSeg>::diff(
+			UINT elem, 
+			SegMgr<BitsPerSeg> * sm, 
+			TSEGIter ** free_list)
+{
+	TSEGIter * sct = segs.get_head();
+	TSEGIter * next_sct = sct;
+	TSEGIter * prev_sct = NULL;
+	for (; sct != segs.end(); prev_sct = sct, sct = next_sct) {
+		SEG<BitsPerSeg> * s = SC_val(sct);
+		next_sct = segs.get_next(next_sct);
+		
+		UINT start = s->get_start();
+		if (elem < start) { break; }
+		
+		UINT last = s->get_end();
+		if (elem <= last) {
+			s->bs.diff(elem - start);
+			if (s->bs.is_empty()) {
+				segs.remove(prev_sct, sct, free_list);
+				sm->free(s);
+			}
+			return;
+		}
+	}
+}
+
+
+//Difference between current bitset and 'src', current bitset
+//will be modified.
+template <UINT BitsPerSeg>
+void SBitSetCore<BitsPerSeg>::diff(
+		SBitSetCore const& src, 
+		SegMgr<BitsPerSeg> * sm, 
+		TSEGIter ** free_list)
+{
+	ASSERT(this != &src, ("operate on same set"));
+	TSEGIter * tgtst = segs.get_head();
+	TSEGIter * prev_st = NULL;
+	TSEGIter * next_st = tgtst;
+	TSEGIter * next_srcst = src.segs.get_head();
+	TSEGIter * srcst = next_srcst;
+	for (; srcst != src.segs.end(); srcst = next_srcst) {
+		next_srcst = src.segs.get_next(next_srcst);
+		
+		SEG<BitsPerSeg> * s = SC_val(srcst);
+		UINT src_start = s->start;
+		
+		for (; tgtst != segs.end();) {
+			SEG<BitsPerSeg> * t = SC_val(tgtst);
+			UINT tgt_start = t->start;
+
+			if (src_start < tgt_start) {
+				break;
+			}
+
+			if (src_start > tgt_start) {
+				next_st = segs.get_next(next_st);
+				prev_st = tgtst;
+				tgtst = next_st;
+				continue;
+			}
+			
+			next_st = segs.get_next(next_st);
+			t->bs.diff(s->bs);
+			
+			if (t->bs.is_empty()) {
+				segs.remove(prev_st, tgtst, free_list);
+				//prev_st keep unchanged.
+				tgtst = next_st;
+				sm->free(t);
+			} else {
+				prev_st = tgtst;
+				tgtst = next_st;
+			}
+		}
+	}
+}
+
+
+template <UINT BitsPerSeg>
+void SBitSetCore<BitsPerSeg>::dump2(FILE * h) const
+{
+	ASSERT0(h);
+	fprintf(h, "\n");
+	if (segs.get_elem_count() == 0) {
+		fprintf(h, "empty");
+		fflush(h);
+		return;
+	}
+	dump(h);
+}
+
+
+template <UINT BitsPerSeg>
+void SBitSetCore<BitsPerSeg>::dump(FILE * h) const
+{
+	ASSERT0(h);
+	for (TSEGIter * st = segs.get_head(); 
+		 st != segs.end(); st = segs.get_next(st)) {
+		SEG<BitsPerSeg> * s = st->val();
+		ASSERT0(s);
+		
+		fprintf(h, " [");
+		INT n;
+		for (INT i = s->bs.get_first(); i >= 0; i = n) {
+			n = s->bs.get_next(i);
+			fprintf(h, "%d", i + s->get_start());
+			if (n >= 0) {
+				fprintf(h, ",");
+			}
+		}
+		fprintf(h, "]");
+	}
+	fflush(h);
+}
+
+
+template <UINT BitsPerSeg>
+UINT SBitSetCore<BitsPerSeg>::get_elem_count() const
+{
+	UINT c = 0;
+	for (TSEGIter * st = segs.get_head(); 
+		 st != segs.end(); st = segs.get_next(st)) {
+		SEG<BitsPerSeg> * s = st->val();
+		c += s->bs.get_elem_count();
+	}
+	return c;
+}
+
+
+//*cur will be set to NULL if set is empty.
+template <UINT BitsPerSeg>
+INT SBitSetCore<BitsPerSeg>::get_first(TSEGIter ** cur) const
+{
+	ASSERT0(cur);
+	TSEGIter * sc = segs.get_head();
+	if (sc == segs.end()) {
+		ASSERT0(segs.get_elem_count() == 0);
+		*cur = NULL;
+		return -1;
+	}
+	*cur = sc;
+	ASSERT0(sc->val());
+
+	SEG<BitsPerSeg> * s = sc->val();
+	ASSERT(!s->bs.is_empty(), ("empty SEG should not exist."));
+	return (INT)s->get_start() + s->bs.get_first();
+}
+
+
+//*cur will be set to NULL if set is empty.
+template <UINT BitsPerSeg>
+INT SBitSetCore<BitsPerSeg>::get_last(TSEGIter ** cur) const
+{
+	ASSERT0(cur);
+	TSEGIter * sc = segs.get_tail();
+	if (sc == segs.end()) {
+		ASSERT0(segs.get_elem_count() == 0);
+		*cur = NULL;
+		return -1;
+	}
+	*cur = sc;
+	ASSERT0(sc->val());
+
+	SEG<BitsPerSeg> * s = sc->val();
+	ASSERT0(!s->bs.is_empty());
+	return s->get_start() + s->bs.get_last();
+}
+
+
+//Note *cur must be initialized.
+template <UINT BitsPerSeg>
+INT SBitSetCore<BitsPerSeg>::get_next(
+		UINT elem, 
+		TSEGIter ** cur) const
+{
+	if (cur == NULL) {
+		for (TSEGIter * st = segs.get_head(); 
+			 st != segs.end(); st = segs.get_next(st)) {
+			SEG<BitsPerSeg> * s = st->val();
+			ASSERT0(s);
+				
+			UINT start = s->get_start();
+			if (elem < start) { continue; }
+			UINT last = s->get_end();
+			if (elem <= last) {
+				INT n = s->bs.get_next(elem - start);
+				if (n >= 0) { return (INT)(start + (UINT)n); }
+
+				st = segs.get_next(st);
+				if (st == NULL) {
+					return -1;
+				}
+				
+				start = SC_val(st)->get_start();
+				n = SC_val(st)->bs.get_first();
+				ASSERT0(n >= 0);
+				return (INT)(start + (UINT)n);
+			}
+		}
+		return -1;
+	}
+	
+	TSEGIter * st = *cur;
+	if (st == NULL) { return -1; }
+	
+	UINT start = SC_val(st)->get_start();
+	INT n = SC_val(st)->bs.get_next(elem - start);
+	if (n >= 0) {
+		return (INT)(start + (UINT)n);
+	}
+	
+	st = segs.get_next(st);
+	if (st == segs.end()) {
+		*cur = NULL;
+		return -1;
+	}
+
+	//Update container.
+	*cur = st;
+	start = SC_val(st)->get_start();
+	n = SC_val(st)->bs.get_first();
+	ASSERT0(n >= 0);
+	return (INT)(start + (UINT)n);
+}
+
+
+template <UINT BitsPerSeg>
+bool SBitSetCore<BitsPerSeg>::is_equal(SBitSetCore<BitsPerSeg> const& src) const
+{
+	ASSERT(this != &src, ("operate on same set"));
+	TSEGIter * srcst = src.segs.get_head();
+	TSEGIter * tgtst = segs.get_head();
+	for (; srcst != src.segs.end() || tgtst != segs.end(); )  {
+		if ((srcst == NULL) ^ (tgtst == NULL)) {
+			return false;
+		}
+		
+		ASSERT0(srcst);
+		
+		if (SC_val(srcst)->start != SC_val(tgtst)->start) {
+			return false;
+		}
+		
+		if (!SC_val(srcst)->bs.is_equal(SC_val(tgtst)->bs)) {
+			return false;
+		}
+		
+		srcst = src.segs.get_next(srcst);
+		tgtst = segs.get_next(tgtst);
+	}
+	return true;
+}
+
+
+template <UINT BitsPerSeg>
+bool SBitSetCore<BitsPerSeg>::is_intersect(
+			SBitSetCore<BitsPerSeg> const& src) const
+{
+	ASSERT(this != &src, ("operate on same set"));
+	TSEGIter * srcst = src.segs.get_head();
+	TSEGIter * tgtst = segs.get_head();
+	for (; srcst != src.segs.end() && tgtst != segs.end(); ) {
+		if (SC_val(srcst)->start < SC_val(tgtst)->start) {
+			srcst = src.segs.get_next(srcst);
+			continue;
+		} else if (SC_val(srcst)->start == SC_val(tgtst)->start) {
+			if (SC_val(srcst)->bs.is_intersect(SC_val(tgtst)->bs)) {
+				return true;
+			}
+			
+			srcst = src.segs.get_next(srcst);
+			tgtst = segs.get_next(tgtst);
+			continue;
+		} else {
+			//srcst's start > tgtst's start
+			tgtst = segs.get_next(tgtst);
+			continue;
+		}
+	}
+	return false;
+}
+
+
+template <UINT BitsPerSeg>
+bool SBitSetCore<BitsPerSeg>::is_contain(UINT elem) const
+{
+	for (TSEGIter * st = segs.get_head(); 
+		 st != segs.end(); st = segs.get_next(st)) {
+		SEG<BitsPerSeg> * seg = SC_val(st);
+        UINT start = seg->get_start();
+        if (elem < start) { return false; }
+		
+        if (elem >= start && elem <= seg->get_end()) {
+            return seg->bs.is_contain(elem - start);
+        }
+	}
+	return false;
+}
+
+
+template <UINT BitsPerSeg>
+bool SBitSetCore<BitsPerSeg>::is_empty() const
+{
+	TSEGIter * st = segs.get_head();
+	#ifdef _DEBUG_	
+	if (st != segs.end()) {
+		ASSERT0(st->val() && !st->val()->bs.is_empty());
+	}
+	#endif
+	return st == segs.end();
+}
+
+
+//Do intersection for current bitset and 'src', current bitset
+//will be modified.
+template <UINT BitsPerSeg>
+void SBitSetCore<BitsPerSeg>::intersect(
+		SBitSetCore<BitsPerSeg> const& src, 
+		SegMgr<BitsPerSeg> * sm, 
+		TSEGIter ** free_list)
+{
+	ASSERT(this != &src, ("operate on same set"));
+	TSEGIter * tgtst = segs.get_head();
+	TSEGIter * prev_st = NULL;
+	TSEGIter * next_st = tgtst;
+	TSEGIter * next_srcst = src.segs.get_head();
+	TSEGIter * srcst = next_srcst;
+	for (; srcst != src.segs.end(); srcst = next_srcst) {
+		next_srcst = src.segs.get_next(next_srcst);
+		
+		SEG<BitsPerSeg> * s = SC_val(srcst);
+		UINT src_start = s->start;
+		
+		for (; tgtst != segs.end();) {
+			SEG<BitsPerSeg> * t = SC_val(tgtst);
+			UINT tgt_start = t->start;
+
+			if (src_start < tgt_start) {
+				if (next_srcst == NULL) {
+					//the last segment of src.
+					next_st = segs.get_next(next_st);
+					segs.remove(prev_st, tgtst, free_list);
+					//prev_st keep unchanged.
+					tgtst = next_st;
+					sm->free(t);
+					continue;
+				}
+				break;
+			}
+			
+			if (src_start > tgt_start) {
+				next_st = segs.get_next(next_st);
+				segs.remove(prev_st, tgtst, free_list);
+				//prev_st keep unchanged.
+				tgtst = next_st;
+				sm->free(t);
+				continue;
+			}
+
+			next_st = segs.get_next(next_st);
+			t->bs.intersect(s->bs);
+			if (t->bs.is_empty()) {
+				segs.remove(prev_st, tgtst, free_list);
+				//prev_st keep unchanged.
+				tgtst = next_st;
+				sm->free(t);
+			} else {
+				prev_st = tgtst;
+				tgtst = next_st;
+			}
+		}
+	}
+	
+	if (next_srcst == src.segs.end()) {
+		//tgt list is longer than src. So tgt list still have
+		//element to cope with.
+		for (; tgtst != segs.end(); tgtst = next_st) {
+			SEG<BitsPerSeg> * t = SC_val(tgtst);
+			next_st = segs.get_next(next_st);
+			segs.remove(prev_st, tgtst, free_list);
+			
+			//prev_st keep unchanged.
+			tgtst = next_st;
+			sm->free(t);
+		}
+	}
+}
+//END SBitSetCore
+
+
+//
+//START SBitSet
+//
+template <UINT BitsPerSeg>
+UINT SBitSet<BitsPerSeg>::count_mem() const
+{
+	UINT c = 0;
+	for (TSEGIter * st = SBitSetCore<BitsPerSeg>::segs.get_head(); 
+		 st != SBitSetCore<BitsPerSeg>::segs.end(); 
+		 st = SBitSetCore<BitsPerSeg>::segs.get_next(st)) {
+		SEG<BitsPerSeg> * s = st->val();
+		c += s->count_mem();
+	}
+	c += sizeof(m_pool);
+	c += sizeof(m_sm);
+	c += SBitSetCore<BitsPerSeg>::segs.count_mem();
+	c += smpoolGetPoolSize(m_pool);
+	return c;
+}
+//END SBitSet
+
+
+//
+//START SegMgr
+//
+#if defined(_DEBUG_) && defined(DEBUG_SEG)
+
+//Dump SEGs that do not be freed in time.
+template <UINT BitsPerSeg>
+void dumpSegMgr(SegMgr<BitsPerSeg> * segmgr, FILE * h)
+{	
+	if (h == NULL) { return; }
+	fprintf(h, "\nNot freed seg:");
+	for (UINT i = 0; i < segmgr->seg_count; i++) {
+		if (segmgr->allocated.is_contain(i)) {
+			fprintf(h, "%d,", i); //Seg i still not be freed.
+		}
+	}
+	fflush(h);
+}
+#endif
+//END SegMgr

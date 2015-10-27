@@ -35,30 +35,30 @@ author: Su Zhenyu
 
 INT m518087(CHAR const* info, ...)
 {
-	//CHAR * ptr = (CHAR*)&info;
-	//ptr += sizeof(CHAR*); //being sizeof(info)
-	va_list ptr;
-	va_start(ptr, info);
+    //CHAR * ptr = (CHAR*)&info;
+    //ptr += sizeof(CHAR*); //being sizeof(info)
+    va_list ptr;
+    va_start(ptr, info);
 
-	//PROTOTYPE: int __cdecl vprintf(char const*, char *)
-	//vprintf(info, ptr);
+    //PROTOTYPE: int __cdecl vprintf(char const*, char *)
+    //vprintf(info, ptr);
 
-	//PROTOTYPE: int vfprintf (FILE * stream, const char * format, va_list ap)
-	vfprintf(stdout, info, ptr);
-	fflush(stdout);
+    //PROTOTYPE: int vfprintf (FILE * stream, const char * format, va_list ap)
+    vfprintf(stdout, info, ptr);
+    fflush(stdout);
 
-	/*
-	abort() has type 'void' and is not a throw-expression.
-	And it is unable to be used in clause : a ? 1 : abort().
-	*/
-	va_end(ptr);
-	abort();
-	return 0;
+    /*
+    abort() has type 'void' and is not a throw-expression.
+    And it is unable to be used in clause : a ? 1 : abort().
+    */
+    va_end(ptr);
+    abort();
+    return 0;
 }
 
 
 INT m022138(CHAR const* filename, INT line)
 {
-	printf("\nASSERTION in %s(%d): ", filename, line);
-	return 0;
+    printf("\nASSERTION in %s(%d): ", filename, line);
+    return 0;
 }

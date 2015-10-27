@@ -33,6 +33,8 @@ author: Su Zhenyu
 @*/
 #include "cominc.h"
 
+namespace xoc {
+
 //Optimize float operation.
 bool g_is_opt_float = true;
 
@@ -73,12 +75,12 @@ bool g_do_cfg_remove_unreach_bb = true;
 
 /* Perform cfg optimization: remove redundant trampoline bb.
 e.g:
-	BB1: goto L1
-	BB2, L1: goto L2
+    BB1: goto L1
+    BB2, L1: goto L2
 should be optimized and generate:
-	BB1: goto L2
+    BB1: goto L2
 */
-bool g_do_cfg_remove_tramp_bb = true;
+bool g_do_cfg_remove_trampolin_bb = true;
 
 //Build dominator tree.
 bool g_do_cfg_dom = true;
@@ -133,6 +135,9 @@ bool g_do_gcse = false;
 //Perform interprocedual analysis and optimization.
 bool g_do_ipa = false;
 
+//Build Call Graph.
+bool g_do_call_graph = false;
+
 //If true to show compilation time.
 bool g_show_comp_time = false;
 
@@ -181,3 +186,5 @@ bool g_do_loop_convert = false;
 
 //Polyhedral Transformations.
 bool g_do_poly_tran = false;
+
+} //namespace xoc

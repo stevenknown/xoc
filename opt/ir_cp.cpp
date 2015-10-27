@@ -32,32 +32,108 @@ IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 author: Su Zhenyu
 @*/
 #include "cominc.h"
+#include "prssainfo.h"
+#include "prdf.h"
+#include "ir_ssa.h"
 #include "ir_cp.h"
+
+namespace xoc {
 
 //
 //START IR_CP
 //
 //Return true if ir's type is consistent with 'cand_expr'.
-bool IR_CP::check_type_consistency(IR const* ir, IR const* cand_expr) const
+bool IR_CP::checkTypeConsistency(IR const* ir, IR const* cand_expr) const
 {
-	UINT t1 = IR_dt(ir);
-	UINT t2 = IR_dt(cand_expr);
-	IS_TRUE0(t1 != VOID_TY && t2 != VOID_TY);
-	if (t1 == t2) { return true; }
+    Type const* t1 = IR_dt(ir);
+    Type const* t2 = IR_dt(cand_expr);
 
-	if (m_dm->is_scalar(t1) && m_dm->is_scalar(t2)) {
-		if (m_dm->is_signed(t1) ^ m_dm->is_signed(t2)) {
-			//Sign must be consistent.
-			return false;
-		}
-		if (m_dm->get_dtd_bytesize(t1) < m_dm->get_dtd_bytesize(t2)) {
-			//ir size must be equal or great than cand.
-			return false;
-		}
-		return true;
-	}
+    //Do copy-prog even if data type is VOID.
+    if (t1 == t2) { return true; }
 
-	return false;
+    if (m_dm->is_scalar(t1) && m_dm->is_scalar(t2)) {
+        if (m_dm->is_signed(t1) ^ m_dm->is_signed(t2)) {
+            //Sign must be consistent.
+            return false;
+        }
+        if (m_dm->get_bytesize(t1) < m_dm->get_bytesize(t2)) {
+            //ir size must be equal or great than cand.
+            return false;
+        }
+        return true;
+    }
+
+    return false;
+}
+
+
+/* Check and replace 'exp' with 'cand_expr' if they are
+equal, and update SSA info. If 'cand_expr' is NOT leaf,
+that will create redundant computation, and
+depends on later Redundancy Elimination to reverse back.
+
+'cand_expr': substitute cand_expr for exp.
+    e.g: exp is pr1 of S2, cand_expr is 10.
+        pr1 = 10 //S1
+        g = pr1 //S2
+    =>
+        pr1 = 10
+        g = 10
+
+NOTE: Do NOT handle stmt. */
+void IR_CP::replaceExpViaSSADu(IR * exp, IR const* cand_expr,
+                                    IN OUT CPCtx & ctx)
+{
+    ASSERT0(exp && exp->is_exp() && cand_expr && cand_expr->is_exp());
+    ASSERT0(exp->get_exact_ref());
+
+    if (!checkTypeConsistency(exp, cand_expr)) {
+        return;
+    }
+
+    IR * parent = IR_parent(exp);
+    if (parent->is_ild()) {
+        CPC_need_recomp_aa(ctx) = true;
+    } else if (parent->is_ist() && exp == IST_base(parent)) {
+        if (!cand_expr->is_ld() &&
+            !cand_expr->is_pr() &&
+            !cand_expr->is_lda()) {
+            return;
+        }
+        CPC_need_recomp_aa(ctx) = true;
+    }
+
+    IR * newir = m_ru->dupIRTree(cand_expr);
+
+    if (cand_expr->is_read_pr() && PR_ssainfo(cand_expr) != NULL) {
+        PR_ssainfo(newir) = PR_ssainfo(cand_expr);
+        SSA_uses(PR_ssainfo(newir)).append(newir);
+    } else {
+        m_du->copyIRTreeDU(newir, cand_expr, true);
+    }
+
+    //cand_expr may be IR tree. And there might be PR or LD on the tree.
+    newir->copyRefForTree(cand_expr, m_ru);
+
+    //Add SSA use for new exp.
+    SSAInfo * cand_ssainfo = NULL;
+    if ((cand_ssainfo = cand_expr->get_ssainfo()) != NULL) {
+        SSA_uses(cand_ssainfo).append(newir);
+    }
+
+    //Remove old exp SSA use.
+    SSAInfo * exp_ssainfo = exp->get_ssainfo();
+    ASSERT0(exp_ssainfo);
+    ASSERT0(SSA_uses(exp_ssainfo).find(exp));
+    SSA_uses(exp_ssainfo).remove(exp);
+
+    CPC_change(ctx) = true;
+
+    ASSERT0(exp->get_stmt());
+    bool doit = parent->replaceKid(exp, newir, false);
+    ASSERT0(doit);
+    UNUSED(doit);
+    m_ru->freeIRTree(exp);
 }
 
 
@@ -65,299 +141,372 @@ bool IR_CP::check_type_consistency(IR const* ir, IR const* cand_expr) const
 equal, and update DU info. If 'cand_expr' is NOT leaf,
 that will create redundant computation, and
 depends on later Redundancy Elimination to reverse back.
+exp: expression which will be replaced.
 
-'cand_expr': substitute cand_expr for ir.
-	e.g: cand_expr is *p, cand_expr_md is MD3
-		*p(MD3) = 10 //p point to MD3
-		...
-		g = *q(MD3) //q point to MD3
+cand_expr: substitute cand_expr for exp.
+    e.g: cand_expr is *p, cand_expr_md is MD3
+        *p(MD3) = 10 //p point to MD3
+        ...
+        g = *q(MD3) //q point to MD3
+
+exp_use_ssadu: true if exp used SSA du info.
 
 NOTE: Do NOT handle stmt. */
-void IR_CP::replace_expr(IR * exp, IR const* cand_expr, IN OUT CP_CTX & ctx)
+void IR_CP::replaceExp(IR * exp, IR const* cand_expr,
+                        IN OUT CPCtx & ctx, bool exp_use_ssadu)
 {
-	IS_TRUE0(exp && exp->is_exp() && cand_expr);
-	IS_TRUE0(exp->get_exact_ref());
+    ASSERT0(exp && exp->is_exp() && cand_expr);
+    ASSERT0(exp->get_exact_ref());
 
-	if (!check_type_consistency(exp, cand_expr)) {
-		return;
-	}
+    if (!checkTypeConsistency(exp, cand_expr)) {
+        return;
+    }
 
-	IR * parent = IR_parent(exp);
-	if (IR_type(parent) == IR_ILD) {
-		CPC_need_recomp_aa(ctx) = true;
-	} else if (IR_type(parent) == IR_IST && exp == IST_base(parent)) {
-		if (IR_type(cand_expr) != IR_LD &&
-			!cand_expr->is_pr() &&
-			IR_type(cand_expr) != IR_LDA) {
-			return;
-		}
-		CPC_need_recomp_aa(ctx) = true;
-	}
+    IR * parent = IR_parent(exp);
+    if (parent->is_ild()) {
+        CPC_need_recomp_aa(ctx) = true;
+    } else if (parent->is_ist() && exp == IST_base(parent)) {
+        if (!cand_expr->is_ld() && !cand_expr->is_pr() && !cand_expr->is_lda()) {
+            return;
+        }
+        CPC_need_recomp_aa(ctx) = true;
+    }
 
-	IR * newir = m_ru->dup_irs(cand_expr);
-	m_du->copy_ir_tree_du_info(newir, cand_expr, true);
+    IR * newir = m_ru->dupIRTree(cand_expr);
+    m_du->copyIRTreeDU(newir, cand_expr, true);
 
-	IS_TRUE0(cand_expr->get_stmt());
-	m_du->remove_use_out_from_defset(exp);
-	CPC_change(ctx) = true;
+    ASSERT0(cand_expr->get_stmt());
+    if (exp_use_ssadu) {
+        //Remove exp SSA use.
+        ASSERT0(exp->get_ssainfo());
+        ASSERT0(exp->get_ssainfo()->get_uses().find(exp));
 
-	IS_TRUE0(exp->get_stmt());
-	bool doit = parent->replace_kid(exp, newir, false);
-	IS_TRUE0(doit);
-	m_ru->free_irs(exp);
+        exp->removeSSAUse();
+    } else {
+        m_du->removeUseOutFromDefset(exp);
+    }
+    CPC_change(ctx) = true;
+
+    ASSERT0(exp->get_stmt());
+    bool doit = parent->replaceKid(exp, newir, false);
+    ASSERT0(doit);
+    UNUSED(doit);
+    m_ru->freeIRTree(exp);
 }
 
 
 bool IR_CP::is_copy(IR * ir) const
 {
-	switch (IR_type(ir)) {
-	case IR_ST:
-	case IR_STPR:
-	case IR_IST:
-		return can_be_candidate(ir->get_rhs());
-	default: break;
-	}
-	return false;
+    switch (IR_code(ir)) {
+    case IR_ST:
+    case IR_STPR:
+    case IR_IST:
+        return canBeCandidate(ir->get_rhs());
+    case IR_PHI:
+        if (cnt_list(PHI_opnd_list(ir)) == 1) {
+            return true;
+        }
+    default: break;
+    }
+    return false;
 }
 
 
 /* Return true if 'occ' does not be modified till meeting 'use_ir'.
 e.g:
-	xx = occ  //def_ir
-	..
-	..
-	yy = xx  //use_ir
+    xx = occ  //def_ir
+    ..
+    ..
+    yy = xx  //use_ir
 
 'def_ir': ir stmt.
 'occ': opnd of 'def_ir'
 'use_ir': stmt in use-list of 'def_ir'. */
-bool IR_CP::is_available(IR * def_ir, IR * occ, IR * use_ir)
+bool IR_CP::is_available(IR const* def_ir, IR const* occ, IR * use_ir)
 {
-	if (def_ir == use_ir) {	return false; }
-	if (IR_is_const(occ)) {
-		return true;
-	}
+    if (def_ir == use_ir) {    return false; }
+    if (occ->is_const()) { return true; }
 
-	/* Need check overlapped MD_SET.
-	e.g: Suppose occ is '*p + *q', p->a, q->b.
-	occ can NOT reach 'def_ir' if one of p, q, a, b
-	modified during the path. */
+    /* Need check overlapped MDSet.
+    e.g: Suppose occ is '*p + *q', p->a, q->b.
+    occ can NOT reach 'def_ir' if one of p, q, a, b
+    modified during the path. */
 
-	IR_BB * defbb = def_ir->get_bb();
-	IR_BB * usebb = use_ir->get_bb();
-	if (defbb == usebb) {
-		//Both def_ir and use_ir are in same BB.
-		C<IR*> * ir_holder = NULL;
-		bool f = IR_BB_ir_list(defbb).find(def_ir, &ir_holder);
-		IS_TRUE0(f);
-		IR * ir;
-		for (ir = IR_BB_ir_list(defbb).get_next(&ir_holder);
-			 ir != NULL && ir != use_ir;
-			 ir = IR_BB_ir_list(defbb).get_next(&ir_holder)) {
-			if (m_du->is_may_def(ir, occ, true)) {
-				return false;
-			}
-		}
-		if (ir == NULL) {
-			;//use_ir appears prior to def_ir. Do more check via live_in_expr.
-		} else {
-			IS_TRUE(ir == use_ir, ("def_ir should be in same bb to use_ir"));
-			return true;
-		}
-	}
+    IRBB * defbb = def_ir->get_bb();
+    IRBB * usebb = use_ir->get_bb();
+    if (defbb == usebb) {
+        //Both def_ir and use_ir are in same BB.
+        C<IR*> * ir_holder = NULL;
+        bool f = BB_irlist(defbb).find(const_cast<IR*>(def_ir), &ir_holder);
+        CK_USE(f);
+        IR * ir;
+        for (ir = BB_irlist(defbb).get_next(&ir_holder);
+             ir != NULL && ir != use_ir;
+             ir = BB_irlist(defbb).get_next(&ir_holder)) {
+            if (m_du->is_may_def(ir, occ, true)) {
+                return false;
+            }
+        }
+        if (ir == NULL) {
+            ;//use_ir appears prior to def_ir. Do more check via live_in_expr.
+        } else {
+            ASSERT(ir == use_ir, ("def_ir should be in same bb to use_ir"));
+            return true;
+        }
+    }
 
-	IS_TRUE0(use_ir->is_stmt());
-	DBITSETC const* availin_expr = m_du->get_availin_expr(IR_BB_id(usebb));
-	IS_TRUE0(availin_expr);
+    ASSERT0(use_ir->is_stmt());
+    DefDBitSetCore const* availin_expr = m_du->get_availin_expr(BB_id(usebb));
+    ASSERT0(availin_expr);
 
-	if (availin_expr->is_contain(IR_id(occ))) {
-		IR * u;
-		for (u = IR_BB_first_ir(usebb); u != use_ir && u != NULL;
-			 u = IR_BB_next_ir(usebb)) {
-			//Check if 'u' override occ's value.
-			if (m_du->is_may_def(u, occ, true)) {
-				return false;
-			}
-		}
-		IS_TRUE(u != NULL && u == use_ir,
-				("Not find use_ir in bb, may be it has "
-				 "been removed by other optimization"));
-		return true;
-	}
-	return false;
+    if (availin_expr->is_contain(IR_id(occ))) {
+        IR * u;
+        for (u = BB_first_ir(usebb); u != use_ir && u != NULL;
+             u = BB_next_ir(usebb)) {
+            //Check if 'u' override occ's value.
+            if (m_du->is_may_def(u, occ, true)) {
+                return false;
+            }
+        }
+        ASSERT(u != NULL && u == use_ir,
+                ("Not find use_ir in bb, may be it has "
+                 "been removed by other optimization"));
+        return true;
+    }
+    return false;
 }
 
 
 //CVT with simply cvt-exp is copy-propagate candidate.
 bool IR_CP::is_simp_cvt(IR const* ir) const
 {
-	if (IR_type(ir) != IR_CVT) return false;
-	while (true) {
-		if (IR_type(ir) == IR_CVT) {
-			ir = CVT_exp(ir);
-		} else if (IR_type(ir) == IR_LD || IR_is_const(ir) || ir->is_pr()) {
-			return true;
-		} else {
-			return false;
-		}
-	}
-	return false;
+    if (!ir->is_cvt()) return false;
+
+    for (;;) {
+        if (ir->is_cvt()) {
+            ir = CVT_exp(ir);
+        } else if (ir->is_ld() || ir->is_const() || ir->is_pr()) {
+            return true;
+        } else {
+            break;
+        }
+    }
+    return false;
+}
+
+
+//Get the value expression that to be propagated.
+inline static IR * get_propagated_value(IR * stmt)
+{
+    switch (IR_code(stmt)) {
+    case IR_ST: return ST_rhs(stmt);
+    case IR_STPR: return STPR_rhs(stmt);
+    case IR_IST: return IST_rhs(stmt);
+    case IR_PHI: return PHI_opnd_list(stmt);
+    default:;
+    }
+    ASSERT0(0);
+    return NULL;
 }
 
 
 //'usevec': for local used.
-bool IR_CP::do_prop(IN IR_BB * bb, SVECTOR<IR*> & usevec)
+bool IR_CP::doProp(IN IRBB * bb, Vector<IR*> & usevec)
 {
-	bool change = false;
-	C<IR*> * cur_iter, * next_iter;
+    bool change = false;
+    C<IR*> * cur_iter, * next_iter;
 
-	for (IR_BB_ir_list(bb).get_head(&cur_iter),
-		 next_iter = cur_iter; cur_iter != NULL; cur_iter = next_iter) {
+    for (BB_irlist(bb).get_head(&cur_iter),
+         next_iter = cur_iter; cur_iter != NULL; cur_iter = next_iter) {
 
-		IR * def_stmt = C_val(cur_iter);
+        IR * def_stmt = C_val(cur_iter);
 
-		IR_BB_ir_list(bb).get_next(&next_iter);
+        BB_irlist(bb).get_next(&next_iter);
 
-		DU_SET const* useset = m_du->get_du_c(def_stmt);
-		if (useset == NULL || !is_copy(def_stmt)) { continue; }
+        if (!is_copy(def_stmt)) { continue; }
 
-		if (def_stmt->get_exact_ref() == NULL) { continue; }
+        DUSet const* useset = NULL;
+        UINT num_of_use = 0;
+        SSAInfo * ssainfo = NULL;
+        bool ssadu = false;
+        if ((ssainfo = def_stmt->get_ssainfo()) != NULL &&
+            SSA_uses(ssainfo).get_elem_count() != 0) {
+            //Record use_stmt in another vector to facilitate this function
+            //if it is not in use-list any more after copy-propagation.
+            SEGIter * sc;
+            for    (INT u = SSA_uses(ssainfo).get_first(&sc);
+                 u >= 0; u = SSA_uses(ssainfo).get_next(u, &sc)) {
+                IR * use = m_ru->get_ir(u);
+                ASSERT0(use);
+                usevec.set(num_of_use, use);
+                num_of_use++;
+            }
+            ssadu = true;
+        } else if (def_stmt->get_exact_ref() == NULL &&
+                   !def_stmt->is_void()) {
+            //Allowing copy propagate exact or VOID value.
+            continue;
+        } else if ((useset = def_stmt->get_duset_c()) != NULL &&
+                   useset->get_elem_count() != 0) {
+            //Record use_stmt in another vector to facilitate this function
+            //if it is not in use-list any more after copy-propagation.
+            DU_ITER di = NULL;
+            for    (INT u = useset->get_first(&di);
+                 u >= 0; u = useset->get_next(u, &di)) {
+                IR * use = m_ru->get_ir(u);
+                usevec.set(num_of_use, use);
+                num_of_use++;
+            }
+        } else  {
+            continue;
+        }
 
-		if (useset->get_elem_count() == 0) { continue; }
+        IR const* prop_value = get_propagated_value(def_stmt);
 
-		IR * rhs = def_stmt->get_rhs();
+        for (UINT i = 0; i < num_of_use; i++) {
+            IR * use = usevec.get(i);
+            ASSERT0(use->is_exp());
+            IR * use_stmt = use->get_stmt();
+            ASSERT0(use_stmt->is_stmt());
 
-		//Record use_stmt if it is not in use-list
-		//any more after copy-propagation.
-		DU_ITER di;
-		UINT num = 0;
-		for	(INT u = useset->get_first(&di);
-			 u >= 0; u = useset->get_next(u, &di)) {
-			IR * use = m_ru->get_ir(u);
-			usevec.set(num, use);
-			num++;
-		}
+            ASSERT0(use_stmt->get_bb() != NULL);
+            IRBB * use_bb = use_stmt->get_bb();
+            if (!ssadu &&
+                !(bb == use_bb && bb->is_dom(def_stmt, use_stmt, true)) &&
+                !m_cfg->is_dom(BB_id(bb), BB_id(use_bb))) {
+                /* 'def_stmt' must dominate 'use_stmt'.
+                e.g:
+                    if (...) {
+                        g = 10; //S1
+                    }
+                    ... = g; //S2
+                g can not be propagted since S1 is not dominate S2. */
+                continue;
+            }
 
-		for (UINT i = 0; i < num; i++) {
-			IR * use = usevec.get(i);
-			IS_TRUE0(use->is_exp());
-			IR * use_stmt = use->get_stmt();
-			IS_TRUE0(use_stmt->is_stmt());
+            if (!is_available(def_stmt, prop_value, use_stmt)) {
+                /* The value that will be propagated can
+                not be killed during 'ir' and 'use_stmt'.
+                e.g:
+                    g = a; //S1
+                    if (...) {
+                        a = ...; //S3
+                    }
+                    ... = g; //S2
+                g can not be propagted since a is killed by S3. */
+                continue;
+            }
 
-			IS_TRUE0(use_stmt->get_bb() != NULL);
-			IR_BB * use_bb = use_stmt->get_bb();
-			if (!(bb == use_bb && bb->is_dom(def_stmt, use_stmt, true)) &&
-				!m_cfg->is_dom(IR_BB_id(bb), IR_BB_id(use_bb))) {
-				/* 'def_stmt' must dominate 'use_stmt'.
-				e.g:
-					if (...) {
-						g = 10; //S1
-					}
-					... = g; //S2
-				g can not be propagted since S1 is not dominate S2. */
-				continue;
-			}
+            if (!ssadu && !m_du->isExactAndUniqueDef(def_stmt, use)) {
+                /* Only single definition is allowed.
+                e.g:
+                    g = 20; //S3
+                    if (...) {
+                        g = 10; //S1
+                    }
+                    ... = g; //S2
+                g can not be propagted since there are
+                more than one definitions are able to get to S2. */
+                continue;
+            }
 
-			if (!is_available(def_stmt, rhs, use_stmt)) {
-				/* The value that will be propagated can
-				not be killed during 'ir' and 'use_stmt'.
-				e.g:
-					g = a; //S1
-					if (...) {
-						a = ...; //S3
-					}
-					... = g; //S2
-				g can not be propagted since a is killed by S3. */
-				continue;
-			}
+            if (!canBeCandidate(prop_value)) {
+                continue;
+            }
 
-			if (!m_du->is_exact_unique_def(def_stmt, use)) {
-				/* Only single definition is allowed.
-				e.g:
-					g = 20; //S3
-					if (...) {
-						g = 10; //S1
-					}
-					... = g; //S2
-				g can not be propagted since there are
-				more than one definitions are able to get to S2. */
-				continue;
-			}
+            CPCtx lchange;
+            IR * old_use_stmt = use_stmt;
 
-			if (!can_be_candidate(rhs)) {
-				continue;
-			}
+            replaceExp(use, prop_value, lchange, ssadu);
 
-			CP_CTX lchange;
-			IR * old_use_stmt = use_stmt;
-			replace_expr(use, rhs, lchange);
+            ASSERT(use_stmt && use_stmt->is_stmt(),
+                    ("ensure use_stmt still legal"));
+            change |= CPC_change(lchange);
 
-			IS_TRUE(use_stmt && use_stmt->is_stmt(),
-					("ensure use_stmt still legal"));
-			change |= CPC_change(lchange);
+            if (!CPC_change(lchange)) { continue; }
 
-			//Indicate whether use_stmt is the next stmt of def_stmt.
-			bool is_next = false;
-			if (next_iter != NULL && use_stmt == C_val(next_iter)) {
-				is_next = true;
-			}
+            //Indicate whether use_stmt is the next stmt of def_stmt.
+            bool is_next = false;
+            if (next_iter != NULL && use_stmt == C_val(next_iter)) {
+                is_next = true;
+            }
 
-			RF_CTX rf;
-			use_stmt = m_ru->refine_ir(use_stmt, change, rf);
-			if (use_stmt == NULL && is_next) {
-				//use_stmt has been optimized and removed by refine_ir().
-				next_iter = cur_iter;
-				IR_BB_ir_list(bb).get_next(&next_iter);
-			}
+            RefineCTX rf;
+            use_stmt = m_ru->refineIR(use_stmt, change, rf);
+            if (use_stmt == NULL && is_next) {
+                //use_stmt has been optimized and removed by refineIR().
+                next_iter = cur_iter;
+                BB_irlist(bb).get_next(&next_iter);
+            }
 
-			if (use_stmt != NULL && use_stmt != old_use_stmt) {
-				//use_stmt has been removed and new stmt generated.
-				IS_TRUE(IR_type(old_use_stmt) == IR_UNDEF,
-						("the old one should be freed"));
+            if (use_stmt != NULL && use_stmt != old_use_stmt) {
+                //use_stmt has been removed and new stmt generated.
+                ASSERT(old_use_stmt->is_undef(),
+                       ("the old one should be freed"));
 
-				C<IR*> * irct = NULL;
-				IR_BB_ir_list(use_bb).find(old_use_stmt, &irct);
-				IS_TRUE0(irct);
-				IR_BB_ir_list(use_bb).insert_before(use_stmt, irct);
-				IR_BB_ir_list(use_bb).remove(irct);
-			}
-		} //end for each USE
-	} //end for IR
-	return change;
+                C<IR*> * irct = NULL;
+                BB_irlist(use_bb).find(old_use_stmt, &irct);
+                ASSERT0(irct);
+                BB_irlist(use_bb).insert_before(use_stmt, irct);
+                BB_irlist(use_bb).remove(irct);
+            }
+        } //end for each USE
+    } //end for IR
+    return change;
 }
 
 
-bool IR_CP::perform(OPT_CTX & oc)
+void IR_CP::doFinalRefine()
 {
-	START_TIMER_AFTER();
-	IS_TRUE0(OPTC_is_cfg_valid(oc));
-	m_ru->check_valid_and_recompute(&oc, OPT_DOM, OPT_DU_REF, OPT_LIVE_EXPR,
-									OPT_DU_CHAIN, OPT_UNDEF);
+    RefineCTX rf;
+    RC_insert_cvt(rf) = false;
+    m_ru->refineBBlist(m_ru->get_bb_list(), rf);
+}
 
-	bool change = false;
-	IR_BB * entry = m_ru->get_cfg()->get_entry_list()->get_head();
-	IS_TRUE(entry != NULL, ("Not unique entry, invalid REGION"));
-	GRAPH domtree;
-	m_cfg->get_dom_tree(domtree);
-	VERTEX * v = domtree.get_vertex(IR_BB_id(entry));
-	LIST<VERTEX*> lst;
-	VERTEX * root = domtree.get_vertex(IR_BB_id(entry));
-	m_cfg->sort_dom_tree_in_preorder(domtree, root, lst);
-	SVECTOR<IR*> usevec;
 
-	for (VERTEX * v = lst.get_head(); v != NULL; v = lst.get_next()) {
-		IR_BB * bb = m_ru->get_bb(VERTEX_id(v));
-		IS_TRUE0(bb);
-		change |= do_prop(bb, usevec);
-	}
-	if (change) {
-		OPTC_is_expr_tab_valid(oc) = false;
-		OPTC_is_aa_valid(oc) = false;
-		OPTC_is_du_chain_valid(oc) = true; //already update.
-		OPTC_is_ref_valid(oc) = true; //already update.
-		IS_TRUE0(m_du->verify_du_ref() && m_du->verify_du_chain());
-	}
-	END_TIMER_AFTER(get_opt_name());
-	return change;
+bool IR_CP::perform(OptCTX & oc)
+{
+    START_TIMER_AFTER();
+    ASSERT0(OC_is_cfg_valid(oc));
+
+    if (m_prop_kind == CP_PROP_CONST) {
+
+        m_ru->checkValidAndRecompute(&oc, PASS_DOM, PASS_DU_REF,
+                                    PASS_DU_CHAIN, PASS_UNDEF);
+    } else {
+        m_ru->checkValidAndRecompute(&oc, PASS_DOM, PASS_DU_REF,
+                                    PASS_LIVE_EXPR, PASS_DU_CHAIN, PASS_UNDEF);
+    }
+
+    bool change = false;
+    IRBB * entry = m_ru->get_cfg()->get_entry_list()->get_head();
+    ASSERT(entry != NULL, ("Not unique entry, invalid Region"));
+    Graph domtree;
+    m_cfg->get_dom_tree(domtree);
+    List<Vertex*> lst;
+    Vertex * root = domtree.get_vertex(BB_id(entry));
+    m_cfg->sortDomTreeInPreorder(root, lst);
+    Vector<IR*> usevec;
+
+    for (Vertex * v = lst.get_head(); v != NULL; v = lst.get_next()) {
+        IRBB * bb = m_cfg->get_bb(VERTEX_id(v));
+        ASSERT0(bb);
+        change |= doProp(bb, usevec);
+    }
+
+    if (change) {
+        doFinalRefine();
+        OC_is_expr_tab_valid(oc) = false;
+        OC_is_aa_valid(oc) = false;
+        OC_is_du_chain_valid(oc) = true; //already update.
+        OC_is_ref_valid(oc) = true; //already update.
+        ASSERT0(m_du->verifyMDRef() && m_du->verifyMDDUChain());
+        ASSERT0(verifySSAInfo(m_ru));
+    }
+
+    END_TIMER_AFTER(get_pass_name());
+    return change;
 }
 //END IR_CP
+
+} //namespace xoc

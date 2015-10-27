@@ -34,31 +34,36 @@ author: Su Zhenyu
 #ifndef __CFS_OPT_H__
 #define __CFS_OPT_H__
 
-class IR_CFS_OPT : public IR_OPT {
+namespace xoc {
+
+class IR_CFS_OPT : public Pass {
 protected:
-	REGION * m_ru;
-	DT_MGR * m_dm;
-	bool trans_to_do_while_loop(IR ** head, IR * ir);
-	bool is_non_branch_ir(IR * ir);
-	bool trans_if1(IR ** head, IR * ir);
-	bool trans_if2(IR ** head, IR * ir);
-	bool trans_if3(IR ** head, IR * ir);
-	bool hoist_loop(IR ** head, IR * ir);
-	bool hoist_if(IR ** head, IR * ir);
+    Region * m_ru;
+    TypeMgr * m_dm;
+    bool transformToDoWhile(IR ** head, IR * ir);
+    bool transformIf1(IR ** head, IR * ir);
+    bool transformIf2(IR ** head, IR * ir);
+    bool transformIf3(IR ** head, IR * ir);
+    bool transformIf4(IR ** head, IR * ir);
+    bool transformIf5(IR ** head, IR * ir);
+    bool hoistLoop(IR ** head, IR * ir);
+    bool hoistIf(IR ** head, IR * ir);
 public:
-	IR_CFS_OPT(REGION * ru) { m_ru = ru; m_dm = ru->get_dm(); }
-	~IR_CFS_OPT() {}
+    IR_CFS_OPT(Region * ru) { m_ru = ru; m_dm = ru->get_type_mgr(); }
+    ~IR_CFS_OPT() {}
 
-	void dump();
+    void dump();
 
-	virtual CHAR const* get_opt_name() const { return "IR_CFS_OPT"; }
+    virtual CHAR const* get_pass_name() const { return "IR_CFS_OPT"; }
 
-	bool perform_cfs_optimization(IN OUT IR ** ir_list, IN SIMP_CTX const& sc);
-	virtual bool perform(OPT_CTX & oc)
-	{
-		IS_TRUE0(0);
-		return false;
-	}
-	virtual bool perform(IN SIMP_CTX const& simp);
+    bool perform_cfs_optimization(IN OUT IR ** ir_list, IN SimpCTX const& sc);
+    virtual bool perform(OptCTX &)
+    {
+        ASSERT0(0);
+        return false;
+    }
+    virtual bool perform(IN SimpCTX const& simp);
 };
+
+} //namespace xoc
 #endif

@@ -41,14 +41,20 @@ author: Su Zhenyu
 #include "string.h"
 #include "ltype.h"
 
-//Most general utilies for common used
+//libxcom
 #include "comf.h"
 #include "smempool.h"
 #include "sstl.h"
+#include "matt.h"
 #include "bs.h"
+#include "sbs.h"
 #include "sgraph.h"
 #include "rational.h"
 #include "flty.h"
+#include "xmat.h"
+
+using namespace xcom;
+
 #include "option.h"
 #include "targ_const_info.h"
 #include "util.h"
@@ -67,7 +73,7 @@ author: Su Zhenyu
 #include "ai.h"
 #include "du.h"
 #include "ir.h"
-#include "ir_opt.h"
+#include "pass.h"
 #include "ir_refine.h"
 #include "ir_simp.h"
 #include "ir_bb.h"
@@ -75,8 +81,12 @@ author: Su Zhenyu
 #include "ir_cfg.h"
 #include "ir_high_opt.h"
 #include "ir_middle_opt.h"
+#include "targ_info.h"
+#include "region_mgr.h"
 #include "region.h"
 #include "ir_du.h"
 #include "ir_aa.h"
 #include "ir_expr_tab.h"
+
+using namespace xoc;
 #endif

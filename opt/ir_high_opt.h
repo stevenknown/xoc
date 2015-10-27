@@ -35,4 +35,3 @@ author: Su Zhenyu
 #define __IR_HIGH_OPT_H__
 
 #endif
-
