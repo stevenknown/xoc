@@ -25,16 +25,8 @@ CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
 OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE
 USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 @*/
-#include "ltype.h"
-#include "comf.h"
-#include "smempool.h"
-#include "sstl.h"
-#include "bs.h"
-#include "sbs.h"
-
-using namespace xcom;
-
-#include "util.h"
+#include "xcominc.h"
+#include "../opt/util.h"
 using namespace xoc;
 
 #ifdef _DEBUG_

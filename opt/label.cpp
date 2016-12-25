@@ -31,13 +31,7 @@ IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 author: Su Zhenyu
 @*/
-#include "ltype.h"
-#include "comf.h"
-#include "smempool.h"
-#include "sstl.h"
-
-using namespace xcom;
-
+#include "../com/xcominc.h"
 #include "util.h"
 #include "symtab.h"
 #include "label.h"

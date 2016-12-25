@@ -38,9 +38,20 @@ author: Su Zhenyu
 //e.g: Build XOC on x8664, HOST_INT should be 64bit.
 //Or build XOC on ARM, HOST_INT should be 32bit,
 //of course 64bit is ok if you want.
-#define HOST_INT LONGLONG
-#define HOST_UINT LONGLONG
-#define HOST_FP double
+#define HOST_INT             LONGLONG
+#define HOST_UINT            LONGLONG
+#define HOST_FP              double
+#define HOST_BIT_PER_BYTE    8
+
+//Define signed and unsigned integer type on host machine.
+#define INT8                 CHAR
+#define UINT8                UCHAR
+#define INT16                SHORT
+#define UINT16               USHORT
+#define INT32                INT
+#define UINT32               UINT
+#define INT64                LONGLONG
+#define UINT64               ULONGLONG
 
 //If the number of OR of one BB is larger than following value,
 //all local optimizations are disabled.
@@ -60,7 +71,7 @@ author: Su Zhenyu
 #define GENERAL_REGISTER_SIZE   (BYTE_PER_POINTER)
 
 //Bit size of word length of host machine.
-#define WORD_LENGTH_OF_HOST_MACHINE    (sizeof(HOST_UINT) * HOST_BIT_PER_BYTE)
+#define WORD_LENGTH_OF_HOST_MACHINE    (HOST_BIT_PER_BYTE * HOST_BIT_PER_BYTE)
 
 //Bit size of word length of target machine.
 #define WORD_LENGTH_OF_TARGET_MACHINE  (GENERAL_REGISTER_SIZE * BIT_PER_BYTE)
@@ -68,16 +79,13 @@ author: Su Zhenyu
 //Represent target machine word with host type.
 #define TMWORD                           UINT
 
-//Target machine relatived heap memory allocate function name
-#define MALLOC_NAME                       "malloc"
-
 //Setting for compiler build-environment. Byte length.
 #define HOST_BIT_PER_BYTE                8
 
 //Maximum memory space of stack variables.
-#define MAX_STACK_VAR_SPACE              16*1024*1024
+#define MAX_STACK_SPACE              16*1024*1024
 
-//The order of push parameter when function was call.
+//The order of pushing parameter when function call.
 //true: from right to left
 //false: from left to right
 #define PUSH_PARAM_FROM_RIGHT_TO_LEFT    true
@@ -89,10 +97,6 @@ author: Su Zhenyu
 //Note the first opnd must be predicate register if target support.
 #define HAS_PREDICATE_REGISTER           false
 
-//Define the max/min integer value range of target machine.
-#define MAX_INT_VALUE                    0x7fffFFFF
-#define MIN_INT_VALUE                    0x80000000
-#define MAX_UINT_VALUE                   0xffffFFFF
 #define EPSILON                          0.000001
 
 #define REG_UNDEF ((USHORT)-1) //Reserved undefined physical register id

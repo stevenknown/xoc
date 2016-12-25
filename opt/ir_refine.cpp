@@ -320,14 +320,14 @@ IR * Region::refineCall(IR * ir, bool & change, RefineCtx & rc)
 {
     bool lchange = false;
     if (CALL_param_list(ir) != NULL) {
-        IR * param = removehead(&CALL_param_list(ir));
+        IR * param = xcom::removehead(&CALL_param_list(ir));
         IR * newparamlst = NULL;
         IR * last = NULL;
         while (param != NULL) {
             IR * newp = refineIR(param, lchange, rc);
             add_next(&newparamlst, &last, newp);
             last = newp;
-            param = removehead(&CALL_param_list(ir));
+            param = xcom::removehead(&CALL_param_list(ir));
         }
         CALL_param_list(ir) = newparamlst;
     }
@@ -1266,7 +1266,7 @@ IR * Region::refineArray(IR * ir, bool & change, RefineCtx & rc)
 
     IR * newsublist = NULL;
     IR * last = NULL;
-    IR * s = removehead(&ARR_sub_list(ir));
+    IR * s = xcom::removehead(&ARR_sub_list(ir));
 
     for (; s != NULL;) {
         IR * newsub = refineIR(s, change, rc);
@@ -1274,7 +1274,7 @@ IR * Region::refineArray(IR * ir, bool & change, RefineCtx & rc)
             IR_parent(newsub) = ir;
         }
         add_next(&newsublist, &last, newsub);
-        s = removehead(&ARR_sub_list(ir));
+        s = xcom::removehead(&ARR_sub_list(ir));
     }
     ARR_sub_list(ir) = newsublist;
     return ir;
@@ -1586,7 +1586,7 @@ IR * Region::refineIRlist(IR * ir_list, bool & change, RefineCtx & rc)
         IR * new_list = NULL;
         IR * last = NULL;
         while (ir_list != NULL) {
-            IR * ir = removehead(&ir_list);
+            IR * ir = xcom::removehead(&ir_list);
             IR * newIR = refineIR(ir, lchange, rc);
             add_next(&new_list, &last, newIR);
         }
@@ -1853,12 +1853,16 @@ HOST_INT Region::calcLSRIntVal(Type const* type, HOST_INT v0, HOST_INT v1)
         res = (HOST_INT) (HOST_UINT) (((UINT64)v0) >> v1);
         break;
     case D_I128:
+        #ifdef INT128
         res = (HOST_INT) (((INT128)(UINT128)v0) >> v1);
-        break;    
+        break;
+        #endif
     case D_U128:
+        #ifdef UINT128
         res = (HOST_INT) (HOST_UINT) (((UINT128)v0) >> v1);
-        break;        
-    default: ASSERT(0, ("TODO"));
+        break;
+        #endif
+    default: ASSERT(0, ("Need to support"));
     }
     return res;
 }

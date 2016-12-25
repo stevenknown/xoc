@@ -31,14 +31,7 @@ IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 author: Su Zhenyu
 @*/
-#include "ltype.h"
-#include "comf.h"
-#include "strbuf.h"
-#include "smempool.h"
-#include "sstl.h"
-
-using namespace xcom;
-
+#include "../com/xcominc.h"
 #include "errno.h"
 #include "util.h"
 using namespace xoc;
@@ -60,7 +53,7 @@ void interwarn(CHAR const* format, ...)
     va_list arg;
     va_start(arg, format);
     buf.vsprint(format, arg);
-    prt2C("\n!!!XOC INTERNAL WARNING:%s\n\n", buf.buf);
+    prt2C("\n!!!INTERNAL WARNING:%s\n\n", buf.buf);
     va_end(arg);
 }
 
@@ -206,7 +199,7 @@ public:
     //Add left child
     void add_lc(int from, RBCOL f, int to, RBCOL t)
     {
-        TN * x = m_root;
+        RBTNType * x = m_root;
         if (x == NULL) {
             m_root = new_tn(from, f);
             x = new_tn(to, t);
@@ -215,7 +208,7 @@ public:
             return;
         }
 
-        List<TN*> lst;
+        List<RBTNType*> lst;
         lst.append_tail(x);
         while (lst.get_elem_count() != 0) {
             x = lst.remove_head();
@@ -231,7 +224,7 @@ public:
         }
         ASSERT0(x);
         ASSERT0(x->color == f);
-        TN * y = new_tn(to, t);
+        RBTNType * y = new_tn(to, t);
 
         ASSERT0(x->lchild == NULL);
         x->lchild = y;
@@ -241,7 +234,7 @@ public:
     //Add left child
     void add_rc(int from, RBCOL f, int to, RBCOL t)
     {
-        TN * x = m_root;
+        RBTNType * x = m_root;
         if (x == NULL) {
             m_root = new_tn(from, f);
             x = new_tn(to, t);
@@ -250,7 +243,7 @@ public:
             return;
         }
 
-        List<TN*> lst;
+        List<RBTNType*> lst;
         lst.append_tail(x);
         while (lst.get_elem_count() != 0) {
             x = lst.remove_head();
@@ -266,7 +259,7 @@ public:
         }
         ASSERT0(x);
         ASSERT0(x->color == f);
-        TN * y = new_tn(to, t);
+        RBTNType * y = new_tn(to, t);
 
         ASSERT0(x->rchild == NULL);
         x->rchild = y;

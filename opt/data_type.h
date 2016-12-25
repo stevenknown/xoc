@@ -51,16 +51,16 @@ class Type;
 #define IS_SIMPLEX(t)           (IS_INT(t) || IS_FP(t) || IS_BOOL(t) || \
                                  t == D_STR || t == D_VOID)
 
-/* Data Type, represented with bit length.
-
-Is unsigned type indispensible?
-
-Java, for example, gets rid of signed/unsigned mixup issues by eliminating
-unsigned types. This goes down a little hard for type convertion, although
-some argue that Java has demonstrated that unsigned types really aren't necessary.
-But unsigned types are useful for implementing memory operation for that span
-more than half of the memory address space, and useful for primitives
-implementing multiprecision arithmetic, etc. */
+//Data Type, represented with bit length.
+//
+//Is unsigned type indispensible?
+//
+//Java, for example, gets rid of signed/unsigned mixup issues by eliminating
+//unsigned types. This goes down a little hard for type convertion, although
+//some argue that Java has demonstrated that unsigned types really aren't necessary.
+//But unsigned types are useful for implementing memory operation for that span
+//more than half of the memory address space, and useful for primitives
+//implementing multiprecision arithmetic, etc.
 typedef enum _DATA_TYPE {
     D_UNDEF = 0,
 

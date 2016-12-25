@@ -1918,12 +1918,12 @@ bool IR::calcArrayOffset(TMWORD * ofst_val, TypeMgr * tm) const
         ASSERT0(!s->is_fp() && CONST_int_val(s) >= 0);
 
         #ifdef _VC2010_
-        #define MARK_32BIT 0xFFFFffff00000000lu
+        #define MASK_32BIT 0xFFFFffff00000000lu
         #else
-        #define MARK_32BIT 0xFFFFffff00000000llu
+        #define MASK_32BIT 0xFFFFffff00000000llu
         #endif
         ASSERT((((ULONGLONG)CONST_int_val(s)) &
-                (ULONGLONG)(LONGLONG)MARK_32BIT) == 0,
+                (ULONGLONG)(LONGLONG)MASK_32BIT) == 0,
                ("allow 32bit array offset."));
 
         ASSERT0(dim < ((CArray*)this)->getDimNum());

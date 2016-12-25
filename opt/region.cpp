@@ -1221,7 +1221,8 @@ IR * Region::buildImmInt(HOST_INT v, Type const* type)
     IR * imm = allocIR(IR_CONST);
     if (type->is_int()) {
         //Make sure value is sign-extended.
-        switch (TY_dtype(type)) {        
+        switch (TY_dtype(type)) { 
+        case D_B:
         case D_I8:
         case D_U8:
             {
@@ -1535,7 +1536,7 @@ C<IRBB*> * Region::splitIRlistIntoBB(IR * irs, BBList * bbl, C<IRBB*> * ctbb)
     LAB2BB * lab2bb = cfg->get_lab2bb_map();
 
     while (irs != NULL) {
-        IR * ir = removehead(&irs);
+        IR * ir = xcom::removehead(&irs);
         if (newbb->is_bb_down_boundary(ir)) {
             BB_irlist(newbb).append_tail(ir);
             newbb = allocBB();

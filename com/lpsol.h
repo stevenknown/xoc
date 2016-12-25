@@ -84,7 +84,7 @@ public:
     void init(INT varnum)
     {
         if (m_is_init) return;
-        m_pair.reinit(varnum, varnum);
+        m_pair.reinit((UINT)varnum, (UINT)varnum);
         m_is_init = true;
     }
 
@@ -100,14 +100,14 @@ public:
     void genPair(INT nvidx, INT bvidx)
     {
         ASSERT0(nvidx != bvidx);
-        m_pair.set(nvidx, bvidx, true);
+        m_pair.set((UINT)nvidx, (UINT)bvidx, true);
     }
 
     //Rows indicate NV, cols indicate BV.
     bool is_handle(INT nvidx, INT bvidx) const
     {
         ASSERT0(nvidx != bvidx);
-        return m_pair.get(nvidx, bvidx);
+        return m_pair.get((UINT)nvidx, (UINT)bvidx);
     }
 
     //Rows indicate NV, cols indicate BV.

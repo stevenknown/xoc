@@ -186,6 +186,36 @@ bool RegionMgr::verifyPreDefinedInfo()
             sizeof(TMWORD) * HOST_BIT_PER_BYTE);
     ASSERT0(BIT_PER_BYTE == HOST_BIT_PER_BYTE);
 
+    ASSERT0(sizeof(INT8) * HOST_BIT_PER_BYTE == 8);
+    ASSERT0(sizeof(UINT8) * HOST_BIT_PER_BYTE == 8);
+    ASSERT0(sizeof(INT16) * HOST_BIT_PER_BYTE == 16);
+    ASSERT0(sizeof(UINT16) * HOST_BIT_PER_BYTE == 16);
+    ASSERT0(sizeof(INT32) * HOST_BIT_PER_BYTE == 32);
+    ASSERT0(sizeof(UINT32) * HOST_BIT_PER_BYTE == 32);
+    ASSERT0(sizeof(INT64) * HOST_BIT_PER_BYTE == 64);
+    ASSERT0(sizeof(UINT64) * HOST_BIT_PER_BYTE == 64);
+    #ifdef INT128
+    ASSERT0(sizeof(INT128) * HOST_BIT_PER_BYTE == 128);
+    #endif
+    #ifdef UINT128
+    ASSERT0(sizeof(UINT128) * HOST_BIT_PER_BYTE == 128);
+    #endif
+
+    ASSERT0(!IS_UNSIGN_TY(INT8));
+    ASSERT0(IS_UNSIGN_TY(UINT8));
+    ASSERT0(!IS_UNSIGN_TY(INT16));
+    ASSERT0(IS_UNSIGN_TY(UINT16));
+    ASSERT0(!IS_UNSIGN_TY(INT32));
+    ASSERT0(IS_UNSIGN_TY(UINT32));
+    ASSERT0(!IS_UNSIGN_TY(INT64));
+    ASSERT0(IS_UNSIGN_TY(UINT64));
+    #ifdef INT128
+    ASSERT0(!IS_UNSIGN_TY(INT128));
+    #endif
+    #ifdef UINT128
+    ASSERT0(IS_UNSIGN_TY(UINT128));
+    #endif
+
     //Host LONGLONG should not less than HOST_INT,
     //otherwise the integer might be truncated wrongfully.
     ASSERT0(sizeof(HOST_INT) <= sizeof(LONGLONG));

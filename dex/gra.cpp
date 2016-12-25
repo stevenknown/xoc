@@ -31,8 +31,8 @@ IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 author: Su Zhenyu
 @*/
-#include "cominc.h"
-#include "prdf.h"
+#include "../opt/cominc.h"
+#include "../opt/prdf.h"
 #include "dex.h"
 #include "gra.h"
 
@@ -5916,41 +5916,10 @@ void RA::allocGlobal(List<UINT> & nis, List<UINT> & nis2)
 
 bool RA::perform(OptCtx & oc)
 {
-    bool omit_constrain = true;
-    //Antutu4.4.1
-    //if (strcmp(name, "Lorg/a/a/h;::a")==0) {
-    //if (strcmp(name, "Landroid/support/v4/view/ViewPager;::a")==0) {
-    //if (strcmp(name, "Landroid/support/v4/app/aa;::onItemClick") == 0) {
-    //if (strcmp(name, "Lcom/antutu/benchmark/view/CircleProgress;::onDraw") == 0) {
-    //if (strcmp(name, "Lcom/xiaomi/network/HostManager;::generateHostStats") == 0) {
-    //if (strcmp(name, "Lorg/a/a/h;::a") == 0) { //count == 3
-
-    //Antutu5.1
-    //if (strcmp(name, "Lcom/antutu/benchmark/f/v;::a") == 0) { //hot
-    //if (strcmp(name, "Lcom/antutu/benchmark/f/v;::b") == 0) { //hot
-    //if (strcmp(name, "Lcom/a/a/aq;::handleMessage") == 0) { //maxvar must be
-    //if (strcmp(name, "La/d;::a") == 0) { //verify_interf failed
-
-    //Linpack.
-    //if (strcmp(name, "Lcom/adwhirl/AdWhirlManager;::fetchConfig") == 0) { //paired bug
-    //if (strcmp(name, "Lcom/greenecomputing/linpack/Linpack;::dgesl") == 0) { //paired bug
-    ///if (strcmp(name, "Lcom/flurry/android/q;::a") == 0) { //bug, fixed
-    //if (strcmp(name, "Lcom/greenecomputing/linpack/Linpack;::dgefa") == 0) { //bug, fixed
-    //if (strcmp(name, "Lcom/millennialmedia/android/VideoPlayer$VideoServer;::run") == 0) { //bug, fixed
-    //if (strcmp(name, "Lcom/adwhirl/adapters/CustomAdapter;::displayCustom") == 0) { //insert too many move.
-    //if (strcmp(name, "Lcom/google/gson/JsonArrayDeserializationVisitor;::<init>") == 0) { //bug, fixed
-    //if (strcmp(name, "Lcom/flurry/android/CatalogActivity;::onCreate") == 0) { //insert too many move.
-    //if (strcmp(name, "Lcom/admob/android/ads/AdContainer;::drawText") == 0) { //phy exceed usable set.
-    if (m_ru->isRegionName("Lcom/admob/android/ads/AdRequester;::requestAd")) { //glt interference.
-        gcount++;
-        //if (gcount==1)
-        {
-            gdebug();
-        }
-    }
+    bool omit_constrain = true;    
     get_glt(10); //for debug symbol
     get_lt(1,0); //for debug symbol
-    dumpBBList(m_ru->get_bb_list(), m_ru);
+    
     m_cfg->dump_vcg();
     m_pr2v->dump();
     START_TIMER("GRA");

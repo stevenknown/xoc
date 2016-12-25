@@ -34,7 +34,7 @@ author: Su Zhenyu
 #ifndef _L_TYPE_
 #define _L_TYPE_
 
-#ifdef _WINDOWS_
+#ifdef _ON_WINDOWS_
     #ifdef _VC6_
     #include "windows.h"
     #include "errors.h"
@@ -102,7 +102,7 @@ author: Su Zhenyu
 #define LONG     long
 #define ULONG    unsigned long
 
-#ifdef _WINDOWS_
+#ifdef _ON_WINDOWS_
     #define LONGLONG   __int64
     #define ULONGLONG  unsigned __int64
 #else
@@ -121,17 +121,22 @@ author: Su Zhenyu
 #undef ASSERTL0
 
 #ifdef _DEBUG_
+    #ifdef __cplusplus
+    #define EXTERN_C extern "C"
+    #else
+    #define EXTERN_C extern
+    #endif
     #include "stdio.h"
-    INT m518087(CHAR const* info, ...);
-    INT m022138(CHAR const* filename, INT line);
+    EXTERN_C INT m518087(CHAR const* info, ...);
+    EXTERN_C INT m022138(CHAR const* filename, INT line);
 
     #define ASSERT(a, b)  \
-                ((a) ? 0 : (m022138(__FILE__, __LINE__), m518087 b))
+        ((a) ? 0 : (m022138(__FILE__, __LINE__), m518087 b))
     #define ASSERTL(a, filename, line, b)  \
-                ((a) ? 0 : (m022138(filename, line), m518087 b))
+        ((a) ? 0 : (m022138(filename, line), m518087 b))
     #define ASSERT0(a)  ((a) ? 0 : (m022138(__FILE__, __LINE__), m518087 ("")))
     #define ASSERTL0(a, filename, line)  \
-                ((a) ? 0 : (m022138(filename, line), m518087 ("")))
+        ((a) ? 0 : (m022138(filename, line), m518087 ("")))
 #else
     #define ASSERT(a, b)
     #define ASSERTL(a, filename, line, b)
@@ -177,8 +182,8 @@ author: Su Zhenyu
 #undef GET_HIGH_32BIT
 #define GET_HIGH_32BIT(l)        (((l)>>32)&0xffffFFFF)
 
-#define IS_UNSIGN_TY(type)       ((type)0 - 1 > 0) //Be true if type is unsigned.
-#define IS_UNSIGN_VAR(var)       (var > 0 && ~var > 0) //Be true if variable is unsigned.
+//True if type is unsigned.
+#define IS_UNSIGN_TY(type)       ((type)(((type)0) - 1) > 0) 
 
 #define IN //input
 #define OUT //output

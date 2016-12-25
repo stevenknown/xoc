@@ -106,42 +106,43 @@ bool IR_CFS_OPT::transformIf5(IR ** head, IR * ir)
 bool IR_CFS_OPT::transformToDoWhile(IR ** head, IR * ir)
 {
     ASSERT(head != NULL && *head != NULL, ("invalid parameter"));
-    if (ir->is_lab()) {
-        IR * t = ir;
-        while (t != NULL) {
-            if (t->is_if()) {
-                if (IF_truebody(t) != NULL &&
-                    IF_truebody(t)->is_goto() &&
-                    isSameLabel(LAB_lab(ir), GOTO_lab(IF_truebody(t)))) {
+    if (!ir->is_lab()) { return false; }
+    
+    for (IR * t = ir; t != NULL; t = t->get_next()) {
+        if (!t->is_if()) { continue; }
 
-                    //start transform...
-                    IR * dowhile = m_ru->allocIR(IR_DO_WHILE);
-                    LOOP_det(dowhile) = m_ru->dupIRTree(LOOP_det(t));
+        if (IF_truebody(t) != NULL &&
+            IF_truebody(t)->is_goto() &&
+            isSameLabel(LAB_lab(ir), GOTO_lab(IF_truebody(t)))) {
 
-                    IR * if_stmt = t;
-                    t = ir->get_next();
-                    while (t != NULL && t != if_stmt) {
-                        IR * c = t;
-                        t = t->get_next();
-                        remove(head, c);
-                        add_next(&LOOP_body(dowhile), c);
-                    }
-                    ASSERT(t == if_stmt, ("???"));
-                    remove(head, if_stmt);
-                    if (IF_falsebody(if_stmt)) {
-                        add_next(&dowhile, IF_falsebody(if_stmt));
-                        IF_falsebody(if_stmt) = NULL;
-                    }
-                    insertafter(&ir, dowhile);
-                    m_ru->freeIRTree(if_stmt); //free IF
-                    remove(head, ir);
-                    m_ru->freeIRTree(ir); //free LABEL
-                    return true;
-                }
+            //Start transform.
+            IR * dowhile = m_ru->allocIR(IR_DO_WHILE);
+            LOOP_det(dowhile) = m_ru->dupIRTree(LOOP_det(t));
+
+            IR * if_stmt = t;
+            t = ir->get_next();
+            while (t != NULL && t != if_stmt) {
+                IR * c = t;
+                t = t->get_next();
+                xcom::remove(head, c);
+                xcom::add_next(&LOOP_body(dowhile), c);
             }
-            t = t->get_next();
+
+            ASSERT(t == if_stmt, ("illegal IR layout"));
+
+            xcom::remove(head, if_stmt);
+            if (IF_falsebody(if_stmt)) {
+                xcom::add_next(&dowhile, IF_falsebody(if_stmt));
+                IF_falsebody(if_stmt) = NULL;
+            }
+            xcom::insertafter(&ir, dowhile);
+            m_ru->freeIRTree(if_stmt); //free IF
+            xcom::remove(head, ir);
+            m_ru->freeIRTree(ir); //free LABEL
+            return true;
         }
     }
+
     return false;
 }
 
@@ -217,12 +218,12 @@ bool IR_CFS_OPT::transformIf1(IR ** head, IR * ir)
                 while (t != first_goto) {
                     IR * c = t;
                     t = t->get_next();
-                    remove(&IF_truebody(ir), c);
-                    add_next(&new_list1, &last, c);
+                    xcom::remove(&IF_truebody(ir), c);
+                    xcom::add_next(&new_list1, &last, c);
                 }
                 ASSERT(t && t == first_goto, ("invalid control flow"));
 
-                remove(&IF_truebody(ir), first_goto);
+                xcom::remove(&IF_truebody(ir), first_goto);
                 m_ru->freeIRTree(first_goto);
 
                 //Split all irs between IF and L1.
@@ -230,30 +231,30 @@ bool IR_CFS_OPT::transformIf1(IR ** head, IR * ir)
                 while (t != second_goto) {
                     IR * c = t;
                     t = t->get_next();
-                    remove(head, c);
-                    add_next(&new_list2, c);
+                    xcom::remove(head, c);
+                    xcom::add_next(&new_list2, c);
                 }
                 ASSERT(t != NULL && t == second_goto, ("???"));
-                remove(head, second_goto);
-                add_next(&new_list2, second_goto);
+                xcom::remove(head, second_goto);
+                xcom::add_next(&new_list2, second_goto);
 
                 //Swap new_list1 and new_list2
-                insertbefore(&IF_truebody(ir), IF_truebody(ir), new_list2);
+                xcom::insertbefore(&IF_truebody(ir), IF_truebody(ir), new_list2);
 
                 //Update the IR_parent for new_list2.
                 for (IR * tmp = new_list2; tmp != NULL; tmp = IR_next(tmp)) {
                     IR_parent(tmp) = ir;
                 }
 
-                ASSERT(IF_truebody(ir) == new_list2,
-                        ("illegal insertbefore<T>"));
+                ASSERT(IF_truebody(ir) == new_list2, ("illegal insertbefore<T>"));
 
-                insertafter(&ir, new_list1);
+                xcom::insertafter(&ir, new_list1);
 
                 //Update the IR_parent for new_list1.
                 for (IR * tmp = new_list1; tmp != NULL; tmp = IR_next(tmp)) {
                     IR_parent(tmp) = IR_parent(ir);
                 }
+
                 return true;
             }
         }
@@ -281,9 +282,9 @@ bool IR_CFS_OPT::transformIf2(IR ** head, IR * ir)
     if (ir == NULL || !ir->is_if()) { return false; }
 
     //Check true part
-    if (!IF_truebody(ir)) {
+    if (IF_truebody(ir) == NULL) {
         if (IF_falsebody(ir) == NULL) {
-            remove(head, ir);
+            xcom::remove(head, ir);
             m_ru->freeIRTree(ir);
             return true;
         }
@@ -314,37 +315,26 @@ bool IR_CFS_OPT::transformIf3(IR ** head, IR * ir)
     if (det->is_gt()) {
         IR * opnd0 = BIN_opnd0(det);
         IR * opnd1 = BIN_opnd1(det);
-
         if (opnd0->is_ld() &&
-            opnd1->is_const() &&
             opnd0->is_int() &&
-            CONST_int_val(opnd1) == MAX_INT_VALUE) {
+            opnd1->is_const() &&
+            opnd1->is_int() &&
+            m_ru->getIntegerInDataTypeValueRange(opnd1) == 
+              m_ru->getMaxInteger(m_tm->get_dtype_bitsize(
+                TY_dtype(opnd1->get_type())), opnd1->is_signed())) {
+            //e.g:
+            //x is unsigned, if(x>0xFFFFFFFF) {a=1} else {b=1} => b=1
             //x is signed, if(x>0x7FFFFFFF) {a=1} else {b=1} =>  b=1
             IR * allocIR = NULL;
-            if (IF_falsebody(ir)) {
-                allocIR = m_ru->dupIRTree(IF_falsebody(ir));
-            }
-            replace(head, ir, allocIR);
-
-            //Revise IR_parent.
-            IR_parent(allocIR) = IR_parent(ir);
-
-            m_ru->freeIRTree(ir);
-            return true;
-        } else if (opnd0->is_ld() &&
-                   opnd1->is_const() &&
-                   opnd0->is_uint() &&
-                   CONST_int_val(opnd1) == MAX_UINT_VALUE) {
-            //x is unsigned, if(x>0xFFFFFFFF) {a=1} else {b=1} => b=1
-            IR * allocIR = NULL;
-            if (IF_falsebody(ir)) {
+            if (IF_falsebody(ir) != NULL) {
                 allocIR = m_ru->dupIRTree(IF_falsebody(ir));
             }
 
-            replace(head, ir, allocIR);
+            xcom::replace(head, ir, allocIR);
 
-            //Revise IR_parent.
-            IR_parent(allocIR) = IR_parent(ir);
+            if (allocIR != NULL) {
+                IR_parent(allocIR) = IR_parent(ir);
+            }
 
             m_ru->freeIRTree(ir);
             return true;
@@ -353,15 +343,24 @@ bool IR_CFS_OPT::transformIf3(IR ** head, IR * ir)
         IR * opnd0 = BIN_opnd0(det);
         IR * opnd1 = BIN_opnd1(det);
         if (opnd0->is_ld() &&
-            opnd1->is_const() &&
             opnd0->is_int() &&
-            CONST_int_val(opnd1) == MIN_INT_VALUE) {
+            opnd1->is_const() &&
+            opnd1->is_int() &&
+            m_ru->getIntegerInDataTypeValueRange(opnd1) == 
+              m_ru->getMinInteger(m_tm->get_dtype_bitsize(
+                TY_dtype(opnd1->get_type())), opnd1->is_signed())) {
             //x is signed, IF(x < 0x80000000) {a=1} ELSE {b=1}  =>  b=1
             IR * allocIR = NULL;
-            if (IF_falsebody(ir)) {
+            if (IF_falsebody(ir) != NULL) {
                 allocIR = m_ru->dupIRTree(IF_falsebody(ir));
             }
-            replace(head, ir, allocIR);
+            
+            xcom::replace(head, ir, allocIR);
+
+            if (allocIR != NULL) {
+                IR_parent(allocIR) = IR_parent(ir);
+            }
+
             m_ru->freeIRTree(ir);
             return true;
         } else if (opnd0->is_ld() &&
@@ -370,13 +369,15 @@ bool IR_CFS_OPT::transformIf3(IR ** head, IR * ir)
                    CONST_int_val(opnd1) == 0) {
             //x is unsigned, if(x<0) {a=1} else {b=1}  =>  b=1
             IR * allocIR = NULL;
-            if (IF_falsebody(ir)) {
+            if (IF_falsebody(ir) != NULL) {
                 allocIR = m_ru->dupIRTree(IF_falsebody(ir));
             }
-            replace(head, ir, allocIR);
+            
+            xcom::replace(head, ir, allocIR);
 
-            //Revise IR_parent.
-            IR_parent(allocIR) = IR_parent(ir);
+            if (allocIR != NULL) {
+                IR_parent(allocIR) = IR_parent(ir);
+            }
 
             m_ru->freeIRTree(ir);
             return true;
@@ -421,13 +422,13 @@ bool IR_CFS_OPT::hoistLoop(IR ** head, IR * ir)
             ASSERT(c->is_stmt(), ("Non-stmt ir should be remove "
                                    "during reshape_ir_tree()"));
             det = det->get_next();
-            remove(&LOOP_det(ir), c);
-            add_next(&new_list, c);
+            xcom::remove(&LOOP_det(ir), c);
+            xcom::add_next(&new_list, c);
             i--;
         }
         new_body_list = m_ru->dupIRTreeList(new_list);
-        insertbefore(head, ir, new_list);
-        add_next(&LOOP_body(ir), new_body_list);
+        xcom::insertbefore(head, ir, new_list);
+        xcom::add_next(&LOOP_body(ir), new_body_list);
         return true;
     }
     return false;
@@ -460,19 +461,20 @@ bool IR_CFS_OPT::hoistIf(IR ** head, IR * ir)
             ASSERT(c->is_stmt(),
                 ("Non-stmt ir should be remove during reshape_ir_tree()"));
             det = det->get_next();
-            remove(&IF_det(ir), c);
-            add_next(&new_list, c);
+            xcom::remove(&IF_det(ir), c);
+            xcom::add_next(&new_list, c);
             i--;
         }
-        insertbefore(head, ir, new_list);
+        xcom::insertbefore(head, ir, new_list);
         return true;
     }
     return false;
 }
 
 
-bool IR_CFS_OPT::perform_cfs_optimization(IN OUT IR ** ir_list,
-                                          SimpCtx const& sc)
+bool IR_CFS_OPT::CfsOpt(
+        IN OUT IR ** ir_list,
+        SimpCtx const& sc)
 {
     bool change = false;
 
@@ -508,12 +510,12 @@ bool IR_CFS_OPT::perform_cfs_optimization(IN OUT IR ** ir_list,
                 ir = *ir_list;
                 continue;
             }
-            if (perform_cfs_optimization(&IF_truebody(ir), sc)) {
+            if (CfsOpt(&IF_truebody(ir), sc)) {
                 change = true;
                 ir = *ir_list;
                 continue;
             }
-            if (perform_cfs_optimization(&IF_falsebody(ir), sc)) {
+            if (CfsOpt(&IF_falsebody(ir), sc)) {
                 change = true;
                 ir = *ir_list;
                 continue;
@@ -527,14 +529,14 @@ bool IR_CFS_OPT::perform_cfs_optimization(IN OUT IR ** ir_list,
                 ir = *ir_list;
                 continue;
             }
-            if (perform_cfs_optimization(&LOOP_body(ir), sc)) {
+            if (CfsOpt(&LOOP_body(ir), sc)) {
                 change = true;
                 ir = *ir_list;
                 continue;
             }
             break;
         case IR_SWITCH:
-            if (perform_cfs_optimization(&SWITCH_body(ir), sc)) {
+            if (CfsOpt(&SWITCH_body(ir), sc)) {
                 change = true;
                 ir = *ir_list;
                 continue;
@@ -564,10 +566,10 @@ bool IR_CFS_OPT::perform(SimpCtx const& sc)
             !SIMP_switch(&sc) &&
             !SIMP_break(&sc) &&
             !SIMP_continue(&sc));
-    if (g_opt_level == OPT_LEVEL0) { return false; }
+    if (!g_do_cfs_opt) { return false; }
 
     IR * irs = m_ru->get_ir_list();
-    bool change = perform_cfs_optimization(&irs, sc);
+    bool change = CfsOpt(&irs, sc);
     if (change) {
         m_ru->set_ir_list(irs);
     }

@@ -45,10 +45,8 @@ CFS_INFO * CfsMgr::new_cfs_info(IR_TYPE irtype)
     CFS_INFO_cfs_type(ci) = irtype;
     switch (irtype) {
     case IR_IF:
-        {
-            CFS_INFO_true_body(ci) = m_bs_mgr.create();
-            CFS_INFO_false_body(ci) = m_bs_mgr.create();
-        }
+        CFS_INFO_true_body(ci) = m_bs_mgr.create();
+        CFS_INFO_false_body(ci) = m_bs_mgr.create();
         break;
     case IR_DO_LOOP:
     case IR_WHILE_DO:
@@ -154,11 +152,11 @@ void CfsMgr::set_map_bb2abs(IRBB const* bb, AbsNode * abs)
 
 
 AbsNode * CfsMgr::constructAbsLoop(
-                        IN IRBB * entry,
-                        IN AbsNode * parent,
-                        IN BitSet * cur_region,
-                        IN Graph & cur_graph,
-                        IN OUT BitSet & visited)
+        IN IRBB * entry,
+        IN AbsNode * parent,
+        IN BitSet * cur_region,
+        IN Graph & cur_graph,
+        IN OUT BitSet & visited)
 {
     UNUSED(cur_region);
     ASSERT0(cur_region == NULL || cur_region->is_contain(BB_id(entry)));
@@ -230,11 +228,11 @@ AbsNode * CfsMgr::constructAbsBB(IN IRBB * bb, IN AbsNode * parent)
 
 
 AbsNode * CfsMgr::constructAbsTree(
-                        IN IRBB * entry,
-                        IN AbsNode * parent,
-                        IN BitSet * cur_region,
-                        IN Graph & cur_graph,
-                        IN OUT BitSet & visited)
+        IN IRBB * entry,
+        IN AbsNode * parent,
+        IN BitSet * cur_region,
+        IN Graph & cur_graph,
+        IN OUT BitSet & visited)
 {
     IR_CFG * cfg = m_ru->get_cfg();
     AbsNode * lst = NULL;
@@ -266,7 +264,7 @@ AbsNode * CfsMgr::constructAbsTree(
         LI<IRBB> * li = cfg->mapBB2LabelInfo(bb);
         if (li != NULL) {
             node = constructAbsLoop(bb, parent, LI_bb_set(li),
-                                      g, loc_visited);
+                                    g, loc_visited);
         } else {
             IR * last_xr = cfg->get_last_xr(bb);
             if (last_xr != NULL && //'bb' is branching node of IF.
@@ -335,7 +333,7 @@ AbsNode * CfsMgr::constructAbstractControlFlowStruct()
     ASSERT(cfg->get_entry(), ("CFG should be single-entry"));
     BitSet visited;
     AbsNode * a = constructAbsTree(cfg->get_entry(), NULL,
-                                   NULL, *(Graph*)cfg, visited);
+        NULL, *(Graph*)cfg, visited);
     //dump_abs_tree(a);
     return a;
 }

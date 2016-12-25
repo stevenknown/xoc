@@ -1132,7 +1132,7 @@ Programming Guides
         Add to command line: /D "_CRT_SECURE_NO_WARNINGS" /D "_VC2010_" -D "FOR_DEX" /D "_DEBUG_"
 
     ¡ñ How to build XOC project under Windows
-        Add predefined macro to command line: -D_WINDOWS_
+        Add predefined macro to command line: -D_ON_WINDOWS_
 
     ¡ñ Setting up the build environment
         This is an example to demostrate how to drive XOC to compile user

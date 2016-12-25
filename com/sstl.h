@@ -3456,7 +3456,7 @@ public:
         //Free HC containers.
         for (UINT i = 0; i < m_bucket_size; i++) {
             HC<T> * hc = NULL;
-            while ((hc = removehead((HC<T>**)&HB_member(m_bucket[i]))) != NULL) {
+            while ((hc = xcom::removehead((HC<T>**)&HB_member(m_bucket[i]))) != NULL) {
                 m_free_list.add_free_elem(hc);
             }
         }
@@ -3617,24 +3617,24 @@ public:
 template <class T, class Ttgt, class CompareKey = CompareKeyBase<T> >
 class RBT {
 protected:
-    typedef RBTNode<T, Ttgt> TN;
+    typedef RBTNode<T, Ttgt> RBTNType;
     UINT m_num_of_tn;
-    TN * m_root;
+    RBTNType * m_root;
     SMemPool * m_pool;
-    TN * m_free_list;
+    RBTNType * m_free_list;
     CompareKey m_ck;
 
-    TN * new_tn()
+    RBTNType * new_tn()
     {
-        TN * p = (TN*)smpoolMallocConstSize(sizeof(TN), m_pool);
+        RBTNType * p = (RBTNType*)smpoolMallocConstSize(sizeof(RBTNType), m_pool);
         ASSERT0(p);
-        memset(p, 0, sizeof(TN));
+        memset(p, 0, sizeof(RBTNType));
         return p;
     }
 
-    inline TN * new_tn(T t, RBCOL c)
+    inline RBTNType * new_tn(T t, RBCOL c)
     {
-        TN * x = removehead(&m_free_list);
+        RBTNType * x = xcom::removehead(&m_free_list);
         if (x == NULL) {
             x = new_tn();
         } else {
@@ -3646,7 +3646,7 @@ protected:
         return x;
     }
 
-    void free_rbt(TN * t)
+    void free_rbt(RBTNType * t)
     {
         if (t == NULL) return;
         t->prev = t->next = t->parent = NULL;
@@ -3655,10 +3655,10 @@ protected:
         insertbefore_one(&m_free_list, m_free_list, t);
     }
 
-    void rleft(TN * x)
+    void rleft(RBTNType * x)
     {
         ASSERT0(x->rchild != NULL);
-        TN * y = x->rchild;
+        RBTNType * y = x->rchild;
         y->parent = x->parent;
         x->parent = y;
         x->rchild = y->lchild;
@@ -3675,10 +3675,10 @@ protected:
         }
     }
 
-    void rright(TN * y)
+    void rright(RBTNType * y)
     {
         ASSERT0(y->lchild != NULL);
-        TN * x = y->lchild;
+        RBTNType * x = y->lchild;
         x->parent = y->parent;
         y->parent = x;
         y->lchild = x->rchild;
@@ -3695,21 +3695,21 @@ protected:
         }
     }
 
-    bool is_lchild(TN const* z) const
+    bool is_lchild(RBTNType const* z) const
     {
         ASSERT0(z && z->parent);
         return z == z->parent->lchild;
     }
 
-    bool is_rchild(TN const* z) const
+    bool is_rchild(RBTNType const* z) const
     {
         ASSERT0(z && z->parent);
         return z == z->parent->rchild;
     }
 
-    void fixup(TN * z)
+    void fixup(RBTNType * z)
     {
-        TN * y = NULL;
+        RBTNType * y = NULL;
         while (z->parent != NULL && z->parent->color == RBRED) {
             if (is_lchild(z->parent)) {
                 y = z->parent->parent->rchild;
@@ -3760,7 +3760,7 @@ public:
     void init()
     {
         ASSERT0(m_pool == NULL);
-        m_pool = smpoolCreate(sizeof(TN) * 4, MEM_CONST_SIZE);
+        m_pool = smpoolCreate(sizeof(RBTNType) * 4, MEM_CONST_SIZE);
         m_root = NULL;
         m_num_of_tn = 0;
         m_free_list = NULL;
@@ -3788,13 +3788,13 @@ public:
 
     void clean()
     {
-        List<TN*> wl;
+        List<RBTNType*> wl;
         if (m_root != NULL) {
             wl.append_tail(m_root);
             m_root = NULL;
         }
         while (wl.get_elem_count() != 0) {
-            TN * x = wl.remove_head();
+            RBTNType * x = wl.remove_head();
             if (x->rchild != NULL) {
                 wl.append_tail(x->rchild);
             }
@@ -3808,12 +3808,12 @@ public:
 
     UINT get_elem_count() const { return m_num_of_tn; }
     SMemPool * get_pool() { return m_pool; }
-    TN * get_root() { return m_root; }
+    RBTNType * get_root() { return m_root; }
 
-    TN * find_with_key(T keyt) const
+    RBTNType * find_with_key(T keyt) const
     {
         if (m_root == NULL) { return NULL; }
-        TN * x = m_root;
+        RBTNType * x = m_root;
         while (x != NULL) {
             if (m_ck.is_equ(keyt, x->key)) {
                 return x;
@@ -3826,16 +3826,16 @@ public:
         return NULL;
     }
 
-    inline TN * find_rbtn(T t) const
+    inline RBTNType * find_rbtn(T t) const
     {
         if (m_root == NULL) { return NULL; }
         return find_with_key(t);
     }
 
-    TN * insert(T t, bool * find = NULL)
+    RBTNType * insert(T t, bool * find = NULL)
     {
         if (m_root == NULL) {
-            TN * z = new_tn(t, RBBLACK);
+            RBTNType * z = new_tn(t, RBBLACK);
             m_num_of_tn++;
             m_root = z;
             if (find != NULL) {
@@ -3844,8 +3844,8 @@ public:
             return z;
         }
 
-        TN * mark = NULL;
-        TN * x = m_root;
+        RBTNType * mark = NULL;
+        RBTNType * x = m_root;
         while (x != NULL) {
             mark = x;
             if (m_ck.is_equ(t, x->key)) {
@@ -3870,7 +3870,7 @@ public:
         }
 
         //Add new.
-        TN * z = new_tn(t, RBRED);
+        RBTNType * z = new_tn(t, RBRED);
         z->parent = mark;
         if (mark == NULL) {
             //The first node.
@@ -3888,17 +3888,17 @@ public:
         return z;
     }
 
-    TN * min(TN * x)
+    RBTNType * find_min(RBTNType * x)
     {
         ASSERT0(x);
         while (x->lchild != NULL) { x = x->lchild; }
         return x;
     }
 
-    TN * succ(TN * x)
+    RBTNType * find_succ(RBTNType * x)
     {
-        if (x->rchild != NULL) { return min(x->rchild); }
-        TN * y = x->parent;
+        if (x->rchild != NULL) { return find_min(x->rchild); }
+        RBTNType * y = x->parent;
         while (y != NULL && x == y->rchild) {
             x = y;
             y = y->parent;
@@ -3906,7 +3906,7 @@ public:
         return y;
     }
 
-    inline bool both_child_black(TN * x)
+    inline bool both_child_black(RBTNType * x)
     {
         if (x->lchild != NULL && x->lchild->color == RBRED) {
             return false;
@@ -3917,12 +3917,12 @@ public:
         return true;
     }
 
-    void rmfixup(TN * x)
+    void rmfixup(RBTNType * x)
     {
         ASSERT0(x);
         while (x != m_root && x->color == RBBLACK) {
             if (is_lchild(x)) {
-                TN * bro = x->parent->rchild;
+                RBTNType * bro = x->parent->rchild;
                 ASSERT0(bro);
                 if (bro->color == RBRED) {
                     bro->color = RBBLACK;
@@ -3949,7 +3949,7 @@ public:
                 x = m_root;
             } else {
                 ASSERT0(is_rchild(x));
-                TN * bro = x->parent->lchild;
+                RBTNType * bro = x->parent->lchild;
                 if (bro->color == RBRED) {
                     bro->color = RBBLACK;
                     x->parent->color = RBRED;
@@ -3980,12 +3980,12 @@ public:
 
     void remove(T t)
     {
-        TN * z = find_rbtn(t);
+        RBTNType * z = find_rbtn(t);
         if (z == NULL) { return; }
         remove(z);
     }
 
-    void remove(TN * z)
+    void remove(RBTNType * z)
     {
         if (z == NULL) { return; }
         if (m_num_of_tn == 1) {
@@ -3997,15 +3997,15 @@ public:
             m_root = NULL;
             return;
         }
-        TN * y;
+        RBTNType * y;
         if (z->lchild == NULL || z->rchild == NULL) {
             y = z;
         } else {
-            y = min(z->rchild);
+            y = find_min(z->rchild);
         }
 
-        TN * x = y->lchild != NULL ? y->lchild : y->rchild;
-        TN holder;
+        RBTNType * x = y->lchild != NULL ? y->lchild : y->rchild;
+        RBTNType holder;
         if (x != NULL) {
             x->parent = y->parent;
         } else {
@@ -4061,7 +4061,7 @@ public:
     }
 
     //iter should be clean by caller.
-    T get_first(List<TN*> & iter, Ttgt * mapped = NULL) const
+    T get_first(List<RBTNType*> & iter, Ttgt * mapped = NULL) const
     {
         if (m_root == NULL) {
             if (mapped != NULL) { *mapped = Ttgt(0); }
@@ -4072,9 +4072,9 @@ public:
         return m_root->key;
     }
 
-    T get_next(List<TN*> & iter, Ttgt * mapped = NULL) const
+    T get_next(List<RBTNType*> & iter, Ttgt * mapped = NULL) const
     {
-        TN * x = iter.remove_head();
+        RBTNType * x = iter.remove_head();
         if (x == NULL) {
             if (mapped != NULL) { *mapped = Ttgt(0); }
             return T(0);
@@ -4142,7 +4142,7 @@ template <class Tsrc, class Ttgt, class CompareKey = CompareKeyBase<Tsrc> >
 class TMap : public RBT<Tsrc, Ttgt, CompareKey> {
 public:
     typedef RBT<Tsrc, Ttgt, CompareKey> BaseType;
-    typedef RBTNode<Tsrc, Ttgt> TN;
+    typedef RBTNode<Tsrc, Ttgt> RBTNType;
     TMap() {}
     COPY_CONSTRUCTOR(TMap);
     ~TMap() {}
@@ -4157,7 +4157,7 @@ public:
     //This function will enforce mapping between t and mapped.
     void setAlways(Tsrc t, Ttgt mapped)
     {
-        TN * z = BaseType::insert(t, NULL);
+        RBTNType * z = BaseType::insert(t, NULL);
         ASSERT0(z);
         z->mapped = mapped;
     }
@@ -4166,7 +4166,7 @@ public:
     void set(Tsrc t, Ttgt mapped)
     {
         bool find = false;
-        TN * z = BaseType::insert(t, &find);
+        RBTNType * z = BaseType::insert(t, &find);
         ASSERT0(z);
         ASSERT(!find, ("already mapped"));
         z->mapped = mapped;
@@ -4176,7 +4176,7 @@ public:
     //Note this function is readonly.
     Ttgt get(Tsrc t, bool * f = NULL) const
     {
-        TN * z = BaseType::find_rbtn(t);
+        RBTNType * z = BaseType::find_rbtn(t);
         if (z == NULL) {
             if (f != NULL) {
                 *f = false;

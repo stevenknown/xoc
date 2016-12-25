@@ -33,36 +33,17 @@ author: Su Zhenyu
 @*/
 #ifndef __COMMONINC_H__
 #define __COMMONINC_H__
-
-//Common included files
-#include "stdlib.h"
-#include "stdarg.h"
-#include "stdio.h"
-#include "string.h"
-#include "ltype.h"
-#include "math.h"
-
-//libxcom
-#include "comf.h"
-#include "strbuf.h"
-#include "smempool.h"
-#include "sstl.h"
-#include "matt.h"
-#include "bs.h"
-#include "sbs.h"
-#include "sbs_hash.h"
-#include "sgraph.h"
-#include "rational.h"
-#include "flty.h"
-#include "xmat.h"
-
-using namespace xcom;
-
+//common included files
+#include <stdlib.h>
+#include <stdarg.h>
+#include <stdio.h>
+#include <string.h>
+#include <math.h>
+#include "../com/xcominc.h" //libxcom
 #include "option.h"
 #include "targ_const_info.h"
 #include "util.h"
 #include "symtab.h"
 #include "label.h"
 #include "cdg.h"
-
 #endif

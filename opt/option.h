@@ -38,11 +38,11 @@ namespace xoc {
 
 class PassMgr;
 
-#define OPT_LEVEL0        0
-#define OPT_LEVEL1    1
-#define OPT_LEVEL2    2
-#define OPT_LEVEL3    3
-#define SIZE_OPT      4
+#define OPT_LEVEL0      0
+#define OPT_LEVEL1      1
+#define OPT_LEVEL2      2
+#define OPT_LEVEL3      3
+#define SIZE_OPT        4
 
 #define VERIFY_LEVEL_1  1 //only perform basic verifications.
 #define VERIFY_LEVEL_2  2 //do more aggressive check.

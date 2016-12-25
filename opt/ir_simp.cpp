@@ -1214,8 +1214,8 @@ IR * Region::simplifyArrayAddrExp(IR * ir, SimpCtx * ctx)
     IR * ofst_exp = NULL;
     TMWORD const* elemnumbuf = ARR_elem_num_buf(ir);
 
-    for (IR * s = removehead(&ARR_sub_list(ir));
-         s != NULL; dim++, s = removehead(&ARR_sub_list(ir))) {
+    for (IR * s = xcom::removehead(&ARR_sub_list(ir));
+         s != NULL; dim++, s = xcom::removehead(&ARR_sub_list(ir))) {
         SimpCtx tcont(*ctx);
         SIMP_ret_array_val(&tcont) = true;
         IR * newsub = simplifyExpression(s, &tcont);
@@ -1570,8 +1570,8 @@ IR * Region::simplifyArrayIngredient(IR * ir, SimpCtx * ctx)
     //Simplify sublist.
     IR * newsublist = NULL;
     IR * newsublast = NULL;
-    IR * s = removehead(&ARR_sub_list(ir));
-    for (; s != NULL; s = removehead(&ARR_sub_list(ir))) {
+    IR * s = xcom::removehead(&ARR_sub_list(ir));
+    for (; s != NULL; s = xcom::removehead(&ARR_sub_list(ir))) {
         SimpCtx subctx(*ctx);
         SIMP_ret_array_val(&subctx) = true;
         IR * news = simplifyExpression(s, &subctx);
@@ -1597,7 +1597,6 @@ IR * Region::simplifyStoreArray(IR * ir, SimpCtx * ctx)
 {
     ASSERT0(ir->is_starray());
     ASSERT0(SIMP_stmtlist(ctx) == NULL);
-
     IR * ret_list = NULL;
     IR * last = NULL;
     Type const* type = ir->get_type();
@@ -1768,7 +1767,7 @@ IR * Region::simplifyCall(IR * ir, SimpCtx * ctx)
     IR * last = NULL;
     bool lchange = false;
     while (CALL_param_list(ir) != NULL) {
-        IR * p = removehead(&CALL_param_list(ir));
+        IR * p = xcom::removehead(&CALL_param_list(ir));
 
         if (g_is_simplify_parameter && !p->is_memory_opnd() && !p->is_lda()) {
             //We always simplify parameters to lowest height to
@@ -2339,7 +2338,7 @@ void Region::simplifyBB(IRBB * bb, SimpCtx * ctx)
         ASSERT0(stmt && stmt->is_single());
         IR * newstmt_lst = simplifyStmt(stmt, ctx);
         while (newstmt_lst != NULL) {
-            IR * newir = removehead(&newstmt_lst);
+            IR * newir = xcom::removehead(&newstmt_lst);
             newir->set_bb(bb);
             ASSERT0(newir->verify(this));
             new_ir_list.append_tail(newir);

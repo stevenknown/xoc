@@ -1883,12 +1883,14 @@ void IR_AA::inferIstoreValue(IN IR * ir, IN AACtx * ic, IN MD2MDSet * mx)
         if (m_flow_sensitive) {
             if (ist_mustaddr != NULL) {
                 if (ist_mustaddr->is_exact()) {
+                    //istore is killing def.
                     if (is_maypts) {
                         setPointTo(MD_id(ist_mustaddr), *mx, m_maypts);
                     } else {
                         setPointToMDSet(MD_id(ist_mustaddr), *mx, tmp);
                     }
                 } else {
+                    //istore is nonkilling def.
                     setPointToMDSetByAddMDSet(MD_id(ist_mustaddr), *mx, *pts2);
                 }
             } else {
@@ -3606,7 +3608,7 @@ void IR_AA::computeFlowSensitive(List<IRBB*> const& bbl)
             }
         }
     }
-    ASSERT0(!change);
+    ASSERT(!change, ("Iterated too many times"));
 }
 
 

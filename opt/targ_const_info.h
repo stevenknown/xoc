@@ -48,6 +48,9 @@ author: Su Zhenyu
 
 #elif defined(FOR_JS)
 #include "../js/js_const_info.h"
+
+#else
+#error "No target info"
 #endif
 
 #endif

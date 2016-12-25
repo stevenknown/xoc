@@ -623,6 +623,87 @@ public:
             get_dtype(WORD_LENGTH_OF_TARGET_MACHINE, false));
     }
 
+    //Use HOST_INT type describes the value.
+    //The value can not exceed ir type's value range.
+    inline HOST_INT getIntegerInDataTypeValueRange(IR * ir) const
+    {
+        ASSERT0(ir->is_const() && ir->is_int());
+        UINT bitsz = get_type_mgr()->get_dtype_bitsize(
+            TY_dtype(ir->get_type()));
+        ASSERT(sizeof(HOST_INT) * BIT_PER_BYTE >= bitsz, 
+            ("integer might be truncated"));
+        switch (bitsz) {
+        case 8: return (HOST_INT)(((UINT8)(INT8)CONST_int_val(ir)));
+        case 16: return (HOST_INT)(((UINT16)(INT16)CONST_int_val(ir)));
+        case 32: return (HOST_INT)(((UINT32)(INT32)CONST_int_val(ir)));
+        case 64: return (HOST_INT)(((UINT64)(INT64)CONST_int_val(ir)));
+        case 128: 
+            #ifdef INT128
+            return (HOST_INT)(((UINT128)(INT128)CONST_int_val(ir)));
+            #endif            
+        default: ASSERT(0, ("TODO:need to support"));
+        }
+        return 0;
+    }
+
+    inline HOST_INT getMaxInteger(UINT bitsize, bool is_signed) const
+    {
+        ASSERT(sizeof(HOST_INT) * BIT_PER_BYTE >= bitsize,
+            ("integer might be truncated"));
+        if (is_signed) {
+            switch (bitsize) {
+            case 8: return (HOST_INT)(((UINT8)(INT8)-1) >> 1);
+            case 16: return (HOST_INT)(((UINT16)(INT16)-1) >> 1);   
+            case 32: return (HOST_INT)(((UINT32)(INT32)-1) >> 1);
+            case 64: return (HOST_INT)(((UINT64)(INT64)-1) >> 1);
+            case 128: 
+                #ifdef INT128
+                return (HOST_INT)(((UINT128)(INT128)-1) >> 1);
+                #endif            
+            default: ASSERT(0, ("TODO:need to support"));
+            }
+            return 0;
+        }
+
+        switch (bitsize) {
+        case 8: return (HOST_INT)(((UINT8)(INT8)-1));
+        case 16: return (HOST_INT)(((UINT16)(INT16)-1));   
+        case 32: return (HOST_INT)(((UINT32)(INT32)-1));
+        case 64: return (HOST_INT)(((UINT64)(INT64)-1));
+        case 128: 
+            #ifdef INT128
+            return (HOST_INT)(((UINT128)(INT128)-1));
+            #endif            
+        default: ASSERT(0, ("TODO:need to support"));
+        }
+        return 0;
+    }
+
+    inline HOST_INT getMinInteger(UINT bitsize, bool is_signed) const
+    { 
+        switch (bitsize) {
+        case 8: 
+            return (HOST_INT)
+                ((UINT8)(~(UINT8)getMaxInteger(bitsize, is_signed)));
+        case 16: 
+            return (HOST_INT)
+                ((UINT16)(~(UINT16)getMaxInteger(bitsize, is_signed)));
+        case 32: 
+            return (HOST_INT)
+                ((UINT32)(~(UINT32)getMaxInteger(bitsize, is_signed)));
+        case 64: 
+            return (HOST_INT)
+                ((UINT64)(~(UINT64)getMaxInteger(bitsize, is_signed)));
+        case 128: 
+            #ifdef INT128
+            return (HOST_INT)
+                ((UINT128)(~(UINT128)getMaxInteger(bitsize, is_signed)));
+            #endif            
+        default: ASSERT(0, ("TODO:need to support"));
+        }
+        return 0; 
+    }
+
     //Perform high level optmizations.
     virtual bool HighProcess(OptCtx & oc);
 
