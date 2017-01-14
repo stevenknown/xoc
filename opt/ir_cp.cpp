@@ -505,7 +505,8 @@ bool IR_CP::perform(OptCtx & oc)
         OC_is_aa_valid(oc) = false;
         OC_is_du_chain_valid(oc) = true; //already update.
         OC_is_ref_valid(oc) = true; //already update.
-        ASSERT0(m_ru->verifyMDRef() && m_du->verifyMDDUChain());
+        ASSERT0(m_ru->verifyMDRef() && 
+            m_du->verifyMDDUChain(COMPUTE_PR_DU | COMPUTE_NOPR_DU));
         ASSERT0(verifySSAInfo(m_ru));
     }
 

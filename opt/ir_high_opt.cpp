@@ -71,10 +71,10 @@ void Region::HighProcessImpl(OptCtx & oc)
     if (g_do_md_du_ana) {
         ASSERT0(g_cst_bb_list && OC_is_cfg_valid(oc) && OC_is_aa_valid(oc));
         ASSERT0(get_pass_mgr());
-        IR_DU_MGR * dumgr =
-            (IR_DU_MGR*)get_pass_mgr()->registerPass(PASS_DU_MGR);
+        IR_DU_MGR * dumgr = (IR_DU_MGR*)get_pass_mgr()->
+            registerPass(PASS_DU_MGR);
         ASSERT0(dumgr);
-        UINT f = SOL_REACH_DEF|SOL_REF;
+        UINT f = SOL_REACH_DEF|SOL_REF|COMPUTE_PR_DU|COMPUTE_NOPR_DU;
         if (g_compute_available_exp) {
             f |= SOL_AVAIL_EXPR;
         }
@@ -89,7 +89,20 @@ void Region::HighProcessImpl(OptCtx & oc)
 
         if (dumgr->perform(oc, f) && OC_is_ref_valid(oc)) {
             if (g_compute_du_chain) {
-                dumgr->computeMDDUChain(oc);
+                UINT flag = COMPUTE_NOPR_DU;
+                //If PRs have already been in SSA form, compute
+                //DU chain doesn't make any sense.    
+                if (get_pass_mgr() != NULL) {
+                    IR_SSA_MGR * ssamgr = (IR_SSA_MGR*)get_pass_mgr()->
+                        queryPass(PASS_SSA_MGR);
+                    if (ssamgr == NULL) {
+                        flag |= COMPUTE_PR_DU;
+                    }
+                } else {
+                    flag |= COMPUTE_PR_DU;
+                }
+
+                dumgr->computeMDDUChain(oc, false, flag);
             }
         }
     }
@@ -171,7 +184,7 @@ bool Region::HighProcess(OptCtx & oc)
     }
 
     simp.setSimpCFS();
-    set_ir_list(simplifyStmtList(get_ir_list(), &simp));
+    set_ir_list(simplifyStmtList(get_ir_list(), &simp));    
     ASSERT0(verify_simp(get_ir_list(), simp));
     ASSERT0(verify_irs(get_ir_list(), NULL, this));
 

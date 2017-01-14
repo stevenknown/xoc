@@ -1708,7 +1708,7 @@ void Region::insertCvtForBinaryOp(IR * ir, bool & change)
 //Insert CVT for float if necessary.
 IR * Region::insertCvtForFloat(IR * parent, IR * kid, bool &)
 {
-    ASSERT0(parent->is_fp() || kid->is_fp());
+    CK_USE(parent->is_fp() || kid->is_fp());
     return kid;
 }
 

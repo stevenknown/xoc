@@ -300,6 +300,20 @@ void MDSet::dump(MDSystem * ms, bool detail) const
 
 
 //
+//START MDSetHash
+//
+void MDSetHash::dump()
+{
+    if (g_tfile == NULL) { return; }
+    fprintf(g_tfile, "\n==---- DUMP MDSet Hash ----==\n");
+    SBitSetCoreHash<MDSetHashAllocator>::dump_hashed_set(g_tfile);
+    SBitSetCoreHash<MDSetHashAllocator>::dump(g_tfile);   
+    fflush(g_tfile);
+}
+//END MDSetHash
+
+
+//
 //START MDSetMgr
 //
 //Clean and give it back to md set manager.
@@ -709,13 +723,19 @@ void MDSystem::computeOverlap(
     ASSERT0(ofsttab);
     if (ofsttab->get_elem_count() > 0) {
         tabiter.clean();
+        bool find_overlapped = false;
         for (MD const* tmd = ofsttab->get_first(tabiter, NULL);
              tmd != NULL; tmd = ofsttab->get_next(tabiter, NULL)) {
             ASSERT0(MD_base(md) == MD_base(tmd));
             if (tmd == md) { continue; }
             if (md->is_overlap(tmd)) {
                 output.bunion(tmd, mbsmgr);
+                find_overlapped = true;
             }
+        }
+
+        if (find_overlapped) {
+            output.bunion(md, mbsmgr);
         }
     }
 }

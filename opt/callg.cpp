@@ -77,7 +77,7 @@ void CallGraph::dump_vcg(CHAR const* name, INT flag)
     if (name == NULL) {
         name = "graph_call_graph.vcg";
     }
-    unlink(name);
+    UNLINK(name);
     FILE * h = fopen(name, "a+");
     ASSERT(h != NULL, ("%s create failed!!!",name));
 

@@ -87,7 +87,6 @@ namespace xoc {
 //Mapping from IR to index.
 typedef HMap<IR const*, UINT, HashFuncBase2<IR const*> > IR2UINT;
 
-
 class IR_DU_MGR;
 
 //Mapping from MD to IR list, and to be responsible for
@@ -235,11 +234,14 @@ typedef HMap<IR*, DUSet*> IR2DU;
 #define COMP_EXP_COLLECT_MUST_USE      4
 
 #define SOL_UNDEF                      0
-#define SOL_AVAIL_REACH_DEF            1  //must be available reach-definition.
-#define SOL_REACH_DEF                  2  //may be reach-definition.
-#define SOL_AVAIL_EXPR                 4  //must be available expression.
-#define SOL_RU_REF                     8  //region's def/use mds.
-#define SOL_REF                        16 //referrenced mds.
+#define SOL_AVAIL_REACH_DEF            0x1  //must be available reach-definition.
+#define SOL_REACH_DEF                  0x2  //may be reach-definition.
+#define SOL_AVAIL_EXPR                 0x4  //must be available expression.
+#define SOL_RU_REF                     0x8  //region's def/use mds.
+#define SOL_REF                        0x10 //referrenced mds.
+#define COMPUTE_PR_DU                  0x20 //compute PR du chain.
+#define COMPUTE_NOPR_DU                0x40 //compute Non-PR du chain.
+
 class IR_DU_MGR : public Pass {
     friend class MDId2IRlist;
     friend class DUSet;
@@ -253,12 +255,6 @@ protected:
     MDSetMgr * m_mds_mgr;
     MDSetHash * m_mds_hash;
     DefMiscBitSetMgr * m_misc_bs_mgr;
-
-    //Indicate whether compute the DU chain for PR.
-    //This flag is often set to false if PR SSA has constructed to reduce
-    //compilation time and memory consumption.
-    //If the flag is true, reach-def will not be computed.
-    BYTE m_is_compute_pr_du_chain:1;
 
     ConstIRIter m_citer; //for tmp use.
     ConstIRIter m_citer2; //for tmp use.
@@ -357,10 +353,11 @@ protected:
     UINT checkIsNonLocalKillingDef(IR const* stmt, IR const* exp);
     inline bool canBeLiveExprCand(IR const* ir) const;
     void computeArrayRefAtIstoreBase(IR * ir);
-    void computeExpression(IR * ir, MDSet * ret_mds, UINT flag);
-    void computeArrayRef(IR * ir, OUT MDSet * ret_mds, UINT flag);
-    void checkAndBuildChainRecursive(IRBB * bb, IR * exp, C<IR*> * ct);
-    void checkAndBuildChain(IR * stmt, C<IR*> * ct);
+    void computeExpression(IR * ir, MDSet * ret_mds, UINT compflag, UINT duflag);
+    void computeArrayRef(IR * ir, OUT MDSet * ret_mds, UINT compflag, UINT duflag);
+    void checkAndBuildChainForMemIR(IRBB * bb, IR * exp, C<IR*> * ct);
+    void checkAndBuildChainRecursive(IRBB * bb, IR * exp, C<IR*> * ct, UINT flag);
+    void checkAndBuildChain(IR * stmt, C<IR*> * ct, UINT flag);
     void computeMayDef(
             IR const* ir,
             MDSet * bb_maydefmds,
@@ -420,12 +417,12 @@ protected:
             IR const* use);
     void initMD2IRList(IRBB * bb);
     void inferRegion(IR * ir, bool ruinfo_avail, IN MDSet * tmp);
-    void inferIstore(IR * ir);
-    void inferStore(IR * ir);
-    void inferStorePR(IR * ir);
-    void inferStoreArray(IR * ir);
-    void inferPhi(IR * ir);
-    void inferCall(IR * ir, IN MD2MDSet * mx);
+    void inferIstore(IR * ir, UINT duflag);
+    void inferStore(IR * ir, UINT duflag);
+    void inferStorePR(IR * ir, UINT duflag);
+    void inferStoreArray(IR * ir, UINT duflag);
+    void inferPhi(IR * ir, UINT duflag);
+    void inferCall(IR * ir, UINT duflag, IN MD2MDSet * mx);
 
     void solve(DefDBitSetCore const& expr_universe,
                UINT const flag,
@@ -437,7 +434,7 @@ protected:
     void resetGlobalSet(bool cleanMember);
     void updateDefWithMustEffectMD(IR * ir, MD const* musteffect);
     void updateDefWithMustExactMD(IR * ir, MD const* mustexact);
-    void updateDef(IR * ir);
+    void updateDef(IR * ir, UINT flag);
     void updateRegion(IR * ir);
 public:
     explicit IR_DU_MGR(Region * ru);
@@ -461,13 +458,18 @@ public:
     { computeOverlapUseMDSet(ir, recompute); }
 
     void computeOverlapUseMDSet(IR * ir, bool recompute);
+
+    //Collect MustUse MDSet for both PR operation and Non-PR operation.
+    //e.g: = a + b + *p;
+    //    assume p->w,u, the MustUse is {a,b,p}, not include w,u.
     void collectMustUsedMDs(IR const* ir, OUT MDSet & mustuse);
+    
     void computeGenForBB(
             IN IRBB * bb,
             OUT DefDBitSetCore & expr_univers,
             DefMiscBitSetMgr & bsmgr);
-    void computeMDDUforBB(IRBB * bb);
-    void computeMDRef();
+    void computeMDDUforBB(IRBB * bb, UINT flag);
+    void computeMDRef(UINT duflag);
     void computeKillSet(
             DefDBitSetCoreReserveTab & dbitsetchash,
             Vector<MDSet*> const* mustdefs,
@@ -478,7 +480,7 @@ public:
             OUT DefDBitSetCore * expr_universe,
             Vector<MDSet*> const* maydefmds,
             DefMiscBitSetMgr & bsmgr);
-    void computeMDDUChain(IN OUT OptCtx & oc, bool retain_reach_def = false);
+    void computeMDDUChain(IN OUT OptCtx & oc, bool retain_reach_def, UINT flag);
     void computeRegionMDDU(
             Vector<MDSet*> const* mustdefmds,
             Vector<MDSet*> const* maydefmds,
@@ -763,7 +765,6 @@ public:
 
     void freeDU();
 
-    bool isComputePRDU() const { return m_is_compute_pr_du_chain; }
     inline bool is_du_exist(IR const* def, IR const* use) const
     {
         ASSERT0(def->is_stmt() && use->is_exp());
@@ -790,9 +791,7 @@ public:
 
     void setMustKilledDef(UINT bbid, DefDBitSetCore const* set);
     void setMayKilledDef(UINT bbid, DefDBitSetCore const* set);
-    void setKilledIRExpr(UINT bbid, DefDBitSetCore const* set);
-    void setComputePRDU(bool compute)
-    { m_is_compute_pr_du_chain = (BYTE)compute; }
+    void setKilledIRExpr(UINT bbid, DefDBitSetCore const* set);    
 
     //DU chain operations.
     //Set 'use' to be USE of 'stmt'.
@@ -895,8 +894,8 @@ public:
     void removeDefOutFromUseset(IR * def);
     void removeIROutFromDUMgr(IR * ir);
 
-    bool verifyMDDUChain();
-    bool verifyMDDUChainForIR(IR const* ir);
+    bool verifyMDDUChain(UINT flag);
+    bool verifyMDDUChainForIR(IR const* ir, UINT flag);
     bool verifyLiveinExp();
 
     virtual bool perform(OptCtx &)

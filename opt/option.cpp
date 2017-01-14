@@ -235,4 +235,9 @@ UINT g_verify_level = VERIFY_LEVEL_2;
 //               intconst 24|0x18 (u32) id:14
 bool g_is_simplify_parameter = true;
 
+//Dump MD Set Hash Table.
+bool g_is_dump_mdset_hash = false;
+
+//Dump MD DU chain built by DU Manager.
+bool g_is_dump_du_chain = false;
 } //namespace xoc

@@ -171,7 +171,7 @@ void DEX_CFG::dump_vcg_ex(BitSet const& markbbs)
     CHAR const* name = "graph_cfg.vcg";
     //Note this function does not use g_tfile as output.
     //So it is dispensable to check g_tfile.
-    unlink(name);
+    UNLINK(name);
     FILE * h = fopen(name, "a+");
     ASSERT(h != NULL, ("%s create failed!!!",name));
     FILE * old = NULL;
@@ -206,7 +206,7 @@ void DEX_CFG::dump_vcg_ex2(BitSet const& trybbs, BitSet const& catchbbs)
     CHAR const* name = "graph_cfg.vcg";
     //Note this function does not use g_tfile as output.
     //So it is dispensable to check g_tfile.
-    unlink(name);
+    UNLINK(name);
     FILE * h = fopen(name, "a+");
     ASSERT(h != NULL, ("%s create failed!!!",name));
     FILE * old = NULL;

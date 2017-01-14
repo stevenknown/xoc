@@ -4144,7 +4144,7 @@ void Matrix<T>::dumpf(CHAR * name, bool is_del) const
         name = "matrix.tmp";
     }
     if (is_del) {
-        unlink(name);
+        UNLINK(name);
     }
     FILE * h = fopen(name, "a+");
     ASSERT(h, ("%s create failed!!!", name));

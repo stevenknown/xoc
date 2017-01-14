@@ -343,7 +343,7 @@ void dumpBBList(BBList * bbl,
     if (name == NULL) {
         h = g_tfile;
     } else {
-        unlink(name);
+        UNLINK(name);
         h = fopen(name, "a+");
         ASSERT(h != NULL, ("can not dump."));
         g_tfile = h;

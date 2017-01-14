@@ -840,7 +840,7 @@ void IR_CFG::dump_dot(CHAR const* name, bool detail, bool dump_eh)
     if (name == NULL) {
         name = "graph_cfg.dot";
     }
-    unlink(name);
+    UNLINK(name);
     FILE * h = fopen(name, "a+");
     ASSERT(h, ("%s create failed!!!", name));
 
@@ -1104,7 +1104,7 @@ void IR_CFG::dump_vcg(CHAR const* name, bool detail, bool dump_eh)
 
     //Note this function does not use g_tfile as output.
     //So it is dispensable to check g_tfile.
-    unlink(name);
+    UNLINK(name);
     FILE * h = fopen(name, "a+");
     ASSERT(h != NULL, ("%s create failed!!!",name));
     FILE * old = NULL;
@@ -1257,7 +1257,7 @@ bool IR_CFG::performMiscOpt(OptCtx & oc)
         }
 
         count++;
-    } while (lchange && count < 20);
+    } while (lchange && count < 1000);
 
     ASSERT(!lchange, ("CFG optimization iterated too many times."));
 

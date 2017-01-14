@@ -100,6 +100,23 @@ public:
         RC_stmt_removed(*this) = false;
         RC_hoist_to_lnot(*this) = true;
     }
+
+    void setUnOptFlag() 
+    {
+        RC_refine_div_const(*this) = false;
+        RC_refine_mul_const(*this) = false;
+        RC_refine_stmt(*this) = false;
+        RC_do_fold_const(*this) = false;
+
+        if (g_do_refine_auto_insert_cvt) {
+            RC_insert_cvt(*this) = true;
+        } else {
+            RC_insert_cvt(*this) = false;
+        }
+
+        RC_stmt_removed(*this) = false;
+        RC_hoist_to_lnot(*this) = false;
+    }
 };
 
 } //namespace xoc

@@ -904,7 +904,7 @@ void Graph::dump_dot(CHAR const* name)
     if (name == NULL) {
         name = "graph.dot";
     }
-    unlink(name);
+    UNLINK(name);
     FILE * h = fopen(name, "a+");
     ASSERT(h, ("%s create failed!!!", name));
 
@@ -936,7 +936,7 @@ void Graph::dump_vcg(CHAR const* name)
     if (name == NULL) {
         name = "graph.vcg";
     }
-    unlink(name);
+    UNLINK(name);
     FILE * h = fopen(name, "a+");
     ASSERT(h, ("%s create failed!!!",name));
     fprintf(h, "graph: {"

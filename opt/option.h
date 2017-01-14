@@ -186,7 +186,6 @@ typedef enum _PASS_TYPE {
     PASS_NUM,
 } PASS_TYPE;
 
-//Exported Variables
 extern CHAR * g_func_or_bb_option;
 extern INT g_opt_level;
 extern bool g_do_gra;
@@ -276,5 +275,10 @@ extern UINT g_verify_level;
 //of parameters of call can be left out if the flag set to false.
 extern bool g_is_simplify_parameter;
 
+//Dump MD Set Hash Table.
+extern bool g_is_dump_mdset_hash;
+
+//Dump MD DU chain built by DU Manager.
+extern bool g_is_dump_du_chain;
 } //namespace xoc
 #endif

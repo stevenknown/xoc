@@ -823,7 +823,7 @@ bool IR_LICM::perform(OptCtx & oc)
 
         //DU chain and du ref is maintained.
         ASSERT0(m_ru->verifyMDRef());
-        ASSERT0(m_du->verifyMDDUChain());
+        ASSERT0(m_du->verifyMDDUChain(COMPUTE_PR_DU | COMPUTE_NOPR_DU));
 
         if (du_set_info_changed) {
             OC_is_live_expr_valid(oc) = false;

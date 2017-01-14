@@ -124,7 +124,8 @@ bool Region::performSimplify(OptCtx & oc)
     }
 
     if (g_verify_level >= VERIFY_LEVEL_3 && OC_is_du_chain_valid(oc)) {
-        ASSERT0(get_du_mgr() == NULL || get_du_mgr()->verifyMDDUChain());
+        ASSERT0(get_du_mgr() == NULL || 
+            get_du_mgr()->verifyMDDUChain(COMPUTE_PR_DU | COMPUTE_NOPR_DU));
     }
     return true;
 }
@@ -159,19 +160,20 @@ bool Region::MiddleProcess(OptCtx & oc)
     if (bbl->get_elem_count() == 0) { return true; }
 
     if (g_verify_level >= VERIFY_LEVEL_3) {
-        ASSERT0(get_du_mgr() == NULL || get_du_mgr()->verifyMDDUChain());
+        ASSERT0(get_du_mgr() == NULL || 
+            get_du_mgr()->verifyMDDUChain(COMPUTE_PR_DU | COMPUTE_NOPR_DU));
     }
 
-    bool can_do_simp = true;
+    bool do_simplification = true;
     if (get_pass_mgr() != NULL) {
         IR_SSA_MGR * ssamgr = (IR_SSA_MGR*)get_pass_mgr()->
             queryPass(PASS_SSA_MGR);
         if (ssamgr != NULL && ssamgr->is_ssa_constructed()) {
-            can_do_simp = false;
+            do_simplification = false;
         }
     }
 
-    if (can_do_simp) {
+    if (do_simplification) {
         performSimplify(oc);
     }
 
@@ -188,7 +190,7 @@ bool Region::MiddleProcess(OptCtx & oc)
             ASSERT0(verifyIRandBB(bbl, this));
             if (g_verify_level >= VERIFY_LEVEL_3 && OC_is_du_chain_valid(oc)) {
                 ASSERT0(get_du_mgr() == NULL ||
-                        get_du_mgr()->verifyMDDUChain());
+                    get_du_mgr()->verifyMDDUChain(COMPUTE_PR_DU | COMPUTE_NOPR_DU));
             }
         } else { ASSERT0(verifyIRandBB(bbl, this)); }
     } else {

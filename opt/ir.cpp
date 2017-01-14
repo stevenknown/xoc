@@ -1110,12 +1110,9 @@ void dump_ir(IR const* ir,
                      dump_src_line, dump_addr, dump_inner_region);
             g_indent -= dn;
 
-            if (SWITCH_case_list(ir) != NULL) {
-                note("\ncase_list:");
-                g_indent += dn;
+            if (SWITCH_case_list(ir) != NULL) {                
                 dump_irs(SWITCH_case_list(ir), tm, NULL, dump_kid,
                          dump_src_line, dump_addr, dump_inner_region);
-                g_indent -= dn;
             }
 
             if (SWITCH_body(ir) != NULL) {
@@ -1129,14 +1126,18 @@ void dump_ir(IR const* ir,
         }
         break;
     case IR_CASE:
-        {
-            ASSERT0(CASE_vexp(ir));
-            ASSERT0(CASE_lab(ir));
-            note("\ncase %d, ", CONST_int_val(CASE_vexp(ir)));
-            ir_dump_lab(ir);
-            PADDR(ir);
-            fprintf(g_tfile, "%s", attr);
-        }
+        ASSERT0(CASE_vexp(ir));
+        ASSERT0(CASE_lab(ir));
+        note("\ncase");
+        PADDR(ir);
+        fprintf(g_tfile, "%s", attr);
+
+        g_indent += dn;
+        dump_irs(CASE_vexp(ir), tm, NULL, dump_kid,
+                 dump_src_line, dump_addr, dump_inner_region);
+        note("\n");
+        ir_dump_lab(ir);
+        g_indent -= dn;
         break;
     case IR_ARRAY:
         if (ARR_ofst(ir) != 0) {

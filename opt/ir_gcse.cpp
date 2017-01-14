@@ -775,7 +775,7 @@ bool IR_GCSE::perform(OptCtx & oc)
 
         //DU reference and du chain has maintained.
         ASSERT0(m_ru->verifyMDRef());
-        ASSERT0(m_du->verifyMDDUChain());
+        ASSERT0(m_du->verifyMDDUChain(COMPUTE_PR_DU | COMPUTE_NOPR_DU));
 
         OC_is_live_expr_valid(oc) = false;
         OC_is_reach_def_valid(oc) = false;

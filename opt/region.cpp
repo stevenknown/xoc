@@ -1566,6 +1566,149 @@ C<IRBB*> * Region::splitIRlistIntoBB(IR * irs, BBList * bbl, C<IRBB*> * ctbb)
 }
 
 
+bool Region::evaluateConstInteger(IR const* ir, OUT ULONGLONG * const_value)
+{
+    switch (ir->get_code()) {
+    case IR_CONST:
+        if (!ir->is_int()) { return false; }
+        *const_value = CONST_int_val(ir);
+        return true;
+    case IR_ADD:
+    case IR_SUB:
+    case IR_MUL:
+    case IR_DIV:
+    case IR_REM:
+    case IR_MOD:
+    case IR_LAND: //logical and &&
+    case IR_LOR: //logical or ||
+    case IR_BAND: //inclusive and &
+    case IR_BOR: //inclusive or |
+    case IR_XOR: //exclusive or
+    case IR_LT:
+    case IR_LE:
+    case IR_GT:
+    case IR_GE:
+    case IR_EQ:
+    case IR_NE:
+    case IR_ASR:
+    case IR_LSR:
+    case IR_LSL:
+        {
+            IR const* opnd0 = BIN_opnd0(ir);
+            IR const* opnd1 = BIN_opnd1(ir);
+
+            //TODO: Handle the case if opnd0's type is different with opnd1.
+            if (!opnd0->is_int() || !opnd1->is_int()) { return false; }
+            if (opnd0->is_uint() ^ opnd1->is_uint()) { return false; }
+            
+            ULONGLONG lvalue = 0, rvalue = 0;
+            if (!evaluateConstInteger(BIN_opnd0(ir), &lvalue)) { return false; }
+            if (!evaluateConstInteger(BIN_opnd1(ir), &rvalue)) { return false; }
+
+            if (opnd0->is_uint()) {                
+                switch (ir->get_code()) {
+                case IR_ADD: *const_value = lvalue + rvalue; break;
+                case IR_MUL: *const_value = lvalue * rvalue; break;
+                case IR_SUB: *const_value = lvalue - rvalue; break;
+                case IR_DIV: *const_value = lvalue / rvalue; break;
+                case IR_REM: *const_value = lvalue % rvalue; break;
+                case IR_MOD: *const_value = lvalue % rvalue; break;
+                case IR_LAND: *const_value = lvalue && rvalue; break;
+                case IR_LOR:  *const_value = lvalue || rvalue; break;
+                case IR_BAND: *const_value = lvalue & rvalue; break;
+                case IR_BOR:  *const_value = lvalue | rvalue; break;
+                case IR_XOR:  *const_value = lvalue ^ rvalue; break;
+                case IR_LT: *const_value= lvalue < rvalue; break;
+                case IR_LE: *const_value= lvalue <= rvalue; break;
+                case IR_GT: *const_value= lvalue > rvalue; break;
+                case IR_GE: *const_value= lvalue >= rvalue; break;
+                case IR_EQ: *const_value= lvalue == rvalue; break;
+                case IR_NE: *const_value= lvalue != rvalue; break;
+                case IR_ASR: *const_value = lvalue >> rvalue; break;
+                case IR_LSR: *const_value = lvalue >> rvalue; break;
+                case IR_LSL: *const_value = lvalue << rvalue; break;
+                default: return false;
+                }
+            } else {
+                LONGLONG lv = (LONGLONG)lvalue;
+                LONGLONG rv = (LONGLONG)rvalue;
+                LONGLONG res = 0;
+                switch (ir->get_code()) {
+                case IR_ADD:  res = lv + rv; break;
+                case IR_SUB:  res = lv - rv; break;
+                case IR_MUL:  res = lv * rv; break;
+                case IR_DIV:  res = lv / rv; break;
+                case IR_REM:  res = lv % rv; break;
+                case IR_MOD:  res = lv % rv; break;
+                case IR_LAND: res = lv && rv; break;
+                case IR_LOR:  res = lv || rv; break;
+                case IR_BAND: res = lv & rv; break;
+                case IR_BOR:  res = lv | rv; break;
+                case IR_XOR:  res = lv ^ rv; break;
+                case IR_LT: res = lv < rv; break;
+                case IR_LE: res = lv <= rv; break;
+                case IR_GT: res = lv > rv; break;
+                case IR_GE: res = lv >= rv; break;
+                case IR_EQ: res = lv == rv; break;
+                case IR_NE: res = lv != rv; break;
+                case IR_ASR: res = lv >> rv; break;
+                case IR_LSR: res = lv >> rv; break;
+                case IR_LSL: res = lv << rv; break;
+                default: return false;
+                }
+                *const_value = (ULONGLONG)res;
+            }
+            return true;
+        }
+    case IR_BNOT: //bitwise not
+    case IR_LNOT: //logical not
+    case IR_NEG: //negative
+        {
+            if (!UNA_opnd0(ir)->is_int()) { return false; }
+
+            ULONGLONG value = 0;
+            if (!evaluateConstInteger(UNA_opnd0(ir), &value)) { return false; }
+
+            switch (ir->get_code()) {
+            case IR_BNOT: *const_value = ~value; break;
+            case IR_LNOT: *const_value = !value; break;
+            case IR_NEG:  *const_value = (ULONGLONG)(-(LONGLONG)value); break;
+            default: return false;
+            }
+            return true;
+        }
+    case IR_PR:
+        {
+            IR * defstmt = NULL;
+            SSAInfo const* ssainfo = PR_ssainfo(ir);
+            if (ssainfo != NULL) {
+                defstmt = SSA_def(ssainfo);
+                if (defstmt != NULL && !defstmt->is_stpr()) {
+                    return false;
+                }
+            } else {
+                DUSet const* defset = ir->readDUSet();
+                if (defset == NULL || defset->get_elem_count() != 1) { 
+                    return false; 
+                }
+
+                DUIter di = NULL;
+                defstmt = get_ir(defset->get_first(&di));
+                ASSERT0(defstmt && defstmt->is_stmt());
+
+                if (!defstmt->is_stpr()) { return false; }
+
+                return evaluateConstInteger(STPR_rhs(defstmt), const_value);
+            }
+        }
+    case IR_CVT:        
+        return evaluateConstInteger(CVT_exp(ir), const_value);
+    default:;
+    }
+    return false;
+}
+
+
 //Find the boundary IR generated in BB to update bb-list incremently.
 //e.g: Given BB1 has one stmt:
 //    BB1:
@@ -3114,7 +3257,7 @@ void Region::checkValidAndRecompute(OptCtx * oc, ...)
         !OC_is_reach_def_valid(*oc)) {
         f |= SOL_REACH_DEF;
     }
-
+        
     if ((HAVE_FLAG(f, SOL_REF) || opts.is_contain(PASS_AA)) &&
         !OC_is_aa_valid(*oc) &&
         get_bb_list() != NULL &&
@@ -3140,7 +3283,7 @@ void Region::checkValidAndRecompute(OptCtx * oc, ...)
         }
 
         aa->perform(*oc);
-    }
+    }   
 
     if (f != 0 &&
         get_bb_list() != NULL &&
@@ -3148,6 +3291,9 @@ void Region::checkValidAndRecompute(OptCtx * oc, ...)
         if (dumgr == NULL) {
             dumgr = (IR_DU_MGR*)passmgr->registerPass(PASS_DU_MGR);
         }
+
+        f |= COMPUTE_NOPR_DU;
+        f |= COMPUTE_PR_DU;
 
         dumgr->perform(*oc, f);
         if (HAVE_FLAG(f, SOL_REF)) {
@@ -3166,10 +3312,19 @@ void Region::checkValidAndRecompute(OptCtx * oc, ...)
             dumgr = (IR_DU_MGR*)passmgr->registerPass(PASS_DU_MGR);
         }
 
+        UINT flag = COMPUTE_NOPR_DU;
+        
+        //If PRs have already been in SSA form, compute
+        //DU chain doesn't make any sense.    
+        IR_SSA_MGR * ssamgr = (IR_SSA_MGR*)passmgr->queryPass(PASS_SSA_MGR);
+        if (ssamgr == NULL) {
+            flag |= COMPUTE_PR_DU;
+        }
+
         if (opts.is_contain(PASS_REACH_DEF)) {
-            dumgr->computeMDDUChain(*oc, true);
+            dumgr->computeMDDUChain(*oc, true, flag);
         } else {
-            dumgr->computeMDDUChain(*oc, false);
+            dumgr->computeMDDUChain(*oc, false, flag);
         }
     }
 
@@ -3334,7 +3489,7 @@ bool Region::processIRList(OptCtx & oc)
     prescan(get_ir_list());
     END_TIMER();
     if (!HighProcess(oc)) { return false; }
-    ASSERT0(get_du_mgr()->verifyMDDUChain());
+    ASSERT0(get_du_mgr()->verifyMDDUChain(COMPUTE_PR_DU|COMPUTE_NOPR_DU));
     if (!MiddleProcess(oc)) { return false; }
 
     return true;
@@ -3360,7 +3515,8 @@ bool Region::process(OptCtx * oc)
         //Need to scan call-list.
         get_region_mgr()->buildCallGraph(*oc, true, true);
         if (OC_is_callg_valid(*oc)) {
-            Inliner * inl = (Inliner*)get_pass_mgr()->registerPass(PASS_INLINER);
+            Inliner * inl = (Inliner*)get_pass_mgr()->
+                registerPass(PASS_INLINER);
             inl->perform(*oc);
             get_pass_mgr()->destroyPass(inl);
         }

@@ -85,11 +85,14 @@ typedef struct _MemPool {
 #ifdef __cplusplus
 extern "C" {
 #endif
-//create mem pool
+//Create memory pool
+//size: the initial byte size of pool. For MEM_CONST_SIZE, 'size'
+//      must be integer multiples of element byte size.
+//mpt: pool type.
 MEMPOOLIDX smpoolCreatePoolIndex(size_t size, MEMPOOLTYPE mpt = MEM_COMM);
 SMemPool * smpoolCreate(size_t size, MEMPOOLTYPE mpt = MEM_COMM);
 
-//delete mem pool
+//delete memory pool
 INT smpoolDeleteViaPoolIndex(MEMPOOLIDX mpt_idx);
 INT smpoolDelete(SMemPool * handle);
 
@@ -109,8 +112,8 @@ size_t smpoolGetPoolSize(SMemPool const* handle);
 //the initialization is dispensable.
 void smpoolInitPool(); //Initializing pool utilities
 
-//This function perform finialization works if you invoke the
-//smpoolInitPool().
+//This function perform finialization works 
+//if smpoolInitPool() has been invoked.
 void smpoolFiniPool(); //Finializing pool
 
 void dumpPool(SMemPool * handler, FILE * h);

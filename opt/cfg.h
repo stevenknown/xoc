@@ -1524,7 +1524,7 @@ void CFG<BB, XR>::dump_vcg(CHAR const* name)
     if (!name) {
         name = "graph_cfg.vcg";
     }
-    unlink(name);
+    UNLINK(name);
     FILE * hvcg = fopen(name, "a+");
     ASSERT(hvcg, ("%s create failed!!!", name));
     fprintf(hvcg, "graph: {"

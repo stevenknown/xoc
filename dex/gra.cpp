@@ -1377,7 +1377,7 @@ void GIG::dump_vcg(CHAR const* name)
         name = "graph_global_if.vcg";
     }
     
-    unlink(name);
+    UNLINK(name);
     FILE * h = fopen(name, "a+");
     ASSERT(h, ("%s create failed!!!",name));
     fprintf(h, "graph: {"
@@ -1606,7 +1606,7 @@ void IG::dump_vcg(CHAR const* name)
     if (name == NULL) {
         name = "graph_local_if.vcg";
     }
-    unlink(name);
+    UNLINK(name);
     FILE * h = fopen(name, "a+");
     ASSERT(h, ("%s create failed!!!",name));
     fprintf(h, "graph: {"
@@ -4158,7 +4158,7 @@ static bool gdebug()
 //START RA
 //
 void RA::allocLocal(List<UINT> & nis, bool omit_constrain)
-{
+{    
     List<LT*> unalloc;
     List<LT*> tmp;
     List<LT*> prios;

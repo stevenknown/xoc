@@ -273,7 +273,7 @@ void RegionMgr::dumpRelationGraph(CHAR const* name)
     if (name == NULL) {
         name = "graph_region_relation_graph.vcg";
     }    
-    unlink(name);
+    UNLINK(name);
     xcom::Graph g;
     for (UINT id = 0; id < getNumOfRegion(); id++) {
         Region * ru = get_region(id);

@@ -92,7 +92,7 @@ void initdump(CHAR const* f, bool is_del)
 {
     if (f == NULL) { return; }
     if (is_del) {
-        unlink(f);
+        UNLINK(f);
     }
     g_tfile = fopen(f, "a+");
     if (g_tfile == NULL) {

@@ -3729,7 +3729,7 @@ protected:
                 }
             } else {
                 ASSERT0(is_rchild(z->parent));
-                y =    z->parent->parent->lchild;
+                y = z->parent->parent->lchild;
                 if (y != NULL && y->color == RBRED) {
                     z->parent->color = RBBLACK;
                     z->parent->parent->color = RBRED;

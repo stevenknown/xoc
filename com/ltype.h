@@ -60,9 +60,12 @@ author: Su Zhenyu
     #define SNPRINTF _snprintf
     #define VSNPRINTF _vsnprintf 
     #define RESTRICT __restrict
+
+    //Use POSIX name "UNLINK" instead of ISO C++ conformat name "_unlink".
+    #define UNLINK   _unlink
 #else    
     //Default is linux version
-    #include "unistd.h" //for unlink declaration
+    #include "unistd.h" //for UNLINK declaration
     #define ALLOCA    alloca 
     #define SNPRINTF snprintf
     #define VSNPRINTF vsnprintf
@@ -192,11 +195,5 @@ author: Su Zhenyu
 //Misc Dumps/Dumpf of Vector<T>
 #define D_BOOL           1
 #define D_INT            2
-
-//If here compile failed, use its POSIX name "unlink" instead of
-//ISO C++ conformat name "_unlink".
-#ifdef _VC2010_
-#define unlink           _unlink
-#endif
 
 #endif

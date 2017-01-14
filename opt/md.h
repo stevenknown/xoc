@@ -136,8 +136,8 @@ typedef enum _MD_TYPE {
 //The memory object is a PR.
 #define MD_is_pr(md)             (VAR_is_pr(MD_base(md)))
 
-//Indicate MD can not be effect MD, namely, the MD must be
-//placed in MayDef or MayUse set.
+//True indicates MD will not be effect MD, namely, 
+//the MD only could be put in MayDef or MayUse md set.
 #define MD_is_may(md)            ((md)->u2.s1.is_may_reference)
 
 class MD {
@@ -543,6 +543,8 @@ public:
 
     MDSet const* append(SBitSetCore<> const& set)
     { return (MDSet const*)SBitSetCoreHash<MDSetHashAllocator>::append(set); }
+
+    void dump();
 };
 
 

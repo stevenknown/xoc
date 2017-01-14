@@ -268,7 +268,7 @@ static void rmat_dumpf(void const* pbasis, CHAR const* name, bool is_del)
         name = "matrix.tmp";
     }
     if (is_del) {
-        unlink(name);
+        UNLINK(name);
     }
 
     FILE * h = fopen(name, "a+");
@@ -1177,7 +1177,7 @@ void INTMat::dumpf(CHAR const* name, bool is_del) const
         name = "matrix.tmp";
     }
     if (is_del) {
-        unlink(name);
+        UNLINK(name);
     }
     FILE * h = fopen(name, "a+");
     ASSERT(h, ("%s create failed!!!", name));
@@ -1275,7 +1275,7 @@ static void flt_dumpf(void const* pbasis, CHAR const* name, bool is_del)
         name = "matrix.tmp";
     }
     if (is_del) {
-        unlink(name);
+        UNLINK(name);
     }
     FILE * h = fopen(name, "a+");
     ASSERT(h, ("%s create failed!!!", name));
@@ -1585,7 +1585,7 @@ static void bool_dumpf(void const* pbasis, CHAR const* name, bool is_del)
         name = "matrix.tmp";
     }
     if (is_del) {
-        unlink(name);
+        UNLINK(name);
     }
     FILE * h = fopen(name, "a+");
     ASSERT(h, ("%s create failed!!!", name));

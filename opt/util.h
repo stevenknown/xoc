@@ -139,7 +139,7 @@ void dump_rbt(RBT<T, Ttgt> & rbt,
     if (name == NULL) {
         name = "graph_rbt.vcg";
     }
-    unlink(name);
+    UNLINK(name);
     FILE * hvcg = fopen(name, "a+");
     ASSERT(hvcg, ("%s create failed!!!", name));
     fprintf(hvcg, "graph: {"

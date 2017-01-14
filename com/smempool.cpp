@@ -189,8 +189,8 @@ void smpoolInitPool()
 }
 
 
-//This function perform finialization works if you invoke the
-//smpoolInitPool().
+//This function perform finialization works 
+//if smpoolInitPool() has been invoked.
 void smpoolFiniPool()
 {
     if (g_is_pool_init && g_is_pool_hashed) {
@@ -222,10 +222,10 @@ void smpoolFiniPool()
 }
 
 
-//Create new mem pool, return the pool handle.
-//NOTICE:
-//Since this type of pool will NOT to be recorded
-//in 'hash table of POOLs', pool index always be 0.
+//Create new memory pool, return the pool handle.
+//size: the initial byte size of pool. For MEM_CONST_SIZE, 'size'
+//      must be integer multiples of element byte size.
+//mpt: pool type.
 SMemPool * smpoolCreate(size_t size, MEMPOOLTYPE mpt)
 {
     SMemPool * mp = NULL;
@@ -235,8 +235,11 @@ SMemPool * smpoolCreate(size_t size, MEMPOOLTYPE mpt)
 }
 
 
-//Create new mem pool, return the pool idx.
+//Create new memory pool, return the pool idx.
 #define MAX_TRY 1024
+//size: the initial byte size of pool. For MEM_CONST_SIZE, 'size'
+//      must be integer multiples of element byte size.
+//mpt: pool type.
 MEMPOOLIDX smpoolCreatePoolIndex(size_t size, MEMPOOLTYPE mpt)
 {
     SMemPool * mp = NULL;
@@ -279,7 +282,7 @@ MEMPOOLIDX smpoolCreatePoolIndex(size_t size, MEMPOOLTYPE mpt)
 }
 
 
-//Free mem pool totally.
+//Destroy memory pool totally.
 INT smpoolDelete(SMemPool * handler)
 {
     if (handler == NULL) {
@@ -297,7 +300,7 @@ INT smpoolDelete(SMemPool * handler)
 }
 
 
-//Free mem pool totally.
+//Destroy mem pool totally.
 INT smpoolDeleteViaPoolIndex(MEMPOOLIDX mpt_idx)
 {
     //search the mempool which indicated with 'mpt_idx'
@@ -350,8 +353,8 @@ INT smpoolDeleteViaPoolIndex(MEMPOOLIDX mpt_idx)
 
 
 //Allocate one element from const size pool.
-//User must ensure each elment in const size pool are same size.
-//'elem_size': indicate the byte size of each element.
+//User must ensure each element in const size pool are same size.
+//elem_size: the byte size of each element.
 void * smpoolMallocConstSize(size_t elem_size, IN SMemPool * handler)
 {
     ASSERT(elem_size > 0, ("elem size can not be 0"));

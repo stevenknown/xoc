@@ -1617,7 +1617,7 @@ void BitSet::dump(CHAR const* name, bool is_del, UINT flag, INT last_pos) const
         name = "zbs.cxx";
     }
     if (is_del) {
-        unlink(name);
+        UNLINK(name);
     }
     FILE * h = fopen(name, "a+");
     ASSERT(h != NULL, ("%s create failed!!!", name));

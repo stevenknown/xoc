@@ -610,7 +610,7 @@ void dumpf_svec(void * vec, UINT ty, CHAR const* name, bool is_del)
     }
 
     if (is_del) {
-        unlink(name);
+        UNLINK(name);
     }
 
     static INT g_count = 0;

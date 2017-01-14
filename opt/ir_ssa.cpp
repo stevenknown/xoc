@@ -178,7 +178,7 @@ void SSAGraph::dump(CHAR const* name, bool detail)
     if (name == NULL) {
         name = "graph_ssa_graph.vcg";
     }
-    unlink(name);
+    UNLINK(name);
     FILE * h = fopen(name, "a+");
     ASSERT(h != NULL, ("%s create failed!!!",name));
 

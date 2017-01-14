@@ -220,7 +220,7 @@ bool IR_LOOP_CVT::perform(OptCtx & oc)
     if (change) {
         //DU reference and du chain has maintained.
         ASSERT0(m_ru->verifyMDRef());
-        ASSERT0(m_du->verifyMDDUChain());
+        ASSERT0(m_du->verifyMDDUChain(COMPUTE_PR_DU | COMPUTE_NOPR_DU));
 
         //All these changed.
         OC_is_reach_def_valid(oc) = false;

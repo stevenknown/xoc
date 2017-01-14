@@ -693,6 +693,12 @@ void IR_AA::inferArrayLdabase(
                 MD_ofst(&tmd) += ofst;
                 changed = true;
             }
+
+            //Set MD size to be the size of array element if MD is exact.
+            if (MD_size(&tmd) != ir->get_dtype_size(m_tm)) {
+                MD_size(&tmd) = ir->get_dtype_size(m_tm);
+                changed = true;
+            }
         } else {
             changed = true;
             UINT basesz = m_tm->getPointerBaseByteSize(array_base->get_type());
@@ -1013,9 +1019,20 @@ bool IR_AA::computeConstOffset(
     IN OUT MDSet & opnd0_mds)
 {
     //Compute the offset for pointer arithmetic.
-    if (CONST_int_val(opnd1) == 0) {
+    if (opnd1->is_const() && opnd1->is_int() && CONST_int_val(opnd1) == 0) {
         mds.copy(opnd0_mds, *m_misc_bs_mgr);
         return true;
+    }
+
+    HOST_UINT const_offset = 0;
+    if (opnd1->is_const() && opnd1->is_int()) {
+        const_offset = (HOST_UINT)CONST_int_val(opnd1);
+    } else if (opnd1->is_pr()) {
+        if (!m_ru->evaluateConstInteger(opnd1, &const_offset)) {
+            return false;
+        }
+    } else {
+        return false;
     }
 
     mds.clean(*m_misc_bs_mgr);
@@ -1034,14 +1051,14 @@ bool IR_AA::computeConstOffset(
                     //In the case: lda(x) + ofst, we can determine
                     //the value of lda(x) is constant.
                     ; //Keep offset validation unchanged.
-                    MD_ofst(&x) += (UINT)CONST_int_val(opnd1);
+                    MD_ofst(&x) += (UINT)const_offset;
                     entry = m_md_sys->registerMD(x);
                     ASSERT0(MD_id(entry) > 0);
                 } else {
                     //case: &x - ofst.
                     //Keep offset validation unchanged.
                     INT s = (INT)MD_ofst(&x);
-                    s -= (INT)CONST_int_val(opnd1);
+                    s -= (INT)const_offset;
                     if (s < 0) {
                         MD_ty(&x) = MD_UNBOUND;
                         MD_size(&x) = 0;
@@ -1076,13 +1093,14 @@ void IR_AA::inferPtArith(
 {
     ASSERT0(ir->is_add() || ir->is_sub());
     IR * opnd1 = BIN_opnd1(ir);
-    if (opnd1->is_const() && opnd1->is_int() &&
+    if (((opnd1->is_const() && opnd1->is_int()) || opnd1->is_pr()) &&
         computeConstOffset(ir, opnd1, mds, opnd0_mds)) {
         return;
     } else {
         //Generate MD expression for opnd1.
         AACtx opnd1_tic(*opnd0_ic);
         opnd1_tic.cleanBottomUpFlag();
+        AC_comp_pt(&opnd1_tic) = false; //PointToSet of addon is useless.
         inferExpression(opnd1, mds, &opnd1_tic, mx);
 
         //Bottom-up flag of opnd1 is useless to its parent.
@@ -2139,10 +2157,8 @@ void IR_AA::processIst(IN IR * ir, IN MD2MDSet * mx)
         return;
     }
 
-    INT size = -1;
-    if (IST_ofst(ir) != 0 ||
-        ((size = (INT)ir->get_dtype_size(m_tm)) !=
-         (INT)IST_base(ir)->get_dtype_size(m_tm))) {
+    UINT ist_size = ir->get_dtype_size(m_tm);
+    if (IST_ofst(ir) != 0 || ist_size != (INT)IST_base(ir)->get_dtype_size(m_tm)) {
         UINT ist_ofst = IST_ofst(ir);
         //Compute where IST_base may point to.
         MDSet tmp;
@@ -2157,8 +2173,9 @@ void IR_AA::processIst(IN IR * ir, IN MD2MDSet * mx)
                 MD_ofst(&md) += ist_ofst;
 
                 //Note if ir's type is VOID, size is 0.
-                //Thus the MD indicates a object that is p + ild_ofst + 0.
-                MD_size(&md) = size == -1 ? ir->get_dtype_size(m_tm) : size;
+                //Thus the MD indicates a object that is
+                //p + ist_ofst + 0, if ist_ofst exist.
+                MD_size(&md) = ist_size;
                 MD const* entry = m_md_sys->registerMD(md);
                 ASSERT(MD_id(entry) > 0, ("Not yet registered"));
                 tmp.bunion(entry, *m_misc_bs_mgr);
@@ -2176,6 +2193,17 @@ void IR_AA::processIst(IN IR * ir, IN MD2MDSet * mx)
     SEGIter * iter;
     if (ml_may_pt.get_elem_count() == 1 &&
         !MD_is_may(x = m_md_sys->get_md((UINT)ml_may_pt.get_first(&iter)))) {
+        if (x->is_exact() && !ir->is_void() && ist_size != MD_size(x)) {
+            MD md(*x);
+
+            //Note if ir's type is VOID, size is 0.
+            //Thus the MD indicates a object that is
+            //p + ist_ofst + 0, if ist_ofst exist.
+            MD_size(&md) = ist_size;
+            MD const* entry = m_md_sys->registerMD(md);
+            ASSERT(MD_id(entry) > 0, ("Not yet registered"));
+            x = entry;
+        }
         set_must_addr(ir, x);
         ir->cleanRefMDSet();
     } else {
@@ -3201,7 +3229,7 @@ void IR_AA::dump(CHAR const* name)
     FILE * old = NULL;
     if (name != NULL) {
         old = g_tfile;
-        //unlink(name);
+        //UNLINK(name);
         g_tfile = fopen(name, "a+");
         ASSERT(g_tfile, ("%s create failed!!!", name));
     }

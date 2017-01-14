@@ -384,6 +384,8 @@ public:
     void dumpMemUsage();
     void dump(bool dump_inner_region);
 
+    bool evaluateConstInteger(IR const* ir, OUT ULONGLONG * const_value);
+
     void freeIR(IR * ir);
     void freeIRTree(IR * ir);
     void freeIRTreeList(IR * ir);
