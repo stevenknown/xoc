@@ -2491,17 +2491,31 @@ void IR_DU_MGR::inferCall(IR * ir, UINT duflag, IN MD2MDSet * mx)
         computeExpression(ICALL_callee(ir), NULL, COMP_EXP_RECOMPUTE, duflag);
     }
 
+    if (!HAVE_FLAG(duflag, COMPUTE_NOPR_DU)) {
+        for (IR * p = CALL_param_list(ir); p != NULL; p = p->get_next()) { 
+            computeExpression(p, NULL, COMP_EXP_RECOMPUTE, duflag);
+        }
+        for (IR * p = CALL_dummyuse(ir); p != NULL; p = p->get_next()) {
+             computeExpression(p, NULL, COMP_EXP_RECOMPUTE, duflag);
+        }
+        return;
+    }
+
+    ASSERT(mx, ("needed by computation of NOPR du chain"));
+    
     MDSet maydefuse;
 
     //Set MD which parameters pointed to.
-    for (IR * p = CALL_param_list(ir); p != NULL; p = p->get_next()) {
-        //Compute USE mdset.
-        if (p->is_ptr()) {
-            //e.g: foo(p); where p->{a, b} then foo may use p, a, b.
-            //Note that point-to information is only avaiable for the
+    for (IR * p = CALL_param_list(ir); p != NULL; p = p->get_next()) {        
+        if (p->is_ptr() || p->is_void()) {            
+            //Compute the point-to set p pointed to.
+            //e.g: foo(p); where p->{a, b}, then foo may use p, a, b.
+            //Note that point-to set is only avaiable for the
             //last stmt of BB. The call is just in the situation.
             m_aa->computeMayPointTo(p, mx, maydefuse);
         }
+
+        //Compute USE mdset.
         computeExpression(p, NULL, COMP_EXP_RECOMPUTE, duflag);
     }
 
@@ -3003,8 +3017,6 @@ void IR_DU_MGR::computeMDRef(UINT duflag)
                     } else {
                         mx = m_aa->get_unique_md2mds();
                     }
-                    ASSERT0(mx);
-
                     inferCall(ir, duflag, mx);
                 }
                 break;
@@ -4615,7 +4627,7 @@ bool IR_DU_MGR::checkIsTruelyDep(IR const* def, IR const* use)
 
 
 //Verify if DU chain is correct between each Def and Use of MD.
-bool IR_DU_MGR::verifyMDDUChainForIR(IR const* ir, UINT flag)
+bool IR_DU_MGR::verifyMDDUChainForIR(IR const* ir, UINT duflag)
 {
     bool precision_check = g_verify_level >= VERIFY_LEVEL_2;
     ASSERT0(ir->is_stmt());
@@ -4623,8 +4635,8 @@ bool IR_DU_MGR::verifyMDDUChainForIR(IR const* ir, UINT flag)
     if (ir->get_ssainfo() == NULL ||
         ir->is_calls_stmt()) { //Need to check memory DU for call
         //ir is in MD DU form.
-        if ((HAVE_FLAG(flag, COMPUTE_PR_DU) && ir->is_write_pr()) ||
-            (HAVE_FLAG(flag, COMPUTE_NOPR_DU) && ir->is_memory_ref())) {
+        if ((HAVE_FLAG(duflag, COMPUTE_PR_DU) && ir->is_write_pr()) ||
+            (HAVE_FLAG(duflag, COMPUTE_NOPR_DU) && ir->is_memory_ref())) {
             DUSet const* useset = ir->readDUSet();
             if (useset != NULL) {
                 DUIter di = NULL;
@@ -4667,8 +4679,8 @@ bool IR_DU_MGR::verifyMDDUChainForIR(IR const* ir, UINT flag)
             continue;
         }
 
-        if ((!HAVE_FLAG(flag, COMPUTE_PR_DU) && ir->is_read_pr()) ||
-            (!HAVE_FLAG(flag, COMPUTE_NOPR_DU) && ir->is_memory_ref())) {
+        if ((!HAVE_FLAG(duflag, COMPUTE_PR_DU) && u->is_read_pr()) ||
+            (!HAVE_FLAG(duflag, COMPUTE_NOPR_DU) && u->is_memory_ref())) {
             continue;
         }
 
@@ -4704,14 +4716,14 @@ bool IR_DU_MGR::verifyMDDUChainForIR(IR const* ir, UINT flag)
 
 
 //Verify DU chain's sanity.
-bool IR_DU_MGR::verifyMDDUChain(UINT flag)
+bool IR_DU_MGR::verifyMDDUChain(UINT duflag)
 {
     BBList * bbl = m_ru->get_bb_list();
     for (IRBB * bb = bbl->get_head();
          bb != NULL; bb = bbl->get_next()) {
         for (IR * ir = BB_first_ir(bb);
              ir != NULL; ir = BB_next_ir(bb)) {
-            verifyMDDUChainForIR(ir, flag);
+            verifyMDDUChainForIR(ir, duflag);
          }
     }
     return true;
@@ -5173,7 +5185,7 @@ bool IR_DU_MGR::perform(IN OUT OptCtx & oc, UINT flag)
 void IR_DU_MGR::computeMDDUChain(
         IN OUT OptCtx & oc, 
         bool retain_reach_def, 
-        UINT flag)
+        UINT duflag)
 {
     if (m_ru->get_bb_list()->get_elem_count() == 0) { return; }
 
@@ -5205,7 +5217,7 @@ void IR_DU_MGR::computeMDDUChain(
 
     for (IRBB * bb = bbl->get_tail(&ct);
          bb != NULL; bb = bbl->get_prev(&ct)) {
-        computeMDDUforBB(bb, flag);
+        computeMDDUforBB(bb, duflag);
     }
 
     delete m_md2irs;
@@ -5227,7 +5239,7 @@ void IR_DU_MGR::computeMDDUChain(
         dumpDUChainDetail();
     }    
 
-    ASSERT(verifyMDDUChain(flag), ("verifyMDDUChain failed"));
+    ASSERT(verifyMDDUChain(duflag), ("verifyMDDUChain failed"));
     END_TIMER();
 }
 //END IR_DU_MGR

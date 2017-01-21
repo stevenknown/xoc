@@ -61,7 +61,7 @@ author: Su Zhenyu
     #define VSNPRINTF _vsnprintf 
     #define RESTRICT __restrict
 
-    //Use POSIX name "UNLINK" instead of ISO C++ conformat name "_unlink".
+    //Use POSIX name "unlink" instead of ISO C++ conformat name "_unlink".
     #define UNLINK   _unlink
 #else    
     //Default is linux version
@@ -70,6 +70,7 @@ author: Su Zhenyu
     #define SNPRINTF snprintf
     #define VSNPRINTF vsnprintf
     #define RESTRICT __restrict__
+    #define UNLINK   unlink
 #endif
 
 #include "stdlib.h"

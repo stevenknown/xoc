@@ -64,7 +64,7 @@ void Region::HighProcessImpl(OptCtx & oc)
     }
 
     if (g_do_aa) {
-        ASSERT0(g_cst_bb_list && OC_is_cfg_valid(oc));
+        ASSERT0(g_cst_bb_list && OC_is_cfg_valid(oc));        
         checkValidAndRecompute(&oc, PASS_AA, PASS_UNDEF);
     }
 
@@ -86,7 +86,6 @@ void Region::HighProcessImpl(OptCtx & oc)
         if (g_compute_du_chain) {
             f |= SOL_REACH_DEF;
         }
-
         if (dumgr->perform(oc, f) && OC_is_ref_valid(oc)) {
             if (g_compute_du_chain) {
                 UINT flag = COMPUTE_NOPR_DU;

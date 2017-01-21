@@ -59,14 +59,14 @@ public:
 };
 
 
-//Propagate the constant operation, include const, lda, and cvt for const.
+//Propagate the constant operation, include CONST, LDA, CVT for const.
 #define CP_PROP_CONST                1
 
-//Propagate the simplex operation, include const, pr, lda, and cvt for simplex.
+//Propagate the simplex operation, include CONST, PR, LDA, CVT for simplex.
 #define CP_PROP_SIMPLEX                2
 
-//Propagate unary and simplex operations, include const, pr, lda, cvt for simplex, ld,
-//id, neg, bnot, lnot, ild.
+//Propagate unary and simplex operations, include CONST, PR, LDA, CVT, LD,
+//ID, NEG, BNOT, LNOT, ILD.
 #define CP_PROP_UNARY_AND_SIMPLEX    3
 
 //Perform Copy Propagation

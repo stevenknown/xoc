@@ -1063,7 +1063,7 @@ void IR_SSA_MGR::stripPhi(IR * phi, C<IR*> * phict)
     phicopy->cleanRefMDSet();
     IR * opnd = PHI_opnd_list(phi);
 
-    //opnd may be const, lda or pr.
+    //opnd may be CONST, LDA, PR.
     //ASSERT0(opnd->is_pr());
     ASSERT0(PHI_ssainfo(phi));
 

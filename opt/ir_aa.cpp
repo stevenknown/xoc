@@ -346,9 +346,9 @@ bool IR_AA::isValidStmtToAA(IR * ir)
 
 
 //Process LDA operator, and generate MD.
-//Note this function does not handle array's lda base.
+//Note this function does not handle array's LDA base.
 //e.g: y = &x or y = &a[i]
-//'mds' : record memory descriptor of 'ir'
+//'mds' : record output memory descriptor of 'ir'
 void IR_AA::processLda(IR * ir, IN OUT MDSet & mds, IN OUT AACtx * ic)
 {
     ASSERT0(ir->is_lda() && ir->is_ptr());
@@ -360,6 +360,15 @@ void IR_AA::processLda(IR * ir, IN OUT MDSet & mds, IN OUT AACtx * ic)
         t = allocStringMD(v->get_name());
     } else {
         t = m_ru->genMDforVAR(v);
+    }
+
+    if (t->is_exact()) {
+        //Adjust size of MD of LDA to be pointer size.
+        MD t2(*t);
+        MD_size(&t2) = ir->get_dtype_size(m_tm);
+        MD const* entry = m_md_sys->registerMD(t2);
+        ASSERT0(MD_id(entry) > 0);
+        t = entry;
     }
 
     if (!m_is_visit.is_contain(IR_id(ir))) {
@@ -374,40 +383,37 @@ void IR_AA::processLda(IR * ir, IN OUT MDSet & mds, IN OUT AACtx * ic)
 
     //Inform the caller that there is MD has been taken address.
     AC_has_comp_lda(ic) = true;
-    if (AC_is_mds_mod(ic) || LDA_ofst(ir) != 0) {
-        if ((LDA_ofst(ir) != 0 && t->is_exact()) ||
-            ir->get_parent()->is_array()) {
-            //If LDA is array base, its ofst may not be 0.
+    
+    if (!AC_is_mds_mod(ic) && LDA_ofst(ir) == 0) { return; }
+    
+    if ((LDA_ofst(ir) != 0 && t->is_exact()) || ir->get_parent()->is_array()) {
+        //If LDA is array base, and LDA ofst may not be 0.
+        //e.g: struct S { int a; int b[..]; }
+        //    access s.b[..]
+        MD md(*t);
+        MD_ofst(&md) += LDA_ofst(ir);
+
+        if (ir->get_parent()->is_array() &&
+            ((CArray*)ir->get_parent())->is_base(ir) &&
+            !ir->get_parent()->is_void() &&
+            t->is_exact()) {
+            //The result data type of LDA will amended to be the type of
+            //array element if array is the field of D_MC.
             //e.g: struct S { int a; int b[..]; }
-            //    access s.b[..]
-            MD md(*t);
-            MD_ofst(&md) += LDA_ofst(ir);
-
-            if (ir->get_parent()->is_array() &&
-                !ir->get_parent()->is_void() &&
-                t->is_exact()) {
-                //The result data type of LDA should changed to be the type of
-                //array element if array is the field of a D_MC type
-                //data structure.
-                //e.g: struct S { int a; int b[..]; }
-                //    access s.b[..] generate array(lda(s, ofst(4))
-
-                //'ir' is LDA base of array operation.
-                //Adjust MD size to be array's element size.
-                UINT elem_sz = ir->get_parent()->get_dtype_size(m_tm);
-                ASSERT0(elem_sz > 0);
-                MD_size(&md) = elem_sz;
-            }
-
-            if (!t->is_equ(md)) {
-                MD const* entry = m_md_sys->registerMD(md);
-                ASSERT0(MD_id(entry) > 0);
-                ASSERT0(t->is_effect() && entry->is_effect());
-                mds.clean(*m_misc_bs_mgr);
-                mds.bunion_pure(MD_id(entry), *m_misc_bs_mgr);
-            }
+            //    access s.b[..] generate ARRAY(LDA(s, ofst(4))            
+            UINT elem_sz = ir->get_parent()->get_dtype_size(m_tm);
+            ASSERT0(elem_sz > 0);
+            MD_size(&md) = elem_sz;
         }
-    }
+
+        if (!t->is_equ(md)) {
+            MD const* entry = m_md_sys->registerMD(md);
+            ASSERT0(MD_id(entry) > 0);
+            ASSERT0(t->is_effect() && entry->is_effect());
+            mds.clean(*m_misc_bs_mgr);
+            mds.bunion_pure(MD_id(entry), *m_misc_bs_mgr);
+        }
+    }    
 }
 
 
@@ -484,7 +490,7 @@ void IR_AA::inferArrayInfinite(
 //This function will not clean 'mds' since user may be perform union operation.
 void IR_AA::computeMayPointTo(IR * pointer, OUT MDSet & mds)
 {
-    ASSERT0(pointer && pointer->is_ptr());
+    ASSERT0(pointer && (pointer->is_ptr() || pointer->is_void()));
 
     //Get context.
     MD2MDSet * mx = NULL;
@@ -503,15 +509,28 @@ void IR_AA::computeMayPointTo(IR * pointer, OUT MDSet & mds)
 //perform union operations to 'mds'.
 void IR_AA::computeMayPointTo(IR * pointer, IN MD2MDSet * mx, OUT MDSet & mds)
 {
-    ASSERT0(pointer && pointer->is_ptr() && mx);
+    ASSERT0(pointer && (pointer->is_ptr() || pointer->is_void()) && mx);
 
     if (pointer->is_lda()) {
         AACtx ic;
         AC_comp_pt(&ic) = true;
         MDSet tmp;
         processLda(pointer, tmp, &ic);
-        ASSERT0(!tmp.is_empty());
-        mds.bunion(tmp, *m_misc_bs_mgr);
+        ASSERT0(tmp.get_elem_count() == 1);
+        
+        SEGIter * iter;        
+        MD const* t = m_md_sys->get_md((UINT)tmp.get_first(&iter));
+        ASSERT0(t);
+        if (t->is_exact()) {
+            //Adjust MD of LDA to be unbound.
+            MD t2(*t);
+            MD_ty(&t2) = MD_UNBOUND;
+            MD const* entry = m_md_sys->registerMD(t2);
+            ASSERT0(MD_id(entry) > 0);
+            t = entry;
+        }
+        
+        mds.bunion(t, *m_misc_bs_mgr);
         tmp.clean(*m_misc_bs_mgr);
         return;
     }
@@ -562,6 +581,12 @@ void IR_AA::computeMayPointTo(IR * pointer, IN MD2MDSet * mx, OUT MDSet & mds)
                 mds.bunion(*m_maypts, *m_misc_bs_mgr);
             }
         }
+    }
+
+    if (emd == NULL && maymds == NULL) {
+        //We do NOT known where p pointed to.
+        //e.g: (int*)0x1234
+        mds.bunion(*m_maypts, *m_misc_bs_mgr);
     }
 }
 
@@ -1037,8 +1062,8 @@ bool IR_AA::computeConstOffset(
 
     mds.clean(*m_misc_bs_mgr);
     if (BIN_opnd0(ir)->is_lda() || evaluateFromLda(BIN_opnd0(ir))) {
-        //In the case: lda(x) + ofst, we can determine
-        //the value of lda(x) is constant.
+        //In the case: LDA(x) + ofst, we can determine
+        //the value of LDA(x) is constant.
         //Keep offset validation unchanged.
         SEGIter * iter;
         for (INT i = opnd0_mds.get_first(&iter);
@@ -1048,8 +1073,8 @@ bool IR_AA::computeConstOffset(
                 MD const* entry = NULL;
                 MD x(*imd);
                 if (ir->is_add()) {
-                    //In the case: lda(x) + ofst, we can determine
-                    //the value of lda(x) is constant.
+                    //In the case: LDA(x) + ofst, we can determine
+                    //the value of LDA(x) is constant.
                     ; //Keep offset validation unchanged.
                     MD_ofst(&x) += (UINT)const_offset;
                     entry = m_md_sys->registerMD(x);
@@ -1533,7 +1558,7 @@ void IR_AA::processConst(
 }
 
 
-//Recompute the data type size accroding to stmt type.
+//Recompute the data type byte-size accroding to stmt type.
 void IR_AA::recomputeDataType(AACtx const& ic, IR const* ir, OUT MDSet & pts)
 {
     if (AC_has_comp_lda(&ic) && !ir->is_void()) {
@@ -1541,16 +1566,16 @@ void IR_AA::recomputeDataType(AACtx const& ic, IR const* ir, OUT MDSet & pts)
         //Here we need to reinfer the actual memory address according
         //to the stmt data type because the result data type of array
         //operation may not same as the data type or LDA operation.
-        //e.g: b:ptr<i32>=lda(a), a is a memory chunk, but b is
+        //e.g: b:ptr<i32>=LDA(a), a is a memory chunk, but b is
         //a pointer that pointed to an i32 memory space.
 
-        ASSERT(ir->is_ptr(), ("LDA's result should be stored as pointer."));
-        ASSERT(pts.get_effect_md(m_md_sys), ("LDA's base must be effect VAR"));
+        ASSERT(ir->is_ptr(), ("LDA's result should be pointer type"));
+        ASSERT(pts.get_effect_md(m_md_sys), ("LDA's base must be effect MD"));
 
         //ptset may include element which also be in m_maypts.
         //ASSERT0(!ptset->is_intersect(*m_maypts));
 
-        ASSERT(ir->is_ptr(), ("lda's base must be pointer."));
+        ASSERT(ir->is_ptr(), ("LDA's base must be pointer."));
         UINT size = TY_ptr_base_size(ir->get_type());
         reviseMDsize(pts, size);
     }
@@ -1586,6 +1611,7 @@ void IR_AA::inferStoreValue(
     MDSet tmp;
     AACtx rhsic(*ic);
     if (ir->is_ptr() || ir->is_void()) {
+        //Regard ir as pointer if its has VOID type.
         AC_comp_pt(&rhsic) = true;
     }
 
@@ -2428,10 +2454,9 @@ void IR_AA::processCall(IN IR * ir, IN MD2MDSet * mx)
 
         ASSERT(t, ("result of call miss exact MD."));
 
-        if (ir->is_ptr()) {
-            //Set the pointer points to the May-Point-To set.
-
-            //Try to improve the precsion via typed alias info.
+        if (ir->is_ptr() || ir->is_void()) {
+            //Try to improve the precsion via typed alias info or 
+            //set ir pointed to May-Point-To set for conservative purpose.
             MD const* typed_md;
             if (ir->get_ai() != NULL &&
                 (typed_md = computePointToViaType(ir)) != NULL) {

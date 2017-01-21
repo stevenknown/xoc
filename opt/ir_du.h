@@ -480,7 +480,10 @@ public:
             OUT DefDBitSetCore * expr_universe,
             Vector<MDSet*> const* maydefmds,
             DefMiscBitSetMgr & bsmgr);
-    void computeMDDUChain(IN OUT OptCtx & oc, bool retain_reach_def, UINT flag);
+    void computeMDDUChain(
+            IN OUT OptCtx & oc, 
+            bool retain_reach_def, 
+            UINT duflag);
     void computeRegionMDDU(
             Vector<MDSet*> const* mustdefmds,
             Vector<MDSet*> const* maydefmds,
@@ -894,8 +897,8 @@ public:
     void removeDefOutFromUseset(IR * def);
     void removeIROutFromDUMgr(IR * ir);
 
-    bool verifyMDDUChain(UINT flag);
-    bool verifyMDDUChainForIR(IR const* ir, UINT flag);
+    bool verifyMDDUChain(UINT duflag);
+    bool verifyMDDUChainForIR(IR const* ir, UINT duflag);
     bool verifyLiveinExp();
 
     virtual bool perform(OptCtx &)

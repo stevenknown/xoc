@@ -1736,23 +1736,18 @@ public:
 //       So if you need a new container, please check the FREE-List first,
 //       accordingly, you should first invoke 'get_free_list' which get free
 //       containers out from 'm_free_list'.
-//    4. If you want to invoke APPEND, please call 'newXXX' first to
-//       allocate a new container memory space, record your elements into
-//       the container, then APPEND it at list.
-//       newXXX such as:
-//            T * newXXX(INT type)
-//            {
-//                T * t = get_free_T();
-//                if (t == 0) { t = (T*)malloc(sizeof(T)); }
-//                T_type(c) = type;
-//                return t;
-//            }
-//    5. The single linked list is different with dual linked list.
+//    4. The single linked list is different with dual linked list.
 //       the dual linked list does not use mempool to hold the container.
 //       Compared to dual linked list, single linked list allocate containers
 //       in a const size pool.
 //       Invoke init() to do initialization if you allocate SList by malloc().
-//    6. Compare the iterator with end() to determine if meeting the end of list.
+//    5. Compare the iterator with end() to determine if meeting the end of list.
+//    6. Byte size of element in Const Pool is equal to sizeof(SC<T>).
+//
+//    Usage:SMemPool * pool = smpoolCreate(sizeof(SC<T>) * n, MEM_CONST_SIZE);
+//          SList<T> list(pool);
+//          ...
+//          smpoolDelete(pool);
 template <class T> class SList : public SListCore<T> {
 protected:
     SMemPool * m_free_list_pool;
@@ -4114,6 +4109,9 @@ public:
 //You should call clean() to initialize the iterator.
 template <class Tsrc, class Ttgt>
 class TMapIter2 : public SList<RBTNode<Tsrc, Ttgt>*> {
+public:
+    typedef RBTNode<Tsrc, Ttgt>* Container;
+    
 public:
     TMapIter2(SMemPool * pool) : SList<RBTNode<Tsrc, Ttgt>*>(pool)
     { ASSERT0(pool); }

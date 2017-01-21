@@ -34,6 +34,7 @@ namespace xcom {
 #ifdef _DEBUG_
 #define DEBUG_SEG
 #endif
+
 #define BITS_PER_SEG    512
 
 class BitSet;

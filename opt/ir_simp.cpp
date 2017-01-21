@@ -1293,7 +1293,7 @@ IR * Region::simplifyArrayAddrExp(IR * ir, SimpCtx * ctx)
         //CASE: struct S {int a, b;} s[10];
         //the elem_ty is struct S.
         //s[1].b has ARR_ofst(ir)==4
-        //can simply to: 1*sizeof(struct S) + offset(4) + lda(s).
+        //can simply to: 1*sizeof(struct S) + offset(4) + LDA(s).
         IR * imm = buildImmInt((HOST_INT)(ARR_ofst(ir)), indextyid);
         ofst_exp = buildBinaryOpSimp(IR_ADD, indextyid, ofst_exp, imm);
     }
