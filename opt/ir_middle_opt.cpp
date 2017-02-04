@@ -53,14 +53,14 @@ void Region::lowerIRTreeToLowestHeight(OptCtx & oc)
     }
 
     //Simplify IR tree if it is needed.
-    simplifyBBlist(get_bb_list(), &simp);
+    simplifyBBlist(getBBList(), &simp);
 
     if (SIMP_need_recon_bblist(&simp)) {
         //New BB boundary IR generated, rebuilding CFG.
         if (reconstructBBlist(oc)) {
-            get_cfg()->rebuild(oc);
-            get_cfg()->removeEmptyBB(oc);
-            get_cfg()->computeExitList();
+            getCFG()->rebuild(oc);
+            getCFG()->removeEmptyBB(oc);
+            getCFG()->computeExitList();
         }
     }
 
@@ -87,8 +87,8 @@ bool Region::performSimplify(OptCtx & oc)
         simp.setSimpToPRmode();
     }
         
-    simplifyBBlist(get_bb_list(), &simp);
-
+    simplifyBBlist(getBBList(), &simp);
+    
     if (g_do_cfg &&
         g_cst_bb_list &&
         SIMP_need_recon_bblist(&simp) &&
@@ -98,34 +98,34 @@ bool Region::performSimplify(OptCtx & oc)
         ASSERT0(verifyMDRef());
 
         //Before CFG building.
-        get_cfg()->removeEmptyBB(oc);
+        getCFG()->removeEmptyBB(oc);
 
-        get_cfg()->rebuild(oc);
+        getCFG()->rebuild(oc);
 
         //After CFG building.
         //Remove empty bb when cfg rebuilted because
         //rebuilding cfg may generate redundant empty bb.
         //It disturbs the computation of entry and exit.
-        get_cfg()->removeEmptyBB(oc);
+        getCFG()->removeEmptyBB(oc);
 
         //Compute exit bb while cfg rebuilt.
-        get_cfg()->computeExitList();
-        ASSERT0(get_cfg()->verify());
+        getCFG()->computeExitList();
+        ASSERT0(getCFG()->verify());
 
-        get_cfg()->performMiscOpt(oc);
+        getCFG()->performMiscOpt(oc);
 
         if (g_do_cdg) {
-            ASSERT0(get_pass_mgr());
-            CDG * cdg = (CDG*)get_pass_mgr()->registerPass(PASS_CDG);
-            cdg->rebuild(oc, *get_cfg());
+            ASSERT0(getPassMgr());
+            CDG * cdg = (CDG*)getPassMgr()->registerPass(PASS_CDG);
+            cdg->rebuild(oc, *getCFG());
         }
     } else {
         ASSERT0(verifyMDRef());
     }
-
+    
     if (g_verify_level >= VERIFY_LEVEL_3 && OC_is_du_chain_valid(oc)) {
-        ASSERT0(get_du_mgr() == NULL || 
-            get_du_mgr()->verifyMDDUChain(COMPUTE_PR_DU | COMPUTE_NOPR_DU));
+        ASSERT0(getDUMgr() == NULL || 
+            getDUMgr()->verifyMDDUChain(COMPUTE_PR_DU | COMPUTE_NOPR_DU));
     }
     return true;
 }
@@ -156,17 +156,17 @@ bool Region::performSimplify(OptCtx & oc)
 //       using the standard scalar passes.
 bool Region::MiddleProcess(OptCtx & oc)
 {
-    BBList * bbl = get_bb_list();
+    BBList * bbl = getBBList();
     if (bbl->get_elem_count() == 0) { return true; }
 
     if (g_verify_level >= VERIFY_LEVEL_3) {
-        ASSERT0(get_du_mgr() == NULL || 
-            get_du_mgr()->verifyMDDUChain(COMPUTE_PR_DU | COMPUTE_NOPR_DU));
+        ASSERT0(getDUMgr() == NULL || 
+            getDUMgr()->verifyMDDUChain(COMPUTE_PR_DU | COMPUTE_NOPR_DU));
     }
 
     bool do_simplification = true;
-    if (get_pass_mgr() != NULL) {
-        IR_SSA_MGR * ssamgr = (IR_SSA_MGR*)get_pass_mgr()->
+    if (getPassMgr() != NULL) {
+        IR_SSA_MGR * ssamgr = (IR_SSA_MGR*)getPassMgr()->
             queryPass(PASS_SSA_MGR);
         if (ssamgr != NULL && ssamgr->is_ssa_constructed()) {
             do_simplification = false;
@@ -178,7 +178,7 @@ bool Region::MiddleProcess(OptCtx & oc)
     }
 
     if (g_opt_level > OPT_LEVEL0) {
-        PassMgr * passmgr = get_pass_mgr();
+        PassMgr * passmgr = getPassMgr();
         ASSERT0(passmgr);
         passmgr->performScalarOpt(oc);
     }
@@ -189,8 +189,8 @@ bool Region::MiddleProcess(OptCtx & oc)
         if (refineBBlist(bbl, rf)) {
             ASSERT0(verifyIRandBB(bbl, this));
             if (g_verify_level >= VERIFY_LEVEL_3 && OC_is_du_chain_valid(oc)) {
-                ASSERT0(get_du_mgr() == NULL ||
-                    get_du_mgr()->verifyMDDUChain(COMPUTE_PR_DU | COMPUTE_NOPR_DU));
+                ASSERT0(getDUMgr() == NULL ||
+                    getDUMgr()->verifyMDDUChain(COMPUTE_PR_DU | COMPUTE_NOPR_DU));
             }
         } else { ASSERT0(verifyIRandBB(bbl, this)); }
     } else {

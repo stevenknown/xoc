@@ -507,8 +507,8 @@ public:
     void ElemCleanPointTo(MDSet const& mds, IN MD2MDSet * mx);
     void ElemCleanExactPointTo(MDSet const& mds, IN MD2MDSet * mx);
 
-    virtual CHAR const* get_pass_name() const { return "Alias Analysis"; }
-    virtual PASS_TYPE get_pass_type() const { return PASS_AA; }
+    virtual CHAR const* getPassName() const { return "Alias Analysis"; }
+    virtual PASS_TYPE getPassType() const { return PASS_AA; }
     PtPairSet * getInPtPairSet(IRBB const* bb)
     {
         ASSERT(m_in_pp_set.get(BB_id(bb)),
@@ -528,24 +528,24 @@ public:
     { return ctx.get(mdid); }
 
     //Return the Memory Descriptor Set for given ir may describe.
-    MDSet const* get_may_addr(IR const* ir) { return ir->getRefMDSet(); }
+    MDSet const* getMayAddr(IR const* ir) { return ir->getRefMDSet(); }
 
     //Return the MemoryAddr for 'ir' must be.
-    MD const* get_must_addr(IR const* ir) { return ir->getRefMD(); }
+    MD const* getMustAddr(IR const* ir) { return ir->getRefMD(); }
 
-    MD2MDSet * get_unique_md2mds() { return &m_unique_md2mds; }
+    MD2MDSet * getUniqueMD2MDSet() { return &m_unique_md2mds; }
 
     void initAliasAnalysis();
 
     //Return true if Alias Analysis has initialized.
     bool is_init() const { return m_maypts != NULL; }
-    bool is_flow_sensitive() const { return m_flow_sensitive; }
+    bool isFlowSensitive() const { return m_flow_sensitive; }
     bool isValidStmtToAA(IR * ir);
 
-    bool is_all_mem(UINT mdid) const
-    { return mdid == MD_ALL_MEM ? true : false; }
+    bool isFullMem(UINT mdid) const
+    { return mdid == MD_FULL_MEM ? true : false; }
 
-    bool is_heap_mem(UINT mdid) const
+    bool isHeapMem(UINT mdid) const
     { //return mdid == MD_HEAP_MEM ? true : false;
       UNUSED(mdid);
       return false;
@@ -557,12 +557,12 @@ public:
     void cleanContext(OptCtx & oc);
     void destroyContext(OptCtx & oc);
 
-    void set_must_addr(IR * ir, MD const* md)
+    void setMustAddr(IR * ir, MD const* md)
     {
         ASSERT0(ir != NULL && md);
         ir->setRefMD(md, m_ru);
     }
-    void set_may_addr(IR * ir, MDSet const* mds)
+    void setMayAddr(IR * ir, MDSet const* mds)
     {
         ASSERT0(ir && mds && !mds->is_empty());
         ir->setRefMDSet(mds, m_ru);
@@ -657,7 +657,7 @@ public:
 
     //Set 'md' points to whole memory.
     void setPointToAllMem(UINT mdid, OUT MD2MDSet & ctx)
-    { setPointToMDSetByAddMD(mdid, ctx, m_md_sys->get_md(MD_ALL_MEM)); }
+    { setPointToMDSetByAddMD(mdid, ctx, m_md_sys->get_md(MD_FULL_MEM)); }
 
     //Set md points to whole global memory.
     void setPointToGlobalMem(UINT mdid, OUT MD2MDSet & ctx)

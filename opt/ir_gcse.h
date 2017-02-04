@@ -55,9 +55,9 @@ public:
 
     void pick_eh()
     {
-        List<IRBB*> * bbs = m_ru->get_bb_list();
+        List<IRBB*> * bbs = m_ru->getBBList();
         for (IRBB * bb = bbs->get_head(); bb != NULL; bb = bbs->get_next()) {
-            if (bb->is_exp_handling()) {
+            if (bb->isExceptionHandler()) {
                 removeVertex(BB_id(bb));
             }
         }
@@ -113,22 +113,22 @@ public:
     {
         ASSERT0(ru);
         m_ru = ru;
-        m_cfg = ru->get_cfg();
-        m_du = ru->get_du_mgr();
-        m_aa = ru->get_aa();
+        m_cfg = ru->getCFG();
+        m_du = ru->getDUMgr();
+        m_aa = ru->getAA();
         ASSERT0(m_du && m_aa && m_cfg);
         m_expr_tab = NULL;
-        m_tm = ru->get_type_mgr();
+        m_tm = ru->getTypeMgr();
         m_gvn = gvn;
         m_tg = NULL;
         m_is_in_ssa_form = false;
         m_ssamgr = NULL;
     }
     virtual ~IR_GCSE() {}
-    virtual CHAR const* get_pass_name() const
+    virtual CHAR const* getPassName() const
     { return "Global Command Subscript Elimination"; }
 
-    PASS_TYPE get_pass_type() const { return PASS_GCSE; }
+    PASS_TYPE getPassType() const { return PASS_GCSE; }
 
     bool perform(OptCtx & oc);
 };

@@ -355,7 +355,7 @@ public:
     void destroyVar(VAR * v); //Free VAR memory.
     void dump(IN OUT CHAR * name = NULL);
 
-    TypeMgr * get_type_mgr() const { return m_tm; }
+    TypeMgr * getTypeMgr() const { return m_tm; }
     VarVec * get_var_vec() { return &m_var_vec; }
     VAR * get_var(size_t id) const { return m_var_vec.get((UINT)id); }
 

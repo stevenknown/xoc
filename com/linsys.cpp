@@ -412,8 +412,7 @@ bool Lineq::reduce(IN OUT RMat & m, UINT rhs_idx, bool is_intersect)
                 //Do NOT remove this constrain.
                 //TODO: Check the domain of constant symbol.
                 break;
-            default:
-                UNREACH();;
+            default: UNREACH();;
             }
         } else if (vars == 1) {
             //Record number of inequality if it only has single variable.

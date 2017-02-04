@@ -115,8 +115,8 @@ IRBB * findAndInsertPreheader(
 {
     ASSERT0(li && ru);
     insert_bb = false;
-    IR_CFG * cfg = ru->get_cfg();
-    BBList * bblst = ru->get_bb_list();
+    IR_CFG * cfg = ru->getCFG();
+    BBList * bblst = ru->getBBList();
     IRBB * head = LI_loop_head(li);
 
     C<IRBB*> * bbholder = NULL;
@@ -138,7 +138,7 @@ IRBB * findAndInsertPreheader(
     }
 
     if (BB_last_ir(prev) != NULL &&
-        prev->is_bb_down_boundary(BB_last_ir(prev))) {
+        prev->is_down_boundary(BB_last_ir(prev))) {
         //Can not append IR to prev BB.
         find_appropriate_prev_bb = false;
     }

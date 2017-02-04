@@ -239,7 +239,7 @@ static void do_opt(IR * ir_list, DexRegion * func_ru)
 {
     if (ir_list == NULL) { return; }
 
-    //dump_irs(ir_list, func_ru->get_type_mgr());
+    //dump_irs(ir_list, func_ru->getTypeMgr());
 
     bool change;
 
@@ -255,7 +255,8 @@ static void do_opt(IR * ir_list, DexRegion * func_ru)
     func_ru->addToIRList(ir_list);
 
     #if 1
-    bool succ = func_ru->process();
+    OptCtx oc;
+    bool succ = func_ru->process(&oc);
     ASSERT0(succ);
     #else
     func_ru->processSimply();
@@ -316,7 +317,7 @@ static void convertIR2LIR(
 {
     IR2Dex ir2dex(func_ru, df);
     List<LIR*> newlirs;
-    ir2dex.convert(func_ru->get_ir_list(), newlirs);
+    ir2dex.convert(func_ru->getIRList(), newlirs);
 
     //to LIRCode.
     UINT u = newlirs.get_elem_count();
@@ -474,7 +475,7 @@ static void handleRegion(
     SMemPool * dbxpool = NULL; //record the all DexDbx data.
     if (g_collect_debuginfo) {
         if (g_do_ipa) {
-            dbxpool = ((DexRegionMgr*)func_ru->get_region_mgr())->get_pool();
+            dbxpool = ((DexRegionMgr*)func_ru->getRegionMgr())->get_pool();
         } else {
             dbxpool = smpoolCreate(sizeof(DexDbx), MEM_COMM);
         }
@@ -484,7 +485,7 @@ static void handleRegion(
     }
 
     TypeIndexRep tr;
-    TypeMgr * dm = func_ru->get_type_mgr();
+    TypeMgr * dm = func_ru->getTypeMgr();
     tr.i8 = dm->getSimplexType(D_I8);
     tr.u8 = dm->getSimplexType(D_U8);
     tr.i16 = dm->getSimplexType(D_I16);
@@ -518,13 +519,13 @@ static void handleRegion(
         //goto FIN;
     }
 
-    //dump_irs(ir_list, func_ru->get_type_mgr());
+    //dump_irs(ir_list, func_ru->getTypeMgr());
     func_ru->setPrno2Vreg(&prno2v);
 
     #if 1
     do_opt(ir_list, func_ru);
     #else
-    LOG("\t\tdo pass test: '%s'", func_ru->get_ru_name());
+    LOG("\t\tdo pass test: '%s'", func_ru->getRegionName());
     func_ru->addToIRList(ir_list);
     func_ru->getPrno2Vreg()->clean();
     func_ru->getPrno2Vreg()->copy(*func_ru->getDex2IR()->getPR2Vreg());
@@ -668,9 +669,9 @@ bool compileFunc(
 
     func_ru->setDexFile(df);
     func_ru->setDexMethod(dexm);
-    func_ru->set_ru_var(rm->get_var_mgr()->registerVar(
+    func_ru->set_ru_var(rm->getVarMgr()->registerVar(
                         runame,
-                        rm->get_type_mgr()->getMCType(0),
+                        rm->getTypeMgr()->getMCType(0),
                         0, VAR_GLOBAL|VAR_FAKE));
     func_ru->setParamNum(lircode->numArgs);
     func_ru->setOrgVregNum(lircode->maxVars);

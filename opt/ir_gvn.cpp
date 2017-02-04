@@ -51,10 +51,10 @@ IR_GVN::IR_GVN(Region * ru)
 {
     ASSERT0(ru != NULL);
     m_ru = ru;
-    m_md_sys = m_ru->get_md_sys();
-    m_du = m_ru->get_du_mgr();
-    m_tm = m_ru->get_type_mgr();
-    m_cfg = m_ru->get_cfg();
+    m_md_sys = m_ru->getMDSystem();
+    m_du = m_ru->getDUMgr();
+    m_tm = m_ru->getTypeMgr();
+    m_cfg = m_ru->getCFG();
     ASSERT0(m_cfg && m_du && m_md_sys && m_tm);
     m_vn_count = 1;
     m_is_vn_fp = false;
@@ -64,7 +64,7 @@ IR_GVN::IR_GVN(Region * ru)
     m_zero_vn = NULL;
     m_mc_zero_vn = NULL;
 
-    List<IRBB*> * bbl = ru->get_bb_list();
+    List<IRBB*> * bbl = ru->getBBList();
     UINT n = 0;
     for (IRBB * bb = bbl->get_head(); bb != NULL; bb = bbl->get_next()) {
         n += bb->getNumOfIR();
@@ -432,7 +432,7 @@ VN * IR_GVN::allocLiveinVN(IR const* exp, MD const* emd, bool & change)
 VN * IR_GVN::computePR(IR const* exp, bool & change)
 {
     SSAInfo * ssainfo = PR_ssainfo(exp);
-    ASSERT0(exp->is_read_pr() && ssainfo);
+    ASSERT0(exp->isReadPR() && ssainfo);
 
     IR const* def = ssainfo->get_def();
     if (def == NULL) {
@@ -455,8 +455,8 @@ VN * IR_GVN::computePR(IR const* exp, bool & change)
 //Only compute memory operation's vn.
 VN * IR_GVN::computeExactMemory(IR const* exp, bool & change)
 {
-    ASSERT0(exp->is_memory_opnd());
-    MD const* emd = exp->get_exact_ref();
+    ASSERT0(exp->isMemoryOpnd());
+    MD const* emd = exp->getExactRef();
     if (emd == NULL) { return NULL; }
 
     IR const* ed = m_du->getExactAndUniqueDef(exp);
@@ -491,11 +491,11 @@ VN * IR_GVN::computeExactMemory(IR const* exp, bool & change)
         UINT defcount = 0;
         for (INT i = defset->get_first(&di);
              i >= 0; i = defset->get_next(i, &di), defcount++) {
-            IR const* dir = m_ru->get_ir(i);
+            IR const* dir = m_ru->getIR(i);
             ASSERT0(dir->is_stmt());
             MD const* xd = m_du->get_must_def(dir);
             if (xd == NULL) {
-                MDSet const* xds = m_du->get_may_def(dir);
+                MDSet const* xds = m_du->getMayDef(dir);
                 if (xds != NULL && xds->is_contain(emd)) {
                     ASSERT0(m_ir2vn.get(IR_id(exp)) == NULL);
                     //exp's value is may defined, here we can not
@@ -762,7 +762,7 @@ VN * IR_GVN::computeScalarByAnonDomDef(
             m_du->is_may_def(domdef, exp, false));
     SCVNE2VN * vnexp_map = m_def2sctab.get(domdef);
     UINT dtsz = exp->get_dtype_size(m_tm);
-    MD const* md = exp->get_exact_ref();
+    MD const* md = exp->getExactRef();
     ASSERT0(md);
     VNE_SC vexp(MD_id(md), exp->get_offset(), dtsz);
     //NOTE:
@@ -792,14 +792,14 @@ VN * IR_GVN::computeScalar(IR const* exp, bool & change)
     VN * evn = m_ir2vn.get(IR_id(exp));
     if (evn != NULL) { return evn; }
 
-    if (exp->is_read_pr() && PR_ssainfo(exp) != NULL) {
+    if (exp->isReadPR() && PR_ssainfo(exp) != NULL) {
         return computePR(exp, change);
     }
 
     evn = computeExactMemory(exp, change);
     if (evn != NULL) { return evn; }
 
-    if (exp->get_exact_ref() == NULL) {
+    if (exp->getExactRef() == NULL) {
         //Can not handle inexact MD.
         return NULL;
     }
@@ -894,7 +894,7 @@ VN * IR_GVN::computeVN(IR const* exp, bool & change)
     case IR_LNOT: //logical not
     case IR_NEG: //negative
         {
-            VN * x = computeVN(UNA_opnd0(exp), change);
+            VN * x = computeVN(UNA_opnd(exp), change);
             if (x == NULL) {
                 if (m_ir2vn.get(IR_id(exp)) != NULL) {
                     m_ir2vn.set(IR_id(exp), NULL);
@@ -1111,7 +1111,7 @@ void IR_GVN::processBB(IRBB * bb, bool & change)
             {
                 computeVN(IST_base(ir), change);
 
-                VN * x = computeVN(ir->get_rhs(), change);
+                VN * x = computeVN(ir->getRHS(), change);
                 if (x == NULL) { return; }
 
                 //IST's vn may be set by its dominated use-stmt ILD.
@@ -1194,7 +1194,7 @@ void IR_GVN::dump_bb(UINT bbid)
     fprintf(g_tfile, "\n");
     for (IR * ir = BB_first_ir(bb);
          ir != NULL; ir = BB_next_ir(bb)) {
-        dump_ir(ir, m_ru->get_type_mgr());
+        dump_ir(ir, m_ru->getTypeMgr());
         fprintf(g_tfile, "\n");
         VN * x = m_ir2vn.get(IR_id(ir));
         if (x != NULL) {
@@ -1292,8 +1292,8 @@ void IR_GVN::dump_bb(UINT bbid)
 void IR_GVN::dump()
 {
     if (g_tfile == NULL) return;
-    fprintf(g_tfile, "\n==---- DUMP GVN -- ru:'%s' ----==", m_ru->get_ru_name());
-    BBList * bbl = m_ru->get_bb_list();
+    fprintf(g_tfile, "\n==---- DUMP GVN -- ru:'%s' ----==", m_ru->getRegionName());
+    BBList * bbl = m_ru->getBBList();
     for (IRBB * bb = bbl->get_head(); bb != NULL; bb = bbl->get_next()) {
         dump_bb(BB_id(bb));
     }
@@ -1308,7 +1308,7 @@ bool IR_GVN::calcCondMustVal(IR const* ir, bool & must_true, bool & must_false)
     must_false = false;
     ASSERT0(ir->is_judge());
     if (ir->is_lnot()) {
-        VN const* v = m_ir2vn.get(IR_id(UNA_opnd0(ir)));
+        VN const* v = m_ir2vn.get(IR_id(UNA_opnd(ir)));
         if (v == NULL) { return false; }
 
         if (VN_type(v) == VN_INT) {
@@ -1459,7 +1459,7 @@ bool IR_GVN::reperform(OptCtx & oc)
 //GVN try to assign a value numbers to expressions.
 bool IR_GVN::perform(OptCtx & oc)
 {
-    BBList * bbl = m_ru->get_bb_list();
+    BBList * bbl = m_ru->getBBList();
     if (bbl->get_elem_count() == 0) { return false; }
 
     START_TIMER_AFTER();
@@ -1467,11 +1467,11 @@ bool IR_GVN::perform(OptCtx & oc)
                                  PASS_DOM, PASS_UNDEF);
 
     if (!OC_is_du_chain_valid(oc)) {
-        END_TIMER_AFTER(get_pass_name());
+        END_TIMER_AFTER(getPassName());
         return false;
     }
 
-    List<IRBB*> * tbbl = m_cfg->get_bblist_in_rpo();
+    List<IRBB*> * tbbl = m_cfg->getBBListInRPO();
     ASSERT0(tbbl->get_elem_count() == bbl->get_elem_count());
 
     UINT count = 0;
@@ -1492,7 +1492,7 @@ bool IR_GVN::perform(OptCtx & oc)
     #endif
 
     //dump();
-    END_TIMER_AFTER(get_pass_name());
+    END_TIMER_AFTER(getPassName());
     ASSERT0(verify());
     m_is_valid = true;
     return true;

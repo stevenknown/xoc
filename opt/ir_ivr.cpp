@@ -64,7 +64,7 @@ bool IR_IVR::computeInitVal(IR const* ir, IV * iv)
         return true;
     }
 
-    MD const* md = v->get_exact_ref();
+    MD const* md = v->getExactRef();
     if (md != NULL) {
         IV_initv_md(iv) = md;
         IV_initv_type(iv) = IV_INIT_VAL_IS_VAR;
@@ -91,9 +91,9 @@ bool IR_IVR::findInitVal(IV * iv)
 
     MD const* emd = NULL;
     if (m_is_only_handle_exact_md) {
-        emd = domdef->get_exact_ref();
+        emd = domdef->getExactRef();
     } else {
-        emd = domdef->get_effect_ref();
+        emd = domdef->getEffectRef();
     }
 
     if (emd == NULL || emd != IV_iv(iv)) {
@@ -168,7 +168,7 @@ bool IR_IVR::matchIVUpdate(
     }
 
     if (m_is_only_handle_exact_md) {
-        MD const* op0md = op0->get_exact_ref();
+        MD const* op0md = op0->getExactRef();
         if (op0md == NULL || op0md != biv) {
             return false;
         }
@@ -241,7 +241,7 @@ void IR_IVR::findBIV(
         IRBB * bb = m_cfg->get_bb(i);
         ASSERT0(bb && m_cfg->get_vertex(BB_id(bb)));
         for (IR * ir = BB_first_ir(bb); ir != NULL; ir = BB_next_ir(bb)) {
-            if (!ir->is_st() && !ir->is_ist() && !ir->is_calls_stmt()) {
+            if (!ir->is_st() && !ir->is_ist() && !ir->isCallStmt()) {
                 continue;
             }
 
@@ -268,7 +268,7 @@ void IR_IVR::findBIV(
             }
 
             //The stmt may-kill other definitions for same MD.
-            MDSet const* maydef = m_du->get_may_def(ir);
+            MDSet const* maydef = m_du->getMayDef(ir);
             if (maydef == NULL) { continue; }
 
             for (INT i2 = tmp.get_first(); i2 != -1; i2 = tmp.get_next(i2)) {
@@ -320,7 +320,7 @@ void IR_IVR::findBIV(
         DUIter di = NULL;
         for (INT i = useset->get_first(&di);
              i >= 0; i = useset->get_next(i, &di)) {
-            IR const* use = m_ru->get_ir(i);
+            IR const* use = m_ru->getIR(i);
             ASSERT0(use->is_exp());
 
             IR const* use_stmt = use->get_stmt();
@@ -353,7 +353,7 @@ bool IR_IVR::is_loop_invariant(LI<IRBB> const* li, IR const* ir)
     if (defs == NULL) { return true; }
     DUIter di = NULL;
     for (INT i = defs->get_first(&di); i >= 0; i = defs->get_next(i, &di)) {
-        IR const* d = m_ru->get_ir(i);
+        IR const* d = m_ru->getIR(i);
         ASSERT0(d->is_stmt() && d->get_bb());
         if (li->is_inside_loop(BB_id(d->get_bb()))) {
             return false;
@@ -377,7 +377,7 @@ bool IR_IVR::scanExp(IR const* ir, LI<IRBB> const* li, BitSet const& ivmds)
     case IR_ARRAY:
     case IR_PR:
         {
-            MD const* irmd = ir->get_exact_ref();
+            MD const* irmd = ir->getExactRef();
             if (irmd == NULL) { return false; }
             if (ivmds.is_contain(MD_id(irmd))) {
                 return true;
@@ -455,7 +455,7 @@ void IR_IVR::findDIV(LI<IRBB> const* li, SList<IV*> const& bivlst, BitSet & tmp)
             case IR_STPR:
             case IR_IST:
                 {
-                    IR * rhs = ir->get_rhs();
+                    IR * rhs = ir->getRHS();
                     if (scanExp(rhs, li, tmp)) {
                         addDIVList(li, rhs);
                     }
@@ -575,8 +575,8 @@ void IR_IVR::_dump(LI<IRBB> * li, UINT indent)
 void IR_IVR::dump()
 {
     if (g_tfile == NULL) { return; }
-    fprintf(g_tfile, "\n==---- DUMP IVR -- ru:'%s' ----==", m_ru->get_ru_name());
-    _dump(m_cfg->get_loop_info(), 0);
+    fprintf(g_tfile, "\n==---- DUMP IVR -- ru:'%s' ----==", m_ru->getRegionName());
+    _dump(m_cfg->getLoopInfo(), 0);
     fflush(g_tfile);
 }
 
@@ -600,7 +600,7 @@ void IR_IVR::clean()
 bool IR_IVR::perform(OptCtx & oc)
 {
     START_TIMER_AFTER();
-    UINT n = m_ru->get_bb_list()->get_elem_count();
+    UINT n = m_ru->getBBList()->get_elem_count();
     if (n == 0) { return false; }
     ASSERT0(m_cfg && m_du && m_md_sys && m_tm);
 
@@ -609,13 +609,13 @@ bool IR_IVR::perform(OptCtx & oc)
                                  PASS_RPO, PASS_UNDEF);
 
     if (!OC_is_du_chain_valid(oc)) {
-        END_TIMER_AFTER(get_pass_name());
+        END_TIMER_AFTER(getPassName());
         return false;
     }
 
-    m_du = (IR_DU_MGR*)m_ru->get_pass_mgr()->queryPass(PASS_DU_MGR);
+    m_du = (IR_DU_MGR*)m_ru->getPassMgr()->queryPass(PASS_DU_MGR);
 
-    LI<IRBB> const* li = m_cfg->get_loop_info();
+    LI<IRBB> const* li = m_cfg->getLoopInfo();
     clean();
     if (li == NULL) { return false; }
 
@@ -644,7 +644,7 @@ bool IR_IVR::perform(OptCtx & oc)
     }
 
     //dump();
-    END_TIMER_AFTER(get_pass_name());
+    END_TIMER_AFTER(getPassName());
     return false;
 }
 //END IR_IVR

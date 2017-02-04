@@ -81,7 +81,7 @@ public:
         return p;
     }
 
-    virtual bool processProgramRegion(Region * program);
+    virtual bool processProgramRegion(Region * program, OptCtx * oc);
 };
 
 #endif

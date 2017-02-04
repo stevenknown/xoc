@@ -160,7 +160,7 @@ AbsNode * CfsMgr::constructAbsLoop(
 {
     UNUSED(cur_region);
     ASSERT0(cur_region == NULL || cur_region->is_contain(BB_id(entry)));
-    IR_CFG * cfg = m_ru->get_cfg();
+    IR_CFG * cfg = m_ru->getCFG();
     LI<IRBB> * li = cfg->mapBB2LabelInfo(entry);
     ASSERT0(li != NULL && LI_loop_head(li) == entry);
 
@@ -169,7 +169,7 @@ AbsNode * CfsMgr::constructAbsLoop(
     ABS_NODE_parent(node) = parent;
     ABS_NODE_loop_head(node) = entry;
     IRBB * body_start;
-    cfg->get_loop_two_kids(entry, NULL, &body_start);
+    cfg->getKidOfLoop(entry, NULL, &body_start);
     ASSERT0(body_start != NULL);
 
     CFS_INFO * ci = map_ir2cfsinfo(cfg->get_last_xr(entry));
@@ -199,8 +199,8 @@ AbsNode * CfsMgr::constructAbsIf(
     ABS_NODE_if_head(node) = entry;
 
     IRBB * true_body, * false_body;
-    IR_CFG * cfg = m_ru->get_cfg();
-    cfg->get_if_three_kids(entry, &true_body, &false_body, NULL);
+    IR_CFG * cfg = m_ru->getCFG();
+    cfg->getKidOfIF(entry, &true_body, &false_body, NULL);
     CFS_INFO * ci = map_ir2cfsinfo(cfg->get_last_xr(entry));
     ASSERT0(ci != NULL && CFS_INFO_head(ci) == entry);
 
@@ -234,7 +234,7 @@ AbsNode * CfsMgr::constructAbsTree(
         IN Graph & cur_graph,
         IN OUT BitSet & visited)
 {
-    IR_CFG * cfg = m_ru->get_cfg();
+    IR_CFG * cfg = m_ru->getCFG();
     AbsNode * lst = NULL;
     IRBB * bb = entry;
     Graph g;
@@ -268,7 +268,7 @@ AbsNode * CfsMgr::constructAbsTree(
         } else {
             IR * last_xr = cfg->get_last_xr(bb);
             if (last_xr != NULL && //'bb' is branching node of IF.
-                last_xr->is_cond_br()) {
+                last_xr->isConditionalBr()) {
                 ASSERT0(map_ir2cfsinfo(last_xr) != NULL);
 
                 //There might not exist ipdom.
@@ -329,7 +329,7 @@ AbsNode * CfsMgr::constructAbsTree(
 //Construct Control Flow Structure.
 AbsNode * CfsMgr::constructAbstractControlFlowStruct()
 {
-    IR_CFG * cfg = m_ru->get_cfg();
+    IR_CFG * cfg = m_ru->getCFG();
     ASSERT(cfg->get_entry(), ("CFG should be single-entry"));
     BitSet visited;
     AbsNode * a = constructAbsTree(cfg->get_entry(), NULL,

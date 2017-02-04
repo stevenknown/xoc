@@ -151,14 +151,14 @@ static bool isAllElementDerivedFromSameEffectVar(
 IR_AA::IR_AA(Region * ru)
 {
     ASSERT0(ru);
-    m_cfg = ru->get_cfg();
-    m_var_mgr = ru->get_var_mgr();
+    m_cfg = ru->getCFG();
+    m_var_mgr = ru->getVarMgr();
     m_ru = ru;
-    m_rumgr = ru->get_region_mgr();
-    m_tm = ru->get_type_mgr();
-    m_md_sys = ru->get_md_sys();
-    m_mds_mgr = ru->get_mds_mgr();
-    m_mds_hash = ru->get_mds_hash();
+    m_rumgr = ru->getRegionMgr();
+    m_tm = ru->getTypeMgr();
+    m_md_sys = ru->getMDSystem();
+    m_mds_mgr = ru->getMDSetMgr();
+    m_mds_hash = ru->getMDSetHash();
     m_misc_bs_mgr = ru->getMiscBitSetMgr();
     ASSERT0(m_cfg && m_mds_hash && m_md_sys && m_tm && m_mds_mgr);
     m_flow_sensitive = true;
@@ -204,7 +204,7 @@ size_t IR_AA::count_mem()
 size_t IR_AA::countMD2MDSetMemory()
 {
     size_t count = 0;
-    BBList * bbl = m_ru->get_bb_list();
+    BBList * bbl = m_ru->getBBList();
     MD2MDSetIter iter;
     for (IRBB * bb = bbl->get_head(); bb != NULL; bb = bbl->get_next()) {
         MD2MDSet * mx = m_md2mds_vec.get(BB_id(bb));
@@ -386,22 +386,22 @@ void IR_AA::processLda(IR * ir, IN OUT MDSet & mds, IN OUT AACtx * ic)
     
     if (!AC_is_mds_mod(ic) && LDA_ofst(ir) == 0) { return; }
     
-    if ((LDA_ofst(ir) != 0 && t->is_exact()) || ir->get_parent()->is_array()) {
+    if ((LDA_ofst(ir) != 0 && t->is_exact()) || ir->getParent()->is_array()) {
         //If LDA is array base, and LDA ofst may not be 0.
         //e.g: struct S { int a; int b[..]; }
         //    access s.b[..]
         MD md(*t);
         MD_ofst(&md) += LDA_ofst(ir);
 
-        if (ir->get_parent()->is_array() &&
-            ((CArray*)ir->get_parent())->is_base(ir) &&
-            !ir->get_parent()->is_void() &&
+        if (ir->getParent()->is_array() &&
+            ((CArray*)ir->getParent())->is_base(ir) &&
+            !ir->getParent()->is_void() &&
             t->is_exact()) {
             //The result data type of LDA will amended to be the type of
             //array element if array is the field of D_MC.
             //e.g: struct S { int a; int b[..]; }
             //    access s.b[..] generate ARRAY(LDA(s, ofst(4))            
-            UINT elem_sz = ir->get_parent()->get_dtype_size(m_tm);
+            UINT elem_sz = ir->getParent()->get_dtype_size(m_tm);
             ASSERT0(elem_sz > 0);
             MD_size(&md) = elem_sz;
         }
@@ -541,14 +541,14 @@ void IR_AA::computeMayPointTo(IR * pointer, IN MD2MDSet * mx, OUT MDSet & mds)
         MDSet const* ptset = getPointTo(MD_id(emd), *mx);
         MD const* typed_md = NULL;
         if (ptset != NULL && !ptset->is_empty()) {
-            if (pointer->get_ai() != NULL &&
+            if (pointer->getAI() != NULL &&
                 ptset->is_contain_global() &&
                 (typed_md = computePointToViaType(pointer)) != NULL) {
                 mds.bunion(typed_md, *m_misc_bs_mgr);
             } else {
                 mds.bunion(*ptset, *m_misc_bs_mgr);
             }
-        } else if (pointer->get_ai() != NULL &&
+        } else if (pointer->getAI() != NULL &&
                    (typed_md = computePointToViaType(pointer)) != NULL) {
             mds.bunion(typed_md, *m_misc_bs_mgr);
         } else {
@@ -566,14 +566,14 @@ void IR_AA::computeMayPointTo(IR * pointer, IN MD2MDSet * mx, OUT MDSet & mds)
             MDSet const* ptset = getPointTo((UINT)i, *mx);
             MD const* typed_md = NULL;
             if (ptset != NULL && !ptset->is_empty()) {
-                if (pointer->get_ai() != NULL &&
+                if (pointer->getAI() != NULL &&
                     ptset->is_contain_global() &&
                     (typed_md = computePointToViaType(pointer)) != NULL) {
                     mds.bunion(typed_md, *m_misc_bs_mgr);
                 } else {
                     mds.bunion(*ptset, *m_misc_bs_mgr);
                 }
-            } else if (pointer->get_ai() != NULL &&
+            } else if (pointer->getAI() != NULL &&
                        (typed_md = computePointToViaType(pointer)) != NULL) {
                 mds.bunion(typed_md, *m_misc_bs_mgr);
             } else {
@@ -606,7 +606,7 @@ void IR_AA::inferArrayExpBase(
         IN OUT AACtx * ic,
         IN OUT MD2MDSet * mx)
 {
-    ASSERT0(ir->is_array_op() && array_base->is_ptr());
+    ASSERT0(ir->isArrayOp() && array_base->is_ptr());
     MDSet tmp;
     AACtx tic;
     tic.copyTopDownFlag(*ic);
@@ -621,7 +621,7 @@ void IR_AA::inferArrayExpBase(
         //We could not determine which MD the array base refer to,
         //so we could not infer which MD the array accessed.
         MD const* typed_md = NULL;
-        if (array_base->get_ai() != NULL &&
+        if (array_base->getAI() != NULL &&
             (typed_md = computePointToViaType(array_base)) != NULL) {
             mds.clean(*m_misc_bs_mgr);
             mds.bunion(typed_md, *m_misc_bs_mgr);
@@ -645,7 +645,7 @@ void IR_AA::inferArrayExpBase(
             MDSet const* pts = getPointTo((UINT)i, *mx);
             MD const* typed_md = NULL;
             if (pts != NULL && !pts->is_empty()) {
-                if (array_base->get_ai() != NULL &&
+                if (array_base->getAI() != NULL &&
                     pts->is_contain_global() &&
                     (typed_md = computePointToViaType(array_base)) != NULL) {
                     setPointToUniqueMD((UINT)i, *mx, typed_md);
@@ -656,7 +656,7 @@ void IR_AA::inferArrayExpBase(
                         is_ofst_predicable, mdsz, *pts, mds);
                 }
 
-            } else if (array_base->get_ai() != NULL &&
+            } else if (array_base->getAI() != NULL &&
                        (typed_md = computePointToViaType(array_base)) != NULL) {
                 mds.bunion(typed_md, *m_misc_bs_mgr);
             } else {
@@ -673,11 +673,11 @@ void IR_AA::inferArrayExpBase(
     MD const* x = NULL;
     if (mds.get_elem_count() == 1 &&
         !MD_is_may(x = m_md_sys->get_md((UINT)mds.get_first(&iter)))) {
-        set_must_addr(ir, m_md_sys->get_md((UINT)mds.get_first(&iter)));
+        setMustAddr(ir, m_md_sys->get_md((UINT)mds.get_first(&iter)));
         ir->cleanRefMDSet();
     } else {
         ir->cleanRefMD();
-        set_may_addr(ir, m_mds_hash->append(mds));
+        setMayAddr(ir, m_mds_hash->append(mds));
     }
 
     tmp.clean(*m_misc_bs_mgr);
@@ -695,7 +695,7 @@ void IR_AA::inferArrayLdabase(
         OUT MDSet & mds,
         IN OUT AACtx * ic)
 {
-    ASSERT0(ir->is_array_op() && array_base->is_lda());
+    ASSERT0(ir->isArrayOp() && array_base->is_lda());
     AACtx tic(*ic);
     processLda(array_base, mds, &tic);
 
@@ -707,7 +707,7 @@ void IR_AA::inferArrayLdabase(
         ASSERT0(mds.get_elem_count() == 1);
         MD const* org = m_md_sys->get_md((UINT)mds.get_first(&iter));
         if (!org->is_exact()) {
-            set_must_addr(ir, org);
+            setMustAddr(ir, org);
             return;
         }
 
@@ -744,15 +744,15 @@ void IR_AA::inferArrayLdabase(
             mds.clean(*m_misc_bs_mgr);
             mds.bunion_pure(MD_id(entry), *m_misc_bs_mgr);
 
-            set_must_addr(ir, entry);
+            setMustAddr(ir, entry);
             return;
         }
 
         //mds is unchanged.
-        set_must_addr(ir, org);
+        setMustAddr(ir, org);
     } else {
-        ASSERT(get_may_addr(ir) == NULL, ("have no mayaddr"));
-        MD const* x = get_must_addr(ir);
+        ASSERT(getMayAddr(ir) == NULL, ("have no mayaddr"));
+        MD const* x = getMustAddr(ir);
         ASSERT0(x && x->is_effect());
         mds.clean(*m_misc_bs_mgr);
         mds.bunion_pure(MD_id(x), *m_misc_bs_mgr);
@@ -770,7 +770,7 @@ void IR_AA::processArray(
         IN OUT AACtx * ic,
         IN OUT MD2MDSet * mx)
 {
-    ASSERT0(ir->is_array_op());
+    ASSERT0(ir->isArrayOp());
 
     //Scan subscript expression and infer the offset of array element.
     for (IR * s = ARR_sub_list(ir); s != NULL; s = s->get_next()) {
@@ -839,7 +839,7 @@ MD const* IR_AA::allocPRMD(IR * pr)
 {
     ASSERT0(pr->is_pr());
     MD const* md = m_ru->genMDforPR(pr);
-    set_must_addr(pr, md);
+    setMustAddr(pr, md);
     pr->cleanRefMDSet();
     return md;
 }
@@ -851,7 +851,7 @@ MD const* IR_AA::allocPhiMD(IR * phi)
 {
     ASSERT0(phi->is_phi());
     MD const* md = m_ru->genMDforPR(phi);
-    set_must_addr(phi, md);
+    setMustAddr(phi, md);
     phi->cleanRefMDSet();
     return md;
 }
@@ -861,7 +861,7 @@ MD const* IR_AA::allocIdMD(IR * ir)
 {
     ASSERT0(ir->is_id());
     MD const* t = m_ru->genMDforId(ir);
-    set_must_addr(ir, t);
+    setMustAddr(ir, t);
     ir->cleanRefMDSet();
     return t;
 }
@@ -881,7 +881,7 @@ MD const* IR_AA::allocLoadMD(IR * ir)
         ASSERT(MD_id(entry) > 0, ("Not yet registered"));
         t = entry; //regard MD with offset as return result.
     }
-    set_must_addr(ir, t);
+    setMustAddr(ir, t);
     return t;
 }
 
@@ -890,7 +890,7 @@ MD const* IR_AA::allocStorePRMD(IR * ir)
 {
     ASSERT0(ir->is_stpr());
     MD const* md = m_ru->genMDforPR(ir);
-    set_must_addr(ir, md);
+    setMustAddr(ir, md);
     ir->cleanRefMDSet();
     return md;
 }
@@ -898,9 +898,9 @@ MD const* IR_AA::allocStorePRMD(IR * ir)
 
 MD const* IR_AA::allocCallResultPRMD(IR * ir)
 {
-    ASSERT0(ir->is_calls_stmt());
+    ASSERT0(ir->isCallStmt());
     MD const* md = m_ru->genMDforPR(ir);
-    set_must_addr(ir, md);
+    setMustAddr(ir, md);
     ir->cleanRefMDSet();
     return md;
 }
@@ -947,7 +947,7 @@ MD const* IR_AA::allocSetelemMD(IR * ir)
         md = entry; //regard MD with range as return result.
     }
 
-    set_must_addr(ir, md);
+    setMustAddr(ir, md);
     ir->cleanRefMDSet();
     return md;
 }
@@ -957,7 +957,7 @@ MD const* IR_AA::allocGetelemMD(IR * ir)
 {
     ASSERT0(ir->is_getelem());
     MD const* md = m_ru->genMDforPR(ir);
-    set_must_addr(ir, md);
+    setMustAddr(ir, md);
     ir->cleanRefMDSet();
     return md;
 }
@@ -982,7 +982,7 @@ MD const* IR_AA::allocStoreMD(IR * ir)
         ASSERT(MD_id(entry) > 0, ("Not yet registered"));
         md = entry; //regard MD with offset as return result.
     }
-    set_must_addr(ir, md);
+    setMustAddr(ir, md);
     return md;
 }
 
@@ -1053,7 +1053,7 @@ bool IR_AA::computeConstOffset(
     if (opnd1->is_const() && opnd1->is_int()) {
         const_offset = (HOST_UINT)CONST_int_val(opnd1);
     } else if (opnd1->is_pr()) {
-        if (!m_ru->evaluateConstInteger(opnd1, &const_offset)) {
+        if (!m_ru->evaluateConstInteger(opnd1, (ULONGLONG*)&const_offset)) {
             return false;
         }
     } else {
@@ -1251,7 +1251,7 @@ MD const* IR_AA::assignPRMD(
         tmp = allocPRMD(ir);
         AC_is_mds_mod(ic) = true;
     } else {
-        tmp = get_must_addr(ir);
+        tmp = getMustAddr(ir);
         AC_is_mds_mod(ic) = false;
     }
     ASSERT0(tmp);
@@ -1262,7 +1262,7 @@ MD const* IR_AA::assignPRMD(
         MD const* typed_md = NULL;
         if (pts != NULL && !pts->is_empty()) {
             if (pts->is_contain_global() &&
-                ir->get_ai() != NULL &&
+                ir->getAI() != NULL &&
                 (typed_md = computePointToViaType(ir)) != NULL) {
                 setPointToUniqueMD(MD_id(tmp), *mx, typed_md);
                 mds->clean(*m_misc_bs_mgr);
@@ -1273,7 +1273,7 @@ MD const* IR_AA::assignPRMD(
             } else {
                 mds->copy(*pts, *m_misc_bs_mgr);
             }
-        } else if (ir->get_ai() != NULL &&
+        } else if (ir->getAI() != NULL &&
                    (typed_md = computePointToViaType(ir)) != NULL) {
             setPointToMDSetByAddMD(MD_id(tmp), *mx, typed_md);
             mds->clean(*m_misc_bs_mgr);
@@ -1309,7 +1309,7 @@ MD const* IR_AA::assignLoadMD(
         t = allocLoadMD(ir);
         AC_is_mds_mod(ic) = true;
     } else {
-        t = get_must_addr(ir);
+        t = getMustAddr(ir);
         AC_is_mds_mod(ic) = false;
     }
     ASSERT0(t);
@@ -1321,7 +1321,7 @@ MD const* IR_AA::assignLoadMD(
         MD const* typed_md = NULL;
         if (pts != NULL && !pts->is_empty()) {
             if (pts->is_contain_global() &&
-                ir->get_ai() != NULL &&
+                ir->getAI() != NULL &&
                 (typed_md = computePointToViaType(ir)) != NULL) {
                 setPointToUniqueMD(MD_id(t), *mx, typed_md);
                 mds->clean(*m_misc_bs_mgr);
@@ -1332,7 +1332,7 @@ MD const* IR_AA::assignLoadMD(
             } else {
                 mds->copy(*pts, *m_misc_bs_mgr);
             }
-        } else if (ir->get_ai() != NULL &&
+        } else if (ir->getAI() != NULL &&
                    (typed_md = computePointToViaType(ir)) != NULL) {
             setPointToMDSetByAddMD(MD_id(t), *mx, typed_md);
             mds->clean(*m_misc_bs_mgr);
@@ -1366,14 +1366,14 @@ MD const* IR_AA::assignIdMD(
         m_is_visit.bunion(IR_id(ir));
         if (ID_info(ir)->is_string()) {
             t = allocStringMD(ID_info(ir)->get_name());
-            set_must_addr(ir, t);
+            setMustAddr(ir, t);
             ir->cleanRefMDSet();
         } else {
             t = allocIdMD(ir);
         }
         AC_is_mds_mod(ic) = true;
     } else {
-        t = get_must_addr(ir);
+        t = getMustAddr(ir);
         AC_is_mds_mod(ic) = false;
     }
     ASSERT0(t);
@@ -1391,7 +1391,7 @@ MD const* IR_AA::allocStringMD(SYM const* string)
     MD const* strmd;
     if ((strmd = m_rumgr->genDedicateStrMD()) != NULL) { return strmd; }
 
-    VAR * v = m_ru->get_var_mgr()->registerStringVar(NULL, string, 1);
+    VAR * v = m_ru->getVarMgr()->registerStringVar(NULL, string, 1);
     VAR_allocable(v) = true;
     //Set string address to be taken only if it is base of LDA.
     //VAR_is_addr_taken(v) = true;
@@ -1428,7 +1428,7 @@ void IR_AA::processIld(
     if (mds.is_empty()) {
         ASSERT0(AC_returned_pts(&tic));
         ir->cleanRefMD();
-        set_may_addr(ir, AC_returned_pts(&tic));
+        setMayAddr(ir, AC_returned_pts(&tic));
         if (AC_comp_pt(ic)) {
             AC_returned_pts(ic) = m_maypts;
         }
@@ -1474,15 +1474,15 @@ void IR_AA::processIld(
     if (mds.get_elem_count() == 1 &&
         !MD_is_may(mustaddr = m_md_sys->get_md((UINT)mds.get_first(&iter)))) {
         mustaddr = m_md_sys->get_md((UINT)mds.get_first(&iter));
-        set_must_addr(ir, mustaddr);
+        setMustAddr(ir, mustaddr);
         ir->cleanRefMDSet();
     } else if (isAllElementDerivedFromSameEffectVar(mds, m_md_sys, &mustaddr)) {
         ASSERT0(mustaddr);
-        set_must_addr(ir, mustaddr);
+        setMustAddr(ir, mustaddr);
         ir->cleanRefMDSet();
     } else {
         ir->cleanRefMD();
-        set_may_addr(ir, m_mds_hash->append(mds));
+        setMayAddr(ir, m_mds_hash->append(mds));
     }
 
     if (!AC_comp_pt(ic)) { return; }
@@ -1636,13 +1636,13 @@ void IR_AA::inferStoreValue(
         MD const* typed_md = NULL;
         bool is_maypts = false;
         if (!tmp.is_empty()) {
-            if (tmp.is_contain_global() && rhs->get_ai() != NULL &&
+            if (tmp.is_contain_global() && rhs->getAI() != NULL &&
                 (typed_md = computePointToViaType(rhs)) != NULL) {
                 //Make use of typed pointer info to improve the precsion.
                 tmp.clean(*m_misc_bs_mgr);
                 tmp.bunion(typed_md, *m_misc_bs_mgr);
             }
-        } else if (rhs->get_ai() != NULL &&
+        } else if (rhs->getAI() != NULL &&
                    (typed_md = computePointToViaType(rhs)) != NULL) {
             tmp.bunion(typed_md, *m_misc_bs_mgr);
         } else {
@@ -1706,7 +1706,7 @@ void IR_AA::processStore(IN IR * ir, IN MD2MDSet * mx)
         m_is_visit.bunion(IR_id(ir));
         t = allocStoreMD(ir);
     } else {
-        t = get_must_addr(ir);
+        t = getMustAddr(ir);
     }
 
     AACtx ic;
@@ -1730,7 +1730,7 @@ void IR_AA::processStorePR(IN IR * ir, IN MD2MDSet * mx)
         m_is_visit.bunion(IR_id(ir));
         t = allocStorePRMD(ir);
     } else {
-        t = get_must_addr(ir);
+        t = getMustAddr(ir);
     }
 
     AACtx ic;
@@ -1747,7 +1747,7 @@ void IR_AA::processSetelem(IR * ir, IN MD2MDSet * mx)
         m_is_visit.bunion(IR_id(ir));
         t = allocSetelemMD(ir);
     } else {
-        t = get_must_addr(ir);
+        t = getMustAddr(ir);
     }
 
     AACtx ic;
@@ -1770,7 +1770,7 @@ void IR_AA::processGetelem(IR * ir, IN MD2MDSet * mx)
         m_is_visit.bunion(IR_id(ir));
         allocGetelemMD(ir);
     } else {
-        get_must_addr(ir);
+        getMustAddr(ir);
     }
 
     //Process base field, it must refer to memory object.
@@ -1793,7 +1793,7 @@ void IR_AA::processPhi(IN IR * ir, IN MD2MDSet * mx)
         m_is_visit.bunion(IR_id(ir));
         phi_md = allocPhiMD(ir);
     } else {
-        phi_md = get_must_addr(ir);
+        phi_md = getMustAddr(ir);
     }
 
     AACtx ic;
@@ -1857,8 +1857,8 @@ void IR_AA::processPhi(IN IR * ir, IN MD2MDSet * mx)
 void IR_AA::inferIstoreValue(IN IR * ir, IN AACtx * ic, IN MD2MDSet * mx)
 {
     ASSERT0(ir->is_ist());
-    MDSet const* ist_mayaddr = get_may_addr(ir);
-    MD const* ist_mustaddr = get_must_addr(ir);
+    MDSet const* ist_mayaddr = getMayAddr(ir);
+    MD const* ist_mustaddr = getMustAddr(ir);
     ASSERT0(ist_mustaddr != NULL ||
             (ist_mayaddr != NULL && !ist_mayaddr->is_empty()));
 
@@ -1903,13 +1903,13 @@ void IR_AA::inferIstoreValue(IN IR * ir, IN AACtx * ic, IN MD2MDSet * mx)
         MD const* typed_md = NULL;
         bool is_maypts = false;
         if (!tmp.is_empty()) {
-            if (tmp.is_contain_global() && IST_rhs(ir)->get_ai() != NULL &&
+            if (tmp.is_contain_global() && IST_rhs(ir)->getAI() != NULL &&
                 (typed_md = computePointToViaType(IST_rhs(ir))) != NULL) {
                 //Make use of typed pointer info to improve the precsion.
                 tmp.clean(*m_misc_bs_mgr);
                 tmp.bunion(typed_md, *m_misc_bs_mgr);
             }
-        } else if (IST_rhs(ir)->get_ai() != NULL &&
+        } else if (IST_rhs(ir)->getAI() != NULL &&
                    (typed_md = computePointToViaType(IST_rhs(ir))) != NULL) {
             tmp.bunion(typed_md, *m_misc_bs_mgr);
         } else {
@@ -1973,8 +1973,8 @@ void IR_AA::inferIstoreValue(IN IR * ir, IN AACtx * ic, IN MD2MDSet * mx)
 void IR_AA::inferStoreArrayValue(IN IR * ir, IN AACtx * ic, IN MD2MDSet * mx)
 {
     ASSERT0(ir->is_starray());
-    MDSet const* lhs_mayaddr = get_may_addr(ir);
-    MD const* lhs_mustaddr = get_must_addr(ir);
+    MDSet const* lhs_mayaddr = getMayAddr(ir);
+    MD const* lhs_mustaddr = getMustAddr(ir);
     ASSERT(lhs_mustaddr != NULL ||
            (lhs_mayaddr != NULL && !lhs_mayaddr->is_empty()),
            ("You need infer the may memory address of array operation"));
@@ -2007,13 +2007,13 @@ void IR_AA::inferStoreArrayValue(IN IR * ir, IN AACtx * ic, IN MD2MDSet * mx)
         bool is_maypts = false;
         if (!tmp.is_empty()) {
             if (tmp.is_contain_global() &&
-                STARR_rhs(ir)->get_ai() != NULL &&
+                STARR_rhs(ir)->getAI() != NULL &&
                 (typed_md = computePointToViaType(STARR_rhs(ir))) != NULL) {
                 //Make use of typed pointer info to improve the precsion.
                 tmp.clean(*m_misc_bs_mgr);
                 tmp.bunion(typed_md, *m_misc_bs_mgr);
             }
-        } else if (STARR_rhs(ir)->get_ai() != NULL &&
+        } else if (STARR_rhs(ir)->getAI() != NULL &&
                    (typed_md = computePointToViaType(STARR_rhs(ir))) != NULL) {
             tmp.bunion(typed_md, *m_misc_bs_mgr);
         } else {
@@ -2089,7 +2089,7 @@ void IR_AA::processStoreArray(IN IR * ir, IN MD2MDSet * mx)
         //We can not determine the memory address of array element.
         //Set ir has no exact mem-addr for convervative purpose.
         ir->cleanRefMD();
-        set_may_addr(ir, m_maypts);
+        setMayAddr(ir, m_maypts);
         goto FIN;
     }
 
@@ -2132,11 +2132,11 @@ void IR_AA::processStoreArray(IN IR * ir, IN MD2MDSet * mx)
             if (mayaddr.get_elem_count() == 1 &&
                 !MD_is_may(x = m_md_sys->get_md(
                     (UINT)mayaddr.get_first(&iter2)))) {
-                set_must_addr(ir, x);
+                setMustAddr(ir, x);
                 ir->cleanRefMDSet();
             } else {
                 ir->cleanRefMD();
-                set_may_addr(ir, m_mds_hash->append(mayaddr));
+                setMayAddr(ir, m_mds_hash->append(mayaddr));
             }
         }
         tmp.clean(*m_misc_bs_mgr);
@@ -2176,7 +2176,7 @@ void IR_AA::processIst(IN IR * ir, IN MD2MDSet * mx)
         //it may point to any variables which have been taken address.
         ASSERT0(AC_returned_pts(&ic) == m_maypts);
         ir->cleanRefMD();
-        set_may_addr(ir, m_maypts);
+        setMayAddr(ir, m_maypts);
 
         AACtx ic2;
         inferIstoreValue(ir, &ic2, mx);
@@ -2184,7 +2184,7 @@ void IR_AA::processIst(IN IR * ir, IN MD2MDSet * mx)
     }
 
     UINT ist_size = ir->get_dtype_size(m_tm);
-    if (IST_ofst(ir) != 0 || ist_size != (INT)IST_base(ir)->get_dtype_size(m_tm)) {
+    if (IST_ofst(ir) != 0 || ist_size != IST_base(ir)->get_dtype_size(m_tm)) {
         UINT ist_ofst = IST_ofst(ir);
         //Compute where IST_base may point to.
         MDSet tmp;
@@ -2230,12 +2230,12 @@ void IR_AA::processIst(IN IR * ir, IN MD2MDSet * mx)
             ASSERT(MD_id(entry) > 0, ("Not yet registered"));
             x = entry;
         }
-        set_must_addr(ir, x);
+        setMustAddr(ir, x);
         ir->cleanRefMDSet();
     } else {
         //Set ir has no exact mem-addr for convervative.
         ir->cleanRefMD();
-        set_may_addr(ir, m_mds_hash->append(ml_may_pt));
+        setMayAddr(ir, m_mds_hash->append(ml_may_pt));
     }
 
     AACtx ic2;
@@ -2256,7 +2256,7 @@ void IR_AA::processRegion(IR const* ir, IN MD2MDSet * mx)
 
     bool has_maydef_info = false;
     //Check if region modify or use MD.
-    MDSet const* defmds = ru->get_may_def();
+    MDSet const* defmds = ru->getMayDef();
     if (defmds != NULL && !defmds->is_empty()) {
         ElemCopyPointToAndMayPointTo(*defmds, mx);
         has_maydef_info = true;
@@ -2360,7 +2360,7 @@ MD const* IR_AA::allocHeapobj(IR * ir)
     CHAR name[128];
     sprintf(name, "heap_obj%d", m_ir2heapobj.get_elem_count());
     ASSERT0(strlen(name) < 128);
-    VAR * tv = m_ru->get_var_mgr()->registerVar(
+    VAR * tv = m_ru->getVarMgr()->registerVar(
         name, m_tm->getMCType(0), 0, VAR_GLOBAL);
 
     //Set the var to be unallocable, means do NOT add
@@ -2386,7 +2386,7 @@ MD const* IR_AA::allocHeapobj(IR * ir)
 //Compute the point-to set modification when we meet call.
 void IR_AA::processCall(IN IR * ir, IN MD2MDSet * mx)
 {
-    ASSERT0(ir->is_calls_stmt());
+    ASSERT0(ir->isCallStmt());
 
     MDSet tmp;
     if (ir->is_icall()) {
@@ -2404,7 +2404,7 @@ void IR_AA::processCall(IN IR * ir, IN MD2MDSet * mx)
 
         inferExpression(p, tmp, &tic, mx);
 
-        if (!ir->is_readonly_call() &&
+        if (!ir->isReadOnlyCall() &&
             (AC_comp_pt(&tic) || AC_has_comp_lda(&tic))) {
             if (!tmp.is_empty()) {
                 by_addr_mds.bunion(tmp, *m_misc_bs_mgr);
@@ -2430,7 +2430,7 @@ void IR_AA::processCall(IN IR * ir, IN MD2MDSet * mx)
                 m_is_visit.bunion(IR_id(ir));
                 t = allocCallResultPRMD(ir);
             } else {
-                t = get_must_addr(ir);
+                t = getMustAddr(ir);
             }
             setPointToUniqueMD(MD_id(t), *mx, allocHeapobj(ir));
         }
@@ -2449,7 +2449,7 @@ void IR_AA::processCall(IN IR * ir, IN MD2MDSet * mx)
             m_is_visit.bunion(IR_id(ir));
             t = allocCallResultPRMD(ir);
         } else {
-            t = get_must_addr(ir);
+            t = getMustAddr(ir);
         }
 
         ASSERT(t, ("result of call miss exact MD."));
@@ -2458,7 +2458,7 @@ void IR_AA::processCall(IN IR * ir, IN MD2MDSet * mx)
             //Try to improve the precsion via typed alias info or 
             //set ir pointed to May-Point-To set for conservative purpose.
             MD const* typed_md;
-            if (ir->get_ai() != NULL &&
+            if (ir->getAI() != NULL &&
                 (typed_md = computePointToViaType(ir)) != NULL) {
                 //Make use of typed pointer info to improve the precsion.
                 setPointToUniqueMD(MD_id(t), *mx, typed_md);
@@ -2471,7 +2471,7 @@ void IR_AA::processCall(IN IR * ir, IN MD2MDSet * mx)
         }
     }
 
-    if (ir->is_readonly_call()) {
+    if (ir->isReadOnlyCall()) {
         //Readonly call does not modify any point-to informations.
         tmp.clean(*m_misc_bs_mgr);
         by_addr_mds.clean(*m_misc_bs_mgr);
@@ -2584,7 +2584,7 @@ void IR_AA::inferExpression(
             //opnd0 may be pointer.
             AACtx tic(*ic);
             AC_comp_pt(&tic) = false;
-            inferExpression(UNA_opnd0(expr), mds, &tic, mx);
+            inferExpression(UNA_opnd(expr), mds, &tic, mx);
 
             //These expressions does not descripte
             //an accurate memory-address. So, for the
@@ -2655,14 +2655,14 @@ void IR_AA::ElemUnionPointTo(
     for (INT i = mds.get_first(&iter);
          i >= 0; i = mds.get_next((UINT)i, &iter)) {
         ASSERT0(m_md_sys->get_md((UINT)i));
-        if (is_all_mem((UINT)i)) {
+        if (isFullMem((UINT)i)) {
             set_all = true;
             MDId2MD const* id2md = m_md_sys->get_id2md_map();
             for (INT j = MD_FIRST; j <= id2md->get_last_idx(); j++) {
                 ASSERT0(id2md->get((UINT)j));
                 setPointToMDSetByAddMDSet((UINT)j, *mx, pt_set);
             }
-        } else if (is_heap_mem((UINT)i)) {
+        } else if (isHeapMem((UINT)i)) {
             if (set_all) { continue; }
             for (INT j = m_id2heap_md_map.get_first();
                  j >= 0; j = m_id2heap_md_map.get_next((UINT)j)) {
@@ -2688,7 +2688,7 @@ void IR_AA::ElemUnionPointTo(
     for (INT i = mds.get_first(&iter);
          i >= 0; i = mds.get_next((UINT)i, &iter)) {
         ASSERT0(m_md_sys->get_md((UINT)i));
-        if (is_all_mem((UINT)i)) {
+        if (isFullMem((UINT)i)) {
             set_all = true;
             MDId2MD const* id2md = m_md_sys->get_id2md_map();
             for (INT j = MD_FIRST; j <= id2md->get_last_idx(); j++) {
@@ -2696,7 +2696,7 @@ void IR_AA::ElemUnionPointTo(
                 setPointToMDSetByAddMD((UINT)j, *mx, pt_elem);
             }
             return;
-        } else if (is_heap_mem((UINT)i)) {
+        } else if (isHeapMem((UINT)i)) {
             if (set_all) { continue; }
             for (INT j = m_id2heap_md_map.get_first();
                  j >= 0; j = m_id2heap_md_map.get_next((UINT)j)) {
@@ -2723,7 +2723,7 @@ void IR_AA::ElemCopyAndUnionPointTo(
     for (INT i = mds.get_first(&iter);
          i >= 0; i = mds.get_next((UINT)i, &iter)) {
         ASSERT0(m_md_sys->get_md((UINT)i));
-        if (is_all_mem((UINT)i)) {
+        if (isFullMem((UINT)i)) {
             set_all = true;
 
             MDId2MD const* id2md = m_md_sys->get_id2md_map();
@@ -2736,7 +2736,7 @@ void IR_AA::ElemCopyAndUnionPointTo(
                 }
             }
             return;
-        } else if (is_heap_mem((UINT)i)) {
+        } else if (isHeapMem((UINT)i)) {
             if (set_all) { continue; }
 
             for (INT j = m_id2heap_md_map.get_first();
@@ -2776,7 +2776,7 @@ void IR_AA::ElemCopyPointTo(
     for (INT i = mds.get_first(&iter);
          i >= 0; i = mds.get_next((UINT)i, &iter)) {
         ASSERT0(m_md_sys->get_md((UINT)i));
-        if (is_all_mem((UINT)i)) {
+        if (isFullMem((UINT)i)) {
             set_all = true;
             MDId2MD const* id2md = m_md_sys->get_id2md_map();
             for (INT j = MD_FIRST; j <= id2md->get_last_idx(); j++) {
@@ -2784,7 +2784,7 @@ void IR_AA::ElemCopyPointTo(
                 setPointToMDSet((UINT)j, *mx, pt_set);
             }
             return;
-        } else if (is_heap_mem((UINT)i)) {
+        } else if (isHeapMem((UINT)i)) {
             if (set_all) { continue; }
             for (INT j = m_id2heap_md_map.get_first();
                  j >= 0; j = m_id2heap_md_map.get_next((UINT)j)) {
@@ -2807,7 +2807,7 @@ void IR_AA::ElemCopyPointToAndMayPointTo(MDSet const& mds, IN MD2MDSet * mx)
     for (INT i = mds.get_first(&iter);
          i >= 0; i = mds.get_next((UINT)i, &iter)) {
         ASSERT0(m_md_sys->get_md((UINT)i));
-        if (is_all_mem((UINT)i)) {
+        if (isFullMem((UINT)i)) {
             set_all = true;
             MDId2MD const* id2md = m_md_sys->get_id2md_map();
             for (INT j = MD_FIRST; j <= id2md->get_last_idx(); j++) {
@@ -2815,7 +2815,7 @@ void IR_AA::ElemCopyPointToAndMayPointTo(MDSet const& mds, IN MD2MDSet * mx)
                 setPointTo((UINT)j, *mx, m_maypts);
             }
             return;
-        } else if (is_heap_mem((UINT)i)) {
+        } else if (isHeapMem((UINT)i)) {
             if (set_all) { continue; }
             for (INT j = m_id2heap_md_map.get_first();
                  j >= 0; j = m_id2heap_md_map.get_next((UINT)j)) {
@@ -2838,14 +2838,14 @@ void IR_AA::ElemCleanExactPointTo(MDSet const& mds, IN MD2MDSet * mx)
     for (INT i = mds.get_first(&iter);
          i >= 0; i = mds.get_next((UINT)i, &iter)) {
         ASSERT0(m_md_sys->get_md((UINT)i));
-        if (is_all_mem((UINT)i)) {
+        if (isFullMem((UINT)i)) {
             set_all = true;
             MDId2MD const* id2md = m_md_sys->get_id2md_map();
             for (INT j = MD_FIRST; j <= id2md->get_last_idx(); j++) {
                 ASSERT0(id2md->get((UINT)j));
                 cleanPointTo((UINT)j, *mx);
             }
-        } else if (is_heap_mem((UINT)i)) {
+        } else if (isHeapMem((UINT)i)) {
             if (set_all) { continue; }
             for (INT j = m_id2heap_md_map.get_first();
                  j >= 0; j = m_id2heap_md_map.get_next((UINT)j)) {
@@ -2868,7 +2868,7 @@ void IR_AA::ElemCleanPointTo(MDSet const& mds, IN MD2MDSet * mx)
     for (INT i = mds.get_first(&iter);
          i >= 0; i = mds.get_next((UINT)i, &iter)) {
         ASSERT0(m_md_sys->get_md((UINT)i));
-        if (is_all_mem((UINT)i)) {
+        if (isFullMem((UINT)i)) {
             set_all = true;
             MDId2MD const* id2md = m_md_sys->get_id2md_map();
             for (INT j = MD_FIRST; j <= id2md->get_last_idx(); j++) {
@@ -2876,7 +2876,7 @@ void IR_AA::ElemCleanPointTo(MDSet const& mds, IN MD2MDSet * mx)
                 cleanPointTo((UINT)j, *mx);
             }
             return;
-        } else if (is_heap_mem((UINT)i)) {
+        } else if (isHeapMem((UINT)i)) {
             if (set_all) { continue; }
             for (INT j = m_id2heap_md_map.get_first();
                  j >= 0; j = m_id2heap_md_map.get_next((UINT)j)) {
@@ -2895,7 +2895,7 @@ void IR_AA::dumpInOutPointToSetForBB()
 {
     if (g_tfile == NULL) return;
     fprintf(g_tfile, "\n==---- DUMP POINT TO INFO ----==");
-    BBList * bbl = m_cfg->get_bb_list();
+    BBList * bbl = m_cfg->getBBList();
     for (IRBB * bb = bbl->get_head(); bb != NULL; bb = bbl->get_next()) {
         PtPairSet * in_set = getInPtPairSet(bb);
         PtPairSet * out_set = getOutPtPairSet(bb);
@@ -2957,8 +2957,8 @@ void IR_AA::dumpPtPairSet(PtPairSet & pps)
 void IR_AA::dumpIRPointTo(IN IR * ir, bool dump_kid, IN MD2MDSet * mx)
 {
     if (ir == NULL || g_tfile == NULL) return;
-    MD const* must = get_must_addr(ir);
-    MDSet const* may = get_may_addr(ir);
+    MD const* must = getMustAddr(ir);
+    MDSet const* may = getMayAddr(ir);
     if (must != NULL ||
         (may != NULL && may->get_elem_count() > 0)) {
         dump_ir(ir, m_tm, NULL, false, false, false, false);
@@ -3219,14 +3219,14 @@ void IR_AA::dumpIRPointToForRegion(bool dump_kid)
 {
     if (g_tfile == NULL) return;
     fprintf(g_tfile, "\n==--- DUMP '%s' IR_AA : IR ADDRESS and POINT-TO ----==",
-            m_ru->get_ru_name());
+            m_ru->getRegionName());
     m_md_sys->dumpAllMD();
     fprintf(g_tfile, "\n\n---- All MD in MAY-POINT-TO SET : ");
 
     ASSERT0(m_maypts);
     m_maypts->dump(m_md_sys, true);
 
-    BBList * bbl = m_cfg->get_bb_list();
+    BBList * bbl = m_cfg->getBBList();
     for (IRBB * bb = bbl->get_head(); bb != NULL; bb = bbl->get_next()) {
         dumpIRPointToForBB(bb, dump_kid);
     }
@@ -3276,7 +3276,7 @@ void IR_AA::dumpMD2MDSetForRegion(bool dump_pt_graph)
     if (m_flow_sensitive) {
         fprintf(g_tfile, "\n\n==---- DUMP ALL MD POINT-TO "
                          "OUT-SET (FLOW SENSITIVE) ----==");
-        BBList * bbl = m_cfg->get_bb_list();
+        BBList * bbl = m_cfg->getBBList();
         for (IRBB * bb = bbl->get_head(); bb != NULL; bb = bbl->get_next()) {
             fprintf(g_tfile, "\n\n--- BB%u ---", BB_id(bb));
             dumpMD2MDSet(mapBBtoMD2MDSet(BB_id(bb)),
@@ -3370,7 +3370,7 @@ void IR_AA::convertMD2MDSet2PT(
         if (from_md_pts == NULL) { continue; }
 
         if (from_md_pts->is_contain_all()) {
-            PtPair const* pp = pt_pair_mgr.add(fromid, MD_ALL_MEM);
+            PtPair const* pp = pt_pair_mgr.add(fromid, MD_FULL_MEM);
             ASSERT0(pp);
             pps.bunion(PP_id(pp));
         } else {
@@ -3487,21 +3487,21 @@ bool IR_AA::verifyIR(IR * ir)
     case IR_ID:
     case IR_LD:
     case IR_PR:
-        ASSERT0(get_must_addr(ir));
-        ASSERT0(get_may_addr(ir) == NULL);
+        ASSERT0(getMustAddr(ir));
+        ASSERT0(getMayAddr(ir) == NULL);
         break;
     case IR_ST:
-        ASSERT0(get_must_addr(ir));
-        ASSERT0(get_may_addr(ir) == NULL);
+        ASSERT0(getMustAddr(ir));
+        ASSERT0(getMayAddr(ir) == NULL);
         break;
     case IR_STPR:
-        ASSERT0(get_must_addr(ir));
-        ASSERT0(get_may_addr(ir) == NULL);
+        ASSERT0(getMustAddr(ir));
+        ASSERT0(getMayAddr(ir) == NULL);
         break;
     case IR_STARRAY:
         {
-            MD const* mustaddr = get_must_addr(ir);
-            MDSet const* mayaddr = get_may_addr(ir);
+            MD const* mustaddr = getMustAddr(ir);
+            MDSet const* mayaddr = getMayAddr(ir);
             ASSERT0(mustaddr ||
                      (mayaddr && !mayaddr->is_empty()));
             ASSERT0((mustaddr != NULL) ^
@@ -3523,8 +3523,8 @@ bool IR_AA::verifyIR(IR * ir)
         }
         break;
     case IR_ARRAY:
-        ASSERT0(ir->get_parent());
-        if (ir->get_parent()->is_array()) {
+        ASSERT0(ir->getParent());
+        if (ir->getParent()->is_array()) {
             //Compute the memory address and ONLY
             //record the top level ARRAY node's memory address.
             break;
@@ -3533,8 +3533,8 @@ bool IR_AA::verifyIR(IR * ir)
     case IR_ILD:
     case IR_IST:
         {
-            MD const* mustaddr = get_must_addr(ir);
-            MDSet const* mayaddr = get_may_addr(ir);
+            MD const* mustaddr = getMustAddr(ir);
+            MDSet const* mayaddr = getMayAddr(ir);
             ASSERT0(mustaddr ||
                      (mayaddr && !mayaddr->is_empty()));
             ASSERT0((mustaddr != NULL) ^
@@ -3558,7 +3558,7 @@ bool IR_AA::verifyIR(IR * ir)
     case IR_CALL:
     case IR_ICALL:
         if (ir->hasReturnValue()) {
-            ASSERT0(get_must_addr(ir));
+            ASSERT0(getMustAddr(ir));
         }
 
         for (IR * p = CALL_param_list(ir); p != NULL; p = p->get_next()) {
@@ -3570,12 +3570,12 @@ bool IR_AA::verifyIR(IR * ir)
         }
         break;
     case IR_PHI:
-        ASSERT0(get_must_addr(ir));
-        ASSERT0(get_may_addr(ir) == NULL);
+        ASSERT0(getMustAddr(ir));
+        ASSERT0(getMayAddr(ir) == NULL);
         break;
     default:
-        ASSERT0(get_must_addr(ir) == NULL);
-        ASSERT0(get_may_addr(ir) == NULL);
+        ASSERT0(getMustAddr(ir) == NULL);
+        ASSERT0(getMayAddr(ir) == NULL);
     }
 
     for (UINT i = 0; i < IR_MAX_KID_NUM(ir); i++) {
@@ -3590,7 +3590,7 @@ bool IR_AA::verifyIR(IR * ir)
 
 bool IR_AA::verify()
 {
-    BBList * bbl = m_ru->get_bb_list();
+    BBList * bbl = m_ru->getBBList();
     for (IRBB * bb = bbl->get_head();
          bb != NULL; bb = bbl->get_next()) {
         for (IR * ir = BB_first_ir(bb);
@@ -3683,7 +3683,7 @@ void IR_AA::initGlobalAndParameterVarPtset(
             CHAR name[64];
             SNPRINTF(name, 63, "DummyGlobalVarPointedByVar%x",
                 (UINT)(size_t)param);
-            VAR * tv = m_ru->get_var_mgr()->registerVar(
+            VAR * tv = m_ru->getVarMgr()->registerVar(
                 name, m_tm->getMCType(0), 0, VAR_GLOBAL|VAR_ADDR_TAKEN);
 
             //Set the var to be unallocable, means do NOT add
@@ -3768,13 +3768,13 @@ void IR_AA::initGlobalAndParameterVarPtset(
 void IR_AA::initEntryPtset(PtPairSet ** ptset_arr)
 {
     ConstMDIter iter;
-    VarTab * vt = m_ru->get_var_tab();
+    VarTab * vt = m_ru->getVarTab();
     if (m_flow_sensitive) {
         ASSERT0(m_cfg->verify());
 
-        ASSERT0(m_ru->get_bb_list()->get_elem_count() != 0);
+        ASSERT0(m_ru->getBBList()->get_elem_count() != 0);
 
-        BBList * rubblst = m_ru->get_bb_list();
+        BBList * rubblst = m_ru->getBBList();
         PtPairSet * loc_ptset_arr =
             new PtPairSet[rubblst->get_elem_count() * 2]();
 
@@ -3803,7 +3803,7 @@ void IR_AA::initEntryPtset(PtPairSet ** ptset_arr)
         IRBB * entry = m_cfg->get_entry();
         ASSERT0(entry);
         MD2MDSet * mx = allocMD2MDSetForBB(BB_id(entry));
-        setPointToAllMem(MD_ALL_MEM, *mx);
+        setPointToAllMem(MD_FULL_MEM, *mx);
         setPointToGlobalMem(MD_GLOBAL_MEM, *mx);
         VarTabIter c;
         for (VAR * v = vt->get_first(c); v != NULL; v = vt->get_next(c)) {
@@ -3819,7 +3819,7 @@ void IR_AA::initEntryPtset(PtPairSet ** ptset_arr)
         }
         convertMD2MDSet2PT(*getInPtPairSet(entry), m_pt_pair_mgr, mx);
     } else {
-        setPointToAllMem(MD_ALL_MEM, m_unique_md2mds);
+        setPointToAllMem(MD_FULL_MEM, m_unique_md2mds);
         setPointToGlobalMem(MD_GLOBAL_MEM, m_unique_md2mds);
         VarTabIter c;
         for (VAR * v = vt->get_first(c); v != NULL; v = vt->get_next(c)) {
@@ -3843,12 +3843,12 @@ void IR_AA::initMayPointToSet()
 {
     //Record MDs whose address have been takens or it is global variable.
     Region * ru = m_ru;
-    RegionMgr * rm = m_ru->get_region_mgr();
+    RegionMgr * rm = m_ru->getRegionMgr();
     VarTabIter c;
     ConstMDIter iter;
     MDSet tmp;
     for (;;) {
-        VarTab * vtab = ru->get_var_tab();
+        VarTab * vtab = ru->getVarTab();
         c.clean();
         for (VAR * v = vtab->get_first(c); v != NULL; v = vtab->get_next(c)) {
             if (!VAR_is_addr_taken(v)) { continue; }
@@ -3910,7 +3910,7 @@ void IR_AA::initMayPointToSet()
 
 void IR_AA::computeFlowInsensitive()
 {
-    BBList * bbl = m_cfg->get_bb_list();
+    BBList * bbl = m_cfg->getBBList();
     C<IRBB*> * ct = NULL;
     UINT c = 0;
     while (++c < 3) {
@@ -3937,7 +3937,7 @@ void IR_AA::initAliasAnalysis()
 bool IR_AA::perform(IN OUT OptCtx & oc)
 {
     ASSERT(m_maypts, ("Should invoke initAliasAnalysis() first."));
-    if (m_ru->get_bb_list()->get_elem_count() == 0) { return true; }
+    if (m_ru->getBBList()->get_elem_count() == 0) { return true; }
 
     START_TIMER_AFTER();
 
@@ -3955,8 +3955,8 @@ bool IR_AA::perform(IN OUT OptCtx & oc)
 
         m_ru->checkValidAndRecompute(&oc, PASS_RPO, PASS_UNDEF);
 
-        List<IRBB*> * tbbl = m_cfg->get_bblist_in_rpo();
-        ASSERT0(tbbl->get_elem_count() == m_ru->get_bb_list()->get_elem_count());
+        List<IRBB*> * tbbl = m_cfg->getBBListInRPO();
+        ASSERT0(tbbl->get_elem_count() == m_ru->getBBList()->get_elem_count());
 
         computeFlowSensitive(*tbbl);
     } else {
@@ -3985,7 +3985,7 @@ bool IR_AA::perform(IN OUT OptCtx & oc)
     //structure to release memory.
     m_pt_pair_mgr.clobber();
 
-    END_TIMER_AFTER(get_pass_name());
+    END_TIMER_AFTER(getPassName());
 
     return true;
 }

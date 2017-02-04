@@ -48,7 +48,7 @@ public:
 
     virtual bool shouldAddEdge(IR const* ir) const
     {
-        ASSERT0(ir->is_calls_stmt());
+        ASSERT0(ir->isCallStmt());
         SYM const* name = VAR_name(CALL_idinfo(ir));
         if (is_unimportant(name)) { return false; }
 

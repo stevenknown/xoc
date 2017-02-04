@@ -687,9 +687,9 @@ void dump_lir2(LIR * lir, DexFile * df, INT pos)
             }
             break;
         default:
-            /* It seems dex does not distinguish
-            float and integer const. And regard float as
-            32bit integer, double will be 64bit integer. */
+            //It seems dex does not distinguish
+            //float and integer const. And regard float as
+            //32bit integer, double will be 64bit integer.
             UNREACH();
         }
         break;
@@ -879,8 +879,7 @@ void dump_lir2(LIR * lir, DexFile * df, INT pos)
             fprintf(g_tfile, ", INT->SHORT");
             fprintf(g_tfile, ", v%d <- v%d", LIR_res(lir), LIR_op0(lir));
             break;
-        default:
-            UNREACH();
+        default: UNREACH();
         }
         break;
     case LOP_ADD_ASSIGN :

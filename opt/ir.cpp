@@ -134,7 +134,7 @@ INT checkKidNumValidUnary(IR const* ir, UINT n, CHAR const* filename,
     UINT x = IR_MAX_KID_NUM(ir);
     ASSERTL(n < x, filename, line,
             ("%d is beyond maximum IR kids num %d", n, x));
-    ASSERT0(ir->is_unary_op());
+    ASSERT0(ir->isUnaryOp());
     return n;
 }
 
@@ -145,7 +145,7 @@ INT checkKidNumValidBinary(IR const* ir, UINT n, CHAR const* filename,
     UINT x = IR_MAX_KID_NUM(ir);
     ASSERTL(n < x, filename, line,
             ("%d is beyond maximum IR kids num %d", n, x));
-    ASSERT0(ir->is_binary_op());
+    ASSERT0(ir->isBinaryOp());
     return n;
 }
 
@@ -176,7 +176,7 @@ INT checkKidNumValidCall(IR const* ir, UINT n, CHAR const* filename, INT line)
     UINT x = IR_MAX_KID_NUM(ir);
     ASSERTL(n < x, filename, line,
             ("%d is beyond maximum IR kids num %d", n, x));
-    ASSERT0(ir->is_calls_stmt());
+    ASSERT0(ir->isCallStmt());
     return n;
 }
 
@@ -186,7 +186,7 @@ INT checkKidNumValidArray(IR const* ir, UINT n, CHAR const* filename, INT line)
     UINT x = IR_MAX_KID_NUM(ir);
     ASSERTL(n < x, filename, line,
             ("%d is beyond maximum IR kids num %d", n, x));
-    ASSERT0(ir->is_array_op());
+    ASSERT0(ir->isArrayOp());
     return n;
 }
 
@@ -211,14 +211,14 @@ IR const* checkIRT(IR const* ir, IR_TYPE irt)
 
 IR const* checkIRTBranch(IR const* ir)
 {
-    ASSERT0(ir->is_cond_br());
+    ASSERT0(ir->isConditionalBr());
     return ir;
 }
 
 
 IR const* checkIRTCall(IR const* ir)
 {
-    ASSERT0(ir->is_calls_stmt());
+    ASSERT0(ir->isCallStmt());
     return ir;
 }
 
@@ -307,7 +307,7 @@ static void verifyIR(IR * ir, IRAddressHash * irh, Region const* ru)
     for (UINT i = 0; i < IR_MAX_KID_NUM(ir); i++) {
         IR * k = ir->get_kid(i);
         if (k != NULL) {
-            ASSERT(k->get_parent() == ir, ("ir must be k's parent"));
+            ASSERT(k->getParent() == ir, ("ir must be k's parent"));
             verify_irs(k, irh, ru);
         }
     }
@@ -422,7 +422,7 @@ static void ir_dump_lab(IR const* ir)
 static void dump_ai(OUT CHAR * buf, IR const* ir)
 {
     ASSERT0(ir && buf);
-    AIContainer const* ai = ir->get_ai();
+    AIContainer const* ai = ir->getAI();
     if (ai == NULL) { return; }
 
     AICont const& cont = ai->read_cont();
@@ -1051,7 +1051,7 @@ void dump_ir(IR const* ir,
         fprintf(g_tfile, "%s", attr);
         if (dump_kid) {
             g_indent += dn;
-            dump_irs(UNA_opnd0(ir), tm, NULL, dump_kid,
+            dump_irs(UNA_opnd(ir), tm, NULL, dump_kid,
                      dump_src_line, dump_addr, dump_inner_region);
             g_indent -= dn;
         }
@@ -1079,7 +1079,7 @@ void dump_ir(IR const* ir,
         fprintf(g_tfile, "%s", attr);
         if (dump_kid) {
             g_indent += dn;
-            dump_irs(UNA_opnd0(ir), tm, NULL, dump_kid,
+            dump_irs(UNA_opnd(ir), tm, NULL, dump_kid,
                      dump_src_line, dump_addr, dump_inner_region);
             g_indent -= dn;
         }
@@ -1091,7 +1091,7 @@ void dump_ir(IR const* ir,
         fprintf(g_tfile, "%s", attr);
         if (dump_kid) {
             g_indent += dn;
-            dump_irs(UNA_opnd0(ir), tm, NULL, dump_kid,
+            dump_irs(UNA_opnd(ir), tm, NULL, dump_kid,
                      dump_src_line, dump_addr, dump_inner_region);
             g_indent -= dn;
         }
@@ -1286,8 +1286,8 @@ void dump_ir(IR const* ir,
         break;
     case IR_REGION:
         note("\nregion");
-        if (REGION_ru(ir)->get_ru_var() != NULL) {
-            VAR * ruvar = REGION_ru(ir)->get_ru_var();
+        if (REGION_ru(ir)->getRegionVar() != NULL) {
+            VAR * ruvar = REGION_ru(ir)->getRegionVar();
             CHAR tt[40];
             tt[0] = 0;
 
@@ -1423,7 +1423,7 @@ bool IR::verify(Region const* ru) const
 {
     verifyKids();
 
-    TypeMgr const* tm = ru->get_type_mgr();
+    TypeMgr const* tm = ru->getTypeMgr();
     ASSERT0(tm);
     UNUSED(tm);
 
@@ -1680,15 +1680,15 @@ bool IR::verify(Region const* ru) const
     case IR_LNOT:
         ASSERT0(d);
         ASSERT0(is_bool());
-        ASSERT0(UNA_opnd0(this) && UNA_opnd0(this)->is_exp());
-        ASSERT0(UNA_opnd0(this)->is_single());
+        ASSERT0(UNA_opnd(this) && UNA_opnd(this)->is_exp());
+        ASSERT0(UNA_opnd(this)->is_single());
         break;
     case IR_BNOT:
     case IR_NEG:
         ASSERT0(d);
         ASSERT0(TY_dtype(d) != D_UNDEF);
-        ASSERT0(UNA_opnd0(this) && UNA_opnd0(this)->is_exp());
-        ASSERT0(UNA_opnd0(this)->is_single());
+        ASSERT0(UNA_opnd(this) && UNA_opnd(this)->is_exp());
+        ASSERT0(UNA_opnd(this)->is_single());
         break;
     case IR_GOTO:
         ASSERT0(GOTO_lab(this));
@@ -1816,7 +1816,7 @@ bool IR::verifyPhi(Region const* ru) const
 {
     ASSERT0(is_phi());
     List<IRBB*> preds;
-    IR_CFG * cfg = ru->get_cfg();
+    IR_CFG * cfg = ru->getCFG();
     IRBB * bb = get_bb();
     ASSERT0(bb);
     cfg->get_preds(preds, bb);
@@ -1832,13 +1832,13 @@ bool IR::verifyPhi(Region const* ru) const
     }
     ASSERT(num_opnd == num_pred, ("the num of opnd unmatch"));
 
-    SSAInfo * ssainfo = get_ssainfo();
+    SSAInfo * ssainfo = getSSAInfo();
     ASSERT0(ssainfo);
 
     SSAUseIter vit = NULL;
     for (INT i = SSA_uses(ssainfo).get_first(&vit);
          vit != NULL; i = SSA_uses(ssainfo).get_next(i, &vit)) {
-        IR const* use = const_cast<Region*>(ru)->get_ir(i);
+        IR const* use = const_cast<Region*>(ru)->getIR(i);
 
         if (!use->is_pr()) { continue; }
 
@@ -1967,7 +1967,7 @@ bool IR::isIRListEqual(IR const* irs, bool is_cmp_kid) const
 //they are parity memory reference.
 bool IR::isMemRefEqual(IR const* src) const
 {
-    ASSERT(is_memory_ref() && src->is_memory_ref(), ("Not memory expression"));
+    ASSERT(isMemoryRef() && src->isMemoryRef(), ("Not memory expression"));
     if (isIREqual(src, true)) { return true; }
 
     switch (get_code()) {
@@ -2072,7 +2072,7 @@ bool IR::isMemRefEqual(IR const* src) const
     case IR_SETELEM:
     case IR_GETELEM:
     case IR_PHI:
-        if (src->is_read_pr() || src->is_write_pr() || src->is_calls_stmt()) {
+        if (src->isReadPR() || src->isWritePR() || src->isCallStmt()) {
             return get_prno() == src->get_prno();
         }
         return false;
@@ -2246,7 +2246,7 @@ bool IR::isIREqual(IR const* src, bool is_cmp_kid) const
         IR * kid1 = get_kid(i);
         IR * kid2 = src->get_kid(i);
 
-        if (src->is_calls_stmt() &&
+        if (src->isCallStmt() &&
             (kid1 == CALL_dummyuse(this) ||
              kid2 == CALL_dummyuse(src))) {
             //Do NOT check the equality of dummyuses.
@@ -2384,7 +2384,7 @@ IR * IR::getOpndPR(UINT prno)
     case IR_BNOT:
     case IR_LNOT:
     case IR_NEG:
-        return UNA_opnd0(this)->getOpndPR(prno);
+        return UNA_opnd(this)->getOpndPR(prno);
     case IR_LT:
     case IR_LE:
     case IR_GT:
@@ -2564,7 +2564,7 @@ void IR::setRefMD(MD const* md, Region * ru)
 
         ASSERT0(ru);
         du = ru->allocDU();
-        set_du(du);
+        setDU(du);
     }
     DU_md(du) = md;
 }
@@ -2579,7 +2579,7 @@ void IR::setRefMDSet(MDSet const* mds, Region * ru)
 
         ASSERT0(ru);
         du = ru->allocDU();
-        set_du(du);
+        setDU(du);
     }
     DU_mds(du) = mds;
 }
@@ -2620,7 +2620,7 @@ void IR::invertLor(Region * ru)
 //Note this function does not maintain DU chain between call and its use.
 void IR::removePROutFromUseset(DefMiscBitSetMgr & sbs_mgr, Region * ru)
 {
-    ASSERT0(is_calls_stmt() && ru);
+    ASSERT0(isCallStmt() && ru);
     DUSet * useset = getDUSet();
     if (useset == NULL) { return; }
 
@@ -2628,9 +2628,9 @@ void IR::removePROutFromUseset(DefMiscBitSetMgr & sbs_mgr, Region * ru)
     INT lnext = -1;
     for (INT i = useset->get_first(&di); i >= 0; i = lnext) {
         lnext = useset->get_next(i, &di);
-        IR const* exp = ru->get_ir(i);
+        IR const* exp = ru->getIR(i);
         ASSERT0(exp->is_exp());
-        if (!exp->is_read_pr()) { continue; }
+        if (!exp->isReadPR()) { continue; }
         useset->remove(i, sbs_mgr);
     }
 }
@@ -2639,12 +2639,12 @@ void IR::removePROutFromUseset(DefMiscBitSetMgr & sbs_mgr, Region * ru)
 static void removeSSAUseRecur(IR * ir)
 {
     if (ir->is_stmt()) {
-        SSAInfo * ssainfo = ir->get_ssainfo();
+        SSAInfo * ssainfo = ir->getSSAInfo();
         if (ssainfo != NULL) {
             ssainfo->cleanDU();
         }
     } else {
-        SSAInfo * ssainfo = ir->get_ssainfo();
+        SSAInfo * ssainfo = ir->getSSAInfo();
         if (ssainfo != NULL) {
             SSA_uses(ssainfo).remove(ir);
         }
@@ -2658,7 +2658,7 @@ static void removeSSAUseRecur(IR * ir)
                     SSA_uses(ssainfo).remove(x);
                 }
             } else {
-                ASSERT0(!x->is_read_pr());
+                ASSERT0(!x->isReadPR());
             }
 
             if (!x->is_leaf()) {
@@ -2684,10 +2684,10 @@ void IR::removeSSAUse()
 void IR::copyRef(IR const* src, Region * ru)
 {
     ASSERT0(src && ru);
-    ASSERT(is_memory_ref(), ("not memory reference"));
+    ASSERT(isMemoryRef(), ("not memory reference"));
     ASSERT0(!src->is_undef());
     setRefMD(src->getRefMD(), ru);
-    if (is_read_pr() || is_write_pr()) {;}
+    if (isReadPR() || isWritePR()) {;}
     else { setRefMDSet(src->getRefMDSet(), ru); }
 }
 //END IR

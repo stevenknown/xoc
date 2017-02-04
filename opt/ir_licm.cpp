@@ -72,7 +72,7 @@ bool IR_LICM::scanOpnd(
         for (IR * ir = BB_first_ir(bb);
              ir != NULL; ir = BB_next_ir(bb)) {
             if (!ir->isContainMemRef()) { continue; }
-            if ((ir->is_calls_stmt() && !ir->is_readonly_call()) ||
+            if ((ir->isCallStmt() && !ir->isReadOnlyCall()) ||
                 ir->is_region() || ir->is_phi()) {
                 //TODO: support call.
                 *is_legal = false;
@@ -85,19 +85,19 @@ bool IR_LICM::scanOpnd(
             m_iriter.clean();
             for (IR const* x = iterRhsInitC(ir, m_iriter);
                  x != NULL; x = iterRhsNextC(m_iriter)) {
-                if (!x->is_memory_opnd() ||
-                    x->is_readonly_exp() ||
+                if (!x->isMemoryOpnd() ||
+                    x->isReadOnlyExp() ||
                     invariant_exp.find(const_cast<IR*>(x))) {
                     continue;
                 }
 
-                if (x->is_pr() && x->get_ssainfo() != NULL) {
+                if (x->is_pr() && x->getSSAInfo() != NULL) {
                     //Check if SSA def is loop invariant.
-                    IR const* def = x->get_ssainfo()->get_def();
+                    IR const* def = x->getSSAInfo()->get_def();
 
                     if (def == NULL) { continue; }
 
-                    ASSERT0(def->is_write_pr() || def->isCallHasRetVal());
+                    ASSERT0(def->isWritePR() || def->isCallHasRetVal());
 
                     if (!invariant_stmt.find(const_cast<IR*>(def)) &&
                         li->is_inside_loop(BB_id(def->get_bb()))) {
@@ -114,7 +114,7 @@ bool IR_LICM::scanOpnd(
                 DUIter di = NULL;
                 for (INT i2 = defset->get_first(&di);
                      i2 >= 0; i2 = defset->get_next(i2, &di)) {
-                    IR const* d = m_ru->get_ir(i2);
+                    IR const* d = m_ru->getIR(i2);
                     ASSERT0(d->get_bb() && d->is_stmt());
                     if (!invariant_stmt.find(const_cast<IR*>(d)) &&
                         li->is_inside_loop(BB_id(d->get_bb()))) {
@@ -145,7 +145,7 @@ bool IR_LICM::markExpAndStmt(IR * ir, TTab<IR*> & invariant_exp)
     switch (IR_code(ir)) {
     case IR_ST:
         e = ST_rhs(ir);
-        if (!e->is_const_exp() && !e->is_pr()) {
+        if (!e->isConstExp() && !e->is_pr()) {
             //e.g: ST(P1, P2), do not move P2 out of loop.
             if (!invariant_exp.find(e)) {
                 invariant_exp.append(e);
@@ -160,7 +160,7 @@ bool IR_LICM::markExpAndStmt(IR * ir, TTab<IR*> & invariant_exp)
         break;
     case IR_STPR:
         e = STPR_rhs(ir);
-        if (!e->is_const_exp() && !e->is_pr()) {
+        if (!e->isConstExp() && !e->is_pr()) {
             //e.g: ST(P1, P2), do not move P2 out of loop.
             if (!invariant_exp.find(e)) {
                 invariant_exp.append(e);
@@ -172,7 +172,7 @@ bool IR_LICM::markExpAndStmt(IR * ir, TTab<IR*> & invariant_exp)
         break;
     case IR_IST:
         e = IST_rhs(ir);
-        if (!e->is_const_exp() && !e->is_pr()) {
+        if (!e->isConstExp() && !e->is_pr()) {
             if (!invariant_exp.find(e)) {
                 invariant_exp.append(e);
                 change = true;
@@ -197,7 +197,7 @@ bool IR_LICM::markExpAndStmt(IR * ir, TTab<IR*> & invariant_exp)
             //Hoisting CALL out of loop may be unsafe if the loop
             //will never execute.
             for (IR * p = CALL_param_list(ir); p != NULL; p = p->get_next()) {
-                if (!p->is_const_exp() && !p->is_pr()) {
+                if (!p->isConstExp() && !p->is_pr()) {
                     if (!invariant_exp.find(p)) {
                         invariant_exp.append(p);
                         change = true;
@@ -206,7 +206,7 @@ bool IR_LICM::markExpAndStmt(IR * ir, TTab<IR*> & invariant_exp)
             }
 
             //The result of call may not be loop invariant.
-            if (ir->is_readonly_call()) {
+            if (ir->isReadOnlyCall()) {
                 ASSERT0(!m_analysable_stmt_list.find(ir));
                 m_analysable_stmt_list.append_tail(ir);
             }
@@ -225,7 +225,7 @@ bool IR_LICM::markExpAndStmt(IR * ir, TTab<IR*> & invariant_exp)
         break;
     case IR_SWITCH:
         e = SWITCH_vexp(ir);
-        if (!e->is_const_exp() && !e->is_pr()) {
+        if (!e->isConstExp() && !e->is_pr()) {
             //e.g: SWITCH(P2), do not move P2 out of loop.
             if (!invariant_exp.find(e)) {
                 invariant_exp.append(e);
@@ -361,7 +361,7 @@ void IR_LICM::updateMD2Num(IR * ir)
         break;
     case IR_CALL:
     case IR_ICALL:
-        ASSERT0(ir->is_readonly_call());
+        ASSERT0(ir->isReadOnlyCall());
         //TODO: support not readonly call.
         break;
     case IR_GOTO:
@@ -478,18 +478,18 @@ bool IR_LICM::is_dom_all_use_in_loop(IR const* ir, LI<IRBB> * li)
 
     IRBB * irbb = ir->get_bb();
 
-    if (ir->get_ssainfo() != NULL) {
+    if (ir->getSSAInfo() != NULL) {
         //Check if SSA def is loop invariant.
-        ASSERT0(ir->get_ssainfo()->get_def() == ir);
+        ASSERT0(ir->getSSAInfo()->get_def() == ir);
 
-        SSAInfo * ssainfo = ir->get_ssainfo();
+        SSAInfo * ssainfo = ir->getSSAInfo();
         SSAUseIter iter;
         for (INT i = SSA_uses(ssainfo).get_first(&iter);
              iter != NULL; i = SSA_uses(ssainfo).get_next(i, &iter)) {
-            IR const* use = m_ru->get_ir(i);
+            IR const* use = m_ru->getIR(i);
 
             if (!use->is_pr()) {
-                ASSERT0(!use->is_read_pr());
+                ASSERT0(!use->isReadPR());
                 continue;
             }
 
@@ -509,7 +509,7 @@ bool IR_LICM::is_dom_all_use_in_loop(IR const* ir, LI<IRBB> * li)
     DUIter di = NULL;
     for (INT i = useset->get_first(&di);
          i >= 0; i = useset->get_next(i, &di)) {
-        IR const* u = m_ru->get_ir(i);
+        IR const* u = m_ru->getIR(i);
         ASSERT0(u->is_exp() && u->get_stmt());
 
         if (!is_stmt_dom_its_use(ir, u, li, irbb)) {
@@ -546,9 +546,9 @@ bool IR_LICM::hoistInvariantStmt(
     ConstIRIter iriter;
     for (IR const* x = iterRhsInitC(stmt, iriter);
          x != NULL; x = iterRhsNextC(iriter)) {
-        if (x->get_ssainfo() != NULL) {
+        if (x->getSSAInfo() != NULL) {
             //Check if SSA def is loop invariant.
-            IR * def = SSA_def(x->get_ssainfo());
+            IR * def = SSA_def(x->getSSAInfo());
             if (def == NULL) { continue; }
 
             if (!checkDefStmt(def, invariant_stmt, prehead, li)) {
@@ -565,7 +565,7 @@ bool IR_LICM::hoistInvariantStmt(
         DUIter di = NULL;
         for (INT i = defset->get_first(&di);
              i >= 0; i = defset->get_next(i, &di)) {
-            IR * d = m_ru->get_ir(i);
+            IR * d = m_ru->getIR(i);
             ASSERT0(d);
 
             if (!checkDefStmt(d, invariant_stmt, prehead, li)) {
@@ -625,7 +625,7 @@ bool IR_LICM::hoistCand(
         for (IR * c = invariant_exp.get_first(ti);
              c != NULL; c = invariant_exp.get_next(ti)) {
             ASSERT0(c->is_exp());
-            if (!is_worth_hoist(c)) { continue; }
+            if (!isWorthHoist(c)) { continue; }
 
             IR * stmt = c->get_stmt();
 
@@ -635,9 +635,9 @@ bool IR_LICM::hoistCand(
             m_iriter.clean();
             for (IR const* x = iterInitC(c, m_iriter);
                  x != NULL; x = iterNextC(m_iriter)) {
-                if (x->get_ssainfo() != NULL) {
+                if (x->getSSAInfo() != NULL) {
                     //Check if SSA def is loop invariant.
-                    IR * def = SSA_def(x->get_ssainfo());
+                    IR * def = SSA_def(x->getSSAInfo());
                     if (def == NULL) { continue; }
 
                     if (checkDefStmt(def, invariant_stmt, prehead, li)) {
@@ -655,7 +655,7 @@ bool IR_LICM::hoistCand(
                 DUIter di = NULL;
                 for (INT i = defset->get_first(&di);
                      i >= 0; i = defset->get_next(i, &di)) {
-                    IR * d = m_ru->get_ir(i);
+                    IR * d = m_ru->getIR(i);
                     ASSERT0(d->is_stmt());
 
                     if (checkDefStmt(d, invariant_stmt, prehead, li)) {
@@ -674,7 +674,7 @@ bool IR_LICM::hoistCand(
             removednum++;
 
             if ((stmt->is_st() || stmt->is_stpr()) &&
-                c == stmt->get_rhs() &&
+                c == stmt->getRHS() &&
                 invariant_stmt.find(stmt) &&
                 backedge_bb != NULL && //loop only have one exit.
                 is_dom_all_use_in_loop(stmt, li)) {
@@ -795,7 +795,7 @@ bool IR_LICM::perform(OptCtx & oc)
                                  PASS_DU_CHAIN, PASS_UNDEF);
 
     if (!OC_is_du_chain_valid(oc)) {
-        END_TIMER_AFTER(get_pass_name());
+        END_TIMER_AFTER(getPassName());
         return false;
     }
 
@@ -806,12 +806,12 @@ bool IR_LICM::perform(OptCtx & oc)
 
     m_ssamgr = NULL;
     IR_SSA_MGR * ssamgr =
-            (IR_SSA_MGR*)m_ru->get_pass_mgr()->queryPass(PASS_SSA_MGR);
+            (IR_SSA_MGR*)m_ru->getPassMgr()->queryPass(PASS_SSA_MGR);
     if (ssamgr != NULL && ssamgr->is_ssa_constructed()) {
         m_ssamgr = ssamgr;
     }
 
-    bool change = doLoopTree(m_cfg->get_loop_info(),
+    bool change = doLoopTree(m_cfg->getLoopInfo(),
                              du_set_info_changed,
                              insert_bb,
                              invariant_stmt,
@@ -839,7 +839,7 @@ bool IR_LICM::perform(OptCtx & oc)
             OC_is_cdg_valid(oc) = false;
         }
     }
-    END_TIMER_AFTER(get_pass_name());
+    END_TIMER_AFTER(getPassName());
     return change;
 }
 //END IR_LICM

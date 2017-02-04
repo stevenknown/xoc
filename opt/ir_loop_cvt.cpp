@@ -58,7 +58,7 @@ bool IR_LOOP_CVT::is_while_do(LI<IRBB> const* li, OUT IRBB ** gobackbb,
     }
 
     IR * lastir = BB_last_ir(head);
-    if (!lastir->is_cond_br()) {
+    if (!lastir->isConditionalBr()) {
         return false;
     }
 
@@ -91,7 +91,7 @@ bool IR_LOOP_CVT::try_convert(LI<IRBB> * li, IRBB * gobackbb,
     }
 
     ASSERT0(loopbody_start_bb && epilog);
-    IRBB * next = m_cfg->get_fallthrough_bb(gobackbb);
+    IRBB * next = m_cfg->getFallThroughBB(gobackbb);
     if (next == NULL || next != epilog) {
         //No benefit to be get to convert this kind of loop.
         return false;
@@ -117,10 +117,10 @@ bool IR_LOOP_CVT::try_convert(LI<IRBB> * li, IRBB * gobackbb,
         m_ii.clean();
         for (IR * x = iterRhsInit(ir, m_ii);
              x != NULL; x = iterRhsNext(m_ii)) {
-            if (!x->is_memory_ref()) { continue; }
+            if (!x->isMemoryRef()) { continue; }
 
             UINT cnt = 0;
-            if (x->is_read_pr() && PR_ssainfo(x) != NULL) {
+            if (x->isReadPR() && PR_ssainfo(x) != NULL) {
                 IR * def = SSA_def(PR_ssainfo(x));
                 if (def != NULL &&
                     li->is_inside_loop(BB_id(def->get_bb()))) {
@@ -132,7 +132,7 @@ bool IR_LOOP_CVT::try_convert(LI<IRBB> * li, IRBB * gobackbb,
 
                 for (INT d = defset->get_first(&di);
                      d >= 0; d = defset->get_next(d, &di)) {
-                    IR * def = m_ru->get_ir(d);
+                    IR * def = m_ru->getIR(d);
 
                     ASSERT0(def->get_bb());
                     if (li->is_inside_loop(BB_id(def->get_bb()))) {
@@ -150,7 +150,7 @@ bool IR_LOOP_CVT::try_convert(LI<IRBB> * li, IRBB * gobackbb,
         }
 
         BB_irlist(gobackbb).insert_before(newir, irct);
-        if (newir->is_cond_br()) {
+        if (newir->isConditionalBr()) {
             ASSERT0(ir == BB_last_ir(head));
             last_cond_br = newir;
             newir->invertIRType(m_ru);
@@ -207,7 +207,7 @@ bool IR_LOOP_CVT::perform(OptCtx & oc)
     START_TIMER_AFTER();
     m_ru->checkValidAndRecompute(&oc, PASS_LOOP_INFO, PASS_RPO, PASS_UNDEF);
 
-    LI<IRBB> * li = m_cfg->get_loop_info();
+    LI<IRBB> * li = m_cfg->getLoopInfo();
     if (li == NULL) { return false; }
 
     List<LI<IRBB>*> worklst;
@@ -233,7 +233,7 @@ bool IR_LOOP_CVT::perform(OptCtx & oc)
         //TODO: make rpo, dom valid.
     }
 
-    END_TIMER_AFTER(get_pass_name());
+    END_TIMER_AFTER(getPassName());
     return change;
 }
 

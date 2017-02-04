@@ -407,7 +407,7 @@ public:
     {
         ASSERT0(src && isIREqual(src, true) && ru);
         ASSERT0(src != this);
-        if (is_memory_ref()) {
+        if (isMemoryRef()) {
             setRefMD(src->getRefMD(), ru);
             setRefMDSet(src->getRefMDSet(), ru);
         }
@@ -440,7 +440,7 @@ public:
     IR_TYPE get_code() const { return (IR_TYPE)IR_code(this); }
     IR * get_next() const { return IR_next(this); }
     IR * get_prev() const { return IR_prev(this); }
-    IR * get_parent() const { return IR_parent(this); }
+    IR * getParent() const { return IR_parent(this); }
     inline IR * get_kid(UINT idx) const;
     inline IRBB * get_bb() const;
     inline DU * getDU() const;
@@ -486,17 +486,17 @@ public:
     //Return data type descriptor.
     Type const* get_type() const { return IR_dt(this); }
 
-    AIContainer const* get_ai() const { return IR_ai(this); }
+    AIContainer const* getAI() const { return IR_ai(this); }
 
     //Return rhs if exist. Some stmt has rhs,
     //such as IR_ST, IR_STPR and IR_IST.
-    inline IR * get_rhs() const;
+    inline IR * getRHS() const;
 
     //Return the PR no if exist.
     inline UINT get_prno() const;
 
     //Return the SSAInfo if exist.
-    inline SSAInfo * get_ssainfo() const;
+    inline SSAInfo * getSSAInfo() const;
 
     //Return stmt if it writes PR as result.
     //Otherwise return NULL.
@@ -545,13 +545,13 @@ public:
     }
 
     //Return exact MD if ir defined.
-    inline MD const* get_exact_ref() const
+    inline MD const* getExactRef() const
     {
         MD const* md = getRefMD();
         return (md == NULL || !md->is_exact()) ? NULL : md;
     }
 
-    inline MD const* get_effect_ref() const
+    inline MD const* getEffectRef() const
     {
         MD const* md = getRefMD();
         ASSERT0(md == NULL || !MD_is_may(md));
@@ -624,7 +624,7 @@ public:
     bool isIREqual(IR const* src, bool is_cmp_kid = true) const;
 
     //Return true if current ir is both PR and equal to src.
-    inline bool is_pr_equal(IR const* src) const;
+    inline bool isPREqual(IR const* src) const;
 
     //Return true if ir-list are equivalent.
     bool isIRListEqual(IR const* irs, bool is_cmp_kid = true) const;
@@ -650,15 +650,6 @@ public:
     //Return true if current ir is expression.
     bool is_exp() const { return !is_stmt(); }
 
-    //Record if ir might throw exception.
-    bool is_may_throw() const { return IR_may_throw(this); }
-
-    //Return true if current ir is binary operation.
-    bool is_binary_op() const { return IRDES_is_bin(g_ir_desc[get_code()]); }
-
-    //Return true if current ir is unary operation.
-    bool is_unary_op() const { return IRDES_is_una(g_ir_desc[get_code()]); }
-
     //Return true if k is kid node of right-hand-side of current ir.
     bool is_rhs(IR const* k) const { return !is_lhs(k) && k != this; }
 
@@ -671,20 +662,29 @@ public:
     //Return true if ir is volatile.
     inline bool is_volatile() const;
 
+    //Record if ir might throw exception.
+    bool isMayThrow() const { return IR_may_throw(this); }
+
+    //Return true if current ir is binary operation.
+    bool isBinaryOp() const { return IRDES_is_bin(g_ir_desc[get_code()]); }
+
+    //Return true if current ir is unary operation.
+    bool isUnaryOp() const { return IRDES_is_una(g_ir_desc[get_code()]); }
+
     //Return true if ir is constant expression.
-    inline bool is_const_exp() const;
+    inline bool isConstExp() const;
 
     //Return true if ir is readonly expression.
     //This attribute indicate that the expression does not modify any
     //memory. Note it can only refer to expression.
-    inline bool is_readonly_exp() const;
+    inline bool isReadOnlyExp() const;
 
     //Return true if ir is readonly function call.
     //This function is a shortcut to access properties of call stmt.
     //This attribute indicate that if function does not modify any
     //global memory or any memory object that pass through pointer
     //arguments.
-    inline bool is_readonly_call() const;
+    inline bool isReadOnlyCall() const;
 
     bool is_undef() const { return get_code() == IR_UNDEF; }
     bool is_dowhile() const { return get_code() == IR_DO_WHILE; }
@@ -755,48 +755,46 @@ public:
     bool is_stpr() const { return get_code() == IR_STPR; }
 
     //Return true if ir indicate conditional branch to a label.
-    bool is_cond_br() const { return is_truebr() || is_falsebr(); }
+    bool isConditionalBr() const { return is_truebr() || is_falsebr(); }
 
     //Return true if ir is operation that read or write to an array element.
-    bool is_array_op() const { return is_array() || is_starray(); }
+    bool isArrayOp() const { return is_array() || is_starray(); }
 
     //Return true if ir may jump to multiple target.
-    bool is_multicond_br() const { return is_switch(); }
+    bool isMultiConditionalBr() const { return is_switch(); }
 
-    bool is_uncond_br() const { return is_goto() || is_igoto(); }
+    bool isUnconditionalBr() const { return is_goto() || is_igoto(); }
 
     //Return true if ir is indirect jump to multiple target.
-    bool is_indirect_br() const { return is_igoto(); }
+    bool isIndirectBr() const { return is_igoto(); }
 
-    bool is_calls_stmt() const { return is_call() || is_icall(); }
+    bool isCallStmt() const { return is_call() || is_icall(); }
 
     //Return true if ir is a call and has a return value.
     inline bool isCallHasRetVal() const
-    { return is_calls_stmt() && hasReturnValue(); }
+    { return isCallStmt() && hasReturnValue(); }
 
     //Return true if stmt modify PR.
     //CALL/ICALL may modify PR if it has a return value.
-    inline bool is_write_pr() const
+    inline bool isWritePR() const
     { return is_stpr() || is_phi() || is_setelem() || is_getelem(); }
 
     //Return true if current stmt exactly modifies a PR.
     //CALL/ICALL may modify PR if it has a return value.
     //IR_SETELEM and IR_GETELEM may modify part of PR rather the whole.
-    inline bool is_overwrite_pr() const { return is_stpr() || is_phi(); }
+    inline bool isMustWritePR() const { return is_stpr() || is_phi(); }
 
     //Return true if current stmt read value from PR.
-    bool is_read_pr() const  { return is_pr(); }
+    bool isReadPR() const  { return is_pr(); }
 
     //Return true if current operation references memory.
     //These kinds of operation always define or use MD.
-    bool is_memory_ref() const
-    { return IRDES_is_mem_ref(g_ir_desc[get_code()]); }
+    bool isMemoryRef() const { return IRDES_is_mem_ref(g_ir_desc[get_code()]); }
 
     //Return true if current operation references memory, and
     //it is the rhs of stmt.
     //These kinds of operation always use MD.
-    bool is_memory_opnd() const
-    { return IRDES_is_mem_opnd(g_ir_desc[get_code()]); }
+    bool isMemoryOpnd() const { return IRDES_is_mem_opnd(g_ir_desc[get_code()]); }
 
     //Return true if current ir is integer constant, and the number
     //is equal to 'value'.
@@ -820,7 +818,7 @@ public:
     }
 
     //True if ir is atomic read-modify-write.
-    inline bool is_rmw() const;
+    inline bool isReadModWrite() const;
 
     //True if ir is atomic operation.    
     bool is_atom() const { return IR_is_atomic(this); }
@@ -908,16 +906,16 @@ public:
     }
 
     //Return true if current stmt must modify 'md'.
-    inline bool is_exact_def(MD const* md) const;
-    inline bool is_exact_def(MD const* md, MDSet const* mds) const;
+    inline bool isExactDef(MD const* md) const;
+    inline bool isExactDef(MD const* md, MDSet const* mds) const;
 
-    inline void set_rhs(IR * rhs);
     inline void set_prno(UINT prno);
-    inline void set_ssainfo(SSAInfo * ssa);
+    inline void set_bb(IRBB * bb);    
     inline void set_label(LabelInfo const* li);
     inline void set_ofst(UINT ofst);
-    inline void set_du(DU * du);
-    inline void set_bb(IRBB * bb);
+    inline void setRHS(IR * rhs);
+    inline void setSSAInfo(SSAInfo * ssa);
+    inline void setDU(DU * du);
 
     //Set 'kid' to be 'idx'th child of current ir.
     inline void set_kid(UINT idx, IR * kid);
@@ -992,16 +990,16 @@ public:
 
 
 //Record float point.
-#define CONST_fp_val(ir)   (((CConst*)CK_IRT(ir, IR_CONST))->u1.fp_const_value)
+#define CONST_fp_val(ir)  (((CConst*)CK_IRT(ir, IR_CONST))->u1.fp_const_value)
 
 //Record integer.
-#define CONST_int_val(ir)  (((CConst*)CK_IRT(ir, IR_CONST))->u1.int_const_value)
+#define CONST_int_val(ir) (((CConst*)CK_IRT(ir, IR_CONST))->u1.int_const_value)
 
 //Record string.
-#define CONST_str_val(ir)  (((CConst*)CK_IRT(ir, IR_CONST))->u1.str_value)
+#define CONST_str_val(ir) (((CConst*)CK_IRT(ir, IR_CONST))->u1.str_value)
 
 //Record anonymous value.
-#define CONST_anony_val(ir)  (((CConst*)CK_IRT(ir, IR_CONST))->u1.anonymous_value)
+#define CONST_anony_val(ir) (((CConst*)CK_IRT(ir, IR_CONST))->u1.anonymous_value)
 class CConst : public IR {
 public:
     union {
@@ -1348,7 +1346,7 @@ public:
 
 
 //Unary Operations, include neg, bnot, lnot.
-#define UNA_opnd0(ir)       (((CUna*)ir)->opnd[CKID_UNA(ir, 0)])
+#define UNA_opnd(ir)        (((CUna*)ir)->opnd[CKID_UNA(ir, 0)])
 #define UNA_kid(ir, idx)    (((CUna*)ir)->opnd[CKID_UNA(ir, idx)])
 class CUna : public IR {
 public:
@@ -1583,7 +1581,7 @@ public:
     //Return the number of dimensions.
     TMWORD getDimNum() const
     {
-        ASSERT0(is_array_op());
+        ASSERT0(isArrayOp());
         TMWORD dim = 0;
         for (IR const* s = ARR_sub_list(this); s != NULL; s = s->get_next()) {
             dim++;
@@ -1814,7 +1812,7 @@ public:
 //
 //START IR
 //
-IR * IR::get_rhs() const
+IR * IR::getRHS() const
 {
     switch (get_code()) {
     case IR_ST: return ST_rhs(this);
@@ -1843,7 +1841,7 @@ UINT IR::get_prno() const
 }
 
 
-SSAInfo * IR::get_ssainfo() const
+SSAInfo * IR::getSSAInfo() const
 {
     switch (get_code()) {
     case IR_PR: return PR_ssainfo(this);
@@ -1974,7 +1972,7 @@ DU * IR::getDU() const
 }
 
 
-void IR::set_du(DU * du)
+void IR::setDU(DU * du)
 {
     #ifdef _DEBUG_
     switch (get_code()) {
@@ -2041,20 +2039,20 @@ UINT IR::getArrayElemDtSize(TypeMgr const* tm) const
 }
 
 
-bool IR::is_const_exp() const
+bool IR::isConstExp() const
 {
     if (is_const()) { return true; }
-    if (is_cvt()) { return CVT_exp(this)->is_const_exp(); }
+    if (is_cvt()) { return CVT_exp(this)->isConstExp(); }
     return false;
 }
 
 
-bool IR::is_readonly_exp() const
+bool IR::isReadOnlyExp() const
 {
     ASSERT0(is_exp());
     switch (get_code()) {
     case IR_CONST: return true;
-    case IR_CVT: return CVT_exp(this)->is_readonly_exp();
+    case IR_CVT: return CVT_exp(this)->isReadOnlyExp();
     case IR_LD:
         if (VAR_is_readonly(LD_idinfo(this)) &&
             !VAR_is_volatile(LD_idinfo(this))) {
@@ -2068,7 +2066,7 @@ bool IR::is_readonly_exp() const
 }
 
 
-bool IR::is_readonly_call() const
+bool IR::isReadOnlyCall() const
 {
     switch (get_code()) {
     case IR_CALL: return CALL_is_readonly(this);
@@ -2093,7 +2091,7 @@ bool IR::is_volatile() const
 
 bool IR::isDirectArrayRef() const
 {
-    return is_array_op() && ARR_base(this)->is_lda();
+    return isArrayOp() && ARR_base(this)->is_lda();
 }
 
 
@@ -2124,7 +2122,7 @@ void IR::set_bb(IRBB * bb)
 }
 
 
-void IR::set_rhs(IR * rhs)
+void IR::setRHS(IR * rhs)
 {
     switch (get_code()) {
     case IR_ST: ST_rhs(this) = rhs; return;
@@ -2167,7 +2165,7 @@ void IR::clearSSAInfo()
 }
 
 
-void IR::set_ssainfo(SSAInfo * ssa)
+void IR::setSSAInfo(SSAInfo * ssa)
 {
     switch (get_code()) {
     case IR_PR: PR_ssainfo(this) = ssa; return;
@@ -2285,14 +2283,14 @@ void IR::set_kid(UINT idx, IR * kid)
 }
 
 
-bool IR::is_pr_equal(IR const* src) const
+bool IR::isPREqual(IR const* src) const
 {
-    ASSERT0(is_write_pr() && src->is_read_pr());
+    ASSERT0(isWritePR() && src->isReadPR());
     return get_type() == src->get_type() && get_prno() == src->get_prno();
 }
 
 
-bool IR::is_rmw() const
+bool IR::isReadModWrite() const
 {
     if (IR_is_read_mod_write(this)) {
         //Code pattern: $x = call(oldvalue, newvalue)
@@ -2375,7 +2373,7 @@ bool IR::is_lhs(IR const* k) const
 
 
 //Return true if ir exactly modified 'md' or element in MDSet 'mds'.
-bool IR::is_exact_def(MD const* md, MDSet const* mds) const
+bool IR::isExactDef(MD const* md, MDSet const* mds) const
 {
     ASSERT0(is_stmt());
 
@@ -2397,7 +2395,7 @@ bool IR::is_exact_def(MD const* md, MDSet const* mds) const
 }
 
 
-bool IR::is_exact_def(MD const* md) const
+bool IR::isExactDef(MD const* md) const
 {
     ASSERT0(is_stmt() && md);
     if (!md->is_exact()) { return false; }
@@ -2490,7 +2488,7 @@ bool IR::hasReturnValue() const
 //is equal to 'value'.
 bool IR::isConstIntValueEqualTo(HOST_INT value) const
 {
-    if (!is_const_exp()) { return false; }
+    if (!isConstExp()) { return false; }
 
     IR const* p = this;
     while (!p->is_const()) {

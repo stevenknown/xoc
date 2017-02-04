@@ -75,14 +75,14 @@ static bool isLowest(IR const* ir)
 {
     ASSERT0(ir->is_exp());
     if (ir->is_leaf()) { return true; }
-    IR * parent = ir->get_parent();
+    IR * parent = ir->getParent();
     if (parent == NULL) { return true; }
     if (!parent->is_stmt()) {
         //tree height is more than 2.
         return false;
     }
 
-    if (parent->is_calls_stmt()) {
+    if (parent->isCallStmt()) {
         //If parent is CALL/ICALL, we always intend to reduce the
         //height for parameter/callee even if its height is not more than 2.
         return false;
@@ -124,7 +124,7 @@ bool Region::isLowestHeightSelect(IR const* ir) const
 //At lowest mode, the array base, array subscript-expression must be leaf.
 bool Region::isLowestHeightArrayOp(IR const* ir) const
 {
-    ASSERT0(ir->is_array_op());
+    ASSERT0(ir->isArrayOp());
     if (ir->is_array() && !isLowest(ir)) { return false; }
 
     if (!ARR_base(ir)->is_leaf()) { return false; }
@@ -590,8 +590,8 @@ IR * Region::simplifyLogicalNot(IN IR * ir, SimpCtx * ctx)
     IR * ret_list = NULL;
 
     //truebr(exp != 0), L1
-    IR * opnd0 = UNA_opnd0(ir);
-    UNA_opnd0(ir) = NULL;
+    IR * opnd0 = UNA_opnd(ir);
+    UNA_opnd(ir) = NULL;
     if (!opnd0->is_judge()) {
         opnd0 = buildJudge(opnd0);
     }
@@ -599,7 +599,7 @@ IR * Region::simplifyLogicalNot(IN IR * ir, SimpCtx * ctx)
     copyDbx(true_br, ir, this);
     xcom::add_next(&ret_list, true_br);
 
-    TypeMgr * dm = get_type_mgr();
+    TypeMgr * dm = getTypeMgr();
     //pr = 1
     Type const* t = dm->getSimplexTypeEx(
         dm->get_dtype(WORD_LENGTH_OF_HOST_MACHINE, true));
@@ -657,7 +657,7 @@ IR * Region::simplifyLogicalAnd(IN IR * ir, SimpCtx * ctx)
     IR * pr = buildPR(ir->get_type());
     allocRefForPR(pr);
     IR * ret_list = simplifyLogicalAndAtTruebr(ir, label1);
-    TypeMgr * tm = get_type_mgr();
+    TypeMgr * tm = getTypeMgr();
     Type const* t = tm->getSimplexTypeEx(
                 tm->get_dtype(WORD_LENGTH_OF_HOST_MACHINE, true));
     IR * imm0 = buildImmInt(0, t);
@@ -883,7 +883,7 @@ IR * Region::simplifyLogicalOr(IN IR * ir, SimpCtx * ctx)
     IR * pr = buildPR(ir->get_type());
     allocRefForPR(pr);
     IR * ret_list = simplifyLogicalOrAtTruebr(ir, label1);
-    TypeMgr * dm = get_type_mgr();
+    TypeMgr * dm = getTypeMgr();
     Type const* type = dm->getSimplexTypeEx(
                          dm->get_dtype(WORD_LENGTH_OF_HOST_MACHINE, true));
     IR * imm0 = buildImmInt(0, type);
@@ -915,7 +915,7 @@ IR * Region::simplifyLogicalOr(IN IR * ir, SimpCtx * ctx)
 IR * Region::simplifyLogicalDet(IR * ir, SimpCtx * ctx)
 {
     if (ir == NULL) { return NULL; }
-    ASSERT0(ir->is_cond_br());
+    ASSERT0(ir->isConditionalBr());
     ASSERT0(BR_det(ir)->is_logical());
     IR * ret_list = NULL;
     if (BR_det(ir)->is_lor()) {
@@ -958,7 +958,7 @@ IR * Region::simplifyLogicalDet(IR * ir, SimpCtx * ctx)
         } else {
             IR_code(ir) = IR_TRUEBR;
         }
-        BR_det(ir) = UNA_opnd0(BR_det(ir));
+        BR_det(ir) = UNA_opnd(BR_det(ir));
         if (!BR_det(ir)->is_judge()) {
             IR * old = BR_det(ir);
             BR_det(ir) = buildJudge(old);
@@ -1215,10 +1215,10 @@ IR * Region::simplifySwitchSelf(IR * ir, SimpCtx * ctx)
 //coming into this function.
 IR * Region::simplifyArrayAddrExp(IR * ir, SimpCtx * ctx)
 {
-    ASSERT0(ir && SIMP_array(ctx) && ir->is_array_op());
+    ASSERT0(ir && SIMP_array(ctx) && ir->isArrayOp());
     ASSERT0(ARR_sub_list(ir));
 
-    TypeMgr * dm = get_type_mgr(); //may generate new pointer type.
+    TypeMgr * dm = getTypeMgr(); //may generate new pointer type.
     ASSERT0(ir->get_dtype_size(dm) > 0);
 
     //For n dimension array, enumb record the number
@@ -1661,8 +1661,8 @@ IR * Region::simplifyStoreArray(IR * ir, SimpCtx * ctx)
     ret = buildIstore(array_addr, rhsval, type);
     ret->setRefMD(ir->getRefMD(), this);
     ret->setRefMDSet(ir->getRefMDSet(), this);
-    if (get_du_mgr() != NULL) {
-        get_du_mgr()->changeDef(ret, ir, getMiscBitSetMgr());
+    if (getDUMgr() != NULL) {
+        getDUMgr()->changeDef(ret, ir, getMiscBitSetMgr());
     }
     freeIRTree(ir);
 FIN:
@@ -1700,8 +1700,8 @@ IR * Region::simplifyArray(IR * ir, SimpCtx * ctx)
         ld->setRefMDSet(ir->getRefMDSet(), this);
         freeIRTree(ir);
         freeIRTree(array_addr);
-        if (get_du_mgr() != NULL) {
-            get_du_mgr()->changeUse(ld, ir, getMiscBitSetMgr());
+        if (getDUMgr() != NULL) {
+            getDUMgr()->changeUse(ld, ir, getMiscBitSetMgr());
         }
         return ld;
     }
@@ -1715,8 +1715,8 @@ IR * Region::simplifyArray(IR * ir, SimpCtx * ctx)
         IR * elem_val = buildIload(array_addr, ir->get_type());
         elem_val->setRefMD(ir->getRefMD(), this);
         elem_val->setRefMDSet(ir->getRefMDSet(), this);
-        if (get_du_mgr() != NULL) {
-            get_du_mgr()->changeUse(elem_val, ir, getMiscBitSetMgr());
+        if (getDUMgr() != NULL) {
+            getDUMgr()->changeUse(elem_val, ir, getMiscBitSetMgr());
         }
         freeIRTree(ir);
 
@@ -1741,8 +1741,8 @@ IR * Region::simplifyArray(IR * ir, SimpCtx * ctx)
         IR * elem_val = buildIload(array_addr, ir->get_type());
         elem_val->setRefMD(ir->getRefMD(), this);
         elem_val->setRefMDSet(ir->getRefMDSet(), this);
-        if (get_du_mgr() != NULL) {
-            get_du_mgr()->changeUse(elem_val, ir, getMiscBitSetMgr());
+        if (getDUMgr() != NULL) {
+            getDUMgr()->changeUse(elem_val, ir, getMiscBitSetMgr());
         }
         freeIRTree(ir);
 
@@ -1762,8 +1762,8 @@ IR * Region::simplifyArray(IR * ir, SimpCtx * ctx)
     IR * elem_val = buildIload(array_addr, ir->get_type());
     elem_val->setRefMD(ir->getRefMD(), this);
     elem_val->setRefMDSet(ir->getRefMDSet(), this);
-    if (get_du_mgr() != NULL) {
-        get_du_mgr()->changeUse(elem_val, ir, getMiscBitSetMgr());
+    if (getDUMgr() != NULL) {
+        getDUMgr()->changeUse(elem_val, ir, getMiscBitSetMgr());
     }
     freeIRTree(ir);
     return elem_val;
@@ -1772,7 +1772,7 @@ IR * Region::simplifyArray(IR * ir, SimpCtx * ctx)
 
 IR * Region::simplifyCall(IR * ir, SimpCtx * ctx)
 {
-    ASSERT0(ir->is_calls_stmt());
+    ASSERT0(ir->isCallStmt());
     SimpCtx tcont(*ctx);
     ASSERT0(SIMP_stmtlist(ctx) == NULL);
     SIMP_ret_array_val(&tcont) = true;
@@ -1785,7 +1785,7 @@ IR * Region::simplifyCall(IR * ir, SimpCtx * ctx)
     while (CALL_param_list(ir) != NULL) {
         IR * p = xcom::removehead(&CALL_param_list(ir));
 
-        if (g_is_simplify_parameter && !p->is_memory_opnd() && !p->is_lda()) {
+        if (g_is_simplify_parameter && !p->isMemoryOpnd() && !p->is_lda()) {
             //We always simplify parameters to lowest height to
             //facilitate the query of point-to set.
             //e.g: IR_DU_MGR is going to compute may point-to while
@@ -2173,7 +2173,7 @@ IR * Region::simplifySwitch(IR * ir, SimpCtx * ctx)
 
     SWITCH_body(ir) = NULL;
     body = simplifyStmtList(body, ctx);
-    if (ir->get_parent() == NULL) {
+    if (ir->getParent() == NULL) {
         for (IR * t = body; t != NULL; t = t->get_next()) {
             IR_parent(t) = NULL;
         }

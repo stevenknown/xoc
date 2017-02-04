@@ -42,7 +42,7 @@ public:
     virtual ~DEX_RP() {}
 
     /*
-    virtual bool is_promotable(IR const* ir) const
+    virtual bool isPromotable(IR const* ir) const
     {
         if (ir->is_array()) {
             IR * sub = ARR_sub_list(ir);
@@ -53,7 +53,7 @@ public:
                 }
             }
         }
-        return IR_RP::is_promotable(ir);
+        return IR_RP::isPromotable(ir);
     }
 
     void insert_stuff_code(IR const* ref, Region * ru, IR_GVN * gvn)
@@ -65,7 +65,7 @@ public:
         IRBB * stmt_bb = stmt->get_bb();
         ASSERT0(stmt_bb);
 
-        IR_DU_MGR * dumgr = ru->get_du_mgr();
+        IR_DU_MGR * dumgr = ru->getDUMgr();
 
         C<IR*> * ct = NULL;
         BB_irlist(stmt_bb).find(stmt, &ct);

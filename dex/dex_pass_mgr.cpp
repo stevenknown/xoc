@@ -47,7 +47,7 @@ author: Su Zhenyu
 
 Pass * DexPassMgr::allocCFG()
 {
-    BBList * bbl = m_ru->get_bb_list();
+    BBList * bbl = m_ru->getBBList();
     UINT n = MAX(8, xcom::getNearestPowerOf2(bbl->get_elem_count()));
     return new DEX_CFG(C_SEME, bbl, m_ru, n, n);
 }
@@ -102,7 +102,7 @@ void DexPassMgr::performScalarOpt(OptCtx & oc)
     ((IR_DCE*)registerPass(PASS_DCE))->set_elim_cfs(false);
 
     if (passlist.get_elem_count() != 0) {
-        LOG("\tScalar optimizations for '%s'", m_ru->get_ru_name());
+        LOG("\tScalar optimizations for '%s'", m_ru->getRegionName());
     }
 
     bool change;
@@ -111,25 +111,25 @@ void DexPassMgr::performScalarOpt(OptCtx & oc)
         change = false;
         for (Pass * pass = passlist.get_head();
              pass != NULL; pass = passlist.get_next()) {
-            CHAR const* passname = pass->get_pass_name();
+            CHAR const* passname = pass->getPassName();
             LOG("\t\tpass %s", passname);
-            ASSERT0(verifyIRandBB(m_ru->get_bb_list(), m_ru));
+            ASSERT0(verifyIRandBB(m_ru->getBBList(), m_ru));
             ULONGLONG t = getusec();
 
-            //dumpBBList(m_ru->get_bb_list(), m_ru, "before");
-            //m_ru->get_cfg()->dump_vcg("before.vcg");
+            //dumpBBList(m_ru->getBBList(), m_ru, "before");
+            //m_ru->getCFG()->dump_vcg("before.vcg");
 
             bool doit = pass->perform(oc);
 
-            //dumpBBList(m_ru->get_bb_list(), m_ru, "after");
-            //m_ru->get_cfg()->dump_vcg("after.vcg");
+            //dumpBBList(m_ru->getBBList(), m_ru, "after");
+            //m_ru->getCFG()->dump_vcg("after.vcg");
 
-            appendTimeInfo(pass->get_pass_name(), getusec() - t);
+            appendTimeInfo(pass->getPassName(), getusec() - t);
             if (doit) {
                 LOG("\t\t\tchanged");
                 change = true;
-                ASSERT0(verifyIRandBB(m_ru->get_bb_list(), m_ru));
-                ASSERT0(m_ru->get_cfg()->verify());
+                ASSERT0(verifyIRandBB(m_ru->getBBList(), m_ru));
+                ASSERT0(m_ru->getCFG()->verify());
             }
         }
         count++;

@@ -70,7 +70,7 @@ void IR_GCSE::elimCseAtStore(IR * use, IR * use_stmt, IR * gen)
     ASSERT0(g_elim_irt.append_tail(IR_code(use)));
     #endif
     ASSERT0(use->is_exp() && gen->is_exp());
-    ASSERT0(use_stmt->get_rhs() == use);
+    ASSERT0(use_stmt->getRHS() == use);
 
     //Cut off du chain for use and its definitions.
     m_du->removeUseOutFromDefset(use);
@@ -81,7 +81,7 @@ void IR_GCSE::elimCseAtStore(IR * use, IR * use_stmt, IR * gen)
     ASSERT0(gen_pr);
 
     IR * newrhs_pr = m_ru->dupIRTree(gen_pr);
-    use_stmt->set_rhs(newrhs_pr);
+    use_stmt->setRHS(newrhs_pr);
     IR_parent(newrhs_pr) = use_stmt;
 
     //Use stmt is just a move.
@@ -89,7 +89,7 @@ void IR_GCSE::elimCseAtStore(IR * use, IR * use_stmt, IR * gen)
 
     //Add du chain.
     IR * gen_stmt = gen->get_stmt();
-    ASSERT0(gen_stmt->is_pr_equal(gen_pr));
+    ASSERT0(gen_stmt->isPREqual(gen_pr));
     if (m_is_in_ssa_form) {
         m_ssamgr->buildDUChain(gen_stmt, newrhs_pr);
     } else {
@@ -130,7 +130,7 @@ void IR_GCSE::elimCseAtBranch(IR * use, IR * use_stmt, IN IR * gen)
 
     //Add du chain.
     IR * gen_stmt = gen->get_stmt();
-    ASSERT0(gen_stmt->is_pr_equal(gen_pr));
+    ASSERT0(gen_stmt->isPREqual(gen_pr));
 
     if (m_is_in_ssa_form) {
         m_ssamgr->buildDUChain(gen_stmt, new_pr);
@@ -268,7 +268,7 @@ void IR_GCSE::prcessCseGen(IN IR * gen, IR * gen_stmt, bool & change)
     CK_USE(holder);
     BB_irlist(bb).insert_before(new_stpr, holder);
 
-    if (gen_stmt->is_cond_br() && gen == BR_det(gen_stmt)) {
+    if (gen_stmt->isConditionalBr() && gen == BR_det(gen_stmt)) {
         IR * old = tmp_pr;
         tmp_pr = m_ru->buildJudge(tmp_pr);
         copyDbx(tmp_pr, old, m_ru);
@@ -371,7 +371,7 @@ bool IR_GCSE::findAndElim(IR * exp, IR * gen)
 
     IRBB * gen_bb;
     IRBB * exp_bb;
-    if (m_cfg->has_eh_edge()) {
+    if (m_cfg->hasEHEdge()) {
         ASSERT0(m_tg);
         if ((gen_bb = gen_stmt->get_bb()) == (exp_bb = exp_stmt->get_bb())) {
             if (!gen_bb->is_dom(gen_stmt, exp_stmt, true)) {
@@ -430,7 +430,7 @@ void IR_GCSE::handleCandidate(IR * exp, IRBB * bb, UINT entry_id, bool & change)
         //Found cse and replaced it with pr.
         change = true;
     } else if (vn != NULL && gen == NULL) {
-        if (m_cfg->has_eh_edge()) {
+        if (m_cfg->hasEHEdge()) {
             ASSERT0(m_tg);
             if (m_tg->is_pdom(BB_id(bb), entry_id)) {
                 m_vn2exp.set(vn, exp);
@@ -483,7 +483,7 @@ bool IR_GCSE::doPropVN(IRBB * bb, UINT entry_id)
         case IR_STPR:
         case IR_IST:
             {
-                IR * rhs = ir->get_rhs();
+                IR * rhs = ir->getRHS();
                 //Find cse and replace it with properly pr.
                 if (isCseCandidate(rhs)) {
                     handleCandidate(rhs, bb, entry_id, change);
@@ -536,7 +536,7 @@ bool IR_GCSE::doProp(IRBB * bb, List<IR*> & livexp)
     DefDBitSetCore * x = m_du->getAvailInExpr(BB_id(bb), NULL);
     SEGIter * st = NULL;
     for (INT i = x->get_first(&st); i != -1; i = x->get_next(i, &st)) {
-        IR * y = m_ru->get_ir(i);
+        IR * y = m_ru->getIR(i);
         ASSERT0(y && y->is_exp());
         livexp.append_tail(y);
     }
@@ -639,7 +639,7 @@ bool IR_GCSE::doProp(IRBB * bb, List<IR*> & livexp)
         case IR_CALL:
         case IR_ICALL:
             {
-                MDSet const* maydef = m_du->get_may_def(ir);
+                MDSet const* maydef = m_du->getMayDef(ir);
                 if (maydef != NULL && !maydef->is_empty()) {
                     C<IR*> * ct2, * next;
                     for (livexp.get_head(&ct2), next = ct2;
@@ -696,17 +696,17 @@ bool IR_GCSE::perform(OptCtx & oc)
         m_ru->checkValidAndRecompute(&oc, PASS_DOM, PASS_PDOM, PASS_EXPR_TAB,
                                      PASS_DU_REF, PASS_DU_CHAIN, PASS_UNDEF);
         m_expr_tab =
-            (IR_EXPR_TAB*)m_ru->get_pass_mgr()->registerPass(PASS_EXPR_TAB);
+            (IR_EXPR_TAB*)m_ru->getPassMgr()->registerPass(PASS_EXPR_TAB);
     }
 
     if (!OC_is_du_chain_valid(oc)) {
-        END_TIMER_AFTER(get_pass_name());
+        END_TIMER_AFTER(getPassName());
         return false;
     }
 
     m_is_in_ssa_form = false;
     IR_SSA_MGR * ssamgr =
-            (IR_SSA_MGR*)(m_ru->get_pass_mgr()->queryPass(PASS_SSA_MGR));
+            (IR_SSA_MGR*)(m_ru->getPassMgr()->queryPass(PASS_SSA_MGR));
     if (ssamgr != NULL && ssamgr->is_ssa_constructed()) {
         m_is_in_ssa_form = true;
         m_ssamgr = ssamgr;
@@ -723,7 +723,7 @@ bool IR_GCSE::perform(OptCtx & oc)
     m_cfg->sortDomTreeInPreorder(root, lst);
 
     List<IR*> livexp;
-    if (m_cfg->has_eh_edge()) {
+    if (m_cfg->hasEHEdge()) {
         m_tg = new TG(m_ru);
         m_tg->clone(*m_cfg);
         m_tg->pick_eh();
@@ -760,7 +760,7 @@ bool IR_GCSE::perform(OptCtx & oc)
     if (change) {
         #ifdef DEBUG_GCSE
         FILE * h = fopen("gcse.effect.log", "a+");
-        fprintf(h, "\n\"%s\",", m_ru->get_ru_name());
+        fprintf(h, "\n\"%s\",", m_ru->getRegionName());
         //fprintf(h, " elim_num:%d, ", g_num_of_elim);
         //for (UINT i = (UINT)g_elim_irt.get_head();
         //     i != 0; i = (UINT)g_elim_irt.get_next()) {
@@ -783,12 +783,12 @@ bool IR_GCSE::perform(OptCtx & oc)
         //gvn has updated correctly.
     }
 
-    if (m_cfg->has_eh_edge()) {
+    if (m_cfg->hasEHEdge()) {
         delete m_tg;
         m_tg = NULL;
     }
-    ASSERT0(verifyIRandBB(m_ru->get_bb_list(), m_ru));
-    END_TIMER_AFTER(get_pass_name());
+    ASSERT0(verifyIRandBB(m_ru->getBBList(), m_ru));
+    END_TIMER_AFTER(getPassName());
     return change;
 }
 //END IR_GCSE

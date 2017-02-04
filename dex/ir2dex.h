@@ -109,9 +109,9 @@ public:
     {
         ASSERT0(ru && df);
         m_ru = (DexRegion*)ru;
-        m_ru_mgr = (DexRegionMgr*)ru->get_region_mgr();
+        m_ru_mgr = (DexRegionMgr*)ru->getRegionMgr();
         m_df = df;
-        m_tm = ru->get_type_mgr();
+        m_tm = ru->getTypeMgr();
         m_tr = ((DexRegion*)ru)->getTypeIndexRep();
         m_d2ir = ((DexRegion*)ru)->getDex2IR();
         m_prno2v = ((DexRegion*)ru)->getPrno2Vreg();
@@ -120,7 +120,7 @@ public:
 
         m_var2fieldid = m_ru->getVAR2Fieldid();
         m_lab2idx.init(getNearestPowerOf2(
-                        MAX(4, ru->get_bb_list()->get_elem_count())));
+                        MAX(4, ru->getBBList()->get_elem_count())));
         m_pool = smpoolCreate(16, MEM_COMM);
     }
 

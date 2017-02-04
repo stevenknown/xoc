@@ -85,7 +85,7 @@ void IR_CP::replaceExpViaSSADu(IR * exp, IR const* cand_expr,
                                     IN OUT CPCtx & ctx)
 {
     ASSERT0(exp && exp->is_exp() && cand_expr && cand_expr->is_exp());
-    ASSERT0(exp->get_exact_ref());
+    ASSERT0(exp->getExactRef());
 
     if (!checkTypeConsistency(exp, cand_expr)) {
         return;
@@ -105,7 +105,7 @@ void IR_CP::replaceExpViaSSADu(IR * exp, IR const* cand_expr,
 
     IR * newir = m_ru->dupIRTree(cand_expr);
 
-    if (cand_expr->is_read_pr() && PR_ssainfo(cand_expr) != NULL) {
+    if (cand_expr->isReadPR() && PR_ssainfo(cand_expr) != NULL) {
         PR_ssainfo(newir) = PR_ssainfo(cand_expr);
         SSA_uses(PR_ssainfo(newir)).append(newir);
     } else {
@@ -117,12 +117,12 @@ void IR_CP::replaceExpViaSSADu(IR * exp, IR const* cand_expr,
 
     //Add SSA use for new exp.
     SSAInfo * cand_ssainfo = NULL;
-    if ((cand_ssainfo = cand_expr->get_ssainfo()) != NULL) {
+    if ((cand_ssainfo = cand_expr->getSSAInfo()) != NULL) {
         SSA_uses(cand_ssainfo).append(newir);
     }
 
     //Remove old exp SSA use.
-    SSAInfo * exp_ssainfo = exp->get_ssainfo();
+    SSAInfo * exp_ssainfo = exp->getSSAInfo();
     ASSERT0(exp_ssainfo);
     ASSERT0(SSA_uses(exp_ssainfo).find(exp));
     SSA_uses(exp_ssainfo).remove(exp);
@@ -156,7 +156,7 @@ void IR_CP::replaceExp(IR * exp, IR const* cand_expr,
                         IN OUT CPCtx & ctx, bool exp_use_ssadu)
 {
     ASSERT0(exp && exp->is_exp() && cand_expr);
-    ASSERT0(exp->get_exact_ref());
+    ASSERT0(exp->getExactRef());
 
     if (!checkTypeConsistency(exp, cand_expr)) {
         return;
@@ -178,8 +178,8 @@ void IR_CP::replaceExp(IR * exp, IR const* cand_expr,
     ASSERT0(cand_expr->get_stmt());
     if (exp_use_ssadu) {
         //Remove exp SSA use.
-        ASSERT0(exp->get_ssainfo());
-        ASSERT0(exp->get_ssainfo()->get_uses().find(exp));
+        ASSERT0(exp->getSSAInfo());
+        ASSERT0(exp->getSSAInfo()->get_uses().find(exp));
 
         exp->removeSSAUse();
     } else {
@@ -201,7 +201,7 @@ bool IR_CP::is_copy(IR * ir) const
     case IR_ST:
     case IR_STPR:
     case IR_IST:
-        return canBeCandidate(ir->get_rhs());
+        return canBeCandidate(ir->getRHS());
     case IR_PHI:
         if (cnt_list(PHI_opnd_list(ir)) == 1) {
             return true;
@@ -279,7 +279,7 @@ bool IR_CP::is_available(IR const* def_ir, IR const* occ, IR * use_ir)
 
 
 //CVT with simply cvt-exp is copy-propagate candidate.
-bool IR_CP::is_simp_cvt(IR const* ir) const
+bool IR_CP::isSimpCVT(IR const* ir) const
 {
     if (!ir->is_cvt()) return false;
 
@@ -330,20 +330,20 @@ bool IR_CP::doProp(IN IRBB * bb, Vector<IR*> & usevec)
         UINT num_of_use = 0;
         SSAInfo * ssainfo = NULL;
         bool ssadu = false;
-        if ((ssainfo = def_stmt->get_ssainfo()) != NULL &&
+        if ((ssainfo = def_stmt->getSSAInfo()) != NULL &&
             SSA_uses(ssainfo).get_elem_count() != 0) {
             //Record use_stmt in another vector to facilitate this function
             //if it is not in use-list any more after copy-propagation.
             SEGIter * sc;
             for    (INT u = SSA_uses(ssainfo).get_first(&sc);
                  u >= 0; u = SSA_uses(ssainfo).get_next(u, &sc)) {
-                IR * use = m_ru->get_ir(u);
+                IR * use = m_ru->getIR(u);
                 ASSERT0(use);
                 usevec.set(num_of_use, use);
                 num_of_use++;
             }
             ssadu = true;
-        } else if (def_stmt->get_exact_ref() == NULL &&
+        } else if (def_stmt->getExactRef() == NULL &&
                    !def_stmt->is_void()) {
             //Allowing copy propagate exact or VOID value.
             continue;
@@ -354,7 +354,7 @@ bool IR_CP::doProp(IN IRBB * bb, Vector<IR*> & usevec)
             DUIter di = NULL;
             for (INT u = useset->get_first(&di);
                  u >= 0; u = useset->get_next(u, &di)) {
-                IR * use = m_ru->get_ir(u);
+                IR * use = m_ru->getIR(u);
                 usevec.set(num_of_use, use);
                 num_of_use++;
             }
@@ -460,7 +460,7 @@ void IR_CP::doFinalRefine()
 {
     RefineCtx rf;
     RC_insert_cvt(rf) = false;
-    m_ru->refineBBlist(m_ru->get_bb_list(), rf);
+    m_ru->refineBBlist(m_ru->getBBList(), rf);
 }
 
 
@@ -479,12 +479,12 @@ bool IR_CP::perform(OptCtx & oc)
     }
 
     if (!OC_is_du_chain_valid(oc)) {
-        END_TIMER_AFTER(get_pass_name());
+        END_TIMER_AFTER(getPassName());
         return false;
     }
 
     bool change = false;
-    IRBB * entry = m_ru->get_cfg()->get_entry();
+    IRBB * entry = m_ru->getCFG()->get_entry();
     ASSERT(entry, ("Not unique entry, invalid Region"));
     Graph domtree;
     m_cfg->get_dom_tree(domtree);
@@ -510,7 +510,7 @@ bool IR_CP::perform(OptCtx & oc)
         ASSERT0(verifySSAInfo(m_ru));
     }
 
-    END_TIMER_AFTER(get_pass_name());
+    END_TIMER_AFTER(getPassName());
     return change;
 }
 //END IR_CP

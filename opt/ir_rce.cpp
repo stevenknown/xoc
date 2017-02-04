@@ -45,7 +45,7 @@ void IR_RCE::dump()
     if (g_tfile == NULL) return;
     fprintf(g_tfile, "\n\n==---- DUMP IR_RCE ----==\n");
 
-    BBList * bbl = m_ru->get_bb_list();
+    BBList * bbl = m_ru->getBBList();
     for (IRBB * bb = bbl->get_head(); bb != NULL; bb = bbl->get_next()) {
         //TODO:
     }
@@ -119,7 +119,7 @@ IR * IR_RCE::calcCondMustVal(
 
 IR * IR_RCE::processBranch(IR * ir, IN OUT bool & cfg_mod)
 {
-    ASSERT0(ir->is_cond_br());
+    ASSERT0(ir->isConditionalBr());
 
     bool must_true, must_false, changed = false;
     IR * new_det = calcCondMustVal(BR_det(ir), must_true, must_false, changed);
@@ -128,7 +128,7 @@ IR * IR_RCE::processBranch(IR * ir, IN OUT bool & cfg_mod)
         if (must_true) {
             //TRUEBR(0x1), always jump.
             IRBB * from = ir->get_bb();
-            IRBB * to = m_cfg->get_fallthrough_bb(from);
+            IRBB * to = m_cfg->getFallThroughBB(from);
             ASSERT0(from != NULL && to != NULL);
             IR * newbr = m_ru->buildGoto(BR_lab(ir));
 
@@ -167,7 +167,7 @@ IR * IR_RCE::processBranch(IR * ir, IN OUT bool & cfg_mod)
             //FALSEBR(0x1), never jump.
             //Revise m_cfg. remove branch edge.
             IRBB * from = ir->get_bb();
-            IRBB * to = m_cfg->get_target_bb(from);
+            IRBB * to = m_cfg->getTargetBB(from);
             ASSERT0(from != NULL && to != NULL);
 
             ir->removeSSAUse();
@@ -184,7 +184,7 @@ IR * IR_RCE::processBranch(IR * ir, IN OUT bool & cfg_mod)
         } else if (must_false) {
             //FALSEBR(0x0), always jump.
             IRBB * from = ir->get_bb();
-            IRBB * to = m_cfg->get_fallthrough_bb(from);
+            IRBB * to = m_cfg->getFallThroughBB(from);
             ASSERT0(from != NULL && to != NULL);
 
             IR * newbr = m_ru->buildGoto(BR_lab(ir));
@@ -221,7 +221,7 @@ IR * IR_RCE::processBranch(IR * ir, IN OUT bool & cfg_mod)
 IR * IR_RCE::processStore(IR * ir)
 {
     ASSERT0(ir->is_st());
-    if (ST_rhs(ir)->get_exact_ref() == ir->get_exact_ref()) {
+    if (ST_rhs(ir)->getExactRef() == ir->getExactRef()) {
         ir->removeSSAUse();
         m_ru->freeIRTree(ir);
         return NULL;
@@ -234,7 +234,7 @@ IR * IR_RCE::processStore(IR * ir)
 IR * IR_RCE::processStorePR(IR * ir)
 {
     ASSERT0(ir->is_stpr());
-    if (STPR_rhs(ir)->get_exact_ref() == ir->get_exact_ref()) {
+    if (STPR_rhs(ir)->getExactRef() == ir->getExactRef()) {
         ir->removeSSAUse();
         m_ru->freeIRTree(ir);
         return NULL;
@@ -248,7 +248,7 @@ IR * IR_RCE::processStorePR(IR * ir)
 //2. b = b; remove redundant store.
 bool IR_RCE::performSimplyRCE(IN OUT bool & cfg_mod)
 {
-    BBList * bbl = m_ru->get_bb_list();
+    BBList * bbl = m_ru->getBBList();
     bool change = false;
     C<IRBB*> * ct_bb;
     for (IRBB * bb = bbl->get_head(&ct_bb);
@@ -297,7 +297,7 @@ bool IR_RCE::perform(OptCtx & oc)
                                  PASS_UNDEF);
 
     if (!OC_is_du_chain_valid(oc)) {
-        END_TIMER_AFTER(get_pass_name());
+        END_TIMER_AFTER(getPassName());
         return false;
     }
 
@@ -339,7 +339,7 @@ bool IR_RCE::perform(OptCtx & oc)
         ASSERT0(verifySSAInfo(m_ru));
     }
 
-    END_TIMER_AFTER(get_pass_name());
+    END_TIMER_AFTER(getPassName());
     return change;
 }
 

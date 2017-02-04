@@ -42,14 +42,14 @@ IR_EXPR_TAB::IR_EXPR_TAB(Region * ru)
 {
     m_expr_count = 0;
     m_ru = ru;
-    m_tm = ru->get_type_mgr();
+    m_tm = ru->getTypeMgr();
     memset(m_level1_hash_tab, 0,
            sizeof(ExpRep*) * IR_EXPR_TAB_LEVEL1_HASH_BUCKET);
     m_pool = smpoolCreate(sizeof(ExpRep*) * 128, MEM_COMM);
     m_sc_pool = smpoolCreate(sizeof(SC<ExpRep*>) * 4, MEM_CONST_SIZE);
     m_ir_expr_lst.set_pool(m_sc_pool);
-    m_md_set_mgr = ru->get_mds_mgr();
-    m_bs_mgr = ru->get_bs_mgr();
+    m_md_set_mgr = ru->getMDSetMgr();
+    m_bs_mgr = ru->getBitSetMgr();
 }
 
 
@@ -106,7 +106,7 @@ void IR_EXPR_TAB::dump_ir_expr_tab()
 {
     if (g_tfile == NULL) return;
     fprintf(g_tfile, "\n==---- DUMP IR_EXPR_TAB ----==");
-    IR_DU_MGR * du_mgr = m_ru->get_du_mgr();
+    IR_DU_MGR * du_mgr = m_ru->getDUMgr();
     INT last = m_ir_expr_vec.get_last_idx();
     for (INT i = 0; i <= last; i++) {
         ExpRep * ie = m_ir_expr_vec.get(i);
@@ -118,10 +118,10 @@ void IR_EXPR_TAB::dump_ir_expr_tab()
         for (IR * occ = EXPR_occ_list(ie).get_head();
              occ != NULL; occ = EXPR_occ_list(ie).get_next()) {
             fprintf(g_tfile, "IR%d", IR_id(occ));
-            MDSet const* use_mds = du_mgr->get_may_use(occ);
+            MDSet const* use_mds = du_mgr->getMayUse(occ);
             if (use_mds != NULL) {
                 fprintf(g_tfile, "(use:");
-                use_mds->dump(m_ru->get_md_sys());
+                use_mds->dump(m_ru->getMDSystem());
                 fprintf(g_tfile, ")");
             }
             fprintf(g_tfile, ",");
@@ -591,7 +591,7 @@ void IR_EXPR_TAB::reperform(IN OUT OptCtx & oc)
 //the 'GEN-SET' and 'KILL-SET' of IR-EXPR for BB as well as.
 bool IR_EXPR_TAB::perform(IN OUT OptCtx & oc)
 {
-    BBList * bbl = m_ru->get_bb_list();
+    BBList * bbl = m_ru->getBBList();
     if (bbl->get_elem_count() == 0) { return false; }
 
     C<IRBB*> * cb;

@@ -567,10 +567,10 @@ public:
     void dump_bb(UINT bbid);
     void dump_ir2vn();
 
-    virtual CHAR const* get_pass_name() const
+    virtual CHAR const* getPassName() const
     { return "Global Value Numbering"; }
 
-    PASS_TYPE get_pass_type() const { return PASS_GVN; }
+    PASS_TYPE getPassType() const { return PASS_GVN; }
 
     bool is_triple(IR_TYPE i) const { return i == IR_ILD; }
     bool is_quad(IR_TYPE i) const { return i == IR_ARRAY; }

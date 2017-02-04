@@ -120,9 +120,9 @@ public:
 
     void set_map_ir2ir_expr(IR const* ir, ExpRep * ie);
 
-    PASS_TYPE get_pass_type() const { return PASS_EXPR_TAB; }
+    PASS_TYPE getPassType() const { return PASS_EXPR_TAB; }
 
-    virtual CHAR const* get_pass_name() const { return "IR Expr Tabel"; }
+    virtual CHAR const* getPassName() const { return "IR Expr Tabel"; }
 
     virtual bool perform(IN OUT OptCtx & oc);
 };

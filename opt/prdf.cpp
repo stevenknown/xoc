@@ -45,7 +45,7 @@ void PRDF::dump()
 {
     if (g_tfile == NULL) { return; }
     fprintf(g_tfile, "\n==---- DUMP PRDF : liveness of PR ----==\n");
-    List<IRBB*> * bbl = m_ru->get_bb_list();
+    List<IRBB*> * bbl = m_ru->getBBList();
     g_indent = 2;
     for (IRBB * bb = bbl->get_head(); bb != NULL; bb = bbl->get_next()) {
         fprintf(g_tfile, "\n\n\n-- BB%d --", BB_id(bb));
@@ -80,7 +80,7 @@ void PRDF::processMay(
 
     MDSet const* mds = pr->getRefMDSet();
     if (mds != NULL) {
-        MD const* prmd = pr->get_exact_ref();
+        MD const* prmd = pr->getExactRef();
         ASSERT0(prmd);
         SEGIter * iter;
         for (INT i = mds->get_first(&iter);
@@ -243,8 +243,8 @@ void PRDF::computeGlobal()
     ASSERT0(m_cfg->get_entry() && BB_is_entry(m_cfg->get_entry()));
 
     //Rpo should be available.
-    List<IRBB*> * vlst = m_cfg->get_bblist_in_rpo();
-    ASSERT0(vlst->get_elem_count() == m_ru->get_bb_list()->get_elem_count());
+    List<IRBB*> * vlst = m_cfg->getBBListInRPO();
+    ASSERT0(vlst->get_elem_count() == m_ru->getBBList()->get_elem_count());
 
     C<IRBB*> * ct;
     for (vlst->get_head(&ct); ct != vlst->end(); ct = vlst->get_next(ct)) {
@@ -302,7 +302,7 @@ void PRDF::computeGlobal()
     g_max_times = MAX(g_max_times, count);
     FILE * h = fopen("prdf.sat.dump", "a+");
     fprintf(h, "\n%s run %u times, maxtimes %u",
-            m_ru->get_ru_name(), count, g_max_times);
+            m_ru->getRegionName(), count, g_max_times);
     fclose(h);
     #endif
 }
@@ -312,7 +312,7 @@ bool PRDF::perform(OptCtx & oc)
 {
     START_TIMER_AFTER();
     m_ru->checkValidAndRecompute(&oc, PASS_RPO, PASS_UNDEF);
-    List<IRBB*> * bbl = m_ru->get_bb_list();
+    List<IRBB*> * bbl = m_ru->getBBList();
     if (bbl->get_elem_count() == 0) { return false; }
 
     List<IR const*> lst;
@@ -326,7 +326,7 @@ bool PRDF::perform(OptCtx & oc)
     computeGlobal();
 
     //dump();
-    END_TIMER_AFTER(get_pass_name());
+    END_TIMER_AFTER(getPassName());
     return false;
 }
 //END PRDF

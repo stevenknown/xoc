@@ -82,7 +82,7 @@ public:
     virtual ~DexRegion() { smpoolDelete(m_sc_pool); }
 
     IR * gen_and_add_sib(IR * ir, UINT prno);
-    DexPassMgr * getDexPassMgr() { return (DexPassMgr*)get_pass_mgr(); }
+    DexPassMgr * getDexPassMgr() { return (DexPassMgr*)getPassMgr(); }
     Var2UINT * getVAR2Fieldid() { return &m_var2fieldid; }
 
     virtual bool HighProcess(OptCtx & oc);
@@ -124,7 +124,7 @@ public:
     void process_group_bb(IRBB * bb, List<IR*> & lst);
     void process_group();
     void processSimply();
-    virtual bool process();
+    virtual bool process(OptCtx * oc);
 };
 
 #endif

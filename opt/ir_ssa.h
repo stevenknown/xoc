@@ -183,14 +183,14 @@ public:
         ASSERT0(ru);
         m_ru = ru;
 
-        m_tm = ru->get_type_mgr();
+        m_tm = ru->getTypeMgr();
         ASSERT0(m_tm);
 
         ASSERT0(ru->getMiscBitSetMgr());
         m_seg_mgr = ru->getMiscBitSetMgr()->getSegMgr();
         ASSERT0(m_seg_mgr);
 
-        m_cfg = ru->get_cfg();
+        m_cfg = ru->getCFG();
         ASSERT(m_cfg, ("cfg is not available."));
     }
     COPY_CONSTRUCTOR(IR_SSA_MGR);
@@ -199,18 +199,18 @@ public:
     void buildDomiateFrontier(OUT DfMgr & dfm);
     void buildDUChain(IR * def, IR * use)
     {
-        ASSERT0(def->is_write_pr() || def->isCallHasRetVal());
-        ASSERT0(use->is_read_pr());
-        SSAInfo * ssainfo = def->get_ssainfo();
+        ASSERT0(def->isWritePR() || def->isCallHasRetVal());
+        ASSERT0(use->isReadPR());
+        SSAInfo * ssainfo = def->getSSAInfo();
         if (ssainfo == NULL) {
             ssainfo = allocSSAInfo(def->get_prno());
-            def->set_ssainfo(ssainfo);
+            def->setSSAInfo(ssainfo);
             SSA_def(ssainfo) = def;
 
             //You may be set multiple defs for use.
-            ASSERT(use->get_ssainfo() == NULL, ("use already has SSA info."));
+            ASSERT(use->getSSAInfo() == NULL, ("use already has SSA info."));
 
-            use->set_ssainfo(ssainfo);
+            use->setSSAInfo(ssainfo);
         }
 
         SSA_uses(ssainfo).append(use);
@@ -334,10 +334,10 @@ public:
     bool verifyVP(); //Only used in IR_SSA_MGR.
     bool verifySSAInfo(); //Can be used in any module.
 
-    virtual CHAR const* get_pass_name() const
+    virtual CHAR const* getPassName() const
     { return "SSA Optimization Manager"; }
 
-    PASS_TYPE get_pass_type() const { return PASS_SSA_MGR; }
+    PASS_TYPE getPassType() const { return PASS_SSA_MGR; }
 };
 
 

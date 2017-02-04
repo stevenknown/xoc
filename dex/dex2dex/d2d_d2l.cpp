@@ -827,9 +827,9 @@ static void processClass(DexFile* pDexFile, D2Dpool* pool)
         rumgr->init();
         topru = rumgr->newRegion(RU_PROGRAM);
         rumgr->addToRegionTab(topru);
-          topru->set_ru_var(rumgr->get_var_mgr()->registerVar(
+          topru->set_ru_var(rumgr->getVarMgr()->registerVar(
                            ".dex",
-                           rumgr->get_type_mgr()->getMCType(0),
+                           rumgr->getTypeMgr()->getMCType(0),
                            0,
                            VAR_GLOBAL|VAR_FAKE));
     }
@@ -850,7 +850,8 @@ static void processClass(DexFile* pDexFile, D2Dpool* pool)
     }
 
     if (g_do_ipa) {
-        bool s = rumgr->processProgramRegion(topru);
+        OptCtx oc;
+        bool s = rumgr->processProgramRegion(topru, &oc);
         ASSERT0(s);
         delete rumgr;
     }

@@ -251,22 +251,34 @@ public:
         return n;
     }
 
-    //For some aggressive optimized purposes, call node is not looked as
-    //boundary of basic block.
-    //So we must bottom-up go through whole bb to find call.
-    inline bool is_bb_has_call() const
+    //Is bb containing such label carried by 'lir'.
+    inline bool hasLabel(LabelInfo const* lab)
     {
-        BBIRList * irlst = const_cast<BBIRList*>(&BB_irlist(this));
-        for (IR * ir = irlst->get_tail();
-             ir != NULL; ir = irlst->get_prev()) {
-            if (ir->is_calls_stmt()) {
+        for (LabelInfo const* li = getLabelList().get_head();
+             li != NULL; li = getLabelList().get_next()) {
+            if (isSameLabel(li, lab)) {
                 return true;
             }
         }
         return false;
     }
 
-    inline bool is_bb_has_return() const
+    //For some aggressive optimized purposes, call node is not looked as
+    //boundary of basic block.
+    //So we must bottom-up go through whole bb to find call.
+    inline bool hasCall() const
+    {
+        BBIRList * irlst = const_cast<BBIRList*>(&BB_irlist(this));
+        for (IR * ir = irlst->get_tail();
+             ir != NULL; ir = irlst->get_prev()) {
+            if (ir->isCallStmt()) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    inline bool hasReturn() const
     {
         BBIRList * irlst = const_cast<BBIRList*>(&BB_irlist(this));
         for (IR * ir = irlst->get_tail();
@@ -279,7 +291,7 @@ public:
     }
 
     //Return true if BB is an entry BB of TRY block.
-    inline bool is_try_start() const
+    inline bool isTryStart() const
     {
         bool r = BB_is_try_start(this);
      #ifdef _DEBUG_
@@ -298,7 +310,7 @@ public:
     }
 
     //Return true if BB is an exit BB of TRY block.
-    inline bool is_try_end() const
+    inline bool isTryEnd() const
     {
         bool r = BB_is_try_end(this);
  #ifdef _DEBUG_
@@ -317,7 +329,7 @@ public:
     }
 
     //Return true if BB is entry of CATCH block.
-    inline bool is_exp_handling() const
+    inline bool isExceptionHandler() const
     {
         bool r = BB_is_catch_start(this);
         #ifdef _DEBUG_
@@ -355,30 +367,18 @@ public:
     }
 
     //Could ir be looked as a boundary stmt of basic block?
-    inline bool is_bb_boundary(IR * ir)
-    { return (is_bb_up_boundary(ir) || is_bb_down_boundary(ir)); }
+    inline bool is_boundary(IR * ir)
+    { return (is_up_boundary(ir) || is_down_boundary(ir)); }
 
     //Could ir be looked as a first stmt in basic block?
-    inline bool is_bb_up_boundary(IR const* ir) const
+    inline bool is_up_boundary(IR const* ir) const
     {
         ASSERT(ir->isStmtInBB() || ir->is_lab(), ("illegal stmt in bb"));
         return ir->is_lab();
     }
-    bool is_bb_down_boundary(IR * ir);
+    bool is_down_boundary(IR * ir);
 
-    //Is bb containing such label carried by 'lir'.
-    inline bool is_bb_has_label(LabelInfo const* lab)
-    {
-        for (LabelInfo const* li = getLabelList().get_head();
-             li != NULL; li = getLabelList().get_next()) {
-            if (isSameLabel(li, lab)) {
-                return true;
-            }
-        }
-        return false;
-    }
-
-    inline bool is_attach_dedicated_lab()
+    inline bool isAttachDedicatedLabel()
     {
         for (LabelInfo const* li = getLabelList().get_head();
              li != NULL; li = getLabelList().get_next()) {

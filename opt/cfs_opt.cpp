@@ -150,7 +150,7 @@ bool IR_CFS_OPT::transformToDoWhile(IR ** head, IR * ir)
 //ONLY used in this file
 static inline bool is_non_branch_ir(IR * ir)
 {
-    return !ir->is_cond_br() && !ir->is_uncond_br() && !ir->is_multicond_br();
+    return !ir->isConditionalBr() && !ir->isUnconditionalBr() && !ir->isMultiConditionalBr();
 }
 
 
@@ -568,7 +568,7 @@ bool IR_CFS_OPT::perform(SimpCtx const& sc)
             !SIMP_continue(&sc));
     if (!g_do_cfs_opt) { return false; }
 
-    IR * irs = m_ru->get_ir_list();
+    IR * irs = m_ru->getIRList();
     bool change = CfsOpt(&irs, sc);
     if (change) {
         m_ru->set_ir_list(irs);

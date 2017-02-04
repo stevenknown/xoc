@@ -105,9 +105,9 @@ public:
             IRBB const* bb = ct->val();
             C<IR*> * ct2;
             IR * x = BB_irlist(const_cast<IRBB*>(bb)).get_tail(&ct2);
-            if (x != NULL && x->is_may_throw() && x->get_ai() != NULL) {
+            if (x != NULL && x->isMayThrow() && x->getAI() != NULL) {
                 EHLabelAttachInfo const* ehlab =
-                    (EHLabelAttachInfo const*)x->get_ai()->get(AI_EH_LABEL);
+                    (EHLabelAttachInfo const*)x->getAI()->get(AI_EH_LABEL);
                 if (ehlab == NULL) { continue; }
 
                 SC<LabelInfo*> * sc;
@@ -142,7 +142,7 @@ public:
              ct != m_bb_list->end();
              ct = m_bb_list->get_next(ct)) {
             IRBB * bb = ct->val();
-            if (is_ru_entry(bb)) {
+            if (isRegionEntry(bb)) {
                 entry = bb;
                 break;
             }
@@ -157,7 +157,7 @@ public:
              ct != m_bb_list->end(); ct = m_bb_list->get_next(ct)) {
             IRBB * bb = ct->val();
 
-            if (bb->is_exp_handling()) {
+            if (bb->isExceptionHandler()) {
                 ehl.append_tail(bb);
                 findEHRegion(bb, mainstreambbs, ehbbs);
             }
@@ -246,8 +246,8 @@ public:
     //Allocate and initialize control flow graph.
     void initCfg(OptCtx & oc);
     virtual bool if_opt(IRBB * bb);
-    bool is_ru_entry(IRBB * bb) { return BB_is_entry(bb); }
-    bool is_ru_exit(IRBB * bb) { return BB_is_exit(bb); }
+    bool isRegionEntry(IRBB * bb) { return BB_is_entry(bb); }
+    bool isRegionExit(IRBB * bb) { return BB_is_exit(bb); }
     void insertBBbetween(
             IN IRBB * from,
             IN C<IRBB*> * from_ct,
@@ -271,12 +271,12 @@ public:
 
     Region * get_ru() { return m_ru; }
     UINT get_bb_num() const { return get_vertex_num(); }
-    BBList * get_bb_list() { return m_bb_list; }
+    BBList * getBBList() { return m_bb_list; }
     LAB2BB * get_lab2bb_map() { return &m_lab2bb; }
     IRBB * get_bb(UINT id) const { return m_bb_vec.get(id); }
     virtual bool goto_opt(IRBB * bb);
-    virtual CHAR const* get_pass_name() const { return "CFG"; }
-    virtual PASS_TYPE get_pass_type() const { return PASS_CFG; }
+    virtual CHAR const* getPassName() const { return "CFG"; }
+    virtual PASS_TYPE getPassType() const { return PASS_CFG; }
 
     //Find natural loop and scan loop body to find call and early exit, etc.
     void LoopAnalysis(OptCtx & oc);
@@ -329,7 +329,7 @@ public:
     bool removeRedundantBranch();
     virtual void resetMapBetweenLabelAndBB(IRBB * bb);
 
-    virtual void set_rpo(IRBB * bb, INT order) { BB_rpo(bb) = order; }
+    virtual void setRPO(IRBB * bb, INT order) { BB_rpo(bb) = order; }
 
     virtual void moveLabels(IRBB * src, IRBB * tgt);
 

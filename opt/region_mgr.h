@@ -141,18 +141,18 @@ public:
     //Dump regions recorded via addToRegionTab().
     void dump(bool dump_inner_region);
 
-    BitSetMgr * get_bs_mgr() { return &m_bs_mgr; }
+    BitSetMgr * getBitSetMgr() { return &m_bs_mgr; }
     DefMiscBitSetMgr * get_sbs_mgr() { return &m_sbs_mgr; }
     virtual Region * get_region(UINT id) { return m_id2ru.get(id); }
     UINT getNumOfRegion() const { return (UINT)(m_id2ru.get_last_idx() + 1); }
-    VarMgr * get_var_mgr() { return m_var_mgr; }
+    VarMgr * getVarMgr() { return m_var_mgr; }
     MD const* genDedicateStrMD();
-    MDSystem * get_md_sys() { return m_md_sys; }
+    MDSystem * getMDSystem() { return m_md_sys; }
     SymTab * get_sym_tab() { return &m_sym_tab; }
-    TypeMgr * get_type_mgr() { return &m_type_mgr; }
+    TypeMgr * getTypeMgr() { return &m_type_mgr; }
     CallGraph * get_call_graph() const { return m_call_graph; }
-    VarMgr * get_var_mgr() const { return m_var_mgr; }
-    TargInfo * get_targ_info() const { return m_targinfo; }
+    VarMgr * getVarMgr() const { return m_var_mgr; }
+    TargInfo * getTargInfo() const { return m_targinfo; }
 
     //Register exact MD for each global variable.
     //Note you should call this function as early as possible, e.g, before process

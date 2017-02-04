@@ -47,13 +47,13 @@ public:
     virtual ~Pass() {}
     COPY_CONSTRUCTOR(Pass);
 
-    virtual CHAR const* get_pass_name() const
+    virtual CHAR const* getPassName() const
     {
         ASSERT(0, ("Optimization Dependent Code"));
         return NULL;
     }
 
-    virtual PASS_TYPE get_pass_type() const
+    virtual PASS_TYPE getPassType() const
     {
         ASSERT(0, ("Optimization Dependent Code"));
         return PASS_UNDEF;

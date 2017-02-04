@@ -66,10 +66,10 @@ public:
     IPA(Region * program)
     {
         ASSERT0(program && program->is_program());
-        m_rumgr = program->get_region_mgr();
+        m_rumgr = program->getRegionMgr();
         ASSERT0(m_rumgr);
         m_program = program;
-        m_mdsys = m_rumgr->get_md_sys();
+        m_mdsys = m_rumgr->getMDSystem();
         m_pool = smpoolCreate(16, MEM_COMM);
         m_is_keep_dumgr = false;
         m_is_keep_reachdef = false;
@@ -77,11 +77,13 @@ public:
     }
     virtual ~IPA() { smpoolDelete(m_pool); }
 
+    void computeCallRefForAllRegion();
+
     void setKeepDUMgr(bool keep) { m_is_keep_dumgr = keep; }
     void setKeepReachdef(bool keep) { m_is_keep_reachdef = keep; }
     void setRecomputeDURef(bool doit) { m_is_recompute_du_ref = doit; }
-    virtual CHAR const* get_pass_name() const { return "IPA"; }
-    virtual PASS_TYPE get_pass_type() const { return PASS_IPA; }
+    virtual CHAR const* getPassName() const { return "IPA"; }
+    virtual PASS_TYPE getPassType() const { return PASS_IPA; }
     virtual bool perform(OptCtx & oc);
 };
 

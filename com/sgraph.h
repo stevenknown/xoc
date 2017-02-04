@@ -622,7 +622,7 @@ public:
                         BitSet & visit);
     void sortDomTreeInPreorder(IN Vertex * root, OUT List<Vertex*> & lst);
     void sortDomTreeInPostrder(IN Vertex * root, OUT List<Vertex*> & lst);
-    void set_bs_mgr(BitSetMgr * bs_mgr) { m_bs_mgr = bs_mgr; }
+    void setBitSetMgr(BitSetMgr * bs_mgr) { m_bs_mgr = bs_mgr; }
     bool removeUnreachNode(UINT entry_id);
 };
 

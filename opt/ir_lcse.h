@@ -83,10 +83,10 @@ public:
     virtual ~IR_LCSE() {}
 
     bool canBeCandidate(IR * ir);
-    virtual CHAR const* get_pass_name() const
+    virtual CHAR const* getPassName() const
     { return "Local Command Subscript Elimination"; }
 
-    PASS_TYPE get_pass_type() const { return PASS_LCSE; }
+    PASS_TYPE getPassType() const { return PASS_LCSE; }
 
     void set_enable_filter(bool is_enable) { m_enable_filter = is_enable; }
     bool perform(OptCtx & oc);

@@ -86,8 +86,8 @@ protected:
     bool doProp(IN IRBB * bb, Vector<IR*> & usevec);
     void doFinalRefine();
 
-    bool is_simp_cvt(IR const* ir) const;
-    bool is_const_cvt(IR const* ir) const;
+    bool isSimpCVT(IR const* ir) const;
+    bool isConstCVT(IR const* ir) const;
     bool is_available(IR const* def_ir, IR const* occ, IR * use_ir);
     inline bool is_copy(IR * ir) const;
 
@@ -107,11 +107,11 @@ public:
     {
         ASSERT0(ru != NULL);
         m_ru = ru;
-        m_md_sys = ru->get_md_sys();
-        m_du = ru->get_du_mgr();
-        m_cfg = ru->get_cfg();
-        m_md_set_mgr = ru->get_mds_mgr();
-        m_tm = ru->get_type_mgr();
+        m_md_sys = ru->getMDSystem();
+        m_du = ru->getDUMgr();
+        m_cfg = ru->getCFG();
+        m_md_set_mgr = ru->getMDSetMgr();
+        m_tm = ru->getTypeMgr();
         ASSERT0(m_cfg && m_du && m_md_sys && m_tm && m_md_set_mgr);
         m_prop_kind = CP_PROP_UNARY_AND_SIMPLEX;
     }
@@ -122,7 +122,7 @@ public:
     {
         switch (m_prop_kind) {
         case CP_PROP_CONST:
-            return ir->is_lda() || ir->is_const_exp();
+            return ir->is_lda() || ir->isConstExp();
         case CP_PROP_SIMPLEX:
             switch (IR_code(ir)) {
             case IR_LDA:
@@ -130,7 +130,7 @@ public:
             case IR_CONST:
             case IR_PR:
                 return true;
-            default: return is_simp_cvt(ir);
+            default: return isSimpCVT(ir);
             }
         case CP_PROP_UNARY_AND_SIMPLEX:
             switch (IR_code(ir)) {
@@ -144,7 +144,7 @@ public:
             case IR_LNOT:
             case IR_ILD:
                 return true;
-            default: return is_simp_cvt(ir);
+            default: return isSimpCVT(ir);
             }
         default:;
         }
@@ -152,10 +152,10 @@ public:
         return false;
     }
 
-    virtual CHAR const* get_pass_name() const { return "Copy Propagation"; }
-    virtual PASS_TYPE get_pass_type() const { return PASS_CP; }
+    virtual CHAR const* getPassName() const { return "Copy Propagation"; }
+    virtual PASS_TYPE getPassType() const { return PASS_CP; }
 
-    void set_prop_kind(UINT kind) { m_prop_kind = kind; }
+    void setPropagationKind(UINT kind) { m_prop_kind = kind; }
 
     virtual bool perform(OptCtx & oc);
 };

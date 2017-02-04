@@ -383,7 +383,7 @@ public:
     Vector<LT*> * get_lt_vec() { return &m_lt_vec; }
     UINT get_first_pos() const { return LT_FIRST_POS; }
     UINT get_last_pos() const { return m_max_lt_len - 1; }
-    IR * get_ir(UINT pos) { return m_pos2ir.get(pos); }
+    IR * getIR(UINT pos) { return m_pos2ir.get(pos); }
     IG * get_ig() { return &m_ig; }
 
     IR * genMappedPR(UINT vid, Type const* ty);
@@ -574,7 +574,7 @@ public:
     //Get LTMgr via BB's id.
     LTMgr * get_ltm(UINT bbid) { return m_bb2ltmgr.get(bbid); }
     Region * get_ru() { return m_ru; }
-    BitSetMgr * get_bs_mgr() { return &m_bs_mgr; }
+    BitSetMgr * getBitSetMgr() { return &m_bs_mgr; }
     Vector<GLT*> * get_pr2glt_map() { return &m_pr2glt; }
     UINT get_num_of_glt() const { return m_glt_count - 1; }
     Vector<GLT*> * get_gltvec() { return &m_gltid2glt_map; }
@@ -639,7 +639,7 @@ public:
         ASSERT0(ru && glt_mgr);
         m_gltm = glt_mgr;
         m_ru = ru;
-        m_cfg = m_ru->get_cfg();
+        m_cfg = m_ru->getCFG();
         m_is_consider_local_interf = false;
         set_direction(false);
     }
@@ -685,8 +685,8 @@ public:
         ASSERT0(gltm);
         m_gltm = gltm;
         m_ru = gltm->get_ru();
-        m_tm = m_ru->get_type_mgr();
-        m_bsm = gltm->get_bs_mgr();
+        m_tm = m_ru->getTypeMgr();
+        m_bsm = gltm->getBitSetMgr();
         m_4 = NULL;
         m_8 = NULL;
         m_16 = NULL;
@@ -909,8 +909,8 @@ public:
     {
         ASSERT0(ru && tr);
         m_ru = ru;
-        m_cfg = ru->get_cfg();
-        m_tm = ru->get_type_mgr();
+        m_cfg = ru->getCFG();
+        m_tm = ru->getTypeMgr();
         m_tr = tr;
         m_param_num = param_num;
         m_vregnum = vregnum;

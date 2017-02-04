@@ -66,9 +66,9 @@ Dex2IR::Dex2IR(IN Region * ru,
 {
     ASSERT0(ru && df && fu);
     m_ru = (DexRegion*)ru;
-    m_ru_mgr = (DexRegionMgr*)ru->get_region_mgr();
-    m_tm = ru->get_type_mgr();
-    m_vm = ru->get_var_mgr();
+    m_ru_mgr = (DexRegionMgr*)ru->getRegionMgr();
+    m_tm = ru->getTypeMgr();
+    m_vm = ru->getVarMgr();
     m_df = df;
     m_var2fieldid = m_ru->getVAR2Fieldid();
     m_lircode = fu;
@@ -350,7 +350,7 @@ IR * Dex2IR::convertSget(IN LIR * lir)
     tbaa->type = mapFieldType2Type(LIR_op0(lir));
     ASSERT0(tbaa->type);
     ai->set(tbaa);
-    ASSERT0(rhs->get_ai() == NULL);
+    ASSERT0(rhs->getAI() == NULL);
     IR_ai(rhs) = ai;
 
     IR * c = m_ru->buildStorePR(PR_no(res), res->get_type(), rhs);
@@ -447,7 +447,7 @@ IR * Dex2IR::convertAput(IN LIR * lir)
     tbaa->type = m_tr->array;
     ASSERT0(tbaa->type);
     ai->set(tbaa);
-    ASSERT0(base->get_ai() == NULL);
+    ASSERT0(base->getAI() == NULL);
     IR_ai(base) = ai;
 
     IR * c = m_ru->buildStoreArray(base, ofst, ty, ty, 1, &enbuf, src);
@@ -487,7 +487,7 @@ IR * Dex2IR::convertAget(IN LIR * lir)
     tbaa->type = m_tr->array;
     ASSERT0(tbaa->type);
     ai->set(tbaa);
-    ASSERT0(base->get_ai() == NULL);
+    ASSERT0(base->getAI() == NULL);
     IR_ai(base) = ai;
 
     IR * c = m_ru->buildStorePR(PR_no(res), res->get_type(), array);
@@ -737,7 +737,7 @@ IR * Dex2IR::convertIget(IN LIR * lir)
     tbaa->type = m_tr->ptr;
     ASSERT0(tbaa->type);
     ai->set(tbaa);
-    ASSERT0(obj->get_ai() == NULL);
+    ASSERT0(obj->getAI() == NULL);
     IR_ai(obj) = ai;
 
     if (m_has_catch) {
@@ -756,7 +756,7 @@ IR * Dex2IR::convertIget(IN LIR * lir)
         tbaa->type = m_tr->array;
         ASSERT0(tbaa->type);
         ai->set(tbaa);
-        ASSERT0(ild->get_ai() == NULL);
+        ASSERT0(ild->getAI() == NULL);
         IR_ai(ild) = ai;
     } else if (is_obj_type(type_name)) {
         //The type of result value of ild is pointer to object type.
@@ -767,7 +767,7 @@ IR * Dex2IR::convertIget(IN LIR * lir)
         tbaa->type = m_tr->ptr;
         ASSERT0(tbaa->type);
         ai->set(tbaa);
-        ASSERT0(ild->get_ai() == NULL);
+        ASSERT0(ild->getAI() == NULL);
         IR_ai(ild) = ai;
     }
 
@@ -1140,7 +1140,7 @@ void Dex2IR::attachCatchInfo(IR * ir)
 {
     if (m_current_catch_list != NULL) {
         AIContainer * ai = m_ru->allocAIContainer();
-        ASSERT0(ir->get_ai() == NULL);
+        ASSERT0(ir->getAI() == NULL);
         IR_ai(ir) = ai;
 
         EHLabelAttachInfo * ehai = (EHLabelAttachInfo*)xmalloc(
@@ -1571,9 +1571,7 @@ IR * Dex2IR::convertLoadConst(IN LIR * lir)
         break;
     case LIR_JDT_long:
     case LIR_JDT_double :
-    default:
-        UNREACH();
-        break;
+    default: UNREACH();
     }
 
     IR * res = genMappedPR(LIR_res(lir), ty);
@@ -2023,13 +2021,13 @@ IR * Dex2IR::convert(bool * succ)
     bool dump = g_dump_dex2ir && g_tfile != NULL;
     if (dump) {
         fprintf(g_tfile, "\n\n==== DEX->IR CONVERT %s =====",
-                m_ru->get_ru_name());
+                m_ru->getRegionName());
     }
 
     FILE * log = NULL;
     if (g_dd) {
         log = fopen("dex2ir.log", "a+");
-        fprintf(log, "\n== %s ==", m_ru->get_ru_name());
+        fprintf(log, "\n== %s ==", m_ru->getRegionName());
     }
 
     if (dump) { dump_lir2lab(); }

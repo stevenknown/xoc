@@ -102,10 +102,10 @@ public:
     {
         ASSERT0(ru != NULL);
         m_ru = ru;
-        m_tm = ru->get_type_mgr();
-        m_cfg = ru->get_cfg();
-        m_du = ru->get_du_mgr();
-        m_md_sys = ru->get_md_sys();
+        m_tm = ru->getTypeMgr();
+        m_cfg = ru->getCFG();
+        m_du = ru->getDUMgr();
+        m_md_sys = ru->getMDSystem();
         ASSERT0(m_cfg && m_du && m_md_sys && m_tm);
         m_is_elim_cfs = false;
         m_is_use_md_du = true;
@@ -117,9 +117,9 @@ public:
               BitSet const& is_bb_effect,
               IN Vector<Vector<IR*>*> & all_ir);
 
-    virtual CHAR const* get_pass_name() const
+    virtual CHAR const* getPassName() const
     { return "Dead Code Eliminiation"; }
-    virtual PASS_TYPE get_pass_type() const { return PASS_DCE; }
+    virtual PASS_TYPE getPassType() const { return PASS_DCE; }
 
     void set_elim_cfs(bool doit) { m_is_elim_cfs = doit; }
     void set_use_md_du(bool use_md_du) { m_is_use_md_du = use_md_du; }

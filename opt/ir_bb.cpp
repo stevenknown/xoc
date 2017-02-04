@@ -48,7 +48,7 @@ C<IR*> * BBIRList::append_tail_ex(IR * ir)
     C<IR*> * ct;
     for (List<IR*>::get_tail(&ct);
          ct != List<IR*>::end(); ct = List<IR*>::get_prev(ct)) {
-        if (!m_bb->is_bb_down_boundary(ct->val())) {
+        if (!m_bb->is_down_boundary(ct->val())) {
             break;
         }
     }
@@ -77,7 +77,7 @@ size_t IRBB::count_mem() const
 
 
 //Could ir be looked as a last stmt in basic block?
-bool IRBB::is_bb_down_boundary(IR * ir)
+bool IRBB::is_down_boundary(IR * ir)
 {
     ASSERT(ir->isStmtInBB() || ir->is_lab(), ("illegal stmt in bb"));
     switch (ir->get_code()) {
@@ -134,7 +134,7 @@ void IRBB::dump(Region * ru, bool dump_inner_region)
     //IR list
     note("\nSTMT NUM:%d", getNumOfIR());
     g_indent += 3;
-    TypeMgr * dm = ru->get_type_mgr();
+    TypeMgr * dm = ru->getTypeMgr();
     for (IR * ir = BB_first_ir(this);
          ir != NULL; ir = BB_irlist(this).get_next()) {
         ASSERT0(ir->is_single() && ir->get_bb() == this);
@@ -174,7 +174,7 @@ void IRBB::verify()
         default: ASSERT(0, ("BB does not supported this kind of IR."));
         }
 
-        if (is_bb_down_boundary(ir)) {
+        if (is_down_boundary(ir)) {
             ASSERT(ir == BB_last_ir(this), ("invalid BB down boundary."));
         }
 
@@ -232,7 +232,7 @@ void IRBB::dupSuccessorPhiOpnd(CFG<IRBB, IR> * cfg, Region * ru, UINT opnd_pos)
             }
 
             IR * newopnd = ru->dupIRTree(opnd);
-            if (opnd->is_read_pr()) {
+            if (opnd->isReadPR()) {
                 newopnd->copyRef(opnd, ru);
                 ASSERT0(PR_ssainfo(opnd));
                 PR_ssainfo(newopnd) = PR_ssainfo(opnd);
@@ -351,9 +351,9 @@ void dumpBBList(BBList * bbl,
 
     if (h != NULL && bbl->get_elem_count() != 0) {
         if (h == g_tfile) {
-            note("\n==---- DUMP '%s' BBList ----==", ru->get_ru_name());
+            note("\n==---- DUMP '%s' BBList ----==", ru->getRegionName());
         } else {
-            fprintf(h, "\n==---- DUMP '%s' BBList ----==", ru->get_ru_name());
+            fprintf(h, "\n==---- DUMP '%s' BBList ----==", ru->getRegionName());
         }
 
         for (IRBB * bb = bbl->get_head(); bb != NULL; bb = bbl->get_next()) {

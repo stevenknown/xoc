@@ -44,8 +44,8 @@ IR_CFG::IR_CFG(CFG_SHAPE cs, BBList * bbl, Region * ru,
     : CFG<IRBB, IR>(bbl, edge_hash_size, vertex_hash_size)
 {
     m_ru = ru;
-    m_tm = ru->get_type_mgr();
-    set_bs_mgr(ru->get_bs_mgr());
+    m_tm = ru->getTypeMgr();
+    setBitSetMgr(ru->getBitSetMgr());
     if (m_bb_list->get_elem_count() == 0) {
         return;
     }
@@ -120,7 +120,7 @@ void IR_CFG::cf_opt()
     bool change = true;
     while (change) {
         change = false;
-        BBList * bbl = get_bb_list();
+        BBList * bbl = getBBList();
         for (IRBB * bb = bbl->get_head(); bb != NULL; bb = bbl->get_next()) {
             change = goto_opt(bb);
             if (change) { break; }
@@ -134,7 +134,7 @@ void IR_CFG::cf_opt()
 //Do early control flow optimization.
 void IR_CFG::initCfg(OptCtx & oc)
 {
-    if (get_bb_list()->get_elem_count() == 0) {
+    if (getBBList()->get_elem_count() == 0) {
         //If bb is empty, set CFG is invalid.
         //OC_is_cfg_valid(oc) = true;
         return;
@@ -227,7 +227,7 @@ void IR_CFG::findEHRegion(
         BitSet const& mainstreambbs,
         OUT BitSet & ehbbs)
 {
-    ASSERT0(catch_start && catch_start->is_exp_handling());
+    ASSERT0(catch_start && catch_start->isExceptionHandler());
     List<Vertex const*> list;
     Vertex const* bbv = get_vertex(BB_id(catch_start));
     ASSERT0(bbv);
@@ -264,7 +264,7 @@ void IR_CFG::findAllTryRegions(OUT BitSet & trybbs)
     for (m_bb_list->get_head(&ct);
          ct != m_bb_list->end(); ct = m_bb_list->get_next(ct)) {
         IRBB const* bb = ct->val();
-        if (!bb->is_try_start()) { continue; }
+        if (!bb->isTryStart()) { continue; }
         t.clean();
         findTryRegion(bb, t);
         trybbs.bunion(t);
@@ -278,7 +278,7 @@ void IR_CFG::findAllTryRegions(OUT BitSet & trybbs)
 //Note: this function does not clean trybbs. Caller is responsible for that.
 void IR_CFG::findTryRegion(IRBB const* try_start, OUT BitSet & trybbs)
 {
-    ASSERT0(try_start && try_start->is_try_start());
+    ASSERT0(try_start && try_start->isTryStart());
     List<Vertex const*> list;
     Vertex const* bbv = get_vertex(BB_id(try_start));
     ASSERT0(bbv);
@@ -293,7 +293,7 @@ void IR_CFG::findTryRegion(IRBB const* try_start, OUT BitSet & trybbs)
         IRBB * bb = get_bb(id);
         ASSERT(bb, ("vertex on CFG correspond to nothing"));
 
-        if (bb->is_try_end() && bb != try_start) {
+        if (bb->isTryEnd() && bb != try_start) {
             //BB may have both try_start and try_end label.
             //If it is the case, the try_end is always other region's
             //end label, just ignore that.
@@ -321,7 +321,7 @@ void IR_CFG::findTryRegion(IRBB const* try_start, OUT BitSet & trybbs)
 //Find a list bb that referred labels which is the target of ir.
 void IR_CFG::findTargetBBOfIndirectBranch(IR const* ir, OUT List<IRBB*> & tgtlst)
 {
-    ASSERT0(ir->is_indirect_br());
+    ASSERT0(ir->isIndirectBr());
     for (IR * c = IGOTO_case_list(ir); c != NULL; c = c->get_next()) {
         ASSERT0(c->is_case());
         IRBB * bb = m_lab2bb.get(CASE_lab(c));
@@ -346,14 +346,14 @@ void IR_CFG::findTargetBBOfIndirectBranch(IR const* ir, OUT List<IRBB*> & tgtlst
 //Find natural loop and scan loop body to find call and early exit, etc.
 void IR_CFG::LoopAnalysis(OptCtx & oc)
 {
-    if (get_bb_list()->get_elem_count() == 0) {
+    if (getBBList()->get_elem_count() == 0) {
         //If bb is empty, set LoopInfo to be invalid.
         //OC_is_loopinfo_valid(oc) = true;
         return;
     }
     m_ru->checkValidAndRecompute(&oc, PASS_DOM, PASS_UNDEF);
-    find_loop();
-    collect_loop_info();
+    findLoop();
+    collectLoopInfo();
     OC_is_loopinfo_valid(oc) = true;
 }
 
@@ -389,7 +389,7 @@ void IR_CFG::insertBBbetween(
 {
     //Revise BB list, note that 'from' is either fall-through to 'to',
     //or jumping to 'to'.
-    BBList * bblst = get_bb_list();
+    BBList * bblst = getBBList();
 
     //First, processing edge if 'from'->'to' is fallthrough.
     C<IRBB*> * tmp_ct = from_ct;
@@ -519,11 +519,11 @@ bool IR_CFG::removeTrampolinBB()
     List<IRBB*> preds;
     for (IRBB * bb = m_bb_list->get_head(&ct);
          bb != NULL; bb = m_bb_list->get_next(&ct)) {
-        if (bb->is_exp_handling()) { continue; }
+        if (bb->isExceptionHandler()) { continue; }
 
         IR * uncond_br = get_first_xr(bb);
         if (uncond_br == NULL ||
-            !uncond_br->is_uncond_br() ||
+            !uncond_br->isUnconditionalBr() ||
             bb->getNumOfIR() != 1) {
             continue;
         }
@@ -630,7 +630,7 @@ bool IR_CFG::removeTrampolinEdge()
         if (bb->getNumOfIR() != 1) { continue; }
 
         IR * last_xr = get_last_xr(bb);
-        if (last_xr->is_goto() && !bb->is_attach_dedicated_lab()) {
+        if (last_xr->is_goto() && !bb->isAttachDedicatedLabel()) {
             LabelInfo const* tgt_li = last_xr->get_label();
             ASSERT0(tgt_li != NULL);
 
@@ -654,7 +654,7 @@ bool IR_CFG::removeTrampolinEdge()
                 }
 
                 IR * last_xr_of_pred = get_last_xr(pred);
-                if (!pred->is_bb_down_boundary(last_xr_of_pred)) {
+                if (!pred->is_down_boundary(last_xr_of_pred)) {
                     // CASE: pred->bb, pred is fallthrough-BB.
                     //  pred is:
                     //      a=b+1
@@ -706,7 +706,7 @@ bool IR_CFG::removeTrampolinEdge()
                     continue;
                 } //end if
 
-                if (last_xr_of_pred->is_cond_br()) {
+                if (last_xr_of_pred->isConditionalBr()) {
                     // CASE: pred->f, pred->bb, and pred->f is fall through edge.
                     //  pred is:
                     //      truebr/falsebr L1
@@ -762,12 +762,12 @@ bool IR_CFG::removeRedundantBranch()
 {
     bool removed = CFG<IRBB, IR>::removeRedundantBranch();
     C<IRBB*> * ct;
-    IR_DU_MGR * dumgr = m_ru->get_du_mgr();
+    IR_DU_MGR * dumgr = m_ru->getDUMgr();
     List<IRBB*> succs;
     for (IRBB * bb = m_bb_list->get_head(&ct);
          bb != NULL; bb = m_bb_list->get_next(&ct)) {
         IR * last_xr = get_last_xr(bb);
-        if (last_xr != NULL && last_xr->is_cond_br()) {
+        if (last_xr != NULL && last_xr->isConditionalBr()) {
             IR * det = BR_det(last_xr);
             ASSERT0(det != NULL);
             bool always_true = (det->is_const() &&
@@ -869,7 +869,7 @@ void IR_CFG::dump_dot(CHAR const* name, bool detail, bool dump_eh)
     //Print Region name.
     fprintf(h, "\nstartnode [fontsize=24,style=filled, "
                "color=gold,shape=none,label=\"RegionName:%s\"];",
-               m_ru->get_ru_name());
+               m_ru->getRegionName());
 
     //Print node
     INT c;
@@ -1122,7 +1122,7 @@ void IR_CFG::dump_vcg(CHAR const* name, bool detail, bool dump_eh)
     fprintf(h,
             "\nnode: {title:\"\" vertical_order:0 shape:box color:turquoise "
             "borderwidth:0 fontname:\"Courier Bold\" "
-            "scaling:2 label:\"RegionName:%s\" }", m_ru->get_ru_name());
+            "scaling:2 label:\"RegionName:%s\" }", m_ru->getRegionName());
     old = g_tfile;
     g_tfile = h;
     dump_node(h, detail);
@@ -1136,7 +1136,7 @@ void IR_CFG::dump_vcg(CHAR const* name, bool detail, bool dump_eh)
 
 void IR_CFG::computeDomAndIdom(IN OUT OptCtx & oc, BitSet const* uni)
 {
-    if (get_bb_list()->get_elem_count() == 0) { return; }
+    if (getBBList()->get_elem_count() == 0) { return; }
 
     UNUSED(uni);
     START_TIMER_AFTER();
@@ -1144,8 +1144,8 @@ void IR_CFG::computeDomAndIdom(IN OUT OptCtx & oc, BitSet const* uni)
     ASSERT(m_entry, ("ONLY support SESE or SEME"));
 
     m_ru->checkValidAndRecompute(&oc, PASS_RPO, PASS_UNDEF);
-    List<IRBB*> * bblst = get_bblist_in_rpo();
-    ASSERT0(bblst->get_elem_count() == m_ru->get_bb_list()->get_elem_count());
+    List<IRBB*> * bblst = getBBListInRPO();
+    ASSERT0(bblst->get_elem_count() == m_ru->getBBList()->get_elem_count());
 
     List<Vertex const*> vlst;
     for (IRBB * bb = bblst->get_head(); bb != NULL; bb = bblst->get_next()) {
@@ -1171,14 +1171,14 @@ void IR_CFG::computeDomAndIdom(IN OUT OptCtx & oc, BitSet const* uni)
 
 void IR_CFG::computePdomAndIpdom(IN OUT OptCtx & oc, BitSet const* uni)
 {
-    if (get_bb_list()->get_elem_count() == 0) { return; }
+    if (getBBList()->get_elem_count() == 0) { return; }
 
     START_TIMER("Compute PDom,IPDom");
     ASSERT0(OC_is_cfg_valid(oc));
 
     m_ru->checkValidAndRecompute(&oc, PASS_RPO, PASS_UNDEF);
-    List<IRBB*> * bblst = get_bblist_in_rpo();
-    ASSERT0(bblst->get_elem_count() == m_ru->get_bb_list()->get_elem_count());
+    List<IRBB*> * bblst = getBBListInRPO();
+    ASSERT0(bblst->get_elem_count() == m_ru->getBBList()->get_elem_count());
 
     List<Vertex const*> vlst;
     for (IRBB * bb = bblst->get_tail(); bb != NULL; bb = bblst->get_prev()) {
@@ -1205,7 +1205,7 @@ void IR_CFG::computePdomAndIpdom(IN OUT OptCtx & oc, BitSet const* uni)
 
 void IR_CFG::remove_xr(IRBB * bb, IR * ir)
 {
-    IR_DU_MGR * dumgr = m_ru->get_du_mgr();
+    IR_DU_MGR * dumgr = m_ru->getDUMgr();
     if (dumgr != NULL) {
         dumgr->removeIROutFromDUMgr(ir);
     }
@@ -1272,13 +1272,13 @@ bool IR_CFG::performMiscOpt(OptCtx & oc)
         //This check is only in debug mode.
         OC_is_rpo_valid(oc) = false;
         computePdomAndIpdom(oc, NULL);
-        CDG * cdg = (CDG*)m_ru->get_pass_mgr()->registerPass(PASS_CDG);
-        cdg->rebuild(oc, *m_ru->get_cfg());
+        CDG * cdg = (CDG*)m_ru->getPassMgr()->registerPass(PASS_CDG);
+        cdg->rebuild(oc, *m_ru->getCFG());
         ASSERT0(verifyIfBBRemoved(cdg, oc));
         #endif
     }
 
-    ASSERT0(verifyIRandBB(get_bb_list(), m_ru));
+    ASSERT0(verifyIRandBB(getBBList(), m_ru));
     ASSERT0(m_ru->verifyRPO(oc));
 
     END_TIMER_AFTER("CFG Optimization");

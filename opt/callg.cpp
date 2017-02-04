@@ -162,7 +162,7 @@ void CallGraph::dump_vcg(CHAR const* name, INT flag)
             }
 
             g_indent = 0;
-            IR * irs = CN_ru(cn)->get_ir_list();
+            IR * irs = CN_ru(cn)->getIRList();
             if (irs != NULL) {
                 for (; irs != NULL; irs = irs->get_next()) {
                     //fprintf(h, "%s\n", dump_ir_buf(ir, buf));
@@ -171,7 +171,7 @@ void CallGraph::dump_vcg(CHAR const* name, INT flag)
                             dump_src_line, false, dump_inner_region);
                 }
             } else {
-                dumpBBList(CN_ru(cn)->get_bb_list(),
+                dumpBBList(CN_ru(cn)->getBBList(),
                            CN_ru(cn), NULL, dump_inner_region);
             }
         }
@@ -197,7 +197,7 @@ void CallGraph::dump_vcg(CHAR const* name, INT flag)
 //'ru': the region that ir resident in.
 CallNode * CallGraph::newCallNode(IR const* ir, Region * ru)
 {
-    ASSERT0(ir->is_calls_stmt() && ru);
+    ASSERT0(ir->isCallStmt() && ru);
     if (ir->is_call()) {
         SYM const* name = CALL_idinfo(ir)->get_name();
         CallNode * cn  = mapSym2CallNode(name, ru);
@@ -222,8 +222,8 @@ CallNode * CallGraph::newCallNode(IR const* ir, Region * ru)
 CallNode * CallGraph::newCallNode(Region * ru)
 {
     ASSERT0(ru);
-    ASSERT0(ru->get_ru_var() && ru->get_ru_var()->get_name());
-    SYM const* name = ru->get_ru_var()->get_name();
+    ASSERT0(ru->getRegionVar() && ru->getRegionVar()->get_name());
+    SYM const* name = ru->getRegionVar()->get_name();
     if (ru->is_program()) {
         CallNode * cn = mapRegion2CallNode(ru);
         if (cn != NULL) {
@@ -239,13 +239,13 @@ CallNode * CallGraph::newCallNode(Region * ru)
         return cn;
     }
 
-    ASSERT0(genSYM2CN(ru->get_parent()));
+    ASSERT0(genSYM2CN(ru->getParent()));
 
     CallNode * cn = allocCallNode();
     CN_sym(cn) = name;
     CN_id(cn) = m_cn_count++;
     CN_ru(cn) = ru;
-    genSYM2CN(ru->get_parent())->set(name, cn);
+    genSYM2CN(ru->getParent())->set(name, cn);
     ASSERT0(m_ruid2cn.get(REGION_id(ru)) == NULL);
     m_ruid2cn.set(REGION_id(ru), cn);
     return cn;
@@ -260,11 +260,11 @@ bool CallGraph::build(RegionMgr * rumgr)
         if (ru == NULL) { continue; }
         ASSERT0(ru->is_function() || ru->is_program());
 
-        if (ru->get_parent() != NULL) {
-            SYM2CN * sym2cn = genSYM2CN(ru->get_parent());
+        if (ru->getParent() != NULL) {
+            SYM2CN * sym2cn = genSYM2CN(ru->getParent());
             ASSERT0(sym2cn);
 
-            SYM const* name = ru->get_ru_var()->get_name();
+            SYM const* name = ru->getRegionVar()->get_name();
             ASSERT0(name);
 
             CallNode * cn = sym2cn->get(name);
@@ -295,7 +295,7 @@ bool CallGraph::build(RegionMgr * rumgr)
         CallNode * caller = mapRegion2CallNode(ru);
         ASSERT0(caller);
         add_node(caller);
-        List<IR const*> * call_list = ru->gen_call_list();
+        List<IR const*> * call_list = ru->getCallList();
         ASSERT0(call_list);
         if (call_list->get_elem_count() == 0) { continue; }
 
@@ -303,7 +303,7 @@ bool CallGraph::build(RegionMgr * rumgr)
         for (call_list->get_head(&ct);
              ct != NULL; ct = call_list->get_next(ct)) {
             IR const* ir = ct->val();
-            ASSERT0(ir && ir->is_calls_stmt());
+            ASSERT0(ir && ir->isCallStmt());
             ASSERT0(!CALL_is_intrinsic(ir));
 
             if (!shouldAddEdge(ir)) { continue; }

@@ -48,7 +48,7 @@ void IR_DCE::dump(EFFECT_STMT const& is_stmt_effect,
 {
     if (g_tfile == NULL) return;
     fprintf(g_tfile, "\n==---- DUMP IR_DCE ----==\n");
-    BBList * bbl = m_ru->get_bb_list();
+    BBList * bbl = m_ru->getBBList();
     for (IRBB * bb = bbl->get_head(); bb != NULL; bb = bbl->get_next()) {
         fprintf(g_tfile, "\n------- BB%d", BB_id(bb));
         if (!is_bb_effect.is_contain(BB_id(bb))) {
@@ -131,7 +131,7 @@ bool IR_DCE::check_stmt(IR const* ir)
             return true;
         }
 
-        if (!x->is_memory_ref()) { continue; }
+        if (!x->isMemoryRef()) { continue; }
 
         //Check if using volatile variable.
         //e.g: volatile int g = 0;
@@ -163,8 +163,8 @@ bool IR_DCE::check_stmt(IR const* ir)
 //Return true if ir is effect.
 bool IR_DCE::check_call(IR const* ir)
 {
-    ASSERT0(ir->is_calls_stmt());
-    return !ir->is_readonly_call() || IR_has_sideeffect(ir) || IR_no_move(ir);
+    ASSERT0(ir->isCallStmt());
+    return !ir->isReadOnlyCall() || IR_has_sideeffect(ir) || IR_no_move(ir);
 }
 
 
@@ -172,7 +172,7 @@ void IR_DCE::mark_effect_ir(IN OUT EFFECT_STMT & is_stmt_effect,
                             IN OUT BitSet & is_bb_effect,
                             IN OUT List<IR const*> & work_list)
 {
-    List<IRBB*> * bbl = m_ru->get_bb_list();
+    List<IRBB*> * bbl = m_ru->getBBList();
     C<IRBB*> * ct;
     for (IRBB * bb = bbl->get_head(&ct);
          bb != NULL; bb = bbl->get_next(&ct)) {
@@ -230,7 +230,7 @@ bool IR_DCE::find_effect_kid(IN IRBB * bb,
 {
     ASSERT0(m_cfg && m_cdg);
     ASSERT0(ir->get_bb() == bb);
-    if (ir->is_cond_br() || ir->is_multicond_br()) {
+    if (ir->isConditionalBr() || ir->isMultiConditionalBr()) {
         EdgeC const* ec = VERTEX_out_list(m_cdg->get_vertex(BB_id(bb)));
         while (ec != NULL) {
             IRBB * succ = m_cfg->get_bb(VERTEX_id(EDGE_to(EC_edge(ec))));
@@ -243,7 +243,7 @@ bool IR_DCE::find_effect_kid(IN IRBB * bb,
             }
             ec = EC_next(ec);
         }
-    } else if (ir->is_uncond_br()) {
+    } else if (ir->isUnconditionalBr()) {
         EdgeC const* ecp = VERTEX_in_list(m_cdg->get_vertex(BB_id(bb)));
         while (ecp != NULL) {
             INT cd_pred = VERTEX_id(EDGE_from(EC_edge(ecp)));
@@ -276,7 +276,7 @@ bool IR_DCE::preserve_cd(IN OUT BitSet & is_bb_effect,
     ASSERT0(m_cfg && m_cdg);
     bool change = false;
     List<IRBB*> lst_2;
-    BBList * bbl = m_ru->get_bb_list();
+    BBList * bbl = m_ru->getBBList();
     C<IRBB*> * ct;
     for (bbl->get_head(&ct); ct != bbl->end(); ct = bbl->get_next(ct)) {
         IRBB * bb = ct->val();
@@ -317,7 +317,7 @@ bool IR_DCE::preserve_cd(IN OUT BitSet & is_bb_effect,
 
             IR * ir = BB_last_ir(bb); //last IR of BB.
             ASSERT0(ir != NULL);
-            if ((ir->is_cond_br() || ir->is_multicond_br()) &&
+            if ((ir->isConditionalBr() || ir->isMultiConditionalBr()) &&
                 !is_stmt_effect.is_contain(IR_id(ir))) {
                 //switch might have multiple succ-BB.
                 if (find_effect_kid(bb, ir, is_stmt_effect)) {
@@ -338,7 +338,7 @@ bool IR_DCE::preserve_cd(IN OUT BitSet & is_bb_effect,
         IR * ir = BB_last_ir(bb); //last IR of BB.
         ASSERT0(ir);
 
-        if (ir->is_uncond_br() && !is_stmt_effect.is_contain(IR_id(ir))) {
+        if (ir->isUnconditionalBr() && !is_stmt_effect.is_contain(IR_id(ir))) {
             if (find_effect_kid(bb, ir, is_stmt_effect)) {
                 is_stmt_effect.bunion(IR_id(ir));
                 is_bb_effect.bunion(BB_id(bb));
@@ -369,13 +369,13 @@ void IR_DCE::iter_collect(IN OUT EFFECT_STMT & is_stmt_effect,
             m_citer.clean();
             for (IR const* x = iterRhsInitC(ir, m_citer);
                  x != NULL; x = iterRhsNextC(m_citer)) {
-                if (!x->is_memory_opnd()) { continue; }
+                if (!x->isMemoryOpnd()) { continue; }
 
-                if (x->is_read_pr() && PR_ssainfo(x) != NULL) {
+                if (x->isReadPR() && PR_ssainfo(x) != NULL) {
                     IR const* d = PR_ssainfo(x)->get_def();
                     if (d != NULL) {
                         ASSERT0(d->is_stmt());
-                        ASSERT0(d->is_write_pr() || d->isCallHasRetVal());
+                        ASSERT0(d->isWritePR() || d->isCallHasRetVal());
 
                         if (!is_stmt_effect.is_contain(IR_id(d))) {
                             change = true;
@@ -392,7 +392,7 @@ void IR_DCE::iter_collect(IN OUT EFFECT_STMT & is_stmt_effect,
                     DUIter di = NULL;
                     for (INT i = defset->get_first(&di);
                          i >= 0; i = defset->get_next(i, &di)) {
-                        IR const* d = m_ru->get_ir(i);
+                        IR const* d = m_ru->getIR(i);
                         ASSERT0(d->is_stmt());
                         if (!is_stmt_effect.is_contain(IR_id(d))) {
                             change = true;
@@ -424,7 +424,7 @@ void IR_DCE::iter_collect(IN OUT EFFECT_STMT & is_stmt_effect,
 //It will be illegal if empty BB has non-taken branch.
 void IR_DCE::fix_control_flow(List<IRBB*> & bblst, List<C<IRBB*>*> & ctlst)
 {
-    BBList * bbl = m_ru->get_bb_list();
+    BBList * bbl = m_ru->getBBList();
     C<IRBB*> * ct = ctlst.get_head();
 
     C<IRBB*> * bbct;
@@ -512,7 +512,7 @@ void IR_DCE::record_all_ir(IN OUT Vector<Vector<IR*>*> & all_ir)
 {
     UNUSED(all_ir);
     #ifdef _DEBUG_
-    BBList * bbl = m_ru->get_bb_list();
+    BBList * bbl = m_ru->getBBList();
     for (IRBB * bb = bbl->get_head(); bb != NULL; bb = bbl->get_next()) {
         if (BB_irlist(bb).get_elem_count() == 0) { continue; }
         Vector<IR*> * ir_vec = new Vector<IR*>();
@@ -574,7 +574,7 @@ bool IR_DCE::perform(OptCtx & oc)
     if (m_is_elim_cfs) {
         m_ru->checkValidAndRecompute(&oc, PASS_DU_REF, PASS_CDG,PASS_PDOM,
                                      PASS_DU_CHAIN, PASS_CDG, PASS_UNDEF);
-        m_cdg = (CDG*)m_ru->get_pass_mgr()->registerPass(PASS_CDG);
+        m_cdg = (CDG*)m_ru->getPassMgr()->registerPass(PASS_CDG);
     } else {
         m_ru->checkValidAndRecompute(&oc, PASS_DU_REF, PASS_PDOM,
                                      PASS_DU_CHAIN, PASS_UNDEF);
@@ -582,7 +582,7 @@ bool IR_DCE::perform(OptCtx & oc)
     }
 
     if (!OC_is_du_chain_valid(oc)) {
-        END_TIMER_AFTER(get_pass_name());
+        END_TIMER_AFTER(getPassName());
         return false;
     }
 
@@ -609,7 +609,7 @@ bool IR_DCE::perform(OptCtx & oc)
     iter_collect(is_stmt_effect, is_bb_effect, work_list);
 
     bool change = false;
-    BBList * bbl = m_ru->get_bb_list();
+    BBList * bbl = m_ru->getBBList();
     C<IRBB*> * ctbb;
     List<IRBB*> bblst;
     List<C<IRBB*>*> ctlst;
@@ -630,8 +630,8 @@ bool IR_DCE::perform(OptCtx & oc)
                 //DU chain of PR in DU manager counterpart.
                 m_du->removeIROutFromDUMgr(stmt);
 
-                if (stmt->is_cond_br() || stmt->is_uncond_br() ||
-                    stmt->is_multicond_br()) {
+                if (stmt->isConditionalBr() || stmt->isUnconditionalBr() ||
+                    stmt->isMultiConditionalBr()) {
                     revise_successor(bb, ctbb, bbl);
                 }
 
@@ -679,7 +679,7 @@ bool IR_DCE::perform(OptCtx & oc)
         ASSERT0(verifySSAInfo(m_ru));
     }
 
-    END_TIMER_AFTER(get_pass_name());
+    END_TIMER_AFTER(getPassName());
     return change;
 }
 //END IR_DCE

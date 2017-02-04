@@ -87,8 +87,8 @@ public:
     PRDF(Region * ru)
     {
         m_ru = ru;
-        m_md_sys = ru->get_md_sys();
-        m_cfg = ru->get_cfg();
+        m_md_sys = ru->getMDSystem();
+        m_cfg = ru->getCFG();
         m_var2pr = NULL;
         m_handle_may = false;
     }
@@ -168,8 +168,8 @@ public:
 
     void dump();
 
-    virtual CHAR const* get_pass_name() const { return "PRDF"; }
-    PASS_TYPE get_pass_type() const { return PASS_PRDF; }
+    virtual CHAR const* getPassName() const { return "PRDF"; }
+    PASS_TYPE getPassType() const { return PASS_PRDF; }
 
     DefMiscBitSetMgr & getMiscBitSetMgr() { return m_sbs_mgr; }
 

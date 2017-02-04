@@ -53,8 +53,8 @@ public:
         ASSERT0(ru != NULL);
         m_ru = ru;
         m_gvn = gvn;
-        m_cfg = ru->get_cfg();
-        m_du = m_ru->get_du_mgr();
+        m_cfg = ru->getCFG();
+        m_du = m_ru->getDUMgr();
         ASSERT0(m_cfg && m_du);
         m_use_gvn = false;
     }
@@ -68,10 +68,10 @@ public:
             bool & changed);
 
     void dump();
-    virtual CHAR const* get_pass_name() const
+    virtual CHAR const* getPassName() const
     { return "Redundant Code Elimination"; }
 
-    PASS_TYPE get_pass_type() const { return PASS_RCE; }
+    PASS_TYPE getPassType() const { return PASS_RCE; }
 
     bool is_use_gvn() const { return m_use_gvn; }
 

@@ -82,7 +82,7 @@ MD const* RegionMgr::genDedicateStrMD()
     //Regard all string variables as same unbound MD.
     if (m_str_md == NULL) {
         SYM * s = addToSymbolTab("DedicatedVarBeRegardedAsString");
-        VAR * sv = get_var_mgr()->registerStringVar("DedicatedStringVar", s, 1);
+        VAR * sv = getVarMgr()->registerStringVar("DedicatedStringVar", s, 1);
         VAR_allocable(sv) = false;
         VAR_is_addr_taken(sv) = true;
         MD md;
@@ -124,7 +124,7 @@ void RegionMgr::registerGlobalMD()
         MD md;
         MD_base(&md) = v;
         MD_ofst(&md) = 0;
-        MD_size(&md) = v->getByteSize(get_type_mgr());
+        MD_size(&md) = v->getByteSize(getTypeMgr());
         if (VAR_is_fake(v) || VAR_is_func_decl(v)) {
             MD_ty(&md) = MD_UNBOUND;
         } else {
@@ -277,8 +277,8 @@ void RegionMgr::dumpRelationGraph(CHAR const* name)
     xcom::Graph g;
     for (UINT id = 0; id < getNumOfRegion(); id++) {
         Region * ru = get_region(id);
-        if (ru == NULL || ru->get_parent() == NULL) { continue; }
-        g.addEdge(ru->get_parent()->id(), ru->id());
+        if (ru == NULL || ru->getParent() == NULL) { continue; }
+        g.addEdge(ru->getParent()->id(), ru->id());
     }
     g.dump_vcg(name);
 }
@@ -338,7 +338,7 @@ void RegionMgr::estimateEV(
             ru->scanCallAndReturnList(num_ru, scan_inner_region);
         }
 
-        List<IR const*> * call_list = ru->get_call_list();
+        List<IR const*> * call_list = ru->getCallList();
         if (call_list != NULL) {
             num_call += call_list->get_elem_count();
         }

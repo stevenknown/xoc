@@ -108,11 +108,11 @@ public:
     {
         ASSERT0(ru != NULL);
         m_ru = ru;
-        m_aa = ru->get_aa();
-        m_du = ru->get_du_mgr();
-        m_cfg = ru->get_cfg();
-        m_tm = ru->get_type_mgr();
-        m_md_sys = ru->get_md_sys();
+        m_aa = ru->getAA();
+        m_du = ru->getDUMgr();
+        m_cfg = ru->getCFG();
+        m_tm = ru->getTypeMgr();
+        m_md_sys = ru->getMDSystem();
         ASSERT0(m_cfg && m_du && m_md_sys && m_tm);
         m_pool = smpoolCreate(4 * sizeof(UINT), MEM_CONST_SIZE);
         m_ssamgr = NULL;
@@ -130,7 +130,7 @@ public:
             TTab<IR*> const& invariant_exp);
 
     //Consider whether exp is worth hoisting.
-    bool is_worth_hoist(IR * exp)
+    bool isWorthHoist(IR * exp)
     {
         CK_USE(exp);
         ASSERT0(exp->is_exp());
@@ -139,10 +139,10 @@ public:
         return !IR_no_move(exp);
     }
 
-    virtual CHAR const* get_pass_name() const
+    virtual CHAR const* getPassName() const
     { return "Loop Invariant Code Motion"; }
 
-    PASS_TYPE get_pass_type() const { return PASS_LICM; }
+    PASS_TYPE getPassType() const { return PASS_LICM; }
 
     virtual bool perform(OptCtx & oc);
 };

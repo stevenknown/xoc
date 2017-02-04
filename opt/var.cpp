@@ -41,7 +41,7 @@ VarMgr::VarMgr(RegionMgr * rm)
     m_var_count = 1; //for enjoying bitset util
     m_str_count = 1;
     m_ru_mgr = rm;
-    m_tm = rm->get_type_mgr();
+    m_tm = rm->getTypeMgr();
 }
 
 

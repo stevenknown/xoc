@@ -74,7 +74,7 @@ namespace xoc {
 
 //Single timer, show format string before timer finish.
 //e.g:
-//    START_TIMER(("My Pass Name%s", get_pass_name()));
+//    START_TIMER(("My Pass Name%s", getPassName()));
 //    Run mypass();
 //    END_TIMER_FMT();
 #define START_TIMER_FMT(s)          \
@@ -94,7 +94,7 @@ namespace xoc {
 //e.g:
 //    START_TIMER_AFTER();
 //    Run mypass();
-//    END_TIMER_FMT_AFTER(("My Pass Name%s", get_pass_name()));
+//    END_TIMER_FMT_AFTER(("My Pass Name%s", getPassName()));
 #define START_TIMER_FMT_AFTER()     \
     LONG _start_time_count_ = 0;    \
     if (g_show_comp_time) {         \

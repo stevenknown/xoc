@@ -790,9 +790,7 @@ void d2rMethod(
                     width = size * 4 + 2;
                     break;
                 }
-                default:
-                    UNREACH();
-                    break;
+                default: UNREACH();
             }
             codePtr += width;
             dexOffset += width;

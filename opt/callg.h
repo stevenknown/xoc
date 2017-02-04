@@ -121,7 +121,7 @@ public:
     {
         ASSERT0(edge_hash > 0 && vex_hash > 0);
         m_ru_mgr = rumgr;
-        m_tm = rumgr->get_type_mgr();
+        m_tm = rumgr->getTypeMgr();
         m_cn_count = 1;
         m_cn_pool = smpoolCreate(sizeof(CallNode) * 2, MEM_CONST_SIZE);
     }
@@ -160,7 +160,7 @@ public:
 
     CallNode * mapSym2CallNode(SYM const* sym, Region * start) const
     {
-        for (; start != NULL; start = start->get_parent()) {
+        for (; start != NULL; start = start->getParent()) {
             SYM2CN * sym2cn = getSYM2CN(start);
             if (sym2cn == NULL) { continue; }
             CallNode * cn = sym2cn->get(sym);
@@ -193,7 +193,7 @@ public:
     //Note ir must be a function call.
     virtual bool shouldAddEdge(IR const* ir) const
     {
-        ASSERT0(ir->is_calls_stmt());
+        ASSERT0(ir->isCallStmt());
         UNUSED(ir);
         return true;
     }

@@ -44,19 +44,19 @@ void Region::HighProcessImpl(OptCtx & oc)
         //Remove empty bb when cfg rebuilted because
         //rebuilding cfg may generate redundant empty bb.
         //It disturbs the computation of entry and exit.
-        get_cfg()->removeEmptyBB(oc);
+        getCFG()->removeEmptyBB(oc);
 
         //Compute exit bb while cfg rebuilt.
-        get_cfg()->computeExitList();
-        ASSERT0(get_cfg()->verify());
+        getCFG()->computeExitList();
+        ASSERT0(getCFG()->verify());
 
-        get_cfg()->performMiscOpt(oc);
+        getCFG()->performMiscOpt(oc);
     }
 
     if (g_do_ssa) {
-        ASSERT0(get_pass_mgr());
+        ASSERT0(getPassMgr());
         IR_SSA_MGR * ssamgr =
-            (IR_SSA_MGR*)get_pass_mgr()->registerPass(PASS_SSA_MGR);
+            (IR_SSA_MGR*)getPassMgr()->registerPass(PASS_SSA_MGR);
         ASSERT0(ssamgr);
         if (!ssamgr->is_ssa_constructed()) {
             ssamgr->construction(oc);
@@ -70,8 +70,8 @@ void Region::HighProcessImpl(OptCtx & oc)
 
     if (g_do_md_du_ana) {
         ASSERT0(g_cst_bb_list && OC_is_cfg_valid(oc) && OC_is_aa_valid(oc));
-        ASSERT0(get_pass_mgr());
-        IR_DU_MGR * dumgr = (IR_DU_MGR*)get_pass_mgr()->
+        ASSERT0(getPassMgr());
+        IR_DU_MGR * dumgr = (IR_DU_MGR*)getPassMgr()->
             registerPass(PASS_DU_MGR);
         ASSERT0(dumgr);
         UINT f = SOL_REACH_DEF|SOL_REF|COMPUTE_PR_DU|COMPUTE_NOPR_DU;
@@ -86,13 +86,14 @@ void Region::HighProcessImpl(OptCtx & oc)
         if (g_compute_du_chain) {
             f |= SOL_REACH_DEF;
         }
+                
         if (dumgr->perform(oc, f) && OC_is_ref_valid(oc)) {
             if (g_compute_du_chain) {
                 UINT flag = COMPUTE_NOPR_DU;
                 //If PRs have already been in SSA form, compute
                 //DU chain doesn't make any sense.    
-                if (get_pass_mgr() != NULL) {
-                    IR_SSA_MGR * ssamgr = (IR_SSA_MGR*)get_pass_mgr()->
+                if (getPassMgr() != NULL) {
+                    IR_SSA_MGR * ssamgr = (IR_SSA_MGR*)getPassMgr()->
                         queryPass(PASS_SSA_MGR);
                     if (ssamgr == NULL) {
                         flag |= COMPUTE_PR_DU;
@@ -165,31 +166,31 @@ void Region::HighProcessImpl(OptCtx & oc)
 bool Region::HighProcess(OptCtx & oc)
 {
     g_indent = 0;
-    note("\n\n==== Region:%s HIGHEST LEVEL FARMAT ====\n\n", get_ru_name());
+    note("\n\n==== Region:%s HIGHEST LEVEL FARMAT ====\n\n", getRegionName());
 
     SimpCtx simp;
     if (g_do_cfs_opt) {
         IR_CFS_OPT co(this);
         co.perform(simp);
-        ASSERT0(verify_irs(get_ir_list(), NULL, this));
+        ASSERT0(verify_irs(getIRList(), NULL, this));
     }
 
     if (g_build_cfs) {
-        ASSERT0(get_pass_mgr());
+        ASSERT0(getPassMgr());
         SIMP_is_record_cfs(&simp) = true;
-        CfsMgr * cfsmgr = (CfsMgr*)get_pass_mgr()->registerPass(PASS_CFS_MGR);
+        CfsMgr * cfsmgr = (CfsMgr*)getPassMgr()->registerPass(PASS_CFS_MGR);
         ASSERT0(cfsmgr);
         SIMP_cfs_mgr(&simp) = cfsmgr;
     }
 
     simp.setSimpCFS();
-    set_ir_list(simplifyStmtList(get_ir_list(), &simp));    
-    ASSERT0(verify_simp(get_ir_list(), simp));
-    ASSERT0(verify_irs(get_ir_list(), NULL, this));
+    set_ir_list(simplifyStmtList(getIRList(), &simp));    
+    ASSERT0(verify_simp(getIRList(), simp));
+    ASSERT0(verify_irs(getIRList(), NULL, this));
 
     if (g_cst_bb_list) {
         constructIRBBlist();
-        ASSERT0(verifyIRandBB(get_bb_list(), this));
+        ASSERT0(verifyIRandBB(getBBList(), this));
         set_ir_list(NULL); //All IRs have been moved to each IRBB.
     }
 

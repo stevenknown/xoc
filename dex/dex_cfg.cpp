@@ -189,7 +189,7 @@ void DEX_CFG::dump_vcg_ex(BitSet const& markbbs)
     fprintf(h,
             "\nnode: {title:\"\" vertical_order:0 shape:box color:turquoise "
             "borderwidth:0 fontname:\"Courier Bold\" "
-            "scaling:2 label:\"RegionName:%s\" }", m_ru->get_ru_name());
+            "scaling:2 label:\"RegionName:%s\" }", m_ru->getRegionName());
 
     old = g_tfile;
     g_tfile = h;
@@ -224,7 +224,7 @@ void DEX_CFG::dump_vcg_ex2(BitSet const& trybbs, BitSet const& catchbbs)
     fprintf(h,
             "\nnode: {title:\"\" vertical_order:0 shape:box color:turquoise "
             "borderwidth:0 fontname:\"Courier Bold\" "
-            "scaling:2 label:\"RegionName:%s\" }", m_ru->get_ru_name());
+            "scaling:2 label:\"RegionName:%s\" }", m_ru->getRegionName());
 
     old = g_tfile;
     g_tfile = h;

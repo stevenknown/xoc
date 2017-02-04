@@ -84,7 +84,7 @@ public:
     Inliner(Region * program)
     {
         ASSERT0(program && program->is_program());
-        m_rumgr = program->get_region_mgr();
+        m_rumgr = program->getRegionMgr();
         ASSERT0(m_rumgr);
         m_program = program;
         m_call_graph = m_rumgr->get_call_graph();
@@ -100,8 +100,8 @@ public:
 
     inline bool is_call_site(IR * call, Region * ru);
 
-    virtual PASS_TYPE get_pass_type() const { return PASS_INLINER; }
-    virtual CHAR const* get_pass_name() const { return "Inliner"; }
+    virtual PASS_TYPE getPassType() const { return PASS_INLINER; }
+    virtual CHAR const* getPassName() const { return "Inliner"; }
 
     IR * replaceReturn(
             Region * caller,

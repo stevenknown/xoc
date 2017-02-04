@@ -60,7 +60,7 @@ Region * IPA::findRegion(IR * call, Region * callru)
             continue;
         }
 
-        if (callname == callee->get_ru_var()->get_name()) {
+        if (callname == callee->getRegionVar()->get_name()) {
             return callee;
         }
     }
@@ -70,6 +70,8 @@ Region * IPA::findRegion(IR * call, Region * callru)
 
 //call: call stmt.
 //callru: the region that call stmt resident in.
+//Generate dummy use only if MD both exist in caller's MayDef and
+//callee's MayUse.
 void IPA::createCallDummyuse(IR * call, Region * callru)
 {
     Region * calleeru = findRegion(call, callru);
@@ -77,12 +79,12 @@ void IPA::createCallDummyuse(IR * call, Region * callru)
 
     ASSERT0(CALL_dummyuse(call) == NULL);
 
-    MDSet const* mayuse = calleeru->get_may_use();
+    MDSet const* mayuse = calleeru->getMayUse();
     if (mayuse == NULL || mayuse->is_empty()) { return; }
 
     SEGIter * iter;
 
-    MDSet const* callermaydef = callru->get_may_def();
+    MDSet const* callermaydef = callru->getMayDef();
     if (callermaydef == NULL || callermaydef->is_empty()) { return; }
 
     for (INT j = mayuse->get_first(&iter);
@@ -105,9 +107,9 @@ void IPA::createCallDummyuse(IR * call, Region * callru)
 void IPA::createCallDummyuse(Region * ru)
 {
     ASSERT0(ru);
-    IR * ir = ru->get_ir_list();
+    IR * ir = ru->getIRList();
     if (ir == NULL) {
-        BBList * bbl = ru->get_bb_list();
+        BBList * bbl = ru->getBBList();
         if (bbl == NULL) { return; }
         for (IRBB * bb = bbl->get_head(); bb != NULL; bb = bbl->get_next()) {
             for (IR * ir2 = BB_first_ir(bb); 
@@ -128,6 +130,21 @@ void IPA::createCallDummyuse(Region * ru)
 }
 
 
+void IPA::computeCallRefForAllRegion()
+{
+    START_TIMER_AFTER();
+    for (UINT i = 0; i < m_rumgr->getNumOfRegion(); i++) {
+        Region * ru = m_rumgr->get_region(i);
+        if (ru == NULL) { continue; }
+
+        ASSERT0(ru->getDUMgr());
+        ru->getDUMgr()->computeCallRef(COMPUTE_PR_DU|COMPUTE_NOPR_DU);        
+        
+    }
+    END_TIMER_AFTER("computeCallRefForAllRegion()");
+}
+
+
 void IPA::createCallDummyuse(OptCtx & oc)
 {
     for (UINT i = 0; i < m_rumgr->getNumOfRegion(); i++) {
@@ -138,8 +155,8 @@ void IPA::createCallDummyuse(OptCtx & oc)
         if (g_compute_du_chain) {
             OptCtx loc(oc);
             recomputeDUChain(ru, loc);
-            if (!m_is_keep_dumgr && ru->get_pass_mgr() != NULL) {
-                ru->get_pass_mgr()->destroyPass(PASS_DU_MGR);
+            if (!m_is_keep_dumgr && ru->getPassMgr() != NULL) {
+                ru->getPassMgr()->destroyPass(PASS_DU_MGR);
             }
         }
     }
@@ -155,7 +172,7 @@ void IPA::createCallDummyuse(OptCtx & oc)
 
 void IPA::recomputeDUChain(Region * ru, OptCtx & oc)
 {
-    if (ru->get_pass_mgr() == NULL) {
+    if (ru->getPassMgr() == NULL) {
         ru->initPassMgr();
     }
 
@@ -201,7 +218,7 @@ bool IPA::perform(OptCtx & oc)
     ASSERT0(OC_is_callg_valid(oc));
     ASSERT0(m_program && m_program->is_program());
     createCallDummyuse(oc);
-    END_TIMER_AFTER(get_pass_name());
+    END_TIMER_AFTER(getPassName());
     return true;
 }
 

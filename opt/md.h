@@ -46,8 +46,8 @@ typedef enum _MD_TYPE {
 } MD_TYPE;
 
 #define MD_UNDEF              0 //Undefined.
-#define MD_ALL_MEM            1 //All program memory.
-#define MD_FIRST              MD_ALL_MEM
+#define MD_FULL_MEM            1 //All program memory.
+#define MD_FIRST              MD_FULL_MEM
 #define MD_GLOBAL_MEM         2 //Allocate at static data section
                                 //BYTE explicit definition.
 #define MD_HEAP_MEM           3 //Allocate in heap.
@@ -361,12 +361,12 @@ public:
     bool is_contain_global() const
     {
         return DefSBitSetCore::is_contain(MD_GLOBAL_MEM) ||
-               DefSBitSetCore::is_contain(MD_ALL_MEM);
+               DefSBitSetCore::is_contain(MD_FULL_MEM);
     }
 
     //Return true if set contain all memory variable.
     bool is_contain_all() const
-    { return DefSBitSetCore::is_contain(MD_ALL_MEM); }
+    { return DefSBitSetCore::is_contain(MD_FULL_MEM); }
 
     //Return true if set contain md.
     inline bool is_contain(MD const* md) const
@@ -374,7 +374,7 @@ public:
         if (DefSBitSetCore::is_contain(MD_GLOBAL_MEM) && md->is_global()) {
             return true;
         }
-        if (DefSBitSetCore::is_contain(MD_ALL_MEM)) {
+        if (DefSBitSetCore::is_contain(MD_FULL_MEM)) {
             return true;
         }
         return DefSBitSetCore::is_contain(MD_id(md));
@@ -386,8 +386,8 @@ public:
         if (DefSBitSetCore::is_contain(MD_GLOBAL_MEM) && md->is_global()) {
             return true;
         }
-        if ((DefSBitSetCore::is_contain(MD_ALL_MEM)) ||
-            (MD_id(md) == MD_ALL_MEM && !DefSBitSetCore::is_empty())) {
+        if ((DefSBitSetCore::is_contain(MD_FULL_MEM)) ||
+            (MD_id(md) == MD_FULL_MEM && !DefSBitSetCore::is_empty())) {
             return true;
         }
         return DefSBitSetCore::is_contain(MD_id(md));
@@ -411,8 +411,8 @@ public:
             return true;
         }
 
-        if ((DefSBitSetCore::is_contain(MD_ALL_MEM) && !mds.is_empty()) ||
-            (((DefSBitSetCore&)mds).is_contain(MD_ALL_MEM) &&
+        if ((DefSBitSetCore::is_contain(MD_FULL_MEM) && !mds.is_empty()) ||
+            (((DefSBitSetCore&)mds).is_contain(MD_FULL_MEM) &&
              !DefSBitSetCore::is_empty())) {
             return true;
         }
@@ -433,8 +433,8 @@ public:
     inline void diff(MDSet const& mds, DefMiscBitSetMgr & m)
     {
         ASSERT0(this != &mds);
-        ASSERT(!DefSBitSetCore::is_contain(MD_ALL_MEM), ("low performance"));
-        if (((DefSBitSetCore const&)mds).is_contain(MD_ALL_MEM)) {
+        ASSERT(!DefSBitSetCore::is_contain(MD_FULL_MEM), ("low performance"));
+        if (((DefSBitSetCore const&)mds).is_contain(MD_FULL_MEM)) {
             clean(m);
             return;
         }
@@ -614,7 +614,7 @@ public:
     void dumpAllMD();
     void destroy();
 
-    TypeMgr * get_type_mgr() const { return m_tm; }
+    TypeMgr * getTypeMgr() const { return m_tm; }
 
     //Get registered MD.
     //NOTICE: DO NOT free the return value, because it is the registered one.

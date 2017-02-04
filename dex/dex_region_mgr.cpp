@@ -51,7 +51,7 @@ VAR * DexRegionMgr::addVarForBuiltin(CHAR const* name)
     SYM * sym = addToSymbolTab(name);
     UINT flag = 0;
     SET_FLAG(flag, VAR_GLOBAL);
-    return get_var_mgr()->registerVar(sym, get_type_mgr()->getVoid(), 0, flag);
+    return getVarMgr()->registerVar(sym, getTypeMgr()->getVoid(), 0, flag);
 }
 
 
@@ -65,14 +65,13 @@ void DexRegionMgr::initBuiltin()
 }
 
 
-bool DexRegionMgr::processProgramRegion(Region * program)
+bool DexRegionMgr::processProgramRegion(Region * program, OptCtx * oc)
 {
     ASSERT0(program && program->is_program());
 
     //Function region has been handled. And call list should be available.
-    OptCtx oc;
-    buildCallGraph(oc, false, false);
-    ASSERT0(OC_is_callg_valid(oc));
+    buildCallGraph(*oc, false, false);
+    ASSERT0(OC_is_callg_valid(*oc));
 
 
     return true;

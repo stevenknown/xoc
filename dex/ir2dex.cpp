@@ -221,8 +221,7 @@ LIR * IR2Dex::buildCvt(IN IR ** ir)
         default: UNREACH();
         }
         break;
-    default:
-        UNREACH();
+    default: UNREACH();
     }
     ASSERT0(x != LIR_convert_unknown);
     LIR_dt(lir) = x;
@@ -466,7 +465,7 @@ UINT IR2Dex::findFieldId(IR * ir, IR * objptr)
                 PR1 (r:PTR:4 ptbase:1) mem_addr id:19
     */
     ASSERT0(ir->is_stmt() && objptr->is_exp() && ir->is_kids(objptr));
-    IR_DU_MGR * du_mgr = m_ru->get_du_mgr();
+    IR_DU_MGR * du_mgr = m_ru->getDUMgr();
     ASSERT0(du_mgr);
     IR const* def = du_mgr->getExactAndUniqueDef(objptr);
     ASSERT0(def);
@@ -569,11 +568,11 @@ LIR * IR2Dex::buildBinRegReg(IN IR ** ir)
 {
     IR const* tir = *ir;
     IR const* rhs = STPR_rhs(tir);
-    ASSERT0(rhs->is_binary_op());
+    ASSERT0(rhs->isBinaryOp());
     ASSERT0(tir->is_stpr());
     IR * op0 = BIN_opnd0(rhs);
     IR * op1 = BIN_opnd1(rhs);
-    if (tir->is_pr_equal(op1) && rhs->is_commutative()) {
+    if (tir->isPREqual(op1) && rhs->is_commutative()) {
         IR * t = op0;
         op0 = op1;
         op1 = t;
@@ -650,15 +649,14 @@ LIR * IR2Dex::buildUniOp(IN IR ** ir)
 {
     IR * tir = *ir;
     ASSERT0(tir->is_stpr());
-    IR * op0 = UNA_opnd0(STPR_rhs(tir));
+    IR * op0 = UNA_opnd(STPR_rhs(tir));
     ASSERT(op0->is_pr(), ("just support pr operation"));
 
     enum _LIROpcode lty = LOP_NOP;
     switch (IR_code(STPR_rhs(tir))) {
     case IR_NEG   : lty = LOP_NEG; break;
     case IR_BNOT  : lty = LOP_NOT; break;
-    default:
-        UNREACH();
+    default: UNREACH();
     }
 
     LIR * lir = (LIR*)ymalloc(sizeof(LIRABOp));
@@ -1471,7 +1469,7 @@ void IR2Dex::dump_output(List<LIR*> & newlirs, Prno2Vreg const& prno2v)
     if (m_lab2idx.get_elem_count() != 0) {
         INT c;
         fprintf(g_tfile, "\n==== RU:%s, IR2Dex DUMP lab2idx ====",
-                m_ru->get_ru_name());
+                m_ru->getRegionName());
         for (LabelInfo const* li = m_lab2idx.get_first(c);
              li != NULL; li = m_lab2idx.get_next(c)) {
             dumpLabel(li);
@@ -1479,7 +1477,7 @@ void IR2Dex::dump_output(List<LIR*> & newlirs, Prno2Vreg const& prno2v)
         }
     }
     fprintf(g_tfile, "\n==== RU:%s, DUMP lir list after reloc === vregnum:%d ",
-            m_ru->get_ru_name(), prno2v.maxreg + 1);
+            m_ru->getRegionName(), prno2v.maxreg + 1);
     /*
     if (prno2v.maxreg >= 0) {
         fprintf(g_tfile, "(");
@@ -1510,7 +1508,7 @@ void IR2Dex::convert(IR * ir_list, List<LIR*> & newlirs)
     bool dump = g_dump_ir2dex && g_tfile != NULL;
     if (dump) {
         fprintf(g_tfile, "\n\n==== IR->DEX CONVERT %s =====",
-                m_ru->get_ru_name());
+                m_ru->getRegionName());
     }
     IR2DexCtx cont;
     UINT idx = 0;
@@ -1543,7 +1541,7 @@ void IR2Dex::convert(IR * ir_list, List<LIR*> & newlirs)
     if (g_dd) {
         ASSERT0(g_tfile);
         FILE * log = fopen("ir2dex.log", "a+");
-        fprintf(log, "\n== %s ==", m_ru->get_ru_name());
+        fprintf(log, "\n== %s ==", m_ru->getRegionName());
         FILE * t = g_tfile;
         g_tfile = log;
         UINT j = 0;

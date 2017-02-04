@@ -156,10 +156,10 @@ public:
     {
         ASSERT0(ru != NULL);
         m_ru = ru;
-        m_md_sys = ru->get_md_sys();
-        m_du = ru->get_du_mgr();
-        m_cfg = ru->get_cfg();
-        m_tm = ru->get_type_mgr();
+        m_md_sys = ru->getMDSystem();
+        m_du = ru->getDUMgr();
+        m_cfg = ru->getCFG();
+        m_tm = ru->getTypeMgr();
         m_pool = smpoolCreate(sizeof(IV) * 4, MEM_COMM);
         m_sc_pool = smpoolCreate(sizeof(SC<IV*>) * 4, MEM_CONST_SIZE);
         m_is_only_handle_exact_md = true;
@@ -181,10 +181,10 @@ public:
 
     IV const* getIV(IR const* ir) { return m_ir2iv.get(ir); }
 
-    virtual CHAR const* get_pass_name() const
+    virtual CHAR const* getPassName() const
     { return "Induction Variable Recogization"; }
 
-    PASS_TYPE get_pass_type() const { return PASS_IVR; }
+    PASS_TYPE getPassType() const { return PASS_IVR; }
 
     bool is_loop_invariant(LI<IRBB> const* li, IR const* ir);
 

@@ -70,7 +70,7 @@ bool DexRegion::MiddleProcess(OptCtx & oc)
 
 bool DexRegion::HighProcess(OptCtx & oc)
 {
-    CHAR const* ru_name = get_ru_name();
+    CHAR const* ru_name = getRegionName();
     g_indent = 0;
     SimpCtx simp;
     SIMP_if(&simp) = true;
@@ -81,14 +81,14 @@ bool DexRegion::HighProcess(OptCtx & oc)
     SIMP_break(&simp) = true;
     SIMP_continue(&simp) = true;
 
-    set_ir_list(simplifyStmtList(get_ir_list(), &simp));
+    set_ir_list(simplifyStmtList(getIRList(), &simp));
 
-    ASSERT0(verify_simp(get_ir_list(), simp));
-    ASSERT0(verify_irs(get_ir_list(), NULL, this));
+    ASSERT0(verify_simp(getIRList(), simp));
+    ASSERT0(verify_irs(getIRList(), NULL, this));
 
     constructIRBBlist();
 
-    ASSERT0(verifyIRandBB(get_bb_list(), this));
+    ASSERT0(verifyIRandBB(getBBList(), this));
 
     //All IRs have been moved to each IRBB.
     set_ir_list(NULL);
@@ -116,7 +116,7 @@ bool DexRegion::verifyRAresult(RA & ra, Prno2Vreg & prno2v)
         ASSERT0(find);
     }
 
-    BBList * bbl = get_bb_list();
+    BBList * bbl = getBBList();
     for (IRBB * bb = bbl->get_head(); bb != NULL; bb = bbl->get_next()) {
         LTMgr * ltm = gltm->map_bb2ltm(bb);
         if (ltm == NULL) { continue; }
@@ -139,7 +139,7 @@ void DexRegion::updateRAresult(IN RA & ra, OUT Prno2Vreg & prno2v)
     prno2v.maxreg = ra.get_maxreg();
     prno2v.paramnum = ra.get_paramnum();
     GltMgr * gltm = ra.get_gltm();
-    BBList * bbl = get_bb_list();
+    BBList * bbl = getBBList();
     prno2v.clean();
     for (IRBB * bb = bbl->get_head(); bb != NULL; bb = bbl->get_next()) {
         LTMgr * ltm = gltm->map_bb2ltm(bb);
@@ -166,17 +166,17 @@ void DexRegion::updateRAresult(IN RA & ra, OUT Prno2Vreg & prno2v)
 
 void DexRegion::processSimply()
 {
-    LOG("DexRegion::processSimply %s", get_ru_name());
-    if (get_ir_list() == NULL) { return ; }
+    LOG("DexRegion::processSimply %s", getRegionName());
+    if (getIRList() == NULL) { return ; }
 
     OptCtx oc;
     OC_show_comp_time(oc) = g_show_comp_time;
 
-    CHAR const* ru_name = get_ru_name();
+    CHAR const* ru_name = getRegionName();
 
     constructIRBBlist();
 
-    ASSERT0(verifyIRandBB(get_bb_list(), this));
+    ASSERT0(verifyIRandBB(getBBList(), this));
 
     //All IRs have been moved to each IRBB.
     set_ir_list(NULL);
@@ -204,7 +204,7 @@ void DexRegion::processSimply()
 static void addCatchTypeName(DexRegion * ru)
 {
     Dex2IR * d2ir = ru->getDex2IR();
-    SymTab * symtab = ru->get_region_mgr()->get_sym_tab();
+    SymTab * symtab = ru->getRegionMgr()->get_sym_tab();
     for (TryInfo * ti = d2ir->getTryInfo(); ti != NULL; ti = ti->next) {
         for (CatchInfo * ci = ti->catch_list; ci != NULL; ci = ci->next) {
             ASSERT0(ci->kindname);
@@ -215,26 +215,25 @@ static void addCatchTypeName(DexRegion * ru)
 
 
 //This function outputs Prno2Vreg after Dex register allocation.
-bool DexRegion::process()
+bool DexRegion::process(OptCtx * oc)
 {
-    if (get_ir_list() == NULL) { return true; }
-    OptCtx oc;
-    OC_show_comp_time(oc) = g_show_comp_time;
+    if (getIRList() == NULL) { return true; }
+    OC_show_comp_time(*oc) = g_show_comp_time;
 
     g_indent = 0;
     if (!g_silence) {
-        LOG("DexRegion process %s", get_ru_name());
+        LOG("DexRegion process %s", getRegionName());
     }
-    //note("\n==---- REGION_NAME:%s ----==", get_ru_name());
-    prescan(get_ir_list());
+    //note("\n==---- REGION_NAME:%s ----==", getRegionName());
+    prescan(getIRList());
 
     PassMgr * passmgr = initPassMgr();
 
-    HighProcess(oc);
+    HighProcess(*oc);
 
-    MiddleProcess(oc);
+    MiddleProcess(*oc);
 
-    ASSERT0(get_pass_mgr());
+    ASSERT0(getPassMgr());
     IR_SSA_MGR * ssamgr = (IR_SSA_MGR*)passmgr->queryPass(PASS_SSA_MGR);
     if (ssamgr != NULL && ssamgr->is_ssa_constructed()) {
         ssamgr->destruction();
@@ -251,7 +250,7 @@ bool DexRegion::process()
     //DO NOT REQUEST PASS AFTER THIS LINE//
     ///////////////////////////////////////
 
-    BBList * bbl = get_bb_list();
+    BBList * bbl = getBBList();
     if (bbl->get_elem_count() == 0) { return true; }
 
     ASSERT0(verifyIRandBB(bbl, this));
@@ -270,8 +269,8 @@ bool DexRegion::process()
               getDex2IR()->getVreg2PR(),
               original_prno2vreg,
               &m_var2pr);
-        LOG("\t\tdo DEX Register Allcation for '%s'", get_ru_name());
-        ra.perform(oc);
+        LOG("\t\tdo DEX Register Allcation for '%s'", getRegionName());
+        ra.perform(*oc);
         updateRAresult(ra, *getPrno2Vreg());
     } else {
         //Do not allocate register.

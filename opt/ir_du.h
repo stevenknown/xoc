@@ -47,11 +47,11 @@ namespace xoc {
 //    copyIRTreeDU
 //    changeUse
 //    changeDef
-//    get_may_def
-//    get_must_use
-//    get_may_use
+//    getMayDef
+//    getMustUse
+//    getMayUse
 //    get_must_def
-//    get_effect_ref
+//    getEffectRef
 //    get_effect_def_md
 //    get_exact_def_md
 //    get_effect_use_md
@@ -137,15 +137,15 @@ public:
 //Ud chains describe all of the might uses of the prior DEFINITION of md.
 //Du chains describe all effective USEs of once definition of md.
 //e.g:
-//        d1:a=   d2:a=   d3:a=
-//              \       |         /
-//                  b = a
-//              /            \
-//             d4: =b         d5: =b
-//        Ud chains:  a use def d1,d2,d3 stmt
-//        Du chains:  b's value will be used by d4,d5 stmt
-//If ir is stmt, this class indicate the USE expressions set.
-//If ir is expression, this class indicate the DEF stmt set.
+//  d1:a=   d2:a=   d3:a=
+//  \      |      /
+//     b   =   a
+//     |       |
+//  d4:..=b      d5:...=b
+//  Ud chains:  a use d1,d2,d3 stmt
+//  Du chains:  b's value used by d4,d5 stmt
+//If ir is stmt, this class indicates a set of USE expressions.
+//If ir is expression, this class indicates a set of DEF stmts.
 
 class DefDBitSetCoreHashAllocator {
     DefMiscBitSetMgr * m_sbs_mgr;
@@ -228,19 +228,19 @@ public:
 typedef HMap<IR*, DUSet*> IR2DU;
 
 //Def|Use information manager.
-#define COMP_EXP_RECOMPUTE             1 //Recompute MD reference, completely
-                                         //needs POINT-TO info.
-#define COMP_EXP_UPDATE_DU             2
-#define COMP_EXP_COLLECT_MUST_USE      4
+#define COMP_EXP_RECOMPUTE         1 //Recompute MD reference, completely
+                                     //needs POINT-TO info.
+#define COMP_EXP_UPDATE_DU         2
+#define COMP_EXP_COLLECT_MUST_USE  4
 
-#define SOL_UNDEF                      0
-#define SOL_AVAIL_REACH_DEF            0x1  //must be available reach-definition.
-#define SOL_REACH_DEF                  0x2  //may be reach-definition.
-#define SOL_AVAIL_EXPR                 0x4  //must be available expression.
-#define SOL_RU_REF                     0x8  //region's def/use mds.
-#define SOL_REF                        0x10 //referrenced mds.
-#define COMPUTE_PR_DU                  0x20 //compute PR du chain.
-#define COMPUTE_NOPR_DU                0x40 //compute Non-PR du chain.
+#define SOL_UNDEF                  0
+#define SOL_AVAIL_REACH_DEF        0x1  //compute Must-Available Reach-definition.
+#define SOL_REACH_DEF              0x2  //compute May-Available Reach-definition.
+#define SOL_AVAIL_EXPR             0x4  //compute Must-Available expression.
+#define SOL_RU_REF                 0x8  //compute Region referenced MayDef/MayUse.
+#define SOL_REF                    0x10 //compute IR referenced MD/MDSet.
+#define COMPUTE_PR_DU              0x20 //compute PR du chain.
+#define COMPUTE_NOPR_DU            0x40 //compute Non-PR du chain.
 
 class IR_DU_MGR : public Pass {
     friend class MDId2IRlist;
@@ -411,7 +411,7 @@ protected:
 
     bool hasSingleDefToMD(DUSet const& defset, MD const* md) const;
 
-    bool is_overlap_def_use(
+    bool isOverlapDefUse(
             MD const* mustdef,
             MDSet const* maydef,
             IR const* use);
@@ -422,7 +422,7 @@ protected:
     void inferStorePR(IR * ir, UINT duflag);
     void inferStoreArray(IR * ir, UINT duflag);
     void inferPhi(IR * ir, UINT duflag);
-    void inferCall(IR * ir, UINT duflag, IN MD2MDSet * mx);
+    void inferCallAndIcall(IR * ir, UINT duflag, IN MD2MDSet * mx);
 
     void solve(DefDBitSetCore const& expr_universe,
                UINT const flag,
@@ -435,7 +435,6 @@ protected:
     void updateDefWithMustEffectMD(IR * ir, MD const* musteffect);
     void updateDefWithMustExactMD(IR * ir, MD const* mustexact);
     void updateDef(IR * ir, UINT flag);
-    void updateRegion(IR * ir);
 public:
     explicit IR_DU_MGR(Region * ru);
     COPY_CONSTRUCTOR(IR_DU_MGR);
@@ -469,7 +468,8 @@ public:
             OUT DefDBitSetCore & expr_univers,
             DefMiscBitSetMgr & bsmgr);
     void computeMDDUforBB(IRBB * bb, UINT flag);
-    void computeMDRef(UINT duflag);
+    void computeCallRef(UINT duflag);
+    void computeMDRef(IN OUT OptCtx & oc, UINT duflag);
     void computeKillSet(
             DefDBitSetCoreReserveTab & dbitsetchash,
             Vector<MDSet*> const* mustdefs,
@@ -584,7 +584,7 @@ public:
         DUIter di = NULL;
         for (UINT i = (UINT)from_du->get_first(&di);
              di != NULL; i = (UINT)from_du->get_next(i, &di)) {
-            IR const* ref = m_ru->get_ir(i);
+            IR const* ref = m_ru->getIR(i);
             //ref may be stmt or exp.
 
             DUSet * ref_defuse_set = ref->getDUSet();
@@ -605,14 +605,14 @@ public:
                    DUSet * useset_of_from,
                    DefMiscBitSetMgr * m)
     {
-        ASSERT0(m_ru->get_ir(from)->is_stmt() &&
-                m_ru->get_ir(to)->is_stmt() &&
+        ASSERT0(m_ru->getIR(from)->is_stmt() &&
+                m_ru->getIR(to)->is_stmt() &&
                 useset_of_to && useset_of_from && m);
         DUIter di = NULL;
         for (INT i = useset_of_from->get_first(&di);
              di != NULL; i = useset_of_from->get_next((UINT)i, &di)) {
-            IR const* exp = m_ru->get_ir((UINT)i);
-            ASSERT0(exp->is_memory_ref());
+            IR const* exp = m_ru->getIR((UINT)i);
+            ASSERT0(exp->isMemoryRef());
 
             DUSet * defset = exp->getDUSet();
             if (defset == NULL) { continue; }
@@ -650,12 +650,12 @@ public:
                    DUSet * defset_of_from,
                    DefMiscBitSetMgr * m)
     {
-        ASSERT0(m_ru->get_ir(from)->is_exp() && m_ru->get_ir(to)->is_exp() &&
+        ASSERT0(m_ru->getIR(from)->is_exp() && m_ru->getIR(to)->is_exp() &&
                 defset_of_from && defset_of_to && m);
         DUIter di = NULL;
         for (INT i = defset_of_from->get_first(&di);
              di != NULL; i = defset_of_from->get_next((UINT)i, &di)) {
-            IR * stmt = m_ru->get_ir((UINT)i);
+            IR * stmt = m_ru->getIR((UINT)i);
             ASSERT0(stmt->is_stmt());
             DUSet * useset = stmt->getDUSet();
             if (useset == NULL) { continue; }
@@ -698,8 +698,8 @@ public:
     DefDBitSetCore * getAvailInExpr(UINT bbid, DefMiscBitSetMgr * mgr);
     DefDBitSetCore * getInReachDef(UINT bbid, DefMiscBitSetMgr * mgr);
     DefDBitSetCore * getAvailInReachDef(UINT bbid, DefMiscBitSetMgr * mgr);
-    virtual CHAR const* get_pass_name() const { return "DU Manager"; }
-    virtual PASS_TYPE get_pass_type() const { return PASS_DU_MGR; }
+    virtual CHAR const* getPassName() const { return "DU Manager"; }
+    virtual PASS_TYPE getPassType() const { return PASS_DU_MGR; }
 
     //DU chain operation.
     DUSet * getAndAllocDUSet(IR * ir);
@@ -718,7 +718,7 @@ public:
     MD const* get_effect_def_md(IR const* ir)
     {
         ASSERT0(ir && ir->is_stmt());
-        return ir->get_effect_ref();
+        return ir->getEffectRef();
     }
 
     //Return exact MD if ir defined.
@@ -731,21 +731,21 @@ public:
     }
 
     //Return the MayDef MD set.
-    MDSet const* get_may_def(IR const* ir)
+    MDSet const* getMayDef(IR const* ir)
     {
         ASSERT0(ir && ir->is_stmt());
         return ir->getRefMDSet();
     }
 
     //Return the MustUse MD.
-    MD const* get_must_use(IR const* ir)
+    MD const* getMustUse(IR const* ir)
     {
         ASSERT0(ir && ir->is_exp());
-        return ir->get_effect_ref();
+        return ir->getEffectRef();
     }
 
     //Return the MayUse MD set.
-    MDSet const* get_may_use(IR const* ir)
+    MDSet const* getMayUse(IR const* ir)
     {
         ASSERT0(ir && ir->is_exp());
         return ir->getRefMDSet();
@@ -762,7 +762,7 @@ public:
     MD const* get_effect_use_md(IR const* ir)
     {
         ASSERT0(ir && ir->is_exp());
-        return ir->get_effect_ref();
+        return ir->getEffectRef();
     }
     IR const* getExactAndUniqueDef(IR const* exp);
 
@@ -817,7 +817,7 @@ public:
         DUIter di = NULL;
         for (INT i = stmtset->get_first(&di);
              i >= 0; i = stmtset->get_next((UINT)i, &di)) {
-            IR * d = m_ru->get_ir((UINT)i);
+            IR * d = m_ru->getIR((UINT)i);
             ASSERT0(d->is_stmt());
             getAndAllocDUSet(d)->add_use(exp, *m_misc_bs_mgr);
         }
@@ -868,7 +868,7 @@ public:
         DUIter di = NULL;
         for (INT i = expset->get_first(&di);
              i >= 0; i = expset->get_next((UINT)i, &di)) {
-            IR * u = m_ru->get_ir((UINT)i);
+            IR * u = m_ru->getIR((UINT)i);
             ASSERT0(u->is_exp());
             getAndAllocDUSet(u)->add_def(stmt, *m_misc_bs_mgr);
         }

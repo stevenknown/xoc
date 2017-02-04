@@ -2459,8 +2459,7 @@ UINT MIP<Mat, T>::RecusivePart(
             status = IP_NO_PRI_FEASIBLE_SOL;
             break;
         case SIX_TIME_OUT:
-        default:
-            UNREACH();
+        default: UNREACH();
         }
         return status;
     }

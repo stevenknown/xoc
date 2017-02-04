@@ -43,8 +43,8 @@ IR_LCSE::IR_LCSE(Region * ru)
 {
     ASSERT0(ru != NULL);
     m_ru = ru;
-    m_tm = ru->get_type_mgr();
-    m_du = m_ru->get_du_mgr();
+    m_tm = ru->getTypeMgr();
+    m_du = m_ru->getDUMgr();
     ASSERT0(m_du && m_tm);
     m_expr_tab = NULL;
     m_expr_vec = NULL;
@@ -204,8 +204,7 @@ IR * IR_LCSE::hoist_cse(IN IRBB * bb, IN IR * ir_pos, IN ExpRep * ie)
             ir_pos->setParentPointer(false);
         }
         break;
-    default:
-        UNREACH();
+    default: UNREACH();
     } //end switch
     return NULL;
 }
@@ -218,7 +217,7 @@ bool IR_LCSE::processBranch(
         IN OUT Vector<IR*> & map_expr2avail_pos,
         IN OUT Vector<IR*> & map_expr2avail_pr)
 {
-    ASSERT0(ir->is_cond_br());
+    ASSERT0(ir->isConditionalBr());
     bool change = false;
     if (!canBeCandidate(BR_det(ir))) { return false; }
     ExpRep * ie = m_expr_tab->map_ir2ir_expr(BR_det(ir));
@@ -304,7 +303,7 @@ IR * IR_LCSE::processExp(
 bool IR_LCSE::canBeCandidate(IR * ir)
 {
     if (!m_enable_filter) {
-        return ir->is_binary_op() ||
+        return ir->isBinaryOp() ||
             ir->is_bnot() ||
             ir->is_lnot() ||
             ir->is_neg();
@@ -321,7 +320,7 @@ bool IR_LCSE::canBeCandidate(IR * ir)
         //    But CP will progagate P1 because ILD is the copy-prop candidate.
         return false;
     }
-    return ir->is_binary_op() || ir->is_bnot() || ir->is_lnot() || ir->is_neg();
+    return ir->isBinaryOp() || ir->is_bnot() || ir->is_lnot() || ir->is_neg();
 }
 
 
@@ -539,8 +538,7 @@ bool IR_LCSE::processUse(IN IRBB * bb, IN IR * ir,
             }
         }
         break;
-    default:
-        UNREACH();
+    default: UNREACH();
     } //end switch
     return change;
 }
@@ -564,7 +562,7 @@ bool IR_LCSE::processDef(
     case IR_RETURN:
         {
             //Compute killed ir-expr.
-            MDSet const* maydef = m_du->get_may_def(ir);
+            MDSet const* maydef = m_du->getMayDef(ir);
             MD const* mustdef = m_du->get_must_def(ir);
             if ((maydef != NULL && !maydef->is_empty()) ||
                 mustdef != NULL) {
@@ -620,17 +618,17 @@ bool IR_LCSE::perform(OptCtx & oc)
                                  PASS_EXPR_TAB, PASS_UNDEF);
 
     if (!OC_is_du_chain_valid(oc)) {
-        END_TIMER_AFTER(get_pass_name());
+        END_TIMER_AFTER(getPassName());
         return false;
     }
 
-    m_expr_tab = (IR_EXPR_TAB*)m_ru->get_pass_mgr()->registerPass(PASS_EXPR_TAB);
+    m_expr_tab = (IR_EXPR_TAB*)m_ru->getPassMgr()->registerPass(PASS_EXPR_TAB);
     ASSERT0(m_expr_tab);
 
     m_expr_vec = m_expr_tab->get_expr_vec();
     ASSERT0(m_expr_vec);
 
-    BBList * bbl = m_ru->get_bb_list();
+    BBList * bbl = m_ru->getBBList();
 
     bool change = false;
 
@@ -675,7 +673,7 @@ bool IR_LCSE::perform(OptCtx & oc)
         OC_is_du_chain_valid(oc) = false;
         OC_is_ref_valid(oc) = false;
     }
-    END_TIMER_AFTER(get_pass_name());
+    END_TIMER_AFTER(getPassName());
     return change;
 }
 //END IR_LCSE

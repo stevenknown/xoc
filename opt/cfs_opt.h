@@ -49,12 +49,12 @@ protected:
     bool hoistLoop(IR ** head, IR * ir);
     bool hoistIf(IR ** head, IR * ir);
 public:
-    IR_CFS_OPT(Region * ru) { m_ru = ru; m_tm = ru->get_type_mgr(); }
+    IR_CFS_OPT(Region * ru) { m_ru = ru; m_tm = ru->getTypeMgr(); }
     ~IR_CFS_OPT() {}
 
     void dump();
 
-    virtual CHAR const* get_pass_name() const { return "IR_CFS_OPT"; }
+    virtual CHAR const* getPassName() const { return "IR_CFS_OPT"; }
 
     bool CfsOpt(IN OUT IR ** ir_list, SimpCtx const& sc);
     virtual bool perform(OptCtx &)

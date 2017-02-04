@@ -62,7 +62,7 @@ public:
     explicit DontPromotTab(Region * ru)
     {
         ASSERT0(ru);
-        m_md_sys = ru->get_md_sys();
+        m_md_sys = ru->getMDSystem();
     }
     COPY_CONSTRUCTOR(DontPromotTab);
 
@@ -87,7 +87,7 @@ public:
         for (INT i = get_first(&iter); i >= 0; i = get_next(i, &iter)) {
             MD const* t = m_md_sys->get_md(i);
             ASSERT0(t);
-            t->dump(m_md_sys->get_type_mgr());
+            t->dump(m_md_sys->getTypeMgr());
         }
 
         fflush(g_tfile);
@@ -207,7 +207,7 @@ protected:
             OUT List<IR*> & exact_occ_list,
             OUT TTab<IR*> & inexact_access);
 
-    bool is_may_throw(IR * ir, IRIter & iter);
+    bool isMayThrow(IR * ir, IRIter & iter);
     bool mayBeGlobalRef(IR * ref)
     {
         MD const* md = ref->getRefMD();
@@ -227,11 +227,11 @@ protected:
     }
 
     bool scanOpnd(IR * ir,
-                 LI<IRBB> const* li,
-                 OUT TMap<MD const*, IR*> & exact_access,
-                 OUT List<IR*> & exact_occ_list,
-                 OUT TTab<IR*> & inexact_access,
-                 IRIter & ii);
+                  LI<IRBB> const* li,
+                  OUT TMap<MD const*, IR*> & exact_access,
+                  OUT List<IR*> & exact_occ_list,
+                  OUT TTab<IR*> & inexact_access,
+                  IRIter & ii);
     bool scanResult(IN IR * ir,
                     LI<IRBB> const* li,
                     OUT TMap<MD const*, IR*> & exact_access,
@@ -243,7 +243,7 @@ protected:
                 OUT TTab<IR*> & inexact_access,
                 OUT List<IR*> & exact_occ_list,
                 IRIter & ii);
-    bool should_be_promoted(IR const* occ, List<IR*> & exact_occ_list);
+    bool shouldBePromoted(IR const* occ, List<IR*> & exact_occ_list);
 
     bool promoteInexactAccess(
             LI<IRBB> const* li,
@@ -286,17 +286,17 @@ public:
     {
         ASSERT0(ru != NULL);
         m_ru = ru;
-        m_md_sys = ru->get_md_sys();
-        m_cfg = ru->get_cfg();
-        m_tm = ru->get_type_mgr();
-        m_du = ru->get_du_mgr();
-        m_mds_mgr = ru->get_mds_mgr();
+        m_md_sys = ru->getMDSystem();
+        m_cfg = ru->getCFG();
+        m_tm = ru->getTypeMgr();
+        m_du = ru->getDUMgr();
+        m_mds_mgr = ru->getMDSetMgr();
         m_misc_bs_mgr = ru->getMiscBitSetMgr();
         m_gvn = gvn;
         m_is_insert_bb = false;
         m_ssamgr = NULL;
 
-        UINT c = MAX(11, m_ru->get_md_sys()->get_num_of_md());
+        UINT c = MAX(11, m_ru->getMDSystem()->get_num_of_md());
         m_md2lt_map = new MD2MDLifeTime(c);
         m_mdlt_count = 0;
         m_pool = smpoolCreate(2 * sizeof(MD_LT), MEM_COMM);
@@ -358,15 +358,15 @@ public:
 
     //Return true if 'ir' can be promoted.
     //Note ir must be memory reference.
-    virtual bool is_promotable(IR const* ir) const
+    virtual bool isPromotable(IR const* ir) const
     {
-        ASSERT0(ir->is_memory_ref());
+        ASSERT0(ir->isMemoryRef());
         //I think the reference that may throw is promotable.
         return !IR_has_sideeffect(ir) && !IR_no_move(ir);
     }
 
-    virtual CHAR const* get_pass_name() const { return "Register Promotion"; }
-    PASS_TYPE get_pass_type() const { return PASS_RP; }
+    virtual CHAR const* getPassName() const { return "Register Promotion"; }
+    PASS_TYPE getPassType() const { return PASS_RP; }
 
     virtual bool perform(OptCtx & oc);
 };
