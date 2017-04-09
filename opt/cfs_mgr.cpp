@@ -62,13 +62,13 @@ CFS_INFO * CfsMgr::new_cfs_info(IR_TYPE irtype)
 
 void CfsMgr::set_map_ir2cfsinfo(IR * ir, CFS_INFO * ci)
 {
-    m_map_ir2cfsinfo.set(IR_id(ir), ci);
+    m_map_ir2cfsinfo.set(ir->id(), ci);
 }
 
 
 CFS_INFO * CfsMgr::map_ir2cfsinfo(IR * ir)
 {
-    return m_map_ir2cfsinfo.get(IR_id(ir));
+    return m_map_ir2cfsinfo.get(ir->id());
 }
 
 
@@ -305,7 +305,7 @@ AbsNode * CfsMgr::constructAbsTree(
         for (v = g.get_first_vertex(c); v != NULL; v = g.get_next_vertex(c)) {
             if (g.get_in_degree(v) == 0) {
                 ASSERT(cand == NULL, ("multiple immediate-post-dominators"));
-                cand = cfg->get_bb(VERTEX_id(v));
+                cand = cfg->getBB(VERTEX_id(v));
             }
         }
 

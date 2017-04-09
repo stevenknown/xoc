@@ -657,11 +657,11 @@ public:
 
     //Set 'md' points to whole memory.
     void setPointToAllMem(UINT mdid, OUT MD2MDSet & ctx)
-    { setPointToMDSetByAddMD(mdid, ctx, m_md_sys->get_md(MD_FULL_MEM)); }
+    { setPointToMDSetByAddMD(mdid, ctx, m_md_sys->getMD(MD_FULL_MEM)); }
 
     //Set md points to whole global memory.
     void setPointToGlobalMem(UINT mdid, OUT MD2MDSet & ctx)
-    { setPointToMDSetByAddMD(mdid, ctx, m_md_sys->get_md(MD_GLOBAL_MEM)); }
+    { setPointToMDSetByAddMD(mdid, ctx, m_md_sys->getMD(MD_GLOBAL_MEM)); }
 
     void set_flow_sensitive(bool is_sensitive)
     { m_flow_sensitive = (BYTE)is_sensitive; }

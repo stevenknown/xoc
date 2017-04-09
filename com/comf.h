@@ -45,7 +45,7 @@ namespace xcom {
 //-Werror=unused-variable.
 //#define UNUSED(v) (v)
 template <typename T> void dummy_use(T const&) {}
-#define UNUSED(v) dummy_use(v)
+#define UNUSED(v) xcom::dummy_use(v)
 
 
 #ifdef _DEBUG_

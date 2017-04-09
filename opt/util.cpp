@@ -96,9 +96,9 @@ void initdump(CHAR const* f, bool is_del)
     }
     g_tfile = fopen(f, "a+");
     if (g_tfile == NULL) {
-        fprintf(stdout,
-                "can not open dump file %s, errno:%d, errstring:\'%s\'",
-                f, errno, strerror(errno));
+        fprintf(stderr, 
+            "\ncan not open dump file %s, errno:%d, errstring:\'%s\'\n",
+            f, errno, strerror(errno));
     }
 }
 
@@ -170,7 +170,6 @@ void tfree()
 
 void dumpIndent(FILE * h, UINT indent)
 {
-    ASSERT0(indent < 10000);
     for (; indent > 0; indent--) {
         fprintf(h, "%c", g_indent_chars);
     }

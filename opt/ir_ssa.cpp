@@ -41,12 +41,6 @@ namespace xoc {
 //
 //START DfMgr
 //
-DfMgr::DfMgr(IR_SSA_MGR * sm)
-{
-    m_ssa_mgr = sm;
-}
-
-
 //Get the BB set where 'v' is the dominate frontier of them.
 BitSet * DfMgr::get_df_ctrlset(Vertex const* v)
 {
@@ -79,7 +73,7 @@ void DfMgr::dump(DGraph & g)
     for (Vertex const* v = g.get_first_vertex(c);
          v != NULL; v = g.get_next_vertex(c)) {
         UINT vid = VERTEX_id(v);
-        fprintf(g_tfile, "\nVEX%d DF controlled: ", VERTEX_id(v));
+        fprintf(g_tfile, "\nBB%d DF controlled: ", vid);
         BitSet const* df = m_df_vec.get(vid);
         if (df != NULL) {
             for (INT i = df->get_first(); i >= 0; i = df->get_next(i)) {
@@ -137,7 +131,7 @@ SSAGraph::SSAGraph(Region * ru, IR_SSA_MGR * ssamgr)
     ASSERT0(ru && ssamgr);
     m_ru = ru;
     m_ssa_mgr = ssamgr;
-    Vector<VP*> const* vp_vec = ssamgr->get_vp_vec();
+    Vector<VP*> const* vp_vec = ssamgr->getVPVec();
     UINT inputcount = 1;
     for (INT i = 1; i <= vp_vec->get_last_idx(); i++) {
         VP * v = vp_vec->get(i);
@@ -160,13 +154,13 @@ SSAGraph::SSAGraph(Region * ru, IR_SSA_MGR * ssamgr)
             }
         } else {
             ASSERT0(def->is_stmt());
-            addVertex(IR_id(def));
+            addVertex(def->id());
             SSAUseIter vit = NULL;
             for (INT i2 = SSA_uses(v).get_first(&vit);
                  vit != NULL; i2 = SSA_uses(v).get_next(i2, &vit)) {
                 IR * use = m_ru->getIR(i2);
                 ASSERT0(use->is_pr());
-                addEdge(IR_id(def), IR_id(use->get_stmt()));
+                addEdge(def->id(), IR_id(use->get_stmt()));
             }
         }
     }
@@ -255,7 +249,7 @@ void SSAGraph::dump(CHAR const* name, bool detail)
         IR * res = def->getResultPR();
         if (res != NULL) {
             fprintf(h, "\nnode: { title:\"%d\" shape:box fontname:\"courB\" "
-                        "color:gold label:\"", IR_id(def));
+                        "color:gold label:\"", def->id());
             for (IR * r = res; r != NULL; r = r->get_next()) {
                 VP * vp2 = (VP*)r->getSSAInfo();
                 fprintf(h, "P%uV%u ", VP_prno(vp2), VP_ver(vp2));
@@ -264,7 +258,7 @@ void SSAGraph::dump(CHAR const* name, bool detail)
         } else {
             fprintf(h, "\nnode: { title:\"%u\" shape:box fontname:\"courB\" "
                         "color:gold label:\" <-- ",
-                    IR_id(def));
+                    def->id());
         }
 
         lst.clean();
@@ -328,14 +322,14 @@ void IR_SSA_MGR::cleanPRNO2Stack()
 
 
 //Dump ssa du stmt graph.
-void IR_SSA_MGR::dump_ssa_graph(CHAR * name)
+void IR_SSA_MGR::dumpSSAGraph(CHAR * name)
 {
     SSAGraph sa(m_ru, this);
     sa.dump(name, true);
 }
 
 
-CHAR * IR_SSA_MGR::dump_vp(IN VP * v, OUT CHAR * buf)
+CHAR * IR_SSA_MGR::dumpVP(IN VP * v, OUT CHAR * buf)
 {
     sprintf(buf, "P%dV%d", VP_prno(v), VP_ver(v));
     return buf;
@@ -344,12 +338,12 @@ CHAR * IR_SSA_MGR::dump_vp(IN VP * v, OUT CHAR * buf)
 
 //This function dumps VP structure and SSA DU info.
 //have_renamed: set true if PRs have been renamed in construction.
-void IR_SSA_MGR::dump_all_vp(bool have_renamed)
+void IR_SSA_MGR::dumpAllVP(bool have_renamed)
 {
     if (g_tfile == NULL) return;
     fprintf(g_tfile, "\n==---- DUMP IR_SSA_MGR:VP_DU ----==\n");
 
-    Vector<VP*> const* vp_vec = get_vp_vec();
+    Vector<VP*> const* vp_vec = getVPVec();
     for (INT i = 1; i <= vp_vec->get_last_idx(); i++) {
         VP * v = vp_vec->get(i);
         ASSERT0(v != NULL);
@@ -364,14 +358,14 @@ void IR_SSA_MGR::dump_all_vp(bool have_renamed)
 
             if (def->is_stpr()) {
                 fprintf(g_tfile, "DEF:st pr%d,id%d",
-                        def->get_prno(), IR_id(def));
+                        def->get_prno(), def->id());
             } else if (def->is_phi()) {
                 fprintf(g_tfile, "DEF:phi pr%d,id%d",
-                        def->get_prno(), IR_id(def));
+                        def->get_prno(), def->id());
             } else if (def->isCallStmt()) {
                 fprintf(g_tfile, "DEF:call");
                 if (def->hasReturnValue()) {
-                    fprintf(g_tfile, " pr%d,id%d", def->get_prno(), IR_id(def));
+                    fprintf(g_tfile, " pr%d,id%d", def->get_prno(), def->id());
                 }
             } else {
                 ASSERT(0, ("not def stmt of PR"));
@@ -460,13 +454,6 @@ void IR_SSA_MGR::dump()
 }
 
 
-//Build dominance frontier.
-void IR_SSA_MGR::buildDomiateFrontier(OUT DfMgr & dfm)
-{
-    dfm.build((DGraph&)*m_cfg);
-}
-
-
 //Initialize VP for each PR.
 IR * IR_SSA_MGR::initVP(IN IR * ir)
 {
@@ -486,9 +473,7 @@ IR * IR_SSA_MGR::initVP(IN IR * ir)
     for (IR * kid = iterInit(ir, m_iter);
          kid != NULL; kid = iterNext(m_iter)) {
         if (ir->is_rhs(kid) && kid->is_pr()) {
-            PR_ssainfo(kid) = allocVP(PR_no(kid), 0);
-
-            //SSA_uses(PR_ssainfo(kid)).append(kid);
+            PR_ssainfo(kid) = allocVP(PR_no(kid), 0);            
             if (m_prno2ir.get(PR_no(kid)) == NULL) {
                 m_prno2ir.set(PR_no(kid), kid);
             }
@@ -538,9 +523,10 @@ void IR_SSA_MGR::insertPhi(UINT prno, IN IRBB * bb)
 void IR_SSA_MGR::placePhiForPR(
         UINT prno,
         IN List<IRBB*> * defbbs,
-        DfMgr & dfm,
+        DfMgr const& dfm,
         BitSet & visited,
-        List<IRBB*> & wl)
+        List<IRBB*> & wl,
+        Vector<DefSBitSet*> & defed_prs_vec)
 {
     visited.clean();
     wl.clean();
@@ -554,7 +540,7 @@ void IR_SSA_MGR::placePhiForPR(
         IRBB * bb = wl.remove_head();
 
         //Each basic block in dfcs is in dominance frontier of 'bb'.
-        BitSet const* dfcs = dfm.read_df_ctrlset(BB_id(bb));
+        BitSet const* dfcs = dfm.readDFControlSet(BB_id(bb));
         if (dfcs == NULL) { continue; }
 
         for (INT i = dfcs->get_first(); i >= 0; i = dfcs->get_next(i)) {
@@ -567,35 +553,16 @@ void IR_SSA_MGR::placePhiForPR(
 
             visited.bunion(i);
 
-            IRBB * ibb = m_cfg->get_bb(i);
+            IRBB * ibb = m_cfg->getBB(i);
             ASSERT0(ibb);
 
             //Redundant phi will be removed during refinePhi().
             insertPhi(prno, ibb);
 
+            ASSERT0(defed_prs_vec.get(i));
+            defed_prs_vec.get(i)->bunion(prno);
+
             wl.append_tail(ibb);
-        }
-    }
-}
-
-
-void IR_SSA_MGR::computeEffectPR(
-        IN OUT BitSet & effect_prs,
-        IN BitSet & defed_prs,
-        IN IRBB * bb,
-        IN PRDF & live_mgr,
-        IN Vector<BitSet*> & pr2defbb)
-{
-    for (INT i = defed_prs.get_first(); i >= 0; i = defed_prs.get_next(i)) {
-        BitSet * bbs = pr2defbb.get(i);
-        if (bbs == NULL) {
-            bbs = new BitSet();
-            pr2defbb.set(i, bbs);
-        }
-        bbs->bunion(BB_id(bb));
-
-        if (live_mgr.get_liveout(BB_id(bb))->is_contain(i)) {
-            effect_prs.bunion(i);
         }
     }
 }
@@ -606,7 +573,7 @@ void IR_SSA_MGR::computeEffectPR(
 //the phi is redundant.
 //common_def: record the common_def if the definition of all opnd is the same.
 //TODO: p=phi(m,p), the only use of p is phi. the phi is redundant.
-bool IR_SSA_MGR::is_redundant_phi(IR const* phi, OUT IR ** common_def) const
+bool IR_SSA_MGR::isRedundantPHI(IR const* phi, OUT IR ** common_def) const
 {
     ASSERT0(phi->is_phi());
 
@@ -651,24 +618,22 @@ bool IR_SSA_MGR::is_redundant_phi(IR const* phi, OUT IR ** common_def) const
 
 //Place phi and assign the v0 for each PR.
 //'effect_prs': record the pr which need to versioning.
-void IR_SSA_MGR::placePhi(IN DfMgr & dfm,
-                           OUT DefSBitSet & effect_prs,
-                           DefMiscBitSetMgr & bs_mgr,
-                           Vector<DefSBitSet*> & defed_prs_vec,
-                           List<IRBB*> & wl)
+void IR_SSA_MGR::placePhi(DfMgr const& dfm,
+                          OUT DefSBitSet & effect_prs,
+                          DefMiscBitSetMgr & bs_mgr,
+                          Vector<DefSBitSet*> & defed_prs_vec,
+                          List<IRBB*> & wl)
 {
     START_TIMERS("SSA: Place phi", t2);
-    //Record the defbb list for each pr.
+
+    //Record BBs which modified each PR.
     BBList * bblst = m_ru->getBBList();
     Vector<List<IRBB*>*> pr2defbb(bblst->get_elem_count()); //for local used.
 
-    //DefSBitSet defed_prs;
     for (IRBB * bb = bblst->get_head(); bb != NULL; bb = bblst->get_next()) {
-        //defed_prs.clean();
         DefSBitSet * bs = bs_mgr.allocSBitSet();
         defed_prs_vec.set(BB_id(bb), bs);
         collectDefinedPR(bb, *bs);
-        //computeEffectPR(effect_prs, tmp, bb, live_mgr, pr2defbb);
 
         //Regard all defined PR as effect, and they will be versioned later.
         effect_prs.bunion(*bs);
@@ -691,7 +656,7 @@ void IR_SSA_MGR::placePhi(IN DfMgr & dfm,
     SEGIter * cur = NULL;
     for (INT i = effect_prs.get_first(&cur);
          i >= 0; i = effect_prs.get_next(i, &cur)) {
-        placePhiForPR(i, pr2defbb.get(i), dfm, visited, wl);
+        placePhiForPR(i, pr2defbb.get(i), dfm, visited, wl, defed_prs_vec);
     }
     END_TIMERS(t2);
 
@@ -705,7 +670,7 @@ void IR_SSA_MGR::placePhi(IN DfMgr & dfm,
 
 
 //Rename vp from current version to the top-version on stack if it exist.
-void IR_SSA_MGR::rename_bb(IN IRBB * bb)
+void IR_SSA_MGR::renameBB(IN IRBB * bb)
 {
      for (IR * ir = BB_first_ir(bb); ir != NULL; ir = BB_next_ir(bb)) {
         if (!ir->is_phi()) {
@@ -804,7 +769,7 @@ void IR_SSA_MGR::handleBBRename(
         ASSERT0(ve);
         ve_vec->set(VP_prno(ve), ve);
     }
-    rename_bb(bb);
+    renameBB(bb);
 
     //Rename PHI opnd in successor BB.
     List<IRBB*> succs;
@@ -906,9 +871,9 @@ void IR_SSA_MGR::renameInDomTreeOrder(
             Vertex * dom_succ = EDGE_to(EC_edge(c));
             if (dom_succ == bbv) { continue; }
             if (!visited.is_contain(VERTEX_id(dom_succ))) {
-                ASSERT0(m_cfg->get_bb(VERTEX_id(dom_succ)));
+                ASSERT0(m_cfg->getBB(VERTEX_id(dom_succ)));
                 all_visited = false;
-                stk.push(m_cfg->get_bb(VERTEX_id(dom_succ)));
+                stk.push(m_cfg->getBB(VERTEX_id(dom_succ)));
                 break;
             }
             c = EC_next(c);
@@ -1009,9 +974,9 @@ void IR_SSA_MGR::destructionInDomTreeOrder(IRBB * root, Graph & domtree)
             Vertex * dom_succ = EDGE_to(EC_edge(c));
             if (dom_succ == bbv) { continue; }
             if (!visited.is_contain(VERTEX_id(dom_succ))) {
-                ASSERT0(m_cfg->get_bb(VERTEX_id(dom_succ)));
+                ASSERT0(m_cfg->getBB(VERTEX_id(dom_succ)));
                 all_visited = false;
-                stk.push(m_cfg->get_bb(VERTEX_id(dom_succ)));
+                stk.push(m_cfg->getBB(VERTEX_id(dom_succ)));
                 break;
             }
             c = EC_next(c);
@@ -1050,7 +1015,7 @@ void IR_SSA_MGR::destruction(DomTree & domtree)
 //by user.
 void IR_SSA_MGR::stripPhi(IR * phi, C<IR*> * phict)
 {
-    IRBB * bb = phi->get_bb();
+    IRBB * bb = phi->getBB();
     ASSERT0(bb);
 
     Vertex const* vex = m_cfg->get_vertex(BB_id(bb));
@@ -1086,7 +1051,7 @@ void IR_SSA_MGR::stripPhi(IR * phi, C<IR*> * phict)
             PR_no(phicopy), phicopy->get_type(), opndcopy);
         store_to_phicopy->copyRef(phicopy, m_ru);
 
-        IRBB * p = m_cfg->get_bb(pred);
+        IRBB * p = m_cfg->getBB(pred);
         ASSERT0(p);
         IR * plast = BB_last_ir(p);
 
@@ -1238,9 +1203,9 @@ bool IR_SSA_MGR::verifyVP()
             ASSERT(VP_ver(v) != 0, ("version can not be 0"));
             ASSERT0(def->is_stmt());
 
-            ASSERT(!defset.is_contain(IR_id(def)),
+            ASSERT(!defset.is_contain(def->id()),
                     ("DEF for each pr+version must be unique."));
-            defset.bunion(IR_id(def));
+            defset.bunion(def->id());
         }
 
         IR const* respr = NULL;
@@ -1293,9 +1258,9 @@ static void verify_ssainfo_core(IR * ir, BitSet & defset, Region * ru)
 
     if (ir->is_stmt()) {
         ASSERT(def == ir, ("ir does not have SSA du"));
-        ASSERT(!defset.is_contain(IR_id(ir)),
+        ASSERT(!defset.is_contain(ir->id()),
                 ("DEF for each pr+version must be unique."));
-        defset.bunion(IR_id(def));
+        defset.bunion(def->id());
     }
 
     IR const* respr = NULL;
@@ -1468,7 +1433,7 @@ void IR_SSA_MGR::refinePhi(List<IRBB*> & wl)
             if (!ir->is_phi()) { break; }
 
             IR * common_def = NULL;
-            if (is_redundant_phi(ir, &common_def)) {
+            if (isRedundantPHI(ir, &common_def)) {
                 for (IR const* opnd = PHI_opnd_list(ir);
                      opnd != NULL; opnd = opnd->get_next()) {
                     ASSERT0(opnd->is_phi_opnd());
@@ -1484,7 +1449,7 @@ void IR_SSA_MGR::refinePhi(List<IRBB*> & wl)
                         continue;
                     }
 
-                    IRBB * defbb = SSA_def(si)->get_bb();
+                    IRBB * defbb = SSA_def(si)->getBB();
 
                     ASSERT(defbb, ("defbb does not belong to any BB"));
 
@@ -1779,8 +1744,8 @@ void IR_SSA_MGR::construction(DomTree & domtree)
     ASSERT0(m_ru);
 
     START_TIMERS("SSA: DF Manager", t1);
-    DfMgr dfm(this);
-    buildDomiateFrontier(dfm);
+    DfMgr dfm;
+    dfm.build((DGraph&)*m_cfg); //Build dominance frontier.
     //dfm.dump((DGraph&)*m_cfg);
     END_TIMERS(t1);
 
@@ -1819,8 +1784,8 @@ void IR_SSA_MGR::construction(DomTree & domtree)
 bool verifySSAInfo(Region * ru)
 {
     IR_SSA_MGR * ssamgr =
-        (IR_SSA_MGR*)(ru->getPassMgr()->queryPass(PASS_SSA_MGR));
-    if (ssamgr != NULL && ssamgr->is_ssa_constructed()) {
+        (IR_SSA_MGR*)(ru->getPassMgr()->queryPass(PASS_PR_SSA_MGR));
+    if (ssamgr != NULL && ssamgr->isSSAConstructed()) {
         ASSERT0(ssamgr->verifySSAInfo());
         ASSERT0(ssamgr->verifyPhi(false));
     }

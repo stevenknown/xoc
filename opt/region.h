@@ -397,7 +397,7 @@ public:
         #ifdef CONST_IRT_SZ
         return IR_irt_size(ir);
         #else
-        return IRTSIZE(IR_code(ir));
+        return IRTSIZE(ir->get_code());
         #endif
     }
 
@@ -450,10 +450,7 @@ public:
 
     //Return IR pointer via the unique IR_id.
     IR * getIR(UINT irid) const
-    {
-        ASSERT0(REGION_analysis_instrument(this)->m_ir_vector.get(irid));
-        return REGION_analysis_instrument(this)->m_ir_vector.get(irid);
-    }
+    { return REGION_analysis_instrument(this)->m_ir_vector.get(irid); }
 
     //Return the vector that record all allocated IRs.
     Vector<IR*> * getIRVec() const

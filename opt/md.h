@@ -115,7 +115,7 @@ typedef enum _MD_TYPE {
 //        MD_UNBOUND. An unbound MD may be effect, but is definitly inexact.
 
 //Unique id of memory object.
-#define MD_id(md)                ((md)->id)
+#define MD_id(md)                ((md)->uid)
 
 //Each MD has a base, it is corresponding to an unique variable.
 #define MD_base(md)              ((md)->base)
@@ -142,7 +142,7 @@ typedef enum _MD_TYPE {
 
 class MD {
 public:
-    UINT id; //unique id.
+    UINT uid; //unique id.
     UINT ofst; //byte offsets relative to 'base'
     UINT size; //byte size of the memory block
     VAR * base;
@@ -173,7 +173,11 @@ public:
     }
 
     VAR * get_base() const { return MD_base(this); }
+    UINT get_ofst() const { return MD_ofst(this); }
+    UINT get_size() const { return MD_size(this); }
+    MD_TYPE get_type() const { return (MD_TYPE)MD_ty(this); }
 
+    UINT id() const { return MD_id(this); }
     //Return true if current md exactly cover 'm', such as:
     //current md: |-------|
     //m:            |----|
@@ -618,7 +622,7 @@ public:
 
     //Get registered MD.
     //NOTICE: DO NOT free the return value, because it is the registered one.
-    MD * get_md(UINT id)
+    MD * getMD(UINT id)
     {
         ASSERT0(id != 0);
         MD * md = m_id2md_map.get(id);
@@ -626,7 +630,7 @@ public:
         return md;
     }
 
-    MD const* read_md(UINT id) const
+    MD const* readMD(UINT id) const
     {
         ASSERT0(id != 0);
         MD * md = m_id2md_map.get(id);
@@ -635,14 +639,14 @@ public:
     }
 
     //Get MD TAB that described mds which under same base VAR.
-    MDTab * get_md_tab(VAR const* v)
+    MDTab * getMDTab(VAR const* v)
     {
         ASSERT0(v);
         return m_var2mdtab.get(v);
     }
 
-    UINT get_num_of_md() const { return m_id2md_map.get_elem_count(); }
-    MDId2MD const* get_id2md_map() const { return &m_id2md_map; }
+    UINT getNumOfMD() const { return m_id2md_map.get_elem_count(); }
+    MDId2MD const* getID2MDMap() const { return &m_id2md_map; }
 
     inline void freeMD(MD * md)
     {
@@ -671,7 +675,7 @@ bool MDSet::is_pr_set(MDSystem const* mdsys) const
     SEGIter * iter;
     for (INT i = get_first(&iter);
          i >= 0; i = get_next((UINT)i, &iter)) {
-        MD const* md = mdsys->read_md((UINT)i);
+        MD const* md = mdsys->readMD((UINT)i);
         ASSERT0(md);
         if (!md->is_pr()) { return false; }
     }
@@ -711,7 +715,7 @@ bool MDSet::is_overlap_ex(MD const* md, MDSystem const* mdsys) const
     SEGIter * iter;
     for (INT i = get_first(&iter);
          i >= 0; i = get_next((UINT)i, &iter)) {
-        MD const* t = const_cast<MDSystem*>(mdsys)->get_md((UINT)i);
+        MD const* t = const_cast<MDSystem*>(mdsys)->getMD((UINT)i);
         ASSERT0(t);
         if (t->is_overlap(md)) { return true; }
     }

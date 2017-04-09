@@ -78,7 +78,7 @@ protected:
 
     bool is_cfs(IR const* ir) const
     {
-        switch (IR_code(ir)) {
+        switch (ir->get_code()) {
         case IR_TRUEBR:
         case IR_FALSEBR:
         case IR_GOTO:

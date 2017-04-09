@@ -61,8 +61,7 @@ public:
                     //indicates a natural loop.
     BitSet * bb_set; //loop body elements
 
-    bool is_loop_reduction()
-    { return !has_early_exit; }
+    bool is_loop_reduction() { return !has_early_exit; }
 
     //Return true if bb is belong to current loop.
     //'bbid': id of BB.

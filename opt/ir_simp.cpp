@@ -978,19 +978,19 @@ void Region::simplifySelectKids(IR * ir, SimpCtx * ctx)
 {
     ASSERT0(ir && ir->is_select());
     for (UINT i = 0; i < IR_MAX_KID_NUM(ir); i++) {
-        IR * kid = ir->get_kid(i);
+        IR * kid = ir->getKid(i);
         if (kid == NULL) { continue; }
         IR * new_kid = simplifyExpression(kid, ctx);
 
         if (SIMP_to_lowest_height(ctx)) {
             if (!new_kid->is_leaf()) {
                 //Lower new_kid to PR.
-                ir->set_kid(i, simpToPR(new_kid, ctx));
+                ir->setKid(i, simpToPR(new_kid, ctx));
                 continue;
             }
         }
 
-        ir->set_kid(i, new_kid);
+        ir->setKid(i, new_kid);
     }
 }
 
@@ -1219,7 +1219,7 @@ IR * Region::simplifyArrayAddrExp(IR * ir, SimpCtx * ctx)
     ASSERT0(ARR_sub_list(ir));
 
     TypeMgr * dm = getTypeMgr(); //may generate new pointer type.
-    ASSERT0(ir->get_dtype_size(dm) > 0);
+    ASSERT0(ir->get_type_size(dm) > 0);
 
     //For n dimension array, enumb record the number
     //of elements at 0~n-1 dimension.
@@ -1315,7 +1315,7 @@ IR * Region::simplifyArrayAddrExp(IR * ir, SimpCtx * ctx)
     //Because that when 'sub' is pointer, the extra IR_MUL
     //operation will be generated.
     IR * array_addr = buildBinaryOpSimp(IR_ADD,
-        dm->getPointerType(ir->get_dtype_size(dm)), newbase, ofst_exp);
+        dm->getPointerType(ir->get_type_size(dm)), newbase, ofst_exp);
 
     if (SIMP_to_pr_mode(ctx) && !array_addr->is_pr()) {
         SimpCtx ttcont(*ctx);
@@ -1356,10 +1356,10 @@ IR * Region::simplifyBinAndUniExpression(IR * ir, SimpCtx * ctx)
     if (ir->is_ild() && !SIMP_ild_ist(ctx)) { return ir; }
 
     for (UINT i = 0; i < IR_MAX_KID_NUM(ir); i++) {
-        IR * kid = ir->get_kid(i);
+        IR * kid = ir->getKid(i);
         if (kid != NULL) {
             IR * x = simplifyExpression(kid, ctx);
-            ir->set_kid(i, x);
+            ir->setKid(i, x);
         }
     }
 
@@ -1369,7 +1369,7 @@ IR * Region::simplifyBinAndUniExpression(IR * ir, SimpCtx * ctx)
 
     //Do lowering.
     for (UINT i = 0; i < IR_MAX_KID_NUM(ir); i++) {
-        IR * k = ir->get_kid(i);
+        IR * k = ir->getKid(i);
         if (k == NULL) { continue; }
 
         //Lower ARRAY arith :
@@ -1379,7 +1379,7 @@ IR * Region::simplifyBinAndUniExpression(IR * ir, SimpCtx * ctx)
         //  t2 = b[i]
         //  t1 + t2
         if (SIMP_array_to_pr_mode(ctx) && k->is_array()) {
-            ir->set_kid(i, simpToPR(k, ctx));
+            ir->setKid(i, simpToPR(k, ctx));
         }
     }
 
@@ -1469,7 +1469,7 @@ IR * Region::simplifyJudgeDet(IR * ir, SimpCtx * ctx)
     if (ir == NULL) return NULL;
     ASSERT0(ir->is_judge());
     ASSERT0(ir->is_single());
-    switch (IR_code(ir)) {
+    switch (ir->get_code()) {
     case IR_LAND: //logical and &&
     case IR_LOR: //logical or ||
         {
@@ -1493,9 +1493,9 @@ IR * Region::simplifyJudgeDet(IR * ir, SimpCtx * ctx)
                 ir = newir;
             } else {
                 for (UINT i = 0; i < IR_MAX_KID_NUM(ir); i++) {
-                    IR * kid = ir->get_kid(i);
+                    IR * kid = ir->getKid(i);
                     if (kid != NULL) {
-                        ir->set_kid(i, simplifyExpression(kid, ctx));
+                        ir->setKid(i, simplifyExpression(kid, ctx));
                     }
                 }
             }
@@ -1523,9 +1523,9 @@ IR * Region::simplifyJudgeDet(IR * ir, SimpCtx * ctx)
                 ctx->unionBottomupFlag(tcont);
             } else {
                 for (UINT i = 0; i < IR_MAX_KID_NUM(ir); i++) {
-                    IR * kid = ir->get_kid(i);
+                    IR * kid = ir->getKid(i);
                     if (kid != NULL) {
-                        ir->set_kid(i, simplifyExpression(kid, ctx));
+                        ir->setKid(i, simplifyExpression(kid, ctx));
                     }
                 }
             }
@@ -1544,9 +1544,9 @@ IR * Region::simplifyJudgeDet(IR * ir, SimpCtx * ctx)
         {
             ASSERT0(IR_parent(ir));
             for (UINT i = 0; i < IR_MAX_KID_NUM(ir); i++) {
-                IR * kid = ir->get_kid(i);
+                IR * kid = ir->getKid(i);
                 if (kid != NULL) {
-                    ir->set_kid(i, simplifyExpression(kid, ctx));
+                    ir->setKid(i, simplifyExpression(kid, ctx));
                 }
             }
 
@@ -2023,9 +2023,9 @@ IR * Region::simplifyBranch(IR * ir, SimpCtx * ctx)
         ret_list = simplifyStmtList(ret_list, &tcont);
     } else {
         for (INT i = 0; i < IR_MAX_KID_NUM(ir); i++) {
-            IR * kid = ir->get_kid(i);
+            IR * kid = ir->getKid(i);
             if (kid != NULL) {
-                ir->set_kid(i, simplifyExpression(kid, &tcont));
+                ir->setKid(i, simplifyExpression(kid, &tcont));
                 if (SIMP_stmtlist(&tcont) != NULL) {
                     xcom::add_next(&ret_list, SIMP_stmtlist(&tcont));
                     SIMP_stmtlist(&tcont) = NULL;
@@ -2232,9 +2232,9 @@ IR * Region::simplifyStmt(IR * ir, SimpCtx * ctx)
             ASSERT0(SIMP_stmtlist(ctx) == NULL);
             SIMP_ret_array_val(&tcont) = true;
             for (INT i = 0; i < IR_MAX_KID_NUM(ir); i++) {
-                IR * kid = ir->get_kid(i);
+                IR * kid = ir->getKid(i);
                 if (kid != NULL) {
-                    ir->set_kid(i, simplifyExpression(kid, &tcont));
+                    ir->setKid(i, simplifyExpression(kid, &tcont));
                     ctx->unionBottomupFlag(tcont);
                     if (SIMP_stmtlist(&tcont) != NULL) {
                         xcom::add_next(&ret_list, SIMP_stmtlist(&tcont));
@@ -2355,7 +2355,7 @@ void Region::simplifyBB(IRBB * bb, SimpCtx * ctx)
         IR * newstmt_lst = simplifyStmt(stmt, ctx);
         while (newstmt_lst != NULL) {
             IR * newir = xcom::removehead(&newstmt_lst);
-            newir->set_bb(bb);
+            newir->setBB(bb);
             ASSERT0(newir->verify(this));
             new_ir_list.append_tail(newir);
         }

@@ -54,7 +54,7 @@ C<IR*> * BBIRList::append_tail_ex(IR * ir)
     }
 
     ASSERT0(m_bb);
-    ir->set_bb(m_bb);
+    ir->setBB(m_bb);
     if (ct == NULL) {
         //The only one stmt of BB is down boundary or bb is empty.
         return EList<IR*, IR2Holder>::append_head(ir);
@@ -137,7 +137,7 @@ void IRBB::dump(Region * ru, bool dump_inner_region)
     TypeMgr * dm = ru->getTypeMgr();
     for (IR * ir = BB_first_ir(this);
          ir != NULL; ir = BB_irlist(this).get_next()) {
-        ASSERT0(ir->is_single() && ir->get_bb() == this);
+        ASSERT0(ir->is_single() && ir->getBB() == this);
         dump_ir(ir, dm, NULL, true, true, false, dump_inner_region);
     }
     g_indent -= 3;
@@ -154,8 +154,8 @@ void IRBB::verify()
     for (IR * ir = BB_irlist(this).get_head(&ct);
          ir != NULL; ir = BB_irlist(this).get_next(&ct)) {
         ASSERT0(ir->is_single());
-        ASSERT0(ir->get_bb() == this);
-        switch (IR_code(ir)) {
+        ASSERT0(ir->getBB() == this);
+        switch (ir->get_code()) {
         case IR_ST:
         case IR_STPR:
         case IR_STARRAY:
@@ -192,7 +192,7 @@ bool IRBB::successorHasPhi(CFG<IRBB, IR> * cfg)
     for (EdgeC * out = VERTEX_out_list(vex);
          out != NULL; out = EC_next(out)) {
         Vertex * succ_vex = EDGE_to(EC_edge(out));
-        IRBB * succ = cfg->get_bb(VERTEX_id(succ_vex));
+        IRBB * succ = cfg->getBB(VERTEX_id(succ_vex));
         ASSERT0(succ);
 
         for (IR * ir = BB_first_ir(succ);
@@ -214,7 +214,7 @@ void IRBB::dupSuccessorPhiOpnd(CFG<IRBB, IR> * cfg, Region * ru, UINT opnd_pos)
     for (EdgeC * out = VERTEX_out_list(vex);
          out != NULL; out = EC_next(out)) {
         Vertex * succ_vex = EDGE_to(EC_edge(out));
-        IRBB * succ = ircfg->get_bb(VERTEX_id(succ_vex));
+        IRBB * succ = ircfg->getBB(VERTEX_id(succ_vex));
         ASSERT0(succ);
 
         for (IR * ir = BB_first_ir(succ);
@@ -285,7 +285,7 @@ void IRBB::removeSuccessorPhiOpnd(CFG<IRBB, IR> * cfg)
     Vertex * vex = cfg->get_vertex(BB_id(this));
     ASSERT0(vex);
     for (EdgeC * out = VERTEX_out_list(vex); out != NULL; out = EC_next(out)) {
-        IRBB * succ = ((IR_CFG*)cfg)->get_bb(VERTEX_id(EDGE_to(EC_edge(out))));
+        IRBB * succ = ((IR_CFG*)cfg)->getBB(VERTEX_id(EDGE_to(EC_edge(out))));
         ASSERT0(succ);
         removeSuccessorDesignatePhiOpnd(cfg, succ);
     }

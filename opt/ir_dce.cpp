@@ -63,7 +63,7 @@ void IR_DCE::dump(EFFECT_STMT const& is_stmt_effect,
             ASSERT0(ir != NULL);
             fprintf(g_tfile, "\n");
             dump_ir(ir, m_tm);
-            if (!is_stmt_effect.is_contain(IR_id(ir))) {
+            if (!is_stmt_effect.is_contain(ir->id())) {
                 fprintf(g_tfile, "\t\tremove!");
             }
         }
@@ -82,7 +82,7 @@ void IR_DCE::dump(EFFECT_STMT const& is_stmt_effect,
         for (INT j = 0; j <= ir_vec->get_last_idx(); j++) {
             IR * ir = ir_vec->get(j);
             ASSERT0(ir != NULL);
-            if (!is_stmt_effect.is_contain(IR_id(ir))) {
+            if (!is_stmt_effect.is_contain(ir->id())) {
                 fprintf(g_tfile, "\n");
                 dump_ir(ir, m_tm);
                 fprintf(g_tfile, "\t\tremove!");
@@ -115,7 +115,7 @@ bool IR_DCE::check_stmt(IR const* ir)
             SEGIter * iter;
             for (INT i = maydefs->get_first(&iter);
                  i >= 0; i = maydefs->get_next(i, &iter)) {
-                MD * md = m_md_sys->get_md(i);
+                MD * md = m_md_sys->getMD(i);
                 ASSERT0(md);
                 if (is_effect_write(md->get_base())) {
                     return true;
@@ -147,7 +147,7 @@ bool IR_DCE::check_stmt(IR const* ir)
                 SEGIter * iter;
                 for (INT i = mds->get_first(&iter);
                      i != -1; i = mds->get_next(i, &iter)) {
-                    MD * md2 = m_md_sys->get_md(i);
+                    MD * md2 = m_md_sys->getMD(i);
                     ASSERT0(md2 != NULL);
                     if (is_effect_read(md2->get_base())) {
                         return true;
@@ -178,7 +178,7 @@ void IR_DCE::mark_effect_ir(IN OUT EFFECT_STMT & is_stmt_effect,
          bb != NULL; bb = bbl->get_next(&ct)) {
         for (IR const* ir = BB_first_ir(bb);
              ir != NULL; ir = BB_next_ir(bb)) {
-            switch (IR_code(ir)) {
+            switch (ir->get_code()) {
             case IR_RETURN:
                 //Do NOT set exit-bb to be effect.
                 //That will generate redundant control-flow dependence.
@@ -189,13 +189,13 @@ void IR_DCE::mark_effect_ir(IN OUT EFFECT_STMT & is_stmt_effect,
                 //    RETURN //EXIT BB
                 //IF clause stmt is redundant code.
                 is_bb_effect.bunion(BB_id(bb));
-                is_stmt_effect.bunion(IR_id(ir));
+                is_stmt_effect.bunion(ir->id());
                 work_list.append_tail(ir);
                 break;
             case IR_CALL:
             case IR_ICALL:
                 if (check_call(ir)) {
-                    is_stmt_effect.bunion(IR_id(ir));
+                    is_stmt_effect.bunion(ir->id());
                     is_bb_effect.bunion(BB_id(bb));
                     work_list.append_tail(ir);
                 }
@@ -205,7 +205,7 @@ void IR_DCE::mark_effect_ir(IN OUT EFFECT_STMT & is_stmt_effect,
             case IR_GOTO:
             case IR_IGOTO:
                 if (!m_is_elim_cfs) {
-                    is_stmt_effect.bunion(IR_id(ir));
+                    is_stmt_effect.bunion(ir->id());
                     is_bb_effect.bunion(BB_id(bb));
                     work_list.append_tail(ir);
                 }
@@ -213,7 +213,7 @@ void IR_DCE::mark_effect_ir(IN OUT EFFECT_STMT & is_stmt_effect,
             default:
                 {
                     if (check_stmt(ir)) {
-                        is_stmt_effect.bunion(IR_id(ir));
+                        is_stmt_effect.bunion(ir->id());
                         is_bb_effect.bunion(BB_id(bb));
                         work_list.append_tail(ir);
                     }
@@ -229,11 +229,11 @@ bool IR_DCE::find_effect_kid(IN IRBB * bb,
                              IN EFFECT_STMT & is_stmt_effect)
 {
     ASSERT0(m_cfg && m_cdg);
-    ASSERT0(ir->get_bb() == bb);
+    ASSERT0(ir->getBB() == bb);
     if (ir->isConditionalBr() || ir->isMultiConditionalBr()) {
         EdgeC const* ec = VERTEX_out_list(m_cdg->get_vertex(BB_id(bb)));
         while (ec != NULL) {
-            IRBB * succ = m_cfg->get_bb(VERTEX_id(EDGE_to(EC_edge(ec))));
+            IRBB * succ = m_cfg->getBB(VERTEX_id(EDGE_to(EC_edge(ec))));
             ASSERT0(succ != NULL);
             for (IR * r = BB_irlist(succ).get_head();
                  r != NULL; r = BB_irlist(succ).get_next()) {
@@ -250,7 +250,7 @@ bool IR_DCE::find_effect_kid(IN IRBB * bb,
             EdgeC const* ecs = VERTEX_out_list(m_cdg->get_vertex(cd_pred));
             while (ecs != NULL) {
                 INT cd_succ = VERTEX_id(EDGE_to(EC_edge(ecs)));
-                IRBB * succ = m_cfg->get_bb(cd_succ);
+                IRBB * succ = m_cfg->getBB(cd_succ);
                 ASSERT(succ, ("BB%d does not on CFG", cd_succ));
                 for (IR * r = BB_irlist(succ).get_head();
                      r != NULL; r = BB_irlist(succ).get_next()) {
@@ -301,7 +301,7 @@ bool IR_DCE::preserve_cd(IN OUT BitSet & is_bb_effect,
                 UINT bbto = BB_rpo(bb);
                 while (ec != NULL) {
                     IRBB * pred =
-                        m_cfg->get_bb(VERTEX_id(EDGE_from(EC_edge(ec))));
+                        m_cfg->getBB(VERTEX_id(EDGE_from(EC_edge(ec))));
                     ASSERT0(pred);
 
                     if (BB_rpo(pred) > (INT)bbto &&
@@ -318,10 +318,10 @@ bool IR_DCE::preserve_cd(IN OUT BitSet & is_bb_effect,
             IR * ir = BB_last_ir(bb); //last IR of BB.
             ASSERT0(ir != NULL);
             if ((ir->isConditionalBr() || ir->isMultiConditionalBr()) &&
-                !is_stmt_effect.is_contain(IR_id(ir))) {
+                !is_stmt_effect.is_contain(ir->id())) {
                 //switch might have multiple succ-BB.
                 if (find_effect_kid(bb, ir, is_stmt_effect)) {
-                    is_stmt_effect.bunion(IR_id(ir));
+                    is_stmt_effect.bunion(ir->id());
                     act_ir_lst.append_tail(ir);
                     change = true;
                 }
@@ -338,9 +338,9 @@ bool IR_DCE::preserve_cd(IN OUT BitSet & is_bb_effect,
         IR * ir = BB_last_ir(bb); //last IR of BB.
         ASSERT0(ir);
 
-        if (ir->isUnconditionalBr() && !is_stmt_effect.is_contain(IR_id(ir))) {
+        if (ir->isUnconditionalBr() && !is_stmt_effect.is_contain(ir->id())) {
             if (find_effect_kid(bb, ir, is_stmt_effect)) {
-                is_stmt_effect.bunion(IR_id(ir));
+                is_stmt_effect.bunion(ir->id());
                 is_bb_effect.bunion(BB_id(bb));
                 act_ir_lst.append_tail(ir);
                 change = true;
@@ -381,8 +381,8 @@ void IR_DCE::iter_collect(IN OUT EFFECT_STMT & is_stmt_effect,
                             change = true;
                             pwlst2->append_tail(d);
                             is_stmt_effect.bunion(IR_id(d));
-                            ASSERT0(d->get_bb() != NULL);
-                            is_bb_effect.bunion(BB_id(d->get_bb()));
+                            ASSERT0(d->getBB() != NULL);
+                            is_bb_effect.bunion(BB_id(d->getBB()));
                         }
                     }
                 } else {
@@ -398,8 +398,8 @@ void IR_DCE::iter_collect(IN OUT EFFECT_STMT & is_stmt_effect,
                             change = true;
                             pwlst2->append_tail(d);
                             is_stmt_effect.bunion(IR_id(d));
-                            ASSERT0(d->get_bb() != NULL);
-                            is_bb_effect.bunion(BB_id(d->get_bb()));
+                            ASSERT0(d->getBB() != NULL);
+                            is_bb_effect.bunion(BB_id(d->getBB()));
                         }
                     }
                 }
@@ -461,7 +461,7 @@ void IR_DCE::fix_control_flow(List<IRBB*> & bblst, List<C<IRBB*>*> & ctlst)
             if (!m_cdg->is_cd(BB_id(bb), VERTEX_id(s))) {
                 //See dce.c:lexrun(), bb5 control bb6, but not control bb8.
                 //if bb5 is empty, insert goto to bb8.
-                IRBB * tgt = m_cfg->get_bb(VERTEX_id(s));
+                IRBB * tgt = m_cfg->getBB(VERTEX_id(s));
                 ASSERT0(tgt);
 
                 //Find a normal label as target.
@@ -499,7 +499,7 @@ void IR_DCE::fix_control_flow(List<IRBB*> & bblst, List<C<IRBB*>*> & ctlst)
                 }
                 break;
             } else {
-                ASSERT0(BB_irlist(m_cfg->get_bb(VERTEX_id(s))).
+                ASSERT0(BB_irlist(m_cfg->getBB(VERTEX_id(s))).
                          get_elem_count() == 0);
             }
             vout = EC_next(vout);
@@ -549,7 +549,7 @@ void IR_DCE::revise_successor(IRBB * bb, C<IRBB*> * bbct, BBList * bbl)
             continue;
         }
 
-        IRBB * succ_bb = m_cfg->get_bb(VERTEX_id(EDGE_to(e)));
+        IRBB * succ_bb = m_cfg->getBB(VERTEX_id(EDGE_to(e)));
         ASSERT0(succ_bb);
 
         if (succ_bb != next_bb) {

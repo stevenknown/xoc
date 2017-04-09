@@ -36,29 +36,31 @@ author: Su Zhenyu
 
 namespace xoc {
 
-/* How to use AIContainer?
-1. Allocate AIContainer from Region.
-2. Construct your data structure to be attached.
-3. Set the AIContainer type and the data structure.
+class MDSSAInfo;
 
-e.g:
-    IR * ir = ...; Given IR.
-    IR_ai(ir) = region->allocAIContainer();
-    Dbx * dbx = getDbx();
-    IR_ai(ir)->set(AI_DBX, (BaseAttachInfo*)dbx);
-
-Note that you do not need to free/delete AI structure.
-They will be freed at destructor of region. */
+//Usage of AIContainer:
+//1.Allocate AIContainer from Region.
+//2.Construct your data structure to be contained.
+//3.Set the AIContainer type and the data structure.
+//
+//e.g: use DBX AI.
+//  IR * ir = ...; //Given IR.
+//  IR_ai(ir) = region->allocAIContainer();
+//  Dbx * dbx = getDbx();
+//  IR_ai(ir)->set(AI_DBX, (BaseAttachInfo*)dbx);
+//  Note that you do not need to free/delete AI structure, 
+//  which will be freed in destructor of region.
 
 //Attach Info Type.
 typedef enum _AI_TYPE {
     AI_UNDEF = 0,
-    AI_DBX, //Debug Info
-    AI_PROF, //Profile Info
-    AI_TBAA, //Type Based AA
-    AI_EH_LABEL, //Record a list of Labels.
-    AI_USER_DEF, //User Defined
-    AI_LAST, //The number of ai type.
+    AI_DBX,       //Debug Info
+    AI_PROF,      //Profile Info
+    AI_TBAA,      //Type Based AA
+    AI_EH_LABEL,  //Record a list of Labels.
+    AI_USER_DEF,  //User Defined
+    AI_MD_SSA,    //MD SSA info
+    AI_LAST,      //The number of ai type.
 } AI_TYPE;
 
 
@@ -75,7 +77,7 @@ public:
 };
 
 
-//This class represent container of miscellaneous AttachInfo.
+//This class represents container of miscellaneous AttachInfo.
 typedef SimpleVec<BaseAttachInfo*, 1> AICont;
 class AIContainer {
 protected:
@@ -108,8 +110,12 @@ public:
     {
         if (!cont.is_init()) { return; }
         ASSERT0(type > AI_UNDEF && type < AI_LAST);
-        if ((UINT)type < cont.get_capacity()) {
-            cont.set((UINT)type, NULL);
+        for (UINT i = 0; i < cont.get_capacity(); i++) {
+            BaseAttachInfo * ac = cont.get(i);            
+            if (ac != NULL && ac->type == type) {
+                cont.set(i, NULL);
+                return;
+            }
         }
     }
 
@@ -168,6 +174,7 @@ public:
         case AI_TBAA: return "Tbaa";
         case AI_EH_LABEL: return "EH";
         case AI_USER_DEF: return "UserDef";
+        case AI_MD_SSA: return "SSA";
         case AI_LAST:;
         default: UNREACH();
         }
@@ -190,8 +197,7 @@ public:
     void init(SMemPool * pool)
     {
         BaseAttachInfo::init(AI_EH_LABEL);
-        labels.init();
-        labels.set_pool(pool);
+        labels.init(pool);        
     }
 
     SList<LabelInfo*> const& read_labels() const { return labels; }
@@ -239,6 +245,13 @@ public:
 
     TbaaAttachInfo() : BaseAttachInfo(AI_TBAA) { type = NULL; }
     COPY_CONSTRUCTOR(TbaaAttachInfo);
+};
+
+
+class MDSSAInfoAttachInfo : public BaseAttachInfo {
+public:
+    MDSSAInfoAttachInfo() : BaseAttachInfo(AI_MD_SSA) {}
+    COPY_CONSTRUCTOR(MDSSAInfoAttachInfo);
 };
 
 } //namespace xoc

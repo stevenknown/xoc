@@ -47,6 +47,8 @@ author: Su Zhenyu
 #include "ai.h"
 #include "du.h"
 #include "ir.h"
+#include "prssainfo.h"
+#include "mdssainfo.h"
 #include "ir_bb.h"
 #include "ir_refine.h"
 #include "ir_simp.h"

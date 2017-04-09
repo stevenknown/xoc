@@ -242,6 +242,17 @@ inline T * removehead(T ** pheader)
 
 
 template <class T>
+inline T * removehead_single_list(T ** pheader)
+{
+    if (pheader == NULL || *pheader == NULL) return NULL;
+    T * t = *pheader;
+    *pheader = t->next;
+    t->next = NULL;
+    return t;
+}
+
+
+template <class T>
 inline T * removetail(T ** pheader)
 {
     if (pheader == NULL || *pheader == NULL) { return NULL; }
@@ -409,7 +420,10 @@ public:
     T value;
 
 public:
-    C()
+    C() { init(); }
+    COPY_CONSTRUCTOR(C<T>);
+
+    void init()
     {
         prev = next = NULL;
         value = T(0); //The default value of container.
@@ -426,8 +440,12 @@ template <class T> class SC {
 public:
     SC<T> * next;
     T value;
+    
+public:
+    SC() { init(); }
+    COPY_CONSTRUCTOR(SC<T>);
 
-    SC()
+    void init()
     {
         next = NULL;
         value = T(0);
@@ -1511,7 +1529,7 @@ protected:
     }
 
     //Find the last element, and return the CONTAINER.
-    //This is a cost operation. Use it carefully.
+    //This is a costly operation. Use it carefully.
     inline SC<T> * get_tail() const
     {
         SC<T> * c = m_head.next;
@@ -1564,6 +1582,19 @@ public:
     }
 
     void append_head(IN SC<T> * c) { insert_after(c, &m_head); }
+
+    //Find the last element, and add 'c' after it.
+    //This is a costly operation. Use it carefully.
+    void append_tail(IN SC<T> * c)
+    {
+        SC<T> * cur = m_head.next;
+        SC<T> * prev = &m_head;
+        while (cur != &m_head) {
+            cur = cur->next;
+            prev = cur;
+        }
+        insert_after(c, prev);
+    }
 
     void copy(IN SListCore<T> & src, SC<T> ** free_list, SMemPool * pool)
     {
@@ -1746,6 +1777,8 @@ public:
 //
 //    Usage:SMemPool * pool = smpoolCreate(sizeof(SC<T>) * n, MEM_CONST_SIZE);
 //          SList<T> list(pool);
+//          SList<T> * list2 = smpoolMalloc();
+//          list2->init(pool);
 //          ...
 //          smpoolDelete(pool);
 template <class T> class SList : public SListCore<T> {
@@ -1767,6 +1800,12 @@ public:
         //Note: Before going to the destructor, even if the containers have
         //been allocated in memory pool, you should invoke clean() to
         //free all of them back to a free list to reuse them.
+    }
+
+    void init(SMemPool * pool)
+    { 
+        SListCore<T>::init();
+        set_pool(pool); 
     }
 
     void set_pool(SMemPool * pool)
@@ -1987,9 +2026,7 @@ public:
             m_head = m_tail = NULL;
             m_elem_count = 0;
         }
-
-        ASSERT0(m_head == m_tail && m_head == NULL &&
-                 m_elem_count == 0);
+        ASSERT0(m_head == m_tail && m_head == NULL && m_elem_count == 0);
     }
 
     UINT count_mem() const
@@ -1997,7 +2034,7 @@ public:
         UINT count = sizeof(m_elem_count);
         count += sizeof(m_head);
         count += sizeof(m_tail);
-        //Do not count SC, they belong to input pool.
+        //Do not count SC, they has been involved in pool.
         return count;
     }
 

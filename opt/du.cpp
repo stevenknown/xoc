@@ -36,7 +36,7 @@ author: Su Zhenyu
 namespace xoc {
 
 //Add define stmt with check if the stmt is unique in list.
-void DUSet::add_use(IR const* exp, DefMiscBitSetMgr & m)
+void DUSet::addUse(IR const* exp, DefMiscBitSetMgr & m)
 {
     ASSERT0(exp && exp->is_exp());
     bunion(IR_id(exp), m);
@@ -44,14 +44,14 @@ void DUSet::add_use(IR const* exp, DefMiscBitSetMgr & m)
 
 
 //Add define stmt with check if the stmt is unique in list.
-void DUSet::add_def(IR const* stmt, DefMiscBitSetMgr & m)
+void DUSet::addDef(IR const* stmt, DefMiscBitSetMgr & m)
 {
     ASSERT0(stmt && stmt->is_stmt());
     bunion(IR_id(stmt), m);
 }
 
 
-void DUSet::remove_use(IR const* exp, DefMiscBitSetMgr & m)
+void DUSet::removeUse(IR const* exp, DefMiscBitSetMgr & m)
 {
     ASSERT0(exp && exp->is_exp());
     diff(IR_id(exp), m);

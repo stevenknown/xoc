@@ -167,8 +167,8 @@ bool Region::MiddleProcess(OptCtx & oc)
     bool do_simplification = true;
     if (getPassMgr() != NULL) {
         IR_SSA_MGR * ssamgr = (IR_SSA_MGR*)getPassMgr()->
-            queryPass(PASS_SSA_MGR);
-        if (ssamgr != NULL && ssamgr->is_ssa_constructed()) {
+            queryPass(PASS_PR_SSA_MGR);
+        if (ssamgr != NULL && ssamgr->isSSAConstructed()) {
             do_simplification = false;
         }
     }

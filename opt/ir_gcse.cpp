@@ -238,7 +238,7 @@ void IR_GCSE::prcessCseGen(IN IR * gen, IR * gen_stmt, bool & change)
     ASSERT0(gen->is_exp() && gen_stmt->is_stmt());
     //Move STORE_VAL to temp PR.
     //e.g: a = 10, expression of store_val is NULL.
-    IRBB * bb = gen_stmt->get_bb();
+    IRBB * bb = gen_stmt->getBB();
     ASSERT0(bb);
     IR * tmp_pr = m_exp2pr.get(gen);
     if (tmp_pr != NULL) { return; }
@@ -292,7 +292,7 @@ void IR_GCSE::prcessCseGen(IN IR * gen, IR * gen_stmt, bool & change)
 bool IR_GCSE::isCseCandidate(IR * ir)
 {
     ASSERT0(ir);
-    switch (IR_code(ir)) {
+    switch (ir->get_code()) {
     case IR_ADD:
     case IR_SUB:
     case IR_MUL:
@@ -367,13 +367,13 @@ bool IR_GCSE::findAndElim(IR * exp, IR * gen)
     ASSERT0(exp != gen);
     IR * exp_stmt = exp->get_stmt();
     IR * gen_stmt = gen->get_stmt();
-    ASSERT0(exp_stmt->get_bb() && gen_stmt->get_bb());
+    ASSERT0(exp_stmt->getBB() && gen_stmt->getBB());
 
     IRBB * gen_bb;
     IRBB * exp_bb;
     if (m_cfg->hasEHEdge()) {
         ASSERT0(m_tg);
-        if ((gen_bb = gen_stmt->get_bb()) == (exp_bb = exp_stmt->get_bb())) {
+        if ((gen_bb = gen_stmt->getBB()) == (exp_bb = exp_stmt->getBB())) {
             if (!gen_bb->is_dom(gen_stmt, exp_stmt, true)) {
                 return false;
             }
@@ -381,7 +381,7 @@ bool IR_GCSE::findAndElim(IR * exp, IR * gen)
             return false;
         }
     } else {
-        if ((gen_bb = gen_stmt->get_bb()) == (exp_bb = exp_stmt->get_bb())) {
+        if ((gen_bb = gen_stmt->getBB()) == (exp_bb = exp_stmt->getBB())) {
             if (!gen_bb->is_dom(gen_stmt, exp_stmt, true)) {
                 return false;
             }
@@ -399,7 +399,7 @@ bool IR_GCSE::prcessCse(IN IR * exp, IN List<IR*> & livexp)
 {
     IR * expstmt = exp->get_stmt();
     ExpRep * irie = m_expr_tab->map_ir2ir_expr(exp);
-    ASSERT0(irie && expstmt->get_bb());
+    ASSERT0(irie && expstmt->getBB());
     C<IR*> * ct;
     bool change = false;
     for (IR * gen = livexp.get_head(&ct);
@@ -408,9 +408,9 @@ bool IR_GCSE::prcessCse(IN IR * exp, IN List<IR*> & livexp)
         ASSERT0(xie);
         if (irie != xie) { continue; }
         IR * gen_stmt = gen->get_stmt();
-        ASSERT0(gen_stmt->get_bb());
-        UINT iid = BB_id(expstmt->get_bb());
-        UINT xid = BB_id(gen_stmt->get_bb());
+        ASSERT0(gen_stmt->getBB());
+        UINT iid = BB_id(expstmt->getBB());
+        UINT xid = BB_id(gen_stmt->getBB());
         if (!m_cfg->get_dom_set(iid)->is_contain(xid)) {
             continue;
         }
@@ -478,7 +478,7 @@ bool IR_GCSE::doPropVN(IRBB * bb, UINT entry_id)
     C<IR*> * ct;
     for (IR * ir = BB_irlist(bb).get_head(&ct);
          ir != NULL; ir = BB_irlist(bb).get_next(&ct)) {
-        switch (IR_code(ir)) {
+        switch (ir->get_code()) {
         case IR_ST:
         case IR_STPR:
         case IR_IST:
@@ -546,7 +546,7 @@ bool IR_GCSE::doProp(IRBB * bb, List<IR*> & livexp)
     MDSet tmp;
     for (IR * ir = BB_irlist(bb).get_head(&ct);
          ir != NULL; ir = BB_irlist(bb).get_next(&ct)) {
-        switch (IR_code(ir)) {
+        switch (ir->get_code()) {
         case IR_ST:
             //Find cse and replace it with properly pr.
             if (isCseCandidate(ST_rhs(ir))) {
@@ -632,7 +632,7 @@ bool IR_GCSE::doProp(IRBB * bb, List<IR*> & livexp)
         }
 
         //Remove may-killed live-expr.
-        switch (IR_code(ir)) {
+        switch (ir->get_code()) {
         case IR_ST:
         case IR_STPR:
         case IR_IST:
@@ -706,8 +706,8 @@ bool IR_GCSE::perform(OptCtx & oc)
 
     m_is_in_ssa_form = false;
     IR_SSA_MGR * ssamgr =
-            (IR_SSA_MGR*)(m_ru->getPassMgr()->queryPass(PASS_SSA_MGR));
-    if (ssamgr != NULL && ssamgr->is_ssa_constructed()) {
+            (IR_SSA_MGR*)(m_ru->getPassMgr()->queryPass(PASS_PR_SSA_MGR));
+    if (ssamgr != NULL && ssamgr->isSSAConstructed()) {
         m_is_in_ssa_form = true;
         m_ssamgr = ssamgr;
     }
@@ -742,7 +742,7 @@ bool IR_GCSE::perform(OptCtx & oc)
         m_exp2pr.clean();
         MDSet tmp;
         for (Vertex * v = lst.get_head(); v != NULL; v = lst.get_next()) {
-            IRBB * bb = m_cfg->get_bb(VERTEX_id(v));
+            IRBB * bb = m_cfg->getBB(VERTEX_id(v));
             ASSERT0(bb);
             change |= doPropVN(bb, BB_id(entry));
         }
@@ -751,7 +751,7 @@ bool IR_GCSE::perform(OptCtx & oc)
         m_vn2exp.clean();
         m_exp2pr.clean();
         for (Vertex * v = lst.get_head(); v != NULL; v = lst.get_next()) {
-            IRBB * bb = m_cfg->get_bb(VERTEX_id(v));
+            IRBB * bb = m_cfg->getBB(VERTEX_id(v));
             ASSERT0(bb);
             change |= doProp(bb, livexp);
         }

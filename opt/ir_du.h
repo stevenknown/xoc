@@ -110,7 +110,7 @@ public:
     void append(MD const* md, IR const* ir)
     {
         ASSERT0(ir);
-        append(MD_id(md), IR_id(ir));
+        append(MD_id(md), ir->id());
     }
     void append(MD const* md, UINT irid)
     {
@@ -119,7 +119,7 @@ public:
     void append(UINT mdid, IR * ir)
     {
         ASSERT0(ir);
-        append(mdid, IR_id(ir));
+        append(mdid, ir->id());
     }
     void append(UINT mdid, UINT irid);
 
@@ -444,8 +444,8 @@ public:
     void buildDUChain(IR * def, IR * use)
     {
         ASSERT0(def && def->is_stmt() && use && use->is_exp());
-        getAndAllocDUSet(def)->add_use(use, *m_misc_bs_mgr);
-        getAndAllocDUSet(use)->add_def(def, *m_misc_bs_mgr);
+        getAndAllocDUSet(def)->addUse(use, *m_misc_bs_mgr);
+        getAndAllocDUSet(use)->addDef(def, *m_misc_bs_mgr);
     }
 
     //Compute the MDSet that might overlap ones which 'ir' defined.
@@ -804,7 +804,7 @@ public:
         ASSERT0(stmt && stmt->is_stmt());
         if (use == NULL) return;
         ASSERT0(use->is_exp());
-        getAndAllocDUSet(stmt)->add_use(use, *m_misc_bs_mgr);
+        getAndAllocDUSet(stmt)->addUse(use, *m_misc_bs_mgr);
     }
 
     //DU chain operations.
@@ -819,7 +819,7 @@ public:
              i >= 0; i = stmtset->get_next((UINT)i, &di)) {
             IR * d = m_ru->getIR((UINT)i);
             ASSERT0(d->is_stmt());
-            getAndAllocDUSet(d)->add_use(exp, *m_misc_bs_mgr);
+            getAndAllocDUSet(d)->addUse(exp, *m_misc_bs_mgr);
         }
     }
 
@@ -854,7 +854,7 @@ public:
         ASSERT0(ir->is_exp());
         if (def == NULL) return;
         ASSERT0(def->is_stmt());
-        getAndAllocDUSet(ir)->add_def(def, *m_misc_bs_mgr);
+        getAndAllocDUSet(ir)->addDef(def, *m_misc_bs_mgr);
     }
 
 
@@ -870,7 +870,7 @@ public:
              i >= 0; i = expset->get_next((UINT)i, &di)) {
             IR * u = m_ru->getIR((UINT)i);
             ASSERT0(u->is_exp());
-            getAndAllocDUSet(u)->add_def(stmt, *m_misc_bs_mgr);
+            getAndAllocDUSet(u)->addDef(stmt, *m_misc_bs_mgr);
         }
     }
 
@@ -884,7 +884,7 @@ public:
         if (useset != NULL) { useset->remove(IR_id(use), *m_misc_bs_mgr); }
 
         DUSet * defset= use->getDUSet();
-        if (defset != NULL) { defset->remove(IR_id(def), *m_misc_bs_mgr); }
+        if (defset != NULL) { defset->remove(def->id(), *m_misc_bs_mgr); }
     }
 
     //DU chain operations.

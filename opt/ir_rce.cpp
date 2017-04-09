@@ -64,7 +64,7 @@ IR * IR_RCE::calcCondMustVal(
     must_true = false;
     must_false = false;
     ASSERT0(ir->is_judge());
-    switch (IR_code(ir)) {
+    switch (ir->get_code()) {
     case IR_LT:
     case IR_LE:
     case IR_GT:
@@ -127,7 +127,7 @@ IR * IR_RCE::processBranch(IR * ir, IN OUT bool & cfg_mod)
     if (ir->is_truebr()) {
         if (must_true) {
             //TRUEBR(0x1), always jump.
-            IRBB * from = ir->get_bb();
+            IRBB * from = ir->getBB();
             IRBB * to = m_cfg->getFallThroughBB(from);
             ASSERT0(from != NULL && to != NULL);
             IR * newbr = m_ru->buildGoto(BR_lab(ir));
@@ -135,7 +135,7 @@ IR * IR_RCE::processBranch(IR * ir, IN OUT bool & cfg_mod)
             ir->removeSSAUse();
 
             //Revise the PHI operand to fallthrough successor.
-            ir->get_bb()->removeSuccessorDesignatePhiOpnd(m_cfg, to);
+            ir->getBB()->removeSuccessorDesignatePhiOpnd(m_cfg, to);
 
             m_ru->freeIRTree(ir);
 
@@ -146,14 +146,14 @@ IR * IR_RCE::processBranch(IR * ir, IN OUT bool & cfg_mod)
         } else if (must_false) {
             //TRUEBR(0x0), never jump.
             //Revise cfg. remove branch edge.
-            IRBB * from = ir->get_bb();
+            IRBB * from = ir->getBB();
             IRBB * to = m_cfg->findBBbyLabel(BR_lab(ir));
             ASSERT0(from && to);
 
             ir->removeSSAUse();
 
             //Revise the PHI operand to target successor.
-            ir->get_bb()->removeSuccessorDesignatePhiOpnd(m_cfg, to);
+            ir->getBB()->removeSuccessorDesignatePhiOpnd(m_cfg, to);
 
             m_ru->freeIRTree(ir);
 
@@ -166,14 +166,14 @@ IR * IR_RCE::processBranch(IR * ir, IN OUT bool & cfg_mod)
         if (must_true) {
             //FALSEBR(0x1), never jump.
             //Revise m_cfg. remove branch edge.
-            IRBB * from = ir->get_bb();
+            IRBB * from = ir->getBB();
             IRBB * to = m_cfg->getTargetBB(from);
             ASSERT0(from != NULL && to != NULL);
 
             ir->removeSSAUse();
 
             //Revise the PHI operand to target successor.
-            ir->get_bb()->removeSuccessorDesignatePhiOpnd(m_cfg, to);
+            ir->getBB()->removeSuccessorDesignatePhiOpnd(m_cfg, to);
 
             m_ru->freeIRTree(ir);
 
@@ -183,7 +183,7 @@ IR * IR_RCE::processBranch(IR * ir, IN OUT bool & cfg_mod)
             return NULL;
         } else if (must_false) {
             //FALSEBR(0x0), always jump.
-            IRBB * from = ir->get_bb();
+            IRBB * from = ir->getBB();
             IRBB * to = m_cfg->getFallThroughBB(from);
             ASSERT0(from != NULL && to != NULL);
 
@@ -192,7 +192,7 @@ IR * IR_RCE::processBranch(IR * ir, IN OUT bool & cfg_mod)
             ir->removeSSAUse();
 
             //Revise the PHI operand to fallthrough successor.
-            ir->get_bb()->removeSuccessorDesignatePhiOpnd(m_cfg, to);
+            ir->getBB()->removeSuccessorDesignatePhiOpnd(m_cfg, to);
 
             m_ru->freeIRTree(ir);
 
@@ -260,7 +260,7 @@ bool IR_RCE::performSimplyRCE(IN OUT bool & cfg_mod)
             IR * ir = ct->val();
             ir_list->get_next(&next_ct);
             IR * newIR = ir;
-            switch (IR_code(ir)) {
+            switch (ir->get_code()) {
             case IR_TRUEBR:
             case IR_FALSEBR:
                 newIR = processBranch(ir, cfg_mod);

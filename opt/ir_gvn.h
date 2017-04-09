@@ -576,9 +576,9 @@ public:
     bool is_quad(IR_TYPE i) const { return i == IR_ARRAY; }
     bool is_valid() { return m_is_valid; }
 
-    VN * mapIR2VN(IR const* ir) { return m_ir2vn.get(IR_id(ir)); }
+    VN * mapIR2VN(IR const* ir) { return m_ir2vn.get(ir->id()); }
 
-    void set_mapIR2VN(IR const* ir, VN * vn) { m_ir2vn.set(IR_id(ir), vn); }
+    void set_mapIR2VN(IR const* ir, VN * vn) { m_ir2vn.set(ir->id(), vn); }
     void setComputeVNForFP(bool doit) { m_is_vn_fp = doit; }
     void set_valid(bool valid) { m_is_valid = valid; }
     void setComputeIloadVNviaDU(bool doit) { m_is_comp_ild_vn_by_du = doit; }

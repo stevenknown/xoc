@@ -44,8 +44,8 @@ INT m518087(CHAR const* info, ...)
     //vprintf(info, ptr);
 
     //PROTOTYPE: int vfprintf (FILE * stream, const char * format, va_list ap)
-    vfprintf(stdout, info, ptr);
-    fflush(stdout);
+    vfprintf(stderr, info, ptr);
+    fflush(stderr);
 
     //abort() has type 'void' and is not a throw-expression.
     //And it is unable to be used in clause : a ? 1 : abort().
@@ -57,6 +57,6 @@ INT m518087(CHAR const* info, ...)
 
 INT m022138(CHAR const* filename, INT line)
 {
-    printf("\nASSERTION in %s(%d): ", filename, line);
+    fprintf(stderr, "\nASSERTION in %s(%d): ", filename, line);
     return 0;
 }

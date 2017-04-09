@@ -109,8 +109,6 @@ void RegionMgr::registerGlobalMD()
         VAR * v = varvec->get(i);
         if (v == NULL || VAR_is_local(v)) { continue; }
 
-        ASSERT0(VAR_is_global(v));
-
         //User sometime intentionally declare non-allocable
         //global variable to custmized usage.
         //ASSERT0(VAR_allocable(v));

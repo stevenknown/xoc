@@ -143,7 +143,7 @@ MD * MDSet::get_effect_md(MDSystem * ms) const
         return NULL;
     }
     SEGIter * iter;
-    MD * md = ms->get_md(get_first(&iter));
+    MD * md = ms->getMD(get_first(&iter));
     ASSERT0(md != NULL);
     if (VAR_is_fake(MD_base(md))) {
         return NULL;
@@ -192,7 +192,7 @@ bool MDSet::is_exact_equal(MDSet const& mds, MDSystem * ms) const
     INT md1 = -1;
     SEGIter * iter;
     for (INT i = get_first(&iter); i != -1; i = get_next(i, &iter)) {
-        if (!ms->get_md(i)->is_exact()) {
+        if (!ms->getMD(i)->is_exact()) {
             return false;
         }
         md1 = i;
@@ -207,7 +207,7 @@ bool MDSet::is_exact_equal(MDSet const& mds, MDSystem * ms) const
     count = 0;
     INT md2 = -1;
     for (INT i = mds.get_first(&iter); i != -1; i = get_next(i, &iter)) {
-        if (!ms->get_md(i)->is_exact()) {
+        if (!ms->getMD(i)->is_exact()) {
             return false;
         }
         md2 = i;
@@ -227,7 +227,7 @@ bool MDSet::is_contain_only_exact_and_str(MDSystem * ms) const
     ASSERT0(ms);
     SEGIter * iter;
     for (INT i = get_first(&iter); i != -1; i = get_next(i, &iter)) {
-        MD * tmd = ms->get_md(i);
+        MD * tmd = ms->getMD(i);
         ASSERT0(tmd != NULL);
         if (!tmd->is_exact() && !MD_base(tmd)->is_string()) {
             return false;
@@ -242,7 +242,7 @@ bool MDSet::is_contain_inexact(MDSystem * ms) const
     ASSERT0(ms);
     SEGIter * iter;
     for (INT i = get_first(&iter); i != -1; i = get_next(i, &iter)) {
-        MD * tmd = ms->get_md(i);
+        MD * tmd = ms->getMD(i);
         ASSERT0(tmd != NULL);
         if (MD_id(tmd) == MD_FULL_MEM) {
             return true;
@@ -289,7 +289,7 @@ void MDSet::dump(MDSystem * ms, bool detail) const
     }
     if (detail) {
         for (INT i = get_first(&iter); i != -1; i = get_next(i, &iter)) {
-            MD const* md = ms->get_md(i);
+            MD const* md = ms->getMD(i);
             ASSERT0(md);
             md->dump(ms->getTypeMgr());
         }
@@ -467,12 +467,12 @@ void MD2MDSet::dump(Region * ru)
 
     //Dump all MDs.
     MDSystem * ms = ru->getMDSystem();
-    ms->get_id2md_map()->dump();
+    ms->getID2MDMap()->dump();
     MD2MDSetIter mxiter;
     MDSet const* pts = NULL;
     for (UINT mdid = get_first(mxiter, &pts);
          mdid > 0; mdid = get_next(mxiter, &pts)) {
-        MD const* md = ms->get_md(mdid);
+        MD const* md = ms->getMD(mdid);
         ASSERT0(md);
 
         buf.clean();
@@ -485,7 +485,7 @@ void MD2MDSet::dump(Region * ru)
         SEGIter * iter_j;
         for (INT j = pts->get_first(&iter_j);
              j >= 0; j = pts->get_next(j, &iter_j)) {
-            MD * mmd = ms->get_md(j);
+            MD * mmd = ms->getMD(j);
             ASSERT0(mmd);
             buf.clean();
             fprintf(g_tfile, "\t\t\t%s\n",
@@ -502,7 +502,7 @@ void MD2MDSet::dump(Region * ru)
         VAR * v = var_tab->get(i);
         if (v == NULL) { continue; }
 
-        MDTab * mdtab = ms->get_md_tab(v);
+        MDTab * mdtab = ms->getMDTab(v);
 
         buf.clean();
         fprintf(g_tfile, "\n\t%s", v->dump(buf, ru->getTypeMgr()));
@@ -544,7 +544,7 @@ MD const* MDSystem::registerMD(MD const& m)
     ASSERT0(MD_base(&m));
     if (MD_id(&m) > 0) {
         //Find the entry in MDTab accroding to m.
-        MDTab * mdtab = get_md_tab(MD_base(&m));
+        MDTab * mdtab = getMDTab(MD_base(&m));
         ASSERT(mdtab != NULL, ("md has not been registered"));
         MD const* entry = mdtab->find(&m);
         ASSERT(entry, ("md has not been registered"));
@@ -554,7 +554,7 @@ MD const* MDSystem::registerMD(MD const& m)
     ASSERT0(MD_base(&m) != NULL);
 
     //Check if MD has been registerd.
-    MDTab * mdtab = get_md_tab(MD_base(&m));
+    MDTab * mdtab = getMDTab(MD_base(&m));
     if (mdtab != NULL) {
         //VAR-base has been registered, then check md by
         //offset in md-table.
@@ -565,17 +565,17 @@ MD const* MDSystem::registerMD(MD const& m)
         }
 
         if (MD_base(&m) == m_all_mem) {
-            return get_md(MD_FULL_MEM);
+            return getMD(MD_FULL_MEM);
         }
 
         //TODO: remove HEAP, STACK id. I consider they are useless.
         //if (MD_base(md) == g_heap_mem) {
         //    MD_id(md) = MD_HEAP_MEM;
-        //    return ::get_md(MD_HEAP_MEM);
+        //    return ::getMD(MD_HEAP_MEM);
         //}
         //if (MD_base(md) == g_stack_mem) {
         //    MD_id(md) = MD_STACK_MEM;
-        //    return ::get_md(MD_STACK_MEM);
+        //    return ::getMD(MD_STACK_MEM);
         //}
     }
 
@@ -710,7 +710,7 @@ void MDSystem::computeOverlap(
         output.bunion(MD_GLOBAL_MEM, mbsmgr);
     }
 
-    MDTab * mdt = get_md_tab(MD_base(md));
+    MDTab * mdt = getMDTab(MD_base(md));
     ASSERT0(mdt != NULL);
 
     MD const* effect_md = mdt->get_effect_md();
@@ -750,7 +750,7 @@ void MDSystem::computeOverlapExactMD(
         DefMiscBitSetMgr & mbsmgr)
 {
     ASSERT0(md && md->is_exact());
-    MDTab * mdt = get_md_tab(MD_base(md));
+    MDTab * mdt = getMDTab(MD_base(md));
     ASSERT0(mdt);
 
     OffsetTab * ofstab = mdt->get_ofst_tab();
@@ -791,9 +791,9 @@ void MDSystem::computeOverlap(
     SEGIter * iter;
     for (INT i = mds.get_first(&iter);
          i >= 0; i = mds.get_next(i, &iter)) {
-        MD * md = get_md(i);
+        MD * md = getMD(i);
         ASSERT0(md);
-        MDTab * mdt = get_md_tab(MD_base(md));
+        MDTab * mdt = getMDTab(MD_base(md));
         ASSERT0(mdt != NULL);
         if (md->is_global()) { set_global = true; }
 
@@ -820,7 +820,7 @@ void MDSystem::computeOverlap(
         }
     }
 
-    if (strictly && set_global) { mds.bunion(get_md(MD_GLOBAL_MEM), mbsmgr); }
+    if (strictly && set_global) { mds.bunion(getMD(MD_GLOBAL_MEM), mbsmgr); }
 
     for (INT i = 0; i <= tmpvec.get_last_idx(); i++) {
         MD const* t = tmpvec.get(i);
@@ -854,9 +854,9 @@ void MDSystem::computeOverlap(
     bool set_global = false;
     SEGIter * iter;
     for (INT i = mds.get_first(&iter); i >= 0; i = mds.get_next(i, &iter)) {
-        MD * md = get_md(i);
+        MD * md = getMD(i);
         ASSERT0(md);
-        MDTab * mdt = get_md_tab(MD_base(md));
+        MDTab * mdt = getMDTab(MD_base(md));
         ASSERT0(mdt != NULL);
         if (md->is_global()) { set_global = true; }
 
@@ -922,11 +922,11 @@ void MDSystem::dumpAllMD()
 void MDSystem::removeMDforVAR(VAR const* v, ConstMDIter & iter)
 {
     ASSERT0(v);
-    MDTab * mdtab = get_md_tab(v);
+    MDTab * mdtab = getMDTab(v);
     if (mdtab != NULL) {
         MD const* x = mdtab->get_effect_md();
         if (x != NULL) {
-            MD * freeone = get_md(MD_id(x));
+            MD * freeone = getMD(MD_id(x));
             freeMD(freeone);
         }
 
@@ -936,7 +936,7 @@ void MDSystem::removeMDforVAR(VAR const* v, ConstMDIter & iter)
             iter.clean();
             for (MD const* md = ofstab->get_first(iter, NULL);
                  md != NULL; md = ofstab->get_next(iter, NULL)) {
-                MD * freeone = get_md(MD_id(md));
+                MD * freeone = getMD(MD_id(md));
                 freeMD(freeone);
             }
         }

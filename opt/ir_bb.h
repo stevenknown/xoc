@@ -52,7 +52,7 @@ public:
     {
         if (ir == NULL) { return NULL; }
         ASSERT0(m_bb != NULL);
-        ir->set_bb(m_bb);
+        ir->setBB(m_bb);
         return EList<IR*, IR2Holder>::append_head(ir);
     }
 
@@ -60,7 +60,7 @@ public:
     {
         if (ir == NULL) { return NULL; }
         ASSERT0(m_bb != NULL);
-        ir->set_bb(m_bb);
+        ir->setBB(m_bb);
         return EList<IR*, IR2Holder>::append_tail(ir);
     }
 
@@ -80,7 +80,7 @@ public:
         if (ir == NULL) { return NULL; }
         ASSERT0(marker != NULL);
         ASSERT0(m_bb != NULL);
-        ir->set_bb(m_bb);
+        ir->setBB(m_bb);
         return EList<IR*, IR2Holder>::insert_before(ir, marker);
     }
 
@@ -90,7 +90,7 @@ public:
         if (ir == NULL) { return NULL; }
         ASSERT0(marker != NULL);
         ASSERT0(m_bb != NULL);
-        ir->set_bb(m_bb);
+        ir->setBB(m_bb);
         return EList<IR*, IR2Holder>::insert_before(ir, marker);
     }
 
@@ -100,7 +100,7 @@ public:
         if (ir == NULL) { return NULL; }
         ASSERT0(marker != NULL);
         ASSERT0(m_bb != NULL);
-        ir->set_bb(m_bb);
+        ir->setBB(m_bb);
         return EList<IR*, IR2Holder>::insert_after(ir, marker);
     }
 
@@ -110,7 +110,7 @@ public:
         if (ir == NULL) { return NULL; }
         ASSERT0(marker != NULL);
         ASSERT0(m_bb != NULL);
-        ir->set_bb(m_bb);
+        ir->setBB(m_bb);
         return EList<IR*, IR2Holder>::insert_after(ir, marker);
     }
 
@@ -118,7 +118,7 @@ public:
     inline IR * remove(IN C<IR*> * holder)
     {
         if (holder == NULL) return NULL;
-        holder->val()->set_bb(NULL);
+        holder->val()->setBB(NULL);
         return EList<IR*, IR2Holder>::remove(holder);
     }
 
@@ -126,11 +126,11 @@ public:
     inline IR * remove(IN IR * ir)
     {
         if (ir == NULL) return NULL;
-        ir->set_bb(NULL);
+        ir->setBB(NULL);
         return EList<IR*, IR2Holder>::remove(ir);
     }
 
-    void set_bb(IRBB * bb) { m_bb = bb; }
+    void setBB(IRBB * bb) { m_bb = bb; }
 };
 //END BBIRList
 
@@ -140,8 +140,8 @@ public:
 //
 #define MAX_BB_KIDS_NUM     2
 
-#define BB_rpo(b)               ((b)->rpo)
-#define BB_id(b)                ((b)->id)
+#define BB_rpo(b)               ((b)->m_rpo)
+#define BB_id(b)                ((b)->m_id)
 #define BB_irlist(b)            ((b)->ir_list)
 #define BB_first_ir(b)          ((b)->ir_list.get_head())
 #define BB_next_ir(b)           ((b)->ir_list.get_next())
@@ -157,8 +157,8 @@ public:
 #define BB_is_unreach(b)        ((b)->u1.s1.is_unreachable)
 class IRBB {
 public:
-    UINT id; //BB's id
-    INT rpo; //reverse post order
+    UINT m_id; //BB's id
+    INT m_rpo; //reverse post order
     BBIRList ir_list; //IR list
     List<LabelInfo const*> lab_list; //Record labels attached on BB
     union {
@@ -178,10 +178,10 @@ public:
 public:
     IRBB()
     {
-        ir_list.set_bb(this);
-        id = 0;
+        ir_list.setBB(this);
+        m_id = 0;
         u1.u1b1 = 0;
-        rpo = -1;
+        m_rpo = -1;
     }
     COPY_CONSTRUCTOR(IRBB);
     ~IRBB()
@@ -232,7 +232,7 @@ public:
     UINT getNumOfPred(CFG<IRBB, IR> * cfg) const
     {
         ASSERT0(cfg);
-        Vertex const* vex = cfg->get_vertex(BB_id(this));
+        Vertex const* vex = cfg->get_vertex(id());
         ASSERT0(vex);
         UINT n = 0;
         for (EdgeC const* in = VERTEX_in_list(vex);
@@ -290,6 +290,8 @@ public:
         return false;
     }
 
+    UINT id() const { return BB_id(this); }
+    
     //Return true if BB is an entry BB of TRY block.
     inline bool isTryStart() const
     {
@@ -398,7 +400,7 @@ public:
     inline bool is_dom(IR const* ir1, IR const* ir2, bool is_strict) const
     {
         ASSERT0(ir1->is_stmt() && ir2->is_stmt() &&
-                 ir1->get_bb() == this && ir2->get_bb() == this);
+                 ir1->getBB() == this && ir2->getBB() == this);
         if (is_strict && ir1 == ir2) {
             return false;
         }
@@ -450,6 +452,8 @@ public:
     //Return true if one of bb's successor has a phi.
     bool successorHasPhi(CFG<IRBB, IR> * cfg);
 
+    INT rpo() const { return BB_rpo(this); }
+    
     //Before removing bb or change bb successor,
     //you need remove the related PHI operand if BB successor has PHI stmt.
     void removeSuccessorPhiOpnd(CFG<IRBB, IR> * cfg);

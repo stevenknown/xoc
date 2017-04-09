@@ -57,13 +57,13 @@ public:
         ConstIRIter iter;
         switch (t->get_code()) {
         case IR_LD:
-            hval = t->get_code() + (t->get_offset() + 1) +
+            hval = t->get_code() + (t->getOffset() + 1) +
                    (UINT)(size_t)t->get_type();
             break;
         case IR_ILD:
             for (IR const* x = iterInitC(t, iter);
                  x != NULL; x = iterNextC(iter)) {
-                UINT v = IR_code(x) + (x->get_offset() + 1) +
+                UINT v = IR_code(x) + (x->getOffset() + 1) +
                          (UINT)(size_t)x->get_type();
                 if (x->is_id()) {
                     v += ((UINT)(size_t)ID_info(x)) * 5;
@@ -72,26 +72,26 @@ public:
             }
             break;
         case IR_ST:
-            hval = ((UINT)IR_LD) + (t->get_offset() + 1) +
+            hval = ((UINT)IR_LD) + (t->getOffset() + 1) +
                    (UINT)(size_t)t->get_type();
             break;
         case IR_IST:
             for (IR const* x = iterInitC(IST_base(t), iter);
                  x != NULL; x = iterNextC(iter)) {
-                UINT v = IR_code(x) + (x->get_offset() + 1) +
+                UINT v = IR_code(x) + (x->getOffset() + 1) +
                         (UINT)(size_t)x->get_type();
                 if (x->is_id()) {
                     v += ((UINT)(size_t)ID_info(x)) * 5;
                 }
                 hval += v;
             }
-            hval += ((UINT)IR_ILD) + (t->get_offset() + 1) +
+            hval += ((UINT)IR_ILD) + (t->getOffset() + 1) +
                     (UINT)(size_t)t->get_type();
             break;
         case IR_ARRAY:
             for (IR const* x = iterInitC(t, iter);
                  x != NULL; x = iterNextC(iter)) {
-                UINT v = IR_code(x) + (x->get_offset() + 1) +
+                UINT v = IR_code(x) + (x->getOffset() + 1) +
                         (UINT)(size_t)x->get_type();
                 if (x->is_id()) {
                     v += ((UINT)(size_t)ID_info(x)) * 5;
@@ -158,7 +158,7 @@ public:
             return false;
         }
 
-        if (t1->get_offset() != t2->get_offset()) { return false; }
+        if (t1->getOffset() != t2->getOffset()) { return false; }
 
         if (IR_dt(t1) != IR_dt(t2)) { return false; }
 
@@ -175,7 +175,7 @@ public:
             return false;
         }
 
-        if (t1->get_offset() != t2->get_offset()) { return false; }
+        if (t1->getOffset() != t2->getOffset()) { return false; }
 
         if (IR_dt(t1) != IR_dt(t2)) { return false; }
 
@@ -444,7 +444,7 @@ void IR_RP::dump_mdlt()
     fprintf(g_tfile, "\n==---- DUMP MD LIFE TIME ----==");
     SEGIter * iter;
     for (INT i = mdbs.get_first(&iter); i >= 0; i = mdbs.get_next(i, &iter)) {
-        MD * md = m_md_sys->get_md(i);
+        MD * md = m_md_sys->getMD(i);
         ASSERT0(md != NULL);
         MD_LT * lt = m_md2lt_map->get(md);
         ASSERT0(lt != NULL);
@@ -488,11 +488,11 @@ void IR_RP::buildLifeTime()
         SEGIter * iter;
         for (INT i = livein->get_first(&iter);
              i >= 0; i = livein->get_next(i, &iter)) {
-            MDLT_livebbs(getMDLifeTime(m_md_sys->get_md(i)))->bunion(BB_id(bb));
+            MDLT_livebbs(getMDLifeTime(m_md_sys->getMD(i)))->bunion(BB_id(bb));
         }
         for (INT i = liveout->get_first(&iter);
              i >= 0; i = liveout->get_next(i, &iter)) {
-            MDLT_livebbs(getMDLifeTime(m_md_sys->get_md(i)))->bunion(BB_id(bb));
+            MDLT_livebbs(getMDLifeTime(m_md_sys->getMD(i)))->bunion(BB_id(bb));
         }
     }
 
@@ -579,7 +579,7 @@ bool IR_RP::checkExpressionIsLoopInvariant(IN IR * ir, LI<IRBB> const* li)
         if (ir->isReadPR() && PR_ssainfo(ir) != NULL) {
             SSAInfo * ssainfo = PR_ssainfo(ir);
             if (ssainfo->get_def() != NULL) {
-                IRBB * defbb = ssainfo->get_def()->get_bb();
+                IRBB * defbb = ssainfo->get_def()->getBB();
                 ASSERT0(defbb);
 
                 if (li->is_inside_loop(BB_id(defbb))) {
@@ -597,7 +597,7 @@ bool IR_RP::checkExpressionIsLoopInvariant(IN IR * ir, LI<IRBB> const* li)
              i >= 0; i = duset->get_next(i, &dui)) {
             IR const* defstmt = m_ru->getIR(i);
             ASSERT0(defstmt->is_stmt());
-            IRBB * bb = defstmt->get_bb();
+            IRBB * bb = defstmt->getBB();
 
             if (li->is_inside_loop(BB_id(bb))) { return false; }
         }
@@ -606,7 +606,7 @@ bool IR_RP::checkExpressionIsLoopInvariant(IN IR * ir, LI<IRBB> const* li)
     }
 
     for (UINT i = 0; i < IR_MAX_KID_NUM(ir); i++) {
-        IR * kid = ir->get_kid(i);
+        IR * kid = ir->getKid(i);
         if (kid == NULL) { continue; }
         if (!checkExpressionIsLoopInvariant(kid, li)) {
             return false;
@@ -649,8 +649,7 @@ bool IR_RP::handleArrayRef(
         //The array reference can not be promoted.
         //Check the promotable candidates if current stmt
         //modify the related MD.
-        clobberAccessInList(ir, exact_access, exact_occ_list,
-                            inexact_access);
+        clobberAccessInList(ir, exact_access, exact_occ_list, inexact_access);
         return true;
     }
 
@@ -658,8 +657,7 @@ bool IR_RP::handleArrayRef(
     if (mustuse == NULL || !mustuse->is_effect()) { return false; }
 
     if (mustuse->is_volatile()) {
-        clobberAccessInList(ir, exact_access, exact_occ_list,
-                            inexact_access);
+        clobberAccessInList(ir, exact_access, exact_occ_list, inexact_access);
         return true;
     }
 
@@ -676,7 +674,7 @@ bool IR_RP::handleArrayRef(
     }
 
     //MD is inexact. Check if it is loop invariant.
-    if (ir->is_starray() ||     !checkArrayIsLoopInvariant(ir, li)) {
+    if (ir->is_starray() || !checkArrayIsLoopInvariant(ir, li)) {
         //If ir is STARRAY that modify inexact MD.
         //It may clobber all other array with same array base.
         clobberAccessInList(ir, exact_access, exact_occ_list, inexact_access);
@@ -692,8 +690,7 @@ bool IR_RP::handleArrayRef(
 
         //The result can not be promoted.
         //Check the promotable candidates if current stmt modify the related MD.
-        clobberAccessInList(ir, exact_access, exact_occ_list,
-                            inexact_access);
+        clobberAccessInList(ir, exact_access, exact_occ_list, inexact_access);
         return true;
     }
     addInexactAccess(inexact_access, ir);
@@ -711,7 +708,7 @@ bool IR_RP::handleGeneralRef(
     ASSERT0(ir->isMemoryRef());
     ASSERT0(!ir->is_array());
 
-    if (ir->get_offset() != 0) {
+    if (ir->getOffset() != 0) {
         //TODO:not yet support, x is MC type.
         //clobberAccessInList(ir, exact_access, exact_occ_list,
         //                       inexact_access);
@@ -727,8 +724,7 @@ bool IR_RP::handleGeneralRef(
     }
 
     if (mustuse->is_volatile()) {
-        clobberAccessInList(ir, exact_access, exact_occ_list,
-                            inexact_access);
+        clobberAccessInList(ir, exact_access, exact_occ_list, inexact_access);
         return true;
     }
 
@@ -749,14 +745,12 @@ bool IR_RP::handleGeneralRef(
     if (ir->is_ild() || ir->is_ist()) {
         //MD is inexact. Check if it is loop invariant.
         if (!checkIndirectAccessIsLoopInvariant(ir, li)) {
-            clobberAccessInList(ir, exact_access, exact_occ_list,
-                                inexact_access);
+            clobberAccessInList(ir, exact_access, exact_occ_list, inexact_access);
             return true;
         }
     } else if (ir->is_ld()) {
         if (!checkExpressionIsLoopInvariant(ir, li)) {
-            clobberAccessInList(ir, exact_access, exact_occ_list,
-                                inexact_access);
+            clobberAccessInList(ir, exact_access, exact_occ_list, inexact_access);
             return true;
         }
     } else {
@@ -772,8 +766,7 @@ bool IR_RP::handleGeneralRef(
 
         //The ir can not be promoted.
         //Check the promotable candidates if current stmt modify the related MD.
-        clobberAccessInList(ir, exact_access, exact_occ_list,
-                            inexact_access);
+        clobberAccessInList(ir, exact_access, exact_occ_list, inexact_access);
         return true;
     }
     addInexactAccess(inexact_access, ir);
@@ -920,10 +913,10 @@ UINT IR_RP::analyzeIndirectAccessStatus(IR const* ref1, IR const* ref2)
     VN const* vn2 = m_gvn->mapIR2VN(base2);
     if (vn1 == NULL || vn2 == NULL) { return RP_UNKNOWN; }
 
-    UINT tysz1 = ref1->get_dtype_size(m_tm);
-    UINT tysz2 = ref2->get_dtype_size(m_tm);
-    UINT ofst1 = ref1->get_offset();
-    UINT ofst2 = ref2->get_offset();
+    UINT tysz1 = ref1->get_type_size(m_tm);
+    UINT tysz2 = ref2->get_type_size(m_tm);
+    UINT ofst1 = ref1->getOffset();
+    UINT ofst2 = ref2->getOffset();
     if ((((ofst1 + tysz1) <= ofst2) ||
         ((ofst2 + tysz2) <= ofst1))) {
         return RP_DIFFERENT_OBJ;
@@ -976,7 +969,7 @@ bool IR_RP::scanResult(
         OUT List<IR*> & exact_occ_list,
         OUT TTab<IR*> & inexact_access)
 {
-    switch (IR_code(ir)) {
+    switch (ir->get_code()) {
     case IR_ST:
         return handleGeneralRef(ir, li, exact_access, exact_occ_list,
                                 inexact_access);
@@ -1131,7 +1124,7 @@ void IR_RP::handleRestore2Mem(
         case IR_ARRAY:
         case IR_STARRAY:
             {
-                ASSERT(delegate->get_offset() == 0, ("TODO: not yet support."));
+                ASSERT(delegate->getOffset() == 0, ("TODO: not yet support."));
 
                 //Prepare base and subscript expression list.
                 IR * base = m_ru->dupIRTree(ARR_base(delegate));
@@ -1400,8 +1393,8 @@ bool IR_RP::hasLoopOutsideUse(IR const* stmt, LI<IRBB> const* li)
         ASSERT0(u->is_exp());
         ASSERT0(u->get_stmt());
         IR * s = u->get_stmt();
-        ASSERT0(s->get_bb());
-        if (!li->is_inside_loop(BB_id(s->get_bb()))) {
+        ASSERT0(s->getBB());
+        if (!li->is_inside_loop(BB_id(s->getBB()))) {
             return true;
         }
     }
@@ -1578,7 +1571,7 @@ void IR_RP::handleAccessInBody(
 
             STARR_rhs(ref) = NULL;
 
-            IRBB * refbb = ref->get_bb();
+            IRBB * refbb = ref->getBB();
             ASSERT0(refbb);
             C<IR*> * ct = NULL;
             BB_irlist(refbb).find(ref, &ct);
@@ -1636,7 +1629,7 @@ void IR_RP::handleAccessInBody(
 
             ref->setRHS(NULL);
 
-            IRBB * stmt_bb = ref->get_bb();
+            IRBB * stmt_bb = ref->getBB();
             ASSERT0(stmt_bb);
             C<IR*> * ct = NULL;
             BB_irlist(stmt_bb).find(ref, &ct);
@@ -1785,7 +1778,7 @@ void IR_RP::computeOuterDefUse(
                  i >= 0; i = refduset->get_next(i, &di)) {
                 IR const* d = m_ru->getIR(i);
                 ASSERT0(d->is_stmt());
-                if (!li->is_inside_loop(BB_id(d->get_bb()))) {
+                if (!li->is_inside_loop(BB_id(d->getBB()))) {
                     defset->bunion(i, *sbs_mgr);
                 }
             }
@@ -1806,7 +1799,7 @@ void IR_RP::computeOuterDefUse(
                  i >= 0; i = refduset->get_next(i, &di)) {
                 IR const* u = m_ru->getIR(i);
                 ASSERT0(u->is_exp());
-                if (!li->is_inside_loop(BB_id(u->get_stmt()->get_bb()))) {
+                if (!li->is_inside_loop(BB_id(u->get_stmt()->getBB()))) {
                     set->bunion(i, *sbs_mgr);
                 }
             }
@@ -1821,8 +1814,7 @@ void IR_RP::createDelegateInfo(
         TMap<IR*, SList<IR*>*> & delegate2has_outside_uses_ir_list)
 {
     SList<IR*> * irlst = (SList<IR*>*)xmalloc(sizeof(SList<IR*>));
-    irlst->init();
-    irlst->set_pool(m_ir_ptr_pool);
+    irlst->init(m_ir_ptr_pool);    
     delegate2has_outside_uses_ir_list.set(delegate, irlst);
 
     //Ref is the delegate of all the semantic equivalent expressions.
@@ -2070,7 +2062,7 @@ bool IR_RP::tryPromote(
 
     for (INT i = LI_bb_set(li)->get_first();
          i != -1; i = LI_bb_set(li)->get_next(i)) {
-        IRBB * bb = m_cfg->get_bb(i);
+        IRBB * bb = m_cfg->getBB(i);
         ASSERT0(bb && m_cfg->get_vertex(BB_id(bb)));
         if (bb->hasReturn()) {
             return false;
@@ -2171,8 +2163,8 @@ bool IR_RP::perform(OptCtx & oc)
     //computeLiveness();
     m_ssamgr = NULL;
     IR_SSA_MGR * ssamgr =
-            (IR_SSA_MGR*)(m_ru->getPassMgr()->queryPass(PASS_SSA_MGR));
-    if (ssamgr != NULL && ssamgr->is_ssa_constructed()) {
+            (IR_SSA_MGR*)(m_ru->getPassMgr()->queryPass(PASS_PR_SSA_MGR));
+    if (ssamgr != NULL && ssamgr->isSSAConstructed()) {
         m_ssamgr = ssamgr;
     }
 

@@ -179,7 +179,7 @@ Graph * PassMgr::allocCDG()
 
 Pass * PassMgr::allocCCP()
 {
-    //return new IR_CCP(m_ru, (IR_SSA_MGR*)registerPass(PASS_SSA_MGR));
+    //return new IR_CCP(m_ru, (IR_SSA_MGR*)registerPass(PASS_PR_SSA_MGR));
     return NULL;
 }
 
@@ -295,7 +295,7 @@ Pass * PassMgr::registerPass(PASS_TYPE opty)
     case PASS_LOOP_CVT:
         pass = allocLoopCvt();
         break;
-    case PASS_SSA_MGR:
+    case PASS_PR_SSA_MGR:
         pass = allocSSAMgr();
         break;
     case PASS_CCP:
@@ -348,9 +348,9 @@ void PassMgr::performScalarOpt(OptCtx & oc)
     }
 
     bool in_ssa_form = false;
-    IR_SSA_MGR * ssamgr =
-            (IR_SSA_MGR*)(m_ru->getPassMgr()->queryPass(PASS_SSA_MGR));
-    if (ssamgr != NULL && ssamgr->is_ssa_constructed()) {
+    IR_SSA_MGR * ssamgr = (IR_SSA_MGR*)(m_ru->getPassMgr()->
+        queryPass(PASS_PR_SSA_MGR));
+    if (ssamgr != NULL && ssamgr->isSSAConstructed()) {
         in_ssa_form = true;
     }
 

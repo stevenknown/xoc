@@ -97,19 +97,19 @@ class RegionMgr;
 #define VAR_labinfo(v)           ((v)->u1.labinfo)
 
 //Variable is label.
-#define VAR_is_label(v)         ((v)->u2.u2s1.is_label)
+#define VAR_is_label(v)         ((v)->u2.s1.is_label)
 
 //Variable is global.
-#define VAR_is_global(v)         ((v)->u2.u2s1.is_global)
+#define VAR_is_global(v)         ((v)->u2.s1.is_global)
 
 //Variable is local.
-#define VAR_is_local(v)          ((v)->u2.u2s1.is_local)
+#define VAR_is_local(v)          ((v)->u2.s1.is_local)
 
 //Global Variables which is static cannot be referenced outside this region.
-#define VAR_is_static(v)         ((v)->u2.u2s1.is_static)
+#define VAR_is_static(v)         ((v)->u2.s1.is_static)
 
 //Variable is readonly.
-#define VAR_is_readonly(v)       ((v)->u2.u2s1.is_readonly)
+#define VAR_is_readonly(v)       ((v)->u2.s1.is_readonly)
 
 //Record the initial valud index.
 #define VAR_init_val_id(v)       ((v)->u1.init_val_id)
@@ -118,38 +118,38 @@ class RegionMgr;
 #define VAR_has_init_val(v)      (VAR_init_val_id(v) != 0)
 
 //Variable is region.
-#define VAR_is_func_decl(v)      ((v)->u2.u2s1.is_func_decl)
+#define VAR_is_func_decl(v)      ((v)->u2.s1.is_func_decl)
 
 //Variable is aritifical or spurious that used to
 //faciliate optimizations and analysis.
-#define VAR_is_fake(v)           ((v)->u2.u2s1.is_fake)
+#define VAR_is_fake(v)           ((v)->u2.s1.is_fake)
 
 //Variable is volatile.
-#define VAR_is_volatile(v)       ((v)->u2.u2s1.is_volatile)
+#define VAR_is_volatile(v)       ((v)->u2.s1.is_volatile)
 
 //Variable is an array.
-#define VAR_is_array(v)          ((v)->u2.u2s1.is_array)
+#define VAR_is_array(v)          ((v)->u2.s1.is_array)
 
 //Variable is parameter of this region.
-#define VAR_is_formal_param(v)   ((v)->u2.u2s1.is_formal_param)
+#define VAR_is_formal_param(v)   ((v)->u2.s1.is_formal_param)
 
 //Record the parameter position.
 #define VAR_formal_param_pos(v)  ((v)->u1.formal_parameter_pos)
 
 //Variable is spill location.
-#define VAR_is_spill(v)          ((v)->u2.u2s1.is_spill)
+#define VAR_is_spill(v)          ((v)->u2.s1.is_spill)
 
 //Variable has been taken address.
-#define VAR_is_addr_taken(v)     ((v)->u2.u2s1.is_addr_taken)
+#define VAR_is_addr_taken(v)     ((v)->u2.s1.is_addr_taken)
 
 //Variable is PR.
-#define VAR_is_pr(v)             ((v)->u2.u2s1.is_pr)
+#define VAR_is_pr(v)             ((v)->u2.s1.is_pr)
 
 //Variable is marked "restrict", and it always be parameter.
-#define VAR_is_restrict(v)       ((v)->u2.u2s1.is_restrict)
+#define VAR_is_restrict(v)       ((v)->u2.s1.is_restrict)
 
 //Variable is concrete, and will be output to Code Generator.
-#define VAR_allocable(v)         ((v)->u2.u2s1.is_allocable)
+#define VAR_allocable(v)         ((v)->u2.s1.is_allocable)
 
 //Record the alignment.
 #define VAR_align(v)             ((v)->align)
@@ -200,7 +200,7 @@ public:
             //false indicate it is only being a placeholder and do not
             //allocate in essence.
             UINT is_allocable:1;
-        } u2s1;
+        } s1;
     } u2;
 
 public:
@@ -275,7 +275,14 @@ public:
 
     //You must make sure this function will not change any field of VAR.
     virtual CHAR const* dump(StrBuf & buf, TypeMgr const* dm) const;
+
+    void setToGlobal(bool is_global)
+    {         
+        VAR_is_global(this) = (UINT)is_global; 
+        VAR_is_local(this) = (UINT)!is_global;
+    }
 };
+
 //END VAR
 
 typedef TabIter<VAR*> VarTabIter;

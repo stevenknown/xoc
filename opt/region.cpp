@@ -1512,8 +1512,8 @@ IR * Region::buildBinaryOp(
     if (type->is_mc()) {
         //mc_size records the memory-chunk size if rtype is D_MC, or else is 0.
         ASSERT(TY_mc_size(type) != 0, ("Size of memory chunck can not be 0"));
-        ASSERT0(TY_mc_size(type) == lchild->get_dtype_size(getTypeMgr()) &&
-                TY_mc_size(type) == rchild->get_dtype_size(getTypeMgr()));
+        ASSERT0(TY_mc_size(type) == lchild->get_type_size(getTypeMgr()) &&
+                TY_mc_size(type) == rchild->get_type_size(getTypeMgr()));
     }
     #endif
 
@@ -1551,7 +1551,7 @@ C<IRBB*> * Region::splitIRlistIntoBB(IR * irs, BBList * bbl, C<IRBB*> * ctbb)
 
             //Regard label-info as add-on info that attached on newbb, and
             //'ir' will be dropped off.
-            LabelInfo const* li = ir->get_label();
+            LabelInfo const* li = ir->getLabel();
             newbb->addLabel(li);
             lab2bb->set(li, newbb);
             if (!LABEL_INFO_is_try_start(li) && !LABEL_INFO_is_pragma(li)) {
@@ -1828,7 +1828,7 @@ IR * Region::constructIRlist(bool clean_ir_list)
             //insertbefore_one(&ret_list, ret_list, ir);
             add_next(&ret_list, &last, ir);
             if (clean_ir_list) {
-                ir->set_bb(NULL);
+                ir->setBB(NULL);
             }
         }
         if (clean_ir_list) {
@@ -1957,7 +1957,7 @@ bool Region::isSafeToOptimize(IR const* ir)
 
     //Check kids.
     for(INT i = 0; i < IR_MAX_KID_NUM(ir); i++) {
-        IR * kid = ir->get_kid(i);
+        IR * kid = ir->getKid(i);
         if (kid != NULL) {
             if (!isSafeToOptimize(kid)) {
                 return false;
@@ -2054,7 +2054,7 @@ CHAR const* Region::getRegionName() const
 //a high level type. IRBB consists of only middle/low level IR.
 void Region::freeIRTreeList(IR * ir)
 {
-    if (ir == NULL) return;
+    if (ir == NULL) { return; }
     IR * head = ir, * next = NULL;
     while (ir != NULL) {
         next = ir->get_next();
@@ -2091,7 +2091,7 @@ void Region::freeIRTree(IR * ir)
     ASSERT(!ir->is_undef(), ("ir has been freed"));
     ASSERT(ir->is_single(), ("chain list should be cut off"));
     for (INT i = 0; i < IR_MAX_KID_NUM(ir); i++) {
-        IR * kid = ir->get_kid(i);
+        IR * kid = ir->getKid(i);
         if (kid != NULL) {
             freeIRTreeList(kid);
         }
@@ -2175,7 +2175,7 @@ void Region::dumpFreeTab()
 
         for (IR * ir = lst; ir != NULL; ir = ir->get_next()) {
             ASSERT0(getIRTypeSize(ir) == sz);
-            fprintf(g_tfile, "ir(%d),", IR_id(ir));
+            fprintf(g_tfile, "ir(%d),", ir->id());
         }
     }
     fflush(g_tfile);
@@ -2221,13 +2221,13 @@ IR * Region::allocIR(IR_TYPE irt)
         ir = (IR*)xmalloc(IRTSIZE(irt));
         INT v = MAX(getIRVec()->get_last_idx(), 0);
         IR_id(ir) = (UINT)(v+1);
-        getIRVec()->set(IR_id(ir), ir);
+        getIRVec()->set(ir->id(), ir);
         set_irt_size(ir, IRTSIZE(irt));
     } else {
         ASSERT0(ir->get_prev() == NULL);
         IR_next(ir) = NULL;
         #ifdef _DEBUG_
-        REGION_analysis_instrument(this)->m_has_been_freed_irs.diff(IR_id(ir));
+        REGION_analysis_instrument(this)->m_has_been_freed_irs.diff(ir->id());
         #endif
     }
     IR_code(ir) = irt;
@@ -2248,8 +2248,8 @@ void Region::freeIR(IR * ir)
     ASSERT(ir->is_single(), ("chain list should be cut off"));
     #ifdef _DEBUG_
     ASSERT0(!REGION_analysis_instrument(this)->
-            m_has_been_freed_irs.is_contain(IR_id(ir)));
-    REGION_analysis_instrument(this)->m_has_been_freed_irs.bunion(IR_id(ir));
+            m_has_been_freed_irs.is_contain(ir->id()));
+    REGION_analysis_instrument(this)->m_has_been_freed_irs.bunion(ir->id());
     #endif
 
     ASSERT0(getMiscBitSetMgr());
@@ -2270,7 +2270,7 @@ void Region::freeIR(IR * ir)
     }
 
     //Zero clearing all data fields.
-    UINT res_id = IR_id(ir);
+    UINT res_id = ir->id();
     UINT res_irt_sz = getIRTypeSize(ir);
     memset(ir, 0, res_irt_sz);
     IR_id(ir) = res_id;
@@ -2306,11 +2306,11 @@ IR * Region::dupIRTree(IR const* ir)
     if (ir == NULL) { return NULL; }
     IR * newir = dupIR(ir);
     for (UINT i = 0; i < IR_MAX_KID_NUM(ir); i++) {
-        IR * kid = ir->get_kid(i);
+        IR * kid = ir->getKid(i);
         if (kid != NULL) {
             IR * newkid_list = dupIRTreeList(kid);
-            newir->set_kid(i, newkid_list);
-        } else { ASSERT0(newir->get_kid(i) == NULL); }
+            newir->setKid(i, newkid_list);
+        } else { ASSERT0(newir->getKid(i) == NULL); }
     }
     return newir;
 }
@@ -2438,7 +2438,7 @@ void Region::scanCallAndReturnList(
 void Region::prescan(IR const* ir)
 {
     for (; ir != NULL; ir = ir->get_next()) {
-        switch (IR_code(ir)) {
+        switch (ir->get_code()) {
         case IR_ST:
             prescan(ST_rhs(ir));
             break;
@@ -2451,7 +2451,7 @@ void Region::prescan(IR const* ir)
             }
 
             for (UINT i = 0; i < IR_MAX_KID_NUM(ir); i++) {
-                IR * k = ir->get_kid(i);
+                IR * k = ir->getKid(i);
                 if (k != NULL) {
                     ASSERT0(IR_parent(k) == ir);
                     prescan(k);
@@ -2487,7 +2487,7 @@ void Region::prescan(IR const* ir)
                     MD md;
                     MD_base(&md) = LDA_idinfo(ir); //correspond to VAR
                     MD_ofst(&md) = LDA_ofst(ir);
-                    MD_size(&md) = ir->get_dtype_size(getTypeMgr());
+                    MD_size(&md) = ir->get_type_size(getTypeMgr());
                     MD_ty(&md) = MD_EXACT;
                     getMDSystem()->registerMD(md);
                 }
@@ -2523,7 +2523,7 @@ void Region::prescan(IR const* ir)
             }
 
             for (UINT i = 0; i < IR_MAX_KID_NUM(ir); i++) {
-                IR * k = ir->get_kid(i);
+                IR * k = ir->getKid(i);
                 if (k != NULL) {
                     ASSERT0(IR_parent(k) == ir);
                     prescan(k);
@@ -2532,7 +2532,7 @@ void Region::prescan(IR const* ir)
              break;
         default:
             for (UINT i = 0; i < IR_MAX_KID_NUM(ir); i++) {
-                IR * k = ir->get_kid(i);
+                IR * k = ir->getKid(i);
                 if (k != NULL) {
                     ASSERT0(IR_parent(k) == ir);
                     prescan(k);
@@ -2711,14 +2711,14 @@ void Region::dumpAllocatedIR()
             d = IR_dt(ir);
             ASSERT0(d);
             if (d == NULL) {
-                note("\nid(%d): %s 0x%.8x", IR_id(ir), IRNAME(ir), ir);
+                note("\nid(%d): %s 0x%.8x", ir->id(), IRNAME(ir), ir);
             } else {
                 buf.clean();
                 note("\nid(%d): %s r:%s 0x%.8x",
-                     IR_id(ir), IRNAME(ir), dm->dump_type(d, buf), ir);
+                     ir->id(), IRNAME(ir), dm->dump_type(d, buf), ir);
             }
         } else {
-            note("\nid(%d): undef 0x%.8x", IR_id(ir), ir);
+            note("\nid(%d): undef 0x%.8x", ir->id(), ir);
         }
 
         i++;
@@ -2818,7 +2818,7 @@ bool Region::verifyMDRef()
                             SEGIter * iter;
                             for (INT i = may->get_first(&iter);
                                  i >= 0; i = may->get_next(i, &iter)) {
-                                MD const* x = getMDSystem()->get_md(i);
+                                MD const* x = getMDSystem()->getMD(i);
                                 UNUSED(x);
                                 ASSERT0(x && !x->is_pr());
                             }
@@ -2845,7 +2845,7 @@ bool Region::verifyMDRef()
                             SEGIter * iter;
                             for (INT i = mayuse->get_first(&iter);
                                  i >= 0; i = mayuse->get_next(i, &iter)) {
-                                MD const* x = getMDSystem()->get_md(i);
+                                MD const* x = getMDSystem()->getMD(i);
                                 UNUSED(x);
                                 ASSERT0(x && !x->is_pr());
                             }
@@ -2902,7 +2902,7 @@ bool Region::verifyMDRef()
                             SEGIter * iter;
                             for (INT i = maydef->get_first(&iter);
                                  i >= 0; i = maydef->get_next(i, &iter)) {
-                                MD const* x = getMDSystem()->get_md(i);
+                                MD const* x = getMDSystem()->getMD(i);
                                 UNUSED(x);
                                 ASSERT0(x);
                                 ASSERT0(!x->is_pr());
@@ -2992,7 +2992,7 @@ bool Region::verifyIRinRegion()
     IR const* ir = getIRList();
     if (ir == NULL) { return true; }
     for (; ir != NULL; ir = ir->get_next()) {
-        ASSERT(getIR(IR_id(ir)) == ir,
+        ASSERT(getIR(ir->id()) == ir,
                ("ir id:%d is not allocated in region %s", getRegionName()));
     }
     return true;
@@ -3042,7 +3042,7 @@ void Region::dumpVarMD(VAR * v, UINT indent)
 {
     StrBuf buf(64);
     ConstMDIter iter;
-    MDTab * mdtab = getMDSystem()->get_md_tab(v);
+    MDTab * mdtab = getMDSystem()->getMDTab(v);
     if (mdtab != NULL) {
         MD const* x = mdtab->get_effect_md();
         if (x != NULL) {
@@ -3126,7 +3126,9 @@ void Region::dumpVARInRegion()
                 note("\n%s", buf.buf);
                 fprintf(g_tfile, " param%d", i);
                 fflush(g_tfile);
+                g_indent += 2;
                 dumpVarMD(v, g_indent);
+                g_indent -= 2;
                 g_indent -= 2;
             }
         }
@@ -3316,7 +3318,7 @@ void Region::checkValidAndRecompute(OptCtx * oc, ...)
         
         //If PRs have already been in SSA form, compute
         //DU chain doesn't make any sense.    
-        IR_SSA_MGR * ssamgr = (IR_SSA_MGR*)passmgr->queryPass(PASS_SSA_MGR);
+        IR_SSA_MGR * ssamgr = (IR_SSA_MGR*)passmgr->queryPass(PASS_PR_SSA_MGR);
         if (ssamgr == NULL) {
             flag |= COMPUTE_PR_DU;
         }
@@ -3522,7 +3524,7 @@ bool Region::process(OptCtx * oc)
         }
     }
 
-    IR_SSA_MGR * ssamgr;
+    IR_SSA_MGR * ssamgr = NULL;
 
     if (getIRList() != NULL) {
         if (!processIRList(*oc)) { goto ERR_RET; }
@@ -3534,19 +3536,18 @@ bool Region::process(OptCtx * oc)
         if (!OC_is_callg_valid(*oc)) {
             //processFuncRegion has scanned and collected call-list.
             //Thus it does not need to scan call-list here.
-            getRegionMgr()->buildCallGraph(*oc, true, true);
-            ASSERT0(OC_is_callg_valid(*oc));
+            getRegionMgr()->buildCallGraph(*oc, true, true);            
         }
-
-        ASSERT0(getPassMgr());
-        IPA * ipa = (IPA*)getPassMgr()->registerPass(PASS_IPA);
-        ipa->perform(*oc);
-        getPassMgr()->destroyPass(ipa);
+        
+        if (OC_is_callg_valid(*oc)) {            
+            IPA * ipa = (IPA*)getPassMgr()->registerPass(PASS_IPA);
+            ipa->perform(*oc);
+            getPassMgr()->destroyPass(ipa);
+        }
     }
 
-    ASSERT0(getPassMgr());
-    ssamgr = (IR_SSA_MGR*)getPassMgr()->queryPass(PASS_SSA_MGR);
-    if (ssamgr != NULL && ssamgr->is_ssa_constructed()) {
+    ssamgr = (IR_SSA_MGR*)getPassMgr()->queryPass(PASS_PR_SSA_MGR);
+    if (ssamgr != NULL && ssamgr->isSSAConstructed()) {
         ssamgr->destruction();
     }
 
@@ -3561,8 +3562,8 @@ bool Region::process(OptCtx * oc)
 
 ERR_RET:
     ASSERT0(getPassMgr());
-    ssamgr = (IR_SSA_MGR*)getPassMgr()->queryPass(PASS_SSA_MGR);
-    if (ssamgr != NULL && ssamgr->is_ssa_constructed()) {
+    ssamgr = (IR_SSA_MGR*)getPassMgr()->queryPass(PASS_PR_SSA_MGR);
+    if (ssamgr != NULL && ssamgr->isSSAConstructed()) {
         ssamgr->destruction();
     }
 

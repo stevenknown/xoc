@@ -180,12 +180,12 @@ protected:
             dump_helper_set(h, mn2->set, ind, id);
 
             B2NType * nextmn = NULL;
-            for (UINT id = mn2->next.get_first(ti, &nextmn);
-                 id != 0; id = mn2->next.get_next(ti, &nextmn)) {
+            for (UINT id2 = mn2->next.get_first(ti, &nextmn);
+                 id2 != 0; id2 = mn2->next.get_next(ti, &nextmn)) {
                 ASSERT0(nextmn);
                 mn_stack.push(nextmn);
                 indent_stack.push(ind + 2);
-                id_stack.push(id);
+                id_stack.push(id2);
             }
         }
     }

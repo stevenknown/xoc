@@ -52,18 +52,12 @@ public:
     }
 
     void add(UINT irid, DefMiscBitSetMgr & m) { bunion(irid, m); }
-    void add_def(IR const* stmt, DefMiscBitSetMgr & m);
-    void add_use(IR const* exp, DefMiscBitSetMgr & m);
+    void addDef(IR const* stmt, DefMiscBitSetMgr & m);
+    void addUse(IR const* exp, DefMiscBitSetMgr & m);
 
     void remove(UINT irid, DefMiscBitSetMgr & m) { diff(irid, m); }
-    void remove_use(IR const* exp, DefMiscBitSetMgr & m);
+    void removeUse(IR const* exp, DefMiscBitSetMgr & m);
     void removeDef(IR const* stmt, DefMiscBitSetMgr & m);
-
-    void union_set(DUSet const* set, DefMiscBitSetMgr & m)
-    {
-        if (set == NULL) { return; }
-        bunion(*set, m);
-    }
 };
 
 

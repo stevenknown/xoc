@@ -573,9 +573,9 @@ bool IR_LCSE::processDef(
                     for (IR * occ = EXPR_occ_list(ie).get_head();
                          occ != NULL; occ = EXPR_occ_list(ie).get_next()) {
                         IR * occ_stmt = occ->get_stmt();
-                        ASSERT0(occ_stmt != NULL && occ_stmt->get_bb());
-                        ASSERT0(ir->get_bb() == bb);
-                        if (occ_stmt->get_bb() != bb) {
+                        ASSERT0(occ_stmt != NULL && occ_stmt->getBB());
+                        ASSERT0(ir->getBB() == bb);
+                        if (occ_stmt->getBB() != bb) {
                             continue;
                         }
 
@@ -655,7 +655,7 @@ bool IR_LCSE::perform(OptCtx & oc)
             change |= processUse(bb, ir, avail_ir_expr,
                 map_expr2avail_pos, map_expr2avail_pr);
 
-            if (ir->has_result()) {
+            if (ir->hasResult()) {
                 //There may have expressions be killed.
                 //Remove them out the avail_ir_expr.
                 change |= processDef(bb, ir, avail_ir_expr,

@@ -81,13 +81,13 @@ bool IR_LOOP_CVT::try_convert(LI<IRBB> * li, IRBB * gobackbb,
     IRBB * epilog;
     if (li->is_inside_loop(succ1)) {
         ASSERT0(!li->is_inside_loop(succ2));
-        loopbody_start_bb = m_cfg->get_bb(succ1);
-        epilog = m_cfg->get_bb(succ2);
+        loopbody_start_bb = m_cfg->getBB(succ1);
+        epilog = m_cfg->getBB(succ2);
     } else {
         ASSERT0(li->is_inside_loop(succ2));
         ASSERT0(!li->is_inside_loop(succ1));
-        loopbody_start_bb = m_cfg->get_bb(succ2);
-        epilog = m_cfg->get_bb(succ1);
+        loopbody_start_bb = m_cfg->getBB(succ2);
+        epilog = m_cfg->getBB(succ1);
     }
 
     ASSERT0(loopbody_start_bb && epilog);
@@ -123,7 +123,7 @@ bool IR_LOOP_CVT::try_convert(LI<IRBB> * li, IRBB * gobackbb,
             if (x->isReadPR() && PR_ssainfo(x) != NULL) {
                 IR * def = SSA_def(PR_ssainfo(x));
                 if (def != NULL &&
-                    li->is_inside_loop(BB_id(def->get_bb()))) {
+                    li->is_inside_loop(BB_id(def->getBB()))) {
                     rmvec.set(cnt++, def);
                 }
             } else {
@@ -134,8 +134,8 @@ bool IR_LOOP_CVT::try_convert(LI<IRBB> * li, IRBB * gobackbb,
                      d >= 0; d = defset->get_next(d, &di)) {
                     IR * def = m_ru->getIR(d);
 
-                    ASSERT0(def->get_bb());
-                    if (li->is_inside_loop(BB_id(def->get_bb()))) {
+                    ASSERT0(def->getBB());
+                    if (li->is_inside_loop(BB_id(def->getBB()))) {
                         rmvec.set(cnt++, def);
                     }
                 }
@@ -168,7 +168,7 @@ bool IR_LOOP_CVT::try_convert(LI<IRBB> * li, IRBB * gobackbb,
         loopbody_start_lab = ::allocInternalLabel(m_ru->get_pool());
         m_cfg->add_lab(loopbody_start_bb, loopbody_start_lab);
     }
-    last_cond_br->set_label(loopbody_start_lab);
+    last_cond_br->setLabel(loopbody_start_lab);
 
     //Add back edge.
     m_cfg->addEdge(BB_id(gobackbb), BB_id(loopbody_start_bb));

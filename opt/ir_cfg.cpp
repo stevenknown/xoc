@@ -290,7 +290,7 @@ void IR_CFG::findTryRegion(IRBB const* try_start, OUT BitSet & trybbs)
 
         trybbs.bunion(id);
 
-        IRBB * bb = get_bb(id);
+        IRBB * bb = getBB(id);
         ASSERT(bb, ("vertex on CFG correspond to nothing"));
 
         if (bb->isTryEnd() && bb != try_start) {
@@ -448,12 +448,12 @@ void IR_CFG::insertBBbetween(
     //Revise the target LABEL of last XR in 'from'.
     IR * last_xr_of_from = get_last_xr(from);
 
-    ASSERT0(last_xr_of_from->get_label() &&
-            findBBbyLabel(last_xr_of_from->get_label()) == to);
-    ASSERT0(last_xr_of_from->get_label() != NULL);
+    ASSERT0(last_xr_of_from->getLabel() &&
+            findBBbyLabel(last_xr_of_from->getLabel()) == to);
+    ASSERT0(last_xr_of_from->getLabel() != NULL);
 
     LabelInfo * li = m_ru->genIlabel();
-    last_xr_of_from->set_label(li);
+    last_xr_of_from->setLabel(li);
 
     newbb->addLabel(li);
     m_lab2bb.set(li, newbb);
@@ -587,12 +587,13 @@ bool IR_CFG::removeTrampolinBB()
 
             //Revise branch target LabelInfo of xr in 'pred'.
             IR * last_xr_of_pred = get_last_xr(pred);
-
-            ASSERT0(last_xr_of_pred->get_label());
-            ASSERT(findBBbyLabel(last_xr_of_pred->get_label()) == next,
-                   ("Labels of bb should have already moved to "
-                    "next BB by moveLabels()"));
-            last_xr_of_pred->set_label(uncond_br->get_label());
+            if (last_xr_of_pred != NULL) {
+                ASSERT0(last_xr_of_pred->getLabel());
+                ASSERT(findBBbyLabel(last_xr_of_pred->getLabel()) == next,
+                       ("Labels of bb should have already moved to "
+                        "next BB by moveLabels()"));
+                last_xr_of_pred->setLabel(uncond_br->getLabel());
+            }
             removeEdge(pred, bb);
 
             Edge * e = addEdge(BB_id(pred), BB_id(next));
@@ -631,7 +632,7 @@ bool IR_CFG::removeTrampolinEdge()
 
         IR * last_xr = get_last_xr(bb);
         if (last_xr->is_goto() && !bb->isAttachDedicatedLabel()) {
-            LabelInfo const* tgt_li = last_xr->get_label();
+            LabelInfo const* tgt_li = last_xr->getLabel();
             ASSERT0(tgt_li != NULL);
 
             List<IRBB*> preds; //use list because cfg may be modify.
@@ -695,10 +696,10 @@ bool IR_CFG::removeTrampolinEdge()
                     //    bb is:
                     //        L1:
                     //        goto L2
-                    ASSERT0(last_xr_of_pred->get_label() &&
-                            findBBbyLabel(last_xr_of_pred->get_label()) == bb);
+                    ASSERT0(last_xr_of_pred->getLabel() &&
+                            findBBbyLabel(last_xr_of_pred->getLabel()) == bb);
 
-                    ASSERT0(last_xr_of_pred->get_label() != NULL);
+                    ASSERT0(last_xr_of_pred->getLabel() != NULL);
                     GOTO_lab(last_xr_of_pred) = tgt_li;
                     removeEdge(pred, bb);
                     addEdge(BB_id(pred), BB_id(succ));
@@ -736,10 +737,10 @@ bool IR_CFG::removeTrampolinEdge()
                         continue;
                     }
 
-                    ASSERT0(last_xr_of_pred->get_label() &&
-                            findBBbyLabel(last_xr_of_pred->get_label()) == bb);
+                    ASSERT0(last_xr_of_pred->getLabel() &&
+                            findBBbyLabel(last_xr_of_pred->getLabel()) == bb);
 
-                    ASSERT0(last_xr_of_pred->get_label() != NULL);
+                    ASSERT0(last_xr_of_pred->getLabel() != NULL);
                     if (bb != succ) {
                         //bb should not be the same one with succ.
                         BR_lab(last_xr_of_pred) = tgt_li;
@@ -781,7 +782,7 @@ bool IR_CFG::removeRedundantBranch()
             if ((last_xr->is_truebr() && always_true) ||
                 (last_xr->is_falsebr() && always_false)) {
                 //Substitute cond_br with 'goto'.
-                LabelInfo const* tgt_li = last_xr->get_label();
+                LabelInfo const* tgt_li = last_xr->getLabel();
                 ASSERT0(tgt_li != NULL);
 
                 BB_irlist(bb).remove_tail();
@@ -877,7 +878,7 @@ void IR_CFG::dump_dot(CHAR const* name, bool detail, bool dump_eh)
          v != NULL; v = m_vertices.get_next(c)) {
         INT id = VERTEX_id(v);
 
-        IRBB * bb = get_bb(id);
+        IRBB * bb = getBB(id);
         ASSERT0(bb);
 
         CHAR const* shape = "box";
@@ -1003,7 +1004,7 @@ void IR_CFG::dump_node(FILE * h, bool detail)
                 fprintf(h, " rpo:%d ", VERTEX_rpo(v));
             }
 
-            IRBB * bb2 = get_bb(id);
+            IRBB * bb2 = getBB(id);
             ASSERT0(bb2 != NULL);
             dumpBBLabel(bb2->getLabelList(), h);
             fprintf(h, "\n");

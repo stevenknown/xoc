@@ -124,7 +124,7 @@ public:
         case CP_PROP_CONST:
             return ir->is_lda() || ir->isConstExp();
         case CP_PROP_SIMPLEX:
-            switch (IR_code(ir)) {
+            switch (ir->get_code()) {
             case IR_LDA:
             case IR_ID:
             case IR_CONST:
@@ -133,7 +133,7 @@ public:
             default: return isSimpCVT(ir);
             }
         case CP_PROP_UNARY_AND_SIMPLEX:
-            switch (IR_code(ir)) {
+            switch (ir->get_code()) {
             case IR_LD:
             case IR_LDA:
             case IR_ID:

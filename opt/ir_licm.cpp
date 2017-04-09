@@ -67,7 +67,7 @@ bool IR_LICM::scanOpnd(
             continue;
         }
 
-        IRBB * bb = m_cfg->get_bb(i);
+        IRBB * bb = m_cfg->getBB(i);
         ASSERT0(bb && m_cfg->get_vertex(i));
         for (IR * ir = BB_first_ir(bb);
              ir != NULL; ir = BB_next_ir(bb)) {
@@ -100,7 +100,7 @@ bool IR_LICM::scanOpnd(
                     ASSERT0(def->isWritePR() || def->isCallHasRetVal());
 
                     if (!invariant_stmt.find(const_cast<IR*>(def)) &&
-                        li->is_inside_loop(BB_id(def->get_bb()))) {
+                        li->is_inside_loop(BB_id(def->getBB()))) {
                         is_cand = false;
                         break;
                     }
@@ -115,9 +115,9 @@ bool IR_LICM::scanOpnd(
                 for (INT i2 = defset->get_first(&di);
                      i2 >= 0; i2 = defset->get_next(i2, &di)) {
                     IR const* d = m_ru->getIR(i2);
-                    ASSERT0(d->get_bb() && d->is_stmt());
+                    ASSERT0(d->getBB() && d->is_stmt());
                     if (!invariant_stmt.find(const_cast<IR*>(d)) &&
-                        li->is_inside_loop(BB_id(d->get_bb()))) {
+                        li->is_inside_loop(BB_id(d->getBB()))) {
                         is_cand = false;
                         break;
                     }
@@ -142,7 +142,7 @@ bool IR_LICM::markExpAndStmt(IR * ir, TTab<IR*> & invariant_exp)
 {
     bool change = false;
     IR * e;
-    switch (IR_code(ir)) {
+    switch (ir->get_code()) {
     case IR_ST:
         e = ST_rhs(ir);
         if (!e->isConstExp() && !e->is_pr()) {
@@ -247,7 +247,7 @@ bool IR_LICM::isUniqueDef(MD const* md)
 
     if (*n > 1) { return false; }
 
-    MDTab * mdt = m_md_sys->get_md_tab(MD_base(md));
+    MDTab * mdt = m_md_sys->getMDTab(MD_base(md));
     if (mdt == NULL) { return true; }
 
     MD const* x = mdt->get_effect_md();
@@ -318,7 +318,7 @@ bool IR_LICM::scanResult(OUT TTab<IR*> & invariant_stmt)
 
 void IR_LICM::updateMD2Num(IR * ir)
 {
-    switch (IR_code(ir)) {
+    switch (ir->get_code()) {
     case IR_ST:
     case IR_STPR:
         {
@@ -348,7 +348,7 @@ void IR_LICM::updateMD2Num(IR * ir)
                 SEGIter * iter;
                 for (INT i = mds->get_first(&iter);
                      i >= 0; i = mds->get_next(i, &iter)) {
-                    MD * md2 = m_md_sys->get_md(i);
+                    MD * md2 = m_md_sys->getMD(i);
                     UINT * n = m_md2num.get(md2);
                     if (n == NULL) {
                         n = (UINT*)xmalloc(sizeof(UINT));
@@ -458,7 +458,7 @@ bool IR_LICM::is_stmt_dom_its_use(
         IRBB const* stmtbb) const
 {
     IR const* ustmt = use->get_stmt();
-    UINT ubbid = BB_id(ustmt->get_bb());
+    UINT ubbid = BB_id(ustmt->getBB());
     if (!li->is_inside_loop(ubbid)) { return true; }
 
     UINT stmtbbid = BB_id(stmtbb);
@@ -476,7 +476,7 @@ bool IR_LICM::is_dom_all_use_in_loop(IR const* ir, LI<IRBB> * li)
 {
     ASSERT0(ir->is_stmt());
 
-    IRBB * irbb = ir->get_bb();
+    IRBB * irbb = ir->getBB();
 
     if (ir->getSSAInfo() != NULL) {
         //Check if SSA def is loop invariant.
@@ -527,8 +527,8 @@ bool IR_LICM::isStmtCanBeHoisted(IR * stmt, IRBB * backedge_bb)
     if (backedge_bb == NULL) { return false; }
 
     //Stmt is at the dominate path in loop.
-    if (stmt->get_bb() != backedge_bb &&
-        !m_cfg->is_dom(BB_id(stmt->get_bb()), BB_id(backedge_bb))) {
+    if (stmt->getBB() != backedge_bb &&
+        !m_cfg->is_dom(BB_id(stmt->getBB()), BB_id(backedge_bb))) {
         return false;
     }
     return true;
@@ -541,7 +541,7 @@ bool IR_LICM::hoistInvariantStmt(
         IRBB * prehead,
         IN LI<IRBB> * li)
 {
-    ASSERT0(stmt->get_bb());
+    ASSERT0(stmt->getBB());
 
     ConstIRIter iriter;
     for (IR const* x = iterRhsInitC(stmt, iriter);
@@ -575,7 +575,7 @@ bool IR_LICM::hoistInvariantStmt(
     }
 
     //OK, stmt can be moved to prehead.
-    BB_irlist(stmt->get_bb()).remove(stmt);
+    BB_irlist(stmt->getBB()).remove(stmt);
     BB_irlist(prehead).append_tail(stmt);
     return true;
 }
@@ -589,7 +589,7 @@ bool IR_LICM::checkDefStmt(
 {
     ASSERT0(def->is_stmt());
 
-    IRBB * dbb = def->get_bb();
+    IRBB * dbb = def->getBB();
     ASSERT0(dbb);
     if (invariant_stmt.find(def)) {
         if (!li->is_inside_loop(BB_id(dbb)) ||
@@ -697,8 +697,8 @@ bool IR_LICM::hoistCand(
                 //    while (a > 0) {
                 //        foo();
                 //    }
-                ASSERT0(stmt->get_bb());
-                BB_irlist(stmt->get_bb()).remove(stmt);
+                ASSERT0(stmt->getBB());
+                BB_irlist(stmt->getBB()).remove(stmt);
                 BB_irlist(prehead).append_tail_ex(stmt);
 
                 //The code motion do not modify DU chain info of 'exp' and
@@ -806,8 +806,8 @@ bool IR_LICM::perform(OptCtx & oc)
 
     m_ssamgr = NULL;
     IR_SSA_MGR * ssamgr =
-            (IR_SSA_MGR*)m_ru->getPassMgr()->queryPass(PASS_SSA_MGR);
-    if (ssamgr != NULL && ssamgr->is_ssa_constructed()) {
+            (IR_SSA_MGR*)m_ru->getPassMgr()->queryPass(PASS_PR_SSA_MGR);
+    if (ssamgr != NULL && ssamgr->isSSAConstructed()) {
         m_ssamgr = ssamgr;
     }
 

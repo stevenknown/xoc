@@ -102,7 +102,7 @@ bool IR_IVR::findInitVal(IV * iv)
 
     LI<IRBB> const* li = IV_li(iv);
     ASSERT0(li);
-    IRBB * dbb = domdef->get_bb();
+    IRBB * dbb = domdef->getBB();
     if (dbb == LI_loop_head(li) || !li->is_inside_loop(BB_id(dbb))) {
         return computeInitVal(domdef, iv);
     }
@@ -213,8 +213,7 @@ void IR_IVR::recordIV(
     SList<IV*> * ivlst = m_li2bivlst.get(LI_id(li));
     if (ivlst == NULL) {
         ivlst = (SList<IV*>*)xmalloc(sizeof(SList<IV*>));
-        ivlst->init();
-        ivlst->set_pool(m_sc_pool);
+        ivlst->init(m_sc_pool);        
         m_li2bivlst.set(LI_id(li), ivlst);
     }
     ivlst->append_head(x);
@@ -238,7 +237,7 @@ void IR_IVR::findBIV(
     for (INT i = LI_bb_set(li)->get_first();
          i != -1; i = LI_bb_set(li)->get_next(i)) {
         //if ((UINT)i == headi) { continue; }
-        IRBB * bb = m_cfg->get_bb(i);
+        IRBB * bb = m_cfg->getBB(i);
         ASSERT0(bb && m_cfg->get_vertex(BB_id(bb)));
         for (IR * ir = BB_first_ir(bb); ir != NULL; ir = BB_next_ir(bb)) {
             if (!ir->is_st() && !ir->is_ist() && !ir->isCallStmt()) {
@@ -272,7 +271,7 @@ void IR_IVR::findBIV(
             if (maydef == NULL) { continue; }
 
             for (INT i2 = tmp.get_first(); i2 != -1; i2 = tmp.get_next(i2)) {
-                MD const* md = m_md_sys->get_md(i2);
+                MD const* md = m_md_sys->getMD(i2);
                 ASSERT0(!m_is_only_handle_exact_md || md->is_exact());
                 if (maydef->is_contain(md)) {
                     map_md2defcount.set(i2, 0);
@@ -297,9 +296,9 @@ void IR_IVR::findBIV(
         ASSERT0(def);
 
         //def stmt is reach-in of loop head.
-        if (m_du->getInReachDef(headi, NULL)->is_contain(IR_id(def))) {
+        if (m_du->getInReachDef(headi, NULL)->is_contain(def->id())) {
             //MD i is biv.
-            sdlst.append_head(m_md_sys->get_md(i));
+            sdlst.append_head(m_md_sys->getMD(i));
             find = true;
         }
     }
@@ -354,8 +353,8 @@ bool IR_IVR::is_loop_invariant(LI<IRBB> const* li, IR const* ir)
     DUIter di = NULL;
     for (INT i = defs->get_first(&di); i >= 0; i = defs->get_next(i, &di)) {
         IR const* d = m_ru->getIR(i);
-        ASSERT0(d->is_stmt() && d->get_bb());
-        if (li->is_inside_loop(BB_id(d->get_bb()))) {
+        ASSERT0(d->is_stmt() && d->getBB());
+        if (li->is_inside_loop(BB_id(d->getBB()))) {
             return false;
         }
     }
@@ -413,8 +412,7 @@ void IR_IVR::addDIVList(LI<IRBB> const* li, IR const* e)
     SList<IR const*> * divlst = m_li2divlst.get(LI_id(li));
     if (divlst == NULL) {
         divlst = (SList<IR const*>*)xmalloc(sizeof(SList<IR const*>));
-        divlst->init();
-        divlst->set_pool(m_sc_pool);
+        divlst->init(m_sc_pool);        
         m_li2divlst.set(LI_id(li), divlst);
     }
 
@@ -447,7 +445,7 @@ void IR_IVR::findDIV(LI<IRBB> const* li, SList<IV*> const& bivlst, BitSet & tmp)
 
     for (INT i = LI_bb_set(li)->get_first();
          i != -1; i = LI_bb_set(li)->get_next(i)) {
-        IRBB * bb = m_cfg->get_bb(i);
+        IRBB * bb = m_cfg->getBB(i);
         ASSERT0(bb && m_cfg->get_vertex(BB_id(bb)));
         for (IR * ir = BB_first_ir(bb); ir != NULL; ir = BB_next_ir(bb)) {
             switch (ir->get_code()) {

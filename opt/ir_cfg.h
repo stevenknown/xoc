@@ -182,7 +182,7 @@ public:
                 IRBB * a = ct2->val();
                 if (ehbbs.is_contain(BB_id(a))) { continue; }
 
-                Edge * e = addEdge(a->id, b->id);
+                Edge * e = addEdge(a->id(), b->id());
                 EDGE_info(e) = xmalloc(sizeof(CFGEdgeInfo));
                 CFGEI_is_eh((CFGEdgeInfo*)EDGE_info(e)) = true;
                 m_has_eh_edge = true;
@@ -273,7 +273,7 @@ public:
     UINT get_bb_num() const { return get_vertex_num(); }
     BBList * getBBList() { return m_bb_list; }
     LAB2BB * get_lab2bb_map() { return &m_lab2bb; }
-    IRBB * get_bb(UINT id) const { return m_bb_vec.get(id); }
+    IRBB * getBB(UINT id) const { return m_bb_vec.get(id); }
     virtual bool goto_opt(IRBB * bb);
     virtual CHAR const* getPassName() const { return "CFG"; }
     virtual PASS_TYPE getPassType() const { return PASS_CFG; }

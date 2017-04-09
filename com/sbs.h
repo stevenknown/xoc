@@ -231,7 +231,7 @@ public:
     ~SBitSetCore()
     {
         //should call clean() before destruction,
-        //otherwise it will incur SegMgr claimed.
+        //otherwise it will incur SegMgr assertion.
     }
 
     void bunion(SBitSetCore<BitsPerSeg> const& src,
@@ -293,6 +293,7 @@ public:
     INT get_last(TSEGIter ** cur) const;
     INT get_next(UINT elem, TSEGIter ** cur) const;
 
+    void init() { segs.init(); }
     void intersect(SBitSetCore<BitsPerSeg> const& src,
                    SegMgr<BitsPerSeg> * sm,
                    TSEGIter ** free_list);

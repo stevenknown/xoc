@@ -40,11 +40,11 @@ class IR_SSA_MGR;
 
 //Dominace Frontier manager
 class DfMgr {
-    IR_SSA_MGR * m_ssa_mgr;
+    //IR_SSA_MGR * m_ssa_mgr;
     BitSetMgr m_bs_mgr;
     Vector<BitSet*> m_df_vec;
 public:
-    explicit DfMgr(IR_SSA_MGR * sm);
+    explicit DfMgr() {}
     COPY_CONSTRUCTOR(DfMgr);
 
     void clean();
@@ -52,7 +52,7 @@ public:
     void dump(DGraph & g);
 
     //Return the BB set controlled by bbid.
-    BitSet const* read_df_ctrlset(UINT bbid) const
+    BitSet const* readDFControlSet(UINT bbid) const
     { return m_df_vec.get(bbid); }
 
     //Get the BB set controlled by v.
@@ -90,10 +90,10 @@ protected:
     IRIter m_iter; //for tmp use.
 
     //Record versions for each PRs.
-    UINT2VPvec m_map_prno2vp_vec;
+    UINT2VPVec m_map_prno2vp_vec;
 
     //Record version stack during renaming.
-    UINT2VPstack m_map_prno2stack;
+    UINT2VPStack m_map_prno2stack;
     Vector<VP*> m_vp_vec;
     Vector<UINT> m_max_version; //record version number counter for pr.
 
@@ -124,11 +124,6 @@ protected:
     void constructMDDUChainForPR();
     void cleanPRNO2Stack();
     void collectDefinedPR(IN IRBB * bb, OUT DefSBitSet & mustdef_pr);
-    void computeEffectPR(IN OUT BitSet & effect_prs,
-                         IN BitSet & defed_prs,
-                         IN IRBB * bb,
-                         IN PRDF & live_mgr,
-                         IN Vector<BitSet*> & pr2defbb);
 
     void destructBBSSAInfo(IRBB * bb);
     void destructionInDomTreeOrder(IRBB * root, Graph & domtree);
@@ -153,7 +148,7 @@ protected:
     void rename(DefSBitSet & effect_prs,
                 Vector<DefSBitSet*> & defed_prs_vec,
                 Graph & domtree);
-    void rename_bb(IRBB * bb);
+    void renameBB(IRBB * bb);
     void renameInDomTreeOrder(
                 IRBB * root,
                 Graph & dtree,
@@ -167,15 +162,15 @@ protected:
 
     void placePhiForPR(UINT prno,
                        IN List<IRBB*> * defbbs,
-                       DfMgr & dfm,
+                       DfMgr const& dfm,
                        BitSet & visited,
-                       List<IRBB*> & wl);
-    void placePhi(IN DfMgr & dfm,
+                       List<IRBB*> & wl,
+                       Vector<DefSBitSet*> & defed_prs_vec);
+    void placePhi(DfMgr const& dfm,
                   IN OUT DefSBitSet & effect_prs,
                   DefMiscBitSetMgr & bs_mgr,
                   Vector<DefSBitSet*> & defed_prs_vec,
                   List<IRBB*> & wl);
-
 public:
     explicit IR_SSA_MGR(Region * ru)
     {
@@ -196,7 +191,6 @@ public:
     COPY_CONSTRUCTOR(IR_SSA_MGR);
     ~IR_SSA_MGR() { destroy(false); }
 
-    void buildDomiateFrontier(OUT DfMgr & dfm);
     void buildDUChain(IR * def, IR * use)
     {
         ASSERT0(def->isWritePR() || def->isCallHasRetVal());
@@ -256,9 +250,9 @@ public:
     void destruction(DomTree & domtree);
     void destruction();
     void dump();
-    void dump_all_vp(bool have_renamed);
-    CHAR * dump_vp(IN VP * v, OUT CHAR * buf);
-    void dump_ssa_graph(CHAR * name = NULL);
+    void dumpAllVP(bool have_renamed);
+    CHAR * dumpVP(IN VP * v, OUT CHAR * buf);
+    void dumpSSAGraph(CHAR * name = NULL);
 
     //Note: Non-SSA DU Chains of read/write PR will be clean and
     //unusable after SSA construction.
@@ -266,8 +260,8 @@ public:
     void construction(DomTree & domtree);
     size_t count_mem();
 
-    Vector<VP*> const* get_vp_vec() const { return &m_vp_vec; }
-    VP * get_vp(UINT id) const { return m_vp_vec.get(id); }
+    Vector<VP*> const* getVPVec() const { return &m_vp_vec; }
+    VP * getVP(UINT id) const { return m_vp_vec.get(id); }
 
     IR * initVP(IN IR * ir);
     void insertPhi(UINT prno, IN IRBB * bb);
@@ -275,14 +269,14 @@ public:
     //Return true if PR ssa is constructed.
     //This flag will direct the behavior of optimizations.
     //If SSA constructed, DU mananger will not compute any information for PR.
-    bool is_ssa_constructed() const { return m_is_ssa_constructed; }
+    bool isSSAConstructed() const { return m_is_ssa_constructed; }
 
     //Return true if phi is redundant, otherwise return false.
     //If all opnds have same defintion or defined by current phi,
     //the phi is redundant.
     //common_def: record the common_def if the definition
     //  of all opnd is the same.
-    bool is_redundant_phi(IR const* phi, OUT IR ** common_def) const;
+    bool isRedundantPHI(IR const* phi, OUT IR ** common_def) const;
 
     //Allocate VP and ensure it is unique according to 'version' and 'prno'.
     VP * allocVP(UINT prno, UINT version)
@@ -311,7 +305,6 @@ public:
         return v;
     }
 
-
     //Allocate SSAInfo for specified PR indicated by 'prno'.
     SSAInfo * allocSSAInfo(UINT prno)
     {
@@ -323,7 +316,7 @@ public:
     //This function will clean all informations and recreate them.
     inline void reinit()
     {
-        if (is_ssa_constructed()) {
+        if (isSSAConstructed()) {
             destroy(true);
         }
         init();
@@ -335,9 +328,9 @@ public:
     bool verifySSAInfo(); //Can be used in any module.
 
     virtual CHAR const* getPassName() const
-    { return "SSA Optimization Manager"; }
+    { return "PR SSA Manager"; }
 
-    PASS_TYPE getPassType() const { return PASS_SSA_MGR; }
+    PASS_TYPE getPassType() const { return PASS_PR_SSA_MGR; }
 };
 
 

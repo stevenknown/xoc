@@ -39,9 +39,9 @@ namespace xoc {
 class IRSet : public DefSBitSet {
 public:
     IRSet(DefSegMgr * sm) : DefSBitSet(sm) {}
+    COPY_CONSTRUCTOR(IRSet);
 
-    void append(IR const* v)
-    { DefSBitSet::bunion(IR_id(v)); }
+    void append(IR const* v) { DefSBitSet::bunion(IR_id(v)); }
 
     bool find(IR const* v) const
     {
@@ -125,10 +125,10 @@ public:
 };
 
 //Mapping from PRNO to vector of VP.
-typedef Vector<Vector<VP*>*> UINT2VPvec;
+typedef Vector<Vector<VP*>*> UINT2VPVec;
 
-//Mapping from PRNO to Stack of VP.
-typedef Vector<Stack<VP*>*> UINT2VPstack;
+//Mapping from PRNO id to Stack of VP.
+typedef Vector<Stack<VP*>*> UINT2VPStack;
 
 } //namespace xoc
 #endif

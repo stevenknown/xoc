@@ -60,7 +60,7 @@ IR * Region::refineIload1(IR * ir, bool & change)
     LD_ofst(ld) += ild_ofst;
     if (getDUMgr() != NULL) {
         //newIR is IR_LD.
-        //Consider the ir->get_offset() and copying MDSet info from 'ir'.
+        //Consider the ir->getOffset() and copying MDSet info from 'ir'.
         if (ir->getExactRef() == NULL) {
             ld->setRefMD(genMDforLoad(ld), this);
         } else {
@@ -257,7 +257,7 @@ IR * Region::refineStore(IR * ir, bool & change, RefineCtx & rc)
             getDUMgr()->removeIROutFromDUMgr(ir);
         }
 
-        IRBB * bb = ir->get_bb();
+        IRBB * bb = ir->getBB();
         if (bb != NULL) {
             BB_irlist(bb).remove(ir);
             RC_stmt_removed(rc) = true;
@@ -286,7 +286,7 @@ IR * Region::refineStore(IR * ir, bool & change, RefineCtx & rc)
                     getDUMgr()->removeIROutFromDUMgr(ir);
                 }
 
-                IRBB * bb = ir->get_bb();
+                IRBB * bb = ir->getBB();
                 if (bb != NULL) {
                     BB_irlist(bb).remove(ir);
                     RC_stmt_removed(rc) = true;
@@ -450,7 +450,7 @@ IR * Region::refinePhi(IR * ir, bool & change, RefineCtx & rc)
     change = true;
 
     if (RC_refine_stmt(rc)) {
-        IRBB * bb = ir->get_bb();
+        IRBB * bb = ir->getBB();
         ASSERT0(bb);
         BB_irlist(bb).remove(ir);
         RC_stmt_removed(rc) = true;
@@ -1240,7 +1240,7 @@ IR * Region::refineStoreArray(IR * ir, bool & change, RefineCtx & rc)
                     getDUMgr()->removeIROutFromDUMgr(ir);
                 }
 
-                IRBB * bb = ir->get_bb();
+                IRBB * bb = ir->getBB();
                 if (bb != NULL) {
                     BB_irlist(bb).remove(ir);
                     RC_stmt_removed(rc) = true;
@@ -1663,7 +1663,7 @@ void Region::insertCvtForBinaryOp(IR * ir, bool & change)
     }
 
     if (op0->is_ptr()) {
-        if (op1->get_dtype_size(getTypeMgr()) > op0->get_dtype_size(getTypeMgr())) {
+        if (op1->get_type_size(getTypeMgr()) > op0->get_type_size(getTypeMgr())) {
             ASSERT(op1->get_type()->is_ptr_addend() && !op1->is_ptr(),
                    ("illegal pointer arith"));
             DATA_TYPE t = getTypeMgr()->getPointerSizeDtype();
@@ -1688,14 +1688,14 @@ void Region::insertCvtForBinaryOp(IR * ir, bool & change)
     TypeMgr * dm = getTypeMgr();
     Type const* type = dm->hoistDtypeForBinop(op0, op1);
     UINT dt_size = dm->get_bytesize(type);
-    if (op0->get_dtype_size(dm) != dt_size) {
+    if (op0->get_type_size(dm) != dt_size) {
         BIN_opnd0(ir) = buildCvt(op0, type);
         copyDbx(BIN_opnd0(ir), op0, this);
         change = true;
         ir->setParentPointer(false);
     }
 
-    if (op1->get_dtype_size(dm) != dt_size) {
+    if (op1->get_type_size(dm) != dt_size) {
         BIN_opnd1(ir) = buildCvt(op1, type);
         copyDbx(BIN_opnd1(ir), op1, this);
         change = true;
@@ -1775,8 +1775,8 @@ IR * Region::insertCvt(IR * parent, IR * kid, bool & change)
             Type const* tgt_ty = parent->get_type();
             if (tgt_ty->is_void()) { return kid; }
 
-            UINT tgt_size = parent->get_dtype_size(dm);
-            UINT src_size = kid->get_dtype_size(dm);
+            UINT tgt_size = parent->get_type_size(dm);
+            UINT src_size = kid->get_type_size(dm);
 
             if (parent->is_vec() || kid->is_vec()) {
                 //Do not do hoisting for vector type.
@@ -2175,12 +2175,12 @@ IR * Region::foldConst(IR * ir, bool & change)
 {
     bool doit = false;
     for (INT i = 0; i < IR_MAX_KID_NUM(ir); i++) {
-        IR * kid = ir->get_kid(i);
+        IR * kid = ir->getKid(i);
         if (kid != NULL) {
             IR * new_kid = foldConst(kid, change);
             if (new_kid != kid) {
                 doit = true;
-                ir->set_kid(i, new_kid);
+                ir->setKid(i, new_kid);
             }
         }
     }
@@ -2381,7 +2381,7 @@ IR * Region::foldConst(IR * ir, bool & change)
                     freeIRTree(ir);
                     ir = newir;
                     change = true;
-                } else if (opnd0->get_dtype_size(dm) == 4 &&
+                } else if (opnd0->get_type_size(dm) == 4 &&
                            CONST_int_val(opnd1) == 32) {
                     //x<<32 => 0, x is 32bit
                     IR * newir = buildImmInt(0, ir->get_type());

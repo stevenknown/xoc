@@ -232,8 +232,8 @@ bool IR_CP::is_available(IR const* def_ir, IR const* occ, IR * use_ir)
     //occ can NOT reach 'def_ir' if one of p, q, a, b
     //modified during the path.
 
-    IRBB * defbb = def_ir->get_bb();
-    IRBB * usebb = use_ir->get_bb();
+    IRBB * defbb = def_ir->getBB();
+    IRBB * usebb = use_ir->getBB();
     if (defbb == usebb) {
         //Both def_ir and use_ir are in same BB.
         C<IR*> * ir_holder = NULL;
@@ -260,7 +260,7 @@ bool IR_CP::is_available(IR const* def_ir, IR const* occ, IR * use_ir)
         m_du->getAvailInExpr(BB_id(usebb), NULL);
     ASSERT0(availin_expr);
 
-    if (availin_expr->is_contain(IR_id(occ))) {
+    if (availin_expr->is_contain(occ->id())) {
         IR * u;
         for (u = BB_first_ir(usebb); u != use_ir && u != NULL;
              u = BB_next_ir(usebb)) {
@@ -370,8 +370,8 @@ bool IR_CP::doProp(IN IRBB * bb, Vector<IR*> & usevec)
             IR * use_stmt = use->get_stmt();
             ASSERT0(use_stmt->is_stmt());
 
-            ASSERT0(use_stmt->get_bb() != NULL);
-            IRBB * use_bb = use_stmt->get_bb();
+            ASSERT0(use_stmt->getBB() != NULL);
+            IRBB * use_bb = use_stmt->getBB();
             if (!ssadu &&
                 !(bb == use_bb && bb->is_dom(def_stmt, use_stmt, true)) &&
                 !m_cfg->is_dom(BB_id(bb), BB_id(use_bb))) {
@@ -494,7 +494,7 @@ bool IR_CP::perform(OptCtx & oc)
     Vector<IR*> usevec;
 
     for (Vertex * v = lst.get_head(); v != NULL; v = lst.get_next()) {
-        IRBB * bb = m_cfg->get_bb(VERTEX_id(v));
+        IRBB * bb = m_cfg->getBB(VERTEX_id(v));
         ASSERT0(bb);
         change |= doProp(bb, usevec);
     }

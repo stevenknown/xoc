@@ -87,12 +87,12 @@ IRBB * findSingleBackedgeStartBB(LI<IRBB> const* li, IR_CFG * cfg)
         }
         ec = EC_next(ec);
     }
-    ASSERT0(backedgebbid > 0 && cfg->get_bb(backedgebbid));
+    ASSERT0(backedgebbid > 0 && cfg->getBB(backedgebbid));
     if (backedgecount > 2) {
         //There are multiple backedges.
         return NULL;
     }
-    return cfg->get_bb(backedgebbid);
+    return cfg->getBB(backedgebbid);
 }
 
 
@@ -179,13 +179,13 @@ IRBB * findAndInsertPreheader(
 
     for (INT i = LI_bb_set(li)->get_first();
          i >= 0; i = LI_bb_set(li)->get_next(i)) {
-        IRBB * bb = cfg->get_bb(i);
+        IRBB * bb = cfg->getBB(i);
         ASSERT0(bb);
         for (IR const* ir = BB_first_ir(bb); ir != NULL; ir = BB_next_ir(bb)) {
             if (ir->is_switch()) {
                 for (IR * c = SWITCH_case_list(ir);
                      c != NULL; c = c->get_next()) {
-                    LabelInfo const* lab = c->get_label();
+                    LabelInfo const* lab = c->getLabel();
                     ASSERT0(lab);
                     if (head_labinfo.find(lab)) {
                         head_labinfo.setAlways(lab, true);
@@ -194,7 +194,7 @@ IRBB * findAndInsertPreheader(
                 continue;
             }
 
-            LabelInfo const* lab = ir->get_label();
+            LabelInfo const* lab = ir->getLabel();
             if (lab == NULL) { continue; }
 
             if (!head_labinfo.find(lab)) { continue; }

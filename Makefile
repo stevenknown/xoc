@@ -39,6 +39,8 @@ opt/ir_refine.o\
 opt/ir_rp.o\
 opt/ir_aa.o\
 opt/ir_ssa.o\
+opt/ir_mdssa.o\
+opt/mdssainfo.o\
 opt/label.o\
 opt/data_type.o \
 opt/option.o\

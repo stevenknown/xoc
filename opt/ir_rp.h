@@ -71,7 +71,7 @@ public:
         if (MDSet::is_overlap(md)) { return true; }
         SEGIter * iter;
         for (INT i = get_first(&iter); i >= 0; i = get_next(i, &iter)) {
-            MD const* t = m_md_sys->get_md(i);
+            MD const* t = m_md_sys->getMD(i);
             ASSERT0(t);
             if (t->is_overlap(md)) { return true; }
         }
@@ -85,7 +85,7 @@ public:
         fprintf(g_tfile, "\n==---- DUMP Dont Promot Tabel ----==\n");
         SEGIter * iter;
         for (INT i = get_first(&iter); i >= 0; i = get_next(i, &iter)) {
-            MD const* t = m_md_sys->get_md(i);
+            MD const* t = m_md_sys->getMD(i);
             ASSERT0(t);
             t->dump(m_md_sys->getTypeMgr());
         }
@@ -219,7 +219,7 @@ protected:
         SEGIter * iter;
         for (INT i = mds->get_first(&iter);
              i >= 0; i = mds->get_next(i, &iter)) {
-            MD const* md2 = m_md_sys->get_md(i);
+            MD const* md2 = m_md_sys->getMD(i);
             ASSERT0(md2);
             if (md2->is_global()) { return true; }
         }
@@ -296,7 +296,7 @@ public:
         m_is_insert_bb = false;
         m_ssamgr = NULL;
 
-        UINT c = MAX(11, m_ru->getMDSystem()->get_num_of_md());
+        UINT c = MAX(11, m_ru->getMDSystem()->getNumOfMD());
         m_md2lt_map = new MD2MDLifeTime(c);
         m_mdlt_count = 0;
         m_pool = smpoolCreate(2 * sizeof(MD_LT), MEM_COMM);

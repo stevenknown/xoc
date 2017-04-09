@@ -85,7 +85,7 @@ void PRDF::processMay(
         SEGIter * iter;
         for (INT i = mds->get_first(&iter);
              i >= 0; i = mds->get_next(i, &iter)) {
-            MD const* md = m_md_sys->get_md(i);
+            MD const* md = m_md_sys->getMD(i);
             ASSERT0(md);
             if (MD_base(md) != MD_base(prmd)) {
                 bool find;
