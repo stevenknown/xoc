@@ -181,8 +181,8 @@ public:
     CHAR const* name;
     BYTE kid_map;
     BYTE kid_num;
-    UINT attr;
     BYTE size;
+    UINT attr;
 };
 
 

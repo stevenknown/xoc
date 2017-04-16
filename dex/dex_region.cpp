@@ -234,8 +234,8 @@ bool DexRegion::process(OptCtx * oc)
     MiddleProcess(*oc);
 
     ASSERT0(getPassMgr());
-    IR_SSA_MGR * ssamgr = (IR_SSA_MGR*)passmgr->queryPass(PASS_SSA_MGR);
-    if (ssamgr != NULL && ssamgr->is_ssa_constructed()) {
+    IR_SSA_MGR * ssamgr = (IR_SSA_MGR*)passmgr->queryPass(PASS_PR_SSA_MGR);
+    if (ssamgr != NULL && ssamgr->isSSAConstructed()) {
         ssamgr->destruction();
     }
 

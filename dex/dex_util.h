@@ -158,7 +158,7 @@ inline bool is_builtin(IR const* ir)
 {
     //The first charactor of builtin function is #.
     ASSERT0(ir && ir->is_call());
-    return ((CCall*)ir)->get_callee_name()[0] == '#';
+    return ((CCall*)ir)->getCalleeNameString()[0] == '#';
 }
 
 inline bool is_wide(LIR * lir)

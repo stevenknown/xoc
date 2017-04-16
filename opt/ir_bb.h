@@ -394,13 +394,13 @@ public:
         return false;
     }
 
-    //Return true if ir1 dominate ir2 in current bb.
+    //Return true if ir1 dominates ir2 in current bb.
     //Function will modify the IR container of bb.
     //'is_strict': true if ir1 should not equal to ir2.
     inline bool is_dom(IR const* ir1, IR const* ir2, bool is_strict) const
     {
-        ASSERT0(ir1->is_stmt() && ir2->is_stmt() &&
-                 ir1->getBB() == this && ir2->getBB() == this);
+        ASSERT0(ir1 && ir2 && ir1->is_stmt() && ir2->is_stmt() &&
+            ir1->getBB() == this && ir2->getBB() == this);
         if (is_strict && ir1 == ir2) {
             return false;
         }

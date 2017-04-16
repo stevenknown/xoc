@@ -62,7 +62,7 @@ public:
 
         IR * stmt = ref->get_stmt();
         ASSERT0(stmt);
-        IRBB * stmt_bb = stmt->get_bb();
+        IRBB * stmt_bb = stmt->getBB();
         ASSERT0(stmt_bb);
 
         IR_DU_MGR * dumgr = ru->getDUMgr();

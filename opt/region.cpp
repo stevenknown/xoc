@@ -3294,8 +3294,7 @@ void Region::checkValidAndRecompute(OptCtx * oc, ...)
             dumgr = (IR_DU_MGR*)passmgr->registerPass(PASS_DU_MGR);
         }
 
-        f |= COMPUTE_NOPR_DU;
-        f |= COMPUTE_PR_DU;
+        f |= COMPUTE_NOPR_DU|COMPUTE_PR_DU;
 
         dumgr->perform(*oc, f);
         if (HAVE_FLAG(f, SOL_REF)) {

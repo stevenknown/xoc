@@ -206,6 +206,7 @@ extern bool g_is_lower_to_pr_mode; //Lower IR to PR mode.
 extern bool g_is_support_dynamic_type;
 
 extern bool g_do_ssa; //Do optimization in SSA.
+extern bool g_do_md_ssa; //Do optimization in Memory SSA.
 extern bool g_do_cfg;
 extern bool g_do_rpo;
 extern bool g_do_loop_ana; //loop analysis.

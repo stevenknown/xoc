@@ -2462,8 +2462,8 @@ void IR_DU_MGR::inferIstore(IR * ir, UINT duflag)
     if (HAVE_FLAG(duflag, COMPUTE_NOPR_DU)) {
         //Compute DEF mdset. AA should guarantee either mustdef is not NULL or
         //maydef not NULL.
-        ASSERT0((ir->getRefMDSet() && !ir->getRefMDSet()->is_empty()) ^
-                (ir->getRefMD() != NULL));
+        ASSERT0((ir->getRefMDSet() && !ir->getRefMDSet()->is_empty()) ||
+            (ir->getRefMD()));
         computeOverlapDefMDSet(ir, false);            
     }
     computeExpression(IST_rhs(ir), NULL, COMP_EXP_RECOMPUTE, duflag);

@@ -65,7 +65,7 @@ void DEX_CFG::dump_bb(
             fprintf(h, " rpo:%d ", rpo);
         }
 
-        IRBB * bb = get_bb(id);
+        IRBB * bb = getBB(id);
         ASSERT0(bb != NULL);
         dumpBBLabel(bb->getLabelList(), h);
         fprintf(h, "\n");

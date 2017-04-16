@@ -81,10 +81,10 @@ int xtime = 1;
 void DexPassMgr::performScalarOpt(OptCtx & oc)
 {
     List<Pass*> passlist; //A list of optimization.
-    IR_SSA_MGR * ssamgr = (IR_SSA_MGR*)registerPass(PASS_SSA_MGR);
+    IR_SSA_MGR * ssamgr = (IR_SSA_MGR*)registerPass(PASS_PR_SSA_MGR);
     bool is_ssa_avail = false;
     if (ssamgr != NULL) {
-        is_ssa_avail = ssamgr->is_ssa_constructed();
+        is_ssa_avail = ssamgr->isSSAConstructed();
     }
 
     passlist.append_tail(registerPass(PASS_CP));

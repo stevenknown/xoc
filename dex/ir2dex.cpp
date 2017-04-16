@@ -761,7 +761,7 @@ LIR * IR2Dex::convertStoreArray(IN OUT IR ** ir, IN IR2DexCtx * cont)
     lir->opcode = LOP_APUT;
 
     ASSERT0(IR_dt(tir) == IR_dt(rhs) ||
-            tir->get_dtype_size(m_tm) == rhs->get_dtype_size(m_tm));
+            tir->get_type_size(m_tm) == rhs->get_type_size(m_tm));
     *ir = IR_next(*ir);
     return (LIR*)lir;
 }
@@ -784,7 +784,7 @@ LIR * IR2Dex::convertIstore(IN OUT IR ** ir, IN IR2DexCtx * cont)
     LIR_op1(lir) = IST_ofst(tir) / m_d2ir->get_ofst_addend();
     lir->opcode = LOP_IPUT;
     ASSERT0(IR_dt(tir) == IR_dt(rhs) ||
-             tir->get_dtype_size(m_tm) == rhs->get_dtype_size(m_tm));
+             tir->get_type_size(m_tm) == rhs->get_type_size(m_tm));
     *ir = IR_next(*ir);
     return (LIR*)lir;
 }
@@ -1418,7 +1418,7 @@ void IR2Dex::reloc()
         case LOP_IF:
             {
                 bool find;
-                UINT idx = m_lab2idx.get(b->ir->get_label(), &find);
+                UINT idx = m_lab2idx.get(b->ir->getLabel(), &find);
                 ASSERT0(find);
                 if (LIR_opcode(l) == LOP_IFZ) {
                     LIR_op0(l) = idx;

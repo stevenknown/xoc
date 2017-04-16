@@ -311,19 +311,19 @@ void RSC::comp_st_fmt(IR const* ir)
         switch (stv->get_code()) {
         case IR_CONST:
             //A, +B, load const
-            m_ir2fmt.set(IR_id(ir), FABcv);
+            m_ir2fmt.set(ir->id(), FABcv);
             break;
         case IR_LD:
             //AABBBB, sget
-            m_ir2fmt.set(IR_id(ir), FAABBBB);
+            m_ir2fmt.set(ir->id(), FAABBBB);
             break;
         case IR_ILD:
             //ABCCCC, iget
-            m_ir2fmt.set(IR_id(ir), FABCCCCv);
+            m_ir2fmt.set(ir->id(), FABCCCCv);
             return;
         case IR_LDA:
             //AABBBB
-            m_ir2fmt.set(IR_id(ir), FAABBBBv);
+            m_ir2fmt.set(ir->id(), FAABBBBv);
             return;
         case IR_ADD:
         case IR_SUB:
@@ -344,15 +344,15 @@ void RSC::comp_st_fmt(IR const* ir)
                     ASSERT0(op1->is_int());
                     if (!is_s8((INT)CONST_int_val(op1))) {
                         //vA, vB, CCCC+
-                        m_ir2fmt.set(IR_id(ir), FABCCCCv);
+                        m_ir2fmt.set(ir->id(), FABCCCCv);
                     } else {
                         ASSERT0(is_s16((INT)CONST_int_val(op1)));
                         //vAA, vAB, CC+
-                        m_ir2fmt.set(IR_id(ir), FAABBCCcv);
+                        m_ir2fmt.set(ir->id(), FAABBCCcv);
                     }
                 } else {
                     //AABBCC, v0 = v1 op v2
-                    m_ir2fmt.set(IR_id(ir), FAABBCC);
+                    m_ir2fmt.set(ir->id(), FAABBCC);
                 }
             }
             return;
@@ -363,7 +363,7 @@ void RSC::comp_st_fmt(IR const* ir)
         case IR_EQ:
         case IR_NE:
             //AABBCC, v0 = v1 op v2
-            m_ir2fmt.set(IR_id(ir), FAABBCC);
+            m_ir2fmt.set(ir->id(), FAABBCC);
             return;
         case IR_ARRAY:
             //AABBCC.
@@ -371,23 +371,23 @@ void RSC::comp_st_fmt(IR const* ir)
             ASSERT0(ARR_base(stv)->is_pr() &&
                      ARR_sub_list(stv)->is_pr() &&
                      ((CArray*)stv)->getDimNum() == 1);
-            m_ir2fmt.set(IR_id(ir), FAABBCC);
+            m_ir2fmt.set(ir->id(), FAABBCC);
             return;
         case IR_BNOT:
         case IR_LNOT:
         case IR_NEG:
             //AB.
             ASSERT(UNA_opnd(stv)->is_pr(), ("unary op base must be pr"));
-            m_ir2fmt.set(IR_id(ir), FAB);
+            m_ir2fmt.set(ir->id(), FAB);
             return;
         case IR_CVT:
             //AB.
             ASSERT(CVT_exp(stv)->is_pr(), ("cvt base must be pr"));
-            m_ir2fmt.set(IR_id(ir), FAB);
+            m_ir2fmt.set(ir->id(), FAB);
             return;
         case IR_PR:
             //AAAABBBB
-            m_ir2fmt.set(IR_id(ir), FAAAABBBB);
+            m_ir2fmt.set(ir->id(), FAAAABBBB);
             return;
         default: UNREACH();
         }
@@ -396,11 +396,11 @@ void RSC::comp_st_fmt(IR const* ir)
         switch (stv->get_code()) {
         case IR_PR:
             //AABBBB, sput
-            m_ir2fmt.set(IR_id(ir), FAABBBB);
+            m_ir2fmt.set(ir->id(), FAABBBB);
             break;
         case IR_ILD:
             //ABCCCC, iget
-            m_ir2fmt.set(IR_id(ir), FABCCCCv);
+            m_ir2fmt.set(ir->id(), FABCCCCv);
             return;
         default: UNREACH();
         }
@@ -421,7 +421,7 @@ void RSC::comp_starray_fmt(IR const* ir)
     //aput, OBJ, vAA -> (array_base_ptr)vBB, (array_elem)vCC
     ASSERT0(ARR_base(ir)->is_pr() && ARR_sub_list(ir)->is_pr());
 
-    m_ir2fmt.set(IR_id(ir), FAABBCC);
+    m_ir2fmt.set(ir->id(), FAABBCC);
 }
 
 
@@ -437,7 +437,7 @@ void RSC::comp_ist_fmt(IR const* ir)
     UNUSED(lhs);
     //ABCCCC
     //iput, vA(stv) -> vB(mlr), +CCCC(field_id)
-    m_ir2fmt.set(IR_id(ir), FABCCCCv);
+    m_ir2fmt.set(ir->id(), FABCCCCv);
 }
 
 
@@ -455,22 +455,22 @@ void RSC::comp_call_fmt(IR const* ir)
         ASSERT0(blt != BLTIN_UNDEF);
         switch (blt) {
         case BLTIN_NEW:
-            m_ir2fmt.set(IR_id(ir), FAABBBBv);
+            m_ir2fmt.set(ir->id(), FAABBBBv);
             return;
         case BLTIN_NEW_ARRAY:
-            m_ir2fmt.set(IR_id(ir), FABCCCCv);
+            m_ir2fmt.set(ir->id(), FABCCCCv);
             return;
         case BLTIN_MOVE_EXP:
         case BLTIN_MOVE_RES:
-            m_ir2fmt.set(IR_id(ir), FAA);
+            m_ir2fmt.set(ir->id(), FAA);
             return;
         case BLTIN_THROW:
             ASSERT0(CALL_param_list(ir) && CALL_param_list(ir)->is_pr());
-            m_ir2fmt.set(IR_id(ir), FAA);
+            m_ir2fmt.set(ir->id(), FAA);
             return;
         case BLTIN_CHECK_CAST:
             ASSERT0(CALL_param_list(ir) && CALL_param_list(ir)->is_pr());
-            m_ir2fmt.set(IR_id(ir), FAABBBBv);
+            m_ir2fmt.set(ir->id(), FAABBBBv);
             return;
         case BLTIN_FILLED_NEW_ARRAY:
             {
@@ -486,28 +486,28 @@ void RSC::comp_call_fmt(IR const* ir)
             for (; p != NULL; p = p->get_next()) {
                 ASSERT0(p->is_pr());
             }
-            m_ir2fmt.set(IR_id(ir), FACDEFGBBBBv);
+            m_ir2fmt.set(ir->id(), FACDEFGBBBBv);
             return;
             }
         case BLTIN_FILL_ARRAY_DATA:
             ASSERT0(CALL_param_list(ir) && CALL_param_list(ir)->is_pr());
-            m_ir2fmt.set(IR_id(ir), FAABBBBBBBBv);
+            m_ir2fmt.set(ir->id(), FAABBBBBBBBv);
             return;
         case BLTIN_CONST_CLASS:
-            m_ir2fmt.set(IR_id(ir), FAABBBBv);
+            m_ir2fmt.set(ir->id(), FAABBBBv);
             return;
         case BLTIN_ARRAY_LENGTH:
             ASSERT0(CALL_param_list(ir) && CALL_param_list(ir)->is_pr());
-            m_ir2fmt.set(IR_id(ir), FAB);
+            m_ir2fmt.set(ir->id(), FAB);
             return;
         case BLTIN_MONITOR_ENTER:
         case BLTIN_MONITOR_EXIT:
             ASSERT0(CALL_param_list(ir) && CALL_param_list(ir)->is_pr());
-            m_ir2fmt.set(IR_id(ir), FAA);
+            m_ir2fmt.set(ir->id(), FAA);
             return;
         case BLTIN_INSTANCE_OF:
             ASSERT0(CALL_param_list(ir) && CALL_param_list(ir)->is_pr());
-            m_ir2fmt.set(IR_id(ir), FABCCCCv);
+            m_ir2fmt.set(ir->id(), FABCCCCv);
             return;
         case BLTIN_CMP_BIAS:
             {
@@ -515,7 +515,7 @@ void RSC::comp_call_fmt(IR const* ir)
                 ASSERT0(p && p->is_const());
                 p = p->get_next();
                 ASSERT0(p && p->is_pr() && p->get_next() && p->get_next()->is_pr());
-                m_ir2fmt.set(IR_id(ir), FAABBCC);
+                m_ir2fmt.set(ir->id(), FAABBCC);
                 return;
             }
         default:ASSERT(0, ("Unknown intrinsic"));
@@ -537,7 +537,7 @@ void RSC::comp_call_fmt(IR const* ir)
     case INVOKE_INTERFACE:
         {
             ASSERT0(cnt_list(p) <= 5);
-            m_ir2fmt.set(IR_id(ir), FACDEFGBBBBv);
+            m_ir2fmt.set(ir->id(), FACDEFGBBBBv);
         }
         break;
     case INVOKE_VIRTUAL_RANGE:
@@ -545,7 +545,7 @@ void RSC::comp_call_fmt(IR const* ir)
     case INVOKE_DIRECT_RANGE:
     case INVOKE_STATIC_RANGE:
     case INVOKE_INTERFACE_RANGE:
-        m_ir2fmt.set(IR_id(ir), FAACCCCBBBBv);
+        m_ir2fmt.set(ir->id(), FAACCCCBBBBv);
         break;
     default: UNREACH();
     }
@@ -558,7 +558,7 @@ void RSC::comp_call_fmt(IR const* ir)
 
 void RSC::comp_ir_fmt(IR const* ir)
 {
-    switch (IR_code(ir)) {
+    switch (ir->get_code()) {
     case IR_CONST:
     case IR_ID:
     case IR_LD:
@@ -572,7 +572,7 @@ void RSC::comp_ir_fmt(IR const* ir)
         //v%d(res) <- v%d(op0), field_id(op1)
         comp_ir_fmt(ILD_base(ir));
         if (ILD_base(ir)->is_pr()) {
-            m_ir2fmt.set(IR_id(ir), FABCCCCv);
+            m_ir2fmt.set(ir->id(), FABCCCCv);
         } else { UNREACH(); }
         return;
     case IR_STARRAY:
@@ -617,11 +617,11 @@ void RSC::comp_ir_fmt(IR const* ir)
         return;
     case IR_GOTO:
     case IR_LABEL:
-        m_ir2fmt.set(IR_id(ir), F0);
+        m_ir2fmt.set(ir->id(), F0);
         return;
     case IR_SWITCH:
         comp_ir_fmt(SWITCH_vexp(ir));
-        m_ir2fmt.set(IR_id(ir), FAABBBBBBBBv);
+        m_ir2fmt.set(ir->id(), FAABBBBBBBBv);
         return;
     case IR_ARRAY:
         ASSERT0(((CArray*)ir)->getDimNum() == 1);
@@ -642,22 +642,22 @@ void RSC::comp_ir_fmt(IR const* ir)
             if (BIN_opnd1(det)->is_const()) {
                 //AABBBB
                 ASSERT0(BIN_opnd0(det)->is_pr());
-                m_ir2fmt.set(IR_id(ir), FAABBBBv);
+                m_ir2fmt.set(ir->id(), FAABBBBv);
             } else {
                 ASSERT0(BIN_opnd0(det)->is_pr());
                 ASSERT0(BIN_opnd1(det)->is_pr());
                 //ABCCCC
-                m_ir2fmt.set(IR_id(ir), FABCCCCv);
+                m_ir2fmt.set(ir->id(), FABCCCCv);
             }
         }
         return;
     case IR_RETURN:
         ASSERT0(cnt_list(RET_exp(ir)) <= 1);
         if (RET_exp(ir) == NULL) {
-            m_ir2fmt.set(IR_id(ir), F0);
+            m_ir2fmt.set(ir->id(), F0);
         } else {
             ASSERT0(RET_exp(ir)->is_pr());
-            m_ir2fmt.set(IR_id(ir), FAA);
+            m_ir2fmt.set(ir->id(), FAA);
         }
         return;
     case IR_SELECT:
@@ -693,7 +693,7 @@ void RSC::dump_ir_fmt()
         fprintf(g_tfile, "\n-- BB%d --", BB_id(bb));
         for (IR const* ir = BB_first_ir(bb);
              ir != NULL; ir = BB_next_ir(bb)) {
-            FMT f = m_ir2fmt.get(IR_id(ir));
+            FMT f = m_ir2fmt.get(ir->id());
             fprintf(g_tfile, "\nFMT:%s", g_fmt_name[f]);
             dump_ir(ir, m_ru->getTypeMgr());
         }
@@ -897,7 +897,7 @@ bool RSC::verify_fmt()
     for (IRBB * bb = bbl->get_head(); bb != NULL; bb = bbl->get_next()) {
         for (IR const* ir = BB_first_ir(bb);
              ir != NULL; ir = BB_next_ir(bb)) {
-            FMT f = m_ir2fmt.get(IR_id(ir));
+            FMT f = m_ir2fmt.get(ir->id());
             UNUSED(f);
             ASSERT0(f != FUNDEF);
         }
@@ -1485,7 +1485,7 @@ bool GIG::is_interf(IN GLT * glt1, IN GLT * glt2)
     SEGIter * sc = NULL;
     for (INT i = bs1->get_first(&sc); i >= 0; i = bs1->get_next(i, &sc)) {
         if (!bs2->is_contain(i)) { continue; }
-        IRBB * bb = m_cfg->get_bb(i);
+        IRBB * bb = m_cfg->getBB(i);
         ASSERT0(bb != NULL);
         LTMgr * ltmgr = m_gltm->map_bb2ltm(bb);
         LT * lt1 = ltmgr->map_pr2lt(pr1);
@@ -1860,7 +1860,7 @@ IR * LTMgr::genReload(IR * newpr, IR * marker, IR * spill_loc)
                                        m_ru->dupIR(spill_loc));
     m_ra->m_rsc.comp_ir_fmt(reload);
 
-    IRBB * irbb = marker->get_bb();
+    IRBB * irbb = marker->getBB();
     ASSERT0(irbb);
     BB_irlist(irbb).insert_before(reload, marker);
     return newpr;
@@ -1886,7 +1886,7 @@ IR * LTMgr::genReloadSwap(IR * orgpr, IR * marker)
                                        m_ru->dupIR(orgpr));
     m_ra->m_rsc.comp_ir_fmt(reload);
 
-    IRBB * irbb = marker->get_bb();
+    IRBB * irbb = marker->getBB();
     ASSERT0(irbb);
     BB_irlist(irbb).insert_before(reload, marker);
 
@@ -2066,10 +2066,10 @@ void LTMgr::genRangeCallGroup(IR const* ir)
     }
     if (p == NULL) { return; }
 
-    LTG * ltg = m_gltm->m_ltgmgr.map_ir2ltg(IR_id(ir));
+    LTG * ltg = m_gltm->m_ltgmgr.map_ir2ltg(ir->id());
     if (ltg == NULL) {
         ltg = m_gltm->m_ltgmgr.create();
-        m_gltm->m_ltgmgr.set_map_ir2ltg(IR_id(ir), ltg);
+        m_gltm->m_ltgmgr.set_map_ir2ltg(ir->id(), ltg);
     } else {
         ltg->clean();
     }
@@ -2201,7 +2201,7 @@ void LTMgr::processResult(
         ASSERT0(lt);
         LT_range(lt)->bunion(pos);
     }
-    switch (IR_code(ir)) {
+    switch (ir->get_code()) {
     case IR_ST: break;
     case IR_STPR:
         if (group_part) {
@@ -2299,11 +2299,11 @@ void LTMgr::processUse(
 bool LTMgr::has_pair_res(IR * ir)
 {
     ASSERT0(ir->is_stmt());
-    switch(IR_code(ir)) {
+    switch(ir->get_code()) {
     case IR_STPR:
     case IR_CALL:
     case IR_ICALL:
-        if (ir->get_dtype_size(m_tm) == PAIR_BYTES) {
+        if (ir->get_type_size(m_tm) == PAIR_BYTES) {
             return true;
         }
         break;
@@ -2588,7 +2588,7 @@ void LTMgr::revise_special_lt(List<LT*> * lts)
 void LTMgr::renameUse(IR * ir, LT * l, IR ** newpr)
 {
     LTG * gr = LT_ltg(l);
-    switch (IR_code(ir)) {
+    switch (ir->get_code()) {
     case IR_STARRAY:
         ASSERT0(((CArray*)ir)->getDimNum() == 1);
         renameUse(STARR_rhs(ir), l, newpr);
@@ -2706,7 +2706,7 @@ void LTMgr::renameUse(IR * ir, LT * l, IR ** newpr)
             IR * p = IR_parent(ir);
             ASSERT0(p); //only process PR here for that has a parent.
             for (INT i = 0; i < IR_MAX_KID_NUM(p); i++) {
-                IR * t = p->get_kid(i);
+                IR * t = p->getKid(i);
                 if (t == NULL || !t->is_pr()) { continue; }
                 if (PR_no(t) == LT_prno(l)) {
                     if (*newpr == NULL) {
@@ -2714,7 +2714,7 @@ void LTMgr::renameUse(IR * ir, LT * l, IR ** newpr)
                     }
                     IR * x = m_ru->dupIR(*newpr);
                     IR_dt(x) = IR_dt(t);
-                    p->set_kid(i, x);
+                    p->setKid(i, x);
                     IR_parent(x) = p;
                     m_ru->freeIR(t);
                 } else if (gr != NULL && gr->is_member(PR_no(t))) {
@@ -2749,7 +2749,7 @@ void LTMgr::renameLT(LT * l, IR ** newpr)
         IR * ir = m_pos2ir.get(i);
         ASSERT0(ir);
         if (l->is_def(i)) {
-            switch (IR_code(ir)) {
+            switch (ir->get_code()) {
             case IR_STPR:
                 {
                     UINT prno = ir->get_prno();
@@ -3119,7 +3119,7 @@ void LTMgr::dump_unallocated(FILE * h, BitSet & visited)
 void LTMgr::dump()
 {
     if (g_tfile == NULL) return;
-    fprintf(g_tfile, "\n--- BB%d Local Life Time ---", m_bb->id);
+    fprintf(g_tfile, "\n--- BB%d Local Life Time ---", m_bb->id());
 
     //Print live-in PR.
     fprintf(g_tfile, "\nlivein:");
@@ -4605,7 +4605,7 @@ void RA::reviseRSC()
     IR2INT pr2phy;
     for (IR * ir = resolve_list.get_head();
          ir != NULL; ir = resolve_list.get_next()) {
-        IRBB * irbb = ir->get_bb();
+        IRBB * irbb = ir->getBB();
         LTMgr * ltm = m_gltm.get_ltm(BB_id(irbb));
         visitbb.bunion(BB_id(irbb));
         FMT fmt = m_rsc.get_fmt(ir);
@@ -4678,8 +4678,8 @@ void RA::reviseRSC()
     for (IR * ir = pr2phy.get_first(iter2, &phy);
          ir != NULL; ir = pr2phy.get_next(iter2, &phy)) {
         IR * stmt = ir->get_stmt();
-        ASSERT0(stmt && stmt->get_bb());
-        LTMgr * ltm = m_gltm.get_ltm(BB_id(stmt->get_bb()));
+        ASSERT0(stmt && stmt->getBB());
+        LTMgr * ltm = m_gltm.get_ltm(BB_id(stmt->getBB()));
         ASSERT0(ltm);
         LT * l = ltm->map_pr2lt(PR_no(ir));
         ASSERT0(l && LT_prno(l) == PR_no(ir) && !l->has_allocated());
@@ -5226,7 +5226,7 @@ IR * RA::insertMoveBefore(IR * stmt, IR * src)
                                    m_ru->dupIR(src));
     m_rsc.comp_ir_fmt(mv);
 
-    IRBB * irbb = stmt->get_bb();
+    IRBB * irbb = stmt->getBB();
     ASSERT0(irbb);
     BB_irlist(irbb).insert_before(mv, stmt);
     stmt->replaceKid(src, newkid, true);
@@ -5383,7 +5383,7 @@ void RA::dump_ltg()
          id != 0; id = m_gltm.m_ltgmgr.get_next(iter, &ltg)) {
         IR * ir = m_ru->getIR(id);
         ASSERT0(ir && is_range_call(ir) && ltg);
-        IRBB * bb = ir->get_bb();
+        IRBB * bb = ir->getBB();
         dump_ir(ir, m_tm);
         LTMgr * ltm = m_gltm.map_bb2ltm(bb);
         ASSERT0(ltm);
@@ -5396,8 +5396,8 @@ void RA::dump_ltg()
 void RA::assignLTG(LTG * ltg, IR * ir)
 {
     ASSERT0(ltg && ltg->ty == LTG_RANGE_PARAM && ir->isCallStmt());
-    ASSERT0(ir->get_bb());
-    IRBB * bb = ir->get_bb();
+    ASSERT0(ir->getBB());
+    IRBB * bb = ir->getBB();
     //ASSERT0(BB_last_ir(bb) == ir);
     LTMgr * ltm = m_gltm.map_bb2ltm(bb);
     ASSERT0(ltm);
@@ -5880,7 +5880,7 @@ bool RA::verify_ltg()
             phy += LT_rg_sz(l);
 
             ASSERT0(arg);
-            UINT bsz = arg->get_dtype_size(m_tm);
+            UINT bsz = arg->get_type_size(m_tm);
             UNUSED(bsz);
             if (LT_rg_sz(l) == 1) {
                 ASSERT0(bsz <= BYTE_PER_INT);

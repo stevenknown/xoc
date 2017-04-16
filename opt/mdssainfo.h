@@ -185,6 +185,8 @@ public:
     void destroy(DefMiscBitSetMgr & m) { m_vopnd_set.clean(m); }
 
     VOpndSet * getVOpndSet() { return &m_vopnd_set; }
+
+    VOpndSet const* readVOpndSet() const { return &m_vopnd_set; }
 };
 
 
@@ -230,7 +232,7 @@ public:
 
 
 //This class represent MD phi operation.
-#define MDPHI_opnd_list(p)   ((p)->m_opnd_list)
+#define MDPHI_opnd_list(p)   (((MDPhi*)p)->m_opnd_list)
 class MDPhi : public MDDef {
 public:
     IR * m_opnd_list;

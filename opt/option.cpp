@@ -195,8 +195,11 @@ bool g_do_rce = false;
 //Perform register promotion.
 bool g_do_rp = false;
 
-//Build SSA form and perform optimization based on SSA.
+//Build PR SSA and perform optimization based on SSA.
 bool g_do_ssa = false;
+
+//Build Memory SSA and perform optimization based on Memory SSA.
+bool g_do_md_ssa = true;
 
 //Record the maximum limit of the number of BB to perform optimizations.
 UINT g_thres_opt_bb_num = 100000;

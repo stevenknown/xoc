@@ -78,6 +78,11 @@ protected:
     void destroyMDSSAInfo();
     void destructBBSSAInfo(IRBB * bb);
     void destructionInDomTreeOrder(IRBB * root, Graph & domtree);
+    void dumpExpDUChainIter(
+            IR const* ir,
+            List<IR const*> & lst,
+            List<IR const*> & opnd_lst,
+            OUT bool * parting_line);
 
     void freePhiList();
 
@@ -116,7 +121,7 @@ protected:
                   DefMiscBitSetMgr & bs_mgr,
                   Vector<DefSBitSet*> & defined_md_vec,
                   List<IRBB*> & wl);
-    void verifySSAInfo(IR * ir);
+    void verifySSAInfo(IR const* ir);
 public:
     explicit MDSSAMgr(Region * ru) : m_usedef_mgr(ru)
     {
@@ -172,9 +177,14 @@ public:
     void destruction(DomTree & domtree);
     void destruction();
     void dump();
+    void dumpDUChain();
     void dumpAllVMD();
     CHAR * dumpVMD(IN VMD * v, OUT CHAR * buf);
     void dumpSSAGraph(CHAR * name = NULL);
+
+    //Find killing must-def for expression ir.
+    MDDef * findKillingDef(IR const* ir);
+    MDDef * findNearestDef(IR const* ir);
 
     void initVMD(IN IR * ir, OUT DefSBitSet & maydef_md);
     void insertPhi(UINT mdid, IN IRBB * bb);

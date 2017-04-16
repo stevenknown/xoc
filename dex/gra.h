@@ -378,7 +378,7 @@ public:
     void clean();
 
 
-    IRBB * get_bb() { return m_bb; }
+    IRBB * getBB() { return m_bb; }
     LT * get_lt(UINT ltid) { return m_lt_vec.get(ltid); }
     Vector<LT*> * get_lt_vec() { return &m_lt_vec; }
     UINT get_first_pos() const { return LT_FIRST_POS; }
@@ -723,7 +723,7 @@ public:
     void dump_glt_usable();
     void dump_bb(UINT bbid);
     void dump();
-    FMT get_fmt(IR const* ir) const { return m_ir2fmt.get(IR_id(ir)); }
+    FMT get_fmt(IR const* ir) const { return m_ir2fmt.get(ir->id()); }
 
     GLT * mapLT2GLT(LT * lt) { return m_gltm->map_pr2glt(LT_prno(lt)); }
     bool verify_fmt();
