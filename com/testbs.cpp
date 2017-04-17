@@ -184,7 +184,7 @@ void dump_segmgr(SegMgr<BitsPerSeg> & m)
 
     BitSet x;
     SList<SEG<BitsPerSeg>*> const* flst = m.get_free_list();
-    for (flst->get_head(&st); st != flst.end(); st = flst->get_next(st)) {
+    for (flst->get_head(&st); st != flst->end(); st = flst->get_next(st)) {
         SEG<BitsPerSeg> const* s = st->val();
         fprintf(g_tfile, "%d,", s->id);
         x.bunion(s->id);

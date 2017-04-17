@@ -1,3 +1,4 @@
+CC = clang++
 COM_OBJS +=\
 com/ltype.o \
 com/comf.o \
@@ -70,7 +71,7 @@ all: com_objs opt_objs
 INC=-I .
 %.o:%.cpp
 	@echo "build $<"
-	gcc $(CFLAGS) $(INC) -c $< -o $@
+	$(CC) $(CFLAGS) $(INC) -c $< -o $@
 
 com_objs: $(COM_OBJS)
 opt_objs: $(OPT_OBJS)
