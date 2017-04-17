@@ -60,9 +60,10 @@ opt/ir_loop_cvt.o\
 opt/prdf.o
 
 CFLAGS = -DFOR_DEX -D_DEBUG_ -O0 -g2 -Wno-write-strings -Wsign-promo \
-        -Wsign-compare -Wpointer-arith -Wno-multichar -Winit-self \
-        -Wstrict-aliasing=3 -finline-limit=10000000 -Wswitch #-Wall
-        #-Werror=overloaded-virtual \
+        -Wsign-compare -Wpointer-arith -Wno-multichar -Winit-self -Wswitch
+ifneq (,$(filter $(CC),g++ gcc))
+	CFLAGS += -Wstrict-aliasing=3 -finline-limit=10000000
+endif
 
 all: com_objs opt_objs
 	ar rcs libxoc.a $(COM_OBJS) $(OPT_OBJS)

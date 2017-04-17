@@ -124,6 +124,14 @@ author: Su Zhenyu
 #undef ASSERT0
 #undef ASSERTL0
 
+// This macro is needed to prevent the clang static analyzer from generating
+// false-positive reports in ASSERT() macros.
+#ifdef __clang__
+#define CLANG_ANALYZER_NORETURN __attribute__((analyzer_noreturn))
+#else
+#define CLANG_ANALYZER_NORETURN
+#endif
+
 #ifdef _DEBUG_
     #ifdef __cplusplus
     #define EXTERN_C extern "C"
@@ -131,8 +139,8 @@ author: Su Zhenyu
     #define EXTERN_C extern
     #endif
     #include "stdio.h"
-    EXTERN_C INT m518087(CHAR const* info, ...);
-    EXTERN_C INT m022138(CHAR const* filename, INT line);
+    EXTERN_C INT m518087(CHAR const* info, ...) CLANG_ANALYZER_NORETURN;
+    EXTERN_C INT m022138(CHAR const* filename, INT line) CLANG_ANALYZER_NORETURN;
 
     #define ASSERT(a, b)  \
         ((a) ? 0 : (m022138(__FILE__, __LINE__), m518087 b))
