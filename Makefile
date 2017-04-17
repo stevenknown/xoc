@@ -76,6 +76,10 @@ INC=-I .
 
 com_objs: $(COM_OBJS)
 opt_objs: $(OPT_OBJS)
+test:
+	$(CC) -o test.o -c $(CFLAGS) -fPIC -fsanitize=address -fsanitize=undefined \
+		-fno-omit-frame-pointer -I./opt test.cpp
+	$(CC) -o test -fsanitize=address -fsanitize=undefined test.o libxoc.a
 
 clean:
 	@find -name "*.o" | xargs rm -f
@@ -92,4 +96,5 @@ clean:
 	@find -name "*.swo" | xargs rm -f
 	@find -name "*.LOGLOG" | xargs rm -f
 	@find -name "LOGLOG" | xargs rm -f
+	@find -name "test" | xargs rm -f
 
