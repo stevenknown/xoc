@@ -1142,8 +1142,8 @@ Programming Guides
         void main(int argc, char * argv[])
         {
             //Create region manager, since it is the top data structure of XOC.
-            REGION_MGR rm;
-            rm.init_var_mgr();
+            xoc::RegionMgr rm;
+            rm.initVarMgr();
 
             //Generate IR list, VAR and REGION accroding to user input.
             generate_ir_list(&rm);
