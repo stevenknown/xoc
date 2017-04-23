@@ -669,7 +669,7 @@ bool compileFunc(
 
     func_ru->setDexFile(df);
     func_ru->setDexMethod(dexm);
-    func_ru->set_ru_var(rm->getVarMgr()->registerVar(
+    func_ru->setRegionVar(rm->getVarMgr()->registerVar(
                         runame,
                         rm->getTypeMgr()->getMCType(0),
                         0, VAR_GLOBAL|VAR_FAKE));

@@ -94,7 +94,7 @@ IRDesc const g_ir_desc[] = {
     {IR_SELECT,   "select",       0x7, 3, sizeof(CSelect),   0,                                                                                },
     {IR_BREAK,    "break",        0x0, 0, sizeof(CBreak),    IRT_IS_STMT,                                                                      },
     {IR_CONTINUE, "continue",     0x0, 0, sizeof(CContinue), IRT_IS_STMT,                                                                      },
-    {IR_PHI,      "phi",          0x1, 1, sizeof(CPhi),      IRT_IS_STMT|IRT_HAS_RESULT|IRT_IS_MEM_REF,                                        },
+    {IR_PHI,      "phi",          0x1, 1, sizeof(CPhi),      IRT_IS_STMT|IRT_HAS_RESULT|IRT_IS_MEM_REF|IRT_IS_STMT_IN_BB,                      },
     {IR_REGION,   "region",       0x0, 0, sizeof(CRegion),   IRT_IS_STMT|IRT_IS_STMT_IN_BB,                                                    },
     {IR_TYPE_NUM, "LAST IR Code", 0x0, 0, 0,                 0,                                                                                },
 };

@@ -864,7 +864,7 @@ public:
     void setMapPR2Var(UINT prno, VAR * pr_var)
     { REGION_analysis_instrument(this)->m_prno2var.set(prno, pr_var); }
 
-    void set_ru_var(VAR * v) { m_var = v; }
+    void setRegionVar(VAR * v) { m_var = v; }
     void set_ir_list(IR * irs) { REGION_analysis_instrument(this)->m_ir_list = irs; }
     void set_blx_data(void * d) { REGION_blx_data(this) = d; }
     IR * StrengthReduce(IN OUT IR * ir, IN OUT bool & change);

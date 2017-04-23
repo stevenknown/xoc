@@ -3036,8 +3036,8 @@ public:
 
     UINT get_hash_value(OBJTY v, UINT bucket_size) const
     {
-        ASSERT(sizeof(OBJTY) == sizeof(CHAR*),
-               ("exception will taken place in type-cast"));
+        ASSERT_UNUSED(sizeof(OBJTY) == sizeof(CHAR*),
+            ("exception will taken place in type-cast"));
         return get_hash_value((CHAR const*)v, bucket_size);
     }
 
@@ -3046,8 +3046,8 @@ public:
 
     bool compare(CHAR const* s, OBJTY val) const
     {
-        ASSERT(sizeof(OBJTY) == sizeof(CHAR const*),
-               ("exception will taken place in type-cast"));
+        ASSERT_UNUSED(sizeof(OBJTY) == sizeof(CHAR const*),
+            ("exception will taken place in type-cast"));
         return (strcmp(s,  (CHAR const*)val) == 0);
     }
 };

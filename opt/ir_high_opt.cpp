@@ -53,10 +53,10 @@ void Region::HighProcessImpl(OptCtx & oc)
         getCFG()->performMiscOpt(oc);
     }
 
-    if (g_do_ssa) {
+    if (g_do_pr_ssa) {
         ASSERT0(getPassMgr());
-        IR_SSA_MGR * ssamgr =
-            (IR_SSA_MGR*)getPassMgr()->registerPass(PASS_PR_SSA_MGR);
+        PRSSAMgr * ssamgr =
+            (PRSSAMgr*)getPassMgr()->registerPass(PASS_PR_SSA_MGR);
         ASSERT0(ssamgr);
         if (!ssamgr->isSSAConstructed()) {
             ssamgr->construction(oc);
@@ -93,7 +93,7 @@ void Region::HighProcessImpl(OptCtx & oc)
                 //If PRs have already been in SSA form, compute
                 //DU chain doesn't make any sense.    
                 if (getPassMgr() != NULL) {
-                    IR_SSA_MGR * ssamgr = (IR_SSA_MGR*)getPassMgr()->
+                    PRSSAMgr * ssamgr = (PRSSAMgr*)getPassMgr()->
                         queryPass(PASS_PR_SSA_MGR);
                     if (ssamgr == NULL) {
                         flag |= COMPUTE_PR_DU;

@@ -98,10 +98,10 @@ static IF_TYPE get_simple_if_node_type(IR_CFG * cfg, IRBB * bb)
     }
 
     //If succ of true body is false body, such as
-    //  if
-    //  | \
-    //  | true
-    //  | /
+    //  if-stmt
+    //  |  |
+    //  |  true
+    //  |  |
     //  false(actually is endif block)
     if (succs_in_true.get_head() == falsebd) {
         return SIMP_IF_THEN_TYPE;
@@ -118,10 +118,10 @@ static IF_TYPE get_simple_if_node_type(IR_CFG * cfg, IRBB * bb)
     }
 
     //In the case of succ of true body is NOT false body, such as
-    //     if
-    //     | \
-    // false  true
-    //     | /
+    //     if-stmt
+    //     |   |
+    // false   true
+    //     |   |
     //     endif
     if (succs_in_true.get_head() == succs_in_false.get_head()) {
         return SIMP_IF_ELSE_TYPE;

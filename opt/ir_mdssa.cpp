@@ -894,18 +894,18 @@ Stack<VMD*> * MDSSAMgr::mapMD2VMDStack(UINT mdid)
 void MDSSAMgr::handleBBRename(
         IRBB * bb,
         DefSBitSet & defed_mds,
-        IN OUT BB2VMD & bb2vmd)
+        IN OUT BB2VMDMap & bb2vmdmap)
 {
-    ASSERT0(bb2vmd.get(BB_id(bb)) == NULL);
-    Vector<VMD*> * ve_vec = new Vector<VMD*>();
-    bb2vmd.set(BB_id(bb), ve_vec);
+    ASSERT0(bb2vmdmap.get(BB_id(bb)) == NULL);
+    TMap<UINT, VMD*> * mdid2vmd = new TMap<UINT, VMD*>();
+    bb2vmdmap.set(BB_id(bb), mdid2vmd);
 
     SEGIter * cur = NULL;
     for (INT mdid = defed_mds.get_first(&cur);
          mdid >= 0; mdid = defed_mds.get_next(mdid, &cur)) {
-        VMD * ve = mapMD2VMDStack(mdid)->get_top();
-        ASSERT0(ve);
-        ve_vec->set(VMD_mdid(ve), ve);
+        VMD * vmd = mapMD2VMDStack(mdid)->get_top();
+        ASSERT0(vmd);
+        mdid2vmd->set(VMD_mdid(vmd), vmd);
     }   
          
     renameBB(bb);
@@ -969,7 +969,7 @@ void MDSSAMgr::renameInDomTreeOrder(
     Stack<IRBB*> stk;
     UINT n = m_ru->getBBList()->get_elem_count();
     BitSet visited(n / BIT_PER_BYTE);
-    BB2VMD bb2vmd(n);
+    BB2VMDMap bb2vmdmap;
     IRBB * v;
     stk.push(root);
     List<IR*> lst; //for tmp use.
@@ -978,7 +978,7 @@ void MDSSAMgr::renameInDomTreeOrder(
             visited.bunion(BB_id(v));
             DefSBitSet * defed_mds = defed_mds_vec.get(BB_id(v));
             ASSERT0(defed_mds);
-            handleBBRename(v, *defed_mds, bb2vmd);
+            handleBBRename(v, *defed_mds, bb2vmdmap);
         }
 
         Vertex const* bbv = domtree.get_vertex(BB_id(v));
@@ -998,8 +998,8 @@ void MDSSAMgr::renameInDomTreeOrder(
             stk.pop();
 
             //Do post-processing while all kids of BB has been processed.
-            Vector<VMD*> * ve_vec = bb2vmd.get(BB_id(v));
-            ASSERT0(ve_vec);
+            TMap<UINT, VMD*> * mdid2vmd = bb2vmdmap.get(BB_id(v));
+            ASSERT0(mdid2vmd);
             DefSBitSet * defed_mds = defed_mds_vec.get(BB_id(v));
             ASSERT0(defed_mds);
 
@@ -1008,20 +1008,22 @@ void MDSSAMgr::renameInDomTreeOrder(
                  i >= 0; i = defed_mds->get_next(i, &cur)) {
                 Stack<VMD*> * vs = mapMD2VMDStack(i);
                 ASSERT0(vs->get_bottom());
-                VMD * ve = ve_vec->get(VMD_mdid(vs->get_top()));
-                while (vs->get_top() != ve) {
+                VMD * vmd = mdid2vmd->get(VMD_mdid(vs->get_top()));
+                while (vs->get_top() != vmd) {
                     vs->pop();
                 }
             }
 
-            bb2vmd.set(BB_id(v), NULL);
-            delete ve_vec;
+            //vmdmap is useless from now on.
+            bb2vmdmap.set(BB_id(v), NULL);
+            delete mdid2vmd;
         }
     }
 
     #ifdef _DEBUG_
-    for (INT i = 0; i <= bb2vmd.get_last_idx(); i++) {
-        ASSERT0(bb2vmd.get(i) == NULL);
+    //Verify if vpmap of each BB has been deleted.
+    for (INT i = 0; i <= bb2vmdmap.get_last_idx(); i++) {
+        ASSERT0(bb2vmdmap.get(i) == NULL);
     }
     #endif
 }
@@ -1068,7 +1070,7 @@ void MDSSAMgr::destructionInDomTreeOrder(IRBB * root, Graph & domtree)
     Stack<IRBB*> stk;
     UINT n = m_ru->getBBList()->get_elem_count();
     BitSet visited(n / BIT_PER_BYTE);
-    BB2VMD BB2VMD(n);
+    BB2VMDMap bb2vmdmap(n);
     IRBB * v;
     stk.push(root);
     while ((v = stk.get_top()) != NULL) {
@@ -1475,9 +1477,8 @@ void MDSSAMgr::destroyMDSSAInfo()
 }
 
 
-//This function revise phi data type, and remove redundant phi.
 //wl: work list for temporary used.
-void MDSSAMgr::refinePhiForBB(List<IRBB*> & wl, IRBB * bb)
+void MDSSAMgr::prunePhiForBB(List<IRBB*> & wl, IRBB * bb)
 {
     ASSERT0(bb);
     MDPhiList * philist = m_usedef_mgr.genBBPhiList(BB_id(bb));
@@ -1535,9 +1536,9 @@ void MDSSAMgr::refinePhiForBB(List<IRBB*> & wl, IRBB * bb)
 }
 
 
-//This function revise phi data type, and remove redundant phi.
+//Remove redundant phi.
 //wl: work list for temporary used.
-void MDSSAMgr::refinePhi(List<IRBB*> & wl)
+void MDSSAMgr::prunePhi(List<IRBB*> & wl)
 {
     START_TIMERS("MDSSA: Refine phi", t);
 
@@ -1553,7 +1554,7 @@ void MDSSAMgr::refinePhi(List<IRBB*> & wl)
 
     IRBB * bb = NULL;
     while ((bb = wl.remove_head()) != NULL) {
-        refinePhiForBB(wl, bb);
+        prunePhiForBB(wl, bb);
     }
 
     END_TIMERS(t);
@@ -1578,8 +1579,6 @@ void MDSSAMgr::construction(OptCtx & oc)
 }
 
 
-//Note: Non-SSA DU Chains of read/write PR will be clean and
-//unusable after SSA construction.
 void MDSSAMgr::construction(DomTree & domtree)
 {
     ASSERT0(m_ru);
@@ -1597,17 +1596,13 @@ void MDSSAMgr::construction(DomTree & domtree)
     DefSBitSet effect_mds(bs_mgr.getSegMgr());
     Vector<DefSBitSet*> defed_mds_vec;
 
-    if (m_ru->isRegionName("init")) {
-        int a = 0;
-    }
-
     placePhi(dfm, effect_mds, bs_mgr, defed_mds_vec, wl);
 
     rename(effect_mds, defed_mds_vec, domtree);
 
     ASSERT0(verifyPhi(true));
 
-    refinePhi(wl);
+    prunePhi(wl);
 
     //Clean version stack after renaming.
     cleanMD2Stack();    

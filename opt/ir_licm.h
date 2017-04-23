@@ -52,7 +52,7 @@ protected:
     TMap<MD const*, UINT*> m_md2num;
 
     //Indicate whether current IR is tranformed to ssa form.
-    IR_SSA_MGR * m_ssamgr;
+    PRSSAMgr * m_ssamgr;
 
 protected:
     bool doLoopTree(LI<IRBB> * li,

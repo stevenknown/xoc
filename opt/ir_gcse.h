@@ -85,7 +85,7 @@ protected:
     IR_CFG * m_cfg;
     IR_DU_MGR * m_du;
     IR_AA * m_aa;
-    IR_SSA_MGR * m_ssamgr;
+    PRSSAMgr * m_ssamgr;
     IR_EXPR_TAB * m_expr_tab;
     TypeMgr * m_tm;
     IR_GVN * m_gvn;

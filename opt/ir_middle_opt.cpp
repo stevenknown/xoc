@@ -43,7 +43,7 @@ void Region::lowerIRTreeToLowestHeight(OptCtx & oc)
         simp.setSimpToPRmode();
     }
 
-    if (g_do_ssa) {
+    if (g_do_pr_ssa) {
         //Note if this flag enable,
         //AA may generate imprecise result.
         //TODO: use SSA info to improve the precision of AA.
@@ -166,7 +166,7 @@ bool Region::MiddleProcess(OptCtx & oc)
 
     bool do_simplification = true;
     if (getPassMgr() != NULL) {
-        IR_SSA_MGR * ssamgr = (IR_SSA_MGR*)getPassMgr()->
+        PRSSAMgr * ssamgr = (PRSSAMgr*)getPassMgr()->
             queryPass(PASS_PR_SSA_MGR);
         if (ssamgr != NULL && ssamgr->isSSAConstructed()) {
             do_simplification = false;

@@ -36,11 +36,11 @@ author: Su Zhenyu
 
 namespace xoc {
 
-class IR_SSA_MGR;
+class PRSSAMgr;
 
 //Dominace Frontier manager
 class DfMgr {
-    //IR_SSA_MGR * m_ssa_mgr;
+    //PRSSAMgr * m_ssa_mgr;
     BitSetMgr m_bs_mgr;
     Vector<BitSet*> m_df_vec;
 public:
@@ -65,20 +65,20 @@ public:
 //SSAGraph
 class SSAGraph : Graph {
     Region * m_ru;
-    IR_SSA_MGR * m_ssa_mgr;
+    PRSSAMgr * m_ssa_mgr;
     TMap<UINT, VP*> m_vdefs;
 public:
-    SSAGraph(Region * ru, IR_SSA_MGR * ssamgr);
+    SSAGraph(Region * ru, PRSSAMgr * ssamgr);
     COPY_CONSTRUCTOR(SSAGraph);
     void dump(CHAR const* name = NULL, bool detail = true);
 };
 
 
-typedef Vector<Vector<VP*>*> BB2VP;
+typedef Vector<TMap<UINT, VP*>*> BB2VPMap;
 
 
 //Perform SSA based optimizations.
-class IR_SSA_MGR : public Pass {
+class PRSSAMgr : public Pass {
 protected:
     Region * m_ru;
     SMemPool * m_vp_pool;
@@ -130,7 +130,7 @@ protected:
 
     void handleBBRename(IRBB * bb,
                         IN DefSBitSet & defed_prs,
-                        IN OUT BB2VP & bb2vp);
+                        IN OUT BB2VPMap & bb2vp);
 
     Stack<VP*> * mapPRNO2VPStack(UINT prno);
     IR * mapPRNO2IR(UINT prno) { return m_prno2ir.get(prno); }
@@ -172,7 +172,7 @@ protected:
                   Vector<DefSBitSet*> & defed_prs_vec,
                   List<IRBB*> & wl);
 public:
-    explicit IR_SSA_MGR(Region * ru)
+    explicit PRSSAMgr(Region * ru)
     {
         clean();
         ASSERT0(ru);
@@ -188,8 +188,8 @@ public:
         m_cfg = ru->getCFG();
         ASSERT(m_cfg, ("cfg is not available."));
     }
-    COPY_CONSTRUCTOR(IR_SSA_MGR);
-    ~IR_SSA_MGR() { destroy(false); }
+    COPY_CONSTRUCTOR(PRSSAMgr);
+    ~PRSSAMgr() { destroy(false); }
 
     void buildDUChain(IR * def, IR * use)
     {
@@ -323,8 +323,8 @@ public:
     }
 
     bool verifyPhi(bool is_vpinfo_avail);
-    bool verifyPRNOofVP(); //Only used in IR_SSA_MGR.
-    bool verifyVP(); //Only used in IR_SSA_MGR.
+    bool verifyPRNOofVP(); //Only used in PRSSAMgr.
+    bool verifyVP(); //Only used in PRSSAMgr.
     bool verifySSAInfo(); //Can be used in any module.
 
     virtual CHAR const* getPassName() const

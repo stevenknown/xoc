@@ -2162,8 +2162,8 @@ bool IR_RP::perform(OptCtx & oc)
 
     //computeLiveness();
     m_ssamgr = NULL;
-    IR_SSA_MGR * ssamgr =
-            (IR_SSA_MGR*)(m_ru->getPassMgr()->queryPass(PASS_PR_SSA_MGR));
+    PRSSAMgr * ssamgr =
+            (PRSSAMgr*)(m_ru->getPassMgr()->queryPass(PASS_PR_SSA_MGR));
     if (ssamgr != NULL && ssamgr->isSSAConstructed()) {
         m_ssamgr = ssamgr;
     }

@@ -205,7 +205,7 @@ extern bool g_is_lower_to_pr_mode; //Lower IR to PR mode.
 //That means the type of IR_ST, IR_LD, IR_STPR, IR_PR may be VOID.
 extern bool g_is_support_dynamic_type;
 
-extern bool g_do_ssa; //Do optimization in SSA.
+extern bool g_do_pr_ssa; //Do optimization in SSA.
 extern bool g_do_md_ssa; //Do optimization in Memory SSA.
 extern bool g_do_cfg;
 extern bool g_do_rpo;

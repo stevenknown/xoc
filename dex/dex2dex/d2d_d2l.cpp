@@ -827,7 +827,7 @@ static void processClass(DexFile* pDexFile, D2Dpool* pool)
         rumgr->init();
         topru = rumgr->newRegion(RU_PROGRAM);
         rumgr->addToRegionTab(topru);
-          topru->set_ru_var(rumgr->getVarMgr()->registerVar(
+          topru->setRegionVar(rumgr->getVarMgr()->registerVar(
                            ".dex",
                            rumgr->getTypeMgr()->getMCType(0),
                            0,

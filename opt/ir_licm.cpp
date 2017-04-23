@@ -805,8 +805,8 @@ bool IR_LICM::perform(OptCtx & oc)
     TTab<IR*> invariant_exp;
 
     m_ssamgr = NULL;
-    IR_SSA_MGR * ssamgr =
-            (IR_SSA_MGR*)m_ru->getPassMgr()->queryPass(PASS_PR_SSA_MGR);
+    PRSSAMgr * ssamgr =
+            (PRSSAMgr*)m_ru->getPassMgr()->queryPass(PASS_PR_SSA_MGR);
     if (ssamgr != NULL && ssamgr->isSSAConstructed()) {
         m_ssamgr = ssamgr;
     }

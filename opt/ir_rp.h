@@ -120,7 +120,7 @@ protected:
     TypeMgr * m_tm;
     IR_DU_MGR * m_du;
     IR_GVN * m_gvn;
-    IR_SSA_MGR * m_ssamgr;
+    PRSSAMgr * m_ssamgr;
     DefMiscBitSetMgr * m_misc_bs_mgr;
     DontPromotTab m_dont_promot;
     BitSetMgr m_bs_mgr;

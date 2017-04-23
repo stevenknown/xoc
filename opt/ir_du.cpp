@@ -532,8 +532,9 @@ bool IR_DU_MGR::hasSingleDefToMD(DUSet const& defset, MD const* md) const
 bool IR_DU_MGR::is_must_kill(IR const* def1, IR const* def2)
 {
     ASSERT0(def1->is_stmt() && def2->is_stmt());
-    if (def1->is_stpr() && def2->is_stpr()) {
-        return STPR_no(def1) == STPR_no(def2);
+    if ((def1->isWritePR() || def1->isCallStmt()) && 
+        (def2->isWritePR() || def2->isCallStmt())) {
+        return def1->get_prno() == def2->get_prno();
     }
 
     MD const* md1 = def1->getExactRef();
@@ -2812,9 +2813,32 @@ void IR_DU_MGR::computeMayDef(
         IR const* ir,
         MDSet * bb_maydefmds,
         DefDBitSetCore * maygen_stmt,
-        DefMiscBitSetMgr & bsmgr)
+        DefMiscBitSetMgr & bsmgr,
+        UINT flag)
 {
-    if (!ir->is_stpr()) {
+    ASSERT0(ir->is_stmt());
+    switch (ir->get_code()) {
+    case IR_ST:
+    case IR_IST:
+    case IR_STARRAY:
+        if (!HAVE_FLAG(flag, COMPUTE_NOPR_DU)) { return; }
+        break;
+    case IR_STPR:
+    case IR_SETELEM:
+    case IR_GETELEM:
+    case IR_CALL:
+    case IR_ICALL:
+    case IR_PHI:
+        if (!HAVE_FLAG(flag, COMPUTE_PR_DU)) { return; }
+        break;    
+    case IR_REGION:
+        //Region does not have any def.
+        break;
+    default: //Handle general stmt.
+        ASSERT0(!ir->isMemoryRef());
+    }
+    
+    if (!ir->isWritePR()) {
         MD const* ref = get_effect_def_md(ir);
         if (ref != NULL && !ref->is_exact()) {
             bb_maydefmds->bunion(ref, bsmgr);
@@ -2849,40 +2873,41 @@ void IR_DU_MGR::computeMustExactDef(
         OUT MDSet * bb_mustdefmds,
         DefDBitSetCore * mustgen_stmt,
         ConstMDIter & mditer,
-        DefMiscBitSetMgr & bsmgr)
+        DefMiscBitSetMgr & bsmgr,
+        UINT flag)
 {
     switch (ir->get_code()) {
+    case IR_ST:
+    case IR_IST:
+    case IR_STARRAY:
+        if (!HAVE_FLAG(flag, COMPUTE_NOPR_DU)) { return; }
+        break;
+    case IR_STPR:
+    case IR_SETELEM:
+    case IR_GETELEM:
     case IR_CALL:
     case IR_ICALL:
     case IR_PHI:
-        {
-            MD const* x = ir->getExactRef();
-            if (x != NULL) {
-                //call may not have return value.
-
-                bb_mustdefmds->bunion(x, bsmgr);
-
-                //Add MD which is exact and overlapped with x.
-                m_md_sys->computeOverlapExactMD(
-                        x, bb_mustdefmds, mditer, bsmgr);
-            }
-        }
-        break;
+        if (!HAVE_FLAG(flag, COMPUTE_PR_DU)) { return; }
+        break;    
     case IR_REGION:
-        //Region does not have any must-exact def, all defs are
-        //regards as may-def.
+        //Region does not have any def.
         break;
     default: //Handle general stmt.
-        {
-            MD const* x = ir->getExactRef();
-            if (x != NULL) {
-                bb_mustdefmds->bunion(x, bsmgr);
+        ASSERT0(!ir->isMemoryRef());
+    }
+    
+    MD const* x = ir->getExactRef();
+    if (x != NULL) {
+        //call may not have return value.
+        bb_mustdefmds->bunion(x, bsmgr);
 
-                //Add MD which is exact and overlapped with x.
-                m_md_sys->computeOverlapExactMD(
-                        x, bb_mustdefmds, mditer, bsmgr);
-            }
-        }
+        //Add MD which is exact and overlapped with x.
+        m_md_sys->computeOverlapExactMD(x, bb_mustdefmds, mditer, bsmgr);
+    } else if (ir->isWritePR() ||
+               (ir->isCallStmt() && ir->hasReturnValue())) {
+        ASSERT0(ir->getRefMD());
+        bb_mustdefmds->bunion(ir->getRefMD(), bsmgr);
     }
 
     //Computing Must GEN set of reach-definition.
@@ -2963,7 +2988,7 @@ void IR_DU_MGR::computeMustExactDefMayDefMayUse(
             if (!ir->hasResult()) { continue; }
 
             //Do not compute MustExactDef/MayDef for PR.
-            if ((ir->is_stpr() || ir->is_phi()) && 
+            if (ir->isWritePR() && 
                 !HAVE_FLAG(flag, COMPUTE_PR_DU)) {
                 continue;
             }
@@ -2971,11 +2996,11 @@ void IR_DU_MGR::computeMustExactDefMayDefMayUse(
             //Collect mustdef mds.
             if (bb_mustdefmds != NULL) {
                 computeMustExactDef(ir, bb_mustdefmds,
-                    mustgen_stmt, mditer, bsmgr);
+                    mustgen_stmt, mditer, bsmgr, flag);
             }
 
             if (bb_maydefmds != NULL) {
-                computeMayDef(ir, bb_maydefmds, maygen_stmt, bsmgr);
+                computeMayDef(ir, bb_maydefmds, maygen_stmt, bsmgr, flag);
             }
         }
     }
@@ -5079,14 +5104,14 @@ bool IR_DU_MGR::perform(IN OUT OptCtx & oc, UINT flag)
         computeMustExactDefMayDefMayUse(mustexactdef_mds, 
             maydef_mds, mayuse_mds, flag, bsmgr);
         END_TIMERS(t3);
-
+        
         DefDBitSetCoreHashAllocator dbitsetchashallocator(&bsmgr);
         DefDBitSetCoreReserveTab dbitsetchash(&dbitsetchashallocator);
         if (HAVE_FLAG(flag, SOL_REACH_DEF) ||
             HAVE_FLAG(flag, SOL_AVAIL_REACH_DEF)) {
             START_TIMERS("Build KillSet", t);
             computeKillSet(dbitsetchash, mustexactdef_mds, maydef_mds, bsmgr);
-            END_TIMERS(t);
+              END_TIMERS(t);
         }
 
         DefDBitSetCore expr_univers(SOL_SET_IS_SPARSE);
@@ -5104,7 +5129,7 @@ bool IR_DU_MGR::perform(IN OUT OptCtx & oc, UINT flag)
             computeRegionMDDU(mustexactdef_mds, maydef_mds, mayuse_mds);
             END_TIMERS(t);
         }
-
+        
         if (HAVE_FLAG(flag, SOL_REACH_DEF) ||
             HAVE_FLAG(flag, SOL_AVAIL_REACH_DEF) ||
             HAVE_FLAG(flag, SOL_AVAIL_EXPR)) {

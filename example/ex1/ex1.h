@@ -29,21 +29,29 @@ WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR
 OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN
 IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-author: Leslie Zhai <lesliezhai@llvm.org.cn>
+author: Su Zhenyu
 @*/
+#ifndef _EX1_H_
+#define _EX1_H_
 
-#include "cominc.h"
+class CVAR : public VAR {
+public:
+    virtual CHAR const* dumpVARDecl(OUT StrBuf & buf) const { return NULL; }
+};
 
-int main(int argc, char *argv[]) 
-{
-    xoc::RegionMgr RegMgr;
-    RegMgr.initVarMgr();
 
-    // FIXME: how to demostrate libxoc?
-    //generate_ir_list(&RegMgr);
-    //generate_var_tab(&RegMgr);
+class CVarMgr : public VarMgr {
+public:
+    CVarMgr(RegionMgr * mgr) : VarMgr(mgr) {}
+    virtual ~CVarMgr() {}
+    virtual VAR * allocVAR() { return new CVAR(); }
+};
 
-    //RegMgr.process();
 
-    return 0;
-}
+class CDdxMgr : public DbxMgr {
+public:
+    //Append src file line into dump file.
+    //Only print statement line.
+    virtual void printSrcLine(Dbx const& dbx) {}
+};
+#endif

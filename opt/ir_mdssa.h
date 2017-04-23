@@ -31,7 +31,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 namespace xoc {
 
-typedef Vector<Vector<VMD*>*> BB2VMD;
+typedef Vector<TMap<UINT, VMD*>*> BB2VMDMap;
 typedef TMap<UINT, MDPhiList*> BB2MDPhiList;
 typedef TMapIter<UINT, MDPhiList*> BB2MDPhiListIter;
 
@@ -89,15 +89,13 @@ protected:
     void handleBBRename(
             IRBB * bb,
             IN DefSBitSet & defed_prs,
-            IN OUT BB2VMD & bb2vp);
+            IN OUT BB2VMDMap & bb2vmdmap);
 
     Stack<VMD*> * mapMD2VMDStack(UINT mdid);
     
     void renamePhiResult(IN IRBB * bb);
     void renameUse(IR * ir);
     void renameDef(IR * ir, IRBB * bb);
-    void refinePhi(List<IRBB*> & wl);
-    void refinePhiForBB(List<IRBB*> & wl, IRBB * bb);
     void rename(DefSBitSet & effect_prs,
                 Vector<DefSBitSet*> & defed_prs_vec,
                 Graph & domtree);
@@ -108,7 +106,9 @@ protected:
             Vector<DefSBitSet*> & defed_prs_vec);
 
     void stripPhi(MDPhi * phi);
-
+    
+    void prunePhi(List<IRBB*> & wl);
+    void prunePhiForBB(List<IRBB*> & wl, IRBB * bb);
     void placePhiForMD(
             UINT mdid,
             IN List<IRBB*> * defbbs,

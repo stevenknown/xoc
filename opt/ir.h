@@ -1281,7 +1281,7 @@ public:
 //NOTE: 'opnd_pad' must be the first member.
 
 //Indicate the callee function pointer.
-#define ICALL_callee(ir)      (((CICall*)ir)->opnd[CKID_TY(ir, IR_ICALL, 2)])
+#define ICALL_callee(ir)      (*(((CICall*)ir)->opnd + CKID_TY(ir, IR_ICALL, 2)))
 
 //True if current call is readonly.
 #define ICALL_is_readonly(ir) (((CICall*)CK_IRT_ONLY_ICALL(ir))->is_readonly)
@@ -1392,10 +1392,10 @@ public:
 //NOTE: 'opnd_pad' must be the first member of CDoLoop.
 
 //Record the stmt that init iv.
-#define LOOP_init(ir)        (((CDoLoop*)ir)->opnd[CKID_TY(ir, IR_DO_LOOP, 2)])
+#define LOOP_init(ir)          (*(((CDoLoop*)ir)->opnd + CKID_TY(ir, IR_DO_LOOP, 2)))
 
 //Record the stmt that update iv.
-#define LOOP_step(ir)        (((CDoLoop*)ir)->opnd[CKID_TY(ir, IR_DO_LOOP, 3)])
+#define LOOP_step(ir)        (*(((CDoLoop*)ir)->opnd + CKID_TY(ir, IR_DO_LOOP, 3)))
 #define DOLOOP_kid(ir, idx)  (((CDoLoop*)ir)->opnd[CKID_TY(ir, IR_DO_LOOP, idx)])
 class CDoLoop : public CWhileDo {
 public:
@@ -1593,7 +1593,7 @@ public:
 //
 //If 'elem_tyid' is vector, ARR_ofst refers the referrenced element byte offset.
 #define STARR_bb(ir)        (((CStArray*)CK_IRT(ir, IR_STARRAY))->bb)
-#define STARR_rhs(ir)       (((CStArray*)ir)->opnd[CKID_TY(ir, IR_STARRAY, 0)])
+#define STARR_rhs(ir)       (*(((CStArray*)ir)->opnd + CKID_TY(ir, IR_STARRAY, 0)))
 class CStArray: public CArray {
 public:
     //NOTE: 'opnd' must be the first member of CStArray.

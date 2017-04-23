@@ -180,86 +180,86 @@ void RegionMgr::addToRegionTab(Region * ru)
 
 bool RegionMgr::verifyPreDefinedInfo()
 {
-    ASSERT0(WORD_LENGTH_OF_TARGET_MACHINE ==
+    ASSERT0_UNUSED(WORD_LENGTH_OF_TARGET_MACHINE ==
             sizeof(TMWORD) * HOST_BIT_PER_BYTE);
-    ASSERT0(BIT_PER_BYTE == HOST_BIT_PER_BYTE);
+    ASSERT0_UNUSED(BIT_PER_BYTE == HOST_BIT_PER_BYTE);
 
-    ASSERT0(sizeof(INT8) * HOST_BIT_PER_BYTE == 8);
-    ASSERT0(sizeof(UINT8) * HOST_BIT_PER_BYTE == 8);
-    ASSERT0(sizeof(INT16) * HOST_BIT_PER_BYTE == 16);
-    ASSERT0(sizeof(UINT16) * HOST_BIT_PER_BYTE == 16);
-    ASSERT0(sizeof(INT32) * HOST_BIT_PER_BYTE == 32);
-    ASSERT0(sizeof(UINT32) * HOST_BIT_PER_BYTE == 32);
-    ASSERT0(sizeof(INT64) * HOST_BIT_PER_BYTE == 64);
-    ASSERT0(sizeof(UINT64) * HOST_BIT_PER_BYTE == 64);
+    ASSERT0_UNUSED(sizeof(INT8) * HOST_BIT_PER_BYTE == 8);
+    ASSERT0_UNUSED(sizeof(UINT8) * HOST_BIT_PER_BYTE == 8);
+    ASSERT0_UNUSED(sizeof(INT16) * HOST_BIT_PER_BYTE == 16);
+    ASSERT0_UNUSED(sizeof(UINT16) * HOST_BIT_PER_BYTE == 16);
+    ASSERT0_UNUSED(sizeof(INT32) * HOST_BIT_PER_BYTE == 32);
+    ASSERT0_UNUSED(sizeof(UINT32) * HOST_BIT_PER_BYTE == 32);
+    ASSERT0_UNUSED(sizeof(INT64) * HOST_BIT_PER_BYTE == 64);
+    ASSERT0_UNUSED(sizeof(UINT64) * HOST_BIT_PER_BYTE == 64);
     #ifdef INT128
-    ASSERT0(sizeof(INT128) * HOST_BIT_PER_BYTE == 128);
+    ASSERT0_UNUSED(sizeof(INT128) * HOST_BIT_PER_BYTE == 128);
     #endif
     #ifdef UINT128
-    ASSERT0(sizeof(UINT128) * HOST_BIT_PER_BYTE == 128);
+    ASSERT0_UNUSED(sizeof(UINT128) * HOST_BIT_PER_BYTE == 128);
     #endif
 
-    ASSERT0(!IS_UNSIGN_TY(INT8));
-    ASSERT0(IS_UNSIGN_TY(UINT8));
-    ASSERT0(!IS_UNSIGN_TY(INT16));
-    ASSERT0(IS_UNSIGN_TY(UINT16));
-    ASSERT0(!IS_UNSIGN_TY(INT32));
-    ASSERT0(IS_UNSIGN_TY(UINT32));
-    ASSERT0(!IS_UNSIGN_TY(INT64));
-    ASSERT0(IS_UNSIGN_TY(UINT64));
+    ASSERT0_UNUSED(!IS_UNSIGN_TY(INT8));
+    ASSERT0_UNUSED(IS_UNSIGN_TY(UINT8));
+    ASSERT0_UNUSED(!IS_UNSIGN_TY(INT16));
+    ASSERT0_UNUSED(IS_UNSIGN_TY(UINT16));
+    ASSERT0_UNUSED(!IS_UNSIGN_TY(INT32));
+    ASSERT0_UNUSED(IS_UNSIGN_TY(UINT32));
+    ASSERT0_UNUSED(!IS_UNSIGN_TY(INT64));
+    ASSERT0_UNUSED(IS_UNSIGN_TY(UINT64));
     #ifdef INT128
-    ASSERT0(!IS_UNSIGN_TY(INT128));
+    ASSERT0_UNUSED(!IS_UNSIGN_TY(INT128));
     #endif
     #ifdef UINT128
-    ASSERT0(IS_UNSIGN_TY(UINT128));
+    ASSERT0_UNUSED(IS_UNSIGN_TY(UINT128));
     #endif
 
     //Host LONGLONG should not less than HOST_INT,
     //otherwise the integer might be truncated wrongfully.
-    ASSERT0(sizeof(HOST_INT) <= sizeof(LONGLONG));
-    ASSERT0(sizeof(HOST_INT) == sizeof(HOST_UINT));
+    ASSERT0_UNUSED(sizeof(HOST_INT) <= sizeof(LONGLONG));
+    ASSERT0_UNUSED(sizeof(HOST_INT) == sizeof(HOST_UINT));
 
-    ASSERT0(WORD_LENGTH_OF_HOST_MACHINE ==
-            (sizeof(HOST_UINT) * HOST_BIT_PER_BYTE));
+    ASSERT0_UNUSED(WORD_LENGTH_OF_HOST_MACHINE ==
+        (sizeof(HOST_UINT) * HOST_BIT_PER_BYTE));
 
-    ASSERT0(sizeof(CHAR) == sizeof(UCHAR) &&
-            sizeof(SHORT) == sizeof(USHORT) &&
-            sizeof(INT) == sizeof(UINT) &&
-            sizeof(LONG) == sizeof(ULONG) &&
-            sizeof(LONGLONG) == sizeof(ULONGLONG));
+    ASSERT0_UNUSED(sizeof(CHAR) == sizeof(UCHAR) &&
+        sizeof(SHORT) == sizeof(USHORT) &&
+        sizeof(INT) == sizeof(UINT) &&
+        sizeof(LONG) == sizeof(ULONG) &&
+        sizeof(LONGLONG) == sizeof(ULONGLONG));
 
-    ASSERT0(sizeof(CHAR) <= sizeof(SHORT) &&
-            sizeof(SHORT) <= sizeof(INT) &&
-            sizeof(INT) <= sizeof(LONG) &&
-            sizeof(LONG) <= sizeof(LONGLONG));
+    ASSERT0_UNUSED(sizeof(CHAR) <= sizeof(SHORT) &&
+        sizeof(SHORT) <= sizeof(INT) &&
+        sizeof(INT) <= sizeof(LONG) &&
+        sizeof(LONG) <= sizeof(LONGLONG));
 
-    ASSERT0(BYTE_PER_CHAR < BYTE_PER_SHORT &&
-            BYTE_PER_SHORT < BYTE_PER_INT &&
-            BYTE_PER_INT <= BYTE_PER_LONG &&
-            BYTE_PER_LONG <= BYTE_PER_LONGLONG &&
-            BYTE_PER_FLOAT < BYTE_PER_DOUBLE &&
-            BYTE_PER_INT <= BYTE_PER_POINTER);
+    ASSERT0_UNUSED(BYTE_PER_CHAR < BYTE_PER_SHORT &&
+        BYTE_PER_SHORT < BYTE_PER_INT &&
+        BYTE_PER_INT <= BYTE_PER_LONG &&
+        BYTE_PER_LONG <= BYTE_PER_LONGLONG &&
+        BYTE_PER_FLOAT < BYTE_PER_DOUBLE &&
+        BYTE_PER_INT <= BYTE_PER_POINTER);
 
-    ASSERT0(BYTE_PER_CHAR < sizeof(ULONGLONG) &&
-            BYTE_PER_SHORT < sizeof(ULONGLONG) &&
-            BYTE_PER_INT <= sizeof(ULONGLONG) &&
-            BYTE_PER_LONG <= sizeof(ULONGLONG) &&
-            BYTE_PER_FLOAT <= sizeof(ULONGLONG) &&
-            BYTE_PER_DOUBLE <= sizeof(ULONGLONG) &&
-            BYTE_PER_POINTER <= sizeof(ULONGLONG) &&
-            GENERAL_REGISTER_SIZE <= sizeof(ULONGLONG));
+    ASSERT0_UNUSED(BYTE_PER_CHAR < sizeof(ULONGLONG) &&
+        BYTE_PER_SHORT < sizeof(ULONGLONG) &&
+        BYTE_PER_INT <= sizeof(ULONGLONG) &&
+        BYTE_PER_LONG <= sizeof(ULONGLONG) &&
+        BYTE_PER_FLOAT <= sizeof(ULONGLONG) &&
+        BYTE_PER_DOUBLE <= sizeof(ULONGLONG) &&
+        BYTE_PER_POINTER <= sizeof(ULONGLONG) &&
+        GENERAL_REGISTER_SIZE <= sizeof(ULONGLONG));
 
-    ASSERT0(BYTE_PER_CHAR <= sizeof(HOST_INT) &&
-            BYTE_PER_CHAR <= sizeof(HOST_UINT) &&
-            BYTE_PER_CHAR <= sizeof(HOST_FP));
+    ASSERT0_UNUSED(BYTE_PER_CHAR <= sizeof(HOST_INT) &&
+        BYTE_PER_CHAR <= sizeof(HOST_UINT) &&
+        BYTE_PER_CHAR <= sizeof(HOST_FP));
 
-    ASSERT0(BYTE_PER_SHORT <= sizeof(HOST_INT) &&
-            BYTE_PER_SHORT <= sizeof(HOST_UINT) &&
-            BYTE_PER_SHORT <= sizeof(HOST_FP));
+    ASSERT0_UNUSED(BYTE_PER_SHORT <= sizeof(HOST_INT) &&
+        BYTE_PER_SHORT <= sizeof(HOST_UINT) &&
+        BYTE_PER_SHORT <= sizeof(HOST_FP));
 
-    ASSERT0(BYTE_PER_INT <= sizeof(HOST_INT) &&
-            BYTE_PER_INT <= sizeof(HOST_UINT) &&
-            BYTE_PER_INT <= sizeof(HOST_FP));
+    ASSERT0_UNUSED(BYTE_PER_INT <= sizeof(HOST_INT) &&
+        BYTE_PER_INT <= sizeof(HOST_UINT) &&
+        BYTE_PER_INT <= sizeof(HOST_FP));
 
     return true;
 }

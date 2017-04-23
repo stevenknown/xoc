@@ -1,4 +1,3 @@
-CC = clang++
 COM_OBJS +=\
 com/ltype.o \
 com/comf.o \
@@ -59,10 +58,16 @@ opt/loop.o\
 opt/ir_loop_cvt.o\
 opt/prdf.o
 
+
 CFLAGS = -DFOR_DEX -D_DEBUG_ -O0 -g2 -Wno-write-strings -Wsign-promo \
         -Wsign-compare -Wpointer-arith -Wno-multichar -Winit-self -Wswitch
 ifneq (,$(filter $(CC),g++ gcc))
 	CFLAGS += -Wstrict-aliasing=3 -finline-limit=10000000
+endif
+
+CC := $(shell which clang++ > /dev/null)
+ifndef CC
+CC = $(if $(shell which clang), clang, gcc)
 endif
 
 all: com_objs opt_objs
@@ -76,10 +81,6 @@ INC=-I .
 
 com_objs: $(COM_OBJS)
 opt_objs: $(OPT_OBJS)
-test:
-	$(CC) -o test.o -c $(CFLAGS) -fPIC -fsanitize=address -fsanitize=undefined \
-		-fno-omit-frame-pointer -I./opt test.cpp
-	$(CC) -o test -fsanitize=address -fsanitize=undefined test.o libxoc.a
 
 clean:
 	@find -name "*.o" | xargs rm -f
@@ -94,6 +95,7 @@ clean:
 	@find -name "*.asm" | xargs rm -f
 	@find -name "*.swp" | xargs rm -f
 	@find -name "*.swo" | xargs rm -f
+	@find -name "*.log" | xargs rm -f
 	@find -name "*.LOGLOG" | xargs rm -f
 	@find -name "LOGLOG" | xargs rm -f
 	@find -name "test" | xargs rm -f

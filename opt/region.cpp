@@ -1697,9 +1697,8 @@ bool Region::evaluateConstInteger(IR const* ir, OUT ULONGLONG * const_value)
                 ASSERT0(defstmt && defstmt->is_stmt());
 
                 if (!defstmt->is_stpr()) { return false; }
-
-                return evaluateConstInteger(STPR_rhs(defstmt), const_value);
             }
+            return evaluateConstInteger(STPR_rhs(defstmt), const_value);
         }
     case IR_CVT:        
         return evaluateConstInteger(CVT_exp(ir), const_value);
@@ -3317,7 +3316,7 @@ void Region::checkValidAndRecompute(OptCtx * oc, ...)
         
         //If PRs have already been in SSA form, compute
         //DU chain doesn't make any sense.    
-        IR_SSA_MGR * ssamgr = (IR_SSA_MGR*)passmgr->queryPass(PASS_PR_SSA_MGR);
+        PRSSAMgr * ssamgr = (PRSSAMgr*)passmgr->queryPass(PASS_PR_SSA_MGR);
         if (ssamgr == NULL) {
             flag |= COMPUTE_PR_DU;
         }
@@ -3402,7 +3401,7 @@ bool Region::partitionRegion()
     addToVarTab(ruv);
 
     Region * inner_ru = getRegionMgr()->allocRegion(RU_SUB);
-    inner_ru->set_ru_var(ruv);
+    inner_ru->setRegionVar(ruv);
     IR * ir_ru = buildRegion(inner_ru);
     copyDbx(ir, ir_ru, inner_ru);
     //------------
@@ -3523,7 +3522,7 @@ bool Region::process(OptCtx * oc)
         }
     }
 
-    IR_SSA_MGR * ssamgr = NULL;
+    PRSSAMgr * ssamgr = NULL;
 
     if (getIRList() != NULL) {
         if (!processIRList(*oc)) { goto ERR_RET; }
@@ -3545,7 +3544,7 @@ bool Region::process(OptCtx * oc)
         }
     }
 
-    ssamgr = (IR_SSA_MGR*)getPassMgr()->queryPass(PASS_PR_SSA_MGR);
+    ssamgr = (PRSSAMgr*)getPassMgr()->queryPass(PASS_PR_SSA_MGR);
     if (ssamgr != NULL && ssamgr->isSSAConstructed()) {
         ssamgr->destruction();
     }
@@ -3561,7 +3560,7 @@ bool Region::process(OptCtx * oc)
 
 ERR_RET:
     ASSERT0(getPassMgr());
-    ssamgr = (IR_SSA_MGR*)getPassMgr()->queryPass(PASS_PR_SSA_MGR);
+    ssamgr = (PRSSAMgr*)getPassMgr()->queryPass(PASS_PR_SSA_MGR);
     if (ssamgr != NULL && ssamgr->isSSAConstructed()) {
         ssamgr->destruction();
     }

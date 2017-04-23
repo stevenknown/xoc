@@ -362,13 +362,15 @@ protected:
             IR const* ir,
             MDSet * bb_maydefmds,
             DefDBitSetCore * maygen_stmt,
-            DefMiscBitSetMgr & bsmgr);
+            DefMiscBitSetMgr & bsmgr,
+            UINT flag);
     void computeMustExactDef(
             IR const* ir,
             MDSet * bb_mustdefmds,
             DefDBitSetCore * mustgen_stmt,
             ConstMDIter & mditer,
-            DefMiscBitSetMgr & bsmgr);
+            DefMiscBitSetMgr & bsmgr,
+            UINT flag);
     void computeMustExactDefMayDefMayUse(
             OUT Vector<MDSet*> * mustdef,
             OUT Vector<MDSet*> * maydef,

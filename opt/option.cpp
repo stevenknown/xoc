@@ -196,7 +196,7 @@ bool g_do_rce = false;
 bool g_do_rp = false;
 
 //Build PR SSA and perform optimization based on SSA.
-bool g_do_ssa = false;
+bool g_do_pr_ssa = false;
 
 //Build Memory SSA and perform optimization based on Memory SSA.
 bool g_do_md_ssa = true;

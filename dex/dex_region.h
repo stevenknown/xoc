@@ -56,7 +56,7 @@ protected:
 
 protected:
     bool is_64bit(IR const* ir)
-    { return get_type_mgr()->get_bytesize(ir->get_type())== 8; }
+    { return getTypeMgr()->get_bytesize(ir->get_type())== 8; }
 
 public:
     CHAR const* m_functype;

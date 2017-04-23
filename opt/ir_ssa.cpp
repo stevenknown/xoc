@@ -126,7 +126,7 @@ void DfMgr::build(DGraph & g)
 //
 //START SSAGraph
 //
-SSAGraph::SSAGraph(Region * ru, IR_SSA_MGR * ssamgr)
+SSAGraph::SSAGraph(Region * ru, PRSSAMgr * ssamgr)
 {
     ASSERT0(ru && ssamgr);
     m_ru = ru;
@@ -293,9 +293,9 @@ void SSAGraph::dump(CHAR const* name, bool detail)
 
 
 //
-//START IR_SSA_MGR
+//START PRSSAMgr
 //
-size_t IR_SSA_MGR::count_mem()
+size_t PRSSAMgr::count_mem()
 {
     size_t count = 0;
     count += smpoolGetPoolSize(m_vp_pool);
@@ -311,7 +311,7 @@ size_t IR_SSA_MGR::count_mem()
 
 
 //Clean version stack.
-void IR_SSA_MGR::cleanPRNO2Stack()
+void PRSSAMgr::cleanPRNO2Stack()
 {
     for (INT i = 0; i <= m_map_prno2stack.get_last_idx(); i++) {
         Stack<VP*> * s = m_map_prno2stack.get(i);
@@ -322,14 +322,14 @@ void IR_SSA_MGR::cleanPRNO2Stack()
 
 
 //Dump ssa du stmt graph.
-void IR_SSA_MGR::dumpSSAGraph(CHAR * name)
+void PRSSAMgr::dumpSSAGraph(CHAR * name)
 {
     SSAGraph sa(m_ru, this);
     sa.dump(name, true);
 }
 
 
-CHAR * IR_SSA_MGR::dumpVP(IN VP * v, OUT CHAR * buf)
+CHAR * PRSSAMgr::dumpVP(IN VP * v, OUT CHAR * buf)
 {
     sprintf(buf, "P%dV%d", VP_prno(v), VP_ver(v));
     return buf;
@@ -338,10 +338,10 @@ CHAR * IR_SSA_MGR::dumpVP(IN VP * v, OUT CHAR * buf)
 
 //This function dumps VP structure and SSA DU info.
 //have_renamed: set true if PRs have been renamed in construction.
-void IR_SSA_MGR::dumpAllVP(bool have_renamed)
+void PRSSAMgr::dumpAllVP(bool have_renamed)
 {
     if (g_tfile == NULL) return;
-    fprintf(g_tfile, "\n==---- DUMP IR_SSA_MGR:VP_DU ----==\n");
+    fprintf(g_tfile, "\n==---- DUMP PRSSAMgr:VP_DU ----==\n");
 
     Vector<VP*> const* vp_vec = getVPVec();
     for (INT i = 1; i <= vp_vec->get_last_idx(); i++) {
@@ -394,10 +394,10 @@ void IR_SSA_MGR::dumpAllVP(bool have_renamed)
 }
 
 
-void IR_SSA_MGR::dump()
+void PRSSAMgr::dump()
 {
     if (g_tfile == NULL) { return; }
-    fprintf(g_tfile, "\n\n==---- DUMP Result of IR_SSA_MGR ----==\n");
+    fprintf(g_tfile, "\n\n==---- DUMP Result of PRSSAMgr ----==\n");
 
     BBList * bbl = m_ru->getBBList();
     List<IR const*> lst;
@@ -455,7 +455,7 @@ void IR_SSA_MGR::dump()
 
 
 //Initialize VP for each PR.
-IR * IR_SSA_MGR::initVP(IN IR * ir)
+IR * PRSSAMgr::initVP(IN IR * ir)
 {
     IR * prres = ir->getResultPR();
 
@@ -484,7 +484,7 @@ IR * IR_SSA_MGR::initVP(IN IR * ir)
 
 
 //'mustdef_pr': record PRs which defined in 'bb'.
-void IR_SSA_MGR::collectDefinedPR(IN IRBB * bb, OUT DefSBitSet & mustdef_pr)
+void PRSSAMgr::collectDefinedPR(IN IRBB * bb, OUT DefSBitSet & mustdef_pr)
 {
     for (IR * ir = BB_first_ir(bb); ir != NULL; ir = BB_next_ir(bb)) {
         //Generate VP for non-phi stmt.
@@ -496,7 +496,7 @@ void IR_SSA_MGR::collectDefinedPR(IN IRBB * bb, OUT DefSBitSet & mustdef_pr)
 }
 
 
-void IR_SSA_MGR::insertPhi(UINT prno, IN IRBB * bb)
+void PRSSAMgr::insertPhi(UINT prno, IN IRBB * bb)
 {
     UINT num_opnd = m_cfg->get_in_degree(m_cfg->get_vertex(BB_id(bb)));
     IR * pr = m_prno2ir.get(prno);
@@ -520,7 +520,7 @@ void IR_SSA_MGR::insertPhi(UINT prno, IN IRBB * bb)
 
 //Insert phi for PR.
 //defbbs: record BBs which defined the PR identified by 'prno'.
-void IR_SSA_MGR::placePhiForPR(
+void PRSSAMgr::placePhiForPR(
         UINT prno,
         IN List<IRBB*> * defbbs,
         DfMgr const& dfm,
@@ -573,7 +573,7 @@ void IR_SSA_MGR::placePhiForPR(
 //the phi is redundant.
 //common_def: record the common_def if the definition of all opnd is the same.
 //TODO: p=phi(m,p), the only use of p is phi. the phi is redundant.
-bool IR_SSA_MGR::isRedundantPHI(IR const* phi, OUT IR ** common_def) const
+bool PRSSAMgr::isRedundantPHI(IR const* phi, OUT IR ** common_def) const
 {
     ASSERT0(phi->is_phi());
 
@@ -618,7 +618,7 @@ bool IR_SSA_MGR::isRedundantPHI(IR const* phi, OUT IR ** common_def) const
 
 //Place phi and assign the v0 for each PR.
 //'effect_prs': record the pr which need to versioning.
-void IR_SSA_MGR::placePhi(DfMgr const& dfm,
+void PRSSAMgr::placePhi(DfMgr const& dfm,
                           OUT DefSBitSet & effect_prs,
                           DefMiscBitSetMgr & bs_mgr,
                           Vector<DefSBitSet*> & defed_prs_vec,
@@ -670,7 +670,7 @@ void IR_SSA_MGR::placePhi(DfMgr const& dfm,
 
 
 //Rename vp from current version to the top-version on stack if it exist.
-void IR_SSA_MGR::renameBB(IN IRBB * bb)
+void PRSSAMgr::renameBB(IN IRBB * bb)
 {
      for (IR * ir = BB_first_ir(bb); ir != NULL; ir = BB_next_ir(bb)) {
         if (!ir->is_phi()) {
@@ -742,7 +742,7 @@ void IR_SSA_MGR::renameBB(IN IRBB * bb)
 }
 
 
-Stack<VP*> * IR_SSA_MGR::mapPRNO2VPStack(UINT prno)
+Stack<VP*> * PRSSAMgr::mapPRNO2VPStack(UINT prno)
 {
     Stack<VP*> * stack = m_map_prno2stack.get(prno);
     if (stack == NULL) {
@@ -753,21 +753,21 @@ Stack<VP*> * IR_SSA_MGR::mapPRNO2VPStack(UINT prno)
 }
 
 
-void IR_SSA_MGR::handleBBRename(
+void PRSSAMgr::handleBBRename(
         IRBB * bb,
         DefSBitSet & defed_prs,
-        IN OUT BB2VP & bb2vp)
+        IN OUT BB2VPMap & bb2vp)
 {
     ASSERT0(bb2vp.get(BB_id(bb)) == NULL);
-    Vector<VP*> * ve_vec = new Vector<VP*>();
-    bb2vp.set(BB_id(bb), ve_vec);
+    TMap<UINT, VP*> * prno2vp = new TMap<UINT, VP*>();
+    bb2vp.set(BB_id(bb), prno2vp);
 
     SEGIter * cur = NULL;
     for (INT prno = defed_prs.get_first(&cur);
          prno >= 0; prno = defed_prs.get_next(prno, &cur)) {
-        VP * ve = mapPRNO2VPStack(prno)->get_top();
-        ASSERT0(ve);
-        ve_vec->set(VP_prno(ve), ve);
+        VP * vp = mapPRNO2VPStack(prno)->get_top();
+        ASSERT0(vp);
+        prno2vp->set(VP_prno(vp), vp);
     }
     renameBB(bb);
 
@@ -844,7 +844,7 @@ void IR_SSA_MGR::handleBBRename(
 
 
 //defed_prs_vec: for each BB, indicate PRs which has been defined.
-void IR_SSA_MGR::renameInDomTreeOrder(
+void PRSSAMgr::renameInDomTreeOrder(
         IRBB * root,
         Graph & domtree,
         Vector<DefSBitSet*> & defed_prs_vec)
@@ -852,7 +852,7 @@ void IR_SSA_MGR::renameInDomTreeOrder(
     Stack<IRBB*> stk;
     UINT n = m_ru->getBBList()->get_elem_count();
     BitSet visited(n / BIT_PER_BYTE);
-    BB2VP bb2vp(n);
+    BB2VPMap bb2vpmap(n);
     IRBB * v;
     stk.push(root);
     List<IR*> lst; //for tmp use.
@@ -861,7 +861,7 @@ void IR_SSA_MGR::renameInDomTreeOrder(
             visited.bunion(BB_id(v));
             DefSBitSet * defed_prs = defed_prs_vec.get(BB_id(v));
             ASSERT0(defed_prs);
-            handleBBRename(v, *defed_prs, bb2vp);
+            handleBBRename(v, *defed_prs, bb2vpmap);
         }
 
         Vertex const* bbv = domtree.get_vertex(BB_id(v));
@@ -883,8 +883,8 @@ void IR_SSA_MGR::renameInDomTreeOrder(
             stk.pop();
 
             //Do post-processing while all kids of BB has been processed.
-            Vector<VP*> * ve_vec = bb2vp.get(BB_id(v));
-            ASSERT0(ve_vec);
+            TMap<UINT, VP*> * prno2vp = bb2vpmap.get(BB_id(v));
+            ASSERT0(prno2vp);
             DefSBitSet * defed_prs = defed_prs_vec.get(BB_id(v));
             ASSERT0(defed_prs);
 
@@ -893,26 +893,29 @@ void IR_SSA_MGR::renameInDomTreeOrder(
                  i >= 0; i = defed_prs->get_next(i, &cur)) {
                 Stack<VP*> * vs = mapPRNO2VPStack(i);
                 ASSERT0(vs->get_bottom() != NULL);
-                VP * ve = ve_vec->get(VP_prno(vs->get_top()));
-                while (vs->get_top() != ve) {
+                VP * vp = prno2vp->get(VP_prno(vs->get_top()));
+                while (vs->get_top() != vp) {
                     vs->pop();
                 }
             }
-            bb2vp.set(BB_id(v), NULL);
-            delete ve_vec;
+
+            //vpmap is useless from now on.
+            bb2vpmap.set(BB_id(v), NULL);
+            delete prno2vp;
         }
     }
 
     #ifdef _DEBUG_
-    for (INT i = 0; i <= bb2vp.get_last_idx(); i++) {
-        ASSERT0(bb2vp.get(i) == NULL);
+    //Verify if vpmap of each BB has been deleted.
+    for (INT i = 0; i <= bb2vpmap.get_last_idx(); i++) {
+        ASSERT0(bb2vpmap.get(i) == NULL);
     }
     #endif
 }
 
 
 //Rename variables.
-void IR_SSA_MGR::rename(
+void PRSSAMgr::rename(
         DefSBitSet & effect_prs,
         Vector<DefSBitSet*> & defed_prs_vec,
         Graph & domtree)
@@ -934,7 +937,7 @@ void IR_SSA_MGR::rename(
 }
 
 
-void IR_SSA_MGR::destructBBSSAInfo(IRBB * bb)
+void PRSSAMgr::destructBBSSAInfo(IRBB * bb)
 {
     C<IR*> * ct, * next_ct;
     BB_irlist(bb).get_head(&next_ct);
@@ -951,12 +954,12 @@ void IR_SSA_MGR::destructBBSSAInfo(IRBB * bb)
 }
 
 
-void IR_SSA_MGR::destructionInDomTreeOrder(IRBB * root, Graph & domtree)
+void PRSSAMgr::destructionInDomTreeOrder(IRBB * root, Graph & domtree)
 {
     Stack<IRBB*> stk;
     UINT n = m_ru->getBBList()->get_elem_count();
     BitSet visited(n / BIT_PER_BYTE);
-    BB2VP bb2vp(n);
+    BB2VPMap bb2vp(n);
     IRBB * v;
     stk.push(root);
     while ((v = stk.get_top()) != NULL) {
@@ -994,7 +997,7 @@ void IR_SSA_MGR::destructionInDomTreeOrder(IRBB * root, Graph & domtree)
 //traverse dominator tree.
 //Return true if inserting copy at the head of fallthrough BB
 //of current BB's predessor.
-void IR_SSA_MGR::destruction(DomTree & domtree)
+void PRSSAMgr::destruction(DomTree & domtree)
 {
     START_TIMER_FMT_AFTER();
 
@@ -1013,7 +1016,7 @@ void IR_SSA_MGR::destruction(DomTree & domtree)
 //of current BB's predessor.
 //Note that do not free phi at this function, it will be freed
 //by user.
-void IR_SSA_MGR::stripPhi(IR * phi, C<IR*> * phict)
+void PRSSAMgr::stripPhi(IR * phi, C<IR*> * phict)
 {
     IRBB * bb = phi->getBB();
     ASSERT0(bb);
@@ -1105,7 +1108,7 @@ void IR_SSA_MGR::stripPhi(IR * phi, C<IR*> * phict)
 //This function verify def/use information of PHI stmt.
 //If vpinfo is available, the function also check VP_prno of phi operands.
 //is_vpinfo_avail: set true if VP information is available.
-bool IR_SSA_MGR::verifyPhi(bool is_vpinfo_avail)
+bool PRSSAMgr::verifyPhi(bool is_vpinfo_avail)
 {
     UNUSED(is_vpinfo_avail);
     BBList * bblst = m_ru->getBBList();
@@ -1167,7 +1170,7 @@ bool IR_SSA_MGR::verifyPhi(bool is_vpinfo_avail)
 //This function only can be invoked immediately
 //after rename(), because refinePhi() might clobber VP information, that leads
 //VP_prno() to be invalid.
-bool IR_SSA_MGR::verifyPRNOofVP()
+bool PRSSAMgr::verifyPRNOofVP()
 {
     ConstIRIter ii;
     BBList * bblst = m_ru->getBBList();
@@ -1188,7 +1191,7 @@ bool IR_SSA_MGR::verifyPRNOofVP()
 }
 
 
-bool IR_SSA_MGR::verifyVP()
+bool PRSSAMgr::verifyVP()
 {
     //Check version for each vp.
     BitSet defset;
@@ -1304,7 +1307,7 @@ static void verify_ssainfo_core(IR * ir, BitSet & defset, Region * ru)
 
 //The verification check the DU info in SSA form.
 //Current IR must be in SSA form.
-bool IR_SSA_MGR::verifySSAInfo()
+bool PRSSAMgr::verifySSAInfo()
 {
     //Check version for each vp.
     BitSet defset;
@@ -1333,7 +1336,7 @@ bool IR_SSA_MGR::verifySSAInfo()
 
 
 //This function perform SSA destruction via scanning BB in sequential order.
-void IR_SSA_MGR::destruction()
+void PRSSAMgr::destruction()
 {
     BBList * bblst = m_ru->getBBList();
     if (bblst->get_elem_count() == 0) { return; }
@@ -1353,7 +1356,7 @@ void IR_SSA_MGR::destruction()
 
 
 //Set SSAInfo of IR to be NULL to inform optimizer that IR is not in SSA form.
-void IR_SSA_MGR::cleanPRSSAInfo()
+void PRSSAMgr::cleanPRSSAInfo()
 {
     BBList * bblst = m_ru->getBBList();
     C<IRBB*> * bbct;
@@ -1406,7 +1409,7 @@ static void revise_phi_dt(IR * phi, Region * ru)
 
 //This function revise phi data type, and remove redundant phi.
 //wl: work list for temporary used.
-void IR_SSA_MGR::refinePhi(List<IRBB*> & wl)
+void PRSSAMgr::refinePhi(List<IRBB*> & wl)
 {
     START_TIMERS("SSA: Refine phi", t);
 
@@ -1510,7 +1513,7 @@ void IR_SSA_MGR::refinePhi(List<IRBB*> & wl)
 
 
 //This function revise phi data type, and remove redundant phi.
-void IR_SSA_MGR::stripVersionForBBList()
+void PRSSAMgr::stripVersionForBBList()
 {
     START_TIMERS("SSA: Strip version", t);
 
@@ -1589,7 +1592,7 @@ static IR * replace_res_pr(
 
 
 //Strip specified VP's version.
-void IR_SSA_MGR::stripSpecifiedVP(VP * vp)
+void PRSSAMgr::stripSpecifiedVP(VP * vp)
 {
     IR * def = SSA_def(vp);
     if (def == NULL) { return; }
@@ -1637,7 +1640,7 @@ void IR_SSA_MGR::stripSpecifiedVP(VP * vp)
 }
 
 
-void IR_SSA_MGR::stripStmtVersion(IR * stmt, BitSet & visited)
+void PRSSAMgr::stripStmtVersion(IR * stmt, BitSet & visited)
 {
     ASSERT0(stmt->is_stmt());
 
@@ -1685,7 +1688,7 @@ void IR_SSA_MGR::stripStmtVersion(IR * stmt, BitSet & visited)
 //during striping will not be maintained and the relationship between
 //VP_prno and the concrete occurrence PR may be invalid and
 //that making the process assert.
-void IR_SSA_MGR::stripVersionForAllVP()
+void PRSSAMgr::stripVersionForAllVP()
 {
     for (INT i = 1; i <= m_vp_vec.get_last_idx(); i++) {
         VP * v = m_vp_vec.get(i);
@@ -1697,7 +1700,7 @@ void IR_SSA_MGR::stripVersionForAllVP()
 
 //Construct DU chain which need by IR_DU_MGR.
 //This function will build the DUSet for PHI and its USE.
-void IR_SSA_MGR::constructMDDUChainForPR()
+void PRSSAMgr::constructMDDUChainForPR()
 {
     for (INT i = 1; i <= m_vp_vec.get_last_idx(); i++) {
         VP * v = m_vp_vec.get(i);
@@ -1719,7 +1722,7 @@ void IR_SSA_MGR::constructMDDUChainForPR()
 }
 
 
-void IR_SSA_MGR::construction(OptCtx & oc)
+void PRSSAMgr::construction(OptCtx & oc)
 {
     reinit();
     m_ru->checkValidAndRecompute(&oc, PASS_DOM, PASS_UNDEF);
@@ -1739,7 +1742,7 @@ void IR_SSA_MGR::construction(OptCtx & oc)
 
 //Note: Non-SSA DU Chains of read/write PR will be clean and
 //unusable after SSA construction.
-void IR_SSA_MGR::construction(DomTree & domtree)
+void PRSSAMgr::construction(DomTree & domtree)
 {
     ASSERT0(m_ru);
 
@@ -1778,13 +1781,13 @@ void IR_SSA_MGR::construction(DomTree & domtree)
 
     m_is_ssa_constructed = true;
 }
-//END IR_SSA_MGR
+//END PRSSAMgr
 
 
 bool verifySSAInfo(Region * ru)
 {
-    IR_SSA_MGR * ssamgr =
-        (IR_SSA_MGR*)(ru->getPassMgr()->queryPass(PASS_PR_SSA_MGR));
+    PRSSAMgr * ssamgr =
+        (PRSSAMgr*)(ru->getPassMgr()->queryPass(PASS_PR_SSA_MGR));
     if (ssamgr != NULL && ssamgr->isSSAConstructed()) {
         ASSERT0(ssamgr->verifySSAInfo());
         ASSERT0(ssamgr->verifyPhi(false));

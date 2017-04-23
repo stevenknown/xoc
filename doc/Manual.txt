@@ -179,7 +179,7 @@ Programming Guides
             by user or compiler and existed in the concrete. In contrast to
             effect MD, ALL_MEM memory object is ineffect.
 
-        ¡ð  Exact
+        ¡ð Exact
             This attribute represent abstract memory object with type is
             MD_EXACT. An exact MD is also effect.
 
@@ -208,23 +208,23 @@ Programming Guides
     Type                Description
     D_B                 1 boolean
     D_I8                8 bit signed integer
-    D_I16                16 bit signed integer
-    D_I32                32 bit signed integer
-    D_I64                64 bit signed integer
-    D_I128                128 bit signed integer
+    D_I16               16 bit signed integer
+    D_I32               32 bit signed integer
+    D_I64               64 bit signed integer
+    D_I128              128 bit signed integer
     D_U8                8 bit unsigned integer
-    D_U16                16 bit unsigned integer
-    D_U32                32 bit unsigned integer
-    D_U64                64 bit unsigned integer
-    D_U128                128 bit unsigned integer
-    D_F32                32 bit float point value
-    D_F64                64 bit float point value
-    D_F80                80 bit float point value
-    D_F128                128 bit float point value
+    D_U16               16 bit unsigned integer
+    D_U32               32 bit unsigned integer
+    D_U64               64 bit unsigned integer
+    D_U128              128 bit unsigned integer
+    D_F32               32 bit float point value
+    D_F64               64 bit float point value
+    D_F80               80 bit float point value
+    D_F128              128 bit float point value
     D_MC                Memory Chunk
-    D_STR                String
-    D_PTR                Pointer
-    D_VOID                Void type
+    D_STR               String
+    D_PTR               Pointer
+    D_VOID              Void type
 
     ¡ñ Pointer type
     The pointer type is used to describe memory locations. To define a pointer
@@ -686,14 +686,14 @@ Programming Guides
         and produce a single value.
         The result value may not have the same type as its operand.
         Unary operation include:
-            IR_LNOT compute the logical NOT, returns false if its UNA_opnd0
+            IR_LNOT compute the logical NOT, returns false if its UNA_opnd
                     can be converted to true; otherwise, returns true.
             IR_NEG  compute the negative value of IR_opnd0.
             IR_BNOT compute the bitwise NOT of IR_opnd0.
 
         Operands:
         * IR_dt     indicate the result type.
-        * UNA_opnd0 indicate the single operand.
+        * UNA_opnd indicate the single operand.
 
     ¡ñ IR_GOTO
         This operation represent unconditional branch that cause control
@@ -1068,9 +1068,9 @@ Programming Guides
             copy_referred_mds
             clean_use_mds
             clean_def_mds
-            get_may_def
-            get_must_use
-            get_may_use
+            getMayDef
+            getMustUse
+            getMayUse
             get_must_def
             get_effect_def_md
             get_exact_def_md
@@ -1142,8 +1142,8 @@ Programming Guides
         void main(int argc, char * argv[])
         {
             //Create region manager, since it is the top data structure of XOC.
-            xoc::RegionMgr rm;
-            rm.initVarMgr();
+            REGION_MGR rm;
+            rm.init_var_mgr();
 
             //Generate IR list, VAR and REGION accroding to user input.
             generate_ir_list(&rm);
@@ -1215,12 +1215,12 @@ Programming Guides
                 if (!OPTC_is_du_chain_valid(oc)) {
                     if (!OPTC_is_ref_valid(oc)) {
                         if (!OPTC_is_aa_valid(oc)) {
-                            m_ru->get_aa()->perform(oc);
+                            m_ru->getAA()->perform(oc);
                         }
-                        m_ru->get_du_mgr()->perform(oc, SOL_REF);
+                        m_ru->getDUMgr()->perform(oc, SOL_REF);
                     }
-                    IS_TRUE0(m_ru->get_du_mgr()->verify());
-                    m_ru->get_du_mgr()->compute_du_chain(oc);
+                    IS_TRUE0(m_ru->getDUMgr()->verify());
+                    m_ru->getDUMgr()->compute_du_chain(oc);
                 }
 
                 //Do nothing.
@@ -1241,11 +1241,11 @@ Programming Guides
         2. Generate a header file that includes all predefined macros for const
            values which compiler used, named nt_const_info.h
         3. Define a marco FOR_NT and add nt_const_info.h into
-           xoc/opt/targ_const_info.h, suck as:
+           xoc/opt/targ_const_info.h, such as:
              ...
              #elif defined(FOR_NT)
              #include "../nt/nt_const_info.h"
              ...
            Add -DFOR_NT into build system.
         4. Add compiler driver files ntdriver.cpp and ntdriver.h, and place
-           them at xoc/nt.
+           them under xoc/nt.
