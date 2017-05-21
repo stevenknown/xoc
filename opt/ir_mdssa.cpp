@@ -43,7 +43,6 @@ size_t MDSSAMgr::count_mem()
 {
     size_t count = 0;
     count += m_map_md2stack.count_mem();
-    count += m_map_bb2philist.count_mem();
     count += m_max_version.count_mem();
     count += m_usedef_mgr.count_mem();
     count += sizeof(MDSSAMgr);
@@ -51,8 +50,7 @@ size_t MDSSAMgr::count_mem()
 }
 
 
-//is_reinit: this function is invoked in reinit().
-void MDSSAMgr::destroy(bool is_reinit)
+void MDSSAMgr::destroy()
 {
     if (m_usedef_mgr.m_mdssainfo_pool == NULL) { return; }
     
@@ -63,10 +61,6 @@ void MDSSAMgr::destroy(bool is_reinit)
     //    "SSA before destroy"));
 
     cleanMD2Stack();
-    if (is_reinit) {
-        m_max_version.clean();
-        m_usedef_mgr.reinit();
-    }
     destroyMDSSAInfo();
     freePhiList();
 }
@@ -206,7 +200,7 @@ void MDSSAMgr::dump()
                     if (vopnd->getDef() != NULL) {
                         ASSERT0(vopnd->getDef()->getOcc() == ir);
                     }                    
-                    vopnd->dump(m_ru);
+                    vopnd->dump(m_ru, &m_usedef_mgr);
                 }                
             }
 
@@ -795,8 +789,8 @@ void MDSSAMgr::renameDef(IR * ir, IRBB * bb)
         MDDEF_bb(mddef) = bb;
         MDDEF_result(mddef) = newv;
         MDDEF_is_phi(mddef) = false;
-        if (nearestv != NULL) {
-            MDDEF_prev(mddef) = nearestv->getDef();
+        if (nearestv != NULL && nearestv->getDef() != NULL) {            
+            addDefChain(nearestv->getDef(), mddef);            
         }
         MDDEF_occ(mddef) = ir;
         
@@ -808,6 +802,30 @@ void MDSSAMgr::renameDef(IR * ir, IRBB * bb)
 
     set->bunion(added, *m_sbs_mgr);
     added.clean(*m_sbs_mgr);
+}
+
+
+void MDSSAMgr::cutoffDefChain(MDDef * def)
+{
+    MDDef * prev = def->getPrev();
+    if (prev != NULL) {
+        ASSERT0(prev->getNextSet() && prev->getNextSet()->find(def));
+        prev->getNextSet()->remove(def, *m_sbs_mgr);        
+    }
+    MDDEF_prev(def) = NULL;
+}
+
+
+//Add relation to def1->def2 where def1 dominated def2.
+void MDSSAMgr::addDefChain(MDDef * def1, MDDef * def2)
+{
+    ASSERT0(def1 && def2);
+    ASSERT(def2->getPrev() == NULL, ("should cutoff outdated def-relation"));
+    if (def1->getNextSet() == NULL) {
+        MDDEF_nextset(def1) = m_usedef_mgr.allocMDDefSet();
+    }
+    def1->getNextSet()->append(def2, *m_sbs_mgr);
+    MDDEF_prev(def2) = def1;
 }
 
 
@@ -833,7 +851,7 @@ void MDSSAMgr::renamePhiResult(IN IRBB * bb)
         mapMD2VMDStack(vopnd->mdid())->push(newv);
 
         MDDEF_result(phi) = newv;
-        MDDEF_prev(phi) = NULL;
+        cutoffDefChain(phi);       
         
         VMD_def(newv) = phi;
     }
@@ -1441,6 +1459,44 @@ bool MDSSAMgr::verify()
 }
 
 
+//Remove MD SSA use-def chain.
+//e.g: ir=...
+//    =ir //S1
+//If S1 will be deleted, ir should be removed from its useset in MDSSAInfo.
+void MDSSAMgr::removeMDSSAUseRecur(IR * ir)
+{
+    MDSSAInfo * ssainfo = getUseDefMgr()->readMDSSAInfo(ir);
+    ASSERT(ssainfo, ("ir does not have SSA info"));
+
+    if (ir->is_stmt()) {
+        ssainfo->removeUse(ir, getUseDefMgr());
+    } else {
+        ssainfo->removeUse(ir, getUseDefMgr());
+        SSAInfo * ssainfo = ir->getSSAInfo();
+        if (ssainfo != NULL) {
+            SSA_uses(ssainfo).remove(ir);
+        }
+    }
+
+    for (UINT i = 0; i < IR_MAX_KID_NUM(ir); i++) {
+        for (IR * x = ir->getKid(i); x != NULL; x = x->get_next()) {
+            if (x->is_pr()) {
+                SSAInfo * ssainfo = PR_ssainfo(x);
+                if (ssainfo != NULL) {
+                    SSA_uses(ssainfo).remove(x);
+                }
+            } else {
+                ASSERT0(!x->isReadPR());
+            }
+
+            if (!x->is_leaf()) {
+                removeMDSSAUseRecur(x);
+            }
+        }
+    }
+}
+
+
 //This function perform SSA destruction via scanning BB in sequential order.
 void MDSSAMgr::destruction()
 {
@@ -1466,14 +1522,23 @@ void MDSSAMgr::destroyMDSSAInfo()
 {
     for (INT i = 0; i <= m_ru->getIRVec()->get_last_idx(); i++) {
         IR * ir = m_ru->getIR(i);
-        if (ir == NULL || 
-            ir->getAI() == NULL ||
-            ir->getAI()->get(AI_MD_SSA) == NULL) { 
-            continue; 
-        }            
-        ((MDSSAInfo*)ir->getAI()->get(AI_MD_SSA))->destroy(*m_sbs_mgr);
-        IR_ai(ir)->clean(AI_MD_SSA);
+        if (ir == NULL) { continue; }
+        cleanMDSSAInfoOfIR(ir);
     }    
+}
+
+
+//NOTE: invoke this function before freeIR.
+void MDSSAMgr::cleanMDSSAInfoOfIR(IR * ir)
+{
+    ASSERT0(ir);
+    MDSSAInfo * info = NULL;
+    if (ir->getAI() == NULL ||
+        (info = (MDSSAInfo*)ir->getAI()->get(AI_MD_SSA)) == NULL) {
+        return;
+    }
+    info->destroy(*m_sbs_mgr);
+    IR_ai(ir)->clean(AI_MD_SSA);
 }
 
 
@@ -1561,10 +1626,23 @@ void MDSSAMgr::prunePhi(List<IRBB*> & wl)
 }
 
 
+//Reinitialize MD SSA manager.
+void MDSSAMgr::reinit()
+{
+    destroy();
+    m_max_version.clean();
+    m_usedef_mgr.reinit();
+    init();
+}
+
+
 void MDSSAMgr::construction(OptCtx & oc)
 {
-    reinit();
     m_ru->checkValidAndRecompute(&oc, PASS_DOM, PASS_UNDEF);
+
+    if (isMDSSAConstructed()) {
+        reinit();
+    }
 
     //Extract dominate tree of CFG.
     START_TIMERS("SSA: Extract Dom Tree", t4);
@@ -1586,9 +1664,7 @@ void MDSSAMgr::construction(DomTree & domtree)
     START_TIMERS("SSA: DF Manager", t1);
     DfMgr dfm;
     dfm.build((DGraph&)*m_cfg); //Build dominance frontier.
-    //m_cfg->dump_vcg();
-    //dfm.dump((DGraph&)*m_cfg);
-    //domtree.dump_vcg("zdomtree.vcg");
+    //m_cfg->dump_vcg(); dfm.dump((DGraph&)*m_cfg); domtree.dump_vcg("zdomtree.vcg");
     END_TIMERS(t1);
 
     List<IRBB*> wl;
@@ -1609,7 +1685,6 @@ void MDSSAMgr::construction(DomTree & domtree)
     
     dump();
     dumpDUChain();
-    //m_ru->getDUMgr()->dumpRef();
 
     ASSERT0(verify());
     ASSERT0(verifyIRandBB(m_ru->getBBList(), m_ru));

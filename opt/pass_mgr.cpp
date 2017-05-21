@@ -165,9 +165,15 @@ Pass * PassMgr::allocLoopCvt()
 }
 
 
-Pass * PassMgr::allocSSAMgr()
+Pass * PassMgr::allocPRSSAMgr()
 {
     return new PRSSAMgr(m_ru);
+}
+
+
+Pass * PassMgr::allocMDSSAMgr()
+{
+    return new MDSSAMgr(m_ru);
 }
 
 
@@ -296,7 +302,10 @@ Pass * PassMgr::registerPass(PASS_TYPE opty)
         pass = allocLoopCvt();
         break;
     case PASS_PR_SSA_MGR:
-        pass = allocSSAMgr();
+        pass = allocPRSSAMgr();
+        break;
+    case PASS_MD_SSA_MGR:
+        pass = allocMDSSAMgr();
         break;
     case PASS_CCP:
         pass = allocCCP();

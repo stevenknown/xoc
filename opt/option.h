@@ -123,23 +123,6 @@ public:
         OC_is_rpo_valid(*this) = false;
         OC_is_loopinfo_valid(*this) = false;
     }
-
-    inline bool is_all_intra_valid()
-    {
-        return OC_is_ref_valid(*this) &&
-               OC_is_du_chain_valid(*this) &&
-               OC_is_live_expr_valid(*this) &&
-               OC_is_reach_def_valid(*this) &&
-               OC_is_avail_reach_def_valid(*this) &&
-               OC_is_aa_valid(*this) &&
-               OC_is_expr_tab_valid(*this) &&
-               OC_is_dom_valid(*this) &&
-               OC_is_pdom_valid(*this) &&
-               OC_is_cfg_valid(*this) &&
-               OC_is_cdg_valid(*this) &&
-               OC_is_rpo_valid(*this) &&
-               OC_is_loopinfo_valid(*this);
-    }
 };
 
 //Declare the optimization.

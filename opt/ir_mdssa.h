@@ -50,10 +50,10 @@ protected:
     //Record version stack during renaming.
     UINT2VMDStack m_map_md2stack;
     
-    xcom::Vector<UINT> m_max_version; //record version number counter for pr.
+    //record version number counter for pr.
+    xcom::Vector<UINT> m_max_version; 
 
     UseDefMgr m_usedef_mgr;
-    BB2MDPhiList m_map_bb2philist; //map from IRBB id to MDPhiList.
 protected:
     void init()
     {
@@ -70,8 +70,11 @@ protected:
         m_sbs_mgr = NULL;
         m_cfg = NULL;
         m_is_ssa_constructed = false;
-    }
-    
+    }    
+
+    void addDefChain(MDDef * def1, MDDef * def2);
+
+    void cutoffDefChain(MDDef * def);
     void cleanMD2Stack();
     void collectDefinedMD(IN IRBB * bb, OUT DefSBitSet & mustdef_pr);
 
@@ -103,7 +106,7 @@ protected:
     void renameInDomTreeOrder(
             IRBB * root,
             Graph & dtree,
-            Vector<DefSBitSet*> & defed_prs_vec);
+            Vector<DefSBitSet*> & defed_prs_vec);    
 
     void stripPhi(MDPhi * phi);
     
@@ -143,7 +146,11 @@ public:
         m_md_sys = ru->getMDSystem();
     }
     COPY_CONSTRUCTOR(MDSSAMgr);
-    ~MDSSAMgr() { destroy(false); }
+    ~MDSSAMgr() 
+    { 
+        ASSERT(!isMDSSAConstructed(), ("should be destructed"));
+        destroy(); 
+    }
 
     void buildDUChain(IR * def, IR * use)
     {
@@ -172,8 +179,9 @@ public:
     void construction(OptCtx & oc);
     void construction(DomTree & domtree);
     size_t count_mem();
+    void cleanMDSSAInfoOfIR(IR * ir);
     
-    void destroy(bool is_reinit);
+    void destroy();
     void destruction(DomTree & domtree);
     void destruction();
     void dump();
@@ -185,6 +193,8 @@ public:
     //Find killing must-def for expression ir.
     MDDef * findKillingDef(IR const* ir);
     MDDef * findNearestDef(IR const* ir);
+
+    UseDefMgr * getUseDefMgr() { return &m_usedef_mgr; }
 
     void initVMD(IN IR * ir, OUT DefSBitSet & maydef_md);
     void insertPhi(UINT mdid, IN IRBB * bb);
@@ -201,15 +211,15 @@ public:
     //  of all opnd is the same.
     bool isRedundantPHI(MDPhi const* phi, OUT VMD ** common_def) const;
     
-    //Reinitialize SSA manager.
+    //Reinitialize MD SSA manager.
     //This function will clean all informations and recreate them.
-    inline void reinit()
-    {
-        if (isMDSSAConstructed()) {
-            destroy(true);
-        }
-        init();
-    }
+    void reinit();
+
+    //Remove MD SSA use-def chain.
+    //e.g: ir=...
+    //    =ir //S1
+    //If S1 will be deleted, ir should be removed from its useset in MDSSAInfo.
+    void removeMDSSAUseRecur(IR * ir);
 
     bool verifyPhi(bool is_vpinfo_avail);
     bool verifyVMD();

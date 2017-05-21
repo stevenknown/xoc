@@ -35,6 +35,7 @@ author: Su Zhenyu
 #include "prssainfo.h"
 #include "prdf.h"
 #include "ir_ssa.h"
+#include "ir_mdssa.h"
 #include "ir_cp.h"
 
 namespace xoc {
@@ -81,8 +82,10 @@ bool IR_CP::checkTypeConsistency(IR const* ir, IR const* cand_expr) const
 //        g = 10
 //
 //NOTE: Do NOT handle stmt.
-void IR_CP::replaceExpViaSSADu(IR * exp, IR const* cand_expr,
-                                    IN OUT CPCtx & ctx)
+void IR_CP::replaceExpViaSSADu(
+        IR * exp, 
+        IR const* cand_expr,
+        IN OUT CPCtx & ctx)
 {
     ASSERT0(exp && exp->is_exp() && cand_expr && cand_expr->is_exp());
     ASSERT0(exp->getExactRef());
@@ -152,8 +155,13 @@ void IR_CP::replaceExpViaSSADu(IR * exp, IR const* cand_expr,
 //exp_use_ssadu: true if exp used SSA du info.
 //
 //NOTE: Do NOT handle stmt.
-void IR_CP::replaceExp(IR * exp, IR const* cand_expr,
-                        IN OUT CPCtx & ctx, bool exp_use_ssadu)
+void IR_CP::replaceExp(
+        IR * exp, 
+        IR const* cand_expr,
+        IN OUT CPCtx & ctx, 
+        bool exp_use_ssadu,
+        bool exp_use_mdssadu,
+        MDSSAMgr * mdssamgr)
 {
     ASSERT0(exp && exp->is_exp() && cand_expr);
     ASSERT0(exp->getExactRef());
@@ -162,15 +170,17 @@ void IR_CP::replaceExp(IR * exp, IR const* cand_expr,
         return;
     }
 
-    IR * parent = IR_parent(exp);
-    if (parent->is_ild()) {
-        CPC_need_recomp_aa(ctx) = true;
-    } else if (parent->is_ist() && exp == IST_base(parent)) {
-        if (!cand_expr->is_ld() && !cand_expr->is_pr() && !cand_expr->is_lda()) {
-            return;
-        }
-        CPC_need_recomp_aa(ctx) = true;
-    }
+    //The memory that exp pointed is same to cand_expr because cand_expr
+    //has been garanteed that will not change in propagation interval.
+    //IR * parent = exp->getParent();
+    //if (parent->is_ild()) {
+    //    CPC_need_recomp_aa(ctx) = true;
+    //} else if (parent->is_ist() && exp == IST_base(parent)) {
+    //    if (!cand_expr->is_ld() && !cand_expr->is_pr() && !cand_expr->is_lda()) {
+    //        return;
+    //    }
+    //    CPC_need_recomp_aa(ctx) = true;
+    //}
 
     IR * newir = m_ru->dupIRTree(cand_expr);
     m_du->copyIRTreeDU(newir, cand_expr, true);
@@ -180,17 +190,24 @@ void IR_CP::replaceExp(IR * exp, IR const* cand_expr,
         //Remove exp SSA use.
         ASSERT0(exp->getSSAInfo());
         ASSERT0(exp->getSSAInfo()->get_uses().find(exp));
-
         exp->removeSSAUse();
+    } else if (exp_use_mdssadu) {
+        //Remove exp MD SSA use.
+        ASSERT0(mdssamgr);
+        MDSSAInfo * mdssainfo = mdssamgr->getUseDefMgr()->readMDSSAInfo(exp);
+        ASSERT0(mdssainfo);
+        mdssamgr->removeMDSSAUseRecur(exp);
     } else {
         m_du->removeUseOutFromDefset(exp);
     }
     CPC_change(ctx) = true;
 
     ASSERT0(exp->get_stmt());
-    bool doit = parent->replaceKid(exp, newir, false);
+    bool doit = exp->getParent()->replaceKid(exp, newir, false);
     ASSERT0(doit);
     UNUSED(doit);
+
+    mdssamgr->cleanMDSSAInfoOfIR(exp);
     m_ru->freeIRTree(exp);
 }
 
@@ -299,7 +316,7 @@ bool IR_CP::isSimpCVT(IR const* ir) const
 //Get the value expression that to be propagated.
 inline static IR * get_propagated_value(IR * stmt)
 {
-    switch (IR_code(stmt)) {
+    switch (stmt->get_code()) {
     case IR_ST: return ST_rhs(stmt);
     case IR_STPR: return STPR_rhs(stmt);
     case IR_IST: return IST_rhs(stmt);
@@ -312,61 +329,62 @@ inline static IR * get_propagated_value(IR * stmt)
 
 
 //'usevec': for local used.
-bool IR_CP::doProp(IN IRBB * bb, Vector<IR*> & usevec)
+bool IR_CP::doProp(
+        IN IRBB * bb, 
+        IN DefSBitSetCore & useset,
+        MDSSAMgr * mdssamgr)
 {
     bool change = false;
     C<IR*> * cur_iter, * next_iter;
 
     for (BB_irlist(bb).get_head(&cur_iter),
          next_iter = cur_iter; cur_iter != NULL; cur_iter = next_iter) {
-
         IR * def_stmt = cur_iter->val();
 
         BB_irlist(bb).get_next(&next_iter);
 
         if (!is_copy(def_stmt)) { continue; }
 
-        DUSet const* useset = NULL;
-        UINT num_of_use = 0;
         SSAInfo * ssainfo = NULL;
+        MDSSAInfo * mdssainfo = mdssamgr->getUseDefMgr()->
+            readMDSSAInfo(def_stmt);
         bool ssadu = false;
+        bool mdssadu = false;
+        useset.clean(*m_ru->getMiscBitSetMgr());
         if ((ssainfo = def_stmt->getSSAInfo()) != NULL &&
             SSA_uses(ssainfo).get_elem_count() != 0) {
             //Record use_stmt in another vector to facilitate this function
             //if it is not in use-list any more after copy-propagation.
             SEGIter * sc;
-            for    (INT u = SSA_uses(ssainfo).get_first(&sc);
+            for (INT u = SSA_uses(ssainfo).get_first(&sc);
                  u >= 0; u = SSA_uses(ssainfo).get_next(u, &sc)) {
                 IR * use = m_ru->getIR(u);
                 ASSERT0(use);
-                usevec.set(num_of_use, use);
-                num_of_use++;
+                useset.bunion(use->id(), *m_ru->getMiscBitSetMgr());
             }
             ssadu = true;
-        } else if (def_stmt->getExactRef() == NULL &&
-                   !def_stmt->is_void()) {
-            //Allowing copy propagate exact or VOID value.
-            continue;
-        } else if ((useset = def_stmt->readDUSet()) != NULL &&
-                   useset->get_elem_count() != 0) {
-            //Record use_stmt in another vector to facilitate this function
-            //if it is not in use-list any more after copy-propagation.
-            DUIter di = NULL;
-            for (INT u = useset->get_first(&di);
-                 u >= 0; u = useset->get_next(u, &di)) {
-                IR * use = m_ru->getIR(u);
-                usevec.set(num_of_use, use);
-                num_of_use++;
+        } else if (mdssainfo != NULL && 
+                   mdssainfo->readVOpndSet() != NULL &&
+                   !mdssainfo->readVOpndSet()->is_empty()) {
+            if (def_stmt->is_ist() &&
+                def_stmt->getRefMD() == NULL &&
+                !def_stmt->getRefMD()->is_exact()) {
+                continue;
             }
+            mdssainfo->collectUse(useset, mdssamgr->getUseDefMgr(), 
+                m_ru->getMiscBitSetMgr());
+            mdssadu = true;
         } else  {
             continue;
         }
 
         IR const* prop_value = get_propagated_value(def_stmt);
 
-        for (UINT i = 0; i < num_of_use; i++) {
-            IR * use = usevec.get(i);
-            ASSERT0(use->is_exp());
+        SEGIter * segiter;
+        for (INT i = useset.get_first(&segiter);
+             i != -1; i = useset.get_next(i, &segiter)) {
+            IR * use = m_ru->getIR(i);
+            ASSERT0(use && use->is_exp());
             IR * use_stmt = use->get_stmt();
             ASSERT0(use_stmt->is_stmt());
 
@@ -398,7 +416,7 @@ bool IR_CP::doProp(IN IRBB * bb, Vector<IR*> & usevec)
                 continue;
             }
 
-            if (!ssadu && !m_du->isExactAndUniqueDef(def_stmt, use)) {
+            if (!ssadu && !mdssadu && !m_du->isExactAndUniqueDef(def_stmt, use)) {
                 //Only single definition is allowed.
                 //e.g:
                 //    g = 20; //S3
@@ -418,10 +436,10 @@ bool IR_CP::doProp(IN IRBB * bb, Vector<IR*> & usevec)
             CPCtx lchange;
             IR * old_use_stmt = use_stmt;
 
-            replaceExp(use, prop_value, lchange, ssadu);
+            replaceExp(use, prop_value, lchange, ssadu, mdssadu, mdssamgr);
 
             ASSERT(use_stmt && use_stmt->is_stmt(),
-                    ("ensure use_stmt still legal"));
+                ("ensure use_stmt still legal"));
             change |= CPC_change(lchange);
 
             if (!CPC_change(lchange)) { continue; }
@@ -469,18 +487,18 @@ bool IR_CP::perform(OptCtx & oc)
     START_TIMER_AFTER();
     ASSERT0(OC_is_cfg_valid(oc));
 
-    if (m_prop_kind == CP_PROP_CONST) {
+    m_ru->checkValidAndRecompute(&oc, PASS_DOM, PASS_DU_REF, PASS_UNDEF);
 
-        m_ru->checkValidAndRecompute(&oc, PASS_DOM, PASS_DU_REF,
-            PASS_DU_CHAIN, PASS_UNDEF);
-    } else {
-        m_ru->checkValidAndRecompute(&oc, PASS_DOM, PASS_DU_REF,
-            PASS_LIVE_EXPR, PASS_DU_CHAIN, PASS_UNDEF);
+    PRSSAMgr * prssamgr = (PRSSAMgr*)m_ru->getPassMgr()->
+        registerPass(PASS_PR_SSA_MGR);
+    if (!prssamgr->isSSAConstructed()) {
+        prssamgr->construction(oc);
     }
 
-    if (!OC_is_du_chain_valid(oc)) {
-        END_TIMER_AFTER(getPassName());
-        return false;
+    MDSSAMgr * mdssamgr = (MDSSAMgr*)m_ru->getPassMgr()->
+        registerPass(PASS_MD_SSA_MGR);
+    if (!mdssamgr->isMDSSAConstructed()) {
+        mdssamgr->construction(oc);
     }
 
     bool change = false;
@@ -491,15 +509,18 @@ bool IR_CP::perform(OptCtx & oc)
     List<Vertex*> lst;
     Vertex * root = domtree.get_vertex(BB_id(entry));
     m_cfg->sortDomTreeInPreorder(root, lst);
-    Vector<IR*> usevec;
+    DefSBitSetCore useset;
 
     for (Vertex * v = lst.get_head(); v != NULL; v = lst.get_next()) {
         IRBB * bb = m_cfg->getBB(VERTEX_id(v));
         ASSERT0(bb);
-        change |= doProp(bb, usevec);
+        change |= doProp(bb, useset, mdssamgr);
     }
 
+    useset.clean(*m_ru->getMiscBitSetMgr());
+
     if (change) {
+        m_cfg->dump_vcg();
         doFinalRefine();
         OC_is_expr_tab_valid(oc) = false;
         OC_is_aa_valid(oc) = false;
@@ -508,6 +529,7 @@ bool IR_CP::perform(OptCtx & oc)
         ASSERT0(m_ru->verifyMDRef() && 
             m_du->verifyMDDUChain(COMPUTE_PR_DU | COMPUTE_NOPR_DU));
         ASSERT0(verifySSAInfo(m_ru));
+        ASSERT0(mdssamgr->verify());
     }
 
     END_TIMER_AFTER(getPassName());

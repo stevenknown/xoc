@@ -98,7 +98,8 @@ public:
     virtual Pass * allocRCE();
     virtual Pass * allocGVN();
     virtual Pass * allocLoopCvt();
-    virtual Pass * allocSSAMgr();
+    virtual Pass * allocPRSSAMgr();
+    virtual Pass * allocMDSSAMgr();
     virtual Pass * allocCCP();
     virtual Pass * allocExprTab();
     virtual Pass * allocCfsMgr();

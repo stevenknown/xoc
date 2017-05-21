@@ -3791,7 +3791,7 @@ public:
 
     void init()
     {
-        ASSERT0(m_pool == NULL);
+        if (m_pool != NULL) { return; }
         m_pool = smpoolCreate(sizeof(RBTNType) * 4, MEM_CONST_SIZE);
         m_root = NULL;
         m_num_of_tn = 0;

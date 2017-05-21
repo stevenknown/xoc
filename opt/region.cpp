@@ -3169,7 +3169,7 @@ void Region::checkValidAndRecompute(OptCtx * oc, ...)
         opty = (PASS_TYPE)va_arg(ptr, UINT);
     }
     va_end(ptr);
-    ASSERT(num < 1000, ("miss ending placeholder"));
+    ASSERT(num < 1000, ("too many pass queried or miss ending placeholder"));
 
     if (num == 0) { return; }
 
@@ -3523,6 +3523,7 @@ bool Region::process(OptCtx * oc)
     }
 
     PRSSAMgr * ssamgr = NULL;
+    MDSSAMgr * mdssamgr = NULL;
 
     if (getIRList() != NULL) {
         if (!processIRList(*oc)) { goto ERR_RET; }
@@ -3547,6 +3548,11 @@ bool Region::process(OptCtx * oc)
     ssamgr = (PRSSAMgr*)getPassMgr()->queryPass(PASS_PR_SSA_MGR);
     if (ssamgr != NULL && ssamgr->isSSAConstructed()) {
         ssamgr->destruction();
+    }
+
+    mdssamgr = (MDSSAMgr*)getPassMgr()->queryPass(PASS_MD_SSA_MGR);
+    if (mdssamgr != NULL && mdssamgr->isMDSSAConstructed()) {
+        mdssamgr->destruction();
     }
 
     if (!g_retain_pass_mgr_for_region) {

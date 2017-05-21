@@ -83,7 +83,7 @@ protected:
     inline bool checkTypeConsistency(
             IR const* ir,
             IR const* cand_expr) const;
-    bool doProp(IN IRBB * bb, Vector<IR*> & usevec);
+    bool doProp(IN IRBB * bb, IN DefSBitSetCore & useset, MDSSAMgr * mdssamgr);
     void doFinalRefine();
 
     bool isSimpCVT(IR const* ir) const;
@@ -97,7 +97,9 @@ protected:
             IR * exp,
             IR const* cand_expr,
             IN OUT CPCtx & ctx,
-            bool exp_use_ssadu);
+            bool exp_use_ssadu,
+            bool exp_use_mdssadu,
+            MDSSAMgr * mdssamgr);
     void replaceExpViaSSADu(
             IR * exp,
             IR const* cand_expr,

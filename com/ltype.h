@@ -79,7 +79,7 @@ author: Su Zhenyu
 #include "string.h"
 #include "memory.h"
 
-//These types may be defined, but we need to override them.
+//Primitive types may have been defined, override them.
 #undef STATUS
 #undef BYTE
 #undef CHAR

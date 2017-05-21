@@ -1423,7 +1423,7 @@ IR * Region::refineIR(IR * ir, bool & change, RefineCtx & rc)
      case IR_ST:
     case IR_STPR:
         ir = refineStore(ir, tmpc, rc);
-         break;
+        break;
     case IR_IST:
         ir = refineIstore(ir, tmpc, rc);
         break;

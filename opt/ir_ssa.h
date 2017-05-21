@@ -189,7 +189,11 @@ public:
         ASSERT(m_cfg, ("cfg is not available."));
     }
     COPY_CONSTRUCTOR(PRSSAMgr);
-    ~PRSSAMgr() { destroy(false); }
+    ~PRSSAMgr() 
+    { 
+        ASSERT(!isSSAConstructed(), ("should be destructed"));
+        destroy(false); 
+    }
 
     void buildDUChain(IR * def, IR * use)
     {
