@@ -49,7 +49,7 @@
       <WarningLevel>Level3</WarningLevel>
       <Optimization>Disabled</Optimization>
       <PreprocessorDefinitions>WIN32;_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
-      <AdditionalOptions>/D "_CRT_SECURE_NO_WARNINGS" /D "_VC2010_" -D "FOR_DEX" /D "_DEBUG_" -I ../../../com -I ../../../xoc -I ../../../win %(AdditionalOptions)</AdditionalOptions>
+      <AdditionalOptions>/D "_CRT_SECURE_NO_WARNINGS" /D "_VC2010_" -D "FOR_DEX" /D "_DEBUG_" /D "_ON_WINDOWS_" %(AdditionalOptions)</AdditionalOptions>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -83,47 +83,51 @@
     <ClCompile Include="..\..\..\com\rational.cpp" />
     <ClCompile Include="..\..\..\com\sgraph.cpp" />
     <ClCompile Include="..\..\..\com\smempool.cpp" />
-    <ClCompile Include="..\..\..\xoc\callg.cpp" />
-    <ClCompile Include="..\..\..\xoc\cdg.cpp" />
-    <ClCompile Include="..\..\..\xoc\cfs_mgr.cpp" />
-    <ClCompile Include="..\..\..\xoc\cfs_opt.cpp" />
-    <ClCompile Include="..\..\..\xoc\data_type.cpp" />
-    <ClCompile Include="..\..\..\xoc\dbg.cpp" />
-    <ClCompile Include="..\..\..\xoc\goto_opt.cpp" />
-    <ClCompile Include="..\..\..\xoc\if_opt.cpp" />
-    <ClCompile Include="..\..\..\xoc\inliner.cpp" />
-    <ClCompile Include="..\..\..\xoc\ipa.cpp" />
-    <ClCompile Include="..\..\..\xoc\ir.cpp" />
-    <ClCompile Include="..\..\..\xoc\ir_aa.cpp" />
-    <ClCompile Include="..\..\..\xoc\ir_bb.cpp" />
-    <ClCompile Include="..\..\..\xoc\ir_ccp.cpp" />
-    <ClCompile Include="..\..\..\xoc\ir_cfg.cpp" />
-    <ClCompile Include="..\..\..\xoc\ir_cp.cpp" />
-    <ClCompile Include="..\..\..\xoc\ir_dce.cpp" />
-    <ClCompile Include="..\..\..\xoc\ir_dse.cpp" />
-    <ClCompile Include="..\..\..\xoc\ir_du.cpp" />
-    <ClCompile Include="..\..\..\xoc\ir_expr_tab.cpp" />
-    <ClCompile Include="..\..\..\xoc\ir_gcse.cpp" />
-    <ClCompile Include="..\..\..\xoc\ir_gvn.cpp" />
-    <ClCompile Include="..\..\..\xoc\ir_high_opt.cpp" />
-    <ClCompile Include="..\..\..\xoc\ir_ivr.cpp" />
-    <ClCompile Include="..\..\..\xoc\ir_lcse.cpp" />
-    <ClCompile Include="..\..\..\xoc\ir_licm.cpp" />
-    <ClCompile Include="..\..\..\xoc\ir_middle_opt.cpp" />
-    <ClCompile Include="..\..\..\xoc\ir_rce.cpp" />
-    <ClCompile Include="..\..\..\xoc\ir_refine.cpp" />
-    <ClCompile Include="..\..\..\xoc\ir_rp.cpp" />
-    <ClCompile Include="..\..\..\xoc\ir_simp.cpp" />
-    <ClCompile Include="..\..\..\xoc\ir_ssa.cpp" />
-    <ClCompile Include="..\..\..\xoc\ir_vrp.cpp" />
-    <ClCompile Include="..\..\..\xoc\label.cpp" />
-    <ClCompile Include="..\..\..\xoc\md.cpp" />
-    <ClCompile Include="..\..\..\xoc\option.cpp" />
-    <ClCompile Include="..\..\..\xoc\pass_mgr.cpp" />
-    <ClCompile Include="..\..\..\xoc\prdf.cpp" />
-    <ClCompile Include="..\..\..\xoc\region.cpp" />
-    <ClCompile Include="..\..\..\xoc\util.cpp" />
-    <ClCompile Include="..\..\..\xoc\var.cpp" />
+    <ClCompile Include="..\..\..\com\strbuf.cpp" />
+    <ClCompile Include="..\..\..\opt\callg.cpp" />
+    <ClCompile Include="..\..\..\opt\cdg.cpp" />
+    <ClCompile Include="..\..\..\opt\cfs_mgr.cpp" />
+    <ClCompile Include="..\..\..\opt\cfs_opt.cpp" />
+    <ClCompile Include="..\..\..\opt\data_type.cpp" />
+    <ClCompile Include="..\..\..\opt\du.cpp" />
+    <ClCompile Include="..\..\..\opt\dbg.cpp" />
+    <ClCompile Include="..\..\..\opt\goto_opt.cpp" />
+    <ClCompile Include="..\..\..\opt\if_opt.cpp" />
+    <ClCompile Include="..\..\..\opt\inliner.cpp" />
+    <ClCompile Include="..\..\..\opt\ipa.cpp" />
+    <ClCompile Include="..\..\..\opt\ir.cpp" />
+    <ClCompile Include="..\..\..\opt\ir_aa.cpp" />
+    <ClCompile Include="..\..\..\opt\ir_bb.cpp" />
+    <ClCompile Include="..\..\..\opt\ir_cfg.cpp" />
+    <ClCompile Include="..\..\..\opt\ir_cp.cpp" />
+    <ClCompile Include="..\..\..\opt\ir_dce.cpp" />
+    <ClCompile Include="..\..\..\opt\ir_du.cpp" />
+    <ClCompile Include="..\..\..\opt\ir_expr_tab.cpp" />
+    <ClCompile Include="..\..\..\opt\ir_gcse.cpp" />
+    <ClCompile Include="..\..\..\opt\ir_gvn.cpp" />
+    <ClCompile Include="..\..\..\opt\ir_high_opt.cpp" />
+    <ClCompile Include="..\..\..\opt\ir_ivr.cpp" />
+    <ClCompile Include="..\..\..\opt\ir_lcse.cpp" />
+    <ClCompile Include="..\..\..\opt\ir_licm.cpp" />
+    <ClCompile Include="..\..\..\opt\ir_loop_cvt.cpp" />
+    <ClCompile Include="..\..\..\opt\ir_middle_opt.cpp" />
+    <ClCompile Include="..\..\..\opt\ir_rce.cpp" />
+    <ClCompile Include="..\..\..\opt\ir_refine.cpp" />
+    <ClCompile Include="..\..\..\opt\ir_rp.cpp" />
+    <ClCompile Include="..\..\..\opt\ir_simp.cpp" />
+    <ClCompile Include="..\..\..\opt\ir_ssa.cpp" />
+    <ClCompile Include="..\..\..\opt\ir_mdssa.cpp" />
+    <ClCompile Include="..\..\..\opt\mdssainfo.cpp" />
+    <ClCompile Include="..\..\..\opt\md.cpp" />
+    <ClCompile Include="..\..\..\opt\label.cpp" />
+    <ClCompile Include="..\..\..\opt\loop.cpp" />
+    <ClCompile Include="..\..\..\opt\option.cpp" />
+    <ClCompile Include="..\..\..\opt\pass_mgr.cpp" />
+    <ClCompile Include="..\..\..\opt\prdf.cpp" />
+    <ClCompile Include="..\..\..\opt\region.cpp" />
+    <ClCompile Include="..\..\..\opt\region_mgr.cpp" />
+    <ClCompile Include="..\..\..\opt\util.cpp" />
+    <ClCompile Include="..\..\..\opt\var.cpp" />
     <ClCompile Include="..\ex1.cpp" />
   </ItemGroup>
   <ItemGroup>
@@ -151,11 +155,9 @@
     <ClInclude Include="..\..\..\xoc\ir.h" />
     <ClInclude Include="..\..\..\xoc\ir_aa.h" />
     <ClInclude Include="..\..\..\xoc\ir_bb.h" />
-    <ClInclude Include="..\..\..\xoc\ir_ccp.h" />
     <ClInclude Include="..\..\..\xoc\ir_cfg.h" />
     <ClInclude Include="..\..\..\xoc\ir_cp.h" />
     <ClInclude Include="..\..\..\xoc\ir_dce.h" />
-    <ClInclude Include="..\..\..\xoc\ir_dse.h" />
     <ClInclude Include="..\..\..\xoc\ir_du.h" />
     <ClInclude Include="..\..\..\xoc\ir_expr_tab.h" />
     <ClInclude Include="..\..\..\xoc\ir_gcse.h" />
@@ -171,7 +173,6 @@
     <ClInclude Include="..\..\..\xoc\ir_rp.h" />
     <ClInclude Include="..\..\..\xoc\ir_simp.h" />
     <ClInclude Include="..\..\..\xoc\ir_ssa.h" />
-    <ClInclude Include="..\..\..\xoc\ir_vrp.h" />
     <ClInclude Include="..\..\..\xoc\label.h" />
     <ClInclude Include="..\..\..\xoc\md.h" />
     <ClInclude Include="..\..\..\xoc\option.h" />

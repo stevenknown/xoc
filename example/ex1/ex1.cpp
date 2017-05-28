@@ -39,12 +39,12 @@ static void generate_region(RegionMgr * rm)
     //Generate region for whole program.
     Region * topru = rm->newRegion(RU_PROGRAM);
     rm->addToRegionTab(topru);
-    topru->set_ru_var(rm->getVarMgr()->registerVar(
+    topru->setRegionVar(rm->getVarMgr()->registerVar(
         ".program", rm->getTypeMgr()->getMCType(0), 0, VAR_GLOBAL|VAR_FAKE));
 
     //Generate region for function.
     Region * func_ru = rm->allocRegion(RU_FUNC);
-    func_ru->set_ru_var(rm->getVarMgr()->registerVar(
+    func_ru->setRegionVar(rm->getVarMgr()->registerVar(
         ".function", rm->getTypeMgr()->getMCType(0), 0, VAR_GLOBAL|VAR_FAKE));
 
     IR * ir = topru->buildRegion(func_ru);
@@ -55,28 +55,68 @@ static void generate_region(RegionMgr * rm)
     //e.g:
     //  i32 g;
     //  i32 q;
-    //  q = g; 
+    //  q = g;
+    //  if (q >= 20) {
+    //      g = g + 1;
+    //  } else {
+    //      g = g - 1;
+    //      q = 30;
+    //  }
     //  return g:u32;
-    IR * ld = func_ru->buildLoad( //Load value with I32 type.
-        rm->getVarMgr()->registerVar("g",
-            rm->getTypeMgr()->getI32(),0,VAR_GLOBAL),
-        rm->getTypeMgr()->getI32());
+    VAR * g = rm->getVarMgr()->registerVar("g",
+        rm->getTypeMgr()->getI32(),0,VAR_GLOBAL);
+    VAR * q = rm->getVarMgr()->registerVar("q",
+            rm->getTypeMgr()->getI32(),0,VAR_GLOBAL);
+    Type const* i32ty = rm->getTypeMgr()->getI32();
+    Type const* u32ty = rm->getTypeMgr()->getU32();
 
-    IR * st = func_ru->buildStore(
-        rm->getVarMgr()->registerVar("q",
-            rm->getTypeMgr()->getI32(),0,VAR_GLOBAL),
-        ld);
+    //Load g with i32 type
+    IR * ld_exp = func_ru->buildLoad(g, i32ty);
+        
+    //Store q with i32 type
+    IR * st_stmt = func_ru->buildStore(q, ld_exp);
 
-    func_ru->addToIRList(st);
+    //Record IR stmt in an IR-list of region
+    func_ru->addToIRList(st_stmt);
 
-    IR * ret = REGION_ru(ir)->buildReturn(
-        func_ru->buildLoad(LD_idinfo(ld), 
-            rm->getTypeMgr()->getU32())); //Return value with U32 type.
+    //Build g = g + 1
+    IR * true_stmt = func_ru->buildStore(g,
+        func_ru->buildBinaryOp(IR_ADD,
+            i32ty,
+            func_ru->buildLoad(g),
+            func_ru->buildImmInt(1, i32ty)));
 
-    func_ru->addToIRList(ret);
+    //Build g = g - 1
+    IR * false_stmt = func_ru->buildStore(g,
+        func_ru->buildBinaryOp(IR_SUB, 
+            i32ty,
+            func_ru->buildLoad(g),
+            func_ru->buildImmInt(1, i32ty)));
 
-    //Dump All regions to tmp.log
-    rm->dump(true);
+    //Build q = 30
+    IR * false_stmt_2 = func_ru->buildStore(q,
+        func_ru->buildImmInt(30, i32ty));
+
+    //Chain false_stmt and false_stmt_2 into a list.    
+    add_next(&false_stmt, false_stmt_2);
+
+    //Build q >= 20
+    IR * det_exp = func_ru->buildCmp(IR_GE, 
+        func_ru->buildLoad(q),
+        func_ru->buildImmInt(20, i32ty));
+
+    //Build IF stmt
+    IR * ifstmt = func_ru->buildIf(det_exp, true_stmt, false_stmt);
+
+    //Record IR stmt in an IR-list of region
+    func_ru->addToIRList(ifstmt);
+        
+    //Build return stmt
+    //Note the type of current g becomes u32
+    IR * ret = REGION_ru(ir)->buildReturn(func_ru->buildLoad(g, u32ty));           
+
+    //Record IR stmt in an IR-list of region
+    func_ru->addToIRList(ret);   
 }
 
 
@@ -92,6 +132,9 @@ int main(int argc, char * argv[])
 
     //Generate region.
     generate_region(rm);
+
+    //Dump All regions to tmp.log
+    rm->dump(true);
 
     printf("\nProcess region");
 
