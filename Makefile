@@ -58,16 +58,17 @@ opt/loop.o\
 opt/ir_loop_cvt.o\
 opt/prdf.o
 
-
 CFLAGS = -DFOR_DEX -D_DEBUG_ -O0 -g2 -Wno-write-strings -Wsign-promo \
         -Wsign-compare -Wpointer-arith -Wno-multichar -Winit-self -Wswitch
-ifneq (,$(filter $(CC),g++ gcc))
-	CFLAGS += -Wstrict-aliasing=3 -finline-limit=10000000
-endif
 
 CC := $(shell which clang++ > /dev/null)
+
 ifndef CC
 CC = $(if $(shell which clang), clang, gcc)
+endif
+
+ifneq (,$(filter $(CC),g++ gcc))
+	CFLAGS += -Wstrict-aliasing=3 -finline-limit=10000000
 endif
 
 all: com_objs opt_objs

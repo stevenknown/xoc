@@ -172,7 +172,7 @@ Region * RegionMgr::newRegion(REGION_TYPE rt)
 void RegionMgr::addToRegionTab(Region * ru)
 {
     ASSERT(REGION_id(ru) > 0, ("should generate new region via newRegion()"));
-    ASSERT0(get_region(REGION_id(ru)) == NULL);
+    ASSERT0(getRegion(REGION_id(ru)) == NULL);
     ASSERT0(REGION_id(ru) < m_ru_count);
     m_id2ru.set(REGION_id(ru), ru);
 }
@@ -274,7 +274,7 @@ void RegionMgr::dumpRelationGraph(CHAR const* name)
     UNLINK(name);
     xcom::Graph g;
     for (UINT id = 0; id < getNumOfRegion(); id++) {
-        Region * ru = get_region(id);
+        Region * ru = getRegion(id);
         if (ru == NULL || ru->getParent() == NULL) { continue; }
         g.addEdge(ru->getParent()->id(), ru->id());
     }
@@ -290,7 +290,7 @@ void RegionMgr::dump(bool dump_inner_region)
     g_indent = 0;
     note("\n==---- DUMP ALL Registered Region ----==");
     for (UINT id = 0; id < getNumOfRegion(); id++) {
-        Region * ru = get_region(id);
+        Region * ru = getRegion(id);
         if (ru == NULL) { continue; }
         ru->dump(dump_inner_region);
     }
@@ -304,7 +304,7 @@ void RegionMgr::deleteRegion(Region * ru, bool collect_id)
 {
     ASSERT0(ru);
     UINT id = REGION_id(ru);
-    ASSERT(get_region(id), ("not registered region"));
+    ASSERT(getRegion(id), ("not registered region"));
     delete ru;
 
     if (collect_id && id != 0) {
@@ -326,7 +326,7 @@ void RegionMgr::estimateEV(
         bool scan_inner_region)
 {
     for (UINT i = 0; i < getNumOfRegion(); i++) {
-        Region * ru = get_region(i);
+        Region * ru = getRegion(i);
         if (ru == NULL) { continue; }
 
         num_ru++;

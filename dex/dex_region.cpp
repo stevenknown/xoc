@@ -81,7 +81,7 @@ bool DexRegion::HighProcess(OptCtx & oc)
     SIMP_break(&simp) = true;
     SIMP_continue(&simp) = true;
 
-    set_ir_list(simplifyStmtList(getIRList(), &simp));
+    setIRList(simplifyStmtList(getIRList(), &simp));
 
     ASSERT0(verify_simp(getIRList(), simp));
     ASSERT0(verify_irs(getIRList(), NULL, this));
@@ -91,7 +91,7 @@ bool DexRegion::HighProcess(OptCtx & oc)
     ASSERT0(verifyIRandBB(getBBList(), this));
 
     //All IRs have been moved to each IRBB.
-    set_ir_list(NULL);
+    setIRList(NULL);
 
     HighProcessImpl(oc);
     return true;
@@ -179,7 +179,7 @@ void DexRegion::processSimply()
     ASSERT0(verifyIRandBB(getBBList(), this));
 
     //All IRs have been moved to each IRBB.
-    set_ir_list(NULL);
+    setIRList(NULL);
 
     PassMgr * passmgr = initPassMgr();
     ASSERT0(passmgr);

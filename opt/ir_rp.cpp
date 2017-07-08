@@ -838,7 +838,7 @@ void IR_RP::clobberAccessInList(
                     need_to_be_removed2.set(cnt, acc);
                     cnt++;
                 }
-            } else if (acc_mds != NULL && acc_mds->is_overlap(mustdef)) {
+            } else if (acc_mds != NULL && acc_mds->is_overlap(mustdef, m_ru)) {
                 //ir is not suite to promot any more, all mds which
                 //overlapped with it are also not promotable.
                 need_to_be_removed2.set(cnt, acc);
@@ -850,7 +850,7 @@ void IR_RP::clobberAccessInList(
              acc != NULL; acc = inexact_access.get_next(iter2)) {
             MD const* acc_md = acc->getRefMD();
             MDSet const* acc_mds = acc->getRefMDSet();
-            if ((acc_md != NULL && maydef->is_overlap(acc_md)) ||
+            if ((acc_md != NULL && maydef->is_overlap(acc_md, m_ru)) ||
                 (acc_mds != NULL &&
                  (acc_mds == maydef || maydef->is_intersect(*acc_mds)))) {
                 //ir is not suite to promot any more, all mds which

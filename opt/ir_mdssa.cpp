@@ -1605,7 +1605,7 @@ void MDSSAMgr::prunePhiForBB(List<IRBB*> & wl, IRBB * bb)
 //wl: work list for temporary used.
 void MDSSAMgr::prunePhi(List<IRBB*> & wl)
 {
-    START_TIMERS("MDSSA: Refine phi", t);
+    START_TIMERS("MDSSA: Prune phi", t);
 
     BBList * bblst = m_ru->getBBList();
     C<IRBB*> * ct;
@@ -1683,8 +1683,8 @@ void MDSSAMgr::construction(DomTree & domtree)
     //Clean version stack after renaming.
     cleanMD2Stack();    
     
-    dump();
-    dumpDUChain();
+    //dump();
+    //dumpDUChain();
 
     ASSERT0(verify());
     ASSERT0(verifyIRandBB(m_ru->getBBList(), m_ru));

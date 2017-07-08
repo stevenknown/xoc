@@ -45,7 +45,7 @@ namespace xcom {
 
 void StrBuf::strcat(UINT l, CHAR const* format, va_list args)
 {
-    UINT sl = ::strlen(buf);
+    size_t sl = ::strlen(buf);
     if (buflen - sl <= l) {
         CHAR * oldbuf = buf;
         buflen += l + 1;

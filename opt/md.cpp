@@ -255,6 +255,50 @@ bool MDSet::is_contain_inexact(MDSystem * ms) const
 }
 
 
+//Return true if md is overlap with the elements in set.
+bool MDSet::is_overlap(MD const* md, Region * current_ru) const
+{
+    ASSERT0(current_ru);
+    
+    if (DefSBitSetCore::is_contain(MD_GLOBAL_MEM) && md->is_global()) {
+        return true;
+    }
+    if ((DefSBitSetCore::is_contain(MD_FULL_MEM)) ||
+        (MD_id(md) == MD_FULL_MEM && !DefSBitSetCore::is_empty())) {
+        return true;
+    }        
+    if (!current_ru->isRegionVAR(md->get_base()) &&
+        DefSBitSetCore::is_contain(MD_IMPORT_VAR)) {
+        return true;
+    }
+    return DefSBitSetCore::is_contain(MD_id(md));
+}
+
+
+//Return true if md is overlapped with element in current MDSet.
+//Note this function will iterate elements in set which is costly.
+//Use it carefully.
+bool MDSet::is_overlap_ex(
+        MD const* md, 
+        Region * current_ru, 
+        MDSystem const* mdsys) const
+{
+    ASSERT0(md && mdsys);
+
+    if (MDSet::is_overlap(md, current_ru)) { return true; }
+
+    SEGIter * iter;
+    for (INT i = get_first(&iter);
+         i >= 0; i = get_next((UINT)i, &iter)) {
+        MD const* t = const_cast<MDSystem*>(mdsys)->getMD((UINT)i);
+        ASSERT0(t);
+        if (t->is_overlap(md)) { return true; }
+    }
+
+    return false;
+}
+
+
 void MDSet::bunion(MDSet const& mds, DefMiscBitSetMgr & mbsmgr)
 {
     if (this == &mds) { return; }
@@ -632,6 +676,32 @@ void MDSystem::initGlobalMemMD(VarMgr * vm)
 }
 
 
+//MD for imported variables.
+void MDSystem::initImportVar(VarMgr * vm)
+{
+    m_import_var = NULL;
+    if (vm == NULL) { return; }
+
+    m_import_var = vm->registerVar(
+                        (CHAR*)".import_var",
+                        getTypeMgr()->getMCType(0),
+                        1, VAR_GLOBAL|VAR_FAKE);
+    VAR_allocable(m_import_var) = false;
+
+    MD x;
+    //MD_id(&x) = MD_IMPORT_VAR;
+    MD_base(&x) = m_import_var;
+    MD_size(&x) = 0;
+    MD_ty(&x) = MD_UNBOUND;
+    MD_is_may(&x) = true; //MD_IMPORT_VAR can only be May reference.
+    MD const* e = registerMD(x);
+    CK_USE(e);
+    ASSERT0(MD_id(e) == MD_IMPORT_VAR);
+}
+
+
+
+
 //MD for total memory.
 void MDSystem::initAllMemMD(VarMgr * vm)
 {
@@ -667,6 +737,7 @@ void MDSystem::init(VarMgr * vm)
     ASSERT0(m_tm);
     initAllMemMD(vm);
     initGlobalMemMD(vm);
+    initImportVar(vm);
     ASSERT0(m_md_count == MD_FIRST_ALLOCABLE);
 }
 
@@ -697,17 +768,22 @@ void MDSystem::destroy()
 //
 //Note this function does NOT clean output, and will append result to output.
 void MDSystem::computeOverlap(
+        Region * current_ru,
         MD const* md,
         MDSet & output,
         ConstMDIter & tabiter,
         DefMiscBitSetMgr & mbsmgr,
         bool strictly)
 {
-    ASSERT0(md);
+    ASSERT0(md && current_ru);
     ASSERT0(MD_id(md) != MD_FULL_MEM);
 
-    if (strictly && md->is_global()) {
-        output.bunion(MD_GLOBAL_MEM, mbsmgr);
+    if (strictly) {
+        if (md->is_global()) {
+            output.bunion(MD_GLOBAL_MEM, mbsmgr);
+        } else if (!current_ru->isRegionVAR(md->get_base())) {
+            output.bunion(MD_IMPORT_VAR, mbsmgr);
+        }
     }
 
     MDTab * mdt = getMDTab(MD_base(md));
@@ -777,6 +853,7 @@ void MDSystem::computeOverlapExactMD(
 //'tabiter': for local use.
 //'strictly': set to true to compute if md may be overlapped with global memory.
 void MDSystem::computeOverlap(
+        Region * current_ru,
         IN OUT MDSet & mds,
         Vector<MD const*> & tmpvec,
         ConstMDIter & tabiter,
@@ -784,10 +861,13 @@ void MDSystem::computeOverlap(
         bool strictly)
 {
     if (((DefSBitSetCore&)mds).is_contain(MD_FULL_MEM)) { return; }
+    
+    ASSERT0(current_ru);
 
     UINT count = 0;
     tmpvec.clean();
     bool set_global = false;
+    bool set_import_var = false;
     SEGIter * iter;
     for (INT i = mds.get_first(&iter);
          i >= 0; i = mds.get_next(i, &iter)) {
@@ -795,7 +875,11 @@ void MDSystem::computeOverlap(
         ASSERT0(md);
         MDTab * mdt = getMDTab(MD_base(md));
         ASSERT0(mdt != NULL);
-        if (md->is_global()) { set_global = true; }
+        if (md->is_global()) { 
+            set_global = true; 
+        } else if (!current_ru->isRegionVAR(md->get_base())) { 
+            set_import_var = true; 
+        }
 
         MD const* effect_md = mdt->get_effect_md();
         if (effect_md != NULL && !mds.is_contain(effect_md)) {
@@ -820,8 +904,15 @@ void MDSystem::computeOverlap(
         }
     }
 
-    if (strictly && set_global) { mds.bunion(getMD(MD_GLOBAL_MEM), mbsmgr); }
-
+    if (strictly) {
+        if (set_global) { 
+            mds.bunion(getMD(MD_GLOBAL_MEM), mbsmgr); 
+        }
+        if (set_import_var) {
+            mds.bunion(getMD(MD_IMPORT_VAR), mbsmgr);
+        }
+    }
+    
     for (INT i = 0; i <= tmpvec.get_last_idx(); i++) {
         MD const* t = tmpvec.get(i);
         ASSERT0(t && t->is_effect());
@@ -841,6 +932,7 @@ void MDSystem::computeOverlap(
 //
 //Note output do not need to clean before invoke this function.
 void MDSystem::computeOverlap(
+        Region * current_ru,
         MDSet const& mds,
         OUT MDSet & output,
         ConstMDIter & tabiter,
@@ -851,14 +943,21 @@ void MDSystem::computeOverlap(
 
     if (mds.is_contain_pure(MD_FULL_MEM)) { return; }
 
+    ASSERT0(current_ru);
+
     bool set_global = false;
+    bool set_import_var = false;
     SEGIter * iter;
     for (INT i = mds.get_first(&iter); i >= 0; i = mds.get_next(i, &iter)) {
         MD * md = getMD(i);
         ASSERT0(md);
         MDTab * mdt = getMDTab(MD_base(md));
         ASSERT0(mdt != NULL);
-        if (md->is_global()) { set_global = true; }
+        if (md->is_global()) { 
+            set_global = true; 
+        } else if (!current_ru->isRegionVAR(md->get_base())) {
+            set_import_var = true; 
+        }
 
         MD const* effect_md = mdt->get_effect_md();
         if (effect_md != NULL && !mds.is_contain_pure(MD_id(effect_md))) {
@@ -881,7 +980,14 @@ void MDSystem::computeOverlap(
         }
     }
 
-    if (strictly && set_global) { output.bunion_pure(MD_GLOBAL_MEM, mbsmgr); }
+    if (strictly) {
+        if (set_global) { 
+            output.bunion_pure(MD_GLOBAL_MEM, mbsmgr); 
+        }
+        if (set_import_var) {
+            output.bunion_pure(MD_IMPORT_VAR, mbsmgr);
+        }
+    }
 }
 
 

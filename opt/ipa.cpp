@@ -32,6 +32,7 @@ IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 author: Su Zhenyu
 @*/
 #include "cominc.h"
+#include "comopt.h"
 #include "callg.h"
 #include "ipa.h"
 
@@ -40,7 +41,7 @@ namespace xoc {
 Region * IPA::findRegion(IR * call, Region * callru)
 {
     ASSERT0(call->is_call());
-    CallGraph * cg = m_rumgr->get_call_graph();
+    CallGraph * cg = m_rumgr->getCallGraph();
     ASSERT0(cg);
     CallNode * callercn = cg->mapRegion2CallNode(callru);
     ASSERT(callercn, ("caller is not on graph"));
@@ -134,8 +135,12 @@ void IPA::computeCallRefForAllRegion()
 {
     START_TIMER_AFTER();
     for (UINT i = 0; i < m_rumgr->getNumOfRegion(); i++) {
-        Region * ru = m_rumgr->get_region(i);
-        if (ru == NULL) { continue; }
+        Region * ru = m_rumgr->getRegion(i);
+        if (ru == NULL ||
+            (ru->getIRList() == NULL && 
+             ru->getBBList()->get_elem_count() == 0)) { 
+            continue; 
+        }
         
         ru->initPassMgr();
         IR_AA * aa = (IR_AA*)ru->getPassMgr()->
@@ -154,7 +159,7 @@ void IPA::computeCallRefForAllRegion()
 void IPA::createCallDummyuse(OptCtx & oc)
 {
     for (UINT i = 0; i < m_rumgr->getNumOfRegion(); i++) {
-        Region * ru = m_rumgr->get_region(i);
+        Region * ru = m_rumgr->getRegion(i);
         if (ru == NULL) { continue; }
         createCallDummyuse(ru);
         
@@ -193,6 +198,34 @@ void IPA::recomputeDUChain(Region * ru, OptCtx & oc)
     ru->getPassMgr()->registerPass(PASS_AA);
 
     ASSERT0(!OC_is_du_chain_valid(oc));
+
+    if (g_do_md_ssa) {
+        //Build MD SSA du chain.
+        if (m_is_recompute_du_ref) {
+            ru->checkValidAndRecompute(&oc,
+                PASS_DU_REF,
+                PASS_CFG,
+                PASS_UNDEF);
+        }
+
+        //Compute typical PR du chain.
+        IR_DU_MGR * dumgr = (IR_DU_MGR*)ru->getPassMgr()->
+            registerPass(PASS_DU_MGR);
+        ASSERT0(dumgr);
+        dumgr->perform(oc, SOL_REACH_DEF|COMPUTE_PR_DU);
+        dumgr->computeMDDUChain(oc, false, COMPUTE_PR_DU);
+
+        MDSSAMgr * mdssamgr = (MDSSAMgr*)ru->getPassMgr()->
+            registerPass(PASS_MD_SSA_MGR);
+        ASSERT0(mdssamgr);
+        if (!mdssamgr->isMDSSAConstructed()) {
+            mdssamgr->construction(oc);
+        }
+
+        return;
+    }
+
+    //Build typeical du chain.
     if (m_is_recompute_du_ref) {
         if (m_is_keep_reachdef) {
             ru->checkValidAndRecompute(&oc,

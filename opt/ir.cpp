@@ -2207,7 +2207,9 @@ bool IR::isIREqual(IR const* src, bool is_cmp_kid) const
         if (ARR_elem_num_buf(src) != NULL) {
             ASSERT0(ARR_elem_num_buf(this));
             TMWORD dimnum = ((CArray*)this)->getDimNum();
-            ASSERT0(((CArray*)src)->getDimNum() == dimnum);
+            if (((CArray*)src)->getDimNum() != dimnum) {
+                return false;
+            }
             for (UINT i = 0; i < dimnum; i++) {
                 if (((CArray*)this)->getElementNumOfDim(i) !=
                     ((CArray*)src)->getElementNumOfDim(i)) {

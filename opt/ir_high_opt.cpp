@@ -51,6 +51,14 @@ void Region::HighProcessImpl(OptCtx & oc)
         ASSERT0(getCFG()->verify());
 
         getCFG()->performMiscOpt(oc);
+
+        //Build DOM after CFG optimized.
+        checkValidAndRecompute(&oc, PASS_DOM, PASS_UNDEF);
+        
+        if (g_do_loop_ana) {
+            ASSERT(g_do_cfg_dom, ("dominator is necessary to build loop"));
+            checkValidAndRecompute(&oc, PASS_LOOP_INFO, PASS_UNDEF);
+        }
     }
 
     if (g_do_pr_ssa) {
@@ -74,7 +82,7 @@ void Region::HighProcessImpl(OptCtx & oc)
         IR_DU_MGR * dumgr = (IR_DU_MGR*)getPassMgr()->
             registerPass(PASS_DU_MGR);
         ASSERT0(dumgr);
-        UINT f = SOL_REACH_DEF|SOL_REF|COMPUTE_PR_DU|COMPUTE_NOPR_DU;
+        UINT f = SOL_REF|COMPUTE_PR_DU|COMPUTE_NOPR_DU;
         if (g_compute_available_exp) {
             f |= SOL_AVAIL_EXPR;
         }
@@ -90,15 +98,14 @@ void Region::HighProcessImpl(OptCtx & oc)
         if (dumgr->perform(oc, f) && OC_is_ref_valid(oc)) {
             if (g_compute_du_chain) {
                 UINT flag = COMPUTE_NOPR_DU;
+                ASSERT0(getPassMgr());
+                
                 //If PRs have already been in SSA form, compute
-                //DU chain doesn't make any sense.    
-                if (getPassMgr() != NULL) {
-                    PRSSAMgr * ssamgr = (PRSSAMgr*)getPassMgr()->
-                        queryPass(PASS_PR_SSA_MGR);
-                    if (ssamgr == NULL) {
-                        flag |= COMPUTE_PR_DU;
-                    }
-                } else {
+                //PR DU chain doesn't make any sense.                
+                PRSSAMgr * ssamgr = NULL;
+                if ((ssamgr = (PRSSAMgr*)getPassMgr()->
+                     queryPass(PASS_PR_SSA_MGR)) == NULL ||
+                    !ssamgr->isSSAConstructed()) {
                     flag |= COMPUTE_PR_DU;
                 }
 
@@ -184,14 +191,14 @@ bool Region::HighProcess(OptCtx & oc)
     }
 
     simp.setSimpCFS();
-    set_ir_list(simplifyStmtList(getIRList(), &simp));    
+    setIRList(simplifyStmtList(getIRList(), &simp));    
     ASSERT0(verify_simp(getIRList(), simp));
     ASSERT0(verify_irs(getIRList(), NULL, this));
 
     if (g_cst_bb_list) {
         constructIRBBlist();
         ASSERT0(verifyIRandBB(getBBList(), this));
-        set_ir_list(NULL); //All IRs have been moved to each IRBB.
+        setIRList(NULL); //All IRs have been moved to each IRBB.
     }
 
     HighProcessImpl(oc);

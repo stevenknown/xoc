@@ -1136,7 +1136,7 @@ Programming Guides
 
     ¡ñ Setting up the build environment
         This is an example to demostrate how to drive XOC to compile user
-        input data.    Note the header file cominc.h is important and necessary.
+        input data. Note the header file cominc.h is important and necessary.
 
         #include "cominc.h"
         void main(int argc, char * argv[])

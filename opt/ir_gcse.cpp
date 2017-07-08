@@ -665,7 +665,7 @@ bool IR_GCSE::doProp(IRBB * bb, List<IR*> & livexp)
                         tmp.clean(m_misc_bs_mgr);
                         m_du->collectMayUseRecursive(x2,
                             tmp, true, m_misc_bs_mgr);
-                        if (tmp.is_overlap(mustdef)) {
+                        if (tmp.is_overlap(mustdef, m_ru)) {
                             livexp.remove(ct2);
                         }
                     }

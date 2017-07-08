@@ -58,17 +58,19 @@ typedef HMap<MD*, MD_LT*> MD2MDLifeTime;
 
 class DontPromotTab : public MDSet {
     MDSystem * m_md_sys;
+    Region * m_ru;
 public:
     explicit DontPromotTab(Region * ru)
     {
         ASSERT0(ru);
+        m_ru = ru;
         m_md_sys = ru->getMDSystem();
     }
     COPY_CONSTRUCTOR(DontPromotTab);
 
     inline bool is_overlap(MD const* md)
     {
-        if (MDSet::is_overlap(md)) { return true; }
+        if (MDSet::is_overlap(md, m_ru)) { return true; }
         SEGIter * iter;
         for (INT i = get_first(&iter); i >= 0; i = get_next(i, &iter)) {
             MD const* t = m_md_sys->getMD(i);

@@ -123,7 +123,7 @@ bool g_do_aa = true;
 bool g_do_md_du_ana = true;
 
 //Compute DU chain.
-bool g_compute_du_chain = true;
+bool g_compute_du_chain = false;
 
 //Computem available expression during du analysis to
 //build more precise du chain.

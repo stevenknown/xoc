@@ -206,8 +206,7 @@ void IR_CP::replaceExp(
     bool doit = exp->getParent()->replaceKid(exp, newir, false);
     ASSERT0(doit);
     UNUSED(doit);
-
-    mdssamgr->cleanMDSSAInfoOfIR(exp);
+    
     m_ru->freeIRTree(exp);
 }
 

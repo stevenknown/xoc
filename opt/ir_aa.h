@@ -663,6 +663,10 @@ public:
     void setPointToGlobalMem(UINT mdid, OUT MD2MDSet & ctx)
     { setPointToMDSetByAddMD(mdid, ctx, m_md_sys->getMD(MD_GLOBAL_MEM)); }
 
+    //Set md points to imported variable.
+    void setPointToImportVar(UINT mdid, OUT MD2MDSet & ctx)
+    { setPointToMDSetByAddMD(mdid, ctx, m_md_sys->getMD(MD_IMPORT_VAR)); }
+
     void set_flow_sensitive(bool is_sensitive)
     { m_flow_sensitive = (BYTE)is_sensitive; }
 

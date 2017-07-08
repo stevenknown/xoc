@@ -571,7 +571,7 @@ bool IR_CFS_OPT::perform(SimpCtx const& sc)
     IR * irs = m_ru->getIRList();
     bool change = CfsOpt(&irs, sc);
     if (change) {
-        m_ru->set_ir_list(irs);
+        m_ru->setIRList(irs);
     }
     return change;
 }

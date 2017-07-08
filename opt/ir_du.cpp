@@ -101,8 +101,10 @@ void MDId2IRlist::clean()
 //'md' corresponds to unique 'ir'.
 void MDId2IRlist::set(UINT mdid, IR * ir)
 {
-    ASSERT(mdid != MD_GLOBAL_MEM && mdid != MD_FULL_MEM,
-            ("there is not any md could kill Fake-May-MD."));
+    ASSERT(mdid != MD_GLOBAL_MEM && 
+           mdid != MD_FULL_MEM &&
+           mdid != MD_IMPORT_VAR, 
+        ("there is not any md could kill Fake-May-MD."));
     ASSERT0(ir);
     DefSBitSetCore * irtab = TMap<UINT, DefSBitSetCore*>::get(mdid);
     if (irtab == NULL) {
@@ -219,14 +221,16 @@ void IR_DU_MGR::computeOverlapUseMDSet(IR * ir, bool recompute)
     MD const* md = ir->getRefMD();
     MDSet tmpmds;
     if (md != NULL) {
-        if (MD_id(md) == MD_GLOBAL_MEM || MD_id(md) == MD_FULL_MEM) {
+        if (MD_id(md) == MD_GLOBAL_MEM || 
+            MD_id(md) == MD_IMPORT_VAR || 
+            MD_id(md) == MD_FULL_MEM) {
             return;
         }
 
         //Compute overlapped md set for must-ref.
         has_init = true;
         if (recompute || !m_is_cached_mdset.is_contain(MD_id(md))) {
-            m_md_sys->computeOverlap(md, tmpmds, 
+            m_md_sys->computeOverlap(m_ru, md, tmpmds, 
                 m_tab_iter, *m_misc_bs_mgr, true);
             
             MDSet const* newmds = m_mds_hash->append(tmpmds);
@@ -255,7 +259,7 @@ void IR_DU_MGR::computeOverlapUseMDSet(IR * ir, bool recompute)
             tmpmds.bunion_pure(*mds, *m_misc_bs_mgr);
         }
 
-        m_md_sys->computeOverlap(*mds, tmpmds,
+        m_md_sys->computeOverlap(m_ru, *mds, tmpmds,
             m_tab_iter, *m_misc_bs_mgr, true);
     }
 
@@ -534,6 +538,10 @@ bool IR_DU_MGR::is_must_kill(IR const* def1, IR const* def2)
     ASSERT0(def1->is_stmt() && def2->is_stmt());
     if ((def1->isWritePR() || def1->isCallStmt()) && 
         (def2->isWritePR() || def2->isCallStmt())) {
+        if ((def1->isCallStmt() && !def1->hasReturnValue()) ||
+            (def2->isCallStmt() && !def2->hasReturnValue())) {
+            return false;
+        }
         return def1->get_prno() == def2->get_prno();
     }
 
@@ -1339,7 +1347,7 @@ void IR_DU_MGR::dumpIRRef(IN IR * ir, UINT indent)
 
     if (ir->isCallStmt()) {
         bool doit = false;
-        CallGraph * callg = m_ru->getRegionMgr()->get_call_graph();
+        CallGraph * callg = m_ru->getRegionMgr()->getCallGraph();
         if (callg != NULL) {
             Region * ru = callg->mapCall2Region(ir, m_ru);
             if (ru != NULL && REGION_is_mddu_valid(ru)) {
@@ -2512,7 +2520,7 @@ void IR_DU_MGR::inferCallAndIcall(IR * ir, UINT duflag, IN MD2MDSet * mx)
     }
 
     MDSet tmpmds;
-    m_md_sys->computeOverlap(maydefuse, 
+    m_md_sys->computeOverlap(m_ru, maydefuse, 
         tmpmds, m_tab_iter, *m_misc_bs_mgr, true);
     maydefuse.bunion_pure(tmpmds, *m_misc_bs_mgr);
     
@@ -2521,7 +2529,7 @@ void IR_DU_MGR::inferCallAndIcall(IR * ir, UINT duflag, IN MD2MDSet * mx)
         modify_global = false;
     } else {
         //Utilize calllee's MayDef MD Set if callee region has been processed.
-        CallGraph * callg = m_ru->getRegionMgr()->get_call_graph();
+        CallGraph * callg = m_ru->getRegionMgr()->getCallGraph();
         if (callg != NULL) {
             Region * callee = callg->mapCall2Region(ir, m_ru);
             if (callee != NULL && REGION_is_mddu_valid(callee)) {
@@ -2536,8 +2544,10 @@ void IR_DU_MGR::inferCallAndIcall(IR * ir, UINT duflag, IN MD2MDSet * mx)
 
     if (modify_global) {
         //For conservative purpose.
-        //Set to mod/ref global memory for conservative purpose.
+        //Set to mod/ref global memory and all imported variables
+        //for conservative purpose.
         maydefuse.bunion(m_md_sys->getMD(MD_GLOBAL_MEM), *m_misc_bs_mgr);
+        maydefuse.bunion(m_md_sys->getMD(MD_IMPORT_VAR), *m_misc_bs_mgr);
     }
 
     //Register the MD set.
@@ -2590,7 +2600,7 @@ void IR_DU_MGR::collectMayUse(IR const* ir, MDSet & may_use, bool computePR)
         if (ir->isCallStmt()) {
             //Handle CALL/ICALL stmt sideeffect.
             bool done = false;
-            CallGraph * callg = m_ru->getRegionMgr()->get_call_graph();
+            CallGraph * callg = m_ru->getRegionMgr()->getCallGraph();
             if (callg != NULL) {
                 Region * ru = callg->mapCall2Region(ir, m_ru);
                 if (ru != NULL && REGION_is_mddu_valid(ru)) {
@@ -2689,7 +2699,7 @@ void IR_DU_MGR::collectMayUseRecursive(
             }
 
             bool done = false;
-            CallGraph * callg = m_ru->getRegionMgr()->get_call_graph();
+            CallGraph * callg = m_ru->getRegionMgr()->getCallGraph();
             if (callg != NULL) {
                 Region * ru = callg->mapCall2Region(ir, m_ru);
                 if (ru != NULL && REGION_is_mddu_valid(ru)) {
@@ -4316,12 +4326,12 @@ void IR_DU_MGR::checkDefSetToBuildDUChain(
             if (maydef != NULL &&
                 ((maydef == expmds ||
                   (expmds != NULL && maydef->is_intersect(*expmds))) ||
-                 (expmd != NULL && maydef->is_overlap(expmd)))) {
+                 (expmd != NULL && maydef->is_overlap(expmd, m_ru)))) {
                 //Nonkilling Def.
                 build_du = true;
             } else if (mustdef != NULL &&
                        expmds != NULL &&
-                       expmds->is_overlap(mustdef)) {
+                       expmds->is_overlap(mustdef, m_ru)) {
                 //Killing Def if mustdef is exact, or else is nonkilling def.
                 build_du = true;
             }
@@ -4539,7 +4549,9 @@ void IR_DU_MGR::initMD2IRList(IRBB * bb)
             SEGIter * iter;
             for (INT j = maydef->get_first(&iter);
                  j != -1; j = maydef->get_next(j, &iter)) {
-                if (j == MD_GLOBAL_MEM || j == MD_FULL_MEM) {
+                if (j == MD_GLOBAL_MEM || 
+                    j == MD_IMPORT_VAR || 
+                    j == MD_FULL_MEM) {
                     m_md2irs->setHasIneffectDef();
                 } else if (mustdef != NULL && MD_id(mustdef) == (UINT)j) {
                     continue;
@@ -4609,7 +4621,7 @@ bool IR_DU_MGR::checkIsTruelyDep(IR const* def, IR const* use)
                 //them individually.
                 if (mustdef == mustuse || mustdef->is_overlap(mustuse)) {
                     ; //Do nothing.
-                } else if (maydef != NULL && maydef->is_overlap(mustuse)) {
+                } else if (maydef != NULL && maydef->is_overlap(mustuse, m_ru)) {
                     ; //Do nothing.
                 } else if (maydef != NULL &&
                            mayuse != NULL &&
@@ -4623,17 +4635,17 @@ bool IR_DU_MGR::checkIsTruelyDep(IR const* def, IR const* use)
             }
         } else if (mayuse != NULL) {
             if (def->isCallStmt()) {
-                ASSERT0(mayuse->is_overlap_ex(mustdef, m_md_sys) ||
+                ASSERT0(mayuse->is_overlap_ex(mustdef, m_ru, m_md_sys) ||
                         (maydef != NULL && mayuse->is_intersect(*maydef)));
             } else {
-                ASSERT0(mayuse->is_overlap_ex(mustdef, m_md_sys));
+                ASSERT0(mayuse->is_overlap_ex(mustdef, m_ru, m_md_sys));
             }
         } else {
             ASSERT(0, ("Not a truely dependence"));
         }
     } else if (maydef != NULL) {
         if (mustuse != NULL) {
-            ASSERT0(maydef->is_overlap_ex(mustuse, m_md_sys));
+            ASSERT0(maydef->is_overlap_ex(mustuse, m_ru, m_md_sys));
         } else if (mayuse != NULL) {
             ASSERT0(mayuse->is_intersect(*maydef));
         } else {

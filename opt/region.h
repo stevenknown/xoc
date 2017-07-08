@@ -727,6 +727,9 @@ public:
     //Return true if ir belongs to current region.
     bool isRegionIR(IR const* ir);
 
+    //Return true if VAR belongs to current region.
+    bool isRegionVAR(VAR const* var);
+
     //Check and insert data type CVT if it is necessary.
     IR * insertCvt(IR * parent, IR * kid, bool & change);
     void insertCvtForBinaryOp(IR * ir, bool & change);
@@ -865,7 +868,7 @@ public:
     { REGION_analysis_instrument(this)->m_prno2var.set(prno, pr_var); }
 
     void setRegionVar(VAR * v) { m_var = v; }
-    void set_ir_list(IR * irs) { REGION_analysis_instrument(this)->m_ir_list = irs; }
+    void setIRList(IR * irs) { REGION_analysis_instrument(this)->m_ir_list = irs; }
     void set_blx_data(void * d) { REGION_blx_data(this) = d; }
     IR * StrengthReduce(IN OUT IR * ir, IN OUT bool & change);
 

@@ -1967,6 +1967,13 @@ bool Region::isSafeToOptimize(IR const* ir)
 }
 
 
+//Return true if VAR belongs to current region.
+bool Region::isRegionVAR(VAR const* var)
+{
+    return getVarTab()->find(const_cast<VAR*>(var));
+}
+
+
 bool Region::isRegionIR(IR const* ir)
 {
     Vector<IR*> * vec = getIRVec();
@@ -2253,6 +2260,12 @@ void Region::freeIR(IR * ir)
 
     ASSERT0(getMiscBitSetMgr());
     ir->freeDUset(*getMiscBitSetMgr());
+
+    MDSSAMgr * mdssamgr = NULL;
+    if (getPassMgr() != NULL &&
+        (mdssamgr = ((MDSSAMgr*)getPassMgr()->queryPass(PASS_MD_SSA_MGR))) != NULL) {
+        mdssamgr->cleanMDSSAInfoOfIR(ir);
+    }   
 
     AIContainer * res_ai = IR_ai(ir);
     if (res_ai != NULL) {
@@ -3185,10 +3198,6 @@ void Region::checkValidAndRecompute(OptCtx * oc, ...)
             //CFG is not constructed.
             cfg = (IR_CFG*)getPassMgr()->registerPass(PASS_CFG);
             cfg->initCfg(*oc);
-            if (g_do_loop_ana) {
-                ASSERT(g_do_cfg_dom, ("dominator is necessary to build loop"));
-                cfg->LoopAnalysis(*oc);
-            }
         } else {
             //Caution: the validation of cfg should maintained by user.
             cfg->rebuild(*oc);

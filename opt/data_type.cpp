@@ -56,8 +56,8 @@ TypeDesc const g_type_desc[] = {
     {D_F128,  "f128",  128},
 
     {D_MC,    "mc",    0}, //memory chunk, for structures
-    {D_STR,   "str",   BYTE_PER_POINTER * BIT_PER_BYTE}, //char strings is pointer
-    {D_PTR,   "ptr",   BYTE_PER_POINTER * BIT_PER_BYTE}, //pointer
+    {D_STR,   "s",   BYTE_PER_POINTER * BIT_PER_BYTE}, //char strings is pointer
+    {D_PTR,   "*",   BYTE_PER_POINTER * BIT_PER_BYTE}, //pointer
     {D_VEC,   "vec",   0}, //vector
 
     {D_VOID,  "void",  0}, //void type
@@ -421,7 +421,7 @@ CHAR const* TypeMgr::dump_type(Type const* type, OUT StrBuf & buf)
             ASSERT0(elem_byte_size != 0);
             ASSERT0(get_bytesize(type) % elem_byte_size == 0);
             UINT elemnum = get_bytesize(type) / elem_byte_size;
-            buf.strcat("vec(%d*%s)", elemnum, DTNAME(TY_vec_ety(type)));
+            buf.strcat("v(%d*%s)", elemnum, DTNAME(TY_vec_ety(type)));
         }
         break;
     case D_VOID:

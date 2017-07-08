@@ -86,7 +86,7 @@ bool Region::performSimplify(OptCtx & oc)
     if (g_is_lower_to_pr_mode) {
         simp.setSimpToPRmode();
     }
-        
+  
     simplifyBBlist(getBBList(), &simp);
     
     if (g_do_cfg &&
@@ -127,6 +127,7 @@ bool Region::performSimplify(OptCtx & oc)
         ASSERT0(getDUMgr() == NULL || 
             getDUMgr()->verifyMDDUChain(COMPUTE_PR_DU | COMPUTE_NOPR_DU));
     }
+
     return true;
 }
 
@@ -165,12 +166,10 @@ bool Region::MiddleProcess(OptCtx & oc)
     }
 
     bool do_simplification = true;
-    if (getPassMgr() != NULL) {
-        PRSSAMgr * ssamgr = (PRSSAMgr*)getPassMgr()->
-            queryPass(PASS_PR_SSA_MGR);
-        if (ssamgr != NULL && ssamgr->isSSAConstructed()) {
-            do_simplification = false;
-        }
+    if (getPassMgr() != NULL &&
+        (getPassMgr()->queryPass(PASS_PR_SSA_MGR) != NULL &&
+          ((PRSSAMgr*)getPassMgr()->queryPass(PASS_PR_SSA_MGR))->isSSAConstructed())) {
+        do_simplification = false;
     }
 
     if (do_simplification) {

@@ -46,14 +46,15 @@ typedef enum _MD_TYPE {
 } MD_TYPE;
 
 #define MD_UNDEF              0 //Undefined.
-#define MD_FULL_MEM            1 //All program memory.
+#define MD_FULL_MEM           1 //All program memory.
 #define MD_FIRST              MD_FULL_MEM
 #define MD_GLOBAL_MEM         2 //Allocate at static data section
                                 //BYTE explicit definition.
-#define MD_HEAP_MEM           3 //Allocate in heap.
-#define MD_STACK_MEM          4 //Allocate at stack.
+#define MD_IMPORT_VAR         3 //Not allocated in current region.
+#define MD_HEAP_MEM           4 //Allocate in heap.
+#define MD_STACK_MEM          5 //Allocate at stack.
 //The first id which is allocable.
-#define MD_FIRST_ALLOCABLE (MD_GLOBAL_MEM + 1)
+#define MD_FIRST_ALLOCABLE (MD_IMPORT_VAR + 1)
 
 //Memory Descriptor.
 //MD is an appealing property to represent exact or inexact memory object.
@@ -365,6 +366,7 @@ public:
     bool is_contain_global() const
     {
         return DefSBitSetCore::is_contain(MD_GLOBAL_MEM) ||
+               DefSBitSetCore::is_contain(MD_IMPORT_VAR) ||
                DefSBitSetCore::is_contain(MD_FULL_MEM);
     }
 
@@ -385,22 +387,15 @@ public:
     }
 
     //Return true if md is overlap with the elements in set.
-    inline bool is_overlap(MD const* md) const
-    {
-        if (DefSBitSetCore::is_contain(MD_GLOBAL_MEM) && md->is_global()) {
-            return true;
-        }
-        if ((DefSBitSetCore::is_contain(MD_FULL_MEM)) ||
-            (MD_id(md) == MD_FULL_MEM && !DefSBitSetCore::is_empty())) {
-            return true;
-        }
-        return DefSBitSetCore::is_contain(MD_id(md));
-    }
+    bool is_overlap(MD const* md, Region * current_ru) const;
 
     //Return true if md is overlapped with element in current MDSet.
     //Note this function will iterate elements in set which is costly.
     //Use it carefully.
-    inline bool is_overlap_ex(MD const* md, MDSystem const* mdsys) const;
+    bool is_overlap_ex(
+            MD const* md, 
+            Region * current_ru, 
+            MDSystem const* mdsys) const;
 
     bool is_contain_inexact(MDSystem * ms) const;
     bool is_contain_only_exact_and_str(MDSystem * ms) const;
@@ -564,6 +559,7 @@ class MDSystem {
     TypeMgr * m_tm;
     VAR * m_all_mem;
     VAR * m_global_mem;
+    VAR * m_import_var;
     MDId2MD m_id2md_map; //Map MD id to MD.
     SList<MD*> m_free_md_list; //MD allocated in pool.
     UINT m_md_count; //generate MD index, used by registerMD().
@@ -582,6 +578,7 @@ class MDSystem {
     //Allocated object should be recorded in list.
     MDTab * allocMDTab() { return new MDTab(); }
     void initGlobalMemMD(VarMgr * vm);
+    void initImportVar(VarMgr * vm);
     void initAllMemMD(VarMgr * vm);
 public:
     MDSystem(VarMgr * vm) { init(vm); }
@@ -596,18 +593,21 @@ public:
             ConstMDIter & tabiter,
             DefMiscBitSetMgr & mbsmgr);
     void computeOverlap(
+            Region * current_ru,
             MD const* md,
             MDSet & output,
             ConstMDIter & tabiter,
             DefMiscBitSetMgr & mbsmgr,
             bool strictly);
     void computeOverlap(
+            Region * current_ru,
             IN OUT MDSet & mds,
             Vector<MD const*> & tmpvec,
             ConstMDIter & tabiter,
             DefMiscBitSetMgr & mbsmgr,
             bool strictly);
     void computeOverlap(
+            Region * current_ru,
             MDSet const& mds,
             OUT MDSet & output,
             ConstMDIter & tabiter,
@@ -701,27 +701,5 @@ public:
 
     void dump(Region * ru);
 };
-
-
-//Return true if md is overlapped with element in current MDSet.
-//Note this function will iterate elements in set which is costly.
-//Use it carefully.
-bool MDSet::is_overlap_ex(MD const* md, MDSystem const* mdsys) const
-{
-    ASSERT0(md && mdsys);
-
-    if (MDSet::is_overlap(md)) { return true; }
-
-    SEGIter * iter;
-    for (INT i = get_first(&iter);
-         i >= 0; i = get_next((UINT)i, &iter)) {
-        MD const* t = const_cast<MDSystem*>(mdsys)->getMD((UINT)i);
-        ASSERT0(t);
-        if (t->is_overlap(md)) { return true; }
-    }
-
-    return false;
-}
-
 } //namespace xoc
 #endif

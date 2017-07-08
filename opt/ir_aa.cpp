@@ -1577,15 +1577,19 @@ void IR_AA::recomputeDataType(AACtx const& ic, IR const* ir, OUT MDSet & pts)
         //e.g: b:ptr<i32>=LDA(a), a is a memory chunk, but b is
         //a pointer that pointed to an i32 memory space.
 
-        ASSERT(ir->is_ptr(), ("LDA's result should be pointer type"));
-        ASSERT(pts.get_effect_md(m_md_sys), ("LDA's base must be effect MD"));
+        //ir's type may not be pointer type.
+        //e.g: x = (int)&arr[j], the result type of LDA has been 
+        //converted to integer. So x will be integer.
 
-        //ptset may include element which also be in m_maypts.
-        //ASSERT0(!ptset->is_intersect(*m_maypts));
+        if (ir->is_ptr()) {
+            ASSERT(pts.get_effect_md(m_md_sys), ("LDA's base must be effect MD"));
 
-        ASSERT(ir->is_ptr(), ("LDA's base must be pointer."));
-        UINT size = TY_ptr_base_size(ir->get_type());
-        reviseMDsize(pts, size);
+            //ptset may include element which also be in m_maypts.
+            //ASSERT0(!ptset->is_intersect(*m_maypts));
+
+            UINT size = TY_ptr_base_size(ir->get_type());
+            reviseMDsize(pts, size);
+        }
     }
 }
 
@@ -3812,6 +3816,7 @@ void IR_AA::initEntryPtset(PtPairSet ** ptset_arr)
         MD2MDSet * mx = allocMD2MDSetForBB(BB_id(entry));
         setPointToAllMem(MD_FULL_MEM, *mx);
         setPointToGlobalMem(MD_GLOBAL_MEM, *mx);
+        setPointToImportVar(MD_IMPORT_VAR, *mx);
         VarTabIter c;
         for (VAR * v = vt->get_first(c); v != NULL; v = vt->get_next(c)) {
             if (!VAR_is_global(v) && !VAR_is_formal_param(v)) { continue; }
@@ -3828,6 +3833,7 @@ void IR_AA::initEntryPtset(PtPairSet ** ptset_arr)
     } else {
         setPointToAllMem(MD_FULL_MEM, m_unique_md2mds);
         setPointToGlobalMem(MD_GLOBAL_MEM, m_unique_md2mds);
+        setPointToImportVar(MD_IMPORT_VAR, m_unique_md2mds);
         VarTabIter c;
         for (VAR * v = vt->get_first(c); v != NULL; v = vt->get_next(c)) {
             if (!VAR_is_global(v) && !VAR_is_formal_param(v)) { continue; }
@@ -3910,6 +3916,7 @@ void IR_AA::initMayPointToSet()
     }
 
     tmp.bunion(MD_GLOBAL_MEM, *m_misc_bs_mgr);
+    tmp.bunion(MD_IMPORT_VAR, *m_misc_bs_mgr);
     m_maypts = m_mds_hash->append(tmp);
     tmp.clean(*m_misc_bs_mgr);
 }

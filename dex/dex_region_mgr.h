@@ -60,7 +60,7 @@ public:
     Region * getProgramRegion()
     {
         //The first region should be program-region.
-        return get_region(1);
+        return getRegion(1);
     }
     SMemPool * get_pool() { return m_pool; }
     Var2UINT & getVar2Builtin() { return m_var2blt; }

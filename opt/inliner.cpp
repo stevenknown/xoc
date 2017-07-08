@@ -238,7 +238,7 @@ bool Inliner::do_inline_c(Region * caller, Region * callee)
         }
     }
 
-    caller->set_ir_list(head);
+    caller->setIRList(head);
     return change;
 }
 

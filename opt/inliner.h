@@ -87,7 +87,7 @@ public:
         m_rumgr = program->getRegionMgr();
         ASSERT0(m_rumgr);
         m_program = program;
-        m_call_graph = m_rumgr->get_call_graph();
+        m_call_graph = m_rumgr->getCallGraph();
         ASSERT0(m_call_graph);
         m_pool = smpoolCreate(16, MEM_COMM);
     }

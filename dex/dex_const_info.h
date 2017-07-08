@@ -41,7 +41,7 @@ author: Su Zhenyu
 #define HOST_INT             LONGLONG
 #define HOST_UINT            LONGLONG
 #define HOST_FP              double
-#define HOST_BIT_PER_BYTE    8
+#define HOST_BYTE_PER_INT    8
 
 //Define signed and unsigned integer type on host machine.
 #define INT8                 CHAR
@@ -71,7 +71,7 @@ author: Su Zhenyu
 #define GENERAL_REGISTER_SIZE   (BYTE_PER_POINTER)
 
 //Bit size of word length of host machine.
-#define WORD_LENGTH_OF_HOST_MACHINE    (HOST_BIT_PER_BYTE * HOST_BIT_PER_BYTE)
+#define WORD_LENGTH_OF_HOST_MACHINE    (HOST_BIT_PER_BYTE * HOST_BYTE_PER_INT)
 
 //Bit size of word length of target machine.
 #define WORD_LENGTH_OF_TARGET_MACHINE  (GENERAL_REGISTER_SIZE * BIT_PER_BYTE)

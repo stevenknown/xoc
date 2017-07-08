@@ -55,7 +55,7 @@ public:
     void vsprint(CHAR const* format, va_list args);
     void strcat(CHAR const* format, ...);    
     void strcat(UINT l, CHAR const* format, va_list args);
-    UINT strlen() const { return ::strlen(buf); }
+    size_t strlen() const { return ::strlen(buf); }
     void nstrcat(UINT size, CHAR const* format, ...);
     void vstrcat(CHAR const* format, va_list args);
 };

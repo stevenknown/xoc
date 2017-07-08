@@ -256,7 +256,7 @@ CallNode * CallGraph::newCallNode(Region * ru)
 bool CallGraph::build(RegionMgr * rumgr)
 {
     for (UINT i = 0; i < rumgr->getNumOfRegion(); i++) {
-        Region * ru = rumgr->get_region(i);
+        Region * ru = rumgr->getRegion(i);
         if (ru == NULL) { continue; }
         ASSERT0(ru->is_function() || ru->is_program());
 
@@ -288,7 +288,7 @@ bool CallGraph::build(RegionMgr * rumgr)
     }
 
     for (UINT i = 0; i < rumgr->getNumOfRegion(); i++) {
-        Region * ru = rumgr->get_region(i);
+        Region * ru = rumgr->getRegion(i);
         if (ru == NULL) { continue; }
 
         ASSERT0(ru->is_function() || ru->is_program());
