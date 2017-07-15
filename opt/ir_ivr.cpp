@@ -213,7 +213,7 @@ void IR_IVR::recordIV(
     SList<IV*> * ivlst = m_li2bivlst.get(LI_id(li));
     if (ivlst == NULL) {
         ivlst = (SList<IV*>*)xmalloc(sizeof(SList<IV*>));
-        ivlst->init(m_sc_pool);        
+        ivlst->init(m_sc_pool);
         m_li2bivlst.set(LI_id(li), ivlst);
     }
     ivlst->append_head(x);
@@ -412,7 +412,7 @@ void IR_IVR::addDIVList(LI<IRBB> const* li, IR const* e)
     SList<IR const*> * divlst = m_li2divlst.get(LI_id(li));
     if (divlst == NULL) {
         divlst = (SList<IR const*>*)xmalloc(sizeof(SList<IR const*>));
-        divlst->init(m_sc_pool);        
+        divlst->init(m_sc_pool);
         m_li2divlst.set(LI_id(li), divlst);
     }
 

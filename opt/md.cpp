@@ -259,14 +259,14 @@ bool MDSet::is_contain_inexact(MDSystem * ms) const
 bool MDSet::is_overlap(MD const* md, Region * current_ru) const
 {
     ASSERT0(current_ru);
-    
+
     if (DefSBitSetCore::is_contain(MD_GLOBAL_MEM) && md->is_global()) {
         return true;
     }
     if ((DefSBitSetCore::is_contain(MD_FULL_MEM)) ||
         (MD_id(md) == MD_FULL_MEM && !DefSBitSetCore::is_empty())) {
         return true;
-    }        
+    }
     if (!current_ru->isRegionVAR(md->get_base()) &&
         DefSBitSetCore::is_contain(MD_IMPORT_VAR)) {
         return true;
@@ -279,8 +279,8 @@ bool MDSet::is_overlap(MD const* md, Region * current_ru) const
 //Note this function will iterate elements in set which is costly.
 //Use it carefully.
 bool MDSet::is_overlap_ex(
-        MD const* md, 
-        Region * current_ru, 
+        MD const* md,
+        Region * current_ru,
         MDSystem const* mdsys) const
 {
     ASSERT0(md && mdsys);
@@ -351,7 +351,7 @@ void MDSetHash::dump()
     if (g_tfile == NULL) { return; }
     fprintf(g_tfile, "\n==---- DUMP MDSet Hash ----==\n");
     SBitSetCoreHash<MDSetHashAllocator>::dump_hashed_set(g_tfile);
-    SBitSetCoreHash<MDSetHashAllocator>::dump(g_tfile);   
+    SBitSetCoreHash<MDSetHashAllocator>::dump(g_tfile);
     fflush(g_tfile);
 }
 //END MDSetHash
@@ -861,7 +861,7 @@ void MDSystem::computeOverlap(
         bool strictly)
 {
     if (((DefSBitSetCore&)mds).is_contain(MD_FULL_MEM)) { return; }
-    
+
     ASSERT0(current_ru);
 
     UINT count = 0;
@@ -875,10 +875,10 @@ void MDSystem::computeOverlap(
         ASSERT0(md);
         MDTab * mdt = getMDTab(MD_base(md));
         ASSERT0(mdt != NULL);
-        if (md->is_global()) { 
-            set_global = true; 
-        } else if (!current_ru->isRegionVAR(md->get_base())) { 
-            set_import_var = true; 
+        if (md->is_global()) {
+            set_global = true;
+        } else if (!current_ru->isRegionVAR(md->get_base())) {
+            set_import_var = true;
         }
 
         MD const* effect_md = mdt->get_effect_md();
@@ -905,14 +905,14 @@ void MDSystem::computeOverlap(
     }
 
     if (strictly) {
-        if (set_global) { 
-            mds.bunion(getMD(MD_GLOBAL_MEM), mbsmgr); 
+        if (set_global) {
+            mds.bunion(getMD(MD_GLOBAL_MEM), mbsmgr);
         }
         if (set_import_var) {
             mds.bunion(getMD(MD_IMPORT_VAR), mbsmgr);
         }
     }
-    
+
     for (INT i = 0; i <= tmpvec.get_last_idx(); i++) {
         MD const* t = tmpvec.get(i);
         ASSERT0(t && t->is_effect());
@@ -953,10 +953,10 @@ void MDSystem::computeOverlap(
         ASSERT0(md);
         MDTab * mdt = getMDTab(MD_base(md));
         ASSERT0(mdt != NULL);
-        if (md->is_global()) { 
-            set_global = true; 
+        if (md->is_global()) {
+            set_global = true;
         } else if (!current_ru->isRegionVAR(md->get_base())) {
-            set_import_var = true; 
+            set_import_var = true;
         }
 
         MD const* effect_md = mdt->get_effect_md();
@@ -981,8 +981,8 @@ void MDSystem::computeOverlap(
     }
 
     if (strictly) {
-        if (set_global) { 
-            output.bunion_pure(MD_GLOBAL_MEM, mbsmgr); 
+        if (set_global) {
+            output.bunion_pure(MD_GLOBAL_MEM, mbsmgr);
         }
         if (set_import_var) {
             output.bunion_pure(MD_IMPORT_VAR, mbsmgr);

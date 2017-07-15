@@ -270,7 +270,7 @@ void RegionMgr::dumpRelationGraph(CHAR const* name)
     if (getNumOfRegion() == 0) { return; }
     if (name == NULL) {
         name = "graph_region_relation_graph.vcg";
-    }    
+    }
     UNLINK(name);
     xcom::Graph g;
     for (UINT id = 0; id < getNumOfRegion(); id++) {

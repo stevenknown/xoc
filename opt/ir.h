@@ -41,6 +41,7 @@ class IRBB;
 class DU;
 class SSAInfo;
 class MDSSAInfo;
+class MDPhi;
 
 typedef List<IRBB*> BBList;
 typedef List<IR const*> ConstIRIter;
@@ -170,7 +171,7 @@ typedef enum {
 #define IRDES_is_logical(m)       (HAVE_FLAG(((m).attr), IRT_IS_LOGICAL))
 #define IRDES_is_leaf(m)          (HAVE_FLAG(((m).attr), IRT_IS_LEAF))
 #define IRDES_is_stmt_in_bb(m)    (HAVE_FLAG(((m).attr), IRT_IS_STMT_IN_BB))
-#define IRDES_is_non_pr_memref(m) (HAVE_FLAG(((m).attr), IRT_IS_NON_PR_MEMREF)) 
+#define IRDES_is_non_pr_memref(m) (HAVE_FLAG(((m).attr), IRT_IS_NON_PR_MEMREF))
 #define IRDES_has_result(m)       (HAVE_FLAG(((m).attr), IRT_HAS_RESULT))
 #define IRDES_size(m)             ((m).size)
 class IRDesc {
@@ -291,7 +292,7 @@ extern IRDesc const g_ir_desc[];
 
 //True if current operation is atomic. If ir is atomic load, write or
 //read-modify-write.
-//Read barrier: such as LD/ILD/PR/ARRAY may be regarded as read 
+//Read barrier: such as LD/ILD/PR/ARRAY may be regarded as read
 //barrier if the flag is true.
 //Analogously, ST/STPR/IST/STARRAY/CALL may be regarded as write barrier.
 #define IR_is_atomic(ir)         ((ir)->is_atomic_op)
@@ -299,11 +300,11 @@ extern IRDesc const g_ir_desc[];
 //True if current operation is atomic read-modify-write.
 //For given variable, RMW operation read the old value, then compare
 //with new value, then write the new value to the variable. The write
-//operation may be failed. If the variable is volatile, one should 
+//operation may be failed. If the variable is volatile, one should
 //not change the order of this operation with other memory operations.
 //The flag can be used to represent safepoint in code generation, and
 //if it is, the IR modified/invalided each pointers previous defined,
-//and this cuts off the Def-Use chain of those pointers immediately 
+//and this cuts off the Def-Use chain of those pointers immediately
 //after the IR.
 #define IR_is_read_mod_write(ir) ((ir)->is_read_mod_write)
 
@@ -444,7 +445,7 @@ public:
 
     IR_TYPE get_code() const { return (IR_TYPE)IR_code(this); }
     IR * get_next() const { return IR_next(this); }
-    IR * get_prev() const { return IR_prev(this); }    
+    IR * get_prev() const { return IR_prev(this); }
     inline UINT getOffset() const; //Get byte offset if any.
     IR * getParent() const { return IR_parent(this); }
     inline IR * getKid(UINT idx) const;
@@ -572,7 +573,7 @@ public:
     UINT id() const { return IR_id(this); }
     void invertLand(Region * ru);
     void invertLor(Region * ru);
-    bool isNoMove() const { return IR_no_move(this); } 
+    bool isNoMove() const { return IR_no_move(this); }
     //Return true if current IR may contain memory reference.
     bool isContainMemRef() const
     {
@@ -803,7 +804,7 @@ public:
     //Return true if current operation references memory, and
     //it is the rhs of stmt.
     //These kinds of operation always use MD.
-    bool isMemoryOpnd() const 
+    bool isMemoryOpnd() const
     { return IRDES_is_mem_opnd(g_ir_desc[get_code()]); }
 
     //Return true if current ir is integer constant, and the number
@@ -818,7 +819,7 @@ public:
     //True if ir is atomic read-modify-write.
     inline bool isReadModWrite() const;
 
-    //True if ir is atomic operation.    
+    //True if ir is atomic operation.
     bool is_atomic() const { return IR_is_atomic(this); }
     bool is_judge() const { return is_relation() || is_logical(); }
     bool is_logical() const { return IRDES_is_logical(g_ir_desc[get_code()]); }
@@ -867,19 +868,19 @@ public:
         default: ASSERT(0, ("unsupport"));
         }
     }
-    
+
     //Return true if current ir can be placed in BB.
-    bool isStmtInBB() const 
+    bool isStmtInBB() const
     { return IRDES_is_stmt_in_bb(g_ir_desc[get_code()]); }
 
     //Return true if current stmt must modify 'md'.
     inline bool isExactDef(MD const* md) const;
     inline bool isExactDef(MD const* md, MDSet const* mds) const;
 
-    inline void set_prno(UINT prno);    
-    inline void setOffset(UINT ofst);    
+    inline void set_prno(UINT prno);
+    inline void setOffset(UINT ofst);
     inline void setLabel(LabelInfo const* li);
-    inline void setBB(IRBB * bb);    
+    inline void setBB(IRBB * bb);
     inline void setRHS(IR * rhs);
     inline void setSSAInfo(SSAInfo * ssa);
     inline void setDU(DU * du);
@@ -1001,9 +1002,11 @@ public:
 
 #define ID_info(ir)          (((CId*)CK_IRT(ir, IR_ID))->id_info)
 #define ID_du(ir)            (((CId*)CK_IRT(ir, IR_ID))->du)
+#define ID_phi(ir)           (((CId*)CK_IRT(ir, IR_ID))->phi)
 class CId : public DuProp, public VarProp {
 //ID need DU info, some Passes need it, e.g. GVN.
 public:
+    MDPhi * phi; //record the MD PHI dummy stmt if ID is operand of MD PHI.
 };
 
 
@@ -1246,7 +1249,7 @@ public:
 
     UINT prno; //Result PR number if any.
 
-    SSAInfo * prssainfo; //indicates PR ssa def and use set. 
+    SSAInfo * prssainfo; //indicates PR ssa def and use set.
 
     //NOTE: 'opnd' must be the last member.
     IR * opnd[2];

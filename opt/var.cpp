@@ -295,7 +295,7 @@ VAR * VarMgr::registerStringVar(CHAR const* var_name, SYM const* s, UINT align)
     }
 
     v = allocVAR();
-    
+
     if (var_name == NULL) {
         StrBuf buf(64);
         buf.sprint(".rodata_%lu", (ULONG)m_str_count++);

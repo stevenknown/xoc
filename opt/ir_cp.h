@@ -83,12 +83,35 @@ protected:
     inline bool checkTypeConsistency(
             IR const* ir,
             IR const* cand_expr) const;
+
+    bool doPropToMDPhi(
+            bool prssadu,
+            bool mdssadu,
+            IN IR const* prop_value,
+            IN IR * use,
+            MDSSAMgr * mdssamgr);
+    bool doPropToNormalStmt(
+            C<IR*> * cur_iter,
+            C<IR*> ** next_iter,
+            bool prssadu,
+            bool mdssadu,
+            IN IR const* prop_value,
+            IN IR * use,
+            IN IR * use_stmt,
+            IN IRBB * def_bb,
+            IN OUT IRBB * use_bb,
+            MDSSAMgr * mdssamgr);
     bool doProp(IN IRBB * bb, IN DefSBitSetCore & useset, MDSSAMgr * mdssamgr);
     void doFinalRefine();
 
     bool isSimpCVT(IR const* ir) const;
     bool isConstCVT(IR const* ir) const;
-    bool is_available(IR const* def_ir, IR const* occ, IR * use_ir);
+    bool is_available(
+            IR const* def_ir,
+            IR const* occ,
+            IR * use_ir,
+            MDPhi * use_phi,
+            IRBB * usebb);
     inline bool is_copy(IR * ir) const;
 
     bool performDomTree(IN Vertex * v, IN Graph & domtree);

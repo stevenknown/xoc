@@ -464,7 +464,7 @@ public:
     //e.g: = a + b + *p;
     //    assume p->w,u, the MustUse is {a,b,p}, not include w,u.
     void collectMustUsedMDs(IR const* ir, OUT MDSet & mustuse);
-    
+
     void computeGenForBB(
             IN IRBB * bb,
             OUT DefDBitSetCore & expr_univers,
@@ -483,8 +483,8 @@ public:
             Vector<MDSet*> const* maydefmds,
             DefMiscBitSetMgr & bsmgr);
     void computeMDDUChain(
-            IN OUT OptCtx & oc, 
-            bool retain_reach_def, 
+            IN OUT OptCtx & oc,
+            bool retain_reach_def,
             UINT duflag);
     void computeRegionMDDU(
             Vector<MDSet*> const* mustdefmds,
@@ -796,7 +796,7 @@ public:
 
     void setMustKilledDef(UINT bbid, DefDBitSetCore const* set);
     void setMayKilledDef(UINT bbid, DefDBitSetCore const* set);
-    void setKilledIRExpr(UINT bbid, DefDBitSetCore const* set);    
+    void setKilledIRExpr(UINT bbid, DefDBitSetCore const* set);
 
     //DU chain operations.
     //Set 'use' to be USE of 'stmt'.

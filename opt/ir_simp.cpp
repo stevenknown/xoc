@@ -1130,7 +1130,7 @@ IR * Region::simplifySwitchSelf(IR * ir, SimpCtx * ctx)
     }
 
     LabelInfo * switch_endlab = NULL;
-    
+
     //Simplify CASE list into IF as default to enable
     //more advantage high level optimizations.
     if (SWITCH_deflab(ir) != NULL) {
@@ -1142,14 +1142,14 @@ IR * Region::simplifySwitchSelf(IR * ir, SimpCtx * ctx)
             switch_endlab = genIlabel();
         }
         IR * goto_switch_end = buildGoto(switch_endlab);
-        xcom::add_next(&prev_ir_tree, goto_switch_end);        
+        xcom::add_next(&prev_ir_tree, goto_switch_end);
         copyDbx(goto_switch_end, ir, this);
     }
-    
+
     for (; case_lst != NULL; case_lst = IR_prev(case_lst)) {
         IR * ifstmt = buildIf(
             buildCmp(IR_EQ, dupIRTree(swt_val), CASE_vexp(case_lst)),
-            buildGoto(CASE_lab(case_lst)), 
+            buildGoto(CASE_lab(case_lst)),
             prev_ir_tree);
         copyDbx(ifstmt, case_lst, this);
         CASE_vexp(case_lst) = NULL;
@@ -1158,7 +1158,7 @@ IR * Region::simplifySwitchSelf(IR * ir, SimpCtx * ctx)
 
     xcom::add_next(&prev_ir_tree, SWITCH_body(ir));
     SWITCH_body(ir) = NULL;
-    
+
     if (switch_endlab != NULL) {
         xcom::add_next(&prev_ir_tree, buildLabel(switch_endlab));
     }

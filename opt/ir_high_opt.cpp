@@ -54,7 +54,7 @@ void Region::HighProcessImpl(OptCtx & oc)
 
         //Build DOM after CFG optimized.
         checkValidAndRecompute(&oc, PASS_DOM, PASS_UNDEF);
-        
+
         if (g_do_loop_ana) {
             ASSERT(g_do_cfg_dom, ("dominator is necessary to build loop"));
             checkValidAndRecompute(&oc, PASS_LOOP_INFO, PASS_UNDEF);
@@ -72,7 +72,7 @@ void Region::HighProcessImpl(OptCtx & oc)
     }
 
     if (g_do_aa) {
-        ASSERT0(g_cst_bb_list && OC_is_cfg_valid(oc));        
+        ASSERT0(g_cst_bb_list && OC_is_cfg_valid(oc));
         checkValidAndRecompute(&oc, PASS_AA, PASS_UNDEF);
     }
 
@@ -94,14 +94,14 @@ void Region::HighProcessImpl(OptCtx & oc)
         if (g_compute_du_chain) {
             f |= SOL_REACH_DEF;
         }
-                
+
         if (dumgr->perform(oc, f) && OC_is_ref_valid(oc)) {
             if (g_compute_du_chain) {
                 UINT flag = COMPUTE_NOPR_DU;
                 ASSERT0(getPassMgr());
-                
+
                 //If PRs have already been in SSA form, compute
-                //PR DU chain doesn't make any sense.                
+                //PR DU chain doesn't make any sense.
                 PRSSAMgr * ssamgr = NULL;
                 if ((ssamgr = (PRSSAMgr*)getPassMgr()->
                      queryPass(PASS_PR_SSA_MGR)) == NULL ||
@@ -191,7 +191,7 @@ bool Region::HighProcess(OptCtx & oc)
     }
 
     simp.setSimpCFS();
-    setIRList(simplifyStmtList(getIRList(), &simp));    
+    setIRList(simplifyStmtList(getIRList(), &simp));
     ASSERT0(verify_simp(getIRList(), simp));
     ASSERT0(verify_irs(getIRList(), NULL, this));
 

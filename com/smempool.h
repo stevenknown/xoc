@@ -112,7 +112,7 @@ size_t smpoolGetPoolSize(SMemPool const* handle);
 //the initialization is dispensable.
 void smpoolInitPool(); //Initializing pool utilities
 
-//This function perform finialization works 
+//This function perform finialization works
 //if smpoolInitPool() has been invoked.
 void smpoolFiniPool(); //Finializing pool
 

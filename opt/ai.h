@@ -48,7 +48,7 @@ class MDSSAInfo;
 //  IR_ai(ir) = region->allocAIContainer();
 //  Dbx * dbx = getDbx();
 //  IR_ai(ir)->set(AI_DBX, (BaseAttachInfo*)dbx);
-//  Note that you do not need to free/delete AI structure, 
+//  Note that you do not need to free/delete AI structure,
 //  which will be freed in destructor of region.
 
 //Attach Info Type.
@@ -111,7 +111,7 @@ public:
         if (!cont.is_init()) { return; }
         ASSERT0(type > AI_UNDEF && type < AI_LAST);
         for (UINT i = 0; i < cont.get_capacity(); i++) {
-            BaseAttachInfo * ac = cont.get(i);            
+            BaseAttachInfo * ac = cont.get(i);
             if (ac != NULL && ac->type == type) {
                 cont.set(i, NULL);
                 return;
@@ -197,7 +197,7 @@ public:
     void init(SMemPool * pool)
     {
         BaseAttachInfo::init(AI_EH_LABEL);
-        labels.init(pool);        
+        labels.init(pool);
     }
 
     SList<LabelInfo*> const& read_labels() const { return labels; }

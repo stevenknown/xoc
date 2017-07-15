@@ -107,7 +107,7 @@ bool IR_CFS_OPT::transformToDoWhile(IR ** head, IR * ir)
 {
     ASSERT(head != NULL && *head != NULL, ("invalid parameter"));
     if (!ir->is_lab()) { return false; }
-    
+
     for (IR * t = ir; t != NULL; t = t->get_next()) {
         if (!t->is_if()) { continue; }
 
@@ -319,7 +319,7 @@ bool IR_CFS_OPT::transformIf3(IR ** head, IR * ir)
             opnd0->is_int() &&
             opnd1->is_const() &&
             opnd1->is_int() &&
-            m_ru->getIntegerInDataTypeValueRange(opnd1) == 
+            m_ru->getIntegerInDataTypeValueRange(opnd1) ==
               m_ru->getMaxInteger(m_tm->get_dtype_bitsize(
                 TY_dtype(opnd1->get_type())), opnd1->is_signed())) {
             //e.g:
@@ -346,7 +346,7 @@ bool IR_CFS_OPT::transformIf3(IR ** head, IR * ir)
             opnd0->is_int() &&
             opnd1->is_const() &&
             opnd1->is_int() &&
-            m_ru->getIntegerInDataTypeValueRange(opnd1) == 
+            m_ru->getIntegerInDataTypeValueRange(opnd1) ==
               m_ru->getMinInteger(m_tm->get_dtype_bitsize(
                 TY_dtype(opnd1->get_type())), opnd1->is_signed())) {
             //x is signed, IF(x < 0x80000000) {a=1} ELSE {b=1}  =>  b=1
@@ -354,7 +354,7 @@ bool IR_CFS_OPT::transformIf3(IR ** head, IR * ir)
             if (IF_falsebody(ir) != NULL) {
                 allocIR = m_ru->dupIRTree(IF_falsebody(ir));
             }
-            
+
             xcom::replace(head, ir, allocIR);
 
             if (allocIR != NULL) {
@@ -372,7 +372,7 @@ bool IR_CFS_OPT::transformIf3(IR ** head, IR * ir)
             if (IF_falsebody(ir) != NULL) {
                 allocIR = m_ru->dupIRTree(IF_falsebody(ir));
             }
-            
+
             xcom::replace(head, ir, allocIR);
 
             if (allocIR != NULL) {

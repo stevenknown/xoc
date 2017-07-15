@@ -96,7 +96,7 @@ void initdump(CHAR const* f, bool is_del)
     }
     g_tfile = fopen(f, "a+");
     if (g_tfile == NULL) {
-        fprintf(stderr, 
+        fprintf(stderr,
             "\ncan not open dump file %s, errno:%d, errstring:\'%s\'\n",
             f, errno, strerror(errno));
     }
@@ -112,7 +112,7 @@ void note(CHAR const* format, ...)
     va_list arg;
     va_start(arg, format);
     buf.vstrcat(format, arg);
-    
+
     size_t i = 0;
     while (i < buf.strlen()) {
         if (buf.buf[i] == '\n') {
@@ -139,7 +139,7 @@ void note(CHAR const* format, ...)
 
     fprintf(g_tfile, "%s", buf.buf + i);
     fflush(g_tfile);
-FIN:    
+FIN:
     va_end(arg);
     return;
 }

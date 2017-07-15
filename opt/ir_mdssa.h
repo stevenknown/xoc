@@ -37,28 +37,28 @@ typedef TMapIter<UINT, MDPhiList*> BB2MDPhiListIter;
 
 class MDSSAMgr : public Pass {
 protected:
-    Region * m_ru;    
+    Region * m_ru;
     MDSystem * m_md_sys;
     TypeMgr * m_tm;
     IR_CFG * m_cfg;
     DefSegMgr * m_seg_mgr;
     DefMiscBitSetMgr * m_sbs_mgr;
     bool m_is_ssa_constructed;
-    
-    IRIter m_iter; //for tmp use.   
+
+    IRIter m_iter; //for tmp use.
 
     //Record version stack during renaming.
     UINT2VMDStack m_map_md2stack;
-    
+
     //record version number counter for pr.
-    xcom::Vector<UINT> m_max_version; 
+    xcom::Vector<UINT> m_max_version;
 
     UseDefMgr m_usedef_mgr;
 protected:
     void init()
     {
-        if (m_usedef_mgr.m_mdssainfo_pool != NULL) { return; }        
-        m_is_ssa_constructed = false;        
+        if (m_usedef_mgr.m_mdssainfo_pool != NULL) { return; }
+        m_is_ssa_constructed = false;
     }
 
     //NOTE this function only be called at constructor.
@@ -70,7 +70,7 @@ protected:
         m_sbs_mgr = NULL;
         m_cfg = NULL;
         m_is_ssa_constructed = false;
-    }    
+    }
 
     void addDefChain(MDDef * def1, MDDef * def2);
 
@@ -95,7 +95,7 @@ protected:
             IN OUT BB2VMDMap & bb2vmdmap);
 
     Stack<VMD*> * mapMD2VMDStack(UINT mdid);
-    
+
     void renamePhiResult(IN IRBB * bb);
     void renameUse(IR * ir);
     void renameDef(IR * ir, IRBB * bb);
@@ -106,10 +106,10 @@ protected:
     void renameInDomTreeOrder(
             IRBB * root,
             Graph & dtree,
-            Vector<DefSBitSet*> & defed_prs_vec);    
+            Vector<DefSBitSet*> & defed_prs_vec);
 
     void stripPhi(MDPhi * phi);
-    
+
     void prunePhi(List<IRBB*> & wl);
     void prunePhiForBB(List<IRBB*> & wl, IRBB * bb);
     void placePhiForMD(
@@ -146,10 +146,10 @@ public:
         m_md_sys = ru->getMDSystem();
     }
     COPY_CONSTRUCTOR(MDSSAMgr);
-    ~MDSSAMgr() 
-    { 
+    ~MDSSAMgr()
+    {
         ASSERT(!isMDSSAConstructed(), ("should be destructed"));
-        destroy(); 
+        destroy();
     }
 
     void buildDUChain(IR * def, IR * use)
@@ -180,7 +180,7 @@ public:
     void construction(DomTree & domtree);
     size_t count_mem();
     void cleanMDSSAInfoOfIR(IR * ir);
-    
+
     void destroy();
     void destruction(DomTree & domtree);
     void destruction();
@@ -210,7 +210,7 @@ public:
     //common_def: record the common_def if the definition
     //  of all opnd is the same.
     bool isRedundantPHI(MDPhi const* phi, OUT VMD ** common_def) const;
-    
+
     //Reinitialize MD SSA manager.
     //This function will clean all informations and recreate them.
     void reinit();

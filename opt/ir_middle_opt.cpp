@@ -86,9 +86,9 @@ bool Region::performSimplify(OptCtx & oc)
     if (g_is_lower_to_pr_mode) {
         simp.setSimpToPRmode();
     }
-  
+
     simplifyBBlist(getBBList(), &simp);
-    
+
     if (g_do_cfg &&
         g_cst_bb_list &&
         SIMP_need_recon_bblist(&simp) &&
@@ -122,9 +122,9 @@ bool Region::performSimplify(OptCtx & oc)
     } else {
         ASSERT0(verifyMDRef());
     }
-    
+
     if (g_verify_level >= VERIFY_LEVEL_3 && OC_is_du_chain_valid(oc)) {
-        ASSERT0(getDUMgr() == NULL || 
+        ASSERT0(getDUMgr() == NULL ||
             getDUMgr()->verifyMDDUChain(COMPUTE_PR_DU | COMPUTE_NOPR_DU));
     }
 
@@ -161,7 +161,7 @@ bool Region::MiddleProcess(OptCtx & oc)
     if (bbl->get_elem_count() == 0) { return true; }
 
     if (g_verify_level >= VERIFY_LEVEL_3) {
-        ASSERT0(getDUMgr() == NULL || 
+        ASSERT0(getDUMgr() == NULL ||
             getDUMgr()->verifyMDDUChain(COMPUTE_PR_DU | COMPUTE_NOPR_DU));
     }
 

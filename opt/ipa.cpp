@@ -47,7 +47,7 @@ Region * IPA::findRegion(IR * call, Region * callru)
     ASSERT(callercn, ("caller is not on graph"));
 
     SYM const* callname = CALL_idinfo(call)->get_name();
-    
+
     //Iterate accessing successors.
     ASSERT0(cg->get_vertex(CN_id(callercn)));
     for (EdgeC const* ec = VERTEX_out_list(cg->get_vertex(CN_id(callercn)));
@@ -113,7 +113,7 @@ void IPA::createCallDummyuse(Region * ru)
         BBList * bbl = ru->getBBList();
         if (bbl == NULL) { return; }
         for (IRBB * bb = bbl->get_head(); bb != NULL; bb = bbl->get_next()) {
-            for (IR * ir2 = BB_first_ir(bb); 
+            for (IR * ir2 = BB_first_ir(bb);
                  ir2 != NULL; ir2 = BB_next_ir(bb)) {
                 if (!ir2->is_call()) { continue; }
                 //TODO: handle icall.
@@ -137,11 +137,11 @@ void IPA::computeCallRefForAllRegion()
     for (UINT i = 0; i < m_rumgr->getNumOfRegion(); i++) {
         Region * ru = m_rumgr->getRegion(i);
         if (ru == NULL ||
-            (ru->getIRList() == NULL && 
-             ru->getBBList()->get_elem_count() == 0)) { 
-            continue; 
+            (ru->getIRList() == NULL &&
+             ru->getBBList()->get_elem_count() == 0)) {
+            continue;
         }
-        
+
         ru->initPassMgr();
         IR_AA * aa = (IR_AA*)ru->getPassMgr()->
             registerPass(PASS_AA);
@@ -150,7 +150,7 @@ void IPA::computeCallRefForAllRegion()
         ASSERT0(dumgr);
         dumgr->computeCallRef(COMPUTE_PR_DU|COMPUTE_NOPR_DU);
         ru->getPassMgr()->destroyPass(dumgr);
-        ru->getPassMgr()->destroyPass(aa);        
+        ru->getPassMgr()->destroyPass(aa);
     }
     END_TIMER_AFTER("computeCallRefForAllRegion()");
 }
@@ -162,7 +162,7 @@ void IPA::createCallDummyuse(OptCtx & oc)
         Region * ru = m_rumgr->getRegion(i);
         if (ru == NULL) { continue; }
         createCallDummyuse(ru);
-        
+
         if (g_compute_du_chain) {
             OptCtx loc(oc);
             recomputeDUChain(ru, loc);
@@ -184,8 +184,8 @@ void IPA::createCallDummyuse(OptCtx & oc)
 void IPA::recomputeDUChain(Region * ru, OptCtx & oc)
 {
     ASSERT0(ru);
-    if (ru->getIRList() == NULL && 
-        (ru->getBBList() == NULL || 
+    if (ru->getIRList() == NULL &&
+        (ru->getBBList() == NULL ||
          ru->getBBList()->get_elem_count() == 0)) {
         return;
     }

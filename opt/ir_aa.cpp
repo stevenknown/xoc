@@ -383,9 +383,9 @@ void IR_AA::processLda(IR * ir, IN OUT MDSet & mds, IN OUT AACtx * ic)
 
     //Inform the caller that there is MD has been taken address.
     AC_has_comp_lda(ic) = true;
-    
+
     if (!AC_is_mds_mod(ic) && LDA_ofst(ir) == 0) { return; }
-    
+
     if ((LDA_ofst(ir) != 0 && t->is_exact()) || ir->getParent()->is_array()) {
         //If LDA is array base, and LDA ofst may not be 0.
         //e.g: struct S { int a; int b[..]; }
@@ -400,7 +400,7 @@ void IR_AA::processLda(IR * ir, IN OUT MDSet & mds, IN OUT AACtx * ic)
             //The result data type of LDA will amended to be the type of
             //array element if array is the field of D_MC.
             //e.g: struct S { int a; int b[..]; }
-            //    access s.b[..] generate ARRAY(LDA(s, ofst(4))            
+            //    access s.b[..] generate ARRAY(LDA(s, ofst(4))
             UINT elem_sz = ir->getParent()->get_type_size(m_tm);
             ASSERT0(elem_sz > 0);
             MD_size(&md) = elem_sz;
@@ -413,7 +413,7 @@ void IR_AA::processLda(IR * ir, IN OUT MDSet & mds, IN OUT AACtx * ic)
             mds.clean(*m_misc_bs_mgr);
             mds.bunion_pure(MD_id(entry), *m_misc_bs_mgr);
         }
-    }    
+    }
 }
 
 
@@ -518,8 +518,8 @@ void IR_AA::computeMayPointTo(IR * pointer, IN MD2MDSet * mx, OUT MDSet & mds)
         MDSet tmp;
         processLda(pointer, tmp, &ic);
         ASSERT0(tmp.get_elem_count() == 1);
-        
-        SEGIter * iter;        
+
+        SEGIter * iter;
         MD const* t = m_md_sys->getMD((UINT)tmp.get_first(&iter));
         ASSERT0(t);
         if (t->is_exact()) {
@@ -530,7 +530,7 @@ void IR_AA::computeMayPointTo(IR * pointer, IN MD2MDSet * mx, OUT MDSet & mds)
             ASSERT0(MD_id(entry) > 0);
             t = entry;
         }
-        
+
         mds.bunion(t, *m_misc_bs_mgr);
         tmp.clean(*m_misc_bs_mgr);
         return;
@@ -1578,7 +1578,7 @@ void IR_AA::recomputeDataType(AACtx const& ic, IR const* ir, OUT MDSet & pts)
         //a pointer that pointed to an i32 memory space.
 
         //ir's type may not be pointer type.
-        //e.g: x = (int)&arr[j], the result type of LDA has been 
+        //e.g: x = (int)&arr[j], the result type of LDA has been
         //converted to integer. So x will be integer.
 
         if (ir->is_ptr()) {
@@ -2467,7 +2467,7 @@ void IR_AA::processCall(IN IR * ir, IN MD2MDSet * mx)
         ASSERT(t, ("result of call miss exact MD."));
 
         if (ir->is_ptr() || ir->is_void()) {
-            //Try to improve the precsion via typed alias info or 
+            //Try to improve the precsion via typed alias info or
             //set ir pointed to May-Point-To set for conservative purpose.
             MD const* typed_md;
             if (ir->getAI() != NULL &&
@@ -2940,7 +2940,7 @@ void IR_AA::dumpPtPairSet(PtPairSet & pps)
 
         fprintf(g_tfile, "%s", from->get_base()->dump(buf, m_tm));
         if (from->is_exact()) {
-            fprintf(g_tfile, ":ofst(%u):size(%u)", 
+            fprintf(g_tfile, ":ofst(%u):size(%u)",
                 MD_ofst(from), MD_size(from));
         } else {
             fprintf(g_tfile, ":ofst(--):size(%u)", MD_size(from));

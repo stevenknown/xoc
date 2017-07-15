@@ -72,7 +72,7 @@ static void generate_region(RegionMgr * rm)
 
     //Load g with i32 type
     IR * ld_exp = func_ru->buildLoad(g, i32ty);
-        
+
     //Store q with i32 type
     IR * st_stmt = func_ru->buildStore(q, ld_exp);
 
@@ -88,7 +88,7 @@ static void generate_region(RegionMgr * rm)
 
     //Build g = g - 1
     IR * false_stmt = func_ru->buildStore(g,
-        func_ru->buildBinaryOp(IR_SUB, 
+        func_ru->buildBinaryOp(IR_SUB,
             i32ty,
             func_ru->buildLoad(g),
             func_ru->buildImmInt(1, i32ty)));
@@ -97,11 +97,11 @@ static void generate_region(RegionMgr * rm)
     IR * false_stmt_2 = func_ru->buildStore(q,
         func_ru->buildImmInt(30, i32ty));
 
-    //Chain false_stmt and false_stmt_2 into a list.    
+    //Chain false_stmt and false_stmt_2 into a list.
     add_next(&false_stmt, false_stmt_2);
 
     //Build q >= 20
-    IR * det_exp = func_ru->buildCmp(IR_GE, 
+    IR * det_exp = func_ru->buildCmp(IR_GE,
         func_ru->buildLoad(q),
         func_ru->buildImmInt(20, i32ty));
 
@@ -110,13 +110,13 @@ static void generate_region(RegionMgr * rm)
 
     //Record IR stmt in an IR-list of region
     func_ru->addToIRList(ifstmt);
-        
+
     //Build return stmt
     //Note the type of current g becomes u32
-    IR * ret = REGION_ru(ir)->buildReturn(func_ru->buildLoad(g, u32ty));           
+    IR * ret = REGION_ru(ir)->buildReturn(func_ru->buildLoad(g, u32ty));
 
     //Record IR stmt in an IR-list of region
-    func_ru->addToIRList(ret);   
+    func_ru->addToIRList(ret);
 }
 
 
@@ -147,7 +147,7 @@ int main(int argc, char * argv[])
     delete g_dbx_mgr;
     g_dbx_mgr = NULL;
     printf("\nFinish\n");
-    
+
     finidump();
 
     return 0;

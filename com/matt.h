@@ -1548,10 +1548,10 @@ INT Matrix<T>::ReverseOrderNumber(INT * numbuf, UINT numlen)
 //n: natural number.
 template <class T>
 void Matrix<T>::FullPermutationRecur(
-        INT v, 
+        INT v,
         INT * posbuf,
-        UINT posbufnum, 
-        INT n, 
+        UINT posbufnum,
+        INT n,
         T & det)
 {
     for (UINT i = 0; i < posbufnum; i++) {
@@ -3013,7 +3013,7 @@ bool Matrix<T>::lu(OUT Matrix<T> & l, OUT Matrix<T> & u)
     l.reinit(m_row_size, m_row_size, &m_inhr);
     l.eye(1);
 
-    for (UINT row = 0, col = 0; 
+    for (UINT row = 0, col = 0;
          row < u.m_row_size && col < u.m_col_size;
          row++, col++) {
         //Finding the perfect pivot entry or permuting
@@ -3304,14 +3304,14 @@ T Matrix<T>::dot(UINT srow, UINT scol,
 //'srow, scol, erow, ecol'  must express one vector.
 //'v': v must be a row/col vector.
 template <class T>
-T Matrix<T>::dot(UINT srow, 
-                 UINT scol, 
-                 UINT erow, 
+T Matrix<T>::dot(UINT srow,
+                 UINT scol,
+                 UINT erow,
                  UINT ecol,
-                 Matrix<T> const& v, 
-                 UINT vsrow, 
+                 Matrix<T> const& v,
+                 UINT vsrow,
                  UINT vscol,
-                 UINT verow, 
+                 UINT verow,
                  UINT vecol) const
 {
     ASSERT(m_is_init, ("not yet initialize."));

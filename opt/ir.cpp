@@ -507,7 +507,7 @@ void dump_ir(IR const* ir,
     StrBuf buf(64);
     StrBuf buf2(64);
 
-    if (g_dbx_mgr != NULL && dump_src_line) {        
+    if (g_dbx_mgr != NULL && dump_src_line) {
         g_dbx_mgr->printSrcLine(ir);
     }
 
@@ -523,7 +523,7 @@ void dump_ir(IR const* ir,
             CHAR tt[40];
             tt[0] = 0;
             CHAR * name = xstrcat(tt, 40, "%s",
-            SYM_name(ST_idinfo(ir)->get_name()));            
+            SYM_name(ST_idinfo(ir)->get_name()));
 
             //Dump operator and variable name.
             note("\nst:%s", xdm->dump_type(d, buf));
@@ -642,7 +642,7 @@ void dump_ir(IR const* ir,
             //Dump variable info.
             CHAR * name = xstrcat(tt, 40, "%s",
                 SYM_name(LD_idinfo(ir)->get_name()));
-            
+
             if (LD_ofst(ir) != 0) {
                 note("\nld:%s:offset(%d) '%s'",
                      xdm->dump_type(d, buf), LD_ofst(ir), name);
@@ -703,7 +703,7 @@ void dump_ir(IR const* ir,
             break;
         }
     case IR_CONST:
-        if (ir->is_sint()) {            
+        if (ir->is_sint()) {
             #if WORD_LENGTH_OF_HOST_MACHINE==32
             CHAR const* intfmt = "\nintconst:%s %d|0x%x";
             #elif WORD_LENGTH_OF_HOST_MACHINE==64
@@ -711,7 +711,7 @@ void dump_ir(IR const* ir,
             #else
             #error "Need to support";
             #endif
-            note(intfmt, xdm->dump_type(d, buf), 
+            note(intfmt, xdm->dump_type(d, buf),
                  CONST_int_val(ir), CONST_int_val(ir));
         } else if (ir->is_uint()) {
             #if WORD_LENGTH_OF_HOST_MACHINE==32
@@ -752,7 +752,7 @@ void dump_ir(IR const* ir,
             #else
             #error "Need to support";
             #endif
-            note(intfmt, xdm->dump_type(d, buf), 
+            note(intfmt, xdm->dump_type(d, buf),
                  CONST_int_val(ir), CONST_int_val(ir));
         } else {
             //Dump as HOST_INT type even if it is unrecognized,
@@ -1110,7 +1110,7 @@ void dump_ir(IR const* ir,
                      dump_src_line, dump_addr, dump_inner_region);
             g_indent -= dn;
 
-            if (SWITCH_case_list(ir) != NULL) {                
+            if (SWITCH_case_list(ir) != NULL) {
                 dump_irs(SWITCH_case_list(ir), tm, NULL, dump_kid,
                          dump_src_line, dump_addr, dump_inner_region);
             }
@@ -1236,7 +1236,7 @@ void dump_ir(IR const* ir,
                 UINT i = 0;
 
                 //Dump parameter list.
-                for (IR * p2 = CALL_param_list(ir); 
+                for (IR * p2 = CALL_param_list(ir);
                      p2 != NULL; p2 = p2->get_next()) {
                     sprintf(tmpbuf, " param%d", i);
                     g_indent += dn;
@@ -1248,7 +1248,7 @@ void dump_ir(IR const* ir,
 
                 //Dump dummy use.
                 i = 0;
-                for (IR * p2 = CALL_dummyuse(ir); 
+                for (IR * p2 = CALL_dummyuse(ir);
                      p2 != NULL; p2 = p2->get_next()) {
                     sprintf(tmpbuf, " dummy%d", i);
                     g_indent += dn;
@@ -1318,7 +1318,7 @@ void dump_ir(IR const* ir,
         ASSERT(0, ("unknown IR type:%s", IRNAME(ir)));
         return ;
     }
-    
+
     fflush(g_tfile);
 }
 

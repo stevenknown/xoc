@@ -230,7 +230,7 @@ void LT::clean()
     //lt_group_pos = 0;
     //if (lt_group != NULL) {
     //    lt_group->clean();
-    //}    
+    //}
 }
 
 
@@ -1376,7 +1376,7 @@ void GIG::dump_vcg(CHAR const* name)
     if (name == NULL) {
         name = "graph_global_if.vcg";
     }
-    
+
     UNLINK(name);
     FILE * h = fopen(name, "a+");
     ASSERT(h, ("%s create failed!!!",name));
@@ -1416,7 +1416,7 @@ void GIG::dump_vcg(CHAR const* name)
               "edge.color: darkgreen\n");
 
     StrBuf buf(128);
-    
+
     //Print node
     INT c;
     for (Vertex const* v = m_vertices.get_first(c);
@@ -1436,7 +1436,7 @@ void GIG::dump_vcg(CHAR const* name)
                 VERTEX_id(EDGE_to(e)),
                 m_is_direction ? "" : "arrowstyle:none" );
     }
-    
+
     fprintf(h, "\n}\n");
     fclose(h);
 }
@@ -1664,7 +1664,7 @@ void IG::dump_vcg(CHAR const* name)
                 VERTEX_id(EDGE_from(e)), VERTEX_id(EDGE_to(e)),
                 m_is_direction ? "" : "arrowstyle:none" );
     }
-    
+
     fprintf(h, "\n}\n");
     fclose(h);
 }
@@ -4011,7 +4011,7 @@ bool BBRA::split(LT * lt)
     //INT hole_startpos, hole_endpos;
     //bool split_hole = false;
     //if (has_hole && cand != lt) {
-    //    split_hole = getResideinHole(&hole_startpos, 
+    //    split_hole = getResideinHole(&hole_startpos,
     //        &hole_endpos, cand, lt, mgr);
     //}
     //
@@ -4158,7 +4158,7 @@ static bool gdebug()
 //START RA
 //
 void RA::allocLocal(List<UINT> & nis, bool omit_constrain)
-{    
+{
     List<LT*> unalloc;
     List<LT*> tmp;
     List<LT*> prios;
@@ -5916,10 +5916,10 @@ void RA::allocGlobal(List<UINT> & nis, List<UINT> & nis2)
 
 bool RA::perform(OptCtx & oc)
 {
-    bool omit_constrain = true;    
+    bool omit_constrain = true;
     get_glt(10); //for debug symbol
     get_lt(1,0); //for debug symbol
-    
+
     m_cfg->dump_vcg();
     m_pr2v->dump();
     START_TIMER("GRA");

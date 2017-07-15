@@ -93,7 +93,7 @@ IR * Inliner::replaceReturnImpl(
                 UINT receive = CALL_prno(caller_call);
                 IR * mv_lst = NULL;
                 if (send != NULL) {
-                    IR * mv = caller->buildStorePR(receive, 
+                    IR * mv = caller->buildStorePR(receive,
                         caller_call->get_type(), send);
                     xcom::insertbefore_one(&mv_lst, mv_lst, mv);
                 }

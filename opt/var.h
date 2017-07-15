@@ -277,8 +277,8 @@ public:
     virtual CHAR const* dump(StrBuf & buf, TypeMgr const* dm) const;
 
     void setToGlobal(bool is_global)
-    {         
-        VAR_is_global(this) = (UINT)is_global; 
+    {
+        VAR_is_global(this) = (UINT)is_global;
         VAR_is_local(this) = (UINT)!is_global;
     }
 };

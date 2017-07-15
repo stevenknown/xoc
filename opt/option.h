@@ -255,7 +255,7 @@ extern UINT g_verify_level;
 //           mul (u32) id:13
 //               ld (i32 'i')
 //               intconst 24|0x18 (u32) id:14
-//Note user should definitely confirm that the point-to information 
+//Note user should definitely confirm that the point-to information
 //of parameters of call can be left out if the flag set to false.
 extern bool g_is_simplify_parameter;
 

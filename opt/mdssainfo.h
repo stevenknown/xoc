@@ -39,7 +39,7 @@ class MDSSAMgr;
 
 //Mapping from MD id to vector of VMD.
 class UINT2VMDVec {
-protected:    
+protected:
     UINT m_threshold;
     Vector<Vector<VMD*>*> m_mdid2vmdvec_vec;
     TMap<UINT, Vector<VMD*>*> m_mdid2vmdvec_map;
@@ -50,22 +50,22 @@ public:
 
     UINT count_mem() const;
 
-    void init(UINT threshold = 1000) 
-    { 
-        m_threshold = threshold; 
+    void init(UINT threshold = 1000)
+    {
+        m_threshold = threshold;
         m_mdid2vmdvec_vec.init();
         m_mdid2vmdvec_map.init();
     }
-    
+
     void destroy()
     {
         m_mdid2vmdvec_vec.destroy();
         m_mdid2vmdvec_map.destroy();
     }
 
-    Vector<VMD*> * get(UINT mdid) 
+    Vector<VMD*> * get(UINT mdid)
     {
-        if (mdid < m_threshold) { 
+        if (mdid < m_threshold) {
             return m_mdid2vmdvec_vec.get(mdid);
         }
         return m_mdid2vmdvec_map.get(mdid);
@@ -80,7 +80,7 @@ public:
 //Mapping from MD id to Stack of VMD.
 typedef Vector<Stack<VMD*>*> UINT2VMDStack;
 
-    
+
 typedef enum _VOPND_CODE {
     VOPND_UNDEF = 0,
     VOPND_MD,
@@ -95,18 +95,18 @@ class VOpnd {
 public:
     VOPND_CODE m_code;
     UINT m_id;
-    
+
 public:
     VOpnd();
     COPY_CONSTRUCTOR(VOpnd);
     ~VOpnd();
 
-    void clean() 
-    { 
-        VOPND_id(this) = 0; 
-        VOPND_code(this) = VOPND_UNDEF; 
-    } 
-    VOPND_CODE code() const { return VOPND_code(this); }   
+    void clean()
+    {
+        VOPND_id(this) = 0;
+        VOPND_code(this) = VOPND_UNDEF;
+    }
+    VOPND_CODE code() const { return VOPND_code(this); }
 
     bool is_const() const { return VOPND_code(this) == VOPND_CONST; }
     bool is_md() const { return VOPND_code(this) == VOPND_MD; }
@@ -142,7 +142,7 @@ public:
     UINT m_mdid;
     MDDef * m_def_stmt;
     IRSet m_occs;
-    
+
 public:
     VMD();
     VMD(DefSegMgr * sm);
@@ -170,16 +170,16 @@ public:
     MDDef * getDef() const { return VMD_def(this); }
     IRSet * getOccSet() { return &VMD_occs(this); }
 
-    UINT mdid() const 
-    { 
+    UINT mdid() const
+    {
         ASSERT0(is_md());
-        return VMD_mdid(this); 
+        return VMD_mdid(this);
     }
 
-    UINT version() const 
-    { 
+    UINT version() const
+    {
         ASSERT0(is_md());
-        return VMD_version(this); 
+        return VMD_version(this);
     }
 };
 
@@ -194,7 +194,7 @@ public:
     //otherwise it will incur SegMgr assertion.
     ~VOpndSet() {}
 
-    void append(VOpnd const* v, DefMiscBitSetMgr & m) 
+    void append(VOpnd const* v, DefMiscBitSetMgr & m)
     { DefSBitSetCore::bunion(v->id(), m); }
 
     bool find(VOpnd const* v) const
@@ -212,7 +212,7 @@ public:
 
 typedef SEGIter * VOpndSetIter;
 
-class MDSSAInfo : public MDSSAInfoAttachInfo {   
+class MDSSAInfo : public MDSSAInfoAttachInfo {
 protected:
     VOpndSet m_vopnd_set;
 
@@ -260,7 +260,7 @@ public:
 
     //Before destruction, invoke clean() to free memory resource.
     ~MDDef();
-    
+
     IRBB * getBB() const { return MDDEF_bb(this); }
     VMD * getResult() const { return MDDEF_result(this); }
     MDDef * getPrev() const { return MDDEF_prev(this); }
@@ -269,9 +269,9 @@ public:
 
     UINT id() const { return MDDEF_id(this); }
     void init(bool is_phi)
-    { 
-        MDDEF_bb(this) = NULL; 
-        MDDEF_result(this) = NULL; 
+    {
+        MDDEF_bb(this) = NULL;
+        MDDEF_result(this) = NULL;
         MDDEF_is_phi(this) = (BYTE)is_phi;
         MDDEF_prev(this) = NULL;
         MDDEF_nextset(this) = NULL;
@@ -291,7 +291,7 @@ public:
     //otherwise it will incur SegMgr assertion.
     ~MDDefSet() {}
 
-    void append(MDDef const* v, DefMiscBitSetMgr & m) 
+    void append(MDDef const* v, DefMiscBitSetMgr & m)
     { DefSBitSetCore::bunion(v->id(), m); }
 
     bool find(MDDef const* v) const
@@ -319,15 +319,17 @@ public:
     ~MDPhi();
 
     void init()
-    { 
+    {
         MDDef::init(true);
         m_opnd_list = NULL;
     }
-    
-    void dump(Region * ru, UseDefMgr * mgr);    
-    
+
+    void dump(Region * ru, UseDefMgr * mgr);
+
     IR * getOpndList() const { return m_opnd_list; }
     VMD * getOpndVMD(IR const* opnd, UseDefMgr const* mgr) const;
+
+    void replaceOpnd(IR * oldopnd, IR * newopnd);
 };
 
 
@@ -361,10 +363,9 @@ protected:
     Vector<VOpnd*> m_vopnd_vec;
     Vector<MDPhiList*> m_philist_vec; //record the Phi list of BB.
     UINT2VMDVec m_map_md2vmd; //record version for each MD.
-    TMap<IR*, MDPhi*> m_opnd2phi; //map from phi-operand to phi stmt.        
-protected: 
+protected:
     void cleanOrDestroy(bool is_reinit);
-    void destroyMD2VMDVec();    
+    void destroyMD2VMDVec();
 public:
     UseDefMgr(Region * ru);
     COPY_CONSTRUCTOR(UseDefMgr);
@@ -375,7 +376,7 @@ public:
     MDSSAInfo * allocMDSSAInfo();
     MDPhi * allocMDPhi(UINT mdid, UINT num_operands);
     MDDef * allocMDDef();
-    MDDefSet * allocMDDefSet();    
+    MDDefSet * allocMDDefSet();
     SC<VOpnd*> * allocSCVOpnd(VOpnd * opnd);
     VConst * allocVConst(IR const* ir);
     VMD * allocVMD(UINT mdid, UINT version);

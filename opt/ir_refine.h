@@ -101,7 +101,7 @@ public:
         RC_hoist_to_lnot(*this) = true;
     }
 
-    void setUnOptFlag() 
+    void setUnOptFlag()
     {
         RC_refine_div_const(*this) = false;
         RC_refine_mul_const(*this) = false;

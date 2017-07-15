@@ -205,11 +205,11 @@ AbsNode * CfsMgr::constructAbsIf(
     ASSERT0(ci != NULL && CFS_INFO_head(ci) == entry);
 
     BitSet loc_visited;
-    ABS_NODE_true_body(node) = constructAbsTree(true_body, node, 
+    ABS_NODE_true_body(node) = constructAbsTree(true_body, node,
         CFS_INFO_true_body(ci), cur_graph, loc_visited);
     visited.bunion(loc_visited);
     loc_visited.clean();
-    ABS_NODE_false_body(node) = constructAbsTree(false_body, node, 
+    ABS_NODE_false_body(node) = constructAbsTree(false_body, node,
         CFS_INFO_false_body(ci), cur_graph, loc_visited);
     visited.bunion(loc_visited);
     visited.bunion(BB_id(entry));

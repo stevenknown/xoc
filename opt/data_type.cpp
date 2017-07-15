@@ -387,7 +387,7 @@ UINT TypeMgr::get_bytesize(Type const* type) const
 
 CHAR const* TypeMgr::dump_type(Type const* type, OUT StrBuf & buf)
 {
-    ASSERT0(type);    
+    ASSERT0(type);
     DATA_TYPE dt = TY_dtype(type);
     switch (dt) {
     case D_B:
@@ -412,7 +412,7 @@ CHAR const* TypeMgr::dump_type(Type const* type, OUT StrBuf & buf)
         buf.strcat("%s(%d)", DTNAME(dt), get_bytesize(type));
         break;
     case D_PTR:
-        buf.strcat("%s", DTNAME(dt));        
+        buf.strcat("%s", DTNAME(dt));
         buf.strcat("(%d)", TY_ptr_base_size(type));
         break;
     case D_VEC:

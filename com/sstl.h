@@ -440,7 +440,7 @@ template <class T> class SC {
 public:
     SC<T> * next;
     T value;
-    
+
 public:
     SC() { init(); }
     COPY_CONSTRUCTOR(SC<T>);
@@ -1803,9 +1803,9 @@ public:
     }
 
     void init(SMemPool * pool)
-    { 
+    {
         SListCore<T>::init();
-        set_pool(pool); 
+        set_pool(pool);
     }
 
     void set_pool(SMemPool * pool)
@@ -4148,7 +4148,7 @@ template <class Tsrc, class Ttgt>
 class TMapIter2 : public SList<RBTNode<Tsrc, Ttgt>*> {
 public:
     typedef RBTNode<Tsrc, Ttgt>* Container;
-    
+
 public:
     TMapIter2(SMemPool * pool) : SList<RBTNode<Tsrc, Ttgt>*>(pool)
     { ASSERT0(pool); }

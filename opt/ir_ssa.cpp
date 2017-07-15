@@ -473,7 +473,7 @@ IR * PRSSAMgr::initVP(IN IR * ir)
     for (IR * kid = iterInit(ir, m_iter);
          kid != NULL; kid = iterNext(m_iter)) {
         if (ir->is_rhs(kid) && kid->is_pr()) {
-            PR_ssainfo(kid) = allocVP(PR_no(kid), 0);            
+            PR_ssainfo(kid) = allocVP(PR_no(kid), 0);
             if (m_prno2ir.get(PR_no(kid)) == NULL) {
                 m_prno2ir.set(PR_no(kid), kid);
             }

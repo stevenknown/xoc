@@ -291,7 +291,7 @@ public:
     }
 
     UINT id() const { return BB_id(this); }
-    
+
     //Return true if BB is an entry BB of TRY block.
     inline bool isTryStart() const
     {
@@ -453,7 +453,7 @@ public:
     bool successorHasPhi(CFG<IRBB, IR> * cfg);
 
     INT rpo() const { return BB_rpo(this); }
-    
+
     //Before removing bb or change bb successor,
     //you need remove the related PHI operand if BB successor has PHI stmt.
     void removeSuccessorPhiOpnd(CFG<IRBB, IR> * cfg);

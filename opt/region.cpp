@@ -1221,7 +1221,7 @@ IR * Region::buildImmInt(HOST_INT v, Type const* type)
     IR * imm = allocIR(IR_CONST);
     if (type->is_int()) {
         //Make sure value is sign-extended.
-        switch (TY_dtype(type)) { 
+        switch (TY_dtype(type)) {
         case D_B:
         case D_I8:
         case D_U8:
@@ -1254,13 +1254,13 @@ IR * Region::buildImmInt(HOST_INT v, Type const* type)
                 INT64 sv = (INT64)uv;
                 CONST_int_val(imm) = (HOST_INT)sv;
             }
-            break;            
+            break;
         default: ASSERT(0, ("TODO"));
         }
     } else {
         CONST_int_val(imm) = v;
     }
-        
+
     IR_dt(imm) = type;
     return imm;
 }
@@ -1600,12 +1600,12 @@ bool Region::evaluateConstInteger(IR const* ir, OUT ULONGLONG * const_value)
             //TODO: Handle the case if opnd0's type is different with opnd1.
             if (!opnd0->is_int() || !opnd1->is_int()) { return false; }
             if (opnd0->is_uint() ^ opnd1->is_uint()) { return false; }
-            
+
             ULONGLONG lvalue = 0, rvalue = 0;
             if (!evaluateConstInteger(BIN_opnd0(ir), &lvalue)) { return false; }
             if (!evaluateConstInteger(BIN_opnd1(ir), &rvalue)) { return false; }
 
-            if (opnd0->is_uint()) {                
+            if (opnd0->is_uint()) {
                 switch (ir->get_code()) {
                 case IR_ADD: *const_value = lvalue + rvalue; break;
                 case IR_MUL: *const_value = lvalue * rvalue; break;
@@ -1688,8 +1688,8 @@ bool Region::evaluateConstInteger(IR const* ir, OUT ULONGLONG * const_value)
                 }
             } else {
                 DUSet const* defset = ir->readDUSet();
-                if (defset == NULL || defset->get_elem_count() != 1) { 
-                    return false; 
+                if (defset == NULL || defset->get_elem_count() != 1) {
+                    return false;
                 }
 
                 DUIter di = NULL;
@@ -1700,7 +1700,7 @@ bool Region::evaluateConstInteger(IR const* ir, OUT ULONGLONG * const_value)
             }
             return evaluateConstInteger(STPR_rhs(defstmt), const_value);
         }
-    case IR_CVT:        
+    case IR_CVT:
         return evaluateConstInteger(CVT_exp(ir), const_value);
     default:;
     }
@@ -2265,7 +2265,7 @@ void Region::freeIR(IR * ir)
     if (getPassMgr() != NULL &&
         (mdssamgr = ((MDSSAMgr*)getPassMgr()->queryPass(PASS_MD_SSA_MGR))) != NULL) {
         mdssamgr->cleanMDSSAInfoOfIR(ir);
-    }   
+    }
 
     AIContainer * res_ai = IR_ai(ir);
     if (res_ai != NULL) {
@@ -3163,7 +3163,7 @@ void Region::dumpVARInRegion()
         }
         g_indent -= 2;
     }
-    
+
     fflush(g_tfile);
 }
 
@@ -3267,7 +3267,7 @@ void Region::checkValidAndRecompute(OptCtx * oc, ...)
         !OC_is_reach_def_valid(*oc)) {
         f |= SOL_REACH_DEF;
     }
-        
+
     if ((HAVE_FLAG(f, SOL_REF) || opts.is_contain(PASS_AA)) &&
         !OC_is_aa_valid(*oc) &&
         getBBList() != NULL &&
@@ -3293,7 +3293,7 @@ void Region::checkValidAndRecompute(OptCtx * oc, ...)
         }
 
         aa->perform(*oc);
-    }   
+    }
 
     if (f != 0 &&
         getBBList() != NULL &&
@@ -3322,9 +3322,9 @@ void Region::checkValidAndRecompute(OptCtx * oc, ...)
         }
 
         UINT flag = COMPUTE_NOPR_DU;
-        
+
         //If PRs have already been in SSA form, compute
-        //DU chain doesn't make any sense.    
+        //DU chain doesn't make any sense.
         PRSSAMgr * ssamgr = (PRSSAMgr*)passmgr->queryPass(PASS_PR_SSA_MGR);
         if (ssamgr == NULL) {
             flag |= COMPUTE_PR_DU;
@@ -3404,7 +3404,7 @@ bool Region::partitionRegion()
 
     //Generate IR region.
     Type const* type = getTypeMgr()->getMCType(0);
-    VAR * ruv = getVarMgr()->registerVar("inner_ru", 
+    VAR * ruv = getVarMgr()->registerVar("inner_ru",
         type, 1, VAR_LOCAL|VAR_FAKE);
     VAR_allocable(ruv) = false;
     addToVarTab(ruv);
@@ -3544,10 +3544,10 @@ bool Region::process(OptCtx * oc)
         if (!OC_is_callg_valid(*oc)) {
             //processFuncRegion has scanned and collected call-list.
             //Thus it does not need to scan call-list here.
-            getRegionMgr()->buildCallGraph(*oc, true, true);            
+            getRegionMgr()->buildCallGraph(*oc, true, true);
         }
-        
-        if (OC_is_callg_valid(*oc)) {            
+
+        if (OC_is_callg_valid(*oc)) {
             IPA * ipa = (IPA*)getPassMgr()->registerPass(PASS_IPA);
             ipa->perform(*oc);
             getPassMgr()->destroyPass(ipa);

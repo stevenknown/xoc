@@ -1307,7 +1307,7 @@ bool DGraph::computePdom(List<Vertex const*> const* vlst, BitSet const* uni)
         count++;
         change = false;
         C<Vertex const*> * ct2;
-        for (vlst->get_head(&ct2); 
+        for (vlst->get_head(&ct2);
              ct2 != vlst->end(); ct2 = vlst->get_next(ct2)) {
             Vertex const* v = ct2->val();
             ASSERT0(v);

@@ -34,12 +34,12 @@ class StrBuf {
 public:
     CHAR * buf;
     UINT buflen;
-    
-public:    
+
+public:
     StrBuf(UINT initsize)
-    { 
+    {
         ASSERT0(initsize > 0);
-        buflen = initsize; 
+        buflen = initsize;
         buf = (CHAR*)malloc(initsize);
         buf[0] = 0;
     }
@@ -53,7 +53,7 @@ public:
     }
     void sprint(CHAR const* format, ...);
     void vsprint(CHAR const* format, va_list args);
-    void strcat(CHAR const* format, ...);    
+    void strcat(CHAR const* format, ...);
     void strcat(UINT l, CHAR const* format, va_list args);
     size_t strlen() const { return ::strlen(buf); }
     void nstrcat(UINT size, CHAR const* format, ...);

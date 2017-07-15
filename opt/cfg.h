@@ -530,7 +530,7 @@ void CFG<BB, XR>::getKidOfIF(
             }
         } //end if
     }
-    
+
     if (sibling != NULL) {
         UINT ipdom = DGraph::get_ipdom(bb->id());
         ASSERT(ipdom > 0, ("bb does not have ipdom"));

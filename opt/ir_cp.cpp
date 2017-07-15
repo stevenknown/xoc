@@ -83,7 +83,7 @@ bool IR_CP::checkTypeConsistency(IR const* ir, IR const* cand_expr) const
 //
 //NOTE: Do NOT handle stmt.
 void IR_CP::replaceExpViaSSADu(
-        IR * exp, 
+        IR * exp,
         IR const* cand_expr,
         IN OUT CPCtx & ctx)
 {
@@ -156,15 +156,15 @@ void IR_CP::replaceExpViaSSADu(
 //
 //NOTE: Do NOT handle stmt.
 void IR_CP::replaceExp(
-        IR * exp, 
+        IR * exp,
         IR const* cand_expr,
-        IN OUT CPCtx & ctx, 
+        IN OUT CPCtx & ctx,
         bool exp_use_ssadu,
         bool exp_use_mdssadu,
         MDSSAMgr * mdssamgr)
 {
     ASSERT0(exp && exp->is_exp() && cand_expr);
-    ASSERT0(exp->getExactRef());
+    ASSERT0(exp->getExactRef() || exp->is_id());
 
     if (!checkTypeConsistency(exp, cand_expr)) {
         return;
@@ -191,22 +191,32 @@ void IR_CP::replaceExp(
         ASSERT0(exp->getSSAInfo());
         ASSERT0(exp->getSSAInfo()->get_uses().find(exp));
         exp->removeSSAUse();
+        ASSERT0(exp->get_stmt());
+        bool doit = exp->getParent()->replaceKid(exp, newir, false);
+        ASSERT0(doit);
+        UNUSED(doit);
     } else if (exp_use_mdssadu) {
         //Remove exp MD SSA use.
         ASSERT0(mdssamgr);
         MDSSAInfo * mdssainfo = mdssamgr->getUseDefMgr()->readMDSSAInfo(exp);
         ASSERT0(mdssainfo);
         mdssamgr->removeMDSSAUseRecur(exp);
+        if (exp->is_id()) {
+            ASSERT0(ID_phi(exp));
+            ID_phi(exp)->replaceOpnd(exp, newir);
+        } else {
+            bool doit = exp->getParent()->replaceKid(exp, newir, false);
+            ASSERT0(doit);
+            UNUSED(doit);
+        }
     } else {
         m_du->removeUseOutFromDefset(exp);
+        ASSERT0(exp->get_stmt());
+        bool doit = exp->getParent()->replaceKid(exp, newir, false);
+        ASSERT0(doit);
+        UNUSED(doit);
     }
     CPC_change(ctx) = true;
-
-    ASSERT0(exp->get_stmt());
-    bool doit = exp->getParent()->replaceKid(exp, newir, false);
-    ASSERT0(doit);
-    UNUSED(doit);
-    
     m_ru->freeIRTree(exp);
 }
 
@@ -238,9 +248,17 @@ bool IR_CP::is_copy(IR * ir) const
 //'def_ir': ir stmt.
 //'occ': opnd of 'def_ir'
 //'use_ir': stmt in use-list of 'def_ir'.
-bool IR_CP::is_available(IR const* def_ir, IR const* occ, IR * use_ir)
+bool IR_CP::is_available(
+        IR const* def_ir,
+        IR const* occ,
+        IR * use_ir,
+        MDPhi * use_phi,
+        IRBB * usebb)
 {
-    if (def_ir == use_ir) {    return false; }
+    ASSERT0(usebb);
+    ASSERT0(use_ir || use_phi);
+
+    if (def_ir == use_ir) { return false; }
     if (occ->is_const()) { return true; }
 
     //Need check overlapped MDSet.
@@ -249,48 +267,53 @@ bool IR_CP::is_available(IR const* def_ir, IR const* occ, IR * use_ir)
     //modified during the path.
 
     IRBB * defbb = def_ir->getBB();
-    IRBB * usebb = use_ir->getBB();
-    if (defbb == usebb) {
-        //Both def_ir and use_ir are in same BB.
-        C<IR*> * ir_holder = NULL;
-        bool f = BB_irlist(defbb).find(const_cast<IR*>(def_ir), &ir_holder);
-        CK_USE(f);
-        IR * ir;
-        for (ir = BB_irlist(defbb).get_next(&ir_holder);
-             ir != NULL && ir != use_ir;
-             ir = BB_irlist(defbb).get_next(&ir_holder)) {
-            if (m_du->is_may_def(ir, occ, true)) {
-                return false;
-            }
-        }
-        if (ir == NULL) {
-            ;//use_ir appears prior to def_ir. Do more check via live_in_expr.
-        } else {
-            ASSERT(ir == use_ir, ("def_ir should be in same bb to use_ir"));
-            return true;
+
+    //Both def_ir and use_ir are in same BB.
+    C<IR*> * ir_holder = NULL;
+    bool f = BB_irlist(defbb).find(const_cast<IR*>(def_ir), &ir_holder);
+    CK_USE(f);
+    IR * ir;
+    for (ir = BB_irlist(defbb).get_next(&ir_holder);
+         ir != NULL && ir != use_ir;
+         ir = BB_irlist(defbb).get_next(&ir_holder)) {
+        if (m_du->is_may_def(ir, occ, false)) {
+            return false;
         }
     }
 
-    ASSERT0(use_ir->is_stmt());
-    DefDBitSetCore const* availin_expr =
-        m_du->getAvailInExpr(BB_id(usebb), NULL);
-    ASSERT0(availin_expr);
-
-    if (availin_expr->is_contain(occ->id())) {
-        IR * u;
-        for (u = BB_first_ir(usebb); u != use_ir && u != NULL;
-             u = BB_next_ir(usebb)) {
-            //Check if 'u' override occ's value.
-            if (m_du->is_may_def(u, occ, true)) {
-                return false;
-            }
-        }
-        ASSERT(u != NULL && u == use_ir,
-                ("Not find use_ir in bb, may be it has "
-                 "been removed by other optimization"));
+    if (ir == use_ir) {
+        ASSERT(defbb == usebb, ("def_ir should be in same bb to use_ir"));
         return true;
     }
-    return false;
+
+    ASSERT0(m_cfg->is_dom(defbb->id(), usebb->id()));
+
+    xcom::List<IRBB*> wl;
+    m_cfg->get_preds(wl, usebb);
+    xcom::BitSet visited;
+    while (wl.get_elem_count() != 0) {
+        IRBB * t = wl.remove_head();
+        if (t == defbb) { continue; }
+
+        C<IR*> * tir_holder = NULL;
+        for (IR * tir = BB_irlist(t).get_head(&tir_holder);
+             tir != NULL; tir = BB_irlist(t).get_next(&tir_holder)) {
+            if (m_du->is_may_def(tir, occ, false)) {
+                return false;
+            }
+        }
+
+        visited.bunion(t->id());
+        for (EdgeC * el = VERTEX_in_list(m_cfg->get_vertex(t->id()));
+             el != NULL; el = EC_next(el)) {
+            INT pred = VERTEX_id(EDGE_from(EC_edge(el)));
+            if (!visited.is_contain(pred)) {
+                wl.append_tail(m_cfg->getBB(pred));
+            }
+        }
+    }
+
+    return true;
 }
 
 
@@ -328,8 +351,75 @@ inline static IR * get_propagated_value(IR * stmt)
 
 
 //'usevec': for local used.
+bool IR_CP::doPropToMDPhi(
+        bool prssadu,
+        bool mdssadu,
+        IN IR const* prop_value,
+        IN IR * use,
+        MDSSAMgr * mdssamgr)
+{
+    bool change = false;
+    CPCtx lchange;
+    replaceExp(use, prop_value, lchange, prssadu, mdssadu, mdssamgr);
+    return CPC_change(lchange);
+}
+
+
+//'usevec': for local used.
+bool IR_CP::doPropToNormalStmt(
+        C<IR*> * cur_iter,
+        C<IR*> ** next_iter,
+        bool prssadu,
+        bool mdssadu,
+        IN IR const* prop_value,
+        IN IR * use,
+        IN IR * use_stmt,
+        IN IRBB * def_bb,
+        IN OUT IRBB * use_bb,
+        MDSSAMgr * mdssamgr)
+{
+    bool change = false;
+    CPCtx lchange;
+    IR * old_use_stmt = use_stmt;
+
+    replaceExp(use, prop_value, lchange, prssadu, mdssadu, mdssamgr);
+
+    ASSERT(use_stmt->is_stmt(), ("ensure use_stmt still legal"));
+
+    if (!CPC_change(lchange)) { return false; }
+
+    //Indicate whether use_stmt is the next stmt of def_stmt.
+    bool is_next = false;
+    if (*next_iter != NULL && use_stmt == (*next_iter)->val()) {
+        is_next = true;
+    }
+
+    RefineCtx rf;
+    use_stmt = m_ru->refineIR(use_stmt, change, rf);
+    if (use_stmt == NULL && is_next) {
+        //use_stmt has been optimized and removed by refineIR().
+        *next_iter = cur_iter;
+        BB_irlist(def_bb).get_next(next_iter);
+    }
+
+    if (use_stmt != NULL && use_stmt != old_use_stmt) {
+        //use_stmt has been removed and new stmt generated.
+        ASSERT(old_use_stmt->is_undef(), ("the old one should be freed"));
+
+        C<IR*> * irct = NULL;
+        BB_irlist(use_bb).find(old_use_stmt, &irct);
+        ASSERT0(irct);
+        BB_irlist(use_bb).insert_before(use_stmt, irct);
+        BB_irlist(use_bb).remove(irct);
+    }
+
+    return true;
+}
+
+
+//'usevec': for local used.
 bool IR_CP::doProp(
-        IN IRBB * bb, 
+        IN IRBB * bb,
         IN DefSBitSetCore & useset,
         MDSSAMgr * mdssamgr)
 {
@@ -347,7 +437,7 @@ bool IR_CP::doProp(
         SSAInfo * ssainfo = NULL;
         MDSSAInfo * mdssainfo = mdssamgr->getUseDefMgr()->
             readMDSSAInfo(def_stmt);
-        bool ssadu = false;
+        bool prssadu = false;
         bool mdssadu = false;
         useset.clean(*m_ru->getMiscBitSetMgr());
         if ((ssainfo = def_stmt->getSSAInfo()) != NULL &&
@@ -361,8 +451,8 @@ bool IR_CP::doProp(
                 ASSERT0(use);
                 useset.bunion(use->id(), *m_ru->getMiscBitSetMgr());
             }
-            ssadu = true;
-        } else if (mdssainfo != NULL && 
+            prssadu = true;
+        } else if (mdssainfo != NULL &&
                    mdssainfo->readVOpndSet() != NULL &&
                    !mdssainfo->readVOpndSet()->is_empty()) {
             if (def_stmt->is_ist() &&
@@ -370,7 +460,7 @@ bool IR_CP::doProp(
                 !def_stmt->getRefMD()->is_exact()) {
                 continue;
             }
-            mdssainfo->collectUse(useset, mdssamgr->getUseDefMgr(), 
+            mdssainfo->collectUse(useset, mdssamgr->getUseDefMgr(),
                 m_ru->getMiscBitSetMgr());
             mdssadu = true;
         } else  {
@@ -384,25 +474,29 @@ bool IR_CP::doProp(
              i != -1; i = useset.get_next(i, &segiter)) {
             IR * use = m_ru->getIR(i);
             ASSERT0(use && use->is_exp());
-            IR * use_stmt = use->get_stmt();
-            ASSERT0(use_stmt->is_stmt());
-
-            ASSERT0(use_stmt->getBB() != NULL);
-            IRBB * use_bb = use_stmt->getBB();
-            if (!ssadu &&
-                !(bb == use_bb && bb->is_dom(def_stmt, use_stmt, true)) &&
-                !m_cfg->is_dom(BB_id(bb), BB_id(use_bb))) {
-                //'def_stmt' must dominate 'use_stmt'.
-                //e.g:
-                //    if (...) {
-                //        g = 10; //S1
-                //    }
-                //    ... = g; //S2
-                //g can not be propagted since S1 is not dominate S2.
+            if (use->is_id() && !prop_value->is_const()) {
+                //Do NOT propagate non-const value to operand of MD PHI.
+                ASSERT(use->get_stmt() == NULL,
+                    ("operand of MD PHI does not have related stmt."));
                 continue;
             }
 
-            if (!is_available(def_stmt, prop_value, use_stmt)) {
+            IR * use_stmt = NULL;
+            MDPhi * use_phi = NULL;
+            IRBB * use_bb = NULL;
+
+            if (use->is_id()) {
+                ASSERT0(ID_phi(use));
+                use_bb = ID_phi(use)->getBB();
+                use_phi = ID_phi(use);
+                ASSERT0(use_phi && use_phi->is_phi());
+            } else {
+                use_stmt = use->get_stmt();
+                ASSERT0(use_stmt->is_stmt() && use_stmt->getBB());
+                use_bb = use_stmt->getBB();
+            }
+
+            if (!is_available(def_stmt, prop_value, use_stmt, use_phi, use_bb)) {
                 //The value that will be propagated can
                 //not be killed during 'ir' and 'use_stmt'.
                 //e.g:
@@ -415,7 +509,9 @@ bool IR_CP::doProp(
                 continue;
             }
 
-            if (!ssadu && !mdssadu && !m_du->isExactAndUniqueDef(def_stmt, use)) {
+            if (!prssadu &&
+                !mdssadu &&
+                !m_du->isExactAndUniqueDef(def_stmt, use)) {
                 //Only single definition is allowed.
                 //e.g:
                 //    g = 20; //S3
@@ -432,40 +528,12 @@ bool IR_CP::doProp(
                 continue;
             }
 
-            CPCtx lchange;
-            IR * old_use_stmt = use_stmt;
-
-            replaceExp(use, prop_value, lchange, ssadu, mdssadu, mdssamgr);
-
-            ASSERT(use_stmt && use_stmt->is_stmt(),
-                ("ensure use_stmt still legal"));
-            change |= CPC_change(lchange);
-
-            if (!CPC_change(lchange)) { continue; }
-
-            //Indicate whether use_stmt is the next stmt of def_stmt.
-            bool is_next = false;
-            if (next_iter != NULL && use_stmt == next_iter->val()) {
-                is_next = true;
-            }
-
-            RefineCtx rf;
-            use_stmt = m_ru->refineIR(use_stmt, change, rf);
-            if (use_stmt == NULL && is_next) {
-                //use_stmt has been optimized and removed by refineIR().
-                next_iter = cur_iter;
-                BB_irlist(bb).get_next(&next_iter);
-            }
-
-            if (use_stmt != NULL && use_stmt != old_use_stmt) {
-                //use_stmt has been removed and new stmt generated.
-                ASSERT(old_use_stmt->is_undef(), ("the old one should be freed"));
-
-                C<IR*> * irct = NULL;
-                BB_irlist(use_bb).find(old_use_stmt, &irct);
-                ASSERT0(irct);
-                BB_irlist(use_bb).insert_before(use_stmt, irct);
-                BB_irlist(use_bb).remove(irct);
+            if (use->is_id()) {
+                change |= doPropToMDPhi(prssadu, mdssadu,
+                    prop_value, use, mdssamgr);
+            } else {
+                change |= doPropToNormalStmt(cur_iter, &next_iter, prssadu,
+                    mdssadu, prop_value, use, use_stmt, bb, use_bb, mdssamgr);
             }
         } //end for each USE
     } //end for IR
@@ -506,7 +574,7 @@ bool IR_CP::perform(OptCtx & oc)
     Graph domtree;
     m_cfg->get_dom_tree(domtree);
     List<Vertex*> lst;
-    Vertex * root = domtree.get_vertex(BB_id(entry));
+    Vertex * root = domtree.get_vertex(entry->id());
     m_cfg->sortDomTreeInPreorder(root, lst);
     DefSBitSetCore useset;
 
@@ -515,6 +583,8 @@ bool IR_CP::perform(OptCtx & oc)
         ASSERT0(bb);
         change |= doProp(bb, useset, mdssamgr);
     }
+
+    //mdssamgr->dump();
 
     useset.clean(*m_ru->getMiscBitSetMgr());
 
@@ -525,7 +595,7 @@ bool IR_CP::perform(OptCtx & oc)
         OC_is_aa_valid(oc) = false;
         OC_is_du_chain_valid(oc) = true; //already update.
         OC_is_ref_valid(oc) = true; //already update.
-        ASSERT0(m_ru->verifyMDRef() && 
+        ASSERT0(m_ru->verifyMDRef() &&
             m_du->verifyMDDUChain(COMPUTE_PR_DU | COMPUTE_NOPR_DU));
         ASSERT0(verifySSAInfo(m_ru));
         ASSERT0(mdssamgr->verify());

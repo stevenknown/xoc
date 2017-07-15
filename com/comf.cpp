@@ -1244,10 +1244,10 @@ static bool is_exist_mark(CHAR const* format)
 
 
 //Parse string that starts with '%'.
-static bool percent(CHAR * buf, 
-                    UINT buflen, 
+static bool percent(CHAR * buf,
+                    UINT buflen,
                     IN OUT UINT * bufpos,
-                    IN OUT CHAR const** format, 
+                    IN OUT CHAR const** format,
                     va_list stack_start)
 {
     //The info related to %, e.g:'%d', can not longer than 255.

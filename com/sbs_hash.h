@@ -158,16 +158,16 @@ protected:
         }
     }
     #else
-    //dump_helper for Bit2NodeT.    
+    //dump_helper for Bit2NodeT.
     void dump_helper(FILE * h, B2NType * mn, UINT indent) const
     {
         ASSERT0(mn);
-        
-        TMapIter<UINT, B2NType*> ti;        
-        Stack<B2NType*> mn_stack;        
+
+        TMapIter<UINT, B2NType*> ti;
+        Stack<B2NType*> mn_stack;
         Stack<UINT> indent_stack;
         Stack<UINT> id_stack;
-        
+
         mn_stack.push(mn);
         id_stack.push(0);
         indent_stack.push(indent);

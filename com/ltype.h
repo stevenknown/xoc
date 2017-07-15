@@ -58,15 +58,15 @@ author: Su Zhenyu
     #include "malloc.h"
     #define ALLOCA    _alloca
     #define SNPRINTF _snprintf
-    #define VSNPRINTF _vsnprintf 
+    #define VSNPRINTF _vsnprintf
     #define RESTRICT __restrict
 
     //Use POSIX name "unlink" instead of ISO C++ conformat name "_unlink".
     #define UNLINK   _unlink
-#else    
+#else
     //Default is linux version
     #include "unistd.h" //for UNLINK declaration
-    #define ALLOCA    alloca 
+    #define ALLOCA    alloca
     #define SNPRINTF snprintf
     #define VSNPRINTF vsnprintf
     #define RESTRICT __restrict__
@@ -195,7 +195,7 @@ author: Su Zhenyu
 #define GET_HIGH_32BIT(l)        (((l)>>32)&0xffffFFFF)
 
 //True if type is unsigned.
-#define IS_UNSIGN_TY(type)       ((type)(((type)0) - 1) > 0) 
+#define IS_UNSIGN_TY(type)       ((type)(((type)0) - 1) > 0)
 
 #define IN //input
 #define OUT //output

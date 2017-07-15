@@ -1751,7 +1751,7 @@ IR * Region::insertCvt(IR * parent, IR * kid, bool & change)
     case IR_XOR:
     case IR_BNOT:
     case IR_LNOT:
-    case IR_NEG:    
+    case IR_NEG:
     case IR_GOTO:
     case IR_DO_WHILE:
     case IR_WHILE_DO:
@@ -1785,7 +1785,7 @@ IR * Region::insertCvt(IR * parent, IR * kid, bool & change)
             }
 
             if (parent->is_fp() || kid->is_fp()) {
-                return insertCvtForFloat(parent, kid, change);    
+                return insertCvtForFloat(parent, kid, change);
             }
 
             if (tgt_size <= src_size) {
@@ -1824,7 +1824,7 @@ IR * Region::insertCvt(IR * parent, IR * kid, bool & change)
 
 //Make sure v0 is sign-extended if its bits length less than HOST_INT.
 HOST_INT Region::calcLSRIntVal(Type const* type, HOST_INT v0, HOST_INT v1)
-{    
+{
     HOST_INT res = 0;
     switch (TY_dtype(type)) {
     case D_B:
@@ -1842,13 +1842,13 @@ HOST_INT Region::calcLSRIntVal(Type const* type, HOST_INT v0, HOST_INT v1)
         break;
     case D_I32:
         res = (HOST_INT) (((INT32)(UINT32)v0) >> v1);
-        break;    
+        break;
     case D_U32:
         res = (HOST_INT) (HOST_UINT) (((UINT32)v0) >> v1);
         break;
     case D_I64:
         res = (HOST_INT) (((INT64)(UINT64)v0) >> v1);
-        break;    
+        break;
     case D_U64:
         res = (HOST_INT) (HOST_UINT) (((UINT64)v0) >> v1);
         break;
@@ -2009,7 +2009,7 @@ IR * Region::foldConstIntBinary(IR * ir, bool & change)
     case IR_GE:
     case IR_EQ:
     case IR_NE:
-    case IR_ASR:    
+    case IR_ASR:
     case IR_LSL:
         {
             IR * x = NULL;
@@ -2343,7 +2343,7 @@ IR * Region::foldConst(IR * ir, bool & change)
             IR * opnd0 = BIN_opnd0(ir);
             IR * opnd1 = BIN_opnd1(ir);
             if (opnd0->is_const() &&
-                opnd0->is_int() && 
+                opnd0->is_int() &&
                 CONST_int_val(opnd0) == 0) {
                 IR * newir = buildImmInt(0, ir->get_type());
                 copyDbx(newir, ir, this);

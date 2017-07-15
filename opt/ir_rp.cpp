@@ -1151,7 +1151,7 @@ void IR_RP::handleRestore2Mem(
                 IR * lhs = m_ru->dupIRTree(IST_base(delegate));
                 m_du->copyIRTreeDU(lhs, IST_base(delegate), true);
 
-                stmt = m_ru->buildIstore(lhs, pr, 
+                stmt = m_ru->buildIstore(lhs, pr,
                     IST_ofst(delegate), IR_dt(delegate));
             }
             break;
@@ -1315,7 +1315,7 @@ bool IR_RP::promoteExactAccess(
         ASSERT0(delegate_pr);
 
         handleAccessInBody(ref, delegate2, delegate_pr,
-            delegate2has_outside_uses_ir_list, restore2mem, 
+            delegate2has_outside_uses_ir_list, restore2mem,
             fixup_list, delegate2stpr, li, ii);
 
         //Each memory reference in the tree has been promoted.
@@ -1814,7 +1814,7 @@ void IR_RP::createDelegateInfo(
         TMap<IR*, SList<IR*>*> & delegate2has_outside_uses_ir_list)
 {
     SList<IR*> * irlst = (SList<IR*>*)xmalloc(sizeof(SList<IR*>));
-    irlst->init(m_ir_ptr_pool);    
+    irlst->init(m_ir_ptr_pool);
     delegate2has_outside_uses_ir_list.set(delegate, irlst);
 
     //Ref is the delegate of all the semantic equivalent expressions.

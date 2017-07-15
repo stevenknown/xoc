@@ -262,9 +262,9 @@ bool IR_LCSE::processBranch(
 //'ie': cse candidate expression indicator.
 //'stmt': the stmt contains 'exp'.
 IR * IR_LCSE::processExp(
-        IN IRBB * bb, 
+        IN IRBB * bb,
         IN ExpRep * ie,
-        IN IR * stmt, 
+        IN IR * stmt,
         IN OUT BitSet & avail_ir_expr,
         IN OUT Vector<IR*> & map_expr2avail_pos,
         IN OUT Vector<IR*> & map_expr2avail_pr)

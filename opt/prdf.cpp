@@ -262,7 +262,7 @@ void PRDF::computeGlobal()
     do {
         change = false;
         C<IRBB*> * ct2;
-        for (vlst->get_tail(&ct2); 
+        for (vlst->get_tail(&ct2);
              ct2 != vlst->end(); ct2 = vlst->get_prev(ct2)) {
             IRBB * bb = ct2->val();
             ASSERT0(bb);

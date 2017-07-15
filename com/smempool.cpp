@@ -189,7 +189,7 @@ void smpoolInitPool()
 }
 
 
-//This function perform finialization works 
+//This function perform finialization works
 //if smpoolInitPool() has been invoked.
 void smpoolFiniPool()
 {

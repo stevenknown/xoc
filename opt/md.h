@@ -137,7 +137,7 @@ typedef enum _MD_TYPE {
 //The memory object is a PR.
 #define MD_is_pr(md)             (VAR_is_pr(MD_base(md)))
 
-//True indicates MD will not be effect MD, namely, 
+//True indicates MD will not be effect MD, namely,
 //the MD only could be put in MayDef or MayUse md set.
 #define MD_is_may(md)            ((md)->u2.s1.is_may_reference)
 
@@ -393,8 +393,8 @@ public:
     //Note this function will iterate elements in set which is costly.
     //Use it carefully.
     bool is_overlap_ex(
-            MD const* md, 
-            Region * current_ru, 
+            MD const* md,
+            Region * current_ru,
             MDSystem const* mdsys) const;
 
     bool is_contain_inexact(MDSystem * ms) const;
