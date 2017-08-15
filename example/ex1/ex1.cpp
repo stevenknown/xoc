@@ -140,7 +140,7 @@ int main(int argc, char * argv[])
 
     //Compile region.
     OptCtx oc;
-    bool s = rm->processProgramRegion(rm->get_region(1), &oc);
+    bool s = rm->processProgramRegion(rm->getRegion(1), &oc);
     ASSERT0(s);
 
     delete rm;
