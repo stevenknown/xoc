@@ -431,13 +431,13 @@ public:
         //The entry node can not have any predecessors.
         ASSERT0(m_entry);
         Vertex * vex = get_vertex(m_entry->id());
-        CK_USE(vex && get_in_degree(vex) == 0);
+        CHECK_DUMMYUSE(vex && get_in_degree(vex) == 0);
 
         //The exit node can not have successors.
         for (BB * bb = m_exit_list.get_head();
              bb != NULL; bb = m_exit_list.get_next()) {
             Vertex * vex2 = get_vertex(bb->id());
-            CK_USE(vex2 && get_out_degree(vex2) == 0);
+            CHECK_DUMMYUSE(vex2 && get_out_degree(vex2) == 0);
         }
 
 
@@ -616,7 +616,7 @@ bool CFG<BB, XR>::verifyIfBBRemoved(IN CDG * cdg, OptCtx & oc)
 template <class BB, class XR>
 bool CFG<BB, XR>::removeEmptyBB(OptCtx & oc)
 {
-    START_TIMER("Remove Empty BB");
+    START_TIMER(t, "Remove Empty BB");
     C<BB*> * ct, * next_ct;
     bool doit = false;
     List<BB*> succs;
@@ -761,7 +761,7 @@ bool CFG<BB, XR>::removeEmptyBB(OptCtx & oc)
             doit = true;
         } //end if
     } //end for each bb
-    END_TIMER();
+    END_TIMER(t, "Remove Empty BB");
     return doit;
 }
 
@@ -815,7 +815,7 @@ bool CFG<BB, XR>::removeRedundantBranchCase1(
 template <class BB, class XR>
 bool CFG<BB, XR>::removeRedundantBranch()
 {
-    START_TIMER("Remove Redundant Branch");
+    START_TIMER(t, "Remove Redundant Branch");
     C<BB*> * ct, * next_ct;
     bool doit = false;
     for (m_bb_list->get_head(&ct), next_ct = ct;
@@ -855,7 +855,7 @@ bool CFG<BB, XR>::removeRedundantBranch()
             }
         }
     }
-    END_TIMER();
+    END_TIMER(t, "Remove Redundant Branch");
     return doit;
 }
 
@@ -1063,7 +1063,7 @@ bool CFG<BB, XR>::removeUnreachBB()
     ASSERT0(m_bb_list);
     if (m_bb_list->get_elem_count() == 0) { return false; }
 
-    START_TIMER("Remove Unreach BB");
+    START_TIMER(t, "Remove Unreach BB");
 
     //There is only one entry point.
     BitSet visited;
@@ -1093,7 +1093,7 @@ bool CFG<BB, XR>::removeUnreachBB()
         }
     }
 
-    END_TIMER();
+    END_TIMER(t, "Remove Unreach BB");
     return removed;
 }
 
@@ -1627,7 +1627,7 @@ void CFG<BB, XR>::computeRPO(OptCtx & oc)
 {
     if (m_bb_list->get_elem_count() == 0) { return; }
 
-    START_TIMER("Compute Rpo");
+    START_TIMER(t, "Compute Rpo");
 
     #ifdef _DEBUG_
     //Only for verify.
@@ -1658,7 +1658,7 @@ void CFG<BB, XR>::computeRPO(OptCtx & oc)
         m_rpo_bblst.append_tail(bb);
     }
     OC_is_rpo_valid(oc) = true;
-    END_TIMER();
+    END_TIMER(t, "Compute Rpo");
 }
 
 } //namespace xoc

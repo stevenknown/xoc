@@ -204,7 +204,7 @@ bool IR_LOOP_CVT::find_and_convert(List<LI<IRBB>*> & worklst)
 
 bool IR_LOOP_CVT::perform(OptCtx & oc)
 {
-    START_TIMER_AFTER();
+    START_TIMER(t, getPassName());
     m_ru->checkValidAndRecompute(&oc, PASS_LOOP_INFO, PASS_RPO, PASS_UNDEF);
 
     LI<IRBB> * li = m_cfg->getLoopInfo();
@@ -233,7 +233,7 @@ bool IR_LOOP_CVT::perform(OptCtx & oc)
         //TODO: make rpo, dom valid.
     }
 
-    END_TIMER_AFTER(getPassName());
+    END_TIMER(t, getPassName());
     return change;
 }
 

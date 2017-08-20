@@ -701,10 +701,10 @@ LONG revlong(LONG d)
 //Convert floating point string into binary words.
 void af2i(IN CHAR * f, OUT BYTE * buf, UINT buflen, bool is_double)
 {
-    UNUSED(is_double);
-    UNUSED(buflen);
-    UNUSED(buf);
-    UNUSED(f);
+    DUMMYUSE(is_double);
+    DUMMYUSE(buflen);
+    DUMMYUSE(buf);
+    DUMMYUSE(f);
     ASSERT0(f && buf);
     ASSERT(0, ("TODO"));
 }
@@ -809,7 +809,7 @@ CHAR * getfilepath(CHAR const* n, OUT CHAR * buf, UINT bufl)
         return NULL;
     }
 
-    UNUSED(bufl);
+    DUMMYUSE(bufl);
     ASSERT0(i < (INT)bufl);
     memcpy(buf, n, i);
     buf[i] = 0;
@@ -853,7 +853,7 @@ void strshift(IN OUT CHAR * string, INT ofst)
 //e.g: Given /xx/yy/zz.foo, return zz.
 CHAR * getfilename(CHAR const* path, OUT CHAR * buf, UINT bufl)
 {
-    UNUSED(bufl);
+    DUMMYUSE(bufl);
     if (path == NULL) { return NULL; }
     INT l = (INT)strlen(path);
     INT i = l;
@@ -894,7 +894,7 @@ CHAR * getfilesuffix(CHAR const* n, OUT CHAR * buf, UINT bufl)
     while (n[i] != '.' && i >= 0) {
         i--;
     }
-    UNUSED(bufl);
+    DUMMYUSE(bufl);
     if (i < 0) { return NULL; }
     ASSERT0((UINT)(l - i -1) < bufl);
     memcpy(buf, n + i + 1, l - i -1);

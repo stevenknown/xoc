@@ -57,7 +57,7 @@ IR * IR_LCSE::hoist_cse(IN IRBB * bb, IN IR * ir_pos, IN ExpRep * ie)
 {
     C<IR*> * pos_holder = NULL;
     bool f = BB_irlist(bb).find(ir_pos, &pos_holder);
-    CK_USE(f);
+    CHECK_DUMMYUSE(f);
     switch (IR_code(ir_pos)) {
     case IR_ST:
     case IR_IST:
@@ -613,12 +613,12 @@ bool IR_LCSE::processDef(
 
 bool IR_LCSE::perform(OptCtx & oc)
 {
-    START_TIMER_AFTER();
+    START_TIMER(t, getPassName());
     m_ru->checkValidAndRecompute(&oc, PASS_DU_REF, PASS_DU_CHAIN,
-                                 PASS_EXPR_TAB, PASS_UNDEF);
+        PASS_EXPR_TAB, PASS_UNDEF);
 
     if (!OC_is_du_chain_valid(oc)) {
-        END_TIMER_AFTER(getPassName());
+        END_TIMER(t, getPassName());
         return false;
     }
 
@@ -673,7 +673,7 @@ bool IR_LCSE::perform(OptCtx & oc)
         OC_is_du_chain_valid(oc) = false;
         OC_is_ref_valid(oc) = false;
     }
-    END_TIMER_AFTER(getPassName());
+    END_TIMER(t, getPassName());
     return change;
 }
 //END IR_LCSE

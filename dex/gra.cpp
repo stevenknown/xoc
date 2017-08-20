@@ -434,7 +434,7 @@ void RSC::comp_ist_fmt(IR const* ir)
 
     IR const* lhs = IST_base(ir);
     ASSERT0(lhs->is_pr());
-    UNUSED(lhs);
+    DUMMYUSE(lhs);
     //ABCCCC
     //iput, vA(stv) -> vB(mlr), +CCCC(field_id)
     m_ir2fmt.set(ir->id(), FABCCCCv);
@@ -898,7 +898,7 @@ bool RSC::verify_fmt()
         for (IR const* ir = BB_first_ir(bb);
              ir != NULL; ir = BB_next_ir(bb)) {
             FMT f = m_ir2fmt.get(ir->id());
-            UNUSED(f);
+            DUMMYUSE(f);
             ASSERT0(f != FUNDEF);
         }
     }
@@ -1062,7 +1062,7 @@ bool GltMgr::verify()
             LTMgr * ltm = m_bb2ltmgr.get(j);
             ASSERT0(ltm);
             LT * l = ltm->map_pr2lt(GLT_prno(g));
-            UNUSED(l);
+            DUMMYUSE(l);
             ASSERT0(l && LT_is_global(l));
             ASSERT0(LT_phy(l) == GLT_phy(g));
 
@@ -2315,7 +2315,7 @@ bool LTMgr::has_pair_res(IR * ir)
 
 IR * LTMgr::genDedicatePR(UINT phy)
 {
-    UNUSED(phy);
+    DUMMYUSE(phy);
     ASSERT(0, ("Target Dependent Code"));
     return NULL;
 }
@@ -3089,7 +3089,7 @@ void LTMgr::dump_unallocated(FILE * h, BitSet & visited)
         //Collects position info
         if (LT_occ(lt) == NULL) { continue; }
         INT last_idx = LT_occ(lt)->get_last();
-        UNUSED(last_idx);
+        DUMMYUSE(last_idx);
         ASSERT(last_idx == -1 || last_idx < (INT)m_max_lt_len,
                 ("Depiction of life time long than the finial position"));
 
@@ -3285,7 +3285,7 @@ bool BBRA::assignRegister(LT * l, List<UINT> & nis)
     //Deduct the used register by neighbors.
     nis.clean();
     bool on = m_ig->get_neighbor_list(nis, LT_uid(l));
-    CK_USE(on);
+    CHECK_DUMMYUSE(on);
     UINT n = nis.get_elem_count();
     for (UINT i = nis.get_head(); n > 0; i = nis.get_next(), n--) {
         LT const* ni = m_ltm->get_lt(i);
@@ -3857,16 +3857,16 @@ bool BBRA::isOpndSameWithResult(IR *)
 
 void BBRA::renameResult(IR *, UINT old_prno, IR * newpr)
 {
-    UNUSED(newpr);
-    UNUSED(old_prno);
+    DUMMYUSE(newpr);
+    DUMMYUSE(old_prno);
     UNREACH();
 }
 
 
 void BBRA::renameOpnd(IR *, UINT old_prno, IR * newpr)
 {
-    UNUSED(newpr);
-    UNUSED(old_prno);
+    DUMMYUSE(newpr);
+    DUMMYUSE(old_prno);
     UNREACH();
 }
 
@@ -3941,7 +3941,7 @@ void BBRA::splitLTAt(
         if (end == lastpos) {
             ASSERT0(spill_loc);
             IR * newpr = m_ltm->genReload(lt, end, spill_loc);
-            CK_USE(newpr);
+            CHECK_DUMMYUSE(newpr);
             if (LT_is_global(lt)) {
                 ASSERT(PR_no(newpr) == LT_prno(lt),
                         ("Should not rename global register, since that "
@@ -4086,7 +4086,7 @@ bool BBRA::solve(List<LT*> & prios)
         ASSERT(!lt->has_branch(m_ltm),
         ("Branch should be allocated first, we can not split at branch"));
         bool succ = split(lt);
-        CK_USE(succ);
+        CHECK_DUMMYUSE(succ);
         ASSERT0(succ);
         m_ltm->clean();
         m_ltm->build(true, NULL, *m_tmp_cii);
@@ -4145,13 +4145,6 @@ bool BBRA::perform(List<LT*> & prios)
     return true;
 }
 //END BBRA
-
-
-static int gcount = 0;
-static bool gdebug()
-{
-    return 1;
-}
 
 
 //
@@ -4338,7 +4331,7 @@ void RA::diffLocalNeighbourUsed(GLT * g, List<UINT> & nis, BitSet * unusable)
 
         nis.clean();
         bool on = ig->get_neighbor_list(nis, LT_uid(gl));
-        CK_USE(on);
+        CHECK_DUMMYUSE(on);
         ASSERT0(on);
         UINT n = nis.get_elem_count();
         for (UINT i = nis.get_head(); n > 0; i = nis.get_next(), n--) {
@@ -4376,7 +4369,7 @@ bool RA::assignRegister(GLT * g, List<UINT> & nis, List<UINT> & nis2)
     //Avoid allocate the register used by global neighbors.
     nis.clean();
     bool on = m_ig.get_neighbor_list(nis, GLT_id(g));
-    CK_USE(on);
+    CHECK_DUMMYUSE(on);
     ASSERT0(on);
     UINT n = nis.get_elem_count();
     for (UINT i = nis.get_head(); n > 0; i = nis.get_next(), n--) {
@@ -4911,7 +4904,7 @@ void RA::solveConflict(OUT List<GLT*> & unalloc, List<UINT> & nis)
 
         nis.clean();
         bool on = m_ig.get_neighbor_list(nis, GLT_id(g));
-        CK_USE(on);
+        CHECK_DUMMYUSE(on);
         ASSERT0(on);
         m_ig.add_glt(slglt);
         m_ig.set_interf_with(GLT_id(slglt), nis);
@@ -4940,7 +4933,7 @@ void RA::updateLocal()
 //Verify local part is consistent with glt.
 bool RA::verify_glt(bool check_alloc)
 {
-    UNUSED(check_alloc);
+    DUMMYUSE(check_alloc);
     Vector<GLT*> * gltv = m_gltm.get_gltvec();
     for (INT i = 1; i <= gltv->get_last_idx(); i++) {
         GLT * g = gltv->get(i);
@@ -4957,7 +4950,7 @@ bool RA::verify_glt(bool check_alloc)
             //If local part not exist, remove the bit out of lived-bbs.
             ASSERT(ltm, ("miss local part"));
             LT * lt = ltm->map_pr2lt(GLT_prno(g));
-            CK_USE(lt);
+            CHECK_DUMMYUSE(lt);
 
             ASSERT(lt, ("miss local part"));
             ASSERT0(LT_is_global(lt));
@@ -4990,7 +4983,7 @@ UINT RA::computeSatisfiedNumRegister(
         BitSet const& assigned,
         BitSet const& liveout_phy)
 {
-    UNUSED(liveout_phy);
+    DUMMYUSE(liveout_phy);
 
     ASSERT0(rangestart != REG_UNDEF);
     UINT nsat = 0;
@@ -5057,7 +5050,7 @@ UINT RA::computeNumRegister(
         BitSet const& assigned,
         BitSet const& liveout_phy)
 {
-    UNUSED(liveout_phy);
+    DUMMYUSE(liveout_phy);
 
     ASSERT0(rangestart != REG_UNDEF);
     UINT start = rangestart;
@@ -5573,7 +5566,7 @@ bool RA::verify_rsc()
                 FMT fmt = m_rsc.m_ir2fmt.get(IR_id(occ));
                 ASSERT0(fmt != FUNDEF);
                 BitSet * usable = m_rsc.get_usable(fmt, l->is_def(j));
-                CK_USE(usable);
+                CHECK_DUMMYUSE(usable);
 
                 ASSERT(usable, ("stmt miss usable-regs info"));
                 ASSERT(usable->is_contain(LT_phy(l)), ("phy is not legal"));
@@ -5604,7 +5597,7 @@ bool RA::verify_usable()
                 }
                 if (LT_is_global(l)) {
                     GLT * g = m_gltm.map_pr2glt(LT_prno(l));
-                    CK_USE(g);
+                    CHECK_DUMMYUSE(g);
                     ASSERT0(g);
                     ASSERT0(GLT_usable(g) == LT_usable(l));
                 }
@@ -5659,7 +5652,7 @@ bool RA::verify_reg(bool check_usable, bool check_alloc)
             }
             bool find;
             UINT v = prno2v.get(LT_prno(l), &find);
-            UNUSED(v);
+            DUMMYUSE(v);
             if (find) {
                 //each prno is corresponding to a unqiue vreg.
                 ASSERT0(v == LT_phy(l));
@@ -5714,12 +5707,12 @@ bool RA::verify_lt_occ()
 
         SEGIter * sc = NULL;
         UINT prno = GLT_prno(g);
-        UNUSED(prno);
+        DUMMYUSE(prno);
         for (INT j = bbs->get_first(&sc); j >= 0; j = bbs->get_next(j, &sc)) {
             DefSBitSetCore * livein = m_prdf.get_livein(j);
             DefSBitSetCore * liveout = m_prdf.get_liveout(j);
-            CK_USE(livein);
-            CK_USE(liveout);
+            CHECK_DUMMYUSE(livein);
+            CHECK_DUMMYUSE(liveout);
             ASSERT0(livein->is_contain(prno) || liveout->is_contain(prno));
         }
     }
@@ -5742,10 +5735,10 @@ bool RA::verify_lt_occ()
                 ASSERT0(ir);
                 if (l->is_def(j)) {
                     IR * pr = ir->getResultPR(prno);
-                    CK_USE(pr);
+                    CHECK_DUMMYUSE(pr);
                 } else {
                     IR * pr = ir->getOpndPR(prno);
-                    CK_USE(pr);
+                    CHECK_DUMMYUSE(pr);
                 }
             }
         }
@@ -5764,7 +5757,7 @@ bool RA::verify_lt_occ()
                 if (!k->is_pr() || !k->is_stpr()) { continue; }
 
                 LT * l = ltm->map_pr2lt(k->get_prno());
-                CK_USE(l);
+                CHECK_DUMMYUSE(l);
                 ASSERT0(LT_prno(l) == k->get_prno());
             }
         }
@@ -5785,7 +5778,7 @@ bool RA::verify_interf()
 
         nis.clean();
         bool on = m_ig.get_neighbor_list(nis, GLT_id(g));
-        CK_USE(on);
+        CHECK_DUMMYUSE(on);
         UINT n = nis.get_elem_count();
         for (UINT j = nis.get_head(); n > 0; j = nis.get_next(), n--) {
             GLT * ni = m_gltm.get_glt(j);
@@ -5821,7 +5814,7 @@ bool RA::verify_interf()
             ASSERT0(ig);
             nis.clean();
             bool on = ig->get_neighbor_list(nis, LT_uid(l));
-            CK_USE(on);
+            CHECK_DUMMYUSE(on);
             UINT n = nis.get_elem_count();
             for (UINT j = nis.get_head(); n > 0; j = nis.get_next(), n--) {
                 LT * ni = ltm->get_lt(j);
@@ -5881,7 +5874,7 @@ bool RA::verify_ltg()
 
             ASSERT0(arg);
             UINT bsz = arg->get_type_size(m_tm);
-            UNUSED(bsz);
+            DUMMYUSE(bsz);
             if (LT_rg_sz(l) == 1) {
                 ASSERT0(bsz <= BYTE_PER_INT);
             } else if (LT_rg_sz(l) == 2) {
@@ -5920,9 +5913,9 @@ bool RA::perform(OptCtx & oc)
     get_glt(10); //for debug symbol
     get_lt(1,0); //for debug symbol
 
-    m_cfg->dump_vcg();
-    m_pr2v->dump();
-    START_TIMER("GRA");
+    //m_cfg->dump_vcg();
+    //m_pr2v->dump();
+    START_TIMER(t, "GRA");
 
     ASSERT0(m_var2pr);
     m_prdf.setVAR2PR(m_var2pr);
@@ -5984,7 +5977,7 @@ bool RA::perform(OptCtx & oc)
     ASSERT0(verify_interf());
     m_gltm.freeGLTBitset();
 
-    END_TIMER();
+    END_TIMER(t, "GRA");
     return true;
 }
 //END RA

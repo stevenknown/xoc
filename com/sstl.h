@@ -48,7 +48,7 @@ public:
 template <class T>
 void * operator new(size_t size, xcom::allocator<T> * pool)
 {
-    UNUSED(pool);
+    DUMMYUSE(pool);
     return ::operator new(size);
 }
 
@@ -56,7 +56,7 @@ void * operator new(size_t size, xcom::allocator<T> * pool)
 template <class T>
 void operator delete(void * ptr, xcom::allocator<T> * pool)
 {
-    UNUSED(pool);
+    DUMMYUSE(pool);
     ::operator delete(ptr);
 }
 
@@ -3036,7 +3036,7 @@ public:
 
     UINT get_hash_value(OBJTY v, UINT bucket_size) const
     {
-        ASSERT_UNUSED(sizeof(OBJTY) == sizeof(CHAR*),
+        ASSERT_DUMMYUSE(sizeof(OBJTY) == sizeof(CHAR*),
             ("exception will taken place in type-cast"));
         return get_hash_value((CHAR const*)v, bucket_size);
     }
@@ -3046,7 +3046,7 @@ public:
 
     bool compare(CHAR const* s, OBJTY val) const
     {
-        ASSERT_UNUSED(sizeof(OBJTY) == sizeof(CHAR const*),
+        ASSERT_DUMMYUSE(sizeof(OBJTY) == sizeof(CHAR const*),
             ("exception will taken place in type-cast"));
         return (strcmp(s,  (CHAR const*)val) == 0);
     }
@@ -3159,7 +3159,7 @@ protected:
     virtual T create(OBJTY v)
     {
         ASSERT(0, ("Inherited class need to implement"));
-        UNUSED(v);
+        DUMMYUSE(v);
         return T(0);
     }
 public:
@@ -3513,7 +3513,7 @@ public:
             bool doit = insert_t((HC<T>**)&HB_member(m_bucket[hashv]),
                                  &elemhc, t);
             ASSERT0(!doit);
-            UNUSED(doit); //to avoid -Werror=unused-variable.
+            DUMMYUSE(doit); //to avoid -Werror=unused-variable.
 
             HC_vec_idx(elemhc) = (UINT)i;
 

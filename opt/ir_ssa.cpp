@@ -36,18 +36,16 @@ author: Su Zhenyu
 
 namespace xoc {
 
-//#define TRAVERSE_IN_DOM_TREE_ORDER
-
 //
 //START DfMgr
 //
 //Get the BB set where 'v' is the dominate frontier of them.
-BitSet * DfMgr::get_df_ctrlset(Vertex const* v)
+BitSet * DfMgr::gen_df_ctrlset(UINT vid)
 {
-    BitSet * df = m_df_vec.get(VERTEX_id(v));
+    BitSet * df = m_df_vec.get(vid);
     if (df == NULL) {
         df = m_bs_mgr.create();
-        m_df_vec.set(VERTEX_id(v), df);
+        m_df_vec.set(vid, df);
     }
     return df;
 }
@@ -73,7 +71,7 @@ void DfMgr::dump(DGraph & g)
     for (Vertex const* v = g.get_first_vertex(c);
          v != NULL; v = g.get_next_vertex(c)) {
         UINT vid = VERTEX_id(v);
-        fprintf(g_tfile, "\nBB%d DF controlled: ", vid);
+        fprintf(g_tfile, "\nBB%d DF set:", vid);
         BitSet const* df = m_df_vec.get(vid);
         if (df != NULL) {
             for (INT i = df->get_first(); i >= 0; i = df->get_next(i)) {
@@ -86,38 +84,87 @@ void DfMgr::dump(DGraph & g)
 
 
 //This function compute dominance frontier to graph g.
-void DfMgr::build(DGraph & g)
+void DfMgr::buildRecur(Vertex const* v, DGraph const& g, DomTree const& domtree)
+{
+    UINT vid = VERTEX_id(v);    
+    Vertex * v_domtree = domtree.get_vertex(vid);
+    ASSERT0(v_domtree);
+        
+    //Access each succs.
+    for (EdgeC const* ec = VERTEX_out_list(v_domtree);
+         ec != NULL; ec = EC_next(ec)) {
+        Vertex const* succ_domtree = EDGE_to(EC_edge(ec));
+        Vertex const* succ = g.get_vertex(VERTEX_id(succ_domtree));
+        buildRecur(succ, g, domtree);
+    }
+
+    BitSet * df = gen_df_ctrlset(vid);
+    df->clean();
+
+    //Compute DF(local)
+    for (EdgeC const* ec = VERTEX_out_list(v); 
+         ec != NULL; ec = EC_next(ec)) {
+        Vertex const* succ = EDGE_to(EC_edge(ec));
+        if (g.get_idom(VERTEX_id(succ)) != vid) {
+            df->bunion(VERTEX_id(succ));
+        }
+    }
+
+    //Compute DF(up)
+    for (EdgeC const* ec = VERTEX_out_list(v_domtree); 
+         ec != NULL; ec = EC_next(ec)) {
+        Vertex const* succ_domtree = EDGE_to(EC_edge(ec));
+        BitSet * succ_df = gen_df_ctrlset(VERTEX_id(succ_domtree));        
+        for (INT p = succ_df->get_first(); p >= 0; p = succ_df->get_next(p)) {
+            if (g.get_idom((UINT)p) != vid) {
+                df->bunion(p);
+            }
+        }
+    }
+}
+
+
+//This function compute dominance frontier to graph g recursively.
+void DfMgr::build(DGraph const& g, DomTree const& domtree)
 {
     INT c;
     for (Vertex const* v = g.get_first_vertex(c);
          v != NULL; v = g.get_next_vertex(c)) {
-        BitSet const* v_dom = g.get_dom_set(v);
+        buildRecur(v, g, domtree);
+    }
+}
+
+
+//This function compute dominance frontier to graph g.
+void DfMgr::build(DGraph const& g)
+{
+    INT c;
+    for (Vertex const* v = g.get_first_vertex(c);
+         v != NULL; v = g.get_next_vertex(c)) {
+        BitSet const* v_dom = g.read_dom_set(VERTEX_id(v));
         ASSERT0(v_dom != NULL);
         UINT vid = VERTEX_id(v);
 
-        //Access each preds
-        EdgeC const* ec = VERTEX_in_list(v);
-        while (ec != NULL) {
+        //Access each preds        
+        for (EdgeC const* ec = VERTEX_in_list(v);
+             ec != NULL; ec = EC_next(ec)) {
             Vertex const* pred = EDGE_from(EC_edge(ec));
-            BitSet * pred_df = get_df_ctrlset(pred);
+            BitSet * pred_df = gen_df_ctrlset(VERTEX_id(pred));
             if (pred == v || g.get_idom(vid) != VERTEX_id(pred)) {
                 pred_df->bunion(vid);
             }
 
-            BitSet const* pred_dom = g.get_dom_set(pred);
+            BitSet const* pred_dom = g.read_dom_set(VERTEX_id(pred));
             ASSERT0(pred_dom != NULL);
             for (INT i = pred_dom->get_first();
                  i >= 0; i = pred_dom->get_next(i)) {
                 if (!v_dom->is_contain(i)) {
-                    Vertex const* pred_dom_v = g.get_vertex(i);
-                    ASSERT0(pred_dom_v != NULL);
-                    get_df_ctrlset(pred_dom_v)->bunion(vid);
+                    ASSERT0(g.get_vertex(i));
+                    gen_df_ctrlset(i)->bunion(vid);
                 }
             }
-            ec = EC_next(ec);
         }
     }
-    //dump(g);
 }
 //END DfMgr
 
@@ -619,12 +666,12 @@ bool PRSSAMgr::isRedundantPHI(IR const* phi, OUT IR ** common_def) const
 //Place phi and assign the v0 for each PR.
 //'effect_prs': record the pr which need to versioning.
 void PRSSAMgr::placePhi(DfMgr const& dfm,
-                          OUT DefSBitSet & effect_prs,
-                          DefMiscBitSetMgr & bs_mgr,
-                          Vector<DefSBitSet*> & defed_prs_vec,
-                          List<IRBB*> & wl)
+                        OUT DefSBitSet & effect_prs,
+                        DefMiscBitSetMgr & bs_mgr,
+                        Vector<DefSBitSet*> & defed_prs_vec,
+                        List<IRBB*> & wl)
 {
-    START_TIMERS("SSA: Place phi", t2);
+    START_TIMER(t, "SSA: Place phi");
 
     //Record BBs which modified each PR.
     BBList * bblst = m_ru->getBBList();
@@ -658,7 +705,7 @@ void PRSSAMgr::placePhi(DfMgr const& dfm,
          i >= 0; i = effect_prs.get_next(i, &cur)) {
         placePhiForPR(i, pr2defbb.get(i), dfm, visited, wl, defed_prs_vec);
     }
-    END_TIMERS(t2);
+    END_TIMER(t, "SSA: Place phi");
 
     //Free local used objects.
     for (INT i = 0; i <= pr2defbb.get_last_idx(); i++) {
@@ -820,7 +867,7 @@ void PRSSAMgr::handleBBRename(
                     ASSERT0(defres);
 
                     IR * new_opnd = m_ru->buildPRdedicated(
-                                    defres->get_prno(), defres->get_type());
+                        defres->get_prno(), defres->get_type());
                     new_opnd->copyRef(defres, m_ru);
                     replace(&PHI_opnd_list(ir), opnd, new_opnd);
                     IR_parent(new_opnd) = ir;
@@ -920,7 +967,7 @@ void PRSSAMgr::rename(
         Vector<DefSBitSet*> & defed_prs_vec,
         Graph & domtree)
 {
-    START_TIMERS("SSA: Rename", t);
+    START_TIMER(t, "SSA: Rename");
     BBList * bblst = m_ru->getBBList();
     if (bblst->get_elem_count() == 0) { return; }
 
@@ -933,7 +980,7 @@ void PRSSAMgr::rename(
 
     ASSERT0(m_cfg->get_entry());
     renameInDomTreeOrder(m_cfg->get_entry(), domtree, defed_prs_vec);
-    END_TIMERS(t);
+    END_TIMER(t, "SSA: Rename");
 }
 
 
@@ -999,7 +1046,7 @@ void PRSSAMgr::destructionInDomTreeOrder(IRBB * root, Graph & domtree)
 //of current BB's predessor.
 void PRSSAMgr::destruction(DomTree & domtree)
 {
-    START_TIMER_FMT_AFTER();
+    START_TIMER(t, "SSA: destruction in dom tree order");
 
     BBList * bblst = m_ru->getBBList();
     if (bblst->get_elem_count() == 0) { return; }
@@ -1008,7 +1055,7 @@ void PRSSAMgr::destruction(DomTree & domtree)
     cleanPRSSAInfo();
     m_is_ssa_constructed = false;
 
-    END_TIMER_FMT_AFTER(("SSA: destruction in dom tree order"));
+    END_TIMER(t, "SSA: destruction in dom tree order");
 }
 
 
@@ -1043,10 +1090,10 @@ void PRSSAMgr::stripPhi(IR * phi, C<IR*> * phict)
         nextel = EC_next(el);
         INT pred = VERTEX_id(EDGE_from(EC_edge(el)));
 
-        ASSERT0(opnd);
+        ASSERT0(opnd && opnd->is_exp());
         IR * opndcopy = m_ru->dupIRTree(opnd);
-        if (opndcopy->is_pr()) {
-            opndcopy->copyRef(opnd, m_ru);
+        if (!opndcopy->is_const()) {
+            opndcopy->copyRefForTree(opnd, m_ru);
         }
 
         //The copy will be inserted into related predecessor.
@@ -1110,7 +1157,7 @@ void PRSSAMgr::stripPhi(IR * phi, C<IR*> * phict)
 //is_vpinfo_avail: set true if VP information is available.
 bool PRSSAMgr::verifyPhi(bool is_vpinfo_avail)
 {
-    UNUSED(is_vpinfo_avail);
+    DUMMYUSE(is_vpinfo_avail);
     BBList * bblst = m_ru->getBBList();
     List<IRBB*> preds;
     for (IRBB * bb = bblst->get_head(); bb != NULL; bb = bblst->get_next()) {
@@ -1156,7 +1203,7 @@ bool PRSSAMgr::verifyPhi(bool is_vpinfo_avail)
                 ASSERT(PR_no(use) == PHI_prno(ir), ("prno is unmatch"));
 
                 SSAInfo * use_ssainfo = PR_ssainfo(use);
-                CK_USE(use_ssainfo);
+                CHECK_DUMMYUSE(use_ssainfo);
 
                 ASSERT0(SSA_def(use_ssainfo) == ir);
             }
@@ -1340,7 +1387,6 @@ void PRSSAMgr::destruction()
 {
     BBList * bblst = m_ru->getBBList();
     if (bblst->get_elem_count() == 0) { return; }
-
     C<IRBB*> * bbct;
     for (bblst->get_head(&bbct);
          bbct != bblst->end(); bbct = bblst->get_next(bbct)) {
@@ -1411,7 +1457,7 @@ static void revise_phi_dt(IR * phi, Region * ru)
 //wl: work list for temporary used.
 void PRSSAMgr::refinePhi(List<IRBB*> & wl)
 {
-    START_TIMERS("SSA: Refine phi", t);
+    START_TIMER(t, "SSA: Refine phi");
 
     BBList * bblst = m_ru->getBBList();
     C<IRBB*> * ct;
@@ -1508,14 +1554,14 @@ void PRSSAMgr::refinePhi(List<IRBB*> & wl)
         }
     }
 
-    END_TIMERS(t);
+    END_TIMER(t, "SSA: Refine phi");
 }
 
 
 //This function revise phi data type, and remove redundant phi.
 void PRSSAMgr::stripVersionForBBList()
 {
-    START_TIMERS("SSA: Strip version", t);
+    START_TIMER(t, "SSA: Strip version");
 
     BBList * bblst = m_ru->getBBList();
     if (bblst->get_elem_count() == 0) { return; }
@@ -1542,7 +1588,7 @@ void PRSSAMgr::stripVersionForBBList()
         }
     }
 
-    END_TIMERS(t);
+    END_TIMER(t, "SSA: Strip version");
 }
 
 
@@ -1551,7 +1597,7 @@ static IR * replace_res_pr(
                 IR * stmt, UINT oldprno,
                 UINT newprno, Type const* newprty)
 {
-    UNUSED(oldprno);
+    DUMMYUSE(oldprno);
 
     //newprty may be VOID.
 
@@ -1728,10 +1774,10 @@ void PRSSAMgr::construction(OptCtx & oc)
     m_ru->checkValidAndRecompute(&oc, PASS_DOM, PASS_UNDEF);
 
     //Extract dominate tree of CFG.
-    START_TIMERS("SSA: Extract Dom Tree", t4);
+    START_TIMER(t, "SSA: Extract Dom Tree");
     DomTree domtree;
     m_cfg->get_dom_tree(domtree);
-    END_TIMERS(t4);
+    END_TIMER(t, "SSA: Extract Dom Tree");
 
     construction(domtree);
 
@@ -1746,11 +1792,11 @@ void PRSSAMgr::construction(DomTree & domtree)
 {
     ASSERT0(m_ru);
 
-    START_TIMERS("SSA: DF Manager", t1);
+    START_TIMER(t, "SSA: Build dominance frontier");
     DfMgr dfm;
-    dfm.build((DGraph&)*m_cfg); //Build dominance frontier.
+    dfm.build((DGraph&)*m_cfg);
     //dfm.dump((DGraph&)*m_cfg);
-    END_TIMERS(t1);
+    END_TIMER(t, "SSA: Build dominance frontier");
 
     List<IRBB*> wl;
     DefMiscBitSetMgr sm;

@@ -417,7 +417,7 @@ void PassMgr::performScalarOpt(OptCtx & oc)
     UINT count = 0;
     BBList * bbl = m_ru->getBBList();
     IR_CFG * cfg = m_ru->getCFG();
-    UNUSED(cfg);
+    DUMMYUSE(cfg);
     do {
         change = false;
         for (Pass * pass = passlist.get_head();

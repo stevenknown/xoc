@@ -510,7 +510,7 @@ void IR_DCE::fix_control_flow(List<IRBB*> & bblst, List<C<IRBB*>*> & ctlst)
 
 void IR_DCE::record_all_ir(IN OUT Vector<Vector<IR*>*> & all_ir)
 {
-    UNUSED(all_ir);
+    DUMMYUSE(all_ir);
     #ifdef _DEBUG_
     BBList * bbl = m_ru->getBBList();
     for (IRBB * bb = bbl->get_head(); bb != NULL; bb = bbl->get_next()) {
@@ -570,19 +570,19 @@ void IR_DCE::revise_successor(IRBB * bb, C<IRBB*> * bbct, BBList * bbl)
 //An aggressive algo will be used if cdg is avaliable.
 bool IR_DCE::perform(OptCtx & oc)
 {
-    START_TIMER_AFTER();
+    START_TIMER(t, getPassName());
     if (m_is_elim_cfs) {
         m_ru->checkValidAndRecompute(&oc, PASS_DU_REF, PASS_CDG,PASS_PDOM,
-                                     PASS_DU_CHAIN, PASS_CDG, PASS_UNDEF);
+            PASS_DU_CHAIN, PASS_CDG, PASS_UNDEF);
         m_cdg = (CDG*)m_ru->getPassMgr()->registerPass(PASS_CDG);
     } else {
         m_ru->checkValidAndRecompute(&oc, PASS_DU_REF, PASS_PDOM,
-                                     PASS_DU_CHAIN, PASS_UNDEF);
+            PASS_DU_CHAIN, PASS_UNDEF);
         m_cdg = NULL;
     }
 
     if (!OC_is_du_chain_valid(oc)) {
-        END_TIMER_AFTER(getPassName());
+        END_TIMER(t, getPassName());
         return false;
     }
 
@@ -679,7 +679,7 @@ bool IR_DCE::perform(OptCtx & oc)
         ASSERT0(verifySSAInfo(m_ru));
     }
 
-    END_TIMER_AFTER(getPassName());
+    END_TIMER(t, getPassName());
     return change;
 }
 //END IR_DCE

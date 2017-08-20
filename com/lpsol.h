@@ -557,7 +557,7 @@ INT SIX<Mat, T>::findPivotBV(UINT pivot_nv, IN OUT PVParam<Mat> & pp)
     Vector<INT> const& eq2bvmap = *pp.eq2bvmap;
     Vector<bool> const& nvset = *pp.nvset;
 
-    UNUSED(nvset);
+    DUMMYUSE(nvset);
 
     PivotPairTab & ppt = *pp.ppt;
     INT rhs_idx = pp.rhs_idx;
@@ -677,8 +677,8 @@ INT SIX<Mat, T>::findPivotNVandBVPair(
     Mat const& tgtf = *pp.tgtf;
     IN OUT Vector<bool> & nvset = *pp.nvset;
     IN OUT Vector<bool> & bvset = *pp.bvset;
-    UNUSED(nvset);
-    UNUSED(bvset);
+    DUMMYUSE(nvset);
+    DUMMYUSE(bvset);
     PivotPairTab & ppt = *pp.ppt;
     INT rhs_idx = pp.rhs_idx;
     UINT i;
@@ -1521,9 +1521,9 @@ void SIX<Mat, T>::verify(
         Mat const& vc,
         INT rhs_idx)
 {
-    UNUSED(vc);
-    UNUSED(tgtf);
-    UNUSED(rhs_idx);
+    DUMMYUSE(vc);
+    DUMMYUSE(tgtf);
+    DUMMYUSE(rhs_idx);
     ASSERT(rhs_idx == -1 ||
            rhs_idx == (INT)leq.get_col_size() -1, ("unsupport"));
     INT max_cols = -1;
@@ -1547,7 +1547,7 @@ void SIX<Mat, T>::verify(
 
     UINT num_cols_of_const_term = max_cols - m_rhs_idx;
 
-    UNUSED(num_cols_of_const_term);
+    DUMMYUSE(num_cols_of_const_term);
     ASSERT(num_cols_of_const_term == 1,
            ("No yet support const term with multi-columns."));
     ASSERT(tgtf.is_vec() && tgtf.get_col_size() == (UINT)max_cols,
@@ -1856,7 +1856,7 @@ void SIX<Mat, T>::calcFinalSolution(
         Mat const& orignal_tgtf,
         INT rhs_idx)
 {
-    UNUSED(rhs_idx);
+    DUMMYUSE(rhs_idx);
 
     //After normalizing done, new dummy nonbasic variables might be generated,
     //recalculate the value to recover the real variables.
@@ -1890,7 +1890,7 @@ void SIX<Mat, T>::calcFinalSolution(
     v = 0;
     UINT num_of_const_term = sol.get_col_size() - m_rhs_idx;
 
-    UNUSED(num_of_const_term);
+    DUMMYUSE(num_of_const_term);
     ASSERT(num_of_const_term == 1,
             ("No yet support const term with multi-columns."));
     for (UINT j = 0; j < (UINT)sol.get_col_size(); j++) {
@@ -2298,8 +2298,8 @@ void MIP<Mat, T>::verify(Mat const& leq,
                          Mat const& vc,
                          INT rhs_idx)
 {
-    UNUSED(rhs_idx);
-    UNUSED(tgtf);
+    DUMMYUSE(rhs_idx);
+    DUMMYUSE(tgtf);
     ASSERT(rhs_idx == -1 || rhs_idx == (INT)leq.get_col_size() -1,
             ("Parameter is not yet support right now."));
     INT max_cols = -1;
@@ -2326,7 +2326,7 @@ void MIP<Mat, T>::verify(Mat const& leq,
 
     UINT num_cols_of_const_term = max_cols - m_rhs_idx;
 
-    UNUSED(num_cols_of_const_term);
+    DUMMYUSE(num_cols_of_const_term);
     ASSERT(num_cols_of_const_term == 1,
             ("No yet support const term with multi-columns."));
 

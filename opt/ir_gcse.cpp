@@ -199,7 +199,7 @@ void IR_GCSE::elimCseAtCall(IR * use, IR * use_stmt, IR * gen)
 
     //Add du chain from gen_pr's stmt to the use of pr.
     bool f = use_stmt->replaceKid(use, use_pr, false);
-    CK_USE(f);
+    CHECK_DUMMYUSE(f);
     m_ru->freeIRTree(use);
 
     if (m_is_in_ssa_form) {
@@ -264,8 +264,8 @@ void IR_GCSE::prcessCseGen(IN IR * gen, IR * gen_stmt, bool & change)
     //The 'find()' is fast because it is implemented with hash.
     C<IR*> * holder = NULL;
     bool f = BB_irlist(bb).find(gen_stmt, &holder);
-    CK_USE(f);
-    CK_USE(holder);
+    CHECK_DUMMYUSE(f);
+    CHECK_DUMMYUSE(holder);
     BB_irlist(bb).insert_before(new_stpr, holder);
 
     if (gen_stmt->isConditionalBr() && gen == BR_det(gen_stmt)) {
@@ -275,7 +275,7 @@ void IR_GCSE::prcessCseGen(IN IR * gen, IR * gen_stmt, bool & change)
     }
 
     bool v = gen_stmt->replaceKid(gen, tmp_pr, false);
-    CK_USE(v);
+    CHECK_DUMMYUSE(v);
 
     //Keep original du unchange, add new du chain for new stmt.
     if (m_is_in_ssa_form) {
@@ -683,10 +683,10 @@ bool IR_GCSE::doProp(IRBB * bb, List<IR*> & livexp)
 
 bool IR_GCSE::perform(OptCtx & oc)
 {
-    START_TIMER_AFTER();
+    START_TIMER(t, getPassName());
     if (m_gvn != NULL) {
         m_ru->checkValidAndRecompute(&oc, PASS_DOM, PASS_PDOM,
-                                     PASS_DU_REF, PASS_DU_CHAIN, PASS_UNDEF);
+            PASS_DU_REF, PASS_DU_CHAIN, PASS_UNDEF);
         if (!m_gvn->is_valid()) {
             m_gvn->reperform(oc);
             m_gvn->dump();
@@ -694,19 +694,19 @@ bool IR_GCSE::perform(OptCtx & oc)
         m_expr_tab = NULL;
     } else {
         m_ru->checkValidAndRecompute(&oc, PASS_DOM, PASS_PDOM, PASS_EXPR_TAB,
-                                     PASS_DU_REF, PASS_DU_CHAIN, PASS_UNDEF);
-        m_expr_tab =
-            (IR_EXPR_TAB*)m_ru->getPassMgr()->registerPass(PASS_EXPR_TAB);
+            PASS_DU_REF, PASS_DU_CHAIN, PASS_UNDEF);
+        m_expr_tab = (IR_EXPR_TAB*)m_ru->getPassMgr()->
+            registerPass(PASS_EXPR_TAB);
     }
 
     if (!OC_is_du_chain_valid(oc)) {
-        END_TIMER_AFTER(getPassName());
+        END_TIMER(t, getPassName());
         return false;
     }
 
     m_is_in_ssa_form = false;
-    PRSSAMgr * ssamgr =
-            (PRSSAMgr*)(m_ru->getPassMgr()->queryPass(PASS_PR_SSA_MGR));
+    PRSSAMgr * ssamgr = (PRSSAMgr*)(m_ru->getPassMgr()->
+        queryPass(PASS_PR_SSA_MGR));
     if (ssamgr != NULL && ssamgr->isSSAConstructed()) {
         m_is_in_ssa_form = true;
         m_ssamgr = ssamgr;
@@ -788,7 +788,7 @@ bool IR_GCSE::perform(OptCtx & oc)
         m_tg = NULL;
     }
     ASSERT0(verifyIRandBB(m_ru->getBBList(), m_ru));
-    END_TIMER_AFTER(getPassName());
+    END_TIMER(t, getPassName());
     return change;
 }
 //END IR_GCSE

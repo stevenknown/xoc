@@ -39,17 +39,18 @@ namespace xoc {
 class MDSSAInfo;
 
 //Usage of AIContainer:
-//1.Allocate AIContainer from Region.
-//2.Construct your data structure to be contained.
+//1.Allocate AIContainer.
+//2.Construct AI data structure to be attached.
 //3.Set the AIContainer type and the data structure.
-//
-//e.g: use DBX AI.
+//e.g: construct DBX AI.
 //  IR * ir = ...; //Given IR.
 //  IR_ai(ir) = region->allocAIContainer();
 //  Dbx * dbx = getDbx();
 //  IR_ai(ir)->set(AI_DBX, (BaseAttachInfo*)dbx);
-//  Note that you do not need to free/delete AI structure,
-//  which will be freed in destructor of region.
+//Note that you do not need to free/delete AI structure,
+//which will be freed in destructor of region.
+//And region is not reponsible for allocation or free of
+//AI data structure.
 
 //Attach Info Type.
 typedef enum _AI_TYPE {
@@ -174,7 +175,7 @@ public:
         case AI_TBAA: return "Tbaa";
         case AI_EH_LABEL: return "EH";
         case AI_USER_DEF: return "UserDef";
-        case AI_MD_SSA: return "SSA";
+        case AI_MD_SSA: return "MDSSA";
         case AI_LAST:;
         default: UNREACH();
         }

@@ -55,7 +55,7 @@ void StrBuf::strcat(UINT l, CHAR const* format, va_list args)
     }
     UINT k = VSNPRINTF(buf + sl, l + 1, format, args);
     ASSERT0(k == l);
-    UNUSED(k);
+    DUMMYUSE(k);
 }
 
 

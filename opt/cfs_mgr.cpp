@@ -158,7 +158,7 @@ AbsNode * CfsMgr::constructAbsLoop(
         IN Graph & cur_graph,
         IN OUT BitSet & visited)
 {
-    UNUSED(cur_region);
+    DUMMYUSE(cur_region);
     ASSERT0(cur_region == NULL || cur_region->is_contain(BB_id(entry)));
     IR_CFG * cfg = m_ru->getCFG();
     LI<IRBB> * li = cfg->mapBB2LabelInfo(entry);
@@ -173,7 +173,7 @@ AbsNode * CfsMgr::constructAbsLoop(
     ASSERT0(body_start != NULL);
 
     CFS_INFO * ci = map_ir2cfsinfo(cfg->get_last_xr(entry));
-    CK_USE(ci);
+    CHECK_DUMMYUSE(ci);
     ASSERT0(CFS_INFO_head(ci) == entry);
 
     ASSERT0(CFS_INFO_loop_body(ci)->is_contain(*LI_bb_set(li)));
@@ -279,7 +279,7 @@ AbsNode * CfsMgr::constructAbsTree(
                 //
                 //  BB1 does not have a ipdom.
                 UINT ipdom = ((DGraph*)cfg)->get_ipdom(BB_id(bb));
-                UNUSED(ipdom);
+                DUMMYUSE(ipdom);
                 ASSERT(ipdom > 0, ("bb does not have ipdom"));
                 node = constructAbsIf(bb, parent, g, loc_visited);
             } else {

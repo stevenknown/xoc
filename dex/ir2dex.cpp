@@ -811,7 +811,7 @@ LIR * IR2Dex::buildInvoke(IN IR ** ir)
         //The second must be method-id.
         ASSERT0(p && p->is_const());
         UINT method_id = CONST_int_val(p);
-        UNUSED(method_id);
+        DUMMYUSE(method_id);
     }
     #endif
 

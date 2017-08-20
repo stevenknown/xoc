@@ -875,7 +875,7 @@ void INTMat::_verify_hnf(INTMat & h)
         //1. Eliminate element from i+1 to n to single zero.
         UINT j;
         INT v = h.get(i, i);
-        UNUSED(v);
+        DUMMYUSE(v);
 
         for (j = 0; j < i; j++) {
             ASSERT(h.get(i,j) >= 0, ("negtive element"));

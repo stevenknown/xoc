@@ -73,6 +73,7 @@ void Region::lowerIRTreeToLowestHeight(OptCtx & oc)
 }
 
 
+//Simplification will maintain MD SSA, DU Ref information.
 bool Region::performSimplify(OptCtx & oc)
 {
     SimpCtx simp;
@@ -173,7 +174,15 @@ bool Region::MiddleProcess(OptCtx & oc)
     }
 
     if (do_simplification) {
+        if (isRegionName("main")){
+            getMDSSAMgr()->dump();
+            int a = 0;
+        }
         performSimplify(oc);
+        if (isRegionName("main")){
+            getMDSSAMgr()->dump();
+            int a = 0;
+        }
     }
 
     if (g_opt_level > OPT_LEVEL0) {
@@ -194,6 +203,10 @@ bool Region::MiddleProcess(OptCtx & oc)
         } else { ASSERT0(verifyIRandBB(bbl, this)); }
     } else {
         ASSERT0(verifyIRandBB(bbl, this));
+    }
+    if (isRegionName("main")){
+        getMDSSAMgr()->verify(); int a = 0;
+        getMDSSAMgr()->dump();
     }
     return true;
 }

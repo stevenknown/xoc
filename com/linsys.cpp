@@ -1130,7 +1130,7 @@ void Lineq::substituteAndExpand(
         RMat const& p,
         UINT sub_var)
 {
-    UNUSED(rhs_idx);
+    DUMMYUSE(rhs_idx);
     ASSERT0(coeff.get_col_size() == p.get_col_size() && sub_var < rhs_idx);
     RMat tp;
     for (UINT i = 0; i < p.get_row_size(); i++) {
@@ -1285,9 +1285,9 @@ void Lineq::dumps_var_bound(UINT u)
 //Ehrhart Polynomial.
 void Lineq::EhartPoly(OUT RMat & res, IN RMat & a, UINT rhs_idx)
 {
-    UNUSED(rhs_idx);
-    UNUSED(a);
-    UNUSED(res);
+    DUMMYUSE(rhs_idx);
+    DUMMYUSE(a);
+    DUMMYUSE(res);
     UNREACH();
 }
 
@@ -1710,7 +1710,7 @@ bool Lineq::convertRay2Constraint(
         OUT INTMat & cs,
         UINT cslimit)
 {
-    UNUSED(cslimit);
+    DUMMYUSE(cslimit);
     if (gmat.size() == 0) {
         cs.clean();
         return false;
@@ -1865,7 +1865,7 @@ bool Lineq::convertRay2Constraint(
 //Then a - b = (L1 กษ (P1'-P2')) กศ ((L1-L2) กษ (P1' กษ P2')).
 void Lineq::PolyDiff(OUT RMat & res, IN RMat & a, IN RMat & b, UINT rhs_idx)
 {
-    UNUSED(rhs_idx);
+    DUMMYUSE(rhs_idx);
     if (a.size() == 0) { res.clean(); return; }
     if (b.size() == 0) { res.copy(a); return; }
     ASSERT0(a.is_homo(b));
@@ -1875,9 +1875,9 @@ void Lineq::PolyDiff(OUT RMat & res, IN RMat & a, IN RMat & b, UINT rhs_idx)
 
 void Lineq::PolyImage(OUT RMat & res, IN RMat & a, UINT rhs_idx)
 {
-    UNUSED(res);
-    UNUSED(a);
-    UNUSED(rhs_idx);
+    DUMMYUSE(res);
+    DUMMYUSE(a);
+    DUMMYUSE(rhs_idx);
     UNREACH();
 }
 //END Lineq

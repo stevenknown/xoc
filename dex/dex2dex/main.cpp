@@ -50,8 +50,8 @@ author: GongKai, JinYue
 #ifdef DEBUG_D2D
 int main(int argcc, char * argvc[])
 {
-    UNUSED(argcc);
-    UNUSED(argvc);
+    DUMMYUSE(argcc);
+    DUMMYUSE(argvc);
 
     CHAR * argv[] = {
         "d2d.exe",

@@ -36,6 +36,23 @@ namespace xoc {
 //
 //START MDSSAInfo
 //
+//Return true if all definition of vopnd can reach 'exp'.
+bool MDSSAInfo::isUseReachable(IN UseDefMgr * usedefmgr, IR const* exp)
+{
+    ASSERT0(usedefmgr && exp && exp->is_exp());
+    SEGIter * iter = NULL;    
+    for (INT i = getVOpndSet()->get_first(&iter);
+         i >= 0; i = getVOpndSet()->get_next(i, &iter)) {
+        VMD * vopnd = (VMD*)usedefmgr->getVOpnd(i);
+        ASSERT0(vopnd && vopnd->is_md());
+        if (!vopnd->getOccSet()->is_contain(exp->id())) {
+            return false;
+        }
+    }
+    return true;
+}
+
+
 //Collect all USE, where USE is IR expression.
 void MDSSAInfo::collectUse(
         OUT DefSBitSetCore & set,
@@ -327,6 +344,13 @@ void UseDefMgr::cleanOrDestroy(bool is_reinit)
         }
     }
 
+    for (INT i = 0; i <= m_mdssainfo_vec.get_last_idx(); i++) {
+        MDSSAInfo * info = m_mdssainfo_vec.get((UINT)i);
+        if (info != NULL) {
+            info->destroy(*m_sbs_mgr);
+        }
+    }
+
     destroyMD2VMDVec();
 
     if (is_reinit) {
@@ -334,6 +358,7 @@ void UseDefMgr::cleanOrDestroy(bool is_reinit)
         m_map_md2vmd.init();
         m_philist_vec.clean();
         m_def_vec.clean();
+        m_mdssainfo_vec.clean();
         m_vopnd_vec.clean();
         m_def_count = 1;
         m_vopnd_count = 1;
@@ -380,8 +405,19 @@ void UseDefMgr::cleanOrDestroy(bool is_reinit)
 }
 
 
+void UseDefMgr::setMDSSAInfo(IR * ir, MDSSAInfo * mdssainfo)
+{
+    ASSERT0(ir && mdssainfo);
+    if (ir->getAI() == NULL) {
+        IR_ai(ir) = m_ru->allocAIContainer();
+    }
+    IR_ai(ir)->set(mdssainfo);
+}
+
+
 MDSSAInfo * UseDefMgr::genMDSSAInfo(IR * ir)
 {
+    ASSERT0(ir);
     if (ir->getAI() == NULL) {
         IR_ai(ir) = m_ru->allocAIContainer();
     }
@@ -420,6 +456,9 @@ MDSSAInfo * UseDefMgr::allocMDSSAInfo()
     ASSERT0(p);
     memset(p, 0, sizeof(MDSSAInfo));
     p->init();
+    ASSERT0(m_mdssainfo_vec.get_last_idx() == -1 ||
+        m_mdssainfo_vec.get_last_idx() >= 0);
+    m_mdssainfo_vec.set(m_mdssainfo_vec.get_last_idx() + 1, p);
     return p;
 }
 
@@ -434,7 +473,7 @@ MDPhi * UseDefMgr::allocMDPhi(UINT mdid, UINT num_operands)
     phi->init();
     MDDEF_id(phi) = m_def_count++;
     m_def_vec.set(MDDEF_id(phi), phi);
-    VMD * vmd = allocVMD(mdid, 0);
+    VMD const* vmd = allocVMD(mdid, 0);
     ASSERT0(vmd);
 
     MD const* md = m_md_sys->getMD(mdid);
@@ -446,7 +485,6 @@ MDPhi * UseDefMgr::allocMDPhi(UINT mdid, UINT num_operands)
 
         MDSSAInfo * mdssainfo = genMDSSAInfo(opnd);
 
-        VMD const* vmd = allocVMD(md->id(), 0);
         ASSERT0(m_sbs_mgr);
         mdssainfo->getVOpndSet()->append(vmd, *m_sbs_mgr);
 

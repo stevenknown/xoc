@@ -43,20 +43,19 @@ namespace xcom {
 
 //Used to avoid warning: unreferenced variable if set
 //-Werror=unused-variable.
-//#define UNUSED(v) (v)
 template <typename T> int dummy_use(T const&) { return 0; }
-#define UNUSED(v) xcom::dummy_use(v)
+#define DUMMYUSE(v) xcom::dummy_use(v)
 
 #ifdef _DEBUG_
-#define CK_USE(a)    ASSERT0(a)
-#define ASSERT_UNUSED(a, b)  \
-    ((a) ? UNUSED(0) : (m022138(__FILE__, __LINE__), m518087 b))
-#define ASSERT0_UNUSED(a)  \
-    ((a) ? UNUSED(0) : (m022138(__FILE__, __LINE__), m518087 ("")))
+#define CHECK_DUMMYUSE(a)    ASSERT0(a)
+#define ASSERT_DUMMYUSE(a, b)  \
+    ((a) ? DUMMYUSE(0) : (m022138(__FILE__, __LINE__), m518087 b))
+#define ASSERT0_DUMMYUSE(a)  \
+    ((a) ? DUMMYUSE(0) : (m022138(__FILE__, __LINE__), m518087 ("")))
 #else
-#define CK_USE(a)    UNUSED(a)
-#define ASSERT_UNUSED(a, b)
-#define ASSERT0_UNUSED(a)
+#define CHECK_DUMMYUSE(a)    DUMMYUSE(a)
+#define ASSERT_DUMMYUSE(a, b)
+#define ASSERT0_DUMMYUSE(a)
 #endif
 
 

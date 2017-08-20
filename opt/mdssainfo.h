@@ -225,6 +225,8 @@ public:
 
     VOpndSet * getVOpndSet() { return &m_vopnd_set; }
 
+    bool isUseReachable(IN UseDefMgr * usedefmgr, IR const* exp);
+
     VOpndSet const* readVOpndSet() const { return &m_vopnd_set; }
 
     //Collect all USE, where USE is IR expression.
@@ -359,6 +361,7 @@ protected:
     SC<VOpnd*> * m_free_sc_list;
     UINT m_def_count;
     UINT m_vopnd_count;
+    Vector<MDSSAInfo*> m_mdssainfo_vec;
     Vector<MDDef*> m_def_vec;
     Vector<VOpnd*> m_vopnd_vec;
     Vector<MDPhiList*> m_philist_vec; //record the Phi list of BB.
@@ -391,6 +394,8 @@ public:
     Region * getRegion() const { return m_ru; }
 
     MDSSAInfo * readMDSSAInfo(IR const* ir) const;
+
+    void setMDSSAInfo(IR * ir, MDSSAInfo * mdssainfo);
 };
 
 } //namespace xoc

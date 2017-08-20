@@ -133,7 +133,7 @@ void IPA::createCallDummyuse(Region * ru)
 
 void IPA::computeCallRefForAllRegion()
 {
-    START_TIMER_AFTER();
+    START_TIMER(t, "Compute CallRef for all regions");
     for (UINT i = 0; i < m_rumgr->getNumOfRegion(); i++) {
         Region * ru = m_rumgr->getRegion(i);
         if (ru == NULL ||
@@ -152,7 +152,7 @@ void IPA::computeCallRefForAllRegion()
         ru->getPassMgr()->destroyPass(dumgr);
         ru->getPassMgr()->destroyPass(aa);
     }
-    END_TIMER_AFTER("computeCallRefForAllRegion()");
+    END_TIMER(t, "Compute CallRef for all regions");
 }
 
 
@@ -263,11 +263,11 @@ void IPA::recomputeDUChain(Region * ru, OptCtx & oc)
 //DU chain if need.
 bool IPA::perform(OptCtx & oc)
 {
-    START_TIMER_AFTER();
+    START_TIMER(t, getPassName());
     ASSERT0(OC_is_callg_valid(oc));
     ASSERT0(m_program && m_program->is_program());
     createCallDummyuse(oc);
-    END_TIMER_AFTER(getPassName());
+    END_TIMER(t, getPassName());
     return true;
 }
 

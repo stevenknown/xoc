@@ -1048,8 +1048,8 @@ void IR_GVN::processCall(IR const* ir, bool & change)
 
 void IR_GVN::processRegion(IR const* ir, bool & change)
 {
-    UNUSED(change);
-    UNUSED(ir);
+    DUMMYUSE(change);
+    DUMMYUSE(ir);
     UNREACH(); //TODO
 }
 
@@ -1462,12 +1462,12 @@ bool IR_GVN::perform(OptCtx & oc)
     BBList * bbl = m_ru->getBBList();
     if (bbl->get_elem_count() == 0) { return false; }
 
-    START_TIMER_AFTER();
-    m_ru->checkValidAndRecompute(&oc, PASS_DU_CHAIN, PASS_DU_REF, PASS_RPO,
-                                 PASS_DOM, PASS_UNDEF);
+    START_TIMER(t, getPassName());
+    m_ru->checkValidAndRecompute(&oc, PASS_DU_CHAIN, 
+        PASS_DU_REF, PASS_RPO, PASS_DOM, PASS_UNDEF);
 
     if (!OC_is_du_chain_valid(oc)) {
-        END_TIMER_AFTER(getPassName());
+        END_TIMER(t, getPassName());
         return false;
     }
 
@@ -1492,7 +1492,7 @@ bool IR_GVN::perform(OptCtx & oc)
     #endif
 
     //dump();
-    END_TIMER_AFTER(getPassName());
+    END_TIMER(t, getPassName());
     ASSERT0(verify());
     m_is_valid = true;
     return true;

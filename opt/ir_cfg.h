@@ -301,7 +301,7 @@ public:
             n++;
         }
 
-        CK_USE(find); //pred should be a predecessor of bb.
+        CHECK_DUMMYUSE(find); //pred should be a predecessor of bb.
 
         return n;
     }
@@ -333,7 +333,7 @@ public:
 
     virtual void moveLabels(IRBB * src, IRBB * tgt);
 
-    virtual bool perform(OptCtx & oc) { UNUSED(oc); return false; }
+    virtual bool perform(OptCtx & oc) { DUMMYUSE(oc); return false; }
 
     //Perform miscellaneous control flow optimizations.
     //Include remove dead bb which is unreachable, remove empty bb as many

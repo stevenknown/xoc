@@ -219,8 +219,8 @@ AnalysisInstrument::~AnalysisInstrument()
 
 bool AnalysisInstrument::verify_var(VarMgr * vm, VAR * v)
 {
-    CK_USE(v);
-    CK_USE(vm);
+    CHECK_DUMMYUSE(v);
+    CHECK_DUMMYUSE(vm);
     if (m_ru->is_function() || m_ru->is_eh() ||
         REGION_type(m_ru) == RU_SUB) {
         //If var is global but unallocable, it often be
@@ -384,7 +384,7 @@ IR * Region::buildPR(Type const* type)
 UINT Region::buildPrno(Type const* type)
 {
     ASSERT0(type);
-    UNUSED(type);
+    DUMMYUSE(type);
     return REGION_analysis_instrument(this)->m_pr_count++;
 }
 
@@ -1291,7 +1291,7 @@ IR * Region::buildPointerOp(IR_TYPE irt, IR * lchild, IR * rchild)
 
     Type const* d0 = lchild->get_type();
     Type const* d1 = rchild->get_type();
-    UNUSED(d1);
+    DUMMYUSE(d1);
     if (lchild->is_ptr() && rchild->is_ptr()) {
         //CASE: Pointer substraction.
         //  char *p, *q;
@@ -1738,7 +1738,7 @@ bool Region::evaluateConstInteger(IR const* ir, OUT ULONGLONG * const_value)
 //    a = pr
 bool Region::reconstructBBlist(OptCtx & oc)
 {
-    START_TIMER("Reconstruct IRBB list");
+    START_TIMER(t, "Reconstruct IRBB list");
     ASSERT(getCFG(), ("CFG is not available"));
 
     bool change = false;
@@ -1791,7 +1791,7 @@ bool Region::reconstructBBlist(OptCtx & oc)
         }
     }
 
-    END_TIMER();
+    END_TIMER(t, "Reconstruct IRBB list");
 
     if (change) {
         //Must rebuild CFG and all other structures which are
@@ -1806,7 +1806,7 @@ bool Region::reconstructBBlist(OptCtx & oc)
 //clean_ir_list: clean bb's ir list if it is true.
 IR * Region::constructIRlist(bool clean_ir_list)
 {
-    START_TIMER("Construct IRBB list");
+    START_TIMER(t, "Construct IR list from BB");
     IR * ret_list = NULL;
     IR * last = NULL;
     C<IRBB*> * ct;
@@ -1836,7 +1836,7 @@ IR * Region::constructIRlist(bool clean_ir_list)
     }
 
     //ret_list = reverse_list(ret_list);
-    END_TIMER();
+    END_TIMER(t, "Construct IR list from BB");
     return ret_list;
 }
 
@@ -1846,7 +1846,7 @@ IR * Region::constructIRlist(bool clean_ir_list)
 void Region::constructIRBBlist()
 {
     if (getIRList() == NULL) { return; }
-    START_TIMER("Construct IRBB list");
+    START_TIMER(t, "Construct IRBB list");
     IRBB * cur_bb = NULL;
     IR * pointer = getIRList();
     while (pointer != NULL) {
@@ -1926,7 +1926,7 @@ void Region::constructIRBBlist()
 
     //cur_bb is the last bb, it is also the exit bb.
     //IR_BB_is_func_exit(cur_bb) = true;
-    END_TIMER();
+    END_TIMER(t, "Construct IRBB list");
 }
 
 
@@ -2106,6 +2106,57 @@ void Region::freeIRTree(IR * ir)
 }
 
 
+//This function erases all informations of ir and
+//append it into free_list for next allocation.
+//If Attach Info exist, this function will erase it rather than delete.
+//If DU info exist, this function will retrieve it back
+//to region for next allocation.
+//Note that this function does NOT free ir's kids and siblings.
+void Region::freeIR(IR * ir)
+{
+    ASSERT0(ir);
+    ASSERT(ir->is_single(), ("chain list should be cut off"));
+    #ifdef _DEBUG_
+    ASSERT0(!REGION_analysis_instrument(this)->
+            m_has_been_freed_irs.is_contain(ir->id()));
+    REGION_analysis_instrument(this)->m_has_been_freed_irs.bunion(ir->id());
+    #endif
+
+    ASSERT0(getMiscBitSetMgr());
+    ir->freeDUset(*getMiscBitSetMgr());
+
+    AIContainer * res_ai = IR_ai(ir);
+    if (res_ai != NULL) {
+        //AICont will be reinitialized while setting.
+        res_ai->destroy();
+    }
+
+    DU * du = ir->cleanDU();
+    if (du != NULL) {
+        DU_md(du) = NULL;
+        DU_mds(du) = NULL;
+        ASSERT0(du->has_clean());
+        REGION_analysis_instrument(this)->m_free_du_list.append_head(du);
+    }
+
+    //Zero clearing all data fields.
+    UINT res_id = ir->id();
+    UINT res_irt_sz = getIRTypeSize(ir);
+    memset(ir, 0, res_irt_sz);
+    IR_id(ir) = res_id;
+    IR_ai(ir) = res_ai;
+    set_irt_size(ir, res_irt_sz);
+
+    UINT idx = res_irt_sz - sizeof(IR);
+    IR * head = REGION_analysis_instrument(this)->m_free_tab[idx];
+    if (head != NULL) {
+        IR_next(ir) = head;
+        IR_prev(head) = ir;
+    }
+    REGION_analysis_instrument(this)->m_free_tab[idx] = ir;
+}
+
+
 //This function iterate VAR table of current region to
 //find all VAR which are formal parameter.
 //in_decl_order: if it is true, this function will sort the formal
@@ -2241,64 +2292,6 @@ IR * Region::allocIR(IR_TYPE irt)
 }
 
 
-//This function erase all informations of ir and append it into free_list for
-//next allocation.
-//If Attach Info exist, this function will erase it rather than delete.
-//If DU info exist, this function will return it back to region for next
-//allocation.
-//Note that this function does NOT free ir's kids and siblings, and delete
-//any memory.
-void Region::freeIR(IR * ir)
-{
-    ASSERT0(ir);
-    ASSERT(ir->is_single(), ("chain list should be cut off"));
-    #ifdef _DEBUG_
-    ASSERT0(!REGION_analysis_instrument(this)->
-            m_has_been_freed_irs.is_contain(ir->id()));
-    REGION_analysis_instrument(this)->m_has_been_freed_irs.bunion(ir->id());
-    #endif
-
-    ASSERT0(getMiscBitSetMgr());
-    ir->freeDUset(*getMiscBitSetMgr());
-
-    MDSSAMgr * mdssamgr = NULL;
-    if (getPassMgr() != NULL &&
-        (mdssamgr = ((MDSSAMgr*)getPassMgr()->queryPass(PASS_MD_SSA_MGR))) != NULL) {
-        mdssamgr->cleanMDSSAInfoOfIR(ir);
-    }
-
-    AIContainer * res_ai = IR_ai(ir);
-    if (res_ai != NULL) {
-        //AICont will be reinitialized while setting.
-        res_ai->destroy();
-    }
-
-    DU * du = ir->cleanDU();
-    if (du != NULL) {
-        DU_md(du) = NULL;
-        DU_mds(du) = NULL;
-        ASSERT0(du->has_clean());
-        REGION_analysis_instrument(this)->m_free_du_list.append_head(du);
-    }
-
-    //Zero clearing all data fields.
-    UINT res_id = ir->id();
-    UINT res_irt_sz = getIRTypeSize(ir);
-    memset(ir, 0, res_irt_sz);
-    IR_id(ir) = res_id;
-    IR_ai(ir) = res_ai;
-    set_irt_size(ir, res_irt_sz);
-
-    UINT idx = res_irt_sz - sizeof(IR);
-    IR * head = REGION_analysis_instrument(this)->m_free_tab[idx];
-    if (head != NULL) {
-        IR_next(ir) = head;
-        IR_prev(head) = ir;
-    }
-    REGION_analysis_instrument(this)->m_free_tab[idx] = ir;
-}
-
-
 //Duplication 'ir' and kids, and its sibling, return list of new ir.
 //Duplicate irs start from 'ir' to the end of list.
 IR * Region::dupIRTreeList(IR const* ir)
@@ -2328,8 +2321,8 @@ IR * Region::dupIRTree(IR const* ir)
 }
 
 
-//Duplication all contents of 'src', except the AI info, kids and siblings IR.
-//Since src may be come from other region, we do not copy AI info.
+//Duplication all contents of 'src', includes AI, except DU info, 
+//SSA info, kids and siblings IR.
 IR * Region::dupIR(IR const* src)
 {
     if (src == NULL) { return NULL; }
@@ -2781,7 +2774,7 @@ bool Region::verifyMDRef()
                     ASSERT0(t->getRefMDSet() == NULL);
                     break;
                 case IR_LD:
-                    if (g_is_support_dynamic_type) {
+                    if (g_is_support_dynamic_type) {                        
                         ASSERT(t->getEffectRef(), ("type is at least effect"));
                         ASSERT(!t->getEffectRef()->is_pr(),
                                ("MD can not present a PR."));
@@ -2817,8 +2810,8 @@ bool Region::verifyMDRef()
                     {
                         MD const* must = t->getEffectRef();
                         MDSet const* may = t->getRefMDSet();
-                        UNUSED(must);
-                        UNUSED(may);
+                        DUMMYUSE(must);
+                        DUMMYUSE(may);
                         ASSERT0(must || (may && !may->is_empty()));
                         if (must != NULL) {
                             //PR can not be accessed by indirect operation.
@@ -2831,7 +2824,7 @@ bool Region::verifyMDRef()
                             for (INT i = may->get_first(&iter);
                                  i >= 0; i = may->get_next(i, &iter)) {
                                 MD const* x = getMDSystem()->getMD(i);
-                                UNUSED(x);
+                                DUMMYUSE(x);
                                 ASSERT0(x && !x->is_pr());
                             }
                             ASSERT0(getMDSetHash()->find(*may));
@@ -2843,8 +2836,8 @@ bool Region::verifyMDRef()
                     {
                         MD const* mustuse = t->getEffectRef();
                         MDSet const* mayuse = t->getRefMDSet();
-                        UNUSED(mustuse);
-                        UNUSED(mayuse);
+                        DUMMYUSE(mustuse);
+                        DUMMYUSE(mayuse);
 
                         ASSERT0(mustuse || (mayuse && !mayuse->is_empty()));
                         if (mustuse != NULL) {
@@ -2858,7 +2851,7 @@ bool Region::verifyMDRef()
                             for (INT i = mayuse->get_first(&iter);
                                  i >= 0; i = mayuse->get_next(i, &iter)) {
                                 MD const* x = getMDSystem()->getMD(i);
-                                UNUSED(x);
+                                DUMMYUSE(x);
                                 ASSERT0(x && !x->is_pr());
                             }
                             ASSERT0(getMDSetHash()->find(*mayuse));
@@ -2915,7 +2908,7 @@ bool Region::verifyMDRef()
                             for (INT i = maydef->get_first(&iter);
                                  i >= 0; i = maydef->get_next(i, &iter)) {
                                 MD const* x = getMDSystem()->getMD(i);
-                                UNUSED(x);
+                                DUMMYUSE(x);
                                 ASSERT0(x);
                                 ASSERT0(!x->is_pr());
                             }
@@ -3165,6 +3158,17 @@ void Region::dumpVARInRegion()
     }
 
     fflush(g_tfile);
+}
+
+
+//Copy src's AI to tgt.
+void Region::copyAI(IR const* src, IR * tgt)
+{
+    if (src->getAI() == NULL) { return; }    
+    if (IR_ai(tgt) == NULL) {
+        IR_ai(tgt) = allocAIContainer();
+    }
+    IR_ai(tgt)->copy(src->getAI());
 }
 
 
@@ -3431,7 +3435,7 @@ bool Region::partitionRegion()
     OptCtx oc;
     bool succ = REGION_ru(ir_ru)->process(&oc);
     ASSERT0(succ);
-    UNUSED(succ);
+    DUMMYUSE(succ);
 
     dump_irs(getIRList(), getTypeMgr());
 
@@ -3494,9 +3498,9 @@ bool Region::processIRList(OptCtx & oc)
 {
     if (getIRList() == NULL) { return true; }
 
-    START_TIMER("PreScan");
+    START_TIMER(t, "PreScan");
     prescan(getIRList());
-    END_TIMER();
+    END_TIMER(t, "PreScan");
     if (!HighProcess(oc)) { return false; }
     ASSERT0(getDUMgr()->verifyMDDUChain(COMPUTE_PR_DU|COMPUTE_NOPR_DU));
     if (!MiddleProcess(oc)) { return false; }

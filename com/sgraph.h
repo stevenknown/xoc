@@ -547,12 +547,12 @@ public:
     //idom must be positive
     //NOTE: Entry does not have idom.
     //'id': vertex id.
-    UINT get_idom(UINT id) { return (UINT)m_idom_set.get(id); }
+    UINT get_idom(UINT id) const { return (UINT)m_idom_set.get(id); }
 
     //ipdom must be positive
     //NOTE: Exit does not have idom.
     //'id': vertex id.
-    UINT get_ipdom(UINT id) { return (UINT)m_ipdom_set.get(id); }
+    UINT get_ipdom(UINT id) const { return (UINT)m_ipdom_set.get(id); }
 
     void get_dom_tree(OUT Graph & dom);
     void get_pdom_tree(OUT Graph & pdom);

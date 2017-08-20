@@ -97,6 +97,12 @@ public:
 
     IR const* get_def() const { return def_stmt; }
     IRSet const& get_uses() const { return use_exp_set; }
+
+    void removeUse(IR const* ir) 
+    { 
+        ASSERT0(ir && ir->isReadPR());
+        SSA_uses(this).remove(ir); 
+    }
 };
 
 

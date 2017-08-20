@@ -715,7 +715,7 @@ bool IR_LICM::hoistCand(
                 //move S2 into prehead BB.
                 IR * t = m_ru->buildPR(IR_dt(c));
                 bool f = stmt->replaceKid(c, t, false);
-                CK_USE(f);
+                CHECK_DUMMYUSE(f);
 
                 IR * stpr = m_ru->buildStorePR(PR_no(t), IR_dt(t), c);
 
@@ -790,12 +790,12 @@ bool IR_LICM::doLoopTree(
 
 bool IR_LICM::perform(OptCtx & oc)
 {
-    START_TIMER_AFTER();
-    m_ru->checkValidAndRecompute(&oc, PASS_DOM, PASS_DU_REF, PASS_LOOP_INFO,
-                                 PASS_DU_CHAIN, PASS_UNDEF);
+    START_TIMER(t, getPassName());
+    m_ru->checkValidAndRecompute(&oc, PASS_DOM, 
+        PASS_DU_REF, PASS_LOOP_INFO, PASS_DU_CHAIN, PASS_UNDEF);
 
     if (!OC_is_du_chain_valid(oc)) {
-        END_TIMER_AFTER(getPassName());
+        END_TIMER(t, getPassName());
         return false;
     }
 
@@ -805,17 +805,14 @@ bool IR_LICM::perform(OptCtx & oc)
     TTab<IR*> invariant_exp;
 
     m_ssamgr = NULL;
-    PRSSAMgr * ssamgr =
-            (PRSSAMgr*)m_ru->getPassMgr()->queryPass(PASS_PR_SSA_MGR);
+    PRSSAMgr * ssamgr = (PRSSAMgr*)m_ru->getPassMgr()->
+        queryPass(PASS_PR_SSA_MGR);
     if (ssamgr != NULL && ssamgr->isSSAConstructed()) {
         m_ssamgr = ssamgr;
     }
 
-    bool change = doLoopTree(m_cfg->getLoopInfo(),
-                             du_set_info_changed,
-                             insert_bb,
-                             invariant_stmt,
-                             invariant_exp);
+    bool change = doLoopTree(m_cfg->getLoopInfo(), du_set_info_changed,
+        insert_bb, invariant_stmt, invariant_exp);
     if (change) {
         m_cfg->performMiscOpt(oc);
 
@@ -839,7 +836,8 @@ bool IR_LICM::perform(OptCtx & oc)
             OC_is_cdg_valid(oc) = false;
         }
     }
-    END_TIMER_AFTER(getPassName());
+
+    END_TIMER(t, getPassName());
     return change;
 }
 //END IR_LICM

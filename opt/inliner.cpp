@@ -273,8 +273,8 @@ bool Inliner::can_be_cand(Region * ru)
 
 bool Inliner::perform(OptCtx & oc)
 {
-    START_TIMER_AFTER();
-    UNUSED(oc);
+    START_TIMER(t, getPassName());
+    DUMMYUSE(oc);
     ASSERT0(OC_is_callg_valid(oc));
     ASSERT0(m_program && m_program->is_program());
     IR * irs = m_program->getIRList();
@@ -287,7 +287,7 @@ bool Inliner::perform(OptCtx & oc)
         }
         irs = irs->get_next();
     }
-    END_TIMER_AFTER(getPassName());
+    END_TIMER(t, getPassName());
     return false;
 }
 //END Inliner

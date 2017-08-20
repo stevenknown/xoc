@@ -530,6 +530,9 @@ public:
     //Return the Memory Descriptor Set for given ir may describe.
     MDSet const* getMayAddr(IR const* ir) { return ir->getRefMDSet(); }
 
+    //Return the may-point-to Memory Descriptor Set.
+    MDSet const* getMayPointToMDSet() const { return m_maypts; }
+
     //Return the MemoryAddr for 'ir' must be.
     MD const* getMustAddr(IR const* ir) { return ir->getRefMD(); }
 
@@ -547,7 +550,7 @@ public:
 
     bool isHeapMem(UINT mdid) const
     { //return mdid == MD_HEAP_MEM ? true : false;
-      UNUSED(mdid);
+      DUMMYUSE(mdid);
       return false;
     }
 

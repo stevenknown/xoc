@@ -56,7 +56,7 @@ size_t MiscBitSetMgr<BitsPerSeg>::count_mem(FILE * h) const
     count += smpoolGetPoolSize(ptr_pool);
     count += sm.count_mem();
 
-    UNUSED(h);
+    DUMMYUSE(h);
     #ifdef _DEBUG_
     if (h != NULL) {
         //Dump mem usage into file.
@@ -241,7 +241,7 @@ void SBitSetCore<BitsPerSeg>::destroySEGandClean(
         SEG<BitsPerSeg> * s = st->val();
         ASSERT0(s);
 
-        UNUSED(sm);
+        DUMMYUSE(sm);
         #ifdef _DEBUG_
         sm->dec_seg_count();
 

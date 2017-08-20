@@ -35,6 +35,8 @@ author: Su Zhenyu
 #include "prdf.h"
 #include "prssainfo.h"
 #include "ir_ssa.h"
+#include "mdssainfo.h"
+#include "ir_mdssa.h"
 
 namespace xoc {
 
@@ -58,16 +60,19 @@ IR * Region::refineIload1(IR * ir, bool & change)
     copyDbx(ld, base, this);
 
     LD_ofst(ld) += ild_ofst;
-    if (getDUMgr() != NULL) {
-        //newIR is IR_LD.
-        //Consider the ir->getOffset() and copying MDSet info from 'ir'.
-        if (ir->getExactRef() == NULL) {
-            ld->setRefMD(genMDforLoad(ld), this);
-        } else {
-            ld->copyRef(ir, this);
-        }
-        getDUMgr()->changeUse(ld, ir, getMiscBitSetMgr());
+    IR_DU_MGR * dumgr = getDUMgr();
+    if (dumgr != NULL) {
+        //Consider the ir->getOffset() and copying MDSet info from 'ir' to 'ld.
+        //Note: do not recompute MD and overlap set to ld because that
+        //might generate new MD that not versioned by MDSSAMgr.
+        //ir's MD ref must be equivalent to ld.
+        ld->copyRef(ir, this);        
+        dumgr->changeUse(ld, ir, getMiscBitSetMgr());
+        if (getMDSSAMgr() != NULL) {
+            getMDSSAMgr()->changeUse(ir, ld);
+        }        
     }
+    copyAI(ir, ld);
     freeIRTree(ir);
     change = true;
 
@@ -93,8 +98,11 @@ IR * Region::refineIload2(IR * ir, bool & change)
     if (getDUMgr() != NULL) {
         ld->copyRef(ir, this);
         getDUMgr()->changeUse(ld, ir, getMiscBitSetMgr());
+        if (getMDSSAMgr() != NULL) {
+            getMDSSAMgr()->changeUse(ir, ld);
+        }        
     }
-
+    copyAI(ir, ld);
     freeIRTree(ir);
     change = true;
     //Do not need to set parent pointer.
@@ -160,8 +168,10 @@ IR * Region::refineIstore(IR * ir, bool & change, RefineCtx & rc)
                                 LDA_ofst(lhs) + IST_ofst(ir),
                                 IST_rhs(ir));
         if (dumgr != NULL) {
-            copyDbx(newir, ir, this);
             newir->copyRef(ir, this);
+            if (getMDSSAMgr() != NULL) {
+                getMDSSAMgr()->changeDef(ir, newir);
+            }
 
             bool maybe_exist_expired_du = false;
             if (newir->getRefMD() == NULL) {
@@ -182,6 +192,8 @@ IR * Region::refineIstore(IR * ir, bool & change, RefineCtx & rc)
                 dumgr->removeExpiredDUForStmt(newir);
             }
         }
+        copyAI(ir, newir);
+        
         IST_rhs(ir) = NULL;
         freeIR(ir);
         ir = newir;
@@ -199,7 +211,11 @@ IR * Region::refineIstore(IR * ir, bool & change, RefineCtx & rc)
             newrhs->copyRef(rhs, this);
             dumgr->copyDUSet(newrhs, rhs);
             dumgr->changeUse(newrhs, rhs, getMiscBitSetMgr());
+            if (getMDSSAMgr() != NULL) {
+                getMDSSAMgr()->changeUse(rhs, newrhs);
+            }
         }
+        copyAI(rhs, newrhs);
 
         ASSERT(rhs->is_single(), ("expression cannot be linked to chain"));
         freeIRTree(rhs);
@@ -282,6 +298,11 @@ IR * Region::refineStore(IR * ir, bool & change, RefineCtx & rc)
                 ;
             } else {
                 change = true;
+                if (getMDSSAMgr() != NULL) {
+                    getMDSSAMgr()->dump();
+                    getMDSSAMgr()->coalesceVersion(ir, rhs);
+                    getMDSSAMgr()->dump();
+                }
                 if (getDUMgr() != NULL) {
                     getDUMgr()->removeIROutFromDUMgr(ir);
                 }
@@ -727,8 +748,8 @@ IR * Region::refineMod(IR * ir, bool & change)
     ASSERT0(ir->is_mod());
     IR * op0 = BIN_opnd0(ir);
     IR * op1 = BIN_opnd1(ir);
-    CK_USE(op0);
-    CK_USE(op1);
+    CHECK_DUMMYUSE(op0);
+    CHECK_DUMMYUSE(op1);
 
     if (op1->is_const() && op1->is_int() && CONST_int_val(op1) == 1) {
         //mod X,1 => 0
@@ -752,8 +773,8 @@ IR * Region::refineRem(IR * ir, bool & change)
     IR * op0 = BIN_opnd0(ir);
     IR * op1 = BIN_opnd1(ir);
 
-    CK_USE(op0);
-    CK_USE(op1);
+    CHECK_DUMMYUSE(op0);
+    CHECK_DUMMYUSE(op1);
 
     if (op1->is_const() && op1->is_int() && CONST_int_val(op1) == 1) {
         //rem X,1 => 0
@@ -1215,7 +1236,7 @@ IR * Region::refineBinaryOp(IR * ir, bool & change, RefineCtx & rc)
 IR * Region::refineStoreArray(IR * ir, bool & change, RefineCtx & rc)
 {
     IR * newir = refineArray(ir, change, rc);
-    CK_USE(newir == ir);
+    CHECK_DUMMYUSE(newir == ir);
 
     bool lchange = false;
     IR * newrhs = refineIR(STARR_rhs(ir), lchange, rc);
@@ -1633,7 +1654,7 @@ bool Region::refineStmtList(IN OUT BBIRList & ir_list, RefineCtx & rc)
 bool Region::refineBBlist(IN OUT BBList * ir_bb_list, RefineCtx & rc)
 {
     if (!g_do_refine) { return false; }
-    START_TIMER("Refine IRBB list");
+    START_TIMER(t, "Refine IRBB list");
     bool change = false;
     C<IRBB*> * ct;
     for (ir_bb_list->get_head(&ct);
@@ -1641,7 +1662,7 @@ bool Region::refineBBlist(IN OUT BBList * ir_bb_list, RefineCtx & rc)
          IRBB * bb = ct->val();
         change |= refineStmtList(BB_irlist(bb), rc);
     }
-    END_TIMER();
+    END_TIMER(t, "Refine IRBB list");
     return change;
 }
 
@@ -1707,7 +1728,7 @@ void Region::insertCvtForBinaryOp(IR * ir, bool & change)
 //Insert CVT for float if necessary.
 IR * Region::insertCvtForFloat(IR * parent, IR * kid, bool &)
 {
-    CK_USE(parent->is_fp() || kid->is_fp());
+    CHECK_DUMMYUSE(parent->is_fp() || kid->is_fp());
     return kid;
 }
 
@@ -1948,7 +1969,7 @@ IR * Region::foldConstIntUnary(IR * ir, bool & change)
 {
     ASSERT0(ir->isUnaryOp());
     TypeMgr * dm = getTypeMgr();
-    CK_USE(dm);
+    CHECK_DUMMYUSE(dm);
 
     ASSERT0(UNA_opnd(ir)->is_const());
     HOST_INT v0 = CONST_int_val(UNA_opnd(ir));
@@ -2099,7 +2120,7 @@ IR * Region::foldConstFloatUnary(IR * ir, bool & change)
 {
     ASSERT0(ir->isUnaryOp());
     TypeMgr * dm = getTypeMgr();
-    UNUSED(dm);
+    DUMMYUSE(dm);
 
     if (ir->is_neg()) {
         ASSERT(dm->get_bytesize(UNA_opnd(ir)->get_type()) <= 8, ("TODO"));
@@ -2139,7 +2160,7 @@ IR * Region::foldConstFloatBinary(IR * ir, bool & change)
     double v1 = CONST_fp_val(BIN_opnd1(ir));
     INT tylen = MAX(dm->get_bytesize(BIN_opnd0(ir)->get_type()),
                     dm->get_bytesize(BIN_opnd1(ir)->get_type()));
-    UNUSED(tylen);
+    DUMMYUSE(tylen);
 
     ASSERT(tylen <= 8, ("TODO"));
     IR * oldir = ir;

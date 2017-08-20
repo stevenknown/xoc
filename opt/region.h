@@ -40,6 +40,7 @@ class CfsMgr;
 class IR_DU_MGR;
 class IR_AA;
 class IR_EXPR_TAB;
+class MDSSAMgr;
 
 //Make sure IR_ICALL is the largest ir.
 #define MAX_OFFSET_AT_FREE_TABLE    (sizeof(CICall) - sizeof(IR))
@@ -366,6 +367,7 @@ public:
     double calcFloatVal(IR_TYPE ty, double v0, double v1);
     size_t count_mem();
     void checkValidAndRecompute(OptCtx * oc, ...);
+    void copyAI(IR const* src, IR * tgt);
 
     virtual void destroy();
     void destroyPassMgr();
@@ -479,6 +481,13 @@ public:
     {
         return getPassMgr() != NULL ?
                 (IR_DU_MGR*)getPassMgr()->queryPass(PASS_DU_MGR) : NULL;
+    }
+
+    //Return DU info manager.
+    MDSSAMgr * getMDSSAMgr() const
+    {
+        return getPassMgr() != NULL ?
+                (MDSSAMgr*)getPassMgr()->queryPass(PASS_MD_SSA_MGR) : NULL;
     }
 
     Region * getParent() const { return REGION_parent(this); }
@@ -861,7 +870,7 @@ public:
         #ifdef CONST_IRT_SZ
         IR_irt_size(ir) = irt_sz;
         #else
-        UNUSED(ir);
+        DUMMYUSE(ir);
         #endif
     }
     void setMapPR2Var(UINT prno, VAR * pr_var)

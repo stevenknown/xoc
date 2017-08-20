@@ -274,7 +274,7 @@ public:
 
     inline void checkAndGrow(B2NType * mn)
     {
-        UNUSED(mn);
+        DUMMYUSE(mn);
 
         #ifdef _BIT2NODE_IN_HASH_
         //This class use HMap to hash SBitSetCore.

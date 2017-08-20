@@ -3528,7 +3528,7 @@ bool IR_AA::verifyIR(IR * ir)
                 for (INT i = mayaddr->get_first(&iter);
                      i >= 0; i = mayaddr->get_next((UINT)i, &iter)) {
                     MD const* x = m_md_sys->getMD((UINT)i);
-                    CK_USE(x);
+                    CHECK_DUMMYUSE(x);
                     ASSERT0(!x->is_pr());
                 }
             }
@@ -3561,7 +3561,7 @@ bool IR_AA::verifyIR(IR * ir)
                 for (INT i = mayaddr->get_first(&iter);
                      i >= 0; i = mayaddr->get_next((UINT)i, &iter)) {
                     MD const* x = m_md_sys->getMD((UINT)i);
-                    CK_USE(x);
+                    CHECK_DUMMYUSE(x);
                     ASSERT0(!x->is_pr());
                 }
             }
@@ -3953,7 +3953,7 @@ bool IR_AA::perform(IN OUT OptCtx & oc)
     ASSERT(m_maypts, ("Should invoke initAliasAnalysis() first."));
     if (m_ru->getBBList()->get_elem_count() == 0) { return true; }
 
-    START_TIMER_AFTER();
+    START_TIMER(t, getPassName());
 
     //Initialization.
     m_pt_pair_mgr.init();
@@ -3999,7 +3999,7 @@ bool IR_AA::perform(IN OUT OptCtx & oc)
     //structure to release memory.
     m_pt_pair_mgr.clobber();
 
-    END_TIMER_AFTER(getPassName());
+    END_TIMER(t, getPassName());
 
     return true;
 }

@@ -1139,8 +1139,8 @@ void IR_CFG::computeDomAndIdom(IN OUT OptCtx & oc, BitSet const* uni)
 {
     if (getBBList()->get_elem_count() == 0) { return; }
 
-    UNUSED(uni);
-    START_TIMER_AFTER();
+    DUMMYUSE(uni);
+    START_TIMER(t, "Compute Dom, IDom");
     ASSERT0(OC_is_cfg_valid(oc));
     ASSERT(m_entry, ("ONLY support SESE or SEME"));
 
@@ -1158,15 +1158,15 @@ void IR_CFG::computeDomAndIdom(IN OUT OptCtx & oc, BitSet const* uni)
     //DGraph::computeIdom();
 
     bool f = DGraph::computeIdom2(vlst);
-    UNUSED(f);
+    DUMMYUSE(f);
     ASSERT0(f);
 
     f = DGraph::computeDom2(vlst);
-    UNUSED(f);
+    DUMMYUSE(f);
     ASSERT0(f);
 
     OC_is_dom_valid(oc) = true;
-    END_TIMER_AFTER("Compute Dom, IDom");
+    END_TIMER(t, "Compute Dom, IDom");
 }
 
 
@@ -1174,7 +1174,7 @@ void IR_CFG::computePdomAndIpdom(IN OUT OptCtx & oc, BitSet const* uni)
 {
     if (getBBList()->get_elem_count() == 0) { return; }
 
-    START_TIMER("Compute PDom,IPDom");
+    START_TIMER(t, "Compute PDom,IPDom");
     ASSERT0(OC_is_cfg_valid(oc));
 
     m_ru->checkValidAndRecompute(&oc, PASS_RPO, PASS_UNDEF);
@@ -1193,14 +1193,14 @@ void IR_CFG::computePdomAndIpdom(IN OUT OptCtx & oc, BitSet const* uni)
     } else {
         f = DGraph::computePdom(&vlst);
     }
-    UNUSED(f);
+    DUMMYUSE(f);
     ASSERT0(f);
 
     f = DGraph::computeIpdom();
     ASSERT0(f);
 
     OC_is_pdom_valid(oc) = true;
-    END_TIMER();
+    END_TIMER(t, "Compute PDom,IPDom");
 }
 
 
@@ -1222,7 +1222,7 @@ void IR_CFG::remove_xr(IRBB * bb, IR * ir)
 //the trampolin branch.
 bool IR_CFG::performMiscOpt(OptCtx & oc)
 {
-    START_TIMER_AFTER();
+    START_TIMER(t, "CFG Optimizations");
 
     bool change = false;
     bool ck_cfg = false;
@@ -1282,7 +1282,7 @@ bool IR_CFG::performMiscOpt(OptCtx & oc)
     ASSERT0(verifyIRandBB(getBBList(), m_ru));
     ASSERT0(m_ru->verifyRPO(oc));
 
-    END_TIMER_AFTER("CFG Optimization");
+    END_TIMER(t, "CFG Optimizations");
     return change;
 }
 

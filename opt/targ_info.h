@@ -84,7 +84,7 @@ public:
     virtual UINT estimateNumOfCycles(IR const* ir)
     {
         ASSERT(0, ("Target Dependent Code"));
-        UNUSED(ir);
+        DUMMYUSE(ir);
         return 0;
     }
 };

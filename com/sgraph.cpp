@@ -1156,7 +1156,7 @@ bool DGraph::computeDom(List<Vertex const*> const* vlst, BitSet const* uni)
 //'uni': universe.
 bool DGraph::computeDom3(List<Vertex const*> const* vlst, BitSet const* uni)
 {
-    UNUSED(uni);
+    DUMMYUSE(uni);
     List<Vertex const*> tmpvlst;
     List<Vertex const*> * pvlst = &tmpvlst;
     if (vlst != NULL) {
@@ -1255,7 +1255,7 @@ bool DGraph::computePdomByRpo(Vertex * root, BitSet const* uni)
     } else {
         res = computePdom(&vlst, uni);
     }
-    CK_USE(res);
+    CHECK_DUMMYUSE(res);
     return true;
 }
 

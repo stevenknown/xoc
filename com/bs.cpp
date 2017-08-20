@@ -1694,7 +1694,7 @@ UINT BitSetMgr::count_mem(FILE * h)
         ASSERT0(ct->val());
         count += ct->val()->count_mem();
     }
-    UNUSED(h);
+    DUMMYUSE(h);
 
     #ifdef _DEBUG_
     if (h != NULL) {

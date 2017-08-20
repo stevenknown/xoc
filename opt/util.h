@@ -36,97 +36,43 @@ author: Su Zhenyu
 
 namespace xoc {
 
-//Singler timer, show const string before timer start.
+//Timer, show const string before timer start and end.
 //e.g:
-//    START_TIMER("My Pass");
+//    START_TIMER(t, "My Pass");
 //    Run mypass();
-//    END_TIMER();
-#define START_TIMER(s)              \
-    LONG _start_time_count_ = 0;    \
-    if (g_show_comp_time) {         \
-        _start_time_count_ = getclockstart(); \
-        prt2C("\n==-- %s Time:", (s));    \
+//    END_TIMER(t, "My Pass");
+#define START_TIMER(_timer_, s)                      \
+    LONG _timer_ = 0;                                \
+    if (g_show_comp_time) {                          \
+        _timer_ = getclockstart();                   \
+        prt2C("\n==-- START %s", (s));               \
+    }
+#define END_TIMER(_timer_, s)                        \
+    if (g_show_comp_time) {                          \
+        prt2C("\n==-- END %s", s);                   \
+        prt2C(" Time:%fsec", getclockend(_timer_));  \
     }
 
-#define END_TIMER()                 \
-    if (g_show_comp_time) {         \
-        prt2C("%fsec", getclockend(_start_time_count_)); \
-    }
 
-
-//Single timer, show const string after timer finish.
+//Timer, show format string before timer start and end.
 //e.g:
-//    START_TIMER_AFTER();
+//    START_TIMER(t, ("My Pass Name:%s", getPassName()));
 //    Run mypass();
-//    END_TIMER_AFTER("My Pass");
-#define START_TIMER_AFTER()         \
-    LONG _start_time_count_ = 0;    \
-    if (g_show_comp_time) {         \
-        _start_time_count_ = getclockstart(); \
+//    END_TIMER(t, ("My Pass Name:%s", getPassName()));
+#define START_TIMER_FMT(_timer_, s)                  \
+    LONG _timer_ = 0;                                \
+    if (g_show_comp_time) {                          \
+        _timer_ = getclockstart();                   \
+        prt2C("\n==-- START ");                      \
+        prt2C s;                                     \
     }
-
-#define END_TIMER_AFTER(s)          \
-    if (g_show_comp_time) {         \
-        prt2C("\n==-- %s Time:%fsec", \
-              (s), getclockend(_start_time_count_)); \
+#define END_TIMER_FMT(_timer_, s)                    \
+    if (g_show_comp_time) {                          \
+        prt2C("\n==-- END ");                        \
+        prt2C s;                                     \
+        prt2C(" Time:%fsec", getclockend(_timer_)); \
     }
-
-
-//Single timer, show format string before timer finish.
-//e.g:
-//    START_TIMER(("My Pass Name%s", getPassName()));
-//    Run mypass();
-//    END_TIMER_FMT();
-#define START_TIMER_FMT(s)          \
-    LONG _start_time_count_ = 0;    \
-    if (g_show_comp_time) {         \
-        _start_time_count_ = getclockstart(); \
-        prt2C("\n==-- ");          \
-        prt2C s;                   \
-        prt2C(" Time:");           \
-    }
-
-#define END_TIMER_FMT()            \
-    if (g_show_comp_time) { prt2C("%fsec", getclockend(_start_time_count_)); }
-
-
-//Single timer, show format string after timer finish.
-//e.g:
-//    START_TIMER_AFTER();
-//    Run mypass();
-//    END_TIMER_FMT_AFTER(("My Pass Name%s", getPassName()));
-#define START_TIMER_FMT_AFTER()     \
-    LONG _start_time_count_ = 0;    \
-    if (g_show_comp_time) {         \
-        _start_time_count_ = getclockstart();    \
-    }
-
-#define END_TIMER_FMT_AFTER(s)     \
-    if (g_show_comp_time) {        \
-        prt2C("\n==-- ");          \
-        prt2C s;                   \
-        prt2C(" Time:%fsec", getclockend(_start_time_count_)); \
-    }
-
-
-//Define multiple const string timers,
-//and show const string before timer start.
-//e.g:
-//    START_TIMERS("My Pass", local_timer);
-//    Run mypass();
-//    END_TIMERS(local_timer);
-#define START_TIMERS(s, _timer_timer_)  \
-    LONG _timer_timer_ = 0;             \
-    if (g_show_comp_time) {             \
-        _timer_timer_ = getclockstart();\
-        prt2C("\n==-- %s Time:", (s));  \
-    }
-
-#define END_TIMERS(_timer_timer_)       \
-    if (g_show_comp_time) {             \
-        prt2C("%fsec", getclockend(_timer_timer_)); \
-    }
-
+    
 
 #define NIL_START  100000
 template <class T, class Ttgt>

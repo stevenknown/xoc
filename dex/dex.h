@@ -142,7 +142,7 @@ public:
     {
         UINT mapped = 0;
         bool f = HMap<UINT, UINT, HashFuncBase2<UINT> >::find(prno, &mapped);
-        UNUSED(f);
+        DUMMYUSE(f);
         ASSERT(f, ("prno should be mapped with vreg in dex2ir"));
         //return HMap<UINT, UINT, HashFuncBase2<UINT> >::get(prno);
         return mapped;

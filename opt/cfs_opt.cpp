@@ -58,8 +58,8 @@ namespace xoc {
 bool IR_CFS_OPT::transformIf4(IR ** head, IR * ir)
 {
     //TODO.
-    UNUSED(ir);
-    UNUSED(head);
+    DUMMYUSE(ir);
+    DUMMYUSE(head);
     return false;
 }
 
@@ -79,8 +79,8 @@ bool IR_CFS_OPT::transformIf4(IR ** head, IR * ir)
 bool IR_CFS_OPT::transformIf5(IR ** head, IR * ir)
 {
     //TODO.
-    UNUSED(ir);
-    UNUSED(head);
+    DUMMYUSE(ir);
+    DUMMYUSE(head);
     return false;
 }
 

@@ -46,7 +46,7 @@ namespace xcom {
 //Build matrix to describe edge-weight.
 void AGraph::buildAdjacentMatrix(Matrix<UINT> & adj_mat)
 {
-    UNUSED(adj_mat);
+    DUMMYUSE(adj_mat);
     ASSERT(0, ("Target Dependent Code"));
     //Like: adj_mat.set(i, j, Edge-WEIGHT);
 }

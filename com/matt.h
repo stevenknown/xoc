@@ -2025,7 +2025,7 @@ bool Matrix<T>::ginv(OUT Matrix<T> & x)
         //Ginv = ((At*A)^-1)*At
         Matrix<T> quad = *At * *A;
         bool res = quad.inv(quad);
-        UNUSED(res);
+        DUMMYUSE(res);
         ASSERT(res, ("quad should be invertible!"));
         x = quad * *At;
         if (m_row_size < m_col_size) {
@@ -3552,7 +3552,7 @@ bool Matrix<T>::sse(OUT Matrix<T> & x, Matrix<T> const& b)
     if (det() != 0) {
         Matrix<T> p,l,u;
         bool s = plu(p,l,u);
-        CK_USE(s); //illegal solution if s is false.
+        CHECK_DUMMYUSE(s); //illegal solution if s is false.
         u.inv(u);
         l.inv(l);
         x = u * l * p * b;
@@ -4032,7 +4032,7 @@ void Matrix<T>::padding()
         tran = true;
     }
     UINT rows = tmp.m_row_size;
-    UNUSED(rows);
+    DUMMYUSE(rows);
     tmp.eche();
     ASSERT(rows == tmp.m_row_size, ("rows vector are non independent"));
 

@@ -292,12 +292,12 @@ bool IR_RCE::performSimplyRCE(IN OUT bool & cfg_mod)
 
 bool IR_RCE::perform(OptCtx & oc)
 {
-    START_TIMER_AFTER();
-    m_ru->checkValidAndRecompute(&oc, PASS_CFG, PASS_DU_REF, PASS_DU_CHAIN,
-                                 PASS_UNDEF);
+    START_TIMER(t, getPassName());
+    m_ru->checkValidAndRecompute(&oc, PASS_CFG, 
+        PASS_DU_REF, PASS_DU_CHAIN, PASS_UNDEF);
 
     if (!OC_is_du_chain_valid(oc)) {
-        END_TIMER_AFTER(getPassName());
+        END_TIMER(t, getPassName());
         return false;
     }
 
@@ -339,7 +339,7 @@ bool IR_RCE::perform(OptCtx & oc)
         ASSERT0(verifySSAInfo(m_ru));
     }
 
-    END_TIMER_AFTER(getPassName());
+    END_TIMER(t, getPassName());
     return change;
 }
 

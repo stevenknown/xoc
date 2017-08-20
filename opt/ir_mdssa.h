@@ -71,6 +71,7 @@ protected:
         m_cfg = NULL;
         m_is_ssa_constructed = false;
     }
+    void cleanMDSSAInfoAI();
 
     void addDefChain(MDDef * def1, MDDef * def2);
 
@@ -78,7 +79,6 @@ protected:
     void cleanMD2Stack();
     void collectDefinedMD(IN IRBB * bb, OUT DefSBitSet & mustdef_pr);
 
-    void destroyMDSSAInfo();
     void destructBBSSAInfo(IRBB * bb);
     void destructionInDomTreeOrder(IRBB * root, Graph & domtree);
     void dumpExpDUChainIter(
@@ -152,10 +152,13 @@ public:
         destroy();
     }
 
+    //Add occurence to each vopnd in mdssainfo.
+    void addMDSSAOcc(IR * ir, MDSSAInfo * mdssainfo);
+
     void buildDUChain(IR * def, IR * use)
     {
-        UNUSED(def);
-        UNUSED(use);
+        DUMMYUSE(def);
+        DUMMYUSE(use);
         UNREACH();
         //ASSERT0(def->isWritePR() || def->isCallHasRetVal());
         //ASSERT0(use->isReadPR());
@@ -179,8 +182,21 @@ public:
     void construction(OptCtx & oc);
     void construction(DomTree & domtree);
     size_t count_mem();
-    void cleanMDSSAInfoOfIR(IR * ir);
+    void changeDef(IR * olddef, IR * newdef);
+    void changeUse(IR * olduse, IR * newuse);
+    void changeIR(IR * oldir, IR * newir);
+    //Coalesce version of MD from 'src' to 'tgt'.
+    //This function replace definitiond of USE of src to tgt's defintion.//
+    //e.g: p0=...
+    //     p1=p0
+    //     ...=p1
+    //=> after coalescing, p1 is src, p0 is tgt
+    //     p0=...
+    //     ------ //removed
+    //     ...=p0
+    void coalesceVersion(IR const* src, IR const* tgt);
 
+    
     void destroy();
     void destruction(DomTree & domtree);
     void destruction();
@@ -215,10 +231,12 @@ public:
     //This function will clean all informations and recreate them.
     void reinit();
 
-    //Remove MD SSA use-def chain.
+    //Remove MD-SSA and PR-SSA use-def chain.
     //e.g: ir=...
     //    =ir //S1
     //If S1 will be deleted, ir should be removed from its useset in MDSSAInfo.
+    //NOTE: If ir is a IR tree, e.g: ild(x, ld(y)), remove ild(x) means ld(y) will
+    //be removed as well. And ld(y)'s MDSSAInfo will be updated as well.
     void removeMDSSAUseRecur(IR * ir);
 
     bool verifyPhi(bool is_vpinfo_avail);

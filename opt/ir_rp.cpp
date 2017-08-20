@@ -782,7 +782,7 @@ void IR_RP::clobberAccessInList(
         OUT List<IR*> & exact_occ_list,
         OUT TTab<IR*> & inexact_access)
 {
-    UNUSED(exact_occ_list);
+    DUMMYUSE(exact_occ_list);
 
     MD const* mustdef = ir->getRefMD();
     MDSet const* maydef = ir->getRefMDSet();
@@ -1242,7 +1242,7 @@ bool IR_RP::promoteExactAccess(
     List<IR*> fixup_list; //record the IR that need to fix up duset.
 
     BitSet * bbset = LI_bb_set(li);
-    CK_USE(bbset);
+    CHECK_DUMMYUSE(bbset);
     ASSERT0(!bbset->is_empty()); //loop is empty.
 
     DefMiscBitSetMgr * sbs_mgr = m_ru->getMiscBitSetMgr();
@@ -1666,7 +1666,7 @@ void IR_RP::handleAccessInBody(
 
             ASSERT0(IR_parent(ref));
             bool r = IR_parent(ref)->replaceKid(ref, pr, false);
-            CK_USE(r);
+            CHECK_DUMMYUSE(r);
 
             if (stmt->isMayThrow() && !isMayThrow(stmt, ii)) {
                 IR_may_throw(stmt) = false;
@@ -1862,7 +1862,7 @@ bool IR_RP::promoteInexactAccess(
     List<IR*> fixup_list; //record the IR that need to fix up duset.
 
     BitSet * bbset = LI_bb_set(li);
-    CK_USE(bbset);
+    CHECK_DUMMYUSE(bbset);
     ASSERT0(!bbset->is_empty()); //loop is empty.
 
     DefMiscBitSetMgr * sbs_mgr = m_ru->getMiscBitSetMgr();
@@ -2038,9 +2038,9 @@ void IR_RP::buildDepGraph(
         TTab<IR*> & inexact_access,
         List<IR*> & exact_occ_list)
 {
-    UNUSED(exact_access);
-    UNUSED(inexact_access);
-    UNUSED(exact_occ_list);
+    DUMMYUSE(exact_access);
+    DUMMYUSE(inexact_access);
+    DUMMYUSE(exact_occ_list);
 }
 
 
@@ -2151,12 +2151,12 @@ bool IR_RP::EvaluableScalarReplacement(List<LI<IRBB> const*> & worklst)
 //Perform scalar replacement of aggregates and array.
 bool IR_RP::perform(OptCtx & oc)
 {
-    START_TIMER_AFTER();
+    START_TIMER(t, getPassName());
     m_ru->checkValidAndRecompute(&oc, PASS_DU_CHAIN, PASS_LOOP_INFO,
                                  PASS_DU_REF, PASS_UNDEF);
 
     if (!OC_is_du_chain_valid(oc)) {
-        END_TIMER_AFTER(getPassName());
+        END_TIMER(t, getPassName());
         return false;
     }
 
@@ -2169,13 +2169,13 @@ bool IR_RP::perform(OptCtx & oc)
     }
 
     ASSERT(m_ssamgr == NULL,
-           ("TODO: Do SSA renaming when after register promotion done"));
+        ("TODO: Do SSA renaming when after register promotion done"));
 
     LI<IRBB> const* li = m_cfg->getLoopInfo();
     if (li == NULL) { return false; }
 
-    SMemPool * cspool = smpoolCreate(sizeof(SC<LI<IRBB> const*>),
-                                     MEM_CONST_SIZE);
+    SMemPool * cspool = smpoolCreate(
+        sizeof(SC<LI<IRBB> const*>), MEM_CONST_SIZE);
     List<LI<IRBB> const*> worklst;
     while (li != NULL) {
         worklst.append_tail(li);
@@ -2218,7 +2218,7 @@ FIN:
     //buildLifeTime();
     //dump_mdlt();
     smpoolDelete(cspool);
-    END_TIMER_AFTER(getPassName());
+    END_TIMER(t, getPassName());
     return change;
 }
 //END IR_RP

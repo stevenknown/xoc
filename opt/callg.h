@@ -194,7 +194,7 @@ public:
     virtual bool shouldAddEdge(IR const* ir) const
     {
         ASSERT0(ir->isCallStmt());
-        UNUSED(ir);
+        DUMMYUSE(ir);
         return true;
     }
 };

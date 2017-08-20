@@ -597,17 +597,17 @@ void IR_IVR::clean()
 
 bool IR_IVR::perform(OptCtx & oc)
 {
-    START_TIMER_AFTER();
+    START_TIMER(t, getPassName());
     UINT n = m_ru->getBBList()->get_elem_count();
     if (n == 0) { return false; }
     ASSERT0(m_cfg && m_du && m_md_sys && m_tm);
 
-    m_ru->checkValidAndRecompute(&oc, PASS_REACH_DEF, PASS_DU_REF,
-                                 PASS_DOM, PASS_LOOP_INFO, PASS_DU_CHAIN,
-                                 PASS_RPO, PASS_UNDEF);
+    m_ru->checkValidAndRecompute(&oc, PASS_REACH_DEF, 
+        PASS_DU_REF, PASS_DOM, PASS_LOOP_INFO, 
+        PASS_DU_CHAIN, PASS_RPO, PASS_UNDEF);
 
     if (!OC_is_du_chain_valid(oc)) {
-        END_TIMER_AFTER(getPassName());
+        END_TIMER(t, getPassName());
         return false;
     }
 
@@ -642,7 +642,7 @@ bool IR_IVR::perform(OptCtx & oc)
     }
 
     //dump();
-    END_TIMER_AFTER(getPassName());
+    END_TIMER(t, getPassName());
     return false;
 }
 //END IR_IVR

@@ -310,7 +310,7 @@ void PRDF::computeGlobal()
 
 bool PRDF::perform(OptCtx & oc)
 {
-    START_TIMER_AFTER();
+    START_TIMER(t, getPassName());
     m_ru->checkValidAndRecompute(&oc, PASS_RPO, PASS_UNDEF);
     List<IRBB*> * bbl = m_ru->getBBList();
     if (bbl->get_elem_count() == 0) { return false; }
@@ -326,7 +326,7 @@ bool PRDF::perform(OptCtx & oc)
     computeGlobal();
 
     //dump();
-    END_TIMER_AFTER(getPassName());
+    END_TIMER(t, getPassName());
     return false;
 }
 //END PRDF

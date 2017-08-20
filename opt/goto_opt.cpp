@@ -37,7 +37,7 @@ namespace xoc {
 
 bool IR_CFG::goto_opt(IRBB * bb)
 {
-    UNUSED(bb);
+    DUMMYUSE(bb);
     return false;
 }
 

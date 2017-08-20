@@ -92,7 +92,7 @@ public:
     //    lowest_pos....pos...forward_occ...highest_pos
     inline INT get_forward_occ(INT pos, OUT bool * is_def, INT firstpos)
     {
-        UNUSED(firstpos);
+        DUMMYUSE(firstpos);
         ASSERT(pos >= firstpos, ("Illegal position"));
         ASSERT0(occ);
         pos = occ->get_next(pos);
@@ -117,7 +117,7 @@ public:
     //    lowest_pos....pos...forward_def...highest_pos
     inline INT get_forward_def_occ(INT pos, INT firstpos)
     {
-        UNUSED(firstpos);
+        DUMMYUSE(firstpos);
         ASSERT(pos >= firstpos, ("Illegal position"));
         ASSERT0(occ);
         for (pos = occ->get_next(pos); pos >= 0; pos = occ->get_next(pos)) {

@@ -665,13 +665,12 @@ void MDSystem::initGlobalMemMD(VarMgr * vm)
     VAR_allocable(m_global_mem) = false;
 
     MD x;
-    //MD_id(&x) = MD_GLOBAL_MEM;
     MD_base(&x) = m_global_mem;
     MD_size(&x) = 0;
     MD_ty(&x) = MD_UNBOUND;
     MD_is_may(&x) = true; //MD_GLOBAL_MEM can only be May reference.
     MD const* e = registerMD(x);
-    CK_USE(e);
+    CHECK_DUMMYUSE(e);
     ASSERT0(MD_id(e) == MD_GLOBAL_MEM);
 }
 
@@ -689,13 +688,12 @@ void MDSystem::initImportVar(VarMgr * vm)
     VAR_allocable(m_import_var) = false;
 
     MD x;
-    //MD_id(&x) = MD_IMPORT_VAR;
     MD_base(&x) = m_import_var;
     MD_size(&x) = 0;
     MD_ty(&x) = MD_UNBOUND;
     MD_is_may(&x) = true; //MD_IMPORT_VAR can only be May reference.
     MD const* e = registerMD(x);
-    CK_USE(e);
+    CHECK_DUMMYUSE(e);
     ASSERT0(MD_id(e) == MD_IMPORT_VAR);
 }
 
@@ -716,13 +714,12 @@ void MDSystem::initAllMemMD(VarMgr * vm)
     VAR_allocable(m_all_mem) = false;
 
     MD x;
-    //MD_id(&x) = MD_FULL_MEM;
     MD_base(&x) = m_all_mem;
     MD_is_may(&x) = true;  //MD_FULL_MEM can only be May reference.
     MD_size(&x) = 0;
     MD_ty(&x) = MD_UNBOUND;
     MD const* e = registerMD(x);
-    CK_USE(e);
+    CHECK_DUMMYUSE(e);
     ASSERT0(MD_id(e) == MD_FULL_MEM);
 }
 
@@ -776,8 +773,6 @@ void MDSystem::computeOverlap(
         bool strictly)
 {
     ASSERT0(md && current_ru);
-    ASSERT0(MD_id(md) != MD_FULL_MEM);
-
     if (strictly) {
         if (md->is_global()) {
             output.bunion(MD_GLOBAL_MEM, mbsmgr);
@@ -860,10 +855,7 @@ void MDSystem::computeOverlap(
         DefMiscBitSetMgr & mbsmgr,
         bool strictly)
 {
-    if (((DefSBitSetCore&)mds).is_contain(MD_FULL_MEM)) { return; }
-
     ASSERT0(current_ru);
-
     UINT count = 0;
     tmpvec.clean();
     bool set_global = false;
@@ -940,9 +932,6 @@ void MDSystem::computeOverlap(
         bool strictly)
 {
     ASSERT0(&mds != &output);
-
-    if (mds.is_contain_pure(MD_FULL_MEM)) { return; }
-
     ASSERT0(current_ru);
 
     bool set_global = false;

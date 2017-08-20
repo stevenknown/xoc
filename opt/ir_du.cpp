@@ -1889,8 +1889,7 @@ void IR_DU_MGR::copyIRTreeDU(IR * to, IR const* from, bool copyDUChain)
             continue;
         }
 
-        to_ir->setRefMD(from_ir->getRefMD(), m_ru);
-        to_ir->setRefMDSet(from_ir->getRefMDSet(), m_ru);
+        to_ir->copyRef(from_ir, m_ru);
 
         if (!copyDUChain) { continue; }
 
@@ -2482,13 +2481,14 @@ void IR_DU_MGR::inferIstore(IR * ir, UINT duflag)
 //Inference call's MayDef MD set.
 //Call may modify addressable local variables and globals in indefinite ways.
 void IR_DU_MGR::inferCallAndIcall(IR * ir, UINT duflag, IN MD2MDSet * mx)
-{
+{    
     ASSERT0(ir->isCallStmt());
     if (ir->is_icall()) {
         computeExpression(ICALL_callee(ir), NULL, COMP_EXP_RECOMPUTE, duflag);
     }
 
     if (!HAVE_FLAG(duflag, COMPUTE_NOPR_DU)) {
+        //Only compute du chain for PR.
         for (IR * p = CALL_param_list(ir); p != NULL; p = p->get_next()) {
             computeExpression(p, NULL, COMP_EXP_RECOMPUTE, duflag);
         }
@@ -2508,6 +2508,7 @@ void IR_DU_MGR::inferCallAndIcall(IR * ir, UINT duflag, IN MD2MDSet * mx)
             //Note that point-to set is only avaiable for the
             //last stmt of BB. The call is just in the situation.
             ASSERT(mx, ("needed by computation of NOPR du chain"));
+            ASSERT0(m_aa);
             m_aa->computeMayPointTo(p, mx, maydefuse);
         }
 
@@ -2518,12 +2519,7 @@ void IR_DU_MGR::inferCallAndIcall(IR * ir, UINT duflag, IN MD2MDSet * mx)
     for (IR * p = CALL_dummyuse(ir); p != NULL; p = p->get_next()) {
          computeExpression(p, NULL, COMP_EXP_RECOMPUTE, duflag);
     }
-
-    MDSet tmpmds;
-    m_md_sys->computeOverlap(m_ru, maydefuse,
-        tmpmds, m_tab_iter, *m_misc_bs_mgr, true);
-    maydefuse.bunion_pure(tmpmds, *m_misc_bs_mgr);
-
+    
     bool modify_global = true;
     if (ir->isReadOnlyCall()) {
         modify_global = false;
@@ -2544,11 +2540,18 @@ void IR_DU_MGR::inferCallAndIcall(IR * ir, UINT duflag, IN MD2MDSet * mx)
 
     if (modify_global) {
         //For conservative purpose.
-        //Set to mod/ref global memory and all imported variables
-        //for conservative purpose.
+        //Set to mod/ref global memor, all imported variables,
+        //and all exposed local variables for conservative purpose.
         maydefuse.bunion(m_md_sys->getMD(MD_GLOBAL_MEM), *m_misc_bs_mgr);
         maydefuse.bunion(m_md_sys->getMD(MD_IMPORT_VAR), *m_misc_bs_mgr);
+        ASSERT0(m_aa);
+        maydefuse.bunion(*m_aa->getMayPointToMDSet(), *m_misc_bs_mgr);
     }
+
+    MDSet tmpmds;
+    m_md_sys->computeOverlap(m_ru, maydefuse,
+        tmpmds, m_tab_iter, *m_misc_bs_mgr, true);
+    maydefuse.bunion_pure(tmpmds, *m_misc_bs_mgr);
 
     //Register the MD set.
     ir->setRefMDSet(m_mds_hash->append(maydefuse), m_ru);
@@ -3541,7 +3544,7 @@ bool IR_DU_MGR::ForAvailReachDef(
         List<IRBB*> * lst,
         DefMiscBitSetMgr & bsmgr)
 {
-    UNUSED(lst);
+    DUMMYUSE(lst);
     bool change = false;
     DefDBitSetCore news(SOL_SET_IS_SPARSE);
     DefDBitSetCore * in = getAvailInReachDef(bbid, m_misc_bs_mgr);
@@ -3595,7 +3598,7 @@ bool IR_DU_MGR::ForReachDef(
         List<IRBB*> * lst,
         DefMiscBitSetMgr & bsmgr)
 {
-    UNUSED(lst);
+    DUMMYUSE(lst);
     bool change = false;
     DefDBitSetCore * in_reach_def = getInReachDef(bbid, m_misc_bs_mgr);
     DefDBitSetCore news(SOL_SET_IS_SPARSE);
@@ -3655,7 +3658,7 @@ bool IR_DU_MGR::ForAvailExpression(
             List<IRBB*> * lst,
             DefMiscBitSetMgr & bsmgr)
 {
-    UNUSED(lst);
+    DUMMYUSE(lst);
     bool change = false;
     DefDBitSetCore news(SOL_SET_IS_SPARSE);
 
@@ -3770,7 +3773,7 @@ void IR_DU_MGR::solve(
         i++;
     } while (lst.get_elem_count() != 0);
     ASSERT0(i < count);
-    UNUSED(count);
+    DUMMYUSE(count);
 #else
     bool change;
     UINT count = 0;
@@ -4675,7 +4678,7 @@ bool IR_DU_MGR::verifyMDDUChainForIR(IR const* ir, UINT duflag)
                 for (INT i = useset->get_first(&di);
                      i >= 0; i = useset->get_next(i, &di)) {
                     IR const* use = m_ru->getIR(i);
-                    UNUSED(use);
+                    DUMMYUSE(use);
 
                     ASSERT0(use->is_exp());
 
@@ -4725,7 +4728,7 @@ bool IR_DU_MGR::verifyMDDUChainForIR(IR const* ir, UINT duflag)
         for (INT i = defset->get_first(&di);
              i >= 0; i = defset->get_next(i, &di)) {
             IR const* def = m_ru->getIR(i);
-            CK_USE(def);
+            CHECK_DUMMYUSE(def);
             ASSERT0(def->is_stmt());
 
             //Check the existence to 'def'.
@@ -5049,12 +5052,12 @@ bool IR_DU_MGR::perform(IN OUT OptCtx & oc, UINT flag)
 
     ASSERT0(OC_is_cfg_valid(oc)); //First, only cfg is needed.
 
-    START_TIMERS("Build DU ref", t1);
+    START_TIMER(t1, "Build DU ref");
     if (HAVE_FLAG(flag, SOL_REF)) {
         ASSERT0(OC_is_aa_valid(oc));
         computeMDRef(oc, flag);
     }
-    END_TIMERS(t1);
+    END_TIMER(t1, "Build DU ref");
 
     if (HAVE_FLAG(flag, SOL_AVAIL_REACH_DEF) ||
         HAVE_FLAG(flag, SOL_REACH_DEF) ||
@@ -5088,7 +5091,7 @@ bool IR_DU_MGR::perform(IN OUT OptCtx & oc, UINT flag)
             maydef_mds = new Vector<MDSet*>();
         }
 
-        START_TIMERS("Allocate May/Must MDS table", t2);
+        START_TIMER(t2, "Allocate May/Must MDS table");
 
         if (mustexactdef_mds != NULL) {
             mds_arr_for_must = new MDSet[bbl->get_elem_count()]();
@@ -5108,47 +5111,47 @@ bool IR_DU_MGR::perform(IN OUT OptCtx & oc, UINT flag)
                 maydef_mds->set(BB_id(bb), &mds_arr_for_may[i]);
             }
         }
-        END_TIMERS(t2);
+        END_TIMER(t2, "Allocate May/Must MDS table");
 
         DefMiscBitSetMgr bsmgr;
 
-        START_TIMERS("Build MustDef, MayDef, MayUse", t3);
+        START_TIMER(t3, "Build MustDef, MayDef, MayUse");
         computeMustExactDefMayDefMayUse(mustexactdef_mds,
             maydef_mds, mayuse_mds, flag, bsmgr);
-        END_TIMERS(t3);
+        END_TIMER(t3, "Build MustDef, MayDef, MayUse");
 
         DefDBitSetCoreHashAllocator dbitsetchashallocator(&bsmgr);
         DefDBitSetCoreReserveTab dbitsetchash(&dbitsetchashallocator);
         if (HAVE_FLAG(flag, SOL_REACH_DEF) ||
             HAVE_FLAG(flag, SOL_AVAIL_REACH_DEF)) {
-            START_TIMERS("Build KillSet", t);
+            START_TIMER(t4, "Build KillSet");
             computeKillSet(dbitsetchash, mustexactdef_mds, maydef_mds, bsmgr);
-              END_TIMERS(t);
+            END_TIMER(t4, "Build KillSet");
         }
 
         DefDBitSetCore expr_univers(SOL_SET_IS_SPARSE);
         if (HAVE_FLAG(flag, SOL_AVAIL_EXPR)) {
             //Compute GEN, KILL IR-EXPR.
-            START_TIMERS("Build AvailableExp", t);
+            START_TIMER(t5, "Build AvailableExp");
             computeAuxSetForExpression(dbitsetchash,
                 &expr_univers, maydef_mds, bsmgr);
-            END_TIMERS(t);
+            END_TIMER(t5, "Build AvailableExp");
         }
 
         if (HAVE_FLAG(flag, SOL_RU_REF)) {
             //Compute DEF,USE mds for Region.
-            START_TIMERS("Build Region DefUse MDSet", t);
+            START_TIMER(t6, "Build Region DefUse MDSet");
             computeRegionMDDU(mustexactdef_mds, maydef_mds, mayuse_mds);
-            END_TIMERS(t);
+            END_TIMER(t6, "Build Region DefUse MDSet");
         }
 
         if (HAVE_FLAG(flag, SOL_REACH_DEF) ||
             HAVE_FLAG(flag, SOL_AVAIL_REACH_DEF) ||
             HAVE_FLAG(flag, SOL_AVAIL_EXPR)) {
             m_ru->checkValidAndRecompute(&oc, PASS_RPO, PASS_UNDEF);
-            START_TIMERS("Solve DU set", t4);
+            START_TIMER(t7, "Solve DU set");
             solve(expr_univers, flag, bsmgr);
-            END_TIMERS(t4);
+            END_TIMER(t7, "Solve DU set");
         }
 
         expr_univers.clean(bsmgr);
@@ -5212,7 +5215,7 @@ void IR_DU_MGR::computeMDDUChain(
 {
     if (m_ru->getBBList()->get_elem_count() == 0) { return; }
 
-    START_TIMER("Build DU-CHAIN");
+    START_TIMER(t, "Build DU-CHAIN");
 
     ASSERT0(OC_is_ref_valid(oc) && OC_is_reach_def_valid(oc));
 
@@ -5220,7 +5223,7 @@ void IR_DU_MGR::computeMDDUChain(
     BBList * bbl = m_ru->getBBList();
     if (bbl->get_elem_count() > g_thres_opt_bb_num) {
         //There are too many BB. Leave it here.
-        END_TIMER();
+        END_TIMER(t, "Build DU-CHAIN");
         resetReachDefInSet(true);
         OC_is_reach_def_valid(oc) = false;
         return;
@@ -5263,7 +5266,7 @@ void IR_DU_MGR::computeMDDUChain(
     }
 
     ASSERT(verifyMDDUChain(duflag), ("verifyMDDUChain failed"));
-    END_TIMER();
+    END_TIMER(t, "Build DU-CHAIN");
 }
 //END IR_DU_MGR
 

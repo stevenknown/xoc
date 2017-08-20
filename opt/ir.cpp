@@ -459,12 +459,12 @@ void dump_ir(IR const* ir,
              bool dump_addr,
              bool dump_inner_region)
 {
-    UNUSED(dump_addr);
-    UNUSED(dump_src_line);
-    UNUSED(dump_kid);
-    UNUSED(attr);
-    UNUSED(tm);
-    UNUSED(ir);
+    DUMMYUSE(dump_addr);
+    DUMMYUSE(dump_src_line);
+    DUMMYUSE(dump_kid);
+    DUMMYUSE(attr);
+    DUMMYUSE(tm);
+    DUMMYUSE(ir);
 
     ASSERT0(tm);
     UINT dn = 4;
@@ -1425,7 +1425,7 @@ bool IR::verify(Region const* ru) const
 
     TypeMgr const* tm = ru->getTypeMgr();
     ASSERT0(tm);
-    UNUSED(tm);
+    DUMMYUSE(tm);
 
     Type const* d = get_type();
     ASSERT0(d);
@@ -1822,7 +1822,7 @@ bool IR::verifyPhi(Region const* ru) const
     cfg->get_preds(preds, bb);
 
     UINT num_pred = preds.get_elem_count();
-    UNUSED(num_pred);
+    DUMMYUSE(num_pred);
 
     //Check the number of phi opnds.
     UINT num_opnd = 0;
@@ -1845,7 +1845,7 @@ bool IR::verifyPhi(Region const* ru) const
         ASSERT(PR_no(use) == PHI_prno(this), ("prno is unmatch"));
 
         SSAInfo * use_ssainfo = PR_ssainfo(use);
-        CK_USE(use_ssainfo);
+        CHECK_DUMMYUSE(use_ssainfo);
 
         ASSERT0(SSA_def(use_ssainfo) == this);
     }
@@ -2685,7 +2685,7 @@ void IR::removeSSAUse()
 //'src': copy MD reference from 'src', it may be different to current ir.
 void IR::copyRef(IR const* src, Region * ru)
 {
-    ASSERT0(src && ru);
+    ASSERT0(src && ru && this != src);
     ASSERT(isMemoryRef(), ("not memory reference"));
     ASSERT0(!src->is_undef());
     setRefMD(src->getRefMD(), ru);

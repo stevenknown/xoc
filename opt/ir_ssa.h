@@ -43,12 +43,15 @@ class DfMgr {
     //PRSSAMgr * m_ssa_mgr;
     BitSetMgr m_bs_mgr;
     Vector<BitSet*> m_df_vec;
+    
+    void buildRecur(Vertex const* v, DGraph const& g, DomTree const& domtree);
 public:
     explicit DfMgr() {}
     COPY_CONSTRUCTOR(DfMgr);
 
     void clean();
-    void build(DGraph & g);
+    void build(DGraph const& g);
+    void build(DGraph const& g, DomTree const& domtree);
     void dump(DGraph & g);
 
     //Return the BB set controlled by bbid.
@@ -56,7 +59,7 @@ public:
     { return m_df_vec.get(bbid); }
 
     //Get the BB set controlled by v.
-    BitSet * get_df_ctrlset(Vertex const* v);
+    BitSet * gen_df_ctrlset(UINT vid);
 
     void rebuild(DGraph & g) { clean(); build(g); }
 };

@@ -68,7 +68,7 @@ public:
     //Note v must be const string pointer.
     UINT get_hash_value(OBJTY v, UINT bs) const
     {
-        ASSERT_UNUSED(sizeof(OBJTY) == sizeof(CHAR const*),
+        ASSERT_DUMMYUSE(sizeof(OBJTY) == sizeof(CHAR const*),
                 ("exception will taken place in type-cast"));
         ASSERT0(isPowerOf2(bs));
         UINT n = computeCharSum((CHAR const*)v);
@@ -80,7 +80,7 @@ public:
 
     bool compare(SYM const* s, OBJTY val) const
     {
-        ASSERT_UNUSED(sizeof(OBJTY) == sizeof(CHAR const*),
+        ASSERT_DUMMYUSE(sizeof(OBJTY) == sizeof(CHAR const*),
                 ("exception will taken place in type-cast"));
         return (strcmp(SYM_name(s),  (CHAR const*)val) == 0);
     }
@@ -110,7 +110,7 @@ public:
     //Note v must be string pointer.
     UINT get_hash_value(OBJTY v, UINT bs) const
     {
-        ASSERT_UNUSED(sizeof(OBJTY) == sizeof(CHAR*),
+        ASSERT_DUMMYUSE(sizeof(OBJTY) == sizeof(CHAR*),
                ("exception will taken place in type-cast"));
         ASSERT0(isPowerOf2(bs));
         UINT n = computeCharSum((CHAR*)v);
@@ -122,7 +122,7 @@ public:
 
     bool compare(SYM const* s, OBJTY val) const
     {
-        ASSERT_UNUSED(sizeof(OBJTY) == sizeof(CHAR*),
+        ASSERT_DUMMYUSE(sizeof(OBJTY) == sizeof(CHAR*),
                 ("exception will taken place in type-cast"));
         return (strcmp(SYM_name(s),  (CHAR*)val) == 0);
     }

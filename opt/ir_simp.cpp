@@ -32,6 +32,8 @@ IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 author: Su Zhenyu
 @*/
 #include "cominc.h"
+#include "ir_ssa.h"
+#include "ir_mdssa.h"
 #include "cfs_mgr.h"
 
 namespace xoc {
@@ -1659,11 +1661,14 @@ IR * Region::simplifyStoreArray(IR * ir, SimpCtx * ctx)
     }
 
     ret = buildIstore(array_addr, rhsval, type);
-    ret->setRefMD(ir->getRefMD(), this);
-    ret->setRefMDSet(ir->getRefMDSet(), this);
+    ret->copyRef(ir, this);
+    if (getMDSSAMgr() != NULL) {
+        getMDSSAMgr()->changeDef(ir, ret);
+    }
     if (getDUMgr() != NULL) {
         getDUMgr()->changeDef(ret, ir, getMiscBitSetMgr());
     }
+    copyAI(ir, ret);
     freeIRTree(ir);
 FIN:
     xcom::add_next(&ret_list, &last, ret);
@@ -1696,8 +1701,11 @@ IR * Region::simplifyArray(IR * ir, SimpCtx * ctx)
     if (array_addr->is_id()) {
         IR * ld = buildLoad(ID_info(array_addr), array_addr->get_type());
         //Load variable which is an array.
-        ld->setRefMD(ir->getRefMD(), this);
-        ld->setRefMDSet(ir->getRefMDSet(), this);
+        ld->copyRef(ir, this);
+        if (getMDSSAMgr() != NULL) {
+            getMDSSAMgr()->changeUse(ir, ld);
+        }
+        copyAI(ir, ld);        
         freeIRTree(ir);
         freeIRTree(array_addr);
         if (getDUMgr() != NULL) {
@@ -1713,11 +1721,14 @@ IR * Region::simplifyArray(IR * ir, SimpCtx * ctx)
 
         //Load array element value.
         IR * elem_val = buildIload(array_addr, ir->get_type());
-        elem_val->setRefMD(ir->getRefMD(), this);
-        elem_val->setRefMDSet(ir->getRefMDSet(), this);
+        elem_val->copyRef(ir, this);
+        if (getMDSSAMgr() != NULL) {
+            getMDSSAMgr()->changeUse(ir, elem_val);
+        }        
         if (getDUMgr() != NULL) {
             getDUMgr()->changeUse(elem_val, ir, getMiscBitSetMgr());
         }
+        copyAI(ir, elem_val);
         freeIRTree(ir);
 
         IR * pr = buildPR(elem_val->get_type());
@@ -1739,11 +1750,14 @@ IR * Region::simplifyArray(IR * ir, SimpCtx * ctx)
 
         //Load array element's value.
         IR * elem_val = buildIload(array_addr, ir->get_type());
-        elem_val->setRefMD(ir->getRefMD(), this);
-        elem_val->setRefMDSet(ir->getRefMDSet(), this);
+        elem_val->copyRef(ir, this);
+        if (getMDSSAMgr() != NULL) {
+            getMDSSAMgr()->changeUse(ir, elem_val);
+        }
         if (getDUMgr() != NULL) {
             getDUMgr()->changeUse(elem_val, ir, getMiscBitSetMgr());
         }
+        copyAI(ir, elem_val);
         freeIRTree(ir);
 
         IR * pr = buildPR(elem_val->get_type());
@@ -1760,11 +1774,14 @@ IR * Region::simplifyArray(IR * ir, SimpCtx * ctx)
 
     //Load array element value.
     IR * elem_val = buildIload(array_addr, ir->get_type());
-    elem_val->setRefMD(ir->getRefMD(), this);
-    elem_val->setRefMDSet(ir->getRefMDSet(), this);
+    elem_val->copyRef(ir, this);
+    if (getMDSSAMgr() != NULL) {
+        getMDSSAMgr()->changeUse(ir, elem_val);
+    }    
     if (getDUMgr() != NULL) {
         getDUMgr()->changeUse(elem_val, ir, getMiscBitSetMgr());
     }
+    copyAI(ir, elem_val);
     freeIRTree(ir);
     return elem_val;
 }
@@ -2367,13 +2384,13 @@ void Region::simplifyBB(IRBB * bb, SimpCtx * ctx)
 //NOTE: simplification should not generate indirect memory operation.
 void Region::simplifyBBlist(BBList * bbl, SimpCtx * ctx)
 {
-    START_TIMER("Simplify IRBB list");
+    START_TIMER(t, "Simplify IRBB list");
     C<IRBB*> * ct;
     for (bbl->get_head(&ct); ct != bbl->end(); ct = bbl->get_next(ct)) {
         IRBB * bb = ct->val();
         simplifyBB(bb, ctx);
     }
-    END_TIMER();
+    END_TIMER(t, "Simplify IRBB list");
 }
 
 } //namespace xoc
