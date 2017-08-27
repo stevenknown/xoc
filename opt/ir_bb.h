@@ -394,6 +394,17 @@ public:
         return false;
     }
 
+    inline bool isContainLabel(LabelInfo const* lab)
+    {
+        for (LabelInfo const* li = getLabelList().get_head();
+             li != NULL; li = getLabelList().get_next()) {
+            if (li == lab) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     //Return true if ir1 dominates ir2 in current bb.
     //Function will modify the IR container of bb.
     //'is_strict': true if ir1 should not equal to ir2.

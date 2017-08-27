@@ -40,26 +40,34 @@ class PRSSAMgr;
 
 //Dominace Frontier manager
 class DfMgr {
+protected:
     //PRSSAMgr * m_ssa_mgr;
     BitSetMgr m_bs_mgr;
     Vector<BitSet*> m_df_vec;
+    UINT m_thres;
     
     void buildRecur(Vertex const* v, DGraph const& g, DomTree const& domtree);
+    
+    //Generate the DF control set
+    BitSet * genDFControlSet(UINT vid);    
 public:
-    explicit DfMgr() {}
+    explicit DfMgr(UINT thres = THRESHOLD_HIGH_DOMINATOR_FRONTIER_DENSITY) :
+        m_thres(thres) {}
     COPY_CONSTRUCTOR(DfMgr);
-
+    
     void clean();
     void build(DGraph const& g);
     void build(DGraph const& g, DomTree const& domtree);
     void dump(DGraph & g);
 
-    //Return the BB set controlled by bbid.
-    BitSet const* readDFControlSet(UINT bbid) const
-    { return m_df_vec.get(bbid); }
+    //Count Dominator Frontier Density for each Vertex.
+    //Return true if there exist vertex that might inserting
+    //ton of phis which will blow up memory.
+    bool hasHighDFDensityVertex(DGraph const& g);
 
-    //Get the BB set controlled by v.
-    BitSet * gen_df_ctrlset(UINT vid);
+    //Return the BB set controlled by vid.
+    BitSet const* getDFControlSet(UINT vid) const
+    { return m_df_vec.get(vid); }
 
     void rebuild(DGraph & g) { clean(); build(g); }
 };
@@ -264,7 +272,7 @@ public:
     //Note: Non-SSA DU Chains of read/write PR will be clean and
     //unusable after SSA construction.
     void construction(OptCtx & oc);
-    void construction(DomTree & domtree);
+    bool construction(DomTree & domtree);
     size_t count_mem();
 
     Vector<VP*> const* getVPVec() const { return &m_vp_vec; }

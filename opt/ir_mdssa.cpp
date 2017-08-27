@@ -179,7 +179,7 @@ void MDSSAMgr::dump()
             bool parting_line = false;
             //Result
             if (ir->isMemoryRefNotOperatePR() || ir->isCallStmt()) {
-                MDSSAInfo * mdssainfo = m_usedef_mgr.readMDSSAInfo(ir);
+                MDSSAInfo * mdssainfo = m_usedef_mgr.getMDSSAInfo(ir);
                 ASSERT0(mdssainfo);
                 SEGIter * iter = NULL;
                 if (!parting_line) {
@@ -209,7 +209,7 @@ void MDSSAMgr::dump()
                     continue;
                 }
 
-                MDSSAInfo * mdssainfo = m_usedef_mgr.readMDSSAInfo(opnd);
+                MDSSAInfo * mdssainfo = m_usedef_mgr.getMDSSAInfo(opnd);
                 ASSERT0(mdssainfo);
                 SEGIter * iter = NULL;
                 if (!parting_line) {
@@ -241,7 +241,7 @@ void MDSSAMgr::dump()
 MDDef * MDSSAMgr::findNearestDef(IR const* ir)
 {
     ASSERT0(ir);
-    MDSSAInfo const* mdssainfo = m_usedef_mgr.readMDSSAInfo(ir);
+    MDSSAInfo const* mdssainfo = m_usedef_mgr.getMDSSAInfo(ir);
     ASSERT(mdssainfo, ("miss MDSSAInfo"));
 
     SEGIter * iter = NULL;
@@ -352,7 +352,7 @@ void MDSSAMgr::dumpExpDUChainIter(
             continue;
         }
 
-        MDSSAInfo * mdssainfo = m_usedef_mgr.readMDSSAInfo(opnd);
+        MDSSAInfo * mdssainfo = m_usedef_mgr.getMDSSAInfo(opnd);
         ASSERT0(mdssainfo);
         SEGIter * iter = NULL;
         if (!(*parting_line)) {
@@ -471,7 +471,7 @@ void MDSSAMgr::dumpDUChain()
             bool parting_line = false;
             //Result
             if (ir->isMemoryRefNotOperatePR() || ir->isCallStmt()) {
-                MDSSAInfo * mdssainfo = m_usedef_mgr.readMDSSAInfo(ir);
+                MDSSAInfo * mdssainfo = m_usedef_mgr.getMDSSAInfo(ir);
                 ASSERT0(mdssainfo);
                 SEGIter * iter = NULL;
                 if (!parting_line) {
@@ -597,7 +597,7 @@ void MDSSAMgr::placePhiForMD(
         IRBB * bb = wl.remove_head();
 
         //Each basic block in dfcs is in dominance frontier of 'bb'.
-        BitSet const* dfcs = dfm.readDFControlSet(BB_id(bb));
+        BitSet const* dfcs = dfm.getDFControlSet(BB_id(bb));
         if (dfcs == NULL) { continue; }
 
         for (INT i = dfcs->get_first(); i >= 0; i = dfcs->get_next(i)) {
@@ -980,7 +980,7 @@ void MDSSAMgr::handleBBRename(
             VMD * topv = mapMD2VMDStack(opnd->getRefMD()->id())->get_top();
             ASSERT(topv, ("miss def-stmt to operand of phi"));
 
-            MDSSAInfo * opnd_ssainfo = m_usedef_mgr.readMDSSAInfo(opnd);
+            MDSSAInfo * opnd_ssainfo = m_usedef_mgr.getMDSSAInfo(opnd);
             ASSERT0(opnd_ssainfo);
 
             opnd_ssainfo->getVOpndSet()->clean(*m_sbs_mgr);
@@ -1386,7 +1386,7 @@ bool MDSSAMgr::verifyVMD()
 void MDSSAMgr::verifySSAInfo(IR const* ir)
 {
     ASSERT0(ir);
-    MDSSAInfo * mdssainfo = m_usedef_mgr.readMDSSAInfo(ir);
+    MDSSAInfo * mdssainfo = m_usedef_mgr.getMDSSAInfo(ir);
     ASSERT0(mdssainfo);
     SEGIter * iter;
     VOpndSet * set = mdssainfo->getVOpndSet();
@@ -1498,7 +1498,7 @@ void MDSSAMgr::changeDef(IR * olddef, IR * newdef)
 {
     ASSERT0(olddef && newdef && olddef->is_stmt() && newdef->is_stmt());
     ASSERT0(olddef != newdef);
-    MDSSAInfo * mdssainfo = getUseDefMgr()->readMDSSAInfo(olddef);
+    MDSSAInfo * mdssainfo = getUseDefMgr()->getMDSSAInfo(olddef);
     ASSERT0(mdssainfo);
 
     SEGIter * iter = NULL;
@@ -1521,7 +1521,7 @@ void MDSSAMgr::changeUse(IR * olduse, IR * newuse)
 {
     ASSERT0(olduse && newuse && olduse->is_exp() && newuse->is_exp());
     ASSERT0(olduse != newuse);
-    MDSSAInfo * mdssainfo = getUseDefMgr()->readMDSSAInfo(olduse);
+    MDSSAInfo * mdssainfo = getUseDefMgr()->getMDSSAInfo(olduse);
     ASSERT0(mdssainfo);
 
     SEGIter * iter = NULL;
@@ -1548,8 +1548,8 @@ void MDSSAMgr::changeUse(IR * olduse, IR * newuse)
 //     ...=p0
 void MDSSAMgr::coalesceVersion(IR const* src, IR const* tgt)
 {
-    MDSSAInfo * src_mdssainfo = getUseDefMgr()->readMDSSAInfo(src);
-    MDSSAInfo * tgt_mdssainfo = getUseDefMgr()->readMDSSAInfo(tgt);
+    MDSSAInfo * src_mdssainfo = getUseDefMgr()->getMDSSAInfo(src);
+    MDSSAInfo * tgt_mdssainfo = getUseDefMgr()->getMDSSAInfo(tgt);
     ASSERT0(src_mdssainfo && tgt_mdssainfo);
     SEGIter * iter1 = NULL;
     for (INT i = src_mdssainfo->getVOpndSet()->get_first(&iter1);
@@ -1582,7 +1582,7 @@ void MDSSAMgr::coalesceVersion(IR const* src, IR const* tgt)
         for (INT k = src_vopnd->getOccSet()->get_first(&iter3);
              k >= 0; k = src_vopnd->getOccSet()->get_next(k, &iter3)) {
             IR const* occ = (IR*)m_ru->getIR(k);
-            MDSSAInfo * occ_mdssainfo = getUseDefMgr()->readMDSSAInfo(occ);
+            MDSSAInfo * occ_mdssainfo = getUseDefMgr()->getMDSSAInfo(occ);
             ASSERT(occ_mdssainfo, ("occ miss MDSSAInfo"));
             
             occ_mdssainfo->getVOpndSet()->remove(src_vopnd, *m_sbs_mgr);
@@ -1618,7 +1618,7 @@ void MDSSAMgr::addMDSSAOcc(IR * ir, MDSSAInfo * mdssainfo)
 //be removed as well. And ld(y)'s MDSSAInfo will be updated as well.
 void MDSSAMgr::removeMDSSAUseRecur(IR * ir)
 {
-    MDSSAInfo * mdssainfo = getUseDefMgr()->readMDSSAInfo(ir);
+    MDSSAInfo * mdssainfo = getUseDefMgr()->getMDSSAInfo(ir);
     SSAInfo * prssainfo = NULL;
     if (mdssainfo != NULL) {
         //ir does not have SSA info
@@ -1695,12 +1695,12 @@ void MDSSAMgr::prunePhiForBB(List<IRBB*> & wl, IRBB * bb)
                 for (INT i = useset->get_first(&iter);
                      i >= 0; i = useset->get_next(i, &iter)) {
                     IR * u = m_ru->getIR(i);
-                    ASSERT0(u && m_usedef_mgr.readMDSSAInfo(u));
+                    ASSERT0(u && m_usedef_mgr.getMDSSAInfo(u));
 
                     //Change DEF.
-                    m_usedef_mgr.readMDSSAInfo(u)->
+                    m_usedef_mgr.getMDSSAInfo(u)->
                         getVOpndSet()->remove(phi->getResult(), *m_sbs_mgr);
-                    m_usedef_mgr.readMDSSAInfo(u)->
+                    m_usedef_mgr.getMDSSAInfo(u)->
                         getVOpndSet()->append(common_def, *m_sbs_mgr);
                 }
 
@@ -1778,7 +1778,9 @@ void MDSSAMgr::construction(OptCtx & oc)
     m_cfg->get_dom_tree(domtree);
     END_TIMER(t1, "MDSSA: Extract Dom Tree");
 
-    construction(domtree);
+    if (!construction(domtree)) {
+        return;
+    }
 
     OC_is_du_chain_valid(oc) = false; //DU chain of PR is voilated.
     m_is_ssa_constructed = true;
@@ -1787,7 +1789,7 @@ void MDSSAMgr::construction(OptCtx & oc)
 }
 
 
-void MDSSAMgr::construction(DomTree & domtree)
+bool MDSSAMgr::construction(DomTree & domtree)
 {
     ASSERT0(m_ru);
 
@@ -1795,6 +1797,9 @@ void MDSSAMgr::construction(DomTree & domtree)
     DfMgr dfm;
     dfm.build((DGraph&)*m_cfg); //Build dominance frontier.    
     END_TIMER(t1, "MDSSA: Build dominance frontier");
+    if (dfm.hasHighDFDensityVertex((DGraph&)*m_cfg)) {
+        return false;
+    }
 
     List<IRBB*> wl;
     DefMiscBitSetMgr bs_mgr;
@@ -1820,6 +1825,8 @@ void MDSSAMgr::construction(DomTree & domtree)
     ASSERT0(verifyPhi(false) && verifyVMD());
 
     m_is_ssa_constructed = true;
+
+    return true;
 }
 //END MDSSAMgr
 

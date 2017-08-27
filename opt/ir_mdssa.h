@@ -180,7 +180,7 @@ public:
     //Note: Non-SSA DU Chains of read/write PR will be clean and
     //unusable after SSA construction.
     void construction(OptCtx & oc);
-    void construction(DomTree & domtree);
+    bool construction(DomTree & domtree);
     size_t count_mem();
     void changeDef(IR * olddef, IR * newdef);
     void changeUse(IR * olduse, IR * newuse);

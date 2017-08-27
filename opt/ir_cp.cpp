@@ -199,7 +199,7 @@ void IR_CP::replaceExp(
     } else if (exp_use_mdssadu) {
         //Remove exp MD SSA use.
         ASSERT0(mdssamgr);
-        MDSSAInfo * mdssainfo = mdssamgr->getUseDefMgr()->readMDSSAInfo(exp);
+        MDSSAInfo * mdssainfo = mdssamgr->getUseDefMgr()->getMDSSAInfo(exp);
         ASSERT0(mdssainfo);
         mdssamgr->removeMDSSAUseRecur(exp);
         if (exp->is_id()) {
@@ -212,7 +212,7 @@ void IR_CP::replaceExp(
         }
 
         MDSSAInfo * cand_exp_mdssainfo = mdssamgr->
-            getUseDefMgr()->readMDSSAInfo(cand_expr);
+            getUseDefMgr()->getMDSSAInfo(cand_expr);
         if (cand_exp_mdssainfo != NULL) {
             mdssamgr->getUseDefMgr()->setMDSSAInfo(newir, cand_exp_mdssainfo);
             mdssamgr->addMDSSAOcc(newir, cand_exp_mdssainfo);
@@ -466,7 +466,7 @@ void IR_CP::dumpCopyPropagationAction(
         IRNAME(use), use->id());
     if (use->is_id()) {
         ASSERT0(mdssamgr);
-        MDSSAInfo * mdssainfo = mdssamgr->getUseDefMgr()->readMDSSAInfo(use);
+        MDSSAInfo * mdssainfo = mdssamgr->getUseDefMgr()->getMDSSAInfo(use);
         ASSERT0(mdssainfo);
         ASSERT0(ID_phi(use));
         note("\n");
@@ -527,7 +527,7 @@ bool IR_CP::doProp(
 
         SSAInfo * ssainfo = NULL;
         MDSSAInfo * mdssainfo = mdssamgr->getUseDefMgr()->
-            readMDSSAInfo(def_stmt);
+            getMDSSAInfo(def_stmt);
         bool prssadu = false;
         bool mdssadu = false;
         useset.clean(*m_ru->getMiscBitSetMgr());

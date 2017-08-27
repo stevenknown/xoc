@@ -492,6 +492,96 @@ void IR_CFG::resetMapBetweenLabelAndBB(IRBB * bb)
 }
 
 
+//Combine trampoline branch.
+//e.g:L2:
+//    truebr L4 | false L4
+//    goto L3
+//    L4
+//    ...
+//    L3:
+//    ...
+//=>
+//    L2:
+//    falsebr L3 | truebr L3
+//    EMPTY BB
+//    L4:
+//    ...
+//    L3:
+bool IR_CFG::inverseAndRemoveTrampolineBranch()
+{
+    bool changed = false;
+    C<IRBB*> * ct;
+    List<IRBB*> succs;
+    List<IRBB*> preds;
+    for (IRBB * bb = m_bb_list->get_head(&ct);
+         bb != NULL; bb = m_bb_list->get_next(&ct)) {
+        if (bb->isExceptionHandler()) { continue; }
+
+        IR * br = get_last_xr(bb);
+        if (br == NULL || !br->isConditionalBr()) {
+            continue;
+        }
+
+        C<IRBB*> * nextbbct = ct;
+        IRBB * next = m_bb_list->get_next(&nextbbct);
+        IR * jmp = NULL;
+        if (next == NULL || //bb may be the last BB in bb-list.
+            (jmp = get_first_xr(next)) == NULL || //bb can not be empty
+            !jmp->is_goto()) { //the only IR must be GOTO
+            continue;
+        }
+
+        if (next->isExceptionHandler()) { continue; }        
+
+        IRBB * next_next = m_bb_list->get_next(&nextbbct);
+        if (next_next == NULL || //bb may be the last BB in bb-list.
+            !next_next->isContainLabel(BR_lab(br))) {
+            continue;
+        }
+
+        IRBB * jmp_tgt = findBBbyLabel(GOTO_lab(jmp));
+        Edge const* e_of_jmp = get_edge(next->id(), jmp_tgt->id());
+        ASSERT0(e_of_jmp);        
+        CFGEdgeInfo * ei = (CFGEdgeInfo*)EDGE_info(e_of_jmp);
+        if (ei != NULL && CFGEI_is_eh(ei)) { 
+            //Do not remove exception edge.
+            continue;
+        }
+
+        Edge const* e_of_bb = get_edge(bb->id(), next_next->id());
+        ASSERT0(e_of_bb);        
+        CFGEdgeInfo * ei2 = (CFGEdgeInfo*)EDGE_info(e_of_bb);
+        if (ei2 != NULL && CFGEI_is_eh(ei2)) { 
+            //Do not remove exception edge.
+            continue;
+        }
+
+        //Do replacement
+        if (br->is_truebr()) {
+            IR_code(br) = IR_FALSEBR;
+        } else {
+            ASSERT0(br->is_falsebr());
+            IR_code(br) = IR_TRUEBR;
+        }
+        BR_lab(br) = GOTO_lab(jmp);
+
+        //Change 'next' to be empty BB.
+        remove_xr(next, jmp);
+
+        //Remove jmp->jmp_tgt, add jmp->next_next
+        removeEdge(next, jmp_tgt);
+        Edge * newe = addEdge(next->id(), next_next->id());
+        EDGE_info(newe) = ei;
+
+        //Remove bb->next_next, add bb->jmp_tgt
+        removeEdge(bb, next_next);
+        Edge * newe2 = addEdge(bb->id(), jmp_tgt->id());
+        EDGE_info(newe2) = ei2;
+        changed = true;
+    }
+    return changed;
+}
+
 
 //Remove trampoline BB.
 //e.g: bb1->bb2->bb3
@@ -532,7 +622,6 @@ bool IR_CFG::removeTrampolinBB()
         //  and pred2->bb, jumping edge.
         //  bb:
         //      goto L1
-        //
         //  next of bb:
         //      L1:
         //      ...
@@ -1246,6 +1335,7 @@ bool IR_CFG::performMiscOpt(OptCtx & oc)
 
         if (g_do_cfg_remove_trampolin_bb) {
             lchange |= removeTrampolinEdge();
+            lchange |= inverseAndRemoveTrampolineBranch();
         }
 
         if (lchange) {

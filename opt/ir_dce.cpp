@@ -489,8 +489,7 @@ void IR_DCE::fix_control_flow(List<IRBB*> & bblst, List<C<IRBB*>*> & ctlst)
                         if (EC_edge(ec) != e) {
                             //May be remove multi edges.
                             ((Graph*)m_cfg)->removeEdgeBetween(
-                                            EDGE_from(EC_edge(ec)),
-                                            EDGE_to(EC_edge(ec)));
+                                EDGE_from(EC_edge(ec)), EDGE_to(EC_edge(ec)));
                             change = true;
                             break;
                         }
@@ -500,7 +499,7 @@ void IR_DCE::fix_control_flow(List<IRBB*> & bblst, List<C<IRBB*>*> & ctlst)
                 break;
             } else {
                 ASSERT0(BB_irlist(m_cfg->getBB(VERTEX_id(s))).
-                         get_elem_count() == 0);
+                    get_elem_count() == 0);
             }
             vout = EC_next(vout);
         }

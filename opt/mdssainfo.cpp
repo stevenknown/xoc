@@ -199,11 +199,11 @@ VMD * MDPhi::getOpndVMD(IR const* opnd, UseDefMgr const* mgr) const
     ASSERT(xcom::in_list(getOpndList(), opnd), ("not operand of phi"));
     if (!opnd->is_id() && opnd->isMemoryOpnd()) { return NULL; }
 
-    ASSERT0(mgr && mgr->readMDSSAInfo(opnd) &&
-        mgr->readMDSSAInfo(opnd)->getVOpndSet()->get_elem_count() == 1);
+    ASSERT0(mgr && mgr->getMDSSAInfo(opnd) &&
+        mgr->getMDSSAInfo(opnd)->getVOpndSet()->get_elem_count() == 1);
 
     SEGIter * iter;
-    VMD * vopnd = (VMD*)mgr->getVOpnd(mgr->readMDSSAInfo(opnd)->
+    VMD * vopnd = (VMD*)mgr->getVOpnd(mgr->getMDSSAInfo(opnd)->
         getVOpndSet()->get_first(&iter));
     ASSERT0(vopnd->is_md());
     return vopnd;
@@ -432,7 +432,7 @@ MDSSAInfo * UseDefMgr::genMDSSAInfo(IR * ir)
 }
 
 
-MDSSAInfo * UseDefMgr::readMDSSAInfo(IR const* ir) const
+MDSSAInfo * UseDefMgr::getMDSSAInfo(IR const* ir) const
 {
     if (ir->getAI() == NULL) {
         return NULL;

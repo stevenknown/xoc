@@ -40,7 +40,7 @@ namespace xoc {
 //START DfMgr
 //
 //Get the BB set where 'v' is the dominate frontier of them.
-BitSet * DfMgr::gen_df_ctrlset(UINT vid)
+BitSet * DfMgr::genDFControlSet(UINT vid)
 {
     BitSet * df = m_df_vec.get(vid);
     if (df == NULL) {
@@ -98,7 +98,7 @@ void DfMgr::buildRecur(Vertex const* v, DGraph const& g, DomTree const& domtree)
         buildRecur(succ, g, domtree);
     }
 
-    BitSet * df = gen_df_ctrlset(vid);
+    BitSet * df = genDFControlSet(vid);
     df->clean();
 
     //Compute DF(local)
@@ -114,7 +114,7 @@ void DfMgr::buildRecur(Vertex const* v, DGraph const& g, DomTree const& domtree)
     for (EdgeC const* ec = VERTEX_out_list(v_domtree); 
          ec != NULL; ec = EC_next(ec)) {
         Vertex const* succ_domtree = EDGE_to(EC_edge(ec));
-        BitSet * succ_df = gen_df_ctrlset(VERTEX_id(succ_domtree));        
+        BitSet * succ_df = genDFControlSet(VERTEX_id(succ_domtree));        
         for (INT p = succ_df->get_first(); p >= 0; p = succ_df->get_next(p)) {
             if (g.get_idom((UINT)p) != vid) {
                 df->bunion(p);
@@ -135,6 +135,30 @@ void DfMgr::build(DGraph const& g, DomTree const& domtree)
 }
 
 
+//Count Dominator Frontier Density for each Vertex.
+//Return true if there exist vertex that might inserting
+//ton of phis which will blow up memory.
+bool DfMgr::hasHighDFDensityVertex(DGraph const& g)
+{
+    Vector<UINT> counter_of_vex(g.get_vertex_num());
+    INT c;
+    for (Vertex const* v = g.get_first_vertex(c);
+         v != NULL; v = g.get_next_vertex(c)) {
+        BitSet const* dfset = getDFControlSet(VERTEX_id(v));
+        if (dfset == NULL) { continue; }
+        for (INT i = dfset->get_first(); i >= 0; i = dfset->get_next(i)) {
+            UINT cc = counter_of_vex.get(i) + 1;
+            if (cc >= m_thres) {
+                return true;
+            }
+            counter_of_vex.set(i, cc);
+        }
+    }
+
+    return false;
+}
+
+
 //This function compute dominance frontier to graph g.
 void DfMgr::build(DGraph const& g)
 {
@@ -149,7 +173,7 @@ void DfMgr::build(DGraph const& g)
         for (EdgeC const* ec = VERTEX_in_list(v);
              ec != NULL; ec = EC_next(ec)) {
             Vertex const* pred = EDGE_from(EC_edge(ec));
-            BitSet * pred_df = gen_df_ctrlset(VERTEX_id(pred));
+            BitSet * pred_df = genDFControlSet(VERTEX_id(pred));
             if (pred == v || g.get_idom(vid) != VERTEX_id(pred)) {
                 pred_df->bunion(vid);
             }
@@ -160,7 +184,7 @@ void DfMgr::build(DGraph const& g)
                  i >= 0; i = pred_dom->get_next(i)) {
                 if (!v_dom->is_contain(i)) {
                     ASSERT0(g.get_vertex(i));
-                    gen_df_ctrlset(i)->bunion(vid);
+                    genDFControlSet(i)->bunion(vid);
                 }
             }
         }
@@ -587,7 +611,7 @@ void PRSSAMgr::placePhiForPR(
         IRBB * bb = wl.remove_head();
 
         //Each basic block in dfcs is in dominance frontier of 'bb'.
-        BitSet const* dfcs = dfm.readDFControlSet(BB_id(bb));
+        BitSet const* dfcs = dfm.getDFControlSet(BB_id(bb));
         if (dfcs == NULL) { continue; }
 
         for (INT i = dfcs->get_first(); i >= 0; i = dfcs->get_next(i)) {
@@ -1779,7 +1803,9 @@ void PRSSAMgr::construction(OptCtx & oc)
     m_cfg->get_dom_tree(domtree);
     END_TIMER(t, "SSA: Extract Dom Tree");
 
-    construction(domtree);
+    if (!construction(domtree)) {
+        return;
+    }
 
     OC_is_du_chain_valid(oc) = false; //DU chain of PR is voilated.
     m_is_ssa_constructed = true;
@@ -1788,15 +1814,18 @@ void PRSSAMgr::construction(OptCtx & oc)
 
 //Note: Non-SSA DU Chains of read/write PR will be clean and
 //unusable after SSA construction.
-void PRSSAMgr::construction(DomTree & domtree)
+bool PRSSAMgr::construction(DomTree & domtree)
 {
     ASSERT0(m_ru);
 
     START_TIMER(t, "SSA: Build dominance frontier");
     DfMgr dfm;
     dfm.build((DGraph&)*m_cfg);
-    //dfm.dump((DGraph&)*m_cfg);
+    dfm.dump((DGraph&)*m_cfg);
     END_TIMER(t, "SSA: Build dominance frontier");
+    if (dfm.hasHighDFDensityVertex((DGraph&)*m_cfg)) {
+        return false;
+    }
 
     List<IRBB*> wl;
     DefMiscBitSetMgr sm;
@@ -1826,6 +1855,8 @@ void PRSSAMgr::construction(DomTree & domtree)
     ASSERT0(verifyPhi(false) && verifyVP());
 
     m_is_ssa_constructed = true;
+
+    return true;
 }
 //END PRSSAMgr
 

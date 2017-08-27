@@ -386,14 +386,13 @@ public:
     size_t count_mem();
 
     MDSSAInfo * genMDSSAInfo(IR * ir);
+    MDSSAInfo * getMDSSAInfo(IR const* ir) const;
     SC<VOpnd*> ** getFreeSCListAddress() { return &m_free_sc_list; }
     Vector<VOpnd*> * getVOpndVec() { return &m_vopnd_vec; }
     VOpnd * getVOpnd(UINT i) const { return m_vopnd_vec.get(i); }
     MDPhiList * genBBPhiList(UINT bbid);
     MDDef * getMDDef(UINT id) const { return m_def_vec.get(id); }
     Region * getRegion() const { return m_ru; }
-
-    MDSSAInfo * readMDSSAInfo(IR const* ir) const;
 
     void setMDSSAInfo(IR * ir, MDSSAInfo * mdssainfo);
 };

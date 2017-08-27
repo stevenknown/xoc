@@ -571,14 +571,10 @@ bool CFG<BB, XR>::verifyIfBBRemoved(IN CDG * cdg, OptCtx & oc)
         BB * next_bb = NULL;
         if (next_ct != NULL) { next_bb = next_ct->val(); }
 
-        if (get_last_xr(bb) == NULL &&
-            !isRegionEntry(bb) &&
-            !bb->isExceptionHandler()) {
-            if (next_bb == NULL) { continue; }
-            if (!is_cfg_valid) { continue; }
-
-            get_succs(succs, bb);
-
+        IR const* last_xr = get_last_xr(bb);
+        if (last_xr == NULL && !isRegionEntry(bb) && !bb->isExceptionHandler()) {
+            if (next_bb == NULL || !is_cfg_valid) { continue; }
+            
             //CASE:
             //    BB1
             //    LOOP_HEADER(BB2)
@@ -589,6 +585,7 @@ bool CFG<BB, XR>::verifyIfBBRemoved(IN CDG * cdg, OptCtx & oc)
             //There are edges: BB1->BB2->BB3, BB2->BB5, BB3->BB2
             //Where BB3->BB2 is back edge.
             //When we remove BB2, add edge BB3->BB5.
+            get_succs(succs, bb);
             if (succs.get_elem_count() <= 1) { continue; }
 
             for (BB * succ = succs.get_head();
@@ -606,8 +603,28 @@ bool CFG<BB, XR>::verifyIfBBRemoved(IN CDG * cdg, OptCtx & oc)
                     UNREACH();
                 }
             }
-        } //end if
-    } //end for each bb
+        } else if (last_xr != NULL && last_xr->isConditionalBr()) {
+            //CASE:Check legalization of fallthrough edge and target edge.
+            //     condbr L1
+            //     FallThroughBB
+            //     ...
+            //     L1:
+            get_succs(succs, bb);
+            ASSERT(succs.get_elem_count() == 2, ("illegal number of edge"));
+            bool find_fallthrough_bb = false;
+            for (BB * succ = succs.get_head();
+                 succ != NULL; succ = succs.get_next()) {
+                if (succ == next_bb) {
+                    //find fallthrough bb.
+                    find_fallthrough_bb = true;
+                    continue;
+                }
+                ASSERT0(last_xr->getLabel());
+                ASSERT(succ == findBBbyLabel(last_xr->getLabel()), 
+                    ("miss target BB"));
+            }            
+        }
+    } //end for each BB
     return true;
 }
 

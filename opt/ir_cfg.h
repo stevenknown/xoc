@@ -254,6 +254,7 @@ public:
             IN IRBB * to,
             IN C<IRBB*> * to_ct,
             IN IRBB * newbb);
+    bool inverseAndRemoveTrampolineBranch();
 
     //Return the first operation of 'bb'.
     IR * get_first_xr(IRBB * bb)

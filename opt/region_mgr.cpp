@@ -302,6 +302,7 @@ void RegionMgr::dump(bool dump_inner_region)
 //to next region alloction.
 void RegionMgr::deleteRegion(Region * ru, bool collect_id)
 {
+    START_TIMER_FMT(t, ("Delete Region%d", ru->id()));
     ASSERT0(ru);
     UINT id = REGION_id(ru);
     ASSERT(getRegion(id), ("not registered region"));
@@ -316,6 +317,8 @@ void RegionMgr::deleteRegion(Region * ru, bool collect_id)
     ASSERT0(m_num_allocated != 0);
     m_num_allocated--;
     #endif
+
+    END_TIMER_FMT(t, ("Delete Region%d", ru->id()));
 }
 
 
