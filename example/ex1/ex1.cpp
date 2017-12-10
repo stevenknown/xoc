@@ -37,13 +37,13 @@ author: Su Zhenyu
 static void generate_region(RegionMgr * rm)
 {
     //Generate region for whole program.
-    Region * topru = rm->newRegion(RU_PROGRAM);
+    Region * topru = rm->newRegion(REGION_PROGRAM);
     rm->addToRegionTab(topru);
     topru->setRegionVar(rm->getVarMgr()->registerVar(
-        ".program", rm->getTypeMgr()->getMCType(0), 0, VAR_GLOBAL|VAR_FAKE));
+        "program", rm->getTypeMgr()->getMCType(0), 0, VAR_GLOBAL|VAR_FAKE));
 
     //Generate region for function.
-    Region * func_ru = rm->allocRegion(RU_FUNC);
+    Region * func_ru = rm->allocRegion(REGION_FUNC);
     func_ru->setRegionVar(rm->getVarMgr()->registerVar(
         ".function", rm->getTypeMgr()->getMCType(0), 0, VAR_GLOBAL|VAR_FAKE));
 
@@ -120,6 +120,20 @@ static void generate_region(RegionMgr * rm)
 }
 
 
+static void dumpGR(Region * rg)
+{
+    g_indent = 0;
+    xcom::StrBuf b(64);
+    b.strcat("tmp.gr");
+    FILE * gr = fopen(b.buf, "a");
+    FILE * oldvalue = g_tfile;
+    g_tfile = gr;
+    rg->dumpGR(true);
+    fclose(gr);
+    g_tfile = oldvalue;
+}
+
+
 int main(int argc, char * argv[])
 {
     g_dbx_mgr = new DbxMgr();
@@ -142,6 +156,9 @@ int main(int argc, char * argv[])
     OptCtx oc;
     bool s = rm->processProgramRegion(rm->getRegion(1), &oc);
     ASSERT0(s);
+    
+    //Dump GR file.
+    dumpGR(rm->getRegion(1));
 
     delete rm;
     delete g_dbx_mgr;
