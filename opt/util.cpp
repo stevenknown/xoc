@@ -104,6 +104,45 @@ void initdump(CHAR const* f, bool is_del)
 
 
 //Print string with indent chars.
+void prt(CHAR const* format, ...)
+{
+    if (g_tfile == NULL || format == NULL) { return; }
+
+    StrBuf buf(64);
+    va_list arg;
+    va_start(arg, format);
+    buf.vstrcat(format, arg);
+
+    //Print leading \n.
+    size_t i = 0;
+    while (i < buf.strlen()) {
+        if (buf.buf[i] == '\n') {
+            if (g_prt_carriage_return_for_dot) {
+                //Print terminate lines that are left justified in DOT file.
+                fprintf(g_tfile, "\\l");
+            } else {
+                fprintf(g_tfile, "\n");
+            }
+        } else {
+            break;
+        }
+        i++;
+    }
+
+    if (i == buf.strlen()) {
+        fflush(g_tfile);
+        va_end(arg);
+        return;
+    }
+
+    fprintf(g_tfile, "%s", buf.buf + i);
+    fflush(g_tfile);
+    va_end(arg);
+    return;
+}
+
+
+//Print string with indent chars.
 void note(CHAR const* format, ...)
 {
     if (g_tfile == NULL || format == NULL) { return; }
@@ -113,6 +152,7 @@ void note(CHAR const* format, ...)
     va_start(arg, format);
     buf.vstrcat(format, arg);
 
+    //Print leading \n.
     size_t i = 0;
     while (i < buf.strlen()) {
         if (buf.buf[i] == '\n') {
@@ -134,12 +174,12 @@ void note(CHAR const* format, ...)
 
     if (i == buf.strlen()) {
         fflush(g_tfile);
-        goto FIN;
+        va_end(arg);
+        return;
     }
 
     fprintf(g_tfile, "%s", buf.buf + i);
     fflush(g_tfile);
-FIN:
     va_end(arg);
     return;
 }

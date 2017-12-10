@@ -37,27 +37,27 @@ author: Su Zhenyu
 namespace xoc {
 
 typedef enum {
-    RU_UNDEF = 0,
+    REGION_UNDEF = 0,
 
     //Region is black box with
     //Black box is single entry, single exit.
-    RU_BLX,
+    REGION_BLACKBOX,
 
     //Sub region is the region which contains a list of IRs,
     //Sub region must be single entry, multiple exits.
-    RU_SUB,
+    REGION_INNER,
 
     //Region is exception region.
     //Exception is single entry, multiple exits.
-    RU_EH,
+    REGION_EH,
 
     //Region is function unit
     //Function unit is single entry, multiple exits.
-    RU_FUNC,
+    REGION_FUNC,
 
     //Region is whole program spectrum.
     //Program region is single entry, multiple exits.
-    RU_PROGRAM,
+    REGION_PROGRAM,
 } REGION_TYPE;
 
 class Region;
@@ -119,7 +119,7 @@ public:
     SYM * addToSymbolTab(CHAR const* s) { return m_sym_tab.add(s); }
 
     //This function will establish a map between region and its id.
-    void addToRegionTab(Region * ru);
+    void addToRegionTab(Region * rg);
 
     //Allocate Region.
     virtual Region * allocRegion(REGION_TYPE rt);
@@ -134,7 +134,7 @@ public:
     IPA * allocIPA(Region * program);
 
     //Destroy specific region by given id.
-    void deleteRegion(Region * ru, bool collect_id = true);
+    void deleteRegion(Region * rg, bool collect_id = true);
 
     void dumpRelationGraph(CHAR const* name);
 
@@ -148,7 +148,7 @@ public:
     VarMgr * getVarMgr() { return m_var_mgr; }
     MD const* genDedicateStrMD();
     MDSystem * getMDSystem() { return m_md_sys; }
-    SymTab * get_sym_tab() { return &m_sym_tab; }
+    SymTab * getSymTab() { return &m_sym_tab; }
     TypeMgr * getTypeMgr() { return &m_type_mgr; }
     CallGraph * getCallGraph() const { return m_call_graph; }
     VarMgr * getVarMgr() const { return m_var_mgr; }

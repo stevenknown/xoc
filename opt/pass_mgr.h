@@ -66,7 +66,7 @@ protected:
     }
     Graph * registerGraphBasedPass(PASS_TYPE opty);
 public:
-    PassMgr(Region * ru);
+    PassMgr(Region * rg);
     COPY_CONSTRUCTOR(PassMgr);
     virtual ~PassMgr()
     {

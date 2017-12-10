@@ -66,11 +66,11 @@ IR * Region::refineIload1(IR * ir, bool & change)
         //Note: do not recompute MD and overlap set to ld because that
         //might generate new MD that not versioned by MDSSAMgr.
         //ir's MD ref must be equivalent to ld.
-        ld->copyRef(ir, this);        
+        ld->copyRef(ir, this);
         dumgr->changeUse(ld, ir, getMiscBitSetMgr());
         if (getMDSSAMgr() != NULL) {
             getMDSSAMgr()->changeUse(ir, ld);
-        }        
+        }
     }
     copyAI(ir, ld);
     freeIRTree(ir);
@@ -100,7 +100,7 @@ IR * Region::refineIload2(IR * ir, bool & change)
         getDUMgr()->changeUse(ld, ir, getMiscBitSetMgr());
         if (getMDSSAMgr() != NULL) {
             getMDSSAMgr()->changeUse(ir, ld);
-        }        
+        }
     }
     copyAI(ir, ld);
     freeIRTree(ir);
@@ -193,7 +193,7 @@ IR * Region::refineIstore(IR * ir, bool & change, RefineCtx & rc)
             }
         }
         copyAI(ir, newir);
-        
+
         IST_rhs(ir) = NULL;
         freeIR(ir);
         ir = newir;
@@ -333,6 +333,40 @@ IR * Region::refineStore(IR * ir, bool & change, RefineCtx & rc)
         }
     }
 
+    return ir;
+}
+
+
+IR * Region::refineSetelem(IR * ir, bool & change, RefineCtx & rc)
+{
+    ASSERT0(ir->is_setelem());
+    IR * rhs = refineIR(SETELEM_rhs(ir), change, rc);
+    if (rhs != SETELEM_rhs(ir)) {
+        ir->setParent(rhs);
+        ir->setRHS(rhs);
+    }
+    IR * ofst = refineIR(SETELEM_ofst(ir), change, rc);
+    if (ofst != SETELEM_ofst(ir)) {
+        ir->setParent(ofst);
+        SETELEM_ofst(ir) = ofst;
+    }
+    return ir;
+}
+
+
+IR * Region::refineGetelem(IR * ir, bool & change, RefineCtx & rc)
+{
+    ASSERT0(ir->is_getelem());
+    IR * base = refineIR(GETELEM_base(ir), change, rc);
+    if (base != GETELEM_base(ir)) {
+        ir->setParent(base);
+        GETELEM_base(ir) = base;
+    }
+    IR * ofst = refineIR(GETELEM_ofst(ir), change, rc);
+    if (ofst != GETELEM_ofst(ir)) {
+        ir->setParent(ofst);
+        GETELEM_ofst(ir) = ofst;
+    }
     return ir;
 }
 
@@ -486,23 +520,23 @@ IR * Region::refinePhi(IR * ir, bool & change, RefineCtx & rc)
 //Note this function will not free ir, since it is the caller's responsibility.
 //
 //CASE1:
-//    st:i32 $pr6
+//    st:i32 $6
 //    cvt:i32
 //        select:i8
 //            ne:bool
-//                $pr6:i32
+//                $6:i32
 //                intconst:i32 0
 //            intconst:i8 0 true_exp
 //            intconst:i8 1 false_exp
 //to
-//    st:i32 $pr6
+//    st:i32 $6
 //    cvt:i32
 //        lnot:i8
-//           $pr6:i32
+//           $6:i32
 //
 //Other analogous cases:
 //   b=(a==0?1:0) => b=!a
-static inline IR * hoistSelectToLnot(IR * ir, Region * ru)
+static inline IR * hoistSelectToLnot(IR * ir, Region * rg)
 {
     ASSERT0(ir->is_select());
     IR * det = SELECT_pred(ir);
@@ -512,9 +546,9 @@ static inline IR * hoistSelectToLnot(IR * ir, Region * ru)
         if (BIN_opnd1(det)->isConstIntValueEqualTo(0) &&
             trueexp->isConstIntValueEqualTo(0) &&
             falseexp->isConstIntValueEqualTo(1)) {
-            IR * lnot = ru->buildUnaryOp(
+            IR * lnot = rg->buildUnaryOp(
                            IR_LNOT,
-                           ru->getTypeMgr()->getBool(),
+                           rg->getTypeMgr()->getBool(),
                            BIN_opnd0(det));
             BIN_opnd0(det) = NULL;
             return lnot;
@@ -527,7 +561,7 @@ static inline IR * hoistSelectToLnot(IR * ir, Region * ru)
         if (BIN_opnd1(det)->isConstIntValueEqualTo(0) &&
             trueexp->isConstIntValueEqualTo(1) &&
             falseexp->isConstIntValueEqualTo(0)) {
-            IR * lnot = ru->buildLogicalNot(BIN_opnd0(det));
+            IR * lnot = rg->buildLogicalNot(BIN_opnd0(det));
             BIN_opnd0(det) = NULL;
             return lnot;
         }
@@ -1441,9 +1475,15 @@ IR * Region::refineIR(IR * ir, bool & change, RefineCtx & rc)
     case IR_STARRAY:
         ir = refineStoreArray(ir, tmpc, rc);
         break;
-     case IR_ST:
+    case IR_ST:
     case IR_STPR:
         ir = refineStore(ir, tmpc, rc);
+        break;
+    case IR_SETELEM:
+        ir = refineSetelem(ir, tmpc, rc);
+        break;
+    case IR_GETELEM:
+        ir = refineGetelem(ir, tmpc, rc);
         break;
     case IR_IST:
         ir = refineIstore(ir, tmpc, rc);
@@ -1701,7 +1741,8 @@ void Region::insertCvtForBinaryOp(IR * ir, bool & change)
 
     //Both op0 and op1 are NOT pointer.
     if (op0->is_vec() || op1->is_vec()) {
-        ASSERT0(op0->get_type() == op1->get_type());
+        //ASSERT0(op0->get_type() == op1->get_type());
+        //op0 may be vector and op1 may be MC.
         return;
     }
 

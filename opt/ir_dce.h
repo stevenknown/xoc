@@ -98,14 +98,14 @@ protected:
     bool check_stmt(IR const* ir);
     bool check_call(IR const* ir);
 public:
-    explicit IR_DCE(Region * ru)
+    explicit IR_DCE(Region * rg)
     {
-        ASSERT0(ru != NULL);
-        m_ru = ru;
-        m_tm = ru->getTypeMgr();
-        m_cfg = ru->getCFG();
-        m_du = ru->getDUMgr();
-        m_md_sys = ru->getMDSystem();
+        ASSERT0(rg != NULL);
+        m_ru = rg;
+        m_tm = rg->getTypeMgr();
+        m_cfg = rg->getCFG();
+        m_du = rg->getDUMgr();
+        m_md_sys = rg->getMDSystem();
         ASSERT0(m_cfg && m_du && m_md_sys && m_tm);
         m_is_elim_cfs = false;
         m_is_use_md_du = true;

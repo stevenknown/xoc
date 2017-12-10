@@ -39,11 +39,11 @@ namespace xoc {
 //
 //START IR_LCSE
 //
-IR_LCSE::IR_LCSE(Region * ru)
+IR_LCSE::IR_LCSE(Region * rg)
 {
-    ASSERT0(ru != NULL);
-    m_ru = ru;
-    m_tm = ru->getTypeMgr();
+    ASSERT0(rg != NULL);
+    m_ru = rg;
+    m_tm = rg->getTypeMgr();
     m_du = m_ru->getDUMgr();
     ASSERT0(m_du && m_tm);
     m_expr_tab = NULL;

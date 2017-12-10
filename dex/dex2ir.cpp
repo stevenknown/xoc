@@ -59,20 +59,20 @@ inline static bool is_obj_type(CHAR const* type_name)
     return *type_name == 'L';
 }
 
-Dex2IR::Dex2IR(IN Region * ru,
+Dex2IR::Dex2IR(IN Region * rg,
                IN DexFile * df,
                IN LIRCode * fu,
                DbxVec const& dbxvec) : m_dbxvec(dbxvec)
 {
-    ASSERT0(ru && df && fu);
-    m_ru = (DexRegion*)ru;
-    m_ru_mgr = (DexRegionMgr*)ru->getRegionMgr();
-    m_tm = ru->getTypeMgr();
-    m_vm = ru->getVarMgr();
+    ASSERT0(rg && df && fu);
+    m_ru = (DexRegion*)rg;
+    m_ru_mgr = (DexRegionMgr*)rg->getRegionMgr();
+    m_tm = rg->getTypeMgr();
+    m_vm = rg->getVarMgr();
     m_df = df;
     m_var2fieldid = m_ru->getVAR2Fieldid();
     m_lircode = fu;
-    m_tr = ((DexRegion*)ru)->getTypeIndexRep();
+    m_tr = ((DexRegion*)rg)->getTypeIndexRep();
     m_ti = NULL;
     m_pool = smpoolCreate(16, MEM_COMM);
     m_pr2v.init(MAX(4, getNearestPowerOf2(fu->maxVars)));
@@ -1921,12 +1921,12 @@ void Dex2IR::markTryLabel()
                 /* Record the Label which be placed at the end of LIR.
                 e.g:
                     call '#monitor_exit'  id:168 throw sideeffect ai:EH,
-                        $pr3:i32 param0 id:167
+                        $3:i32 param0 id:167
 
                     ilabel(_L12)(try_start ) id:170  <=== Try Start
 
                     call '#throw'  id:172 throw terminate sideeffect ai:EH,
-                        $pr1:i32 param0 id:171
+                        $1:i32 param0 id:171
 
                     ilabel(_L13)(try_end ) id:173 <=== Try End, the last label
 

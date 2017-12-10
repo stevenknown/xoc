@@ -51,11 +51,11 @@ author: Su Zhenyu
 #include "dex_driver.h"
 
 //Ensure RETURN IR at the end of function if its return-type is VOID.
-static void add_ret(IR * irs, Region * ru)
+static void add_ret(IR * irs, Region * rg)
 {
     IR * last = get_last(irs);
     if (last != NULL && !last->is_return()) {
-        IR * ret = ru->buildReturn(NULL);
+        IR * ret = rg->buildReturn(NULL);
         if (irs == NULL) {
             irs = ret;
         } else {
@@ -347,19 +347,19 @@ public:
     DexDbx * last_debug_info;
 
 public:
-    DbxCtx(DexRegion * ru,
+    DbxCtx(DexRegion * rg,
            OffsetVec const& off,
            OUT DbxVec & dv,
            SMemPool * p,
            UINT n) :
-        region(ru),
+        region(rg),
         offsetvec(off),
         last_instruction_index(0),
         dbxvec(dv),
         pool(p),
         lircode_num(n),
         last_debug_info(NULL)
-    { ASSERT0(ru); }
+    { ASSERT0(rg); }
 
     DexDbx * newDexDbx()
     {
@@ -427,7 +427,7 @@ void dumpLocal(
 //Callback for "new locals table entry". "signature" is an empty string
 //if no signature is available for an entry.
 static void parseDebugInfo(
-        DexRegion * ru,
+        DexRegion * rg,
         DexFile const* df,
         DexCode const* dexcode,
         DexMethod const* dexmethod,
@@ -438,7 +438,7 @@ static void parseDebugInfo(
 {
     DexMethodId const* methodid = dexGetMethodId(df, dexmethod->methodIdx);
 
-    DbxCtx dc(ru, offsetvec, dbxvec, pool, LIRC_num_of_op(lircode));
+    DbxCtx dc(rg, offsetvec, dbxvec, pool, LIRC_num_of_op(lircode));
 
     dexDecodeDebugInfo(
             df,
@@ -657,7 +657,7 @@ bool compileFunc(
     }
 
     //Generate Program region.
-    DexRegion * func_ru = (DexRegion*)rm->newRegion(RU_FUNC);
+    DexRegion * func_ru = (DexRegion*)rm->newRegion(REGION_FUNC);
 
     if (g_do_ipa) {
         ASSERT0(rumgr);

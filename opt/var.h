@@ -58,8 +58,8 @@ class RegionMgr;
 //It always be allocated in stack or thread local storage(TLS).
 #define VAR_LOCAL                0x2
 
-//This kind of variable can be seen by all functions in same file.
-#define VAR_STATIC               0x4
+//This kind of variable can be seen in same file.
+#define VAR_PRIVATE              0x4
 #define VAR_READONLY             0x8 //var is readonly
 #define VAR_VOLATILE             0x10 //var is volatile
 #define VAR_HAS_INIT_VAL         0x20 //var with initialied value.
@@ -80,7 +80,7 @@ class RegionMgr;
 ///////////////////////////////////////////////////////
 
 //Variable unique id.
-#define VAR_id(v)                ((v)->id)
+#define VAR_id(v)                ((v)->uid)
 
 //Variable type.
 #define VAR_type(v)              ((v)->type)
@@ -97,7 +97,7 @@ class RegionMgr;
 #define VAR_labinfo(v)           ((v)->u1.labinfo)
 
 //Variable is label.
-#define VAR_is_label(v)         ((v)->u2.s1.is_label)
+#define VAR_is_label(v)          ((v)->u2.s1.is_label)
 
 //Variable is global.
 #define VAR_is_global(v)         ((v)->u2.s1.is_global)
@@ -105,8 +105,9 @@ class RegionMgr;
 //Variable is local.
 #define VAR_is_local(v)          ((v)->u2.s1.is_local)
 
-//Global Variables which is static cannot be referenced outside this region.
-#define VAR_is_static(v)         ((v)->u2.s1.is_static)
+//Global Variables which is private cannot be
+//referenced outside current file region.
+#define VAR_is_private(v)        ((v)->u2.s1.is_private)
 
 //Variable is readonly.
 #define VAR_is_readonly(v)       ((v)->u2.s1.is_readonly)
@@ -155,7 +156,7 @@ class RegionMgr;
 #define VAR_align(v)             ((v)->align)
 class VAR {
 public:
-    UINT id; //unique id;
+    UINT uid; //unique id;
     Type const* type; //Data type.
     UINT align; //memory alignment of var.
     SYM const* name;
@@ -182,7 +183,7 @@ public:
         struct {
             UINT is_global:1;       //VAR can be seen all program.
             UINT is_local:1;        //VAR only can be seen in region.
-            UINT is_static:1;       //VAR only can be seen in file.
+            UINT is_private:1;      //VAR only can be seen in file.
             UINT is_readonly:1;     //VAR is readonly.
             UINT is_volatile:1;     //VAR is volatile.
             UINT has_init_val:1;    //VAR has initial value.
@@ -207,6 +208,7 @@ public:
     VAR();
     virtual ~VAR() {}
 
+    UINT id() const { return VAR_id(this); }
     bool is_local() const { return VAR_is_local(this); }
     bool is_global() const { return VAR_is_global(this); }
     bool is_fake() const { return VAR_is_fake(this); }
@@ -214,6 +216,7 @@ public:
     bool is_allocable() const { return VAR_allocable(this); }
     bool is_array() const { return VAR_is_array(this); }
     bool is_formal_param() const { return VAR_is_formal_param(this); }
+    bool is_private() const { return VAR_is_private(this); }
     bool is_readonly() const { return VAR_is_readonly(this); }
     bool is_func_decl() const { return VAR_is_func_decl(this); }
     bool is_volatile() const { return VAR_is_volatile(this); }
@@ -266,8 +269,8 @@ public:
     {
         //Length of string var should include '\0'.
         return is_string() ?
-                getStringLength() + 1:
-                dm->get_bytesize(VAR_type(this));
+            getStringLength() + 1:
+            dm->get_bytesize(VAR_type(this));
     }
 
     virtual CHAR const* dumpVARDecl(StrBuf &) const { return NULL; }
@@ -275,6 +278,8 @@ public:
 
     //You must make sure this function will not change any field of VAR.
     virtual CHAR const* dump(StrBuf & buf, TypeMgr const* dm) const;
+    void dumpFlag(StrBuf & buf, bool grmode) const;
+    CHAR const* dumpGR(StrBuf & buf, TypeMgr * dm) const;
 
     void setToGlobal(bool is_global)
     {

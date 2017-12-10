@@ -69,7 +69,7 @@ protected:
     }
 
 public:
-    IR_CFG(CFG_SHAPE cs, BBList * bbl, Region * ru,
+    IR_CFG(CFG_SHAPE cs, BBList * bbl, Region * rg,
            UINT edge_hash_size = 16, UINT vertex_hash_size = 16);
     COPY_CONSTRUCTOR(IR_CFG);
     virtual ~IR_CFG() {}
@@ -95,100 +95,16 @@ public:
         addVertex(BB_id(bb));
     }
 
-    //Construct EH edge after cfg built.
-    void buildEHEdge()
-    {
-        ASSERT(m_bb_list, ("bb_list is emt"));
-        C<IRBB*> * ct;
-        for (m_bb_list->get_head(&ct);
-             ct != m_bb_list->end(); ct = m_bb_list->get_next(ct)) {
-            IRBB const* bb = ct->val();
-            C<IR*> * ct2;
-            IR * x = BB_irlist(const_cast<IRBB*>(bb)).get_tail(&ct2);
-            if (x != NULL && x->isMayThrow() && x->getAI() != NULL) {
-                EHLabelAttachInfo const* ehlab =
-                    (EHLabelAttachInfo const*)x->getAI()->get(AI_EH_LABEL);
-                if (ehlab == NULL) { continue; }
-
-                SC<LabelInfo*> * sc;
-                SList<LabelInfo*> const& labs = ehlab->read_labels();
-                for (sc = labs.get_head();
-                     sc != labs.end();
-                     sc = labs.get_next(sc)) {
-                    ASSERT0(sc);
-                    IRBB * tgt = findBBbyLabel(sc->val());
-                    ASSERT0(tgt);
-                    Edge * e = addEdge(BB_id(bb), BB_id(tgt));
-                    EDGE_info(e) = xmalloc(sizeof(CFGEdgeInfo));
-                    CFGEI_is_eh((CFGEdgeInfo*)EDGE_info(e)) = true;
-                    m_has_eh_edge = true;
-                }
-            }
-        }
-    }
+    //Construct CFG edge for BB has phi.
+      void buildAndRevisePhiEdge(TMap<IR*, LabelInfo*> & ir2label);
 
     //Construct EH edge after cfg built.
     //This function use a conservative method, and this method
     //may generate lots of redundant exception edges.
-    void buildEHEdgeNaive()
-    {
-        ASSERT(m_bb_list, ("bb_list is emt"));
-        List<IRBB*> maythrow;
-        List<IRBB*> ehl;
-        IRBB * entry = NULL;
-        C<IRBB*> * ct;
+    void buildEHEdgeNaive();
 
-        for (m_bb_list->get_head(&ct);
-             ct != m_bb_list->end();
-             ct = m_bb_list->get_next(ct)) {
-            IRBB * bb = ct->val();
-            if (isRegionEntry(bb)) {
-                entry = bb;
-                break;
-            }
-        }
-
-        ASSERT(entry, ("Region does not have an entry"));
-        BitSet mainstreambbs;
-        computeMainStreamBBSet(entry, mainstreambbs);
-
-        BitSet ehbbs; //Record all BB in exception region.
-        for (m_bb_list->get_head(&ct);
-             ct != m_bb_list->end(); ct = m_bb_list->get_next(ct)) {
-            IRBB * bb = ct->val();
-
-            if (bb->isExceptionHandler()) {
-                ehl.append_tail(bb);
-                findEHRegion(bb, mainstreambbs, ehbbs);
-            }
-
-            if (bb->mayThrowException() && !ehbbs.is_contain(BB_id(bb))) {
-                maythrow.append_tail(bb);
-            }
-        }
-
-        if (ehl.get_elem_count() == 0) { return; }
-
-        if (maythrow.get_elem_count() == 0) {
-            ASSERT(entry, ("multi entries"));
-            maythrow.append_tail(entry);
-        }
-
-        for (ehl.get_head(&ct); ct != ehl.end(); ct = ehl.get_next(ct)) {
-            IRBB * b = ct->val();
-            C<IRBB*> * ct2;
-            for (maythrow.get_head(&ct2);
-                 ct2 != maythrow.end(); ct2 = maythrow.get_next(ct2)) {
-                IRBB * a = ct2->val();
-                if (ehbbs.is_contain(BB_id(a))) { continue; }
-
-                Edge * e = addEdge(a->id(), b->id());
-                EDGE_info(e) = xmalloc(sizeof(CFGEdgeInfo));
-                CFGEI_is_eh((CFGEdgeInfo*)EDGE_info(e)) = true;
-                m_has_eh_edge = true;
-            }
-        }
-    }
+    //Construct EH edge after cfg built.
+    void buildEHEdge();
 
     virtual void cf_opt();
     void computeDomAndIdom(IN OUT OptCtx & oc, BitSet const* uni = NULL);
@@ -270,8 +186,8 @@ public:
         return BB_last_ir(bb);
     }
 
-    Region * get_ru() { return m_ru; }
-    UINT get_bb_num() const { return get_vertex_num(); }
+    Region * getRegion() { return m_ru; }
+    UINT getNumOfBB() const { return get_vertex_num(); }
     BBList * getBBList() { return m_bb_list; }
     LAB2BB * get_lab2bb_map() { return &m_lab2bb; }
     IRBB * getBB(UINT id) const { return m_bb_vec.get(id); }
@@ -341,6 +257,9 @@ public:
     //as possible, simplify and remove the branch like "if (x==x)", remove
     //the trampolin branch.
     bool performMiscOpt(OptCtx & oc);
+
+    //Verification at building SSA mode by ir parser.
+    bool verifyPhiEdge(IR * phi, TMap<IR*, LabelInfo*> & ir2label);
 };
 
 } //namespace xoc

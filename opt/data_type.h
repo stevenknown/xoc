@@ -220,7 +220,7 @@ public:
     UINT pointer_base_size;
 
 public:
-    PointerType() { pointer_base_size = 0; }
+    PointerType() { TY_dtype(this) = D_PTR; pointer_base_size = 0; }
     COPY_CONSTRUCTOR(PointerType);
 
     void copy(PointerType const& src)
@@ -237,7 +237,7 @@ public:
     //NOTE: If ir is pointer, its 'rtype' should NOT be D_MC.
     UINT mc_size;
 public:
-    MCType() { mc_size = 0; }
+    MCType() { TY_dtype(this) = D_MC; mc_size = 0; }
     COPY_CONSTRUCTOR(MCType);
 
     void copy(MCType const& src)
@@ -256,7 +256,12 @@ public:
     //Record the vector elem size if ir represent a vector.
     DATA_TYPE vector_elem_type;
 public:
-    VectorType() { total_vector_size = 0; vector_elem_type = D_UNDEF; }
+    VectorType()
+    {
+        TY_dtype(this) = D_VEC;
+        total_vector_size = 0;
+        vector_elem_type = D_UNDEF;
+    }
     COPY_CONSTRUCTOR(VectorType);
 
     void copy(VectorType const& src)
@@ -368,12 +373,6 @@ class TypeMgr {
     Type const* m_f80;
     Type const* m_f128;
     Type const* m_str;
-    Type const* m_uint16x4;
-    Type const* m_int16x4;
-    Type const* m_uint32x4;
-    Type const* m_int32x4;
-    Type const* m_uint64x2;
-    Type const* m_int64x2;
 
     void * xmalloc(size_t size)
     {
@@ -421,13 +420,6 @@ public:
         m_f128 = getSimplexType(D_F128);
         m_str = getSimplexType(D_STR);
         m_void = getSimplexType(D_VOID);
-
-        m_uint16x4 = getVectorType(64, D_U16);
-        m_int16x4 = getVectorType(64, D_I16);
-        m_uint32x4 = getVectorType(128, D_U32);
-        m_int32x4 = getVectorType(128, D_I32);
-        m_uint64x2 = getVectorType(128, D_U64);
-        m_int64x2 = getVectorType(64, D_I64);
     }
     COPY_CONSTRUCTOR(TypeMgr);
     ~TypeMgr()
@@ -600,63 +592,15 @@ public:
         return 0;
     }
 
-    //Return vector type, which type is <vec_elem_num x vec_elem_ty>.
-    Type const* getVectorTypeEx2(UINT vec_elem_num, DATA_TYPE vec_elem_ty)
-    {
-        if (vec_elem_num == 4) {
-            switch (vec_elem_ty) {
-            case D_U16: return m_uint16x4;
-            case D_I16: return m_int16x4;
-            case D_U32: return m_uint32x4;
-            case D_I32: return m_int32x4;
-            default:;
-            }
-        }
-        if (vec_elem_num == 2) {
-            switch (vec_elem_ty) {
-            case D_U64: return m_uint64x2;
-            case D_I64: return m_int64x2;
-            default:;
-            }
-        }
-        return getVectorType(vec_elem_num * get_dtype_bytesize(vec_elem_ty),
-                             vec_elem_ty);
-    }
-
-    //Return vector type, which type is :
-    //    total_sz = <vec_elem_num x vec_elem_ty>.
-    Type const* getVectorTypeEx(UINT total_sz, DATA_TYPE vec_elem_ty)
-    {
-        if (total_sz == 64) {
-            switch (vec_elem_ty) {
-            case D_U16: return m_uint16x4;
-            case D_I16: return m_int16x4;
-            default:;
-            }
-        }
-        if (total_sz == 128) {
-            switch (vec_elem_ty) {
-            case D_U32: return m_uint32x4;
-            case D_I32: return m_int32x4;
-            case D_U64: return m_uint64x2;
-            case D_I64: return m_int64x2;
-            default:;
-            }
-        }
-        return getVectorType(total_sz, vec_elem_ty);
-    }
-
-    //Return vector type, and total_sz = <vec_elem_num x vec_elem_ty>.
+    //Return vector type, and vector total size = <vec_elem_num x vec_elem_ty>.
     //e.g: int<16 x D_I32> means there are 16 elems in vector, each elem is
-    //D_I32 type, and 'total_sz' is 64 bytes.
-    Type const* getVectorType(UINT total_sz, DATA_TYPE vec_elem_ty)
+    //D_I32 type, and vector total size is 64 bytes.
+    Type const* getVectorType(UINT vec_elem_num, DATA_TYPE vec_elem_ty)
     {
-        ASSERT0(total_sz != 0 && vec_elem_ty != D_UNDEF);
-        ASSERT((total_sz % get_dtype_bytesize(vec_elem_ty)) == 0,
-                ("total_sz must be multiple of sizeof vec_elem_ty"));
+        ASSERT0(vec_elem_num != 0 && vec_elem_ty != D_UNDEF);
         VectorType d;
         TY_dtype(&d) = D_VEC;
-        TY_vec_size(&d) = total_sz;
+        TY_vec_size(&d) = vec_elem_num * get_dtype_bytesize(vec_elem_ty);
         TY_vec_ety(&d) = vec_elem_ty;
         return TC_type(registerVector(&d));
     }

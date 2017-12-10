@@ -60,11 +60,11 @@ class DontPromotTab : public MDSet {
     MDSystem * m_md_sys;
     Region * m_ru;
 public:
-    explicit DontPromotTab(Region * ru)
+    explicit DontPromotTab(Region * rg)
     {
-        ASSERT0(ru);
-        m_ru = ru;
-        m_md_sys = ru->getMDSystem();
+        ASSERT0(rg);
+        m_ru = rg;
+        m_md_sys = rg->getMDSystem();
     }
     COPY_CONSTRUCTOR(DontPromotTab);
 
@@ -284,16 +284,16 @@ protected:
         return p;
     }
 public:
-    IR_RP(Region * ru, IR_GVN * gvn) : m_dont_promot(ru)
+    IR_RP(Region * rg, IR_GVN * gvn) : m_dont_promot(rg)
     {
-        ASSERT0(ru != NULL);
-        m_ru = ru;
-        m_md_sys = ru->getMDSystem();
-        m_cfg = ru->getCFG();
-        m_tm = ru->getTypeMgr();
-        m_du = ru->getDUMgr();
-        m_mds_mgr = ru->getMDSetMgr();
-        m_misc_bs_mgr = ru->getMiscBitSetMgr();
+        ASSERT0(rg != NULL);
+        m_ru = rg;
+        m_md_sys = rg->getMDSystem();
+        m_cfg = rg->getCFG();
+        m_tm = rg->getTypeMgr();
+        m_du = rg->getDUMgr();
+        m_mds_mgr = rg->getMDSetMgr();
+        m_misc_bs_mgr = rg->getMiscBitSetMgr();
         m_gvn = gvn;
         m_is_insert_bb = false;
         m_ssamgr = NULL;

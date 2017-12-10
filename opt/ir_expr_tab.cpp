@@ -38,18 +38,18 @@ namespace xoc {
 //
 //START IR_EXPR_TAB
 //
-IR_EXPR_TAB::IR_EXPR_TAB(Region * ru)
+IR_EXPR_TAB::IR_EXPR_TAB(Region * rg)
 {
     m_expr_count = 0;
-    m_ru = ru;
-    m_tm = ru->getTypeMgr();
+    m_ru = rg;
+    m_tm = rg->getTypeMgr();
     memset(m_level1_hash_tab, 0,
            sizeof(ExpRep*) * IR_EXPR_TAB_LEVEL1_HASH_BUCKET);
     m_pool = smpoolCreate(sizeof(ExpRep*) * 128, MEM_COMM);
     m_sc_pool = smpoolCreate(sizeof(SC<ExpRep*>) * 4, MEM_CONST_SIZE);
     m_ir_expr_lst.set_pool(m_sc_pool);
-    m_md_set_mgr = ru->getMDSetMgr();
-    m_bs_mgr = ru->getBitSetMgr();
+    m_md_set_mgr = rg->getMDSetMgr();
+    m_bs_mgr = rg->getBitSetMgr();
 }
 
 

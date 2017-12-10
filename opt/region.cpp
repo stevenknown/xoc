@@ -59,6 +59,7 @@ static bool checkLogicalOp(IR_TYPE irt, Type const* type, TypeMgr * tm)
 static bool is_reduction(IR const* ir)
 {
     ASSERT0(ir->is_stmt());
+    DUMMYUSE(is_reduction);
     if (!ir->is_st() && !ir->is_stpr()) { return false; }
     IR * rhs = ir->getRHS();
 
@@ -108,12 +109,12 @@ static bool is_reduction(IR const* ir)
 //
 //START AnalysisInstrument
 //
-AnalysisInstrument::AnalysisInstrument(Region * ru) :
-    m_mds_mgr(ru, &m_sbs_mgr),
+AnalysisInstrument::AnalysisInstrument(Region * rg) :
+    m_mds_mgr(rg, &m_sbs_mgr),
     m_mds_hash_allocator(&m_sbs_mgr),
     m_mds_hash(&m_mds_hash_allocator)
 {
-    m_ru = ru;
+    m_ru = rg;
     m_ru_mgr = NULL;
     m_call_list = NULL;
     m_return_list = NULL;
@@ -132,10 +133,10 @@ AnalysisInstrument::AnalysisInstrument(Region * ru) :
 //The index of MD and VAR is important resource if there
 //are a lot of REGIONs in RegionMgr.
 //Note this function does NOT process GLOBAL variable.
-static void destroyVARandMD(Region * ru, AnalysisInstrument * anainstr)
+static void destroyVARandMD(Region * rg, AnalysisInstrument * anainstr)
 {
-    VarMgr * varmgr = ru->getVarMgr();
-    MDSystem * mdsys = ru->getMDSystem();
+    VarMgr * varmgr = rg->getVarMgr();
+    MDSystem * mdsys = rg->getMDSystem();
     VarTabIter c;
     ConstMDIter iter;
     for (VAR * v = ANA_INS_var_tab(anainstr).get_first(c);
@@ -222,7 +223,7 @@ bool AnalysisInstrument::verify_var(VarMgr * vm, VAR * v)
     CHECK_DUMMYUSE(v);
     CHECK_DUMMYUSE(vm);
     if (m_ru->is_function() || m_ru->is_eh() ||
-        REGION_type(m_ru) == RU_SUB) {
+        REGION_type(m_ru) == REGION_INNER) {
         //If var is global but unallocable, it often be
         //used as placeholder or auxilary var.
 
@@ -334,7 +335,7 @@ void Region::destroy()
     REGION_refinfo(this) = NULL;
     REGION_id(this) = 0;
     REGION_parent(this) = NULL;
-    REGION_type(this) = RU_UNDEF;
+    REGION_type(this) = REGION_UNDEF;
 }
 
 
@@ -412,7 +413,7 @@ IR * Region::buildLogicalOp(IR_TYPE irt, IR * opnd0, IR * opnd1)
 
 
 //Build IR_ID operation.
-IR * Region::buildId(IN VAR * var)
+IR * Region::buildId(VAR * var)
 {
     ASSERT0(var);
     IR * ir = allocIR(IR_ID);
@@ -540,9 +541,30 @@ IR * Region::buildPhi(UINT prno, Type const* type, UINT num_opnd)
     for (UINT i = 0; i < num_opnd; i++) {
         IR * x = buildPRdedicated(prno, type);
         PR_ssainfo(x) = NULL;
-        add_next(&PHI_opnd_list(ir), &last, x);
+        xcom::add_next(&PHI_opnd_list(ir), &last, x);
         IR_parent(x) = ir;
     }
+    return ir;
+}
+
+
+//Build IR_PHI operation.
+//'res': result pr of PHI.
+IR * Region::buildPhi(UINT prno, Type const* type, IR * opnd_list)
+{
+    ASSERT0(type);
+    ASSERT0(prno > 0);
+    IR * ir = allocIR(IR_PHI);
+    PHI_prno(ir) = prno;
+    IR_dt(ir) = type;
+    for (IR * opnd = opnd_list; opnd != NULL; opnd = opnd->get_next()) {
+        ASSERT0(opnd->is_pr() || opnd->is_const());
+        if (opnd->is_pr()) {
+            PR_ssainfo(opnd) = NULL;
+        }
+        IR_parent(opnd) = ir;
+    }
+    PHI_opnd_list(ir) = opnd_list;
     return ir;
 }
 
@@ -604,17 +626,17 @@ IR * Region::buildIcall(
 
 
 //Build IR_REGION operation.
-IR * Region::buildRegion(Region * ru)
+IR * Region::buildRegion(Region * rg)
 {
-    ASSERT0(ru && !ru->is_undef());
-    ASSERT(ru->getRegionVar(), ("region should bond with a variable"));
+    ASSERT0(rg && !rg->is_undef());
+    ASSERT(rg->getRegionVar(), ("region should bond with a variable"));
     IR * ir = allocIR(IR_REGION);
     IR_dt(ir) = getTypeMgr()->getVoid();
-    REGION_ru(ir) = ru;
-    REGION_parent(ru) = this;
+    REGION_ru(ir) = rg;
+    REGION_parent(rg) = this;
 
     #ifdef _DEBUG_
-    if (ru->is_function()) {
+    if (rg->is_function()) {
         ASSERT(is_program() || is_function(),
             ("Only program or function region can have a"
              " function region as subregion."));
@@ -722,14 +744,81 @@ IR * Region::buildIload(IR * base, UINT ofst, Type const* type)
 }
 
 
+//Build store operation to get value from 'base', and store the result PR.
+//'prno': result prno.
+//'type': data type of targe pr.
+//'offset': byte offset to the start of PR.
+//'base: hold the value that expected to extract.
+IR * Region::buildGetElem(UINT prno, Type const* type, IR * base, IR * offset)
+{
+    ASSERT0(type && offset && base && prno > 0 && base->is_exp());
+    IR * ir = allocIR(IR_GETELEM);
+    GETELEM_prno(ir) = prno;
+    GETELEM_base(ir) = base;
+    GETELEM_ofst(ir) = offset;
+    IR_dt(ir) = type;
+    IR_parent(base) = ir;
+    IR_parent(offset) = ir;
+    return ir;
+}
+
+
+//Build store operation to get value from 'rhs', and store the result PR.
+//'type': data type of targe pr.
+//'offset': byte offset to the start of rhs PR.
+//'base: hold the value that expected to extract.
+IR * Region::buildGetElem(Type const* type, IR * base, IR * offset)
+{
+    ASSERT0(type && base && base->is_exp());
+    IR * ir = buildGetElem(REGION_analysis_instrument(this)->m_pr_count,
+        type, base, offset);
+    REGION_analysis_instrument(this)->m_pr_count++;
+    return ir;
+}
+
+
+//Build store operation to store 'rhs' to store value to be one of the
+//element of a PR.
+//'prno': target prno.
+//'type': data type of targe pr.
+//'offset': byte offset to the start of result PR.
+//'rhs: value expected to store.
+IR * Region::buildSetElem(UINT prno, Type const* type, IR * rhs, IR * offset)
+{
+    ASSERT0(type && offset && rhs && prno > 0 && rhs->is_exp());
+    IR * ir = allocIR(IR_SETELEM);
+    SETELEM_prno(ir) = prno;
+    SETELEM_rhs(ir) = rhs;
+    SETELEM_ofst(ir) = offset;
+    IR_dt(ir) = type;
+    IR_parent(rhs) = ir;
+    IR_parent(offset) = ir;
+    return ir;
+}
+
+
+//Build store operation to store 'rhs' to store value to be one of the
+//element of a PR.
+//'type': data type of targe pr.
+//'offset': byte offset to the start of result PR.
+//'rhs: value expected to store.
+IR * Region::buildSetElem(Type const* type, IR * rhs, IR * offset)
+{
+    ASSERT0(type && rhs && rhs->is_exp());
+    IR * ir = buildSetElem(REGION_analysis_instrument(this)->m_pr_count,
+        type, rhs, offset);
+    REGION_analysis_instrument(this)->m_pr_count++;
+    return ir;
+}
+
+
 //Build store operation to store 'rhs' to new pr with type and prno.
 //'prno': target prno.
 //'type': data type of targe pr.
 //'rhs: value expected to store.
 IR * Region::buildStorePR(UINT prno, Type const* type, IR * rhs)
 {
-    ASSERT0(type);
-    ASSERT0(prno > 0 && rhs && rhs->is_exp());
+    ASSERT0(type && prno > 0 && rhs && rhs->is_exp());
     IR * ir = allocIR(IR_STPR);
     STPR_no(ir) = prno;
     STPR_rhs(ir) = rhs;
@@ -744,13 +833,10 @@ IR * Region::buildStorePR(UINT prno, Type const* type, IR * rhs)
 //'rhs: value expected to store.
 IR * Region::buildStorePR(Type const* type, IR * rhs)
 {
-    ASSERT0(type);
-    ASSERT0(rhs && rhs->is_exp());
-    IR * ir = allocIR(IR_STPR);
-    STPR_no(ir) = REGION_analysis_instrument(this)->m_pr_count++;
-    STPR_rhs(ir) = rhs;
-    IR_dt(ir) = type;
-    IR_parent(rhs) = ir;
+    ASSERT0(type && rhs && rhs->is_exp());
+    IR * ir = buildStorePR(REGION_analysis_instrument(this)->m_pr_count,
+        type, rhs);
+    REGION_analysis_instrument(this)->m_pr_count++;
     return ir;
 }
 
@@ -942,7 +1028,7 @@ IR * Region::buildStoreArray(
         IR * rhs)
 {
     ASSERT0(base && sublist && type);
-    ASSERT0(base->is_exp() && base->is_ptr());
+    ASSERT0(base->is_exp() && (base->is_ptr() || base->is_void()));
     ASSERT0(rhs && rhs->is_exp());
     ASSERT0(allBeExp(sublist));
     CStArray * ir = (CStArray*)allocIR(IR_STARRAY);
@@ -1020,31 +1106,40 @@ IR * Region::buildCase(IR * casev_exp, LabelInfo const* jump_lab)
 
 
 //Build Do Loop stmt.
+//'iv': induction variable.
 //'det': determinate expression.
 //'loop_body': stmt list.
 //'init': record the stmt that initialize iv.
 //'step': record the stmt that update iv.
-IR * Region::buildDoLoop(IR * det, IR * init, IR * step, IR * loop_body)
+IR * Region::buildDoLoop(
+        IR * iv,
+        IR * init,
+        IR * det,
+        IR * step,
+        IR * loop_body)
 {
     ASSERT0(det &&
             (det->is_lt() ||
              det->is_le() ||
              det->is_gt() ||
              det->is_ge()));
-    ASSERT0(init && (init->is_st() || init->is_stpr()));
-    ASSERT0(step && is_reduction(step));
+    ASSERT0(init && step && init->is_exp() && step->is_exp());
+    ASSERT0(iv->is_id() || iv->is_pr());
+    //ASSERT0(is_reduction(step));
 
     IR * ir = allocIR(IR_DO_LOOP);
     IR_dt(ir) = getTypeMgr()->getVoid();
+
+    LOOP_iv(ir) = iv;
+    IR_parent(iv) = ir;
+
     LOOP_det(ir) = det;
     IR_parent(det) = ir;
 
-    ASSERT0(init && init->is_stmt() && step && step->is_stmt());
-
     LOOP_init(ir) = init;
-    LOOP_step(ir) = step;
-
     IR_parent(init) = ir;
+
+    LOOP_step(ir) = step;
     IR_parent(step) = ir;
 
     LOOP_body(ir) = loop_body;
@@ -1255,7 +1350,11 @@ IR * Region::buildImmInt(HOST_INT v, Type const* type)
                 CONST_int_val(imm) = (HOST_INT)sv;
             }
             break;
-        default: ASSERT(0, ("TODO"));
+        case D_I128:
+        case D_U128:
+            ASSERT(0, ("TODO:unsupport 128 bit integer"));
+            break;
+        default: ASSERT(0, ("TODO:unsupport integer type"));
         }
     } else {
         CONST_int_val(imm) = v;
@@ -1446,7 +1545,7 @@ IR * Region::buildCmp(IR_TYPE irt, IR * lchild, IR * rchild)
 IR * Region::buildUnaryOp(IR_TYPE irt, Type const* type, IN IR * opnd)
 {
     ASSERT0(type);
-    ASSERT0(is_una_irt(irt));
+    ASSERT0(isUnaryOp(irt));
     ASSERT0(opnd && opnd->is_exp());
     ASSERT0(irt != IR_LNOT || type->is_bool());
     IR * ir = allocIR(irt);
@@ -1708,6 +1807,17 @@ bool Region::evaluateConstInteger(IR const* ir, OUT ULONGLONG * const_value)
 }
 
 
+//Register gloval variable located in program region.
+void Region::registerGlobalVAR()
+{
+    MD const * common_string_var_md = getRegionMgr()->genDedicateStrMD();
+    if (common_string_var_md != NULL) {
+        ASSERT0(is_program());
+        addToVarTab(common_string_var_md->get_base());
+    }
+}
+
+
 //Find the boundary IR generated in BB to update bb-list incremently.
 //e.g: Given BB1 has one stmt:
 //    BB1:
@@ -1901,9 +2011,13 @@ void Region::constructIRBBlist()
 
             //label info be seen as add-on info attached on bb, and
             //'ir' be dropped off.
+            bool not_merge_label = true;
             for (;;) {
                 cur_bb->addLabel(LAB_lab(cur_ir));
                 freeIR(cur_ir);
+                if (not_merge_label) {
+                    break;
+                }
                 if (pointer != NULL && pointer->is_label()) {
                     cur_ir = pointer;
                     pointer = IR_next(pointer);
@@ -2023,7 +2137,12 @@ MD const* Region::genMDforPR(UINT prno, Type const* type)
     MD md;
     MD_base(&md) = pr_var; //correspond to VAR
     MD_ofst(&md) = 0;
-    MD_ty(&md) = MD_UNBOUND;
+    if (pr_var->get_type()->is_void()) {
+        MD_ty(&md) = MD_UNBOUND;
+    } else {
+        MD_ty(&md) = MD_EXACT;
+        MD_size(&md) = getTypeMgr()->get_bytesize(pr_var->get_type());
+    }
     MD const* e = getMDSystem()->registerMD(md);
     ASSERT0(MD_id(e) > 0);
     return e;
@@ -2033,10 +2152,10 @@ MD const* Region::genMDforPR(UINT prno, Type const* type)
 //Get function unit.
 Region * Region::getFuncRegion()
 {
-    Region * ru = this;
-    while (!ru->is_function()) { ru = REGION_parent(ru); }
-    ASSERT(ru != NULL, ("Not in func unit"));
-    return ru;
+    Region * rg = this;
+    while (!rg->is_function()) { rg = REGION_parent(rg); }
+    ASSERT(rg != NULL, ("Not in func unit"));
+    return rg;
 }
 
 
@@ -2154,6 +2273,21 @@ void Region::freeIR(IR * ir)
         IR_prev(head) = ir;
     }
     REGION_analysis_instrument(this)->m_free_tab[idx] = ir;
+}
+
+
+//This function find VAR via iterating VAR table of current region.
+VAR * Region::findVarViaSymbol(SYM const* sym)
+{
+    ASSERT0(sym);
+    VarTab * vtab = getVarTab();
+    VarTabIter c;
+    for (VAR * v = vtab->get_first(c); v != NULL; v = vtab->get_next(c)) {
+        if (v->get_name() == sym) {
+            return v;
+        }
+    }
+    return NULL;
 }
 
 
@@ -2321,7 +2455,7 @@ IR * Region::dupIRTree(IR const* ir)
 }
 
 
-//Duplication all contents of 'src', includes AI, except DU info, 
+//Duplication all contents of 'src', includes AI, except DU info,
 //SSA info, kids and siblings IR.
 IR * Region::dupIR(IR const* src)
 {
@@ -2507,8 +2641,7 @@ void Region::prescan(IR const* ir)
             //    int a[10];
             //    int * p;
             //    p = a;
-            UNREACH();
-            //ASSERT0(ID_info(ir) && VAR_is_array(ID_info(ir)));
+            ASSERT0(ID_info(ir));
             break;
         case IR_CONST:
         case IR_LD:
@@ -2618,10 +2751,100 @@ void Region::dumpMemUsage()
 }
 
 
+void Region::dumpGR(bool dump_inner_region)
+{
+    note("\n//====---- Dump region '%s' ----====", getRegionName());
+    note("\nregion ");
+    switch (REGION_type(this)) {
+    case REGION_PROGRAM: prt("program "); break;
+    case REGION_BLACKBOX: prt("blx "); break;
+    case REGION_FUNC: prt("func "); break;
+    case REGION_INNER: prt("sub "); break;
+    default: ASSERT0(0); //TODO
+    }
+    if (getRegionVar() != NULL) {
+        prt("%s ", SYM_name(getRegionVar()->get_name()));
+    }
+
+    prt("(");
+    dumpParameter();
+    prt(")");
+    prt(" {\n");
+    g_indent += DUMP_INDENT_NUM;
+    dumpVarTab();
+    DumpGRCtx ctx;
+    ctx.dump_inner_region = dump_inner_region;
+    ctx.cfg = getCFG();
+    if (getIRList() != NULL) {
+        dumpGRList(getIRList(), getTypeMgr(), &ctx);
+    } else {
+        dumpGRInBBList(getBBList(), getTypeMgr(), &ctx);
+    }
+    g_indent -= DUMP_INDENT_NUM;
+    note("\n}");
+}
+
+
+void Region::dumpVarTab()
+{
+    VarTab * vt = getVarTab();
+    if (vt->get_elem_count() == 0) { return; }
+    VarTabIter c;
+    StrBuf buf(64);
+
+    //Sort var in id order.
+    DefSBitSet set(getMiscBitSetMgr()->getSegMgr());
+    for (VAR * v = vt->get_first(c); v != NULL; v = vt->get_next(c)) {
+        if (v->is_formal_param() || v->is_pr()) { continue; }
+        set.bunion(v->id());
+    }
+    SEGIter * cur = NULL;
+    for (INT id = set.get_first(&cur);
+         id >= 0; id = set.get_next(id, &cur)) {
+        VAR * v = getVarMgr()->get_var(id);
+        ASSERT0(v);
+        buf.clean();
+        note("\n%s;", v->dumpGR(buf, getTypeMgr()));
+    }
+    set.clean();
+}
+
+
+//Dump formal parameter list.
+void Region::dumpParameter()
+{
+    if (!is_function()) { return; }
+    VarTabIter c;
+    Vector<VAR*> fpvec;
+    for (VAR * v = getVarTab()->get_first(c);
+         v != NULL; v = getVarTab()->get_next(c)) {
+        if (VAR_is_formal_param(v)) {
+            ASSERT0(!v->is_pr());
+            fpvec.set(v->getFormalParamPos(), v);
+        }
+    }
+    if (fpvec.get_last_idx() < 0) { return; }
+    StrBuf buf(32);
+    for (INT i = 0; i <= fpvec.get_last_idx(); i++) {
+        VAR * v = fpvec.get(i);
+        if (i != 0) {
+            prt(",");
+        }
+        if (v == NULL) {
+            //This position may be reserved for other use.
+            //ASSERT0(v);
+            prt("undefined");
+            continue;
+        }
+        buf.clean();
+        prt("%s", v->dumpGR(buf, getTypeMgr()));
+    }
+}
+
+
 void Region::dump(bool dump_inner_region)
 {
     if (g_tfile == NULL) { return; }
-
     dumpVARInRegion();
 
     //Dump imported variables referenced.
@@ -2774,7 +2997,7 @@ bool Region::verifyMDRef()
                     ASSERT0(t->getRefMDSet() == NULL);
                     break;
                 case IR_LD:
-                    if (g_is_support_dynamic_type) {                        
+                    if (g_is_support_dynamic_type) {
                         ASSERT(t->getEffectRef(), ("type is at least effect"));
                         ASSERT(!t->getEffectRef()->is_pr(),
                                ("MD can not present a PR."));
@@ -2875,6 +3098,8 @@ bool Region::verifyMDRef()
                     }
                     break;
                 case IR_STPR:
+                case IR_SETELEM:
+                case IR_GETELEM:
                     if (g_is_support_dynamic_type) {
                         ASSERT(t->getEffectRef(),
                                ("type is at least effect"));
@@ -3035,7 +3260,15 @@ bool Region::verifyBBlist(BBList & bbl)
                         ("default target cannot be NULL"));
             }
         } else if (last->isUnconditionalBr()) {
-            ASSERT(lab2bb.get(GOTO_lab(last)), ("target cannot be NULL"));
+            if (last->is_goto()) {
+                ASSERT(lab2bb.get(GOTO_lab(last)), ("target cannot be NULL"));
+            } else {
+                for (IR * caseexp = IGOTO_case_list(last); caseexp != NULL;
+                    caseexp = caseexp->get_next()) {
+                    ASSERT(lab2bb.get(CASE_lab(caseexp)),
+                        ("target cannot be NULL"));
+                }
+            }
         }
     }
     return true;
@@ -3078,7 +3311,6 @@ void Region::dumpVarMD(VAR * v, UINT indent)
 void Region::dumpVARInRegion()
 {
     if (g_tfile == NULL) { return; }
-
     StrBuf buf(64);
 
     //Dump Region name.
@@ -3112,7 +3344,6 @@ void Region::dumpVARInRegion()
                     fpvec.set(v->getFormalParamPos(), v);
                 }
             }
-
             for (INT i = 0; i <= fpvec.get_last_idx(); i++) {
                 VAR * v = fpvec.get(i);
                 if (v == NULL) {
@@ -3124,7 +3355,6 @@ void Region::dumpVARInRegion()
                     g_indent -= 2;
                     continue;
                 }
-
                 buf.clean();
                 v->dump(buf, getTypeMgr());
                 g_indent += 2;
@@ -3164,7 +3394,7 @@ void Region::dumpVARInRegion()
 //Copy src's AI to tgt.
 void Region::copyAI(IR const* src, IR * tgt)
 {
-    if (src->getAI() == NULL) { return; }    
+    if (src->getAI() == NULL) { return; }
     if (IR_ai(tgt) == NULL) {
         IR_ai(tgt) = allocAIContainer();
     }
@@ -3413,7 +3643,7 @@ bool Region::partitionRegion()
     VAR_allocable(ruv) = false;
     addToVarTab(ruv);
 
-    Region * inner_ru = getRegionMgr()->allocRegion(RU_SUB);
+    Region * inner_ru = getRegionMgr()->allocRegion(REGION_INNER);
     inner_ru->setRegionVar(ruv);
     IR * ir_ru = buildRegion(inner_ru);
     copyDbx(ir, ir_ru, inner_ru);

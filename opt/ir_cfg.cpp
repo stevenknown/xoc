@@ -39,13 +39,13 @@ author: Su Zhenyu
 namespace xoc {
 
 //IR_CFG
-IR_CFG::IR_CFG(CFG_SHAPE cs, BBList * bbl, Region * ru,
+IR_CFG::IR_CFG(CFG_SHAPE cs, BBList * bbl, Region * rg,
                UINT edge_hash_size, UINT vertex_hash_size)
     : CFG<IRBB, IR>(bbl, edge_hash_size, vertex_hash_size)
 {
-    m_ru = ru;
-    m_tm = ru->getTypeMgr();
-    setBitSetMgr(ru->getBitSetMgr());
+    m_ru = rg;
+    m_tm = rg->getTypeMgr();
+    setBitSetMgr(rg->getBitSetMgr());
     if (m_bb_list->get_elem_count() == 0) {
         return;
     }
@@ -64,8 +64,8 @@ IR_CFG::IR_CFG(CFG_SHAPE cs, BBList * bbl, Region * ru,
             if (LABEL_INFO_is_catch_start(li)) {
                 BB_is_catch_start(bb) = true;
             }
-            if (LABEL_INFO_is_unreachable(li)) {
-                BB_is_unreach(bb) = true;
+            if (LABEL_INFO_is_terminate(li)) {
+                BB_is_terminate(bb) = true;
             }
         }
     }
@@ -126,6 +126,190 @@ void IR_CFG::cf_opt()
             if (change) { break; }
             change = if_opt(bb);
             if (change) { break; }
+        }
+    }
+}
+
+
+//Construct EH edge after cfg built.
+void IR_CFG::buildEHEdge()
+{
+    ASSERT(m_bb_list, ("bb_list is emt"));
+    C<IRBB*> * ct;
+    for (m_bb_list->get_head(&ct);
+         ct != m_bb_list->end(); ct = m_bb_list->get_next(ct)) {
+        IRBB const* bb = ct->val();
+        C<IR*> * ct2;
+        IR * x = BB_irlist(const_cast<IRBB*>(bb)).get_tail(&ct2);
+        if (x != NULL && x->isMayThrow() && x->getAI() != NULL) {
+            EHLabelAttachInfo const* ehlab =
+                (EHLabelAttachInfo const*)x->getAI()->get(AI_EH_LABEL);
+            if (ehlab == NULL) { continue; }
+
+            SC<LabelInfo*> * sc;
+            SList<LabelInfo*> const& labs = ehlab->read_labels();
+            for (sc = labs.get_head();
+                 sc != labs.end();
+                 sc = labs.get_next(sc)) {
+                ASSERT0(sc);
+                IRBB * tgt = findBBbyLabel(sc->val());
+                ASSERT0(tgt);
+                Edge * e = addEdge(BB_id(bb), BB_id(tgt));
+                EDGE_info(e) = xmalloc(sizeof(CFGEdgeInfo));
+                CFGEI_is_eh((CFGEdgeInfo*)EDGE_info(e)) = true;
+                m_has_eh_edge = true;
+            }
+        }
+    }
+}
+
+
+//Construct EH edge after cfg built.
+//This function use a conservative method, and this method
+//may generate lots of redundant exception edges.
+void IR_CFG::buildEHEdgeNaive()
+{
+    ASSERT(m_bb_list, ("bb_list is emt"));
+    List<IRBB*> maythrow;
+    List<IRBB*> ehl;
+    IRBB * entry = NULL;
+    C<IRBB*> * ct;
+
+    for (m_bb_list->get_head(&ct);
+         ct != m_bb_list->end();
+         ct = m_bb_list->get_next(ct)) {
+        IRBB * bb = ct->val();
+        if (isRegionEntry(bb)) {
+            entry = bb;
+            break;
+        }
+    }
+
+    ASSERT(entry, ("Region does not have an entry"));
+    BitSet mainstreambbs;
+    computeMainStreamBBSet(entry, mainstreambbs);
+
+    BitSet ehbbs; //Record all BB in exception region.
+    for (m_bb_list->get_head(&ct);
+         ct != m_bb_list->end(); ct = m_bb_list->get_next(ct)) {
+        IRBB * bb = ct->val();
+
+        if (bb->isExceptionHandler()) {
+            ehl.append_tail(bb);
+            findEHRegion(bb, mainstreambbs, ehbbs);
+        }
+
+        if (bb->mayThrowException() && !ehbbs.is_contain(BB_id(bb))) {
+            maythrow.append_tail(bb);
+        }
+    }
+
+    if (ehl.get_elem_count() == 0) { return; }
+
+    if (maythrow.get_elem_count() == 0) {
+        ASSERT(entry, ("multi entries"));
+        maythrow.append_tail(entry);
+    }
+
+    for (ehl.get_head(&ct); ct != ehl.end(); ct = ehl.get_next(ct)) {
+         IRBB * b = ct->val();
+         C<IRBB*> * ct2;
+         for (maythrow.get_head(&ct2);
+              ct2 != maythrow.end(); ct2 = maythrow.get_next(ct2)) {
+             IRBB * a = ct2->val();
+             if (ehbbs.is_contain(BB_id(a))) { continue; }
+
+             Edge * e = addEdge(a->id(), b->id());
+             EDGE_info(e) = xmalloc(sizeof(CFGEdgeInfo));
+             CFGEI_is_eh((CFGEdgeInfo*)EDGE_info(e)) = true;
+             m_has_eh_edge = true;
+         }
+    }
+}
+
+
+//Verification at building SSA mode by ir parser.
+bool IR_CFG::verifyPhiEdge(IR * phi, TMap<IR*, LabelInfo*> & ir2label)
+{
+    Vertex * bbvex = get_vertex(phi->getBB()->id());
+    EdgeC * opnd_pred = VERTEX_in_list(bbvex);
+    IR * opnd = PHI_opnd_list(phi);
+    for (; opnd != NULL && opnd_pred != NULL;
+         opnd = opnd->get_next(), opnd_pred = EC_next(opnd_pred)) {
+        LabelInfo * opnd_label = ir2label.get(opnd);
+        IRBB * incoming_bb = findBBbyLabel(opnd_label);
+        ASSERT0(incoming_bb);
+        if (VERTEX_id(EDGE_from(EC_edge(opnd_pred))) != incoming_bb->id()) {
+            return false;
+        }
+    }
+    ASSERT0(opnd == NULL && opnd_pred == NULL);
+    return true;
+}
+
+
+//Construct CFG edge for BB has phi.
+void IR_CFG::buildAndRevisePhiEdge(TMap<IR*, LabelInfo*> & ir2label)
+{
+    ASSERT(m_bb_list, ("bb_list is emt"));
+    C<IRBB*> * ct;
+    for (m_bb_list->get_head(&ct);
+         ct != m_bb_list->end(); ct = m_bb_list->get_next(ct)) {
+        IRBB const* bb = ct->val();
+        if (BB_irlist(bb).get_elem_count() == 0) {
+            continue;
+        }
+
+        INT phi_opnd_num = -1;
+        C<IR*> * ct2;
+        for (BB_irlist(const_cast<IRBB*>(bb)).get_head(&ct2);
+             ct2 != NULL; BB_irlist(const_cast<IRBB*>(bb)).get_next(&ct2)) {
+            IR * x = ct2->val();
+            ASSERT0(x);
+            if (x->is_phi()) {
+                for (IR * opnd = PHI_opnd_list(x);
+                     opnd != NULL; opnd = opnd->get_next()) {
+                    LabelInfo * opnd_label = ir2label.get(opnd);
+                    ASSERT(opnd_label, ("no corresponding label to opnd"));
+                    IRBB * incoming_bb = findBBbyLabel(opnd_label);
+                    ASSERT0(incoming_bb);
+                    addEdge(incoming_bb->id(), bb->id());
+                }
+                if (phi_opnd_num == -1) {
+                    phi_opnd_num = xcom::cnt_list(PHI_opnd_list(x));
+
+                    //Sort in-edge of bb to make sure the order of them are same
+                    //with the phi-operands.
+                    Vertex * bbvex = get_vertex(bb->id());
+                    EdgeC * opnd_pred = VERTEX_in_list(bbvex);
+                    for (IR * opnd = PHI_opnd_list(x);
+                         opnd != NULL; opnd = opnd->get_next()) {
+                        LabelInfo * opnd_label = ir2label.get(opnd);
+                        IRBB * incoming_bb = findBBbyLabel(opnd_label);
+                        ASSERT0(incoming_bb);
+                        if (VERTEX_id(EDGE_from(EC_edge(opnd_pred))) == incoming_bb->id()) {
+                            opnd_pred = EC_next(opnd_pred);
+                            continue;
+                        }
+
+                        EdgeC * q;
+                        for (q = EC_next(opnd_pred); q != NULL; q = EC_next(q)) {
+                            if (VERTEX_id(EDGE_from(EC_edge(q))) == incoming_bb->id()) {
+                                break;
+                            }
+                        }
+                        ASSERT(q, ("can not find needed EdgeC"));
+                        xcom::swap(&VERTEX_in_list(bbvex), opnd_pred, q);
+                        opnd_pred = EC_next(q);
+                    }
+
+                    ASSERT0(verifyPhiEdge(x, ir2label));
+                } else {
+                    ASSERT((UINT)phi_opnd_num == xcom::cnt_list(PHI_opnd_list(x)),
+                        ("the number of operand is inconsistent"));
+                    ASSERT0((UINT)phi_opnd_num == get_in_degree(get_vertex(bb->id())));
+                }
+            }
         }
     }
 }
@@ -531,7 +715,7 @@ bool IR_CFG::inverseAndRemoveTrampolineBranch()
             continue;
         }
 
-        if (next->isExceptionHandler()) { continue; }        
+        if (next->isExceptionHandler()) { continue; }
 
         IRBB * next_next = m_bb_list->get_next(&nextbbct);
         if (next_next == NULL || //bb may be the last BB in bb-list.
@@ -541,17 +725,17 @@ bool IR_CFG::inverseAndRemoveTrampolineBranch()
 
         IRBB * jmp_tgt = findBBbyLabel(GOTO_lab(jmp));
         Edge const* e_of_jmp = get_edge(next->id(), jmp_tgt->id());
-        ASSERT0(e_of_jmp);        
+        ASSERT0(e_of_jmp);
         CFGEdgeInfo * ei = (CFGEdgeInfo*)EDGE_info(e_of_jmp);
-        if (ei != NULL && CFGEI_is_eh(ei)) { 
+        if (ei != NULL && CFGEI_is_eh(ei)) {
             //Do not remove exception edge.
             continue;
         }
 
         Edge const* e_of_bb = get_edge(bb->id(), next_next->id());
-        ASSERT0(e_of_bb);        
+        ASSERT0(e_of_bb);
         CFGEdgeInfo * ei2 = (CFGEdgeInfo*)EDGE_info(e_of_bb);
-        if (ei2 != NULL && CFGEI_is_eh(ei2)) { 
+        if (ei2 != NULL && CFGEI_is_eh(ei2)) {
             //Do not remove exception edge.
             continue;
         }

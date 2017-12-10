@@ -72,6 +72,131 @@ void VAR::dump(FILE * h, TypeMgr const* dm) const
 }
 
 
+void VAR::dumpFlag(StrBuf & buf, bool grmode) const
+{
+    bool first = true;
+    if (!grmode) {
+        if (!first) {
+            buf.strcat(",");
+        }
+        first = false;
+        if (HAVE_FLAG(VAR_flag(this), VAR_GLOBAL)) {
+            buf.strcat("global");
+        } else if (HAVE_FLAG(VAR_flag(this), VAR_LOCAL)) {
+            buf.strcat("local");
+        } else {
+            UNREACH();
+        }
+        if (HAVE_FLAG(VAR_flag(this), VAR_IS_SPILL)) {
+            if (!first) {
+                buf.strcat(",");
+            }
+            first = false;
+            buf.strcat("spill_loc");
+        }
+        if (HAVE_FLAG(VAR_flag(this), VAR_ADDR_TAKEN)) {
+            if (!first) {
+                buf.strcat(",");
+            }
+            first = false;
+            buf.strcat(",addr_taken");
+        }
+        if (HAVE_FLAG(VAR_flag(this), VAR_IS_FORMAL_PARAM)) {
+            if (!first) {
+                buf.strcat(",");
+            }
+            first = false;
+            buf.strcat("formal_param");
+        }
+        if (HAVE_FLAG(VAR_flag(this), VAR_HAS_INIT_VAL)) {
+            if (!first) {
+                buf.strcat(",");
+            }
+            first = false;
+            buf.strcat("has_init_val");
+        }
+        if (HAVE_FLAG(VAR_flag(this), VAR_IS_ALLOCABLE)) {
+            if (!first) {
+                buf.strcat(",");
+            }
+            first = false;
+            buf.strcat("allocable");
+        }
+    }
+    if (HAVE_FLAG(VAR_flag(this), VAR_FUNC_DECL)) {
+        if (!first) {
+            buf.strcat(",");
+        }
+        first = false;
+        buf.strcat("func_decl");
+    }
+    if (HAVE_FLAG(VAR_flag(this), VAR_PRIVATE)) {
+        if (!first) {
+            buf.strcat(",");
+        }
+        first = false;
+        buf.strcat("private");
+    }
+    if (HAVE_FLAG(VAR_flag(this), VAR_READONLY)) {
+        if (!first) {
+            buf.strcat(",");
+        }
+        first = false;
+        buf.strcat("readonly");
+    }
+    if (HAVE_FLAG(VAR_flag(this), VAR_VOLATILE)) {
+        if (!first) {
+            buf.strcat(",");
+        }
+        first = false;
+        buf.strcat("volatile");
+    }
+    if (HAVE_FLAG(VAR_flag(this), VAR_IS_RESTRICT)) {
+        if (!first) {
+            buf.strcat(",");
+        }
+        first = false;
+        buf.strcat("restrict");
+    }
+    if (HAVE_FLAG(VAR_flag(this), VAR_FAKE)) {
+        if (!first) {
+            buf.strcat(",");
+        }
+        first = false;
+        buf.strcat("fake");
+    }
+    if (HAVE_FLAG(VAR_flag(this), VAR_IS_LABEL)) {
+        if (!first) {
+            buf.strcat(",");
+        }
+        first = false;
+        buf.strcat("label");
+    }
+    if (HAVE_FLAG(VAR_flag(this), VAR_IS_ARRAY)) {
+        if (!first) {
+            buf.strcat(",");
+        }
+        first = false;
+        buf.strcat("array");
+    }
+}
+
+
+CHAR const* VAR::dumpGR(StrBuf & buf, TypeMgr * dm) const
+{
+    StrBuf buf2(32);
+    buf.strcat("var %s:%s",
+        SYM_name(VAR_name(this)),
+        dm->dump_type(get_type(), buf2));
+    if (VAR_flag(this) != 0) {
+        buf.strcat(":(");
+    }
+    dumpFlag(buf, true);
+    buf.strcat(")");
+    return buf.buf;
+}
+
+
 //You must make sure this function will not change any field of VAR.
 CHAR const* VAR::dump(StrBuf & buf, TypeMgr const* dm) const
 {
@@ -86,73 +211,13 @@ CHAR const* VAR::dump(StrBuf & buf, TypeMgr const* dm) const
         lname = tt;
     }
     buf.strcat("VAR%d(%s):", VAR_id(this), lname);
-    if (HAVE_FLAG(VAR_flag(this), VAR_GLOBAL)) {
-        buf.strcat("global");
-    } else if (HAVE_FLAG(VAR_flag(this), VAR_LOCAL)) {
-        buf.strcat("local");
-    } else {
-        UNREACH();
-    }
-
-    if (HAVE_FLAG(VAR_flag(this), VAR_STATIC)) {
-        buf.strcat(",static");
-    }
-
-    if (HAVE_FLAG(VAR_flag(this), VAR_READONLY)) {
-        buf.strcat(",const");
-    }
-
-    if (HAVE_FLAG(VAR_flag(this), VAR_VOLATILE)) {
-        buf.strcat(",volatile");
-    }
-
-    if (HAVE_FLAG(VAR_flag(this), VAR_IS_RESTRICT)) {
-        buf.strcat(",restrict");
-    }
-
-    if (HAVE_FLAG(VAR_flag(this), VAR_HAS_INIT_VAL)) {
-        buf.strcat(",has_init_val");
-    }
-
-    if (HAVE_FLAG(VAR_flag(this), VAR_FUNC_DECL)) {
-        buf.strcat(",func_decl");
-    }
-
-    if (HAVE_FLAG(VAR_flag(this), VAR_FAKE)) {
-        buf.strcat(",fake");
-    }
-
-    if (HAVE_FLAG(VAR_flag(this), VAR_IS_LABEL)) {
-        buf.strcat(",label");
-    }
-
-    if (HAVE_FLAG(VAR_flag(this), VAR_IS_FORMAL_PARAM)) {
-        buf.strcat(",formal_param");
-    }
-
-    if (HAVE_FLAG(VAR_flag(this), VAR_IS_SPILL)) {
-        buf.strcat(",spill_loc");
-    }
-
-    if (HAVE_FLAG(VAR_flag(this), VAR_ADDR_TAKEN)) {
-        buf.strcat(",addr_taken");
-    }
-
-    if (is_string()) {
-        buf.strcat(",str");
-    }
-
-    if (HAVE_FLAG(VAR_flag(this), VAR_IS_ARRAY)) {
-        buf.strcat(",array");
-    }
-
-    if (HAVE_FLAG(VAR_flag(this), VAR_IS_ALLOCABLE)) {
-        buf.strcat(",allocable");
-    }
+    dumpFlag(buf, false);
 
     Type const* ltype = VAR_type(this);
     ASSERT0(ltype);
-
+    if (is_string()) {
+        buf.strcat(",str");
+    }
     if (is_pointer()) {
         buf.strcat(",pointer,pt_base_sz:%d", TY_ptr_base_size(ltype));
     }
@@ -174,7 +239,7 @@ CHAR const* VAR::dump(StrBuf & buf, TypeMgr const* dm) const
     UINT tmpf = VAR_flag(this);
     REMOVE_FLAG(tmpf, VAR_GLOBAL);
     REMOVE_FLAG(tmpf, VAR_LOCAL);
-    REMOVE_FLAG(tmpf, VAR_STATIC);
+    REMOVE_FLAG(tmpf, VAR_PRIVATE);
     REMOVE_FLAG(tmpf, VAR_READONLY);
     REMOVE_FLAG(tmpf, VAR_VOLATILE);
     REMOVE_FLAG(tmpf, VAR_HAS_INIT_VAL);
@@ -288,7 +353,7 @@ VAR * VarMgr::registerVar(
 //'s': string's content.
 VAR * VarMgr::registerStringVar(CHAR const* var_name, SYM const* s, UINT align)
 {
-    ASSERT0(s != NULL);
+    ASSERT0(s);
     VAR * v;
     if ((v = m_str_tab.get(s)) != NULL) {
         return v;
@@ -298,7 +363,7 @@ VAR * VarMgr::registerStringVar(CHAR const* var_name, SYM const* s, UINT align)
 
     if (var_name == NULL) {
         StrBuf buf(64);
-        buf.sprint(".rodata_%lu", (ULONG)m_str_count++);
+        buf.sprint("_const_string_%lu", (ULONG)m_str_count++);
         VAR_name(v) = m_ru_mgr->addToSymbolTab(buf.buf);
     } else {
         VAR_name(v) = m_ru_mgr->addToSymbolTab(var_name);
@@ -307,7 +372,7 @@ VAR * VarMgr::registerStringVar(CHAR const* var_name, SYM const* s, UINT align)
     VAR_str(v) = s;
     VAR_type(v) = m_tm->getString();
     VAR_align(v) = align;
-    VAR_is_global(v) = true; //store in .data or .rodata
+    VAR_is_global(v) = true;
     VAR_allocable(v) = true;
     assignVarId(v);
     m_str_tab.set(s, v);

@@ -47,10 +47,10 @@ typedef Vector<Vector<Vector<VN*>*>*> VEC3;
 typedef Vector<Vector<VN*>*> VEC2;
 typedef Vector<VN*> VEC1;
 
-IR_GVN::IR_GVN(Region * ru)
+IR_GVN::IR_GVN(Region * rg)
 {
-    ASSERT0(ru != NULL);
-    m_ru = ru;
+    ASSERT0(rg != NULL);
+    m_ru = rg;
     m_md_sys = m_ru->getMDSystem();
     m_du = m_ru->getDUMgr();
     m_tm = m_ru->getTypeMgr();
@@ -64,7 +64,7 @@ IR_GVN::IR_GVN(Region * ru)
     m_zero_vn = NULL;
     m_mc_zero_vn = NULL;
 
-    List<IRBB*> * bbl = ru->getBBList();
+    List<IRBB*> * bbl = rg->getBBList();
     UINT n = 0;
     for (IRBB * bb = bbl->get_head(); bb != NULL; bb = bbl->get_next()) {
         n += bb->getNumOfIR();
@@ -125,7 +125,7 @@ void IR_GVN::clean()
 bool IR_GVN::verify()
 {
     for (INT i = 0; i <= m_irt_vec.get_last_idx(); i++) {
-        if (is_bin_irt((IR_TYPE)i) || i == IR_LDA) {
+        if (isBinaryOp((IR_TYPE)i) || i == IR_LDA) {
             Vector<Vector<VN*>*> * v0_vec = m_irt_vec.get(i);
             if (v0_vec == NULL) { continue; }
             for (INT j = 0; j <= v0_vec->get_last_idx(); j++) {
@@ -1292,7 +1292,7 @@ void IR_GVN::dump_bb(UINT bbid)
 void IR_GVN::dump()
 {
     if (g_tfile == NULL) return;
-    fprintf(g_tfile, "\n==---- DUMP GVN -- ru:'%s' ----==", m_ru->getRegionName());
+    fprintf(g_tfile, "\n==---- DUMP GVN -- rg:'%s' ----==", m_ru->getRegionName());
     BBList * bbl = m_ru->getBBList();
     for (IRBB * bb = bbl->get_head(); bb != NULL; bb = bbl->get_next()) {
         dump_bb(BB_id(bb));
@@ -1463,7 +1463,7 @@ bool IR_GVN::perform(OptCtx & oc)
     if (bbl->get_elem_count() == 0) { return false; }
 
     START_TIMER(t, getPassName());
-    m_ru->checkValidAndRecompute(&oc, PASS_DU_CHAIN, 
+    m_ru->checkValidAndRecompute(&oc, PASS_DU_CHAIN,
         PASS_DU_REF, PASS_RPO, PASS_DOM, PASS_UNDEF);
 
     if (!OC_is_du_chain_valid(oc)) {

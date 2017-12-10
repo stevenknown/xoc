@@ -48,12 +48,12 @@ protected:
     //Note that compute GVN is expensive.
     bool m_use_gvn;
 public:
-    IR_RCE(Region * ru, IR_GVN * gvn)
+    IR_RCE(Region * rg, IR_GVN * gvn)
     {
-        ASSERT0(ru != NULL);
-        m_ru = ru;
+        ASSERT0(rg != NULL);
+        m_ru = rg;
         m_gvn = gvn;
-        m_cfg = ru->getCFG();
+        m_cfg = rg->getCFG();
         m_du = m_ru->getDUMgr();
         ASSERT0(m_cfg && m_du);
         m_use_gvn = false;

@@ -41,7 +41,7 @@ typedef TMap<Type const*, MD const*> Type2MD;
 class DEX_AA : public IR_AA {
     Type2MD m_type2md;
 public:
-    DEX_AA(Region * ru) : IR_AA(ru) {}
+    DEX_AA(Region * rg) : IR_AA(rg) {}
 
     //Attemp to compute POINT-TO set via data type.
     virtual MD const* computePointToViaType(IR const* ir)

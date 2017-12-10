@@ -93,7 +93,7 @@ class IR_EXPR_TAB : public Pass {
         return encode_expr(ir);
     }
 public:
-    explicit IR_EXPR_TAB(Region * ru);
+    explicit IR_EXPR_TAB(Region * rg);
     COPY_CONSTRUCTOR(IR_EXPR_TAB);
     ~IR_EXPR_TAB();
 

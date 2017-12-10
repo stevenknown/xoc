@@ -288,7 +288,7 @@ MDDef * MDSSAMgr::findNearestDef(IR const* ir)
                 if (tdef->getResult()->mdid() == last->getResult()->mdid()) {
                     ASSERT0(tdef == last || !tdef->is_phi());
                 }
-                
+
                 //tdef is near more than 'last'.
                 last = tdef;
                 ASSERT0(lastrpo == BB_rpo(tbb));
@@ -1507,7 +1507,7 @@ void MDSSAMgr::changeDef(IR * olddef, IR * newdef)
         VMD * vopnd = (VMD*)getUseDefMgr()->getVOpnd(i);
         ASSERT0(vopnd && vopnd->is_md());
         ASSERT0(vopnd->getDef()->getOcc() == olddef);
-        MDDEF_occ(VMD_def(vopnd)) = newdef;        
+        MDDEF_occ(VMD_def(vopnd)) = newdef;
     }
 }
 
@@ -1528,7 +1528,7 @@ void MDSSAMgr::changeUse(IR * olduse, IR * newuse)
     for (INT i = mdssainfo->getVOpndSet()->get_first(&iter);
          i >= 0; i = mdssainfo->getVOpndSet()->get_next(i, &iter)) {
         VMD * vopnd = (VMD*)getUseDefMgr()->getVOpnd(i);
-        ASSERT0(vopnd && vopnd->is_md());        
+        ASSERT0(vopnd && vopnd->is_md());
         if (vopnd->getOccSet()->is_contain(olduse->id())) {
             vopnd->getOccSet()->diff(olduse->id());
             vopnd->getOccSet()->bunion(newuse->id());
@@ -1555,7 +1555,7 @@ void MDSSAMgr::coalesceVersion(IR const* src, IR const* tgt)
     for (INT i = src_mdssainfo->getVOpndSet()->get_first(&iter1);
          i >= 0; i = src_mdssainfo->getVOpndSet()->get_next(i, &iter1)) {
         VMD * src_vopnd = (VMD*)getUseDefMgr()->getVOpnd(i);
-        ASSERT0(src_vopnd && src_vopnd->is_md());        
+        ASSERT0(src_vopnd && src_vopnd->is_md());
 
         //Find the MD in tgt's vopnd-set which has same mdid with src's
         //except the distinct version.
@@ -1574,7 +1574,7 @@ void MDSSAMgr::coalesceVersion(IR const* src, IR const* tgt)
         }
 
         ASSERT(tgt_vopnd, ("no MD correspond to src"));
-        ASSERT(tgt_vopnd->version() != src_vopnd->version(), 
+        ASSERT(tgt_vopnd->version() != src_vopnd->version(),
             ("DEF and USE reference same version MD"));
 
         //Replace the USE of src to USE of tgt.
@@ -1584,14 +1584,14 @@ void MDSSAMgr::coalesceVersion(IR const* src, IR const* tgt)
             IR const* occ = (IR*)m_ru->getIR(k);
             MDSSAInfo * occ_mdssainfo = getUseDefMgr()->getMDSSAInfo(occ);
             ASSERT(occ_mdssainfo, ("occ miss MDSSAInfo"));
-            
+
             occ_mdssainfo->getVOpndSet()->remove(src_vopnd, *m_sbs_mgr);
             occ_mdssainfo->getVOpndSet()->append(tgt_vopnd, *m_sbs_mgr);
             tgt_vopnd->getOccSet()->bunion(occ->id());
         }
         src_vopnd->getOccSet()->clean();
     }
-    
+
 }
 
 
@@ -1628,7 +1628,7 @@ void MDSSAMgr::removeMDSSAUseRecur(IR * ir)
         //Maintain the SSAInfo of read-pr/write-pr operation.
         prssainfo->removeUse(ir);
     }
-    
+
     for (UINT i = 0; i < IR_MAX_KID_NUM(ir); i++) {
         for (IR * x = ir->getKid(i); x != NULL; x = x->get_next()) {
             removeMDSSAUseRecur(x);
@@ -1757,7 +1757,7 @@ void MDSSAMgr::reinit()
     destroy();
     cleanMDSSAInfoAI();
     m_max_version.clean();
-    m_usedef_mgr.reinit();    
+    m_usedef_mgr.reinit();
     init();
 }
 
@@ -1795,7 +1795,7 @@ bool MDSSAMgr::construction(DomTree & domtree)
 
     START_TIMER(t1, "MDSSA: Build dominance frontier");
     DfMgr dfm;
-    dfm.build((DGraph&)*m_cfg); //Build dominance frontier.    
+    dfm.build((DGraph&)*m_cfg); //Build dominance frontier.
     END_TIMER(t1, "MDSSA: Build dominance frontier");
     if (dfm.hasHighDFDensityVertex((DGraph&)*m_cfg)) {
         return false;

@@ -558,7 +558,7 @@ protected:
     void processRegion(IR const* ir, bool & change);
     void processPhi(IR const* ir, bool & change);
 public:
-    explicit IR_GVN(Region * ru);
+    explicit IR_GVN(Region * rg);
     COPY_CONSTRUCTOR(IR_GVN);
     virtual ~IR_GVN();
 

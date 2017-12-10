@@ -126,24 +126,24 @@ protected:
                   List<IRBB*> & wl);
     void verifySSAInfo(IR const* ir);
 public:
-    explicit MDSSAMgr(Region * ru) : m_usedef_mgr(ru)
+    explicit MDSSAMgr(Region * rg) : m_usedef_mgr(rg)
     {
         cleanInConstructor();
-        ASSERT0(ru);
-        m_ru = ru;
+        ASSERT0(rg);
+        m_ru = rg;
 
-        m_tm = ru->getTypeMgr();
+        m_tm = rg->getTypeMgr();
         ASSERT0(m_tm);
 
-        ASSERT0(ru->getMiscBitSetMgr());
-        m_sbs_mgr = ru->getMiscBitSetMgr();
-        m_seg_mgr = ru->getMiscBitSetMgr()->getSegMgr();
+        ASSERT0(rg->getMiscBitSetMgr());
+        m_sbs_mgr = rg->getMiscBitSetMgr();
+        m_seg_mgr = rg->getMiscBitSetMgr()->getSegMgr();
         ASSERT0(m_seg_mgr);
 
-        m_cfg = ru->getCFG();
+        m_cfg = rg->getCFG();
         ASSERT(m_cfg, ("cfg is not available."));
 
-        m_md_sys = ru->getMDSystem();
+        m_md_sys = rg->getMDSystem();
     }
     COPY_CONSTRUCTOR(MDSSAMgr);
     ~MDSSAMgr()
@@ -196,7 +196,7 @@ public:
     //     ...=p0
     void coalesceVersion(IR const* src, IR const* tgt);
 
-    
+
     void destroy();
     void destruction(DomTree & domtree);
     void destruction();

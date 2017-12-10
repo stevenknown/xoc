@@ -50,7 +50,7 @@ protected:
     { return NULL; }
 
 public:
-    explicit TG(Region * ru) { m_ru = ru; }
+    explicit TG(Region * rg) { m_ru = rg; }
     COPY_CONSTRUCTOR(TG);
 
     void pick_eh()
@@ -109,16 +109,16 @@ protected:
     bool prcessCse(IR * ir, List<IR*> & livexp);
     bool shouldBeCse(IR * det);
 public:
-    IR_GCSE(Region * ru, IR_GVN * gvn)
+    IR_GCSE(Region * rg, IR_GVN * gvn)
     {
-        ASSERT0(ru);
-        m_ru = ru;
-        m_cfg = ru->getCFG();
-        m_du = ru->getDUMgr();
-        m_aa = ru->getAA();
+        ASSERT0(rg);
+        m_ru = rg;
+        m_cfg = rg->getCFG();
+        m_du = rg->getDUMgr();
+        m_aa = rg->getAA();
         ASSERT0(m_du && m_aa && m_cfg);
         m_expr_tab = NULL;
-        m_tm = ru->getTypeMgr();
+        m_tm = rg->getTypeMgr();
         m_gvn = gvn;
         m_tg = NULL;
         m_is_in_ssa_form = false;

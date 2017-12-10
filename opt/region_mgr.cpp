@@ -42,9 +42,9 @@ namespace xoc {
 RegionMgr::~RegionMgr()
 {
     for (INT id = 0; id <= m_id2ru.get_last_idx(); id++) {
-        Region * ru = m_id2ru.get(id);
-        if (ru == NULL) { continue; }
-        deleteRegion(ru, false);
+        Region * rg = m_id2ru.get(id);
+        if (rg == NULL) { continue; }
+        deleteRegion(rg, false);
     }
 
     #ifdef _DEBUG_
@@ -156,25 +156,25 @@ Region * RegionMgr::newRegion(REGION_TYPE rt)
     m_num_allocated++;
     #endif
 
-    Region * ru = allocRegion(rt);
+    Region * rg = allocRegion(rt);
     UINT free_id = m_free_ru_id.remove_head();
     if (free_id == 0) {
-        REGION_id(ru) = m_ru_count++;
+        REGION_id(rg) = m_ru_count++;
     } else {
-        REGION_id(ru) = free_id;
+        REGION_id(rg) = free_id;
     }
 
-    return ru;
+    return rg;
 }
 
 
 //Record new region and delete it when RegionMgr destroy.
-void RegionMgr::addToRegionTab(Region * ru)
+void RegionMgr::addToRegionTab(Region * rg)
 {
-    ASSERT(REGION_id(ru) > 0, ("should generate new region via newRegion()"));
-    ASSERT0(getRegion(REGION_id(ru)) == NULL);
-    ASSERT0(REGION_id(ru) < m_ru_count);
-    m_id2ru.set(REGION_id(ru), ru);
+    ASSERT(REGION_id(rg) > 0, ("should generate new region via newRegion()"));
+    ASSERT0(getRegion(REGION_id(rg)) == NULL);
+    ASSERT0(REGION_id(rg) < m_ru_count);
+    m_id2ru.set(REGION_id(rg), rg);
 }
 
 
@@ -274,9 +274,9 @@ void RegionMgr::dumpRelationGraph(CHAR const* name)
     UNLINK(name);
     xcom::Graph g;
     for (UINT id = 0; id < getNumOfRegion(); id++) {
-        Region * ru = getRegion(id);
-        if (ru == NULL || ru->getParent() == NULL) { continue; }
-        g.addEdge(ru->getParent()->id(), ru->id());
+        Region * rg = getRegion(id);
+        if (rg == NULL || rg->getParent() == NULL) { continue; }
+        g.addEdge(rg->getParent()->id(), rg->id());
     }
     g.dump_vcg(name);
 }
@@ -290,9 +290,9 @@ void RegionMgr::dump(bool dump_inner_region)
     g_indent = 0;
     note("\n==---- DUMP ALL Registered Region ----==");
     for (UINT id = 0; id < getNumOfRegion(); id++) {
-        Region * ru = getRegion(id);
-        if (ru == NULL) { continue; }
-        ru->dump(dump_inner_region);
+        Region * rg = getRegion(id);
+        if (rg == NULL) { continue; }
+        rg->dump(dump_inner_region);
     }
     fflush(g_tfile);
 }
@@ -300,13 +300,13 @@ void RegionMgr::dump(bool dump_inner_region)
 
 //This function destroy region, and free the region id
 //to next region alloction.
-void RegionMgr::deleteRegion(Region * ru, bool collect_id)
+void RegionMgr::deleteRegion(Region * rg, bool collect_id)
 {
-    START_TIMER_FMT(t, ("Delete Region%d", ru->id()));
-    ASSERT0(ru);
-    UINT id = REGION_id(ru);
+    START_TIMER_FMT(t, ("Delete Region%d", rg->id()));
+    ASSERT0(rg);
+    UINT id = REGION_id(rg);
     ASSERT(getRegion(id), ("not registered region"));
-    delete ru;
+    delete rg;
 
     if (collect_id && id != 0) {
         m_id2ru.set(id, NULL);
@@ -318,7 +318,7 @@ void RegionMgr::deleteRegion(Region * ru, bool collect_id)
     m_num_allocated--;
     #endif
 
-    END_TIMER_FMT(t, ("Delete Region%d", ru->id()));
+    END_TIMER_FMT(t, ("Delete Region"));
 }
 
 
@@ -329,17 +329,17 @@ void RegionMgr::estimateEV(
         bool scan_inner_region)
 {
     for (UINT i = 0; i < getNumOfRegion(); i++) {
-        Region * ru = getRegion(i);
-        if (ru == NULL) { continue; }
+        Region * rg = getRegion(i);
+        if (rg == NULL) { continue; }
 
         num_ru++;
 
-        ASSERT0(ru->is_function() || ru->is_program());
+        ASSERT0(rg->is_function() || rg->is_program());
         if (scan_call) {
-            ru->scanCallAndReturnList(num_ru, scan_inner_region);
+            rg->scanCallAndReturnList(num_ru, scan_inner_region);
         }
 
-        List<IR const*> * call_list = ru->getCallList();
+        List<IR const*> * call_list = rg->getCallList();
         if (call_list != NULL) {
             num_call += call_list->get_elem_count();
         }

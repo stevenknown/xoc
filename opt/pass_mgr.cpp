@@ -36,13 +36,13 @@ author: Su Zhenyu
 
 namespace xoc {
 
-PassMgr::PassMgr(Region * ru)
+PassMgr::PassMgr(Region * rg)
 {
-    ASSERT0(ru);
+    ASSERT0(rg);
     m_pool = smpoolCreate(sizeof(TimeInfo) * 4, MEM_COMM);
-    m_ru = ru;
-    m_rumgr = ru->getRegionMgr();
-    m_tm = ru->getTypeMgr();
+    m_ru = rg;
+    m_rumgr = rg->getRegionMgr();
+    m_tm = rg->getTypeMgr();
     ASSERT0(m_tm);
 }
 

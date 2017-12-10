@@ -49,6 +49,6 @@ all: objs
 objs: $(OBJS)
 
 clean:
-	@find -name "*.a" | xargs rm -f
-	@find -name "*.o" | xargs rm -f
-	@find -name "*.tmp" | xargs rm -f
+	@find ./ -name "*.a" | xargs rm -f
+	@find ./ -name "*.o" | xargs rm -f
+	@find ./ -name "*.tmp" | xargs rm -f

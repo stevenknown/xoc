@@ -65,7 +65,7 @@ typedef enum {
 #define LABEL_INFO_is_catch_start(l)    ((l)->u2.s1.is_catch_start)
 #define LABEL_INFO_is_try_start(l)      ((l)->u2.s1.is_try_start)
 #define LABEL_INFO_is_try_end(l)        ((l)->u2.s1.is_try_end)
-#define LABEL_INFO_is_unreachable(l)    ((l)->u2.s1.is_unreachable)
+#define LABEL_INFO_is_terminate(l)      ((l)->u2.s1.is_terminate)
 #define LABEL_INFO_is_pragma(l)         (LABEL_INFO_type(l) == L_PRAGMA)
 #define LABEL_INFO_b1(l)                ((l)->u2.b1)
 class LabelInfo {
@@ -96,7 +96,7 @@ public:
 
             //Set true if current label is a placeholer to indicate that
             //program control flow is terminate here.
-            BYTE is_unreachable:1;
+            BYTE is_terminate:1;
         } s1;
         BYTE b1;
     } u2;

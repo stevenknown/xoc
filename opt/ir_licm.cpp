@@ -791,7 +791,7 @@ bool IR_LICM::doLoopTree(
 bool IR_LICM::perform(OptCtx & oc)
 {
     START_TIMER(t, getPassName());
-    m_ru->checkValidAndRecompute(&oc, PASS_DOM, 
+    m_ru->checkValidAndRecompute(&oc, PASS_DOM,
         PASS_DU_REF, PASS_LOOP_INFO, PASS_DU_CHAIN, PASS_UNDEF);
 
     if (!OC_is_du_chain_valid(oc)) {

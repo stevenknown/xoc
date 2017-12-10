@@ -123,7 +123,7 @@ public:
     Vreg2PR m_v2pr; //map from dex register v to IR_PR node.
     Prno2Vreg m_pr2v; //map from dex register v to IR_PR node.
 
-    Dex2IR(Region * ru, DexFile * df, LIRCode * fu, DbxVec const& dbxvec);
+    Dex2IR(Region * rg, DexFile * df, LIRCode * fu, DbxVec const& dbxvec);
     ~Dex2IR()
     {
         TMapIter<LIR*, List<LabelInfo*>*> iter;

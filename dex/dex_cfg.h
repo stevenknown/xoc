@@ -55,10 +55,10 @@ protected:
 public:
     DEX_CFG(CFG_SHAPE cs,
             BBList * bbl,
-            Region * ru,
+            Region * rg,
             UINT edge_hash_size = 16,
             UINT vertex_hash_size = 16) :
-        IR_CFG(cs, bbl, ru, edge_hash_size, vertex_hash_size) {}
+        IR_CFG(cs, bbl, rg, edge_hash_size, vertex_hash_size) {}
     virtual ~DEX_CFG() {}
 
     void dump_vcg_ex(BitSet const& markbbs);

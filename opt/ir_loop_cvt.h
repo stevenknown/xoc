@@ -73,11 +73,11 @@ protected:
                     UINT succ1, UINT succ2);
     bool find_and_convert(List<LI<IRBB>*> & worklst);
 public:
-    explicit IR_LOOP_CVT(Region * ru)
+    explicit IR_LOOP_CVT(Region * rg)
     {
-        ASSERT0(ru != NULL);
-        m_ru = ru;
-        m_du = ru->getDUMgr();
+        ASSERT0(rg != NULL);
+        m_ru = rg;
+        m_du = rg->getDUMgr();
         m_cfg = m_ru->getCFG();
         ASSERT0(m_cfg && m_du);
     }

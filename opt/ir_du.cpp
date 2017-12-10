@@ -54,13 +54,13 @@ namespace xoc {
 //
 //START MDId2IRlist
 //
-MDId2IRlist::MDId2IRlist(Region * ru)
+MDId2IRlist::MDId2IRlist(Region * rg)
 {
-    m_ru = ru;
-    m_md_sys = ru->getMDSystem();
-    m_tm = ru->getTypeMgr();
-    m_du = ru->getDUMgr();
-    m_misc_bs_mgr = ru->getMiscBitSetMgr();
+    m_ru = rg;
+    m_md_sys = rg->getMDSystem();
+    m_tm = rg->getTypeMgr();
+    m_du = rg->getDUMgr();
+    m_misc_bs_mgr = rg->getMiscBitSetMgr();
     m_are_stmts_defed_ineffect_md = false;
 }
 
@@ -171,15 +171,15 @@ void MDId2IRlist::dump()
 //
 //START IR_DU_MGR
 //
-IR_DU_MGR::IR_DU_MGR(Region * ru)
+IR_DU_MGR::IR_DU_MGR(Region * rg)
 {
-    m_ru = ru;
-    m_tm = ru->getTypeMgr();
-    m_md_sys = ru->getMDSystem();
-    m_aa = ru->getAA();
-    m_cfg = ru->getCFG();
-    m_mds_mgr = ru->getMDSetMgr();
-    m_mds_hash = ru->getMDSetHash();
+    m_ru = rg;
+    m_tm = rg->getTypeMgr();
+    m_md_sys = rg->getMDSystem();
+    m_aa = rg->getAA();
+    m_cfg = rg->getCFG();
+    m_mds_mgr = rg->getMDSetMgr();
+    m_mds_hash = rg->getMDSetHash();
     m_pool = smpoolCreate(sizeof(DUSet) * 2, MEM_COMM);
     m_is_init = NULL;
     m_md2irs = NULL;
@@ -187,7 +187,7 @@ IR_DU_MGR::IR_DU_MGR(Region * ru)
     //NOTE: call clean() for each object which
     //inheirted from SBitSet or SBitSetCore while destructing the object.
     //That will free SEG back to MiscBitSetMgr.
-    m_misc_bs_mgr = ru->getMiscBitSetMgr();
+    m_misc_bs_mgr = rg->getMiscBitSetMgr();
 
     ASSERT0(m_aa && m_cfg && m_md_sys && m_tm && m_mds_mgr && m_mds_hash);
 }
@@ -1349,9 +1349,9 @@ void IR_DU_MGR::dumpIRRef(IN IR * ir, UINT indent)
         bool doit = false;
         CallGraph * callg = m_ru->getRegionMgr()->getCallGraph();
         if (callg != NULL) {
-            Region * ru = callg->mapCall2Region(ir, m_ru);
-            if (ru != NULL && REGION_is_mddu_valid(ru)) {
-                MDSet const* muse = ru->getMayUse();
+            Region * rg = callg->mapCall2Region(ir, m_ru);
+            if (rg != NULL && REGION_is_mddu_valid(rg)) {
+                MDSet const* muse = rg->getMayUse();
                 //May use
                 fprintf(g_tfile, " <-- ");
                 if (muse != NULL && !muse->is_empty()) {
@@ -2448,6 +2448,22 @@ void IR_DU_MGR::inferStorePR(IR * ir, UINT duflag)
 }
 
 
+void IR_DU_MGR::inferSetelem(IR * ir, UINT duflag)
+{
+    ASSERT0(ir->is_setelem() && ir->getRefMD() && ir->getRefMDSet() == NULL);
+    computeExpression(SETELEM_rhs(ir), NULL, COMP_EXP_RECOMPUTE, duflag);
+    computeExpression(SETELEM_ofst(ir), NULL, COMP_EXP_RECOMPUTE, duflag);
+}
+
+
+void IR_DU_MGR::inferGetelem(IR * ir, UINT duflag)
+{
+    ASSERT0(ir->is_getelem() && ir->getRefMD() && ir->getRefMDSet() == NULL);
+    computeExpression(GETELEM_base(ir), NULL, COMP_EXP_RECOMPUTE, duflag);
+    computeExpression(GETELEM_ofst(ir), NULL, COMP_EXP_RECOMPUTE, duflag);
+}
+
+
 void IR_DU_MGR::inferPhi(IR * ir, UINT duflag)
 {
     ASSERT0(ir->is_phi() && ir->getRefMD() && ir->getRefMDSet() == NULL);
@@ -2481,7 +2497,7 @@ void IR_DU_MGR::inferIstore(IR * ir, UINT duflag)
 //Inference call's MayDef MD set.
 //Call may modify addressable local variables and globals in indefinite ways.
 void IR_DU_MGR::inferCallAndIcall(IR * ir, UINT duflag, IN MD2MDSet * mx)
-{    
+{
     ASSERT0(ir->isCallStmt());
     if (ir->is_icall()) {
         computeExpression(ICALL_callee(ir), NULL, COMP_EXP_RECOMPUTE, duflag);
@@ -2518,8 +2534,14 @@ void IR_DU_MGR::inferCallAndIcall(IR * ir, UINT duflag, IN MD2MDSet * mx)
 
     for (IR * p = CALL_dummyuse(ir); p != NULL; p = p->get_next()) {
          computeExpression(p, NULL, COMP_EXP_RECOMPUTE, duflag);
+         if (p->getRefMD() != NULL) {
+            maydefuse.bunion_pure(p->getRefMD()->id(), *m_misc_bs_mgr);
+         }
+         if (p->getRefMDSet() != NULL && !p->getRefMDSet()->is_empty()) {
+            maydefuse.bunion_pure(*p->getRefMDSet(), *m_misc_bs_mgr);
+         }
     }
-    
+
     bool modify_global = true;
     if (ir->isReadOnlyCall()) {
         modify_global = false;
@@ -2605,9 +2627,9 @@ void IR_DU_MGR::collectMayUse(IR const* ir, MDSet & may_use, bool computePR)
             bool done = false;
             CallGraph * callg = m_ru->getRegionMgr()->getCallGraph();
             if (callg != NULL) {
-                Region * ru = callg->mapCall2Region(ir, m_ru);
-                if (ru != NULL && REGION_is_mddu_valid(ru)) {
-                    MDSet const* muse = ru->getMayUse();
+                Region * rg = callg->mapCall2Region(ir, m_ru);
+                if (rg != NULL && REGION_is_mddu_valid(rg)) {
+                    MDSet const* muse = rg->getMayUse();
                     if (muse != NULL) {
                         may_use.bunion(*muse, *m_misc_bs_mgr);
                         done = true;
@@ -2661,6 +2683,14 @@ void IR_DU_MGR::collectMayUseRecursive(
     case IR_STPR:
         collectMayUseRecursive(STPR_rhs(ir), may_use, computePR, bsmgr);
         return;
+    case IR_SETELEM:
+        collectMayUseRecursive(SETELEM_rhs(ir), may_use, computePR, bsmgr);
+        collectMayUseRecursive(SETELEM_ofst(ir), may_use, computePR, bsmgr);
+        return;
+    case IR_GETELEM:
+        collectMayUseRecursive(GETELEM_base(ir), may_use, computePR, bsmgr);
+        collectMayUseRecursive(GETELEM_ofst(ir), may_use, computePR, bsmgr);
+        return;
     case IR_STARRAY:
         for (IR * s = ARR_sub_list(ir); s != NULL; s = s->get_next()) {
             collectMayUseRecursive(s, may_use, computePR, bsmgr);
@@ -2704,9 +2734,9 @@ void IR_DU_MGR::collectMayUseRecursive(
             bool done = false;
             CallGraph * callg = m_ru->getRegionMgr()->getCallGraph();
             if (callg != NULL) {
-                Region * ru = callg->mapCall2Region(ir, m_ru);
-                if (ru != NULL && REGION_is_mddu_valid(ru)) {
-                    MDSet const* muse = ru->getMayUse();
+                Region * rg = callg->mapCall2Region(ir, m_ru);
+                if (rg != NULL && REGION_is_mddu_valid(rg)) {
+                    MDSet const* muse = rg->getMayUse();
                     if (muse != NULL) {
                         may_use.bunion(*muse, bsmgr);
                         done = true;
@@ -3080,6 +3110,12 @@ void IR_DU_MGR::computeMDRef(IN OUT OptCtx & oc, UINT duflag)
                 break;
             case IR_STPR:
                 inferStorePR(ir, duflag);
+                break;
+            case IR_SETELEM:
+                inferSetelem(ir, duflag);
+                break;
+            case IR_GETELEM:
+                inferGetelem(ir, duflag);
                 break;
             case IR_STARRAY:
                 inferStoreArray(ir, duflag);

@@ -42,6 +42,7 @@ class DU;
 class SSAInfo;
 class MDSSAInfo;
 class MDPhi;
+class IR_CFG;
 
 typedef List<IRBB*> BBList;
 typedef List<IR const*> ConstIRIter;
@@ -404,18 +405,18 @@ public:
 
     //Copy memory reference only for current ir node.
     //'src': copy MD reference from 'src', it may be different to current ir.
-    void copyRef(IR const* src, Region * ru);
+    void copyRef(IR const* src, Region * rg);
 
     //Copy each memory reference for whole ir tree.
     //'src': copy MD reference from 'src', it must be equal to current ir tree.
     //'copy_kid_ref': copy MD reference for kid recursively.
-    void copyRefForTree(IR const* src, Region * ru)
+    void copyRefForTree(IR const* src, Region * rg)
     {
-        ASSERT0(src && isIREqual(src, true) && ru);
+        ASSERT0(src && isIREqual(src, true) && rg);
         ASSERT0(src != this);
         if (isMemoryRef()) {
-            setRefMD(src->getRefMD(), ru);
-            setRefMDSet(src->getRefMDSet(), ru);
+            setRefMD(src->getRefMD(), rg);
+            setRefMDSet(src->getRefMDSet(), rg);
         }
 
         for (UINT i = 0; i < IR_MAX_KID_NUM(this); i++) {
@@ -426,7 +427,7 @@ public:
             ASSERT0(srckid);
             for (; kid != NULL; kid = IR_next(kid), srckid = IR_next(srckid)) {
                 ASSERT0(srckid);
-                kid->copyRefForTree(srckid, ru);
+                kid->copyRefForTree(srckid, rg);
             }
         }
     }
@@ -571,8 +572,8 @@ public:
     inline bool hasReturnValue() const;
 
     UINT id() const { return IR_id(this); }
-    void invertLand(Region * ru);
-    void invertLor(Region * ru);
+    void invertLand(Region * rg);
+    void invertLor(Region * rg);
     bool isNoMove() const { return IR_no_move(this); }
     //Return true if current IR may contain memory reference.
     bool isContainMemRef() const
@@ -848,7 +849,7 @@ public:
     inline bool isDirectArrayRef() const;
 
     //This function invert the operation accroding to it semantics.
-    inline void invertIRType(Region * ru)
+    inline void invertIRType(Region * rg)
     {
         switch (get_code()) {
         case IR_LT: IR_code(this) = IR_GE; break;
@@ -860,10 +861,10 @@ public:
         case IR_TRUEBR: IR_code(this) = IR_FALSEBR; break;
         case IR_FALSEBR: IR_code(this) = IR_TRUEBR; break;
         case IR_LOR:
-            invertLor(ru);
+            invertLor(rg);
             break;
         case IR_LAND:
-            invertLand(ru);
+            invertLand(rg);
             break;
         default: ASSERT(0, ("unsupport"));
         }
@@ -909,8 +910,8 @@ public:
         TY_ptr_base_size(&d) = pointer_base_size;
         IR_dt(this) = TC_type(tm->registerPointer(&d));
     }
-    void setRefMD(MD const* md, Region * ru);
-    void setRefMDSet(MDSet const* mds, Region * ru);
+    void setRefMD(MD const* md, Region * rg);
+    void setRefMDSet(MDSet const* mds, Region * rg);
 
     //Find and substitute 'newk' for 'oldk'.
     //Return true if replaced the 'oldk'.
@@ -949,10 +950,10 @@ public:
     //This function only handle Call/Icall stmt, it find PR and remove
     //them out of UseSet.
     //Note this function does not maintain DU chain between call and its use.
-    void removePROutFromUseset(DefMiscBitSetMgr & sbs_mgr, Region * ru);
+    void removePROutFromUseset(DefMiscBitSetMgr & sbs_mgr, Region * rg);
 
-    bool verify(Region const* ru) const;
-    bool verifyPhi(Region const* ru) const;
+    bool verify(Region const* rg) const;
+    bool verifyPhi(Region const* rg) const;
     bool verifyKids() const;
 };
 
@@ -1102,20 +1103,21 @@ public:
 };
 
 
-//This class represent an operation that store value to be one of the
-//element of a PR.
+//This class represent an operation that store value to be part of the section
+//of the PR.
 //
-//SETELEM_ofst descibe the byte offset to the address of result PR.
+//SETELEM_ofst descibe the byte offset to the start address of result PR.
 //
-//The the number of byte of result PR must be an integer multiple of
-//the number of byte of SETELEM_rhs if the result data type is vector.
+//The the number of bytes of result PR must be an integer multiple of
+//the number of bytes of SETELEM_rhs if the result data type is vector.
 //
-//usage: setelem $pr2(vec<4*i32>) $pr1(i32), 4.
-//    The result PR is pr2.
-//    The example store pr1 to be second element of pr2.
+//usage: setelem $2(vec<4*i32>) = $1(i32), 4.
+//    The result PR is $2.
+//    The code stores $1 to be second element of $2, namely, the section
+//    of $2 that offset is 4 bytes.
 //
-//This operation will store val to the memory which offset to the memory chunk
-//or vector's base address.
+//This operation will store value to the memory which offset to the
+//memory chunk or vector's base address.
 #define SETELEM_bb(ir)      (((CSetElem*)CK_IRT(ir, IR_SETELEM))->bb)
 #define SETELEM_prno(ir)    (((CSetElem*)CK_IRT(ir, IR_SETELEM))->prno)
 #define SETELEM_ssainfo(ir) (((CSetElem*)CK_IRT(ir, IR_SETELEM))->ssainfo)
@@ -1137,7 +1139,7 @@ public:
 //The the number of byte of GETELEM_base must be
 //an integer multiple of the number of byte of result PR if base memory is vector.
 //
-//usage: getelem $pr1(i32) $pr2(vec<4*i32>), 4.
+//usage: getelem $1(i32) $2(vec<4*i32>), 4.
 //    The base memory location is a PR, which is a vector.
 //    The example get the second element of pr2, then store it to pr1.
 #define GETELEM_bb(ir)      (((CGetElem*)CK_IRT(ir, IR_GETELEM))->bb)
@@ -1349,9 +1351,9 @@ public:
 
 //High level control loop operation.
 //usage:
-//    while (det)
+//    while (det) {
 //      body
-//    endwhile
+//    }
 //NOTE:
 //    * The member layout should be same as do_while.
 //    * 'opnd' must be the last member of CWhileDo.
@@ -1370,9 +1372,9 @@ public:
 
 //High level control loop operation.
 //usage:
-//    do
+//    do {
 //      body
-//    while (det)
+//    } while (det)
 class CDoWhile : public CWhileDo {
 public:
 };
@@ -1382,28 +1384,40 @@ public:
 //This structure represent a kind of loop with
 //plainly definition of INIT(low bound), DET(HIGH bound),
 //LOOP-BODY and STEP(Increment or Dcrement) of induction variable.
-//usage:
+//e.g1:
 //    do
-//      init: i = 0
+//      ivr: id i
+//      init: 0
 //      det: i <= 10
-//      body
-//      step: i = i+1
+//      step: i+1
+//      body {stmt_list}
 //    enddo
-//This class uses LOOP_det, LOOP_body to access its determinate
-//expression, and loop body.
-//
+//e.g2:
+//    do
+//      ivr: $1
+//      init: 0
+//      det: $1 <= 10
+//      step: $1+1
+//      body {stmt_list}
+//    enddo
+//This class uses LOOP_det access its determinate expression,
+//and LOOP_body access loop body.
 //NOTE: 'opnd_pad' must be the first member of CDoLoop.
 
-//Record the stmt that init iv.
-#define LOOP_init(ir)          (*(((CDoLoop*)ir)->opnd + CKID_TY(ir, IR_DO_LOOP, 2)))
+//Record the induction variable.
+//There is only one basic induction variable for do-loop.
+#define LOOP_iv(ir)         (*(((CDoLoop*)ir)->opnd + CKID_TY(ir, IR_DO_LOOP, 2)))
 
-//Record the stmt that update iv.
-#define LOOP_step(ir)        (*(((CDoLoop*)ir)->opnd + CKID_TY(ir, IR_DO_LOOP, 3)))
-#define DOLOOP_kid(ir, idx)  (((CDoLoop*)ir)->opnd[CKID_TY(ir, IR_DO_LOOP, idx)])
+//Record the expression that initialize induction variable.
+#define LOOP_init(ir)       (*(((CDoLoop*)ir)->opnd + CKID_TY(ir, IR_DO_LOOP, 3)))
+
+//Record the expression that update induction variable.
+#define LOOP_step(ir)       (*(((CDoLoop*)ir)->opnd + CKID_TY(ir, IR_DO_LOOP, 4)))
+#define DOLOOP_kid(ir, idx) (((CDoLoop*)ir)->opnd[CKID_TY(ir, IR_DO_LOOP, idx)])
 class CDoLoop : public CWhileDo {
 public:
     //NOTE: 'opnd_pad' must be the first member of CDoLoop.
-    IR * opnd_pad[2];
+    IR * opnd_pad[3];
 };
 
 
@@ -1756,10 +1770,10 @@ public:
 //NOTE: If region is in BB, it must be single entry, single exit, since
 //it might be reduced from reducible graph.
 #define REGION_bb(ir)        (((CRegion*)CK_IRT(ir, IR_REGION))->bb)
-#define REGION_ru(ir)        (((CRegion*)CK_IRT(ir, IR_REGION))->ru)
+#define REGION_ru(ir)        (((CRegion*)CK_IRT(ir, IR_REGION))->rg)
 class CRegion : public IR, public StmtProp {
 public:
-    Region * ru;
+    Region * rg;
 
     //True if region is readonly.
     //This property is very useful if region is a blackbox.
@@ -2134,7 +2148,10 @@ void IR::setSSAInfo(SSAInfo * ssa)
     case IR_SETELEM: SETELEM_ssainfo(this) = ssa; return;
     case IR_GETELEM: GETELEM_ssainfo(this) = ssa; return;
     case IR_CALL:
-    case IR_ICALL: CALL_ssainfo(this) = ssa; return;
+    case IR_ICALL:
+        ASSERT(CALL_prno(this) != 0, ("does not have return value"));
+        CALL_ssainfo(this) = ssa;
+        return;
     case IR_PHI: PHI_ssainfo(this) = ssa; return;
     default: ASSERT(0, ("unsupport"));
     }
@@ -2255,7 +2272,8 @@ bool IR::isReadModWrite() const
 {
     if (IR_is_read_mod_write(this)) {
         //Code pattern: $x = call(oldvalue, newvalue)
-        //newvalue may be [ld|pr|const].
+		//oldvalue must be [ld].
+        //newvalue could be [ld|pr|const].
         ASSERT0(is_call() &&
                 CALL_param_list(this) != NULL &&
                 CALL_param_list(this)->is_ld() &&
@@ -2402,7 +2420,7 @@ DU * IR::cleanDU()
 //Return stmt if it writes PR as result.
 IR * IR::getResultPR()
 {
-    ASSERT0(is_stmt());
+	ASSERT0(is_stmt());
     switch (get_code()) {
     case IR_ST: return NULL;
     case IR_STPR:
@@ -2480,8 +2498,22 @@ void dump_irs(IR * ir_list,
               bool dump_inner_region = true);
 void dump_irs(IRList & ir_list, TypeMgr const* tm);
 void dump_irs(List<IR*> & ir_list, TypeMgr const* tm);
-bool verify_irs(IR * ir, IRAddressHash * irh, Region const* ru);
-bool verifyIRandBB(BBList * ir_bb_list, Region const* ru);
+
+class DumpGRCtx {
+public:
+    //Dump string literal and ignore the \n.
+    bool dump_string_in_one_line;
+    bool dump_inner_region;
+    IR_CFG * cfg;
+
+    DumpGRCtx() { memset(this, 0, sizeof(DumpGRCtx)); }
+};
+void dumpGR(IR const* ir, TypeMgr * tm, DumpGRCtx * ctx);
+void dumpGRInBBList(xcom::List<IRBB*> * bblist, TypeMgr * tm, DumpGRCtx * ctx);
+void dumpGRList(IR * irlist, TypeMgr * tm, DumpGRCtx * ctx);
+
+bool verify_irs(IR * ir, IRAddressHash * irh, Region const* rg);
+bool verifyIRandBB(BBList * ir_bb_list, Region const* rg);
 bool verify_simp(IR * ir, SimpCtx & simp);
 
 //Iterative access ir tree. This funtion initialize the iterator.
@@ -2690,10 +2722,10 @@ inline IR * iterRhsNext(IN OUT IRIter & ii)
 inline bool is_commutative(IR_TYPE irt)
 { return IRDES_is_commutative(g_ir_desc[irt]); }
 
-inline bool is_bin_irt(IR_TYPE irt)
+inline bool isBinaryOp(IR_TYPE irt)
 { return IRDES_is_bin(g_ir_desc[irt]); }
 
-inline bool is_una_irt(IR_TYPE irt)
+inline bool isUnaryOp(IR_TYPE irt)
 { return IRDES_is_una(g_ir_desc[irt]); }
 
 inline IR_TYPE invertIRType(IR_TYPE src)

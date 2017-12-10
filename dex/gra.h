@@ -552,7 +552,7 @@ protected:
     }
     bool verify();
 public:
-    GltMgr(Region * ru, PRDF * prdf, RA * ra);
+    GltMgr(Region * rg, PRDF * prdf, RA * ra);
     COPY_CONSTRUCTOR(GltMgr);
     ~GltMgr()
     {
@@ -573,7 +573,7 @@ public:
 
     //Get LTMgr via BB's id.
     LTMgr * get_ltm(UINT bbid) { return m_bb2ltmgr.get(bbid); }
-    Region * get_ru() { return m_ru; }
+    Region * getRegion() { return m_ru; }
     BitSetMgr * getBitSetMgr() { return &m_bs_mgr; }
     Vector<GLT*> * get_pr2glt_map() { return &m_pr2glt; }
     UINT get_num_of_glt() const { return m_glt_count - 1; }
@@ -634,11 +634,11 @@ public:
     bool m_is_consider_local_interf;
 
 public:
-    GIG(Region * ru, GltMgr * glt_mgr)
+    GIG(Region * rg, GltMgr * glt_mgr)
     {
-        ASSERT0(ru && glt_mgr);
+        ASSERT0(rg && glt_mgr);
         m_gltm = glt_mgr;
-        m_ru = ru;
+        m_ru = rg;
         m_cfg = m_ru->getCFG();
         m_is_consider_local_interf = false;
         set_direction(false);
@@ -684,7 +684,7 @@ public:
     {
         ASSERT0(gltm);
         m_gltm = gltm;
-        m_ru = gltm->get_ru();
+        m_ru = gltm->getRegion();
         m_tm = m_ru->getTypeMgr();
         m_bsm = gltm->getBitSetMgr();
         m_4 = NULL;
@@ -897,20 +897,20 @@ protected:
     void reviseParam();
     bool overlapParam(LT const* l) const;
 public:
-    RA(Region * ru,
+    RA(Region * rg,
        TypeIndexRep * tr,
        UINT param_num,
        UINT vregnum,
        Vreg2PR * v2pr,
        Prno2Vreg * pr2v,
        VAR2PR * var2pr) :
-        m_prdf(ru), m_gltm(ru, &m_prdf, self()), m_ig(ru, &m_gltm),
+        m_prdf(rg), m_gltm(rg, &m_prdf, self()), m_ig(rg, &m_gltm),
         m_rsc(&m_gltm)
     {
-        ASSERT0(ru && tr);
-        m_ru = ru;
-        m_cfg = ru->getCFG();
-        m_tm = ru->getTypeMgr();
+        ASSERT0(rg && tr);
+        m_ru = rg;
+        m_cfg = rg->getCFG();
+        m_tm = rg->getTypeMgr();
         m_tr = tr;
         m_param_num = param_num;
         m_vregnum = vregnum;

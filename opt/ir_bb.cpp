@@ -103,7 +103,7 @@ bool IRBB::is_down_boundary(IR * ir)
 }
 
 
-void IRBB::dump(Region * ru, bool dump_inner_region)
+void IRBB::dump(Region * rg, bool dump_inner_region)
 {
     if (g_tfile == NULL) { return; }
 
@@ -134,7 +134,7 @@ void IRBB::dump(Region * ru, bool dump_inner_region)
     //IR list
     note("\nSTMT NUM:%d", getNumOfIR());
     g_indent += 3;
-    TypeMgr * dm = ru->getTypeMgr();
+    TypeMgr * dm = rg->getTypeMgr();
     for (IR * ir = BB_first_ir(this);
          ir != NULL; ir = BB_irlist(this).get_next()) {
         ASSERT0(ir->is_single() && ir->getBB() == this);
@@ -170,6 +170,8 @@ void IRBB::verify()
         case IR_FALSEBR:
         case IR_RETURN:
         case IR_SWITCH:
+        case IR_SETELEM:
+        case IR_GETELEM:
             break;
         default: ASSERT(0, ("BB does not supported this kind of IR."));
         }
@@ -206,7 +208,7 @@ bool IRBB::successorHasPhi(CFG<IRBB, IR> * cfg)
 
 //Duplicate and add an operand that indicated by opnd_pos at phi stmt
 //in one of bb's successors.
-void IRBB::dupSuccessorPhiOpnd(CFG<IRBB, IR> * cfg, Region * ru, UINT opnd_pos)
+void IRBB::dupSuccessorPhiOpnd(CFG<IRBB, IR> * cfg, Region * rg, UINT opnd_pos)
 {
     IR_CFG * ircfg = (IR_CFG*)cfg;
     Vertex * vex = ircfg->get_vertex(BB_id(this));
@@ -231,9 +233,9 @@ void IRBB::dupSuccessorPhiOpnd(CFG<IRBB, IR> * cfg, Region * ru, UINT opnd_pos)
                 lpos--;
             }
 
-            IR * newopnd = ru->dupIRTree(opnd);
+            IR * newopnd = rg->dupIRTree(opnd);
             if (opnd->isReadPR()) {
-                newopnd->copyRef(opnd, ru);
+                newopnd->copyRef(opnd, rg);
                 ASSERT0(PR_ssainfo(opnd));
                 PR_ssainfo(newopnd) = PR_ssainfo(opnd);
                 SSA_uses(PR_ssainfo(newopnd)).append(newopnd);
@@ -252,7 +254,7 @@ void IRBB::removeSuccessorDesignatePhiOpnd(CFG<IRBB, IR> * cfg, IRBB * succ)
 {
     ASSERT0(cfg && succ);
     IR_CFG * ircfg = (IR_CFG*)cfg;
-    Region * ru = ircfg->get_ru();
+    Region * rg = ircfg->getRegion();
     UINT const pos = ircfg->WhichPred(this, succ);
     for (IR * ir = BB_first_ir(succ); ir != NULL; ir = BB_next_ir(succ)) {
         if (!ir->is_phi()) { break; }
@@ -273,7 +275,7 @@ void IRBB::removeSuccessorDesignatePhiOpnd(CFG<IRBB, IR> * cfg, IRBB * succ)
 
         opnd->removeSSAUse();
         ((CPhi*)ir)->removeOpnd(opnd);
-        ru->freeIRTree(opnd);
+        rg->freeIRTree(opnd);
     }
 }
 
@@ -314,7 +316,8 @@ void dumpBBLabel(List<LabelInfo const*> & lablist, FILE * h)
 
         if (LABEL_INFO_is_try_start(li) ||
             LABEL_INFO_is_try_end(li) ||
-            LABEL_INFO_is_catch_start(li)) {
+            LABEL_INFO_is_catch_start(li) ||
+            LABEL_INFO_is_terminate(li)) {
             fprintf(g_tfile, "(");
             if (LABEL_INFO_is_try_start(li)) {
                 fprintf(g_tfile, "try_start,");
@@ -323,7 +326,10 @@ void dumpBBLabel(List<LabelInfo const*> & lablist, FILE * h)
                 fprintf(g_tfile, "try_end,");
             }
             if (LABEL_INFO_is_catch_start(li)) {
-                fprintf(g_tfile, "catch_start");
+                fprintf(g_tfile, "catch_start,");
+            }
+            if (LABEL_INFO_is_terminate(li)) {
+                fprintf(g_tfile, "terminate");
             }
             fprintf(g_tfile, ")");
         }
@@ -333,11 +339,11 @@ void dumpBBLabel(List<LabelInfo const*> & lablist, FILE * h)
 
 
 void dumpBBList(BBList * bbl,
-                Region * ru,
+                Region * rg,
                 CHAR const* name,
                 bool dump_inner_region)
 {
-    ASSERT0(ru && bbl);
+    ASSERT0(rg && bbl);
     FILE * h = NULL;
     FILE * org_g_tfile = g_tfile;
     if (name == NULL) {
@@ -351,13 +357,13 @@ void dumpBBList(BBList * bbl,
 
     if (h != NULL && bbl->get_elem_count() != 0) {
         if (h == g_tfile) {
-            note("\n==---- DUMP '%s' BBList ----==", ru->getRegionName());
+            note("\n==---- DUMP '%s' BBList ----==", rg->getRegionName());
         } else {
-            fprintf(h, "\n==---- DUMP '%s' BBList ----==", ru->getRegionName());
+            fprintf(h, "\n==---- DUMP '%s' BBList ----==", rg->getRegionName());
         }
 
         for (IRBB * bb = bbl->get_head(); bb != NULL; bb = bbl->get_next()) {
-            bb->dump(ru, dump_inner_region);
+            bb->dump(rg, dump_inner_region);
         }
     }
 

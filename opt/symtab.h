@@ -160,7 +160,7 @@ public:
     //If the string table is not big enough to hold strings, expand it.
     inline SYM * add(CHAR const* s)
     {
-        UINT sz = Hash<SYM*, SymbolHashFunc>::get_bucket_size() * 2;
+        UINT sz = Hash<SYM*, SymbolHashFunc>::get_bucket_size() * 4;
         if (sz < Hash<SYM*, SymbolHashFunc>::get_elem_count()) {
             Hash<SYM*, SymbolHashFunc>::grow(sz);
         }

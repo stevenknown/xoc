@@ -56,7 +56,7 @@ DexCallGraph::DexCallGraph(UINT edge_hash, UINT vex_hash, RegionMgr * rumgr) :
         CallGraph(edge_hash, vex_hash, rumgr)
 {
     ASSERT0(rumgr);
-    SymTab * symtab = rumgr->get_sym_tab();
+    SymTab * symtab = rumgr->getSymTab();
     for (UINT i = 0; i < g_unimportant_func_num; i++) {
         SYM const* sym = symtab->add(g_unimportant_func[i]);
         m_unimportant_symtab.append(sym);

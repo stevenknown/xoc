@@ -102,7 +102,6 @@ public:
             UINT show_compile_time:1; //Show compilation time.
         } s1;
     } u2;
-
 public:
     OptCtx()
     {

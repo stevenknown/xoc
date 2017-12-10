@@ -464,7 +464,7 @@ protected:
     Region * m_ru;
     DefMiscBitSetMgr * m_misc_bs_mgr;
 public:
-    MDSetMgr(Region * ru, DefMiscBitSetMgr * mbsm);
+    MDSetMgr(Region * rg, DefMiscBitSetMgr * mbsm);
     COPY_CONSTRUCTOR(MDSetMgr);
     ~MDSetMgr() { destroy(); }
 
@@ -699,7 +699,7 @@ public:
     //Clean each MD->MDSet, but do not free MDSet.
     void clean() { TMap<UINT, MDSet const*>::clean(); }
 
-    void dump(Region * ru);
+    void dump(Region * rg);
 };
 } //namespace xoc
 #endif

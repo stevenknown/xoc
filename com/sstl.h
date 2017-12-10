@@ -189,6 +189,57 @@ inline void remove(T ** pheader, T * t)
 }
 
 
+//Swap t1 t2 in list.
+template <class T>
+inline void swap(T ** pheader, T * t1, T * t2)
+{
+    ASSERT0(pheader);
+    T * t1p = t1->prev;
+    T * t1n = t1->next;
+    T * t2p = t2->prev;
+    T * t2n = t2->next;
+
+    if (t2 == t1n) {
+        t2->next = t1;
+    } else {
+        t2->next = t1n;
+    }
+    if (t2 == t1p) {
+        t2->prev = t1;
+    } else {
+        t2->prev = t1p;
+    }
+    if (t1 == t2n) {
+        t1->next = t2;
+    } else {
+        t1->next = t2n;
+    }
+    if (t1 == t2p) {
+        t1->prev = t2;
+    } else {
+        t1->prev = t2p;
+    }
+
+    if (t1p != NULL  && t1p != t2) {
+        t1p->next = t2;
+    }
+    if (t1n != NULL && t1n != t2) {
+        t1n->prev = t2;
+    }
+    if (t2p != NULL && t2p != t1) {
+        t2p->next = t1;
+    }
+    if (t2n != NULL && t2n != t1) {
+        t2n->prev = t1;
+    }
+    if (*pheader == t1) {
+        *pheader = t2;
+    } else if (*pheader == t2) {
+        *pheader = t1;
+    }
+}
+
+
 template <class T>
 inline void replace(T ** pheader, T * olds, T * news)
 {
@@ -2964,8 +3015,8 @@ public:
 //      of dynamic object and the virtual function pointers.
 #define HC_val(c)            (c)->val
 #define HC_vec_idx(c)        (c)->vec_idx
-#define HC_next(c)            (c)->next
-#define HC_prev(c)            (c)->prev
+#define HC_next(c)           (c)->next
+#define HC_prev(c)           (c)->prev
 template <class T> struct HC {
     HC<T> * prev;
     HC<T> * next;
@@ -2974,7 +3025,7 @@ template <class T> struct HC {
 };
 
 #define HB_member(hm)        (hm).hash_member
-#define HB_count(hm)        (hm).hash_member_count
+#define HB_count(hm)         (hm).hash_member_count
 class HashBucket {
 public:
     void * hash_member; //hash member list

@@ -50,8 +50,8 @@ IRDesc const g_ir_desc[] = {
     {IR_STPR,     "stpr",         0x1, 1, sizeof(CStpr),     IRT_IS_STMT|IRT_IS_MEM_REF|IRT_HAS_RESULT|IRT_IS_STMT_IN_BB,                      },
     {IR_STARRAY,  "starray",      0x7, 3, sizeof(CStArray),  IRT_IS_STMT|IRT_IS_MEM_REF|IRT_HAS_RESULT|IRT_IS_STMT_IN_BB|IRT_IS_NON_PR_MEMREF, },
     {IR_IST,      "ist",          0x3, 2, sizeof(CIst),      IRT_IS_STMT|IRT_IS_MEM_REF|IRT_HAS_RESULT|IRT_IS_STMT_IN_BB|IRT_IS_NON_PR_MEMREF, },
-    {IR_SETELEM,  "setepr",       0x3, 2, sizeof(CSetElem),  IRT_IS_STMT|IRT_IS_MEM_REF|IRT_HAS_RESULT|IRT_IS_STMT_IN_BB,                      },
-    {IR_GETELEM,  "getepr",       0x3, 2, sizeof(CGetElem),  IRT_IS_STMT|IRT_IS_MEM_REF|IRT_HAS_RESULT|IRT_IS_STMT_IN_BB,                      },
+    {IR_SETELEM,  "setelem",      0x3, 2, sizeof(CSetElem),  IRT_IS_STMT|IRT_IS_MEM_REF|IRT_HAS_RESULT|IRT_IS_STMT_IN_BB,                      },
+    {IR_GETELEM,  "getelem",      0x3, 2, sizeof(CGetElem),  IRT_IS_STMT|IRT_IS_MEM_REF|IRT_HAS_RESULT|IRT_IS_STMT_IN_BB,                      },
     {IR_CALL,     "call",         0x3, 2, sizeof(CCall),     IRT_IS_STMT|IRT_IS_MEM_REF|IRT_HAS_RESULT|IRT_IS_STMT_IN_BB,                      },
     {IR_ICALL,    "icall",        0x7, 3, sizeof(CICall),    IRT_IS_STMT|IRT_IS_MEM_REF|IRT_HAS_RESULT|IRT_IS_STMT_IN_BB,                      },
     {IR_LDA,      "lda",          0x0, 0, sizeof(CLda),      IRT_IS_UNA|IRT_IS_LEAF,                                                           },
@@ -81,9 +81,9 @@ IRDesc const g_ir_desc[] = {
     {IR_CVT,      "cvt",          0x1, 1, sizeof(CCvt),      IRT_IS_UNA,                                                                       },
     {IR_GOTO,     "goto",         0x0, 0, sizeof(CGoto),     IRT_IS_STMT|IRT_IS_STMT_IN_BB,                                                    },
     {IR_IGOTO,    "igoto",        0x3, 2, sizeof(CIGoto),    IRT_IS_STMT|IRT_IS_STMT_IN_BB,                                                    },
-    {IR_DO_WHILE, "do_while",     0x3, 2, sizeof(CDoWhile),  IRT_IS_STMT,                                                                      },
-    {IR_WHILE_DO, "while_do",     0x3, 2, sizeof(CWhileDo),  IRT_IS_STMT,                                                                      },
-    {IR_DO_LOOP,  "do_loop",      0xF, 4, sizeof(CDoLoop),   IRT_IS_STMT,                                                                      },
+    {IR_DO_WHILE, "dowhile",      0x3, 2, sizeof(CDoWhile),  IRT_IS_STMT,                                                                      },
+    {IR_WHILE_DO, "whiledo",      0x3, 2, sizeof(CWhileDo),  IRT_IS_STMT,                                                                      },
+    {IR_DO_LOOP,  "doloop",       0x1F,5, sizeof(CDoLoop),   IRT_IS_STMT,                                                                      },
     {IR_IF,       "if",           0x7, 3, sizeof(CIf),       IRT_IS_STMT,                                                                      },
     {IR_LABEL,    "label",        0x0, 0, sizeof(CLab),      IRT_IS_STMT,                                                                      },
     {IR_SWITCH,   "switch",       0x7, 3, sizeof(CSwitch),   IRT_IS_STMT|IRT_IS_STMT_IN_BB,                                                    },
@@ -301,14 +301,14 @@ void dump_irs(IR * ir_list,
 }
 
 
-static void verifyIR(IR * ir, IRAddressHash * irh, Region const* ru)
+static void verifyIR(IR * ir, IRAddressHash * irh, Region const* rg)
 {
     ASSERT0(irh != NULL);
     for (UINT i = 0; i < IR_MAX_KID_NUM(ir); i++) {
         IR * k = ir->getKid(i);
         if (k != NULL) {
             ASSERT(k->getParent() == ir, ("ir must be k's parent"));
-            verify_irs(k, irh, ru);
+            verify_irs(k, irh, rg);
         }
     }
 
@@ -316,14 +316,14 @@ static void verifyIR(IR * ir, IRAddressHash * irh, Region const* ru)
     //memory crash during freeIR().
     ASSERT(!irh->find(ir), ("IR has been used again"));
     irh->append(ir);
-    ir->verify(ru);
+    ir->verify(rg);
 }
 
 
 //Check for IR and IRBB sanity and uniqueness.
 //Ensure that all IRs must be embedded into a basic block.
 //Ensure that PHI must be the first stmt in basic block.
-bool verifyIRandBB(BBList * bblst, Region const* ru)
+bool verifyIRandBB(BBList * bblst, Region const* rg)
 {
     IRAddressHash irh;
     for (IRBB * bb = bblst->get_head();
@@ -345,7 +345,7 @@ bool verifyIRandBB(BBList * bblst, Region const* ru)
                 ASSERT0(!ir->is_phi());
             }
 
-            verify_irs(ir, &irh, ru);
+            verify_irs(ir, &irh, rg);
             ASSERT0(ir->isStmtInBB());
         }
         bb->verify();
@@ -368,7 +368,7 @@ bool verify_simp(IR * ir_list, SimpCtx & simp)
 
 
 //Check for IR sanity and uniqueness.
-bool verify_irs(IR * ir, IRAddressHash * irh, Region const* ru)
+bool verify_irs(IR * ir, IRAddressHash * irh, Region const* rg)
 {
     IRAddressHash * loc = NULL;
     if (irh == NULL) {
@@ -376,7 +376,7 @@ bool verify_irs(IR * ir, IRAddressHash * irh, Region const* ru)
         irh = loc;
     }
     while (ir != NULL) {
-        verifyIR(ir, irh, ru);
+        verifyIR(ir, irh, rg);
         ir = ir->get_next();
     }
     if (loc != NULL) {
@@ -406,13 +406,24 @@ void dump_irs(IRList & ir_list, TypeMgr const* tm)
 }
 
 
-static void ir_dump_lab(IR const* ir)
+static void dump_lab_decl(LabelInfo const* li)
 {
-    LabelInfo const* li = ir->getLabel();
     if (LABEL_INFO_type(li) == L_ILABEL) {
-        fprintf(g_tfile, "ilabel(" ILABEL_STR_FORMAT ")", ILABEL_CONT(li));
+        prt("label " ILABEL_STR_FORMAT "", ILABEL_CONT(li));
     } else if (LABEL_INFO_type(li) == L_CLABEL) {
-        fprintf(g_tfile, "clabel(" CLABEL_STR_FORMAT ")", CLABEL_CONT(li));
+        prt("label " CLABEL_STR_FORMAT "", CLABEL_CONT(li));
+    } else {
+        ASSERT(0, ("unknown label type"));
+    }
+}
+
+
+static void dump_label_ref(LabelInfo const* li)
+{
+    if (LABEL_INFO_type(li) == L_ILABEL) {
+        prt(ILABEL_STR_FORMAT "", ILABEL_CONT(li));
+    } else if (LABEL_INFO_type(li) == L_CLABEL) {
+        prt(CLABEL_STR_FORMAT "", CLABEL_CONT(li));
     } else {
         ASSERT(0, ("unknown label type"));
     }
@@ -550,13 +561,39 @@ void dump_ir(IR const* ir,
         }
         break;
     case IR_STPR:
-        note("\nstpr $pr%d:%s", STPR_no(ir), xdm->dump_type(d, buf));
+        note("\nstpr $%d:%s", STPR_no(ir), xdm->dump_type(d, buf));
         PADDR(ir);
         fprintf(g_tfile, "%s", attr);
 
         if (dump_kid) {
             g_indent += dn;
             dump_irs(STPR_rhs(ir), tm, NULL, dump_kid,
+                     dump_src_line, dump_addr, dump_inner_region);
+            g_indent -= dn;
+        }
+        break;
+    case IR_SETELEM:
+        note("\nsetelem $%d:%s", SETELEM_prno(ir), xdm->dump_type(d, buf));
+        PADDR(ir);
+        fprintf(g_tfile, "%s", attr);
+        if (dump_kid) {
+            g_indent += dn;
+            dump_irs(SETELEM_rhs(ir), tm, NULL, dump_kid,
+                     dump_src_line, dump_addr, dump_inner_region);
+            dump_irs(SETELEM_ofst(ir), tm, (CHAR*)" offset", dump_kid,
+                     dump_src_line, dump_addr, dump_inner_region);
+            g_indent -= dn;
+        }
+        break;
+    case IR_GETELEM:
+        note("\ngetelem $%d:%s", GETELEM_prno(ir), xdm->dump_type(d, buf));
+        PADDR(ir);
+        fprintf(g_tfile, "%s", attr);
+        if (dump_kid) {
+            g_indent += dn;
+            dump_irs(GETELEM_base(ir), tm, (CHAR*)" base", dump_kid,
+                     dump_src_line, dump_addr, dump_inner_region);
+            dump_irs(GETELEM_ofst(ir), tm, (CHAR*)" offset", dump_kid,
                      dump_src_line, dump_addr, dump_inner_region);
             g_indent -= dn;
         }
@@ -678,7 +715,7 @@ void dump_ir(IR const* ir,
         }
         break;
     case IR_PR:
-        note("\n$pr%d:%s", PR_no(ir), xdm->dump_type(d, buf));
+        note("\n$%d:%s", PR_no(ir), xdm->dump_type(d, buf));
         PADDR(ir);
         fprintf(g_tfile, "%s", attr);
         break;
@@ -871,8 +908,13 @@ void dump_ir(IR const* ir,
         PADDR(ir);
         fprintf(g_tfile, "%s", attr);
         if (dump_kid) {
-            note("\ninit:");
+            note("\niv:");
+            g_indent += dn;
+            dump_irs(LOOP_iv(ir), tm, NULL, dump_kid,
+                     dump_src_line, dump_addr, dump_inner_region);
+            g_indent -= dn;
 
+            note("\ninit:");
             g_indent += dn;
             dump_irs(LOOP_init(ir), tm, NULL, dump_kid,
                      dump_src_line, dump_addr, dump_inner_region);
@@ -922,7 +964,7 @@ void dump_ir(IR const* ir,
         break;
     case IR_GOTO:
         note("\ngoto ");
-        ir_dump_lab(ir);
+        dump_lab_decl(ir->getLabel());
         PADDR(ir);
         fprintf(g_tfile, "%s", attr);
         break;
@@ -947,14 +989,14 @@ void dump_ir(IR const* ir,
         {
             LabelInfo const* li = LAB_lab(ir);
             if (LABEL_INFO_type(li) == L_ILABEL) {
-                note("\nilabel(" ILABEL_STR_FORMAT ")",
+                note("\nlabel " ILABEL_STR_FORMAT "",
                      ILABEL_CONT(LAB_lab(ir)));
             } else if (LABEL_INFO_type(li) == L_CLABEL) {
-                note("\nclabel(" CLABEL_STR_FORMAT ")",
+                note("\nlabel " CLABEL_STR_FORMAT "",
                      CLABEL_CONT(LAB_lab(ir)));
             } else if (LABEL_INFO_type(li) == L_PRAGMA) {
                 ASSERT0(LABEL_INFO_pragma(LAB_lab(ir)));
-                note("\npragma(%s)", SYM_name(LABEL_INFO_pragma(LAB_lab(ir))));
+                note("\npragma %s", SYM_name(LABEL_INFO_pragma(LAB_lab(ir))));
             } else { UNREACH(); }
 
             PADDR(ir);
@@ -973,6 +1015,10 @@ void dump_ir(IR const* ir,
 
             if (LABEL_INFO_is_catch_start(li)) {
                 fprintf(g_tfile, "catch_start ");
+            }
+
+            if (LABEL_INFO_is_terminate(li)) {
+                fprintf(g_tfile, "terminate ");
             }
 
             if (LABEL_INFO_is_used(li)) {
@@ -1057,7 +1103,7 @@ void dump_ir(IR const* ir,
         }
         break;
     case IR_PHI:
-        note("\n$pr%d:%s = phi", PHI_prno(ir), xdm->dump_type(d, buf));
+        note("\n$%d:%s = phi", PHI_prno(ir), xdm->dump_type(d, buf));
 
         PADDR(ir);
         fprintf(g_tfile, "%s", attr);
@@ -1100,7 +1146,7 @@ void dump_ir(IR const* ir,
         note("\nswitch");
         if (SWITCH_deflab(ir) != NULL) {
             fprintf(g_tfile, ", deflab: ");
-            ir_dump_lab(ir);
+            dump_lab_decl(ir->getLabel());
         }
         PADDR(ir);
         fprintf(g_tfile, "%s", attr);
@@ -1136,7 +1182,7 @@ void dump_ir(IR const* ir,
         dump_irs(CASE_vexp(ir), tm, NULL, dump_kid,
                  dump_src_line, dump_addr, dump_inner_region);
         note("\n");
-        ir_dump_lab(ir);
+        dump_lab_decl(ir->getLabel());
         g_indent -= dn;
         break;
     case IR_ARRAY:
@@ -1195,7 +1241,7 @@ void dump_ir(IR const* ir,
     case IR_ICALL:
         {
             if (ir->hasReturnValue()) {
-                note("\n$pr%d:%s = ", CALL_prno(ir), xdm->dump_type(d, buf));
+                note("\n$%d:%s = ", CALL_prno(ir), xdm->dump_type(d, buf));
             } else {
                 note("\n");
             }
@@ -1203,16 +1249,12 @@ void dump_ir(IR const* ir,
             if (ir->is_call()) {
                 CHAR tt[44];
                 tt[0] = 0;
-
                 CHAR const* string = SYM_name(CALL_idinfo(ir)->get_name());
-
                 CHAR * name = xstrcat(tt, 40, "%s", string);
                 if (strlen(string) > 40) {
                     strcat(tt, "...");
                 }
-
                 fprintf(g_tfile, "call '%s' ", name);
-
                 buf.clean();
                 if (CALL_idinfo(ir)->dumpVARDecl(buf) != NULL) {
                     fprintf(g_tfile, "decl:%s", buf.buf);
@@ -1262,7 +1304,7 @@ void dump_ir(IR const* ir,
         }
     case IR_TRUEBR:
         note("\ntruebr ");
-        ir_dump_lab(ir);
+        dump_lab_decl(ir->getLabel());
         PADDR(ir);
         fprintf(g_tfile, "%s", attr);
         if (dump_kid) {
@@ -1274,7 +1316,7 @@ void dump_ir(IR const* ir,
         break;
     case IR_FALSEBR:
         note("\nfalsebr ");
-        ir_dump_lab(ir);
+        dump_lab_decl(ir->getLabel());
         PADDR(ir);
         fprintf(g_tfile, "%s", attr);
         if (dump_kid) {
@@ -1410,8 +1452,8 @@ UINT getArithPrecedence(IR_TYPE ty)
 
 bool CRegion::is_readonly() const
 {
-    ASSERT0(ru);
-    return ru->is_readonly();
+    ASSERT0(rg);
+    return rg->is_readonly();
 }
 
 
@@ -1419,11 +1461,11 @@ bool CRegion::is_readonly() const
 //START IR
 //
 //Check that IR cannot take a UNDEF type.
-bool IR::verify(Region const* ru) const
+bool IR::verify(Region const* rg) const
 {
     verifyKids();
 
-    TypeMgr const* tm = ru->getTypeMgr();
+    TypeMgr const* tm = rg->getTypeMgr();
     ASSERT0(tm);
     DUMMYUSE(tm);
 
@@ -1457,7 +1499,7 @@ bool IR::verify(Region const* ru) const
         }
     }
 
-    switch (IR_code(this)) {
+    switch (get_code()) {
     case IR_UNDEF: ASSERT(0, ("should not be undef")); break;
     case IR_CONST:
         ASSERT0(d);
@@ -1500,29 +1542,6 @@ bool IR::verify(Region const* ru) const
         ASSERT0(STPR_rhs(this)->is_exp());
         ASSERT0(STPR_rhs(this)->is_single());
         break;
-    case IR_STARRAY:
-        //Stmt properties check.
-        ASSERT0(d);
-        ASSERT(get_dtype() != D_UNDEF, ("size of store value cannot be zero"));
-        ASSERT0(get_dtype() != D_UNDEF);
-        ASSERT0(STARR_rhs(this));
-        ASSERT0(STARR_rhs(this)->is_exp());
-        ASSERT0(STARR_rhs(this)->is_single());
-
-        //Array properties check.
-        ASSERT0(ARR_base(this)->is_ptr());
-        ASSERT0(ARR_elemtype(this) != 0);
-        ASSERT0(ARR_elemtype(this));
-
-        if (ARR_ofst(this) != 0) {
-            ASSERT0(tm->get_bytesize(d) + ARR_ofst(this) <=
-                    tm->get_bytesize(ARR_elemtype(this)));
-        }
-
-        ASSERT0(ARR_base(this)->is_single());
-
-        ASSERT(ARR_sub_list(this), ("subscript expression can not be null"));
-        break;
     case IR_ILD:
         ASSERT0(d);
         ASSERT0(get_dtype() != D_UNDEF);
@@ -1548,22 +1567,20 @@ bool IR::verify(Region const* ru) const
 
         ASSERT0(SETELEM_rhs(this) && SETELEM_ofst(this));
 
-        ASSERT0(d->is_mc() || d->is_vector());
-
         if (d->is_vector()) {
             ASSERT0(TY_vec_ety(d) != D_UNDEF);
 
             //Note if the rhssize less than elemsize, it will be hoist to
             //elemsize.
             ASSERT0(tm->get_dtype_bytesize(TY_vec_ety(d)) >=
-                    tm->get_bytesize(ST_rhs(this)->get_type()));
+                    tm->get_bytesize(SETELEM_rhs(this)->get_type()));
         }
 
         ASSERT0(SETELEM_rhs(this)->is_exp());
         ASSERT0(SETELEM_ofst(this)->is_exp());
         ASSERT0(TY_dtype(d) != D_UNDEF);
         ASSERT0(SETELEM_ofst(this)->is_single());
-        ASSERT0(IST_rhs(this)->is_single());
+        ASSERT0(SETELEM_rhs(this)->is_single());
         break;
     case IR_GETELEM:
         {
@@ -1573,7 +1590,6 @@ bool IR::verify(Region const* ru) const
             IR const* base = GETELEM_base(this);
             ASSERT0(base && GETELEM_ofst(this));
             Type const* basedtd = base->get_type();
-            ASSERT0(basedtd->is_mc() || basedtd->is_vector());
 
             if (basedtd->is_vector()) {
                 ASSERT0(TY_vec_ety(basedtd) != D_UNDEF);
@@ -1736,21 +1752,27 @@ bool IR::verify(Region const* ru) const
         ASSERT(CASE_vexp(this)->is_const(),
                ("case value-expression must be const"));
         break;
+    case IR_STARRAY:
     case IR_ARRAY:
         ASSERT0(d);
         ASSERT0(TY_dtype(d) != D_UNDEF);
-        ASSERT0(ARR_base(this)->is_ptr());
+        ASSERT0(ARR_base(this)->is_ptr() || ARR_base(this)->is_void());
         ASSERT0(ARR_elemtype(this) != 0);
         ASSERT0(ARR_elemtype(this));
-
-        if (ARR_ofst(this) != 0) {
-            ASSERT0(tm->get_bytesize(d) + ARR_ofst(this) <=
-                    tm->get_bytesize(ARR_elemtype(this)));
+        if (ARR_ofst(this) != 0 && !ARR_elemtype(this)->is_void()) {
+            UINT elem_data_size = tm->get_bytesize(ARR_elemtype(this));
+            UINT result_data_size = tm->get_bytesize(d);
+            ASSERT(result_data_size + ARR_ofst(this) <= elem_data_size,
+                ("result data size should be less than element data size"));
         }
-
         ASSERT0(ARR_base(this)->is_single());
-        ASSERT0(ARR_sub_list(this));
+        ASSERT(ARR_sub_list(this), ("subscript expression can not be null"));
         ASSERT0(allBeExp(ARR_sub_list(this)));
+        if (get_code() == IR_STARRAY) {
+            ASSERT0(STARR_rhs(this));
+            ASSERT0(STARR_rhs(this)->is_exp());
+            ASSERT0(STARR_rhs(this)->is_single());
+        }
         break;
     case IR_CVT:
         ASSERT0(d);
@@ -1800,7 +1822,7 @@ bool IR::verify(Region const* ru) const
 
         //PHI must have at least one opnd.
         ASSERT0(PHI_opnd_list(this) != NULL);
-        ASSERT0(verifyPhi(ru));
+        ASSERT0(verifyPhi(rg));
         break;
     case IR_REGION: break;
     default: UNREACH();
@@ -1812,11 +1834,11 @@ bool IR::verify(Region const* ru) const
 //This function verify def/use information of PHI stmt.
 //If vpinfo is available, the function also check VP_prno of phi operands.
 //is_vpinfo_avail: set true if VP information is available.
-bool IR::verifyPhi(Region const* ru) const
+bool IR::verifyPhi(Region const* rg) const
 {
     ASSERT0(is_phi());
     List<IRBB*> preds;
-    IR_CFG * cfg = ru->getCFG();
+    IR_CFG * cfg = rg->getCFG();
     IRBB * bb = getBB();
     ASSERT0(bb);
     cfg->get_preds(preds, bb);
@@ -1838,7 +1860,7 @@ bool IR::verifyPhi(Region const* ru) const
     SSAUseIter vit = NULL;
     for (INT i = SSA_uses(ssainfo).get_first(&vit);
          vit != NULL; i = SSA_uses(ssainfo).get_next(i, &vit)) {
-        IR const* use = const_cast<Region*>(ru)->getIR(i);
+        IR const* use = const_cast<Region*>(rg)->getIR(i);
 
         if (!use->is_pr()) { continue; }
 
@@ -2558,14 +2580,14 @@ IR * IR::getResultPR(UINT prno)
 
 
 //Copy MD that ir referenced accroding to 'mds'.
-void IR::setRefMD(MD const* md, Region * ru)
+void IR::setRefMD(MD const* md, Region * rg)
 {
     DU * du = getDU();
     if (du == NULL) {
         if (md == NULL) { return; }
 
-        ASSERT0(ru);
-        du = ru->allocDU();
+        ASSERT0(rg);
+        du = rg->allocDU();
         setDU(du);
     }
     DU_md(du) = md;
@@ -2573,26 +2595,26 @@ void IR::setRefMD(MD const* md, Region * ru)
 
 
 //Copy the set of MD that ir referenced accroding to 'mds'.
-void IR::setRefMDSet(MDSet const* mds, Region * ru)
+void IR::setRefMDSet(MDSet const* mds, Region * rg)
 {
     DU * du = getDU();
     if (du == NULL) {
         if (mds == NULL) { return; }
 
-        ASSERT0(ru);
-        du = ru->allocDU();
+        ASSERT0(rg);
+        du = rg->allocDU();
         setDU(du);
     }
     DU_mds(du) = mds;
 }
 
 
-void IR::invertLand(Region * ru)
+void IR::invertLand(Region * rg)
 {
-    ASSERT0(ru);
+    ASSERT0(rg);
     //a&&b => !a || !b
-    IR * newop0 = ru->buildLogicalNot(BIN_opnd0(this));
-    IR * newop1 = ru->buildLogicalNot(BIN_opnd1(this));
+    IR * newop0 = rg->buildLogicalNot(BIN_opnd0(this));
+    IR * newop1 = rg->buildLogicalNot(BIN_opnd1(this));
     IR_code(this) = IR_LOR;
 
     BIN_opnd0(this) = newop0;
@@ -2602,12 +2624,12 @@ void IR::invertLand(Region * ru)
 }
 
 
-void IR::invertLor(Region * ru)
+void IR::invertLor(Region * rg)
 {
-    ASSERT0(ru);
+    ASSERT0(rg);
     //a||b => !a && !b
-    IR * newop0 = ru->buildLogicalNot(BIN_opnd0(this));
-    IR * newop1 = ru->buildLogicalNot(BIN_opnd1(this));
+    IR * newop0 = rg->buildLogicalNot(BIN_opnd0(this));
+    IR * newop1 = rg->buildLogicalNot(BIN_opnd1(this));
     IR_code(this) = IR_LAND;
 
     BIN_opnd0(this) = newop0;
@@ -2620,9 +2642,9 @@ void IR::invertLor(Region * ru)
 //This function only handle Call/Icall stmt, it find PR and remove
 //them out of UseSet.
 //Note this function does not maintain DU chain between call and its use.
-void IR::removePROutFromUseset(DefMiscBitSetMgr & sbs_mgr, Region * ru)
+void IR::removePROutFromUseset(DefMiscBitSetMgr & sbs_mgr, Region * rg)
 {
-    ASSERT0(isCallStmt() && ru);
+    ASSERT0(isCallStmt() && rg);
     DUSet * useset = getDUSet();
     if (useset == NULL) { return; }
 
@@ -2630,7 +2652,7 @@ void IR::removePROutFromUseset(DefMiscBitSetMgr & sbs_mgr, Region * ru)
     INT lnext = -1;
     for (INT i = useset->get_first(&di); i >= 0; i = lnext) {
         lnext = useset->get_next(i, &di);
-        IR const* exp = ru->getIR(i);
+        IR const* exp = rg->getIR(i);
         ASSERT0(exp->is_exp());
         if (!exp->isReadPR()) { continue; }
         useset->remove(i, sbs_mgr);
@@ -2683,14 +2705,744 @@ void IR::removeSSAUse()
 
 //Copy memory reference only for current ir node.
 //'src': copy MD reference from 'src', it may be different to current ir.
-void IR::copyRef(IR const* src, Region * ru)
+void IR::copyRef(IR const* src, Region * rg)
 {
-    ASSERT0(src && ru && this != src);
+    ASSERT0(src && rg && this != src);
     ASSERT(isMemoryRef(), ("not memory reference"));
     ASSERT0(!src->is_undef());
-    setRefMD(src->getRefMD(), ru);
+    setRefMD(src->getRefMD(), rg);
     if (isReadPR() || isWritePR()) {;}
-    else { setRefMDSet(src->getRefMDSet(), ru); }
+    else { setRefMDSet(src->getRefMDSet(), rg); }
+}
+
+
+static bool hasProp(IR const* ir)
+{
+    return ir->isMayThrow() ||
+        ir->is_terminate() ||
+        ir->is_atomic() ||
+        ir->isReadModWrite() ||
+        ir->hasSideEffect() ||
+        ir->isNoMove();
+}
+
+
+static void dumpOffset(IR const* ir)
+{
+    if (hasProp(ir) ||
+        ir->getOffset() != 0 ||
+        ((ir->is_array() || ir->is_starray()) &&
+         ARR_elem_num_buf(ir) != NULL)) {
+        prt(":%d", ir->getOffset());
+    }
+}
+
+
+static void dumpProp(IR const* ir, TypeMgr * tm, DumpGRCtx * ctx)
+{
+    bool first = true;
+    if (ir->isMayThrow()) {
+        if (!first) { prt(","); }
+        else { prt(":("); }
+        prt("throw");
+        first = false;
+    }
+    if (ir->is_terminate()) {
+        if (!first) { prt(","); }
+        else { prt(":("); }
+        prt("terminate");
+        first = false;
+    }
+    if (ir->is_atomic()) {
+        if (!first) { prt(","); }
+        else { prt(":("); }
+        prt("atom");
+        first = false;
+    }
+    if (ir->isReadModWrite()) {
+        if (!first) { prt(","); }
+        else { prt(":("); }
+        prt("rmw");
+        first = false;
+    }
+    if (ir->hasSideEffect()) {
+        if (!first) { prt(","); }
+        else { prt(":("); }
+        prt("sideeffect");
+        first = false;
+    }
+    if (ir->isNoMove()) {
+        if (!first) { prt(","); }
+        else { prt(":("); }
+        prt("nomove");
+        first = false;
+    }
+    if (ir->isCallStmt() && CALL_dummyuse(ir) != NULL) {
+        if (!first) { prt(","); }
+        else { prt(":("); }
+        prt("use(");
+        g_indent += DUMP_INDENT_NUM;
+        for (IR * p = CALL_dummyuse(ir); p != NULL; p = p->get_next()) {
+            if (p != CALL_dummyuse(ir)) {
+                prt(",");
+            }
+            dumpGR(p, tm, ctx);
+        }
+        prt(")");
+        first = false;
+        g_indent -= DUMP_INDENT_NUM;
+    }
+    if (!first) { prt(")"); }
+}
+
+
+void dumpGR(IR const* ir, TypeMgr * tm, DumpGRCtx * ctx)
+{
+    UINT dn = DUMP_INDENT_NUM;
+    if (g_tfile == NULL || ir == NULL) { return; }
+    ASSERT0(tm);
+
+    StrBuf buf(64);
+    StrBuf buf2(64);
+    Type const* d = ir->get_type();
+    switch (ir->get_code()) {
+    case IR_ST:
+        note("\n%s:%s", IRNAME(ir), tm->dump_type(d, buf));
+        dumpOffset(ir);
+        dumpProp(ir, tm, ctx);
+        prt(" %s = ", SYM_name(ST_idinfo(ir)->get_name()));
+        g_indent += dn;
+        dumpGR(ST_rhs(ir), tm, ctx);
+        g_indent -= dn;
+        prt(";");
+        break;
+    case IR_STPR:
+        note("\n%s", IRNAME(ir));
+        dumpProp(ir, tm, ctx);
+        prt(" $%d:%s = ", STPR_no(ir), tm->dump_type(d, buf));
+        g_indent += dn;
+        dumpGR(STPR_rhs(ir), tm, ctx);
+        g_indent -= dn;
+        prt(";");
+        break;
+    case IR_SETELEM:
+        note("\n%s", IRNAME(ir));
+        dumpProp(ir, tm, ctx);
+        prt(" $%d:%s = ", SETELEM_prno(ir), tm->dump_type(d, buf));
+        g_indent += dn;
+        dumpGR(SETELEM_rhs(ir), tm, ctx);
+        prt(",");
+        dumpGR(SETELEM_ofst(ir), tm, ctx);
+        g_indent -= dn;
+        prt(";");
+        break;
+    case IR_GETELEM:
+        note("\n%s", IRNAME(ir));
+        dumpProp(ir, tm, ctx);
+        prt(" $%d:%s = ", GETELEM_prno(ir), tm->dump_type(d, buf));
+        g_indent += dn;
+        dumpGR(GETELEM_base(ir), tm, ctx);
+        prt(",");
+        dumpGR(GETELEM_ofst(ir), tm, ctx);
+        g_indent -= dn;
+        prt(";");
+        break;
+    case IR_STARRAY:
+        note("\n%s:%s:%s",
+            IRNAME(ir),
+            tm->dump_type(d, buf),
+            tm->dump_type(ARR_elemtype(ir), buf2));
+        dumpOffset(ir);
+        if (hasProp(ir)) {
+            prt(":");
+            if (ARR_elem_num_buf(ir) != NULL) {
+                UINT dim = 0;
+                prt("[");
+                for (IR const* sub = ARR_sub_list(ir); sub != NULL;) {
+                    prt("%d", ((CStArray*)ir)->getElementNumOfDim(dim));
+                    sub = sub->get_next();
+                    if (sub != NULL) {
+                        prt(",");
+                    }
+                    dim++;
+                }
+                prt("]");
+            }
+        }
+        dumpProp(ir, tm, ctx);
+        prt(" = ");
+        g_indent += dn;
+        dumpGR(ARR_base(ir), tm, ctx);
+        prt(", ");
+        if (ARR_sub_list(ir) != NULL) {
+            //Dump elem number.
+            prt("(");
+            dumpGRList(ARR_sub_list(ir), tm, ctx);
+            prt(")");
+        }
+        prt(", ");
+        dumpGR(STARR_rhs(ir), tm, ctx);
+        g_indent -= dn;
+        prt(";");
+        break;
+    case IR_IST:
+        note("\n%s:%s", IRNAME(ir), tm->dump_type(d, buf));
+        dumpOffset(ir);
+        dumpProp(ir, tm, ctx);
+        prt(" = ");
+        g_indent += dn;
+        dumpGRList(IST_base(ir), tm, ctx);
+        prt(",");
+        dumpGRList(IST_rhs(ir), tm, ctx);
+        g_indent -= dn;
+        prt(";");
+        break;
+    case IR_LD:
+        note("\n%s:%s", IRNAME(ir), tm->dump_type(d, buf));
+        dumpOffset(ir);
+        dumpProp(ir, tm, ctx);
+        prt(" %s", SYM_name(LD_idinfo(ir)->get_name()));
+        break;
+    case IR_ILD:
+        note("\n%s:%s", IRNAME(ir), tm->dump_type(d, buf));
+        dumpOffset(ir);
+        dumpProp(ir, tm, ctx);
+        prt(" ");
+        g_indent += dn;
+        dumpGRList(ILD_base(ir), tm, ctx);
+        g_indent -= dn;
+        break;
+    case IR_PR:
+        note("\n$%d:%s", PR_no(ir), tm->dump_type(d, buf));
+        dumpProp(ir, tm, ctx);
+        break;
+    case IR_ID:
+        note("\n%s", IRNAME(ir));
+        dumpProp(ir, tm, ctx);
+        prt(" %s", SYM_name(ID_info(ir)->get_name()));
+        break;
+    case IR_CONST:
+        if (ir->is_sint()) {
+            #if WORD_LENGTH_OF_HOST_MACHINE==32
+            //CHAR const* intfmt = "%d:%s";
+            CHAR const* intfmt = "%x:%s";
+            #elif WORD_LENGTH_OF_HOST_MACHINE==64
+            //CHAR const* intfmt = "%lld:%s";
+            CHAR const* intfmt = "0x%llx:%s";
+            #else
+            #error "Need to support";
+            #endif
+            prt(intfmt, CONST_int_val(ir), tm->dump_type(d, buf));
+        } else if (ir->is_uint()) {
+            #if WORD_LENGTH_OF_HOST_MACHINE==32
+            CHAR const* intfmt = "%u:%s";
+            #elif WORD_LENGTH_OF_HOST_MACHINE==64
+            CHAR const* intfmt = "%llu:%s";
+            #else
+            #error "Need to support";
+            #endif
+            prt(intfmt, CONST_int_val(ir), tm->dump_type(d, buf));
+        } else if (ir->is_fp()) {
+            prt("%f:%s ", CONST_fp_val(ir), tm->dump_type(d, buf));
+        } else if (ir->is_bool()) {
+            prt("%d:%s", (UINT)CONST_int_val(ir), tm->dump_type(d, buf));
+        } else if (ir->is_str()) {
+            CHAR * tbuf = SYM_name(CONST_str_val(ir));
+            //Remove \n to show string in one line.
+            if (ctx != NULL && ctx->dump_string_in_one_line) {
+                UINT len = strlen(SYM_name(CONST_str_val(ir)));
+                tbuf = (CHAR*)malloc(len);
+                tbuf[0] = 0;
+                xstrcat(tbuf, len, "%s", SYM_name(CONST_str_val(ir)));
+                for (UINT i = 0; i < len && tbuf[i] != 0; i++) {
+                    if (tbuf[i] == '\n') { tbuf[i] = ' '; }
+                }
+            }
+            prt("\"%s\"", tbuf);
+        } else if (ir->is_mc()) {
+            //Imm may be MC type.
+            #if WORD_LENGTH_OF_HOST_MACHINE==32
+            CHAR const* intfmt = "%u:%s";
+            #elif WORD_LENGTH_OF_HOST_MACHINE==64
+            CHAR const* intfmt = "%llu:%s";
+            #else
+            #error "Need to support";
+            #endif
+            prt(intfmt, CONST_int_val(ir), tm->dump_type(d, buf));
+        } else {
+            //Dump as HOST_INT type even if it is unrecognized,
+            //leave the sanity check to verify().
+            //Note the dump format may extend or truncate the real value.
+            //Imm may be MC type.
+            #if WORD_LENGTH_OF_HOST_MACHINE==32
+            CHAR const* intfmt = "%u:%s";
+            #elif WORD_LENGTH_OF_HOST_MACHINE==64
+            CHAR const* intfmt = "%llu:%s";
+            #else
+            #error "Need to support";
+            #endif
+            prt(intfmt, CONST_int_val(ir), tm->dump_type(d, buf));
+        }
+        break;
+    case IR_LOR:  //logical or ||
+    case IR_LAND: //logical and &&
+    case IR_BOR:  //inclusive or |
+    case IR_BAND: //inclusive and &
+    case IR_XOR:  //exclusive or
+    case IR_EQ:   //==
+    case IR_NE:   //!=
+    case IR_LT:
+    case IR_GT:
+    case IR_GE:
+    case IR_LE:
+    case IR_ASR:
+    case IR_LSR:
+    case IR_LSL:
+    case IR_ADD:
+    case IR_SUB:
+    case IR_DIV:
+    case IR_MUL:
+    case IR_MOD:
+    case IR_REM:
+        note("\n%s:%s", IRNAME(ir), tm->dump_type(d, buf));
+        dumpProp(ir, tm, ctx);
+        prt(" ");
+        g_indent += dn;
+        dumpGRList(BIN_opnd0(ir), tm, ctx);
+        prt(", ");
+        dumpGRList(BIN_opnd1(ir), tm, ctx);
+        g_indent -= dn;
+        break;
+    case IR_IF:
+        note("\n%s", IRNAME(ir));
+        dumpProp(ir, tm, ctx);
+        prt(" (");
+
+        g_indent += dn;
+        dumpGRList(IF_det(ir), tm, ctx);
+        g_indent -= dn;
+        prt(")");
+
+        note("\n{");
+        g_indent += dn;
+        dumpGRList(IF_truebody(ir), tm, ctx);
+        g_indent -= dn;
+        note("\n}");
+
+        if (IF_falsebody(ir)) {
+            note("\nelse");
+            note("\n{");
+            g_indent += dn;
+            dumpGRList(IF_falsebody(ir), tm, ctx);
+            g_indent -= dn;
+            note("\n}");
+        }
+        prt(";");
+        break;
+    case IR_DO_WHILE:
+        note("\ndo");
+        dumpProp(ir, tm, ctx);
+        prt(" {");
+
+        g_indent += dn;
+        dumpGRList(LOOP_body(ir), tm, ctx);
+        g_indent -= dn;
+
+        note("\n} while (");
+        g_indent += dn;
+        dumpGRList(LOOP_det(ir), tm, ctx);
+        g_indent -= dn;
+        prt(");");
+        break;
+    case IR_WHILE_DO:
+        note("\nwhile");
+        dumpProp(ir, tm, ctx);
+        prt(" (");
+
+        g_indent += dn;
+        dumpGRList(LOOP_det(ir), tm, ctx);
+        g_indent -= dn;
+        prt(") {");
+
+        g_indent += dn;
+        dumpGRList(LOOP_body(ir), tm, ctx);
+        g_indent -= dn;
+        note("\n};");
+        break;
+    case IR_DO_LOOP:
+        note("\n%s", IRNAME(ir));
+        dumpProp(ir, tm, ctx);
+        prt(" (");
+
+        g_indent += dn;
+        note("\n//iv");
+        dumpGRList(LOOP_iv(ir), tm, ctx);
+        g_indent -= dn;
+        prt(",");
+
+        g_indent += dn;
+        note("\n//init");
+        dumpGRList(LOOP_init(ir), tm, ctx);
+        g_indent -= dn;
+        prt(",");
+
+        g_indent += dn;
+        note("\n//det");
+        dumpGRList(LOOP_det(ir), tm, ctx);
+        g_indent -= dn;
+        prt(",");
+
+        g_indent += dn;
+        note("\n//step");
+        dumpGRList(LOOP_step(ir), tm, ctx);
+        g_indent -= dn;
+        prt(")");
+
+        note("\n {");
+        g_indent += dn;
+        dumpGRList(LOOP_body(ir), tm, ctx);
+        g_indent -= dn;
+
+        note("\n};");
+        break;
+    case IR_BREAK:
+    case IR_CONTINUE:
+        note("\n%s;", IRNAME(ir));
+        break;
+    case IR_RETURN:
+        note("\n%s", IRNAME(ir));
+        prt(" ");
+        g_indent += dn;
+        dumpGR(RET_exp(ir), tm, ctx);
+        g_indent -= dn;
+        prt(";");
+        break;
+    case IR_GOTO:
+        note("\n%s", IRNAME(ir));
+        dumpProp(ir, tm, ctx);
+        prt(" ");
+        dump_label_ref(ir->getLabel());
+        prt(";");
+        break;
+    case IR_IGOTO:
+        note("\n%s", IRNAME(ir));
+        dumpProp(ir, tm, ctx);
+        prt(" (");
+
+        g_indent += dn;
+        dumpGRList(IGOTO_vexp(ir), tm, ctx);
+        prt(")");
+        g_indent -= dn;
+
+        g_indent += dn;
+        for (IR * c = IGOTO_case_list(ir); c != NULL; c = c->get_next()) {
+            dumpGR(c, tm, ctx);
+            prt(", ");
+        }
+        g_indent -= dn;
+        prt(";");
+        break;
+    case IR_LABEL:
+        {
+            LabelInfo const* li = LAB_lab(ir);
+            if (LABEL_INFO_type(li) == L_ILABEL) {
+                note("\nlabel " ILABEL_STR_FORMAT "",
+                     ILABEL_CONT(LAB_lab(ir)));
+            } else if (LABEL_INFO_type(li) == L_CLABEL) {
+                note("\nlabel " CLABEL_STR_FORMAT "",
+                     CLABEL_CONT(LAB_lab(ir)));
+            } else if (LABEL_INFO_type(li) == L_PRAGMA) {
+                ASSERT0(LABEL_INFO_pragma(LAB_lab(ir)));
+                note("\npragma %s", SYM_name(LABEL_INFO_pragma(LAB_lab(ir))));
+            } else { UNREACH(); }
+
+            if (LABEL_INFO_b1(li) != 0) {
+                prt("(");
+            }
+
+            if (LABEL_INFO_is_try_start(li)) {
+                prt("try_start ");
+            }
+
+            if (LABEL_INFO_is_try_end(li)) {
+                prt("try_end ");
+            }
+
+            if (LABEL_INFO_is_catch_start(li)) {
+                prt("catch_start ");
+            }
+
+            if (LABEL_INFO_is_terminate(li)) {
+                prt("terminate ");
+            }
+
+            if (LABEL_INFO_is_used(li)) {
+                prt("used ");
+            }
+
+            if (LABEL_INFO_b1(li) != 0) {
+                prt(")");
+            }
+        }
+        prt(";");
+        break;
+    case IR_SELECT: //formulized log_OR_exp?exp:cond_exp
+        note("\nselect:%s", tm->dump_type(d, buf));
+        dumpProp(ir, tm, ctx);
+
+        g_indent += dn;
+        dumpGRList(SELECT_pred(ir), tm, ctx);
+        prt(",");
+        g_indent -= dn;
+
+        g_indent += dn;
+        dumpGRList(SELECT_trueexp(ir), tm, ctx);
+        prt(",");
+        g_indent -= dn;
+
+        g_indent += dn;
+        dumpGRList(SELECT_falseexp(ir), tm, ctx);
+        g_indent -= dn;
+        break;
+    case IR_LDA:
+        note("\n%s", IRNAME(ir));
+        dumpOffset(ir);
+        dumpProp(ir, tm, ctx);
+        prt(" %s", SYM_name(LDA_idinfo(ir)->get_name()));
+        break;
+    case IR_NEG: //negative
+    case IR_BNOT: //bitwise not
+    case IR_LNOT: //logical not
+    case IR_CVT: //type convertion
+        note("\n%s:%s", IRNAME(ir), tm->dump_type(d, buf));
+        dumpProp(ir, tm, ctx);
+        prt(" ");
+        g_indent += dn;
+        dumpGRList(UNA_opnd(ir), tm, ctx);
+        g_indent -= dn;
+        break;
+    case IR_PHI:
+        note("\n%s $%d:%s = ", IRNAME(ir), PHI_prno(ir), tm->dump_type(d, buf));
+        g_indent += dn;
+        ASSERT0(ctx->cfg && ir->getBB());
+        {
+            xcom::List<IRBB*> preds;
+            ctx->cfg->get_preds(preds, ir->getBB());
+            C<IRBB*> * bbct = NULL;
+            ASSERT0(preds.get_elem_count() == xcom::cnt_list(PHI_opnd_list(ir)));
+            preds.get_head(&bbct);
+            for (IR * opnd = PHI_opnd_list(ir);
+                 opnd != NULL;
+                 opnd = opnd->get_next(), bbct = preds.get_next(bbct)) {
+                if (opnd != PHI_opnd_list(ir)) {
+                    prt(",");
+                }
+                C<LabelInfo const*> * lct;
+                LabelInfo const* lab = bbct->val()->
+                    getLabelListConst().get_head(&lct);
+                if (lab == NULL) {
+                    lab = ctx->cfg->getRegion()->genIlabel();
+                    bbct->val()->addLabel(lab);
+                }
+                prt("(");
+                dumpGR(opnd, tm, ctx);
+                prt(",");
+                dump_label_ref(lab);
+                prt(")");
+            }
+        }
+        g_indent -= dn;
+        prt(";");
+        break;
+    case IR_SWITCH:
+        note("\n%s", IRNAME(ir));
+        dumpProp(ir, tm, ctx);
+        prt(" (");
+        g_indent += dn;
+        dumpGRList(SWITCH_vexp(ir), tm, ctx);
+        prt(") ");
+        g_indent -= dn;
+        if (SWITCH_deflab(ir) != NULL) {
+            note("\ndefault ");
+            dump_label_ref(ir->getLabel());
+            prt(", ");
+        }
+
+        for (IR * c = SWITCH_case_list(ir); c != NULL; c = c->get_next()) {
+            dumpGR(c, tm, ctx);
+            prt(", ");
+        }
+
+        if (SWITCH_body(ir) != NULL) {
+            note("\n{ ");
+            g_indent += dn;
+            dumpGRList(SWITCH_body(ir), tm, ctx);
+            g_indent -= dn;
+            note("\n}");
+        }
+        prt(";");
+        break;
+    case IR_CASE:
+        ASSERT0(CASE_vexp(ir));
+        ASSERT0(CASE_lab(ir));
+        note("\ncase");
+        dumpProp(ir, tm, ctx);
+        prt(" ");
+        g_indent += dn;
+        dumpGRList(CASE_vexp(ir), tm, ctx);
+        prt(", ");
+        dump_label_ref(ir->getLabel());
+        g_indent -= dn;
+        break;
+    case IR_ARRAY:
+        note("\n%s:%s:%s",
+            IRNAME(ir),
+            tm->dump_type(d, buf),
+            tm->dump_type(ARR_elemtype(ir), buf2));
+        dumpOffset(ir);
+        if (hasProp(ir)) {
+            prt(":");
+            if (ARR_elem_num_buf(ir) != NULL) {
+                UINT dim = 0;
+                prt("[");
+                for (IR const* sub = ARR_sub_list(ir); sub != NULL;) {
+                    prt("%d", ((CArray*)ir)->getElementNumOfDim(dim));
+                    sub = sub->get_next();
+                    if (sub != NULL) {
+                        prt(",");
+                    }
+                    dim++;
+                }
+                prt("]");
+            }
+        }
+        dumpProp(ir, tm, ctx);
+
+        g_indent += dn;
+        dumpGR(ARR_base(ir), tm, ctx);
+        prt(", ");
+        g_indent -= dn;
+
+        if (ARR_sub_list(ir) != NULL) {
+            g_indent += dn;
+            prt("(");
+            for (IR * s = ARR_sub_list(ir); s != NULL; s = s->get_next()) {
+                if (s != ARR_sub_list(ir)) {
+                    prt(",");
+                }
+                dumpGR(s, tm, ctx);
+            }
+            prt(")");
+            g_indent -= dn;
+        }
+        break;
+    case IR_CALL:
+    case IR_ICALL:
+        note("\n%s", IRNAME(ir));
+        dumpProp(ir, tm, ctx);
+        prt(" ");
+        if (ir->hasReturnValue()) {
+            prt("$%d:%s = ", CALL_prno(ir), tm->dump_type(d, buf));
+        }
+        if (ir->is_icall()) {
+            g_indent += dn;
+            dumpGR(ICALL_callee(ir), tm, ctx);
+            prt(", ");
+            g_indent -= dn;
+        } else {
+            prt("%s", SYM_name(CALL_idinfo(ir)->get_name()));
+        }
+        prt("(");
+        g_indent += dn;
+        for (IR * p = CALL_param_list(ir); p != NULL; p = p->get_next()) {
+            if (p != CALL_param_list(ir)) {
+                prt(",");
+            }
+            dumpGR(p, tm, ctx);
+        }
+        g_indent -= dn;
+        prt(")");
+        prt(";");
+        break;
+    case IR_TRUEBR:
+    case IR_FALSEBR:
+        note("\n%s", IRNAME(ir));
+        dumpProp(ir, tm, ctx);
+        prt(" (");
+        g_indent += dn;
+        dumpGRList(BR_det(ir), tm, ctx);
+        g_indent -= dn;
+        prt("), ");
+        dump_label_ref(ir->getLabel());
+        prt(";");
+        break;
+    case IR_REGION:
+        ASSERT0(REGION_ru(ir));
+        if (ctx != NULL && ctx->dump_inner_region) {
+            //g_indent += dn;
+            REGION_ru(ir)->dumpGR(ctx->dump_inner_region);
+            //g_indent -= dn;
+        } else {
+            note("\nregion ");
+            switch (REGION_type(REGION_ru(ir))) {
+            case REGION_PROGRAM: prt("program "); break;
+            case REGION_BLACKBOX: prt("blx "); break;
+            case REGION_FUNC: prt("func "); break;
+            case REGION_INNER: prt("inner "); break;
+            default: ASSERT0(0); //TODO
+            }
+            if (REGION_ru(ir)->getRegionVar() != NULL) {
+                prt("%s ", SYM_name(REGION_ru(ir)->getRegionVar()->get_name()));
+            }
+        }
+        prt(";");
+        break;
+    case IR_UNDEF:
+        note("\nundef!");
+        break;
+    default:
+        ASSERT(0, ("unknown IR type:%s", IRNAME(ir)));
+        return ;
+    }
+
+    fflush(g_tfile);
+}
+
+
+void dumpGRList(IR * irlist, TypeMgr * tm, DumpGRCtx * ctx)
+{
+    for (IR * ir = irlist; ir != NULL; ir = ir->get_next()) {
+        dumpGR(ir, tm, ctx);
+    }
+}
+
+
+void dumpGRInBBList(xcom::List<IRBB*> * bblist, TypeMgr * tm, DumpGRCtx * ctx)
+{
+    ASSERT0(bblist);
+    C<IRBB*> * bbct = NULL;
+    for (bblist->get_head(&bbct);
+         bbct != bblist->end(); bbct = bblist->get_next(bbct)) {
+        IRBB * bb = bbct->val();
+        C<LabelInfo const*> * labct;
+        for (bb->getLabelListConst().get_head(&labct);
+            labct != bb->getLabelListConst().end();
+            labct = bb->getLabelListConst().get_next(labct)) {
+            LabelInfo const* li = labct->val();
+            ASSERT0(li);
+            note("\n");
+            dump_lab_decl(li);
+            prt(";");
+        }
+
+        C<IR*> * irct = NULL;
+        for (BB_irlist(bb).get_head(&irct);
+             irct != BB_irlist(bb).end(); irct = BB_irlist(bb).get_next(irct)) {
+            IR * ir = irct->val();
+            ASSERT0(ir);
+            dumpGR(ir, tm, ctx);
+        }
+    }
 }
 //END IR
 

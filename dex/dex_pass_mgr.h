@@ -36,7 +36,7 @@ author: Su Zhenyu
 
 class DexPassMgr : public PassMgr {
 public:
-    DexPassMgr(Region * ru) : PassMgr(ru) {}
+    DexPassMgr(Region * rg) : PassMgr(rg) {}
     virtual ~DexPassMgr() {}
 
     virtual Pass * allocCFG();

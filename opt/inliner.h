@@ -53,7 +53,7 @@ protected:
     Region * m_program;
     TMap<Region*, InlineInfo*> m_ru2inl;
 
-    void checkRegion(IN Region * ru,
+    void checkRegion(IN Region * rg,
                      OUT bool & need_el,
                      OUT bool & has_ret) const;
 
@@ -65,12 +65,12 @@ protected:
         return p;
     }
 
-    InlineInfo * mapRegion2InlineInfo(Region * ru, bool alloc)
+    InlineInfo * mapRegion2InlineInfo(Region * rg, bool alloc)
     {
-        InlineInfo * ii = m_ru2inl.get(ru);
+        InlineInfo * ii = m_ru2inl.get(rg);
         if (ii == NULL && alloc) {
             ii = (InlineInfo*)xmalloc(sizeof(InlineInfo));
-            m_ru2inl.set(ru, ii);
+            m_ru2inl.set(rg, ii);
         }
         return ii;
     }
@@ -93,12 +93,12 @@ public:
     }
     virtual ~Inliner() { smpoolDelete(m_pool); }
 
-    bool can_be_cand(Region * ru);
+    bool can_be_cand(Region * rg);
 
     bool do_inline_c(Region * caller, Region * callee);
     void do_inline(Region * cand);
 
-    inline bool is_call_site(IR * call, Region * ru);
+    inline bool is_call_site(IR * call, Region * rg);
 
     virtual PASS_TYPE getPassType() const { return PASS_INLINER; }
     virtual CHAR const* getPassName() const { return "Inliner"; }

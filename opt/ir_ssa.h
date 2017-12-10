@@ -45,16 +45,16 @@ protected:
     BitSetMgr m_bs_mgr;
     Vector<BitSet*> m_df_vec;
     UINT m_thres;
-    
+
     void buildRecur(Vertex const* v, DGraph const& g, DomTree const& domtree);
-    
+
     //Generate the DF control set
-    BitSet * genDFControlSet(UINT vid);    
+    BitSet * genDFControlSet(UINT vid);
 public:
     explicit DfMgr(UINT thres = THRESHOLD_HIGH_DOMINATOR_FRONTIER_DENSITY) :
         m_thres(thres) {}
     COPY_CONSTRUCTOR(DfMgr);
-    
+
     void clean();
     void build(DGraph const& g);
     void build(DGraph const& g, DomTree const& domtree);
@@ -79,7 +79,7 @@ class SSAGraph : Graph {
     PRSSAMgr * m_ssa_mgr;
     TMap<UINT, VP*> m_vdefs;
 public:
-    SSAGraph(Region * ru, PRSSAMgr * ssamgr);
+    SSAGraph(Region * rg, PRSSAMgr * ssamgr);
     COPY_CONSTRUCTOR(SSAGraph);
     void dump(CHAR const* name = NULL, bool detail = true);
 };
@@ -183,20 +183,20 @@ protected:
                   Vector<DefSBitSet*> & defed_prs_vec,
                   List<IRBB*> & wl);
 public:
-    explicit PRSSAMgr(Region * ru)
+    explicit PRSSAMgr(Region * rg)
     {
         clean();
-        ASSERT0(ru);
-        m_ru = ru;
+        ASSERT0(rg);
+        m_ru = rg;
 
-        m_tm = ru->getTypeMgr();
+        m_tm = rg->getTypeMgr();
         ASSERT0(m_tm);
 
-        ASSERT0(ru->getMiscBitSetMgr());
-        m_seg_mgr = ru->getMiscBitSetMgr()->getSegMgr();
+        ASSERT0(rg->getMiscBitSetMgr());
+        m_seg_mgr = rg->getMiscBitSetMgr()->getSegMgr();
         ASSERT0(m_seg_mgr);
 
-        m_cfg = ru->getCFG();
+        m_cfg = rg->getCFG();
         ASSERT(m_cfg, ("cfg is not available."));
     }
     COPY_CONSTRUCTOR(PRSSAMgr);
@@ -273,6 +273,9 @@ public:
     //unusable after SSA construction.
     void construction(OptCtx & oc);
     bool construction(DomTree & domtree);
+
+    //Compute SSAInfo for IRs in region that are in SSA mode.
+    void computeSSAInfo();
     size_t count_mem();
 
     Vector<VP*> const* getVPVec() const { return &m_vp_vec; }
@@ -349,7 +352,7 @@ public:
 };
 
 
-bool verifySSAInfo(Region * ru);
+bool verifySSAInfo(Region * rg);
 
 } //namespace xoc
 #endif

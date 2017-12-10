@@ -162,7 +162,7 @@ void IR_CP::replaceExp(
         MDSSAMgr * mdssamgr)
 {
     ASSERT0(exp && exp->is_exp() && cand_expr);
-    ASSERT0(exp->getExactRef() || 
+    ASSERT0(exp->getExactRef() ||
         exp->is_id() || //exp is operand of MD PHI
         exp->is_pr());  //exp is operand of PR PHI
 
@@ -170,8 +170,8 @@ void IR_CP::replaceExp(
         return;
     }
 
-    //The memory that 'exp' pointed to is same to 'cand_expr' because 
-    //cand_expr has been garanteed that will not change in propagation 
+    //The memory that 'exp' pointed to is same to 'cand_expr' because
+    //cand_expr has been garanteed that will not change in propagation
     //interval.
     //IR * parent = exp->getParent();
     //if (parent->is_ild()) {
@@ -266,7 +266,7 @@ bool IR_CP::is_available(
     ASSERT0(usebb);
     ASSERT0(use_stmt || use_phi);
 
-    if (def_stmt == use_stmt) { return false; }    
+    if (def_stmt == use_stmt) { return false; }
     if (isSimpCVT(prop_value)) {
         prop_value = getSimpCVTValue(prop_value);
         ASSERT0(prop_value);
@@ -354,7 +354,7 @@ bool IR_CP::isSimpCVT(IR const* ir) const
 //CVT with simply cvt-exp is copy-propagate candidate.
 IR const* IR_CP::getSimpCVTValue(IR const* ir) const
 {
-    if (!ir->is_cvt()) return false;
+    if (!ir->is_cvt()) { return NULL; }
 
     for (;;) {
         if (ir->is_cvt()) {
@@ -391,7 +391,7 @@ bool IR_CP::doPropToMDPhi(
         IN IR const* prop_value,
         IN IR * use,
         MDSSAMgr * mdssamgr)
-{    
+{
     CPCtx lchange;
     replaceExp(use, prop_value, lchange, prssadu, mdssadu, mdssamgr);
     return CPC_change(lchange);
@@ -413,7 +413,7 @@ bool IR_CP::doPropToNormalStmt(
 {
     bool change = false;
     CPCtx lchange;
-    
+
     IR * old_use_stmt = use_stmt;
 
     replaceExp(use, prop_value, lchange, prssadu, mdssadu, mdssamgr);
@@ -452,9 +452,9 @@ bool IR_CP::doPropToNormalStmt(
 
 
 void IR_CP::dumpCopyPropagationAction(
-        IR const* def_stmt, 
-        IR const* prop_value, 
-        IR const* use, 
+        IR const* def_stmt,
+        IR const* prop_value,
+        IR const* use,
         MDSSAMgr * mdssamgr)
 {
     if (g_tfile == NULL) { return; }
@@ -480,18 +480,18 @@ void IR_CP::dumpCopyPropagationAction(
 
 
 //bool IR_CP::isAllVMDReachAllUse(
-//        IR * ir, 
-//        MDSSAInfo * mdssainfo, 
+//        IR * ir,
+//        MDSSAInfo * mdssainfo,
 //        IN DefSBitSetCore & useset)
 //{
 //    ASSERT0(ir && ir->isMemoryRef() && mdssainfo);
 //    SEGIter * segiter;
-//    for (INT i = useset.get_first(&segiter); 
+//    for (INT i = useset.get_first(&segiter);
 //         i != -1; i = useset.get_next(i, &segiter)) {
 //        IR * use = m_ru->getIR(i);
 //        ASSERT0(use && use->is_exp());
 //        if (use->is_id() && !prop_value->is_const()) {
-//            //Do NOT propagate non-const value to operand of MD PHI.                
+//            //Do NOT propagate non-const value to operand of MD PHI.
 //            continue;
 //        }
 //    }
@@ -564,7 +564,7 @@ bool IR_CP::doProp(
             IR * use = m_ru->getIR(i);
             ASSERT0(use && use->is_exp());
             if (use->is_id() && !prop_value->is_const()) {
-                //Do NOT propagate non-const value to operand of MD PHI.                
+                //Do NOT propagate non-const value to operand of MD PHI.
                 continue;
             }
 

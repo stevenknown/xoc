@@ -86,10 +86,10 @@ void DfMgr::dump(DGraph & g)
 //This function compute dominance frontier to graph g.
 void DfMgr::buildRecur(Vertex const* v, DGraph const& g, DomTree const& domtree)
 {
-    UINT vid = VERTEX_id(v);    
+    UINT vid = VERTEX_id(v);
     Vertex * v_domtree = domtree.get_vertex(vid);
     ASSERT0(v_domtree);
-        
+
     //Access each succs.
     for (EdgeC const* ec = VERTEX_out_list(v_domtree);
          ec != NULL; ec = EC_next(ec)) {
@@ -102,7 +102,7 @@ void DfMgr::buildRecur(Vertex const* v, DGraph const& g, DomTree const& domtree)
     df->clean();
 
     //Compute DF(local)
-    for (EdgeC const* ec = VERTEX_out_list(v); 
+    for (EdgeC const* ec = VERTEX_out_list(v);
          ec != NULL; ec = EC_next(ec)) {
         Vertex const* succ = EDGE_to(EC_edge(ec));
         if (g.get_idom(VERTEX_id(succ)) != vid) {
@@ -111,10 +111,10 @@ void DfMgr::buildRecur(Vertex const* v, DGraph const& g, DomTree const& domtree)
     }
 
     //Compute DF(up)
-    for (EdgeC const* ec = VERTEX_out_list(v_domtree); 
+    for (EdgeC const* ec = VERTEX_out_list(v_domtree);
          ec != NULL; ec = EC_next(ec)) {
         Vertex const* succ_domtree = EDGE_to(EC_edge(ec));
-        BitSet * succ_df = genDFControlSet(VERTEX_id(succ_domtree));        
+        BitSet * succ_df = genDFControlSet(VERTEX_id(succ_domtree));
         for (INT p = succ_df->get_first(); p >= 0; p = succ_df->get_next(p)) {
             if (g.get_idom((UINT)p) != vid) {
                 df->bunion(p);
@@ -169,7 +169,7 @@ void DfMgr::build(DGraph const& g)
         ASSERT0(v_dom != NULL);
         UINT vid = VERTEX_id(v);
 
-        //Access each preds        
+        //Access each preds
         for (EdgeC const* ec = VERTEX_in_list(v);
              ec != NULL; ec = EC_next(ec)) {
             Vertex const* pred = EDGE_from(EC_edge(ec));
@@ -197,10 +197,10 @@ void DfMgr::build(DGraph const& g)
 //
 //START SSAGraph
 //
-SSAGraph::SSAGraph(Region * ru, PRSSAMgr * ssamgr)
+SSAGraph::SSAGraph(Region * rg, PRSSAMgr * ssamgr)
 {
-    ASSERT0(ru && ssamgr);
-    m_ru = ru;
+    ASSERT0(rg && ssamgr);
+    m_ru = rg;
     m_ssa_mgr = ssamgr;
     Vector<VP*> const* vp_vec = ssamgr->getVPVec();
     UINT inputcount = 1;
@@ -1322,7 +1322,7 @@ bool PRSSAMgr::verifyVP()
 }
 
 
-static void verify_ssainfo_core(IR * ir, BitSet & defset, Region * ru)
+static void verify_ssainfo_core(IR * ir, BitSet & defset, Region * rg)
 {
     ASSERT0(ir);
     SSAInfo * ssainfo = ir->getSSAInfo();
@@ -1352,7 +1352,7 @@ static void verify_ssainfo_core(IR * ir, BitSet & defset, Region * ru)
     UINT opndprno = 0;
     for (INT i = SSA_uses(ssainfo).get_first(&vit);
          vit != NULL; i = SSA_uses(ssainfo).get_next(i, &vit)) {
-        IR * use = ru->getIR(i);
+        IR * use = rg->getIR(i);
 
         ASSERT0(use->is_pr() || use->is_const() || use->is_lda());
 
@@ -1458,7 +1458,7 @@ void PRSSAMgr::cleanPRSSAInfo()
 }
 
 
-static void revise_phi_dt(IR * phi, Region * ru)
+static void revise_phi_dt(IR * phi, Region * rg)
 {
     ASSERT0(phi->is_phi());
     //The data type of phi is set to be same type as its USE.
@@ -1470,10 +1470,10 @@ static void revise_phi_dt(IR * phi, Region * ru)
     SSAUseIter si = NULL;
     INT i = SSA_uses(irssainfo).get_first(&si);
     ASSERT0(si && i >= 0);
-    ASSERT0(ru->getIR(i)->is_pr());
-    ASSERT0(PR_no(ru->getIR(i)) == PHI_prno(phi));
+    ASSERT0(rg->getIR(i)->is_pr());
+    ASSERT0(PR_no(rg->getIR(i)) == PHI_prno(phi));
 
-    IR_dt(phi) = ru->getIR(i)->get_type();
+    IR_dt(phi) = rg->getIR(i)->get_type();
 }
 
 
@@ -1792,6 +1792,42 @@ void PRSSAMgr::constructMDDUChainForPR()
 }
 
 
+//Compute SSAInfo for IRs in region that are in SSA mode.
+void PRSSAMgr::computeSSAInfo()
+{
+    reinit();
+    BBList * bblst = m_ru->getBBList();
+    ASSERT0(bblst);
+    if (bblst->get_elem_count() == 0) { return; }
+
+    IRIter ii;
+    C<IRBB*> * bbct = NULL;
+    for (bblst->get_head(&bbct); bbct != bblst->end(); bblst->get_next(&bbct)) {
+        IRBB * bb = bbct->val();
+        C<IR*> * irct = NULL;
+        for (BB_irlist(bb).get_head(&irct);
+             irct != BB_irlist(bb).end(); irct = BB_irlist(bb).get_next(irct)) {
+            IR * ir = irct->val();
+            ii.clean();
+            for (IR * x = iterInit(ir, ii); x != NULL; x = iterNext(ii)) {
+                if (x->isReadPR() || (x->is_stmt() && x->getResultPR() != NULL)) {
+                    SSAInfo * ssainfo = allocSSAInfo(x->get_prno());
+                    x->setSSAInfo(ssainfo);
+                    if (x->isReadPR()) {
+                        SSA_uses(ssainfo).append(x);
+                    } else {
+                        ASSERT(SSA_def(ssainfo) == NULL,
+                            ("multidefinition in for PR%d", x->get_prno()));
+                        SSA_def(ssainfo) = x;
+                    }
+                }
+            }
+        }
+    }
+    m_is_ssa_constructed = true;
+}
+
+
 void PRSSAMgr::construction(OptCtx & oc)
 {
     reinit();
@@ -1861,10 +1897,10 @@ bool PRSSAMgr::construction(DomTree & domtree)
 //END PRSSAMgr
 
 
-bool verifySSAInfo(Region * ru)
+bool verifySSAInfo(Region * rg)
 {
     PRSSAMgr * ssamgr =
-        (PRSSAMgr*)(ru->getPassMgr()->queryPass(PASS_PR_SSA_MGR));
+        (PRSSAMgr*)(rg->getPassMgr()->queryPass(PASS_PR_SSA_MGR));
     if (ssamgr != NULL && ssamgr->isSSAConstructed()) {
         ASSERT0(ssamgr->verifySSAInfo());
         ASSERT0(ssamgr->verifyPhi(false));

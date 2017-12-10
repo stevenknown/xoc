@@ -109,14 +109,14 @@ IRBB * findSingleBackedgeStartBB(LI<IRBB> const* li, IR_CFG * cfg)
 //force to insert a new bb.
 IRBB * findAndInsertPreheader(
         LI<IRBB> const* li,
-        Region * ru,
+        Region * rg,
         OUT bool & insert_bb,
         bool force)
 {
-    ASSERT0(li && ru);
+    ASSERT0(li && rg);
     insert_bb = false;
-    IR_CFG * cfg = ru->getCFG();
-    BBList * bblst = ru->getBBList();
+    IR_CFG * cfg = rg->getCFG();
+    BBList * bblst = rg->getBBList();
     IRBB * head = LI_loop_head(li);
 
     C<IRBB*> * bbholder = NULL;
@@ -148,7 +148,7 @@ IRBB * findAndInsertPreheader(
     List<IRBB*> preds;
     cfg->get_preds(preds, head);
     insert_bb = true;
-    IRBB * newbb = ru->allocBB();
+    IRBB * newbb = rg->allocBB();
     bblst->insert_before(newbb, bbholder);
     BitSet * loop_body = LI_bb_set(li);
     for (IRBB * p = preds.get_head(); p != NULL; p = preds.get_next()) {

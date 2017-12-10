@@ -800,7 +800,7 @@ LIR * IR2Dex::buildInvoke(IN IR ** ir)
         // CALL id:16 'LCAnimal;::<init>'
         //     intconst:U32 (0x2) param0 id:10
         //     intconst:U32 (0x0) param1 id:12
-        //     $pr1:I32 param2 id:14
+        //     $1:I32 param2 id:14
 
         //The first must be inoke-flag.
         IR * p = CALL_param_list(tir);

@@ -959,13 +959,13 @@ void RSC::perform(bool omit_constrain)
 //
 //START GltMgr Global Life Time Manager
 //
-GltMgr::GltMgr(Region * ru, PRDF * prdf, RA * ra)
+GltMgr::GltMgr(Region * rg, PRDF * prdf, RA * ra)
 {
     m_glt_count = 1;
-    m_ru = ru;
+    m_ru = rg;
     m_ra = ra;
     m_rsc = ra->get_rsc();
-    m_tm = ru->getTypeMgr();
+    m_tm = rg->getTypeMgr();
     m_prdf = prdf;
     m_is_consider_local_interf = false;
     m_pool = smpoolCreate(sizeof(GLT) * 10, MEM_COMM);

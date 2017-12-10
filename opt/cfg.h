@@ -574,7 +574,7 @@ bool CFG<BB, XR>::verifyIfBBRemoved(IN CDG * cdg, OptCtx & oc)
         IR const* last_xr = get_last_xr(bb);
         if (last_xr == NULL && !isRegionEntry(bb) && !bb->isExceptionHandler()) {
             if (next_bb == NULL || !is_cfg_valid) { continue; }
-            
+
             //CASE:
             //    BB1
             //    LOOP_HEADER(BB2)
@@ -620,9 +620,9 @@ bool CFG<BB, XR>::verifyIfBBRemoved(IN CDG * cdg, OptCtx & oc)
                     continue;
                 }
                 ASSERT0(last_xr->getLabel());
-                ASSERT(succ == findBBbyLabel(last_xr->getLabel()), 
+                ASSERT(succ == findBBbyLabel(last_xr->getLabel()),
                     ("miss target BB"));
-            }            
+            }
         }
     } //end for each BB
     return true;
@@ -1196,7 +1196,7 @@ void CFG<BB, XR>::build(OptCtx & oc)
             //ASSERT(bb->is_bb_exit(), ("Should be removed!"));
             //Add fall-through edge.
             //The last bb may not terminated by 'return' stmt.
-            if (next != NULL && !next->is_unreachable()) {
+            if (next != NULL && !next->is_terminate()) {
                 addEdge(bb->id(), next->id());
             } else {
                 addVertex(bb->id());
@@ -1210,13 +1210,13 @@ void CFG<BB, XR>::build(OptCtx & oc)
         } else if (last->is_call()) {
             //Add fall-through edge
             //The last bb may not be terminated by 'return' stmt.
-            if (next != NULL && !next->is_unreachable()) {
+            if (next != NULL && !next->is_terminate()) {
                 addEdge(bb->id(), next->id());
             }
         } else if (last->isConditionalBr()) {
             //Add fall-through edge
             //The last bb may not be terminated by 'return' stmt.
-            if (next != NULL && !next->is_unreachable()) {
+            if (next != NULL && !next->is_terminate()) {
                 addEdge(bb->id(), next->id());
             }
             //Add edge between source BB and target BB.
@@ -1226,7 +1226,7 @@ void CFG<BB, XR>::build(OptCtx & oc)
         } else if (last->isMultiConditionalBr()) {
             //Add fall-through edge
             //The last bb may not be terminated by 'return' stmt.
-            if (next != NULL && !next->is_unreachable()) {
+            if (next != NULL && !next->is_terminate()) {
                 addEdge(bb->id(), next->id());
             }
 
@@ -1259,7 +1259,7 @@ void CFG<BB, XR>::build(OptCtx & oc)
         } else if (!last->is_return()) {
             //Add fall-through edge.
             //The last bb may not end by 'return' stmt.
-            if (next != NULL && !next->is_unreachable()) {
+            if (next != NULL && !next->is_terminate()) {
                 addEdge(bb->id(), next->id());
             }
         }

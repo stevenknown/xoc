@@ -36,7 +36,7 @@ author: Su Zhenyu
 
 class DEX_CP : public IR_CP {
 public:
-    DEX_CP(Region * ru) : IR_CP(ru) {}
+    DEX_CP(Region * rg) : IR_CP(rg) {}
     virtual ~DEX_CP() {}
 
     //Check if ir is appropriate for propagation.

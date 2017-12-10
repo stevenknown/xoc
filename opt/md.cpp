@@ -363,13 +363,13 @@ void MDSetHash::dump()
 //Clean and give it back to md set manager.
 //Do not destroy mds.
 //Destroy MDSet manager.
-MDSetMgr::MDSetMgr(Region * ru, DefMiscBitSetMgr * mbsm)
+MDSetMgr::MDSetMgr(Region * rg, DefMiscBitSetMgr * mbsm)
 {
     m_mds_pool = smpoolCreate(sizeof(MDSet) * 8, MEM_CONST_SIZE);
     m_sc_mds_pool = smpoolCreate(sizeof(SC<MDSet*>) * 8, MEM_CONST_SIZE);
     m_md_set_list.set_pool(m_sc_mds_pool);
     m_free_md_set.set_pool(m_sc_mds_pool);
-    m_ru = ru;
+    m_ru = rg;
     ASSERT0(mbsm);
     m_misc_bs_mgr = mbsm;
 }
@@ -501,7 +501,7 @@ void MDSetMgr::dump()
 //
 //Dump all relations between MD, and MDSet.
 //'md2mds': mapping from 'md' to an md-set it pointed to.
-void MD2MDSet::dump(Region * ru)
+void MD2MDSet::dump(Region * rg)
 {
     StrBuf buf(64);
 
@@ -510,7 +510,7 @@ void MD2MDSet::dump(Region * ru)
     fprintf(g_tfile, "\n*** Dump MD POINT-TO list ***");
 
     //Dump all MDs.
-    MDSystem * ms = ru->getMDSystem();
+    MDSystem * ms = rg->getMDSystem();
     ms->getID2MDMap()->dump();
     MD2MDSetIter mxiter;
     MDSet const* pts = NULL;
@@ -520,7 +520,7 @@ void MD2MDSet::dump(Region * ru)
         ASSERT0(md);
 
         buf.clean();
-        fprintf(g_tfile, "\n\t%s", md->dump(buf, ru->getTypeMgr()));
+        fprintf(g_tfile, "\n\t%s", md->dump(buf, rg->getTypeMgr()));
 
         //Dumps MDSet related to 'md'.
 
@@ -533,13 +533,13 @@ void MD2MDSet::dump(Region * ru)
             ASSERT0(mmd);
             buf.clean();
             fprintf(g_tfile, "\t\t\t%s\n",
-                    mmd->dump(buf, ru->getTypeMgr()));
+                    mmd->dump(buf, rg->getTypeMgr()));
         }
     }
 
     //Dump set of MD that corresponding to an individual VAR.
     fprintf(g_tfile, "\n*** Dump the mapping from VAR to set of MD ***");
-    VarVec * var_tab = ru->getVarMgr()->get_var_vec();
+    VarVec * var_tab = rg->getVarMgr()->get_var_vec();
     Vector<MD const*> mdv;
     ConstMDIter iter;
     for (INT i = 0; i <= var_tab->get_last_idx(); i++) {
@@ -549,7 +549,7 @@ void MD2MDSet::dump(Region * ru)
         MDTab * mdtab = ms->getMDTab(v);
 
         buf.clean();
-        fprintf(g_tfile, "\n\t%s", v->dump(buf, ru->getTypeMgr()));
+        fprintf(g_tfile, "\n\t%s", v->dump(buf, rg->getTypeMgr()));
 
         if (mdtab == NULL || mdtab->get_elem_count() == 0) { continue; }
 
@@ -560,7 +560,7 @@ void MD2MDSet::dump(Region * ru)
         for (INT i2 = 0; i2 <= mdv.get_last_idx(); i2++) {
             MD const* md = mdv.get(i2);
             buf.clean();
-            fprintf(g_tfile, "\n\t\t%s", md->dump(buf, ru->getTypeMgr()));
+            fprintf(g_tfile, "\n\t\t%s", md->dump(buf, rg->getTypeMgr()));
         }
     }
 

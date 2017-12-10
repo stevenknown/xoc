@@ -104,15 +104,15 @@ protected:
         return p;
     }
 public:
-    explicit IR_LICM(Region * ru)
+    explicit IR_LICM(Region * rg)
     {
-        ASSERT0(ru != NULL);
-        m_ru = ru;
-        m_aa = ru->getAA();
-        m_du = ru->getDUMgr();
-        m_cfg = ru->getCFG();
-        m_tm = ru->getTypeMgr();
-        m_md_sys = ru->getMDSystem();
+        ASSERT0(rg != NULL);
+        m_ru = rg;
+        m_aa = rg->getAA();
+        m_du = rg->getDUMgr();
+        m_cfg = rg->getCFG();
+        m_tm = rg->getTypeMgr();
+        m_md_sys = rg->getMDSystem();
         ASSERT0(m_cfg && m_du && m_md_sys && m_tm);
         m_pool = smpoolCreate(4 * sizeof(UINT), MEM_CONST_SIZE);
         m_ssamgr = NULL;

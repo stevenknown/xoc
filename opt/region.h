@@ -87,7 +87,7 @@ public:
     BitSet m_has_been_freed_irs;
     #endif
 public:
-    explicit AnalysisInstrument(Region * ru);
+    explicit AnalysisInstrument(Region * rg);
     COPY_CONSTRUCTOR(AnalysisInstrument);
     ~AnalysisInstrument();
 
@@ -275,10 +275,14 @@ public:
     //Allocate AliasAnalysis.
     virtual IR_AA * allocAliasAnalysis();
 
+    IR * buildSetElem(Type const* type, IR * rhs, IR * offset);
+    IR * buildSetElem(UINT prno, Type const* type, IR * rhs, IR * offset);
+    IR * buildGetElem(UINT prno, Type const* type, IR * base, IR * offset);
+    IR * buildGetElem(Type const* type, IR * base, IR * offset);
     IR * buildContinue();
     IR * buildBreak();
     IR * buildCase(IR * casev_exp, LabelInfo const* case_br_lab);
-    IR * buildDoLoop(IR * det, IR * init, IR * step, IR * loop_body);
+    IR * buildDoLoop(IR * iv, IR * init, IR * det, IR * step, IR * loop_body);
     IR * buildDoWhile(IR * det, IR * loop_body);
     IR * buildWhileDo(IR * det, IR * loop_body);
     IR * buildIf(IR * det, IR * true_body, IR * false_body);
@@ -290,7 +294,7 @@ public:
     IR * buildPR(Type const* type);
     UINT buildPrno(Type const* type);
     IR * buildBranch(bool is_true_br, IR * det, LabelInfo const* lab);
-    IR * buildId(IN VAR * var_info);
+    IR * buildId(VAR * var_info);
     IR * buildIlabel();
     IR * buildLabel(LabelInfo const* li);
     IR * buildCvt(IR * exp, Type const* tgt_ty);
@@ -345,8 +349,9 @@ public:
                     TMWORD const* elem_num_buf);
     IR * buildReturn(IR * ret_exp);
     IR * buildSelect(IR * det, IR * true_exp, IR * false_exp, Type const* type);
+    IR * buildPhi(UINT prno, Type const* type, IR * opnd_list);
     IR * buildPhi(UINT prno, Type const* type, UINT num_opnd);
-    IR * buildRegion(Region * ru);
+    IR * buildRegion(Region * rg);
     IR * buildIcall(IR * callee,
                     IR * param_list,
                     UINT result_prno,
@@ -380,6 +385,9 @@ public:
     void dumpFreeTab();
     void dumpMemUsage();
     void dump(bool dump_inner_region);
+    void dumpParameter();
+    void dumpVarTab();
+    void dumpGR(bool dump_inner_region);
 
     bool evaluateConstInteger(IR const* ir, OUT ULONGLONG * const_value);
 
@@ -393,6 +401,7 @@ public:
     IR * foldConstIntBinary(IR * ir, bool & change);
     IR * foldConst(IR * ir, bool & change);
     void findFormalParam(OUT List<VAR const*> & varlst, bool in_decl_order);
+    VAR * findVarViaSymbol(SYM const* sym);
 
     UINT getIRTypeSize(IR * ir) const
     {
@@ -532,11 +541,11 @@ public:
 
     Region * getTopRegion()
     {
-        Region * ru = this;
-        while (ru->getParent() != NULL) {
-            ru = ru->getParent();
+        Region * rg = this;
+        while (rg->getParent() != NULL) {
+            rg = rg->getParent();
         }
-        return ru;
+        return rg;
     }
 
     //Allocate a internal LabelInfo that is not declared by compiler user.
@@ -759,12 +768,12 @@ public:
         return strcmp(getRegionName(), n) == 0;
     }
 
-    bool is_undef() const { return REGION_type(this) == RU_UNDEF; }
-    bool is_function() const { return REGION_type(this) == RU_FUNC; }
-    bool is_blackbox() const { return REGION_type(this) == RU_BLX; }
-    bool is_program() const { return REGION_type(this) == RU_PROGRAM; }
-    bool is_subregion() const { return REGION_type(this) == RU_SUB; }
-    bool is_eh() const { return REGION_type(this) == RU_EH; }
+    bool is_undef() const { return REGION_type(this) == REGION_UNDEF; }
+    bool is_function() const { return REGION_type(this) == REGION_FUNC; }
+    bool is_blackbox() const { return REGION_type(this) == REGION_BLACKBOX; }
+    bool is_program() const { return REGION_type(this) == REGION_PROGRAM; }
+    bool is_subregion() const { return REGION_type(this) == REGION_INNER; }
+    bool is_eh() const { return REGION_type(this) == REGION_EH; }
     bool is_readonly() const { return REGION_is_readonly(this); }
 
     //Perform middle level IR optimizations which are implemented
@@ -780,6 +789,8 @@ public:
     { return REGION_analysis_instrument(this)->m_call_list; }
 
     //Peephole optimizations.
+    IR * refineSetelem(IR * ir, bool & change, RefineCtx & rc);
+    IR * refineGetelem(IR * ir, bool & change, RefineCtx & rc);
     IR * refineBand(IR * ir, bool & change);
     IR * refineBor(IR * ir, bool & change);
     IR * refineCvt(IR * ir, bool & change, RefineCtx & rc);
@@ -821,6 +832,7 @@ public:
     bool refineBBlist(IN OUT BBList * ir_bb_list, RefineCtx & rc);
     IR * reassociation(IR * ir, bool & change);
     bool reconstructBBlist(OptCtx & oc);
+    void registerGlobalVAR();
 
     IR * simpToPR(IR * ir, SimpCtx * ctx);
     C<IRBB*> * splitIRlistIntoBB(IR * irs, BBList * bbl, C<IRBB*> * ctbb);
@@ -876,9 +888,13 @@ public:
     void setMapPR2Var(UINT prno, VAR * pr_var)
     { REGION_analysis_instrument(this)->m_prno2var.set(prno, pr_var); }
 
+    void setPRCount(UINT cnt)
+    { REGION_analysis_instrument(this)->m_pr_count = cnt; }
+
     void setRegionVar(VAR * v) { m_var = v; }
-    void setIRList(IR * irs) { REGION_analysis_instrument(this)->m_ir_list = irs; }
-    void set_blx_data(void * d) { REGION_blx_data(this) = d; }
+    void setIRList(IR * irs)
+    { REGION_analysis_instrument(this)->m_ir_list = irs; }
+    void setBlackBoxData(void * d) { REGION_blx_data(this) = d; }
     IR * StrengthReduce(IN OUT IR * ir, IN OUT bool & change);
 
     //num_inner_region: count the number of inner regions.
@@ -894,7 +910,7 @@ public:
         getCallList()->clean();
         getReturnList()->clean(); //Scan RETURN as well.
         scanCallAndReturnList(num_inner_region, getCallList(),
-                              getReturnList(), scan_inner_region);
+            getReturnList(), scan_inner_region);
     }
 
     void lowerIRTreeToLowestHeight(OptCtx & oc);

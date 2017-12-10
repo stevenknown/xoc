@@ -69,7 +69,7 @@ public:
             UINT insertCvt:1;
 
             //Pass info topdown. True to transform comparison stmt to lnot
-            //e.g: transform $pr1!=0?0:1 to lnot($pr1),
+            //e.g: transform $1!=0?0:1 to lnot($1),
             //where lnot indicates logical-not.
             UINT hoist_to_lnot:1;
 

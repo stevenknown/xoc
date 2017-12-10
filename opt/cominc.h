@@ -36,17 +36,17 @@ author: Su Zhenyu
 
 #include "commoninc.h"
 #include "data_type.h"
-#include "dbg.h"
-#include "loop.h"
-#include "cfg.h"
 
 //Middle level included files
+#include "dbg.h"
 #include "var.h"
 #include "md.h"
 #include "pass.h"
 #include "ai.h"
 #include "du.h"
 #include "ir.h"
+#include "loop.h"
+#include "cfg.h"
 #include "prssainfo.h"
 #include "mdssainfo.h"
 #include "ir_bb.h"

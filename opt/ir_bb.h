@@ -154,7 +154,7 @@ public:
 #define BB_is_catch_start(b)    ((b)->u1.s1.is_catch_start)
 #define BB_is_try_start(b)      ((b)->u1.s1.is_try_start)
 #define BB_is_try_end(b)        ((b)->u1.s1.is_try_end)
-#define BB_is_unreach(b)        ((b)->u1.s1.is_unreachable)
+#define BB_is_terminate(b)      ((b)->u1.s1.is_terminate)
 class IRBB {
 public:
     UINT m_id; //BB's id
@@ -168,7 +168,7 @@ public:
             BYTE is_fallthrough:1; //bb has a fall through successor.
             BYTE is_target:1; //bb is branch target.
             BYTE is_catch_start:1; //bb is entry of catch block.
-            BYTE is_unreachable:1; //bb is unreachable.
+            BYTE is_terminate:1; //bb terminate the control flow.
             BYTE is_try_start:1; //bb is entry of try block.
             BYTE is_try_end:1; //bb is exit of try block.
         } s1;
@@ -210,8 +210,8 @@ public:
                 BB_is_try_end(this) = true;
             }
 
-            if (LABEL_INFO_is_unreachable(li)) {
-                BB_is_unreach(this) = true;
+            if (LABEL_INFO_is_terminate(li)) {
+                BB_is_terminate(this) = true;
 
             }
             getLabelList().append_tail(li);
@@ -223,8 +223,8 @@ public:
     //Clean attached label.
     void cleanLabelInfoList() { getLabelList().clean(); }
 
-    void dump(Region * ru, bool dump_inner_region);
-    void dupSuccessorPhiOpnd(CFG<IRBB, IR> * cfg, Region * ru, UINT opnd_pos);
+    void dump(Region * rg, bool dump_inner_region);
+    void dupSuccessorPhiOpnd(CFG<IRBB, IR> * cfg, Region * rg, UINT opnd_pos);
 
     List<LabelInfo const*> & getLabelList() { return lab_list; }
     List<LabelInfo const*> const& getLabelListConst() const { return lab_list; }
@@ -349,16 +349,16 @@ public:
         return r;
     }
 
-    //Return true if BB is unreachable.
-    inline bool is_unreachable() const
+    //Return true if BB is terminate.
+    inline bool is_terminate() const
     {
-        bool r = BB_is_unreach(this);
+        bool r = BB_is_terminate(this);
         #ifdef _DEBUG_
         bool find = false;
         IRBB * pthis = const_cast<IRBB*>(this);
         for (LabelInfo const* li = pthis->getLabelList().get_head();
              li != NULL; li = pthis->getLabelList().get_next()) {
-            if (LABEL_INFO_is_unreachable(li)) {
+            if (LABEL_INFO_is_terminate(li)) {
                 find = true;
                 break;
             }
@@ -444,8 +444,8 @@ public:
     //Add all Labels attached on src BB to current BB.
     inline void mergeLabeInfoList(IRBB * src)
     {
-        for (LabelInfo const* li = src->getLabelList().get_head();
-             li != NULL; li = src->getLabelList().get_next()) {
+        for (LabelInfo const* li = src->getLabelList().get_tail();
+             li != NULL; li = src->getLabelList().get_prev()) {
             if (lab_list.find(li)) { continue; }
             lab_list.append_head(li);
 
@@ -454,8 +454,8 @@ public:
                 BB_is_catch_start(this) = true;
             }
 
-            if (LABEL_INFO_is_unreachable(li)) {
-                BB_is_unreach(this) = true;
+            if (LABEL_INFO_is_terminate(li)) {
+                BB_is_terminate(this) = true;
             }
         }
     }
@@ -521,7 +521,7 @@ public:
 //Exported Functions
 void dumpBBLabel(List<LabelInfo const*> & lablist, FILE * h);
 void dumpBBList(BBList * bbl,
-                Region * ru,
+                Region * rg,
                 CHAR const* name = NULL,
                 bool dump_inner_region = true);
 

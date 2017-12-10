@@ -472,35 +472,43 @@ IR * Region::simplifyDoLoopSelf(IR * ir, SimpCtx * ctx)
 
     LabelInfo * startl = genIlabel();
 
+    IR * iv = simplifyExpression(LOOP_iv(ir), &local);
+    ASSERT0(iv->is_id() || iv->is_pr());
+
     //det exp
     //When we first lowering CFS, det-expression should not be TRUEBR/FASLEBR.
     ASSERT0(LOOP_det(ir)->is_judge());
     SimpCtx tcont(*ctx);
     SIMP_ret_array_val(&tcont) = true;
-    IR * det = simplifyDet(LOOP_det(ir), &tcont);
-    IR * last = removetail(&det);
+    IR * upperbound = simplifyDet(LOOP_det(ir), &tcont);
+    IR * last = xcom::removetail(&upperbound);
     ASSERT(last->is_exp(), ("invalide det exp"));
-    if (!last->is_judge()) {
-        //det-expression should be judgement.
-        last = buildJudge(last);
-    }
-
+    //det-expression should be judgement.
+    //last = buildCmp(IR_LE, iv->is_id() ? buildLoad(ID_info(iv)) : iv, last);
     IR * falsebr = buildBranch(false, last, genIlabel());
     copyDbx(falsebr, LOOP_det(ir), this);
-    xcom::add_next(&det, falsebr);
 
     LabelInfo * stepl = genIlabel();
 
     SIMP_break_label(&local) = BR_lab(falsebr);
     SIMP_continue_label(&local) = stepl;
 
-    IR * init = simplifyStmtList(LOOP_init(ir), &local);
-    IR * step = simplifyStmtList(LOOP_step(ir), &local);
+    IR * init = simplifyExpression(LOOP_init(ir), &local);
+    if (iv->is_id()) {
+        init = buildStore(ID_info(iv), init);
+    } else {
+        init = buildStorePR(PR_no(iv), iv->get_type(), init);
+    }
+    IR * step = simplifyExpression(LOOP_step(ir), &local);
     IR * body = simplifyStmtList(LOOP_body(ir), &local);
 
-    //step label , for simp 'continue' used
+    //step label, for simp 'continue' used
     xcom::add_next(&body, buildLabel(stepl));
-    xcom::add_next(&body, step);
+    if (iv->is_id()) {
+        xcom::add_next(&body, buildStore(ID_info(iv), step));
+    } else {
+        xcom::add_next(&body, buildStorePR(PR_no(iv), iv->get_type(), step));
+    }
     xcom::add_next(&body, buildGoto(startl));
 
     if (SIMP_is_record_cfs(ctx)) {
@@ -518,10 +526,11 @@ IR * Region::simplifyDoLoopSelf(IR * ir, SimpCtx * ctx)
 
     xcom::add_next(&ret_list, init);
     xcom::add_next(&ret_list, buildLabel(startl));
-    xcom::add_next(&ret_list, det);
+    xcom::add_next(&ret_list, falsebr);
     xcom::add_next(&ret_list, body);
     xcom::add_next(&ret_list, buildLabel(BR_lab(falsebr)));
     for (IR * p = ret_list; p != NULL; p = p->get_next()) {
+        ASSERT0(p->is_stmt());
         IR_parent(p) = NULL;
     }
     SIMP_changed(ctx) = true;
@@ -1039,8 +1048,9 @@ IR * Region::simplifySelect(IR * ir, SimpCtx * ctx)
     IR * last = NULL;
     xcom::add_next(&lst, &last, falsebr);
 
-    ASSERT0(SELECT_trueexp(ir)->get_type() == SELECT_falseexp(ir)->get_type());
-    IR * res = buildPR(SELECT_trueexp(ir)->get_type());
+    //Trueexp's type may be different to Falseexp.
+    //ASSERT0(SELECT_trueexp(ir)->get_type() == SELECT_falseexp(ir)->get_type());
+    IR * res = buildPR(ir->get_type());
     allocRefForPR(res);
 
     //Simp true exp.
@@ -1271,14 +1281,15 @@ IR * Region::simplifyArrayAddrExp(IR * ir, SimpCtx * ctx)
             ofst_exp = buildBinaryOpSimp(IR_ADD, indextyid, ofst_exp, newsub);
         }
 
-        ASSERT(elemnumbuf[dim] != 0,
-               ("Incomplete array dimension info, we need to "
-                "know how many elements in each dimension."));
-
-        if (dim == 0) {
-            enumb = elemnumbuf[dim];
-        } else {
-            enumb *= elemnumbuf[dim];
+        if (elemnumbuf != NULL) {
+            ASSERT(elemnumbuf[dim] != 0,
+                ("Incomplete array dimension info, we need to "
+                    "know how many elements in each dimension."));
+            if (dim == 0) {
+                enumb = elemnumbuf[dim];
+            } else {
+                enumb *= elemnumbuf[dim];
+            }
         }
     }
 
@@ -1300,14 +1311,15 @@ IR * Region::simplifyArrayAddrExp(IR * ir, SimpCtx * ctx)
         ofst_exp = buildBinaryOpSimp(IR_ADD, indextyid, ofst_exp, imm);
     }
 
-    ASSERT0(ARR_base(ir) && ARR_base(ir)->is_ptr());
+    ASSERT0(ARR_base(ir) &&
+        (ARR_base(ir)->is_ptr() || ARR_base(ir)->is_void()));
     SimpCtx tcont(*ctx);
     SIMP_ret_array_val(&tcont) = false;
     IR * newbase = simplifyExpression(ARR_base(ir), &tcont);
     ctx->appendStmt(tcont);
     ctx->unionBottomupFlag(tcont);
 
-    ASSERT0(newbase && newbase->is_ptr());
+    ASSERT0(newbase && (newbase->is_ptr() || newbase->is_void()));
     ARR_base(ir) = NULL;
 
     //'array_addr' is address of an ARRAY, and it is pointer type.
@@ -1705,7 +1717,7 @@ IR * Region::simplifyArray(IR * ir, SimpCtx * ctx)
         if (getMDSSAMgr() != NULL) {
             getMDSSAMgr()->changeUse(ir, ld);
         }
-        copyAI(ir, ld);        
+        copyAI(ir, ld);
         freeIRTree(ir);
         freeIRTree(array_addr);
         if (getDUMgr() != NULL) {
@@ -1724,7 +1736,7 @@ IR * Region::simplifyArray(IR * ir, SimpCtx * ctx)
         elem_val->copyRef(ir, this);
         if (getMDSSAMgr() != NULL) {
             getMDSSAMgr()->changeUse(ir, elem_val);
-        }        
+        }
         if (getDUMgr() != NULL) {
             getDUMgr()->changeUse(elem_val, ir, getMiscBitSetMgr());
         }
@@ -1777,7 +1789,7 @@ IR * Region::simplifyArray(IR * ir, SimpCtx * ctx)
     elem_val->copyRef(ir, this);
     if (getMDSSAMgr() != NULL) {
         getMDSSAMgr()->changeUse(ir, elem_val);
-    }    
+    }
     if (getDUMgr() != NULL) {
         getDUMgr()->changeUse(elem_val, ir, getMiscBitSetMgr());
     }
@@ -1894,7 +1906,6 @@ IR * Region::simplifySetelem(IR * ir, SimpCtx * ctx)
     if (SIMP_stmtlist(&tcont) != NULL) {
         xcom::add_next(&ret_list, &last, SIMP_stmtlist(&tcont));
     }
-    xcom::add_next(&ret_list, &last, ir);
 
     //Process offset.
     tcont.copy(*ctx);
@@ -1907,7 +1918,6 @@ IR * Region::simplifySetelem(IR * ir, SimpCtx * ctx)
         xcom::add_next(&ret_list, &last, SIMP_stmtlist(&tcont));
     }
     xcom::add_next(&ret_list, &last, ir);
-
     return ret_list;
 }
 
@@ -1927,12 +1937,10 @@ IR * Region::simplifyGetelem(IR * ir, SimpCtx * ctx)
     ctx->unionBottomupFlag(tcont);
 
     IR * ret_list = NULL;
-
     IR * last = NULL;
     if (SIMP_stmtlist(&tcont) != NULL) {
         xcom::add_next(&ret_list, &last, SIMP_stmtlist(&tcont));
     }
-    xcom::add_next(&ret_list, &last, ir);
 
     //Process offset.
     tcont.copy(*ctx);
@@ -1945,7 +1953,6 @@ IR * Region::simplifyGetelem(IR * ir, SimpCtx * ctx)
         xcom::add_next(&ret_list, &last, SIMP_stmtlist(&tcont));
     }
     xcom::add_next(&ret_list, &last, ir);
-
     return ret_list;
 }
 

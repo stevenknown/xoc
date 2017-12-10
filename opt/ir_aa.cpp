@@ -148,18 +148,18 @@ static bool isAllElementDerivedFromSameEffectVar(
 //
 //START IR_AA
 //
-IR_AA::IR_AA(Region * ru)
+IR_AA::IR_AA(Region * rg)
 {
-    ASSERT0(ru);
-    m_cfg = ru->getCFG();
-    m_var_mgr = ru->getVarMgr();
-    m_ru = ru;
-    m_rumgr = ru->getRegionMgr();
-    m_tm = ru->getTypeMgr();
-    m_md_sys = ru->getMDSystem();
-    m_mds_mgr = ru->getMDSetMgr();
-    m_mds_hash = ru->getMDSetHash();
-    m_misc_bs_mgr = ru->getMiscBitSetMgr();
+    ASSERT0(rg);
+    m_cfg = rg->getCFG();
+    m_var_mgr = rg->getVarMgr();
+    m_ru = rg;
+    m_rumgr = rg->getRegionMgr();
+    m_tm = rg->getTypeMgr();
+    m_md_sys = rg->getMDSystem();
+    m_mds_mgr = rg->getMDSetMgr();
+    m_mds_hash = rg->getMDSetHash();
+    m_misc_bs_mgr = rg->getMiscBitSetMgr();
     ASSERT0(m_cfg && m_mds_hash && m_md_sys && m_tm && m_mds_mgr);
     m_flow_sensitive = true;
     m_pool = smpoolCreate(128, MEM_COMM);
@@ -338,6 +338,8 @@ bool IR_AA::isValidStmtToAA(IR * ir)
     case IR_RETURN:
     case IR_PHI:
     case IR_REGION:
+    case IR_SETELEM:
+    case IR_GETELEM:
         return true;
     default:
         return false;
@@ -614,7 +616,7 @@ void IR_AA::inferArrayExpBase(
         IN OUT AACtx * ic,
         IN OUT MD2MDSet * mx)
 {
-    ASSERT0(ir->isArrayOp() && array_base->is_ptr());
+    ASSERT0(ir->isArrayOp() && (array_base->is_ptr() || array_base->is_void()));
     MDSet tmp;
     AACtx tic;
     tic.copyTopDownFlag(*ic);
@@ -918,41 +920,39 @@ MD const* IR_AA::allocSetelemMD(IR * ir)
 {
     ASSERT0(ir->is_setelem());
     MD const* md = m_ru->genMDforPR(ir);
-
     IR const* ofst = SETELEM_ofst(ir);
     ASSERT0(ofst);
+    if (md->is_exact()) {
+        if (ofst->is_const()) {
+            ASSERT(ofst->is_int(), ("offset of SETELEM must be integer."));
 
-    if (ofst->is_const()) {
-        ASSERT(ofst->is_int(), ("offset of SETE must be integer."));
+            //Accumulating offset of identifier.
+            //e.g: struct {int a,b; } s; s.a = 10
+            //generate: st s:offset(4) = 10;
+            MD t(*md);
+            ASSERT0(ir->get_type_size(m_tm) > 0);
+            MD_ofst(&t) += (UINT)CONST_int_val(ofst);
+            MD_size(&t) = ir->get_type_size(m_tm);
+            MD const* entry = m_md_sys->registerMD(t);
+            ASSERT(MD_id(entry) > 0, ("Not yet registered"));
+            md = entry; //regard MD with offset as return result.
+        } else {
+            //Offset is variable.
+            //e.g: vector<4xi32> v; v[i] = 34;
+            //will generate:
+            //    st $1 = ld v;
+            //    setelem $1 = 34, ld i;
+            //    st v = $1;
 
-        //Accumulating offset of identifier.
-        //e.g: struct {int a,b; } s; s.a = 10
-        //generate: st('s', ofst:4) = 10
-        MD t(*md);
-        ASSERT0(t.is_exact());
-        ASSERT0(ir->get_type_size(m_tm) > 0);
-        MD_ofst(&t) += (UINT)CONST_int_val(ofst);
-        MD_size(&t) = ir->get_type_size(m_tm);
-        MD const* entry = m_md_sys->registerMD(t);
-        ASSERT(MD_id(entry) > 0, ("Not yet registered"));
-        md = entry; //regard MD with offset as return result.
-    } else {
-        //Offset is variable.
-        //e.g: vector<4xi32> v; v[i] = 0;
-        //will generate:
-        //    st pr1(v)
-        //    sete pr1(ofst:i), 10)
-        //    st(v, pr1)
-
-        MD t(*md);
-        ASSERT0(t.is_exact());
-        ASSERT0(ir->get_type_size(m_tm) > 0);
-        MD_ty(&t) = MD_RANGE;
-        MD_ofst(&t) = 0;
-        MD_size(&t) = ir->get_type_size(m_tm);
-        MD const* entry = m_md_sys->registerMD(t);
-        ASSERT(MD_id(entry) > 0, ("Not yet registered"));
-        md = entry; //regard MD with range as return result.
+            MD t(*md);
+            ASSERT0(ir->get_type_size(m_tm) > 0);
+            MD_ty(&t) = MD_RANGE;
+            MD_ofst(&t) = 0;
+            MD_size(&t) = ir->get_type_size(m_tm);
+            MD const* entry = m_md_sys->registerMD(t);
+            ASSERT(MD_id(entry) > 0, ("Not yet registered"));
+            md = entry; //regard MD with range as return result.
+        }
     }
 
     setMustAddr(ir, md);
@@ -2260,21 +2260,21 @@ void IR_AA::processIst(IN IR * ir, IN MD2MDSet * mx)
 //this function will be costly.
 void IR_AA::processRegion(IR const* ir, IN MD2MDSet * mx)
 {
-    Region * ru = REGION_ru(ir);
-    ASSERT0(ru);
-    //ASSERT0(REGION_type(ru) == RU_BLX || REGION_type(ru) == RU_SUB);
+    Region * rg = REGION_ru(ir);
+    ASSERT0(rg);
+    //ASSERT0(REGION_type(rg) == REGION_BLACKBOX || REGION_type(rg) == REGION_INNER);
 
-    if (ru->is_readonly()) { return; }
+    if (rg->is_readonly()) { return; }
 
     bool has_maydef_info = false;
     //Check if region modify or use MD.
-    MDSet const* defmds = ru->getMayDef();
+    MDSet const* defmds = rg->getMayDef();
     if (defmds != NULL && !defmds->is_empty()) {
         ElemCopyPointToAndMayPointTo(*defmds, mx);
         has_maydef_info = true;
     }
 
-    if (!has_maydef_info) {
+    if (!has_maydef_info && (rg->is_blackbox() || rg->is_subregion())) {
         //For conservative purpose, region may change
         //global variable's point-to and local variable's
         //point-to which are forseeable.
@@ -2290,7 +2290,10 @@ void IR_AA::processRegionSideeffect(IN OUT MD2MDSet & mx)
     MDId2MD const* id2md = m_md_sys->getID2MDMap();
     for (INT j = MD_FIRST; j <= id2md->get_last_idx(); j++) {
         MD * t = id2md->get((UINT)j);
-        ASSERT0(t);
+        if (t == NULL) {
+            //MD j has been allocated but freed and record in free-list.
+            continue;
+        }
 
         VAR const* v = t->get_base();
         if (v->is_pointer() ||
@@ -3507,6 +3510,8 @@ bool IR_AA::verifyIR(IR * ir)
         ASSERT0(getMayAddr(ir) == NULL);
         break;
     case IR_STPR:
+    case IR_SETELEM:
+    case IR_GETELEM:
         ASSERT0(getMustAddr(ir));
         ASSERT0(getMayAddr(ir) == NULL);
         break;
@@ -3855,13 +3860,13 @@ void IR_AA::initEntryPtset(PtPairSet ** ptset_arr)
 void IR_AA::initMayPointToSet()
 {
     //Record MDs whose address have been takens or it is global variable.
-    Region * ru = m_ru;
+    Region * rg = m_ru;
     RegionMgr * rm = m_ru->getRegionMgr();
     VarTabIter c;
     ConstMDIter iter;
     MDSet tmp;
     for (;;) {
-        VarTab * vtab = ru->getVarTab();
+        VarTab * vtab = rg->getVarTab();
         c.clean();
         for (VAR * v = vtab->get_first(c); v != NULL; v = vtab->get_next(c)) {
             if (!VAR_is_addr_taken(v)) { continue; }
@@ -3903,14 +3908,15 @@ void IR_AA::initMayPointToSet()
             }
         }
 
-        if (ru->is_function() || ru->is_program()) {
+        if (rg->is_function() || rg->is_program()) {
             break;
         } else {
-            ASSERT0(REGION_type(ru) == RU_SUB || REGION_type(ru) == RU_EH);
+            ASSERT0(REGION_type(rg) == REGION_INNER ||
+                REGION_type(rg) == REGION_EH);
         }
 
-        ru = REGION_parent(ru);
-        if (ru == NULL) {
+        rg = REGION_parent(rg);
+        if (rg == NULL) {
             break;
         }
     }

@@ -152,14 +152,14 @@ protected:
             IR * delta,
             bool is_increment);
 public:
-    explicit IR_IVR(Region * ru)
+    explicit IR_IVR(Region * rg)
     {
-        ASSERT0(ru != NULL);
-        m_ru = ru;
-        m_md_sys = ru->getMDSystem();
-        m_du = ru->getDUMgr();
-        m_cfg = ru->getCFG();
-        m_tm = ru->getTypeMgr();
+        ASSERT0(rg != NULL);
+        m_ru = rg;
+        m_md_sys = rg->getMDSystem();
+        m_du = rg->getDUMgr();
+        m_cfg = rg->getCFG();
+        m_tm = rg->getTypeMgr();
         m_pool = smpoolCreate(sizeof(IV) * 4, MEM_COMM);
         m_sc_pool = smpoolCreate(sizeof(SC<IV*>) * 4, MEM_CONST_SIZE);
         m_is_only_handle_exact_md = true;

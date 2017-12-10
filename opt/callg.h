@@ -39,14 +39,14 @@ namespace xoc {
 //CALL NODE
 #define CN_id(c)             ((c)->id)
 #define CN_sym(c)            ((c)->ru_name)
-#define CN_ru(c)             ((c)->ru)
+#define CN_ru(c)             ((c)->rg)
 #define CN_is_used(c)        ((c)->u1.s1.is_used)
 #define CN_unknown_callee(c) ((c)->u1.s1.has_unknown_callee)
 class CallNode {
 public:
     UINT id;
     SYM const* ru_name; //record the Region name.
-    Region * ru; //record the Region that callnode corresponds to.
+    Region * rg; //record the Region that callnode corresponds to.
     union {
         struct {
             //It is marked by attribute used, which usually means
@@ -97,22 +97,22 @@ class CallGraph : public DGraph {
     }
 
     //Generate map between Symbol and CallNode for current region.
-    SYM2CN * genSYM2CN(Region * ru)
+    SYM2CN * genSYM2CN(Region * rg)
     {
-        ASSERT0(ru);
-        SYM2CN * sym2cn = m_ru2sym2cn.get(ru);
+        ASSERT0(rg);
+        SYM2CN * sym2cn = m_ru2sym2cn.get(rg);
         if (sym2cn == NULL) {
             sym2cn = new SYM2CN();
-            m_ru2sym2cn.set(ru, sym2cn);
+            m_ru2sym2cn.set(rg, sym2cn);
         }
         return sym2cn;
     }
 
     //Read map between Symbol and CallNode for current region if exist.
-    SYM2CN * getSYM2CN(Region * ru) const { return m_ru2sym2cn.get(ru); }
+    SYM2CN * getSYM2CN(Region * rg) const { return m_ru2sym2cn.get(rg); }
 
-    CallNode * newCallNode(IR const* ir, Region * ru);
-    CallNode * newCallNode(Region * ru);
+    CallNode * newCallNode(IR const* ir, Region * rg);
+    CallNode * newCallNode(Region * rg);
 
 public:
     CallGraph(UINT edge_hash,
@@ -130,8 +130,8 @@ public:
     {
         SYM2CN * sym2cn = NULL;
         Region2SYM2CNIter iter;
-        for (Region * ru = m_ru2sym2cn.get_first(iter, &sym2cn);
-             ru != NULL; ru = m_ru2sym2cn.get_next(iter, &sym2cn)) {
+        for (Region * rg = m_ru2sym2cn.get_first(iter, &sym2cn);
+             rg != NULL; rg = m_ru2sym2cn.get_next(iter, &sym2cn)) {
             delete sym2cn;
         }
         smpoolDelete(m_cn_pool);
@@ -155,8 +155,8 @@ public:
     CallNode * mapVertex2CallNode(Vertex const* v) const
     { return m_cnid2cn.get(VERTEX_id(v)); }
 
-    CallNode * mapRegion2CallNode(Region const* ru) const
-    { return m_ruid2cn.get(REGION_id(ru)); }
+    CallNode * mapRegion2CallNode(Region const* rg) const
+    { return m_ruid2cn.get(REGION_id(rg)); }
 
     CallNode * mapSym2CallNode(SYM const* sym, Region * start) const
     {
@@ -170,11 +170,11 @@ public:
     }
 
     //Map a call/icall to its target Region.
-    //ru: the region that ir resident in.
-    Region * mapCall2Region(IR const* ir, Region * ru)
+    //rg: the region that ir resident in.
+    Region * mapCall2Region(IR const* ir, Region * rg)
     {
         if (ir->is_call()) {
-            CallNode * cn = mapSym2CallNode(CALL_idinfo(ir)->get_name(), ru);
+            CallNode * cn = mapSym2CallNode(CALL_idinfo(ir)->get_name(), rg);
             if (cn != NULL) { return CN_ru(cn); }
             return NULL;
         }

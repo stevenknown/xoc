@@ -130,15 +130,15 @@ protected:
             IR const* cand_expr,
             IN OUT CPCtx & ctx);
 public:
-    IR_CP(Region * ru)
+    IR_CP(Region * rg)
     {
-        ASSERT0(ru != NULL);
-        m_ru = ru;
-        m_md_sys = ru->getMDSystem();
-        m_du = ru->getDUMgr();
-        m_cfg = ru->getCFG();
-        m_md_set_mgr = ru->getMDSetMgr();
-        m_tm = ru->getTypeMgr();
+        ASSERT0(rg != NULL);
+        m_ru = rg;
+        m_md_sys = rg->getMDSystem();
+        m_du = rg->getDUMgr();
+        m_cfg = rg->getCFG();
+        m_md_set_mgr = rg->getMDSetMgr();
+        m_tm = rg->getTypeMgr();
         ASSERT0(m_cfg && m_du && m_md_sys && m_tm && m_md_set_mgr);
         m_prop_kind = CP_PROP_UNARY_AND_SIMPLEX;
         m_is_dump_cp = true;
@@ -181,13 +181,13 @@ public:
     }
 
     void dumpCopyPropagationAction(
-        IR const* def_stmt, 
-        IR const* prop_value, 
-        IR const* use, 
+        IR const* def_stmt,
+        IR const* prop_value,
+        IR const* use,
         MDSSAMgr * mdssamgr);
 
     virtual CHAR const* getPassName() const { return "Copy Propagation"; }
-    virtual PASS_TYPE getPassType() const { return PASS_CP; }    
+    virtual PASS_TYPE getPassType() const { return PASS_CP; }
     IR const* getSimpCVTValue(IR const* ir) const;
 
     void setPropagationKind(UINT kind) { m_prop_kind = kind; }

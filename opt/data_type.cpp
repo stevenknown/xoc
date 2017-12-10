@@ -56,8 +56,8 @@ TypeDesc const g_type_desc[] = {
     {D_F128,  "f128",  128},
 
     {D_MC,    "mc",    0}, //memory chunk, for structures
-    {D_STR,   "s",   BYTE_PER_POINTER * BIT_PER_BYTE}, //char strings is pointer
-    {D_PTR,   "*",   BYTE_PER_POINTER * BIT_PER_BYTE}, //pointer
+    {D_STR,   "str",   BYTE_PER_POINTER * BIT_PER_BYTE}, //string is pointer
+    {D_PTR,   "*",     BYTE_PER_POINTER * BIT_PER_BYTE}, //pointer
     {D_VEC,   "vec",   0}, //vector
 
     {D_VOID,  "void",  0}, //void type
@@ -229,18 +229,15 @@ TypeContainer const* TypeMgr::registerVector(Type const* type)
 {
     ASSERT0(type->is_vector() && TY_vec_ety(type) != D_UNDEF);
     ASSERT0(TY_vec_size(type) >= get_dtype_bytesize(TY_vec_ety(type)) &&
-             TY_vec_size(type) % get_dtype_bytesize(TY_vec_ety(type)) == 0);
+            TY_vec_size(type) % get_dtype_bytesize(TY_vec_ety(type)) == 0);
 
     ElemTypeTab * elemtab = m_vector_type_tab.get(type);
     if (elemtab != NULL) {
         TypeContainer const* entry = elemtab->get(type);
-        if (entry != NULL) { return entry; }
-        goto FIN;
+        if (entry != NULL) {
+            return entry;
+        }
     }
-
-    //Add new vector into table.
-    elemtab = new ElemTypeTab();
-    m_vector_type_tab.set(type, elemtab);
 
     //Add new element type into vector.
     //e.g:
@@ -252,11 +249,15 @@ TypeContainer const* TypeMgr::registerVector(Type const* type)
     //    MC,size=300,vec_ty=D_UNDEF
     //        MC,size=300,vec_ty=D_F32
     //    ...
-FIN:
     TypeContainer * x = newTC();
     VectorType * ty = newVectorType();
     TC_type(x) = ty;
     ty->copy((VectorType const&)*type);
+    if (elemtab == NULL) {
+        //Add new vector into table.
+        elemtab = new ElemTypeTab();
+        m_vector_type_tab.set(ty, elemtab);
+    }
     elemtab->set(ty, x);
     TC_typeid(x) = m_type_count++;
     m_type_tab.set(TC_typeid(x), ty);
@@ -278,7 +279,9 @@ TypeContainer const* TypeMgr::registerMC(Type const* type)
     }
 
     TypeContainer const* entry = m_memorychunk_type_tab.get(type);
-    if (entry != NULL) { return entry; }
+    if (entry != NULL) {
+        return entry;
+    }
 
     //Add new item into table.
     TypeContainer * x = newTC();
@@ -409,11 +412,10 @@ CHAR const* TypeMgr::dump_type(Type const* type, OUT StrBuf & buf)
         buf.strcat("%s", DTNAME(dt));
         break;
     case D_MC:
-        buf.strcat("%s(%d)", DTNAME(dt), get_bytesize(type));
+        buf.strcat("%s<%d>", DTNAME(dt), get_bytesize(type));
         break;
     case D_PTR:
-        buf.strcat("%s", DTNAME(dt));
-        buf.strcat("(%d)", TY_ptr_base_size(type));
+        buf.strcat("%s<%d>", DTNAME(dt), TY_ptr_base_size(type));
         break;
     case D_VEC:
         {
@@ -421,7 +423,7 @@ CHAR const* TypeMgr::dump_type(Type const* type, OUT StrBuf & buf)
             ASSERT0(elem_byte_size != 0);
             ASSERT0(get_bytesize(type) % elem_byte_size == 0);
             UINT elemnum = get_bytesize(type) / elem_byte_size;
-            buf.strcat("v(%d*%s)", elemnum, DTNAME(TY_vec_ety(type)));
+            buf.strcat("%s<%d*%s>", DTNAME(dt), elemnum, DTNAME(TY_vec_ety(type)));
         }
         break;
     case D_VOID:
@@ -452,8 +454,9 @@ void TypeMgr::dump_type_tab()
 {
     StrBuf buf(64);
     if (g_tfile == NULL) return;
-    fprintf(g_tfile, "\n==---- DUMP Type GLOBAL TABLE ----==\n");
+    fprintf(g_tfile, "\n==---- DUMP Type Table ----==\n");
     for (INT i = 1; i <= m_type_tab.get_last_idx(); i++) {
+        buf.clean();
         Type * d = m_type_tab.get(i);
         ASSERT0(d);
         fprintf(g_tfile, "%s tyid:%d", dump_type(d, buf), i);

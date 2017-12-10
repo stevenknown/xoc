@@ -40,7 +40,7 @@ namespace xoc {
 bool MDSSAInfo::isUseReachable(IN UseDefMgr * usedefmgr, IR const* exp)
 {
     ASSERT0(usedefmgr && exp && exp->is_exp());
-    SEGIter * iter = NULL;    
+    SEGIter * iter = NULL;
     for (INT i = getVOpndSet()->get_first(&iter);
          i >= 0; i = getVOpndSet()->get_next(i, &iter)) {
         VMD * vopnd = (VMD*)usedefmgr->getVOpnd(i);
@@ -61,7 +61,7 @@ void MDSSAInfo::collectUse(
 {
     ASSERT0(usedefmgr && bsmgr);
     SEGIter * iter = NULL;
-    Region * ru = usedefmgr->getRegion();
+    Region * rg = usedefmgr->getRegion();
     for (INT i = getVOpndSet()->get_first(&iter);
          i >= 0; i = getVOpndSet()->get_next(i, &iter)) {
         VMD * vopnd = (VMD*)usedefmgr->getVOpnd(i);
@@ -70,7 +70,7 @@ void MDSSAInfo::collectUse(
         SEGIter * vit = NULL;
         for (INT i2 = vopnd->getOccSet()->get_first(&vit);
             i2 >= 0; i2 = vopnd->getOccSet()->get_next(i2, &vit)) {
-            IR * use = ru->getIR(i2);
+            IR * use = rg->getIR(i2);
             ASSERT0(use && (use->isMemoryRef() || use->is_id()));
             set.bunion(use->id(), *bsmgr);
         }
@@ -119,10 +119,10 @@ UINT UINT2VMDVec::count_mem() const
 //
 //START VMD
 //
-void VMD::dump(Region * ru, UseDefMgr * mgr)
+void VMD::dump(Region * rg, UseDefMgr * mgr)
 {
     if (g_tfile == NULL) { return; }
-    ASSERT0(is_md() && ru);
+    ASSERT0(is_md() && rg);
     fprintf(g_tfile, "(MD%dV%d", mdid(), version());
 
     //Dump Def
@@ -173,7 +173,7 @@ void VMD::dump(Region * ru, UseDefMgr * mgr)
             fprintf(g_tfile, ",");
         }
 
-        IR * use = ru->getIR(i2);
+        IR * use = rg->getIR(i2);
         ASSERT0(use && (use->isMemoryRef() || use->is_id()));
         fprintf(g_tfile, "%s(id:%d)", IRNAME(use), use->id());
     }
@@ -210,14 +210,14 @@ VMD * MDPhi::getOpndVMD(IR const* opnd, UseDefMgr const* mgr) const
 }
 
 
-void MDPhi::dump(Region * ru, UseDefMgr * mgr)
+void MDPhi::dump(Region * rg, UseDefMgr * mgr)
 {
-    ASSERT0(ru);
+    ASSERT0(rg);
     ASSERT0(is_phi());
     if (g_tfile == NULL) { return; }
 
     List<IRBB*> preds;
-    IR_CFG * cfg = ru->getCFG();
+    IR_CFG * cfg = rg->getCFG();
     ASSERT0(cfg);
     cfg->get_preds(preds, getBB());
     IRBB * pred = preds.get_head();
@@ -265,7 +265,7 @@ void MDPhi::dump(Region * ru, UseDefMgr * mgr)
             fprintf(g_tfile, ",");
         }
 
-        IR const* use = ru->getIR(i2);
+        IR const* use = rg->getIR(i2);
         ASSERT0(use && (use->isMemoryRef() || use->is_id()));
         fprintf(g_tfile, "%s(id:%d)", IRNAME(use), use->id());
     }
@@ -278,7 +278,7 @@ void MDPhi::dump(Region * ru, UseDefMgr * mgr)
 //
 //START UseDefMgr
 //
-UseDefMgr::UseDefMgr(Region * ru) : m_ru(ru)
+UseDefMgr::UseDefMgr(Region * rg) : m_ru(rg)
 {
     ASSERT0(m_ru);
 

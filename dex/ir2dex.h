@@ -105,22 +105,22 @@ protected:
     //be freed by caller.
     void * ymalloc(UINT size);
 public:
-    IR2Dex(IN Region * ru, IN DexFile * df)
+    IR2Dex(IN Region * rg, IN DexFile * df)
     {
-        ASSERT0(ru && df);
-        m_ru = (DexRegion*)ru;
-        m_ru_mgr = (DexRegionMgr*)ru->getRegionMgr();
+        ASSERT0(rg && df);
+        m_ru = (DexRegion*)rg;
+        m_ru_mgr = (DexRegionMgr*)rg->getRegionMgr();
         m_df = df;
-        m_tm = ru->getTypeMgr();
-        m_tr = ((DexRegion*)ru)->getTypeIndexRep();
-        m_d2ir = ((DexRegion*)ru)->getDex2IR();
-        m_prno2v = ((DexRegion*)ru)->getPrno2Vreg();
+        m_tm = rg->getTypeMgr();
+        m_tr = ((DexRegion*)rg)->getTypeIndexRep();
+        m_d2ir = ((DexRegion*)rg)->getDex2IR();
+        m_prno2v = ((DexRegion*)rg)->getPrno2Vreg();
         m_org_pr2v = m_d2ir->getPR2Vreg();
         ASSERT0(m_org_pr2v);
 
         m_var2fieldid = m_ru->getVAR2Fieldid();
         m_lab2idx.init(getNearestPowerOf2(
-                        MAX(4, ru->getBBList()->get_elem_count())));
+                        MAX(4, rg->getBBList()->get_elem_count())));
         m_pool = smpoolCreate(16, MEM_COMM);
     }
 

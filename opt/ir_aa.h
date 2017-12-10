@@ -462,7 +462,7 @@ protected:
         return p;
     }
 public:
-    explicit IR_AA(Region * ru);
+    explicit IR_AA(Region * rg);
     virtual ~IR_AA();
 
     //Attemp to compute the type based may point to MD set.

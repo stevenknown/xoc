@@ -40,12 +40,12 @@ namespace xoc {
 //
 //START Inliner
 //
-bool Inliner::is_call_site(IR * call, Region * ru)
+bool Inliner::is_call_site(IR * call, Region * rg)
 {
     ASSERT0(call->isCallStmt());
     CallNode const* cn1 =
-        m_call_graph->mapSym2CallNode(CALL_idinfo(call)->get_name(), ru);
-    CallNode const* cn2 = m_call_graph->mapRegion2CallNode(ru);
+        m_call_graph->mapSym2CallNode(CALL_idinfo(call)->get_name(), rg);
+    CallNode const* cn2 = m_call_graph->mapRegion2CallNode(rg);
     return cn1 == cn2;
 }
 
@@ -119,14 +119,14 @@ IR * Inliner::replaceReturnImpl(
 
 
 void Inliner::checkRegion(
-        IN Region * ru,
+        IN Region * rg,
         OUT bool & need_el,
         OUT bool & has_ret) const
 {
     need_el = false;
     has_ret = false;
     List<IR const*> lst;
-    IR const* irs = ru->getIRList();
+    IR const* irs = rg->getIRList();
     if (irs == NULL) { return; }
     for (IR const* x = irs; x != NULL; x = x->get_next()) {
         switch (IR_code(x)) {
@@ -260,11 +260,11 @@ void Inliner::do_inline(Region * cand)
 }
 
 
-//Evaluate whether ru can be inlining candidate.
-bool Inliner::can_be_cand(Region * ru)
+//Evaluate whether rg can be inlining candidate.
+bool Inliner::can_be_cand(Region * rg)
 {
-    IR * ru_irs = ru->getIRList();
-    if (REGION_is_expect_inline(ru) && cnt_list(ru_irs) < g_inline_threshold) {
+    IR * ru_irs = rg->getIRList();
+    if (REGION_is_expect_inline(rg) && cnt_list(ru_irs) < g_inline_threshold) {
         return true;
     }
     return false;
@@ -280,9 +280,9 @@ bool Inliner::perform(OptCtx & oc)
     IR * irs = m_program->getIRList();
     while (irs != NULL) {
         if (irs->is_region()) {
-            Region * ru = REGION_ru(irs);
-            if (can_be_cand(ru)) {
-                do_inline(ru);
+            Region * rg = REGION_ru(irs);
+            if (can_be_cand(rg)) {
+                do_inline(rg);
             }
         }
         irs = irs->get_next();

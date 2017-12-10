@@ -165,7 +165,7 @@ public:
     }
 
     void destroy() { VMD_occs(this).destroy(); }
-    void dump(Region * ru, UseDefMgr * usedefmgr);
+    void dump(Region * rg, UseDefMgr * usedefmgr);
 
     MDDef * getDef() const { return VMD_def(this); }
     IRSet * getOccSet() { return &VMD_occs(this); }
@@ -326,7 +326,7 @@ public:
         m_opnd_list = NULL;
     }
 
-    void dump(Region * ru, UseDefMgr * mgr);
+    void dump(Region * rg, UseDefMgr * mgr);
 
     IR * getOpndList() const { return m_opnd_list; }
     VMD * getOpndVMD(IR const* opnd, UseDefMgr const* mgr) const;
@@ -370,7 +370,7 @@ protected:
     void cleanOrDestroy(bool is_reinit);
     void destroyMD2VMDVec();
 public:
-    UseDefMgr(Region * ru);
+    UseDefMgr(Region * rg);
     COPY_CONSTRUCTOR(UseDefMgr);
     ~UseDefMgr() { cleanOrDestroy(false); }
 

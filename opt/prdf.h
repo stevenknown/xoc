@@ -84,11 +84,11 @@ protected:
             DefSBitSetCore * use,
             bool is_lhs);
 public:
-    PRDF(Region * ru)
+    PRDF(Region * rg)
     {
-        m_ru = ru;
-        m_md_sys = ru->getMDSystem();
-        m_cfg = ru->getCFG();
+        m_ru = rg;
+        m_md_sys = rg->getMDSystem();
+        m_cfg = rg->getCFG();
         m_var2pr = NULL;
         m_handle_may = false;
     }

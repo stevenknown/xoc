@@ -103,7 +103,7 @@ class MDId2IRlist : public TMap<UINT, DefSBitSetCore*> {
     //Indicate if there exist stmt which only have MayDef.
     bool m_are_stmts_defed_ineffect_md;
 public:
-    explicit MDId2IRlist(Region * ru);
+    explicit MDId2IRlist(Region * rg);
     COPY_CONSTRUCTOR(MDId2IRlist);
     ~MDId2IRlist();
 
@@ -422,6 +422,8 @@ protected:
     void inferIstore(IR * ir, UINT duflag);
     void inferStore(IR * ir, UINT duflag);
     void inferStorePR(IR * ir, UINT duflag);
+    void inferGetelem(IR * ir, UINT duflag);
+    void inferSetelem(IR * ir, UINT duflag);
     void inferStoreArray(IR * ir, UINT duflag);
     void inferPhi(IR * ir, UINT duflag);
     void inferCallAndIcall(IR * ir, UINT duflag, IN MD2MDSet * mx);
@@ -438,7 +440,7 @@ protected:
     void updateDefWithMustExactMD(IR * ir, MD const* mustexact);
     void updateDef(IR * ir, UINT flag);
 public:
-    explicit IR_DU_MGR(Region * ru);
+    explicit IR_DU_MGR(Region * rg);
     COPY_CONSTRUCTOR(IR_DU_MGR);
     ~IR_DU_MGR();
 

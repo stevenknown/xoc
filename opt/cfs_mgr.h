@@ -143,9 +143,9 @@ protected:
         return p;
     }
 public:
-    CfsMgr(Region * ru)
+    CfsMgr(Region * rg)
     {
-        m_ru = ru;
+        m_ru = rg;
         m_pool = smpoolCreate(64, MEM_COMM);
     }
 

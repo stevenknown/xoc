@@ -72,9 +72,11 @@ namespace xoc {
         prt2C s;                                     \
         prt2C(" Time:%fsec", getclockend(_timer_)); \
     }
-    
+
 
 #define NIL_START  100000
+#define DUMP_INDENT_NUM 4
+
 template <class T, class Ttgt>
 void dump_rbt(RBT<T, Ttgt> & rbt,
               CHAR const* name = NULL,
@@ -245,9 +247,12 @@ void * tlloc(LONG size);
 //Free whole temporary memory pool.
 void tfree();
 
-//Dump formatted string to g_tfile.
+//Helper function to dump formatted string to g_tfile.
 //This function indents blank space indicated by g_indent.
 void note(CHAR const* format, ...);
+
+//Helper function to dump formatted string to g_tfile without indent.
+void prt(CHAR const* format, ...);
 
 } //namespace xoc
 #endif

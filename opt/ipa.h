@@ -56,10 +56,10 @@ protected:
     }
 
     void createCallDummyuse(IR * call, Region * callru);
-    void createCallDummyuse(Region * ru);
+    void createCallDummyuse(Region * rg);
     void createCallDummyuse(OptCtx & oc);
 
-    void recomputeDUChain(Region * ru, OptCtx & oc);
+    void recomputeDUChain(Region * rg, OptCtx & oc);
 
     Region * findRegion(IR * call, Region * callru);
 public:

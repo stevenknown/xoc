@@ -75,7 +75,7 @@ class Region;
 class IR_CFG;
 
 IRBB * findAndInsertPreheader(
-            LI<IRBB> const* li, Region * ru,
+            LI<IRBB> const* li, Region * rg,
             OUT bool & insert_bb, bool force);
 IRBB * findSingleBackedgeStartBB(LI<IRBB> const* li, IR_CFG * cfg);
 bool findTwoSuccessorBBOfLoopHeader(

@@ -573,7 +573,7 @@ void IR_IVR::_dump(LI<IRBB> * li, UINT indent)
 void IR_IVR::dump()
 {
     if (g_tfile == NULL) { return; }
-    fprintf(g_tfile, "\n==---- DUMP IVR -- ru:'%s' ----==", m_ru->getRegionName());
+    fprintf(g_tfile, "\n==---- DUMP IVR -- rg:'%s' ----==", m_ru->getRegionName());
     _dump(m_cfg->getLoopInfo(), 0);
     fflush(g_tfile);
 }
@@ -602,8 +602,8 @@ bool IR_IVR::perform(OptCtx & oc)
     if (n == 0) { return false; }
     ASSERT0(m_cfg && m_du && m_md_sys && m_tm);
 
-    m_ru->checkValidAndRecompute(&oc, PASS_REACH_DEF, 
-        PASS_DU_REF, PASS_DOM, PASS_LOOP_INFO, 
+    m_ru->checkValidAndRecompute(&oc, PASS_REACH_DEF,
+        PASS_DU_REF, PASS_DOM, PASS_LOOP_INFO,
         PASS_DU_CHAIN, PASS_RPO, PASS_UNDEF);
 
     if (!OC_is_du_chain_valid(oc)) {

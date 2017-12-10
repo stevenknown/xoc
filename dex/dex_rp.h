@@ -37,7 +37,7 @@ author: Su Zhenyu
 class DEX_RP : public IR_RP {
     bool m_has_insert_stuff;
 public:
-    DEX_RP(Region * ru, IR_GVN * gvn) : IR_RP(ru, gvn)
+    DEX_RP(Region * rg, IR_GVN * gvn) : IR_RP(rg, gvn)
     { m_has_insert_stuff = false; }
     virtual ~DEX_RP() {}
 
@@ -56,7 +56,7 @@ public:
         return IR_RP::isPromotable(ir);
     }
 
-    void insert_stuff_code(IR const* ref, Region * ru, IR_GVN * gvn)
+    void insert_stuff_code(IR const* ref, Region * rg, IR_GVN * gvn)
     {
         ASSERT0(ref->is_array());
 
@@ -65,7 +65,7 @@ public:
         IRBB * stmt_bb = stmt->getBB();
         ASSERT0(stmt_bb);
 
-        IR_DU_MGR * dumgr = ru->getDUMgr();
+        IR_DU_MGR * dumgr = rg->getDUMgr();
 
         C<IR*> * ct = NULL;
         BB_irlist(stmt_bb).find(stmt, &ct);
@@ -74,11 +74,11 @@ public:
         //Insert stuff code as you need. It will slow down the benchmark.
         UINT num_want_to_insert = 30;
         for (UINT i = 0; i < num_want_to_insert; i++) {
-            IR * newref = ru->dupIRTree(ref);
+            IR * newref = rg->dupIRTree(ref);
             dumgr->copyIRTreeDU(newref, ref, true);
-            IR * stpr = ru->buildStorePR(ru->buildPrno(newref->get_type()),
+            IR * stpr = rg->buildStorePR(rg->buildPrno(newref->get_type()),
                                             newref->get_type(), newref);
-            ru->allocRefForPR(stpr);
+            rg->allocRefForPR(stpr);
             IR_may_throw(stpr) = true;
 
             //New IR has same VN with original one.

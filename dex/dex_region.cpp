@@ -201,10 +201,10 @@ void DexRegion::processSimply()
 
 
 //Add catch type string into symbol tabel to speed up string comparation.
-static void addCatchTypeName(DexRegion * ru)
+static void addCatchTypeName(DexRegion * rg)
 {
-    Dex2IR * d2ir = ru->getDex2IR();
-    SymTab * symtab = ru->getRegionMgr()->get_sym_tab();
+    Dex2IR * d2ir = rg->getDex2IR();
+    SymTab * symtab = rg->getRegionMgr()->getSymTab();
     for (TryInfo * ti = d2ir->getTryInfo(); ti != NULL; ti = ti->next) {
         for (CatchInfo * ci = ti->catch_list; ci != NULL; ci = ci->next) {
             ASSERT0(ci->kindname);

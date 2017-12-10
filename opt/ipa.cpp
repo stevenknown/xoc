@@ -88,6 +88,7 @@ void IPA::createCallDummyuse(IR * call, Region * callru)
     MDSet const* callermaydef = callru->getMayDef();
     if (callermaydef == NULL || callermaydef->is_empty()) { return; }
 
+    IR * last = NULL;
     for (INT j = mayuse->get_first(&iter);
          j >= 0; j = mayuse->get_next(j, &iter)) {
         MD const* md = m_mdsys->getMD(j);
@@ -98,26 +99,25 @@ void IPA::createCallDummyuse(IR * call, Region * callru)
 
         IR * ld = callru->buildLoad(MD_base(md));
         callru->allocRefForLoad(ld);
-        add_next(&CALL_dummyuse(call), ld);
-        call->setParent(ld);
+        xcom::add_next(&CALL_dummyuse(call), &last, ld);
+        IR_parent(ld) = call;
     }
 }
 
 
-
-void IPA::createCallDummyuse(Region * ru)
+void IPA::createCallDummyuse(Region * rg)
 {
-    ASSERT0(ru);
-    IR * ir = ru->getIRList();
+    ASSERT0(rg);
+    IR * ir = rg->getIRList();
     if (ir == NULL) {
-        BBList * bbl = ru->getBBList();
+        BBList * bbl = rg->getBBList();
         if (bbl == NULL) { return; }
         for (IRBB * bb = bbl->get_head(); bb != NULL; bb = bbl->get_next()) {
             for (IR * ir2 = BB_first_ir(bb);
                  ir2 != NULL; ir2 = BB_next_ir(bb)) {
                 if (!ir2->is_call()) { continue; }
                 //TODO: handle icall.
-                createCallDummyuse(ir2, ru);
+                createCallDummyuse(ir2, rg);
             }
         }
         return;
@@ -126,7 +126,7 @@ void IPA::createCallDummyuse(Region * ru)
     for (; ir != NULL; ir = ir->get_next()) {
         if (!ir->is_call()) { continue; }
         //TODO: handle icall.
-        createCallDummyuse(ir, ru);
+        createCallDummyuse(ir, rg);
     }
 }
 
@@ -135,22 +135,22 @@ void IPA::computeCallRefForAllRegion()
 {
     START_TIMER(t, "Compute CallRef for all regions");
     for (UINT i = 0; i < m_rumgr->getNumOfRegion(); i++) {
-        Region * ru = m_rumgr->getRegion(i);
-        if (ru == NULL ||
-            (ru->getIRList() == NULL &&
-             ru->getBBList()->get_elem_count() == 0)) {
+        Region * rg = m_rumgr->getRegion(i);
+        if (rg == NULL ||
+            (rg->getIRList() == NULL &&
+             rg->getBBList()->get_elem_count() == 0)) {
             continue;
         }
 
-        ru->initPassMgr();
-        IR_AA * aa = (IR_AA*)ru->getPassMgr()->
+        rg->initPassMgr();
+        IR_AA * aa = (IR_AA*)rg->getPassMgr()->
             registerPass(PASS_AA);
-        IR_DU_MGR * dumgr = (IR_DU_MGR*)ru->getPassMgr()->
+        IR_DU_MGR * dumgr = (IR_DU_MGR*)rg->getPassMgr()->
             registerPass(PASS_DU_MGR);
         ASSERT0(dumgr);
         dumgr->computeCallRef(COMPUTE_PR_DU|COMPUTE_NOPR_DU);
-        ru->getPassMgr()->destroyPass(dumgr);
-        ru->getPassMgr()->destroyPass(aa);
+        rg->getPassMgr()->destroyPass(dumgr);
+        rg->getPassMgr()->destroyPass(aa);
     }
     END_TIMER(t, "Compute CallRef for all regions");
 }
@@ -159,15 +159,15 @@ void IPA::computeCallRefForAllRegion()
 void IPA::createCallDummyuse(OptCtx & oc)
 {
     for (UINT i = 0; i < m_rumgr->getNumOfRegion(); i++) {
-        Region * ru = m_rumgr->getRegion(i);
-        if (ru == NULL) { continue; }
-        createCallDummyuse(ru);
+        Region * rg = m_rumgr->getRegion(i);
+        if (rg == NULL) { continue; }
+        createCallDummyuse(rg);
 
         if (g_compute_du_chain) {
             OptCtx loc(oc);
-            recomputeDUChain(ru, loc);
-            if (!m_is_keep_dumgr && ru->getPassMgr() != NULL) {
-                ru->getPassMgr()->destroyPass(PASS_DU_MGR);
+            recomputeDUChain(rg, loc);
+            if (!m_is_keep_dumgr && rg->getPassMgr() != NULL) {
+                rg->getPassMgr()->destroyPass(PASS_DU_MGR);
             }
         }
     }
@@ -181,41 +181,41 @@ void IPA::createCallDummyuse(OptCtx & oc)
 }
 
 
-void IPA::recomputeDUChain(Region * ru, OptCtx & oc)
+void IPA::recomputeDUChain(Region * rg, OptCtx & oc)
 {
-    ASSERT0(ru);
-    if (ru->getIRList() == NULL &&
-        (ru->getBBList() == NULL ||
-         ru->getBBList()->get_elem_count() == 0)) {
+    ASSERT0(rg);
+    if (rg->getIRList() == NULL &&
+        (rg->getBBList() == NULL ||
+         rg->getBBList()->get_elem_count() == 0)) {
         return;
     }
 
-    if (ru->getPassMgr() == NULL) {
-        ru->initPassMgr();
+    if (rg->getPassMgr() == NULL) {
+        rg->initPassMgr();
     }
 
     //IR_DU_MGR need AA
-    ru->getPassMgr()->registerPass(PASS_AA);
+    rg->getPassMgr()->registerPass(PASS_AA);
 
     ASSERT0(!OC_is_du_chain_valid(oc));
 
     if (g_do_md_ssa) {
         //Build MD SSA du chain.
         if (m_is_recompute_du_ref) {
-            ru->checkValidAndRecompute(&oc,
+            rg->checkValidAndRecompute(&oc,
                 PASS_DU_REF,
                 PASS_CFG,
                 PASS_UNDEF);
         }
 
         //Compute typical PR du chain.
-        IR_DU_MGR * dumgr = (IR_DU_MGR*)ru->getPassMgr()->
+        IR_DU_MGR * dumgr = (IR_DU_MGR*)rg->getPassMgr()->
             registerPass(PASS_DU_MGR);
         ASSERT0(dumgr);
         dumgr->perform(oc, SOL_REACH_DEF|COMPUTE_PR_DU);
         dumgr->computeMDDUChain(oc, false, COMPUTE_PR_DU);
 
-        MDSSAMgr * mdssamgr = (MDSSAMgr*)ru->getPassMgr()->
+        MDSSAMgr * mdssamgr = (MDSSAMgr*)rg->getPassMgr()->
             registerPass(PASS_MD_SSA_MGR);
         ASSERT0(mdssamgr);
         if (!mdssamgr->isMDSSAConstructed()) {
@@ -228,14 +228,14 @@ void IPA::recomputeDUChain(Region * ru, OptCtx & oc)
     //Build typeical du chain.
     if (m_is_recompute_du_ref) {
         if (m_is_keep_reachdef) {
-            ru->checkValidAndRecompute(&oc,
+            rg->checkValidAndRecompute(&oc,
                     PASS_REACH_DEF,
                     PASS_DU_REF,
                     PASS_CFG,
                     PASS_DU_CHAIN,
                     PASS_UNDEF);
         } else {
-            ru->checkValidAndRecompute(&oc,
+            rg->checkValidAndRecompute(&oc,
                     PASS_DU_REF,
                     PASS_CFG,
                     PASS_DU_CHAIN,
@@ -243,13 +243,13 @@ void IPA::recomputeDUChain(Region * ru, OptCtx & oc)
         }
     } else {
         if (m_is_keep_reachdef) {
-            ru->checkValidAndRecompute(&oc,
+            rg->checkValidAndRecompute(&oc,
                     PASS_REACH_DEF,
                     PASS_CFG,
                     PASS_DU_CHAIN,
                     PASS_UNDEF);
         } else {
-            ru->checkValidAndRecompute(&oc,
+            rg->checkValidAndRecompute(&oc,
                     PASS_CFG,
                     PASS_DU_CHAIN,
                     PASS_UNDEF);

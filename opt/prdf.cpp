@@ -225,15 +225,15 @@ void PRDF::computeLocal(IRBB * bb, List<IR const*> & lst)
 //Note this function does not consider PHI effect.
 //e.g:
 //BB1:             BB2:
-//st $pr4 = 0      st $pr3 = 1
+//st $4 = 0        st $3 = 1
 //     \               /
 //      \             /
 //      BB3:
-//      phi $pr5 = $pr4, $pr4
+//      phi $5   =  $4, $4
 //      ...
 //
-//In actually , $pr4 only lived out from BB1, and $pr3 only lived out
-//from BB2. For present, $pr4 both live out from BB1 and BB2, and $pr3
+//In actually , $4 only lived out from BB1, and $3 only lived out
+//from BB2. For present, $4 both live out from BB1 and BB2, and $3
 //is similar.
 #ifdef STATISTIC_PRDF
 static UINT g_max_times = 0;
