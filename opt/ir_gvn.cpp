@@ -821,7 +821,7 @@ VN * IR_GVN::computeScalar(IR const* exp, bool & change)
         return computeScalarByAnonDomDef(exp, domdef, change);
     }
 
-    switch (IR_code(exp)) {
+    switch (exp->get_code()) {
     case IR_LD:
         if (domdef->is_stpr() || (LD_idinfo(exp) != ST_idinfo(domdef))) {
             return NULL;
@@ -851,7 +851,7 @@ VN * IR_GVN::computeScalar(IR const* exp, bool & change)
 VN * IR_GVN::computeVN(IR const* exp, bool & change)
 {
     ASSERT0(exp);
-    switch (IR_code(exp)) {
+    switch (exp->get_code()) {
     case IR_ADD:
     case IR_SUB:
     case IR_MUL:
@@ -1169,7 +1169,7 @@ void IR_GVN::dump_ir2vn()
 
 void IR_GVN::dump_h1(IR const* k, VN * x)
 {
-    fprintf(g_tfile, "\n\t%s", IRTNAME(IR_code(k)));
+    fprintf(g_tfile, "\n\t%s", IRTNAME(k->get_code()));
     if (k->is_pr()) {
         fprintf(g_tfile, "%d", PR_no(k));
     }

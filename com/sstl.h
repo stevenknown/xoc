@@ -540,7 +540,7 @@ public:
     void clean()
     { m_tail = NULL; }
 
-    //True if invoke memset when user query free element.
+    //True if invoke ::memset when user query free element.
     void set_clean(bool is_clean)
     { m_is_clean = (BYTE)is_clean; }
 
@@ -568,11 +568,11 @@ public:
         if (m_tail != NULL) {
             ASSERT0(t->next == NULL);
             m_tail->next = NULL;
-            m_is_clean ? memset(t, 0, sizeof(T)) : t->prev = NULL;
+            m_is_clean ? ::memset(t, 0, sizeof(T)) : t->prev = NULL;
         } else {
             ASSERT0(t->prev == NULL && t->next == NULL);
             if (m_is_clean) {
-                memset(t, 0, sizeof(T));
+                ::memset(t, 0, sizeof(T));
             }
         }
         return t;
@@ -2644,7 +2644,7 @@ public:
             init(n);
         }
         if (n > 0) {
-            memcpy(m_vec, vec.m_vec, sizeof(T) * n);
+            ::memcpy(m_vec, vec.m_vec, sizeof(T) * n);
         }
         m_last_idx = vec.m_last_idx;
     }
@@ -2701,7 +2701,7 @@ public:
             ASSERT(m_vec == NULL, ("vector should be NULL if size is zero."));
             m_vec = (T*)::malloc(sizeof(T) * num_of_elem);
             ASSERT0(m_vec);
-            memset(m_vec, 0, sizeof(T) * num_of_elem);
+            ::memset(m_vec, 0, sizeof(T) * num_of_elem);
             m_elem_num = num_of_elem;
             return;
         }
@@ -2709,8 +2709,8 @@ public:
         ASSERT0(num_of_elem > (UINT)m_elem_num);
         T * tmp = (T*)::malloc(num_of_elem * sizeof(T));
         ASSERT0(tmp);
-        memcpy(tmp, m_vec, m_elem_num * sizeof(T));
-        memset(((CHAR*)tmp) + m_elem_num * sizeof(T), 0,
+        ::memcpy(tmp, m_vec, m_elem_num * sizeof(T));
+        ::memset(((CHAR*)tmp) + m_elem_num * sizeof(T), 0,
                (num_of_elem - m_elem_num)* sizeof(T));
         ::free(m_vec);
         m_vec = tmp;
@@ -2932,7 +2932,7 @@ public:
     void clean()
     {
         ASSERT(s1.m_is_init, ("SimpleVec not yet initialized."));
-        memset(m_vec, 0, sizeof(T) * SVEC_elem_num(this));
+        ::memset(m_vec, 0, sizeof(T) * SVEC_elem_num(this));
     }
 
     UINT count_mem() const { return SVEC_elem_num(this) + sizeof(Vector<T>); }
@@ -2966,7 +2966,7 @@ public:
                    ("SimpleVec should be NULL if size is zero."));
             m_vec = (T*)::malloc(sizeof(T) * size);
             ASSERT0(m_vec);
-            memset(m_vec, 0, sizeof(T) * size);
+            ::memset(m_vec, 0, sizeof(T) * size);
             SVEC_elem_num(this) = size;
             return;
         }
@@ -2974,8 +2974,8 @@ public:
         ASSERT0(size > SVEC_elem_num(this));
         T * tmp = (T*)::malloc(size * sizeof(T));
         ASSERT0(tmp);
-        memcpy(tmp, m_vec, SVEC_elem_num(this) * sizeof(T));
-        memset(((CHAR*)tmp) + SVEC_elem_num(this) * sizeof(T),
+        ::memcpy(tmp, m_vec, SVEC_elem_num(this) * sizeof(T));
+        ::memset(((CHAR*)tmp) + SVEC_elem_num(this) * sizeof(T),
                0, (size - SVEC_elem_num(this))* sizeof(T));
         ::free(m_vec);
         m_vec = tmp;
@@ -3139,7 +3139,7 @@ protected:
         if (c == NULL) {
             c = (HC<T>*)smpoolMallocConstSize(sizeof(HC<T>), m_free_list_pool);
             ASSERT0(c);
-            memset(c, 0, sizeof(HC<T>));
+            ::memset(c, 0, sizeof(HC<T>));
         }
         return c;
     }
@@ -3312,7 +3312,7 @@ public:
     void clean()
     {
         if (m_bucket == NULL) return;
-        memset(m_bucket, 0, sizeof(HashBucket) * m_bucket_size);
+        ::memset(m_bucket, 0, sizeof(HashBucket) * m_bucket_size);
         m_elem_count = 0;
         m_elem_vector.clean();
     }
@@ -3430,7 +3430,7 @@ public:
     {
         if (m_bucket != NULL || bsize == 0) { return; }
         m_bucket = (HashBucket*)::malloc(sizeof(HashBucket) * bsize);
-        memset(m_bucket, 0, sizeof(HashBucket) * bsize);
+        ::memset(m_bucket, 0, sizeof(HashBucket) * bsize);
         m_bucket_size = bsize;
         m_elem_count = 0;
         m_free_list_pool = smpoolCreate(sizeof(HC<T>) * 4, MEM_CONST_SIZE);
@@ -3528,7 +3528,7 @@ public:
 
         HashBucket * new_bucket =
             (HashBucket*)::malloc(sizeof(HashBucket) * bsize);
-        memset(new_bucket, 0, sizeof(HashBucket) * bsize);
+        ::memset(new_bucket, 0, sizeof(HashBucket) * bsize);
         if (m_elem_count == 0) {
             ::free(m_bucket);
             m_bucket = new_bucket;
@@ -3695,6 +3695,7 @@ template <class T> class CompareKeyBase {
 public:
     bool is_less(T t1, T t2) const { return t1 < t2; }
     bool is_equ(T t1, T t2) const { return t1 == t2; }
+    T createKey(T t) { return t; }
 };
 
 template <class T, class Ttgt, class CompareKey = CompareKeyBase<T> >
@@ -3711,7 +3712,7 @@ protected:
     {
         RBTNType * p = (RBTNType*)smpoolMallocConstSize(sizeof(RBTNType), m_pool);
         ASSERT0(p);
-        memset(p, 0, sizeof(RBTNType));
+        ::memset(p, 0, sizeof(RBTNType));
         return p;
     }
 
@@ -3724,7 +3725,7 @@ protected:
             x->lchild = NULL;
             x->rchild = NULL;
         }
-        x->key = t;
+        x->key = m_ck.createKey(t);
         x->color = c;
         return x;
     }
@@ -4241,21 +4242,23 @@ public:
 
     //Alway set new mapping even if it has done.
     //This function will enforce mapping between t and mapped.
-    void setAlways(Tsrc t, Ttgt mapped)
+    Tsrc setAlways(Tsrc t, Ttgt mapped)
     {
         RBTNType * z = BaseType::insert(t, NULL);
         ASSERT0(z);
         z->mapped = mapped;
+        return z->key; //key may be different with t.
     }
 
     //Establishing mapping in between 't' and 'mapped'.
-    void set(Tsrc t, Ttgt mapped)
+    Tsrc set(Tsrc t, Ttgt mapped)
     {
         bool find = false;
         RBTNType * z = BaseType::insert(t, &find);
         ASSERT0(z);
         ASSERT(!find, ("already mapped"));
         z->mapped = mapped;
+        return z->key; //key may be different with t.
     }
 
     //Get mapped element of 't'. Set find to true if t is already be mapped.
@@ -4329,17 +4332,18 @@ public:
 
     //Add element into table.
     //Note: the element in the table must be unqiue.
-    void append(T t)
+    T append(T t)
     {
         ASSERT0(t != T(0));
         #ifdef _DEBUG_
-        bool find = false;
-        T mapped = BaseTMap::get(t, &find);
-        if (find) {
-            ASSERT0(mapped == t);
-        }
+        //Mapped element may not same with 't'.
+        //bool find = false;        
+        //T mapped = BaseTMap::get(t, &find);
+        //if (find) {           
+        //    ASSERT0(mapped == t);
+        //}
         #endif
-        BaseTMap::setAlways(t, t);
+        return BaseTMap::setAlways(t, t);
     }
 
     //Add element into table, if it is exist, return the exist one.
@@ -4353,8 +4357,7 @@ public:
             return mapped;
         }
 
-        BaseTMap::setAlways(t, t);
-        return t;
+        return BaseTMap::setAlways(t, t);        
     }
 
     void remove(T t)

@@ -156,7 +156,7 @@ int main(int argc, char * argv[])
     OptCtx oc;
     bool s = rm->processProgramRegion(rm->getRegion(1), &oc);
     ASSERT0(s);
-    
+
     //Dump GR file.
     dumpGR(rm->getRegion(1));
 

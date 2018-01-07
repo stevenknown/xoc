@@ -71,7 +71,7 @@ public:
         if (res != NULL) { *res = ir; }
 
         IR * rhs = ST_rhs(ir);
-        if ((UINT)IR_code(rhs) != (UINT)irt) return false;
+        if ((UINT)rhs->get_code() != (UINT)irt) return false;
 
         if (!BIN_opnd0(rhs)->is_pr()) return false;
         if (op0 != NULL) { *op0 = BIN_opnd0(rhs); }
@@ -121,7 +121,7 @@ public:
     {
         if (!ir->is_stpr()) { return false; }
         if (res != NULL) { *res = ir; }
-        if ((UINT)IR_code(ST_rhs(ir)) != (UINT)irt) return false;
+        if (((UINT)ST_rhs(ir)->get_code()) != (UINT)irt) return false;
         if (!UNA_opnd(ST_rhs(ir))->is_pr()) return false;
         if (op0 != NULL) { *op0 = UNA_opnd(ST_rhs(ir)); }
         return true;
@@ -131,7 +131,7 @@ public:
     {
         if (!ir->is_stpr()) return false;
         IR * rhs = ST_rhs(ir);
-        switch (IR_code(rhs)) {
+        switch (rhs->get_code()) {
         case IR_BNOT:
         case IR_LNOT:
         case IR_NEG:
@@ -2879,8 +2879,8 @@ void LTMgr::dump_allocated(FILE * h, BitSet & visited)
         }
 
         //Collects position info.
-        CHAR * pos_marker = (CHAR*)malloc(m_max_lt_len);
-        memset(pos_marker, 0, sizeof(CHAR) * m_max_lt_len);
+        CHAR * pos_marker = (CHAR*)::malloc(m_max_lt_len);
+        ::memset(pos_marker, 0, sizeof(CHAR) * m_max_lt_len);
         for (INT j = LT_range(lt)->get_first();
              j >= 0; j = LT_range(lt)->get_next(j)) {
             ASSERT0(j < (INT)m_max_lt_len);
@@ -3067,8 +3067,8 @@ void LTMgr::dump_unallocated(FILE * h, BitSet & visited)
         fprintf(h, "\n  LT(%3d):", LT_uid(lt));
 
         //Collects position info.
-        CHAR * pos_marker = (CHAR*)malloc(m_max_lt_len);
-        memset(pos_marker, 0, sizeof(CHAR) * m_max_lt_len);
+        CHAR * pos_marker = (CHAR*)::malloc(m_max_lt_len);
+        ::memset(pos_marker, 0, sizeof(CHAR) * m_max_lt_len);
         for (INT j = LT_range(lt)->get_first();
              j >= 0; j = LT_range(lt)->get_next(j)) {
             ASSERT0(j < (INT)m_max_lt_len);

@@ -191,10 +191,11 @@ class Lexer {
 protected:
     SMemPool * m_pool;
     TOKEN m_cur_token;
-    UINT m_cur_token_string_pos; //for local used.
 
-    //The string buffer which token were reside.
-    CHAR m_cur_token_string[MAX_BUF_LINE]; //for local used.
+    //The buffer that hold the token content.
+    CHAR * m_cur_token_string; //for local used.
+    UINT m_cur_token_string_len;
+    UINT m_cur_token_string_pos;
 
     //Indicate current processing character during parsing.
     CHAR m_cur_char;
@@ -202,55 +203,66 @@ protected:
     //Set true to regard '\n' as token.
     bool m_enable_newline_token;
 
-    //Set true if source line is in end of the character '0xd' and '0xa'.
+    //Set true if source line is end with the character '0xd' and '0xa'.
     bool m_is_dos;
 
     //Inpute source file handler.
     FILE * m_src_file;
 
-    //Input source file buffer.
-    CHAR const* m_src_buf;
-
+    //Record the line number that may be backed tracking from the newest line.
     UINT m_real_line_num;
 
-    //line number of src file.
+    //Record the newest line number of src file.
     UINT m_src_line_num;
 
     //Current parsing line of src file
     CHAR * m_cur_line;
 
-    //The current line buf length ,than read from file buf.
+    //Length of current parsing line buffer.
     UINT m_cur_line_len;
 
-    //Record offset of each line in src file.
+    //Record byte offset in src file of each parsed lines.
     LONG * m_ofst_tab;
 
-    //Record entry number of offset table.
+    //Record length of offset table.
     LONG m_ofst_tab_byte_size;
 
-    //If true, lexer will recognize the true and false token.
+    //Set true if need lexer to recognize the true and false token.
     bool m_enable_true_false_token;
 
-    //Record current file offset of src file.
+    //Record current byte offset in src file.
     UINT m_cur_src_ofst;
 
     //Set true to return the newline charactors as normal character.
     bool m_use_newline_char;
 
+    //Current position in m_cur_line.
     UINT m_cur_line_pos;
+    
+    //Length of m_cur_line.
     UINT m_cur_line_num;
+
+    //Buffer to hold the prefected byte from src file.
     CHAR m_file_buf[MAX_BUF_LINE];
+    
+    //Current position in m_file_buf.
     UINT m_file_buf_pos;
+
+    //Record the actually byte size that read from src file.
     UINT m_last_read_num;
-    String2Token m_str2token;
+
+    //String2Token m_str2token;
+    TMap<CHAR const*, TOKEN, CompareStringFunc> m_str2token;
     xcom::List<LexErrorMsg*> m_err_msg_list;
 
 protected:
     void initKeyWordTab();
 
+    void checkAndGrowCurTokenString();
+
     TOKEN getKeyWord(CHAR const* s)
     {
-        if (s == NULL) return T_NUL;
+        if (s == NULL) { return T_NUL; }
         return m_str2token.get(s);
     }
     INT getLine();
@@ -268,11 +280,11 @@ protected:
         ASSERT(m_pool, ("not yet initialized."));
         void * p = smpoolMallocConstSize(size, m_pool);
         ASSERT(p, ("malloc failed"));
-        memset(p, 0, size);
+        ::memset(p, 0, size);
         return p;
     }
 public:
-    Lexer() : m_str2token(0)
+    Lexer()
     {
         m_enable_newline_token = false;
         m_is_dos = true;
@@ -286,7 +298,9 @@ public:
         m_file_buf_pos = MAX_BUF_LINE;
         initKeyWordTab();
         m_pool = smpoolCreate(0, MEM_COMM);
-        clean();
+        m_cur_token_string = (CHAR*)::malloc(MAX_BUF_LINE);
+        m_cur_token_string_len = MAX_BUF_LINE;
+        clean();        
     }
     COPY_CONSTRUCTOR(Lexer);
     ~Lexer()
@@ -295,13 +309,13 @@ public:
             ::free(m_ofst_tab);
             m_ofst_tab = NULL;
         }
-
         if (m_cur_line != NULL) {
             ::free(m_cur_line);
             m_cur_line = NULL;
         }
-
         smpoolDelete(m_pool);
+        ::free(m_cur_token_string);
+        m_cur_token_string_len = 0;
     }
 
     void clean()
@@ -311,6 +325,9 @@ public:
         m_src_line_num = 0;
         if (m_cur_line != NULL) {
             m_cur_line[0] = 0;
+        }
+        if (m_cur_token_string != NULL) {
+            m_cur_token_string[0] = 0;
         }
         m_file_buf[0] = 0;
         m_real_line_num = 0;

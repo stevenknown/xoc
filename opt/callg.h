@@ -61,7 +61,7 @@ public:
     } u1;
 
 public:
-    CallNode() { memset(this, 0, sizeof(CallNode)); }
+    CallNode() { ::memset(this, 0, sizeof(CallNode)); }
 };
 
 
@@ -92,7 +92,7 @@ class CallGraph : public DGraph {
         CallNode * p = (CallNode*)smpoolMallocConstSize(
                             sizeof(CallNode), m_cn_pool);
         ASSERT0(p);
-        memset(p, 0, sizeof(CallNode));
+        ::memset(p, 0, sizeof(CallNode));
         return p;
     }
 

@@ -199,7 +199,7 @@ public:
         Vertex * vex =
             (Vertex*)smpoolMallocConstSize(sizeof(Vertex), m_ec_pool);
         ASSERT0(vex);
-        memset(vex, 0, sizeof(Vertex));
+        ::memset(vex, 0, sizeof(Vertex));
         VERTEX_id(vex) = (UINT)(size_t)v;
         return vex;
     }
@@ -280,7 +280,7 @@ protected:
         Vertex * vex = (Vertex*)smpoolMallocConstSize(
             sizeof(Vertex), m_vertex_pool);
         ASSERT0(vex);
-        memset(vex, 0, sizeof(Vertex));
+        ::memset(vex, 0, sizeof(Vertex));
         return vex;
     }
 
@@ -299,7 +299,7 @@ protected:
         Edge * e = m_e_free_list.get_free_elem();
         if (e == NULL) {
             e = (Edge*)smpoolMallocConstSize(sizeof(Edge), m_edge_pool);
-            memset(e, 0, sizeof(Edge));
+            ::memset(e, 0, sizeof(Edge));
         }
         EDGE_from(e) = from;
         EDGE_to(e) = to;
@@ -316,7 +316,7 @@ protected:
         EdgeC * el = m_el_free_list.get_free_elem();
         if (el == NULL) {
             el = (EdgeC*)smpoolMallocConstSize(sizeof(EdgeC), m_ec_pool);
-            memset(el, 0, sizeof(EdgeC));
+            ::memset(el, 0, sizeof(EdgeC));
         }
         EC_edge(el) = e;
         return el;

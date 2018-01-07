@@ -174,6 +174,10 @@ void RegionMgr::addToRegionTab(Region * rg)
     ASSERT(REGION_id(rg) > 0, ("should generate new region via newRegion()"));
     ASSERT0(getRegion(REGION_id(rg)) == NULL);
     ASSERT0(REGION_id(rg) < m_ru_count);
+    INT pad = xcom::getNearestPowerOf2(REGION_id(rg));
+    if (m_id2ru.get_last_idx() + 1 < pad) {
+        m_id2ru.set(pad, NULL);
+    }
     m_id2ru.set(REGION_id(rg), rg);
 }
 

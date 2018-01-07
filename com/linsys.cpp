@@ -57,7 +57,7 @@ class X2V_MAP {
         ASSERT(m_is_init == true, ("List not yet initialized."));
         void * p = smpoolMalloc(size, m_pool);
         if (!p) return NULL;
-        memset(p,0,size);
+        ::memset(p,0,size);
         return p;
     }
 

@@ -59,7 +59,7 @@ LabelInfo * allocLabel(SMemPool * pool)
 {
     LabelInfo * p = (LabelInfo*)smpoolMalloc(sizeof(LabelInfo), pool);
     ASSERT0(p);
-    memset(p, 0, sizeof(LabelInfo));
+    ::memset(p, 0, sizeof(LabelInfo));
     return p;
 }
 
@@ -90,9 +90,6 @@ void dumpLabel(LabelInfo const* li)
     }
     if (LABEL_INFO_is_catch_start(li)) {
         fprintf(g_tfile, "catch_start ");
-    }
-    if (LABEL_INFO_is_used(li)) {
-        fprintf(g_tfile, "used ");
     }
     if (LABEL_INFO_b1(li) != 0) {
         fprintf(g_tfile, ")");

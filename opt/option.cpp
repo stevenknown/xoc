@@ -204,9 +204,17 @@ bool g_do_md_ssa = true;
 //Record the maximum limit of the number of BB to perform optimizations.
 UINT g_thres_opt_bb_num = 100000;
 
+//Record the maximum limit of the number of
+//PtPair to perform flow sensitive analysis.
+UINT g_thres_flow_sensitive_aa = 10000;
+
 //Record the maximum limit of the number of IR to perform optimizations.
 //This is the threshold to do optimization.
 UINT g_thres_opt_ir_num = 30000;
+
+//Record the maximum limit of the number of IR in single to perform optimizations.
+//This is the threshold to do optimization.
+UINT g_thres_opt_ir_num_in_bb = 10000;
 
 //Convert while-do to do-while loop.
 bool g_do_loop_convert = false;

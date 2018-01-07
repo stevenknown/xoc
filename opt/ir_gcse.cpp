@@ -67,7 +67,7 @@ void IR_GCSE::elimCseAtStore(IR * use, IR * use_stmt, IR * gen)
     ASSERT0(use_stmt->is_st() || use_stmt->is_stpr() || use_stmt->is_ist());
     #ifdef DEBUG_GCSE
     ASSERT0(++g_num_of_elim);
-    ASSERT0(g_elim_irt.append_tail(IR_code(use)));
+    ASSERT0(g_elim_irt.append_tail(use->get_code()));
     #endif
     ASSERT0(use->is_exp() && gen->is_exp());
     ASSERT0(use_stmt->getRHS() == use);
@@ -116,7 +116,7 @@ void IR_GCSE::elimCseAtBranch(IR * use, IR * use_stmt, IN IR * gen)
 {
     #ifdef DEBUG_GCSE
     ASSERT0(++g_num_of_elim);
-    ASSERT0(g_elim_irt.append_tail(IR_code(use)));
+    ASSERT0(g_elim_irt.append_tail(use->get_code()));
     #endif
     ASSERT0(use->is_exp() && gen->is_exp());
 
@@ -174,7 +174,7 @@ void IR_GCSE::elimCseAtCall(IR * use, IR * use_stmt, IR * gen)
 {
     #ifdef DEBUG_GCSE
     ASSERT0(++g_num_of_elim);
-    ASSERT0(g_elim_irt.append_tail(IR_code(use)));
+    ASSERT0(g_elim_irt.append_tail(use->get_code()));
     #endif
     ASSERT0(use->is_exp() && gen->is_exp() && use_stmt->is_stmt());
 
@@ -332,7 +332,7 @@ bool IR_GCSE::elim(IR * use, IR * use_stmt, IR * gen, IR * gen_stmt)
     //     ...=a+b <--use CSE
     bool change = false;
     prcessCseGen(gen, gen_stmt, change);
-    switch (IR_code(use_stmt)) {
+    switch (use_stmt->get_code()) {
     case IR_ST:
     case IR_STPR:
     case IR_IST:

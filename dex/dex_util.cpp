@@ -343,7 +343,7 @@ void extractFunctionTypeFromFunctionTypeString(
         } else if (*p == ')') {
             end2 = p;
             UINT s = end2 - start2 - 1;
-            memcpy(param_type, start2 + 1, s);
+            ::memcpy(param_type, start2 + 1, s);
             param_type[s] = 0;
             break;
         }
@@ -352,7 +352,7 @@ void extractFunctionTypeFromFunctionTypeString(
     ASSERT(end2, ("unsupport string pattern"));
 
     UINT s = end - end2;
-    memcpy(return_type, end2 + 1, s);
+    ::memcpy(return_type, end2 + 1, s);
     return_type[s] = 0;
 }
 
@@ -374,13 +374,13 @@ void extractFunctionTypeFromRegionName(
 
     if (classpath != NULL) {
         UINT l = strlen(ret[CLASSPATH_PART]);
-        memcpy(classpath, ret[CLASSPATH_PART], l + 1);
+        ::memcpy(classpath, ret[CLASSPATH_PART], l + 1);
         classpath[l] = 0;
     }
 
     if (functionname != NULL) {
         UINT l = strlen(ret[FUNCNAME_PART]);
-        memcpy(functionname, ret[FUNCNAME_PART], l + 1);
+        ::memcpy(functionname, ret[FUNCNAME_PART], l + 1);
         functionname[l] = 0;
     }
 
@@ -399,7 +399,7 @@ void extractFunctionTypeFromRegionName(
             end = p;
             UINT s = end - start - 1;
             if (param_type != NULL) {
-                memcpy(param_type, start + 1, s);
+                ::memcpy(param_type, start + 1, s);
                 param_type[s] = 0;
             }
             len++;
@@ -409,14 +409,14 @@ void extractFunctionTypeFromRegionName(
 
     ASSERT(end, ("unsupport string pattern"));
 
-    UINT s = strlen(typestr) - len;
+    UINT s = ::strlen(typestr) - len;
     if (return_type != NULL) {
-        memcpy(return_type, typestr + len, s);
+        ::memcpy(return_type, typestr + len, s);
         return_type[s] = 0;
     }
 
     for (UINT i = 0; i < num; i++) {
-        free(ret[i]);
+        ::free(ret[i]);
     }
 }
 
@@ -514,7 +514,7 @@ UINT extractSeparateParamterType(
 
             UINT s = end - start;
             if (outputbuf != NULL) {
-                memcpy(outputbuf, start, s);
+                ::memcpy(outputbuf, start, s);
                 outputbuf[s] = 0;
                 ASSERT0(params);
                 outputbuf = params->get_next();

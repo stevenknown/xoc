@@ -97,7 +97,7 @@ protected:
                     bool scan_inner_region);
 
 public:
-    explicit RegionMgr() : m_sym_tab(0)
+    explicit RegionMgr()
     {
         ASSERT0(verifyPreDefinedInfo());
         #ifdef _DEBUG_
@@ -111,7 +111,6 @@ public:
         m_str_md = NULL;
         m_call_graph = NULL;
         m_targinfo = NULL;
-        m_sym_tab.init(64);
     }
     COPY_CONSTRUCTOR(RegionMgr);
     virtual ~RegionMgr();

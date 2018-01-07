@@ -266,6 +266,8 @@ public:
         return (((ULONGLONG)MD_ofst(t1)) << 32 | ((ULONGLONG)MD_size(t1))) ==
                (((ULONGLONG)MD_ofst(t2)) << 32 | ((ULONGLONG)MD_size(t2)));
     }
+
+    MD const* createKey(MD const* t) { return t; }
 };
 
 
@@ -483,7 +485,7 @@ public:
         if (mds == NULL) {
             mds = (MDSet*)smpoolMallocConstSize(sizeof(MDSet), m_mds_pool);
             ASSERT0(mds);
-            memset(mds, 0, sizeof(MDSet));
+            ::memset(mds, 0, sizeof(MDSet));
             m_md_set_list.append_head(mds);
         }
         return mds;
@@ -653,7 +655,7 @@ public:
         if (md == NULL) { return; }
         m_id2md_map.remove(MD_id(md));
         UINT mdid = MD_id(md);
-        memset(md, 0, sizeof(MD));
+        ::memset(md, 0, sizeof(MD));
         MD_id(md) = mdid;
         m_free_md_list.append_head(md);
     }

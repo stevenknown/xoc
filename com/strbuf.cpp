@@ -50,7 +50,7 @@ void StrBuf::strcat(UINT l, CHAR const* format, va_list args)
         CHAR * oldbuf = buf;
         buflen += l + 1;
         buf = (CHAR*)malloc(buflen);
-        memcpy(buf, oldbuf, sl);
+        ::memcpy(buf, oldbuf, sl);
         free(oldbuf);
     }
     UINT k = VSNPRINTF(buf + sl, l + 1, format, args);

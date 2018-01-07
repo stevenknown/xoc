@@ -39,6 +39,7 @@ protected:
     SMemPool * m_pool;
     Var2UINT m_var2blt;
     UINT2Var m_blt2var;
+    ConstSym2Var m_sym2var;
 
 protected:
     VAR * addVarForBuiltin(CHAR const* name);
@@ -51,6 +52,7 @@ public:
     COPY_CONSTRUCTOR(DexRegionMgr);
     virtual ~DexRegionMgr() { smpoolDelete(m_pool); }
 
+    void addBuiltinVarToTab();
     virtual Region * allocRegion(REGION_TYPE rt)
     { return new DexRegion(rt, this); }
 
@@ -65,6 +67,7 @@ public:
     SMemPool * get_pool() { return m_pool; }
     Var2UINT & getVar2Builtin() { return m_var2blt; }
     UINT2Var & getBuiltin2Var() { return m_blt2var; }
+    ConstSym2Var & getSym2Var() { return m_sym2var; }
     Var2UINT const& getVar2BuiltinC() const { return m_var2blt; }
     UINT2Var const& getBuiltin2VarC() const { return m_blt2var; }
 
@@ -77,7 +80,7 @@ public:
     {
         void * p = smpoolMalloc(size, m_pool);
         ASSERT0(p);
-        memset(p, 0, size);
+        ::memset(p, 0, size);
         return p;
     }
 

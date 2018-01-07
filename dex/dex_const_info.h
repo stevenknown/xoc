@@ -43,6 +43,10 @@ author: Su Zhenyu
 #define HOST_FP              double
 #define HOST_BYTE_PER_INT    8
 
+//Describe the maximum byte size that can be allocated on host machine stack.
+//The threshold often used in allocating memory via ALLOCA.
+#define HOST_STACK_MAX_USABLE_MEMORY_BYTE_SIZE    32768
+
 //Define signed and unsigned integer type on host machine.
 #define INT8                 CHAR
 #define UINT8                UCHAR

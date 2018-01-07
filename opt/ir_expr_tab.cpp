@@ -43,7 +43,7 @@ IR_EXPR_TAB::IR_EXPR_TAB(Region * rg)
     m_expr_count = 0;
     m_ru = rg;
     m_tm = rg->getTypeMgr();
-    memset(m_level1_hash_tab, 0,
+    ::memset(m_level1_hash_tab, 0,
            sizeof(ExpRep*) * IR_EXPR_TAB_LEVEL1_HASH_BUCKET);
     m_pool = smpoolCreate(sizeof(ExpRep*) * 128, MEM_COMM);
     m_sc_pool = smpoolCreate(sizeof(SC<ExpRep*>) * 4, MEM_CONST_SIZE);
@@ -84,7 +84,7 @@ void * IR_EXPR_TAB::xmalloc(INT size)
 {
     void * p = smpoolMalloc(size, m_pool);
     ASSERT0(p);
-    memset(p, 0, size);
+    ::memset(p, 0, size);
     return p;
 }
 

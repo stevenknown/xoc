@@ -2272,7 +2272,7 @@ bool IR::isReadModWrite() const
 {
     if (IR_is_read_mod_write(this)) {
         //Code pattern: $x = call(oldvalue, newvalue)
-		//oldvalue must be [ld].
+        //oldvalue must be [ld].
         //newvalue could be [ld|pr|const].
         ASSERT0(is_call() &&
                 CALL_param_list(this) != NULL &&
@@ -2420,7 +2420,7 @@ DU * IR::cleanDU()
 //Return stmt if it writes PR as result.
 IR * IR::getResultPR()
 {
-	ASSERT0(is_stmt());
+    ASSERT0(is_stmt());
     switch (get_code()) {
     case IR_ST: return NULL;
     case IR_STPR:
@@ -2481,6 +2481,7 @@ bool IR::isConstIntValueEqualTo(HOST_INT value) const
 
 
 //Exported Functions.
+CHAR const* compositeName(SYM const* n, xcom::StrBuf & buf);
 void dump_ir(IR const* ir,
              TypeMgr const* tm,
              CHAR * attr = NULL,
@@ -2506,7 +2507,7 @@ public:
     bool dump_inner_region;
     IR_CFG * cfg;
 
-    DumpGRCtx() { memset(this, 0, sizeof(DumpGRCtx)); }
+    DumpGRCtx() { ::memset(this, 0, sizeof(DumpGRCtx)); }
 };
 void dumpGR(IR const* ir, TypeMgr * tm, DumpGRCtx * ctx);
 void dumpGRInBBList(xcom::List<IRBB*> * bblist, TypeMgr * tm, DumpGRCtx * ctx);

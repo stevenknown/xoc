@@ -59,6 +59,8 @@ public:
 
     bool is_equ(CHAR const* t1, CHAR const* t2) const
     { return strcmp(t1, t2) == 0; }
+
+    CHAR const* createKey(CHAR const* t) { return t; }    
 };
 
 typedef TMap<CHAR const*, Type const*, CmpStr> Str2Type;
@@ -106,7 +108,7 @@ protected:
         ASSERT(pool, ("need pool!!"));
         void * p = smpoolMalloc(size, pool);
         ASSERT0(p);
-        memset(p, 0, size);
+        ::memset(p, 0, size);
         return p;
     }
 
@@ -116,7 +118,7 @@ protected:
         ASSERT(m_pool != NULL, ("need pool!!"));
         void * p = smpoolMalloc(size, m_pool);
         ASSERT0(p);
-        memset(p, 0, size);
+        ::memset(p, 0, size);
         return p;
     }
 public:

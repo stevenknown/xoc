@@ -57,6 +57,7 @@ public:
 
     SMemPool * m_pool;
     SMemPool * m_du_pool;
+    SMemPool * m_sc_labelinfo_pool;
 
     //Indicate a list of IR.
     IR * m_ir_list;
@@ -201,7 +202,7 @@ public:
                ("pool does not initialized"));
         void * p = smpoolMalloc(size, REGION_analysis_instrument(this)->m_pool);
         ASSERT0(p != NULL);
-        memset(p, 0, size);
+        ::memset(p, 0, size);
         return p;
     }
 
@@ -225,12 +226,15 @@ public:
     }
 
     //The function generates new MD for given LD.
-    //It should be called if new PR generated in optimzations.
+    //It should be called if LD generated in optimzations.
     inline MD const* allocRefForLoad(IR * ld)
     {
         MD const* md = genMDforLoad(ld);
         ld->setRefMD(md, this);
-        ld->cleanRefMDSet();
+
+        //Do NOT clean MDSet because transformation may combine ILD(LDA)
+        //into LD and carry MDSet from ILD.
+        //ld->cleanRefMDSet();
         return md;
     }
 
@@ -240,7 +244,10 @@ public:
     {
         MD const* md = genMDforStore(st);
         st->setRefMD(md, this);
-        st->cleanRefMDSet();
+
+        //Do NOT clean MDSet because transformation may combine IST(LDA)
+        //into ST and carry MDSet from IST.
+        //st->cleanRefMDSet();
         return md;
     }
 
@@ -250,7 +257,7 @@ public:
         if (du == NULL) {
             du = (DU*)smpoolMallocConstSize(sizeof(DU),
                             REGION_analysis_instrument(this)->m_du_pool);
-            memset(du, 0, sizeof(DU));
+            ::memset(du, 0, sizeof(DU));
         }
         return du;
     }
@@ -419,6 +426,9 @@ public:
 
     SMemPool * get_pool() const
     { return REGION_analysis_instrument(this)->m_pool; }
+
+    SMemPool * getSCLabelInfoPool() const
+    { return REGION_analysis_instrument(this)->m_sc_labelinfo_pool; }
 
     UINT getPRCount() const
     { return REGION_analysis_instrument(this)->m_pr_count; }

@@ -324,9 +324,9 @@ void IR_CFG::initCfg(OptCtx & oc)
         return;
     }
 
-    //cfg->removeEmptyBB();
-    build(oc);
-    buildEHEdge();
+    //cfg->removeEmptyBB();    
+    build(oc);    
+    buildEHEdge();    
 
     //Rebuild cfg may generate redundant empty bb, it
     //disturb the computation of entry and exit.

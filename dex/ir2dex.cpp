@@ -54,7 +54,7 @@ void * IR2Dex::ymalloc(UINT size)
 {
     void * p = LIRMALLOC(size);
     ASSERT0(p);
-    memset(p, 0, size);
+    ::memset(p, 0, size);
     return p;
 }
 
@@ -653,7 +653,7 @@ LIR * IR2Dex::buildUniOp(IN IR ** ir)
     ASSERT(op0->is_pr(), ("just support pr operation"));
 
     enum _LIROpcode lty = LOP_NOP;
-    switch (IR_code(STPR_rhs(tir))) {
+    switch (STPR_rhs(tir)->get_code()) {
     case IR_NEG   : lty = LOP_NEG; break;
     case IR_BNOT  : lty = LOP_NOT; break;
     default: UNREACH();
@@ -1252,7 +1252,7 @@ LIR * IR2Dex::convertBranch(bool is_truebr, IN OUT IR ** ir, IN IR2DexCtx * cont
     ASSERT0(BIN_opnd0(det)->is_pr());
 
     if (is_truebr) {
-        switch (IR_code(det)) {
+        switch (det->get_code()) {
         case IR_LT: LIR_dt(lir) = LIR_cond_LT; break;
         case IR_GT: LIR_dt(lir) = LIR_cond_GT; break;
         case IR_LE: LIR_dt(lir) = LIR_cond_LE; break;
@@ -1262,7 +1262,7 @@ LIR * IR2Dex::convertBranch(bool is_truebr, IN OUT IR ** ir, IN IR2DexCtx * cont
         default: UNREACH();
         }
     } else {
-        switch (IR_code(det)) {
+        switch (det->get_code()) {
         case IR_LT: LIR_dt(lir) = LIR_cond_GE; break;
         case IR_GT: LIR_dt(lir) = LIR_cond_LE; break;
         case IR_LE: LIR_dt(lir) = LIR_cond_GT; break;
@@ -1363,7 +1363,7 @@ LIR * IR2Dex::convertSwitch(IN OUT IR ** ir, IN IR2DexCtx * cont)
 LIR * IR2Dex::convert(IN OUT IR ** ir, IN IR2DexCtx * cont)
 {
     ASSERT0((*ir)->is_stmt());
-    switch (IR_code(*ir)) {
+    switch ((*ir)->get_code()) {
      case IR_ST:
         return convertStoreVar(ir, cont);
     case IR_STPR:

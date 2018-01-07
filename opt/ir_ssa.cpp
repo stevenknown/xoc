@@ -1628,7 +1628,7 @@ static IR * replace_res_pr(
     ASSERT0(newprno > 0);
 
     //Replace stmt PR and DATA_TYPE info.
-    switch (IR_code(stmt)) {
+    switch (stmt->get_code()) {
     case IR_STPR:
         ASSERT0(STPR_no(stmt) == oldprno);
         STPR_no(stmt) = newprno;

@@ -21,6 +21,8 @@ public:
         if (s1 == NULL) { return true; }
         return false;
     }
+
+    char const* createKey(char const* t) { return t; }
 };
 void string_tab()
 {

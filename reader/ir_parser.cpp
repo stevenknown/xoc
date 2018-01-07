@@ -133,6 +133,7 @@ static XCodeInfo g_keyword_info[] = {
     { X_SIDEEFFECT,  "sideeffect",       },
     { X_NOMOVE,      "nomove",           },
     { X_USE,         "use",              },
+    { X_DEF,         "def",              },
     { X_PRIVATE,     "private",          },
     { X_RESTRICT,    "restrict",         },
     { X_VOLATILE,    "volatile",         },
@@ -140,20 +141,117 @@ static XCodeInfo g_keyword_info[] = {
     { X_FAKE,        "fake",             },
     { X_GLOBAL,      "global",           },
     { X_UNDEFINED,   "undefined",        },
+    { X_STRING,      "string",           },
+    { X_BYTE,        "byte",             },
+    { X_ELEMTYPE,    "elemtype",         },
+    { X_DIM,         "dim",              },
     { X_LAST,        "",                 },
 };
 
 
-//
-//START ParseCtx
-//
-//END ParseCtx
+static X_CODE g_property_code [] = {
+    X_READONLY,
+    X_RMW,
+    X_THROW,
+    X_SIDEEFFECT,
+    X_NOMOVE,
+    X_ATOM,
+    X_TERMINATE,
+    X_USE,
+    X_DEF,
+    X_ELEMTYPE,
+    X_DIM
+};
 
+
+static X_CODE g_stmt_code [] = {
+    X_REGION,
+    X_ST,
+    X_STRP,
+    X_STARRAY,
+    X_SETELEM,
+    X_GETELEM,
+    X_IST,
+    X_CALL,
+    X_ICALL,
+    X_GOTO,
+    X_IGOTO,
+    X_DO,
+    X_WHILE,
+    X_DO_LOOP,
+    X_LABEL,
+    X_TRUEBR,
+    X_FALSEBR,
+    X_PHI,
+    X_IF,
+    X_BREAK,
+    X_RETURN,
+    X_CONTINUE,
+    X_SWITCH
+};
+
+
+static X_CODE g_exp_code [] = {
+    X_ID,
+    X_LD,
+    X_ILD,
+    X_ARRAY,
+    X_LDA,
+    X_ADD,
+    X_SUB,
+    X_MUL,
+    X_DIV,
+    X_REM,
+    X_MOD,
+    X_LAND,
+    X_LOR,
+    X_BAND,
+    X_BOR,
+    X_XOR,
+    X_ASR,
+    X_LSR,
+    X_LSL,
+    X_LT,
+    X_LE,
+    X_GT,
+    X_GE,
+    X_EQ,
+    X_NE,
+    X_BNOT,
+    X_LNOT,
+    X_NEG,
+    X_CVT,
+    X_SELECT,
+    X_CASE
+};
+
+
+static X_CODE g_type_code [] = {
+    X_I8,
+    X_U8,
+    X_I16,
+    X_U16,
+    X_I32,
+    X_U32,
+    X_I64,
+    X_U64,
+    X_I128,
+    X_U128,
+    X_F32,
+    X_F64,
+    X_F80,
+    X_F128,
+    X_MC,
+    X_STR,
+    X_VEC,
+    X_BOOL,
+    X_VOID
+};
 
 //
 //START IRParser
 //
-static void copyProp(IR * ir, PropertySet & cont)
+static void copyProp(IR * ir, PropertySet & cont, ParseCtx * ctx)
 {
     IR_is_atomic(ir) = cont.atomic;
     IR_may_throw(ir) = cont.throw_exception;
@@ -161,6 +259,32 @@ static void copyProp(IR * ir, PropertySet & cont)
     IR_no_move(ir) = cont.nomove;
     IR_is_read_mod_write(ir) = cont.read_modify_write;
     IR_is_terminate(ir) = cont.terminate;
+    if (ir->is_icall()) {
+        ICALL_is_readonly(ir) = cont.readonly;
+    }
+    if (ir->is_region()) {
+        REGION_is_readonly(REGION_ru(ir)) = cont.readonly;
+    }
+
+    if (ir->isMayThrow()) {
+        for (LabelInfo * l = cont.getLabelList().get_tail();
+             l != NULL; l = cont.getLabelList().get_prev()) {            
+            AIContainer * ai = IR_ai(ir);
+            if (ai == NULL) {
+                ai = ctx->current_region->allocAIContainer();
+                IR_ai(ir) = ai;
+            }
+
+            EHLabelAttachInfo * ehai = (EHLabelAttachInfo*)ai->get(AI_EH_LABEL);
+            if (ehai == NULL) {
+                ehai = (EHLabelAttachInfo*)ctx->current_region->
+                    xmalloc(sizeof(EHLabelAttachInfo));
+                ehai->init(ctx->current_region->getSCLabelInfoPool());
+                ai->set(ehai);
+            }
+            ehai->get_labels().append_head(l);
+        }
+    }
 }
 
 
@@ -173,12 +297,47 @@ IRParser::~IRParser()
 }
 
 
+static CHAR * dumpTN(SYM* key, SYM* mapped)
+{
+    return SYM_name(key);
+}
+
+
+static CHAR const* dumpStr(CHAR const*  key, X_CODE code)
+{
+    return key;
+}
+
+
 void IRParser::initKeyWordMap()
 {
+    DUMMYUSE(dumpTN);
+    DUMMYUSE(dumpStr);
     for (UINT i = X_UNDEF + 1; i < X_LAST; i++) {
-        m_sym2xcode.set(m_rumgr->addToSymbolTab(
-            g_keyword_info[i].name), (X_CODE)i);
+        m_str2xcode.set(g_keyword_info[i].name, (X_CODE)i);
     }
+    for (UINT i = 0; i < (sizeof(g_property_code) / 
+         sizeof(g_property_code[0])); i++) {
+        m_prop2xcode.set(g_keyword_info[g_property_code[i]].name,
+            g_property_code[i]);
+    }
+    for (UINT i = 0; i < (sizeof(g_stmt_code) / 
+         sizeof(g_stmt_code[0])); i++) {
+        m_stmt2xcode.set(g_keyword_info[g_stmt_code[i]].name,
+            g_stmt_code[i]);
+    }
+    for (UINT i = 0; i < (sizeof(g_exp_code) / 
+         sizeof(g_exp_code[0])); i++) {
+        m_exp2xcode.set(g_keyword_info[g_exp_code[i]].name,
+            g_exp_code[i]);
+    }
+    for (UINT i = 0; i < (sizeof(g_type_code) / 
+         sizeof(g_type_code[0])); i++) {
+        m_type2xcode.set(g_keyword_info[g_type_code[i]].name,
+            g_type_code[i]);
+    }
+    //dump_rbt((RBT<CHAR const*, X_CODE, CompareStringFunc>&)m_type2xcode,
+    //    NULL, 100000U, dumpStr);
 }
 
 
@@ -193,26 +352,6 @@ void IRParser::dump()
 {
     ASSERT0(0);
 }
-
-
-////Find VAR in nested region from the inside out.
-//Region * IRParser::findRegion(ParseCtx * ctx, SYM const* name)
-//{
-//    ASSERT0(ctx && ctx->current_region && name);
-//    for (Region * region = ctx->current_region->getParent();
-//         region != NULL; region = region->getParent()) {
-//        if (region->getRegionVar()->get_name() == NULL) {
-//            return region;
-//        }
-//        for (IR * ir = region->getIRList(); ir != NULL; ir = ir->get_next()) {
-//            if (ir->is_region() &&
-//                REGION_ru(ir)->getRegionVar()->get_name() == name) {
-//                return REGION_ru(ir);
-//            }
-//        }
-//    }
-//    return NULL;
-//}
 
 
 //Find VAR in nested region from the inside out.
@@ -233,8 +372,31 @@ VAR * IRParser::findVar(ParseCtx * ctx, SYM const* name)
 X_CODE IRParser::getXCode(TOKEN tok, CHAR const* tok_string)
 {
     if (tok != T_IDENTIFIER) { return X_UNDEF; }
-    SYM const* sym = m_rumgr->addToSymbolTab(tok_string);
-    return m_sym2xcode.get(sym);
+    return m_str2xcode.get(tok_string);
+}
+
+
+X_CODE IRParser::getCurrentPropertyCode()
+{
+    return m_prop2xcode.get(m_lexer->getCurrentTokenString());
+}
+
+
+X_CODE IRParser::getCurrentStmtCode()
+{
+    return m_stmt2xcode.get(m_lexer->getCurrentTokenString());
+}
+
+
+X_CODE IRParser::getCurrentExpCode()
+{
+    return m_exp2xcode.get(m_lexer->getCurrentTokenString());
+}
+
+
+X_CODE IRParser::getCurrentTypeCode()
+{
+    return m_type2xcode.get(m_lexer->getCurrentTokenString());
 }
 
 
@@ -261,11 +423,13 @@ void IRParser::error(CHAR const* format, ...)
 
 void IRParser::error(TOKEN tok, CHAR const* format, ...)
 {
+	CHECK_DUMMYUSE(tok);
     StrBuf buf(64);
     va_list arg;
     va_start(arg, format);
     buf.vsprint(format, arg);
-    prt2C("\nerror(%d):%s", m_lexer->getCurrentLineNum(), buf.buf);
+    prt2C("\nerror(%d):'%s', %s", m_lexer->getCurrentLineNum(), 
+        m_lexer->getCurrentTokenString(), buf.buf);
     va_end(arg);
 
     ParseErrorMsg * msg = new ParseErrorMsg(10);
@@ -275,6 +439,7 @@ void IRParser::error(TOKEN tok, CHAR const* format, ...)
 
 void IRParser::error(X_CODE xcode, CHAR const* format, ...)
 {
+	CHECK_DUMMYUSE(xcode);
     StrBuf buf(64);
     va_list arg;
     va_start(arg, format);
@@ -352,18 +517,18 @@ bool IRParser::declareRegion(ParseCtx * ctx)
     TOKEN tok = m_lexer->getNextToken();
 
     //Properties
-	PropertySet cont;
-	tok = m_lexer->getCurrentToken();
-	if (tok == T_COLON) {
-		tok = m_lexer->getNextToken();
+    PropertySet cont;
+    tok = m_lexer->getCurrentToken();
+    if (tok == T_COLON) {
+        tok = m_lexer->getNextToken();
         ctx->ircode = IR_REGION;
-		if (!parseProperty(cont, ctx)) {
-			error(tok, "illegal property declaration");
-			return false;
-		}
+        if (!parseProperty(cont, ctx)) {
+            error(tok, "illegal property declaration");
+            return false;
+        }
         ctx->ircode = IR_UNDEF;
-	    tok = m_lexer->getCurrentToken();
-	}
+        tok = m_lexer->getCurrentToken();
+    }
 
     Region * region = NULL;
     UINT flag = 0;
@@ -386,20 +551,27 @@ bool IRParser::declareRegion(ParseCtx * ctx)
 
     //Region name
     tok = m_lexer->getNextToken();
-    if (tok != T_IDENTIFIER) {
+    if (tok == T_AT) {
+        tok = m_lexer->getNextToken();
+        if (tok != T_STRING) {
+            error(tok, "miss region name");
+            return false;
+        }
+    } else if (tok == T_IDENTIFIER) {
+        ;
+    } else {
         error(tok, "miss region name");
         return false;
     }
-    VAR * regionvar = NULL;
     SYM const* sym = m_rumgr->addToSymbolTab(m_lexer->getCurrentTokenString());
+    VAR * regionvar = NULL;
     if (ctx != NULL) {
         regionvar = findVar(ctx, sym);
         REGION_parent(region) = ctx->current_region;
     }
     if (regionvar == NULL) {
         regionvar = m_rumgr->getVarMgr()->registerVar(
-            m_lexer->getCurrentTokenString(),
-            m_rumgr->getTypeMgr()->getMCType(0), 1, flag);
+            sym, m_rumgr->getTypeMgr()->getMCType(0), 1, flag);
         VAR_is_func_decl(regionvar) = true;
     }
     region->setRegionVar(regionvar);
@@ -420,14 +592,17 @@ bool IRParser::declareRegion(ParseCtx * ctx)
         return false;
     }
 
-    //Region body
-    if (!parseRegionBody(&newctx)) {
+    //Region body	
+    START_TIMER_FMT(w, ("region(%d):%s", region->id(), region->getRegionName()));
+    if (!parseRegionBody(&newctx)) {		
         return false;
     }
-
+    END_TIMER(w, "");
+	
     if (!newctx.has_error) {
         newctx.current_region->setIRList(newctx.stmt_list);
-        if (!newctx.has_high_level_ir) {
+		if (0) {
+        //if (!newctx.has_high_level_ir) {
             newctx.current_region->constructIRBBlist();
             newctx.current_region->setIRList(NULL);
 
@@ -444,8 +619,8 @@ bool IRParser::declareRegion(ParseCtx * ctx)
                     getPassMgr()->registerPass(PASS_PR_SSA_MGR);
                 ASSERT0(prssamgr);
                 prssamgr->computeSSAInfo();
-				prssamgr->verifySSAInfo();
-				prssamgr->verifyPhi(false);
+                prssamgr->verifySSAInfo();
+                prssamgr->verifyPhi(false);
             }
         }
     }
@@ -455,7 +630,7 @@ bool IRParser::declareRegion(ParseCtx * ctx)
     if (ctx != NULL) {
         ASSERT0(ctx->current_region);
         IR * ir = ctx->current_region->buildRegion(region);
-        copyProp(ir, cont);
+        copyProp(ir, cont, ctx);
         ctx->addIR(ir);
     }
     return true;
@@ -472,6 +647,7 @@ bool IRParser::parseRegionBody(ParseCtx * ctx)
     tok = m_lexer->getNextToken();
 
     //Var declarations
+    //START_TIMER(t, "IR Parser:Parsing Variable Declaration");
     for (; tok == T_IDENTIFIER;) {
         X_CODE code = getCurrentXCode();
         if (code == X_VAR) {
@@ -493,6 +669,7 @@ bool IRParser::parseRegionBody(ParseCtx * ctx)
             tok = m_lexer->getNextToken();
         }
     }
+    //END_TIMER_FMT(t, ("IR Parser:Parsing Variable Declaration"));
 
     if (!parseStmtList(ctx)) {
         return false;
@@ -514,9 +691,8 @@ bool IRParser::parseStmtList(ParseCtx * ctx)
     bool has_high_level_ir = false;
     bool has_phi = false;
     for (;;) {
-        X_CODE code = getXCode(tok, m_lexer->getCurrentTokenString());
+        X_CODE code = getCurrentStmtCode();
         bool res = false;
-        //prt2C("\ncode:%s,line:%d", getKeywordName(code), m_lexer->getCurrentLineNum());
         switch (code) {
         case X_REGION:
             res = declareRegion(ctx);
@@ -637,7 +813,7 @@ bool IRParser::isEndOfScope() const
 
 bool IRParser::parseXOperator(ParseCtx * ctx)
 {
-    X_CODE code = getCurrentXCode();
+    X_CODE code = getCurrentExpCode();
     switch (code) {
     case X_ID:
         return parseId(ctx);
@@ -715,18 +891,18 @@ bool IRParser::parseCase(ParseCtx * ctx)
     TOKEN tok = m_lexer->getNextToken();
 
     //Properties
-	PropertySet cont;
-	tok = m_lexer->getCurrentToken();
-	if (tok == T_COLON) {
-		tok = m_lexer->getNextToken();
+    PropertySet cont;
+    tok = m_lexer->getCurrentToken();
+    if (tok == T_COLON) {
+        tok = m_lexer->getNextToken();
         ctx->ircode = IR_CASE;
-		if (!parseProperty(cont, ctx)) {
-			error(tok, "illegal property declaration");
-			return false;
-		}
+        if (!parseProperty(cont, ctx)) {
+            error(tok, "illegal property declaration");
+            return false;
+        }
         ctx->ircode = IR_UNDEF;
-	    tok = m_lexer->getCurrentToken();
-	}
+        tok = m_lexer->getCurrentToken();
+    }
 
     IR * case_det = NULL;
     if (tok == T_IMM) {
@@ -788,7 +964,7 @@ bool IRParser::parseCase(ParseCtx * ctx)
     tok = m_lexer->getNextToken();
 
     IR * case_exp = ctx->current_region->buildCase(case_det, caselab);
-    copyProp(case_exp, cont);
+    copyProp(case_exp, cont, ctx);
     ctx->returned_exp = case_exp;
     return true;
 }
@@ -923,12 +1099,21 @@ bool IRParser::parseId(ParseCtx * ctx)
     TOKEN tok = m_lexer->getNextToken();
 
     //Id
-    if (tok != T_IDENTIFIER) {
+    if (tok == T_AT) {
+        tok = m_lexer->getNextToken();
+        if (tok != T_STRING) {
+            error(tok, "miss variable name");
+            return false;
+        }
+    } else if (tok == T_IDENTIFIER) {
+        ;
+    } else {
         error(tok, "miss variable name");
         return false;
     }
-    VAR * var = findVar(ctx, m_rumgr->addToSymbolTab(
-        m_lexer->getCurrentTokenString()));
+    SYM const* sym = m_rumgr->addToSymbolTab(m_lexer->getCurrentTokenString());
+    ASSERT0(sym);
+    VAR * var = findVar(ctx, sym);
     if (var == NULL) {
         error(tok, "%s is not declared", m_lexer->getCurrentTokenString());
         return false;
@@ -959,7 +1144,15 @@ bool IRParser::parseLda(ParseCtx * ctx)
     }
 
     //Lda base id
-    if (tok != T_IDENTIFIER) {
+    if (tok == T_AT) {
+        tok = m_lexer->getNextToken();
+        if (tok != T_STRING) {
+            error(tok, "miss region name");
+            return false;
+        }
+    } else if (tok == T_IDENTIFIER) {
+        ;
+    } else {
         error(tok, "miss variable name");
         return false;
     }
@@ -992,19 +1185,9 @@ bool IRParser::parseStoreArray(ParseCtx * ctx)
             return false;
         }
     }
-
-    tok = m_lexer->getCurrentToken();
-    Type const* elem_ty = NULL;
-    if (tok == T_COLON) {
-        //Array element type
-        tok = m_lexer->getNextToken();
-        if (!parseType(ctx, &elem_ty)) {
-            return false;
-        }
+    if (ty == NULL) {
+        ty = m_tm->getVoid();
     }
-	if (elem_ty == NULL) {
-		elem_ty = ty;
-	}
 
     tok = m_lexer->getCurrentToken();
     UINT offset = 0;
@@ -1020,36 +1203,27 @@ bool IRParser::parseStoreArray(ParseCtx * ctx)
     }
 
     tok = m_lexer->getCurrentToken();
-    xcom::List<TMWORD> elem_dim;
-    if (tok == T_COLON) {
-        //Array dimension declaration
-        tok = m_lexer->getNextToken();
-        if (tok == T_LSPAREN) {
-            if (!parseArrayDimension(elem_dim)) {
-                return false;
-            }
-            ASSERT0(elem_dim.get_elem_count() > 0);
-        } else if (tok == T_COLON) {
-			;//No dimension declared.
-		} else {
-            error(tok, "illegal dimension declaration");
-            return false;
-        }
-    }
 
     //Properties
-	PropertySet cont;
-	tok = m_lexer->getCurrentToken();
-	if (tok == T_COLON) {
-		tok = m_lexer->getNextToken();
+    PropertySet cont;
+    tok = m_lexer->getCurrentToken();
+    xcom::List<TMWORD> dim_list;
+    if (tok == T_COLON) {
+        tok = m_lexer->getNextToken();
         ctx->ircode = IR_STARRAY;
-		if (!parseProperty(cont, ctx)) {
-			error(tok, "illegal property declaration");
-			return false;
-		}
+        cont.dim_list = &dim_list;
+        if (!parseProperty(cont, ctx)) {
+            error(tok, "illegal property declaration");
+            return false;
+        }
         ctx->ircode = IR_UNDEF;
-	    tok = m_lexer->getCurrentToken();
-	}
+        tok = m_lexer->getCurrentToken();
+    }
+
+    Type const* elem_ty = ty;
+    if (cont.elemtype != NULL) {
+        elem_ty = cont.elemtype;
+    }
 
     if (tok != T_ASSIGN) {
         error(tok, "miss '='");
@@ -1094,21 +1268,21 @@ bool IRParser::parseStoreArray(ParseCtx * ctx)
     tok = m_lexer->getNextToken();
 
     TMWORD * elem_dim_buf = NULL;
-    if (elem_dim.get_elem_count() > 0) {
+    if (dim_list.get_elem_count() > 0) {
         elem_dim_buf = (TMWORD*)ALLOCA(
-            elem_dim.get_elem_count() * sizeof(TMWORD));
+            dim_list.get_elem_count() * sizeof(TMWORD));
         xcom::C<TMWORD> * ct = NULL;
-        elem_dim.get_head(&ct);
-        for (UINT i = 0; i < elem_dim.get_elem_count(); i++) {
+        dim_list.get_head(&ct);
+        for (UINT i = 0; i < dim_list.get_elem_count(); i++) {
             elem_dim_buf[i] = ct->val();
-            elem_dim.get_next(&ct);
+            dim_list.get_next(&ct);
         }
     }
 
-    if (elem_dim.get_elem_count() != 0 &&
-        xcom::cnt_list(subscript_list) != elem_dim.get_elem_count()) {
+    if (dim_list.get_elem_count() != 0 &&
+        xcom::cnt_list(subscript_list) != dim_list.get_elem_count()) {
         error("declare %d dimension array, but %d subscript given",
-            elem_dim.get_elem_count(), xcom::cnt_list(subscript_list));
+            dim_list.get_elem_count(), xcom::cnt_list(subscript_list));
         return false;
     }
 
@@ -1124,13 +1298,14 @@ bool IRParser::parseStoreArray(ParseCtx * ctx)
     IR * rhs = ctx->returned_exp;
     ASSERT0(rhs);
 
+    ASSERT0(ty && elem_ty);
     IR * ir = ctx->current_region->buildStoreArray(base,
-        subscript_list, ty, elem_ty == NULL ? m_tm->getVoid() : elem_ty,
+        subscript_list, ty, elem_ty,
         xcom::cnt_list(subscript_list),
         elem_dim_buf, rhs);
     ctx->addIR(ir);
-	ARR_ofst(ir) = offset;
-	copyProp(ir, cont);
+    ARR_ofst(ir) = offset;
+    copyProp(ir, cont, ctx);
     ctx->returned_exp = NULL;
     return true;
 }
@@ -1148,20 +1323,7 @@ bool IRParser::parseArray(ParseCtx * ctx)
             return false;
         }
     }
-
-    tok = m_lexer->getCurrentToken();
-    Type const* elem_ty = NULL;
-    if (tok == T_COLON) {
-        //Array element type
-        tok = m_lexer->getNextToken();
-        if (!parseType(ctx, &elem_ty)) {
-            return false;
-        }
-    }
-    if (elem_ty == NULL) {
-        elem_ty = ty;
-    }
-
+    
     tok = m_lexer->getCurrentToken();
     UINT offset = 0;
     if (tok == T_COLON) {
@@ -1175,20 +1337,25 @@ bool IRParser::parseArray(ParseCtx * ctx)
         tok = m_lexer->getNextToken();
     }
 
+    //Properties
+    PropertySet cont;
     tok = m_lexer->getCurrentToken();
-    xcom::List<TMWORD> elem_dim;
+    xcom::List<TMWORD> dim_list;
     if (tok == T_COLON) {
-        //Array dimension declaration
         tok = m_lexer->getNextToken();
-        if (tok == T_LSPAREN) {
-            if (!parseArrayDimension(elem_dim)) {
-                return false;
-            }
-            ASSERT0(elem_dim.get_elem_count() > 0);
-        } else {
-            error(tok, "illegal dimension declaration");
+        ctx->ircode = IR_ARRAY;
+        cont.dim_list = &dim_list;
+        if (!parseProperty(cont, ctx)) {
+            error(tok, "illegal property declaration");
             return false;
         }
+        ctx->ircode = IR_UNDEF;
+        tok = m_lexer->getCurrentToken();
+    }
+
+    Type const* elem_ty = ty;
+    if (cont.elemtype != NULL) {
+        elem_ty = cont.elemtype;
     }
 
     //Array base expression
@@ -1228,21 +1395,21 @@ bool IRParser::parseArray(ParseCtx * ctx)
     tok = m_lexer->getNextToken();
 
     TMWORD * elem_dim_buf = NULL;
-    if (elem_dim.get_elem_count() > 0) {
+    if (dim_list.get_elem_count() > 0) {
         elem_dim_buf = (TMWORD*)ALLOCA(
-            elem_dim.get_elem_count() * sizeof(TMWORD));
+            dim_list.get_elem_count() * sizeof(TMWORD));
         xcom::C<TMWORD> * ct = NULL;
-        elem_dim.get_head(&ct);
-        for (UINT i = 0; i < elem_dim.get_elem_count(); i++) {
+        dim_list.get_head(&ct);
+        for (UINT i = 0; i < dim_list.get_elem_count(); i++) {
             elem_dim_buf[i] = ct->val();
-            elem_dim.get_next(&ct);
+            dim_list.get_next(&ct);
         }
     }
 
-    if (elem_dim.get_elem_count() != 0 &&
-        xcom::cnt_list(subscript_list) != elem_dim.get_elem_count()) {
+    if (dim_list.get_elem_count() != 0 &&
+        xcom::cnt_list(subscript_list) != dim_list.get_elem_count()) {
         error("declare %d dimension array, but %d subscript given",
-            elem_dim.get_elem_count(), xcom::cnt_list(subscript_list));
+            dim_list.get_elem_count(), xcom::cnt_list(subscript_list));
         return false;
     }
 
@@ -1309,7 +1476,7 @@ bool IRParser::parseIld(ParseCtx * ctx)
 
     IR * ild = ctx->current_region->buildIload(base, ty);
     ILD_ofst(ild) = offset;
-    copyProp(ild, cont);
+    copyProp(ild, cont, ctx);
     ctx->returned_exp = ild;
     return true;
 }
@@ -1342,19 +1509,27 @@ bool IRParser::parseLd(ParseCtx * ctx)
     }
 
     //Properties
-	PropertySet cont;
-	if (tok == T_COLON) {
-		tok = m_lexer->getNextToken();
+    PropertySet cont;
+    if (tok == T_COLON) {
+        tok = m_lexer->getNextToken();
         ctx->ircode = IR_LD;
-		if (!parseProperty(cont, ctx)) {
-			error(tok, "illegal property declaration");
-			return false;
-		}
+        if (!parseProperty(cont, ctx)) {
+            error(tok, "illegal property declaration");
+            return false;
+        }
         ctx->ircode = IR_UNDEF;
-	}
+    }
 
-	tok = m_lexer->getCurrentToken();
-    if (tok != T_IDENTIFIER) {
+    tok = m_lexer->getCurrentToken();
+    if (tok == T_AT) {
+        tok = m_lexer->getNextToken();
+        if (tok != T_STRING) {
+            error(tok, "miss variable name");
+            return false;
+        }
+    } else if (tok == T_IDENTIFIER) {
+        ;
+    } else {
         error(tok, "miss variable name");
         return false;
     }
@@ -1370,7 +1545,7 @@ bool IRParser::parseLd(ParseCtx * ctx)
         ty == NULL ? var->get_type() : ty);
     LD_ofst(ld) = offset;
     ctx->returned_exp = ld;
-    copyProp(ld, cont);
+    copyProp(ld, cont, ctx);
     m_lexer->getNextToken();
     return true;
 }
@@ -1634,17 +1809,17 @@ bool IRParser::parseBinaryOp(IR_TYPE code, ParseCtx * ctx)
     }
 
     //Properties
-	PropertySet cont;
-	tok = m_lexer->getCurrentToken();
-	if (tok == T_COLON) {
-		tok = m_lexer->getNextToken();
+    PropertySet cont;
+    tok = m_lexer->getCurrentToken();
+    if (tok == T_COLON) {
+        tok = m_lexer->getNextToken();
         ctx->ircode = code;
-		if (!parseProperty(cont, ctx)) {
-			error(tok, "illegal property declaration");
-			return false;
-		}
+        if (!parseProperty(cont, ctx)) {
+            error(tok, "illegal property declaration");
+            return false;
+        }
         ctx->ircode = IR_UNDEF;
-	}
+    }
 
     if (!parseExp(ctx)) {
         return false;
@@ -1685,7 +1860,7 @@ bool IRParser::parseBinaryOp(IR_TYPE code, ParseCtx * ctx)
 
     IR * exp = ctx->current_region->buildBinaryOpSimp(code, ty, opnd0, opnd1);
     ctx->returned_exp = exp;
-    copyProp(exp, cont);
+    copyProp(exp, cont, ctx);
     return true;
 }
 
@@ -1877,7 +2052,7 @@ bool IRParser::parseStore(ParseCtx * ctx)
     ASSERT0(getCurrentXCode() == X_ST);
     TOKEN tok = m_lexer->getNextToken();
 
-	//Type
+    //Type
     Type const* ty = NULL;
     if (tok == T_COLON) {
         tok = m_lexer->getNextToken();
@@ -1886,7 +2061,7 @@ bool IRParser::parseStore(ParseCtx * ctx)
         }
     }
 
-	//Offset
+    //Offset
     tok = m_lexer->getCurrentToken();
     UINT offset = 0;
     if (tok == T_COLON) {
@@ -1899,21 +2074,29 @@ bool IRParser::parseStore(ParseCtx * ctx)
         tok = m_lexer->getNextToken();
     }
 
-	//Properties
-	PropertySet cont;
-	tok = m_lexer->getCurrentToken();
-	if (tok == T_COLON) {
-		tok = m_lexer->getNextToken();
+    //Properties
+    PropertySet cont;
+    tok = m_lexer->getCurrentToken();
+    if (tok == T_COLON) {
+        tok = m_lexer->getNextToken();
         ctx->ircode = IR_ST;
-		if (!parseProperty(cont, ctx)) {
-			error(tok, "illegal property declaration");
-			return false;
-		}
+        if (!parseProperty(cont, ctx)) {
+            error(tok, "illegal property declaration");
+            return false;
+        }
         ctx->ircode = IR_UNDEF;
-	}
+    }
 
     tok = m_lexer->getCurrentToken();
-    if (tok != T_IDENTIFIER) {
+    if (tok == T_AT) {
+        tok = m_lexer->getNextToken();
+        if (tok != T_STRING) {
+            error(tok, "miss variable name to be stored");
+            return false;
+        }
+    } else if (tok == T_IDENTIFIER) {
+        ;
+    } else {
         error(tok, "miss variable name to be stored");
         return false;
     }
@@ -1945,7 +2128,7 @@ bool IRParser::parseStore(ParseCtx * ctx)
     ST_ofst(ir) = offset;
     ctx->addIR(ir);
     ctx->returned_exp = NULL;
-    copyProp(ir, cont);
+    copyProp(ir, cont, ctx);
     return true;
 }
 
@@ -1960,6 +2143,7 @@ bool IRParser::parseStorePR(ParseCtx * ctx)
         return false;
     }
 
+    //PR no
     tok = m_lexer->getNextToken();
     UINT prno = 0;
     if (tok == T_IMM) {
@@ -1971,6 +2155,7 @@ bool IRParser::parseStorePR(ParseCtx * ctx)
         return false;
     }
 
+    //Type
     tok = m_lexer->getNextToken();
     Type const* ty = NULL;
     if (tok == T_COLON) {
@@ -1981,6 +2166,20 @@ bool IRParser::parseStorePR(ParseCtx * ctx)
     } else {
         ty = m_tm->getVoid();
     }
+    
+    //Properties
+    PropertySet cont;
+    tok = m_lexer->getCurrentToken();
+    if (tok == T_COLON) {
+        tok = m_lexer->getNextToken();        
+        ctx->ircode = IR_STPR;
+        if (!parseProperty(cont, ctx)) {
+            error(tok, "illegal property declaration");
+            return false;
+        }
+        ctx->ircode = IR_UNDEF;
+        tok = m_lexer->getCurrentToken();
+    }
 
     tok = m_lexer->getCurrentToken();
     if (tok != T_ASSIGN) {
@@ -1988,12 +2187,15 @@ bool IRParser::parseStorePR(ParseCtx * ctx)
         return false;
     }
 
+    //Rhs
     tok = m_lexer->getNextToken();
     if (!parseExp(ctx)) {
         return false;
     }
     ASSERT0(ctx->returned_exp);
+
     IR * ir = ctx->current_region->buildStorePR(prno, ty, ctx->returned_exp);
+    copyProp(ir, cont, ctx);
     ctx->addIR(ir);
     ctx->returned_exp = NULL;
     return true;
@@ -2003,21 +2205,7 @@ bool IRParser::parseStorePR(ParseCtx * ctx)
 bool IRParser::parseModifyPR(X_CODE code, ParseCtx * ctx)
 {
     ASSERT0(code == X_SETELEM || code == X_GETELEM);
-    TOKEN tok = m_lexer->getNextToken();
-
-    //Properties
-	PropertySet cont;
-	tok = m_lexer->getCurrentToken();
-	if (tok == T_COLON) {
-		tok = m_lexer->getNextToken();
-        ctx->ircode = code == X_SETELEM ? IR_SETELEM : IR_GETELEM;
-		if (!parseProperty(cont, ctx)) {
-			error(tok, "illegal property declaration");
-			return false;
-		}
-        ctx->ircode = IR_UNDEF;
-	    tok = m_lexer->getCurrentToken();
-	}
+    TOKEN tok = m_lexer->getNextToken();    
 
     if (tok != T_DOLLAR) {
         error(tok, "miss '$' specifier after %s", getKeywordName(code));
@@ -2039,11 +2227,26 @@ bool IRParser::parseModifyPR(X_CODE code, ParseCtx * ctx)
     Type const* ty = NULL;
     if (tok == T_COLON) {
         tok = m_lexer->getNextToken();
-        if (!parseType(ctx, &ty) || ty == NULL) {
+        if (!parseType(ctx, &ty)) {
             return false;
         }
-    } else {
+    }
+    if (ty == NULL) {
         ty = m_tm->getVoid();
+    }
+
+    //Properties
+    PropertySet cont;
+    tok = m_lexer->getCurrentToken();
+    if (tok == T_COLON) {
+        tok = m_lexer->getNextToken();
+        ctx->ircode = code == X_SETELEM ? IR_SETELEM : IR_GETELEM;
+        if (!parseProperty(cont, ctx)) {
+            error(tok, "illegal property declaration");
+            return false;
+        }
+        ctx->ircode = IR_UNDEF;
+        tok = m_lexer->getCurrentToken();
     }
 
     tok = m_lexer->getCurrentToken();
@@ -2078,7 +2281,7 @@ bool IRParser::parseModifyPR(X_CODE code, ParseCtx * ctx)
     }
     ctx->addIR(ir);
     ctx->returned_exp = NULL;
-    copyProp(ir, cont);
+    copyProp(ir, cont, ctx);
     return true;
 }
 
@@ -2098,7 +2301,7 @@ bool IRParser::parseIStore(ParseCtx * ctx)
         ty = m_tm->getVoid();
     }
 
-	//Offset
+    //Offset
     tok = m_lexer->getCurrentToken();
     UINT offset = 0;
     if (tok == T_COLON) {
@@ -2112,18 +2315,18 @@ bool IRParser::parseIStore(ParseCtx * ctx)
     }
 
     //Properties
-	PropertySet cont;
-	tok = m_lexer->getCurrentToken();
-	if (tok == T_COLON) {
-		tok = m_lexer->getNextToken();
+    PropertySet cont;
+    tok = m_lexer->getCurrentToken();
+    if (tok == T_COLON) {
+        tok = m_lexer->getNextToken();
         ctx->ircode = IR_IST;
-		if (!parseProperty(cont, ctx)) {
-			error(tok, "illegal property declaration");
-			return false;
-		}
+        if (!parseProperty(cont, ctx)) {
+            error(tok, "illegal property declaration");
+            return false;
+        }
         ctx->ircode = IR_UNDEF;
-	    tok = m_lexer->getCurrentToken();
-	}
+        tok = m_lexer->getCurrentToken();
+    }
 
     if (tok != T_ASSIGN) {
         error(tok, "miss '='");
@@ -2153,7 +2356,7 @@ bool IRParser::parseIStore(ParseCtx * ctx)
     ctx->returned_exp = NULL;
 
     IR * ir = ctx->current_region->buildIstore(base, rhs, ty);
-    copyProp(ir, cont);
+    copyProp(ir, cont, ctx);
     IST_ofst(ir) = offset;
     ctx->addIR(ir);
     return true;
@@ -2167,17 +2370,17 @@ bool IRParser::parseCallAndICall(bool is_call, ParseCtx * ctx)
     TOKEN tok = m_lexer->getNextToken();
 
     //Properties
-	PropertySet cont;
-	if (tok == T_COLON) {
-		tok = m_lexer->getNextToken();
+    PropertySet cont;
+    if (tok == T_COLON) {
+        tok = m_lexer->getNextToken();
         ctx->ircode = is_call ? IR_CALL : IR_ICALL;
-		if (!parseProperty(cont, ctx)) {
-			error(tok, "illegal property declaration");
-			return false;
-		}
+        if (!parseProperty(cont, ctx)) {
+            error(tok, "illegal property declaration");
+            return false;
+        }
         ctx->ircode = IR_UNDEF;
-	}
-	tok = m_lexer->getCurrentToken();
+    }
+    tok = m_lexer->getCurrentToken();
 
     UINT return_prno = 0;
     Type const* return_ty = m_tm->getVoid();
@@ -2216,7 +2419,15 @@ bool IRParser::parseCallAndICall(bool is_call, ParseCtx * ctx)
     VAR * callee_var = NULL;
     IR * callee_exp = NULL;
     if (is_call) {
-        if (tok != T_IDENTIFIER) {
+        if (tok == T_AT) {
+            tok = m_lexer->getNextToken();
+            if (tok != T_STRING) {
+                error(tok, "miss callee function name");
+                return false;
+            }
+        } else if (tok == T_IDENTIFIER) {
+            ;
+        } else {
             error(tok, "miss callee function name");
             return false;
         }
@@ -2299,7 +2510,7 @@ bool IRParser::parseCallAndICall(bool is_call, ParseCtx * ctx)
         CALL_dummyuse(ir) = cont.ir_use_list;
         ir->setParent(CALL_dummyuse(ir));
     }
-	copyProp(ir, cont);
+    copyProp(ir, cont, ctx);
     ctx->addIR(ir);
     ctx->returned_exp = NULL;
     return true;
@@ -2312,18 +2523,18 @@ bool IRParser::parseGoto(ParseCtx * ctx)
     TOKEN tok = m_lexer->getNextToken();
 
     //Properties
-	PropertySet cont;
-	tok = m_lexer->getCurrentToken();
-	if (tok == T_COLON) {
-		tok = m_lexer->getNextToken();
+    PropertySet cont;
+    tok = m_lexer->getCurrentToken();
+    if (tok == T_COLON) {
+        tok = m_lexer->getNextToken();
         ctx->ircode = IR_GOTO;
-		if (!parseProperty(cont, ctx)) {
-			error(tok, "illegal property declaration");
-			return false;
-		}
+        if (!parseProperty(cont, ctx)) {
+            error(tok, "illegal property declaration");
+            return false;
+        }
         ctx->ircode = IR_UNDEF;
-	    tok = m_lexer->getCurrentToken();
-	}
+        tok = m_lexer->getCurrentToken();
+    }
 
     if (tok != T_IDENTIFIER) {
         error(tok, "miss label after goto");
@@ -2339,7 +2550,7 @@ bool IRParser::parseGoto(ParseCtx * ctx)
     IR * ir = ctx->current_region->buildGoto(label);
     ctx->addIR(ir);
     m_lexer->getNextToken();
-    copyProp(ir, cont);
+    copyProp(ir, cont, ctx);
     ctx->returned_exp = NULL;
     return true;
 }
@@ -2351,18 +2562,18 @@ bool IRParser::parseIGoto(ParseCtx * ctx)
     TOKEN tok = m_lexer->getNextToken();
 
     //Properties
-	PropertySet cont;
-	tok = m_lexer->getCurrentToken();
-	if (tok == T_COLON) {
-		tok = m_lexer->getNextToken();
+    PropertySet cont;
+    tok = m_lexer->getCurrentToken();
+    if (tok == T_COLON) {
+        tok = m_lexer->getNextToken();
         ctx->ircode = IR_IGOTO;
-		if (!parseProperty(cont, ctx)) {
-			error(tok, "illegal property declaration");
-			return false;
-		}
+        if (!parseProperty(cont, ctx)) {
+            error(tok, "illegal property declaration");
+            return false;
+        }
         ctx->ircode = IR_UNDEF;
-	    tok = m_lexer->getCurrentToken();
-	}
+        tok = m_lexer->getCurrentToken();
+    }
 
     //Igoto determinate expression
     if (!parseExp(ctx)) {
@@ -2412,7 +2623,7 @@ bool IRParser::parseIGoto(ParseCtx * ctx)
     }
 
     IR * ir = ctx->current_region->buildIgoto(det, case_list);
-    copyProp(ir, cont);
+    copyProp(ir, cont, ctx);
     ctx->addIR(ir);
     return true;
 }
@@ -2424,18 +2635,18 @@ bool IRParser::parseDoWhile(ParseCtx * ctx)
     TOKEN tok = m_lexer->getNextToken();
 
     //Properties
-	PropertySet cont;
-	tok = m_lexer->getCurrentToken();
-	if (tok == T_COLON) {
-		tok = m_lexer->getNextToken();
+    PropertySet cont;
+    tok = m_lexer->getCurrentToken();
+    if (tok == T_COLON) {
+        tok = m_lexer->getNextToken();
         ctx->ircode = IR_DO_WHILE;
-		if (!parseProperty(cont, ctx)) {
-			error(tok, "illegal property declaration");
-			return false;
-		}
+        if (!parseProperty(cont, ctx)) {
+            error(tok, "illegal property declaration");
+            return false;
+        }
         ctx->ircode = IR_UNDEF;
-	    tok = m_lexer->getCurrentToken();
-	}
+        tok = m_lexer->getCurrentToken();
+    }
 
     //body
     if (tok != T_LLPAREN) {
@@ -2474,7 +2685,7 @@ bool IRParser::parseDoWhile(ParseCtx * ctx)
 
     IR * ir = ctx->current_region->buildDoWhile(det, body);
     ctx->addIR(ir);
-    copyProp(ir, cont);
+    copyProp(ir, cont, ctx);
     ctx->returned_exp = NULL;
     return true;
 }
@@ -2486,18 +2697,18 @@ bool IRParser::parseWhileDo(ParseCtx * ctx)
     TOKEN tok = m_lexer->getNextToken();
 
     //Properties
-	PropertySet cont;
-	tok = m_lexer->getCurrentToken();
-	if (tok == T_COLON) {
-		tok = m_lexer->getNextToken();
+    PropertySet cont;
+    tok = m_lexer->getCurrentToken();
+    if (tok == T_COLON) {
+        tok = m_lexer->getNextToken();
         ctx->ircode = IR_WHILE_DO;
-		if (!parseProperty(cont, ctx)) {
-			error(tok, "illegal property declaration");
-			return false;
-		}
+        if (!parseProperty(cont, ctx)) {
+            error(tok, "illegal property declaration");
+            return false;
+        }
         ctx->ircode = IR_UNDEF;
-	    tok = m_lexer->getCurrentToken();
-	}
+        tok = m_lexer->getCurrentToken();
+    }
 
     if (!parseExp(ctx)) {
         return false;
@@ -2530,7 +2741,7 @@ bool IRParser::parseWhileDo(ParseCtx * ctx)
 
     IR * ir = ctx->current_region->buildWhileDo(det, body);
     ctx->addIR(ir);
-    copyProp(ir, cont);
+    copyProp(ir, cont, ctx);
     ctx->returned_exp = NULL;
     return true;
 }
@@ -2542,18 +2753,18 @@ bool IRParser::parseDoLoop(ParseCtx * ctx)
     TOKEN tok = m_lexer->getNextToken();
 
     //Properties
-	PropertySet cont;
-	tok = m_lexer->getCurrentToken();
-	if (tok == T_COLON) {
-		tok = m_lexer->getNextToken();
+    PropertySet cont;
+    tok = m_lexer->getCurrentToken();
+    if (tok == T_COLON) {
+        tok = m_lexer->getNextToken();
         ctx->ircode = IR_DO_LOOP;
-		if (!parseProperty(cont, ctx)) {
-			error(tok, "illegal property declaration");
-			return false;
-		}
+        if (!parseProperty(cont, ctx)) {
+            error(tok, "illegal property declaration");
+            return false;
+        }
         ctx->ircode = IR_UNDEF;
-	    tok = m_lexer->getCurrentToken();
-	}
+        tok = m_lexer->getCurrentToken();
+    }
 
     if (tok != T_LPAREN) {
         error(tok, "miss '(' after doloop operator");
@@ -2671,7 +2882,7 @@ bool IRParser::parseDoLoop(ParseCtx * ctx)
 
     IR * ir = ctx->current_region->buildDoLoop(iv, init, det, step, body);
     ctx->addIR(ir);
-    copyProp(ir, cont);
+    copyProp(ir, cont, ctx);
     m_lexer->getNextToken();
     return true;
 }
@@ -2712,7 +2923,7 @@ bool IRParser::parseLabelProperty(LabelInfo * label)
             m_lexer->getNextToken();
             break;
         } else {
-            error(tok, "illegal label declaration");
+            error(tok, "illegal label declaration or miss ','");
             return false;
         }
     }
@@ -2726,18 +2937,18 @@ bool IRParser::parseLabel(ParseCtx * ctx)
     TOKEN tok = m_lexer->getNextToken();
 
     //Properties
-	PropertySet cont;
-	tok = m_lexer->getCurrentToken();
-	if (tok == T_COLON) {
-		tok = m_lexer->getNextToken();
+    PropertySet cont;
+    tok = m_lexer->getCurrentToken();
+    if (tok == T_COLON) {
+        tok = m_lexer->getNextToken();
         ctx->ircode = IR_LABEL;
-		if (!parseProperty(cont, ctx)) {
-			error(tok, "illegal property declaration");
-			return false;
-		}
+        if (!parseProperty(cont, ctx)) {
+            error(tok, "illegal property declaration");
+            return false;
+        }
         ctx->ircode = IR_UNDEF;
-	    tok = m_lexer->getCurrentToken();
-	}
+        tok = m_lexer->getCurrentToken();
+    }
 
     if (tok != T_IDENTIFIER) {
         error(tok, "illegal label");
@@ -2759,7 +2970,7 @@ bool IRParser::parseLabel(ParseCtx * ctx)
 
     IR * ir = ctx->current_region->buildLabel(label);
     ctx->addIR(ir);
-    copyProp(ir, cont);
+    copyProp(ir, cont, ctx);
     ctx->returned_exp = NULL;
     return true;
 }
@@ -2772,18 +2983,18 @@ bool IRParser::parseBranch(bool is_truebr, ParseCtx * ctx)
     TOKEN tok = m_lexer->getNextToken();
 
     //Properties
-	PropertySet cont;
-	if (tok == T_COLON) {
-		tok = m_lexer->getNextToken();
+    PropertySet cont;
+    if (tok == T_COLON) {
+        tok = m_lexer->getNextToken();
         ctx->ircode = is_truebr ? IR_TRUEBR : IR_FALSEBR;
-		if (!parseProperty(cont, ctx)) {
-			error(tok, "illegal property declaration");
-			return false;
-		}
+        if (!parseProperty(cont, ctx)) {
+            error(tok, "illegal property declaration");
+            return false;
+        }
         ctx->ircode = IR_UNDEF;
-	}
+    }
 
-	tok = m_lexer->getCurrentToken();
+    tok = m_lexer->getCurrentToken();
     if (!parseExp(ctx)) {
         error(tok, "illegal determinate-expression");
         return false;
@@ -2818,7 +3029,7 @@ bool IRParser::parseBranch(bool is_truebr, ParseCtx * ctx)
 
     IR * ir = ctx->current_region->buildBranch(is_truebr, det, label);
     ctx->addIR(ir);
-    copyProp(ir, cont);
+    copyProp(ir, cont, ctx);
     ctx->returned_exp = NULL;
     return true;
 }
@@ -2938,18 +3149,18 @@ bool IRParser::parseIf(ParseCtx * ctx)
     TOKEN tok = m_lexer->getNextToken();
 
     //Properties
-	PropertySet cont;
-	tok = m_lexer->getCurrentToken();
-	if (tok == T_COLON) {
-		tok = m_lexer->getNextToken();
+    PropertySet cont;
+    tok = m_lexer->getCurrentToken();
+    if (tok == T_COLON) {
+        tok = m_lexer->getNextToken();
         ctx->ircode = IR_IF;
-		if (!parseProperty(cont, ctx)) {
-			error(tok, "illegal property declaration");
-			return false;
-		}
+        if (!parseProperty(cont, ctx)) {
+            error(tok, "illegal property declaration");
+            return false;
+        }
         ctx->ircode = IR_UNDEF;
-	    tok = m_lexer->getCurrentToken();
-	}
+        tok = m_lexer->getCurrentToken();
+    }
 
     if (!parseExp(ctx)) {
         return false;
@@ -3006,7 +3217,7 @@ bool IRParser::parseIf(ParseCtx * ctx)
 
     IR * ir = ctx->current_region->buildIf(det, truebody, falsebody);
     ctx->addIR(ir);
-    copyProp(ir, cont);
+    copyProp(ir, cont, ctx);
     ctx->returned_exp = NULL;
     return true;
 }
@@ -3051,18 +3262,18 @@ bool IRParser::parseSwitch(ParseCtx * ctx)
     TOKEN tok = m_lexer->getNextToken();
 
     //Properties
-	PropertySet cont;
-	tok = m_lexer->getCurrentToken();
-	if (tok == T_COLON) {
-		tok = m_lexer->getNextToken();
+    PropertySet cont;
+    tok = m_lexer->getCurrentToken();
+    if (tok == T_COLON) {
+        tok = m_lexer->getNextToken();
         ctx->ircode = IR_SWITCH;
-		if (!parseProperty(cont, ctx)) {
-			error(tok, "illegal property declaration");
-			return false;
-		}
+        if (!parseProperty(cont, ctx)) {
+            error(tok, "illegal property declaration");
+            return false;
+        }
         ctx->ircode = IR_UNDEF;
-	    tok = m_lexer->getCurrentToken();
-	}
+        tok = m_lexer->getCurrentToken();
+    }
 
     //Switch determinate expression
     if (!parseExp(ctx)) {
@@ -3101,17 +3312,17 @@ bool IRParser::parseSwitch(ParseCtx * ctx)
                 return false;
             }
             IR * case_exp = ctx->returned_exp;
-            if (case_exp == NULL) {
-                break;
+            if (case_exp != NULL) {
+                xcom::add_next(&case_list, &last, case_exp);
+                //break;
             }
-            ctx->returned_exp = NULL;
-            xcom::add_next(&case_list, &last, case_exp);
+            ctx->returned_exp = NULL;            
         }
         tok = m_lexer->getCurrentToken();
         if (tok == T_COMMA) {
             tok = m_lexer->getNextToken();
             continue;
-        } else if (tok == T_LLPAREN) {
+        } else if (tok == T_LLPAREN || tok == T_SEMI) {
             break;
         } else {
             error(tok, "illegal case list");
@@ -3121,29 +3332,35 @@ bool IRParser::parseSwitch(ParseCtx * ctx)
 
     //Switch body
     tok = m_lexer->getCurrentToken();
-    if (tok != T_LLPAREN) {
-        error(tok, "miss '{' before switch body");
-        return false;
+    IR * body = NULL;
+    if (tok != T_SEMI) {
+        if (tok != T_LLPAREN) {
+            error(tok, "miss '{' before switch body");
+            return false;
+        }
+        tok = m_lexer->getNextToken();
+
+        IR * oldvalue1;
+        IR * oldvalue2;
+        ctx->storeValue(&oldvalue1, &oldvalue2);
+        parseStmtList(ctx);
+        body = ctx->stmt_list;
+        ctx->reloadValue(oldvalue1, oldvalue2);
+
+        tok = m_lexer->getCurrentToken();
+        if (tok != T_RLPAREN) {
+            error(tok, "miss '}' after doloop body");
+            return false;
+        }
+        m_lexer->getNextToken();
     }
-    tok = m_lexer->getNextToken();
 
-    IR * oldvalue1;
-    IR * oldvalue2;
-    ctx->storeValue(&oldvalue1, &oldvalue2);
-    parseStmtList(ctx);
-    IR * body = ctx->stmt_list;
-    ctx->reloadValue(oldvalue1, oldvalue2);
-
-    tok = m_lexer->getCurrentToken();
-    if (tok != T_RLPAREN) {
-        error(tok, "miss '}' after doloop body");
-        return false;
+    if (body != NULL) {
+        ctx->has_high_level_ir = true;
     }
-    m_lexer->getNextToken();
-
     IR * ir = ctx->current_region->buildSwitch(
         det, case_list, body, deflab);
-    copyProp(ir, cont);
+    copyProp(ir, cont, ctx);
     ctx->addIR(ir);
     return true;
 }
@@ -3205,7 +3422,7 @@ bool IRParser::parseType(ParseCtx * ctx, Type const** ty)
         return true;
     }
 
-    X_CODE code = getCurrentXCode();
+    X_CODE code = getCurrentTypeCode();
     UINT size = 0;
     switch (code) {
     TOKEN tok;
@@ -3438,7 +3655,17 @@ bool IRParser::declareVarProperty(VAR * var, ParseCtx * ctx)
                 VAR_is_array(var) = true;
                 tok = m_lexer->getNextToken();
                 break;
-            default:
+            case X_STRING:
+                if (!parseStringValue(var, ctx)) {
+                    return false;
+                }
+                break;
+			case X_BYTE:
+				if (!parseByteValue(var, ctx)) {
+					return false;
+				}
+				break;
+			default:
                 error(tok, "illegal to use %s in variable type declaration",
                     m_lexer->getCurrentTokenString());
             }
@@ -3469,6 +3696,81 @@ bool IRParser::declareVarProperty(VAR * var, ParseCtx * ctx)
 }
 
 
+bool IRParser::parseByteValue(VAR * var, ParseCtx * ctx)
+{
+    ASSERT0(getCurrentXCode() == X_BYTE);
+    TOKEN tok = m_lexer->getNextToken();
+	if (tok != T_LPAREN) {
+        error(tok, "miss '(' after 'byte'");
+        return false;
+    }
+	tok = m_lexer->getNextToken();
+    xcom::Vector<BYTE> buf;
+    UINT bytesize = 0;
+    for (; tok != T_RPAREN && !isTerminator(tok);) {
+		if (!parseExp(ctx) || ctx->returned_exp == NULL) {
+			error(tok, "illegal literal");
+			return false;
+		}
+        if (!ctx->returned_exp->is_const() || !ctx->returned_exp->is_int()) {
+            error(tok, "not integer");
+            return false;
+        }        
+        buf.set(bytesize, (BYTE)CONST_int_val(ctx->returned_exp));
+		ctx->current_region->freeIRTreeList(ctx->returned_exp);
+		ctx->returned_exp = NULL;
+        bytesize++;
+		tok = m_lexer->getCurrentToken();
+        if (tok != T_COMMA && tok != T_RPAREN) {
+            error(tok, "miss ','");
+            return false;
+        } else if (tok == T_COMMA) {
+            tok = m_lexer->getNextToken();
+        }
+    }
+    VAR_byte_val(var) = (ByteBuf*)ctx->current_region->xmalloc(sizeof(ByteBuf));
+
+    BYTEBUF_size(VAR_byte_val(var)) = bytesize;
+    BYTEBUF_buffer(VAR_byte_val(var)) = 
+        (BYTE*)ctx->current_region->xmalloc(bytesize);
+    ::memcpy(BYTEBUF_buffer(VAR_byte_val(var)), buf.get_vec(), bytesize);
+    if (m_lexer->getCurrentToken() != T_RPAREN) {
+        error(tok, "miss ')'");
+        return false;
+    }
+    m_lexer->getNextToken();
+    return true;
+}
+
+
+bool IRParser::parseStringValue(VAR * var, ParseCtx * ctx)
+{
+    ASSERT0(getCurrentXCode() == X_STRING);
+    if (!var->is_string()) {
+        error(m_lexer->getCurrentToken(), "variable must be string type");
+        return false;
+    }
+    TOKEN tok = m_lexer->getNextToken();
+    if (tok != T_LPAREN) {
+        error(tok, "miss '(' after 'string'");
+        return false;
+    }
+    tok = m_lexer->getNextToken();
+    if (tok != T_STRING) {        
+        error(m_lexer->getCurrentToken(), "need string literal");
+        return false;
+    }
+    VAR_string(var) = m_rumgr->addToSymbolTab(m_lexer->getCurrentTokenString());    
+	tok = m_lexer->getNextToken();
+    if (tok != T_RPAREN) {
+        error(tok, "miss ')'");
+        return false;
+    }
+    m_lexer->getNextToken();
+    return true;
+}
+
+
 bool IRParser::parseUseProperty(PropertySet & cont, ParseCtx * ctx)
 {
     ASSERT0(getCurrentXCode() == X_USE);
@@ -3492,6 +3794,112 @@ bool IRParser::parseUseProperty(PropertySet & cont, ParseCtx * ctx)
 }
 
 
+bool IRParser::parseElemTypeProperty(PropertySet & cont, ParseCtx * ctx)
+{
+    ASSERT0(getCurrentXCode() == X_ELEMTYPE);
+    TOKEN tok = m_lexer->getNextToken();
+    Type const* elemtype = NULL;
+    if (tok != T_COLON) {
+        error(tok, "miss ':' after elemtype");
+        return false;
+    }
+    
+    //Array element type
+    tok = m_lexer->getNextToken();
+    if (!parseType(ctx, &elemtype) || elemtype == NULL) {
+        error(tok, "illegal elemtype");
+        return false; 
+    }
+
+    cont.elemtype = elemtype;
+    return true;
+}
+
+
+bool IRParser::parseDimProperty(PropertySet & cont, ParseCtx * ctx)
+{
+    ASSERT0(getCurrentXCode() == X_DIM);
+    TOKEN tok = m_lexer->getNextToken();
+
+    //Array dimension declaration    
+    if (tok != T_LSPAREN) {
+        error(tok, "illegal dimension declaration");
+        return false;
+    }
+    ASSERT0(cont.dim_list);    
+    if (!parseArrayDimension(*cont.dim_list)) {
+        return false;
+    }
+    ASSERT0(cont.dim_list->get_elem_count() > 0);
+    return true;
+}
+
+
+bool IRParser::parseDefProperty(PropertySet & cont, ParseCtx * ctx)
+{
+    ASSERT0(getCurrentXCode() == X_DEF);
+    TOKEN tok = m_lexer->getNextToken();
+    if (tok != T_LPAREN) {
+        error(tok, "miss '(' after 'def'");
+        return false;
+    }
+    tok = m_lexer->getNextToken();
+    if (!parseExpList(ctx)) {
+        return false;
+    }
+    if (m_lexer->getCurrentToken() != T_RPAREN) {
+        error(tok, "miss ')'");
+        return false;
+    }
+    m_lexer->getNextToken();
+    cont.ir_def_list = ctx->returned_exp;
+    ctx->returned_exp = NULL;
+    return true;
+}
+
+
+bool IRParser::parseThrowTarget(PropertySet & cont, ParseCtx * ctx)
+{
+    ASSERT0(getCurrentXCode() == X_THROW);
+    TOKEN tok = m_lexer->getNextToken();
+    if (tok != T_LPAREN) {
+        error(tok, "miss '(' after 'throw'");
+        return false;
+    }
+    tok = m_lexer->getNextToken();
+    cont.getLabelList().clean();
+    for (; tok != T_RPAREN && !isTerminator(tok);) {
+        if (tok != T_IDENTIFIER) {
+            error(tok, "illegal label");
+            return false;
+        }
+        SYM const* sym = m_rumgr->addToSymbolTab(
+            m_lexer->getCurrentTokenString());
+        LabelInfo * label = ctx->mapSym2Label(sym);
+        if (label == NULL) {
+            label = ctx->current_region->genCustomLabel(sym);
+            ctx->setMapSym2Label(sym, label);
+        }
+        cont.getLabelList().append_tail(label);
+        tok = m_lexer->getNextToken();
+
+        if (tok != T_COMMA && tok != T_RPAREN) {
+            error(tok, "miss ',' in dimension declaration");
+            return false;
+        } else if (tok == T_COMMA) {
+            tok = m_lexer->getNextToken();
+        }
+    }
+    if (m_lexer->getCurrentToken() != T_RPAREN) {
+        error(tok, "miss ')'");
+        return false;
+    }
+    m_lexer->getNextToken();    
+    ctx->returned_exp = NULL;
+    return true;
+}
+
+
 //List of property declaration.
 bool IRParser::parseProperty(PropertySet & cont, ParseCtx * ctx)
 {
@@ -3508,18 +3916,27 @@ bool IRParser::parseProperty(PropertySet & cont, ParseCtx * ctx)
         case T_END:
             break;
         case T_IDENTIFIER:
-            switch (getCurrentXCode()) {
+            switch (getCurrentPropertyCode()) {
             case X_READONLY:
+                ASSERT0(ctx);
+                if (ctx->ircode != IR_ICALL &&
+                    ctx->ircode != IR_REGION) {
+                    error(tok, "%s does have READONLY property", 
+                        IRTNAME(ctx->ircode));
+                    return false;
+                }
                 cont.readonly = true;
                 tok = m_lexer->getNextToken();
-				break;
+                break;
             case X_RMW:
                 cont.read_modify_write = true;
                 tok = m_lexer->getNextToken();
                 break;
             case X_THROW:
                 cont.throw_exception = true;
-                tok = m_lexer->getNextToken();
+                if (!parseThrowTarget(cont, ctx)) {                    
+                    return false;
+                }                
                 break;
             case X_SIDEEFFECT:
                 cont.sideeffect = true;
@@ -3537,16 +3954,52 @@ bool IRParser::parseProperty(PropertySet & cont, ParseCtx * ctx)
                 cont.terminate = true;
                 tok = m_lexer->getNextToken();
                 break;
-			case X_USE:
+            case X_USE:
                 ASSERT0(ctx);
-				if (ctx->ircode != IR_CALL && ctx->ircode != IR_ICALL) {
-					error(tok, "%s does have USE property", IRTNAME(ctx->ircode));
-					return false;
-				}
-				if (!parseUseProperty(cont, ctx)) {
-					return false;
-				}
-				break;
+                if (ctx->ircode != IR_CALL && 
+                    ctx->ircode != IR_ICALL &&
+                    ctx->ircode != IR_REGION) {
+                    error(tok, "%s does have USE property", IRTNAME(ctx->ircode));
+                    return false;
+                }
+                if (!parseUseProperty(cont, ctx)) {
+                    return false;
+                }
+                break;
+            case X_DEF:
+                ASSERT0(ctx);
+                if (ctx->ircode != IR_CALL &&
+                    ctx->ircode != IR_ICALL &&
+                    ctx->ircode != IR_REGION) {
+                    error(tok, "%s does have DEF property", IRTNAME(ctx->ircode));
+                    return false;
+                }
+                if (!parseDefProperty(cont, ctx)) {
+                    return false;
+                }
+                break;
+            case X_ELEMTYPE:
+                ASSERT0(ctx);
+                if (ctx->ircode != IR_STARRAY && ctx->ircode != IR_ARRAY) {
+                    error(tok, "%s does have elemtype property",
+                        IRTNAME(ctx->ircode));
+                    return false;
+                }
+                if (!parseElemTypeProperty(cont, ctx)) {
+                    return false;
+                }
+                break;
+            case X_DIM:
+                ASSERT0(ctx);
+                if (ctx->ircode != IR_STARRAY && ctx->ircode != IR_ARRAY) {
+                    error(tok, "%s does have dim property", 
+                        IRTNAME(ctx->ircode));
+                    return false;
+                }
+                if (!parseDimProperty(cont, ctx)) {
+                    return false;
+                }
+                break;
             default:
                 error(tok, "illegal to use %s in variable type declaration",
                     m_lexer->getCurrentTokenString());
@@ -3587,7 +4040,15 @@ bool IRParser::declareVar(ParseCtx * ctx, VAR ** var)
         return false;
     }
     TOKEN tok = m_lexer->getNextToken();
-    if (tok != T_IDENTIFIER) {
+    if (tok == T_AT) {
+        tok = m_lexer->getNextToken();
+        if (tok != T_STRING) {
+            error(tok, "miss identifier name");
+            return false;
+        }
+    } else if (tok == T_IDENTIFIER) {
+        ;
+    } else {
         error(tok, "miss identifier name");
         return false;
     }
@@ -3611,7 +4072,7 @@ bool IRParser::declareVar(ParseCtx * ctx, VAR ** var)
         sym, ty, 1,
         ctx->current_region->is_program() ? VAR_GLOBAL : VAR_LOCAL);
     ctx->current_region->addToVarTab(v);
-	*var = v;
+    *var = v;
 
     //Property
     tok = m_lexer->getCurrentToken();
@@ -3627,7 +4088,7 @@ bool IRParser::declareVar(ParseCtx * ctx, VAR ** var)
 
 
 //Dump token string.
-//Return true if no error find.
+//Return true if no error occur.
 bool IRParser::parse()
 {
     START_TIMER(t, "IR Parser");

@@ -281,7 +281,7 @@ bool IR_LICM::scanResult(OUT TTab<IR*> & invariant_stmt)
     bool change = false;
     for (IR * stmt = m_analysable_stmt_list.remove_head(); stmt != NULL;
          stmt = m_analysable_stmt_list.remove_head()) {
-        switch (IR_code(stmt)) {
+        switch (stmt->get_code()) {
         case IR_ST:
         case IR_STPR:
             {

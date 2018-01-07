@@ -58,7 +58,7 @@ IR * IR_LCSE::hoist_cse(IN IRBB * bb, IN IR * ir_pos, IN ExpRep * ie)
     C<IR*> * pos_holder = NULL;
     bool f = BB_irlist(bb).find(ir_pos, &pos_holder);
     CHECK_DUMMYUSE(f);
-    switch (IR_code(ir_pos)) {
+    switch (ir_pos->get_code()) {
     case IR_ST:
     case IR_IST:
         {

@@ -194,7 +194,7 @@ void * tlloc(LONG size)
     }
     void * p = smpoolMalloc(size, g_pool_tmp_used);
     if (p == NULL) return NULL;
-    memset(p, 0, size);
+    ::memset(p, 0, size);
     return p;
 }
 

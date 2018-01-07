@@ -54,12 +54,12 @@ static bool checkLogicalOp(IR_TYPE irt, Type const* type, TypeMgr * tm)
     }
     return true;
 }
+#endif
 
 
 static bool is_reduction(IR const* ir)
 {
-    ASSERT0(ir->is_stmt());
-    DUMMYUSE(is_reduction);
+    ASSERT0(ir->is_stmt());    
     if (!ir->is_st() && !ir->is_stpr()) { return false; }
     IR * rhs = ir->getRHS();
 
@@ -103,7 +103,6 @@ static bool is_reduction(IR const* ir)
 
     return true;
 }
-#endif
 
 
 //
@@ -125,7 +124,9 @@ AnalysisInstrument::AnalysisInstrument(Region * rg) :
     m_pr_count = 1;
     m_pool = smpoolCreate(256, MEM_COMM);
     m_du_pool = smpoolCreate(sizeof(DU) * 4, MEM_CONST_SIZE);
-    memset(m_free_tab, 0, sizeof(m_free_tab));
+    m_sc_labelinfo_pool = smpoolCreate(sizeof(SC<LabelInfo*>) * 4, 
+        MEM_CONST_SIZE);
+    ::memset(m_free_tab, 0, sizeof(m_free_tab));
 }
 
 
@@ -213,7 +214,9 @@ AnalysisInstrument::~AnalysisInstrument()
 
     //Destroy all DUSet which allocated in the du_pool.
     smpoolDelete(m_du_pool);
+    smpoolDelete(m_sc_labelinfo_pool);
     m_du_pool = NULL;
+    m_sc_labelinfo_pool = NULL;
     m_ir_list = NULL;
 }
 
@@ -251,6 +254,7 @@ size_t AnalysisInstrument::count_mem()
 
     count += smpoolGetPoolSize(m_pool);
     count += smpoolGetPoolSize(m_du_pool);
+    count += smpoolGetPoolSize(m_sc_labelinfo_pool);
 
     count += m_ru_var_tab.count_mem();
     count += m_ir_bb_mgr.count_mem();
@@ -974,7 +978,7 @@ IR * Region::buildArray(
     if (elem_num_buf != NULL) {
         UINT l = sizeof(TMWORD) * dims;
         TMWORD * ebuf = (TMWORD*)xmalloc(l);
-        memcpy(ebuf, elem_num_buf, l);
+        ::memcpy(ebuf, elem_num_buf, l);
         ARR_elem_num_buf(ir) = ebuf;
     }
     return ir;
@@ -1047,7 +1051,7 @@ IR * Region::buildStoreArray(
     if (elem_num_buf != NULL) {
         UINT l = sizeof(TMWORD) * dims;
         TMWORD * ebuf = (TMWORD*)xmalloc(l);
-        memcpy(ebuf, elem_num_buf, l);
+        ::memcpy(ebuf, elem_num_buf, l);
         ARR_elem_num_buf(ir) = ebuf;
     }
     STARR_rhs(ir) = rhs;
@@ -1126,6 +1130,7 @@ IR * Region::buildDoLoop(
     ASSERT0(init && step && init->is_exp() && step->is_exp());
     ASSERT0(iv->is_id() || iv->is_pr());
     //ASSERT0(is_reduction(step));
+    DUMMYUSE(is_reduction);
 
     IR * ir = allocIR(IR_DO_LOOP);
     IR_dt(ir) = getTypeMgr()->getVoid();
@@ -1968,12 +1973,11 @@ void Region::constructIRBBlist()
         ASSERT0(pointer->isStmtInBB() || pointer->is_lab());
         IR * cur_ir = pointer;
         pointer = IR_next(pointer);
-        IR_next(cur_ir) = IR_prev(cur_ir) = NULL;
-        //remove(&start_ir, cur_ir);
+        IR_next(cur_ir) = IR_prev(cur_ir) = NULL;        
 
         if (cur_bb->is_down_boundary(cur_ir)) {
             BB_irlist(cur_bb).append_tail(cur_ir);
-            switch (IR_code(cur_ir)) {
+            switch (cur_ir->get_code()) {
             case IR_CALL:
             case IR_ICALL: //indirective call
             case IR_TRUEBR:
@@ -2002,7 +2006,8 @@ void Region::constructIRBBlist()
             //Generate new BB.
             getBBList()->append_tail(cur_bb);
             cur_bb = allocBB();
-        } else if (cur_ir->is_label()) {
+        }
+        else if (cur_ir->is_label()) {
             BB_is_fallthrough(cur_bb) = true;
             getBBList()->append_tail(cur_bb);
 
@@ -2022,12 +2027,20 @@ void Region::constructIRBBlist()
                     cur_ir = pointer;
                     pointer = IR_next(pointer);
                     IR_next(cur_ir) = IR_prev(cur_ir) = NULL;
-                } else {
+                }
+                else {
                     break;
                 }
             }
 
             BB_is_target(cur_bb) = true;
+        } else if (cur_ir->isMayThrow()) {
+            BB_irlist(cur_bb).append_tail(cur_ir);
+            BB_is_fallthrough(cur_bb) = true;
+            
+            //Generate new BB.
+            getBBList()->append_tail(cur_bb);
+            cur_bb = allocBB();
         } else {
             //Note that PHI should be placed followed after a LABEL immediately.
             //That is a invalid phi if it has only one operand.
@@ -2261,7 +2274,7 @@ void Region::freeIR(IR * ir)
     //Zero clearing all data fields.
     UINT res_id = ir->id();
     UINT res_irt_sz = getIRTypeSize(ir);
-    memset(ir, 0, res_irt_sz);
+    ::memset(ir, 0, res_irt_sz);
     IR_id(ir) = res_id;
     IR_ai(ir) = res_ai;
     set_irt_size(ir, res_irt_sz);
@@ -2467,7 +2480,7 @@ IR * Region::dupIR(IR const* src)
     UINT res_id = IR_id(res);
     AIContainer * res_ai = IR_ai(res);
     UINT res_irt_sz = getIRTypeSize(res);
-    memcpy(res, src, IRTSIZE(irt));
+    ::memcpy(res, src, IRTSIZE(irt));
     IR_id(res) = res_id;
     IR_ai(res) = res_ai;
     set_irt_size(res, res_irt_sz);
@@ -2608,7 +2621,7 @@ void Region::prescan(IR const* ir)
                     }
 
                     VAR * sv = getVarMgr()->
-                                registerStringVar(NULL, VAR_str(v), 1);
+                        registerStringVar(NULL, VAR_string(v), 1);
                     ASSERT0(sv);
                     VAR_is_addr_taken(sv) = true;
                     VAR_allocable(sv) = true;
@@ -2763,7 +2776,8 @@ void Region::dumpGR(bool dump_inner_region)
     default: ASSERT0(0); //TODO
     }
     if (getRegionVar() != NULL) {
-        prt("%s ", SYM_name(getRegionVar()->get_name()));
+        xcom::StrBuf buf(32);
+        prt("%s ", compositeName(getRegionVar()->get_name(), buf));
     }
 
     prt("(");
@@ -2990,7 +3004,7 @@ bool Region::verifyMDRef()
             cii.clean();
             for (IR const* t = iterInitC(ir, cii);
                  t != NULL; t = iterNextC(cii)) {
-                switch (IR_code(t)) {
+                switch (t->get_code()) {
                 case IR_ID:
                     //We do not need MD or MDSET information of IR_ID.
                     //ASSERT0(t->getExactRef());
@@ -3000,11 +3014,11 @@ bool Region::verifyMDRef()
                     if (g_is_support_dynamic_type) {
                         ASSERT(t->getEffectRef(), ("type is at least effect"));
                         ASSERT(!t->getEffectRef()->is_pr(),
-                               ("MD can not present a PR."));
+                            ("MD can not present a PR."));
                     } else {
                         ASSERT(t->getExactRef(), ("type must be exact"));
                         ASSERT(!t->getExactRef()->is_pr(),
-                               ("MD can not present a PR."));
+                            ("MD can not present a PR."));
                     }
 
                     //MayUse of ld may not empty.
@@ -3017,14 +3031,13 @@ bool Region::verifyMDRef()
                     break;
                 case IR_PR:
                     if (g_is_support_dynamic_type) {
-                        ASSERT(t->getEffectRef(),
-                               ("type is at least effect"));
+                        ASSERT(t->getEffectRef(), ("type is at least effect"));
                         ASSERT(t->getEffectRef()->is_pr(),
-                               ("MD must present a PR."));
+                            ("MD must present a PR."));
                     } else {
                         ASSERT(t->getExactRef(), ("type must be exact"));
                         ASSERT(t->getExactRef()->is_pr(),
-                               ("MD must present a PR."));
+                            ("MD must present a PR."));
                     }
 
                     ASSERT0(t->getRefMDSet() == NULL);
@@ -3101,14 +3114,13 @@ bool Region::verifyMDRef()
                 case IR_SETELEM:
                 case IR_GETELEM:
                     if (g_is_support_dynamic_type) {
-                        ASSERT(t->getEffectRef(),
-                               ("type is at least effect"));
+                        ASSERT(t->getEffectRef(), ("type is at least effect"));
                         ASSERT(t->getEffectRef()->is_pr(),
                                ("MD must present a PR."));
                     } else {
                         ASSERT(t->getExactRef(), ("type must be exact"));
                         ASSERT(t->getExactRef()->is_pr(),
-                               ("MD must present a PR."));
+                            ("MD must present a PR."));
                     }
 
                     ASSERT0(t->getRefMDSet() == NULL);
@@ -3126,7 +3138,7 @@ bool Region::verifyMDRef()
 
                         MDSet const* maydef = t->getRefMDSet();
                         ASSERT0(mustdef != NULL ||
-                                (maydef != NULL && !maydef->is_empty()));
+                            (maydef != NULL && !maydef->is_empty()));
                         if (maydef != NULL) {
                             //PR can not be accessed by indirect operation.
                             SEGIter * iter;
@@ -3134,8 +3146,7 @@ bool Region::verifyMDRef()
                                  i >= 0; i = maydef->get_next(i, &iter)) {
                                 MD const* x = getMDSystem()->getMD(i);
                                 DUMMYUSE(x);
-                                ASSERT0(x);
-                                ASSERT0(!x->is_pr());
+                                ASSERT0(x && !x->is_pr());
                             }
                             ASSERT0(getMDSetHash()->find(*maydef));
                         }
@@ -3507,26 +3518,25 @@ void Region::checkValidAndRecompute(OptCtx * oc, ...)
         getBBList() != NULL &&
         getBBList()->get_elem_count() != 0) {
         ASSERT(cfg && OC_is_cfg_valid(*oc),
-               ("You should make CFG available first."));
+            ("You should make CFG available first."));
         if (aa == NULL) {
             aa = (IR_AA*)passmgr->registerPass(PASS_AA);
-
             if (!aa->is_init()) {
                 aa->initAliasAnalysis();
             }
-
-            UINT numir = 0;
-            for (IRBB * bb = getBBList()->get_head();
-                 bb != NULL; bb = getBBList()->get_next()) {
-                numir += bb->getNumOfIR();
-            }
-
-            if (numir > g_thres_opt_ir_num) {
-                aa->set_flow_sensitive(false);
-            }
         }
-
-        aa->perform(*oc);
+        UINT numir = 0;
+        UINT max_numir_in_bb = 0;
+        for (IRBB * bb = getBBList()->get_head();
+            bb != NULL; bb = getBBList()->get_next()) {
+            numir += bb->getNumOfIR();
+            max_numir_in_bb = MAX(max_numir_in_bb, bb->getNumOfIR());
+        }
+        if (numir > g_thres_opt_ir_num ||
+            max_numir_in_bb > g_thres_opt_ir_num_in_bb) {
+            aa->set_flow_sensitive(false);
+        }
+         aa->perform(*oc);
     }
 
     if (f != 0 &&
@@ -3535,9 +3545,7 @@ void Region::checkValidAndRecompute(OptCtx * oc, ...)
         if (dumgr == NULL) {
             dumgr = (IR_DU_MGR*)passmgr->registerPass(PASS_DU_MGR);
         }
-
         f |= COMPUTE_NOPR_DU|COMPUTE_PR_DU;
-
         dumgr->perform(*oc, f);
         if (HAVE_FLAG(f, SOL_REF)) {
             ASSERT0(verifyMDRef());

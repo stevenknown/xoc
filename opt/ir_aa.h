@@ -123,7 +123,7 @@ class PtPairMgr {
         PtPair * p = (PtPair*)smpoolMallocConstSize(sizeof(PtPair),
                                                     m_pool_pt_pair);
         ASSERT0(p);
-        memset(p, 0, sizeof(PtPair));
+        ::memset(p, 0, sizeof(PtPair));
         return p;
     }
 
@@ -134,7 +134,7 @@ class PtPairMgr {
                                     sizeof(TMap<UINT, PtPair*>),
                                     m_pool_tmap);
         ASSERT0(p);
-        memset(p, 0, sizeof(TMap<UINT, PtPair*>));
+        ::memset(p, 0, sizeof(TMap<UINT, PtPair*>));
         return p;
     }
 public:
@@ -318,7 +318,6 @@ protected:
     //If the flag is true, flow sensitive analysis is performed.
     //Or perform flow insensitive.
     BYTE m_flow_sensitive:1;
-
 protected:
     MD const* allocHeapobj(IR * ir);
     MD const* assignIdMD(
@@ -354,14 +353,17 @@ protected:
     void convertPT2MD2MDSet(
             PtPairSet const& pps,
             IN PtPairMgr & pt_pair_mgr,
-            IN OUT MD2MDSet * ctx);
-    void convertMD2MDSet2PT(
+            IN OUT MD2MDSet * ctx,
+            IRBB const* bb);
+    bool convertMD2MDSet2PT(
             OUT PtPairSet & pps,
             IN PtPairMgr & pt_pair_mgr,
-            IN MD2MDSet * mx);
+            IN MD2MDSet * mx,
+            IRBB const* bb);
 
     bool evaluateFromLda(IR const* ir);
 
+    bool isFlowSensitiveProperly();
     void initEntryPtset(PtPairSet ** ptset_arr);
     void initGlobalAndParameterVarPtset(
             VAR * v,
@@ -458,7 +460,7 @@ protected:
     {
         void * p = smpoolMalloc(size, m_pool);
         ASSERT0(p);
-        memset(p, 0, size);
+        ::memset(p, 0, size);
         return p;
     }
 public:
@@ -474,7 +476,7 @@ public:
     void cleanPointTo(UINT mdid, IN OUT MD2MDSet & ctx)
     { ctx.setAlways(mdid, NULL); }
 
-    void computeFlowSensitive(List<IRBB*> const& bbl);
+    bool computeFlowSensitive(List<IRBB*> const& bbl);
     void computeStmt(IRBB const* bb, IN OUT MD2MDSet * mx);
     void computeFlowInsensitive();
     void computeMayPointTo(IR * pointer, IN MD2MDSet * mx, OUT MDSet & mds);

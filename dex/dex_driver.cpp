@@ -279,7 +279,7 @@ static void convertLIR2Dex(
 {
     DexCode const* dexcode = dexGetCode(df, dexm);
     DexCode x; //only for local used.
-    memset(&x, 0, sizeof(DexCode));
+    ::memset(&x, 0, sizeof(DexCode));
 
     //Transform LIR to DEX.
     CBSHandle transformed_dex_code = transformCode(lircode, &x);
@@ -325,7 +325,7 @@ static void convertIR2LIR(
     lircode->lirList = (LIR**)LIRMALLOC(u * sizeof(LIR*));
     lircode->maxVars = func_ru->getPrno2Vreg()->maxreg + 1;
     ASSERT0(lircode->numArgs == func_ru->getPrno2Vreg()->paramnum);
-    memset(lircode->lirList, 0, u * sizeof(LIR*));
+    ::memset(lircode->lirList, 0, u * sizeof(LIR*));
     UINT i = 0;
     for (LIR * l = newlirs.get_head(); l != NULL; l = newlirs.get_next()) {
         ASSERT0(l);
@@ -366,7 +366,7 @@ public:
         ASSERT0(pool);
         DexDbx * dd = (DexDbx*)smpoolMalloc(sizeof(DexDbx), pool);
         ASSERT0(dd);
-        memset(dd, 0, sizeof(DexDbx));
+        ::memset(dd, 0, sizeof(DexDbx));
         dd->init(AI_DBX);
         return dd;
     }
@@ -672,7 +672,7 @@ bool compileFunc(
     func_ru->setRegionVar(rm->getVarMgr()->registerVar(
                         runame,
                         rm->getTypeMgr()->getMCType(0),
-                        0, VAR_GLOBAL|VAR_FAKE));
+                        0, VAR_GLOBAL|VAR_FAKE|VAR_FUNC_DECL));
     func_ru->setParamNum(lircode->numArgs);
     func_ru->setOrgVregNum(lircode->maxVars);
     func_ru->setClassSourceFilePath(getClassSourceFilePath(df, dexclassdef));
@@ -685,7 +685,8 @@ bool compileFunc(
         Region * program = ((DexRegionMgr*)rumgr)->getProgramRegion();
         ASSERT0(program);
         REGION_parent(func_ru) = program;
-        //program->addToIRList(program->buildRegion(func_ru));
+        program->addToVarTab(func_ru->getRegionVar());
+        program->addToIRList(program->buildRegion(func_ru));
         rm->addToRegionTab(func_ru);
         if (rulist != NULL) {
             //Caller must make sure func_ru will not be destroied before IPA.

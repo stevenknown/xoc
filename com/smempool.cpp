@@ -98,8 +98,8 @@ static SMemPool * new_mem_pool(size_t size, MEMPOOLTYPE mpt)
 
     SMemPool * mp = (SMemPool*)malloc(size_mp + size + END_BOUND_BYTE);
     ASSERT(mp, ("create mem pool failed, no enough memory"));
-    memset(mp, 0, size_mp);
-    memset(((CHAR*)mp) + size_mp + size, BOUNDARY_NUM, END_BOUND_BYTE);
+    ::memset(mp, 0, size_mp);
+    ::memset(((CHAR*)mp) + size_mp + size, BOUNDARY_NUM, END_BOUND_BYTE);
 
     MEMPOOL_type(mp) = mpt;
     #ifdef _DEBUG_

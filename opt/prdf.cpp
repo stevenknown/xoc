@@ -130,7 +130,7 @@ void PRDF::computeLocal(IRBB * bb, List<IR const*> & lst)
     use->clean(m_sbs_mgr);
     for (IR * x = BB_last_ir(bb); x != NULL; x = BB_prev_ir(bb)) {
         ASSERT0(x->is_stmt());
-        switch (IR_code(x)) {
+        switch (x->get_code()) {
         case IR_ST:
             lst.clean();
             processOpnd(ST_rhs(x), lst, use, gen);

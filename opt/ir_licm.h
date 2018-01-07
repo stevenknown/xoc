@@ -100,7 +100,7 @@ protected:
         ASSERT0(m_pool != NULL);
         void * p = smpoolMallocConstSize(sizeof(UINT), m_pool);
         ASSERT0(p != NULL);
-        memset(p, 0, size);
+        ::memset(p, 0, size);
         return p;
     }
 public:

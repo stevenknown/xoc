@@ -258,10 +258,7 @@ void IR_AA::clean()
     m_is_visit.clean();
     m_in_pp_set.clean();
     m_out_pp_set.clean();
-
-    if (!m_flow_sensitive) {
-        m_unique_md2mds.clean();
-    }
+    m_unique_md2mds.clean();
 
     OptCtx oc;
     cleanContext(oc);
@@ -3371,19 +3368,43 @@ void IR_AA::dumpMD2MDSet(MD const* md, IN MD2MDSet * mx)
 }
 
 
-void IR_AA::convertMD2MDSet2PT(
+//Return false if flow sensitive analysis is inproperly.
+bool IR_AA::convertMD2MDSet2PT(
         OUT PtPairSet & pps,
         IN PtPairMgr & pt_pair_mgr,
-        IN MD2MDSet * mx)
-{
+        IN MD2MDSet * mx,
+        IRBB const* bb)
+{    
     MD2MDSetIter mxiter;
     MDSet const* from_md_pts = NULL;
+
+    //Grow pps before hand with the maximum length needed.
+    UINT num_of_tgt_md = 0;
+    for (UINT fromid = mx->get_first(mxiter, &from_md_pts);
+        fromid > 0; fromid = mx->get_next(mxiter, &from_md_pts)) {
+        ASSERT0(m_md_sys->getMD(fromid));
+        if (from_md_pts == NULL || from_md_pts->is_contain_all()) {
+            continue;
+        }
+        num_of_tgt_md += from_md_pts->get_elem_count();
+    }
+    if (num_of_tgt_md != 0) {
+        num_of_tgt_md = (num_of_tgt_md * mx->get_elem_count() /
+            HOST_BIT_PER_BYTE + 1) *
+            HOST_BIT_PER_BYTE / HOST_BIT_PER_BYTE;
+        if (pps.get_byte_size() < num_of_tgt_md) {
+            ASSERT0(pps.is_empty());
+            pps.alloc(num_of_tgt_md); //alloc will destroy the original buffer.
+        }
+    }
+    if (num_of_tgt_md > g_thres_flow_sensitive_aa) {
+        return false;
+    }
+
     for (UINT fromid = mx->get_first(mxiter, &from_md_pts);
          fromid > 0; fromid = mx->get_next(mxiter, &from_md_pts)) {
         ASSERT0(m_md_sys->getMD(fromid));
-
         if (from_md_pts == NULL) { continue; }
-
         if (from_md_pts->is_contain_all()) {
             PtPair const* pp = pt_pair_mgr.add(fromid, MD_FULL_MEM);
             ASSERT0(pp);
@@ -3398,20 +3419,22 @@ void IR_AA::convertMD2MDSet2PT(
                 pps.bunion(PP_id(pp));
             }
         }
-    }
+    }        
+    return true;
 }
 
 
 void IR_AA::convertPT2MD2MDSet(
         PtPairSet const& pps,
         IN PtPairMgr & pt_pair_mgr,
-        IN OUT MD2MDSet * ctx)
+        IN OUT MD2MDSet * ctx,
+        IRBB const* bb)
 {
     for (INT i = pps.get_first(); i >= 0; i = pps.get_next((UINT)i)) {
         PtPair * pp = pt_pair_mgr.get((UINT)i);
         ASSERT0(pp != NULL);
         setPointToMDSetByAddMD(PP_from(pp), *ctx, m_md_sys->getMD(PP_to(pp)));
-    }
+    }    
 }
 
 
@@ -3623,7 +3646,8 @@ bool IR_AA::verify()
 //NOTICE: Do NOT clean 'md2mds' of BB at the last iter,
 //it supplied the POINT TO information for subsequently
 //optimizations.
-void IR_AA::computeFlowSensitive(List<IRBB*> const& bbl)
+//Return false if flow sensitive analysis is inproperly.
+bool IR_AA::computeFlowSensitive(List<IRBB*> const& bbl)
 {
     bool change = true;
     UINT count = 0;
@@ -3659,12 +3683,13 @@ void IR_AA::computeFlowSensitive(List<IRBB*> const& bbl)
                 //iteration. And it will be used during computing POINT-TO
                 //info and DU analysis.
                 md2mds->clean();
-                convertPT2MD2MDSet(*pps, m_pt_pair_mgr, md2mds);
+                convertPT2MD2MDSet(*pps, m_pt_pair_mgr, md2mds, bb);
             }
             computeStmt(bb, md2mds);
             tmp.clean();
-
-            convertMD2MDSet2PT(tmp, m_pt_pair_mgr, md2mds);
+            if (!convertMD2MDSet2PT(tmp, m_pt_pair_mgr, md2mds, bb)) {
+                return false;
+            }
 
             #ifdef _DEBUG_
             //MD2MDSet x;
@@ -3679,6 +3704,7 @@ void IR_AA::computeFlowSensitive(List<IRBB*> const& bbl)
         }
     }
     ASSERT(!change, ("Iterated too many times"));
+    return true;
 }
 
 
@@ -3772,6 +3798,33 @@ void IR_AA::initGlobalAndParameterVarPtset(
 }
 
 
+//Determine if flow sensitive analysis is properly.
+bool IR_AA::isFlowSensitiveProperly()
+{
+    IRBB * entry = m_cfg->get_entry();
+    ASSERT0(entry);
+    MD2MDSet * mx = allocMD2MDSetForBB(BB_id(entry));
+    ASSERT(mx, ("invoke initEntryPtset before here"));
+    MD2MDSetIter mxiter;
+    MDSet const* from_md_pts = NULL;
+
+    //Grow pps before hand with the maximum length needed.
+    UINT num_of_tgt_md = 0;
+    for (UINT fromid = mx->get_first(mxiter, &from_md_pts);
+        fromid > 0; fromid = mx->get_next(mxiter, &from_md_pts)) {
+        ASSERT0(m_md_sys->getMD(fromid));
+        if (from_md_pts == NULL || from_md_pts->is_contain_all()) {
+            continue;
+        }
+        num_of_tgt_md += from_md_pts->get_elem_count();
+    }
+    num_of_tgt_md = (num_of_tgt_md * mx->get_elem_count() /
+        HOST_BIT_PER_BYTE + 1) *
+        HOST_BIT_PER_BYTE / HOST_BIT_PER_BYTE;
+    return num_of_tgt_md < g_thres_flow_sensitive_aa;
+}
+
+
 //Initialize POINT_TO set for input MD at the entry of Region.
 //e.g:char * q;
 //    void f(int * p)
@@ -3834,7 +3887,7 @@ void IR_AA::initEntryPtset(PtPairSet ** ptset_arr)
 
             initGlobalAndParameterVarPtset(v, mx, iter);
         }
-        convertMD2MDSet2PT(*getInPtPairSet(entry), m_pt_pair_mgr, mx);
+        convertMD2MDSet2PT(*getInPtPairSet(entry), m_pt_pair_mgr, mx, NULL);
     } else {
         setPointToAllMem(MD_FULL_MEM, m_unique_md2mds);
         setPointToGlobalMem(MD_GLOBAL_MEM, m_unique_md2mds);
@@ -3972,20 +4025,26 @@ bool IR_AA::perform(IN OUT OptCtx & oc)
     PtPairSet * ptset_arr = NULL;
     if (m_flow_sensitive) {
         initEntryPtset(&ptset_arr);
-
         m_ru->checkValidAndRecompute(&oc, PASS_RPO, PASS_UNDEF);
-
         List<IRBB*> * tbbl = m_cfg->getBBListInRPO();
         ASSERT0(tbbl->get_elem_count() == m_ru->getBBList()->get_elem_count());
-
-        computeFlowSensitive(*tbbl);
+        START_TIMER_FMT(t, ("%s:flow sensitive analysis", getPassName()));
+        bool is_succ = computeFlowSensitive(*tbbl);
+        END_TIMER_FMT(t, ("%s:flow sensitive analysis", getPassName()));
+        if (!is_succ) {
+            m_flow_sensitive = false;
+            START_TIMER_FMT(t, ("%s:flow insensitive analysis", getPassName()));
+            initEntryPtset(NULL);
+            computeFlowInsensitive();
+            END_TIMER_FMT(t, ("%s:flow insensitive analysis", getPassName()));
+        }
     } else {
+        START_TIMER_FMT(t, ("%s:flow insensitive analysis", getPassName()));
         initEntryPtset(NULL);
         computeFlowInsensitive();
+        END_TIMER_FMT(t, ("%s:flow insensitive analysis", getPassName()));
     }
-
     OC_is_aa_valid(oc) = true;
-
     if (ptset_arr != NULL) {
         //PtPair information will be unavailable.
         delete [] ptset_arr;

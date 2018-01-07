@@ -857,7 +857,7 @@ void * BitSet::realloc(IN void * src, size_t orgsize, size_t newsize)
 void BitSet::alloc(UINT size)
 {
     m_size = size;
-    if (m_ptr != NULL) { ::free(m_ptr);    }
+    if (m_ptr != NULL) { ::free(m_ptr); }
     if (size != 0) {
         m_ptr = (BYTE*)::malloc(size);
         ::memset(m_ptr, 0, m_size);

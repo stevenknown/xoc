@@ -78,6 +78,16 @@ class RegionMgr;
 //NOTE: Do *NOT* forget modify the bit-field in VAR if
 //you remove/add flag here.
 ///////////////////////////////////////////////////////
+#define BYTEBUF_size(b)    ((b)->m_byte_size)
+#define BYTEBUF_buffer(b)  ((b)->m_byte_buffer)
+class ByteBuf {
+public:
+    UINT m_byte_size;
+    BYTE * m_byte_buffer;
+
+    BYTE * getBuffer() const { return m_byte_buffer; }
+    UINT getSize() const { return m_byte_size; }
+};
 
 //Variable unique id.
 #define VAR_id(v)                ((v)->uid)
@@ -91,7 +101,7 @@ class RegionMgr;
 #define VAR_flag(v)              ((v)->u2.flag)
 
 //Record string content if variable is string.
-#define VAR_str(v)               ((v)->u1.string)
+#define VAR_string(v)            ((v)->u1.string)
 
 //Record LabelInfo if variable is label.
 #define VAR_labinfo(v)           ((v)->u1.labinfo)
@@ -113,10 +123,10 @@ class RegionMgr;
 #define VAR_is_readonly(v)       ((v)->u2.s1.is_readonly)
 
 //Record the initial valud index.
-#define VAR_init_val_id(v)       ((v)->u1.init_val_id)
+#define VAR_byte_val(v)          ((v)->u1.byte_val)
 
 //Variable has initial value.
-#define VAR_has_init_val(v)      (VAR_init_val_id(v) != 0)
+#define VAR_has_init_val(v)      (VAR_byte_val(v) != NULL)
 
 //Variable is region.
 #define VAR_is_func_decl(v)      ((v)->u2.s1.is_func_decl)
@@ -135,7 +145,7 @@ class RegionMgr;
 #define VAR_is_formal_param(v)   ((v)->u2.s1.is_formal_param)
 
 //Record the parameter position.
-#define VAR_formal_param_pos(v)  ((v)->u1.formal_parameter_pos)
+#define VAR_formal_param_pos(v)  ((v)->formal_parameter_pos)
 
 //Variable is spill location.
 #define VAR_is_spill(v)          ((v)->u2.s1.is_spill)
@@ -161,21 +171,19 @@ public:
     UINT align; //memory alignment of var.
     SYM const* name;
 
+	//Record the formal parameter position if VAR is parameter.
+	//Start from 0.
+	UINT formal_parameter_pos;
+
     union {
-        //Record string contents if VAR is const string.
-        SYM const* string;
+		//Record string contents if VAR is const string.
+		SYM const* string;
 
-        //Index to constant value table.
-        //This value is 0 if no initial value.
-        //Record constant content if VAR has constant initial value.
-        UINT init_val_id;
+        //Record byte code if VAR has constant initial value.
+        ByteBuf * byte_val;
 
-        //Record the formal parameter position if VAR is parameter.
-        //Start from 0.
-        UINT formal_parameter_pos;
-
-        //Record labelinfo if VAR is label.
-        LabelInfo * labinfo;
+		//Record labelinfo if VAR is label.
+		LabelInfo * labinfo;
     } u1;
 
     union {
@@ -203,7 +211,6 @@ public:
             UINT is_allocable:1;
         } s1;
     } u2;
-
 public:
     VAR();
     virtual ~VAR() {}
@@ -261,8 +268,10 @@ public:
     UINT getStringLength() const
     {
         ASSERT0(VAR_type(this)->is_string());
-        return VAR_str(this) == NULL ? 0 : xstrlen(SYM_name(VAR_str(this)));
+        return VAR_string(this) == NULL ? 0 : xstrlen(SYM_name(VAR_string(this)));
     }
+    SYM const* getString() const { return VAR_string(this); }
+    ByteBuf const* getByteValue() const { return VAR_byte_val(this); }
 
     //Return the byte size of variable accroding type.
     UINT getByteSize(TypeMgr const* dm) const
@@ -278,7 +287,7 @@ public:
 
     //You must make sure this function will not change any field of VAR.
     virtual CHAR const* dump(StrBuf & buf, TypeMgr const* dm) const;
-    void dumpFlag(StrBuf & buf, bool grmode) const;
+    void dumpFlag(xcom::StrBuf & buf, bool grmode) const;
     CHAR const* dumpGR(StrBuf & buf, TypeMgr * dm) const;
 
     void setToGlobal(bool is_global)
@@ -297,6 +306,7 @@ class CompareVar {
 public:
     bool is_less(VAR * t1, VAR * t2) const { return t1 < t2; }
     bool is_equ(VAR * t1, VAR * t2) const { return t1 == t2; }
+    VAR * createKey(VAR * t) { return t; }
 };
 
 
@@ -304,6 +314,7 @@ class CompareConstVar {
 public:
     bool is_less(VAR const* t1, VAR const* t2) const { return t1 < t2; }
     bool is_equ(VAR const* t1, VAR const* t2) const { return t1 == t2; }
+    VAR const* createKey(VAR const* t) { return t; }
 };
 
 

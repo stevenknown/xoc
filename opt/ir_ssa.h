@@ -151,7 +151,7 @@ protected:
         ASSERT(m_vp_pool != NULL, ("not init"));
         VP * p = (VP*)smpoolMallocConstSize(sizeof(VP), m_vp_pool);
         ASSERT0(p);
-        memset(p, 0, sizeof(VP));
+        ::memset(p, 0, sizeof(VP));
         return p;
     }
 

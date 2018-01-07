@@ -96,7 +96,7 @@ void IR_DCE::dump(EFFECT_STMT const& is_stmt_effect,
 //Return true if ir can be optimized.
 bool IR_DCE::check_stmt(IR const* ir)
 {
-    if (IR_may_throw(ir) || IR_has_sideeffect(ir) || IR_no_move(ir)) {
+    if (ir->isMayThrow() || ir->hasSideEffect() || ir->isNoMove()) {
         return true;
     }
 

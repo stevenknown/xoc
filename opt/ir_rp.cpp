@@ -63,8 +63,8 @@ public:
         case IR_ILD:
             for (IR const* x = iterInitC(t, iter);
                  x != NULL; x = iterNextC(iter)) {
-                UINT v = IR_code(x) + (x->getOffset() + 1) +
-                         (UINT)(size_t)x->get_type();
+                UINT v = x->get_code() + (x->getOffset() + 1) +
+                    (UINT)(size_t)x->get_type();
                 if (x->is_id()) {
                     v += ((UINT)(size_t)ID_info(x)) * 5;
                 }
@@ -78,7 +78,7 @@ public:
         case IR_IST:
             for (IR const* x = iterInitC(IST_base(t), iter);
                  x != NULL; x = iterNextC(iter)) {
-                UINT v = IR_code(x) + (x->getOffset() + 1) +
+                UINT v = x->get_code() + (x->getOffset() + 1) +
                         (UINT)(size_t)x->get_type();
                 if (x->is_id()) {
                     v += ((UINT)(size_t)ID_info(x)) * 5;
@@ -91,7 +91,7 @@ public:
         case IR_ARRAY:
             for (IR const* x = iterInitC(t, iter);
                  x != NULL; x = iterNextC(iter)) {
-                UINT v = IR_code(x) + (x->getOffset() + 1) +
+                UINT v = x->get_code() + (x->getOffset() + 1) +
                         (UINT)(size_t)x->get_type();
                 if (x->is_id()) {
                     v += ((UINT)(size_t)ID_info(x)) * 5;
@@ -1120,7 +1120,7 @@ void IR_RP::handleRestore2Mem(
         }
 
         IR * stmt = NULL;
-        switch (IR_code(delegate)) {
+        switch (delegate->get_code()) {
         case IR_ARRAY:
         case IR_STARRAY:
             {
@@ -1530,7 +1530,7 @@ void IR_RP::handleAccessInBody(
         ASSERT0(stmt);
     }
 
-    switch (IR_code(ref)) {
+    switch (ref->get_code()) {
     case IR_STARRAY:
         {
             bool has_use = false;

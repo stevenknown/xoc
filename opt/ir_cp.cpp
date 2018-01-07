@@ -200,7 +200,7 @@ void IR_CP::replaceExp(
         //Remove exp MD SSA use.
         ASSERT0(mdssamgr);
         MDSSAInfo * mdssainfo = mdssamgr->getUseDefMgr()->getMDSSAInfo(exp);
-        ASSERT0(mdssainfo);
+		CHECK_DUMMYUSE(mdssainfo);
         mdssamgr->removeMDSSAUseRecur(exp);
         if (exp->is_id()) {
             ASSERT0(ID_phi(exp));
@@ -413,13 +413,9 @@ bool IR_CP::doPropToNormalStmt(
 {
     bool change = false;
     CPCtx lchange;
-
     IR * old_use_stmt = use_stmt;
-
     replaceExp(use, prop_value, lchange, prssadu, mdssadu, mdssamgr);
-
     ASSERT(use_stmt->is_stmt(), ("ensure use_stmt still legal"));
-
     if (!CPC_change(lchange)) { return false; }
 
     //Indicate whether use_stmt is the next stmt of def_stmt.
@@ -446,7 +442,6 @@ bool IR_CP::doPropToNormalStmt(
         BB_irlist(use_bb).insert_before(use_stmt, irct);
         BB_irlist(use_bb).remove(irct);
     }
-
     return true;
 }
 
@@ -467,7 +462,7 @@ void IR_CP::dumpCopyPropagationAction(
     if (use->is_id()) {
         ASSERT0(mdssamgr);
         MDSSAInfo * mdssainfo = mdssamgr->getUseDefMgr()->getMDSSAInfo(use);
-        ASSERT0(mdssainfo);
+		CHECK_DUMMYUSE(mdssainfo);
         ASSERT0(ID_phi(use));
         note("\n");
         ID_phi(use)->dump(m_ru, mdssamgr->getUseDefMgr());
@@ -684,6 +679,7 @@ bool IR_CP::perform(OptCtx & oc)
     useset.clean(*m_ru->getMiscBitSetMgr());
 
     if (change) {
+        ASSERT0(mdssamgr->verify());
         doFinalRefine();
         OC_is_expr_tab_valid(oc) = false;
         OC_is_aa_valid(oc) = false;

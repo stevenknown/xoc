@@ -507,11 +507,13 @@ void MD2MDSet::dump(Region * rg)
 
     if (g_tfile == NULL) { return; }
 
-    fprintf(g_tfile, "\n*** Dump MD POINT-TO list ***");
+    fprintf(g_tfile, "\n==---- DUMP MD2MDSet ----==");
 
     //Dump all MDs.
     MDSystem * ms = rg->getMDSystem();
+    fprintf(g_tfile, "\n==-- DUMP MD Index --==");
     ms->getID2MDMap()->dump();
+
     MD2MDSetIter mxiter;
     MDSet const* pts = NULL;
     for (UINT mdid = get_first(mxiter, &pts);
@@ -538,7 +540,7 @@ void MD2MDSet::dump(Region * rg)
     }
 
     //Dump set of MD that corresponding to an individual VAR.
-    fprintf(g_tfile, "\n*** Dump the mapping from VAR to set of MD ***");
+    fprintf(g_tfile, "\n==-- DUMP the mapping from VAR to MDSet --==");
     VarVec * var_tab = rg->getVarMgr()->get_var_vec();
     Vector<MD const*> mdv;
     ConstMDIter iter;

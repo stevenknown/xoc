@@ -234,6 +234,8 @@ extern bool g_build_cfs;
 extern bool g_cst_bb_list; //Construct BB list.
 extern UINT g_thres_opt_ir_num;
 extern UINT g_thres_opt_bb_num;
+extern UINT g_thres_opt_ir_num_in_bb;
+extern UINT g_thres_flow_sensitive_aa;
 extern bool g_do_loop_convert;
 extern bool g_do_poly_tran;
 extern bool g_retain_pass_mgr_for_region;

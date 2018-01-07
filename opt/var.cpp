@@ -53,7 +53,7 @@ VAR::VAR()
     VAR_id(this) = 0; //unique id;
     VAR_type(this) = UNDEF_TYID;
     VAR_name(this) = NULL;
-    VAR_str(this) = 0;
+    VAR_string(this) = NULL;
     u2.flag = 0; //Record various properties of variable.
     align = 0;
 }
@@ -72,7 +72,7 @@ void VAR::dump(FILE * h, TypeMgr const* dm) const
 }
 
 
-void VAR::dumpFlag(StrBuf & buf, bool grmode) const
+void VAR::dumpFlag(xcom::StrBuf & buf, bool grmode) const
 {
     bool first = true;
     if (!grmode) {
@@ -179,14 +179,69 @@ void VAR::dumpFlag(StrBuf & buf, bool grmode) const
         first = false;
         buf.strcat("array");
     }
+    if (is_string() && getString() != NULL) {
+        if (!first) {
+            buf.strcat(",");
+        }
+        first = false;
+
+        //Add back-slash to translate '"' and '\\'.
+        CHAR const* local_string = SYM_name(getString());
+        UINT quote_num = 0;
+        UINT len = 0;
+        for (CHAR const* p = local_string; *p != 0; p++, len++) {
+            if (*p == '"' || *p == '\\') {
+                quote_num++;
+            }
+        }
+        CHAR * local_buf = NULL;
+        if (quote_num != 0) {
+            UINT i = 0;            
+            len += quote_num;
+            if (len < HOST_STACK_MAX_USABLE_MEMORY_BYTE_SIZE) {
+                local_buf = (CHAR*)ALLOCA(len + 1);
+            } else {
+                local_buf = (CHAR*)::malloc(len + 1);
+            }
+            for (CHAR const* q = local_string; *q != 0; q++, i++) {
+                if (*q == '"' || *q == '\\') {
+                    local_buf[i] = '\\';
+                    i++;
+                }
+                local_buf[i] = *q;
+            }
+            local_buf[len] = 0;
+            local_string = local_buf;
+        }
+        buf.strcat("string(\"%s\")", local_string);
+        if (local_buf != NULL && len >= HOST_STACK_MAX_USABLE_MEMORY_BYTE_SIZE) {
+            ::free(local_buf);
+        }
+    } else if (getByteValue() != NULL) {
+        if (!first) {
+            buf.strcat(",");
+        }
+        first = false;
+        buf.strcat("byte(");
+        BYTE const* p = getByteValue()->getBuffer();
+        UINT size = getByteValue()->getSize();
+        ASSERT0(p);
+        buf.strcat("0x%x", (BYTE)*p);
+        UINT i = 1;
+        for (p++; i < size; i++, p++) {
+            buf.strcat(",0x%x", (BYTE)*p);
+        }
+        buf.strcat(")");
+    }
 }
 
 
 CHAR const* VAR::dumpGR(StrBuf & buf, TypeMgr * dm) const
 {
     StrBuf buf2(32);
+    StrBuf buf3(32);
     buf.strcat("var %s:%s",
-        SYM_name(VAR_name(this)),
+        compositeName(VAR_name(this), buf3),
         dm->dump_type(get_type(), buf2));
     if (VAR_flag(this) != 0) {
         buf.strcat(":(");
@@ -203,7 +258,7 @@ CHAR const* VAR::dump(StrBuf & buf, TypeMgr const* dm) const
     CHAR * lname = SYM_name(VAR_name(this));
     CHAR tt[43];
     if (xstrlen(lname) > 43) {
-        memcpy(tt, lname, 43);
+        ::memcpy(tt, lname, 43);
         tt[39] = '.';
         tt[40] = '.';
         tt[41] = '.';
@@ -369,7 +424,7 @@ VAR * VarMgr::registerStringVar(CHAR const* var_name, SYM const* s, UINT align)
         VAR_name(v) = m_ru_mgr->addToSymbolTab(var_name);
     }
 
-    VAR_str(v) = s;
+    VAR_string(v) = s;
     VAR_type(v) = m_tm->getString();
     VAR_align(v) = align;
     VAR_is_global(v) = true;

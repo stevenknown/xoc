@@ -93,6 +93,15 @@ VAR * Dex2IR::addVarByName(CHAR const* name, Type const* ty)
     UINT flag = 0;
     SET_FLAG(flag, VAR_GLOBAL);
     v = m_vm->registerVar(sym, ty, 0, flag);
+    
+    //Record global class,method symbol at RegionMgr.
+    //Record global class,method variable at program region.
+    ASSERT0(m_ru_mgr->getProgramRegion());
+    if (m_ru_mgr->getSym2Var().get(sym) == NULL) {
+        m_ru_mgr->getProgramRegion()->addToVarTab(v);
+        m_ru_mgr->getSym2Var().set(sym, v);
+    }
+
     m_str2var.set(sym, v);
     return v;
 }
@@ -100,10 +109,38 @@ VAR * Dex2IR::addVarByName(CHAR const* name, Type const* ty)
 
 VAR * Dex2IR::addStringVar(CHAR const* string)
 {
-    SYM * sym = m_ru_mgr->addToSymbolTab(string);
+    CHAR const* local_string = string;
+    //UINT quote_num = 0;
+    //UINT len = 0;
+    //for (CHAR const* p = string; *p != 0; p++, len++) {
+    //    if (*p == '"' || *p == '\\') {
+    //        quote_num++;
+    //    }
+    //}
+    //if (quote_num != 0) {
+    //    UINT i = 0;
+    //    CHAR * buf = (CHAR*)ALLOCA(len + quote_num + 1);
+    //    for (CHAR const* q = string; *q != 0; q++, i++) {
+    //        if (*q == '"' || *q == '\\') {
+    //            buf[i] = '\\';
+    //            i++;
+    //        }
+    //        buf[i] = *q;
+    //    }
+    //    local_string = buf;
+    //}
+    SYM * sym = m_ru_mgr->addToSymbolTab(local_string);
     VAR * v = m_str2var.get(sym);
     if (v != NULL) { return v; }
     v = m_vm->registerStringVar(NULL, sym, 0);
+
+    //Record string at RegionMgr.
+    ASSERT0(m_ru_mgr->getProgramRegion());
+    if (m_ru_mgr->getSym2Var().get(sym) == NULL) {
+        m_ru_mgr->getProgramRegion()->addToVarTab(v);
+        m_ru_mgr->getSym2Var().set(sym, v);
+    }
+
     m_str2var.set(sym, v);
     return v;
 }
@@ -238,6 +275,7 @@ VAR * Dex2IR::addFuncVar(UINT method_id, Type const* ty)
     pbuf = assemblyUniqueName(pbuf, class_name, func_param_type, func_name);
     VAR * v = addVarByName(pbuf, ty);
     VAR_is_readonly(v) = is_readonly(func_name);
+    VAR_is_func_decl(v) = true;
     return v;
 }
 

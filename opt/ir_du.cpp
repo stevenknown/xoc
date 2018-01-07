@@ -3866,7 +3866,7 @@ UINT IR_DU_MGR::checkIsLocalKillingDef(
 
     if (!t2->is_pr() && !t2->is_ld()) { return CK_UNKNOWN; }
 
-    if (IR_code(t) != IR_code(t2)) { return CK_UNKNOWN; }
+    if (t->get_code() != t2->get_code()) { return CK_UNKNOWN; }
 
     IRBB * curbb = stmt->getBB();
 
@@ -4265,7 +4265,7 @@ UINT IR_DU_MGR::checkIsNonLocalKillingDef(IR const* stmt, IR const* exp)
     while (t2->is_cvt()) { t2 = CVT_exp(t2); }
     if (!t2->is_pr() && !t2->is_ld()) { return CK_UNKNOWN; }
 
-    if (IR_code(t) != IR_code(t2)) { return CK_UNKNOWN; }
+    if (t->get_code() != t2->get_code()) { return CK_UNKNOWN; }
 
     //Note, t could not be modified in the path between stmt and exp.
     //e.g:

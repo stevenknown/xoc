@@ -310,7 +310,7 @@ public:
     Type const* int64x2;
 
 public:
-    TypeIndexRep() { memset(this, 0, sizeof(TypeIndexRep)); }
+    TypeIndexRep() { ::memset(this, 0, sizeof(TypeIndexRep)); }
 };
 
 //Perform Dex register allocation.

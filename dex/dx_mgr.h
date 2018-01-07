@@ -381,7 +381,7 @@ public:
 #define DX_PCOUNT 5  //Parameter count
 class DXC {
 public:
-    DXC() { memset(this, 0, sizeof(DXC)); }
+    DXC() { ::memset(this, 0, sizeof(DXC)); }
 
     DX_OPC opc;
     INT vA;

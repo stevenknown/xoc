@@ -137,7 +137,7 @@ static inline bool signedFitsInWide32(Int64 value){
         dexInstr->instrData = instrData; \
         ASSERT0(unsignedFitsIn8(dataA));\
         WRITE_16(instrData, ((UInt8)(dataA) << 8)|((UInt8)dexOpCode))\
-        memcpy(instrData,&dataB,8);
+        ::memcpy(instrData,&dataB,8);
 
 #define WRITE_FORMATAABBCC(dexInstr,dataA,dataB,dataC) \
         dexInstr->instrSize = 4;\
@@ -1804,7 +1804,7 @@ Int32 transformCode_orig(D2Dpool* pool, LIRCode* code, DexCode* nCode)
    dexInstrList.instrCount = instrCount;
 
    dexInstrList.instr = (D2DdexInstr*)malloc(sizeof(D2DdexInstr) * instrCount);
-   memset(dexInstrList.instr, 0, sizeof(D2DdexInstr) * instrCount);
+   ::memset(dexInstrList.instr, 0, sizeof(D2DdexInstr) * instrCount);
 
    for(i = 0; i < instrCount; i++)
    {
@@ -1942,7 +1942,7 @@ Int32 transformCode(LIRCode const* code, DexCode* nCode)
    dexInstrList.instrCount = instrCount;
 
    dexInstrList.instr = (D2DdexInstr*)malloc(sizeof(D2DdexInstr) * instrCount);
-   memset(dexInstrList.instr, 0, sizeof(D2DdexInstr) * instrCount);
+   ::memset(dexInstrList.instr, 0, sizeof(D2DdexInstr) * instrCount);
 
    for(i = 0; i < instrCount; i++)
    {
@@ -2203,7 +2203,7 @@ DexCode * writeCodeItem(D2Dpool* pool,
 void lir2dexCode_orig(D2Dpool* pool, const DexCode* pCode, LIRCode* code)
 {
     DexCode npCode;
-    memset(&npCode, 0, sizeof(DexCode));
+    ::memset(&npCode, 0, sizeof(DexCode));
 
     CBSHandle cbsCode = transformCode_orig(pool, code, &npCode);
     npCode.debugInfoOff = pCode->debugInfoOff;
@@ -2217,7 +2217,7 @@ void lir2dexCode_orig(D2Dpool* pool, const DexCode* pCode, LIRCode* code)
 void lir2dexCode(D2Dpool* pool, const DexCode* dexCode, LIRCode* lircode)
 {
     DexCode x;
-    memset(&x, 0, sizeof(DexCode));
+    ::memset(&x, 0, sizeof(DexCode));
     CBSHandle cbsCode = transformCode(lircode, &x);
     writeCodeItem(pool, cbsCode, x.registersSize, x.insSize,
                   dexCode->outsSize, x.triesSize,

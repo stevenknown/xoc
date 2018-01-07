@@ -454,7 +454,7 @@ MDSSAInfo * UseDefMgr::allocMDSSAInfo()
     MDSSAInfo * p = (MDSSAInfo*)smpoolMallocConstSize(
         sizeof(MDSSAInfo), m_mdssainfo_pool);
     ASSERT0(p);
-    memset(p, 0, sizeof(MDSSAInfo));
+    ::memset(p, 0, sizeof(MDSSAInfo));
     p->init();
     ASSERT0(m_mdssainfo_vec.get_last_idx() == -1 ||
         m_mdssainfo_vec.get_last_idx() >= 0);
@@ -537,7 +537,7 @@ VConst * UseDefMgr::allocVConst(IR const* ir)
     VConst * p = (VConst*)smpoolMallocConstSize(
         sizeof(VConst), m_vconst_pool);
     ASSERT0(p);
-    memset(p, 0, sizeof(VConst));
+    ::memset(p, 0, sizeof(VConst));
     VOPND_code(p) = VOPND_CONST;
     VOPND_id(p) = m_vopnd_count++;
     VCONST_val(p) = ir;
@@ -563,7 +563,7 @@ VMD * UseDefMgr::allocVMD(UINT mdid, UINT version)
     ASSERT(m_vmd_pool, ("not init"));
     v = (VMD*)smpoolMallocConstSize(sizeof(VMD), m_vmd_pool);
     ASSERT0(v);
-    memset(v, 0, sizeof(VMD));
+    ::memset(v, 0, sizeof(VMD));
     v->init(m_ru->getMiscBitSetMgr()->getSegMgr());
     VOPND_code(v) = VOPND_MD;
     VOPND_id(v) = m_vopnd_count++;

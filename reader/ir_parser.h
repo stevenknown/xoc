@@ -45,8 +45,8 @@ public:
 
 
 class ParseCtx {
-    TMap<SYM const*, LabelInfo*> m_sym2label;
-    TMap<IR*, LabelInfo*> m_ir2label;
+    xcom::TMap<SYM const*, LabelInfo*> m_sym2label;
+    xcom::TMap<IR*, LabelInfo*> m_ir2label;
 public:
     Region * current_region;
     IR * returned_exp;
@@ -73,7 +73,7 @@ public:
 
     void addIR(IR * stmt) { xcom::add_next(&stmt_list, &last, stmt); }
 
-    TMap<IR*, LabelInfo*> & getIR2Label() { return m_ir2label; }
+    xcom::TMap<IR*, LabelInfo*> & getIR2Label() { return m_ir2label; }
 
     LabelInfo * mapSym2Label(SYM const* sym) const
     { return m_sym2label.get(sym); }
@@ -191,6 +191,7 @@ typedef enum {
     X_SIDEEFFECT, //SideEffect
     X_NOMOVE,
     X_USE,
+    X_DEF,
     X_PRIVATE,
     X_RESTRICT,
     X_VOLATILE,
@@ -198,11 +199,16 @@ typedef enum {
     X_FAKE,
     X_GLOBAL,
     X_UNDEFINED,
+    X_STRING,
+    X_BYTE,
+    X_ELEMTYPE,
+    X_DIM,
     X_LAST,
 } X_CODE;
 
 
 class PropertySet {
+    xcom::List<LabelInfo*> m_labellist;    
 public:
     bool readonly;
     bool read_modify_write;
@@ -212,19 +218,40 @@ public:
     bool atomic;
     bool terminate;
     IR * ir_use_list;
+    IR * ir_def_list;
+    Type const* elemtype;
+    xcom::List<TMWORD> * dim_list;
 
-    PropertySet() { memset(this, 0, sizeof(PropertySet)); }
+    PropertySet() 
+    {
+        readonly = false;
+        read_modify_write = false;
+        throw_exception = false;
+        sideeffect = false;
+        nomove = false;
+        atomic = false;
+        terminate = false;
+        ir_use_list = NULL;
+        ir_def_list = NULL;
+        elemtype = NULL;
+        dim_list = NULL;
+    }
+    
+    xcom::List<LabelInfo*> & getLabelList() { return m_labellist; }
 };
 
 
 class IRParser {
 protected:
-    TMap<SYM const*, X_CODE> m_sym2xcode;
+    TMap<CHAR const*, X_CODE, CompareStringFunc> m_str2xcode;
+    TMap<CHAR const*, X_CODE, CompareStringFunc> m_prop2xcode;
+    TMap<CHAR const*, X_CODE, CompareStringFunc> m_stmt2xcode;
+    TMap<CHAR const*, X_CODE, CompareStringFunc> m_exp2xcode;
+    TMap<CHAR const*, X_CODE, CompareStringFunc> m_type2xcode;
     TypeMgr * m_tm;
     Lexer * m_lexer;
     RegionMgr * m_rumgr;
     List<ParseErrorMsg*> m_err_list;
-
 protected:
     bool declareType(ParseCtx * ctx);
     bool declareVarProperty(VAR * var, ParseCtx * ctx);
@@ -239,6 +266,10 @@ protected:
 
     VAR * findVar(ParseCtx * ctx, SYM const* name);
 
+    X_CODE getCurrentPropertyCode();
+    X_CODE getCurrentStmtCode();
+    X_CODE getCurrentExpCode();
+    X_CODE getCurrentTypeCode();
     X_CODE getXCode(TOKEN tok, CHAR const* tok_string);
     X_CODE getCurrentXCode();
 
@@ -251,6 +282,12 @@ protected:
     bool isExp();
     bool isTerminator(TOKEN tok);
 
+    bool parseDimProperty(PropertySet & cont, ParseCtx * ctx);
+    bool parseElemTypeProperty(PropertySet & cont, ParseCtx * ctx);
+	bool parseByteValue(VAR * var, ParseCtx * ctx);
+    bool parseStringValue(VAR * var, ParseCtx * ctx);
+    bool parseThrowTarget(PropertySet & cont, ParseCtx * ctx);
+    bool parseDefProperty(PropertySet & cont, ParseCtx * ctx);
     bool parseUseProperty(PropertySet & cont, ParseCtx * ctx);
     bool parseProperty(PropertySet & cont, ParseCtx * ctx);
     bool parseCvt(ParseCtx * ctx);

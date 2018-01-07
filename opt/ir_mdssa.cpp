@@ -1174,6 +1174,7 @@ void MDSSAMgr::destruction(DomTree & domtree)
 //by user.
 void MDSSAMgr::stripPhi(MDPhi * phi)
 {
+	CHECK_DUMMYUSE(phi);
     //IRBB * bb = phi->getBB();
     //ASSERT0(bb);
     //
@@ -1282,7 +1283,7 @@ bool MDSSAMgr::verifyPhi(bool is_vpinfo_avail)
 
             //Check phi result.
             VMD * res = phi->getResult();
-            ASSERT0(res->is_md());
+			CHECK_DUMMYUSE(res->is_md());
 
             //Check the number of phi opnds.
             UINT num_opnd = 0;
@@ -1294,8 +1295,9 @@ bool MDSSAMgr::verifyPhi(bool is_vpinfo_avail)
 
                 //Opnd may be ID, CONST or LDA.
                 MD const* opnd_md = opnd->getRefMD();
-                ASSERT(opnd_md && MD_id(opnd_md) == res->mdid(),
-                    ("mdid of VMD is unmatched"));
+				CHECK_DUMMYUSE(opnd_md);
+                ASSERT(MD_id(opnd_md) == res->mdid(),
+					("mdid of VMD is unmatched"));
 
                 //Ver0 is input parameter, and it has no MDSSA_def.
                 //ASSERT0(VOPND_ver(MD_ssainfo(opnd)) > 0);
@@ -1414,7 +1416,23 @@ void MDSSAMgr::verifySSAInfo(IR const* ir)
                         is_contain_pure(vopnd->mdid())) {
                     findref = true;
                 }
-                ASSERT0(findref);
+
+                //Do NOT assert if not find reference.
+                //Some transformation, such as IR Refinement, may change
+                //the MDSet contents. This might lead to the inaccurate and
+                //redundant memory dependence. But the correctness of
+                //dependence is garanteed.
+                //e.g:
+                //ist:*<4> id:18 //:MD11, MD12, MD14, MD15
+                //    lda: *<4> 'r'
+                //    ild: i32  //MMD13: MD16
+                //        ld: *<4> 'q' //MMD18
+                //=> after IR combination: ist(lda) => st
+                //st:*<4> 'r' //MMD12
+                //    ild : i32 //MMD13 : MD16
+                //        ld : *<4> 'q'    //MMD18
+                //ist changed to st. The reference MDSet changed to single MD as well.
+                //ASSERT0(findref);
             }
         }
 
@@ -1435,7 +1453,23 @@ void MDSSAMgr::verifySSAInfo(IR const* ir)
                 occ->getRefMDSet()->is_contain_pure(vopnd->mdid())) {
                 findref = true;
             }
-            ASSERT0(findref);
+
+            //Do NOT assert if not find reference.
+            //Some transformation, such as IR Refinement, may change
+            //the MDSet contents. This might lead to the inaccurate and
+            //redundant memory dependence. But the correctness of
+            //dependence is garanteed.
+            //e.g:
+            //ist:*<4> id:18 //:MD11, MD12, MD14, MD15
+            //    lda: *<4> 'r'
+            //    ild: i32  //MMD13: MD16
+            //        ld: *<4> 'q' //MMD18
+            //=> after IR combination: ist(lda) => st
+            //st:*<4> 'r' //MMD12
+            //    ild : i32 //MMD13 : MD16
+            //        ld : *<4> 'q'    //MMD18
+            //ist changed to st. The reference MDSet changed to single MD as well.
+            //ASSERT0(findref);
         }
     }
 }
@@ -1468,8 +1502,8 @@ bool MDSSAMgr::verify()
                     if (!opnd->is_id()) { continue; }
 
                     MD const* opnd_md = opnd->getRefMD();
-                    ASSERT(opnd_md &&
-                        MD_id(opnd_md) == phi->getResult()->mdid(),
+					CHECK_DUMMYUSE(opnd_md);
+                    ASSERT(MD_id(opnd_md) == phi->getResult()->mdid(),
                         ("MD not matched"));
                     verifySSAInfo(opnd);
                 }

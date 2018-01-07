@@ -168,7 +168,7 @@ void genInstruction(
         UInt8 flags = gDIR2LIRInfo.flags[opcode];
         UInt32 formats = gLIROpcodeInfo.formats[lirOpcode];
         DIRDecodedInsn dInsn;
-        memset(&dInsn,0,sizeof(DIRDecodedInsn));
+        ::memset(&dInsn,0,sizeof(DIRDecodedInsn));
         DIRDecodeInstruction(codePtr,&dInsn);
 
         switch(formats) {
@@ -353,7 +353,7 @@ void genInstruction(
 
                 dataSize = 8 + size * 4;
                 lir->data = (UInt16*)LIRMALLOC(dataSize);
-                memcpy(lir->data,(BYTE*)data,8);
+                ::memcpy(lir->data,(BYTE*)data,8);
 
                 target = (Int32*)(((BYTE*)data) + 8);
                 lirTarget = (UInt32*)(((BYTE*)lir->data) + 8);
@@ -375,7 +375,7 @@ void genInstruction(
                 dataSize = 4 + size * 8;
                 lir->data = (UInt16*)LIRMALLOC(dataSize);
                 copySize = 4 + size*4;
-                memcpy(lir->data,(BYTE*)data,copySize);
+                ::memcpy(lir->data,(BYTE*)data,copySize);
 
                 target = (Int32*)(((BYTE*)data) + copySize);
                 lirTarget = (UInt32*)(((BYTE*)lir->data) + copySize);
@@ -394,7 +394,7 @@ void genInstruction(
                 UInt32 len = data[2] | (((UInt32)data[3]) << 16);
                 dataSize = (4 + (elemWidth * len + 1)/2) * 2;
                 lir->data = (UInt16*)LIRMALLOC(dataSize);
-                memcpy(lir->data,(BYTE*)data,dataSize);
+                ::memcpy(lir->data,(BYTE*)data,dataSize);
                 break;
             }
             default: UNREACH();
@@ -612,7 +612,7 @@ bool aotDrGenCode(
 
     /*positionMap may bigger than we need.*/
     positionMap.posMap =
-        (UInt32*)malloc((codeEnd - codeStart + 1) * sizeof(UInt32));
+        (UInt32*)::malloc((codeEnd - codeStart + 1) * sizeof(UInt32));
 
     UInt32 dexOffset = 0;
     while (codePtr < codeEnd) {
@@ -636,7 +636,7 @@ bool aotDrGenCode(
 
     lirList = (LIRBaseOp**)LIRMALLOC(instrCount * sizeof(LIRBaseOp*));
 
-    memset(lirList, 0 ,instrCount*sizeof(LIRBaseOp*));
+    ::memset(lirList, 0 ,instrCount*sizeof(LIRBaseOp*));
 
     lircode->instrCount = instrCount;
     lircode->lirList = lirList;
@@ -755,7 +755,7 @@ void d2rMethod(
 
     PositionMap positionMap;
 
-    positionMap.posMap = (UInt32*)malloc(insnum * sizeof(UInt32));
+    positionMap.posMap = (UInt32*)::malloc(insnum * sizeof(UInt32));
     UInt32 dexOffset = 0;
     UInt32 lastValidDexOffset = 0;
     bool lastInstrIsPseudo = false;
@@ -823,7 +823,7 @@ void d2rMethod(
     positionMap.posNum = instrCount + 1;
 
     lirList = (LIRBaseOp**)LIRMALLOC(instrCount * sizeof(LIRBaseOp*));
-    memset(lirList, 0, instrCount * sizeof(LIRBaseOp*));
+    ::memset(lirList, 0, instrCount * sizeof(LIRBaseOp*));
 
     lircode->instrCount = instrCount;
     lircode->lirList = lirList;

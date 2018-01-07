@@ -194,26 +194,25 @@ public:
         //}
     }
 
-    inline void addLabel(LabelInfo const* li)
+    inline void addLabel(LabelInfo const* li, bool at_head = false)
     {
-        ASSERT0(li != NULL);
-        if (!getLabelList().find(li)) {
-            if (LABEL_INFO_is_catch_start(li)) {
-                BB_is_catch_start(this) = true;
-            }
-
-            if (LABEL_INFO_is_try_start(li)) {
-                BB_is_try_start(this) = true;
-            }
-
-            if (LABEL_INFO_is_try_end(li)) {
-                BB_is_try_end(this) = true;
-            }
-
-            if (LABEL_INFO_is_terminate(li)) {
-                BB_is_terminate(this) = true;
-
-            }
+        ASSERT0(li);
+        if (getLabelList().find(li)) { return; }
+        if (LABEL_INFO_is_catch_start(li)) {
+            BB_is_catch_start(this) = true;
+        }
+        if (LABEL_INFO_is_try_start(li)) {
+            BB_is_try_start(this) = true;
+        }
+        if (LABEL_INFO_is_try_end(li)) {
+            BB_is_try_end(this) = true;
+        }
+        if (LABEL_INFO_is_terminate(li)) {
+            BB_is_terminate(this) = true;
+        }
+        if (at_head) {
+            getLabelList().append_head(li);
+        } else {
             getLabelList().append_tail(li);
         }
     }
@@ -435,7 +434,7 @@ public:
     {
         C<IR*> * ct;
         IR * x = BB_irlist(const_cast<IRBB*>(this)).get_tail(&ct);
-        if (x != NULL && IR_may_throw(x)) {
+        if (x != NULL && x->isMayThrow()) {
             return true;
         }
         return false;
@@ -446,17 +445,7 @@ public:
     {
         for (LabelInfo const* li = src->getLabelList().get_tail();
              li != NULL; li = src->getLabelList().get_prev()) {
-            if (lab_list.find(li)) { continue; }
-            lab_list.append_head(li);
-
-            //Update current BB status accroding to the Label.
-            if (LABEL_INFO_is_catch_start(li)) {
-                BB_is_catch_start(this) = true;
-            }
-
-            if (LABEL_INFO_is_terminate(li)) {
-                BB_is_terminate(this) = true;
-            }
+            addLabel(li, true);
         }
     }
 

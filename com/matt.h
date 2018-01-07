@@ -145,8 +145,8 @@ public:
         INHR(INHR const& src) { copy(src); }
         INHR const& operator = (INHR const& src) { copy(src); return *this; }
 
-        void copy(INHR const& src) { memcpy(this, &src, sizeof(INHR)); }
-        void clean() { memset(this, 0, sizeof(INHR)); }
+        void copy(INHR const& src) { ::memcpy(this, &src, sizeof(INHR)); }
+        void clean() { ::memset(this, 0, sizeof(INHR)); }
     };
 
     bool m_is_init;
@@ -431,7 +431,7 @@ public:
     void pinv(OUT Matrix<T> & e);
     void eye(T v); //Initialize to identical matrix with pivot entry 'v'
     void zero(); //Set each entry to zero
-    void fzero(); //Fast zeroization, memset(0) invoked
+    void fzero(); //Fast zeroization, ::memset(0) invoked
     void eche(); //Reduce matrix to row-echelon normal form.
 
     //Calculate null space(kern), each column of 'ns' indicate every unknown.
@@ -564,7 +564,7 @@ void Matrix<T>::grow_row(UINT size)
         //If matrix is empty, growing 'size' rows, but only one column.
         ASSERT(!m_col_size && m_mat == NULL, ("matrix should be empty"));
         m_mat = (T*)::malloc(sizeof(T) * size);
-        memset(m_mat, 0, sizeof(T) * size);
+        ::memset(m_mat, 0, sizeof(T) * size);
         m_col_size = 1;
         m_row_size = size;
         goto INIT;
@@ -572,8 +572,8 @@ void Matrix<T>::grow_row(UINT size)
     {
         UINT l = m_col_size * (m_row_size + size) * sizeof(T);
         T * tmp_mat = (T*)::malloc(l);
-        memcpy(tmp_mat, m_mat, m_col_size * m_row_size * sizeof(T));
-        //memset(tmp_mat + m_col_size * m_row_size, 0,
+        ::memcpy(tmp_mat, m_mat, m_col_size * m_row_size * sizeof(T));
+        //::memset(tmp_mat + m_col_size * m_row_size, 0,
         //        size * m_col_size * sizeof(T));
         ::free(m_mat);
         m_mat = tmp_mat;
@@ -603,7 +603,7 @@ void Matrix<T>::grow_row(const T row[], UINT rowelemnum)
     if (m_row_size == 0) {
         ASSERT(!m_col_size && m_mat == NULL, ("matrix should be empty"));
         m_mat = (T*)::malloc(sizeof(T) * rowelemnum);
-        memcpy(m_mat, row, sizeof(T) * rowelemnum);
+        ::memcpy(m_mat, row, sizeof(T) * rowelemnum);
         m_row_size = 1;
         m_col_size = rowelemnum;
         return;
@@ -611,10 +611,10 @@ void Matrix<T>::grow_row(const T row[], UINT rowelemnum)
     ASSERT(rowelemnum <= m_col_size,("unmatch column sizes"));
     INT l = m_col_size * (m_row_size + 1) * sizeof(T);
     T * tmp_mat = (T*)::malloc(l);
-    memcpy(tmp_mat, m_mat, m_col_size * m_row_size * sizeof(T));
-    memcpy(tmp_mat + m_col_size * m_row_size, row, rowelemnum * sizeof(T));
+    ::memcpy(tmp_mat, m_mat, m_col_size * m_row_size * sizeof(T));
+    ::memcpy(tmp_mat + m_col_size * m_row_size, row, rowelemnum * sizeof(T));
     if (rowelemnum < m_col_size) {
-        memset(tmp_mat + (m_col_size * m_row_size + rowelemnum), 0,
+        ::memset(tmp_mat + (m_col_size * m_row_size + rowelemnum), 0,
                (m_col_size - rowelemnum) * sizeof(T));
     }
     ::free(m_mat);
@@ -654,7 +654,7 @@ void Matrix<T>::grow_row(Matrix<T> const& a, UINT from, UINT to)
         m_col_size = a.m_col_size;
         m_row_size = to - from + 1;
         m_mat = (T*)::malloc(sizeof(T) * m_row_size * m_col_size);
-        memcpy(m_mat, a.m_mat + from * a.m_col_size,
+        ::memcpy(m_mat, a.m_mat + from * a.m_col_size,
                 sizeof(T) * m_row_size * m_col_size);
         return;
     }
@@ -664,8 +664,8 @@ void Matrix<T>::grow_row(Matrix<T> const& a, UINT from, UINT to)
                                 m_col_size * sizeof(T));
     ASSERT(tmp_mat,("memory is low!!!"));
     UINT orig_size = m_col_size * m_row_size;
-    memcpy(tmp_mat, m_mat, orig_size * sizeof(T));
-    memcpy(tmp_mat + orig_size, a.m_mat + from * a.m_col_size,
+    ::memcpy(tmp_mat, m_mat, orig_size * sizeof(T));
+    ::memcpy(tmp_mat + orig_size, a.m_mat + from * a.m_col_size,
             row_size * m_col_size * sizeof(T));
     ::free(m_mat);
     m_mat = tmp_mat;
@@ -688,7 +688,7 @@ void Matrix<T>::grow_col(UINT size)
         //If matrix is empty, growing 'size' columns, but only one row.
         ASSERT(!m_row_size && m_mat == NULL, ("exception occur in grow_col()"));
         m_mat = (T*)::malloc(sizeof(T) * size);
-        memset(m_mat, 0, sizeof(T) * size);
+        ::memset(m_mat, 0, sizeof(T) * size);
         m_col_size = size;
         m_row_size = 1;
 
@@ -737,7 +737,7 @@ void Matrix<T>::grow_col(Matrix<T> const& a, UINT from, UINT to)
         m_col_size = to - from + 1;
         m_mat = (T*)::malloc(sizeof(T) * m_row_size * m_col_size);
         for (UINT i = 0 ; i < m_row_size; i++) {
-            memcpy(m_mat + i * m_col_size,
+            ::memcpy(m_mat + i * m_col_size,
                    a.m_mat + i * a.m_col_size + from,
                    sizeof(T) * m_col_size);
         }
@@ -750,10 +750,10 @@ void Matrix<T>::grow_col(Matrix<T> const& a, UINT from, UINT to)
         (m_col_size + col_size) * sizeof(T));
     ASSERT(tmp_mat,("memory is low!!!"));
     for (UINT i = 0 ; i < m_row_size; i++) {
-        memcpy(tmp_mat + i * (m_col_size+col_size),
+        ::memcpy(tmp_mat + i * (m_col_size+col_size),
                m_mat + i * m_col_size,
                m_col_size * sizeof(T));
-        memcpy(tmp_mat + i * (m_col_size+col_size) + m_col_size,
+        ::memcpy(tmp_mat + i * (m_col_size+col_size) + m_col_size,
                a.m_mat + i * a.m_col_size + from,
                sizeof(T) * col_size);
     }
@@ -775,7 +775,7 @@ void Matrix<T>::grow_col(const T col[], UINT colelemnum)
         ASSERT(!m_row_size && m_mat == NULL,
                ("exception occur in grow_col()"));
         m_mat = (T*)::malloc(sizeof(T) * colelemnum);
-        memcpy(m_mat, col, sizeof(T) * colelemnum);
+        ::memcpy(m_mat, col, sizeof(T) * colelemnum);
         m_row_size = colelemnum;
         m_col_size = 1;
         return;
@@ -786,7 +786,7 @@ void Matrix<T>::grow_col(const T col[], UINT colelemnum)
     T * tmp_mat = (T*)::malloc(s);
     ASSERT(tmp_mat,("memory is low!!!"));
     for (UINT i = 0 ; i < m_row_size; i++) {
-        memcpy(tmp_mat + i * (m_col_size + 1), m_mat + i * m_col_size,
+        ::memcpy(tmp_mat + i * (m_col_size + 1), m_mat + i * m_col_size,
                m_col_size * sizeof(T));
         if (i >= colelemnum) {
             *(tmp_mat + i*(m_col_size+1) + m_col_size) = 0;
@@ -821,7 +821,7 @@ void Matrix<T>::grow_all(UINT row_size, UINT col_size)
         ASSERT(!m_row_size && m_mat == NULL,
                 ("exception occur in grow_all()"));
         m_mat = (T*)::malloc(sizeof(T) * row_size * col_size);
-        memset(m_mat, 0 , sizeof(T) * row_size * col_size);
+        ::memset(m_mat, 0 , sizeof(T) * row_size * col_size);
         m_row_size = row_size;
         m_col_size = col_size;
         return;
@@ -831,10 +831,10 @@ void Matrix<T>::grow_all(UINT row_size, UINT col_size)
         (m_col_size + col_size) * sizeof(T);
     T * tmp_mat = (T*)::malloc(newsize);
     ASSERT(tmp_mat,("memory is low!!!"));
-    //memset(tmp_mat, 0, newsize); //initilzed later on.
+    //::memset(tmp_mat, 0, newsize); //initilzed later on.
 
     for (i = 0 ; i < m_row_size; i++) {
-        memcpy(tmp_mat + i * (m_col_size+col_size),
+        ::memcpy(tmp_mat + i * (m_col_size+col_size),
                m_mat + i * m_col_size, m_col_size * sizeof(T));
     }
     ::free(m_mat);
@@ -870,8 +870,8 @@ void Matrix<T>::del_row(UINT from, UINT to)
     }
     UINT l = m_col_size * (m_row_size - (to - from + 1)) * sizeof(T);
     T * tmp_mat = (T*)::malloc(l);
-    memcpy(tmp_mat, m_mat, m_col_size * from * sizeof(T));
-    memcpy(tmp_mat + m_col_size * from,
+    ::memcpy(tmp_mat, m_mat, m_col_size * from * sizeof(T));
+    ::memcpy(tmp_mat + m_col_size * from,
            m_mat + m_col_size * (to + 1),
            m_col_size * (m_row_size - to - 1) * sizeof(T));
     ::free(m_mat);
@@ -892,9 +892,9 @@ void Matrix<T>::del_col(UINT from, UINT to)
     UINT l = col_size * m_row_size  * sizeof(T);
     T * tmp_mat = (T*)::malloc(l);
     for (UINT i = 0 ; i < m_row_size; i++) {
-        memcpy(tmp_mat + i * col_size, m_mat + i * m_col_size,
+        ::memcpy(tmp_mat + i * col_size, m_mat + i * m_col_size,
             from * sizeof(T));
-        memcpy(tmp_mat + i * col_size + from,
+        ::memcpy(tmp_mat + i * col_size + from,
             m_mat + (i * m_col_size + to + 1),
             (m_col_size - to  - 1)* sizeof(T));
     }
@@ -945,7 +945,7 @@ void Matrix<T>::set_row(UINT rows, T row[], INT num)
     ASSERT(m_is_init, ("not yet initialize."));
     ASSERT(rows < m_row_size && num == m_col_size,
             ("exception occur in set()"));
-    memcpy(m_mat + rows * m_col_size, row, sizeof(T) * m_col_size);
+    ::memcpy(m_mat + rows * m_col_size, row, sizeof(T) * m_col_size);
 }
 
 
@@ -961,7 +961,7 @@ void Matrix<T>::set_row(UINT rows, Matrix<T> const& v)
     ASSERT((m_col_size == v.size()), ("invalid vector"));
     if (v.is_rowvec()) {
         ASSERT(v.m_col_size == m_col_size,("unmatch vector"));
-        memcpy(m_mat + rows * m_col_size, v.m_mat, sizeof(T) * m_col_size);
+        ::memcpy(m_mat + rows * m_col_size, v.m_mat, sizeof(T) * m_col_size);
     } else if (v.is_colvec()) {
         ASSERT(v.m_row_size == m_col_size,("unmatch vector"));
         for (UINT i = 0; i < m_col_size; i++) {
@@ -1164,7 +1164,7 @@ void Matrix<T>::copy(IN Matrix<T> const& m)
             }
             m_mat = (T*)::malloc(m.size() * sizeof(T));
         }
-        memcpy(m_mat, m.m_mat, m.size() * sizeof(T));
+        ::memcpy(m_mat, m.m_mat, m.size() * sizeof(T));
         m_row_size = m.m_row_size;
         m_col_size = m.m_col_size;
     }
@@ -1602,7 +1602,7 @@ T Matrix<T>::FullPermutation(UINT n)
     INT * posbuf = (INT*)::malloc(sizeof(INT) * n);
     T det;
     det = 0;
-    memset(posbuf, 0, sizeof(INT) * n);
+    ::memset(posbuf, 0, sizeof(INT) * n);
     for (UINT i = 0; i < n; i++) {
         posbuf[i] = 1;
         FullPermutationRecur(2, posbuf, n, n, det);
@@ -2265,7 +2265,7 @@ void Matrix<T>::fzero()
 {
     ASSERT(m_is_init, ("not yet initialize."));
     if (m_mat != NULL) {
-        memset(m_mat, 0, sizeof(T) * m_row_size * m_col_size);
+        ::memset(m_mat, 0, sizeof(T) * m_row_size * m_col_size);
     }
 }
 

@@ -168,7 +168,7 @@ public:
         SIMP_stmtlist(this) = NULL;
     }
 
-    void init() { memset(this, 0, sizeof(SimpCtx)); }
+    void init() { ::memset(this, 0, sizeof(SimpCtx)); }
 
     //Append irs to current simplification context and
     //return back to up level.

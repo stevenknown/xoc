@@ -67,6 +67,10 @@ IR * Region::refineIload1(IR * ir, bool & change)
         //might generate new MD that not versioned by MDSSAMgr.
         //ir's MD ref must be equivalent to ld.
         ld->copyRef(ir, this);
+        if (ld->getEffectRef() == NULL) {
+            MD const* t = allocRefForLoad(ld);
+            CHECK_DUMMYUSE(ld->getRefMDSet() && ld->getRefMDSet()->is_contain(t));
+        }
         dumgr->changeUse(ld, ir, getMiscBitSetMgr());
         if (getMDSSAMgr() != NULL) {
             getMDSSAMgr()->changeUse(ir, ld);
@@ -97,6 +101,10 @@ IR * Region::refineIload2(IR * ir, bool & change)
     copyDbx(ld, ir, this);
     if (getDUMgr() != NULL) {
         ld->copyRef(ir, this);
+        if (ld->getEffectRef() == NULL) {
+            MD const* t = allocRefForLoad(ld);
+            CHECK_DUMMYUSE(ld->getRefMDSet() && ld->getRefMDSet()->is_contain(t));
+        }
         getDUMgr()->changeUse(ld, ir, getMiscBitSetMgr());
         if (getMDSSAMgr() != NULL) {
             getMDSSAMgr()->changeUse(ir, ld);
@@ -169,6 +177,11 @@ IR * Region::refineIstore(IR * ir, bool & change, RefineCtx & rc)
                                 IST_rhs(ir));
         if (dumgr != NULL) {
             newir->copyRef(ir, this);
+            if (newir->getEffectRef() == NULL) {
+                MD const* t = allocRefForStore(newir);
+                CHECK_DUMMYUSE(newir->getRefMDSet() && 
+                    newir->getRefMDSet()->is_contain(t));
+            }
             if (getMDSSAMgr() != NULL) {
                 getMDSSAMgr()->changeDef(ir, newir);
             }
@@ -209,6 +222,11 @@ IR * Region::refineIstore(IR * ir, bool & change, RefineCtx & rc)
         copyDbx(newrhs, rhs, this);
         if (dumgr != NULL) {
             newrhs->copyRef(rhs, this);
+            if (newrhs->getEffectRef() == NULL) {
+                MD const* t = allocRefForLoad(newrhs);
+                CHECK_DUMMYUSE(newrhs->getRefMDSet() && 
+                    newrhs->getRefMDSet()->is_contain(t));
+            }
             dumgr->copyDUSet(newrhs, rhs);
             dumgr->changeUse(newrhs, rhs, getMiscBitSetMgr());
             if (getMDSSAMgr() != NULL) {
@@ -676,7 +694,7 @@ IR * Region::refineNot(IR * ir, bool & change, RefineCtx & rc)
     if (ir->is_lnot()) {
         IR * op0 = UNA_opnd(ir);
         bool lchange = false;
-        switch (IR_code(op0)) {
+        switch (op0->get_code()) {
         case IR_LT:
         case IR_LE:
         case IR_GT:

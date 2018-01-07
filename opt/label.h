@@ -61,7 +61,6 @@ typedef enum {
 #define LABEL_INFO_name(l)              ((l)->u1.lab_name)
 #define LABEL_INFO_num(l)               ((l)->u1.lab_num)
 #define LABEL_INFO_pragma(l)            ((l)->u1.pragma_str)
-#define LABEL_INFO_is_used(l)           ((l)->u2.s1.is_used)
 #define LABEL_INFO_is_catch_start(l)    ((l)->u2.s1.is_catch_start)
 #define LABEL_INFO_is_try_start(l)      ((l)->u2.s1.is_try_start)
 #define LABEL_INFO_is_try_end(l)        ((l)->u2.s1.is_try_end)
@@ -80,8 +79,6 @@ public:
 
     union {
         struct {
-            BYTE is_used:1;
-
             //Set true if current label is the start
             //label of exception catch block.
             BYTE is_catch_start:1;

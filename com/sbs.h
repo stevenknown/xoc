@@ -764,7 +764,7 @@ protected:
             (SBitSetCore<BitsPerSeg>*)smpoolMallocConstSize(
                 sizeof(SBitSetCore<BitsPerSeg>), m_sbitsetcore_pool);
         ASSERT(p, ("malloc failed"));
-        memset(p, 0, sizeof(SBitSetCore<BitsPerSeg>));
+        ::memset(p, 0, sizeof(SBitSetCore<BitsPerSeg>));
         return p;
     }
 
@@ -775,7 +775,7 @@ protected:
             (DBitSetCore<BitsPerSeg>*)smpoolMallocConstSize(
                 sizeof(DBitSetCore<BitsPerSeg>), m_dbitsetcore_pool);
         ASSERT(p, ("malloc failed"));
-        memset(p, 0, sizeof(DBitSetCore<BitsPerSeg>));
+        ::memset(p, 0, sizeof(DBitSetCore<BitsPerSeg>));
         return p;
     }
 public:

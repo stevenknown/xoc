@@ -290,6 +290,8 @@ public:
 
     bool is_equ(Type const* t1, Type const* t2) const
     { return TY_mc_size(t1) == TY_mc_size(t2); }
+
+    Type const* createKey(Type const* t) { return t; }
 };
 
 
@@ -305,6 +307,8 @@ public:
 
     bool is_equ(Type const* t1, Type const* t2) const
     { return TY_ptr_base_size(t1) == TY_ptr_base_size(t2); }
+
+    Type const* createKey(Type const* t) { return t; }
 };
 
 
@@ -321,6 +325,8 @@ public:
 
     bool is_equ(Type const* t1, Type const* t2) const
     { return TY_vec_ety(t1) == TY_vec_ety(t2); }
+
+    Type const* createKey(Type const* t) { return t; }
 };
 
 
@@ -338,6 +344,8 @@ public:
 
     bool is_equ(Type const* t1, Type const* t2) const
     { return TY_vec_size(t1) == TY_vec_size(t2); }
+
+    Type const* createKey(Type const* t) { return t; }
 };
 
 
@@ -378,7 +386,7 @@ class TypeMgr {
     {
         void * p = smpoolMalloc(size, m_pool);
         ASSERT0(p);
-        memset(p, 0, size);
+        ::memset(p, 0, size);
         return p;
     }
 
