@@ -56,7 +56,13 @@ opt/ipa.o\
 opt/callg.o\
 opt/loop.o\
 opt/ir_loop_cvt.o\
+opt/symtab.o\
 opt/prdf.o
+
+GRREADER_OBJS += \
+reader/ir_parser.o\
+reader/ir_lex.o\
+reader/grreader.o
 
 CFLAGS = -DFOR_DEX -D_DEBUG_ -O0 -g2 -Wno-write-strings -Wsign-promo \
         -Wsign-compare -Wpointer-arith -Wno-multichar -Winit-self -Wswitch
@@ -71,8 +77,8 @@ ifneq (,$(filter $(CC),g++ gcc))
 	CFLAGS += -Wstrict-aliasing=3 -finline-limit=10000000
 endif
 
-all: com_objs opt_objs
-	ar rcs libxoc.a $(COM_OBJS) $(OPT_OBJS)
+all: com_objs opt_objs grreader_objs
+	ar rcs libxoc.a $(COM_OBJS) $(OPT_OBJS) $(GRREADER_OBJS)
 	@echo "success!!"
 
 INC=-I .
@@ -82,6 +88,7 @@ INC=-I .
 
 com_objs: $(COM_OBJS)
 opt_objs: $(OPT_OBJS)
+grreader_objs: $(GRREADER_OBJS)
 
 clean:
 	@find ./ -name "*.o" | xargs rm -f

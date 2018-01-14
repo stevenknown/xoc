@@ -158,7 +158,7 @@ inline void add_next(IN OUT T ** pheader, IN OUT T ** last, IN T * t)
         while (t->next != NULL) { t = t->next; }
         *last = t;
     } else {
-        ASSERT0(last != NULL && *last != NULL && (*last)->next == NULL);
+        ASSERT(last && *last && (*last)->next == NULL, ("must be the last"));
         (*last)->next = t;
         t->prev = *last;
         while (t->next != NULL) { t = t->next; }

@@ -232,7 +232,7 @@ bool AnalysisInstrument::verify_var(VarMgr * vm, VAR * v)
 
         //For these kind of regions, there are only local variable or
         //unablable global variable is legal.
-        ASSERT0(VAR_is_local(v) || !VAR_allocable(v));
+        ASSERT0(VAR_is_local(v) || VAR_is_unallocable(v));
     } else if (m_ru->is_program()) {
         //Theoretically, only global variable is legal in program region.
         //However even if the program region there may be local
@@ -2132,7 +2132,7 @@ VAR * Region::genVARforPR(UINT prno, Type const* type)
     //For now, it is only be regarded as a pseduo-register.
     //And set it to allocable if the PR is in essence need to be
     //allocated in memory.
-    VAR_allocable(pr_var) = false;
+    VAR_is_unallocable(pr_var) = true;
     addToVarTab(pr_var);
     return pr_var;
 }
@@ -2624,7 +2624,6 @@ void Region::prescan(IR const* ir)
                         registerStringVar(NULL, VAR_string(v), 1);
                     ASSERT0(sv);
                     VAR_is_addr_taken(sv) = true;
-                    VAR_allocable(sv) = true;
                 } else if (v->is_label()) {
                     ; //do nothing.
                 } else {
@@ -3648,7 +3647,7 @@ bool Region::partitionRegion()
     Type const* type = getTypeMgr()->getMCType(0);
     VAR * ruv = getVarMgr()->registerVar("inner_ru",
         type, 1, VAR_LOCAL|VAR_FAKE);
-    VAR_allocable(ruv) = false;
+    VAR_is_unallocable(ruv) = true;
     addToVarTab(ruv);
 
     Region * inner_ru = getRegionMgr()->allocRegion(REGION_INNER);

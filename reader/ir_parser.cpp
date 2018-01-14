@@ -145,6 +145,7 @@ static XCodeInfo g_keyword_info[] = {
     { X_BYTE,        "byte",             },
     { X_ELEMTYPE,    "elemtype",         },
     { X_DIM,         "dim",              },
+    { X_UNALLOCABLE, "unallocable",      },
     { X_LAST,        "",                 },
 };
 
@@ -160,7 +161,8 @@ static X_CODE g_property_code [] = {
     X_USE,
     X_DEF,
     X_ELEMTYPE,
-    X_DIM
+    X_DIM,
+    X_UNALLOCABLE,
 };
 
 
@@ -258,7 +260,7 @@ static void copyProp(IR * ir, PropertySet & cont, ParseCtx * ctx)
     IR_has_sideeffect(ir) = cont.sideeffect;
     IR_no_move(ir) = cont.nomove;
     IR_is_read_mod_write(ir) = cont.read_modify_write;
-    IR_is_terminate(ir) = cont.terminate;
+    IR_is_terminate(ir) = cont.terminate;    
     if (ir->is_icall()) {
         ICALL_is_readonly(ir) = cont.readonly;
     }
@@ -626,7 +628,6 @@ bool IRParser::declareRegion(ParseCtx * ctx)
     }
 
     exitRegion(&newctx);
-
     if (ctx != NULL) {
         ASSERT0(ctx->current_region);
         IR * ir = ctx->current_region->buildRegion(region);
@@ -1033,7 +1034,7 @@ bool IRParser::parsePR(ParseCtx * ctx)
     if (tok == T_IMM) {
         prno = (UINT)xcom::xatoll(m_lexer->getCurrentTokenString(), false);
         ctx->current_region->setPRCount(
-            MAX(ctx->current_region->getPRCount(), prno));
+            MAX(ctx->current_region->getPRCount(), prno + 1));
     } else {
         error(tok, "miss PR number");
         return false;
@@ -2149,7 +2150,7 @@ bool IRParser::parseStorePR(ParseCtx * ctx)
     if (tok == T_IMM) {
         prno = (UINT)xcom::xatoll(m_lexer->getCurrentTokenString(), false);
         ctx->current_region->setPRCount(
-            MAX(ctx->current_region->getPRCount(), prno));
+            MAX(ctx->current_region->getPRCount(), prno + 1));
     } else {
         error(tok, "miss PR number");
         return false;
@@ -2217,7 +2218,7 @@ bool IRParser::parseModifyPR(X_CODE code, ParseCtx * ctx)
     if (tok == T_IMM) {
         prno = (UINT)xcom::xatoll(m_lexer->getCurrentTokenString(), false);
         ctx->current_region->setPRCount(
-            MAX(ctx->current_region->getPRCount(), prno));
+            MAX(ctx->current_region->getPRCount(), prno + 1));
     } else {
         error(tok, "miss PR number");
         return false;
@@ -2391,7 +2392,7 @@ bool IRParser::parseCallAndICall(bool is_call, ParseCtx * ctx)
             return_prno = (UINT)xcom::xatoll(
                 m_lexer->getCurrentTokenString(), false);
             ctx->current_region->setPRCount(
-                MAX(ctx->current_region->getPRCount(), return_prno));
+                MAX(ctx->current_region->getPRCount(), return_prno + 1));
         }
         else {
             error(tok, "miss PR number");
@@ -3051,7 +3052,7 @@ bool IRParser::parsePhi(ParseCtx * ctx)
     if (tok == T_IMM) {
         prno = (UINT)xcom::xatoll(m_lexer->getCurrentTokenString(), false);
         ctx->current_region->setPRCount(
-            MAX(ctx->current_region->getPRCount(), prno));
+            MAX(ctx->current_region->getPRCount(), prno + 1));
     } else {
         error(tok, "miss PR number");
         return false;
@@ -3665,7 +3666,11 @@ bool IRParser::declareVarProperty(VAR * var, ParseCtx * ctx)
 					return false;
 				}
 				break;
-			default:
+            case X_UNALLOCABLE:
+                VAR_is_unallocable(var) = true;
+                tok = m_lexer->getNextToken();
+                break;
+            default:
                 error(tok, "illegal to use %s in variable type declaration",
                     m_lexer->getCurrentTokenString());
             }

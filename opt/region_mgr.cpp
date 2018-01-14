@@ -83,7 +83,7 @@ MD const* RegionMgr::genDedicateStrMD()
     if (m_str_md == NULL) {
         SYM * s = addToSymbolTab("DedicatedVarBeRegardedAsString");
         VAR * sv = getVarMgr()->registerStringVar("DedicatedStringVar", s, 1);
-        VAR_allocable(sv) = false;
+        VAR_is_unallocable(sv) = true;
         VAR_is_addr_taken(sv) = true;
         MD md;
         MD_base(&md) = sv;
@@ -111,7 +111,7 @@ void RegionMgr::registerGlobalMD()
 
         //User sometime intentionally declare non-allocable
         //global variable to custmized usage.
-        //ASSERT0(VAR_allocable(v));
+        //ASSERT0(!VAR_is_unallocable(v));
 
         if (v->is_string() && genDedicateStrMD() != NULL) {
             continue;

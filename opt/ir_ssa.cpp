@@ -499,7 +499,7 @@ void PRSSAMgr::dump()
             IR * res = ir->getResultPR();
             fprintf(g_tfile, "\nVP:");
             if (res != NULL) {
-                VP * vp = (VP*)PR_ssainfo(res);
+                VP * vp = (VP*)res->getSSAInfo();
                 ASSERT0(vp);
                 fprintf(g_tfile, "p%dv%d ", VP_prno(vp), VP_ver(vp));
             } else {

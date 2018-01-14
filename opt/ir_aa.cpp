@@ -1397,7 +1397,6 @@ MD const* IR_AA::allocStringMD(SYM const* string)
     if ((strmd = m_rumgr->genDedicateStrMD()) != NULL) { return strmd; }
 
     VAR * v = m_ru->getVarMgr()->registerStringVar(NULL, string, 1);
-    VAR_allocable(v) = true;
     //Set string address to be taken only if it is base of LDA.
     //VAR_is_addr_taken(v) = true;
     MD md;
@@ -2380,7 +2379,7 @@ MD const* IR_AA::allocHeapobj(IR * ir)
     //For now, it is only be regarded as a placeholder.
     //And set it to allocable if the var is in essence need to be
     //allocated in memory.
-    VAR_allocable(tv) = false;
+    VAR_is_unallocable(tv) = true;
 
     //Will be freed region destruction.
     m_ru->addToVarTab(tv);
@@ -3733,7 +3732,7 @@ void IR_AA::initGlobalAndParameterVarPtset(
             //For now, it is only be regarded as a pseduo-register.
             //And set it to allocable if the PR is in essence need to be
             //allocated in memory.
-            VAR_allocable(tv) = false;
+            VAR_is_unallocable(tv) = true;
             m_ru->addToVarTab(tv);
 
             MD md;

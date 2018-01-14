@@ -31,7 +31,7 @@ IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 author: Su Zhenyu
 @*/
-#ifdef WIN32
+#ifdef _ON_WINDOWS_
 #include <time.h>
 #else
 #include <time.h>
@@ -471,7 +471,7 @@ LONG xstrstr(CHAR const* src, CHAR const* par, INT i)
         }
         if (*p == 0) {
             if (i == 0) {
-                return s - src;
+                return (LONG)(s - src);
             }
             i--;
         }
@@ -1089,7 +1089,7 @@ float getclockend(LONG start)
 //Get current micro-second.
 ULONGLONG getusec()
 {
-#ifdef WIN32
+#ifdef _ON_WINDOWS_
     time_t timer;
     timer = time(&timer);
 

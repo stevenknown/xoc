@@ -357,9 +357,9 @@ void dumpBBList(BBList * bbl,
 
     if (h != NULL && bbl->get_elem_count() != 0) {
         if (h == g_tfile) {
-            note("\n==---- DUMP '%s' BBList ----==", rg->getRegionName());
+            note("\n==---- DUMP ORBBList region '%s' ----==", rg->getRegionName());
         } else {
-            fprintf(h, "\n==---- DUMP '%s' BBList ----==", rg->getRegionName());
+            fprintf(h, "\n==---- DUMP ORBBList region '%s' ----==", rg->getRegionName());
         }
 
         for (IRBB * bb = bbl->get_head(); bb != NULL; bb = bbl->get_next()) {

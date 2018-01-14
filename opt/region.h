@@ -62,8 +62,8 @@ public:
     //Indicate a list of IR.
     IR * m_ir_list;
 
-    List<IR const*> * m_call_list; //record CALL/ICALL in region.
-    List<IR const*> * m_return_list; //record RETURN in region.
+    xcom::List<IR const*> * m_call_list; //record CALL/ICALL in region.
+    xcom::List<IR const*> * m_return_list; //record RETURN in region.
 
     RegionMgr * m_ru_mgr; //Region manager.
     PassMgr * m_pass_mgr; //PASS manager.
@@ -73,19 +73,19 @@ public:
     //All LOCAL vars in the tab will be destroyed during region destruction.
     VarTab m_ru_var_tab;
     IR * m_free_tab[MAX_OFFSET_AT_FREE_TABLE + 1];
-    Vector<VAR*> m_prno2var; //map prno to related VAR.
-    Vector<IR*> m_ir_vector; //record IR which have allocated.
-    BitSetMgr m_bs_mgr;
-    DefMiscBitSetMgr m_sbs_mgr;
+    xcom::Vector<VAR*> m_prno2var; //map prno to related VAR.
+    xcom::Vector<IR*> m_ir_vector; //record IR which have allocated.
+    xcom::BitSetMgr m_bs_mgr;
+    xcom::DefMiscBitSetMgr m_sbs_mgr;
     MDSetMgr m_mds_mgr;
     MDSetHashAllocator m_mds_hash_allocator;
     MDSetHash m_mds_hash;
-    List<DU*> m_free_du_list;
+    xcom::List<DU*> m_free_du_list;
     IRBBMgr m_ir_bb_mgr; //Allocate the basic block.
     BBList m_ir_bb_list; //record a list of basic blocks.
 
     #ifdef _DEBUG_
-    BitSet m_has_been_freed_irs;
+    xcom::BitSet m_has_been_freed_irs;
     #endif
 public:
     explicit AnalysisInstrument(Region * rg);
@@ -898,6 +898,9 @@ public:
     void setMapPR2Var(UINT prno, VAR * pr_var)
     { REGION_analysis_instrument(this)->m_prno2var.set(prno, pr_var); }
 
+    //Set the counter of PR.
+    //Note 'cnt' will be assigned to next new PR, so it should have not be
+    //referenced.
     void setPRCount(UINT cnt)
     { REGION_analysis_instrument(this)->m_pr_count = cnt; }
 

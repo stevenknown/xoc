@@ -108,10 +108,10 @@ void UINT2VMDVec::set(UINT mdid, Vector<VMD*> * vmdvec)
 
 UINT UINT2VMDVec::count_mem() const
 {
-    UINT count = sizeof(UINT2VMDVec);
+    size_t count = sizeof(UINT2VMDVec);
     count += m_mdid2vmdvec_vec.count_mem();
     count += m_mdid2vmdvec_map.count_mem();
-    return count;
+    return (UINT)count;
 }
 //END UINT2VMDVec
 

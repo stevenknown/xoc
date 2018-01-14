@@ -203,6 +203,7 @@ typedef enum {
     X_BYTE,
     X_ELEMTYPE,
     X_DIM,
+    X_UNALLOCABLE,
     X_LAST,
 } X_CODE;
 
@@ -217,6 +218,7 @@ public:
     bool nomove;
     bool atomic;
     bool terminate;
+    bool allocable;
     IR * ir_use_list;
     IR * ir_def_list;
     Type const* elemtype;
@@ -231,6 +233,7 @@ public:
         nomove = false;
         atomic = false;
         terminate = false;
+        allocable = false;
         ir_use_list = NULL;
         ir_def_list = NULL;
         elemtype = NULL;

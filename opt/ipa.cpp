@@ -76,18 +76,17 @@ Region * IPA::findRegion(IR * call, Region * callru)
 void IPA::createCallDummyuse(IR * call, Region * callru)
 {
     Region * calleeru = findRegion(call, callru);
-    if (calleeru == NULL) { return; }
-
-    ASSERT0(CALL_dummyuse(call) == NULL);
+    if (calleeru == NULL || CALL_dummyuse(call) != NULL) {
+        return; 
+    }
 
     MDSet const* mayuse = calleeru->getMayUse();
     if (mayuse == NULL || mayuse->is_empty()) { return; }
-
-    SEGIter * iter;
-
+    
     MDSet const* callermaydef = callru->getMayDef();
     if (callermaydef == NULL || callermaydef->is_empty()) { return; }
 
+    SEGIter * iter;
     IR * last = NULL;
     for (INT j = mayuse->get_first(&iter);
          j >= 0; j = mayuse->get_next(j, &iter)) {

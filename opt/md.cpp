@@ -145,7 +145,7 @@ MD * MDSet::get_effect_md(MDSystem * ms) const
     SEGIter * iter;
     MD * md = ms->getMD(get_first(&iter));
     ASSERT0(md != NULL);
-    if (VAR_is_fake(MD_base(md))) {
+    if (md->get_base()->is_fake()) {
         return NULL;
     }
     return md;
@@ -663,9 +663,7 @@ void MDSystem::initGlobalMemMD(VarMgr * vm)
     m_global_mem = vm->registerVar(
                         (CHAR*)".global_mem",
                         getTypeMgr()->getMCType(0),
-                        1, VAR_GLOBAL|VAR_FAKE);
-    VAR_allocable(m_global_mem) = false;
-
+                        1, VAR_GLOBAL|VAR_FAKE|VAR_IS_UNALLOCABLE);
     MD x;
     MD_base(&x) = m_global_mem;
     MD_size(&x) = 0;
@@ -686,9 +684,7 @@ void MDSystem::initImportVar(VarMgr * vm)
     m_import_var = vm->registerVar(
                         (CHAR*)".import_var",
                         getTypeMgr()->getMCType(0),
-                        1, VAR_GLOBAL|VAR_FAKE);
-    VAR_allocable(m_import_var) = false;
-
+                        1, VAR_GLOBAL|VAR_FAKE|VAR_IS_UNALLOCABLE);
     MD x;
     MD_base(&x) = m_import_var;
     MD_size(&x) = 0;
@@ -712,9 +708,7 @@ void MDSystem::initAllMemMD(VarMgr * vm)
                     (CHAR*)".all_mem",
                     getTypeMgr()->getMCType(0),
                     1,
-                    VAR_GLOBAL|VAR_FAKE);
-    VAR_allocable(m_all_mem) = false;
-
+                    VAR_GLOBAL|VAR_FAKE|VAR_IS_UNALLOCABLE);
     MD x;
     MD_base(&x) = m_all_mem;
     MD_is_may(&x) = true;  //MD_FULL_MEM can only be May reference.

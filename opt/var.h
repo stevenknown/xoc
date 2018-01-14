@@ -60,19 +60,19 @@ class RegionMgr;
 
 //This kind of variable can be seen in same file.
 #define VAR_PRIVATE              0x4
-#define VAR_READONLY             0x8 //var is readonly
-#define VAR_VOLATILE             0x10 //var is volatile
-#define VAR_HAS_INIT_VAL         0x20 //var with initialied value.
-#define VAR_FAKE                 0x40 //var is fake
-#define VAR_IS_LABEL             0x80 //var is label.
-#define VAR_FUNC_DECL            0x100 //var is function declaration.
-#define VAR_IS_ARRAY             0x200 //var is array.
-#define VAR_IS_FORMAL_PARAM      0x400 //var is formal parameter.
-#define VAR_IS_SPILL             0x800 //var is spill location.
+#define VAR_READONLY             0x8    //var is readonly
+#define VAR_VOLATILE             0x10   //var is volatile
+#define VAR_HAS_INIT_VAL         0x20   //var with initialied value.
+#define VAR_FAKE                 0x40   //var is fake
+#define VAR_IS_LABEL             0x80   //var is label.
+#define VAR_FUNC_DECL            0x100  //var is function declaration.
+#define VAR_IS_ARRAY             0x200  //var is array.
+#define VAR_IS_FORMAL_PARAM      0x400  //var is formal parameter.
+#define VAR_IS_SPILL             0x800  //var is spill location.
 #define VAR_ADDR_TAKEN           0x1000 //var's address has been taken.
 #define VAR_IS_PR                0x2000 //var is pr.
 #define VAR_IS_RESTRICT          0x4000 //var is restrict.
-#define VAR_IS_ALLOCABLE         0x8000 //var is allocable on memory.
+#define VAR_IS_UNALLOCABLE       0x8000 //var is unallocable in memory.
 
 ///////////////////////////////////////////////////////
 //NOTE: Do *NOT* forget modify the bit-field in VAR if
@@ -160,7 +160,7 @@ public:
 #define VAR_is_restrict(v)       ((v)->u2.s1.is_restrict)
 
 //Variable is concrete, and will be output to Code Generator.
-#define VAR_allocable(v)         ((v)->u2.s1.is_allocable)
+#define VAR_is_unallocable(v)         ((v)->u2.s1.is_unallocable)
 
 //Record the alignment.
 #define VAR_align(v)             ((v)->align)
@@ -205,10 +205,9 @@ public:
             UINT is_pr:1;           //VAR is pr.
             UINT is_restrict:1;     //VAR is restrict.
 
-            //True if var should be allocate on memory or
-            //false indicate it is only being a placeholder and do not
-            //allocate in essence.
-            UINT is_allocable:1;
+            //True if variable should NOT be allocated in memory and
+            //it is only being a placeholder in essence.
+            UINT is_unallocable:1;
         } s1;
     } u2;
 public:
@@ -220,7 +219,7 @@ public:
     bool is_global() const { return VAR_is_global(this); }
     bool is_fake() const { return VAR_is_fake(this); }
     bool is_label() const { return VAR_is_label(this); }
-    bool is_allocable() const { return VAR_allocable(this); }
+    bool is_unallocable() const { return VAR_is_unallocable(this); }
     bool is_array() const { return VAR_is_array(this); }
     bool is_formal_param() const { return VAR_is_formal_param(this); }
     bool is_private() const { return VAR_is_private(this); }

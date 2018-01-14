@@ -115,13 +115,13 @@ void VAR::dumpFlag(xcom::StrBuf & buf, bool grmode) const
             first = false;
             buf.strcat("has_init_val");
         }
-        if (HAVE_FLAG(VAR_flag(this), VAR_IS_ALLOCABLE)) {
-            if (!first) {
-                buf.strcat(",");
-            }
-            first = false;
-            buf.strcat("allocable");
+    }
+    if (HAVE_FLAG(VAR_flag(this), VAR_IS_UNALLOCABLE)) {
+        if (!first) {
+            buf.strcat(",");
         }
+        first = false;
+        buf.strcat("unallocable");
     }
     if (HAVE_FLAG(VAR_flag(this), VAR_FUNC_DECL)) {
         if (!first) {
@@ -307,7 +307,7 @@ CHAR const* VAR::dump(StrBuf & buf, TypeMgr const* dm) const
     REMOVE_FLAG(tmpf, VAR_ADDR_TAKEN);
     REMOVE_FLAG(tmpf, VAR_IS_PR);
     REMOVE_FLAG(tmpf, VAR_IS_RESTRICT);
-    REMOVE_FLAG(tmpf, VAR_IS_ALLOCABLE);
+    REMOVE_FLAG(tmpf, VAR_IS_UNALLOCABLE);
     ASSERT0(tmpf == 0);
     #endif
     return buf.buf;
@@ -428,7 +428,6 @@ VAR * VarMgr::registerStringVar(CHAR const* var_name, SYM const* s, UINT align)
     VAR_type(v) = m_tm->getString();
     VAR_align(v) = align;
     VAR_is_global(v) = true;
-    VAR_allocable(v) = true;
     assignVarId(v);
     m_str_tab.set(s, v);
     return v;

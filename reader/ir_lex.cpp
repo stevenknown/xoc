@@ -245,7 +245,7 @@ INT Lexer::getLine()
         //Read MAX_BUF_LINE characters from src file.
         if (m_file_buf_pos >= m_last_read_num) {
             ASSERT0(m_src_file != NULL);
-            INT dw = fread(m_file_buf, 1, MAX_BUF_LINE, m_src_file);
+            INT dw = (INT)fread(m_file_buf, 1, MAX_BUF_LINE, m_src_file);
             if (dw == 0) {
                 if (!is_some_chars_in_cur_line) {
                     //Some characters had been put into 'm_cur_line', 
@@ -346,7 +346,7 @@ FIN:
     ASSERT0((m_src_line_num + 1) < getOffsetTabLineNum());
     m_ofst_tab[m_src_line_num + 1] = m_cur_src_ofst;
     m_cur_line[pos] = 0;
-    m_cur_line_num = ::strlen(m_cur_line);
+    m_cur_line_num = (UINT)::strlen(m_cur_line);
     m_cur_line_pos = 0;
     return ST_SUCC;
 
