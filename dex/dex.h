@@ -92,7 +92,7 @@ public:
     Var2UINT() {}
     virtual ~Var2UINT() {}
 
-    UINT mget(VAR const* v) const
+    UINT get_mapped(VAR const* v) const
     {
         bool find;
         UINT i = TMap<VAR const*, UINT>::get(v, &find);
@@ -107,7 +107,7 @@ public:
     UINT2Var() {}
     virtual ~UINT2Var() {}
 
-    VAR * mget(UINT u)
+    VAR * get_mapped(UINT u)
     {
         ASSERT0(u != 0);
         bool find;
@@ -142,7 +142,7 @@ public:
     {
         UINT mapped = 0;
         bool f = HMap<UINT, UINT, HashFuncBase2<UINT> >::find(prno, &mapped);
-        UNUSED(f);
+        DUMMYUSE(f);
         ASSERT(f, ("prno should be mapped with vreg in dex2ir"));
         //return HMap<UINT, UINT, HashFuncBase2<UINT> >::get(prno);
         return mapped;
@@ -310,7 +310,7 @@ public:
     Type const* int64x2;
 
 public:
-    TypeIndexRep() { memset(this, 0, sizeof(TypeIndexRep)); }
+    TypeIndexRep() { ::memset(this, 0, sizeof(TypeIndexRep)); }
 };
 
 //Perform Dex register allocation.

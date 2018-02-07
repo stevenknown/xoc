@@ -67,11 +67,11 @@ public:
     void getr(UINT row, UINT col, FRAC_TYPE * numer, FRAC_TYPE * denom);
     Rational getr(UINT row, UINT col);
     bool inv(RMat & e);
-    void ds(IN RMat const& c);
+    void ds(RMat const& c);
     void copy(RMat const& r);
     void copy(INTMat const& r);
     UINT comden(UINT row, UINT col); //Common denominator
-    void substit(IN RMat const& exp,
+    void substit(RMat const& exp,
                 UINT v,
                 bool is_eq = true,
                 INT rhs_idx = -1);

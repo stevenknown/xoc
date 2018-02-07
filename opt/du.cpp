@@ -35,32 +35,8 @@ author: Su Zhenyu
 
 namespace xoc {
 
-bool DUSet::verify_def(IR_DU_MGR * du) const
-{
-    CK_USE(du);
-    DU_ITER di = NULL;
-    for (UINT d = get_first(&di);
-         di != NULL; d = get_next(d, &di)) {
-        ASSERT0(du->get_ir(d)->is_stmt());
-    }
-    return true;
-}
-
-
-bool DUSet::verify_use(IR_DU_MGR * du) const
-{
-    CK_USE(du);
-    DU_ITER di = NULL;
-    for (UINT u = get_first(&di);
-         di != NULL; u = get_next(u, &di)) {
-        ASSERT0(du->get_ir(u)->is_exp());
-    }
-    return true;
-}
-
-
 //Add define stmt with check if the stmt is unique in list.
-void DUSet::add_use(IR const* exp, DefMiscBitSetMgr & m)
+void DUSet::addUse(IR const* exp, DefMiscBitSetMgr & m)
 {
     ASSERT0(exp && exp->is_exp());
     bunion(IR_id(exp), m);
@@ -68,14 +44,14 @@ void DUSet::add_use(IR const* exp, DefMiscBitSetMgr & m)
 
 
 //Add define stmt with check if the stmt is unique in list.
-void DUSet::add_def(IR const* stmt, DefMiscBitSetMgr & m)
+void DUSet::addDef(IR const* stmt, DefMiscBitSetMgr & m)
 {
     ASSERT0(stmt && stmt->is_stmt());
     bunion(IR_id(stmt), m);
 }
 
 
-void DUSet::remove_use(IR const* exp, DefMiscBitSetMgr & m)
+void DUSet::removeUse(IR const* exp, DefMiscBitSetMgr & m)
 {
     ASSERT0(exp && exp->is_exp());
     diff(IR_id(exp), m);

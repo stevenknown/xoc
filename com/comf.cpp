@@ -31,7 +31,7 @@ IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 author: Su Zhenyu
 @*/
-#ifdef WIN32
+#ifdef _ON_WINDOWS_
 #include <time.h>
 #else
 #include <time.h>
@@ -151,7 +151,7 @@ ASCII g_asc1[] = {
 
 
 //Caculate the number of bits which longer enough to represent given constant.
-UINT get_const_bit_len(LONGLONG v)
+UINT computeConstBitLen(ULONGLONG v)
 {
 #ifdef _VC6_
     if (!(v & 0xffffffffffffff00)) return 8;
@@ -169,14 +169,14 @@ UINT get_const_bit_len(LONGLONG v)
 //Append string to buf.
 //This function will guarantee that the length of string does
 //not exceed bufl.
-CHAR * xstrcat(CHAR * buf, UINT bufl, CHAR const* info, ...)
+CHAR * xstrcat(CHAR * buf, size_t bufl, CHAR const* info, ...)
 {
     //CHAR * ptr = (CHAR*)&info;
     //ptr += sizeof(CHAR*);
-    UINT l = ::strlen(buf);
+    size_t l = ::strlen(buf);
     if (l >= bufl) { return buf; }
 
-    UINT x = bufl - l;
+    size_t x = bufl - l;
 
     va_list ptr;
     va_start(ptr, info);
@@ -209,18 +209,14 @@ INT xceiling(INT a, INT b)
 {
     ASSERT(b != 0, ("div zero"));
     if (a % b == 0) {
-        /*
-        (a+b-1)/b will be errorneous
-        CASE:ceil(-4, 2)
-        */
+        //(a+b-1)/b will be errorneous
+        //CASE:ceil(-4, 2)
         return a / b;
     } else if ((a < 0 && b < 0) || (a > 0 && b > 0)) {
         return ((a + b) / b);
     } else {
-        /*
-        (a+b-1)/b will be errorneous
-        CASE:ceil(5,-2)
-        */
+        //(a+b-1)/b will be errorneous
+        //CASE:ceil(5,-2)
         return (a / b);
     }
 }
@@ -384,7 +380,7 @@ INT xctoi(CHAR const* cl)
     #endif
 
     if (cl == NULL || strcmp(cl, "") == 0) return 0;
-    INT l = strlen(cl);
+    INT l = (INT)strlen(cl);
     if (l > BYTE_PER_INT) {
         ASSERT(0, ("too many characters in integer"));
         return 0;
@@ -403,7 +399,7 @@ INT xctoi(CHAR const* cl)
 //e.g: cl = '1','2','3','4','5'
 //return 12345.
 //'is_oct': if true, nptr is octal digits.
-LONG xatol(CHAR const* nptr, bool is_oct)
+LONGLONG xatoll(CHAR const* nptr, bool is_oct)
 {
     if (nptr == NULL) return 0;
     while (*nptr == ' ' || *nptr == '\t') {
@@ -413,7 +409,7 @@ LONG xatol(CHAR const* nptr, bool is_oct)
     if (sign == '-' || sign == '+') {
         nptr++;
     }
-    LONG res = 0;
+    LONGLONG res = 0;
     if (nptr[0] == '0' && (nptr[1] == 'x' || nptr[1] == 'X')) { //hex
         nptr += 2;
         UCHAR c = *nptr;
@@ -456,14 +452,14 @@ LONGLONG xabs(LONGLONG a)
 }
 
 
-/* Find partial string, return the subscript-index if substring found,
-otherwise return -1.
-
-'src': input string.
-'par': partial string.
-'i': find the ith partial string. And 'i' get started with 0.
-    If one only want to find the first partial string, i equals to 0. */
-INT xstrstr(CHAR const* src, CHAR const* par, INT i)
+//Find partial string, return the subscript-index if substring found,
+//otherwise return -1.
+//
+//'src': input string.
+//'par': partial string.
+//'i': find the ith partial string. And 'i' get started with 0.
+//    If one only want to find the first partial string, i equals to 0.
+LONG xstrstr(CHAR const* src, CHAR const* par, INT i)
 {
     CHAR const* s = src;
     while (*s != 0) {
@@ -475,7 +471,7 @@ INT xstrstr(CHAR const* src, CHAR const* par, INT i)
         }
         if (*p == 0) {
             if (i == 0) {
-                return s - src;
+                return (LONG)(s - src);
             }
             i--;
         }
@@ -502,8 +498,8 @@ UINT xsplit(CHAR const* str, OUT Vector<CHAR*> & ret, CHAR const* sep)
     for (; *end != 0;) {
         if (*end != *sep) { len++; end++; continue; }
 
-        CHAR * substr = (CHAR*)malloc(len + 1);
-        memcpy(substr, start, len);
+        CHAR * substr = (CHAR*)::malloc(len + 1);
+        ::memcpy(substr, start, len);
         substr[len] = 0;
         ret.set(num, substr);
         num++;
@@ -512,8 +508,8 @@ UINT xsplit(CHAR const* str, OUT Vector<CHAR*> & ret, CHAR const* sep)
         start = end;
     }
 
-    CHAR * substr = (CHAR*)malloc(len + 1);
-    memcpy(substr, start, len);
+    CHAR * substr = (CHAR*)::malloc(len + 1);
+    ::memcpy(substr, start, len);
     substr[len] = 0;
     ret.set(num, substr);
     num++;
@@ -525,13 +521,13 @@ UINT xsplit(CHAR const* str, OUT Vector<CHAR*> & ret, CHAR const* sep)
 }
 
 
-void xstrcpy(CHAR * tgt, CHAR const* src, UINT size)
+void xstrcpy(CHAR * tgt, CHAR const* src, size_t size)
 {
-    UINT l = strlen(src);
+    size_t l = strlen(src);
     if (l >= size) {
         l = size - 1;
     }
-    memcpy(tgt, src, l);
+    ::memcpy(tgt, src, l);
     tgt[l] = 0;
 }
 
@@ -539,7 +535,7 @@ void xstrcpy(CHAR * tgt, CHAR const* src, UINT size)
 //Reverse the string.
 UCHAR * reverseString(UCHAR * v)
 {
-    INT end = strlen((CHAR*)v) - 1;
+    INT end = (INT)strlen((CHAR*)v) - 1;
     INT start = 0;
     while (start <= end - 1) {
         BYTE b = v[start];
@@ -614,7 +610,7 @@ void dumpf_svec(void * vec, UINT ty, CHAR const* name, bool is_del)
     }
 
     if (is_del) {
-        unlink(name);
+        UNLINK(name);
     }
 
     static INT g_count = 0;
@@ -705,10 +701,10 @@ LONG revlong(LONG d)
 //Convert floating point string into binary words.
 void af2i(IN CHAR * f, OUT BYTE * buf, UINT buflen, bool is_double)
 {
-    UNUSED(is_double);
-    UNUSED(buflen);
-    UNUSED(buf);
-    UNUSED(f);
+    DUMMYUSE(is_double);
+    DUMMYUSE(buflen);
+    DUMMYUSE(buf);
+    DUMMYUSE(f);
     ASSERT0(f && buf);
     ASSERT(0, ("TODO"));
 }
@@ -760,7 +756,7 @@ INT findstr(CHAR * src, CHAR * s)
     CHAR * startp = src, * p, * q;
     INT l = 0;
     INT i = 0;
-    srclen = strlen(src);
+    srclen = (INT)strlen(src);
     p = startp;
     while (p[i] != 0) {
         if (p[i] == s[0]) {
@@ -803,7 +799,7 @@ CHAR * getfilepath(CHAR const* n, OUT CHAR * buf, UINT bufl)
     if (n == NULL) { return NULL; }
 
     ASSERT0(buf);
-    INT l = strlen(n);
+    INT l = (INT)strlen(n);
     INT i = l;
     while (n[i] != '\\' && n[i] != '/' && i >= 0) {
         i--;
@@ -813,9 +809,9 @@ CHAR * getfilepath(CHAR const* n, OUT CHAR * buf, UINT bufl)
         return NULL;
     }
 
-    UNUSED(bufl);
+    DUMMYUSE(bufl);
     ASSERT0(i < (INT)bufl);
-    memcpy(buf, n, i);
+    ::memcpy(buf, n, i);
     buf[i] = 0;
     return buf;
 }
@@ -827,7 +823,7 @@ CHAR * getfilepath(CHAR const* n, OUT CHAR * buf, UINT bufl)
 //   means shifting string to left.
 void strshift(IN OUT CHAR * string, INT ofst)
 {
-    INT len = strlen(string), i;
+    INT len = (INT)strlen(string), i;
     if (string == NULL) { return; }
 
     if (ofst >= 0) { //shift to right
@@ -857,9 +853,9 @@ void strshift(IN OUT CHAR * string, INT ofst)
 //e.g: Given /xx/yy/zz.foo, return zz.
 CHAR * getfilename(CHAR const* path, OUT CHAR * buf, UINT bufl)
 {
-    UNUSED(bufl);
+    DUMMYUSE(bufl);
     if (path == NULL) { return NULL; }
-    INT l = strlen(path);
+    INT l = (INT)strlen(path);
     INT i = l;
     INT dotpos = -1;
     while (path[i] != '\\' && path[i] != '/' && i >= 0) {
@@ -880,7 +876,7 @@ CHAR * getfilename(CHAR const* path, OUT CHAR * buf, UINT bufl)
 
     UINT len = end - start;
     if (len > 0) {
-        memcpy(buf, path + start, len);
+        ::memcpy(buf, path + start, len);
     }
     buf[len] = 0;
     return buf;
@@ -893,15 +889,15 @@ CHAR * getfilesuffix(CHAR const* n, OUT CHAR * buf, UINT bufl)
 {
     if (n == NULL) { return NULL; }
 
-    INT l = strlen(n);
+    INT l = (INT)strlen(n);
     INT i = l;
     while (n[i] != '.' && i >= 0) {
         i--;
     }
-    UNUSED(bufl);
+    DUMMYUSE(bufl);
     if (i < 0) { return NULL; }
     ASSERT0((UINT)(l - i -1) < bufl);
-    memcpy(buf, n + i + 1, l - i -1);
+    ::memcpy(buf, n + i + 1, l - i -1);
     buf[l - i -1] = 0;
     return buf;
 }
@@ -911,7 +907,7 @@ CHAR * getfilesuffix(CHAR const* n, OUT CHAR * buf, UINT bufl)
 //e.g: Given string is a\b\c, separator is '\', return c;
 CHAR const* extractRightMostSubString(CHAR const* string, CHAR separator)
 {
-    UINT l = strlen(string);
+    size_t l = strlen(string);
     CHAR const* p = string + l;
     for (; l != 0; l--, p--) {
         if (*p == separator) {
@@ -921,6 +917,22 @@ CHAR const* extractRightMostSubString(CHAR const* string, CHAR separator)
 
     //Not found method name.
     return p;
+}
+
+
+//Extract the left most sub-string which separated by 'separator' from string.
+void extractLeftMostSubString(CHAR * tgt, CHAR const* string, CHAR separator)
+{
+    CHAR const* p = string;
+    for (CHAR c = *p; c != 0; p++, c = *p) {
+        if (c == separator) {
+            break;
+        }
+    }
+
+    size_t l = p - string;
+    ::memcpy(tgt, string, l);
+    tgt[l] = 0;
 }
 
 
@@ -952,7 +964,7 @@ bool xstrcmp(CHAR const* p1, CHAR const* p2, INT n)
 CHAR * upper(CHAR * n)
 {
     if (n == NULL) { return NULL; }
-    LONG l = strlen(n);
+    LONG l = (LONG)strlen(n);
     l--;
     while (l >= 0) {
         if (n[l] >= 'a' && n[l] <= 'z')
@@ -966,7 +978,7 @@ CHAR * upper(CHAR * n)
 CHAR * lower(CHAR * n)
 {
     if (n == NULL) { return NULL; }
-    LONG l = strlen(n);
+    LONG l = (LONG)strlen(n);
     l--;
     while (l >= 0) {
         if (n[l] >= 'A' && n[l] <= 'Z')
@@ -1077,7 +1089,7 @@ float getclockend(LONG start)
 //Get current micro-second.
 ULONGLONG getusec()
 {
-#ifdef WIN32
+#ifdef _ON_WINDOWS_
     time_t timer;
     timer = time(&timer);
 
@@ -1164,7 +1176,7 @@ static bool prt_ulong_hex(CHAR * buf, UINT buflen, UINT * pbufpos,
     }
 
     for (INT digno = 0; digno < format_size; digno++) {
-        INT digit = (v & mask) >> shift;
+        UINT digit = (UINT)(v & mask) >> shift;
         if (!prtchar(buf, buflen, pbufpos, g_hexdigits[digit])) {
             return false;
         }
@@ -1232,8 +1244,11 @@ static bool is_exist_mark(CHAR const* format)
 
 
 //Parse string that starts with '%'.
-static bool percent(CHAR * buf, UINT buflen, IN OUT UINT * bufpos,
-                    IN OUT CHAR const** format, va_list stack_start)
+static bool percent(CHAR * buf,
+                    UINT buflen,
+                    IN OUT UINT * bufpos,
+                    IN OUT CHAR const** format,
+                    va_list stack_start)
 {
     //The info related to %, e.g:'%d', can not longer than 255.
     CHAR sbuf[255];
@@ -1311,11 +1326,9 @@ LETTER:
     switch (ch) {
     case 'c': //ANSI CHAR
         {
-            /*
-            CHAR is promoted to INT when passed through '...'.
-            So you should pass 'INT' not 'CHAR' to 'va_arg'.
-            If this code is reached, the program will abort.
-            */
+            //CHAR is promoted to INT when passed through '...'.
+            //So you should pass 'INT' not 'CHAR' to 'va_arg'.
+            //If this code is reached, the program will abort.
             CHAR c = (CHAR)va_arg(stack_start, INT);
             if (!prtchar(buf, buflen, bufpos, c)) goto OVER;
         }
@@ -1372,7 +1385,7 @@ LETTER:
     if (is_align_left) {
         if (tpos + *bufpos >= buflen) goto OVER;
         if (tpos < format_size) {
-            memcpy(buf + *bufpos, sbuf, tpos);
+            ::memcpy(buf + *bufpos, sbuf, tpos);
             *bufpos += tpos;
             for (UINT i = 0; i < format_size - tpos; i++) {
                 if (!prtchar(buf, buflen, bufpos, ' ')) {
@@ -1380,7 +1393,7 @@ LETTER:
                 }
             }
         }else{
-            memcpy(buf + *bufpos, sbuf, tpos);
+            ::memcpy(buf + *bufpos, sbuf, tpos);
             *bufpos += tpos;
         }
         goto FIN;
@@ -1393,10 +1406,10 @@ LETTER:
                     goto OVER;
                 }
             }
-            memcpy(buf + *bufpos, sbuf, tpos);
+            ::memcpy(buf + *bufpos, sbuf, tpos);
             *bufpos += tpos;
         } else {
-            memcpy(buf + *bufpos, sbuf, tpos);
+            ::memcpy(buf + *bufpos, sbuf, tpos);
             *bufpos += tpos;
         }
         goto FIN;
@@ -1408,15 +1421,15 @@ LETTER:
                     goto OVER;
                 }
             }
-            memcpy(buf + *bufpos, sbuf, tpos);
+            ::memcpy(buf + *bufpos, sbuf, tpos);
             *bufpos += tpos;
         } else {
-            memcpy(buf + *bufpos, sbuf, tpos);
+            ::memcpy(buf + *bufpos, sbuf, tpos);
             *bufpos += tpos;
         }
         goto FIN;
     }
-    memcpy(buf + *bufpos, sbuf, tpos);
+    ::memcpy(buf + *bufpos, sbuf, tpos);
     *bufpos += tpos;
 FIN:
     *format = format_pos;
@@ -1466,10 +1479,7 @@ OVER: //Get some problems.
 //Format string and record in buf.
 //buf: output buffer that record string.
 //buflen: length of output buffer.
-CHAR * xsprintf(IN OUT CHAR * buf,
-                UINT buflen,
-                CHAR const* format,
-                ...)
+CHAR * xsprintf(IN OUT CHAR * buf, UINT buflen, CHAR const* format, ...)
 {
     UINT bufpos = 0;
     CHAR ch = *format;

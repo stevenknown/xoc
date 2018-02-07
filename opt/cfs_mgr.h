@@ -64,14 +64,14 @@ SCOP
 */
 #define ABS_NODE_prev(sn)            ((sn)->prev)
 #define ABS_NODE_next(sn)            ((sn)->next)
-#define ABS_NODE_parent(sn)            ((sn)->parent)
-#define ABS_NODE_loop_body(sn)        ((sn)->u2.loop_body)
-#define ABS_NODE_true_body(sn)        ((sn)->u2.u3.true_body)
-#define ABS_NODE_false_body(sn)        ((sn)->u2.u3.false_body)
+#define ABS_NODE_parent(sn)          ((sn)->parent)
+#define ABS_NODE_loop_body(sn)       ((sn)->u2.loop_body)
+#define ABS_NODE_true_body(sn)       ((sn)->u2.s1.true_body)
+#define ABS_NODE_false_body(sn)      ((sn)->u2.s1.false_body)
 #define ABS_NODE_type(sn)            ((sn)->ty)
-#define ABS_NODE_if_head(sn)        ((sn)->u1.if_head)
-#define ABS_NODE_loop_head(sn)        ((sn)->u1.loop_head)
-#define ABS_NODE_bb(sn)                ((sn)->u1.bb)
+#define ABS_NODE_if_head(sn)         ((sn)->u1.if_head)
+#define ABS_NODE_loop_head(sn)       ((sn)->u1.loop_head)
+#define ABS_NODE_bb(sn)              ((sn)->u1.bb)
 class AbsNode {
 public:
     AbsNode * prev;
@@ -83,7 +83,7 @@ public:
         struct {
             AbsNode * true_body;
             AbsNode * false_body;
-        } u3;
+        } s1;
     } u2;
 
     union {
@@ -98,11 +98,11 @@ public:
 //CFS_INFO
 //
 #define CFS_INFO_cfs_type(ci)            ((ci)->cfs_type)
-#define CFS_INFO_ir(ci)                    ((ci)->u2.ir)
+#define CFS_INFO_ir(ci)                  ((ci)->u2.ir)
 #define CFS_INFO_head(ci)                ((ci)->u2.head)
-#define CFS_INFO_true_body(ci)            ((ci)->u1.if_info.true_body_ir_set)
-#define CFS_INFO_false_body(ci)            ((ci)->u1.if_info.false_body_ir_set)
-#define CFS_INFO_loop_body(ci)            ((ci)->u1.loop_info.loop_body_ir_set)
+#define CFS_INFO_true_body(ci)           ((ci)->u1.if_info.true_body_ir_set)
+#define CFS_INFO_false_body(ci)          ((ci)->u1.if_info.false_body_ir_set)
+#define CFS_INFO_loop_body(ci)           ((ci)->u1.loop_info.loop_body_ir_set)
 class CFS_INFO {
 public:
     IR_TYPE cfs_type;
@@ -139,35 +139,36 @@ protected:
     {
         void * p = smpoolMalloc(size, m_pool);
         ASSERT0(p);
-        memset(p, 0, size);
+        ::memset(p, 0, size);
         return p;
     }
 public:
-    CfsMgr(Region * ru)
+    CfsMgr(Region * rg)
     {
-        m_ru = ru;
+        m_ru = rg;
         m_pool = smpoolCreate(64, MEM_COMM);
     }
 
     ~CfsMgr() { smpoolDelete(m_pool); }
 
     AbsNode * constructAbsLoop(
-                            IN IRBB * entry,
-                            IN AbsNode * parent,
-                            IN BitSet * cur_region,
-                            IN Graph & cur_graph,
-                            IN OUT BitSet & visited);
-    AbsNode * constructAbsIf(IN IRBB * entry,
-                            IN AbsNode * parent,
-                            IN Graph & cur_graph,
-                            IN OUT BitSet & visited);
+            IN IRBB * entry,
+            IN AbsNode * parent,
+            IN BitSet * cur_region,
+            IN Graph & cur_graph,
+            IN OUT BitSet & visited);
+    AbsNode * constructAbsIf(
+            IN IRBB * entry,
+            IN AbsNode * parent,
+            IN Graph & cur_graph,
+            IN OUT BitSet & visited);
     AbsNode * constructAbsBB(IN IRBB * bb, IN AbsNode * parent);
     AbsNode * constructAbsTree(
-                            IN IRBB * entry,
-                            IN AbsNode * parent,
-                            IN BitSet * cur_region,
-                            IN Graph & cur_graph,
-                            IN OUT BitSet & visited);
+            IN IRBB * entry,
+            IN AbsNode * parent,
+            IN BitSet * cur_region,
+            IN Graph & cur_graph,
+            IN OUT BitSet & visited);
     AbsNode * constructAbstractControlFlowStruct();
 
     void dump_indent(UINT indent);
@@ -185,10 +186,10 @@ public:
 
     void recordStmt(IR * ir, BitSet & irset);
 
-    virtual CHAR const* get_pass_name() const
+    virtual CHAR const* getPassName() const
     { return "Control Flow Structure MGR"; }
 
-    virtual PASS_TYPE get_pass_type() const { return PASS_CFS_MGR; }
+    virtual PASS_TYPE getPassType() const { return PASS_CFS_MGR; }
 };
 
 } //namespace xoc

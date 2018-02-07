@@ -1,6 +1,6 @@
-2015 ~ 2016
-	1. Correctness.
-	2. New analysis module: Induction Variable Recognization
-	3. Enable the support to JavaScript.
-	4. SSA-back translation for exception block.
-	5. Test environment.
+2016 - 2017
+    *. Correctness.
+    *. New analysis module: Induction Variable Recognization
+    *. SSA-back translation for exception block.
+    *. Complete and refine test environment.
+    *. Enable a new code generation module for arm, x86 target.

@@ -37,69 +37,112 @@ author: Su Zhenyu
 namespace xoc {
 
 //CALL NODE
-#define CN_id(c)         ((c)->id)
-#define CN_sym(c)        ((c)->ru_name)
-#define CN_ru(c)         ((c)->ru)
-#define CN_is_used(c)    ((c)->u1.s1.is_used)
+#define CN_id(c)             ((c)->id)
+#define CN_sym(c)            ((c)->ru_name)
+#define CN_ru(c)             ((c)->rg)
+#define CN_is_used(c)        ((c)->u1.s1.is_used)
+#define CN_unknown_callee(c) ((c)->u1.s1.has_unknown_callee)
 class CallNode {
 public:
     UINT id;
     SYM const* ru_name; //record the Region name.
-    Region * ru; //record the Region that callnode corresponds to.
+    Region * rg; //record the Region that callnode corresponds to.
     union {
         struct {
             //It is marked by attribute used, which usually means
             //that it is called in inline assembly code.
             BYTE is_used:1;
+
+            //It may be unable to determine some targets
+            //of a callsite. In this case, the flag will return true.
+            BYTE has_unknown_callee:1;
         } s1;
         BYTE u1b1;
     } u1;
+
+public:
+    CallNode() { ::memset(this, 0, sizeof(CallNode)); }
 };
 
 
 //Mapping from SYM to CallNode.
 typedef TMap<SYM const*, CallNode*> SYM2CN;
+typedef TMap<Region*, SYM2CN*> Region2SYM2CN;
+typedef TMapIter<Region*, SYM2CN*> Region2SYM2CNIter;
 
 
 //Call Graph
-#define CALLG_DUMP_IR    1
+//The call graph is not precise. That is, a callsite may indicate it can
+//call a function when in fact it does not do so in the running program.
+#define CALLG_DUMP_IR            1
+#define CALLG_DUMP_SRC_LINE      2
+#define CALLG_DUMP_INNER_REGION  4
 class CallGraph : public DGraph {
     RegionMgr * m_ru_mgr;
-    TypeMgr * m_dm;
+    TypeMgr * m_tm;
     SMemPool * m_cn_pool; //pool for call node.
     UINT m_cn_count;
     Vector<CallNode*> m_cnid2cn;
     Vector<CallNode*> m_ruid2cn;
-    SYM2CN m_sym2cn_map;
+    Region2SYM2CN m_ru2sym2cn;
 
-    CallNode * newCallNode()
+    CallNode * allocCallNode()
     {
         ASSERT0(m_cn_pool);
         CallNode * p = (CallNode*)smpoolMallocConstSize(
                             sizeof(CallNode), m_cn_pool);
         ASSERT0(p);
-        memset(p, 0, sizeof(CallNode));
+        ::memset(p, 0, sizeof(CallNode));
         return p;
     }
+
+    //Generate map between Symbol and CallNode for current region.
+    SYM2CN * genSYM2CN(Region * rg)
+    {
+        ASSERT0(rg);
+        SYM2CN * sym2cn = m_ru2sym2cn.get(rg);
+        if (sym2cn == NULL) {
+            sym2cn = new SYM2CN();
+            m_ru2sym2cn.set(rg, sym2cn);
+        }
+        return sym2cn;
+    }
+
+    //Read map between Symbol and CallNode for current region if exist.
+    SYM2CN * getSYM2CN(Region * rg) const { return m_ru2sym2cn.get(rg); }
+
+    CallNode * newCallNode(IR const* ir, Region * rg);
+    CallNode * newCallNode(Region * rg);
+
 public:
-    CallGraph(UINT edge_hash, UINT vex_hash, RegionMgr * rumgr):
-          DGraph(edge_hash, vex_hash)
+    CallGraph(UINT edge_hash,
+              UINT vex_hash,
+              RegionMgr * rumgr): DGraph(edge_hash, vex_hash)
     {
         ASSERT0(edge_hash > 0 && vex_hash > 0);
         m_ru_mgr = rumgr;
-        m_dm = rumgr->get_type_mgr();
+        m_tm = rumgr->getTypeMgr();
         m_cn_count = 1;
         m_cn_pool = smpoolCreate(sizeof(CallNode) * 2, MEM_CONST_SIZE);
     }
     COPY_CONSTRUCTOR(CallGraph);
-    virtual ~CallGraph() { smpoolDelete(m_cn_pool); }
+    virtual ~CallGraph()
+    {
+        SYM2CN * sym2cn = NULL;
+        Region2SYM2CNIter iter;
+        for (Region * rg = m_ru2sym2cn.get_first(iter, &sym2cn);
+             rg != NULL; rg = m_ru2sym2cn.get_next(iter, &sym2cn)) {
+            delete sym2cn;
+        }
+        smpoolDelete(m_cn_pool);
+    }
 
     void add_node(CallNode * cn)
     {
         m_cnid2cn.set(CN_id(cn), cn);
         addVertex(CN_id(cn));
     }
-    void build(Region * top);
+    bool build(RegionMgr * rumgr);
     void computeEntryList(List<CallNode*> & elst);
     void computeExitList(List<CallNode*> & elst);
 
@@ -108,27 +151,36 @@ public:
     //        with completely information.
     void dump_vcg(CHAR const* name = NULL, INT flag = -1);
 
-    CallNode * map_id2cn(UINT id) const { return m_cnid2cn.get(id); }
-    CallNode * map_vex2cn(Vertex const* v) const
+    CallNode * mapId2CallNode(UINT id) const { return m_cnid2cn.get(id); }
+    CallNode * mapVertex2CallNode(Vertex const* v) const
     { return m_cnid2cn.get(VERTEX_id(v)); }
 
-    CallNode * map_ru2cn(Region const* ru) const
-    { return m_ruid2cn.get(REGION_id(ru)); }
+    CallNode * mapRegion2CallNode(Region const* rg) const
+    { return m_ruid2cn.get(REGION_id(rg)); }
 
-    CallNode * map_sym2cn(SYM const* name) const
-    { return m_sym2cn_map.get(name); }
-
-    Region * map_ir2ru(IR const* ir)
+    CallNode * mapSym2CallNode(SYM const* sym, Region * start) const
     {
-        ASSERT0(ir->is_calls_stmt());
-        SYM * name = VAR_name(CALL_idinfo(ir));
-        CallNode * cn = map_sym2cn(name);
-        if (cn == NULL) return NULL;
-        return CN_ru(cn);
+        for (; start != NULL; start = start->getParent()) {
+            SYM2CN * sym2cn = getSYM2CN(start);
+            if (sym2cn == NULL) { continue; }
+            CallNode * cn = sym2cn->get(sym);
+            if (cn != NULL) { return cn; }
+        }
+        return NULL;
     }
 
-    CallNode * newCallNode(IR * ir);
-    CallNode * newCallNode(Region * ru);
+    //Map a call/icall to its target Region.
+    //rg: the region that ir resident in.
+    Region * mapCall2Region(IR const* ir, Region * rg)
+    {
+        if (ir->is_call()) {
+            CallNode * cn = mapSym2CallNode(CALL_idinfo(ir)->get_name(), rg);
+            if (cn != NULL) { return CN_ru(cn); }
+            return NULL;
+        }
+        ASSERT0(ir->is_icall());
+        return NULL; //TODO: implement icall analysis.
+    }
 
     void erase()
     {
@@ -141,7 +193,8 @@ public:
     //Note ir must be a function call.
     virtual bool shouldAddEdge(IR const* ir) const
     {
-        ASSERT0(ir->is_calls_stmt());
+        ASSERT0(ir->isCallStmt());
+        DUMMYUSE(ir);
         return true;
     }
 };

@@ -40,4 +40,6 @@ extern CHAR const* g_dex_file_path;
 extern INT g_output_file_handler;
 extern INT g_source_file_handler;
 
+//Set true to disable all auxiliary informations which will output to stdout.
+extern bool g_silence;
 #endif

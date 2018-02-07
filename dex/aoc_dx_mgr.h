@@ -34,7 +34,7 @@ author: Su Zhenyu
 #ifndef _AOC_DX_MGR_
 #define _AOC_DX_MGR_
 
-class AocDxMgr : public DX_MGR {
+class AocDxMgr : public DxMgr {
     DexFile const* m_df;
 public:
     AocDxMgr(DexFile const* df) { m_df = df; }

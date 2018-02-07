@@ -36,30 +36,32 @@ author: Su Zhenyu
 
 namespace xoc {
 
+class SimpCtx;
+
 //Basis Class of pass.
 class Pass {
 protected:
-    SimpCTX * m_simp;
+    SimpCtx * m_simp;
 public:
     Pass() { m_simp = NULL; }
     virtual ~Pass() {}
     COPY_CONSTRUCTOR(Pass);
 
-    virtual CHAR const* get_pass_name() const
+    virtual CHAR const* getPassName() const
     {
         ASSERT(0, ("Optimization Dependent Code"));
         return NULL;
     }
 
-    virtual PASS_TYPE get_pass_type() const
+    virtual PASS_TYPE getPassType() const
     {
         ASSERT(0, ("Optimization Dependent Code"));
         return PASS_UNDEF;
     }
 
-    void set_simp_cont(SimpCTX * simp) { m_simp = simp; }
+    void set_simp_cont(SimpCtx * simp) { m_simp = simp; }
 
-    virtual bool perform(OptCTX &)
+    virtual bool perform(OptCtx &)
     {
         ASSERT(0, ("Optimization Dependent Code"));
         return false;

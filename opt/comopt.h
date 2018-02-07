@@ -32,10 +32,9 @@ IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 author: Su Zhenyu
 @*/
 //Optimizations
-#include "prssainfo.h"
 #include "prdf.h"
 #include "ir_ssa.h"
-//#include "ir_mdssa.h"
+#include "ir_mdssa.h"
 #include "cfs_mgr.h"
 #include "cfs_opt.h"
 #include "goto_opt.h"

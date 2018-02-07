@@ -61,11 +61,10 @@ typedef enum {
 #define LABEL_INFO_name(l)              ((l)->u1.lab_name)
 #define LABEL_INFO_num(l)               ((l)->u1.lab_num)
 #define LABEL_INFO_pragma(l)            ((l)->u1.pragma_str)
-#define LABEL_INFO_is_used(l)           ((l)->u2.s1.is_used)
 #define LABEL_INFO_is_catch_start(l)    ((l)->u2.s1.is_catch_start)
 #define LABEL_INFO_is_try_start(l)      ((l)->u2.s1.is_try_start)
 #define LABEL_INFO_is_try_end(l)        ((l)->u2.s1.is_try_end)
-#define LABEL_INFO_is_unreachable(l)    ((l)->u2.s1.is_unreachable)
+#define LABEL_INFO_is_terminate(l)      ((l)->u2.s1.is_terminate)
 #define LABEL_INFO_is_pragma(l)         (LABEL_INFO_type(l) == L_PRAGMA)
 #define LABEL_INFO_b1(l)                ((l)->u2.b1)
 class LabelInfo {
@@ -73,15 +72,13 @@ public:
     LABEL_TYPE ltype;
 
     union {
-        SYM * lab_name;
+        SYM const* lab_name;
+        SYM const* pragma_str;
         UINT lab_num;
-        SYM * pragma_str;
     } u1;
 
     union {
         struct {
-            BYTE is_used:1;
-
             //Set true if current label is the start
             //label of exception catch block.
             BYTE is_catch_start:1;
@@ -96,7 +93,7 @@ public:
 
             //Set true if current label is a placeholer to indicate that
             //program control flow is terminate here.
-            BYTE is_unreachable:1;
+            BYTE is_terminate:1;
         } s1;
         BYTE b1;
     } u2;
@@ -106,8 +103,9 @@ public:
     {
         ltype = li.ltype;
         u1.lab_name = li.u1.lab_name;
-        u2.b1 = li.u2.b1;
+        copy_flag(li);
     }
+    void copy_flag(LabelInfo const& li) { u2.b1 = li.u2.b1; }
 };
 
 
@@ -131,9 +129,9 @@ inline UINT computeLabelHashValue(LabelInfo const* li)
 }
 
 
-LabelInfo * newLabel(SMemPool * pool);
-LabelInfo * newInternalLabel(SMemPool * pool);
-LabelInfo * newCustomerLabel(SYM * st, SMemPool * pool);
+LabelInfo * allocLabel(SMemPool * pool);
+LabelInfo * allocInternalLabel(SMemPool * pool);
+LabelInfo * allocCustomerLabel(SYM const* st, SMemPool * pool);
 inline bool isSameLabel(LabelInfo const* li1, LabelInfo const* li2)
 {
     ASSERT0(li1 && li2);

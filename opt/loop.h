@@ -58,11 +58,10 @@ public:
     UCHAR has_early_exit:1;
     UCHAR has_call:1;
     BB * loop_head; //loop head node, the only one header
-                   //indicates a natural loop.
+                    //indicates a natural loop.
     BitSet * bb_set; //loop body elements
 
-    bool is_loop_reduction()
-    { return !has_early_exit; }
+    bool is_loop_reduction() { return !has_early_exit; }
 
     //Return true if bb is belong to current loop.
     //'bbid': id of BB.
@@ -76,7 +75,7 @@ class Region;
 class IR_CFG;
 
 IRBB * findAndInsertPreheader(
-            LI<IRBB> const* li, Region * ru,
+            LI<IRBB> const* li, Region * rg,
             OUT bool & insert_bb, bool force);
 IRBB * findSingleBackedgeStartBB(LI<IRBB> const* li, IR_CFG * cfg);
 bool findTwoSuccessorBBOfLoopHeader(

@@ -29,12 +29,25 @@ WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR
 OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN
 IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-author: GongKai, JinYue
+author: Su Zhenyu
 @*/
-#ifndef _LIRCOMM_
-#define _LIRCOMM_
+#ifndef _DEX_CP_H_
+#define _DEX_CP_H_
 
-#define LIRMALLOC drLinearAlloc
-#define LIRFREEALL drLinearFree
+class DEX_CP : public IR_CP {
+public:
+    DEX_CP(Region * rg) : IR_CP(rg) {}
+    virtual ~DEX_CP() {}
+
+    //Check if ir is appropriate for propagation.
+    virtual bool canBeCandidate(IR const* ir) const
+    {
+        //Prop const imm may generate code which is not legal dex format.
+        //TODO: Perform more code normalization before ir2dex.
+        //return ir->is_const() || ir->is_pr();
+
+        return ir->is_pr();
+    }
+};
 
 #endif

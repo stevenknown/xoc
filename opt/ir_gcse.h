@@ -50,14 +50,14 @@ protected:
     { return NULL; }
 
 public:
-    explicit TG(Region * ru) { m_ru = ru; }
+    explicit TG(Region * rg) { m_ru = rg; }
     COPY_CONSTRUCTOR(TG);
 
     void pick_eh()
     {
-        List<IRBB*> * bbs = m_ru->get_bb_list();
+        List<IRBB*> * bbs = m_ru->getBBList();
         for (IRBB * bb = bbs->get_head(); bb != NULL; bb = bbs->get_next()) {
-            if (bb->is_exp_handling()) {
+            if (bb->isExceptionHandler()) {
                 removeVertex(BB_id(bb));
             }
         }
@@ -65,14 +65,14 @@ public:
 
     inline void computeDomAndIdom()
     {
-        if (!computeDom()) { ASSERT0(0); }
-        if (!computeIdom()) { ASSERT0(0); }
+        if (!computeDom()) { UNREACH(); }
+        if (!computeIdom()) { UNREACH(); }
     }
 
     inline void computePdomAndIpdom(Vertex * root)
     {
-        if (!computePdomByRpo(root, NULL)) { ASSERT0(0); }
-        if (!computeIpdom()) { ASSERT0(0); }
+        if (!computePdomByRpo(root, NULL)) { UNREACH(); }
+        if (!computeIpdom()) { UNREACH(); }
     }
 };
 
@@ -85,12 +85,12 @@ protected:
     IR_CFG * m_cfg;
     IR_DU_MGR * m_du;
     IR_AA * m_aa;
-    IR_SSA_MGR * m_ssamgr;
+    PRSSAMgr * m_ssamgr;
     IR_EXPR_TAB * m_expr_tab;
-    TypeMgr * m_dm;
+    TypeMgr * m_tm;
     IR_GVN * m_gvn;
     TG * m_tg;
-    DefMiscBitSetMgr * m_misc_bs_mgr;
+    DefMiscBitSetMgr m_misc_bs_mgr;
     TMap<IR*, IR*> m_exp2pr;
     TMap<VN const*, IR*> m_vn2exp;
     List<IR*> m_newst_lst;
@@ -109,29 +109,28 @@ protected:
     bool prcessCse(IR * ir, List<IR*> & livexp);
     bool shouldBeCse(IR * det);
 public:
-    IR_GCSE(Region * ru, IR_GVN * gvn)
+    IR_GCSE(Region * rg, IR_GVN * gvn)
     {
-        ASSERT0(ru);
-        m_ru = ru;
-        m_cfg = ru->get_cfg();
-        m_du = ru->get_du_mgr();
-        m_aa = ru->get_aa();
-        ASSERT0(m_du && m_aa);
+        ASSERT0(rg);
+        m_ru = rg;
+        m_cfg = rg->getCFG();
+        m_du = rg->getDUMgr();
+        m_aa = rg->getAA();
+        ASSERT0(m_du && m_aa && m_cfg);
         m_expr_tab = NULL;
-        m_dm = ru->get_type_mgr();
+        m_tm = rg->getTypeMgr();
         m_gvn = gvn;
-        m_misc_bs_mgr = ru->getMiscBitSetMgr();
         m_tg = NULL;
         m_is_in_ssa_form = false;
         m_ssamgr = NULL;
     }
     virtual ~IR_GCSE() {}
-    virtual CHAR const* get_pass_name() const
+    virtual CHAR const* getPassName() const
     { return "Global Command Subscript Elimination"; }
 
-    PASS_TYPE get_pass_type() const { return PASS_GCSE; }
+    PASS_TYPE getPassType() const { return PASS_GCSE; }
 
-    bool perform(OptCTX & oc);
+    bool perform(OptCtx & oc);
 };
 
 } //namespace xoc

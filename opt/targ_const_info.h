@@ -36,12 +36,21 @@ author: Su Zhenyu
 
 #if defined(FOR_X86)
 #include "../x86/x86_const_info.h"
+
+#elif defined(FOR_ARM)
+#include "../arm/arm_const_info.h"
+
 #elif defined(FOR_PAC)
 #include "../pac/pac_const_info.h"
+
 #elif defined(FOR_DEX)
 #include "../dex/dex_const_info.h"
+
 #elif defined(FOR_JS)
 #include "../js/js_const_info.h"
+
+#else
+#error "No target info"
 #endif
 
 #endif

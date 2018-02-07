@@ -1,4 +1,4 @@
-COM_OBJS +=\
+OBJS +=\
 ltype.o \
 xmat.o \
 comf.o \
@@ -8,27 +8,47 @@ sgraph.o \
 rational.o \
 testbs.o \
 flty.o \
+strbuf.o \
 linsys.o \
 bs.o
 
-CFLAGS = -DFOR_PAC  -D_LINUX_ -Wno-write-strings -Wsign-promo -Werror=pointer-to-int-cast -Wparentheses \
-   -Wformat -Wsign-compare -Wpointer-arith -Wno-multichar -Winit-self -Wuninitialized -Wmaybe-uninitialized -Wtype-limits -Wstrict-overflow \
-   -Wstrict-aliasing=3 -finline-limit=10000000 -Wswitch -O3 -g2 -Wall #-fprofile-arcs -ftest-coverage #-D_DEBUG_ # 
+ifeq ($(CFLAGS),)
+CFLAGS = \
+    -D_DEBUG_ \
+	-Wno-write-strings \
+	-Wsign-promo \
+	-Wparentheses \
+    -Wformat \
+	-Wsign-compare \
+	-Wpointer-arith \
+	-Wno-multichar \
+	-Winit-self \
+	-Wuninitialized \
+    -Wstrict-aliasing=3 \
+	-Wswitch \
+	-O2 \
+	-g2 \
+	-Wall
 
-INC=.
-%.o:%.cpp
-	@echo "build $<"
-	$(INFER) gcc $(CFLAGS) $(INC) -c $< -o $@
+#CFLAGS+=\
+	-Werror=pointer-to-int-cast \
+	-Wmaybe-uninitialized \
+	-Wtype-limits \
+	-Wstrict-overflow \
+	-finline-limit=10000000
+endif
 
-com_objs: $(COM_OBJS)
-
-all: com_objs 
-	ar rvs libxcom.a $(COM_OBJS)
+all: objs 
+	ar rvs libxcom.a $(OBJS)
 	@echo "success!!"
 
-clean:
-	@find -name "*.a" | xargs rm -f
-	@find -name "*.o" | xargs rm -f
-	@find -name "*.tmp" | xargs rm -f
-	@find -name "tags" | xargs rm -f
+%.o:%.cpp
+	@echo "build $<"
+	$(INFER) gcc $(CFLAGS) -c $< -o $@
 
+objs: $(OBJS)
+
+clean:
+	@find ./ -name "*.a" | xargs rm -f
+	@find ./ -name "*.o" | xargs rm -f
+	@find ./ -name "*.tmp" | xargs rm -f

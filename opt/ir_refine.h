@@ -36,7 +36,7 @@ author: Su Zhenyu
 
 namespace xoc {
 
-//Refine operation context variable.
+//Refining context variable.
 //Set the following option true or false to enable or disable the refinement.
 #define RC_refine_div_const(r)       ((r).u1.s1.refine_div_const)
 #define RC_refine_mul_const(r)       ((r).u1.s1.refine_mul_const)
@@ -45,7 +45,7 @@ namespace xoc {
 #define RC_insert_cvt(r)             ((r).u1.s1.insertCvt)
 #define RC_refine_stmt(r)            ((r).u1.s1.refine_stmt)
 #define RC_stmt_removed(r)           ((r).u1.s1.stmt_has_been_removed)
-class RefineCTX {
+class RefineCtx {
 public:
     union {
         struct {
@@ -61,11 +61,15 @@ public:
             //Pass info topdown. e.g: int a; a=2+3 => a=5
             UINT do_fold_const:1;
 
-            //Pass info topdown. True to insert IR_CVT automaticlly.
+            //Pass info topdown.
+            //If the flag is true, the process will insert IR_CVT
+            //if kid's type size is smaller then parent's type size.
+            //e.g: parent:I32 = kid:I8 will be
+            //     parent:I32 = cvt:I32 (kid:I8)
             UINT insertCvt:1;
 
             //Pass info topdown. True to transform comparison stmt to lnot
-            //e.g: transform $pr1!=0?0:1 to lnot($pr1),
+            //e.g: transform $1!=0?0:1 to lnot($1),
             //where lnot indicates logical-not.
             UINT hoist_to_lnot:1;
 
@@ -80,7 +84,7 @@ public:
     } u1;
 
 public:
-    RefineCTX()
+    RefineCtx()
     {
         RC_refine_div_const(*this) = true;
         RC_refine_mul_const(*this) = true;
@@ -95,6 +99,23 @@ public:
 
         RC_stmt_removed(*this) = false;
         RC_hoist_to_lnot(*this) = true;
+    }
+
+    void setUnOptFlag()
+    {
+        RC_refine_div_const(*this) = false;
+        RC_refine_mul_const(*this) = false;
+        RC_refine_stmt(*this) = false;
+        RC_do_fold_const(*this) = false;
+
+        if (g_do_refine_auto_insert_cvt) {
+            RC_insert_cvt(*this) = true;
+        } else {
+            RC_insert_cvt(*this) = false;
+        }
+
+        RC_stmt_removed(*this) = false;
+        RC_hoist_to_lnot(*this) = false;
     }
 };
 

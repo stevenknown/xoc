@@ -39,10 +39,11 @@ namespace xoc {
 class Region;
 
 //Describe debug information.
-#define DBX_lineno(d)            (d)->lineno
+//Note line number can not be 0.
+#define DBX_lineno(d)   ((d)->lineno)
 class Dbx {
 public:
-    UINT lineno;
+    UINT lineno; //Note line number can not be 0.
 
 public:
     void clean() { lineno = 0; }
@@ -53,15 +54,23 @@ public:
 class DbxMgr {
 public:
     virtual ~DbxMgr() {}
-    virtual void printSrcLine(IR const*) {}
+
+    //Do some prepare work before print source file.
+    virtual void doPrepareWorkBeforePrint() {}
+
+    virtual void printSrcLine(IR const*);
+    virtual void printSrcLine(Dbx const&) {} //Taget Dependent Code
 };
 
-extern DbxMgr * g_dbg_mgr;
+
+//User need to initialize DbxMgr before compilation.
+extern DbxMgr * g_dbx_mgr;
 
 //Copy Dbx from src.
-void copyDbx(IR * tgt, IR const* src, Region * ru);
-void set_lineno(IR * ir, UINT lineno, Region * ru);
+void copyDbx(IR * tgt, IR const* src, Region * rg);
+void set_lineno(IR * ir, UINT lineno, Region * rg);
 UINT get_lineno(IR const* ir);
+UINT get_lineno(Dbx const& dbx);
 Dbx * get_dbx(IR const* ir);
 
 } //namespace xoc

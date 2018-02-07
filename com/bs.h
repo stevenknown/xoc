@@ -36,10 +36,10 @@ author: Su Zhenyu
 
 namespace xcom {
 
-#define BS_ZERO            0
+#define BS_ZERO           0
 #define BS_DUMP_BITSET    1
-#define BS_DUMP_POS        2
-#define BITS_PER_BYTE    8
+#define BS_DUMP_POS       2
+#define BITS_PER_BYTE     8
 #define BYTES_PER_UINT    4
 
 class BitSet;
@@ -104,7 +104,7 @@ public:
     void copy(BitSet const& src);
     void clean();
     UINT count_mem() const { return get_byte_size() + sizeof(BitSet); }
-    void complement(IN BitSet const& univers);
+    void complement(BitSet const& univers);
 
     void diff(UINT elem);
     void diff(BitSet const& bs);
@@ -143,7 +143,7 @@ class ROBitSet : public BitSet {
 public:
     ROBitSet(BYTE const* vec, UINT veclen) : BitSet(0) { init(vec, veclen); }
     COPY_CONSTRUCTOR(ROBitSet);
-    ~ROBitSet() {}
+    ~ROBitSet() { m_ptr = NULL; m_size = 0; }
 
     void init(BYTE const* vec, UINT veclen)
     {
@@ -170,7 +170,7 @@ public:
     void diff(BitSet const& bs);
     void copy(BitSet const& src);
     void clean();
-    void complement(IN BitSet const& univers);
+    void complement(BitSet const& univers);
     void alloc(UINT size);
     void bunion(BitSet const& bs);
     void bunion(UINT elem);
@@ -186,10 +186,10 @@ protected:
 
     inline void * xmalloc(size_t size)
     {
-        ASSERT(m_pool, ("List not yet initialized."));
+        ASSERT(m_pool, ("not yet initialized."));
         void * p = smpoolMallocConstSize(size, m_pool);
         ASSERT(p, ("malloc failed"));
-        memset(p, 0, size);
+        ::memset(p, 0, size);
         return p;
     }
 public:
@@ -381,13 +381,13 @@ public:
     }
 
     //Get number of elements in vector.
-    inline UINT get_elem_count() const
+    UINT get_elem_count() const
     {
         ASSERT(Vector<T>::m_is_init, ("VECTOR not yet initialized."));
         return m_bs.get_elem_count();
     }
 
-    inline BitSet * get_bs() { return &m_bs; }
+    BitSet * get_bs() { return &m_bs; }
 
     inline void set(UINT i, T elem)
     {
@@ -469,7 +469,7 @@ public:
             lst.get_head(&ct);
             UINT i;
             for (i = 0; i < n; i++, lst.get_next(&ct)) {
-                if (c >= C_val(ct)) {
+                if (c >= ct->val()) {
                     lst.insert_before(c, ct);
                     break;
                 }
@@ -521,9 +521,9 @@ public:
         init();
     }
 
-    UINT count_mem()
+    size_t count_mem()
     {
-        UINT count = smpoolGetPoolSize(m_pool);
+        size_t count = smpoolGetPoolSize(m_pool);
         for (SC<BSVec<T>*> * ct = m_bs_list.get_head();
              ct != m_bs_list.end(); ct = m_bs_list.get_next(ct)) {
             BSVec<T> * bs = ct->val();
@@ -548,14 +548,14 @@ extern inline BitSet * bs_create(BitSetMgr & bs_mgr)
 {
     return bs_mgr.create();
 }
-extern BitSet * bs_union(IN BitSet const& set1,
-                         IN BitSet const& set2,
+extern BitSet * bs_union(BitSet const& set1,
+                         BitSet const& set2,
                          OUT BitSet & res);
-extern BitSet * bs_diff(IN BitSet const& set1,
-                        IN BitSet const& set2,
+extern BitSet * bs_diff(BitSet const& set1,
+                        BitSet const& set2,
                         OUT BitSet & res);
-extern BitSet * bs_intersect(IN BitSet const& set1,
-                             IN BitSet const& set2,
+extern BitSet * bs_intersect(BitSet const& set1,
+                             BitSet const& set2,
                              OUT BitSet & res);
 } //namespace xcom
 #endif

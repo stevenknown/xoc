@@ -1,3 +1,36 @@
+/*@
+XOC Release License
+
+Copyright (c) 2013-2014, Alibaba Group, All rights reserved.
+
+    compiler@aliexpress.com
+
+Redistribution and use in source and binary forms, with or without
+modification, are permitted provided that the following conditions are met:
+
+    * Redistributions of source code must retain the above copyright
+      notice, this list of conditions and the following disclaimer.
+    * Redistributions in binary form must reproduce the above copyright
+      notice, this list of conditions and the following disclaimer in the
+      documentation and/or other materials provided with the distribution.
+    * Neither the name of the Su Zhenyu nor the names of its contributors
+      may be used to endorse or promote products derived from this software
+      without specific prior written permission.
+
+THIS SOFTWARE IS PROVIDED "AS IS" AND ANY EXPRESS OR IMPLIED
+WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES
+OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS
+BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT
+OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR
+BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY,
+WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR
+OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN
+IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+author: GongKai, JinYue, Su Zhenyu
+@*/
 #include <stdio.h>
 #include <malloc.h>
 #include <stdlib.h>
@@ -7,28 +40,22 @@
 #include "libdex/CmdUtils.h"
 #include "liropcode.h"
 #include "str/cstr.h"
-#include "d2d_l2d.h"
-#include "d2d_d2l.h"
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <fcntl.h>
-
+#include "lir.h"
+#include "d2d_comm.h"
+#include "d2d_l2d.h"
+#include "d2d_d2l.h"
 #include "cominc.h"
 #include "comopt.h"
 #include "xassert.h"
 #include "io/cio.h"
-#include "d2d_comm.h"
-#include "dx_mgr.h"
-#include "aoc_dx_mgr.h"
-#include "prdf.h"
 #include "dex.h"
 #include "gra.h"
+#include "dex_hook.h"
 #include "dex_util.h"
-#include "dex2ir.h"
-#include "ir2dex.h"
-#include "d2d_l2d.h"
-#include "dex_driver.h"
-#include "lir.h"
+#include "drcode.h"
 
 UInt32 gdb_compute_dataSize(D2Dpool* pool)
 {
@@ -223,7 +250,7 @@ static void convertClassData(
 static D2Dpool* poolInfoInit()
 {
     D2Dpool* pool = (D2Dpool*)malloc(sizeof(D2Dpool));
-    memset(pool, 0, sizeof(D2Dpool));
+    ::memset(pool, 0, sizeof(D2Dpool));
 
     pool->classDataCbs = cbsInitialize(0);
     pool->lbs = cbsInitialize(0);
@@ -263,7 +290,7 @@ static Int32 writeToFile(D2Dpool* pool, int outFd, long* fileLen, bool ifOpt)
     if (ifOpt) {
         UInt32 optSize = sizeof(DexOptHeader);
         char buff[optSize];
-        memset(buff, 0xff, optSize);
+        ::memset(buff, 0xff, optSize);
         cIOWrite(outFd, buff, optSize);
     }
 
@@ -292,7 +319,7 @@ static void createHeader(DexFile* pDexFile, D2Dpool* pool)
 {
     const DexHeader* header = pDexFile->pHeader;
     BYTE signatur[20];
-    memset(signatur, 0, sizeof(BYTE)*20);
+    ::memset(signatur, 0, sizeof(BYTE)*20);
     int ENDIAN_CONSTANT = 0x12345678;
 
     ASSERT0(pool->currentSize == 0);
@@ -366,7 +393,7 @@ static void copyIdItem(DexFile* pDexFile, D2Dpool* pool)
     UInt32 copySize;
     void* data;
 
-    /*string id*/
+    //string id
     copySize = pDexFile->pHeader->stringIdsSize * sizeof(DexStringId);
     // If id size is zero, do not copy and asset.
     if (copySize > 0) {
@@ -778,14 +805,33 @@ static void copyClassData(D2Dpool* pool)
     return;
 }
 
-static void processClass(DexFile* pDexFile, D2Dpool* pool)
+
+static void dumpGR(Region * r, char const* dexfilename)
+{
+    g_indent = 0;
+    r->dump(true);
+    ASSERT0(dexfilename);
+    xcom::StrBuf b(64);
+    b.strcat(dexfilename);
+    b.strcat(".gr");
+    UNLINK(b.buf);
+    FILE * gr = fopen(b.buf, "a");
+    FILE * oldvalue = g_tfile;
+    g_tfile = gr;
+    r->dumpGR(true);
+    fclose(gr);
+    g_tfile = oldvalue; 
+}
+
+
+static void processClass(DexFile* pDexFile, D2Dpool* pool, char const* dexfilename)
 {
     const DexClassDef* pDexClassDef;
     UInt32 clsNumber = pDexFile->pHeader->classDefsSize;
 
     ASSERT0(pool->currentSize == cbsGetSize(pool->lbs));
     DexClassDef nDexCd;
-    memset(&nDexCd, 0, sizeof(DexClassDef));
+    ::memset(&nDexCd, 0, sizeof(DexClassDef));
 
     pool->codeItemOff = pool->currentSize;
     UInt32 size = 0;
@@ -798,13 +844,14 @@ static void processClass(DexFile* pDexFile, D2Dpool* pool)
         rumgr = new DexRegionMgr();
         rumgr->initVarMgr();
         rumgr->init();
-        topru = rumgr->newRegion(RU_PROGRAM);
-        rumgr->set_region(topru);
-          topru->set_ru_var(rumgr->get_var_mgr()->registerVar(
-                           ".dex",
-                           rumgr->get_type_mgr()->getMCType(0),
-                           0,
-                           VAR_GLOBAL|VAR_FAKE));
+        topru = rumgr->newRegion(REGION_PROGRAM);
+        rumgr->addToRegionTab(topru);
+            topru->setRegionVar(rumgr->getVarMgr()->registerVar(
+                ".dex",
+                rumgr->getTypeMgr()->getMCType(0),
+                0,
+                VAR_GLOBAL|VAR_FAKE));
+        rumgr->addBuiltinVarToTab();
     }
 
     for (UInt32 i = 0; i < clsNumber; i++) {
@@ -823,7 +870,14 @@ static void processClass(DexFile* pDexFile, D2Dpool* pool)
     }
 
     if (g_do_ipa) {
-        rumgr->processProgramRegion(topru);
+        OptCtx oc;
+        bool s = rumgr->processProgramRegion(topru, &oc);
+
+        Region * program = ((DexRegionMgr*)rumgr)->getProgramRegion();
+        ASSERT0(program);
+        dumpGR(program, dexfilename);
+
+        ASSERT0(s);
         delete rumgr;
     }
 
@@ -1114,9 +1168,11 @@ static D2Dpool* doCopyAndFixup(DexFile* pDexFile, char const* dexfilename)
     copyDexMiscData(pDexFile, pool);
 
     g_do_dex_ra = false;
+    g_do_expr_tab = false;
+    g_do_cdg = false;
 
     //transform class and write the code item.
-    processClass(pDexFile, pool);
+    processClass(pDexFile, pool, dexfilename);
 
     //copy the annotatais directory item
     //type list info

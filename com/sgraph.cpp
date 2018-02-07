@@ -105,10 +105,10 @@ void Graph::init()
 }
 
 
-/* Reconstruct vertex hash table, and edge hash table with new bucket size.
-'vertex_hash_sz': new vertex table size to be resized.
-'edge_hash_sz': new edge table size to be resized.
-NOTE: mem pool should have been initialized. */
+//Reconstruct vertex hash table, and edge hash table with new bucket size.
+//'vertex_hash_sz': new vertex table size to be resized.
+//'edge_hash_sz': new edge table size to be resized.
+//NOTE: mem pool should have been initialized.
 void Graph::resize(UINT vertex_hash_sz, UINT edge_hash_sz)
 {
     ASSERT0(m_ec_pool);
@@ -129,9 +129,9 @@ void Graph::resize(UINT vertex_hash_sz, UINT edge_hash_sz)
 }
 
 
-UINT Graph::count_mem() const
+size_t Graph::count_mem() const
 {
-    UINT count = 0;
+    size_t count = 0;
     count += sizeof(BYTE);
     count += sizeof(m_edge_hash_size);
     count += sizeof(m_vex_hash_size);
@@ -202,9 +202,9 @@ void Graph::erase()
 }
 
 
-/* Sort vertice by rporder, and update rpo of vertex.
-Record sorted vertex into vlst in incremental order of rpo.
-NOTE: rpo start at 1, and 0 means undefined. */
+//Sort vertice by rporder, and update rpo of vertex.
+//Record sorted vertex into vlst in incremental order of rpo.
+//NOTE: rpo start at 1, and 0 means undefined.
 void Graph::computeRpoNoRecursive(Vertex * root, OUT List<Vertex const*> & vlst)
 {
     ASSERT0(root && is_graph_entry(root));
@@ -248,10 +248,8 @@ bool Graph::clone(Graph const& src)
          srcv != NULL; srcv = src.get_next_vertex(c)) {
         Vertex * v = addVertex(VERTEX_id(srcv));
 
-        /*
-        Calls inherited class method.
-        Vertex info of memory should allocated by inherited class method
-        */
+        //Calls inherited class method.
+        //Vertex info of memory should allocated by inherited class method
         if (VERTEX_info(srcv) != NULL) {
             VERTEX_info(v) = cloneVertexInfo(srcv);
         }
@@ -261,12 +259,10 @@ bool Graph::clone(Graph const& src)
     for (Edge * srce = src.get_first_edge(c);
          srce != NULL; srce = src.get_next_edge(c)) {
         Edge * e = addEdge(VERTEX_id(EDGE_from(srce)),
-                            VERTEX_id(EDGE_to(srce)));
+            VERTEX_id(EDGE_to(srce)));
 
-        /*
-        Calls inherited class method.
-        Edge info of memory should allocated by inherited class method
-        */
+        //Calls inherited class method.
+        //Edge info of memory should allocated by inherited class method
         if (EDGE_info(srce) != NULL) {
             EDGE_info(e) = cloneEdgeInfo(srce);
         }
@@ -369,53 +365,112 @@ void Graph::reverseEdges()
 }
 
 
-/*
-Insert 'newv' between 'v1' and 'v2'.
-e.g: given edge v1->v2, the result is v1->newv->v2.
-Return edge v1->newv, newv->v2.
-*/
-void Graph::insertVertexBetween(IN Vertex * v1, IN Vertex * v2,
-                                  IN Vertex * newv, OUT Edge ** e1,
-                                  OUT Edge ** e2)
+//Insert 'newv' between 'v1' and 'v2'.
+//e.g: given edge v1->v2, the result is v1->newv->v2.
+//Return edge v1->newv, newv->v2.
+void Graph::insertVertexBetween(
+        IN Vertex * v1,
+        IN Vertex * v2,
+        IN Vertex * newv,
+        OUT Edge ** e1,
+        OUT Edge ** e2,
+        bool sort)
 {
     Edge * e = get_edge(v1, v2);
+
+    EdgeC * v2pos_in_list = NULL;
+    EdgeC * v1pos_in_list = NULL;
+    if (sort) {
+        for (EdgeC * ec = VERTEX_out_list(v1); ec != NULL; ec = EC_next(ec)) {
+            if (EDGE_to(EC_edge(ec)) == v2) {
+                break;
+            }
+            v2pos_in_list = ec;
+        }
+
+        for (EdgeC * ec = VERTEX_in_list(v2); ec != NULL; ec = EC_next(ec)) {
+            if (EDGE_from(EC_edge(ec)) == v1) {
+                break;
+            }
+            v1pos_in_list = ec;
+        }
+    }
+
+    ASSERT(e, ("no edge in bewteen %d and %d", VERTEX_id(v1), VERTEX_id(v2)));
     removeEdge(e);
     Edge * tmpe1 = addEdge(v1, newv);
     Edge * tmpe2 = addEdge(newv, v2);
-    if (e1 != NULL) *e1 = tmpe1;
-    if (e2 != NULL) *e2 = tmpe2;
+    if (e1 != NULL) { *e1 = tmpe1; }
+    if (e2 != NULL) { *e2 = tmpe2; }
+
+    if (!sort) { return; }
+
+    EdgeC * tmpe1_ec = NULL;
+    for (EdgeC * ec = VERTEX_out_list(v1); ec != NULL; ec = EC_next(ec)) {
+        if (EC_edge(ec) == tmpe1) {
+            tmpe1_ec = ec;
+            break;
+        }
+    }
+    ASSERT0(tmpe1_ec);
+
+    EdgeC * tmpe2_ec = NULL;
+    for (EdgeC * ec = VERTEX_in_list(v2); ec != NULL; ec = EC_next(ec)) {
+        if (EC_edge(ec) == tmpe2) {
+            tmpe2_ec = ec;
+            break;
+        }
+    }
+    ASSERT0(tmpe2_ec);
+
+    xcom::remove(&VERTEX_out_list(v1), tmpe1_ec);
+    if (v2pos_in_list == NULL) {
+        xcom::append_head(&VERTEX_out_list(v1), tmpe1_ec);
+    } else {
+        xcom::insertafter_one(&v2pos_in_list, tmpe1_ec);
+    }
+
+    xcom::remove(&VERTEX_in_list(v2), tmpe2_ec);
+    if (v1pos_in_list == NULL) {
+        xcom::append_head(&VERTEX_in_list(v2), tmpe2_ec);
+    } else {
+        xcom::insertafter_one(&v1pos_in_list, tmpe2_ec);
+    }
 }
 
 
-/*
-Insert 'newv' between 'v1' and 'v2'.
-e.g: given edge v1->v2, the result is v1->newv->v2.
-Return edge v1->newv, newv->v2.
-
-NOTICE: newv must be node in graph.
-*/
-void Graph::insertVertexBetween(UINT v1, UINT v2, UINT newv,
-                                OUT Edge ** e1, OUT Edge ** e2)
+//Insert 'newv' between 'v1' and 'v2'.
+//e.g: given edge v1->v2, the result is v1->newv->v2.
+//Return edge v1->newv, newv->v2.
+//
+//NOTICE: newv must be node in graph.
+void Graph::insertVertexBetween(
+        UINT v1,
+        UINT v2,
+        UINT newv,
+        OUT Edge ** e1,
+        OUT Edge ** e2,
+        bool sort)
 {
     Vertex * pv1 = get_vertex(v1);
     Vertex * pv2 = get_vertex(v2);
     Vertex * pnewv = get_vertex(newv);
-    ASSERT0(pv1 != NULL && pv2 != NULL && pnewv != NULL);
-    insertVertexBetween(pv1, pv2, pnewv, e1, e2);
+    ASSERT0(pv1 && pv2 && pnewv);
+    insertVertexBetween(pv1, pv2, pnewv, e1, e2, sort);
 }
 
 
 Edge * Graph::removeEdge(Edge * e)
 {
     ASSERT(m_ec_pool != NULL, ("not yet initialized."));
-    if (e == NULL) return NULL;
+    if (e == NULL) { return NULL; }
     Vertex * from = EDGE_from(e);
     Vertex * to = EDGE_to(e);
 
     //remove out of out-list of 'from'
     EdgeC * el = VERTEX_out_list(from);
     while (el != NULL) {
-        if (EC_edge(el) == e) {    break; }
+        if (EC_edge(el) == e) { break; }
         el = EC_next(el);
     }
     ASSERT(el != NULL, ("can not find out-edge, it is illegal graph"));
@@ -425,7 +480,7 @@ Edge * Graph::removeEdge(Edge * e)
     //remove out of in-list of 'to'
     el = VERTEX_in_list(to);
     while (el != NULL) {
-        if (EC_edge(el) == e) break;
+        if (EC_edge(el) == e) { break; }
         el = EC_next(el);
     }
     ASSERT(el != NULL, ("can not find in-edge, it is illegal graph"));
@@ -467,13 +522,11 @@ Vertex * Graph::removeVertex(Vertex * vex)
 }
 
 
-/*
-Return all neighbors of 'vid' on graph.
-Return false if 'vid' is not on graph.
-
-'ni_list': record the neighbours of 'vid'.
-    Note that this function ensure each neighbours in ni_list is unique.
-*/
+//Return all neighbors of 'vid' on graph.
+//Return false if 'vid' is not on graph.
+//
+//'ni_list': record the neighbours of 'vid'.
+//    Note that this function ensure each neighbours in ni_list is unique.
 bool Graph::get_neighbor_list(OUT List<UINT> & ni_list, UINT vid) const
 {
     ASSERT(m_ec_pool != NULL, ("not yet initialized."));
@@ -590,13 +643,13 @@ Edge * Graph::get_edge(Vertex const* from, Vertex const* to) const
     }
 
     if (!m_is_direction) {
-        EdgeC * el = VERTEX_out_list(to);
-        while (el != NULL) {
-            Edge * e = EC_edge(el);
+        EdgeC * el2 = VERTEX_out_list(to);
+        while (el2 != NULL) {
+            Edge * e = EC_edge(el2);
             if (EDGE_from(e) == to && EDGE_to(e) == from) {
                 return e;
             }
-            el = EC_next(el);
+            el2 = EC_next(el2);
         }
     }
     return NULL;
@@ -688,17 +741,15 @@ bool Graph::is_reachable(Vertex * from, Vertex * to) const
 }
 
 
-/*
-Sort graph vertices in topological order.
-'vex_vec': record nodes with topological sort.
-NOTE: current graph will be empty at function return.
-    If one need to keep the graph unchanged, clone graph
-    as a tmpgraph and operate on the tmpgraph.
-    e.g: Graph org;
-        And org must be unchanged,
-        Graph tmp(org);
-        tmp.sortInToplogOrder(...)
-*/
+//Sort graph vertices in topological order.
+//'vex_vec': record nodes with topological sort.
+//NOTE: current graph will be empty at function return.
+//    If one need to keep the graph unchanged, clone graph
+//    as a tmpgraph and operate on the tmpgraph.
+//    e.g: Graph org;
+//        And org must be unchanged,
+//        Graph tmp(org);
+//        tmp.sortInToplogOrder(...)
 bool Graph::sortInToplogOrder(OUT Vector<UINT> & vex_vec, bool is_topdown)
 {
     ASSERT(m_ec_pool != NULL, ("Graph still not yet initialize."));
@@ -764,29 +815,27 @@ void Graph::removeEdgeBetween(Vertex * v1, Vertex * v2)
 }
 
 
-/*
-Remove transitive edge.
-e.g: Given edges of G, there are v1->v2->v3, v1->v3, then v1->v3 named
-transitive edge.
-
-Algo:
-    INPUT: Graph with N edges.
-    1. Sort vertices in topological order.
-    2. Associate each edges with indicator respective,
-       and recording them in one matrix(N*N)
-        e.g: e1:v0->v2, e2:v1->v2, e3:v0->v1
-              0   1    2
-            0 --  e3   e1
-            1 --  --   e2
-            2 --  --   --
-
-    3. Scan vertices according to toplogical order,
-       remove all edges which the target-node has been
-       marked at else rows.
-        e.g: There are dependence edges: v0->v1, v0->v2.
-         If v1->v2 has been marked, we said v0->v2 is removable,
-         and the same goes for the rest of edges.
-*/
+//Remove transitive edge.
+//e.g: Given edges of G, there are v1->v2->v3, v1->v3, then v1->v3 named
+//transitive edge.
+//
+//Algo:
+//    INPUT: Graph with N edges.
+//    1. Sort vertices in topological order.
+//    2. Associate each edges with indicator respective,
+//       and recording them in one matrix(N*N)
+//        e.g: e1:v0->v2, e2:v1->v2, e3:v0->v1
+//              0   1    2
+//            0 --  e3   e1
+//            1 --  --   e2
+//            2 --  --   --
+//
+//    3. Scan vertices according to toplogical order,
+//       remove all edges which the target-node has been
+//       marked at else rows.
+//        e.g: There are dependence edges: v0->v1, v0->v2.
+//         If v1->v2 has been marked, we said v0->v2 is removable,
+//         and the same goes for the rest of edges.
 void Graph::removeTransitiveEdge()
 {
     BitSetMgr bs_mgr;
@@ -855,7 +904,7 @@ void Graph::dump_dot(CHAR const* name)
     if (name == NULL) {
         name = "graph.dot";
     }
-    unlink(name);
+    UNLINK(name);
     FILE * h = fopen(name, "a+");
     ASSERT(h, ("%s create failed!!!", name));
 
@@ -887,7 +936,7 @@ void Graph::dump_vcg(CHAR const* name)
     if (name == NULL) {
         name = "graph.vcg";
     }
-    unlink(name);
+    UNLINK(name);
     FILE * h = fopen(name, "a+");
     ASSERT(h, ("%s create failed!!!",name));
     fprintf(h, "graph: {"
@@ -976,12 +1025,12 @@ bool DGraph::cloneDomAndPdom(DGraph const& src)
         Vertex * tgtv = get_vertex(src_vid);
         ASSERT0(tgtv != NULL);
 
-        BitSet * set = src.get_dom_set_c(VERTEX_id(srcv));
+        BitSet const* set = src.read_dom_set(VERTEX_id(srcv));
         if (set != NULL) {
             get_dom_set(tgtv)->copy(*set);
         }
 
-        set = src.get_pdom_set_c(VERTEX_id(srcv));
+        set = src.read_pdom_set(VERTEX_id(srcv));
         if (set != NULL) {
             get_pdom_set(tgtv)->copy(*set);
         }
@@ -992,7 +1041,7 @@ bool DGraph::cloneDomAndPdom(DGraph const& src)
 }
 
 
-UINT DGraph::count_mem() const
+size_t DGraph::count_mem() const
 {
     UINT count = 0;
     count += m_dom_set.count_mem();
@@ -1004,11 +1053,11 @@ UINT DGraph::count_mem() const
 }
 
 
-/* Vertices should have been sorted in topological order.
-And we access them by reverse-topological order.
-'vlst': compute dominator for vertices in vlst if it
-    is not empty or else compute all graph.
-'uni': universe. */
+//Vertices should have been sorted in topological order.
+//And we access them by reverse-topological order.
+//'vlst': compute dominator for vertices in vlst if it
+//    is not empty or else compute all graph.
+//'uni': universe.
 bool DGraph::computeDom(List<Vertex const*> const* vlst, BitSet const* uni)
 {
     List<Vertex const*> tmpvlst;
@@ -1061,10 +1110,10 @@ bool DGraph::computeDom(List<Vertex const*> const* vlst, BitSet const* uni)
     while (change && count < 10) {
         count++;
         change = false;
-        C<Vertex const*> * ct;
-        for (pvlst->get_head(&ct);
-             ct != pvlst->end(); ct = pvlst->get_next(ct)) {
-            Vertex const* v = ct->val();
+        C<Vertex const*> * ct2;
+        for (pvlst->get_head(&ct2);
+             ct2 != pvlst->end(); ct2 = pvlst->get_next(ct2)) {
+            Vertex const* v = ct2->val();
             ASSERT0(v);
             UINT vid = VERTEX_id(v);
             if (is_graph_entry(v)) {
@@ -1100,14 +1149,14 @@ bool DGraph::computeDom(List<Vertex const*> const* vlst, BitSet const* uni)
 }
 
 
-/* Vertices should have been sorted in topological order.
-And we access them by reverse-topological order.
-'vlst': compute dominator for vertices in vlst if it
-    is not empty or else compute all graph.
-'uni': universe. */
+//Vertices should have been sorted in topological order.
+//And we access them by reverse-topological order.
+//'vlst': compute dominator for vertices in vlst if it
+//    is not empty or else compute all graph.
+//'uni': universe.
 bool DGraph::computeDom3(List<Vertex const*> const* vlst, BitSet const* uni)
 {
-    UNUSED(uni);
+    DUMMYUSE(uni);
     List<Vertex const*> tmpvlst;
     List<Vertex const*> * pvlst = &tmpvlst;
     if (vlst != NULL) {
@@ -1143,10 +1192,10 @@ bool DGraph::computeDom3(List<Vertex const*> const* vlst, BitSet const* uni)
     while (change && count < 10) {
         count++;
         change = false;
-        C<Vertex const*> * ct;
-        for (pvlst->get_head(&ct);
-             ct != pvlst->end(); ct = pvlst->get_next(ct)) {
-            Vertex const* v = ct->val();
+        C<Vertex const*> * ct2;
+        for (pvlst->get_head(&ct2);
+             ct2 != pvlst->end(); ct2 = pvlst->get_next(ct2)) {
+            Vertex const* v = ct2->val();
             ASSERT0(v);
             UINT vid = VERTEX_id(v);
             if (is_graph_entry(v)) {
@@ -1188,12 +1237,12 @@ bool DGraph::computeDom3(List<Vertex const*> const* vlst, BitSet const* uni)
 }
 
 
-/* Compute post-dominator according to rpo.
-root: root node of graph.
-uni: universe.
-Note you should use this function carefully, it may be expensive, because that
-the function does not check if RPO is available, namely, it will always
-compute the RPO. */
+//Compute post-dominator according to rpo.
+//root: root node of graph.
+//uni: universe.
+//Note you should use this function carefully, it may be expensive, because that
+//the function does not check if RPO is available, namely, it will always
+//compute the RPO.
 bool DGraph::computePdomByRpo(Vertex * root, BitSet const* uni)
 {
     List<Vertex const*> vlst;
@@ -1206,7 +1255,7 @@ bool DGraph::computePdomByRpo(Vertex * root, BitSet const* uni)
     } else {
         res = computePdom(&vlst, uni);
     }
-    CK_USE(res);
+    CHECK_DUMMYUSE(res);
     return true;
 }
 
@@ -1227,10 +1276,10 @@ bool DGraph::computePdom(List<Vertex const*> const* vlst)
 }
 
 
-/* Vertices should have been sorted in topological order.
-And we access them by reverse-topological order.
-vlst: vertex list.
-uni: universe. */
+//Vertices should have been sorted in topological order.
+//And we access them by reverse-topological order.
+//vlst: vertex list.
+//uni: universe.
 bool DGraph::computePdom(List<Vertex const*> const* vlst, BitSet const* uni)
 {
     ASSERT0(vlst && uni);
@@ -1257,9 +1306,10 @@ bool DGraph::computePdom(List<Vertex const*> const* vlst, BitSet const* uni)
     while (change && count < 10) {
         count++;
         change = false;
-        C<Vertex const*> * ct;
-        for (vlst->get_head(&ct); ct != vlst->end(); ct = vlst->get_next(ct)) {
-            Vertex const* v = ct->val();
+        C<Vertex const*> * ct2;
+        for (vlst->get_head(&ct2);
+             ct2 != vlst->end(); ct2 = vlst->get_next(ct2)) {
+            Vertex const* v = ct2->val();
             ASSERT0(v);
             UINT vid = VERTEX_id(v);
             if (is_graph_exit(v)) {
@@ -1321,14 +1371,13 @@ bool DGraph::computeDom2(List<Vertex const*> const& vlst)
 }
 
 
-/* Vertices should have been sorted in rpo.
-'vlst': a list of vertex which sort in rpo order.
-
-NOTE:
-    1. The root node has better to be the first one in 'vlst'.
-    2. Do not use '0' as vertex id, it is used as Undefined.
-    3. Entry does not have idom.
-*/
+//Vertices should have been sorted in rpo.
+//'vlst': a list of vertex which sort in rpo order.
+//
+//NOTE:
+//    1. The root node has better to be the first one in 'vlst'.
+//    2. Do not use '0' as vertex id, it is used as Undefined.
+//    3. Entry does not have idom.
 bool DGraph::computeIdom2(List<Vertex const*> const& vlst)
 {
     bool change = true;
@@ -1555,9 +1604,9 @@ void DGraph::get_pdom_tree(OUT Graph & pdom)
 }
 
 
-/* Dump dom set, pdom set, idom, ipdom.
-'dump_dom_tree': set to be true to dump dominate
-    tree, and post dominate Tree. */
+//Dump dom set, pdom set, idom, ipdom.
+//'dump_dom_tree': set to be true to dump dominate
+//  tree, and post dominate Tree.
 void DGraph::dump_dom(FILE * h, bool dump_dom_tree)
 {
     if (h == NULL) return;
@@ -1616,8 +1665,7 @@ void DGraph::dump_dom(FILE * h, bool dump_dom_tree)
 }
 
 
-void DGraph::sortDomTreeInPreorder(IN Vertex * root,
-                                    OUT List<Vertex*> & lst)
+void DGraph::sortDomTreeInPreorder(IN Vertex * root, OUT List<Vertex*> & lst)
 {
     ASSERT0(root);
     BitSet is_visited;
@@ -1651,14 +1699,13 @@ void DGraph::sortDomTreeInPreorder(IN Vertex * root,
 }
 
 
-/*
-'order_buf': record the bfs-order for each vertex.
-
-NOTE: BFS does NOT keep the sequence if you are going to
-access vertex in lexicographic order.
-*/
-void DGraph::sortInBfsOrder(Vector<UINT> & order_buf, Vertex * root,
-                               BitSet & visit)
+//'order_buf': record the bfs-order for each vertex.
+//NOTE: BFS does NOT keep the sequence if you are going to
+//access vertex in lexicographic order.
+void DGraph::sortInBfsOrder(
+        Vector<UINT> & order_buf,
+        Vertex * root,
+        BitSet & visit)
 {
     List<Vertex*> worklst;
     worklst.append_tail(root);
@@ -1682,8 +1729,7 @@ void DGraph::sortInBfsOrder(Vector<UINT> & order_buf, Vertex * root,
 }
 
 
-void DGraph::sortDomTreeInPostrder(IN Vertex * root,
-                                        OUT List<Vertex*> & lst)
+void DGraph::sortDomTreeInPostrder(IN Vertex * root, OUT List<Vertex*> & lst)
 {
     ASSERT0(root);
     BitSet is_visited;

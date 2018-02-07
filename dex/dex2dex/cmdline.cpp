@@ -45,6 +45,9 @@ author: Su Zhenyu
 INT g_source_file_handler = 0;
 CHAR const* g_dex_file_path = NULL;
 INT g_output_file_handler = 0;
+
+//Set true to disable all auxiliary informations which will output to stdout.
+bool g_silence = false;
 static CHAR const* g_version = "0.9.2";
 
 static void usage()
@@ -55,6 +58,7 @@ static void usage()
             "\nOptions: "
             "\n  -o <file>       refer to output dex file path"
             "\n  -dump <file>    refer to dump file path"
+            "\n  -silence        if it is set, dexpro will not display any auxiliary informations to screen"
             "\n", g_version);
 }
 
@@ -75,7 +79,7 @@ static bool is_dex_source_file(CHAR const* fn)
 }
 
 
-static bool process_dump(UINT argc, CHAR const* argv[], IN OUT UINT & i)
+static bool create_dump_file(UINT argc, CHAR const* argv[], IN OUT UINT & i)
 {
     CHAR const* dumpfile = NULL;
     if (i + 1 < argc && argv[i + 1] != NULL) {
@@ -84,8 +88,32 @@ static bool process_dump(UINT argc, CHAR const* argv[], IN OUT UINT & i)
     i += 2;
     if (dumpfile == NULL) { return false; }
 
-    initdump(dumpfile, false);
+    xoc::initdump(dumpfile, false);
     return true;
+}
+
+
+//Return true if command line is valid, otherwise return false.
+static bool process_prefix_dump(UINT argc, CHAR const* argv[], IN OUT UINT & i)
+{
+    if (strcmp(argv[i], "-dump") == 0) {
+        return create_dump_file(argc, argv, i);
+    }
+
+    return false;
+}
+
+
+//Return true if command line is valid, otherwise return false.
+static bool process_silence(UINT argc, CHAR const* argv[], IN OUT UINT & i)
+{
+    if (strcmp(argv[i], "-silence") == 0) {
+        g_silence = true;
+        i += 1;
+        return true;
+    }
+
+    return false;
 }
 
 
@@ -121,8 +149,13 @@ bool processCommandLine(UINT argc, CHAR const* argv[])
                     usage();
                     return false;
                 }
-            } else if (strcmp(cmdstr, "dump") == 0) {
-                if (!process_dump(argc, argv, i)) {
+            } else if (strcmp(cmdstr, "silence") == 0) {
+                if (!process_silence(argc, argv, i)) {
+                    usage();
+                    return false;
+                }
+            } else if (strncmp(cmdstr, "dump", 4) == 0) {
+                if (!process_prefix_dump(argc, argv, i)) {
                     usage();
                     return false;
                 }

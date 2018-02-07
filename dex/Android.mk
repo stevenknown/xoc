@@ -12,6 +12,7 @@ X_INCLUDE_FILES := \
     ${LOCAL_PATH}/lir \
     ${LOCAL_PATH}/linealloc \
     ${LOCAL_PATH}/../com \
+    ${LOCAL_PATH}/../reader \
     ${LOCAL_PATH}/../opt
 
 
@@ -58,6 +59,7 @@ X_SRC_FILES:= \
     linealloc/*.cpp\
     lir/*.cpp\
     ../opt/*.cpp\
+    ../reader/*.cpp\
     ../com/*.cpp
 
 LOCAL_CFLAGS += $(X_LOCAL_CFLAGS)
@@ -89,6 +91,7 @@ X_SRC_FILES:= \
     linealloc/*.cpp\
     lir/*.cpp\
     ../opt/*.cpp\
+    ../reader/*.cpp\
     ../com/*.cpp\
     *.cpp
 

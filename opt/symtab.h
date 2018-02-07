@@ -45,6 +45,60 @@ public:
 };
 
 
+class CompareStringFunc {
+public:
+    bool is_less(CHAR const* t1, CHAR const* t2) const
+    { return ::strcmp(t1, t2) < 0; }
+
+    bool is_equ(CHAR const* t1, CHAR const* t2) const
+    { return ::strcmp(t1, t2) == 0; }
+    
+    CHAR const* createKey(CHAR const* t) { return t; }
+};
+
+
+class SymbolHashFunc {
+public:
+    UINT computeCharSum(CHAR const* s) const
+    {
+        UINT v = 0;
+        UINT cnt = 0;
+        while ((*s++ != 0) && (cnt < 20)) {
+            v += (UINT)(*s);
+            cnt++;
+        }
+        return v;
+    }
+
+    UINT get_hash_value(SYM const* s, UINT bs) const
+    {
+        ASSERT0(isPowerOf2(bs));
+        UINT v = computeCharSum(SYM_name(s));
+        return hash32bit(v) & (bs - 1);
+    }
+
+    //Note v must be string pointer.
+    UINT get_hash_value(OBJTY v, UINT bs) const
+    {
+        ASSERT_DUMMYUSE(sizeof(OBJTY) == sizeof(CHAR*),
+            ("exception will taken place in type-cast"));
+        ASSERT0(isPowerOf2(bs));
+        UINT n = computeCharSum((CHAR*)v);
+        return hash32bit(n) & (bs - 1);
+    }
+
+    bool compare(SYM const* s1, SYM const* s2) const
+    { return strcmp(SYM_name(s1), SYM_name(s2)) == 0; }
+
+    bool compare(SYM const* s, OBJTY val) const
+    {
+        ASSERT_DUMMYUSE(sizeof(OBJTY) == sizeof(CHAR*),
+            ("exception will taken place in type-cast"));
+        return (strcmp(SYM_name(s), (CHAR*)val) == 0);
+    }
+};
+
+
 class ConstSymbolHashFunc {
 public:
     UINT computeCharSum(CHAR const* s) const
@@ -68,7 +122,7 @@ public:
     //Note v must be const string pointer.
     UINT get_hash_value(OBJTY v, UINT bs) const
     {
-        ASSERT(sizeof(OBJTY) == sizeof(CHAR const*),
+        ASSERT_DUMMYUSE(sizeof(OBJTY) == sizeof(CHAR const*),
                 ("exception will taken place in type-cast"));
         ASSERT0(isPowerOf2(bs));
         UINT n = computeCharSum((CHAR const*)v);
@@ -80,71 +134,32 @@ public:
 
     bool compare(SYM const* s, OBJTY val) const
     {
-        ASSERT(sizeof(OBJTY) == sizeof(CHAR const*),
+        ASSERT_DUMMYUSE(sizeof(OBJTY) == sizeof(CHAR const*),
                 ("exception will taken place in type-cast"));
         return (strcmp(SYM_name(s),  (CHAR const*)val) == 0);
     }
 };
 
 
-class SymbolHashFunc {
-public:
-    UINT computeCharSum(CHAR const* s) const
-    {
-        UINT v = 0;
-        UINT cnt = 0;
-        while ((*s++ != 0) && (cnt < 20)) {
-            v += (UINT)(*s);
-            cnt++;
-        }
-        return v;
-    }
-
-    UINT get_hash_value(SYM * s, UINT bs) const
-    {
-        ASSERT0(isPowerOf2(bs));
-        UINT v = computeCharSum(SYM_name(s));
-        return hash32bit(v) & (bs - 1);
-    }
-
-    //Note v must be string pointer.
-    UINT get_hash_value(OBJTY v, UINT bs) const
-    {
-        ASSERT(sizeof(OBJTY) == sizeof(CHAR*),
-                ("exception will taken place in type-cast"));
-        ASSERT0(isPowerOf2(bs));
-        UINT n = computeCharSum((CHAR*)v);
-        return hash32bit(n) & (bs - 1);
-    }
-
-    bool compare(SYM * s1, SYM * s2) const
-    { return strcmp(SYM_name(s1),  SYM_name(s2)) == 0; }
-
-    bool compare(SYM * s, OBJTY val) const
-    {
-        ASSERT(sizeof(OBJTY) == sizeof(CHAR*),
-                ("exception will taken place in type-cast"));
-        return (strcmp(SYM_name(s),  (CHAR*)val) == 0);
-    }
-};
-
-
-class SymTab : public Hash<SYM*, SymbolHashFunc> {
+//
+//START SymTab based on Hash
+//
+class SymTabHash : public Hash<SYM*, SymbolHashFunc> {
     SMemPool * m_pool;
 public:
-    explicit SymTab(UINT bsize) : Hash<SYM*, SymbolHashFunc>(bsize)
+    explicit SymTabHash(UINT bsize) : Hash<SYM*, SymbolHashFunc>(bsize)
     { m_pool = smpoolCreate(64, MEM_COMM); }
-    virtual ~SymTab()
+    virtual ~SymTabHash()
     { smpoolDelete(m_pool); }
 
-    inline CHAR * strdup(CHAR const* s)
+    CHAR * strdup(CHAR const* s)
     {
         if (s == NULL) {
             return NULL;
         }
-        UINT l = strlen(s);
+        size_t l = strlen(s);
         CHAR * ns = (CHAR*)smpoolMalloc(l + 1, m_pool);
-        memcpy(ns, s, l);
+        ::memcpy(ns, s, l);
         ns[l] = 0;
         return ns;
     }
@@ -160,16 +175,69 @@ public:
     //If the string table is not big enough to hold strings, expand it.
     inline SYM * add(CHAR const* s)
     {
-        UINT sz = Hash<SYM*, SymbolHashFunc>::get_bucket_size() * 2;
+        UINT sz = Hash<SYM*, SymbolHashFunc>::get_bucket_size() * 4;
         if (sz < Hash<SYM*, SymbolHashFunc>::get_elem_count()) {
             Hash<SYM*, SymbolHashFunc>::grow(sz);
         }
         return Hash<SYM*, SymbolHashFunc>::append((OBJTY)s);
     }
 
-    inline SYM * get(CHAR const* s)
+    SYM * get(CHAR const* s)
     { return Hash<SYM*, SymbolHashFunc>::find((OBJTY)s); }
 };
+//END SymTabHash
+
+
+//
+//START SymTab based on Map
+//
+class CompareSymTab {
+    CHAR * xstrdup(CHAR const* s)
+    {
+        if (s == NULL) {
+            return NULL;
+        }
+        size_t l = ::strlen(s);
+        CHAR * ns = (CHAR*)smpoolMalloc(l + 1, m_pool);
+        ::memcpy(ns, s, l);
+        ns[l] = 0;
+        return ns;
+    }
+public:
+    SMemPool * m_pool;
+    
+    bool is_less(SYM * t1, SYM * t2) const
+    { return ::strcmp(SYM_name(t1), SYM_name(t2)) < 0; }
+
+    bool is_equ(SYM * t1, SYM * t2) const
+    { return ::strcmp(SYM_name(t1), SYM_name(t2)) == 0; }
+    
+    SYM * createKey(SYM * t)
+    {
+        SYM_name(t) = xstrdup(SYM_name(t));
+        return t;
+    }
+};
+
+
+class SymTab : public TTab<SYM*, CompareSymTab> {
+    SYM * m_free_one;
+    SMemPool * m_pool;
+public:
+    explicit SymTab()
+    {
+        m_pool = smpoolCreate(64, MEM_COMM);
+        m_free_one = NULL;
+        TTab<SYM*, CompareSymTab>::m_ck.m_pool = m_pool;
+        ASSERT0(m_pool);
+        
+    }
+    virtual ~SymTab() { smpoolDelete(m_pool); }
+
+    //Add const string into symbol table.
+    SYM * add(CHAR const* s);
+};
+//END SymTab
 
 } //namespace xoc
 #endif

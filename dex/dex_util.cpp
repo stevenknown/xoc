@@ -34,23 +34,16 @@ author: Su Zhenyu
 #include "libdex/DexFile.h"
 #include "libdex/DexClass.h"
 #include "libdex/DexProto.h"
-
 #include "liropcode.h"
-
-#include "cominc.h"
-#include "comopt.h"
-
+#include "lir.h"
 #include "drAlloc.h"
 #include "d2d_comm.h"
-
+#include "cominc.h"
+#include "comopt.h"
 #include "dex.h"
 #include "gra.h"
-
-#include "dx_mgr.h"
-#include "aoc_dx_mgr.h"
+#include "dex_hook.h"
 #include "dex_util.h"
-#include "dex2ir.h"
-#include "ir2dex.h"
 
 CHAR const* get_dt_name(LIR * ir)
 {
@@ -125,12 +118,12 @@ bool is_builtin(IR const* ir, BLTIN_TYPE bt, DexRegionMgr const* rumgr)
             //The first is a pr that record the number of array elements.
             IR * p = CALL_param_list(ir);
             ASSERT0(p && p->is_pr());
-            p = IR_next(p);
+            p = p->get_next();
 
             //The second is array element type id.
             ASSERT0(p && p->is_const());
             UINT elem_type_id = CONST_int_val(p);
-            ASSERT0(IR_next(p) == NULL);
+            ASSERT0(p->get_next() == NULL);
         }
         break;
     case BLTIN_MOVE_EXP         :
@@ -146,7 +139,7 @@ bool is_builtin(IR const* ir, BLTIN_TYPE bt, DexRegionMgr const* rumgr)
             //the exception object.
             IR * p = CALL_param_list(ir);
             ASSERT0(p->is_pr());
-            ASSERT0(IR_next(p) == NULL);
+            ASSERT0(p->get_next() == NULL);
         }
         break;
     case BLTIN_CHECK_CAST       :
@@ -162,12 +155,12 @@ bool is_builtin(IR const* ir, BLTIN_TYPE bt, DexRegionMgr const* rumgr)
             //The first is a pr that record the object-ptr
             IR * p = CALL_param_list(ir);
             ASSERT0(p && p->is_pr());
-            p = IR_next(p);
+            p = p->get_next();
 
             //The second is class type id.
             ASSERT0(p && p->is_const());
             UINT type_id = CONST_int_val(p);
-            ASSERT0(IR_next(p) == NULL);
+            ASSERT0(p->get_next() == NULL);
         }
         break;
     case BLTIN_FILLED_NEW_ARRAY    :
@@ -188,14 +181,14 @@ bool is_builtin(IR const* ir, BLTIN_TYPE bt, DexRegionMgr const* rumgr)
 
             //The first record invoke flag.
             ASSERT0(p->is_const());
-            p = IR_next(p);
+            p = p->get_next();
 
             //The second record class type id.
             ASSERT0(p && p->is_const());
-            p = IR_next(p);
+            p = p->get_next();
             while (p != NULL) {
                 ASSERT0(p->is_pr());
-                p = IR_next(p);
+                p = p->get_next();
             }
         }
         break;
@@ -213,11 +206,11 @@ bool is_builtin(IR const* ir, BLTIN_TYPE bt, DexRegionMgr const* rumgr)
 
             //The first record array obj-ptr.
             ASSERT0(p->is_pr());
-            p = IR_next(p);
+            p = p->get_next();
 
             //The second record binary data.
             ASSERT0(p && p->is_const());
-            ASSERT0(IR_next(p) == NULL);
+            ASSERT0(p->get_next() == NULL);
         }
         break;
     case BLTIN_CONST_CLASS      :
@@ -266,11 +259,11 @@ bool is_builtin(IR const* ir, BLTIN_TYPE bt, DexRegionMgr const* rumgr)
             IR * p = CALL_param_list(ir);
             //The first is object-ptr reg.
             ASSERT0(p && p->is_pr());
-            p = IR_next(p);
+            p = p->get_next();
 
             //The second is type-id.
             ASSERT0(p->is_const());
-            ASSERT0(IR_next(p) == NULL);
+            ASSERT0(p->get_next() == NULL);
 
             //The first is result reg..
             ASSERT0(ir->hasReturnValue());
@@ -292,18 +285,18 @@ bool is_builtin(IR const* ir, BLTIN_TYPE bt, DexRegionMgr const* rumgr)
             //The first is object-ptr reg.
             RegionMgr * trumgr =
                    const_cast<RegionMgr*>((RegionMgr const*)rumgr);
-            ASSERT0(p && p->is_int(trumgr->get_type_mgr()));
-            p = IR_next(p);
+            ASSERT0(p && p->is_int());
+            p = p->get_next();
 
             ASSERT0(p && p->is_pr());
-            p = IR_next(p);
+            p = p->get_next();
 
             ASSERT0(p && p->is_pr());
-            ASSERT0(IR_next(p) == NULL);
+            ASSERT0(p->get_next() == NULL);
             ASSERT0(ir->hasReturnValue());
         }
         break;
-    default: ASSERT0(0);
+    default: UNREACH();
     }
 #endif
     return true;
@@ -350,7 +343,7 @@ void extractFunctionTypeFromFunctionTypeString(
         } else if (*p == ')') {
             end2 = p;
             UINT s = end2 - start2 - 1;
-            memcpy(param_type, start2 + 1, s);
+            ::memcpy(param_type, start2 + 1, s);
             param_type[s] = 0;
             break;
         }
@@ -359,7 +352,7 @@ void extractFunctionTypeFromFunctionTypeString(
     ASSERT(end2, ("unsupport string pattern"));
 
     UINT s = end - end2;
-    memcpy(return_type, end2 + 1, s);
+    ::memcpy(return_type, end2 + 1, s);
     return_type[s] = 0;
 }
 
@@ -381,13 +374,13 @@ void extractFunctionTypeFromRegionName(
 
     if (classpath != NULL) {
         UINT l = strlen(ret[CLASSPATH_PART]);
-        memcpy(classpath, ret[CLASSPATH_PART], l + 1);
+        ::memcpy(classpath, ret[CLASSPATH_PART], l + 1);
         classpath[l] = 0;
     }
 
     if (functionname != NULL) {
         UINT l = strlen(ret[FUNCNAME_PART]);
-        memcpy(functionname, ret[FUNCNAME_PART], l + 1);
+        ::memcpy(functionname, ret[FUNCNAME_PART], l + 1);
         functionname[l] = 0;
     }
 
@@ -406,7 +399,7 @@ void extractFunctionTypeFromRegionName(
             end = p;
             UINT s = end - start - 1;
             if (param_type != NULL) {
-                memcpy(param_type, start + 1, s);
+                ::memcpy(param_type, start + 1, s);
                 param_type[s] = 0;
             }
             len++;
@@ -416,14 +409,14 @@ void extractFunctionTypeFromRegionName(
 
     ASSERT(end, ("unsupport string pattern"));
 
-    UINT s = strlen(typestr) - len;
+    UINT s = ::strlen(typestr) - len;
     if (return_type != NULL) {
-        memcpy(return_type, typestr + len, s);
+        ::memcpy(return_type, typestr + len, s);
         return_type[s] = 0;
     }
 
     for (UINT i = 0; i < num; i++) {
-        free(ret[i]);
+        ::free(ret[i]);
     }
 }
 
@@ -521,7 +514,7 @@ UINT extractSeparateParamterType(
 
             UINT s = end - start;
             if (outputbuf != NULL) {
-                memcpy(outputbuf, start, s);
+                ::memcpy(outputbuf, start, s);
                 outputbuf[s] = 0;
                 ASSERT0(params);
                 outputbuf = params->get_next();
@@ -694,10 +687,10 @@ void dump_lir2(LIR * lir, DexFile * df, INT pos)
             }
             break;
         default:
-            /* It seems dex does not distinguish
-            float and integer const. And regard float as
-            32bit integer, double will be 64bit integer. */
-            ASSERT0(0);
+            //It seems dex does not distinguish
+            //float and integer const. And regard float as
+            //32bit integer, double will be 64bit integer.
+            UNREACH();
         }
         break;
     case LOP_RETURN:
@@ -716,7 +709,7 @@ void dump_lir2(LIR * lir, DexFile * df, INT pos)
                 fprintf(g_tfile, ", %s", get_dt_name(lir));
                 fprintf(g_tfile, ", (v%d,v%d)", LIR_res(lir), LIR_res(lir) + 1);
                 break;
-            default: ASSERT0(0);
+            default: UNREACH();
             }
         }
         break;
@@ -886,8 +879,7 @@ void dump_lir2(LIR * lir, DexFile * df, INT pos)
             fprintf(g_tfile, ", INT->SHORT");
             fprintf(g_tfile, ", v%d <- v%d", LIR_res(lir), LIR_op0(lir));
             break;
-        default:
-            ASSERT0(0);
+        default: UNREACH();
         }
         break;
     case LOP_ADD_ASSIGN :
@@ -1041,7 +1033,7 @@ void dump_lir2(LIR * lir, DexFile * df, INT pos)
                     LIR_op0(lir), LIR_op0(lir)+1,
                     (UINT)LIR_op1(lir));
             break;
-        default: ASSERT0(0);
+        default: UNREACH();
         }
         break;
     case LOP_ADD       :
@@ -1112,7 +1104,7 @@ void dump_lir2(LIR * lir, DexFile * df, INT pos)
                 //16bit imm
                 fprintf(g_tfile, "(lit16)%d", (INT)LIR_op1(lir));
             } else {
-                ASSERT0(0);
+                UNREACH();
             }
         }
         break;
@@ -1290,7 +1282,7 @@ void dump_lir2(LIR * lir, DexFile * df, INT pos)
             bool is_range = HAVE_FLAG((k & 0xf0), LIR_Range);
             if (is_range) {
                 switch (k & 0x0f) {
-                case LIR_invoke_unknown: ASSERT0(0); break;
+                case LIR_invoke_unknown: UNREACH(); break;
                 case LIR_invoke_virtual:
                     fprintf(g_tfile, ", virtual-range"); break;
                 case LIR_invoke_direct:
@@ -1301,11 +1293,11 @@ void dump_lir2(LIR * lir, DexFile * df, INT pos)
                     fprintf(g_tfile, ", interface-range"); break;
                 case LIR_invoke_static:
                     fprintf(g_tfile, ", static-range"); break;
-                default: ASSERT0(0);
+                default: UNREACH();
                 }
             } else {
                 switch (k & 0x0f) {
-                case LIR_invoke_unknown: ASSERT0(0); break;
+                case LIR_invoke_unknown: UNREACH(); break;
                 case LIR_invoke_virtual:
                     fprintf(g_tfile, ", virtual"); break;
                 case LIR_invoke_direct:
@@ -1316,7 +1308,7 @@ void dump_lir2(LIR * lir, DexFile * df, INT pos)
                     fprintf(g_tfile, ", interface"); break;
                 case LIR_invoke_static:
                     fprintf(g_tfile, ", static"); break;
-                default: ASSERT0(0);
+                default: UNREACH();
                 }
             }
 
@@ -1374,13 +1366,13 @@ void dump_lir2(LIR * lir, DexFile * df, INT pos)
                     LIR_op0(lir),
                     (INT)LIR_op1(lir));
             break;
-        default: ASSERT0(0);
+        default: UNREACH();
         }
         break;
     case LOP_PHI:
-        ASSERT0(0);
+        UNREACH();
         break;
-    default: ASSERT0(0);
+    default: UNREACH();
     } //end switch
     fflush(g_tfile);
 }
@@ -1476,7 +1468,8 @@ CHAR const* get_field_type_name(DexFile const* df, UINT field_id)
 }
 
 
-//Return the class name which 'field_id' was place in.
+//Return the class name which 'field_id' was placed in.
+//field_id: field number in dexfile.
 CHAR const* get_field_class_name(DexFile const* df, UINT field_id)
 {
     DexFieldId const* fid = dexGetFieldId(df, field_id);
@@ -1541,695 +1534,3 @@ void dump_all_class_and_field(DexFile * df)
     }
     fflush(g_tfile);
 }
-
-
-/*
----dex file map-------
-    header!
-    string id!
-    type id!
-    proto id!
-    field id!
-    method id!
-    class def id!
-
-    annotation set ref list
-    annotation set item list !
-
-    code item !
-
-    annotations directory item!
-    type list info!
-    string data item list !
-    debug info!
-    annotation item list !
-    encodearray item list !
-
-    class Data item !
-    map list!
-*/
-
-//
-//START DEX_CP
-//
-class DEX_CP : public IR_CP {
-public:
-    DEX_CP(Region * ru) : IR_CP(ru) {}
-    virtual ~DEX_CP() {}
-
-    //Check if ir is appropriate for propagation.
-    virtual bool canBeCandidate(IR const* ir) const
-    {
-        //Prop const imm may generate code which is not legal dex format.
-        //TODO: Perform more code normalization before ir2dex.
-        //return ir->is_const() || ir->is_pr();
-
-        return ir->is_pr();
-    }
-};
-//END DEX_CP
-
-
-class DEX_RP : public IR_RP {
-    bool m_has_insert_stuff;
-public:
-    DEX_RP(Region * ru, IR_GVN * gvn) : IR_RP(ru, gvn)
-    { m_has_insert_stuff = false; }
-    virtual ~DEX_RP() {}
-
-    /*
-    virtual bool is_promotable(IR const* ir) const
-    {
-        if (ir->is_array()) {
-            IR * sub = ARR_sub_list(ir);
-            ASSERT0(sub);
-            if (cnt_list(sub) == 1) {
-                if (sub->is_pr() && PR_no(sub) == 2) {
-                    return false;
-                }
-            }
-        }
-        return IR_RP::is_promotable(ir);
-    }
-
-    void insert_stuff_code(IR const* ref, Region * ru, IR_GVN * gvn)
-    {
-        ASSERT0(IR_type(ref) == IR_ARRAY);
-
-        IR * stmt = ref->get_stmt();
-        ASSERT0(stmt);
-        IRBB * stmt_bb = stmt->get_bb();
-        ASSERT0(stmt_bb);
-
-        IR_DU_MGR * dumgr = ru->get_du_mgr();
-
-        C<IR*> * ct = NULL;
-        BB_irlist(stmt_bb).find(stmt, &ct);
-        ASSERT0(ct != NULL);
-
-        //Insert stuff code as you need. It will slow down the benchmark.
-        UINT num_want_to_insert = 30;
-        for (UINT i = 0; i < num_want_to_insert; i++) {
-            IR * newref = ru->dupIRTree(ref);
-            dumgr->copyIRTreeDU(newref, ref, true);
-            IR * stpr = ru->buildStorePR(ru->buildPrno(IR_dt(newref)),
-                                            IR_dt(newref), newref);
-            ru->allocRefForPR(stpr);
-            IR_may_throw(stpr) = true;
-
-            //New IR has same VN with original one.
-            gvn->set_mapIR2VN(stpr, gvn->mapIR2VN(ref));
-
-            BB_irlist(stmt_bb).insert_before(stpr, ct);
-        }
-    }
-
-    virtual void handleAccessInBody(IR * ref, IR * delegate, IR * delegate_pr,
-                                    TMap<IR*, SList<IR*>*> &
-                                            delegate2has_outside_uses_ir_list,
-                                    TTab<IR*> & restore2mem,
-                                    List<IR*> & fixup_list,
-                                    TMap<IR*, IR*> & delegate2stpr,
-                                    LI<IRBB> const* li,
-                                    IRIter & ii)
-    {
-        if (!m_has_insert_stuff &&
-            IR_type(ref) == IR_ARRAY &&
-            (m_ru->isRegionName(
-                "Lsoftweg/hw/performance/CPUTest;::arrayElementsDouble") ||
-             m_ru->isRegionName(
-                 "Lsoftweg/hw/performance/CPUTest;::arrayElementsSingle"))) {
-            m_has_insert_stuff = true;
-            insert_stuff_code(ref, m_ru, m_gvn);
-        }
-        IR_RP::handleAccessInBody(ref, delegate, delegate_pr,
-                                delegate2has_outside_uses_ir_list,
-                                restore2mem, fixup_list,
-                                delegate2stpr, li, ii);
-    }
-    */
-};
-
-//
-//START AocDxMgr
-//
-CHAR const* AocDxMgr::get_string(UINT str_idx)
-{
-    return dexStringById(m_df, str_idx);
-}
-
-
-CHAR const* AocDxMgr::get_type_name(UINT idx)
-{
-    return dexStringByTypeIdx(m_df, idx);
-}
-
-
-//field_id: field number in dexfile.
-CHAR const* AocDxMgr::get_field_name(UINT field_idx)
-{
-    DexFieldId const* fid = dexGetFieldId(m_df, field_idx);
-    ASSERT0(fid);
-
-    //Get field's name via nameIdx in symbol table.
-    return dexStringById(m_df, fid->nameIdx);
-}
-
-
-CHAR const* AocDxMgr::get_method_name(UINT method_idx)
-{
-    DexMethodId const* method_id = dexGetMethodId(m_df, method_idx);
-    ASSERT0(method_id);
-    CHAR const* method_name = dexStringById(m_df, method_id->nameIdx);
-    ASSERT0(method_name);
-    return method_name;
-}
-
-
-CHAR const* AocDxMgr::get_class_name(UINT class_type_idx)
-{
-    return dexStringByTypeIdx(m_df, class_type_idx);
-}
-
-
-CHAR const* AocDxMgr::get_class_name_by_method_id(UINT method_idx)
-{
-    DexMethodId const* method_id = dexGetMethodId(m_df, method_idx);
-    ASSERT0(method_id);
-    CHAR const* class_name = dexStringByTypeIdx(m_df, method_id->classIdx);
-    return class_name;
-}
-
-
-CHAR const* AocDxMgr::get_class_name_by_field_id(UINT field_idx)
-{
-    DexFieldId const* fid = dexGetFieldId(m_df, field_idx);
-    ASSERT0(fid);
-    return dexStringByTypeIdx(m_df, fid->classIdx);
-}
-
-
-CHAR const* AocDxMgr::get_class_name_by_declaration_id(UINT cls_def_idx)
-{
-    DexClassDef const* class_info = dexGetClassDef(m_df, cls_def_idx);
-    CHAR const* class_name = dexStringByTypeIdx(m_df, class_info->classIdx);
-    ASSERT0(class_name);
-    return class_name;
-}
-//END AocDxMgr
-
-
-//
-//START DexPassMgr
-//
-Pass * DexPassMgr::allocDCE()
-{
-    IR_DCE * pass = new IR_DCE(m_ru);
-    pass->set_elim_cfs(true);
-    return pass;
-}
-
-
-Pass * DexPassMgr::allocCopyProp()
-{
-    Pass * pass = new DEX_CP(m_ru);
-    SimpCTX simp;
-    pass->set_simp_cont(&simp);
-    return pass;
-}
-
-
-Pass * DexPassMgr::allocRP()
-{
-    Pass * pass = new DEX_RP(m_ru, (IR_GVN*)registerPass(PASS_GVN));
-    return pass;
-}
-
-
-int xtime = 1;
-void DexPassMgr::performScalarOpt(OptCTX & oc)
-{
-    List<Pass*> passlist; //A list of optimization.
-    IR_SSA_MGR * ssamgr = (IR_SSA_MGR*)registerPass(PASS_SSA_MGR);
-    bool is_ssa_avail = false;
-    if (ssamgr != NULL) {
-        is_ssa_avail = ssamgr->is_ssa_constructed();
-    }
-
-    passlist.append_tail(registerPass(PASS_CP));
-    passlist.append_tail(registerPass(PASS_DCE));
-    passlist.append_tail(registerPass(PASS_RP));
-    passlist.append_tail(registerPass(PASS_CP));
-    passlist.append_tail(registerPass(PASS_DCE));
-    passlist.append_tail(registerPass(PASS_RP));
-    passlist.append_tail(registerPass(PASS_CP));
-    passlist.append_tail(registerPass(PASS_DCE));
-    passlist.append_tail(registerPass(PASS_LOOP_CVT));
-    passlist.append_tail(registerPass(PASS_LICM));
-    passlist.append_tail(registerPass(PASS_GCSE));
-
-    ((IR_DCE*)registerPass(PASS_DCE))->set_elim_cfs(false);
-
-    if (passlist.get_elem_count() != 0) {
-        LOG("\tScalar optimizations for '%s'", m_ru->get_ru_name());
-    }
-
-    bool change;
-    UINT count = 0;
-    //do {
-        change = false;
-        for (Pass * pass = passlist.get_head();
-             pass != NULL; pass = passlist.get_next()) {
-            CHAR const* passname = pass->get_pass_name();
-            LOG("\t\tpass %s", passname);
-            ASSERT0(verifyIRandBB(m_ru->get_bb_list(), m_ru));
-            ULONGLONG t = getusec();
-
-            //dumpBBList(m_ru->get_bb_list(), m_ru, "before");
-            //m_ru->get_cfg()->dump_vcg("before.vcg");
-
-            bool doit = pass->perform(oc);
-
-            //dumpBBList(m_ru->get_bb_list(), m_ru, "after");
-            //m_ru->get_cfg()->dump_vcg("after.vcg");
-
-            appendTimeInfo(pass->get_pass_name(), getusec() - t);
-            if (doit) {
-                LOG("\t\t\tchanged");
-                change = true;
-                ASSERT0(verifyIRandBB(m_ru->get_bb_list(), m_ru));
-                ASSERT0(m_ru->get_cfg()->verify());
-            }
-        }
-        count++;
-    //} while (change && count < 20);
-    //ASSERT0(!change);
-}
-//END DexPassMgr
-
-
-//
-//START DEX_AA
-//
-//Mapping from TYID to MD.
-//tyid start from 1.
-typedef TMap<Type const*, MD const*> Type2MD;
-
-class DEX_AA : public IR_AA {
-    Type2MD m_type2md;
-public:
-    DEX_AA(Region * ru) : IR_AA(ru) {}
-
-    //Attemp to compute POINT-TO set via data type.
-    virtual MD const* computePointToViaType(IR const* ir)
-    {
-        AttachInfo * ai = IR_ai(ir);
-        ASSERT0(ir && ai);
-
-        TbaaAttachInfo * ty = (TbaaAttachInfo*)ai->get(AI_TBAA);
-        if (ty == NULL) { return NULL; }
-
-        ASSERT(ty->type, ("Type should not be given if "
-                          "you intend to annotate it as TBAA."));
-        MD const* md = m_type2md.get(ty->type);
-        if (md != NULL) {
-            return md;
-        }
-
-        CHAR buf[64];
-        sprintf(buf, "dummy%d", (UINT)(size_t)ty->type);
-        VAR * dummy = m_var_mgr->registerVar(
-                        buf, ty->type, 1, VAR_GLOBAL);
-        VAR_is_addr_taken(dummy) = true;
-        VAR_allocable(dummy) = false;
-        m_ru->addToVarTab(dummy);
-
-        MD dummy_md;
-        MD_base(&dummy_md) = dummy;
-        MD_size(&dummy_md) = 0;
-        MD_ty(&dummy_md) = MD_UNBOUND;
-        MD const* entry = m_md_sys->registerMD(dummy_md);
-        m_type2md.set(ty->type, entry);
-        return entry;
-    }
-
-    void handle_ld(IR * ld, MD2MDSet * mx)
-    {
-        ASSERT0(ld->is_ld() && mx);
-        AttachInfo * ai = IR_ai(ld);
-        if (ai == NULL) { return; }
-
-        TbaaAttachInfo * ty = (TbaaAttachInfo*)ai->get(AI_TBAA);
-        if (ty == NULL) { return; }
-
-        MD const* md = m_type2md.get(ty->type);
-        if (md != NULL) {
-            MD const* t = allocLoadMD(ld);
-            setPointToMDSetByAddMD(t, *mx, md);
-            return;
-        }
-
-        CHAR buf[64];
-        sprintf(buf, "dummy%d", (UINT)(size_t)ty->type);
-        VAR * dummy = m_var_mgr->registerVar(
-                    buf, m_dm->getMCType(0), 1, VAR_GLOBAL);
-        VAR_is_addr_taken(dummy) = true;
-        VAR_allocable(dummy) = false;
-        m_ru->addToVarTab(dummy);
-
-        MD dummy_md;
-        MD_base(&dummy_md) = dummy;
-        MD_size(&dummy_md) = 0;
-        MD_ty(&dummy_md) = MD_UNBOUND;
-        MD const* entry = m_md_sys->registerMD(dummy_md);
-        m_type2md.set(ty->type, entry);
-
-        MD const* t = allocLoadMD(ld);
-        setPointToMDSetByAddMD(t, *mx, entry);
-    }
-};
-//END DEX_AA
-
-
-//
-static CHAR const* g_unimportant_func[] = {
-    "Ljava/lang/StringBuilder;:()V:<init>",
-};
-static UINT g_unimportant_func_num =
-    sizeof(g_unimportant_func) / sizeof(g_unimportant_func[0]);
-
-
-DexCallGraph::DexCallGraph(UINT edge_hash, UINT vex_hash, RegionMgr * rumgr) :
-        CallGraph(edge_hash, vex_hash, rumgr)
-{
-    ASSERT0(rumgr);
-    SymTab * symtab = rumgr->get_sym_tab();
-    for (UINT i = 0; i < g_unimportant_func_num; i++) {
-        SYM const* sym = symtab->add(g_unimportant_func[i]);
-        m_unimportant_symtab.append(sym);
-    }
-}
-
-
-bool DexCallGraph::is_unimportant(SYM const* sym) const
-{
-    return m_unimportant_symtab.find(sym);
-}
-//END DexCallGraph
-
-
-//
-//START DexRegionMgr
-//
-
-//Add a variable of CLASS.
-VAR * DexRegionMgr::addVarForBuiltin(CHAR const* name)
-{
-    SYM * sym = addToSymbolTab(name);
-    UINT flag = 0;
-    SET_FLAG(flag, VAR_GLOBAL);
-    return get_var_mgr()->registerVar(sym, get_type_mgr()->getVoid(), 0, flag);
-}
-
-
-void DexRegionMgr::initBuiltin()
-{
-    for (UINT i = BLTIN_UNDEF + 1; i < BLTIN_LAST; i++) {
-        VAR * v = addVarForBuiltin(BLTIN_name((BLTIN_TYPE)i));
-        m_var2blt.set(v, i);
-        m_blt2var.set(i, v);
-    }
-}
-
-
-void DexRegionMgr::processProgramRegion(Region * program)
-{
-    ASSERT0(program && program->is_program());
-
-    //Function region has been handled. And call list should be available.
-    CallGraph * callg = initCallGraph(program, false);
-    //callg->dump_vcg();
-}
-//START DexRegion
-//
-PassMgr * DexRegion::allocPassMgr()
-{
-    return new DexPassMgr(this);
-}
-
-
-//Initialize alias analysis.
-IR_AA * DexRegion::allocAliasAnalysis()
-{
-    return new DEX_AA(this);
-}
-
-
-bool DexRegion::MiddleProcess(OptCTX & oc)
-{
-    return Region::MiddleProcess(oc);
-}
-
-
-void DexRegion::HighProcessImpl(OptCTX & oc)
-{
-    PassMgr * passmgr = get_pass_mgr();
-    ASSERT0(passmgr);
-
-    if (g_do_cfg) {
-        ASSERT0(g_cst_bb_list);
-        IR_CFG * cfg = (IR_CFG*)passmgr->registerPass(PASS_CFG);
-        ASSERT0(cfg);
-        cfg->initCfg(oc);
-        if (g_do_loop_ana) {
-            ASSERT0(g_do_cfg_dom);
-            cfg->LoopAnalysis(oc);
-        }
-    }
-
-    if (g_do_ssa) {
-        IR_SSA_MGR * ssamgr = (IR_SSA_MGR*)passmgr->registerPass(PASS_SSA_MGR);
-        ASSERT0(ssamgr);
-        ssamgr->construction(oc);
-    }
-
-    if (g_do_aa) {
-        ASSERT0(g_cst_bb_list && OC_is_cfg_valid(oc));
-        IR_AA * aa = (IR_AA*)passmgr->registerPass(PASS_AA);
-        ASSERT0(aa);
-        aa->initAliasAnalysis();
-        aa->perform(oc);
-    }
-
-    if (g_do_du_ana) {
-        ASSERT0(g_cst_bb_list && OC_is_cfg_valid(oc) && OC_is_aa_valid(oc));
-        IR_DU_MGR * dumgr = (IR_DU_MGR*)passmgr->registerPass(PASS_DU_MGR);
-        ASSERT0(dumgr);
-
-        UINT f = SOL_REACH_DEF|SOL_REF;
-        //f |= SOL_AVAIL_REACH_DEF|SOL_AVAIL_EXPR|SOL_RU_REF;
-
-        if (g_do_ivr) {
-            f |= SOL_AVAIL_REACH_DEF|SOL_AVAIL_EXPR;
-        }
-
-        if (g_do_compute_available_exp) {
-            f |= SOL_AVAIL_EXPR;
-        }
-
-        dumgr->perform(oc, f);
-        dumgr->computeMDDUChain(oc);
-}
-}
-
-
-bool DexRegion::HighProcess(OptCTX & oc)
-{
-    CHAR const* ru_name = get_ru_name();
-    g_indent = 0;
-    SimpCTX simp;
-    SIMP_if(&simp) = 1;
-    SIMP_do_loop(&simp) = 1;
-    SIMP_do_while(&simp) = 1;
-    SIMP_while_do(&simp) = 1;
-    SIMP_switch(&simp) = 0;
-    SIMP_break(&simp) = 1;
-    SIMP_continue(&simp) = 1;
-
-    REGION_analysis_instrument(this)->m_ir_list =
-                    simplifyStmtList(get_ir_list(), &simp);
-
-    ASSERT0(verify_simp(get_ir_list(), simp));
-    ASSERT0(verify_irs(get_ir_list(), NULL, this));
-
-    constructIRBBlist();
-
-    ASSERT0(verifyIRandBB(get_bb_list(), this));
-
-    //All IRs have been moved to each IRBB.
-    REGION_analysis_instrument(this)->m_ir_list = NULL;
-
-    HighProcessImpl(oc);
-    return true;
-}
-
-
-//All global prs must be mapped.
-bool DexRegion::verifyRAresult(RA & ra, Prno2Vreg & prno2v)
-{
-    GltMgr * gltm = ra.get_gltm();
-    Vector<GLT*> * gltv = gltm->get_gltvec();
-    for (UINT i = 0; i < gltm->get_num_of_glt(); i++) {
-        GLT * g = gltv->get(i);
-        if (g == NULL) { continue; }
-        ASSERT0(g->has_allocated());
-        if (GLT_bbs(g) == NULL) {
-            //parameter may be have no occ.
-            continue;
-        }
-        bool find;
-        prno2v.get(GLT_prno(g), &find);
-        ASSERT0(find);
-    }
-
-    BBList * bbl = get_bb_list();
-    for (IRBB * bb = bbl->get_head(); bb != NULL; bb = bbl->get_next()) {
-        LTMgr * ltm = gltm->map_bb2ltm(bb);
-        if (ltm == NULL) { continue; }
-        Vector<LT*> * lvec = ltm->get_lt_vec();
-        for (INT i = 0; i <= lvec->get_last_idx(); i++) {
-            LT * l = lvec->get(i);
-            if (l == NULL) { continue; }
-            ASSERT0(l->has_allocated());
-            bool find;
-            prno2v.get(LT_prno(l), &find);
-            ASSERT0(find);
-        }
-    }
-    return true;
-}
-
-
-void DexRegion::updateRAresult(IN RA & ra, OUT Prno2Vreg & prno2v)
-{
-    prno2v.maxreg = ra.get_maxreg();
-    prno2v.paramnum = ra.get_paramnum();
-    GltMgr * gltm = ra.get_gltm();
-    BBList * bbl = get_bb_list();
-    prno2v.clean();
-    for (IRBB * bb = bbl->get_head(); bb != NULL; bb = bbl->get_next()) {
-        LTMgr * ltm = gltm->map_bb2ltm(bb);
-        if (ltm == NULL) { continue; }
-        Vector<LT*> * lvec = ltm->get_lt_vec();
-        for (INT i = 0; i <= lvec->get_last_idx(); i++) {
-            LT * l = lvec->get(i);
-            if (l == NULL) { continue; }
-            ASSERT0(l->has_allocated());
-            bool find;
-            UINT v = prno2v.get(LT_prno(l), &find);
-            if (find) {
-                //each prno is corresponding to a unqiue vreg.
-                ASSERT0(v == LT_phy(l));
-            } else {
-                prno2v.set(LT_prno(l), LT_phy(l));
-            }
-        }
-    }
-    //prno2v.dump();
-    ASSERT0(verifyRAresult(ra, prno2v));
-}
-
-
-void DexRegion::processSimply()
-{
-    LOG("DexRegion::processSimply %s", get_ru_name());
-    if (get_ir_list() == NULL) { return ; }
-    OptCTX oc;
-    OC_show_comp_time(oc) = g_show_comp_time;
-
-    CHAR const* ru_name = get_ru_name();
-
-    constructIRBBlist();
-
-    ASSERT0(verifyIRandBB(get_bb_list(), this));
-
-    REGION_analysis_instrument(this)->m_ir_list = NULL; //All IRs have been moved to each IRBB.
-
-    PassMgr * passmgr = initPassMgr();
-    ASSERT0(passmgr);
-
-    ASSERT0(g_cst_bb_list);
-    IR_CFG * cfg = (IR_CFG*)passmgr->registerPass(PASS_CFG);
-    ASSERT0(cfg);
-    cfg->initCfg(oc);
-    ASSERT0(g_do_cfg_dom);
-    cfg->LoopAnalysis(oc);
-
-    destroyPassMgr();
-
-    //Do not allocate register.
-    getPrno2Vreg()->clean();
-    getPrno2Vreg()->copy(*getDex2IR()->getPR2Vreg());
-    return;
-}
-
-
-//This function outputs Prno2Vreg after Dex register allocation.
-void DexRegion::process()
-{
-    if (get_ir_list() == NULL) { return; }
-    OptCTX oc;
-    OC_show_comp_time(oc) = g_show_comp_time;
-
-    g_indent = 0;
-    LOG("DexRegion process %s", get_ru_name());
-    //note("\n==---- REGION_NAME:%s ----==", get_ru_name());
-    prescan(get_ir_list());
-
-    REGION_is_pr_unique_for_same_number(this) = true;
-
-    PassMgr * passmgr = initPassMgr();
-
-    HighProcess(oc);
-    MiddleProcess(oc);
-
-    ASSERT0(get_pass_mgr());
-    IR_SSA_MGR * ssamgr = (IR_SSA_MGR*)passmgr->query_opt(PASS_SSA_MGR);
-    if (ssamgr != NULL && ssamgr->is_ssa_constructed()) {
-        ssamgr->destructionInBBListOrder();
-    }
-
-    //Destroy PassMgr.
-    destroyPassMgr();
-
-    if (!is_function()) { return; }
-
-    BBList * bbl = get_bb_list();
-    if (bbl->get_elem_count() == 0) { return; }
-
-    ASSERT0(verifyIRandBB(bbl, this));
-
-    RefineCTX rf;
-    RC_insert_cvt(rf) = false; //Do not insert cvt for DEX code.
-    refineBBlist(bbl, rf);
-    ASSERT0(verifyIRandBB(bbl, this));
-
-    if (g_do_dex_ra) {
-        Prno2Vreg * original_prno2vreg = getDex2IR()->getPR2Vreg();
-        RA ra(this,
-              getTypeIndexRep(),
-              getParamNum(),
-              getOrgVregNum(),
-              getDex2IR()->getVreg2PR(),
-              original_prno2vreg,
-              &m_var2pr);
-        LOG("\t\tdo DEX Register Allcation for '%s'", get_ru_name());
-        ra.perform(oc);
-        updateRAresult(ra, *getPrno2Vreg());
-    } else {
-        //Do not allocate register.
-        getPrno2Vreg()->clean();
-        getPrno2Vreg()->copy(*getDex2IR()->getPR2Vreg());
-    }
-}
-//END DexRegion

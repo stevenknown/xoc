@@ -39,15 +39,15 @@ namespace xoc {
 //
 //START IR_LCSE
 //
-IR_LCSE::IR_LCSE(Region * ru)
+IR_LCSE::IR_LCSE(Region * rg)
 {
-    ASSERT0(ru != NULL);
-    m_ru = ru;
-    m_dm = ru->get_type_mgr();
-    m_du = m_ru->get_du_mgr();
+    ASSERT0(rg != NULL);
+    m_ru = rg;
+    m_tm = rg->getTypeMgr();
+    m_du = m_ru->getDUMgr();
+    ASSERT0(m_du && m_tm);
     m_expr_tab = NULL;
     m_expr_vec = NULL;
-    m_misc_bs_mgr = m_ru->getMiscBitSetMgr();
     m_enable_filter = true;
 }
 
@@ -57,8 +57,8 @@ IR * IR_LCSE::hoist_cse(IN IRBB * bb, IN IR * ir_pos, IN ExpRep * ie)
 {
     C<IR*> * pos_holder = NULL;
     bool f = BB_irlist(bb).find(ir_pos, &pos_holder);
-    CK_USE(f);
-    switch (IR_code(ir_pos)) {
+    CHECK_DUMMYUSE(f);
+    switch (ir_pos->get_code()) {
     case IR_ST:
     case IR_IST:
         {
@@ -70,7 +70,7 @@ IR * IR_LCSE::hoist_cse(IN IRBB * bb, IN IR * ir_pos, IN ExpRep * ie)
                 //e.g: a = 10, expression of store_val is NULL.
                 IR * x = ST_rhs(ir_pos);
                 ret = m_ru->buildPR(IR_dt(x));
-                IR * new_st = m_ru->buildStorePR(PR_no(ret), IR_dt(ret), x);
+                IR * new_st = m_ru->buildStorePR(PR_no(ret), ret->get_type(), x);
 
                 //Insert into IR list of BB.
                 BB_irlist(bb).insert_before(new_st, pos_holder);
@@ -86,7 +86,7 @@ IR * IR_LCSE::hoist_cse(IN IRBB * bb, IN IR * ir_pos, IN ExpRep * ie)
                         IR * x = IST_base(ir_pos);
                         ret = m_ru->buildPR(IR_dt(x));
                         IR * new_st = m_ru->buildStorePR(PR_no(ret),
-                                            IR_dt(ret), m_ru->dupIRTree(x));
+                                            ret->get_type(), m_ru->dupIRTree(x));
 
                         //Insert into IR list of BB.
                         BB_irlist(bb).insert_before(new_st, pos_holder);
@@ -105,32 +105,32 @@ IR * IR_LCSE::hoist_cse(IN IRBB * bb, IN IR * ir_pos, IN ExpRep * ie)
     case IR_CALL:
     case IR_ICALL:
         {
-            IR * parm = CALL_param_list(ir_pos);
+            IR * p = CALL_param_list(ir_pos);
             IR * ret = NULL; //return the pr that hold the cse value.
             IR * next_parm = NULL;
-            while (parm != NULL) {
-                next_parm = IR_next(parm);
-                ExpRep * tie = m_expr_tab->map_ir2ir_expr(parm);
+            while (p != NULL) {
+                next_parm = p->get_next();
+                ExpRep * tie = m_expr_tab->map_ir2ir_expr(p);
                 if (tie != NULL && tie == ie) {
                     bool insert_st;
                     if (ret == NULL) {
-                        ret = m_ru->buildPR(IR_dt(parm));
-                        replace(&CALL_param_list(ir_pos), parm, ret);
+                        ret = m_ru->buildPR(IR_dt(p));
+                        replace(&CALL_param_list(ir_pos), p, ret);
                         insert_st = true;
                     } else {
-                        replace(&CALL_param_list(ir_pos), parm,
+                        replace(&CALL_param_list(ir_pos), p,
                                 m_ru->dupIRTree(ret));
                         insert_st = false;
                     }
-                    ASSERT0(IR_prev(parm) == NULL && IR_next(parm) == NULL);
+                    ASSERT0(IR_prev(p) == NULL && p->get_next() == NULL);
 
                     if (insert_st) {
-                        IR * new_st = m_ru->buildStorePR(PR_no(ret),
-                                                           IR_dt(ret), parm);
+                        IR * new_st = m_ru->buildStorePR(
+                                        PR_no(ret), ret->get_type(), p);
                         BB_irlist(bb).insert_before(new_st, pos_holder);
                     }
                 }
-                parm = next_parm;
+                p = next_parm;
             } //end while
             ir_pos->setParentPointer(false);
             return ret;
@@ -153,7 +153,7 @@ IR * IR_LCSE::hoist_cse(IN IRBB * bb, IN IR * ir_pos, IN ExpRep * ie)
             if (tie != NULL && tie == ie) {
                 IR * x = BR_det(ir_pos);
                 IR * ret = m_ru->buildPR(IR_dt(x));
-                IR * new_st = m_ru->buildStorePR(PR_no(ret), IR_dt(ret), x);
+                IR * new_st = m_ru->buildStorePR(PR_no(ret), ret->get_type(), x);
                 BB_irlist(bb).insert_before(new_st, pos_holder);
                 BR_det(ir_pos) = ret;
                 ir_pos->setParentPointer(false);
@@ -167,7 +167,7 @@ IR * IR_LCSE::hoist_cse(IN IRBB * bb, IN IR * ir_pos, IN ExpRep * ie)
             if (tie != NULL && tie == ie) {
                 IR * x = IGOTO_vexp(ir_pos);
                 IR * ret = m_ru->buildPR(IR_dt(x));
-                IR * new_st = m_ru->buildStorePR(PR_no(ret), IR_dt(ret), x);
+                IR * new_st = m_ru->buildStorePR(PR_no(ret), ret->get_type(), x);
                 BB_irlist(bb).insert_before(new_st, pos_holder);
                 IGOTO_vexp(ir_pos) = ret;
                 ir_pos->setParentPointer(false);
@@ -181,7 +181,7 @@ IR * IR_LCSE::hoist_cse(IN IRBB * bb, IN IR * ir_pos, IN ExpRep * ie)
             if (tie != NULL && tie == ie) {
                 IR * x = SWITCH_vexp(ir_pos);
                 IR * ret = m_ru->buildPR(IR_dt(x));
-                IR * new_st = m_ru->buildStorePR(PR_no(ret), IR_dt(ret), x);
+                IR * new_st = m_ru->buildStorePR(PR_no(ret), ret->get_type(), x);
                 BB_irlist(bb).insert_before(new_st, pos_holder);
                 SWITCH_vexp(ir_pos) = ret;
                 ir_pos->setParentPointer(false);
@@ -195,7 +195,7 @@ IR * IR_LCSE::hoist_cse(IN IRBB * bb, IN IR * ir_pos, IN ExpRep * ie)
             if (tie != NULL && tie == ie) {
                 IR * x = RET_exp(ir_pos);
                 IR * ret = m_ru->buildPR(IR_dt(x));
-                IR * new_st = m_ru->buildStorePR(PR_no(ret), IR_dt(ret), x);
+                IR * new_st = m_ru->buildStorePR(PR_no(ret), ret->get_type(), x);
                 BB_irlist(bb).insert_before(new_st, pos_holder);
                 RET_exp(ir_pos) = ret;
                 ir_pos->setParentPointer(false);
@@ -204,8 +204,7 @@ IR * IR_LCSE::hoist_cse(IN IRBB * bb, IN IR * ir_pos, IN ExpRep * ie)
             ir_pos->setParentPointer(false);
         }
         break;
-    default:
-        ASSERT0(0);
+    default: UNREACH();
     } //end switch
     return NULL;
 }
@@ -218,7 +217,7 @@ bool IR_LCSE::processBranch(
         IN OUT Vector<IR*> & map_expr2avail_pos,
         IN OUT Vector<IR*> & map_expr2avail_pr)
 {
-    ASSERT0(ir->is_cond_br());
+    ASSERT0(ir->isConditionalBr());
     bool change = false;
     if (!canBeCandidate(BR_det(ir))) { return false; }
     ExpRep * ie = m_expr_tab->map_ir2ir_expr(BR_det(ir));
@@ -228,23 +227,21 @@ bool IR_LCSE::processBranch(
         if (ir_pos != NULL) {
             IR * pr = map_expr2avail_pr.get(EXPR_id(ie));
             if (pr == NULL) {
-                /* e.g: before:
-                    =a||b
-                    ...
-                    falsebr(a||b)
-                after:
-                    t=a||b
-                    =t
-                    ...
-                    =a||b
-                */
+                //e.g: before:
+                //    =a||b
+                //    ...
+                //    falsebr(a||b)
+                //after:
+                //    t=a||b
+                //    =t
+                //    ...
+                //    =a||b
                 pr = hoist_cse(bb, ir_pos, ie);
                 ASSERT0(pr != NULL);
                 map_expr2avail_pr.set(EXPR_id(ie), pr);
                 change = true;
             }
-            IR * imm0 = m_ru->buildImmInt(0, IR_dt(pr));
-            BR_det(ir) = m_ru->buildCmp(IR_NE, m_ru->dupIRTree(pr), imm0);
+            BR_det(ir) = m_ru->buildJudge(m_ru->dupIRTree(pr));
             ir->setParentPointer(false);
             change = true;
         } else {
@@ -255,20 +252,22 @@ bool IR_LCSE::processBranch(
 }
 
 
-/* Return new IR_PR if 'ie' has been regarded as cse candidate expression.
-e.g:
-        call(a+b, a+b);
-    =>
-        p1 = a+b;
-        call(p1, p1);
-    return p1 as new expression.
-
-'ie': cse candidate expression indicator.
-'stmt': the stmt contains 'exp'. */
-IR * IR_LCSE::processExp(IN IRBB * bb, IN ExpRep * ie,
-                         IN IR * stmt, IN OUT BitSet & avail_ir_expr,
-                         IN OUT Vector<IR*> & map_expr2avail_pos,
-                         IN OUT Vector<IR*> & map_expr2avail_pr)
+//Return new IR_PR if 'ie' has been regarded as cse candidate expression.
+//e.g:
+//        call(a+b, a+b);
+//    =>
+//        p1 = a+b;
+//        call(p1, p1);
+//    return p1 as new expression.
+//'ie': cse candidate expression indicator.
+//'stmt': the stmt contains 'exp'.
+IR * IR_LCSE::processExp(
+        IN IRBB * bb,
+        IN ExpRep * ie,
+        IN IR * stmt,
+        IN OUT BitSet & avail_ir_expr,
+        IN OUT Vector<IR*> & map_expr2avail_pos,
+        IN OUT Vector<IR*> & map_expr2avail_pr)
 {
     ASSERT0(ie);
     avail_ir_expr.bunion(EXPR_id(ie));
@@ -278,18 +277,16 @@ IR * IR_LCSE::processExp(IN IRBB * bb, IN ExpRep * ie,
     if (ir_pos != NULL) {
         IR * cse_val_pr = map_expr2avail_pr.get(EXPR_id(ie));
         if (cse_val_pr == NULL) {
-            /*
-            e.g:
-            before:
-                =a||b
-                ...
-                falsebr(a||b)
-            after:
-                t=a||b
-                =t
-                ...
-                =a||b
-            */
+            //e.g:
+            //before:
+            //    =a||b
+            //    ...
+            //    falsebr(a||b)
+            //after:
+            //    t=a||b
+            //    =t
+            //    ...
+            //    =a||b
             cse_val_pr = hoist_cse(bb, ir_pos, ie);
             ASSERT0(cse_val_pr != NULL);
             map_expr2avail_pr.set(EXPR_id(ie), cse_val_pr);
@@ -306,25 +303,24 @@ IR * IR_LCSE::processExp(IN IRBB * bb, IN ExpRep * ie,
 bool IR_LCSE::canBeCandidate(IR * ir)
 {
     if (!m_enable_filter) {
-        return ir->is_binary_op() ||
+        return ir->isBinaryOp() ||
             ir->is_bnot() ||
             ir->is_lnot() ||
             ir->is_neg();
     }
     ASSERT0(ir->is_exp());
     if (ir->is_ild()) {
-        /* Avoid perform the opposite behavior to Copy-Propagation.
-        e.g:
-            ST(P1, ILD(P2))
-            ST(P3, ILD(P2))
-            after LCSE, we get:
-            ST(P1, ILD(P2))
-            ST(P3, P1)
-            But CP will progagate P1 because ILD is the copy-prop candidate. */
+        //Avoid perform the opposite behavior to Copy-Propagation.
+        //e.g:
+        //    ST(P1, ILD(P2))
+        //    ST(P3, ILD(P2))
+        //    after LCSE, we get:
+        //    ST(P1, ILD(P2))
+        //    ST(P3, P1)
+        //    But CP will progagate P1 because ILD is the copy-prop candidate.
         return false;
     }
-    return ir->is_binary_op() || ir->is_bnot() ||
-           ir->is_lnot() || ir->is_neg();
+    return ir->isBinaryOp() || ir->is_bnot() || ir->is_lnot() || ir->is_neg();
 }
 
 
@@ -347,17 +343,15 @@ bool IR_LCSE::processRhsOfStore(
         if (ir_pos != NULL) {
             IR * pr = map_expr2avail_pr.get(EXPR_id(ie));
             if (pr == NULL) {
-                /*
-                e.g: before:
-                    =a+b
-                    ...
-                        =a+b
-                after:
-                    t=a+b
-                    =t
-                    ...
-                    =a+b
-                */
+                //e.g: before:
+                //    =a+b
+                //    ...
+                //        =a+b
+                //after:
+                //    t=a+b
+                //    =t
+                //    ...
+                //    =a+b
                 pr = hoist_cse(bb, ir_pos, ie);
                 ASSERT0(pr != NULL);
                 map_expr2avail_pr.set(EXPR_id(ie), pr);
@@ -380,15 +374,15 @@ bool IR_LCSE::processRhsOfStore(
             if (ir_pos != NULL) {
                 IR * pr = map_expr2avail_pr.get(EXPR_id(ie));
                 if (pr == NULL) {
-                    /* e.g: before:
-                        =a+b
-                        ...
-                            =a+b
-                    after:
-                        t=a+b
-                        =t
-                        ...
-                        =a+b */
+                    //e.g: before:
+                    //    =a+b
+                    //    ...
+                    //        =a+b
+                    //after:
+                    //    t=a+b
+                    //    =t
+                    //    ...
+                    //    =a+b
                     pr = hoist_cse(bb, ir_pos, ie);
                     ASSERT0(pr != NULL);
                     map_expr2avail_pr.set(EXPR_id(ie), pr);
@@ -414,15 +408,13 @@ bool IR_LCSE::processParamList(IN IRBB * bb, IN IR * ir,
     bool change = false;
     bool lchange = true;
     while (lchange) {
-        /*
-        Iterative analyse cse, e.g:
-            CALL(ADD(x,y), SUB(a,b), ADD(x,y), SUB(a,b))
-        */
-        IR * parm = CALL_param_list(ir);
+        //Iterative analyse cse, e.g:
+        //    CALL(ADD(x,y), SUB(a,b), ADD(x,y), SUB(a,b))
+        IR * p = CALL_param_list(ir);
         lchange = false;
-        while (parm != NULL) {
-            if (canBeCandidate(parm)) {
-                ExpRep * ie = m_expr_tab->map_ir2ir_expr(parm);
+        while (p != NULL) {
+            if (canBeCandidate(p)) {
+                ExpRep * ie = m_expr_tab->map_ir2ir_expr(p);
                 IR * newparam = processExp(bb,    ie, ir,
                                             avail_ir_expr,
                                             map_expr2avail_pos,
@@ -433,7 +425,7 @@ bool IR_LCSE::processParamList(IN IRBB * bb, IN IR * ir,
                     break;
                 }
             }
-            parm = IR_next(parm);
+            p = p->get_next();
         }
     }
     return change;
@@ -446,16 +438,16 @@ bool IR_LCSE::processUse(IN IRBB * bb, IN IR * ir,
                           IN OUT Vector<IR*> & map_expr2avail_pr)
 {
     bool change = false;
-    switch (IR_code(ir)) {
+    switch (ir->get_code()) {
     case IR_ST:
     case IR_IST:
         change |= processRhsOfStore(bb, ir, avail_ir_expr, map_expr2avail_pos,
-                                 map_expr2avail_pr);
+                                    map_expr2avail_pr);
         break;
     case IR_CALL:
     case IR_ICALL:
         change |= processParamList(bb, ir, avail_ir_expr, map_expr2avail_pos,
-                                     map_expr2avail_pr);
+                                   map_expr2avail_pr);
         break;
     case IR_GOTO:
         break;
@@ -474,13 +466,11 @@ bool IR_LCSE::processUse(IN IRBB * bb, IN IR * ir,
             ExpRep * ie = m_expr_tab->map_ir2ir_expr(BR_det(ir));
             ASSERT0(ie);
             IR * cse_val = processExp(bb, ie, ir, avail_ir_expr,
-                                       map_expr2avail_pos,
-                                       map_expr2avail_pr);
+                                      map_expr2avail_pos,
+                                      map_expr2avail_pr);
             if (cse_val != NULL) {
                 if (!cse_val->is_judge()) {
-                    cse_val = m_ru->buildCmp(IR_NE,
-                                m_ru->dupIRTree(cse_val),
-                                m_ru->buildImmInt(0, IR_dt(cse_val)));
+                    cse_val = m_ru->buildJudge(m_ru->dupIRTree(cse_val));
                     BR_det(ir) = cse_val;
                 } else {
                     BR_det(ir) = m_ru->dupIRTree(cse_val);
@@ -497,12 +487,11 @@ bool IR_LCSE::processUse(IN IRBB * bb, IN IR * ir,
             ExpRep * ie = m_expr_tab->map_ir2ir_expr(IGOTO_vexp(ir));
             ASSERT0(ie);
             IR * cse_val = processExp(bb, ie, ir, avail_ir_expr,
-                                       map_expr2avail_pos,
-                                       map_expr2avail_pr);
+                                      map_expr2avail_pos,
+                                      map_expr2avail_pr);
             if (IGOTO_vexp(ir) != cse_val) {
                 if (!cse_val->is_judge()) {
-                    cse_val = m_ru->buildCmp(IR_NE, m_ru->dupIRTree(cse_val),
-                                      m_ru->buildImmInt(0, IR_dt(cse_val)));
+                    cse_val = m_ru->buildJudge(m_ru->dupIRTree(cse_val));
                     IGOTO_vexp(ir) = cse_val;
                 } else {
                     IGOTO_vexp(ir) = m_ru->dupIRTree(cse_val);
@@ -523,8 +512,7 @@ bool IR_LCSE::processUse(IN IRBB * bb, IN IR * ir,
                                        map_expr2avail_pr);
             if (SWITCH_vexp(ir) != cse_val) {
                 if (!cse_val->is_judge()) {
-                    cse_val = m_ru->buildCmp(IR_NE, m_ru->dupIRTree(cse_val),
-                                      m_ru->buildImmInt(0, IR_dt(cse_val)));
+                    cse_val = m_ru->buildJudge(m_ru->dupIRTree(cse_val));
                     SWITCH_vexp(ir) = cse_val;
                 } else {
                     SWITCH_vexp(ir) = m_ru->dupIRTree(cse_val);
@@ -550,22 +538,23 @@ bool IR_LCSE::processUse(IN IRBB * bb, IN IR * ir,
             }
         }
         break;
-    default:
-        ASSERT0(0);
+    default: UNREACH();
     } //end switch
     return change;
 }
 
 
 //Return true if common expression has been substituted.
-bool IR_LCSE::processDef(IN IRBB * bb, IN IR * ir,
-                          IN OUT BitSet & avail_ir_expr,
-                          IN OUT Vector<IR*> & map_expr2avail_pos,
-                          IN OUT Vector<IR*> & map_expr2avail_pr,
-                          IN MDSet & tmp)
+bool IR_LCSE::processDef(
+        IN IRBB * bb,
+        IN IR * ir,
+        IN OUT BitSet & avail_ir_expr,
+        IN OUT Vector<IR*> & map_expr2avail_pos,
+        IN OUT Vector<IR*> & map_expr2avail_pr,
+        IN MDSet & tmp)
 {
     bool change = false;
-    switch (IR_code(ir)) {
+    switch (ir->get_code()) {
     case IR_ST:
     case IR_IST:
     case IR_CALL:
@@ -573,24 +562,26 @@ bool IR_LCSE::processDef(IN IRBB * bb, IN IR * ir,
     case IR_RETURN:
         {
             //Compute killed ir-expr.
-            MDSet const* maydef = m_du->get_may_def(ir);
+            MDSet const* maydef = m_du->getMayDef(ir);
             MD const* mustdef = m_du->get_must_def(ir);
             if ((maydef != NULL && !maydef->is_empty()) ||
                 mustdef != NULL) {
-                for (INT j = avail_ir_expr.get_first(); j != -1;
-                     j = avail_ir_expr.get_next(j)) {
+                for (INT j = avail_ir_expr.get_first();
+                     j != -1; j = avail_ir_expr.get_next(j)) {
                     ExpRep * ie = m_expr_vec->get(j);
                     ASSERT0(ie != NULL);
                     for (IR * occ = EXPR_occ_list(ie).get_head();
                          occ != NULL; occ = EXPR_occ_list(ie).get_next()) {
                         IR * occ_stmt = occ->get_stmt();
-                        ASSERT0(occ_stmt != NULL && occ_stmt->get_bb());
-                        ASSERT0(ir->get_bb() == bb);
-                        if (occ_stmt->get_bb() != bb) {
+                        ASSERT0(occ_stmt != NULL && occ_stmt->getBB());
+                        ASSERT0(ir->getBB() == bb);
+                        if (occ_stmt->getBB() != bb) {
                             continue;
                         }
-                        tmp.clean(*m_misc_bs_mgr);
-                        m_du->collectMayUseRecursive(occ, tmp, true);
+
+                        tmp.clean(m_misc_bs_mgr);
+                        m_du->collectMayUseRecursive(occ,
+                            tmp, true, m_misc_bs_mgr);
                         if ((maydef != NULL && maydef->is_intersect(tmp)) ||
                             (mustdef != NULL && tmp.is_contain(mustdef))) {
                             avail_ir_expr.diff(EXPR_id(ie));
@@ -614,26 +605,30 @@ bool IR_LCSE::processDef(IN IRBB * bb, IN IR * ir,
     case IR_TRUEBR:
     case IR_FALSEBR:
         break;
-    default:
-        ASSERT0(0);
+    default: UNREACH();
     } //end switch
     return change;
 }
 
 
-bool IR_LCSE::perform(OptCTX & oc)
+bool IR_LCSE::perform(OptCtx & oc)
 {
-    START_TIMER_AFTER();
+    START_TIMER(t, getPassName());
     m_ru->checkValidAndRecompute(&oc, PASS_DU_REF, PASS_DU_CHAIN,
-                                    PASS_EXPR_TAB, PASS_UNDEF);
+        PASS_EXPR_TAB, PASS_UNDEF);
 
-    m_expr_tab = (IR_EXPR_TAB*)m_ru->get_pass_mgr()->registerPass(PASS_EXPR_TAB);
+    if (!OC_is_du_chain_valid(oc)) {
+        END_TIMER(t, getPassName());
+        return false;
+    }
+
+    m_expr_tab = (IR_EXPR_TAB*)m_ru->getPassMgr()->registerPass(PASS_EXPR_TAB);
     ASSERT0(m_expr_tab);
 
     m_expr_vec = m_expr_tab->get_expr_vec();
     ASSERT0(m_expr_vec);
 
-    BBList * bbl = m_ru->get_bb_list();
+    BBList * bbl = m_ru->getBBList();
 
     bool change = false;
 
@@ -655,23 +650,20 @@ bool IR_LCSE::perform(OptCTX & oc)
         avail_ir_expr.clean();
         C<IR*> * ct = NULL;
         for (BB_irlist(bb).get_head(&ct);
-             ct != BB_irlist(bb).end();
-             ct = BB_irlist(bb).get_next(ct)) {
+             ct != BB_irlist(bb).end(); ct = BB_irlist(bb).get_next(ct)) {
             IR * ir = ct->val();
             change |= processUse(bb, ir, avail_ir_expr,
-                                  map_expr2avail_pos,
-                                  map_expr2avail_pr);
-            if (ir->has_result()) {
+                map_expr2avail_pos, map_expr2avail_pr);
+
+            if (ir->hasResult()) {
                 //There may have expressions be killed.
                 //Remove them out the avail_ir_expr.
                 change |= processDef(bb, ir, avail_ir_expr,
-                                      map_expr2avail_pos,
-                                      map_expr2avail_pr,
-                                      tmp);
+                    map_expr2avail_pos, map_expr2avail_pr, tmp);
             }
         } //end for each IR
     }
-    tmp.clean(*m_misc_bs_mgr);
+    tmp.clean(m_misc_bs_mgr);
 
     ASSERT0(verifyIRandBB(bbl, m_ru));
     if (change) {
@@ -681,7 +673,7 @@ bool IR_LCSE::perform(OptCTX & oc)
         OC_is_du_chain_valid(oc) = false;
         OC_is_ref_valid(oc) = false;
     }
-    END_TIMER_AFTER(get_pass_name());
+    END_TIMER(t, getPassName());
     return change;
 }
 //END IR_LCSE

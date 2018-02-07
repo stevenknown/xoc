@@ -73,20 +73,21 @@ protected:
                     UINT succ1, UINT succ2);
     bool find_and_convert(List<LI<IRBB>*> & worklst);
 public:
-    explicit IR_LOOP_CVT(Region * ru)
+    explicit IR_LOOP_CVT(Region * rg)
     {
-        ASSERT0(ru != NULL);
-        m_ru = ru;
-        m_du = ru->get_du_mgr();
-        m_cfg = m_ru->get_cfg();
+        ASSERT0(rg != NULL);
+        m_ru = rg;
+        m_du = rg->getDUMgr();
+        m_cfg = m_ru->getCFG();
+        ASSERT0(m_cfg && m_du);
     }
     COPY_CONSTRUCTOR(IR_LOOP_CVT);
     virtual ~IR_LOOP_CVT() {}
 
-    virtual CHAR const* get_pass_name() const { return "Loop Convertion"; }
-    PASS_TYPE get_pass_type() const { return PASS_LOOP_CVT; }
+    virtual CHAR const* getPassName() const { return "Loop Convertion"; }
+    PASS_TYPE getPassType() const { return PASS_LOOP_CVT; }
 
-    virtual bool perform(OptCTX & oc);
+    virtual bool perform(OptCtx & oc);
 };
 
 } //namespace xoc

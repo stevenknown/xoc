@@ -34,19 +34,19 @@ author: Su Zhenyu
 #include "libdex/DexFile.h"
 #include "libdex/DexClass.h"
 #include "liropcode.h"
+#include "lir.h"
 #include "drAlloc.h"
 #include "d2d_comm.h"
-
 #include "cominc.h"
 #include "comopt.h"
 #include "dx_mgr.h"
-#include "prdf.h"
 #include "dex.h"
+#include "trycatch_info.h"
 #include "gra.h"
+#include "dex_hook.h"
 #include "dex_util.h"
 #include "dex2ir.h"
 #include "ir2dex.h"
-
 
 //Use outside pool to alloc memory. The pool will
 //be freed by caller.
@@ -54,7 +54,7 @@ void * IR2Dex::ymalloc(UINT size)
 {
     void * p = LIRMALLOC(size);
     ASSERT0(p);
-    memset(p, 0, size);
+    ::memset(p, 0, size);
     return p;
 }
 
@@ -65,13 +65,13 @@ LIR * IR2Dex::buildConstString(IN IR ** ir)
     IR * tir = *ir;
     ASSERT0(tir->is_stpr());
     UINT vx = get_vreg(STPR_no(tir));
-    VAR * v = ID_info(LDA_base(STPR_rhs(tir)));
+    VAR * v = LDA_idinfo(STPR_rhs(tir));
     CHAR const* n = SYM_name(VAR_name(v));
     LIRABOp * lir = (LIRABOp*)ymalloc(sizeof(LIRABOp));
     lir->opcode = LOP_CONST_STRING;
     LIR_dt(lir) = LIR_JDT_unknown; //see dir2lir.c
     lir->vA = vx;
-    lir->vB = m_var2ofst->mget(v);
+    lir->vB = m_var2fieldid->get_mapped(v);
     *ir = IR_next(*ir);
     return (LIR*)lir;
 }
@@ -89,7 +89,7 @@ LIR * IR2Dex::buildSput(IN IR ** ir)
     lir->opcode = LOP_SPUT;
     LIR_dt(lir) = get_lir_ty(TY_dtype(tir->get_type()));
     lir->vA = get_vreg(ST_rhs(tir));
-    lir->vB = m_var2ofst->mget(ST_idinfo(tir));
+    lir->vB = m_var2fieldid->get_mapped(ST_idinfo(tir));
     *ir = IR_next(*ir);
     return (LIR*)lir;
 }
@@ -104,7 +104,7 @@ LIR * IR2Dex::buildSgetBasicTypeVar(IN IR ** ir)
     UINT vx = get_vreg(STPR_no(tir));
     VAR * v = LD_idinfo(STPR_rhs(tir));
     CHAR const* n = SYM_name(VAR_name(v));
-    UINT field_id = m_var2ofst->mget(v);
+    UINT field_id = m_var2fieldid->get_mapped(v);
     LIRABOp * lir = (LIRABOp*)ymalloc(sizeof(LIRABOp));
     lir->opcode = LOP_SGET;
     LIR_dt(lir) = get_lir_ty(TY_dtype(tir->get_type()));
@@ -122,9 +122,9 @@ LIR * IR2Dex::buildSgetObj(IN IR ** ir)
     ASSERT0(tir->is_stpr());
     ASSERT0(STPR_rhs(tir)->is_lda());
     UINT vx = get_vreg(STPR_no(tir));
-    VAR * v = ID_info(LDA_base(STPR_rhs(tir)));
+    VAR * v = LDA_idinfo(STPR_rhs(tir));
     CHAR const* n = SYM_name(VAR_name(v));
-    UINT field_id = m_var2ofst->mget(v);
+    UINT field_id = m_var2fieldid->get_mapped(v);
     LIRABOp * lir = (LIRABOp*)ymalloc(sizeof(LIRABOp));
     lir->opcode = LOP_SGET;
     LIR_dt(lir) = LIR_JDT_object;
@@ -162,7 +162,7 @@ LIR * IR2Dex::buildMove(IN IR ** ir)
     } else if (ty == m_tr->i64 || ty == m_tr->f64 || ty == m_tr->u64) {
         LIR_dt(lir) = LIR_JDT_wide;
     } else {
-        ASSERT0(0);
+        UNREACH();
     }
     *ir = IR_next(*ir);
     return (LIR*)lir;
@@ -194,7 +194,7 @@ LIR * IR2Dex::buildCvt(IN IR ** ir)
         case D_B: x = LIR_convert_i2b; break;
         case D_I8: x = LIR_convert_i2c; break;
         case D_I16: x = LIR_convert_i2s; break;
-        default: ASSERT0(0);
+        default: UNREACH();
         }
         break;
     case D_I64:
@@ -202,7 +202,7 @@ LIR * IR2Dex::buildCvt(IN IR ** ir)
         case D_I32: x = LIR_convert_l2i; break;
         case D_F32: x = LIR_convert_l2f; break;
         case D_F64: x = LIR_convert_l2d; break;
-        default: ASSERT0(0);
+        default: UNREACH();
         }
         break;
     case D_F32:
@@ -210,7 +210,7 @@ LIR * IR2Dex::buildCvt(IN IR ** ir)
         case D_I32: x = LIR_convert_f2i; break;
         case D_I64: x = LIR_convert_f2l; break;
         case D_F64: x = LIR_convert_f2d; break;
-        default: ASSERT0(0);
+        default: UNREACH();
         }
         break;
     case D_F64:
@@ -218,11 +218,10 @@ LIR * IR2Dex::buildCvt(IN IR ** ir)
         case D_I32: x = LIR_convert_d2i; break;
         case D_I64: x = LIR_convert_d2l; break;
         case D_F32: x = LIR_convert_d2f; break;
-        default: ASSERT0(0);
+        default: UNREACH();
         }
         break;
-    default:
-        ASSERT0(0);
+    default: UNREACH();
     }
     ASSERT0(x != LIR_convert_unknown);
     LIR_dt(lir) = x;
@@ -253,7 +252,7 @@ LIR * IR2Dex::buildMoveResult(IN IR ** ir)
     } else if (ty == m_tr->ptr) {
         LIR_dt(lir) = LIR_JDT_object;
     } else {
-        ASSERT0(0);
+        UNREACH();
     }
     *ir = IR_next(*ir);
     return (LIR*)lir;
@@ -270,7 +269,7 @@ LIR * IR2Dex::buildThrow(IN IR ** ir)
     IR * p = CALL_param_list(*ir);
     ASSERT0(p);
     lir->vA = get_vreg(p);
-    ASSERT0(IR_next(p) == NULL);
+    ASSERT0(p->get_next() == NULL);
     *ir = IR_next(*ir);
     return (LIR*)lir;
 }
@@ -287,7 +286,7 @@ LIR * IR2Dex::buildMonitorExit(IN IR ** ir)
     ASSERT0(p);
 
     lir->vA = get_vreg(p);
-    ASSERT0(IR_next(p) == NULL);
+    ASSERT0(p->get_next() == NULL);
     *ir = IR_next(*ir);
     return (LIR*)lir;
 }
@@ -304,7 +303,7 @@ LIR * IR2Dex::buildMonitorEnter(IN IR ** ir)
     ASSERT0(p);
 
     lir->vA = get_vreg(p);
-    ASSERT0(IR_next(p) == NULL);
+    ASSERT0(p->get_next() == NULL);
     *ir = IR_next(*ir);
     return (LIR*)lir;
 }
@@ -330,7 +329,7 @@ LIR * IR2Dex::buildMoveException(IN IR ** ir)
     } else if (ty == m_tr->ptr) {
         LIR_dt(lir) = LIR_JDT_object;
     } else {
-        ASSERT0(0);
+        UNREACH();
     }
 
     lir->vA = get_vreg(CALL_prno(*ir));
@@ -374,13 +373,13 @@ LIR * IR2Dex::buildCheckCast(IN IR ** ir)
 
     //object-ptr
     lir->vA = get_vreg(p);
-    p = IR_next(p);
+    p = p->get_next();
     ASSERT0(p);
 
     //class id.
     lir->vB = CONST_int_val(p);
     LIR_dt(lir) = LIR_JDT_unknown; //see genInstruction()
-    p = IR_next(p);
+    p = p->get_next();
     ASSERT0(p == NULL);
     *ir = IR_next(*ir);
     return (LIR*)lir;
@@ -410,7 +409,7 @@ LIR * IR2Dex::buildConst(IN IR ** ir)
     } else if (ty == m_tr->i64 || ty == m_tr->f64 || ty == m_tr->u64) {
         LIR_dt(lir) = LIR_JDT_wide;
     } else {
-        ASSERT0(0);
+        UNREACH();
     }
     *ir = IR_next(*ir);
     return (LIR*)lir;
@@ -431,7 +430,7 @@ enum LIR_JDT_Kind IR2Dex::get_lir_ty(DATA_TYPE dt)
     case D_F32    : return LIR_JDT_float;
     case D_F64  : return LIR_JDT_double;
     case D_PTR    : return LIR_JDT_object;
-    default: ASSERT0(0);
+    default: UNREACH();
     }
     return LIR_JDT_unknown;
 }
@@ -466,7 +465,7 @@ UINT IR2Dex::findFieldId(IR * ir, IR * objptr)
                 PR1 (r:PTR:4 ptbase:1) mem_addr id:19
     */
     ASSERT0(ir->is_stmt() && objptr->is_exp() && ir->is_kids(objptr));
-    IR_DU_MGR * du_mgr = m_ru->get_du_mgr();
+    IR_DU_MGR * du_mgr = m_ru->getDUMgr();
     ASSERT0(du_mgr);
     IR const* def = du_mgr->getExactAndUniqueDef(objptr);
     ASSERT0(def);
@@ -539,7 +538,7 @@ LIR * IR2Dex::buildBinRegLit(IN IR ** ir)
     ASSERT0((is_us8(vA) && is_us8(vB) && is_s8(vC)) ||
              (is_us4(vA) && is_us4(vA) && is_s16(vC)));
     enum _LIROpcode lty = LOP_NOP;
-    switch (IR_code(rhs)) {
+    switch (rhs->get_code()) {
     case IR_ADD   : lty = LOP_ADD_LIT; break;
     case IR_SUB   : lty = LOP_SUB_LIT; break;
     case IR_MUL   : lty = LOP_MUL_LIT; break;
@@ -551,7 +550,7 @@ LIR * IR2Dex::buildBinRegLit(IN IR ** ir)
     case IR_ASR   : lty = LOP_SHR_LIT; break;
     case IR_LSR   : lty = LOP_USHR_LIT; break;
     case IR_LSL   : lty = LOP_SHL_LIT; break;
-    default: ASSERT0(0);
+    default: UNREACH();
     }
 
     LIRABCOp * lir = (LIRABCOp*)ymalloc(sizeof(LIRABCOp));
@@ -569,11 +568,11 @@ LIR * IR2Dex::buildBinRegReg(IN IR ** ir)
 {
     IR const* tir = *ir;
     IR const* rhs = STPR_rhs(tir);
-    ASSERT0(rhs->is_binary_op());
+    ASSERT0(rhs->isBinaryOp());
     ASSERT0(tir->is_stpr());
     IR * op0 = BIN_opnd0(rhs);
     IR * op1 = BIN_opnd1(rhs);
-    if (tir->is_pr_equal(op1) && rhs->is_commutative()) {
+    if (tir->isPREqual(op1) && rhs->is_commutative()) {
         IR * t = op0;
         op0 = op1;
         op1 = t;
@@ -590,7 +589,7 @@ LIR * IR2Dex::buildBinRegReg(IN IR ** ir)
         is_assign_equ = true;
     }
     enum _LIROpcode lty = LOP_NOP;
-    switch (IR_code(rhs)) {
+    switch (rhs->get_code()) {
     case IR_ADD   : lty = is_assign_equ ? LOP_ADD_ASSIGN : LOP_ADD; break;
     case IR_SUB   :
         lty = is_assign_equ ? LOP_SUB_ASSIGN : LOP_SUB;
@@ -605,7 +604,7 @@ LIR * IR2Dex::buildBinRegReg(IN IR ** ir)
     case IR_ASR   : lty = is_assign_equ ? LOP_SHR_ASSIGN : LOP_SHR; break;
     case IR_LSR   : lty = is_assign_equ ? LOP_USHR_ASSIGN : LOP_USHR; break;
     case IR_LSL   : lty = is_assign_equ ? LOP_SHL_ASSIGN : LOP_SHL; break;
-    default: ASSERT0(0);
+    default: UNREACH();
     }
 
     LIR * lir;
@@ -639,7 +638,7 @@ LIR * IR2Dex::buildBinOp(IN IR ** ir)
     } else if (op0->is_pr() && op1->is_const()) {
         return buildBinRegLit(ir);
     } else {
-        ASSERT0(0);
+        UNREACH();
     }
     return NULL;
 }
@@ -650,15 +649,14 @@ LIR * IR2Dex::buildUniOp(IN IR ** ir)
 {
     IR * tir = *ir;
     ASSERT0(tir->is_stpr());
-    IR * op0 = UNA_opnd0(STPR_rhs(tir));
+    IR * op0 = UNA_opnd(STPR_rhs(tir));
     ASSERT(op0->is_pr(), ("just support pr operation"));
 
     enum _LIROpcode lty = LOP_NOP;
-    switch (IR_code(STPR_rhs(tir))) {
+    switch (STPR_rhs(tir)->get_code()) {
     case IR_NEG   : lty = LOP_NEG; break;
     case IR_BNOT  : lty = LOP_NOT; break;
-    default:
-        ASSERT0(0);
+    default: UNREACH();
     }
 
     LIR * lir = (LIR*)ymalloc(sizeof(LIRABOp));
@@ -676,10 +674,10 @@ LIR * IR2Dex::convertStoreVar(IN OUT IR ** ir, IN IR2DexCtx * cont)
     IR * tir = *ir;
     ASSERT0(tir->is_st());
     IR * rhs = ST_rhs(tir);
-    switch (IR_code(rhs)) {
+    switch (rhs->get_code()) {
     case IR_PR  :
         return buildSput(ir);
-    default: ASSERT0(0);
+    default: UNREACH();
     }
     return NULL;
 }
@@ -690,22 +688,17 @@ LIR * IR2Dex::convertStorePR(IN OUT IR ** ir, IN IR2DexCtx * cont)
     IR * tir = *ir;
     ASSERT0(tir->is_stpr());
     IR * rhs = STPR_rhs(tir);
-    switch (IR_code(rhs)) {
+    switch (rhs->get_code()) {
     case IR_LD:
         //vA<-ld(id)
         return buildSgetBasicTypeVar(ir);
     case IR_LDA:
-        {
-            IR * id = LDA_base(rhs);
-            ASSERT0(id->is_id());
-            if (id->is_str()) {
-                return buildConstString(ir);
-            }
-            ASSERT0(id->is_mc());
-            //vA<-&(obj)
-            return buildSgetObj(ir);
+        if (LDA_idinfo(rhs)->is_string()) {
+            return buildConstString(ir);
         }
-        break;
+        ASSERT0(LDA_idinfo(rhs)->is_mc());
+        //vA<-&(obj)
+        return buildSgetObj(ir);
     case IR_CONST:
         return buildConst(ir);
     case IR_ILD:
@@ -724,10 +717,10 @@ LIR * IR2Dex::convertStorePR(IN OUT IR ** ir, IN IR2DexCtx * cont)
         return buildBinOp(ir);
     case IR_LAND  :
     case IR_LOR   :
-        ASSERT0(0);
+        UNREACH();
         break;
     case IR_LNOT  :
-        ASSERT0(0);
+        UNREACH();
         break;
     case IR_BNOT  :
     case IR_NEG   :
@@ -738,9 +731,9 @@ LIR * IR2Dex::convertStorePR(IN OUT IR ** ir, IN IR2DexCtx * cont)
         return buildCvt(ir);
     case IR_PR  :
         return buildMove(ir);
-    default: ASSERT0(0);
+    default: UNREACH();
     }
-    ASSERT0(0);
+    UNREACH();
     return NULL;
 }
 
@@ -768,7 +761,7 @@ LIR * IR2Dex::convertStoreArray(IN OUT IR ** ir, IN IR2DexCtx * cont)
     lir->opcode = LOP_APUT;
 
     ASSERT0(IR_dt(tir) == IR_dt(rhs) ||
-            tir->get_dtype_size(m_dm) == rhs->get_dtype_size(m_dm));
+            tir->get_type_size(m_tm) == rhs->get_type_size(m_tm));
     *ir = IR_next(*ir);
     return (LIR*)lir;
 }
@@ -791,7 +784,7 @@ LIR * IR2Dex::convertIstore(IN OUT IR ** ir, IN IR2DexCtx * cont)
     LIR_op1(lir) = IST_ofst(tir) / m_d2ir->get_ofst_addend();
     lir->opcode = LOP_IPUT;
     ASSERT0(IR_dt(tir) == IR_dt(rhs) ||
-             tir->get_dtype_size(m_dm) == rhs->get_dtype_size(m_dm));
+             tir->get_type_size(m_tm) == rhs->get_type_size(m_tm));
     *ir = IR_next(*ir);
     return (LIR*)lir;
 }
@@ -807,18 +800,18 @@ LIR * IR2Dex::buildInvoke(IN IR ** ir)
         // CALL id:16 'LCAnimal;::<init>'
         //     intconst:U32 (0x2) param0 id:10
         //     intconst:U32 (0x0) param1 id:12
-        //     $pr1:I32 param2 id:14
+        //     $1:I32 param2 id:14
 
         //The first must be inoke-flag.
         IR * p = CALL_param_list(tir);
         ASSERT0(p->is_const());
         UINT invoke_flags = CONST_int_val(p);
-        p = IR_next(p);
+        p = p->get_next();
 
         //The second must be method-id.
         ASSERT0(p && p->is_const());
         UINT method_id = CONST_int_val(p);
-        UNUSED(method_id);
+        DUMMYUSE(method_id);
     }
     #endif
 
@@ -849,15 +842,15 @@ LIR * IR2Dex::buildInvoke(IN IR ** ir)
     case INVOKE_INTERFACE_RANGE:
         flag = LIR_invoke_interface; flag |= LIR_Range; break;
     case INVOKE_UNDEF:
-    default: ASSERT0(0);
+    default: UNREACH();
     }
     LIR_dt(lir) = flag;
-    p = IR_next(p);
+    p = p->get_next();
 
     //Method id.
     ASSERT0(p && p->is_const());
     lir->ref = CONST_int_val(p);
-    p = IR_next(p);
+    p = p->get_next();
 
     //Real invoke paramenters.
     UINT i = 0;
@@ -866,7 +859,7 @@ LIR * IR2Dex::buildInvoke(IN IR ** ir)
         ASSERT0(t->is_pr());
         i++;
         if (is_pair(t)) { i++; }
-        t = IR_next(t);
+        t = t->get_next();
     }
     if (i > 0) {
         lir->args = (USHORT*)ymalloc(i * sizeof(USHORT));
@@ -883,7 +876,7 @@ LIR * IR2Dex::buildInvoke(IN IR ** ir)
             lir->args[j] = vx + 1;
         }
 
-        p = IR_next(p);
+        p = p->get_next();
         j++;
     }
     *ir = IR_next(*ir);
@@ -930,10 +923,10 @@ LIR * IR2Dex::buildFillArrayData(IN IR ** ir)
     //The first parameter is array obj-ptr.
     ASSERT0(p && p->is_pr());
     lir->value = get_vreg(p);
-    p = IR_next(p);
+    p = p->get_next();
 
     //The second parameter record the pointer to filling data.
-    ASSERT0(p && p->is_uint(m_dm));
+    ASSERT0(p && p->is_uint());
     lir->data = (UInt16*)CONST_int_val(p);
 
     #ifdef _DEBUG_
@@ -969,21 +962,21 @@ LIR * IR2Dex::buildFilledNewArray(IN IR ** ir)
     IR * p = CALL_param_list(tir);
 
     //first parameter is invoke-kind.
-    ASSERT0(p && p->is_uint(m_dm));
+    ASSERT0(p && p->is_uint());
     LIR_dt(lir) = CONST_int_val(p);
-    p = IR_next(p);
+    p = p->get_next();
 
     //second one is class-id.
-    ASSERT0(p && p->is_int(m_dm));
+    ASSERT0(p && p->is_int());
     lir->ref = CONST_int_val(p);
-    p = IR_next(p);
+    p = p->get_next();
 
     //and else parameters.
     UINT i = 0;
     IR * t = p;
     while (t != NULL) {
         ASSERT0(t->is_pr());
-        t = IR_next(t);
+        t = t->get_next();
         i++;
     }
     lir->argc = i;
@@ -991,7 +984,7 @@ LIR * IR2Dex::buildFilledNewArray(IN IR ** ir)
     i = 0;
     while (p != NULL) {
         lir->args[i] = get_vreg(p);
-        p = IR_next(p);
+        p = p->get_next();
         i++;
     }
     *ir = IR_next(*ir);
@@ -1044,12 +1037,12 @@ LIR * IR2Dex::buildNewArray(IN IR ** ir)
     //The number of array element.
     ASSERT0(p->is_pr());
     lir->vB = get_vreg(p);
-    p = IR_next(p);
+    p = p->get_next();
 
     //Type id of array element.
     ASSERT0(p->is_const());
     lir->vC = CONST_int_val(p);
-    ASSERT0(IR_next(p) == NULL);
+    ASSERT0(p->get_next() == NULL);
 
     ASSERT0(tir->hasReturnValue());
     lir->vA = get_vreg(CALL_prno(tir));
@@ -1081,12 +1074,12 @@ LIR * IR2Dex::buildInstanceOf(IN IR ** ir)
     IR * p = CALL_param_list(tir);
     ASSERT0(p->is_pr());
     lir->vB = get_vreg(p);
-    p = IR_next(p);
+    p = p->get_next();
 
     //type-id
     ASSERT0(p->is_const());
     lir->vC = CONST_int_val(p);
-    ASSERT0(IR_next(p) == NULL);
+    ASSERT0(p->get_next() == NULL);
 
     *ir = IR_next(*ir);
     return (LIR*)lir;
@@ -1111,17 +1104,17 @@ LIR * IR2Dex::buildCmpBias(IN IR ** ir)
 
     //cmp-kind
     IR * p = CALL_param_list(tir);
-    ASSERT0(p && p->is_int(m_dm) && IR_dt(p) == m_tr->u32);
+    ASSERT0(p && p->is_int() && IR_dt(p) == m_tr->u32);
     CMP_KIND ck = (CMP_KIND)CONST_int_val(p);
-    p = IR_next(p);
+    p = p->get_next();
 
     ASSERT0(p && p->is_pr());
     LIR_op0(lir) = get_vreg(p);
-    p = IR_next(p);
+    p = p->get_next();
 
     ASSERT0(p && p->is_pr());
     LIR_op1(lir) = get_vreg(p);
-    p = IR_next(p);
+    p = p->get_next();
 
     ASSERT0(tir->hasReturnValue());
     LIR_res(lir) = get_vreg(CALL_prno(tir));
@@ -1147,7 +1140,7 @@ LIR * IR2Dex::buildCmpBias(IN IR ** ir)
         LIR_opcode(lir) = LOP_CMP_LONG;
         LIR_dt(lir) = LIR_convert_unknown;
         break;
-    default: ASSERT0(0);
+    default: UNREACH();
     }
     *ir = IR_next(*ir);
     return (LIR*)lir;
@@ -1173,7 +1166,7 @@ LIR * IR2Dex::convertCall(IN OUT IR ** ir, IN IR2DexCtx * cont)
         case BLTIN_MONITOR_EXIT: return buildMonitorExit(ir);
         case BLTIN_INSTANCE_OF: return buildInstanceOf(ir);
         case BLTIN_CMP_BIAS: return buildCmpBias(ir);
-        default: ASSERT0(0);
+        default: UNREACH();
         }
         return NULL;
     }
@@ -1259,24 +1252,24 @@ LIR * IR2Dex::convertBranch(bool is_truebr, IN OUT IR ** ir, IN IR2DexCtx * cont
     ASSERT0(BIN_opnd0(det)->is_pr());
 
     if (is_truebr) {
-        switch (IR_code(det)) {
+        switch (det->get_code()) {
         case IR_LT: LIR_dt(lir) = LIR_cond_LT; break;
         case IR_GT: LIR_dt(lir) = LIR_cond_GT; break;
         case IR_LE: LIR_dt(lir) = LIR_cond_LE; break;
         case IR_GE: LIR_dt(lir) = LIR_cond_GE; break;
         case IR_EQ: LIR_dt(lir) = LIR_cond_EQ; break;
         case IR_NE: LIR_dt(lir) = LIR_cond_NE; break;
-        default: ASSERT0(0);
+        default: UNREACH();
         }
     } else {
-        switch (IR_code(det)) {
+        switch (det->get_code()) {
         case IR_LT: LIR_dt(lir) = LIR_cond_GE; break;
         case IR_GT: LIR_dt(lir) = LIR_cond_LE; break;
         case IR_LE: LIR_dt(lir) = LIR_cond_GT; break;
         case IR_GE: LIR_dt(lir) = LIR_cond_LT; break;
         case IR_EQ: LIR_dt(lir) = LIR_cond_NE; break;
         case IR_NE: LIR_dt(lir) = LIR_cond_EQ; break;
-        default: ASSERT0(0);
+        default: UNREACH();
         }
     }
 
@@ -1301,13 +1294,13 @@ LIR * IR2Dex::convertSwitch(IN OUT IR ** ir, IN IR2DexCtx * cont)
         IR * c = case_list;
         bool is_packed = true; //case value is continuous.
         INT base_val = CONST_int_val(CASE_vexp(c));
-        while (c != NULL && IR_next(c) != NULL) {
+        while (c != NULL && c->get_next() != NULL) {
             if ((CONST_int_val(CASE_vexp(c)) + 1) !=
-                CONST_int_val(CASE_vexp(IR_next(c)))) {
+                CONST_int_val(CASE_vexp(c->get_next()))) {
                 is_packed = false;
                 break;
             }
-            c = IR_next(c);
+            c = c->get_next();
         }
         if (is_packed) {
             lir->opcode = LOP_TABLE_SWITCH;
@@ -1321,7 +1314,7 @@ LIR * IR2Dex::convertSwitch(IN OUT IR ** ir, IN IR2DexCtx * cont)
         UINT num_of_case = 0;
         while (c != NULL) {
             num_of_case++;
-            c = IR_next(c);
+            c = c->get_next();
         }
 
         if (is_packed) {
@@ -1346,7 +1339,7 @@ LIR * IR2Dex::convertSwitch(IN OUT IR ** ir, IN IR2DexCtx * cont)
             IR * x = case_list;
             for (UINT i = 0; i < num_of_case; i++) {
                 pcase_value[i] = CONST_int_val(CASE_vexp(x));
-                x = IR_next(x);
+                x = x->get_next();
             }
 
             //((BYTE*)data)[4+num_of_case*4, 4+num_of_case*8-1]:
@@ -1370,7 +1363,7 @@ LIR * IR2Dex::convertSwitch(IN OUT IR ** ir, IN IR2DexCtx * cont)
 LIR * IR2Dex::convert(IN OUT IR ** ir, IN IR2DexCtx * cont)
 {
     ASSERT0((*ir)->is_stmt());
-    switch (IR_code(*ir)) {
+    switch ((*ir)->get_code()) {
      case IR_ST:
         return convertStoreVar(ir, cont);
     case IR_STPR:
@@ -1400,7 +1393,7 @@ LIR * IR2Dex::convert(IN OUT IR ** ir, IN IR2DexCtx * cont)
     case IR_REGION:
         ASSERT(0, ("TODO"));
     default:
-        ASSERT0(0);
+        UNREACH();
     }
     return NULL;
 }
@@ -1425,7 +1418,7 @@ void IR2Dex::reloc()
         case LOP_IF:
             {
                 bool find;
-                UINT idx = m_lab2idx.get(b->ir->get_label(), &find);
+                UINT idx = m_lab2idx.get(b->ir->getLabel(), &find);
                 ASSERT0(find);
                 if (LIR_opcode(l) == LOP_IFZ) {
                     LIR_op0(l) = idx;
@@ -1464,7 +1457,7 @@ void IR2Dex::reloc()
                 }
             }
             break;
-        default: ASSERT0(0);
+        default: UNREACH();
         }
     }
 }
@@ -1476,7 +1469,7 @@ void IR2Dex::dump_output(List<LIR*> & newlirs, Prno2Vreg const& prno2v)
     if (m_lab2idx.get_elem_count() != 0) {
         INT c;
         fprintf(g_tfile, "\n==== RU:%s, IR2Dex DUMP lab2idx ====",
-                m_ru->get_ru_name());
+                m_ru->getRegionName());
         for (LabelInfo const* li = m_lab2idx.get_first(c);
              li != NULL; li = m_lab2idx.get_next(c)) {
             dumpLabel(li);
@@ -1484,7 +1477,7 @@ void IR2Dex::dump_output(List<LIR*> & newlirs, Prno2Vreg const& prno2v)
         }
     }
     fprintf(g_tfile, "\n==== RU:%s, DUMP lir list after reloc === vregnum:%d ",
-            m_ru->get_ru_name(), prno2v.maxreg + 1);
+            m_ru->getRegionName(), prno2v.maxreg + 1);
     /*
     if (prno2v.maxreg >= 0) {
         fprintf(g_tfile, "(");
@@ -1515,14 +1508,14 @@ void IR2Dex::convert(IR * ir_list, List<LIR*> & newlirs)
     bool dump = g_dump_ir2dex && g_tfile != NULL;
     if (dump) {
         fprintf(g_tfile, "\n\n==== IR->DEX CONVERT %s =====",
-                m_ru->get_ru_name());
+                m_ru->getRegionName());
     }
     IR2DexCtx cont;
     UINT idx = 0;
     while (ir_list != NULL) {
         if (dump) {
             fprintf(g_tfile, "\n---");
-            dump_ir(ir_list, m_dm);
+            dump_ir(ir_list, m_tm);
         }
 
         if (ir_list->is_label()) {
@@ -1548,7 +1541,7 @@ void IR2Dex::convert(IR * ir_list, List<LIR*> & newlirs)
     if (g_dd) {
         ASSERT0(g_tfile);
         FILE * log = fopen("ir2dex.log", "a+");
-        fprintf(log, "\n== %s ==", m_ru->get_ru_name());
+        fprintf(log, "\n== %s ==", m_ru->getRegionName());
         FILE * t = g_tfile;
         g_tfile = log;
         UINT j = 0;

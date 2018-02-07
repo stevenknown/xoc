@@ -36,80 +36,6 @@ author: Su Zhenyu
 
 namespace xcom {
 
-
-/* Singler timer, show const string before timer start.
-e.g:
-    START_TIMER("My Pass");
-    Run mypass();
-    END_TIMER(); */
-#define START_TIMER(s)              \
-    LONG _start_time_count_ = 0;    \
-    if (g_show_comp_time) {         \
-        _start_time_count_ =        \
-            getclockstart();        \
-        printf("\n==-- %s Time:", (s));    \
-    }
-#define END_TIMER()                 \
-    if (g_show_comp_time) {         \
-        printf("%fsec", getclockend(_start_time_count_)); \
-    }
-
-
-/* Single timer, show const string after timer finish.
-e.g:
-    START_TIMER_AFTER();
-    Run mypass();
-    END_TIMER_AFTER("My Pass"); */
-#define START_TIMER_AFTER()         \
-    LONG _start_time_count_ = 0;    \
-    if (g_show_comp_time) {         \
-        _start_time_count_ =        \
-                getclockstart();    \
-    }
-#define END_TIMER_AFTER(s)          \
-    if (g_show_comp_time) {         \
-        printf("\n==-- %s Time:%fsec", \
-               (s), getclockend(_start_time_count_)); \
-    }
-
-
-/* Single timer, show format string after timer finish.
-e.g:
-    START_TIMER();
-    Run mypass();
-    END_TIMER_FMT(("My Pass Name%s", get_pass_name())); */
-#define START_TIMER_FMT()           \
-    LONG _start_time_count_ = 0;    \
-    if (g_show_comp_time) {         \
-        _start_time_count_ = getclockstart();    \
-    }
-#define END_TIMER_FMT(s)            \
-    if (g_show_comp_time) {         \
-        printf("\n==-- ");          \
-        printf s;                   \
-        printf(" Time:%fsec",       \
-               getclockend(_start_time_count_)); \
-    }
-
-
-/* Define multiple const string timers,
-and show const string before timer start.
-e.g:
-    START_TIMERS("My Pass", local_timer);
-    Run mypass();
-    END_TIMERS(local_timer); */
-#define START_TIMERS(s, _timer_timer_) \
-    LONG _timer_timer_ = 0;            \
-    if (g_show_comp_time) {            \
-        _timer_timer_ =                \
-            getclockstart();           \
-        printf("\n==-- %s Time:", (s)); \
-    }
-#define END_TIMERS(_timer_timer_)      \
-    if (g_show_comp_time) {            \
-        printf("%fsec", getclockend(_timer_timer_)); \
-    }
-
 //This macro declare copy constructor for class.
 #define COPY_CONSTRUCTOR(class_name)   \
     class_name(class_name const&);     \
@@ -117,15 +43,19 @@ e.g:
 
 //Used to avoid warning: unreferenced variable if set
 //-Werror=unused-variable.
-//#define UNUSED(v) (v)
-template <typename T> void dummy_use(T const&) {}
-#define UNUSED(v) dummy_use(v)
-
+template <typename T> int dummy_use(T const&) { return 0; }
+#define DUMMYUSE(v) xcom::dummy_use(v)
 
 #ifdef _DEBUG_
-#define CK_USE(a)    ASSERT0(a)
+#define CHECK_DUMMYUSE(a)    ASSERT0(a)
+#define ASSERT_DUMMYUSE(a, b)  \
+    ((a) ? DUMMYUSE(0) : (m022138(__FILE__, __LINE__), m518087 b))
+#define ASSERT0_DUMMYUSE(a)  \
+    ((a) ? DUMMYUSE(0) : (m022138(__FILE__, __LINE__), m518087 ("")))
 #else
-#define CK_USE(a)    UNUSED(a)
+#define CHECK_DUMMYUSE(a)    DUMMYUSE(a)
+#define ASSERT_DUMMYUSE(a, b)
+#define ASSERT0_DUMMYUSE(a)
 #endif
 
 
@@ -153,6 +83,9 @@ UINT combin(UINT n, UINT m); //Combination
 //e.g  v=17 , align=4 , the result is 20.
 LONGLONG ceil_align(LONGLONG v, LONGLONG align);
 
+//Caculate the number of bits which longer enough to represent given constant.
+UINT computeConstBitLen(ULONGLONG v);
+
 //Dumpf() for Vector<TY>.
 void dumpf_svec(void * vec, UINT ty, CHAR const* name, bool is_del);
 
@@ -173,6 +106,9 @@ INT findstr(CHAR * src, CHAR * s);
 //e.g: Given string is a\b\c, separator is '\', return c;
 CHAR const* extractRightMostSubString(CHAR const* string, CHAR separator);
 
+//Extract the left most sub-string which separated by 'separator' from string.
+//e.g: Given string is a\b\c, separator is '\', return a;
+void extractLeftMostSubString(CHAR * tgt, CHAR const* string, CHAR separator);
 //Great common divisor for number of values.
 INT gcdm(UINT num, ...);
 
@@ -215,7 +151,6 @@ UINT getSparsePopCount(ULONGLONG v);
 //Compute the power of 2, return the result.
 //Note v must be power of 2.
 UINT getPowerOf2(ULONGLONG v);
-UINT get_const_bit_len(LONGLONG v);
 
 //Extract file suffix.
 //e.g: Given a.foo, return foo.
@@ -254,11 +189,10 @@ bool is_integer(float f);
 
 //Judge if 'd' is integer conform to IEEE754 spec.
 bool is_integerd(double d);
-bool isPowerOf5(double f);
 
 //inline is necessary to avoid multiple define.
-inline bool isPowerOf2(ULONGLONG x)
-{ return (x != 0 && (x & (x-1)) == 0); }
+inline bool isPowerOf2(ULONGLONG x) { return (x != 0 && (x & (x-1)) == 0); }
+bool isPowerOf5(double f);
 
 //Prime Factorization.
 //e.g: 435234 = 251 * 17 * 17 * 3 * 2.
@@ -281,7 +215,7 @@ INT slcm(INT x, INT y);
 //   means shifting string to left.
 void strshift(CHAR * src, INT ofst);
 
-CHAR * xstrcat(CHAR * buf, UINT bufl, CHAR const* info, ...);
+CHAR * xstrcat(CHAR * buf, size_t bufl, CHAR const* info, ...);
 UINT xstrlen(CHAR const* p);
 
 //Compare the first 'n' char of two string.
@@ -291,16 +225,13 @@ bool xstrcmp(CHAR const* p1, CHAR const* p2, INT n);
 //Format string and record in buf.
 //'buf': output buffer record string.
 //'stack_start': point to the first args.
-CHAR * xsprintf(IN OUT CHAR * buf,
-                UINT buflen,
-                IN CHAR const* format,
-                ...);
+CHAR * xsprintf(IN OUT CHAR * buf, UINT buflen, CHAR const* format, ...);
 
 //Convert a string into long integer.
 //e.g: cl = '1','2','3','4','5'
 //return 12345.
 //'is_oct': if true, nptr is octal digits.
-LONG xatol(CHAR const* nptr, bool is_oct);
+LONGLONG xatoll(CHAR const* nptr, bool is_oct);
 
 //Convert char value into binary.
 //e.g: char p = ' '; p is blank.
@@ -310,7 +241,7 @@ INT xctoi(CHAR const* cl);
 UCHAR * xltoa(LONG v, OUT UCHAR * buf);
 INT xceiling(INT a, INT b);
 INT xfloor(INT a, INT b);
-INT xstrstr(CHAR const* src, CHAR const* par, INT i);
+LONG xstrstr(CHAR const* src, CHAR const* par, INT i);
 
 //Split string by given separetor, and return the number of substring.
 //str: input string.
@@ -318,7 +249,7 @@ INT xstrstr(CHAR const* src, CHAR const* par, INT i);
 //sep: separator.
 //Note caller is responsible for the free of each string memory in ret.
 UINT xsplit(CHAR const* str, OUT Vector<CHAR*, 8> & ret, CHAR const* sep);
-void xstrcpy(CHAR * tgt, CHAR const* src, UINT size);
+void xstrcpy(CHAR * tgt, CHAR const* src, size_t size);
 inline bool xisspace(CHAR c) { return c == ' ' || c == '\t'; }
 inline bool xisdigit(CHAR c) { return c >= '0' && c <= '9'; }
 inline bool xisdigithex(CHAR d)

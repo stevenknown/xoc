@@ -59,14 +59,14 @@ public:
 };
 
 
-//Propagate the constant operation, include const, lda, and cvt for const.
+//Propagate the constant operation, include CONST, LDA, CVT for const.
 #define CP_PROP_CONST                1
 
-//Propagate the simplex operation, include const, pr, lda, and cvt for simplex.
+//Propagate the simplex operation, include CONST, PR, LDA, CVT for simplex.
 #define CP_PROP_SIMPLEX                2
 
-//Propagate unary and simplex operations, include const, pr, lda, cvt for simplex, ld,
-//id, neg, bnot, lnot, ild.
+//Propagate unary and simplex operations, include CONST, PR, LDA, CVT, LD,
+//ID, NEG, BNOT, LNOT, ILD.
 #define CP_PROP_UNARY_AND_SIMPLEX    3
 
 //Perform Copy Propagation
@@ -77,36 +77,71 @@ protected:
     IR_DU_MGR * m_du;
     IR_CFG * m_cfg;
     MDSetMgr * m_md_set_mgr;
-    TypeMgr * m_dm;
+    TypeMgr * m_tm;
     UINT m_prop_kind;
+    bool m_is_dump_cp;
 
-    inline bool checkTypeConsistency(IR const* ir,
-                                       IR const* cand_expr) const;
-    bool doProp(IN IRBB * bb, Vector<IR*> & usevec);
+protected:
+    inline bool checkTypeConsistency(
+            IR const* ir,
+            IR const* cand_expr) const;
+
+    bool doPropToMDPhi(
+            bool prssadu,
+            bool mdssadu,
+            IN IR const* prop_value,
+            IN IR * use,
+            MDSSAMgr * mdssamgr);
+    bool doPropToNormalStmt(
+            C<IR*> * cur_iter,
+            C<IR*> ** next_iter,
+            bool prssadu,
+            bool mdssadu,
+            IN IR const* prop_value,
+            IN IR * use,
+            IN IR * use_stmt,
+            IN IRBB * def_bb,
+            IN OUT IRBB * use_bb,
+            MDSSAMgr * mdssamgr);
+    bool doProp(IN IRBB * bb, IN DefSBitSetCore & useset, MDSSAMgr * mdssamgr);
     void doFinalRefine();
 
-    bool is_simp_cvt(IR const* ir) const;
-    bool is_const_cvt(IR const* ir) const;
-    bool is_available(IR const* def_ir, IR const* occ, IR * use_ir);
+    bool isSimpCVT(IR const* ir) const;
+    bool isConstCVT(IR const* ir) const;
+    bool is_available(
+            IR const* def_stmt,
+            IR const* prop_value,
+            IR * use_stmt,
+            MDPhi * use_phi,
+            IRBB * usebb);
     inline bool is_copy(IR * ir) const;
 
     bool performDomTree(IN Vertex * v, IN Graph & domtree);
 
-    void replaceExp(IR * exp, IR const* cand_expr,
-                    IN OUT CPCtx & ctx, bool exp_use_ssadu);
-    void replaceExpViaSSADu(IR * exp, IR const* cand_expr,
-                            IN OUT CPCtx & ctx);
+    void replaceExp(
+            IR * exp,
+            IR const* cand_expr,
+            IN OUT CPCtx & ctx,
+            bool exp_use_ssadu,
+            bool exp_use_mdssadu,
+            MDSSAMgr * mdssamgr);
+    void replaceExpViaSSADu(
+            IR * exp,
+            IR const* cand_expr,
+            IN OUT CPCtx & ctx);
 public:
-    IR_CP(Region * ru)
+    IR_CP(Region * rg)
     {
-        ASSERT0(ru != NULL);
-        m_ru = ru;
-        m_md_sys = ru->get_md_sys();
-        m_du = ru->get_du_mgr();
-        m_cfg = ru->get_cfg();
-        m_md_set_mgr = ru->get_mds_mgr();
-        m_dm = ru->get_type_mgr();
+        ASSERT0(rg != NULL);
+        m_ru = rg;
+        m_md_sys = rg->getMDSystem();
+        m_du = rg->getDUMgr();
+        m_cfg = rg->getCFG();
+        m_md_set_mgr = rg->getMDSetMgr();
+        m_tm = rg->getTypeMgr();
+        ASSERT0(m_cfg && m_du && m_md_sys && m_tm && m_md_set_mgr);
         m_prop_kind = CP_PROP_UNARY_AND_SIMPLEX;
+        m_is_dump_cp = true;
     }
     virtual ~IR_CP() {}
 
@@ -115,46 +150,50 @@ public:
     {
         switch (m_prop_kind) {
         case CP_PROP_CONST:
-            return ir->is_lda() || ir->is_const_exp();
+            return ir->is_lda() || ir->isConstExp();
         case CP_PROP_SIMPLEX:
-            switch (IR_code(ir)) {
+            switch (ir->get_code()) {
             case IR_LDA:
             case IR_ID:
             case IR_CONST:
             case IR_PR:
                 return true;
-            default:
-                return is_simp_cvt(ir);
+            default: return isSimpCVT(ir);
             }
-            UNREACH();
         case CP_PROP_UNARY_AND_SIMPLEX:
-            switch (IR_code(ir)) {
-            case IR_LD:
+            switch (ir->get_code()) {
             case IR_LDA:
             case IR_ID:
             case IR_CONST:
             case IR_PR:
-            case IR_NEG:
-            case IR_BNOT:
-            case IR_LNOT:
-            case IR_ILD:
                 return true;
-            default:
-                return is_simp_cvt(ir);
+            case IR_LD:
+            case IR_ILD:
+                if (ir->getRefMD() != NULL && ir->getRefMD()->is_exact()) {
+                    return true;
+                }
+                return false;
+            default: return isSimpCVT(ir);
             }
-            UNREACH();
-        default:;
+        default: UNREACH();
         }
-        UNREACH();
         return false;
     }
 
-    virtual CHAR const* get_pass_name() const { return "Copy Propagation"; }
-    virtual PASS_TYPE get_pass_type() const { return PASS_CP; }
+    void dumpCopyPropagationAction(
+        IR const* def_stmt,
+        IR const* prop_value,
+        IR const* use,
+        MDSSAMgr * mdssamgr);
 
-    void set_prop_kind(UINT kind) { m_prop_kind = kind; }
+    virtual CHAR const* getPassName() const { return "Copy Propagation"; }
+    virtual PASS_TYPE getPassType() const { return PASS_CP; }
+    IR const* getSimpCVTValue(IR const* ir) const;
 
-    virtual bool perform(OptCTX & oc);
+    void setPropagationKind(UINT kind) { m_prop_kind = kind; }
+    void setDumpCP(bool dump) { m_is_dump_cp = dump; }
+
+    virtual bool perform(OptCtx & oc);
 };
 
 } //namespace xoc

@@ -57,7 +57,7 @@ protected:
     {
         DefSBitSetCore * set = m_def.get(bbid);
         if (set == NULL) {
-            set = m_sbs_mgr.create_sbitsetc();
+            set = m_sbs_mgr.allocSBitSetCore();
             m_def.set(bbid, set);
         }
         return set;
@@ -67,28 +67,28 @@ protected:
     {
         DefSBitSetCore * set = m_use.get(bbid);
         if (set == NULL) {
-            set = m_sbs_mgr.create_sbitsetc();
+            set = m_sbs_mgr.allocSBitSetCore();
             m_use.set(bbid, set);
         }
         return set;
     }
 
     inline void processOpnd(
-                    IR const* exp,
-                    List<IR const*> & lst,
-                    DefSBitSetCore * use,
-                    DefSBitSetCore * gen);
+            IR const* exp,
+            List<IR const*> & lst,
+            DefSBitSetCore * use,
+            DefSBitSetCore * gen);
     inline void processMay(
-                    IR const* pr,
-                    DefSBitSetCore * gen,
-                    DefSBitSetCore * use,
-                    bool is_lhs);
+            IR const* pr,
+            DefSBitSetCore * gen,
+            DefSBitSetCore * use,
+            bool is_lhs);
 public:
-    PRDF(Region * ru)
+    PRDF(Region * rg)
     {
-        m_ru = ru;
-        m_md_sys = ru->get_md_sys();
-        m_cfg = ru->get_cfg();
+        m_ru = rg;
+        m_md_sys = rg->getMDSystem();
+        m_cfg = rg->getCFG();
         m_var2pr = NULL;
         m_handle_may = false;
     }
@@ -98,28 +98,28 @@ public:
         for (INT i = 0; i <= m_def.get_last_idx(); i++) {
             DefSBitSetCore * bs = m_def.get((UINT)i);
             if (bs != NULL) {
-                m_sbs_mgr.free_sbitsetc(bs);
+                m_sbs_mgr.freeSBitSetCore(bs);
             }
         }
 
         for (INT i = 0; i <= m_use.get_last_idx(); i++) {
             DefSBitSetCore * bs = m_use.get((UINT)i);
             if (bs != NULL) {
-                m_sbs_mgr.free_sbitsetc(bs);
+                m_sbs_mgr.freeSBitSetCore(bs);
             }
         }
 
         for (INT i = 0; i <= m_livein.get_last_idx(); i++) {
             DefSBitSetCore * bs = m_livein.get((UINT)i);
             if (bs != NULL) {
-                m_sbs_mgr.free_sbitsetc(bs);
+                m_sbs_mgr.freeSBitSetCore(bs);
             }
         }
 
         for (INT i = 0; i <= m_liveout.get_last_idx(); i++) {
             DefSBitSetCore * bs = m_liveout.get((UINT)i);
             if (bs != NULL) {
-                m_sbs_mgr.free_sbitsetc(bs);
+                m_sbs_mgr.freeSBitSetCore(bs);
             }
         }
     }
@@ -127,9 +127,9 @@ public:
     void computeLocal(IRBB * bb, List<IR const*> & lst);
     void computeGlobal();
 
-    UINT count_mem() const
+    size_t count_mem() const
     {
-        UINT count = m_sbs_mgr.count_mem();
+        size_t count = m_sbs_mgr.count_mem();
         count += m_def.count_mem();
         count += m_use.count_mem();
         count += m_livein.count_mem();
@@ -168,13 +168,13 @@ public:
 
     void dump();
 
-    virtual CHAR const* get_pass_name() const { return "PRDF"; }
-    PASS_TYPE get_pass_type() const { return PASS_PRDF; }
+    virtual CHAR const* getPassName() const { return "PRDF"; }
+    PASS_TYPE getPassType() const { return PASS_PRDF; }
 
     DefMiscBitSetMgr & getMiscBitSetMgr() { return m_sbs_mgr; }
 
     //Get livein PR. The return set is readonly.
-    DefSBitSetCore const* get_livein_c(UINT bbid) const
+    DefSBitSetCore const* read_livein(UINT bbid) const
     { return m_livein.get(bbid); }
 
     //Get livein PR.
@@ -182,7 +182,7 @@ public:
     {
         DefSBitSetCore * x = m_livein.get(bbid);
         if (x == NULL) {
-            x = m_sbs_mgr.create_sbitsetc();
+            x = m_sbs_mgr.allocSBitSetCore();
             m_livein.set(bbid, x);
         }
         return x;
@@ -197,7 +197,7 @@ public:
     {
         DefSBitSetCore * x = m_liveout.get(bbid);
         if (x == NULL) {
-            x = m_sbs_mgr.create_sbitsetc();
+            x = m_sbs_mgr.allocSBitSetCore();
             m_liveout.set(bbid, x);
         }
         return x;
@@ -213,7 +213,7 @@ public:
     void setPRToBeLiveout(IRBB * bb, UINT prno)
     { get_liveout(BB_id(bb))->bunion(prno, m_sbs_mgr); }
 
-    virtual bool perform(OptCTX & oc);
+    virtual bool perform(OptCtx & oc);
 };
 
 } //namespace xoc

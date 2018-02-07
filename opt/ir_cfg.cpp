@@ -39,13 +39,13 @@ author: Su Zhenyu
 namespace xoc {
 
 //IR_CFG
-IR_CFG::IR_CFG(CFG_SHAPE cs, BBList * bbl, Region * ru,
+IR_CFG::IR_CFG(CFG_SHAPE cs, BBList * bbl, Region * rg,
                UINT edge_hash_size, UINT vertex_hash_size)
     : CFG<IRBB, IR>(bbl, edge_hash_size, vertex_hash_size)
 {
-    m_ru = ru;
-    m_dm = ru->get_type_mgr();
-    set_bs_mgr(ru->get_bs_mgr());
+    m_ru = rg;
+    m_tm = rg->getTypeMgr();
+    setBitSetMgr(rg->getBitSetMgr());
     if (m_bb_list->get_elem_count() == 0) {
         return;
     }
@@ -56,33 +56,35 @@ IR_CFG::IR_CFG(CFG_SHAPE cs, BBList * bbl, Region * ru,
          bb != NULL; bb = m_bb_list->get_prev()) {
         m_bb_vec.set(BB_id(bb), bb);
         addVertex(BB_id(bb));
-        for (LabelInfo const* li = bb->get_lab_list().get_head();
-             li != NULL; li = bb->get_lab_list().get_next()) {
+        for (LabelInfo const* li = bb->getLabelList().get_head();
+             li != NULL; li = bb->getLabelList().get_next()) {
+            ASSERT(m_lab2bb.get(li) == NULL,
+                   ("Label has been mapped to BB%d", BB_id(m_lab2bb.get(li))));
             m_lab2bb.set(li, bb);
             if (LABEL_INFO_is_catch_start(li)) {
                 BB_is_catch_start(bb) = true;
             }
-            if (LABEL_INFO_is_unreachable(li)) {
-                BB_is_unreach(bb) = true;
+            if (LABEL_INFO_is_terminate(li)) {
+                BB_is_terminate(bb) = true;
             }
         }
     }
+
     switch (cs) {
     case C_SESE:
         {
             //Make sure the region has the unique entry.
-            IRBB * entry = m_ru->newBB();
-            BB_is_entry(entry) = true;
-            BB_is_fallthrough(entry) = true;
-            add_bb(entry);
-            m_bb_list->append_head(entry);
-            m_entry_list.append_tail(entry);
+            m_entry = m_ru->allocBB();
+            BB_is_entry(m_entry) = true;
+            BB_is_fallthrough(m_entry) = true;
+            add_bb(m_entry);
+            m_bb_list->append_head(m_entry);
 
-            /* Create logical exit BB.
-            NOTICE: In actually, the logical exit BB is ONLY
-            used to solve diverse dataflow equations, whereas
-            considering the requirement of ENTRY BB, EXIT BB. */
-            IRBB * exit = m_ru->newBB();
+            //Create logical exit BB.
+            //NOTICE: In actually, the logical exit BB is ONLY
+            //used to solve diverse dataflow equations, whereas
+            //considering the requirement of ENTRY BB, EXIT BB.
+            IRBB * exit = m_ru->allocBB();
             BB_is_fallthrough(exit) = true;
             add_bb(exit);
             m_bb_list->append_tail(exit);
@@ -92,29 +94,21 @@ IR_CFG::IR_CFG(CFG_SHAPE cs, BBList * bbl, Region * ru,
     case C_SEME:
         {
             //Create entry BB.
-            IRBB * entry = m_ru->newBB();
-            BB_is_entry(entry) = true;
+            m_entry = m_ru->allocBB();
+            BB_is_entry(m_entry) = true;
             //BB_is_fallthrough(entry) = true;
-            add_bb(entry);
-            m_bb_list->append_head(entry);
-            m_entry_list.append_tail(entry);
+            add_bb(m_entry);
+            m_bb_list->append_head(m_entry);
 
-            /* Collect exit BB.
-            for (IRBB * bb = m_bb_list->get_head();
-                 bb != NULL; bb = m_bb_list->get_next()) {
-                if (IR_BB_is_func_exit(bb)) {
-                    m_exit_list.append_tail(bb);
-                }
-            } */
+            //Collect exit BB.
+            //for (IRBB * bb = m_bb_list->get_head();
+            //     bb != NULL; bb = m_bb_list->get_next()) {
+            //    if (IR_BB_is_func_exit(bb)) {
+            //        m_exit_list.append_tail(bb);
+            //    }
+            //}
             break;
         }
-    case C_MEME:
-    case C_MESE:
-        /* One should mark all entries and exits after cfg contructed.
-        Multiple entry and exit are deprecated, it might confuse
-        some optimizations. */
-        ASSERT(0, ("TODO"));
-        break;
     default: ASSERT(0, ("strang shape of CFG"));
     }
 }
@@ -126,7 +120,7 @@ void IR_CFG::cf_opt()
     bool change = true;
     while (change) {
         change = false;
-        BBList * bbl = get_bb_list();
+        BBList * bbl = getBBList();
         for (IRBB * bb = bbl->get_head(); bb != NULL; bb = bbl->get_next()) {
             change = goto_opt(bb);
             if (change) { break; }
@@ -137,17 +131,207 @@ void IR_CFG::cf_opt()
 }
 
 
-//Do early control flow optimization.
-void IR_CFG::initCfg(OptCTX & oc)
+//Construct EH edge after cfg built.
+void IR_CFG::buildEHEdge()
 {
-    //cfg->removeEmptyBB();
-    build(oc);
-    buildEHEdge();
+    ASSERT(m_bb_list, ("bb_list is emt"));
+    C<IRBB*> * ct;
+    for (m_bb_list->get_head(&ct);
+         ct != m_bb_list->end(); ct = m_bb_list->get_next(ct)) {
+        IRBB const* bb = ct->val();
+        C<IR*> * ct2;
+        IR * x = BB_irlist(const_cast<IRBB*>(bb)).get_tail(&ct2);
+        if (x != NULL && x->isMayThrow() && x->getAI() != NULL) {
+            EHLabelAttachInfo const* ehlab =
+                (EHLabelAttachInfo const*)x->getAI()->get(AI_EH_LABEL);
+            if (ehlab == NULL) { continue; }
+
+            SC<LabelInfo*> * sc;
+            SList<LabelInfo*> const& labs = ehlab->read_labels();
+            for (sc = labs.get_head();
+                 sc != labs.end();
+                 sc = labs.get_next(sc)) {
+                ASSERT0(sc);
+                IRBB * tgt = findBBbyLabel(sc->val());
+                ASSERT0(tgt);
+                Edge * e = addEdge(BB_id(bb), BB_id(tgt));
+                EDGE_info(e) = xmalloc(sizeof(CFGEdgeInfo));
+                CFGEI_is_eh((CFGEdgeInfo*)EDGE_info(e)) = true;
+                m_has_eh_edge = true;
+            }
+        }
+    }
+}
+
+
+//Construct EH edge after cfg built.
+//This function use a conservative method, and this method
+//may generate lots of redundant exception edges.
+void IR_CFG::buildEHEdgeNaive()
+{
+    ASSERT(m_bb_list, ("bb_list is emt"));
+    List<IRBB*> maythrow;
+    List<IRBB*> ehl;
+    IRBB * entry = NULL;
+    C<IRBB*> * ct;
+
+    for (m_bb_list->get_head(&ct);
+         ct != m_bb_list->end();
+         ct = m_bb_list->get_next(ct)) {
+        IRBB * bb = ct->val();
+        if (isRegionEntry(bb)) {
+            entry = bb;
+            break;
+        }
+    }
+
+    ASSERT(entry, ("Region does not have an entry"));
+    BitSet mainstreambbs;
+    computeMainStreamBBSet(entry, mainstreambbs);
+
+    BitSet ehbbs; //Record all BB in exception region.
+    for (m_bb_list->get_head(&ct);
+         ct != m_bb_list->end(); ct = m_bb_list->get_next(ct)) {
+        IRBB * bb = ct->val();
+
+        if (bb->isExceptionHandler()) {
+            ehl.append_tail(bb);
+            findEHRegion(bb, mainstreambbs, ehbbs);
+        }
+
+        if (bb->mayThrowException() && !ehbbs.is_contain(BB_id(bb))) {
+            maythrow.append_tail(bb);
+        }
+    }
+
+    if (ehl.get_elem_count() == 0) { return; }
+
+    if (maythrow.get_elem_count() == 0) {
+        ASSERT(entry, ("multi entries"));
+        maythrow.append_tail(entry);
+    }
+
+    for (ehl.get_head(&ct); ct != ehl.end(); ct = ehl.get_next(ct)) {
+         IRBB * b = ct->val();
+         C<IRBB*> * ct2;
+         for (maythrow.get_head(&ct2);
+              ct2 != maythrow.end(); ct2 = maythrow.get_next(ct2)) {
+             IRBB * a = ct2->val();
+             if (ehbbs.is_contain(BB_id(a))) { continue; }
+
+             Edge * e = addEdge(a->id(), b->id());
+             EDGE_info(e) = xmalloc(sizeof(CFGEdgeInfo));
+             CFGEI_is_eh((CFGEdgeInfo*)EDGE_info(e)) = true;
+             m_has_eh_edge = true;
+         }
+    }
+}
+
+
+//Verification at building SSA mode by ir parser.
+bool IR_CFG::verifyPhiEdge(IR * phi, TMap<IR*, LabelInfo*> & ir2label)
+{
+    Vertex * bbvex = get_vertex(phi->getBB()->id());
+    EdgeC * opnd_pred = VERTEX_in_list(bbvex);
+    IR * opnd = PHI_opnd_list(phi);
+    for (; opnd != NULL && opnd_pred != NULL;
+         opnd = opnd->get_next(), opnd_pred = EC_next(opnd_pred)) {
+        LabelInfo * opnd_label = ir2label.get(opnd);
+        IRBB * incoming_bb = findBBbyLabel(opnd_label);
+        ASSERT0(incoming_bb);
+        if (VERTEX_id(EDGE_from(EC_edge(opnd_pred))) != incoming_bb->id()) {
+            return false;
+        }
+    }
+    ASSERT0(opnd == NULL && opnd_pred == NULL);
+    return true;
+}
+
+
+//Construct CFG edge for BB has phi.
+void IR_CFG::buildAndRevisePhiEdge(TMap<IR*, LabelInfo*> & ir2label)
+{
+    ASSERT(m_bb_list, ("bb_list is emt"));
+    C<IRBB*> * ct;
+    for (m_bb_list->get_head(&ct);
+         ct != m_bb_list->end(); ct = m_bb_list->get_next(ct)) {
+        IRBB const* bb = ct->val();
+        if (BB_irlist(bb).get_elem_count() == 0) {
+            continue;
+        }
+
+        INT phi_opnd_num = -1;
+        C<IR*> * ct2;
+        for (BB_irlist(const_cast<IRBB*>(bb)).get_head(&ct2);
+             ct2 != NULL; BB_irlist(const_cast<IRBB*>(bb)).get_next(&ct2)) {
+            IR * x = ct2->val();
+            ASSERT0(x);
+            if (x->is_phi()) {
+                for (IR * opnd = PHI_opnd_list(x);
+                     opnd != NULL; opnd = opnd->get_next()) {
+                    LabelInfo * opnd_label = ir2label.get(opnd);
+                    ASSERT(opnd_label, ("no corresponding label to opnd"));
+                    IRBB * incoming_bb = findBBbyLabel(opnd_label);
+                    ASSERT0(incoming_bb);
+                    addEdge(incoming_bb->id(), bb->id());
+                }
+                if (phi_opnd_num == -1) {
+                    phi_opnd_num = xcom::cnt_list(PHI_opnd_list(x));
+
+                    //Sort in-edge of bb to make sure the order of them are same
+                    //with the phi-operands.
+                    Vertex * bbvex = get_vertex(bb->id());
+                    EdgeC * opnd_pred = VERTEX_in_list(bbvex);
+                    for (IR * opnd = PHI_opnd_list(x);
+                         opnd != NULL; opnd = opnd->get_next()) {
+                        LabelInfo * opnd_label = ir2label.get(opnd);
+                        IRBB * incoming_bb = findBBbyLabel(opnd_label);
+                        ASSERT0(incoming_bb);
+                        if (VERTEX_id(EDGE_from(EC_edge(opnd_pred))) == incoming_bb->id()) {
+                            opnd_pred = EC_next(opnd_pred);
+                            continue;
+                        }
+
+                        EdgeC * q;
+                        for (q = EC_next(opnd_pred); q != NULL; q = EC_next(q)) {
+                            if (VERTEX_id(EDGE_from(EC_edge(q))) == incoming_bb->id()) {
+                                break;
+                            }
+                        }
+                        ASSERT(q, ("can not find needed EdgeC"));
+                        xcom::swap(&VERTEX_in_list(bbvex), opnd_pred, q);
+                        opnd_pred = EC_next(q);
+                    }
+
+                    ASSERT0(verifyPhiEdge(x, ir2label));
+                } else {
+                    ASSERT((UINT)phi_opnd_num == xcom::cnt_list(PHI_opnd_list(x)),
+                        ("the number of operand is inconsistent"));
+                    ASSERT0((UINT)phi_opnd_num == get_in_degree(get_vertex(bb->id())));
+                }
+            }
+        }
+    }
+}
+
+
+//Do early control flow optimization.
+void IR_CFG::initCfg(OptCtx & oc)
+{
+    if (getBBList()->get_elem_count() == 0) {
+        //If bb is empty, set CFG is invalid.
+        //OC_is_cfg_valid(oc) = true;
+        return;
+    }
+
+    //cfg->removeEmptyBB();    
+    build(oc);    
+    buildEHEdge();    
 
     //Rebuild cfg may generate redundant empty bb, it
     //disturb the computation of entry and exit.
     removeEmptyBB(oc);
-    computeEntryAndExit(true, true);
+    computeExitList();
 
     bool change = true;
     UINT count = 0;
@@ -155,43 +339,42 @@ void IR_CFG::initCfg(OptCTX & oc)
         change = false;
         if (g_do_cfg_remove_empty_bb &&
             removeEmptyBB(oc)) {
-            computeEntryAndExit(true, true);
+            computeExitList();
             change = true;
         }
 
         if (g_do_cfg_remove_unreach_bb &&
             removeUnreachBB()) {
-            computeEntryAndExit(true, true);
+            computeExitList();
             change = true;
         }
 
         if (g_do_cfg_remove_trampolin_bb &&
             removeTrampolinEdge()) {
-            computeEntryAndExit(true, true);
+            computeExitList();
             change = true;
         }
 
         if (g_do_cfg_remove_unreach_bb &&
             removeUnreachBB()) {
-            computeEntryAndExit(true, true);
+            computeExitList();
             change = true;
         }
 
         if (g_do_cfg_remove_trampolin_bb &&
             removeTrampolinBB()) {
-            computeEntryAndExit(true, true);
+            computeExitList();
             change = true;
         }
         count++;
     }
     ASSERT0(!change);
     ASSERT0(verify());
-    ASSERT(get_entry_list()->get_elem_count() <= 1, ("Must be single entry"));
 }
 
 
 void IR_CFG::findTargetBBOfMulticondBranch(
-        IN IR * ir,
+        IR const* ir,
         OUT List<IRBB*> & tgt_bbs)
 {
     ASSERT0(ir->is_switch());
@@ -228,7 +411,7 @@ void IR_CFG::findEHRegion(
         BitSet const& mainstreambbs,
         OUT BitSet & ehbbs)
 {
-    ASSERT0(catch_start && catch_start->is_exp_handling());
+    ASSERT0(catch_start && catch_start->isExceptionHandler());
     List<Vertex const*> list;
     Vertex const* bbv = get_vertex(BB_id(catch_start));
     ASSERT0(bbv);
@@ -265,7 +448,7 @@ void IR_CFG::findAllTryRegions(OUT BitSet & trybbs)
     for (m_bb_list->get_head(&ct);
          ct != m_bb_list->end(); ct = m_bb_list->get_next(ct)) {
         IRBB const* bb = ct->val();
-        if (!bb->is_try_start()) { continue; }
+        if (!bb->isTryStart()) { continue; }
         t.clean();
         findTryRegion(bb, t);
         trybbs.bunion(t);
@@ -279,7 +462,7 @@ void IR_CFG::findAllTryRegions(OUT BitSet & trybbs)
 //Note: this function does not clean trybbs. Caller is responsible for that.
 void IR_CFG::findTryRegion(IRBB const* try_start, OUT BitSet & trybbs)
 {
-    ASSERT0(try_start && try_start->is_try_start());
+    ASSERT0(try_start && try_start->isTryStart());
     List<Vertex const*> list;
     Vertex const* bbv = get_vertex(BB_id(try_start));
     ASSERT0(bbv);
@@ -291,10 +474,10 @@ void IR_CFG::findTryRegion(IRBB const* try_start, OUT BitSet & trybbs)
 
         trybbs.bunion(id);
 
-        IRBB * bb = get_bb(id);
+        IRBB * bb = getBB(id);
         ASSERT(bb, ("vertex on CFG correspond to nothing"));
 
-        if (bb->is_try_end() && bb != try_start) {
+        if (bb->isTryEnd() && bb != try_start) {
             //BB may have both try_start and try_end label.
             //If it is the case, the try_end is always other region's
             //end label, just ignore that.
@@ -320,10 +503,10 @@ void IR_CFG::findTryRegion(IRBB const* try_start, OUT BitSet & trybbs)
 
 
 //Find a list bb that referred labels which is the target of ir.
-void IR_CFG::findTargetBBOfIndirectBranch(IR * ir, OUT List<IRBB*> & tgtlst)
+void IR_CFG::findTargetBBOfIndirectBranch(IR const* ir, OUT List<IRBB*> & tgtlst)
 {
-    ASSERT0(ir->is_indirect_br());
-    for (IR * c = IGOTO_case_list(ir); c != NULL; c = IR_next(c)) {
+    ASSERT0(ir->isIndirectBr());
+    for (IR * c = IGOTO_case_list(ir); c != NULL; c = c->get_next()) {
         ASSERT0(c->is_case());
         IRBB * bb = m_lab2bb.get(CASE_lab(c));
         ASSERT0(bb); //no bb is correspond to lab.
@@ -331,8 +514,8 @@ void IR_CFG::findTargetBBOfIndirectBranch(IR * ir, OUT List<IRBB*> & tgtlst)
 
         #ifdef _DEBUG_
         bool find = false;
-        for (LabelInfo const* li = bb->get_lab_list().get_head();
-             li != NULL; li = bb->get_lab_list().get_next()) {
+        for (LabelInfo const* li = bb->getLabelList().get_head();
+             li != NULL; li = bb->getLabelList().get_next()) {
             if (isSameLabel(CASE_lab(c), li)) {
                 find = true;
                 break;
@@ -345,11 +528,16 @@ void IR_CFG::findTargetBBOfIndirectBranch(IR * ir, OUT List<IRBB*> & tgtlst)
 
 
 //Find natural loop and scan loop body to find call and early exit, etc.
-void IR_CFG::LoopAnalysis(OptCTX & oc)
+void IR_CFG::LoopAnalysis(OptCtx & oc)
 {
+    if (getBBList()->get_elem_count() == 0) {
+        //If bb is empty, set LoopInfo to be invalid.
+        //OC_is_loopinfo_valid(oc) = true;
+        return;
+    }
     m_ru->checkValidAndRecompute(&oc, PASS_DOM, PASS_UNDEF);
-    find_loop();
-    collect_loop_info();
+    findLoop();
+    collectLoopInfo();
     OC_is_loopinfo_valid(oc) = true;
 }
 
@@ -358,12 +546,12 @@ void IR_CFG::LoopAnalysis(OptCTX & oc)
 IRBB * IR_CFG::findBBbyLabel(LabelInfo const* lab)
 {
     IRBB * bb = m_lab2bb.get(lab);
-    ASSERT(bb, ("no bb correspond to this label."));
+    if (bb == NULL) { return NULL; }
 
     #ifdef _DEBUG_
     bool find = false;
-    for (LabelInfo const* li = bb->get_lab_list().get_head();
-         li != NULL; li = bb->get_lab_list().get_next()) {
+    for (LabelInfo const* li = bb->getLabelList().get_head();
+         li != NULL; li = bb->getLabelList().get_next()) {
         if (isSameLabel(lab, li)) {
             find = true;
             break;
@@ -383,9 +571,9 @@ void IR_CFG::insertBBbetween(
         IN C<IRBB*> * to_ct,
         IN IRBB * newbb)
 {
-    /* Revise BB list, note that 'from' is either fall-through to 'to',
-    or jumping to 'to'.    */
-    BBList * bblst = get_bb_list();
+    //Revise BB list, note that 'from' is either fall-through to 'to',
+    //or jumping to 'to'.
+    BBList * bblst = getBBList();
 
     //First, processing edge if 'from'->'to' is fallthrough.
     C<IRBB*> * tmp_ct = from_ct;
@@ -403,30 +591,29 @@ void IR_CFG::insertBBbetween(
     C<IRBB*> * pred_ct = NULL;
     for (IRBB * pred = preds.get_head(&pred_ct);
          pred != NULL; pred = preds.get_next(&pred_ct)) {
-        C<IRBB*> * tmp_ct = to_ct;
-        if (BB_is_fallthrough(pred) && bblst->get_prev(&tmp_ct) == pred) {
-            /* Given 'to' has a fallthrough in-edge. Insert a tmp BB
-            e.g:
-                from->bb1->bb2->to, all edges are fallthrough
-                from->to, jump-edge
-                bb1->to, jump-edge
-
-            Here we need to revise the fallthrough-edge 'bb2->to',
-            the result is from->bb1->bb2->tmp_tramp_bb, all
-            edges are fallthrough tmp_tramp_bb->to, jump-edge
-                from->to, jump-edge
-                bb1->to, jump-edge
-
-                bb2->tmp_tramp_bb, tmp_tramp_bb->to, both are jump-edge.
-                ir-list of tmp_tramp_bb is:
-                    goto L1:
-
-                ir-list of 'to' is:
-                    L1:
-                    ...
-                    ...
-            */
-            IRBB * tmp_tramp_bb = m_ru->newBB();
+        C<IRBB*> * tmp_ct2 = to_ct;
+        if (BB_is_fallthrough(pred) && bblst->get_prev(&tmp_ct2) == pred) {
+            //Given 'to' has a fallthrough in-edge. Insert a tmp BB
+            //e.g:
+            //    from->bb1->bb2->to, all edges are fallthrough
+            //    from->to, jump-edge
+            //    bb1->to, jump-edge
+            //
+            //Here we need to revise the fallthrough-edge 'bb2->to',
+            //the result is from->bb1->bb2->tmp_tramp_bb, all
+            //edges are fallthrough tmp_tramp_bb->to, jump-edge
+            //    from->to, jump-edge
+            //    bb1->to, jump-edge
+            //
+            //    bb2->tmp_tramp_bb, tmp_tramp_bb->to, both are jump-edge.
+            //    ir-list of tmp_tramp_bb is:
+            //        goto L1:
+            //
+            //    ir-list of 'to' is:
+            //        L1:
+            //        ...
+            //        ...
+            IRBB * tmp_tramp_bb = m_ru->allocBB();
             LabelInfo * li = m_ru->genIlabel();
             IR * goto_ir = m_ru->buildGoto(li);
             BB_irlist(tmp_tramp_bb).append_tail(goto_ir);
@@ -435,24 +622,22 @@ void IR_CFG::insertBBbetween(
             add_bb(tmp_tramp_bb);
             bblst->insert_after(tmp_tramp_bb, pred);
 
-            insertVertexBetween(BB_id(pred),
-                                  BB_id(to),
-                                  BB_id(tmp_tramp_bb));
+            insertVertexBetween(BB_id(pred), BB_id(to), BB_id(tmp_tramp_bb));
 
             //Fall through edge has been broken, insert 'newbb' before 'to'.
             break;
         }
-    } //end for
+    }
 
     //Revise the target LABEL of last XR in 'from'.
     IR * last_xr_of_from = get_last_xr(from);
 
-    ASSERT0(last_xr_of_from->get_label() &&
-            findBBbyLabel(last_xr_of_from->get_label()) == to);
-    ASSERT0(last_xr_of_from->get_label() != NULL);
+    ASSERT0(last_xr_of_from->getLabel() &&
+            findBBbyLabel(last_xr_of_from->getLabel()) == to);
+    ASSERT0(last_xr_of_from->getLabel() != NULL);
 
     LabelInfo * li = m_ru->genIlabel();
-    last_xr_of_from->set_label(li);
+    last_xr_of_from->setLabel(li);
 
     newbb->addLabel(li);
     m_lab2bb.set(li, newbb);
@@ -464,38 +649,142 @@ void IR_CFG::insertBBbetween(
 }
 
 
-//Merge LABEL from 'src' to 'tgt'.
-void IR_CFG::unionLabels(IRBB * src, IRBB * tgt)
+//Migrate Lables from src BB to tgt BB.
+void IR_CFG::moveLabels(IRBB * src, IRBB * tgt)
 {
-    tgt->unionLabels(src);
+    tgt->mergeLabeInfoList(src);
 
     //Set label2bb map.
-    for (LabelInfo const* li = tgt->get_lab_list().get_head();
-         li != NULL; li = tgt->get_lab_list().get_next()) {
+    for (LabelInfo const* li = tgt->getLabelList().get_head();
+         li != NULL; li = tgt->getLabelList().get_next()) {
         m_lab2bb.setAlways(li, tgt);
     }
+
+    //Cut off the relation between src and Labels.
+    src->cleanLabelInfoList();
 }
 
 
-/* Remove trampoline BB.
-e.g: bb1->bb2->bb3
-    stmt of bb2 is just 'goto bb3', and bb3 is the NEXT BB of bb2 in BB-List.
-    Then bb2 is tramp BB.
-Return true if at least one tramp BB removed.
+//Cut off the mapping relation bwteen Labels and BB.
+void IR_CFG::resetMapBetweenLabelAndBB(IRBB * bb)
+{
+    for (LabelInfo const* li = bb->getLabelList().get_head();
+         li != NULL; li = bb->getLabelList().get_next()) {
+        m_lab2bb.setAlways(li, NULL);
+    }
+    bb->cleanLabelInfoList();
+}
 
-ALGO:
-    for each pred of BB
-        if (pred is fallthrough && prev of BB == pred)
-            remove edge pred->BB.
-            add edge pred->BB's next.
+
+//Combine trampoline branch.
+//e.g:L2:
+//    truebr L4 | false L4
+//    goto L3
+//    L4
+//    ...
+//    L3:
+//    ...
+//=>
+//    L2:
+//    falsebr L3 | truebr L3
+//    EMPTY BB
+//    L4:
+//    ...
+//    L3:
+bool IR_CFG::inverseAndRemoveTrampolineBranch()
+{
+    bool changed = false;
+    C<IRBB*> * ct;
+    List<IRBB*> succs;
+    List<IRBB*> preds;
+    for (IRBB * bb = m_bb_list->get_head(&ct);
+         bb != NULL; bb = m_bb_list->get_next(&ct)) {
+        if (bb->isExceptionHandler()) { continue; }
+
+        IR * br = get_last_xr(bb);
+        if (br == NULL || !br->isConditionalBr()) {
             continue;
-        end if
-        duplicate LabelInfo from BB to BB's next.
-        revise LabelInfo of pred to new target BB.
-        remove edge pred->BB.
-        add edge pred->BB's next.
-    end for
-*/
+        }
+
+        C<IRBB*> * nextbbct = ct;
+        IRBB * next = m_bb_list->get_next(&nextbbct);
+        IR * jmp = NULL;
+        if (next == NULL || //bb may be the last BB in bb-list.
+            (jmp = get_first_xr(next)) == NULL || //bb can not be empty
+            !jmp->is_goto()) { //the only IR must be GOTO
+            continue;
+        }
+
+        if (next->isExceptionHandler()) { continue; }
+
+        IRBB * next_next = m_bb_list->get_next(&nextbbct);
+        if (next_next == NULL || //bb may be the last BB in bb-list.
+            !next_next->isContainLabel(BR_lab(br))) {
+            continue;
+        }
+
+        IRBB * jmp_tgt = findBBbyLabel(GOTO_lab(jmp));
+        Edge const* e_of_jmp = get_edge(next->id(), jmp_tgt->id());
+        ASSERT0(e_of_jmp);
+        CFGEdgeInfo * ei = (CFGEdgeInfo*)EDGE_info(e_of_jmp);
+        if (ei != NULL && CFGEI_is_eh(ei)) {
+            //Do not remove exception edge.
+            continue;
+        }
+
+        Edge const* e_of_bb = get_edge(bb->id(), next_next->id());
+        ASSERT0(e_of_bb);
+        CFGEdgeInfo * ei2 = (CFGEdgeInfo*)EDGE_info(e_of_bb);
+        if (ei2 != NULL && CFGEI_is_eh(ei2)) {
+            //Do not remove exception edge.
+            continue;
+        }
+
+        //Do replacement
+        if (br->is_truebr()) {
+            IR_code(br) = IR_FALSEBR;
+        } else {
+            ASSERT0(br->is_falsebr());
+            IR_code(br) = IR_TRUEBR;
+        }
+        BR_lab(br) = GOTO_lab(jmp);
+
+        //Change 'next' to be empty BB.
+        remove_xr(next, jmp);
+
+        //Remove jmp->jmp_tgt, add jmp->next_next
+        removeEdge(next, jmp_tgt);
+        Edge * newe = addEdge(next->id(), next_next->id());
+        EDGE_info(newe) = ei;
+
+        //Remove bb->next_next, add bb->jmp_tgt
+        removeEdge(bb, next_next);
+        Edge * newe2 = addEdge(bb->id(), jmp_tgt->id());
+        EDGE_info(newe2) = ei2;
+        changed = true;
+    }
+    return changed;
+}
+
+
+//Remove trampoline BB.
+//e.g: bb1->bb2->bb3
+//    stmt of bb2 is just 'goto bb3', and bb3 is the NEXT BB of bb2 in BB-List.
+//    Then bb2 is tramp BB.
+//Return true if at least one tramp BB removed.
+//
+//ALGO:
+//    for each pred of BB
+//        if (pred is fallthrough && prev of BB == pred)
+//            remove edge pred->BB.
+//            add edge pred->BB's next.
+//            continue;
+//        end if
+//        duplicate LabelInfo from BB to BB's next.
+//        revise LabelInfo of pred to new target BB.
+//        remove edge pred->BB.
+//        add edge pred->BB's next.
+//    end for
 bool IR_CFG::removeTrampolinBB()
 {
     bool removed = false;
@@ -504,62 +793,46 @@ bool IR_CFG::removeTrampolinBB()
     List<IRBB*> preds;
     for (IRBB * bb = m_bb_list->get_head(&ct);
          bb != NULL; bb = m_bb_list->get_next(&ct)) {
-        if (bb->is_exp_handling()) { continue; }
-        IR * br = get_first_xr(bb);
-        if (br != NULL &&
-            br->is_uncond_br() &&
-            bb->getNumOfIR() == 1) {
-            /* CASE: Given pred1->bb, fallthrough edge,
-                and pred2->bb, jumping edge.
-                bb:
-                    goto L1
+        if (bb->isExceptionHandler()) { continue; }
 
-                next of bb:
-                    L1:
-                    ...
-                    ...
-            Remove bb and revise CFG. */
-            get_succs(succs, bb);
-            C<IRBB*> * tmp_bb_ct = ct;
-            IRBB * next = m_bb_list->get_next(&tmp_bb_ct);
-            ASSERT0(succs.get_elem_count() == 1);
-            if (next == NULL || //bb may be the last BB in bb-list.
-                next != succs.get_head()) {
-                continue;
-            }
+        IR * uncond_br = get_first_xr(bb);
+        if (uncond_br == NULL ||
+            !uncond_br->isUnconditionalBr() ||
+            bb->getNumOfIR() != 1) {
+            continue;
+        }
 
-            tmp_bb_ct = ct;
-            IRBB * prev = m_bb_list->get_prev(&tmp_bb_ct);
-            preds.clean(); //use list because cfg may be modify.
-            get_preds(preds, bb);
-            for (IRBB * pred = preds.get_head();
-                 pred != NULL; pred = preds.get_next()) {
-                unionLabels(bb, next);
+        //CASE: Given pred1->bb, fallthrough edge,
+        //  and pred2->bb, jumping edge.
+        //  bb:
+        //      goto L1
+        //  next of bb:
+        //      L1:
+        //      ...
+        //      ...
+        //Remove bb and revise CFG.
+        get_succs(succs, bb);
+        C<IRBB*> * tmp_bb_ct = ct;
+        IRBB * next = m_bb_list->get_next(&tmp_bb_ct);
+        ASSERT0(succs.get_elem_count() == 1);
 
-                if (BB_is_fallthrough(pred) && prev == pred) {
-                    removeEdge(pred, bb);
+        if (next == NULL || //bb may be the last BB in bb-list.
+            next != succs.get_head()) { //next BB is not the successor.
+            continue;
+        }
 
-                    //Add normal control flow edge.
-                    Edge * e = addEdge(BB_id(pred), BB_id(next));
-                    CFGEdgeInfo * ei = (CFGEdgeInfo*)EDGE_info(e);
-                    if (ei != NULL && CFGEI_is_eh(ei)) {
-                        //If there is already an edge, check if it is an
-                        //exception edge. If it is, change the exception edge
-                        //to be normal control flow edge.
-                        CFGEI_is_eh(ei) = false;
-                    }
-                    continue;
-                }
+        tmp_bb_ct = ct;
+        IRBB * prev = m_bb_list->get_prev(&tmp_bb_ct);
+        preds.clean(); //use list because cfg may be modify.
+        get_preds(preds, bb);
+        for (IRBB * pred = preds.get_head();
+             pred != NULL; pred = preds.get_next()) {
+            moveLabels(bb, next);
 
-                //Revise branch target LabelInfo of xr in 'pred'.
-                IR * last_xr_of_pred = get_last_xr(pred);
-
-                ASSERT0(last_xr_of_pred->get_label() &&
-                        findBBbyLabel(last_xr_of_pred->get_label()) == bb);
-
-                ASSERT0(last_xr_of_pred->get_label() != NULL);
-                last_xr_of_pred->set_label(br->get_label());
+            if (BB_is_fallthrough(pred) && prev == pred) {
                 removeEdge(pred, bb);
+
+                //Add normal control flow edge.
                 Edge * e = addEdge(BB_id(pred), BB_id(next));
                 CFGEdgeInfo * ei = (CFGEdgeInfo*)EDGE_info(e);
                 if (ei != NULL && CFGEI_is_eh(ei)) {
@@ -568,22 +841,59 @@ bool IR_CFG::removeTrampolinBB()
                     //to be normal control flow edge.
                     CFGEI_is_eh(ei) = false;
                 }
-            } //end for each pred of BB.
+                continue;
+            }
 
-            remove_bb(bb);
-            removed = true;
-            bb = m_bb_list->get_head(&ct); //reprocessing BB list.
-        } //end if ending XR of BB is uncond-branch.
+            //CASE:
+            // pred:
+            //     goto L2:
+            // ...
+            // ...
+            // bb: L2
+            //     goto L1
+            //
+            // next of bb:
+            //     L1:
+            //     ...
+            //     ...
+            //Remove bb and revise CFG.
+
+            //Revise branch target LabelInfo of xr in 'pred'.
+            IR * last_xr_of_pred = get_last_xr(pred);
+            if (last_xr_of_pred != NULL) {
+                ASSERT0(last_xr_of_pred->getLabel());
+                ASSERT(findBBbyLabel(last_xr_of_pred->getLabel()) == next,
+                       ("Labels of bb should have already moved to "
+                        "next BB by moveLabels()"));
+                last_xr_of_pred->setLabel(uncond_br->getLabel());
+            }
+            removeEdge(pred, bb);
+
+            Edge * e = addEdge(BB_id(pred), BB_id(next));
+            CFGEdgeInfo * ei = (CFGEdgeInfo*)EDGE_info(e);
+            if (ei != NULL && CFGEI_is_eh(ei)) {
+                //If there is already an edge, check if it is an
+                //exception edge. If it is, change the exception edge
+                //to be normal control flow edge.
+                CFGEI_is_eh(ei) = false;
+            }
+        } //end for each pred of BB.
+
+        //The map between Labels and BB has changed.
+        //resetMapBetweenLabelAndBB(bb);
+        remove_bb(bb);
+        removed = true;
+        bb = m_bb_list->get_head(&ct); //reprocessing BB list.
     } //end for each BB
     return removed;
 }
 
 
-/* Remove trampoline edge.
-e.g: bb1->bb2->bb3
-stmt of bb2 is just 'goto bb3', then bb1->bb2 is tramp edge.
-And the resulting edges are bb1->bb3, bb2->bb3 respectively.
-Return true if at least one tramp edge removed. */
+//Remove trampoline edge.
+//e.g: bb1->bb2->bb3
+//stmt of bb2 is just 'goto bb3', then bb1->bb2 is tramp edge.
+//And the resulting edges are bb1->bb3, bb2->bb3 respectively.
+//Return true if at least one tramp edge removed.
 bool IR_CFG::removeTrampolinEdge()
 {
     bool removed = false;
@@ -594,8 +904,8 @@ bool IR_CFG::removeTrampolinEdge()
         if (bb->getNumOfIR() != 1) { continue; }
 
         IR * last_xr = get_last_xr(bb);
-        if (last_xr->is_goto() && !bb->is_attach_dedicated_lab()) {
-            LabelInfo const* tgt_li = last_xr->get_label();
+        if (last_xr->is_goto() && !bb->isAttachDedicatedLabel()) {
+            LabelInfo const* tgt_li = last_xr->getLabel();
             ASSERT0(tgt_li != NULL);
 
             List<IRBB*> preds; //use list because cfg may be modify.
@@ -618,23 +928,22 @@ bool IR_CFG::removeTrampolinEdge()
                 }
 
                 IR * last_xr_of_pred = get_last_xr(pred);
-                if (!pred->is_bb_down_boundary(last_xr_of_pred)) {
-                    /* CASE: pred->bb, pred is fallthrough-BB.
-                        pred is:
-                            a=b+1
-                        ...
-                        bb is:
-                            L1:
-                            goto L2
-                    =>
-                        pred is:
-                            a=b+1
-                            goto L2
-                        ...
-                        bb is:
-                            L1:
-                            goto L2
-                    */
+                if (!pred->is_down_boundary(last_xr_of_pred)) {
+                    // CASE: pred->bb, pred is fallthrough-BB.
+                    //  pred is:
+                    //      a=b+1
+                    //  ...
+                    //  bb is:
+                    //      L1:
+                    //      goto L2
+                    //=>
+                    //  pred is:
+                    //      a=b+1
+                    //      goto L2
+                    //  ...
+                    //  bb is:
+                    //      L1:
+                    //      goto L2
                     BB_irlist(pred).append_tail(m_ru->dupIRTree(last_xr));
                     BB_is_fallthrough(pred) = false;
                     removeEdge(pred, bb);
@@ -646,25 +955,24 @@ bool IR_CFG::removeTrampolinEdge()
                 } //end if
 
                 if (last_xr_of_pred->is_goto()) {
-                    /* CASE: pred->bb,
-                        pred is:
-                            goto L1
-                        ...
-                        bb is:
-                            L1:
-                            goto L2
-                    =>
-                        pred to be:
-                            goto L2
-                        ...
-                        bb is:
-                            L1:
-                            goto L2
-                    */
-                    ASSERT0(last_xr_of_pred->get_label() &&
-                            findBBbyLabel(last_xr_of_pred->get_label()) == bb);
+                    //CASE: pred->bb,
+                    //    pred is:
+                    //        goto L1
+                    //    ...
+                    //    bb is:
+                    //        L1:
+                    //        goto L2
+                    //=>
+                    //    pred to be:
+                    //        goto L2
+                    //    ...
+                    //    bb is:
+                    //        L1:
+                    //        goto L2
+                    ASSERT0(last_xr_of_pred->getLabel() &&
+                            findBBbyLabel(last_xr_of_pred->getLabel()) == bb);
 
-                    ASSERT0(last_xr_of_pred->get_label() != NULL);
+                    ASSERT0(last_xr_of_pred->getLabel() != NULL);
                     GOTO_lab(last_xr_of_pred) = tgt_li;
                     removeEdge(pred, bb);
                     addEdge(BB_id(pred), BB_id(succ));
@@ -672,30 +980,29 @@ bool IR_CFG::removeTrampolinEdge()
                     continue;
                 } //end if
 
-                if (last_xr_of_pred->is_cond_br()) {
-                    /* CASE: pred->f, pred->bb, and pred->f is fall through edge.
-                        pred is:
-                            truebr/falsebr L1
-
-                        f is:
-                            ...
-                            ...
-
-                        bb is:
-                            L1:
-                            goto L2
-                    =>
-                        pred is:
-                            truebr/falsebr L2
-
-                        f is:
-                            ...
-                            ...
-
-                        bb is:
-                            L1:
-                            goto L2
-                    */
+                if (last_xr_of_pred->isConditionalBr()) {
+                    // CASE: pred->f, pred->bb, and pred->f is fall through edge.
+                    //  pred is:
+                    //      truebr/falsebr L1
+                    //
+                    //  f is:
+                    //      ...
+                    //      ...
+                    //
+                    //  bb is:
+                    //      L1:
+                    //      goto L2
+                    //=>
+                    //  pred is:
+                    //      truebr/falsebr L2
+                    //
+                    //  f is:
+                    //      ...
+                    //      ...
+                    //
+                    //  bb is:
+                    //      L1:
+                    //      goto L2
                     C<IRBB*> * prev_of_bb = ct;
                     if (m_bb_list->get_prev(&prev_of_bb) == pred) {
                         //Can not remove jumping-edge if 'bb' is
@@ -703,10 +1010,10 @@ bool IR_CFG::removeTrampolinEdge()
                         continue;
                     }
 
-                    ASSERT0(last_xr_of_pred->get_label() &&
-                            findBBbyLabel(last_xr_of_pred->get_label()) == bb);
+                    ASSERT0(last_xr_of_pred->getLabel() &&
+                            findBBbyLabel(last_xr_of_pred->getLabel()) == bb);
 
-                    ASSERT0(last_xr_of_pred->get_label() != NULL);
+                    ASSERT0(last_xr_of_pred->getLabel() != NULL);
                     if (bb != succ) {
                         //bb should not be the same one with succ.
                         BR_lab(last_xr_of_pred) = tgt_li;
@@ -729,26 +1036,26 @@ bool IR_CFG::removeRedundantBranch()
 {
     bool removed = CFG<IRBB, IR>::removeRedundantBranch();
     C<IRBB*> * ct;
-    IR_DU_MGR * dumgr = m_ru->get_du_mgr();
+    IR_DU_MGR * dumgr = m_ru->getDUMgr();
     List<IRBB*> succs;
     for (IRBB * bb = m_bb_list->get_head(&ct);
          bb != NULL; bb = m_bb_list->get_next(&ct)) {
         IR * last_xr = get_last_xr(bb);
-        if (last_xr != NULL && last_xr->is_cond_br()) {
+        if (last_xr != NULL && last_xr->isConditionalBr()) {
             IR * det = BR_det(last_xr);
             ASSERT0(det != NULL);
             bool always_true = (det->is_const() &&
-                                det->is_int(m_dm) &&
+                                det->is_int() &&
                                 CONST_int_val(det) != 0) ||
                                 det->is_str();
             bool always_false = det->is_const() &&
-                                det->is_int(m_dm) &&
+                                det->is_int() &&
                                 CONST_int_val(det) == 0;
 
             if ((last_xr->is_truebr() && always_true) ||
                 (last_xr->is_falsebr() && always_false)) {
                 //Substitute cond_br with 'goto'.
-                LabelInfo const* tgt_li = last_xr->get_label();
+                LabelInfo const* tgt_li = last_xr->getLabel();
                 ASSERT0(tgt_li != NULL);
 
                 BB_irlist(bb).remove_tail();
@@ -768,7 +1075,7 @@ bool IR_CFG::removeRedundantBranch()
                 m_bb_list->get_next(&tmp_ct);
                 for (IRBB * s = succs.get_head();
                      s != NULL; s = succs.get_next()) {
-                    if (s == C_val(tmp_ct)) {
+                    if (s == tmp_ct->val()) {
                         //Remove branch edge, leave fallthrough edge.
                         removeEdge(bb, s);
                     }
@@ -788,7 +1095,7 @@ bool IR_CFG::removeRedundantBranch()
                 m_bb_list->get_next(&tmp_ct);
                 for (IRBB * s = succs.get_head();
                      s != NULL; s = succs.get_next()) {
-                    if (s != C_val(tmp_ct)) {
+                    if (s != tmp_ct->val()) {
                         removeEdge(bb, s);
                     }
                 }
@@ -807,7 +1114,7 @@ void IR_CFG::dump_dot(CHAR const* name, bool detail, bool dump_eh)
     if (name == NULL) {
         name = "graph_cfg.dot";
     }
-    unlink(name);
+    UNLINK(name);
     FILE * h = fopen(name, "a+");
     ASSERT(h, ("%s create failed!!!", name));
 
@@ -835,8 +1142,8 @@ void IR_CFG::dump_dot(CHAR const* name, bool detail, bool dump_eh)
 
     //Print Region name.
     fprintf(h, "\nstartnode [fontsize=24,style=filled, "
-               "color=gold,shape=Mrecord,label=\"RegionName:%s\"];",
-                  m_ru->get_ru_name());
+               "color=gold,shape=none,label=\"RegionName:%s\"];",
+               m_ru->getRegionName());
 
     //Print node
     INT c;
@@ -844,18 +1151,22 @@ void IR_CFG::dump_dot(CHAR const* name, bool detail, bool dump_eh)
          v != NULL; v = m_vertices.get_next(c)) {
         INT id = VERTEX_id(v);
 
-        IRBB * bb = get_bb(id);
+        IRBB * bb = getBB(id);
         ASSERT0(bb);
 
         CHAR const* shape = "box";
-        if (BB_is_catch_start(bb)) {
-            shape = "invtrapezium";
-        }
-
         CHAR const* font = "courB";
         CHAR const* color = "black";
         CHAR const* style = "bold";
         UINT fontsize = 12;
+
+        if (BB_is_catch_start(bb)) {
+            font = "Times Bold";
+            fontsize = 18;
+            color = "lightblue";
+            style = "filled";
+        }
+
         if (BB_is_entry(bb) || BB_is_exit(bb)) {
             font = "Times Bold";
             fontsize = 18;
@@ -864,8 +1175,9 @@ void IR_CFG::dump_dot(CHAR const* name, bool detail, bool dump_eh)
         }
 
         if (detail) {
-            fprintf(h, "\nnode%d [font=\"%s\",fontsize=%d,color=%s,"
-                       "shape=%s,style=%s,label=\" BB%d",
+            fprintf(h,
+                    "\nnode%d [font=\"%s\",fontsize=%d,color=%s,"
+                    "shape=%s,style=%s,label=\" BB%d",
                     id,
                     font,
                     fontsize,
@@ -878,7 +1190,7 @@ void IR_CFG::dump_dot(CHAR const* name, bool detail, bool dump_eh)
                 fprintf(h, "\\l");
 
                  //TODO: implement dump_ir_buf();
-                dump_ir(ir, m_dm, NULL, true, false, false);
+                dump_ir(ir, m_tm, NULL, true, false, false);
             }
 
             //The last \l is very important to display DOT in a fine manner.
@@ -886,8 +1198,9 @@ void IR_CFG::dump_dot(CHAR const* name, bool detail, bool dump_eh)
 
             fprintf(h, "\"];");
         } else {
-            fprintf(h, "\nnode%d [font=\"%s\",fontsize=%d,color=%s,"
-                       "shape=%s,style=%s,label=\" BB%d\"];",
+            fprintf(h,
+                    "\nnode%d [font=\"%s\",fontsize=%d,color=%s,"
+                    "shape=%s,style=%s,label=\" BB%d\"];",
                     id,
                     font,
                     fontsize,
@@ -904,7 +1217,8 @@ void IR_CFG::dump_dot(CHAR const* name, bool detail, bool dump_eh)
          e != NULL;  e = m_edges.get_next(c)) {
         CFGEdgeInfo * ei = (CFGEdgeInfo*)EDGE_info(e);
         if (ei == NULL) {
-            fprintf(h, "\nnode%d->node%d[style=bold, color=maroon, label=\"%s\"]",
+            fprintf(h,
+                    "\nnode%d->node%d[style=bold, color=maroon, label=\"%s\"]",
                     VERTEX_id(EDGE_from(e)),
                     VERTEX_id(EDGE_to(e)),
                     "");
@@ -912,7 +1226,7 @@ void IR_CFG::dump_dot(CHAR const* name, bool detail, bool dump_eh)
             if (dump_eh) {
                 fprintf(h,
                         "\nnode%d->node%d[style=dotted, "
-                        "color=lightgray, label=\"%s\"]",
+                        "color=darkslategray, label=\"%s\"]",
                         VERTEX_id(EDGE_from(e)),
                         VERTEX_id(EDGE_to(e)),
                         "");
@@ -929,72 +1243,9 @@ void IR_CFG::dump_dot(CHAR const* name, bool detail, bool dump_eh)
 }
 
 
-void IR_CFG::dump_vcg(CHAR const* name, bool detail, bool dump_eh)
+void IR_CFG::dump_node(FILE * h, bool detail)
 {
-    if (name == NULL) {
-        name = "graph_cfg.vcg";
-    }
-    //Note this function does not use g_tfile as output.
-    //So it is dispensable to check g_tfile.
-    unlink(name);
-    FILE * h = fopen(name, "a+");
-    ASSERT(h != NULL, ("%s create failed!!!",name));
-    FILE * old = NULL;
-
-    //Print comment
-    //fprintf(h, "\n/*");
-    //old = g_tfile;
-    //g_tfile = h;
-    //dumpBBList(m_bb_list, m_ru);
-    //g_tfile = old;
-    //fprintf(h, "\n*/\n");
-
-    //Print graph structure description.
-    fprintf(h, "graph: {"
-              "title: \"Graph\"\n"
-              "shrink:  15\n"
-              "stretch: 27\n"
-              "layout_downfactor: 1\n"
-              "layout_upfactor: 1\n"
-              "layout_nearfactor: 1\n"
-              "layout_splinefactor: 70\n"
-              "spreadlevel: 1\n"
-              "treefactor: 0.500000\n"
-              "node_alignment: center\n"
-              "orientation: top_to_bottom\n"
-              "late_edge_labels: no\n"
-              "display_edge_labels: yes\n"
-              "dirty_edge_labels: no\n"
-              "finetuning: no\n"
-              "nearedges: no\n"
-              "splines: yes\n"
-              "ignoresingles: no\n"
-              "straight_phase: no\n"
-              "priority_phase: no\n"
-              "manhatten_edges: no\n"
-              "smanhatten_edges: no\n"
-              "port_sharing: no\n"
-              "crossingphase2: yes\n"
-              "crossingoptimization: yes\n"
-              "crossingweight: bary\n"
-              "arrow_mode: free\n"
-              "layoutalgorithm: mindepthslow\n"
-              "node.borderwidth: 2\n"
-              "node.color: lightcyan\n"
-              "node.textcolor: black\n"
-              "node.bordercolor: blue\n"
-              "edge.color: darkgreen\n");
-
-    //Print Region name.
-    fprintf(h,
-            "\nnode: {title:\"\" vertical_order:0 shape:box color:turquoise "
-            "borderwidth:0 fontname:\"Courier Bold\" "
-            "scaling:2 label:\"RegionName:%s\" }", m_ru->get_ru_name());
-
-    //Print node.
-    old = g_tfile;
-    g_tfile = h;
-
+    ASSERT0(m_bb_list);
     C<IRBB*> * bbct;
     UINT vertical_order = 1;
     for (IRBB * bb = m_bb_list->get_head(&bbct);
@@ -1026,16 +1277,16 @@ void IR_CFG::dump_vcg(CHAR const* name, bool detail, bool dump_eh)
                 fprintf(h, " rpo:%d ", VERTEX_rpo(v));
             }
 
-            IRBB * bb = get_bb(id);
-            ASSERT0(bb != NULL);
-            dumpBBLabel(bb->get_lab_list(), h);
+            IRBB * bb2 = getBB(id);
+            ASSERT0(bb2 != NULL);
+            dumpBBLabel(bb2->getLabelList(), h);
             fprintf(h, "\n");
-            for (IR * ir = BB_first_ir(bb);
-                 ir != NULL; ir = BB_next_ir(bb)) {
+            for (IR * ir = BB_first_ir(bb2);
+                 ir != NULL; ir = BB_next_ir(bb2)) {
                 //fprintf(h, "%s\n", dump_ir_buf(ir, buf));
 
                 //TODO: implement dump_ir_buf();
-                dump_ir(ir, m_dm, NULL, true, false);
+                dump_ir(ir, m_tm, NULL, true, false);
             }
             fprintf(h, "\"}");
         } else {
@@ -1049,8 +1300,51 @@ void IR_CFG::dump_vcg(CHAR const* name, bool detail, bool dump_eh)
             fprintf(h, "\" }");
         }
     }
+}
 
-    //Print edge
+
+//Print graph structure description.
+void IR_CFG::dump_head(FILE * h)
+{
+    fprintf(h, "graph: {"
+              "title: \"Graph\"\n"
+              "shrink:    15\n"
+              "stretch: 27\n"
+              "layout_downfactor: 1\n"
+              "layout_upfactor: 1\n"
+              "layout_nearfactor: 1\n"
+              "layout_splinefactor: 70\n"
+              "spreadlevel: 1\n"
+              "treefactor: 0.500000\n"
+              "node_alignment: center\n"
+              "orientation: top_to_bottom\n"
+              "late_edge_labels: no\n"
+              "display_edge_labels: yes\n"
+              "dirty_edge_labels: no\n"
+              "finetuning: no\n"
+              "nearedges: no\n"
+              "splines: yes\n"
+              "ignoresingles: no\n"
+              "straight_phase: no\n"
+              "priority_phase: no\n"
+              "manhatten_edges: no\n"
+              "smanhatten_edges: no\n"
+              "port_sharing: no\n"
+              "crossingphase2: yes\n"
+              "crossingoptimization: yes\n"
+              "crossingweight: bary\n"
+              "arrow_mode: free\n"
+              "layoutalgorithm: mindepthslow\n"
+              "node.borderwidth: 2\n"
+              "node.color: lightcyan\n"
+              "node.textcolor: black\n"
+              "node.bordercolor: blue\n"
+              "edge.color: darkgreen\n");
+}
+
+
+void IR_CFG::dump_edge(FILE * h, bool dump_eh)
+{
     INT c;
     for (Edge * e = m_edges.get_first(c); e != NULL; e = m_edges.get_next(c)) {
         CFGEdgeInfo * ei = (CFGEdgeInfo*)EDGE_info(e);
@@ -1073,23 +1367,59 @@ void IR_CFG::dump_vcg(CHAR const* name, bool detail, bool dump_eh)
                     VERTEX_id(EDGE_from(e)), VERTEX_id(EDGE_to(e)));
         }
     }
+}
+
+
+void IR_CFG::dump_vcg(CHAR const* name, bool detail, bool dump_eh)
+{
+    ASSERT0(m_ru);
+
+    if (name == NULL) { name = "graph_cfg.vcg"; }
+
+    //Note this function does not use g_tfile as output.
+    //So it is dispensable to check g_tfile.
+    UNLINK(name);
+    FILE * h = fopen(name, "a+");
+    ASSERT(h != NULL, ("%s create failed!!!",name));
+    FILE * old = NULL;
+
+    //Print comment
+    //fprintf(h, "\n/*");
+    //old = g_tfile;
+    //g_tfile = h;
+    //dumpBBList(m_bb_list, m_ru);
+    //g_tfile = old;
+    //fprintf(h, "\n*/\n");
+    dump_head(h);
+
+    //Print Region name.
+    fprintf(h,
+            "\nnode: {title:\"\" vertical_order:0 shape:box color:turquoise "
+            "borderwidth:0 fontname:\"Courier Bold\" "
+            "scaling:2 label:\"RegionName:%s\" }", m_ru->getRegionName());
+    old = g_tfile;
+    g_tfile = h;
+    dump_node(h, detail);
+    dump_edge(h, dump_eh);
+
     g_tfile = old;
     fprintf(h, "\n}\n");
     fclose(h);
 }
 
 
-void IR_CFG::computeDomAndIdom(IN OUT OptCTX & oc, BitSet const* uni)
+void IR_CFG::computeDomAndIdom(IN OUT OptCtx & oc, BitSet const* uni)
 {
-    UNUSED(uni);
-    START_TIMER_AFTER();
+    if (getBBList()->get_elem_count() == 0) { return; }
+
+    DUMMYUSE(uni);
+    START_TIMER(t, "Compute Dom, IDom");
     ASSERT0(OC_is_cfg_valid(oc));
-    ASSERT(m_entry_list.get_elem_count() == 1,
-            ("ONLY support SESE or SEME"));
+    ASSERT(m_entry, ("ONLY support SESE or SEME"));
 
     m_ru->checkValidAndRecompute(&oc, PASS_RPO, PASS_UNDEF);
-    List<IRBB*> * bblst = get_bblist_in_rpo();
-    ASSERT0(bblst->get_elem_count() == m_ru->get_bb_list()->get_elem_count());
+    List<IRBB*> * bblst = getBBListInRPO();
+    ASSERT0(bblst->get_elem_count() == m_ru->getBBList()->get_elem_count());
 
     List<Vertex const*> vlst;
     for (IRBB * bb = bblst->get_head(); bb != NULL; bb = bblst->get_next()) {
@@ -1101,26 +1431,28 @@ void IR_CFG::computeDomAndIdom(IN OUT OptCTX & oc, BitSet const* uni)
     //DGraph::computeIdom();
 
     bool f = DGraph::computeIdom2(vlst);
-    UNUSED(f);
+    DUMMYUSE(f);
     ASSERT0(f);
 
     f = DGraph::computeDom2(vlst);
-    UNUSED(f);
+    DUMMYUSE(f);
     ASSERT0(f);
 
     OC_is_dom_valid(oc) = true;
-    END_TIMER_AFTER("Compute Dom, IDom");
+    END_TIMER(t, "Compute Dom, IDom");
 }
 
 
-void IR_CFG::computePdomAndIpdom(IN OUT OptCTX & oc, BitSet const* uni)
+void IR_CFG::computePdomAndIpdom(IN OUT OptCtx & oc, BitSet const* uni)
 {
-    START_TIMER("Compute PDom,IPDom");
+    if (getBBList()->get_elem_count() == 0) { return; }
+
+    START_TIMER(t, "Compute PDom,IPDom");
     ASSERT0(OC_is_cfg_valid(oc));
 
     m_ru->checkValidAndRecompute(&oc, PASS_RPO, PASS_UNDEF);
-    List<IRBB*> * bblst = get_bblist_in_rpo();
-    ASSERT0(bblst->get_elem_count() == m_ru->get_bb_list()->get_elem_count());
+    List<IRBB*> * bblst = getBBListInRPO();
+    ASSERT0(bblst->get_elem_count() == m_ru->getBBList()->get_elem_count());
 
     List<Vertex const*> vlst;
     for (IRBB * bb = bblst->get_tail(); bb != NULL; bb = bblst->get_prev()) {
@@ -1134,20 +1466,20 @@ void IR_CFG::computePdomAndIpdom(IN OUT OptCTX & oc, BitSet const* uni)
     } else {
         f = DGraph::computePdom(&vlst);
     }
-    UNUSED(f);
+    DUMMYUSE(f);
     ASSERT0(f);
 
     f = DGraph::computeIpdom();
     ASSERT0(f);
 
     OC_is_pdom_valid(oc) = true;
-    END_TIMER();
+    END_TIMER(t, "Compute PDom,IPDom");
 }
 
 
 void IR_CFG::remove_xr(IRBB * bb, IR * ir)
 {
-    IR_DU_MGR * dumgr = m_ru->get_du_mgr();
+    IR_DU_MGR * dumgr = m_ru->getDUMgr();
     if (dumgr != NULL) {
         dumgr->removeIROutFromDUMgr(ir);
     }
@@ -1157,24 +1489,39 @@ void IR_CFG::remove_xr(IRBB * bb, IR * ir)
 }
 
 
-/* Perform miscellaneous control flow optimizations.
-Include removing dead bb which is unreachable, removing empty bb as many
-as possible, simplify and remove the branch like "if (x==x)", removing
-the trampolin branch. */
-bool IR_CFG::performMiscOpt(OptCTX & oc)
+//Perform miscellaneous control flow optimizations.
+//Include removing dead bb which is unreachable, removing empty bb as many
+//as possible, simplify and remove the branch like "if (x==x)", removing
+//the trampolin branch.
+bool IR_CFG::performMiscOpt(OptCtx & oc)
 {
-    START_TIMER_AFTER();
+    START_TIMER(t, "CFG Optimizations");
 
     bool change = false;
     bool ck_cfg = false;
     bool lchange;
+    UINT count = 0;
 
     do {
         lchange = false;
-        lchange |= removeUnreachBB();
-        lchange |= removeEmptyBB(oc);
-        lchange |= removeRedundantBranch();
-        lchange |= removeTrampolinEdge();
+
+        if (g_do_cfg_remove_unreach_bb) {
+            lchange |= removeUnreachBB();
+        }
+
+        if (g_do_cfg_remove_empty_bb) {
+            lchange |= removeEmptyBB(oc);
+        }
+
+        if (g_do_cfg_remove_redundant_branch) {
+            lchange |= removeRedundantBranch();
+        }
+
+        if (g_do_cfg_remove_trampolin_bb) {
+            lchange |= removeTrampolinEdge();
+            lchange |= inverseAndRemoveTrampolineBranch();
+        }
+
         if (lchange) {
             OC_is_cdg_valid(oc) = false;
             OC_is_dom_valid(oc) = false;
@@ -1183,10 +1530,14 @@ bool IR_CFG::performMiscOpt(OptCTX & oc)
             OC_is_rpo_valid(oc) = false;
             ck_cfg = true;
         }
-    } while (lchange);
+
+        count++;
+    } while (lchange && count < 1000);
+
+    ASSERT(!lchange, ("CFG optimization iterated too many times."));
 
     if (ck_cfg) {
-        computeEntryAndExit(true, true);
+        computeExitList();
 
         ASSERT0(verifySSAInfo(m_ru));
 
@@ -1196,13 +1547,16 @@ bool IR_CFG::performMiscOpt(OptCTX & oc)
         //This check is only in debug mode.
         OC_is_rpo_valid(oc) = false;
         computePdomAndIpdom(oc, NULL);
-        CDG * cdg = (CDG*)m_ru->get_pass_mgr()->registerPass(PASS_CDG);
-        cdg->rebuild(oc, *m_ru->get_cfg());
-        ASSERT0(verify_rmbb(cdg, oc));
+        CDG * cdg = (CDG*)m_ru->getPassMgr()->registerPass(PASS_CDG);
+        cdg->rebuild(oc, *m_ru->getCFG());
+        ASSERT0(verifyIfBBRemoved(cdg, oc));
         #endif
     }
 
-    END_TIMER_AFTER("CFG Opt");
+    ASSERT0(verifyIRandBB(getBBList(), m_ru));
+    ASSERT0(m_ru->verifyRPO(oc));
+
+    END_TIMER(t, "CFG Optimizations");
     return change;
 }
 

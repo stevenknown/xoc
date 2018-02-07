@@ -381,7 +381,7 @@ public:
 #define DX_PCOUNT 5  //Parameter count
 class DXC {
 public:
-    DXC() { memset(this, 0, sizeof(DXC)); }
+    DXC() { ::memset(this, 0, sizeof(DXC)); }
 
     DX_OPC opc;
     INT vA;
@@ -454,20 +454,20 @@ public:
     void decode_dx(USHORT const* cptr, IN OUT DXC & dc);
     void dump_dx(DXC const& dc, FILE * h, INT ofst);
     void dump_method(IN DX_INFO const& dxinfo, IN FILE * h);
-    virtual CHAR const* get_string(UINT str_idx) { ASSERT0(0); return NULL; }
-    virtual CHAR const* get_type_name(UINT idx) { ASSERT0(0); return NULL; }
+    virtual CHAR const* get_string(UINT str_idx) { UNREACH(); return NULL; }
+    virtual CHAR const* get_type_name(UINT idx) { UNREACH(); return NULL; }
     virtual CHAR const* get_field_name(UINT field_idx)
-    { ASSERT0(0); return NULL; }
+    { UNREACH(); return NULL; }
     virtual CHAR const* get_method_name(UINT method_idx)
-    { ASSERT0(0); return NULL; }
+    { UNREACH(); return NULL; }
     virtual CHAR const* get_class_name(UINT class_type_idx)
-    { ASSERT0(0); return NULL; }
+    { UNREACH(); return NULL; }
     virtual CHAR const* get_class_name_by_method_id(UINT method_idx)
-    { ASSERT0(0); return NULL; }
+    { UNREACH(); return NULL; }
     virtual CHAR const* get_class_name_by_field_id(UINT field_idx)
-    { ASSERT0(0); return NULL; }
+    { UNREACH(); return NULL; }
     virtual CHAR const* get_class_name_by_declaration_id(UINT cls_def_idx)
-    { ASSERT0(0); return NULL; }
+    { UNREACH(); return NULL; }
 
     void extract_dxinfo(OUT DX_INFO & dxinfo, USHORT const* cptr, UINT cs,
                         UINT const* class_def_idx, UINT const* method_idx);

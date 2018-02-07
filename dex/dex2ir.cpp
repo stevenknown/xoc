@@ -35,13 +35,14 @@ author: Su Zhenyu
 #include "libdex/DexClass.h"
 #include "libdex/DexOpcodes.h"
 #include "liropcode.h"
-
+#include "lir.h"
 #include "cominc.h"
 #include "comopt.h"
 #include "dx_mgr.h"
-#include "prdf.h"
 #include "dex.h"
+#include "trycatch_info.h"
 #include "gra.h"
+#include "dex_hook.h"
 #include "dex_util.h"
 #include "dex2ir.h"
 
@@ -58,6 +59,30 @@ inline static bool is_obj_type(CHAR const* type_name)
     return *type_name == 'L';
 }
 
+Dex2IR::Dex2IR(IN Region * rg,
+               IN DexFile * df,
+               IN LIRCode * fu,
+               DbxVec const& dbxvec) : m_dbxvec(dbxvec)
+{
+    ASSERT0(rg && df && fu);
+    m_ru = (DexRegion*)rg;
+    m_ru_mgr = (DexRegionMgr*)rg->getRegionMgr();
+    m_tm = rg->getTypeMgr();
+    m_vm = rg->getVarMgr();
+    m_df = df;
+    m_var2fieldid = m_ru->getVAR2Fieldid();
+    m_lircode = fu;
+    m_tr = ((DexRegion*)rg)->getTypeIndexRep();
+    m_ti = NULL;
+    m_pool = smpoolCreate(16, MEM_COMM);
+    m_pr2v.init(MAX(4, getNearestPowerOf2(fu->maxVars)));
+    m_ptr_addend = m_tm->getSimplexType(D_U32);
+    m_ofst_addend = m_tm->get_dtype_bytesize(D_I64);
+    m_pr2v.maxreg = fu->maxVars - 1;
+    m_pr2v.paramnum = fu->numArgs;
+    m_current_catch_list = NULL;
+}
+
 
 //Add a variable of CLASS.
 VAR * Dex2IR::addVarByName(CHAR const* name, Type const* ty)
@@ -68,6 +93,15 @@ VAR * Dex2IR::addVarByName(CHAR const* name, Type const* ty)
     UINT flag = 0;
     SET_FLAG(flag, VAR_GLOBAL);
     v = m_vm->registerVar(sym, ty, 0, flag);
+    
+    //Record global class,method symbol at RegionMgr.
+    //Record global class,method variable at program region.
+    ASSERT0(m_ru_mgr->getProgramRegion());
+    if (m_ru_mgr->getSym2Var().get(sym) == NULL) {
+        m_ru_mgr->getProgramRegion()->addToVarTab(v);
+        m_ru_mgr->getSym2Var().set(sym, v);
+    }
+
     m_str2var.set(sym, v);
     return v;
 }
@@ -75,10 +109,38 @@ VAR * Dex2IR::addVarByName(CHAR const* name, Type const* ty)
 
 VAR * Dex2IR::addStringVar(CHAR const* string)
 {
-    SYM * sym = m_ru_mgr->addToSymbolTab(string);
+    CHAR const* local_string = string;
+    //UINT quote_num = 0;
+    //UINT len = 0;
+    //for (CHAR const* p = string; *p != 0; p++, len++) {
+    //    if (*p == '"' || *p == '\\') {
+    //        quote_num++;
+    //    }
+    //}
+    //if (quote_num != 0) {
+    //    UINT i = 0;
+    //    CHAR * buf = (CHAR*)ALLOCA(len + quote_num + 1);
+    //    for (CHAR const* q = string; *q != 0; q++, i++) {
+    //        if (*q == '"' || *q == '\\') {
+    //            buf[i] = '\\';
+    //            i++;
+    //        }
+    //        buf[i] = *q;
+    //    }
+    //    local_string = buf;
+    //}
+    SYM * sym = m_ru_mgr->addToSymbolTab(local_string);
     VAR * v = m_str2var.get(sym);
     if (v != NULL) { return v; }
     v = m_vm->registerStringVar(NULL, sym, 0);
+
+    //Record string at RegionMgr.
+    ASSERT0(m_ru_mgr->getProgramRegion());
+    if (m_ru_mgr->getSym2Var().get(sym) == NULL) {
+        m_ru_mgr->getProgramRegion()->addToVarTab(v);
+        m_ru_mgr->getSym2Var().set(sym, v);
+    }
+
     m_str2var.set(sym, v);
     return v;
 }
@@ -213,6 +275,7 @@ VAR * Dex2IR::addFuncVar(UINT method_id, Type const* ty)
     pbuf = assemblyUniqueName(pbuf, class_name, func_param_type, func_name);
     VAR * v = addVarByName(pbuf, ty);
     VAR_is_readonly(v) = is_readonly(func_name);
+    VAR_is_func_decl(v) = true;
     return v;
 }
 
@@ -252,7 +315,7 @@ Type const* Dex2IR::getType(LIR * ir)
 {
     switch (LIR_dt(ir)) {
     case LIR_JDT_unknown:
-        ASSERT0(0);
+        UNREACH();
     case LIR_JDT_void    :
         return m_tr->i32;
     case LIR_JDT_int    :
@@ -271,7 +334,7 @@ Type const* Dex2IR::getType(LIR * ir)
     case LIR_JDT_wide: return m_tr->u64;
     case LIR_JDT_long: return m_tr->i64;
     case LIR_JDT_double: return m_tr->f64;
-    default: ASSERT0(0);
+    default: UNREACH();
     }
     return 0;
 }
@@ -280,9 +343,9 @@ Type const* Dex2IR::getType(LIR * ir)
 void Dex2IR::set_map_v2ofst(VAR * v, UINT ofst)
 {
     bool find;
-    UINT k = m_map_var2ofst.get(v, &find);
+    UINT k = m_var2fieldid->get(v, &find);
     if (!find) {
-        m_map_var2ofst.set(v, ofst);
+        m_var2fieldid->set(v, ofst);
     } else {
         ASSERT0(k == ofst);
     }
@@ -317,7 +380,7 @@ IR * Dex2IR::convertSget(IN LIR * lir)
     }
     */
     rhs = m_ru->buildLoad(v);
-    AttachInfo * ai = m_ru->newAI();
+    AIContainer * ai = m_ru->allocAIContainer();
 
     TbaaAttachInfo * tbaa = (TbaaAttachInfo*)xmalloc(
                     sizeof(TbaaAttachInfo), m_ru->get_pool());
@@ -325,10 +388,17 @@ IR * Dex2IR::convertSget(IN LIR * lir)
     tbaa->type = mapFieldType2Type(LIR_op0(lir));
     ASSERT0(tbaa->type);
     ai->set(tbaa);
-    ASSERT0(rhs->get_ai() == NULL);
+    ASSERT0(rhs->getAI() == NULL);
     IR_ai(rhs) = ai;
 
-    return m_ru->buildStorePR(PR_no(res), IR_dt(res), rhs);
+    IR * c = m_ru->buildStorePR(PR_no(res), res->get_type(), rhs);
+    IR_may_throw(c) = true;
+    if (m_has_catch) {
+        IR * lab = m_ru->buildLabel(m_ru->genIlabel());
+        add_next(&c, lab);
+        attachCatchInfo(c);
+    }
+    return c;
 }
 
 
@@ -336,15 +406,15 @@ Type const* Dex2IR::mapDexType2XocType(CHAR charty)
 {
     Type const* ty = NULL;
     switch (charty) {
-    case 'V': ty = m_dm->getSimplexTypeEx(D_VOID); break;
-    case 'Z': ty = m_dm->getSimplexTypeEx(D_B); break;
-    case 'B': ty = m_dm->getSimplexTypeEx(D_U8); break;
-    case 'S': ty = m_dm->getSimplexTypeEx(D_I16); break;
-    case 'C': ty = m_dm->getSimplexTypeEx(D_I8); break;
-    case 'I': ty = m_dm->getSimplexTypeEx(D_I32); break;
-    case 'J': ty = m_dm->getSimplexTypeEx(D_I64); break;
-    case 'F': ty = m_dm->getSimplexTypeEx(D_F32); break;
-    case 'D': ty = m_dm->getSimplexTypeEx(D_F64); break;
+    case 'V': ty = m_tm->getSimplexTypeEx(D_VOID); break;
+    case 'Z': ty = m_tm->getSimplexTypeEx(D_B); break;
+    case 'B': ty = m_tm->getSimplexTypeEx(D_U8); break;
+    case 'S': ty = m_tm->getSimplexTypeEx(D_I16); break;
+    case 'C': ty = m_tm->getSimplexTypeEx(D_I8); break;
+    case 'I': ty = m_tm->getSimplexTypeEx(D_I32); break;
+    case 'J': ty = m_tm->getSimplexTypeEx(D_I64); break;
+    case 'F': ty = m_tm->getSimplexTypeEx(D_F32); break;
+    case 'D': ty = m_tm->getSimplexTypeEx(D_F64); break;
     case 'L': ty = m_tr->ptr; break;
     case '[': ty = m_tr->array; break;
     default: ASSERT(0, ("TODO: not yet support")); break;
@@ -381,10 +451,17 @@ IR * Dex2IR::convertSput(IN LIR * lir)
     TODO: Generate new PR instead of change the ty.
     */
     IR_dt(res) = getType(lir);
-    ASSERT0(IR_dt(res));
+    ASSERT0(res->get_type());
     VAR * v = addStaticVar(LIR_op0(lir), getType(lir));
     set_map_v2ofst(v, LIR_op0(lir));
-    return m_ru->buildStore(v, res);
+    IR * c = m_ru->buildStore(v, res);
+    IR_may_throw(c) = true;
+    if (m_has_catch) {
+        IR * lab = m_ru->buildLabel(m_ru->genIlabel());
+        add_next(&c, lab);
+        attachCatchInfo(c);
+    }
+    return c;
 }
 
 
@@ -401,14 +478,14 @@ IR * Dex2IR::convertAput(IN LIR * lir)
     TMWORD enbuf = 0;
 
     //base type info.
-    AttachInfo * ai = m_ru->newAI();
+    AIContainer * ai = m_ru->allocAIContainer();
     TbaaAttachInfo * tbaa = (TbaaAttachInfo*)xmalloc(
                     sizeof(TbaaAttachInfo), m_ru->get_pool());
     tbaa->init(AI_TBAA);
     tbaa->type = m_tr->array;
     ASSERT0(tbaa->type);
     ai->set(tbaa);
-    ASSERT0(base->get_ai() == NULL);
+    ASSERT0(base->getAI() == NULL);
     IR_ai(base) = ai;
 
     IR * c = m_ru->buildStoreArray(base, ofst, ty, ty, 1, &enbuf, src);
@@ -441,17 +518,17 @@ IR * Dex2IR::convertAget(IN LIR * lir)
     //IR_may_throw(array) = true;
 
     //base type info.
-    AttachInfo * ai = m_ru->newAI();
+    AIContainer * ai = m_ru->allocAIContainer();
     TbaaAttachInfo * tbaa = (TbaaAttachInfo*)xmalloc(
                     sizeof(TbaaAttachInfo), m_ru->get_pool());
     tbaa->init(AI_TBAA);
     tbaa->type = m_tr->array;
     ASSERT0(tbaa->type);
     ai->set(tbaa);
-    ASSERT0(base->get_ai() == NULL);
+    ASSERT0(base->getAI() == NULL);
     IR_ai(base) = ai;
 
-    IR * c = m_ru->buildStorePR(PR_no(res), IR_dt(res), array);
+    IR * c = m_ru->buildStorePR(PR_no(res), res->get_type(), array);
     IR_may_throw(c) = true;
     if (m_has_catch) {
         IR * lab = m_ru->buildLabel(m_ru->genIlabel());
@@ -494,11 +571,11 @@ IR * Dex2IR::convertIput(IN LIR * lir)
     /*
     UINT ofst = computeFieldOffset(LIR_op1(lir));
     IR * addr = m_ru->buildBinaryOp(IR_ADD,
-                                IR_dt(thisptr),
+                                thisptr->get_type(),
                                 thisptr,
                                 m_ru->buildImmInt(ofst, m_ptr_addend));
     */
-    IR * c = m_ru->buildIstore(addr, stv, IR_dt(stv));
+    IR * c = m_ru->buildIstore(addr, stv, stv->get_type());
     IST_ofst(c) = LIR_op1(lir) * m_ofst_addend;
 
     IR_may_throw(c) = true;
@@ -546,7 +623,7 @@ IR * Dex2IR::convertCmp(IN LIR * lir)
             ck = CMPG_DOUBLE;
         }
         break;
-    default: ASSERT0(0);
+    default: UNREACH();
     }
 
     Type const* ty = 0;
@@ -556,7 +633,7 @@ IR * Dex2IR::convertCmp(IN LIR * lir)
     case CMPL_DOUBLE: ty = m_tr->f64; break;
     case CMPG_DOUBLE: ty = m_tr->f64; break;
     case CMP_LONG: ty = m_tr->i64; break;
-    default: ASSERT0(0);
+    default: UNREACH();
     }
 
     //Generate callee.
@@ -578,8 +655,8 @@ IR * Dex2IR::convertCmp(IN LIR * lir)
     add_next(&p, &last, r);
 
     IR * c = m_ru->buildCall(v, p,
-                            genMappedPrno(LIR_res(lir), m_tr->i32),
-                            m_tr->i32);
+                             genMappedPrno(LIR_res(lir), m_tr->i32),
+                             m_tr->i32);
     CALL_is_readonly(c) = true;
     IR_has_sideeffect(c) = false;
     CALL_is_intrinsic(c) = true;
@@ -649,11 +726,11 @@ UINT Dex2IR::computeFieldOffset(UINT field_id)
     for (UINT i = 0; i < class_data->header.instanceFieldsSize; i++) {
         DexField * finfo = &class_data->instanceFields[i];
         if (finfo->fieldIdx == field_id) {
-            return i * m_dm->get_dtype_bytesize(D_I64);
+            return i * m_tm->get_dtype_bytesize(D_I64);
         }
         //dumpf_field(df, finfo, 4);
     }
-    ASSERT0(0);
+    UNREACH();
     return 0;
 }
 
@@ -687,18 +764,18 @@ IR * Dex2IR::convertIget(IN LIR * lir)
     IR * ild = m_ru->buildIload(obj, ty);
     ILD_ofst(ild) = objofst; //ILD(MEM_ADDR+ofst)
     IR_may_throw(ild) = true;
-    IR * c = m_ru->buildStorePR(PR_no(res), IR_dt(res), ild);
+    IR * c = m_ru->buildStorePR(PR_no(res), res->get_type(), ild);
 
     IR_may_throw(c) = true;
 
-    AttachInfo * ai = m_ru->newAI();
+    AIContainer * ai = m_ru->allocAIContainer();
     TbaaAttachInfo * tbaa = (TbaaAttachInfo*)xmalloc(
                     sizeof(TbaaAttachInfo), m_ru->get_pool());
     tbaa->init(AI_TBAA);
     tbaa->type = m_tr->ptr;
     ASSERT0(tbaa->type);
     ai->set(tbaa);
-    ASSERT0(obj->get_ai() == NULL);
+    ASSERT0(obj->getAI() == NULL);
     IR_ai(obj) = ai;
 
     if (m_has_catch) {
@@ -710,25 +787,25 @@ IR * Dex2IR::convertIget(IN LIR * lir)
     CHAR const* type_name = get_var_type_name(LIR_op1(lir));
     if (is_array_type(type_name)) {
         //The type of result value of ild is pointer to array type.
-        AttachInfo * ai = m_ru->newAI();
+        AIContainer * ai = m_ru->allocAIContainer();
         TbaaAttachInfo * tbaa = (TbaaAttachInfo*)xmalloc(
                     sizeof(TbaaAttachInfo), m_ru->get_pool());
         tbaa->init(AI_TBAA);
         tbaa->type = m_tr->array;
         ASSERT0(tbaa->type);
         ai->set(tbaa);
-        ASSERT0(ild->get_ai() == NULL);
+        ASSERT0(ild->getAI() == NULL);
         IR_ai(ild) = ai;
     } else if (is_obj_type(type_name)) {
         //The type of result value of ild is pointer to object type.
-        AttachInfo * ai = m_ru->newAI();
+        AIContainer * ai = m_ru->allocAIContainer();
         TbaaAttachInfo * tbaa = (TbaaAttachInfo*)xmalloc(
                     sizeof(TbaaAttachInfo), m_ru->get_pool());
         tbaa->init(AI_TBAA);
         tbaa->type = m_tr->ptr;
         ASSERT0(tbaa->type);
         ai->set(tbaa);
-        ASSERT0(ild->get_ai() == NULL);
+        ASSERT0(ild->getAI() == NULL);
         IR_ai(ild) = ai;
     }
 
@@ -752,17 +829,17 @@ IR * Dex2IR::convertBinaryOpAssign(IN LIR * lir)
     case LOP_OR_ASSIGN  : ir_ty = IR_BOR; break;
     case LOP_XOR_ASSIGN : ir_ty = IR_XOR; break;
     case LOP_SHL_ASSIGN : ir_ty = IR_LSL;
-        ty2 = m_dm->getSimplexTypeEx(D_U32); break;
+        ty2 = m_tm->getSimplexTypeEx(D_U32); break;
     case LOP_SHR_ASSIGN : ir_ty = IR_ASR;
-        ty2 = m_dm->getSimplexTypeEx(D_U32); break;
+        ty2 = m_tm->getSimplexTypeEx(D_U32); break;
     case LOP_USHR_ASSIGN: ir_ty = IR_LSR;
-        ty2 = m_dm->getSimplexTypeEx(D_U32); break;
-    default: ASSERT0(0);
+        ty2 = m_tm->getSimplexTypeEx(D_U32); break;
+    default: UNREACH();
     }
     IR * res = genMappedPR(LIR_res(lir), ty);
     IR * op0 = genMappedPR(LIR_op0(lir), ty2);
     IR * x = m_ru->buildBinaryOp(ir_ty, ty, res, op0);
-    IR * c = m_ru->buildStorePR(PR_no(res), IR_dt(res), x);
+    IR * c = m_ru->buildStorePR(PR_no(res), res->get_type(), x);
     if (ir_ty == IR_DIV || ir_ty == IR_REM) {
         #ifdef DIV_REM_MAY_THROW
         IR_may_throw(x) = true;
@@ -795,13 +872,13 @@ IR * Dex2IR::convertBinaryOp(IN LIR * lir)
     case LOP_SHL : ir_ty = IR_LSL; break;
     case LOP_SHR : ir_ty = IR_ASR; break;
     case LOP_USHR: ir_ty = IR_LSR; break;
-    default: ASSERT0(0);
+    default: UNREACH();
     }
     IR * res = genMappedPR(LIR_res(lir), ty);
     IR * op0 = genMappedPR(LIR_op0(lir), ty);
     IR * op1 = genMappedPR(LIR_op1(lir), ty);
     IR * x = m_ru->buildBinaryOp(ir_ty, ty, op0, op1);
-    IR * c = m_ru->buildStorePR(PR_no(res), IR_dt(res), x);
+    IR * c = m_ru->buildStorePR(PR_no(res), res->get_type(), x);
     if (ir_ty == IR_DIV || ir_ty == IR_REM) {
         #ifdef DIV_REM_MAY_THROW
         IR_may_throw(x) = true;
@@ -839,14 +916,14 @@ IR * Dex2IR::convertBinaryOpLit(IN LIR * lir)
     case LOP_SHL_LIT : ir_ty = IR_LSL; break;
     case LOP_SHR_LIT : ir_ty = IR_ASR; break;
     case LOP_USHR_LIT: ir_ty = IR_LSR; break;
-    default: ASSERT0(0);
+    default: UNREACH();
     }
 
     IR * res = genMappedPR(LIR_res(lir), ty);
     IR * op0 = genMappedPR(LIR_op0(lir), ty);
     IR * lit = m_ru->buildImmInt(LIR_op1(lir), ty);
     IR * x = m_ru->buildBinaryOp(ir_ty, ty, op0, lit);
-    IR * c = m_ru->buildStorePR(PR_no(res), IR_dt(res), x);
+    IR * c = m_ru->buildStorePR(PR_no(res), res->get_type(), x);
     if ((ir_ty == IR_DIV || ir_ty == IR_REM) && CONST_int_val(lit) == 0) {
         IR_may_throw(x) = true;
         IR_may_throw(c) = true;
@@ -867,50 +944,50 @@ UINT Dex2IR::get_dexopcode(UINT flag)
     UINT dexopcode = 0; //defined in DexOpcodes.h
     switch (flag1) {
     case LIR_invoke_unknown:
-        ASSERT0(0);
+        UNREACH();
         switch (flag2) {
         case 0: dexopcode = OP_FILLED_NEW_ARRAY; break;
         case LIR_Range: dexopcode = OP_FILLED_NEW_ARRAY_RANGE; break;
-        default: ASSERT0(0);
+        default: UNREACH();
         }
         break;
     case LIR_invoke_virtual:
         switch (flag2) {
         case 0: dexopcode = OP_INVOKE_VIRTUAL; break;
         case LIR_Range: dexopcode = OP_INVOKE_VIRTUAL_RANGE; break;
-        default: ASSERT0(0);
+        default: UNREACH();
         }
         break;
     case LIR_invoke_super:
         switch(flag2) {
         case 0: dexopcode = OP_INVOKE_SUPER; break;
         case LIR_Range: dexopcode = OP_INVOKE_SUPER_RANGE; break;
-        default: ASSERT0(0);
+        default: UNREACH();
         }
         break;
     case LIR_invoke_direct:
         switch (flag2) {
         case 0: dexopcode = OP_INVOKE_DIRECT; break;
         case LIR_Range: dexopcode = OP_INVOKE_DIRECT_RANGE; break;
-        default: ASSERT0(0);
+        default: UNREACH();
         }
         break;
     case LIR_invoke_static:
         switch (flag2) {
         case 0: dexopcode = OP_INVOKE_STATIC; break;
         case LIR_Range: dexopcode = OP_INVOKE_STATIC_RANGE; break;
-        default: ASSERT0(0);
+        default: UNREACH();
         }
         break;
     case LIR_invoke_interface:
         switch (flag2) {
         case 0: dexopcode = OP_INVOKE_INTERFACE; break;
         case LIR_Range: dexopcode = OP_INVOKE_INTERFACE_RANGE; break;
-        default: ASSERT0(0);
+        default: UNREACH();
         }
         break;
     default:
-        ASSERT0(0);
+        UNREACH();
     }
     return dexopcode;
 }
@@ -949,7 +1026,7 @@ IR * Dex2IR::convertInvoke(IN LIR * lir)
     bool has_this = true;
     if (is_range) {
         switch (k & 0x0f) {
-        case LIR_invoke_unknown: ASSERT0(0); break;
+        case LIR_invoke_unknown: UNREACH(); break;
         case LIR_invoke_virtual: ik = INVOKE_VIRTUAL_RANGE; break;
         case LIR_invoke_direct: ik = INVOKE_DIRECT_RANGE; break;
         case LIR_invoke_super: ik = INVOKE_SUPER_RANGE; break;
@@ -958,17 +1035,17 @@ IR * Dex2IR::convertInvoke(IN LIR * lir)
             ik = INVOKE_STATIC_RANGE;
             has_this = false;
             break;
-        default: ASSERT0(0);
+        default: UNREACH();
         }
     } else {
         switch (k & 0x0f) {
-        case LIR_invoke_unknown: ASSERT0(0); break;
+        case LIR_invoke_unknown: UNREACH(); break;
         case LIR_invoke_virtual: ik = INVOKE_VIRTUAL; break;
         case LIR_invoke_direct: ik = INVOKE_DIRECT; break;
         case LIR_invoke_super: ik = INVOKE_SUPER; break;
         case LIR_invoke_interface: ik = INVOKE_INTERFACE; break;
         case LIR_invoke_static: ik = INVOKE_STATIC; has_this = false; break;
-        default: ASSERT0(0);
+        default: UNREACH();
         }
     }
     IR * kind = m_ru->buildImmInt(ik, m_tr->u32);
@@ -998,7 +1075,7 @@ IR * Dex2IR::convertInvoke(IN LIR * lir)
         add_next(&param_list, &last, param);
     }
     ASSERT0(*paramty == 0);
-    IR * c = m_ru->buildCall(v, param_list, 0, m_dm->getVoid());
+    IR * c = m_ru->buildCall(v, param_list, 0, m_tm->getVoid());
     IR_may_throw(c) = true;
     CALL_is_readonly(c) = VAR_is_readonly(v);
     IR_has_sideeffect(c) = true;
@@ -1081,7 +1158,7 @@ IR * Dex2IR::convertArrayLength(IN LIR * lir)
 }
 
 
-void Dex2IR::attachCatchInfo(IR * ir, AttachInfo * ai)
+void Dex2IR::attachCatchInfo(IR * ir, AIContainer * ai)
 {
     if (m_current_catch_list != NULL) {
         ASSERT0(ai);
@@ -1100,8 +1177,8 @@ void Dex2IR::attachCatchInfo(IR * ir, AttachInfo * ai)
 void Dex2IR::attachCatchInfo(IR * ir)
 {
     if (m_current_catch_list != NULL) {
-        AttachInfo * ai = m_ru->newAI();
-        ASSERT0(ir->get_ai() == NULL);
+        AIContainer * ai = m_ru->allocAIContainer();
+        ASSERT0(ir->getAI() == NULL);
         IR_ai(ir) = ai;
 
         EHLabelAttachInfo * ehai = (EHLabelAttachInfo*)xmalloc(
@@ -1121,7 +1198,7 @@ IR * Dex2IR::convertMonitorExit(IN LIR * lir)
 {
     VAR * v = getBuiltinVar(BLTIN_MONITOR_EXIT, m_ru_mgr);
     IR * c = m_ru->buildCall(v, genMappedPR(LIR_res(lir), m_tr->i32),
-                             0, m_dm->getVoid());
+                             0, m_tm->getVoid());
     IR_may_throw(c) = true;
     CALL_is_intrinsic(c) = true;
     IR_has_sideeffect(c) = true;
@@ -1136,7 +1213,7 @@ IR * Dex2IR::convertMonitorEnter(IN LIR * lir)
 {
     VAR * v = getBuiltinVar(BLTIN_MONITOR_ENTER, m_ru_mgr);
     IR * c = m_ru->buildCall(v, genMappedPR(LIR_res(lir), m_tr->i32),
-                             0, m_dm->getVoid());
+                             0, m_tm->getVoid());
     IR_may_throw(c) = true;
     CALL_is_intrinsic(c) = true;
     IR_has_sideeffect(c) = true;
@@ -1206,7 +1283,7 @@ IR * Dex2IR::convertFillArrayData(IN LIR * lir)
     #endif
 
     VAR * v = getBuiltinVar(BLTIN_FILL_ARRAY_DATA, m_ru_mgr);
-    IR * call = m_ru->buildCall(v, NULL, 0, m_dm->getVoid());
+    IR * call = m_ru->buildCall(v, NULL, 0, m_tm->getVoid());
 
     //The first parameter is array obj-ptr.
     IR * p = genMappedPR(l->value, m_tr->ptr);
@@ -1291,7 +1368,7 @@ IR * Dex2IR::convertCheckCast(IN LIR * lir)
     VAR * v = getBuiltinVar(BLTIN_CHECK_CAST, m_ru_mgr);
     IR * p = genMappedPR(LIR_res(lir), m_tr->i32);
     add_next(&p, m_ru->buildImmInt(LIR_op0(lir), m_tr->i32));
-    IR * c = m_ru->buildCall(v, p, 0, m_dm->getVoid());
+    IR * c = m_ru->buildCall(v, p, 0, m_tm->getVoid());
     IR_may_throw(c) = true;
     CALL_is_intrinsic(c) = true;
     CALL_is_readonly(c) = true;
@@ -1329,7 +1406,7 @@ IR * Dex2IR::convertFilledNewArray(IN LIR * lir)
     for (UINT i = 0; i < r->argc; i++) {
         add_next(&p, &last, genMappedPR(r->args[i], m_tr->i32));
     }
-    IR * c = m_ru->buildCall(v, p, 0, m_dm->getVoid());
+    IR * c = m_ru->buildCall(v, p, 0, m_tm->getVoid());
     IR_may_throw(c) = true;
     CALL_is_intrinsic(c) = true;
     CALL_is_readonly(c) = true;
@@ -1343,12 +1420,12 @@ IR * Dex2IR::convertThrow(IN LIR * lir)
 {
     VAR * v = getBuiltinVar(BLTIN_THROW, m_ru_mgr);
     IR * c = m_ru->buildCall(v, genMappedPR(LIR_res(lir), m_tr->i32),
-                             0, m_dm->getVoid());
+                             0, m_tm->getVoid());
     IR_may_throw(c) = true;
     CALL_is_readonly(c) = true;
     CALL_is_intrinsic(c) = true;
     IR_has_sideeffect(c) = true;
-    IR_is_termiate(c) = true;
+    IR_is_terminate(c) = true;
     attachCatchInfo(c);
     return c;
 }
@@ -1391,7 +1468,7 @@ IR * Dex2IR::convertMoveResult(IN LIR * lir)
     case LIR_JDT_unknown: resty = m_tr->i32; break;
     case LIR_JDT_object: resty = m_tr->ptr; break;
     case LIR_JDT_wide: resty = m_tr->i64; break;
-    default: ASSERT0(0);
+    default: UNREACH();
     }
 
     VAR * v = getBuiltinVar(BLTIN_MOVE_RES, m_ru_mgr);
@@ -1419,11 +1496,11 @@ IR * Dex2IR::convertMove(IN LIR * lir)
     case LIR_JDT_wide: //return 64bits result
         ty = m_tr->i64; //TODO: need pair?
         break;
-    default: ASSERT0(0);
+    default: UNREACH();
     }
     IR * tgt = genMappedPR(LIR_res(lir), ty);
     IR * src = genMappedPR(LIR_op0(lir), ty);
-    return m_ru->buildStorePR(PR_no(tgt), IR_dt(tgt), src);
+    return m_ru->buildStorePR(PR_no(tgt), tgt->get_type(), src);
 }
 
 
@@ -1473,7 +1550,7 @@ IR * Dex2IR::convertRet(IN LIR * lir)
     case LIR_JDT_wide: //return 64bits result
         exp = genMappedPR(LIR_res(lir), m_tr->i64);
         break;
-    default: ASSERT0(0);
+    default: UNREACH();
     }
     return m_ru->buildReturn(exp);
 }
@@ -1486,12 +1563,12 @@ IR * Dex2IR::convertUnaryOp(IN LIR * lir)
     switch (LIR_opcode(lir)) {
     case LOP_NEG: ir_ty = IR_NEG; break;
     case LOP_NOT: ir_ty = IR_BNOT; break;
-    default: ASSERT0(0);
+    default: UNREACH();
     }
     IR * res = genMappedPR(LIR_res(lir), ty);
     IR * op0 = genMappedPR(LIR_op0(lir), ty);
     IR * x = m_ru->buildUnaryOp(ir_ty, ty, op0);
-    return m_ru->buildStorePR(PR_no(res), IR_dt(res), x);
+    return m_ru->buildStorePR(PR_no(res), res->get_type(), x);
     //Not throw exception.
 }
 
@@ -1502,9 +1579,9 @@ IR * Dex2IR::convertLoadStringAddr(IN LIR * lir)
     ASSERT0(string);
     VAR * v = addStringVar(string);
     set_map_v2ofst(v, LIR_op0(lir));
-    IR * lda = m_ru->buildLda(m_ru->buildId(v));
+    IR * lda = m_ru->buildLda(v);
     IR * res = genMappedPR(LIR_res(lir), m_tr->ptr);
-    return m_ru->buildStorePR(PR_no(res), IR_dt(res), lda);
+    return m_ru->buildStorePR(PR_no(res), res->get_type(), lda);
 }
 
 
@@ -1525,20 +1602,18 @@ IR * Dex2IR::convertLoadConst(IN LIR * lir)
     case LIR_JDT_float  :
     case LIR_JDT_none   :
     case LIR_wide       :
-        ASSERT0(0);
+        UNREACH();
         break;
     case LIR_JDT_wide:
         ty = m_tr->i64;
         break;
     case LIR_JDT_long:
     case LIR_JDT_double :
-    default:
-        ASSERT0(0);
-        break;
+    default: UNREACH();
     }
 
     IR * res = genMappedPR(LIR_res(lir), ty);
-    return m_ru->buildStorePR(PR_no(res), IR_dt(res),
+    return m_ru->buildStorePR(PR_no(res), res->get_type(),
                               m_ru->buildImmInt(LIR_int_imm(lir), ty));
 }
 
@@ -1579,7 +1654,7 @@ IR * Dex2IR::convertCondBr(IN LIR * lir)
         op1 = m_ru->buildImmInt(0, ty);
         liridx = LIR_op0(lir);
     } else {
-        ASSERT0(0);
+        UNREACH();
     }
     IR * det = m_ru->buildBinaryOp(rt, m_tr->b, op0, op1);
     //Target label
@@ -1615,13 +1690,13 @@ IR * Dex2IR::convertCvt(IN LIR * lir)
     case LIR_convert_i2b: tgt = m_tr->b; src = m_tr->i32; break;
     case LIR_convert_i2c: tgt = m_tr->i8; src = m_tr->i32; break;
     case LIR_convert_i2s: tgt = m_tr->i16; src = m_tr->i32; break;
-    default: ASSERT0(0);
+    default: UNREACH();
     }
 
     IR * res = genMappedPR(LIR_res(lir), tgt);
     IR * exp = genMappedPR(LIR_op0(lir), src);
     IR * cvt = m_ru->buildCvt(exp, tgt);
-    return m_ru->buildStorePR(PR_no(res), IR_dt(res), cvt);
+    return m_ru->buildStorePR(PR_no(res), res->get_type(), cvt);
 }
 
 
@@ -1734,9 +1809,9 @@ IR * Dex2IR::convert(IN LIR * lir)
     case LOP_FILLED_NEW_ARRAY:
         return convertFilledNewArray(lir);
     case LOP_PHI:
-        ASSERT0(0);
+        UNREACH();
         break;
-    default: ASSERT0(0);
+    default: UNREACH();
     } //end switch
 
     if (g_tfile != NULL) {
@@ -1884,9 +1959,12 @@ void Dex2IR::markTryLabel()
                 /* Record the Label which be placed at the end of LIR.
                 e.g:
                     call '#monitor_exit'  id:168 throw sideeffect ai:EH,
-                        $pr3:i32 param0 id:167
+                        $3:i32 param0 id:167
 
-                        $pr1:i32 param0 id:171
+                    ilabel(_L12)(try_start ) id:170  <=== Try Start
+
+                    call '#throw'  id:172 throw terminate sideeffect ai:EH,
+                        $1:i32 param0 id:171
 
                     ilabel(_L13)(try_end ) id:173 <=== Try End, the last label
 
@@ -1934,7 +2012,9 @@ void Dex2IR::markTryLabel()
                 ci->kind = each_catch->class_type;
                 ci->kindname = ci->kind == kDexNoIndex ?
                                "<any>" : dexStringByTypeIdx(m_df, ci->kind);
-
+                //In DEX, one catch-block may be shared by multiple try-block.
+                //We only record one of them.
+                m_label2catchinfo.setAlways(lab, ci);
                 add_next(&ti->catch_list, &last, ci);
                 m_has_catch = true;
             }
@@ -1979,13 +2059,13 @@ IR * Dex2IR::convert(bool * succ)
     bool dump = g_dump_dex2ir && g_tfile != NULL;
     if (dump) {
         fprintf(g_tfile, "\n\n==== DEX->IR CONVERT %s =====",
-                m_ru->get_ru_name());
+                m_ru->getRegionName());
     }
 
     FILE * log = NULL;
     if (g_dd) {
         log = fopen("dex2ir.log", "a+");
-        fprintf(log, "\n== %s ==", m_ru->get_ru_name());
+        fprintf(log, "\n== %s ==", m_ru->getRegionName());
     }
 
     if (dump) { dump_lir2lab(); }
@@ -2043,16 +2123,16 @@ IR * Dex2IR::convert(bool * succ)
 
         if (dump) {
             dump_lir(lir, m_df, i);
-            dump_irs(newir, m_dm);
+            dump_irs(newir, m_tm);
         }
 
         DexDbx const* dbx = m_dbxvec.get(i);
         if (dbx != NULL) {
             //Record Debug info.
             for (IR * tmp = newir; tmp != NULL; tmp = IR_next(tmp)) {
-                AttachInfo * ai = IR_ai(tmp);
+                AIContainer * ai = IR_ai(tmp);
                 if (ai == NULL) {
-                    ai = m_ru->newAI();
+                    ai = m_ru->allocAIContainer();
                     IR_ai(tmp) = ai;
                 }
                 ai->set((BaseAttachInfo*)dbx);

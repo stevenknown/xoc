@@ -67,7 +67,7 @@ public:
 class IR_EXPR_TAB : public Pass {
     UINT m_expr_count; //the encode-number expression.
     Region * m_ru;
-    TypeMgr * m_dm;
+    TypeMgr * m_tm;
     BSVec<ExpRep*> m_ir_expr_vec;
 
     //Record allocated object. used by destructor.
@@ -93,13 +93,13 @@ class IR_EXPR_TAB : public Pass {
         return encode_expr(ir);
     }
 public:
-    explicit IR_EXPR_TAB(Region * ru);
+    explicit IR_EXPR_TAB(Region * rg);
     COPY_CONSTRUCTOR(IR_EXPR_TAB);
     ~IR_EXPR_TAB();
 
     ExpRep * append_expr(IR * ir);
     void clean_occ_list();
-    UINT count_mem();
+    size_t count_mem();
 
     void dump_ir_expr_tab();
     ExpRep * encode_expr(IN IR * ir);
@@ -116,15 +116,15 @@ public:
     IR * remove_occ(IR * occ);
     void remove_occs(IR * ir);
     ExpRep * remove_expr(IR * ir);
-    void reperform(IN OUT OptCTX & oc);
+    void reperform(IN OUT OptCtx & oc);
 
     void set_map_ir2ir_expr(IR const* ir, ExpRep * ie);
 
-    PASS_TYPE get_pass_type() const { return PASS_EXPR_TAB; }
+    PASS_TYPE getPassType() const { return PASS_EXPR_TAB; }
 
-    virtual CHAR const* get_pass_name() const { return "IR Expr Tabel"; }
+    virtual CHAR const* getPassName() const { return "IR Expr Tabel"; }
 
-    virtual bool perform(IN OUT OptCTX & oc);
+    virtual bool perform(IN OUT OptCtx & oc);
 };
 
 } //namespace xoc

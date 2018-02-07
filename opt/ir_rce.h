@@ -48,26 +48,30 @@ protected:
     //Note that compute GVN is expensive.
     bool m_use_gvn;
 public:
-    IR_RCE(Region * ru, IR_GVN * gvn)
+    IR_RCE(Region * rg, IR_GVN * gvn)
     {
-        ASSERT0(ru != NULL);
-        m_ru = ru;
+        ASSERT0(rg != NULL);
+        m_ru = rg;
         m_gvn = gvn;
-        m_cfg = ru->get_cfg();
-        m_du = m_ru->get_du_mgr();
+        m_cfg = rg->getCFG();
+        m_du = m_ru->getDUMgr();
+        ASSERT0(m_cfg && m_du);
         m_use_gvn = false;
     }
     COPY_CONSTRUCTOR(IR_RCE);
     virtual ~IR_RCE() {}
 
-    IR * calcCondMustVal(IN IR * ir, OUT bool & must_true,
-                            OUT bool & must_false);
+    IR * calcCondMustVal(
+            IN IR * ir,
+            OUT bool & must_true,
+            OUT bool & must_false,
+            bool & changed);
 
     void dump();
-    virtual CHAR const* get_pass_name() const
+    virtual CHAR const* getPassName() const
     { return "Redundant Code Elimination"; }
 
-    PASS_TYPE get_pass_type() const { return PASS_RCE; }
+    PASS_TYPE getPassType() const { return PASS_RCE; }
 
     bool is_use_gvn() const { return m_use_gvn; }
 
@@ -77,7 +81,7 @@ public:
     IR * processStorePR(IR * ir);
     IR * processBranch(IR * ir, IN OUT bool & cfg_mod);
     bool performSimplyRCE(IN OUT bool & cfg_mod);
-    virtual bool perform(OptCTX & oc);
+    virtual bool perform(OptCtx & oc);
 };
 
 } //namespace xoc

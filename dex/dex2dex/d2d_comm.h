@@ -34,11 +34,6 @@ author: GongKai, JinYue
 #ifndef _D2D_COMM_H_
 #define _D2D_COMM_H_
 
-#define LIRMALLOC drLinearAlloc
-#define LIRFREEALL drLinearFree
-//#define LIRMALLOC malloc
-//#define LIRFREEALL
-
 //avoid confict instruction: kSparseSwitchSignature 0x0200 and lc_nop 0x0200
 #define KVM_kPackedSwitchSignature 0x10FF
 #define KVM_kSparseSwitchSignature 0x20FF

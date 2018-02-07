@@ -38,40 +38,28 @@ author: GongKai, JinYue
 #include "libdex/InstrUtils.h"
 #include "libdex/DexProto.h"
 #include "libdex/CmdUtils.h"
-
+#include "io/cio.h"
 #include "dir.h"
 #include "liropcode.h"
 #include <assert.h>
 #include <stdio.h>
+#include "lir.h"
+#include "d2d_comm.h"
+#include "d2d_l2d.h"
+#include "d2d_d2l.h"
 
 #include "cominc.h"
 #include "comopt.h"
-
-#include "drAlloc.h"
-//#include "d2lcode.h"
-#include "d2d_l2d.h"
-#include "d2d_d2l.h"
 #include "xassert.h"
+#include "drAlloc.h"
 #include "utils/cbytestream.h"
 #include "utils/clbe.h"
-#include "liropcode.h"
-#include "d2d_comm.h"
 #include "d2d_dexlib.h"
-
-#include "xassert.h"
-#include "io/cio.h"
-#include "d2d_comm.h"
-#include "dx_mgr.h"
-#include "aoc_dx_mgr.h"
-#include "prdf.h"
 #include "dex.h"
 #include "gra.h"
+#include "dex_hook.h"
 #include "dex_util.h"
-#include "dex2ir.h"
-#include "ir2dex.h"
-#include "d2d_l2d.h"
-#include "dex_driver.h"
-#include "lir.h"
+#include "drcode.h"
 
 static inline UInt8 getlirOpcode(ULong codePtr){
     BYTE* data = (BYTE*)codePtr;
@@ -149,7 +137,7 @@ static inline bool signedFitsInWide32(Int64 value){
         dexInstr->instrData = instrData; \
         ASSERT0(unsignedFitsIn8(dataA));\
         WRITE_16(instrData, ((UInt8)(dataA) << 8)|((UInt8)dexOpCode))\
-        memcpy(instrData,&dataB,8);
+        ::memcpy(instrData,&dataB,8);
 
 #define WRITE_FORMATAABBCC(dexInstr,dataA,dataB,dataC) \
         dexInstr->instrSize = 4;\
@@ -1816,7 +1804,7 @@ Int32 transformCode_orig(D2Dpool* pool, LIRCode* code, DexCode* nCode)
    dexInstrList.instrCount = instrCount;
 
    dexInstrList.instr = (D2DdexInstr*)malloc(sizeof(D2DdexInstr) * instrCount);
-   memset(dexInstrList.instr, 0, sizeof(D2DdexInstr) * instrCount);
+   ::memset(dexInstrList.instr, 0, sizeof(D2DdexInstr) * instrCount);
 
    for(i = 0; i < instrCount; i++)
    {
@@ -1954,7 +1942,7 @@ Int32 transformCode(LIRCode const* code, DexCode* nCode)
    dexInstrList.instrCount = instrCount;
 
    dexInstrList.instr = (D2DdexInstr*)malloc(sizeof(D2DdexInstr) * instrCount);
-   memset(dexInstrList.instr, 0, sizeof(D2DdexInstr) * instrCount);
+   ::memset(dexInstrList.instr, 0, sizeof(D2DdexInstr) * instrCount);
 
    for(i = 0; i < instrCount; i++)
    {
@@ -2070,8 +2058,9 @@ Int32 transformCode(LIRCode const* code, DexCode* nCode)
    nCode->insnsSize = cbsGetSize(regIns) / 2;
 
    //Try/Catch buf will be added.
-   // Fix: Trycatched should be 4-byte aligned.
-   // And then the code_item will also be 4-byte aligned. whenever tries size is zero or not.
+   //Fix: Trycatched should be 4-byte aligned.
+   //And then the code_item will also be 4-byte aligned.
+   //whenever tries size is zero or not.
    if (nCode->insnsSize & 0x01){
      cbsWrite16(regIns, (UInt16)0);
    }
@@ -2162,7 +2151,8 @@ static Int32 writeCodeItem_orig(D2Dpool* pool, CBSHandle cbsCode, DexCode* nCode
     return writeSize;
 }
 
-DexCode * writeCodeItem(D2Dpool* pool, CBSHandle cbsCode,
+DexCode * writeCodeItem(D2Dpool* pool,
+                        CBSHandle cbsCode,
                         UInt16 registersSize,
                         UInt16 insSize,
                         UInt16 outsSize,
@@ -2213,7 +2203,7 @@ DexCode * writeCodeItem(D2Dpool* pool, CBSHandle cbsCode,
 void lir2dexCode_orig(D2Dpool* pool, const DexCode* pCode, LIRCode* code)
 {
     DexCode npCode;
-    memset(&npCode, 0, sizeof(DexCode));
+    ::memset(&npCode, 0, sizeof(DexCode));
 
     CBSHandle cbsCode = transformCode_orig(pool, code, &npCode);
     npCode.debugInfoOff = pCode->debugInfoOff;
@@ -2227,7 +2217,7 @@ void lir2dexCode_orig(D2Dpool* pool, const DexCode* pCode, LIRCode* code)
 void lir2dexCode(D2Dpool* pool, const DexCode* dexCode, LIRCode* lircode)
 {
     DexCode x;
-    memset(&x, 0, sizeof(DexCode));
+    ::memset(&x, 0, sizeof(DexCode));
     CBSHandle cbsCode = transformCode(lircode, &x);
     writeCodeItem(pool, cbsCode, x.registersSize, x.insSize,
                   dexCode->outsSize, x.triesSize,

@@ -40,12 +40,12 @@ namespace xoc {
 //
 //START Inliner
 //
-bool Inliner::is_call_site(IR * call, Region * ru)
+bool Inliner::is_call_site(IR * call, Region * rg)
 {
-    ASSERT0(call->is_calls_stmt());
-    SYM * name = VAR_name(CALL_idinfo(call));
-    CallNode const* cn1 = m_call_graph->map_sym2cn(name);
-    CallNode const* cn2 = m_call_graph->map_ru2cn(ru);
+    ASSERT0(call->isCallStmt());
+    CallNode const* cn1 =
+        m_call_graph->mapSym2CallNode(CALL_idinfo(call)->get_name(), rg);
+    CallNode const* cn2 = m_call_graph->mapRegion2CallNode(rg);
     return cn1 == cn2;
 }
 
@@ -62,8 +62,8 @@ IR * Inliner::replaceReturnImpl(
 {
     IR * next = NULL;
     for (IR * x = new_irs; x != NULL; x = next) {
-        next = IR_next(x);
-        switch (IR_code(x)) {
+        next = x->get_next();
+        switch (x->get_code()) {
         case IR_DO_WHILE:
         case IR_WHILE_DO:
         case IR_DO_LOOP: //loop with init , boundary , and step info
@@ -94,7 +94,7 @@ IR * Inliner::replaceReturnImpl(
                 IR * mv_lst = NULL;
                 if (send != NULL) {
                     IR * mv = caller->buildStorePR(receive,
-                                                   IR_dt(caller_call), send);
+                        caller_call->get_type(), send);
                     xcom::insertbefore_one(&mv_lst, mv_lst, mv);
                 }
                 RET_exp(x) = NULL;
@@ -119,17 +119,17 @@ IR * Inliner::replaceReturnImpl(
 
 
 void Inliner::checkRegion(
-        IN Region * ru,
+        IN Region * rg,
         OUT bool & need_el,
         OUT bool & has_ret) const
 {
     need_el = false;
     has_ret = false;
     List<IR const*> lst;
-    IR const* irs = ru->get_ir_list();
+    IR const* irs = rg->getIRList();
     if (irs == NULL) { return; }
-    for (IR const* x = irs; x != NULL; x = IR_next(x)) {
-        switch (IR_code(x)) {
+    for (IR const* x = irs; x != NULL; x = x->get_next()) {
+        switch (x->get_code()) {
         case IR_DO_WHILE:
         case IR_WHILE_DO:
         case IR_DO_LOOP:
@@ -209,14 +209,14 @@ IR * Inliner::replaceReturn(
 
 bool Inliner::do_inline_c(Region * caller, Region * callee)
 {
-    IR * caller_irs = caller->get_ir_list();
-    IR * callee_irs = callee->get_ir_list();
+    IR * caller_irs = caller->getIRList();
+    IR * callee_irs = callee->getIRList();
     if (caller_irs == NULL || callee_irs == NULL) { return false; }
     IR * next = NULL;
     bool change = false;
     IR * head = caller_irs;
     for (; caller_irs != NULL; caller_irs = next) {
-        next = IR_next(caller_irs);
+        next = caller_irs->get_next();
         if (caller_irs->is_call() &&
             is_call_site(caller_irs, callee)) {
             IR * new_irs_in_caller = caller->dupIRTreeList(callee_irs);
@@ -238,7 +238,7 @@ bool Inliner::do_inline_c(Region * caller, Region * callee)
         }
     }
 
-    caller->set_ir_list(head);
+    caller->setIRList(head);
     return change;
 }
 
@@ -246,13 +246,13 @@ bool Inliner::do_inline_c(Region * caller, Region * callee)
 //'cand': candidate that expected to be inlined.
 void Inliner::do_inline(Region * cand)
 {
-    CallNode * cn = m_call_graph->map_ru2cn(cand);
+    CallNode * cn = m_call_graph->mapRegion2CallNode(cand);
     ASSERT0(cn);
     Vertex * v = m_call_graph->get_vertex(CN_id(cn));
     ASSERT0(v);
     for (EdgeC * el = VERTEX_in_list(v);
          el != NULL; el = EC_next(el)) {
-        Region * caller = CN_ru(m_call_graph->map_vex2cn(EDGE_from(EC_edge(el))));
+        Region * caller = CN_ru(m_call_graph->mapVertex2CallNode(EDGE_from(EC_edge(el))));
         if (caller != NULL) {
             do_inline_c(caller, cand);
         }
@@ -260,32 +260,34 @@ void Inliner::do_inline(Region * cand)
 }
 
 
-//Evaluate whether ru can be inlining candidate.
-bool Inliner::can_be_cand(Region * ru)
+//Evaluate whether rg can be inlining candidate.
+bool Inliner::can_be_cand(Region * rg)
 {
-    IR * ru_irs = ru->get_ir_list();
-    if (REGION_is_expect_inline(ru) && cnt_list(ru_irs) < g_inline_threshold) {
+    IR * ru_irs = rg->getIRList();
+    if (REGION_is_expect_inline(rg) && cnt_list(ru_irs) < g_inline_threshold) {
         return true;
     }
     return false;
 }
 
 
-bool Inliner::perform(OptCTX & oc)
+bool Inliner::perform(OptCtx & oc)
 {
-    UNUSED(oc);
+    START_TIMER(t, getPassName());
+    DUMMYUSE(oc);
     ASSERT0(OC_is_callg_valid(oc));
     ASSERT0(m_program && m_program->is_program());
-    IR * irs = m_program->get_ir_list();
+    IR * irs = m_program->getIRList();
     while (irs != NULL) {
         if (irs->is_region()) {
-            Region * ru = REGION_ru(irs);
-            if (can_be_cand(ru)) {
-                do_inline(ru);
+            Region * rg = REGION_ru(irs);
+            if (can_be_cand(rg)) {
+                do_inline(rg);
             }
         }
-        irs = IR_next(irs);
+        irs = irs->get_next();
     }
+    END_TIMER(t, getPassName());
     return false;
 }
 //END Inliner

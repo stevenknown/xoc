@@ -35,30 +35,10 @@ author: Su Zhenyu
 #define __DEX_TO_IR_H__
 
 //Map from LIR to LABEL.
-typedef TMap<LIR*, List<LabelInfo*>*> LIR2LABS;
+typedef TMap<LIR*, List<LabelInfo*>*> LIR2LabelInfo;
 
-
-class CatchInfo {
-public:
-    CatchInfo * prev;
-    CatchInfo * next;
-    LabelInfo * catch_start;
-    UINT kind; //record exception type.
-    CHAR const* kindname; //record exception type name.
-};
-
-
-class TryInfo {
-public:
-    TryInfo * prev;
-    TryInfo * next;
-    LabelInfo * try_start;
-    LabelInfo * try_end;
-    UINT try_start_pos;
-    UINT try_end_pos;
-    CatchInfo * catch_list;
-};
-
+class DexRegion;
+class DexRegionMgr;
 
 typedef enum _CMP_KIND {
     CMP_UNDEF = 0,
@@ -79,9 +59,12 @@ public:
 
     bool is_equ(CHAR const* t1, CHAR const* t2) const
     { return strcmp(t1, t2) == 0; }
+
+    CHAR const* createKey(CHAR const* t) { return t; }    
 };
 
 typedef TMap<CHAR const*, Type const*, CmpStr> Str2Type;
+typedef TMap<LabelInfo const*, CatchInfo const*> Label2CatchInfo;
 
 //In Actually, it does work to convert ANA IR to IR, but is not DEX.
 //To wit, the class declared in class LIR2IR, that will be better.
@@ -89,15 +72,16 @@ class Dex2IR {
 protected:
     DexRegion * m_ru;
     DexRegionMgr * m_ru_mgr;
-    TypeMgr * m_dm;
+    TypeMgr * m_tm;
     DexFile * m_df;
     VarMgr * m_vm;
     LIRCode * m_lircode;
     TypeIndexRep const* m_tr;
     SMemPool * m_pool;
-    Var2UINT m_map_var2ofst;
-    LIR2LABS m_lir2labs;
+
+    LIR2LabelInfo m_lir2labs;
     Str2Type m_typename2type;
+    Label2CatchInfo m_label2catchinfo;
     DbxVec const& m_dbxvec;
     Type const* m_ptr_addend;
     UINT m_ofst_addend;
@@ -110,9 +94,10 @@ protected:
     TryInfo * m_ti;
     bool m_has_catch; //Set to true if region has catch block.
     List<LabelInfo*> m_last_try_end_lab_list;
+    Var2UINT * m_var2fieldid;
 
     void attachCatchInfo(IR * ir);
-    void attachCatchInfo(IR * ir, AttachInfo * ai);
+    void attachCatchInfo(IR * ir, AIContainer * ai);
 
     void markLIRLabel();
     void markTryLabel();
@@ -123,7 +108,7 @@ protected:
         ASSERT(pool, ("need pool!!"));
         void * p = smpoolMalloc(size, pool);
         ASSERT0(p);
-        memset(p, 0, size);
+        ::memset(p, 0, size);
         return p;
     }
 
@@ -133,36 +118,14 @@ protected:
         ASSERT(m_pool != NULL, ("need pool!!"));
         void * p = smpoolMalloc(size, m_pool);
         ASSERT0(p);
-        memset(p, 0, size);
+        ::memset(p, 0, size);
         return p;
     }
 public:
     Vreg2PR m_v2pr; //map from dex register v to IR_PR node.
     Prno2Vreg m_pr2v; //map from dex register v to IR_PR node.
 
-    Dex2IR(IN Region * ru,
-           IN DexFile * df,
-           IN LIRCode * fu,
-           DbxVec const& dbxvec) : m_dbxvec(dbxvec)
-    {
-        ASSERT0(ru && df && fu);
-        m_ru = (DexRegion*)ru;
-        m_ru_mgr = (DexRegionMgr*)ru->get_region_mgr();
-        m_dm = ru->get_type_mgr();
-        m_vm = ru->get_var_mgr();
-        m_df = df;
-        m_lircode = fu;
-        m_tr = ((DexRegion*)ru)->getTypeIndexRep();
-        m_ti = NULL;
-        m_pool = smpoolCreate(16, MEM_COMM);
-        m_pr2v.init(MAX(4, getNearestPowerOf2(fu->maxVars)));
-        m_ptr_addend = m_dm->getSimplexType(D_U32);
-        m_ofst_addend = m_dm->get_dtype_bytesize(D_I64);
-        m_pr2v.maxreg = fu->maxVars - 1;
-        m_pr2v.paramnum = fu->numArgs;
-        m_current_catch_list = NULL;
-    }
-
+    Dex2IR(Region * rg, DexFile * df, LIRCode * fu, DbxVec const& dbxvec);
     ~Dex2IR()
     {
         TMapIter<LIR*, List<LabelInfo*>*> iter;
@@ -235,8 +198,9 @@ public:
     Type const* getType(LIR * ir);
     Prno2Vreg * getPR2Vreg() { return &m_pr2v; }
     Vreg2PR * getVreg2PR() { return &m_v2pr; }
-    Var2UINT * getVAR2Ofst() { return &m_map_var2ofst; }
     TryInfo * getTryInfo() { return m_ti; }
+    Label2CatchInfo const& getLabel2CatchInfo() const
+    { return m_label2catchinfo; }
 
     List<LabelInfo*> & getLastTryEndLabelList()
     { return m_last_try_end_lab_list; }

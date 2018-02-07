@@ -31,41 +31,35 @@ IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 author: Su Zhenyu
 @*/
-#include "ltype.h"
-#include "comf.h"
-#include "smempool.h"
-#include "sstl.h"
-
-using namespace xcom;
-
+#include "../com/xcominc.h"
 #include "util.h"
 #include "symtab.h"
 #include "label.h"
 
 namespace xoc {
 
-LabelInfo * newCustomerLabel(SYM * st, SMemPool * pool)
+LabelInfo * allocCustomerLabel(SYM const* st, SMemPool * pool)
 {
-    LabelInfo * li = newLabel(pool);
+    LabelInfo * li = allocLabel(pool);
     LABEL_INFO_name(li) = st;
     LABEL_INFO_type(li) = L_CLABEL;
     return li;
 }
 
 
-LabelInfo * newInternalLabel(SMemPool * pool)
+LabelInfo * allocInternalLabel(SMemPool * pool)
 {
-    LabelInfo * n = newLabel(pool);
+    LabelInfo * n = allocLabel(pool);
     LABEL_INFO_type(n) = L_ILABEL;
     return n;
 }
 
 
-LabelInfo * newLabel(SMemPool * pool)
+LabelInfo * allocLabel(SMemPool * pool)
 {
     LabelInfo * p = (LabelInfo*)smpoolMalloc(sizeof(LabelInfo), pool);
     ASSERT0(p);
-    memset(p, 0, sizeof(LabelInfo));
+    ::memset(p, 0, sizeof(LabelInfo));
     return p;
 }
 
@@ -80,9 +74,10 @@ void dumpLabel(LabelInfo const* li)
         fprintf(g_tfile, "\nclabel(" CLABEL_STR_FORMAT ")",
                 CLABEL_CONT(li));
     } else if (LABEL_INFO_type(li) == L_PRAGMA) {
+        ASSERT0(LABEL_INFO_pragma(li));
         fprintf(g_tfile, "\npragms(%s)",
                 SYM_name(LABEL_INFO_pragma(li)));
-    } else { ASSERT0(0); }
+    } else { UNREACH(); }
 
     if (LABEL_INFO_b1(li) != 0) {
         fprintf(g_tfile, "(");
@@ -95,9 +90,6 @@ void dumpLabel(LabelInfo const* li)
     }
     if (LABEL_INFO_is_catch_start(li)) {
         fprintf(g_tfile, "catch_start ");
-    }
-    if (LABEL_INFO_is_used(li)) {
-        fprintf(g_tfile, "used ");
     }
     if (LABEL_INFO_b1(li) != 0) {
         fprintf(g_tfile, ")");

@@ -51,7 +51,8 @@ protected:
     List<TimeInfo*> m_ti_list;
     SMemPool * m_pool;
     Region * m_ru;
-    TypeMgr * m_dm;
+    RegionMgr * m_rumgr;
+    TypeMgr * m_tm;
     CDG * m_cdg;
     TMap<PASS_TYPE, Pass*> m_registered_pass;
     TMap<PASS_TYPE, Graph*> m_registered_graph_based_pass;
@@ -60,16 +61,16 @@ protected:
     {
         void * p = smpoolMalloc(size, m_pool);
         if (p == NULL) return NULL;
-        memset(p, 0, size);
+        ::memset(p, 0, size);
         return p;
     }
     Graph * registerGraphBasedPass(PASS_TYPE opty);
 public:
-    PassMgr(Region * ru);
+    PassMgr(Region * rg);
     COPY_CONSTRUCTOR(PassMgr);
     virtual ~PassMgr()
     {
-        destroyPass();
+        destroyAllPass();
         smpoolDelete(m_pool);
     }
 
@@ -97,12 +98,18 @@ public:
     virtual Pass * allocRCE();
     virtual Pass * allocGVN();
     virtual Pass * allocLoopCvt();
-    virtual Pass * allocSSAMgr();
+    virtual Pass * allocPRSSAMgr();
+    virtual Pass * allocMDSSAMgr();
     virtual Pass * allocCCP();
     virtual Pass * allocExprTab();
     virtual Pass * allocCfsMgr();
+    virtual Pass * allocIPA();
+    virtual Pass * allocInliner();
 
-    void destroyPass();
+    void destroyAllPass();
+    void destroyPass(Pass * pass);
+    void destroyPass(PASS_TYPE passtype);
+
     void dump_pass_time_info()
     {
         if (g_tfile == NULL) { return; }
@@ -118,7 +125,7 @@ public:
 
     Pass * registerPass(PASS_TYPE opty);
 
-    Pass * query_opt(PASS_TYPE opty)
+    Pass * queryPass(PASS_TYPE opty)
     {
         if (opty == PASS_CDG) {
             return (Pass*)m_registered_graph_based_pass.get(opty);
@@ -126,7 +133,7 @@ public:
         return m_registered_pass.get(opty);
     }
 
-    virtual void performScalarOpt(OptCTX & oc);
+    virtual void performScalarOpt(OptCtx & oc);
 };
 
 } //namespace xoc

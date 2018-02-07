@@ -34,49 +34,24 @@ author: Su Zhenyu
 #ifndef __COMINC_H__
 #define __COMINC_H__
 
-//Common included files
-#include "stdlib.h"
-#include "stdarg.h"
-#include "stdio.h"
-#include "string.h"
-#include "ltype.h"
-
-//libxcom
-#include "comf.h"
-#include "smempool.h"
-#include "sstl.h"
-#include "matt.h"
-#include "bs.h"
-#include "sbs.h"
-#include "sgraph.h"
-#include "rational.h"
-#include "flty.h"
-#include "xmat.h"
-
-using namespace xcom;
-
-#include "option.h"
-#include "targ_const_info.h"
-#include "util.h"
-#include "symtab.h"
-#include "label.h"
-#include "cdg.h"
-#include "loop.h"
-#include "cfg.h"
-#include "math.h"
+#include "commoninc.h"
 #include "data_type.h"
-#include "dbg.h"
 
 //Middle level included files
+#include "dbg.h"
 #include "var.h"
 #include "md.h"
+#include "pass.h"
 #include "ai.h"
 #include "du.h"
 #include "ir.h"
-#include "pass.h"
+#include "loop.h"
+#include "cfg.h"
+#include "prssainfo.h"
+#include "mdssainfo.h"
+#include "ir_bb.h"
 #include "ir_refine.h"
 #include "ir_simp.h"
-#include "ir_bb.h"
 #include "pass_mgr.h"
 #include "ir_cfg.h"
 #include "ir_high_opt.h"

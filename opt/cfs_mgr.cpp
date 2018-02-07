@@ -45,10 +45,8 @@ CFS_INFO * CfsMgr::new_cfs_info(IR_TYPE irtype)
     CFS_INFO_cfs_type(ci) = irtype;
     switch (irtype) {
     case IR_IF:
-        {
-            CFS_INFO_true_body(ci) = m_bs_mgr.create();
-            CFS_INFO_false_body(ci) = m_bs_mgr.create();
-        }
+        CFS_INFO_true_body(ci) = m_bs_mgr.create();
+        CFS_INFO_false_body(ci) = m_bs_mgr.create();
         break;
     case IR_DO_LOOP:
     case IR_WHILE_DO:
@@ -56,7 +54,7 @@ CFS_INFO * CfsMgr::new_cfs_info(IR_TYPE irtype)
         CFS_INFO_loop_body(ci) = m_bs_mgr.create();
         break;
     default:
-        ASSERT0(0);
+        UNREACH();
     }
     return ci;
 }
@@ -64,13 +62,13 @@ CFS_INFO * CfsMgr::new_cfs_info(IR_TYPE irtype)
 
 void CfsMgr::set_map_ir2cfsinfo(IR * ir, CFS_INFO * ci)
 {
-    m_map_ir2cfsinfo.set(IR_id(ir), ci);
+    m_map_ir2cfsinfo.set(ir->id(), ci);
 }
 
 
 CFS_INFO * CfsMgr::map_ir2cfsinfo(IR * ir)
 {
-    return m_map_ir2cfsinfo.get(IR_id(ir));
+    return m_map_ir2cfsinfo.get(ir->id());
 }
 
 
@@ -79,7 +77,7 @@ void CfsMgr::recordStmt(IR * ir_list, BitSet & irset)
 {
     while (ir_list != NULL) {
         irset.bunion(IR_id(ir_list));
-        ir_list = IR_next(ir_list);
+        ir_list = ir_list->get_next();
     }
 }
 
@@ -103,7 +101,7 @@ void CfsMgr::dump_indent(UINT indent)
 
 void CfsMgr::dump_abs_tree(AbsNode * an)
 {
-    fprintf(g_tfile, "\n##############\nDUMP AbsNode Tree\n##############\n");
+    fprintf(g_tfile, "\n==---- DUMP AbsNode Tree ----==\n");
     dump_abs_tree(an, 0);
 }
 
@@ -154,16 +152,16 @@ void CfsMgr::set_map_bb2abs(IRBB const* bb, AbsNode * abs)
 
 
 AbsNode * CfsMgr::constructAbsLoop(
-                        IN IRBB * entry,
-                        IN AbsNode * parent,
-                        IN BitSet * cur_region,
-                        IN Graph & cur_graph,
-                        IN OUT BitSet & visited)
+        IN IRBB * entry,
+        IN AbsNode * parent,
+        IN BitSet * cur_region,
+        IN Graph & cur_graph,
+        IN OUT BitSet & visited)
 {
-    UNUSED(cur_region);
+    DUMMYUSE(cur_region);
     ASSERT0(cur_region == NULL || cur_region->is_contain(BB_id(entry)));
-    IR_CFG * cfg = m_ru->get_cfg();
-    LI<IRBB> * li = cfg->map_bb2li(entry);
+    IR_CFG * cfg = m_ru->getCFG();
+    LI<IRBB> * li = cfg->mapBB2LabelInfo(entry);
     ASSERT0(li != NULL && LI_loop_head(li) == entry);
 
     AbsNode * node = new_abs_node(ABS_LOOP);
@@ -171,18 +169,17 @@ AbsNode * CfsMgr::constructAbsLoop(
     ABS_NODE_parent(node) = parent;
     ABS_NODE_loop_head(node) = entry;
     IRBB * body_start;
-    cfg->get_loop_two_kids(entry, NULL, &body_start);
+    cfg->getKidOfLoop(entry, NULL, &body_start);
     ASSERT0(body_start != NULL);
 
     CFS_INFO * ci = map_ir2cfsinfo(cfg->get_last_xr(entry));
-    CK_USE(ci);
+    CHECK_DUMMYUSE(ci);
     ASSERT0(CFS_INFO_head(ci) == entry);
 
     ASSERT0(CFS_INFO_loop_body(ci)->is_contain(*LI_bb_set(li)));
     BitSet loc_visited;
     ABS_NODE_loop_body(node) = constructAbsTree(body_start, node,
-                                                  LI_bb_set(li),
-                                                  cur_graph, loc_visited);
+        LI_bb_set(li), cur_graph, loc_visited);
     visited.bunion(loc_visited);
     visited.bunion(BB_id(entry));
     return node;
@@ -191,10 +188,10 @@ AbsNode * CfsMgr::constructAbsLoop(
 
 //'cur_region' covered 'entry'.
 AbsNode * CfsMgr::constructAbsIf(
-                        IN IRBB * entry,
-                        IN AbsNode * parent,
-                        IN Graph & cur_graph,
-                        IN OUT BitSet & visited)
+        IN IRBB * entry,
+        IN AbsNode * parent,
+        IN Graph & cur_graph,
+        IN OUT BitSet & visited)
 {
     AbsNode * node = new_abs_node(ABS_IF);
     set_map_bb2abs(entry, node);
@@ -202,16 +199,18 @@ AbsNode * CfsMgr::constructAbsIf(
     ABS_NODE_if_head(node) = entry;
 
     IRBB * true_body, * false_body;
-    IR_CFG * cfg = m_ru->get_cfg();
-    cfg->get_if_three_kids(entry, &true_body, &false_body, NULL);
+    IR_CFG * cfg = m_ru->getCFG();
+    cfg->getKidOfIF(entry, &true_body, &false_body, NULL);
     CFS_INFO * ci = map_ir2cfsinfo(cfg->get_last_xr(entry));
     ASSERT0(ci != NULL && CFS_INFO_head(ci) == entry);
 
     BitSet loc_visited;
-    ABS_NODE_true_body(node) = constructAbsTree(true_body, node, CFS_INFO_true_body(ci), cur_graph, loc_visited);
+    ABS_NODE_true_body(node) = constructAbsTree(true_body, node,
+        CFS_INFO_true_body(ci), cur_graph, loc_visited);
     visited.bunion(loc_visited);
     loc_visited.clean();
-    ABS_NODE_false_body(node) = constructAbsTree(false_body, node, CFS_INFO_false_body(ci), cur_graph, loc_visited);
+    ABS_NODE_false_body(node) = constructAbsTree(false_body, node,
+        CFS_INFO_false_body(ci), cur_graph, loc_visited);
     visited.bunion(loc_visited);
     visited.bunion(BB_id(entry));
     return node;
@@ -229,13 +228,13 @@ AbsNode * CfsMgr::constructAbsBB(IN IRBB * bb, IN AbsNode * parent)
 
 
 AbsNode * CfsMgr::constructAbsTree(
-                        IN IRBB * entry,
-                        IN AbsNode * parent,
-                        IN BitSet * cur_region,
-                        IN Graph & cur_graph,
-                        IN OUT BitSet & visited)
+        IN IRBB * entry,
+        IN AbsNode * parent,
+        IN BitSet * cur_region,
+        IN Graph & cur_graph,
+        IN OUT BitSet & visited)
 {
-    IR_CFG * cfg = m_ru->get_cfg();
+    IR_CFG * cfg = m_ru->getCFG();
     AbsNode * lst = NULL;
     IRBB * bb = entry;
     Graph g;
@@ -262,26 +261,25 @@ AbsNode * CfsMgr::constructAbsTree(
             cur_region->is_contain(BB_id(bb)))) {
         AbsNode * node = NULL;
         loc_visited.clean();
-        LI<IRBB> * li = cfg->map_bb2li(bb);
+        LI<IRBB> * li = cfg->mapBB2LabelInfo(bb);
         if (li != NULL) {
             node = constructAbsLoop(bb, parent, LI_bb_set(li),
-                                      g, loc_visited);
+                                    g, loc_visited);
         } else {
             IR * last_xr = cfg->get_last_xr(bb);
             if (last_xr != NULL && //'bb' is branching node of IF.
-                last_xr->is_cond_br()) {
+                last_xr->isConditionalBr()) {
                 ASSERT0(map_ir2cfsinfo(last_xr) != NULL);
 
-                /* There might not exist ipdom.
-                e.g:
-                    if (x) //BB1
-                        return 1;
-                    return 2;
-
-                    BB1 does not have a ipdom.
-                */
+                //There might not exist ipdom.
+                //e.g:
+                //  if (x) //BB1
+                //      return 1;
+                //  return 2;
+                //
+                //  BB1 does not have a ipdom.
                 UINT ipdom = ((DGraph*)cfg)->get_ipdom(BB_id(bb));
-                UNUSED(ipdom);
+                DUMMYUSE(ipdom);
                 ASSERT(ipdom > 0, ("bb does not have ipdom"));
                 node = constructAbsIf(bb, parent, g, loc_visited);
             } else {
@@ -307,7 +305,7 @@ AbsNode * CfsMgr::constructAbsTree(
         for (v = g.get_first_vertex(c); v != NULL; v = g.get_next_vertex(c)) {
             if (g.get_in_degree(v) == 0) {
                 ASSERT(cand == NULL, ("multiple immediate-post-dominators"));
-                cand = cfg->get_bb(VERTEX_id(v));
+                cand = cfg->getBB(VERTEX_id(v));
             }
         }
 
@@ -331,11 +329,11 @@ AbsNode * CfsMgr::constructAbsTree(
 //Construct Control Flow Structure.
 AbsNode * CfsMgr::constructAbstractControlFlowStruct()
 {
-    IR_CFG * cfg = m_ru->get_cfg();
-    IRBB * entry = cfg->get_entry_list()->get_head();
-    ASSERT(cfg->get_entry_list()->get_elem_count() == 1, ("CFG should be single-entry"));
+    IR_CFG * cfg = m_ru->getCFG();
+    ASSERT(cfg->get_entry(), ("CFG should be single-entry"));
     BitSet visited;
-    AbsNode * a = constructAbsTree(entry, NULL, NULL, *(Graph*)cfg, visited);
+    AbsNode * a = constructAbsTree(cfg->get_entry(), NULL,
+        NULL, *(Graph*)cfg, visited);
     //dump_abs_tree(a);
     return a;
 }

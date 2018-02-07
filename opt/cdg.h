@@ -42,14 +42,14 @@ class Region;
 class CDG : public Graph {
     Region * m_ru;
 public:
-    CDG(Region * ru) { m_ru = ru; }
+    CDG(Region * rg) { m_ru = rg; }
     void get_cd_preds(UINT id, OUT List<Vertex*> & lst);
     void get_cd_succs(UINT id, OUT List<Vertex*> & lst);
     bool is_only_cd_self(UINT id);
     bool is_cd(UINT a, UINT b);
     void dump();
-    void build(IN OUT OptCTX & oc, DGraph & cfg);
-    void rebuild(IN OUT OptCTX & oc, DGraph & cfg);
+    void build(IN OUT OptCtx & oc, DGraph & cfg);
+    void rebuild(IN OUT OptCtx & oc, DGraph & cfg);
 };
 
 } //namespace xoc

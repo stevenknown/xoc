@@ -38,18 +38,18 @@ namespace xoc {
 //
 //START IR_EXPR_TAB
 //
-IR_EXPR_TAB::IR_EXPR_TAB(Region * ru)
+IR_EXPR_TAB::IR_EXPR_TAB(Region * rg)
 {
     m_expr_count = 0;
-    m_ru = ru;
-    m_dm = ru->get_type_mgr();
-    memset(m_level1_hash_tab, 0,
+    m_ru = rg;
+    m_tm = rg->getTypeMgr();
+    ::memset(m_level1_hash_tab, 0,
            sizeof(ExpRep*) * IR_EXPR_TAB_LEVEL1_HASH_BUCKET);
     m_pool = smpoolCreate(sizeof(ExpRep*) * 128, MEM_COMM);
     m_sc_pool = smpoolCreate(sizeof(SC<ExpRep*>) * 4, MEM_CONST_SIZE);
     m_ir_expr_lst.set_pool(m_sc_pool);
-    m_md_set_mgr = ru->get_mds_mgr();
-    m_bs_mgr = ru->get_bs_mgr();
+    m_md_set_mgr = rg->getMDSetMgr();
+    m_bs_mgr = rg->getBitSetMgr();
 }
 
 
@@ -66,9 +66,9 @@ IR_EXPR_TAB::~IR_EXPR_TAB()
 }
 
 
-UINT IR_EXPR_TAB::count_mem()
+size_t IR_EXPR_TAB::count_mem()
 {
-    UINT count = 0;
+    size_t count = 0;
     count += sizeof(m_expr_count);
     count += sizeof(m_ru);
     count += m_ir_expr_vec.count_mem();
@@ -84,7 +84,7 @@ void * IR_EXPR_TAB::xmalloc(INT size)
 {
     void * p = smpoolMalloc(size, m_pool);
     ASSERT0(p);
-    memset(p, 0, size);
+    ::memset(p, 0, size);
     return p;
 }
 
@@ -106,22 +106,22 @@ void IR_EXPR_TAB::dump_ir_expr_tab()
 {
     if (g_tfile == NULL) return;
     fprintf(g_tfile, "\n==---- DUMP IR_EXPR_TAB ----==");
-    IR_DU_MGR * du_mgr = m_ru->get_du_mgr();
+    IR_DU_MGR * du_mgr = m_ru->getDUMgr();
     INT last = m_ir_expr_vec.get_last_idx();
     for (INT i = 0; i <= last; i++) {
         ExpRep * ie = m_ir_expr_vec.get(i);
         if (ie == NULL) { continue; }
         ASSERT0(EXPR_id(ie) == (UINT)i);
         fprintf(g_tfile, "\n\n----------- ExpRep(%d)", i);
-        dump_ir(EXPR_ir(ie), m_dm);
+        dump_ir(EXPR_ir(ie), m_tm);
         fprintf(g_tfile, "\n\tOCC:");
         for (IR * occ = EXPR_occ_list(ie).get_head();
              occ != NULL; occ = EXPR_occ_list(ie).get_next()) {
             fprintf(g_tfile, "IR%d", IR_id(occ));
-            MDSet const* use_mds = du_mgr->get_may_use(occ);
+            MDSet const* use_mds = du_mgr->getMayUse(occ);
             if (use_mds != NULL) {
                 fprintf(g_tfile, "(use:");
-                use_mds->dump(m_ru->get_md_sys());
+                use_mds->dump(m_ru->getMDSystem());
                 fprintf(g_tfile, ")");
             }
             fprintf(g_tfile, ",");
@@ -135,31 +135,22 @@ void IR_EXPR_TAB::dump_ir_expr_tab()
 ExpRep * IR_EXPR_TAB::map_ir2ir_expr(IR const* ir)
 {
     if (ir == NULL) return NULL;
-    return m_map_ir2ir_expr.get(IR_id(ir));
+    return m_map_ir2ir_expr.get(ir->id());
 }
 
 
 void IR_EXPR_TAB::set_map_ir2ir_expr(IR const* ir, ExpRep * ie)
 {
-    m_map_ir2ir_expr.set(IR_id(ir), ie);
+    m_map_ir2ir_expr.set(ir->id(), ie);
 }
 
 
 UINT IR_EXPR_TAB::compute_hash_key(IR const* ir)
 {
     ASSERT0(ir != NULL);
-    UINT hval = IR_code(ir) + (ir->get_offset() + 1) + (UINT)(size_t)IR_dt(ir);
+    UINT hval = ir->get_code() + (ir->getOffset() + 1) + (UINT)(size_t)IR_dt(ir);
     if (ir->is_id()) {
         VAR * var = ID_info(ir);
-        /*
-        SYM * name = VAR_name(id_info);
-        CHAR * s = SYM_name(name);
-        UINT v = 0 ;
-        while (*s != 0) {
-            v += (UINT)(*s++);
-        }
-        hval += v;
-        */
         hval += 5 * (UINT)(size_t)var;
     }
     return hval;
@@ -178,9 +169,9 @@ UINT IR_EXPR_TAB::compute_hash_key_for_tree(IR * ir)
 }
 
 
-/* Append IR tree expression into HASH table and return the entry-info.
-If 'ir' has already been inserted in the table with an ExpRep,
-get that and return. */
+//Append IR tree expression into HASH table and return the entry-info.
+//If 'ir' has already been inserted in the table with an ExpRep,
+//get that and return.
 ExpRep * IR_EXPR_TAB::append_expr(IR * ir)
 {
     if (ir == NULL) return NULL;
@@ -228,7 +219,7 @@ ExpRep * IR_EXPR_TAB::append_expr(IR * ir)
     //Scanning in ExpRep list in level2 hash tab.
     ExpRep * last = NULL;
     while (ie != NULL) {
-        if (ir->is_ir_equal(EXPR_ir(ie))) {
+        if (ir->isIREqual(EXPR_ir(ie))) {
             return ie;
         }
         last = ie;
@@ -272,58 +263,54 @@ IR * IR_EXPR_TAB::remove_occ(IR * occ)
 void IR_EXPR_TAB::remove_occs(IR * ir)
 {
     ASSERT0(ir->is_stmt());
-    switch (IR_code(ir)) {
+    switch (ir->get_code()) {
     case IR_ST:
         {
             IR * stv = ST_rhs(ir);
             if (stv->is_const()) { return; }
-            this->remove_occ(stv);
+            remove_occ(stv);
         }
         break;
     case IR_IST:
         {
             IR * stv = IST_rhs(ir);
             if (!stv->is_const()) {
-                this->remove_occ(stv);
+                remove_occ(stv);
             }
 
             IR * m = IST_base(ir);
             if (m->is_const()) { return; }
-            this->remove_occ(m);
+            remove_occ(m);
         }
         break;
     case IR_CALL:
     case IR_ICALL:
-        {
-            IR * p = CALL_param_list(ir);
-            while (p != NULL) {
-                if (!p->is_const()) {
-                    this->remove_occ(p);
-                }
-                p = IR_next(p);
+        for (IR * p = CALL_param_list(ir); p != NULL; p = p->get_next()) {
+            if (!p->is_const()) {
+                remove_occ(p);
             }
         }
         break;
     case IR_TRUEBR:
     case IR_FALSEBR:
-        this->remove_occ(BR_det(ir));
+        remove_occ(BR_det(ir));
         break;
     case IR_SWITCH:
         ASSERT0(SWITCH_vexp(ir));
         if (!SWITCH_vexp(ir)->is_const()) {
-            this->remove_occ(SWITCH_vexp(ir));
+            remove_occ(SWITCH_vexp(ir));
         }
         break;
     case IR_IGOTO:
         ASSERT0(IGOTO_vexp(ir));
         if (!IGOTO_vexp(ir)->is_const()) {
-            this->remove_occ(IGOTO_vexp(ir));
+            remove_occ(IGOTO_vexp(ir));
         }
         break;
     case IR_RETURN:
         if (RET_exp(ir) != NULL) {
             if (!RET_exp(ir)->is_const()) {
-                this->remove_occ(RET_exp(ir));
+                remove_occ(RET_exp(ir));
             }
         }
         break;
@@ -338,7 +325,7 @@ void IR_EXPR_TAB::remove_occs(IR * ir)
     case IR_CONTINUE:
     case IR_PHI:
         break;
-    default: ASSERT0(0);
+    default: UNREACH();
     }
 }
 
@@ -365,7 +352,7 @@ ExpRep * IR_EXPR_TAB::remove_expr(IR * ir)
 
     //Scanning in ExpRep list in level2 hash tab.
     while (ie != NULL) {
-        if (ir->is_ir_equal(EXPR_ir(ie))) {
+        if (ir->isIREqual(EXPR_ir(ie))) {
             remove(&level2_hash_tab[level2_hashv], ie);
             m_ir_expr_vec.remove(EXPR_id(ie), NULL);
             return ie;
@@ -377,10 +364,8 @@ ExpRep * IR_EXPR_TAB::remove_expr(IR * ir)
 }
 
 
-/*
-Return entry-info if expression has been entered into HASH table,
-otherwise return NULL.
-*/
+//Return entry-info if expression has been entered into HASH table,
+//otherwise return NULL.
 ExpRep * IR_EXPR_TAB::find_expr(IR * ir)
 {
     if (ir == NULL) return NULL;
@@ -402,7 +387,7 @@ ExpRep * IR_EXPR_TAB::find_expr(IR * ir)
 
     //Scanning in ExpRep list in level2 hash tab.
     while (ie != NULL) {
-        if (ir->is_ir_equal(EXPR_ir(ie))) {
+        if (ir->isIREqual(EXPR_ir(ie))) {
             return ie;
         }
         ie = EXPR_next(ie);
@@ -416,7 +401,7 @@ ExpRep * IR_EXPR_TAB::encode_expr(IN IR * ir)
     if (ir == NULL) return NULL;
 
     ASSERT0(ir->is_exp());
-    switch (IR_code(ir)) {
+    switch (ir->get_code()) {
     case IR_ID:
     case IR_LD:
     case IR_LDA:
@@ -457,23 +442,23 @@ ExpRep * IR_EXPR_TAB::encode_expr(IN IR * ir)
             EXPR_occ_list(ie).append_tail(ir);
             return ie;
         }
-    default: ASSERT0(0);
+    default: UNREACH();
     }
     return NULL;
 }
 
 
-/* Encode expression for single BB.
-Scan IR statement literally, and encoding it for generating
-the unique id for each individual expressions, and update
-the 'GEN-SET' and 'KILL-SET' of IR-EXPR for BB as well as. */
+//Encode expression for single BB.
+//Scan IR statement literally, and encoding it for generating
+//the unique id for each individual expressions, and update
+//the 'GEN-SET' and 'KILL-SET' of IR-EXPR for BB as well as.
 void IR_EXPR_TAB::encode_bb(IRBB * bb)
 {
     C<IR*> * ct;
     for (IR * ir = BB_irlist(bb).get_head(&ct);
          ir != NULL; ir = BB_irlist(bb).get_next(&ct)) {
         ASSERT0(ir->is_stmt());
-        switch (IR_code(ir)) {
+        switch (ir->get_code()) {
         case IR_ST:
             {
                 ExpRep * ie = encode_expr(ST_rhs(ir));
@@ -497,10 +482,10 @@ void IR_EXPR_TAB::encode_bb(IRBB * bb)
                     set_map_ir2ir_expr(ARR_base(ir), ie);
                 }
 
-                for (IR * sub = ARR_sub_list(ir); sub != NULL; sub = IR_next(sub)) {
-                    ExpRep * ie = encode_expr(sub);
-                    if (ie != NULL) {
-                        set_map_ir2ir_expr(sub, ie);
+                for (IR * sub = ARR_sub_list(ir); sub != NULL; sub = sub->get_next()) {
+                    ExpRep * ie2 = encode_expr(sub);
+                    if (ie2 != NULL) {
+                        set_map_ir2ir_expr(sub, ie2);
                     }
                 }
 
@@ -531,14 +516,10 @@ void IR_EXPR_TAB::encode_bb(IRBB * bb)
                 }
             }
         case IR_CALL:
-            {
-                IR * parm = CALL_param_list(ir);
-                while (parm != NULL) {
-                    ExpRep * ie = encode_expr(parm);
-                    if (ie != NULL) {
-                        set_map_ir2ir_expr(parm, ie);
-                    }
-                    parm = IR_next(parm);
+            for (IR * p = CALL_param_list(ir); p != NULL; p = p->get_next()) {
+                ExpRep * ie = encode_expr(p);
+                if (ie != NULL) {
+                    set_map_ir2ir_expr(p, ie);
                 }
             }
             break;
@@ -590,27 +571,29 @@ void IR_EXPR_TAB::encode_bb(IRBB * bb)
             break;
         case IR_PHI:
             break;
-        default: ASSERT0(0);
+        default: UNREACH();
         } //end switch
     } //end for IR
     //dump_ir_expr_tab();
 }
 
 
-void IR_EXPR_TAB::reperform(IN OUT OptCTX & oc)
+void IR_EXPR_TAB::reperform(IN OUT OptCtx & oc)
 {
     clean_occ_list();
     perform(oc);
 }
 
 
-/* Encode expression for a list of BB.
-Scan IR statement literally, and encoding it for generating
-the unique id for each individual expressions, and update
-the 'GEN-SET' and 'KILL-SET' of IR-EXPR for BB as well as. */
-bool IR_EXPR_TAB::perform(IN OUT OptCTX & oc)
+//Encode expression for a list of BB.
+//Scan IR statement literally, and encoding it for generating
+//the unique id for each individual expressions, and update
+//the 'GEN-SET' and 'KILL-SET' of IR-EXPR for BB as well as.
+bool IR_EXPR_TAB::perform(IN OUT OptCtx & oc)
 {
-    BBList * bbl = m_ru->get_bb_list();
+    BBList * bbl = m_ru->getBBList();
+    if (bbl->get_elem_count() == 0) { return false; }
+
     C<IRBB*> * cb;
     for (IRBB * bb = bbl->get_head(&cb);
          bb != NULL; bb = bbl->get_next(&cb)) {

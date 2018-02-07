@@ -46,77 +46,77 @@ typedef enum _MD_TYPE {
 } MD_TYPE;
 
 #define MD_UNDEF              0 //Undefined.
-#define MD_ALL_MEM            1 //All program memory.
+#define MD_FULL_MEM           1 //All program memory.
+#define MD_FIRST              MD_FULL_MEM
 #define MD_GLOBAL_MEM         2 //Allocate at static data section
                                 //BYTE explicit definition.
-#define MD_HEAP_MEM           3 //Allocate in heap.
-#define MD_STACK_MEM          4 //Allocate at stack.
+#define MD_IMPORT_VAR         3 //Not allocated in current region.
+#define MD_HEAP_MEM           4 //Allocate in heap.
+#define MD_STACK_MEM          5 //Allocate at stack.
 //The first id which is allocable.
-#define MD_FIRST_ALLOCABLE (MD_GLOBAL_MEM + 1)
+#define MD_FIRST_ALLOCABLE (MD_IMPORT_VAR + 1)
 
+//Memory Descriptor.
+//MD is an appealing property to represent exact or inexact memory object.
+//By using MD, we can model miscellaneous memory accessing, and perform
+//memory analysis and optimizations.
+//
+//MD is used to represent different memory object with
+//same base. Attributes of MD may be Id, Base Variable, Size, Offset,
+//Effect, Exact, Range, Unbound.
+//¡ð    Id
+//    Unique id of abstract memory object.
+//
+//¡ð    Base Variable
+//    Since MD is the abstract version of VAR, it is closely related to
+//    individual variable. This variable may be the base of several MD.
+//
+//¡ð Type
+//    This attribute represent abstract memory object type.
+//    * MD_UNBOUND
+//        The object is unbound if we have no knowledge about MD size or
+//        MD offset. The Def-Use relation to the object is inexact. The
+//        store to object is nonkilling definition.
+//
+//    * MD_EXACT
+//        The object is exact indicate the memory address and size is
+//        determinate when load or store to the object. The Def-Use
+//        relation to the object is exact. In general, the memory load
+//        or store will be exact if its data type is primitive.
+//        The store to object is killing definition.
+//
+//    * MD_RANGE
+//        The object is range if we both know the MD offset of base
+//        variable and MD size, but the precise address and byte size
+//        may be uncertain when load or store to the object. The Def-Use
+//        relation to the object is inexact. The store to object is
+//        nonkilling definition.
+//
+//¡ð Size
+//    This attribute represents byte size of the abstract memory object.
+//
+//¡ð Offset
+//    This attribute represents byte size offset to the base variable.
+//
+//¡ð Effect
+//    This attribute refers to variables which are definitely declared
+//    by user or compiler and existed in the concrete. In contrast to
+//    effect MD, ALL_MEM memory object is ineffect.
+//
+//¡ð    Exact
+//    This attribute represent abstract memory object with type is
+//    MD_EXACT. An exact MD is also effect.
+//
+//¡ð Range
+//    This attribute represent abstract memory object with type is
+//    MD_RANGE. An range MD is also effect, but is not exact.
+//
+//¡ð Unbound
+//        This attribute represent abstract memory object with type is
+//        MD_UNBOUND. An unbound MD may be effect, but is definitly inexact.
 
-/*
-Memory Descriptor.
-MD is an appealing property to represent exact or inexact memory object.
-By using MD, we can model miscellaneous memory accessing, and perform
-memory analysis and optimizations.
-
-MD is used to represent different memory object with
-same base. Attributes of MD may be Id, Base Variable, Size, Offset,
-Effect, Exact, Range, Unbound.
-¡ð    Id
-    Unique id of abstract memory object.
-
-¡ð    Base Variable
-    Since MD is the abstract version of VAR, it is closely related to
-    individual variable. This variable may be the base of several MD.
-
-¡ð Type
-    This attribute represent abstract memory object type.
-    * MD_UNBOUND
-        The object is unbound if we have no knowledge about MD size or
-        MD offset. The Def-Use relation to the object is inexact. The
-        store to object is nonkilling definition.
-
-    * MD_EXACT
-        The object is exact indicate the memory address and size is
-        determinate when load or store to the object. The Def-Use
-        relation to the object is exact. In general, the memory load
-        or store will be exact if its data type is primitive.
-        The store to object is killing definition.
-
-    * MD_RANGE
-        The object is range if we both know the MD offset of base
-        variable and MD size, but the precise address and byte size
-        may be uncertain when load or store to the object. The Def-Use
-        relation to the object is inexact. The store to object is
-        nonkilling definition.
-
-¡ð Size
-    This attribute represents byte size of the abstract memory object.
-
-¡ð Offset
-    This attribute represents byte size offset to the base variable.
-
-¡ð Effect
-    This attribute refers to variables which are definitely declared
-    by user or compiler and existed in the concrete. In contrast to
-    effect MD, ALL_MEM memory object is ineffect.
-
-¡ð    Exact
-    This attribute represent abstract memory object with type is
-    MD_EXACT. An exact MD is also effect.
-
-¡ð Range
-    This attribute represent abstract memory object with type is
-    MD_RANGE. An range MD is also effect, but is not exact.
-
-¡ð Unbound
-        This attribute represent abstract memory object with type is
-        MD_UNBOUND. An unbound MD may be effect, but is definitly inexact.
-*/
 //Unique id of memory object.
-#define MD_id(md)                ((md)->id)
+#define MD_id(md)                ((md)->uid)
 
 //Each MD has a base, it is corresponding to an unique variable.
 #define MD_base(md)              ((md)->base)
@@ -128,22 +128,22 @@ Effect, Exact, Range, Unbound.
 //or it is not available.
 #define MD_size(md)              ((md)->size)
 
-/* Memory object type. If it is MD_EXACT, there will be exact use/def.
-If it is MD_RANGE, there will be inexact use/def, but the accessing restricted
-into a computable range. If it is MD_UNBOUND, there will be inexact use/def,
-and we do not know where to be access. */
+//Memory object type. If it is MD_EXACT, there will be exact use/def.
+//If it is MD_RANGE, there will be inexact use/def, but the accessing restricted
+//into a computable range. If it is MD_UNBOUND, there will be inexact use/def,
+//and we do not know where to be access.
 #define MD_ty(md)                ((md)->u2.s1.type)
 
 //The memory object is a PR.
 #define MD_is_pr(md)             (VAR_is_pr(MD_base(md)))
 
-//Indicate MD can not be effect MD, namely, the MD must be
-//placed in MayDef or MayUse set.
+//True indicates MD will not be effect MD, namely,
+//the MD only could be put in MayDef or MayUse md set.
 #define MD_is_may(md)            ((md)->u2.s1.is_may_reference)
 
 class MD {
 public:
-    UINT id; //unique id.
+    UINT uid; //unique id.
     UINT ofst; //byte offsets relative to 'base'
     UINT size; //byte size of the memory block
     VAR * base;
@@ -173,23 +173,27 @@ public:
         u2.s1v = md->u2.s1v;
     }
 
-    /* Return true if current md exactly cover 'm', such as:
-    current md: |-------|
-    m:            |----|
-    */
+    VAR * get_base() const { return MD_base(this); }
+    UINT get_ofst() const { return MD_ofst(this); }
+    UINT get_size() const { return MD_size(this); }
+    MD_TYPE get_type() const { return (MD_TYPE)MD_ty(this); }
+
+    UINT id() const { return MD_id(this); }
+    //Return true if current md exactly cover 'm', such as:
+    //current md: |-------|
+    //m:            |----|
     bool is_cover(MD const* m) const;
 
-    /* Return true if current md intersect but may be not cover 'm', such as:
-    current md: |-------|
-    m:            |-------|
-    */
+    //Return true if current md intersect but may be not cover 'm', such as:
+    //current md: |-------|
+    //m:            |-------|
     bool is_overlap(MD const* m) const;
 
-    /* Return true if md represent real object that would be emitted to
-    target machine. Fake object is not effect object.
-    NOTE: Effect MD inexact represent the memory object which may or may
-    not occur at run time. If stmt modified effect but inexact MD,
-    it is non-killing definition. */
+    //Return true if md represent real object that would be emitted to
+    //target machine. Fake object is not effect object.
+    //NOTE: Effect MD inexact represent the memory object which may or may
+    //not occur at run time. If stmt modified effect but inexact MD,
+    //it is non-killing definition.
     bool is_effect() const { return !VAR_is_fake(MD_base(this)); }
 
     //Return true if md is exact object.
@@ -228,7 +232,7 @@ public:
     }
 
     //Dump md into 'buf', 'bufl' indicate the byte length of the buffer.
-    CHAR * dump(IN OUT CHAR * buf, UINT bufl, TypeMgr * dm) const;
+    CHAR * dump(StrBuf & buf,  TypeMgr * dm) const;
 
     //Dump md to file.
     void dump(TypeMgr * dm) const;
@@ -247,36 +251,6 @@ public:
 typedef TMapIter<MD*, MD*> MDIter;
 typedef TMapIter<MD const*, MD const*> ConstMDIter;
 
-class MDHashFunc {
-public:
-    UINT get_hash_value(MD * md, UINT bucket_size) const
-    { return MD_ofst(md) % bucket_size; }
-
-    bool compare(MD * md1, MD * md2) const
-    {
-        ASSERT0(MD_base(md1) == MD_base(md2));
-        if (MD_ofst(md1) != MD_ofst(md2)) { return false; }
-        if (MD_size(md1) != MD_size(md2)) { return false; }
-        return true;
-    }
-};
-
-
-class ConstMDHashFunc {
-public:
-    UINT get_hash_value(MD const* md, UINT bucket_size) const
-    { return MD_ofst(md) % bucket_size; }
-
-    bool compare(MD const* md1, MD const* md2) const
-    {
-        ASSERT0(MD_base(md1) == MD_base(md2));
-        if (MD_ofst(md1) != MD_ofst(md2)) { return false; }
-        if (MD_size(md1) != MD_size(md2)) { return false; }
-        return true;
-    }
-};
-
-
 class CompareOffset {
 public:
     bool is_less(MD const* t1, MD const*  t2) const
@@ -292,6 +266,8 @@ public:
         return (((ULONGLONG)MD_ofst(t1)) << 32 | ((ULONGLONG)MD_size(t1))) ==
                (((ULONGLONG)MD_ofst(t2)) << 32 | ((ULONGLONG)MD_size(t2)));
     }
+
+    MD const* createKey(MD const* t) { return t; }
 };
 
 
@@ -322,8 +298,8 @@ public:
         m_ofst_tab.clean();
     }
 
-    UINT count_mem() const
-    { return m_ofst_tab.count_mem() + sizeof(m_invalid_ofst_md); }
+    size_t count_mem() const
+    { return m_ofst_tab.count_mem() + (size_t)sizeof(m_invalid_ofst_md); }
 
     MD const* find(MD const* md)
     {
@@ -370,11 +346,12 @@ public:
 
 
 //Memory Descriptor Set.
+//Note: one must call clean() to reclamition before deletion or destruction.
 class MDSet : public DefSBitSetCore {
 public:
     MDSet() {}
     COPY_CONSTRUCTOR(MDSet);
-    ~MDSet() { /* should call clean() before destruction.*/ }
+    ~MDSet() {} //should call clean() before destruction.
 
     void bunion(MDSet const& pt, DefMiscBitSetMgr & mbsmgr);
     void bunion(MD const* md, DefMiscBitSetMgr & mbsmgr);
@@ -391,12 +368,13 @@ public:
     bool is_contain_global() const
     {
         return DefSBitSetCore::is_contain(MD_GLOBAL_MEM) ||
-               DefSBitSetCore::is_contain(MD_ALL_MEM);
+               DefSBitSetCore::is_contain(MD_IMPORT_VAR) ||
+               DefSBitSetCore::is_contain(MD_FULL_MEM);
     }
 
     //Return true if set contain all memory variable.
     bool is_contain_all() const
-    { return DefSBitSetCore::is_contain(MD_ALL_MEM); }
+    { return DefSBitSetCore::is_contain(MD_FULL_MEM); }
 
     //Return true if set contain md.
     inline bool is_contain(MD const* md) const
@@ -404,29 +382,22 @@ public:
         if (DefSBitSetCore::is_contain(MD_GLOBAL_MEM) && md->is_global()) {
             return true;
         }
-        if (DefSBitSetCore::is_contain(MD_ALL_MEM)) {
+        if (DefSBitSetCore::is_contain(MD_FULL_MEM)) {
             return true;
         }
         return DefSBitSetCore::is_contain(MD_id(md));
     }
 
     //Return true if md is overlap with the elements in set.
-    inline bool is_overlap(MD const* md) const
-    {
-        if (DefSBitSetCore::is_contain(MD_GLOBAL_MEM) && md->is_global()) {
-            return true;
-        }
-        if ((DefSBitSetCore::is_contain(MD_ALL_MEM)) ||
-            (MD_id(md) == MD_ALL_MEM && !DefSBitSetCore::is_empty())) {
-            return true;
-        }
-        return DefSBitSetCore::is_contain(MD_id(md));
-    }
+    bool is_overlap(MD const* md, Region * current_ru) const;
 
     //Return true if md is overlapped with element in current MDSet.
     //Note this function will iterate elements in set which is costly.
     //Use it carefully.
-    inline bool is_overlap_ex(MD const* md, MDSystem const* mdsys) const;
+    bool is_overlap_ex(
+            MD const* md,
+            Region * current_ru,
+            MDSystem const* mdsys) const;
 
     bool is_contain_inexact(MDSystem * ms) const;
     bool is_contain_only_exact_and_str(MDSystem * ms) const;
@@ -441,8 +412,8 @@ public:
             return true;
         }
 
-        if ((DefSBitSetCore::is_contain(MD_ALL_MEM) && !mds.is_empty()) ||
-            (((DefSBitSetCore&)mds).is_contain(MD_ALL_MEM) &&
+        if ((DefSBitSetCore::is_contain(MD_FULL_MEM) && !mds.is_empty()) ||
+            (((DefSBitSetCore&)mds).is_contain(MD_FULL_MEM) &&
              !DefSBitSetCore::is_empty())) {
             return true;
         }
@@ -463,8 +434,8 @@ public:
     inline void diff(MDSet const& mds, DefMiscBitSetMgr & m)
     {
         ASSERT0(this != &mds);
-        ASSERT(!DefSBitSetCore::is_contain(MD_ALL_MEM), ("low performance"));
-        if (((DefSBitSetCore const&)mds).is_contain(MD_ALL_MEM)) {
+        ASSERT(!DefSBitSetCore::is_contain(MD_FULL_MEM), ("low performance"));
+        if (((DefSBitSetCore const&)mds).is_contain(MD_FULL_MEM)) {
             clean(m);
             return;
         }
@@ -495,7 +466,7 @@ protected:
     Region * m_ru;
     DefMiscBitSetMgr * m_misc_bs_mgr;
 public:
-    MDSetMgr(Region * ru, DefMiscBitSetMgr * mbsm);
+    MDSetMgr(Region * rg, DefMiscBitSetMgr * mbsm);
     COPY_CONSTRUCTOR(MDSetMgr);
     ~MDSetMgr() { destroy(); }
 
@@ -514,7 +485,7 @@ public:
         if (mds == NULL) {
             mds = (MDSet*)smpoolMallocConstSize(sizeof(MDSet), m_mds_pool);
             ASSERT0(mds);
-            memset(mds, 0, sizeof(MDSet));
+            ::memset(mds, 0, sizeof(MDSet));
             m_md_set_list.append_head(mds);
         }
         return mds;
@@ -553,376 +524,50 @@ public:
 };
 
 
-class MD2Node2 {
+class MDSetHashAllocator {
+    MiscBitSetMgr<> * m_sbs_mgr;
 public:
-    MDSet * mds;
-    HMap<UINT, MD2Node2*, HashFuncBase2<UINT> > next;
+    MDSetHashAllocator(MiscBitSetMgr<> * sbsmgr)
+    { ASSERT0(sbsmgr); m_sbs_mgr = sbsmgr; }
 
-    MD2Node2(UINT hash_tab_size = 16) : next(hash_tab_size) { mds = NULL; }
-    ~MD2Node2() {}
-
-    UINT count_mem() const { return next.count_mem() + sizeof(mds); }
+    SBitSetCore<> * alloc() { return m_sbs_mgr->allocSBitSetCore(); }
+    void free(SBitSetCore<> * set) { m_sbs_mgr->freeSBitSetCore(set); }
+    MiscBitSetMgr<> * getBsMgr() const { return m_sbs_mgr; }
 };
 
 
-class MD2Node {
+class MDSetHash : public SBitSetCoreHash<MDSetHashAllocator> {
 public:
-    MDSet * mds;
-    TMap<UINT, MD2Node*> next;
+    MDSetHash(MDSetHashAllocator * allocator) :
+        SBitSetCoreHash<MDSetHashAllocator>(allocator) {}
+    virtual ~MDSetHash() {}
 
-    MD2Node() { mds = NULL; }
-    ~MD2Node() {}
+    MDSet const* append(SBitSetCore<> const& set)
+    { return (MDSet const*)SBitSetCoreHash<MDSetHashAllocator>::append(set); }
 
-    void init()
-    {
-        mds = NULL;
-        next.init();
-    }
-
-    void destroy()
-    {
-        mds = NULL;
-        next.destroy();
-    }
-
-    UINT count_mem() const { return next.count_mem() + sizeof(mds); }
-};
-
-#define _MD2NODE2_
-#define MD2NODE2_INIT_SZ    8 //The size must be power of 2.
-
-class MDSetHash {
-protected:
-    SMemPool * m_pool;
-    MDSetMgr * m_mds_mgr;
-    DefMiscBitSetMgr * m_mbs_mgr;
-
-    #ifdef _DEBUG_
-    UINT m_num_node; //record the number of MD2Node in the tree.
-    #endif
-
-    #ifdef _MD2NODE2_
-    typedef MD2Node2 MNTY;
-    #else
-    typedef MD2Node MNTY;
-    #endif
-
-    MNTY * m_md2node;
-
-protected:
-    inline MNTY * newMD2Node()
-    {
-        #ifdef _MD2NODE2_
-        MD2Node2 * mn = new MD2Node2(MD2NODE2_INIT_SZ);
-        #else
-        MD2Node * mn =
-            (MD2Node*)smpoolMallocConstSize(sizeof(MD2Node), m_pool);
-        ::memset(mn, 0, sizeof(MD2Node));
-        mn->init();
-        #endif
-
-        #ifdef _DEBUG_
-        m_num_node++;
-        #endif
-
-        return mn;
-    }
-
-    void dump_helper_a(MDSet * mds, UINT indent, UINT id)
-    {
-        fprintf(g_tfile, "\n");
-
-        UINT i = 0;
-        while (i < indent) { fprintf(g_tfile, " "); i++; }
-        fprintf(g_tfile, "%d", id);
-
-        if (mds != NULL) {
-            fprintf(g_tfile, " {");
-            SEGIter * iter;
-            for (INT j = mds->get_first(&iter); j >= 0;) {
-                fprintf(g_tfile, "%d", i);
-                j = mds->get_next((UINT)j, &iter);
-                if (j >= 0) {
-                    fprintf(g_tfile, ",");
-                }
-            }
-            fprintf(g_tfile, "}");
-        }
-    }
-
-    void dump_helper(MD2Node * mn, UINT indent, MDSystem * mdsys)
-    {
-        MD2Node * nextmn = NULL;
-        TMapIter<UINT, MD2Node*> ti;
-        for (UINT id = mn->next.get_first(ti, &nextmn);
-             id != 0; id = mn->next.get_next(ti, &nextmn)) {
-            dump_helper_a(nextmn->mds, indent, id);
-            ASSERT0(nextmn);
-            dump_helper(nextmn, indent + 2, mdsys);
-        }
-    }
-
-    void dump_helper(MD2Node2 * mn, UINT indent, MDSystem * mdsys)
-    {
-        INT pos;
-        for (MD2Node2 * nextmn = mn->next.get_first_elem(pos);
-             nextmn != NULL; nextmn = mn->next.get_next_elem(pos)) {
-            dump_helper_a(nextmn->mds, indent, (UINT)pos);
-            dump_helper(nextmn, indent + 2, mdsys);
-        }
-    }
-
-public:
-    MDSetHash(MDSetMgr * mds, DefMiscBitSetMgr * mbs)
-    {
-        ASSERT0(mds && mbs);
-        m_mds_mgr = mds;
-        m_mbs_mgr = mbs;
-        m_pool = smpoolCreate(sizeof(MD2Node) * 4, MEM_CONST_SIZE);
-
-        #ifdef _DEBUG_
-        m_num_node = 0;
-        #endif
-
-        #ifdef _MD2NODE2_
-        m_md2node = new MD2Node2(MD2NODE2_INIT_SZ);
-        #else
-        m_md2node = new MD2Node();
-        #endif
-    }
-
-    ~MDSetHash()
-    {
-        destroyMN2Node();
-
-        #ifdef _MD2NODE2_
-        //m_md2node already deleted in destroyMN2Node().
-        #else
-        delete m_md2node;
-        #endif
-
-        smpoolDelete(m_pool);
-    }
-
-    inline void destroyMN2Node()
-    {
-        //Destroy the TMap structure, here you do
-        //NOT need invoke MDSet's destroy() because they were allocated from
-        //MDSetMgr and will be deleted by the destroy() of it.
-        List<MNTY*> wl;
-
-        #ifdef _MD2NODE2_
-        //Do nothing.
-        #else
-        TMapIter<UINT, MD2Node*> ti;
-        #endif
-
-        wl.append_tail(get_root());
-
-        while (wl.get_elem_count() != 0) {
-            MNTY * mn = wl.remove_head();
-            ASSERT0(mn);
-
-            MNTY * nextmn = NULL;
-
-            #ifdef _MD2NODE2_
-            INT pos = 0;
-            for (nextmn = mn->next.get_first_elem(pos);
-                 nextmn != NULL; nextmn = mn->next.get_next_elem(pos)) {
-                wl.append_tail(nextmn);
-            }
-            #else
-            ti.clean();
-            for (UINT id = mn->next.get_first(ti, &nextmn);
-                 id != 0; id = mn->next.get_next(ti, &nextmn)) {
-                ASSERT0(nextmn);
-                wl.append_tail(nextmn);
-            }
-            #endif
-
-            if (mn->mds != NULL) {
-                m_mds_mgr->free(mn->mds);
-            }
-
-            mn->next.destroy();
-
-            #ifdef _MD2NODE2_
-            delete mn;
-            #else
-            //Do nothing.
-            #endif
-        }
-    }
-
-    inline void checkAndGrow(MNTY * mn)
-    {
-        #ifdef _MD2NODE2_
-        //This class use HMap to hash MDSet.
-        //As the element is more and more appended,
-        //the collisions become more frequently.
-        //Extend HMap if the number of element is twice of the hash
-        //table size.
-        if (mn->next.get_elem_count() >    mn->next.get_bucket_size() * 2) {
-            mn->next.grow();
-        }
-        #else
-        //Do nothing.
-        #endif
-    }
-
-    MDSet const* append(MDSet const& mds)
-    {
-        SEGIter * iter;
-        INT id = mds.get_first(&iter);
-        if (id < 0) { return NULL; }
-
-        MNTY * mn = m_md2node->next.get((UINT)id);
-        if (mn == NULL) {
-            checkAndGrow(m_md2node);
-            mn = newMD2Node();
-            m_md2node->next.set((UINT)id, mn);
-        }
-
-        INT nextid = mds.get_next((UINT)id, &iter);
-        for (; nextid >= 0; id = nextid,
-             nextid = mds.get_next((UINT)nextid, &iter)) {
-            MNTY * nextmn = mn->next.get((UINT)nextid);
-            if (nextmn == NULL) {
-                checkAndGrow(mn);
-                nextmn = newMD2Node();
-                mn->next.set((UINT)nextid, nextmn);
-            }
-            mn = nextmn;
-        }
-
-        ASSERT0(mn);
-        if (mn->mds == NULL) {
-            MDSet * s = m_mds_mgr->create();
-            ASSERT0(s);
-            s->copy(mds, *m_mbs_mgr);
-            mn->mds = s;
-        }
-        ASSERT0(mn->mds == &mds || mn->mds->is_equal(mds));
-        return mn->mds;
-    }
-
-    UINT count_mem() const
-    {
-        UINT count = smpoolGetPoolSize(m_pool);
-        count += get_root()->count_mem();
-        return count;
-    }
-
-    void dump(MDSystem * mdsys)
-    {
-        if (g_tfile == NULL) { return; }
-
-        fprintf(g_tfile, "\n==---- DUMP MDSetHash ----==");
-
-        #ifdef _DEBUG_
-        fprintf(g_tfile, " NumOfNode:%d ----==",
-                m_num_node + 1 /*The first node is m_md2node*/);
-        #endif
-
-        dump_helper(get_root(), 1, mdsys);
-
-        fflush(g_tfile);
-    }
-
-    MNTY * get_root() const  { return m_md2node; }
-
-    //Return the number of MDSet recorded in the hash.
-    UINT get_elem_count() const
-    {
-        UINT count = 0;
-
-        //Destroy the TMap structure, here you do
-        //NOT need invoke MDSet's destroy() because they were allocated from
-        //MDSetMgr and will be deleted by the destroy() of it.
-
-        List<MNTY const*> wl;
-
-        #ifdef _MD2NODE2_
-        //Do nothing.
-        #else
-        TMapIter<UINT, MD2Node*> ti;
-        #endif
-
-        wl.append_tail(get_root());
-        while (wl.get_elem_count() != 0) {
-            MNTY const* mn = wl.remove_head();
-            ASSERT0(mn);
-
-            MNTY * nextmn = NULL;
-            #ifdef _MD2NODE2_
-            INT pos = 0;
-            for (nextmn = mn->next.get_first_elem(pos);
-                 nextmn != NULL; nextmn = mn->next.get_next_elem(pos)) {
-                wl.append_tail(nextmn);
-            }
-            #else
-            ti.clean();
-            for (UINT id = mn->next.get_first(ti, &nextmn);
-                 id != 0; id = mn->next.get_next(ti, &nextmn)) {
-                ASSERT0(nextmn);
-                wl.append_tail(nextmn);
-            }
-            #endif
-
-            if (mn->mds != NULL) {
-                count++;
-            }
-        }
-        return count;
-    }
-
-    //Return true if MDSet pointer has been record in the hash.
-    bool find(MDSet const& mds)
-    {
-        SEGIter * iter;
-        INT id = mds.get_first(&iter);
-        if (id < 0) { return false; }
-
-        MNTY * mn = get_root()->next.get((UINT)id);
-        if (mn == NULL) { return false; }
-
-        INT nextid = mds.get_next((UINT)id, &iter);
-        for (; nextid >= 0; id = nextid,
-             nextid = mds.get_next((UINT)nextid, &iter)) {
-            MNTY * nextmn = mn->next.get((UINT)nextid);
-            if (nextmn == NULL) { return false; }
-            mn = nextmn;
-        }
-
-        ASSERT0(mn);
-        if (mn->mds == NULL) {
-            return false;
-        }
-        return mn->mds == &mds;
-    }
+    void dump();
 };
 
 
-/* MD System.
-Manage the memory allocation and free of MD, and
-the mapping between MD_id and MD.
-Manage the memory allocation and free of MDTab, and
-the mapping between VAR and MDTab.
-NOTE: each region manager has a single MDSystem. */
+//MD System.
+//Manage the memory allocation and free of MD, and
+//the mapping between MD_id and MD.
+//Manage the memory allocation and free of MDTab, and
+//the mapping between VAR and MDTab.
+//NOTE: each region manager has a single MDSystem.
 class MDSystem {
     SMemPool * m_pool;
     SMemPool * m_sc_mdptr_pool;
-    SMemPool * m_sc_mdid_pool;
-    TypeMgr * m_dm;
+    TypeMgr * m_tm;
     VAR * m_all_mem;
     VAR * m_global_mem;
+    VAR * m_import_var;
     MDId2MD m_id2md_map; //Map MD id to MD.
     SList<MD*> m_free_md_list; //MD allocated in pool.
-    SList<UINT> m_free_mdid_list;
     UINT m_md_count; //generate MD index, used by registerMD().
     TMap<VAR const*, MDTab*, CompareConstVar> m_var2mdtab; //map VAR to MDTab.
 
-    inline MD * newMD()
+    inline MD * allocMD()
     {
         MD * md = m_free_md_list.remove_head();
         if (md == NULL) {
@@ -933,9 +578,9 @@ class MDSystem {
     }
 
     //Allocated object should be recorded in list.
-    MDTab * newMDTab() { return new MDTab(); }
-    MD2Node * newMD2Node();
+    MDTab * allocMDTab() { return new MDTab(); }
     void initGlobalMemMD(VarMgr * vm);
+    void initImportVar(VarMgr * vm);
     void initAllMemMD(VarMgr * vm);
 public:
     MDSystem(VarMgr * vm) { init(vm); }
@@ -944,31 +589,42 @@ public:
 
     void init(VarMgr * vm);
     void clean();
-    void computeOverlap(MD const* md,
-                        MDSet & output,
-                        ConstMDIter & tabiter,
-                        DefMiscBitSetMgr & mbsmgr,
-                        bool strictly);
-    void computeOverlap(IN OUT MDSet & mds,
-                        Vector<MD const*> & tmpvec,
-                        ConstMDIter & tabiter,
-                        DefMiscBitSetMgr & mbsmgr,
-                        bool strictly);
-    void computeOverlap(MDSet const& mds,
-                        OUT MDSet & output,
-                        ConstMDIter & tabiter,
-                        DefMiscBitSetMgr & mbsmgr,
-                        bool strictly);
+    void computeOverlapExactMD(
+            MD const* md,
+            OUT MDSet * output,
+            ConstMDIter & tabiter,
+            DefMiscBitSetMgr & mbsmgr);
+    void computeOverlap(
+            Region * current_ru,
+            MD const* md,
+            MDSet & output,
+            ConstMDIter & tabiter,
+            DefMiscBitSetMgr & mbsmgr,
+            bool strictly);
+    void computeOverlap(
+            Region * current_ru,
+            IN OUT MDSet & mds,
+            Vector<MD const*> & tmpvec,
+            ConstMDIter & tabiter,
+            DefMiscBitSetMgr & mbsmgr,
+            bool strictly);
+    void computeOverlap(
+            Region * current_ru,
+            MDSet const& mds,
+            OUT MDSet & output,
+            ConstMDIter & tabiter,
+            DefMiscBitSetMgr & mbsmgr,
+            bool strictly);
 
     //Dump all registered MDs.
     void dumpAllMD();
     void destroy();
 
-    TypeMgr * get_type_mgr() const { return m_dm; }
+    TypeMgr * getTypeMgr() const { return m_tm; }
 
     //Get registered MD.
     //NOTICE: DO NOT free the return value, because it is the registered one.
-    MD * get_md(UINT id)
+    MD * getMD(UINT id)
     {
         ASSERT0(id != 0);
         MD * md = m_id2md_map.get(id);
@@ -976,7 +632,7 @@ public:
         return md;
     }
 
-    MD const* get_md_c(UINT id) const
+    MD const* readMD(UINT id) const
     {
         ASSERT0(id != 0);
         MD * md = m_id2md_map.get(id);
@@ -985,21 +641,22 @@ public:
     }
 
     //Get MD TAB that described mds which under same base VAR.
-    MDTab * get_md_tab(VAR const* v)
+    MDTab * getMDTab(VAR const* v)
     {
         ASSERT0(v);
         return m_var2mdtab.get(v);
     }
 
-    UINT get_num_of_md() const { return m_id2md_map.get_elem_count(); }
-    MDId2MD const* get_id2md_map() const { return &m_id2md_map; }
+    UINT getNumOfMD() const { return m_id2md_map.get_elem_count(); }
+    MDId2MD const* getID2MDMap() const { return &m_id2md_map; }
 
     inline void freeMD(MD * md)
     {
         if (md == NULL) { return; }
         m_id2md_map.remove(MD_id(md));
-        m_free_mdid_list.append_head(MD_id(md));
-        memset(md, 0, sizeof(MD));
+        UINT mdid = MD_id(md);
+        ::memset(md, 0, sizeof(MD));
+        MD_id(md) = mdid;
         m_free_md_list.append_head(md);
     }
 
@@ -1020,7 +677,7 @@ bool MDSet::is_pr_set(MDSystem const* mdsys) const
     SEGIter * iter;
     for (INT i = get_first(&iter);
          i >= 0; i = get_next((UINT)i, &iter)) {
-        MD const* md = mdsys->get_md_c((UINT)i);
+        MD const* md = mdsys->readMD((UINT)i);
         ASSERT0(md);
         if (!md->is_pr()) { return false; }
     }
@@ -1044,29 +701,7 @@ public:
     //Clean each MD->MDSet, but do not free MDSet.
     void clean() { TMap<UINT, MDSet const*>::clean(); }
 
-    void dump(Region * ru);
+    void dump(Region * rg);
 };
-
-
-//Return true if md is overlapped with element in current MDSet.
-//Note this function will iterate elements in set which is costly.
-//Use it carefully.
-bool MDSet::is_overlap_ex(MD const* md, MDSystem const* mdsys) const
-{
-    ASSERT0(md && mdsys);
-
-    if (MDSet::is_overlap(md)) { return true; }
-
-    SEGIter * iter;
-    for (INT i = get_first(&iter);
-         i >= 0; i = get_next((UINT)i, &iter)) {
-        MD const* t = const_cast<MDSystem*>(mdsys)->get_md((UINT)i);
-        ASSERT0(t);
-        if (t->is_overlap(md)) { return true; }
-    }
-
-    return false;
-}
-
 } //namespace xoc
 #endif

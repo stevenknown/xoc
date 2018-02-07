@@ -56,8 +56,8 @@ TypeDesc const g_type_desc[] = {
     {D_F128,  "f128",  128},
 
     {D_MC,    "mc",    0}, //memory chunk, for structures
-    {D_STR,   "str",   BYTE_PER_POINTER * BIT_PER_BYTE}, //char strings is pointer
-    {D_PTR,   "ptr",   BYTE_PER_POINTER * BIT_PER_BYTE}, //pointer
+    {D_STR,   "str",   BYTE_PER_POINTER * BIT_PER_BYTE}, //string is pointer
+    {D_PTR,   "*",     BYTE_PER_POINTER * BIT_PER_BYTE}, //pointer
     {D_VEC,   "vec",   0}, //vector
 
     {D_VOID,  "void",  0}, //void type
@@ -73,52 +73,52 @@ Type const* checkType(Type const* ty, DATA_TYPE dt)
 #endif
 
 
-/* The hoisting rules are:
-1. Return max bit size of DATA_TYPE between 'opnd0' and 'opnd1',
-2. else return SIGNED if one of them is signed;
-3. else return FLOAT if one of them is float,
-4. else return UNSIGNED.
-
-The C language rules are:
-1. If any operand is of a integral type smaller than int? Convert to int.
-2. Is any operand unsigned long? Convert the other to unsigned long.
-3. (else) Is any operand signed long? Convert the other to signed long.
-4. (else) Is any operand unsigned int? Convert the other to unsigned int.
-
-NOTE: The function does NOT hoist vector type. */
+//The hoisting rules are:
+//1. Return max bit size of DATA_TYPE between 'opnd0' and 'opnd1',
+//2. else return SIGNED if one of them is signed;
+//3. else return FLOAT if one of them is float,
+//4. else return UNSIGNED.
+//
+//The C language rules are:
+//1. If any operand is of a integral type smaller than int? Convert to int.
+//2. Is any operand unsigned long? Convert the other to unsigned long.
+//3. (else) Is any operand signed long? Convert the other to signed long.
+//4. (else) Is any operand unsigned int? Convert the other to unsigned int.
+//
+//NOTE: The function does NOT hoist vector type.
 Type const* TypeMgr::hoistDtypeForBinop(IR const* opnd0, IR const* opnd1)
 {
-    Type const* d0 = IR_dt(opnd0);
-    Type const* d1 = IR_dt(opnd1);
-
+    Type const* d0 = opnd0->get_type();
+    Type const* d1 = opnd1->get_type();
+    ASSERT0(!d0->is_void() && !d1->is_void());
     ASSERT(!d0->is_vector() && !d1->is_vector(),
-            ("Can not hoist vector type."));
+           ("Can not hoist vector type."));
     ASSERT(!d0->is_pointer() && !d1->is_pointer(),
-            ("Can not hoist pointer type."));
+           ("Can not hoist pointer type."));
 
     DATA_TYPE t0 = TY_dtype(d0);
     DATA_TYPE t1 = TY_dtype(d1);
     if (t0 == D_MC && t1 == D_MC) {
         ASSERT0(TY_mc_size(d0) == TY_mc_size(d1));
-        return IR_dt(opnd0);
+        return opnd0->get_type();
     }
 
     if (t0 == D_MC) {
         ASSERT0(TY_mc_size(d0) != 0);
         UINT ty_size = MAX(TY_mc_size(d0), get_bytesize(d1));
         if (ty_size == TY_mc_size(d0)) {
-            return IR_dt(opnd0);
+            return opnd0->get_type();
         }
-        return IR_dt(opnd1);
+        return opnd1->get_type();
     }
 
     if (t1 == D_MC) {
         ASSERT0(TY_mc_size(d1) != 0);
         UINT ty_size = MAX(TY_mc_size(d1), get_bytesize(d0));
         if (ty_size == TY_mc_size(d1)) {
-            return IR_dt(opnd1);
+            return opnd1->get_type();
         }
-        return IR_dt(opnd0);
+        return opnd0->get_type();
     }
 
     //Always hoist to longest integer type.
@@ -196,17 +196,16 @@ DATA_TYPE TypeMgr::hoistBSdtype(UINT bit_size, bool is_signed) const
 TypeContainer const* TypeMgr::registerPointer(Type const* type)
 {
     ASSERT0(type && type->is_pointer());
-    /* Insertion Sort by ptr-base-size in incrmental order.
-    e.g: Given PTR, base_size=32,
-        PTR, base_size=24
-        PTR, base_size=128
-        ...
-    => after insertion.
-        PTR, base_size=24
-        PTR, base_size=32  //insert into here.
-        PTR, base_size=128
-        ...
-    */
+    //Insertion Sort by ptr-base-size in incrmental order.
+    //e.g: Given PTR, base_size=32,
+    //    PTR, base_size=24
+    //    PTR, base_size=128
+    //    ...
+    //=> after insertion.
+    //    PTR, base_size=24
+    //    PTR, base_size=32  //insert into here.
+    //    PTR, base_size=128
+    //    ...
     TypeContainer const* entry = m_pointer_type_tab.get(type);
     if (entry != NULL) {
         return entry;
@@ -230,18 +229,15 @@ TypeContainer const* TypeMgr::registerVector(Type const* type)
 {
     ASSERT0(type->is_vector() && TY_vec_ety(type) != D_UNDEF);
     ASSERT0(TY_vec_size(type) >= get_dtype_bytesize(TY_vec_ety(type)) &&
-             TY_vec_size(type) % get_dtype_bytesize(TY_vec_ety(type)) == 0);
+            TY_vec_size(type) % get_dtype_bytesize(TY_vec_ety(type)) == 0);
 
     ElemTypeTab * elemtab = m_vector_type_tab.get(type);
     if (elemtab != NULL) {
         TypeContainer const* entry = elemtab->get(type);
-        if (entry != NULL) { return entry; }
-        goto FIN;
+        if (entry != NULL) {
+            return entry;
+        }
     }
-
-    //Add new vector into table.
-    elemtab = new ElemTypeTab();
-    m_vector_type_tab.set(type, elemtab);
 
     //Add new element type into vector.
     //e.g:
@@ -253,11 +249,15 @@ TypeContainer const* TypeMgr::registerVector(Type const* type)
     //    MC,size=300,vec_ty=D_UNDEF
     //        MC,size=300,vec_ty=D_F32
     //    ...
-FIN:
     TypeContainer * x = newTC();
     VectorType * ty = newVectorType();
     TC_type(x) = ty;
     ty->copy((VectorType const&)*type);
+    if (elemtab == NULL) {
+        //Add new vector into table.
+        elemtab = new ElemTypeTab();
+        m_vector_type_tab.set(ty, elemtab);
+    }
     elemtab->set(ty, x);
     TC_typeid(x) = m_type_count++;
     m_type_tab.set(TC_typeid(x), ty);
@@ -279,7 +279,9 @@ TypeContainer const* TypeMgr::registerMC(Type const* type)
     }
 
     TypeContainer const* entry = m_memorychunk_type_tab.get(type);
-    if (entry != NULL) { return entry; }
+    if (entry != NULL) {
+        return entry;
+    }
 
     //Add new item into table.
     TypeContainer * x = newTC();
@@ -386,10 +388,9 @@ UINT TypeMgr::get_bytesize(Type const* type) const
 }
 
 
-CHAR * TypeMgr::dump_type(IN Type const* type, OUT CHAR * buf)
+CHAR const* TypeMgr::dump_type(Type const* type, OUT StrBuf & buf)
 {
     ASSERT0(type);
-    CHAR * p = buf;
     DATA_TYPE dt = TY_dtype(type);
     switch (dt) {
     case D_B:
@@ -408,15 +409,13 @@ CHAR * TypeMgr::dump_type(IN Type const* type, OUT CHAR * buf)
     case D_F80:
     case D_F128:
     case D_STR:
-        sprintf(buf, "%s", DTNAME(dt));
+        buf.strcat("%s", DTNAME(dt));
         break;
     case D_MC:
-        sprintf(buf, "%s(%d)", DTNAME(dt), get_bytesize(type));
+        buf.strcat("%s<%d>", DTNAME(dt), get_bytesize(type));
         break;
     case D_PTR:
-        sprintf(buf, "%s", DTNAME(dt));
-        buf += strlen(buf);
-        sprintf(buf, "(%d)", TY_ptr_base_size(type));
+        buf.strcat("%s<%d>", DTNAME(dt), TY_ptr_base_size(type));
         break;
     case D_VEC:
         {
@@ -424,15 +423,15 @@ CHAR * TypeMgr::dump_type(IN Type const* type, OUT CHAR * buf)
             ASSERT0(elem_byte_size != 0);
             ASSERT0(get_bytesize(type) % elem_byte_size == 0);
             UINT elemnum = get_bytesize(type) / elem_byte_size;
-            sprintf(buf, "vec(%d*%s)", elemnum, DTNAME(TY_vec_ety(type)));
+            buf.strcat("%s<%d*%s>", DTNAME(dt), elemnum, DTNAME(TY_vec_ety(type)));
         }
         break;
     case D_VOID:
-        sprintf(buf, "%s", DTNAME(dt));
+        buf.strcat("%s", DTNAME(dt));
         break;
-    default: ASSERT(0, ("unsupport"));
+    default: UNREACH();
     }
-    return p;
+    return buf.buf;
 }
 
 
@@ -445,7 +444,7 @@ void TypeMgr::dump_type(UINT tyid)
 void TypeMgr::dump_type(Type const* type)
 {
     if (g_tfile == NULL) return;
-    CHAR buf[256];
+    StrBuf buf(64);
     fprintf(g_tfile, "%s", dump_type(type, buf));
     fflush(g_tfile);
 }
@@ -453,10 +452,11 @@ void TypeMgr::dump_type(Type const* type)
 
 void TypeMgr::dump_type_tab()
 {
-    CHAR buf[256];
+    StrBuf buf(64);
     if (g_tfile == NULL) return;
-    fprintf(g_tfile, "\n==---- DUMP Type GLOBAL TABLE ----==\n");
+    fprintf(g_tfile, "\n==---- DUMP Type Table ----==\n");
     for (INT i = 1; i <= m_type_tab.get_last_idx(); i++) {
+        buf.clean();
         Type * d = m_type_tab.get(i);
         ASSERT0(d);
         fprintf(g_tfile, "%s tyid:%d", dump_type(d, buf), i);

@@ -34,6 +34,7 @@ namespace xcom {
 #ifdef _DEBUG_
 #define DEBUG_SEG
 #endif
+
 #define BITS_PER_SEG    512
 
 class BitSet;
@@ -72,8 +73,7 @@ public:
         bs.copy(src.bs);
     }
 
-    inline UINT count_mem() const
-    { return sizeof(start) + bs.count_mem(); }
+    size_t count_mem() const { return sizeof(start) + bs.count_mem(); }
 
     inline void clean()
     {
@@ -93,9 +93,10 @@ public:
     }
 
     //Return the start position of current segment.
-    inline UINT get_start() const { return start; }
+    UINT get_start() const { return start; }
+
     //Return the end position of current segment.
-    inline UINT get_end() const { return start + BitsPerSeg - 1; }
+    UINT get_end() const { return start + BitsPerSeg - 1; }
 };
 
 
@@ -181,9 +182,9 @@ public:
         return s;
     }
 
-    UINT count_mem() const
+    size_t count_mem() const
     {
-        UINT count = 0;
+        size_t count = 0;
         for (TSEGIter * sc = m_free_list.get_head();
              sc != m_free_list.end(); sc = m_free_list.get_next(sc)) {
             SEG<BitsPerSeg> * s = sc->val();
@@ -208,10 +209,16 @@ public:
 
 
 //Sparse BitSet Core
-//e.g:
+//e.g1:
+//    MiscBitSetMgr<33> mbsm;
+//    SBitSetCore<33> * x = mbsm.allocSBitSetCore() ;
+//    x->bunion(100, mbsm);
+//    mbsm.freeSBitSetCore(x); //Very Important!
+//e.g2:
 //    MiscBitSetMgr<33> mbsm;
 //    SBitSetCore<33> x;
-//    x.bunion(N, mbsm);
+//    x.bunion(100, mbsm);
+//    x.clean(mbsm);  //Very Important!
 template <UINT BitsPerSeg = BITS_PER_SEG>
 class SBitSetCore {
 protected:
@@ -221,7 +228,11 @@ protected:
 public:
     SBitSetCore() {}
     COPY_CONSTRUCTOR(SBitSetCore);
-    ~SBitSetCore() { /* should call clean() before destruction. */ }
+    ~SBitSetCore()
+    {
+        //should call clean() before destruction,
+        //otherwise it will incur SegMgr assertion.
+    }
 
     void bunion(SBitSetCore<BitsPerSeg> const& src,
                 SegMgr<BitsPerSeg> * sm,
@@ -261,9 +272,9 @@ public:
     void copy(SBitSetCore<BitsPerSeg> const& src, MiscBitSetMgr<BitsPerSeg> & m)
     { copy(src, &m.sm, &m.scflst, m.ptr_pool); }
 
-    UINT count_mem() const;
+    size_t count_mem() const;
 
-    void destroy_seg_and_clean(SegMgr<BitsPerSeg> * sm, TSEGIter ** free_list);
+    void destroySEGandClean(SegMgr<BitsPerSeg> * sm, TSEGIter ** free_list);
     void diff(UINT elem, SegMgr<BitsPerSeg> * sm, TSEGIter ** free_list);
     void diff(SBitSetCore<BitsPerSeg> const& src,
               SegMgr<BitsPerSeg> * sm,
@@ -282,12 +293,12 @@ public:
     INT get_last(TSEGIter ** cur) const;
     INT get_next(UINT elem, TSEGIter ** cur) const;
 
+    void init() { segs.init(); }
     void intersect(SBitSetCore<BitsPerSeg> const& src,
                    SegMgr<BitsPerSeg> * sm,
                    TSEGIter ** free_list);
-    void intersect(
-            SBitSetCore<BitsPerSeg> const& src,
-            MiscBitSetMgr<BitsPerSeg> & m)
+    void intersect(SBitSetCore<BitsPerSeg> const& src,
+                   MiscBitSetMgr<BitsPerSeg> & m)
     { intersect(src, &m.sm, &m.scflst); }
 
     bool is_equal(SBitSetCore<BitsPerSeg> const& src) const;
@@ -300,10 +311,15 @@ public:
 //Sparse BitSet
 //This class encapsulates operations of SBitSetCore, and
 //simply the use of them.
-//e.g:
+//e.g1:
 //    MiscBitSetMgr<47> mbsm;
-//    SBitSet<47> x(mbsm);
-//    x.bunion(N);
+//    SBitSet<47> x(mbsm.getSegMgr());
+//    x.bunion(100);
+//e.g2:
+//    MiscBitSetMgr<47> mbsm;
+//    SBitSet<47> * x = new SBitSet<47>(mbsm.getSegMgr());
+//    x->bunion(100);
+//    x->clean(); //Very Important!
 template <UINT BitsPerSeg = BITS_PER_SEG>
 class SBitSet : public SBitSetCore<BitsPerSeg> {
 protected:
@@ -361,7 +377,7 @@ public:
         //Do NOT change current m_sm.
         SBitSetCore<BitsPerSeg>::copy(src, m_sm, &m_flst, m_pool);
     }
-    UINT count_mem() const;
+    size_t count_mem() const;
 
     void diff(UINT elem)
     { SBitSetCore<BitsPerSeg>::diff(elem, m_sm, &m_flst); }
@@ -381,18 +397,26 @@ public:
 //
 //START DBitSetCore, Dual Sparse or Dense BitSetCore
 //
-//This class represent a BitSet which can be switched
-//between sparse and dense bitset.
-//e.g:
+//This class represent a BitSet which can be transformed
+//in between sparse and dense bitset.
+//e.g1:
 //    MiscBitSetMgr<47> mbsm;
 //    DBitSetCore<47> x;
 //    x.set_sparse(True or False);
-//    x.bunion(N, mbsm);
+//    x.bunion(100, mbsm);
+//    x.clean(mbsm); //Very Important!
+//e.g2:
+//    MiscBitSetMgr<47> mbsm;
+//    DBitSetCore<47> * x = mbsm.allocDBitSetCore();
+//    x->set_sparse(True or False);
+//    x->bunion(100, mbsm);
+//    mbsm->freeDBitSet(x); //Very Important!
 template <UINT BitsPerSeg = BITS_PER_SEG>
 class DBitSetCore : public SBitSetCore<BitsPerSeg> {
 protected:
-    UINT m_is_sparse:1; //true if bitset is sparse.
+    BYTE m_is_sparse:1; //true if bitset is sparse.
 
+protected:
     //Only read BitSet.
     BitSet const* read_bs() const
     {
@@ -406,10 +430,9 @@ protected:
     }
 
     //Get BitSet, alloc BitSet if it not exist.
-    BitSet * alloc_bs(
-            SegMgr<BitsPerSeg> * sm,
-            TSEGIter ** flst,
-            SMemPool * pool)
+    BitSet * alloc_bs(SegMgr<BitsPerSeg> * sm,
+                      TSEGIter ** flst,
+                      SMemPool * pool)
     {
         ASSERT(!m_is_sparse, ("only used by dense bitset"));
         TSEGIter * sc = SBitSetCore<BitsPerSeg>::segs.get_head();
@@ -435,6 +458,7 @@ protected:
     }
 public:
     DBitSetCore() { m_is_sparse = true; }
+    DBitSetCore(bool is_sparse) { set_sparse(is_sparse); }
     COPY_CONSTRUCTOR(DBitSetCore);
     ~DBitSetCore() {}
 
@@ -471,11 +495,6 @@ public:
     void diff(DBitSetCore<BitsPerSeg> const& src, MiscBitSetMgr<BitsPerSeg> & m)
     { diff(src, &m.sm, &m.scflst); }
 
-    void intersect(
-            DBitSetCore<BitsPerSeg> const& src,
-            MiscBitSetMgr<BitsPerSeg> & m)
-    { intersect(src, &m.sm, &m.scflst); }
-
     void bunion(UINT elem,
                 SegMgr<BitsPerSeg> * sm,
                 TSEGIter ** free_list,
@@ -508,9 +527,7 @@ public:
             tgtbs->copy(*srcbs);
         }
     }
-    //inline void copy(DBitSetCore const& src, MiscBitSetMgr<BitsPerSeg> & m);
-
-    UINT count_mem() const { return SBitSetCore<BitsPerSeg>::count_mem() + 1; }
+    size_t count_mem() const { return SBitSetCore<BitsPerSeg>::count_mem() + 1; }
 
     void diff(UINT elem, SegMgr<BitsPerSeg> * sm, TSEGIter ** free_list)
     {
@@ -522,8 +539,6 @@ public:
             tgtbs->diff(elem);
         }
     }
-    //inline void diff(UINT elem, MiscBitSetMgr<BitsPerSeg> & m);
-
     void diff(DBitSetCore<BitsPerSeg> const& src,
               SegMgr<BitsPerSeg> * sm,
               TSEGIter ** free_list)
@@ -540,7 +555,10 @@ public:
             tgtbs->diff(*srcbs);
         }
     }
-    //inline void diff(DBitSetCore const& src, MiscBitSetMgr<BitsPerSeg> & m);
+
+    void intersect(DBitSetCore<BitsPerSeg> const& src,
+                   MiscBitSetMgr<BitsPerSeg> & m)
+    { intersect(src, &m.sm, &m.scflst); }
 
     void intersect(DBitSetCore<BitsPerSeg> const& src,
                    SegMgr<BitsPerSeg> * sm,
@@ -642,14 +660,22 @@ public:
 //
 //START DBitSet, Dual Sparse or Dense BitSet
 //
-//This class represent a BitSet which can be switched between sparse and
+//This class represent a BitSet which can be transformed in between sparse and
 //dense bitset.
 //This class encapsulates operations of DBitSetCore, and
 //simply the use of them.
+//e.g1:
 //    MiscBitSetMgr<47> mbsm;
 //    DBitSet<47> x(mbsm);
 //    x.set_sparse(True or False);
-//    x.bunion(N);
+//    x.bunion(100);
+//    x.clean(mbsm); //Very Important!
+//e.g2:
+//    MiscBitSetMgr<47> mbsm;
+//    DBitSet<47> * x = mbsm.allocDBitSet();
+//    x->set_sparse(True or False);
+//    x->bunion(100);
+//    mbsm.freeDBitSet(x); //Very Important!
 template <UINT BitsPerSeg = BITS_PER_SEG>
 class DBitSet : public DBitSetCore<BitsPerSeg> {
 protected:
@@ -693,9 +719,9 @@ public:
     void copy(DBitSet<BitsPerSeg> const& src)
     { DBitSetCore<BitsPerSeg>::copy(src, m_sm, &m_flst, m_pool); }
 
-    UINT count_mem() const
+    size_t count_mem() const
     {
-        UINT count = sizeof(m_pool);
+        size_t count = sizeof(m_pool);
         count += sizeof(m_flst);
         count += sizeof(m_sm);
         count += smpoolGetPoolSize(m_pool);
@@ -703,12 +729,9 @@ public:
         return count;
     }
 
-    void clean()
-    { DBitSetCore<BitsPerSeg>::clean(m_sm, &m_flst); }
+    void clean() { DBitSetCore<BitsPerSeg>::clean(m_sm, &m_flst); }
 
-    void diff(UINT elem)
-    { DBitSetCore<BitsPerSeg>::diff(elem, m_sm, &m_flst); }
-
+    void diff(UINT elem) { DBitSetCore<BitsPerSeg>::diff(elem, m_sm, &m_flst); }
     void diff(DBitSet<BitsPerSeg> const& src)
     { DBitSetCore<BitsPerSeg>::diff(src, m_sm, &m_flst); }
 
@@ -726,7 +749,6 @@ class MiscBitSetMgr {
 protected:
     SList<SBitSet<BitsPerSeg>*> m_sbitset_list;
     SList<DBitSet<BitsPerSeg>*> m_dbitset_list;
-    SList<DBitSetCore<BitsPerSeg>*> m_dbitsetcore_list;
     SList<SBitSetCore<BitsPerSeg>*> m_free_sbitsetcore_list;
     SList<SBitSet<BitsPerSeg>*> m_free_sbitset_list;
     SList<DBitSet<BitsPerSeg>*> m_free_dbitset_list;
@@ -739,11 +761,10 @@ protected:
     {
         ASSERT(m_sbitsetcore_pool, ("not yet initialized."));
         SBitSetCore<BitsPerSeg> * p =
-                (SBitSetCore<BitsPerSeg>*)smpoolMallocConstSize(
-                                sizeof(SBitSetCore<BitsPerSeg>),
-                                m_sbitsetcore_pool);
+            (SBitSetCore<BitsPerSeg>*)smpoolMallocConstSize(
+                sizeof(SBitSetCore<BitsPerSeg>), m_sbitsetcore_pool);
         ASSERT(p, ("malloc failed"));
-        memset(p, 0, sizeof(SBitSetCore<BitsPerSeg>));
+        ::memset(p, 0, sizeof(SBitSetCore<BitsPerSeg>));
         return p;
     }
 
@@ -752,10 +773,9 @@ protected:
         ASSERT(m_dbitsetcore_pool, ("not yet initialized."));
         DBitSetCore<BitsPerSeg> * p =
             (DBitSetCore<BitsPerSeg>*)smpoolMallocConstSize(
-                                sizeof(DBitSetCore<BitsPerSeg>),
-                                m_dbitsetcore_pool);
+                sizeof(DBitSetCore<BitsPerSeg>), m_dbitsetcore_pool);
         ASSERT(p, ("malloc failed"));
-        memset(p, 0, sizeof(DBitSetCore<BitsPerSeg>));
+        ::memset(p, 0, sizeof(DBitSetCore<BitsPerSeg>));
         return p;
     }
 public:
@@ -779,15 +799,12 @@ public:
 
         ptr_pool = smpoolCreate(sizeof(TSEGIter) * 10, MEM_CONST_SIZE);
         m_sbitsetcore_pool = smpoolCreate(
-                    sizeof(SBitSetCore<BitsPerSeg>) * 10,
-                    MEM_CONST_SIZE);
+            sizeof(SBitSetCore<BitsPerSeg>) * 10, MEM_CONST_SIZE);
         m_dbitsetcore_pool = smpoolCreate(
-                    sizeof(DBitSetCore<BitsPerSeg>) * 10,
-                    MEM_CONST_SIZE);
+            sizeof(DBitSetCore<BitsPerSeg>) * 10, MEM_CONST_SIZE);
 
         m_sbitset_list.set_pool(ptr_pool);
         m_dbitset_list.set_pool(ptr_pool);
-        m_dbitsetcore_list.set_pool(ptr_pool);
 
         m_free_sbitsetcore_list.set_pool(ptr_pool);
         m_free_sbitset_list.set_pool(ptr_pool);
@@ -817,14 +834,6 @@ public:
             delete d;
         }
 
-        //All DBitSetCore and SBitSetCore are allocated in the pool.
-        //It is not necessary to destroy it specially.
-        //SC<DBitSetCore*> * dct;
-        //for (DBitSetCore * d = m_dbitsetcore_list.get_head(&dct);
-        //     d != NULL; d = m_dbitsetcore_list.get_next(&dct)) {
-        //    delete d;
-        //}
-
         smpoolDelete(m_sbitsetcore_pool);
         smpoolDelete(m_dbitsetcore_pool);
         smpoolDelete(ptr_pool);
@@ -835,7 +844,7 @@ public:
         scflst = NULL;
     }
 
-    inline SBitSet<BitsPerSeg> * create_sbitset()
+    inline SBitSet<BitsPerSeg> * allocSBitSet()
     {
         SBitSet<BitsPerSeg> * p = m_free_sbitset_list.remove_head();
         if (p == NULL) {
@@ -845,7 +854,7 @@ public:
         return p;
     }
 
-    inline SBitSetCore<BitsPerSeg> * create_sbitsetc()
+    inline SBitSetCore<BitsPerSeg> * allocSBitSetCore()
     {
         SBitSetCore<BitsPerSeg> * p = m_free_sbitsetcore_list.remove_head();
         if (p == NULL) {
@@ -854,7 +863,7 @@ public:
         return p;
     }
 
-    inline DBitSet<BitsPerSeg> * create_dbitset()
+    inline DBitSet<BitsPerSeg> * allocDBitSet()
     {
         DBitSet<BitsPerSeg> * p = m_free_dbitset_list.remove_head();
         if (p == NULL) {
@@ -864,24 +873,23 @@ public:
         return p;
     }
 
-    inline DBitSetCore<BitsPerSeg> * create_dbitsetc()
+    inline DBitSetCore<BitsPerSeg> * allocDBitSetCore()
     {
         DBitSetCore<BitsPerSeg> * p = m_free_dbitsetcore_list.remove_head();
         if (p == NULL) {
             p = xmalloc_dbitsetc();
             p->set_sparse(true);
-            m_dbitsetcore_list.append_head(p);
         }
         return p;
     }
 
     //Note that this function does not add up the memory allocated by
-    //create_sbitsetc() and create_dbitsetc(). You should count these
+    //allocSBitSetCore() and allocDBitSetCore(). You should count these
     //objects additionally.
-    UINT count_mem(FILE * h = NULL) const;
+    size_t count_mem(FILE * h = NULL) const;
 
     //free bs for next use.
-    inline void free_sbitset(SBitSet<BitsPerSeg> * bs)
+    inline void freeSBitSet(SBitSet<BitsPerSeg> * bs)
     {
         if (bs == NULL) { return; }
         bs->clean();
@@ -889,41 +897,41 @@ public:
     }
 
     //Free bs for next use.
-    inline void free_sbitsetc(SBitSetCore<BitsPerSeg> * bs)
+    inline void freeSBitSetCore(SBitSetCore<BitsPerSeg> * bs)
     {
-        if (bs == NULL) return;
+        if (bs == NULL) { return; }
         bs->clean(*this);
         m_free_sbitsetcore_list.append_head(bs);
     }
 
     //Free bs for next use.
-    inline void free_dbitset(DBitSet<BitsPerSeg> * bs)
+    inline void freeDBitSet(DBitSet<BitsPerSeg> * bs)
     {
-        if (bs == NULL) return;
+        if (bs == NULL) { return; }
         bs->clean();
         m_free_dbitset_list.append_head(bs);
     }
 
     //free bs for next use.
-    inline void free_dbitsetc(DBitSetCore<BitsPerSeg> * bs)
+    inline void freeDBitSetCore(DBitSetCore<BitsPerSeg> * bs)
     {
-        if (bs == NULL) return;
+        if (bs == NULL) { return; }
         bs->clean(&sm, &scflst);
         m_free_dbitsetcore_list.append_head(bs);
     }
 
     //This function destroy SEG objects and free containers back to
     //MiscBitSetMgr for next use.
-    inline void destroy_seg_and_freedc(DBitSetCore<BitsPerSeg> * bs)
+    inline void destroySEGandFreeDBitSetCore(DBitSetCore<BitsPerSeg> * bs)
     {
         if (bs == NULL) { return; }
-        bs->destroy_seg_and_clean(&sm, &scflst);
+        bs->destroySEGandClean(&sm, &scflst);
 
-        //Recycle bs.
+        //Recycle bitset.
         m_free_dbitsetcore_list.append_head(bs);
     }
 
-    SegMgr<BitsPerSeg> * get_seg_mgr() { return &sm; }
+    SegMgr<BitsPerSeg> * getSegMgr() { return &sm; }
 };
 //END MiscBitSetMgr
 
@@ -942,4 +950,5 @@ typedef MiscBitSetMgr<> DefMiscBitSetMgr;
 typedef SC<DefSEG*> SEGIter; //Default SEG iter.
 
 } //namespace xcom
+
 #endif

@@ -39,7 +39,7 @@ namespace xoc {
 class IR_CFS_OPT : public Pass {
 protected:
     Region * m_ru;
-    TypeMgr * m_dm;
+    TypeMgr * m_tm;
     bool transformToDoWhile(IR ** head, IR * ir);
     bool transformIf1(IR ** head, IR * ir);
     bool transformIf2(IR ** head, IR * ir);
@@ -49,20 +49,20 @@ protected:
     bool hoistLoop(IR ** head, IR * ir);
     bool hoistIf(IR ** head, IR * ir);
 public:
-    IR_CFS_OPT(Region * ru) { m_ru = ru; m_dm = ru->get_type_mgr(); }
+    IR_CFS_OPT(Region * rg) { m_ru = rg; m_tm = rg->getTypeMgr(); }
     ~IR_CFS_OPT() {}
 
     void dump();
 
-    virtual CHAR const* get_pass_name() const { return "IR_CFS_OPT"; }
+    virtual CHAR const* getPassName() const { return "IR_CFS_OPT"; }
 
-    bool perform_cfs_optimization(IN OUT IR ** ir_list, IN SimpCTX const& sc);
-    virtual bool perform(OptCTX &)
+    bool CfsOpt(IN OUT IR ** ir_list, SimpCtx const& sc);
+    virtual bool perform(OptCtx &)
     {
-        ASSERT0(0);
+        UNREACH();
         return false;
     }
-    virtual bool perform(IN SimpCTX const& simp);
+    virtual bool perform(SimpCtx const& simp);
 };
 
 } //namespace xoc

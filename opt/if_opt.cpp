@@ -36,19 +36,17 @@ author: Su Zhenyu
 
 namespace xoc {
 
-/* Recognize simple IF control flow node
-only recog such as:
-    if (cond)
-        single_BB
-    else
-        single_BB
-    endif
-  or:
-    if (cond)
-        single_BB
-    endif
-
-*/
+//Recognize simple IF control flow node
+//only recog such as:
+//    if (cond)
+//        single_BB
+//    else
+//        single_BB
+//    endif
+//  or:
+//    if (cond)
+//        single_BB
+//    endif
 static IF_TYPE get_simple_if_node_type(IR_CFG * cfg, IRBB * bb)
 {
     ASSERT(cfg && bb, ("need cfg"));
@@ -99,13 +97,12 @@ static IF_TYPE get_simple_if_node_type(IR_CFG * cfg, IRBB * bb)
         return NOT_SIMP_IF;
     }
 
-    /*If succ of true body is false body, such as
-        if
-        | \
-        | true
-        | /
-        false(actually is endif block)
-    */
+    //If succ of true body is false body, such as
+    //  if-stmt
+    //  |  |
+    //  |  true
+    //  |  |
+    //  false(actually is endif block)
     if (succs_in_true.get_head() == falsebd) {
         return SIMP_IF_THEN_TYPE;
     }
@@ -120,13 +117,12 @@ static IF_TYPE get_simple_if_node_type(IR_CFG * cfg, IRBB * bb)
         return NOT_SIMP_IF;
     }
 
-    /*In the case of succ of true body is NOT false body, such as
-           if
-           | \
-       false  true
-           | /
-           endif
-    */
+    //In the case of succ of true body is NOT false body, such as
+    //     if-stmt
+    //     |   |
+    // false   true
+    //     |   |
+    //     endif
     if (succs_in_true.get_head() == succs_in_false.get_head()) {
         return SIMP_IF_ELSE_TYPE;
     }
@@ -134,16 +130,12 @@ static IF_TYPE get_simple_if_node_type(IR_CFG * cfg, IRBB * bb)
 }
 
 
-/*
-Perform if optimization
-*/
+//Perform if optimization
 bool IR_CFG::if_opt(IRBB * bb)
 {
     IF_TYPE ift = NOT_SIMP_IF;
     if (NOT_SIMP_IF != (ift = get_simple_if_node_type(this, bb))) {
-        /*
-        TODO: Do misc if-pass here...
-        */
+        //TODO: Do misc if-pass here...
         return false;
     }
     return false;

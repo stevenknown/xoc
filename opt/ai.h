@@ -36,29 +36,32 @@ author: Su Zhenyu
 
 namespace xoc {
 
-/* How to use AttachInfo?
-1. Allocate AttachInfo from Region.
-2. Construct your data structure to be attached.
-3. Set the AttachInfo type and the data structure.
+class MDSSAInfo;
 
-e.g:
-    IR * ir = ...; Given IR.
-    IR_ai(ir) = region->newAI();
-    Dbx * dbx = getDbx();
-    IR_ai(ir)->set(AI_DBX, (BaseAttachInfo*)dbx);
-
-Note that you do not need to free/delete AI structure.
-They will be freed at destructor of region. */
+//Usage of AIContainer:
+//1.Allocate AIContainer.
+//2.Construct AI data structure to be attached.
+//3.Set the AIContainer type and the data structure.
+//e.g: construct DBX AI.
+//  IR * ir = ...; //Given IR.
+//  IR_ai(ir) = region->allocAIContainer();
+//  Dbx * dbx = getDbx();
+//  IR_ai(ir)->set(AI_DBX, (BaseAttachInfo*)dbx);
+//Note that you do not need to free/delete AI structure,
+//which will be freed in destructor of region.
+//And region is not reponsible for allocation or free of
+//AI data structure.
 
 //Attach Info Type.
 typedef enum _AI_TYPE {
     AI_UNDEF = 0,
-    AI_DBX, //Debug Info
-    AI_PROF, //Profile Info
-    AI_TBAA, //Type Based AA
-    AI_EH_LABEL, //Record a list of Labels.
-    AI_USER_DEF, //User Defined
-    AI_LAST, //The number of ai type.
+    AI_DBX,       //Debug Info
+    AI_PROF,      //Profile Info
+    AI_TBAA,      //Type Based AA
+    AI_EH_LABEL,  //Record a list of Labels.
+    AI_USER_DEF,  //User Defined
+    AI_MD_SSA,    //MD SSA info
+    AI_LAST,      //The number of ai type.
 } AI_TYPE;
 
 
@@ -66,21 +69,25 @@ class BaseAttachInfo {
 public:
     AI_TYPE type;
 
+public:
     explicit BaseAttachInfo(AI_TYPE t) { init(t); }
     COPY_CONSTRUCTOR(BaseAttachInfo);
+    ~BaseAttachInfo() {}
 
     void init(AI_TYPE t) { type = t; }
 };
 
 
+//This class represents container of miscellaneous AttachInfo.
 typedef SimpleVec<BaseAttachInfo*, 1> AICont;
-class AttachInfo {
+class AIContainer {
 protected:
     AICont cont;
 
 public:
-    AttachInfo() { init(); }
-    COPY_CONSTRUCTOR(AttachInfo);
+    AIContainer() { init(); }
+    COPY_CONSTRUCTOR(AIContainer);
+    ~AIContainer() {}
 
     void init()
     {
@@ -93,7 +100,7 @@ public:
     void destroy() { cont.destroy(); }
     void destroy_vec() { cont.destroy_vec(); }
 
-    void copy(AttachInfo const* ai)
+    void copy(AIContainer const* ai)
     {
         ASSERT0(ai);
         if (!ai->is_init()) { return; }
@@ -104,8 +111,12 @@ public:
     {
         if (!cont.is_init()) { return; }
         ASSERT0(type > AI_UNDEF && type < AI_LAST);
-        if ((UINT)type < cont.get_capacity()) {
-            cont.set((UINT)type, NULL);
+        for (UINT i = 0; i < cont.get_capacity(); i++) {
+            BaseAttachInfo * ac = cont.get(i);
+            if (ac != NULL && ac->type == type) {
+                cont.set(i, NULL);
+                return;
+            }
         }
     }
 
@@ -128,7 +139,7 @@ public:
                 continue;
             }
 
-            //Note c will override the prior AttachInfo that has same type.
+            //Note c will override the prior AIContainer that has same type.
             cont.set(i, c);
             return;
         }
@@ -136,12 +147,12 @@ public:
         if (emptyslot != -1) {
             cont.set((UINT)emptyslot, c);
         } else {
-            //AttachInfo buffer will grow bigger.
+            //AIContainer buffer will grow bigger.
             cont.set(i, c);
         }
     }
 
-    BaseAttachInfo const* get(AI_TYPE type) const
+    BaseAttachInfo * get(AI_TYPE type) const
     {
         if (!cont.is_init()) { return NULL; }
         for (UINT i = 0; i < cont.get_capacity(); i++) {
@@ -163,9 +174,10 @@ public:
         case AI_PROF: return "Prof";
         case AI_TBAA: return "Tbaa";
         case AI_EH_LABEL: return "EH";
-        case AI_USER_DEF: return "User";
+        case AI_USER_DEF: return "UserDef";
+        case AI_MD_SSA: return "MDSSA";
         case AI_LAST:;
-        default: ASSERT0(0);
+        default: UNREACH();
         }
         return NULL;
     }
@@ -186,8 +198,7 @@ public:
     void init(SMemPool * pool)
     {
         BaseAttachInfo::init(AI_EH_LABEL);
-        labels.init();
-        labels.set_pool(pool);
+        labels.init(pool);
     }
 
     SList<LabelInfo*> const& read_labels() const { return labels; }
@@ -235,6 +246,13 @@ public:
 
     TbaaAttachInfo() : BaseAttachInfo(AI_TBAA) { type = NULL; }
     COPY_CONSTRUCTOR(TbaaAttachInfo);
+};
+
+
+class MDSSAInfoAttachInfo : public BaseAttachInfo {
+public:
+    MDSSAInfoAttachInfo() : BaseAttachInfo(AI_MD_SSA) {}
+    COPY_CONSTRUCTOR(MDSSAInfoAttachInfo);
 };
 
 } //namespace xoc

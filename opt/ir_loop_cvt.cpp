@@ -58,7 +58,7 @@ bool IR_LOOP_CVT::is_while_do(LI<IRBB> const* li, OUT IRBB ** gobackbb,
     }
 
     IR * lastir = BB_last_ir(head);
-    if (!lastir->is_cond_br()) {
+    if (!lastir->isConditionalBr()) {
         return false;
     }
 
@@ -81,17 +81,17 @@ bool IR_LOOP_CVT::try_convert(LI<IRBB> * li, IRBB * gobackbb,
     IRBB * epilog;
     if (li->is_inside_loop(succ1)) {
         ASSERT0(!li->is_inside_loop(succ2));
-        loopbody_start_bb = m_cfg->get_bb(succ1);
-        epilog = m_cfg->get_bb(succ2);
+        loopbody_start_bb = m_cfg->getBB(succ1);
+        epilog = m_cfg->getBB(succ2);
     } else {
         ASSERT0(li->is_inside_loop(succ2));
         ASSERT0(!li->is_inside_loop(succ1));
-        loopbody_start_bb = m_cfg->get_bb(succ2);
-        epilog = m_cfg->get_bb(succ1);
+        loopbody_start_bb = m_cfg->getBB(succ2);
+        epilog = m_cfg->getBB(succ1);
     }
 
     ASSERT0(loopbody_start_bb && epilog);
-    IRBB * next = m_cfg->get_fallthrough_bb(gobackbb);
+    IRBB * next = m_cfg->getFallThroughBB(gobackbb);
     if (next == NULL || next != epilog) {
         //No benefit to be get to convert this kind of loop.
         return false;
@@ -106,7 +106,7 @@ bool IR_LOOP_CVT::try_convert(LI<IRBB> * li, IRBB * gobackbb,
 
     //Copy ir in header to gobackbb.
     IR * last_cond_br = NULL;
-    DU_ITER di = NULL;
+    DUIter di = NULL;
     Vector<IR*> rmvec;
     for (IR * ir = BB_first_ir(head);
          ir != NULL; ir = BB_next_ir(head)) {
@@ -117,25 +117,25 @@ bool IR_LOOP_CVT::try_convert(LI<IRBB> * li, IRBB * gobackbb,
         m_ii.clean();
         for (IR * x = iterRhsInit(ir, m_ii);
              x != NULL; x = iterRhsNext(m_ii)) {
-            if (!x->is_memory_ref()) { continue; }
+            if (!x->isMemoryRef()) { continue; }
 
             UINT cnt = 0;
-            if (x->is_read_pr() && PR_ssainfo(x) != NULL) {
+            if (x->isReadPR() && PR_ssainfo(x) != NULL) {
                 IR * def = SSA_def(PR_ssainfo(x));
                 if (def != NULL &&
-                    li->is_inside_loop(BB_id(def->get_bb()))) {
+                    li->is_inside_loop(BB_id(def->getBB()))) {
                     rmvec.set(cnt++, def);
                 }
             } else {
-                DUSet const* defset = x->get_duset_c();
+                DUSet const* defset = x->readDUSet();
                 if (defset == NULL) { continue; }
 
                 for (INT d = defset->get_first(&di);
                      d >= 0; d = defset->get_next(d, &di)) {
-                    IR * def = m_ru->get_ir(d);
+                    IR * def = m_ru->getIR(d);
 
-                    ASSERT0(def->get_bb());
-                    if (li->is_inside_loop(BB_id(def->get_bb()))) {
+                    ASSERT0(def->getBB());
+                    if (li->is_inside_loop(BB_id(def->getBB()))) {
                         rmvec.set(cnt++, def);
                     }
                 }
@@ -150,7 +150,7 @@ bool IR_LOOP_CVT::try_convert(LI<IRBB> * li, IRBB * gobackbb,
         }
 
         BB_irlist(gobackbb).insert_before(newir, irct);
-        if (newir->is_cond_br()) {
+        if (newir->isConditionalBr()) {
             ASSERT0(ir == BB_last_ir(head));
             last_cond_br = newir;
             newir->invertIRType(m_ru);
@@ -163,12 +163,12 @@ bool IR_LOOP_CVT::try_convert(LI<IRBB> * li, IRBB * gobackbb,
     m_cfg->removeEdge(gobackbb, head); //revise cfg.
 
     LabelInfo const* loopbody_start_lab =
-            loopbody_start_bb->get_lab_list().get_head();
+            loopbody_start_bb->getLabelList().get_head();
     if (loopbody_start_lab == NULL) {
-        loopbody_start_lab = ::newInternalLabel(m_ru->get_pool());
+        loopbody_start_lab = ::allocInternalLabel(m_ru->get_pool());
         m_cfg->add_lab(loopbody_start_bb, loopbody_start_lab);
     }
-    last_cond_br->set_label(loopbody_start_lab);
+    last_cond_br->setLabel(loopbody_start_lab);
 
     //Add back edge.
     m_cfg->addEdge(BB_id(gobackbb), BB_id(loopbody_start_bb));
@@ -202,12 +202,12 @@ bool IR_LOOP_CVT::find_and_convert(List<LI<IRBB>*> & worklst)
 }
 
 
-bool IR_LOOP_CVT::perform(OptCTX & oc)
+bool IR_LOOP_CVT::perform(OptCtx & oc)
 {
-    START_TIMER_AFTER();
+    START_TIMER(t, getPassName());
     m_ru->checkValidAndRecompute(&oc, PASS_LOOP_INFO, PASS_RPO, PASS_UNDEF);
 
-    LI<IRBB> * li = m_cfg->get_loop_info();
+    LI<IRBB> * li = m_cfg->getLoopInfo();
     if (li == NULL) { return false; }
 
     List<LI<IRBB>*> worklst;
@@ -219,8 +219,8 @@ bool IR_LOOP_CVT::perform(OptCTX & oc)
     bool change = find_and_convert(worklst);
     if (change) {
         //DU reference and du chain has maintained.
-        ASSERT0(m_du->verifyMDRef());
-        ASSERT0(m_du->verifyMDDUChain());
+        ASSERT0(m_ru->verifyMDRef());
+        ASSERT0(m_du->verifyMDDUChain(COMPUTE_PR_DU | COMPUTE_NOPR_DU));
 
         //All these changed.
         OC_is_reach_def_valid(oc) = false;
@@ -233,7 +233,7 @@ bool IR_LOOP_CVT::perform(OptCTX & oc)
         //TODO: make rpo, dom valid.
     }
 
-    END_TIMER_AFTER(get_pass_name());
+    END_TIMER(t, getPassName());
     return change;
 }
 

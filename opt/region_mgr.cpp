@@ -42,9 +42,14 @@ namespace xoc {
 RegionMgr::~RegionMgr()
 {
     for (INT id = 0; id <= m_id2ru.get_last_idx(); id++) {
-        Region * ru = m_id2ru.get(id);
-        if (ru != NULL) { delete ru; }
+        Region * rg = m_id2ru.get(id);
+        if (rg == NULL) { continue; }
+        deleteRegion(rg, false);
     }
+
+    #ifdef _DEBUG_
+    ASSERT(m_num_allocated == 0, ("there is still region leave out"));
+    #endif
 
     if (m_md_sys != NULL) {
         delete m_md_sys;
@@ -63,62 +68,66 @@ RegionMgr::~RegionMgr()
 }
 
 
-/* Map string variable to dedicated string md.
-CASE: android/external/tagsoup/src/org/ccil/cowan/tagsoup/HTMLSchema.java
-    This method allocates 3000+ string variable.
-    Each string has been taken address.
-    It will bloat may_point_to_set.
-    So we need to regard all string variables as one if necessary. */
-MD const* RegionMgr::getDedicateStrMD()
+//Try to generate a MD to represent dedicated string md.
+//In case, e.g: android/external/tagsoup/src/org/ccil/cowan/tagsoup/HTMLSchema.java
+//There is a function allocates 3000+ string variable.
+//Each string has been taken address.
+//That will inflate may_point_to_set too much.
+//In this situation, AA can be conservatively regard all string variables
+//as same unbounded MD.
+MD const* RegionMgr::genDedicateStrMD()
 {
-    if (m_is_regard_str_as_same_md) {
-        //Regard all string variables as single one.
-        if (m_str_md == NULL) {
-            SYM * s  = addToSymbolTab("Dedicated_VAR_be_regarded_as_string");
-            VAR * sv = get_var_mgr()->
-                        registerStringVar("Dedicated_String_Var", s, 1);
-            VAR_allocable(sv) = false;
-            VAR_is_addr_taken(sv) = true;
-            MD md;
-            MD_base(&md) = sv;
-            MD_ty(&md) = MD_UNBOUND;
-            ASSERT0(MD_base(&md)->is_string());
-            MD const* e = m_md_sys->registerMD(md);
-            ASSERT0(MD_id(e) > 0);
-            m_str_md = e;
-        }
-        return m_str_md;
+    if (!m_is_regard_str_as_same_md) { return NULL; }
+
+    //Regard all string variables as same unbound MD.
+    if (m_str_md == NULL) {
+        SYM * s = addToSymbolTab("DedicatedVarBeRegardedAsString");
+        VAR * sv = getVarMgr()->registerStringVar("DedicatedStringVar", s, 1);
+        VAR_is_unallocable(sv) = true;
+        VAR_is_addr_taken(sv) = true;
+        MD md;
+        MD_base(&md) = sv;
+        MD_ty(&md) = MD_UNBOUND;
+        ASSERT0(MD_base(&md)->is_string());
+        MD const* e = m_md_sys->registerMD(md);
+        ASSERT0(MD_id(e) > 0);
+        m_str_md = e;
     }
-    return NULL;
+    return m_str_md;
 }
 
 
 //Register exact MD for each global variable.
-void RegionMgr::registerGlobalMDS()
+//Note you should call this function as early as possible, e.g, before process
+//all regions. Because that will assign smaller MD id to global variable.
+void RegionMgr::registerGlobalMD()
 {
     //Only top region can do initialize MD for global variable.
     ASSERT0(m_var_mgr);
-    ID2VAR * varvec = m_var_mgr->get_var_vec();
+    VarVec * varvec = m_var_mgr->get_var_vec();
     for (INT i = 0; i <= varvec->get_last_idx(); i++) {
         VAR * v = varvec->get(i);
-        if (v == NULL) { continue; }
+        if (v == NULL || VAR_is_local(v)) { continue; }
 
-        if (VAR_is_fake(v) ||
-            VAR_is_local(v) ||
-            VAR_is_func_unit(v) ||
-            VAR_is_func_decl(v)) {
-            continue;
-        }
-        ASSERT0(VAR_is_global(v) && VAR_allocable(v));
-        if (v->is_string() && getDedicateStrMD() != NULL) {
+        //User sometime intentionally declare non-allocable
+        //global variable to custmized usage.
+        //ASSERT0(!VAR_is_unallocable(v));
+
+        if (v->is_string() && genDedicateStrMD() != NULL) {
             continue;
         }
 
+        //We allocate MDTab for VAR which is func-decl or fake as well.
+        //Since some Passes such as AA may need fake VAR to do analysis.
         MD md;
         MD_base(&md) = v;
         MD_ofst(&md) = 0;
-        MD_size(&md) = v->getByteSize(get_type_mgr());
-        MD_ty(&md) = MD_EXACT;
+        MD_size(&md) = v->getByteSize(getTypeMgr());
+        if (VAR_is_fake(v) || VAR_is_func_decl(v)) {
+            MD_ty(&md) = MD_UNBOUND;
+        } else {
+            MD_ty(&md) = MD_EXACT;
+        }
         m_md_sys->registerMD(md);
     }
 }
@@ -143,175 +152,248 @@ Region * RegionMgr::allocRegion(REGION_TYPE rt)
 
 Region * RegionMgr::newRegion(REGION_TYPE rt)
 {
-    Region * ru = allocRegion(rt);
+    #ifdef _DEBUG_
+    m_num_allocated++;
+    #endif
+
+    Region * rg = allocRegion(rt);
     UINT free_id = m_free_ru_id.remove_head();
     if (free_id == 0) {
-        REGION_id(ru) = m_ru_count++;
+        REGION_id(rg) = m_ru_count++;
     } else {
-        REGION_id(ru) = free_id;
+        REGION_id(rg) = free_id;
     }
-    return ru;
+
+    return rg;
 }
 
 
 //Record new region and delete it when RegionMgr destroy.
-void RegionMgr::set_region(Region * ru)
+void RegionMgr::addToRegionTab(Region * rg)
 {
-    ASSERT(REGION_id(ru) > 0, ("should generate new region via newRegion()"));
-    ASSERT0(m_id2ru.get(REGION_id(ru)) == NULL);
-    m_id2ru.set(REGION_id(ru), ru);
+    ASSERT(REGION_id(rg) > 0, ("should generate new region via newRegion()"));
+    ASSERT0(getRegion(REGION_id(rg)) == NULL);
+    ASSERT0(REGION_id(rg) < m_ru_count);
+    INT pad = xcom::getNearestPowerOf2(REGION_id(rg));
+    if (m_id2ru.get_last_idx() + 1 < pad) {
+        m_id2ru.set(pad, NULL);
+    }
+    m_id2ru.set(REGION_id(rg), rg);
 }
 
 
-void RegionMgr::deleteRegion(Region * ru)
+bool RegionMgr::verifyPreDefinedInfo()
 {
-    ASSERT0(ru);
-    UINT id = REGION_id(ru);
+    ASSERT0_DUMMYUSE(WORD_LENGTH_OF_TARGET_MACHINE ==
+            sizeof(TMWORD) * HOST_BIT_PER_BYTE);
+    ASSERT0_DUMMYUSE(BIT_PER_BYTE == HOST_BIT_PER_BYTE);
 
-    //User may not record the region.
-    //ASSERT(get_region(id), ("Does not belong to current region mgr"));
-    delete ru;
+    ASSERT0_DUMMYUSE(sizeof(INT8) * HOST_BIT_PER_BYTE == 8);
+    ASSERT0_DUMMYUSE(sizeof(UINT8) * HOST_BIT_PER_BYTE == 8);
+    ASSERT0_DUMMYUSE(sizeof(INT16) * HOST_BIT_PER_BYTE == 16);
+    ASSERT0_DUMMYUSE(sizeof(UINT16) * HOST_BIT_PER_BYTE == 16);
+    ASSERT0_DUMMYUSE(sizeof(INT32) * HOST_BIT_PER_BYTE == 32);
+    ASSERT0_DUMMYUSE(sizeof(UINT32) * HOST_BIT_PER_BYTE == 32);
+    ASSERT0_DUMMYUSE(sizeof(INT64) * HOST_BIT_PER_BYTE == 64);
+    ASSERT0_DUMMYUSE(sizeof(UINT64) * HOST_BIT_PER_BYTE == 64);
+    #ifdef INT128
+    ASSERT0_DUMMYUSE(sizeof(INT128) * HOST_BIT_PER_BYTE == 128);
+    #endif
+    #ifdef UINT128
+    ASSERT0_DUMMYUSE(sizeof(UINT128) * HOST_BIT_PER_BYTE == 128);
+    #endif
 
-    if (id != 0) {
+    ASSERT0_DUMMYUSE(!IS_UNSIGN_TY(INT8));
+    ASSERT0_DUMMYUSE(IS_UNSIGN_TY(UINT8));
+    ASSERT0_DUMMYUSE(!IS_UNSIGN_TY(INT16));
+    ASSERT0_DUMMYUSE(IS_UNSIGN_TY(UINT16));
+    ASSERT0_DUMMYUSE(!IS_UNSIGN_TY(INT32));
+    ASSERT0_DUMMYUSE(IS_UNSIGN_TY(UINT32));
+    ASSERT0_DUMMYUSE(!IS_UNSIGN_TY(INT64));
+    ASSERT0_DUMMYUSE(IS_UNSIGN_TY(UINT64));
+    #ifdef INT128
+    ASSERT0_DUMMYUSE(!IS_UNSIGN_TY(INT128));
+    #endif
+    #ifdef UINT128
+    ASSERT0_DUMMYUSE(IS_UNSIGN_TY(UINT128));
+    #endif
+
+    //Host LONGLONG should not less than HOST_INT,
+    //otherwise the integer might be truncated wrongfully.
+    ASSERT0_DUMMYUSE(sizeof(HOST_INT) <= sizeof(LONGLONG));
+    ASSERT0_DUMMYUSE(sizeof(HOST_INT) == sizeof(HOST_UINT));
+
+    ASSERT0_DUMMYUSE(WORD_LENGTH_OF_HOST_MACHINE ==
+        (sizeof(HOST_UINT) * HOST_BIT_PER_BYTE));
+
+    ASSERT0_DUMMYUSE(sizeof(CHAR) == sizeof(UCHAR) &&
+        sizeof(SHORT) == sizeof(USHORT) &&
+        sizeof(INT) == sizeof(UINT) &&
+        sizeof(LONG) == sizeof(ULONG) &&
+        sizeof(LONGLONG) == sizeof(ULONGLONG));
+
+    ASSERT0_DUMMYUSE(sizeof(CHAR) <= sizeof(SHORT) &&
+        sizeof(SHORT) <= sizeof(INT) &&
+        sizeof(INT) <= sizeof(LONG) &&
+        sizeof(LONG) <= sizeof(LONGLONG));
+
+    ASSERT0_DUMMYUSE(BYTE_PER_CHAR < BYTE_PER_SHORT &&
+        BYTE_PER_SHORT < BYTE_PER_INT &&
+        BYTE_PER_INT <= BYTE_PER_LONG &&
+        BYTE_PER_LONG <= BYTE_PER_LONGLONG &&
+        BYTE_PER_FLOAT < BYTE_PER_DOUBLE &&
+        BYTE_PER_INT <= BYTE_PER_POINTER);
+
+    ASSERT0_DUMMYUSE(BYTE_PER_CHAR < sizeof(ULONGLONG) &&
+        BYTE_PER_SHORT < sizeof(ULONGLONG) &&
+        BYTE_PER_INT <= sizeof(ULONGLONG) &&
+        BYTE_PER_LONG <= sizeof(ULONGLONG) &&
+        BYTE_PER_FLOAT <= sizeof(ULONGLONG) &&
+        BYTE_PER_DOUBLE <= sizeof(ULONGLONG) &&
+        BYTE_PER_POINTER <= sizeof(ULONGLONG) &&
+        GENERAL_REGISTER_SIZE <= sizeof(ULONGLONG));
+
+    ASSERT0_DUMMYUSE(BYTE_PER_CHAR <= sizeof(HOST_INT) &&
+        BYTE_PER_CHAR <= sizeof(HOST_UINT) &&
+        BYTE_PER_CHAR <= sizeof(HOST_FP));
+
+    ASSERT0_DUMMYUSE(BYTE_PER_SHORT <= sizeof(HOST_INT) &&
+        BYTE_PER_SHORT <= sizeof(HOST_UINT) &&
+        BYTE_PER_SHORT <= sizeof(HOST_FP));
+
+    ASSERT0_DUMMYUSE(BYTE_PER_INT <= sizeof(HOST_INT) &&
+        BYTE_PER_INT <= sizeof(HOST_UINT) &&
+        BYTE_PER_INT <= sizeof(HOST_FP));
+
+    return true;
+}
+
+
+void RegionMgr::dumpRelationGraph(CHAR const* name)
+{
+    if (getNumOfRegion() == 0) { return; }
+    if (name == NULL) {
+        name = "graph_region_relation_graph.vcg";
+    }
+    UNLINK(name);
+    xcom::Graph g;
+    for (UINT id = 0; id < getNumOfRegion(); id++) {
+        Region * rg = getRegion(id);
+        if (rg == NULL || rg->getParent() == NULL) { continue; }
+        g.addEdge(rg->getParent()->id(), rg->id());
+    }
+    g.dump_vcg(name);
+}
+
+
+//Dump regions recorded via addToRegionTab().
+void RegionMgr::dump(bool dump_inner_region)
+{
+    if (g_tfile == NULL || getNumOfRegion() == 0) { return; }
+
+    g_indent = 0;
+    note("\n==---- DUMP ALL Registered Region ----==");
+    for (UINT id = 0; id < getNumOfRegion(); id++) {
+        Region * rg = getRegion(id);
+        if (rg == NULL) { continue; }
+        rg->dump(dump_inner_region);
+    }
+    fflush(g_tfile);
+}
+
+
+//This function destroy region, and free the region id
+//to next region alloction.
+void RegionMgr::deleteRegion(Region * rg, bool collect_id)
+{
+    START_TIMER_FMT(t, ("Delete Region%d", rg->id()));
+    ASSERT0(rg);
+    UINT id = REGION_id(rg);
+    ASSERT(getRegion(id), ("not registered region"));
+    delete rg;
+
+    if (collect_id && id != 0) {
         m_id2ru.set(id, NULL);
         m_free_ru_id.append_head(id);
     }
+
+    #ifdef _DEBUG_
+    ASSERT0(m_num_allocated != 0);
+    m_num_allocated--;
+    #endif
+
+    END_TIMER_FMT(t, ("Delete Region"));
 }
 
 
-//Process a RU_FUNC region.
-void RegionMgr::processFuncRegion(IN Region * func)
+void RegionMgr::estimateEV(
+        OUT UINT & num_call,
+        OUT UINT & num_ru,
+        bool scan_call,
+        bool scan_inner_region)
 {
-    ASSERT0(func->is_function());
-    if (func->get_ir_list() == NULL) { return; }
-    func->process();
-    tfree();
-}
+    for (UINT i = 0; i < getNumOfRegion(); i++) {
+        Region * rg = getRegion(i);
+        if (rg == NULL) { continue; }
 
+        num_ru++;
 
-IPA * RegionMgr::allocIPA(Region * program)
-{
-    return new IPA(this, program);
+        ASSERT0(rg->is_function() || rg->is_program());
+        if (scan_call) {
+            rg->scanCallAndReturnList(num_ru, scan_inner_region);
+        }
+
+        List<IR const*> * call_list = rg->getCallList();
+        if (call_list != NULL) {
+            num_call += call_list->get_elem_count();
+        }
+    }
+    num_ru = MAX(4, xcom::getNearestPowerOf2(num_ru));
+    num_call = MAX(4, xcom::getNearestPowerOf2(num_call));
 }
 
 
 //Scan call site and build call graph.
-CallGraph * RegionMgr::initCallGraph(Region * top, bool scan_call)
+//Return true if building graph successfully, otherwise return false.
+void RegionMgr::buildCallGraph(
+        OptCtx & oc,
+        bool scan_call,
+        bool scan_inner_region)
 {
-    ASSERT0(m_call_graph == NULL);
+    //Generate call-list and return-list.
     UINT vn = 0, en = 0;
-    IR * irs = top->get_ir_list();
-    while (irs != NULL) {
-        if (irs->is_region()) {
-            vn++;
-            Region * ru = REGION_ru(irs);
-            List<IR const*> * call_list = ru->get_call_list();
-            if (scan_call) {
-                ru->scanCallList(*call_list);
-            }
-            ASSERT0(call_list);
-            if (call_list->get_elem_count() == 0) {
-                irs = IR_next(irs);
-                continue;
-            }
-            for (IR const* ir = call_list->get_head();
-                 ir != NULL; ir = call_list->get_next()) {
-                en++;
-            }
-        }
-        irs = IR_next(irs);
-    }
+    estimateEV(en, vn, scan_call, scan_inner_region);
 
-    vn = MAX(4, xcom::getNearestPowerOf2(vn));
-    en = MAX(4, xcom::getNearestPowerOf2(en));
-    m_call_graph = allocCallGraph(vn, en);
-    m_call_graph->build(top);
-    return m_call_graph;
+    if (m_call_graph == NULL) {
+        //Construct call graph.
+        m_call_graph = allocCallGraph(vn, en);
+    }
+    ASSERT0(m_call_graph);
+
+    OC_is_callg_valid(oc) = m_call_graph->build(this);
 }
 
 
-//#define MEMLEAKTEST
-#ifdef MEMLEAKTEST
-static void test_ru(RegionMgr * rm)
+//Process function level region.
+bool RegionMgr::processFuncRegion(Region * func, OptCtx * oc)
 {
-    Region * ru = NULL;
-    Region * program = rm->get_region(1);
-    ASSERT0(program);
-    for (IR * ir = program->get_ir_list(); ir != NULL; ir = IR_next(ir)) {
-        if (ir->is_region()) {
-            ru = REGION_ru(ir);
-            break;
-        }
-    }
-
-    ASSERT0(ru);
-
-    INT i = 0;
-    VAR * v = ru->get_ru_var();
-    Region * x = new Region(RU_FUNC, rm);
-    while (i < 10000) {
-        x->init(RU_FUNC, rm);
-        x->set_ru_var(v);
-        IR * irs = ru->get_ir_list();
-        x->set_ir_list(x->dupIRTreeList(irs));
-        //g_do_ssa = true;
-        x->process();
-        //VarMgr * vm = x->get_var_mgr();
-        //vm->dump();
-        //MDSystem * ms = x->get_md_sys();
-        //ms->dumpAllMD();
-        tfree();
-        x->destroy();
-        i++;
-    }
-    return;
+    ASSERT0(func->is_function());
+    g_indent = 0;
+    bool s = func->process(oc);
+    tfree();
+    return s;
 }
-#endif
 
 
-//Process top-level region unit.
-//Top level region unit should be program unit.
-void RegionMgr::processProgramRegion(Region * program)
+//Process top-level region.
+//Top level region should be program.
+bool RegionMgr::processProgramRegion(Region * program, OptCtx * oc)
 {
-    ASSERT0(program);
-    registerGlobalMDS();
-    ASSERT(program->is_program(), ("TODO: support more operation."));
-    OptCTX oc;
-    if (g_do_inline) {
-        //Need to scan call-list.
-        CallGraph * callg = initCallGraph(program, true);
-        UNUSED(callg);
-        //callg->dump_vcg(get_dt_mgr(), NULL);
-
-        OC_is_callg_valid(oc) = true;
-
-        Inliner inl(this, program);
-        inl.perform(oc);
-    }
-
-    //Test mem leak.
-    //test_ru(this);
-
-    for (IR * ir = program->get_ir_list(); ir != NULL; ir = IR_next(ir)) {
-        if (ir->is_region()) {
-            processFuncRegion(REGION_ru(ir));
-        } else {
-            ASSERT(0, ("TODO"));
-        }
-    }
-
-    if (g_do_ipa) {
-        if (!OC_is_callg_valid(oc)) {
-            //processFuncRegion has scanned and collected call-list.
-            //Thus it does not need to scan call-list here.
-            initCallGraph(program, false);
-            OC_is_callg_valid(oc) = true;
-        }
-
-        IPA * ipa = allocIPA(program);
-        ipa->perform(oc);
-        delete ipa;
-    }
+    ASSERT0(program && program->is_program());
+    g_indent = 0;
+    bool s = program->process(oc);
+    tfree();
+    return s;
 }
 //END RegionMgr
 

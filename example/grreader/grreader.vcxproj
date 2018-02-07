@@ -1,0 +1,296 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project DefaultTargets="Build" ToolsVersion="14.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup Label="ProjectConfigurations">
+    <ProjectConfiguration Include="Debug|Win32">
+      <Configuration>Debug</Configuration>
+      <Platform>Win32</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Release|Win32">
+      <Configuration>Release</Configuration>
+      <Platform>Win32</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Debug|x64">
+      <Configuration>Debug</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Release|x64">
+      <Configuration>Release</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+  </ItemGroup>
+  <PropertyGroup Label="Globals">
+    <ProjectGuid>{FEEA3C48-44BB-42D6-A1A7-5274D859D48C}</ProjectGuid>
+    <Keyword>Win32Proj</Keyword>
+    <RootNamespace>grreader</RootNamespace>
+    <WindowsTargetPlatformVersion>8.1</WindowsTargetPlatformVersion>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="Configuration">
+    <ConfigurationType>Application</ConfigurationType>
+    <UseDebugLibraries>true</UseDebugLibraries>
+    <PlatformToolset>v140</PlatformToolset>
+    <CharacterSet>Unicode</CharacterSet>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'" Label="Configuration">
+    <ConfigurationType>Application</ConfigurationType>
+    <UseDebugLibraries>false</UseDebugLibraries>
+    <PlatformToolset>v140</PlatformToolset>
+    <WholeProgramOptimization>true</WholeProgramOptimization>
+    <CharacterSet>Unicode</CharacterSet>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'" Label="Configuration">
+    <ConfigurationType>Application</ConfigurationType>
+    <UseDebugLibraries>true</UseDebugLibraries>
+    <PlatformToolset>v140</PlatformToolset>
+    <CharacterSet>Unicode</CharacterSet>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'" Label="Configuration">
+    <ConfigurationType>Application</ConfigurationType>
+    <UseDebugLibraries>false</UseDebugLibraries>
+    <PlatformToolset>v140</PlatformToolset>
+    <WholeProgramOptimization>true</WholeProgramOptimization>
+    <CharacterSet>Unicode</CharacterSet>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
+  <ImportGroup Label="ExtensionSettings">
+  </ImportGroup>
+  <ImportGroup Label="Shared">
+  </ImportGroup>
+  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <PropertyGroup Label="UserMacros" />
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
+    <LinkIncremental>true</LinkIncremental>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <LinkIncremental>true</LinkIncremental>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
+    <LinkIncremental>false</LinkIncremental>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <LinkIncremental>false</LinkIncremental>
+  </PropertyGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
+    <ClCompile>
+      <PrecompiledHeader>
+      </PrecompiledHeader>
+      <WarningLevel>Level3</WarningLevel>
+      <Optimization>Disabled</Optimization>
+      <PreprocessorDefinitions>WIN32;_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <AdditionalOptions>/D "_ON_WINDOWS_" /D "FOR_DEX" /D "_CRT_SECURE_NO_WARNINGS" %(AdditionalOptions)</AdditionalOptions>
+    </ClCompile>
+    <Link>
+      <SubSystem>Console</SubSystem>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+    </Link>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <ClCompile>
+      <PrecompiledHeader>
+      </PrecompiledHeader>
+      <WarningLevel>Level3</WarningLevel>
+      <Optimization>Disabled</Optimization>
+      <PreprocessorDefinitions>_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <AdditionalOptions>/D "_CRT_SECURE_NO_WARNINGS" /D "_ON_WINDOWS_" /D "FOR_DEX" %(AdditionalOptions)</AdditionalOptions>
+    </ClCompile>
+    <Link>
+      <SubSystem>Console</SubSystem>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+    </Link>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
+    <ClCompile>
+      <WarningLevel>Level3</WarningLevel>
+      <PrecompiledHeader>
+      </PrecompiledHeader>
+      <Optimization>MaxSpeed</Optimization>
+      <FunctionLevelLinking>true</FunctionLevelLinking>
+      <IntrinsicFunctions>true</IntrinsicFunctions>
+      <PreprocessorDefinitions>WIN32;NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <AdditionalOptions>/D "_ON_WINDOWS_" /D "FOR_DEX" /D "_CRT_SECURE_NO_WARNINGS" %(AdditionalOptions)</AdditionalOptions>
+    </ClCompile>
+    <Link>
+      <SubSystem>Console</SubSystem>
+      <EnableCOMDATFolding>true</EnableCOMDATFolding>
+      <OptimizeReferences>true</OptimizeReferences>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+    </Link>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <ClCompile>
+      <WarningLevel>Level3</WarningLevel>
+      <PrecompiledHeader>
+      </PrecompiledHeader>
+      <Optimization>MaxSpeed</Optimization>
+      <FunctionLevelLinking>true</FunctionLevelLinking>
+      <IntrinsicFunctions>true</IntrinsicFunctions>
+      <PreprocessorDefinitions>NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <AdditionalOptions>/D "_CRT_SECURE_NO_WARNINGS" /D "_ON_WINDOWS_" /D "FOR_DEX" %(AdditionalOptions)</AdditionalOptions>
+    </ClCompile>
+    <Link>
+      <SubSystem>Console</SubSystem>
+      <EnableCOMDATFolding>true</EnableCOMDATFolding>
+      <OptimizeReferences>true</OptimizeReferences>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+    </Link>
+  </ItemDefinitionGroup>
+  <ItemGroup>
+    <Text Include="ReadMe.txt" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="..\..\com\bs.h" />
+    <ClInclude Include="..\..\com\comf.h" />
+    <ClInclude Include="..\..\com\ltype.h" />
+    <ClInclude Include="..\..\com\sbs.h" />
+    <ClInclude Include="..\..\com\sgraph.h" />
+    <ClInclude Include="..\..\com\smempool.h" />
+    <ClInclude Include="..\..\com\sstl.h" />
+    <ClInclude Include="..\..\com\strbuf.h" />
+    <ClInclude Include="..\..\com\xcominc.h" />
+    <ClInclude Include="..\..\opt\ai.h" />
+    <ClInclude Include="..\..\opt\callg.h" />
+    <ClInclude Include="..\..\opt\cdg.h" />
+    <ClInclude Include="..\..\opt\cfg.h" />
+    <ClInclude Include="..\..\opt\cfs_mgr.h" />
+    <ClInclude Include="..\..\opt\cfs_opt.h" />
+    <ClInclude Include="..\..\opt\cominc.h" />
+    <ClInclude Include="..\..\opt\commoninc.h" />
+    <ClInclude Include="..\..\opt\comopt.h" />
+    <ClInclude Include="..\..\opt\data_type.h" />
+    <ClInclude Include="..\..\opt\dbg.h" />
+    <ClInclude Include="..\..\opt\du.h" />
+    <ClInclude Include="..\..\opt\goto_opt.h" />
+    <ClInclude Include="..\..\opt\if_opt.h" />
+    <ClInclude Include="..\..\opt\inliner.h" />
+    <ClInclude Include="..\..\opt\ipa.h" />
+    <ClInclude Include="..\..\opt\ir.h" />
+    <ClInclude Include="..\..\opt\ir_aa.h" />
+    <ClInclude Include="..\..\opt\ir_bb.h" />
+    <ClInclude Include="..\..\opt\ir_ccp.h" />
+    <ClInclude Include="..\..\opt\ir_cfg.h" />
+    <ClInclude Include="..\..\opt\ir_cp.h" />
+    <ClInclude Include="..\..\opt\ir_dce.h" />
+    <ClInclude Include="..\..\opt\ir_dse.h" />
+    <ClInclude Include="..\..\opt\ir_du.h" />
+    <ClInclude Include="..\..\opt\ir_expr_tab.h" />
+    <ClInclude Include="..\..\opt\ir_gcse.h" />
+    <ClInclude Include="..\..\opt\ir_gvn.h" />
+    <ClInclude Include="..\..\opt\ir_high_opt.h" />
+    <ClInclude Include="..\..\opt\ir_ivr.h" />
+    <ClInclude Include="..\..\opt\ir_lcse.h" />
+    <ClInclude Include="..\..\opt\ir_licm.h" />
+    <ClInclude Include="..\..\opt\ir_loop_cvt.h" />
+    <ClInclude Include="..\..\opt\ir_mdssa.h" />
+    <ClInclude Include="..\..\opt\ir_middle_opt.h" />
+    <ClInclude Include="..\..\opt\ir_poly.h" />
+    <ClInclude Include="..\..\opt\ir_pre.h" />
+    <ClInclude Include="..\..\opt\ir_rce.h" />
+    <ClInclude Include="..\..\opt\ir_refine.h" />
+    <ClInclude Include="..\..\opt\ir_rp.h" />
+    <ClInclude Include="..\..\opt\ir_scev.h" />
+    <ClInclude Include="..\..\opt\ir_simp.h" />
+    <ClInclude Include="..\..\opt\ir_ssa.h" />
+    <ClInclude Include="..\..\opt\ir_vrp.h" />
+    <ClInclude Include="..\..\opt\label.h" />
+    <ClInclude Include="..\..\opt\loop.h" />
+    <ClInclude Include="..\..\opt\md.h" />
+    <ClInclude Include="..\..\opt\mdssainfo.h" />
+    <ClInclude Include="..\..\opt\option.h" />
+    <ClInclude Include="..\..\opt\pass.h" />
+    <ClInclude Include="..\..\opt\pass_mgr.h" />
+    <ClInclude Include="..\..\opt\prdf.h" />
+    <ClInclude Include="..\..\opt\prssainfo.h" />
+    <ClInclude Include="..\..\opt\region.h" />
+    <ClInclude Include="..\..\opt\region_mgr.h" />
+    <ClInclude Include="..\..\opt\symtab.h" />
+    <ClInclude Include="..\..\opt\targ_const_info.h" />
+    <ClInclude Include="..\..\opt\targ_info.h" />
+    <ClInclude Include="..\..\opt\util.h" />
+    <ClInclude Include="..\..\opt\var.h" />
+    <ClInclude Include="..\..\reader\grreader.h" />
+    <ClInclude Include="..\..\reader\ir_lex.h" />
+    <ClInclude Include="..\..\reader\ir_parser.h" />
+    <ClInclude Include="stdafx.h" />
+    <ClInclude Include="targetver.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="..\..\com\bs.cpp" />
+    <ClCompile Include="..\..\com\comf.cpp" />
+    <ClCompile Include="..\..\com\ltype.cpp" />
+    <ClCompile Include="..\..\com\sgraph.cpp" />
+    <ClCompile Include="..\..\com\smempool.cpp" />
+    <ClCompile Include="..\..\com\strbuf.cpp" />
+    <ClCompile Include="..\..\opt\callg.cpp" />
+    <ClCompile Include="..\..\opt\cdg.cpp" />
+    <ClCompile Include="..\..\opt\cfs_mgr.cpp" />
+    <ClCompile Include="..\..\opt\cfs_opt.cpp" />
+    <ClCompile Include="..\..\opt\data_type.cpp" />
+    <ClCompile Include="..\..\opt\dbg.cpp" />
+    <ClCompile Include="..\..\opt\du.cpp" />
+    <ClCompile Include="..\..\opt\goto_opt.cpp" />
+    <ClCompile Include="..\..\opt\if_opt.cpp" />
+    <ClCompile Include="..\..\opt\inliner.cpp" />
+    <ClCompile Include="..\..\opt\ipa.cpp" />
+    <ClCompile Include="..\..\opt\ir.cpp" />
+    <ClCompile Include="..\..\opt\ir_aa.cpp" />
+    <ClCompile Include="..\..\opt\ir_bb.cpp" />
+    <ClCompile Include="..\..\opt\ir_ccp.cpp" />
+    <ClCompile Include="..\..\opt\ir_cfg.cpp" />
+    <ClCompile Include="..\..\opt\ir_cp.cpp" />
+    <ClCompile Include="..\..\opt\ir_dce.cpp" />
+    <ClCompile Include="..\..\opt\ir_dse.cpp" />
+    <ClCompile Include="..\..\opt\ir_du.cpp" />
+    <ClCompile Include="..\..\opt\ir_expr_tab.cpp" />
+    <ClCompile Include="..\..\opt\ir_gcse.cpp" />
+    <ClCompile Include="..\..\opt\ir_gvn.cpp" />
+    <ClCompile Include="..\..\opt\ir_high_opt.cpp" />
+    <ClCompile Include="..\..\opt\ir_ivr.cpp" />
+    <ClCompile Include="..\..\opt\ir_lcse.cpp" />
+    <ClCompile Include="..\..\opt\ir_licm.cpp" />
+    <ClCompile Include="..\..\opt\ir_loop_cvt.cpp" />
+    <ClCompile Include="..\..\opt\ir_mdssa.cpp" />
+    <ClCompile Include="..\..\opt\ir_middle_opt.cpp" />
+    <ClCompile Include="..\..\opt\ir_poly.cpp" />
+    <ClCompile Include="..\..\opt\ir_pre.cpp" />
+    <ClCompile Include="..\..\opt\ir_rce.cpp" />
+    <ClCompile Include="..\..\opt\ir_refine.cpp" />
+    <ClCompile Include="..\..\opt\ir_rp.cpp" />
+    <ClCompile Include="..\..\opt\ir_scev.cpp" />
+    <ClCompile Include="..\..\opt\ir_simp.cpp" />
+    <ClCompile Include="..\..\opt\ir_ssa.cpp" />
+    <ClCompile Include="..\..\opt\ir_vrp.cpp" />
+    <ClCompile Include="..\..\opt\label.cpp" />
+    <ClCompile Include="..\..\opt\loop.cpp" />
+    <ClCompile Include="..\..\opt\md.cpp" />
+    <ClCompile Include="..\..\opt\mdssainfo.cpp" />
+    <ClCompile Include="..\..\opt\option.cpp" />
+    <ClCompile Include="..\..\opt\pass_mgr.cpp" />
+    <ClCompile Include="..\..\opt\prdf.cpp" />
+    <ClCompile Include="..\..\opt\region.cpp" />
+    <ClCompile Include="..\..\opt\region_mgr.cpp" />
+    <ClCompile Include="..\..\opt\symtab.cpp" />
+    <ClCompile Include="..\..\opt\util.cpp" />
+    <ClCompile Include="..\..\opt\var.cpp" />
+    <ClCompile Include="..\..\reader\grreader.cpp" />
+    <ClCompile Include="..\..\reader\ir_lex.cpp" />
+    <ClCompile Include="..\..\reader\ir_parser.cpp" />
+    <ClCompile Include="main.cpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="..\..\com\sbs.impl" />
+  </ItemGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
+  <ImportGroup Label="ExtensionTargets">
+  </ImportGroup>
+</Project>

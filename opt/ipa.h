@@ -38,29 +38,53 @@ namespace xoc {
 
 class IPA : public Pass {
 protected:
-    RegionMgr * m_ru_mgr;
+    RegionMgr * m_rumgr;
     Region * m_program;
     SMemPool * m_pool;
+    MDSystem * m_mdsys;
+    bool m_is_keep_dumgr; //true to keep AA and DU mgr if computed.
+    bool m_is_keep_reachdef; //true to keep Reachdef.
+    bool m_is_recompute_du_ref; //true to recompute DU reference.
 
+protected:
     void * xmalloc(UINT size)
     {
         void * p = smpoolMalloc(size, m_pool);
         ASSERT0(p);
-        memset(p, 0, size);
+        ::memset(p, 0, size);
         return p;
     }
+
+    void createCallDummyuse(IR * call, Region * callru);
+    void createCallDummyuse(Region * rg);
+    void createCallDummyuse(OptCtx & oc);
+
+    void recomputeDUChain(Region * rg, OptCtx & oc);
+
+    Region * findRegion(IR * call, Region * callru);
 public:
-    IPA(RegionMgr * rumgr, Region * program)
+    IPA(Region * program)
     {
-        m_ru_mgr = rumgr;
+        ASSERT0(program && program->is_program());
+        m_rumgr = program->getRegionMgr();
+        ASSERT0(m_rumgr);
         m_program = program;
-        ASSERT0(rumgr && program);
+        m_mdsys = m_rumgr->getMDSystem();
         m_pool = smpoolCreate(16, MEM_COMM);
+        m_is_keep_dumgr = false;
+        m_is_keep_reachdef = false;
+        m_is_recompute_du_ref = true;
     }
     virtual ~IPA() { smpoolDelete(m_pool); }
-    virtual CHAR const* get_pass_name() const { return "IPA"; }
-    virtual PASS_TYPE get_pass_type() const { return PASS_IPA; }
-    virtual bool perform(OptCTX & oc);
+
+    void computeCallRefForAllRegion();
+
+    void setKeepDUMgr(bool keep) { m_is_keep_dumgr = keep; }
+    void setKeepReachdef(bool keep) { m_is_keep_reachdef = keep; }
+    void setRecomputeDURef(bool doit) { m_is_recompute_du_ref = doit; }
+    virtual CHAR const* getPassName() const { return "IPA"; }
+    virtual PASS_TYPE getPassType() const { return PASS_IPA; }
+    virtual bool perform(OptCtx & oc);
 };
 
 } //namespace xoc

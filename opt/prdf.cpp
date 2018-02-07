@@ -45,7 +45,7 @@ void PRDF::dump()
 {
     if (g_tfile == NULL) { return; }
     fprintf(g_tfile, "\n==---- DUMP PRDF : liveness of PR ----==\n");
-    List<IRBB*> * bbl = m_ru->get_bb_list();
+    List<IRBB*> * bbl = m_ru->getBBList();
     g_indent = 2;
     for (IRBB * bb = bbl->get_head(); bb != NULL; bb = bbl->get_next()) {
         fprintf(g_tfile, "\n\n\n-- BB%d --", BB_id(bb));
@@ -78,14 +78,14 @@ void PRDF::processMay(
 {
     if (!m_handle_may) { return; }
 
-    MDSet const* mds = pr->get_ref_mds();
+    MDSet const* mds = pr->getRefMDSet();
     if (mds != NULL) {
-        MD const* prmd = pr->get_exact_ref();
+        MD const* prmd = pr->getExactRef();
         ASSERT0(prmd);
         SEGIter * iter;
         for (INT i = mds->get_first(&iter);
              i >= 0; i = mds->get_next(i, &iter)) {
-            MD const* md = m_md_sys->get_md(i);
+            MD const* md = m_md_sys->getMD(i);
             ASSERT0(md);
             if (MD_base(md) != MD_base(prmd)) {
                 bool find;
@@ -130,7 +130,7 @@ void PRDF::computeLocal(IRBB * bb, List<IR const*> & lst)
     use->clean(m_sbs_mgr);
     for (IR * x = BB_last_ir(bb); x != NULL; x = BB_prev_ir(bb)) {
         ASSERT0(x->is_stmt());
-        switch (IR_code(x)) {
+        switch (x->get_code()) {
         case IR_ST:
             lst.clean();
             processOpnd(ST_rhs(x), lst, use, gen);
@@ -216,36 +216,35 @@ void PRDF::computeLocal(IRBB * bb, List<IR const*> & lst)
             processOpnd(PHI_opnd_list(x), lst, use, gen);
             break;
         case IR_REGION: break;
-        default: ASSERT0(0);
+        default: UNREACH();
         }
     }
 }
 
 
-/* Note this function does not consider PHI effect.
-e.g:
-BB1:             BB2:
-st $pr4 = 0      st $pr3 = 1
-     \               /
-      \             /
-      BB3:
-      phi $pr5 = $pr4, $pr4
-      ...
-
-In actually , $pr4 only lived out from BB1, and $pr3 only lived out
-from BB2. For present, $pr4 both live out from BB1 and BB2, and $pr3
-is similar. */
+//Note this function does not consider PHI effect.
+//e.g:
+//BB1:             BB2:
+//st $4 = 0        st $3 = 1
+//     \               /
+//      \             /
+//      BB3:
+//      phi $5   =  $4, $4
+//      ...
+//
+//In actually , $4 only lived out from BB1, and $3 only lived out
+//from BB2. For present, $4 both live out from BB1 and BB2, and $3
+//is similar.
 #ifdef STATISTIC_PRDF
 static UINT g_max_times = 0;
 #endif
 void PRDF::computeGlobal()
 {
-    ASSERT0(BB_is_entry(m_cfg->get_entry_list()->get_head()) &&
-            m_cfg->get_entry_list()->get_elem_count() == 1);
+    ASSERT0(m_cfg->get_entry() && BB_is_entry(m_cfg->get_entry()));
 
     //Rpo should be available.
-    List<IRBB*> * vlst = m_cfg->get_bblist_in_rpo();
-    ASSERT0(vlst->get_elem_count() == m_ru->get_bb_list()->get_elem_count());
+    List<IRBB*> * vlst = m_cfg->getBBListInRPO();
+    ASSERT0(vlst->get_elem_count() == m_ru->getBBList()->get_elem_count());
 
     C<IRBB*> * ct;
     for (vlst->get_head(&ct); ct != vlst->end(); ct = vlst->get_next(ct)) {
@@ -262,9 +261,10 @@ void PRDF::computeGlobal()
     DefSBitSetCore news;
     do {
         change = false;
-        C<IRBB*> * ct;
-        for (vlst->get_tail(&ct); ct != vlst->end(); ct = vlst->get_prev(ct)) {
-            IRBB * bb = ct->val();
+        C<IRBB*> * ct2;
+        for (vlst->get_tail(&ct2);
+             ct2 != vlst->end(); ct2 = vlst->get_prev(ct2)) {
+            IRBB * bb = ct2->val();
             ASSERT0(bb);
             UINT bbid = BB_id(bb);
 
@@ -302,17 +302,17 @@ void PRDF::computeGlobal()
     g_max_times = MAX(g_max_times, count);
     FILE * h = fopen("prdf.sat.dump", "a+");
     fprintf(h, "\n%s run %u times, maxtimes %u",
-            m_ru->get_ru_name(), count, g_max_times);
+            m_ru->getRegionName(), count, g_max_times);
     fclose(h);
     #endif
 }
 
 
-bool PRDF::perform(OptCTX & oc)
+bool PRDF::perform(OptCtx & oc)
 {
-    START_TIMER_AFTER();
+    START_TIMER(t, getPassName());
     m_ru->checkValidAndRecompute(&oc, PASS_RPO, PASS_UNDEF);
-    List<IRBB*> * bbl = m_ru->get_bb_list();
+    List<IRBB*> * bbl = m_ru->getBBList();
     if (bbl->get_elem_count() == 0) { return false; }
 
     List<IR const*> lst;
@@ -326,7 +326,7 @@ bool PRDF::perform(OptCTX & oc)
     computeGlobal();
 
     //dump();
-    END_TIMER_AFTER(get_pass_name());
+    END_TIMER(t, getPassName());
     return false;
 }
 //END PRDF

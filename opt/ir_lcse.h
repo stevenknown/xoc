@@ -42,11 +42,11 @@ class IR_LCSE : public Pass {
 protected:
     bool m_enable_filter; //filter determines which expression can be CSE.
     Region * m_ru;
-    TypeMgr * m_dm;
+    TypeMgr * m_tm;
     IR_EXPR_TAB * m_expr_tab;
     IR_DU_MGR * m_du;
     BSVec<ExpRep*> * m_expr_vec;
-    DefMiscBitSetMgr * m_misc_bs_mgr;
+    DefMiscBitSetMgr m_misc_bs_mgr;
 
     IR * hoist_cse(IRBB * bb,  IR * ir_pos, ExpRep * ie);
     bool processUse(IN IRBB * bb, IN IR * ir,
@@ -78,18 +78,18 @@ protected:
                     IN OUT Vector<IR*> & map_expr2avail_pos,
                     IN OUT Vector<IR*> & map_expr2avail_pr);
 public:
-    explicit IR_LCSE(Region * ru);
+    explicit IR_LCSE(Region * rg);
     COPY_CONSTRUCTOR(IR_LCSE);
     virtual ~IR_LCSE() {}
 
     bool canBeCandidate(IR * ir);
-    virtual CHAR const* get_pass_name() const
+    virtual CHAR const* getPassName() const
     { return "Local Command Subscript Elimination"; }
 
-    PASS_TYPE get_pass_type() const { return PASS_LCSE; }
+    PASS_TYPE getPassType() const { return PASS_LCSE; }
 
-    inline void set_enable_filter(bool is_enable) { m_enable_filter = is_enable; }
-    bool perform(OptCTX & oc);
+    void set_enable_filter(bool is_enable) { m_enable_filter = is_enable; }
+    bool perform(OptCtx & oc);
 };
 
 } //namespace xoc

@@ -120,17 +120,18 @@ void CDG::get_cd_succs(UINT id, OUT List<Vertex*> & lst)
 }
 
 
-void CDG::rebuild(IN OUT OptCTX & oc, DGraph & cfg)
+void CDG::rebuild(IN OUT OptCtx & oc, DGraph & cfg)
 {
     erase();
     build(oc, cfg);
 }
 
 
-void CDG::build(IN OUT OptCTX & oc, DGraph & cfg)
+void CDG::build(IN OUT OptCtx & oc, DGraph & cfg)
 {
     if (cfg.get_vertex_num() == 0) { return; }
-    START_TIMER("CDG");
+
+    START_TIMER(t, "CDG");
     ASSERT0(OC_is_cfg_valid(oc));
     m_ru->checkValidAndRecompute(&oc, PASS_PDOM, PASS_UNDEF);
 
@@ -140,7 +141,7 @@ void CDG::build(IN OUT OptCTX & oc, DGraph & cfg)
 
     Vector<UINT> top_order;
     pdom_tree.sortInToplogOrder(top_order, false);
-    //dump_vec(top_order);
+    //dumpIntVector(top_order);
 
     BitSetMgr bs_mgr;
     Vector<BitSet*> cd_set;
@@ -190,7 +191,7 @@ void CDG::build(IN OUT OptCTX & oc, DGraph & cfg)
     } //end for
 
     OC_is_cdg_valid(oc) = true;
-    END_TIMER();
+    END_TIMER(t, "CDG");
 }
 //END CDG
 

@@ -38,7 +38,7 @@ namespace xoc {
 
 class IR_DU_MGR;
 
-typedef SEGIter * DU_ITER;
+typedef SEGIter * DUIter;
 
 class DUSet : public DefSBitSetCore {
 protected:
@@ -52,26 +52,17 @@ public:
     }
 
     void add(UINT irid, DefMiscBitSetMgr & m) { bunion(irid, m); }
-    void add_def(IR const* stmt, DefMiscBitSetMgr & m);
-    void add_use(IR const* exp, DefMiscBitSetMgr & m);
+    void addDef(IR const* stmt, DefMiscBitSetMgr & m);
+    void addUse(IR const* exp, DefMiscBitSetMgr & m);
 
     void remove(UINT irid, DefMiscBitSetMgr & m) { diff(irid, m); }
-    void remove_use(IR const* exp, DefMiscBitSetMgr & m);
+    void removeUse(IR const* exp, DefMiscBitSetMgr & m);
     void removeDef(IR const* stmt, DefMiscBitSetMgr & m);
-
-    void union_set(DUSet const* set, DefMiscBitSetMgr & m)
-    {
-        if (set == NULL) { return; }
-        bunion(*set, m);
-    }
-
-    inline bool verify_def(IR_DU_MGR * du) const;
-    inline bool verify_use(IR_DU_MGR * du) const;
 };
 
 
-#define DU_md(du)            ((du)->md)
-#define DU_mds(du)            ((du)->mds)
+#define DU_md(du)           ((du)->md)
+#define DU_mds(du)          ((du)->mds)
 #define DU_duset(du)        ((du)->duset)
 class DU {
 public:
@@ -79,7 +70,7 @@ public:
     MDSet const* mds; //indicate May MDSet reference.
     DUSet * duset; //indicate Def/Use of stmt/expr set.
 
-    inline void clean()
+    void clean()
     {
         md = NULL;
         mds = NULL;

@@ -29,35 +29,40 @@ WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR
 OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN
 IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-author: GongKai, JinYue
+author: Su Zhenyu
 @*/
-#if 0
-#ifndef _D2LCODE_H_
-#define _D2LCODE_H_
+#ifndef _DEX_CFG_H_
+#define _DEX_CFG_H_
 
+class DEX_CFG : public IR_CFG {
+protected:
+    void dump_node(FILE * h, bool detail, BitSet const& tryblock);
+    void dump_node2(
+            FILE * h,
+            bool detail,
+            BitSet const& trybbs,
+            BitSet const& catchbbs);
+    void dump_bb(
+            FILE * h,
+            bool detail,
+            UINT id,
+            UINT rpo,
+            CHAR const* shape,
+            CHAR const* color,
+            CHAR const* font,
+            UINT scale,
+            OUT UINT & vertical_order);
+public:
+    DEX_CFG(CFG_SHAPE cs,
+            BBList * bbl,
+            Region * rg,
+            UINT edge_hash_size = 16,
+            UINT vertex_hash_size = 16) :
+        IR_CFG(cs, bbl, rg, edge_hash_size, vertex_hash_size) {}
+    virtual ~DEX_CFG() {}
 
-#include <stdlib.h>
-#include <stdio.h>
-#include <string.h>
+    void dump_vcg_ex(BitSet const& markbbs);
+    void dump_vcg_ex2(BitSet const& trybbs, BitSet const& catchbbs);
+};
 
-typedef struct {
-    /*max vars for this mcode*/
-    UInt16 maxVars;
-    /*number Exception for this */
-    UInt16 numExceptions;
-    /*offset for debug sextion*/
-    UInt32 debugOff;
-    /*code length*/
-    UInt32 codeLength;
-    /*data length*/
-    UInt32 instrLength;
-    /*message for exception*/
-    LCatchException* exceptions;
-    /*message for code*/
-    BYTE* code;
-} LCodeData;
-
-
-UInt32 lir2lexTransform(LIRCode* code, LCodeData* codeData);
-#endif
 #endif

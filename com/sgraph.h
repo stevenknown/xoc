@@ -55,6 +55,8 @@ public:
         from = to = NULL;
         info = NULL;
     }
+
+public:
     Edge * prev; //used by FreeList and EdgeHash
     Edge * next; //used by FreeList and EdgeHash
     Vertex * from;
@@ -74,6 +76,8 @@ public:
         next = prev = NULL;
         edge = NULL;
     }
+
+public:
     EdgeC * next;
     EdgeC * prev;
     Edge * edge;
@@ -98,6 +102,7 @@ public:
         id = 0;
     }
 
+public:
     Vertex * prev; //used by FreeList and HASH
     Vertex * next; //used by FreeList and HASH
     EdgeC * in_list; //incoming edge list
@@ -185,36 +190,33 @@ protected:
     SMemPool * m_ec_pool;
 public:
     VertexHash(UINT bsize = 64) : Hash<Vertex*, VertexHashFunc>(bsize)
-    {
-        m_ec_pool = smpoolCreate(sizeof(Vertex) * 4, MEM_CONST_SIZE);
-    }
-
-    virtual ~VertexHash()
-    { smpoolDelete(m_ec_pool); }
+    { m_ec_pool = smpoolCreate(sizeof(Vertex) * 4, MEM_CONST_SIZE); }
+    COPY_CONSTRUCTOR(VertexHash);
+    virtual ~VertexHash() { smpoolDelete(m_ec_pool); }
 
     virtual Vertex * create(OBJTY v)
     {
         Vertex * vex =
             (Vertex*)smpoolMallocConstSize(sizeof(Vertex), m_ec_pool);
         ASSERT0(vex);
-        memset(vex, 0, sizeof(Vertex));
+        ::memset(vex, 0, sizeof(Vertex));
         VERTEX_id(vex) = (UINT)(size_t)v;
         return vex;
     }
 };
 
 
-/* A graph G = (V, E), consists of a set of vertices, V, and a set of edges, E.
-Each edge is a pair (v,w), where v,w belong to V. Edges are sometimes
-referred to as arcs. If the pair is ordered, then the graph is directed.
-Directed graphs are sometimes referred to as digraphs. Vertex w is adjacent
-to v if and only if (v,w) belong to E. In an undirected graph with edge (v,w),
-and hence (w,v), w is adjacent to v and v is adjacent to w.
-Sometimes an edge has a third component, known as either a weight or a cost.
-
-NOTICE: for accelerating perform operation of each vertex, e.g
-compute dominator, please try best to add vertex with
-topological order. */
+//A graph G = (V, E), consists of a set of vertices, V, and a set of edges, E.
+//Each edge is a pair (v,w), where v,w belong to V. Edges are sometimes
+//referred to as arcs. If the pair is ordered, then the graph is directed.
+//Directed graphs are sometimes referred to as digraphs. Vertex w is adjacent
+//to v if and only if (v,w) belong to E. In an undirected graph with edge (v,w),
+//and hence (w,v), w is adjacent to v and v is adjacent to w.
+//Sometimes an edge has a third component, known as either a weight or a cost.
+//
+//NOTICE: for accelerating perform operation of each vertex, e.g
+//compute dominator, please try best to add vertex with
+//topological order.
 class Graph {
     friend class EdgeHash;
     friend class VertexHash;
@@ -243,44 +245,42 @@ protected:
     inline void addOutList(Vertex * vex, Edge * e)
     {
         ASSERT(m_ec_pool != NULL, ("not yet initialized."));
-        if (vex == NULL || e == NULL)return;
-
-        EdgeC * el = VERTEX_out_list(vex);
-        while (el != NULL) {
+        ASSERT0(vex && e);
+        EdgeC * last = NULL;
+        for (EdgeC * el = VERTEX_out_list(vex); el != NULL; el = EC_next(el)) {
+            last = el;
             if (EC_edge(el) == e) return;
-            el = EC_next(el);
         }
-        el = newEdgeC(e);
-        add_next(&VERTEX_out_list(vex), el);
+        ASSERT0(last == NULL || EC_next(last) == NULL);
+        add_next(&VERTEX_out_list(vex), &last, newEdgeC(e));
     }
 
     //Add 'e' into in-edges of 'vex'
     inline void addInList(Vertex * vex, Edge * e)
     {
-        ASSERT(m_ec_pool != NULL, ("not yet initialized."));
-        if (vex == NULL || e == NULL) return;
-
-        EdgeC * el = VERTEX_in_list(vex);
-        while (el != NULL) {
-            if (EC_edge(el) == e) return;
-            el = EC_next(el);
+        ASSERT(m_ec_pool, ("not yet initialized."));
+        ASSERT0(vex && e);
+        EdgeC * last = NULL;
+        for (EdgeC * el = VERTEX_in_list(vex); el != NULL; el = EC_next(el)) {
+            last = el;
+            if (EC_edge(el) == e) { return; }
         }
-        el = newEdgeC(e);
-        add_next(&VERTEX_in_list(vex), el);
+        ASSERT0(last == NULL || EC_next(last) == NULL);
+        add_next(&VERTEX_in_list(vex), &last, newEdgeC(e));
     }
 
     virtual void * cloneEdgeInfo(Edge*)
-    { ASSERT(0, ("should be overloaded")); return NULL; }
+    { ASSERT(0, ("Target Dependent Code")); return NULL; }
 
     virtual void * cloneVertexInfo(Vertex*)
-    { ASSERT(0, ("should be overloaded")); return NULL; }
+    { ASSERT(0, ("Target Dependent Code")); return NULL; }
 
     inline Vertex * newVertex()
     {
-        Vertex * vex = (Vertex*)smpoolMallocConstSize(sizeof(Vertex),
-                                                      m_vertex_pool);
+        Vertex * vex = (Vertex*)smpoolMallocConstSize(
+            sizeof(Vertex), m_vertex_pool);
         ASSERT0(vex);
-        memset(vex, 0, sizeof(Vertex));
+        ::memset(vex, 0, sizeof(Vertex));
         return vex;
     }
 
@@ -299,7 +299,7 @@ protected:
         Edge * e = m_e_free_list.get_free_elem();
         if (e == NULL) {
             e = (Edge*)smpoolMallocConstSize(sizeof(Edge), m_edge_pool);
-            memset(e, 0, sizeof(Edge));
+            ::memset(e, 0, sizeof(Edge));
         }
         EDGE_from(e) = from;
         EDGE_to(e) = to;
@@ -316,7 +316,7 @@ protected:
         EdgeC * el = m_el_free_list.get_free_elem();
         if (el == NULL) {
             el = (EdgeC*)smpoolMallocConstSize(sizeof(EdgeC), m_ec_pool);
-            memset(el, 0, sizeof(EdgeC));
+            ::memset(el, 0, sizeof(EdgeC));
         }
         EC_edge(el) = e;
         return el;
@@ -325,8 +325,8 @@ public:
     Graph(UINT edge_hash_size = 64, UINT vex_hash_size = 64);
     Graph(Graph const& g);
     Graph const& operator = (Graph const&);
-
     virtual ~Graph() { destroy(); }
+
     void init();
     void destroy();
     inline Edge * addEdge(UINT from, UINT to)
@@ -345,10 +345,11 @@ public:
         return m_vertices.append(newVertex(vid));
     }
 
-    void computeRpoNoRecursive(IN OUT Vertex * root,
-                               OUT List<Vertex const*> & vlst);
+    void computeRpoNoRecursive(
+            IN OUT Vertex * root,
+            OUT List<Vertex const*> & vlst);
     bool clone(Graph const& src);
-    UINT count_mem() const;
+    size_t count_mem() const;
 
     void dump_dot(CHAR const* name = NULL);
     void dump_vcg(CHAR const* name = NULL);
@@ -356,12 +357,10 @@ public:
     //Return true if 'succ' is successor of 'v'.
     bool is_succ(Vertex * v, Vertex * succ) const
     {
-        EdgeC * e = VERTEX_out_list(v);
-        while (e != NULL) {
+        for (EdgeC * e = VERTEX_out_list(v); e != NULL; e = EC_next(e)) {
             if (EDGE_to(EC_edge(e)) == succ) {
                 return true;
             }
-            e = EC_next(e);
         }
         return false;
     }
@@ -369,12 +368,10 @@ public:
     //Return true if 'pred' is predecessor of 'v'.
     bool is_pred(Vertex * v, Vertex * pred) const
     {
-        EdgeC * e = VERTEX_in_list(v);
-        while (e != NULL) {
+        for (EdgeC * e = VERTEX_in_list(v); e != NULL; e = EC_next(e)) {
             if (EDGE_from(EC_edge(e)) == pred) {
                 return true;
             }
-            e = EC_next(e);
         }
         return false;
     }
@@ -384,19 +381,26 @@ public:
     bool is_direction() const { return m_is_direction; }
 
     //Is there exist a path connect 'from' and 'to'.
-    inline bool is_reachable(UINT from, UINT to) const
+    bool is_reachable(UINT from, UINT to) const
     {
         ASSERT(m_ec_pool != NULL, ("not yet initialized."));
         return is_reachable(get_vertex(from), get_vertex(to));
     }
     bool is_reachable(Vertex * from, Vertex * to) const;
     void insertVertexBetween(
-            IN Vertex * v1, IN Vertex * v2,
-            IN Vertex * newv, OUT Edge ** e1 = NULL,
-            OUT Edge ** e2 = NULL);
+            IN Vertex * v1,
+            IN Vertex * v2,
+            IN Vertex * newv,
+            OUT Edge ** e1 = NULL,
+            OUT Edge ** e2 = NULL,
+            bool sort = true);
     void insertVertexBetween(
-            UINT v1, UINT v2, UINT newv,
-            OUT Edge ** e1 = NULL, OUT Edge ** e2 = NULL);
+            UINT v1,
+            UINT v2,
+            UINT newv,
+            OUT Edge ** e1 = NULL,
+            OUT Edge ** e2 = NULL,
+            bool sort = true);
     bool is_graph_entry(Vertex const* v) const
     { return VERTEX_in_list(v) == NULL;    }
 
@@ -408,7 +412,7 @@ public:
 
     bool get_neighbor_list(IN OUT List<UINT> & ni_list, UINT vid) const;
     bool get_neighbor_set(OUT DefSBitSet & niset, UINT vid) const;
-    inline UINT get_degree(UINT vid) const
+    UINT get_degree(UINT vid) const
     {
         ASSERT(m_ec_pool != NULL, ("not yet initialized."));
         return get_degree(get_vertex(vid));
@@ -416,12 +420,12 @@ public:
     UINT get_degree(Vertex const* vex) const;
     UINT get_in_degree(Vertex const* vex) const;
     UINT get_out_degree(Vertex const* vex) const;
-    inline UINT get_vertex_num() const
+    UINT get_vertex_num() const
     {
         ASSERT(m_ec_pool != NULL, ("not yet initialized."));
         return m_vertices.get_elem_count();
     }
-    inline UINT get_edge_num() const
+    UINT get_edge_num() const
     {
         ASSERT(m_ec_pool != NULL, ("not yet initialized."));
         return m_edges.get_elem_count();
@@ -436,22 +440,22 @@ public:
     }
     Edge * get_edge(UINT from, UINT to) const;
     Edge * get_edge(Vertex const* from, Vertex const* to) const;
-    inline Edge * get_first_edge(INT & cur) const
+    Edge * get_first_edge(INT & cur) const
     {
         ASSERT(m_ec_pool != NULL, ("not yet initialized."));
         return m_edges.get_first(cur);
     }
-    inline Edge * get_next_edge(INT & cur) const
+    Edge * get_next_edge(INT & cur) const
     {
         ASSERT(m_ec_pool != NULL, ("not yet initialized."));
         return m_edges.get_next(cur);
     }
-    inline Vertex * get_first_vertex(INT & cur) const
+    Vertex * get_first_vertex(INT & cur) const
     {
         ASSERT(m_ec_pool != NULL, ("not yet initialized."));
         return m_vertices.get_first(cur);
     }
-    inline Vertex * get_next_vertex(INT & cur) const
+    Vertex * get_next_vertex(INT & cur) const
     {
         ASSERT(m_ec_pool != NULL, ("not yet initialized."));
         return m_vertices.get_next(cur);
@@ -463,7 +467,7 @@ public:
     Edge * removeEdge(Edge * e);
     void removeEdgeBetween(Vertex * v1, Vertex * v2);
     Vertex * removeVertex(Vertex * vex);
-    inline Vertex * removeVertex(UINT vid)
+    Vertex * removeVertex(UINT vid)
     {
         ASSERT(m_ec_pool != NULL, ("not yet initialized."));
         return removeVertex(get_vertex(vid));
@@ -500,8 +504,7 @@ public:
 //This class indicate a Dominator Tree.
 class DomTree : public Graph {
 public:
-    DomTree()
-    { set_dense(true); }
+    DomTree() { set_dense(true); }
 };
 
 
@@ -521,7 +524,7 @@ public:
     DGraph(DGraph const& g);
     DGraph const& operator = (DGraph const&);
 
-    inline bool clone(DGraph const& g)
+    bool clone(DGraph const& g)
     {
         m_bs_mgr = g.m_bs_mgr;
         return Graph::clone(g);
@@ -537,24 +540,24 @@ public:
     bool computeIdom();
     bool computeIdom2(List<Vertex const*> const& vlst);
     bool computeIpdom();
-    UINT count_mem() const;
+    size_t count_mem() const;
 
     void dump_dom(FILE * h, bool dump_dom_tree = true);
 
     //idom must be positive
     //NOTE: Entry does not have idom.
     //'id': vertex id.
-    inline UINT get_idom(UINT id) { return (UINT)m_idom_set.get(id); }
+    UINT get_idom(UINT id) const { return (UINT)m_idom_set.get(id); }
 
     //ipdom must be positive
     //NOTE: Exit does not have idom.
     //'id': vertex id.
-    inline UINT get_ipdom(UINT id) { return (UINT)m_ipdom_set.get(id); }
+    UINT get_ipdom(UINT id) const { return (UINT)m_ipdom_set.get(id); }
 
     void get_dom_tree(OUT Graph & dom);
     void get_pdom_tree(OUT Graph & pdom);
 
-    BitSet * get_dom_set_c(UINT id) const { return m_dom_set.get(id); }
+    BitSet const* read_dom_set(UINT id) const { return m_dom_set.get(id); }
 
     //Get vertices who dominate vertex 'id'.
     //NOTE: set does NOT include 'v' itself.
@@ -577,7 +580,7 @@ public:
         return get_dom_set(VERTEX_id(v));
     }
 
-    BitSet * get_pdom_set_c(UINT id) const { return m_pdom_set.get(id); }
+    BitSet const* read_pdom_set(UINT id) const { return m_pdom_set.get(id); }
 
     //Get vertices who post dominated by vertex 'id'.
     //NOTE: set does NOT include 'v' itself.
@@ -603,24 +606,23 @@ public:
     //Return true if 'v1' dominate 'v2'.
     bool is_dom(UINT v1, UINT v2) const
     {
-        ASSERT0(get_dom_set_c(v2));
-        return get_dom_set_c(v2)->is_contain(v1);
+        ASSERT0(read_dom_set(v2));
+        return read_dom_set(v2)->is_contain(v1);
     }
 
     //Return true if 'v1' post dominate 'v2'.
     bool is_pdom(UINT v1, UINT v2) const
     {
-        ASSERT0(get_pdom_set_c(v2));
-        return get_pdom_set_c(v2)->is_contain(v1);
+        ASSERT0(read_pdom_set(v2));
+        return read_pdom_set(v2)->is_contain(v1);
     }
 
-    void sortInBfsOrder(Vector<UINT> & order_buf, Vertex * root,
-                           BitSet & visit);
-    void sortDomTreeInPreorder(IN Vertex * root,
-                                   OUT List<Vertex*> & lst);
-    void sortDomTreeInPostrder(IN Vertex * root,
-                                    OUT List<Vertex*> & lst);
-    void set_bs_mgr(BitSetMgr * bs_mgr) { m_bs_mgr = bs_mgr; }
+    void sortInBfsOrder(Vector<UINT> & order_buf,
+                        Vertex * root,
+                        BitSet & visit);
+    void sortDomTreeInPreorder(IN Vertex * root, OUT List<Vertex*> & lst);
+    void sortDomTreeInPostrder(IN Vertex * root, OUT List<Vertex*> & lst);
+    void setBitSetMgr(BitSetMgr * bs_mgr) { m_bs_mgr = bs_mgr; }
     bool removeUnreachNode(UINT entry_id);
 };
 

@@ -25,19 +25,13 @@ CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
 OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE
 USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 @*/
-#include "ltype.h"
-#include "comf.h"
-#include "smempool.h"
-#include "sstl.h"
-#include "bs.h"
-#include "sbs.h"
-
-using namespace xcom;
+#include "xcominc.h"
+#include "../opt/util.h"
+using namespace xoc;
 
 #ifdef _DEBUG_
 void bs_test()
 {
-    extern FILE * g_tfile;
     SegMgr<BITS_PER_SEG> sm;
 
     DBitSet<BITS_PER_SEG> a(&sm);
@@ -120,7 +114,6 @@ void bs_test()
 
 void bs_test2()
 {
-    extern FILE * g_tfile;
     SegMgr<BITS_PER_SEG> sm;
     SBitSet<BITS_PER_SEG> a(&sm),b(&sm);
     a.bunion(8);
@@ -158,11 +151,10 @@ void bs_test2()
 
 void bs_test3()
 {
-    extern FILE * g_tfile;
     if (g_tfile == NULL) { return; }
     fprintf(g_tfile, "\n===");
     MiscBitSetMgr<33> mbsm;
-    SBitSet<33> x1(mbsm.get_seg_mgr());
+    SBitSet<33> x1(mbsm.getSegMgr());
     for (int i = 0; i < 600; i+=3) {
         x1.bunion(i);
     }
@@ -170,7 +162,7 @@ void bs_test3()
     fprintf(g_tfile, "\n===");
 
     MiscBitSetMgr<123> mbsm2;
-    SBitSet<123> x2(mbsm2.get_seg_mgr());
+    SBitSet<123> x2(mbsm2.getSegMgr());
     for (int i = 0; i < 600; i+=3) {
         x2.bunion(i);
     }
@@ -181,7 +173,6 @@ void bs_test3()
 
 
 #ifdef DEBUG_SEG
-extern FILE * g_tfile;
 template <UINT BitsPerSeg>
 void dump_segmgr(SegMgr<BitsPerSeg> & m)
 {
@@ -193,7 +184,7 @@ void dump_segmgr(SegMgr<BitsPerSeg> & m)
 
     BitSet x;
     SList<SEG<BitsPerSeg>*> const* flst = m.get_free_list();
-    for (flst->get_head(&st); st != flst.end(); st = flst->get_next(st)) {
+    for (flst->get_head(&st); st != flst->end(); st = flst->get_next(st)) {
         SEG<BitsPerSeg> const* s = st->val();
         fprintf(g_tfile, "%d,", s->id);
         x.bunion(s->id);

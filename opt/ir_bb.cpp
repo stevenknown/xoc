@@ -37,13 +37,39 @@ author: Su Zhenyu
 #include "ir_ssa.h"
 
 namespace xoc {
+//
+//START BBIRList
+//
+//Insert ir prior to cond_br, uncond_br, call, return.
+C<IR*> * BBIRList::append_tail_ex(IR * ir)
+{
+    if (ir == NULL) { return NULL; }
+
+    C<IR*> * ct;
+    for (List<IR*>::get_tail(&ct);
+         ct != List<IR*>::end(); ct = List<IR*>::get_prev(ct)) {
+        if (!m_bb->is_down_boundary(ct->val())) {
+            break;
+        }
+    }
+
+    ASSERT0(m_bb);
+    ir->setBB(m_bb);
+    if (ct == NULL) {
+        //The only one stmt of BB is down boundary or bb is empty.
+        return EList<IR*, IR2Holder>::append_head(ir);
+    }
+    return EList<IR*, IR2Holder>::insert_after(ir, ct);
+}
+//END BBIRList
+
 
 //
 //START IRBB
 //
-UINT IRBB::count_mem() const
+size_t IRBB::count_mem() const
 {
-    UINT count = sizeof(IRBB);
+    size_t count = sizeof(IRBB);
     count += ir_list.count_mem();
     count += lab_list.count_mem();
     return count;
@@ -51,22 +77,25 @@ UINT IRBB::count_mem() const
 
 
 //Could ir be looked as a last stmt in basic block?
-bool IRBB::is_bb_down_boundary(IR * ir)
+bool IRBB::is_down_boundary(IR * ir)
 {
     ASSERT(ir->isStmtInBB() || ir->is_lab(), ("illegal stmt in bb"));
-    switch (IR_code(ir)) {
+    switch (ir->get_code()) {
     case IR_CALL:
     case IR_ICALL: //indirective call
         return ((CCall*)ir)->isMustBBbound();
     case IR_GOTO:
     case IR_IGOTO:
-    case IR_TRUEBR:
-    case IR_FALSEBR:
-    case IR_RETURN:
         return true;
     case IR_SWITCH:
         ASSERT(SWITCH_body(ir) == NULL,
-                ("Peel switch-body to enable switch in bb-list construction"));
+               ("Peel switch-body to enable switch in bb-list construction"));
+        return true;
+    case IR_TRUEBR:
+    case IR_FALSEBR:
+        return true;
+    case IR_RETURN:
+    case IR_REGION:
         return true;
     default: break;
     }
@@ -74,20 +103,18 @@ bool IRBB::is_bb_down_boundary(IR * ir)
 }
 
 
-void IRBB::dump(Region * ru)
+void IRBB::dump(Region * rg, bool dump_inner_region)
 {
     if (g_tfile == NULL) { return; }
 
-    g_indent = 0;
-
-    fprintf(g_tfile, "\n----- BB%d ------", BB_id(this));
-    if (get_lab_list().get_elem_count() > 0) {
-        fprintf(g_tfile, "\nLABEL:");
-        dumpBBLabel(get_lab_list(), g_tfile);
+    note("\n----- BB%d ------", BB_id(this));
+    if (getLabelList().get_elem_count() > 0) {
+        note("\nLABEL:");
+        dumpBBLabel(getLabelList(), g_tfile);
     }
 
     //Attributes
-    fprintf(g_tfile, "\nATTR:");
+    note("\nATTR:");
     if (BB_is_entry(this)) {
         fprintf(g_tfile, "entry_bb ");
     }
@@ -105,14 +132,13 @@ void IRBB::dump(Region * ru)
     }
 
     //IR list
-    fprintf(g_tfile, "\nSTMT NUM:%d", getNumOfIR());
+    note("\nSTMT NUM:%d", getNumOfIR());
     g_indent += 3;
-    TypeMgr * dm = ru->get_type_mgr();
+    TypeMgr * dm = rg->getTypeMgr();
     for (IR * ir = BB_first_ir(this);
-        ir != NULL; ir = BB_irlist(this).get_next()) {
-        ASSERT0(IR_next(ir) == NULL && IR_prev(ir) == NULL);
-        ASSERT0(ir->get_bb() == this);
-        dump_ir(ir, dm, NULL, true, true, false);
+         ir != NULL; ir = BB_irlist(this).get_next()) {
+        ASSERT0(ir->is_single() && ir->getBB() == this);
+        dump_ir(ir, dm, NULL, true, true, false, dump_inner_region);
     }
     g_indent -= 3;
     fprintf(g_tfile, "\n");
@@ -127,9 +153,9 @@ void IRBB::verify()
     C<IR*> * ct;
     for (IR * ir = BB_irlist(this).get_head(&ct);
          ir != NULL; ir = BB_irlist(this).get_next(&ct)) {
-        ASSERT0(IR_next(ir) == NULL && IR_prev(ir) == NULL);
-        ASSERT0(ir->get_bb() == this);
-        switch (IR_code(ir)) {
+        ASSERT0(ir->is_single());
+        ASSERT0(ir->getBB() == this);
+        switch (ir->get_code()) {
         case IR_ST:
         case IR_STPR:
         case IR_STARRAY:
@@ -144,13 +170,14 @@ void IRBB::verify()
         case IR_FALSEBR:
         case IR_RETURN:
         case IR_SWITCH:
+        case IR_SETELEM:
+        case IR_GETELEM:
             break;
         default: ASSERT(0, ("BB does not supported this kind of IR."));
         }
 
-        if (ir->is_calls_stmt() || ir->is_cond_br() ||
-            ir->is_multicond_br() || ir->is_uncond_br()) {
-            ASSERT(ir == BB_last_ir(this), ("invalid bb boundary."));
+        if (is_down_boundary(ir)) {
+            ASSERT(ir == BB_last_ir(this), ("invalid BB down boundary."));
         }
 
         c++;
@@ -167,7 +194,7 @@ bool IRBB::successorHasPhi(CFG<IRBB, IR> * cfg)
     for (EdgeC * out = VERTEX_out_list(vex);
          out != NULL; out = EC_next(out)) {
         Vertex * succ_vex = EDGE_to(EC_edge(out));
-        IRBB * succ = cfg->get_bb(VERTEX_id(succ_vex));
+        IRBB * succ = cfg->getBB(VERTEX_id(succ_vex));
         ASSERT0(succ);
 
         for (IR * ir = BB_first_ir(succ);
@@ -181,7 +208,7 @@ bool IRBB::successorHasPhi(CFG<IRBB, IR> * cfg)
 
 //Duplicate and add an operand that indicated by opnd_pos at phi stmt
 //in one of bb's successors.
-void IRBB::dupSuccessorPhiOpnd(CFG<IRBB, IR> * cfg, Region * ru, UINT opnd_pos)
+void IRBB::dupSuccessorPhiOpnd(CFG<IRBB, IR> * cfg, Region * rg, UINT opnd_pos)
 {
     IR_CFG * ircfg = (IR_CFG*)cfg;
     Vertex * vex = ircfg->get_vertex(BB_id(this));
@@ -189,7 +216,7 @@ void IRBB::dupSuccessorPhiOpnd(CFG<IRBB, IR> * cfg, Region * ru, UINT opnd_pos)
     for (EdgeC * out = VERTEX_out_list(vex);
          out != NULL; out = EC_next(out)) {
         Vertex * succ_vex = EDGE_to(EC_edge(out));
-        IRBB * succ = ircfg->get_bb(VERTEX_id(succ_vex));
+        IRBB * succ = ircfg->getBB(VERTEX_id(succ_vex));
         ASSERT0(succ);
 
         for (IR * ir = BB_first_ir(succ);
@@ -201,14 +228,14 @@ void IRBB::dupSuccessorPhiOpnd(CFG<IRBB, IR> * cfg, Region * ru, UINT opnd_pos)
             IR * opnd;
             UINT lpos = opnd_pos;
             for (opnd = PHI_opnd_list(ir);
-                 lpos != 0; opnd = IR_next(opnd)) {
+                 lpos != 0; opnd = opnd->get_next()) {
                 ASSERT0(opnd);
                 lpos--;
             }
 
-            IR * newopnd = ru->dupIRTree(opnd);
-            if (opnd->is_read_pr()) {
-                newopnd->copyRef(opnd, ru);
+            IR * newopnd = rg->dupIRTree(opnd);
+            if (opnd->isReadPR()) {
+                newopnd->copyRef(opnd, rg);
                 ASSERT0(PR_ssainfo(opnd));
                 PR_ssainfo(newopnd) = PR_ssainfo(opnd);
                 SSA_uses(PR_ssainfo(newopnd)).append(newopnd);
@@ -221,42 +248,48 @@ void IRBB::dupSuccessorPhiOpnd(CFG<IRBB, IR> * cfg, Region * ru, UINT opnd_pos)
 //END IRBB
 
 
+//Before removing bb or change bb successor,
+//you need remove the related PHI operand if BB successor has PHI stmt.
+void IRBB::removeSuccessorDesignatePhiOpnd(CFG<IRBB, IR> * cfg, IRBB * succ)
+{
+    ASSERT0(cfg && succ);
+    IR_CFG * ircfg = (IR_CFG*)cfg;
+    Region * rg = ircfg->getRegion();
+    UINT const pos = ircfg->WhichPred(this, succ);
+    for (IR * ir = BB_first_ir(succ); ir != NULL; ir = BB_next_ir(succ)) {
+        if (!ir->is_phi()) { break; }
 
-//Before removing bb, revising phi opnd if there are phis
-//in one of bb's successors.
+        ASSERT0(cnt_list(PHI_opnd_list(ir)) == succ->getNumOfPred(cfg));
+
+        IR * opnd;
+        UINT lpos = pos;
+        for (opnd = PHI_opnd_list(ir); lpos != 0; opnd = opnd->get_next()) {
+            ASSERT0(opnd);
+            lpos--;
+        }
+
+        if (opnd == NULL) {
+            //PHI does not contain any operand.
+            continue;
+        }
+
+        opnd->removeSSAUse();
+        ((CPhi*)ir)->removeOpnd(opnd);
+        rg->freeIRTree(opnd);
+    }
+}
+
+
+//Before removing bb or change bb successor,
+//you need remove the related PHI operand if BB successor has PHI stmt.
 void IRBB::removeSuccessorPhiOpnd(CFG<IRBB, IR> * cfg)
 {
-    IR_CFG * ircfg = (IR_CFG*)cfg;
-    Region * ru = ircfg->get_ru();
-    Vertex * vex = ircfg->get_vertex(BB_id(this));
+    Vertex * vex = cfg->get_vertex(BB_id(this));
     ASSERT0(vex);
-    for (EdgeC * out = VERTEX_out_list(vex);
-         out != NULL; out = EC_next(out)) {
-        Vertex * succ_vex = EDGE_to(EC_edge(out));
-        IRBB * succ = ircfg->get_bb(VERTEX_id(succ_vex));
+    for (EdgeC * out = VERTEX_out_list(vex); out != NULL; out = EC_next(out)) {
+        IRBB * succ = ((IR_CFG*)cfg)->getBB(VERTEX_id(EDGE_to(EC_edge(out))));
         ASSERT0(succ);
-
-        UINT const pos = ircfg->WhichPred(this, succ);
-
-        for (IR * ir = BB_first_ir(succ);
-             ir != NULL; ir = BB_next_ir(succ)) {
-            if (!ir->is_phi()) { break; }
-
-            ASSERT0(cnt_list(PHI_opnd_list(ir)) ==
-                     cnt_list(VERTEX_in_list(succ_vex)));
-
-            IR * opnd;
-            UINT lpos = pos;
-            for (opnd = PHI_opnd_list(ir);
-                 lpos != 0; opnd = IR_next(opnd)) {
-                ASSERT0(opnd);
-                lpos--;
-            }
-
-            opnd->removeSSAUse();
-            ((CPhi*)ir)->removeOpnd(opnd);
-            ru->freeIRTree(opnd);
-        }
+        removeSuccessorDesignatePhiOpnd(cfg, succ);
     }
 }
 //END IRBB
@@ -275,14 +308,16 @@ void dumpBBLabel(List<LabelInfo const*> & lablist, FILE * h)
             fprintf(h, ILABEL_STR_FORMAT, ILABEL_CONT(li));
             break;
         case L_PRAGMA:
+            ASSERT0(LABEL_INFO_pragma(li));
             fprintf(h, "%s", SYM_name(LABEL_INFO_pragma(li)));
             break;
-        default: ASSERT0(0);
+        default: UNREACH();
         }
 
         if (LABEL_INFO_is_try_start(li) ||
             LABEL_INFO_is_try_end(li) ||
-            LABEL_INFO_is_catch_start(li)) {
+            LABEL_INFO_is_catch_start(li) ||
+            LABEL_INFO_is_terminate(li)) {
             fprintf(g_tfile, "(");
             if (LABEL_INFO_is_try_start(li)) {
                 fprintf(g_tfile, "try_start,");
@@ -291,7 +326,10 @@ void dumpBBLabel(List<LabelInfo const*> & lablist, FILE * h)
                 fprintf(g_tfile, "try_end,");
             }
             if (LABEL_INFO_is_catch_start(li)) {
-                fprintf(g_tfile, "catch_start");
+                fprintf(g_tfile, "catch_start,");
+            }
+            if (LABEL_INFO_is_terminate(li)) {
+                fprintf(g_tfile, "terminate");
             }
             fprintf(g_tfile, ")");
         }
@@ -300,30 +338,40 @@ void dumpBBLabel(List<LabelInfo const*> & lablist, FILE * h)
 }
 
 
-void dumpBBList(BBList * bbl, Region * ru, CHAR const* name)
+void dumpBBList(BBList * bbl,
+                Region * rg,
+                CHAR const* name,
+                bool dump_inner_region)
 {
-    ASSERT0(ru);
+    ASSERT0(rg && bbl);
     FILE * h = NULL;
     FILE * org_g_tfile = g_tfile;
     if (name == NULL) {
         h = g_tfile;
     } else {
-        unlink(name);
+        UNLINK(name);
         h = fopen(name, "a+");
         ASSERT(h != NULL, ("can not dump."));
         g_tfile = h;
     }
+
     if (h != NULL && bbl->get_elem_count() != 0) {
-        fprintf(h, "\n==---- DUMP '%s' BBList ----==",
-                ru->get_ru_name());
+        if (h == g_tfile) {
+            note("\n==---- DUMP ORBBList region '%s' ----==", rg->getRegionName());
+        } else {
+            fprintf(h, "\n==---- DUMP ORBBList region '%s' ----==", rg->getRegionName());
+        }
+
         for (IRBB * bb = bbl->get_head(); bb != NULL; bb = bbl->get_next()) {
-            bb->dump(ru);
+            bb->dump(rg, dump_inner_region);
         }
     }
+
     fflush(h);
     if (h != org_g_tfile) {
         fclose(h);
     }
+
     g_tfile = org_g_tfile;
 }
 

@@ -48,7 +48,7 @@ public:
 class IR_DCE : public Pass {
 protected:
     MDSystem * m_md_sys;
-    TypeMgr * m_dm;
+    TypeMgr * m_tm;
     Region * m_ru;
     IR_CFG * m_cfg;
     CDG * m_cdg;
@@ -74,12 +74,11 @@ protected:
     bool is_effect_write(VAR * v) const
     { return VAR_is_global(v) || VAR_is_volatile(v); }
 
-    bool is_effect_read(VAR * v) const
-    { return VAR_is_volatile(v); }
+    bool is_effect_read(VAR * v) const { return VAR_is_volatile(v); }
 
     bool is_cfs(IR const* ir) const
     {
-        switch (IR_code(ir)) {
+        switch (ir->get_code()) {
         case IR_TRUEBR:
         case IR_FALSEBR:
         case IR_GOTO:
@@ -99,32 +98,33 @@ protected:
     bool check_stmt(IR const* ir);
     bool check_call(IR const* ir);
 public:
-    explicit IR_DCE(Region * ru)
+    explicit IR_DCE(Region * rg)
     {
-        ASSERT0(ru != NULL);
-        m_ru = ru;
-        m_dm = ru->get_type_mgr();
-        m_cfg = ru->get_cfg();
-        m_du = ru->get_du_mgr();
-        m_md_sys = ru->get_md_sys();
+        ASSERT0(rg != NULL);
+        m_ru = rg;
+        m_tm = rg->getTypeMgr();
+        m_cfg = rg->getCFG();
+        m_du = rg->getDUMgr();
+        m_md_sys = rg->getMDSystem();
+        ASSERT0(m_cfg && m_du && m_md_sys && m_tm);
         m_is_elim_cfs = false;
         m_is_use_md_du = true;
         m_cdg = NULL;
     }
     virtual ~IR_DCE() {}
 
-    void dump(IN EFFECT_STMT const& is_stmt_effect,
-              IN BitSet const& is_bb_effect,
+    void dump(EFFECT_STMT const& is_stmt_effect,
+              BitSet const& is_bb_effect,
               IN Vector<Vector<IR*>*> & all_ir);
 
-    virtual CHAR const* get_pass_name() const
+    virtual CHAR const* getPassName() const
     { return "Dead Code Eliminiation"; }
-    virtual PASS_TYPE get_pass_type() const { return PASS_DCE; }
+    virtual PASS_TYPE getPassType() const { return PASS_DCE; }
 
     void set_elim_cfs(bool doit) { m_is_elim_cfs = doit; }
     void set_use_md_du(bool use_md_du) { m_is_use_md_du = use_md_du; }
 
-    virtual bool perform(OptCTX & oc);
+    virtual bool perform(OptCtx & oc);
 };
 
 } //namespace xoc

@@ -34,20 +34,49 @@ author: GongKai, JinYue
 #ifndef __LIR_H__
 #define __LIR_H__
 
-#ifdef __cplusplus
-extern "C"
-{
-#endif
-void d2rMethod(
-        D2Dpool* pool,
-        DexFile* pDexFile,
-        const DexMethod* pDexMethod,
-        const DexClassDef* classdef,
-        RegionMgr* rumgr,
-        List<DexRegion const*> * rulist);
-void d2rCopyData(D2Dpool* pool, BYTE* endAddr);
-#ifdef __cplusplus
-}
-#endif
+#define LIRMALLOC drLinearAlloc
+#define LIRFREEALL drLinearFree
+
+#define LIRC_num_of_op(l)    ((l)->instrCount)
+#define LIRC_op(l, i)        ((l)->lirList[i])
+
+#define LIR_opcode(ir)       ((ir)->opcode)
+#define LIR_name(ir)         (gLIROpcodeInfo.opNames[LIR_opcode(ir)])
+#define LIR_dt(ir)           ((ir)->flags)
+
+//For CONST
+#define LIR_int_imm(ir)      (((LIRConstOp*)ir)->vB)
+
+//For SPUT
+#define LIR_sym_ptr(ir)      (((LIRABOp*)ir)->ptr)
+#define LIR_val(ir)          (((LIRABOp*)ir)->vA) //store value
+
+//For ADD,SUB,MUL,DIV,REM,AND,OR,SHL,SHR,USHR,
+//XOR,CONST,NEW_INSTANCE.
+#define LIR_res(ir)          (((LIRABCOp*)ir)->vA)
+
+//For ADD,SUB,MUL,DIV,REM,AND,OR,SHL,SHR,USHR,
+//XOR,NEW_INSTANCE.
+#define LIR_op0(ir)          (((LIRABCOp*)ir)->vB)
+
+//For ADD,SUB,MUL,DIV,REM,AND,OR,SHL,SHR,USHR,XOR
+#define LIR_op1(ir)          (((LIRABCOp*)ir)->vC)
+
+#define LIR_fill_array_data_mark(ir) \
+        (((USHORT*)(((LIRSwitchOp*)ir)->data))[0])
+#define LIR_switch_kind(ir) \
+        (((USHORT*)(((LIRSwitchOp*)ir)->data))[0])
+#define LIR_case_num(ir) \
+        (((USHORT*)(((LIRSwitchOp*)ir)->data))[1])
+#define LIR_packed_switch_base_value(ir) \
+        (*((INT*)(&(((LIRSwitchOp*)ir)->data[2]))))
+#define LIR_packed_switch_case_entry(ir) \
+        ((UINT*)(((USHORT*)((LIRSwitchOp*)ir)->data) + 4))
+#define LIR_sparse_switch_case_value(ir) \
+        ((UINT*)(((USHORT*)(((LIRSwitchOp*)ir)->data)) + 2))
+#define LIR_sparse_switch_case_entry(ir) \
+        (UINT*)&(((BYTE*)(((LIRSwitchOp*)ir)->data))[4 + LIR_case_num(ir) * 4])
+
+typedef LIRBaseOp LIR;
 
 #endif

@@ -33,6 +33,7 @@ author: Su Zhenyu
 @*/
 #include "ltype.h"
 #include "comf.h"
+#include "strbuf.h"
 #include "rational.h"
 
 namespace xcom {
@@ -127,14 +128,14 @@ FRAC_TYPE Rational::_gcd(FRAC_TYPE x, FRAC_TYPE y)
 }
 
 
-CHAR * Rational::format(CHAR * buf)
+CHAR const* Rational::format(StrBuf & buf)
 {
     if (m_den == 1) {
-        sprintf(buf, "%d", m_num);
+        buf.sprint("%d", m_num);
     } else {
-        sprintf(buf, "%d/%d", m_num, m_den);
+        buf.sprint("%d/%d", m_num, m_den);
     }
-    return buf;
+    return buf.buf;
 }
 
 

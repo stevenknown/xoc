@@ -31,31 +31,60 @@ IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 author: Su Zhenyu
 @*/
-#ifndef __TARG_HOOK_H__
-#define __TARG_HOOK_H__
+#ifndef _DEX_REGION_MGR_H_
+#define _DEX_REGION_MGR_H_
 
-#include "targ_info.h"
+class DexRegionMgr : public RegionMgr {
+protected:
+    SMemPool * m_pool;
+    Var2UINT m_var2blt;
+    UINT2Var m_blt2var;
+    ConstSym2Var m_sym2var;
 
-#ifdef FOR_X86
-#include "x86/x86.h"
+protected:
+    VAR * addVarForBuiltin(CHAR const* name);
+    void initBuiltin();
 
-#elif defined(FOR_PAC)
-#include "../pac/pac.h"
-#include "../pac/pac_util.h"
-#include "../pac/pacir2or.h"
-#include "../pac/pacasmprinter.h"
-#include "../pac/pac_cg.h"
+public:
+    DexRegionMgr()
+    { m_pool = smpoolCreate(128, MEM_COMM); }
 
-#elif defined(FOR_ARM)
-#include "../arm/arm.h"
+    COPY_CONSTRUCTOR(DexRegionMgr);
+    virtual ~DexRegionMgr() { smpoolDelete(m_pool); }
 
-#elif defined(FOR_DEX)
-#include "../dex/dex_const_info.h"
-#include "../dex/dex_util.h"
+    void addBuiltinVarToTab();
+    virtual Region * allocRegion(REGION_TYPE rt)
+    { return new DexRegion(rt, this); }
 
-#elif defined(FOR_JS)
-#include "../js/js_const_info.h"
+    virtual CallGraph * allocCallGraph(UINT edgenum, UINT vexnum)
+    { return new DexCallGraph(edgenum, vexnum, this); }
 
-#endif
+    Region * getProgramRegion()
+    {
+        //The first region should be program-region.
+        return getRegion(1);
+    }
+    SMemPool * get_pool() { return m_pool; }
+    Var2UINT & getVar2Builtin() { return m_var2blt; }
+    UINT2Var & getBuiltin2Var() { return m_blt2var; }
+    ConstSym2Var & getSym2Var() { return m_sym2var; }
+    Var2UINT const& getVar2BuiltinC() const { return m_var2blt; }
+    UINT2Var const& getBuiltin2VarC() const { return m_blt2var; }
+
+    //Do some initialization.
+    void init() { initBuiltin(); }
+
+    DexRegionMgr * self() { return this; }
+
+    void * xmalloc(UINT size)
+    {
+        void * p = smpoolMalloc(size, m_pool);
+        ASSERT0(p);
+        ::memset(p, 0, size);
+        return p;
+    }
+
+    virtual bool processProgramRegion(Region * program, OptCtx * oc);
+};
 
 #endif

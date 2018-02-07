@@ -45,15 +45,14 @@ protected:
     IR_CFG * m_cfg;
     ConstIRIter m_iriter;
     ConstMDIter m_mditer;
-    TypeMgr * m_dm;
+    TypeMgr * m_tm;
     MDSystem * m_md_sys;
     SMemPool * m_pool;
     List<IR*> m_analysable_stmt_list;
     TMap<MD const*, UINT*> m_md2num;
 
     //Indicate whether current IR is tranformed to ssa form.
-    bool m_is_in_ssa_form;
-    IR_SSA_MGR * m_ssamgr;
+    PRSSAMgr * m_ssamgr;
 
 protected:
     bool doLoopTree(LI<IRBB> * li,
@@ -62,6 +61,12 @@ protected:
                     TTab<IR*> & invariant_stmt,
                     TTab<IR*> & invariant_exp);
 
+    bool checkDefStmt(
+            IR * def,
+            TTab<IR*> & invariant_stmt,
+            IN IRBB * prehead,
+            IN LI<IRBB> * li);
+
     inline bool is_stmt_dom_its_use(
                     IR const* stmt,
                     IR const* use,
@@ -69,6 +74,11 @@ protected:
                     IRBB const* stmtbb) const;
     bool is_dom_all_use_in_loop(IR const* ir, LI<IRBB> * li);
 
+    bool hoistInvariantStmt(
+            TTab<IR*> & invariant_stmt,
+            IR * stmt,
+            IRBB * prehead,
+            IN LI<IRBB> * li);
     bool hoistCand(TTab<IR*> & invariant_exp,
                    TTab<IR*> & invariant_stmt,
                    IN IRBB * prehead,
@@ -90,21 +100,21 @@ protected:
         ASSERT0(m_pool != NULL);
         void * p = smpoolMallocConstSize(sizeof(UINT), m_pool);
         ASSERT0(p != NULL);
-        memset(p, 0, size);
+        ::memset(p, 0, size);
         return p;
     }
 public:
-    explicit IR_LICM(Region * ru)
+    explicit IR_LICM(Region * rg)
     {
-        ASSERT0(ru != NULL);
-        m_ru = ru;
-        m_aa = ru->get_aa();
-        m_du = ru->get_du_mgr();
-        m_cfg = ru->get_cfg();
-        m_dm = ru->get_type_mgr();
-        m_md_sys = ru->get_md_sys();
+        ASSERT0(rg != NULL);
+        m_ru = rg;
+        m_aa = rg->getAA();
+        m_du = rg->getDUMgr();
+        m_cfg = rg->getCFG();
+        m_tm = rg->getTypeMgr();
+        m_md_sys = rg->getMDSystem();
+        ASSERT0(m_cfg && m_du && m_md_sys && m_tm);
         m_pool = smpoolCreate(4 * sizeof(UINT), MEM_CONST_SIZE);
-        m_is_in_ssa_form = false;
         m_ssamgr = NULL;
     }
     COPY_CONSTRUCTOR(IR_LICM);
@@ -115,22 +125,26 @@ public:
                   OUT TTab<IR*> & invariant_exp);
 
     //Given loop info li, dump the invariant stmt and invariant expression.
-    void dump(TTab<IR*> const& invariant_stmt, TTab<IR*> const& invariant_exp);
+    void dumpInvariantExpStmt(
+            TTab<IR*> const& invariant_stmt,
+            TTab<IR*> const& invariant_exp);
 
     //Consider whether exp is worth hoisting.
-    bool is_worth_hoist(IR * exp)
+    bool isWorthHoist(IR * exp)
     {
-        CK_USE(exp);
+        CHECK_DUMMYUSE(exp);
         ASSERT0(exp->is_exp());
-        return true;
+        //If IR_has_sideeffect(ir) is true, that means exp can not be removed,
+        //but still can be moved.
+        return !IR_no_move(exp);
     }
 
-    virtual CHAR const* get_pass_name() const
+    virtual CHAR const* getPassName() const
     { return "Loop Invariant Code Motion"; }
 
-    PASS_TYPE get_pass_type() const { return PASS_LICM; }
+    PASS_TYPE getPassType() const { return PASS_LICM; }
 
-    virtual bool perform(OptCTX & oc);
+    virtual bool perform(OptCtx & oc);
 };
 
 } //namespace xoc

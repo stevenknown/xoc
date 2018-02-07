@@ -50,8 +50,8 @@ author: GongKai, JinYue
 #ifdef DEBUG_D2D
 int main(int argcc, char * argvc[])
 {
-    UNUSED(argcc);
-    UNUSED(argvc);
+    DUMMYUSE(argcc);
+    DUMMYUSE(argvc);
 
     CHAR * argv[] = {
         "d2d.exe",
@@ -89,7 +89,7 @@ FIN:
         close(g_output_file_handler);
     }
 
-    finidump();
+    xoc::finidump();
 
     return locerrno; //success.
 }

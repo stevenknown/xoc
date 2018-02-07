@@ -36,53 +36,64 @@ author: Su Zhenyu
 
 namespace xoc {
 
-class IR_SSA_MGR;
+class PRSSAMgr;
 
 //Dominace Frontier manager
 class DfMgr {
-    IR_SSA_MGR * m_ssa_mgr;
+protected:
+    //PRSSAMgr * m_ssa_mgr;
     BitSetMgr m_bs_mgr;
     Vector<BitSet*> m_df_vec;
+    UINT m_thres;
+
+    void buildRecur(Vertex const* v, DGraph const& g, DomTree const& domtree);
+
+    //Generate the DF control set
+    BitSet * genDFControlSet(UINT vid);
 public:
-    explicit DfMgr(IR_SSA_MGR * sm);
+    explicit DfMgr(UINT thres = THRESHOLD_HIGH_DOMINATOR_FRONTIER_DENSITY) :
+        m_thres(thres) {}
     COPY_CONSTRUCTOR(DfMgr);
 
     void clean();
-    void build(DGraph & g);
+    void build(DGraph const& g);
+    void build(DGraph const& g, DomTree const& domtree);
     void dump(DGraph & g);
 
-    //Return the BB set controlled by bbid.
-    BitSet const* get_df_ctrlset_c(UINT bbid) const
-    { return m_df_vec.get(bbid); }
+    //Count Dominator Frontier Density for each Vertex.
+    //Return true if there exist vertex that might inserting
+    //ton of phis which will blow up memory.
+    bool hasHighDFDensityVertex(DGraph const& g);
 
-    //Get the BB set controlled by v.
-    BitSet * get_df_ctrlset(Vertex const* v);
+    //Return the BB set controlled by vid.
+    BitSet const* getDFControlSet(UINT vid) const
+    { return m_df_vec.get(vid); }
 
-    inline void rebuild(DGraph & g) { clean(); build(g); }
+    void rebuild(DGraph & g) { clean(); build(g); }
 };
 
 
 //SSAGraph
 class SSAGraph : Graph {
     Region * m_ru;
-    IR_SSA_MGR * m_ssa_mgr;
+    PRSSAMgr * m_ssa_mgr;
     TMap<UINT, VP*> m_vdefs;
 public:
-    SSAGraph(Region * ru, IR_SSA_MGR * ssamgr);
+    SSAGraph(Region * rg, PRSSAMgr * ssamgr);
     COPY_CONSTRUCTOR(SSAGraph);
-    void dump(IN CHAR const* name = NULL, bool detail = true);
+    void dump(CHAR const* name = NULL, bool detail = true);
 };
 
 
-typedef Vector<Vector<VP*>*> BB2VP;
+typedef Vector<TMap<UINT, VP*>*> BB2VPMap;
 
 
 //Perform SSA based optimizations.
-class IR_SSA_MGR : public Pass {
+class PRSSAMgr : public Pass {
 protected:
     Region * m_ru;
     SMemPool * m_vp_pool;
-    TypeMgr * m_dm;
+    TypeMgr * m_tm;
     IR_CFG * m_cfg;
     DefSegMgr * m_seg_mgr;
     bool m_is_ssa_constructed;
@@ -90,10 +101,10 @@ protected:
     IRIter m_iter; //for tmp use.
 
     //Record versions for each PRs.
-    UINT2VPvec m_map_prno2vp_vec;
+    UINT2VPVec m_map_prno2vp_vec;
 
     //Record version stack during renaming.
-    UINT2VPstack m_map_prno2stack;
+    UINT2VPStack m_map_prno2stack;
     Vector<VP*> m_vp_vec;
     Vector<UINT> m_max_version; //record version number counter for pr.
 
@@ -113,7 +124,7 @@ protected:
     void clean()
     {
         m_ru = NULL;
-        m_dm = NULL;
+        m_tm = NULL;
         m_seg_mgr = NULL;
         m_cfg = NULL;
         m_vp_count = 1;
@@ -124,29 +135,23 @@ protected:
     void constructMDDUChainForPR();
     void cleanPRNO2Stack();
     void collectDefinedPR(IN IRBB * bb, OUT DefSBitSet & mustdef_pr);
-    void computeEffectPR(IN OUT BitSet & effect_prs,
-                         IN BitSet & defed_prs,
-                         IN IRBB * bb,
-                         IN PRDF & live_mgr,
-                         IN Vector<BitSet*> & pr2defbb);
 
-    void destructBBSSAInfo(IRBB * bb, IN OUT bool & insert_stmt_after_call);
+    void destructBBSSAInfo(IRBB * bb);
     void destructionInDomTreeOrder(IRBB * root, Graph & domtree);
 
     void handleBBRename(IRBB * bb,
                         IN DefSBitSet & defed_prs,
-                        IN OUT BB2VP & bb2vp);
+                        IN OUT BB2VPMap & bb2vp);
 
     Stack<VP*> * mapPRNO2VPStack(UINT prno);
-    inline IR * mapPRNO2IR(UINT prno)
-    { return m_prno2ir.get(prno); }
+    IR * mapPRNO2IR(UINT prno) { return m_prno2ir.get(prno); }
 
-    VP * newVP()
+    VP * allocVP()
     {
         ASSERT(m_vp_pool != NULL, ("not init"));
         VP * p = (VP*)smpoolMallocConstSize(sizeof(VP), m_vp_pool);
         ASSERT0(p);
-        memset(p, 0, sizeof(VP));
+        ::memset(p, 0, sizeof(VP));
         return p;
     }
 
@@ -154,7 +159,7 @@ protected:
     void rename(DefSBitSet & effect_prs,
                 Vector<DefSBitSet*> & defed_prs_vec,
                 Graph & domtree);
-    void rename_bb(IRBB * bb);
+    void renameBB(IRBB * bb);
     void renameInDomTreeOrder(
                 IRBB * root,
                 Graph & dtree,
@@ -162,56 +167,59 @@ protected:
 
     void stripVersionForBBList();
     void stripVersionForAllVP();
-    bool stripPhi(IR * phi, C<IR*> * phict);
+    void stripPhi(IR * phi, C<IR*> * phict);
     void stripSpecifiedVP(VP * vp);
     void stripStmtVersion(IR * stmt, BitSet & visited);
 
     void placePhiForPR(UINT prno,
                        IN List<IRBB*> * defbbs,
-                       DfMgr & dfm,
+                       DfMgr const& dfm,
                        BitSet & visited,
-                       List<IRBB*> & wl);
-    void placePhi(IN DfMgr & dfm,
+                       List<IRBB*> & wl,
+                       Vector<DefSBitSet*> & defed_prs_vec);
+    void placePhi(DfMgr const& dfm,
                   IN OUT DefSBitSet & effect_prs,
                   DefMiscBitSetMgr & bs_mgr,
                   Vector<DefSBitSet*> & defed_prs_vec,
                   List<IRBB*> & wl);
-
 public:
-    explicit IR_SSA_MGR(Region * ru)
+    explicit PRSSAMgr(Region * rg)
     {
         clean();
-        ASSERT0(ru);
-        m_ru = ru;
+        ASSERT0(rg);
+        m_ru = rg;
 
-        m_dm = ru->get_type_mgr();
-        ASSERT0(m_dm);
+        m_tm = rg->getTypeMgr();
+        ASSERT0(m_tm);
 
-        ASSERT0(ru->getMiscBitSetMgr());
-        m_seg_mgr = ru->getMiscBitSetMgr()->get_seg_mgr();
+        ASSERT0(rg->getMiscBitSetMgr());
+        m_seg_mgr = rg->getMiscBitSetMgr()->getSegMgr();
         ASSERT0(m_seg_mgr);
 
-        m_cfg = ru->get_cfg();
+        m_cfg = rg->getCFG();
         ASSERT(m_cfg, ("cfg is not available."));
     }
-    COPY_CONSTRUCTOR(IR_SSA_MGR);
-    ~IR_SSA_MGR() { destroy(false); }
+    COPY_CONSTRUCTOR(PRSSAMgr);
+    ~PRSSAMgr()
+    {
+        ASSERT(!isSSAConstructed(), ("should be destructed"));
+        destroy(false);
+    }
 
-    void buildDomiateFrontier(OUT DfMgr & dfm);
     void buildDUChain(IR * def, IR * use)
     {
-        ASSERT0(def->is_write_pr() || def->isCallHasRetVal());
-        ASSERT0(use->is_read_pr());
-        SSAInfo * ssainfo = def->get_ssainfo();
+        ASSERT0(def->isWritePR() || def->isCallHasRetVal());
+        ASSERT0(use->isReadPR());
+        SSAInfo * ssainfo = def->getSSAInfo();
         if (ssainfo == NULL) {
-            ssainfo = newSSAInfo(def->get_prno());
-            def->set_ssainfo(ssainfo);
+            ssainfo = allocSSAInfo(def->get_prno());
+            def->setSSAInfo(ssainfo);
             SSA_def(ssainfo) = def;
 
             //You may be set multiple defs for use.
-            ASSERT(use->get_ssainfo() == NULL, ("use already has SSA info."));
+            ASSERT(use->getSSAInfo() == NULL, ("use already has SSA info."));
 
-            use->set_ssainfo(ssainfo);
+            use->setSSAInfo(ssainfo);
         }
 
         SSA_uses(ssainfo).append(use);
@@ -222,8 +230,11 @@ public:
     {
         if (m_vp_pool == NULL) { return; }
 
-        ASSERT(!m_is_ssa_constructed,
-            ("Still in ssa mode, you should out of SSA before the destruction."));
+        //Caution: if you do not destruct SSA prior to destory().
+        //The reference to IR's SSA info will lead to undefined behaviors.
+        //ASSERT(!m_is_ssa_constructed,
+        //   ("Still in ssa mode, you should out of "
+        //    "SSA before the destruction."));
 
         for (INT i = 0; i <= m_map_prno2vp_vec.get_last_idx(); i++) {
             Vector<VP*> * vpv = m_map_prno2vp_vec.get((UINT)i);
@@ -252,18 +263,23 @@ public:
     }
 
     void destruction(DomTree & domtree);
-    void destructionInBBListOrder();
+    void destruction();
     void dump();
-    void dump_all_vp(bool have_renamed);
-    CHAR * dump_vp(IN VP * v, OUT CHAR * buf);
-    void dump_ssa_graph(CHAR * name = NULL);
+    void dumpAllVP(bool have_renamed);
+    CHAR * dumpVP(IN VP * v, OUT CHAR * buf);
+    void dumpSSAGraph(CHAR * name = NULL);
 
-    void construction(OptCTX & oc);
-    void construction(DomTree & domtree);
-    UINT count_mem();
+    //Note: Non-SSA DU Chains of read/write PR will be clean and
+    //unusable after SSA construction.
+    void construction(OptCtx & oc);
+    bool construction(DomTree & domtree);
 
-    inline Vector<VP*> const* get_vp_vec() const { return &m_vp_vec; }
-    inline VP * get_vp(UINT id) const { return m_vp_vec.get(id); }
+    //Compute SSAInfo for IRs in region that are in SSA mode.
+    void computeSSAInfo();
+    size_t count_mem();
+
+    Vector<VP*> const* getVPVec() const { return &m_vp_vec; }
+    VP * getVP(UINT id) const { return m_vp_vec.get(id); }
 
     IR * initVP(IN IR * ir);
     void insertPhi(UINT prno, IN IRBB * bb);
@@ -271,16 +287,17 @@ public:
     //Return true if PR ssa is constructed.
     //This flag will direct the behavior of optimizations.
     //If SSA constructed, DU mananger will not compute any information for PR.
-    bool is_ssa_constructed() const { return m_is_ssa_constructed; }
+    bool isSSAConstructed() const { return m_is_ssa_constructed; }
 
-    /* Return true if phi is redundant, otherwise return false.
-    If all opnds have same defintion or defined by current phi,
-    the phi is redundant.
-    common_def: record the common_def if the definition of all opnd is the same. */
-    bool is_redundant_phi(IR const* phi, OUT IR ** common_def) const;
+    //Return true if phi is redundant, otherwise return false.
+    //If all opnds have same defintion or defined by current phi,
+    //the phi is redundant.
+    //common_def: record the common_def if the definition
+    //  of all opnd is the same.
+    bool isRedundantPHI(IR const* phi, OUT IR ** common_def) const;
 
     //Allocate VP and ensure it is unique according to 'version' and 'prno'.
-    VP * newVP(UINT prno, UINT version)
+    VP * allocVP(UINT prno, UINT version)
     {
         ASSERT0(prno > 0);
         Vector<VP*> * vec = m_map_prno2vp_vec.get(prno);
@@ -295,7 +312,7 @@ public:
         }
 
         ASSERT(m_seg_mgr, ("SSA manager is not initialized"));
-        v = newVP();
+        v = allocVP();
         v->initNoClean(m_seg_mgr);
         VP_prno(v) = prno;
         VP_ver(v) = version;
@@ -306,35 +323,36 @@ public:
         return v;
     }
 
-
     //Allocate SSAInfo for specified PR indicated by 'prno'.
-    inline SSAInfo * newSSAInfo(UINT prno)
+    SSAInfo * allocSSAInfo(UINT prno)
     {
         ASSERT0(prno > 0);
-        return (SSAInfo*)newVP(prno, 0);
+        return (SSAInfo*)allocVP(prno, 0);
     }
 
     //Reinitialize SSA manager.
     //This function will clean all informations and recreate them.
     inline void reinit()
     {
-        destroy(true);
+        if (isSSAConstructed()) {
+            destroy(true);
+        }
         init();
     }
 
     bool verifyPhi(bool is_vpinfo_avail);
-    bool verifyPRNOofVP(); //Only used in IR_SSA_MGR.
-    bool verifyVP(); //Only used in IR_SSA_MGR.
+    bool verifyPRNOofVP(); //Only used in PRSSAMgr.
+    bool verifyVP(); //Only used in PRSSAMgr.
     bool verifySSAInfo(); //Can be used in any module.
 
-    virtual CHAR const* get_pass_name() const
-    { return "SSA Optimization Manager"; }
+    virtual CHAR const* getPassName() const
+    { return "PR SSA Manager"; }
 
-    PASS_TYPE get_pass_type() const { return PASS_SSA_MGR; }
+    PASS_TYPE getPassType() const { return PASS_PR_SSA_MGR; }
 };
 
 
-bool verifySSAInfo(Region * ru);
+bool verifySSAInfo(Region * rg);
 
 } //namespace xoc
 #endif

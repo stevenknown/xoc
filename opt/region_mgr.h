@@ -37,27 +37,27 @@ author: Su Zhenyu
 namespace xoc {
 
 typedef enum {
-    RU_UNDEF = 0,
+    REGION_UNDEF = 0,
 
     //Region is black box with
     //Black box is single entry, single exit.
-    RU_BLX,
+    REGION_BLACKBOX,
 
     //Sub region is the region which contains a list of IRs,
     //Sub region must be single entry, multiple exits.
-    RU_SUB,
+    REGION_INNER,
 
     //Region is exception region.
     //Exception is single entry, multiple exits.
-    RU_EH,
+    REGION_EH,
 
     //Region is function unit
     //Function unit is single entry, multiple exits.
-    RU_FUNC,
+    REGION_FUNC,
 
     //Region is whole program spectrum.
     //Program region is single entry, multiple exits.
-    RU_PROGRAM,
+    REGION_PROGRAM,
 } REGION_TYPE;
 
 class Region;
@@ -72,8 +72,12 @@ class IPA;
 class RegionMgr {
 friend class Region;
 protected:
+    #ifdef _DEBUG_
+    UINT m_num_allocated;
+    #endif
     Vector<Region*> m_id2ru;
     BitSetMgr m_bs_mgr;
+    DefMiscBitSetMgr m_sbs_mgr;
     SymTab m_sym_tab;
     TypeMgr m_type_mgr;
     VarMgr * m_var_mgr;
@@ -85,9 +89,20 @@ protected:
     UINT m_label_count;
     bool m_is_regard_str_as_same_md;
     TargInfo * m_targinfo;
+
+protected:
+    void estimateEV(OUT UINT & num_call,
+                    OUT UINT & num_ru,
+                    bool scan_call,
+                    bool scan_inner_region);
+
 public:
-    explicit RegionMgr() : m_sym_tab(0)
+    explicit RegionMgr()
     {
+        ASSERT0(verifyPreDefinedInfo());
+        #ifdef _DEBUG_
+        m_num_allocated = 0;
+        #endif
         m_ru_count = 1;
         m_label_count = 1;
         m_var_mgr = NULL;
@@ -96,12 +111,14 @@ public:
         m_str_md = NULL;
         m_call_graph = NULL;
         m_targinfo = NULL;
-        m_sym_tab.init(64);
     }
     COPY_CONSTRUCTOR(RegionMgr);
     virtual ~RegionMgr();
 
     SYM * addToSymbolTab(CHAR const* s) { return m_sym_tab.add(s); }
+
+    //This function will establish a map between region and its id.
+    void addToRegionTab(Region * rg);
 
     //Allocate Region.
     virtual Region * allocRegion(REGION_TYPE rt);
@@ -116,46 +133,59 @@ public:
     IPA * allocIPA(Region * program);
 
     //Destroy specific region by given id.
-    void deleteRegion(Region * ru);
+    void deleteRegion(Region * rg, bool collect_id = true);
 
-    BitSetMgr * get_bs_mgr() { return &m_bs_mgr; }
-    virtual Region * get_region(UINT id) { return m_id2ru.get(id); }
-    UINT getNumOfRegion() const { return m_ru_count; }
-    VarMgr * get_var_mgr() { return m_var_mgr; }
-    MD const* getDedicateStrMD();
-    MDSystem * get_md_sys() { return m_md_sys; }
-    SymTab * get_sym_tab() { return &m_sym_tab; }
-    TypeMgr * get_type_mgr() { return &m_type_mgr; }
-    CallGraph * get_call_graph() const { return m_call_graph; }
-    VarMgr * get_var_mgr() const { return m_var_mgr; }
-    TargInfo * get_targ_info() const { return m_targinfo; }
+    void dumpRelationGraph(CHAR const* name);
 
-    void registerGlobalMDS();
+    //Dump regions recorded via addToRegionTab().
+    void dump(bool dump_inner_region);
+
+    BitSetMgr * getBitSetMgr() { return &m_bs_mgr; }
+    DefMiscBitSetMgr * get_sbs_mgr() { return &m_sbs_mgr; }
+    virtual Region * getRegion(UINT id) { return m_id2ru.get(id); }
+    UINT getNumOfRegion() const { return (UINT)(m_id2ru.get_last_idx() + 1); }
+    VarMgr * getVarMgr() { return m_var_mgr; }
+    MD const* genDedicateStrMD();
+    MDSystem * getMDSystem() { return m_md_sys; }
+    SymTab * getSymTab() { return &m_sym_tab; }
+    TypeMgr * getTypeMgr() { return &m_type_mgr; }
+    CallGraph * getCallGraph() const { return m_call_graph; }
+    VarMgr * getVarMgr() const { return m_var_mgr; }
+    TargInfo * getTargInfo() const { return m_targinfo; }
+
+    //Register exact MD for each global variable.
+    //Note you should call this function as early as possible, e.g, before process
+    //all regions. Because that will assign smaller MD id to global variable.
+    void registerGlobalMD();
 
     //Initialize VarMgr structure and MD system.
     //It is the first thing you should do after you declared a RegionMgr.
     inline void initVarMgr()
     {
+        ASSERT(m_var_mgr == NULL, ("VarMgr already initialized"));
         m_var_mgr = allocVarMgr();
         ASSERT0(m_var_mgr);
+
+        ASSERT(m_md_sys == NULL, ("MDSystem already initialized"));
         m_md_sys = new MDSystem(m_var_mgr);
+        ASSERT0(m_md_sys);
     }
 
     //Scan call site and build call graph.
-    CallGraph * initCallGraph(Region * top, bool scan_call);
+    void buildCallGraph(OptCtx & oc, bool scan_call, bool scan_inner_region);
 
     Region * newRegion(REGION_TYPE rt);
 
-    //This function will establish a map between region and its id.
-    void set_region(Region * ru);
     void set_targ_info(TargInfo * ti) { m_targinfo = ti; }
 
     //Process region in the form of function type.
-    virtual void processFuncRegion(IN Region * func);
+    virtual bool processFuncRegion(IN Region * func, OptCtx * oc);
 
     //Process top-level region unit.
     //Top level region unit should be program unit.
-    virtual void processProgramRegion(IN Region * program);
+    virtual bool processProgramRegion(IN Region * program, OptCtx * oc);
+
+    bool verifyPreDefinedInfo();
 };
 //END RegionMgr
 
