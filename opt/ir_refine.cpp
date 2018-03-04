@@ -1862,7 +1862,7 @@ IR * Region::insertCvt(IR * parent, IR * kid, bool & change)
                 //Do not do hoisting for vector type.
                 ASSERT(tgt_size == src_size, ("different size vector"));
                 return kid;
-            }
+            }           
 
             if (parent->is_fp() || kid->is_fp()) {
                 return insertCvtForFloat(parent, kid, change);
@@ -1870,6 +1870,13 @@ IR * Region::insertCvt(IR * parent, IR * kid, bool & change)
 
             if (tgt_size <= src_size) {
                 //Do not hoist type.
+                return kid;
+            }
+
+            if (parent->is_ptr() &&
+                parent->is_add() &&
+                BIN_opnd0(parent)->is_ptr()) {
+                //Skip pointer arithmetics.
                 return kid;
             }
 

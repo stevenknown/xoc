@@ -354,24 +354,22 @@ void dumpBBList(BBList * bbl,
         ASSERT(h != NULL, ("can not dump."));
         g_tfile = h;
     }
-
-    if (h != NULL && bbl->get_elem_count() != 0) {
+    if (h == NULL) { return; }
+    if (bbl->get_elem_count() != 0) {
         if (h == g_tfile) {
-            note("\n==---- DUMP ORBBList region '%s' ----==", rg->getRegionName());
+            note("\n==---- DUMP IRBBList region '%s' ----==", rg->getRegionName());
         } else {
-            fprintf(h, "\n==---- DUMP ORBBList region '%s' ----==", rg->getRegionName());
+            fprintf(h, "\n==---- DUMP IRBBList region '%s' ----==", rg->getRegionName());
         }
 
         for (IRBB * bb = bbl->get_head(); bb != NULL; bb = bbl->get_next()) {
             bb->dump(rg, dump_inner_region);
         }
+        fflush(h);
     }
-
-    fflush(h);
     if (h != org_g_tfile) {
         fclose(h);
     }
-
     g_tfile = org_g_tfile;
 }
 

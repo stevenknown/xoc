@@ -204,6 +204,7 @@ typedef enum {
     X_ELEMTYPE,
     X_DIM,
     X_UNALLOCABLE,
+    X_ALIGN,
     X_LAST,
 } X_CODE;
 
@@ -261,8 +262,8 @@ protected:
     bool declareVar(ParseCtx * ctx, VAR ** var);
     bool declareRegion(ParseCtx * ctx);
 
-    void enterRegion(ParseCtx * ctx) {}
-    void exitRegion(ParseCtx * ctx) {}
+    void enterRegion(ParseCtx *) {}
+    void exitRegion(ParseCtx *) {}
     void error(TOKEN tok, CHAR const* format, ...);
     void error(X_CODE xcode, CHAR const* format, ...);
     void error(CHAR const* format, ...);
@@ -287,6 +288,7 @@ protected:
 
     bool parseDimProperty(PropertySet & cont, ParseCtx * ctx);
     bool parseElemTypeProperty(PropertySet & cont, ParseCtx * ctx);
+    bool parseAlign(VAR * var, ParseCtx * ctx);
 	bool parseByteValue(VAR * var, ParseCtx * ctx);
     bool parseStringValue(VAR * var, ParseCtx * ctx);
     bool parseThrowTarget(PropertySet & cont, ParseCtx * ctx);

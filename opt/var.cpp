@@ -72,7 +72,7 @@ void VAR::dump(FILE * h, TypeMgr const* dm) const
 }
 
 
-void VAR::dumpFlag(xcom::StrBuf & buf, bool grmode) const
+void VAR::dumpProp(xcom::StrBuf & buf, bool grmode) const
 {
     bool first = true;
     if (!grmode) {
@@ -179,6 +179,13 @@ void VAR::dumpFlag(xcom::StrBuf & buf, bool grmode) const
         first = false;
         buf.strcat("array");
     }
+    if (get_align() > 1) {
+        if (!first) {
+            buf.strcat(",");
+        }
+        first = false;
+        buf.strcat("align(%d)", get_align());
+    }
     if (is_string() && getString() != NULL) {
         if (!first) {
             buf.strcat(",");
@@ -238,16 +245,16 @@ void VAR::dumpFlag(xcom::StrBuf & buf, bool grmode) const
 
 CHAR const* VAR::dumpGR(StrBuf & buf, TypeMgr * dm) const
 {
-    StrBuf buf2(32);
-    StrBuf buf3(32);
+    xcom::StrBuf buf2(32);
+    xcom::StrBuf buf3(32);
     buf.strcat("var %s:%s",
         compositeName(VAR_name(this), buf3),
         dm->dump_type(get_type(), buf2));
-    if (VAR_flag(this) != 0) {
+    if (hasGRFlag() || get_align() > 1) {
         buf.strcat(":(");
-    }
-    dumpFlag(buf, true);
-    buf.strcat(")");
+        dumpProp(buf, true);
+        buf.strcat(")");
+    }    
     return buf.buf;
 }
 
@@ -266,7 +273,7 @@ CHAR const* VAR::dump(StrBuf & buf, TypeMgr const* dm) const
         lname = tt;
     }
     buf.strcat("VAR%d(%s):", VAR_id(this), lname);
-    dumpFlag(buf, false);
+    dumpProp(buf, false);
 
     Type const* ltype = VAR_type(this);
     ASSERT0(ltype);
@@ -280,10 +287,6 @@ CHAR const* VAR::dump(StrBuf & buf, TypeMgr const* dm) const
     buf.strcat(",%s", dm->get_dtype_name(TY_dtype(ltype)));
     if (TY_dtype(ltype) > D_F128) {
         buf.strcat(",mem_size:%d", getByteSize(dm));
-    }
-
-    if (VAR_align(this) != 0) {
-        buf.strcat(",align:%d", VAR_align(this));
     }
 
     buf.strcat(",decl:'");
@@ -337,6 +340,12 @@ void VarMgr::destroy()
     }
 
     m_freelist_of_varid.clean(*m_ru_mgr->get_sbs_mgr());
+}
+
+
+bool VarMgr::isDedicatedStringVar(CHAR const* name) const
+{
+    return ::strcmp(name, DEDICATED_STRING_VAR_NAME) == 0;
 }
 
 
@@ -413,9 +422,7 @@ VAR * VarMgr::registerStringVar(CHAR const* var_name, SYM const* s, UINT align)
     if ((v = m_str_tab.get(s)) != NULL) {
         return v;
     }
-
     v = allocVAR();
-
     if (var_name == NULL) {
         StrBuf buf(64);
         buf.sprint("_const_string_%lu", (ULONG)m_str_count++);
@@ -423,10 +430,9 @@ VAR * VarMgr::registerStringVar(CHAR const* var_name, SYM const* s, UINT align)
     } else {
         VAR_name(v) = m_ru_mgr->addToSymbolTab(var_name);
     }
-
     VAR_string(v) = s;
     VAR_type(v) = m_tm->getString();
-    VAR_align(v) = align;
+    VAR_align(v) = align;    
     VAR_is_global(v) = true;
     assignVarId(v);
     m_str_tab.set(s, v);

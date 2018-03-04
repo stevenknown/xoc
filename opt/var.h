@@ -50,7 +50,7 @@ class RegionMgr;
 //NOTE: Do *NOT* forget modify the bit-field in VAR if
 //you remove/add flag here.
 ///////////////////////////////////////////////////////
-
+#define DEDICATED_STRING_VAR_NAME "#DedicatedStringVar"
 #define VAR_UNDEF                0x0
 #define VAR_GLOBAL               0x1    //can be seen by all functions.
 
@@ -160,7 +160,7 @@ public:
 #define VAR_is_restrict(v)       ((v)->u2.s1.is_restrict)
 
 //Variable is concrete, and will be output to Code Generator.
-#define VAR_is_unallocable(v)         ((v)->u2.s1.is_unallocable)
+#define VAR_is_unallocable(v)    ((v)->u2.s1.is_unallocable)
 
 //Record the alignment.
 #define VAR_align(v)             ((v)->align)
@@ -261,6 +261,23 @@ public:
         return VAR_type(this)->is_vector();
     }
 
+    //Return true if variable has flags to output to GR.
+    bool hasGRFlag() const
+    {
+        return (is_unallocable() ||
+            is_func_decl() ||
+            is_private() ||
+            is_readonly() ||
+            is_volatile() ||
+            is_restrict() ||
+            is_fake() ||
+            is_label() ||
+            is_array() ||
+            (is_string() && getString() != NULL) ||
+            getByteValue() != NULL);
+    }
+
+    UINT get_align() const { return VAR_align(this); }    
     SYM const* get_name() const { return VAR_name(this); }
     Type const* get_type() const { return VAR_type(this); }
     UINT getFormalParamPos() const { return VAR_formal_param_pos(this); }
@@ -286,7 +303,7 @@ public:
 
     //You must make sure this function will not change any field of VAR.
     virtual CHAR const* dump(StrBuf & buf, TypeMgr const* dm) const;
-    void dumpFlag(xcom::StrBuf & buf, bool grmode) const;
+    void dumpProp(xcom::StrBuf & buf, bool grmode) const;
     CHAR const* dumpGR(StrBuf & buf, TypeMgr * dm) const;
 
     void setToGlobal(bool is_global)
@@ -382,6 +399,8 @@ public:
     VAR * get_var(size_t id) const { return m_var_vec.get((UINT)id); }
 
     VAR * findStringVar(SYM const* str) { return m_str_tab.get(str); }
+
+    bool isDedicatedStringVar(CHAR const* name) const;
 
     //Interface to target machine.
     //Customer could specify additional attributions for specific purpose.

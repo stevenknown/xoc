@@ -97,21 +97,7 @@ protected:
                     bool scan_inner_region);
 
 public:
-    explicit RegionMgr()
-    {
-        ASSERT0(verifyPreDefinedInfo());
-        #ifdef _DEBUG_
-        m_num_allocated = 0;
-        #endif
-        m_ru_count = 1;
-        m_label_count = 1;
-        m_var_mgr = NULL;
-        m_md_sys = NULL;
-        m_is_regard_str_as_same_md = true;
-        m_str_md = NULL;
-        m_call_graph = NULL;
-        m_targinfo = NULL;
-    }
+    explicit RegionMgr();
     COPY_CONSTRUCTOR(RegionMgr);
     virtual ~RegionMgr();
 
@@ -125,6 +111,9 @@ public:
 
     //Allocate VarMgr.
     virtual VarMgr * allocVarMgr();
+
+    //Allocate TargInfo.
+    virtual TargInfo * allocTargInfo();
 
     //Allocate CallGraph.
     virtual CallGraph * allocCallGraph(UINT edgenum, UINT vexnum);
@@ -176,7 +165,7 @@ public:
 
     Region * newRegion(REGION_TYPE rt);
 
-    void set_targ_info(TargInfo * ti) { m_targinfo = ti; }
+    void setTargetInfo(TargInfo * ti) { m_targinfo = ti; }
 
     //Process region in the form of function type.
     virtual bool processFuncRegion(IN Region * func, OptCtx * oc);

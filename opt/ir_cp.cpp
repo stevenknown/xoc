@@ -229,7 +229,7 @@ void IR_CP::replaceExp(
 }
 
 
-bool IR_CP::is_copy(IR * ir) const
+bool IR_CP::isCopyOR(IR * ir) const
 {
     switch (ir->get_code()) {
     case IR_ST:
@@ -506,7 +506,7 @@ bool IR_CP::doProp(
          next_iter = cur_iter; cur_iter != NULL; cur_iter = next_iter) {
         IR * def_stmt = cur_iter->val();
         BB_irlist(bb).get_next(&next_iter);
-        if (!is_copy(def_stmt)) {
+        if (!isCopyOR(def_stmt)) {
             continue;
         }
 

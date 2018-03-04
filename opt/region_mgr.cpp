@@ -39,6 +39,23 @@ namespace xoc {
 //
 //START RegionMgr
 //
+RegionMgr::RegionMgr()
+{
+    ASSERT0(verifyPreDefinedInfo());
+    #ifdef _DEBUG_
+    m_num_allocated = 0;
+    #endif
+    m_ru_count = 1;
+    m_label_count = 1;
+    m_var_mgr = NULL;
+    m_md_sys = NULL;
+    m_is_regard_str_as_same_md = true;
+    m_str_md = NULL;
+    m_call_graph = NULL;
+    m_targinfo = NULL;
+}
+
+
 RegionMgr::~RegionMgr()
 {
     for (INT id = 0; id <= m_id2ru.get_last_idx(); id++) {
@@ -82,7 +99,8 @@ MD const* RegionMgr::genDedicateStrMD()
     //Regard all string variables as same unbound MD.
     if (m_str_md == NULL) {
         SYM * s = addToSymbolTab("DedicatedVarBeRegardedAsString");
-        VAR * sv = getVarMgr()->registerStringVar("DedicatedStringVar", s, 1);
+        VAR * sv = getVarMgr()->registerStringVar(
+            DEDICATED_STRING_VAR_NAME, s, MEMORY_ALIGNMENT);
         VAR_is_unallocable(sv) = true;
         VAR_is_addr_taken(sv) = true;
         MD md;
@@ -91,7 +109,7 @@ MD const* RegionMgr::genDedicateStrMD()
         ASSERT0(MD_base(&md)->is_string());
         MD const* e = m_md_sys->registerMD(md);
         ASSERT0(MD_id(e) > 0);
-        m_str_md = e;
+        m_str_md = e;        
     }
     return m_str_md;
 }
@@ -141,6 +159,12 @@ CallGraph * RegionMgr::allocCallGraph(UINT edgenum, UINT vexnum)
 VarMgr * RegionMgr::allocVarMgr()
 {
     return new VarMgr(this);
+}
+
+
+TargInfo * RegionMgr::allocTargInfo()
+{
+    return NULL;
 }
 
 

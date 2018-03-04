@@ -408,6 +408,7 @@ public:
     IR * foldConstIntBinary(IR * ir, bool & change);
     IR * foldConst(IR * ir, bool & change);
     void findFormalParam(OUT List<VAR const*> & varlst, bool in_decl_order);
+    VAR const* findFormalParam(UINT position);
     VAR * findVarViaSymbol(SYM const* sym);
 
     UINT getIRTypeSize(IR * ir) const

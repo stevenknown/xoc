@@ -437,7 +437,7 @@ IR * Region::buildLdaString(CHAR const* varname, CHAR const * string)
 IR * Region::buildLdaString(CHAR const* varname, SYM * string)
 {
     ASSERT0(string);
-    VAR * v = getVarMgr()->registerStringVar(varname, string, 1);
+    VAR * v = getVarMgr()->registerStringVar(varname, string, MEMORY_ALIGNMENT);
     return buildLda(v);
 }
 
@@ -1305,6 +1305,7 @@ IR * Region::buildImmFp(HOST_FP fp, Type const* type)
     //Generator.
     ASSERT0(type->is_fp());
     CONST_fp_val(imm) = fp;
+    CONST_fp_mant(imm) = DEFAULT_MANTISSA_NUM;
     IR_dt(imm) = type;
     return imm;
 }
@@ -1327,32 +1328,48 @@ IR * Region::buildImmInt(HOST_INT v, Type const* type)
         case D_U8:
             {
                 UINT8 uv = (UINT8)v;
-                INT8 sv = (INT8)uv;
-                CONST_int_val(imm) = (HOST_INT)sv;
+                if (type->is_unsigned()) {
+                    CONST_int_val(imm) = (HOST_INT)uv;
+                } else {
+                    INT8 sv = (INT8)uv;
+                    CONST_int_val(imm) = (HOST_INT)sv;
+                }
             }
             break;
         case D_I16:
         case D_U16:
             {
                 UINT16 uv = (UINT16)v;
-                INT16 sv = (INT16)uv;
-                CONST_int_val(imm) = (HOST_INT)sv;
+                if (type->is_unsigned()) {
+                    CONST_int_val(imm) = (HOST_INT)uv;
+                } else {
+                    INT16 sv = (INT16)uv;
+                    CONST_int_val(imm) = (HOST_INT)sv;
+                }
             }
             break;
         case D_I32:
         case D_U32:
             {
                 UINT32 uv = (UINT32)v;
-                INT32 sv = (INT32)uv;
-                CONST_int_val(imm) = (HOST_INT)sv;
+                if (type->is_unsigned()) {
+                    CONST_int_val(imm) = (HOST_INT)uv;
+                } else {
+                    INT32 sv = (INT32)uv;
+                    CONST_int_val(imm) = (HOST_INT)sv;
+                }
             }
             break;
         case D_I64:
         case D_U64:
             {
                 UINT64 uv = (UINT64)v;
-                INT64 sv = (INT64)uv;
-                CONST_int_val(imm) = (HOST_INT)sv;
+                if (type->is_unsigned()) {
+                    CONST_int_val(imm) = (HOST_INT)uv;
+                } else {
+                    INT64 sv = (INT64)uv;
+                    CONST_int_val(imm) = (HOST_INT)sv;
+                }
             }
             break;
         case D_I128:
@@ -2346,6 +2363,21 @@ void Region::findFormalParam(OUT List<VAR const*> & varlst, bool in_decl_order)
 }
 
 
+//This function find the formal parameter variable by given position.
+VAR const* Region::findFormalParam(UINT position)
+{
+    VarTabIter c;
+    VarTab * vt = getVarTab();
+    ASSERT0(vt);
+    for (VAR const* v = vt->get_first(c); v != NULL; v = vt->get_next(c)) {
+        if (VAR_is_formal_param(v) && VAR_formal_param_pos(v) == position) {
+            return v;
+        }
+    }
+    return NULL;
+}
+
+
 //Allocate PassMgr
 PassMgr * Region::allocPassMgr()
 {
@@ -2620,8 +2652,8 @@ void Region::prescan(IR const* ir)
                         break;
                     }
 
-                    VAR * sv = getVarMgr()->
-                        registerStringVar(NULL, VAR_string(v), 1);
+                    VAR * sv = getVarMgr()->registerStringVar(
+                        NULL, VAR_string(v), MEMORY_ALIGNMENT);
                     ASSERT0(sv);
                     VAR_is_addr_taken(sv) = true;
                 } else if (v->is_label()) {

@@ -114,7 +114,7 @@ protected:
             IR * use_stmt,
             MDPhi * use_phi,
             IRBB * usebb);
-    inline bool is_copy(IR * ir) const;
+    inline bool isCopyOR(IR * ir) const;
 
     bool performDomTree(IN Vertex * v, IN Graph & domtree);
 

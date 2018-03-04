@@ -1396,7 +1396,8 @@ MD const* IR_AA::allocStringMD(SYM const* string)
     MD const* strmd;
     if ((strmd = m_rumgr->genDedicateStrMD()) != NULL) { return strmd; }
 
-    VAR * v = m_ru->getVarMgr()->registerStringVar(NULL, string, 1);
+    VAR * v = m_ru->getVarMgr()->registerStringVar(
+        NULL, string, MEMORY_ALIGNMENT);
     //Set string address to be taken only if it is base of LDA.
     //VAR_is_addr_taken(v) = true;
     MD md;
@@ -2545,8 +2546,11 @@ void IR_AA::inferExpression(
     case IR_LAND:
     case IR_LOR:
         {
-            ASSERT(!BIN_opnd0(expr)->is_ptr(),
-                   ("illegal, left operand can not be pointer type"));
+            //CASE: if (p && q)
+            //GR: land (ld p:*<2>, ld q:*<2>)
+            //ASSERT(!BIN_opnd0(expr)->is_ptr(),
+            //    ("illegal, left operand can not be pointer type"));
+
             AACtx tic(*ic);
             AC_comp_pt(&tic) = false;
             inferExpression(BIN_opnd1(expr), mds, &tic, mx);
@@ -3917,11 +3921,12 @@ void IR_AA::initMayPointToSet()
     VarTabIter c;
     ConstMDIter iter;
     MDSet tmp;
-    for (;;) {
+    for (;!rg->is_program();) {
         VarTab * vtab = rg->getVarTab();
         c.clean();
         for (VAR * v = vtab->get_first(c); v != NULL; v = vtab->get_next(c)) {
             if (!VAR_is_addr_taken(v)) { continue; }
+            ASSERT0(!v->is_global());
 
             //Handle dedicated string md which has been taken address.
             MD const* strmd;
@@ -3960,17 +3965,11 @@ void IR_AA::initMayPointToSet()
             }
         }
 
-        if (rg->is_function() || rg->is_program()) {
-            break;
-        } else {
-            ASSERT0(REGION_type(rg) == REGION_INNER ||
-                REGION_type(rg) == REGION_EH);
-        }
-
         rg = REGION_parent(rg);
-        if (rg == NULL) {
+        if (rg->is_program() || rg == NULL) {
             break;
         }
+        ASSERT0(rg->is_subregion() || rg->is_function() || rg->is_eh());
     }
 
     tmp.bunion(MD_GLOBAL_MEM, *m_misc_bs_mgr);

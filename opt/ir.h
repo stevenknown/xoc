@@ -959,7 +959,10 @@ public:
 
 
 //Record float point.
-#define CONST_fp_val(ir)  (((CConst*)CK_IRT(ir, IR_CONST))->u1.fp_const_value)
+#define CONST_fp_val(ir)  (((CConst*)CK_IRT(ir, IR_CONST))->u1.s1.fp_const_value)
+
+//Record the number of mantissa of float-point number.
+#define CONST_fp_mant(ir) (((CConst*)CK_IRT(ir, IR_CONST))->u1.s1.fp_mantissa)
 
 //Record integer.
 #define CONST_int_val(ir) (((CConst*)CK_IRT(ir, IR_CONST))->u1.int_const_value)
@@ -979,11 +982,21 @@ public:
         HOST_INT int_const_value;
 
         //record float point value.
-        HOST_FP fp_const_value;
+        struct {            
+            HOST_FP fp_const_value;
+
+            //record the number of mantissa of float-point number.
+            BYTE fp_mantissa;
+        } s1;
 
         //record customized value.
         void * anonymous_value;
     } u1;
+
+    HOST_FP getFP() const { return CONST_fp_val(this); }
+    BYTE getMantissa() const { return CONST_fp_mant(this); }
+    HOST_INT getINT() const { return CONST_int_val(this); }
+    SYM const* getSTR() const { return CONST_str_val(this); }
 };
 
 

@@ -803,7 +803,9 @@ void dump_ir(IR const* ir,
             note(intfmt, xdm->dump_type(d, buf),
                  CONST_int_val(ir), CONST_int_val(ir));
         } else if (ir->is_fp()) {
-            note("\nfpconst:%s %f", xdm->dump_type(d, buf), CONST_fp_val(ir));
+            CHAR fpformat[128];
+            ::snprintf(fpformat, 127, "fpconst:%%s %%.%df", CONST_fp_mant(ir));
+            note(fpformat, xdm->dump_type(d, buf), CONST_fp_val(ir));
         } else if (ir->is_bool()) {
             note("\nboolconst:%s %d", xdm->dump_type(d, buf), CONST_int_val(ir));
         } else if (ir->is_str()) {
@@ -3051,7 +3053,9 @@ void dumpGR(IR const* ir, TypeMgr * tm, DumpGRCtx * ctx)
             #endif
             prt(intfmt, CONST_int_val(ir), tm->dump_type(d, buf));
         } else if (ir->is_fp()) {
-            prt("%f:%s ", CONST_fp_val(ir), tm->dump_type(d, buf));
+            CHAR fpformat[128];
+            ::snprintf(fpformat, 127, "%%.%df:%%s ", CONST_fp_mant(ir));
+            prt(fpformat, CONST_fp_val(ir), tm->dump_type(d, buf));
         } else if (ir->is_bool()) {
             prt("%d:%s", (UINT)CONST_int_val(ir), tm->dump_type(d, buf));
         } else if (ir->is_str()) {

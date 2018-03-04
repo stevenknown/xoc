@@ -146,6 +146,7 @@ static XCodeInfo g_keyword_info[] = {
     { X_ELEMTYPE,    "elemtype",         },
     { X_DIM,         "dim",              },
     { X_UNALLOCABLE, "unallocable",      },
+    { X_ALIGN,       "align",            },
     { X_LAST,        "",                 },
 };
 
@@ -299,22 +300,8 @@ IRParser::~IRParser()
 }
 
 
-static CHAR * dumpTN(SYM* key, SYM* mapped)
-{
-    return SYM_name(key);
-}
-
-
-static CHAR const* dumpStr(CHAR const*  key, X_CODE code)
-{
-    return key;
-}
-
-
 void IRParser::initKeyWordMap()
 {
-    DUMMYUSE(dumpTN);
-    DUMMYUSE(dumpStr);
     for (UINT i = X_UNDEF + 1; i < X_LAST; i++) {
         m_str2xcode.set(g_keyword_info[i].name, (X_CODE)i);
     }
@@ -338,8 +325,6 @@ void IRParser::initKeyWordMap()
         m_type2xcode.set(g_keyword_info[g_type_code[i]].name,
             g_type_code[i]);
     }
-    //dump_rbt((RBT<CHAR const*, X_CODE, CompareStringFunc>&)m_type2xcode,
-    //    NULL, 100000U, dumpStr);
 }
 
 
@@ -3510,7 +3495,7 @@ bool IRParser::parseType(ParseCtx * ctx, Type const** ty)
                 return false;
             }
 
-            size = atol(m_lexer->getCurrentTokenString());
+            size = ::atol(m_lexer->getCurrentTokenString());
 
             tok = m_lexer->getNextToken();
             if (tok != T_ASTERISK) {
@@ -3595,7 +3580,7 @@ bool IRParser::parseSize(TOKEN tok, UINT * size)
         return false;
     }
 
-    *size = atol(m_lexer->getCurrentTokenString());
+    *size = ::atol(m_lexer->getCurrentTokenString());
 
     tok = m_lexer->getNextToken();
     if (tok != T_MORETHAN) {
@@ -3670,6 +3655,11 @@ bool IRParser::declareVarProperty(VAR * var, ParseCtx * ctx)
                 VAR_is_unallocable(var) = true;
                 tok = m_lexer->getNextToken();
                 break;
+            case X_ALIGN:
+				if (!parseAlign(var, ctx)) {
+					return false;
+				}
+				break;
             default:
                 error(tok, "illegal to use %s in variable type declaration",
                     m_lexer->getCurrentTokenString());
@@ -3694,6 +3684,30 @@ bool IRParser::declareVarProperty(VAR * var, ParseCtx * ctx)
 
     if (tok != T_RPAREN) {
         error(tok, "type declaration miss ')'");
+        return false;
+    }
+    m_lexer->getNextToken();
+    return true;
+}
+
+
+bool IRParser::parseAlign(VAR * var, ParseCtx *)
+{
+    ASSERT0(getCurrentXCode() == X_ALIGN);
+    TOKEN tok = m_lexer->getNextToken();
+	if (tok != T_LPAREN) {
+        error(tok, "miss '(' after 'align'");
+        return false;
+    }
+	tok = m_lexer->getNextToken();    
+    if (tok != T_IMM) {
+        error(tok, "alignment must be integer");
+        return false;
+    }
+    VAR_align(var) = ::atol(m_lexer->getCurrentTokenString());
+    tok = m_lexer->getNextToken();
+    if (m_lexer->getCurrentToken() != T_RPAREN) {
+        error(tok, "miss ')'");
         return false;
     }
     m_lexer->getNextToken();
@@ -3748,7 +3762,7 @@ bool IRParser::parseByteValue(VAR * var, ParseCtx * ctx)
 }
 
 
-bool IRParser::parseStringValue(VAR * var, ParseCtx * ctx)
+bool IRParser::parseStringValue(VAR * var, ParseCtx *)
 {
     ASSERT0(getCurrentXCode() == X_STRING);
     if (!var->is_string()) {
@@ -3821,7 +3835,7 @@ bool IRParser::parseElemTypeProperty(PropertySet & cont, ParseCtx * ctx)
 }
 
 
-bool IRParser::parseDimProperty(PropertySet & cont, ParseCtx * ctx)
+bool IRParser::parseDimProperty(PropertySet & cont, ParseCtx *)
 {
     ASSERT0(getCurrentXCode() == X_DIM);
     TOKEN tok = m_lexer->getNextToken();
@@ -4073,9 +4087,16 @@ bool IRParser::declareVar(ParseCtx * ctx, VAR ** var)
     }
 
     ASSERT0(ctx->current_region);
-    VAR * v = m_rumgr->getVarMgr()->registerVar(
-        sym, ty, 1,
-        ctx->current_region->is_program() ? VAR_GLOBAL : VAR_LOCAL);
+    VAR * v = NULL;
+    if (m_rumgr->getVarMgr()->isDedicatedStringVar(SYM_name(sym))) {
+        MD const* md = m_rumgr->genDedicateStrMD();
+        v = md->get_base();
+    } else {
+        v = m_rumgr->getVarMgr()->registerVar(
+            sym, ty, 1,//default alignment is 1.
+            ctx->current_region->is_program() ?
+                VAR_GLOBAL : VAR_LOCAL);
+    }
     ctx->current_region->addToVarTab(v);
     *var = v;
 
@@ -4088,6 +4109,12 @@ bool IRParser::declareVar(ParseCtx * ctx, VAR ** var)
         }
     }
 
+    if (!v->is_unallocable() &&
+        (v->get_align() % MEMORY_ALIGNMENT) != 0) {
+        error("variable alignment should be divided by %d", MEMORY_ALIGNMENT);
+        return false;
+    }
+    
     return true;
 }
 
@@ -4101,7 +4128,7 @@ bool IRParser::parse()
     TOKEN tok = m_lexer->getNextToken(); //Get first token.
     for (;; tok = m_lexer->getNextToken()) {
         switch (tok) {
-        case T_END: return true;
+        case T_END: goto END;
         case T_NUL: return false;
         case T_IDENTIFIER:
             {
@@ -4123,6 +4150,7 @@ bool IRParser::parse()
             return false;
         }
     }
+END:
     END_TIMER(t, "IR Parser");
     return getErrorMsgList().get_elem_count() == 0;
 }

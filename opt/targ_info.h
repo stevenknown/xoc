@@ -40,53 +40,23 @@ public:
     COPY_CONSTRUCTOR(TargInfo);
     virtual ~TargInfo() {}
 
-    virtual UINT getNumOfAllocableIntegerRegister()
-    {
-        ASSERT(0, ("Target Dependent Code"));
-        return 0;
-    }
-
-    virtual UINT getNumOfAllocableFloatRegister()
-    {
-        ASSERT(0, ("Target Dependent Code"));
-        return 0;
-    }
+    virtual UINT getNumOfAllocableIntegerRegister() = 0;
+    virtual UINT getNumOfAllocableFloatRegister() = 0;
 
     //Return byte size of data cache.
-    virtual UINT getDCacheSize()
-    {
-        ASSERT(0, ("Target Dependent Code"));
-        return 0;
-    }
+    virtual UINT getDCacheSize() = 0;
 
     //Return byte size of instruction cache.
-    virtual UINT getICacheSize()
-    {
-        ASSERT(0, ("Target Dependent Code"));
-        return 0;
-    }
+    virtual UINT getICacheSize() = 0;
 
     //Return byte size of cache line.
-    virtual UINT getCacheLineSize()
-    {
-        ASSERT(0, ("Target Dependent Code"));
-        return 0;
-    }
+    virtual UINT getCacheLineSize() = 0;
 
     //Return byte size of TLB if any.
-    virtual UINT getTLBSize()
-    {
-        ASSERT(0, ("Target Dependent Code"));
-        return 0;
-    }
+    virtual UINT getTLBSize() = 0;
 
     //Approximate the cycles to execute ir operation.
-    virtual UINT estimateNumOfCycles(IR const* ir)
-    {
-        ASSERT(0, ("Target Dependent Code"));
-        DUMMYUSE(ir);
-        return 0;
-    }
+    virtual UINT estimateNumOfCycles(IR const*) = 0;
 };
 
 } //namespace xoc
