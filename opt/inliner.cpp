@@ -63,7 +63,7 @@ IR * Inliner::replaceReturnImpl(
     IR * next = NULL;
     for (IR * x = new_irs; x != NULL; x = next) {
         next = x->get_next();
-        switch (x->get_code()) {
+        switch (x->getCode()) {
         case IR_DO_WHILE:
         case IR_WHILE_DO:
         case IR_DO_LOOP: //loop with init , boundary , and step info
@@ -94,7 +94,7 @@ IR * Inliner::replaceReturnImpl(
                 IR * mv_lst = NULL;
                 if (send != NULL) {
                     IR * mv = caller->buildStorePR(receive,
-                        caller_call->get_type(), send);
+                        caller_call->getType(), send);
                     xcom::insertbefore_one(&mv_lst, mv_lst, mv);
                 }
                 RET_exp(x) = NULL;
@@ -129,7 +129,7 @@ void Inliner::checkRegion(
     IR const* irs = rg->getIRList();
     if (irs == NULL) { return; }
     for (IR const* x = irs; x != NULL; x = x->get_next()) {
-        switch (x->get_code()) {
+        switch (x->getCode()) {
         case IR_DO_WHILE:
         case IR_WHILE_DO:
         case IR_DO_LOOP:
@@ -248,11 +248,12 @@ void Inliner::do_inline(Region * cand)
 {
     CallNode * cn = m_call_graph->mapRegion2CallNode(cand);
     ASSERT0(cn);
-    Vertex * v = m_call_graph->get_vertex(CN_id(cn));
+    xcom::Vertex * v = m_call_graph->get_vertex(CN_id(cn));
     ASSERT0(v);
-    for (EdgeC * el = VERTEX_in_list(v);
+    for (xcom::EdgeC * el = VERTEX_in_list(v);
          el != NULL; el = EC_next(el)) {
-        Region * caller = CN_ru(m_call_graph->mapVertex2CallNode(EDGE_from(EC_edge(el))));
+        Region * caller = CN_ru(m_call_graph->mapVertex2CallNode(
+            EDGE_from(EC_edge(el))));
         if (caller != NULL) {
             do_inline_c(caller, cand);
         }

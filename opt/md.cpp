@@ -366,7 +366,7 @@ void MDSetHash::dump()
 MDSetMgr::MDSetMgr(Region * rg, DefMiscBitSetMgr * mbsm)
 {
     m_mds_pool = smpoolCreate(sizeof(MDSet) * 8, MEM_CONST_SIZE);
-    m_sc_mds_pool = smpoolCreate(sizeof(SC<MDSet*>) * 8, MEM_CONST_SIZE);
+    m_sc_mds_pool = smpoolCreate(sizeof(xcom::SC<MDSet*>) * 8, MEM_CONST_SIZE);
     m_md_set_list.set_pool(m_sc_mds_pool);
     m_free_md_set.set_pool(m_sc_mds_pool);
     m_ru = rg;
@@ -378,7 +378,7 @@ MDSetMgr::MDSetMgr(Region * rg, DefMiscBitSetMgr * mbsm)
 void MDSetMgr::destroy()
 {
     m_free_md_set.clean();
-    for (SC<MDSet*> * sc = m_md_set_list.get_head();
+    for (xcom::SC<MDSet*> * sc = m_md_set_list.get_head();
          sc != m_md_set_list.end(); sc = m_md_set_list.get_next(sc)) {
         MDSet * mds = sc->val();
         ASSERT0(mds);
@@ -402,7 +402,7 @@ void MDSetMgr::free(MDSet * mds)
     //Caution: this verification is pretty slowly, even if in debug
     //mode, so be patient.
 
-    SC<MDSet*> * sct;
+    xcom::SC<MDSet*> * sct;
     for (MDSet * x = m_free_md_set.get_head(&sct);
          x != NULL; x = m_free_md_set.get_next(&sct)) {
         ASSERT(x != mds, ("Already have been freed."));
@@ -417,7 +417,7 @@ void MDSetMgr::free(MDSet * mds)
 UINT MDSetMgr::count_mem()
 {
     UINT count = 0;
-    for (SC<MDSet*> * sc = m_md_set_list.get_head();
+    for (xcom::SC<MDSet*> * sc = m_md_set_list.get_head();
          sc != m_md_set_list.end(); sc = m_md_set_list.get_next(sc)) {
         MDSet const* mds = sc->val();
         ASSERT0(mds);
@@ -433,7 +433,7 @@ void MDSetMgr::dump()
 
     FILE * h = g_tfile;
     UINT count = 0;
-    for (SC<MDSet*> * sc = m_md_set_list.get_head();
+    for (xcom::SC<MDSet*> * sc = m_md_set_list.get_head();
          sc != m_md_set_list.end(); sc = m_md_set_list.get_next(sc)) {
         MDSet const* mds = sc->val();
         ASSERT0(mds);
@@ -442,7 +442,7 @@ void MDSetMgr::dump()
 
     //Dump mem usage into file.
     List<size_t> lst;
-    for (SC<MDSet*> * sc = m_md_set_list.get_head();
+    for (xcom::SC<MDSet*> * sc = m_md_set_list.get_head();
          sc != m_md_set_list.end(); sc = m_md_set_list.get_next(sc)) {
         MDSet const* bs = sc->val();
         ASSERT0(bs);
@@ -450,7 +450,7 @@ void MDSetMgr::dump()
         bool inserted = false;
         if (m_md_set_list.get_elem_count() < 10000) {
             //Inserting sort complexity is quadratic.
-            C<size_t> * ct;
+            xcom::C<size_t> * ct;
             UINT n = lst.get_elem_count();
             lst.get_head(&ct);
             UINT i;
@@ -723,7 +723,7 @@ void MDSystem::initAllMemMD(VarMgr * vm)
 void MDSystem::init(VarMgr * vm)
 {
     m_pool = smpoolCreate(sizeof(MD) * 5, MEM_CONST_SIZE);
-    m_sc_mdptr_pool = smpoolCreate(sizeof(SC<MD*>) * 10, MEM_CONST_SIZE);
+    m_sc_mdptr_pool = smpoolCreate(sizeof(xcom::SC<MD*>) * 10, MEM_CONST_SIZE);
     m_free_md_list.set_pool(m_sc_mdptr_pool);
     m_md_count = 1;
     m_tm = vm->getTypeMgr();

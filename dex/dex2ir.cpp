@@ -315,7 +315,7 @@ Type const* Dex2IR::getType(LIR * ir)
 {
     switch (LIR_dt(ir)) {
     case LIR_JDT_unknown:
-        UNREACH();
+        UNREACHABLE();
     case LIR_JDT_void    :
         return m_tr->i32;
     case LIR_JDT_int    :
@@ -334,7 +334,7 @@ Type const* Dex2IR::getType(LIR * ir)
     case LIR_JDT_wide: return m_tr->u64;
     case LIR_JDT_long: return m_tr->i64;
     case LIR_JDT_double: return m_tr->f64;
-    default: UNREACH();
+    default: UNREACHABLE();
     }
     return 0;
 }
@@ -391,7 +391,7 @@ IR * Dex2IR::convertSget(IN LIR * lir)
     ASSERT0(rhs->getAI() == NULL);
     IR_ai(rhs) = ai;
 
-    IR * c = m_ru->buildStorePR(PR_no(res), res->get_type(), rhs);
+    IR * c = m_ru->buildStorePR(PR_no(res), res->getType(), rhs);
     IR_may_throw(c) = true;
     if (m_has_catch) {
         IR * lab = m_ru->buildLabel(m_ru->genIlabel());
@@ -451,7 +451,7 @@ IR * Dex2IR::convertSput(IN LIR * lir)
     TODO: Generate new PR instead of change the ty.
     */
     IR_dt(res) = getType(lir);
-    ASSERT0(res->get_type());
+    ASSERT0(res->getType());
     VAR * v = addStaticVar(LIR_op0(lir), getType(lir));
     set_map_v2ofst(v, LIR_op0(lir));
     IR * c = m_ru->buildStore(v, res);
@@ -528,7 +528,7 @@ IR * Dex2IR::convertAget(IN LIR * lir)
     ASSERT0(base->getAI() == NULL);
     IR_ai(base) = ai;
 
-    IR * c = m_ru->buildStorePR(PR_no(res), res->get_type(), array);
+    IR * c = m_ru->buildStorePR(PR_no(res), res->getType(), array);
     IR_may_throw(c) = true;
     if (m_has_catch) {
         IR * lab = m_ru->buildLabel(m_ru->genIlabel());
@@ -571,11 +571,11 @@ IR * Dex2IR::convertIput(IN LIR * lir)
     /*
     UINT ofst = computeFieldOffset(LIR_op1(lir));
     IR * addr = m_ru->buildBinaryOp(IR_ADD,
-                                thisptr->get_type(),
+                                thisptr->getType(),
                                 thisptr,
                                 m_ru->buildImmInt(ofst, m_ptr_addend));
     */
-    IR * c = m_ru->buildIstore(addr, stv, stv->get_type());
+    IR * c = m_ru->buildIstore(addr, stv, stv->getType());
     IST_ofst(c) = LIR_op1(lir) * m_ofst_addend;
 
     IR_may_throw(c) = true;
@@ -623,7 +623,7 @@ IR * Dex2IR::convertCmp(IN LIR * lir)
             ck = CMPG_DOUBLE;
         }
         break;
-    default: UNREACH();
+    default: UNREACHABLE();
     }
 
     Type const* ty = 0;
@@ -633,7 +633,7 @@ IR * Dex2IR::convertCmp(IN LIR * lir)
     case CMPL_DOUBLE: ty = m_tr->f64; break;
     case CMPG_DOUBLE: ty = m_tr->f64; break;
     case CMP_LONG: ty = m_tr->i64; break;
-    default: UNREACH();
+    default: UNREACHABLE();
     }
 
     //Generate callee.
@@ -730,7 +730,7 @@ UINT Dex2IR::computeFieldOffset(UINT field_id)
         }
         //dumpf_field(df, finfo, 4);
     }
-    UNREACH();
+    UNREACHABLE();
     return 0;
 }
 
@@ -764,7 +764,7 @@ IR * Dex2IR::convertIget(IN LIR * lir)
     IR * ild = m_ru->buildIload(obj, ty);
     ILD_ofst(ild) = objofst; //ILD(MEM_ADDR+ofst)
     IR_may_throw(ild) = true;
-    IR * c = m_ru->buildStorePR(PR_no(res), res->get_type(), ild);
+    IR * c = m_ru->buildStorePR(PR_no(res), res->getType(), ild);
 
     IR_may_throw(c) = true;
 
@@ -834,12 +834,12 @@ IR * Dex2IR::convertBinaryOpAssign(IN LIR * lir)
         ty2 = m_tm->getSimplexTypeEx(D_U32); break;
     case LOP_USHR_ASSIGN: ir_ty = IR_LSR;
         ty2 = m_tm->getSimplexTypeEx(D_U32); break;
-    default: UNREACH();
+    default: UNREACHABLE();
     }
     IR * res = genMappedPR(LIR_res(lir), ty);
     IR * op0 = genMappedPR(LIR_op0(lir), ty2);
     IR * x = m_ru->buildBinaryOp(ir_ty, ty, res, op0);
-    IR * c = m_ru->buildStorePR(PR_no(res), res->get_type(), x);
+    IR * c = m_ru->buildStorePR(PR_no(res), res->getType(), x);
     if (ir_ty == IR_DIV || ir_ty == IR_REM) {
         #ifdef DIV_REM_MAY_THROW
         IR_may_throw(x) = true;
@@ -872,13 +872,13 @@ IR * Dex2IR::convertBinaryOp(IN LIR * lir)
     case LOP_SHL : ir_ty = IR_LSL; break;
     case LOP_SHR : ir_ty = IR_ASR; break;
     case LOP_USHR: ir_ty = IR_LSR; break;
-    default: UNREACH();
+    default: UNREACHABLE();
     }
     IR * res = genMappedPR(LIR_res(lir), ty);
     IR * op0 = genMappedPR(LIR_op0(lir), ty);
     IR * op1 = genMappedPR(LIR_op1(lir), ty);
     IR * x = m_ru->buildBinaryOp(ir_ty, ty, op0, op1);
-    IR * c = m_ru->buildStorePR(PR_no(res), res->get_type(), x);
+    IR * c = m_ru->buildStorePR(PR_no(res), res->getType(), x);
     if (ir_ty == IR_DIV || ir_ty == IR_REM) {
         #ifdef DIV_REM_MAY_THROW
         IR_may_throw(x) = true;
@@ -916,14 +916,14 @@ IR * Dex2IR::convertBinaryOpLit(IN LIR * lir)
     case LOP_SHL_LIT : ir_ty = IR_LSL; break;
     case LOP_SHR_LIT : ir_ty = IR_ASR; break;
     case LOP_USHR_LIT: ir_ty = IR_LSR; break;
-    default: UNREACH();
+    default: UNREACHABLE();
     }
 
     IR * res = genMappedPR(LIR_res(lir), ty);
     IR * op0 = genMappedPR(LIR_op0(lir), ty);
     IR * lit = m_ru->buildImmInt(LIR_op1(lir), ty);
     IR * x = m_ru->buildBinaryOp(ir_ty, ty, op0, lit);
-    IR * c = m_ru->buildStorePR(PR_no(res), res->get_type(), x);
+    IR * c = m_ru->buildStorePR(PR_no(res), res->getType(), x);
     if ((ir_ty == IR_DIV || ir_ty == IR_REM) && CONST_int_val(lit) == 0) {
         IR_may_throw(x) = true;
         IR_may_throw(c) = true;
@@ -944,50 +944,50 @@ UINT Dex2IR::get_dexopcode(UINT flag)
     UINT dexopcode = 0; //defined in DexOpcodes.h
     switch (flag1) {
     case LIR_invoke_unknown:
-        UNREACH();
+        UNREACHABLE();
         switch (flag2) {
         case 0: dexopcode = OP_FILLED_NEW_ARRAY; break;
         case LIR_Range: dexopcode = OP_FILLED_NEW_ARRAY_RANGE; break;
-        default: UNREACH();
+        default: UNREACHABLE();
         }
         break;
     case LIR_invoke_virtual:
         switch (flag2) {
         case 0: dexopcode = OP_INVOKE_VIRTUAL; break;
         case LIR_Range: dexopcode = OP_INVOKE_VIRTUAL_RANGE; break;
-        default: UNREACH();
+        default: UNREACHABLE();
         }
         break;
     case LIR_invoke_super:
         switch(flag2) {
         case 0: dexopcode = OP_INVOKE_SUPER; break;
         case LIR_Range: dexopcode = OP_INVOKE_SUPER_RANGE; break;
-        default: UNREACH();
+        default: UNREACHABLE();
         }
         break;
     case LIR_invoke_direct:
         switch (flag2) {
         case 0: dexopcode = OP_INVOKE_DIRECT; break;
         case LIR_Range: dexopcode = OP_INVOKE_DIRECT_RANGE; break;
-        default: UNREACH();
+        default: UNREACHABLE();
         }
         break;
     case LIR_invoke_static:
         switch (flag2) {
         case 0: dexopcode = OP_INVOKE_STATIC; break;
         case LIR_Range: dexopcode = OP_INVOKE_STATIC_RANGE; break;
-        default: UNREACH();
+        default: UNREACHABLE();
         }
         break;
     case LIR_invoke_interface:
         switch (flag2) {
         case 0: dexopcode = OP_INVOKE_INTERFACE; break;
         case LIR_Range: dexopcode = OP_INVOKE_INTERFACE_RANGE; break;
-        default: UNREACH();
+        default: UNREACHABLE();
         }
         break;
     default:
-        UNREACH();
+        UNREACHABLE();
     }
     return dexopcode;
 }
@@ -1026,7 +1026,7 @@ IR * Dex2IR::convertInvoke(IN LIR * lir)
     bool has_this = true;
     if (is_range) {
         switch (k & 0x0f) {
-        case LIR_invoke_unknown: UNREACH(); break;
+        case LIR_invoke_unknown: UNREACHABLE(); break;
         case LIR_invoke_virtual: ik = INVOKE_VIRTUAL_RANGE; break;
         case LIR_invoke_direct: ik = INVOKE_DIRECT_RANGE; break;
         case LIR_invoke_super: ik = INVOKE_SUPER_RANGE; break;
@@ -1035,17 +1035,17 @@ IR * Dex2IR::convertInvoke(IN LIR * lir)
             ik = INVOKE_STATIC_RANGE;
             has_this = false;
             break;
-        default: UNREACH();
+        default: UNREACHABLE();
         }
     } else {
         switch (k & 0x0f) {
-        case LIR_invoke_unknown: UNREACH(); break;
+        case LIR_invoke_unknown: UNREACHABLE(); break;
         case LIR_invoke_virtual: ik = INVOKE_VIRTUAL; break;
         case LIR_invoke_direct: ik = INVOKE_DIRECT; break;
         case LIR_invoke_super: ik = INVOKE_SUPER; break;
         case LIR_invoke_interface: ik = INVOKE_INTERFACE; break;
         case LIR_invoke_static: ik = INVOKE_STATIC; has_this = false; break;
-        default: UNREACH();
+        default: UNREACHABLE();
         }
     }
     IR * kind = m_ru->buildImmInt(ik, m_tr->u32);
@@ -1468,7 +1468,7 @@ IR * Dex2IR::convertMoveResult(IN LIR * lir)
     case LIR_JDT_unknown: resty = m_tr->i32; break;
     case LIR_JDT_object: resty = m_tr->ptr; break;
     case LIR_JDT_wide: resty = m_tr->i64; break;
-    default: UNREACH();
+    default: UNREACHABLE();
     }
 
     VAR * v = getBuiltinVar(BLTIN_MOVE_RES, m_ru_mgr);
@@ -1496,11 +1496,11 @@ IR * Dex2IR::convertMove(IN LIR * lir)
     case LIR_JDT_wide: //return 64bits result
         ty = m_tr->i64; //TODO: need pair?
         break;
-    default: UNREACH();
+    default: UNREACHABLE();
     }
     IR * tgt = genMappedPR(LIR_res(lir), ty);
     IR * src = genMappedPR(LIR_op0(lir), ty);
-    return m_ru->buildStorePR(PR_no(tgt), tgt->get_type(), src);
+    return m_ru->buildStorePR(PR_no(tgt), tgt->getType(), src);
 }
 
 
@@ -1550,7 +1550,7 @@ IR * Dex2IR::convertRet(IN LIR * lir)
     case LIR_JDT_wide: //return 64bits result
         exp = genMappedPR(LIR_res(lir), m_tr->i64);
         break;
-    default: UNREACH();
+    default: UNREACHABLE();
     }
     return m_ru->buildReturn(exp);
 }
@@ -1563,12 +1563,12 @@ IR * Dex2IR::convertUnaryOp(IN LIR * lir)
     switch (LIR_opcode(lir)) {
     case LOP_NEG: ir_ty = IR_NEG; break;
     case LOP_NOT: ir_ty = IR_BNOT; break;
-    default: UNREACH();
+    default: UNREACHABLE();
     }
     IR * res = genMappedPR(LIR_res(lir), ty);
     IR * op0 = genMappedPR(LIR_op0(lir), ty);
     IR * x = m_ru->buildUnaryOp(ir_ty, ty, op0);
-    return m_ru->buildStorePR(PR_no(res), res->get_type(), x);
+    return m_ru->buildStorePR(PR_no(res), res->getType(), x);
     //Not throw exception.
 }
 
@@ -1581,7 +1581,7 @@ IR * Dex2IR::convertLoadStringAddr(IN LIR * lir)
     set_map_v2ofst(v, LIR_op0(lir));
     IR * lda = m_ru->buildLda(v);
     IR * res = genMappedPR(LIR_res(lir), m_tr->ptr);
-    return m_ru->buildStorePR(PR_no(res), res->get_type(), lda);
+    return m_ru->buildStorePR(PR_no(res), res->getType(), lda);
 }
 
 
@@ -1602,18 +1602,18 @@ IR * Dex2IR::convertLoadConst(IN LIR * lir)
     case LIR_JDT_float  :
     case LIR_JDT_none   :
     case LIR_wide       :
-        UNREACH();
+        UNREACHABLE();
         break;
     case LIR_JDT_wide:
         ty = m_tr->i64;
         break;
     case LIR_JDT_long:
     case LIR_JDT_double :
-    default: UNREACH();
+    default: UNREACHABLE();
     }
 
     IR * res = genMappedPR(LIR_res(lir), ty);
-    return m_ru->buildStorePR(PR_no(res), res->get_type(),
+    return m_ru->buildStorePR(PR_no(res), res->getType(),
                               m_ru->buildImmInt(LIR_int_imm(lir), ty));
 }
 
@@ -1654,7 +1654,7 @@ IR * Dex2IR::convertCondBr(IN LIR * lir)
         op1 = m_ru->buildImmInt(0, ty);
         liridx = LIR_op0(lir);
     } else {
-        UNREACH();
+        UNREACHABLE();
     }
     IR * det = m_ru->buildBinaryOp(rt, m_tr->b, op0, op1);
     //Target label
@@ -1690,13 +1690,13 @@ IR * Dex2IR::convertCvt(IN LIR * lir)
     case LIR_convert_i2b: tgt = m_tr->b; src = m_tr->i32; break;
     case LIR_convert_i2c: tgt = m_tr->i8; src = m_tr->i32; break;
     case LIR_convert_i2s: tgt = m_tr->i16; src = m_tr->i32; break;
-    default: UNREACH();
+    default: UNREACHABLE();
     }
 
     IR * res = genMappedPR(LIR_res(lir), tgt);
     IR * exp = genMappedPR(LIR_op0(lir), src);
     IR * cvt = m_ru->buildCvt(exp, tgt);
-    return m_ru->buildStorePR(PR_no(res), res->get_type(), cvt);
+    return m_ru->buildStorePR(PR_no(res), res->getType(), cvt);
 }
 
 
@@ -1809,9 +1809,9 @@ IR * Dex2IR::convert(IN LIR * lir)
     case LOP_FILLED_NEW_ARRAY:
         return convertFilledNewArray(lir);
     case LOP_PHI:
-        UNREACH();
+        UNREACHABLE();
         break;
-    default: UNREACH();
+    default: UNREACHABLE();
     } //end switch
 
     if (g_tfile != NULL) {

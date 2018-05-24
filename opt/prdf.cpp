@@ -115,7 +115,7 @@ void PRDF::processOpnd(
     for (IR const* k = iterInitC(ir, lst);
          k != NULL; k = iterNextC(lst)) {
         if (k->is_pr()) {
-            use->bunion(k->get_prno(), m_sbs_mgr);
+            use->bunion(k->getPrno(), m_sbs_mgr);
             processMay(k, gen, use, false);
         }
     }
@@ -130,7 +130,7 @@ void PRDF::computeLocal(IRBB * bb, List<IR const*> & lst)
     use->clean(m_sbs_mgr);
     for (IR * x = BB_last_ir(bb); x != NULL; x = BB_prev_ir(bb)) {
         ASSERT0(x->is_stmt());
-        switch (x->get_code()) {
+        switch (x->getCode()) {
         case IR_ST:
             lst.clean();
             processOpnd(ST_rhs(x), lst, use, gen);
@@ -216,7 +216,7 @@ void PRDF::computeLocal(IRBB * bb, List<IR const*> & lst)
             processOpnd(PHI_opnd_list(x), lst, use, gen);
             break;
         case IR_REGION: break;
-        default: UNREACH();
+        default: UNREACHABLE();
         }
     }
 }
@@ -276,7 +276,8 @@ void PRDF::computeGlobal()
             news.bunion(*m_use.get(bbid), m_sbs_mgr);
             m_livein.get(bbid)->copy(news, m_sbs_mgr);
 
-            EdgeC const* ec = VERTEX_out_list(m_cfg->get_vertex(BB_id(bb)));
+            xcom::EdgeC const* ec = VERTEX_out_list(
+                m_cfg->get_vertex(BB_id(bb)));
             if (ec != NULL) {
                 INT succ = VERTEX_id(EDGE_to(EC_edge(ec)));
                 news.copy(*m_livein.get(succ), m_sbs_mgr);

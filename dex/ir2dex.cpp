@@ -87,7 +87,7 @@ LIR * IR2Dex::buildSput(IN IR ** ir)
     #endif
     LIRABOp * lir = (LIRABOp*)ymalloc(sizeof(LIRABOp));
     lir->opcode = LOP_SPUT;
-    LIR_dt(lir) = get_lir_ty(TY_dtype(tir->get_type()));
+    LIR_dt(lir) = get_lir_ty(TY_dtype(tir->getType()));
     lir->vA = get_vreg(ST_rhs(tir));
     lir->vB = m_var2fieldid->get_mapped(ST_idinfo(tir));
     *ir = IR_next(*ir);
@@ -107,7 +107,7 @@ LIR * IR2Dex::buildSgetBasicTypeVar(IN IR ** ir)
     UINT field_id = m_var2fieldid->get_mapped(v);
     LIRABOp * lir = (LIRABOp*)ymalloc(sizeof(LIRABOp));
     lir->opcode = LOP_SGET;
-    LIR_dt(lir) = get_lir_ty(TY_dtype(tir->get_type()));
+    LIR_dt(lir) = get_lir_ty(TY_dtype(tir->getType()));
     lir->vA = vx;
     lir->vB = field_id;
     *ir = IR_next(*ir);
@@ -162,7 +162,7 @@ LIR * IR2Dex::buildMove(IN IR ** ir)
     } else if (ty == m_tr->i64 || ty == m_tr->f64 || ty == m_tr->u64) {
         LIR_dt(lir) = LIR_JDT_wide;
     } else {
-        UNREACH();
+        UNREACHABLE();
     }
     *ir = IR_next(*ir);
     return (LIR*)lir;
@@ -182,8 +182,8 @@ LIR * IR2Dex::buildCvt(IN IR ** ir)
     lir->vB = vy;
 
     //Determine the CVT src and target type.
-    DATA_TYPE tgt = TY_dtype(rhs->get_type());
-    DATA_TYPE src = TY_dtype(CVT_exp(rhs)->get_type());
+    DATA_TYPE tgt = TY_dtype(rhs->getType());
+    DATA_TYPE src = TY_dtype(CVT_exp(rhs)->getType());
     LIR_Convert_Kind x = LIR_convert_unknown;
     switch (src) {
     case D_I32:
@@ -194,7 +194,7 @@ LIR * IR2Dex::buildCvt(IN IR ** ir)
         case D_B: x = LIR_convert_i2b; break;
         case D_I8: x = LIR_convert_i2c; break;
         case D_I16: x = LIR_convert_i2s; break;
-        default: UNREACH();
+        default: UNREACHABLE();
         }
         break;
     case D_I64:
@@ -202,7 +202,7 @@ LIR * IR2Dex::buildCvt(IN IR ** ir)
         case D_I32: x = LIR_convert_l2i; break;
         case D_F32: x = LIR_convert_l2f; break;
         case D_F64: x = LIR_convert_l2d; break;
-        default: UNREACH();
+        default: UNREACHABLE();
         }
         break;
     case D_F32:
@@ -210,7 +210,7 @@ LIR * IR2Dex::buildCvt(IN IR ** ir)
         case D_I32: x = LIR_convert_f2i; break;
         case D_I64: x = LIR_convert_f2l; break;
         case D_F64: x = LIR_convert_f2d; break;
-        default: UNREACH();
+        default: UNREACHABLE();
         }
         break;
     case D_F64:
@@ -218,10 +218,10 @@ LIR * IR2Dex::buildCvt(IN IR ** ir)
         case D_I32: x = LIR_convert_d2i; break;
         case D_I64: x = LIR_convert_d2l; break;
         case D_F32: x = LIR_convert_d2f; break;
-        default: UNREACH();
+        default: UNREACHABLE();
         }
         break;
-    default: UNREACH();
+    default: UNREACHABLE();
     }
     ASSERT0(x != LIR_convert_unknown);
     LIR_dt(lir) = x;
@@ -252,7 +252,7 @@ LIR * IR2Dex::buildMoveResult(IN IR ** ir)
     } else if (ty == m_tr->ptr) {
         LIR_dt(lir) = LIR_JDT_object;
     } else {
-        UNREACH();
+        UNREACHABLE();
     }
     *ir = IR_next(*ir);
     return (LIR*)lir;
@@ -318,7 +318,7 @@ LIR * IR2Dex::buildMoveException(IN IR ** ir)
 
     ASSERT0((*ir)->hasReturnValue());
 
-    Type const* ty = (*ir)->get_type();
+    Type const* ty = (*ir)->getType();
     if (ty == m_tr->i32 || ty == m_tr->f32 ||
         ty == m_tr->u32 || ty == m_tr->b ||
         ty == m_tr->i16 || ty == m_tr->u16 ||
@@ -329,7 +329,7 @@ LIR * IR2Dex::buildMoveException(IN IR ** ir)
     } else if (ty == m_tr->ptr) {
         LIR_dt(lir) = LIR_JDT_object;
     } else {
-        UNREACH();
+        UNREACHABLE();
     }
 
     lir->vA = get_vreg(CALL_prno(*ir));
@@ -409,7 +409,7 @@ LIR * IR2Dex::buildConst(IN IR ** ir)
     } else if (ty == m_tr->i64 || ty == m_tr->f64 || ty == m_tr->u64) {
         LIR_dt(lir) = LIR_JDT_wide;
     } else {
-        UNREACH();
+        UNREACHABLE();
     }
     *ir = IR_next(*ir);
     return (LIR*)lir;
@@ -430,7 +430,7 @@ enum LIR_JDT_Kind IR2Dex::get_lir_ty(DATA_TYPE dt)
     case D_F32    : return LIR_JDT_float;
     case D_F64  : return LIR_JDT_double;
     case D_PTR    : return LIR_JDT_object;
-    default: UNREACH();
+    default: UNREACHABLE();
     }
     return LIR_JDT_unknown;
 }
@@ -482,7 +482,7 @@ LIR * IR2Dex::buildIget(IN IR ** ir)
     IR * tir = *ir;
     ASSERT0(tir->is_stpr());
     ASSERT0(STPR_rhs(tir)->is_ild());
-    DATA_TYPE ty = TY_dtype(tir->get_type());
+    DATA_TYPE ty = TY_dtype(tir->getType());
     UINT vx = get_vreg(STPR_no(tir));
 
     //base_ptr
@@ -515,7 +515,7 @@ LIR * IR2Dex::buildArray(IN IR ** ir)
     ASSERT0(base->is_pr() && ofst->is_pr());
     LIRABCOp * lir = (LIRABCOp*)ymalloc(sizeof(LIRABCOp));
     lir->opcode = LOP_AGET;
-    LIR_dt(lir) = get_lir_ty(TY_dtype(tir->get_type()));
+    LIR_dt(lir) = get_lir_ty(TY_dtype(tir->getType()));
     lir->vA = get_vreg(STPR_no(tir));
     lir->vB = get_vreg(base);
     lir->vC = get_vreg(ofst);
@@ -538,7 +538,7 @@ LIR * IR2Dex::buildBinRegLit(IN IR ** ir)
     ASSERT0((is_us8(vA) && is_us8(vB) && is_s8(vC)) ||
              (is_us4(vA) && is_us4(vA) && is_s16(vC)));
     enum _LIROpcode lty = LOP_NOP;
-    switch (rhs->get_code()) {
+    switch (rhs->getCode()) {
     case IR_ADD   : lty = LOP_ADD_LIT; break;
     case IR_SUB   : lty = LOP_SUB_LIT; break;
     case IR_MUL   : lty = LOP_MUL_LIT; break;
@@ -550,7 +550,7 @@ LIR * IR2Dex::buildBinRegLit(IN IR ** ir)
     case IR_ASR   : lty = LOP_SHR_LIT; break;
     case IR_LSR   : lty = LOP_USHR_LIT; break;
     case IR_LSL   : lty = LOP_SHL_LIT; break;
-    default: UNREACH();
+    default: UNREACHABLE();
     }
 
     LIRABCOp * lir = (LIRABCOp*)ymalloc(sizeof(LIRABCOp));
@@ -558,7 +558,7 @@ LIR * IR2Dex::buildBinRegLit(IN IR ** ir)
     lir->vA = vA;
     lir->vB = vB;
     lir->vC = vC;
-    LIR_dt(lir) = get_lir_ty(TY_dtype(tir->get_type()));
+    LIR_dt(lir) = get_lir_ty(TY_dtype(tir->getType()));
     *ir = IR_next(*ir);
     return (LIR*)lir;
 }
@@ -589,7 +589,7 @@ LIR * IR2Dex::buildBinRegReg(IN IR ** ir)
         is_assign_equ = true;
     }
     enum _LIROpcode lty = LOP_NOP;
-    switch (rhs->get_code()) {
+    switch (rhs->getCode()) {
     case IR_ADD   : lty = is_assign_equ ? LOP_ADD_ASSIGN : LOP_ADD; break;
     case IR_SUB   :
         lty = is_assign_equ ? LOP_SUB_ASSIGN : LOP_SUB;
@@ -604,7 +604,7 @@ LIR * IR2Dex::buildBinRegReg(IN IR ** ir)
     case IR_ASR   : lty = is_assign_equ ? LOP_SHR_ASSIGN : LOP_SHR; break;
     case IR_LSR   : lty = is_assign_equ ? LOP_USHR_ASSIGN : LOP_USHR; break;
     case IR_LSL   : lty = is_assign_equ ? LOP_SHL_ASSIGN : LOP_SHL; break;
-    default: UNREACH();
+    default: UNREACHABLE();
     }
 
     LIR * lir;
@@ -620,7 +620,7 @@ LIR * IR2Dex::buildBinRegReg(IN IR ** ir)
         ((LIRABCOp*)lir)->vB = vB;
         ((LIRABCOp*)lir)->vC = vC;
     }
-    LIR_dt(lir) = get_lir_ty(TY_dtype(tir->get_type()));
+    LIR_dt(lir) = get_lir_ty(TY_dtype(tir->getType()));
     *ir = IR_next(*ir);
     return lir;
 }
@@ -638,7 +638,7 @@ LIR * IR2Dex::buildBinOp(IN IR ** ir)
     } else if (op0->is_pr() && op1->is_const()) {
         return buildBinRegLit(ir);
     } else {
-        UNREACH();
+        UNREACHABLE();
     }
     return NULL;
 }
@@ -653,17 +653,17 @@ LIR * IR2Dex::buildUniOp(IN IR ** ir)
     ASSERT(op0->is_pr(), ("just support pr operation"));
 
     enum _LIROpcode lty = LOP_NOP;
-    switch (STPR_rhs(tir)->get_code()) {
+    switch (STPR_rhs(tir)->getCode()) {
     case IR_NEG   : lty = LOP_NEG; break;
     case IR_BNOT  : lty = LOP_NOT; break;
-    default: UNREACH();
+    default: UNREACHABLE();
     }
 
     LIR * lir = (LIR*)ymalloc(sizeof(LIRABOp));
     lir->opcode = lty;
     ((LIRABOp*)lir)->vA = get_vreg(STPR_no(tir));
     ((LIRABOp*)lir)->vB = get_vreg(op0);
-    LIR_dt(lir) = get_lir_ty(TY_dtype(tir->get_type()));
+    LIR_dt(lir) = get_lir_ty(TY_dtype(tir->getType()));
     *ir = IR_next(*ir);
     return lir;
 }
@@ -674,10 +674,10 @@ LIR * IR2Dex::convertStoreVar(IN OUT IR ** ir, IN IR2DexCtx * cont)
     IR * tir = *ir;
     ASSERT0(tir->is_st());
     IR * rhs = ST_rhs(tir);
-    switch (rhs->get_code()) {
+    switch (rhs->getCode()) {
     case IR_PR  :
         return buildSput(ir);
-    default: UNREACH();
+    default: UNREACHABLE();
     }
     return NULL;
 }
@@ -688,7 +688,7 @@ LIR * IR2Dex::convertStorePR(IN OUT IR ** ir, IN IR2DexCtx * cont)
     IR * tir = *ir;
     ASSERT0(tir->is_stpr());
     IR * rhs = STPR_rhs(tir);
-    switch (rhs->get_code()) {
+    switch (rhs->getCode()) {
     case IR_LD:
         //vA<-ld(id)
         return buildSgetBasicTypeVar(ir);
@@ -717,10 +717,10 @@ LIR * IR2Dex::convertStorePR(IN OUT IR ** ir, IN IR2DexCtx * cont)
         return buildBinOp(ir);
     case IR_LAND  :
     case IR_LOR   :
-        UNREACH();
+        UNREACHABLE();
         break;
     case IR_LNOT  :
-        UNREACH();
+        UNREACHABLE();
         break;
     case IR_BNOT  :
     case IR_NEG   :
@@ -731,9 +731,9 @@ LIR * IR2Dex::convertStorePR(IN OUT IR ** ir, IN IR2DexCtx * cont)
         return buildCvt(ir);
     case IR_PR  :
         return buildMove(ir);
-    default: UNREACH();
+    default: UNREACHABLE();
     }
-    UNREACH();
+    UNREACHABLE();
     return NULL;
 }
 
@@ -748,7 +748,7 @@ LIR * IR2Dex::convertStoreArray(IN OUT IR ** ir, IN IR2DexCtx * cont)
     IR * lhs = ARR_base(tir);
     ASSERT0(rhs->is_pr());
     LIR_res(lir) = get_vreg(rhs);
-    LIR_dt(lir) = get_lir_ty(TY_dtype(tir->get_type()));
+    LIR_dt(lir) = get_lir_ty(TY_dtype(tir->getType()));
 
     IR * base = ARR_base(tir);
     IR * ofst = ARR_sub_list(tir);
@@ -761,7 +761,7 @@ LIR * IR2Dex::convertStoreArray(IN OUT IR ** ir, IN IR2DexCtx * cont)
     lir->opcode = LOP_APUT;
 
     ASSERT0(IR_dt(tir) == IR_dt(rhs) ||
-            tir->get_type_size(m_tm) == rhs->get_type_size(m_tm));
+            tir->getTypeSize(m_tm) == rhs->getTypeSize(m_tm));
     *ir = IR_next(*ir);
     return (LIR*)lir;
 }
@@ -777,14 +777,14 @@ LIR * IR2Dex::convertIstore(IN OUT IR ** ir, IN IR2DexCtx * cont)
     IR * lhs = IST_base(tir);
     ASSERT0(rhs->is_pr());
     LIR_res(lir) = get_vreg(rhs);
-    LIR_dt(lir) = get_lir_ty(TY_dtype(tir->get_type()));
+    LIR_dt(lir) = get_lir_ty(TY_dtype(tir->getType()));
 
     ASSERT0(lhs->is_pr());
     LIR_op0(lir) = get_vreg(lhs);
     LIR_op1(lir) = IST_ofst(tir) / m_d2ir->get_ofst_addend();
     lir->opcode = LOP_IPUT;
     ASSERT0(IR_dt(tir) == IR_dt(rhs) ||
-             tir->get_type_size(m_tm) == rhs->get_type_size(m_tm));
+             tir->getTypeSize(m_tm) == rhs->getTypeSize(m_tm));
     *ir = IR_next(*ir);
     return (LIR*)lir;
 }
@@ -842,7 +842,7 @@ LIR * IR2Dex::buildInvoke(IN IR ** ir)
     case INVOKE_INTERFACE_RANGE:
         flag = LIR_invoke_interface; flag |= LIR_Range; break;
     case INVOKE_UNDEF:
-    default: UNREACH();
+    default: UNREACHABLE();
     }
     LIR_dt(lir) = flag;
     p = p->get_next();
@@ -1140,7 +1140,7 @@ LIR * IR2Dex::buildCmpBias(IN IR ** ir)
         LIR_opcode(lir) = LOP_CMP_LONG;
         LIR_dt(lir) = LIR_convert_unknown;
         break;
-    default: UNREACH();
+    default: UNREACHABLE();
     }
     *ir = IR_next(*ir);
     return (LIR*)lir;
@@ -1166,7 +1166,7 @@ LIR * IR2Dex::convertCall(IN OUT IR ** ir, IN IR2DexCtx * cont)
         case BLTIN_MONITOR_EXIT: return buildMonitorExit(ir);
         case BLTIN_INSTANCE_OF: return buildInstanceOf(ir);
         case BLTIN_CMP_BIAS: return buildCmpBias(ir);
-        default: UNREACH();
+        default: UNREACHABLE();
         }
         return NULL;
     }
@@ -1252,24 +1252,24 @@ LIR * IR2Dex::convertBranch(bool is_truebr, IN OUT IR ** ir, IN IR2DexCtx * cont
     ASSERT0(BIN_opnd0(det)->is_pr());
 
     if (is_truebr) {
-        switch (det->get_code()) {
+        switch (det->getCode()) {
         case IR_LT: LIR_dt(lir) = LIR_cond_LT; break;
         case IR_GT: LIR_dt(lir) = LIR_cond_GT; break;
         case IR_LE: LIR_dt(lir) = LIR_cond_LE; break;
         case IR_GE: LIR_dt(lir) = LIR_cond_GE; break;
         case IR_EQ: LIR_dt(lir) = LIR_cond_EQ; break;
         case IR_NE: LIR_dt(lir) = LIR_cond_NE; break;
-        default: UNREACH();
+        default: UNREACHABLE();
         }
     } else {
-        switch (det->get_code()) {
+        switch (det->getCode()) {
         case IR_LT: LIR_dt(lir) = LIR_cond_GE; break;
         case IR_GT: LIR_dt(lir) = LIR_cond_LE; break;
         case IR_LE: LIR_dt(lir) = LIR_cond_GT; break;
         case IR_GE: LIR_dt(lir) = LIR_cond_LT; break;
         case IR_EQ: LIR_dt(lir) = LIR_cond_NE; break;
         case IR_NE: LIR_dt(lir) = LIR_cond_EQ; break;
-        default: UNREACH();
+        default: UNREACHABLE();
         }
     }
 
@@ -1363,7 +1363,7 @@ LIR * IR2Dex::convertSwitch(IN OUT IR ** ir, IN IR2DexCtx * cont)
 LIR * IR2Dex::convert(IN OUT IR ** ir, IN IR2DexCtx * cont)
 {
     ASSERT0((*ir)->is_stmt());
-    switch ((*ir)->get_code()) {
+    switch ((*ir)->getCode()) {
      case IR_ST:
         return convertStoreVar(ir, cont);
     case IR_STPR:
@@ -1393,7 +1393,7 @@ LIR * IR2Dex::convert(IN OUT IR ** ir, IN IR2DexCtx * cont)
     case IR_REGION:
         ASSERT(0, ("TODO"));
     default:
-        UNREACH();
+        UNREACHABLE();
     }
     return NULL;
 }
@@ -1457,7 +1457,7 @@ void IR2Dex::reloc()
                 }
             }
             break;
-        default: UNREACH();
+        default: UNREACHABLE();
         }
     }
 }

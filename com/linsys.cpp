@@ -412,7 +412,7 @@ bool Lineq::reduce(IN OUT RMat & m, UINT rhs_idx, bool is_intersect)
                 //Do NOT remove this constrain.
                 //TODO: Check the domain of constant symbol.
                 break;
-            default: UNREACH();;
+            default: UNREACHABLE();;
             }
         } else if (vars == 1) {
             //Record number of inequality if it only has single variable.
@@ -1288,7 +1288,7 @@ void Lineq::EhartPoly(OUT RMat & res, IN RMat & a, UINT rhs_idx)
     DUMMYUSE(rhs_idx);
     DUMMYUSE(a);
     DUMMYUSE(res);
-    UNREACH();
+    UNREACHABLE();
 }
 
 
@@ -1878,7 +1878,7 @@ void Lineq::PolyImage(OUT RMat & res, IN RMat & a, UINT rhs_idx)
     DUMMYUSE(res);
     DUMMYUSE(a);
     DUMMYUSE(rhs_idx);
-    UNREACH();
+    UNREACHABLE();
 }
 //END Lineq
 

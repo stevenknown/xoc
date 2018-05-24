@@ -43,7 +43,7 @@ namespace xoc {
 //START IR_DCE
 //
 void IR_DCE::dump(EFFECT_STMT const& is_stmt_effect,
-                  BitSet const& is_bb_effect,
+                  xcom::BitSet const& is_bb_effect,
                   IN Vector<Vector<IR*>*> & all_ir)
 {
     if (g_tfile == NULL) return;
@@ -169,16 +169,16 @@ bool IR_DCE::check_call(IR const* ir)
 
 
 void IR_DCE::mark_effect_ir(IN OUT EFFECT_STMT & is_stmt_effect,
-                            IN OUT BitSet & is_bb_effect,
+                            IN OUT xcom::BitSet & is_bb_effect,
                             IN OUT List<IR const*> & work_list)
 {
     List<IRBB*> * bbl = m_ru->getBBList();
-    C<IRBB*> * ct;
+    xcom::C<IRBB*> * ct;
     for (IRBB * bb = bbl->get_head(&ct);
          bb != NULL; bb = bbl->get_next(&ct)) {
         for (IR const* ir = BB_first_ir(bb);
              ir != NULL; ir = BB_next_ir(bb)) {
-            switch (ir->get_code()) {
+            switch (ir->getCode()) {
             case IR_RETURN:
                 //Do NOT set exit-bb to be effect.
                 //That will generate redundant control-flow dependence.
@@ -211,16 +211,14 @@ void IR_DCE::mark_effect_ir(IN OUT EFFECT_STMT & is_stmt_effect,
                 }
                 break;
             default:
-                {
-                    if (check_stmt(ir)) {
-                        is_stmt_effect.bunion(ir->id());
-                        is_bb_effect.bunion(BB_id(bb));
-                        work_list.append_tail(ir);
-                    }
+                if (check_stmt(ir)) {
+                    is_stmt_effect.bunion(ir->id());
+                    is_bb_effect.bunion(BB_id(bb));
+                    work_list.append_tail(ir);
                 }
-            } //end switch IR_code
-        } //end for each IR
-    } //end for each IRBB
+            }
+        }
+    }
 }
 
 
@@ -231,7 +229,7 @@ bool IR_DCE::find_effect_kid(IN IRBB * bb,
     ASSERT0(m_cfg && m_cdg);
     ASSERT0(ir->getBB() == bb);
     if (ir->isConditionalBr() || ir->isMultiConditionalBr()) {
-        EdgeC const* ec = VERTEX_out_list(m_cdg->get_vertex(BB_id(bb)));
+        xcom::EdgeC const* ec = VERTEX_out_list(m_cdg->get_vertex(BB_id(bb)));
         while (ec != NULL) {
             IRBB * succ = m_cfg->getBB(VERTEX_id(EDGE_to(EC_edge(ec))));
             ASSERT0(succ != NULL);
@@ -244,10 +242,10 @@ bool IR_DCE::find_effect_kid(IN IRBB * bb,
             ec = EC_next(ec);
         }
     } else if (ir->isUnconditionalBr()) {
-        EdgeC const* ecp = VERTEX_in_list(m_cdg->get_vertex(BB_id(bb)));
+        xcom::EdgeC const* ecp = VERTEX_in_list(m_cdg->get_vertex(BB_id(bb)));
         while (ecp != NULL) {
             INT cd_pred = VERTEX_id(EDGE_from(EC_edge(ecp)));
-            EdgeC const* ecs = VERTEX_out_list(m_cdg->get_vertex(cd_pred));
+            xcom::EdgeC const* ecs = VERTEX_out_list(m_cdg->get_vertex(cd_pred));
             while (ecs != NULL) {
                 INT cd_succ = VERTEX_id(EDGE_to(EC_edge(ecs)));
                 IRBB * succ = m_cfg->getBB(cd_succ);
@@ -263,13 +261,13 @@ bool IR_DCE::find_effect_kid(IN IRBB * bb,
             ecp = EC_next(ecp);
         }
     } else {
-        UNREACH();
+        UNREACHABLE();
     }
     return false;
 }
 
 
-bool IR_DCE::preserve_cd(IN OUT BitSet & is_bb_effect,
+bool IR_DCE::preserve_cd(IN OUT xcom::BitSet & is_bb_effect,
                          IN OUT EFFECT_STMT & is_stmt_effect,
                          IN OUT List<IR const*> & act_ir_lst)
 {
@@ -277,7 +275,7 @@ bool IR_DCE::preserve_cd(IN OUT BitSet & is_bb_effect,
     bool change = false;
     List<IRBB*> lst_2;
     BBList * bbl = m_ru->getBBList();
-    C<IRBB*> * ct;
+    xcom::C<IRBB*> * ct;
     for (bbl->get_head(&ct); ct != bbl->end(); ct = bbl->get_next(ct)) {
         IRBB * bb = ct->val();
         ASSERT0(bb);
@@ -285,7 +283,7 @@ bool IR_DCE::preserve_cd(IN OUT BitSet & is_bb_effect,
             UINT bbid = BB_id(bb);
             //Set control dep bb to be effective.
             ASSERT0(m_cdg->get_vertex(bbid));
-            for (EdgeC const* ec = VERTEX_in_list(m_cdg->get_vertex(bbid));
+            for (xcom::EdgeC const* ec = VERTEX_in_list(m_cdg->get_vertex(bbid));
                  ec != NULL; ec = EC_next(ec)) {
                 INT cd_pred = VERTEX_id(EDGE_from(EC_edge(ec)));
                 if (!is_bb_effect.is_contain(cd_pred)) {
@@ -295,7 +293,7 @@ bool IR_DCE::preserve_cd(IN OUT BitSet & is_bb_effect,
             }
 
             ASSERT0(m_cfg->get_vertex(bbid));
-            EdgeC const* ec = VERTEX_in_list(m_cfg->get_vertex(bbid));
+            xcom::EdgeC const* ec = VERTEX_in_list(m_cfg->get_vertex(bbid));
             if (cnt_list(ec) >= 2) {
                 ASSERT0(BB_rpo(bb) >= 0);
                 UINT bbto = BB_rpo(bb);
@@ -354,7 +352,7 @@ bool IR_DCE::preserve_cd(IN OUT BitSet & is_bb_effect,
 //Iterative record effect IRs, according to DU chain,
 //and preserving the control flow dependence.
 void IR_DCE::iter_collect(IN OUT EFFECT_STMT & is_stmt_effect,
-                          IN OUT BitSet & is_bb_effect,
+                          IN OUT xcom::BitSet & is_bb_effect,
                           IN OUT List<IR const*> & work_list)
 {
     List<IR const*> work_list2;
@@ -425,19 +423,19 @@ void IR_DCE::iter_collect(IN OUT EFFECT_STMT & is_stmt_effect,
 void IR_DCE::fix_control_flow(List<IRBB*> & bblst, List<C<IRBB*>*> & ctlst)
 {
     BBList * bbl = m_ru->getBBList();
-    C<IRBB*> * ct = ctlst.get_head();
+    xcom::C<IRBB*> * ct = ctlst.get_head();
 
-    C<IRBB*> * bbct;
+    xcom::C<IRBB*> * bbct;
     for (bblst.get_head(&bbct); bbct != bblst.end();
          bbct = bblst.get_next(bbct), ct = ctlst.get_next()) {
         IRBB * bb = bbct->val();
         ASSERT0(ct && bb);
         if (BB_irlist(bb).get_elem_count() != 0) { continue; }
 
-        EdgeC * vout = VERTEX_out_list(m_cfg->get_vertex(BB_id(bb)));
+        xcom::EdgeC * vout = VERTEX_out_list(m_cfg->get_vertex(BB_id(bb)));
         if (vout == NULL || cnt_list(vout) <= 1) { continue; }
 
-        C<IRBB*> * next_ct = ct;
+        xcom::C<IRBB*> * next_ct = ct;
         bbl->get_next(&next_ct);
         IRBB * next_bb = NULL;
         if (next_ct != NULL) {
@@ -445,13 +443,13 @@ void IR_DCE::fix_control_flow(List<IRBB*> & bblst, List<C<IRBB*>*> & ctlst)
         }
 
         while (vout != NULL) {
-            Edge * e = EC_edge(vout);
+            xcom::Edge * e = EC_edge(vout);
             if (EDGE_info(e) != NULL && CFGEI_is_eh((CFGEdgeInfo*)EDGE_info(e))) {
                 vout = EC_next(vout);
                 continue;
             }
 
-            Vertex * s = EDGE_to(e);
+            xcom::Vertex * s = EDGE_to(e);
             if (VERTEX_id(s) == BB_id(bb) ||
                 (next_bb != NULL && VERTEX_id(s) == BB_id(next_bb))) {
                 vout = EC_next(vout);
@@ -481,14 +479,14 @@ void IR_DCE::fix_control_flow(List<IRBB*> & bblst, List<C<IRBB*>*> & ctlst)
                 IR * g = m_ru->buildGoto(li);
                 BB_irlist(bb).append_tail(g);
                 bool change = true;
-                Vertex * bbv = m_cfg->get_vertex(BB_id(bb));
+                xcom::Vertex * bbv = m_cfg->get_vertex(BB_id(bb));
                 while (change) {
-                    EdgeC * ec = VERTEX_out_list(bbv);
+                    xcom::EdgeC * ec = VERTEX_out_list(bbv);
                     change = false;
                     while (ec != NULL) {
                         if (EC_edge(ec) != e) {
                             //May be remove multi edges.
-                            ((Graph*)m_cfg)->removeEdgeBetween(
+                            ((xcom::Graph*)m_cfg)->removeEdgeBetween(
                                 EDGE_from(EC_edge(ec)), EDGE_to(EC_edge(ec)));
                             change = true;
                             break;
@@ -528,13 +526,13 @@ void IR_DCE::record_all_ir(IN OUT Vector<Vector<IR*>*> & all_ir)
 
 //Fix control flow if BB is empty.
 //It is illegal if empty BB has non-taken branch.
-void IR_DCE::revise_successor(IRBB * bb, C<IRBB*> * bbct, BBList * bbl)
+void IR_DCE::revise_successor(IRBB * bb, xcom::C<IRBB*> * bbct, BBList * bbl)
 {
     ASSERT0(bb && bbct);
-    EdgeC * ec = VERTEX_out_list(m_cfg->get_vertex(BB_id(bb)));
+    xcom::EdgeC * ec = VERTEX_out_list(m_cfg->get_vertex(BB_id(bb)));
     if (ec == NULL) { return; }
 
-    C<IRBB*> * next_ct = bbct;
+    xcom::C<IRBB*> * next_ct = bbct;
     bbl->get_next(&next_ct);
     IRBB * next_bb = NULL;
     if (next_ct != NULL) {
@@ -542,7 +540,7 @@ void IR_DCE::revise_successor(IRBB * bb, C<IRBB*> * bbct, BBList * bbl)
     }
 
     while (ec != NULL) {
-        Edge * e = EC_edge(ec);
+        xcom::Edge * e = EC_edge(ec);
         if (EDGE_info(e) != NULL && CFGEI_is_eh((CFGEdgeInfo*)EDGE_info(e))) {
             ec = EC_next(ec);
             continue;
@@ -555,8 +553,8 @@ void IR_DCE::revise_successor(IRBB * bb, C<IRBB*> * bbct, BBList * bbl)
             bb->removeSuccessorPhiOpnd(m_cfg);
         }
 
-        EdgeC * next_ec = EC_next(ec);
-        ((Graph*)m_cfg)->removeEdge(e);
+        xcom::EdgeC * next_ec = EC_next(ec);
+        ((xcom::Graph*)m_cfg)->removeEdge(e);
         ec = next_ec;
     }
 
@@ -596,7 +594,7 @@ bool IR_DCE::perform(OptCtx & oc)
     //Mark effect IRs.
     EFFECT_STMT is_stmt_effect;
     List<IR const*> work_list;
-    BitSet is_bb_effect;
+    xcom::BitSet is_bb_effect;
 
     //Mark effect IRs.
     mark_effect_ir(is_stmt_effect, is_bb_effect, work_list);
@@ -609,12 +607,12 @@ bool IR_DCE::perform(OptCtx & oc)
 
     bool change = false;
     BBList * bbl = m_ru->getBBList();
-    C<IRBB*> * ctbb;
+    xcom::C<IRBB*> * ctbb;
     List<IRBB*> bblst;
     List<C<IRBB*>*> ctlst;
     for (IRBB * bb = bbl->get_head(&ctbb);
          bb != NULL; bb = bbl->get_next(&ctbb)) {
-        C<IR*> * ctir, * next;
+        xcom::C<IR*> * ctir, * next;
         bool tobecheck = false;
         for (BB_irlist(bb).get_head(&ctir), next = ctir;
              ctir != NULL; ctir = next) {

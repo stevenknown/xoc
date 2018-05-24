@@ -42,39 +42,41 @@ class PRSSAMgr;
 class DfMgr {
 protected:
     //PRSSAMgr * m_ssa_mgr;
-    BitSetMgr m_bs_mgr;
-    Vector<BitSet*> m_df_vec;
+    xcom::BitSetMgr m_bs_mgr;
+    Vector<xcom::BitSet*> m_df_vec;
     UINT m_thres;
 
-    void buildRecur(Vertex const* v, DGraph const& g, DomTree const& domtree);
+    void buildRecur(xcom::Vertex const* v,
+        xcom::DGraph const& g,
+        DomTree const& domtree);
 
     //Generate the DF control set
-    BitSet * genDFControlSet(UINT vid);
+    xcom::BitSet * genDFControlSet(UINT vid);
 public:
     explicit DfMgr(UINT thres = THRESHOLD_HIGH_DOMINATOR_FRONTIER_DENSITY) :
         m_thres(thres) {}
     COPY_CONSTRUCTOR(DfMgr);
 
     void clean();
-    void build(DGraph const& g);
-    void build(DGraph const& g, DomTree const& domtree);
-    void dump(DGraph & g);
+    void build(xcom::DGraph const& g);
+    void build(xcom::DGraph const& g, DomTree const& domtree);
+    void dump(xcom::DGraph & g);
 
-    //Count Dominator Frontier Density for each Vertex.
+    //Count Dominator Frontier Density for each xcom::Vertex.
     //Return true if there exist vertex that might inserting
     //ton of phis which will blow up memory.
-    bool hasHighDFDensityVertex(DGraph const& g);
+    bool hasHighDFDensityVertex(xcom::DGraph const& g);
 
     //Return the BB set controlled by vid.
-    BitSet const* getDFControlSet(UINT vid) const
+    xcom::BitSet const* getDFControlSet(UINT vid) const
     { return m_df_vec.get(vid); }
 
-    void rebuild(DGraph & g) { clean(); build(g); }
+    void rebuild(xcom::DGraph & g) { clean(); build(g); }
 };
 
 
 //SSAGraph
-class SSAGraph : Graph {
+class SSAGraph : xcom::Graph {
     Region * m_ru;
     PRSSAMgr * m_ssa_mgr;
     TMap<UINT, VP*> m_vdefs;
@@ -137,7 +139,7 @@ protected:
     void collectDefinedPR(IN IRBB * bb, OUT DefSBitSet & mustdef_pr);
 
     void destructBBSSAInfo(IRBB * bb);
-    void destructionInDomTreeOrder(IRBB * root, Graph & domtree);
+    void destructionInDomTreeOrder(IRBB * root, xcom::Graph & domtree);
 
     void handleBBRename(IRBB * bb,
                         IN DefSBitSet & defed_prs,
@@ -158,23 +160,23 @@ protected:
     void refinePhi(List<IRBB*> & wl);
     void rename(DefSBitSet & effect_prs,
                 Vector<DefSBitSet*> & defed_prs_vec,
-                Graph & domtree);
+                xcom::Graph & domtree);
     void renameBB(IRBB * bb);
     void renameInDomTreeOrder(
                 IRBB * root,
-                Graph & dtree,
+                xcom::Graph & dtree,
                 Vector<DefSBitSet*> & defed_prs_vec);
 
     void stripVersionForBBList();
     void stripVersionForAllVP();
-    void stripPhi(IR * phi, C<IR*> * phict);
+    void stripPhi(IR * phi, xcom::C<IR*> * phict);
     void stripSpecifiedVP(VP * vp);
-    void stripStmtVersion(IR * stmt, BitSet & visited);
+    void stripStmtVersion(IR * stmt, xcom::BitSet & visited);
 
     void placePhiForPR(UINT prno,
                        IN List<IRBB*> * defbbs,
                        DfMgr const& dfm,
-                       BitSet & visited,
+                       xcom::BitSet & visited,
                        List<IRBB*> & wl,
                        Vector<DefSBitSet*> & defed_prs_vec);
     void placePhi(DfMgr const& dfm,
@@ -212,7 +214,7 @@ public:
         ASSERT0(use->isReadPR());
         SSAInfo * ssainfo = def->getSSAInfo();
         if (ssainfo == NULL) {
-            ssainfo = allocSSAInfo(def->get_prno());
+            ssainfo = allocSSAInfo(def->getPrno());
             def->setSSAInfo(ssainfo);
             SSA_def(ssainfo) = def;
 

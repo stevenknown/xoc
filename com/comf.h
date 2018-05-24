@@ -185,10 +185,10 @@ inline UINT hash32bit(UINT n)
 }
 
 //Judge if 'f' is integer conform to IEEE754 spec.
-bool is_integer(float f);
+bool isIntegerF(float f);
 
 //Judge if 'd' is integer conform to IEEE754 spec.
-bool is_integerd(double d);
+bool isIntegerD(double d);
 
 //inline is necessary to avoid multiple define.
 inline bool isPowerOf2(ULONGLONG x) { return (x != 0 && (x & (x-1)) == 0); }

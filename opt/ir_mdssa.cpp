@@ -69,7 +69,7 @@ void MDSSAMgr::freePhiList()
         MDPhiList * philist = m_usedef_mgr.genBBPhiList(BB_id(bb));
         if (philist == NULL) { continue; }
 
-        for (SC<MDPhi*> * sct = philist->get_head();
+        for (xcom::SC<MDPhi*> * sct = philist->get_head();
              sct != philist->end(); sct = philist->get_next(sct)) {
             MDPhi * phi = sct->val();
             ASSERT0(phi && phi->is_phi());
@@ -164,7 +164,7 @@ void MDSSAMgr::dump()
 
         MDPhiList * philist = m_usedef_mgr.genBBPhiList(BB_id(bb));
         ASSERT0(philist);
-        for (SC<MDPhi*> * sct = philist->get_head();
+        for (xcom::SC<MDPhi*> * sct = philist->get_head();
              sct != philist->end(); sct = philist->get_next(sct)) {
             MDPhi * phi = sct->val();
             ASSERT0(phi && phi->is_phi());
@@ -343,7 +343,7 @@ void MDSSAMgr::dumpExpDUChainIter(
 {
 
     IRSet visited(m_sbs_mgr->getSegMgr());
-    xcom::List<MDDef*> wl;
+    List<MDDef*> wl;
     lst.clean();
     opnd_lst.clean();
     for (IR const* opnd = iterInitC(ir, lst);
@@ -388,7 +388,7 @@ void MDSSAMgr::dumpExpDUChainIter(
                 wl.clean();
                 wl.append_tail(vopnd->getDef());
 
-                BitSet visited_def;
+                xcom::BitSet visited_def;
                 bool first2 = true;
 
                 fprintf(g_tfile, "(");
@@ -456,7 +456,7 @@ void MDSSAMgr::dumpDUChain()
         fprintf(g_tfile, "\n--- BB%d ---", BB_id(bb));
         MDPhiList * philist = m_usedef_mgr.genBBPhiList(BB_id(bb));
         ASSERT0(philist);
-        for (SC<MDPhi*> * sct = philist->get_head();
+        for (xcom::SC<MDPhi*> * sct = philist->get_head();
              sct != philist->end(); sct = philist->get_next(sct)) {
             MDPhi * phi = sct->val();
             ASSERT0(phi && phi->is_phi());
@@ -581,7 +581,7 @@ void MDSSAMgr::placePhiForMD(
         UINT mdid,
         IN List<IRBB*> * defbbs,
         DfMgr const& dfm,
-        BitSet & visited,
+        xcom::BitSet & visited,
         List<IRBB*> & wl,
         Vector<DefSBitSet*> & defmds_vec)
 {
@@ -597,7 +597,7 @@ void MDSSAMgr::placePhiForMD(
         IRBB * bb = wl.remove_head();
 
         //Each basic block in dfcs is in dominance frontier of 'bb'.
-        BitSet const* dfcs = dfm.getDFControlSet(BB_id(bb));
+        xcom::BitSet const* dfcs = dfm.getDFControlSet(BB_id(bb));
         if (dfcs == NULL) { continue; }
 
         for (INT i = dfcs->get_first(); i >= 0; i = dfcs->get_next(i)) {
@@ -702,7 +702,7 @@ void MDSSAMgr::placePhi(DfMgr const& dfm,
     }
 
     //Place phi for lived MD.
-    BitSet visited((bblst->get_elem_count()/8)+1);
+    xcom::BitSet visited((bblst->get_elem_count()/8)+1);
     SEGIter * cur = NULL;
     for (INT i = effect_md.get_first(&cur);
          i >= 0; i = effect_md.get_next(i, &cur)) {
@@ -848,7 +848,7 @@ void MDSSAMgr::renamePhiResult(IN IRBB * bb)
     ASSERT0(bb);
     MDPhiList * philist = m_usedef_mgr.genBBPhiList(BB_id(bb));
     ASSERT0(philist);
-    for (SC<MDPhi*> * sct = philist->get_head();
+    for (xcom::SC<MDPhi*> * sct = philist->get_head();
          sct != philist->end(); sct = philist->get_next(sct)) {
         MDPhi * phi = sct->val();
         ASSERT0(phi && phi->is_phi() && phi->getBB() == bb);
@@ -965,7 +965,7 @@ void MDSSAMgr::handleBBRename(
         //Replace opnd of PHI of 'succ' with top SSA version.
         MDPhiList * philist = m_usedef_mgr.genBBPhiList(BB_id(succ));
         ASSERT0(philist);
-        for (SC<MDPhi*> * sct = philist->get_head();
+        for (xcom::SC<MDPhi*> * sct = philist->get_head();
              sct != philist->end(); sct = philist->get_next(sct)) {
             MDPhi * phi = sct->val();
             ASSERT0(phi && phi->is_phi());
@@ -994,12 +994,12 @@ void MDSSAMgr::handleBBRename(
 //defed_prs_vec: for each BB, indicate PRs which has been defined.
 void MDSSAMgr::renameInDomTreeOrder(
         IRBB * root,
-        Graph & domtree,
+        xcom::Graph & domtree,
         Vector<DefSBitSet*> & defed_mds_vec)
 {
     Stack<IRBB*> stk;
     UINT n = m_ru->getBBList()->get_elem_count();
-    BitSet visited(n / BIT_PER_BYTE);
+    xcom::BitSet visited(n / BIT_PER_BYTE);
     BB2VMDMap bb2vmdmap;
     IRBB * v;
     stk.push(root);
@@ -1012,10 +1012,11 @@ void MDSSAMgr::renameInDomTreeOrder(
             handleBBRename(v, *defed_mds, bb2vmdmap);
         }
 
-        Vertex const* bbv = domtree.get_vertex(BB_id(v));
+        xcom::Vertex const* bbv = domtree.get_vertex(BB_id(v));
         bool all_visited = true;
-        for (EdgeC const* c = VERTEX_out_list(bbv); c != NULL; c = EC_next(c)) {
-            Vertex * dom_succ = EDGE_to(EC_edge(c));
+        for (xcom::EdgeC const* c = VERTEX_out_list(bbv);
+             c != NULL; c = EC_next(c)) {
+            xcom::Vertex * dom_succ = EDGE_to(EC_edge(c));
             if (dom_succ == bbv) { continue; }
             if (!visited.is_contain(VERTEX_id(dom_succ))) {
                 ASSERT0(m_cfg->getBB(VERTEX_id(dom_succ)));
@@ -1079,7 +1080,7 @@ void MDSSAMgr::changeIR(IR * oldir, IR * newir)
 void MDSSAMgr::rename(
         DefSBitSet & effect_mds,
         Vector<DefSBitSet*> & defed_mds_vec,
-        Graph & domtree)
+        xcom::Graph & domtree)
 {
     START_TIMER(t, "MDSSA: Rename");
     BBList * bblst = m_ru->getBBList();
@@ -1102,7 +1103,7 @@ void MDSSAMgr::destructBBSSAInfo(IRBB * bb)
 {
     MDPhiList * philist = m_usedef_mgr.genBBPhiList(BB_id(bb));
     ASSERT0(philist);
-    for (SC<MDPhi*> * sct = philist->get_head();
+    for (xcom::SC<MDPhi*> * sct = philist->get_head();
          sct != philist->end(); sct = philist->get_next(sct)) {
         MDPhi * phi = sct->val();
         ASSERT0(phi && phi->is_phi());
@@ -1111,11 +1112,11 @@ void MDSSAMgr::destructBBSSAInfo(IRBB * bb)
 }
 
 
-void MDSSAMgr::destructionInDomTreeOrder(IRBB * root, Graph & domtree)
+void MDSSAMgr::destructionInDomTreeOrder(IRBB * root, xcom::Graph & domtree)
 {
     Stack<IRBB*> stk;
     UINT n = m_ru->getBBList()->get_elem_count();
-    BitSet visited(n / BIT_PER_BYTE);
+    xcom::BitSet visited(n / BIT_PER_BYTE);
     BB2VMDMap bb2vmdmap(n);
     IRBB * v;
     stk.push(root);
@@ -1125,13 +1126,13 @@ void MDSSAMgr::destructionInDomTreeOrder(IRBB * root, Graph & domtree)
             destructBBSSAInfo(v);
         }
 
-        Vertex * bbv = domtree.get_vertex(BB_id(v));
+        xcom::Vertex * bbv = domtree.get_vertex(BB_id(v));
         ASSERT(bbv, ("dom tree is invalid."));
 
-        EdgeC * c = VERTEX_out_list(bbv);
+        xcom::EdgeC * c = VERTEX_out_list(bbv);
         bool all_visited = true;
         while (c != NULL) {
-            Vertex * dom_succ = EDGE_to(EC_edge(c));
+            xcom::Vertex * dom_succ = EDGE_to(EC_edge(c));
             if (dom_succ == bbv) { continue; }
             if (!visited.is_contain(VERTEX_id(dom_succ))) {
                 ASSERT0(m_cfg->getBB(VERTEX_id(dom_succ)));
@@ -1178,13 +1179,13 @@ void MDSSAMgr::stripPhi(MDPhi * phi)
     //IRBB * bb = phi->getBB();
     //ASSERT0(bb);
     //
-    //Vertex const* vex = m_cfg->get_vertex(BB_id(bb));
+    //xcom::Vertex const* vex = m_cfg->get_vertex(BB_id(bb));
     //ASSERT0(vex);
     //
     ////Temprarory RP to hold the result of PHI.
-    //IR * phicopy = m_ru->buildPR(phi->get_type());
+    //IR * phicopy = m_ru->buildPR(phi->getType());
     //phicopy->setRefMD(m_ru->genMDforPR(
-    //    PR_no(phicopy), phicopy->get_type()), m_ru);
+    //    PR_no(phicopy), phicopy->getType()), m_ru);
     //phicopy->cleanRefMDSet();
     //IR * opnd = PHI_opnd_list(phi);
     //
@@ -1193,7 +1194,7 @@ void MDSSAMgr::stripPhi(MDPhi * phi)
     //ASSERT0(PHI_ssainfo(phi));
     //
     //UINT pos = 0;
-    //for (EdgeC * el = VERTEX_in_list(vex), * nextel = NULL;
+    //for (xcom::EdgeC * el = VERTEX_in_list(vex), * nextel = NULL;
     //     el != NULL; el = nextel, opnd = opnd->get_next(), pos++) {
     //    ASSERT0(find_position(VERTEX_in_list(vex), el) == pos);
     //
@@ -1208,7 +1209,7 @@ void MDSSAMgr::stripPhi(MDPhi * phi)
     //
     //    //The copy will be inserted into related predecessor.
     //    IR * store_to_phicopy = m_ru->buildStorePR(
-    //        PR_no(phicopy), phicopy->get_type(), opndcopy);
+    //        PR_no(phicopy), phicopy->getType(), opndcopy);
     //    store_to_phicopy->copyRef(phicopy, m_ru);
     //
     //    IRBB * p = m_cfg->getBB(pred);
@@ -1253,7 +1254,7 @@ void MDSSAMgr::stripPhi(MDPhi * phi)
     //}
     //
     //IR * substitue_phi = m_ru->buildStorePR(
-    //    PHI_prno(phi), phi->get_type(), phicopy);
+    //    PHI_prno(phi), phi->getType(), phicopy);
     //substitue_phi->copyRef(phi, m_ru);
     //
     //BB_irlist(bb).insert_before(substitue_phi, phict);
@@ -1276,7 +1277,7 @@ bool MDSSAMgr::verifyPhi(bool is_vpinfo_avail)
         MDPhiList * philist = m_usedef_mgr.genBBPhiList(BB_id(bb));
         if (philist == NULL) { continue; }
 
-        for (SC<MDPhi*> * sct = philist->get_head();
+        for (xcom::SC<MDPhi*> * sct = philist->get_head();
              sct != philist->end(); sct = philist->get_next(sct)) {
             MDPhi * phi = sct->val();
             ASSERT0(phi);
@@ -1317,7 +1318,7 @@ bool MDSSAMgr::verifyPhi(bool is_vpinfo_avail)
 bool MDSSAMgr::verifyVMD()
 {
     //Check version for each vp.
-    BitSet defset;
+    xcom::BitSet defset;
     Vector<VOpnd*> * vec = m_usedef_mgr.getVOpndVec();
     for (INT i = 1; i <= vec->get_last_idx(); i++) {
         VMD * v = (VMD*)vec->get(i);
@@ -1481,10 +1482,10 @@ bool MDSSAMgr::verify()
 {
     //Check version for each vp.
     BBList * bbl = m_ru->getBBList();
-    C<IRBB*> * ct;
+    xcom::C<IRBB*> * ct;
     for (bbl->get_head(&ct); ct != bbl->end(); ct = bbl->get_next(ct)) {
         IRBB * bb = ct->val();
-        C<IR*> * ctir;
+        xcom::C<IR*> * ctir;
         for (BB_irlist(bb).get_head(&ctir);
              ctir != BB_irlist(bb).end();
              ctir = BB_irlist(bb).get_next(ctir)) {
@@ -1492,7 +1493,7 @@ bool MDSSAMgr::verify()
             //Verify PHI list.
             MDPhiList * philist = m_usedef_mgr.genBBPhiList(BB_id(bb));
             ASSERT0(philist);
-            for (SC<MDPhi*> * sct = philist->get_head();
+            for (xcom::SC<MDPhi*> * sct = philist->get_head();
                  sct != philist->end(); sct = philist->get_next(sct)) {
                 MDPhi * phi = sct->val();
                 ASSERT0(phi && phi->is_phi() && phi->getResult());
@@ -1677,7 +1678,7 @@ void MDSSAMgr::destruction()
     BBList * bblst = m_ru->getBBList();
     if (bblst->get_elem_count() == 0) { return; }
 
-    C<IRBB*> * bbct;
+    xcom::C<IRBB*> * bbct;
     for (bblst->get_head(&bbct);
          bbct != bblst->end(); bbct = bblst->get_next(bbct)) {
         IRBB * bb = bbct->val();
@@ -1695,8 +1696,8 @@ void MDSSAMgr::prunePhiForBB(List<IRBB*> & wl, IRBB * bb)
     ASSERT0(bb);
     MDPhiList * philist = m_usedef_mgr.genBBPhiList(BB_id(bb));
     ASSERT0(philist);
-    SC<MDPhi*> * next;
-    for (SC<MDPhi*> * sct = philist->get_head();
+    xcom::SC<MDPhi*> * next;
+    for (xcom::SC<MDPhi*> * sct = philist->get_head();
          sct != philist->end(); sct = next) {
         next = philist->get_next(sct);
         MDPhi * phi = sct->val();
@@ -1755,7 +1756,7 @@ void MDSSAMgr::prunePhi(List<IRBB*> & wl)
     START_TIMER(t, "MDSSA: Prune phi");
 
     BBList * bblst = m_ru->getBBList();
-    C<IRBB*> * ct;
+    xcom::C<IRBB*> * ct;
 
     wl.clean();
     for (bblst->get_head(&ct); ct != bblst->end(); ct = bblst->get_next(ct)) {
@@ -1829,9 +1830,9 @@ bool MDSSAMgr::construction(DomTree & domtree)
 
     START_TIMER(t1, "MDSSA: Build dominance frontier");
     DfMgr dfm;
-    dfm.build((DGraph&)*m_cfg); //Build dominance frontier.
+    dfm.build((xcom::DGraph&)*m_cfg); //Build dominance frontier.
     END_TIMER(t1, "MDSSA: Build dominance frontier");
-    if (dfm.hasHighDFDensityVertex((DGraph&)*m_cfg)) {
+    if (dfm.hasHighDFDensityVertex((xcom::DGraph&)*m_cfg)) {
         return false;
     }
 

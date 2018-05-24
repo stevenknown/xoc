@@ -97,7 +97,7 @@ bool IR_LOOP_CVT::try_convert(LI<IRBB> * li, IRBB * gobackbb,
         return false;
     }
 
-    C<IR*> * irct;
+    xcom::C<IR*> * irct;
     IR * lastir = BB_irlist(gobackbb).get_tail(&irct);
     ASSERT0(lastir->is_goto());
 

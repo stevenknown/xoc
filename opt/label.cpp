@@ -32,7 +32,7 @@ IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 author: Su Zhenyu
 @*/
 #include "../com/xcominc.h"
-#include "util.h"
+#include "commoninc.h"
 #include "symtab.h"
 #include "label.h"
 
@@ -77,7 +77,7 @@ void dumpLabel(LabelInfo const* li)
         ASSERT0(LABEL_INFO_pragma(li));
         fprintf(g_tfile, "\npragms(%s)",
                 SYM_name(LABEL_INFO_pragma(li)));
-    } else { UNREACH(); }
+    } else { UNREACHABLE(); }
 
     if (LABEL_INFO_b1(li) != 0) {
         fprintf(g_tfile, "(");

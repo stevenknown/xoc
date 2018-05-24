@@ -140,7 +140,7 @@ Int32 findPos(PositionMap* posMap,UInt32 target)
             low = mid;
     }
 
-    UNREACH();
+    UNREACHABLE();
     return -1;
 }
 
@@ -397,7 +397,7 @@ void genInstruction(
                 ::memcpy(lir->data,(BYTE*)data,dataSize);
                 break;
             }
-            default: UNREACH();
+            default: UNREACHABLE();
             }
             result = (LIRBaseOp*)lir;
             break;
@@ -456,7 +456,7 @@ END:
             break;
         }default:{
             result = NULL;
-            UNREACH();
+            UNREACHABLE();
         }
         }
 
@@ -481,7 +481,7 @@ END:
                     width = size * 4 + 2;
                     break;
                 }
-                default: UNREACH();
+                default: UNREACHABLE();
                     width = gDIROpcodeInfo.widths[opcode];
                     break;
             }
@@ -790,7 +790,7 @@ void d2rMethod(
                     width = size * 4 + 2;
                     break;
                 }
-                default: UNREACH();
+                default: UNREACHABLE();
             }
             codePtr += width;
             dexOffset += width;

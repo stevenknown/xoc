@@ -119,6 +119,18 @@ void smpoolFiniPool(); //Finializing pool
 void dumpPool(SMemPool * handler, FILE * h);
 #ifdef __cplusplus
 }
+
+//Replacement new-operator allocates memory from common pool.
+inline void * operator new(size_t size, SMemPool * handler)
+{
+    ASSERT0(handler);    
+    return smpoolMalloc(size, handler, MEM_COMM);
+}
+
+inline void operator delete(void *, SMemPool * handler)
+{
+    ASSERT0(handler);
+}
 #endif
 
 extern ULONGLONG g_stat_mem_size;

@@ -38,15 +38,15 @@ author: Su Zhenyu
 
 namespace xoc {
 
-class TG : public DGraph {
+class TG : public xcom::DGraph {
 protected:
     Region * m_ru;
 
 protected:
-    virtual void * cloneEdgeInfo(Edge *)
+    virtual void * cloneEdgeInfo(xcom::Edge *)
     { return NULL; }
 
-    virtual void * cloneVertexInfo(Vertex *)
+    virtual void * cloneVertexInfo(xcom::Vertex *)
     { return NULL; }
 
 public:
@@ -65,14 +65,14 @@ public:
 
     inline void computeDomAndIdom()
     {
-        if (!computeDom()) { UNREACH(); }
-        if (!computeIdom()) { UNREACH(); }
+        if (!computeDom()) { UNREACHABLE(); }
+        if (!computeIdom()) { UNREACHABLE(); }
     }
 
-    inline void computePdomAndIpdom(Vertex * root)
+    inline void computePdomAndIpdom(xcom::Vertex * root)
     {
-        if (!computePdomByRpo(root, NULL)) { UNREACH(); }
-        if (!computeIpdom()) { UNREACH(); }
+        if (!computePdomByRpo(root, NULL)) { UNREACHABLE(); }
+        if (!computeIpdom()) { UNREACHABLE(); }
     }
 };
 

@@ -337,6 +337,8 @@ public:
         m_bs.clean();
     }
 
+    bool is_contain(UINT i) const { return m_bs.is_contain(i); }
+
     //Overloaded [] for non-const array reference return.
     //Create an lvalue, equal to 'set()'
     inline T & operator[](INT i)

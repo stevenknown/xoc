@@ -77,7 +77,7 @@ inline UINT find_position(T const* list, T const* t)
     for (UINT c = 0; list != NULL; c++, list = list->next) {
         if (list == t) { return c; }
     }
-    UNREACH(); //not find.
+    UNREACHABLE(); //not find.
     return 0;
 }
 

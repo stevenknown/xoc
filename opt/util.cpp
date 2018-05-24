@@ -32,6 +32,7 @@ IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 author: Su Zhenyu
 @*/
 #include "../com/xcominc.h"
+#include "commoninc.h"
 #include "errno.h"
 #include "util.h"
 using namespace xoc;
@@ -46,6 +47,21 @@ INT g_indent = 0;
 FILE * g_tfile = NULL;
 static SMemPool * g_pool_tmp_used = NULL;
 static CHAR g_indent_chars = ' ';
+
+//Return true if val is 32bit integer.
+bool isInteger32bit(HOST_UINT val)
+{
+    ASSERT0(sizeof(HOST_UINT) >= sizeof(UINT32));
+    return (((UINT32)val) & (UINT32)0x0000FFFF) != val;
+}
+
+
+//Return true if val is 64bit integer.
+bool isInteger64bit(UINT64 val)
+{
+    return (val & (UINT64)0xFFFFFFFF) != val;
+}
+
 
 void interwarn(CHAR const* format, ...)
 {

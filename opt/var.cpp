@@ -85,7 +85,7 @@ void VAR::dumpProp(xcom::StrBuf & buf, bool grmode) const
         } else if (HAVE_FLAG(VAR_flag(this), VAR_LOCAL)) {
             buf.strcat("local");
         } else {
-            UNREACH();
+            UNREACHABLE();
         }
         if (HAVE_FLAG(VAR_flag(this), VAR_IS_SPILL)) {
             if (!first) {
@@ -249,7 +249,7 @@ CHAR const* VAR::dumpGR(StrBuf & buf, TypeMgr * dm) const
     xcom::StrBuf buf3(32);
     buf.strcat("var %s:%s",
         compositeName(VAR_name(this), buf3),
-        dm->dump_type(get_type(), buf2));
+        dm->dump_type(getType(), buf2));
     if (hasGRFlag() || get_align() > 1) {
         buf.strcat(":(");
         dumpProp(buf, true);

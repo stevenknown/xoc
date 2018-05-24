@@ -62,8 +62,8 @@ public:
     //Indicate a list of IR.
     IR * m_ir_list;
 
-    xcom::List<IR const*> * m_call_list; //record CALL/ICALL in region.
-    xcom::List<IR const*> * m_return_list; //record RETURN in region.
+    List<IR const*> * m_call_list; //record CALL/ICALL in region.
+    List<IR const*> * m_return_list; //record RETURN in region.
 
     RegionMgr * m_ru_mgr; //Region manager.
     PassMgr * m_pass_mgr; //PASS manager.
@@ -73,14 +73,14 @@ public:
     //All LOCAL vars in the tab will be destroyed during region destruction.
     VarTab m_ru_var_tab;
     IR * m_free_tab[MAX_OFFSET_AT_FREE_TABLE + 1];
-    xcom::Vector<VAR*> m_prno2var; //map prno to related VAR.
-    xcom::Vector<IR*> m_ir_vector; //record IR which have allocated.
+    Vector<VAR*> m_prno2var; //map prno to related VAR.
+    Vector<IR*> m_ir_vector; //record IR which have allocated.
     xcom::BitSetMgr m_bs_mgr;
     xcom::DefMiscBitSetMgr m_sbs_mgr;
     MDSetMgr m_mds_mgr;
     MDSetHashAllocator m_mds_hash_allocator;
     MDSetHash m_mds_hash;
-    xcom::List<DU*> m_free_du_list;
+    List<DU*> m_free_du_list;
     IRBBMgr m_ir_bb_mgr; //Allocate the basic block.
     BBList m_ir_bb_list; //record a list of basic blocks.
 
@@ -416,7 +416,7 @@ public:
         #ifdef CONST_IRT_SZ
         return IR_irt_size(ir);
         #else
-        return IRTSIZE(ir->get_code());
+        return IRTSIZE(ir->getCode());
         #endif
     }
 
@@ -451,10 +451,10 @@ public:
     VarTab * getVarTab() const
     { return &REGION_analysis_instrument(this)->m_ru_var_tab; }
 
-    BitSetMgr * getBitSetMgr() const
+    xcom::BitSetMgr * getBitSetMgr() const
     { return &REGION_analysis_instrument(this)->m_bs_mgr; }
 
-    DefMiscBitSetMgr * getMiscBitSetMgr() const
+    xcom::DefMiscBitSetMgr * getMiscBitSetMgr() const
     { return &REGION_analysis_instrument(this)->m_sbs_mgr; }
 
     MDSetMgr * getMDSetMgr() const
@@ -592,12 +592,12 @@ public:
     MD const* genMDforPR(IR const* ir)
     {
         ASSERT0(ir->isWritePR() || ir->isReadPR() || ir->isCallStmt());
-        return genMDforPR(ir->get_prno(), ir->get_type());
+        return genMDforPR(ir->getPrno(), ir->getType());
     }
 
     //Generate MD for VAR.
     MD const* genMDforVAR(VAR * var)
-    { return genMDforVAR(var, var->get_type()); }
+    { return genMDforVAR(var, var->getType()); }
 
 
     //Generate MD for VAR.
@@ -623,28 +623,28 @@ public:
     MD const* genMDforStore(IR const* ir)
     {
         ASSERT0(ir->is_st());
-        return genMDforVAR(ST_idinfo(ir), ir->get_type());
+        return genMDforVAR(ST_idinfo(ir), ir->getType());
     }
 
     //Generate MD for IR_LD.
     MD const* genMDforLoad(IR const* ir)
     {
         ASSERT0(ir->is_ld());
-        return genMDforVAR(LD_idinfo(ir), ir->get_type());
+        return genMDforVAR(LD_idinfo(ir), ir->getType());
     }
 
     //Generate MD for IR_ID.
     MD const* genMDforId(IR const* ir)
     {
         ASSERT0(ir->is_id());
-        return genMDforVAR(ID_info(ir), ir->get_type());
+        return genMDforVAR(ID_info(ir), ir->getType());
     }
 
     //Return the tyid for array index, the default is unsigned 32bit.
     inline Type const* getTargetMachineArrayIndexType()
     {
         return getTypeMgr()->getSimplexTypeEx(getTypeMgr()->
-            get_dtype(WORD_LENGTH_OF_TARGET_MACHINE, false));
+            getDType(WORD_LENGTH_OF_TARGET_MACHINE, false));
     }
 
     //Use HOST_INT type describes the value.
@@ -653,7 +653,7 @@ public:
     {
         ASSERT0(ir->is_const() && ir->is_int());
         UINT bitsz = getTypeMgr()->get_dtype_bitsize(
-            TY_dtype(ir->get_type()));
+            TY_dtype(ir->getType()));
         ASSERT(sizeof(HOST_INT) * BIT_PER_BYTE >= bitsz,
             ("integer might be truncated"));
         switch (bitsz) {
@@ -846,7 +846,10 @@ public:
     void registerGlobalVAR();
 
     IR * simpToPR(IR * ir, SimpCtx * ctx);
-    C<IRBB*> * splitIRlistIntoBB(IR * irs, BBList * bbl, C<IRBB*> * ctbb);
+    xcom::C<IRBB*> * splitIRlistIntoBB(
+            IR * irs,
+            BBList * bbl,
+            xcom::C<IRBB*> * ctbb);
     IR * simplifyLoopIngredient(IR * ir, SimpCtx * ctx);
     IR * simplifyBranch(IR * ir, SimpCtx * ctx);
     IR * simplifyIfSelf(IR * ir, SimpCtx * ctx);

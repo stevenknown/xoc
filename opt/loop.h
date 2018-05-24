@@ -59,7 +59,7 @@ public:
     UCHAR has_call:1;
     BB * loop_head; //loop head node, the only one header
                     //indicates a natural loop.
-    BitSet * bb_set; //loop body elements
+    xcom::BitSet * bb_set; //loop body elements
 
     bool is_loop_reduction() { return !has_early_exit; }
 

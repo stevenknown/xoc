@@ -50,9 +50,11 @@ Region * IPA::findRegion(IR * call, Region * callru)
 
     //Iterate accessing successors.
     ASSERT0(cg->get_vertex(CN_id(callercn)));
-    for (EdgeC const* ec = VERTEX_out_list(cg->get_vertex(CN_id(callercn)));
+    for (xcom::EdgeC const* ec =
+             VERTEX_out_list(cg->get_vertex(CN_id(callercn)));
          ec != NULL; ec = EC_next(ec)) {
-        CallNode * calleecn = cg->mapId2CallNode(VERTEX_id(EDGE_to(EC_edge(ec))));
+        CallNode * calleecn = cg->mapId2CallNode(
+            VERTEX_id(EDGE_to(EC_edge(ec))));
         ASSERT0(calleecn);
 
         Region * callee = CN_ru(calleecn);

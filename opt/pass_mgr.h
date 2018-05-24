@@ -55,7 +55,7 @@ protected:
     TypeMgr * m_tm;
     CDG * m_cdg;
     TMap<PASS_TYPE, Pass*> m_registered_pass;
-    TMap<PASS_TYPE, Graph*> m_registered_graph_based_pass;
+    TMap<PASS_TYPE, xcom::Graph*> m_registered_graph_based_pass;
 
     void * xmalloc(size_t size)
     {
@@ -64,7 +64,7 @@ protected:
         ::memset(p, 0, size);
         return p;
     }
-    Graph * registerGraphBasedPass(PASS_TYPE opty);
+    xcom::Graph * registerGraphBasedPass(PASS_TYPE opty);
 public:
     PassMgr(Region * rg);
     COPY_CONSTRUCTOR(PassMgr);
@@ -82,7 +82,7 @@ public:
         m_ti_list.append_tail(ti);
     }
 
-    virtual Graph * allocCDG();
+    virtual xcom::Graph * allocCDG();
     virtual Pass * allocCFG();
     virtual Pass * allocAA();
     virtual Pass * allocDUMgr();

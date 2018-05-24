@@ -71,13 +71,13 @@ typedef TMap<Region*, SYM2CN*> Region2SYM2CN;
 typedef TMapIter<Region*, SYM2CN*> Region2SYM2CNIter;
 
 
-//Call Graph
+//Call xcom::Graph
 //The call graph is not precise. That is, a callsite may indicate it can
 //call a function when in fact it does not do so in the running program.
 #define CALLG_DUMP_IR            1
 #define CALLG_DUMP_SRC_LINE      2
 #define CALLG_DUMP_INNER_REGION  4
-class CallGraph : public DGraph {
+class CallGraph : public xcom::DGraph {
     RegionMgr * m_ru_mgr;
     TypeMgr * m_tm;
     SMemPool * m_cn_pool; //pool for call node.
@@ -117,7 +117,7 @@ class CallGraph : public DGraph {
 public:
     CallGraph(UINT edge_hash,
               UINT vex_hash,
-              RegionMgr * rumgr): DGraph(edge_hash, vex_hash)
+              RegionMgr * rumgr): xcom::DGraph(edge_hash, vex_hash)
     {
         ASSERT0(edge_hash > 0 && vex_hash > 0);
         m_ru_mgr = rumgr;
@@ -152,7 +152,7 @@ public:
     void dump_vcg(CHAR const* name = NULL, INT flag = -1);
 
     CallNode * mapId2CallNode(UINT id) const { return m_cnid2cn.get(id); }
-    CallNode * mapVertex2CallNode(Vertex const* v) const
+    CallNode * mapVertex2CallNode(xcom::Vertex const* v) const
     { return m_cnid2cn.get(VERTEX_id(v)); }
 
     CallNode * mapRegion2CallNode(Region const* rg) const
@@ -185,7 +185,7 @@ public:
     void erase()
     {
         m_cnid2cn.clean();
-        Graph::erase();
+        xcom::Graph::erase();
     }
 
     //This is an interface.

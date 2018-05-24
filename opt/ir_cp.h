@@ -93,8 +93,8 @@ protected:
             IN IR * use,
             MDSSAMgr * mdssamgr);
     bool doPropToNormalStmt(
-            C<IR*> * cur_iter,
-            C<IR*> ** next_iter,
+            xcom::C<IR*> * cur_iter,
+            xcom::C<IR*> ** next_iter,
             bool prssadu,
             bool mdssadu,
             IN IR const* prop_value,
@@ -116,7 +116,7 @@ protected:
             IRBB * usebb);
     inline bool isCopyOR(IR * ir) const;
 
-    bool performDomTree(IN Vertex * v, IN Graph & domtree);
+    bool performDomTree(IN xcom::Vertex * v, IN xcom::Graph & domtree);
 
     void replaceExp(
             IR * exp,
@@ -152,7 +152,7 @@ public:
         case CP_PROP_CONST:
             return ir->is_lda() || ir->isConstExp();
         case CP_PROP_SIMPLEX:
-            switch (ir->get_code()) {
+            switch (ir->getCode()) {
             case IR_LDA:
             case IR_ID:
             case IR_CONST:
@@ -161,7 +161,7 @@ public:
             default: return isSimpCVT(ir);
             }
         case CP_PROP_UNARY_AND_SIMPLEX:
-            switch (ir->get_code()) {
+            switch (ir->getCode()) {
             case IR_LDA:
             case IR_ID:
             case IR_CONST:
@@ -175,7 +175,7 @@ public:
                 return false;
             default: return isSimpCVT(ir);
             }
-        default: UNREACH();
+        default: UNREACHABLE();
         }
         return false;
     }

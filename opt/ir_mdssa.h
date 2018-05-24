@@ -51,7 +51,7 @@ protected:
     UINT2VMDStack m_map_md2stack;
 
     //record version number counter for pr.
-    xcom::Vector<UINT> m_max_version;
+    Vector<UINT> m_max_version;
 
     UseDefMgr m_usedef_mgr;
 protected:
@@ -80,7 +80,7 @@ protected:
     void collectDefinedMD(IN IRBB * bb, OUT DefSBitSet & mustdef_pr);
 
     void destructBBSSAInfo(IRBB * bb);
-    void destructionInDomTreeOrder(IRBB * root, Graph & domtree);
+    void destructionInDomTreeOrder(IRBB * root, xcom::Graph & domtree);
     void dumpExpDUChainIter(
             IR const* ir,
             List<IR const*> & lst,
@@ -101,11 +101,11 @@ protected:
     void renameDef(IR * ir, IRBB * bb);
     void rename(DefSBitSet & effect_prs,
                 Vector<DefSBitSet*> & defed_prs_vec,
-                Graph & domtree);
+                xcom::Graph & domtree);
     void renameBB(IRBB * bb);
     void renameInDomTreeOrder(
             IRBB * root,
-            Graph & dtree,
+            xcom::Graph & dtree,
             Vector<DefSBitSet*> & defed_prs_vec);
 
     void stripPhi(MDPhi * phi);
@@ -116,7 +116,7 @@ protected:
             UINT mdid,
             IN List<IRBB*> * defbbs,
             DfMgr const& dfm,
-            BitSet & visited,
+            xcom::BitSet & visited,
             List<IRBB*> & wl,
             Vector<DefSBitSet*> & defmds_vec);
     void placePhi(DfMgr const& dfm,
@@ -159,12 +159,12 @@ public:
     {
         DUMMYUSE(def);
         DUMMYUSE(use);
-        UNREACH();
+        UNREACHABLE();
         //ASSERT0(def->isWritePR() || def->isCallHasRetVal());
         //ASSERT0(use->isReadPR());
         //MDSSAInfo * ssainfo = def->getMDSSAInfo();
         //if (ssainfo == NULL) {
-        //    ssainfo = allocMDSSAInfo(def->get_prno());
+        //    ssainfo = allocMDSSAInfo(def->getPrno());
         //    def->setSSAInfo(ssainfo);
         //    SSA_def(ssainfo) = def;
 

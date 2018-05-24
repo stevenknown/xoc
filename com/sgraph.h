@@ -410,7 +410,7 @@ public:
 
     void erase();
 
-    bool get_neighbor_list(IN OUT List<UINT> & ni_list, UINT vid) const;
+    bool getNeighborList(IN OUT List<UINT> & ni_list, UINT vid) const;
     bool get_neighbor_set(OUT DefSBitSet & niset, UINT vid) const;
     UINT get_degree(UINT vid) const
     {

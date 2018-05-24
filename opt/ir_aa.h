@@ -51,8 +51,8 @@ public:
 
 
 //PtPairSet
-//Since PtPair's id is densely allocated, using BitSet is plausible.
-typedef BitSet PtPairSet;
+//Since PtPair's id is densely allocated, using xcom::BitSet is plausible.
+typedef xcom::BitSet PtPairSet;
 
 
 //MD Addendum
@@ -74,14 +74,14 @@ protected:
 public:
     PPSetMgr()
     {
-        m_pool = smpoolCreate(sizeof(SC<PtPairSet*>) * 4, MEM_CONST_SIZE);
+        m_pool = smpoolCreate(sizeof(xcom::SC<PtPairSet*>) * 4, MEM_CONST_SIZE);
         m_free_pp_set.set_pool(m_pool);
         m_pp_set_list.set_pool(m_pool);
     }
     COPY_CONSTRUCTOR(PPSetMgr);
     ~PPSetMgr()
     {
-        for (SC<PtPairSet*> * sc = m_pp_set_list.get_head();
+        for (xcom::SC<PtPairSet*> * sc = m_pp_set_list.get_head();
              sc != m_pp_set_list.end(); sc = m_pp_set_list.get_next(sc)) {
             PtPairSet * pps = sc->val();
             ASSERT0(pps);
@@ -304,7 +304,7 @@ protected:
     Vector<PtPairSet*> m_out_pp_set;
     Var2MD m_var2md;
     PtPairMgr m_pt_pair_mgr;
-    BitSet m_is_visit;
+    xcom::BitSet m_is_visit;
 
     //This class contains those variables that can be referenced by
     //pointers (address-taken variables)
@@ -312,7 +312,7 @@ protected:
 
     //Analysis context. Record MD->MDSet for each BB.
     Vector<MD2MDSet*> m_md2mds_vec;
-    BitSet m_id2heap_md_map;
+    xcom::BitSet m_id2heap_md_map;
     MD2MDSet m_unique_md2mds;
 
     //If the flag is true, flow sensitive analysis is performed.
@@ -353,13 +353,11 @@ protected:
     void convertPT2MD2MDSet(
             PtPairSet const& pps,
             IN PtPairMgr & pt_pair_mgr,
-            IN OUT MD2MDSet * ctx,
-            IRBB const* bb);
+            IN OUT MD2MDSet * ctx);
     bool convertMD2MDSet2PT(
             OUT PtPairSet & pps,
             IN PtPairMgr & pt_pair_mgr,
-            IN MD2MDSet * mx,
-            IRBB const* bb);
+            IN MD2MDSet * mx);
 
     bool evaluateFromLda(IR const* ir);
 

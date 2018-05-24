@@ -107,14 +107,14 @@ public:
     void buildEHEdge();
 
     virtual void cf_opt();
-    void computeDomAndIdom(IN OUT OptCtx & oc, BitSet const* uni = NULL);
-    void computePdomAndIpdom(IN OUT OptCtx & oc, BitSet const* uni = NULL);
+    void computeDomAndIdom(IN OUT OptCtx & oc, xcom::BitSet const* uni = NULL);
+    void computePdomAndIpdom(IN OUT OptCtx & oc, xcom::BitSet const* uni = NULL);
 
     //Record the Exit BB here.
     virtual void computeExitList()
     {
         //Clean the Exit flag.
-        C<IRBB*> * ct;
+        xcom::C<IRBB*> * ct;
         for (m_exit_list.get_head(&ct);
              ct != m_exit_list.end();
              ct = m_exit_list.get_next(ct)) {
@@ -154,10 +154,10 @@ public:
     virtual void findTargetBBOfIndirectBranch(IR const*, OUT List<IRBB*>&);
     void findEHRegion(
             IRBB const* catch_start,
-            BitSet const& mainstreambbs,
-            OUT BitSet & ehbbs);
-    void findTryRegion(IRBB const* try_start, OUT BitSet & ehbbs);
-    void findAllTryRegions(OUT BitSet & trybbs);
+            xcom::BitSet const& mainstreambbs,
+            OUT xcom::BitSet & ehbbs);
+    void findTryRegion(IRBB const* try_start, OUT xcom::BitSet & ehbbs);
+    void findAllTryRegions(OUT xcom::BitSet & trybbs);
 
     //Allocate and initialize control flow graph.
     void initCfg(OptCtx & oc);
@@ -166,9 +166,9 @@ public:
     bool isRegionExit(IRBB * bb) { return BB_is_exit(bb); }
     void insertBBbetween(
             IN IRBB * from,
-            IN C<IRBB*> * from_ct,
+            IN xcom::C<IRBB*> * from_ct,
             IN IRBB * to,
-            IN C<IRBB*> * to_ct,
+            IN xcom::C<IRBB*> * to_ct,
             IN IRBB * newbb);
     bool inverseAndRemoveTrampolineBranch();
 
@@ -203,14 +203,14 @@ public:
     //pred: BB id of predecessor.
     UINT WhichPred(IRBB const* pred, IRBB const* bb) const
     {
-        Vertex * bb_vex = get_vertex(BB_id(bb));
+        xcom::Vertex * bb_vex = get_vertex(BB_id(bb));
         ASSERT0(bb_vex);
 
         UINT n = 0;
         bool find = false;
-        for (EdgeC * in = VERTEX_in_list(bb_vex);
+        for (xcom::EdgeC * in = VERTEX_in_list(bb_vex);
              in != NULL; in = EC_next(in)) {
-            Vertex * local_pred_vex = EDGE_from(EC_edge(in));
+            xcom::Vertex * local_pred_vex = EDGE_from(EC_edge(in));
             if (VERTEX_id(local_pred_vex) == BB_id(pred)) {
                 find = true;
                 break;

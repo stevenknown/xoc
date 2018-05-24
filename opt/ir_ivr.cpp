@@ -53,7 +53,7 @@ bool IR_IVR::computeInitVal(IR const* ir, IV * iv)
         v = ((CCvt*)v)->get_leaf_exp();
     }
 
-    IV_initv_data_type(iv) = v->get_type();
+    IV_initv_data_type(iv) = v->getType();
 
     if (v->is_const() && v->is_int()) {
         if (IV_initv_i(iv) == NULL) {
@@ -225,7 +225,7 @@ void IR_IVR::recordIV(
 //'map_md2defir': map MD to define stmt.
 void IR_IVR::findBIV(
         LI<IRBB> const* li,
-        BitSet & tmp,
+        xcom::BitSet & tmp,
         Vector<UINT> & map_md2defcount,
         UINT2IR & map_md2defir)
 {
@@ -322,7 +322,7 @@ void IR_IVR::findBIV(
             IR const* use = m_ru->getIR(i);
             ASSERT0(use->is_exp());
 
-            IR const* use_stmt = use->get_stmt();
+            IR const* use_stmt = use->getStmt();
             ASSERT0(use_stmt && use_stmt->is_stmt());
 
             if (use_stmt == def) {
@@ -364,28 +364,27 @@ bool IR_IVR::is_loop_invariant(LI<IRBB> const* li, IR const* ir)
 
 //Return true if ir can be regard as induction expression.
 //'defs': def list of 'ir'.
-bool IR_IVR::scanExp(IR const* ir, LI<IRBB> const* li, BitSet const& ivmds)
+bool IR_IVR::scanExp(IR const* ir, LI<IRBB> const* li, xcom::BitSet const& ivmds)
 {
     ASSERT0(ir->is_exp());
-    switch (ir->get_code()) {
+    switch (ir->getCode()) {
     case IR_CONST:
     case IR_LDA:
         return true;
     case IR_LD:
     case IR_ILD:
     case IR_ARRAY:
-    case IR_PR:
-        {
-            MD const* irmd = ir->getExactRef();
-            if (irmd == NULL) { return false; }
-            if (ivmds.is_contain(MD_id(irmd))) {
-                return true;
-            }
-            if (is_loop_invariant(li, ir)) {
-                return true;
-            }
-            return false;
+    case IR_PR: {
+        MD const* irmd = ir->getExactRef();
+        if (irmd == NULL) { return false; }
+        if (ivmds.is_contain(MD_id(irmd))) {
+            return true;
         }
+        if (is_loop_invariant(li, ir)) {
+            return true;
+        }
+        return false;
+    }
     case IR_ADD:
     case IR_SUB:
     case IR_MUL:
@@ -417,7 +416,7 @@ void IR_IVR::addDIVList(LI<IRBB> const* li, IR const* e)
     }
 
     bool find = false;
-    for (SC<IR const*> * sc = divlst->get_head();
+    for (xcom::SC<IR const*> * sc = divlst->get_head();
          sc != divlst->end(); sc = divlst->get_next(sc)) {
         IR const* ive = sc->val();
         ASSERT0(ive);
@@ -431,12 +430,12 @@ void IR_IVR::addDIVList(LI<IRBB> const* li, IR const* e)
 }
 
 
-void IR_IVR::findDIV(LI<IRBB> const* li, SList<IV*> const& bivlst, BitSet & tmp)
+void IR_IVR::findDIV(LI<IRBB> const* li, SList<IV*> const& bivlst, xcom::BitSet & tmp)
 {
     if (bivlst.get_elem_count() == 0) { return; }
 
     tmp.clean();
-    for (SC<IV*> * sc = bivlst.get_head();
+    for (xcom::SC<IV*> * sc = bivlst.get_head();
          sc != bivlst.end(); sc = bivlst.get_next(sc)) {
         IV * iv = sc->val();
         ASSERT0(iv);
@@ -448,7 +447,7 @@ void IR_IVR::findDIV(LI<IRBB> const* li, SList<IV*> const& bivlst, BitSet & tmp)
         IRBB * bb = m_cfg->getBB(i);
         ASSERT0(bb && m_cfg->get_vertex(BB_id(bb)));
         for (IR * ir = BB_first_ir(bb); ir != NULL; ir = BB_next_ir(bb)) {
-            switch (ir->get_code()) {
+            switch (ir->getCode()) {
             case IR_ST:
             case IR_STPR:
             case IR_IST:
@@ -494,7 +493,7 @@ void IR_IVR::_dump(LI<IRBB> * li, UINT indent)
 
         SList<IV*> * bivlst = m_li2bivlst.get(LI_id(li));
         if (bivlst != NULL) {
-            for (SC<IV*> * sc = bivlst->get_head();
+            for (xcom::SC<IV*> * sc = bivlst->get_head();
                  sc != bivlst->end(); sc = bivlst->get_next(sc)) {
                 IV * iv = sc->val();
                 ASSERT0(iv);
@@ -553,7 +552,7 @@ void IR_IVR::_dump(LI<IRBB> * li, UINT indent)
                 for (UINT i = 0; i < indent; i++) { fprintf(g_tfile, " "); }
                 fprintf(g_tfile, "DIV:");
             }
-            for (SC<IR const*> * sc = divlst->get_head();
+            for (xcom::SC<IR const*> * sc = divlst->get_head();
                  sc != divlst->end(); sc = divlst->get_next(sc)) {
                 IR const* iv = sc->val();
                 ASSERT0(iv);
@@ -617,7 +616,7 @@ bool IR_IVR::perform(OptCtx & oc)
     clean();
     if (li == NULL) { return false; }
 
-    BitSet tmp;
+    xcom::BitSet tmp;
     Vector<UINT> map_md2defcount;
     UINT2IR map_md2defir;
 

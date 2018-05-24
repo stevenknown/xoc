@@ -428,7 +428,7 @@ CHAR const* SIX<Mat, T>::get_status_name(UINT status) const
     case SIX_NO_PRI_FEASIBLE_SOL: s = "NO Prime SOL"; break;
     case SIX_OPTIMAL_IS_INFEASIBLE: s = "Optimal SOL is infeasible"; break;
     case SIX_TIME_OUT: s = "Time Out"; break;
-    default: UNREACH();
+    default: UNREACHABLE();
     }
     return s;
 }
@@ -2459,7 +2459,7 @@ UINT MIP<Mat, T>::RecusivePart(
             status = IP_NO_PRI_FEASIBLE_SOL;
             break;
         case SIX_TIME_OUT:
-        default: UNREACH();
+        default: UNREACHABLE();
         }
         return status;
     }

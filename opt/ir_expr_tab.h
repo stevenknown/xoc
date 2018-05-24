@@ -79,7 +79,7 @@ class IR_EXPR_TAB : public Pass {
     ExpRep ** m_level1_hash_tab[IR_EXPR_TAB_LEVEL1_HASH_BUCKET];
     Vector<ExpRep*> m_map_ir2ir_expr;
     MDSetMgr * m_md_set_mgr; //alloca MS_SET.
-    BitSetMgr * m_bs_mgr;
+    xcom::BitSetMgr * m_bs_mgr;
 
     void * xmalloc(INT size);
     inline UINT compute_hash_key(IR const* ir);

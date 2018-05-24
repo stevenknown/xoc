@@ -38,18 +38,18 @@ namespace xoc {
 
 class Region;
 
-//Control Dependence Graph
-class CDG : public Graph {
+//Control Dependence xcom::Graph
+class CDG : public xcom::Graph {
     Region * m_ru;
 public:
     CDG(Region * rg) { m_ru = rg; }
-    void get_cd_preds(UINT id, OUT List<Vertex*> & lst);
-    void get_cd_succs(UINT id, OUT List<Vertex*> & lst);
+    void get_cd_preds(UINT id, OUT List<xcom::Vertex*> & lst);
+    void get_cd_succs(UINT id, OUT List<xcom::Vertex*> & lst);
     bool is_only_cd_self(UINT id);
     bool is_cd(UINT a, UINT b);
     void dump();
-    void build(IN OUT OptCtx & oc, DGraph & cfg);
-    void rebuild(IN OUT OptCtx & oc, DGraph & cfg);
+    void build(IN OUT OptCtx & oc, xcom::DGraph & cfg);
+    void rebuild(IN OUT OptCtx & oc, xcom::DGraph & cfg);
 };
 
 } //namespace xoc

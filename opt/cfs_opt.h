@@ -59,7 +59,7 @@ public:
     bool CfsOpt(IN OUT IR ** ir_list, SimpCtx const& sc);
     virtual bool perform(OptCtx &)
     {
-        UNREACH();
+        UNREACHABLE();
         return false;
     }
     virtual bool perform(SimpCtx const& simp);

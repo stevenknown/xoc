@@ -142,7 +142,7 @@ bool IR_LICM::markExpAndStmt(IR * ir, TTab<IR*> & invariant_exp)
 {
     bool change = false;
     IR * e;
-    switch (ir->get_code()) {
+    switch (ir->getCode()) {
     case IR_ST:
         e = ST_rhs(ir);
         if (!e->isConstExp() && !e->is_pr()) {
@@ -281,35 +281,33 @@ bool IR_LICM::scanResult(OUT TTab<IR*> & invariant_stmt)
     bool change = false;
     for (IR * stmt = m_analysable_stmt_list.remove_head(); stmt != NULL;
          stmt = m_analysable_stmt_list.remove_head()) {
-        switch (stmt->get_code()) {
+        switch (stmt->getCode()) {
         case IR_ST:
-        case IR_STPR:
-            {
-                MD const* must = stmt->getRefMD();
-                ASSERT0(must);
-                if (isUniqueDef(must) &&
-                    !invariant_stmt.find(stmt)) {
-                    invariant_stmt.append(stmt);
-                    change = true;
-                }
+        case IR_STPR: {
+            MD const* must = stmt->getRefMD();
+            ASSERT0(must);
+            if (isUniqueDef(must) &&
+                !invariant_stmt.find(stmt)) {
+                invariant_stmt.append(stmt);
+                change = true;
             }
             break;
-        case IR_IST:
-            {
-                MD const* must = stmt->getRefMD();
-                if (must != NULL && must->is_effect() &&
-                    isUniqueDef(must) &&
-                    !invariant_stmt.find(stmt)) {
-                    invariant_stmt.append(stmt);
-                    change = true;
-                }
+        }
+        case IR_IST: {
+            MD const* must = stmt->getRefMD();
+            if (must != NULL && must->is_effect() &&
+                isUniqueDef(must) &&
+                !invariant_stmt.find(stmt)) {
+                invariant_stmt.append(stmt);
+                change = true;
             }
             break;
+        }
         case IR_CALL:
         case IR_ICALL:
             //TODO: hoist readonly call.
             break;
-        default: UNREACH(); //TODO: support more operations.
+        default: UNREACHABLE(); //TODO: support more operations.
         }
     }
     return change;
@@ -318,7 +316,7 @@ bool IR_LICM::scanResult(OUT TTab<IR*> & invariant_stmt)
 
 void IR_LICM::updateMD2Num(IR * ir)
 {
-    switch (ir->get_code()) {
+    switch (ir->getCode()) {
     case IR_ST:
     case IR_STPR:
         {
@@ -371,7 +369,7 @@ void IR_LICM::updateMD2Num(IR * ir)
     case IR_FALSEBR:
     case IR_RETURN:
         break;
-    default: UNREACH(); //Unsupport.
+    default: UNREACHABLE(); //Unsupport.
     }
 }
 
@@ -457,7 +455,7 @@ bool IR_LICM::is_stmt_dom_its_use(
         LI<IRBB> const* li,
         IRBB const* stmtbb) const
 {
-    IR const* ustmt = use->get_stmt();
+    IR const* ustmt = use->getStmt();
     UINT ubbid = BB_id(ustmt->getBB());
     if (!li->is_inside_loop(ubbid)) { return true; }
 
@@ -493,7 +491,7 @@ bool IR_LICM::is_dom_all_use_in_loop(IR const* ir, LI<IRBB> * li)
                 continue;
             }
 
-            ASSERT(PR_no(use) == ir->get_prno(), ("prno is unmatch"));
+            ASSERT(PR_no(use) == ir->getPrno(), ("prno is unmatch"));
             ASSERT0(PR_ssainfo(use) == ssainfo);
 
             if (!is_stmt_dom_its_use(ir, use, li, irbb)) {
@@ -510,7 +508,7 @@ bool IR_LICM::is_dom_all_use_in_loop(IR const* ir, LI<IRBB> * li)
     for (INT i = useset->get_first(&di);
          i >= 0; i = useset->get_next(i, &di)) {
         IR const* u = m_ru->getIR(i);
-        ASSERT0(u->is_exp() && u->get_stmt());
+        ASSERT0(u->is_exp() && u->getStmt());
 
         if (!is_stmt_dom_its_use(ir, u, li, irbb)) {
             return false;
@@ -627,7 +625,7 @@ bool IR_LICM::hoistCand(
             ASSERT0(c->is_exp());
             if (!isWorthHoist(c)) { continue; }
 
-            IR * stmt = c->get_stmt();
+            IR * stmt = c->getStmt();
 
             //Check that each definitions of candidate have been
             //already hoisted out of the loop.

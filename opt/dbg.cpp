@@ -76,9 +76,9 @@ UINT get_lineno(IR const* ir)
 
 
 //Get line number in source code.
-UINT get_lineno(Dbx const& dbx)
+UINT get_lineno(Dbx const* dbx)
 {
-    return DBX_lineno(&dbx);
+    return DBX_lineno(dbx);
 }
 
 
@@ -129,7 +129,7 @@ void DbxMgr::printSrcLine(IR const* ir)
     if (!ir->is_stmt()) { return; }
     Dbx * dbx = ::get_dbx(ir);
     if (dbx != NULL) {
-        printSrcLine(*dbx);
+        printSrcLine(dbx);
     }
 }
 //END DbxMgr

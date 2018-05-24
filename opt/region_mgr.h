@@ -76,8 +76,8 @@ protected:
     UINT m_num_allocated;
     #endif
     Vector<Region*> m_id2ru;
-    BitSetMgr m_bs_mgr;
-    DefMiscBitSetMgr m_sbs_mgr;
+    xcom::BitSetMgr m_bs_mgr;
+    xcom::DefMiscBitSetMgr m_sbs_mgr;
     SymTab m_sym_tab;
     TypeMgr m_type_mgr;
     VarMgr * m_var_mgr;
@@ -129,8 +129,8 @@ public:
     //Dump regions recorded via addToRegionTab().
     void dump(bool dump_inner_region);
 
-    BitSetMgr * getBitSetMgr() { return &m_bs_mgr; }
-    DefMiscBitSetMgr * get_sbs_mgr() { return &m_sbs_mgr; }
+    xcom::BitSetMgr * getBitSetMgr() { return &m_bs_mgr; }
+    xcom::DefMiscBitSetMgr * get_sbs_mgr() { return &m_sbs_mgr; }
     virtual Region * getRegion(UINT id) { return m_id2ru.get(id); }
     UINT getNumOfRegion() const { return (UINT)(m_id2ru.get_last_idx() + 1); }
     VarMgr * getVarMgr() { return m_var_mgr; }

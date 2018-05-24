@@ -43,7 +43,7 @@ void CallGraph::computeEntryList(List<CallNode*> & elst)
 {
     elst.clean();
     INT c;
-    for (Vertex * v = get_first_vertex(c);
+    for (xcom::Vertex * v = get_first_vertex(c);
          v != NULL; v = get_next_vertex(c)) {
         if (VERTEX_in_list(v) == NULL) {
             CallNode * cn = m_cnid2cn.get(VERTEX_id(v));
@@ -58,7 +58,7 @@ void CallGraph::computeExitList(List<CallNode*> & elst)
 {
     elst.clean();
     INT c;
-    for (Vertex * v = get_first_vertex(c);
+    for (xcom::Vertex * v = get_first_vertex(c);
          v != NULL; v = get_next_vertex(c)) {
         if (VERTEX_out_list(v) == NULL) {
             CallNode * cn = m_cnid2cn.get(VERTEX_id(v));
@@ -134,7 +134,7 @@ void CallGraph::dump_vcg(CHAR const* name, INT flag)
     g_tfile = h;
     INT c;
     List<VAR const*> formalparamlst;
-    for (Vertex * v = m_vertices.get_first(c);
+    for (xcom::Vertex * v = m_vertices.get_first(c);
          v != NULL; v = m_vertices.get_next(c)) {
         INT id = VERTEX_id(v);
         CallNode * cn = m_cnid2cn.get(id);
@@ -179,9 +179,10 @@ void CallGraph::dump_vcg(CHAR const* name, INT flag)
     }
 
     //Dump graph edge
-    for (Edge * e = m_edges.get_first(c); e != NULL; e = m_edges.get_next(c)) {
-        Vertex * from = EDGE_from(e);
-        Vertex * to = EDGE_to(e);
+    for (xcom::Edge * e = m_edges.get_first(c);
+         e != NULL; e = m_edges.get_next(c)) {
+        xcom::Vertex * from = EDGE_from(e);
+        xcom::Vertex * to = EDGE_to(e);
         fprintf(h, "\nedge: { sourcename:\"%d\" targetname:\"%d\" %s}",
                 VERTEX_id(from), VERTEX_id(to),  "");
     }
@@ -276,7 +277,7 @@ bool CallGraph::build(RegionMgr * rumgr)
 
                 if (CN_ru(cn) != rg) {
                     //more than one regions has the same id.
-                    //UNREACH();
+                    //UNREACHABLE();
                     return false;
                 }
 
@@ -299,7 +300,7 @@ bool CallGraph::build(RegionMgr * rumgr)
         ASSERT0(call_list);
         if (call_list->get_elem_count() == 0) { continue; }
 
-        C<IR const*> * ct;
+        xcom::C<IR const*> * ct;
         for (call_list->get_head(&ct);
              ct != NULL; ct = call_list->get_next(ct)) {
             IR const* ir = ct->val();

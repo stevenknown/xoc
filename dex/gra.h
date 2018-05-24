@@ -90,7 +90,7 @@ public:
     //or return -1 if nothing find.
     //e.g:
     //    lowest_pos....pos...forward_occ...highest_pos
-    inline INT get_forward_occ(INT pos, OUT bool * is_def, INT firstpos)
+    inline INT getForwardOcc(INT pos, OUT bool * is_def, INT firstpos)
     {
         DUMMYUSE(firstpos);
         ASSERT(pos >= firstpos, ("Illegal position"));
@@ -115,7 +115,7 @@ public:
     //or return -1 if nothing find.
     //e.g:
     //    lowest_pos....pos...forward_def...highest_pos
-    inline INT get_forward_def_occ(INT pos, INT firstpos)
+    inline INT getForwardOccForDEF(INT pos, INT firstpos)
     {
         DUMMYUSE(firstpos);
         ASSERT(pos >= firstpos, ("Illegal position"));
@@ -131,7 +131,7 @@ public:
     //Get backward occurrences of 'pos'
     //e.g:
     //    Lowest_Pos...Backward_Occ....Pos.....Highest_Pos
-    inline INT get_backward_occ(INT pos, OUT bool * is_d, INT firstpos)
+    inline INT getBackwardOcc(INT pos, OUT bool * is_d, INT firstpos)
     {
         ASSERT(pos >= firstpos, ("Illegal position"));
         if (pos == firstpos && (occ == NULL || occ->is_empty())) { return -1; }
@@ -151,7 +151,7 @@ public:
         return backwpos;
     }
 
-    inline INT get_backward_def_occ(INT pos, INT firstpos)
+    inline INT getBackwardOccForDEF(INT pos, INT firstpos)
     {
         ASSERT(pos >= firstpos, ("Illegal position"));
         if (pos == firstpos && (occ == NULL || occ->is_empty())) { return -1; }
@@ -195,7 +195,7 @@ public:
     COPY_CONSTRUCTOR(LTG);
 
     //Return the number of lt in group.
-    UINT get_lt_count() const { return get_last_idx() + 1; }
+    UINT getLiftTimeCount() const { return get_last_idx() + 1; }
 
     //Return register group size.
     UINT get_rg_sz() const
@@ -341,7 +341,7 @@ protected:
         return p;
     }
 
-    void revise_lt_case_1(LT * lt);
+    void reviseLTCase1(LT * lt);
     void revise_special_lt(List<LT*> * lts);
     void process_rg(LT * lt);
     void processLiveout(IN OUT BitSet & lived_lt, UINT pos,
@@ -379,7 +379,7 @@ public:
 
 
     IRBB * getBB() { return m_bb; }
-    LT * get_lt(UINT ltid) { return m_lt_vec.get(ltid); }
+    LT * getLifeTime(UINT ltid) { return m_lt_vec.get(ltid); }
     Vector<LT*> * get_lt_vec() { return &m_lt_vec; }
     UINT get_first_pos() const { return LT_FIRST_POS; }
     UINT get_last_pos() const { return m_max_lt_len - 1; }
@@ -426,7 +426,7 @@ public:
 
     LT * newLT(UINT prno);
 
-    void removeLT(LT * lt);
+    void removeLifeTime(LT * lt);
     void renameLT(LT * l, IR ** newpr);
     void rename(TMap<UINT, LT*> & prno2lt, BitSet & met);
 
@@ -578,7 +578,7 @@ public:
     Vector<GLT*> * get_pr2glt_map() { return &m_pr2glt; }
     UINT get_num_of_glt() const { return m_glt_count - 1; }
     Vector<GLT*> * get_gltvec() { return &m_gltid2glt_map; }
-    BitSet * getUsableReg(GLT const* g, bool alloc)
+    BitSet * getUsableRegSet(GLT const* g, bool alloc)
     {
         BitSet * rs = m_glt2usable_regs.get(GLT_id(g));
         if (rs == NULL && alloc) {
@@ -922,7 +922,7 @@ public:
     COPY_CONSTRUCTOR(RA);
     ~RA(){}
 
-    LT * get_lt(UINT bbid, UINT prno)
+    LT * getLifeTime(UINT bbid, UINT prno)
     {
         LTMgr * ltm = m_gltm.get_ltm(bbid);
         if (ltm == NULL) { return NULL; }

@@ -54,7 +54,7 @@ CFS_INFO * CfsMgr::new_cfs_info(IR_TYPE irtype)
         CFS_INFO_loop_body(ci) = m_bs_mgr.create();
         break;
     default:
-        UNREACH();
+        UNREACHABLE();
     }
     return ci;
 }
@@ -73,7 +73,7 @@ CFS_INFO * CfsMgr::map_ir2cfsinfo(IR * ir)
 
 
 //Record IR list into 'irset'.
-void CfsMgr::recordStmt(IR * ir_list, BitSet & irset)
+void CfsMgr::recordStmt(IR * ir_list, xcom::BitSet & irset)
 {
     while (ir_list != NULL) {
         irset.bunion(IR_id(ir_list));
@@ -154,9 +154,9 @@ void CfsMgr::set_map_bb2abs(IRBB const* bb, AbsNode * abs)
 AbsNode * CfsMgr::constructAbsLoop(
         IN IRBB * entry,
         IN AbsNode * parent,
-        IN BitSet * cur_region,
-        IN Graph & cur_graph,
-        IN OUT BitSet & visited)
+        IN xcom::BitSet * cur_region,
+        IN xcom::Graph & cur_graph,
+        IN OUT xcom::BitSet & visited)
 {
     DUMMYUSE(cur_region);
     ASSERT0(cur_region == NULL || cur_region->is_contain(BB_id(entry)));
@@ -177,7 +177,7 @@ AbsNode * CfsMgr::constructAbsLoop(
     ASSERT0(CFS_INFO_head(ci) == entry);
 
     ASSERT0(CFS_INFO_loop_body(ci)->is_contain(*LI_bb_set(li)));
-    BitSet loc_visited;
+    xcom::BitSet loc_visited;
     ABS_NODE_loop_body(node) = constructAbsTree(body_start, node,
         LI_bb_set(li), cur_graph, loc_visited);
     visited.bunion(loc_visited);
@@ -190,8 +190,8 @@ AbsNode * CfsMgr::constructAbsLoop(
 AbsNode * CfsMgr::constructAbsIf(
         IN IRBB * entry,
         IN AbsNode * parent,
-        IN Graph & cur_graph,
-        IN OUT BitSet & visited)
+        IN xcom::Graph & cur_graph,
+        IN OUT xcom::BitSet & visited)
 {
     AbsNode * node = new_abs_node(ABS_IF);
     set_map_bb2abs(entry, node);
@@ -204,7 +204,7 @@ AbsNode * CfsMgr::constructAbsIf(
     CFS_INFO * ci = map_ir2cfsinfo(cfg->get_last_xr(entry));
     ASSERT0(ci != NULL && CFS_INFO_head(ci) == entry);
 
-    BitSet loc_visited;
+    xcom::BitSet loc_visited;
     ABS_NODE_true_body(node) = constructAbsTree(true_body, node,
         CFS_INFO_true_body(ci), cur_graph, loc_visited);
     visited.bunion(loc_visited);
@@ -230,17 +230,17 @@ AbsNode * CfsMgr::constructAbsBB(IN IRBB * bb, IN AbsNode * parent)
 AbsNode * CfsMgr::constructAbsTree(
         IN IRBB * entry,
         IN AbsNode * parent,
-        IN BitSet * cur_region,
-        IN Graph & cur_graph,
-        IN OUT BitSet & visited)
+        IN xcom::BitSet * cur_region,
+        IN xcom::Graph & cur_graph,
+        IN OUT xcom::BitSet & visited)
 {
     IR_CFG * cfg = m_ru->getCFG();
     AbsNode * lst = NULL;
     IRBB * bb = entry;
-    Graph g;
+    xcom::Graph g;
     g.clone(cur_graph);
-    Vertex * next = NULL;
-    Vertex * v;
+    xcom::Vertex * next = NULL;
+    xcom::Vertex * v;
     if (cur_region != NULL) {
         if (cur_region->get_elem_count() == 0) {
             visited.clean();
@@ -255,7 +255,7 @@ AbsNode * CfsMgr::constructAbsTree(
             g.removeVertex(v);
         }
     }
-    BitSet loc_visited;
+    xcom::BitSet loc_visited;
     while (bb != NULL &&
            (cur_region == NULL ||
             cur_region->is_contain(BB_id(bb)))) {
@@ -278,7 +278,7 @@ AbsNode * CfsMgr::constructAbsTree(
                 //  return 2;
                 //
                 //  BB1 does not have a ipdom.
-                UINT ipdom = ((DGraph*)cfg)->get_ipdom(BB_id(bb));
+                UINT ipdom = ((xcom::DGraph*)cfg)->get_ipdom(BB_id(bb));
                 DUMMYUSE(ipdom);
                 ASSERT(ipdom > 0, ("bb does not have ipdom"));
                 node = constructAbsIf(bb, parent, g, loc_visited);
@@ -331,9 +331,9 @@ AbsNode * CfsMgr::constructAbstractControlFlowStruct()
 {
     IR_CFG * cfg = m_ru->getCFG();
     ASSERT(cfg->get_entry(), ("CFG should be single-entry"));
-    BitSet visited;
+    xcom::BitSet visited;
     AbsNode * a = constructAbsTree(cfg->get_entry(), NULL,
-        NULL, *(Graph*)cfg, visited);
+        NULL, *(xcom::Graph*)cfg, visited);
     //dump_abs_tree(a);
     return a;
 }

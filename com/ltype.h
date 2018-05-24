@@ -156,7 +156,7 @@ author: Su Zhenyu
     #define ASSERTL0(a, filename, line)
 #endif
 
-#define UNREACH()  ASSERT(0, ("Unreachable."))
+#define UNREACHABLE()  ASSERT(0, ("Unreachable."))
 
 #undef MAX
 #define MAX(a,b)    ((a)>(b)?(a):(b))

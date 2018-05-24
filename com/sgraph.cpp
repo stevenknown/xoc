@@ -527,7 +527,7 @@ Vertex * Graph::removeVertex(Vertex * vex)
 //
 //'ni_list': record the neighbours of 'vid'.
 //    Note that this function ensure each neighbours in ni_list is unique.
-bool Graph::get_neighbor_list(OUT List<UINT> & ni_list, UINT vid) const
+bool Graph::getNeighborList(OUT List<UINT> & ni_list, UINT vid) const
 {
     ASSERT(m_ec_pool != NULL, ("not yet initialized."));
 

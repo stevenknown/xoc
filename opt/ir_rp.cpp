@@ -55,16 +55,16 @@ public:
         ASSERT0(bucket_size != 0 && isPowerOf2(bucket_size));
         UINT hval = 0;
         ConstIRIter iter;
-        switch (t->get_code()) {
+        switch (t->getCode()) {
         case IR_LD:
-            hval = t->get_code() + (t->getOffset() + 1) +
-                   (UINT)(size_t)t->get_type();
+            hval = t->getCode() + (t->getOffset() + 1) +
+                   (UINT)(size_t)t->getType();
             break;
         case IR_ILD:
             for (IR const* x = iterInitC(t, iter);
                  x != NULL; x = iterNextC(iter)) {
-                UINT v = x->get_code() + (x->getOffset() + 1) +
-                    (UINT)(size_t)x->get_type();
+                UINT v = x->getCode() + (x->getOffset() + 1) +
+                    (UINT)(size_t)x->getType();
                 if (x->is_id()) {
                     v += ((UINT)(size_t)ID_info(x)) * 5;
                 }
@@ -73,33 +73,33 @@ public:
             break;
         case IR_ST:
             hval = ((UINT)IR_LD) + (t->getOffset() + 1) +
-                   (UINT)(size_t)t->get_type();
+                   (UINT)(size_t)t->getType();
             break;
         case IR_IST:
             for (IR const* x = iterInitC(IST_base(t), iter);
                  x != NULL; x = iterNextC(iter)) {
-                UINT v = x->get_code() + (x->getOffset() + 1) +
-                        (UINT)(size_t)x->get_type();
+                UINT v = x->getCode() + (x->getOffset() + 1) +
+                        (UINT)(size_t)x->getType();
                 if (x->is_id()) {
                     v += ((UINT)(size_t)ID_info(x)) * 5;
                 }
                 hval += v;
             }
             hval += ((UINT)IR_ILD) + (t->getOffset() + 1) +
-                    (UINT)(size_t)t->get_type();
+                    (UINT)(size_t)t->getType();
             break;
         case IR_ARRAY:
             for (IR const* x = iterInitC(t, iter);
                  x != NULL; x = iterNextC(iter)) {
-                UINT v = x->get_code() + (x->getOffset() + 1) +
-                        (UINT)(size_t)x->get_type();
+                UINT v = x->getCode() + (x->getOffset() + 1) +
+                        (UINT)(size_t)x->getType();
                 if (x->is_id()) {
                     v += ((UINT)(size_t)ID_info(x)) * 5;
                 }
                 hval += v;
             }
             break;
-        default: UNREACH(); //unsupport.
+        default: UNREACHABLE(); //unsupport.
         }
         return hash32bit(hval) & (bucket_size - 1);
     }
@@ -448,7 +448,7 @@ void IR_RP::dump_mdlt()
         ASSERT0(md != NULL);
         MD_LT * lt = m_md2lt_map->get(md);
         ASSERT0(lt != NULL);
-        BitSet * livebbs = MDLT_livebbs(lt);
+        xcom::BitSet * livebbs = MDLT_livebbs(lt);
         ASSERT0(livebbs != NULL);
 
         //Print MD name.
@@ -754,7 +754,7 @@ bool IR_RP::handleGeneralRef(
             return true;
         }
     } else {
-        UNREACH(); //TODO
+        UNREACHABLE(); //TODO
     }
 
     TabIter<IR*> ti;
@@ -913,8 +913,8 @@ UINT IR_RP::analyzeIndirectAccessStatus(IR const* ref1, IR const* ref2)
     VN const* vn2 = m_gvn->mapIR2VN(base2);
     if (vn1 == NULL || vn2 == NULL) { return RP_UNKNOWN; }
 
-    UINT tysz1 = ref1->get_type_size(m_tm);
-    UINT tysz2 = ref2->get_type_size(m_tm);
+    UINT tysz1 = ref1->getTypeSize(m_tm);
+    UINT tysz2 = ref2->getTypeSize(m_tm);
     UINT ofst1 = ref1->getOffset();
     UINT ofst2 = ref2->getOffset();
     if ((((ofst1 + tysz1) <= ofst2) ||
@@ -969,7 +969,7 @@ bool IR_RP::scanResult(
         OUT List<IR*> & exact_occ_list,
         OUT TTab<IR*> & inexact_access)
 {
-    switch (ir->get_code()) {
+    switch (ir->getCode()) {
     case IR_ST:
         return handleGeneralRef(ir, li, exact_access, exact_occ_list,
                                 inexact_access);
@@ -1091,7 +1091,7 @@ void IR_RP::replaceUseForTree(IR * oldir, IR * newir)
         m_du->removeUseOutFromDefset(ARR_sub_list(oldir));
         m_du->changeUse(newir, oldir, m_ru->getMiscBitSetMgr());
     } else {
-        UNREACH(); //TODO
+        UNREACHABLE(); //TODO
     }
 }
 
@@ -1120,62 +1120,56 @@ void IR_RP::handleRestore2Mem(
         }
 
         IR * stmt = NULL;
-        switch (delegate->get_code()) {
+        switch (delegate->getCode()) {
         case IR_ARRAY:
-        case IR_STARRAY:
-            {
-                ASSERT(delegate->getOffset() == 0, ("TODO: not yet support."));
+        case IR_STARRAY: {
+            ASSERT(delegate->getOffset() == 0, ("TODO: not yet support."));
 
-                //Prepare base and subscript expression list.
-                IR * base = m_ru->dupIRTree(ARR_base(delegate));
-                IR * sublist = m_ru->dupIRTree(ARR_sub_list(delegate));
+            //Prepare base and subscript expression list.
+            IR * base = m_ru->dupIRTree(ARR_base(delegate));
+            IR * sublist = m_ru->dupIRTree(ARR_sub_list(delegate));
 
-                //Copy DU chain and MD reference.
-                m_du->copyIRTreeDU(base, ARR_base(delegate), true);
-                m_du->copyIRTreeDU(sublist, ARR_sub_list(delegate), true);
+            //Copy DU chain and MD reference.
+            m_du->copyIRTreeDU(base, ARR_base(delegate), true);
+            m_du->copyIRTreeDU(sublist, ARR_sub_list(delegate), true);
 
-                //Build Store Array operation.
-                stmt = m_ru->buildStoreArray(
-                    base, sublist, IR_dt(delegate),
-                    ARR_elemtype(delegate),
-                    ((CArray*)delegate)->getDimNum(),
-                    ARR_elem_num_buf(delegate),
-                    pr);
+            //Build Store Array operation.
+            stmt = m_ru->buildStoreArray(
+                base, sublist, IR_dt(delegate),
+                ARR_elemtype(delegate),
+                ((CArray*)delegate)->getDimNum(),
+                ARR_elem_num_buf(delegate),
+                pr);
 
-                //Copy MD reference for store array operation.
-                stmt->copyRef(delegate, m_ru);
-            }
+            //Copy MD reference for store array operation.
+            stmt->copyRef(delegate, m_ru);
             break;
-        case IR_IST:
-            {
-                IR * lhs = m_ru->dupIRTree(IST_base(delegate));
-                m_du->copyIRTreeDU(lhs, IST_base(delegate), true);
+        }
+        case IR_IST: {
+            IR * lhs = m_ru->dupIRTree(IST_base(delegate));
+            m_du->copyIRTreeDU(lhs, IST_base(delegate), true);
 
-                stmt = m_ru->buildIstore(lhs, pr,
-                    IST_ofst(delegate), IR_dt(delegate));
-            }
+            stmt = m_ru->buildIstore(lhs, pr,
+                IST_ofst(delegate), IR_dt(delegate));
             break;
+        }
         case IR_ST:
-            {
-                stmt = m_ru->buildStore(ST_idinfo(delegate),
-                                        IR_dt(delegate),
-                                        ST_ofst(delegate), pr);
-            }
+            stmt = m_ru->buildStore(ST_idinfo(delegate),
+                IR_dt(delegate), ST_ofst(delegate), pr);
             break;
-        case IR_ILD:
-            {
-                IR * base = m_ru->dupIRTree(ILD_base(delegate));
-                stmt = m_ru->buildIstore(base, pr,
-                    ILD_ofst(delegate), IR_dt(delegate));
-                m_du->copyIRTreeDU(base, ILD_base(delegate), true);
-            }
+        case IR_ILD: {
+            IR * base = m_ru->dupIRTree(ILD_base(delegate));
+            stmt = m_ru->buildIstore(base, pr,
+                ILD_ofst(delegate), IR_dt(delegate));
+            m_du->copyIRTreeDU(base, ILD_base(delegate), true);
             break;
+        }
         case IR_LD:
             stmt = m_ru->buildStore(LD_idinfo(delegate),
                                     IR_dt(delegate),
                                     LD_ofst(delegate), pr);
             break;
-        default: UNREACH(); //Unsupport.
+        default: UNREACHABLE(); //Unsupport.
         }
 
         ASSERT0(stmt);
@@ -1192,7 +1186,7 @@ void IR_RP::handleRestore2Mem(
         SList<IR*> * irlst = delegate2has_outside_uses_ir_list.get(delegate);
         ASSERT0(irlst);
 
-        for (SC<IR*> * sc = irlst->get_head();
+        for (xcom::SC<IR*> * sc = irlst->get_head();
              sc != irlst->end(); sc = irlst->get_next(sc)) {
             IR * def = sc->val();
 
@@ -1241,7 +1235,7 @@ bool IR_RP::promoteExactAccess(
 
     List<IR*> fixup_list; //record the IR that need to fix up duset.
 
-    BitSet * bbset = LI_bb_set(li);
+    xcom::BitSet * bbset = LI_bb_set(li);
     CHECK_DUMMYUSE(bbset);
     ASSERT0(!bbset->is_empty()); //loop is empty.
 
@@ -1391,8 +1385,8 @@ bool IR_RP::hasLoopOutsideUse(IR const* stmt, LI<IRBB> const* li)
          i >= 0; i = useset->get_next(i, &di)) {
         IR const* u = m_ru->getIR(i);
         ASSERT0(u->is_exp());
-        ASSERT0(u->get_stmt());
-        IR * s = u->get_stmt();
+        ASSERT0(u->getStmt());
+        IR * s = u->getStmt();
         ASSERT0(s->getBB());
         if (!li->is_inside_loop(BB_id(s->getBB()))) {
             return true;
@@ -1474,7 +1468,7 @@ void IR_RP::removeRedundantDUChain(List<IR*> & fixup_list)
             if (PR_ssainfo(ref) != NULL) {
                 if (PR_ssainfo(ref)->get_def() != NULL) {
                     //SSA def must be same PR_no with the SSA use.
-                    ASSERT0(PR_ssainfo(ref)->get_def()->get_prno() == prno);
+                    ASSERT0(PR_ssainfo(ref)->get_def()->getPrno() == prno);
                 }
             } else {
                 for (INT i = duset->get_first(&di);
@@ -1483,7 +1477,7 @@ void IR_RP::removeRedundantDUChain(List<IR*> & fixup_list)
                     ASSERT0(d->is_stmt());
 
                     if ((d->isWritePR() || d->isCallHasRetVal()) &&
-                        d->get_prno() == prno) {
+                        d->getPrno() == prno) {
                         continue;
                     }
 
@@ -1526,11 +1520,11 @@ void IR_RP::handleAccessInBody(
     if (ref->is_stmt()) {
         stmt = ref;
     } else {
-        stmt = ref->get_stmt();
+        stmt = ref->getStmt();
         ASSERT0(stmt);
     }
 
-    switch (ref->get_code()) {
+    switch (ref->getCode()) {
     case IR_STARRAY:
         {
             bool has_use = false;
@@ -1573,7 +1567,7 @@ void IR_RP::handleAccessInBody(
 
             IRBB * refbb = ref->getBB();
             ASSERT0(refbb);
-            C<IR*> * ct = NULL;
+            xcom::C<IR*> * ct = NULL;
             BB_irlist(refbb).find(ref, &ct);
             ASSERT0(ct != NULL);
 
@@ -1631,7 +1625,7 @@ void IR_RP::handleAccessInBody(
 
             IRBB * stmt_bb = ref->getBB();
             ASSERT0(stmt_bb);
-            C<IR*> * ct = NULL;
+            xcom::C<IR*> * ct = NULL;
             BB_irlist(stmt_bb).find(ref, &ct);
             ASSERT0(ct != NULL);
 
@@ -1730,7 +1724,7 @@ void IR_RP::handlePrelog(
         LD_ofst(rhs) = ST_ofst(delegate);
         stpr = m_ru->buildStorePR(PR_no(pr), IR_dt(pr), rhs);
     } else {
-        UNREACH(); //unsupport.
+        UNREACHABLE(); //unsupport.
     }
 
     ASSERT0(rhs && stpr);
@@ -1799,7 +1793,7 @@ void IR_RP::computeOuterDefUse(
                  i >= 0; i = refduset->get_next(i, &di)) {
                 IR const* u = m_ru->getIR(i);
                 ASSERT0(u->is_exp());
-                if (!li->is_inside_loop(BB_id(u->get_stmt()->getBB()))) {
+                if (!li->is_inside_loop(BB_id(u->getStmt()->getBB()))) {
                     set->bunion(i, *sbs_mgr);
                 }
             }
@@ -1861,7 +1855,7 @@ bool IR_RP::promoteInexactAccess(
 
     List<IR*> fixup_list; //record the IR that need to fix up duset.
 
-    BitSet * bbset = LI_bb_set(li);
+    xcom::BitSet * bbset = LI_bb_set(li);
     CHECK_DUMMYUSE(bbset);
     ASSERT0(!bbset->is_empty()); //loop is empty.
 
@@ -2015,7 +2009,7 @@ UINT IR_RP::analyzeArrayStatus(IR const* ref1, IR const* ref2)
 //This function perform the rest work of scanBB().
 void IR_RP::checkAndRemoveInvalidExactOcc(List<IR*> & exact_occ_list)
 {
-    C<IR*> * ct, * nct;
+    xcom::C<IR*> * ct, * nct;
     for (exact_occ_list.get_head(&ct), nct = ct; ct != NULL; ct = nct) {
         IR * occ = ct->val();
         exact_occ_list.get_next(&nct);
@@ -2095,7 +2089,7 @@ bool IR_RP::tryPromote(
 
     if (exact_access.get_elem_count() != 0) {
         #ifdef _DEBUG_
-        BitSet visit;
+        xcom::BitSet visit;
         for (IR * x = exact_occ_list.get_head();
              x != NULL; x = exact_occ_list.get_next()) {
             ASSERT0(!visit.is_contain(IR_id(x)));
@@ -2175,7 +2169,7 @@ bool IR_RP::perform(OptCtx & oc)
     if (li == NULL) { return false; }
 
     SMemPool * cspool = smpoolCreate(
-        sizeof(SC<LI<IRBB> const*>), MEM_CONST_SIZE);
+        sizeof(xcom::SC<LI<IRBB> const*>), MEM_CONST_SIZE);
     List<LI<IRBB> const*> worklst;
     while (li != NULL) {
         worklst.append_tail(li);

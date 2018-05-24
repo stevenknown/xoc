@@ -117,10 +117,12 @@ protected:
     bool computeInitVal(IR const* ir, IV * iv);
 
     void findBIV(LI<IRBB> const* li,
-                 BitSet & tmp,
+                 xcom::BitSet & tmp,
                  Vector<UINT> & map_md2defcount,
                  UINT2IR & map_md2defir);
-    void findDIV(LI<IRBB> const* li, SList<IV*> const& bivlst, BitSet & tmp);
+    void findDIV(LI<IRBB> const* li,
+        SList<IV*> const& bivlst,
+        xcom::BitSet & tmp);
 
     //Find initialze value of IV, if found return true,
     //otherwise return false.
@@ -143,7 +145,7 @@ protected:
             IR ** occ,
             IR ** delta,
             bool & is_increment);
-    bool scanExp(IR const* ir, LI<IRBB> const* li, BitSet const& ivmds);
+    bool scanExp(IR const* ir, LI<IRBB> const* li, xcom::BitSet const& ivmds);
     void recordIV(
             MD * biv,
             LI<IRBB> const* li,
@@ -161,7 +163,7 @@ public:
         m_cfg = rg->getCFG();
         m_tm = rg->getTypeMgr();
         m_pool = smpoolCreate(sizeof(IV) * 4, MEM_COMM);
-        m_sc_pool = smpoolCreate(sizeof(SC<IV*>) * 4, MEM_CONST_SIZE);
+        m_sc_pool = smpoolCreate(sizeof(xcom::SC<IV*>) * 4, MEM_CONST_SIZE);
         m_is_only_handle_exact_md = true;
         m_is_strictly_match_pattern = false;
     }

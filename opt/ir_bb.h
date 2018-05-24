@@ -48,7 +48,7 @@ public:
     BBIRList() { m_bb = NULL; }
     COPY_CONSTRUCTOR(BBIRList);
 
-    inline C<IR*> * append_head(IR * ir)
+    inline xcom::C<IR*> * append_head(IR * ir)
     {
         if (ir == NULL) { return NULL; }
         ASSERT0(m_bb != NULL);
@@ -56,7 +56,7 @@ public:
         return EList<IR*, IR2Holder>::append_head(ir);
     }
 
-    inline C<IR*> * append_tail(IR * ir)
+    inline xcom::C<IR*> * append_tail(IR * ir)
     {
         if (ir == NULL) { return NULL; }
         ASSERT0(m_bb != NULL);
@@ -65,7 +65,7 @@ public:
     }
 
     //Insert ir prior to cond_br, uncond_br, call, return.
-    C<IR*> * append_tail_ex(IR * ir);
+    xcom::C<IR*> * append_tail_ex(IR * ir);
 
     //Count up memory size of BBIRList
     size_t count_mem() const
@@ -75,7 +75,7 @@ public:
     }
 
     //Insert 'ir' before 'marker'.
-    inline C<IR*> * insert_before(IN IR * ir, IN IR * marker)
+    inline xcom::C<IR*> * insert_before(IN IR * ir, IN IR * marker)
     {
         if (ir == NULL) { return NULL; }
         ASSERT0(marker != NULL);
@@ -85,7 +85,7 @@ public:
     }
 
     //Insert 'ir' before 'marker'. marker will be modified.
-    inline C<IR*> * insert_before(IN IR * ir, IN C<IR*> * marker)
+    inline xcom::C<IR*> * insert_before(IN IR * ir, IN xcom::C<IR*> * marker)
     {
         if (ir == NULL) { return NULL; }
         ASSERT0(marker != NULL);
@@ -95,7 +95,7 @@ public:
     }
 
     //Insert 'ir' after 'marker'.
-    inline C<IR*> * insert_after(IR * ir, IR * marker)
+    inline xcom::C<IR*> * insert_after(IR * ir, IR * marker)
     {
         if (ir == NULL) { return NULL; }
         ASSERT0(marker != NULL);
@@ -105,7 +105,7 @@ public:
     }
 
     //Insert 'ir' after 'marker'.
-    inline C<IR*> * insert_after(IR * ir, IN C<IR*> * marker)
+    inline xcom::C<IR*> * insert_after(IR * ir, IN xcom::C<IR*> * marker)
     {
         if (ir == NULL) { return NULL; }
         ASSERT0(marker != NULL);
@@ -115,7 +115,7 @@ public:
     }
 
     //Remove ir that hold by 'holder'.
-    inline IR * remove(IN C<IR*> * holder)
+    inline IR * remove(IN xcom::C<IR*> * holder)
     {
         if (holder == NULL) return NULL;
         holder->val()->setBB(NULL);
@@ -231,10 +231,10 @@ public:
     UINT getNumOfPred(CFG<IRBB, IR> * cfg) const
     {
         ASSERT0(cfg);
-        Vertex const* vex = cfg->get_vertex(id());
+        xcom::Vertex const* vex = cfg->get_vertex(id());
         ASSERT0(vex);
         UINT n = 0;
-        for (EdgeC const* in = VERTEX_in_list(vex);
+        for (xcom::EdgeC const* in = VERTEX_in_list(vex);
              in != NULL; in = EC_next(in), n++);
         return n;
     }
@@ -242,10 +242,10 @@ public:
     UINT getNumOfSucc(CFG<IRBB, IR> * cfg) const
     {
         ASSERT0(cfg);
-        Vertex const* vex = cfg->get_vertex(BB_id(this));
+        xcom::Vertex const* vex = cfg->get_vertex(BB_id(this));
         ASSERT0(vex);
         UINT n = 0;
-        for (EdgeC const* out = VERTEX_out_list(vex);
+        for (xcom::EdgeC const* out = VERTEX_out_list(vex);
              out != NULL; out = EC_next(out), n++);
         return n;
     }
@@ -415,7 +415,7 @@ public:
             return false;
         }
 
-        C<IR*> * ctir;
+        xcom::C<IR*> * ctir;
         for (BB_irlist(this).get_head(&ctir);
              ctir != BB_irlist(this).end();
              ctir = BB_irlist(this).get_next(ctir)) {
@@ -432,7 +432,7 @@ public:
 
     bool mayThrowException() const
     {
-        C<IR*> * ct;
+        xcom::C<IR*> * ct;
         IR * x = BB_irlist(const_cast<IRBB*>(this)).get_tail(&ct);
         if (x != NULL && x->isMayThrow()) {
             return true;

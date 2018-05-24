@@ -177,7 +177,7 @@ public:
         case AI_USER_DEF: return "UserDef";
         case AI_MD_SSA: return "MDSSA";
         case AI_LAST:;
-        default: UNREACH();
+        default: UNREACHABLE();
         }
         return NULL;
     }

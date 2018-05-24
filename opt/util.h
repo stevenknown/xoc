@@ -87,7 +87,7 @@ void dump_rbt(RBT<T, Ttgt, CompareKey> & rbt,
     CHAR const* (*dumpTN)(T, Ttgt) = NULL)
 {
     typedef RBTNode<T, Ttgt> TN;
-    xcom::Vector<TN*> nilvec;
+    Vector<TN*> nilvec;
     if (name == NULL) {
         name = "graph_rbt.vcg";
     }
@@ -130,7 +130,7 @@ void dump_rbt(RBT<T, Ttgt, CompareKey> & rbt,
               "edge.color: darkgreen\n");
 
     //Print node
-    xcom::List<TN*> lst;
+    List<TN*> lst;
     TN const* root = rbt.get_root();
     if (root != NULL) {
         lst.append_tail(const_cast<TN*>(root));
@@ -273,6 +273,12 @@ void note(CHAR const* format, ...);
 
 //Helper function to dump formatted string to g_tfile without indent.
 void prt(CHAR const* format, ...);
+
+//Return true if val is 32bit integer more than 16bit.
+bool isInteger32bit(HOST_UINT val);
+
+//Return true if val is 64bit integer more than 32bit.
+bool isInteger64bit(UINT64 val);
 
 } //namespace xoc
 #endif

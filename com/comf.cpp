@@ -620,34 +620,28 @@ void dumpf_svec(void * vec, UINT ty, CHAR const* name, bool is_del)
 
     ///
     switch (ty) {
-    case D_BOOL:
-        {
-            Vector<bool> *p = (Vector<bool> *)vec;
-            for (INT i = 0; i <= p->get_last_idx(); i++) {
-                fprintf(h, "%d", (INT)p->get(i));
-                if (i != p->get_last_idx()) {
-                    fprintf(h, ", ");
-                }
+    case D_BOOL: {
+        Vector<bool> *p = (Vector<bool> *)vec;
+        for (INT i = 0; i <= p->get_last_idx(); i++) {
+            fprintf(h, "%d", (INT)p->get(i));
+            if (i != p->get_last_idx()) {
+                fprintf(h, ", ");
             }
-            break;
         }
-    case D_INT:
-        {
-            Vector<INT> *p = (Vector<INT> *)vec;
-            for (INT i = 0; i <= p->get_last_idx(); i++) {
-                fprintf(h, "%d", (INT)p->get(i));
-                if (i != p->get_last_idx()) {
-                    fprintf(h, ", ");
-                }
-            }
-            break;
-        }
-    default:
-        ASSERT(0, ("illegal ty"));
+        break;
     }
-
-    ///
-
+    case D_INT: {
+        Vector<INT> * p = (Vector<INT> *)vec;
+        for (INT i = 0; i <= p->get_last_idx(); i++) {
+            fprintf(h, "%d", (INT)p->get(i));
+            if (i != p->get_last_idx()) {
+                fprintf(h, ", ");
+            }
+        }
+        break;
+    }
+    default: ASSERT(0, ("illegal ty"));
+    }
     fprintf(h, "\n");
     fclose(h);
 }
@@ -1002,7 +996,7 @@ INT getFirstOneAtRightSide(INT m)
 
 
 //Judge if 'f' is integer conform to IEEE754 spec.
-bool is_integer(float f)
+bool isIntegerF(float f)
 {
     //0000 0000 0111 1111 1111 1111 1111 1111 //mantissa
     //0111 1111 1000 0000 0000 0000 0000 0000 //exp
@@ -1016,7 +1010,7 @@ bool is_integer(float f)
 
 
 //Judge if 'd' is integer conform to IEEE754 spec.
-bool is_integerd(double d)
+bool isIntegerD(double d)
 {
     //0000 0000 0000 1111 1111 1111 1111 1111 1111 1111 1111 1111 1111 1111 1111 1111 //mantissa
     double * p = &d;

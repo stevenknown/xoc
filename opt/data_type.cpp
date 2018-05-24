@@ -88,8 +88,8 @@ Type const* checkType(Type const* ty, DATA_TYPE dt)
 //NOTE: The function does NOT hoist vector type.
 Type const* TypeMgr::hoistDtypeForBinop(IR const* opnd0, IR const* opnd1)
 {
-    Type const* d0 = opnd0->get_type();
-    Type const* d1 = opnd1->get_type();
+    Type const* d0 = opnd0->getType();
+    Type const* d1 = opnd1->getType();
     ASSERT0(!d0->is_void() && !d1->is_void());
     ASSERT(!d0->is_vector() && !d1->is_vector(),
            ("Can not hoist vector type."));
@@ -100,25 +100,25 @@ Type const* TypeMgr::hoistDtypeForBinop(IR const* opnd0, IR const* opnd1)
     DATA_TYPE t1 = TY_dtype(d1);
     if (t0 == D_MC && t1 == D_MC) {
         ASSERT0(TY_mc_size(d0) == TY_mc_size(d1));
-        return opnd0->get_type();
+        return opnd0->getType();
     }
 
     if (t0 == D_MC) {
         ASSERT0(TY_mc_size(d0) != 0);
         UINT ty_size = MAX(TY_mc_size(d0), get_bytesize(d1));
         if (ty_size == TY_mc_size(d0)) {
-            return opnd0->get_type();
+            return opnd0->getType();
         }
-        return opnd1->get_type();
+        return opnd1->getType();
     }
 
     if (t1 == D_MC) {
         ASSERT0(TY_mc_size(d1) != 0);
         UINT ty_size = MAX(TY_mc_size(d1), get_bytesize(d0));
         if (ty_size == TY_mc_size(d1)) {
-            return opnd1->get_type();
+            return opnd1->getType();
         }
-        return opnd0->get_type();
+        return opnd0->getType();
     }
 
     //Always hoist to longest integer type.
@@ -417,19 +417,18 @@ CHAR const* TypeMgr::dump_type(Type const* type, OUT StrBuf & buf)
     case D_PTR:
         buf.strcat("%s<%d>", DTNAME(dt), TY_ptr_base_size(type));
         break;
-    case D_VEC:
-        {
-            UINT elem_byte_size = get_dtype_bytesize(TY_vec_ety(type));
-            ASSERT0(elem_byte_size != 0);
-            ASSERT0(get_bytesize(type) % elem_byte_size == 0);
-            UINT elemnum = get_bytesize(type) / elem_byte_size;
-            buf.strcat("%s<%d*%s>", DTNAME(dt), elemnum, DTNAME(TY_vec_ety(type)));
-        }
+    case D_VEC: {
+        UINT elem_byte_size = get_dtype_bytesize(TY_vec_ety(type));
+        ASSERT0(elem_byte_size != 0);
+        ASSERT0(get_bytesize(type) % elem_byte_size == 0);
+        UINT elemnum = get_bytesize(type) / elem_byte_size;
+        buf.strcat("%s<%d*%s>", DTNAME(dt), elemnum, DTNAME(TY_vec_ety(type)));
         break;
+    }
     case D_VOID:
         buf.strcat("%s", DTNAME(dt));
         break;
-    default: UNREACH();
+    default: UNREACHABLE();
     }
     return buf.buf;
 }
@@ -437,7 +436,7 @@ CHAR const* TypeMgr::dump_type(Type const* type, OUT StrBuf & buf)
 
 void TypeMgr::dump_type(UINT tyid)
 {
-    dump_type(get_type(tyid));
+    dump_type(getType(tyid));
 }
 
 

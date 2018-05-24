@@ -1762,23 +1762,22 @@ bool Matrix<T>::inv(OUT Matrix<T> & e)
         ASSERT0(!_equal(p.get(0,0), T(0)));
         e.set(0,0, 1/p.get(0,0));
         return true; //non-singular
-    case 2:
-        {
-            //1/(ad-bc)(d -b)
-            //         (-c a)
-            T k = p.get(0,0) * p.get(1,1) - p.get(0,1) * p.get(1,0);
-            if (_equal(k, T(0))) {
-                e.clean();
-                return false; //singular
-            }
-            k = 1 / k;
-            e.set(0,0, p.get(1,1));
-            e.set(1,1, p.get(0,0));
-            e.set(0,1, -1 * p.get(0,1));
-            e.set(1,0, -1 * p.get(1,0));
-            e.mul(k);
-            return true; //non-singular
+    case 2: {
+        //1/(ad-bc)(d -b)
+        //         (-c a)
+        T k = p.get(0,0) * p.get(1,1) - p.get(0,1) * p.get(1,0);
+        if (_equal(k, T(0))) {
+            e.clean();
+            return false; //singular
         }
+        k = 1 / k;
+        e.set(0,0, p.get(1,1));
+        e.set(1,1, p.get(0,0));
+        e.set(0,1, -1 * p.get(0,1));
+        e.set(1,0, -1 * p.get(1,0));
+        e.mul(k);
+        return true; //non-singular
+    }
     default: break;
     }
 
@@ -2482,25 +2481,22 @@ bool Matrix<T>::adj(OUT Matrix<T> & m)
     m.reinit(m_row_size, m_col_size, &m_inhr);
     switch (m_row_size) {
     case 2:
-        {
-            m.set(0,0,get(1,1));
-            m.set(0,1,-get(0,1));
-            m.set(1,0,-get(1,0));
-            m.set(1,1,get(0,0));
-        }
+        m.set(0,0,get(1,1));
+        m.set(0,1,-get(0,1));
+        m.set(1,0,-get(1,0));
+        m.set(1,1,get(0,0));
         break;
-    default:
-        {
-            Matrix<T> tmp;
-            for (UINT i = 0; i < m_row_size; i++) {
-                for (UINT j = 0; j < m_col_size; j++) {
-                    algc(i,j,tmp);
-                    T c = ODD(i+j)?-1:1;
-                    m.set(i, j, c * tmp.det());
-                }
+    default: {
+        Matrix<T> tmp;
+        for (UINT i = 0; i < m_row_size; i++) {
+            for (UINT j = 0; j < m_col_size; j++) {
+                algc(i,j,tmp);
+                T c = ODD(i+j)?-1:1;
+                m.set(i, j, c * tmp.det());
             }
-            m.trans();
         }
+        m.trans();
+    }
     }
 #else //BY INVERSING Matrix
     T dv = this->det();

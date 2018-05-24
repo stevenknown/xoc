@@ -497,7 +497,7 @@ public:
 
     //Return DATA-Type according to given bit size and sign.
     //Note the bit size will be aligned to power of 2.
-    DATA_TYPE get_dtype(UINT bit_size, bool is_signed) const
+    DATA_TYPE getDType(UINT bit_size, bool is_signed) const
     { return hoistBSdtype(bit_size, is_signed); }
 
     //Return bits size of 'dtype' refers to.
@@ -540,7 +540,7 @@ public:
     }
 
     //Retrieve Type via 'type-index'.
-    Type const* get_type(UINT tyid) const
+    Type const* getType(UINT tyid) const
     {
         ASSERT0(tyid != 0);
         ASSERT0(m_type_tab.get(tyid));
@@ -640,39 +640,39 @@ public:
     UINT get_bytesize(Type const* dtd) const;
 
     //Return byte size according to given tyid.
-    UINT get_bytesize(UINT tyid) const { return get_bytesize(get_type(tyid)); }
+    UINT get_bytesize(UINT tyid) const { return get_bytesize(getType(tyid)); }
 
     bool is_scalar(UINT tyid) { return tyid >= D_B && tyid <= D_F128; }
 
     //Return true if tyid is signed.
-    bool is_signed(UINT tyid) const { return get_type(tyid)->is_signed(); }
+    bool is_signed(UINT tyid) const { return getType(tyid)->is_signed(); }
 
     //Return true if tyid is signed integer.
-    bool is_sint(UINT tyid) const { return get_type(tyid)->is_sint(); }
+    bool is_sint(UINT tyid) const { return getType(tyid)->is_sint(); }
 
     //Return true if tyid is unsigned integer.
-    bool is_uint(UINT tyid) const { return get_type(tyid)->is_uint(); }
+    bool is_uint(UINT tyid) const { return getType(tyid)->is_uint(); }
 
     //Return true if tyid is Float point.
-    bool is_fp(UINT tyid) const { return get_type(tyid)->is_fp(); }
+    bool is_fp(UINT tyid) const { return getType(tyid)->is_fp(); }
 
     //Return true if tyid is Boolean.
-    bool is_bool(UINT tyid) const { return m_b == get_type(tyid); }
+    bool is_bool(UINT tyid) const { return m_b == getType(tyid); }
 
     //Return true if tyid is String.
-    bool is_str(UINT tyid) const { return m_str == get_type(tyid); }
+    bool is_str(UINT tyid) const { return m_str == getType(tyid); }
 
     //Return true if tyid is Memory chunk.
-    bool is_mc(UINT tyid) const { return get_type(tyid)->is_mc(); }
+    bool is_mc(UINT tyid) const { return getType(tyid)->is_mc(); }
 
     //Return true if tyid is Pointer.
-    bool is_ptr(UINT tyid) const { return get_type(tyid)->is_pointer(); }
+    bool is_ptr(UINT tyid) const { return getType(tyid)->is_pointer(); }
 
     //Return true if tyid is Void.
-    bool is_void(UINT tyid) const { return get_type(tyid)->is_void(); }
+    bool is_void(UINT tyid) const { return getType(tyid)->is_void(); }
 
     //Return true if data type is Vector.
-    bool is_vec(UINT tyid) const { return get_type(tyid)->is_vector(); }
+    bool is_vec(UINT tyid) const { return getType(tyid)->is_vector(); }
 };
 
 } //namespace xoc

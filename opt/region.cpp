@@ -57,7 +57,7 @@ static bool checkLogicalOp(IR_TYPE irt, Type const* type, TypeMgr * tm)
 #endif
 
 
-static bool is_reduction(IR const* ir)
+static bool isReduction(IR const* ir)
 {
     ASSERT0(ir->is_stmt());    
     if (!ir->is_st() && !ir->is_stpr()) { return false; }
@@ -124,7 +124,7 @@ AnalysisInstrument::AnalysisInstrument(Region * rg) :
     m_pr_count = 1;
     m_pool = smpoolCreate(256, MEM_COMM);
     m_du_pool = smpoolCreate(sizeof(DU) * 4, MEM_CONST_SIZE);
-    m_sc_labelinfo_pool = smpoolCreate(sizeof(SC<LabelInfo*>) * 4, 
+    m_sc_labelinfo_pool = smpoolCreate(sizeof(xcom::SC<LabelInfo*>) * 4, 
         MEM_CONST_SIZE);
     ::memset(m_free_tab, 0, sizeof(m_free_tab));
 }
@@ -481,7 +481,7 @@ IR * Region::buildSelect(
     ASSERT0(false_exp->is_exp() && false_exp->is_single());
 
     //Type of true exp may be not equal to false exp.
-    //ASSERT0(true_exp->get_type() == false_exp->get_type());
+    //ASSERT0(true_exp->getType() == false_exp->getType());
     IR * ir = allocIR(IR_SELECT);
     IR_dt(ir) = type;
     SELECT_pred(ir) = pred;
@@ -707,7 +707,7 @@ IR * Region::buildLoad(VAR * var, Type const* type)
     IR_dt(ir) = type;
     if (g_is_hoist_type) {
         //Hoisting I16/U16/I8/U8 to I32, to utilize whole register.
-        DATA_TYPE dt = ir->get_dtype();
+        DATA_TYPE dt = ir->getDType();
         if (IS_SIMPLEX(dt)) {
             //Hoist data-type from less than INT to INT.
             IR_dt(ir) =
@@ -1129,8 +1129,8 @@ IR * Region::buildDoLoop(
              det->is_ge()));
     ASSERT0(init && step && init->is_exp() && step->is_exp());
     ASSERT0(iv->is_id() || iv->is_pr());
-    //ASSERT0(is_reduction(step));
-    DUMMYUSE(is_reduction);
+    //ASSERT0(isReduction(step));
+    DUMMYUSE(isReduction);
 
     IR * ir = allocIR(IR_DO_LOOP);
     IR_dt(ir) = getTypeMgr()->getVoid();
@@ -1325,53 +1325,49 @@ IR * Region::buildImmInt(HOST_INT v, Type const* type)
         switch (TY_dtype(type)) {
         case D_B:
         case D_I8:
-        case D_U8:
-            {
-                UINT8 uv = (UINT8)v;
-                if (type->is_unsigned()) {
-                    CONST_int_val(imm) = (HOST_INT)uv;
-                } else {
-                    INT8 sv = (INT8)uv;
-                    CONST_int_val(imm) = (HOST_INT)sv;
-                }
+        case D_U8: {
+            UINT8 uv = (UINT8)v;
+            if (type->is_unsigned()) {
+                CONST_int_val(imm) = (HOST_INT)uv;
+            } else {
+                INT8 sv = (INT8)uv;
+                CONST_int_val(imm) = (HOST_INT)sv;
             }
             break;
+        } 
         case D_I16:
-        case D_U16:
-            {
-                UINT16 uv = (UINT16)v;
-                if (type->is_unsigned()) {
-                    CONST_int_val(imm) = (HOST_INT)uv;
-                } else {
-                    INT16 sv = (INT16)uv;
-                    CONST_int_val(imm) = (HOST_INT)sv;
-                }
+        case D_U16: {
+            UINT16 uv = (UINT16)v;
+            if (type->is_unsigned()) {
+                CONST_int_val(imm) = (HOST_INT)uv;
+            } else {
+                INT16 sv = (INT16)uv;
+                CONST_int_val(imm) = (HOST_INT)sv;
             }
             break;
+        }            
         case D_I32:
-        case D_U32:
-            {
-                UINT32 uv = (UINT32)v;
-                if (type->is_unsigned()) {
-                    CONST_int_val(imm) = (HOST_INT)uv;
-                } else {
-                    INT32 sv = (INT32)uv;
-                    CONST_int_val(imm) = (HOST_INT)sv;
-                }
+        case D_U32: {
+            UINT32 uv = (UINT32)v;
+            if (type->is_unsigned()) {
+                CONST_int_val(imm) = (HOST_INT)uv;
+            } else {
+                INT32 sv = (INT32)uv;
+                CONST_int_val(imm) = (HOST_INT)sv;
             }
             break;
+        }            
         case D_I64:
-        case D_U64:
-            {
-                UINT64 uv = (UINT64)v;
-                if (type->is_unsigned()) {
-                    CONST_int_val(imm) = (HOST_INT)uv;
-                } else {
-                    INT64 sv = (INT64)uv;
-                    CONST_int_val(imm) = (HOST_INT)sv;
-                }
+        case D_U64: {
+            UINT64 uv = (UINT64)v;
+            if (type->is_unsigned()) {
+                CONST_int_val(imm) = (HOST_INT)uv;
+            } else {
+                INT64 sv = (INT64)uv;
+                CONST_int_val(imm) = (HOST_INT)sv;
             }
             break;
+        }
         case D_I128:
         case D_U128:
             ASSERT(0, ("TODO:unsupport 128 bit integer"));
@@ -1410,56 +1406,53 @@ IR * Region::buildPointerOp(IR_TYPE irt, IR * lchild, IR * rchild)
         return buildPointerOp(irt, rchild, lchild);
     }
 
-    Type const* d0 = lchild->get_type();
-    Type const* d1 = rchild->get_type();
+    Type const* d0 = lchild->getType();
+    Type const* d1 = rchild->getType();
     DUMMYUSE(d1);
     if (lchild->is_ptr() && rchild->is_ptr()) {
         //CASE: Pointer substraction.
         //  char *p, *q;
         //  p-q => t1=p-q, t2=t1/4, return t2
         switch (irt) {
-        case IR_SUB:
-            {
-                TypeMgr * dm = getTypeMgr();
+        case IR_SUB: {
+            TypeMgr * dm = getTypeMgr();
 
-                //Result is not pointer type.
-                ASSERT0(TY_ptr_base_size(d0) > 0);
-                ASSERT0(TY_ptr_base_size(d0) == TY_ptr_base_size(d1));
-                IR * ret = allocIR(IR_SUB);
-                BIN_opnd0(ret) = lchild;
-                BIN_opnd1(ret) = rchild;
-                IR_dt(ret) = dm->getSimplexTypeEx(
-                                    dm->get_dtype(WORD_BITSIZE, true));
-                if (TY_ptr_base_size(d0) > BYTE_PER_CHAR) {
-                    IR * div = allocIR(IR_DIV);
-                    BIN_opnd0(div) = ret;
-                    BIN_opnd1(div) = buildImmInt(TY_ptr_base_size(d0),
-                                                 ret->get_type());
-                    IR_dt(div) = dm->getSimplexTypeEx(
-                                     dm->get_dtype(WORD_BITSIZE, true));
-                    ret = div;
-                }
-
-                //Avoid too much boring pointer operations.
-                ret->setParentPointer(true);
-                return ret;
+            //Result is not pointer type.
+            ASSERT0(TY_ptr_base_size(d0) > 0);
+            ASSERT0(TY_ptr_base_size(d0) == TY_ptr_base_size(d1));
+            IR * ret = allocIR(IR_SUB);
+            BIN_opnd0(ret) = lchild;
+            BIN_opnd1(ret) = rchild;
+            IR_dt(ret) = dm->getSimplexTypeEx(dm->getDType(WORD_BITSIZE, true));
+            if (TY_ptr_base_size(d0) > BYTE_PER_CHAR) {
+                IR * div = allocIR(IR_DIV);
+                BIN_opnd0(div) = ret;
+                BIN_opnd1(div) = buildImmInt(TY_ptr_base_size(d0),
+                    ret->getType());
+                IR_dt(div) = dm->getSimplexTypeEx(
+                    dm->getDType(WORD_BITSIZE, true));
+                ret = div;
             }
+
+            //Avoid too much boring pointer operations.
+            ret->setParentPointer(true);
+            return ret;
+        }
         case IR_LT:
         case IR_LE:
         case IR_GT:
         case IR_GE:
         case IR_EQ:
-        case IR_NE:
-            {
-                //Result is not pointer type.
-                IR * ret = allocIR(irt);
-                BIN_opnd0(ret) = lchild;
-                BIN_opnd1(ret) = rchild;
-                IR_dt(ret) = getTypeMgr()->getSimplexTypeEx(D_B);
-                IR_parent(lchild) = ret;
-                IR_parent(rchild) = ret;
-                return ret;
-            }
+        case IR_NE: {
+            //Result is not pointer type.
+            IR * ret = allocIR(irt);
+            BIN_opnd0(ret) = lchild;
+            BIN_opnd1(ret) = rchild;
+            IR_dt(ret) = getTypeMgr()->getSimplexTypeEx(D_B);
+            IR_parent(lchild) = ret;
+            IR_parent(rchild) = ret;
+            return ret;
+        }
         default: ASSERT(0, ("illegal pointers operation"));
         }
         ASSERT(0, ("can not get here."));
@@ -1471,48 +1464,46 @@ IR * Region::buildPointerOp(IR_TYPE irt, IR * lchild, IR * rchild)
         //  p - 4 => t1 = p - (4 * sizeof(BASE_TYPE_OF(p)))
         switch (irt) {
         case IR_ADD:
-        case IR_SUB:
-            {
-                IR * addend = allocIR(IR_MUL);
-                BIN_opnd0(addend) = rchild;
+        case IR_SUB: {
+            IR * addend = allocIR(IR_MUL);
+            BIN_opnd0(addend) = rchild;
 
-                ASSERT(TY_ptr_base_size(d0) > 0, ("multipler is 0"));
+            ASSERT(TY_ptr_base_size(d0) > 0, ("multipler is 0"));
 
-                BIN_opnd1(addend) = buildImmInt(TY_ptr_base_size(d0),
-                                                rchild->get_type());
-                IR_dt(addend) = rchild->get_type();
+            BIN_opnd1(addend) = buildImmInt(TY_ptr_base_size(d0),
+                rchild->getType());
+            IR_dt(addend) = rchild->getType();
 
-                IR * ret = allocIR(irt); //ADD or SUB
-                BIN_opnd0(ret) = lchild; //lchild is pointer.
-                BIN_opnd1(ret) = addend; //addend is not pointer.
+            IR * ret = allocIR(irt); //ADD or SUB
+            BIN_opnd0(ret) = lchild; //lchild is pointer.
+            BIN_opnd1(ret) = addend; //addend is not pointer.
 
-                //CASE: 'p = p + 1'
-                //so the result type of '+' should still be pointer type.
-                ret->setPointerType(TY_ptr_base_size(d0), getTypeMgr());
+            //CASE: 'p = p + 1'
+            //so the result type of '+' should still be pointer type.
+            ret->setPointerType(TY_ptr_base_size(d0), getTypeMgr());
 
-                //Avoid too much boring pointer operations.
-                ret->setParentPointer(true);
-                return ret;
-            }
-        default:
-            {
-                ASSERT0(irt == IR_LT || irt == IR_LE ||
-                        irt == IR_GT || irt == IR_GE ||
-                        irt == IR_EQ || irt == IR_NE);
+            //Avoid too much boring pointer operations.
+            ret->setParentPointer(true);
+            return ret;
+        }
+        default: {
+            ASSERT0(irt == IR_LT || irt == IR_LE ||
+                    irt == IR_GT || irt == IR_GE ||
+                    irt == IR_EQ || irt == IR_NE);
 
-                //Pointer operation may give rise to undefined behavior.
-                IR * ret = allocIR(irt);
-                BIN_opnd0(ret) = lchild;
-                BIN_opnd1(ret) = rchild;
-                IR_dt(ret) = getTypeMgr()->getSimplexTypeEx(D_B);
-                IR_parent(lchild) = ret;
-                IR_parent(rchild) = ret;
-                return ret;
-            }
+            //Pointer operation may give rise to undefined behavior.
+            IR * ret = allocIR(irt);
+            BIN_opnd0(ret) = lchild;
+            BIN_opnd1(ret) = rchild;
+            IR_dt(ret) = getTypeMgr()->getSimplexTypeEx(D_B);
+            IR_parent(lchild) = ret;
+            IR_parent(rchild) = ret;
+            return ret;
+        }
         }
     }
 
-    UNREACH();
+    UNREACHABLE();
     return NULL; //just ceases warning.
 }
 
@@ -1524,7 +1515,7 @@ IR * Region::buildPointerOp(IR_TYPE irt, IR * lchild, IR * rchild)
 IR * Region::buildJudge(IR * exp)
 {
     ASSERT0(!exp->is_judge());
-    Type const* type = exp->get_type();
+    Type const* type = exp->getType();
     TypeMgr * dm = getTypeMgr();
     if (exp->is_ptr()) {
         type = dm->getSimplexTypeEx(dm->getPointerSizeDtype());
@@ -1633,8 +1624,8 @@ IR * Region::buildBinaryOp(
     if (type->is_mc()) {
         //mc_size records the memory-chunk size if rtype is D_MC, or else is 0.
         ASSERT(TY_mc_size(type) != 0, ("Size of memory chunck can not be 0"));
-        ASSERT0(TY_mc_size(type) == lchild->get_type_size(getTypeMgr()) &&
-                TY_mc_size(type) == rchild->get_type_size(getTypeMgr()));
+        ASSERT0(TY_mc_size(type) == lchild->getTypeSize(getTypeMgr()) &&
+                TY_mc_size(type) == rchild->getTypeSize(getTypeMgr()));
     }
     #endif
 
@@ -1646,7 +1637,10 @@ IR * Region::buildBinaryOp(
 //'irs': a list of ir.
 //'bbl': a list of bb.
 //'ctbb': marker current bb container.
-C<IRBB*> * Region::splitIRlistIntoBB(IR * irs, BBList * bbl, C<IRBB*> * ctbb)
+xcom::C<IRBB*> * Region::splitIRlistIntoBB(
+        IR * irs,
+        BBList * bbl,
+        xcom::C<IRBB*> * ctbb)
 {
     IR_CFG * cfg = getCFG();
     ASSERT(cfg, ("CFG is not available"));
@@ -1689,7 +1683,7 @@ C<IRBB*> * Region::splitIRlistIntoBB(IR * irs, BBList * bbl, C<IRBB*> * ctbb)
 
 bool Region::evaluateConstInteger(IR const* ir, OUT ULONGLONG * const_value)
 {
-    switch (ir->get_code()) {
+    switch (ir->getCode()) {
     case IR_CONST:
         if (!ir->is_int()) { return false; }
         *const_value = CONST_int_val(ir);
@@ -1713,114 +1707,111 @@ bool Region::evaluateConstInteger(IR const* ir, OUT ULONGLONG * const_value)
     case IR_NE:
     case IR_ASR:
     case IR_LSR:
-    case IR_LSL:
-        {
-            IR const* opnd0 = BIN_opnd0(ir);
-            IR const* opnd1 = BIN_opnd1(ir);
+    case IR_LSL: {
+        IR const* opnd0 = BIN_opnd0(ir);
+        IR const* opnd1 = BIN_opnd1(ir);
 
-            //TODO: Handle the case if opnd0's type is different with opnd1.
-            if (!opnd0->is_int() || !opnd1->is_int()) { return false; }
-            if (opnd0->is_uint() ^ opnd1->is_uint()) { return false; }
+        //TODO: Handle the case if opnd0's type is different with opnd1.
+        if (!opnd0->is_int() || !opnd1->is_int()) { return false; }
+        if (opnd0->is_uint() ^ opnd1->is_uint()) { return false; }
 
-            ULONGLONG lvalue = 0, rvalue = 0;
-            if (!evaluateConstInteger(BIN_opnd0(ir), &lvalue)) { return false; }
-            if (!evaluateConstInteger(BIN_opnd1(ir), &rvalue)) { return false; }
+        ULONGLONG lvalue = 0, rvalue = 0;
+        if (!evaluateConstInteger(BIN_opnd0(ir), &lvalue)) { return false; }
+        if (!evaluateConstInteger(BIN_opnd1(ir), &rvalue)) { return false; }
 
-            if (opnd0->is_uint()) {
-                switch (ir->get_code()) {
-                case IR_ADD: *const_value = lvalue + rvalue; break;
-                case IR_MUL: *const_value = lvalue * rvalue; break;
-                case IR_SUB: *const_value = lvalue - rvalue; break;
-                case IR_DIV: *const_value = lvalue / rvalue; break;
-                case IR_REM: *const_value = lvalue % rvalue; break;
-                case IR_MOD: *const_value = lvalue % rvalue; break;
-                case IR_LAND: *const_value = lvalue && rvalue; break;
-                case IR_LOR:  *const_value = lvalue || rvalue; break;
-                case IR_BAND: *const_value = lvalue & rvalue; break;
-                case IR_BOR:  *const_value = lvalue | rvalue; break;
-                case IR_XOR:  *const_value = lvalue ^ rvalue; break;
-                case IR_LT: *const_value= lvalue < rvalue; break;
-                case IR_LE: *const_value= lvalue <= rvalue; break;
-                case IR_GT: *const_value= lvalue > rvalue; break;
-                case IR_GE: *const_value= lvalue >= rvalue; break;
-                case IR_EQ: *const_value= lvalue == rvalue; break;
-                case IR_NE: *const_value= lvalue != rvalue; break;
-                case IR_ASR: *const_value = lvalue >> rvalue; break;
-                case IR_LSR: *const_value = lvalue >> rvalue; break;
-                case IR_LSL: *const_value = lvalue << rvalue; break;
-                default: return false;
-                }
-            } else {
-                LONGLONG lv = (LONGLONG)lvalue;
-                LONGLONG rv = (LONGLONG)rvalue;
-                LONGLONG res = 0;
-                switch (ir->get_code()) {
-                case IR_ADD:  res = lv + rv; break;
-                case IR_SUB:  res = lv - rv; break;
-                case IR_MUL:  res = lv * rv; break;
-                case IR_DIV:  res = lv / rv; break;
-                case IR_REM:  res = lv % rv; break;
-                case IR_MOD:  res = lv % rv; break;
-                case IR_LAND: res = lv && rv; break;
-                case IR_LOR:  res = lv || rv; break;
-                case IR_BAND: res = lv & rv; break;
-                case IR_BOR:  res = lv | rv; break;
-                case IR_XOR:  res = lv ^ rv; break;
-                case IR_LT: res = lv < rv; break;
-                case IR_LE: res = lv <= rv; break;
-                case IR_GT: res = lv > rv; break;
-                case IR_GE: res = lv >= rv; break;
-                case IR_EQ: res = lv == rv; break;
-                case IR_NE: res = lv != rv; break;
-                case IR_ASR: res = lv >> rv; break;
-                case IR_LSR: res = lv >> rv; break;
-                case IR_LSL: res = lv << rv; break;
-                default: return false;
-                }
-                *const_value = (ULONGLONG)res;
-            }
-            return true;
-        }
-    case IR_BNOT: //bitwise not
-    case IR_LNOT: //logical not
-    case IR_NEG: //negative
-        {
-            if (!UNA_opnd(ir)->is_int()) { return false; }
-
-            ULONGLONG value = 0;
-            if (!evaluateConstInteger(UNA_opnd(ir), &value)) { return false; }
-
-            switch (ir->get_code()) {
-            case IR_BNOT: *const_value = ~value; break;
-            case IR_LNOT: *const_value = !value; break;
-            case IR_NEG:  *const_value = (ULONGLONG)(-(LONGLONG)value); break;
+        if (opnd0->is_uint()) {
+            switch (ir->getCode()) {
+            case IR_ADD: *const_value = lvalue + rvalue; break;
+            case IR_MUL: *const_value = lvalue * rvalue; break;
+            case IR_SUB: *const_value = lvalue - rvalue; break;
+            case IR_DIV: *const_value = lvalue / rvalue; break;
+            case IR_REM: *const_value = lvalue % rvalue; break;
+            case IR_MOD: *const_value = lvalue % rvalue; break;
+            case IR_LAND: *const_value = lvalue && rvalue; break;
+            case IR_LOR:  *const_value = lvalue || rvalue; break;
+            case IR_BAND: *const_value = lvalue & rvalue; break;
+            case IR_BOR:  *const_value = lvalue | rvalue; break;
+            case IR_XOR:  *const_value = lvalue ^ rvalue; break;
+            case IR_LT: *const_value= lvalue < rvalue; break;
+            case IR_LE: *const_value= lvalue <= rvalue; break;
+            case IR_GT: *const_value= lvalue > rvalue; break;
+            case IR_GE: *const_value= lvalue >= rvalue; break;
+            case IR_EQ: *const_value= lvalue == rvalue; break;
+            case IR_NE: *const_value= lvalue != rvalue; break;
+            case IR_ASR: *const_value = lvalue >> rvalue; break;
+            case IR_LSR: *const_value = lvalue >> rvalue; break;
+            case IR_LSL: *const_value = lvalue << rvalue; break;
             default: return false;
             }
-            return true;
-        }
-    case IR_PR:
-        {
-            IR * defstmt = NULL;
-            SSAInfo const* ssainfo = PR_ssainfo(ir);
-            if (ssainfo != NULL) {
-                defstmt = SSA_def(ssainfo);
-                if (defstmt != NULL && !defstmt->is_stpr()) {
-                    return false;
-                }
-            } else {
-                DUSet const* defset = ir->readDUSet();
-                if (defset == NULL || defset->get_elem_count() != 1) {
-                    return false;
-                }
-
-                DUIter di = NULL;
-                defstmt = getIR(defset->get_first(&di));
-                ASSERT0(defstmt && defstmt->is_stmt());
-
-                if (!defstmt->is_stpr()) { return false; }
+        } else {
+            LONGLONG lv = (LONGLONG)lvalue;
+            LONGLONG rv = (LONGLONG)rvalue;
+            LONGLONG res = 0;
+            switch (ir->getCode()) {
+            case IR_ADD:  res = lv + rv; break;
+            case IR_SUB:  res = lv - rv; break;
+            case IR_MUL:  res = lv * rv; break;
+            case IR_DIV:  res = lv / rv; break;
+            case IR_REM:  res = lv % rv; break;
+            case IR_MOD:  res = lv % rv; break;
+            case IR_LAND: res = lv && rv; break;
+            case IR_LOR:  res = lv || rv; break;
+            case IR_BAND: res = lv & rv; break;
+            case IR_BOR:  res = lv | rv; break;
+            case IR_XOR:  res = lv ^ rv; break;
+            case IR_LT: res = lv < rv; break;
+            case IR_LE: res = lv <= rv; break;
+            case IR_GT: res = lv > rv; break;
+            case IR_GE: res = lv >= rv; break;
+            case IR_EQ: res = lv == rv; break;
+            case IR_NE: res = lv != rv; break;
+            case IR_ASR: res = lv >> rv; break;
+            case IR_LSR: res = lv >> rv; break;
+            case IR_LSL: res = lv << rv; break;
+            default: return false;
             }
-            return evaluateConstInteger(STPR_rhs(defstmt), const_value);
+            *const_value = (ULONGLONG)res;
         }
+        return true;
+    }
+    case IR_BNOT: //bitwise not
+    case IR_LNOT: //logical not
+    case IR_NEG: { //negative
+        if (!UNA_opnd(ir)->is_int()) { return false; }
+
+        ULONGLONG value = 0;
+        if (!evaluateConstInteger(UNA_opnd(ir), &value)) { return false; }
+
+        switch (ir->getCode()) {
+        case IR_BNOT: *const_value = ~value; break;
+        case IR_LNOT: *const_value = !value; break;
+        case IR_NEG:  *const_value = (ULONGLONG)(-(LONGLONG)value); break;
+        default: return false;
+        }
+        return true;
+    }
+    case IR_PR: {
+        IR * defstmt = NULL;
+        SSAInfo const* ssainfo = PR_ssainfo(ir);
+        if (ssainfo != NULL) {
+            defstmt = SSA_def(ssainfo);
+            if (defstmt != NULL && !defstmt->is_stpr()) {
+                return false;
+            }
+        } else {
+            DUSet const* defset = ir->readDUSet();
+            if (defset == NULL || defset->get_elem_count() != 1) {
+                return false;
+            }
+
+            DUIter di = NULL;
+            defstmt = getIR(defset->get_first(&di));
+            ASSERT0(defstmt && defstmt->is_stmt());
+
+            if (!defstmt->is_stpr()) { return false; }
+        }
+        return evaluateConstInteger(STPR_rhs(defstmt), const_value);
+    }
     case IR_CVT:
         return evaluateConstInteger(CVT_exp(ir), const_value);
     default:;
@@ -1874,11 +1865,11 @@ bool Region::reconstructBBlist(OptCtx & oc)
     ASSERT(getCFG(), ("CFG is not available"));
 
     bool change = false;
-    C<IRBB*> * ctbb;
+    xcom::C<IRBB*> * ctbb;
     BBList * bbl = getBBList();
     for (bbl->get_head(&ctbb); ctbb != NULL; bbl->get_next(&ctbb)) {
         IRBB * bb = ctbb->val();
-        C<IR*> * ctir;
+        xcom::C<IR*> * ctir;
         BBIRList * irlst = &BB_irlist(bb);
 
         IR * tail = irlst->get_tail();
@@ -1941,12 +1932,12 @@ IR * Region::constructIRlist(bool clean_ir_list)
     START_TIMER(t, "Construct IR list from BB");
     IR * ret_list = NULL;
     IR * last = NULL;
-    C<IRBB*> * ct;
+    xcom::C<IRBB*> * ct;
     for (getBBList()->get_head(&ct);
          ct != getBBList()->end();
          ct = getBBList()->get_next(ct)) {
         IRBB * bb = ct->val();
-        C<LabelInfo const*> * lct;
+        xcom::C<LabelInfo const*> * lct;
         for (bb->getLabelList().get_head(&lct);
              lct != bb->getLabelList().end();
              lct = bb->getLabelList().get_next(lct)) {
@@ -1994,7 +1985,7 @@ void Region::constructIRBBlist()
 
         if (cur_bb->is_down_boundary(cur_ir)) {
             BB_irlist(cur_bb).append_tail(cur_ir);
-            switch (cur_ir->get_code()) {
+            switch (cur_ir->getCode()) {
             case IR_CALL:
             case IR_ICALL: //indirective call
             case IR_TRUEBR:
@@ -2167,11 +2158,11 @@ MD const* Region::genMDforPR(UINT prno, Type const* type)
     MD md;
     MD_base(&md) = pr_var; //correspond to VAR
     MD_ofst(&md) = 0;
-    if (pr_var->get_type()->is_void()) {
+    if (pr_var->getType()->is_void()) {
         MD_ty(&md) = MD_UNBOUND;
     } else {
         MD_ty(&md) = MD_EXACT;
-        MD_size(&md) = getTypeMgr()->get_bytesize(pr_var->get_type());
+        MD_size(&md) = getTypeMgr()->get_bytesize(pr_var->getType());
     }
     MD const* e = getMDSystem()->registerMD(md);
     ASSERT0(MD_id(e) > 0);
@@ -2224,8 +2215,8 @@ void Region::freeIRTreeList(IR * ir)
 //We can only utilizing the function to free the IR which allocated by 'allocIR'.
 void Region::freeIRTreeList(IRList & irs)
 {
-    C<IR*> * next;
-    C<IR*> * ct;
+    xcom::C<IR*> * next;
+    xcom::C<IR*> * ct;
     for (irs.get_head(&ct); ct != irs.end(); ct = next) {
         IR * ir = ct->val();
         next = irs.get_next(ct);
@@ -2336,7 +2327,7 @@ void Region::findFormalParam(OUT List<VAR const*> & varlst, bool in_decl_order)
         for (VAR const* v = vt->get_first(c); v != NULL; v = vt->get_next(c)) {
             if (!VAR_is_formal_param(v)) { continue; }
 
-            C<VAR const*> * ctp;
+            xcom::C<VAR const*> * ctp;
             bool find = false;
             for (VAR const* p = varlst.get_head(&ctp);
                  p != NULL; p = varlst.get_next(&ctp)) {
@@ -2505,7 +2496,7 @@ IR * Region::dupIRTree(IR const* ir)
 IR * Region::dupIR(IR const* src)
 {
     if (src == NULL) { return NULL; }
-    IR_TYPE irt = src->get_code();
+    IR_TYPE irt = src->getCode();
     IR * res = allocIR(irt);
     ASSERT(res != NULL && src != NULL, ("res/src is NULL"));
 
@@ -2536,7 +2527,7 @@ void Region::scanCallListImpl(
         bool scan_inner_region)
 {
     for (IR const* t = irlst; t != NULL; t = t->get_next()) {
-        switch (t->get_code()) {
+        switch (t->getCode()) {
         case IR_CALL:
         case IR_ICALL:
             if (!CALL_is_intrinsic(t)) {
@@ -2622,7 +2613,7 @@ void Region::scanCallAndReturnList(
 void Region::prescan(IR const* ir)
 {
     for (; ir != NULL; ir = ir->get_next()) {
-        switch (ir->get_code()) {
+        switch (ir->getCode()) {
         case IR_ST:
             prescan(ST_rhs(ir));
             break;
@@ -2670,7 +2661,7 @@ void Region::prescan(IR const* ir)
                     MD md;
                     MD_base(&md) = LDA_idinfo(ir); //correspond to VAR
                     MD_ofst(&md) = LDA_ofst(ir);
-                    MD_size(&md) = ir->get_type_size(getTypeMgr());
+                    MD_size(&md) = ir->getTypeSize(getTypeMgr());
                     MD_ty(&md) = MD_EXACT;
                     getMDSystem()->registerMD(md);
                 }
@@ -3035,7 +3026,7 @@ bool Region::verifyMDRef()
             cii.clean();
             for (IR const* t = iterInitC(ir, cii);
                  t != NULL; t = iterNextC(cii)) {
-                switch (t->get_code()) {
+                switch (t->getCode()) {
                 case IR_ID:
                     //We do not need MD or MDSET information of IR_ID.
                     //ASSERT0(t->getExactRef());
@@ -3446,7 +3437,7 @@ void Region::copyAI(IR const* src, IR * tgt)
 
 void Region::checkValidAndRecompute(OptCtx * oc, ...)
 {
-    BitSet opts;
+    xcom::BitSet opts;
     UINT num = 0;
     va_list ptr;
     va_start(ptr, oc);
@@ -3727,7 +3718,7 @@ void Region::updateCallAndReturnList(bool scan_inner_region)
     List<IR const*> * clst = getCallList();
     if (clst == NULL) { return; }
 
-    C<IR const*> * ct;
+    xcom::C<IR const*> * ct;
     for (clst->get_head(&ct); ct != clst->end(); ct = clst->get_next(ct)) {
         IR const* c = ct->val();
         ASSERT0(c);

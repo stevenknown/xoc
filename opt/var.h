@@ -279,7 +279,7 @@ public:
 
     UINT get_align() const { return VAR_align(this); }    
     SYM const* get_name() const { return VAR_name(this); }
-    Type const* get_type() const { return VAR_type(this); }
+    Type const* getType() const { return VAR_type(this); }
     UINT getFormalParamPos() const { return VAR_formal_param_pos(this); }
     UINT getStringLength() const
     {

@@ -253,7 +253,7 @@ protected:
 
     //String2Token m_str2token;
     TMap<CHAR const*, TOKEN, CompareStringFunc> m_str2token;
-    xcom::List<LexErrorMsg*> m_err_msg_list;
+    List<LexErrorMsg*> m_err_msg_list;
 
 protected:
     void initKeyWordTab();

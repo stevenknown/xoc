@@ -59,7 +59,7 @@ public:
     virtual void doPrepareWorkBeforePrint() {}
 
     virtual void printSrcLine(IR const*);
-    virtual void printSrcLine(Dbx const&) {} //Taget Dependent Code
+    virtual void printSrcLine(Dbx const*) {} //Taget Dependent Code
 };
 
 
@@ -70,7 +70,7 @@ extern DbxMgr * g_dbx_mgr;
 void copyDbx(IR * tgt, IR const* src, Region * rg);
 void set_lineno(IR * ir, UINT lineno, Region * rg);
 UINT get_lineno(IR const* ir);
-UINT get_lineno(Dbx const& dbx);
+UINT get_lineno(Dbx const* dbx);
 Dbx * get_dbx(IR const* ir);
 
 } //namespace xoc

@@ -230,21 +230,20 @@ void MDPhi::dump(Region * rg, UseDefMgr * mgr)
             fprintf(g_tfile, ", ");
         }
 
-        switch (opnd->get_code()) {
+        switch (opnd->getCode()) {
         case IR_CONST:
             fprintf(g_tfile, "Const");
             break;
         case IR_LDA:
             fprintf(g_tfile, "Lda");
             break;
-        case IR_ID:
-            {
-                VMD * vopnd = getOpndVMD(opnd, mgr);
-                fprintf(g_tfile, "MD%dV%d(id:%d)",
-                    vopnd->mdid(), vopnd->version(), opnd->id());
-            }
+        case IR_ID: {
+            VMD * vopnd = getOpndVMD(opnd, mgr);
+            fprintf(g_tfile, "MD%dV%d(id:%d)",
+                vopnd->mdid(), vopnd->version(), opnd->id());
             break;
-        default: UNREACH();
+        }            
+        default: UNREACHABLE();
         }
 
         ASSERT0(pred);
@@ -286,14 +285,14 @@ UseDefMgr::UseDefMgr(Region * rg) : m_ru(rg)
     m_sbs_mgr = m_ru->getMiscBitSetMgr();
 
     //Single List Core need user declared a mempool.
-    m_vopnd_sc_pool = smpoolCreate(sizeof(SC<VOpnd*>) * 4, MEM_CONST_SIZE);
+    m_vopnd_sc_pool = smpoolCreate(sizeof(xcom::SC<VOpnd*>) * 4, MEM_CONST_SIZE);
     m_phi_pool = smpoolCreate(sizeof(MDPhi) * 2, MEM_CONST_SIZE);
     m_def_pool = smpoolCreate(sizeof(MDDef) * 2, MEM_CONST_SIZE);
     m_defset_pool = smpoolCreate(sizeof(MDDefSet) * 2, MEM_CONST_SIZE);
     m_vconst_pool = smpoolCreate(sizeof(VConst)*2, MEM_CONST_SIZE);
     m_vmd_pool = smpoolCreate(sizeof(VMD)*2, MEM_CONST_SIZE);
     m_philist_pool = smpoolCreate(sizeof(MDPhiList)*2, MEM_CONST_SIZE);
-    m_philist_sc_pool = smpoolCreate(sizeof(SC<MDPhi*>) * 4, MEM_CONST_SIZE);
+    m_philist_sc_pool = smpoolCreate(sizeof(xcom::SC<MDPhi*>) * 4, MEM_CONST_SIZE);
     m_mdssainfo_pool = smpoolCreate(sizeof(MDSSAInfo)*2, MEM_CONST_SIZE);
 
     m_free_sc_list = NULL;
@@ -392,14 +391,14 @@ void UseDefMgr::cleanOrDestroy(bool is_reinit)
     smpoolDelete(m_mdssainfo_pool);
 
     if (is_reinit) {
-        m_vopnd_sc_pool = smpoolCreate(sizeof(SC<VOpnd*>) * 4, MEM_CONST_SIZE);
+        m_vopnd_sc_pool = smpoolCreate(sizeof(xcom::SC<VOpnd*>) * 4, MEM_CONST_SIZE);
         m_phi_pool = smpoolCreate(sizeof(MDPhi) * 2, MEM_CONST_SIZE);
         m_def_pool = smpoolCreate(sizeof(MDDef) * 2, MEM_CONST_SIZE);
         m_defset_pool = smpoolCreate(sizeof(MDDefSet) * 2, MEM_CONST_SIZE);
         m_vmd_pool = smpoolCreate(sizeof(VMD) * 2, MEM_CONST_SIZE);
         m_vconst_pool = smpoolCreate(sizeof(VConst)*2, MEM_CONST_SIZE);
         m_philist_pool = smpoolCreate(sizeof(MDPhiList)*2, MEM_CONST_SIZE);
-        m_philist_sc_pool = smpoolCreate(sizeof(SC<MDPhi*>) * 4, MEM_CONST_SIZE);
+        m_philist_sc_pool = smpoolCreate(sizeof(xcom::SC<MDPhi*>) * 4, MEM_CONST_SIZE);
         m_mdssainfo_pool = smpoolCreate(sizeof(MDSSAInfo)*4, MEM_CONST_SIZE);
     }
 }
@@ -515,16 +514,16 @@ MDDefSet * UseDefMgr::allocMDDefSet()
 }
 
 
-SC<VOpnd*> * UseDefMgr::allocSCVOpnd(VOpnd * opnd)
+xcom::SC<VOpnd*> * UseDefMgr::allocSCVOpnd(VOpnd * opnd)
 {
-    SC<VOpnd*> * sc = xcom::removehead_single_list(&m_free_sc_list);
+    xcom::SC<VOpnd*> * sc = xcom::removehead_single_list(&m_free_sc_list);
     if (sc != NULL) {
         sc->init();
         return sc;
     }
 
-    sc = (SC<VOpnd*>*)smpoolMallocConstSize(
-        sizeof(SC<VOpnd*>), m_vopnd_sc_pool);
+    sc = (xcom::SC<VOpnd*>*)smpoolMallocConstSize(
+        sizeof(xcom::SC<VOpnd*>), m_vopnd_sc_pool);
     sc->init();
     SC_val(sc) = opnd;
     return sc;

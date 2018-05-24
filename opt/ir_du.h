@@ -179,7 +179,7 @@ public:
     {
         #ifdef HASH_DBITSETCORE
         #else
-        C<DefDBitSetCore*> * ct;
+        xcom::C<DefDBitSetCore*> * ct;
         for (m_allocated.get_head(&ct);
              ct != m_allocated.end(); ct = m_allocated.get_next(ct)) {
             DefDBitSetCore * s = ct->val();
@@ -210,7 +210,7 @@ public:
         #else
         if (h == NULL) { return; }
         fprintf(h, "\n==---- DUMP DefDBitSetCoreReserveTab ----==");
-        C<DefDBitSetCore*> * ct;
+        xcom::C<DefDBitSetCore*> * ct;
         for (m_allocated.get_head(&ct);
              ct != m_allocated.end(); ct = m_allocated.get_next(ct)) {
             DefDBitSetCore * s = ct->val();
@@ -269,7 +269,7 @@ protected:
     DefSBitSetCore m_is_cached_mdset;
 
     //Used by DU chain.
-    BitSet * m_is_init;
+    xcom::BitSet * m_is_init;
     MDId2IRlist * m_md2irs;
 
     OptCtx * m_oc;
@@ -330,7 +330,7 @@ protected:
             IR const* exp,
             MD const* expmd,
             DUSet * expdu,
-            C<IR*> * ct);
+            xcom::C<IR*> * ct);
 
     void checkDefSetToBuildDUChain(
             IR const* exp,
@@ -349,15 +349,23 @@ protected:
             MD const* expmd,
             DUSet * expdu);
     bool checkIsTruelyDep(IR const* def, IR const* use);
-    UINT checkIsLocalKillingDef(IR const* stmt, IR const* exp, C<IR*> * expct);
+    UINT checkIsLocalKillingDef(IR const* stmt,
+            IR const* exp,
+            xcom::C<IR*> * expct);
     UINT checkIsNonLocalKillingDef(IR const* stmt, IR const* exp);
     inline bool canBeLiveExprCand(IR const* ir) const;
     void computeArrayRefAtIstoreBase(IR * ir);
     void computeExpression(IR * ir, MDSet * ret_mds, UINT compflag, UINT duflag);
-    void computeArrayRef(IR * ir, OUT MDSet * ret_mds, UINT compflag, UINT duflag);
-    void checkAndBuildChainForMemIR(IRBB * bb, IR * exp, C<IR*> * ct);
-    void checkAndBuildChainRecursive(IRBB * bb, IR * exp, C<IR*> * ct, UINT flag);
-    void checkAndBuildChain(IR * stmt, C<IR*> * ct, UINT flag);
+    void computeArrayRef(IR * ir,
+            OUT MDSet * ret_mds,
+            UINT compflag,
+            UINT duflag);
+    void checkAndBuildChainForMemIR(IRBB * bb, IR * exp, xcom::C<IR*> * ct);
+    void checkAndBuildChainRecursive(IRBB * bb,
+            IR * exp,
+            xcom::C<IR*> * ct,
+            UINT flag);
+    void checkAndBuildChain(IR * stmt, xcom::C<IR*> * ct, UINT flag);
     void computeMayDef(
             IR const* ir,
             MDSet * bb_maydefmds,
@@ -532,12 +540,12 @@ public:
     //Collect must and may memory reference.
     void collectMayUseRecursive(
             IR const* ir,
-            MDSet & may_use,
+            MDSet & mayUse,
             bool computePR,
             DefMiscBitSetMgr & bsmgr);
 
     //Collect may memory reference.
-    void collectMayUse(IR const* ir, MDSet & may_use, bool computePR);
+    void collectMayUse(IR const* ir, MDSet & mayUse, bool computePR);
 
     //DU chain operation.
     //Copy DUSet from 'src' to 'tgt'. src and tgt must
@@ -792,7 +800,7 @@ public:
             bool omit_self);
     IR const* findKillingLocalDef(
             IRBB * bb,
-            C<IR*> * ct,
+            xcom::C<IR*> * ct,
             IR const* exp,
             MD const* md);
 
@@ -907,7 +915,7 @@ public:
 
     virtual bool perform(OptCtx &)
     {
-        UNREACH();
+        UNREACHABLE();
         return false;
     }
     bool perform(IN OUT OptCtx & oc,

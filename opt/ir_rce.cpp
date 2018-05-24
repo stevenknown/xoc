@@ -64,7 +64,7 @@ IR * IR_RCE::calcCondMustVal(
     must_true = false;
     must_false = false;
     ASSERT0(ir->is_judge());
-    switch (ir->get_code()) {
+    switch (ir->getCode()) {
     case IR_LT:
     case IR_LE:
     case IR_GT:
@@ -73,44 +73,43 @@ IR * IR_RCE::calcCondMustVal(
     case IR_EQ:
     case IR_LAND:
     case IR_LOR:
-    case IR_LNOT:
-        {
-            ir = m_ru->foldConst(ir, changed);
-            if (changed) {
-                ASSERT0(ir->is_const() &&
-                        (CONST_int_val(ir) == 0 || CONST_int_val(ir) == 1));
-                if (CONST_int_val(ir) == 1) {
-                    must_true = true;
-                } else if (CONST_int_val(ir) == 0) {
-                    must_false = true;
-                }
-                return ir;
+    case IR_LNOT: {
+        ir = m_ru->foldConst(ir, changed);
+        if (changed) {
+            ASSERT0(ir->is_const() &&
+                    (CONST_int_val(ir) == 0 || CONST_int_val(ir) == 1));
+            if (CONST_int_val(ir) == 1) {
+                must_true = true;
+            } else if (CONST_int_val(ir) == 0) {
+                must_false = true;
             }
+            return ir;
+        }
 
-            if (m_gvn != NULL && m_gvn->is_valid()) {
-                bool change = m_gvn->calcCondMustVal(ir, must_true, must_false);
-                if (change) {
-                    changed = true;
-                    if (must_true) {
-                        ASSERT0(!must_false);
-                        Type const* type = ir->get_type();
-                        ir->removeSSAUse();
-                        m_ru->freeIRTree(ir);
-                        ir = m_ru->buildImmInt(1, type);
-                        return ir;
-                    } else {
-                        ASSERT0(must_false);
-                        Type const* type = ir->get_type();
-                        ir->removeSSAUse();
-                        m_ru->freeIRTree(ir);
-                        ir = m_ru->buildImmInt(0, type);
-                        return ir;
-                    }
+        if (m_gvn != NULL && m_gvn->is_valid()) {
+            bool change = m_gvn->calcCondMustVal(ir, must_true, must_false);
+            if (change) {
+                changed = true;
+                if (must_true) {
+                    ASSERT0(!must_false);
+                    Type const* type = ir->getType();
+                    ir->removeSSAUse();
+                    m_ru->freeIRTree(ir);
+                    ir = m_ru->buildImmInt(1, type);
+                    return ir;
+                } else {
+                    ASSERT0(must_false);
+                    Type const* type = ir->getType();
+                    ir->removeSSAUse();
+                    m_ru->freeIRTree(ir);
+                    ir = m_ru->buildImmInt(0, type);
+                    return ir;
                 }
             }
         }
         break;
-    default: UNREACH();
+    }
+    default: UNREACHABLE();
     }
 
     return ir;
@@ -250,17 +249,17 @@ bool IR_RCE::performSimplyRCE(IN OUT bool & cfg_mod)
 {
     BBList * bbl = m_ru->getBBList();
     bool change = false;
-    C<IRBB*> * ct_bb;
+    xcom::C<IRBB*> * ct_bb;
     for (IRBB * bb = bbl->get_head(&ct_bb);
          bb != NULL; bb = bbl->get_next(&ct_bb)) {
         BBIRList * ir_list = &BB_irlist(bb);
-        C<IR*> * ct, * next_ct;
+        xcom::C<IR*> * ct, * next_ct;
         for (ir_list->get_head(&next_ct), ct = next_ct;
              ct != NULL; ct = next_ct) {
             IR * ir = ct->val();
             ir_list->get_next(&next_ct);
             IR * newIR = ir;
-            switch (ir->get_code()) {
+            switch (ir->getCode()) {
             case IR_TRUEBR:
             case IR_FALSEBR:
                 newIR = processBranch(ir, cfg_mod);

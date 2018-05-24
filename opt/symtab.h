@@ -224,7 +224,7 @@ class SymTab : public TTab<SYM*, CompareSymTab> {
     SYM * m_free_one;
     SMemPool * m_pool;
 public:
-    explicit SymTab()
+    SymTab()
     {
         m_pool = smpoolCreate(64, MEM_COMM);
         m_free_one = NULL;

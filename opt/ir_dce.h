@@ -36,11 +36,11 @@ author: Su Zhenyu
 
 namespace xoc {
 
-class EFFECT_STMT : public BitSet {
+class EFFECT_STMT : public xcom::BitSet {
 public:
     void bunion(INT elem)
     {
-        BitSet::bunion(elem);
+        xcom::BitSet::bunion(elem);
     }
 };
 
@@ -64,11 +64,11 @@ protected:
     void fix_control_flow(List<IRBB*> & bblst, List<C<IRBB*>*> & ctlst);
     bool find_effect_kid(IN IRBB * bb, IN IR * ir,
                          IN EFFECT_STMT & is_stmt_effect);
-    bool preserve_cd(IN OUT BitSet & is_bb_effect,
+    bool preserve_cd(IN OUT xcom::BitSet & is_bb_effect,
                      IN OUT EFFECT_STMT & is_stmt_effect,
                      IN OUT List<IR const*> & act_ir_lst);
     void mark_effect_ir(IN OUT EFFECT_STMT & is_stmt_effect,
-                        IN OUT BitSet & is_bb_effect,
+                        IN OUT xcom::BitSet & is_bb_effect,
                         IN OUT List<IR const*> & work_list);
 
     bool is_effect_write(VAR * v) const
@@ -78,7 +78,7 @@ protected:
 
     bool is_cfs(IR const* ir) const
     {
-        switch (ir->get_code()) {
+        switch (ir->getCode()) {
         case IR_TRUEBR:
         case IR_FALSEBR:
         case IR_GOTO:
@@ -90,10 +90,10 @@ protected:
     }
 
     void iter_collect(IN OUT EFFECT_STMT & is_stmt_effect,
-                      IN OUT BitSet & is_bb_effect,
+                      IN OUT xcom::BitSet & is_bb_effect,
                       IN OUT List<IR const*> & work_list);
     void record_all_ir(IN OUT Vector<Vector<IR*>*> & all_ir);
-    void revise_successor(IRBB * bb, C<IRBB*> * bbct, BBList * bbl);
+    void revise_successor(IRBB * bb, xcom::C<IRBB*> * bbct, BBList * bbl);
 
     bool check_stmt(IR const* ir);
     bool check_call(IR const* ir);
@@ -114,7 +114,7 @@ public:
     virtual ~IR_DCE() {}
 
     void dump(EFFECT_STMT const& is_stmt_effect,
-              BitSet const& is_bb_effect,
+              xcom::BitSet const& is_bb_effect,
               IN Vector<Vector<IR*>*> & all_ir);
 
     virtual CHAR const* getPassName() const

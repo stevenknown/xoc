@@ -358,7 +358,7 @@ protected:
     Region * m_ru;
     MDSystem * m_md_sys;
     DefMiscBitSetMgr * m_sbs_mgr;
-    SC<VOpnd*> * m_free_sc_list;
+    xcom::SC<VOpnd*> * m_free_sc_list;
     UINT m_def_count;
     UINT m_vopnd_count;
     Vector<MDSSAInfo*> m_mdssainfo_vec;
@@ -380,14 +380,14 @@ public:
     MDPhi * allocMDPhi(UINT mdid, UINT num_operands);
     MDDef * allocMDDef();
     MDDefSet * allocMDDefSet();
-    SC<VOpnd*> * allocSCVOpnd(VOpnd * opnd);
+    xcom::SC<VOpnd*> * allocSCVOpnd(VOpnd * opnd);
     VConst * allocVConst(IR const* ir);
     VMD * allocVMD(UINT mdid, UINT version);
     size_t count_mem();
 
     MDSSAInfo * genMDSSAInfo(IR * ir);
     MDSSAInfo * getMDSSAInfo(IR const* ir) const;
-    SC<VOpnd*> ** getFreeSCListAddress() { return &m_free_sc_list; }
+    xcom::SC<VOpnd*> ** getFreeSCListAddress() { return &m_free_sc_list; }
     Vector<VOpnd*> * getVOpndVec() { return &m_vopnd_vec; }
     VOpnd * getVOpnd(UINT i) const { return m_vopnd_vec.get(i); }
     MDPhiList * genBBPhiList(UINT bbid);

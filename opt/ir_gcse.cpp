@@ -67,7 +67,7 @@ void IR_GCSE::elimCseAtStore(IR * use, IR * use_stmt, IR * gen)
     ASSERT0(use_stmt->is_st() || use_stmt->is_stpr() || use_stmt->is_ist());
     #ifdef DEBUG_GCSE
     ASSERT0(++g_num_of_elim);
-    ASSERT0(g_elim_irt.append_tail(use->get_code()));
+    ASSERT0(g_elim_irt.append_tail(use->getCode()));
     #endif
     ASSERT0(use->is_exp() && gen->is_exp());
     ASSERT0(use_stmt->getRHS() == use);
@@ -88,7 +88,7 @@ void IR_GCSE::elimCseAtStore(IR * use, IR * use_stmt, IR * gen)
     IR_may_throw(use_stmt) = false;
 
     //Add du chain.
-    IR * gen_stmt = gen->get_stmt();
+    IR * gen_stmt = gen->getStmt();
     ASSERT0(gen_stmt->isPREqual(gen_pr));
     if (m_is_in_ssa_form) {
         m_ssamgr->buildDUChain(gen_stmt, newrhs_pr);
@@ -116,7 +116,7 @@ void IR_GCSE::elimCseAtBranch(IR * use, IR * use_stmt, IN IR * gen)
 {
     #ifdef DEBUG_GCSE
     ASSERT0(++g_num_of_elim);
-    ASSERT0(g_elim_irt.append_tail(use->get_code()));
+    ASSERT0(g_elim_irt.append_tail(use->getCode()));
     #endif
     ASSERT0(use->is_exp() && gen->is_exp());
 
@@ -129,7 +129,7 @@ void IR_GCSE::elimCseAtBranch(IR * use, IR * use_stmt, IN IR * gen)
     IR * new_pr = m_ru->dupIRTree(gen_pr);
 
     //Add du chain.
-    IR * gen_stmt = gen->get_stmt();
+    IR * gen_stmt = gen->getStmt();
     ASSERT0(gen_stmt->isPREqual(gen_pr));
 
     if (m_is_in_ssa_form) {
@@ -174,7 +174,7 @@ void IR_GCSE::elimCseAtCall(IR * use, IR * use_stmt, IR * gen)
 {
     #ifdef DEBUG_GCSE
     ASSERT0(++g_num_of_elim);
-    ASSERT0(g_elim_irt.append_tail(use->get_code()));
+    ASSERT0(g_elim_irt.append_tail(use->getCode()));
     #endif
     ASSERT0(use->is_exp() && gen->is_exp() && use_stmt->is_stmt());
 
@@ -186,7 +186,7 @@ void IR_GCSE::elimCseAtCall(IR * use, IR * use_stmt, IR * gen)
     IR * use_pr = m_ru->dupIRTree(gen_pr);
 
     //Set identical vn to use_pr with CSE.
-    IR * gen_stmt = gen->get_stmt();
+    IR * gen_stmt = gen->getStmt();
     ASSERT0(m_gvn);
     VN * vn = m_gvn->mapIR2VN(gen);
     ASSERT0(vn);
@@ -262,7 +262,7 @@ void IR_GCSE::prcessCseGen(IN IR * gen, IR * gen_stmt, bool & change)
     copyDbx(new_stpr, gen_stmt, m_ru);
 
     //The 'find()' is fast because it is implemented with hash.
-    C<IR*> * holder = NULL;
+    xcom::C<IR*> * holder = NULL;
     bool f = BB_irlist(bb).find(gen_stmt, &holder);
     CHECK_DUMMYUSE(f);
     CHECK_DUMMYUSE(holder);
@@ -292,7 +292,7 @@ void IR_GCSE::prcessCseGen(IN IR * gen, IR * gen_stmt, bool & change)
 bool IR_GCSE::isCseCandidate(IR * ir)
 {
     ASSERT0(ir);
-    switch (ir->get_code()) {
+    switch (ir->getCode()) {
     case IR_ADD:
     case IR_SUB:
     case IR_MUL:
@@ -332,7 +332,7 @@ bool IR_GCSE::elim(IR * use, IR * use_stmt, IR * gen, IR * gen_stmt)
     //     ...=a+b <--use CSE
     bool change = false;
     prcessCseGen(gen, gen_stmt, change);
-    switch (use_stmt->get_code()) {
+    switch (use_stmt->getCode()) {
     case IR_ST:
     case IR_STPR:
     case IR_IST:
@@ -365,8 +365,8 @@ bool IR_GCSE::findAndElim(IR * exp, IR * gen)
 {
     ASSERT0(exp && gen);
     ASSERT0(exp != gen);
-    IR * exp_stmt = exp->get_stmt();
-    IR * gen_stmt = gen->get_stmt();
+    IR * exp_stmt = exp->getStmt();
+    IR * gen_stmt = gen->getStmt();
     ASSERT0(exp_stmt->getBB() && gen_stmt->getBB());
 
     IRBB * gen_bb;
@@ -397,17 +397,17 @@ bool IR_GCSE::findAndElim(IR * exp, IR * gen)
 //NOTE: exp should be freed.
 bool IR_GCSE::prcessCse(IN IR * exp, IN List<IR*> & livexp)
 {
-    IR * expstmt = exp->get_stmt();
+    IR * expstmt = exp->getStmt();
     ExpRep * irie = m_expr_tab->map_ir2ir_expr(exp);
     ASSERT0(irie && expstmt->getBB());
-    C<IR*> * ct;
+    xcom::C<IR*> * ct;
     bool change = false;
     for (IR * gen = livexp.get_head(&ct);
          gen != NULL; gen = livexp.get_next(&ct)) {
         ExpRep * xie = m_expr_tab->map_ir2ir_expr(gen);
         ASSERT0(xie);
         if (irie != xie) { continue; }
-        IR * gen_stmt = gen->get_stmt();
+        IR * gen_stmt = gen->getStmt();
         ASSERT0(gen_stmt->getBB());
         UINT iid = BB_id(expstmt->getBB());
         UINT xid = BB_id(gen_stmt->getBB());
@@ -475,38 +475,36 @@ bool IR_GCSE::shouldBeCse(IR * det)
 bool IR_GCSE::doPropVN(IRBB * bb, UINT entry_id)
 {
     bool change = false;
-    C<IR*> * ct;
+    xcom::C<IR*> * ct;
     for (IR * ir = BB_irlist(bb).get_head(&ct);
          ir != NULL; ir = BB_irlist(bb).get_next(&ct)) {
-        switch (ir->get_code()) {
+        switch (ir->getCode()) {
         case IR_ST:
         case IR_STPR:
-        case IR_IST:
-            {
-                IR * rhs = ir->getRHS();
-                //Find cse and replace it with properly pr.
-                if (isCseCandidate(rhs)) {
-                    handleCandidate(rhs, bb, entry_id, change);
-                }
+        case IR_IST: {
+            IR * rhs = ir->getRHS();
+            //Find cse and replace it with properly pr.
+            if (isCseCandidate(rhs)) {
+                handleCandidate(rhs, bb, entry_id, change);
             }
             break;
+        }
         case IR_CALL:
-        case IR_ICALL:
-            {
-                IR * p = CALL_param_list(ir);
-                IR * next = NULL;
-                bool lchange = false;
-                m_newst_lst.clean();
-                while (p != NULL) {
-                    next = p->get_next();
-                    if (isCseCandidate(p)) {
-                        handleCandidate(p, bb, entry_id, lchange);
-                    }
-                    p = next;
+        case IR_ICALL: {
+            IR * p = CALL_param_list(ir);
+            IR * next = NULL;
+            bool lchange = false;
+            m_newst_lst.clean();
+            while (p != NULL) {
+                next = p->get_next();
+                if (isCseCandidate(p)) {
+                    handleCandidate(p, bb, entry_id, lchange);
                 }
-                change |= lchange;
+                p = next;
             }
+            change |= lchange;
             break;
+        }
         case IR_TRUEBR:
         case IR_FALSEBR:
             //Find cse and replace it with properly pr.
@@ -542,11 +540,11 @@ bool IR_GCSE::doProp(IRBB * bb, List<IR*> & livexp)
     }
 
     bool change = false;
-    C<IR*> * ct;
+    xcom::C<IR*> * ct;
     MDSet tmp;
     for (IR * ir = BB_irlist(bb).get_head(&ct);
          ir != NULL; ir = BB_irlist(bb).get_next(&ct)) {
-        switch (ir->get_code()) {
+        switch (ir->getCode()) {
         case IR_ST:
             //Find cse and replace it with properly pr.
             if (isCseCandidate(ST_rhs(ir))) {
@@ -632,7 +630,7 @@ bool IR_GCSE::doProp(IRBB * bb, List<IR*> & livexp)
         }
 
         //Remove may-killed live-expr.
-        switch (ir->get_code()) {
+        switch (ir->getCode()) {
         case IR_ST:
         case IR_STPR:
         case IR_IST:
@@ -641,7 +639,7 @@ bool IR_GCSE::doProp(IRBB * bb, List<IR*> & livexp)
             {
                 MDSet const* maydef = m_du->getMayDef(ir);
                 if (maydef != NULL && !maydef->is_empty()) {
-                    C<IR*> * ct2, * next;
+                    xcom::C<IR*> * ct2, * next;
                     for (livexp.get_head(&ct2), next = ct2;
                          ct2 != NULL; ct2 = next) {
                         livexp.get_next(&next);
@@ -657,7 +655,7 @@ bool IR_GCSE::doProp(IRBB * bb, List<IR*> & livexp)
 
                 MD const* mustdef = m_du->get_must_def(ir);
                 if (mustdef != NULL) {
-                    C<IR*> * ct2, * next;
+                    xcom::C<IR*> * ct2, * next;
                     for (livexp.get_head(&ct2), next = ct2;
                          ct2 != NULL; ct2 = next) {
                         livexp.get_next(&next);
@@ -716,10 +714,10 @@ bool IR_GCSE::perform(OptCtx & oc)
     IRBB * entry = m_cfg->get_entry();
     ASSERT(entry && BB_is_entry(entry), ("Not find CFG entry"));
 
-    Graph domtree;
+    xcom::Graph domtree;
     m_cfg->get_dom_tree(domtree);
-    List<Vertex*> lst;
-    Vertex * root = domtree.get_vertex(BB_id(entry));
+    List<xcom::Vertex*> lst;
+    xcom::Vertex * root = domtree.get_vertex(BB_id(entry));
     m_cfg->sortDomTreeInPreorder(root, lst);
 
     List<IR*> livexp;
@@ -741,7 +739,7 @@ bool IR_GCSE::perform(OptCtx & oc)
         m_vn2exp.clean();
         m_exp2pr.clean();
         MDSet tmp;
-        for (Vertex * v = lst.get_head(); v != NULL; v = lst.get_next()) {
+        for (xcom::Vertex * v = lst.get_head(); v != NULL; v = lst.get_next()) {
             IRBB * bb = m_cfg->getBB(VERTEX_id(v));
             ASSERT0(bb);
             change |= doPropVN(bb, BB_id(entry));
@@ -750,7 +748,7 @@ bool IR_GCSE::perform(OptCtx & oc)
     } else {
         m_vn2exp.clean();
         m_exp2pr.clean();
-        for (Vertex * v = lst.get_head(); v != NULL; v = lst.get_next()) {
+        for (xcom::Vertex * v = lst.get_head(); v != NULL; v = lst.get_next()) {
             IRBB * bb = m_cfg->getBB(VERTEX_id(v));
             ASSERT0(bb);
             change |= doProp(bb, livexp);

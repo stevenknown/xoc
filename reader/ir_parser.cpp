@@ -786,7 +786,7 @@ bool IRParser::parseStmtList(ParseCtx * ctx)
 
         //dump_irs_h(ctx->stmt_list, m_tm);
     }
-    UNREACH();
+    UNREACHABLE();
     return true;
 }
 
@@ -1046,7 +1046,7 @@ bool IRParser::isTerminator(TOKEN tok)
 }
 
 
-bool IRParser::parseArrayDimension(xcom::List<TMWORD> & elem_dim)
+bool IRParser::parseArrayDimension(List<TMWORD> & elem_dim)
 {
     ASSERT0(m_lexer->getCurrentToken() == T_LSPAREN);
     TOKEN tok = m_lexer->getNextToken();
@@ -1151,7 +1151,7 @@ bool IRParser::parseLda(ParseCtx * ctx)
 
     IR * lda = ctx->current_region->buildLda(var);
     LDA_ofst(lda) = (UINT)offset;
-    IR_dt(lda) = m_tm->getPointerType(m_tm->get_bytesize(var->get_type()));
+    IR_dt(lda) = m_tm->getPointerType(m_tm->get_bytesize(var->getType()));
     ctx->returned_exp = lda;
     m_lexer->getNextToken();
     return true;
@@ -1193,7 +1193,7 @@ bool IRParser::parseStoreArray(ParseCtx * ctx)
     //Properties
     PropertySet cont;
     tok = m_lexer->getCurrentToken();
-    xcom::List<TMWORD> dim_list;
+    List<TMWORD> dim_list;
     if (tok == T_COLON) {
         tok = m_lexer->getNextToken();
         ctx->ircode = IR_STARRAY;
@@ -1326,7 +1326,7 @@ bool IRParser::parseArray(ParseCtx * ctx)
     //Properties
     PropertySet cont;
     tok = m_lexer->getCurrentToken();
-    xcom::List<TMWORD> dim_list;
+    List<TMWORD> dim_list;
     if (tok == T_COLON) {
         tok = m_lexer->getNextToken();
         ctx->ircode = IR_ARRAY;
@@ -1528,7 +1528,7 @@ bool IRParser::parseLd(ParseCtx * ctx)
     }
 
     IR * ld = ctx->current_region->buildLoad(var,
-        ty == NULL ? var->get_type() : ty);
+        ty == NULL ? var->getType() : ty);
     LD_ofst(ld) = offset;
     ctx->returned_exp = ld;
     copyProp(ld, cont, ctx);
@@ -3724,7 +3724,7 @@ bool IRParser::parseByteValue(VAR * var, ParseCtx * ctx)
         return false;
     }
 	tok = m_lexer->getNextToken();
-    xcom::Vector<BYTE> buf;
+    Vector<BYTE> buf;
     UINT bytesize = 0;
     for (; tok != T_RPAREN && !isTerminator(tok);) {
 		if (!parseExp(ctx) || ctx->returned_exp == NULL) {
@@ -4130,18 +4130,17 @@ bool IRParser::parse()
         switch (tok) {
         case T_END: goto END;
         case T_NUL: return false;
-        case T_IDENTIFIER:
-            {
-                X_CODE code = getCurrentXCode();
-                switch (code) {
-                case X_REGION:
-                    declareRegion(NULL);
-                    break;
-                default:
-                    error(tok, "miss region declaration at top level");
-                }
+        case T_IDENTIFIER: {
+            X_CODE code = getCurrentXCode();
+            switch (code) {
+            case X_REGION:
+                declareRegion(NULL);
+                break;
+            default:
+                error(tok, "miss region declaration at top level");
             }
             break;
+        }
         default:
             error(tok, "miss region declaration at top level");
         }

@@ -46,7 +46,7 @@ IR_EXPR_TAB::IR_EXPR_TAB(Region * rg)
     ::memset(m_level1_hash_tab, 0,
            sizeof(ExpRep*) * IR_EXPR_TAB_LEVEL1_HASH_BUCKET);
     m_pool = smpoolCreate(sizeof(ExpRep*) * 128, MEM_COMM);
-    m_sc_pool = smpoolCreate(sizeof(SC<ExpRep*>) * 4, MEM_CONST_SIZE);
+    m_sc_pool = smpoolCreate(sizeof(xcom::SC<ExpRep*>) * 4, MEM_CONST_SIZE);
     m_ir_expr_lst.set_pool(m_sc_pool);
     m_md_set_mgr = rg->getMDSetMgr();
     m_bs_mgr = rg->getBitSetMgr();
@@ -55,7 +55,7 @@ IR_EXPR_TAB::IR_EXPR_TAB(Region * rg)
 
 IR_EXPR_TAB::~IR_EXPR_TAB()
 {
-    for (SC<ExpRep*> * sc = m_ir_expr_lst.get_head();
+    for (xcom::SC<ExpRep*> * sc = m_ir_expr_lst.get_head();
          sc != m_ir_expr_lst.end(); sc = m_ir_expr_lst.get_next(sc)) {
         ExpRep * ie = sc->val();
         ASSERT0(ie);
@@ -148,7 +148,7 @@ void IR_EXPR_TAB::set_map_ir2ir_expr(IR const* ir, ExpRep * ie)
 UINT IR_EXPR_TAB::compute_hash_key(IR const* ir)
 {
     ASSERT0(ir != NULL);
-    UINT hval = ir->get_code() + (ir->getOffset() + 1) + (UINT)(size_t)IR_dt(ir);
+    UINT hval = ir->getCode() + (ir->getOffset() + 1) + (UINT)(size_t)IR_dt(ir);
     if (ir->is_id()) {
         VAR * var = ID_info(ir);
         hval += 5 * (UINT)(size_t)var;
@@ -263,26 +263,24 @@ IR * IR_EXPR_TAB::remove_occ(IR * occ)
 void IR_EXPR_TAB::remove_occs(IR * ir)
 {
     ASSERT0(ir->is_stmt());
-    switch (ir->get_code()) {
-    case IR_ST:
-        {
-            IR * stv = ST_rhs(ir);
-            if (stv->is_const()) { return; }
+    switch (ir->getCode()) {
+    case IR_ST: {
+        IR * stv = ST_rhs(ir);
+        if (stv->is_const()) { return; }
+        remove_occ(stv);
+        break;
+    }
+    case IR_IST: {
+        IR * stv = IST_rhs(ir);
+        if (!stv->is_const()) {
             remove_occ(stv);
         }
-        break;
-    case IR_IST:
-        {
-            IR * stv = IST_rhs(ir);
-            if (!stv->is_const()) {
-                remove_occ(stv);
-            }
 
-            IR * m = IST_base(ir);
-            if (m->is_const()) { return; }
-            remove_occ(m);
-        }
+        IR * m = IST_base(ir);
+        if (m->is_const()) { return; }
+        remove_occ(m);
         break;
+    }
     case IR_CALL:
     case IR_ICALL:
         for (IR * p = CALL_param_list(ir); p != NULL; p = p->get_next()) {
@@ -325,7 +323,7 @@ void IR_EXPR_TAB::remove_occs(IR * ir)
     case IR_CONTINUE:
     case IR_PHI:
         break;
-    default: UNREACH();
+    default: UNREACHABLE();
     }
 }
 
@@ -401,7 +399,7 @@ ExpRep * IR_EXPR_TAB::encode_expr(IN IR * ir)
     if (ir == NULL) return NULL;
 
     ASSERT0(ir->is_exp());
-    switch (ir->get_code()) {
+    switch (ir->getCode()) {
     case IR_ID:
     case IR_LD:
     case IR_LDA:
@@ -442,7 +440,7 @@ ExpRep * IR_EXPR_TAB::encode_expr(IN IR * ir)
             EXPR_occ_list(ie).append_tail(ir);
             return ie;
         }
-    default: UNREACH();
+    default: UNREACHABLE();
     }
     return NULL;
 }
@@ -454,11 +452,11 @@ ExpRep * IR_EXPR_TAB::encode_expr(IN IR * ir)
 //the 'GEN-SET' and 'KILL-SET' of IR-EXPR for BB as well as.
 void IR_EXPR_TAB::encode_bb(IRBB * bb)
 {
-    C<IR*> * ct;
+    xcom::C<IR*> * ct;
     for (IR * ir = BB_irlist(bb).get_head(&ct);
          ir != NULL; ir = BB_irlist(bb).get_next(&ct)) {
         ASSERT0(ir->is_stmt());
-        switch (ir->get_code()) {
+        switch (ir->getCode()) {
         case IR_ST:
             {
                 ExpRep * ie = encode_expr(ST_rhs(ir));
@@ -571,7 +569,7 @@ void IR_EXPR_TAB::encode_bb(IRBB * bb)
             break;
         case IR_PHI:
             break;
-        default: UNREACH();
+        default: UNREACHABLE();
         } //end switch
     } //end for IR
     //dump_ir_expr_tab();
@@ -594,7 +592,7 @@ bool IR_EXPR_TAB::perform(IN OUT OptCtx & oc)
     BBList * bbl = m_ru->getBBList();
     if (bbl->get_elem_count() == 0) { return false; }
 
-    C<IRBB*> * cb;
+    xcom::C<IRBB*> * cb;
     for (IRBB * bb = bbl->get_head(&cb);
          bb != NULL; bb = bbl->get_next(&cb)) {
         encode_bb(bb);

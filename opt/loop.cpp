@@ -50,13 +50,13 @@ bool findTwoSuccessorBBOfLoopHeader(
     ASSERT0(li && cfg && succ1 && succ2);
     IRBB * head = LI_loop_head(li);
 
-    Vertex * headvex = cfg->get_vertex(BB_id(head));
+    xcom::Vertex * headvex = cfg->get_vertex(BB_id(head));
     if (cfg->get_out_degree(headvex) != 2) {
         //Not natural loop.
         return false;
     }
 
-    EdgeC const* ec = VERTEX_out_list(headvex);
+    xcom::EdgeC const* ec = VERTEX_out_list(headvex);
     ASSERT0(ec && EC_next(ec));
 
     *succ1 = VERTEX_id(EDGE_to(EC_edge(ec)));
@@ -78,7 +78,7 @@ IRBB * findSingleBackedgeStartBB(LI<IRBB> const* li, IR_CFG * cfg)
 
     UINT backedgebbid = 0;
     UINT backedgecount = 0;
-    EdgeC const* ec = VERTEX_in_list(cfg->get_vertex(BB_id(head)));
+    xcom::EdgeC const* ec = VERTEX_in_list(cfg->get_vertex(BB_id(head)));
     while (ec != NULL) {
         backedgecount++;
         UINT pred = VERTEX_id(EDGE_from(EC_edge(ec)));
@@ -119,16 +119,16 @@ IRBB * findAndInsertPreheader(
     BBList * bblst = rg->getBBList();
     IRBB * head = LI_loop_head(li);
 
-    C<IRBB*> * bbholder = NULL;
+    xcom::C<IRBB*> * bbholder = NULL;
     bblst->find(head, &bbholder);
     ASSERT0(bbholder);
-    C<IRBB*> * tt = bbholder;
+    xcom::C<IRBB*> * tt = bbholder;
     IRBB * prev = bblst->get_prev(&tt);
 
     //Find appropriate BB to be prehead.
     bool find_appropriate_prev_bb = false;
 
-    for (EdgeC const* ec = VERTEX_in_list(cfg->get_vertex(BB_id(head)));
+    for (xcom::EdgeC const* ec = VERTEX_in_list(cfg->get_vertex(BB_id(head)));
          ec != NULL; ec = EC_next(ec)) {
         UINT pred = VERTEX_id(EDGE_from(EC_edge(ec)));
         if (pred == BB_id(prev)) {
@@ -150,7 +150,7 @@ IRBB * findAndInsertPreheader(
     insert_bb = true;
     IRBB * newbb = rg->allocBB();
     bblst->insert_before(newbb, bbholder);
-    BitSet * loop_body = LI_bb_set(li);
+    xcom::BitSet * loop_body = LI_bb_set(li);
     for (IRBB * p = preds.get_head(); p != NULL; p = preds.get_next()) {
         if (loop_body->is_contain(BB_id(p))) {
             continue;
@@ -203,8 +203,8 @@ IRBB * findAndInsertPreheader(
         }
     }
 
-    C<LabelInfo const*> * ct;
-    C<LabelInfo const*> * next_ct;
+    xcom::C<LabelInfo const*> * ct;
+    xcom::C<LabelInfo const*> * next_ct;
     for (lablst.get_head(&ct); ct != lablst.end(); ct = next_ct) {
         next_ct = lablst.get_next(ct);
         LabelInfo const* lab = ct->val();

@@ -71,7 +71,7 @@ public:
         if (res != NULL) { *res = ir; }
 
         IR * rhs = ST_rhs(ir);
-        if ((UINT)rhs->get_code() != (UINT)irt) return false;
+        if ((UINT)rhs->getCode() != (UINT)irt) return false;
 
         if (!BIN_opnd0(rhs)->is_pr()) return false;
         if (op0 != NULL) { *op0 = BIN_opnd0(rhs); }
@@ -86,7 +86,7 @@ public:
         if (!ir->is_stpr()) return false;
         if (res != NULL) { *res = ir; }
 
-        switch (ST_rhs(ir)->get_code()) {
+        switch (ST_rhs(ir)->getCode()) {
         case IR_ADD:
         case IR_SUB:
         case IR_MUL:
@@ -121,7 +121,7 @@ public:
     {
         if (!ir->is_stpr()) { return false; }
         if (res != NULL) { *res = ir; }
-        if (((UINT)ST_rhs(ir)->get_code()) != (UINT)irt) return false;
+        if (((UINT)ST_rhs(ir)->getCode()) != (UINT)irt) return false;
         if (!UNA_opnd(ST_rhs(ir))->is_pr()) return false;
         if (op0 != NULL) { *op0 = UNA_opnd(ST_rhs(ir)); }
         return true;
@@ -131,7 +131,7 @@ public:
     {
         if (!ir->is_stpr()) return false;
         IR * rhs = ST_rhs(ir);
-        switch (rhs->get_code()) {
+        switch (rhs->getCode()) {
         case IR_BNOT:
         case IR_LNOT:
         case IR_NEG:
@@ -308,7 +308,7 @@ void RSC::comp_st_fmt(IR const* ir)
     IR const* stv = ir->getRHS();
     comp_ir_fmt(stv);
     if (ir->is_stpr()) {
-        switch (stv->get_code()) {
+        switch (stv->getCode()) {
         case IR_CONST:
             //A, +B, load const
             m_ir2fmt.set(ir->id(), FABcv);
@@ -389,11 +389,11 @@ void RSC::comp_st_fmt(IR const* ir)
             //AAAABBBB
             m_ir2fmt.set(ir->id(), FAAAABBBB);
             return;
-        default: UNREACH();
+        default: UNREACHABLE();
         }
     } else {
         ASSERT0(ir->is_st());
-        switch (stv->get_code()) {
+        switch (stv->getCode()) {
         case IR_PR:
             //AABBBB, sput
             m_ir2fmt.set(ir->id(), FAABBBB);
@@ -402,7 +402,7 @@ void RSC::comp_st_fmt(IR const* ir)
             //ABCCCC, iget
             m_ir2fmt.set(ir->id(), FABCCCCv);
             return;
-        default: UNREACH();
+        default: UNREACHABLE();
         }
     }
 }
@@ -547,7 +547,7 @@ void RSC::comp_call_fmt(IR const* ir)
     case INVOKE_INTERFACE_RANGE:
         m_ir2fmt.set(ir->id(), FAACCCCBBBBv);
         break;
-    default: UNREACH();
+    default: UNREACHABLE();
     }
 
     for (; p != NULL; p = p->get_next()) {
@@ -558,7 +558,7 @@ void RSC::comp_call_fmt(IR const* ir)
 
 void RSC::comp_ir_fmt(IR const* ir)
 {
-    switch (ir->get_code()) {
+    switch (ir->getCode()) {
     case IR_CONST:
     case IR_ID:
     case IR_LD:
@@ -573,7 +573,7 @@ void RSC::comp_ir_fmt(IR const* ir)
         comp_ir_fmt(ILD_base(ir));
         if (ILD_base(ir)->is_pr()) {
             m_ir2fmt.set(ir->id(), FABCCCCv);
-        } else { UNREACH(); }
+        } else { UNREACHABLE(); }
         return;
     case IR_STARRAY:
         comp_starray_fmt(ir);
@@ -664,10 +664,10 @@ void RSC::comp_ir_fmt(IR const* ir)
         comp_ir_fmt(SELECT_pred(ir));
         comp_ir_fmt(SELECT_trueexp(ir));
         comp_ir_fmt(SELECT_falseexp(ir));
-        UNREACH();
+        UNREACHABLE();
         return;
     case IR_REGION:
-    default: UNREACH();
+    default: UNREACHABLE();
     }
 }
 
@@ -997,7 +997,7 @@ void GltMgr::localize(GLT * g)
 
         bool has_occ = true;
         if (LT_occ(gl) == NULL || LT_occ(gl)->is_empty()) {
-            ltm->removeLT(gl);
+            ltm->removeLifeTime(gl);
             has_occ = false;
         } else {
             LT_is_global(gl) = false;
@@ -1429,7 +1429,7 @@ void GIG::dump_vcg(CHAR const* name)
     }
 
     //Print edge
-    for (Edge const* e = m_edges.get_first(c);
+    for (xcom::Edge const* e = m_edges.get_first(c);
          e != NULL;  e = m_edges.get_next(c)) {
         fprintf(h, "\nedge: { sourcename:\"%d\" targetname:\"%d\" %s}",
                 VERTEX_id(EDGE_from(e)),
@@ -1577,10 +1577,10 @@ void IG::get_neighbor(OUT List<LT*> & nis, LT * lt) const
     Vertex * vex  = pthis->m_vertices.find((OBJTY)LT_uid(lt));
     if (vex == NULL) return;
 
-    EdgeC * el = VERTEX_in_list(vex);
+    xcom::EdgeC * el = VERTEX_in_list(vex);
     while (el != NULL) {
         INT v = VERTEX_id(EDGE_from(EC_edge(el)));
-        LT * ni = m_ltm->get_lt(v);
+        LT * ni = m_ltm->getLifeTime(v);
         ASSERT0(ni);
         if (!nis.find(ni)) {
             nis.append_tail(ni);
@@ -1591,7 +1591,7 @@ void IG::get_neighbor(OUT List<LT*> & nis, LT * lt) const
     el = VERTEX_out_list(vex);
     while (el != NULL) {
         INT v = VERTEX_id(EDGE_to(EC_edge(el)));
-        LT * ni = m_ltm->get_lt(v);
+        LT * ni = m_ltm->getLifeTime(v);
         ASSERT0(ni);
         if (!nis.find(ni)) {
             nis.append_tail(ni);
@@ -1651,7 +1651,7 @@ void IG::dump_vcg(CHAR const* name)
     INT c;
     for (Vertex const* v = m_vertices.get_first(c);
          v != NULL;  v = m_vertices.get_next(c)) {
-        LT * lt = m_ltm->get_lt(VERTEX_id(v));
+        LT * lt = m_ltm->getLifeTime(VERTEX_id(v));
         buf.sprint("LT%d(pr%d):", VERTEX_id(v), LT_prno(lt));
         fprintf(h, "\nnode: { title:\"%d\" label:\"%s\" shape:circle fontname:\"courB\" color:gold}",
                 VERTEX_id(v), buf.buf);
@@ -1926,7 +1926,7 @@ void LTMgr::recordPhyRegOcc(LT * lt, UINT pos, IN BitSet & lived_lt)
         //Record the occurrence before the lived life-time be
         //removed out of 'lived_lt'.
         for (INT i = lived_lt.get_first(); i >= 0; i = lived_lt.get_next(i)) {
-            LT * lived = get_lt(i);
+            LT * lived = getLifeTime(i);
             ASSERT0(lived);
             if (lt->has_allocated() &&
                 LT_phy(lived) == LT_phy(lt)) {
@@ -1993,7 +1993,7 @@ LT * LTMgr::processResultPR(UINT prno, UINT pos, OUT BitSet & lived_lt)
     //Phy register definition.
     if (lt->has_allocated()) {
         for (INT i = lived_lt.get_first(); i >= 0; i = lived_lt.get_next(i)) {
-            LT const* lived = get_lt(i);
+            LT const* lived = getLifeTime(i);
             ASSERT0(lived);
             if (lived->has_allocated() &&
                 lt->is_reg_equal(lived)) {
@@ -2037,7 +2037,7 @@ static bool is_range_call(IR const* ir)
 
     INVOKE_KIND ik = (INVOKE_KIND)CONST_int_val(p);
     switch (ik) {
-    case INVOKE_UNDEF: UNREACH();
+    case INVOKE_UNDEF: UNREACHABLE();
     case INVOKE_VIRTUAL_RANGE:
     case INVOKE_DIRECT_RANGE:
     case INVOKE_SUPER_RANGE:
@@ -2050,7 +2050,7 @@ static bool is_range_call(IR const* ir)
     case INVOKE_STATIC:
     case INVOKE_INTERFACE:
         return false;
-    default: UNREACH();
+    default: UNREACHABLE();
     }
     return false;
 }
@@ -2197,11 +2197,11 @@ void LTMgr::processResult(
 
     //Keep the track of live points at DEF for each lived PR.
     for (INT i = lived_lt.get_first(); i >= 0; i = lived_lt.get_next(i)) {
-         LT * lt = get_lt(i);
+         LT * lt = getLifeTime(i);
         ASSERT0(lt);
         LT_range(lt)->bunion(pos);
     }
-    switch (ir->get_code()) {
+    switch (ir->getCode()) {
     case IR_ST: break;
     case IR_STPR:
         if (group_part) {
@@ -2250,7 +2250,7 @@ void LTMgr::processResult(
             }
         }
         break;
-    default: UNREACH();
+    default: UNREACHABLE();
     }
 }
 
@@ -2268,7 +2268,7 @@ void LTMgr::processUse(
 
     //Keep the track of live points at USE for each live sr
     for (INT i = lived_lt.get_first(); i >= 0; i = lived_lt.get_next(i)) {
-        LT * lt = get_lt(i);
+        LT * lt = getLifeTime(i);
         ASSERT0(lt);
         LT_range(lt)->bunion(pos);
     }
@@ -2299,11 +2299,11 @@ void LTMgr::processUse(
 bool LTMgr::has_pair_res(IR * ir)
 {
     ASSERT0(ir->is_stmt());
-    switch(ir->get_code()) {
+    switch(ir->getCode()) {
     case IR_STPR:
     case IR_CALL:
     case IR_ICALL:
-        if (ir->get_type_size(m_tm) == PAIR_BYTES) {
+        if (ir->getTypeSize(m_tm) == PAIR_BYTES) {
             return true;
         }
         break;
@@ -2379,7 +2379,7 @@ void LTMgr::processLivein(
 
     //Keep tracking of live points for each lived PR.
     for (INT i = lived_lt.get_first(); i >= 0; i = lived_lt.get_next(i)) {
-        LT * lt = get_lt(i);
+        LT * lt = getLifeTime(i);
         ASSERT0(lt);
         LT_range(lt)->bunion(pos);
     }
@@ -2415,7 +2415,7 @@ void LTMgr::processLiveout(
 
     //Keep tracking of live points for each lived PR.
     for (INT i = lived_lt.get_first(); i >= 0; i = lived_lt.get_next(i)) {
-        LT * lt = get_lt(i);
+        LT * lt = getLifeTime(i);
         ASSERT0(lt);
         LT_range(lt)->bunion(pos);
     }
@@ -2490,7 +2490,7 @@ void LTMgr::build(
 
     //Append the FIRST_POS to complete all remainder life times.
     //for (INT i = lived_lt.get_first(); i >= 0; i = lived_lt.get_next(i)) {
-    //     LT * lt = get_lt(i);
+    //     LT * lt = getLifeTime(i);
     //    ASSERT0(lt);
     //    LT_pos(lt)->bunion(pos);
     //}
@@ -2536,11 +2536,11 @@ void LTMgr::clean()
 }
 
 
-void LTMgr::revise_lt_case_1(LT * lt)
+void LTMgr::reviseLTCase1(LT * lt)
 {
     bool is_def;
     INT f = LT_range(lt)->get_first();
-    INT first_concrete_occ = lt->get_forward_occ(f, &is_def, f);
+    INT first_concrete_occ = lt->getForwardOcc(f, &is_def, f);
     ASSERT(first_concrete_occ > (INT)get_first_pos(),
             ("empty life tiem, have no any occ!"));
     BitSet * tmp = m_gltm->m_bs_mgr.create();
@@ -2566,7 +2566,7 @@ void LTMgr::revise_special_lt(List<LT*> * lts)
             //CASE 1: Local PR that only has USE point. That becasuse Code
             //    Generation Phase might generate redundant PR reference code,
             //    or the DEF of local PR is conditional execution.
-            revise_lt_case_1(lt);
+            reviseLTCase1(lt);
         }
     }
 
@@ -2578,7 +2578,7 @@ void LTMgr::revise_special_lt(List<LT*> * lts)
         for (LT * lt = lts->get_head(); lt != NULL; lt = lts->get_next()) {
             if (!is_livein(LT_prno(lt)) &&
                 (LT_occ(lt) == NULL || LT_occ(lt)->get_elem_count() == 0)) {
-                removeLT(lt);
+                removeLifeTime(lt);
             }
         }
     }
@@ -2588,7 +2588,7 @@ void LTMgr::revise_special_lt(List<LT*> * lts)
 void LTMgr::renameUse(IR * ir, LT * l, IR ** newpr)
 {
     LTG * gr = LT_ltg(l);
-    switch (ir->get_code()) {
+    switch (ir->getCode()) {
     case IR_STARRAY:
         ASSERT0(((CArray*)ir)->getDimNum() == 1);
         renameUse(STARR_rhs(ir), l, newpr);
@@ -2663,7 +2663,7 @@ void LTMgr::renameUse(IR * ir, LT * l, IR ** newpr)
         }
         break;
     case IR_REGION:
-        UNREACH();
+        UNREACHABLE();
         break;
     case IR_GOTO: break;
     case IR_ADD:
@@ -2734,7 +2734,7 @@ void LTMgr::renameUse(IR * ir, LT * l, IR ** newpr)
         renameUse(ILD_base(ir), l, newpr);
         break;
     case IR_CONST: break;
-    default: UNREACH();
+    default: UNREACHABLE();
     }
 }
 
@@ -2749,10 +2749,10 @@ void LTMgr::renameLT(LT * l, IR ** newpr)
         IR * ir = m_pos2ir.get(i);
         ASSERT0(ir);
         if (l->is_def(i)) {
-            switch (ir->get_code()) {
+            switch (ir->getCode()) {
             case IR_STPR:
                 {
-                    UINT prno = ir->get_prno();
+                    UINT prno = ir->getPrno();
                     if (prno == LT_prno(l)) {
                         if (*newpr == NULL) {
                             //Generate new PR no.
@@ -2851,7 +2851,7 @@ void LTMgr::rename(TMap<UINT, LT*> & prno2lt, BitSet & met)
 }
 
 
-void LTMgr::removeLT(LT * lt)
+void LTMgr::removeLifeTime(LT * lt)
 {
     m_lt_vec.set(LT_uid(lt), NULL);
     m_prno2lt.setAlways(LT_prno(lt), NULL);
@@ -2927,7 +2927,7 @@ void LTMgr::dump_allocated(FILE * h, BitSet & visited)
                 fprintf(h, "rg"); break;
             case LTG_REG_PAIR:
                 fprintf(h, "pg"); break;
-            default: UNREACH();
+            default: UNREACHABLE();
             }
 
             //Dump ltg's prno, ltid, phy.
@@ -3014,7 +3014,7 @@ void LTMgr::dump_allocated(FILE * h, BitSet & visited)
                 fprintf(h, "rg"); break;
             case LTG_REG_PAIR:
                 fprintf(h, "pg"); break;
-            default: UNREACH();
+            default: UNREACHABLE();
             }
 
             //Dump ltg's prno, ltid, phy.
@@ -3284,11 +3284,11 @@ bool BBRA::assignRegister(LT * l, List<UINT> & nis)
 
     //Deduct the used register by neighbors.
     nis.clean();
-    bool on = m_ig->get_neighbor_list(nis, LT_uid(l));
+    bool on = m_ig->getNeighborList(nis, LT_uid(l));
     CHECK_DUMMYUSE(on);
     UINT n = nis.get_elem_count();
     for (UINT i = nis.get_head(); n > 0; i = nis.get_next(), n--) {
-        LT const* ni = m_ltm->get_lt(i);
+        LT const* ni = m_ltm->getLifeTime(i);
         ASSERT0(ni);
         if (!ni->has_allocated()) { continue; }
         unusable->bunion(LT_phy(ni));
@@ -3322,7 +3322,7 @@ bool BBRA::assignRegister(LT * l, List<UINT> & nis)
     //are neighbors the most preferable or anticipated.
     n = nis.get_elem_count();
     for (UINT i = nis.get_head(); n > 0; i = nis.get_next(), n--) {
-        LT const* ni = m_ltm->get_lt(i);
+        LT const* ni = m_ltm->getLifeTime(i);
         ASSERT0(ni);
         if (ni->has_allocated()) { continue; }
         //Avoid select the reg which ni preferable.
@@ -3829,7 +3829,7 @@ void BBRA::selectReasonableSplitPos(
         }
 
         //Find the DEF of pos1.
-        pos1 = lt->get_backward_def_occ(p1, firstpos);
+        pos1 = lt->getBackwardOccForDEF(p1, firstpos);
         if (pos1 != -1) {
             is_pos1_spill = true; //spill at pos1
         } else if ( //LT_is_dedicated(lt) ||
@@ -3850,7 +3850,7 @@ void BBRA::selectReasonableSplitPos(
 //get the index-info of the same opnd and result.
 bool BBRA::isOpndSameWithResult(IR *)
 {
-    UNREACH();
+    UNREACHABLE();
     return false;
 }
 
@@ -3859,7 +3859,7 @@ void BBRA::renameResult(IR *, UINT old_prno, IR * newpr)
 {
     DUMMYUSE(newpr);
     DUMMYUSE(old_prno);
-    UNREACH();
+    UNREACHABLE();
 }
 
 
@@ -3867,7 +3867,7 @@ void BBRA::renameOpnd(IR *, UINT old_prno, IR * newpr)
 {
     DUMMYUSE(newpr);
     DUMMYUSE(old_prno);
-    UNREACH();
+    UNREACHABLE();
 }
 
 
@@ -3877,7 +3877,7 @@ void BBRA::renameOpnd(IR *, UINT old_prno, IR * newpr)
 void BBRA::renameOpndInRange(LT * lt, IR * newpr, INT start, INT end)
 {
     ASSERT0(lt && newpr && newpr->is_pr());
-    UNREACH();
+    UNREACHABLE();
     INT firstpos = m_ltm->get_first_pos();
     INT lastpos = m_ltm->get_last_pos();
     if (start == -1) { start = firstpos; }
@@ -3959,7 +3959,7 @@ void BBRA::splitLTAt(
                 IR * newpr = m_ltm->genReload(lt, end, spill_loc);
                 if (PR_no(newpr) != LT_prno(lt)) {
                     //Do renaming.
-                    INT forward_def = lt->get_forward_def_occ(end, firstpos);
+                    INT forward_def = lt->getForwardOccForDEF(end, firstpos);
 
                     //May be same result as operand.
                     if (forward_def != -1 && forward_def == (end + 1)) {
@@ -4043,7 +4043,7 @@ bool BBRA::split(LT * lt)
     //
     //show_phase("---Split,before ReAllocate_LifeTime");
     //reallocateLifeTime(prio_list, uncolored_list,
-    //                    mgr, ddg, layerddg, ig, cri);
+    //                    mgr, ddg, rfg, ig, cri);
     //for (LifeTime * tmplt = uncolored_list.get_head();
     //     tmplt != NULL; tmplt = uncolored_list.get_next()) {
     //    if (HAVE_FLAG(m_cur_phase, PHASE_FINIAL_FIXUP_DONE)) {
@@ -4330,12 +4330,12 @@ void RA::diffLocalNeighbourUsed(GLT * g, List<UINT> & nis, BitSet * unusable)
         ASSERT0(ig);
 
         nis.clean();
-        bool on = ig->get_neighbor_list(nis, LT_uid(gl));
+        bool on = ig->getNeighborList(nis, LT_uid(gl));
         CHECK_DUMMYUSE(on);
         ASSERT0(on);
         UINT n = nis.get_elem_count();
         for (UINT i = nis.get_head(); n > 0; i = nis.get_next(), n--) {
-            LT * ni = ltm->get_lt(i);
+            LT * ni = ltm->getLifeTime(i);
             ASSERT0(ni);
             if (LT_is_global(ni) || !ni->has_allocated()) { continue; }
             if (LT_rg(ni) != NULL) {
@@ -4368,7 +4368,7 @@ bool RA::assignRegister(GLT * g, List<UINT> & nis, List<UINT> & nis2)
 
     //Avoid allocate the register used by global neighbors.
     nis.clean();
-    bool on = m_ig.get_neighbor_list(nis, GLT_id(g));
+    bool on = m_ig.getNeighborList(nis, GLT_id(g));
     CHECK_DUMMYUSE(on);
     ASSERT0(on);
     UINT n = nis.get_elem_count();
@@ -4512,7 +4512,7 @@ UINT RA::computeReserveRegister(IRIter & ii, List<IR*> & resolve_list)
             UINT rescount = 0;
 
             if (ir->is_stpr() || ir->isCallHasRetVal()) {
-                LT * l = ltm->map_pr2lt(ir->get_prno());
+                LT * l = ltm->map_pr2lt(ir->getPrno());
                 BitSet const* usable = m_rsc.get_usable(fmt, true);
                 ASSERT(usable, ("stmt miss usable-regs info"));
                 if (LT_rg_sz(l) > 1) {
@@ -4611,10 +4611,10 @@ void RA::reviseRSC()
 
         if (ir->is_stpr() || ir->isCallHasRetVal()) {
             ASSERT(lhsn < 1, ("multiple def"));
-            UINT prno = ir->get_prno();
+            UINT prno = ir->getPrno();
             if (checkIfNeedSpill(prno, fmt, ltm)) {
                 IR * spill_loc = ltm->genSpillSwap(ir, prno, IR_dt(ir), NULL);
-                ASSERT0(spill_loc->get_stmt());
+                ASSERT0(spill_loc->getStmt());
                 pr2phy.set(spill_loc, lhsn);
                 LT * l = ltm->map_pr2lt(prno);
                 lhsn += LT_rg_sz(l);
@@ -4643,7 +4643,7 @@ void RA::reviseRSC()
             }
 
             IR * spill_loc = ltm->genReloadSwap(k, ir);
-            ASSERT0(spill_loc->get_stmt());
+            ASSERT0(spill_loc->getStmt());
             pr2phy.set(spill_loc, rhsn);
             ASSERT0(LT_rg_sz(l) == 1 || LT_rg_sz(l) == 2);
             rhsn += LT_rg_sz(l);
@@ -4670,7 +4670,7 @@ void RA::reviseRSC()
     INT phy;
     for (IR * ir = pr2phy.get_first(iter2, &phy);
          ir != NULL; ir = pr2phy.get_next(iter2, &phy)) {
-        IR * stmt = ir->get_stmt();
+        IR * stmt = ir->getStmt();
         ASSERT0(stmt && stmt->getBB());
         LTMgr * ltm = m_gltm.get_ltm(BB_id(stmt->getBB()));
         ASSERT0(ltm);
@@ -4903,7 +4903,7 @@ void RA::solveConflict(OUT List<GLT*> & unalloc, List<UINT> & nis)
         GLT_usable(slglt) = m_rsc.get_16();
 
         nis.clean();
-        bool on = m_ig.get_neighbor_list(nis, GLT_id(g));
+        bool on = m_ig.getNeighborList(nis, GLT_id(g));
         CHECK_DUMMYUSE(on);
         ASSERT0(on);
         m_ig.add_glt(slglt);
@@ -5464,7 +5464,7 @@ void RA::assignLTG(LTG * ltg, IR * ir)
     //Compute the phy occupied by local neighbours.
     for (INT ltid = nis.get_first(&cur);
          ltid >= 0; ltid = nis.get_next(ltid, &cur)) {
-        LT * l = ltm->get_lt(ltid);
+        LT * l = ltm->getLifeTime(ltid);
         ASSERT0(l);
         if (!l->has_allocated()) { continue; }
         occupied.bunion(LT_phy(l));
@@ -5516,7 +5516,7 @@ void RA::assignLTG(LTG * ltg, IR * ir)
             SEGIter * cur2 = NULL;
             for (INT ltid = nis.get_first(&cur2);
                  ltid >= 0; ltid = nis.get_next(ltid, &cur2)) {
-                LT * l2 = nltm->get_lt(ltid);
+                LT * l2 = nltm->getLifeTime(ltid);
                 ASSERT0(l2);
                 if (!l2->has_allocated()) { continue; }
 
@@ -5756,9 +5756,9 @@ bool RA::verify_lt_occ()
                  k != NULL; k = iterNextC(ii)) {
                 if (!k->is_pr() || !k->is_stpr()) { continue; }
 
-                LT * l = ltm->map_pr2lt(k->get_prno());
+                LT * l = ltm->map_pr2lt(k->getPrno());
                 CHECK_DUMMYUSE(l);
-                ASSERT0(LT_prno(l) == k->get_prno());
+                ASSERT0(LT_prno(l) == k->getPrno());
             }
         }
     }
@@ -5777,7 +5777,7 @@ bool RA::verify_interf()
         if (g == NULL || !g->has_allocated()) { continue; }
 
         nis.clean();
-        bool on = m_ig.get_neighbor_list(nis, GLT_id(g));
+        bool on = m_ig.getNeighborList(nis, GLT_id(g));
         CHECK_DUMMYUSE(on);
         UINT n = nis.get_elem_count();
         for (UINT j = nis.get_head(); n > 0; j = nis.get_next(), n--) {
@@ -5813,11 +5813,11 @@ bool RA::verify_interf()
             IG * ig = ltm->get_ig();
             ASSERT0(ig);
             nis.clean();
-            bool on = ig->get_neighbor_list(nis, LT_uid(l));
+            bool on = ig->getNeighborList(nis, LT_uid(l));
             CHECK_DUMMYUSE(on);
             UINT n = nis.get_elem_count();
             for (UINT j = nis.get_head(); n > 0; j = nis.get_next(), n--) {
-                LT * ni = ltm->get_lt(j);
+                LT * ni = ltm->getLifeTime(j);
                 ASSERT0(ni);
                 if (!ni->has_allocated()) { continue; }
                 nisregs.clean();
@@ -5873,14 +5873,14 @@ bool RA::verify_ltg()
             phy += LT_rg_sz(l);
 
             ASSERT0(arg);
-            UINT bsz = arg->get_type_size(m_tm);
+            UINT bsz = arg->getTypeSize(m_tm);
             DUMMYUSE(bsz);
             if (LT_rg_sz(l) == 1) {
                 ASSERT0(bsz <= BYTE_PER_INT);
             } else if (LT_rg_sz(l) == 2) {
                 ASSERT(bsz == BYTE_PER_LONGLONG, ("lt should not be pair"));
             } else {
-                UNREACH();
+                UNREACHABLE();
             }
         }
     }
@@ -5911,7 +5911,7 @@ bool RA::perform(OptCtx & oc)
 {
     bool omit_constrain = true;
     get_glt(10); //for debug symbol
-    get_lt(1,0); //for debug symbol
+    getLifeTime(1,0); //for debug symbol
 
     //m_cfg->dump_vcg();
     //m_pr2v->dump();

@@ -60,7 +60,7 @@ public:
     {
         ASSERT0(ref->is_array());
 
-        IR * stmt = ref->get_stmt();
+        IR * stmt = ref->getStmt();
         ASSERT0(stmt);
         IRBB * stmt_bb = stmt->getBB();
         ASSERT0(stmt_bb);
@@ -76,8 +76,8 @@ public:
         for (UINT i = 0; i < num_want_to_insert; i++) {
             IR * newref = rg->dupIRTree(ref);
             dumgr->copyIRTreeDU(newref, ref, true);
-            IR * stpr = rg->buildStorePR(rg->buildPrno(newref->get_type()),
-                                            newref->get_type(), newref);
+            IR * stpr = rg->buildStorePR(rg->buildPrno(newref->getType()),
+                                            newref->getType(), newref);
             rg->allocRefForPR(stpr);
             IR_may_throw(stpr) = true;
 

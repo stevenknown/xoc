@@ -176,7 +176,7 @@ public:
     VAR * get_base() const { return MD_base(this); }
     UINT get_ofst() const { return MD_ofst(this); }
     UINT get_size() const { return MD_size(this); }
-    MD_TYPE get_type() const { return (MD_TYPE)MD_ty(this); }
+    MD_TYPE getType() const { return (MD_TYPE)MD_ty(this); }
 
     UINT id() const { return MD_id(this); }
     //Return true if current md exactly cover 'm', such as:

@@ -210,7 +210,7 @@ typedef enum {
 
 
 class PropertySet {
-    xcom::List<LabelInfo*> m_labellist;    
+    List<LabelInfo*> m_labellist;    
 public:
     bool readonly;
     bool read_modify_write;
@@ -223,7 +223,7 @@ public:
     IR * ir_use_list;
     IR * ir_def_list;
     Type const* elemtype;
-    xcom::List<TMWORD> * dim_list;
+    List<TMWORD> * dim_list;
 
     PropertySet() 
     {
@@ -241,7 +241,7 @@ public:
         dim_list = NULL;
     }
     
-    xcom::List<LabelInfo*> & getLabelList() { return m_labellist; }
+    List<LabelInfo*> & getLabelList() { return m_labellist; }
 };
 
 
@@ -299,7 +299,7 @@ protected:
     bool parseCase(ParseCtx * ctx);
     bool parseId(ParseCtx * ctx);
     bool parseLda(ParseCtx * ctx);
-    bool parseArrayDimension(xcom::List<TMWORD> & elem_dim);
+    bool parseArrayDimension(List<TMWORD> & elem_dim);
     bool parseArray(ParseCtx * ctx);
     bool parseIld(ParseCtx * ctx);
     bool parseSelect(ParseCtx * ctx);
@@ -350,7 +350,7 @@ public:
 
     void dump();
 
-    xcom::List<ParseErrorMsg*> & getErrorMsgList() { return m_err_list; }
+    List<ParseErrorMsg*> & getErrorMsgList() { return m_err_list; }
     CHAR const* getKeywordName(X_CODE code);
 
     void setLexer(Lexer * l) { m_lexer = l; }

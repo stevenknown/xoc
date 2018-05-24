@@ -47,7 +47,7 @@ class MD_LT {
 public:
     UINT id;
     MD * md;
-    BitSet * livebbs;
+    xcom::BitSet * livebbs;
 };
 //END MD_LT
 
@@ -123,9 +123,9 @@ protected:
     IR_DU_MGR * m_du;
     IR_GVN * m_gvn;
     PRSSAMgr * m_ssamgr;
-    DefMiscBitSetMgr * m_misc_bs_mgr;
+    xcom::DefMiscBitSetMgr * m_misc_bs_mgr;
     DontPromotTab m_dont_promot;
-    BitSetMgr m_bs_mgr;
+    xcom::BitSetMgr m_bs_mgr;
     bool m_is_insert_bb; //indicate if new bb inserted and cfg changed.
 
 protected:
@@ -302,7 +302,7 @@ public:
         m_md2lt_map = new MD2MDLifeTime(c);
         m_mdlt_count = 0;
         m_pool = smpoolCreate(2 * sizeof(MD_LT), MEM_COMM);
-        m_ir_ptr_pool = smpoolCreate(4 * sizeof(SC<IR*>), MEM_CONST_SIZE);
+        m_ir_ptr_pool = smpoolCreate(4 * sizeof(xcom::SC<IR*>), MEM_CONST_SIZE);
     }
     COPY_CONSTRUCTOR(IR_RP);
     virtual ~IR_RP()

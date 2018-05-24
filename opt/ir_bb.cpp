@@ -45,7 +45,7 @@ C<IR*> * BBIRList::append_tail_ex(IR * ir)
 {
     if (ir == NULL) { return NULL; }
 
-    C<IR*> * ct;
+    xcom::C<IR*> * ct;
     for (List<IR*>::get_tail(&ct);
          ct != List<IR*>::end(); ct = List<IR*>::get_prev(ct)) {
         if (!m_bb->is_down_boundary(ct->val())) {
@@ -80,7 +80,7 @@ size_t IRBB::count_mem() const
 bool IRBB::is_down_boundary(IR * ir)
 {
     ASSERT(ir->isStmtInBB() || ir->is_lab(), ("illegal stmt in bb"));
-    switch (ir->get_code()) {
+    switch (ir->getCode()) {
     case IR_CALL:
     case IR_ICALL: //indirective call
         return ((CCall*)ir)->isMustBBbound();
@@ -150,12 +150,12 @@ void IRBB::dump(Region * rg, bool dump_inner_region)
 void IRBB::verify()
 {
     UINT c = 0;
-    C<IR*> * ct;
+    xcom::C<IR*> * ct;
     for (IR * ir = BB_irlist(this).get_head(&ct);
          ir != NULL; ir = BB_irlist(this).get_next(&ct)) {
         ASSERT0(ir->is_single());
         ASSERT0(ir->getBB() == this);
-        switch (ir->get_code()) {
+        switch (ir->getCode()) {
         case IR_ST:
         case IR_STPR:
         case IR_STARRAY:
@@ -189,11 +189,11 @@ void IRBB::verify()
 //Return true if one of bb's successor has a phi.
 bool IRBB::successorHasPhi(CFG<IRBB, IR> * cfg)
 {
-    Vertex * vex = cfg->get_vertex(BB_id(this));
+    xcom::Vertex * vex = cfg->get_vertex(BB_id(this));
     ASSERT0(vex);
-    for (EdgeC * out = VERTEX_out_list(vex);
+    for (xcom::EdgeC * out = VERTEX_out_list(vex);
          out != NULL; out = EC_next(out)) {
-        Vertex * succ_vex = EDGE_to(EC_edge(out));
+        xcom::Vertex * succ_vex = EDGE_to(EC_edge(out));
         IRBB * succ = cfg->getBB(VERTEX_id(succ_vex));
         ASSERT0(succ);
 
@@ -211,11 +211,11 @@ bool IRBB::successorHasPhi(CFG<IRBB, IR> * cfg)
 void IRBB::dupSuccessorPhiOpnd(CFG<IRBB, IR> * cfg, Region * rg, UINT opnd_pos)
 {
     IR_CFG * ircfg = (IR_CFG*)cfg;
-    Vertex * vex = ircfg->get_vertex(BB_id(this));
+    xcom::Vertex * vex = ircfg->get_vertex(BB_id(this));
     ASSERT0(vex);
-    for (EdgeC * out = VERTEX_out_list(vex);
+    for (xcom::EdgeC * out = VERTEX_out_list(vex);
          out != NULL; out = EC_next(out)) {
-        Vertex * succ_vex = EDGE_to(EC_edge(out));
+        xcom::Vertex * succ_vex = EDGE_to(EC_edge(out));
         IRBB * succ = ircfg->getBB(VERTEX_id(succ_vex));
         ASSERT0(succ);
 
@@ -284,9 +284,9 @@ void IRBB::removeSuccessorDesignatePhiOpnd(CFG<IRBB, IR> * cfg, IRBB * succ)
 //you need remove the related PHI operand if BB successor has PHI stmt.
 void IRBB::removeSuccessorPhiOpnd(CFG<IRBB, IR> * cfg)
 {
-    Vertex * vex = cfg->get_vertex(BB_id(this));
+    xcom::Vertex * vex = cfg->get_vertex(BB_id(this));
     ASSERT0(vex);
-    for (EdgeC * out = VERTEX_out_list(vex); out != NULL; out = EC_next(out)) {
+    for (xcom::EdgeC * out = VERTEX_out_list(vex); out != NULL; out = EC_next(out)) {
         IRBB * succ = ((IR_CFG*)cfg)->getBB(VERTEX_id(EDGE_to(EC_edge(out))));
         ASSERT0(succ);
         removeSuccessorDesignatePhiOpnd(cfg, succ);
@@ -297,7 +297,7 @@ void IRBB::removeSuccessorPhiOpnd(CFG<IRBB, IR> * cfg)
 void dumpBBLabel(List<LabelInfo const*> & lablist, FILE * h)
 {
     ASSERT0(h);
-    C<LabelInfo const*> * ct;
+    xcom::C<LabelInfo const*> * ct;
     for (lablist.get_head(&ct); ct != lablist.end(); ct = lablist.get_next(ct)) {
         LabelInfo const* li = ct->val();
         switch (LABEL_INFO_type(li)) {
@@ -311,7 +311,7 @@ void dumpBBLabel(List<LabelInfo const*> & lablist, FILE * h)
             ASSERT0(LABEL_INFO_pragma(li));
             fprintf(h, "%s", SYM_name(LABEL_INFO_pragma(li)));
             break;
-        default: UNREACH();
+        default: UNREACHABLE();
         }
 
         if (LABEL_INFO_is_try_start(li) ||

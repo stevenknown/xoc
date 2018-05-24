@@ -217,7 +217,7 @@ public:
             if (pr == NULL) {
                 fprintf(g_tfile, "\nv%d -> --", i);
             }
-            fprintf(g_tfile, "\nv%d -> PR%u", i, pr->get_prno());
+            fprintf(g_tfile, "\nv%d -> PR%u", i, pr->getPrno());
         }
         fflush(g_tfile);
     }

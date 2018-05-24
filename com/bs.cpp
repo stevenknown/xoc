@@ -1514,7 +1514,7 @@ BitSet * BitSet::get_subset_in_range(UINT low, UINT high, OUT BitSet & subset)
                 } else if (sb_first_byte + 1 == sb_last_byte) {
                     byte2 = m_ptr[sb_last_byte];
                 } else {
-                    UNREACH();
+                    UNREACHABLE();
                 }
             }
             UINT ofst2 = MODBPB(high);

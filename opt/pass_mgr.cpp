@@ -77,8 +77,8 @@ void PassMgr::destroyAllPass()
         delete p;
     }
 
-    Graph * opt2;
-    TMapIter<PASS_TYPE, Graph*> tabiter2;
+    xcom::Graph * opt2;
+    TMapIter<PASS_TYPE, xcom::Graph*> tabiter2;
     for (m_registered_graph_based_pass.get_first(tabiter2, &opt2);
          opt2 != NULL;
          m_registered_graph_based_pass.get_next(tabiter2, &opt2)) {
@@ -177,7 +177,7 @@ Pass * PassMgr::allocMDSSAMgr()
 }
 
 
-Graph * PassMgr::allocCDG()
+xcom::Graph * PassMgr::allocCDG()
 {
     return new CDG(m_ru);
 }
@@ -234,9 +234,9 @@ Pass * PassMgr::allocCFG()
 }
 
 
-Graph * PassMgr::registerGraphBasedPass(PASS_TYPE opty)
+xcom::Graph * PassMgr::registerGraphBasedPass(PASS_TYPE opty)
 {
-    Graph * pass = NULL;
+    xcom::Graph * pass = NULL;
     switch (opty) {
     case PASS_CDG:
         pass = allocCDG();

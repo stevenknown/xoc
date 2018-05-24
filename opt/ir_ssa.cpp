@@ -40,9 +40,9 @@ namespace xoc {
 //START DfMgr
 //
 //Get the BB set where 'v' is the dominate frontier of them.
-BitSet * DfMgr::genDFControlSet(UINT vid)
+xcom::BitSet * DfMgr::genDFControlSet(UINT vid)
 {
-    BitSet * df = m_df_vec.get(vid);
+    xcom::BitSet * df = m_df_vec.get(vid);
     if (df == NULL) {
         df = m_bs_mgr.create();
         m_df_vec.set(vid, df);
@@ -54,7 +54,7 @@ BitSet * DfMgr::genDFControlSet(UINT vid)
 void DfMgr::clean()
 {
     for (INT i = 0; i <= m_df_vec.get_last_idx(); i++) {
-        BitSet * df = m_df_vec.get(i);
+        xcom::BitSet * df = m_df_vec.get(i);
         if (df != NULL) {
             df->clean();
         }
@@ -63,16 +63,16 @@ void DfMgr::clean()
 
 
 //g: dump dominance frontier to graph.
-void DfMgr::dump(DGraph & g)
+void DfMgr::dump(xcom::DGraph & g)
 {
     if (g_tfile == NULL) return;
     fprintf(g_tfile, "\n==---- DUMP Dominator Frontier Control Set ----==\n");
     INT c;
-    for (Vertex const* v = g.get_first_vertex(c);
+    for (xcom::Vertex const* v = g.get_first_vertex(c);
          v != NULL; v = g.get_next_vertex(c)) {
         UINT vid = VERTEX_id(v);
         fprintf(g_tfile, "\nBB%d DF set:", vid);
-        BitSet const* df = m_df_vec.get(vid);
+        xcom::BitSet const* df = m_df_vec.get(vid);
         if (df != NULL) {
             for (INT i = df->get_first(); i >= 0; i = df->get_next(i)) {
                 fprintf(g_tfile, "%d,", i);
@@ -84,37 +84,37 @@ void DfMgr::dump(DGraph & g)
 
 
 //This function compute dominance frontier to graph g.
-void DfMgr::buildRecur(Vertex const* v, DGraph const& g, DomTree const& domtree)
+void DfMgr::buildRecur(xcom::Vertex const* v, xcom::DGraph const& g, DomTree const& domtree)
 {
     UINT vid = VERTEX_id(v);
-    Vertex * v_domtree = domtree.get_vertex(vid);
+    xcom::Vertex * v_domtree = domtree.get_vertex(vid);
     ASSERT0(v_domtree);
 
     //Access each succs.
-    for (EdgeC const* ec = VERTEX_out_list(v_domtree);
+    for (xcom::EdgeC const* ec = VERTEX_out_list(v_domtree);
          ec != NULL; ec = EC_next(ec)) {
-        Vertex const* succ_domtree = EDGE_to(EC_edge(ec));
-        Vertex const* succ = g.get_vertex(VERTEX_id(succ_domtree));
+        xcom::Vertex const* succ_domtree = EDGE_to(EC_edge(ec));
+        xcom::Vertex const* succ = g.get_vertex(VERTEX_id(succ_domtree));
         buildRecur(succ, g, domtree);
     }
 
-    BitSet * df = genDFControlSet(vid);
+    xcom::BitSet * df = genDFControlSet(vid);
     df->clean();
 
     //Compute DF(local)
-    for (EdgeC const* ec = VERTEX_out_list(v);
+    for (xcom::EdgeC const* ec = VERTEX_out_list(v);
          ec != NULL; ec = EC_next(ec)) {
-        Vertex const* succ = EDGE_to(EC_edge(ec));
+        xcom::Vertex const* succ = EDGE_to(EC_edge(ec));
         if (g.get_idom(VERTEX_id(succ)) != vid) {
             df->bunion(VERTEX_id(succ));
         }
     }
 
     //Compute DF(up)
-    for (EdgeC const* ec = VERTEX_out_list(v_domtree);
+    for (xcom::EdgeC const* ec = VERTEX_out_list(v_domtree);
          ec != NULL; ec = EC_next(ec)) {
-        Vertex const* succ_domtree = EDGE_to(EC_edge(ec));
-        BitSet * succ_df = genDFControlSet(VERTEX_id(succ_domtree));
+        xcom::Vertex const* succ_domtree = EDGE_to(EC_edge(ec));
+        xcom::BitSet * succ_df = genDFControlSet(VERTEX_id(succ_domtree));
         for (INT p = succ_df->get_first(); p >= 0; p = succ_df->get_next(p)) {
             if (g.get_idom((UINT)p) != vid) {
                 df->bunion(p);
@@ -125,26 +125,26 @@ void DfMgr::buildRecur(Vertex const* v, DGraph const& g, DomTree const& domtree)
 
 
 //This function compute dominance frontier to graph g recursively.
-void DfMgr::build(DGraph const& g, DomTree const& domtree)
+void DfMgr::build(xcom::DGraph const& g, DomTree const& domtree)
 {
     INT c;
-    for (Vertex const* v = g.get_first_vertex(c);
+    for (xcom::Vertex const* v = g.get_first_vertex(c);
          v != NULL; v = g.get_next_vertex(c)) {
         buildRecur(v, g, domtree);
     }
 }
 
 
-//Count Dominator Frontier Density for each Vertex.
+//Count Dominator Frontier Density for each xcom::Vertex.
 //Return true if there exist vertex that might inserting
 //ton of phis which will blow up memory.
-bool DfMgr::hasHighDFDensityVertex(DGraph const& g)
+bool DfMgr::hasHighDFDensityVertex(xcom::DGraph const& g)
 {
     Vector<UINT> counter_of_vex(g.get_vertex_num());
     INT c;
-    for (Vertex const* v = g.get_first_vertex(c);
+    for (xcom::Vertex const* v = g.get_first_vertex(c);
          v != NULL; v = g.get_next_vertex(c)) {
-        BitSet const* dfset = getDFControlSet(VERTEX_id(v));
+        xcom::BitSet const* dfset = getDFControlSet(VERTEX_id(v));
         if (dfset == NULL) { continue; }
         for (INT i = dfset->get_first(); i >= 0; i = dfset->get_next(i)) {
             UINT cc = counter_of_vex.get(i) + 1;
@@ -160,25 +160,25 @@ bool DfMgr::hasHighDFDensityVertex(DGraph const& g)
 
 
 //This function compute dominance frontier to graph g.
-void DfMgr::build(DGraph const& g)
+void DfMgr::build(xcom::DGraph const& g)
 {
     INT c;
-    for (Vertex const* v = g.get_first_vertex(c);
+    for (xcom::Vertex const* v = g.get_first_vertex(c);
          v != NULL; v = g.get_next_vertex(c)) {
-        BitSet const* v_dom = g.read_dom_set(VERTEX_id(v));
+        xcom::BitSet const* v_dom = g.read_dom_set(VERTEX_id(v));
         ASSERT0(v_dom != NULL);
         UINT vid = VERTEX_id(v);
 
         //Access each preds
-        for (EdgeC const* ec = VERTEX_in_list(v);
+        for (xcom::EdgeC const* ec = VERTEX_in_list(v);
              ec != NULL; ec = EC_next(ec)) {
-            Vertex const* pred = EDGE_from(EC_edge(ec));
-            BitSet * pred_df = genDFControlSet(VERTEX_id(pred));
+            xcom::Vertex const* pred = EDGE_from(EC_edge(ec));
+            xcom::BitSet * pred_df = genDFControlSet(VERTEX_id(pred));
             if (pred == v || g.get_idom(vid) != VERTEX_id(pred)) {
                 pred_df->bunion(vid);
             }
 
-            BitSet const* pred_dom = g.read_dom_set(VERTEX_id(pred));
+            xcom::BitSet const* pred_dom = g.read_dom_set(VERTEX_id(pred));
             ASSERT0(pred_dom != NULL);
             for (INT i = pred_dom->get_first();
                  i >= 0; i = pred_dom->get_next(i)) {
@@ -221,7 +221,7 @@ SSAGraph::SSAGraph(Region * rg, PRSSAMgr * ssamgr)
                   vit != NULL; i2 = SSA_uses(v).get_next(i2, &vit)) {
                 IR * use = m_ru->getIR(i2);
                 ASSERT0(use->is_pr());
-                addEdge(vdef, IR_id(use->get_stmt()));
+                addEdge(vdef, IR_id(use->getStmt()));
             }
         } else {
             ASSERT0(def->is_stmt());
@@ -231,7 +231,7 @@ SSAGraph::SSAGraph(Region * rg, PRSSAMgr * ssamgr)
                  vit != NULL; i2 = SSA_uses(v).get_next(i2, &vit)) {
                 IR * use = m_ru->getIR(i2);
                 ASSERT0(use->is_pr());
-                addEdge(def->id(), IR_id(use->get_stmt()));
+                addEdge(def->id(), IR_id(use->getStmt()));
             }
         }
     }
@@ -303,7 +303,7 @@ void SSAGraph::dump(CHAR const* name, bool detail)
     List<IR const*> lst;
     TypeMgr * dm = m_ru->getTypeMgr();
     INT c;
-    for (Vertex * v = m_vertices.get_first(c);
+    for (xcom::Vertex * v = m_vertices.get_first(c);
          v != NULL; v = m_vertices.get_next(c)) {
         VP * vp = m_vdefs.get(VERTEX_id(v));
         if (vp != NULL) {
@@ -349,9 +349,10 @@ void SSAGraph::dump(CHAR const* name, bool detail)
     }
 
     //Print edge
-    for (Edge * e = m_edges.get_first(c); e != NULL; e = m_edges.get_next(c)) {
-        Vertex * from = EDGE_from(e);
-        Vertex * to = EDGE_to(e);
+    for (xcom::Edge * e = m_edges.get_first(c);
+         e != NULL; e = m_edges.get_next(c)) {
+        xcom::Vertex * from = EDGE_from(e);
+        xcom::Vertex * to = EDGE_to(e);
         fprintf(h, "\nedge: { sourcename:\"%u\" targetname:\"%u\" %s}",
                 VERTEX_id(from), VERTEX_id(to),  "");
     }
@@ -429,14 +430,14 @@ void PRSSAMgr::dumpAllVP(bool have_renamed)
 
             if (def->is_stpr()) {
                 fprintf(g_tfile, "DEF:st pr%d,id%d",
-                        def->get_prno(), def->id());
+                        def->getPrno(), def->id());
             } else if (def->is_phi()) {
                 fprintf(g_tfile, "DEF:phi pr%d,id%d",
-                        def->get_prno(), def->id());
+                        def->getPrno(), def->id());
             } else if (def->isCallStmt()) {
                 fprintf(g_tfile, "DEF:call");
                 if (def->hasReturnValue()) {
-                    fprintf(g_tfile, " pr%d,id%d", def->get_prno(), def->id());
+                    fprintf(g_tfile, " pr%d,id%d", def->getPrno(), def->id());
                 }
             } else {
                 ASSERT(0, ("not def stmt of PR"));
@@ -454,7 +455,7 @@ void PRSSAMgr::dumpAllVP(bool have_renamed)
             IR * use = m_ru->getIR(i2);
             ASSERT0(use->is_pr());
 
-            fprintf(g_tfile, "(pr%d,id%d)", use->get_prno(), IR_id(use));
+            fprintf(g_tfile, "(pr%d,id%d)", use->getPrno(), IR_id(use));
 
             if (nexti >= 0) {
                 fprintf(g_tfile, ",");
@@ -532,7 +533,7 @@ IR * PRSSAMgr::initVP(IN IR * ir)
 
     //Process result.
     if (prres != NULL) {
-        UINT prno = prres->get_prno();
+        UINT prno = prres->getPrno();
         ir->setSSAInfo(allocVP(prno, 0));
         if (m_prno2ir.get(prno) == NULL) {
             m_prno2ir.set(prno, ir);
@@ -561,7 +562,7 @@ void PRSSAMgr::collectDefinedPR(IN IRBB * bb, OUT DefSBitSet & mustdef_pr)
         //Generate VP for non-phi stmt.
         IR * res = initVP(ir);
         for (IR * r = res; r != NULL; r = r->get_next()) {
-            mustdef_pr.bunion(r->get_prno());
+            mustdef_pr.bunion(r->getPrno());
         }
     }
 }
@@ -575,7 +576,7 @@ void PRSSAMgr::insertPhi(UINT prno, IN IRBB * bb)
 
     //Here each operand and result of phi set to same type.
     //They will be revised to correct type during renaming.
-    IR * phi = m_ru->buildPhi(pr->get_prno(), pr->get_type(), num_opnd);
+    IR * phi = m_ru->buildPhi(pr->getPrno(), pr->getType(), num_opnd);
 
     m_ru->allocRefForPR(phi);
 
@@ -595,7 +596,7 @@ void PRSSAMgr::placePhiForPR(
         UINT prno,
         IN List<IRBB*> * defbbs,
         DfMgr const& dfm,
-        BitSet & visited,
+        xcom::BitSet & visited,
         List<IRBB*> & wl,
         Vector<DefSBitSet*> & defed_prs_vec)
 {
@@ -611,7 +612,7 @@ void PRSSAMgr::placePhiForPR(
         IRBB * bb = wl.remove_head();
 
         //Each basic block in dfcs is in dominance frontier of 'bb'.
-        BitSet const* dfcs = dfm.getDFControlSet(BB_id(bb));
+        xcom::BitSet const* dfcs = dfm.getDFControlSet(BB_id(bb));
         if (dfcs == NULL) { continue; }
 
         for (INT i = dfcs->get_first(); i >= 0; i = dfcs->get_next(i)) {
@@ -723,7 +724,7 @@ void PRSSAMgr::placePhi(DfMgr const& dfm,
 
     //Place phi for lived effect prs.
     wl.clean();
-    BitSet visited((bblst->get_elem_count()/8)+1);
+    xcom::BitSet visited((bblst->get_elem_count()/8)+1);
     SEGIter * cur = NULL;
     for (INT i = effect_prs.get_first(&cur);
          i >= 0; i = effect_prs.get_next(i, &cur)) {
@@ -799,7 +800,7 @@ void PRSSAMgr::renameBB(IN IRBB * bb)
 
             VP * resvp = (VP*)res->getSSAInfo();
             ASSERT0(resvp);
-            ASSERT0(VP_prno(resvp) == res->get_prno());
+            ASSERT0(VP_prno(resvp) == res->getPrno());
             UINT prno = VP_prno(resvp);
             UINT maxv = m_max_version.get(prno);
             VP * new_v = allocVP(prno, maxv + 1);
@@ -863,7 +864,7 @@ void PRSSAMgr::handleBBRename(
             ASSERT0(p != NULL);
 
             //Replace opnd of PHI of 'succ' with top SSA version.
-            C<IR*> * ct;
+            xcom::C<IR*> * ct;
             for (IR * ir = BB_irlist(succ).get_head(&ct);
                  ir != NULL; ir = BB_irlist(succ).get_next(&ct)) {
                 if (!ir->is_phi()) {
@@ -891,7 +892,7 @@ void PRSSAMgr::handleBBRename(
                     ASSERT0(defres);
 
                     IR * new_opnd = m_ru->buildPRdedicated(
-                        defres->get_prno(), defres->get_type());
+                        defres->getPrno(), defres->getType());
                     new_opnd->copyRef(defres, m_ru);
                     replace(&PHI_opnd_list(ir), opnd, new_opnd);
                     IR_parent(new_opnd) = ir;
@@ -917,12 +918,12 @@ void PRSSAMgr::handleBBRename(
 //defed_prs_vec: for each BB, indicate PRs which has been defined.
 void PRSSAMgr::renameInDomTreeOrder(
         IRBB * root,
-        Graph & domtree,
+        xcom::Graph & domtree,
         Vector<DefSBitSet*> & defed_prs_vec)
 {
     Stack<IRBB*> stk;
     UINT n = m_ru->getBBList()->get_elem_count();
-    BitSet visited(n / BIT_PER_BYTE);
+    xcom::BitSet visited(n / BIT_PER_BYTE);
     BB2VPMap bb2vpmap(n);
     IRBB * v;
     stk.push(root);
@@ -935,11 +936,11 @@ void PRSSAMgr::renameInDomTreeOrder(
             handleBBRename(v, *defed_prs, bb2vpmap);
         }
 
-        Vertex const* bbv = domtree.get_vertex(BB_id(v));
-        EdgeC const* c = VERTEX_out_list(bbv);
+        xcom::Vertex const* bbv = domtree.get_vertex(BB_id(v));
+        xcom::EdgeC const* c = VERTEX_out_list(bbv);
         bool all_visited = true;
         while (c != NULL) {
-            Vertex * dom_succ = EDGE_to(EC_edge(c));
+            xcom::Vertex * dom_succ = EDGE_to(EC_edge(c));
             if (dom_succ == bbv) { continue; }
             if (!visited.is_contain(VERTEX_id(dom_succ))) {
                 ASSERT0(m_cfg->getBB(VERTEX_id(dom_succ)));
@@ -989,7 +990,7 @@ void PRSSAMgr::renameInDomTreeOrder(
 void PRSSAMgr::rename(
         DefSBitSet & effect_prs,
         Vector<DefSBitSet*> & defed_prs_vec,
-        Graph & domtree)
+        xcom::Graph & domtree)
 {
     START_TIMER(t, "SSA: Rename");
     BBList * bblst = m_ru->getBBList();
@@ -1010,7 +1011,7 @@ void PRSSAMgr::rename(
 
 void PRSSAMgr::destructBBSSAInfo(IRBB * bb)
 {
-    C<IR*> * ct, * next_ct;
+    xcom::C<IR*> * ct, * next_ct;
     BB_irlist(bb).get_head(&next_ct);
     ct = next_ct;
     for (; ct != BB_irlist(bb).end(); ct = next_ct) {
@@ -1025,11 +1026,11 @@ void PRSSAMgr::destructBBSSAInfo(IRBB * bb)
 }
 
 
-void PRSSAMgr::destructionInDomTreeOrder(IRBB * root, Graph & domtree)
+void PRSSAMgr::destructionInDomTreeOrder(IRBB * root, xcom::Graph & domtree)
 {
     Stack<IRBB*> stk;
     UINT n = m_ru->getBBList()->get_elem_count();
-    BitSet visited(n / BIT_PER_BYTE);
+    xcom::BitSet visited(n / BIT_PER_BYTE);
     BB2VPMap bb2vp(n);
     IRBB * v;
     stk.push(root);
@@ -1039,13 +1040,13 @@ void PRSSAMgr::destructionInDomTreeOrder(IRBB * root, Graph & domtree)
             destructBBSSAInfo(v);
         }
 
-        Vertex * bbv = domtree.get_vertex(BB_id(v));
+        xcom::Vertex * bbv = domtree.get_vertex(BB_id(v));
         ASSERT(bbv, ("dom tree is invalid."));
 
-        EdgeC * c = VERTEX_out_list(bbv);
+        xcom::EdgeC * c = VERTEX_out_list(bbv);
         bool all_visited = true;
         while (c != NULL) {
-            Vertex * dom_succ = EDGE_to(EC_edge(c));
+            xcom::Vertex * dom_succ = EDGE_to(EC_edge(c));
             if (dom_succ == bbv) { continue; }
             if (!visited.is_contain(VERTEX_id(dom_succ))) {
                 ASSERT0(m_cfg->getBB(VERTEX_id(dom_succ)));
@@ -1087,18 +1088,18 @@ void PRSSAMgr::destruction(DomTree & domtree)
 //of current BB's predessor.
 //Note that do not free phi at this function, it will be freed
 //by user.
-void PRSSAMgr::stripPhi(IR * phi, C<IR*> * phict)
+void PRSSAMgr::stripPhi(IR * phi, xcom::C<IR*> * phict)
 {
     IRBB * bb = phi->getBB();
     ASSERT0(bb);
 
-    Vertex const* vex = m_cfg->get_vertex(BB_id(bb));
+    xcom::Vertex const* vex = m_cfg->get_vertex(BB_id(bb));
     ASSERT0(vex);
 
     //Temprarory RP to hold the result of PHI.
-    IR * phicopy = m_ru->buildPR(phi->get_type());
+    IR * phicopy = m_ru->buildPR(phi->getType());
     phicopy->setRefMD(m_ru->genMDforPR(
-        PR_no(phicopy), phicopy->get_type()), m_ru);
+        PR_no(phicopy), phicopy->getType()), m_ru);
     phicopy->cleanRefMDSet();
     IR * opnd = PHI_opnd_list(phi);
 
@@ -1107,7 +1108,7 @@ void PRSSAMgr::stripPhi(IR * phi, C<IR*> * phict)
     ASSERT0(PHI_ssainfo(phi));
 
     UINT pos = 0;
-    for (EdgeC * el = VERTEX_in_list(vex), * nextel = NULL;
+    for (xcom::EdgeC * el = VERTEX_in_list(vex), * nextel = NULL;
          el != NULL; el = nextel, opnd = opnd->get_next(), pos++) {
         ASSERT0(find_position(VERTEX_in_list(vex), el) == pos);
 
@@ -1122,7 +1123,7 @@ void PRSSAMgr::stripPhi(IR * phi, C<IR*> * phict)
 
         //The copy will be inserted into related predecessor.
         IR * store_to_phicopy = m_ru->buildStorePR(
-            PR_no(phicopy), phicopy->get_type(), opndcopy);
+            PR_no(phicopy), phicopy->getType(), opndcopy);
         store_to_phicopy->copyRef(phicopy, m_ru);
 
         IRBB * p = m_cfg->getBB(pred);
@@ -1167,7 +1168,7 @@ void PRSSAMgr::stripPhi(IR * phi, C<IR*> * phict)
     }
 
     IR * substitue_phi = m_ru->buildStorePR(
-        PHI_prno(phi), phi->get_type(), phicopy);
+        PHI_prno(phi), phi->getType(), phicopy);
     substitue_phi->copyRef(phi, m_ru);
 
     BB_irlist(bb).insert_before(substitue_phi, phict);
@@ -1186,7 +1187,7 @@ bool PRSSAMgr::verifyPhi(bool is_vpinfo_avail)
     List<IRBB*> preds;
     for (IRBB * bb = bblst->get_head(); bb != NULL; bb = bblst->get_next()) {
         m_cfg->get_preds(preds, bb);
-        C<IR*> * ct;
+        xcom::C<IR*> * ct;
         for (BB_irlist(bb).get_head(&ct); ct != BB_irlist(bb).end();
              ct = BB_irlist(bb).get_next(ct)) {
             IR const* ir = ct->val();
@@ -1245,7 +1246,7 @@ bool PRSSAMgr::verifyPRNOofVP()
 {
     ConstIRIter ii;
     BBList * bblst = m_ru->getBBList();
-    C<IRBB*> * ct;
+    xcom::C<IRBB*> * ct;
     for (IRBB * bb = bblst->get_head(&ct);
          bb != NULL; bb = bblst->get_next(&ct)) {
          for (IR * ir = BB_first_ir(bb); ir != NULL; ir = BB_next_ir(bb)) {
@@ -1265,7 +1266,7 @@ bool PRSSAMgr::verifyPRNOofVP()
 bool PRSSAMgr::verifyVP()
 {
     //Check version for each vp.
-    BitSet defset;
+    xcom::BitSet defset;
     for (INT i = 1; i <= m_vp_vec.get_last_idx(); i++) {
         VP * v = m_vp_vec.get(i);
         ASSERT0(v != NULL);
@@ -1288,7 +1289,7 @@ bool PRSSAMgr::verifyVP()
             respr = def->getResultPR(VP_prno(v));
             ASSERT0(respr);
 
-            defprno = respr->get_prno();
+            defprno = respr->getPrno();
             ASSERT0(defprno > 0);
         }
 
@@ -1322,7 +1323,7 @@ bool PRSSAMgr::verifyVP()
 }
 
 
-static void verify_ssainfo_core(IR * ir, BitSet & defset, Region * rg)
+static void verify_ssainfo_core(IR * ir, xcom::BitSet & defset, Region * rg)
 {
     ASSERT0(ir);
     SSAInfo * ssainfo = ir->getSSAInfo();
@@ -1344,7 +1345,7 @@ static void verify_ssainfo_core(IR * ir, BitSet & defset, Region * rg)
         respr = def->getResultPR();
         ASSERT0(respr);
 
-        defprno = respr->get_prno();
+        defprno = respr->getPrno();
         ASSERT0(defprno > 0);
     }
 
@@ -1381,12 +1382,12 @@ static void verify_ssainfo_core(IR * ir, BitSet & defset, Region * rg)
 bool PRSSAMgr::verifySSAInfo()
 {
     //Check version for each vp.
-    BitSet defset;
+    xcom::BitSet defset;
     BBList * bbl = m_ru->getBBList();
-    C<IRBB*> * ct;
+    xcom::C<IRBB*> * ct;
     for (bbl->get_head(&ct); ct != bbl->end(); ct = bbl->get_next(ct)) {
         IRBB * bb = ct->val();
-        C<IR*> * ctir;
+        xcom::C<IR*> * ctir;
         for (BB_irlist(bb).get_head(&ctir);
              ctir != BB_irlist(bb).end();
              ctir = BB_irlist(bb).get_next(ctir)) {
@@ -1411,7 +1412,7 @@ void PRSSAMgr::destruction()
 {
     BBList * bblst = m_ru->getBBList();
     if (bblst->get_elem_count() == 0) { return; }
-    C<IRBB*> * bbct;
+    xcom::C<IRBB*> * bbct;
     for (bblst->get_head(&bbct);
          bbct != bblst->end(); bbct = bblst->get_next(bbct)) {
         IRBB * bb = bbct->val();
@@ -1429,13 +1430,13 @@ void PRSSAMgr::destruction()
 void PRSSAMgr::cleanPRSSAInfo()
 {
     BBList * bblst = m_ru->getBBList();
-    C<IRBB*> * bbct;
+    xcom::C<IRBB*> * bbct;
     for (bblst->get_head(&bbct);
          bbct != bblst->end(); bbct = bblst->get_next(bbct)) {
         IRBB * bb = bbct->val();
         ASSERT0(bb);
 
-        C<IR*> * irct;
+        xcom::C<IR*> * irct;
         for (BB_irlist(bb).get_head(&irct);
              irct != BB_irlist(bb).end();
              irct = BB_irlist(bb).get_next(irct)) {
@@ -1473,7 +1474,7 @@ static void revise_phi_dt(IR * phi, Region * rg)
     ASSERT0(rg->getIR(i)->is_pr());
     ASSERT0(PR_no(rg->getIR(i)) == PHI_prno(phi));
 
-    IR_dt(phi) = rg->getIR(i)->get_type();
+    IR_dt(phi) = rg->getIR(i)->getType();
 }
 
 
@@ -1484,7 +1485,7 @@ void PRSSAMgr::refinePhi(List<IRBB*> & wl)
     START_TIMER(t, "SSA: Refine phi");
 
     BBList * bblst = m_ru->getBBList();
-    C<IRBB*> * ct;
+    xcom::C<IRBB*> * ct;
 
     wl.clean();
     for (bblst->get_head(&ct); ct != bblst->end(); ct = bblst->get_next(ct)) {
@@ -1495,8 +1496,8 @@ void PRSSAMgr::refinePhi(List<IRBB*> & wl)
 
     IRBB * bb = NULL;
     while ((bb = wl.remove_head()) != NULL) {
-        C<IR*> * irct = NULL;
-        C<IR*> * nextirct = NULL;
+        xcom::C<IR*> * irct = NULL;
+        xcom::C<IR*> * nextirct = NULL;
         for (BB_irlist(bb).get_head(&nextirct), irct = nextirct;
              irct != BB_irlist(bb).end(); irct = nextirct) {
             nextirct = BB_irlist(bb).get_next(nextirct);
@@ -1539,7 +1540,7 @@ void PRSSAMgr::refinePhi(List<IRBB*> & wl)
                     //current SSAInfo to the common_def.
 
                     ASSERT0(common_def->getResultPR(PHI_prno(ir)));
-                    ASSERT(common_def->getResultPR(PHI_prno(ir))->get_prno()
+                    ASSERT(common_def->getResultPR(PHI_prno(ir))->getPrno()
                             == PHI_prno(ir), ("not same PR"));
 
                     IR * respr = common_def->getResultPR(PHI_prno(ir));
@@ -1590,9 +1591,9 @@ void PRSSAMgr::stripVersionForBBList()
     BBList * bblst = m_ru->getBBList();
     if (bblst->get_elem_count() == 0) { return; }
 
-    C<IRBB*> * ct;
+    xcom::C<IRBB*> * ct;
 
-    BitSet visited;
+    xcom::BitSet visited;
 
     //Ensure the first allocation of bitset could
     //accommodata the last vp id.
@@ -1601,8 +1602,8 @@ void PRSSAMgr::stripVersionForBBList()
 
     for (bblst->get_head(&ct); ct != bblst->end(); ct = bblst->get_next(ct)) {
         IRBB * bb = ct->val();
-        C<IR*> * irct = NULL;
-        C<IR*> * nextirct;
+        xcom::C<IR*> * irct = NULL;
+        xcom::C<IR*> * nextirct;
         for (BB_irlist(bb).get_head(&nextirct), irct = nextirct;
              irct != BB_irlist(bb).end(); irct = nextirct) {
             nextirct = BB_irlist(bb).get_next(nextirct);
@@ -1628,7 +1629,7 @@ static IR * replace_res_pr(
     ASSERT0(newprno > 0);
 
     //Replace stmt PR and DATA_TYPE info.
-    switch (stmt->get_code()) {
+    switch (stmt->getCode()) {
     case IR_STPR:
         ASSERT0(STPR_no(stmt) == oldprno);
         STPR_no(stmt) = newprno;
@@ -1655,7 +1656,7 @@ static IR * replace_res_pr(
         CALL_prno(stmt) = newprno;
         IR_dt(stmt) = newprty;
         return stmt;
-    default: UNREACH();
+    default: UNREACHABLE();
     }
     return NULL;
 }
@@ -1672,7 +1673,7 @@ void PRSSAMgr::stripSpecifiedVP(VP * vp)
     IR * res = def->getResultPR(VP_prno(vp));
     ASSERT(res, ("Stmt does not modified PR%d", VP_prno(vp)));
 
-    Type const* newprty = res->get_type();
+    Type const* newprty = res->getType();
     UINT newprno = m_ru->buildPrno(newprty);
 
     IR * replaced_one = replace_res_pr(def, VP_prno(vp), newprno, newprty);
@@ -1710,7 +1711,7 @@ void PRSSAMgr::stripSpecifiedVP(VP * vp)
 }
 
 
-void PRSSAMgr::stripStmtVersion(IR * stmt, BitSet & visited)
+void PRSSAMgr::stripStmtVersion(IR * stmt, xcom::BitSet & visited)
 {
     ASSERT0(stmt->is_stmt());
 
@@ -1801,23 +1802,23 @@ void PRSSAMgr::computeSSAInfo()
     if (bblst->get_elem_count() == 0) { return; }
 
     IRIter ii;
-    C<IRBB*> * bbct = NULL;
+    xcom::C<IRBB*> * bbct = NULL;
     for (bblst->get_head(&bbct); bbct != bblst->end(); bblst->get_next(&bbct)) {
         IRBB * bb = bbct->val();
-        C<IR*> * irct = NULL;
+        xcom::C<IR*> * irct = NULL;
         for (BB_irlist(bb).get_head(&irct);
              irct != BB_irlist(bb).end(); irct = BB_irlist(bb).get_next(irct)) {
             IR * ir = irct->val();
             ii.clean();
             for (IR * x = iterInit(ir, ii); x != NULL; x = iterNext(ii)) {
                 if (x->isReadPR() || (x->is_stmt() && x->getResultPR() != NULL)) {
-                    SSAInfo * ssainfo = allocSSAInfo(x->get_prno());
+                    SSAInfo * ssainfo = allocSSAInfo(x->getPrno());
                     x->setSSAInfo(ssainfo);
                     if (x->isReadPR()) {
                         SSA_uses(ssainfo).append(x);
                     } else {
                         ASSERT(SSA_def(ssainfo) == NULL,
-                            ("multidefinition in for PR%d", x->get_prno()));
+                            ("multidefinition in for PR%d", x->getPrno()));
                         SSA_def(ssainfo) = x;
                     }
                 }
@@ -1856,10 +1857,10 @@ bool PRSSAMgr::construction(DomTree & domtree)
 
     START_TIMER(t, "SSA: Build dominance frontier");
     DfMgr dfm;
-    dfm.build((DGraph&)*m_cfg);
-    dfm.dump((DGraph&)*m_cfg);
+    dfm.build((xcom::DGraph&)*m_cfg);
+    dfm.dump((xcom::DGraph&)*m_cfg);
     END_TIMER(t, "SSA: Build dominance frontier");
-    if (dfm.hasHighDFDensityVertex((DGraph&)*m_cfg)) {
+    if (dfm.hasHighDFDensityVertex((xcom::DGraph&)*m_cfg)) {
         return false;
     }
 

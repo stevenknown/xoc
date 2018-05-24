@@ -296,7 +296,7 @@ bool is_builtin(IR const* ir, BLTIN_TYPE bt, DexRegionMgr const* rumgr)
             ASSERT0(ir->hasReturnValue());
         }
         break;
-    default: UNREACH();
+    default: UNREACHABLE();
     }
 #endif
     return true;
@@ -690,7 +690,7 @@ void dump_lir2(LIR * lir, DexFile * df, INT pos)
             //It seems dex does not distinguish
             //float and integer const. And regard float as
             //32bit integer, double will be 64bit integer.
-            UNREACH();
+            UNREACHABLE();
         }
         break;
     case LOP_RETURN:
@@ -709,7 +709,7 @@ void dump_lir2(LIR * lir, DexFile * df, INT pos)
                 fprintf(g_tfile, ", %s", get_dt_name(lir));
                 fprintf(g_tfile, ", (v%d,v%d)", LIR_res(lir), LIR_res(lir) + 1);
                 break;
-            default: UNREACH();
+            default: UNREACHABLE();
             }
         }
         break;
@@ -879,7 +879,7 @@ void dump_lir2(LIR * lir, DexFile * df, INT pos)
             fprintf(g_tfile, ", INT->SHORT");
             fprintf(g_tfile, ", v%d <- v%d", LIR_res(lir), LIR_op0(lir));
             break;
-        default: UNREACH();
+        default: UNREACHABLE();
         }
         break;
     case LOP_ADD_ASSIGN :
@@ -1033,7 +1033,7 @@ void dump_lir2(LIR * lir, DexFile * df, INT pos)
                     LIR_op0(lir), LIR_op0(lir)+1,
                     (UINT)LIR_op1(lir));
             break;
-        default: UNREACH();
+        default: UNREACHABLE();
         }
         break;
     case LOP_ADD       :
@@ -1104,7 +1104,7 @@ void dump_lir2(LIR * lir, DexFile * df, INT pos)
                 //16bit imm
                 fprintf(g_tfile, "(lit16)%d", (INT)LIR_op1(lir));
             } else {
-                UNREACH();
+                UNREACHABLE();
             }
         }
         break;
@@ -1282,7 +1282,7 @@ void dump_lir2(LIR * lir, DexFile * df, INT pos)
             bool is_range = HAVE_FLAG((k & 0xf0), LIR_Range);
             if (is_range) {
                 switch (k & 0x0f) {
-                case LIR_invoke_unknown: UNREACH(); break;
+                case LIR_invoke_unknown: UNREACHABLE(); break;
                 case LIR_invoke_virtual:
                     fprintf(g_tfile, ", virtual-range"); break;
                 case LIR_invoke_direct:
@@ -1293,11 +1293,11 @@ void dump_lir2(LIR * lir, DexFile * df, INT pos)
                     fprintf(g_tfile, ", interface-range"); break;
                 case LIR_invoke_static:
                     fprintf(g_tfile, ", static-range"); break;
-                default: UNREACH();
+                default: UNREACHABLE();
                 }
             } else {
                 switch (k & 0x0f) {
-                case LIR_invoke_unknown: UNREACH(); break;
+                case LIR_invoke_unknown: UNREACHABLE(); break;
                 case LIR_invoke_virtual:
                     fprintf(g_tfile, ", virtual"); break;
                 case LIR_invoke_direct:
@@ -1308,7 +1308,7 @@ void dump_lir2(LIR * lir, DexFile * df, INT pos)
                     fprintf(g_tfile, ", interface"); break;
                 case LIR_invoke_static:
                     fprintf(g_tfile, ", static"); break;
-                default: UNREACH();
+                default: UNREACHABLE();
                 }
             }
 
@@ -1366,13 +1366,13 @@ void dump_lir2(LIR * lir, DexFile * df, INT pos)
                     LIR_op0(lir),
                     (INT)LIR_op1(lir));
             break;
-        default: UNREACH();
+        default: UNREACHABLE();
         }
         break;
     case LOP_PHI:
-        UNREACH();
+        UNREACHABLE();
         break;
-    default: UNREACH();
+    default: UNREACHABLE();
     } //end switch
     fflush(g_tfile);
 }

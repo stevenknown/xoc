@@ -64,7 +64,7 @@ public:
         VAR * dummy = m_var_mgr->registerVar(
                         buf, ty->type, 1, VAR_GLOBAL);
         VAR_is_addr_taken(dummy) = true;
-        VAR_allocable(dummy) = false;
+        VAR_is_unallocable(dummy) = true;
         m_ru->addToVarTab(dummy);
 
         MD dummy_md;
@@ -97,7 +97,7 @@ public:
         VAR * dummy = m_var_mgr->registerVar(
                     buf, m_tm->getMCType(0), 1, VAR_GLOBAL);
         VAR_is_addr_taken(dummy) = true;
-        VAR_allocable(dummy) = false;
+        VAR_is_unallocable(dummy) = true;
         m_ru->addToVarTab(dummy);
 
         MD dummy_md;

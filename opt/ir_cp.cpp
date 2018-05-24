@@ -46,8 +46,8 @@ namespace xoc {
 //Return true if ir's type is consistent with 'cand_expr'.
 bool IR_CP::checkTypeConsistency(IR const* ir, IR const* cand_expr) const
 {
-    Type const* t1 = ir->get_type();
-    Type const* t2 = cand_expr->get_type();
+    Type const* t1 = ir->getType();
+    Type const* t2 = cand_expr->getType();
 
     //Do copy-prog even if data type is VOID.
     if (t1 == t2) { return true; }
@@ -132,7 +132,7 @@ void IR_CP::replaceExpViaSSADu(
 
     CPC_change(ctx) = true;
 
-    ASSERT0(exp->get_stmt());
+    ASSERT0(exp->getStmt());
     bool doit = parent->replaceKid(exp, newir, false);
     ASSERT0(doit);
     DUMMYUSE(doit);
@@ -186,13 +186,13 @@ void IR_CP::replaceExp(
     IR * newir = m_ru->dupIRTree(cand_expr);
     m_du->copyIRTreeDU(newir, cand_expr, true);
 
-    ASSERT0(cand_expr->get_stmt());
+    ASSERT0(cand_expr->getStmt());
     if (exp_use_ssadu) {
         //Remove exp SSA use.
         ASSERT0(exp->getSSAInfo());
         ASSERT0(exp->getSSAInfo()->get_uses().find(exp));
         exp->removeSSAUse();
-        ASSERT0(exp->get_stmt());
+        ASSERT0(exp->getStmt());
         bool doit = exp->getParent()->replaceKid(exp, newir, false);
         ASSERT0(doit);
         DUMMYUSE(doit);
@@ -219,7 +219,7 @@ void IR_CP::replaceExp(
         }
     } else {
         m_du->removeUseOutFromDefset(exp);
-        ASSERT0(exp->get_stmt());
+        ASSERT0(exp->getStmt());
         bool doit = exp->getParent()->replaceKid(exp, newir, false);
         ASSERT0(doit);
         DUMMYUSE(doit);
@@ -231,7 +231,7 @@ void IR_CP::replaceExp(
 
 bool IR_CP::isCopyOR(IR * ir) const
 {
-    switch (ir->get_code()) {
+    switch (ir->getCode()) {
     case IR_ST:
     case IR_STPR:
     case IR_IST:
@@ -281,7 +281,7 @@ bool IR_CP::is_available(
     IRBB * defbb = def_stmt->getBB();
 
     //Both def_ir and use_ir are in same BB.
-    C<IR*> * ir_holder = NULL;
+    xcom::C<IR*> * ir_holder = NULL;
     bool f = BB_irlist(defbb).find(const_cast<IR*>(def_stmt), &ir_holder);
     CHECK_DUMMYUSE(f);
     IR * ir;
@@ -304,14 +304,14 @@ bool IR_CP::is_available(
         ASSERT0(m_cfg->is_dom(defbb->id(), usebb->id()));
     }
 
-    xcom::List<IRBB*> wl;
+    List<IRBB*> wl;
     m_cfg->get_preds(wl, usebb);
     xcom::BitSet visited;
     while (wl.get_elem_count() != 0) {
         IRBB * t = wl.remove_head();
         if (t == defbb) { continue; }
 
-        C<IR*> * tir_holder = NULL;
+        xcom::C<IR*> * tir_holder = NULL;
         for (IR * tir = BB_irlist(t).get_head(&tir_holder);
              tir != NULL; tir = BB_irlist(t).get_next(&tir_holder)) {
             if (m_du->is_may_def(tir, prop_value, false)) {
@@ -320,7 +320,7 @@ bool IR_CP::is_available(
         }
 
         visited.bunion(t->id());
-        for (EdgeC * el = VERTEX_in_list(m_cfg->get_vertex(t->id()));
+        for (xcom::EdgeC * el = VERTEX_in_list(m_cfg->get_vertex(t->id()));
              el != NULL; el = EC_next(el)) {
             INT pred = VERTEX_id(EDGE_from(EC_edge(el)));
             if (!visited.is_contain(pred)) {
@@ -372,14 +372,14 @@ IR const* IR_CP::getSimpCVTValue(IR const* ir) const
 //Get the value expression that to be propagated.
 inline static IR * get_propagated_value(IR * stmt)
 {
-    switch (stmt->get_code()) {
+    switch (stmt->getCode()) {
     case IR_ST: return ST_rhs(stmt);
     case IR_STPR: return STPR_rhs(stmt);
     case IR_IST: return IST_rhs(stmt);
     case IR_PHI: return PHI_opnd_list(stmt);
     default:;
     }
-    UNREACH();
+    UNREACHABLE();
     return NULL;
 }
 
@@ -400,8 +400,8 @@ bool IR_CP::doPropToMDPhi(
 
 //'usevec': for local used.
 bool IR_CP::doPropToNormalStmt(
-        C<IR*> * cur_iter,
-        C<IR*> ** next_iter,
+        xcom::C<IR*> * cur_iter,
+        xcom::C<IR*> ** next_iter,
         bool prssadu,
         bool mdssadu,
         IN IR const* prop_value,
@@ -436,7 +436,7 @@ bool IR_CP::doPropToNormalStmt(
         //use_stmt has been removed and new stmt generated.
         ASSERT(old_use_stmt->is_undef(), ("the old one should be freed"));
 
-        C<IR*> * irct = NULL;
+        xcom::C<IR*> * irct = NULL;
         BB_irlist(use_bb).find(old_use_stmt, &irct);
         ASSERT0(irct);
         BB_irlist(use_bb).insert_before(use_stmt, irct);
@@ -467,8 +467,8 @@ void IR_CP::dumpCopyPropagationAction(
         note("\n");
         ID_phi(use)->dump(m_ru, mdssamgr->getUseDefMgr());
     } else {
-        ASSERT0(use->get_stmt());
-        dump_ir(use->get_stmt(), m_tm);
+        ASSERT0(use->getStmt());
+        dump_ir(use->getStmt(), m_tm);
     }
     fflush(g_tfile);
 }
@@ -500,7 +500,7 @@ bool IR_CP::doProp(
         MDSSAMgr * mdssamgr)
 {
     bool change = false;
-    C<IR*> * cur_iter, * next_iter;
+    xcom::C<IR*> * cur_iter, * next_iter;
 
     for (BB_irlist(bb).get_head(&cur_iter),
          next_iter = cur_iter; cur_iter != NULL; cur_iter = next_iter) {
@@ -583,7 +583,7 @@ bool IR_CP::doProp(
                 use_phi = ID_phi(use);
                 ASSERT0(use_phi && use_phi->is_phi());
             } else {
-                use_stmt = use->get_stmt();
+                use_stmt = use->getStmt();
                 ASSERT0(use_stmt->is_stmt() && use_stmt->getBB());
                 use_bb = use_stmt->getBB();
             }
@@ -663,14 +663,14 @@ bool IR_CP::perform(OptCtx & oc)
     bool change = false;
     IRBB * entry = m_ru->getCFG()->get_entry();
     ASSERT(entry, ("Not unique entry, invalid Region"));
-    Graph domtree;
+    xcom::Graph domtree;
     m_cfg->get_dom_tree(domtree);
-    List<Vertex*> lst;
-    Vertex * root = domtree.get_vertex(entry->id());
+    List<xcom::Vertex*> lst;
+    xcom::Vertex * root = domtree.get_vertex(entry->id());
     m_cfg->sortDomTreeInPreorder(root, lst);
     DefSBitSetCore useset;
 
-    for (Vertex * v = lst.get_head(); v != NULL; v = lst.get_next()) {
+    for (xcom::Vertex * v = lst.get_head(); v != NULL; v = lst.get_next()) {
         IRBB * bb = m_cfg->getBB(VERTEX_id(v));
         ASSERT0(bb);
         change |= doProp(bb, useset, mdssamgr);

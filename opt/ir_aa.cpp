@@ -48,7 +48,7 @@ namespace xoc {
 size_t PPSetMgr::count_mem()
 {
     UINT count = 0;
-    for (SC<PtPairSet*> * sc = m_pp_set_list.get_head();
+    for (xcom::SC<PtPairSet*> * sc = m_pp_set_list.get_head();
          sc != m_pp_set_list.end(); sc = m_pp_set_list.get_next(sc)) {
         PtPairSet * pps = sc->val();
         ASSERT0(pps);
@@ -319,7 +319,7 @@ void IR_AA::reviseMDsize(IN OUT MDSet & mds, UINT size)
 //NOTICE: High level control flow or similar statements are unacceptable here.
 bool IR_AA::isValidStmtToAA(IR * ir)
 {
-    switch(ir->get_code()) {
+    switch(ir->getCode()) {
     case IR_ST: //store
     case IR_STPR:
     case IR_STARRAY:
@@ -364,7 +364,7 @@ void IR_AA::processLda(IR * ir, IN OUT MDSet & mds, IN OUT AACtx * ic)
     if (t->is_exact()) {
         //Adjust size of MD of LDA to be pointer size.
         MD t2(*t);
-        MD_size(&t2) = ir->get_type_size(m_tm);
+        MD_size(&t2) = ir->getTypeSize(m_tm);
         MD const* entry = m_md_sys->registerMD(t2);
         ASSERT0(MD_id(entry) > 0);
         t = entry;
@@ -400,7 +400,7 @@ void IR_AA::processLda(IR * ir, IN OUT MDSet & mds, IN OUT AACtx * ic)
             //array element if array is the field of D_MC.
             //e.g: struct S { int a; int b[..]; }
             //    access s.b[..] generate ARRAY(LDA(s, ofst(4))
-            UINT elem_sz = ir->getParent()->get_type_size(m_tm);
+            UINT elem_sz = ir->getParent()->getTypeSize(m_tm);
             ASSERT0(elem_sz > 0);
             MD_size(&md) = elem_sz;
         }
@@ -430,7 +430,7 @@ void IR_AA::processCvt(
     inferExpression(CVT_exp(ir), mds, ic, mx);
     if (AC_is_mds_mod(ic)) {
         SEGIter * iter;
-        UINT size = ir->get_type_size(m_tm); //cvt's tgt byte size.
+        UINT size = ir->getTypeSize(m_tm); //cvt's tgt byte size.
         INT next;
         for (INT i = mds.get_first(&iter); i >= 0; i = next) {
             next = mds.get_next((UINT)i, &iter);
@@ -494,8 +494,8 @@ void IR_AA::computeMayPointTo(IR * pointer, OUT MDSet & mds)
     //Get context.
     MD2MDSet * mx = NULL;
     if (m_flow_sensitive) {
-        ASSERT0(pointer->get_stmt() && pointer->get_stmt()->getBB());
-        mx = mapBBtoMD2MDSet(BB_id(pointer->get_stmt()->getBB()));
+        ASSERT0(pointer->getStmt() && pointer->getStmt()->getBB());
+        mx = mapBBtoMD2MDSet(BB_id(pointer->getStmt()->getBB()));
     } else  {
         mx = &m_unique_md2mds;
     }
@@ -642,7 +642,7 @@ void IR_AA::inferArrayExpBase(
         //e.g: (ld(p))[i], looking for where p pointed to.
         //Each MD in 'tmp' should be pointer.
         mds.clean(*m_misc_bs_mgr);
-        UINT mdsz = ir->get_type_size(m_tm);
+        UINT mdsz = ir->getTypeSize(m_tm);
         SEGIter * iter;
         for (INT i = tmp.get_first(&iter);
              i >= 0; i = tmp.get_next((UINT)i, &iter)) {
@@ -727,13 +727,13 @@ void IR_AA::inferArrayLdabase(
             }
 
             //Set MD size to be the size of array element if MD is exact.
-            if (MD_size(&tmd) != ir->get_type_size(m_tm)) {
-                MD_size(&tmd) = ir->get_type_size(m_tm);
+            if (MD_size(&tmd) != ir->getTypeSize(m_tm)) {
+                MD_size(&tmd) = ir->getTypeSize(m_tm);
                 changed = true;
             }
         } else {
             changed = true;
-            UINT basesz = m_tm->getPointerBaseByteSize(array_base->get_type());
+            UINT basesz = m_tm->getPointerBaseByteSize(array_base->getType());
             ASSERT0(basesz);
 
             MD_ofst(&tmd) = LDA_ofst(array_base);
@@ -883,7 +883,7 @@ MD const* IR_AA::allocLoadMD(IR * ir)
         MD t2(*t);
         ASSERT0(t2.is_exact());
         MD_ofst(&t2) += LD_ofst(ir);
-        MD_size(&t2) = ir->get_type_size(m_tm);
+        MD_size(&t2) = ir->getTypeSize(m_tm);
         MD const* entry = m_md_sys->registerMD(t2);
         ASSERT(MD_id(entry) > 0, ("Not yet registered"));
         t = entry; //regard MD with offset as return result.
@@ -927,9 +927,9 @@ MD const* IR_AA::allocSetelemMD(IR * ir)
             //e.g: struct {int a,b; } s; s.a = 10
             //generate: st s:offset(4) = 10;
             MD t(*md);
-            ASSERT0(ir->get_type_size(m_tm) > 0);
+            ASSERT0(ir->getTypeSize(m_tm) > 0);
             MD_ofst(&t) += (UINT)CONST_int_val(ofst);
-            MD_size(&t) = ir->get_type_size(m_tm);
+            MD_size(&t) = ir->getTypeSize(m_tm);
             MD const* entry = m_md_sys->registerMD(t);
             ASSERT(MD_id(entry) > 0, ("Not yet registered"));
             md = entry; //regard MD with offset as return result.
@@ -942,10 +942,10 @@ MD const* IR_AA::allocSetelemMD(IR * ir)
             //    st v = $1;
 
             MD t(*md);
-            ASSERT0(ir->get_type_size(m_tm) > 0);
+            ASSERT0(ir->getTypeSize(m_tm) > 0);
             MD_ty(&t) = MD_RANGE;
             MD_ofst(&t) = 0;
-            MD_size(&t) = ir->get_type_size(m_tm);
+            MD_size(&t) = ir->getTypeSize(m_tm);
             MD const* entry = m_md_sys->registerMD(t);
             ASSERT(MD_id(entry) > 0, ("Not yet registered"));
             md = entry; //regard MD with range as return result.
@@ -980,9 +980,9 @@ MD const* IR_AA::allocStoreMD(IR * ir)
         //generate: st('s', ofst:4) = 10
         MD t(*md);
         ASSERT0(t.is_exact());
-        ASSERT0(ir->get_type_size(m_tm) > 0);
+        ASSERT0(ir->getTypeSize(m_tm) > 0);
         MD_ofst(&t) += ST_ofst(ir);
-        MD_size(&t) = ir->get_type_size(m_tm);
+        MD_size(&t) = ir->getTypeSize(m_tm);
         MD const* entry = m_md_sys->registerMD(t);
         ASSERT(MD_id(entry) > 0, ("Not yet registered"));
         md = entry; //regard MD with offset as return result.
@@ -1006,7 +1006,7 @@ bool IR_AA::evaluateFromLda(IR const* ir)
     if (defstmt == NULL || !defstmt->is_stpr()) { return false; }
 
     IR const* rhs = STPR_rhs(defstmt);
-    switch (rhs->get_code()) {
+    switch (rhs->getCode()) {
     case IR_LDA: return true;
     case IR_PR: return evaluateFromLda(rhs);
     case IR_CVT: return evaluateFromLda(CVT_exp(rhs));
@@ -1015,7 +1015,7 @@ bool IR_AA::evaluateFromLda(IR const* ir)
 
     IR const* r = rhs;
     for (;;) {
-        switch (r->get_code()) {
+        switch (r->getCode()) {
         case IR_ADD:
             {
                 //Check the opnd0 if current expresion is : op0 + imm(0)
@@ -1453,7 +1453,7 @@ void IR_AA::processIld(
 
             //Note if ir's type is VOID, size is 0.
             //Thus the MD indicates a object that is p + ild_ofst + 0.
-            UINT size = ir->get_type_size(m_tm);
+            UINT size = ir->getTypeSize(m_tm);
             if (l->is_exact() && MD_size(l) != size) {
                 MD md(*l);
                 MD_ofst(&md) += ild_ofst;
@@ -1584,7 +1584,7 @@ void IR_AA::recomputeDataType(AACtx const& ic, IR const* ir, OUT MDSet & pts)
             //ptset may include element which also be in m_maypts.
             //ASSERT0(!ptset->is_intersect(*m_maypts));
 
-            UINT size = TY_ptr_base_size(ir->get_type());
+            UINT size = TY_ptr_base_size(ir->getType());
             reviseMDsize(pts, size);
         }
     }
@@ -2103,8 +2103,8 @@ void IR_AA::processStoreArray(IN IR * ir, IN MD2MDSet * mx)
     }
 
     if (ARR_ofst(ir) != 0 ||
-        ((sz = (INT)ir->get_type_size(m_tm)) !=
-         (INT)ir->get_type_size(m_tm))) {
+        ((sz = (INT)ir->getTypeSize(m_tm)) !=
+         (INT)ir->getTypeSize(m_tm))) {
         //If array offset is not zero, the result data type may not
         //being the element type. Try to infer the actual memory address of
         //array element.
@@ -2118,8 +2118,8 @@ void IR_AA::processStoreArray(IN IR * ir, IN MD2MDSet * mx)
             if (l->is_exact()) {
                 MD md(*l);
                 MD_ofst(&md) += ARR_ofst(ir);
-                ASSERT0(ir->get_type_size(m_tm) > 0);
-                MD_size(&md) = sz == -1 ? ir->get_type_size(m_tm) : sz;
+                ASSERT0(ir->getTypeSize(m_tm) > 0);
+                MD_size(&md) = sz == -1 ? ir->getTypeSize(m_tm) : sz;
                 MD const* entry = m_md_sys->registerMD(md);
                 ASSERT(MD_id(entry) > 0, ("Not yet registered"));
                 tmp.bunion(entry, *m_misc_bs_mgr);
@@ -2192,8 +2192,8 @@ void IR_AA::processIst(IN IR * ir, IN MD2MDSet * mx)
         return;
     }
 
-    UINT ist_size = ir->get_type_size(m_tm);
-    if (IST_ofst(ir) != 0 || ist_size != IST_base(ir)->get_type_size(m_tm)) {
+    UINT ist_size = ir->getTypeSize(m_tm);
+    if (IST_ofst(ir) != 0 || ist_size != IST_base(ir)->getTypeSize(m_tm)) {
         UINT ist_ofst = IST_ofst(ir);
         //Compute where IST_base may point to.
         MDSet tmp;
@@ -2507,7 +2507,7 @@ void IR_AA::inferExpression(
         IN OUT AACtx * ic,
         IN OUT MD2MDSet * mx)
 {
-    switch (expr->get_code()) {
+    switch (expr->getCode()) {
     case IR_ID:
         assignIdMD(expr, &mds, ic);
         return;
@@ -2653,7 +2653,7 @@ void IR_AA::inferExpression(
             }
         }
         return;
-    default: UNREACH();
+    default: UNREACHABLE();
     }
 }
 
@@ -2979,7 +2979,7 @@ void IR_AA::dumpIRPointTo(IN IR * ir, bool dump_kid, IN MD2MDSet * mx)
         dump_ir(ir, m_tm, NULL, false, false, false, false);
     }
 
-    switch (ir->get_code()) {
+    switch (ir->getCode()) {
     case IR_ID:
     case IR_LD:
     case IR_PR:
@@ -3020,7 +3020,7 @@ void IR_AA::dumpIRPointToForBB(IRBB * bb, bool dump_kid)
 {
     if (g_tfile == NULL) { return; }
     fprintf(g_tfile, "\n\n--- BB%u ---", BB_id(bb));
-    C<IR*> * ct;
+    xcom::C<IR*> * ct;
     MD2MDSet * mx;
     if (m_flow_sensitive) {
         mx = mapBBtoMD2MDSet(BB_id(bb));
@@ -3049,7 +3049,7 @@ void IR_AA::dumpIRPointToForBB(IRBB * bb, bool dump_kid)
 
         ASSERT0(isValidStmtToAA(ir));
 
-        switch (ir->get_code()) {
+        switch (ir->getCode()) {
         case IR_ST:
             fprintf(g_tfile, "LHS:");
             dumpIRPointTo(ir, false, mx);
@@ -3222,7 +3222,7 @@ void IR_AA::dumpIRPointToForBB(IRBB * bb, bool dump_kid)
             }
             break;
         case IR_REGION: break;
-        default: UNREACH();
+        default: UNREACHABLE();
         } //end switch
     }
 }
@@ -3311,7 +3311,7 @@ void IR_AA::dumpMD2MDSetForRegion(bool dump_pt_graph)
 void IR_AA::dumpMD2MDSet(IN MD2MDSet * mx, bool dump_ptg)
 {
     if (g_tfile == NULL || mx == NULL) return;
-    Graph g;
+    xcom::Graph g;
     MDId2MD const* id2md = m_md_sys->getID2MDMap();
     for (INT i = MD_FIRST; i <= id2md->get_last_idx(); i++) {
         if (id2md->get((UINT)i) == NULL) { continue; }
@@ -3375,8 +3375,7 @@ void IR_AA::dumpMD2MDSet(MD const* md, IN MD2MDSet * mx)
 bool IR_AA::convertMD2MDSet2PT(
         OUT PtPairSet & pps,
         IN PtPairMgr & pt_pair_mgr,
-        IN MD2MDSet * mx,
-        IRBB const* bb)
+        IN MD2MDSet * mx)
 {    
     MD2MDSetIter mxiter;
     MDSet const* from_md_pts = NULL;
@@ -3430,8 +3429,7 @@ bool IR_AA::convertMD2MDSet2PT(
 void IR_AA::convertPT2MD2MDSet(
         PtPairSet const& pps,
         IN PtPairMgr & pt_pair_mgr,
-        IN OUT MD2MDSet * ctx,
-        IRBB const* bb)
+        IN OUT MD2MDSet * ctx)
 {
     for (INT i = pps.get_first(); i >= 0; i = pps.get_next((UINT)i)) {
         PtPair * pp = pt_pair_mgr.get((UINT)i);
@@ -3447,12 +3445,12 @@ void IR_AA::convertPT2MD2MDSet(
 void IR_AA::computeStmt(IRBB const* bb, IN OUT MD2MDSet * mx)
 {
     ASSERT0(mx != NULL);
-    C<IR*> * ct;
+    xcom::C<IR*> * ct;
     IRBB * readonly_bb = const_cast<IRBB*>(bb); //ensure we do not moidy it.
     for (IR * ir = BB_irlist(readonly_bb).get_head(&ct);
          ir != NULL; ir = BB_irlist(readonly_bb).get_next(&ct)) {
         ASSERT0(isValidStmtToAA(ir));
-        switch (ir->get_code()) {
+        switch (ir->getCode()) {
         case IR_ST:
             processStore(ir, mx);
             break;
@@ -3524,7 +3522,7 @@ void IR_AA::computeStmt(IRBB const* bb, IN OUT MD2MDSet * mx)
 
 bool IR_AA::verifyIR(IR * ir)
 {
-    switch (ir->get_code()) {
+    switch (ir->getCode()) {
     case IR_ID:
     case IR_LD:
     case IR_PR:
@@ -3541,30 +3539,29 @@ bool IR_AA::verifyIR(IR * ir)
         ASSERT0(getMustAddr(ir));
         ASSERT0(getMayAddr(ir) == NULL);
         break;
-    case IR_STARRAY:
-        {
-            MD const* mustaddr = getMustAddr(ir);
-            MDSet const* mayaddr = getMayAddr(ir);
-            ASSERT0(mustaddr ||
-                     (mayaddr && !mayaddr->is_empty()));
-            ASSERT0((mustaddr != NULL) ^
-                     (mayaddr && !mayaddr->is_empty()));
-            if (mustaddr != NULL) {
-                //PR's address can not be taken.
-                ASSERT0(!mustaddr->is_pr());
-            }
-            if (mayaddr != NULL && !mayaddr->is_empty()) {
-                //PR's address can not be taken.
-                SEGIter * iter;
-                for (INT i = mayaddr->get_first(&iter);
-                     i >= 0; i = mayaddr->get_next((UINT)i, &iter)) {
-                    MD const* x = m_md_sys->getMD((UINT)i);
-                    CHECK_DUMMYUSE(x);
-                    ASSERT0(!x->is_pr());
-                }
+    case IR_STARRAY: {
+        MD const* mustaddr = getMustAddr(ir);
+        MDSet const* mayaddr = getMayAddr(ir);
+        ASSERT0(mustaddr ||
+                 (mayaddr && !mayaddr->is_empty()));
+        ASSERT0((mustaddr != NULL) ^
+                 (mayaddr && !mayaddr->is_empty()));
+        if (mustaddr != NULL) {
+            //PR's address can not be taken.
+            ASSERT0(!mustaddr->is_pr());
+        }
+        if (mayaddr != NULL && !mayaddr->is_empty()) {
+            //PR's address can not be taken.
+            SEGIter * iter;
+            for (INT i = mayaddr->get_first(&iter);
+                 i >= 0; i = mayaddr->get_next((UINT)i, &iter)) {
+                MD const* x = m_md_sys->getMD((UINT)i);
+                CHECK_DUMMYUSE(x);
+                ASSERT0(!x->is_pr());
             }
         }
         break;
+    }
     case IR_ARRAY:
         ASSERT0(ir->getParent());
         if (ir->getParent()->is_array()) {
@@ -3574,30 +3571,29 @@ bool IR_AA::verifyIR(IR * ir)
         }
         //fallthrough
     case IR_ILD:
-    case IR_IST:
-        {
-            MD const* mustaddr = getMustAddr(ir);
-            MDSet const* mayaddr = getMayAddr(ir);
-            ASSERT0(mustaddr ||
-                     (mayaddr && !mayaddr->is_empty()));
-            ASSERT0((mustaddr != NULL) ^
-                     (mayaddr && !mayaddr->is_empty()));
-            if (mustaddr != NULL) {
-                //PR's address can not be taken.
-                ASSERT0(!mustaddr->is_pr());
-            }
-            if (mayaddr != NULL && !mayaddr->is_empty()) {
-                //PR's address can not be taken.
-                SEGIter * iter;
-                for (INT i = mayaddr->get_first(&iter);
-                     i >= 0; i = mayaddr->get_next((UINT)i, &iter)) {
-                    MD const* x = m_md_sys->getMD((UINT)i);
-                    CHECK_DUMMYUSE(x);
-                    ASSERT0(!x->is_pr());
-                }
+    case IR_IST: {
+        MD const* mustaddr = getMustAddr(ir);
+        MDSet const* mayaddr = getMayAddr(ir);
+        ASSERT0(mustaddr ||
+                 (mayaddr && !mayaddr->is_empty()));
+        ASSERT0((mustaddr != NULL) ^
+                 (mayaddr && !mayaddr->is_empty()));
+        if (mustaddr != NULL) {
+            //PR's address can not be taken.
+            ASSERT0(!mustaddr->is_pr());
+        }
+        if (mayaddr != NULL && !mayaddr->is_empty()) {
+            //PR's address can not be taken.
+            SEGIter * iter;
+            for (INT i = mayaddr->get_first(&iter);
+                 i >= 0; i = mayaddr->get_next((UINT)i, &iter)) {
+                MD const* x = m_md_sys->getMD((UINT)i);
+                CHECK_DUMMYUSE(x);
+                ASSERT0(!x->is_pr());
             }
         }
         break;
+    }
     case IR_CALL:
     case IR_ICALL:
         if (ir->hasReturnValue()) {
@@ -3658,15 +3654,15 @@ bool IR_AA::computeFlowSensitive(List<IRBB*> const& bbl)
     for (; change && count < 20;) {
         count++;
         change = false;
-        C<IRBB*> * ct = NULL;
+        xcom::C<IRBB*> * ct = NULL;
         for (IRBB const* bb = bbl.get_head(&ct);
              bb != NULL; bb = bbl.get_next(&ct)) {
             PtPairSet * pps = getInPtPairSet(bb);
 
             MD2MDSet * md2mds = allocMD2MDSetForBB(BB_id(bb));
             tmp.clean();
-            Vertex * vex = m_cfg->get_vertex(BB_id(bb));
-            EdgeC * el = VERTEX_in_list(vex);
+            xcom::Vertex * vex = m_cfg->get_vertex(BB_id(bb));
+            xcom::EdgeC * el = VERTEX_in_list(vex);
             if (el != NULL) {
                 while (el != NULL) {
                     IRBB * p = m_cfg->getBB(VERTEX_id(EDGE_from(EC_edge(el))));
@@ -3686,17 +3682,17 @@ bool IR_AA::computeFlowSensitive(List<IRBB*> const& bbl)
                 //iteration. And it will be used during computing POINT-TO
                 //info and DU analysis.
                 md2mds->clean();
-                convertPT2MD2MDSet(*pps, m_pt_pair_mgr, md2mds, bb);
+                convertPT2MD2MDSet(*pps, m_pt_pair_mgr, md2mds);
             }
             computeStmt(bb, md2mds);
             tmp.clean();
-            if (!convertMD2MDSet2PT(tmp, m_pt_pair_mgr, md2mds, bb)) {
+            if (!convertMD2MDSet2PT(tmp, m_pt_pair_mgr, md2mds)) {
                 return false;
             }
 
             #ifdef _DEBUG_
             //MD2MDSet x;
-            //convertPT2MD2MDSet(*out_set, m_pt_pair_mgr, &x);
+            //convertPT2MD2MDSet(*out_set, m_pt_pair_mgr);
             //dumpMD2MDSet(&x, false);
             #endif
             pps = getOutPtPairSet(bb);
@@ -3863,7 +3859,7 @@ void IR_AA::initEntryPtset(PtPairSet ** ptset_arr)
         }
 
         UINT i = 0;
-        C<IRBB*> * ct;
+        xcom::C<IRBB*> * ct;
         for (IRBB * bb = rubblst->get_head(&ct);
              bb != NULL; bb = rubblst->get_next(&ct)) {
             m_in_pp_set.set(BB_id(bb), &loc_ptset_arr[i]);
@@ -3890,7 +3886,7 @@ void IR_AA::initEntryPtset(PtPairSet ** ptset_arr)
 
             initGlobalAndParameterVarPtset(v, mx, iter);
         }
-        convertMD2MDSet2PT(*getInPtPairSet(entry), m_pt_pair_mgr, mx, NULL);
+        convertMD2MDSet2PT(*getInPtPairSet(entry), m_pt_pair_mgr, mx);
     } else {
         setPointToAllMem(MD_FULL_MEM, m_unique_md2mds);
         setPointToGlobalMem(MD_GLOBAL_MEM, m_unique_md2mds);
@@ -3982,7 +3978,7 @@ void IR_AA::initMayPointToSet()
 void IR_AA::computeFlowInsensitive()
 {
     BBList * bbl = m_cfg->getBBList();
-    C<IRBB*> * ct = NULL;
+    xcom::C<IRBB*> * ct = NULL;
     UINT c = 0;
     while (++c < 3) {
         //Compute point-to.
@@ -4026,21 +4022,21 @@ bool IR_AA::perform(IN OUT OptCtx & oc)
         m_ru->checkValidAndRecompute(&oc, PASS_RPO, PASS_UNDEF);
         List<IRBB*> * tbbl = m_cfg->getBBListInRPO();
         ASSERT0(tbbl->get_elem_count() == m_ru->getBBList()->get_elem_count());
-        START_TIMER_FMT(t, ("%s:flow sensitive analysis", getPassName()));
+        START_TIMER_FMT(t2, ("%s:flow sensitive analysis", getPassName()));
         bool is_succ = computeFlowSensitive(*tbbl);
-        END_TIMER_FMT(t, ("%s:flow sensitive analysis", getPassName()));
+        END_TIMER_FMT(t2, ("%s:flow sensitive analysis", getPassName()));
         if (!is_succ) {
             m_flow_sensitive = false;
-            START_TIMER_FMT(t, ("%s:flow insensitive analysis", getPassName()));
+            START_TIMER_FMT(t4, ("%s:flow insensitive analysis", getPassName()));
             initEntryPtset(NULL);
             computeFlowInsensitive();
-            END_TIMER_FMT(t, ("%s:flow insensitive analysis", getPassName()));
+            END_TIMER_FMT(t4, ("%s:flow insensitive analysis", getPassName()));
         }
     } else {
-        START_TIMER_FMT(t, ("%s:flow insensitive analysis", getPassName()));
+        START_TIMER_FMT(t3, ("%s:flow insensitive analysis", getPassName()));
         initEntryPtset(NULL);
         computeFlowInsensitive();
-        END_TIMER_FMT(t, ("%s:flow insensitive analysis", getPassName()));
+        END_TIMER_FMT(t3, ("%s:flow insensitive analysis", getPassName()));
     }
     OC_is_aa_valid(oc) = true;
     if (ptset_arr != NULL) {

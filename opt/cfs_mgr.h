@@ -108,11 +108,11 @@ public:
     IR_TYPE cfs_type;
     union {
         struct {
-            BitSet * true_body_ir_set; //TRUE BODY
-            BitSet * false_body_ir_set; //FALSE BODY
+            xcom::BitSet * true_body_ir_set; //TRUE BODY
+            xcom::BitSet * false_body_ir_set; //FALSE BODY
         } if_info;
         struct {
-            BitSet * loop_body_ir_set; //LOOP BODY
+            xcom::BitSet * loop_body_ir_set; //LOOP BODY
         } loop_info;
     } u1;
     union {
@@ -128,7 +128,7 @@ public:
 //
 class CfsMgr : public Pass {
 protected:
-    BitSetMgr m_bs_mgr; //BitSet manager.
+    xcom::BitSetMgr m_bs_mgr; //xcom::BitSet manager.
     SMemPool * m_pool;
     Vector<CFS_INFO*> m_map_ir2cfsinfo;
     Region * m_ru;
@@ -154,21 +154,21 @@ public:
     AbsNode * constructAbsLoop(
             IN IRBB * entry,
             IN AbsNode * parent,
-            IN BitSet * cur_region,
-            IN Graph & cur_graph,
-            IN OUT BitSet & visited);
+            IN xcom::BitSet * cur_region,
+            IN xcom::Graph & cur_graph,
+            IN OUT xcom::BitSet & visited);
     AbsNode * constructAbsIf(
             IN IRBB * entry,
             IN AbsNode * parent,
-            IN Graph & cur_graph,
-            IN OUT BitSet & visited);
+            IN xcom::Graph & cur_graph,
+            IN OUT xcom::BitSet & visited);
     AbsNode * constructAbsBB(IN IRBB * bb, IN AbsNode * parent);
     AbsNode * constructAbsTree(
             IN IRBB * entry,
             IN AbsNode * parent,
-            IN BitSet * cur_region,
-            IN Graph & cur_graph,
-            IN OUT BitSet & visited);
+            IN xcom::BitSet * cur_region,
+            IN xcom::Graph & cur_graph,
+            IN OUT xcom::BitSet & visited);
     AbsNode * constructAbstractControlFlowStruct();
 
     void dump_indent(UINT indent);
@@ -184,7 +184,7 @@ public:
     void set_map_ir2cfsinfo(IR * ir, CFS_INFO * ci);
     void set_map_bb2abs(IRBB const* bb, AbsNode * abs);
 
-    void recordStmt(IR * ir, BitSet & irset);
+    void recordStmt(IR * ir, xcom::BitSet & irset);
 
     virtual CHAR const* getPassName() const
     { return "Control Flow Structure MGR"; }
