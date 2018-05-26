@@ -80,14 +80,22 @@ author: Su Zhenyu
 //Bit size of word length of target machine.
 #define WORD_LENGTH_OF_TARGET_MACHINE  (GENERAL_REGISTER_SIZE * BIT_PER_BYTE)
 
+//Define default float mantissa in output file, such as GR file.
+#define DEFAULT_MANTISSA_NUM    6
+
 //Represent target machine word with host type.
 #define TMWORD                           UINT
 
+//Define target machine memory and stack alignment.
+//The alignment is power of 2 on PAC.
+#define MEMORY_ALIGNMENT        4
+#define STACK_ALIGNMENT         MEMORY_ALIGNMENT
+
 //Setting for compiler build-environment. Byte length.
-#define HOST_BIT_PER_BYTE                8
+#define HOST_BIT_PER_BYTE       8
 
 //Maximum memory space of stack variables.
-#define MAX_STACK_SPACE              16*1024*1024
+#define MAX_STACK_SPACE         16*1024*1024
 
 //The order of pushing parameter when function call.
 //true: from right to left
