@@ -93,7 +93,7 @@ VAR * Dex2IR::addVarByName(CHAR const* name, Type const* ty)
     UINT flag = 0;
     SET_FLAG(flag, VAR_GLOBAL);
     v = m_vm->registerVar(sym, ty, 0, flag);
-    
+
     //Record global class,method symbol at RegionMgr.
     //Record global class,method variable at program region.
     ASSERT0(m_ru_mgr->getProgramRegion());

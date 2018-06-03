@@ -4337,9 +4337,9 @@ public:
         ASSERT0(t != T(0));
         #ifdef _DEBUG_
         //Mapped element may not same with 't'.
-        //bool find = false;        
+        //bool find = false;
         //T mapped = BaseTMap::get(t, &find);
-        //if (find) {           
+        //if (find) {
         //    ASSERT0(mapped == t);
         //}
         #endif
@@ -4357,7 +4357,7 @@ public:
             return mapped;
         }
 
-        return BaseTMap::setAlways(t, t);        
+        return BaseTMap::setAlways(t, t);
     }
 
     void remove(T t)

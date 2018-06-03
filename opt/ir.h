@@ -987,7 +987,7 @@ public:
         HOST_INT int_const_value;
 
         //record float point value.
-        struct {            
+        struct {
             HOST_FP fp_const_value;
 
             //record the number of mantissa of float-point number.

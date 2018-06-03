@@ -242,7 +242,7 @@ void MDPhi::dump(Region * rg, UseDefMgr * mgr)
             fprintf(g_tfile, "MD%dV%d(id:%d)",
                 vopnd->mdid(), vopnd->version(), opnd->id());
             break;
-        }            
+        }
         default: UNREACHABLE();
         }
 

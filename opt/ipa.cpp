@@ -79,12 +79,12 @@ void IPA::createCallDummyuse(IR * call, Region * callru)
 {
     Region * calleeru = findRegion(call, callru);
     if (calleeru == NULL || CALL_dummyuse(call) != NULL) {
-        return; 
+        return;
     }
 
     MDSet const* mayuse = calleeru->getMayUse();
     if (mayuse == NULL || mayuse->is_empty()) { return; }
-    
+
     MDSet const* callermaydef = callru->getMayDef();
     if (callermaydef == NULL || callermaydef->is_empty()) { return; }
 

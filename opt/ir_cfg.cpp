@@ -292,7 +292,8 @@ void IR_CFG::buildAndRevisePhiEdge(xcom::TMap<IR*, LabelInfo*> & ir2label)
                         }
 
                         xcom::EdgeC * q;
-                        for (q = EC_next(opnd_pred); q != NULL; q = EC_next(q)) {
+                        for (q = EC_next(opnd_pred);
+                             q != NULL; q = EC_next(q)) {
                             if (VERTEX_id(EDGE_from(EC_edge(q))) ==
                                     incoming_bb->id()) {
                                 break;
@@ -326,9 +327,9 @@ void IR_CFG::initCfg(OptCtx & oc)
         return;
     }
 
-    //cfg->removeEmptyBB();    
-    build(oc);    
-    buildEHEdge();    
+    //cfg->removeEmptyBB();
+    build(oc);
+    buildEHEdge();
 
     //Rebuild cfg may generate redundant empty bb, it
     //disturb the computation of entry and exit.

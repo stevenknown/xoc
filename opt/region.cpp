@@ -59,7 +59,7 @@ static bool checkLogicalOp(IR_TYPE irt, Type const* type, TypeMgr * tm)
 
 static bool isReduction(IR const* ir)
 {
-    ASSERT0(ir->is_stmt());    
+    ASSERT0(ir->is_stmt());
     if (!ir->is_st() && !ir->is_stpr()) { return false; }
     IR * rhs = ir->getRHS();
 
@@ -124,7 +124,7 @@ AnalysisInstrument::AnalysisInstrument(Region * rg) :
     m_pr_count = 1;
     m_pool = smpoolCreate(256, MEM_COMM);
     m_du_pool = smpoolCreate(sizeof(DU) * 4, MEM_CONST_SIZE);
-    m_sc_labelinfo_pool = smpoolCreate(sizeof(xcom::SC<LabelInfo*>) * 4, 
+    m_sc_labelinfo_pool = smpoolCreate(sizeof(xcom::SC<LabelInfo*>) * 4,
         MEM_CONST_SIZE);
     ::memset(m_free_tab, 0, sizeof(m_free_tab));
 }
@@ -1334,7 +1334,7 @@ IR * Region::buildImmInt(HOST_INT v, Type const* type)
                 CONST_int_val(imm) = (HOST_INT)sv;
             }
             break;
-        } 
+        }
         case D_I16:
         case D_U16: {
             UINT16 uv = (UINT16)v;
@@ -1345,7 +1345,7 @@ IR * Region::buildImmInt(HOST_INT v, Type const* type)
                 CONST_int_val(imm) = (HOST_INT)sv;
             }
             break;
-        }            
+        }
         case D_I32:
         case D_U32: {
             UINT32 uv = (UINT32)v;
@@ -1356,7 +1356,7 @@ IR * Region::buildImmInt(HOST_INT v, Type const* type)
                 CONST_int_val(imm) = (HOST_INT)sv;
             }
             break;
-        }            
+        }
         case D_I64:
         case D_U64: {
             UINT64 uv = (UINT64)v;
@@ -1981,7 +1981,7 @@ void Region::constructIRBBlist()
         ASSERT0(pointer->isStmtInBB() || pointer->is_lab());
         IR * cur_ir = pointer;
         pointer = IR_next(pointer);
-        IR_next(cur_ir) = IR_prev(cur_ir) = NULL;        
+        IR_next(cur_ir) = IR_prev(cur_ir) = NULL;
 
         if (cur_bb->is_down_boundary(cur_ir)) {
             BB_irlist(cur_bb).append_tail(cur_ir);
@@ -2045,7 +2045,7 @@ void Region::constructIRBBlist()
         } else if (cur_ir->isMayThrow()) {
             BB_irlist(cur_bb).append_tail(cur_ir);
             BB_is_fallthrough(cur_bb) = true;
-            
+
             //Generate new BB.
             getBBList()->append_tail(cur_bb);
             cur_bb = allocBB();

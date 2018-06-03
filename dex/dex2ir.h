@@ -60,7 +60,7 @@ public:
     bool is_equ(CHAR const* t1, CHAR const* t2) const
     { return strcmp(t1, t2) == 0; }
 
-    CHAR const* createKey(CHAR const* t) { return t; }    
+    CHAR const* createKey(CHAR const* t) { return t; }
 };
 
 typedef TMap<CHAR const*, Type const*, CmpStr> Str2Type;

@@ -109,7 +109,7 @@ MD const* RegionMgr::genDedicateStrMD()
         ASSERT0(MD_base(&md)->is_string());
         MD const* e = m_md_sys->registerMD(md);
         ASSERT0(MD_id(e) > 0);
-        m_str_md = e;        
+        m_str_md = e;
     }
     return m_str_md;
 }
@@ -246,6 +246,7 @@ bool RegionMgr::verifyPreDefinedInfo()
     //otherwise the integer might be truncated wrongfully.
     ASSERT0_DUMMYUSE(sizeof(HOST_INT) <= sizeof(LONGLONG));
     ASSERT0_DUMMYUSE(sizeof(HOST_INT) == sizeof(HOST_UINT));
+    ASSERT0_DUMMYUSE(sizeof(HOST_UINT) >= sizeof(UINT32));
 
     ASSERT0_DUMMYUSE(WORD_LENGTH_OF_HOST_MACHINE ==
         (sizeof(HOST_UINT) * HOST_BIT_PER_BYTE));

@@ -52,7 +52,7 @@ public:
 
     bool is_equ(CHAR const* t1, CHAR const* t2) const
     { return ::strcmp(t1, t2) == 0; }
-    
+
     CHAR const* createKey(CHAR const* t) { return t; }
 };
 
@@ -205,13 +205,13 @@ class CompareSymTab {
     }
 public:
     SMemPool * m_pool;
-    
+
     bool is_less(SYM * t1, SYM * t2) const
     { return ::strcmp(SYM_name(t1), SYM_name(t2)) < 0; }
 
     bool is_equ(SYM * t1, SYM * t2) const
     { return ::strcmp(SYM_name(t1), SYM_name(t2)) == 0; }
-    
+
     SYM * createKey(SYM * t)
     {
         SYM_name(t) = xstrdup(SYM_name(t));
@@ -230,7 +230,7 @@ public:
         m_free_one = NULL;
         TTab<SYM*, CompareSymTab>::m_ck.m_pool = m_pool;
         ASSERT0(m_pool);
-        
+
     }
     virtual ~SymTab() { smpoolDelete(m_pool); }
 

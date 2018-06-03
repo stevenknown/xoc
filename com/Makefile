@@ -1,20 +1,9 @@
-OBJS +=\
-ltype.o \
-xmat.o \
-comf.o \
-smempool.o \
-agraph.o \
-sgraph.o \
-rational.o \
-testbs.o \
-flty.o \
-strbuf.o \
-linsys.o \
-bs.o
+include ./Makefile.inc
 
 ifeq ($(CFLAGS),)
 CFLAGS = \
     -D_DEBUG_ \
+    -DFOR_PAC \
 	-Wno-write-strings \
 	-Wsign-promo \
 	-Wparentheses \
@@ -38,15 +27,15 @@ CFLAGS = \
 	-finline-limit=10000000
 endif
 
-all: objs 
-	ar rvs libxcom.a $(OBJS)
+libxcom: com_objs 
+	ar rvs libxcom.a $(COM_OBJS)
 	@echo "success!!"
 
 %.o:%.cpp
 	@echo "build $<"
 	$(INFER) gcc $(CFLAGS) -c $< -o $@
 
-objs: $(OBJS)
+com_objs: $(COM_OBJS)
 
 clean:
 	@find ./ -name "*.a" | xargs rm -f

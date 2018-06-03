@@ -210,7 +210,7 @@ typedef enum {
 
 
 class PropertySet {
-    List<LabelInfo*> m_labellist;    
+    List<LabelInfo*> m_labellist;
 public:
     bool readonly;
     bool read_modify_write;
@@ -225,7 +225,7 @@ public:
     Type const* elemtype;
     List<TMWORD> * dim_list;
 
-    PropertySet() 
+    PropertySet()
     {
         readonly = false;
         read_modify_write = false;
@@ -240,7 +240,7 @@ public:
         elemtype = NULL;
         dim_list = NULL;
     }
-    
+
     List<LabelInfo*> & getLabelList() { return m_labellist; }
 };
 

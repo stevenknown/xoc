@@ -3376,7 +3376,7 @@ bool IR_AA::convertMD2MDSet2PT(
         OUT PtPairSet & pps,
         IN PtPairMgr & pt_pair_mgr,
         IN MD2MDSet * mx)
-{    
+{
     MD2MDSetIter mxiter;
     MDSet const* from_md_pts = NULL;
 
@@ -3421,7 +3421,7 @@ bool IR_AA::convertMD2MDSet2PT(
                 pps.bunion(PP_id(pp));
             }
         }
-    }        
+    }
     return true;
 }
 
@@ -3435,7 +3435,7 @@ void IR_AA::convertPT2MD2MDSet(
         PtPair * pp = pt_pair_mgr.get((UINT)i);
         ASSERT0(pp != NULL);
         setPointToMDSetByAddMD(PP_from(pp), *ctx, m_md_sys->getMD(PP_to(pp)));
-    }    
+    }
 }
 
 

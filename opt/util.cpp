@@ -51,7 +51,7 @@ static CHAR g_indent_chars = ' ';
 //Return true if val is 32bit integer.
 bool isInteger32bit(HOST_UINT val)
 {
-    ASSERT0(sizeof(HOST_UINT) >= sizeof(UINT32));
+    ASSERT0_DUMMYUSE(sizeof(HOST_UINT) >= sizeof(UINT32));
     return (((UINT32)val) & (UINT32)0x0000FFFF) != val;
 }
 

@@ -224,6 +224,7 @@ Programming Guides
     D_MC                Memory Chunk
     D_STR               String
     D_PTR               Pointer
+    D_VEC               Vector
     D_VOID              Void type
 
     ¡ñ Pointer type
@@ -267,7 +268,7 @@ Programming Guides
     simplification of IR is called to translate IR from the current level to
     the next lower level.
 
-    At the end, the code generator translates the lowest level of IR to    its own
+    At the end, the code generator translates the lowest level of IR to its own
     internal representation that matches the target machine instructions.
 
     High level IR preserve the high level control flow constructs, such as

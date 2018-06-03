@@ -56,15 +56,15 @@ bool readGRAndConstructRegion(RegionMgr * rumgr, CHAR const* grfile)
 {
     START_TIMER(t, "readGRAndConstructRegion");
     GRReader reader(rumgr);
-    
+
     //START_TIMER(t, "lexer dump");
     //reader.getLexer()->dump(grfile, NULL);
     //END_TIMER(t, "lexer dump");
 
     FILE * h = fopen(grfile, "r");
     ASSERT0(h);
-    reader.getLexer()->setSrcFile(h);    
-    reader.getLexer()->clean();    
+    reader.getLexer()->setSrcFile(h);
+    reader.getLexer()->clean();
     bool succ = reader.getParser()->parse();
     reader.getLexer()->setSrcFile(NULL);
     END_TIMER(t, "readGRAndConstructRegion");

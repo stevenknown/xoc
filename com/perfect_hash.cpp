@@ -17,12 +17,12 @@ public:
         v %= g_bucket_sz;
         v += map_ptr->offset_vec.get(map_ptr->offset_in_vec);
         UINT start_offset = map_ptr->offset_vec.get(map_ptr->offset_in_vec);
-        
+
         for (; v + start_offset < bucket_size &&
-             HB_member(map_ptr->m_bucket[v + start_offset]) != NULL; 
+             HB_member(map_ptr->m_bucket[v + start_offset]) != NULL;
              start_offset++) {
             //Entry has been occupied.
-            
+
         }
 
         if (v + start_offset < bucket_size &&
@@ -55,7 +55,7 @@ public:
             ("exception will taken place in type-cast"));
         return (strcmp(s, (CHAR const*)val) == 0);
     }
-};
+};
 
 
 class PerfectStringHashMap : public HMap<CHAR const*, UINT, PerfectHashFunc> {
@@ -64,40 +64,40 @@ public:
     UINT offset_in_vec;
     bool need_expand_gap;
 public:
-    PerfectStringHashMap(UINT sz = 0) : HMap<CHAR const*, UINT, PerfectHashFunc>(sz)
-    {
-        m_hf.map_ptr = this;
-    }
-    virtual ~PerfectStringHashMap() {}
-
-    void set(CHAR const* string, UINT val)
-    {        
-        HMap<CHAR const*, UINT, PerfectHashFunc>::set(string, val);
-    }
-
-    void addAllString(xcom::Vector<CHAR const*> & input)
-    {
-        for (;;) {
-            need_expand_gap = false;
+    PerfectStringHashMap(UINT sz = 0) : HMap<CHAR const*, UINT, PerfectHashFunc>(sz)
+    {
+        m_hf.map_ptr = this;
+    }
+    virtual ~PerfectStringHashMap() {}
+
+    void set(CHAR const* string, UINT val)
+    {
+        HMap<CHAR const*, UINT, PerfectHashFunc>::set(string, val);
+    }
+
+    void addAllString(xcom::Vector<CHAR const*> & input)
+    {
+        for (;;) {
+            need_expand_gap = false;
             for (INT i = 0; i <= input.get_last_idx(); i++) {
                 offset_in_vec = i;
                 set(input.get(i), i);
                 if (need_expand_gap) {
                     break;
                 }
-            }
-
-            if (need_expand_gap) {
-                g_gap += 2;
-                UINT bucket_sz = g_bucket_sz + g_gap;
-                clean();
-                init(bucket_sz);
-            } else {
-                //Find the perfect hash map.
-                break;
-            }
-        }
-    }
+            }
+
+            if (need_expand_gap) {
+                g_gap += 2;
+                UINT bucket_sz = g_bucket_sz + g_gap;
+                clean();
+                init(bucket_sz);
+            } else {
+                //Find the perfect hash map.
+                break;
+            }
+        }
+    }
 };
 
 
@@ -108,7 +108,7 @@ void findPerfectHash(xcom::Vector<CHAR const*> & input)
     g_bucket_sz = str_num + 5;
     g_gap = 10;
     UINT bucket_sz = g_bucket_sz + g_gap; //xcom::getNearestPowerOf2((UINT)g_bucket_sz);
-    PerfectStringHashMap pshmap(bucket_sz);    
+    PerfectStringHashMap pshmap(bucket_sz);
     pshmap.addAllString(input);
     pshmap.dump_intersp(g_tfile);
 }
@@ -122,6 +122,4 @@ int main()
         input.set(j, g_keyword_info[i].name);
     }
     findPerfectHash(input);
-
-
 }

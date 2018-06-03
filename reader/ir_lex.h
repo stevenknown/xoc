@@ -238,13 +238,13 @@ protected:
 
     //Current position in m_cur_line.
     UINT m_cur_line_pos;
-    
+
     //Length of m_cur_line.
     UINT m_cur_line_num;
 
     //Buffer to hold the prefected byte from src file.
     CHAR m_file_buf[MAX_BUF_LINE];
-    
+
     //Current position in m_file_buf.
     UINT m_file_buf_pos;
 
@@ -300,7 +300,7 @@ public:
         m_pool = smpoolCreate(0, MEM_COMM);
         m_cur_token_string = (CHAR*)::malloc(MAX_BUF_LINE);
         m_cur_token_string_len = MAX_BUF_LINE;
-        clean();        
+        clean();
     }
     COPY_CONSTRUCTOR(Lexer);
     ~Lexer()

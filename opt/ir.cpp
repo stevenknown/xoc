@@ -423,7 +423,7 @@ static void dump_lab_decl(LabelInfo const* li)
     }
 
     if (LABEL_INFO_is_try_start(li)) {
-        if (!first) { 
+        if (!first) {
             prt(",");
         }
         first = false;
@@ -431,7 +431,7 @@ static void dump_lab_decl(LabelInfo const* li)
     }
 
     if (LABEL_INFO_is_try_end(li)) {
-        if (!first) { 
+        if (!first) {
             prt(",");
         }
         first = false;
@@ -439,7 +439,7 @@ static void dump_lab_decl(LabelInfo const* li)
     }
 
     if (LABEL_INFO_is_catch_start(li)) {
-        if (!first) { 
+        if (!first) {
             prt(",");
         }
         first = false;
@@ -447,7 +447,7 @@ static void dump_lab_decl(LabelInfo const* li)
     }
 
     if (LABEL_INFO_is_terminate(li)) {
-        if (!first) { 
+        if (!first) {
             prt(",");
         }
         first = false;
@@ -536,7 +536,7 @@ void dump_ir(IR const* ir,
     CHAR * p = attr + strlen(attr);
     sprintf(p, " id:%d", ir->id());
     if (ir->isMayThrow()) {
-        strcat(p, " throw");        
+        strcat(p, " throw");
     }
     if (ir->is_terminate()) {
         strcat(p, " terminate");
@@ -2790,12 +2790,12 @@ static void dumpProp(IR const* ir, TypeMgr * tm, DumpGRCtx * ctx)
         if (!first) { prt(","); }
         else { prt(":("); }
         prt("throw(");
-        if (ir->getAI() != NULL) {            
+        if (ir->getAI() != NULL) {
             EHLabelAttachInfo const* ehlab =
                 (EHLabelAttachInfo const*)ir->getAI()->get(AI_EH_LABEL);
             if (ehlab != NULL) {
-                xcom::SList<LabelInfo*> const& labs = ehlab->read_labels();                
-                for (xcom::SC<LabelInfo*> * sc = labs.get_head(); 
+                xcom::SList<LabelInfo*> const& labs = ehlab->read_labels();
+                for (xcom::SC<LabelInfo*> * sc = labs.get_head();
                      sc != labs.end(); sc = labs.get_next(sc)) {
                     if (sc != labs.get_head()) {
                         prt(",");
@@ -2804,7 +2804,7 @@ static void dumpProp(IR const* ir, TypeMgr * tm, DumpGRCtx * ctx)
                 }
             }
         }
-        prt(")");        
+        prt(")");
         first = false;
     }
     if (ir->is_array() || ir->is_starray()) {
@@ -2946,7 +2946,7 @@ void dumpGR(IR const* ir, TypeMgr * tm, DumpGRCtx * ctx)
         prt(";");
         break;
     case IR_STPR:
-        note("\n%s", IRNAME(ir));        
+        note("\n%s", IRNAME(ir));
         prt(" $%d:%s", STPR_no(ir), tm->dump_type(d, buf));
         dumpProp(ir, tm, ctx);
         prt(" = ");
@@ -2956,7 +2956,7 @@ void dumpGR(IR const* ir, TypeMgr * tm, DumpGRCtx * ctx)
         prt(";");
         break;
     case IR_SETELEM:
-        note("\n%s", IRNAME(ir));        
+        note("\n%s", IRNAME(ir));
         prt(" $%d:%s", SETELEM_prno(ir), tm->dump_type(d, buf));
         dumpProp(ir, tm, ctx);
         prt(" = ");
@@ -2968,7 +2968,7 @@ void dumpGR(IR const* ir, TypeMgr * tm, DumpGRCtx * ctx)
         prt(";");
         break;
     case IR_GETELEM:
-        note("\n%s", IRNAME(ir));        
+        note("\n%s", IRNAME(ir));
         prt(" $%d:%s", GETELEM_prno(ir), tm->dump_type(d, buf));
         dumpProp(ir, tm, ctx);
         prt(" = ");
@@ -2981,15 +2981,15 @@ void dumpGR(IR const* ir, TypeMgr * tm, DumpGRCtx * ctx)
         break;
     case IR_STARRAY:
         note("\n%s:%s", IRNAME(ir), tm->dump_type(d, buf));
-        dumpOffset(ir);        
+        dumpOffset(ir);
         dumpProp(ir, tm, ctx);
         prt(" = ");
-        
+
         g_indent += dn;
         dumpGR(ARR_base(ir), tm, ctx);
         prt(", ");
         g_indent -= dn;
-        
+
         dumpArrSubList(ir, dn, tm, ctx);
         prt(", ");
 
@@ -3073,7 +3073,7 @@ void dumpGR(IR const* ir, TypeMgr * tm, DumpGRCtx * ctx)
                 xstrcat(tbuf, len, "%s", SYM_name(CONST_str_val(ir)));
                 for (UINT i = 0; i < len && tbuf[i] != 0; i++) {
                     if (tbuf[i] == '\n') { tbuf[i] = ' '; }
-                }                
+                }
             }
             prt("\"%s\"", tbuf);
             if (tbuf != SYM_name(CONST_str_val(ir))) {

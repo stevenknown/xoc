@@ -3075,9 +3075,9 @@ void IR_DU_MGR::computeCallRef(UINT duflag)
                 } else {
                     mx = m_aa->getUniqueMD2MDSet();
                 }
-                inferCallAndIcall(ir, duflag, mx);            
+                inferCallAndIcall(ir, duflag, mx);
                 break;
-            }                
+            }
             default:;
             }
         }
@@ -3134,7 +3134,7 @@ void IR_DU_MGR::computeMDRef(IN OUT OptCtx & oc, UINT duflag)
                 }
                 inferCallAndIcall(ir, duflag, mx);
                 break;
-            }            
+            }
             case IR_RETURN:
                 computeExpression(RET_exp(ir), NULL,
                     COMP_EXP_RECOMPUTE, duflag);

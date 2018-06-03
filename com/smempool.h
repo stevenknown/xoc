@@ -123,7 +123,7 @@ void dumpPool(SMemPool * handler, FILE * h);
 //Replacement new-operator allocates memory from common pool.
 inline void * operator new(size_t size, SMemPool * handler)
 {
-    ASSERT0(handler);    
+    ASSERT0(handler);
     return smpoolMalloc(size, handler, MEM_COMM);
 }
 

@@ -179,7 +179,7 @@ IR * Region::refineIstore(IR * ir, bool & change, RefineCtx & rc)
             newir->copyRef(ir, this);
             if (newir->getEffectRef() == NULL) {
                 MD const* t2 = allocRefForStore(newir);
-                CHECK_DUMMYUSE(newir->getRefMDSet() && 
+                CHECK_DUMMYUSE(newir->getRefMDSet() &&
                     newir->getRefMDSet()->is_contain(t2));
             }
             if (getMDSSAMgr() != NULL) {
@@ -224,7 +224,7 @@ IR * Region::refineIstore(IR * ir, bool & change, RefineCtx & rc)
             newrhs->copyRef(rhs, this);
             if (newrhs->getEffectRef() == NULL) {
                 MD const* t2 = allocRefForLoad(newrhs);
-                CHECK_DUMMYUSE(newrhs->getRefMDSet() && 
+                CHECK_DUMMYUSE(newrhs->getRefMDSet() &&
                     newrhs->getRefMDSet()->is_contain(t2));
             }
             dumgr->copyDUSet(newrhs, rhs);
@@ -1859,7 +1859,7 @@ IR * Region::insertCvt(IR * parent, IR * kid, bool & change)
                 //Do not do hoisting for vector type.
                 ASSERT(tgt_size == src_size, ("different size vector"));
                 return kid;
-            }           
+            }
 
             if (parent->is_fp() || kid->is_fp()) {
                 return insertCvtForFloat(parent, kid, change);

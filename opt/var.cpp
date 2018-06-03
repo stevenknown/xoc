@@ -203,7 +203,7 @@ void VAR::dumpProp(xcom::StrBuf & buf, bool grmode) const
         }
         CHAR * local_buf = NULL;
         if (quote_num != 0) {
-            UINT i = 0;            
+            UINT i = 0;
             len += quote_num;
             if (len < HOST_STACK_MAX_USABLE_MEMORY_BYTE_SIZE) {
                 local_buf = (CHAR*)ALLOCA(len + 1);
@@ -254,7 +254,7 @@ CHAR const* VAR::dumpGR(StrBuf & buf, TypeMgr * dm) const
         buf.strcat(":(");
         dumpProp(buf, true);
         buf.strcat(")");
-    }    
+    }
     return buf.buf;
 }
 
@@ -432,7 +432,7 @@ VAR * VarMgr::registerStringVar(CHAR const* var_name, SYM const* s, UINT align)
     }
     VAR_string(v) = s;
     VAR_type(v) = m_tm->getString();
-    VAR_align(v) = align;    
+    VAR_align(v) = align;
     VAR_is_global(v) = true;
     assignVarId(v);
     m_str_tab.set(s, v);

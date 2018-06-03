@@ -49,7 +49,7 @@ author: Su Zhenyu
 VAR * DexRegionMgr::addVarForBuiltin(CHAR const* name)
 {
     SYM * sym = addToSymbolTab(name);
-    return getVarMgr()->registerVar(sym, getTypeMgr()->getVoid(), 
+    return getVarMgr()->registerVar(sym, getTypeMgr()->getVoid(),
         0, VAR_FUNC_DECL|VAR_GLOBAL);
 }
 
@@ -71,7 +71,7 @@ void DexRegionMgr::addBuiltinVarToTab()
     for (UINT i = BLTIN_UNDEF + 1; i < BLTIN_LAST; i++) {
         VAR * v = getSym2Var().get(addToSymbolTab(BLTIN_name((BLTIN_TYPE)i)));
         ASSERT0(v);
-        getProgramRegion()->addToVarTab(v);    
+        getProgramRegion()->addToVarTab(v);
     }
 }
 

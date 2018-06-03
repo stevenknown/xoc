@@ -248,15 +248,15 @@ INT Lexer::getLine()
             INT dw = (INT)fread(m_file_buf, 1, MAX_BUF_LINE, m_src_file);
             if (dw == 0) {
                 if (!is_some_chars_in_cur_line) {
-                    //Some characters had been put into 'm_cur_line', 
+                    //Some characters had been put into 'm_cur_line',
                     //but the last character of 'm_file_buf' is not
-                    //'0xD,0xA', so we hould to get there. 
-                    //However there is nothing more can be read from file, 
-                    //thus 'dw' is zero. This situation may take place 
-                    //at that we meet the file that terminate without 
+                    //'0xD,0xA', so we hould to get there.
+                    //However there is nothing more can be read from file,
+                    //thus 'dw' is zero. This situation may take place
+                    //at that we meet the file that terminate without
                     //'0xD,0xA'.
-                    //TODO:Take a consideration of the corner case, we 
-                    //should process the last characters in 'm_cur_line' 
+                    //TODO:Take a consideration of the corner case, we
+                    //should process the last characters in 'm_cur_line'
                     //properly and correctly rather than return 'FEOF' directly.
                     goto FEOF;
                 } else {
@@ -315,8 +315,8 @@ INT Lexer::getLine()
                 m_src_line_num++;
                 goto FIN;
             } else if(m_file_buf[m_file_buf_pos] == 0xd && m_is_dos) {
-                //0xd is the last charactor in 'm_file_buf', thus 0xa 
-                //should be recognized in getNextToken() in order to correct 
+                //0xd is the last charactor in 'm_file_buf', thus 0xa
+                //should be recognized in getNextToken() in order to correct
                 //the lex parsing.
                 is_0xd_recog = 1;
                 if (m_use_newline_char) {
@@ -624,7 +624,7 @@ void Lexer::checkAndGrowCurTokenString()
 {
     if (m_cur_token_string_pos + 10 > m_cur_token_string_len) {
         m_cur_token_string_len *= 2;
-        m_cur_token_string = (CHAR*)::realloc(m_cur_token_string, 
+        m_cur_token_string = (CHAR*)::realloc(m_cur_token_string,
             m_cur_token_string_len);
     }
 }

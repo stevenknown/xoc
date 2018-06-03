@@ -592,7 +592,7 @@ void Sort<T>::shell_sort(IN OUT Vector<T> & data)
          gap *= 2, group = n / gap, rem = n % gap) {
         rem = rem == 0 ? 0 : 1;
         for (UINT i = 0; i < group + rem; i++) {
-            _insert_sort(data, i*gap, MIN(((i+1)*gap - 1), (UINT)n - 1));            
+            _insert_sort(data, i*gap, MIN(((i+1)*gap - 1), (UINT)n - 1));
         }
 
         if (group == 1) {
