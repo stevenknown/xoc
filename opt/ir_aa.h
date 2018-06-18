@@ -616,7 +616,7 @@ public:
         if (pts != NULL) {
             if (pts->is_contain(newmd)) {
                 ASSERT0(m_mds_hash->find(*pts));
-                setPointTo(pointer_mdid, ctx, pts);
+                //setPointTo(pointer_mdid, ctx, pts);
                 return;
             }
             tmp.bunion(*pts, *m_misc_bs_mgr);

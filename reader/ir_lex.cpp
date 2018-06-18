@@ -197,7 +197,7 @@ static UINT g_keyword_num = sizeof(g_keyword_info)/sizeof(g_keyword_info[0]);
 
 
 //Report error with line number.
-void Lexer::error(UINT line_num, CHAR * msg, ...)
+void Lexer::error(UINT line_num, CHAR const* msg, ...)
 {
     if (msg == NULL) { return; }
     LexErrorMsg * p = NULL;

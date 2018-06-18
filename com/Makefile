@@ -3,7 +3,7 @@ include ./Makefile.inc
 ifeq ($(CFLAGS),)
 CFLAGS = \
     -D_DEBUG_ \
-    -DFOR_PAC \
+    -DFOR_DEX \
 	-Wno-write-strings \
 	-Wsign-promo \
 	-Wparentheses \

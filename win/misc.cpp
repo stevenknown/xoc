@@ -78,10 +78,10 @@ char * format_elapsed(double d)
     {
         // show in min:sec
         sprintf(buf, "%01.0f:%02.2f", floor(d/60.0), fmod(d,60.0));
-    }
-    // show in h:min:sec
-    else
+    } else {
+        // show in h:min:sec
         sprintf(buf, "%01.0f:%02.0f:%02.2f", floor(d/3600.0), floor(fmod(d,3600.0)/60.0), fmod(d,60.0));
+    }
     return buf;
 }
 

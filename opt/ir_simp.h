@@ -214,7 +214,7 @@ public:
 
     //Return true if current simplifying policy
     //involved one of these actions.
-    bool isSimpCFG()
+    bool isSimpCFG() const
     {
         return SIMP_if(this) ||
                SIMP_doloop(this) ||

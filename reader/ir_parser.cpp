@@ -2486,6 +2486,7 @@ bool IRParser::parseCallAndICall(bool is_call, ParseCtx * ctx)
         }
         m_lexer->getNextToken();
         dummy_use_list = ctx->returned_exp;
+        DUMMYUSE(dummy_use_list);
     }
 
     IR * ir = NULL;

@@ -1360,7 +1360,7 @@ LETTER:
         }
         break;
     case 'f':
-        ; //TODO
+        {} //TODO
     default:
         goto FIN;
     }

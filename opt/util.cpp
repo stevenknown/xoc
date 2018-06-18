@@ -35,7 +35,6 @@ author: Su Zhenyu
 #include "commoninc.h"
 #include "errno.h"
 #include "util.h"
-using namespace xoc;
 
 namespace xoc {
 
@@ -232,7 +231,7 @@ void dumpIndent(FILE * h, UINT indent)
 }
 
 
-void dumpIntVector(Vector<UINT> & v)
+void dumpIntVector(Vector<UINT> const& v)
 {
     if (g_tfile == NULL) return;
     fprintf(g_tfile, "\n");

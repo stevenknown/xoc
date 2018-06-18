@@ -64,10 +64,10 @@ typedef enum _MD_TYPE {
 //MD is used to represent different memory object with
 //same base. Attributes of MD may be Id, Base Variable, Size, Offset,
 //Effect, Exact, Range, Unbound.
-//¡ğ    Id
+//¡ğ Id
 //    Unique id of abstract memory object.
 //
-//¡ğ    Base Variable
+//¡ğ Base Variable
 //    Since MD is the abstract version of VAR, it is closely related to
 //    individual variable. This variable may be the base of several MD.
 //
@@ -103,7 +103,7 @@ typedef enum _MD_TYPE {
 //    by user or compiler and existed in the concrete. In contrast to
 //    effect MD, ALL_MEM memory object is ineffect.
 //
-//¡ğ    Exact
+//¡ğ Exact
 //    This attribute represent abstract memory object with type is
 //    MD_EXACT. An exact MD is also effect.
 //
@@ -112,8 +112,8 @@ typedef enum _MD_TYPE {
 //    MD_RANGE. An range MD is also effect, but is not exact.
 //
 //¡ğ Unbound
-//        This attribute represent abstract memory object with type is
-//        MD_UNBOUND. An unbound MD may be effect, but is definitly inexact.
+//    This attribute represent abstract memory object with type is
+//    MD_UNBOUND. An unbound MD may be effect, but is definitly inexact.
 
 //Unique id of memory object.
 #define MD_id(md)                ((md)->uid)

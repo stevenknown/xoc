@@ -97,7 +97,7 @@ protected:
                     bool scan_inner_region);
 
 public:
-    explicit RegionMgr();
+    RegionMgr();
     COPY_CONSTRUCTOR(RegionMgr);
     virtual ~RegionMgr();
 

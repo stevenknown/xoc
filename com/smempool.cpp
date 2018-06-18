@@ -41,7 +41,7 @@ author: Su Zhenyu
 #define BOUNDARY_NUM      0xAA
 #define END_BOUND_BYTE     4
 
-using namespace xcom;
+using xcom::Hash;
 
 class MEMPOOL_HASH : public Hash<SMemPool*> {
 public:
@@ -171,7 +171,8 @@ void smpoolInitPool()
         while (mp != NULL) {
             //Mainly hash addr of 'mp' into hash
             //table corresponding to 'mpt_idx'.
-            ASSERT(g_mem_pool_hash_tab->find((OBJTY)MEMPOOL_id(mp)) == NULL,
+            ASSERT(g_mem_pool_hash_tab->find(
+                (xcom::OBJTY)MEMPOOL_id(mp)) == NULL,
                 ("Repetitive pool idx"));
             g_mem_pool_hash_tab->append(mp);
             mp = MEMPOOL_next(mp);
@@ -201,7 +202,7 @@ void smpoolFiniPool()
              mp != NULL; mp = next) {
             next = g_mem_pool_hash_tab->get_next(c);
             g_mem_pool_hash_tab->removed(mp);
-            add_next(&g_mem_pool, mp);
+            xcom::add_next(&g_mem_pool, mp);
         }
         //Code must be placed here! The flag must be reset
         //before the call of pool_hash_tab.destroy().
@@ -252,11 +253,11 @@ MEMPOOLIDX smpoolCreatePoolIndex(size_t size, MEMPOOLTYPE mpt)
         idx = (MEMPOOLIDX)rand();
         do {
             if (idx != 0 &&
-                g_mem_pool_hash_tab->find((OBJTY)(size_t)idx) == NULL) {
+                g_mem_pool_hash_tab->find((xcom::OBJTY)(size_t)idx) == NULL) {
                  //Unique pool idx
                 break;
             }
-            idx = (MEMPOOLIDX)rand();
+            idx = (MEMPOOLIDX)::rand();
             i++;
         } while (i < MAX_TRY);
 
@@ -309,7 +310,7 @@ INT smpoolDeleteViaPoolIndex(MEMPOOLIDX mpt_idx)
 
     //Searching the mempool which indicated with 'mpt_idx'
     if (g_is_pool_hashed && g_is_pool_init) {
-        mp = g_mem_pool_hash_tab->find((OBJTY)(size_t)mpt_idx);
+        mp = g_mem_pool_hash_tab->find((xcom::OBJTY)(size_t)mpt_idx);
         if (mp == NULL) {
             //Sometimes, mem pool is manipulated by user, but
             //is not due to destructer.
@@ -493,7 +494,7 @@ void * smpoolMallocViaPoolIndex(size_t size, MEMPOOLIDX mpt_idx, size_t grow_siz
 
     //Searching the mempool which indicated with 'mpt_idx'
     if (g_is_pool_hashed && g_is_pool_init) {
-        mp = g_mem_pool_hash_tab->find((OBJTY)(size_t)mpt_idx);
+        mp = g_mem_pool_hash_tab->find((xcom::OBJTY)(size_t)mpt_idx);
     } else {
         while (mp != NULL) {
             if (MEMPOOL_id(mp) == mpt_idx) {
@@ -532,7 +533,7 @@ size_t smpoolGetPoolSizeViaIndex(MEMPOOLIDX mpt_idx)
     SMemPool * mp = g_mem_pool;
 
     if (g_is_pool_hashed && g_is_pool_init) {
-        mp = g_mem_pool_hash_tab->find((OBJTY)(size_t)mpt_idx);
+        mp = g_mem_pool_hash_tab->find((xcom::OBJTY)(size_t)mpt_idx);
     } else {
         //Searching the mempool which indicated with 'mpt_idx'
         while (mp!=NULL) {

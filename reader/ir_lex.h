@@ -154,7 +154,7 @@ typedef enum _TOKEN {
 class TokenInfo {
 public:
     TOKEN tok;
-    CHAR * name;
+    CHAR const* name;
     union{
         INT  lineno;
     } u1;
@@ -166,7 +166,7 @@ public:
 class KeywordInfo {
 public:
     TOKEN tok;
-    CHAR * name;
+    CHAR const* name;
 };
 
 //The maximum byte size for each load from source file.
@@ -353,7 +353,7 @@ public:
     { return m_ofst_tab_byte_size / sizeof(LONG); }
 
     //Report error with line number.
-    void error(UINT line_num, CHAR * msg, ...);
+    void error(UINT line_num, CHAR const* msg, ...);
 
     //Set the file handler which need to parse.
     void setSrcFile(FILE * h) { m_src_file = h; }

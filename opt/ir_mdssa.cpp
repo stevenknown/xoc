@@ -1356,7 +1356,7 @@ bool MDSSAMgr::verifyVMD()
                     def->getOcc()->getRefMDSet()->is_contain_pure(res->mdid())) {
                     findref = true;
                 }
-                ASSERT0(findref);
+                CHECK_DUMMYUSE(findref);
             }
         }
 
@@ -1377,7 +1377,7 @@ bool MDSSAMgr::verifyVMD()
                     use->getRefMDSet()->is_contain_pure(res->mdid())) {
                     findref = true;
                 }
-                ASSERT0(findref);
+                CHECK_DUMMYUSE(findref);
             }
         }
     }
@@ -1434,6 +1434,7 @@ void MDSSAMgr::verifySSAInfo(IR const* ir)
                 //        ld : *<4> 'q'    //MMD18
                 //ist changed to st. The reference MDSet changed to single MD as well.
                 //ASSERT0(findref);
+                DUMMYUSE(findref);
             }
         }
 
@@ -1471,6 +1472,7 @@ void MDSSAMgr::verifySSAInfo(IR const* ir)
             //        ld : *<4> 'q'    //MMD18
             //ist changed to st. The reference MDSet changed to single MD as well.
             //ASSERT0(findref);
+            DUMMYUSE(findref);
         }
     }
 }
