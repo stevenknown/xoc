@@ -338,6 +338,7 @@ public:
         return getBB(xcom::DGraph::get_ipdom(bb->id()));
     }
 
+    //Return the root node of LoopInfo tree.
     LI<BB> * getLoopInfo() { return m_loop_info; }
     void getKidOfIF(
             BB * bb,
@@ -1437,7 +1438,8 @@ bool CFG<BB, XR>::findLoop()
         //Access each sussessor of bb.
         xcom::Vertex * vex = get_vertex(bb->id());
         ASSERT0(vex);
-        for (xcom::EdgeC * el = VERTEX_out_list(vex); el != NULL; el = EC_next(el)) {
+        for (xcom::EdgeC * el = VERTEX_out_list(vex);
+             el != NULL; el = EC_next(el)) {
             BB * succ = getBB(VERTEX_id(EDGE_to(EC_edge(el))));
             ASSERT0(succ);
 

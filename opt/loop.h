@@ -36,7 +36,30 @@ author: Su Zhenyu
 
 namespace xoc {
 
-//This file represent loop structure and relate algorithms.
+//This file represent loop tree structure and relate algorithms.
+//e.g: 
+//for (i) { #Loop1
+//  for (j) { #Loop2
+//    ...
+//  }
+//  ...
+//  for (k) { #Loop3
+//    ...
+//  }
+//}
+//for (m) { #Loop4
+//  ...
+//  for (n) { #Loop5
+//    ...
+//  }
+//}
+//LoopInfo Tree:
+//  Loop1
+//   |-Loop2
+//   |-Loop3
+//
+//  Loop4
+//   |-Loop5
 
 //CFG Loop Info.
 #define LI_id(li)                   ((li)->id)

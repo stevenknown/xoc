@@ -934,7 +934,7 @@ bool IR_CFG::removeTrampolinEdge()
                 }
 
                 IR * last_xr_of_pred = get_last_xr(pred);
-                if (!pred->is_down_boundary(last_xr_of_pred)) {
+                if (!pred->isDownBoundary(last_xr_of_pred)) {
                     // CASE: pred->bb, pred is fallthrough-BB.
                     //  pred is:
                     //      a=b+1

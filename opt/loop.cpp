@@ -138,7 +138,7 @@ IRBB * findAndInsertPreheader(
     }
 
     if (BB_last_ir(prev) != NULL &&
-        prev->is_down_boundary(BB_last_ir(prev))) {
+        prev->isDownBoundary(BB_last_ir(prev))) {
         //Can not append IR to prev BB.
         find_appropriate_prev_bb = false;
     }

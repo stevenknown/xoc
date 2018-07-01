@@ -369,15 +369,15 @@ public:
 
     //Could ir be looked as a boundary stmt of basic block?
     inline bool is_boundary(IR * ir)
-    { return (is_up_boundary(ir) || is_down_boundary(ir)); }
+    { return (isUpperBoundary(ir) || isDownBoundary(ir)); }
 
     //Could ir be looked as a first stmt in basic block?
-    inline bool is_up_boundary(IR const* ir) const
+    inline bool isUpperBoundary(IR const* ir) const
     {
         ASSERT(ir->isStmtInBB() || ir->is_lab(), ("illegal stmt in bb"));
         return ir->is_lab();
     }
-    bool is_down_boundary(IR * ir);
+    bool isDownBoundary(IR * ir);
 
     inline bool isAttachDedicatedLabel()
     {

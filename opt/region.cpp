@@ -121,7 +121,7 @@ AnalysisInstrument::AnalysisInstrument(Region * rg) :
     m_pass_mgr = NULL;
 
     //Counter of IR_PR, and do not use '0' as prno.
-    m_pr_count = 1;
+    m_pr_count = PRNO_UNDEF + 1;
     m_pool = smpoolCreate(256, MEM_COMM);
     m_du_pool = smpoolCreate(sizeof(DU) * 4, MEM_CONST_SIZE);
     m_sc_labelinfo_pool = smpoolCreate(sizeof(xcom::SC<LabelInfo*>) * 4,
@@ -1652,12 +1652,12 @@ xcom::C<IRBB*> * Region::splitIRlistIntoBB(
 
     while (irs != NULL) {
         IR * ir = xcom::removehead(&irs);
-        if (newbb->is_down_boundary(ir)) {
+        if (newbb->isDownBoundary(ir)) {
             BB_irlist(newbb).append_tail(ir);
             newbb = allocBB();
             cfg->add_bb(newbb);
             ctbb = bbl->insert_after(newbb, ctbb);
-        } else if (newbb->is_up_boundary(ir)) {
+        } else if (newbb->isUpperBoundary(ir)) {
             ASSERT0(ir->is_label());
 
             newbb = allocBB();
@@ -1876,7 +1876,7 @@ bool Region::reconstructBBlist(OptCtx & oc)
         for (irlst->get_head(&ctir); ctir != NULL; irlst->get_next(&ctir)) {
             IR * ir = ctir->val();
 
-            if (bb->is_down_boundary(ir) && ir != tail) {
+            if (bb->isDownBoundary(ir) && ir != tail) {
                 change = true;
 
                 IR * restirs = NULL; //record rest part in bb list after 'ir'.
@@ -1892,7 +1892,7 @@ bool Region::reconstructBBlist(OptCtx & oc)
 
                 ctbb = splitIRlistIntoBB(restirs, bbl, ctbb);
                 break;
-            } else if (bb->is_up_boundary(ir)) {
+            } else if (bb->isUpperBoundary(ir)) {
                 ASSERT0(ir->is_label());
 
                 change = true;
@@ -1983,7 +1983,7 @@ void Region::constructIRBBlist()
         pointer = IR_next(pointer);
         IR_next(cur_ir) = IR_prev(cur_ir) = NULL;
 
-        if (cur_bb->is_down_boundary(cur_ir)) {
+        if (cur_bb->isDownBoundary(cur_ir)) {
             BB_irlist(cur_bb).append_tail(cur_ir);
             switch (cur_ir->getCode()) {
             case IR_CALL:

@@ -45,6 +45,8 @@ class MDSSAMgr;
 //Make sure IR_ICALL is the largest ir.
 #define MAX_OFFSET_AT_FREE_TABLE    (sizeof(CICall) - sizeof(IR))
 
+#define PRNO_UNDEF 0
+
 //Analysis Instrument.
 //Record Data structure for IR analysis and transformation.
 #define ANA_INS_ru_mgr(a)    ((a)->m_ru_mgr)
