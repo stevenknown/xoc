@@ -650,7 +650,7 @@ LIR * IR2Dex::buildUniOp(IN IR ** ir)
     IR * tir = *ir;
     ASSERT0(tir->is_stpr());
     IR * op0 = UNA_opnd(STPR_rhs(tir));
-    ASSERT(op0->is_pr(), ("just support pr operation"));
+    ASSERTN(op0->is_pr(), ("just support pr operation"));
 
     enum _LIROpcode lty = LOP_NOP;
     switch (STPR_rhs(tir)->getCode()) {
@@ -1324,7 +1324,7 @@ LIR * IR2Dex::convertSwitch(IN OUT IR ** ir, IN IR2DexCtx * cont)
             LIR_case_num(lir) = num_of_case;
             LIR_packed_switch_base_value(lir) = base_val;
             UINT * pcase_entry = LIR_packed_switch_case_entry(lir);
-            ASSERT(sizeof(UINT) == 4, ("case entry is 32bit"));
+            ASSERTN(sizeof(UINT) == 4, ("case entry is 32bit"));
             for (UINT i = 0; i < num_of_case; i++) {
                 pcase_entry[i] = (UINT)0xffffFFFF; //case entry is 32bit.
             }
@@ -1335,7 +1335,7 @@ LIR * IR2Dex::convertSwitch(IN OUT IR ** ir, IN IR2DexCtx * cont)
             LIR_case_num(lir) = num_of_case;
             //((BYTE*)data)[4..4+num_of_case*4-1]: the case-value buffer.
             UINT * pcase_value = LIR_sparse_switch_case_value(lir);
-            ASSERT(sizeof(UINT) == 4, ("case value is 32bit"));
+            ASSERTN(sizeof(UINT) == 4, ("case value is 32bit"));
             IR * x = case_list;
             for (UINT i = 0; i < num_of_case; i++) {
                 pcase_value[i] = CONST_int_val(CASE_vexp(x));
@@ -1391,7 +1391,7 @@ LIR * IR2Dex::convert(IN OUT IR ** ir, IN IR2DexCtx * cont)
         return convertReturn(ir, cont);
     case IR_SELECT:
     case IR_REGION:
-        ASSERT(0, ("TODO"));
+        ASSERTN(0, ("TODO"));
     default:
         UNREACHABLE();
     }

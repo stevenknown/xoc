@@ -503,7 +503,7 @@ public:
     //Return bits size of 'dtype' refers to.
     UINT get_dtype_bitsize(DATA_TYPE dtype) const
     {
-        ASSERT(dtype != D_MC, ("this is memory chunk"));
+        ASSERTN(dtype != D_MC, ("this is memory chunk"));
         return TYDES_bitsize(&g_type_desc[dtype]);
     }
 
@@ -595,7 +595,7 @@ public:
         case D_F128: return m_f128;
         case D_STR: return m_str;
         case D_VOID: return m_void;
-        default: ASSERT(0, ("not simplex type")); break;
+        default: ASSERTN(0, ("not simplex type")); break;
         }
         return 0;
     }

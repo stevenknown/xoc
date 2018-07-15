@@ -79,7 +79,7 @@ size_t IRBB::count_mem() const
 //Could ir be looked as a last stmt in basic block?
 bool IRBB::isDownBoundary(IR * ir)
 {
-    ASSERT(ir->isStmtInBB() || ir->is_lab(), ("illegal stmt in bb"));
+    ASSERTN(ir->isStmtInBB() || ir->is_lab(), ("illegal stmt in bb"));
     switch (ir->getCode()) {
     case IR_CALL:
     case IR_ICALL: //indirective call
@@ -88,7 +88,7 @@ bool IRBB::isDownBoundary(IR * ir)
     case IR_IGOTO:
         return true;
     case IR_SWITCH:
-        ASSERT(SWITCH_body(ir) == NULL,
+        ASSERTN(SWITCH_body(ir) == NULL,
                ("Peel switch-body to enable switch in bb-list construction"));
         return true;
     case IR_TRUEBR:
@@ -173,11 +173,11 @@ void IRBB::verify()
         case IR_SETELEM:
         case IR_GETELEM:
             break;
-        default: ASSERT(0, ("BB does not supported this kind of IR."));
+        default: ASSERTN(0, ("BB does not supported this kind of IR."));
         }
 
         if (isDownBoundary(ir)) {
-            ASSERT(ir == BB_last_ir(this), ("invalid BB down boundary."));
+            ASSERTN(ir == BB_last_ir(this), ("invalid BB down boundary."));
         }
 
         c++;
@@ -351,7 +351,7 @@ void dumpBBList(BBList * bbl,
     } else {
         UNLINK(name);
         h = fopen(name, "a+");
-        ASSERT(h != NULL, ("can not dump."));
+        ASSERTN(h != NULL, ("can not dump."));
         g_tfile = h;
     }
     if (h == NULL) { return; }

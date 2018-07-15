@@ -149,9 +149,9 @@ void VMD::dump(Region * rg, UseDefMgr * mgr)
                 }
 
                 MDDef const* use = mgr->getMDDef(w);
-                ASSERT(use, ("not such MDDef"));
+                ASSERTN(use, ("not such MDDef"));
                 ASSERT0(use->getResult());
-                ASSERT(use->getPrev() == getDef(), ("insanity relation"));
+                ASSERTN(use->getPrev() == getDef(), ("insanity relation"));
                 fprintf(g_tfile, ",NextDEF:MD%dV%d",
                     use->getResult()->mdid(), use->getResult()->version());
                 }
@@ -196,7 +196,7 @@ void MDPhi::replaceOpnd(IR * oldopnd, IR * newopnd)
 //Facility function to make it easier to get the VOpnd of operand of PHI.
 VMD * MDPhi::getOpndVMD(IR const* opnd, UseDefMgr const* mgr) const
 {
-    ASSERT(xcom::in_list(getOpndList(), opnd), ("not operand of phi"));
+    ASSERTN(xcom::in_list(getOpndList(), opnd), ("not operand of phi"));
     if (!opnd->is_id() && opnd->isMemoryOpnd()) { return NULL; }
 
     ASSERT0(mgr && mgr->getMDSSAInfo(opnd) &&
@@ -532,7 +532,7 @@ xcom::SC<VOpnd*> * UseDefMgr::allocSCVOpnd(VOpnd * opnd)
 
 VConst * UseDefMgr::allocVConst(IR const* ir)
 {
-    ASSERT(m_vconst_pool, ("not init"));
+    ASSERTN(m_vconst_pool, ("not init"));
     VConst * p = (VConst*)smpoolMallocConstSize(
         sizeof(VConst), m_vconst_pool);
     ASSERT0(p);
@@ -559,7 +559,7 @@ VMD * UseDefMgr::allocVMD(UINT mdid, UINT version)
         return v;
     }
 
-    ASSERT(m_vmd_pool, ("not init"));
+    ASSERTN(m_vmd_pool, ("not init"));
     v = (VMD*)smpoolMallocConstSize(sizeof(VMD), m_vmd_pool);
     ASSERT0(v);
     ::memset(v, 0, sizeof(VMD));

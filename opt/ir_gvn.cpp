@@ -728,7 +728,7 @@ VN * IR_GVN::computeArray(IR const* exp, bool & change)
     ASSERT0(domdef->is_starray());
     //Check if VN expression is match.
     IR const* narr = IST_base(domdef);
-    ASSERT(((CArray*)narr)->getDimNum() == 1, ("only handle one dim array."));
+    ASSERTN(((CArray*)narr)->getDimNum() == 1, ("only handle one dim array."));
 
     VN const* b = m_ir2vn.get(IR_id(ARR_base(narr)));
     if (b == NULL || b != abase_vn) {
@@ -805,7 +805,7 @@ VN * IR_GVN::computeScalar(IR const* exp, bool & change)
     }
 
     DUSet const* du = exp->readDUSet();
-    ASSERT(du, ("If exact MD DU is empty, should assigned region LiveIn VN"));
+    ASSERTN(du, ("If exact MD DU is empty, should assigned region LiveIn VN"));
     ASSERT0(du->get_elem_count() > 0);
 
     IR const* exp_stmt = const_cast<IR*>(exp)->getStmt();
@@ -832,7 +832,7 @@ VN * IR_GVN::computeScalar(IR const* exp, bool & change)
             return NULL;
         }
         break;
-    default: ASSERT(0, ("unsupport"));
+    default: ASSERTN(0, ("unsupport"));
     }
 
     VN * uni_vn = m_ir2vn.get(IR_id(domdef));
@@ -928,7 +928,7 @@ VN * IR_GVN::computeVN(IR const* exp, bool & change)
         if (v->is_string()) {
             if (m_is_comp_lda_string) {
                 MD const* emd = m_ru->genMDforVAR(v);
-                ASSERT(emd && emd->is_effect(),
+                ASSERTN(emd && emd->is_effect(),
                        ("string should have effect MD"));
                 basevn = registerVNviaMD(emd);
             } else {
@@ -936,7 +936,7 @@ VN * IR_GVN::computeVN(IR const* exp, bool & change)
             }
         } else {
             MD const* emd = m_ru->genMDforVAR(v);
-            ASSERT(emd && emd->is_effect(), ("string should have effect MD"));
+            ASSERTN(emd && emd->is_effect(), ("string should have effect MD"));
             basevn = registerVNviaMD(emd);
         }
 
@@ -980,7 +980,7 @@ VN * IR_GVN::computeVN(IR const* exp, bool & change)
         } else if (exp->is_str()) {
             x = registerVNviaSTR(CONST_str_val(exp));
         } else {
-            ASSERT(0, ("unsupport const type"));
+            ASSERTN(0, ("unsupport const type"));
         }
 
         ASSERT0(x);

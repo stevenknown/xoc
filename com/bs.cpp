@@ -885,7 +885,7 @@ void BitSet::bunion(BitSet const& bs)
         }
     }
     UINT const num_of_uint = cp_sz / BYTES_PER_UINT; //floor-div.
-    ASSERT(m_ptr, ("not yet init"));
+    ASSERTN(m_ptr, ("not yet init"));
     UINT * uint_ptr_this = (UINT*)m_ptr;
     UINT * uint_ptr_bs = (UINT*)bs.m_ptr;
     for (UINT i = 0; i < num_of_uint; i++) {
@@ -920,7 +920,7 @@ void BitSet::diff(UINT elem)
         return;
     }
     elem = MODBPB(elem);
-    ASSERT(m_ptr != NULL, ("not yet init"));
+    ASSERTN(m_ptr != NULL, ("not yet init"));
     m_ptr[first_byte] &= (BYTE)(~(1 << elem));
 }
 
@@ -949,7 +949,7 @@ void BitSet::diff(BitSet const& bs)
         }
     }
 
-    ASSERT(m_ptr != NULL, ("not yet init"));
+    ASSERTN(m_ptr != NULL, ("not yet init"));
     for (UINT i = num_of_uint * BYTES_PER_UINT; i < minsize; i++) {
         BYTE d = bs.m_ptr[i];
         if (d != 0) {
@@ -982,7 +982,7 @@ void BitSet::intersect(BitSet const& bs)
 //'last_bit_pos': start at 0, e.g:given '101', last bit pos is 2.
 void BitSet::rev(UINT last_bit_pos)
 {
-    ASSERT(m_ptr != NULL, ("can not reverse empty set"));
+    ASSERTN(m_ptr != NULL, ("can not reverse empty set"));
     UINT const last_byte_pos = last_bit_pos / BITS_PER_BYTE;
     ASSERT0(last_byte_pos < m_size);
 
@@ -1219,7 +1219,7 @@ bool BitSet::is_intersect(BitSet const& bs) const
 //'strict': 'this' strictly contained in range.
 bool BitSet::is_contained_in_range(UINT low, UINT high, bool strict) const
 {
-    ASSERT(low <= high, ("Invalid bit set"));
+    ASSERTN(low <= high, ("Invalid bit set"));
     INT const set_low = get_first();
     if (set_low == -1) {
         return false;
@@ -1246,7 +1246,7 @@ bool BitSet::is_contained_in_range(UINT low, UINT high, bool strict) const
 //Return true if 'this' contained range between 'low' and 'high'.
 bool BitSet::is_contain_range(UINT low, UINT high, bool strict) const
 {
-    ASSERT(low <= high, ("Invalid bit set"));
+    ASSERTN(low <= high, ("Invalid bit set"));
     INT const set_low = get_first();
     if (set_low == -1) {
         return false;
@@ -1275,7 +1275,7 @@ bool BitSet::is_contain_range(UINT low, UINT high, bool strict) const
 //'low' and 'high'.
 bool BitSet::is_overlapped(UINT low, UINT high) const
 {
-    ASSERT(low <= high, ("Invalid bit set"));
+    ASSERTN(low <= high, ("Invalid bit set"));
     INT const set_low = get_first();
     if (set_low == -1) {
         return false;
@@ -1325,7 +1325,7 @@ bool BitSet::is_overlapped(UINT low, UINT high) const
 //any elements.
 bool BitSet::has_elem_in_range(UINT low, UINT high) const
 {
-    ASSERT(low <= high, ("out of boundary"));
+    ASSERTN(low <= high, ("out of boundary"));
     INT const first_bit = get_first();
     if (first_bit == -1 || (UINT)first_bit > high) {
         return false;
@@ -1366,7 +1366,7 @@ INT BitSet::get_first() const
                 return g_first_one[byte] + (MULBPB(i));
             }
         }
-        ASSERT(0, ("not arrival"));
+        ASSERTN(0, ("not arrival"));
     }
     ASSERT0(i <= m_size);
     for (; i < m_size; i++) {
@@ -1415,8 +1415,8 @@ INT BitSet::get_last() const
 //Extract subset in range between 'low' and 'high'.
 BitSet * BitSet::get_subset_in_range(UINT low, UINT high, OUT BitSet & subset)
 {
-    ASSERT(low <= high, ("Invalid bit set"));
-    ASSERT(&subset != this, ("overlapped!"));
+    ASSERTN(low <= high, ("Invalid bit set"));
+    ASSERTN(&subset != this, ("overlapped!"));
 
     subset.clean();
     INT first_bit = get_first();
@@ -1570,7 +1570,7 @@ void BitSet::clean()
 //Do copy from 'src' to 'des'.
 void BitSet::copy(BitSet const& src)
 {
-    ASSERT(this != &src, ("copy self"));
+    ASSERTN(this != &src, ("copy self"));
     if (src.m_size == 0) {
         ::memset(m_ptr, 0, m_size);
         return;
@@ -1598,7 +1598,7 @@ void BitSet::copy(BitSet const& src)
         ::memset(m_ptr + cp_sz, 0, m_size - cp_sz);
     }
 
-    ASSERT(m_ptr != NULL, ("not yet init"));
+    ASSERTN(m_ptr != NULL, ("not yet init"));
     ::memcpy(m_ptr, src.m_ptr, cp_sz);
 }
 
@@ -1620,7 +1620,7 @@ void BitSet::dump(CHAR const* name, bool is_del, UINT flag, INT last_pos) const
         UNLINK(name);
     }
     FILE * h = fopen(name, "a+");
-    ASSERT(h != NULL, ("%s create failed!!!", name));
+    ASSERTN(h != NULL, ("%s create failed!!!", name));
     dump(h, flag, last_pos);
     fclose(h);
 }
@@ -1756,7 +1756,7 @@ UINT BitSetMgr::count_mem(FILE * h)
 //and modify 'res' as result.
 BitSet * bs_union(BitSet const& set1, BitSet const& set2, OUT BitSet & res)
 {
-    ASSERT(set1.m_ptr != NULL && set2.m_ptr != NULL && res.m_ptr != NULL,
+    ASSERTN(set1.m_ptr != NULL && set2.m_ptr != NULL && res.m_ptr != NULL,
             ("not yet init"));
     if (&res == &set1) {
         res.bunion(set2);
@@ -1777,7 +1777,7 @@ BitSet * bs_union(BitSet const& set1, BitSet const& set2, OUT BitSet & res)
 //Returns a new set which is { x : member( x, 'set1' ) & ~ member( x, 'set2' ) }.
 BitSet * bs_diff(BitSet const& set1, BitSet const& set2, OUT BitSet & res)
 {
-    ASSERT(set1.m_ptr != NULL &&
+    ASSERTN(set1.m_ptr != NULL &&
             set2.m_ptr != NULL &&
             res.m_ptr != NULL, ("not yet init"));
     if (&res == &set1) {
@@ -1797,7 +1797,7 @@ BitSet * bs_diff(BitSet const& set1, BitSet const& set2, OUT BitSet & res)
 //Returns a new set which is intersection of 'set1' and 'set2'.
 BitSet * bs_intersect(BitSet const& set1, BitSet const& set2, OUT BitSet & res)
 {
-    ASSERT(set1.m_ptr != NULL &&
+    ASSERTN(set1.m_ptr != NULL &&
             set2.m_ptr != NULL &&
             res.m_ptr != NULL, ("not yet init"));
     if (&res == &set1) {

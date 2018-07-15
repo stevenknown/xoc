@@ -758,7 +758,7 @@ void IR_AA::inferArrayLdabase(
         //mds is unchanged.
         setMustAddr(ir, org);
     } else {
-        ASSERT(getMayAddr(ir) == NULL, ("have no mayaddr"));
+        ASSERTN(getMayAddr(ir) == NULL, ("have no mayaddr"));
         MD const* x = getMustAddr(ir);
         ASSERT0(x && x->is_effect());
         mds.clean(*m_misc_bs_mgr);
@@ -885,7 +885,7 @@ MD const* IR_AA::allocLoadMD(IR * ir)
         MD_ofst(&t2) += LD_ofst(ir);
         MD_size(&t2) = ir->getTypeSize(m_tm);
         MD const* entry = m_md_sys->registerMD(t2);
-        ASSERT(MD_id(entry) > 0, ("Not yet registered"));
+        ASSERTN(MD_id(entry) > 0, ("Not yet registered"));
         t = entry; //regard MD with offset as return result.
     }
     setMustAddr(ir, t);
@@ -921,7 +921,7 @@ MD const* IR_AA::allocSetelemMD(IR * ir)
     ASSERT0(ofst);
     if (md->is_exact()) {
         if (ofst->is_const()) {
-            ASSERT(ofst->is_int(), ("offset of SETELEM must be integer."));
+            ASSERTN(ofst->is_int(), ("offset of SETELEM must be integer."));
 
             //Accumulating offset of identifier.
             //e.g: struct {int a,b; } s; s.a = 10
@@ -931,7 +931,7 @@ MD const* IR_AA::allocSetelemMD(IR * ir)
             MD_ofst(&t) += (UINT)CONST_int_val(ofst);
             MD_size(&t) = ir->getTypeSize(m_tm);
             MD const* entry = m_md_sys->registerMD(t);
-            ASSERT(MD_id(entry) > 0, ("Not yet registered"));
+            ASSERTN(MD_id(entry) > 0, ("Not yet registered"));
             md = entry; //regard MD with offset as return result.
         } else {
             //Offset is variable.
@@ -947,7 +947,7 @@ MD const* IR_AA::allocSetelemMD(IR * ir)
             MD_ofst(&t) = 0;
             MD_size(&t) = ir->getTypeSize(m_tm);
             MD const* entry = m_md_sys->registerMD(t);
-            ASSERT(MD_id(entry) > 0, ("Not yet registered"));
+            ASSERTN(MD_id(entry) > 0, ("Not yet registered"));
             md = entry; //regard MD with range as return result.
         }
     }
@@ -984,7 +984,7 @@ MD const* IR_AA::allocStoreMD(IR * ir)
         MD_ofst(&t) += ST_ofst(ir);
         MD_size(&t) = ir->getTypeSize(m_tm);
         MD const* entry = m_md_sys->registerMD(t);
-        ASSERT(MD_id(entry) > 0, ("Not yet registered"));
+        ASSERTN(MD_id(entry) > 0, ("Not yet registered"));
         md = entry; //regard MD with offset as return result.
     }
     setMustAddr(ir, md);
@@ -1138,7 +1138,7 @@ void IR_AA::inferPtArith(
         mds.clean(*m_misc_bs_mgr);
         if (AC_has_comp_lda(&opnd1_tic) && AC_has_comp_lda(opnd0_ic)) {
             //In the situation such as: &a - &b.
-            ASSERT(ir->is_sub(), ("only support pointer sub pointer"));
+            ASSERTN(ir->is_sub(), ("only support pointer sub pointer"));
             AC_has_comp_lda(opnd0_ic) = false;
             return;
         }
@@ -1149,7 +1149,7 @@ void IR_AA::inferPtArith(
     //Where is p pointing to at all?
     //Set each MD of opnd0 to be UNBOUND even if it is exact
     //to keep the conservation.
-    ASSERT(mds.is_empty(), ("output buffer not yet initialized"));
+    ASSERTN(mds.is_empty(), ("output buffer not yet initialized"));
 
     if (opnd0_mds.is_empty()) {
         //Point-to set of opnd0 of binary-op is MayPointToSet.
@@ -1206,7 +1206,7 @@ void IR_AA::processPointerArith(
         //    (p +/- n + ...), where n is constant.
         //p may be literal, e.g: ((int*)0x1000) + 1.
         if (ir->is_add()) {
-            ASSERT(!opnd1->is_ptr(), ("pointer can not plus pointer"));
+            ASSERTN(!opnd1->is_ptr(), ("pointer can not plus pointer"));
         }
         if (!opnd1->is_ptr()) {
             //pointer +/- n still be pointer.
@@ -1459,7 +1459,7 @@ void IR_AA::processIld(
                 MD_ofst(&md) += ild_ofst;
                 MD_size(&md) = size;
                 MD const* entry = m_md_sys->registerMD(md);
-                ASSERT(MD_id(entry) > 0, ("Not yet registered"));
+                ASSERTN(MD_id(entry) > 0, ("Not yet registered"));
                 tmp.bunion(MD_id(entry), *m_misc_bs_mgr);
                 change = true;
             } else {
@@ -1579,7 +1579,7 @@ void IR_AA::recomputeDataType(AACtx const& ic, IR const* ir, OUT MDSet & pts)
         //converted to integer. So x will be integer.
 
         if (ir->is_ptr()) {
-            ASSERT(pts.get_effect_md(m_md_sys), ("LDA's base must be effect MD"));
+            ASSERTN(pts.get_effect_md(m_md_sys), ("LDA's base must be effect MD"));
 
             //ptset may include element which also be in m_maypts.
             //ASSERT0(!ptset->is_intersect(*m_maypts));
@@ -1984,7 +1984,7 @@ void IR_AA::inferStoreArrayValue(IN IR * ir, IN AACtx * ic, IN MD2MDSet * mx)
     ASSERT0(ir->is_starray());
     MDSet const* lhs_mayaddr = getMayAddr(ir);
     MD const* lhs_mustaddr = getMustAddr(ir);
-    ASSERT(lhs_mustaddr != NULL ||
+    ASSERTN(lhs_mustaddr != NULL ||
            (lhs_mayaddr != NULL && !lhs_mayaddr->is_empty()),
            ("You need infer the may memory address of array operation"));
 
@@ -2121,7 +2121,7 @@ void IR_AA::processStoreArray(IN IR * ir, IN MD2MDSet * mx)
                 ASSERT0(ir->getTypeSize(m_tm) > 0);
                 MD_size(&md) = sz == -1 ? ir->getTypeSize(m_tm) : sz;
                 MD const* entry = m_md_sys->registerMD(md);
-                ASSERT(MD_id(entry) > 0, ("Not yet registered"));
+                ASSERTN(MD_id(entry) > 0, ("Not yet registered"));
                 tmp.bunion(entry, *m_misc_bs_mgr);
                 change = true;
             } else {
@@ -2212,7 +2212,7 @@ void IR_AA::processIst(IN IR * ir, IN MD2MDSet * mx)
                 //p + ist_ofst + 0, if ist_ofst exist.
                 MD_size(&md) = ist_size;
                 MD const* entry = m_md_sys->registerMD(md);
-                ASSERT(MD_id(entry) > 0, ("Not yet registered"));
+                ASSERTN(MD_id(entry) > 0, ("Not yet registered"));
                 tmp.bunion(entry, *m_misc_bs_mgr);
                 change = true;
             } else {
@@ -2236,7 +2236,7 @@ void IR_AA::processIst(IN IR * ir, IN MD2MDSet * mx)
             //p + ist_ofst + 0, if ist_ofst exist.
             MD_size(&md) = ist_size;
             MD const* entry = m_md_sys->registerMD(md);
-            ASSERT(MD_id(entry) > 0, ("Not yet registered"));
+            ASSERTN(MD_id(entry) > 0, ("Not yet registered"));
             x = entry;
         }
         setMustAddr(ir, x);
@@ -2464,7 +2464,7 @@ void IR_AA::processCall(IN IR * ir, IN MD2MDSet * mx)
             t = getMustAddr(ir);
         }
 
-        ASSERT(t, ("result of call miss exact MD."));
+        ASSERTN(t, ("result of call miss exact MD."));
 
         if (ir->is_ptr() || ir->is_void()) {
             //Try to improve the precsion via typed alias info or
@@ -2548,7 +2548,7 @@ void IR_AA::inferExpression(
         {
             //CASE: if (p && q)
             //GR: land (ld p:*<2>, ld q:*<2>)
-            //ASSERT(!BIN_opnd0(expr)->is_ptr(),
+            //ASSERTN(!BIN_opnd0(expr)->is_ptr(),
             //    ("illegal, left operand can not be pointer type"));
 
             AACtx tic(*ic);
@@ -3271,7 +3271,7 @@ void IR_AA::dump(CHAR const* name)
         old = g_tfile;
         //UNLINK(name);
         g_tfile = fopen(name, "a+");
-        ASSERT(g_tfile, ("%s create failed!!!", name));
+        ASSERTN(g_tfile, ("%s create failed!!!", name));
     }
 
     dumpMD2MDSetForRegion(false);
@@ -3514,7 +3514,7 @@ void IR_AA::computeStmt(IRBB const* bb, IN OUT MD2MDSet * mx)
                 tmp.clean(*m_misc_bs_mgr);
             }
             break;
-        default: ASSERT(0, ("unsupported IR type"));
+        default: ASSERTN(0, ("unsupported IR type"));
         } //end switch
     } //end for
 }
@@ -3702,7 +3702,7 @@ bool IR_AA::computeFlowSensitive(List<IRBB*> const& bbl)
             }
         }
     }
-    ASSERT(!change, ("Iterated too many times"));
+    ASSERTN(!change, ("Iterated too many times"));
     return true;
 }
 
@@ -3751,7 +3751,7 @@ void IR_AA::initGlobalAndParameterVarPtset(
         MD const* x = mdt->get_effect_md();
         if (x != NULL) {
             if (dmd != NULL) {
-                ASSERT(getPointTo(MD_id(x), *mx) == NULL ||
+                ASSERTN(getPointTo(MD_id(x), *mx) == NULL ||
                        getPointTo(MD_id(x), *mx)->is_empty(),
                        ("should already be clean"));
                 setPointToMDSetByAddMD(MD_id(x), *mx, dmd);
@@ -3767,7 +3767,7 @@ void IR_AA::initGlobalAndParameterVarPtset(
             for (MD const* md = ofstab->get_first(iter, NULL);
                  md != NULL; md = ofstab->get_next(iter, NULL)) {
                 if (dmd != NULL) {
-                    ASSERT(getPointTo(MD_id(md), *mx) == NULL ||
+                    ASSERTN(getPointTo(MD_id(md), *mx) == NULL ||
                            getPointTo(MD_id(md), *mx)->is_empty(),
                            ("should already be clean"));
                     setPointToMDSetByAddMD(MD_id(md), *mx, dmd);
@@ -3786,7 +3786,7 @@ void IR_AA::initGlobalAndParameterVarPtset(
     MD_ty(&md) = MD_EXACT;
     MD const* entry = m_md_sys->registerMD(md);
     if (dmd != NULL) {
-        ASSERT(getPointTo(MD_id(entry), *mx) == NULL ||
+        ASSERTN(getPointTo(MD_id(entry), *mx) == NULL ||
                getPointTo(MD_id(entry), *mx)->is_empty(),
                ("should already be clean"));
 
@@ -3803,7 +3803,7 @@ bool IR_AA::isFlowSensitiveProperly()
     IRBB * entry = m_cfg->get_entry();
     ASSERT0(entry);
     MD2MDSet * mx = allocMD2MDSetForBB(BB_id(entry));
-    ASSERT(mx, ("invoke initEntryPtset before here"));
+    ASSERTN(mx, ("invoke initEntryPtset before here"));
     MD2MDSetIter mxiter;
     MDSet const* from_md_pts = NULL;
 
@@ -3994,7 +3994,7 @@ void IR_AA::computeFlowInsensitive()
 //Initialize alias analysis.
 void IR_AA::initAliasAnalysis()
 {
-    ASSERT(!is_init(), ("already initialized"));
+    ASSERTN(!is_init(), ("already initialized"));
     initMayPointToSet();
     set_flow_sensitive(true);
 }
@@ -4003,7 +4003,7 @@ void IR_AA::initAliasAnalysis()
 //Calculate point-to set.
 bool IR_AA::perform(IN OUT OptCtx & oc)
 {
-    ASSERT(m_maypts, ("Should invoke initAliasAnalysis() first."));
+    ASSERTN(m_maypts, ("Should invoke initAliasAnalysis() first."));
     if (m_ru->getBBList()->get_elem_count() == 0) { return true; }
 
     START_TIMER(t, getPassName());

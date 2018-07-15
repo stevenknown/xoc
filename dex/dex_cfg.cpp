@@ -98,7 +98,7 @@ void DEX_CFG::dump_node(FILE * h, bool detail, BitSet const& markbbs)
         UINT scale = 1;
 
         Vertex * v = get_vertex(id);
-        ASSERT(v, ("bb is not in cfg"));
+        ASSERTN(v, ("bb is not in cfg"));
 
         CHAR const* shape = "box";
         if (BB_is_catch_start(bb)) {
@@ -138,7 +138,7 @@ void DEX_CFG::dump_node2(
         UINT scale = 1;
 
         Vertex * v = get_vertex(id);
-        ASSERT(v, ("bb is not in cfg"));
+        ASSERTN(v, ("bb is not in cfg"));
 
         CHAR const* shape = "box";
         if (BB_is_catch_start(bb)) {
@@ -173,7 +173,7 @@ void DEX_CFG::dump_vcg_ex(BitSet const& markbbs)
     //So it is dispensable to check g_tfile.
     UNLINK(name);
     FILE * h = fopen(name, "a+");
-    ASSERT(h != NULL, ("%s create failed!!!",name));
+    ASSERTN(h != NULL, ("%s create failed!!!",name));
     FILE * old = NULL;
 
     //Print comment
@@ -208,7 +208,7 @@ void DEX_CFG::dump_vcg_ex2(BitSet const& trybbs, BitSet const& catchbbs)
     //So it is dispensable to check g_tfile.
     UNLINK(name);
     FILE * h = fopen(name, "a+");
-    ASSERT(h != NULL, ("%s create failed!!!",name));
+    ASSERTN(h != NULL, ("%s create failed!!!",name));
     FILE * old = NULL;
 
     //Print comment

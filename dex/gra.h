@@ -93,7 +93,7 @@ public:
     inline INT getForwardOcc(INT pos, OUT bool * is_def, INT firstpos)
     {
         DUMMYUSE(firstpos);
-        ASSERT(pos >= firstpos, ("Illegal position"));
+        ASSERTN(pos >= firstpos, ("Illegal position"));
         ASSERT0(occ);
         pos = occ->get_next(pos);
         *is_def = this->is_def(pos);
@@ -118,7 +118,7 @@ public:
     inline INT getForwardOccForDEF(INT pos, INT firstpos)
     {
         DUMMYUSE(firstpos);
-        ASSERT(pos >= firstpos, ("Illegal position"));
+        ASSERTN(pos >= firstpos, ("Illegal position"));
         ASSERT0(occ);
         for (pos = occ->get_next(pos); pos >= 0; pos = occ->get_next(pos)) {
             if (is_def(pos)) {
@@ -133,7 +133,7 @@ public:
     //    Lowest_Pos...Backward_Occ....Pos.....Highest_Pos
     inline INT getBackwardOcc(INT pos, OUT bool * is_d, INT firstpos)
     {
-        ASSERT(pos >= firstpos, ("Illegal position"));
+        ASSERTN(pos >= firstpos, ("Illegal position"));
         if (pos == firstpos && (occ == NULL || occ->is_empty())) { return -1; }
 
         INT backwpos = -1;
@@ -153,7 +153,7 @@ public:
 
     inline INT getBackwardOccForDEF(INT pos, INT firstpos)
     {
-        ASSERT(pos >= firstpos, ("Illegal position"));
+        ASSERTN(pos >= firstpos, ("Illegal position"));
         if (pos == firstpos && (occ == NULL || occ->is_empty())) { return -1; }
 
         INT start = LT_range(this)->get_first();
@@ -544,7 +544,7 @@ protected:
     void comp_ir_usage(IR const* ir);
     void * xmalloc(UINT size)
     {
-        ASSERT(m_pool != NULL,("need graph pool!!"));
+        ASSERTN(m_pool != NULL,("need graph pool!!"));
         void * p = smpoolMalloc(size, m_pool);
         ASSERT0(p != NULL);
         ::memset(p, 0, size);

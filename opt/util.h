@@ -93,7 +93,7 @@ void dump_rbt(RBT<T, Ttgt, CompareKey> & rbt,
     }
     UNLINK(name);
     FILE * hvcg = fopen(name, "a+");
-    ASSERT(hvcg, ("%s create failed!!!", name));
+    ASSERTN(hvcg, ("%s create failed!!!", name));
     fprintf(hvcg, "graph: {"
               "title: \"Tree\"\n"
               "shrink:  15\n"

@@ -204,7 +204,7 @@ INT checkKidNumIRtype(IR const* ir, UINT n, IR_TYPE irty,
 
 IR const* checkIRT(IR const* ir, IR_TYPE irt)
 {
-    ASSERT(ir->getCode() == irt, ("current ir is not '%s'", IRTNAME(irt)));
+    ASSERTN(ir->getCode() == irt, ("current ir is not '%s'", IRTNAME(irt)));
     return ir;
 }
 
@@ -307,14 +307,14 @@ static void verifyIR(IR * ir, IRAddressHash * irh, Region const* rg)
     for (UINT i = 0; i < IR_MAX_KID_NUM(ir); i++) {
         IR * k = ir->getKid(i);
         if (k != NULL) {
-            ASSERT(k->getParent() == ir, ("ir must be k's parent"));
+            ASSERTN(k->getParent() == ir, ("ir must be k's parent"));
             verify_irs(k, irh, rg);
         }
     }
 
     //IR can not be used more than twice. Since there will cause
     //memory crash during freeIR().
-    ASSERT(!irh->find(ir), ("IR has been used again"));
+    ASSERTN(!irh->find(ir), ("IR has been used again"));
     irh->append(ir);
     ir->verify(rg);
 }
@@ -415,7 +415,7 @@ static void dump_lab_decl(LabelInfo const* li)
     } else if (LABEL_INFO_type(li) == L_PRAGMA) {
         ASSERT0(LABEL_INFO_pragma(li));
         prt("pragma %s", SYM_name(LABEL_INFO_pragma(li)));
-    } else { ASSERT(0, ("unknown label type")); }
+    } else { ASSERTN(0, ("unknown label type")); }
 
     bool first = true;
     if (LABEL_INFO_b1(li) != 0) {
@@ -467,7 +467,7 @@ static void dump_label_ref(LabelInfo const* li)
     } else if (LABEL_INFO_type(li) == L_CLABEL) {
         prt(CLABEL_STR_FORMAT "", CLABEL_CONT(li));
     } else {
-        ASSERT(0, ("unknown label type"));
+        ASSERTN(0, ("unknown label type"));
     }
 }
 
@@ -1391,7 +1391,7 @@ void dump_ir(IR const* ir,
         fprintf(g_tfile, "%s", attr);
         break;
     default:
-        ASSERT(0, ("unknown IR type:%s", IRNAME(ir)));
+        ASSERTN(0, ("unknown IR type:%s", IRNAME(ir)));
         return ;
     }
     fflush(g_tfile);
@@ -1476,7 +1476,7 @@ UINT getArithPrecedence(IR_TYPE ty)
     case IR_ICALL:
         p = 15;
         break;
-    default: ASSERT(0, ("TODO"));
+    default: ASSERTN(0, ("TODO"));
     }
     return p;
 }
@@ -1532,7 +1532,7 @@ bool IR::verify(Region const* rg) const
     if (d->is_vector()) {
         ASSERT0(TY_vec_ety(d) != D_UNDEF);
 
-        ASSERT(IS_SIMPLEX(TY_vec_ety(d)) || IS_PTR(TY_vec_ety(d)),
+        ASSERTN(IS_SIMPLEX(TY_vec_ety(d)) || IS_PTR(TY_vec_ety(d)),
                ("illegal vector elem type"));
 
         ASSERT0(TY_vec_size(d) >= tm->get_dtype_bytesize(TY_vec_ety(d)) &&
@@ -1545,17 +1545,17 @@ bool IR::verify(Region const* rg) const
     }
 
     switch (getCode()) {
-    case IR_UNDEF: ASSERT(0, ("should not be undef")); break;
+    case IR_UNDEF: ASSERTN(0, ("should not be undef")); break;
     case IR_CONST:
         ASSERT0(d);
-        ASSERT(TY_dtype(d) != D_UNDEF, ("size of load value cannot be zero"));
+        ASSERTN(TY_dtype(d) != D_UNDEF, ("size of load value cannot be zero"));
         if (!is_sint() &&
             !is_uint() &&
             !is_fp() &&
             !is_bool() &&
             !is_mc() &&
             !is_str()) {
-            ASSERT(0, ("unsupport immediate value DATA_TYPE:%d", getDType()));
+            ASSERTN(0, ("unsupport immediate value DATA_TYPE:%d", getDType()));
         }
         break;
     case IR_ID: break;
@@ -1563,11 +1563,11 @@ bool IR::verify(Region const* rg) const
         //src of LD might be small or big compare with REG.
         ASSERT0(LD_idinfo(this));
         ASSERT0(d);
-        ASSERT(TY_dtype(d) != D_UNDEF, ("size of load value cannot be zero"));
+        ASSERTN(TY_dtype(d) != D_UNDEF, ("size of load value cannot be zero"));
         break;
     case IR_ST:
         ASSERT0(d);
-        ASSERT(TY_dtype(d)!= D_UNDEF, ("size of store value cannot be zero"));
+        ASSERTN(TY_dtype(d)!= D_UNDEF, ("size of store value cannot be zero"));
         ASSERT0(ST_idinfo(this));
         ASSERT0(ST_rhs(this));
         ASSERT0(ST_rhs(this)->is_exp());
@@ -1580,7 +1580,7 @@ bool IR::verify(Region const* rg) const
         break;
     case IR_STPR:
         ASSERT0(d);
-        ASSERT(getDType() != D_UNDEF, ("size of store value cannot be zero"));
+        ASSERTN(getDType() != D_UNDEF, ("size of store value cannot be zero"));
         ASSERT0(getDType() != D_UNDEF);
         ASSERT0(STPR_no(this) > 0);
         ASSERT0(STPR_rhs(this));
@@ -1593,17 +1593,17 @@ bool IR::verify(Region const* rg) const
 
         ASSERT0(ILD_base(this));
 
-        ASSERT(ILD_base(this)->is_ptr(), ("base must be pointer"));
+        ASSERTN(ILD_base(this)->is_ptr(), ("base must be pointer"));
 
         ASSERT0(ILD_base(this)->is_exp());
         ASSERT0(ILD_base(this)->is_single());
         break;
     case IR_IST:
         ASSERT0(d);
-        ASSERT(IST_base(this)->is_ptr(), ("base must be pointer"));
+        ASSERTN(IST_base(this)->is_ptr(), ("base must be pointer"));
         ASSERT0(IST_rhs(this));
         ASSERT0(IST_rhs(this)->is_exp());
-        ASSERT(getDType() != D_UNDEF, ("size of istore value cannot be zero"));
+        ASSERTN(getDType() != D_UNDEF, ("size of istore value cannot be zero"));
         ASSERT0(IST_base(this)->is_single());
         ASSERT0(IST_rhs(this)->is_single());
         break;
@@ -1647,10 +1647,10 @@ bool IR::verify(Region const* rg) const
     case IR_LDA:
         ASSERT0(LDA_idinfo(this));
         ASSERT0(d);
-        ASSERT(TY_dtype(d) != D_UNDEF, ("size of load value cannot be zero"));
+        ASSERTN(TY_dtype(d) != D_UNDEF, ("size of load value cannot be zero"));
         ASSERT0(d->is_pointer());
         //Lda base can be general VAR, label, const string.
-        ASSERT(!VAR_is_fake(LDA_idinfo(this)), ("LDA's base must be effect VAR"));
+        ASSERTN(!VAR_is_fake(LDA_idinfo(this)), ("LDA's base must be effect VAR"));
         break;
     case IR_CALL:
         ASSERT0(CALL_idinfo(this));
@@ -1755,9 +1755,9 @@ bool IR::verify(Region const* rg) const
         ASSERT0(GOTO_lab(this));
         break;
     case IR_IGOTO:
-        ASSERT(IGOTO_vexp(this), ("igoto vexp can not be NULL."));
-        ASSERT(IGOTO_case_list(this), ("igoto case list can not be NULL."));
-        ASSERT(IGOTO_vexp(this)->is_single(),
+        ASSERTN(IGOTO_vexp(this), ("igoto vexp can not be NULL."));
+        ASSERTN(IGOTO_case_list(this), ("igoto case list can not be NULL."));
+        ASSERTN(IGOTO_vexp(this)->is_single(),
                ("igoto vexp can NOT be in list."));
         break;
     case IR_DO_WHILE:
@@ -1782,7 +1782,7 @@ bool IR::verify(Region const* rg) const
     case IR_LABEL:
         break;
     case IR_SWITCH:
-        ASSERT(SWITCH_vexp(this), ("switch vexp can not be NULL."));
+        ASSERTN(SWITCH_vexp(this), ("switch vexp can not be NULL."));
         ASSERT0(SWITCH_vexp(this)->is_exp());
 
         //SWITCH case list can be NULL.
@@ -1794,7 +1794,7 @@ bool IR::verify(Region const* rg) const
     case IR_CASE:
         ASSERT0(CASE_lab(this));
         ASSERT0(CASE_vexp(this)->is_single());
-        ASSERT(CASE_vexp(this)->is_const(),
+        ASSERTN(CASE_vexp(this)->is_const(),
                ("case value-expression must be const"));
         break;
     case IR_STARRAY:
@@ -1807,11 +1807,11 @@ bool IR::verify(Region const* rg) const
             UINT elem_data_size = tm->get_bytesize(ARR_elemtype(this));
             UINT result_data_size = tm->get_bytesize(d);
 			DUMMYUSE(elem_data_size | result_data_size);
-            ASSERT(result_data_size + ARR_ofst(this) <= elem_data_size,
+            ASSERTN(result_data_size + ARR_ofst(this) <= elem_data_size,
                 ("result data size should be less than element data size"));
         }
         ASSERT0(ARR_base(this)->is_single());
-        ASSERT(ARR_sub_list(this), ("subscript expression can not be null"));
+        ASSERTN(ARR_sub_list(this), ("subscript expression can not be null"));
         ASSERT0(allBeExp(ARR_sub_list(this)));
         if (getCode() == IR_STARRAY) {
             ASSERT0(STARR_rhs(this));
@@ -1897,7 +1897,7 @@ bool IR::verifyPhi(Region const* rg) const
          opnd != NULL; opnd = opnd->get_next()) {
         num_opnd++;
     }
-    ASSERT(num_opnd == num_pred, ("the num of opnd unmatch"));
+    ASSERTN(num_opnd == num_pred, ("the num of opnd unmatch"));
 
     SSAInfo * ssainfo = getSSAInfo();
     ASSERT0(ssainfo);
@@ -1909,7 +1909,7 @@ bool IR::verifyPhi(Region const* rg) const
 
         if (!use->is_pr()) { continue; }
 
-        ASSERT(PR_no(use) == PHI_prno(this), ("prno is unmatch"));
+        ASSERTN(PR_no(use) == PHI_prno(this), ("prno is unmatch"));
 
         SSAInfo * use_ssainfo = PR_ssainfo(use);
         CHECK_DUMMYUSE(use_ssainfo);
@@ -1929,7 +1929,7 @@ bool IR::verifyKids() const
             ASSERT0(IR_parent(k) == this);
         }
         if (!HAVE_FLAG(IRDES_kid_map(g_ir_desc[getCode()]), kidbit)) {
-            ASSERT(k == NULL,
+            ASSERTN(k == NULL,
                    ("IR_%s does not have No.%d kid", IRNAME(this), i));
         } else {
             //Here, ith kid cannot be NULL.
@@ -1943,13 +1943,13 @@ bool IR::verifyKids() const
                 case IR_SWITCH:
                 case IR_DO_WHILE:
                     if (i == 0) {
-                        ASSERT(k != NULL,
+                        ASSERTN(k != NULL,
                                 ("IR_%s miss kid%d", IRNAME(this), i));
                     }
                     break;
                 case IR_ICALL:
                     if (i == 2) {
-                        ASSERT(k != NULL,
+                        ASSERTN(k != NULL,
                                 ("IR_%s miss kid%d", IRNAME(this), i));
                     }
                     break;
@@ -1957,7 +1957,7 @@ bool IR::verifyKids() const
                 case IR_CALL:
                     break;
                 default:
-                    ASSERT(k != NULL, ("IR_%s miss kid%d", IRNAME(this), i));
+                    ASSERTN(k != NULL, ("IR_%s miss kid%d", IRNAME(this), i));
                 }
             }
         }
@@ -1990,7 +1990,7 @@ bool IR::calcArrayOffset(TMWORD * ofst_val, TypeMgr * tm) const
         #else
         #define MASK_32BIT 0xFFFFffff00000000llu
         #endif
-        ASSERT((((ULONGLONG)CONST_int_val(s)) &
+        ASSERTN((((ULONGLONG)CONST_int_val(s)) &
                 (ULONGLONG)(LONGLONG)MASK_32BIT) == 0,
                ("allow 32bit array offset."));
 
@@ -2034,7 +2034,7 @@ bool IR::isIRListEqual(IR const* irs, bool is_cmp_kid) const
 //they are parity memory reference.
 bool IR::isMemRefEqual(IR const* src) const
 {
-    ASSERT(isMemoryRef() && src->isMemoryRef(), ("Not memory expression"));
+    ASSERTN(isMemoryRef() && src->isMemoryRef(), ("Not memory expression"));
     if (isIREqual(src, true)) { return true; }
 
     switch (getCode()) {
@@ -2753,7 +2753,7 @@ void IR::removeSSAUse()
 void IR::copyRef(IR const* src, Region * rg)
 {
     ASSERT0(src && rg && this != src);
-    ASSERT(isMemoryRef(), ("not memory reference"));
+    ASSERTN(isMemoryRef(), ("not memory reference"));
     ASSERT0(!src->is_undef());
     setRefMD(src->getRefMD(), rg);
     if (isReadPR() || isWritePR()) {;}
@@ -3457,7 +3457,7 @@ void dumpGR(IR const* ir, TypeMgr * tm, DumpGRCtx * ctx)
         note("\nundef!");
         break;
     default:
-        ASSERT(0, ("unknown IR type:%s", IRNAME(ir)));
+        ASSERTN(0, ("unknown IR type:%s", IRNAME(ir)));
         return ;
     }
 

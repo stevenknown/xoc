@@ -131,14 +131,14 @@ inline void add_next(T ** pheader, T * t)
         *pheader = t;
     } else {
         p = (*pheader)->next;
-        ASSERT(t != *pheader, ("\n<add_next> : overlap list member\n"));
+        ASSERTN(t != *pheader, ("\n<add_next> : overlap list member\n"));
         if (p == NULL) {
             (*pheader)->next = t;
             t->prev = *pheader;
         } else {
             while (p->next != NULL) {
                 p = p->next;
-                ASSERT(p != t, ("\n<add_next> : overlap list member\n"));
+                ASSERTN(p != t, ("\n<add_next> : overlap list member\n"));
             }
             p->next = t;
             t->prev = p;
@@ -158,7 +158,7 @@ inline void add_next(IN OUT T ** pheader, IN OUT T ** last, IN T * t)
         while (t->next != NULL) { t = t->next; }
         *last = t;
     } else {
-        ASSERT(last && *last && (*last)->next == NULL, ("must be the last"));
+        ASSERTN(last && *last && (*last)->next == NULL, ("must be the last"));
         (*last)->next = t;
         t->prev = *last;
         while (t->next != NULL) { t = t->next; }
@@ -180,7 +180,7 @@ inline void remove(T ** pheader, T * t)
         return;
     }
 
-    ASSERT(t->prev, ("t is not in list"));
+    ASSERTN(t->prev, ("t is not in list"));
     t->prev->next = t->next;
     if (t->next != NULL) {
         t->next->prev = t->prev;
@@ -260,7 +260,7 @@ inline void replace(T ** pheader, T * olds, T * news)
         }
         p = p->next;
     }
-    ASSERT(find, ("'olds' is not inside in pheader"));
+    ASSERTN(find, ("'olds' is not inside in pheader"));
     #endif
 
     news->prev = olds->prev;
@@ -319,10 +319,10 @@ template <class T>
 inline void insertbefore_one(T ** head, T * marker, T * t)
 {
     if (t == NULL) return;
-    ASSERT(head, ("absent parameter"));
+    ASSERTN(head, ("absent parameter"));
     if (t == marker) return;
     if (*head == NULL) {
-        ASSERT(marker == NULL, ("marker must be NULL"));
+        ASSERTN(marker == NULL, ("marker must be NULL"));
         *head = t;
         return;
     }
@@ -336,7 +336,7 @@ inline void insertbefore_one(T ** head, T * marker, T * t)
         return;
     }
 
-    ASSERT(marker->prev != NULL, ("marker is head"));
+    ASSERTN(marker->prev != NULL, ("marker is head"));
     marker->prev->next = t;
     t->prev = marker->prev;
     t->next = marker;
@@ -351,23 +351,23 @@ template <class T>
 inline void insertbefore(T ** head, T * marker, T * t)
 {
     if (t == NULL) { return; }
-    ASSERT(head, ("absent parameter"));
+    ASSERTN(head, ("absent parameter"));
     if (t == marker) { return; }
     if (*head == NULL) {
-        ASSERT(marker == NULL, ("marker must be NULL"));
+        ASSERTN(marker == NULL, ("marker must be NULL"));
         *head = t;
         return;
     }
 
     if (marker == *head) {
         //'marker' is head, and replace head.
-        ASSERT(t->prev == NULL, ("t is not the first element"));
+        ASSERTN(t->prev == NULL, ("t is not the first element"));
         add_next(&t, *head);
         *head = t;
         return;
     }
 
-    ASSERT(marker->prev != NULL, ("marker should not be head"));
+    ASSERTN(marker->prev != NULL, ("marker should not be head"));
     if (marker->prev != NULL) {
         marker->prev->next = t;
         t->prev = marker->prev;
@@ -707,7 +707,7 @@ public:
     C<T> * append_tail(T t)
     {
         C<T> * c = newc();
-        ASSERT(c != NULL, ("newc return NULL"));
+        ASSERTN(c != NULL, ("newc return NULL"));
         C_val(c) = t;
         append_tail(c);
         return c;
@@ -716,7 +716,7 @@ public:
     void append_tail(C<T> * c)
     {
         if (m_head == NULL) {
-            ASSERT(m_tail == NULL, ("tail should be NULL"));
+            ASSERTN(m_tail == NULL, ("tail should be NULL"));
             m_head = m_tail = c;
             C_next(m_head) = C_prev(m_head) = NULL;
             m_elem_count = 1;
@@ -772,7 +772,7 @@ public:
             ASSERT0(c);
             C_val(c) = C_val(t);
 
-            ASSERT(m_tail == NULL, ("tail should be NULL"));
+            ASSERTN(m_tail == NULL, ("tail should be NULL"));
             m_head = m_tail = c;
             ASSERT0(C_next(c) == NULL && C_prev(c) == NULL);
             t = C_next(t);
@@ -794,7 +794,7 @@ public:
     C<T> * append_head(T t)
     {
         C<T> * c  = newc();
-        ASSERT(c, ("newc return NULL"));
+        ASSERTN(c, ("newc return NULL"));
         C_val(c) = t;
         append_head(c);
         return c;
@@ -804,7 +804,7 @@ public:
     void append_head(C<T> * c)
     {
         if (m_head == NULL) {
-            ASSERT(m_tail == NULL, ("tail should be NULL"));
+            ASSERTN(m_tail == NULL, ("tail should be NULL"));
             m_head = m_tail = c;
             C_next(m_head) = C_prev(m_head) = NULL;
             m_elem_count = 1;
@@ -859,7 +859,7 @@ public:
             ASSERT0(c);
             C_val(c) = C_val(t);
 
-            ASSERT(m_tail == NULL, ("tail should be NULL"));
+            ASSERTN(m_tail == NULL, ("tail should be NULL"));
             m_head = m_tail = c;
             ASSERT0(C_next(c) == NULL && C_prev(c) == NULL);
             t = C_prev(t);
@@ -894,7 +894,7 @@ public:
     //a costly function, and used it be carefully.
     C<T> * insert_before(T t, T marker)
     {
-        ASSERT(t != marker, ("element of list cannot be identical"));
+        ASSERTN(t != marker, ("element of list cannot be identical"));
         if (m_head == NULL || marker == C_val(m_head)) {
             return append_head(t);
         }
@@ -961,7 +961,7 @@ public:
     C<T> * insert_before(T t, IN C<T> * marker)
     {
         C<T> * c = newc();
-        ASSERT(c, ("newc return NULL"));
+        ASSERTN(c, ("newc return NULL"));
         C_val(c) = t;
         insert_before(c, marker);
         return c;
@@ -1052,14 +1052,14 @@ public:
 
     C<T> * insert_after(T t, T marker)
     {
-        ASSERT(t != marker,("element of list cannot be identical"));
+        ASSERTN(t != marker,("element of list cannot be identical"));
         if (m_tail == NULL || marker == m_tail->val()) {
             append_tail(t);
             return m_tail;
         }
-        ASSERT(m_head != NULL, ("Tail is non empty, but head is NULL!"));
+        ASSERTN(m_head != NULL, ("Tail is non empty, but head is NULL!"));
         C<T> * c = newc();
-        ASSERT(c != NULL, ("newc return NULL"));
+        ASSERTN(c != NULL, ("newc return NULL"));
         C_val(c) = t;
         if (marker == m_head->val()) {
             if (C_next(m_head) != NULL) {
@@ -1116,7 +1116,7 @@ public:
     C<T> * insert_after(T t, IN C<T> * marker)
     {
         C<T> * c = newc();
-        ASSERT(c != NULL, ("newc return NULL"));
+        ASSERTN(c != NULL, ("newc return NULL"));
         C_val(c) = t;
         insert_after(c, marker);
         return c;
@@ -1345,7 +1345,7 @@ public:
     //This function will modify m_cur.
     T get_tail_nth(UINT n, IN OUT C<T> ** holder = NULL)
     {
-        ASSERT(n < m_elem_count,("Access beyond list"));
+        ASSERTN(n < m_elem_count,("Access beyond list"));
         m_cur = NULL;
         if (m_elem_count == 0) { return T(0); }
         C<T> * c;
@@ -1372,7 +1372,7 @@ public:
     //This function will modify m_cur.
     T get_head_nth(UINT n, IN OUT C<T> ** holder = NULL)
     {
-        ASSERT(n < m_elem_count,("Access beyond list"));
+        ASSERTN(n < m_elem_count,("Access beyond list"));
         m_cur = NULL;
         if (m_head == NULL) {
             return T(0);
@@ -1435,7 +1435,7 @@ public:
             m_cur = m_cur->next;
         }
 
-        ASSERT(m_head, ("list is empty"));
+        ASSERTN(m_head, ("list is empty"));
 
         if (m_head == holder) {
             return remove_head();
@@ -1445,7 +1445,7 @@ public:
             return remove_tail();
         }
 
-        ASSERT(C_prev(holder) && C_next(holder), ("illegal t in list"));
+        ASSERTN(C_prev(holder) && C_next(holder), ("illegal t in list"));
 
         C_next(C_prev(holder)) = C_next(holder);
         C_prev(C_next(holder)) = C_prev(holder);
@@ -1481,7 +1481,7 @@ public:
         C<T> * c = NULL;
         if (C_prev(m_tail) == NULL) {
             //tail is the only one
-            ASSERT(m_tail == m_head && m_elem_count == 1,
+            ASSERTN(m_tail == m_head && m_elem_count == 1,
                    ("illegal list-remove"));
             c = m_tail;
             m_head = m_tail = m_cur = NULL;
@@ -1507,7 +1507,7 @@ public:
         if (m_head == NULL) { return T(0); }
         if (C_next(m_head) == NULL) {
             //list_head is the only one
-            ASSERT(m_tail == m_head && m_elem_count == 1,
+            ASSERTN(m_tail == m_head && m_elem_count == 1,
                    ("illegal list-remove"));
             c = m_head;
             m_head = m_tail = m_cur = NULL;
@@ -1548,8 +1548,8 @@ protected:
 protected:
     SC<T> * new_sc_container(SMemPool * pool)
     {
-        ASSERT(pool, ("need mem pool"));
-        ASSERT(MEMPOOL_type(pool) == MEM_CONST_SIZE, ("need const size pool"));
+        ASSERTN(pool, ("need mem pool"));
+        ASSERTN(MEMPOOL_type(pool) == MEM_CONST_SIZE, ("need const size pool"));
         SC<T> * p = (SC<T>*)smpoolMallocConstSize(sizeof(SC<T>), pool);
         ASSERT0(p != NULL);
         ::memset(p, 0, sizeof(SC<T>));
@@ -1626,7 +1626,7 @@ public:
     SC<T> * append_head(T t, SC<T> ** free_list, SMemPool * pool)
     {
         SC<T> * c = newsc(free_list, pool);
-        ASSERT(c != NULL, ("newsc return NULL"));
+        ASSERTN(c != NULL, ("newsc return NULL"));
         SC_val(c) = t;
         append_head(c);
         return c;
@@ -1709,7 +1709,7 @@ public:
         #endif
 
         SC<T> * c = newsc(free_list, pool);
-        ASSERT(c != NULL, ("newc return NULL"));
+        ASSERTN(c != NULL, ("newc return NULL"));
 
         SC_val(c) = t;
         insert_after(c, marker);
@@ -1779,10 +1779,10 @@ public:
     T remove(SC<T> * prev, SC<T> * holder, SC<T> ** free_list)
     {
         ASSERT0(holder);
-        ASSERT(m_head.next != &m_head, ("list is empty"));
+        ASSERTN(m_head.next != &m_head, ("list is empty"));
         ASSERT0(prev);
 
-        ASSERT(prev->next == holder, ("not prev one"));
+        ASSERTN(prev->next == holder, ("not prev one"));
         prev->next = holder->next;
         m_elem_count--;
         T t = SC_val(holder);
@@ -1861,7 +1861,7 @@ public:
 
     void set_pool(SMemPool * pool)
     {
-        ASSERT(pool == NULL || MEMPOOL_type(pool) == MEM_CONST_SIZE,
+        ASSERTN(pool == NULL || MEMPOOL_type(pool) == MEM_CONST_SIZE,
                ("need const size pool"));
         m_free_list_pool = pool;
         m_free_list = NULL;
@@ -1942,8 +1942,8 @@ protected:
 protected:
     SC<T> * new_sc_container(SMemPool * pool)
     {
-        ASSERT(pool, ("need mem pool"));
-        ASSERT(MEMPOOL_type(pool) == MEM_CONST_SIZE, ("need const size pool"));
+        ASSERTN(pool, ("need mem pool"));
+        ASSERTN(MEMPOOL_type(pool) == MEM_CONST_SIZE, ("need const size pool"));
         SC<T> * p = (SC<T>*)smpoolMallocConstSize(sizeof(SC<T>), pool);
         ASSERT0(p);
         ::memset(p, 0, sizeof(SC<T>));
@@ -2009,7 +2009,7 @@ public:
     SC<T> * append_tail(T t, SC<T> ** free_list, SMemPool * pool)
     {
         SC<T> * c  = newsc(free_list, pool);
-        ASSERT(c != NULL, ("newsc return NULL"));
+        ASSERTN(c != NULL, ("newsc return NULL"));
         SC_val(c) = t;
         append_tail(c);
         return c;
@@ -2018,7 +2018,7 @@ public:
     void append_tail(IN SC<T> * c)
     {
         if (m_head == NULL) {
-            ASSERT(m_tail == NULL, ("tail should be NULL"));
+            ASSERTN(m_tail == NULL, ("tail should be NULL"));
             ASSERT0(SC_next(c) == NULL);
             m_head = m_tail = c;
             m_elem_count++;
@@ -2035,7 +2035,7 @@ public:
     SC<T> * append_head(T t, SC<T> ** free_list, SMemPool * pool)
     {
         SC<T> * c = newsc(free_list, pool);
-        ASSERT(c != NULL, ("newsc return NULL"));
+        ASSERTN(c != NULL, ("newsc return NULL"));
         SC_val(c) = t;
         append_head(c);
         return c;
@@ -2045,7 +2045,7 @@ public:
     {
         #ifdef _DEBUG_
         if (m_head == NULL) {
-            ASSERT(m_tail == NULL, ("tail should be NULL"));
+            ASSERTN(m_tail == NULL, ("tail should be NULL"));
             ASSERT0(m_elem_count == 0);
         }
         #endif
@@ -2115,7 +2115,7 @@ public:
         #endif
 
         SC<T> * c = newsc(free_list, pool);
-        ASSERT(c, ("newc return NULL"));
+        ASSERTN(c, ("newc return NULL"));
 
         SC_val(c) = t;
         insert_after(c, marker);
@@ -2187,7 +2187,7 @@ public:
     T remove(SC<T> * prev, SC<T> * holder, SC<T> ** free_list)
     {
         ASSERT0(holder);
-        ASSERT(m_head != NULL, ("list is empty"));
+        ASSERTN(m_head != NULL, ("list is empty"));
         #ifdef _SLOW_CHECK_
         ASSERT0(in_list(prev));
         ASSERT0(in_list(holder));
@@ -2201,7 +2201,7 @@ public:
                 m_tail = NULL;
             }
         } else {
-            ASSERT(prev->next == holder, ("not prev one"));
+            ASSERTN(prev->next == holder, ("not prev one"));
             prev->next = holder->next;
         }
 
@@ -2466,7 +2466,7 @@ public:
     C<T> * replace(T oldt, T newt)
     {
         C<T> * old_holder = m_typename2holder.get(oldt);
-        ASSERT(old_holder != NULL, ("old elem not exist"));
+        ASSERTN(old_holder != NULL, ("old elem not exist"));
 
         //add new one
         C<T> * new_holder = List<T>::insert_before(newt, old_holder);
@@ -2537,7 +2537,7 @@ public:
 
     void add(T t)
     {
-        ASSERT(is_init(), ("VECTOR not yet initialized."));
+        ASSERTN(is_init(), ("VECTOR not yet initialized."));
         set(m_last_idx < 0 ? 0 : m_last_idx, t);
     }
 
@@ -2587,7 +2587,7 @@ public:
 
     T get(UINT index) const
     {
-        ASSERT(is_init(), ("VECTOR not yet initialized."));
+        ASSERTN(is_init(), ("VECTOR not yet initialized."));
         return (index >= (UINT)m_elem_num) ? T(0) : m_vec[index];
     }
 
@@ -2602,8 +2602,8 @@ public:
     //    int ex = v[i];
     T const operator[](UINT index) const
     {
-        ASSERT(is_init(), ("VECTOR not yet initialized."));
-        ASSERT(index < (UINT)m_elem_num, ("array subscript over boundary."));
+        ASSERTN(is_init(), ("VECTOR not yet initialized."));
+        ASSERTN(index < (UINT)m_elem_num, ("array subscript over boundary."));
         return m_vec[index];
     }
 
@@ -2613,8 +2613,8 @@ public:
     //or equal to m_elem_num.
     inline T & operator[](UINT index)
     {
-        ASSERT(is_init(), ("VECTOR not yet initialized."));
-        ASSERT(index < (UINT)m_elem_num, ("array subscript over boundary."));
+        ASSERTN(is_init(), ("VECTOR not yet initialized."));
+        ASSERTN(index < (UINT)m_elem_num, ("array subscript over boundary."));
         m_last_idx = MAX((INT)index, m_last_idx);
         return m_vec[index];
     }
@@ -2652,7 +2652,7 @@ public:
     //Clean to zero(default) till 'last_idx'.
     void clean()
     {
-        ASSERT(is_init(), ("VECTOR not yet initialized."));
+        ASSERTN(is_init(), ("VECTOR not yet initialized."));
         if (m_last_idx < 0) {
             return;
         }
@@ -2666,7 +2666,7 @@ public:
     //Growing vector if 'index' is greater than m_elem_num.
     void set(UINT index, T elem)
     {
-        ASSERT(is_init(), ("VECTOR not yet initialized."));
+        ASSERTN(is_init(), ("VECTOR not yet initialized."));
         if (index >= (UINT)m_elem_num) {
             grow(getNearestPowerOf2(index) + 2);
         }
@@ -2678,14 +2678,14 @@ public:
     //Return the number of element the vector could hold.
     UINT get_capacity() const
     {
-        ASSERT(is_init(), ("VECTOR not yet initialized."));
+        ASSERTN(is_init(), ("VECTOR not yet initialized."));
         return m_elem_num;
     }
 
     INT get_last_idx() const
     {
-        ASSERT(is_init(), ("VECTOR not yet initialized."));
-        ASSERT(m_last_idx < (INT)m_elem_num,
+        ASSERTN(is_init(), ("VECTOR not yet initialized."));
+        ASSERTN(m_last_idx < (INT)m_elem_num,
                 ("Last index ran over Vector's size."));
         return m_last_idx;
     }
@@ -2695,10 +2695,10 @@ public:
     //Reallocate memory if necessory.
     void grow(UINT num_of_elem)
     {
-        ASSERT(is_init(), ("VECTOR not yet initialized."));
+        ASSERTN(is_init(), ("VECTOR not yet initialized."));
         if (num_of_elem == 0) { return; }
         if (m_elem_num == 0) {
-            ASSERT(m_vec == NULL, ("vector should be NULL if size is zero."));
+            ASSERTN(m_vec == NULL, ("vector should be NULL if size is zero."));
             m_vec = (T*)::malloc(sizeof(T) * num_of_elem);
             ASSERT0(m_vec);
             ::memset(m_vec, 0, sizeof(T) * num_of_elem);
@@ -2782,11 +2782,11 @@ public:
     //    value of that slot is equal to v.
     UINT get_free_idx(T v = T(0))
     {
-        ASSERT((Vector<T, GrowSize>::is_init()),
+        ASSERTN((Vector<T, GrowSize>::is_init()),
                 ("VECTOR not yet initialized."));
         if (Vector<T, GrowSize>::m_elem_num == 0) {
             //VECTOR is empty.
-            ASSERT((Vector<T, GrowSize>::m_last_idx < 0 &&
+            ASSERTN((Vector<T, GrowSize>::m_last_idx < 0 &&
                     Vector<T, GrowSize>::m_vec == NULL),
                    ("exception occur in Vector"));
             grow(GrowSize);
@@ -2909,7 +2909,7 @@ public:
 
     T get(UINT i) const
     {
-        ASSERT(s1.m_is_init, ("SimpleVec not yet initialized."));
+        ASSERTN(s1.m_is_init, ("SimpleVec not yet initialized."));
         if (i >= SVEC_elem_num(this)) { return T(0); }
         return m_vec[i];
     }
@@ -2931,7 +2931,7 @@ public:
     //Clean to zero(default) till 'last_idx'.
     void clean()
     {
-        ASSERT(s1.m_is_init, ("SimpleVec not yet initialized."));
+        ASSERTN(s1.m_is_init, ("SimpleVec not yet initialized."));
         ::memset(m_vec, 0, sizeof(T) * SVEC_elem_num(this));
     }
 
@@ -2940,7 +2940,7 @@ public:
     //Return NULL if 'i' is illegal, otherwise return 'elem'.
     void set(UINT i, T elem)
     {
-        ASSERT(is_init(), ("SimpleVec not yet initialized."));
+        ASSERTN(is_init(), ("SimpleVec not yet initialized."));
         if (i >= SVEC_elem_num(this)) {
             grow(i * 2 + 1);
         }
@@ -2951,7 +2951,7 @@ public:
     //Return the number of element the vector could hold.
     UINT get_capacity() const
     {
-        ASSERT(is_init(), ("SimpleVec not yet initialized."));
+        ASSERTN(is_init(), ("SimpleVec not yet initialized."));
         return SVEC_elem_num(this);
     }
 
@@ -2959,10 +2959,10 @@ public:
     //Reallocate memory if necessory.
     void grow(UINT size)
     {
-        ASSERT(is_init(), ("SimpleVec not yet initialized."));
+        ASSERTN(is_init(), ("SimpleVec not yet initialized."));
         if (size == 0) { return; }
         if (SVEC_elem_num(this) == 0) {
-            ASSERT(m_vec == NULL,
+            ASSERTN(m_vec == NULL,
                    ("SimpleVec should be NULL if size is zero."));
             m_vec = (T*)::malloc(sizeof(T) * size);
             ASSERT0(m_vec);
@@ -3133,7 +3133,7 @@ protected:
 
     inline HC<T> * newhc() //Allocate hash container.
     {
-        ASSERT(m_bucket != NULL, ("HASH not yet initialized."));
+        ASSERTN(m_bucket != NULL, ("HASH not yet initialized."));
         ASSERT0(m_free_list_pool);
         HC<T> * c = m_free_list.get_free_elem();
         if (c == NULL) {
@@ -3151,7 +3151,7 @@ protected:
         HC<T> * elemhc = *bucket_entry;
         HC<T> * prev = NULL;
         while (elemhc != NULL) {
-            ASSERT(HC_val(elemhc) != T(0),
+            ASSERTN(HC_val(elemhc) != T(0),
                    ("Hash element has so far as to be overrided!"));
             if (m_hf.compare(HC_val(elemhc), val)) {
                 *hc = elemhc;
@@ -3162,7 +3162,7 @@ protected:
         } //end while
         elemhc = newhc();
 
-        ASSERT(elemhc, ("newhc() return NULL"));
+        ASSERTN(elemhc, ("newhc() return NULL"));
         HC_val(elemhc) = create(val);
         if (prev != NULL) {
             //Append on element-list
@@ -3182,7 +3182,7 @@ protected:
         HC<T> * prev = NULL;
         HC<T> * elemhc = *bucket_entry;
         while (elemhc != NULL) {
-            ASSERT(HC_val(elemhc) != T(0), ("Container is empty"));
+            ASSERTN(HC_val(elemhc) != T(0), ("Container is empty"));
             if (m_hf.compare(HC_val(elemhc), t)) {
                 t = HC_val(elemhc);
                 *hc = elemhc;
@@ -3194,7 +3194,7 @@ protected:
 
         elemhc = newhc();
 
-        ASSERT(elemhc, ("newhc() return NULL"));
+        ASSERTN(elemhc, ("newhc() return NULL"));
         HC_val(elemhc) = t;
         if (prev != NULL) {
             //Append on elem-list in the bucket.
@@ -3209,7 +3209,7 @@ protected:
 
     virtual T create(OBJTY v)
     {
-        ASSERT(0, ("Inherited class need to implement"));
+        ASSERTN(0, ("Inherited class need to implement"));
         DUMMYUSE(v);
         return T(0);
     }
@@ -3235,11 +3235,11 @@ public:
     //    Maximum size of T equals sizeof(void*).
     T append(T t, OUT HC<T> ** hct = NULL, bool * find = NULL)
     {
-        ASSERT(m_bucket != NULL, ("Hash not yet initialized."));
+        ASSERTN(m_bucket != NULL, ("Hash not yet initialized."));
         if (t == T(0)) return T(0);
 
         UINT hashv = m_hf.get_hash_value(t, m_bucket_size);
-        ASSERT(hashv < m_bucket_size,
+        ASSERTN(hashv < m_bucket_size,
                ("hash value must less than bucket size"));
 
         HC<T> * elemhc = NULL;
@@ -3270,10 +3270,10 @@ public:
     //NOTE: Do NOT append T(0) to table.
     T append(OBJTY val, OUT HC<T> ** hct = NULL, bool * find = NULL)
     {
-        ASSERT(m_bucket != NULL, ("Hash not yet initialized."));
+        ASSERTN(m_bucket != NULL, ("Hash not yet initialized."));
         UINT hashv = m_hf.get_hash_value(val, m_bucket_size);
 
-        ASSERT(hashv < m_bucket_size, ("hash value must less than bucket size"));
+        ASSERTN(hashv < m_bucket_size, ("hash value must less than bucket size"));
         HC<T> * elemhc = NULL;
         if (!insert_v((HC<T>**)&HB_member(m_bucket[hashv]), &elemhc, val)) {
             HB_count(m_bucket[hashv])++;
@@ -3341,7 +3341,7 @@ public:
     //    or is -1.
     T get_first(INT & iter) const
     {
-        ASSERT(m_bucket != NULL, ("Hash not yet initialized."));
+        ASSERTN(m_bucket != NULL, ("Hash not yet initialized."));
         T t = T(0);
         iter = -1;
         if (m_elem_count <= 0) return T(0);
@@ -3365,7 +3365,7 @@ public:
     //    or is -1.
     T get_next(INT & iter) const
     {
-        ASSERT(m_bucket != NULL && iter >= -1, ("Hash not yet initialized."));
+        ASSERTN(m_bucket != NULL && iter >= -1, ("Hash not yet initialized."));
         T t = T(0);
         if (m_elem_count <= 0) return T(0);
         INT l = m_elem_vector.get_last_idx();
@@ -3389,7 +3389,7 @@ public:
     //    or is -1.
     T get_last(INT & iter) const
     {
-        ASSERT(m_bucket != NULL, ("Hash not yet initialized."));
+        ASSERTN(m_bucket != NULL, ("Hash not yet initialized."));
         T t = T(0);
         iter = -1;
         if (m_elem_count <= 0) return T(0);
@@ -3413,7 +3413,7 @@ public:
     //    or is -1.
     T get_prev(INT & iter) const
     {
-        ASSERT(m_bucket != NULL, ("Hash not yet initialized."));
+        ASSERTN(m_bucket != NULL, ("Hash not yet initialized."));
         T t = T(0);
         if (m_elem_count <= 0) return T(0);
         for (INT i = iter - 1; i >= 0; i--) {
@@ -3482,16 +3482,16 @@ public:
     //get_next(), get_last() and get_prev().
     T removed(T t)
     {
-        ASSERT(m_bucket != NULL, ("Hash not yet initialized."));
+        ASSERTN(m_bucket != NULL, ("Hash not yet initialized."));
         if (t == 0) return T(0);
 
         UINT hashv = m_hf.get_hash_value(t, m_bucket_size);
-        ASSERT(hashv < m_bucket_size,
+        ASSERTN(hashv < m_bucket_size,
                 ("hash value must less than bucket size"));
         HC<T> * elemhc = (HC<T>*)HB_member(m_bucket[hashv]);
         if (elemhc != NULL) {
             while (elemhc != NULL) {
-                ASSERT(HC_val(elemhc) != T(0),
+                ASSERTN(HC_val(elemhc) != T(0),
                         ("Hash element has so far as to be overrided!"));
                 if (m_hf.compare(HC_val(elemhc), t)) {
                     break;
@@ -3519,7 +3519,7 @@ public:
     //The position of element in m_elem_vector is unchanged.
     void grow(UINT bsize = 0)
     {
-        ASSERT(m_bucket != NULL, ("Hash not yet initialized."));
+        ASSERTN(m_bucket != NULL, ("Hash not yet initialized."));
         if (bsize != 0) {
             ASSERT0(bsize > m_bucket_size);
         } else {
@@ -3557,7 +3557,7 @@ public:
             if (t == T(0)) { continue; }
 
             UINT hashv = m_hf.get_hash_value(t, m_bucket_size);
-            ASSERT(hashv < m_bucket_size,
+            ASSERTN(hashv < m_bucket_size,
                     ("hash value must less than bucket size"));
 
             HC<T> * elemhc = NULL;
@@ -3579,13 +3579,13 @@ public:
     //get_last() and get_prev().
     T find(OBJTY val) const
     {
-        ASSERT(m_bucket != NULL, ("Hash not yet initialized."));
+        ASSERTN(m_bucket != NULL, ("Hash not yet initialized."));
         UINT hashv = m_hf.get_hash_value(val, m_bucket_size);
-        ASSERT(hashv < m_bucket_size, ("hash value must less than bucket size"));
+        ASSERTN(hashv < m_bucket_size, ("hash value must less than bucket size"));
         HC<T> const* elemhc = (HC<T> const*)HB_member(m_bucket[hashv]);
         if (elemhc != NULL) {
             while (elemhc != NULL) {
-                ASSERT(HC_val(elemhc) != T(0),
+                ASSERTN(HC_val(elemhc) != T(0),
                        ("Hash element has so far as to be overrided!"));
                 if (m_hf.compare(HC_val(elemhc), val)) {
                     return HC_val(elemhc);
@@ -3604,16 +3604,16 @@ public:
     //get_last() and get_prev().
     bool find(T t, HC<T> const** ct = NULL) const
     {
-        ASSERT(m_bucket != NULL, ("Hash not yet initialized."));
+        ASSERTN(m_bucket != NULL, ("Hash not yet initialized."));
         if (t == T(0)) { return false; }
 
         UINT hashv = m_hf.get_hash_value(t, m_bucket_size);
-        ASSERT(hashv < m_bucket_size,
+        ASSERTN(hashv < m_bucket_size,
                ("hash value must less than bucket size"));
         HC<T> const* elemhc = (HC<T> const*)HB_member(m_bucket[hashv]);
         if (elemhc != NULL) {
             while (elemhc != NULL) {
-                ASSERT(HC_val(elemhc) != T(0),
+                ASSERTN(HC_val(elemhc) != T(0),
                        ("Hash element has so far as to be overrided!"));
                 if (m_hf.compare(HC_val(elemhc), t)) {
                     if (ct != NULL) {
@@ -4073,8 +4073,8 @@ public:
     {
         if (z == NULL) { return; }
         if (m_num_of_tn == 1) {
-            ASSERT(z == m_root, ("z is not the node of tree"));
-            ASSERT(z->rchild == NULL && z->lchild == NULL,
+            ASSERTN(z == m_root, ("z is not the node of tree"));
+            ASSERTN(z->rchild == NULL && z->lchild == NULL,
                     ("z is the last node"));
             free_rbt(z);
             m_num_of_tn--;
@@ -4256,7 +4256,7 @@ public:
         bool find = false;
         RBTNType * z = BaseType::insert(t, &find);
         ASSERT0(z);
-        ASSERT(!find, ("already mapped"));
+        ASSERTN(!find, ("already mapped"));
         z->mapped = mapped;
         return z->key; //key may be different with t.
     }
@@ -4405,13 +4405,13 @@ protected:
         if (t == Tsrc(0)) { return NULL; }
         UINT hashv = Hash<Tsrc, HF>::m_hf.get_hash_value(t,
                                 Hash<Tsrc, HF>::m_bucket_size);
-        ASSERT((hashv < Hash<Tsrc, HF>::m_bucket_size),
+        ASSERTN((hashv < Hash<Tsrc, HF>::m_bucket_size),
                 ("hash value must less than bucket size"));
         HC<Tsrc> * elemhc =
             (HC<Tsrc>*)HB_member((Hash<Tsrc, HF>::m_bucket[hashv]));
         if (elemhc != NULL) {
             while (elemhc != NULL) {
-                ASSERT(HC_val(elemhc) != Tsrc(0),
+                ASSERTN(HC_val(elemhc) != Tsrc(0),
                         ("Hash element has so far as to be overrided!"));
                 if (Hash<Tsrc, HF>::m_hf.compare(HC_val(elemhc), t)) {
                     return elemhc;
@@ -4430,11 +4430,11 @@ public:
     //Alway set new mapping even if it has done.
     void setAlways(Tsrc t, Ttgt mapped)
     {
-        ASSERT((Hash<Tsrc, HF>::m_bucket != NULL), ("not yet initialize."));
+        ASSERTN((Hash<Tsrc, HF>::m_bucket != NULL), ("not yet initialize."));
         if (t == Tsrc(0)) { return; }
         HC<Tsrc> * elemhc = NULL;
         Hash<Tsrc, HF>::append(t, &elemhc, NULL);
-        ASSERT(elemhc != NULL, ("Element does not append into hash table."));
+        ASSERTN(elemhc != NULL, ("Element does not append into hash table."));
         m_mapped_elem_table.set(HC_vec_idx(elemhc), mapped);
     }
 
@@ -4443,7 +4443,7 @@ public:
     //Get mapped pointer of 't'
     Ttgt get(Tsrc t, bool * find = NULL)
     {
-        ASSERT((Hash<Tsrc, HF>::m_bucket != NULL), ("not yet initialize."));
+        ASSERTN((Hash<Tsrc, HF>::m_bucket != NULL), ("not yet initialize."));
         HC<Tsrc> * elemhc = findhc(t);
         if (elemhc != NULL) {
             if (find != NULL) { *find = true; }
@@ -4457,7 +4457,7 @@ public:
 
     void clean()
     {
-        ASSERT((Hash<Tsrc, HF>::m_bucket != NULL), ("not yet initialize."));
+        ASSERTN((Hash<Tsrc, HF>::m_bucket != NULL), ("not yet initialize."));
         Hash<Tsrc, HF>::clean();
         m_mapped_elem_table.clean();
     }
@@ -4519,29 +4519,29 @@ public:
     //Establishing mapping in between 't' and 'mapped'.
     void set(Tsrc t, Ttgt mapped)
     {
-        ASSERT((Hash<Tsrc, HF>::m_bucket != NULL), ("not yet initialize."));
+        ASSERTN((Hash<Tsrc, HF>::m_bucket != NULL), ("not yet initialize."));
         if (t == Tsrc(0)) { return; }
 
         HC<Tsrc> * elemhc = NULL;
         Hash<Tsrc, HF>::append(t, &elemhc, NULL);
 
-        ASSERT(elemhc != NULL,
+        ASSERTN(elemhc != NULL,
                ("Element does not append into hash table yet."));
-        ASSERT(Ttgt(0) == m_mapped_elem_table.get(HC_vec_idx(elemhc)),
+        ASSERTN(Ttgt(0) == m_mapped_elem_table.get(HC_vec_idx(elemhc)),
                ("Already be mapped"));
         m_mapped_elem_table.set(HC_vec_idx(elemhc), mapped);
     }
 
     void setv(OBJTY v, Ttgt mapped)
     {
-        ASSERT((Hash<Tsrc, HF>::m_bucket != NULL), ("not yet initialize."));
+        ASSERTN((Hash<Tsrc, HF>::m_bucket != NULL), ("not yet initialize."));
         if (v == 0) { return; }
 
         HC<Tsrc> * elemhc = NULL;
         Hash<Tsrc, HF>::append(v, &elemhc, NULL);
-        ASSERT(elemhc != NULL,
+        ASSERTN(elemhc != NULL,
                ("Element does not append into hash table yet."));
-        ASSERT(Ttgt(0) == m_mapped_elem_table.get(HC_vec_idx(elemhc)),
+        ASSERTN(Ttgt(0) == m_mapped_elem_table.get(HC_vec_idx(elemhc)),
                ("Already be mapped"));
         m_mapped_elem_table.set(HC_vec_idx(elemhc), mapped);
     }

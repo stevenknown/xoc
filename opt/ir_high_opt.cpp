@@ -56,7 +56,7 @@ void Region::HighProcessImpl(OptCtx & oc)
         checkValidAndRecompute(&oc, PASS_DOM, PASS_UNDEF);
 
         if (g_do_loop_ana) {
-            ASSERT(g_do_cfg_dom, ("dominator is necessary to build loop"));
+            ASSERTN(g_do_cfg_dom, ("dominator is necessary to build loop"));
             checkValidAndRecompute(&oc, PASS_LOOP_INFO, PASS_UNDEF);
         }
     }

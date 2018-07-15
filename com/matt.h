@@ -59,11 +59,11 @@ template <class T> class Matrix;
 template <class T>
 Matrix<T> operator * (Matrix<T> const& a, Matrix<T> const& b)
 {
-    ASSERT(a.m_is_init && b.m_is_init, ("not yet initialize."));
-    ASSERT(a.m_row_size > 0 && a.m_col_size > 0, ("invalid matrix"));
-    ASSERT(b.m_row_size > 0 && b.m_col_size > 0, ("invalid matrix"));
-    ASSERT(a.m_col_size == b.m_row_size, ("invalid matrix type of mul"));
-    ASSERT(a.HOOK_INIT == b.HOOK_INIT && a.HOOK_EQUAL == b.HOOK_EQUAL,
+    ASSERTN(a.m_is_init && b.m_is_init, ("not yet initialize."));
+    ASSERTN(a.m_row_size > 0 && a.m_col_size > 0, ("invalid matrix"));
+    ASSERTN(b.m_row_size > 0 && b.m_col_size > 0, ("invalid matrix"));
+    ASSERTN(a.m_col_size == b.m_row_size, ("invalid matrix type of mul"));
+    ASSERTN(a.HOOK_INIT == b.HOOK_INIT && a.HOOK_EQUAL == b.HOOK_EQUAL,
            ("strange matrix member function"));
     Matrix<T> c(a.m_row_size, b.m_col_size, &a.m_inhr);
     for (UINT i = 0; i < a.m_row_size; i++) {
@@ -83,10 +83,10 @@ Matrix<T> operator * (Matrix<T> const& a, Matrix<T> const& b)
 template <class T>
 Matrix<T> operator + (Matrix<T> const& a, Matrix<T> const& b)
 {
-    ASSERT(a.m_is_init && b.m_is_init, ("not yet initialize."));
-    ASSERT(a.m_row_size == b.m_row_size && a.m_col_size == b.m_col_size,
+    ASSERTN(a.m_is_init && b.m_is_init, ("not yet initialize."));
+    ASSERTN(a.m_row_size == b.m_row_size && a.m_col_size == b.m_col_size,
            ("invalid matrix type of mul"));
-    ASSERT(a.HOOK_INIT == b.HOOK_INIT && a.HOOK_EQUAL == b.HOOK_EQUAL,
+    ASSERTN(a.HOOK_INIT == b.HOOK_INIT && a.HOOK_EQUAL == b.HOOK_EQUAL,
            ("strange matrix member function"));
     Matrix<T> c(a.m_row_size, a.m_col_size, &a.m_inhr);
     for (UINT i = 0; i < a.m_row_size; i++) {
@@ -102,10 +102,10 @@ Matrix<T> operator + (Matrix<T> const& a, Matrix<T> const& b)
 template <class T>
 Matrix<T> operator - (Matrix<T> const& a, Matrix<T> const& b)
 {
-    ASSERT(a.m_is_init && b.m_is_init, ("not yet initialize."));
-    ASSERT(a.m_row_size == b.m_row_size && a.m_col_size == b.m_col_size,
+    ASSERTN(a.m_is_init && b.m_is_init, ("not yet initialize."));
+    ASSERTN(a.m_row_size == b.m_row_size && a.m_col_size == b.m_col_size,
            ("invalid matrix type of mul"));
-    ASSERT(a.HOOK_INIT == b.HOOK_INIT && a.HOOK_EQUAL == b.HOOK_EQUAL,
+    ASSERTN(a.HOOK_INIT == b.HOOK_INIT && a.HOOK_EQUAL == b.HOOK_EQUAL,
            ("strange matrix member function"));
     Matrix<T> c(a.m_row_size, a.m_col_size, &a.m_inhr);
     for (UINT i = 0; i < a.m_row_size; i++) {
@@ -177,7 +177,7 @@ public:
         if (HOOK_SQRT != NULL) {
             return (*HOOK_SQRT)(v);
         }
-        ASSERT(0, ("_sqrt() need to implement"));
+        ASSERTN(0, ("_sqrt() need to implement"));
         return v;
     }
 public:
@@ -288,8 +288,8 @@ public:
     //of 'm_mat'by 'm_mat[row][col]' directly.
     T get(UINT row, UINT col) const
     {
-        ASSERT(m_is_init, ("not yet initialize."));
-        ASSERT(row < m_row_size && col < m_col_size,
+        ASSERTN(m_is_init, ("not yet initialize."));
+        ASSERTN(row < m_row_size && col < m_col_size,
                 ("exception occur in get()"));
         return *(m_mat + (m_col_size * row + col));
     }
@@ -297,7 +297,7 @@ public:
     void grow_row(const T row[], UINT rowelemnum);
     void grow_row(Vector<T> const& row, UINT rowelemnum)
     {
-        ASSERT(row.m_vec, ("vector is empty"));
+        ASSERTN(row.m_vec, ("vector is empty"));
         grow_row(row.m_vec, rowelemnum);
     }
     void grow_row(Matrix<T> const& a); //Add row, a must be vector
@@ -308,8 +308,8 @@ public:
     void grow_col(const T col[], UINT colelemnum);
     void grow_col(Vector<T> const& col, UINT colelemnum)
     {
-        ASSERT(m_is_init, ("not yet initialize."));
-        ASSERT(col.m_vec, ("vector is empty"));
+        ASSERTN(m_is_init, ("not yet initialize."));
+        ASSERTN(col.m_vec, ("vector is empty"));
         grow_col(col.m_vec, colelemnum);
     }
     void grow_col(Matrix<T> const& a); //Add column, a must be vector
@@ -319,13 +319,13 @@ public:
     void grow_all(UINT row_size, UINT col_size);
     void del_row(UINT row)
     {
-        ASSERT(m_is_init, ("not yet initialize."));
+        ASSERTN(m_is_init, ("not yet initialize."));
         del_row(row, row);
     }
     void del_row(UINT from, UINT to);
     void del_col(UINT col)
     {
-        ASSERT(m_is_init, ("not yet initialize."));
+        ASSERTN(m_is_init, ("not yet initialize."));
         del_col(col, col);
     }
     void del_col(UINT from, UINT to);
@@ -340,8 +340,8 @@ public:
     //of 'm_mat' by 'm_mat[row][col]' directly.
     void set(UINT row, UINT col, T v)
     {
-        ASSERT(m_is_init, ("not yet initialize."));
-        ASSERT(row < m_row_size && col < m_col_size,("exception occur in set()"));
+        ASSERTN(m_is_init, ("not yet initialize."));
+        ASSERTN(row < m_row_size && col < m_col_size,("exception occur in set()"));
         *(m_mat + (m_col_size * row + col)) = v;
     }
 
@@ -371,7 +371,7 @@ public:
     //Allow operation as 'x=y=z'
     Matrix<T> & operator = (Matrix<T> const& m)
     {
-        ASSERT(m_is_init && m.m_is_init, ("not yet initialize."));
+        ASSERTN(m_is_init && m.m_is_init, ("not yet initialize."));
         copy(m);
         return *this;
     }
@@ -435,7 +435,7 @@ public:
     void eche(); //Reduce matrix to row-echelon normal form.
 
     //Calculate null space(kern), each column of 'ns' indicate every unknown.
-    void null(Matrix<T> & ns);
+    void nullspace(Matrix<T> & ns);
     void basis(OUT Matrix<T> & b); //Calculate basis
 
     //Calculate algebraic complement
@@ -543,7 +543,7 @@ UINT Matrix<T>::count_mem() const
 template <class T>
 void Matrix<T>::adjust()
 {
-    ASSERT(m_is_init, ("not yet initialize."));
+    ASSERTN(m_is_init, ("not yet initialize."));
     if (HOOK_ADJUST != NULL) {
         (*HOOK_ADJUST)(this);
     }
@@ -556,13 +556,13 @@ void Matrix<T>::adjust()
 template <class T>
 void Matrix<T>::grow_row(UINT size)
 {
-    ASSERT(m_is_init, ("not yet initialize."));
+    ASSERTN(m_is_init, ("not yet initialize."));
     if (size == 0) { return; }
 
     UINT oldrows = 0;
     if (m_row_size == 0) {
         //If matrix is empty, growing 'size' rows, but only one column.
-        ASSERT(!m_col_size && m_mat == NULL, ("matrix should be empty"));
+        ASSERTN(!m_col_size && m_mat == NULL, ("matrix should be empty"));
         m_mat = (T*)::malloc(sizeof(T) * size);
         ::memset(m_mat, 0, sizeof(T) * size);
         m_col_size = 1;
@@ -597,18 +597,18 @@ INIT:
 template <class T>
 void Matrix<T>::grow_row(const T row[], UINT rowelemnum)
 {
-    ASSERT(m_is_init, ("not yet initialize."));
+    ASSERTN(m_is_init, ("not yet initialize."));
     ASSERT0(row != NULL);
     if (rowelemnum == 0) return;
     if (m_row_size == 0) {
-        ASSERT(!m_col_size && m_mat == NULL, ("matrix should be empty"));
+        ASSERTN(!m_col_size && m_mat == NULL, ("matrix should be empty"));
         m_mat = (T*)::malloc(sizeof(T) * rowelemnum);
         ::memcpy(m_mat, row, sizeof(T) * rowelemnum);
         m_row_size = 1;
         m_col_size = rowelemnum;
         return;
     }
-    ASSERT(rowelemnum <= m_col_size,("unmatch column sizes"));
+    ASSERTN(rowelemnum <= m_col_size,("unmatch column sizes"));
     INT l = m_col_size * (m_row_size + 1) * sizeof(T);
     T * tmp_mat = (T*)::malloc(l);
     ::memcpy(tmp_mat, m_mat, m_col_size * m_row_size * sizeof(T));
@@ -627,14 +627,14 @@ void Matrix<T>::grow_row(const T row[], UINT rowelemnum)
 template <class T>
 void Matrix<T>::grow_row(Matrix<T> const& a)
 {
-    ASSERT(m_is_init, ("not yet initialize."));
-    ASSERT(a.is_vec(), ("a must be vector"));
+    ASSERTN(m_is_init, ("not yet initialize."));
+    ASSERTN(a.is_vec(), ("a must be vector"));
     if (m_row_size > 0) {
-        ASSERT(a.size() == m_col_size, ("invalid vector"));
+        ASSERTN(a.size() == m_col_size, ("invalid vector"));
     }
     if (m_row_size == 0) {
-        ASSERT(!HOOK_INIT || HOOK_INIT == a.HOOK_INIT, ("unmatch hook"));
-        ASSERT(!HOOK_EQUAL || HOOK_EQUAL == a.HOOK_EQUAL, ("unmatch hook"));
+        ASSERTN(!HOOK_INIT || HOOK_INIT == a.HOOK_INIT, ("unmatch hook"));
+        ASSERTN(!HOOK_EQUAL || HOOK_EQUAL == a.HOOK_EQUAL, ("unmatch hook"));
         m_inhr = a.m_inhr;
     }
     grow_row(a.m_mat, a.size());
@@ -645,12 +645,12 @@ void Matrix<T>::grow_row(Matrix<T> const& a)
 template <class T>
 void Matrix<T>::grow_row(Matrix<T> const& a, UINT from, UINT to)
 {
-    ASSERT(m_is_init, ("not yet initialize."));
-    ASSERT(from < a.m_row_size && to < a.m_row_size && from <= to,
+    ASSERTN(m_is_init, ("not yet initialize."));
+    ASSERTN(from < a.m_row_size && to < a.m_row_size && from <= to,
             ("not yet initialize."));
     if (m_row_size == 0) {
         //If matrix is empty, growing 'size' rows, but only one column.
-        ASSERT(!m_col_size && m_mat == NULL, ("matrix should be empty"));
+        ASSERTN(!m_col_size && m_mat == NULL, ("matrix should be empty"));
         m_col_size = a.m_col_size;
         m_row_size = to - from + 1;
         m_mat = (T*)::malloc(sizeof(T) * m_row_size * m_col_size);
@@ -658,11 +658,11 @@ void Matrix<T>::grow_row(Matrix<T> const& a, UINT from, UINT to)
                 sizeof(T) * m_row_size * m_col_size);
         return;
     }
-    ASSERT(a.m_col_size == m_col_size, ("unmatch matrix"));
+    ASSERTN(a.m_col_size == m_col_size, ("unmatch matrix"));
     INT row_size = to - from + 1;
     T * tmp_mat = (T*)::malloc((m_row_size + row_size) *
                                 m_col_size * sizeof(T));
-    ASSERT(tmp_mat,("memory is low!!!"));
+    ASSERTN(tmp_mat,("memory is low!!!"));
     UINT orig_size = m_col_size * m_row_size;
     ::memcpy(tmp_mat, m_mat, orig_size * sizeof(T));
     ::memcpy(tmp_mat + orig_size, a.m_mat + from * a.m_col_size,
@@ -680,13 +680,13 @@ void Matrix<T>::grow_row(Matrix<T> const& a, UINT from, UINT to)
 template <class T>
 void Matrix<T>::grow_col(UINT size)
 {
-    ASSERT(m_is_init, ("not yet initialize."));
+    ASSERTN(m_is_init, ("not yet initialize."));
     if (size == 0) {
         return;
     }
     if (m_col_size == 0) { //matrix is empty
         //If matrix is empty, growing 'size' columns, but only one row.
-        ASSERT(!m_row_size && m_mat == NULL, ("exception occur in grow_col()"));
+        ASSERTN(!m_row_size && m_mat == NULL, ("exception occur in grow_col()"));
         m_mat = (T*)::malloc(sizeof(T) * size);
         ::memset(m_mat, 0, sizeof(T) * size);
         m_col_size = size;
@@ -706,14 +706,14 @@ void Matrix<T>::grow_col(UINT size)
 template <class T>
 void Matrix<T>::grow_col(Matrix<T> const& a)
 {
-    ASSERT(m_is_init, ("not yet initialize."));
-    ASSERT(a.is_vec(), ("a must be vector"));
+    ASSERTN(m_is_init, ("not yet initialize."));
+    ASSERTN(a.is_vec(), ("a must be vector"));
     if (m_col_size > 0) {
-        ASSERT(a.size() == m_row_size, ("invalid vector"));
+        ASSERTN(a.size() == m_row_size, ("invalid vector"));
     }
     if (m_col_size == 0) {
-        ASSERT(!HOOK_INIT || HOOK_INIT == a.HOOK_INIT, ("unmatch hook"));
-        ASSERT(!HOOK_EQUAL || HOOK_EQUAL == a.HOOK_EQUAL, ("unmatch hook"));
+        ASSERTN(!HOOK_INIT || HOOK_INIT == a.HOOK_INIT, ("unmatch hook"));
+        ASSERTN(!HOOK_EQUAL || HOOK_EQUAL == a.HOOK_EQUAL, ("unmatch hook"));
         m_inhr = a.m_inhr;
     }
     grow_col(a.m_mat, a.size());
@@ -724,14 +724,14 @@ void Matrix<T>::grow_col(Matrix<T> const& a)
 template <class T>
 void Matrix<T>::grow_col(Matrix<T> const& a, UINT from, UINT to)
 {
-    ASSERT(m_is_init && a.m_is_init, ("not yet initialize."));
-    ASSERT(from < a.m_col_size && to < a.m_col_size && from <= to,
+    ASSERTN(m_is_init && a.m_is_init, ("not yet initialize."));
+    ASSERTN(from < a.m_col_size && to < a.m_col_size && from <= to,
            ("not yet initialize."));
 
     if (m_col_size == 0) { //matrix is empty
 
         //m_row_size also be 0
-        ASSERT(!m_row_size && m_mat == NULL,
+        ASSERTN(!m_row_size && m_mat == NULL,
                 ("exception occur in grow_all()"));
         m_row_size = a.m_row_size;
         m_col_size = to - from + 1;
@@ -744,11 +744,11 @@ void Matrix<T>::grow_col(Matrix<T> const& a, UINT from, UINT to)
         return;
     }
 
-    ASSERT(a.m_row_size == m_row_size, ("unmatch matrix"));
+    ASSERTN(a.m_row_size == m_row_size, ("unmatch matrix"));
     INT col_size = to - from + 1;
     T * tmp_mat = (T*)::malloc(m_row_size *
         (m_col_size + col_size) * sizeof(T));
-    ASSERT(tmp_mat,("memory is low!!!"));
+    ASSERTN(tmp_mat,("memory is low!!!"));
     for (UINT i = 0 ; i < m_row_size; i++) {
         ::memcpy(tmp_mat + i * (m_col_size+col_size),
                m_mat + i * m_col_size,
@@ -769,10 +769,10 @@ void Matrix<T>::grow_col(Matrix<T> const& a, UINT from, UINT to)
 template <class T>
 void Matrix<T>::grow_col(const T col[], UINT colelemnum)
 {
-    ASSERT(m_is_init, ("not yet initialize."));
+    ASSERTN(m_is_init, ("not yet initialize."));
     ASSERT0(col != NULL);
     if (m_col_size == 0) {
-        ASSERT(!m_row_size && m_mat == NULL,
+        ASSERTN(!m_row_size && m_mat == NULL,
                ("exception occur in grow_col()"));
         m_mat = (T*)::malloc(sizeof(T) * colelemnum);
         ::memcpy(m_mat, col, sizeof(T) * colelemnum);
@@ -781,10 +781,10 @@ void Matrix<T>::grow_col(const T col[], UINT colelemnum)
         return;
     }
 
-    ASSERT(colelemnum <= m_row_size,("unmatch column sizes"));
+    ASSERTN(colelemnum <= m_row_size,("unmatch column sizes"));
     UINT s = m_row_size * (m_col_size+1) * sizeof(T);
     T * tmp_mat = (T*)::malloc(s);
-    ASSERT(tmp_mat,("memory is low!!!"));
+    ASSERTN(tmp_mat,("memory is low!!!"));
     for (UINT i = 0 ; i < m_row_size; i++) {
         ::memcpy(tmp_mat + i * (m_col_size + 1), m_mat + i * m_col_size,
                m_col_size * sizeof(T));
@@ -803,7 +803,7 @@ void Matrix<T>::grow_col(const T col[], UINT colelemnum)
 template <class T>
 void Matrix<T>::grow_all(UINT row_size, UINT col_size)
 {
-    ASSERT(m_is_init, ("not yet initialize."));
+    ASSERTN(m_is_init, ("not yet initialize."));
     UINT i,j;
     if (row_size == 0 && col_size == 0) {
         return;
@@ -818,7 +818,7 @@ void Matrix<T>::grow_all(UINT row_size, UINT col_size)
     //The complexity of grow column is same as grow both.
     if (m_col_size == 0) { //matrix is empty
         //m_row_size also be 0
-        ASSERT(!m_row_size && m_mat == NULL,
+        ASSERTN(!m_row_size && m_mat == NULL,
                 ("exception occur in grow_all()"));
         m_mat = (T*)::malloc(sizeof(T) * row_size * col_size);
         ::memset(m_mat, 0 , sizeof(T) * row_size * col_size);
@@ -830,7 +830,7 @@ void Matrix<T>::grow_all(UINT row_size, UINT col_size)
     UINT newsize = (m_row_size + row_size) *
         (m_col_size + col_size) * sizeof(T);
     T * tmp_mat = (T*)::malloc(newsize);
-    ASSERT(tmp_mat,("memory is low!!!"));
+    ASSERTN(tmp_mat,("memory is low!!!"));
     //::memset(tmp_mat, 0, newsize); //initilzed later on.
 
     for (i = 0 ; i < m_row_size; i++) {
@@ -862,8 +862,8 @@ void Matrix<T>::grow_all(UINT row_size, UINT col_size)
 template <class T>
 void Matrix<T>::del_row(UINT from, UINT to)
 {
-    ASSERT(m_is_init, ("not yet initialize."));
-    ASSERT(from < m_row_size && to < m_row_size && from <= to,
+    ASSERTN(m_is_init, ("not yet initialize."));
+    ASSERTN(from < m_row_size && to < m_row_size && from <= to,
             ("out of boundary"));
     if (m_row_size == 0) {
         return;
@@ -883,8 +883,8 @@ void Matrix<T>::del_row(UINT from, UINT to)
 template <class T>
 void Matrix<T>::del_col(UINT from, UINT to)
 {
-    ASSERT(m_is_init, ("not yet initialize."));
-    ASSERT(from < m_col_size && to < m_col_size && from <= to,
+    ASSERTN(m_is_init, ("not yet initialize."));
+    ASSERTN(from < m_col_size && to < m_col_size && from <= to,
            ("out of boundary"));
     if (m_col_size == 0) { return; }
 
@@ -908,7 +908,7 @@ void Matrix<T>::del_col(UINT from, UINT to)
 template <class T>
 void Matrix<T>::pad_quad()
 {
-    ASSERT(m_is_init, ("not yet initialize."));
+    ASSERTN(m_is_init, ("not yet initialize."));
     if (m_row_size == m_col_size) { return;    }
 
     if (m_row_size < m_col_size) {
@@ -925,7 +925,7 @@ void Matrix<T>::pad_quad()
 template <class T>
 void Matrix<T>::setg(UINT row, UINT col, T v)
 {
-    ASSERT(m_is_init, ("not yet initialize."));
+    ASSERTN(m_is_init, ("not yet initialize."));
     if (m_row_size <= row && m_col_size > col) { //grow row
         grow_row(row + 1 - m_row_size);
     } else if (m_row_size > row && m_col_size <= col) { //grow col
@@ -942,8 +942,8 @@ void Matrix<T>::setg(UINT row, UINT col, T v)
 template <class T>
 void Matrix<T>::set_row(UINT rows, T row[], INT num)
 {
-    ASSERT(m_is_init, ("not yet initialize."));
-    ASSERT(rows < m_row_size && num == m_col_size,
+    ASSERTN(m_is_init, ("not yet initialize."));
+    ASSERTN(rows < m_row_size && num == m_col_size,
             ("exception occur in set()"));
     ::memcpy(m_mat + rows * m_col_size, row, sizeof(T) * m_col_size);
 }
@@ -955,20 +955,20 @@ void Matrix<T>::set_row(UINT rows, T row[], INT num)
 template <class T>
 void Matrix<T>::set_row(UINT rows, Matrix<T> const& v)
 {
-    ASSERT(m_is_init, ("not yet initialize."));
-    ASSERT(rows < m_row_size, ("exception occur in set()"));
-    ASSERT(v.is_vec(), ("v must be vector"));
-    ASSERT((m_col_size == v.size()), ("invalid vector"));
+    ASSERTN(m_is_init, ("not yet initialize."));
+    ASSERTN(rows < m_row_size, ("exception occur in set()"));
+    ASSERTN(v.is_vec(), ("v must be vector"));
+    ASSERTN((m_col_size == v.size()), ("invalid vector"));
     if (v.is_rowvec()) {
-        ASSERT(v.m_col_size == m_col_size,("unmatch vector"));
+        ASSERTN(v.m_col_size == m_col_size,("unmatch vector"));
         ::memcpy(m_mat + rows * m_col_size, v.m_mat, sizeof(T) * m_col_size);
     } else if (v.is_colvec()) {
-        ASSERT(v.m_row_size == m_col_size,("unmatch vector"));
+        ASSERTN(v.m_row_size == m_col_size,("unmatch vector"));
         for (UINT i = 0; i < m_col_size; i++) {
             set(rows, i, v.get(i, 0));
         }
     } else {
-        ASSERT(0, ("invalid operation"));
+        ASSERTN(0, ("invalid operation"));
     }
 }
 
@@ -977,8 +977,8 @@ void Matrix<T>::set_row(UINT rows, Matrix<T> const& v)
 template <class T>
 void Matrix<T>::set_rows(UINT from, UINT to, Matrix<T> const& m, UINT mfrom)
 {
-    ASSERT(m_is_init, ("not yet initialize."));
-    ASSERT(m.m_col_size == m_col_size &&
+    ASSERTN(m_is_init, ("not yet initialize."));
+    ASSERTN(m.m_col_size == m_col_size &&
             from <= to && to < m_row_size &&
             mfrom + to - from < m.m_row_size,
             ("illegal matrix"));
@@ -993,8 +993,8 @@ void Matrix<T>::set_rows(UINT from, UINT to, Matrix<T> const& m, UINT mfrom)
 template <class T>
 void Matrix<T>::set_rows(UINT from, UINT to, T v)
 {
-    ASSERT(m_is_init, ("not yet initialize."));
-    ASSERT(from <= to && to < m_row_size, ("illegal matrix"));
+    ASSERTN(m_is_init, ("not yet initialize."));
+    ASSERTN(from <= to && to < m_row_size, ("illegal matrix"));
     for (UINT i = from; i <= to; i++) {
         set_row(i, v);
     }
@@ -1005,8 +1005,8 @@ void Matrix<T>::set_rows(UINT from, UINT to, T v)
 template <class T>
 void Matrix<T>::set_row(UINT rows, T v)
 {
-    ASSERT(m_is_init, ("not yet initialize."));
-    ASSERT(rows < m_row_size, ("exception occur in set()"));
+    ASSERTN(m_is_init, ("not yet initialize."));
+    ASSERTN(rows < m_row_size, ("exception occur in set()"));
     for (UINT i = 0; i < m_col_size; i++) {
         set(rows, i, v);
     }
@@ -1018,8 +1018,8 @@ void Matrix<T>::set_row(UINT rows, T v)
 template <class T>
 void Matrix<T>::set_col(UINT cols, T col[], INT num)
 {
-    ASSERT(m_is_init, ("not yet initialize."));
-    ASSERT(cols < m_col_size && num == m_row_size,
+    ASSERTN(m_is_init, ("not yet initialize."));
+    ASSERTN(cols < m_col_size && num == m_row_size,
             ("exception occur in set()"));
     for (UINT i = 0 ; i < m_row_size ; i++) {
         set(i, cols, col[i]);
@@ -1031,22 +1031,22 @@ void Matrix<T>::set_col(UINT cols, T col[], INT num)
 template <class T>
 void Matrix<T>::set_col(UINT cols, Matrix<T> const& v)
 {
-    ASSERT(m_is_init, ("not yet initialize."));
-    ASSERT(cols < m_col_size, ("exception occur in set()"));
-    ASSERT(v.is_vec(), ("v must be vector"));
-    ASSERT(v.size() == m_row_size, ("invalid vector"));
+    ASSERTN(m_is_init, ("not yet initialize."));
+    ASSERTN(cols < m_col_size, ("exception occur in set()"));
+    ASSERTN(v.is_vec(), ("v must be vector"));
+    ASSERTN(v.size() == m_row_size, ("invalid vector"));
     if (v.is_rowvec()) {
-        ASSERT(v.m_col_size == m_row_size,("unmatch vector"));
+        ASSERTN(v.m_col_size == m_row_size,("unmatch vector"));
         for (UINT i = 0; i < m_row_size; i++) {
             set(i, cols, v.get(0, i));
         }
     } else if (v.is_colvec()) {
-        ASSERT(v.m_row_size == m_row_size,("unmatch vector"));
+        ASSERTN(v.m_row_size == m_row_size,("unmatch vector"));
         for (UINT i = 0; i < m_row_size; i++) {
             set(i, cols, v.get(i, 0));
         }
     } else {
-        ASSERT(0, ("invalid operation"));
+        ASSERTN(0, ("invalid operation"));
     }
 }
 
@@ -1055,8 +1055,8 @@ void Matrix<T>::set_col(UINT cols, Matrix<T> const& v)
 template <class T>
 void Matrix<T>::set_cols(UINT from, UINT to, Matrix<T> const& m, UINT mfrom)
 {
-    ASSERT(m_is_init, ("not yet initialize."));
-    ASSERT(m.m_row_size == m_row_size &&
+    ASSERTN(m_is_init, ("not yet initialize."));
+    ASSERTN(m.m_row_size == m_row_size &&
             from <= to && to < m_col_size && mfrom + to - from < m.m_col_size,
             ("illegal matrix"));
     for (UINT i = 0; i < get_row_size(); i++) {
@@ -1071,8 +1071,8 @@ void Matrix<T>::set_cols(UINT from, UINT to, Matrix<T> const& m, UINT mfrom)
 template <class T>
 void Matrix<T>::set_cols(UINT from, UINT to, T v)
 {
-    ASSERT(m_is_init, ("not yet initialize."));
-    ASSERT(from <= to && to < m_col_size, ("illegal matrix"));
+    ASSERTN(m_is_init, ("not yet initialize."));
+    ASSERTN(from <= to && to < m_col_size, ("illegal matrix"));
     for (UINT j = from; j <= to; j++) {
         set_col(j, v);
     }
@@ -1084,8 +1084,8 @@ void Matrix<T>::set_cols(UINT from, UINT to, T v)
 template <class T>
 void Matrix<T>::set_col(UINT cols, T v)
 {
-    ASSERT(m_is_init, ("not yet initialize."));
-    ASSERT(cols < m_col_size, ("exception occur in set()"));
+    ASSERTN(m_is_init, ("not yet initialize."));
+    ASSERTN(cols < m_col_size, ("exception occur in set()"));
     for (UINT i = 0; i < m_row_size; i++) {
         set(i, cols, v);
     }
@@ -1096,8 +1096,8 @@ void Matrix<T>::set_col(UINT cols, T v)
 template <class T>
 void Matrix<T>::interch_row(UINT row1, UINT row2)
 {
-    ASSERT(m_is_init, ("not yet initialize."));
-    ASSERT(row1 < m_row_size && row2 < m_row_size,
+    ASSERTN(m_is_init, ("not yet initialize."));
+    ASSERTN(row1 < m_row_size && row2 < m_row_size,
             ("exception occur in interch_row()"));
     if (row1 == row2) return;
     for (UINT i = 0 ; i < m_col_size ; i++) {
@@ -1112,8 +1112,8 @@ void Matrix<T>::interch_row(UINT row1, UINT row2)
 template <class T>
 void Matrix<T>::interch_col(UINT col1, UINT col2)
 {
-    ASSERT(m_is_init, ("not yet initialize."));
-    ASSERT(col1 < m_row_size && col2 < m_row_size,
+    ASSERTN(m_is_init, ("not yet initialize."));
+    ASSERTN(col1 < m_row_size && col2 < m_row_size,
             ("exception occur in interch_col()"));
     if (col1 == col2) return;
     for (UINT i = 0 ; i < m_row_size ; i++) {
@@ -1128,10 +1128,10 @@ void Matrix<T>::interch_col(UINT col1, UINT col2)
 template <class T>
 void Matrix<T>::trans()
 {
-    ASSERT(m_is_init, ("not yet initialize."));
+    ASSERTN(m_is_init, ("not yet initialize."));
     UINT i;
     if (m_row_size == 0) return;
-    ASSERT(m_mat,("exception occur tranpose()"));
+    ASSERTN(m_mat,("exception occur tranpose()"));
     T * tmp_mat = (T*)::malloc(m_row_size * m_col_size * sizeof(T));
     for (i = 0; i < m_row_size; i++) {
         for (UINT j = 0; j < m_col_size; j++) {
@@ -1151,7 +1151,7 @@ void Matrix<T>::trans()
 template <class T>
 void Matrix<T>::copy(IN Matrix<T> const& m)
 {
-    ASSERT(m_is_init && m.m_is_init, ("not yet initialize."));
+    ASSERTN(m_is_init && m.m_is_init, ("not yet initialize."));
     if (this == &m) return;
     if (m.size() == 0) {
         clean();
@@ -1175,7 +1175,7 @@ void Matrix<T>::copy(IN Matrix<T> const& m)
 template <class T>
 bool Matrix<T>::is_nonsig() const
 {
-    ASSERT(m_is_init, ("not yet initialize."));
+    ASSERTN(m_is_init, ("not yet initialize."));
     if (!is_quad()) return false;
     if (_equal(det(), T(0))) return false;
     return true;
@@ -1186,8 +1186,8 @@ bool Matrix<T>::is_nonsig() const
 template <class T>
 bool Matrix<T>::is_quad() const
 {
-    ASSERT(m_is_init, ("not yet initialize."));
-    ASSERT(m_row_size > 0 && m_col_size > 0,
+    ASSERTN(m_is_init, ("not yet initialize."));
+    ASSERTN(m_row_size > 0 && m_col_size > 0,
             ("exception occur in is_quad()"));
     return m_row_size == m_col_size;
 }
@@ -1196,7 +1196,7 @@ bool Matrix<T>::is_quad() const
 template <class T>
 bool Matrix<T>::is_unitary() const
 {
-    ASSERT(m_is_init, ("not yet initialize."));
+    ASSERTN(m_is_init, ("not yet initialize."));
     if (!is_quad()) return false;
     for (UINT i = 0; i < m_row_size; i++) {
         for (UINT j = 0; j < m_col_size; j++) {
@@ -1216,7 +1216,7 @@ bool Matrix<T>::is_unitary() const
 template <class T>
 bool Matrix<T>::is_symm() const
 {
-    ASSERT(m_is_init, ("not yet initialize."));
+    ASSERTN(m_is_init, ("not yet initialize."));
     if (!is_quad()) return false;
     for (UINT i = 0; i < m_row_size; i++) {
         for (UINT j = 0; j < m_col_size; j++) {
@@ -1237,7 +1237,7 @@ bool Matrix<T>::is_symm() const
 template <class T>
 bool Matrix<T>::is_orth() const
 {
-    ASSERT(m_is_init, ("not yet initialize."));
+    ASSERTN(m_is_init, ("not yet initialize."));
     Matrix<T> tmp = *this;
     tmp.trans();
     tmp = *this * tmp;
@@ -1256,7 +1256,7 @@ bool Matrix<T>::is_orth() const
 template <class T>
 bool Matrix<T>::operator == (Matrix<T> const& m) const
 {
-    ASSERT(m_is_init && m.m_is_init, ("not yet initialize."));
+    ASSERTN(m_is_init && m.m_is_init, ("not yet initialize."));
     if (this == &m) return true;
     if (!is_homo(m)) {
         return false;
@@ -1276,7 +1276,7 @@ bool Matrix<T>::operator == (Matrix<T> const& m) const
 template <class T>
 bool Matrix<T>::is_homo(Matrix<T> const& m) const
 {
-    ASSERT(m_is_init && m.m_is_init, ("not yet initialize."));
+    ASSERTN(m_is_init && m.m_is_init, ("not yet initialize."));
     if (m_row_size == m.m_row_size && m_col_size == m.m_col_size) {
         return true;
     }
@@ -1287,8 +1287,8 @@ bool Matrix<T>::is_homo(Matrix<T> const& m) const
 template <class T>
 void Matrix<T>::neg()
 {
-    ASSERT(m_is_init, ("not yet initialize."));
-    ASSERT(m_row_size > 0 && m_col_size > 0, ("invalid matrix"));
+    ASSERTN(m_is_init, ("not yet initialize."));
+    ASSERTN(m_row_size > 0 && m_col_size > 0, ("invalid matrix"));
     for (UINT i = 0; i < m_row_size; i++) {
         for (UINT j = 0; j < m_col_size; j++) {
             set(i, j, -get(i, j));
@@ -1301,8 +1301,8 @@ void Matrix<T>::neg()
 template <class T>
 void Matrix<T>::negOfRows(UINT from, UINT to)
 {
-    ASSERT(m_is_init, ("not yet initialize."));
-    ASSERT(m_row_size > 0 && m_col_size > 0 && to < m_row_size && from <= to,
+    ASSERTN(m_is_init, ("not yet initialize."));
+    ASSERTN(m_row_size > 0 && m_col_size > 0 && to < m_row_size && from <= to,
             ("invalid matrix or parameter"));
     for (UINT i = from; i <= to; i++) {
         for (UINT j = 0; j < m_col_size; j++) {
@@ -1316,8 +1316,8 @@ void Matrix<T>::negOfRows(UINT from, UINT to)
 template <class T>
 void Matrix<T>::negOfColumns(UINT from, UINT to)
 {
-    ASSERT(m_is_init, ("not yet initialize."));
-    ASSERT(m_row_size > 0 && m_col_size > 0 && to < m_col_size && from <= to,
+    ASSERTN(m_is_init, ("not yet initialize."));
+    ASSERTN(m_row_size > 0 && m_col_size > 0 && to < m_col_size && from <= to,
             ("invalid matrix or parameter"));
     for (UINT j = from; j <= to; j++) {
         for (UINT i = 0; i < m_row_size; i++) {
@@ -1330,8 +1330,8 @@ void Matrix<T>::negOfColumns(UINT from, UINT to)
 template <class T>
 void Matrix<T>::mul(T v)
 {
-    ASSERT(m_is_init, ("not yet initialize."));
-    ASSERT(m_row_size > 0 && m_col_size > 0, ("invalid matrix"));
+    ASSERTN(m_is_init, ("not yet initialize."));
+    ASSERTN(m_row_size > 0 && m_col_size > 0, ("invalid matrix"));
     if (_equal(v, T(0))) {
         zero();
         return;
@@ -1352,8 +1352,8 @@ void Matrix<T>::mul(T v)
 template <class T>
 void Matrix<T>::mulOfRow(UINT row, T v)
 {
-    ASSERT(m_is_init, ("not yet initialize."));
-    ASSERT(m_row_size > 0 && m_col_size > 0 && row < m_row_size,
+    ASSERTN(m_is_init, ("not yet initialize."));
+    ASSERTN(m_row_size > 0 && m_col_size > 0 && row < m_row_size,
             ("invalid matrix or parameter"));
     if (v == 1) {
         return;
@@ -1372,8 +1372,8 @@ void Matrix<T>::mulOfRow(UINT row, T v)
 template <class T>
 void Matrix<T>::mulOfRows(UINT from, UINT to, T v)
 {
-    ASSERT(m_is_init, ("not yet initialize."));
-    ASSERT(m_row_size > 0 && m_col_size > 0 && to < m_row_size && from <= to,
+    ASSERTN(m_is_init, ("not yet initialize."));
+    ASSERTN(m_row_size > 0 && m_col_size > 0 && to < m_row_size && from <= to,
             ("invalid matrix or parameter"));
     if (v == 1) {
         return;
@@ -1394,8 +1394,8 @@ void Matrix<T>::mulOfRows(UINT from, UINT to, T v)
 template <class T>
 void Matrix<T>::mulOfColumn(UINT col, T v)
 {
-    ASSERT(m_is_init, ("not yet initialize."));
-    ASSERT(m_row_size > 0 && m_col_size > 0 && col < m_col_size,
+    ASSERTN(m_is_init, ("not yet initialize."));
+    ASSERTN(m_row_size > 0 && m_col_size > 0 && col < m_col_size,
                     ("invalid matrix or parameter"));
     if (v == 1) {
         return;
@@ -1414,8 +1414,8 @@ void Matrix<T>::mulOfColumn(UINT col, T v)
 template <class T>
 void Matrix<T>:: mulOfColumns(UINT from, UINT to, T v)
 {
-    ASSERT(m_is_init, ("not yet initialize."));
-    ASSERT(m_row_size > 0 && m_col_size > 0 && to < m_col_size && from <= to,
+    ASSERTN(m_is_init, ("not yet initialize."));
+    ASSERTN(m_row_size > 0 && m_col_size > 0 && to < m_col_size && from <= to,
             ("invalid matrix or parameter"));
     if (v == 1) {
         return;
@@ -1436,8 +1436,8 @@ void Matrix<T>:: mulOfColumns(UINT from, UINT to, T v)
 template <class T>
 void Matrix<T>::addRowToRow(UINT from, UINT to)
 {
-    ASSERT(m_is_init, ("not yet initialize."));
-    ASSERT(m_row_size > 0 && m_col_size > 0 && from < m_row_size &&
+    ASSERTN(m_is_init, ("not yet initialize."));
+    ASSERTN(m_row_size > 0 && m_col_size > 0 && from < m_row_size &&
             to < m_row_size, ("invalid matrix or parameter"));
     for (UINT j = 0; j < m_col_size; j++) {
         set(to, j, (get(from, j) + get(to, j)));
@@ -1450,10 +1450,10 @@ template <class T>
 void Matrix<T>::addRowToRow(IN Matrix<T> const& m,
                             UINT mfrom, UINT to)
 {
-    ASSERT(m_is_init && m.m_is_init, ("not yet initialize."));
-    ASSERT(m_row_size > 0 && m_col_size > 0 && mfrom < m.m_row_size &&
+    ASSERTN(m_is_init && m.m_is_init, ("not yet initialize."));
+    ASSERTN(m_row_size > 0 && m_col_size > 0 && mfrom < m.m_row_size &&
             to < m_row_size, ("invalid matrix or parameter"));
-    ASSERT(m_col_size == m.m_col_size, ("unmatch row size"));
+    ASSERTN(m_col_size == m.m_col_size, ("unmatch row size"));
     for (UINT j = 0; j < m_col_size; j++) {
         set(to, j, (m.get(mfrom, j) + get(to, j)));
     }
@@ -1464,8 +1464,8 @@ void Matrix<T>::addRowToRow(IN Matrix<T> const& m,
 template <class T>
 void Matrix<T>::addColumnToColumn(UINT from, UINT to)
 {
-    ASSERT(m_is_init, ("not yet initialize."));
-    ASSERT(m_row_size > 0 && m_col_size > 0 && from < m_col_size &&
+    ASSERTN(m_is_init, ("not yet initialize."));
+    ASSERTN(m_row_size > 0 && m_col_size > 0 && from < m_col_size &&
             to < m_col_size, ("invalid matrix or parameter"));
     for (UINT i = 0; i < m_row_size; i++) {
         set(i, to, (get(i, from) + get(i, to)));
@@ -1478,10 +1478,10 @@ template <class T>
 void Matrix<T>::addColumnToColumn(IN Matrix<T> const& m,
                                UINT mfrom, UINT to)
 {
-    ASSERT(m_is_init, ("not yet initialize."));
-    ASSERT(m_row_size > 0 && m_col_size > 0 && mfrom < m.m_col_size &&
+    ASSERTN(m_is_init, ("not yet initialize."));
+    ASSERTN(m_row_size > 0 && m_col_size > 0 && mfrom < m.m_col_size &&
             to < m_col_size, ("invalid matrix or parameter"));
-    ASSERT(m_row_size == m.m_row_size, ("unmatch col size"));
+    ASSERTN(m_row_size == m.m_row_size, ("unmatch col size"));
     for (UINT i = 0; i < m_row_size; i++) {
         set(i, to, (m.get(i, mfrom) + get(i, to)));
     }
@@ -1492,8 +1492,8 @@ void Matrix<T>::addColumnToColumn(IN Matrix<T> const& m,
 template <class T>
 void Matrix<T>::mul_and_add_row(UINT from, T v, UINT to)
 {
-    ASSERT(m_is_init, ("not yet initialize."));
-    ASSERT(m_row_size > 0 && m_col_size > 0 && from < m_row_size &&
+    ASSERTN(m_is_init, ("not yet initialize."));
+    ASSERTN(m_row_size > 0 && m_col_size > 0 && from < m_row_size &&
             to < m_row_size, ("invalid matrix or parameter"));
     for (UINT j = 0; j < m_col_size; j++) {
         set(to, j, ((get(from, j) * v) + get(to, j)));
@@ -1504,8 +1504,8 @@ void Matrix<T>::mul_and_add_row(UINT from, T v, UINT to)
 template <class T>
 void Matrix<T>::mul_and_add_col(UINT from, T v, UINT to)
 {
-    ASSERT(m_is_init, ("not yet initialize."));
-    ASSERT(m_row_size > 0 && m_col_size > 0 && from < m_col_size &&
+    ASSERTN(m_is_init, ("not yet initialize."));
+    ASSERTN(m_row_size > 0 && m_col_size > 0 && from < m_col_size &&
             to < m_col_size, ("invalid matrix or parameter"));
     for (UINT i = 0; i < m_row_size; i++) {
         set(i, to, ((get(i, from) * v) + get(i, to)));
@@ -1517,7 +1517,7 @@ void Matrix<T>::mul_and_add_col(UINT from, T v, UINT to)
 template <class T>
 void Matrix<T>::set_all(T v)
 {
-    ASSERT(m_is_init, ("not yet initialize."));
+    ASSERTN(m_is_init, ("not yet initialize."));
     for (UINT j = 0; j < m_row_size; j++) {
         for (UINT i = 0; i < m_col_size; i++) {
             set(j, i, v);
@@ -1573,7 +1573,7 @@ void Matrix<T>::FullPermutationRecur(
                 T t;
                 t = 1;
                 for (UINT j = 0; j < posbufnum; j++) {
-                    ASSERT(posbuf[j]>=1, ("Invalid subscript"));
+                    ASSERTN(posbuf[j]>=1, ("Invalid subscript"));
                     t = t * get(j, (posbuf[j]-1));
                 }
                 INT ron = ReverseOrderNumber(posbuf, posbufnum);
@@ -1598,7 +1598,7 @@ void Matrix<T>::FullPermutationRecur(
 template <class T>
 T Matrix<T>::FullPermutation(UINT n)
 {
-    ASSERT(n > 1, ("Invalid number"));
+    ASSERTN(n > 1, ("Invalid number"));
     INT * posbuf = (INT*)::malloc(sizeof(INT) * n);
     T det;
     det = 0;
@@ -1620,8 +1620,8 @@ T Matrix<T>::FullPermutation(UINT n)
 template <class T>
 T Matrix<T>::det() const
 {
-    ASSERT(m_is_init, ("not yet initialize."));
-    ASSERT(m_row_size >= 1 && m_col_size >= 1, ("strange matrix"));
+    ASSERTN(m_is_init, ("not yet initialize."));
+    ASSERTN(m_row_size >= 1 && m_col_size >= 1, ("strange matrix"));
     if (!is_quad()) {
         return T(0);
     }
@@ -1742,8 +1742,8 @@ FIN:
 template <class T>
 bool Matrix<T>::inv(OUT Matrix<T> & e)
 {
-    ASSERT(m_is_init, ("not yet initialize."));
-    ASSERT(m_row_size >= 1 && m_col_size >= 1, ("strange matrix"));
+    ASSERTN(m_is_init, ("not yet initialize."));
+    ASSERTN(m_row_size >= 1 && m_col_size >= 1, ("strange matrix"));
     if (!is_quad()) {
         e.clean();
         return false;
@@ -1851,8 +1851,8 @@ FIN:
 template <class T>
 void Matrix<T>::frd(OUT Matrix<T> & f, OUT Matrix<T> & g)
 {
-    ASSERT(m_is_init, ("not yet initialize."));
-    ASSERT(m_row_size > 1 && m_col_size > 1, ("strange matrix"));
+    ASSERTN(m_is_init, ("not yet initialize."));
+    ASSERTN(m_row_size > 1 && m_col_size > 1, ("strange matrix"));
     Matrix<T> tmp;
     UINT rankr = rank(&tmp, true);
     g.grow_row(tmp, 0, rankr - 1);
@@ -1876,9 +1876,9 @@ void Matrix<T>::frd(OUT Matrix<T> & f, OUT Matrix<T> & g)
 template <class T>
 bool Matrix<T>::linv(OUT Matrix<T> & x)
 {
-    ASSERT(m_is_init, ("not yet initialize."));
-    ASSERT(m_row_size > 1 && m_col_size > 1, ("strange matrix"));
-    ASSERT(m_row_size >= m_col_size, ("unexpected matrix"));
+    ASSERTN(m_is_init, ("not yet initialize."));
+    ASSERTN(m_row_size > 1 && m_col_size > 1, ("strange matrix"));
+    ASSERTN(m_row_size >= m_col_size, ("unexpected matrix"));
     x.clean();
     Matrix<T> transm = *this;
     transm.trans();
@@ -1898,9 +1898,9 @@ bool Matrix<T>::linv(OUT Matrix<T> & x)
 template <class T>
 bool Matrix<T>::rinv(OUT Matrix<T> & x)
 {
-    ASSERT(m_is_init, ("not yet initialize."));
-    ASSERT(m_row_size > 1 && m_col_size > 1, ("strange matrix"));
-    ASSERT(m_row_size <= m_col_size, ("unexpected matrix"));
+    ASSERTN(m_is_init, ("not yet initialize."));
+    ASSERTN(m_row_size > 1 && m_col_size > 1, ("strange matrix"));
+    ASSERTN(m_row_size <= m_col_size, ("unexpected matrix"));
     x.clean();
     Matrix<T> transm = *this;
     transm.trans();
@@ -1927,7 +1927,7 @@ bool Matrix<T>::rinv(OUT Matrix<T> & x)
 template <class T>
 void Matrix<T>::pinv(OUT Matrix<T> & x)
 {
-    ASSERT(m_is_init, ("not yet initialize."));
+    ASSERTN(m_is_init, ("not yet initialize."));
     refinv(x);
 }
 
@@ -1944,7 +1944,7 @@ void Matrix<T>::pinv(OUT Matrix<T> & x)
 template <class T>
 void Matrix<T>::lstinv(OUT Matrix<T> & x)
 {
-    ASSERT(m_is_init, ("not yet initialize."));
+    ASSERTN(m_is_init, ("not yet initialize."));
     refinv(x);
 }
 
@@ -1961,7 +1961,7 @@ void Matrix<T>::lstinv(OUT Matrix<T> & x)
 template <class T>
 void Matrix<T>::minv(OUT Matrix<T> & x)
 {
-    ASSERT(m_is_init, ("not yet initialize."));
+    ASSERTN(m_is_init, ("not yet initialize."));
     refinv(x);
 }
 
@@ -1979,8 +1979,8 @@ void Matrix<T>::minv(OUT Matrix<T> & x)
 template <class T>
 void Matrix<T>::refinv(OUT Matrix<T> & x)
 {
-    ASSERT(m_is_init, ("not yet initialize."));
-    ASSERT(m_row_size > 1 && m_col_size > 1, ("strange matrix"));
+    ASSERTN(m_is_init, ("not yet initialize."));
+    ASSERTN(m_row_size > 1 && m_col_size > 1, ("strange matrix"));
     Matrix<T> f(0, 0, &m_inhr), g(0, 0, &m_inhr);
     frd(f,g);
     Matrix<T> fl(0, 0, &m_inhr), gr(0, 0, &m_inhr);
@@ -2000,8 +2000,8 @@ void Matrix<T>::refinv(OUT Matrix<T> & x)
 template <class T>
 bool Matrix<T>::ginv(OUT Matrix<T> & x)
 {
-    ASSERT(m_is_init, ("not yet initialize."));
-    ASSERT(m_row_size > 1 && m_col_size > 1, ("strange matrix"));
+    ASSERTN(m_is_init, ("not yet initialize."));
+    ASSERTN(m_row_size > 1 && m_col_size > 1, ("strange matrix"));
     if (rank() == MIN(m_row_size, m_col_size)) {
         if (m_row_size == m_col_size) {
             //Nonsingular matrix inverse
@@ -2025,7 +2025,7 @@ bool Matrix<T>::ginv(OUT Matrix<T> & x)
         Matrix<T> quad = *At * *A;
         bool res = quad.inv(quad);
         DUMMYUSE(res);
-        ASSERT(res, ("quad should be invertible!"));
+        ASSERTN(res, ("quad should be invertible!"));
         x = quad * *At;
         if (m_row_size < m_col_size) {
             x.trans();
@@ -2154,7 +2154,7 @@ FIN:
                     break;
                 }
             }
-            ASSERT(find, ("exception occurring!"));
+            ASSERTN(find, ("exception occurring!"));
         }
         for (UINT col = row+1; col < tmpthis.m_col_size; col++) {
             if (!_equal(tmpthis.get(row, col), T(0))) {
@@ -2186,9 +2186,9 @@ FIN:
 template <class T>
 void Matrix<T>::setdiag(IN Vector<T> const& v, UINT vlen)
 {
-    ASSERT(m_is_init, ("not yet initialize."));
-    ASSERT(is_quad(),("must be square"));
-    ASSERT(vlen == m_row_size,("unmatch vector"));
+    ASSERTN(m_is_init, ("not yet initialize."));
+    ASSERTN(is_quad(),("must be square"));
+    ASSERTN(vlen == m_row_size,("unmatch vector"));
     for (UINT i = 0; i < m_row_size; i++) {
         set(i, i, v[i]);
     }
@@ -2199,8 +2199,8 @@ void Matrix<T>::setdiag(IN Vector<T> const& v, UINT vlen)
 template <class T>
 void Matrix<T>::getdiag(OUT Matrix<T> & v)
 {
-    ASSERT(m_is_init, ("not yet initialize."));
-    ASSERT(m_row_size > 0, ("matrix is empty."));
+    ASSERTN(m_is_init, ("not yet initialize."));
+    ASSERTN(m_row_size > 0, ("matrix is empty."));
     UINT b = MIN(m_row_size, m_col_size);
     v.reinit(1, b);
     for (UINT i = 0; i < b; i++) {
@@ -2214,10 +2214,10 @@ void Matrix<T>::getdiag(OUT Matrix<T> & v)
 template <class T>
 void Matrix<T>::setdiag(IN Matrix<T> const& v)
 {
-    ASSERT(m_is_init, ("not yet initialize."));
-    ASSERT(is_quad(), ("must be square"));
-    ASSERT(v.is_vec(), ("must be vector"));
-    ASSERT(v.size() == m_row_size, ("out of boundary"));
+    ASSERTN(m_is_init, ("not yet initialize."));
+    ASSERTN(is_quad(), ("must be square"));
+    ASSERTN(v.is_vec(), ("must be vector"));
+    ASSERTN(v.size() == m_row_size, ("out of boundary"));
     if (v.is_rowvec()) {
         for (UINT i = 0; i < m_row_size; i++) {
             set(i, i, v.get(0,i));
@@ -2233,8 +2233,8 @@ void Matrix<T>::setdiag(IN Matrix<T> const& v)
 template <class T>
 void Matrix<T>::eye(T v)
 {
-    ASSERT(m_is_init, ("not yet initialize."));
-    ASSERT(is_quad(),("identity matrix must be square"));
+    ASSERTN(m_is_init, ("not yet initialize."));
+    ASSERTN(is_quad(),("identity matrix must be square"));
     for (UINT i = 0; i < m_row_size; i++) {
         for (UINT j = 0; j < m_col_size; j++) {
             if (i == j) {
@@ -2250,7 +2250,7 @@ void Matrix<T>::eye(T v)
 template <class T>
 void Matrix<T>::zero()
 {
-    ASSERT(m_is_init, ("not yet initialize."));
+    ASSERTN(m_is_init, ("not yet initialize."));
     for (UINT i = 0; i < m_row_size; i++) {
         for (UINT j = 0; j < m_col_size; j++) {
             set(i, j, 0);
@@ -2262,7 +2262,7 @@ void Matrix<T>::zero()
 template <class T>
 void Matrix<T>::fzero()
 {
-    ASSERT(m_is_init, ("not yet initialize."));
+    ASSERTN(m_is_init, ("not yet initialize."));
     if (m_mat != NULL) {
         ::memset(m_mat, 0, sizeof(T) * m_row_size * m_col_size);
     }
@@ -2272,8 +2272,8 @@ void Matrix<T>::fzero()
 template <class T>
 bool Matrix<T>::isLowTriangular() const
 {
-    ASSERT(m_is_init, ("not yet initialize."));
-    ASSERT(is_quad(),("must be square"));
+    ASSERTN(m_is_init, ("not yet initialize."));
+    ASSERTN(is_quad(),("must be square"));
     for (UINT i = 0; i < m_row_size; i++) {
         for (UINT j = i + 1; j < m_col_size; j++) {
             if (!_equal(get(i,j), T(0))) {
@@ -2288,8 +2288,8 @@ bool Matrix<T>::isLowTriangular() const
 template <class T>
 bool Matrix<T>::isAntiUpTriangular() const
 {
-    ASSERT(m_is_init, ("not yet initialize."));
-    ASSERT(is_quad(),("must be square"));
+    ASSERTN(m_is_init, ("not yet initialize."));
+    ASSERTN(is_quad(),("must be square"));
     for (UINT i = 0; i < m_row_size; i++) {
         for (UINT j = 0; j < m_col_size - 1 - i; j++) {
             if (!_equal(get(i,j), T(0))) {
@@ -2304,7 +2304,7 @@ bool Matrix<T>::isAntiUpTriangular() const
 template <class T>
 bool Matrix<T>::is_rowvec() const
 {
-    ASSERT(m_is_init, ("not yet initialize."));
+    ASSERTN(m_is_init, ("not yet initialize."));
     return m_row_size == 1;
 }
 
@@ -2312,7 +2312,7 @@ bool Matrix<T>::is_rowvec() const
 template <class T>
 bool Matrix<T>::is_colvec() const
 {
-    ASSERT(m_is_init, ("not yet initialize."));
+    ASSERTN(m_is_init, ("not yet initialize."));
     return m_col_size == 1;
 }
 
@@ -2320,7 +2320,7 @@ bool Matrix<T>::is_colvec() const
 template <class T>
 bool Matrix<T>::is_vec() const
 {
-    ASSERT(m_is_init, ("not yet initialize."));
+    ASSERTN(m_is_init, ("not yet initialize."));
     return is_rowvec() || is_colvec();
 }
 
@@ -2328,8 +2328,8 @@ bool Matrix<T>::is_vec() const
 template <class T>
 bool Matrix<T>::is_rowequ(UINT row, T v) const
 {
-    ASSERT(m_is_init, ("not yet initialize."));
-    ASSERT(row < m_row_size, ("out of boundary"));
+    ASSERTN(m_is_init, ("not yet initialize."));
+    ASSERTN(row < m_row_size, ("out of boundary"));
     for (UINT i = 0;  i < m_col_size; i++) {
         if (!_equal(get(row, i), v)) {
             return false;
@@ -2342,8 +2342,8 @@ bool Matrix<T>::is_rowequ(UINT row, T v) const
 template <class T>
 bool Matrix<T>::is_rowequ(UINT row, Matrix<T> const& m, UINT mrow) const
 {
-    ASSERT(m_is_init, ("not yet initialize."));
-    ASSERT(row < m_row_size &&
+    ASSERTN(m_is_init, ("not yet initialize."));
+    ASSERTN(row < m_row_size &&
             mrow < m.m_row_size &&
             m_col_size == m.m_col_size, ("out of boundary"));
     for (UINT i = 0;  i < m_col_size; i++) {
@@ -2358,8 +2358,8 @@ bool Matrix<T>::is_rowequ(UINT row, Matrix<T> const& m, UINT mrow) const
 template <class T>
 bool Matrix<T>::is_colequ(UINT col, T v) const
 {
-    ASSERT(m_is_init, ("not yet initialize."));
-    ASSERT(col < m_col_size, ("out of boundary"));
+    ASSERTN(m_is_init, ("not yet initialize."));
+    ASSERTN(col < m_col_size, ("out of boundary"));
     for (UINT i = 0;  i < m_row_size; i++) {
         if (!_equal(get(i, col), v)) {
             return false;
@@ -2372,8 +2372,8 @@ bool Matrix<T>::is_colequ(UINT col, T v) const
 template <class T>
 bool Matrix<T>::is_colequ(UINT col, Matrix<T> const& m, UINT mcol) const
 {
-    ASSERT(m_is_init, ("not yet initialize."));
-    ASSERT(col < m_col_size &&
+    ASSERTN(m_is_init, ("not yet initialize."));
+    ASSERTN(col < m_col_size &&
             mcol < m.m_col_size &&
             m_row_size == m.m_row_size, ("out of boundary"));
     for (UINT i = 0;  i < m_row_size; i++) {
@@ -2388,8 +2388,8 @@ bool Matrix<T>::is_colequ(UINT col, Matrix<T> const& m, UINT mcol) const
 template <class T>
 bool Matrix<T>::isUpTriangular() const
 {
-    ASSERT(m_is_init, ("not yet initialize."));
-    ASSERT(is_quad(),("must be square"));
+    ASSERTN(m_is_init, ("not yet initialize."));
+    ASSERTN(is_quad(),("must be square"));
     for (UINT j = 0; j < m_col_size; j++) {
         for (UINT i = j + 1; i < m_row_size; i++) {
             if (!_equal(get(i,j), T(0))) {
@@ -2404,8 +2404,8 @@ bool Matrix<T>::isUpTriangular() const
 template <class T>
 bool Matrix<T>::isAntiLowTriangular() const
 {
-    ASSERT(m_is_init, ("not yet initialize."));
-    ASSERT(is_quad(),("must be square"));
+    ASSERTN(m_is_init, ("not yet initialize."));
+    ASSERTN(is_quad(),("must be square"));
     for (UINT j = 0; j < m_col_size; j++) {
         for (UINT i = m_row_size - 1; i > m_row_size - 1 - j; i--) {
             if (!_equal(get(i,j), T(0))) {
@@ -2422,7 +2422,7 @@ bool Matrix<T>::isAntiLowTriangular() const
 template <class T>
 void Matrix<T>::eche()
 {
-    ASSERT(m_is_init, ("not yet initialize."));
+    ASSERTN(m_is_init, ("not yet initialize."));
     Matrix<T> tmp;
     rank(&tmp);
     copy(tmp);
@@ -2435,7 +2435,7 @@ void Matrix<T>::eche()
 template <class T>
 void Matrix<T>::basis(OUT Matrix<T> & b)
 {
-    ASSERT(m_is_init, ("not yet initialize."));
+    ASSERTN(m_is_init, ("not yet initialize."));
     UINT r = rank(&b, false);
     if (r < b.m_row_size) { //b is not full rank.
         Matrix<T> tmp;
@@ -2449,8 +2449,8 @@ void Matrix<T>::basis(OUT Matrix<T> & b)
 template <class T>
 void Matrix<T>::algc(UINT row, UINT col, OUT Matrix<T> & m)
 {
-    ASSERT(m_is_init, ("not yet initialize."));
-    ASSERT(row < m_row_size && col < m_col_size, ("not an entry"));
+    ASSERTN(m_is_init, ("not yet initialize."));
+    ASSERTN(row < m_row_size && col < m_col_size, ("not an entry"));
     m.reinit(m_row_size - 1, m_col_size - 1, &m_inhr);
     for (UINT i = 0; i < m_row_size; i++) {
         for (UINT j = 0; j < m_col_size; j++) {
@@ -2474,8 +2474,8 @@ void Matrix<T>::algc(UINT row, UINT col, OUT Matrix<T> & m)
 template <class T>
 bool Matrix<T>::adj(OUT Matrix<T> & m)
 {
-    ASSERT(m_is_init, ("not yet initialize."));
-    ASSERT(is_quad(), ("adj for rectangle matrix"));
+    ASSERTN(m_is_init, ("not yet initialize."));
+    ASSERTN(is_quad(), ("adj for rectangle matrix"));
 //#define BY_DEFINITION //Use the your favorite method.
 #ifdef BY_DEFINITION
     m.reinit(m_row_size, m_col_size, &m_inhr);
@@ -2539,9 +2539,9 @@ bool Matrix<T>::adj(OUT Matrix<T> & m)
 //
 //NOTICE: 'this' uses row convention.
 template <class T>
-void Matrix<T>::null(OUT Matrix<T> & ns)
+void Matrix<T>::nullspace(OUT Matrix<T> & ns)
 {
-    ASSERT(m_is_init, ("not yet initialize."));
+    ASSERTN(m_is_init, ("not yet initialize."));
     ns.reinit(m_col_size, m_col_size, &m_inhr);
     Matrix<T> tmp;
 
@@ -2583,8 +2583,8 @@ void Matrix<T>::null(OUT Matrix<T> & ns)
 template <class T>
 T Matrix<T>::tr()
 {
-    ASSERT(m_is_init, ("not yet initialize."));
-    ASSERT(is_quad(), ("must be quad"));
+    ASSERTN(m_is_init, ("not yet initialize."));
+    ASSERTN(is_quad(), ("must be quad"));
     T trv = 0;
     for (UINT i = 0; i < m_row_size; i++) {
         trv = trv + get(i,i);
@@ -2609,8 +2609,8 @@ T Matrix<T>::tr()
 template <class T>
 UINT Matrix<T>::rank(OUT Matrix<T> * basis, bool is_unitarize)
 {
-    ASSERT(m_is_init, ("not yet initialize."));
-    ASSERT(m_row_size > 0 && m_col_size > 0, ("strange matrix"));
+    ASSERTN(m_is_init, ("not yet initialize."));
+    ASSERTN(m_row_size > 0 && m_col_size > 0, ("strange matrix"));
     UINT rankv = 0;
     Matrix<T> * ptr = NULL;
     Matrix<INT> * rowpos = NULL; //record change process of rows.
@@ -2726,8 +2726,8 @@ FIN:
 template <class T>
 void Matrix<T>::insertRowBefore(UINT ridx)
 {
-    ASSERT(m_is_init, ("not yet initialize."));
-    ASSERT(ridx < m_row_size && m_row_size > 0, ("out of bound"));
+    ASSERTN(m_is_init, ("not yet initialize."));
+    ASSERTN(ridx < m_row_size && m_row_size > 0, ("out of bound"));
     Matrix<T> tmp(&m_inhr);
     if (ridx == 0) {
         tmp.grow_col(m_col_size);
@@ -2746,8 +2746,8 @@ void Matrix<T>::insertRowBefore(UINT ridx)
 template <class T>
 void Matrix<T>::insertRowsBefore(UINT ridx, UINT rnum)
 {
-    ASSERT(m_is_init, ("not yet initialize."));
-    ASSERT(ridx < m_row_size && m_row_size > 0, ("out of bound"));
+    ASSERTN(m_is_init, ("not yet initialize."));
+    ASSERTN(ridx < m_row_size && m_row_size > 0, ("out of bound"));
     Matrix<T> tmp(&m_inhr);
     if (rnum == 0) {
         return;
@@ -2775,8 +2775,8 @@ void Matrix<T>::insertRowsBefore(
         UINT mfrom,
         UINT mto)
 {
-    ASSERT(m_is_init && m.m_is_init, ("not yet initialize."));
-    ASSERT(ridx < m_row_size && m_row_size > 0 &&
+    ASSERTN(m_is_init && m.m_is_init, ("not yet initialize."));
+    ASSERTN(ridx < m_row_size && m_row_size > 0 &&
             mfrom < m.m_row_size && mto < m.m_row_size && mfrom <= mto,
             ("out of bound"));
     Matrix<T> tmp(&m_inhr);
@@ -2799,8 +2799,8 @@ void Matrix<T>::insertRowsBefore(
 template <class T>
 void Matrix<T>::insertColumnBefore(UINT cidx)
 {
-    ASSERT(m_is_init, ("not yet initialize."));
-    ASSERT(cidx < m_col_size && m_col_size > 0, ("out of bound"));
+    ASSERTN(m_is_init, ("not yet initialize."));
+    ASSERTN(cidx < m_col_size && m_col_size > 0, ("out of bound"));
     Matrix<T> tmp(&m_inhr);
     if (cidx == 0) {
         tmp.grow_row(m_row_size);
@@ -2819,8 +2819,8 @@ void Matrix<T>::insertColumnBefore(UINT cidx)
 template <class T>
 void Matrix<T>::insertColumnsBefore(UINT cidx, UINT cnum)
 {
-    ASSERT(m_is_init, ("not yet initialize."));
-    ASSERT(cidx < m_col_size && m_col_size > 0, ("out of bound"));
+    ASSERTN(m_is_init, ("not yet initialize."));
+    ASSERTN(cidx < m_col_size && m_col_size > 0, ("out of bound"));
     Matrix<T> tmp(&m_inhr);
     if (cnum == 0) {
         return;
@@ -2848,8 +2848,8 @@ void Matrix<T>::insertColumnsBefore(
         UINT mfrom,
         UINT mto)
 {
-    ASSERT(m_is_init && m.m_is_init, ("not yet initialize."));
-    ASSERT(cidx < m_col_size && m_col_size > 0 &&
+    ASSERTN(m_is_init && m.m_is_init, ("not yet initialize."));
+    ASSERTN(cidx < m_col_size && m_col_size > 0 &&
             mfrom < m.m_col_size && mto < m.m_col_size &&
             mfrom <= mto,    ("out of bound"));
     Matrix<T> tmp(&m_inhr);
@@ -2874,8 +2874,8 @@ template <class T>
 void Matrix<T>::inner(Matrix<T> & in,
                     UINT sr, UINT sl, UINT er, UINT el) const
 {
-    ASSERT(m_is_init, ("not yet initialize."));
-    ASSERT(sr <= er && sl <= el && er < m_row_size && el < m_col_size,
+    ASSERTN(m_is_init, ("not yet initialize."));
+    ASSERTN(sr <= er && sl <= el && er < m_row_size && el < m_col_size,
             ("illegal info"));
     UINT row = er - sr + 1;
     UINT col = el - sl + 1;
@@ -2892,8 +2892,8 @@ void Matrix<T>::inner(Matrix<T> & in,
 template <class T>
 void Matrix<T>::innerRow(OUT Matrix<T> & in, UINT from, UINT to) const
 {
-    ASSERT(m_is_init, ("not yet initialize."));
-    ASSERT(from <= to && to < m_row_size, ("illegal parameter"));
+    ASSERTN(m_is_init, ("not yet initialize."));
+    ASSERTN(from <= to && to < m_row_size, ("illegal parameter"));
     inner(in, from, 0, to, m_col_size -1);
 }
 
@@ -2902,8 +2902,8 @@ void Matrix<T>::innerRow(OUT Matrix<T> & in, UINT from, UINT to) const
 template <class T>
 void Matrix<T>::innerColumn(OUT Matrix<T> & in, UINT from, UINT to) const
 {
-    ASSERT(m_is_init, ("not yet initialize."));
-    ASSERT(from <= to && to < m_col_size, ("illegal parameter"));
+    ASSERTN(m_is_init, ("not yet initialize."));
+    ASSERTN(from <= to && to < m_col_size, ("illegal parameter"));
     inner(in, 0, from, m_row_size - 1, to);
 }
 
@@ -2916,8 +2916,8 @@ void Matrix<T>::innerColumn(OUT Matrix<T> & in, UINT from, UINT to) const
 template <class T>
 bool Matrix<T>::plu(OUT Matrix<T> & p, OUT Matrix<T> & l, OUT Matrix<T> & u)
 {
-    ASSERT(m_is_init, ("not yet initialize."));
-    ASSERT(m_row_size > 1 && m_col_size > 1, ("strange matrix"));
+    ASSERTN(m_is_init, ("not yet initialize."));
+    ASSERTN(m_row_size > 1 && m_col_size > 1, ("strange matrix"));
     bool succ = false;
     Matrix<T> permd(&m_inhr); //Permuting this matrix by 'p'.
     UINT i;
@@ -2967,7 +2967,7 @@ bool Matrix<T>::plu(OUT Matrix<T> & p, OUT Matrix<T> & l, OUT Matrix<T> & u)
 
         //Reduce other column entries below pivot entry to zero.
         T topent = u.get(row, col);
-        ASSERT(!_equal(topent, T(0)), ("zero entry"));
+        ASSERTN(!_equal(topent, T(0)), ("zero entry"));
         for (i = row + 1; i < u.m_row_size; i++) {
 
             //For reducing the computation cost.
@@ -2986,7 +2986,7 @@ bool Matrix<T>::plu(OUT Matrix<T> & p, OUT Matrix<T> & l, OUT Matrix<T> & u)
     if (succ) {
         //In 'double' precison, the equation may be failed , the reason was
         //caused by the precision. But the result is correct.
-        //ASSERT(permd == l * u, ("unequal for PA=L*U after decomposition"));
+        //ASSERTN(permd == l * u, ("unequal for PA=L*U after decomposition"));
     }
 FIN:
     return succ;
@@ -3001,8 +3001,8 @@ FIN:
 template <class T>
 bool Matrix<T>::lu(OUT Matrix<T> & l, OUT Matrix<T> & u)
 {
-    ASSERT(m_is_init, ("not yet initialize."));
-    ASSERT(m_row_size > 1 && m_col_size > 1, ("strange matrix"));
+    ASSERTN(m_is_init, ("not yet initialize."));
+    ASSERTN(m_row_size > 1 && m_col_size > 1, ("strange matrix"));
     bool succ = false;
     UINT i;
     u = *this;
@@ -3053,7 +3053,7 @@ bool Matrix<T>::lu(OUT Matrix<T> & l, OUT Matrix<T> & u)
         }
         //Reduce other column entries below pivot entry to zero.
         T topent = u.get(row, col);
-        ASSERT(!_equal(topent, T(0)), ("zero entry"));
+        ASSERTN(!_equal(topent, T(0)), ("zero entry"));
         for (i = row + 1; i < u.m_row_size; i++) {
             if (!_equal(u.get(i, col), T(0))) {
                 T tmp = -1 * u.get(i, col) / topent;
@@ -3118,7 +3118,7 @@ FIN:
 template <class T>
 void Matrix<T>::qr(OUT Matrix<T> & q, OUT Matrix<T> & r, bool calc_basis)
 {
-    ASSERT(m_is_init, ("not yet initialize."));
+    ASSERTN(m_is_init, ("not yet initialize."));
 
     //Linear dependent to some of row vectors.
     if (calc_basis && rank() < m_row_size - 1) {
@@ -3154,7 +3154,7 @@ void Matrix<T>::qr(OUT Matrix<T> & q, OUT Matrix<T> & r, bool calc_basis)
 template <class T>
 void Matrix<T>::nml()
 {
-    ASSERT(m_is_init, ("not yet initialize."));
+    ASSERTN(m_is_init, ("not yet initialize."));
     for (UINT i = 0; i < m_row_size; i++) {
         T modv = modrow(i);
         if (_equal(modv, T(0))) {
@@ -3173,9 +3173,9 @@ void Matrix<T>::nml()
 template <class T>
 bool Matrix<T>::pqr(Matrix<T> & p, Matrix<T> & q, Matrix<T> & r)
 {
-    ASSERT(m_is_init, ("not yet initialize."));
+    ASSERTN(m_is_init, ("not yet initialize."));
     bool succ = false;
-    ASSERT(0, ("TODO"));
+    ASSERTN(0, ("TODO"));
     return succ;
 }
 
@@ -3184,8 +3184,8 @@ bool Matrix<T>::pqr(Matrix<T> & p, Matrix<T> & q, Matrix<T> & r)
 template <class T>
 T Matrix<T>::dotrow(UINT row, Matrix<T> const& v) const
 {
-    ASSERT(m_is_init, ("not yet initialize."));
-    ASSERT(v.is_vec() && v.size() == m_col_size, ("not a vector."));
+    ASSERTN(m_is_init, ("not yet initialize."));
+    ASSERTN(v.is_vec() && v.size() == m_col_size, ("not a vector."));
     return dot(row, 0, row, m_col_size - 1, v);
 }
 
@@ -3194,8 +3194,8 @@ T Matrix<T>::dotrow(UINT row, Matrix<T> const& v) const
 template <class T>
 T Matrix<T>::dotcol(UINT col, Matrix<T> const& v) const
 {
-    ASSERT(m_is_init, ("not yet initialize."));
-    ASSERT(v.is_vec() && v.size() == m_row_size, ("not a vector."));
+    ASSERTN(m_is_init, ("not yet initialize."));
+    ASSERTN(v.is_vec() && v.size() == m_row_size, ("not a vector."));
     return dot(0, col, m_row_size - 1, col, v);
 }
 
@@ -3205,11 +3205,11 @@ T Matrix<T>::dotcol(UINT col, Matrix<T> const& v) const
 template <class T>
 T Matrix<T>::dot(Matrix<T> const& v) const
 {
-    ASSERT(m_is_init, ("not yet initialize."));
-    ASSERT(size() == v.size(), ("not a vector."));
-    ASSERT(v.m_row_size == 1 || v.m_col_size == 1,
+    ASSERTN(m_is_init, ("not yet initialize."));
+    ASSERTN(size() == v.size(), ("not a vector."));
+    ASSERTN(v.m_row_size == 1 || v.m_col_size == 1,
             ("not a vector, only one row or one col"));
-    ASSERT(m_row_size ==1 || m_col_size == 1,
+    ASSERTN(m_row_size ==1 || m_col_size == 1,
             ("not a vector, only one row or one col"));
     T dotv = 0;
     if (m_row_size == 1 && v.m_row_size == 1) {
@@ -3235,7 +3235,7 @@ T Matrix<T>::dot(Matrix<T> const& v) const
             dotv = dotv + (get(i,0) * v.get(0,i));
         }
     } else {
-        ASSERT(0,("illegal operation"));
+        ASSERTN(0,("illegal operation"));
     }
     return dotv;
 }
@@ -3255,15 +3255,15 @@ T Matrix<T>::dot(UINT srow, UINT scol,
                  UINT erow, UINT ecol,
                  Matrix<T> const& v) const
 {
-    ASSERT(m_is_init, ("not yet initialize."));
-    ASSERT(srow <= erow && scol <= ecol &&
+    ASSERTN(m_is_init, ("not yet initialize."));
+    ASSERTN(srow <= erow && scol <= ecol &&
            (erow - srow + 1) * (ecol - scol + 1) == v.size(),
            ("not a vector."));
-    ASSERT(srow < m_row_size  && scol < m_col_size &&
+    ASSERTN(srow < m_row_size  && scol < m_col_size &&
             erow < m_row_size  && ecol < m_col_size, ("out of boundary."));
-    ASSERT(v.m_row_size ==1 || v.m_col_size == 1,
+    ASSERTN(v.m_row_size ==1 || v.m_col_size == 1,
            ("not a vector, only one row or one col"));
-    ASSERT(srow == erow || scol == ecol,
+    ASSERTN(srow == erow || scol == ecol,
            ("not a vector, only one row or one col"));
 
     T dotv = 0;
@@ -3288,7 +3288,7 @@ T Matrix<T>::dot(UINT srow, UINT scol,
             dotv = dotv + (get(srow,i) * v.get(i,0));
         }
     } else {
-        ASSERT(0,("illegal operation"));
+        ASSERTN(0,("illegal operation"));
     }
     return dotv;
 }
@@ -3310,22 +3310,22 @@ T Matrix<T>::dot(UINT srow,
                  UINT verow,
                  UINT vecol) const
 {
-    ASSERT(m_is_init, ("not yet initialize."));
-    ASSERT(srow <= erow &&
+    ASSERTN(m_is_init, ("not yet initialize."));
+    ASSERTN(srow <= erow &&
            scol <= ecol &&
            vsrow <= verow &&
            vscol <= vecol &&
            (erow - srow + 1) * (ecol - scol + 1) ==
             (verow - vsrow + 1) * (vecol - vscol + 1),
            ("not a vector."));
-    ASSERT(srow < m_row_size  && scol < m_col_size &&
+    ASSERTN(srow < m_row_size  && scol < m_col_size &&
            vsrow < v.m_row_size  && vscol < v.m_col_size &&
            erow < m_row_size  && ecol < m_col_size &&
            verow < v.m_row_size  && vecol < v.m_col_size,
            ("out of boundary."));
-    ASSERT(srow == erow || scol == ecol,
+    ASSERTN(srow == erow || scol == ecol,
            ("not a vector, only one row or one col"));
-    ASSERT(vsrow == verow || vscol == vecol,
+    ASSERTN(vsrow == verow || vscol == vecol,
            ("not a vector, only one row or one col"));
 
     T dotv = 0;
@@ -3351,7 +3351,7 @@ T Matrix<T>::dot(UINT srow,
             dotv = dotv + (get(i,scol) * v.get(i,vscol));
         }
     } else {
-        ASSERT(0,("illegal operation"));
+        ASSERTN(0,("illegal operation"));
     }
     return dotv;
 }
@@ -3366,10 +3366,10 @@ T Matrix<T>::dot(UINT srow,
 template <class T>
 void Matrix<T>::cross(IN Matrix<T> & v, OUT Matrix<T> & u)
 {
-    ASSERT(m_is_init, ("not yet initialize."));
-    ASSERT(&u != this,
+    ASSERTN(m_is_init, ("not yet initialize."));
+    ASSERTN(&u != this,
             ("output matrix is same as current one"));
-    ASSERT(m_row_size == 1 || m_col_size == 1,
+    ASSERTN(m_row_size == 1 || m_col_size == 1,
             ("not a vector, only one row or one col"));
     if (&v == this) {
         u.reinit(1, MAX(v.get_col_size(), v.get_row_size()));
@@ -3386,7 +3386,7 @@ void Matrix<T>::cross(IN Matrix<T> & v, OUT Matrix<T> & u)
             v.trans();
         } else {
             //'v' is col vector
-            ASSERT(m_col_size == 3 && v.get_row_size() == 3,
+            ASSERTN(m_col_size == 3 && v.get_row_size() == 3,
                     ("only valid for 3-dimension vector"));
             u.reinit(1, v.get_row_size());
             u.set(0, 0, get(0, 1)*v.get(2, 0) - get(0, 2)*v.get(1, 0));
@@ -3408,7 +3408,7 @@ void Matrix<T>::cross(IN Matrix<T> & v, OUT Matrix<T> & u)
 template <class T>
 void Matrix<T>::orthn(OUT Matrix<T> & z)
 {
-    ASSERT(m_is_init, ("not yet initialize."));
+    ASSERTN(m_is_init, ("not yet initialize."));
 
     Matrix<T> b1;
     z.reinit(m_row_size, m_col_size, &m_inhr);
@@ -3449,7 +3449,7 @@ void Matrix<T>::orthn(OUT Matrix<T> & z)
 template <class T>
 void Matrix<T>::orth(OUT Matrix<T> & z)
 {
-    ASSERT(m_is_init, ("not yet initialize."));
+    ASSERTN(m_is_init, ("not yet initialize."));
     Matrix<T> b1;
     z.reinit(m_row_size, m_col_size, &m_inhr);
     innerRow(b1, 0, 0); //first row vector
@@ -3467,7 +3467,7 @@ void Matrix<T>::orth(OUT Matrix<T> & z)
             //        [1,1,1]
             //        [1,1,1]
             //    'dv_zz' will be zero!
-            ASSERT(dv_zz != 0,
+            ASSERTN(dv_zz != 0,
                 ("dot() is zero, row '%d' migth be all zero", i));
             T dv_xz = dot(row, 0, row, m_col_size-1, zi) / dv_zz;
             zi.mul(dv_xz);
@@ -3506,8 +3506,8 @@ void Matrix<T>::mls(OUT Matrix<T> & x, Matrix<T> const& b)
     A = A * *this; //trans(A)*A
     A.grow_col(a); //a is augment coefficient vector
 
-    //For speed up, we do invoke null() instead of sse(). It's only a trick.
-    A.null(x);
+    //For speed up, we do invoke nullspace() instead of sse(). It's only a trick.
+    A.nullspace(x);
 
     //Contain the number of (m_row_size - 1) unknowns.
     x.del_row(x.m_row_size - 1);
@@ -3533,16 +3533,16 @@ void Matrix<T>::mls(OUT Matrix<T> & x, Matrix<T> const& b)
 //    1. A is invertable, so is LU decomposable as well, the result is unique.
 //        To get approximatest solution, call mls().
 //    2. A is row convention, and each column indicate the unknown.
-//    3.If 'this' is singular, compute the general solution utilize null().
+//    3.If 'this' is singular, compute the general solution utilize nullspace().
 template <class T>
 bool Matrix<T>::sse(OUT Matrix<T> & x, Matrix<T> const& b)
 {
-    ASSERT(m_is_init, ("not yet initialize."));
-    ASSERT(m_row_size == b.m_row_size, ("unmatch format"));
+    ASSERTN(m_is_init, ("not yet initialize."));
+    ASSERTN(m_row_size == b.m_row_size, ("unmatch format"));
 
     //TODO: Constant part should permit the support of
     //constant symbol as well.
-    ASSERT(b.is_colvec(), ("b must be col vector"));
+    ASSERTN(b.is_colvec(), ("b must be col vector"));
 
     //Theorem: PA = LU, Ly = Pb, Ux = y
     if (det() != 0) {
@@ -3561,14 +3561,14 @@ bool Matrix<T>::sse(OUT Matrix<T> & x, Matrix<T> const& b)
     //Computing general solution.
     Matrix<T> tmp = *this;
 
-    //Here we use the function null() to reduce and format one
+    //Here we use the function nullspace() to reduce and format one
     //generating solution.
-    //However, function null() regard the last column of 'tmp' as
+    //However, function nullspace() regard the last column of 'tmp' as
     //one variable when we invoke grow_col(b).
-    //Consequently, to get the correct solution from output of null(), the
+    //Consequently, to get the correct solution from output of nullspace(), the
     //sign of the last column must be negative value of original.
     tmp.grow_col(b);
-    tmp.null(x);
+    tmp.nullspace(x);
 
     //There are number of (m_row_size - 1) unknowns.
     x.del_row(x.m_row_size - 1);
@@ -3581,8 +3581,8 @@ bool Matrix<T>::sse(OUT Matrix<T> & x, Matrix<T> const& b)
 template <class T>
 T Matrix<T>::mod()
 {
-    ASSERT(m_is_init, ("not yet initialize."));
-    ASSERT(is_vec(), ("not a vector, only one row or one col"));
+    ASSERTN(m_is_init, ("not yet initialize."));
+    ASSERTN(is_vec(), ("not a vector, only one row or one col"));
     T modv = 0;
 
     if (is_rowvec()) { //'this' is row vector
@@ -3596,7 +3596,7 @@ T Matrix<T>::mod()
             modv = modv + (v * v);
         }
     } else {
-        ASSERT(0,("illegal operation"));
+        ASSERTN(0,("illegal operation"));
     }
     modv = _sqrt(modv);
     return modv;
@@ -3607,8 +3607,8 @@ T Matrix<T>::mod()
 template <class T>
 T Matrix<T>::modrow(UINT row)
 {
-    ASSERT(m_is_init, ("not yet initialize."));
-    ASSERT(row < m_row_size, ("out of boundary"));
+    ASSERTN(m_is_init, ("not yet initialize."));
+    ASSERTN(row < m_row_size, ("out of boundary"));
     T modv = 0;
     for (UINT i = 0; i < m_col_size; i++) {
         T v = get(row, i);
@@ -3623,8 +3623,8 @@ T Matrix<T>::modrow(UINT row)
 template <class T>
 T Matrix<T>::modcol(UINT col)
 {
-    ASSERT(m_is_init, ("not yet initialize."));
-    ASSERT(col < m_col_size, ("out of boundary"));
+    ASSERTN(m_is_init, ("not yet initialize."));
+    ASSERTN(col < m_col_size, ("out of boundary"));
     T modv = 0;
     for (UINT i = 0; i < m_row_size; i++) {
         T v = get(i, col);
@@ -3641,8 +3641,8 @@ T Matrix<T>::modcol(UINT col)
 template <class T>
 void Matrix<T>::eig(OUT Matrix<T> & eigv)
 {
-    ASSERT(m_is_init, ("not yet initialize."));
-    ASSERT(is_quad(), ("A must be square."));
+    ASSERTN(m_is_init, ("not yet initialize."));
+    ASSERTN(is_quad(), ("A must be square."));
     Matrix<T> v = *this;
     Matrix<T> q,r;
     UINT count = 0;
@@ -3662,7 +3662,7 @@ void Matrix<T>::eig(OUT Matrix<T> & eigv)
         #endif
         count++;
     }
-    ASSERT(v.is_quad() && v.m_row_size == m_row_size, ("A must be square."));
+    ASSERTN(v.is_quad() && v.m_row_size == m_row_size, ("A must be square."));
 
     UINT i;
     //Sort diagonal eigvalue in decreasing order
@@ -3698,8 +3698,8 @@ void Matrix<T>::eig(OUT Matrix<T> & eigv)
 template <class T>
 void Matrix<T>::eig(OUT Matrix<T> & eigv, OUT Matrix<T> & eigx)
 {
-    ASSERT(m_is_init, ("not yet initialize."));
-    ASSERT(is_quad(), ("A must be square."));
+    ASSERTN(m_is_init, ("not yet initialize."));
+    ASSERTN(is_quad(), ("A must be square."));
     Matrix<T> v;
     eig(v);
     v.adjust();
@@ -3718,7 +3718,7 @@ void Matrix<T>::eig(OUT Matrix<T> & eigv, OUT Matrix<T> & eigx)
         Matrix<T> x(m_row_size, m_col_size, &m_inhr), nul;
         x.eye(lam); //lam*I
         x = *this - x;
-        x.null(nul); //null space descripted in col convention.
+        x.nullspace(nul); //null space descripted in col convention.
         //Extract the non-zero col basis from null space of (A-lam*I)
         for (UINT j = 0; j < nul.m_col_size; j++) {
             bool zero_col = true;
@@ -3748,9 +3748,9 @@ void Matrix<T>::eig(OUT Matrix<T> & eigv, OUT Matrix<T> & eigx)
 template <class T>
 void Matrix<T>::proj(OUT Matrix<T> & p, Matrix<T> const& v)
 {
-    ASSERT(m_is_init, ("not yet initialize."));
-    ASSERT(is_orth(), ("need orthogonal"));
-    ASSERT(v.is_vec() && v.size() == m_col_size, ("must be vector"));
+    ASSERTN(m_is_init, ("not yet initialize."));
+    ASSERTN(is_orth(), ("need orthogonal"));
+    ASSERTN(v.is_vec() && v.size() == m_col_size, ("must be vector"));
     p.reinit(1, m_col_size, &m_inhr);
     for (UINT i = 0; i < m_row_size; i++) {
         Matrix<T> row;
@@ -3774,7 +3774,7 @@ void Matrix<T>::proj(OUT Matrix<T> & p, Matrix<T> const& v)
 template <class T>
 bool Matrix<T>::svd(OUT Matrix<T> & u, OUT Matrix<T> & s, OUT Matrix<T> & eigx)
 {
-    ASSERT(m_is_init, ("not yet initialize."));
+    ASSERTN(m_is_init, ("not yet initialize."));
     if (m_row_size < m_col_size) {
         //Assuming that A is 2*3, then B=trans(A)*A is  3*3 matrix.
         //When we computing SVD of trans(A) instead of A, and B is A*trans(A),
@@ -3845,7 +3845,7 @@ bool Matrix<T>::svd(OUT Matrix<T> & u, OUT Matrix<T> & s, OUT Matrix<T> & eigx)
     //of 'RowA(subU) * x = 0'.
     if (scount < m_row_size) {
         Matrix<T> nulofu1, tmpu;
-        subU.null(nulofu1); //nulofu1 uses col convention.
+        subU.nullspace(nulofu1); //nulofu1 uses col convention.
 
         //Compose U, with row convention arrangement.
         for (i = 0; i < nulofu1.m_col_size; i++) {
@@ -3855,7 +3855,7 @@ bool Matrix<T>::svd(OUT Matrix<T> & u, OUT Matrix<T> & s, OUT Matrix<T> & eigx)
                 subU.grow_row(tmp);
             }
         }
-        ASSERT(subU.is_quad(), ("too many basis"));
+        ASSERTN(subU.is_quad(), ("too many basis"));
     }
 
     //And then subU has orthogonalized u2, u3, ..., we need farther
@@ -3880,8 +3880,8 @@ bool Matrix<T>::svd(OUT Matrix<T> & u, OUT Matrix<T> & s, OUT Matrix<T> & eigx)
 template <class T>
 bool Matrix<T>::diag(OUT Matrix<T> & p, OUT Matrix<T> & d)
 {
-    ASSERT(m_is_init, ("not yet initialize."));
-    ASSERT(is_quad(), ("only quad matirx"));
+    ASSERTN(m_is_init, ("not yet initialize."));
+    ASSERTN(is_quad(), ("only quad matirx"));
     eig(d, p); //d is diagonal, p uses col convention.
     if (!p.is_quad()) {
         //There were not enough eigen vectors to construct the basis of R^n.
@@ -3897,7 +3897,7 @@ bool Matrix<T>::diag(OUT Matrix<T> & p, OUT Matrix<T> & d)
 template <class T>
 T Matrix<T>::norm(INT p)
 {
-    ASSERT(m_is_init, ("not yet initialize."));
+    ASSERTN(m_is_init, ("not yet initialize."));
     T n;
     if (p == NORM_F) {
         n = 0;
@@ -3960,7 +3960,7 @@ T Matrix<T>::norm(INT p)
         }
         return n;
     }
-    ASSERT(0, ("unknown norm type"));
+    ASSERTN(0, ("unknown norm type"));
     return 0;
 }
 
@@ -3973,7 +3973,7 @@ T Matrix<T>::norm(INT p)
 template <class T>
 bool Matrix<T>::cond(T & c, INT p)
 {
-    ASSERT(m_is_init, ("not yet initialize."));
+    ASSERTN(m_is_init, ("not yet initialize."));
     Matrix<T> m;
     if (!inv(m)) {
         return false;
@@ -3991,7 +3991,7 @@ bool Matrix<T>::cond(T & c, INT p)
 template <class T>
 T Matrix<T>::sprad()
 {
-    ASSERT(m_is_init, ("not yet initialize."));
+    ASSERTN(m_is_init, ("not yet initialize."));
     Matrix<T> v;
     eig(v);
     T maxeigv = 0;
@@ -4017,8 +4017,8 @@ T Matrix<T>::sprad()
 template <class T>
 void Matrix<T>::padding()
 {
-    ASSERT(m_is_init, ("not yet initialize."));
-    ASSERT(m_row_size != m_col_size && m_row_size != 0 && m_col_size != 0,
+    ASSERTN(m_is_init, ("not yet initialize."));
+    ASSERTN(m_row_size != m_col_size && m_row_size != 0 && m_col_size != 0,
                 ("already nonsin"));
 
     Matrix<T> tmp = *this;
@@ -4030,7 +4030,7 @@ void Matrix<T>::padding()
     UINT rows = tmp.m_row_size;
     DUMMYUSE(rows);
     tmp.eche();
-    ASSERT(rows == tmp.m_row_size, ("rows vector are non independent"));
+    ASSERTN(rows == tmp.m_row_size, ("rows vector are non independent"));
 
     for (UINT i = 0; i < tmp.m_row_size; i++) {
         for (UINT j = 0; j < tmp.m_col_size; j++) {
@@ -4065,7 +4065,7 @@ void Matrix<T>::padding()
         }
     }
 
-    ASSERT(newrows.m_row_size == abs(m_row_size - m_col_size),
+    ASSERTN(newrows.m_row_size == abs(m_row_size - m_col_size),
              ("The partial rows of matrix must be independent."));
 
     if (tran) {
@@ -4080,13 +4080,13 @@ void Matrix<T>::padding()
 template <class T>
 void Matrix<T>::dumpf(FILE * h) const
 {
-    ASSERT(m_is_init, ("not yet initialize."));
+    ASSERTN(m_is_init, ("not yet initialize."));
 #ifdef NO_BASIC_MAT_DUMP
     if (HOOK_DUMPFH != NULL) {
         (*HOOK_DUMPFH)((void*)this, h);
         return;
     }
-    ASSERT(0, ("dump not yet initialize."));
+    ASSERTN(0, ("dump not yet initialize."));
 #else
 
     //Customization
@@ -4099,7 +4099,7 @@ void Matrix<T>::dumpf(FILE * h) const
 
     //Default version regards T as 'int'.
     static INT g_count = 0;
-    ASSERT(h, ("In dumpf(), file handle is NULL!!!"));
+    ASSERTN(h, ("In dumpf(), file handle is NULL!!!"));
     fprintf(h, "\nMATRIX dump id:%d\n", g_count++);
 
     for (UINT i = 0; i < m_row_size; i++) {
@@ -4118,13 +4118,13 @@ void Matrix<T>::dumpf(FILE * h) const
 template <class T>
 void Matrix<T>::dumpf(CHAR * name, bool is_del) const
 {
-    ASSERT(m_is_init, ("not yet initialize."));
+    ASSERTN(m_is_init, ("not yet initialize."));
 #ifdef NO_BASIC_MAT_DUMP
     if (HOOK_DUMPF != NULL) {
         (*HOOK_DUMPF)((void*)this, name, is_del);
         return;
     }
-    ASSERT(0, ("dump not yet initialize."));
+    ASSERTN(0, ("dump not yet initialize."));
 #else
 
     //Customization
@@ -4143,7 +4143,7 @@ void Matrix<T>::dumpf(CHAR * name, bool is_del) const
         UNLINK(name);
     }
     FILE * h = fopen(name, "a+");
-    ASSERT(h, ("%s create failed!!!", name));
+    ASSERTN(h, ("%s create failed!!!", name));
     dumpf(h);
     fclose(h);
 #endif
@@ -4154,13 +4154,13 @@ void Matrix<T>::dumpf(CHAR * name, bool is_del) const
 template <class T>
 void Matrix<T>::dumps() const
 {
-    ASSERT(m_is_init, ("not yet initialize."));
+    ASSERTN(m_is_init, ("not yet initialize."));
 #ifdef NO_BASIC_MAT_DUMP
     if (HOOK_DUMPS != NULL) {
         (*HOOK_DUMPS)((void*)this);
         return;
     }
-    ASSERT(0, ("dump not yet initialize."));
+    ASSERTN(0, ("dump not yet initialize."));
 #else
 
     //Customization

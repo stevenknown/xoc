@@ -171,6 +171,7 @@ public:
 
 //The maximum byte size for each load from source file.
 #define MAX_BUF_LINE            4096
+#define MAX_OFST_BUF_LEN        1024
 
 class String2Token : public HMap<CHAR const*, TOKEN, HashFuncString2> {
 public:
@@ -277,9 +278,9 @@ protected:
 
     void * xmalloc(size_t size)
     {
-        ASSERT(m_pool, ("not yet initialized."));
+        ASSERTN(m_pool, ("not yet initialized."));
         void * p = smpoolMallocConstSize(size, m_pool);
-        ASSERT(p, ("malloc failed"));
+        ASSERTN(p, ("malloc failed"));
         ::memset(p, 0, size);
         return p;
     }

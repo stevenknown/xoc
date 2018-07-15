@@ -68,7 +68,7 @@ public:
     Float(Float const& f)
     {
         //Sometimes, r need not to initialize always.
-        //ASSERT(r.m_den != 0, ("denominator is 0!"));
+        //ASSERTN(r.m_den != 0, ("denominator is 0!"));
         m_f = f.m_f;
     }
 

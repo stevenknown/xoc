@@ -51,7 +51,7 @@ IR * Region::refineIload1(IR * ir, bool & change)
     //    LD,ofst
     //e.g: (&q)->s => q.s
     IR * base = ILD_base(ir);
-    ASSERT(base->is_lda() && LDA_ofst(base) == 0, ("not the case"));
+    ASSERTN(base->is_lda() && LDA_ofst(base) == 0, ("not the case"));
 
     //ILD offset may not be 0.
     INT ild_ofst = ILD_ofst(ir);
@@ -235,7 +235,7 @@ IR * Region::refineIstore(IR * ir, bool & change, RefineCtx & rc)
         }
         copyAI(rhs, newrhs);
 
-        ASSERT(rhs->is_single(), ("expression cannot be linked to chain"));
+        ASSERTN(rhs->is_single(), ("expression cannot be linked to chain"));
         freeIRTree(rhs);
         lchange = true;
         rhs = newrhs;
@@ -1731,7 +1731,7 @@ void Region::insertCvtForBinaryOp(IR * ir, bool & change)
 
     if (op0->getType() == op1->getType()) {
         if (op0->is_mc()) {
-            ASSERT(TY_mc_size(op0->getType()) ==
+            ASSERTN(TY_mc_size(op0->getType()) ==
                     TY_mc_size(op1->getType()),
                     ("invalid binop for two D_MC operands"));
         }
@@ -1740,7 +1740,7 @@ void Region::insertCvtForBinaryOp(IR * ir, bool & change)
 
     if (op0->is_ptr()) {
         if (op1->getTypeSize(getTypeMgr()) > op0->getTypeSize(getTypeMgr())) {
-            ASSERT(op1->getType()->is_ptr_addend() && !op1->is_ptr(),
+            ASSERTN(op1->getType()->is_ptr_addend() && !op1->is_ptr(),
                    ("illegal pointer arith"));
             DATA_TYPE t = getTypeMgr()->getPointerSizeDtype();
             BIN_opnd1(ir) = buildCvt(op1, getTypeMgr()->getSimplexTypeEx(t));
@@ -1752,7 +1752,7 @@ void Region::insertCvtForBinaryOp(IR * ir, bool & change)
         return;
     }
 
-    ASSERT(!op1->is_ptr(), ("illegal binop for Non-pointer and Pointer"));
+    ASSERTN(!op1->is_ptr(), ("illegal binop for Non-pointer and Pointer"));
 
     //Both op0 and op1 are NOT pointer.
     if (op0->is_vec() || op1->is_vec()) {
@@ -1857,7 +1857,7 @@ IR * Region::insertCvt(IR * parent, IR * kid, bool & change)
 
             if (parent->is_vec() || kid->is_vec()) {
                 //Do not do hoisting for vector type.
-                ASSERT(tgt_size == src_size, ("different size vector"));
+                ASSERTN(tgt_size == src_size, ("different size vector"));
                 return kid;
             }
 
@@ -1946,7 +1946,7 @@ HOST_INT Region::calcLSRIntVal(Type const* type, HOST_INT v0, HOST_INT v1)
         res = (HOST_INT) (HOST_UINT) (((UINT128)v0) >> v1);
         break;
         #endif
-    default: ASSERT(0, ("Need to support"));
+    default: ASSERTN(0, ("Need to support"));
     }
     return res;
 }
@@ -2016,7 +2016,7 @@ HOST_INT Region::calcIntVal(IR_TYPE ty, HOST_INT v0, HOST_INT v1)
         v1 = v0 >> v1;
         break;
     case IR_LSR:
-        ASSERT(0, ("the case must be handled in calcLSRIntVal()"));
+        ASSERTN(0, ("the case must be handled in calcLSRIntVal()"));
         //v1 = ((HOST_UINT)v0) >> v1;
         break;
     case IR_LSL:
@@ -2037,7 +2037,7 @@ IR * Region::foldConstIntUnary(IR * ir, bool & change)
     ASSERT0(UNA_opnd(ir)->is_const());
     HOST_INT v0 = CONST_int_val(UNA_opnd(ir));
     if (ir->is_neg()) {
-        ASSERT(dm->get_bytesize(UNA_opnd(ir)->getType()) <= 8, ("TODO"));
+        ASSERTN(dm->get_bytesize(UNA_opnd(ir)->getType()) <= 8, ("TODO"));
         IR * oldir = ir;
         ir = buildImmInt(-v0, ir->getType());
         copyDbx(ir, oldir, this);
@@ -2045,7 +2045,7 @@ IR * Region::foldConstIntUnary(IR * ir, bool & change)
         change = true;
         return ir;
     } else if (ir->is_lnot()) {
-        ASSERT(dm->get_bytesize(UNA_opnd(ir)->getType()) <= 8, ("TODO"));
+        ASSERTN(dm->get_bytesize(UNA_opnd(ir)->getType()) <= 8, ("TODO"));
         IR * oldir = ir;
         ir = buildImmInt(!v0, ir->getType());
         copyDbx(ir, oldir, this);
@@ -2053,7 +2053,7 @@ IR * Region::foldConstIntUnary(IR * ir, bool & change)
         change = true;
         return ir;
     } else if (ir->is_bnot()) {
-        ASSERT(dm->get_bytesize(UNA_opnd(ir)->getType()) <= 8, ("TODO"));
+        ASSERTN(dm->get_bytesize(UNA_opnd(ir)->getType()) <= 8, ("TODO"));
         IR * oldir = ir;
         ir = buildImmInt(~v0, ir->getType());
         copyDbx(ir, oldir, this);
@@ -2186,7 +2186,7 @@ IR * Region::foldConstFloatUnary(IR * ir, bool & change)
     DUMMYUSE(dm);
 
     if (ir->is_neg()) {
-        ASSERT(dm->get_bytesize(UNA_opnd(ir)->getType()) <= 8, ("TODO"));
+        ASSERTN(dm->get_bytesize(UNA_opnd(ir)->getType()) <= 8, ("TODO"));
         IR * oldir = ir;
         ir = buildImmFp(-CONST_fp_val(UNA_opnd(ir)), ir->getType());
         copyDbx(ir, oldir, this);
@@ -2194,7 +2194,7 @@ IR * Region::foldConstFloatUnary(IR * ir, bool & change)
         change = true;
         return ir; //No need to update DU.
     } else if (ir->is_lnot()) {
-        ASSERT(dm->get_bytesize(UNA_opnd(ir)->getType()) <= 8, ("TODO"));
+        ASSERTN(dm->get_bytesize(UNA_opnd(ir)->getType()) <= 8, ("TODO"));
         IR * oldir = ir;
         HOST_FP t = CONST_fp_val(UNA_opnd(ir));
         if (t == 0.0) {
@@ -2225,7 +2225,7 @@ IR * Region::foldConstFloatBinary(IR * ir, bool & change)
                     dm->get_bytesize(BIN_opnd1(ir)->getType()));
     DUMMYUSE(tylen);
 
-    ASSERT(tylen <= 8, ("TODO"));
+    ASSERTN(tylen <= 8, ("TODO"));
     IR * oldir = ir;
     bool lchange = false;
     switch (ir->getCode()) {
@@ -2299,8 +2299,8 @@ IR * Region::foldConst(IR * ir, bool & change)
             IR * t0 = BIN_opnd0(ir);
             IR * t1 = BIN_opnd1(ir);
             ASSERT0(ir->isBinaryOp());
-            ASSERT(IR_MAX_KID_NUM(ir) == 2, ("binary op"));
-            ASSERT(t0 != NULL && t1 != NULL, ("binary op"));
+            ASSERTN(IR_MAX_KID_NUM(ir) == 2, ("binary op"));
+            ASSERTN(t0 != NULL && t1 != NULL, ("binary op"));
             if ((t0->is_const() && t0->is_fp() &&
                  t1->is_const() && t1->is_fp()) &&
                  g_is_opt_float) {
@@ -2316,7 +2316,7 @@ IR * Region::foldConst(IR * ir, bool & change)
     case IR_NEG:
         {
             //NEG(1.0) => INT(-1.0)
-            ASSERT(IR_MAX_KID_NUM(ir) == 1, ("unary op"));
+            ASSERTN(IR_MAX_KID_NUM(ir) == 1, ("unary op"));
             ASSERT0(UNA_opnd(ir) != NULL);
             if (UNA_opnd(ir)->is_const() &&
                 UNA_opnd(ir)->is_fp() && g_is_opt_float) {
@@ -2526,7 +2526,7 @@ void Region::invertCondition(IR ** cond)
         IR_code(*cond) = IR_EQ;
         break;
     default:
-        ASSERT(0, ("TODO"));
+        ASSERTN(0, ("TODO"));
     }
 }
 

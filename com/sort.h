@@ -76,7 +76,7 @@ public:
 
 float Bucket::append(float t)
 {
-    ASSERT(m_is_init, ("Hash not yet initialized."));
+    ASSERTN(m_is_init, ("Hash not yet initialized."));
     if (t == 0) return 0;
 
     UINT hashv = bucket_get_hash_value(t);
@@ -84,7 +84,7 @@ float Bucket::append(float t)
     if (elemhc) {
         HC<float> * prev;
         while (elemhc) {
-            ASSERT(HC_val(elemhc) != float(0), ("Container is empty"));
+            ASSERTN(HC_val(elemhc) != float(0), ("Container is empty"));
             if (bucket_compare(HC_val(elemhc), t)) {
                 break;
             }
@@ -93,7 +93,7 @@ float Bucket::append(float t)
         }
 
         HC<float> * new_insert_one = newhc();
-        ASSERT(new_insert_one, ("newhc return NULL"));
+        ASSERTN(new_insert_one, ("newhc return NULL"));
         HC_val(new_insert_one) = t;
 
         if (elemhc == NULL) {
@@ -112,7 +112,7 @@ float Bucket::append(float t)
         HC_vec_idx(elemhc) = m_elem_vector.get_free_idx();
     } else {
         elemhc = newhc();
-        ASSERT(elemhc, ("newhc return NULL"));
+        ASSERTN(elemhc, ("newhc return NULL"));
         HC_val(elemhc) = t;
         SHASH_MEMBER(m_bucket[hashv]) = elemhc;
         SHASH_MEMBER_COUNT(m_bucket[hashv])++;
@@ -504,7 +504,7 @@ void Sort<T>::counting_sort(IN OUT Vector<T> & data)
     //
     for (INT i = 0; i <= n; i++) {
         T v = data[i];
-        ASSERT(v >= 0, ("key value should be larger than 0"));
+        ASSERTN(v >= 0, ("key value should be larger than 0"));
         c[v] = c[v] + 1;
     }
 
@@ -531,7 +531,7 @@ bool Sort<T>::_bucket_sort_check(IN OUT Vector<T> & data)
 {
     for (INT i = 0; i <= data.get_last_idx(); i++) {
         T v = data[i];
-        ASSERT(v < 1 && v >= 0, ("The range of elem-value should be [0,1)"));
+        ASSERTN(v < 1 && v >= 0, ("The range of elem-value should be [0,1)"));
     }
     return true;
 }

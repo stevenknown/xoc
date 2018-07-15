@@ -434,7 +434,7 @@ public:
     inline void diff(MDSet const& mds, DefMiscBitSetMgr & m)
     {
         ASSERT0(this != &mds);
-        ASSERT(!DefSBitSetCore::is_contain(MD_FULL_MEM), ("low performance"));
+        ASSERTN(!DefSBitSetCore::is_contain(MD_FULL_MEM), ("low performance"));
         if (((DefSBitSetCore const&)mds).is_contain(MD_FULL_MEM)) {
             clean(m);
             return;
@@ -514,7 +514,7 @@ public:
 
     void set(UINT mdid, MD * md)
     {
-        ASSERT(Vector<MD*>::get(mdid) == NULL, ("already mapped"));
+        ASSERTN(Vector<MD*>::get(mdid) == NULL, ("already mapped"));
         Vector<MD*>::set(mdid, md);
         m_count++;
     }

@@ -67,7 +67,7 @@ TypeDesc const g_type_desc[] = {
 #ifdef _DEBUG_
 Type const* checkType(Type const* ty, DATA_TYPE dt)
 {
-    ASSERT(TY_dtype(ty) == dt, ("type is not '%s'", DTNAME(dt)));
+    ASSERTN(TY_dtype(ty) == dt, ("type is not '%s'", DTNAME(dt)));
     return ty;
 }
 #endif
@@ -91,9 +91,9 @@ Type const* TypeMgr::hoistDtypeForBinop(IR const* opnd0, IR const* opnd1)
     Type const* d0 = opnd0->getType();
     Type const* d1 = opnd1->getType();
     ASSERT0(!d0->is_void() && !d1->is_void());
-    ASSERT(!d0->is_vector() && !d1->is_vector(),
+    ASSERTN(!d0->is_vector() && !d1->is_vector(),
            ("Can not hoist vector type."));
-    ASSERT(!d0->is_pointer() && !d1->is_pointer(),
+    ASSERTN(!d0->is_pointer() && !d1->is_pointer(),
            ("Can not hoist pointer type."));
 
     DATA_TYPE t0 = TY_dtype(d0);
@@ -346,7 +346,7 @@ Type * TypeMgr::registerType(Type const* type)
         return TC_type(registerMC(type));
     }
 
-    ASSERT(0, ("unsupport data type"));
+    ASSERTN(0, ("unsupport data type"));
 
     return NULL;
 }
@@ -382,7 +382,7 @@ UINT TypeMgr::get_bytesize(Type const* type) const
         return TY_mc_size(type);
     case D_VEC:
         return TY_vec_size(type);
-    default: ASSERT(0, ("unsupport"));
+    default: ASSERTN(0, ("unsupport"));
     }
     return 0;
 }

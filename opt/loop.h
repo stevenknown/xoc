@@ -37,7 +37,7 @@ author: Su Zhenyu
 namespace xoc {
 
 //This file represent loop tree structure and relate algorithms.
-//e.g: 
+//e.g:
 //for (i) { #Loop1
 //  for (j) { #Loop2
 //    ...

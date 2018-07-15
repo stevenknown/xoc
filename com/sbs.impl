@@ -122,7 +122,7 @@ void SBitSetCore<BitsPerSeg>::bunion(
         TSEGIter ** free_list,
         SMemPool * pool)
 {
-    ASSERT(this != &src, ("operate on same set"));
+    ASSERTN(this != &src, ("operate on same set"));
     TSEGIter * tgtst = segs.get_head();
     TSEGIter * prev_st = NULL;
     for (TSEGIter * srcst = src.segs.get_head();
@@ -312,7 +312,7 @@ void SBitSetCore<BitsPerSeg>::diff(
         SegMgr<BitsPerSeg> * sm,
         TSEGIter ** free_list)
 {
-    ASSERT(this != &src, ("operate on same set"));
+    ASSERTN(this != &src, ("operate on same set"));
     TSEGIter * tgtst = segs.get_head();
     TSEGIter * prev_st = NULL;
     TSEGIter * next_st = tgtst;
@@ -422,7 +422,7 @@ INT SBitSetCore<BitsPerSeg>::get_first(TSEGIter ** cur) const
     ASSERT0(sc->val());
 
     SEG<BitsPerSeg> * s = sc->val();
-    ASSERT(!s->bs.is_empty(), ("empty SEG should not exist."));
+    ASSERTN(!s->bs.is_empty(), ("empty SEG should not exist."));
     return (INT)s->get_start() + s->bs.get_first();
 }
 
@@ -505,7 +505,7 @@ INT SBitSetCore<BitsPerSeg>::get_next(UINT elem, TSEGIter ** cur) const
 template <UINT BitsPerSeg>
 bool SBitSetCore<BitsPerSeg>::is_equal(SBitSetCore<BitsPerSeg> const& src) const
 {
-    ASSERT(this != &src, ("operate on same set"));
+    ASSERTN(this != &src, ("operate on same set"));
     TSEGIter * srcst = src.segs.get_head();
     TSEGIter * tgtst = segs.get_head();
     for (; srcst != src.segs.end() || tgtst != segs.end(); )  {
@@ -534,7 +534,7 @@ template <UINT BitsPerSeg>
 bool SBitSetCore<BitsPerSeg>::is_intersect(
         SBitSetCore<BitsPerSeg> const& src) const
 {
-    ASSERT(this != &src, ("operate on same set"));
+    ASSERTN(this != &src, ("operate on same set"));
     TSEGIter * srcst = src.segs.get_head();
     TSEGIter * tgtst = segs.get_head();
     for (; srcst != src.segs.end() && tgtst != segs.end(); ) {
@@ -597,7 +597,7 @@ void SBitSetCore<BitsPerSeg>::intersect(
         SegMgr<BitsPerSeg> * sm,
         TSEGIter ** free_list)
 {
-    ASSERT(this != &src, ("operate on same set"));
+    ASSERTN(this != &src, ("operate on same set"));
     TSEGIter * tgtst = segs.get_head();
     TSEGIter * prev_st = NULL;
     TSEGIter * next_st = tgtst;

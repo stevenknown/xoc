@@ -590,7 +590,7 @@ bool IRParser::declareRegion(ParseCtx * ctx)
 
     if (!newctx.has_error) {
         newctx.current_region->setIRList(newctx.stmt_list);
-        ASSERT(!newctx.has_phi, ("TODO"));
+        ASSERTN(!newctx.has_phi, ("TODO"));
 
         bool buildcfg = false; //TODO: build cfg by given parameters.
 		if (buildcfg && !newctx.has_high_level_ir) {
@@ -1016,7 +1016,7 @@ bool IRParser::parseSelect(ParseCtx * ctx)
 
 bool IRParser::parsePR(ParseCtx * ctx)
 {
-    ASSERT(m_lexer->getCurrentToken() == T_DOLLAR,
+    ASSERTN(m_lexer->getCurrentToken() == T_DOLLAR,
         ("miss $ before PR expression"));
     TOKEN tok = m_lexer->getNextToken();
     UINT prno = 0;

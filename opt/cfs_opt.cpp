@@ -105,7 +105,7 @@ bool IR_CFS_OPT::transformIf5(IR ** head, IR * ir)
 //    FALSE-PART
 bool IR_CFS_OPT::transformToDoWhile(IR ** head, IR * ir)
 {
-    ASSERT(head != NULL && *head != NULL, ("invalid parameter"));
+    ASSERTN(head != NULL && *head != NULL, ("invalid parameter"));
     if (!ir->is_lab()) { return false; }
 
     for (IR * t = ir; t != NULL; t = t->get_next()) {
@@ -128,7 +128,7 @@ bool IR_CFS_OPT::transformToDoWhile(IR ** head, IR * ir)
                 xcom::add_next(&LOOP_body(dowhile), c);
             }
 
-            ASSERT(t == if_stmt, ("illegal IR layout"));
+            ASSERTN(t == if_stmt, ("illegal IR layout"));
 
             xcom::remove(head, if_stmt);
             if (IF_falsebody(if_stmt)) {
@@ -178,7 +178,7 @@ static inline bool is_non_branch_ir(IR * ir)
 //of some other instruction.
 bool IR_CFS_OPT::transformIf1(IR ** head, IR * ir)
 {
-    ASSERT(head && *head, ("invalid parameter"));
+    ASSERTN(head && *head, ("invalid parameter"));
 
     if (ir == NULL || !ir->is_if()) { return false; }
 
@@ -221,7 +221,7 @@ bool IR_CFS_OPT::transformIf1(IR ** head, IR * ir)
                     xcom::remove(&IF_truebody(ir), c);
                     xcom::add_next(&new_list1, &last, c);
                 }
-                ASSERT(t && t == first_goto, ("invalid control flow"));
+                ASSERTN(t && t == first_goto, ("invalid control flow"));
 
                 xcom::remove(&IF_truebody(ir), first_goto);
                 m_ru->freeIRTree(first_goto);
@@ -234,7 +234,7 @@ bool IR_CFS_OPT::transformIf1(IR ** head, IR * ir)
                     xcom::remove(head, c);
                     xcom::add_next(&new_list2, c);
                 }
-                ASSERT(t != NULL && t == second_goto, ("???"));
+                ASSERTN(t != NULL && t == second_goto, ("???"));
                 xcom::remove(head, second_goto);
                 xcom::add_next(&new_list2, second_goto);
 
@@ -246,7 +246,7 @@ bool IR_CFS_OPT::transformIf1(IR ** head, IR * ir)
                     IR_parent(tmp) = ir;
                 }
 
-                ASSERT(IF_truebody(ir) == new_list2, ("illegal insertbefore<T>"));
+                ASSERTN(IF_truebody(ir) == new_list2, ("illegal insertbefore<T>"));
 
                 xcom::insertafter(&ir, new_list1);
 
@@ -278,7 +278,7 @@ bool IR_CFS_OPT::transformIf1(IR ** head, IR * ir)
 //   }
 bool IR_CFS_OPT::transformIf2(IR ** head, IR * ir)
 {
-    ASSERT(head && *head, ("invalid parameter"));
+    ASSERTN(head && *head, ("invalid parameter"));
     if (ir == NULL || !ir->is_if()) { return false; }
 
     //Check true part
@@ -308,7 +308,7 @@ bool IR_CFS_OPT::transformIf2(IR ** head, IR * ir)
 //     IF(x < 0x0) {a=1} ELSE {b=1}         =>  b=1
 bool IR_CFS_OPT::transformIf3(IR ** head, IR * ir)
 {
-    ASSERT(head && *head, ("invalid parameter"));
+    ASSERTN(head && *head, ("invalid parameter"));
     if (ir == NULL || !ir->is_if()) { return false; }
 
     IR * det = IF_det(ir);
@@ -405,7 +405,7 @@ bool IR_CFS_OPT::transformIf3(IR ** head, IR * ir)
 bool IR_CFS_OPT::hoistLoop(IR ** head, IR * ir)
 {
     ASSERT0(ir->is_dowhile() || ir->is_whiledo() || ir->is_doloop());
-    ASSERT(LOOP_det(ir), ("DET is NULL"));
+    ASSERTN(LOOP_det(ir), ("DET is NULL"));
     IR * det = LOOP_det(ir);
 
     INT i = 0;
@@ -419,7 +419,7 @@ bool IR_CFS_OPT::hoistLoop(IR ** head, IR * ir)
         det = LOOP_det(ir);
         while (i > 1) {
             IR * c = det;
-            ASSERT(c->is_stmt(), ("Non-stmt ir should be remove "
+            ASSERTN(c->is_stmt(), ("Non-stmt ir should be remove "
                                    "during reshape_ir_tree()"));
             det = det->get_next();
             xcom::remove(&LOOP_det(ir), c);
@@ -443,8 +443,8 @@ bool IR_CFS_OPT::hoistLoop(IR ** head, IR * ir)
 //     if (c<a) {...}
 bool IR_CFS_OPT::hoistIf(IR ** head, IR * ir)
 {
-    ASSERT(ir->is_if(), ("need IF"));
-    ASSERT(IF_det(ir), ("DET is NULL"));
+    ASSERTN(ir->is_if(), ("need IF"));
+    ASSERTN(IF_det(ir), ("DET is NULL"));
 
     IR * det = IF_det(ir);
     INT i = 0;
@@ -458,7 +458,7 @@ bool IR_CFS_OPT::hoistIf(IR ** head, IR * ir)
         det = IF_det(ir);
         while (i > 1) {
             IR * c = det;
-            ASSERT(c->is_stmt(),
+            ASSERTN(c->is_stmt(),
                 ("Non-stmt ir should be remove during reshape_ir_tree()"));
             det = det->get_next();
             xcom::remove(&IF_det(ir), c);

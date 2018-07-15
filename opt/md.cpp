@@ -405,7 +405,7 @@ void MDSetMgr::free(MDSet * mds)
     xcom::SC<MDSet*> * sct;
     for (MDSet * x = m_free_md_set.get_head(&sct);
          x != NULL; x = m_free_md_set.get_next(&sct)) {
-        ASSERT(x != mds, ("Already have been freed."));
+        ASSERTN(x != mds, ("Already have been freed."));
     }
     #endif
 
@@ -591,9 +591,9 @@ MD const* MDSystem::registerMD(MD const& m)
     if (MD_id(&m) > 0) {
         //Find the entry in MDTab accroding to m.
         MDTab * mdtab = getMDTab(MD_base(&m));
-        ASSERT(mdtab != NULL, ("md has not been registered"));
+        ASSERTN(mdtab != NULL, ("md has not been registered"));
         MD const* entry = mdtab->find(&m);
-        ASSERT(entry, ("md has not been registered"));
+        ASSERTN(entry, ("md has not been registered"));
         return entry;
     }
 

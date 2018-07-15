@@ -150,7 +150,7 @@ protected:
 
     VP * allocVP()
     {
-        ASSERT(m_vp_pool != NULL, ("not init"));
+        ASSERTN(m_vp_pool != NULL, ("not init"));
         VP * p = (VP*)smpoolMallocConstSize(sizeof(VP), m_vp_pool);
         ASSERT0(p);
         ::memset(p, 0, sizeof(VP));
@@ -199,12 +199,12 @@ public:
         ASSERT0(m_seg_mgr);
 
         m_cfg = rg->getCFG();
-        ASSERT(m_cfg, ("cfg is not available."));
+        ASSERTN(m_cfg, ("cfg is not available."));
     }
     COPY_CONSTRUCTOR(PRSSAMgr);
     ~PRSSAMgr()
     {
-        ASSERT(!isSSAConstructed(), ("should be destructed"));
+        ASSERTN(!isSSAConstructed(), ("should be destructed"));
         destroy(false);
     }
 
@@ -219,7 +219,7 @@ public:
             SSA_def(ssainfo) = def;
 
             //You may be set multiple defs for use.
-            ASSERT(use->getSSAInfo() == NULL, ("use already has SSA info."));
+            ASSERTN(use->getSSAInfo() == NULL, ("use already has SSA info."));
 
             use->setSSAInfo(ssainfo);
         }
@@ -234,7 +234,7 @@ public:
 
         //Caution: if you do not destruct SSA prior to destory().
         //The reference to IR's SSA info will lead to undefined behaviors.
-        //ASSERT(!m_is_ssa_constructed,
+        //ASSERTN(!m_is_ssa_constructed,
         //   ("Still in ssa mode, you should out of "
         //    "SSA before the destruction."));
 
@@ -313,7 +313,7 @@ public:
             return v;
         }
 
-        ASSERT(m_seg_mgr, ("SSA manager is not initialized"));
+        ASSERTN(m_seg_mgr, ("SSA manager is not initialized"));
         v = allocVP();
         v->initNoClean(m_seg_mgr);
         VP_prno(v) = prno;

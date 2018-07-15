@@ -94,7 +94,7 @@ protected:
 
     void * xmalloc(UINT size)
     {
-        ASSERT(m_pool != NULL, ("need pool!!"));
+        ASSERTN(m_pool != NULL, ("need pool!!"));
         void * p = smpoolMalloc(size, m_pool);
         ASSERT0(p);
         ::memset(p, 0, size);

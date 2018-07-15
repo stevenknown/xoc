@@ -52,7 +52,7 @@ public:
         TbaaAttachInfo * ty = (TbaaAttachInfo*)ai->get(AI_TBAA);
         if (ty == NULL) { return NULL; }
 
-        ASSERT(ty->type, ("Type should not be given if "
+        ASSERTN(ty->type, ("Type should not be given if "
                           "you intend to annotate it as TBAA."));
         MD const* md = m_type2md.get(ty->type);
         if (md != NULL) {

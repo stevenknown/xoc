@@ -251,7 +251,7 @@ bool Region::isLowestHeight(IR const* ir, SimpCtx const* ctx) const
 IR * Region::simplifyIfSelf(IR * ir, SimpCtx * ctx)
 {
     if (ir == NULL) return NULL;
-    ASSERT(ir->is_if(), ("expect IR_IF node"));
+    ASSERTN(ir->is_if(), ("expect IR_IF node"));
     SimpCtx tcont(*ctx);
     SIMP_ret_array_val(&tcont) = true;
 
@@ -260,7 +260,7 @@ IR * Region::simplifyIfSelf(IR * ir, SimpCtx * ctx)
     ASSERT0(IF_det(ir)->is_judge());
     IR * det = simplifyDet(IF_det(ir), &tcont);
     IR * last = removetail(&det);
-    ASSERT(last->is_exp(), ("invalide det exp"));
+    ASSERTN(last->is_exp(), ("invalide det exp"));
     if (!last->is_judge()) {
         //det-expression should be judgement.
         last = buildJudge(last);
@@ -330,7 +330,7 @@ IR * Region::simplifyWhileDoSelf(IR * ir, SimpCtx * ctx)
     SimpCtx local;
     local.copyTopdownFlag(*ctx);
     IR * ret_list = NULL;
-    ASSERT(ir->is_whiledo(), ("expect IR_WHILE_DO node"));
+    ASSERTN(ir->is_whiledo(), ("expect IR_WHILE_DO node"));
     LabelInfo * startl = genIlabel();
 
     //det exp
@@ -341,7 +341,7 @@ IR * Region::simplifyWhileDoSelf(IR * ir, SimpCtx * ctx)
     SIMP_ret_array_val(&tcont) = true;
     IR * det = simplifyDet(LOOP_det(ir), &tcont);
     IR * last = xcom::removetail(&det);
-    ASSERT(last->is_exp(), ("invalide det exp"));
+    ASSERTN(last->is_exp(), ("invalide det exp"));
     if (!last->is_judge()) {
         //det-expression should be judgement.
         last = buildJudge(last);
@@ -396,7 +396,7 @@ IR * Region::simplifyDoWhileSelf(IR * ir, SimpCtx * ctx)
     SimpCtx local;
     local.copyTopdownFlag(*ctx);
     IR * ret_list = NULL;
-    ASSERT(ir->is_dowhile(), ("expect IR_DO_WHILE node"));
+    ASSERTN(ir->is_dowhile(), ("expect IR_DO_WHILE node"));
 
     LabelInfo * startl = genIlabel();
     LabelInfo * endl = genIlabel();
@@ -409,7 +409,7 @@ IR * Region::simplifyDoWhileSelf(IR * ir, SimpCtx * ctx)
     SIMP_ret_array_val(&tcont) = true;
     IR * det = simplifyDet(LOOP_det(ir), &tcont);
     IR * last = removetail(&det);
-    ASSERT(last->is_exp(), ("invalide det exp"));
+    ASSERTN(last->is_exp(), ("invalide det exp"));
     if (!last->is_judge()) {
         //det-expression should be judgement.
         last = buildJudge(last);
@@ -468,7 +468,7 @@ IR * Region::simplifyDoLoopSelf(IR * ir, SimpCtx * ctx)
     SimpCtx local;
     local.copyTopdownFlag(*ctx);
     IR * ret_list = NULL;
-    ASSERT(ir->is_doloop(), ("expect IR_DO_LOOP node"));
+    ASSERTN(ir->is_doloop(), ("expect IR_DO_LOOP node"));
 
     LabelInfo * startl = genIlabel();
 
@@ -482,7 +482,7 @@ IR * Region::simplifyDoLoopSelf(IR * ir, SimpCtx * ctx)
     SIMP_ret_array_val(&tcont) = true;
     IR * upperbound = simplifyDet(LOOP_det(ir), &tcont);
     IR * last = xcom::removetail(&upperbound);
-    ASSERT(last->is_exp(), ("invalide det exp"));
+    ASSERTN(last->is_exp(), ("invalide det exp"));
     //det-expression should be judgement.
     //last = buildCmp(IR_LE, iv->is_id() ? buildLoad(ID_info(iv)) : iv, last);
     IR * falsebr = buildBranch(false, last, genIlabel());
@@ -569,7 +569,7 @@ IR * Region::simplifyDet(IR * ir, SimpCtx * ctx)
             ctx->appendStmt(tcont);
             ctx->unionBottomupFlag(tcont);
         } else {
-            ASSERT(0, ("unknonw ir type"));
+            ASSERTN(0, ("unknonw ir type"));
         }
         ir = next;
     }
@@ -978,7 +978,7 @@ IR * Region::simplifyLogicalDet(IR * ir, SimpCtx * ctx)
         IR_parent(BR_det(ir)) = ir;
         return simplifyStmt(ir, ctx);
     }
-    ASSERT(0, ("TODO"));
+    ASSERTN(0, ("TODO"));
     return ret_list;
 }
 
@@ -1010,7 +1010,7 @@ void Region::simplifySelectKids(IR * ir, SimpCtx * ctx)
 IR * Region::simplifySelect(IR * ir, SimpCtx * ctx)
 {
     if (ir == NULL) { return NULL; }
-    ASSERT(ir->is_select(), ("expect select node"));
+    ASSERTN(ir->is_select(), ("expect select node"));
     if (!SIMP_select(ctx)) {
         simplifySelectKids(ir, ctx);
         if (!SIMP_to_lowest_height(ctx) || isLowestHeightExp(ir, ctx)) {
@@ -1113,7 +1113,7 @@ IR * Region::simplifySelect(IR * ir, SimpCtx * ctx)
 IR * Region::simplifyIgoto(IR * ir, SimpCtx * ctx)
 {
     if (ir == NULL) { return NULL; }
-    ASSERT(ir->is_igoto(), ("expect igoto"));
+    ASSERTN(ir->is_igoto(), ("expect igoto"));
 
     IGOTO_vexp(ir) = simplifyExpression(IGOTO_vexp(ir), ctx);
     return ir;
@@ -1123,7 +1123,7 @@ IR * Region::simplifyIgoto(IR * ir, SimpCtx * ctx)
 IR * Region::simplifySwitchSelf(IR * ir, SimpCtx * ctx)
 {
     if (ir == NULL) { return NULL; }
-    ASSERT(ir->is_switch(), ("expect switch node"));
+    ASSERTN(ir->is_switch(), ("expect switch node"));
 
     IR * vexp_stmt = NULL;
     IR * swt_val = SWITCH_vexp(ir);
@@ -1282,7 +1282,7 @@ IR * Region::simplifyArrayAddrExp(IR * ir, SimpCtx * ctx)
         }
 
         if (elemnumbuf != NULL) {
-            ASSERT(elemnumbuf[dim] != 0,
+            ASSERTN(elemnumbuf[dim] != 0,
                 ("Incomplete array dimension info, we need to "
                     "know how many elements in each dimension."));
             if (dim == 0) {
@@ -1423,7 +1423,7 @@ IR * Region::simpToPR(IR * ir, SimpCtx * ctx)
 IR * Region::simplifyExpression(IR * ir, SimpCtx * ctx)
 {
     if (ir == NULL) { return NULL; }
-    ASSERT(ir->is_exp(), ("expect non-statement node"));
+    ASSERTN(ir->is_exp(), ("expect non-statement node"));
 
     //ir can not in list, or it may incur illegal result.
     ASSERT0(ir->is_single());
@@ -1471,7 +1471,7 @@ IR * Region::simplifyExpression(IR * ir, SimpCtx * ctx)
     case IR_CVT: //data type convertion
         return simplifyBinAndUniExpression(ir, ctx);
     case IR_SELECT: return simplifySelect(ir, ctx);
-    default: ASSERT(0, ("cannot simplify '%s'", IRNAME(ir)));
+    default: ASSERTN(0, ("cannot simplify '%s'", IRNAME(ir)));
     } //end switch
     return NULL;
 }
@@ -1525,7 +1525,7 @@ IR * Region::simplifyJudgeDet(IR * ir, SimpCtx * ctx)
             IR * newir = simplifyLogicalNot(ir, &tcont);
             ASSERT0(newir->is_exp());
             IR * lst = SIMP_stmtlist(&tcont);
-            ASSERT(newir->is_pr(),
+            ASSERTN(newir->is_pr(),
                    ("For now, newir will fairly be IR_PR. But it is not "
                     "certain in the future."));
             SimpCtx t_tcont(tcont);
@@ -1697,7 +1697,7 @@ IR * Region::simplifyArray(IR * ir, SimpCtx * ctx)
 
     IR * array_addr = simplifyArrayAddrExp(ir, ctx);
     //Need to free ir in current function.
-    ASSERT(!ir->is_undef(), ("ir has been freed"));
+    ASSERTN(!ir->is_undef(), ("ir has been freed"));
 
     SIMP_changed(ctx) = true;
     if (!SIMP_ret_array_val(ctx)) {
@@ -2068,7 +2068,7 @@ IR * Region::simplifyIf(IR * ir, SimpCtx * ctx)
     SimpCtx detctx(*ctx);
     IF_det(ir) = simplifyExpression(IF_det(ir), &detctx);
     ir->setParent(IF_det(ir));
-    ASSERT(SIMP_stmtlist(&detctx) == NULL, ("invalid determinator"));
+    ASSERTN(SIMP_stmtlist(&detctx) == NULL, ("invalid determinator"));
 
     //Truebody
     SimpCtx truectx(*ctx);
@@ -2076,7 +2076,7 @@ IR * Region::simplifyIf(IR * ir, SimpCtx * ctx)
     if (SIMP_changed(&truectx)) {
         ir->setParent(IF_truebody(ir));
     }
-    ASSERT(SIMP_stmtlist(&truectx) == NULL,
+    ASSERTN(SIMP_stmtlist(&truectx) == NULL,
            ("should already be added to truebody"));
 
     //Falsebody
@@ -2085,7 +2085,7 @@ IR * Region::simplifyIf(IR * ir, SimpCtx * ctx)
     if (SIMP_changed(&falsectx)) {
         ir->setParent(IF_falsebody(ir));
     }
-    ASSERT(SIMP_stmtlist(&falsectx) == NULL,
+    ASSERTN(SIMP_stmtlist(&falsectx) == NULL,
            ("should already be added to falsebody"));
 
     return ir;
@@ -2098,7 +2098,7 @@ IR * Region::simplifyLoopIngredient(IR * ir, SimpCtx * ctx)
     SimpCtx detctx(*ctx);
     LOOP_det(ir) = simplifyExpression(LOOP_det(ir), &detctx);
     ir->setParent(LOOP_det(ir));
-    ASSERT(SIMP_stmtlist(&detctx) == NULL, ("invalid determinator"));
+    ASSERTN(SIMP_stmtlist(&detctx) == NULL, ("invalid determinator"));
 
     SimpCtx initctx(*ctx);
     if (ir->is_doloop()) {
@@ -2114,7 +2114,7 @@ IR * Region::simplifyLoopIngredient(IR * ir, SimpCtx * ctx)
         if (SIMP_changed(&stepctx)) {
             ir->setParent(LOOP_step(ir));
         }
-        ASSERT(SIMP_stmtlist(&stepctx) == NULL,
+        ASSERTN(SIMP_stmtlist(&stepctx) == NULL,
                ("step of DoLoop is too complex, the operation "
                 "should only be reduction"));
     }
@@ -2125,7 +2125,7 @@ IR * Region::simplifyLoopIngredient(IR * ir, SimpCtx * ctx)
     if (SIMP_changed(&bodyctx)) {
         ir->setParent(LOOP_body(ir));
     }
-    ASSERT(SIMP_stmtlist(&bodyctx) == NULL,
+    ASSERTN(SIMP_stmtlist(&bodyctx) == NULL,
            ("should already be added to truebody"));
 
     IR * ret_list = NULL;
@@ -2145,7 +2145,7 @@ IR * Region::simplifyDoWhile(IR * ir, SimpCtx * ctx)
         return simplifyDoWhileSelf(ir, ctx);
     }
 
-    ASSERT(!SIMP_break(ctx) && !SIMP_continue(ctx),
+    ASSERTN(!SIMP_break(ctx) && !SIMP_continue(ctx),
            ("Must simplify Loop-stmt if you want to simply Break/Continue."));
 
     return simplifyLoopIngredient(ir, ctx);
@@ -2158,7 +2158,7 @@ IR * Region::simplifyWhileDo(IR * ir, SimpCtx * ctx)
         return simplifyWhileDoSelf(ir, ctx);
     }
 
-    ASSERT(!SIMP_break(ctx) && !SIMP_continue(ctx),
+    ASSERTN(!SIMP_break(ctx) && !SIMP_continue(ctx),
            ("Must simplify Loop-stmt if you want to simply Break/Continue."));
 
     return simplifyLoopIngredient(ir, ctx);
@@ -2171,7 +2171,7 @@ IR * Region::simplifyDoLoop(IR * ir, SimpCtx * ctx)
         return simplifyDoLoopSelf(ir, ctx);
     }
 
-    ASSERT(!SIMP_break(ctx) && !SIMP_continue(ctx),
+    ASSERTN(!SIMP_break(ctx) && !SIMP_continue(ctx),
            ("Must simplify Loop-stmt if you want to simply Break/Continue."));
 
     return simplifyLoopIngredient(ir, ctx);
@@ -2187,7 +2187,7 @@ IR * Region::simplifySwitch(IR * ir, SimpCtx * ctx)
     IR * body = SWITCH_body(ir);
     if (body == NULL) { return ir; }
 
-    ASSERT(!SIMP_break(ctx),
+    ASSERTN(!SIMP_break(ctx),
            ("Must simplify Swich-stmt if you want to simply Break."));
 
     SWITCH_body(ir) = NULL;
@@ -2211,8 +2211,8 @@ IR * Region::simplifySwitch(IR * ir, SimpCtx * ctx)
 IR * Region::simplifyStmt(IR * ir, SimpCtx * ctx)
 {
     if (ir == NULL) { return NULL; }
-    ASSERT(ir->is_stmt(), ("expect statement node"));
-    ASSERT(ir->is_single(), ("ir should be remove out of list"));
+    ASSERTN(ir->is_stmt(), ("expect statement node"));
+    ASSERTN(ir->is_single(), ("ir should be remove out of list"));
 
     IR * ret_list = NULL;
     switch (ir->getCode()) {
@@ -2313,7 +2313,7 @@ IR * Region::simplifyStmt(IR * ir, SimpCtx * ctx)
     case IR_REGION:
     case IR_PHI:
         return ir;
-    default: ASSERT(0, ("'%s' is not a statement",IRNAME(ir)));
+    default: ASSERTN(0, ("'%s' is not a statement",IRNAME(ir)));
     }
     setParentPointerForIRList(ret_list);
     return ret_list;
@@ -2330,7 +2330,7 @@ IR * Region::simplifyStmtList(IR * ir_list, SimpCtx * ctx)
     UINT count = 0;
     while (redo_simp) {
         count++;
-        ASSERT(count < 50, ("dead lock"));
+        ASSERTN(count < 50, ("dead lock"));
         redo_simp = false;
 
         IR * last = NULL;

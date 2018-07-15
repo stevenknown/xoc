@@ -192,7 +192,7 @@ CHAR * xstrcat(CHAR * buf, size_t bufl, CHAR const* info, ...)
 //Round off to minus infinity
 INT xfloor(INT a, INT b)
 {
-    ASSERT(b != 0, ("div zero"));
+    ASSERTN(b != 0, ("div zero"));
     if (a % b == 0) {
         //This part could not be combined with third one.
         return (a / b);
@@ -207,7 +207,7 @@ INT xfloor(INT a, INT b)
 //Round up to plus infinity.
 INT xceiling(INT a, INT b)
 {
-    ASSERT(b != 0, ("div zero"));
+    ASSERTN(b != 0, ("div zero"));
     if (a % b == 0) {
         //(a+b-1)/b will be errorneous
         //CASE:ceil(-4, 2)
@@ -338,7 +338,7 @@ UINT fact(UINT n)
 //P(n,m)=n*(n-1)*...*(n-m+1)=n!/(n-m)!
 UINT arra(UINT n, UINT m)
 {
-    ASSERT(n != 0 && m != 0 && n >= m, ("illegal param"));
+    ASSERTN(n != 0 && m != 0 && n >= m, ("illegal param"));
     UINT l = n - m + 1, i = n, res = 1;
     while (i >= l) {
         res = res * i;
@@ -353,7 +353,7 @@ UINT arra(UINT n, UINT m)
 //Simplify:C(n,m)=(n*(n-1)*(m+1))/(n-m)!
 UINT combin(UINT n, UINT m)
 {
-    ASSERT(n != 0 && m != 0 && n >= m, ("illegal param"));
+    ASSERTN(n != 0 && m != 0 && n >= m, ("illegal param"));
     if (n == m) {
         return 1;
     }
@@ -382,7 +382,7 @@ INT xctoi(CHAR const* cl)
     if (cl == NULL || strcmp(cl, "") == 0) return 0;
     INT l = (INT)strlen(cl);
     if (l > BYTE_PER_INT) {
-        ASSERT(0, ("too many characters in integer"));
+        ASSERTN(0, ("too many characters in integer"));
         return 0;
     }
     INT i = 0;
@@ -489,7 +489,7 @@ LONG xstrstr(CHAR const* src, CHAR const* par, INT i)
 UINT xsplit(CHAR const* str, OUT Vector<CHAR*> & ret, CHAR const* sep)
 {
     ASSERT0(str);
-    ASSERT(strlen(sep) == 1, ("separator must be single character"));
+    ASSERTN(strlen(sep) == 1, ("separator must be single character"));
     CHAR const* start = str;
     CHAR const* end = str;
 
@@ -615,7 +615,7 @@ void dumpf_svec(void * vec, UINT ty, CHAR const* name, bool is_del)
 
     static INT g_count = 0;
     FILE * h = fopen(name, "a+");
-    ASSERT(h, ("%s create failed!!!", name));
+    ASSERTN(h, ("%s create failed!!!", name));
     fprintf(h, "\nSVECOTR dump id:%d\n", g_count++);
 
     ///
@@ -640,7 +640,7 @@ void dumpf_svec(void * vec, UINT ty, CHAR const* name, bool is_del)
         }
         break;
     }
-    default: ASSERT(0, ("illegal ty"));
+    default: ASSERTN(0, ("illegal ty"));
     }
     fprintf(h, "\n");
     fclose(h);
@@ -675,7 +675,7 @@ void dumps_svec(void * vec, UINT ty)
             break;
         }
     default:
-        ASSERT(0, ("illegal ty"));
+        ASSERTN(0, ("illegal ty"));
     }//end switch
     printf("\n");
 }
@@ -700,7 +700,7 @@ void af2i(IN CHAR * f, OUT BYTE * buf, UINT buflen, bool is_double)
     DUMMYUSE(buf);
     DUMMYUSE(f);
     ASSERT0(f && buf);
-    ASSERT(0, ("TODO"));
+    ASSERTN(0, ("TODO"));
 }
 
 

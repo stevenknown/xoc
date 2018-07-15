@@ -374,7 +374,7 @@ public:
     //Could ir be looked as a first stmt in basic block?
     inline bool isUpperBoundary(IR const* ir) const
     {
-        ASSERT(ir->isStmtInBB() || ir->is_lab(), ("illegal stmt in bb"));
+        ASSERTN(ir->isStmtInBB() || ir->is_lab(), ("illegal stmt in bb"));
         return ir->is_lab();
     }
     bool isDownBoundary(IR * ir);

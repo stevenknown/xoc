@@ -117,7 +117,7 @@ public:
         UINT vertex_hash_size = 16)
         : xcom::DGraph(edge_hash_size, vertex_hash_size)
     {
-        ASSERT(bb_list, ("CFG need BB list"));
+        ASSERTN(bb_list, ("CFG need BB list"));
         m_bb_list = bb_list;
         m_loop_info = NULL;
         m_bs_mgr = NULL;
@@ -147,7 +147,7 @@ public:
 
     bool computeDom(xcom::BitSet const* uni)
     {
-        ASSERT(m_entry, ("Not found entry"));
+        ASSERTN(m_entry, ("Not found entry"));
         List<xcom::Vertex const*> vlst;
         computeRpoNoRecursive(get_vertex(m_entry->id()), vlst);
         return xcom::DGraph::computeDom(&vlst, uni);
@@ -157,9 +157,9 @@ public:
     //different with dom.
     bool computePdom(xcom::BitSet const* uni)
     {
-        //ASSERT(m_exit_list.get_elem_count() == 1,
+        //ASSERTN(m_exit_list.get_elem_count() == 1,
         //   ("ONLY support SESE or SEME"));
-        ASSERT(m_entry, ("Not found entry"));
+        ASSERTN(m_entry, ("Not found entry"));
         return xcom::DGraph::computePdomByRpo(get_vertex(m_entry->id()), uni);
     }
 
@@ -238,7 +238,7 @@ public:
             BB * bb = ct->val();
             ASSERT0(bb);
 
-            ASSERT(get_vertex(bb->id()),
+            ASSERTN(get_vertex(bb->id()),
                 ("No vertex corresponds to BB%d", bb->id()));
 
             if (isCFGExit(bb->id())) {
@@ -303,11 +303,11 @@ public:
     {
         ASSERT0(bb);
         XR * xr = get_last_xr(bb);
-        ASSERT(xr != NULL, ("bb is empty"));
+        ASSERTN(xr != NULL, ("bb is empty"));
         LabelInfo const* lab = xr->getLabel();
-        ASSERT(lab != NULL, ("xr does not correspond to a unqiue label"));
+        ASSERTN(lab != NULL, ("xr does not correspond to a unqiue label"));
         BB * target = findBBbyLabel(lab);
-        ASSERT(target != NULL, ("label does not correspond to a BB"));
+        ASSERTN(target != NULL, ("label does not correspond to a BB"));
         return target;
     }
 
@@ -416,7 +416,7 @@ public:
     //and converting bb1->bb2 to be conditional branch, converting
     //bb2->bb3 to be unconditional branch.
     void revise_fallthrough(List<BB*> & new_bbl)
-    { ASSERT(0, ("Target Dependent Code")); }
+    { ASSERTN(0, ("Target Dependent Code")); }
 
     void sortByDFS();
     void sortByBFS();
@@ -495,7 +495,7 @@ void CFG<BB, XR>::getKidOfIF(
 {
     if (true_body != NULL || false_body != NULL) {
         UINT ipdom = xcom::DGraph::get_ipdom(bb->id());
-        ASSERT(ipdom > 0, ("bb does not have ipdom"));
+        ASSERTN(ipdom > 0, ("bb does not have ipdom"));
         BB * fallthrough_bb = getFallThroughBB(bb);
         BB * target_bb = getTargetBB(bb);
         XR * xr = get_last_xr(bb);
@@ -536,7 +536,7 @@ void CFG<BB, XR>::getKidOfIF(
 
     if (sibling != NULL) {
         UINT ipdom = xcom::DGraph::get_ipdom(bb->id());
-        ASSERT(ipdom > 0, ("bb does not have ipdom"));
+        ASSERTN(ipdom > 0, ("bb does not have ipdom"));
         *sibling = getBB(ipdom);
     }
 }
@@ -564,7 +564,7 @@ void CFG<BB, XR>::dumpLoopTree(LI<BB> * looplist, UINT indent, FILE * h)
 template <class BB, class XR>
 bool CFG<BB, XR>::verifyIfBBRemoved(IN CDG * cdg, OptCtx & oc)
 {
-    ASSERT(cdg, ("DEBUG: verification need cdg."));
+    ASSERTN(cdg, ("DEBUG: verification need cdg."));
     xcom::C<BB*> * ct, * next_ct;
     List<BB*> succs;
     bool is_cfg_valid = OC_is_cfg_valid(oc);
@@ -614,7 +614,7 @@ bool CFG<BB, XR>::verifyIfBBRemoved(IN CDG * cdg, OptCtx & oc)
             //     ...
             //     L1:
             get_succs(succs, bb);
-            ASSERT(succs.get_elem_count() == 2, ("illegal number of edge"));
+            ASSERTN(succs.get_elem_count() == 2, ("illegal number of edge"));
             bool find_fallthrough_bb = false;
             for (BB * succ = succs.get_head();
                  succ != NULL; succ = succs.get_next()) {
@@ -624,7 +624,7 @@ bool CFG<BB, XR>::verifyIfBBRemoved(IN CDG * cdg, OptCtx & oc)
                     continue;
                 }
                 ASSERT0(last_xr->getLabel());
-                ASSERT(succ == findBBbyLabel(last_xr->getLabel()),
+                ASSERTN(succ == findBBbyLabel(last_xr->getLabel()),
                     ("miss target BB"));
             }
         }
@@ -853,7 +853,7 @@ bool CFG<BB, XR>::removeRedundantBranch()
             //Although bb is empty, it may have some labels attached,
             //which may have dedicated usage. Do not remove it for
             //convservative purpose.
-            ASSERT(isCFGEntry(bb->id()) || isCFGExit(bb->id()) ||
+            ASSERTN(isCFGEntry(bb->id()) || isCFGExit(bb->id()) ||
                    bb->getLabelList().get_elem_count() != 0,
                    ("should call removeEmptyBB() first."));
             continue;
@@ -927,7 +927,7 @@ void CFG<BB, XR>::sortByDFS()
     #ifdef _DEBUG_
     for (BB * bbc = m_bb_list->get_head();
          bbc != NULL; bbc = m_bb_list->get_next()) {
-        ASSERT(visited.get(bbc->id()),
+        ASSERTN(visited.get(bbc->id()),
                 ("unreachable BB, call removeUnreachBB()"));
     }
     #endif
@@ -978,7 +978,7 @@ void CFG<BB, XR>::sortByBFS()
     #ifdef _DEBUG_
     for (BB * bbc = m_bb_list->get_head();
          bbc != NULL; bbc = m_bb_list->get_next()) {
-        ASSERT(visited.get(bbc->id()),
+        ASSERTN(visited.get(bbc->id()),
                 ("unreachable BB, call removeUnreachBB()"));
     }
     #endif
@@ -1017,7 +1017,7 @@ void CFG<BB, XR>::sortByTopological()
         }
 
         succ.clean();
-        ASSERT(header.get_elem_count() > 0, ("No entry BB"));
+        ASSERTN(header.get_elem_count() > 0, ("No entry BB"));
         xcom::C<xcom::Vertex*> * ct;
         for (header.get_head(&ct);
              ct != header.end(); ct = header.get_next(ct)) {
@@ -1103,7 +1103,7 @@ bool CFG<BB, XR>::removeUnreachBB()
         next_ct = m_bb_list->get_next(ct);
         if (!visited.is_contain(bb->id())) {
             //EH may be redundant and can be removed.
-            //ASSERT(!bb->isExceptionHandler(),
+            //ASSERTN(!bb->isExceptionHandler(),
             // ("For conservative purpose, "
             //  "exception handler should be reserved."));
 
@@ -1128,7 +1128,7 @@ void CFG<BB, XR>::chainPredAndSucc(UINT vid, bool is_single_pred_succ)
     xcom::EdgeC * pred_lst = VERTEX_in_list(v);
     xcom::EdgeC * succ_lst = VERTEX_out_list(v);
     if (is_single_pred_succ) {
-        ASSERT(get_in_degree(v) <= 1 &&
+        ASSERTN(get_in_degree(v) <= 1 &&
                 get_out_degree(v) <= 1,
                 ("BB only has solely pred and succ."));
     }
@@ -1182,7 +1182,7 @@ void CFG<BB, XR>::get_preds(IN OUT List<BB*> & preds, BB const* v)
 template <class BB, class XR>
 void CFG<BB, XR>::build(OptCtx & oc)
 {
-    ASSERT(m_bb_list, ("bb_list is emt"));
+    ASSERTN(m_bb_list, ("bb_list is emt"));
     xcom::C<BB*> * ct = NULL;
     xcom::C<BB*> * next_ct;
     List<BB*> tgt_bbs;
@@ -1197,7 +1197,7 @@ void CFG<BB, XR>::build(OptCtx & oc)
         XR * last = get_last_xr(bb);
         if (last == NULL) {
             //Remove empty bb after CFG done.
-            //ASSERT(bb->is_bb_exit(), ("Should be removed!"));
+            //ASSERTN(bb->is_bb_exit(), ("Should be removed!"));
             //Add fall-through edge.
             //The last bb may not terminated by 'return' stmt.
             if (next != NULL && !next->is_terminate()) {
@@ -1225,7 +1225,7 @@ void CFG<BB, XR>::build(OptCtx & oc)
             }
             //Add edge between source BB and target BB.
             BB * target_bb = findBBbyLabel(last->getLabel());
-            ASSERT(target_bb != NULL, ("target cannot be NULL"));
+            ASSERTN(target_bb != NULL, ("target cannot be NULL"));
             addEdge(bb->id(), target_bb->id());
         } else if (last->isMultiConditionalBr()) {
             //Add fall-through edge
@@ -1257,7 +1257,7 @@ void CFG<BB, XR>::build(OptCtx & oc)
             } else {
                 //Add edge between source BB and target BB.
                 BB * target_bb = findBBbyLabel(last->getLabel());
-                ASSERT(target_bb != NULL, ("target cannot be NULL"));
+                ASSERTN(target_bb != NULL, ("target cannot be NULL"));
                 addEdge(bb->id(), target_bb->id());
             }
         } else if (!last->is_return()) {
@@ -1320,7 +1320,7 @@ bool CFG<BB, XR>::insertLoopTree(LI<BB> ** lilist, LI<BB>* loop)
         } else if (LI_bb_set(loop)->is_contain(*LI_bb_set(cur))) {
             remove(lilist, cur);
             insertLoopTree(&LI_inner_list(loop), cur);
-            ASSERT(LI_inner_list(loop), ("illegal loop tree"));
+            ASSERTN(LI_inner_list(loop), ("illegal loop tree"));
         } //end if
     } //end while
     add_next(lilist, loop);
@@ -1409,7 +1409,7 @@ void CFG<BB, XR>::cleanLoopInfo(bool access_li_by_scan_bb)
 
         UINT id = LI_loop_head(x)->id();
         LI<BB> * li2 = m_map_bb2li.get(id);
-        ASSERT(li2, ("No any BB correspond to current loop info."));
+        ASSERTN(li2, ("No any BB correspond to current loop info."));
 
         m_bs_mgr->free(LI_bb_set(li2));
         m_map_bb2li.set(id, NULL);
@@ -1444,7 +1444,7 @@ bool CFG<BB, XR>::findLoop()
             ASSERT0(succ);
 
             xcom::BitSet * dom = m_dom_set.get(bb->id());
-            ASSERT(dom, ("should compute dominator first"));
+            ASSERTN(dom, ("should compute dominator first"));
             if (!dom->is_contain(succ->id())) { continue; }
 
             //If the SUCC is one of the DOMINATOR of bb, then it
@@ -1520,7 +1520,7 @@ bool CFG<BB, XR>::isLoopHeadRecur(LI<BB> * li, BB * bb)
     if (li == NULL) { return false; }
     LI<BB> * t = li;
     while (t != NULL) {
-        ASSERT(LI_loop_head(t) != NULL, ("loop info absent loophead bb"));
+        ASSERTN(LI_loop_head(t) != NULL, ("loop info absent loophead bb"));
         if (LI_loop_head(t) == bb) {
             return true;
         }
@@ -1538,7 +1538,7 @@ void CFG<BB, XR>::dump_vcg(CHAR const* name)
     }
     UNLINK(name);
     FILE * hvcg = fopen(name, "a+");
-    ASSERT(hvcg, ("%s create failed!!!", name));
+    ASSERTN(hvcg, ("%s create failed!!!", name));
     fprintf(hvcg, "graph: {"
               "title: \"Graph\"\n"
               "shrink:  15\n"
@@ -1631,7 +1631,7 @@ void CFG<BB, XR>::computeRPOImpl(
     xcom::EdgeC * el = VERTEX_out_list(v);
     while (el != NULL) {
         xcom::Vertex * succ = EDGE_to(EC_edge(el));
-        ASSERT(getBB(VERTEX_id(succ)) != NULL,
+        ASSERTN(getBB(VERTEX_id(succ)) != NULL,
                 ("without bb corresponded"));
         if (!is_visited.is_contain(VERTEX_id(succ))) {
             computeRPOImpl(is_visited, succ, order);
@@ -1660,7 +1660,7 @@ void CFG<BB, XR>::computeRPO(OptCtx & oc)
     #endif
 
     xcom::BitSet is_visited;
-    ASSERT(m_entry, ("Not find entry"));
+    ASSERTN(m_entry, ("Not find entry"));
 
     #ifdef RECURSIVE_ALGO
     INT order = m_bb_list->get_elem_count();

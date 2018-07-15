@@ -51,7 +51,7 @@ Rational::Rational()
 Rational::Rational(Rational const& r)
 {
     //Sometimes, r need not to initialize always.
-    //ASSERT(r.m_den != 0, ("denominator is 0!"));
+    //ASSERTN(r.m_den != 0, ("denominator is 0!"));
     m_num = r.m_num;
     m_den = r.m_den;
 }
@@ -59,14 +59,14 @@ Rational::Rational(Rational const& r)
 
 Rational::Rational(INT num, INT den)
 {
-    ASSERT(den != 0, ("denominator is 0!"));
+    ASSERTN(den != 0, ("denominator is 0!"));
     m_num = num,  m_den = den;
 }
 
 
 Rational & Rational::operator = (Rational const& a)
 {
-    ASSERT(a.m_den != 0, ("denominator is 0!"));
+    ASSERTN(a.m_den != 0, ("denominator is 0!"));
     m_num = a.m_num;
     m_den = a.m_den;
     return *this;
@@ -99,7 +99,7 @@ void Rational::reduce()
 
 Rational Rational::rabs()
 {
-    ASSERT(m_den != 0, ("denominator is 0!"));
+    ASSERTN(m_den != 0, ("denominator is 0!"));
     Rational b(*this);
     if (b.m_num < 0) {
         b.m_num = -b.m_num;
@@ -218,7 +218,7 @@ static inline void appro(LONGLONG & num, LONGLONG & den)
         num = INT(v);
         den = 1;
     } else {
-        ASSERT(0, ("overflow the range of integer, 0x7fffFFFF."));
+        ASSERTN(0, ("overflow the range of integer, 0x7fffFFFF."));
         num = 0;
         den = 1;
     }
@@ -228,7 +228,7 @@ static inline void appro(LONGLONG & num, LONGLONG & den)
 
 bool operator < (Rational const& a, Rational const& b)
 {
-    ASSERT(a.m_den != 0 && b.m_den != 0, ("denominator is 0!"));
+    ASSERTN(a.m_den != 0 && b.m_den != 0, ("denominator is 0!"));
     if ((LONGLONG)a.m_num * (LONGLONG)b.m_den <
         (LONGLONG)a.m_den * (LONGLONG)b.m_num) {
         return true;
@@ -239,7 +239,7 @@ bool operator < (Rational const& a, Rational const& b)
 
 bool operator <= (Rational const& a, Rational const& b)
 {
-    ASSERT(a.m_den != 0 && b.m_den != 0, ("denominator is 0!"));
+    ASSERTN(a.m_den != 0 && b.m_den != 0, ("denominator is 0!"));
     if (((LONGLONG)(a.m_num) * (LONGLONG)(b.m_den)) <=
         ((LONGLONG)(a.m_den) * (LONGLONG)(b.m_num))) {
         return true;
@@ -250,7 +250,7 @@ bool operator <= (Rational const& a, Rational const& b)
 
 bool operator > (Rational const& a, Rational const& b)
 {
-    ASSERT(a.m_den != 0 && b.m_den != 0, ("denominator is 0!"));
+    ASSERTN(a.m_den != 0 && b.m_den != 0, ("denominator is 0!"));
     if (((LONGLONG)(a.m_num) * (LONGLONG)(b.m_den)) >
         ((LONGLONG)(a.m_den) * (LONGLONG)(b.m_num))) {
         return true;
@@ -261,7 +261,7 @@ bool operator > (Rational const& a, Rational const& b)
 
 bool operator >= (Rational const& a, Rational const& b)
 {
-    ASSERT(a.m_den != 0 && b.m_den != 0, ("denominator is 0!"));
+    ASSERTN(a.m_den != 0 && b.m_den != 0, ("denominator is 0!"));
     if (((LONGLONG)(a.m_num) * (LONGLONG)(b.m_den)) >=
         ((LONGLONG)(a.m_den) * (LONGLONG)(b.m_num))) {
         return true;
@@ -272,7 +272,7 @@ bool operator >= (Rational const& a, Rational const& b)
 
 Rational operator * (Rational const& a, Rational const& b)
 {
-    ASSERT(a.m_den != 0 && b.m_den != 0, ("denominator is 0!"));
+    ASSERTN(a.m_den != 0 && b.m_den != 0, ("denominator is 0!"));
     LONGLONG rnum = (LONGLONG)(a.m_num) * (LONGLONG)(b.m_num);
     Rational rat;
     if (rnum == 0) {
@@ -281,7 +281,7 @@ Rational operator * (Rational const& a, Rational const& b)
         return rat;
     }
     LONGLONG rden = (LONGLONG)(a.m_den) * (LONGLONG)(b.m_den);
-    ASSERT(rden != 0, ("den is zero"));
+    ASSERTN(rden != 0, ("den is zero"));
     if (rnum == rden) { rat.m_num = 1; rat.m_den = 1; return rat; }
     if (rnum == -rden) { rat.m_num = -1; rat.m_den = 1; return rat; }
     if ((rnum < 0 && rden < 0) || rden < 0) { rnum = -rnum; rden = -rden; }
@@ -316,8 +316,8 @@ Rational operator / (Rational const& a, Rational const& b)
     FRAC_TYPE bnum = b.m_num;
     FRAC_TYPE bden = b.m_den;
 
-    ASSERT(aden != 0 && bden != 0, ("denominator is 0"));
-    ASSERT(bnum != 0, ("'a' divided by 0"));
+    ASSERTN(aden != 0 && bden != 0, ("denominator is 0"));
+    ASSERTN(bnum != 0, ("'a' divided by 0"));
 
     Rational rat;
     if (anum == 0) { rat.m_num = 0; rat.m_den = 1; return rat; }
@@ -362,7 +362,7 @@ Rational operator / (Rational const& a, Rational const& b)
 
 Rational operator + (Rational const& a, Rational const& b)
 {
-    ASSERT(a.m_den != 0 && b.m_den != 0, ("denominator is 0!"));
+    ASSERTN(a.m_den != 0 && b.m_den != 0, ("denominator is 0!"));
     Rational rat;
     LONGLONG rnum = (LONGLONG)(a.m_num) * (LONGLONG)(b.m_den) +
                     (LONGLONG)(a.m_den) * (LONGLONG)(b.m_num);
@@ -372,7 +372,7 @@ Rational operator + (Rational const& a, Rational const& b)
         return rat;
     }
     LONGLONG rden = (LONGLONG)(a.m_den) * (LONGLONG)(b.m_den);
-    ASSERT(rden != 0, ("den is 0"));
+    ASSERTN(rden != 0, ("den is 0"));
     if (rnum == rden) { rat.m_num = 1; rat.m_den = 1; return rat; }
     if (rnum == -rden) { rat.m_num = -1; rat.m_den = 1; return rat; }
     if ((rnum < 0 && rden < 0) || rden < 0) { rnum = -rnum; rden = -rden; }

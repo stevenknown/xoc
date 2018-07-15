@@ -417,7 +417,7 @@ Type const* Dex2IR::mapDexType2XocType(CHAR charty)
     case 'D': ty = m_tm->getSimplexTypeEx(D_F64); break;
     case 'L': ty = m_tr->ptr; break;
     case '[': ty = m_tr->array; break;
-    default: ASSERT(0, ("TODO: not yet support")); break;
+    default: ASSERTN(0, ("TODO: not yet support")); break;
     }
     ASSERT0(ty);
     return ty;
@@ -687,7 +687,7 @@ UINT Dex2IR::computeClassPosid(UINT cls_id_in_tytab)
     }
     CHAR const* class_name = dexStringByTypeIdx(m_df, cls_id_in_tytab);
     ASSERT0(class_name);
-    ASSERT(0, ("Not find!"));
+    ASSERTN(0, ("Not find!"));
     return 0;
 }
 
@@ -1062,7 +1062,7 @@ IR * Dex2IR::convertInvoke(IN LIR * lir)
         if (has_this && i == 0) {
             param = genMappedPR(r->args[i], m_tr->ptr);
         } else {
-            ASSERT(*paramty != '[', ("should be convert to L"));
+            ASSERTN(*paramty != '[', ("should be convert to L"));
             param = genMappedPR(r->args[i], mapDexType2XocType(*paramty));
             switch (*paramty) {
             case 'J':
@@ -1984,7 +1984,7 @@ void Dex2IR::markTryLabel()
                 LIR * x = LIRC_op(m_lircode, each_catch->handler_pc);
                 ASSERT0(x);
                 //CASE: it is not always true. Apk may be messed up.
-                //ASSERT(LIR_opcode(x) == LOP_MOVE_EXCEPTION,
+                //ASSERTN(LIR_opcode(x) == LOP_MOVE_EXCEPTION,
                 //         ("LIR at catch start must be move_exception"));
 
                 LabelInfo * lab = NULL;

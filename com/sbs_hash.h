@@ -195,7 +195,7 @@ public:
     {
         ASSERT0(allocator);
         m_allocator = allocator;
-        ASSERT(allocator, ("Parameter can not be NULL"));
+        ASSERTN(allocator, ("Parameter can not be NULL"));
         m_pool = smpoolCreate(sizeof(B2NType) * 4, MEM_CONST_SIZE);
 
         #ifdef _DEBUG_

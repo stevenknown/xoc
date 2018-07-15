@@ -58,7 +58,7 @@ IR_CFG::IR_CFG(CFG_SHAPE cs, BBList * bbl, Region * rg,
         addVertex(BB_id(bb));
         for (LabelInfo const* li = bb->getLabelList().get_head();
              li != NULL; li = bb->getLabelList().get_next()) {
-            ASSERT(m_lab2bb.get(li) == NULL,
+            ASSERTN(m_lab2bb.get(li) == NULL,
                    ("Label has been mapped to BB%d", BB_id(m_lab2bb.get(li))));
             m_lab2bb.set(li, bb);
             if (LABEL_INFO_is_catch_start(li)) {
@@ -107,7 +107,7 @@ IR_CFG::IR_CFG(CFG_SHAPE cs, BBList * bbl, Region * rg,
         //}
         break;
     }
-    default: ASSERT(0, ("strang shape of CFG"));
+    default: ASSERTN(0, ("strang shape of CFG"));
     }
 }
 
@@ -132,7 +132,7 @@ void IR_CFG::cf_opt()
 //Construct EH edge after cfg built.
 void IR_CFG::buildEHEdge()
 {
-    ASSERT(m_bb_list, ("bb_list is emt"));
+    ASSERTN(m_bb_list, ("bb_list is emt"));
     xcom::C<IRBB*> * ct;
     for (m_bb_list->get_head(&ct);
          ct != m_bb_list->end(); ct = m_bb_list->get_next(ct)) {
@@ -167,7 +167,7 @@ void IR_CFG::buildEHEdge()
 //may generate lots of redundant exception edges.
 void IR_CFG::buildEHEdgeNaive()
 {
-    ASSERT(m_bb_list, ("bb_list is emt"));
+    ASSERTN(m_bb_list, ("bb_list is emt"));
     List<IRBB*> maythrow;
     List<IRBB*> ehl;
     IRBB * entry = NULL;
@@ -183,7 +183,7 @@ void IR_CFG::buildEHEdgeNaive()
         }
     }
 
-    ASSERT(entry, ("Region does not have an entry"));
+    ASSERTN(entry, ("Region does not have an entry"));
     xcom::BitSet mainstreambbs;
     computeMainStreamBBSet(entry, mainstreambbs);
 
@@ -205,7 +205,7 @@ void IR_CFG::buildEHEdgeNaive()
     if (ehl.get_elem_count() == 0) { return; }
 
     if (maythrow.get_elem_count() == 0) {
-        ASSERT(entry, ("multi entries"));
+        ASSERTN(entry, ("multi entries"));
         maythrow.append_tail(entry);
     }
 
@@ -249,7 +249,7 @@ bool IR_CFG::verifyPhiEdge(IR * phi, xcom::TMap<IR*, LabelInfo*> & ir2label)
 //Construct CFG edge for BB has phi.
 void IR_CFG::buildAndRevisePhiEdge(xcom::TMap<IR*, LabelInfo*> & ir2label)
 {
-    ASSERT(m_bb_list, ("bb_list is emt"));
+    ASSERTN(m_bb_list, ("bb_list is emt"));
     xcom::C<IRBB*> * ct;
     for (m_bb_list->get_head(&ct);
          ct != m_bb_list->end(); ct = m_bb_list->get_next(ct)) {
@@ -268,7 +268,7 @@ void IR_CFG::buildAndRevisePhiEdge(xcom::TMap<IR*, LabelInfo*> & ir2label)
                 for (IR * opnd = PHI_opnd_list(x);
                      opnd != NULL; opnd = opnd->get_next()) {
                     LabelInfo * opnd_label = ir2label.get(opnd);
-                    ASSERT(opnd_label, ("no corresponding label to opnd"));
+                    ASSERTN(opnd_label, ("no corresponding label to opnd"));
                     IRBB * incoming_bb = findBBbyLabel(opnd_label);
                     ASSERT0(incoming_bb);
                     addEdge(incoming_bb->id(), bb->id());
@@ -299,14 +299,14 @@ void IR_CFG::buildAndRevisePhiEdge(xcom::TMap<IR*, LabelInfo*> & ir2label)
                                 break;
                             }
                         }
-                        ASSERT(q, ("can not find needed xcom::EdgeC"));
+                        ASSERTN(q, ("can not find needed xcom::EdgeC"));
                         xcom::swap(&VERTEX_in_list(bbvex), opnd_pred, q);
                         opnd_pred = EC_next(q);
                     }
 
                     ASSERT0(verifyPhiEdge(x, ir2label));
                 } else {
-                    ASSERT((UINT)phi_opnd_num ==
+                    ASSERTN((UINT)phi_opnd_num ==
                         xcom::cnt_list(PHI_opnd_list(x)),
                         ("the number of operand is inconsistent"));
                     ASSERT0((UINT)phi_opnd_num ==
@@ -478,7 +478,7 @@ void IR_CFG::findTryRegion(IRBB const* try_start, OUT xcom::BitSet & trybbs)
         trybbs.bunion(id);
 
         IRBB * bb = getBB(id);
-        ASSERT(bb, ("vertex on CFG correspond to nothing"));
+        ASSERTN(bb, ("vertex on CFG correspond to nothing"));
 
         if (bb->isTryEnd() && bb != try_start) {
             //BB may have both try_start and try_end label.
@@ -592,7 +592,7 @@ void IR_CFG::insertBBbetween(
     //Second, from->to is jump-edge.
     List<IRBB*> preds;
     get_preds(preds, to);
-    ASSERT(preds.find(from), ("'from' is not pred of 'to'"));
+    ASSERTN(preds.find(from), ("'from' is not pred of 'to'"));
     xcom::C<IRBB*> * pred_ct = NULL;
     for (IRBB * pred = preds.get_head(&pred_ct);
          pred != NULL; pred = preds.get_next(&pred_ct)) {
@@ -868,7 +868,7 @@ bool IR_CFG::removeTrampolinBB()
             IR * last_xr_of_pred = get_last_xr(pred);
             if (last_xr_of_pred != NULL) {
                 ASSERT0(last_xr_of_pred->getLabel());
-                ASSERT(findBBbyLabel(last_xr_of_pred->getLabel()) == next,
+                ASSERTN(findBBbyLabel(last_xr_of_pred->getLabel()) == next,
                        ("Labels of bb should have already moved to "
                         "next BB by moveLabels()"));
                 last_xr_of_pred->setLabel(uncond_br->getLabel());
@@ -1122,7 +1122,7 @@ void IR_CFG::dump_dot(CHAR const* name, bool detail, bool dump_eh)
     }
     UNLINK(name);
     FILE * h = fopen(name, "a+");
-    ASSERT(h, ("%s create failed!!!", name));
+    ASSERTN(h, ("%s create failed!!!", name));
 
     //Print comment
     FILE * org_tfile = g_tfile;
@@ -1238,7 +1238,7 @@ void IR_CFG::dump_dot(CHAR const* name, bool detail, bool dump_eh)
                         "");
             }
         } else {
-            ASSERT(0, ("unsupport EDGE_INFO"));
+            ASSERTN(0, ("unsupport EDGE_INFO"));
         }
     }
 
@@ -1258,7 +1258,7 @@ void IR_CFG::dump_node(FILE * h, bool detail)
          bb != NULL; bb = m_bb_list->get_next(&bbct)) {
         INT id = BB_id(bb);
         xcom::Vertex * v = get_vertex(id);
-        ASSERT(v, ("bb is not in cfg"));
+        ASSERTN(v, ("bb is not in cfg"));
         CHAR const* shape = "box";
         if (BB_is_catch_start(bb)) {
             shape = "uptrapezoid";
@@ -1387,7 +1387,7 @@ void IR_CFG::dump_vcg(CHAR const* name, bool detail, bool dump_eh)
     //So it is dispensable to check g_tfile.
     UNLINK(name);
     FILE * h = fopen(name, "a+");
-    ASSERT(h != NULL, ("%s create failed!!!",name));
+    ASSERTN(h != NULL, ("%s create failed!!!",name));
     FILE * old = NULL;
 
     //Print comment
@@ -1422,7 +1422,7 @@ void IR_CFG::computeDomAndIdom(IN OUT OptCtx & oc, xcom::BitSet const* uni)
     DUMMYUSE(uni);
     START_TIMER(t, "Compute Dom, IDom");
     ASSERT0(OC_is_cfg_valid(oc));
-    ASSERT(m_entry, ("ONLY support SESE or SEME"));
+    ASSERTN(m_entry, ("ONLY support SESE or SEME"));
 
     m_ru->checkValidAndRecompute(&oc, PASS_RPO, PASS_UNDEF);
     List<IRBB*> * bblst = getBBListInRPO();
@@ -1541,7 +1541,7 @@ bool IR_CFG::performMiscOpt(OptCtx & oc)
         count++;
     } while (lchange && count < 1000);
 
-    ASSERT(!lchange, ("CFG optimization iterated too many times."));
+    ASSERTN(!lchange, ("CFG optimization iterated too many times."));
 
     if (ck_cfg) {
         computeExitList();

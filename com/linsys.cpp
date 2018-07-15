@@ -54,7 +54,7 @@ class X2V_MAP {
 
     void * xmalloc(INT size)
     {
-        ASSERT(m_is_init == true, ("List not yet initialized."));
+        ASSERTN(m_is_init == true, ("List not yet initialized."));
         void * p = smpoolMalloc(size, m_pool);
         if (!p) return NULL;
         ::memset(p,0,size);
@@ -130,13 +130,13 @@ public:
 
     Vector<INT> * get_pos_of_var(UINT var)
     {
-        ASSERT(m_is_init == true, ("not yet initialized."));
+        ASSERTN(m_is_init == true, ("not yet initialized."));
         return m_x2pos.get(var);
     }
 
     Vector<INT> * get_neg_of_var(UINT var)
     {
-        ASSERT(m_is_init == true, ("not yet initialized."));
+        ASSERTN(m_is_init == true, ("not yet initialized."));
         return m_x2neg.get(var);
     }
 };
@@ -186,13 +186,13 @@ void Lineq::destroy()
 //Set coeff matrix and index of start column of constant term.
 void Lineq::set_param(RMat * m, INT rhs_idx)
 {
-    ASSERT(m != NULL && m->get_col_size() > 0, ("coeff mat is empty"));
+    ASSERTN(m != NULL && m->get_col_size() > 0, ("coeff mat is empty"));
     m_coeff = m;
     if (rhs_idx == -1) {
         m_rhs_idx = m->get_col_size() -1;
         return;
     }
-    ASSERT(rhs_idx < (INT)m->get_col_size() && rhs_idx >= 1,
+    ASSERTN(rhs_idx < (INT)m->get_col_size() && rhs_idx >= 1,
             ("out of bound"));
     m_rhs_idx = rhs_idx;
 }
@@ -208,8 +208,8 @@ INT Lineq::compareConstIterm(
         INT idx_of_eq,
         Rational v)
 {
-    ASSERT(m_is_init == true, ("not yet initialize."));
-    ASSERT(rhs_idx < m.get_col_size(), ("illegal param"));
+    ASSERTN(m_is_init == true, ("not yet initialize."));
+    ASSERTN(rhs_idx < m.get_col_size(), ("illegal param"));
     bool has_cs1 = false; //has symbolic constant of eqt1
     for (UINT i = rhs_idx + 1; i < m.get_col_size(); i++) {
         if (m.get(idx_of_eq, i) != 0) {
@@ -236,8 +236,8 @@ INT Lineq::compareConstIterm(
 INT Lineq::compareConstIterm(RMat const& m, UINT rhs_idx,
                            INT idx_of_eqt1, INT idx_of_eqt2)
 {
-    ASSERT(m_is_init == true, ("not yet initialize."));
-    ASSERT(rhs_idx < m.get_col_size(), ("illegal param"));
+    ASSERTN(m_is_init == true, ("not yet initialize."));
+    ASSERTN(rhs_idx < m.get_col_size(), ("illegal param"));
     bool has_cs1 = false; //has symbolic constant of eqt1
     bool has_cs2 = false; //has symbolic constant of eqt2
     bool has_same_cs = true; //eq1 and eqt2 have same symbolic constant
@@ -305,12 +305,12 @@ void Lineq::ConvexHullUnionAndIntersect(
     //Scanning each convex hull to compute boundary.
     Lineq lin(NULL);
     for (p = chlst.get_head(); p != NULL; p = chlst.get_next()) {
-        ASSERT(first_cols == p->get_col_size(),
+        ASSERTN(first_cols == p->get_col_size(),
                 ("matrix is not in homotype"));
         //FM-elim
         lin.set_param(p, rhs_idx);
         if (!lin.calcBound(bd)) { //elem of 'bd' would be modified.
-            ASSERT(0, ("inequalities in 'bd' are inconsistent!"));
+            ASSERTN(0, ("inequalities in 'bd' are inconsistent!"));
         }
         UINT j = 0;
         for (RMat * t = bd.get_head(); t; t = bd.get_next(), j++) {
@@ -330,7 +330,7 @@ void Lineq::ConvexHullUnionAndIntersect(
             //Convex hull is empty.
             res.clean();
         } else {
-            ASSERT(0, ("union operation is illegal!"));
+            ASSERTN(0, ("union operation is illegal!"));
         }
     }
 }
@@ -358,8 +358,8 @@ void Lineq::ConvexHullUnionAndIntersect(
 //        e.g: x <= 9, x >= 10, there is no solution!
 bool Lineq::reduce(IN OUT RMat & m, UINT rhs_idx, bool is_intersect)
 {
-    ASSERT(m_is_init == true, ("not yet initialize."));
-    ASSERT(m.size() != 0 && rhs_idx < m.get_col_size(), ("illegal param"));
+    ASSERTN(m_is_init == true, ("not yet initialize."));
+    ASSERTN(m.size() != 0 && rhs_idx < m.get_col_size(), ("illegal param"));
     removeIdenRow(m);
     X2V_MAP x2v; //Mapping the index of eqution to corresponding variable.
                 //See following code for detailed usage.
@@ -433,7 +433,7 @@ bool Lineq::reduce(IN OUT RMat & m, UINT rhs_idx, bool is_intersect)
                     continue;
                 }
                 Rational coeff = m.get(idx_of_ineqt1, idx_of_var);
-                ASSERT(coeff > (Rational)0, ("unmatch info"));
+                ASSERTN(coeff > (Rational)0, ("unmatch info"));
 
                 //Reduce coeff of variable to 1.
                 if (coeff != 1) {
@@ -448,7 +448,7 @@ bool Lineq::reduce(IN OUT RMat & m, UINT rhs_idx, bool is_intersect)
                         continue;
                     }
                     coeff = m.get(idx_of_ineqt2, idx_of_var);
-                    ASSERT(coeff > 0, ("unmatch info"));
+                    ASSERTN(coeff > 0, ("unmatch info"));
 
                     //Reduce coeff of variable to 1.
                     if (coeff != 1) {
@@ -508,7 +508,7 @@ bool Lineq::reduce(IN OUT RMat & m, UINT rhs_idx, bool is_intersect)
 
                 //Reduce coeff to 1
                 Rational coeff  = m.get(idx_of_eqt1, idx_of_var);
-                ASSERT(coeff < 0, ("unmatch info"));
+                ASSERTN(coeff < 0, ("unmatch info"));
                 coeff = -coeff;
                 if (coeff != 1) {
                     m.mulOfRow(idx_of_eqt1, 1/coeff);
@@ -522,7 +522,7 @@ bool Lineq::reduce(IN OUT RMat & m, UINT rhs_idx, bool is_intersect)
 
                     //Reduce coeff to 1
                     coeff  = m.get(idx_of_eqt2, idx_of_var);
-                    ASSERT(coeff < 0, ("unmatch info"));
+                    ASSERTN(coeff < 0, ("unmatch info"));
                     coeff = -coeff;
                     if (coeff != 1) {
                         m.mulOfRow(idx_of_eqt2, 1/coeff);
@@ -654,9 +654,9 @@ FIN:
 //    generate new inequality from pair (1,2), (1,3), (4,2), (4,3).
 bool Lineq::fme(UINT const u, OUT RMat & res, bool const darkshadow)
 {
-    ASSERT(m_is_init == true, ("not yet initialize."));
-    ASSERT(m_coeff != NULL && m_coeff != &res, ("illegal parameter of fme"));
-    ASSERT(m_rhs_idx != -1, ("not yet initialize."));
+    ASSERTN(m_is_init == true, ("not yet initialize."));
+    ASSERTN(m_coeff != NULL && m_coeff != &res, ("illegal parameter of fme"));
+    ASSERTN(m_rhs_idx != -1, ("not yet initialize."));
     if (m_coeff->size() == 0) {
         res.clean();
         return true;
@@ -672,7 +672,7 @@ bool Lineq::fme(UINT const u, OUT RMat & res, bool const darkshadow)
     if (m_rhs_idx == -1) {
         m_rhs_idx = m_coeff->get_col_size() -1;
     }
-    ASSERT(u < (UINT)m_rhs_idx, ("not a variable"));
+    ASSERTN(u < (UINT)m_rhs_idx, ("not a variable"));
     RMat tmp = *m_coeff;
     res.reinit(0, 0);
     bool consistency = true;
@@ -777,8 +777,8 @@ FIN:
 //constrains of the system of inequlities.
 bool Lineq::is_consistent()
 {
-    ASSERT(m_is_init == true, ("not yet initialize."));
-    ASSERT(m_coeff && m_rhs_idx != -1, ("not yet initialize."));
+    ASSERTN(m_is_init == true, ("not yet initialize."));
+    ASSERTN(m_coeff && m_rhs_idx != -1, ("not yet initialize."));
     bool consistency = true;;
     //Reduce variables one by one.
     RMat * orig_coeff = m_coeff;
@@ -838,7 +838,8 @@ bool Lineq::has_solution(RMat const& leq,
     //RMat ns;
     //coeff = eq+leq;
     //coeff.dumpf();
-    //coeff.null(ns); //solving A而*y而=0 via computing Null Space of 'coeff'.
+    //coeff.nullspace(ns); //solving A而*y而=0 via computing
+                           //Null Space of 'coeff'.
     //ns.dumpf();
     if (leq.size() == 0 && eq.size() == 0) {
         return false;
@@ -920,9 +921,9 @@ bool Lineq::has_solution(RMat const& leq,
 //'eq': the equations to be appended.
 void Lineq::appendEquation(RMat const& eq)
 {
-    ASSERT(m_is_init == true, ("not yet initialize."));
+    ASSERTN(m_is_init == true, ("not yet initialize."));
     if (eq.size() == 0) return;
-    ASSERT(eq.get_col_size() == m_coeff->get_col_size(), ("unmatch"));
+    ASSERTN(eq.get_col_size() == m_coeff->get_col_size(), ("unmatch"));
     if (eq.get_row_size() == 0) return;
     RMat tmp = eq;
     //if (tmp.get_col_size() < m_coeff->get_col_size()) {
@@ -946,11 +947,11 @@ void Lineq::appendEquation(RMat const& eq)
 //'ineqt_of_u': bound of variable.
 void Lineq::formatBound(UINT u, OUT RMat & ineqt_of_u)
 {
-    ASSERT(m_is_init == true, ("not yet initialize."));
-    ASSERT(m_coeff &&
+    ASSERTN(m_is_init == true, ("not yet initialize."));
+    ASSERTN(m_coeff &&
            m_coeff->get_row_size() > 0 &&
            m_coeff->get_col_size() > 0, ("matrix is empty"));
-    ASSERT((INT)u < m_rhs_idx, ("not a variable"));
+    ASSERTN((INT)u < m_rhs_idx, ("not a variable"));
 
     ineqt_of_u.reinit(0,0);
 
@@ -1045,8 +1046,8 @@ void Lineq::formatBound(UINT u, OUT RMat & ineqt_of_u)
 //    Column describes the variable.
 bool Lineq::calcBound(IN OUT List<RMat*> & limits)
 {
-    ASSERT(m_is_init == true, ("not yet initialized"));
-    ASSERT(m_coeff != NULL && limits.get_elem_count() == (UINT)m_rhs_idx,
+    ASSERTN(m_is_init == true, ("not yet initialized"));
+    ASSERTN(m_coeff != NULL && limits.get_elem_count() == (UINT)m_rhs_idx,
            ("unmatch coeff matrix info"));
 
     //Eliminating variable one by one, and inner to outer.
@@ -1062,7 +1063,7 @@ bool Lineq::calcBound(IN OUT List<RMat*> & limits)
                 continue;
             }
             if (!lineq.fme(i, res, false)) {
-                ASSERT(0, ("system inconsistency!"));
+                ASSERTN(0, ("system inconsistency!"));
                 return false;
             }
             work = res; //very important! Update information of Lineq system.
@@ -1070,7 +1071,7 @@ bool Lineq::calcBound(IN OUT List<RMat*> & limits)
 
         //Computing the remaining alone variable.
         RMat * newb = limits.get_head_nth(j);
-        ASSERT(newb, ("illegal!!"));
+        ASSERTN(newb, ("illegal!!"));
         *newb = work;
     }
     return true;
@@ -1099,8 +1100,8 @@ void Lineq::move2cstsym(IN OUT RMat & ieq,
                         OUT UINT * first_sym_idx,
                         OUT UINT * last_sym_idx)
 {
-    ASSERT(m_is_init == true, ("not yet initialized"));
-    ASSERT(rhs_idx < ieq.get_col_size() && last_var < rhs_idx &&
+    ASSERTN(m_is_init == true, ("not yet initialized"));
+    ASSERTN(rhs_idx < ieq.get_col_size() && last_var < rhs_idx &&
             first_var <= last_var,
             ("illegal info"));
     RMat colm;
@@ -1180,8 +1181,8 @@ void Lineq::move2var(IN OUT RMat & ieq,
                      OUT UINT * first_var_idx,
                      OUT UINT * last_var_idx)
 {
-    ASSERT(m_is_init == true, ("not yet initialized"));
-    ASSERT(last_sym < ieq.get_col_size() &&
+    ASSERTN(m_is_init == true, ("not yet initialized"));
+    ASSERTN(last_sym < ieq.get_col_size() &&
             first_sym > rhs_idx &&
             first_sym <= last_sym,
             ("illegal info"));
@@ -1539,7 +1540,7 @@ bool Lineq::convertConstraint2Ray(
             if (p > (INT)res.get_row_size()) {
                 res.reinit(p, coeff.get_col_size());
             }
-        } else { ASSERT(0, ("Must have negative coeff")); }
+        } else { ASSERTN(0, ("Must have negative coeff")); }
         i = 0;
         INT omit_count = 0;
         for (INT nc = 0; nc <= row_of_neg_coeff.get_last_idx(); nc++) {
@@ -1801,7 +1802,7 @@ bool Lineq::convertRay2Constraint(
                     res.reinit(p, cs.get_col_size());
                 }
             } else {
-                ASSERT(0, ("Must have negative coeff"));
+                ASSERTN(0, ("Must have negative coeff"));
             }
 
             //Compute the combination of pair of rays.

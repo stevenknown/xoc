@@ -471,13 +471,13 @@ public:
     inline IR * getStmt() const
     {
         ASSERT0(!is_undef());
-        ASSERT(!is_stmt(), ("IR already be stmt, it is performance bug."));
+        ASSERTN(!is_stmt(), ("IR already be stmt, it is performance bug."));
         IR const* ir = this;
         while (IR_parent(ir) != NULL) {
             ir = IR_parent(ir);
             if (ir->is_stmt()) { break; }
         }
-        ASSERT(ir->is_stmt(), ("ir is orphan"));
+        ASSERTN(ir->is_stmt(), ("ir is orphan"));
         return (IR*)ir;
     }
 
@@ -871,7 +871,7 @@ public:
         case IR_LAND:
             invertLand(rg);
             break;
-        default: ASSERT(0, ("unsupport"));
+        default: ASSERTN(0, ("unsupport"));
         }
     }
 
@@ -1282,7 +1282,7 @@ public:
     {
         #ifdef _DEBUG_
         if (CALL_is_not_bb_bound(this)) {
-            ASSERT(CALL_is_intrinsic(this),
+            ASSERTN(CALL_is_intrinsic(this),
                     ("normal call stmt must be BB boundary"));
         }
         #endif
@@ -1812,7 +1812,7 @@ IR * IR::getRHS() const
     case IR_STPR: return STPR_rhs(this);
     case IR_STARRAY: return STARR_rhs(this);
     case IR_IST: return IST_rhs(this);
-    default: ASSERT(0, ("not store operation."));
+    default: ASSERTN(0, ("not store operation."));
     }
     return NULL;
 }
@@ -1853,7 +1853,7 @@ SSAInfo * IR::getSSAInfo() const
 IR * IR::getKid(UINT idx) const
 {
     switch (getCode()) {
-    case IR_UNDEF: ASSERT(0, ("ir should not be undef")); break;
+    case IR_UNDEF: ASSERTN(0, ("ir should not be undef")); break;
     case IR_CONST:
     case IR_ID:
     case IR_LD: return NULL;
@@ -1910,7 +1910,7 @@ IR * IR::getKid(UINT idx) const
     case IR_CONTINUE: return NULL;
     case IR_PHI: return PHI_kid(this, idx);
     case IR_REGION: return NULL;
-    default: ASSERT(0, ("Unknown IR type"));
+    default: ASSERTN(0, ("Unknown IR type"));
     }
     return NULL;
 }
@@ -1935,7 +1935,7 @@ IRBB * IR::getBB() const
     case IR_RETURN: return RET_bb(this);
     case IR_PHI: return PHI_bb(this);
     case IR_REGION: return REGION_bb(this);
-    default: ASSERT(0, ("This stmt can not be placed in basic block."));
+    default: ASSERTN(0, ("This stmt can not be placed in basic block."));
     }
     return NULL;
 }
@@ -2064,7 +2064,7 @@ bool IR::isReadOnlyCall() const
     switch (getCode()) {
     case IR_CALL: return CALL_is_readonly(this);
     case IR_ICALL: return ICALL_is_readonly(this);
-    default: ASSERT(0, ("not a call"));
+    default: ASSERTN(0, ("not a call"));
     }
     return false;
 }
@@ -2109,7 +2109,7 @@ void IR::setBB(IRBB * bb)
     case IR_REGION: REGION_bb(this) = bb; return;
     default:
         //Do not assert to facilitate coding. Just return.
-        //ASSERT(0, ("Not stmt type"));
+        //ASSERTN(0, ("Not stmt type"));
         return;
     }
 }
@@ -2123,7 +2123,7 @@ void IR::setRHS(IR * rhs)
     case IR_STARRAY: STARR_rhs(this) = rhs; return;
     case IR_SETELEM: SETELEM_rhs(this) = rhs; return;
     case IR_IST: IST_rhs(this) = rhs; return;
-    default: ASSERT(0, ("not store operation."));
+    default: ASSERTN(0, ("not store operation."));
     }
 }
 
@@ -2167,11 +2167,11 @@ void IR::setSSAInfo(SSAInfo * ssa)
     case IR_GETELEM: GETELEM_ssainfo(this) = ssa; return;
     case IR_CALL:
     case IR_ICALL:
-        ASSERT(CALL_prno(this) != 0, ("does not have return value"));
+        ASSERTN(CALL_prno(this) != 0, ("does not have return value"));
         CALL_ssainfo(this) = ssa;
         return;
     case IR_PHI: PHI_ssainfo(this) = ssa; return;
-    default: ASSERT(0, ("unsupport"));
+    default: ASSERTN(0, ("unsupport"));
     }
 }
 
@@ -2186,7 +2186,7 @@ void IR::set_prno(UINT prno)
     case IR_CALL:
     case IR_ICALL: CALL_prno(this) = prno; return;
     case IR_PHI: PHI_prno(this) = prno; return;
-    default: ASSERT(0, ("unsupport"));
+    default: ASSERTN(0, ("unsupport"));
     }
 }
 
@@ -2199,12 +2199,12 @@ void IR::setLabel(LabelInfo const* li)
     case IR_FALSEBR: BR_lab(this) = li; return;
     case IR_GOTO: GOTO_lab(this) = li; return;
     case IR_IGOTO:
-        ASSERT(0, ("must specify the specific target label."));
+        ASSERTN(0, ("must specify the specific target label."));
         return;
     case IR_LABEL: LAB_lab(this) = li; return;
     case IR_CASE: CASE_lab(this) = li; return;
     case IR_SWITCH: SWITCH_deflab(this) = li; return;
-    default: ASSERT(0, ("%s has not label", IRTNAME(getCode())));
+    default: ASSERTN(0, ("%s has not label", IRTNAME(getCode())));
     }
 }
 
@@ -2213,7 +2213,7 @@ void IR::setLabel(LabelInfo const* li)
 void IR::setKid(UINT idx, IR * kid)
 {
     switch (getCode()) {
-    case IR_UNDEF: ASSERT(0, ("ir should not be undef")); return;
+    case IR_UNDEF: ASSERTN(0, ("ir should not be undef")); return;
     case IR_CONST:
     case IR_ID:
     case IR_LD: return; //No kids.
@@ -2270,7 +2270,7 @@ void IR::setKid(UINT idx, IR * kid)
     case IR_CONTINUE: return; //No kids.
     case IR_PHI: PHI_kid(this, idx) = kid; break;
     case IR_REGION: return; //No kids.
-    default: ASSERT(0, ("Unknown IR type"));
+    default: ASSERTN(0, ("Unknown IR type"));
     }
 
     for (IR * k = kid; k != NULL; k = IR_next(k)) {
@@ -2489,7 +2489,7 @@ bool IR::isConstIntValueEqualTo(HOST_INT value) const
 
     IR const* p = this;
     while (!p->is_const()) {
-        ASSERT(p->is_cvt(), ("const expression only include CVT and CONST."));
+        ASSERTN(p->is_cvt(), ("const expression only include CVT and CONST."));
         p = CVT_exp(p);
         ASSERT0(p);
     }
@@ -2632,7 +2632,7 @@ inline IR const* iterExpInitC(IR const* ir, OUT ConstIRIter & ii)
         ii.append_tail(kid);
     }
     if (ir->get_next() != NULL) {
-        ASSERT(!ir->get_next()->is_stmt(), ("ir can not be stmt list"));
+        ASSERTN(!ir->get_next()->is_stmt(), ("ir can not be stmt list"));
         ii.append_tail(ir->get_next());
     }
     return ir;
@@ -2756,7 +2756,7 @@ inline IR_TYPE invertIRType(IR_TYPE src)
     case IR_GE: return IR_LT;
     case IR_EQ: return IR_NE;
     case IR_NE: return IR_EQ;
-    default: ASSERT(0, ("unsupport"));
+    default: ASSERTN(0, ("unsupport"));
     }
     return IR_UNDEF;
 }

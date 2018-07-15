@@ -435,7 +435,7 @@ ExpRep * IR_EXPR_TAB::encode_expr(IN IR * ir)
     case IR_SELECT: //formulized determinate-expr?exp:exp
         {
             ExpRep * ie = append_expr(ir);
-            ASSERT(!EXPR_occ_list(ie).find(ir),
+            ASSERTN(!EXPR_occ_list(ie).find(ir),
                     ("process same IR repeated."));
             EXPR_occ_list(ie).append_tail(ir);
             return ie;
@@ -535,7 +535,7 @@ void IR_EXPR_TAB::encode_bb(IRBB * bb)
         case IR_WHILE_DO:
         case IR_DO_LOOP: //loop with init , boundary , and step info
         case IR_IF:
-            ASSERT(0, ("High level IR should be simplified"));
+            ASSERTN(0, ("High level IR should be simplified"));
             break;
         case IR_LABEL:
             break;

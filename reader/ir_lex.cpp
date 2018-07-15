@@ -220,15 +220,15 @@ INT Lexer::getLine()
 {
     //Initializing or realloc offset table.
     if (m_ofst_tab == NULL) {
-        m_ofst_tab_byte_size = MAX_BUF_LEN * sizeof(LONG);
+        m_ofst_tab_byte_size = MAX_OFST_BUF_LEN * sizeof(LONG);
         m_ofst_tab = (LONG*)::malloc(m_ofst_tab_byte_size);
         ::memset(m_ofst_tab, 0, m_ofst_tab_byte_size);
     } else if (getOffsetTabLineNum() < (m_src_line_num + 10)) {
         m_ofst_tab = (LONG*)::realloc(m_ofst_tab,
-            m_ofst_tab_byte_size + MAX_BUF_LEN * sizeof(LONG));
+            m_ofst_tab_byte_size + MAX_OFST_BUF_LEN * sizeof(LONG));
         ::memset(((BYTE*)m_ofst_tab) + m_ofst_tab_byte_size,
-            0, MAX_BUF_LEN * sizeof(LONG));
-        m_ofst_tab_byte_size += MAX_BUF_LEN * sizeof(LONG);
+            0, MAX_OFST_BUF_LEN * sizeof(LONG));
+        m_ofst_tab_byte_size += MAX_OFST_BUF_LEN * sizeof(LONG);
     }
 
     UINT pos = 0;

@@ -294,7 +294,7 @@ bool IR_CP::is_available(
     }
 
     if (ir == use_stmt) {
-        ASSERT(defbb == usebb, ("def_ir should be in same bb to use_ir"));
+        ASSERTN(defbb == usebb, ("def_ir should be in same bb to use_ir"));
         return true;
     }
 
@@ -415,7 +415,7 @@ bool IR_CP::doPropToNormalStmt(
     CPCtx lchange;
     IR * old_use_stmt = use_stmt;
     replaceExp(use, prop_value, lchange, prssadu, mdssadu, mdssamgr);
-    ASSERT(use_stmt->is_stmt(), ("ensure use_stmt still legal"));
+    ASSERTN(use_stmt->is_stmt(), ("ensure use_stmt still legal"));
     if (!CPC_change(lchange)) { return false; }
 
     //Indicate whether use_stmt is the next stmt of def_stmt.
@@ -434,7 +434,7 @@ bool IR_CP::doPropToNormalStmt(
 
     if (use_stmt != NULL && use_stmt != old_use_stmt) {
         //use_stmt has been removed and new stmt generated.
-        ASSERT(old_use_stmt->is_undef(), ("the old one should be freed"));
+        ASSERTN(old_use_stmt->is_undef(), ("the old one should be freed"));
 
         xcom::C<IR*> * irct = NULL;
         BB_irlist(use_bb).find(old_use_stmt, &irct);
@@ -662,7 +662,7 @@ bool IR_CP::perform(OptCtx & oc)
 
     bool change = false;
     IRBB * entry = m_ru->getCFG()->get_entry();
-    ASSERT(entry, ("Not unique entry, invalid Region"));
+    ASSERTN(entry, ("Not unique entry, invalid Region"));
     xcom::Graph domtree;
     m_cfg->get_dom_tree(domtree);
     List<xcom::Vertex*> lst;

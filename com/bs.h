@@ -91,7 +91,7 @@ public:
     void destroy()
     {
         if (m_ptr == NULL) return;
-        ASSERT(m_size > 0, ("bitset is invalid"));
+        ASSERTN(m_size > 0, ("bitset is invalid"));
         ::free(m_ptr);
         m_ptr = NULL;
         m_size = 0;
@@ -186,9 +186,9 @@ protected:
 
     inline void * xmalloc(size_t size)
     {
-        ASSERT(m_pool, ("not yet initialized."));
+        ASSERTN(m_pool, ("not yet initialized."));
         void * p = smpoolMallocConstSize(size, m_pool);
-        ASSERT(p, ("malloc failed"));
+        ASSERTN(p, ("malloc failed"));
         ::memset(p, 0, size);
         return p;
     }
@@ -230,7 +230,7 @@ public:
 
     BitSet * create(UINT init_sz = 0)
     {
-        ASSERT(m_pool, ("not yet init"));
+        ASSERTN(m_pool, ("not yet init"));
         BitSet * p = m_free_list.remove_head();
         if (p == NULL) {
             p = (BitSet*)xmalloc(sizeof(BitSet));
@@ -242,7 +242,7 @@ public:
 
     inline BitSet * copy(BitSet const& bs)
     {
-        ASSERT(m_pool, ("not yet init"));
+        ASSERTN(m_pool, ("not yet init"));
         BitSet * p = create();
         p->copy(bs);
         return p;
@@ -250,7 +250,7 @@ public:
 
     inline void clean()
     {
-        ASSERT(m_pool, ("not yet init"));
+        ASSERTN(m_pool, ("not yet init"));
         destroy();
         init();
     }
@@ -265,7 +265,7 @@ public:
         for (m_free_list.get_head(&ct);
              ct != m_free_list.end(); ct = m_free_list.get_next(ct)) {
             BitSet * x = ct->val();
-            ASSERT(x && x != bs, ("Already have been freed."));
+            ASSERTN(x && x != bs, ("Already have been freed."));
         }
         #endif
         bs->clean();
@@ -309,7 +309,7 @@ public:
     //Copy element from list.
     inline void copy(List<T> & list)
     {
-        ASSERT(Vector<T>::m_is_init, ("VECTOR not yet initialized."));
+        ASSERTN(Vector<T>::m_is_init, ("VECTOR not yet initialized."));
         INT count = 0;
 
         set(list.get_elem_count()-1, 0); //Alloc memory right away.
@@ -324,7 +324,7 @@ public:
 
     inline void copy(BSVec<T> & vec)
     {
-        ASSERT(Vector<T>::m_is_init, ("VECTOR not yet initialized."));
+        ASSERTN(Vector<T>::m_is_init, ("VECTOR not yet initialized."));
         Vector<T>::copy(vec);
         m_bs.copy(vec.m_bs);
     }
@@ -332,7 +332,7 @@ public:
     UINT count_mem() const { return m_bs.count_mem() + Vector<T>::count_mem(); }
     inline void clean()
     {
-        ASSERT(Vector<T>::m_is_init, ("VECTOR not yet initialized."));
+        ASSERTN(Vector<T>::m_is_init, ("VECTOR not yet initialized."));
         Vector<T>::clean();
         m_bs.clean();
     }
@@ -343,7 +343,7 @@ public:
     //Create an lvalue, equal to 'set()'
     inline T & operator[](INT i)
     {
-        ASSERT(Vector<T>::m_is_init, ("VECTOR not yet initialized."));
+        ASSERTN(Vector<T>::m_is_init, ("VECTOR not yet initialized."));
         if (i >= Vector<T>::m_size) {
             set(i, (T)0);
         }
@@ -353,7 +353,7 @@ public:
     //Get the first index number and return the element.
     inline T get_first(OUT INT * idx)
     {
-        ASSERT(Vector<T>::m_is_init, ("VECTOR not yet initialized."));
+        ASSERTN(Vector<T>::m_is_init, ("VECTOR not yet initialized."));
         INT i = m_bs.get_first();
         if (idx) { *idx = i; }
         return Vector<T>::get(i);
@@ -362,7 +362,7 @@ public:
     //Get first number of index of element.
     inline INT get_first() const
     {
-        ASSERT(Vector<T>::m_is_init, ("VECTOR not yet initialized."));
+        ASSERTN(Vector<T>::m_is_init, ("VECTOR not yet initialized."));
         return m_bs.get_first();
     }
 
@@ -370,7 +370,7 @@ public:
     //Return next element related to current 'idx'.
     inline T get_next(INT * curidx)
     {
-        ASSERT(Vector<T>::m_is_init, ("VECTOR not yet initialized."));
+        ASSERTN(Vector<T>::m_is_init, ("VECTOR not yet initialized."));
         *curidx = m_bs.get_next(*curidx);
         return Vector<T>::get(*curidx);
     }
@@ -378,14 +378,14 @@ public:
     //Get next index number.
     inline INT get_next(UINT curidx) const
     {
-        ASSERT(Vector<T>::m_is_init, ("VECTOR not yet initialized."));
+        ASSERTN(Vector<T>::m_is_init, ("VECTOR not yet initialized."));
         return m_bs.get_next(curidx);
     }
 
     //Get number of elements in vector.
     UINT get_elem_count() const
     {
-        ASSERT(Vector<T>::m_is_init, ("VECTOR not yet initialized."));
+        ASSERTN(Vector<T>::m_is_init, ("VECTOR not yet initialized."));
         return m_bs.get_elem_count();
     }
 
@@ -393,7 +393,7 @@ public:
 
     inline void set(UINT i, T elem)
     {
-        ASSERT(Vector<T>::m_is_init, ("VECTOR not yet initialized."));
+        ASSERTN(Vector<T>::m_is_init, ("VECTOR not yet initialized."));
         Vector<T>::set(i, elem);
         m_bs.bunion(i);
     }
@@ -504,7 +504,7 @@ public:
 
     BSVec<T> * create()
     {
-        ASSERT(m_pool, ("not yet init"));
+        ASSERTN(m_pool, ("not yet init"));
 
         BSVec<T> * p = m_free_list.remove_head();
         if (p == NULL) {
@@ -518,7 +518,7 @@ public:
 
     inline void clean()
     {
-        ASSERT(m_pool, ("not yet init"));
+        ASSERTN(m_pool, ("not yet init"));
         destroy();
         init();
     }

@@ -249,7 +249,7 @@ public:
     //e.g: Treat a[1][2] + b to be the lowest height.
     void setSimpToLowestHeight()
     {
-        ASSERT(SIMP_lor_land(this) && SIMP_lnot(this),
+        ASSERTN(SIMP_lor_land(this) && SIMP_lnot(this),
                ("these operations should be lowered as well."));
         SIMP_to_lowest_height(this) = true;
     }

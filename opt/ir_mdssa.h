@@ -141,14 +141,14 @@ public:
         ASSERT0(m_seg_mgr);
 
         m_cfg = rg->getCFG();
-        ASSERT(m_cfg, ("cfg is not available."));
+        ASSERTN(m_cfg, ("cfg is not available."));
 
         m_md_sys = rg->getMDSystem();
     }
     COPY_CONSTRUCTOR(MDSSAMgr);
     ~MDSSAMgr()
     {
-        ASSERT(!isMDSSAConstructed(), ("should be destructed"));
+        ASSERTN(!isMDSSAConstructed(), ("should be destructed"));
         destroy();
     }
 
@@ -169,7 +169,7 @@ public:
         //    SSA_def(ssainfo) = def;
 
             //You may be set multiple defs for use.
-        //    ASSERT(use->getSSAInfo() == NULL, ("use already has SSA info."));
+        //    ASSERTN(use->getSSAInfo() == NULL, ("use already has SSA info."));
 
         //    use->setSSAInfo(ssainfo);
         //}

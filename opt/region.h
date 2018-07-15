@@ -200,7 +200,7 @@ public:
 
     void * xmalloc(UINT size)
     {
-        ASSERT(REGION_analysis_instrument(this)->m_pool != NULL,
+        ASSERTN(REGION_analysis_instrument(this)->m_pool != NULL,
                ("pool does not initialized"));
         void * p = smpoolMalloc(size, REGION_analysis_instrument(this)->m_pool);
         ASSERT0(p != NULL);
@@ -656,7 +656,7 @@ public:
         ASSERT0(ir->is_const() && ir->is_int());
         UINT bitsz = getTypeMgr()->get_dtype_bitsize(
             TY_dtype(ir->getType()));
-        ASSERT(sizeof(HOST_INT) * BIT_PER_BYTE >= bitsz,
+        ASSERTN(sizeof(HOST_INT) * BIT_PER_BYTE >= bitsz,
             ("integer might be truncated"));
         switch (bitsz) {
         case 8: return (HOST_INT)(((UINT8)(INT8)CONST_int_val(ir)));
@@ -667,14 +667,14 @@ public:
             #ifdef INT128
             return (HOST_INT)(((UINT128)(INT128)CONST_int_val(ir)));
             #endif
-        default: ASSERT(0, ("TODO:need to support"));
+        default: ASSERTN(0, ("TODO:need to support"));
         }
         return 0;
     }
 
     inline HOST_INT getMaxInteger(UINT bitsize, bool is_signed) const
     {
-        ASSERT(sizeof(HOST_INT) * BIT_PER_BYTE >= bitsize,
+        ASSERTN(sizeof(HOST_INT) * BIT_PER_BYTE >= bitsize,
             ("integer might be truncated"));
         if (is_signed) {
             switch (bitsize) {
@@ -686,7 +686,7 @@ public:
                 #ifdef INT128
                 return (HOST_INT)(((UINT128)(INT128)-1) >> 1);
                 #endif
-            default: ASSERT(0, ("TODO:need to support"));
+            default: ASSERTN(0, ("TODO:need to support"));
             }
             return 0;
         }
@@ -700,7 +700,7 @@ public:
             #ifdef INT128
             return (HOST_INT)(((UINT128)(INT128)-1));
             #endif
-        default: ASSERT(0, ("TODO:need to support"));
+        default: ASSERTN(0, ("TODO:need to support"));
         }
         return 0;
     }
@@ -725,7 +725,7 @@ public:
             return (HOST_INT)
                 ((UINT128)(~(UINT128)getMaxInteger(bitsize, is_signed)));
             #endif
-        default: ASSERT(0, ("TODO:need to support"));
+        default: ASSERTN(0, ("TODO:need to support"));
         }
         return 0;
     }
@@ -777,7 +777,7 @@ public:
     //Return true if Region name is equivalent to 'n'.
     bool isRegionName(CHAR const* n) const
     {
-        ASSERT(getRegionName(), ("Region does not have name"));
+        ASSERTN(getRegionName(), ("Region does not have name"));
         return strcmp(getRegionName(), n) == 0;
     }
 

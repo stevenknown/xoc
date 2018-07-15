@@ -118,14 +118,14 @@ author: Su Zhenyu
 #define va_copy(d, s) ((d) = (s))
 #endif
 
-//Avoid using the predefined ASSERT.
-#undef ASSERT
+//Avoid using the predefined ASSERTN.
+#undef ASSERTN
 #undef ASSERTL
 #undef ASSERT0
 #undef ASSERTL0
 
 // This macro is needed to prevent the clang static analyzer from generating
-// false-positive reports in ASSERT() macros.
+// false-positive reports in ASSERTN() macros.
 #ifdef __clang__
 #define CLANG_ANALYZER_NORETURN __attribute__((analyzer_noreturn))
 #else
@@ -142,7 +142,7 @@ author: Su Zhenyu
     EXTERN_C INT m518087(CHAR const* info, ...) CLANG_ANALYZER_NORETURN;
     EXTERN_C INT m022138(CHAR const* filename, INT line) CLANG_ANALYZER_NORETURN;
 
-    #define ASSERT(a, b)  \
+    #define ASSERTN(a, b)  \
         ((a) ? 0 : (m022138(__FILE__, __LINE__), m518087 b))
     #define ASSERTL(a, filename, line, b)  \
         ((a) ? 0 : (m022138(filename, line), m518087 b))
@@ -150,13 +150,14 @@ author: Su Zhenyu
     #define ASSERTL0(a, filename, line)  \
         ((a) ? 0 : (m022138(filename, line), m518087 ("")))
 #else
-    #define ASSERT(a, b)
+    #define ASSERTN(a, b)
     #define ASSERTL(a, filename, line, b)
     #define ASSERT0(a)
     #define ASSERTL0(a, filename, line)
 #endif
 
-#define UNREACHABLE()  ASSERT(0, ("Unreachable."))
+#undef UNREACHABLE
+#define UNREACHABLE()  ASSERTN(0, ("Unreachable."))
 
 #undef MAX
 #define MAX(a,b)    ((a)>(b)?(a):(b))
@@ -186,7 +187,8 @@ author: Su Zhenyu
 #define REMOVE_FLAG(flag, v)     ((flag) = ((flag) & (~(v))))
 
 #undef OFFSET_OF
-#define OFFSET_OF(st, f)         ((size_t)&((st*)0)->f) //Offset of field 'f' of struct type 'st'.
+//Offset of field 'f' of struct type 'st'.
+#define OFFSET_OF(st, f)         ((size_t)&((st*)0)->f)
 
 #undef GET_LOW_32BIT
 #define GET_LOW_32BIT(l)         ((l)&0xffffFFFF)
@@ -197,9 +199,13 @@ author: Su Zhenyu
 //True if type is unsigned.
 #define IS_UNSIGN_TY(type)       ((type)(((type)0) - 1) > 0)
 
-#define IN //input
-#define OUT //output
-#define MAX_BUF_LEN      1024
+#undef IN
+#define IN  //indicate input argument
+
+#undef OUT
+#define OUT //indicate output argument
+
+//#define MAX_BUF_LEN      1024
 
 //Misc Dumps/Dumpf of Vector<T>
 #define D_BOOL           1

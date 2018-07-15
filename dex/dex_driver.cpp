@@ -145,7 +145,7 @@ static void updateTryInfo(LIRCode * lircode, Dex2IR & d2ir, IR2Dex & ir2d)
                 //Could this happen?
                 //ti->try_start label will be added the end of LIR list.
             } else {
-                ASSERT(!(find_start_lab ^ find_end_lab),
+                ASSERTN(!(find_start_lab ^ find_end_lab),
                        ("try_start and try_end must both exist or not"));
                 continue; //current try-block has been removed, just neglect it.
             }
@@ -192,7 +192,7 @@ static void updateTryInfo(LIRCode * lircode, Dex2IR & d2ir, IR2Dex & ir2d)
 
         idx = lab2idx->get(ti->try_end, &find);
         if (!find) {
-            ASSERT(d2ir.getLastTryEndLabelList().find(ti->try_end),
+            ASSERTN(d2ir.getLastTryEndLabelList().find(ti->try_end),
                    ("Miss the try-end label, it may be deleted incorrectly."));
             idx = lircode->instrCount;
         }
@@ -210,7 +210,7 @@ static void updateTryInfo(LIRCode * lircode, Dex2IR & d2ir, IR2Dex & ir2d)
         each_try->end_pc = idx;
         //ASSERT0(each_try->end_pc > each_try->start_pc);
 
-        ASSERT(each_try->catches, ("miss catch-block field"));
+        ASSERTN(each_try->catches, ("miss catch-block field"));
 
         //Generate catch-block info.
         UINT j = 0;

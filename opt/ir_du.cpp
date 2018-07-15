@@ -101,7 +101,7 @@ void MDId2IRlist::clean()
 //'md' corresponds to unique 'ir'.
 void MDId2IRlist::set(UINT mdid, IR * ir)
 {
-    ASSERT(mdid != MD_GLOBAL_MEM &&
+    ASSERTN(mdid != MD_GLOBAL_MEM &&
            mdid != MD_FULL_MEM &&
            mdid != MD_IMPORT_VAR,
         ("there is not any md could kill Fake-May-MD."));
@@ -891,7 +891,7 @@ void IR_DU_MGR::computeExpression(
         computeExpression(SELECT_trueexp(ir), ret_mds, compflag, duflag);
         computeExpression(SELECT_falseexp(ir), ret_mds, compflag, duflag);
         break;
-    default: ASSERT(0, ("Unsupport IR code"));
+    default: ASSERTN(0, ("Unsupport IR code"));
     }
 }
 
@@ -935,7 +935,7 @@ void IR_DU_MGR::dumpDUGraph(CHAR const* name, bool detail)
     }
     UNLINK(name);
     FILE * h = fopen(name, "xcom::EdgeC+");
-    ASSERT(h != NULL, ("%s create failed!!!",name));
+    ASSERTN(h != NULL, ("%s create failed!!!",name));
 
     FILE * old;
     //Print comment
@@ -1509,7 +1509,7 @@ void IR_DU_MGR::dump(CHAR const* name)
         old = g_tfile;
         //UNLINK(name);
         g_tfile = fopen(name, "xcom::EdgeC+");
-        ASSERT(g_tfile, ("%s create failed!!!", name));
+        ASSERTN(g_tfile, ("%s create failed!!!", name));
     }
 
     dumpDUChainDetail();
@@ -1896,7 +1896,7 @@ void IR_DU_MGR::copyIRTreeDU(IR * to, IR const* from, bool copyDUChain)
         SSAInfo * ssainfo;
         if ((ssainfo = from_ir->getSSAInfo()) != NULL) {
             if (from_ir->isWritePR() || from_ir->isCallHasRetVal()) {
-                ASSERT(0, ("SSA only has one def"));
+                ASSERTN(0, ("SSA only has one def"));
             }
 
             ASSERT0(to_ir->isReadPR());
@@ -2396,7 +2396,7 @@ void IR_DU_MGR::collectMustUsedMDs(IR const* ir, OUT MDSet & mustuse)
     case IR_IF:
     case IR_LABEL:
     case IR_CASE:
-        ASSERT(0, ("TODO"));
+        ASSERTN(0, ("TODO"));
         break;
     case IR_TRUEBR:
     case IR_FALSEBR:
@@ -2523,7 +2523,7 @@ void IR_DU_MGR::inferCallAndIcall(IR * ir, UINT duflag, IN MD2MDSet * mx)
             //e.g: foo(p); where p->{xcom::EdgeC, b}, then foo may use p, xcom::EdgeC, b.
             //Note that point-to set is only avaiable for the
             //last stmt of BB. The call is just in the situation.
-            ASSERT(mx, ("needed by computation of NOPR du chain"));
+            ASSERTN(mx, ("needed by computation of NOPR du chain"));
             ASSERT0(m_aa);
             m_aa->computeMayPointTo(p, mx, maydefuse);
         }
@@ -3480,7 +3480,7 @@ void IR_DU_MGR::computeGenForBB(
         case IR_IF:
         case IR_LABEL:
         case IR_CASE:
-            ASSERT(0, ("TODO"));
+            ASSERTN(0, ("TODO"));
             break;
         case IR_TRUEBR:
         case IR_FALSEBR:
@@ -3923,7 +3923,7 @@ IR const* IR_DU_MGR::findKillingLocalDef(
             IR const* exp,
             MD const* expmd)
 {
-    ASSERT(expmd->is_exact() || exp->isReadPR(),
+    ASSERTN(expmd->is_exact() || exp->isReadPR(),
            ("only exact md or PR has killing-def"));
 
     xcom::C<IR*> * localct(ct);
@@ -3931,7 +3931,7 @@ IR const* IR_DU_MGR::findKillingLocalDef(
          ir != NULL; ir = BB_irlist(bb).get_prev(&localct)) {
         if (!ir->isMemoryRef()) { continue; }
 
-        ASSERT(!ir->isCallStmt(),
+        ASSERTN(!ir->isCallStmt(),
                ("call should not appear in local processing"));
 
         MD const* mustdef = ir->getRefMD();
@@ -4235,7 +4235,7 @@ void IR_DU_MGR::checkAndBuildChain(IR * stmt, xcom::C<IR*> * ct, UINT flag)
             checkAndBuildChainRecursive(stmt->getBB(), kid, ct, flag);
         }
         return;
-    default: ASSERT(0, ("unsupport"));
+    default: ASSERTN(0, ("unsupport"));
     }
 }
 
@@ -4329,7 +4329,7 @@ void IR_DU_MGR::checkDefSetToBuildDUChain(
             //If def has MustDef (exact|effect) MD, then we do
             //not consider MayDef MDSet if the def is neither CALL|ICALL
             //nor REGION.
-            ASSERT(!MD_is_may(mustdef), ("MayMD can not be mustdef."));
+            ASSERTN(!MD_is_may(mustdef), ("MayMD can not be mustdef."));
             if (expmd == mustdef || expmd->is_overlap(mustdef)) {
                 if (mustdef->is_exact()) {
                     build_du = true;
@@ -4677,7 +4677,7 @@ bool IR_DU_MGR::checkIsTruelyDep(IR const* def, IR const* use)
                 ASSERT0(mayuse->is_overlap_ex(mustdef, m_ru, m_md_sys));
             }
         } else {
-            ASSERT(0, ("Not xcom::EdgeC truely dependence"));
+            ASSERTN(0, ("Not xcom::EdgeC truely dependence"));
         }
     } else if (maydef != NULL) {
         if (mustuse != NULL) {
@@ -4685,10 +4685,10 @@ bool IR_DU_MGR::checkIsTruelyDep(IR const* def, IR const* use)
         } else if (mayuse != NULL) {
             ASSERT0(mayuse->is_intersect(*maydef));
         } else {
-            ASSERT(0, ("Not xcom::EdgeC truely dependence"));
+            ASSERTN(0, ("Not xcom::EdgeC truely dependence"));
         }
     } else {
-        ASSERT(0, ("Not xcom::EdgeC truely dependence"));
+        ASSERTN(0, ("Not xcom::EdgeC truely dependence"));
     }
     return true;
 }
@@ -4755,7 +4755,7 @@ bool IR_DU_MGR::verifyMDDUChainForIR(IR const* ir, UINT duflag)
         DUSet const* defset = u->readDUSet();
         if (defset == NULL) { continue; }
 
-        ASSERT(u->isMemoryOpnd(), ("only memory operand has DUSet"));
+        ASSERTN(u->isMemoryOpnd(), ("only memory operand has DUSet"));
 
         DUIter di = NULL;
         for (INT i = defset->get_first(&di);
@@ -5298,7 +5298,7 @@ void IR_DU_MGR::computeMDDUChain(
         dumpDUChainDetail();
     }
 
-    ASSERT(verifyMDDUChain(duflag), ("verifyMDDUChain failed"));
+    ASSERTN(verifyMDDUChain(duflag), ("verifyMDDUChain failed"));
     END_TIMER(t, "Build DU-CHAIN");
 }
 //END IR_DU_MGR

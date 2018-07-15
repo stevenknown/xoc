@@ -241,7 +241,7 @@ xcom::Graph * PassMgr::registerGraphBasedPass(PASS_TYPE opty)
     case PASS_CDG:
         pass = allocCDG();
         break;
-    default: ASSERT(0, ("Unsupport Optimization."));
+    default: ASSERTN(0, ("Unsupport Optimization."));
     }
 
     ASSERT0(opty != PASS_UNDEF && pass);
@@ -324,7 +324,7 @@ Pass * PassMgr::registerPass(PASS_TYPE opty)
     case PASS_INLINER:
         pass = allocInliner();
         break;
-    default: ASSERT(0, ("Unsupport Optimization."));
+    default: ASSERTN(0, ("Unsupport Optimization."));
     }
 
     ASSERT0(opty != PASS_UNDEF && pass);

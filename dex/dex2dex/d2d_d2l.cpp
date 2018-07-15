@@ -820,7 +820,7 @@ static void dumpGR(Region * r, char const* dexfilename)
     g_tfile = gr;
     r->dumpGR(true);
     fclose(gr);
-    g_tfile = oldvalue; 
+    g_tfile = oldvalue;
 }
 
 

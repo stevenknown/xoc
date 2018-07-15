@@ -360,7 +360,7 @@ void VarMgr::assignVarId(VAR * v)
     } else {
         VAR_id(v) = (UINT)m_var_count++;
     }
-    ASSERT(VAR_id(v) < 5000000, ("too many variables"));
+    ASSERTN(VAR_id(v) < 5000000, ("too many variables"));
     ASSERT0(m_var_vec.get(VAR_id(v)) == NULL);
     m_var_vec.set(VAR_id(v), v);
 }
@@ -395,10 +395,10 @@ VAR * VarMgr::registerVar(
         UINT flag)
 {
     ASSERT0(type);
-    ASSERT(var_name, ("variable need a name"));
+    ASSERTN(var_name, ("variable need a name"));
 
     //VAR is string type, but not const string.
-    //ASSERT(!type->is_string(), ("use registerStringVar instead of"));
+    //ASSERTN(!type->is_string(), ("use registerStringVar instead of"));
 
     VAR * v = allocVAR();
     VAR_type(v) = type;

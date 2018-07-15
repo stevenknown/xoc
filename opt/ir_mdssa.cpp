@@ -53,7 +53,7 @@ void MDSSAMgr::destroy()
 
     //Caution: if you do not finish out-of-SSA prior to destory().
     //The reference to IR's SSA info will lead to undefined behaviors.
-    //ASSERT(!m_is_ssa_constructed,
+    //ASSERTN(!m_is_ssa_constructed,
     //   ("Still in ssa mode, you should do out of "
     //    "SSA before destroy"));
 
@@ -242,7 +242,7 @@ MDDef * MDSSAMgr::findNearestDef(IR const* ir)
 {
     ASSERT0(ir);
     MDSSAInfo const* mdssainfo = m_usedef_mgr.getMDSSAInfo(ir);
-    ASSERT(mdssainfo, ("miss MDSSAInfo"));
+    ASSERTN(mdssainfo, ("miss MDSSAInfo"));
 
     SEGIter * iter = NULL;
     INT lastrpo = -1;
@@ -538,7 +538,7 @@ void MDSSAMgr::initVMD(IN IR * ir, OUT DefSBitSet & maydef_md)
             for (INT i = refset->get_first(&iter);
                  i >= 0; i = refset->get_next((UINT)i, &iter)) {
                 MD * md = m_md_sys->getMD(i);
-                ASSERT(md && !md->is_pr(), ("PR should not in MayBeSet"));
+                ASSERTN(md && !md->is_pr(), ("PR should not in MayBeSet"));
                 VMD const* vmd2 = m_usedef_mgr.allocVMD(MD_id(md), 0);
                 ASSERT0(m_sbs_mgr);
                 mdssainfo->getVOpndSet()->append(vmd2, *m_sbs_mgr);
@@ -788,7 +788,7 @@ void MDSSAMgr::renameDef(IR * ir, IRBB * bb)
         next = set->get_next(i, &iter);
         VMD * vopnd = (VMD*)m_usedef_mgr.getVOpnd(i);
         ASSERT0(vopnd && vopnd->is_md() && vopnd->id() == (UINT)i);
-        ASSERT(vopnd->version() == 0, ("should be first meet"));
+        ASSERTN(vopnd->version() == 0, ("should be first meet"));
 
         UINT maxv = m_max_version.get(vopnd->mdid());
         VMD * newv = m_usedef_mgr.allocVMD(vopnd->mdid(), maxv + 1);
@@ -833,7 +833,7 @@ void MDSSAMgr::cutoffDefChain(MDDef * def)
 void MDSSAMgr::addDefChain(MDDef * def1, MDDef * def2)
 {
     ASSERT0(def1 && def2);
-    ASSERT(def2->getPrev() == NULL, ("should cutoff outdated def-relation"));
+    ASSERTN(def2->getPrev() == NULL, ("should cutoff outdated def-relation"));
     if (def1->getNextSet() == NULL) {
         MDDEF_nextset(def1) = m_usedef_mgr.allocMDDefSet();
     }
@@ -978,7 +978,7 @@ void MDSSAMgr::handleBBRename(
 
             ASSERT0(opnd->getRefMD());
             VMD * topv = mapMD2VMDStack(opnd->getRefMD()->id())->get_top();
-            ASSERT(topv, ("miss def-stmt to operand of phi"));
+            ASSERTN(topv, ("miss def-stmt to operand of phi"));
 
             MDSSAInfo * opnd_ssainfo = m_usedef_mgr.getMDSSAInfo(opnd);
             ASSERT0(opnd_ssainfo);
@@ -1127,7 +1127,7 @@ void MDSSAMgr::destructionInDomTreeOrder(IRBB * root, xcom::Graph & domtree)
         }
 
         xcom::Vertex * bbv = domtree.get_vertex(BB_id(v));
-        ASSERT(bbv, ("dom tree is invalid."));
+        ASSERTN(bbv, ("dom tree is invalid."));
 
         xcom::EdgeC * c = VERTEX_out_list(bbv);
         bool all_visited = true;
@@ -1225,7 +1225,7 @@ void MDSSAMgr::stripPhi(MDPhi * phi)
     //        IRBB * fallthrough = m_cfg->getFallThroughBB(p);
     //        if (!plast->is_terminate()) {
     //            //Fallthrough BB does not exist if the last ir is terminate.
-    //            ASSERT(fallthrough, ("invalid control flow graph."));
+    //            ASSERTN(fallthrough, ("invalid control flow graph."));
     //            if (BB_irlist(fallthrough).get_head() == NULL ||
     //                !BB_irlist(fallthrough).get_head()->is_phi()) {
     //                BB_irlist(fallthrough).append_head(store_to_phicopy);
@@ -1297,16 +1297,16 @@ bool MDSSAMgr::verifyPhi(bool is_vpinfo_avail)
                 //Opnd may be ID, CONST or LDA.
                 MD const* opnd_md = opnd->getRefMD();
 				CHECK_DUMMYUSE(opnd_md);
-                ASSERT(MD_id(opnd_md) == res->mdid(),
+                ASSERTN(MD_id(opnd_md) == res->mdid(),
 					("mdid of VMD is unmatched"));
 
                 //Ver0 is input parameter, and it has no MDSSA_def.
                 //ASSERT0(VOPND_ver(MD_ssainfo(opnd)) > 0);
 
-                ASSERT(ID_phi(opnd) == phi, ("opnd is not an operand of phi"));
+                ASSERTN(ID_phi(opnd) == phi, ("opnd is not an operand of phi"));
             }
 
-            ASSERT(num_opnd == preds.get_elem_count(),
+            ASSERTN(num_opnd == preds.get_elem_count(),
                   ("The number of phi operand must same with "
                    "the number of BB predecessors."));
         }
@@ -1329,11 +1329,11 @@ bool MDSSAMgr::verifyVMD()
         MDDef * def = v->getDef();
         if (def == NULL) {
             //ver0 used to indicate the Region live-in PR. It may be a parameter.
-            ASSERT(v->version() == 0, ("Nondef vp's version must be 0"));
+            ASSERTN(v->version() == 0, ("Nondef vp's version must be 0"));
         } else {
-            ASSERT(v->version() != 0, ("version can not be 0"));
+            ASSERTN(v->version() != 0, ("version can not be 0"));
 
-            ASSERT(!defset.is_contain(def->id()),
+            ASSERTN(!defset.is_contain(def->id()),
                     ("DEF for each md+version must be unique."));
             defset.bunion(def->id());
         }
@@ -1399,8 +1399,8 @@ void MDSSAMgr::verifySSAInfo(IR const* ir)
         MDDef * def = vopnd->getDef();
 
         if (ir->is_stmt()) {
-            ASSERT(vopnd->version() != 0, ("not yet perform renaming"));
-            ASSERT(def && def->getOcc() == ir, ("IR stmt should have MDDef"));
+            ASSERTN(vopnd->version() != 0, ("not yet perform renaming"));
+            ASSERTN(def && def->getOcc() == ir, ("IR stmt should have MDDef"));
         }
 
         if (def != NULL) {
@@ -1506,7 +1506,7 @@ bool MDSSAMgr::verify()
 
                     MD const* opnd_md = opnd->getRefMD();
 					CHECK_DUMMYUSE(opnd_md);
-                    ASSERT(MD_id(opnd_md) == phi->getResult()->mdid(),
+                    ASSERTN(MD_id(opnd_md) == phi->getResult()->mdid(),
                         ("MD not matched"));
                     verifySSAInfo(opnd);
                 }
@@ -1610,8 +1610,8 @@ void MDSSAMgr::coalesceVersion(IR const* src, IR const* tgt)
             }
         }
 
-        ASSERT(tgt_vopnd, ("no MD correspond to src"));
-        ASSERT(tgt_vopnd->version() != src_vopnd->version(),
+        ASSERTN(tgt_vopnd, ("no MD correspond to src"));
+        ASSERTN(tgt_vopnd->version() != src_vopnd->version(),
             ("DEF and USE reference same version MD"));
 
         //Replace the USE of src to USE of tgt.
@@ -1620,7 +1620,7 @@ void MDSSAMgr::coalesceVersion(IR const* src, IR const* tgt)
              k >= 0; k = src_vopnd->getOccSet()->get_next(k, &iter3)) {
             IR const* occ = (IR*)m_ru->getIR(k);
             MDSSAInfo * occ_mdssainfo = getUseDefMgr()->getMDSSAInfo(occ);
-            ASSERT(occ_mdssainfo, ("occ miss MDSSAInfo"));
+            ASSERTN(occ_mdssainfo, ("occ miss MDSSAInfo"));
 
             occ_mdssainfo->getVOpndSet()->remove(src_vopnd, *m_sbs_mgr);
             occ_mdssainfo->getVOpndSet()->append(tgt_vopnd, *m_sbs_mgr);

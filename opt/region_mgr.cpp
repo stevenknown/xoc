@@ -65,7 +65,7 @@ RegionMgr::~RegionMgr()
     }
 
     #ifdef _DEBUG_
-    ASSERT(m_num_allocated == 0, ("there is still region leave out"));
+    ASSERTN(m_num_allocated == 0, ("there is still region leave out"));
     #endif
 
     if (m_md_sys != NULL) {
@@ -195,7 +195,7 @@ Region * RegionMgr::newRegion(REGION_TYPE rt)
 //Record new region and delete it when RegionMgr destroy.
 void RegionMgr::addToRegionTab(Region * rg)
 {
-    ASSERT(REGION_id(rg) > 0, ("should generate new region via newRegion()"));
+    ASSERTN(REGION_id(rg) > 0, ("should generate new region via newRegion()"));
     ASSERT0(getRegion(REGION_id(rg)) == NULL);
     ASSERT0(REGION_id(rg) < m_ru_count);
     INT pad = xcom::getNearestPowerOf2(REGION_id(rg));
@@ -334,7 +334,7 @@ void RegionMgr::deleteRegion(Region * rg, bool collect_id)
     START_TIMER_FMT(t, ("Delete Region%d", rg->id()));
     ASSERT0(rg);
     UINT id = REGION_id(rg);
-    ASSERT(getRegion(id), ("not registered region"));
+    ASSERTN(getRegion(id), ("not registered region"));
     delete rg;
 
     if (collect_id && id != 0) {

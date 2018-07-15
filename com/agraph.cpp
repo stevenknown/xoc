@@ -47,7 +47,7 @@ namespace xcom {
 void AGraph::buildAdjacentMatrix(Matrix<UINT> & adj_mat)
 {
     DUMMYUSE(adj_mat);
-    ASSERT(0, ("Target Dependent Code"));
+    ASSERTN(0, ("Target Dependent Code"));
     //Like: adj_mat.set(i, j, Edge-WEIGHT);
 }
 
@@ -57,7 +57,7 @@ See <Shortest_Path-Dijkstra.txt>
 'infinite': the value indiates infinity. */
 void AGraph::ShortestPath(UINT infinite)
 {
-    ASSERT(m_ec_pool != NULL, ("not yet initialized."));
+    ASSERTN(m_ec_pool != NULL, ("not yet initialized."));
     Matrix<UINT> adj_mat;
     buildAdjacentMatrix(adj_mat);
     UINT row = adj_mat.get_row_size();
@@ -89,7 +89,7 @@ void AGraph::ShortestPath(UINT infinite)
                     }
                 }
             }
-            ASSERT(min <= infinite, ("exception occur in ShortestPath"));
+            ASSERTN(min <= infinite, ("exception occur in ShortestPath"));
             if (min != infinite) {
                 adj_mat.set(i, j, min);
             }

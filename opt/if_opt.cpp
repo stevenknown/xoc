@@ -49,7 +49,7 @@ namespace xoc {
 //    endif
 static IF_TYPE get_simple_if_node_type(IR_CFG * cfg, IRBB * bb)
 {
-    ASSERT(cfg && bb, ("need cfg"));
+    ASSERTN(cfg && bb, ("need cfg"));
     BBList succs;
     cfg->get_succs(succs, bb);
 
@@ -79,7 +79,7 @@ static IF_TYPE get_simple_if_node_type(IR_CFG * cfg, IRBB * bb)
         falsebd = succs.get_head();
         truebd = succs.get_next();
     } else {
-        ASSERT(0, ("illegal CFG"));
+        ASSERTN(0, ("illegal CFG"));
     }
 
     BBList succs_in_true;

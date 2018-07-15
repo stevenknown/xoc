@@ -280,7 +280,7 @@ AbsNode * CfsMgr::constructAbsTree(
                 //  BB1 does not have a ipdom.
                 UINT ipdom = ((xcom::DGraph*)cfg)->get_ipdom(BB_id(bb));
                 DUMMYUSE(ipdom);
-                ASSERT(ipdom > 0, ("bb does not have ipdom"));
+                ASSERTN(ipdom > 0, ("bb does not have ipdom"));
                 node = constructAbsIf(bb, parent, g, loc_visited);
             } else {
                 node = constructAbsBB(bb, parent);
@@ -304,7 +304,7 @@ AbsNode * CfsMgr::constructAbsTree(
         IRBB * cand = NULL;
         for (v = g.get_first_vertex(c); v != NULL; v = g.get_next_vertex(c)) {
             if (g.get_in_degree(v) == 0) {
-                ASSERT(cand == NULL, ("multiple immediate-post-dominators"));
+                ASSERTN(cand == NULL, ("multiple immediate-post-dominators"));
                 cand = cfg->getBB(VERTEX_id(v));
             }
         }
@@ -330,7 +330,7 @@ AbsNode * CfsMgr::constructAbsTree(
 AbsNode * CfsMgr::constructAbstractControlFlowStruct()
 {
     IR_CFG * cfg = m_ru->getCFG();
-    ASSERT(cfg->get_entry(), ("CFG should be single-entry"));
+    ASSERTN(cfg->get_entry(), ("CFG should be single-entry"));
     xcom::BitSet visited;
     AbsNode * a = constructAbsTree(cfg->get_entry(), NULL,
         NULL, *(xcom::Graph*)cfg, visited);

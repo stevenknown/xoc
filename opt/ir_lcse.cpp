@@ -140,7 +140,7 @@ IR * IR_LCSE::hoist_cse(IN IRBB * bb, IN IR * ir_pos, IN ExpRep * ie)
     case IR_IF:
     case IR_LABEL:
     case IR_CASE:
-        ASSERT(0, ("TODO"));
+        ASSERTN(0, ("TODO"));
         break;
     case IR_TRUEBR:
     case IR_FALSEBR: {

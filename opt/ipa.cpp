@@ -44,7 +44,7 @@ Region * IPA::findRegion(IR * call, Region * callru)
     CallGraph * cg = m_rumgr->getCallGraph();
     ASSERT0(cg);
     CallNode * callercn = cg->mapRegion2CallNode(callru);
-    ASSERT(callercn, ("caller is not on graph"));
+    ASSERTN(callercn, ("caller is not on graph"));
 
     SYM const* callname = CALL_idinfo(call)->get_name();
 

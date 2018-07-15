@@ -133,7 +133,7 @@ public:
         #ifdef _DEBUG_
         UINT n = m_free_list.get_elem_count();
 
-        ASSERT(seg_count == n, ("MemLeak! There still are SEGs not freed"));
+        ASSERTN(seg_count == n, ("MemLeak! There still are SEGs not freed"));
         #endif
 
         for (TSEGIter * sc = m_free_list.get_head();
@@ -143,7 +143,7 @@ public:
             delete s;
         }
 
-        ASSERT(m_free_list.get_pool(), ("miss pool"));
+        ASSERTN(m_free_list.get_pool(), ("miss pool"));
 
         smpoolDelete(m_free_list.get_pool());
     }
@@ -256,7 +256,7 @@ public:
               TSEGIter ** free_list,
               SMemPool * pool)
     {
-        ASSERT(this != &src, ("operate on same set"));
+        ASSERTN(this != &src, ("operate on same set"));
         clean(sm, free_list);
         for (TSEGIter * st = src.segs.get_head();
              st != src.segs.end(); st = src.segs.get_next(st)) {
@@ -337,10 +337,10 @@ public:
 
     void init(SegMgr<BitsPerSeg> * sm, UINT sz = sizeof(TSEGIter))
     {
-        ASSERT(sm, ("need SegMgr"));
-        ASSERT(sz % sizeof(TSEGIter) == 0,
+        ASSERTN(sm, ("need SegMgr"));
+        ASSERTN(sz % sizeof(TSEGIter) == 0,
                 ("pool size must be mulitple."));
-        ASSERT(m_pool == NULL, ("already initialized"));
+        ASSERTN(m_pool == NULL, ("already initialized"));
         m_pool = smpoolCreate(sz, MEM_CONST_SIZE);
         m_sm = sm;
         m_flst = NULL;
@@ -348,7 +348,7 @@ public:
 
     void destroy()
     {
-        ASSERT(m_pool, ("already destroy"));
+        ASSERTN(m_pool, ("already destroy"));
         for (TSEGIter * st = SBitSetCore<BitsPerSeg>::segs.get_head();
              st != SBitSetCore<BitsPerSeg>::segs.end();
              st = SBitSetCore<BitsPerSeg>::segs.get_next(st)) {
@@ -420,7 +420,7 @@ protected:
     //Only read BitSet.
     BitSet const* read_bs() const
     {
-        ASSERT(!m_is_sparse, ("only used by dense bitset"));
+        ASSERTN(!m_is_sparse, ("only used by dense bitset"));
         TSEGIter * sc = SBitSetCore<BitsPerSeg>::segs.get_head();
         if (sc == SBitSetCore<BitsPerSeg>::segs.end()) {
             return NULL;
@@ -434,7 +434,7 @@ protected:
                       TSEGIter ** flst,
                       SMemPool * pool)
     {
-        ASSERT(!m_is_sparse, ("only used by dense bitset"));
+        ASSERTN(!m_is_sparse, ("only used by dense bitset"));
         TSEGIter * sc = SBitSetCore<BitsPerSeg>::segs.get_head();
         if (sc == SBitSetCore<BitsPerSeg>::segs.end()) {
             SEG<BitsPerSeg> * t = sm->new_seg();
@@ -448,7 +448,7 @@ protected:
     //Get BitSet and modify BitSet, do not alloc.
     BitSet * get_bs()
     {
-        ASSERT(!m_is_sparse, ("only used by dense bitset"));
+        ASSERTN(!m_is_sparse, ("only used by dense bitset"));
         TSEGIter * sc = SBitSetCore<BitsPerSeg>::segs.get_head();
         if (sc == SBitSetCore<BitsPerSeg>::segs.end()) {
             return NULL;
@@ -467,8 +467,8 @@ public:
                 TSEGIter ** free_list,
                 SMemPool * pool)
     {
-        ASSERT(this != &src, ("operate on same set"));
-        ASSERT(m_is_sparse == src.m_is_sparse, ("diff set type"));
+        ASSERTN(this != &src, ("operate on same set"));
+        ASSERTN(m_is_sparse == src.m_is_sparse, ("diff set type"));
         if (m_is_sparse) {
             SBitSetCore<BitsPerSeg>::bunion(src, sm, free_list, pool);
         } else {
@@ -513,8 +513,8 @@ public:
               TSEGIter ** free_list,
               SMemPool * pool)
     {
-        ASSERT(this != &src, ("operate on same set"));
-        ASSERT(m_is_sparse == src.m_is_sparse, ("diff set type"));
+        ASSERTN(this != &src, ("operate on same set"));
+        ASSERTN(m_is_sparse == src.m_is_sparse, ("diff set type"));
         if (m_is_sparse) {
             SBitSetCore<BitsPerSeg>::copy(src, sm, free_list, pool);
         } else {
@@ -543,8 +543,8 @@ public:
               SegMgr<BitsPerSeg> * sm,
               TSEGIter ** free_list)
     {
-        ASSERT(this != &src, ("operate on same set"));
-        ASSERT(m_is_sparse == src.m_is_sparse, ("diff set type"));
+        ASSERTN(this != &src, ("operate on same set"));
+        ASSERTN(m_is_sparse == src.m_is_sparse, ("diff set type"));
         if (m_is_sparse) {
             SBitSetCore<BitsPerSeg>::diff(src, sm, free_list);
         } else {
@@ -564,8 +564,8 @@ public:
                    SegMgr<BitsPerSeg> * sm,
                    TSEGIter ** free_list)
     {
-        ASSERT(this != &src, ("operate on same set"));
-        ASSERT(m_is_sparse == src.m_is_sparse, ("diff set type"));
+        ASSERTN(this != &src, ("operate on same set"));
+        ASSERTN(m_is_sparse == src.m_is_sparse, ("diff set type"));
         if (m_is_sparse) {
             SBitSetCore<BitsPerSeg>::intersect(src, sm, free_list);
         } else {
@@ -592,8 +592,8 @@ public:
 
     bool is_equal(DBitSetCore<BitsPerSeg> const& src) const
     {
-        ASSERT(this != &src, ("operate on same set"));
-        ASSERT(m_is_sparse == src.m_is_sparse, ("diff set type"));
+        ASSERTN(this != &src, ("operate on same set"));
+        ASSERTN(m_is_sparse == src.m_is_sparse, ("diff set type"));
         if (m_is_sparse) {
             return SBitSetCore<BitsPerSeg>::is_equal(src);
         }
@@ -685,8 +685,8 @@ protected:
 public:
     DBitSet(SegMgr<BitsPerSeg> * sm, UINT sz = sizeof(TSEGIter))
     {
-        ASSERT(sm, ("need SegMgr"));
-        ASSERT(sz % sizeof(TSEGIter) == 0, ("pool size must be mulitple."));
+        ASSERTN(sm, ("need SegMgr"));
+        ASSERTN(sz % sizeof(TSEGIter) == 0, ("pool size must be mulitple."));
         DBitSetCore<BitsPerSeg>::m_is_sparse = true;
         m_pool = smpoolCreate(sz, MEM_CONST_SIZE);
         m_sm = sm;
@@ -759,22 +759,22 @@ protected:
 protected:
     SBitSetCore<BitsPerSeg> * xmalloc_sbitsetc()
     {
-        ASSERT(m_sbitsetcore_pool, ("not yet initialized."));
+        ASSERTN(m_sbitsetcore_pool, ("not yet initialized."));
         SBitSetCore<BitsPerSeg> * p =
             (SBitSetCore<BitsPerSeg>*)smpoolMallocConstSize(
                 sizeof(SBitSetCore<BitsPerSeg>), m_sbitsetcore_pool);
-        ASSERT(p, ("malloc failed"));
+        ASSERTN(p, ("malloc failed"));
         ::memset(p, 0, sizeof(SBitSetCore<BitsPerSeg>));
         return p;
     }
 
     DBitSetCore<BitsPerSeg> * xmalloc_dbitsetc()
     {
-        ASSERT(m_dbitsetcore_pool, ("not yet initialized."));
+        ASSERTN(m_dbitsetcore_pool, ("not yet initialized."));
         DBitSetCore<BitsPerSeg> * p =
             (DBitSetCore<BitsPerSeg>*)smpoolMallocConstSize(
                 sizeof(DBitSetCore<BitsPerSeg>), m_dbitsetcore_pool);
-        ASSERT(p, ("malloc failed"));
+        ASSERTN(p, ("malloc failed"));
         ::memset(p, 0, sizeof(DBitSetCore<BitsPerSeg>));
         return p;
     }

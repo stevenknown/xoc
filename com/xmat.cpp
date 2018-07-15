@@ -41,11 +41,11 @@ namespace xcom {
 Matrix<Rational> operator * (Matrix<Rational> const& a,
                              Matrix<Rational> const& b)
 {
-    ASSERT(a.m_is_init && b.m_is_init, ("not yet initialize."));
-    ASSERT(a.m_row_size > 0 && a.m_col_size > 0, ("invalid matrix"));
-    ASSERT(b.m_row_size > 0 && b.m_col_size > 0, ("invalid matrix"));
-    ASSERT(a.m_col_size == b.m_row_size, ("invalid matrix type of mul"));
-    ASSERT(a.HOOK_INIT == b.HOOK_INIT && a.HOOK_EQUAL == b.HOOK_EQUAL,
+    ASSERTN(a.m_is_init && b.m_is_init, ("not yet initialize."));
+    ASSERTN(a.m_row_size > 0 && a.m_col_size > 0, ("invalid matrix"));
+    ASSERTN(b.m_row_size > 0 && b.m_col_size > 0, ("invalid matrix"));
+    ASSERTN(a.m_col_size == b.m_row_size, ("invalid matrix type of mul"));
+    ASSERTN(a.HOOK_INIT == b.HOOK_INIT && a.HOOK_EQUAL == b.HOOK_EQUAL,
             ("strange matrix member function"));
     Matrix<Rational> c(a.m_row_size, b.m_col_size, &a.m_inhr);
     for (UINT i = 0; i < a.m_row_size; i++) {
@@ -64,10 +64,10 @@ Matrix<Rational> operator * (Matrix<Rational> const& a,
 Matrix<Rational> operator + (Matrix<Rational> const& a,
                              Matrix<Rational> const& b)
 {
-    ASSERT(a.m_is_init && b.m_is_init, ("not yet initialize."));
-    ASSERT(a.m_row_size == b.m_row_size && a.m_col_size == b.m_col_size,
+    ASSERTN(a.m_is_init && b.m_is_init, ("not yet initialize."));
+    ASSERTN(a.m_row_size == b.m_row_size && a.m_col_size == b.m_col_size,
             ("invalid matrix type of mul"));
-    ASSERT(a.HOOK_INIT == b.HOOK_INIT && a.HOOK_EQUAL == b.HOOK_EQUAL,
+    ASSERTN(a.HOOK_INIT == b.HOOK_INIT && a.HOOK_EQUAL == b.HOOK_EQUAL,
             ("strange matrix member function"));
     Matrix<Rational> c(a.m_row_size, a.m_col_size, &a.m_inhr);
     for (UINT i = 0; i < a.m_row_size; i++) {
@@ -81,10 +81,10 @@ Matrix<Rational> operator + (Matrix<Rational> const& a,
 
 Matrix<Rational> operator - (Matrix<Rational> const& a, Matrix<Rational> const& b)
 {
-    ASSERT(a.m_is_init && b.m_is_init, ("not yet initialize."));
-    ASSERT(a.m_row_size == b.m_row_size && a.m_col_size == b.m_col_size,
+    ASSERTN(a.m_is_init && b.m_is_init, ("not yet initialize."));
+    ASSERTN(a.m_row_size == b.m_row_size && a.m_col_size == b.m_col_size,
             ("invalid matrix type of mul"));
-    ASSERT(a.HOOK_INIT == b.HOOK_INIT && a.HOOK_EQUAL == b.HOOK_EQUAL,
+    ASSERTN(a.HOOK_INIT == b.HOOK_INIT && a.HOOK_EQUAL == b.HOOK_EQUAL,
             ("strange matrix member function"));
     Matrix<Rational> c(a.m_row_size, a.m_col_size, &a.m_inhr);
     for (UINT i = 0; i < a.m_row_size; i++) {
@@ -98,11 +98,11 @@ Matrix<Rational> operator - (Matrix<Rational> const& a, Matrix<Rational> const& 
 
 Matrix<INT> operator * (Matrix<INT> const& a, Matrix<INT> const& b)
 {
-    ASSERT(a.m_is_init && b.m_is_init, ("not yet initialize."));
-    ASSERT(a.m_row_size > 0 && a.m_col_size > 0, ("invalid matrix"));
-    ASSERT(b.m_row_size > 0 && b.m_col_size > 0, ("invalid matrix"));
-    ASSERT(a.m_col_size == b.m_row_size, ("invalid matrix type of mul"));
-    ASSERT(a.HOOK_INIT == b.HOOK_INIT && a.HOOK_EQUAL == b.HOOK_EQUAL,
+    ASSERTN(a.m_is_init && b.m_is_init, ("not yet initialize."));
+    ASSERTN(a.m_row_size > 0 && a.m_col_size > 0, ("invalid matrix"));
+    ASSERTN(b.m_row_size > 0 && b.m_col_size > 0, ("invalid matrix"));
+    ASSERTN(a.m_col_size == b.m_row_size, ("invalid matrix type of mul"));
+    ASSERTN(a.HOOK_INIT == b.HOOK_INIT && a.HOOK_EQUAL == b.HOOK_EQUAL,
             ("strange matrix member function"));
     Matrix<INT> c(a.m_row_size, b.m_col_size, &a.m_inhr);
     for (UINT i = 0; i < a.m_row_size; i++) {
@@ -120,10 +120,10 @@ Matrix<INT> operator * (Matrix<INT> const& a, Matrix<INT> const& b)
 
 Matrix<INT> operator + (Matrix<INT> const& a, Matrix<INT> const& b)
 {
-    ASSERT(a.m_is_init && b.m_is_init, ("not yet initialize."));
-    ASSERT(a.m_row_size == b.m_row_size && a.m_col_size == b.m_col_size,
+    ASSERTN(a.m_is_init && b.m_is_init, ("not yet initialize."));
+    ASSERTN(a.m_row_size == b.m_row_size && a.m_col_size == b.m_col_size,
             ("invalid matrix type of mul"));
-    ASSERT(a.HOOK_INIT == b.HOOK_INIT && a.HOOK_EQUAL == b.HOOK_EQUAL,
+    ASSERTN(a.HOOK_INIT == b.HOOK_INIT && a.HOOK_EQUAL == b.HOOK_EQUAL,
             ("strange matrix member function"));
     Matrix<INT> c(a.m_row_size, a.m_col_size, &a.m_inhr);
     for (UINT i = 0; i < a.m_row_size; i++) {
@@ -137,10 +137,10 @@ Matrix<INT> operator + (Matrix<INT> const& a, Matrix<INT> const& b)
 
 Matrix<INT> operator - (Matrix<INT> const& a, Matrix<INT> const& b)
 {
-    ASSERT(a.m_is_init && b.m_is_init, ("not yet initialize."));
-    ASSERT(a.m_row_size == b.m_row_size && a.m_col_size == b.m_col_size,
+    ASSERTN(a.m_is_init && b.m_is_init, ("not yet initialize."));
+    ASSERTN(a.m_row_size == b.m_row_size && a.m_col_size == b.m_col_size,
             ("invalid matrix type of mul"));
-    ASSERT(a.HOOK_INIT == b.HOOK_INIT && a.HOOK_EQUAL == b.HOOK_EQUAL,
+    ASSERTN(a.HOOK_INIT == b.HOOK_INIT && a.HOOK_EQUAL == b.HOOK_EQUAL,
             ("strange matrix member function"));
     Matrix<INT> c(a.m_row_size, a.m_col_size, &a.m_inhr);
     for (UINT i = 0; i < a.m_row_size; i++) {
@@ -155,11 +155,11 @@ Matrix<INT> operator - (Matrix<INT> const& a, Matrix<INT> const& b)
 Matrix<PRECISION_TYPE> operator * (Matrix<PRECISION_TYPE> const& a,
                                    Matrix<PRECISION_TYPE> const& b)
 {
-    ASSERT(a.m_is_init && b.m_is_init, ("not yet initialize."));
-    ASSERT(a.m_row_size > 0 && a.m_col_size > 0, ("invalid matrix"));
-    ASSERT(b.m_row_size > 0 && b.m_col_size > 0, ("invalid matrix"));
-    ASSERT(a.m_col_size == b.m_row_size, ("invalid matrix type of mul"));
-    ASSERT(a.HOOK_INIT == b.HOOK_INIT && a.HOOK_EQUAL == b.HOOK_EQUAL,
+    ASSERTN(a.m_is_init && b.m_is_init, ("not yet initialize."));
+    ASSERTN(a.m_row_size > 0 && a.m_col_size > 0, ("invalid matrix"));
+    ASSERTN(b.m_row_size > 0 && b.m_col_size > 0, ("invalid matrix"));
+    ASSERTN(a.m_col_size == b.m_row_size, ("invalid matrix type of mul"));
+    ASSERTN(a.HOOK_INIT == b.HOOK_INIT && a.HOOK_EQUAL == b.HOOK_EQUAL,
             ("strange matrix member function"));
     Matrix<PRECISION_TYPE> c(a.m_row_size, b.m_col_size, &a.m_inhr);
     for (UINT i = 0; i < a.m_row_size; i++) {
@@ -178,10 +178,10 @@ Matrix<PRECISION_TYPE> operator * (Matrix<PRECISION_TYPE> const& a,
 Matrix<PRECISION_TYPE> operator + (Matrix<PRECISION_TYPE> const& a,
                                    Matrix<PRECISION_TYPE> const& b)
 {
-    ASSERT(a.m_is_init && b.m_is_init, ("not yet initialize."));
-    ASSERT(a.m_row_size == b.m_row_size && a.m_col_size == b.m_col_size,
+    ASSERTN(a.m_is_init && b.m_is_init, ("not yet initialize."));
+    ASSERTN(a.m_row_size == b.m_row_size && a.m_col_size == b.m_col_size,
             ("invalid matrix type of mul"));
-    ASSERT(a.HOOK_INIT == b.HOOK_INIT && a.HOOK_EQUAL == b.HOOK_EQUAL,
+    ASSERTN(a.HOOK_INIT == b.HOOK_INIT && a.HOOK_EQUAL == b.HOOK_EQUAL,
             ("strange matrix member function"));
     Matrix<PRECISION_TYPE> c(a.m_row_size, a.m_col_size, &a.m_inhr);
     for (UINT i = 0; i < a.m_row_size; i++) {
@@ -196,10 +196,10 @@ Matrix<PRECISION_TYPE> operator + (Matrix<PRECISION_TYPE> const& a,
 Matrix<PRECISION_TYPE> operator - (Matrix<PRECISION_TYPE> const& a,
                                    Matrix<PRECISION_TYPE> const& b)
 {
-    ASSERT(a.m_is_init && b.m_is_init, ("not yet initialize."));
-    ASSERT(a.m_row_size == b.m_row_size && a.m_col_size == b.m_col_size,
+    ASSERTN(a.m_is_init && b.m_is_init, ("not yet initialize."));
+    ASSERTN(a.m_row_size == b.m_row_size && a.m_col_size == b.m_col_size,
             ("invalid matrix type of mul"));
-    ASSERT(a.HOOK_INIT == b.HOOK_INIT && a.HOOK_EQUAL == b.HOOK_EQUAL,
+    ASSERTN(a.HOOK_INIT == b.HOOK_INIT && a.HOOK_EQUAL == b.HOOK_EQUAL,
             ("strange matrix member function"));
     Matrix<PRECISION_TYPE> c(a.m_row_size, a.m_col_size, &a.m_inhr);
     for (UINT i = 0; i < a.m_row_size; i++) {
@@ -228,14 +228,14 @@ static void init_den(Matrix<Rational> * pbasis)
 //Rational square root.
 static Rational rat_sqrt(Rational)
 {
-    ASSERT(0, ("NYI"));
+    ASSERTN(0, ("NYI"));
     return 0;
 }
 
 
 static void rmat_dumpf_by_handle(void const* pbasis, FILE * h)
 {
-    ASSERT(h, ("dump file handle is NULL"));
+    ASSERTN(h, ("dump file handle is NULL"));
     RMat * pthis = (RMat*)pbasis;
     fprintf(h, "\nMATRIX(%d,%d)\n", pthis->get_row_size(), pthis->get_col_size());
     for (UINT i = 0; i < pthis->get_row_size(); i++) {
@@ -272,7 +272,7 @@ static void rmat_dumpf(void const* pbasis, CHAR const* name, bool is_del)
     }
 
     FILE * h = fopen(name, "a+");
-    ASSERT(h, ("%s create failed!!!", name));
+    ASSERTN(h, ("%s create failed!!!", name));
     rmat_dumpf_by_handle(pbasis, h);
     fclose(h);
 }
@@ -415,7 +415,7 @@ void RMat::destroy()
 
 void RMat::getr(UINT row, UINT col, FRAC_TYPE * numer, FRAC_TYPE * denom)
 {
-    ASSERT(m_is_init, ("not yet initialize."));
+    ASSERTN(m_is_init, ("not yet initialize."));
     Rational rat = Matrix<Rational>::get(row, col);
     *numer = rat.num();
     *denom = rat.den();
@@ -424,15 +424,15 @@ void RMat::getr(UINT row, UINT col, FRAC_TYPE * numer, FRAC_TYPE * denom)
 
 Rational RMat::getr(UINT row, UINT col)
 {
-    ASSERT(m_is_init, ("not yet initialize."));
+    ASSERTN(m_is_init, ("not yet initialize."));
     return Matrix<Rational>::get(row, col);
 }
 
 
 void RMat::sete(UINT num, ...)
 {
-    ASSERT(m_is_init, ("not yet initialize."));
-    ASSERT(num <= m_col_size*m_row_size, ("set out of boundary."));
+    ASSERTN(m_is_init, ("not yet initialize."));
+    ASSERTN(num <= m_col_size*m_row_size, ("set out of boundary."));
     if (num <= 0) {
         return;
     }
@@ -455,8 +455,8 @@ void RMat::sete(UINT num, ...)
 //Set value to numerator and denomiator.
 void RMat::setr(UINT row, UINT col, FRAC_TYPE numer, FRAC_TYPE denom)
 {
-    ASSERT(m_is_init, ("not yet initialize."));
-    ASSERT(denom != 0, ("denominator is 0!"));
+    ASSERTN(m_is_init, ("not yet initialize."));
+    ASSERTN(denom != 0, ("denominator is 0!"));
     Rational rat;
     rat.num() = numer;
     rat.den() = denom;
@@ -466,8 +466,8 @@ void RMat::setr(UINT row, UINT col, FRAC_TYPE numer, FRAC_TYPE denom)
 
 void RMat::setr(UINT row, UINT col, Rational rat)
 {
-    ASSERT(m_is_init, ("not yet initialize."));
-    ASSERT(rat.den() != 0, ("denominator is 0!"));
+    ASSERTN(m_is_init, ("not yet initialize."));
+    ASSERTN(rat.den() != 0, ("denominator is 0!"));
     Matrix<Rational>::set(row, col, rat);
 }
 
@@ -481,7 +481,7 @@ RMat & RMat::operator = (RMat const& m)
 
 void RMat::copy(RMat const& r)
 {
-    ASSERT(m_is_init && r.m_is_init, ("not yet initialize."));
+    ASSERTN(m_is_init && r.m_is_init, ("not yet initialize."));
     Matrix<Rational>::copy(*((Matrix<Rational>*)&r));
 }
 
@@ -489,7 +489,7 @@ void RMat::copy(RMat const& r)
 //Copy elements in Integer Matrix.
 void RMat::copy(INTMat const& m)
 {
-    ASSERT(m_is_init && m.m_is_init, ("not yet initialize."));
+    ASSERTN(m_is_init && m.m_is_init, ("not yet initialize."));
     if (this == (RMat*)&m) return;
     if (m_mat) {
         ::free(m_mat);
@@ -508,7 +508,7 @@ void RMat::copy(INTMat const& m)
 //Return true if matrix is nonsingular, otherwise return false.
 bool RMat::inv(RMat & e)
 {
-    ASSERT(m_is_init, ("not yet initialize."));
+    ASSERTN(m_is_init, ("not yet initialize."));
     bool is_nonsingular = Matrix<Rational>::inv(e);
     //for (UINT i = 0; i < m_row_size; i++) {
     //    for (UINT j = 0; j < m_col_size; j++) {
@@ -525,14 +525,14 @@ bool RMat::inv(RMat & e)
 //'col': The starting column to reduce.
 UINT RMat::comden(UINT row, UINT col)
 {
-    ASSERT(m_is_init, ("not yet initialize."));
-    ASSERT(row < m_row_size, ("out of boundary"));
+    ASSERTN(m_is_init, ("not yet initialize."));
+    ASSERTN(row < m_row_size, ("out of boundary"));
 
     bool is_int = true; //All elem is integer.
     INT lcm  = 1;
     for (UINT j= col; j < m_col_size; j++) {
             Rational v = get(row, j);
-            ASSERT(v.den() > 0,
+            ASSERTN(v.den() > 0,
                         ("should be converted positive in rational file"));
             if (v.num() == 0) {
                 continue;
@@ -548,7 +548,7 @@ UINT RMat::comden(UINT row, UINT col)
             Rational v = get(row, j);
             if (v.den() != lcm) {
                 INT num = v.num() * (lcm / v.den());
-                ASSERT(num < 0x7FFFffff, ("out of boundary"));
+                ASSERTN(num < 0x7FFFffff, ("out of boundary"));
                 setr(row, j, num, lcm);
             }
         }
@@ -570,9 +570,9 @@ UINT RMat::comden(UINT row, UINT col)
 //        x1 + 7x2 - 2x3  = -10
 void RMat::substit(RMat const& exp, UINT v, bool is_eq, INT rhs_idx)
 {
-    ASSERT(m_is_init && exp.m_is_init,
+    ASSERTN(m_is_init && exp.m_is_init,
             ("not yet initialize."));
-    ASSERT(m_col_size == exp.m_col_size && v < m_col_size &&
+    ASSERTN(m_col_size == exp.m_col_size && v < m_col_size &&
             exp.is_rowvec(), ("unmatch matrix"));
 
     if (!is_eq) {
@@ -602,7 +602,7 @@ void RMat::substit(RMat const& exp, UINT v, bool is_eq, INT rhs_idx)
 //elements all be integer
 bool RMat::is_imat(UINT * row, UINT * col)
 {
-    ASSERT(m_is_init, ("not yet initialize."));
+    ASSERTN(m_is_init, ("not yet initialize."));
     for (UINT i = 0; i < m_row_size; i++) {
         for (UINT j = 0; j < m_col_size; j++) {
             if (get(i, j).den() != 1) {
@@ -627,7 +627,7 @@ Rational RMat::reduce(UINT row, UINT col)
 
 void RMat::reduce()
 {
-    ASSERT(m_is_init, ("not yet initialize."));
+    ASSERTN(m_is_init, ("not yet initialize."));
     for (UINT i = 0; i < m_row_size; i++) {
         for (UINT j = 0; j < m_col_size; j++) {
             Rational v = get(i, j);
@@ -640,7 +640,7 @@ void RMat::reduce()
 
 RMat operator * (RMat const& a, RMat const& b)
 {
-    ASSERT(a.m_is_init && b.m_is_init,
+    ASSERTN(a.m_is_init && b.m_is_init,
             ("not yet initialize."));
     RMat c;
     Matrix<Rational> * cp = (Matrix<Rational>*)&c;
@@ -653,7 +653,7 @@ RMat operator * (RMat const& a, RMat const& b)
 
 RMat operator + (RMat const& a, RMat const& b)
 {
-    ASSERT(a.m_is_init && b.m_is_init,
+    ASSERTN(a.m_is_init && b.m_is_init,
             ("not yet initialize."));
     RMat c;
     Matrix<Rational> *cp = (Matrix<Rational>*)&c;
@@ -666,7 +666,7 @@ RMat operator + (RMat const& a, RMat const& b)
 
 RMat operator - (RMat const& a, RMat const& b)
 {
-    ASSERT(a.m_is_init &&
+    ASSERTN(a.m_is_init &&
             b.m_is_init,
             ("not yet initialize."));
     RMat c;
@@ -686,7 +686,7 @@ RMat operator - (RMat const& a, RMat const& b)
 //'c': constant vector.
 void RMat::ds(RMat const&)
 {
-    ASSERT(m_is_init, ("not yet initialize."));
+    ASSERTN(m_is_init, ("not yet initialize."));
 }
 
 
@@ -695,8 +695,8 @@ void RMat::ds(RMat const&)
 //NOTICE: This function uses row convention.
 void RMat::intlize(INT row)
 {
-    ASSERT(m_is_init, ("not yet initialize."));
-    ASSERT(row < (INT)m_row_size, ("out of range"));
+    ASSERTN(m_is_init, ("not yet initialize."));
+    ASSERTN(row < (INT)m_row_size, ("out of range"));
     if (row != -1) {
         if (comden(row, 0) != 1) {
             for (UINT j = 0; j < m_col_size; j++) {
@@ -765,8 +765,8 @@ void INTMat::destroy()
 //Pamaters after 'num' must be integer.
 void INTMat::sete(UINT num, ...)
 {
-    ASSERT(m_is_init, ("not yet initialize."));
-    ASSERT(num <= m_col_size*m_row_size, ("set out of boundary."));
+    ASSERTN(m_is_init, ("not yet initialize."));
+    ASSERTN(num <= m_col_size*m_row_size, ("set out of boundary."));
     if (num <= 0) {
         return;
     }
@@ -796,7 +796,7 @@ INTMat & INTMat::operator = (INTMat const& m)
 //Copy elements in RMat. Convert value type from rational to integral.
 void INTMat::copy(RMat const& r)
 {
-    ASSERT(m_is_init && r.m_is_init,
+    ASSERTN(m_is_init && r.m_is_init,
             ("not yet initialize."));
     if (this == (INTMat*)&r) return;
     if (m_mat) {
@@ -807,7 +807,7 @@ void INTMat::copy(RMat const& r)
     m_mat = (INT*)::malloc(m_row_size * m_col_size * sizeof(INT));
     for (UINT i = 0; i < m_row_size; i++) {
         for (UINT j = 0; j < m_col_size; j++) {
-            ASSERT(r.get(i, j).den() == 1, ("illegal rmat"));
+            ASSERTN(r.get(i, j).den() == 1, ("illegal rmat"));
             set(i, j, r.get(i, j).num());
         }
     }
@@ -819,7 +819,7 @@ void INTMat::copy(RMat const& r)
 //element's denomiator is not '1'.
 bool INTMat::inv(OUT INTMat & e)
 {
-    ASSERT(m_is_init, ("not yet initialize."));
+    ASSERTN(m_is_init, ("not yet initialize."));
     RMat tmp, v;
     tmp.copy(*this);
     bool is_nonsingular = tmp.inv(tmp);
@@ -827,7 +827,7 @@ bool INTMat::inv(OUT INTMat & e)
     for (UINT i = 0; i < m_row_size; i++) {
         for (UINT j = 0; j < m_col_size; j++) {
             Rational v2 = tmp.get(i, j);
-            ASSERT(v2.den() == 1, ("Should converts INTMat to RMat firstly"));
+            ASSERTN(v2.den() == 1, ("Should converts INTMat to RMat firstly"));
             e.set(i, j, v2.num());
         }
     }
@@ -840,11 +840,11 @@ bool INTMat::inv(OUT INTMat & e)
 //element's denomiator is not '1'.
 INT INTMat::det()
 {
-    ASSERT(m_is_init, ("not yet initialize."));
+    ASSERTN(m_is_init, ("not yet initialize."));
     RMat tmp;
     tmp.copy(*this);
     Rational v = tmp.det();
-    ASSERT(v.den() == 1, ("Should converts INTMat to RMat firstly"));
+    ASSERTN(v.den() == 1, ("Should converts INTMat to RMat firstly"));
     return v.num();
 }
 
@@ -852,10 +852,10 @@ INT INTMat::det()
 //Generate unimodular matrix to elimnate element.
 void INTMat::gen_elim_mat(UINT row, UINT col, OUT INTMat & elim)
 {
-    ASSERT(m_is_init, ("not yet initialize."));
+    ASSERTN(m_is_init, ("not yet initialize."));
     INT aii = get(row, row), aij = get(row, col), x, y;
     INT gcd = exgcd(aii, aij, x, y);
-    ASSERT(gcd == aii*x + aij*y, ("illegal computation"));
+    ASSERTN(gcd == aii*x + aij*y, ("illegal computation"));
 
     //Construct unimodular to eliminate aij.
     //Satisfied: det(uni) = x * ((x*aii+y*aij)/x*gcd) = 1
@@ -870,7 +870,7 @@ void INTMat::gen_elim_mat(UINT row, UINT col, OUT INTMat & elim)
 
 void INTMat::_verify_hnf(INTMat & h)
 {
-    ASSERT(m_is_init, ("not yet initialize."));
+    ASSERTN(m_is_init, ("not yet initialize."));
     for (UINT i = 0; i < MIN(h.m_row_size,h.m_col_size); i++) {
         //1. Eliminate element from i+1 to n to single zero.
         UINT j;
@@ -878,11 +878,11 @@ void INTMat::_verify_hnf(INTMat & h)
         DUMMYUSE(v);
 
         for (j = 0; j < i; j++) {
-            ASSERT(h.get(i,j) >= 0, ("negtive element"));
-            ASSERT(h.get(i,j) < v, ("large than diagnal element"));
+            ASSERTN(h.get(i,j) >= 0, ("negtive element"));
+            ASSERTN(h.get(i,j) < v, ("large than diagnal element"));
         }
         for (j = i + 1; j < h.m_col_size; j++) {
-            ASSERT(h.get(i,j) == 0, ("should be low triangular"));
+            ASSERTN(h.get(i,j) == 0, ("should be low triangular"));
         }
     }//end for
 }
@@ -911,7 +911,7 @@ void INTMat::_verify_hnf(INTMat & h)
 //  2. 'this' may be singular.
 void INTMat::hnf(OUT INTMat & h, OUT INTMat & u)
 {
-    ASSERT(m_is_init, ("not yet initialize."));
+    ASSERTN(m_is_init, ("not yet initialize."));
     u.reinit(m_col_size, m_col_size);
     u.eye(1); //unimodular matrix
     h = *this;
@@ -1036,8 +1036,8 @@ void INTMat::gcd()
 //Note 'this' is a n*2 matrix that each row indicate one coordinate as (x,y).
 void INTMat::cvexhull(OUT INTMat & hull)
 {
-    ASSERT(m_is_init, ("not yet initialize."));
-    ASSERT(m_col_size == 2, ("need n*2 matrix"));
+    ASSERTN(m_is_init, ("not yet initialize."));
+    ASSERTN(m_col_size == 2, ("need n*2 matrix"));
     INT p0_x = 0, p0_y = 0;
     UINT p0_idx = 0;
     for (UINT i = 0; i < m_row_size; i++) {
@@ -1106,7 +1106,7 @@ void INTMat::cvexhull(OUT INTMat & hull)
         } //end for
 
         if (!inserted) {
-            ASSERT(idx == 0, ("illegal list"));
+            ASSERTN(idx == 0, ("illegal list"));
             order.append_tail(i + 1); //The first index in list starting at '1'.
         }
     } //end for
@@ -1141,7 +1141,7 @@ void INTMat::cvexhull(OUT INTMat & hull)
             }
         }
 
-        ASSERT(cross > 0, ("exception!"));
+        ASSERTN(cross > 0, ("exception!"));
         s.push(idx); //point 'idx - 1' turn left.
     }
 
@@ -1156,7 +1156,7 @@ void INTMat::cvexhull(OUT INTMat & hull)
 
 void INTMat::dumps() const
 {
-    ASSERT(m_is_init, ("not yet initialize."));
+    ASSERTN(m_is_init, ("not yet initialize."));
     printf("\n");
     for (UINT i = 0; i < m_row_size; i++) {
         printf("\t");
@@ -1172,7 +1172,7 @@ void INTMat::dumps() const
 
 void INTMat::dumpf(CHAR const* name, bool is_del) const
 {
-    ASSERT(m_is_init, ("not yet initialize."));
+    ASSERTN(m_is_init, ("not yet initialize."));
     if (name == NULL) {
         name = "matrix.tmp";
     }
@@ -1180,7 +1180,7 @@ void INTMat::dumpf(CHAR const* name, bool is_del) const
         UNLINK(name);
     }
     FILE * h = fopen(name, "a+");
-    ASSERT(h, ("%s create failed!!!", name));
+    ASSERTN(h, ("%s create failed!!!", name));
     fprintf(h, "\nMATRIX(%d,%d)\n", this->get_row_size(), this->get_col_size());
     for (UINT i = 0; i < m_row_size; i++) {
         fprintf(h, "\t");
@@ -1254,7 +1254,7 @@ static Float val_sqrt(Float a)
 
 static void flt_dumpf_by_handle(void const* pbasis, FILE * h)
 {
-    ASSERT(h, ("file handle is NULL"));
+    ASSERTN(h, ("file handle is NULL"));
     FloatMat * pthis = (FloatMat*)pbasis;
     fprintf(h, "\nMATRIX(%d,%d)\n", pthis->get_row_size(), pthis->get_col_size());
     for (UINT i = 0; i < pthis->get_row_size(); i++) {
@@ -1278,7 +1278,7 @@ static void flt_dumpf(void const* pbasis, CHAR const* name, bool is_del)
         UNLINK(name);
     }
     FILE * h = fopen(name, "a+");
-    ASSERT(h, ("%s create failed!!!", name));
+    ASSERTN(h, ("%s create failed!!!", name));
     flt_dumpf_by_handle(pbasis, h);
     fclose(h);
 }
@@ -1312,7 +1312,7 @@ static float fast_sqrt_float(float n)
     //strict-aliasing rules [-Wstrict-aliasing]
     float * py = &y;
     LONG i = *(LONG*)py;
-    
+
     i  = 0x5f3759df - (i >> 1);
 
     //WARNING: dereferencing type-punned pointer will break
@@ -1356,7 +1356,7 @@ void FloatMat::set_sd(UINT sd)
     case 5:    g_sd_str = "%.5f"; break;
     case 6:    g_sd_str = "%.6f"; break;
     default:
-        ASSERT(0, ("unsupport significant digit!"));
+        ASSERTN(0, ("unsupport significant digit!"));
     }
 }
 
@@ -1434,8 +1434,8 @@ void FloatMat::destroy()
 // e.g: sete(NUM, 2.0, 3.0...)
 void FloatMat::sete(UINT num, ...)
 {
-    ASSERT(m_is_init, ("not yet initialize."));
-    ASSERT(num <= m_col_size*m_row_size, ("set out of boundary."));
+    ASSERTN(m_is_init, ("not yet initialize."));
+    ASSERTN(num <= m_col_size*m_row_size, ("set out of boundary."));
     if (num <= 0) {
         return;
     }
@@ -1464,8 +1464,8 @@ void FloatMat::sete(UINT num, ...)
 //  e.g: setie(NUM, 2, 3...)
 void FloatMat::setie(UINT num, ...)
 {
-    ASSERT(m_is_init, ("not yet initialize."));
-    ASSERT(num <= m_col_size*m_row_size, ("set out of boundary."));
+    ASSERTN(m_is_init, ("not yet initialize."));
+    ASSERTN(num <= m_col_size*m_row_size, ("set out of boundary."));
     if (num <= 0) {
         return;
     }
@@ -1496,9 +1496,9 @@ FloatMat& FloatMat::operator = (FloatMat const& m)
 
 void FloatMat::substit(IN FloatMat const& exp, UINT v, bool is_eq, INT rhs_idx)
 {
-    ASSERT(m_is_init && exp.m_is_init,
+    ASSERTN(m_is_init && exp.m_is_init,
                             ("not yet initialize."));
-    ASSERT(m_col_size == exp.m_col_size && v < m_col_size &&
+    ASSERTN(m_col_size == exp.m_col_size && v < m_col_size &&
         exp.is_rowvec(), ("unmatch matrix"));
 
     if (!is_eq) {
@@ -1528,7 +1528,7 @@ void FloatMat::substit(IN FloatMat const& exp, UINT v, bool is_eq, INT rhs_idx)
 //All elements are integer
 bool FloatMat::is_imat(UINT * row, UINT * col)
 {
-    ASSERT(m_is_init, ("not yet initialize."));
+    ASSERTN(m_is_init, ("not yet initialize."));
     for (UINT i = 0; i < m_row_size; i++) {
         for (UINT j = 0; j < m_col_size; j++) {
             if (!get(i, j).is_int()) {
@@ -1570,7 +1570,7 @@ FloatMat operator - (FloatMat const& a, FloatMat const& b)
 //
 static void bool_dumpf_by_handle(void const* pbasis, FILE * h)
 {
-    ASSERT(h != NULL, ("file handle is NULL"));
+    ASSERTN(h != NULL, ("file handle is NULL"));
     BMat * pthis = (BMat*)pbasis;
     fprintf(h, "\nMATRIX(%d,%d)\n", pthis->get_row_size(), pthis->get_col_size());
     for (UINT i = 0; i < pthis->get_row_size(); i++) {
@@ -1594,7 +1594,7 @@ static void bool_dumpf(void const* pbasis, CHAR const* name, bool is_del)
         UNLINK(name);
     }
     FILE * h = fopen(name, "a+");
-    ASSERT(h, ("%s create failed!!!", name));
+    ASSERTN(h, ("%s create failed!!!", name));
     bool_dumpf_by_handle(pbasis, h);
     fclose(h);
 }
@@ -1669,8 +1669,8 @@ void BMat::destroy()
 //e.g: sete(3, true, true, false)
 void BMat::sete(UINT num, ...)
 {
-    ASSERT(m_is_init, ("not yet initialize."));
-    ASSERT(num <= m_col_size*m_row_size, ("set out of boundary."));
+    ASSERTN(m_is_init, ("not yet initialize."));
+    ASSERTN(num <= m_col_size*m_row_size, ("set out of boundary."));
     if (num <= 0) {
         return;
     }

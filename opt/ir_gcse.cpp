@@ -712,7 +712,7 @@ bool IR_GCSE::perform(OptCtx & oc)
 
     bool change = false;
     IRBB * entry = m_cfg->get_entry();
-    ASSERT(entry && BB_is_entry(entry), ("Not find CFG entry"));
+    ASSERTN(entry && BB_is_entry(entry), ("Not find CFG entry"));
 
     xcom::Graph domtree;
     m_cfg->get_dom_tree(domtree);

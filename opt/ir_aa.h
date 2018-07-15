@@ -511,13 +511,13 @@ public:
     virtual PASS_TYPE getPassType() const { return PASS_AA; }
     PtPairSet * getInPtPairSet(IRBB const* bb)
     {
-        ASSERT(m_in_pp_set.get(BB_id(bb)),
+        ASSERTN(m_in_pp_set.get(BB_id(bb)),
                ("IN set is not yet initialized for BB%d", BB_id(bb)));
         return m_in_pp_set.get(BB_id(bb));
     }
     PtPairSet * getOutPtPairSet(IRBB const* bb)
     {
-        ASSERT(m_out_pp_set.get(BB_id(bb)),
+        ASSERTN(m_out_pp_set.get(BB_id(bb)),
                ("OUT set is not yet initialized for BB%d", BB_id(bb)));
         return m_out_pp_set.get(BB_id(bb));
     }
@@ -576,7 +576,7 @@ public:
     inline void setPointTo(UINT mdid, MD2MDSet & ctx, MDSet const* ptset)
     {
         ASSERT0(ptset);
-        ASSERT(m_mds_hash->find(*ptset), ("ptset should be in hash"));
+        ASSERTN(m_mds_hash->find(*ptset), ("ptset should be in hash"));
         ctx.setAlways(mdid, ptset);
     }
 

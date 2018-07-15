@@ -40,11 +40,16 @@ public:
     {
         ASSERT0(initsize > 0);
         buflen = initsize;
-        buf = (CHAR*)malloc(initsize);
+        buf = (CHAR*)::malloc(initsize);
         buf[0] = 0;
     }
     COPY_CONSTRUCTOR(StrBuf);
-    ~StrBuf() { if (buf != NULL) { delete buf; } }
+    ~StrBuf()
+    {
+        if (buf != NULL) {
+            ::free(buf);
+        }
+    }
 
     void clean()
     {

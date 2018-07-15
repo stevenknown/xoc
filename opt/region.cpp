@@ -239,7 +239,7 @@ bool AnalysisInstrument::verify_var(VarMgr * vm, VAR * v)
         //variables, e.g: PR, a kind of local variable.
         //ASSERT0(VAR_is_global(v));
     } else {
-        ASSERT(0, ("unsupport variable type."));
+        ASSERTN(0, ("unsupport variable type."));
     }
     return true;
 }
@@ -633,7 +633,7 @@ IR * Region::buildIcall(
 IR * Region::buildRegion(Region * rg)
 {
     ASSERT0(rg && !rg->is_undef());
-    ASSERT(rg->getRegionVar(), ("region should bond with a variable"));
+    ASSERTN(rg->getRegionVar(), ("region should bond with a variable"));
     IR * ir = allocIR(IR_REGION);
     IR_dt(ir) = getTypeMgr()->getVoid();
     REGION_ru(ir) = rg;
@@ -641,7 +641,7 @@ IR * Region::buildRegion(Region * rg)
 
     #ifdef _DEBUG_
     if (rg->is_function()) {
-        ASSERT(is_program() || is_function(),
+        ASSERTN(is_program() || is_function(),
             ("Only program or function region can have a"
              " function region as subregion."));
     }
@@ -729,7 +729,7 @@ IR * Region::buildLoad(VAR * var, Type const* type)
 IR * Region::buildIload(IR * base, Type const* type)
 {
     ASSERT0(type);
-    ASSERT(base && base->is_ptr(), ("mem-address of ILD must be pointer"));
+    ASSERTN(base && base->is_ptr(), ("mem-address of ILD must be pointer"));
     IR * ir = allocIR(IR_ILD);
     IR_dt(ir) = type;
     ILD_base(ir) = base;
@@ -905,7 +905,7 @@ IR * Region::buildIstore(IR * base, IR * rhs, Type const* type)
 {
     ASSERT0(type);
     ASSERT0(base && rhs && rhs->is_exp());
-    ASSERT(base->is_ptr(), ("must be pointer"));
+    ASSERTN(base->is_ptr(), ("must be pointer"));
     IR * ir = allocIR(IR_IST);
     IR_dt(ir) = type;
     IST_base(ir) = base;
@@ -1099,7 +1099,7 @@ IR * Region::buildBreak()
 IR * Region::buildCase(IR * casev_exp, LabelInfo const* jump_lab)
 {
     ASSERT0(casev_exp && jump_lab);
-    ASSERT(casev_exp->is_const(), ("case value-expression must be const"));
+    ASSERTN(casev_exp->is_const(), ("case value-expression must be const"));
     IR * ir = allocIR(IR_CASE);
     IR_dt(ir) = getTypeMgr()->getVoid();
     CASE_lab(ir) = jump_lab;
@@ -1370,9 +1370,9 @@ IR * Region::buildImmInt(HOST_INT v, Type const* type)
         }
         case D_I128:
         case D_U128:
-            ASSERT(0, ("TODO:unsupport 128 bit integer"));
+            ASSERTN(0, ("TODO:unsupport 128 bit integer"));
             break;
-        default: ASSERT(0, ("TODO:unsupport integer type"));
+        default: ASSERTN(0, ("TODO:unsupport integer type"));
         }
     } else {
         CONST_int_val(imm) = v;
@@ -1390,7 +1390,7 @@ IR * Region::buildPointerOp(IR_TYPE irt, IR * lchild, IR * rchild)
 {
     ASSERT0(lchild && rchild);
     if (!lchild->is_ptr() && rchild->is_ptr()) {
-        ASSERT(irt == IR_ADD ||
+        ASSERTN(irt == IR_ADD ||
                irt == IR_MUL ||
                irt == IR_XOR ||
                irt == IR_BAND ||
@@ -1401,7 +1401,7 @@ IR * Region::buildPointerOp(IR_TYPE irt, IR * lchild, IR * rchild)
                irt == IR_GE ||
                irt == IR_EQ ||
                irt == IR_NE, ("illegal pointer operation"));
-        ASSERT(lchild->is_int() || lchild->is_mc() || lchild->is_void(),
+        ASSERTN(lchild->is_int() || lchild->is_mc() || lchild->is_void(),
                ("illegal pointer addend"));
         return buildPointerOp(irt, rchild, lchild);
     }
@@ -1453,9 +1453,9 @@ IR * Region::buildPointerOp(IR_TYPE irt, IR * lchild, IR * rchild)
             IR_parent(rchild) = ret;
             return ret;
         }
-        default: ASSERT(0, ("illegal pointers operation"));
+        default: ASSERTN(0, ("illegal pointers operation"));
         }
-        ASSERT(0, ("can not get here."));
+        ASSERTN(0, ("can not get here."));
     } else if (lchild->is_ptr() && !rchild->is_ptr()) {
         //Result is pointer type.
         //CASE:
@@ -1468,7 +1468,7 @@ IR * Region::buildPointerOp(IR_TYPE irt, IR * lchild, IR * rchild)
             IR * addend = allocIR(IR_MUL);
             BIN_opnd0(addend) = rchild;
 
-            ASSERT(TY_ptr_base_size(d0) > 0, ("multipler is 0"));
+            ASSERTN(TY_ptr_base_size(d0) > 0, ("multipler is 0"));
 
             BIN_opnd1(addend) = buildImmInt(TY_ptr_base_size(d0),
                 rchild->getType());
@@ -1623,7 +1623,7 @@ IR * Region::buildBinaryOp(
     //Generic binary operation.
     if (type->is_mc()) {
         //mc_size records the memory-chunk size if rtype is D_MC, or else is 0.
-        ASSERT(TY_mc_size(type) != 0, ("Size of memory chunck can not be 0"));
+        ASSERTN(TY_mc_size(type) != 0, ("Size of memory chunck can not be 0"));
         ASSERT0(TY_mc_size(type) == lchild->getTypeSize(getTypeMgr()) &&
                 TY_mc_size(type) == rchild->getTypeSize(getTypeMgr()));
     }
@@ -1643,7 +1643,7 @@ xcom::C<IRBB*> * Region::splitIRlistIntoBB(
         xcom::C<IRBB*> * ctbb)
 {
     IR_CFG * cfg = getCFG();
-    ASSERT(cfg, ("CFG is not available"));
+    ASSERTN(cfg, ("CFG is not available"));
 
     IRBB * newbb = allocBB();
     cfg->add_bb(newbb);
@@ -1862,7 +1862,7 @@ void Region::registerGlobalVAR()
 bool Region::reconstructBBlist(OptCtx & oc)
 {
     START_TIMER(t, "Reconstruct IRBB list");
-    ASSERT(getCFG(), ("CFG is not available"));
+    ASSERTN(getCFG(), ("CFG is not available"));
 
     bool change = false;
     xcom::C<IRBB*> * ctbb;
@@ -2008,7 +2008,7 @@ void Region::constructIRBBlist()
             case IR_REGION:
                 BB_is_fallthrough(cur_bb) = true;
                 break;
-            default: ASSERT(0, ("invalid bb down-boundary IR"));
+            default: ASSERTN(0, ("invalid bb down-boundary IR"));
             } //end switch
 
             //Generate new BB.
@@ -2175,7 +2175,7 @@ Region * Region::getFuncRegion()
 {
     Region * rg = this;
     while (!rg->is_function()) { rg = REGION_parent(rg); }
-    ASSERT(rg != NULL, ("Not in func unit"));
+    ASSERTN(rg != NULL, ("Not in func unit"));
     return rg;
 }
 
@@ -2220,7 +2220,7 @@ void Region::freeIRTreeList(IRList & irs)
     for (irs.get_head(&ct); ct != irs.end(); ct = next) {
         IR * ir = ct->val();
         next = irs.get_next(ct);
-        ASSERT(ir->is_single(), ("do not allow sibling node, need to simplify"));
+        ASSERTN(ir->is_single(), ("do not allow sibling node, need to simplify"));
         irs.remove(ir);
         freeIRTree(ir);
     }
@@ -2234,8 +2234,8 @@ void Region::freeIRTree(IR * ir)
 {
     if (ir == NULL) { return; }
 
-    ASSERT(!ir->is_undef(), ("ir has been freed"));
-    ASSERT(ir->is_single(), ("chain list should be cut off"));
+    ASSERTN(!ir->is_undef(), ("ir has been freed"));
+    ASSERTN(ir->is_single(), ("chain list should be cut off"));
     for (INT i = 0; i < IR_MAX_KID_NUM(ir); i++) {
         IR * kid = ir->getKid(i);
         if (kid != NULL) {
@@ -2255,7 +2255,7 @@ void Region::freeIRTree(IR * ir)
 void Region::freeIR(IR * ir)
 {
     ASSERT0(ir);
-    ASSERT(ir->is_single(), ("chain list should be cut off"));
+    ASSERTN(ir->is_single(), ("chain list should be cut off"));
     #ifdef _DEBUG_
     ASSERT0(!REGION_analysis_instrument(this)->
             m_has_been_freed_irs.is_contain(ir->id()));
@@ -2498,7 +2498,7 @@ IR * Region::dupIR(IR const* src)
     if (src == NULL) { return NULL; }
     IR_TYPE irt = src->getCode();
     IR * res = allocIR(irt);
-    ASSERT(res != NULL && src != NULL, ("res/src is NULL"));
+    ASSERTN(res != NULL && src != NULL, ("res/src is NULL"));
 
     UINT res_id = IR_id(res);
     AIContainer * res_ai = IR_ai(res);
@@ -3034,12 +3034,12 @@ bool Region::verifyMDRef()
                     break;
                 case IR_LD:
                     if (g_is_support_dynamic_type) {
-                        ASSERT(t->getEffectRef(), ("type is at least effect"));
-                        ASSERT(!t->getEffectRef()->is_pr(),
+                        ASSERTN(t->getEffectRef(), ("type is at least effect"));
+                        ASSERTN(!t->getEffectRef()->is_pr(),
                             ("MD can not present a PR."));
                     } else {
-                        ASSERT(t->getExactRef(), ("type must be exact"));
-                        ASSERT(!t->getExactRef()->is_pr(),
+                        ASSERTN(t->getExactRef(), ("type must be exact"));
+                        ASSERTN(!t->getExactRef()->is_pr(),
                             ("MD can not present a PR."));
                     }
 
@@ -3053,12 +3053,12 @@ bool Region::verifyMDRef()
                     break;
                 case IR_PR:
                     if (g_is_support_dynamic_type) {
-                        ASSERT(t->getEffectRef(), ("type is at least effect"));
-                        ASSERT(t->getEffectRef()->is_pr(),
+                        ASSERTN(t->getEffectRef(), ("type is at least effect"));
+                        ASSERTN(t->getEffectRef()->is_pr(),
                             ("MD must present a PR."));
                     } else {
-                        ASSERT(t->getExactRef(), ("type must be exact"));
-                        ASSERT(t->getExactRef()->is_pr(),
+                        ASSERTN(t->getExactRef(), ("type must be exact"));
+                        ASSERTN(t->getExactRef()->is_pr(),
                             ("MD must present a PR."));
                     }
 
@@ -3118,13 +3118,13 @@ bool Region::verifyMDRef()
                     break;
                 case IR_ST:
                     if (g_is_support_dynamic_type) {
-                        ASSERT(t->getEffectRef(),
+                        ASSERTN(t->getEffectRef(),
                                ("type is at least effect"));
-                        ASSERT(!t->getEffectRef()->is_pr(),
+                        ASSERTN(!t->getEffectRef()->is_pr(),
                                ("MD can not present a PR."));
                     } else {
-                        ASSERT(t->getExactRef(), ("type must be exact"));
-                        ASSERT(!t->getExactRef()->is_pr(),
+                        ASSERTN(t->getExactRef(), ("type must be exact"));
+                        ASSERTN(!t->getExactRef()->is_pr(),
                                ("MD can not present a PR."));
                     }
                     //ST may modify overlapped memory object.
@@ -3136,12 +3136,12 @@ bool Region::verifyMDRef()
                 case IR_SETELEM:
                 case IR_GETELEM:
                     if (g_is_support_dynamic_type) {
-                        ASSERT(t->getEffectRef(), ("type is at least effect"));
-                        ASSERT(t->getEffectRef()->is_pr(),
+                        ASSERTN(t->getEffectRef(), ("type is at least effect"));
+                        ASSERTN(t->getEffectRef()->is_pr(),
                                ("MD must present a PR."));
                     } else {
-                        ASSERT(t->getExactRef(), ("type must be exact"));
-                        ASSERT(t->getExactRef()->is_pr(),
+                        ASSERTN(t->getExactRef(), ("type must be exact"));
+                        ASSERTN(t->getExactRef()->is_pr(),
                             ("MD must present a PR."));
                     }
 
@@ -3226,7 +3226,7 @@ bool Region::verifyMDRef()
                 case IR_REGION:
                     ASSERT0(t->getRefMD() == NULL && t->getRefMDSet() == NULL);
                     break;
-                default: ASSERT(0, ("unsupport ir type"));
+                default: ASSERTN(0, ("unsupport ir type"));
                 }
             }
         }
@@ -3240,7 +3240,7 @@ bool Region::verifyRPO(OptCtx & oc)
     if (getCFG() == NULL) { return true; }
     ASSERT0(getBBList());
     if (OC_is_rpo_valid(oc)) {
-        ASSERT(getCFG()->getBBListInRPO()->get_elem_count() ==
+        ASSERTN(getCFG()->getBBListInRPO()->get_elem_count() ==
                getBBList()->get_elem_count(),
                ("Previous pass has changed RPO, "
                 "and you should set it to be invalid"));
@@ -3255,7 +3255,7 @@ bool Region::verifyIRinRegion()
     IR const* ir = getIRList();
     if (ir == NULL) { return true; }
     for (; ir != NULL; ir = ir->get_next()) {
-        ASSERT(getIR(ir->id()) == ir,
+        ASSERTN(getIR(ir->id()) == ir,
                ("ir id:%d is not allocated in region %s", getRegionName()));
     }
     return true;
@@ -3278,27 +3278,27 @@ bool Region::verifyBBlist(BBList & bbl)
         if (last == NULL) { continue; }
 
         if (last->isConditionalBr()) {
-            ASSERT(lab2bb.get(BR_lab(last)),
+            ASSERTN(lab2bb.get(BR_lab(last)),
                     ("branch target cannot be NULL"));
         } else if (last->isMultiConditionalBr()) {
             ASSERT0(last->is_switch());
 
             for (IR * c = SWITCH_case_list(last); c != NULL; c = c->get_next()) {
-                ASSERT(lab2bb.get(CASE_lab(last)),
+                ASSERTN(lab2bb.get(CASE_lab(last)),
                         ("case branch target cannot be NULL"));
             }
 
             if (SWITCH_deflab(last) != NULL) {
-                ASSERT(lab2bb.get(SWITCH_deflab(last)),
+                ASSERTN(lab2bb.get(SWITCH_deflab(last)),
                         ("default target cannot be NULL"));
             }
         } else if (last->isUnconditionalBr()) {
             if (last->is_goto()) {
-                ASSERT(lab2bb.get(GOTO_lab(last)), ("target cannot be NULL"));
+                ASSERTN(lab2bb.get(GOTO_lab(last)), ("target cannot be NULL"));
             } else {
                 for (IR * caseexp = IGOTO_case_list(last); caseexp != NULL;
                     caseexp = caseexp->get_next()) {
-                    ASSERT(lab2bb.get(CASE_lab(caseexp)),
+                    ASSERTN(lab2bb.get(CASE_lab(caseexp)),
                         ("target cannot be NULL"));
                 }
             }
@@ -3443,18 +3443,18 @@ void Region::checkValidAndRecompute(OptCtx * oc, ...)
     va_start(ptr, oc);
     PASS_TYPE opty = (PASS_TYPE)va_arg(ptr, UINT);
     while (opty != PASS_UNDEF && num < 1000) {
-        ASSERT(opty < PASS_NUM, ("You should append PASS_UNDEF to pass list."));
+        ASSERTN(opty < PASS_NUM, ("You should append PASS_UNDEF to pass list."));
         opts.bunion(opty);
         num++;
         opty = (PASS_TYPE)va_arg(ptr, UINT);
     }
     va_end(ptr);
-    ASSERT(num < 1000, ("too many pass queried or miss ending placeholder"));
+    ASSERTN(num < 1000, ("too many pass queried or miss ending placeholder"));
 
     if (num == 0) { return; }
 
     PassMgr * passmgr = getPassMgr();
-    ASSERT(passmgr, ("PassMgr is not enable"));
+    ASSERTN(passmgr, ("PassMgr is not enable"));
 
     IR_CFG * cfg = (IR_CFG*)passmgr->queryPass(PASS_CFG);
     IR_AA * aa = NULL;
@@ -3477,7 +3477,7 @@ void Region::checkValidAndRecompute(OptCtx * oc, ...)
         !OC_is_aa_valid(*oc) &&
         getBBList() != NULL &&
         getBBList()->get_elem_count() != 0) {
-        ASSERT(cfg && OC_is_cfg_valid(*oc),
+        ASSERTN(cfg && OC_is_cfg_valid(*oc),
            ("You should make CFG available first."));
         if (aa == NULL) {
             aa = (IR_AA*)passmgr->registerPass(PASS_AA);
@@ -3491,13 +3491,13 @@ void Region::checkValidAndRecompute(OptCtx * oc, ...)
     }
 
     if (opts.is_contain(PASS_DOM) && !OC_is_dom_valid(*oc)) {
-        ASSERT(cfg && OC_is_cfg_valid(*oc),
+        ASSERTN(cfg && OC_is_cfg_valid(*oc),
                ("You should make CFG available first."));
         cfg->computeDomAndIdom(*oc);
     }
 
     if (opts.is_contain(PASS_PDOM) && !OC_is_pdom_valid(*oc)) {
-        ASSERT(cfg && OC_is_cfg_valid(*oc),
+        ASSERTN(cfg && OC_is_cfg_valid(*oc),
                ("You should make CFG available first."));
         cfg->computePdomAndIpdom(*oc);
     }
@@ -3506,7 +3506,7 @@ void Region::checkValidAndRecompute(OptCtx * oc, ...)
         ASSERT0(passmgr);
         CDG * cdg = (CDG*)passmgr->registerPass(PASS_CDG);
         ASSERT0(cdg); //cdg is not enable.
-        ASSERT(cfg && OC_is_cfg_valid(*oc),
+        ASSERTN(cfg && OC_is_cfg_valid(*oc),
                ("You should make CFG available first."));
         cdg->rebuild(*oc, *cfg);
     }
@@ -3539,7 +3539,7 @@ void Region::checkValidAndRecompute(OptCtx * oc, ...)
         !OC_is_aa_valid(*oc) &&
         getBBList() != NULL &&
         getBBList()->get_elem_count() != 0) {
-        ASSERT(cfg && OC_is_cfg_valid(*oc),
+        ASSERTN(cfg && OC_is_cfg_valid(*oc),
             ("You should make CFG available first."));
         if (aa == NULL) {
             aa = (IR_AA*)passmgr->registerPass(PASS_AA);
@@ -3612,18 +3612,18 @@ void Region::checkValidAndRecompute(OptCtx * oc, ...)
     }
 
     if (opts.is_contain(PASS_LOOP_INFO) && !OC_is_loopinfo_valid(*oc)) {
-        ASSERT(cfg && OC_is_cfg_valid(*oc),
+        ASSERTN(cfg && OC_is_cfg_valid(*oc),
                ("You should make CFG available first."));
         cfg->LoopAnalysis(*oc);
     }
 
     if (opts.is_contain(PASS_RPO)) {
-        ASSERT(cfg && OC_is_cfg_valid(*oc),
+        ASSERTN(cfg && OC_is_cfg_valid(*oc),
                ("You should make CFG available first."));
         if (!OC_is_rpo_valid(*oc)) {
             cfg->computeRPO(*oc);
         } else {
-            ASSERT(cfg->getBBListInRPO()->get_elem_count() ==
+            ASSERTN(cfg->getBBListInRPO()->get_elem_count() ==
                    getBBList()->get_elem_count(),
                    ("Previous pass has changed RPO, "
                     "and you should set it to be invalid"));
@@ -3772,7 +3772,7 @@ bool Region::processIRList(OptCtx & oc)
 //Return true if all passes finished normally, otherwise return false.
 bool Region::process(OptCtx * oc)
 {
-    ASSERT(oc, ("Need OptCtx"));
+    ASSERTN(oc, ("Need OptCtx"));
     ASSERT0(verifyIRinRegion());
     note("\nREGION_NAME:%s", getRegionName());
 

@@ -295,7 +295,7 @@ void PRDF::computeGlobal()
         }
         count++;
     } while (change && count < thres);
-    ASSERT(!change, ("result of equation is convergent slowly"));
+    ASSERTN(!change, ("result of equation is convergent slowly"));
 
     news.clean(m_sbs_mgr);
 

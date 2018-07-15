@@ -491,7 +491,7 @@ bool IR_LICM::is_dom_all_use_in_loop(IR const* ir, LI<IRBB> * li)
                 continue;
             }
 
-            ASSERT(PR_no(use) == ir->getPrno(), ("prno is unmatch"));
+            ASSERTN(PR_no(use) == ir->getPrno(), ("prno is unmatch"));
             ASSERT0(PR_ssainfo(use) == ssainfo);
 
             if (!is_stmt_dom_its_use(ir, use, li, irbb)) {
@@ -735,7 +735,7 @@ bool IR_LICM::hoistCand(
             du_set_info_changed = true;
         }
 
-        ASSERT(removednum > 0, ("not find any hoistable exp?"));
+        ASSERTN(removednum > 0, ("not find any hoistable exp?"));
 
         for (UINT i = 0; i < removednum; i++) {
             IR * c = removed.get(i);

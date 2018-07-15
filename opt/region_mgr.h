@@ -151,11 +151,11 @@ public:
     //It is the first thing you should do after you declared a RegionMgr.
     inline void initVarMgr()
     {
-        ASSERT(m_var_mgr == NULL, ("VarMgr already initialized"));
+        ASSERTN(m_var_mgr == NULL, ("VarMgr already initialized"));
         m_var_mgr = allocVarMgr();
         ASSERT0(m_var_mgr);
 
-        ASSERT(m_md_sys == NULL, ("MDSystem already initialized"));
+        ASSERTN(m_md_sys == NULL, ("MDSystem already initialized"));
         m_md_sys = new MDSystem(m_var_mgr);
         ASSERT0(m_md_sys);
     }

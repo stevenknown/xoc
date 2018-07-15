@@ -244,7 +244,7 @@ protected:
     //Add 'e' into out-edges of 'vex'
     inline void addOutList(Vertex * vex, Edge * e)
     {
-        ASSERT(m_ec_pool != NULL, ("not yet initialized."));
+        ASSERTN(m_ec_pool != NULL, ("not yet initialized."));
         ASSERT0(vex && e);
         EdgeC * last = NULL;
         for (EdgeC * el = VERTEX_out_list(vex); el != NULL; el = EC_next(el)) {
@@ -258,7 +258,7 @@ protected:
     //Add 'e' into in-edges of 'vex'
     inline void addInList(Vertex * vex, Edge * e)
     {
-        ASSERT(m_ec_pool, ("not yet initialized."));
+        ASSERTN(m_ec_pool, ("not yet initialized."));
         ASSERT0(vex && e);
         EdgeC * last = NULL;
         for (EdgeC * el = VERTEX_in_list(vex); el != NULL; el = EC_next(el)) {
@@ -270,10 +270,10 @@ protected:
     }
 
     virtual void * cloneEdgeInfo(Edge*)
-    { ASSERT(0, ("Target Dependent Code")); return NULL; }
+    { ASSERTN(0, ("Target Dependent Code")); return NULL; }
 
     virtual void * cloneVertexInfo(Vertex*)
-    { ASSERT(0, ("Target Dependent Code")); return NULL; }
+    { ASSERTN(0, ("Target Dependent Code")); return NULL; }
 
     inline Vertex * newVertex()
     {
@@ -286,7 +286,7 @@ protected:
 
     inline Edge * newEdge(UINT from, UINT to)
     {
-        ASSERT(m_ec_pool != NULL, ("not yet initialized."));
+        ASSERTN(m_ec_pool != NULL, ("not yet initialized."));
         Vertex * fp = addVertex(from);
         Vertex * tp = addVertex(to);
         return newEdge(fp, tp);
@@ -310,7 +310,7 @@ protected:
 
     inline EdgeC * newEdgeC(Edge * e)
     {
-        ASSERT(m_ec_pool != NULL, ("not yet initialized."));
+        ASSERTN(m_ec_pool != NULL, ("not yet initialized."));
         if (e == NULL) { return NULL; }
 
         EdgeC * el = m_el_free_list.get_free_elem();
@@ -331,17 +331,17 @@ public:
     void destroy();
     inline Edge * addEdge(UINT from, UINT to)
     {
-        ASSERT(m_ec_pool != NULL, ("not yet initialized."));
+        ASSERTN(m_ec_pool != NULL, ("not yet initialized."));
         return newEdge(from, to);
     }
     inline Edge * addEdge(Vertex * from, Vertex * to)
     {
-        ASSERT(m_ec_pool != NULL, ("not yet initialized."));
+        ASSERTN(m_ec_pool != NULL, ("not yet initialized."));
         return newEdge(from, to);
     }
     inline Vertex * addVertex(UINT vid)
     {
-        ASSERT(m_ec_pool != NULL, ("not yet initialized."));
+        ASSERTN(m_ec_pool != NULL, ("not yet initialized."));
         return m_vertices.append(newVertex(vid));
     }
 
@@ -383,7 +383,7 @@ public:
     //Is there exist a path connect 'from' and 'to'.
     bool is_reachable(UINT from, UINT to) const
     {
-        ASSERT(m_ec_pool != NULL, ("not yet initialized."));
+        ASSERTN(m_ec_pool != NULL, ("not yet initialized."));
         return is_reachable(get_vertex(from), get_vertex(to));
     }
     bool is_reachable(Vertex * from, Vertex * to) const;
@@ -414,7 +414,7 @@ public:
     bool get_neighbor_set(OUT DefSBitSet & niset, UINT vid) const;
     UINT get_degree(UINT vid) const
     {
-        ASSERT(m_ec_pool != NULL, ("not yet initialized."));
+        ASSERTN(m_ec_pool != NULL, ("not yet initialized."));
         return get_degree(get_vertex(vid));
     }
     UINT get_degree(Vertex const* vex) const;
@@ -422,17 +422,17 @@ public:
     UINT get_out_degree(Vertex const* vex) const;
     UINT get_vertex_num() const
     {
-        ASSERT(m_ec_pool != NULL, ("not yet initialized."));
+        ASSERTN(m_ec_pool != NULL, ("not yet initialized."));
         return m_vertices.get_elem_count();
     }
     UINT get_edge_num() const
     {
-        ASSERT(m_ec_pool != NULL, ("not yet initialized."));
+        ASSERTN(m_ec_pool != NULL, ("not yet initialized."));
         return m_edges.get_elem_count();
     }
     inline Vertex * get_vertex(UINT vid) const
     {
-        ASSERT(m_ec_pool != NULL, ("not yet initialized."));
+        ASSERTN(m_ec_pool != NULL, ("not yet initialized."));
         if (m_dense_vertex != NULL) {
             return m_dense_vertex->get(vid);
         }
@@ -442,22 +442,22 @@ public:
     Edge * get_edge(Vertex const* from, Vertex const* to) const;
     Edge * get_first_edge(INT & cur) const
     {
-        ASSERT(m_ec_pool != NULL, ("not yet initialized."));
+        ASSERTN(m_ec_pool != NULL, ("not yet initialized."));
         return m_edges.get_first(cur);
     }
     Edge * get_next_edge(INT & cur) const
     {
-        ASSERT(m_ec_pool != NULL, ("not yet initialized."));
+        ASSERTN(m_ec_pool != NULL, ("not yet initialized."));
         return m_edges.get_next(cur);
     }
     Vertex * get_first_vertex(INT & cur) const
     {
-        ASSERT(m_ec_pool != NULL, ("not yet initialized."));
+        ASSERTN(m_ec_pool != NULL, ("not yet initialized."));
         return m_vertices.get_first(cur);
     }
     Vertex * get_next_vertex(INT & cur) const
     {
-        ASSERT(m_ec_pool != NULL, ("not yet initialized."));
+        ASSERTN(m_ec_pool != NULL, ("not yet initialized."));
         return m_vertices.get_next(cur);
     }
 
@@ -469,7 +469,7 @@ public:
     Vertex * removeVertex(Vertex * vex);
     Vertex * removeVertex(UINT vid)
     {
-        ASSERT(m_ec_pool != NULL, ("not yet initialized."));
+        ASSERTN(m_ec_pool != NULL, ("not yet initialized."));
         return removeVertex(get_vertex(vid));
     }
     void removeTransitiveEdge();
@@ -477,12 +477,12 @@ public:
     bool sortInToplogOrder(OUT Vector<UINT> & vex_vec, bool is_topdown);
     void set_unique(bool is_unique)
     {
-        ASSERT(m_ec_pool != NULL, ("not yet initialized."));
+        ASSERTN(m_ec_pool != NULL, ("not yet initialized."));
         m_is_unique = (BYTE)is_unique;
     }
     void set_direction(bool has_direction)
     {
-        ASSERT(m_ec_pool != NULL, ("not yet initialized."));
+        ASSERTN(m_ec_pool != NULL, ("not yet initialized."));
         m_is_direction = (BYTE)has_direction;
     }
     void set_dense(bool is_dense)

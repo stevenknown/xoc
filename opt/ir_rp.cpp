@@ -537,7 +537,7 @@ void IR_RP::computeGlobalLiveness()
         }
         count++;
     } while (change && count < 220);
-    ASSERT(!change, ("result of equation is convergent slowly"));
+    ASSERTN(!change, ("result of equation is convergent slowly"));
     news.clean(*m_misc_bs_mgr);
 }
 
@@ -1123,7 +1123,7 @@ void IR_RP::handleRestore2Mem(
         switch (delegate->getCode()) {
         case IR_ARRAY:
         case IR_STARRAY: {
-            ASSERT(delegate->getOffset() == 0, ("TODO: not yet support."));
+            ASSERTN(delegate->getOffset() == 0, ("TODO: not yet support."));
 
             //Prepare base and subscript expression list.
             IR * base = m_ru->dupIRTree(ARR_base(delegate));
@@ -1757,7 +1757,7 @@ void IR_RP::computeOuterDefUse(
     if (ref->is_ild() || ref->is_ld() || ref->is_array()) {
         //ref is USE.
 
-        ASSERT(ref->getSSAInfo() == NULL, ("should not have SSA du"));
+        ASSERTN(ref->getSSAInfo() == NULL, ("should not have SSA du"));
 
         DUSet * defset = delegate2def.get(delegate);
         DUSet const* refduset = ref->readDUSet();
@@ -2162,7 +2162,7 @@ bool IR_RP::perform(OptCtx & oc)
         m_ssamgr = ssamgr;
     }
 
-    ASSERT(m_ssamgr == NULL,
+    ASSERTN(m_ssamgr == NULL,
         ("TODO: Do SSA renaming when after register promotion done"));
 
     LI<IRBB> const* li = m_cfg->getLoopInfo();

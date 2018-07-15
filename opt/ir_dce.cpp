@@ -249,7 +249,7 @@ bool IR_DCE::find_effect_kid(IN IRBB * bb,
             while (ecs != NULL) {
                 INT cd_succ = VERTEX_id(EDGE_to(EC_edge(ecs)));
                 IRBB * succ = m_cfg->getBB(cd_succ);
-                ASSERT(succ, ("BB%d does not on CFG", cd_succ));
+                ASSERTN(succ, ("BB%d does not on CFG", cd_succ));
                 for (IR * r = BB_irlist(succ).get_head();
                      r != NULL; r = BB_irlist(succ).get_next()) {
                     if (is_stmt_effect.is_contain(IR_id(r))) {

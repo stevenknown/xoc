@@ -122,7 +122,7 @@ public:
 
     void set(BaseAttachInfo * c)
     {
-        ASSERT(c, ("Can not set empty AI"));
+        ASSERTN(c, ("Can not set empty AI"));
 
         INT emptyslot = -1;
         if (!cont.is_init()) { cont.init(); }

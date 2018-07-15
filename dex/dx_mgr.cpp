@@ -548,7 +548,7 @@ void DX_MGR::dump_dx(DXC const& dc, FILE * h, INT ofst)
         fprintf(h, "v%u, %llu", dc.vA, dc.vB_wide);
         break;
     default:
-        ASSERT(0, ("Unknown dex format"));
+        ASSERTN(0, ("Unknown dex format"));
         return;
     } //end switch
     fflush(h);
@@ -679,7 +679,7 @@ void DX_MGR::decode_dx(USHORT const* cptr, IN OUT DXC & dc)
             case 2: dc.arg[1] = (reglist >> 4) & 0x0f;
             case 1: dc.vC = dc.arg[0] = reglist & 0x0f; break;
             case 0: break;
-            default: ASSERT(0, ("Invalid arg count"));
+            default: ASSERTN(0, ("Invalid arg count"));
             }
         }
         break;
@@ -705,7 +705,7 @@ void DX_MGR::decode_dx(USHORT const* cptr, IN OUT DXC & dc)
         dc.vB_wide = FETCH_uint32(1) | ((ULONGLONG)FETCH_uint32(3) << 32);
         break;
     default:
-        ASSERT(0, ("Unknown dex format"));
+        ASSERTN(0, ("Unknown dex format"));
     } //end switch
 }
 

@@ -802,7 +802,7 @@ void d2rMethod(
             UInt32 width = gDIROpcodeInfo.widths[opcode];
 
             positionMap.posMap[instrCount] = dexOffset;
-            ASSERT(instrCount < insnum,
+            ASSERTN(instrCount < insnum,
                    ("instrCount overflowed, may be the DEX file is encrypted"));
 
             codePtr += width;

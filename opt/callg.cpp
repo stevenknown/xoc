@@ -79,7 +79,7 @@ void CallGraph::dump_vcg(CHAR const* name, INT flag)
     }
     UNLINK(name);
     FILE * h = fopen(name, "a+");
-    ASSERT(h != NULL, ("%s create failed!!!",name));
+    ASSERTN(h != NULL, ("%s create failed!!!",name));
 
     bool dump_src_line = HAVE_FLAG(flag, CALLG_DUMP_SRC_LINE);
     bool dump_ir_detail = HAVE_FLAG(flag, CALLG_DUMP_IR);
@@ -228,7 +228,7 @@ CallNode * CallGraph::newCallNode(Region * rg)
     if (rg->is_program()) {
         CallNode * cn = mapRegion2CallNode(rg);
         if (cn != NULL) {
-            ASSERT(CN_ru(cn) == rg, ("more than 2 rg with same id"));
+            ASSERTN(CN_ru(cn) == rg, ("more than 2 rg with same id"));
             return cn;
         }
 

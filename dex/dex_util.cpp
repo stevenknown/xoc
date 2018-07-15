@@ -327,7 +327,7 @@ void extractFunctionTypeFromFunctionTypeString(
     ASSERT0(functype && param_type && return_type);
 
     UINT l = strlen(functype);
-    ASSERT(l > 0, ("unsupport string pattern"));
+    ASSERTN(l > 0, ("unsupport string pattern"));
 
     CHAR const* start = functype;
     CHAR const* end = functype + l - 1;
@@ -338,7 +338,7 @@ void extractFunctionTypeFromFunctionTypeString(
     CHAR const* end2 = NULL;
     for (; l > 0; l--, p++) {
         if (*p == '(') {
-            ASSERT(start2 == NULL, ("unsupport string pattern"));
+            ASSERTN(start2 == NULL, ("unsupport string pattern"));
             start2 = p;
         } else if (*p == ')') {
             end2 = p;
@@ -349,7 +349,7 @@ void extractFunctionTypeFromFunctionTypeString(
         }
     }
 
-    ASSERT(end2, ("unsupport string pattern"));
+    ASSERTN(end2, ("unsupport string pattern"));
 
     UINT s = end - end2;
     ::memcpy(return_type, end2 + 1, s);
@@ -370,7 +370,7 @@ void extractFunctionTypeFromRegionName(
     ASSERT0(runame);
     Vector<CHAR*> ret;
     UINT num = xsplit(runame, ret, ":");
-    ASSERT(num == NUM_OF_PART, ("You may be input builtin function name"));
+    ASSERTN(num == NUM_OF_PART, ("You may be input builtin function name"));
 
     if (classpath != NULL) {
         UINT l = strlen(ret[CLASSPATH_PART]);
@@ -393,7 +393,7 @@ void extractFunctionTypeFromRegionName(
     UINT len = 0;
     for (CHAR const* p = typestr; *p != 0; p++, len++) {
         if (*p == '(') {
-            ASSERT(start == NULL, ("unsupport string pattern"));
+            ASSERTN(start == NULL, ("unsupport string pattern"));
             start = p;
         } else if (*p == ')') {
             end = p;
@@ -407,7 +407,7 @@ void extractFunctionTypeFromRegionName(
         }
     }
 
-    ASSERT(end, ("unsupport string pattern"));
+    ASSERTN(end, ("unsupport string pattern"));
 
     UINT s = ::strlen(typestr) - len;
     if (return_type != NULL) {
@@ -455,7 +455,7 @@ UINT printType2Buffer(CHAR const* type_string, OUT CHAR * buf)
         len--; //omit L
         break;
     case '[': break;
-    default: ASSERT(0, ("unknown dex type"));
+    default: ASSERTN(0, ("unknown dex type"));
     }
 
     if (buf != NULL) {
@@ -558,7 +558,7 @@ UINT extractSeparateParamterType(
                 ASSERT0(end != 0);
                 continue;
             default:
-                ASSERT(is_obj,
+                ASSERTN(is_obj,
                 ("Not match any case, it is also not an object"));
                 break;
             }
@@ -1266,7 +1266,7 @@ void dump_lir2(LIR * lir, DexFile * df, INT pos)
             UINT flags = LIR_dt(lir);
             UINT flag1 = flags & 0x0F;
             UINT flag2 = flags & 0xF0;
-            ASSERT(flag1 != 0, ("means LIR is LOP_FILLED_NEW_ARRAY"));
+            ASSERTN(flag1 != 0, ("means LIR is LOP_FILLED_NEW_ARRAY"));
             DexMethodId const* method_id = dexGetMethodId(df, r->ref);
             ASSERT0(method_id);
             CHAR const* method_name = dexStringById(df, method_id->nameIdx);
@@ -1503,7 +1503,7 @@ void dump_all_class_and_field(DexFile * df)
 
         //Dump class name.
         DexClassDef const* class_info = dexGetClassDef(df, i);
-        //ASSERT(i == class_info->classIdx, ("they might be equal"));
+        //ASSERTN(i == class_info->classIdx, ("they might be equal"));
         //CHAR const* class_name = dexStringByTypeIdx(df, class_info->classIdx);
         //ASSERT0(class_name);
         fprintf(g_tfile, "source file:%s", getClassSourceFilePath(df, class_info));

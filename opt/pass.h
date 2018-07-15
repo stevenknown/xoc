@@ -49,13 +49,13 @@ public:
 
     virtual CHAR const* getPassName() const
     {
-        ASSERT(0, ("Optimization Dependent Code"));
+        ASSERTN(0, ("Optimization Dependent Code"));
         return NULL;
     }
 
     virtual PASS_TYPE getPassType() const
     {
-        ASSERT(0, ("Optimization Dependent Code"));
+        ASSERTN(0, ("Optimization Dependent Code"));
         return PASS_UNDEF;
     }
 
@@ -63,7 +63,7 @@ public:
 
     virtual bool perform(OptCtx &)
     {
-        ASSERT(0, ("Optimization Dependent Code"));
+        ASSERTN(0, ("Optimization Dependent Code"));
         return false;
     }
 };

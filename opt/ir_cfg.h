@@ -90,7 +90,7 @@ public:
     inline void add_bb(IRBB * bb)
     {
         ASSERT0(bb && m_bb_vec.get(BB_id(bb)) == NULL);
-        ASSERT(BB_id(bb) != 0, ("bb id should start at 1"));
+        ASSERTN(BB_id(bb) != 0, ("bb id should start at 1"));
         m_bb_vec.set(BB_id(bb), bb);
         addVertex(BB_id(bb));
     }

@@ -126,7 +126,7 @@ static bool process_o(UINT argc, CHAR const* argv[], IN OUT UINT & i)
     i += 2;
     g_output_file_handler = open(output, O_RDWR|O_CREAT, 0666);
     if (g_output_file_handler < 0) {
-        ASSERT(0, ("can not open %s, errno:%d, errstring is %s",
+        ASSERTN(0, ("can not open %s, errno:%d, errstring is %s",
                    output, errno, strerror(errno)));
         return false;
     }
