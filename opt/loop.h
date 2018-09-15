@@ -84,11 +84,11 @@ public:
                     //indicates a natural loop.
     xcom::BitSet * bb_set; //loop body elements
 
-    bool is_loop_reduction() { return !has_early_exit; }
+    bool isLoopReduction() { return !has_early_exit; }
 
     //Return true if bb is belong to current loop.
     //'bbid': id of BB.
-    bool is_inside_loop(UINT bbid) const
+    bool isInsideLoop(UINT bbid) const
     { return LI_bb_set(this)->is_contain(bbid); }
 };
 

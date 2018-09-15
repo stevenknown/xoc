@@ -100,7 +100,7 @@ bool IR_LICM::scanOpnd(
                     ASSERT0(def->isWritePR() || def->isCallHasRetVal());
 
                     if (!invariant_stmt.find(const_cast<IR*>(def)) &&
-                        li->is_inside_loop(BB_id(def->getBB()))) {
+                        li->isInsideLoop(BB_id(def->getBB()))) {
                         is_cand = false;
                         break;
                     }
@@ -117,7 +117,7 @@ bool IR_LICM::scanOpnd(
                     IR const* d = m_ru->getIR(i2);
                     ASSERT0(d->getBB() && d->is_stmt());
                     if (!invariant_stmt.find(const_cast<IR*>(d)) &&
-                        li->is_inside_loop(BB_id(d->getBB()))) {
+                        li->isInsideLoop(BB_id(d->getBB()))) {
                         is_cand = false;
                         break;
                     }
@@ -457,7 +457,7 @@ bool IR_LICM::is_stmt_dom_its_use(
 {
     IR const* ustmt = use->getStmt();
     UINT ubbid = BB_id(ustmt->getBB());
-    if (!li->is_inside_loop(ubbid)) { return true; }
+    if (!li->isInsideLoop(ubbid)) { return true; }
 
     UINT stmtbbid = BB_id(stmtbb);
     if ((stmtbbid != ubbid && m_cfg->is_dom(stmtbbid, ubbid)) ||
@@ -590,14 +590,14 @@ bool IR_LICM::checkDefStmt(
     IRBB * dbb = def->getBB();
     ASSERT0(dbb);
     if (invariant_stmt.find(def)) {
-        if (!li->is_inside_loop(BB_id(dbb)) ||
+        if (!li->isInsideLoop(BB_id(dbb)) ||
             hoistInvariantStmt(invariant_stmt, def, prehead, li)) {
             return true;
         }
         return false;
     }
 
-    if (li->is_inside_loop(BB_id(dbb))) {
+    if (li->isInsideLoop(BB_id(dbb))) {
         return false;
     }
 

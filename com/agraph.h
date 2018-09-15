@@ -81,7 +81,7 @@ public:
 
     UINT count_mem() const
     {
-        UINT count = Graph::count_mem();
+        UINT count = (UINT)Graph::count_mem();
         if (m_spath_mat != NULL) {
             count += m_spath_mat->count_mem();
         }

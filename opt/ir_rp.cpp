@@ -582,7 +582,7 @@ bool IR_RP::checkExpressionIsLoopInvariant(IN IR * ir, LI<IRBB> const* li)
                 IRBB * defbb = ssainfo->get_def()->getBB();
                 ASSERT0(defbb);
 
-                if (li->is_inside_loop(BB_id(defbb))) {
+                if (li->isInsideLoop(BB_id(defbb))) {
                     return false;
                 }
             }
@@ -599,7 +599,7 @@ bool IR_RP::checkExpressionIsLoopInvariant(IN IR * ir, LI<IRBB> const* li)
             ASSERT0(defstmt->is_stmt());
             IRBB * bb = defstmt->getBB();
 
-            if (li->is_inside_loop(BB_id(bb))) { return false; }
+            if (li->isInsideLoop(BB_id(bb))) { return false; }
         }
 
         return true;
@@ -1047,12 +1047,12 @@ IRBB * IR_RP::findSingleExitBB(LI<IRBB> const* li)
         if (z->isConditionalBr()) {
             ASSERT0(succs.get_elem_count() == 2);
             IRBB * succ = succs.get_head();
-            if (!li->is_inside_loop(BB_id(succ))) {
+            if (!li->isInsideLoop(BB_id(succ))) {
                 return succ;
             }
 
             succ = succs.get_next();
-            if (!li->is_inside_loop(BB_id(succ))) {
+            if (!li->isInsideLoop(BB_id(succ))) {
                 return succ;
             }
 
@@ -1388,7 +1388,7 @@ bool IR_RP::hasLoopOutsideUse(IR const* stmt, LI<IRBB> const* li)
         ASSERT0(u->getStmt());
         IR * s = u->getStmt();
         ASSERT0(s->getBB());
-        if (!li->is_inside_loop(BB_id(s->getBB()))) {
+        if (!li->isInsideLoop(BB_id(s->getBB()))) {
             return true;
         }
     }
@@ -1772,7 +1772,7 @@ void IR_RP::computeOuterDefUse(
                  i >= 0; i = refduset->get_next(i, &di)) {
                 IR const* d = m_ru->getIR(i);
                 ASSERT0(d->is_stmt());
-                if (!li->is_inside_loop(BB_id(d->getBB()))) {
+                if (!li->isInsideLoop(BB_id(d->getBB()))) {
                     defset->bunion(i, *sbs_mgr);
                 }
             }
@@ -1793,7 +1793,7 @@ void IR_RP::computeOuterDefUse(
                  i >= 0; i = refduset->get_next(i, &di)) {
                 IR const* u = m_ru->getIR(i);
                 ASSERT0(u->is_exp());
-                if (!li->is_inside_loop(BB_id(u->getStmt()->getBB()))) {
+                if (!li->isInsideLoop(BB_id(u->getStmt()->getBB()))) {
                     set->bunion(i, *sbs_mgr);
                 }
             }

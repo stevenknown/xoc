@@ -37,14 +37,14 @@ namespace xoc {
 
 DbxMgr * g_dbx_mgr = NULL;
 
-void set_lineno(IR * ir, UINT lineno, Region * rg)
+void setLineNum(IR * ir, UINT lineno, Region * rg)
 {
     DbxAttachInfo * da;
     ASSERT0(rg);
     if (IR_ai(ir) == NULL) {
         IR_ai(ir) = rg->allocAIContainer();
         da = (DbxAttachInfo*)smpoolMalloc(
-                        sizeof(DbxAttachInfo), rg->get_pool());
+            sizeof(DbxAttachInfo), rg->get_pool());
         ASSERT0(da);
         da->init();
         IR_ai(ir)->set((BaseAttachInfo*)da);
@@ -53,7 +53,7 @@ void set_lineno(IR * ir, UINT lineno, Region * rg)
         da = (DbxAttachInfo*)IR_ai(ir)->get(AI_DBX);
         if (da == NULL) {
             da = (DbxAttachInfo*)smpoolMalloc(
-                        sizeof(DbxAttachInfo), rg->get_pool());
+                sizeof(DbxAttachInfo), rg->get_pool());
             ASSERT0(da);
             da->init();
             ASSERT0(da);
@@ -65,7 +65,7 @@ void set_lineno(IR * ir, UINT lineno, Region * rg)
 
 
 //Get line number in source code that corresponding to the IR.
-UINT get_lineno(IR const* ir)
+UINT getLineNum(IR const* ir)
 {
     if (IR_ai(ir) == NULL || !IR_ai(ir)->is_init()) { return 0; }
     DbxAttachInfo * da = (DbxAttachInfo*)IR_ai(ir)->get(AI_DBX);
@@ -76,7 +76,7 @@ UINT get_lineno(IR const* ir)
 
 
 //Get line number in source code.
-UINT get_lineno(Dbx const* dbx)
+UINT getLineNum(Dbx const* dbx)
 {
     return DBX_lineno(dbx);
 }
@@ -111,7 +111,7 @@ void copyDbx(IR * tgt, IR const* src, Region * rg)
 }
 
 
-Dbx * get_dbx(IR const* ir)
+Dbx * getDbx(IR const* ir)
 {
     if (IR_ai(ir) == NULL) { return NULL; }
     DbxAttachInfo * da = (DbxAttachInfo*)IR_ai(ir)->get(AI_DBX);
@@ -127,7 +127,7 @@ void DbxMgr::printSrcLine(IR const* ir)
 {
     if (g_tfile == NULL) { return; }
     if (!ir->is_stmt()) { return; }
-    Dbx * dbx = ::get_dbx(ir);
+    Dbx * dbx = ::getDbx(ir);
     if (dbx != NULL) {
         printSrcLine(dbx);
     }

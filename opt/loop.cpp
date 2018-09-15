@@ -82,7 +82,7 @@ IRBB * findSingleBackedgeStartBB(LI<IRBB> const* li, IR_CFG * cfg)
     while (ec != NULL) {
         backedgecount++;
         UINT pred = VERTEX_id(EDGE_from(EC_edge(ec)));
-        if (li->is_inside_loop(pred)) {
+        if (li->isInsideLoop(pred)) {
             backedgebbid = pred;
         }
         ec = EC_next(ec);

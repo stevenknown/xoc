@@ -103,7 +103,7 @@ bool IR_IVR::findInitVal(IV * iv)
     LI<IRBB> const* li = IV_li(iv);
     ASSERT0(li);
     IRBB * dbb = domdef->getBB();
-    if (dbb == LI_loop_head(li) || !li->is_inside_loop(BB_id(dbb))) {
+    if (dbb == LI_loop_head(li) || !li->isInsideLoop(BB_id(dbb))) {
         return computeInitVal(domdef, iv);
     }
     return false;
@@ -354,7 +354,7 @@ bool IR_IVR::is_loop_invariant(LI<IRBB> const* li, IR const* ir)
     for (INT i = defs->get_first(&di); i >= 0; i = defs->get_next(i, &di)) {
         IR const* d = m_ru->getIR(i);
         ASSERT0(d->is_stmt() && d->getBB());
-        if (li->is_inside_loop(BB_id(d->getBB()))) {
+        if (li->isInsideLoop(BB_id(d->getBB()))) {
             return false;
         }
     }

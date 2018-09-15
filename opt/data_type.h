@@ -118,19 +118,19 @@ Type const* checkType(Type const* ty, DATA_TYPE dt);
 #define WORD_BITSIZE    GENERAL_REGISTER_SIZE * BIT_PER_BYTE
 
 //Data Type Descriptor.
-#define TY_dtype(d)           ((d)->data_type)
+#define TY_dtype(d)         ((d)->data_type)
 
 //Indicate the pointer base size.
-#define TY_ptr_base_size(d)   (((PointerType*)CK_TY(d, D_PTR))->pointer_base_size)
+#define TY_ptr_base_size(d) (((PointerType*)CK_TY(d, D_PTR))->pointer_base_size)
 
 //Indicate the size of memory chunk.
-#define TY_mc_size(d)         (((MCType*)CK_TY(d, D_MC))->mc_size)
+#define TY_mc_size(d)       (((MCType*)CK_TY(d, D_MC))->mc_size)
 
 //Indicate the total byte size of whole vector.
-#define TY_vec_size(d)        (((VectorType*)CK_TY(d, D_VEC))->total_vector_size)
+#define TY_vec_size(d)      (((VectorType*)CK_TY(d, D_VEC))->total_vector_size)
 
 //Indicate the vector element size.
-#define TY_vec_ety(d)         (((VectorType*)CK_TY(d, D_VEC))->vector_elem_type)
+#define TY_vec_ety(d)       (((VectorType*)CK_TY(d, D_VEC))->vector_elem_type)
 
 //Date Type Description.
 class Type {

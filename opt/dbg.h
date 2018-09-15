@@ -68,10 +68,10 @@ extern DbxMgr * g_dbx_mgr;
 
 //Copy Dbx from src.
 void copyDbx(IR * tgt, IR const* src, Region * rg);
-void set_lineno(IR * ir, UINT lineno, Region * rg);
-UINT get_lineno(IR const* ir);
-UINT get_lineno(Dbx const* dbx);
-Dbx * get_dbx(IR const* ir);
+void setLineNum(IR * ir, UINT lineno, Region * rg);
+UINT getLineNum(IR const* ir);
+UINT getLineNum(Dbx const* dbx);
+Dbx * getDbx(IR const* ir);
 
 } //namespace xoc
 #endif

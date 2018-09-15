@@ -361,6 +361,7 @@ protected:
 
     bool evaluateFromLda(IR const* ir);
 
+    bool isInLoop(IR const* ir);
     bool isFlowSensitiveProperly();
     void initEntryPtset(PtPairSet ** ptset_arr);
     void initGlobalAndParameterVarPtset(

@@ -65,7 +65,7 @@ bool IR_LOOP_CVT::is_while_do(LI<IRBB> const* li, OUT IRBB ** gobackbb,
     bool f = findTwoSuccessorBBOfLoopHeader(li, m_cfg, succ1, succ2);
     if (!f) { return false; }
 
-    if (li->is_inside_loop(*succ1) && li->is_inside_loop(*succ2)) {
+    if (li->isInsideLoop(*succ1) && li->isInsideLoop(*succ2)) {
         return false;
     }
     return true;
@@ -79,13 +79,13 @@ bool IR_LOOP_CVT::try_convert(LI<IRBB> * li, IRBB * gobackbb,
 
     IRBB * loopbody_start_bb;
     IRBB * epilog;
-    if (li->is_inside_loop(succ1)) {
-        ASSERT0(!li->is_inside_loop(succ2));
+    if (li->isInsideLoop(succ1)) {
+        ASSERT0(!li->isInsideLoop(succ2));
         loopbody_start_bb = m_cfg->getBB(succ1);
         epilog = m_cfg->getBB(succ2);
     } else {
-        ASSERT0(li->is_inside_loop(succ2));
-        ASSERT0(!li->is_inside_loop(succ1));
+        ASSERT0(li->isInsideLoop(succ2));
+        ASSERT0(!li->isInsideLoop(succ1));
         loopbody_start_bb = m_cfg->getBB(succ2);
         epilog = m_cfg->getBB(succ1);
     }
@@ -123,7 +123,7 @@ bool IR_LOOP_CVT::try_convert(LI<IRBB> * li, IRBB * gobackbb,
             if (x->isReadPR() && PR_ssainfo(x) != NULL) {
                 IR * def = SSA_def(PR_ssainfo(x));
                 if (def != NULL &&
-                    li->is_inside_loop(BB_id(def->getBB()))) {
+                    li->isInsideLoop(BB_id(def->getBB()))) {
                     rmvec.set(cnt++, def);
                 }
             } else {
@@ -135,7 +135,7 @@ bool IR_LOOP_CVT::try_convert(LI<IRBB> * li, IRBB * gobackbb,
                     IR * def = m_ru->getIR(d);
 
                     ASSERT0(def->getBB());
-                    if (li->is_inside_loop(BB_id(def->getBB()))) {
+                    if (li->isInsideLoop(BB_id(def->getBB()))) {
                         rmvec.set(cnt++, def);
                     }
                 }

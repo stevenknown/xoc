@@ -1143,35 +1143,52 @@ void IR_AA::inferPtArith(
             return;
         }
     }
-
-    //Pointer arithmetic causes ambiguous memory access.
-    //e.g: while (...) { p = p+1 }
-    //Where is p pointing to at all?
-    //Set each MD of opnd0 to be UNBOUND even if it is exact
-    //to keep the conservation.
+    
     ASSERTN(mds.is_empty(), ("output buffer not yet initialized"));
-
     if (opnd0_mds.is_empty()) {
         //Point-to set of opnd0 of binary-op is MayPointToSet.
         ASSERT0(AC_returned_pts(opnd0_ic));
         return;
     }
 
-    SEGIter * iter;
-    for (INT i = opnd0_mds.get_first(&iter);
-         i >= 0; i = opnd0_mds.get_next((UINT)i, &iter)) {
-        MD * imd = m_md_sys->getMD((UINT)i);
-        if (imd->is_exact()) {
-            MD x(*imd);
-            MD_ty(&x) = MD_UNBOUND;
-            MD const* entry = m_md_sys->registerMD(x);
-            ASSERT0(MD_id(entry) > 0);
-            mds.bunion_pure(MD_id(entry), *m_misc_bs_mgr);
-            continue;
+    if (isInLoop(ir->getStmt())) {
+        //Pointer arithmetic causes ambiguous memory access.
+        //e.g: while (...) { p = p+1 }
+        //Where is p pointing to at all?
+        //Set each MD of opnd0 to be UNBOUND even if it is exact
+        //to keep the conservation.
+        SEGIter * iter;
+        for (INT i = opnd0_mds.get_first(&iter);
+             i >= 0; i = opnd0_mds.get_next((UINT)i, &iter)) {
+            MD * imd = m_md_sys->getMD((UINT)i);
+            if (imd->is_exact()) {
+                MD x(*imd);
+                MD_ty(&x) = MD_UNBOUND;
+                MD const* entry = m_md_sys->registerMD(x);
+                ASSERT0(MD_id(entry) > 0);
+                mds.bunion_pure(MD_id(entry), *m_misc_bs_mgr);
+                continue;
+            }
+            mds.bunion(imd, *m_misc_bs_mgr);
         }
-
-        mds.bunion(imd, *m_misc_bs_mgr);
     }
+}
+
+
+bool IR_AA::isInLoop(IR const* ir)
+{
+    ASSERT0(ir && ir->is_stmt());
+    IRBB * bb = ir->getBB();
+    ASSERT0(bb);
+    LI<IRBB> const* li = m_cfg->getLoopInfo();
+
+    //Only have to check the outermost loop body.
+    for (; li != NULL; li = LI_next(li)) {
+        if (li->isInsideLoop(bb->id())) {
+            return true;
+        }
+    }
+    return false;
 }
 
 

@@ -469,11 +469,11 @@ void CFG<BB, XR>::getKidOfLoop(
     ASSERT0(succs.get_elem_count() == 2);
     BB * s = succs.get_head();
     if (sibling != NULL) {
-        *sibling = li->is_inside_loop(s->id()) ? succs.get_tail() : s;
+        *sibling = li->isInsideLoop(s->id()) ? succs.get_tail() : s;
     }
 
     if (body_root != NULL) {
-        *body_root = li->is_inside_loop(s->id()) ? s : succs.get_tail();
+        *body_root = li->isInsideLoop(s->id()) ? s : succs.get_tail();
     }
 }
 
