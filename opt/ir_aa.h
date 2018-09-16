@@ -345,11 +345,6 @@ protected:
     MD const* allocGetelemMD(IR * ir);
     MD const* allocStringMD(SYM const* string);
 
-    bool computeConstOffset(
-            IR const* ir,
-            IR const* opnd1,
-            IN OUT MDSet & mds,
-            IN OUT MDSet & opnd0_mds);
     void convertPT2MD2MDSet(
             PtPairSet const& pps,
             IN PtPairMgr & pt_pair_mgr,
@@ -358,6 +353,7 @@ protected:
             OUT PtPairSet & pps,
             IN PtPairMgr & pt_pair_mgr,
             IN MD2MDSet * mx);
+    void convertExact2Unbound(MDSet const* src, MDSet * tgt);
 
     bool evaluateFromLda(IR const* ir);
 
@@ -452,6 +448,11 @@ protected:
             IN OUT AACtx * ic,
             IN OUT MD2MDSet * mx);
 
+    bool tryComputeConstOffset(
+            IR const* ir,
+            IR const* opnd1,
+            IN OUT MDSet & mds,
+            IN OUT MDSet & opnd0_mds);
     void recomputeDataType(AACtx const& ic, IR const* ir, OUT MDSet & pts);
     void reviseMDsize(IN OUT MDSet & mds, UINT size);
 

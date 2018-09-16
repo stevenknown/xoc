@@ -175,6 +175,7 @@ void MDSSAMgr::dump()
         for (IR * ir = BB_first_ir(bb);
              ir != NULL; ir = BB_next_ir(bb)) {
             dump_ir(ir, m_tm);
+            ir->dumpRef(m_ru, g_indent);
 
             bool parting_line = false;
             //Result
@@ -1854,8 +1855,6 @@ bool MDSSAMgr::construction(DomTree & domtree)
     //Clean version stack after renaming.
     cleanMD2Stack();
 
-    dump();
-    dumpDUChain();
 
     ASSERT0(verify());
     ASSERT0(verifyIRandBB(m_ru->getBBList(), m_ru));

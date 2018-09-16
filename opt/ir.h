@@ -437,6 +437,8 @@ public:
         }
     }
 
+    void dumpRef(Region * ru, UINT indent);
+
     //Clean all DU-Chain and Defined/Used-MD reference info.
     inline void freeDUset(DefMiscBitSetMgr & sbs_mgr)
     {

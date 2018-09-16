@@ -1042,7 +1042,7 @@ END:
 //Return true if the offset can be confirmed via
 //simply calculation, and has been determined by this function.
 //Return false if caller need to keep evaluating the offset.
-bool IR_AA::computeConstOffset(
+bool IR_AA::tryComputeConstOffset(
     IR const* ir,
     IR const* opnd1,
     IN OUT MDSet & mds,
@@ -1066,45 +1066,43 @@ bool IR_AA::computeConstOffset(
     }
 
     mds.clean(*m_misc_bs_mgr);
-    if (BIN_opnd0(ir)->is_lda() || evaluateFromLda(BIN_opnd0(ir))) {
-        //In the case: LDA(x) + ofst, we can determine
-        //the value of LDA(x) is constant.
-        //Keep offset validation unchanged.
-        SEGIter * iter;
-        for (INT i = opnd0_mds.get_first(&iter);
-             i >= 0; i = opnd0_mds.get_next((UINT)i, &iter)) {
-            MD * imd = m_md_sys->getMD((UINT)i);
-            if (imd->is_exact()) {
-                MD const* entry = NULL;
-                MD x(*imd);
-                if (ir->is_add()) {
-                    //In the case: LDA(x) + ofst, we can determine
-                    //the value of LDA(x) is constant.
-                    ; //Keep offset validation unchanged.
-                    MD_ofst(&x) += (UINT)const_offset;
-                    entry = m_md_sys->registerMD(x);
-                    ASSERT0(MD_id(entry) > 0);
-                } else {
-                    //case: &x - ofst.
-                    //Keep offset validation unchanged.
-                    INT s = (INT)MD_ofst(&x);
-                    s -= (INT)const_offset;
-                    if (s < 0) {
-                        MD_ty(&x) = MD_UNBOUND;
-                        MD_size(&x) = 0;
-                        MD_ofst(&x) = 0;
-                    }
-                    entry = m_md_sys->registerMD(x);
-                    ASSERT0(MD_id(entry) > 0);
-                }
-                mds.bunion(entry, *m_misc_bs_mgr);
-            } else {
-                mds.bunion(imd, *m_misc_bs_mgr);
-            }
+ 
+    //In the case: LDA(x) + ofst, we can determine
+    //the value of LDA(x) is constant.
+    //Keep offset validation unchanged.
+    SEGIter * iter;
+    for (INT i = opnd0_mds.get_first(&iter);
+         i >= 0; i = opnd0_mds.get_next((UINT)i, &iter)) {
+        MD * imd = m_md_sys->getMD((UINT)i);
+        if (!imd->is_exact()) {
+            mds.bunion(imd, *m_misc_bs_mgr);
+            continue;
         }
-        return true;
+        MD const* entry = NULL;
+        MD x(*imd);
+        if (ir->is_add()) {
+            //In the case: LDA(x) + ofst, we can determine
+            //the value of LDA(x) is constant.
+            ; //Keep offset validation unchanged.
+            MD_ofst(&x) += (UINT)const_offset;
+            entry = m_md_sys->registerMD(x);
+            ASSERT0(MD_id(entry) > 0);
+        } else {
+            //case: &x - ofst.
+            //Keep offset validation unchanged.
+            INT s = (INT)MD_ofst(&x);
+            s -= (INT)const_offset;
+            if (s < 0) {
+                MD_ty(&x) = MD_UNBOUND;
+                MD_size(&x) = 0;
+                MD_ofst(&x) = 0;
+            }
+            entry = m_md_sys->registerMD(x);
+            ASSERT0(MD_id(entry) > 0);
+        }
+        mds.bunion(entry, *m_misc_bs_mgr);
     }
-    return false;
+    return true;
 }
 
 
@@ -1123,26 +1121,26 @@ void IR_AA::inferPtArith(
 {
     ASSERT0(ir->is_add() || ir->is_sub());
     IR * opnd1 = BIN_opnd1(ir);
-    if (((opnd1->is_const() && opnd1->is_int()) || opnd1->is_pr()) &&
-        computeConstOffset(ir, opnd1, mds, opnd0_mds)) {
+    if ((BIN_opnd0(ir)->is_lda() || evaluateFromLda(BIN_opnd0(ir))) &&
+        tryComputeConstOffset(ir, opnd1, mds, opnd0_mds)) {
         return;
-    } else {
-        //Generate MD expression for opnd1.
-        AACtx opnd1_tic(*opnd0_ic);
-        opnd1_tic.cleanBottomUpFlag();
-        AC_comp_pt(&opnd1_tic) = false; //PointToSet of addon is useless.
-        inferExpression(opnd1, mds, &opnd1_tic, mx);
-
-        //Bottom-up flag of opnd1 is useless to its parent.
-
-        mds.clean(*m_misc_bs_mgr);
-        if (AC_has_comp_lda(&opnd1_tic) && AC_has_comp_lda(opnd0_ic)) {
-            //In the situation such as: &a - &b.
-            ASSERTN(ir->is_sub(), ("only support pointer sub pointer"));
-            AC_has_comp_lda(opnd0_ic) = false;
-            return;
-        }
     }
+    
+    //Generate MD expression for opnd1.
+    AACtx opnd1_tic(*opnd0_ic);
+    opnd1_tic.cleanBottomUpFlag();
+    AC_comp_pt(&opnd1_tic) = false; //PointToSet of addon is useless.
+    inferExpression(opnd1, mds, &opnd1_tic, mx);
+
+    //Bottom-up flag of opnd1 is useless to its parent.
+
+    mds.clean(*m_misc_bs_mgr);
+    if (AC_has_comp_lda(&opnd1_tic) && AC_has_comp_lda(opnd0_ic)) {
+        //In the situation such as: &a - &b.
+        ASSERTN(ir->is_sub(), ("only support pointer sub pointer"));
+        AC_has_comp_lda(opnd0_ic) = false;
+        return;
+    }    
     
     ASSERTN(mds.is_empty(), ("output buffer not yet initialized"));
     if (opnd0_mds.is_empty()) {
@@ -1151,26 +1149,34 @@ void IR_AA::inferPtArith(
         return;
     }
 
-    if (isInLoop(ir->getStmt())) {
+    if (isInLoop(ir->getStmt()) ||
+        !tryComputeConstOffset(ir, opnd1, mds, opnd0_mds)) {
         //Pointer arithmetic causes ambiguous memory access.
         //e.g: while (...) { p = p+1 }
         //Where is p pointing to at all?
         //Set each MD of opnd0 to be UNBOUND even if it is exact
         //to keep the conservation.
-        SEGIter * iter;
-        for (INT i = opnd0_mds.get_first(&iter);
-             i >= 0; i = opnd0_mds.get_next((UINT)i, &iter)) {
-            MD * imd = m_md_sys->getMD((UINT)i);
-            if (imd->is_exact()) {
-                MD x(*imd);
-                MD_ty(&x) = MD_UNBOUND;
-                MD const* entry = m_md_sys->registerMD(x);
-                ASSERT0(MD_id(entry) > 0);
-                mds.bunion_pure(MD_id(entry), *m_misc_bs_mgr);
-                continue;
-            }
-            mds.bunion(imd, *m_misc_bs_mgr);
+        convertExact2Unbound(&opnd0_mds, &mds);
+    }
+}
+
+
+void IR_AA::convertExact2Unbound(MDSet const* src, MDSet * tgt)
+{
+    SEGIter * iter;
+    for (INT i = src->get_first(&iter);
+        i >= 0; i = src->get_next((UINT)i, &iter)) {
+        MD * imd = m_md_sys->getMD((UINT)i);
+        if (!imd->is_exact()) {
+            tgt->bunion(imd, *m_misc_bs_mgr);
+            continue;
         }
+
+        MD x(*imd);
+        MD_ty(&x) = MD_UNBOUND;
+        MD const* entry = m_md_sys->registerMD(x);
+        ASSERT0(MD_id(entry) > 0);
+        tgt->bunion_pure(MD_id(entry), *m_misc_bs_mgr);
     }
 }
 
@@ -1734,7 +1740,6 @@ void IR_AA::processStore(IN IR * ir, IN MD2MDSet * mx)
     } else {
         t = getMustAddr(ir);
     }
-
     AACtx ic;
     inferStoreValue(ir, ST_rhs(ir), t, &ic, mx);
 }
@@ -3252,7 +3257,7 @@ void IR_AA::dumpIRPointToForRegion(bool dump_kid)
     if (g_tfile == NULL) return;
     fprintf(g_tfile, "\n==--- DUMP '%s' IR_AA : IR ADDRESS and POINT-TO ----==",
             m_ru->getRegionName());
-    m_md_sys->dumpAllMD();
+    m_md_sys->dump();
     fprintf(g_tfile, "\n\n---- All MD in MAY-POINT-TO SET : ");
 
     ASSERT0(m_maypts);
@@ -4062,7 +4067,7 @@ bool IR_AA::perform(IN OUT OptCtx & oc)
     }
 
 #if 0
-    m_md_sys->dumpAllMD();
+    m_md_sys->dump();
     dumpMD2MDSetForRegion(false);
     //dumpInOutPointToSetForBB();
     dumpIRPointToForRegion(true);

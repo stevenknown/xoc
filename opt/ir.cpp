@@ -2772,6 +2772,73 @@ static bool hasProp(IR const* ir)
 }
 
 
+//Dump IR tree's MD reference, where ir may be stmt or exp.
+void IR::dumpRef(Region * r, UINT indent)
+{
+    if (this == NULL || g_tfile == NULL || is_const()) { return; }
+
+    g_indent = indent;
+    dump_ir(this, r->getTypeMgr(), NULL, false);
+
+    //Dump mustref MD.
+    MD const* md = getRefMD();
+    MDSet const* mds = getRefMDSet();
+
+    //MustDef
+    bool prt_mustdef = false;
+    if (md != NULL) {
+        fprintf(g_tfile, "\n");
+        note("");
+        fprintf(g_tfile, "MMD%d", MD_id(md));
+        prt_mustdef = true;
+    }
+
+    if (mds != NULL) {
+        //MayDef
+        if (!prt_mustdef) {
+            note("\n"); //dump indent blank.
+        }
+        fprintf(g_tfile, " : ");
+        if (mds != NULL && !mds->is_empty()) {
+            mds->dump(r->getMDSystem());
+        }
+    }
+
+    if (isCallStmt()) {
+        bool doit = false;
+        CallGraph * callg = r->getRegionMgr()->getCallGraph();
+        if (callg != NULL) {
+            Region * rg = callg->mapCall2Region(this, r);
+            if (rg != NULL && REGION_is_mddu_valid(rg)) {
+                MDSet const* muse = rg->getMayUse();
+                //May use
+                fprintf(g_tfile, " <-- ");
+                if (muse != NULL && !muse->is_empty()) {
+                    muse->dump(r->getMDSystem());
+                    doit = true;
+                }
+            }
+        }
+        if (!doit) {
+            //MayUse MDSet.
+            //Regard MayDef MDSet as MayUse.
+            fprintf(g_tfile, " <-- ");
+            MDSet const* x = getRefMDSet();
+            if (x != NULL && !x->is_empty()) {
+                x->dump(r->getMDSystem());
+            }
+        }
+    }
+
+    for (UINT i = 0; i < IR_MAX_KID_NUM(this); i++) {
+        for (IR * k = getKid(i); k != NULL; k = k->get_next()) {
+            k->dumpRef(r, indent + 2);
+        }
+    }
+    fflush(g_tfile);
+}
+
+
 static void dumpOffset(IR const* ir)
 {
     if (hasProp(ir) ||

@@ -696,8 +696,6 @@ public:
     void dumpMemUsageForEachSet();
     void dumpMemUsageForMDRef();
     void dumpSet(bool is_bs = false);
-    void dumpIRRef(IN IR * ir, UINT indent);
-    void dumpIRListRef(IN IR * ir, UINT indent);
     void dumpBBRef(IN IRBB * bb, UINT indent);
     void dumpRef(UINT indent = 4);
     void dumpDUChain();

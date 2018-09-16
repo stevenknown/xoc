@@ -62,6 +62,7 @@ author: Su Zhenyu
 #include "ir_du.h"
 #include "ir_aa.h"
 #include "ir_expr_tab.h"
+#include "callg.h"
 
 using namespace xoc;
 #endif

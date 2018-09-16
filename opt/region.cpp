@@ -3558,7 +3558,7 @@ void Region::checkValidAndRecompute(OptCtx * oc, ...)
             max_numir_in_bb > g_thres_opt_ir_num_in_bb) {
             aa->set_flow_sensitive(false);
         }
-         aa->perform(*oc);
+        aa->perform(*oc);
     }
 
     if (f != 0 &&

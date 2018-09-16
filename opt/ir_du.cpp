@@ -132,7 +132,7 @@ void MDId2IRlist::append(UINT mdid, UINT irid)
 void MDId2IRlist::dump()
 {
     if (g_tfile == NULL) { return; }
-    m_md_sys->dumpAllMD();
+    m_md_sys->dump();
     fprintf(g_tfile, "\n==-- DUMP MDID2IRLIST --==");
     TMapIter<UINT, DefSBitSetCore*> c;
     for (UINT mdid = get_first(c); mdid != MD_UNDEF; mdid = get_next(c)) {
@@ -1273,7 +1273,7 @@ void IR_DU_MGR::dumpRef(UINT indent)
     BBList * bbs = m_ru->getBBList();
     ASSERT0(bbs);
     if (bbs->get_elem_count() != 0) {
-        m_md_sys->dumpAllMD();
+        m_md_sys->dump();
     }
 
     //Dump imported variables referenced.
@@ -1300,83 +1300,8 @@ void IR_DU_MGR::dumpRef(UINT indent)
 void IR_DU_MGR::dumpBBRef(IN IRBB * bb, UINT indent)
 {
     for (IR * ir = BB_first_ir(bb); ir != NULL; ir = BB_next_ir(bb)) {
-        dumpIRRef(ir, indent);
+        ir->dumpRef(m_ru, indent);
     }
-}
-
-
-void IR_DU_MGR::dumpIRListRef(IN IR * ir, UINT indent)
-{
-    for (; ir != NULL; ir = ir->get_next()) {
-        dumpIRRef(ir, indent);
-    }
-}
-
-
-//Dump IR tree's MD reference, where ir may be stmt or exp.
-void IR_DU_MGR::dumpIRRef(IN IR * ir, UINT indent)
-{
-    if (ir == NULL || g_tfile == NULL || ir->is_const()) { return; }
-
-    g_indent = indent;
-    dump_ir(ir, m_tm, NULL, false);
-
-    //Dump mustref MD.
-    MD const* md = ir->getRefMD();
-    MDSet const* mds = ir->getRefMDSet();
-
-    //MustDef
-    bool prt_mustdef = false;
-    if (md != NULL) {
-        fprintf(g_tfile, "\n");
-        note("");
-        fprintf(g_tfile, "MMD%d", MD_id(md));
-        prt_mustdef = true;
-    }
-
-    if (mds != NULL) {
-        //MayDef
-        if (!prt_mustdef) {
-            note("\n"); //dump indent blank.
-        }
-        fprintf(g_tfile, " : ");
-        if (mds != NULL && !mds->is_empty()) {
-            mds->dump(m_md_sys);
-        }
-    }
-
-    if (ir->isCallStmt()) {
-        bool doit = false;
-        CallGraph * callg = m_ru->getRegionMgr()->getCallGraph();
-        if (callg != NULL) {
-            Region * rg = callg->mapCall2Region(ir, m_ru);
-            if (rg != NULL && REGION_is_mddu_valid(rg)) {
-                MDSet const* muse = rg->getMayUse();
-                //May use
-                fprintf(g_tfile, " <-- ");
-                if (muse != NULL && !muse->is_empty()) {
-                    muse->dump(m_md_sys);
-                    doit = true;
-                }
-            }
-        }
-        if (!doit) {
-            //MayUse MDSet.
-            //Regard MayDef MDSet as MayUse.
-            fprintf(g_tfile, " <-- ");
-            MDSet const* x = ir->getRefMDSet();
-            if (x != NULL && !x->is_empty()) {
-                x->dump(m_md_sys);
-            }
-        }
-    }
-
-    for (UINT i = 0; i < IR_MAX_KID_NUM(ir); i++) {
-        if (ir->getKid(i) != NULL) {
-            dumpIRListRef(ir->getKid(i), indent + 4);
-        }
-    }
-    fflush(g_tfile);
 }
 
 
@@ -5294,7 +5219,7 @@ void IR_DU_MGR::computeMDDUChain(
     OC_is_du_chain_valid(oc) = true;
 
     if (g_is_dump_du_chain) {
-        m_md_sys->dumpAllMD();
+        m_md_sys->dump();
         dumpDUChainDetail();
     }
 

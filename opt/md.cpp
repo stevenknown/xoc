@@ -995,7 +995,7 @@ void MDSystem::clean()
 }
 
 
-void MDSystem::dumpAllMD()
+void MDSystem::dump()
 {
     if (g_tfile == NULL) return;
     fprintf(g_tfile, "\n==---- DUMP ALL MD ----==");

@@ -617,7 +617,7 @@ public:
             bool strictly);
 
     //Dump all registered MDs.
-    void dumpAllMD();
+    void dump();
     void destroy();
 
     TypeMgr * getTypeMgr() const { return m_tm; }

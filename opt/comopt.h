@@ -54,6 +54,5 @@ author: Su Zhenyu
 #include "ir_licm.h"
 #include "ir_ivr.h"
 #include "ir_loop_cvt.h"
-#include "callg.h"
 #include "ipa.h"
 #include "inliner.h"
