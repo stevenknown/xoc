@@ -265,5 +265,11 @@ extern bool g_is_dump_mdset_hash;
 
 //Dump MD DU chain built by DU Manager.
 extern bool g_is_dump_du_chain;
+
+//Dump Alias Analysis miscellaneous info.
+extern bool g_is_dump_alias_analysis;
+
+//Dump after each pass.
+extern bool g_is_dump_after_pass;
 } //namespace xoc
 #endif

@@ -39,7 +39,7 @@ namespace xoc {
 //
 //START RegionMgr
 //
-RegionMgr::RegionMgr()
+RegionMgr::RegionMgr() : m_type_mgr(this)
 {
     ASSERT0(verifyPreDefinedInfo());
     #ifdef _DEBUG_
@@ -208,7 +208,7 @@ void RegionMgr::addToRegionTab(Region * rg)
 
 bool RegionMgr::verifyPreDefinedInfo()
 {
-    ASSERT0_DUMMYUSE(WORD_LENGTH_OF_TARGET_MACHINE ==
+    ASSERT0_DUMMYUSE(WORD_LENGTH_OF_TARGET_MACHINE <=
             sizeof(TMWORD) * HOST_BIT_PER_BYTE);
     ASSERT0_DUMMYUSE(BIT_PER_BYTE == HOST_BIT_PER_BYTE);
 

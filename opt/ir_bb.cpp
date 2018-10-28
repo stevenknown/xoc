@@ -116,19 +116,19 @@ void IRBB::dump(Region * rg, bool dump_inner_region)
     //Attributes
     note("\nATTR:");
     if (BB_is_entry(this)) {
-        fprintf(g_tfile, "entry_bb ");
+        prt("entry_bb ");
     }
 
     //if (BB_is_exit(this)) {
-    //    fprintf(g_tfile, "exit_bb ");
+    //    prt("exit_bb ");
     //}
 
     if (BB_is_fallthrough(this)) {
-        fprintf(g_tfile, "fall_through ");
+        prt("fall_through ");
     }
 
     if (BB_is_target(this)) {
-        fprintf(g_tfile, "branch_target ");
+        prt("branch_target ");
     }
 
     //IR list
@@ -138,10 +138,10 @@ void IRBB::dump(Region * rg, bool dump_inner_region)
     for (IR * ir = BB_first_ir(this);
          ir != NULL; ir = BB_irlist(this).get_next()) {
         ASSERT0(ir->is_single() && ir->getBB() == this);
-        dump_ir(ir, dm, NULL, true, true, false, dump_inner_region);
+        dumpIR(ir, dm, NULL, true, true, false, dump_inner_region);
     }
     g_indent -= 3;
-    fprintf(g_tfile, "\n");
+    note("\n");
     fflush(g_tfile);
 }
 
@@ -155,31 +155,10 @@ void IRBB::verify()
          ir != NULL; ir = BB_irlist(this).get_next(&ct)) {
         ASSERT0(ir->is_single());
         ASSERT0(ir->getBB() == this);
-        switch (ir->getCode()) {
-        case IR_ST:
-        case IR_STPR:
-        case IR_STARRAY:
-        case IR_IST:
-        case IR_PHI:
-        case IR_REGION:
-        case IR_CALL:
-        case IR_ICALL:
-        case IR_GOTO:
-        case IR_IGOTO:
-        case IR_TRUEBR:
-        case IR_FALSEBR:
-        case IR_RETURN:
-        case IR_SWITCH:
-        case IR_SETELEM:
-        case IR_GETELEM:
-            break;
-        default: ASSERTN(0, ("BB does not supported this kind of IR."));
-        }
-
+        ASSERT0(ir->isStmtInBB());
         if (isDownBoundary(ir)) {
             ASSERTN(ir == BB_last_ir(this), ("invalid BB down boundary."));
         }
-
         c++;
     }
     ASSERT0(c == getNumOfIR());
@@ -318,22 +297,22 @@ void dumpBBLabel(List<LabelInfo const*> & lablist, FILE * h)
             LABEL_INFO_is_try_end(li) ||
             LABEL_INFO_is_catch_start(li) ||
             LABEL_INFO_is_terminate(li)) {
-            fprintf(g_tfile, "(");
+            prt("(");
             if (LABEL_INFO_is_try_start(li)) {
-                fprintf(g_tfile, "try_start,");
+                prt("try_start,");
             }
             if (LABEL_INFO_is_try_end(li)) {
-                fprintf(g_tfile, "try_end,");
+                prt("try_end,");
             }
             if (LABEL_INFO_is_catch_start(li)) {
-                fprintf(g_tfile, "catch_start,");
+                prt("catch_start,");
             }
             if (LABEL_INFO_is_terminate(li)) {
-                fprintf(g_tfile, "terminate");
+                prt("terminate");
             }
-            fprintf(g_tfile, ")");
+            prt(")");
         }
-        fprintf(g_tfile, " ");
+        prt(" ");
     }
 }
 

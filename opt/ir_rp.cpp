@@ -229,11 +229,11 @@ static void dump_delegate_tab(RefTab & dele_tab, TypeMgr * dm)
     if (g_tfile == NULL) { return; }
     ASSERT0(dm);
 
-    fprintf(g_tfile, "\n==---- DUMP Delegate Table ----==");
+    note("\n==---- DUMP Delegate Table ----==");
     INT cur = 0;
     for (IR * dele = dele_tab.get_first(cur);
          cur >= 0; dele = dele_tab.get_next(cur)) {
-        dump_ir(dele, dm);
+        dumpIR(dele, dm);
     }
     fflush(g_tfile);
 }
@@ -245,42 +245,42 @@ static void dump_delegate_tab(RefTab & dele_tab, TypeMgr * dm)
 //
 void IR_RP::dump()
 {
-    if (g_tfile == NULL) return;
-    fprintf(g_tfile, "\n==---- DUMP IR_RP ----==\n");
+    if (g_tfile == NULL) { return; }
+    note("\n==---- DUMP IR_RP ----==\n");
 
     g_indent = 2;
     BBList * bbl = m_ru->getBBList();
     for (IRBB * bb = bbl->get_head(); bb != NULL; bb = bbl->get_next()) {
-        fprintf(g_tfile, "\n---- BB%d -----", BB_id(bb));
+        note("\n---- BB%d -----", BB_id(bb));
         MDSet * live_in = getLiveInMDSet(bb);
         MDSet * live_out = getLiveOutMDSet(bb);
         MDSet * def = getDefMDSet(bb);
         MDSet * use = getUseMDSet(bb);
         INT i;
 
-        fprintf(g_tfile, "\nLIVE-IN: ");
+        note("\nLIVE-IN: ");
         SEGIter * iter;
         for (i = live_in->get_first(&iter);
              i != -1; i = live_in->get_next(i, &iter)) {
-            fprintf(g_tfile, "MD%d, ", i);
+            prt("MD%d, ", i);
         }
 
-        fprintf(g_tfile, "\nLIVE-OUT: ");
+        note("\nLIVE-OUT: ");
         for (i = live_out->get_first(&iter);
              i != -1; i = live_out->get_next(i, &iter)) {
-            fprintf(g_tfile, "MD%d, ", i);
+            prt("MD%d, ", i);
         }
 
-        fprintf(g_tfile, "\nDEF: ");
+        note("\nDEF: ");
         for (i = def->get_first(&iter);
              i != -1; i = def->get_next(i, &iter)) {
-            fprintf(g_tfile, "MD%d, ", i);
+            prt("MD%d, ", i);
         }
 
-        fprintf(g_tfile, "\nUSE: ");
+        note("\nUSE: ");
         for (i = use->get_first(&iter);
              i != -1; i = use->get_next(i, &iter)) {
-            fprintf(g_tfile, "MD%d, ", i);
+            prt("MD%d, ", i);
         }
     }
     fflush(g_tfile);
@@ -290,12 +290,12 @@ void IR_RP::dump()
 void IR_RP::dump_occ_list(List<IR*> & occs, TypeMgr * dm)
 {
     if (g_tfile == NULL) { return; }
-    fprintf(g_tfile, "\n---- DUMP exact occ list ----");
+    note("\n---- DUMP exact occ list ----");
     for (IR * x = occs.get_head(); x != NULL; x = occs.get_next()) {
-        dump_ir(x, dm, NULL, true, false, false);
-        fprintf(g_tfile, "\n");
+        dumpIR(x, dm, NULL, true, false, false);
+        note("\n");
     }
-    fprintf(g_tfile, "\n");
+    note("\n");
     fflush(g_tfile);
 }
 
@@ -303,14 +303,14 @@ void IR_RP::dump_occ_list(List<IR*> & occs, TypeMgr * dm)
 void IR_RP::dump_access2(TTab<IR*> & access, TypeMgr * dm)
 {
     if (g_tfile == NULL) { return; }
-    fprintf(g_tfile, "\n---- DUMP inexact access ----");
+    note("\n---- DUMP inexact access ----");
     TabIter<IR*> iter;
     for (IR * ir = access.get_first(iter);
         ir != NULL; ir = access.get_next(iter)) {
-        dump_ir(ir, dm);
-        fprintf(g_tfile, "\n");
+        dumpIR(ir, dm);
+        note("\n");
     }
-    fprintf(g_tfile, "\n");
+    note("\n");
     fflush(g_tfile);
 }
 
@@ -318,16 +318,16 @@ void IR_RP::dump_access2(TTab<IR*> & access, TypeMgr * dm)
 void IR_RP::dump_access(TMap<MD const*, IR*> & access, TypeMgr * dm)
 {
     if (g_tfile == NULL) { return; }
-    fprintf(g_tfile, "\n---- DUMP exact access ----");
+    note("\n---- DUMP exact access ----");
     TMapIter<MD const*, IR*> iter;
     IR * ref;
     for (MD const* md = access.get_first(iter, &ref);
          ref != NULL; md = access.get_next(iter, &ref)) {
         md->dump(dm);
-        dump_ir(ref, dm);
-        fprintf(g_tfile, "\n");
+        dumpIR(ref, dm);
+        note("\n");
     }
-    fprintf(g_tfile, "\n");
+    note("\n");
     fflush(g_tfile);
 }
 
@@ -428,7 +428,7 @@ void IR_RP::cleanLiveBBSet()
 
 void IR_RP::dump_mdlt()
 {
-    if (g_tfile == NULL) return;
+    if (g_tfile == NULL) { return; }
     MDSet mdbs;
     BBList * bbl = m_ru->getBBList();
     for (IRBB * bb = bbl->get_head(); bb != NULL; bb = bbl->get_next()) {
@@ -441,7 +441,7 @@ void IR_RP::dump_mdlt()
     mdbs.dump(m_md_sys);
 
     StrBuf buf(32);
-    fprintf(g_tfile, "\n==---- DUMP MD LIFE TIME ----==");
+    note("\n==---- DUMP MD LIFE TIME ----==");
     SEGIter * iter;
     for (INT i = mdbs.get_first(&iter); i >= 0; i = mdbs.get_next(i, &iter)) {
         MD * md = m_md_sys->getMD(i);
@@ -452,8 +452,8 @@ void IR_RP::dump_mdlt()
         ASSERT0(livebbs != NULL);
 
         //Print MD name.
-        fprintf(g_tfile, "\nMD%d", MD_id(md));
-        fprintf(g_tfile, ":");
+        note("\nMD%d", MD_id(md));
+        prt(":");
 
         //Print live BB.
         if (livebbs == NULL || livebbs->is_empty()) { continue; }
@@ -462,10 +462,10 @@ void IR_RP::dump_mdlt()
             for (INT j = start; j < u; j++) {
                 buf.sprint("%d,", j);
                 for (UINT k = 0; k < buf.strlen(); k++) {
-                    fprintf(g_tfile, " ");
+                    prt(" ");
                 }
             }
-            fprintf(g_tfile, "%d,", u);
+            prt("%d,", u);
             start = u + 1;
         }
     }

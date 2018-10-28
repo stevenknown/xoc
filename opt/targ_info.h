@@ -40,23 +40,29 @@ public:
     COPY_CONSTRUCTOR(TargInfo);
     virtual ~TargInfo() {}
 
-    virtual UINT getNumOfAllocableIntegerRegister() = 0;
-    virtual UINT getNumOfAllocableFloatRegister() = 0;
+	// Return the number of allocable integer register.
+    virtual UINT getNumOfAllocableIntegerRegister() const = 0;
+
+	// Return the number of allocable float register.
+    virtual UINT getNumOfAllocableFloatRegister() const = 0;
 
     //Return byte size of data cache.
-    virtual UINT getDCacheSize() = 0;
+    virtual UINT getDCacheSize() const = 0;
 
     //Return byte size of instruction cache.
-    virtual UINT getICacheSize() = 0;
+    virtual UINT getICacheSize() const = 0;
 
     //Return byte size of cache line.
-    virtual UINT getCacheLineSize() = 0;
+    virtual UINT getDCacheLineSize() const = 0;
 
-    //Return byte size of TLB if any.
-    virtual UINT getTLBSize() = 0;
+    //Return byte size of instruction cache line.
+    virtual UINT getICacheLineSize() const = 0;
+
+	//Return byte size of TLB if any.
+    virtual UINT getTLBSize() const = 0;
 
     //Approximate the cycles to execute ir operation.
-    virtual UINT estimateNumOfCycles(IR const*) = 0;
+    virtual UINT estimateNumOfCycles(IR const*) const = 0;
 };
 
 } //namespace xoc

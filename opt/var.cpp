@@ -366,6 +366,19 @@ void VarMgr::assignVarId(VAR * v)
 }
 
 
+VAR * VarMgr::findVarByName(SYM const* name)
+{
+    for (INT i = 0; i <= m_var_vec.get_last_idx(); i++) {
+        VAR * v = m_var_vec.get(i);
+        if (v == NULL) { continue; }
+        if (v->get_name() == name) {
+            return v;
+        }
+    }
+    return NULL;
+}
+
+
 //Add VAR into VarTab.
 //Note you should call this function cafefully, and make sure
 //the VAR is unique. This function does not keep the uniqueness

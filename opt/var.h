@@ -400,6 +400,7 @@ public:
     VAR * get_var(size_t id) const { return m_var_vec.get((UINT)id); }
 
     VAR * findStringVar(SYM const* str) { return m_str_tab.get(str); }
+    VAR * findVarByName(SYM const* name);
 
     bool isDedicatedStringVar(CHAR const* name) const;
 

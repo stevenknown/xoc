@@ -26,7 +26,7 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE
 USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 @*/
 #include "xcominc.h"
-#include "../opt/commoninc.h"
+#include "../opt/cominc.h"
 using namespace xoc;
 
 #ifdef _DEBUG_
@@ -91,23 +91,23 @@ void bs_test()
     y.bunion(15330);
     y.bunion(16330);
 
-    fprintf(g_tfile, "\n");
+    note("\n");
     x.dump(g_tfile);
-    fprintf(g_tfile, "\n");
+    note("\n");
     y.dump(g_tfile);
-    fprintf(g_tfile, "\n");
+    note("\n");
 
     y.bunion(x);
-    fprintf(g_tfile, "\n=====\n");
+    note("\n=====\n");
     y.dump(g_tfile);
 
     //y.intersect(x);
     x.bunion(0);
     x.bunion(100000000);
-    fprintf(g_tfile, "\ny:"); y.dump(g_tfile);
-    fprintf(g_tfile, "\nx:"); x.dump(g_tfile);
+    note("\ny:"); y.dump(g_tfile);
+    note("\nx:"); x.dump(g_tfile);
     x.diff(y);
-    fprintf(g_tfile, "\n=====\n");
+    note("\n=====\n");
     x.dump(g_tfile);
 }
 
@@ -152,14 +152,14 @@ void bs_test2()
 void bs_test3()
 {
     if (g_tfile == NULL) { return; }
-    fprintf(g_tfile, "\n===");
+    note("\n===");
     MiscBitSetMgr<33> mbsm;
     SBitSet<33> x1(mbsm.getSegMgr());
     for (int i = 0; i < 600; i+=3) {
         x1.bunion(i);
     }
     x1.dump(g_tfile);
-    fprintf(g_tfile, "\n===");
+    note("\n===");
 
     MiscBitSetMgr<123> mbsm2;
     SBitSet<123> x2(mbsm2.getSegMgr());
@@ -167,7 +167,7 @@ void bs_test3()
         x2.bunion(i);
     }
     x2.dump(g_tfile);
-    fprintf(g_tfile, "\n===");
+    note("\n===");
     fflush(g_tfile);
 }
 
@@ -178,7 +178,7 @@ void dump_segmgr(SegMgr<BitsPerSeg> & m)
 {
     if (g_tfile == NULL) { return; }
     SC<SEG<BitsPerSeg>*> * st = NULL;
-    fprintf(g_tfile, "\n====start %d:%d===\n",
+    note("\n====start %d:%d===\n",
             m.get_free_list()->get_elem_count(),
             m.get_seg_count());
 
@@ -186,7 +186,7 @@ void dump_segmgr(SegMgr<BitsPerSeg> & m)
     SList<SEG<BitsPerSeg>*> const* flst = m.get_free_list();
     for (flst->get_head(&st); st != flst->end(); st = flst->get_next(st)) {
         SEG<BitsPerSeg> const* s = st->val();
-        fprintf(g_tfile, "%d,", s->id);
+        prt("%d,", s->id);
         x.bunion(s->id);
     }
     fflush(g_tfile);

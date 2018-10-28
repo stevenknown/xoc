@@ -2028,14 +2028,14 @@ void Dex2IR::dump_lir2lab()
 {
     if (g_tfile != NULL) {
         INT c;
-        fprintf(g_tfile, "\n==-- DUMP LIR->LABEL --== ");
+        note("\n==-- DUMP LIR->LABEL --== ");
 
         TMapIter<LIR*, List<LabelInfo*>*> iter;
         List<LabelInfo*> * lst;
         for (LIR * lir = m_lir2labs.get_first(iter, &lst);
              lir != NULL; lir =    m_lir2labs.get_next(iter, &lst)) {
             ASSERT0(lst);
-            fprintf(g_tfile, "\n");
+            note("\n");
             dump_lir2(lir, m_df, -1);
             for (LabelInfo * lab = lst->get_head();
                  lab != NULL; lab = lst->get_next()) {
@@ -2058,7 +2058,7 @@ IR * Dex2IR::convert(bool * succ)
 
     bool dump = g_dump_dex2ir && g_tfile != NULL;
     if (dump) {
-        fprintf(g_tfile, "\n\n==== DEX->IR CONVERT %s =====",
+        note("\n\n==== DEX->IR CONVERT %s =====",
                 m_ru->getRegionName());
     }
 
@@ -2123,7 +2123,7 @@ IR * Dex2IR::convert(bool * succ)
 
         if (dump) {
             dump_lir(lir, m_df, i);
-            dump_irs(newir, m_tm);
+            dumpIRList(newir, m_tm);
         }
 
         DexDbx const* dbx = m_dbxvec.get(i);

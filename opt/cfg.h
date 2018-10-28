@@ -258,7 +258,7 @@ public:
         return count;
     }
 
-    virtual void dump_loop(FILE * h)
+    virtual void dumpLoop(FILE * h)
     {
         if (h == NULL) return;
         fprintf(h, "\n==---- DUMP Natural Loop Tree ----==");

@@ -65,17 +65,17 @@ void DfMgr::clean()
 //g: dump dominance frontier to graph.
 void DfMgr::dump(xcom::DGraph & g)
 {
-    if (g_tfile == NULL) return;
-    fprintf(g_tfile, "\n==---- DUMP Dominator Frontier Control Set ----==\n");
+    if (g_tfile == NULL) { return; }
+    note("\n==---- DUMP Dominator Frontier Control Set ----==\n");
     INT c;
     for (xcom::Vertex const* v = g.get_first_vertex(c);
          v != NULL; v = g.get_next_vertex(c)) {
         UINT vid = VERTEX_id(v);
-        fprintf(g_tfile, "\nBB%d DF set:", vid);
+        note("\nBB%d DF set:", vid);
         xcom::BitSet const* df = m_df_vec.get(vid);
         if (df != NULL) {
             for (INT i = df->get_first(); i >= 0; i = df->get_next(i)) {
-                fprintf(g_tfile, "%d,", i);
+                prt("%d,", i);
             }
         }
     }
@@ -343,7 +343,7 @@ void SSAGraph::dump(CHAR const* name, bool detail)
         }
         if (detail) {
             //TODO: implement dump_ir_buf();
-            dump_ir(def, dm, NULL, true, false);
+            dumpIR(def, dm, NULL, true, false);
         }
         fprintf(h, "\"}");
     }
@@ -412,14 +412,14 @@ CHAR * PRSSAMgr::dumpVP(IN VP * v, OUT CHAR * buf)
 //have_renamed: set true if PRs have been renamed in construction.
 void PRSSAMgr::dumpAllVP(bool have_renamed)
 {
-    if (g_tfile == NULL) return;
-    fprintf(g_tfile, "\n==---- DUMP PRSSAMgr:VP_DU ----==\n");
+    if (g_tfile == NULL) { return; }
+    note("\n==---- DUMP PRSSAMgr:VP_DU '%s' ----==\n", m_ru->getRegionName());
 
     Vector<VP*> const* vp_vec = getVPVec();
     for (INT i = 1; i <= vp_vec->get_last_idx(); i++) {
         VP * v = vp_vec->get(i);
         ASSERT0(v != NULL);
-        fprintf(g_tfile, "\nid%d:pr%dver%d: ", SSA_id(v), VP_prno(v), VP_ver(v));
+        note("\nid%d:pr%dver%d: ", SSA_id(v), VP_prno(v), VP_ver(v));
         IR * def = SSA_def(v);
         if (VP_ver(v) != 0 && !have_renamed) {
             //After renaming, version is meaningless.
@@ -427,38 +427,32 @@ void PRSSAMgr::dumpAllVP(bool have_renamed)
         }
         if (def != NULL) {
             ASSERT0(def->is_stmt());
-
             if (def->is_stpr()) {
-                fprintf(g_tfile, "DEF:st pr%d,id%d",
-                        def->getPrno(), def->id());
+                prt("DEF:st pr%d,id%d", def->getPrno(), def->id());
             } else if (def->is_phi()) {
-                fprintf(g_tfile, "DEF:phi pr%d,id%d",
-                        def->getPrno(), def->id());
+                prt("DEF:phi pr%d,id%d", def->getPrno(), def->id());
             } else if (def->isCallStmt()) {
-                fprintf(g_tfile, "DEF:call");
+                prt("DEF:call");
                 if (def->hasReturnValue()) {
-                    fprintf(g_tfile, " pr%d,id%d", def->getPrno(), def->id());
+                    prt(" pr%d,id%d", def->getPrno(), def->id());
                 }
             } else {
                 ASSERTN(0, ("not def stmt of PR"));
             }
         } else {
-            fprintf(g_tfile, "DEF:---");
+            prt("DEF:---");
         }
 
-        fprintf(g_tfile, "\tUSE:");
-
+        prt("\tUSE:");
         SSAUseIter vit = NULL;
         INT nexti = 0;
         for (INT i2 = SSA_uses(v).get_first(&vit); vit != NULL; i2 = nexti) {
             nexti = SSA_uses(v).get_next(i2, &vit);
             IR * use = m_ru->getIR(i2);
             ASSERT0(use->is_pr());
-
-            fprintf(g_tfile, "(pr%d,id%d)", use->getPrno(), IR_id(use));
-
+            prt("(pr%d,id%d)", use->getPrno(), IR_id(use));
             if (nexti >= 0) {
-                fprintf(g_tfile, ",");
+                prt(",");
             }
         }
     }
@@ -469,56 +463,51 @@ void PRSSAMgr::dumpAllVP(bool have_renamed)
 void PRSSAMgr::dump()
 {
     if (g_tfile == NULL) { return; }
-    fprintf(g_tfile, "\n\n==---- DUMP Result of PRSSAMgr ----==\n");
+    note("\n==---- DUMP Result of PRSSAMgr '%s' ----==\n",
+        m_ru->getRegionName());
 
     BBList * bbl = m_ru->getBBList();
     List<IR const*> lst;
     List<IR const*> opnd_lst;
     for (IRBB * bb = bbl->get_head();
          bb != NULL; bb = bbl->get_next()) {
-        fprintf(g_tfile, "\n--- BB%d ---", BB_id(bb));
+        note("\n--- BB%d ---", BB_id(bb));
         for (IR * ir = BB_first_ir(bb);
              ir != NULL; ir = BB_next_ir(bb)) {
             g_indent = 4;
-            dump_ir(ir, m_tm);
+            note("\n------------------");
+            dumpIR(ir, m_tm);
             lst.clean();
             opnd_lst.clean();
-            //Find IR_PR.
-            bool find = false;
             for (IR const* opnd = iterInitC(ir, lst);
                 opnd != NULL;
                 opnd = iterNextC(lst)) {
                 if (ir->is_rhs(opnd) && opnd->is_pr()) {
                     opnd_lst.append_tail(opnd);
                 }
-                if (opnd->is_pr()) {
-                    find = true;
-                }
             }
-            if (!find) { continue; }
 
             IR * res = ir->getResultPR();
-            fprintf(g_tfile, "\nVP:");
+            note("\nVP:");
             if (res != NULL) {
                 VP * vp = (VP*)res->getSSAInfo();
                 ASSERT0(vp);
-                fprintf(g_tfile, "p%dv%d ", VP_prno(vp), VP_ver(vp));
+                prt("p%dv%d ", VP_prno(vp), VP_ver(vp));
             } else {
-                fprintf(g_tfile, "--");
+                prt("--");
             }
-            fprintf(g_tfile, " <= ");
+            prt(" <= ");
             if (opnd_lst.get_elem_count() != 0) {
                 UINT i = 0, n = opnd_lst.get_elem_count() - 1;
                 for (IR const* opnd = opnd_lst.get_head(); opnd != NULL;
                      opnd = opnd_lst.get_next(), i++) {
                     VP * vp = (VP*)PR_ssainfo(opnd);
                     ASSERT0(vp);
-                    fprintf(g_tfile, "p%dv%d",
-                            VP_prno(vp), VP_ver(vp));
-                    if (i < n) { fprintf(g_tfile, ","); }
+                    prt("p%dv%d", VP_prno(vp), VP_ver(vp));
+                    if (i < n) { prt(","); }
                 }
             } else {
-                fprintf(g_tfile, "--");
+                prt("--");
             }
         }
     }
@@ -1290,7 +1279,7 @@ bool PRSSAMgr::verifyVP()
             ASSERT0(respr);
 
             defprno = respr->getPrno();
-            ASSERT0(defprno > 0);
+            ASSERT0(defprno != PRNO_UNDEF);
         }
 
         SSAUseIter vit = NULL;
@@ -1346,7 +1335,7 @@ static void verify_ssainfo_core(IR * ir, xcom::BitSet & defset, Region * rg)
         ASSERT0(respr);
 
         defprno = respr->getPrno();
-        ASSERT0(defprno > 0);
+        ASSERT0(defprno != PRNO_UNDEF);
     }
 
     SSAUseIter vit = NULL;
@@ -1619,45 +1608,19 @@ void PRSSAMgr::stripVersionForBBList()
 
 //Return the replaced one.
 static IR * replace_res_pr(
-                IR * stmt, UINT oldprno,
-                UINT newprno, Type const* newprty)
+        IR * stmt,
+        UINT oldprno,
+        UINT newprno,
+        Type const* newprty)
 {
     DUMMYUSE(oldprno);
-
     //newprty may be VOID.
-
-    ASSERT0(newprno > 0);
+    ASSERT0(newprno != PRNO_UNDEF);
 
     //Replace stmt PR and DATA_TYPE info.
-    switch (stmt->getCode()) {
-    case IR_STPR:
-        ASSERT0(STPR_no(stmt) == oldprno);
-        STPR_no(stmt) = newprno;
-        IR_dt(stmt) = newprty;
-        return stmt;
-    case IR_SETELEM:
-        ASSERT0(SETELEM_prno(stmt) == oldprno);
-        SETELEM_prno(stmt) = newprno;
-        IR_dt(stmt) = newprty;
-        return stmt;
-    case IR_GETELEM:
-        ASSERT0(GETELEM_prno(stmt) == oldprno);
-        GETELEM_prno(stmt) = newprno;
-        IR_dt(stmt) = newprty;
-        return stmt;
-    case IR_PHI:
-        ASSERT0(PHI_prno(stmt) == oldprno);
-        PHI_prno(stmt) = newprno;
-        IR_dt(stmt) = newprty;
-        return stmt;
-    case IR_CALL:
-    case IR_ICALL:
-        ASSERT0(CALL_prno(stmt) == oldprno);
-        CALL_prno(stmt) = newprno;
-        IR_dt(stmt) = newprty;
-        return stmt;
-    default: UNREACHABLE();
-    }
+    ASSERT0(stmt->getPrno() == oldprno);
+    stmt->setPrno(newprno);
+    IR_dt(stmt) = newprty;
     return NULL;
 }
 
@@ -1858,7 +1821,7 @@ bool PRSSAMgr::construction(DomTree & domtree)
     START_TIMER(t, "SSA: Build dominance frontier");
     DfMgr dfm;
     dfm.build((xcom::DGraph&)*m_cfg);
-    dfm.dump((xcom::DGraph&)*m_cfg);
+
     END_TIMER(t, "SSA: Build dominance frontier");
     if (dfm.hasHighDFDensityVertex((xcom::DGraph&)*m_cfg)) {
         return false;
@@ -1883,16 +1846,16 @@ bool PRSSAMgr::construction(DomTree & domtree)
     //Recompute the map if ssa needs reconstruct.
     m_prno2ir.clean();
 
-    //dump();
-
-    ASSERT0(verifyIRandBB(m_ru->getBBList(), m_ru));
-
     stripVersionForBBList();
 
+    if (g_is_dump_after_pass) {
+        dump();
+        dfm.dump((xcom::DGraph&)*m_cfg);
+    }
+
+    ASSERT0(verifyIRandBB(m_ru->getBBList(), m_ru));
     ASSERT0(verifyPhi(false) && verifyVP());
-
     m_is_ssa_constructed = true;
-
     return true;
 }
 //END PRSSAMgr

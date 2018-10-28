@@ -52,13 +52,11 @@ void Region::HighProcessImpl(OptCtx & oc)
 
         getCFG()->performMiscOpt(oc);
 
-        //Build DOM after CFG optimized.
+        //Build DOM after CFG be optimized.
         checkValidAndRecompute(&oc, PASS_DOM, PASS_UNDEF);
 
-        if (g_do_loop_ana) {
-            ASSERTN(g_do_cfg_dom, ("dominator is necessary to build loop"));
-            checkValidAndRecompute(&oc, PASS_LOOP_INFO, PASS_UNDEF);
-        }
+        //Infer pointer arith need loopinfo.
+        checkValidAndRecompute(&oc, PASS_LOOP_INFO, PASS_UNDEF);
     }
 
     if (g_do_pr_ssa) {
@@ -179,7 +177,7 @@ bool Region::HighProcess(OptCtx & oc)
     if (g_do_cfs_opt) {
         IR_CFS_OPT co(this);
         co.perform(simp);
-        ASSERT0(verify_irs(getIRList(), NULL, this));
+        ASSERT0(verifyIRList(getIRList(), NULL, this));
     }
 
     if (g_build_cfs) {
@@ -192,8 +190,8 @@ bool Region::HighProcess(OptCtx & oc)
 
     simp.setSimpCFS();
     setIRList(simplifyStmtList(getIRList(), &simp));
-    ASSERT0(verify_simp(getIRList(), simp));
-    ASSERT0(verify_irs(getIRList(), NULL, this));
+    ASSERT0(verifySimp(getIRList(), simp));
+    ASSERT0(verifyIRList(getIRList(), NULL, this));
 
     if (g_cst_bb_list) {
         constructIRBBlist();

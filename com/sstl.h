@@ -3466,7 +3466,7 @@ public:
                 fprintf(h, "*");
                 elemhc = HC_next(elemhc);
                 if (elemhc != NULL) {
-                    //fprintf(g_tfile, ",");
+                    //prt(",");
                 }
             }
         }

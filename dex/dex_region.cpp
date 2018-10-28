@@ -83,8 +83,8 @@ bool DexRegion::HighProcess(OptCtx & oc)
 
     setIRList(simplifyStmtList(getIRList(), &simp));
 
-    ASSERT0(verify_simp(getIRList(), simp));
-    ASSERT0(verify_irs(getIRList(), NULL, this));
+    ASSERT0(verifySimp(getIRList(), simp));
+    ASSERT0(verifyIRList(getIRList(), NULL, this));
 
     constructIRBBlist();
 

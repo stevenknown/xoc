@@ -1146,7 +1146,7 @@ void IR_GVN::processBB(IRBB * bb, bool & change)
 
 void IR_GVN::dump_ir2vn()
 {
-    if (g_tfile == NULL) return;
+    if (g_tfile == NULL) { return; }
     for (INT k = 0; k <= m_ir2vn.get_last_idx(); k++) {
         VN * x = m_ir2vn.get(k);
         if (x != NULL) {
@@ -1159,15 +1159,15 @@ void IR_GVN::dump_ir2vn()
 
 void IR_GVN::dump_h1(IR const* k, VN * x)
 {
-    fprintf(g_tfile, "\n\t%s", IRTNAME(k->getCode()));
+    note("\n\t%s", IRTNAME(k->getCode()));
     if (k->is_pr()) {
-        fprintf(g_tfile, "%d", PR_no(k));
+        prt("%d", PR_no(k));
     }
-    fprintf(g_tfile, " id:%d ", IR_id(k));
+    prt(" id:%d ", IR_id(k));
     if (x != NULL) {
-        fprintf(g_tfile, "vn%d", VN_id(x));
+        prt("vn%d", VN_id(x));
     } else {
-        fprintf(g_tfile, "--");
+        prt("--");
     }
 }
 
@@ -1179,19 +1179,19 @@ void IR_GVN::dump_bb(UINT bbid)
     ASSERT0(bb);
 
     ConstIRIter ii;
-    fprintf(g_tfile, "\n-- BB%d ", BB_id(bb));
+    note("\n-- BB%d ", BB_id(bb));
     dumpBBLabel(bb->getLabelList(), g_tfile);
-    fprintf(g_tfile, "\n");
+    note("\n");
     for (IR * ir = BB_first_ir(bb);
          ir != NULL; ir = BB_next_ir(bb)) {
-        dump_ir(ir, m_ru->getTypeMgr());
-        fprintf(g_tfile, "\n");
+        dumpIR(ir, m_ru->getTypeMgr());
+        note("\n");
         VN * x = m_ir2vn.get(ir->id());
         if (x != NULL) {
-            fprintf(g_tfile, "vn%d", VN_id(x));
+            prt("vn%d", VN_id(x));
         }
 
-        fprintf(g_tfile, " <- {");
+        prt(" <- {");
 
         switch (ir->getCode()) {
         case IR_ST:
@@ -1273,7 +1273,7 @@ void IR_GVN::dump_bb(UINT bbid)
             break;
         default: UNREACHABLE();
         }
-        fprintf(g_tfile, " }");
+        prt(" }");
     }
     fflush(g_tfile);
 }
@@ -1281,8 +1281,8 @@ void IR_GVN::dump_bb(UINT bbid)
 
 void IR_GVN::dump()
 {
-    if (g_tfile == NULL) return;
-    fprintf(g_tfile, "\n==---- DUMP GVN -- rg:'%s' ----==", m_ru->getRegionName());
+    if (g_tfile == NULL) { return; }
+    note("\n==---- DUMP GVN -- rg:'%s' ----==", m_ru->getRegionName());
     BBList * bbl = m_ru->getBBList();
     for (IRBB * bb = bbl->get_head(); bb != NULL; bb = bbl->get_next()) {
         dump_bb(BB_id(bb));

@@ -453,11 +453,11 @@ void IR_CP::dumpCopyPropagationAction(
         MDSSAMgr * mdssamgr)
 {
     if (g_tfile == NULL) { return; }
-    fprintf(g_tfile, "\n==---- DUMP CopyPropagation ----==");
-    fprintf(g_tfile, "\nPropagating Candidate is %s(id:%d), that located in Stmt:",
+    note("\n==---- DUMP CopyPropagation ----==");
+    note("\nPropagating Candidate is %s(id:%d), that located in Stmt:",
         IRNAME(prop_value), prop_value->id());
-    dump_ir(def_stmt, m_tm);
-    fprintf(g_tfile, "\nWill replace %s(id:%d), that located in Stmt:",
+    dumpIR(def_stmt, m_tm);
+    note("\nWill replace %s(id:%d), that located in Stmt:",
         IRNAME(use), use->id());
     if (use->is_id()) {
         ASSERT0(mdssamgr);
@@ -468,7 +468,7 @@ void IR_CP::dumpCopyPropagationAction(
         ID_phi(use)->dump(m_ru, mdssamgr->getUseDefMgr());
     } else {
         ASSERT0(use->getStmt());
-        dump_ir(use->getStmt(), m_tm);
+        dumpIR(use->getStmt(), m_tm);
     }
     fflush(g_tfile);
 }

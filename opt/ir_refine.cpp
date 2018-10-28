@@ -358,10 +358,15 @@ IR * Region::refineStore(IR * ir, bool & change, RefineCtx & rc)
 IR * Region::refineSetelem(IR * ir, bool & change, RefineCtx & rc)
 {
     ASSERT0(ir->is_setelem());
-    IR * rhs = refineIR(SETELEM_rhs(ir), change, rc);
-    if (rhs != SETELEM_rhs(ir)) {
-        ir->setParent(rhs);
-        ir->setRHS(rhs);
+    IR * base = refineIR(SETELEM_base(ir), change, rc);
+    if (base != SETELEM_base(ir)) {
+        ir->setParent(base);
+        SETELEM_base(ir) = base;
+    }
+    IR * val = refineIR(SETELEM_val(ir), change, rc);
+    if (val != SETELEM_val(ir)) {
+        ir->setParent(val);
+        SETELEM_val(ir) = val;
     }
     IR * ofst = refineIR(SETELEM_ofst(ir), change, rc);
     if (ofst != SETELEM_ofst(ir)) {

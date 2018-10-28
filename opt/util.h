@@ -272,7 +272,7 @@ void tfree();
 void note(CHAR const* format, ...);
 
 //Helper function to dump formatted string to g_tfile without indent.
-void prt(CHAR const* format, ...);
+bool prt(CHAR const* format, ...);
 
 //Return true if val is 32bit integer more than 16bit.
 bool isInteger32bit(HOST_UINT val);

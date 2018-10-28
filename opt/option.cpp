@@ -247,8 +247,14 @@ UINT g_verify_level = VERIFY_LEVEL_2;
 bool g_is_simplify_parameter = true;
 
 //Dump MD Set Hash Table.
-bool g_is_dump_mdset_hash = false;
+bool g_is_dump_mdset_hash = true;
 
 //Dump MD DU chain built by DU Manager.
-bool g_is_dump_du_chain = false;
+bool g_is_dump_du_chain = true;
+
+//Dump Alias Analysis miscellaneous info.
+bool g_is_dump_alias_analysis = true;
+
+//Dump after each pass.
+bool g_is_dump_after_pass = true;
 } //namespace xoc

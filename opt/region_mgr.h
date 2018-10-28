@@ -160,6 +160,15 @@ public:
         ASSERT0(m_md_sys);
     }
 
+    //Initialize TargInfo.
+    //It is the first thing you should do after you declared a RegionMgr.
+    void initTargInfo()
+    {
+        ASSERTN(m_targinfo == NULL, ("TargInfo already initialized"));
+        m_targinfo = allocTargInfo();
+        ASSERT0(m_targinfo);
+    }
+
     //Scan call site and build call graph.
     void buildCallGraph(OptCtx & oc, bool scan_call, bool scan_inner_region);
 

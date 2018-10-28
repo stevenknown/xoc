@@ -136,6 +136,33 @@ typedef enum {
     //////////////////////////////////////////////////////////////////
 } IR_TYPE;
 
+#define SWITCH_CASE_BIN \
+    case IR_ADD: \
+    case IR_SUB: \
+    case IR_MUL: \
+    case IR_DIV: \
+    case IR_REM: \
+    case IR_MOD: \
+    case IR_LAND:\
+    case IR_LOR: \
+    case IR_BAND:\
+    case IR_BOR: \
+    case IR_XOR: \
+    case IR_ASR: \
+    case IR_LSR: \
+    case IR_LSL: \
+    case IR_LT:  \
+    case IR_LE:  \
+    case IR_GT:  \
+    case IR_GE:  \
+    case IR_EQ:  \
+    case IR_NE
+
+#define SWITCH_CASE_UNA \
+    case IR_BNOT: \
+    case IR_LNOT: \
+    case IR_NEG:  \
+    case IR_CVT
 
 //Describe miscellaneous information for IR.
 #define IRT_IS_STMT             0x1 //statement.
@@ -156,25 +183,33 @@ typedef enum {
 #define IRT_HAS_RESULT          0x400
 #define IRT_IS_STMT_IN_BB       0x800
 #define IRT_IS_NON_PR_MEMREF    0x1000
+#define IRT_HAS_DU              0x2000
+#define IRT_WRITE_PR            0x4000
+#define IRT_WRITE_WHOLE_PR      0x8000
+#define IRT_HAS_OFFSET          0x10000
 
-#define IRDES_type(m)             ((m).code)
-#define IRDES_name(m)             ((m).name)
-#define IRDES_kid_map(m)          ((m).kid_map)
-#define IRDES_kid_num(m)          ((m).kid_num)
-#define IRDES_is_stmt(m)          (HAVE_FLAG(((m).attr), IRT_IS_STMT))
-#define IRDES_is_bin(m)           (HAVE_FLAG(((m).attr), IRT_IS_BIN))
-#define IRDES_is_una(m)           (HAVE_FLAG(((m).attr), IRT_IS_UNA))
-#define IRDES_is_mem_ref(m)       (HAVE_FLAG(((m).attr), IRT_IS_MEM_REF))
-#define IRDES_is_mem_opnd(m)      (HAVE_FLAG(((m).attr), IRT_IS_MEM_OPND))
-#define IRDES_is_associative(m)   (HAVE_FLAG(((m).attr), IRT_IS_ASSOCIATIVE))
-#define IRDES_is_commutative(m)   (HAVE_FLAG(((m).attr), IRT_IS_COMMUTATIVE))
-#define IRDES_is_relation(m)      (HAVE_FLAG(((m).attr), IRT_IS_RELATION))
-#define IRDES_is_logical(m)       (HAVE_FLAG(((m).attr), IRT_IS_LOGICAL))
-#define IRDES_is_leaf(m)          (HAVE_FLAG(((m).attr), IRT_IS_LEAF))
-#define IRDES_is_stmt_in_bb(m)    (HAVE_FLAG(((m).attr), IRT_IS_STMT_IN_BB))
-#define IRDES_is_non_pr_memref(m) (HAVE_FLAG(((m).attr), IRT_IS_NON_PR_MEMREF))
-#define IRDES_has_result(m)       (HAVE_FLAG(((m).attr), IRT_HAS_RESULT))
-#define IRDES_size(m)             ((m).size)
+#define IRDES_type(m)              ((m).code)
+#define IRDES_name(m)              ((m).name)
+#define IRDES_kid_map(m)           ((m).kid_map)
+#define IRDES_kid_num(m)           ((m).kid_num)
+#define IRDES_is_stmt(m)           (HAVE_FLAG(((m).attr), IRT_IS_STMT))
+#define IRDES_is_bin(m)            (HAVE_FLAG(((m).attr), IRT_IS_BIN))
+#define IRDES_is_una(m)            (HAVE_FLAG(((m).attr), IRT_IS_UNA))
+#define IRDES_is_mem_ref(m)        (HAVE_FLAG(((m).attr), IRT_IS_MEM_REF))
+#define IRDES_is_mem_opnd(m)       (HAVE_FLAG(((m).attr), IRT_IS_MEM_OPND))
+#define IRDES_is_associative(m)    (HAVE_FLAG(((m).attr), IRT_IS_ASSOCIATIVE))
+#define IRDES_is_commutative(m)    (HAVE_FLAG(((m).attr), IRT_IS_COMMUTATIVE))
+#define IRDES_is_relation(m)       (HAVE_FLAG(((m).attr), IRT_IS_RELATION))
+#define IRDES_is_logical(m)        (HAVE_FLAG(((m).attr), IRT_IS_LOGICAL))
+#define IRDES_is_leaf(m)           (HAVE_FLAG(((m).attr), IRT_IS_LEAF))
+#define IRDES_is_stmt_in_bb(m)     (HAVE_FLAG(((m).attr), IRT_IS_STMT_IN_BB))
+#define IRDES_is_non_pr_memref(m)  (HAVE_FLAG(((m).attr), IRT_IS_NON_PR_MEMREF))
+#define IRDES_has_result(m)        (HAVE_FLAG(((m).attr), IRT_HAS_RESULT))
+#define IRDES_has_offset(m)        (HAVE_FLAG(((m).attr), IRT_HAS_OFFSET))
+#define IRDES_has_du(m)            (HAVE_FLAG(((m).attr), IRT_HAS_DU))
+#define IRDES_is_write_pr(m)       (HAVE_FLAG(((m).attr), IRT_WRITE_PR))
+#define IRDES_is_write_whole_pr(m) (HAVE_FLAG(((m).attr), IRT_WRITE_WHOLE_PR))
+#define IRDES_size(m)              ((m).size)
 class IRDesc {
 public:
     //Note: do not change the layout of members because they are
@@ -575,6 +610,12 @@ public:
     //Return true if ir compute produce a result.
     bool hasResult() const { return IRDES_has_result(g_ir_desc[getCode()]); }
 
+    //Return true if ir has constant offset.
+    bool hasOffset() const { return IRDES_has_offset(g_ir_desc[getCode()]); }
+
+    //Return true if ir has DU Info.
+    bool hasDU() const { return IRDES_has_du(g_ir_desc[getCode()]); }
+
     //Return true if ir is call and does have a return value.
     inline bool hasReturnValue() const;
 
@@ -794,13 +835,13 @@ public:
 
     //Return true if stmt modify PR.
     //CALL/ICALL may modify PR if it has a return value.
-    bool isWritePR() const
-    { return is_stpr() || is_phi() || is_setelem() || is_getelem(); }
+    bool isWritePR() const { return IRDES_is_write_pr(g_ir_desc[getCode()]); }
 
     //Return true if current stmt exactly modifies a PR.
     //CALL/ICALL may modify PR if it has a return value.
-    //IR_SETELEM and IR_GETELEM may modify part of PR rather the whole.
-    bool isMustWritePR() const { return is_stpr() || is_phi(); }
+    //IR_SETELEM and IR_GETELEM may modify part of PR rather than whole.
+    bool isWriteWholePR() const
+    { return IRDES_is_write_whole_pr(g_ir_desc[getCode()]); }
 
     //Return true if current stmt read value from PR.
     bool isReadPR() const  { return is_pr(); }
@@ -885,7 +926,7 @@ public:
     inline bool isExactDef(MD const* md) const;
     inline bool isExactDef(MD const* md, MDSet const* mds) const;
 
-    inline void set_prno(UINT prno);
+    inline void setPrno(UINT prno);
     inline void setOffset(UINT ofst);
     inline void setLabel(LabelInfo const* li);
     inline void setBB(IRBB * bb);
@@ -1006,7 +1047,7 @@ public:
     SYM const* getSTR() const { return CONST_str_val(this); }
 };
 
-
+//Record VAR property.
 class VarProp {
 public:
     //Record VAR if ir is IR_LD|IR_ID.
@@ -1014,7 +1055,8 @@ public:
 };
 
 
-#define DU_PROP_du(ir)        (((DuProp*)ir)->du)
+//Record DU property.
+#define DUPROP_du(ir)        (((DuProp*)ir)->du)
 class DuProp : public IR {
 public:
     DU * du;
@@ -1124,17 +1166,16 @@ public:
 
 
 //This class represent an operation that store value to be part of the section
-//of the PR.
-//
+//of 'base'.
+//NOTE: Type of result PR should same with base.
 //SETELEM_ofst descibe the byte offset to the start address of result PR.
-//
 //The the number of bytes of result PR must be an integer multiple of
-//the number of bytes of SETELEM_rhs if the result data type is vector.
+//the number of bytes of SETELEM_val if the result data type is vector.
 //
-//usage: setelem $2(vec<4*i32>) = $1(i32), 4.
+//usage: setelem $2(vec<4*i32>) = $3(vec<4*i32>), $1(i32), 4.
 //    The result PR is $2.
-//    The code stores $1 to be second element of $2, namely, the section
-//    of $2 that offset is 4 bytes.
+//    The code stores $1 that is part of $3 to be second element
+//    of $2, namely, the section of $2 that offset is 4 bytes.
 //
 //This operation will store value to the memory which offset to the
 //memory chunk or vector's base address.
@@ -1142,14 +1183,15 @@ public:
 #define SETELEM_prno(ir)    (((CSetElem*)CK_IRT(ir, IR_SETELEM))->prno)
 #define SETELEM_ssainfo(ir) (((CSetElem*)CK_IRT(ir, IR_SETELEM))->ssainfo)
 #define SETELEM_du(ir)      (((CSetElem*)CK_IRT(ir, IR_SETELEM))->du)
-#define SETELEM_rhs(ir)     (((CSetElem*)ir)->opnd[CKID_TY(ir, IR_SETELEM, 0)])
-#define SETELEM_ofst(ir)    (((CSetElem*)ir)->opnd[CKID_TY(ir, IR_SETELEM, 1)])
+#define SETELEM_base(ir)    (((CSetElem*)ir)->opnd[CKID_TY(ir, IR_SETELEM, 0)])
+#define SETELEM_val(ir)     (((CSetElem*)ir)->opnd[CKID_TY(ir, IR_SETELEM, 1)])
+#define SETELEM_ofst(ir)    (((CSetElem*)ir)->opnd[CKID_TY(ir, IR_SETELEM, 2)])
 #define SETELEM_kid(ir, idx)(((CSetElem*)ir)->opnd[CKID_TY(ir, IR_SETELEM, idx)])
 class CSetElem: public DuProp, public StmtProp {
 public:
     UINT prno; //PR number.
     SSAInfo * ssainfo; //Present ssa def and use set.
-    IR * opnd[2];
+    IR * opnd[3];
 };
 
 
@@ -1578,10 +1620,10 @@ public:
 public:
 
     //Return the number of dimensions.
-    TMWORD getDimNum() const
+    UINT getDimNum() const
     {
         ASSERT0(isArrayOp());
-        TMWORD dim = 0;
+        UINT dim = 0;
         for (IR const* s = ARR_sub_list(this); s != NULL; s = s->get_next()) {
             dim++;
         }
@@ -1589,7 +1631,7 @@ public:
     }
 
     //Return the number of element in given dimension.
-    UINT getElementNumOfDim(UINT dimension) const
+    TMWORD getElementNumOfDim(UINT dimension) const
     {
         ASSERT0(ARR_elem_num_buf(this));
         return ARR_elem_num(this, dimension);
@@ -1642,15 +1684,13 @@ public:
 
 //This class represent data-type convertion.
 //Record the expression to be converted.
-#define CVT_exp(ir)         (((CCvt*)ir)->opnd[CKID_TY(ir, IR_CVT, 0)])
-#define CVT_kid(ir, idx)    (((CCvt*)ir)->opnd[CKID_TY(ir, IR_CVT, idx)])
-class CCvt : public IR {
+#define CVT_exp(ir)         (UNA_opnd(ir))
+#define CVT_kid(ir, idx)    (UNA_kid(ir, idx))
+class CCvt : public CUna {
 public:
-    IR * opnd[1]; //expression to be converted.
-
     //Get the leaf expression.
     //e.g: cvt:i32(cvt:u8(x)), this function will return x;
-    IR * get_leaf_exp()
+    IR * getLeafExp()
     {
         ASSERT0(getCode() == IR_CVT);
         IR * v;
@@ -1846,7 +1886,10 @@ SSAInfo * IR::getSSAInfo() const
     case IR_SETELEM: return SETELEM_ssainfo(this);
     case IR_CALL:
     case IR_ICALL: return CALL_ssainfo(this);
-    default: break;
+    default:
+        ASSERTN(!isReadPR() && !isWritePR() && !isWriteWholePR(),
+            ("miss switch entry"));
+        break;
     }
     return NULL;
 }
@@ -1943,58 +1986,9 @@ IRBB * IR::getBB() const
 }
 
 
-DU * IR::getDU() const
-{
-    switch (getCode()) {
-    case IR_ID:
-    case IR_LD:
-    case IR_ILD:
-    case IR_PR:
-    case IR_ARRAY:
-    case IR_ST:
-    case IR_STPR:
-    case IR_STARRAY:
-    case IR_SETELEM:
-    case IR_GETELEM:
-    case IR_IST:
-    case IR_CALL:
-    case IR_ICALL:
-    case IR_PHI:
-        return DU_PROP_du(this);
-    default:;
-    }
-    return NULL;
-}
-
-
-void IR::setDU(DU * du)
-{
-    #ifdef _DEBUG_
-    switch (getCode()) {
-    case IR_ID:
-    case IR_LD:
-    case IR_ILD:
-    case IR_PR:
-    case IR_ARRAY:
-    case IR_ST:
-    case IR_STPR:
-    case IR_STARRAY:
-    case IR_SETELEM:
-    case IR_GETELEM:
-    case IR_IST:
-    case IR_CALL:
-    case IR_ICALL:
-    case IR_PHI:
-        break;
-    default: UNREACHABLE();
-    }
-    #endif
-    DU_PROP_du(this) = du;
-}
-
-
 UINT IR::getOffset() const
 {
+	//DO NOT ASSERT even if current IR has no offset.
     switch (getCode()) {
     case IR_LD: return LD_ofst(this);
     case IR_ILD: return ILD_ofst(this);
@@ -2123,7 +2117,6 @@ void IR::setRHS(IR * rhs)
     case IR_ST: ST_rhs(this) = rhs; return;
     case IR_STPR: STPR_rhs(this) = rhs; return;
     case IR_STARRAY: STARR_rhs(this) = rhs; return;
-    case IR_SETELEM: SETELEM_rhs(this) = rhs; return;
     case IR_IST: IST_rhs(this) = rhs; return;
     default: ASSERTN(0, ("not store operation."));
     }
@@ -2132,6 +2125,7 @@ void IR::setRHS(IR * rhs)
 
 void IR::setOffset(UINT ofst)
 {
+    ASSERT0(hasOffset());
     switch (getCode()) {
     case IR_LD: LD_ofst(this) = ofst; return;
     case IR_ST: ST_ofst(this) = ofst; return;
@@ -2178,7 +2172,7 @@ void IR::setSSAInfo(SSAInfo * ssa)
 }
 
 
-void IR::set_prno(UINT prno)
+void IR::setPrno(UINT prno)
 {
     switch (getCode()) {
     case IR_PR: PR_no(this) = prno; return;
@@ -2427,8 +2421,8 @@ DU * IR::cleanDU()
     case IR_CALL:
     case IR_ICALL:
         {
-            DU * du = DU_PROP_du(this);
-            DU_PROP_du(this) = NULL;
+            DU * du = DUPROP_du(this);
+            DUPROP_du(this) = NULL;
             return du;
         }
     default:;
@@ -2497,28 +2491,39 @@ bool IR::isConstIntValueEqualTo(HOST_INT value) const
     }
     return p->is_int() && CONST_int_val(p) == value;
 }
+
+
+DU * IR::getDU() const
+{
+    return hasDU() ? DUPROP_du(this) : NULL;
+}
+
+
+void IR::setDU(DU * du)
+{
+    hasDU() ? DUPROP_du(this) = du : 0;
+}
 //END IR
 
 
 //Exported Functions.
 CHAR const* compositeName(SYM const* n, xcom::StrBuf & buf);
-void dump_ir(IR const* ir,
+void dumpIR(IR const* ir,
              TypeMgr const* tm,
              CHAR * attr = NULL,
              bool dump_kid = true,
              bool dump_src_line = true,
              bool dump_addr = false,
              bool dump_inner_region = true);
-void dump_irs_h(IR * ir_list , TypeMgr const* tm);
-void dump_irs(IR * ir_list,
-              TypeMgr const* tm,
-              CHAR * attr = NULL,
-              bool dump_kid = true,
-              bool dump_src_line = true,
-              bool dump_addr = false,
-              bool dump_inner_region = true);
-void dump_irs(IRList & ir_list, TypeMgr const* tm);
-void dump_irs(List<IR*> & ir_list, TypeMgr const* tm);
+void dumpIRList(IR * ir_list,
+                TypeMgr const* tm,
+                CHAR * attr = NULL,
+                bool dump_kid = true,
+                bool dump_src_line = true,
+                bool dump_addr = false,
+                bool dump_inner_region = true);
+void dumpIRList(IRList & ir_list, TypeMgr const* tm);
+void dumpIRList(List<IR*> & ir_list, TypeMgr const* tm);
 
 class DumpGRCtx {
 public:
@@ -2533,9 +2538,9 @@ void dumpGR(IR const* ir, TypeMgr * tm, DumpGRCtx * ctx);
 void dumpGRInBBList(List<IRBB*> * bblist, TypeMgr * tm, DumpGRCtx * ctx);
 void dumpGRList(IR * irlist, TypeMgr * tm, DumpGRCtx * ctx);
 
-bool verify_irs(IR * ir, IRAddressHash * irh, Region const* rg);
+bool verifyIRList(IR * ir, IRAddressHash * irh, Region const* rg);
 bool verifyIRandBB(BBList * ir_bb_list, Region const* rg);
-bool verify_simp(IR * ir, SimpCtx & simp);
+bool verifySimp(IR * ir, SimpCtx & simp);
 
 //Iterative access ir tree. This funtion initialize the iterator.
 //'ir': the root ir of the tree.

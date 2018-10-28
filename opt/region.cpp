@@ -536,7 +536,7 @@ IR * Region::buildCvt(IR * exp, Type const* tgt_ty)
 IR * Region::buildPhi(UINT prno, Type const* type, UINT num_opnd)
 {
     ASSERT0(type);
-    ASSERT0(prno > 0);
+    ASSERT0(prno != PRNO_UNDEF);
     IR * ir = allocIR(IR_PHI);
     PHI_prno(ir) = prno;
     IR_dt(ir) = type;
@@ -557,7 +557,7 @@ IR * Region::buildPhi(UINT prno, Type const* type, UINT num_opnd)
 IR * Region::buildPhi(UINT prno, Type const* type, IR * opnd_list)
 {
     ASSERT0(type);
-    ASSERT0(prno > 0);
+    ASSERT0(prno != PRNO_UNDEF);
     IR * ir = allocIR(IR_PHI);
     PHI_prno(ir) = prno;
     IR_dt(ir) = type;
@@ -755,7 +755,7 @@ IR * Region::buildIload(IR * base, UINT ofst, Type const* type)
 //'base: hold the value that expected to extract.
 IR * Region::buildGetElem(UINT prno, Type const* type, IR * base, IR * offset)
 {
-    ASSERT0(type && offset && base && prno > 0 && base->is_exp());
+    ASSERT0(type && offset && base && prno != PRNO_UNDEF && base->is_exp());
     IR * ir = allocIR(IR_GETELEM);
     GETELEM_prno(ir) = prno;
     GETELEM_base(ir) = base;
@@ -787,15 +787,21 @@ IR * Region::buildGetElem(Type const* type, IR * base, IR * offset)
 //'type': data type of targe pr.
 //'offset': byte offset to the start of result PR.
 //'rhs: value expected to store.
-IR * Region::buildSetElem(UINT prno, Type const* type, IR * rhs, IR * offset)
+IR * Region::buildSetElem(
+        UINT prno,
+        Type const* type,
+        IR * base,
+        IR * val,
+        IR * offset)
 {
-    ASSERT0(type && offset && rhs && prno > 0 && rhs->is_exp());
+    ASSERT0(type && offset && val && prno != PRNO_UNDEF && val->is_exp());
     IR * ir = allocIR(IR_SETELEM);
     SETELEM_prno(ir) = prno;
-    SETELEM_rhs(ir) = rhs;
+    SETELEM_base(ir) = base;
+    SETELEM_val(ir) = val;
     SETELEM_ofst(ir) = offset;
     IR_dt(ir) = type;
-    IR_parent(rhs) = ir;
+    IR_parent(val) = ir;
     IR_parent(offset) = ir;
     return ir;
 }
@@ -806,11 +812,16 @@ IR * Region::buildSetElem(UINT prno, Type const* type, IR * rhs, IR * offset)
 //'type': data type of targe pr.
 //'offset': byte offset to the start of result PR.
 //'rhs: value expected to store.
-IR * Region::buildSetElem(Type const* type, IR * rhs, IR * offset)
+IR * Region::buildSetElem(
+        Type const* type,
+        IR * base,
+        IR * val,
+        IR * offset)
 {
-    ASSERT0(type && rhs && rhs->is_exp());
+    ASSERT0(type && base && val && val->is_exp() &&
+        offset && offset->is_exp());
     IR * ir = buildSetElem(REGION_analysis_instrument(this)->m_pr_count,
-        type, rhs, offset);
+        type, base, val, offset);
     REGION_analysis_instrument(this)->m_pr_count++;
     return ir;
 }
@@ -822,7 +833,7 @@ IR * Region::buildSetElem(Type const* type, IR * rhs, IR * offset)
 //'rhs: value expected to store.
 IR * Region::buildStorePR(UINT prno, Type const* type, IR * rhs)
 {
-    ASSERT0(type && prno > 0 && rhs && rhs->is_exp());
+    ASSERT0(type && prno != PRNO_UNDEF && rhs && rhs->is_exp());
     IR * ir = allocIR(IR_STPR);
     STPR_no(ir) = prno;
     STPR_rhs(ir) = rhs;
@@ -2386,7 +2397,7 @@ IR_AA * Region::allocAliasAnalysis()
 void Region::dumpFreeTab()
 {
     if (g_tfile == NULL) { return; }
-    fprintf(g_tfile, "\n==-- DUMP Region Free Table --==");
+    note("\n==-- DUMP Region Free Table --==");
     for (UINT i = 0; i <= MAX_OFFSET_AT_FREE_TABLE; i++) {
         IR * lst = REGION_analysis_instrument(this)->m_free_tab[i];
         if (lst == NULL) { continue; }
@@ -2398,11 +2409,11 @@ void Region::dumpFreeTab()
             count++;
         }
 
-        fprintf(g_tfile, "\nirsize(%d), num(%d):", sz, count);
+        note("\nirsize(%d), num(%d):", sz, count);
 
         for (IR * ir = lst; ir != NULL; ir = ir->get_next()) {
             ASSERT0(getIRTypeSize(ir) == sz);
-            fprintf(g_tfile, "ir(%d),", ir->id());
+            prt("ir(%d),", ir->id());
         }
     }
     fflush(g_tfile);
@@ -2901,7 +2912,7 @@ void Region::dump(bool dump_inner_region)
     IR * irlst = getIRList();
     if (irlst != NULL) {
         note("\n==---- IR List ----==");
-        dump_irs(irlst, getTypeMgr(), NULL, true,
+        dumpIRList(irlst, getTypeMgr(), NULL, true,
                  true, false, dump_inner_region);
         return;
     }
@@ -2916,7 +2927,7 @@ void Region::dump(bool dump_inner_region)
 //Dump all irs and ordering by IR_id.
 void Region::dumpAllocatedIR()
 {
-    if (g_tfile == NULL) return;
+    if (g_tfile == NULL) { return; }
     note("\n==---- DUMP ALL IR INFO ----==");
     INT n = getIRVec()->get_last_idx();
     INT i = 1;
@@ -2949,13 +2960,13 @@ void Region::dumpAllocatedIR()
         UINT num = 0;
         IR * p = lst;
         while (p != NULL) { p = p->get_next(); num++; }
-        fprintf(g_tfile, ", num%d : ", num);
+        prt(", num%d : ", num);
 
         while (lst != NULL) {
-            fprintf(g_tfile, "%s", IRNAME(lst));
+            prt("%s", IRNAME(lst));
             lst = IR_next(lst);
             if (lst != NULL) {
-                fprintf(g_tfile, ", ");
+                prt(", ");
             }
         }
     }
@@ -2989,7 +3000,7 @@ void Region::dumpAllocatedIR()
 
         DU * du = ir->getDU();
         if (du != NULL) {
-            fprintf(g_tfile, " has du");
+            prt(" has du");
         }
     }
     fflush(g_tfile);
@@ -3010,7 +3021,10 @@ PassMgr * Region::initPassMgr()
 
 void Region::destroyPassMgr()
 {
-    if (ANA_INS_pass_mgr(REGION_analysis_instrument(this)) == NULL) { return; }
+    if (REGION_analysis_instrument(this) == NULL ||
+        ANA_INS_pass_mgr(REGION_analysis_instrument(this)) == NULL) {
+        return;
+    }
     delete ANA_INS_pass_mgr(REGION_analysis_instrument(this));
     ANA_INS_pass_mgr(REGION_analysis_instrument(this)) = NULL;
 }
@@ -3132,8 +3146,22 @@ bool Region::verifyMDRef()
                         ASSERT0(getMDSetHash()->find(*t->getRefMDSet()));
                     }
                     break;
-                case IR_STPR:
                 case IR_SETELEM:
+                    if (g_is_support_dynamic_type) {
+                        ASSERTN(t->getEffectRef(), ("type is at least effect"));
+                        ASSERTN(t->getEffectRef()->is_pr(),
+                               ("MD must present a PR."));
+                    } else {
+                        MD const* md = t->getEffectRef();
+                        ASSERT0(md);
+                        if (!md->is_exact()) {
+                            ASSERTN(md->is_range(), ("type must be range"));
+                        }
+                        ASSERTN(md->is_pr(), ("MD must present a PR."));
+                    }
+                    ASSERT0(t->getRefMDSet() == NULL);
+                    break;
+                case IR_STPR:
                 case IR_GETELEM:
                     if (g_is_support_dynamic_type) {
                         ASSERTN(t->getEffectRef(), ("type is at least effect"));
@@ -3350,7 +3378,7 @@ void Region::dumpVARInRegion()
     if (getRegionVar() != NULL) {
         note("\n==---- REGION(%d):%s:", REGION_id(this), getRegionName());
         getRegionVar()->dumpVARDecl(buf);
-        fprintf(g_tfile, "%s ----==", buf.buf);
+        prt("%s ----==", buf.buf);
     } else {
         note("\n==---- REGION(%d): ----==", REGION_id(this));
     }
@@ -3384,7 +3412,7 @@ void Region::dumpVARInRegion()
                     //ASSERT0(v);
                     g_indent += 2;
                     note("\n--");
-                    fprintf(g_tfile, " param%d", i);
+                    prt(" param%d", i);
                     g_indent -= 2;
                     continue;
                 }
@@ -3392,7 +3420,7 @@ void Region::dumpVARInRegion()
                 v->dump(buf, getTypeMgr());
                 g_indent += 2;
                 note("\n%s", buf.buf);
-                fprintf(g_tfile, " param%d", i);
+                prt(" param%d", i);
                 fflush(g_tfile);
                 g_indent += 2;
                 dumpVarMD(v, g_indent);
@@ -3470,6 +3498,25 @@ void Region::checkValidAndRecompute(OptCtx * oc, ...)
             cfg->rebuild(*oc);
             cfg->removeEmptyBB(*oc);
             cfg->computeExitList();
+        }
+    }
+
+    if (opts.is_contain(PASS_LOOP_INFO) && !OC_is_loopinfo_valid(*oc)) {
+        ASSERTN(cfg && OC_is_cfg_valid(*oc),
+            ("You should make CFG available first."));
+        cfg->LoopAnalysis(*oc);
+    }
+
+    if (opts.is_contain(PASS_RPO)) {
+        ASSERTN(cfg && OC_is_cfg_valid(*oc),
+            ("You should make CFG available first."));
+        if (!OC_is_rpo_valid(*oc)) {
+            cfg->computeRPO(*oc);
+        } else {
+            ASSERTN(cfg->getBBListInRPO()->get_elem_count() ==
+                getBBList()->get_elem_count(),
+                ("Previous pass has changed RPO, "
+                    "and you should set it to be invalid"));
         }
     }
 
@@ -3610,25 +3657,6 @@ void Region::checkValidAndRecompute(OptCtx * oc, ...)
         ASSERT0(exprtab);
         exprtab->reperform(*oc);
     }
-
-    if (opts.is_contain(PASS_LOOP_INFO) && !OC_is_loopinfo_valid(*oc)) {
-        ASSERTN(cfg && OC_is_cfg_valid(*oc),
-               ("You should make CFG available first."));
-        cfg->LoopAnalysis(*oc);
-    }
-
-    if (opts.is_contain(PASS_RPO)) {
-        ASSERTN(cfg && OC_is_cfg_valid(*oc),
-               ("You should make CFG available first."));
-        if (!OC_is_rpo_valid(*oc)) {
-            cfg->computeRPO(*oc);
-        } else {
-            ASSERTN(cfg->getBBListInRPO()->get_elem_count() ==
-                   getBBList()->get_elem_count(),
-                   ("Previous pass has changed RPO, "
-                    "and you should set it to be invalid"));
-        }
-    }
 }
 
 
@@ -3688,22 +3716,22 @@ bool Region::partitionRegion()
         freeIRTree(t);
         inner_ru->addToIRList(inner_ir);
     }
-    dump_irs(inner_ru->getIRList(), getTypeMgr());
+    dumpIRList(inner_ru->getIRList(), getTypeMgr());
     insertafter_one(&start_pos, ir_ru);
-    dump_irs(getIRList(), getTypeMgr());
+    dumpIRList(getIRList(), getTypeMgr());
     //-------------
     OptCtx oc;
     bool succ = REGION_ru(ir_ru)->process(&oc);
     ASSERT0(succ);
     DUMMYUSE(succ);
 
-    dump_irs(getIRList(), getTypeMgr());
+    dumpIRList(getIRList(), getTypeMgr());
 
     //Merger IR list in inner-region to outer region.
     //remove(&REGION_analysis_instrument(this)->m_ir_list, ir_ru);
     //IR * head = inner_ru->constructIRlist();
     //insertafter(&split_pos, dupIRTreeList(head));
-    //dump_irs(getIRList());
+    //dumpIRList(getIRList());
 
     delete inner_ru;
     return false;
@@ -3834,7 +3862,7 @@ bool Region::process(OptCtx * oc)
 
     updateCallAndReturnList(true);
     tfree();
-
+    oc->set_all_invalid();
     return true;
 
 ERR_RET:
@@ -3843,11 +3871,10 @@ ERR_RET:
     if (ssamgr != NULL && ssamgr->isSSAConstructed()) {
         ssamgr->destruction();
     }
-
     if (!g_retain_pass_mgr_for_region) {
         destroyPassMgr();
     }
-
+    oc->set_all_invalid();
     return false;
 }
 //END Region

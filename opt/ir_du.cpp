@@ -133,7 +133,7 @@ void MDId2IRlist::dump()
 {
     if (g_tfile == NULL) { return; }
     m_md_sys->dump();
-    fprintf(g_tfile, "\n==-- DUMP MDID2IRLIST --==");
+    note("\n==-- DUMP MDID2IRLIST --==");
     TMapIter<UINT, DefSBitSetCore*> c;
     for (UINT mdid = get_first(c); mdid != MD_UNDEF; mdid = get_next(c)) {
         MD const * md = m_md_sys->getMD(mdid);
@@ -144,21 +144,22 @@ void MDId2IRlist::dump()
         for (INT i = irs->get_first(&sc); i >= 0; i = irs->get_next(i, &sc)) {
             IR * d = m_ru->getIR(i);
             g_indent = 4;
-            dump_ir(d, m_tm, NULL, false, false, false);
+            note("\n------------------");
+            dumpIR(d, m_tm, NULL, false, false, false);
 
-            fprintf(g_tfile, "\n\t\tdef:");
+            note("\n\t\tdef:");
             MDSet const* ms = m_du->getMayDef(d);
             MD const* m = m_du->get_must_def(d);
 
             if (m != NULL) {
-                fprintf(g_tfile, "MMD%d", MD_id(m));
+                prt("MMD%d", MD_id(m));
             }
 
             if (ms != NULL) {
                 SEGIter * iter;
                 for (INT j = ms->get_first(&iter);
                      j >= 0; j = ms->get_next(j, &iter)) {
-                    fprintf(g_tfile, " MD%d", j);
+                    prt(" MD%d", j);
                 }
             }
         }
@@ -994,7 +995,7 @@ void IR_DU_MGR::dumpDUGraph(CHAR const* name, bool detail)
                         "fontname:\"courB\" label:\"", id);
             IR * ir = m_ru->getIR(id);
             ASSERT0(ir != NULL);
-            dump_ir(ir, m_tm);
+            dumpIR(ir, m_tm);
             fprintf(h, "\"}");
         } else {
             fprintf(h, "\nnode: { title:\"%d\" shape:box color:gold "
@@ -1022,36 +1023,36 @@ void IR_DU_MGR::dumpDUGraph(CHAR const* name, bool detail)
 //Dump mem usage for each ir DU reference.
 void IR_DU_MGR::dumpMemUsageForMDRef()
 {
-    if (g_tfile == NULL) return;
+    if (g_tfile == NULL) { return; }
     fprintf(g_tfile,
         "\n\n==---- DUMP '%s' IR_DU_MGR : Memory Usage for DU Reference ----==",
         m_ru->getRegionName());
 
-    fprintf(g_tfile, "\nMustD: must defined MD");
-    fprintf(g_tfile, "\nMayDs: overlapped and may defined MDSet");
+    note("\nMustD: must defined MD");
+    note("\nMayDs: overlapped and may defined MDSet");
 
-    fprintf(g_tfile, "\nMustU: must used MD");
+    note("\nMustU: must used MD");
 
-    fprintf(g_tfile, "\nMayUs: overlapped and may used MDSet");
+    note("\nMayUs: overlapped and may used MDSet");
     BBList * bbs = m_ru->getBBList();
     size_t count = 0;
     CHAR const* str = NULL;
     g_indent = 0;
     for (IRBB * bb = bbs->get_head(); bb != NULL; bb = bbs->get_next()) {
-        fprintf(g_tfile, "\n--- BB%d ---", BB_id(bb));
+        note("\n--- BB%d ---", BB_id(bb));
         for (IR * ir = BB_first_ir(bb);
              ir != NULL; ir = BB_next_ir(bb)) {
-            dump_ir(ir, m_tm);
-            fprintf(g_tfile, "\n");
+            dumpIR(ir, m_tm);
+            note("\n");
             m_citer.clean();
             for (IR const* x = iterInitC(ir, m_citer);
                  x != NULL; x = iterNextC(m_citer)) {
-                fprintf(g_tfile, "\n\t%s(%d)::", IRNAME(x), IR_id(x));
+                note("\n\t%s(%d)::", IRNAME(x), IR_id(x));
                 if (x->is_stmt()) {
                     //MustDef
                     MD const* md = get_must_def(x);
                     if (md != NULL) {
-                        fprintf(g_tfile, "MustD%uB, ", (UINT)sizeof(MD));
+                        prt("MustD%uB, ", (UINT)sizeof(MD));
                         count += sizeof(MD);
                     }
 
@@ -1064,7 +1065,7 @@ void IR_DU_MGR::dumpMemUsageForMDRef()
                         else  { n /= 1024*1024; str = "MB"; }
 
                         SEGIter * iter;
-                        fprintf(g_tfile, "MayDs(%lu%s, %d elems, last %d), ",
+                        prt("MayDs(%lu%s, %d elems, last %d), ",
                             (ULONG)n, str, mds->get_elem_count(),
                             mds->get_last(&iter));
                         count += n;
@@ -1073,7 +1074,7 @@ void IR_DU_MGR::dumpMemUsageForMDRef()
                     //MustUse
                     MD const* md = get_effect_use_md(x);
                     if (md != NULL) {
-                        fprintf(g_tfile, "MustU%dB, ", (INT)sizeof(MD));
+                        prt("MustU%dB, ", (INT)sizeof(MD));
                         count += sizeof(MD);
                     }
 
@@ -1086,7 +1087,7 @@ void IR_DU_MGR::dumpMemUsageForMDRef()
                         else { n /= 1024*1024; str = "MB"; }
 
                         SEGIter * iter;
-                        fprintf(g_tfile, "MayUs(%lu%s, %d elems, last %d), ",
+                        prt("MayUs(%lu%s, %d elems, last %d), ",
                                 (ULONG)n, str,
                                 mds->get_elem_count(),
                                 mds->get_last(&iter));
@@ -1100,7 +1101,7 @@ void IR_DU_MGR::dumpMemUsageForMDRef()
     if (count < 1024) { str = "B"; }
     else if (count < 1024 * 1024) { count /= 1024; str = "KB"; }
     else  { count /= 1024*1024; str = "MB"; }
-    fprintf(g_tfile, "\nTotal %u%s", (UINT)count, str);
+    note("\nTotal %u%s", (UINT)count, str);
     fflush(g_tfile);
 }
 
@@ -1108,7 +1109,7 @@ void IR_DU_MGR::dumpMemUsageForMDRef()
 //Dump mem usage for each internal set of bb.
 void IR_DU_MGR::dumpMemUsageForEachSet()
 {
-    if (g_tfile == NULL) return;
+    if (g_tfile == NULL) { return; }
     fprintf(g_tfile,
         "\n==---- DUMP '%s' IR_DU_MGR : Memory Usage for Value Set of BB ----==",
         m_ru->getRegionName());
@@ -1117,7 +1118,7 @@ void IR_DU_MGR::dumpMemUsageForEachSet()
     size_t count = 0;
     CHAR const* str = NULL;
     for (IRBB * bb = bbs->get_head(); bb != NULL; bb = bbs->get_next()) {
-        fprintf(g_tfile, "\n--- BB%d ---", BB_id(bb));
+        note("\n--- BB%d ---", BB_id(bb));
         size_t n;
         SEGIter * st = NULL;
         DefDBitSetCore * irs = m_bb_avail_in_reach_def.get(BB_id(bb));
@@ -1127,7 +1128,7 @@ void IR_DU_MGR::dumpMemUsageForEachSet()
             if (n < 1024) { str = "B"; }
             else if (n < 1024 * 1024) { n /= 1024; str = "KB"; }
             else  { n /= 1024*1024; str = "MB"; }
-            fprintf(g_tfile, "\n\tAvaInReachDef:%lu%s, %d elems, last %d",
+            note("\n\tAvaInReachDef:%lu%s, %d elems, last %d",
                     (ULONG)n, str, irs->get_elem_count(), irs->get_last(&st));
         }
 
@@ -1138,7 +1139,7 @@ void IR_DU_MGR::dumpMemUsageForEachSet()
             if (n < 1024) { str = "B"; }
             else if (n < 1024 * 1024) { n /= 1024; str = "KB"; }
             else  { n /= 1024*1024; str = "MB"; }
-            fprintf(g_tfile, "\n\tAvaOutReachDef:%lu%s, %d elems, last %d",
+            note("\n\tAvaOutReachDef:%lu%s, %d elems, last %d",
                     (ULONG)n, str, irs->get_elem_count(), irs->get_last(&st));
         }
 
@@ -1149,7 +1150,7 @@ void IR_DU_MGR::dumpMemUsageForEachSet()
             if (n < 1024) { str = "B"; }
             else if (n < 1024 * 1024) { n /= 1024; str = "KB"; }
             else  { n /= 1024*1024; str = "MB"; }
-            fprintf(g_tfile, "\n\tInReachDef:%lu%s, %d elems, last %d",
+            note("\n\tInReachDef:%lu%s, %d elems, last %d",
                     (ULONG)n, str, irs->get_elem_count(), irs->get_last(&st));
         }
 
@@ -1160,7 +1161,7 @@ void IR_DU_MGR::dumpMemUsageForEachSet()
             if (n < 1024) { str = "B"; }
             else if (n < 1024 * 1024) { n /= 1024; str = "KB"; }
             else  { n /= 1024*1024; str = "MB"; }
-            fprintf(g_tfile, "\n\tOutReachDef:%lu%s, %d elems, last %d",
+            note("\n\tOutReachDef:%lu%s, %d elems, last %d",
                     (ULONG)n, str, irs->get_elem_count(), irs->get_last(&st));
         }
 
@@ -1171,7 +1172,7 @@ void IR_DU_MGR::dumpMemUsageForEachSet()
             if (n < 1024) { str = "B"; }
             else if (n < 1024 * 1024) { n /= 1024; str = "KB"; }
             else  { n /= 1024*1024; str = "MB"; }
-            fprintf(g_tfile, "\n\tMayGenDef:%lu%s, %d elems, last %d",
+            note("\n\tMayGenDef:%lu%s, %d elems, last %d",
                     (ULONG)n, str, irs->get_elem_count(), irs->get_last(&st));
         }
 
@@ -1182,7 +1183,7 @@ void IR_DU_MGR::dumpMemUsageForEachSet()
             if (n < 1024) { str = "B"; }
             else if (n < 1024 * 1024) { n /= 1024; str = "KB"; }
             else  { n /= 1024*1024; str = "MB"; }
-            fprintf(g_tfile, "\n\tMustGenDef:%lu%s, %d elems, last %d",
+            note("\n\tMustGenDef:%lu%s, %d elems, last %d",
                     (ULONG)n, str, irs->get_elem_count(), irs->get_last(&st));
         }
 
@@ -1193,7 +1194,7 @@ void IR_DU_MGR::dumpMemUsageForEachSet()
             if (n < 1024) { str = "B"; }
             else if (n < 1024 * 1024) { n /= 1024; str = "KB"; }
             else  { n /= 1024*1024; str = "MB"; }
-            fprintf(g_tfile, "\n\tMayKilledDef:%lu%s, %d elems, last %d",
+            note("\n\tMayKilledDef:%lu%s, %d elems, last %d",
                     (ULONG)n, str, dbs->get_elem_count(), dbs->get_last(&st));
         }
 
@@ -1204,7 +1205,7 @@ void IR_DU_MGR::dumpMemUsageForEachSet()
             if (n < 1024) { str = "B"; }
             else if (n < 1024 * 1024) { n /= 1024; str = "KB"; }
             else  { n /= 1024*1024; str = "MB"; }
-            fprintf(g_tfile, "\n\tMustKilledDef:%lu%s, %d elems, last %d",
+            note("\n\tMustKilledDef:%lu%s, %d elems, last %d",
                     (ULONG)n, str, dbs->get_elem_count(), dbs->get_last(&st));
         }
 
@@ -1216,7 +1217,7 @@ void IR_DU_MGR::dumpMemUsageForEachSet()
             if (n < 1024) { str = "B"; }
             else if (n < 1024 * 1024) { n /= 1024; str = "KB"; }
             else  { n /= 1024*1024; str = "MB"; }
-            fprintf(g_tfile, "\n\tMayKilledDef:%lu%s, %d elems, last %d",
+            note("\n\tMayKilledDef:%lu%s, %d elems, last %d",
                     (ULONG)n, str, bs->get_elem_count(), bs->get_last(&st));
         }
 
@@ -1227,7 +1228,7 @@ void IR_DU_MGR::dumpMemUsageForEachSet()
             if (n < 1024) { str = "B"; }
             else if (n < 1024 * 1024) { n /= 1024; str = "KB"; }
             else  { n /= 1024*1024; str = "MB"; }
-            fprintf(g_tfile, "\n\tKilledIrExp:%lu%s, %d elems, last %d",
+            note("\n\tKilledIrExp:%lu%s, %d elems, last %d",
                     (ULONG)n, str, dbs->get_elem_count(), dbs->get_last(&st));
         }
 
@@ -1238,7 +1239,7 @@ void IR_DU_MGR::dumpMemUsageForEachSet()
             if (n < 1024) { str = "B"; }
             else if (n < 1024 * 1024) { n /= 1024; str = "KB"; }
             else  { n /= 1024*1024; str = "MB"; }
-            fprintf(g_tfile, "\n\tLiveInIrExp:%lu%s, %d elems, last %d",
+            note("\n\tLiveInIrExp:%lu%s, %d elems, last %d",
                     (ULONG)n, str, bs->get_elem_count(), bs->get_last(&st));
         }
 
@@ -1249,7 +1250,7 @@ void IR_DU_MGR::dumpMemUsageForEachSet()
             if (n < 1024) { str = "B"; }
             else if (n < 1024 * 1024) { n /= 1024; str = "KB"; }
             else  { n /= 1024*1024; str = "MB"; }
-            fprintf(g_tfile, "\n\tLiveOutIrExp:%lu%s, %d elems, last %d",
+            note("\n\tLiveOutIrExp:%lu%s, %d elems, last %d",
                     (ULONG)n, str, bs->get_elem_count(), bs->get_last(&st));
         }
     }
@@ -1257,7 +1258,7 @@ void IR_DU_MGR::dumpMemUsageForEachSet()
     if (count < 1024) { str = "B"; }
     else if (count < 1024 * 1024) { count /= 1024; str = "KB"; }
     else  { count /= 1024*1024; str = "MB"; }
-    fprintf(g_tfile, "\nTotal %u%s", (UINT)count, str);
+    note("\nTotal %u%s", (UINT)count, str);
     fflush(g_tfile);
 }
 
@@ -1267,8 +1268,8 @@ void IR_DU_MGR::dumpMemUsageForEachSet()
 //DUMP ALL BBList DEF/USE/OVERLAP_DEF/OVERLAP_USE"
 void IR_DU_MGR::dumpRef(UINT indent)
 {
-    if (g_tfile == NULL) return;
-    fprintf(g_tfile, "\n\n==---- DUMP '%s' IR_DU_MGR : DU Reference ----==\n",
+    if (g_tfile == NULL) { return; }
+    note("\n\n==---- DUMP '%s' IR_DU_MGR : DU Reference ----==\n",
             m_ru->getRegionName());
     BBList * bbs = m_ru->getBBList();
     ASSERT0(bbs);
@@ -1277,21 +1278,21 @@ void IR_DU_MGR::dumpRef(UINT indent)
     }
 
     //Dump imported variables referenced.
-    fprintf(g_tfile, "\n==----==");
+    note("\n==----==");
     MDSet * ru_maydef = m_ru->getMayDef();
     if (ru_maydef != NULL) {
-        fprintf(g_tfile, "\nRegionMayDef(OuterRegion):");
+        note("\nRegionMayDef(OuterRegion):");
         ru_maydef->dump(m_md_sys, true);
     }
 
     MDSet * ru_mayuse = m_ru->getMayUse();
     if (ru_mayuse != NULL) {
-        fprintf(g_tfile, "\nRegionMayUse(OuterRegion):");
+        note("\nRegionMayUse(OuterRegion):");
         ru_mayuse->dump(m_md_sys, true);
     }
 
     for (IRBB * bb = bbs->get_head(); bb != NULL; bb = bbs->get_next()) {
-        fprintf(g_tfile, "\n--- BB%d ---", BB_id(bb));
+        note("\n--- BB%d ---", BB_id(bb));
         dumpBBRef(bb, indent);
     }
 }
@@ -1314,12 +1315,12 @@ void IR_DU_MGR::dumpBBDUChainDetail(UINT bbid)
 void IR_DU_MGR::dumpBBDUChainDetail(IRBB * bb)
 {
     ASSERT0(bb);
-    fprintf(g_tfile, "\n--- BB%d ---", BB_id(bb));
+    note("\n--- BB%d ---", BB_id(bb));
 
     //Label Info list.
     LabelInfo const* li = bb->getLabelList().get_head();
     if (li != NULL) {
-        fprintf(g_tfile, "\nLABEL:");
+        note("\nLABEL:");
     }
     for (; li != NULL; li = bb->getLabelList().get_next()) {
         switch (LABEL_INFO_type(li)) {
@@ -1339,26 +1340,26 @@ void IR_DU_MGR::dumpBBDUChainDetail(IRBB * bb)
         if (LABEL_INFO_is_try_start(li) ||
             LABEL_INFO_is_try_end(li) ||
             LABEL_INFO_is_catch_start(li)) {
-            fprintf(g_tfile, "(");
+            prt("(");
             if (LABEL_INFO_is_try_start(li)) {
-                fprintf(g_tfile, "try_start,");
+                prt("try_start,");
             }
             if (LABEL_INFO_is_try_end(li)) {
-                fprintf(g_tfile, "try_end,");
+                prt("try_end,");
             }
             if (LABEL_INFO_is_catch_start(li)) {
-                fprintf(g_tfile, "catch_start");
+                prt("catch_start");
             }
-            fprintf(g_tfile, ")");
+            prt(")");
         }
 
-        fprintf(g_tfile, " ");
+        prt(" ");
     }
 
     for (IR * ir = BB_irlist(bb).get_head();
          ir != NULL; ir = BB_irlist(bb).get_next()) {
-        dump_ir(ir, m_tm);
-        fprintf(g_tfile, "\n");
+        dumpIR(ir, m_tm);
+        note("\n");
 
         IRIter ii;
         for (IR * k = iterInit(ir, ii);
@@ -1367,41 +1368,41 @@ void IR_DU_MGR::dumpBBDUChainDetail(IRBB * bb)
                 continue;
             }
 
-            fprintf(g_tfile, "\n\t>>%s", IRNAME(k));
+            note("\n\t>>%s", IRNAME(k));
             if (k->is_stpr() || k->is_pr()) {
-                fprintf(g_tfile, "%d", k->getPrno());
+                prt("%d", k->getPrno());
             }
-            fprintf(g_tfile, "(id:%d) ", IR_id(k));
+            prt("(id:%d) ", IR_id(k));
 
             if (k->is_stmt()) {
-                fprintf(g_tfile, "Dref:");
+                prt("Dref:");
             } else {
-                fprintf(g_tfile, "Uref:");
+                prt("Uref:");
             }
 
             //Dump must ref.
             MD const* md = k->getRefMD();
             if (md != NULL) {
-                fprintf(g_tfile, "MMD%d", MD_id(md));
+                prt("MMD%d", MD_id(md));
             }
 
             //Dump may ref.
             MDSet const* mds = k->getRefMDSet();
             if (mds != NULL && !mds->is_empty()) {
-                fprintf(g_tfile, ",");
+                prt(",");
                 SEGIter * iter;
                 for (INT i = mds->get_first(&iter); i >= 0; ) {
-                    fprintf(g_tfile, "MD%d", i);
+                    prt("MD%d", i);
                     i = mds->get_next(i, &iter);
-                    if (i >= 0) { fprintf(g_tfile, ","); }
+                    if (i >= 0) { prt(","); }
                 }
             }
 
             //Dump def/use list.
             if (k->is_stmt() || ir->is_lhs(k)) {
-                fprintf(g_tfile, "\n\t  USE List:");
+                note("\n\t  USE List:");
             } else {
-                fprintf(g_tfile, "\n\t  DEF List:");
+                note("\n\t  DEF List:");
             }
 
             DUSet const* set = k->readDUSet();
@@ -1410,19 +1411,19 @@ void IR_DU_MGR::dumpBBDUChainDetail(IRBB * bb)
                 for (INT i = set->get_first(&di);
                      i >= 0; ) {
                     IR const* ref = m_ru->getIR(i);
-                    fprintf(g_tfile, "%s", IRNAME(ref));
+                    prt("%s", IRNAME(ref));
                     if (ref->is_stpr() || ref->is_pr()) {
-                        fprintf(g_tfile, "%d", ref->getPrno());
+                        prt("%d", ref->getPrno());
                     }
-                    fprintf(g_tfile, "(id:%d)", IR_id(ref));
+                    prt("(id:%d)", IR_id(ref));
 
                     i = set->get_next(i, &di);
 
-                    if (i >= 0) { fprintf(g_tfile, ","); }
+                    if (i >= 0) { prt(","); }
                 }
             }
         }
-        fprintf(g_tfile, "\n");
+        note("\n");
     } //end for each IR
 }
 
@@ -1451,8 +1452,8 @@ void IR_DU_MGR::dump(CHAR const* name)
 //will dump du chain for each memory reference.
 void IR_DU_MGR::dumpDUChainDetail()
 {
-    if (g_tfile == NULL) return;
-    fprintf(g_tfile, "\n\n==---- DUMP '%s' DU chain detail ----==\n",
+    if (g_tfile == NULL) { return; }
+    note("\n\n==---- DUMP '%s' DU chain detail ----==\n",
             m_ru->getRegionName());
     g_indent = 0;
     BBList * bbl = m_ru->getBBList();
@@ -1469,26 +1470,26 @@ void IR_DU_MGR::dumpDUChainDetail()
 //stmt, but if you want, please invoke dumpDUChainDetail().
 void IR_DU_MGR::dumpDUChain()
 {
-    if (g_tfile == NULL) return;
-    fprintf(g_tfile, "\n\n==---- DUMP '%s' DU chain ----==\n",
+    if (g_tfile == NULL) { return; }
+    note("\n\n==---- DUMP '%s' DU chain ----==\n",
             m_ru->getRegionName());
     g_indent = 2;
     MDSet mds;
     DefMiscBitSetMgr bsmgr;
     BBList * bbl = m_ru->getBBList();
     for (IRBB * bb = bbl->get_head(); bb != NULL; bb = bbl->get_next()) {
-        fprintf(g_tfile, "\n--- BB%d ---", BB_id(bb));
+        note("\n--- BB%d ---", BB_id(bb));
         for (IR * ir = BB_irlist(bb).get_head();
              ir != NULL; ir = BB_irlist(bb).get_next()) {
-            dump_ir(ir, m_tm);
-            fprintf(g_tfile, "\n>>");
+            dumpIR(ir, m_tm);
+            note("\n>>");
 
             //MustDef
-            fprintf(g_tfile, "Dref(");
+            prt("Dref(");
             bool has_prt_something = false;
             MD const* md = get_must_def(ir);
             if (md != NULL) {
-                fprintf(g_tfile, "MMD%d", MD_id(md));
+                prt("MMD%d", MD_id(md));
                 has_prt_something = true;
             }
 
@@ -1498,37 +1499,37 @@ void IR_DU_MGR::dumpDUChain()
                 MDSet const* x = getMayDef(ir);
                 if (x != NULL) {
                     if (has_prt_something) {
-                        fprintf(g_tfile, ",");
+                        prt(",");
                     }
 
                     SEGIter * iter;
                     for (INT i = x->get_first(&iter); i >= 0;) {
-                        fprintf(g_tfile, "MD%d", i);
+                        prt("MD%d", i);
                         i = x->get_next(i, &iter);
                         if (i >= 0) {
-                            fprintf(g_tfile, ",");
+                            prt(",");
                         }
                     }
                     has_prt_something = true;
                 }
             }
             if (!has_prt_something) {
-                fprintf(g_tfile, "--");
+                prt("--");
             }
-            fprintf(g_tfile, ")");
+            prt(")");
 
             //MayUse
-            fprintf(g_tfile, " <= ");
+            prt(" <= ");
             mds.clean(bsmgr);
 
-            fprintf(g_tfile, "Uref(");
+            prt("Uref(");
             collectMayUseRecursive(ir, mds, true, bsmgr);
             if (!mds.is_empty()) {
                 mds.dump(m_md_sys);
             } else {
-                fprintf(g_tfile, "--");
+                prt("--");
             }
-            fprintf(g_tfile, ")");
+            prt(")");
 
             //Dump def chain.
             m_citer.clean();
@@ -1543,7 +1544,7 @@ void IR_DU_MGR::dumpDUChain()
                 }
 
                 if (first) {
-                    fprintf(g_tfile, "\n>>DEF List:");
+                    note("\n>>DEF List:");
                     first = false;
                 }
 
@@ -1551,7 +1552,7 @@ void IR_DU_MGR::dumpDUChain()
                 for (INT i = defset->get_first(&di);
                      i >= 0; i = defset->get_next(i, &di)) {
                     IR const* def = m_ru->getIR(i);
-                    fprintf(g_tfile, "%s(id:%d), ", IRNAME(def), def->id());
+                    prt("%s(id:%d), ", IRNAME(def), def->id());
                 }
             }
 
@@ -1559,12 +1560,12 @@ void IR_DU_MGR::dumpDUChain()
             DUSet const* useset = ir->readDUSet();
             if (useset == NULL || useset->get_elem_count() == 0) { continue; }
 
-            fprintf(g_tfile, "\n>>USE List:");
+            note("\n>>USE List:");
             DUIter di = NULL;
             for (INT i = useset->get_first(&di);
                  i >= 0; i = useset->get_next(i, &di)) {
                 IR const* u = m_ru->getIR(i);
-                fprintf(g_tfile, "%s(id:%d), ", IRNAME(u), IR_id(u));
+                prt("%s(id:%d), ", IRNAME(u), IR_id(u));
             }
         } //end for each IR
     } //end for each BB
@@ -1576,8 +1577,8 @@ void IR_DU_MGR::dumpDUChain()
 //'is_bs': true to dump bitset info.
 void IR_DU_MGR::dumpSet(bool is_bs)
 {
-    if (g_tfile == NULL) return;
-    fprintf(g_tfile, "\n\n==---- DUMP %s() IR_DU_MGR : SET ----==\n",
+    if (g_tfile == NULL) { return; }
+    note("\n\n==---- DUMP %s() IR_DU_MGR : SET ----==\n",
             m_ru->getRegionName());
     BBList * bbl = m_ru->getBBList();
     xcom::C<IRBB*> * cb;
@@ -1586,7 +1587,7 @@ void IR_DU_MGR::dumpSet(bool is_bs)
          bb != NULL; bb = bbl->get_next(&cb)) {
 
         UINT bbid = BB_id(bb);
-        fprintf(g_tfile, "\n---- BB%d ----", bbid);
+        note("\n---- BB%d ----", bbid);
         DefDBitSetCore * def_in = getInReachDef(bbid, NULL);
         DefDBitSetCore * def_out = getOutReachDef(bbid, NULL);
         DefDBitSetCore * avail_def_in = getAvailInReachDef(bbid, NULL);
@@ -1604,180 +1605,180 @@ void IR_DU_MGR::dumpSet(bool is_bs)
 
         SEGIter * st = NULL;
         if (def_in != NULL) {
-            fprintf(g_tfile, "\nDEF IN STMT: %lu byte ",
+            note("\nDEF IN STMT: %lu byte ",
                 (ULONG)def_in->count_mem());
             for (i = def_in->get_first(&st);
                  i != -1; i = def_in->get_next(i, &st)) {
                 IR * ir = m_ru->getIR(i);
                 ASSERT0(ir != NULL);
-                fprintf(g_tfile, "%s(%d), ", IRNAME(ir), ir->id());
+                prt("%s(%d), ", IRNAME(ir), ir->id());
             }
             if (is_bs) {
-                fprintf(g_tfile, "\n             ");
+                note("\n             ");
                 def_in->dump(g_tfile);
             }
         }
 
         if (def_out != NULL) {
-            fprintf(g_tfile, "\nDEF OUT STMT: %lu byte ",
+            note("\nDEF OUT STMT: %lu byte ",
                 (ULONG)def_out->count_mem());
             for (i = def_out->get_first(&st);
                  i != -1; i = def_out->get_next(i, &st)) {
                 IR * ir = m_ru->getIR(i);
                 ASSERT0(ir != NULL);
-                fprintf(g_tfile, "%s(%d), ", IRNAME(ir), ir->id());
+                prt("%s(%d), ", IRNAME(ir), ir->id());
             }
             if (is_bs) {
-                fprintf(g_tfile, "\n             ");
+                note("\n             ");
                 def_out->dump(g_tfile);
             }
         }
 
         if (avail_def_in != NULL) {
-            fprintf(g_tfile, "\nDEF AVAIL_IN STMT: %lu byte ",
+            note("\nDEF AVAIL_IN STMT: %lu byte ",
                 (ULONG)avail_def_in->count_mem());
             for (i = avail_def_in->get_first(&st);
                  i != -1; i = avail_def_in->get_next(i, &st)) {
                 IR * ir = m_ru->getIR(i);
                 ASSERT0(ir != NULL);
-                fprintf(g_tfile, "%s(%d), ", IRNAME(ir), ir->id());
+                prt("%s(%d), ", IRNAME(ir), ir->id());
             }
             if (is_bs) {
-                fprintf(g_tfile, "\n             ");
+                note("\n             ");
                 avail_def_in->dump(g_tfile);
             }
         }
 
         if (avail_def_out != NULL) {
-            fprintf(g_tfile, "\nDEF AVAIL_OUT STMT: %lu byte ",
+            note("\nDEF AVAIL_OUT STMT: %lu byte ",
                 (ULONG)avail_def_out->count_mem());
             for (i = avail_def_out->get_first(&st);
                  i != -1; i = avail_def_out->get_next(i, &st)) {
                 IR * ir = m_ru->getIR(i);
                 ASSERT0(ir != NULL);
-                fprintf(g_tfile, "%s(%d), ", IRNAME(ir), ir->id());
+                prt("%s(%d), ", IRNAME(ir), ir->id());
             }
             if (is_bs) {
-                fprintf(g_tfile, "\n             ");
+                note("\n             ");
                 avail_def_out->dump(g_tfile);
             }
         }
 
         if (may_def_gen != NULL) {
-            fprintf(g_tfile, "\nMAY GEN STMT: %lu byte ",
+            note("\nMAY GEN STMT: %lu byte ",
                 (ULONG)may_def_gen->count_mem());
             for (i = may_def_gen->get_first(&st);
                  i != -1; i = may_def_gen->get_next(i, &st)) {
                 IR * ir = m_ru->getIR(i);
                 ASSERT0(ir != NULL);
-                fprintf(g_tfile, "%s(%d), ", IRNAME(ir), ir->id());
+                prt("%s(%d), ", IRNAME(ir), ir->id());
             }
             if (is_bs) {
-                fprintf(g_tfile, "\n             ");
+                note("\n             ");
                 may_def_gen->dump(g_tfile);
             }
         }
 
         if (must_def_gen != NULL) {
-            fprintf(g_tfile, "\nMUST GEN STMT: %lu byte ",
+            note("\nMUST GEN STMT: %lu byte ",
                 (ULONG)must_def_gen->count_mem());
             for (i = must_def_gen->get_first(&st);
                  i != -1; i = must_def_gen->get_next(i, &st)) {
                 IR * ir = m_ru->getIR(i);
                 ASSERT0(ir != NULL);
-                fprintf(g_tfile, "%s(%d), ", IRNAME(ir), ir->id());
+                prt("%s(%d), ", IRNAME(ir), ir->id());
             }
             if (is_bs) {
-                fprintf(g_tfile, "\n             ");
+                note("\n             ");
                 must_def_gen->dump(g_tfile);
             }
         }
 
         if (must_def_kill != NULL) {
-            fprintf(g_tfile, "\nMUST KILLED STMT: %lu byte ",
+            note("\nMUST KILLED STMT: %lu byte ",
                     (ULONG)must_def_kill->count_mem());
             for (i = must_def_kill->get_first(&st);
                  i != -1; i = must_def_kill->get_next(i, &st)) {
                 IR * ir = m_ru->getIR(i);
                 ASSERT0(ir != NULL);
-                fprintf(g_tfile, "%s(%d), ", IRNAME(ir), ir->id());
+                prt("%s(%d), ", IRNAME(ir), ir->id());
             }
             if (is_bs) {
-                fprintf(g_tfile, "\n             ");
+                note("\n             ");
                 must_def_kill->dump(g_tfile);
             }
         }
 
         if (may_def_kill != NULL) {
-            fprintf(g_tfile, "\nMAY KILLED STMT: %lu byte ",
+            note("\nMAY KILLED STMT: %lu byte ",
                     (ULONG)may_def_kill->count_mem());
             for (i = may_def_kill->get_first(&st);
                  i != -1; i = may_def_kill->get_next(i, &st)) {
                 IR * ir = m_ru->getIR(i);
                 ASSERT0(ir != NULL);
-                fprintf(g_tfile, "%s(%d), ", IRNAME(ir), ir->id());
+                prt("%s(%d), ", IRNAME(ir), ir->id());
             }
             if (is_bs) {
-                fprintf(g_tfile, "\n             ");
+                note("\n             ");
                 may_def_kill->dump(g_tfile);
             }
         }
 
         if (livein_ir != NULL) {
-            fprintf(g_tfile, "\nLIVEIN EXPR: %lu byte ",
+            note("\nLIVEIN EXPR: %lu byte ",
                     (ULONG)livein_ir->count_mem());
             for (i = livein_ir->get_first(&st);
                  i != -1; i = livein_ir->get_next(i, &st)) {
                 IR * ir = m_ru->getIR(i);
                 ASSERT0(ir != NULL);
-                fprintf(g_tfile, "%s(%d), ", IRNAME(ir), ir->id());
+                prt("%s(%d), ", IRNAME(ir), ir->id());
             }
             if (is_bs) {
-                fprintf(g_tfile, "\n             ");
+                note("\n             ");
                 livein_ir->dump(g_tfile);
             }
         }
 
         if (liveout_ir != NULL) {
-            fprintf(g_tfile, "\nLIVEOUT EXPR: %lu byte ",
+            note("\nLIVEOUT EXPR: %lu byte ",
                     (ULONG)liveout_ir->count_mem());
             for (i = liveout_ir->get_first(&st);
                  i != -1; i = liveout_ir->get_next(i, &st)) {
                 IR * ir = m_ru->getIR(i);
                 ASSERT0(ir != NULL);
-                fprintf(g_tfile, "%s(%d), ", IRNAME(ir), ir->id());
+                prt("%s(%d), ", IRNAME(ir), ir->id());
             }
             if (is_bs) {
-                fprintf(g_tfile, "\n             ");
+                note("\n             ");
                 liveout_ir->dump(g_tfile);
             }
         }
 
         if (gen_ir != NULL) {
-            fprintf(g_tfile, "\nGEN EXPR: %lu byte ", (ULONG)gen_ir->count_mem());
+            note("\nGEN EXPR: %lu byte ", (ULONG)gen_ir->count_mem());
             for (i = gen_ir->get_first(&st);
                  i != -1; i = gen_ir->get_next(i, &st)) {
                 IR * ir = m_ru->getIR(i);
                 ASSERT0(ir != NULL);
-                fprintf(g_tfile, "%s(%d), ", IRNAME(ir), ir->id());
+                prt("%s(%d), ", IRNAME(ir), ir->id());
             }
             if (is_bs) {
-                fprintf(g_tfile, "\n             ");
+                note("\n             ");
                 gen_ir->dump(g_tfile);
             }
         }
 
         if (killed_exp != NULL) {
-            fprintf(g_tfile, "\nKILLED EXPR: %lu byte ",
+            note("\nKILLED EXPR: %lu byte ",
                     (ULONG)killed_exp->count_mem());
             for (i = killed_exp->get_first(&st);
                  i != -1; i = killed_exp->get_next(i, &st)) {
                 IR * ir = m_ru->getIR(i);
                 ASSERT0(ir != NULL);
-                fprintf(g_tfile, "%s(%d), ", IRNAME(ir), ir->id());
+                prt("%s(%d), ", IRNAME(ir), ir->id());
             }
             if (is_bs) {
-                fprintf(g_tfile, "\n             ");
+                note("\n             ");
                 killed_exp->dump(g_tfile);
             }
         }
@@ -2376,7 +2377,8 @@ void IR_DU_MGR::inferStorePR(IR * ir, UINT duflag)
 void IR_DU_MGR::inferSetelem(IR * ir, UINT duflag)
 {
     ASSERT0(ir->is_setelem() && ir->getRefMD() && ir->getRefMDSet() == NULL);
-    computeExpression(SETELEM_rhs(ir), NULL, COMP_EXP_RECOMPUTE, duflag);
+    computeExpression(SETELEM_base(ir), NULL, COMP_EXP_RECOMPUTE, duflag);
+    computeExpression(SETELEM_val(ir), NULL, COMP_EXP_RECOMPUTE, duflag);
     computeExpression(SETELEM_ofst(ir), NULL, COMP_EXP_RECOMPUTE, duflag);
 }
 
@@ -2580,6 +2582,19 @@ void IR_DU_MGR::collectMayUse(IR const* ir, MDSet & mayUse, bool computePR)
 
 
 //Collect MD which ir may use, include overlapped MD.
+void IR_DU_MGR::collectMayUseRecursiveIRList(
+        IR const* ir,
+        OUT MDSet & mayUse,
+        bool computePR,
+        DefMiscBitSetMgr & bsmgr)
+{
+  for (IR const* e = ir; e != NULL; e = e->get_next()) {
+    collectMayUseRecursive(e, mayUse, computePR, bsmgr);
+  }
+}
+
+
+//Collect MD which ir may use, include overlapped MD.
 void IR_DU_MGR::collectMayUseRecursive(
         IR const* ir,
         OUT MDSet & mayUse,
@@ -2588,7 +2603,6 @@ void IR_DU_MGR::collectMayUseRecursive(
 {
     if (ir == NULL) { return; }
     switch (ir->getCode()) {
-    case IR_CONST:  return;
     case IR_ID:
     case IR_LD:
         ASSERT0(ir->getParent() != NULL);
@@ -2602,82 +2616,27 @@ void IR_DU_MGR::collectMayUseRecursive(
             }
         }
         return;
+    case IR_CONST:
+    case IR_CVT:
+        //CVT should not has any use-mds. Even if the operation
+        //will genrerate different type.
+        //Fall through
     case IR_ST:
-        collectMayUseRecursive(ST_rhs(ir), mayUse, computePR, bsmgr);
-        return;
     case IR_STPR:
-        collectMayUseRecursive(STPR_rhs(ir), mayUse, computePR, bsmgr);
-        return;
-    case IR_SETELEM:
-        collectMayUseRecursive(SETELEM_rhs(ir), mayUse, computePR, bsmgr);
-        collectMayUseRecursive(SETELEM_ofst(ir), mayUse, computePR, bsmgr);
-        return;
-    case IR_GETELEM:
-        collectMayUseRecursive(GETELEM_base(ir), mayUse, computePR, bsmgr);
-        collectMayUseRecursive(GETELEM_ofst(ir), mayUse, computePR, bsmgr);
-        return;
-    case IR_STARRAY:
-        for (IR * s = ARR_sub_list(ir); s != NULL; s = s->get_next()) {
-            collectMayUseRecursive(s, mayUse, computePR, bsmgr);
-        }
-        collectMayUseRecursive(ARR_base(ir), mayUse, computePR, bsmgr);
-        collectMayUseRecursive(STARR_rhs(ir), mayUse, computePR, bsmgr);
-        return;
-    case IR_ILD:
-        collectMayUseRecursive(ILD_base(ir), mayUse, computePR, bsmgr);
-        ASSERT0(ir->getParent() != NULL);
-        if (!ir->getParent()->is_lda()) {
-            MD const* t = getMustUse(ir);
-            if (t != NULL) {
-                mayUse.bunion(t, bsmgr);
-            }
-
-            MDSet const* ts = getMayUse(ir);
-            if (ts != NULL) {
-                mayUse.bunion(*ts, bsmgr);
-            }
-        }
-        return;
     case IR_IST:
-        collectMayUseRecursive(IST_rhs(ir), mayUse, computePR, bsmgr);
-        collectMayUseRecursive(IST_base(ir), mayUse, computePR, bsmgr);
-        break;
     case IR_LDA:
-        ASSERT0(ir->verify(m_ru));
-        return;
-    case IR_ICALL:
-        collectMayUseRecursive(ICALL_callee(ir), mayUse, computePR, bsmgr);
-        //Fall through.
-    case IR_CALL:
-        {
-            IR * p = CALL_param_list(ir);
-            while (p != NULL) {
-                collectMayUseRecursive(p, mayUse, computePR, bsmgr);
-                p = p->get_next();
-            }
-
-            bool done = false;
-            CallGraph * callg = m_ru->getRegionMgr()->getCallGraph();
-            if (callg != NULL) {
-                Region * rg = callg->mapCall2Region(ir, m_ru);
-                if (rg != NULL && REGION_is_mddu_valid(rg)) {
-                    MDSet const* muse = rg->getMayUse();
-                    if (muse != NULL) {
-                        mayUse.bunion(*muse, bsmgr);
-                        done = true;
-                    }
-                }
-            }
-
-            if (!done) {
-                //Regard MayDef MDSet as MayUse.
-                MDSet const* muse = ir->getRefMDSet();
-                if (muse != NULL) {
-                    mayUse.bunion(*muse, bsmgr);
-                }
-            }
-        }
-        return;
+    case IR_SETELEM:
+    case IR_GETELEM:
+    case IR_STARRAY:
+    case IR_TRUEBR:
+    case IR_FALSEBR:
+    case IR_RETURN:
+    case IR_SELECT:
+    case IR_PHI:
+    case IR_GOTO:
+    case IR_LABEL:
+    case IR_IGOTO:
+    case IR_SWITCH:
     case IR_ADD:
     case IR_SUB:
     case IR_MUL:
@@ -2698,27 +2657,20 @@ void IR_DU_MGR::collectMayUseRecursive(
     case IR_ASR:
     case IR_LSR:
     case IR_LSL:
-        //Binary operation.
-        collectMayUseRecursive(BIN_opnd0(ir), mayUse, computePR, bsmgr);
-        collectMayUseRecursive(BIN_opnd1(ir), mayUse, computePR, bsmgr);
-        return;
     case IR_BNOT:
     case IR_LNOT:
     case IR_NEG:
-        collectMayUseRecursive(UNA_opnd(ir), mayUse, computePR, bsmgr);
+        for (UINT i = 0; i < IR_MAX_KID_NUM(ir); i++) {
+            IR * k = ir->getKid(i);
+            if (k == NULL) { continue; }
+            ASSERT0(k->is_exp());
+            collectMayUseRecursiveIRList(k, mayUse, computePR, bsmgr);
+        }
         return;
-    case IR_GOTO:
-    case IR_LABEL:
-        return;
-    case IR_IGOTO:
-        collectMayUseRecursive(IGOTO_vexp(ir), mayUse, computePR, bsmgr);
-        return;
-    case IR_SWITCH:
-        collectMayUseRecursive(SWITCH_vexp(ir), mayUse, computePR, bsmgr);
-        return;
-    case IR_ARRAY:
-        {
-            ASSERT0(ir->getParent() != NULL);
+    case IR_ILD:
+        collectMayUseRecursive(ILD_base(ir), mayUse, computePR, bsmgr);
+        ASSERT0(ir->getParent() != NULL);
+        if (!ir->getParent()->is_lda()) {
             MD const* t = getMustUse(ir);
             if (t != NULL) {
                 mayUse.bunion(t, bsmgr);
@@ -2728,50 +2680,68 @@ void IR_DU_MGR::collectMayUseRecursive(
             if (ts != NULL) {
                 mayUse.bunion(*ts, bsmgr);
             }
-
-            for (IR * s = ARR_sub_list(ir); s != NULL; s = s->get_next()) {
-                collectMayUseRecursive(s, mayUse, computePR, bsmgr);
-            }
-            collectMayUseRecursive(ARR_base(ir), mayUse, computePR, bsmgr);
         }
         return;
-    case IR_CVT:
-        //CVT should not has any use-mds. Even if the operation
-        //will genrerate different type.
-        collectMayUseRecursive(CVT_exp(ir), mayUse, computePR, bsmgr);
+    case IR_ICALL:
+    case IR_CALL: {
+        for (UINT i = 0; i < IR_MAX_KID_NUM(ir); i++) {
+            IR * k = ir->getKid(i);
+            if (k == NULL) { continue; }
+            ASSERT0(k->is_exp());
+            collectMayUseRecursiveIRList(k, mayUse, computePR, bsmgr);
+        }
+        bool done = false;
+        CallGraph * callg = m_ru->getRegionMgr()->getCallGraph();
+        if (callg != NULL) {
+            Region * rg = callg->mapCall2Region(ir, m_ru);
+            if (rg != NULL && REGION_is_mddu_valid(rg)) {
+                MDSet const* muse = rg->getMayUse();
+                if (muse != NULL) {
+                    mayUse.bunion(*muse, bsmgr);
+                    done = true;
+                }
+            }
+        }
+        if (!done) {
+            //Regard MayDef MDSet as MayUse.
+            MDSet const* muse = ir->getRefMDSet();
+            if (muse != NULL) {
+                mayUse.bunion(*muse, bsmgr);
+            }
+        }
         return;
+    }
+    case IR_ARRAY: {
+        ASSERT0(ir->getParent() != NULL);
+        MD const* t = getMustUse(ir);
+        if (t != NULL) {
+            mayUse.bunion(t, bsmgr);
+        }
+
+        MDSet const* ts = getMayUse(ir);
+        if (ts != NULL) {
+            mayUse.bunion(*ts, bsmgr);
+        }
+        for (UINT i = 0; i < IR_MAX_KID_NUM(ir); i++) {
+            IR * k = ir->getKid(i);
+            if (k == NULL) { continue; }
+            ASSERT0(k->is_exp());
+            collectMayUseRecursiveIRList(k, mayUse, computePR, bsmgr);
+        }
+        return;
+    }
     case IR_PR:
         if (!computePR) { return; }
-
         ASSERT0(getMustUse(ir));
         mayUse.bunion_pure(MD_id(getMustUse(ir)), bsmgr);
         return;
-    case IR_TRUEBR:
-    case IR_FALSEBR:
-        ASSERT0(BR_lab(ir));
-        collectMayUseRecursive(BR_det(ir), mayUse, computePR, bsmgr);
-        return;
-    case IR_RETURN:
-        collectMayUseRecursive(RET_exp(ir), mayUse, computePR, bsmgr);
-        return;
-    case IR_SELECT:
-        collectMayUseRecursive(SELECT_pred(ir), mayUse, computePR, bsmgr);
-        collectMayUseRecursive(SELECT_trueexp(ir), mayUse, computePR, bsmgr);
-        collectMayUseRecursive(SELECT_falseexp(ir), mayUse, computePR, bsmgr);
-        return;
-    case IR_PHI:
-        for (IR * p = PHI_opnd_list(ir); p != NULL; p = p->get_next()) {
-            collectMayUseRecursive(p, mayUse, computePR, bsmgr);
+    case IR_REGION: {
+        MDSet const* x = REGION_ru(ir)->getMayUse();
+        if (x != NULL && !x->is_empty()) {
+            mayUse.bunion(*x, bsmgr);
         }
         return;
-    case IR_REGION:
-        {
-            MDSet const* x = REGION_ru(ir)->getMayUse();
-            if (x != NULL && !x->is_empty()) {
-                mayUse.bunion(*x, bsmgr);
-            }
-        }
-        return;
+    }
     default: UNREACHABLE();
     }
 }
@@ -3862,7 +3832,7 @@ IR const* IR_DU_MGR::findKillingLocalDef(
         MD const* mustdef = ir->getRefMD();
         if (mustdef != NULL) {
             if (mustdef == expmd || mustdef->is_overlap(expmd)) {
-                if (mustdef->is_exact() || ir->isMustWritePR()) {
+                if (mustdef->is_exact() || ir->isWriteWholePR()) {
                     return ir;
                 }
 
@@ -3921,6 +3891,21 @@ bool IR_DU_MGR::buildLocalDUChain(
     }
     xdu->addUse(exp, *m_misc_bs_mgr);
     return true;
+}
+
+
+//Check memory operand and build DU chain for them.
+//Note we always find the nearest exact def, and build
+//the DU between the def and its use.
+void IR_DU_MGR::checkAndBuildChainRecursiveIRList(
+        IRBB * bb,
+        IR * exp,
+        xcom::C<IR*> * ct,
+        UINT flag)
+{
+    for (IR * e = exp; e != NULL; e = e->get_next()) {
+        checkAndBuildChainRecursive(bb, e, ct, flag);
+    }
 }
 
 
@@ -4046,93 +4031,26 @@ void IR_DU_MGR::checkAndBuildChain(IR * stmt, xcom::C<IR*> * ct, UINT flag)
     ASSERT0(stmt->is_stmt());
     switch (stmt->getCode()) {
     case IR_ST:
-        {
-            if (HAVE_FLAG(flag, COMPUTE_NOPR_DU)) {
-                DUSet * du = getAndAllocDUSet(stmt);
-                if (!m_is_init->is_contain(IR_id(stmt))) {
-                    m_is_init->bunion(IR_id(stmt));
-                    du->clean(*m_misc_bs_mgr);
-                }
-            }
-
-            checkAndBuildChainRecursive(stmt->getBB(),
-                stmt->getRHS(), ct, flag);
-            return;
-        }
-    case IR_STPR:
-        {
-            if (HAVE_FLAG(flag, COMPUTE_PR_DU)) {
-                DUSet * du = getAndAllocDUSet(stmt);
-                if (!m_is_init->is_contain(IR_id(stmt))) {
-                    m_is_init->bunion(IR_id(stmt));
-                    du->clean(*m_misc_bs_mgr);
-                }
-            }
-
-            checkAndBuildChainRecursive(stmt->getBB(),
-                stmt->getRHS(), ct, flag);
-            return;
-        }
     case IR_IST:
-        {
-            if (HAVE_FLAG(flag, COMPUTE_NOPR_DU)) {
-                DUSet * du = getAndAllocDUSet(stmt);
-                if (!m_is_init->is_contain(IR_id(stmt))) {
-                    m_is_init->bunion(IR_id(stmt));
-                    du->clean(*m_misc_bs_mgr);
-                }
-            }
-            checkAndBuildChainRecursive(stmt->getBB(),
-                IST_base(stmt), ct, flag);
-            checkAndBuildChainRecursive(stmt->getBB(),
-                IST_rhs(stmt), ct, flag);
-            return;
-        }
     case IR_STARRAY:
-        {
-            if (HAVE_FLAG(flag, COMPUTE_NOPR_DU)) {
-                DUSet * du = getAndAllocDUSet(stmt);
-                if (!m_is_init->is_contain(IR_id(stmt))) {
-                    m_is_init->bunion(IR_id(stmt));
-                    du->clean(*m_misc_bs_mgr);
-                }
-            }
-
-            for (IR * sub = ARR_sub_list(stmt);
-                 sub != NULL; sub = sub->get_next()) {
-                checkAndBuildChainRecursive(stmt->getBB(), sub, ct, flag);
-            }
-            checkAndBuildChainRecursive(stmt->getBB(),
-                ARR_base(stmt), ct, flag);
-            checkAndBuildChainRecursive(stmt->getBB(),
-                STARR_rhs(stmt), ct, flag);
-            return;
-        }
-    case IR_CALL:
-        if (HAVE_FLAG(flag, COMPUTE_PR_DU)) {
+        if (HAVE_FLAG(flag, COMPUTE_NOPR_DU)) {
             DUSet * du = getAndAllocDUSet(stmt);
             if (!m_is_init->is_contain(IR_id(stmt))) {
                 m_is_init->bunion(IR_id(stmt));
                 du->clean(*m_misc_bs_mgr);
             }
         }
-        for (IR * p = CALL_param_list(stmt); p != NULL; p = p->get_next()) {
-            checkAndBuildChainRecursive(stmt->getBB(), p, ct, flag);
-        }
-        for (IR * p = CALL_dummyuse(stmt); p != NULL; p = p->get_next()) {
-            checkAndBuildChainRecursive(stmt->getBB(), p, ct, flag);
+        for (UINT i = 0; i < IR_MAX_KID_NUM(stmt); i++) {
+            IR * kid = stmt->getKid(i);
+            if (kid == NULL) { continue; }
+            checkAndBuildChainRecursiveIRList(stmt->getBB(), kid, ct, flag);
         }
         return;
+    case IR_STPR:
+    case IR_SETELEM:
+    case IR_GETELEM:
     case IR_ICALL:
-        for (IR * p = CALL_param_list(stmt); p != NULL; p = p->get_next()) {
-            checkAndBuildChainRecursive(stmt->getBB(), p, ct, flag);
-        }
-        for (IR * p = CALL_dummyuse(stmt); p != NULL; p = p->get_next()) {
-            checkAndBuildChainRecursive(stmt->getBB(), p, ct, flag);
-        }
-        checkAndBuildChainRecursive(stmt->getBB(),
-            ICALL_callee(stmt), ct, flag);
-        return;
+    case IR_CALL:
     case IR_PHI:
         if (HAVE_FLAG(flag, COMPUTE_PR_DU)) {
             DUSet * du = getAndAllocDUSet(stmt);
@@ -4140,10 +4058,11 @@ void IR_DU_MGR::checkAndBuildChain(IR * stmt, xcom::C<IR*> * ct, UINT flag)
                 m_is_init->bunion(IR_id(stmt));
                 du->clean(*m_misc_bs_mgr);
             }
-            for (IR * opnd = PHI_opnd_list(stmt);
-                 opnd != NULL; opnd = opnd->get_next()) {
-                checkAndBuildChainRecursive(stmt->getBB(), opnd, ct, flag);
-            }
+        }
+        for (UINT i = 0; i < IR_MAX_KID_NUM(stmt); i++) {
+            IR * kid = stmt->getKid(i);
+            if (kid == NULL) { continue; }
+            checkAndBuildChainRecursiveIRList(stmt->getBB(), kid, ct, flag);
         }
         return;
     case IR_REGION:
@@ -4455,6 +4374,8 @@ void IR_DU_MGR::updateDef(IR * ir, UINT flag)
     case IR_STARRAY:
         if (!HAVE_FLAG(flag, COMPUTE_NOPR_DU)) { return; }
     case IR_STPR:
+    case IR_SETELEM:
+    case IR_GETELEM:
     case IR_PHI:
         if (!HAVE_FLAG(flag, COMPUTE_PR_DU)) { return; }
         break;
@@ -4462,7 +4383,7 @@ void IR_DU_MGR::updateDef(IR * ir, UINT flag)
     }
 
     ASSERT0(ir->is_st() || ir->is_ist() || ir->is_starray() ||
-            ir->is_stpr() || ir->is_phi() || ir->isCallStmt());
+            ir->isWritePR() || ir->isCallStmt());
 
     if (!HAVE_FLAG(flag, COMPUTE_PR_DU) && ir->isCallStmt()) {
         updateDefWithMustEffectMD(ir, NULL);
@@ -5154,7 +5075,7 @@ bool IR_DU_MGR::perform(IN OUT OptCtx & oc, UINT flag)
         resetLocalAuxSet(bsmgr);
     }
 
-    if (g_is_dump_mdset_hash) {
+    if (g_is_dump_after_pass && g_is_dump_mdset_hash) {
         m_mds_hash->dump();
     }
 
@@ -5218,7 +5139,7 @@ void IR_DU_MGR::computeMDDUChain(
 
     OC_is_du_chain_valid(oc) = true;
 
-    if (g_is_dump_du_chain) {
+    if (g_is_dump_after_pass && g_is_dump_du_chain) {
         m_md_sys->dump();
         dumpDUChainDetail();
     }

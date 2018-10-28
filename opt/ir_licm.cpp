@@ -380,27 +380,27 @@ void IR_LICM::dumpInvariantExpStmt(
         TTab<IR*> const& invariant_exp)
 {
     if (g_tfile == NULL) { return; }
-    fprintf(g_tfile, "\n==---- DUMP LICM Analysis Result ----==\n");
+    note("\n==---- DUMP LICM Analysis Result ----==\n");
     if (invariant_exp.get_elem_count() > 0) {
         TabIter<IR*> ti;
-        fprintf(g_tfile, "-- Invariant Expression (num=%d) -- :",
+        prt("-- Invariant Expression (num=%d) -- :",
                 invariant_exp.get_elem_count());
         g_indent = 3;
         for (IR * c = invariant_exp.get_first(ti);
              c != NULL; c = invariant_exp.get_next(ti)) {
-             dump_ir(c, m_tm);
+             dumpIR(c, m_tm);
         }
 
     }
-    fprintf(g_tfile, "\n");
+    note("\n");
     if (invariant_stmt.get_elem_count() > 0) {
         TabIter<IR*> ti;
-        fprintf(g_tfile, "-- Invariant Statement (num=%d) -- :",
+        prt("-- Invariant Statement (num=%d) -- :",
                 invariant_stmt.get_elem_count());
         g_indent = 3;
         for (IR * c = invariant_stmt.get_first(ti);
              c != NULL; c = invariant_stmt.get_next(ti)) {
-             dump_ir(c, m_tm);
+             dumpIR(c, m_tm);
         }
     }
 }

@@ -139,6 +139,7 @@ int main(int argc, char * argv[])
     g_dbx_mgr = new DbxMgr();
     RegionMgr * rm = new RegionMgr();
     rm->initVarMgr();
+    rm->initTargInfo();
 
     printf("\nGenerate region");
 

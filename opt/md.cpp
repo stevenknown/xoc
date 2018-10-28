@@ -45,7 +45,7 @@ void MDId2MD::dump() const
         MD * md = Vector<MD*>::get(i);
         if (md == NULL) { continue; }
         ASSERT0(MD_id(md) == (UINT)i);
-        fprintf(g_tfile, "%d,", i);
+        prt("%d,", i);
     }
     fflush(g_tfile);
 }
@@ -320,15 +320,15 @@ void MDSet::bunion(MDSet const& mds, DefMiscBitSetMgr & mbsmgr)
 
 void MDSet::dump(MDSystem * ms, bool detail) const
 {
-    if (g_tfile == NULL) return;
+    if (g_tfile == NULL) { return; }
     ASSERT0(ms);
 
     SEGIter * iter;
     for (INT i = get_first(&iter); i >= 0;) {
-        fprintf(g_tfile, "MD%d", i);
+        prt("MD%d", i);
         i = get_next(i, &iter);
         if (i >= 0) {
-            fprintf(g_tfile, ",");
+            prt(",");
         }
     }
     if (detail) {
@@ -349,7 +349,7 @@ void MDSet::dump(MDSystem * ms, bool detail) const
 void MDSetHash::dump()
 {
     if (g_tfile == NULL) { return; }
-    fprintf(g_tfile, "\n==---- DUMP MDSet Hash ----==\n");
+    note("\n==---- DUMP MDSet Hash ----==\n");
     SBitSetCoreHash<MDSetHashAllocator>::dump_hashed_set(g_tfile);
     SBitSetCoreHash<MDSetHashAllocator>::dump(g_tfile);
     fflush(g_tfile);
@@ -507,11 +507,11 @@ void MD2MDSet::dump(Region * rg)
 
     if (g_tfile == NULL) { return; }
 
-    fprintf(g_tfile, "\n==---- DUMP MD2MDSet ----==");
+    note("\n==---- DUMP MD2MDSet ----==");
 
     //Dump all MDs.
     MDSystem * ms = rg->getMDSystem();
-    fprintf(g_tfile, "\n==-- DUMP MD Index --==");
+    note("\n==-- DUMP MD Index --==");
     ms->getID2MDMap()->dump();
 
     MD2MDSetIter mxiter;
@@ -522,25 +522,25 @@ void MD2MDSet::dump(Region * rg)
         ASSERT0(md);
 
         buf.clean();
-        fprintf(g_tfile, "\n\t%s", md->dump(buf, rg->getTypeMgr()));
+        note("\n\t%s", md->dump(buf, rg->getTypeMgr()));
 
         //Dumps MDSet related to 'md'.
 
         ASSERT0(pts);
-        fprintf(g_tfile, "\n\t\tPOINT TO:\n");
+        note("\n\t\tPOINT TO:\n");
         SEGIter * iter_j;
         for (INT j = pts->get_first(&iter_j);
              j >= 0; j = pts->get_next(j, &iter_j)) {
             MD * mmd = ms->getMD(j);
             ASSERT0(mmd);
             buf.clean();
-            fprintf(g_tfile, "\t\t\t%s\n",
+            prt("\t\t\t%s\n",
                     mmd->dump(buf, rg->getTypeMgr()));
         }
     }
 
     //Dump set of MD that corresponding to an individual VAR.
-    fprintf(g_tfile, "\n==-- DUMP the mapping from VAR to MDSet --==");
+    note("\n==-- DUMP the mapping from VAR to MDSet --==");
     VarVec * var_tab = rg->getVarMgr()->get_var_vec();
     Vector<MD const*> mdv;
     ConstMDIter iter;
@@ -551,7 +551,7 @@ void MD2MDSet::dump(Region * rg)
         MDTab * mdtab = ms->getMDTab(v);
 
         buf.clean();
-        fprintf(g_tfile, "\n\t%s", v->dump(buf, rg->getTypeMgr()));
+        note("\n\t%s", v->dump(buf, rg->getTypeMgr()));
 
         if (mdtab == NULL || mdtab->get_elem_count() == 0) { continue; }
 
@@ -562,11 +562,11 @@ void MD2MDSet::dump(Region * rg)
         for (INT i2 = 0; i2 <= mdv.get_last_idx(); i2++) {
             MD const* md = mdv.get(i2);
             buf.clean();
-            fprintf(g_tfile, "\n\t\t%s", md->dump(buf, rg->getTypeMgr()));
+            note("\n\t\t%s", md->dump(buf, rg->getTypeMgr()));
         }
     }
 
-    fprintf(g_tfile, "\n");
+    note("\n");
     fflush(g_tfile);
 }
 //END MD2MD_SET_MAP
@@ -997,8 +997,8 @@ void MDSystem::clean()
 
 void MDSystem::dump()
 {
-    if (g_tfile == NULL) return;
-    fprintf(g_tfile, "\n==---- DUMP ALL MD ----==");
+    if (g_tfile == NULL) { return; }
+    note("\n==---- DUMP ALL MD ----==");
     for (INT i = 0; i <= m_id2md_map.get_last_idx(); i++) {
         MD * md = m_id2md_map.get(i);
         if (md == NULL) { continue; }

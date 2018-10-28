@@ -171,15 +171,15 @@ public:
     void dump()
     {
         if (g_tfile == NULL) { return; }
-        fprintf(g_tfile, "\n==---- DUMP Prno2Vreg ----==");
+        note("\n==---- DUMP Prno2Vreg ----==");
         g_indent = 4;
 
         if (maxreg < 0) {
-            fprintf(g_tfile, "\n==------ PR to Vreg is unordered ------==");
+            note("\n==------ PR to Vreg is unordered ------==");
             INT cur;
             for (UINT prno = get_first(cur); cur >= 0; prno = get_next(cur)) {
                 UINT v = get(prno);
-                fprintf(g_tfile, "\nPR%d->v%d", prno, v);
+                note("\nPR%d->v%d", prno, v);
             }
         } else {
             INT cur;
@@ -188,14 +188,14 @@ public:
                 for (UINT prno = get_first(cur); cur >= 0; prno = get_next(cur)) {
                     UINT v = get(prno);
                     if (v == (UINT)i) {
-                        fprintf(g_tfile, "\nPR%d -> v%d", prno, v);
+                        note("\nPR%d -> v%d", prno, v);
                         find = true;
                         break;
                     }
                 }
 
                 if (!find) {
-                    fprintf(g_tfile, "\n-- -> v%d", i);
+                    note("\n-- -> v%d", i);
                 }
             }
         }
@@ -210,14 +210,14 @@ public:
     {
         if (g_tfile == NULL) { return; }
 
-        fprintf(g_tfile, "\n==---- DUMP Prno2Vreg ----==");
+        note("\n==---- DUMP Prno2Vreg ----==");
 
         for (INT i = 0; i <= get_last_idx(); i++) {
             IR * pr = get(i);
             if (pr == NULL) {
-                fprintf(g_tfile, "\nv%d -> --", i);
+                note("\nv%d -> --", i);
             }
-            fprintf(g_tfile, "\nv%d -> PR%u", i, pr->getPrno());
+            note("\nv%d -> PR%u", i, pr->getPrno());
         }
         fflush(g_tfile);
     }

@@ -442,9 +442,9 @@ void TypeMgr::dump_type(UINT tyid)
 
 void TypeMgr::dump_type(Type const* type)
 {
-    if (g_tfile == NULL) return;
+    if (g_tfile == NULL) { return; }
     StrBuf buf(64);
-    fprintf(g_tfile, "%s", dump_type(type, buf));
+    prt("%s", dump_type(type, buf));
     fflush(g_tfile);
 }
 
@@ -452,14 +452,14 @@ void TypeMgr::dump_type(Type const* type)
 void TypeMgr::dump_type_tab()
 {
     StrBuf buf(64);
-    if (g_tfile == NULL) return;
-    fprintf(g_tfile, "\n==---- DUMP Type Table ----==\n");
+    if (g_tfile == NULL) { return; }
+    note("\n==---- DUMP Type Table ----==\n");
     for (INT i = 1; i <= m_type_tab.get_last_idx(); i++) {
         buf.clean();
         Type * d = m_type_tab.get(i);
         ASSERT0(d);
-        fprintf(g_tfile, "%s tyid:%d", dump_type(d, buf), i);
-        fprintf(g_tfile, "\n");
+        prt("%s tyid:%d", dump_type(d, buf), i);
+        note("\n");
         fflush(g_tfile);
     }
     fflush(g_tfile);

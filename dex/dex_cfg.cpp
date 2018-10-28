@@ -72,7 +72,7 @@ void DEX_CFG::dump_bb(
         for (IR * ir = BB_first_ir(bb); ir != NULL; ir = BB_next_ir(bb)) {
             //TODO: implement dump_ir_buf();
             //fprintf(h, "%s\n", dump_ir_buf(ir, buf));
-            dump_ir(ir, m_tm, NULL, true, false);
+            dumpIR(ir, m_tm, NULL, true, false);
         }
         fprintf(h, "\"}");
     } else {

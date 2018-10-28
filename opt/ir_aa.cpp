@@ -790,7 +790,7 @@ void IR_AA::processArray(
 
     //Next, scaning array base, it may be LDA
     //operation or computational expression.
-    UINT ofst_val = 0;
+    TMWORD ofst_val = 0;
     bool is_ofst_predicable = ir->calcArrayOffset(&ofst_val, m_tm);
     bool mds_is_may_pt = false;
     AACtx tic;
@@ -1066,7 +1066,7 @@ bool IR_AA::tryComputeConstOffset(
     }
 
     mds.clean(*m_misc_bs_mgr);
- 
+
     //In the case: LDA(x) + ofst, we can determine
     //the value of LDA(x) is constant.
     //Keep offset validation unchanged.
@@ -1125,7 +1125,7 @@ void IR_AA::inferPtArith(
         tryComputeConstOffset(ir, opnd1, mds, opnd0_mds)) {
         return;
     }
-    
+
     //Generate MD expression for opnd1.
     AACtx opnd1_tic(*opnd0_ic);
     opnd1_tic.cleanBottomUpFlag();
@@ -1140,8 +1140,8 @@ void IR_AA::inferPtArith(
         ASSERTN(ir->is_sub(), ("only support pointer sub pointer"));
         AC_has_comp_lda(opnd0_ic) = false;
         return;
-    }    
-    
+    }
+
     ASSERTN(mds.is_empty(), ("output buffer not yet initialized"));
     if (opnd0_mds.is_empty()) {
         //Point-to set of opnd0 of binary-op is MayPointToSet.
@@ -1780,16 +1780,18 @@ void IR_AA::processSetelem(IR * ir, IN MD2MDSet * mx)
     } else {
         t = getMustAddr(ir);
     }
-
     AACtx ic;
-    inferStoreValue(ir, SETELEM_rhs(ir), t, &ic, mx);
+    inferStoreValue(ir, SETELEM_val(ir), t, &ic, mx);
 
+    MDSet tmp;
+    ic.clean();
+    inferExpression(SETELEM_base(ir), tmp, &ic, mx);
     if (!SETELEM_ofst(ir)->is_const()) {
         ic.clean();
-        MDSet tmp;
-        inferExpression(SETELEM_ofst(ir), tmp, &ic, mx);
         tmp.clean(*m_misc_bs_mgr);
+        inferExpression(SETELEM_ofst(ir), tmp, &ic, mx);
     }
+    tmp.clean(*m_misc_bs_mgr);
 }
 
 
@@ -2930,16 +2932,16 @@ void IR_AA::ElemCleanPointTo(MDSet const& mds, IN MD2MDSet * mx)
 //Dump IR's point-to of each BB.
 void IR_AA::dumpInOutPointToSetForBB()
 {
-    if (g_tfile == NULL) return;
-    fprintf(g_tfile, "\n==---- DUMP POINT TO INFO ----==");
+    if (g_tfile == NULL) { return; }
+    note("\n==---- DUMP POINT TO INFO ----==");
     BBList * bbl = m_cfg->getBBList();
     for (IRBB * bb = bbl->get_head(); bb != NULL; bb = bbl->get_next()) {
         PtPairSet * in_set = getInPtPairSet(bb);
         PtPairSet * out_set = getOutPtPairSet(bb);
-        fprintf(g_tfile, "\n--- BB%d ---", BB_id(bb));
-        fprintf(g_tfile, "\nIN-SET::");
+        note("\n--- BB%d ---", BB_id(bb));
+        note("\nIN-SET::");
         dumpPtPairSet(*in_set);
-        fprintf(g_tfile, "\n\nOUT-SET::");
+        note("\n\nOUT-SET::");
         dumpPtPairSet(*out_set);
     }
     fflush(g_tfile);
@@ -2949,39 +2951,39 @@ void IR_AA::dumpInOutPointToSetForBB()
 //Dump POINT-TO pair record in 'pps'.
 void IR_AA::dumpPtPairSet(PtPairSet & pps)
 {
-    if (g_tfile == NULL) return;
+    if (g_tfile == NULL) { return; }
     StrBuf buf(256);
     UINT k = 0;
     bool detail = true;
     for (INT i = pps.get_first(); i >= 0; i = pps.get_next((UINT)i), k++) {
         PtPair * pp = m_pt_pair_mgr.get((UINT)i);
         ASSERT0(pp);
-        fprintf(g_tfile, "\nMD%u->MD%u,  ", PP_from(pp), PP_to(pp));
+        note("\nMD%u->MD%u,  ", PP_from(pp), PP_to(pp));
 
         if (!detail) { continue; }
 
         MD const* from = m_md_sys->getMD(PP_from(pp));
         ASSERT0(from);
 
-        fprintf(g_tfile, "%s", from->get_base()->dump(buf, m_tm));
+        prt("%s", from->get_base()->dump(buf, m_tm));
         if (from->is_exact()) {
-            fprintf(g_tfile, ":ofst(%u):size(%u)",
+            prt(":ofst(%u):size(%u)",
                 MD_ofst(from), MD_size(from));
         } else {
-            fprintf(g_tfile, ":ofst(--):size(%u)", MD_size(from));
+            prt(":ofst(--):size(%u)", MD_size(from));
         }
 
-        fprintf(g_tfile, " ------> ");
+        prt(" ------> ");
 
         MD const* to = m_md_sys->getMD(PP_to(pp));
 
         buf.clean();
-        fprintf(g_tfile, "%s", to->get_base()->dump(buf, m_tm));
+        prt("%s", to->get_base()->dump(buf, m_tm));
 
         if (to->is_exact()) {
-            fprintf(g_tfile, ":ofst(%u):size(%u)", MD_ofst(to), MD_size(to));
+            prt(":ofst(%u):size(%u)", MD_ofst(to), MD_size(to));
         } else {
-            fprintf(g_tfile, ":ofst(--):size(%u)", MD_size(to));
+            prt(":ofst(--):size(%u)", MD_size(to));
         }
     }
 
@@ -2998,7 +3000,7 @@ void IR_AA::dumpIRPointTo(IN IR * ir, bool dump_kid, IN MD2MDSet * mx)
     MDSet const* may = getMayAddr(ir);
     if (must != NULL ||
         (may != NULL && may->get_elem_count() > 0)) {
-        dump_ir(ir, m_tm, NULL, false, false, false, false);
+        dumpIR(ir, m_tm, NULL, false, false, false, false);
     }
 
     switch (ir->getCode()) {
@@ -3041,7 +3043,7 @@ void IR_AA::dumpIRPointTo(IN IR * ir, bool dump_kid, IN MD2MDSet * mx)
 void IR_AA::dumpIRPointToForBB(IRBB * bb, bool dump_kid)
 {
     if (g_tfile == NULL) { return; }
-    fprintf(g_tfile, "\n\n--- BB%u ---", BB_id(bb));
+    note("\n--- BB%u ---", BB_id(bb));
     xcom::C<IR*> * ct;
     MD2MDSet * mx;
     if (m_flow_sensitive) {
@@ -3057,49 +3059,49 @@ void IR_AA::dumpIRPointToForBB(IRBB * bb, bool dump_kid)
         //interwarn("In IRAA, MD2MDSet of BB%u is NULL, may be new "
         //          "bb was generated. One should recall IRAA::perform()",
         //          BB_id(bb));
-        fprintf(g_tfile, "\n--- BB%u's MD2MDSet is NULL ---", BB_id(bb));
+        note("\n--- BB%u's MD2MDSet is NULL ---", BB_id(bb));
         return;
     }
 
     dumpMD2MDSet(mx, true);
     for (IR * ir = BB_irlist(bb).get_head(&ct);
          ir != NULL; ir = BB_irlist(bb).get_next(&ct)) {
-        fprintf(g_tfile, "\n---------");
+        note("\n---------");
         g_indent = 4;
-        dump_irs(ir, m_tm, NULL, true, true, false, false);
-        fprintf(g_tfile, "\n");
+        dumpIRList(ir, m_tm, NULL, true, true, false, false);
+        note("\n");
 
         ASSERT0(isValidStmtToAA(ir));
 
         switch (ir->getCode()) {
         case IR_ST:
-            fprintf(g_tfile, "LHS:");
+            prt("LHS:");
             dumpIRPointTo(ir, false, mx);
-            fprintf(g_tfile, "\nRHS:");
+            note("\nRHS:");
             dumpIRPointTo(ST_rhs(ir), false, mx);
 
             if (dump_kid) {
-                fprintf(g_tfile, "\n>> MDSet DETAIL:");
+                note("\n>> MDSet DETAIL:");
                 dumpIRPointTo(ST_rhs(ir), true, mx);
             }
             break;
         case IR_STPR:
-            fprintf(g_tfile, "LHS:");
+            prt("LHS:");
             dumpIRPointTo(ir, false, mx);
-            fprintf(g_tfile, "\nRHS:");
+            note("\nRHS:");
             dumpIRPointTo(STPR_rhs(ir), false, mx);
             if (dump_kid) {
-                fprintf(g_tfile, "\n>> MDSet DETAIL:");
+                note("\n>> MDSet DETAIL:");
                 dumpIRPointTo(STPR_rhs(ir), true, mx);
             }
             break;
         case IR_STARRAY:
-            fprintf(g_tfile, "LHS:");
+            prt("LHS:");
             dumpIRPointTo(ir, false, mx);
-            fprintf(g_tfile, "\nRHS:");
+            note("\nRHS:");
             dumpIRPointTo(STARR_rhs(ir), false, mx);
             if (dump_kid) {
-                fprintf(g_tfile, "\n>> MDSet DETAIL:");
+                note("\n>> MDSet DETAIL:");
                 dumpIRPointTo(ARR_base(ir), true, mx);
                 dumpIRPointTo(STARR_rhs(ir), true, mx);
                 for (IR * p = ARR_sub_list(ir); p != NULL; p = p->get_next()) {
@@ -3108,12 +3110,12 @@ void IR_AA::dumpIRPointToForBB(IRBB * bb, bool dump_kid)
             }
             break;
         case IR_IST:
-            fprintf(g_tfile, "LHS:");
+            prt("LHS:");
             dumpIRPointTo(ir, false, mx);
-            fprintf(g_tfile, "\nRHS:");
+            note("\nRHS:");
             dumpIRPointTo(IST_rhs(ir), false, mx);
             if (dump_kid) {
-                fprintf(g_tfile, "\n>> MDSet DETAIL:");
+                note("\n>> MDSet DETAIL:");
                 dumpIRPointTo(IST_base(ir), true, mx);
                 dumpIRPointTo(IST_rhs(ir), true, mx);
             }
@@ -3121,26 +3123,26 @@ void IR_AA::dumpIRPointToForBB(IRBB * bb, bool dump_kid)
         case IR_CALL:
             {
                 if (ir->hasReturnValue()) {
-                    fprintf(g_tfile, "LHS:");
+                    prt("LHS:");
                     dumpIRPointTo(ir, false, mx);
                 }
 
                 UINT i = 0;
                 for (IR * p = CALL_param_list(ir); p != NULL; p = p->get_next()) {
-                    fprintf(g_tfile, "\nPARAM%u:", i++);
+                    note("\nPARAM%u:", i++);
                     dumpIRPointTo(p, false, mx);
                 }
 
                 i = 0;
                 for (IR * p = CALL_dummyuse(ir); p != NULL; p = p->get_next()) {
-                    fprintf(g_tfile, "\nDUMMY%u:", i++);
+                    note("\nDUMMY%u:", i++);
                     dumpIRPointTo(p, false, mx);
                 }
 
                 if (dump_kid) {
                     if (CALL_param_list(ir) != NULL ||
                         CALL_dummyuse(ir) != NULL) {
-                        fprintf(g_tfile, "\n>> MDSet DETAIL:\n");
+                        note("\n>> MDSet DETAIL:\n");
                     }
 
                     for (IR * p = CALL_param_list(ir);
@@ -3158,16 +3160,16 @@ void IR_AA::dumpIRPointToForBB(IRBB * bb, bool dump_kid)
         case IR_ICALL: //indirective call
             {
                 if (ir->hasReturnValue()) {
-                    fprintf(g_tfile, "LHS:");
+                    prt("LHS:");
                     dumpIRPointTo(ir, false, mx);
                 }
 
                 ASSERT0(ICALL_callee(ir) != NULL);
-                fprintf(g_tfile, "CALLEE:");
+                prt("CALLEE:");
                 dumpIRPointTo(ICALL_callee(ir), false, mx);
 
                 if (dump_kid && CALL_param_list(ir) != NULL) {
-                    fprintf(g_tfile, "\n>> MDSet DETAIL:\n");
+                    note("\n>> MDSet DETAIL:\n");
                     for (IR * p = CALL_param_list(ir); p ; p = p->get_next()) {
                         dumpIRPointTo(p, true, mx);
                     }
@@ -3178,38 +3180,38 @@ void IR_AA::dumpIRPointToForBB(IRBB * bb, bool dump_kid)
             break;
         case IR_IGOTO:
             ASSERT0(IGOTO_vexp(ir) != NULL);
-            fprintf(g_tfile, "VEXP:");
+            prt("VEXP:");
             dumpIRPointTo(IGOTO_vexp(ir), false, mx);
             if (dump_kid) {
-                fprintf(g_tfile, "\n>> MDSet DETAIL:");
+                note("\n>> MDSet DETAIL:");
                 dumpIRPointTo(IGOTO_vexp(ir), true, mx);
             }
             break;
         case IR_TRUEBR:
         case IR_FALSEBR:
             ASSERT0(BR_det(ir) != NULL);
-            fprintf(g_tfile, "DET:");
+            prt("DET:");
             dumpIRPointTo(BR_det(ir), false, mx);
             if (dump_kid) {
-                fprintf(g_tfile, "\n>> MDSet DETAIL:");
+                note("\n>> MDSet DETAIL:");
                 dumpIRPointTo(BR_det(ir), true, mx);
             }
             break;
         case IR_SELECT:
             ASSERT0(SELECT_pred(ir) != NULL);
-            fprintf(g_tfile, "DET:");
+            prt("DET:");
             dumpIRPointTo(SELECT_pred(ir), false, mx);
             if (dump_kid) {
-                fprintf(g_tfile, "\n>> MDSet DETAIL:");
+                note("\n>> MDSet DETAIL:");
                 dumpIRPointTo(SELECT_pred(ir), true, mx);
             }
             break;
         case IR_SWITCH:
             ASSERT0(SWITCH_vexp(ir) != NULL);
-            fprintf(g_tfile, "VEXP:");
+            prt("VEXP:");
             dumpIRPointTo(SWITCH_vexp(ir), false, mx);
             if (dump_kid) {
-                fprintf(g_tfile, "\n>> MDSet DETAIL:");
+                note("\n>> MDSet DETAIL:");
                 dumpIRPointTo(SWITCH_vexp(ir), true, mx);
             }
             break;
@@ -3220,14 +3222,14 @@ void IR_AA::dumpIRPointToForBB(IRBB * bb, bool dump_kid)
                 }
 
                 if (dump_kid && RET_exp(ir) != NULL) {
-                    fprintf(g_tfile, "\n>> MDSet DETAIL:");
+                    note("\n>> MDSet DETAIL:");
                     dumpIRPointTo(RET_exp(ir), true, mx);
                 }
             }
             break;
         case IR_PHI:
             {
-                fprintf(g_tfile, "LHS:");
+                prt("LHS:");
                 dumpIRPointTo(ir, false, mx);
 
                 for (IR * p = PHI_opnd_list(ir); p; p = p->get_next()) {
@@ -3236,7 +3238,7 @@ void IR_AA::dumpIRPointToForBB(IRBB * bb, bool dump_kid)
 
                 ASSERT0(PHI_opnd_list(ir));
                 if (dump_kid) {
-                    fprintf(g_tfile, "\n>> MDSet DETAIL:\n");
+                    note("\n>> MDSet DETAIL:\n");
                     for (IR * p = PHI_opnd_list(ir); p; p = p->get_next()) {
                         dumpIRPointTo(p, true, mx);
                     }
@@ -3254,11 +3256,11 @@ void IR_AA::dumpIRPointToForBB(IRBB * bb, bool dump_kid)
 //'md2mds': mapping from 'md' to an md-set it pointed to.
 void IR_AA::dumpIRPointToForRegion(bool dump_kid)
 {
-    if (g_tfile == NULL) return;
-    fprintf(g_tfile, "\n==--- DUMP '%s' IR_AA : IR ADDRESS and POINT-TO ----==",
-            m_ru->getRegionName());
+    if (g_tfile == NULL) { return; }
+    note("\n==--- DUMP IR_AA : IR ADDRESS and POINT-TO '%s' ----==",
+         m_ru->getRegionName());
     m_md_sys->dump();
-    fprintf(g_tfile, "\n\n---- All MD in MAY-POINT-TO SET : ");
+    note("\n---- All MD in MAY-POINT-TO SET : ");
 
     ASSERT0(m_maypts);
     m_maypts->dump(m_md_sys, true);
@@ -3280,7 +3282,7 @@ void IR_AA::dumpMayPointTo()
          j >= 0; j = m_maypts->get_next((UINT)j, &iter)) {
         MD * mmd = m_md_sys->getMD((UINT)j);
         ASSERT0(mmd != NULL);
-        fprintf(g_tfile, "MD%u,", MD_id(mmd));
+        prt("MD%u,", MD_id(mmd));
     }
     fflush(g_tfile);
 }
@@ -3309,19 +3311,19 @@ void IR_AA::dump(CHAR const* name)
 //Dump MD's point-to for each BB.
 void IR_AA::dumpMD2MDSetForRegion(bool dump_pt_graph)
 {
-    if (g_tfile == NULL) return;
+    if (g_tfile == NULL) { return; }
     if (m_flow_sensitive) {
-        fprintf(g_tfile, "\n\n==---- DUMP ALL MD POINT-TO "
-                         "OUT-SET (FLOW SENSITIVE) ----==");
+        note("\n==---- DUMP POINT-TO OUT-SET (FLOW SENSITIVE) '%s' ----==",
+            m_ru->getRegionName());
         BBList * bbl = m_cfg->getBBList();
         for (IRBB * bb = bbl->get_head(); bb != NULL; bb = bbl->get_next()) {
-            fprintf(g_tfile, "\n\n--- BB%u ---", BB_id(bb));
+            note("\n--- BB%u ---", BB_id(bb));
             dumpMD2MDSet(mapBBtoMD2MDSet(BB_id(bb)),
                 false); //each BB has its own graph.
         }
     } else {
-        fprintf(g_tfile, "\n\n==---- DUMP ALL MD POINT-TO "
-                         "OUT-SET (FLOW-INSENSITIVE) ----==");
+        note("\n==---- DUMP POINT-TO OUT-SET (FLOW-INSENSITIVE) '%s' ----==",
+            m_ru->getRegionName());
         dumpMD2MDSet(&m_unique_md2mds, dump_pt_graph);
     }
     fflush(g_tfile);
@@ -3340,18 +3342,18 @@ void IR_AA::dumpMD2MDSet(IN MD2MDSet * mx, bool dump_ptg)
 
         MDSet const* mds = getPointTo((UINT)i, *mx);
         if (mds != NULL) {
-            fprintf(g_tfile, "\nMD%u -- PT_SET: ", (UINT)i);
+            note("\nMD%u -- PT_SET: ", (UINT)i);
             SEGIter * iter;
             for (INT j = mds->get_first(&iter);
                  j >= 0; j = mds->get_next((UINT)j, &iter)) {
                 ASSERT0(m_md_sys->getMD((UINT)j));
-                fprintf(g_tfile, "MD%u,", (UINT)j);
+                prt("MD%u,", (UINT)j);
                 if (dump_ptg) {
                     g.addEdge((UINT)i, (UINT)j);
                 }
             }
         } else {
-            fprintf(g_tfile, "\nMD%u -- NO PT", (UINT)i);
+            note("\nMD%u -- NO PT", (UINT)i);
         }
     }
 
@@ -3370,13 +3372,13 @@ void IR_AA::dumpMD2MDSet(MD const* md, IN MD2MDSet * mx)
     if (g_tfile == NULL) { return; }
 
     StrBuf buf(64);
-    fprintf(g_tfile, "\n\t  %s", md->dump(buf, m_tm));
+    note("\n\t  %s", md->dump(buf, m_tm));
 
     //Dump MDSet of 'md'.
     MDSet const* pts = getPointTo(MD_id(md), *mx);
-    fprintf(g_tfile, "\n\t\tPOINT TO:");
+    note("\n\t\tPOINT TO:");
     if (pts != NULL && !pts->is_empty()) {
-        fprintf(g_tfile, "\n");
+        note("\n");
         SEGIter * iter;
         for (INT j = pts->get_first(&iter);
              j >= 0; j = pts->get_next((UINT)j, &iter)) {
@@ -3384,10 +3386,10 @@ void IR_AA::dumpMD2MDSet(MD const* md, IN MD2MDSet * mx)
             ASSERT0(mmd);
 
             buf.clean();
-            fprintf(g_tfile, "\t\t\t%s\n", mmd->dump(buf, m_tm));
+            prt("\t\t\t%s\n", mmd->dump(buf, m_tm));
         }
     } else {
-        fprintf(g_tfile, "----");
+        prt("----");
     }
     fflush(g_tfile);
 }
@@ -3714,7 +3716,7 @@ bool IR_AA::computeFlowSensitive(List<IRBB*> const& bbl)
 
             #ifdef _DEBUG_
             //MD2MDSet x;
-            //convertPT2MD2MDSet(*out_set, m_pt_pair_mgr);
+            //convertPT2MD2MDSet(tmp, m_pt_pair_mgr, &x);
             //dumpMD2MDSet(&x, false);
             #endif
             pps = getOutPtPairSet(bb);
@@ -3723,6 +3725,9 @@ bool IR_AA::computeFlowSensitive(List<IRBB*> const& bbl)
                 change = true;
             }
         }
+
+        //dumpMD2MDSetForRegion(false);
+        //dumpIRPointToForRegion(true);
     }
     ASSERTN(!change, ("Iterated too many times"));
     return true;
@@ -4040,6 +4045,8 @@ bool IR_AA::perform(IN OUT OptCtx & oc)
     //because AA would not be invoked frequently.
     PtPairSet * ptset_arr = NULL;
     if (m_flow_sensitive) {
+        ASSERTN(OC_is_loopinfo_valid(oc),
+            ("infer pointer arith need loop info"));
         initEntryPtset(&ptset_arr);
         m_ru->checkValidAndRecompute(&oc, PASS_RPO, PASS_UNDEF);
         List<IRBB*> * tbbl = m_cfg->getBBListInRPO();
@@ -4065,23 +4072,19 @@ bool IR_AA::perform(IN OUT OptCtx & oc)
         //PtPair information will be unavailable.
         delete [] ptset_arr;
     }
-
-#if 0
-    m_md_sys->dump();
-    dumpMD2MDSetForRegion(false);
-    //dumpInOutPointToSetForBB();
-    dumpIRPointToForRegion(true);
-#endif
-
+    if (g_is_dump_after_pass && g_is_dump_alias_analysis) {
+        m_md_sys->dump();
+        dumpMD2MDSetForRegion(false);
+        //dumpInOutPointToSetForBB();
+        dumpIRPointToForRegion(true);
+    }
     ASSERT0(verify());
 
     //DU info does not depend on these data structure.
     //Since AA is not always used, we destroy the data
     //structure to release memory.
     m_pt_pair_mgr.clobber();
-
     END_TIMER(t, getPassName());
-
     return true;
 }
 

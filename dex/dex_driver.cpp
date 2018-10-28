@@ -239,7 +239,7 @@ static void do_opt(IR * ir_list, DexRegion * func_ru)
 {
     if (ir_list == NULL) { return; }
 
-    //dump_irs(ir_list, func_ru->getTypeMgr());
+    //dumpIRList(ir_list, func_ru->getTypeMgr());
 
     bool change;
 
@@ -250,7 +250,7 @@ static void do_opt(IR * ir_list, DexRegion * func_ru)
 
     //ir_list = func_ru->refineIRlist(ir_list, change, rf);
 
-    verify_irs(ir_list, NULL, func_ru);
+    verifyIRList(ir_list, NULL, func_ru);
 
     func_ru->addToIRList(ir_list);
 
@@ -414,7 +414,7 @@ void dumpLocal(
 {
     DbxCtx * dc = (DbxCtx*)cnxt;
 
-    //fprintf(g_tfile, "\nstartAddr:0x%04x, endAddr:0x%04x, name:%s, desc:%s, signature:%s",
+    //note("\nstartAddr:0x%04x, endAddr:0x%04x, name:%s, desc:%s, signature:%s",
     //            startAddress,
     //            endAddress,
     //            name,
@@ -519,7 +519,7 @@ static void handleRegion(
         //goto FIN;
     }
 
-    //dump_irs(ir_list, func_ru->getTypeMgr());
+    //dumpIRList(ir_list, func_ru->getTypeMgr());
     func_ru->setPrno2Vreg(&prno2v);
 
     #if 1

@@ -42,8 +42,8 @@ namespace xoc {
 
 void IR_RCE::dump()
 {
-    if (g_tfile == NULL) return;
-    fprintf(g_tfile, "\n\n==---- DUMP IR_RCE ----==\n");
+    if (g_tfile == NULL) { return; }
+    note("\n\n==---- DUMP IR_RCE ----==\n");
 
     BBList * bbl = m_ru->getBBList();
     for (IRBB * bb = bbl->get_head(); bb != NULL; bb = bbl->get_next()) {

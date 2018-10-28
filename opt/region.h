@@ -284,8 +284,12 @@ public:
     //Allocate AliasAnalysis.
     virtual IR_AA * allocAliasAnalysis();
 
-    IR * buildSetElem(Type const* type, IR * rhs, IR * offset);
-    IR * buildSetElem(UINT prno, Type const* type, IR * rhs, IR * offset);
+    IR * buildSetElem(Type const* type, IR * base, IR * val, IR * offset);
+    IR * buildSetElem(UINT prno,
+                      Type const* type,
+                      IR * base,
+                      IR * val,
+                      IR * offset);
     IR * buildGetElem(UINT prno, Type const* type, IR * base, IR * offset);
     IR * buildGetElem(Type const* type, IR * base, IR * offset);
     IR * buildContinue();

@@ -361,6 +361,11 @@ protected:
             UINT compflag,
             UINT duflag);
     void checkAndBuildChainForMemIR(IRBB * bb, IR * exp, xcom::C<IR*> * ct);
+	void checkAndBuildChainRecursiveIRList(
+	        IRBB * bb,
+	        IR * exp,
+	        xcom::C<IR*> * ct,
+	        UINT flag);
     void checkAndBuildChainRecursive(IRBB * bb,
             IR * exp,
             xcom::C<IR*> * ct,
@@ -541,6 +546,11 @@ public:
     void collectMayUseRecursive(
             IR const* ir,
             MDSet & mayUse,
+            bool computePR,
+            DefMiscBitSetMgr & bsmgr);
+    void collectMayUseRecursiveIRList(
+            IR const* ir,
+            OUT MDSet & mayUse,
             bool computePR,
             DefMiscBitSetMgr & bsmgr);
 

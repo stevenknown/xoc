@@ -301,7 +301,7 @@ public:
     //Allocate VP and ensure it is unique according to 'version' and 'prno'.
     VP * allocVP(UINT prno, UINT version)
     {
-        ASSERT0(prno > 0);
+        ASSERT0(prno != PRNO_UNDEF);
         Vector<VP*> * vec = m_map_prno2vp_vec.get(prno);
         if (vec == NULL) {
             vec = new Vector<VP*>();
@@ -328,7 +328,7 @@ public:
     //Allocate SSAInfo for specified PR indicated by 'prno'.
     SSAInfo * allocSSAInfo(UINT prno)
     {
-        ASSERT0(prno > 0);
+        ASSERT0(prno != PRNO_UNDEF);
         return (SSAInfo*)allocVP(prno, 0);
     }
 

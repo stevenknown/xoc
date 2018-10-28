@@ -113,13 +113,13 @@ public:
     void dump_pass_time_info()
     {
         if (g_tfile == NULL) { return; }
-        fprintf(g_tfile, "\n==---- PASS TIME INFO ----==");
+        note("\n==---- PASS TIME INFO ----==");
         for (TimeInfo * ti = m_ti_list.get_head(); ti != NULL;
              ti = m_ti_list.get_next()) {
-            fprintf(g_tfile, "\n * %s --- use %llu ms ---",
+            note("\n * %s --- use %llu ms ---",
                     TI_pn(ti), TI_pt(ti));
         }
-        fprintf(g_tfile, "\n===----------------------------------------===");
+        note("\n===----------------------------------------===");
         fflush(g_tfile);
     }
 

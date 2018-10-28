@@ -687,18 +687,18 @@ void RSC::comp_ir_constrain()
 void RSC::dump_ir_fmt()
 {
     if (g_tfile == NULL) { return; }
-    fprintf(g_tfile, "\n==------- DUMP IR FMT --------==");
+    note("\n==------- DUMP IR FMT --------==");
     List<IRBB*> * bbl = m_ru->getBBList();
     for (IRBB * bb = bbl->get_head(); bb != NULL; bb = bbl->get_next()) {
-        fprintf(g_tfile, "\n-- BB%d --", BB_id(bb));
+        note("\n-- BB%d --", BB_id(bb));
         for (IR const* ir = BB_first_ir(bb);
              ir != NULL; ir = BB_next_ir(bb)) {
             FMT f = m_ir2fmt.get(ir->id());
-            fprintf(g_tfile, "\nFMT:%s", g_fmt_name[f]);
-            dump_ir(ir, m_ru->getTypeMgr());
+            note("\nFMT:%s", g_fmt_name[f]);
+            dumpIR(ir, m_ru->getTypeMgr());
         }
     }
-    fprintf(g_tfile, "\n");
+    note("\n");
     fflush(g_tfile);
 }
 
@@ -706,34 +706,34 @@ void RSC::dump_ir_fmt()
 void RSC::dump_glt_usable()
 {
     if (g_tfile == NULL) { return; }
-    fprintf(g_tfile, "\n=== DUMP GLT Usable Regs: ===");
+    note("\n=== DUMP GLT Usable Regs: ===");
     Vector<GLT*> * gltv = m_gltm->get_gltvec();
     bool dump_bit = false;
     for (INT i = 0; i <= gltv->get_last_idx(); i++) {
         GLT * g = gltv->get(i);
         if (g == NULL) { continue; }
-        fprintf(g_tfile, "\nGLT%d(pr%d):", GLT_id(g), GLT_prno(g));
+        note("\nGLT%d(pr%d):", GLT_id(g), GLT_prno(g));
         if (GLT_prefer_reg(g) != REG_UNDEF) {
-            fprintf(g_tfile, "prefer_reg=%d", LT_prefer_reg(g));
+            prt("prefer_reg=%d", LT_prefer_reg(g));
         } else {
             BitSet const* usable = GLT_usable(g);
             if (usable == NULL || usable->is_empty()) {
-                fprintf(g_tfile, "--");
+                prt("--");
                 continue;
             }
 
             if (dump_bit) {
                 for (INT i2 = usable->get_first();
                      i2 >= 0; i2 = usable->get_next(i2)) {
-                    fprintf(g_tfile, "%d,", i2);
+                    prt("%d,", i2);
                 }
             } else {
-                fprintf(g_tfile, "%d~%d",
+                prt("%d~%d",
                         usable->get_first(), usable->get_last());
             }
         }
     }
-    fprintf(g_tfile, "\n");
+    note("\n");
     fflush(g_tfile);
 }
 
@@ -741,7 +741,7 @@ void RSC::dump_glt_usable()
 void RSC::dump_bb(UINT bbid)
 {
     if (g_tfile == NULL) { return; }
-    fprintf(g_tfile, "\n-- BB%d Usable Regs --", bbid);
+    note("\n-- BB%d Usable Regs --", bbid);
     LTMgr * ltm = m_gltm->get_ltm(bbid);
     ASSERT0(ltm);
     Vector<LT*> * ltvec = ltm->get_lt_vec();
@@ -749,22 +749,22 @@ void RSC::dump_bb(UINT bbid)
     for (INT i = 0; i <= ltvec->get_last_idx(); i++) {
         LT const* lt = ltvec->get(i);
         if (lt == NULL) { continue; }
-        fprintf(g_tfile, "\nLT%d(pr%d):", LT_uid(lt), LT_prno(lt));
+        note("\nLT%d(pr%d):", LT_uid(lt), LT_prno(lt));
         if (LT_prefer_reg(lt) != REG_UNDEF) {
-            fprintf(g_tfile, "prefer_reg=%d", LT_prefer_reg(lt));
+            prt("prefer_reg=%d", LT_prefer_reg(lt));
         } else {
             BitSet const* usable = LT_usable(lt);
             if (usable == NULL || usable->is_empty()) {
-                fprintf(g_tfile, "--");
+                prt("--");
                 continue;
             }
             if (dump_bit) {
                 for (INT i2 = usable->get_first();
                      i2 >= 0; i2 = usable->get_next(i2)) {
-                    fprintf(g_tfile, "%d,", i2);
+                    prt("%d,", i2);
                 }
             } else {
-                fprintf(g_tfile, "%d~%d", usable->get_first(), usable->get_last());
+                prt("%d~%d", usable->get_first(), usable->get_last());
             }
         }
     }
@@ -1077,7 +1077,7 @@ bool GltMgr::verify()
 //Dump global lt info.
 void GltMgr::dumpg()
 {
-    if (g_tfile == NULL) return;
+    if (g_tfile == NULL) { return; }
     BitSet prs;
     List<IRBB*> * bbl = m_ru->getBBList();
     for (IRBB * bb = bbl->get_head(); bb != NULL; bb = bbl->get_next()) {
@@ -1122,24 +1122,24 @@ void GltMgr::dumpg()
             "\n=== DUMP Global Life Time = maxreg:%d = paramnum:%d ===",
             m_ra->m_maxreg, m_ra->m_param_num);
     if (m_ra->m_param_num > 0) {
-        fprintf(g_tfile, "{");
+        prt("{");
         for (INT i = 0; i <= m_params.get_last_idx(); i++) {
             INT pr = m_params.get(i);
             if (pr != 0) {
-                fprintf(g_tfile, "pr%d", pr);
+                prt("pr%d", pr);
                 GLT * g = map_pr2glt(pr);
                 ASSERT0(g); //may be pr is local.
                 if (g->has_allocated()) {
-                    fprintf(g_tfile, "(v%d)", GLT_phy(g));
+                    prt("(v%d)", GLT_phy(g));
                 }
-                fprintf(g_tfile, ",");
+                prt(",");
             } else {
-                fprintf(g_tfile, "--,");
+                prt("--,");
             }
         }
-        fprintf(g_tfile, "}");
+        prt("}");
     }
-    fprintf(g_tfile, "\n");
+    note("\n");
 
     StrBuf buf(32);
     for (INT i = prs.get_first(); i >= 0; i = prs.get_next(i)) {
@@ -1147,23 +1147,23 @@ void GltMgr::dumpg()
         if (g == NULL) { continue; }
 
         //Print prno.
-        fprintf(g_tfile, "\n");
-        fprintf(g_tfile, litbuf2.buf, GLT_prno(g));
-        fprintf(g_tfile, " ");
+        note("\n");
+        prt(litbuf2.buf, GLT_prno(g));
+        prt(" ");
 
         //Print phy.
         if (g != NULL) {
-            fprintf(g_tfile, "[");
+            prt("[");
             if (GLT_phy(g) == REG_UNDEF) {
                 UINT h = 0;
                 while (h <= num) {
-                    fprintf(g_tfile, "-");
+                    prt("-");
                     h++;
                 }
             } else {
-                fprintf(g_tfile, litbuf.buf, GLT_phy(g));
+                prt(litbuf.buf, GLT_phy(g));
             }
-            fprintf(g_tfile, "]");
+            prt("]");
         }
 
         //Print live BB.
@@ -1176,14 +1176,14 @@ void GltMgr::dumpg()
             for (INT j = start; j < u; j++) {
                 buf.sprint("%d,", j);
                 for (UINT k = 0; k < buf.strlen(); k++) {
-                    fprintf(g_tfile, " ");
+                    prt(" ");
                 }
             }
-            fprintf(g_tfile, "%d,", u);
+            prt("%d,", u);
             start = u + 1;
         }
     }
-    fprintf(g_tfile, "\n");
+    note("\n");
     fflush(g_tfile);
 }
 
@@ -1193,13 +1193,13 @@ void GltMgr::dump()
 {
     dumpg();
     if (g_tfile == NULL) { return; }
-    fprintf(g_tfile, "\n=== DUMP Local Life Time ===");
+    note("\n=== DUMP Local Life Time ===");
     BBList * bbl = m_ru->getBBList();
     for (IRBB * bb = bbl->get_head(); bb != NULL; bb = bbl->get_next()) {
         LTMgr * lltmgr = map_bb2ltm(bb);
         lltmgr->dump();
     }
-    fprintf(g_tfile, "\n");
+    note("\n");
     fflush(g_tfile);
 }
 
@@ -2758,7 +2758,7 @@ void LTMgr::renameLT(LT * l, IR ** newpr)
                             //Generate new PR no.
                             *newpr = m_ru->buildPR(IR_dt(ir));
                         }
-                        ir->set_prno(PR_no(*newpr));
+                        ir->setPrno(PR_no(*newpr));
                     } else {
                         //l is a member of group.
                         ASSERT0(LT_ltg(l) != NULL);
@@ -3118,24 +3118,24 @@ void LTMgr::dump_unallocated(FILE * h, BitSet & visited)
 
 void LTMgr::dump()
 {
-    if (g_tfile == NULL) return;
-    fprintf(g_tfile, "\n--- BB%d Local Life Time ---", m_bb->id());
+    if (g_tfile == NULL) { return; }
+    note("\n--- BB%d Local Life Time ---", m_bb->id());
 
     //Print live-in PR.
-    fprintf(g_tfile, "\nlivein:");
+    note("\nlivein:");
     DefSBitSetCore * livein = m_prdf->get_livein(BB_id(m_bb));
     SEGIter * cur = NULL;
     for (INT i = livein->get_first(&cur);
          i != -1; i = livein->get_next(i, &cur)) {
-        fprintf(g_tfile, "pr%d, ", i);
+        prt("pr%d, ", i);
     }
 
     //Print live-out PR.
-    fprintf(g_tfile, "\nliveout:");
+    note("\nliveout:");
     DefSBitSetCore * liveout = m_prdf->get_liveout(BB_id(m_bb));
     for (INT i = liveout->get_first(&cur);
          i != -1; i = liveout->get_next(i, &cur)) {
-        fprintf(g_tfile, "pr%d, ", i);
+        prt("pr%d, ", i);
     }
 
     //Print local life times base info.
@@ -3144,8 +3144,8 @@ void LTMgr::dump()
         LT * lt = m_lt_vec.get(i);
         if (lt == NULL) { continue; }
         c = MAX(c, LT_uid(lt));
-        //fprintf(g_tfile, "\n\tLT(%d):", LT_uid(lt));
-        //fprintf(g_tfile, "[pr%d]:", LT_prno(lt));
+        //note("\n\tLT(%d):", LT_uid(lt));
+        //prt("[pr%d]:", LT_prno(lt));
     }
 
     BitSet visited(c + 1);
@@ -4062,16 +4062,16 @@ void BBRA::dump_prio(List<LT*> & prios)
 {
     if (g_tfile == NULL) { return; }
     for (LT * l = prios.get_head(); l != NULL; l = prios.get_next()) {
-        fprintf(g_tfile, "\nLT%d(pr%d)(prio=%f)",
+        note("\nLT%d(pr%d)(prio=%f)",
                 LT_uid(l), LT_prno(l), LT_priority(l));
         if (LT_is_global(l)) {
-            fprintf(g_tfile, "(global)");
+            prt("(global)");
         }
         if (l->has_allocated()) {
-            fprintf(g_tfile, "(phy=v%d)", LT_phy(l));
+            prt("(phy=v%d)", LT_phy(l));
         }
         if (LT_prefer_reg(l) != REG_UNDEF) {
-            fprintf(g_tfile, "(prefer=v%d)", LT_prefer_reg(l));
+            prt("(prefer=v%d)", LT_prefer_reg(l));
         }
     }
     fflush(g_tfile);
@@ -5371,13 +5371,13 @@ void RA::dump_ltg()
     if (g_tfile == NULL) { return; }
     TMapIter<UINT, LTG*> iter;
     LTG * ltg;
-    fprintf(g_tfile, "\n=== DUMP LTG === %s ===\n", m_ru->getRegionName());
+    note("\n=== DUMP LTG === %s ===\n", m_ru->getRegionName());
     for (UINT id = m_gltm.m_ltgmgr.get_first(iter, &ltg);
          id != 0; id = m_gltm.m_ltgmgr.get_next(iter, &ltg)) {
         IR * ir = m_ru->getIR(id);
         ASSERT0(ir && is_range_call(ir) && ltg);
         IRBB * bb = ir->getBB();
-        dump_ir(ir, m_tm);
+        dumpIR(ir, m_tm);
         LTMgr * ltm = m_gltm.map_bb2ltm(bb);
         ASSERT0(ltm);
         ltm->dump();

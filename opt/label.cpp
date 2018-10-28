@@ -66,33 +66,33 @@ LabelInfo * allocLabel(SMemPool * pool)
 
 void dumpLabel(LabelInfo const* li)
 {
-    if (g_tfile == NULL) return;
+    if (g_tfile == NULL) { return; }
     if (LABEL_INFO_type(li) == L_ILABEL) {
-        fprintf(g_tfile, "\nilabel(" ILABEL_STR_FORMAT ")",
+        note("\nilabel(" ILABEL_STR_FORMAT ")",
                 ILABEL_CONT(li));
     } else if (LABEL_INFO_type(li) == L_CLABEL) {
-        fprintf(g_tfile, "\nclabel(" CLABEL_STR_FORMAT ")",
+        note("\nclabel(" CLABEL_STR_FORMAT ")",
                 CLABEL_CONT(li));
     } else if (LABEL_INFO_type(li) == L_PRAGMA) {
         ASSERT0(LABEL_INFO_pragma(li));
-        fprintf(g_tfile, "\npragms(%s)",
+        note("\npragms(%s)",
                 SYM_name(LABEL_INFO_pragma(li)));
     } else { UNREACHABLE(); }
 
     if (LABEL_INFO_b1(li) != 0) {
-        fprintf(g_tfile, "(");
+        prt("(");
     }
     if (LABEL_INFO_is_try_start(li)) {
-        fprintf(g_tfile, "try_start ");
+        prt("try_start ");
     }
     if (LABEL_INFO_is_try_end(li)) {
-        fprintf(g_tfile, "try_end ");
+        prt("try_end ");
     }
     if (LABEL_INFO_is_catch_start(li)) {
-        fprintf(g_tfile, "catch_start ");
+        prt("catch_start ");
     }
     if (LABEL_INFO_b1(li) != 0) {
-        fprintf(g_tfile, ")");
+        prt(")");
     }
     fflush(g_tfile);
 }

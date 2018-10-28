@@ -1468,36 +1468,36 @@ void IR2Dex::dump_output(List<LIR*> & newlirs, Prno2Vreg const& prno2v)
     if (g_tfile == NULL) { return; }
     if (m_lab2idx.get_elem_count() != 0) {
         INT c;
-        fprintf(g_tfile, "\n==== RU:%s, IR2Dex DUMP lab2idx ====",
+        note("\n==== RU:%s, IR2Dex DUMP lab2idx ====",
                 m_ru->getRegionName());
         for (LabelInfo const* li = m_lab2idx.get_first(c);
              li != NULL; li = m_lab2idx.get_next(c)) {
             dumpLabel(li);
-            fprintf(g_tfile, " -->> %d", m_lab2idx.get(li, NULL));
+            prt(" -->> %d", m_lab2idx.get(li, NULL));
         }
     }
-    fprintf(g_tfile, "\n==== RU:%s, DUMP lir list after reloc === vregnum:%d ",
+    note("\n==== RU:%s, DUMP lir list after reloc === vregnum:%d ",
             m_ru->getRegionName(), prno2v.maxreg + 1);
     /*
     if (prno2v.maxreg >= 0) {
-        fprintf(g_tfile, "(");
+        prt("(");
         for (INT i = prno2v.maxreg + 1 - prno2v.paramnum;
              i <= prno2v.maxreg; i++) {
             ASSERT0(i >= 0);
-            fprintf(g_tfile, "v%d,", i);
+            prt("v%d,", i);
         }
-        fprintf(g_tfile, ")");
+        prt(")");
     }
-    fprintf(g_tfile, " ====");
+    prt(" ====");
     */
 
     UINT i = 0;
     for (LIR * lir = newlirs.get_head();
          lir; lir = newlirs.get_next(), i++) {
-        fprintf(g_tfile, "\n%d:", i);
+        note("\n%d:", i);
         dump_lir2(lir, m_df, i);
     }
-    fprintf(g_tfile, "\n");
+    note("\n");
     fflush(g_tfile);
 }
 
@@ -1507,15 +1507,15 @@ void IR2Dex::convert(IR * ir_list, List<LIR*> & newlirs)
 {
     bool dump = g_dump_ir2dex && g_tfile != NULL;
     if (dump) {
-        fprintf(g_tfile, "\n\n==== IR->DEX CONVERT %s =====",
+        note("\n\n==== IR->DEX CONVERT %s =====",
                 m_ru->getRegionName());
     }
     IR2DexCtx cont;
     UINT idx = 0;
     while (ir_list != NULL) {
         if (dump) {
-            fprintf(g_tfile, "\n---");
-            dump_ir(ir_list, m_tm);
+            note("\n---");
+            dumpIR(ir_list, m_tm);
         }
 
         if (ir_list->is_label()) {

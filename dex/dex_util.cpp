@@ -635,7 +635,7 @@ CHAR const* get_func_type(DexFile const* df, DexMethodId const* dmid)
 void dump_lir(LIR * lir, DexFile * df, INT pos)
 {
     if (g_tfile == NULL || lir == NULL) return;
-    fprintf(g_tfile, "\n");
+    note("\n");
     dump_lir2(lir, df, pos);
 }
 
@@ -645,9 +645,9 @@ void dump_lir2(LIR * lir, DexFile * df, INT pos)
 {
     if (g_tfile == NULL || lir == NULL) return;
     if (pos < 0) {
-        fprintf(g_tfile, "%s", LIR_name(lir));
+        prt("%s", LIR_name(lir));
     } else {
-        fprintf(g_tfile, "(%dth)%s", pos, LIR_name(lir));
+        prt("(%dth)%s", pos, LIR_name(lir));
     }
     switch (LIR_opcode(lir)) {
     case LOP_NOP:
@@ -655,34 +655,34 @@ void dump_lir2(LIR * lir, DexFile * df, INT pos)
     case LOP_CONST:
         switch (LIR_dt(lir)) {
         case LIR_JDT_unknown:
-            fprintf(g_tfile, ", INT");
+            prt(", INT");
             if (is_s4(LIR_int_imm(lir)) && LIR_res(lir) < 16) {
                 //AB
-                fprintf(g_tfile, ", v%d <- %d",
+                prt(", v%d <- %d",
                         LIR_res(lir), (INT)LIR_int_imm(lir));
             } else if (is_s16(LIR_int_imm(lir))) {
                 //AABBBB
-                fprintf(g_tfile, ", v%d <- %d",
+                prt(", v%d <- %d",
                         LIR_res(lir), (INT)LIR_int_imm(lir));
             } else {
                 //AABBBBBBBB
-                fprintf(g_tfile, ", v%d <- %d",
+                prt(", v%d <- %d",
                         LIR_res(lir), (INT)LIR_int_imm(lir));
             }
             break;
         case LIR_JDT_wide:
-            fprintf(g_tfile, ", %s", get_dt_name(lir));
+            prt(", %s", get_dt_name(lir));
             if (is_swide16(LIR_int_imm(lir))) {
                 //AABBBB
-                fprintf(g_tfile, ", (v%d,v%d) <- %d",
+                prt(", (v%d,v%d) <- %d",
                         LIR_res(lir), LIR_res(lir) + 1, (INT)LIR_int_imm(lir));
             } else if (is_swide32(LIR_int_imm(lir))) {
                 //AABBBBBBBB
-                fprintf(g_tfile, ", (v%d,v%d) <- %d",
+                prt(", (v%d,v%d) <- %d",
                         LIR_res(lir), LIR_res(lir) + 1, (INT)LIR_int_imm(lir));
             } else {
                 //AABBBBBBBBBBBBBBBB
-                fprintf(g_tfile, ", (v%d,v%d) <- %lld",
+                prt(", (v%d,v%d) <- %lld",
                         LIR_res(lir), LIR_res(lir) + 1, LIR_int_imm(lir));
             }
             break;
@@ -697,17 +697,17 @@ void dump_lir2(LIR * lir, DexFile * df, INT pos)
         {
             switch (LIR_dt(lir)) {
             case LIR_JDT_unknown: //return preg.
-                fprintf(g_tfile, ", INT");
-                fprintf(g_tfile, ", v%d", LIR_res(lir));
+                prt(", INT");
+                prt(", v%d", LIR_res(lir));
                 break;
             case LIR_JDT_void: //No return value.
                 break;
             case LIR_JDT_object: //return object.
-                fprintf(g_tfile, ", obj_ptr:v%d", LIR_res(lir));
+                prt(", obj_ptr:v%d", LIR_res(lir));
                 break;
             case LIR_JDT_wide:
-                fprintf(g_tfile, ", %s", get_dt_name(lir));
-                fprintf(g_tfile, ", (v%d,v%d)", LIR_res(lir), LIR_res(lir) + 1);
+                prt(", %s", get_dt_name(lir));
+                prt(", (v%d,v%d)", LIR_res(lir), LIR_res(lir) + 1);
                 break;
             default: UNREACHABLE();
             }
@@ -716,10 +716,10 @@ void dump_lir2(LIR * lir, DexFile * df, INT pos)
     case LOP_THROW: //AA
         //Throws an exception object.
         //The reference of the exception object is in vx.
-        fprintf(g_tfile, ", v%d", LIR_res(lir));
+        prt(", v%d", LIR_res(lir));
         break;
     case LOP_MONITOR_ENTER  :
-        fprintf(g_tfile, ", v%d", LIR_res(lir));
+        prt(", v%d", LIR_res(lir));
         break;
     case LOP_MONITOR_EXIT   :
         break;
@@ -730,154 +730,154 @@ void dump_lir2(LIR * lir, DexFile * df, INT pos)
             LIRAOp * p = (LIRAOp*)lir;
             switch (LIR_dt(lir)) {
             case LIR_JDT_unknown: //lexOpcode = lc_mov_result32; break;
-                fprintf(g_tfile, ", INT");
-                fprintf(g_tfile, ", retval -> v%d", LIR_res(lir));
+                prt(", INT");
+                prt(", retval -> v%d", LIR_res(lir));
                 break;
             case LIR_JDT_wide: //lexOpcode = lc_mov_result64; break;
-                fprintf(g_tfile, ", %s", get_dt_name(lir));
-                fprintf(g_tfile, ", retval -> (v%d,v%d)",
+                prt(", %s", get_dt_name(lir));
+                prt(", retval -> (v%d,v%d)",
                         LIR_res(lir), LIR_res(lir) + 1);
                 break;
             case LIR_JDT_object: //lexOpcode = lc_mov_result_object; break;
-                fprintf(g_tfile, ", obj-ptr");
-                fprintf(g_tfile, ", retval -> v%d", LIR_res(lir));
+                prt(", obj-ptr");
+                prt(", retval -> v%d", LIR_res(lir));
                 break;
             }
         }
         break;
     case LOP_MOVE_EXCEPTION : //AA
-        fprintf(g_tfile, ", v%d", LIR_res(lir));
+        prt(", v%d", LIR_res(lir));
         break;
     case LOP_GOTO            : //AABBBBBBBB
         {
             LIRGOTOOp * p = (LIRGOTOOp*)lir;
-            fprintf(g_tfile, ", (lirIdx)%dth", p->target);
+            prt(", (lirIdx)%dth", p->target);
         }
         break;
     case LOP_MOVE        :
         switch (LIR_dt(lir)) {
         case LIR_JDT_unknown:
-            fprintf(g_tfile, ", INT");
+            prt(", INT");
             if ((LIR_op0(lir) | LIR_res(lir)) < 16) {
                 //AB
-                fprintf(g_tfile, ", v%d <- v%d", LIR_res(lir), LIR_op0(lir));
+                prt(", v%d <- v%d", LIR_res(lir), LIR_op0(lir));
             } else if (LIR_res(lir) < 256) {
                 //AABBBB
-                fprintf(g_tfile, ", v%d <- v%d", LIR_res(lir), LIR_op0(lir));
+                prt(", v%d <- v%d", LIR_res(lir), LIR_op0(lir));
             } else {
                 //AAAABBBB
-                fprintf(g_tfile, ", v%d <- v%d", LIR_res(lir), LIR_op0(lir));
+                prt(", v%d <- v%d", LIR_res(lir), LIR_op0(lir));
             }
             break;
         case LIR_JDT_wide:
-            fprintf(g_tfile, ", %s", get_dt_name(lir));
+            prt(", %s", get_dt_name(lir));
             if ((LIR_op0(lir) | LIR_res(lir)) < 16) {
                 //AB
-                fprintf(g_tfile, ", (v%d,v%d) <- (v%d,v%d)",
+                prt(", (v%d,v%d) <- (v%d,v%d)",
                         LIR_res(lir), LIR_res(lir) + 1,
                         LIR_op0(lir), LIR_op0(lir) + 1);
             } else if (LIR_res(lir) < 256) {
                 //AABBBB
-                fprintf(g_tfile, ", (v%d,v%d) <- (v%d,v%d)",
+                prt(", (v%d,v%d) <- (v%d,v%d)",
                         LIR_res(lir), LIR_res(lir) + 1,
                         LIR_op0(lir), LIR_op0(lir) + 1);
             } else {
                 //AAAABBBB
-                fprintf(g_tfile, ", (v%d,v%d) <- (v%d,v%d)",
+                prt(", (v%d,v%d) <- (v%d,v%d)",
                         LIR_res(lir), LIR_res(lir) + 1,
                         LIR_op0(lir), LIR_op0(lir) + 1);
             }
             break;
         case LIR_JDT_object:
-            fprintf(g_tfile, ", obj-ptr");
+            prt(", obj-ptr");
             if ((LIR_op0(lir) | LIR_res(lir)) < 16) {
                 //AB
-                fprintf(g_tfile, ", v%d <- v%d", LIR_res(lir), LIR_op0(lir));
+                prt(", v%d <- v%d", LIR_res(lir), LIR_op0(lir));
             } else if (LIR_res(lir) < 256) {
                 //AABBBB
-                fprintf(g_tfile, ", v%d <- v%d", LIR_res(lir), LIR_op0(lir));
+                prt(", v%d <- v%d", LIR_res(lir), LIR_op0(lir));
             } else {
                 //AAAABBBB
-                fprintf(g_tfile, ", v%d <- v%d", LIR_res(lir), LIR_op0(lir));
+                prt(", v%d <- v%d", LIR_res(lir), LIR_op0(lir));
             }
             break;
         }
         break;
     case LOP_NEG        : //AB
     case LOP_NOT        : //AB
-        fprintf(g_tfile, ", %s", get_dt_name(lir));
+        prt(", %s", get_dt_name(lir));
         if (is_wide(lir)) {
-            fprintf(g_tfile, ", (v%d,v%d) <- (v%d,v%d)",
+            prt(", (v%d,v%d) <- (v%d,v%d)",
                     LIR_res(lir), LIR_res(lir)+1, LIR_op0(lir), LIR_op0(lir)+1);
         } else {
-            fprintf(g_tfile, ", v%d <- v%d", LIR_res(lir), LIR_op0(lir));
+            prt(", v%d <- v%d", LIR_res(lir), LIR_op0(lir));
         }
         break;
     case LOP_CONVERT    : //AB
         switch (LIR_dt(lir)) {
         case LIR_convert_i2l:
-            fprintf(g_tfile, ", INT->LONG");
-            fprintf(g_tfile, ", (v%d,v%d) <- v%d",
+            prt(", INT->LONG");
+            prt(", (v%d,v%d) <- v%d",
                     LIR_res(lir), LIR_res(lir)+1, LIR_op0(lir));
             break;
-        case LIR_convert_i2f: fprintf(g_tfile, ", INT->FLOAT");  break;
+        case LIR_convert_i2f: prt(", INT->FLOAT");  break;
         case LIR_convert_i2d:
-            fprintf(g_tfile, ", INT->DOUBLE");
-            fprintf(g_tfile, ", (v%d,v%d) <- v%d",
+            prt(", INT->DOUBLE");
+            prt(", (v%d,v%d) <- v%d",
                     LIR_res(lir), LIR_res(lir)+1, LIR_op0(lir));
             break;
         case LIR_convert_l2i:
-            fprintf(g_tfile, ", LONG->INT");
-            fprintf(g_tfile, ", v%d <- (v%d,v%d)",
+            prt(", LONG->INT");
+            prt(", v%d <- (v%d,v%d)",
                     LIR_res(lir), LIR_op0(lir), LIR_op0(lir)+1);
             break;
         case LIR_convert_l2f:
-            fprintf(g_tfile, ", LONG->FLOAT");
-            fprintf(g_tfile, ", v%d <- (v%d,v%d)",
+            prt(", LONG->FLOAT");
+            prt(", v%d <- (v%d,v%d)",
                     LIR_res(lir), LIR_op0(lir), LIR_op0(lir)+1);
             break;
         case LIR_convert_l2d:
-            fprintf(g_tfile, ", LONG->DOUBLE");
-            fprintf(g_tfile, ", (v%d,v%d) <- (v%d,v%d)",
+            prt(", LONG->DOUBLE");
+            prt(", (v%d,v%d) <- (v%d,v%d)",
                     LIR_res(lir), LIR_res(lir)+1, LIR_op0(lir), LIR_op0(lir)+1);
             break;
-        case LIR_convert_f2i: fprintf(g_tfile, ", FLOAT->INT");  break;
+        case LIR_convert_f2i: prt(", FLOAT->INT");  break;
         case LIR_convert_f2l:
-            fprintf(g_tfile, ", FLOAT->LONG");
-            fprintf(g_tfile, ", (v%d,v%d) <- v%d",
+            prt(", FLOAT->LONG");
+            prt(", (v%d,v%d) <- v%d",
                     LIR_res(lir), LIR_res(lir)+1, LIR_op0(lir));
             break;
         case LIR_convert_f2d:
-            fprintf(g_tfile, ", FLOAT->DOUBLE");
-            fprintf(g_tfile, ", (v%d,v%d) <- v%d",
+            prt(", FLOAT->DOUBLE");
+            prt(", (v%d,v%d) <- v%d",
                     LIR_res(lir), LIR_res(lir)+1, LIR_op0(lir));
             break;
         case LIR_convert_d2i:
-            fprintf(g_tfile, ", DOUBLE->INT");
-            fprintf(g_tfile, ", v%d <- (v%d,v%d)",
+            prt(", DOUBLE->INT");
+            prt(", v%d <- (v%d,v%d)",
                     LIR_res(lir), LIR_op0(lir), LIR_op0(lir)+1);
             break;
         case LIR_convert_d2l:
-            fprintf(g_tfile, ", DOUBLE->LONG");
-            fprintf(g_tfile, ", (v%d,v%d) <- (v%d,v%d)",
+            prt(", DOUBLE->LONG");
+            prt(", (v%d,v%d) <- (v%d,v%d)",
                     LIR_res(lir), LIR_res(lir)+1, LIR_op0(lir), LIR_op0(lir)+1);
             break;
         case LIR_convert_d2f:
-            fprintf(g_tfile, ", DOUBLE->FLOAT");
-            fprintf(g_tfile, ", v%d <- (v%d,v%d)",
+            prt(", DOUBLE->FLOAT");
+            prt(", v%d <- (v%d,v%d)",
                     LIR_res(lir), LIR_op0(lir), LIR_op0(lir)+1);
             break;
         case LIR_convert_i2b:
-            fprintf(g_tfile, ", INT->BOOL");
-            fprintf(g_tfile, ", v%d <- v%d", LIR_res(lir), LIR_op0(lir));
+            prt(", INT->BOOL");
+            prt(", v%d <- v%d", LIR_res(lir), LIR_op0(lir));
             break;
         case LIR_convert_i2c:
-            fprintf(g_tfile, ", INT->CHAR");
-            fprintf(g_tfile, ", v%d <- v%d", LIR_res(lir), LIR_op0(lir));
+            prt(", INT->CHAR");
+            prt(", v%d <- v%d", LIR_res(lir), LIR_op0(lir));
             break;
         case LIR_convert_i2s:
-            fprintf(g_tfile, ", INT->SHORT");
-            fprintf(g_tfile, ", v%d <- v%d", LIR_res(lir), LIR_op0(lir));
+            prt(", INT->SHORT");
+            prt(", v%d <- v%d", LIR_res(lir), LIR_op0(lir));
             break;
         default: UNREACHABLE();
         }
@@ -893,37 +893,37 @@ void dump_lir2(LIR * lir, DexFile * df, INT pos)
     case LOP_SHL_ASSIGN :
     case LOP_SHR_ASSIGN :
     case LOP_USHR_ASSIGN:
-        fprintf(g_tfile, ", %s", get_dt_name(lir));
+        prt(", %s", get_dt_name(lir));
         if (is_wide(lir)) {
-            fprintf(g_tfile, ", (v%d,v%d) <- (v%d,v%d), (v%d,v%d)",
+            prt(", (v%d,v%d) <- (v%d,v%d), (v%d,v%d)",
                     LIR_res(lir), LIR_res(lir)+1,
                     LIR_res(lir), LIR_res(lir)+1,
                     LIR_op0(lir), LIR_op0(lir)+1);
         } else {
-            fprintf(g_tfile, ", v%d <- v%d, v%d",
+            prt(", v%d <- v%d, v%d",
                     LIR_res(lir), LIR_res(lir), LIR_op0(lir));
         }
         break;
     case LOP_ARRAY_LENGTH: //AABBBB
         //Calculates the number of elements of the array referenced by vy
         //and puts the length value into vx.
-        fprintf(g_tfile, ", v%d <- v%d", LIR_res(lir), LIR_op0(lir));
+        prt(", v%d <- v%d", LIR_res(lir), LIR_op0(lir));
         break;
     case LOP_IFZ         :
         //AABBBB
         switch (LIR_dt(lir)) {
-        case LIR_cond_EQ: fprintf(g_tfile, ", =="); break;
-        case LIR_cond_NE: fprintf(g_tfile, ", !="); break;
-        case LIR_cond_LT: fprintf(g_tfile, ", <"); break;
-        case LIR_cond_GE: fprintf(g_tfile, ", >="); break;
-        case LIR_cond_GT: fprintf(g_tfile, ", >"); break;
-        case LIR_cond_LE: fprintf(g_tfile, ", <="); break;
+        case LIR_cond_EQ: prt(", =="); break;
+        case LIR_cond_NE: prt(", !="); break;
+        case LIR_cond_LT: prt(", <"); break;
+        case LIR_cond_GE: prt(", >="); break;
+        case LIR_cond_GT: prt(", >"); break;
+        case LIR_cond_LE: prt(", <="); break;
         }
         if (is_wide(lir)) {
-            fprintf(g_tfile, ", (v%d,v%d), 0, (lirIdx)%dth",
+            prt(", (v%d,v%d), 0, (lirIdx)%dth",
                     LIR_res(lir), LIR_res(lir)+1, LIR_op0(lir));
         } else {
-            fprintf(g_tfile, ", v%d, 0, (lirIdx)%dth",
+            prt(", v%d, 0, (lirIdx)%dth",
                     LIR_res(lir), LIR_op0(lir));
         }
         break;
@@ -931,7 +931,7 @@ void dump_lir2(LIR * lir, DexFile * df, INT pos)
         //AABBBB
         //LIR_op0(lir) is class-type-id, not class-declaration-id.
         ASSERT0(df);
-        fprintf(g_tfile, ", (obj_ptr)v%d <- (clsname<%d>)%s",
+        prt(", (obj_ptr)v%d <- (clsname<%d>)%s",
                 LIR_res(lir),
                 LIR_op0(lir),
                 get_class_name(df, LIR_op0(lir)));
@@ -939,7 +939,7 @@ void dump_lir2(LIR * lir, DexFile * df, INT pos)
     case LOP_CONST_STRING:
         //AABBBB or AABBBBBBBB
         ASSERT0(df);
-        fprintf(g_tfile, ", v%d <- (strofst<%d>)\"%s\"",
+        prt(", v%d <- (strofst<%d>)\"%s\"",
                 LIR_res(lir),
                 LIR_op0(lir),
                 dexStringById(df, LIR_op0(lir)));
@@ -949,16 +949,16 @@ void dump_lir2(LIR * lir, DexFile * df, INT pos)
         //const-class vx,type_id
         //Moves the class object of a class identified by
         //type_id (e.g. Object.class) into vx.
-        fprintf(g_tfile, ", v%d <- (clsname<%d>)%s",
+        prt(", v%d <- (clsname<%d>)%s",
                 LIR_res(lir),
                 LIR_op0(lir),
                 dexStringByTypeIdx(df, LIR_op0(lir)));
         break;
     case LOP_SGET        :
         //AABBBB
-        fprintf(g_tfile, ", %s", get_dt_name(lir));
+        prt(", %s", get_dt_name(lir));
         ASSERT0(df);
-        fprintf(g_tfile, ", v%d <- (ofst<%d>)%s::%s",
+        prt(", v%d <- (ofst<%d>)%s::%s",
                 LIR_res(lir),
                 LIR_op0(lir),
                 get_field_class_name(df, LIR_op0(lir)),
@@ -967,7 +967,7 @@ void dump_lir2(LIR * lir, DexFile * df, INT pos)
     case LOP_CHECK_CAST  :
         //AABBBB
         ASSERT0(df);
-        fprintf(g_tfile, ", v%d '%s'",
+        prt(", v%d '%s'",
                 LIR_res(lir),
                 dexStringByTypeIdx(df, LIR_op0(lir)));
         break;
@@ -975,15 +975,15 @@ void dump_lir2(LIR * lir, DexFile * df, INT pos)
         {
             //AABBBB
             LIRABOp * p = (LIRABOp*)lir;
-            fprintf(g_tfile, ", %s", get_dt_name(lir));
+            prt(", %s", get_dt_name(lir));
             ASSERT0(df);
             if (is_wide(lir)) {
-                fprintf(g_tfile, ", (v%d,v%d) -> %s::%s",
+                prt(", (v%d,v%d) -> %s::%s",
                         LIR_res(lir), LIR_res(lir)+1,
                         get_field_class_name(df, LIR_op0(lir)),
                         get_field_name(df, LIR_op0(lir)));
             } else {
-                fprintf(g_tfile, ", v%d -> %s::%s",
+                prt(", v%d -> %s::%s",
                         LIR_res(lir),
                         get_field_class_name(df, LIR_op0(lir)),
                         get_field_name(df, LIR_op0(lir)));
@@ -992,27 +992,27 @@ void dump_lir2(LIR * lir, DexFile * df, INT pos)
         break;
     case LOP_APUT        :
         //AABBCC
-        fprintf(g_tfile, ", %s", get_dt_name(lir));
+        prt(", %s", get_dt_name(lir));
         ASSERT0(df);
         if (is_wide(lir)) {
-            fprintf(g_tfile, ", (v%d,v%d) -> (array_base_ptr)v%d, (array_elem)v%d",
+            prt(", (v%d,v%d) -> (array_base_ptr)v%d, (array_elem)v%d",
                     LIR_res(lir), LIR_res(lir)+1,
                     LIR_op0(lir), (UINT)LIR_op1(lir));
         } else {
-            fprintf(g_tfile, ", v%d -> (array_base_ptr)v%d, (array_elem)v%d",
+            prt(", v%d -> (array_base_ptr)v%d, (array_elem)v%d",
                     LIR_res(lir), LIR_op0(lir), (UINT)LIR_op1(lir));
         }
         break;
     case LOP_AGET      :
         //AABBCC
-        fprintf(g_tfile, ", %s", get_dt_name(lir));
+        prt(", %s", get_dt_name(lir));
         ASSERT0(df);
         if (is_wide(lir)) {
-            fprintf(g_tfile, ", (v%d,v%d) <- (array_base_ptr)v%d, (array_elem)v%d",
+            prt(", (v%d,v%d) <- (array_base_ptr)v%d, (array_elem)v%d",
                     LIR_res(lir), LIR_res(lir)+1,
                     LIR_op0(lir), (UINT)LIR_op1(lir));
         } else {
-            fprintf(g_tfile, ", v%d <- (array_base_ptr)v%d, (array_elem)v%d",
+            prt(", v%d <- (array_base_ptr)v%d, (array_elem)v%d",
                     LIR_res(lir), LIR_op0(lir), (UINT)LIR_op1(lir));
         }
         break;
@@ -1022,13 +1022,13 @@ void dump_lir2(LIR * lir, DexFile * df, INT pos)
         ASSERT0(df);
         switch (LIR_dt(lir)) {
         case LIR_CMP_float:
-            fprintf(g_tfile, ", FLOAT");
-            fprintf(g_tfile, ", v%d, v%d, %d",
+            prt(", FLOAT");
+            prt(", v%d, v%d, %d",
                     LIR_res(lir), LIR_op0(lir), (UINT)LIR_op1(lir));
             break;
         case LIR_CMP_double:
-            fprintf(g_tfile, ", DOUBLE");
-            fprintf(g_tfile, ", (v%d,v%d), (v%d,v%d), %d",
+            prt(", DOUBLE");
+            prt(", (v%d,v%d), (v%d,v%d), %d",
                     LIR_res(lir), LIR_res(lir)+1,
                     LIR_op0(lir), LIR_op0(lir)+1,
                     (UINT)LIR_op1(lir));
@@ -1048,15 +1048,15 @@ void dump_lir2(LIR * lir, DexFile * df, INT pos)
     case LOP_SHR       :
     case LOP_USHR      :
         {
-            fprintf(g_tfile, ", %s", get_dt_name(lir));
+            prt(", %s", get_dt_name(lir));
             LIRABCOp * p = (LIRABCOp*)lir;
             if (is_wide(lir)) {
-                fprintf(g_tfile, ", (v%d,v%d) <- (v%d,v%d), (v%d,v%d)",
+                prt(", (v%d,v%d) <- (v%d,v%d), (v%d,v%d)",
                         LIR_res(lir), LIR_res(lir)+1,
                         LIR_op0(lir), LIR_op0(lir)+1,
                         (UINT)LIR_op1(lir), (UINT)LIR_op1(lir)+1);
             } else {
-                fprintf(g_tfile, ", v%d <- v%d, v%d",
+                prt(", v%d <- v%d, v%d",
                         LIR_res(lir), LIR_op0(lir), (UINT)LIR_op1(lir));
             }
         }
@@ -1064,14 +1064,14 @@ void dump_lir2(LIR * lir, DexFile * df, INT pos)
     case LOP_IF        :
         //ABCCCC
         switch (LIR_dt(lir)) {
-        case LIR_cond_EQ: fprintf(g_tfile, ", =="); break;
-        case LIR_cond_NE: fprintf(g_tfile, ", !="); break;
-        case LIR_cond_LT: fprintf(g_tfile, ", <"); break;
-        case LIR_cond_GE: fprintf(g_tfile, ", >="); break;
-        case LIR_cond_GT: fprintf(g_tfile, ", >"); break;
-        case LIR_cond_LE: fprintf(g_tfile, ", <="); break;
+        case LIR_cond_EQ: prt(", =="); break;
+        case LIR_cond_NE: prt(", !="); break;
+        case LIR_cond_LT: prt(", <"); break;
+        case LIR_cond_GE: prt(", >="); break;
+        case LIR_cond_GT: prt(", >"); break;
+        case LIR_cond_LE: prt(", <="); break;
         }
-        fprintf(g_tfile, ", v%d, v%d, (lirIdx)%dth",
+        prt(", v%d, v%d, (lirIdx)%dth",
                 LIR_res(lir), LIR_op0(lir), (UINT)LIR_op1(lir));
         break;
     case LOP_ADD_LIT   : //AABBCC, AABBCCCC
@@ -1086,40 +1086,40 @@ void dump_lir2(LIR * lir, DexFile * df, INT pos)
     case LOP_SHR_LIT   : //AABBCC
     case LOP_USHR_LIT   : //AABBCC
         {
-            fprintf(g_tfile, ", %s", get_dt_name(lir));
+            prt(", %s", get_dt_name(lir));
             LIRABCOp * p = (LIRABCOp*)lir;
             if (is_wide(lir)) {
-                fprintf(g_tfile, ", (v%d,v%d) <- (v%d,v%d),",
+                prt(", (v%d,v%d) <- (v%d,v%d),",
                         LIR_res(lir), LIR_res(lir)+1,
                         LIR_op0(lir), LIR_op0(lir)+1);
             } else {
-                fprintf(g_tfile, ", v%d <- v%d,",
+                prt(", v%d <- v%d,",
                         LIR_res(lir), LIR_op0(lir));
             }
 
             if (is_s8((INT)LIR_op1(lir))) {
                 //8bit imm
-                fprintf(g_tfile, "(lit8)%d", (INT)LIR_op1(lir));
+                prt("(lit8)%d", (INT)LIR_op1(lir));
             } else if (is_s16((INT)LIR_op1(lir))) {
                 //16bit imm
-                fprintf(g_tfile, "(lit16)%d", (INT)LIR_op1(lir));
+                prt("(lit16)%d", (INT)LIR_op1(lir));
             } else {
                 UNREACHABLE();
             }
         }
         break;
     case LOP_IPUT       :
-        fprintf(g_tfile, ", %s", get_dt_name(lir));
+        prt(", %s", get_dt_name(lir));
         //ABCCCC
         ASSERT0(df);
         if (is_wide(lir)) {
-            fprintf(g_tfile, ", (v%d,v%d) -> (obj_ptr)v%d, (ofst<%d>)%s::%s",
+            prt(", (v%d,v%d) -> (obj_ptr)v%d, (ofst<%d>)%s::%s",
                     LIR_res(lir), LIR_res(lir)+1,
                     LIR_op0(lir), (UINT)LIR_op1(lir),
                     get_field_class_name(df, (UINT)LIR_op1(lir)),
                     get_field_name(df, (UINT)LIR_op1(lir)));
         } else {
-            fprintf(g_tfile, ", v%d -> (obj_ptr)v%d, (ofst<%d>)%s::%s",
+            prt(", v%d -> (obj_ptr)v%d, (ofst<%d>)%s::%s",
                     LIR_res(lir),
                     LIR_op0(lir),
                     (UINT)LIR_op1(lir),
@@ -1128,18 +1128,18 @@ void dump_lir2(LIR * lir, DexFile * df, INT pos)
         }
         break;
     case LOP_IGET       :
-        fprintf(g_tfile, ", %s", get_dt_name(lir));
+        prt(", %s", get_dt_name(lir));
         //ABCCCC
         ASSERT0(df);
         if (is_wide(lir)) {
-            fprintf(g_tfile, ", (v%d,v%d) <- (obj_ptr)v%d, (ofst<%d>)%s::%s",
+            prt(", (v%d,v%d) <- (obj_ptr)v%d, (ofst<%d>)%s::%s",
                     LIR_res(lir), LIR_res(lir)+1,
                     LIR_op0(lir),
                     (UINT)LIR_op1(lir),
                     get_field_class_name(df, (UINT)LIR_op1(lir)),
                     get_field_name(df, (UINT)LIR_op1(lir)));
         } else {
-            fprintf(g_tfile, ", v%d <- (obj_ptr)v%d, (ofst<%d>)%s::%s",
+            prt(", v%d <- (obj_ptr)v%d, (ofst<%d>)%s::%s",
                     LIR_res(lir),
                     LIR_op0(lir),
                     (UINT)LIR_op1(lir),
@@ -1148,7 +1148,7 @@ void dump_lir2(LIR * lir, DexFile * df, INT pos)
         }
         break;
     case LOP_INSTANCE_OF:
-        fprintf(g_tfile, ", (pred)v%d <- v%d, (clsname<%d>)'%s'",
+        prt(", (pred)v%d <- v%d, (clsname<%d>)'%s'",
                 LIR_res(lir),
                 LIR_op0(lir),
                 (UINT)LIR_op1(lir),
@@ -1157,10 +1157,10 @@ void dump_lir2(LIR * lir, DexFile * df, INT pos)
     case LOP_NEW_ARRAY  :
         //ABCCCC
         //new-array v%d(res) <- v%d(op0), LCAnimal(op1)
-        fprintf(g_tfile, ", %s", get_dt_name(lir));
+        prt(", %s", get_dt_name(lir));
         //ABCCCC
         ASSERT0(df);
-        fprintf(g_tfile, ", v%d <- (num_of_elem)v%d, (elem_type<%d>)'%s'",
+        prt(", v%d <- (num_of_elem)v%d, (elem_type<%d>)'%s'",
                 LIR_res(lir),
                 LIR_op0(lir),
                 (UINT)LIR_op1(lir),
@@ -1170,7 +1170,7 @@ void dump_lir2(LIR * lir, DexFile * df, INT pos)
         {
             LIRSwitchOp * p = (LIRSwitchOp*)lir;
             ASSERT0(LIR_dt(p) == 0x1);
-            fprintf(g_tfile, ", v%d", p->value);
+            prt(", v%d", p->value);
             USHORT * pdata = p->data;
 
             //data[0]: flag to indicate switch-table type:
@@ -1182,18 +1182,18 @@ void dump_lir2(LIR * lir, DexFile * df, INT pos)
 
             //data[2..3]: the base value of case-table
             UINT base_val = *((UINT*)(&pdata[2]));
-            fprintf(g_tfile, ", basev:%d", base_val);
+            prt(", basev:%d", base_val);
 
             //((BYTE*)data)[4..num_of_case*4]:
             //    the position of the index table is at current instruction.
             if (num_of_case > 0) {
                 UINT * pcase_entry = (UINT*)&pdata[4];
-                fprintf(g_tfile, " tgtidx:");
+                prt(" tgtidx:");
                 for (USHORT i = 0; i < num_of_case; i++) {
                     UINT idx_of_insn = pcase_entry[i];
-                    fprintf(g_tfile, "%d", idx_of_insn);
+                    prt("%d", idx_of_insn);
                     if (i != num_of_case - 1) {
-                        fprintf(g_tfile, ",");
+                        prt(",");
                     }
                 }
             }
@@ -1203,7 +1203,7 @@ void dump_lir2(LIR * lir, DexFile * df, INT pos)
         {
             LIRSwitchOp * p = (LIRSwitchOp*)lir;
             ASSERT0(LIR_dt(p) == 0x2);
-            fprintf(g_tfile, ", v%d", p->value);
+            prt(", v%d", p->value);
             USHORT * pdata = p->data;
 
             //pdata[0]: flag to indicate switch-table type:
@@ -1221,21 +1221,21 @@ void dump_lir2(LIR * lir, DexFile * df, INT pos)
                 //((BYTE*)pdata)[4+num_of_case*4, 4+num_of_case*8-1]:
                 //    the position of the index table is at current instruction.
                 UINT * pcase_entry = (UINT*)&tp[4 + num_of_case * 4];
-                fprintf(g_tfile, " val2idx(");
+                prt(" val2idx(");
                 for (UINT i = 0; i < num_of_case; i++) {
                     UINT idx_of_insn = pcase_entry[i];
-                    fprintf(g_tfile, "%d:%d", pcase_value[i], idx_of_insn);
+                    prt("%d:%d", pcase_value[i], idx_of_insn);
                     if (i != num_of_case - 1) {
-                        fprintf(g_tfile, ",");
+                        prt(",");
                     }
                 }
-                fprintf(g_tfile, ")");
+                prt(")");
             }
         }
         break;
     case LOP_FILL_ARRAY_DATA:
         {
-            fprintf(g_tfile, ", %s", get_dt_name(lir));
+            prt(", %s", get_dt_name(lir));
             //AABBBBBBBB
             //pdata[0]: the magic number of code
             //0x100 PACKED_SWITCH, 0x200 SPARSE_SWITCH, 0x300 FILL_ARRAY_DATA
@@ -1247,8 +1247,8 @@ void dump_lir2(LIR * lir, DexFile * df, INT pos)
             UINT size_of_elem = pdata[1];
             UINT num_of_elem = pdata[2];
             UINT data_size = num_of_elem * size_of_elem;
-            //fprintf(g_tfile, ", (elem_sz<%d>), (elem_num<%d>), (data_ptr)0x%x",
-            fprintf(g_tfile, ", (elem_sz<%d>), (elem_num<%d>)",
+            //prt(", (elem_sz<%d>), (elem_num<%d>), (data_ptr)0x%x",
+            prt(", (elem_sz<%d>), (elem_num<%d>)",
                     size_of_elem, num_of_elem);
         }
         break;
@@ -1276,7 +1276,7 @@ void dump_lir2(LIR * lir, DexFile * df, INT pos)
             DexProtoId const* proto_id =
                 dexGetProtoId(df, method_id->protoIdx);
             CHAR const* shorty_name = dexStringById(df, proto_id->shortyIdx);
-            fprintf(g_tfile, ", %s::%s", class_name, method_name);
+            prt(", %s::%s", class_name, method_name);
 
             UINT k = LIR_dt(lir);
             bool is_range = HAVE_FLAG((k & 0xf0), LIR_Range);
@@ -1284,43 +1284,43 @@ void dump_lir2(LIR * lir, DexFile * df, INT pos)
                 switch (k & 0x0f) {
                 case LIR_invoke_unknown: UNREACHABLE(); break;
                 case LIR_invoke_virtual:
-                    fprintf(g_tfile, ", virtual-range"); break;
+                    prt(", virtual-range"); break;
                 case LIR_invoke_direct:
-                    fprintf(g_tfile, ", direct-range"); break;
+                    prt(", direct-range"); break;
                 case LIR_invoke_super:
-                    fprintf(g_tfile, ", super-range"); break;
+                    prt(", super-range"); break;
                 case LIR_invoke_interface:
-                    fprintf(g_tfile, ", interface-range"); break;
+                    prt(", interface-range"); break;
                 case LIR_invoke_static:
-                    fprintf(g_tfile, ", static-range"); break;
+                    prt(", static-range"); break;
                 default: UNREACHABLE();
                 }
             } else {
                 switch (k & 0x0f) {
                 case LIR_invoke_unknown: UNREACHABLE(); break;
                 case LIR_invoke_virtual:
-                    fprintf(g_tfile, ", virtual"); break;
+                    prt(", virtual"); break;
                 case LIR_invoke_direct:
-                    fprintf(g_tfile, ", direct"); break;
+                    prt(", direct"); break;
                 case LIR_invoke_super:
-                    fprintf(g_tfile, ", super"); break;
+                    prt(", super"); break;
                 case LIR_invoke_interface:
-                    fprintf(g_tfile, ", interface"); break;
+                    prt(", interface"); break;
                 case LIR_invoke_static:
-                    fprintf(g_tfile, ", static"); break;
+                    prt(", static"); break;
                 default: UNREACHABLE();
                 }
             }
 
             if (r->argc != 0) {
-                fprintf(g_tfile, ", arg(");
+                prt(", arg(");
                 for (USHORT i = 0; i < r->argc; i++) {
-                    fprintf(g_tfile, "v%d", r->args[i]);
+                    prt("v%d", r->args[i]);
                     if (i != r->argc-1) {
-                        fprintf(g_tfile, ",");
+                        prt(",");
                     }
                 }
-                fprintf(g_tfile, ")");
+                prt(")");
             }
         }
         break;
@@ -1335,16 +1335,16 @@ void dump_lir2(LIR * lir, DexFile * df, INT pos)
             UINT flags = LIR_dt(lir);
             CHAR const* class_name = dexStringByTypeIdx(df, r->ref);
             ASSERT0(class_name);
-            fprintf(g_tfile, ", %s", class_name);
+            prt(", %s", class_name);
             if (r->argc != 0) {
-                fprintf(g_tfile, ", arg(");
+                prt(", arg(");
                 for (USHORT i = 0; i < r->argc; i++) {
-                    fprintf(g_tfile, "v%d", r->args[i]);
+                    prt("v%d", r->args[i]);
                     if (i != r->argc-1) {
-                        fprintf(g_tfile, ",");
+                        prt(",");
                     }
                 }
-                fprintf(g_tfile, ")");
+                prt(")");
             }
         }
         break;
@@ -1353,15 +1353,15 @@ void dump_lir2(LIR * lir, DexFile * df, INT pos)
         ASSERT0(df);
         switch (LIR_dt(lir)) {
         case LIR_CMP_float:
-            fprintf(g_tfile, ", FLOAT");
-            fprintf(g_tfile, ", v%d, v%d, %d",
+            prt(", FLOAT");
+            prt(", v%d, v%d, %d",
                     LIR_res(lir),
                     LIR_op0(lir),
                     (INT)LIR_op1(lir));
             break;
         case LIR_CMP_double:
-            fprintf(g_tfile, ", DOUBLE");
-            fprintf(g_tfile, ", (v%d,v%d), v%d, %d",
+            prt(", DOUBLE");
+            prt(", (v%d,v%d), v%d, %d",
                     LIR_res(lir), LIR_res(lir)+1,
                     LIR_op0(lir),
                     (INT)LIR_op1(lir));
@@ -1381,31 +1381,31 @@ void dump_lir2(LIR * lir, DexFile * df, INT pos)
 //Dump LIR stmts stored in fu->lirList array.
 void dump_all_lir(LIRCode * fu, DexFile * df, DexMethod const* dm)
 {
-    if (g_tfile == NULL) return;
+    if (g_tfile == NULL) { return; }
     ASSERT0(fu && df && dm);
     CHAR const* class_name = get_class_name(df, dm);
     CHAR const* func_name = get_func_name(df, dm);
     ASSERT0(class_name && func_name);
-    fprintf(g_tfile, "\n==---- DUMP LIR of %s::%s ----== maxreg:%d ",
+    note("\n==---- DUMP LIR of %s::%s ----== maxreg:%d ",
             class_name, func_name, fu->maxVars - 1);
     if (fu->maxVars > 0) {
-        fprintf(g_tfile, "(");
+        prt("(");
         for (INT i = fu->maxVars - fu->numArgs; i < (INT)fu->maxVars; i++) {
             ASSERT0(i >= 0);
-            fprintf(g_tfile, "v%d,", i);
+            prt("v%d,", i);
         }
-        fprintf(g_tfile, ")");
+        prt(")");
     }
-    fprintf(g_tfile, " ====");
+    prt(" ====");
     if (fu->triesSize != 0) {
         for (UINT i = 0; i < fu->triesSize; i++) {
-            fprintf(g_tfile, "\ntry%d, ", i);
+            note("\ntry%d, ", i);
             LIROpcodeTry * each_try = fu->trys + i;
-            fprintf(g_tfile, "start_idx=%dth, end_idx=%dth",
+            prt("start_idx=%dth, end_idx=%dth",
                     each_try->start_pc, each_try->end_pc);
             for (UINT j = 0; j < each_try->catchSize; j++) {
                 LIROpcodeCatch * each_catch = each_try->catches + j;
-                fprintf(g_tfile, "\n    catch%d, kind=%d, start_idx=%dth", j,
+                note("\n    catch%d, kind=%d, start_idx=%dth", j,
                         each_catch->class_type,
                         each_catch->handler_pc);
             }
@@ -1414,7 +1414,7 @@ void dump_all_lir(LIRCode * fu, DexFile * df, DexMethod const* dm)
     for (INT i = 0; i < LIRC_num_of_op(fu); i++) {
         LIR * lir = LIRC_op(fu, i);
         ASSERT0(lir);
-        fprintf(g_tfile, "\n");
+        note("\n");
         dump_lir2(lir, df, i);
     }
     fflush(g_tfile);
@@ -1428,8 +1428,8 @@ static void dumpf_field(DexFile * df, DexField * finfo, INT indent)
     CHAR const* fname = get_field_name(df, finfo);
     CHAR const* tname = get_field_type_name(df, finfo);
     ASSERT0(fname && tname);
-    while (indent-- >= 0) { fprintf(g_tfile, " "); }
-    fprintf(g_tfile, "%dth, %s, Type:%s",
+    while (indent-- >= 0) { prt(" "); }
+    prt("%dth, %s, Type:%s",
             finfo->fieldIdx, fname, tname);
     fflush(g_tfile);
 }
@@ -1493,11 +1493,11 @@ CHAR const* get_field_name(DexFile const* df, UINT field_id)
 void dump_all_class_and_field(DexFile * df)
 {
     if (g_tfile == NULL) { return; }
-    fprintf(g_tfile, "\n==---- DUMP ALL CLASS and FIELD ----==");
+    note("\n==---- DUMP ALL CLASS and FIELD ----==");
     //Walk through each class declaration via class-index in file.
     ASSERT0(df && df->pHeader);
     for (UINT i = 0; i < df->pHeader->classDefsSize; i++) {
-        fprintf(g_tfile, "\n");
+        note("\n");
         //Show section header.
         //dumpClassDef(pDexFile, i);
 
@@ -1506,8 +1506,8 @@ void dump_all_class_and_field(DexFile * df)
         //ASSERTN(i == class_info->classIdx, ("they might be equal"));
         //CHAR const* class_name = dexStringByTypeIdx(df, class_info->classIdx);
         //ASSERT0(class_name);
-        fprintf(g_tfile, "source file:%s", getClassSourceFilePath(df, class_info));
-        fprintf(g_tfile, "\nclass %s {", get_class_name(df, class_info));
+        prt("source file:%s", getClassSourceFilePath(df, class_info));
+        note("\nclass %s {", get_class_name(df, class_info));
 
         //Dump class fields.
         BYTE const* encoded_data = dexGetClassData(df, class_info);
@@ -1516,20 +1516,20 @@ void dump_all_class_and_field(DexFile * df)
                 dexReadAndVerifyClassData(&encoded_data, NULL);
             if (class_data != NULL) {
                 for (UINT i = 0; i < class_data->header.instanceFieldsSize; i++) {
-                    fprintf(g_tfile, "\n");
+                    note("\n");
                     DexField * finfo = &class_data->instanceFields[i];
                     ASSERT0(finfo);
                     dumpf_field(df, finfo, 4);
                     fflush(g_tfile);
                 }
             } else {
-                fprintf(g_tfile, "\n\t--");
+                note("\n\t--");
             }
         } else {
-            fprintf(g_tfile, "\n\t--");
+            note("\n\t--");
         }
-        fprintf(g_tfile, "\n");
-        fprintf(g_tfile, "}");
+        note("\n");
+        prt("}");
         fflush(g_tfile);
     }
     fflush(g_tfile);

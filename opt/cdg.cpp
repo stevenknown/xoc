@@ -41,24 +41,24 @@ namespace xoc {
 void CDG::dump()
 {
     dump_vcg("graph_cd_tree.vcg");
-    if (g_tfile == NULL) return;
-    fprintf(g_tfile, "\n==---- DUMP Control Dependence ----==");
+    if (g_tfile == NULL) { return; }
+    note("\n==---- DUMP Control Dependence ----==");
     INT c;
     for (xcom::Vertex * v = get_first_vertex(c);
          v != NULL; v = get_next_vertex(c)) {
         xcom::EdgeC * in = VERTEX_in_list(v);
         if (in == NULL) {
-            fprintf(g_tfile, "\nBB%d has NO ctrl BB", VERTEX_id(v));
+            note("\nBB%d has NO ctrl BB", VERTEX_id(v));
             continue;
         }
-        fprintf(g_tfile, "\nBB%d ctrl BB is: ", VERTEX_id(v));
+        note("\nBB%d ctrl BB is: ", VERTEX_id(v));
         while (in != NULL) {
             xcom::Vertex * pred = EDGE_from(EC_edge(in));
-            fprintf(g_tfile, "%d,", VERTEX_id(pred));
+            prt("%d,", VERTEX_id(pred));
             in = EC_next(in);
         }
     }
-    fprintf(g_tfile, "\n");
+    note("\n");
     fflush(g_tfile);
 }
 

@@ -50,7 +50,7 @@ bool IR_IVR::computeInitVal(IR const* ir, IV * iv)
     IR const* v = ST_rhs(ir); //v is the initial value.
     if (v->is_cvt()) {
         //You should have performed refineIR to optimize cvt.
-        v = ((CCvt*)v)->get_leaf_exp();
+        v = ((CCvt*)v)->getLeafExp();
     }
 
     IV_initv_data_type(iv) = v->getType();
@@ -482,13 +482,13 @@ void IR_IVR::findDIV(LI<IRBB> const* li, SList<IV*> const& bivlst, xcom::BitSet 
 void IR_IVR::_dump(LI<IRBB> * li, UINT indent)
 {
     while (li != NULL) {
-        fprintf(g_tfile, "\n");
-        for (UINT i = 0; i < indent; i++) { fprintf(g_tfile, " "); }
-        fprintf(g_tfile, "LI%d:BB%d", LI_id(li), BB_id(LI_loop_head(li)));
-        fprintf(g_tfile, ",BODY:");
+        note("\n");
+        for (UINT i = 0; i < indent; i++) { prt(" "); }
+        prt("LI%d:BB%d", LI_id(li), BB_id(LI_loop_head(li)));
+        prt(",BODY:");
         for (INT i = LI_bb_set(li)->get_first();
              i != -1; i = LI_bb_set(li)->get_next(i)) {
-            fprintf(g_tfile, "%d,", i);
+            prt("%d,", i);
         }
 
         SList<IV*> * bivlst = m_li2bivlst.get(LI_id(li));
@@ -497,69 +497,69 @@ void IR_IVR::_dump(LI<IRBB> * li, UINT indent)
                  sc != bivlst->end(); sc = bivlst->get_next(sc)) {
                 IV * iv = sc->val();
                 ASSERT0(iv);
-                fprintf(g_tfile, "\n");
-                for (UINT i = 0; i < indent; i++) { fprintf(g_tfile, " "); }
-                fprintf(g_tfile, "BIV(md%d", MD_id(IV_iv(iv)));
+                note("\n");
+                for (UINT i = 0; i < indent; i++) { prt(" "); }
+                prt("BIV(md%d", MD_id(IV_iv(iv)));
 
                 if (IV_is_inc(iv)) {
-                    fprintf(g_tfile, ",step=%lld", (LONGLONG)IV_step(iv));
+                    prt(",step=%lld", (LONGLONG)IV_step(iv));
                 } else {
-                    fprintf(g_tfile, ",step=-%lld", (LONGLONG)IV_step(iv));
+                    prt(",step=-%lld", (LONGLONG)IV_step(iv));
                 }
 
                 if (iv->has_init_val()) {
                     if (iv->isInitConst()) {
-                        fprintf(g_tfile, ",init=%lld",
+                        prt(",init=%lld",
                                 (LONGLONG)*IV_initv_i(iv));
                     } else {
-                        fprintf(g_tfile, ",init=md%d",
+                        prt(",init=md%d",
                                 (INT)MD_id(IV_initv_md(iv)));
                     }
                 }
-                fprintf(g_tfile, ")");
+                prt(")");
 
                 //Dump IV's def-stmt.
-                fprintf(g_tfile, "\n");
-                for (UINT i = 0; i < indent; i++) { fprintf(g_tfile, " "); }
-                fprintf(g_tfile, "Def-Stmt:");
+                note("\n");
+                for (UINT i = 0; i < indent; i++) { prt(" "); }
+                prt("Def-Stmt:");
                 ASSERT0(IV_iv_def(iv));
                 g_indent = indent + 2;
-                dump_ir(IV_iv_def(iv), m_tm, NULL, true, false, false);
+                dumpIR(IV_iv_def(iv), m_tm, NULL, true, false, false);
 
                 //Dump IV's occ-exp.
-                fprintf(g_tfile, "\n");
-                for (UINT i = 0; i < indent; i++) { fprintf(g_tfile, " "); }
-                fprintf(g_tfile, "Occ-Exp:");
+                note("\n");
+                for (UINT i = 0; i < indent; i++) { prt(" "); }
+                prt("Occ-Exp:");
                 ASSERT0(IV_iv_occ(iv));
                 g_indent = indent + 2;
-                dump_ir(IV_iv_occ(iv), m_tm, NULL, true, false, false);
+                dumpIR(IV_iv_occ(iv), m_tm, NULL, true, false, false);
 
                 //Dump IV's init-stmt.
                 if (iv->getInitValStmt() != NULL) {
-                    fprintf(g_tfile, "\n");
-                    for (UINT i = 0; i < indent; i++) { fprintf(g_tfile, " "); }
-                    fprintf(g_tfile, "Init-Stmt:");
+                    note("\n");
+                    for (UINT i = 0; i < indent; i++) { prt(" "); }
+                    prt("Init-Stmt:");
                     g_indent = indent + 2;
-                    dump_ir(iv->getInitValStmt(), m_tm, NULL, true, false, false);
+                    dumpIR(iv->getInitValStmt(), m_tm, NULL, true, false, false);
                 }
             }
-        } else { fprintf(g_tfile, "(NO BIV)"); }
+        } else { prt("(NO BIV)"); }
 
         SList<IR const*> * divlst = m_li2divlst.get(LI_id(li));
         if (divlst != NULL) {
             if (divlst->get_elem_count() > 0) {
-                fprintf(g_tfile, "\n");
-                for (UINT i = 0; i < indent; i++) { fprintf(g_tfile, " "); }
-                fprintf(g_tfile, "DIV:");
+                note("\n");
+                for (UINT i = 0; i < indent; i++) { prt(" "); }
+                prt("DIV:");
             }
             for (xcom::SC<IR const*> * sc = divlst->get_head();
                  sc != divlst->end(); sc = divlst->get_next(sc)) {
                 IR const* iv = sc->val();
                 ASSERT0(iv);
                 g_indent = indent + 2;
-                dump_ir(iv, m_tm, NULL, true, false, false);
+                dumpIR(iv, m_tm, NULL, true, false, false);
             }
-        } else { fprintf(g_tfile, "(NO DIV)"); }
+        } else { prt("(NO DIV)"); }
 
         _dump(LI_inner_list(li), indent + 2);
         li = LI_next(li);
@@ -572,7 +572,7 @@ void IR_IVR::_dump(LI<IRBB> * li, UINT indent)
 void IR_IVR::dump()
 {
     if (g_tfile == NULL) { return; }
-    fprintf(g_tfile, "\n==---- DUMP IVR -- rg:'%s' ----==", m_ru->getRegionName());
+    note("\n==---- DUMP IVR -- rg:'%s' ----==", m_ru->getRegionName());
     _dump(m_cfg->getLoopInfo(), 0);
     fflush(g_tfile);
 }

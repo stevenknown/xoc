@@ -256,15 +256,23 @@ public:
     bool is_less(MD const* t1, MD const*  t2) const
     {
         ASSERT0(MD_base(t1) == MD_base(t2));
-        return (((ULONGLONG)MD_ofst(t1)) << 32 | ((ULONGLONG)MD_size(t1))) <
-               (((ULONGLONG)MD_ofst(t2)) << 32 | ((ULONGLONG)MD_size(t2)));
+        return (((ULONGLONG)t1->is_range()) |
+			    (((ULONGLONG)MD_ofst(t1)) << 1) |
+			    (((ULONGLONG)MD_size(t1)) << 32)) <
+			   (((ULONGLONG)t2->is_range()) |
+			    (((ULONGLONG)MD_ofst(t1)) << 1) |
+			    (((ULONGLONG)MD_size(t2)) << 32));
     }
 
     bool is_equ(MD const* t1, MD const* t2) const
     {
         ASSERT0(MD_base(t1) == MD_base(t2));
-        return (((ULONGLONG)MD_ofst(t1)) << 32 | ((ULONGLONG)MD_size(t1))) ==
-               (((ULONGLONG)MD_ofst(t2)) << 32 | ((ULONGLONG)MD_size(t2)));
+        return (((ULONGLONG)t1->is_range()) |
+			    (((ULONGLONG)MD_ofst(t1)) << 1) |
+			    (((ULONGLONG)MD_size(t1)) << 32)) ==
+			   (((ULONGLONG)t2->is_range()) |
+			    (((ULONGLONG)MD_ofst(t1)) << 1) |
+			    (((ULONGLONG)MD_size(t2)) << 32));
     }
 
     MD const* createKey(MD const* t) { return t; }
@@ -303,7 +311,7 @@ public:
 
     MD const* find(MD const* md)
     {
-        if (md->is_exact()) {
+        if (md->is_exact() || md->is_range()) {
             return m_ofst_tab.find(md);
         }
         return m_invalid_ofst_md;
@@ -311,7 +319,7 @@ public:
 
     void append(MD const* md)
     {
-        if (md->is_exact()) {
+        if (md->is_exact() || md->is_range()) {
             m_ofst_tab.append(md);
             return;
         }

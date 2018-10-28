@@ -38,6 +38,7 @@ namespace xoc {
 
 class IR;
 class Type;
+class RegionMgr;
 
 #define UNDEF_TYID        0
 
@@ -357,6 +358,7 @@ public:
 
 extern TypeDesc const g_type_desc[];
 class TypeMgr {
+	RegionMgr * m_rm;
     Vector<Type*> m_type_tab;
     SMemPool * m_pool;
     PointerTab m_pointer_type_tab;
@@ -404,8 +406,10 @@ class TypeMgr {
     TypeContainer * newTC()
     { return (TypeContainer*)xmalloc(sizeof(TypeContainer)); }
 public:
-    TypeMgr()
+    TypeMgr(RegionMgr * rm)
     {
+    	ASSERT0(rm);
+		m_rm = rm;
         m_type_tab.clean();
         m_pool = smpoolCreate(sizeof(Type) * 8, MEM_COMM);
         m_type_count = 1;
@@ -461,6 +465,8 @@ public:
     DATA_TYPE hoistDtype(DATA_TYPE stype) const;
 
     Type const* hoistDtypeForBinop(IR const* opnd0, IR const* opnd1);
+
+	RegionMgr * getRegionMgr() const { return m_rm; }
 
     //Return DATA_TYPE which 'bitsize' corresponding to
     inline DATA_TYPE get_fp_dtype(INT bitsize) const

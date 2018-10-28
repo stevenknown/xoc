@@ -1892,8 +1892,14 @@ IR * Region::simplifySetelem(IR * ir, SimpCtx * ctx)
     SimpCtx tcont(*ctx);
     ASSERT0(SIMP_stmtlist(ctx) == NULL);
     SIMP_ret_array_val(&tcont) = true;
-    SETELEM_rhs(ir) = simplifyExpression(SETELEM_rhs(ir), &tcont);
-    IR_parent(SETELEM_rhs(ir)) = ir;
+    SETELEM_base(ir) = simplifyExpression(SETELEM_base(ir), &tcont);
+    IR_parent(SETELEM_base(ir)) = ir;
+    ctx->unionBottomupFlag(tcont);
+
+    tcont.copy(*ctx);
+    SIMP_ret_array_val(&tcont) = true;
+    SETELEM_val(ir) = simplifyExpression(SETELEM_val(ir), &tcont);
+    IR_parent(SETELEM_val(ir)) = ir;
     ctx->unionBottomupFlag(tcont);
 
     IR * ret_list = NULL;

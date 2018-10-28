@@ -44,26 +44,26 @@ namespace xoc {
 void PRDF::dump()
 {
     if (g_tfile == NULL) { return; }
-    fprintf(g_tfile, "\n==---- DUMP PRDF : liveness of PR ----==\n");
+    note("\n==---- DUMP PRDF : liveness of PR ----==\n");
     List<IRBB*> * bbl = m_ru->getBBList();
     g_indent = 2;
     for (IRBB * bb = bbl->get_head(); bb != NULL; bb = bbl->get_next()) {
-        fprintf(g_tfile, "\n\n\n-- BB%d --", BB_id(bb));
+        note("\n\n\n-- BB%d --", BB_id(bb));
         DefSBitSetCore * live_in = get_livein(BB_id(bb));
         DefSBitSetCore * live_out = get_liveout(BB_id(bb));
         DefSBitSetCore * def = get_def(BB_id(bb));
         DefSBitSetCore * use = get_use(BB_id(bb));
 
-        fprintf(g_tfile, "\nLIVE-IN: ");
+        note("\nLIVE-IN: ");
         live_in->dump(g_tfile);
 
-        fprintf(g_tfile, "\nLIVE-OUT: ");
+        note("\nLIVE-OUT: ");
         live_out->dump(g_tfile);
 
-        fprintf(g_tfile, "\nDEF: ");
+        note("\nDEF: ");
         def->dump(g_tfile);
 
-        fprintf(g_tfile, "\nUSE: ");
+        note("\nUSE: ");
         use->dump(g_tfile);
     }
     fflush(g_tfile);
@@ -149,7 +149,10 @@ void PRDF::computeLocal(IRBB * bb, List<IR const*> & lst)
             processMay(x, gen, use, true);
 
             lst.clean();
-            processOpnd(SETELEM_rhs(x), lst, use, gen);
+            processOpnd(SETELEM_base(x), lst, use, gen);
+
+            lst.clean();
+            processOpnd(SETELEM_val(x), lst, use, gen);
 
             lst.clean();
             processOpnd(SETELEM_ofst(x), lst, use, gen);

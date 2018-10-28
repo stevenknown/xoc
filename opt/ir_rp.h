@@ -84,7 +84,7 @@ public:
     {
         if (g_tfile == NULL) { return; }
 
-        fprintf(g_tfile, "\n==---- DUMP Dont Promot Tabel ----==\n");
+        note("\n==---- DUMP Dont Promot Tabel ----==\n");
         SEGIter * iter;
         for (INT i = get_first(&iter); i >= 0; i = get_next(i, &iter)) {
             MD const* t = m_md_sys->getMD(i);

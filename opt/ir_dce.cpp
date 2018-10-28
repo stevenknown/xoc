@@ -46,13 +46,13 @@ void IR_DCE::dump(EFFECT_STMT const& is_stmt_effect,
                   xcom::BitSet const& is_bb_effect,
                   IN Vector<Vector<IR*>*> & all_ir)
 {
-    if (g_tfile == NULL) return;
-    fprintf(g_tfile, "\n==---- DUMP IR_DCE ----==\n");
+    if (g_tfile == NULL) { return; }
+    note("\n==---- DUMP IR_DCE ----==\n");
     BBList * bbl = m_ru->getBBList();
     for (IRBB * bb = bbl->get_head(); bb != NULL; bb = bbl->get_next()) {
-        fprintf(g_tfile, "\n------- BB%d", BB_id(bb));
+        note("\n------- BB%d", BB_id(bb));
         if (!is_bb_effect.is_contain(BB_id(bb))) {
-            fprintf(g_tfile, "\t\tineffect BB!");
+            prt("\t\tineffect BB!");
         }
         Vector<IR*> * ir_vec = all_ir.get(BB_id(bb));
         if (ir_vec == NULL) {
@@ -61,19 +61,19 @@ void IR_DCE::dump(EFFECT_STMT const& is_stmt_effect,
         for (INT j = 0; j <= ir_vec->get_last_idx(); j++) {
             IR * ir = ir_vec->get(j);
             ASSERT0(ir != NULL);
-            fprintf(g_tfile, "\n");
-            dump_ir(ir, m_tm);
+            note("\n");
+            dumpIR(ir, m_tm);
             if (!is_stmt_effect.is_contain(ir->id())) {
-                fprintf(g_tfile, "\t\tremove!");
+                prt("\t\tremove!");
             }
         }
     }
 
-    fprintf(g_tfile, "\n\n============= REMOVED IR ==================\n");
+    note("\n\n============= REMOVED IR ==================\n");
     for (IRBB * bb = bbl->get_head(); bb != NULL; bb = bbl->get_next()) {
-        fprintf(g_tfile, "\n------- BB%d", BB_id(bb));
+        note("\n------- BB%d", BB_id(bb));
         if (!is_bb_effect.is_contain(BB_id(bb))) {
-            fprintf(g_tfile, "\t\tineffect BB!");
+            prt("\t\tineffect BB!");
         }
         Vector<IR*> * ir_vec = all_ir.get(BB_id(bb));
         if (ir_vec == NULL) {
@@ -83,9 +83,9 @@ void IR_DCE::dump(EFFECT_STMT const& is_stmt_effect,
             IR * ir = ir_vec->get(j);
             ASSERT0(ir != NULL);
             if (!is_stmt_effect.is_contain(ir->id())) {
-                fprintf(g_tfile, "\n");
-                dump_ir(ir, m_tm);
-                fprintf(g_tfile, "\t\tremove!");
+                note("\n");
+                dumpIR(ir, m_tm);
+                prt("\t\tremove!");
             }
         }
     }
@@ -404,12 +404,12 @@ void IR_DCE::iter_collect(IN OUT EFFECT_STMT & is_stmt_effect,
             }
         }
 
-        //dump_irs((IRList&)*pwlst2);
+        //dumpIRList((IRList&)*pwlst2);
         if (m_is_elim_cfs) {
             change |= preserve_cd(is_bb_effect, is_stmt_effect, *pwlst2);
         }
 
-        //dump_irs((IRList&)*pwlst2);
+        //dumpIRList((IRList&)*pwlst2);
         pwlst1->clean();
         List<IR const*> * tmp = pwlst1;
         pwlst1 = pwlst2;

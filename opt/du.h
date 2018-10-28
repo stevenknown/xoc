@@ -60,7 +60,7 @@ public:
     void removeDef(IR const* stmt, DefMiscBitSetMgr & m);
 };
 
-
+//Record DU info for ir.
 #define DU_md(du)           ((du)->md)
 #define DU_mds(du)          ((du)->mds)
 #define DU_duset(du)        ((du)->duset)

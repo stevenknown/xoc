@@ -104,27 +104,27 @@ void IR_EXPR_TAB::clean_occ_list()
 //Dump all IR expressions of region and its used MDs.
 void IR_EXPR_TAB::dump_ir_expr_tab()
 {
-    if (g_tfile == NULL) return;
-    fprintf(g_tfile, "\n==---- DUMP IR_EXPR_TAB ----==");
+    if (g_tfile == NULL) { return; }
+    note("\n==---- DUMP IR_EXPR_TAB ----==");
     IR_DU_MGR * du_mgr = m_ru->getDUMgr();
     INT last = m_ir_expr_vec.get_last_idx();
     for (INT i = 0; i <= last; i++) {
         ExpRep * ie = m_ir_expr_vec.get(i);
         if (ie == NULL) { continue; }
         ASSERT0(EXPR_id(ie) == (UINT)i);
-        fprintf(g_tfile, "\n\n----------- ExpRep(%d)", i);
-        dump_ir(EXPR_ir(ie), m_tm);
-        fprintf(g_tfile, "\n\tOCC:");
+        note("\n\n----------- ExpRep(%d)", i);
+        dumpIR(EXPR_ir(ie), m_tm);
+        note("\n\tOCC:");
         for (IR * occ = EXPR_occ_list(ie).get_head();
              occ != NULL; occ = EXPR_occ_list(ie).get_next()) {
-            fprintf(g_tfile, "IR%d", IR_id(occ));
+            prt("IR%d", IR_id(occ));
             MDSet const* use_mds = du_mgr->getMayUse(occ);
             if (use_mds != NULL) {
-                fprintf(g_tfile, "(use:");
+                prt("(use:");
                 use_mds->dump(m_ru->getMDSystem());
-                fprintf(g_tfile, ")");
+                prt(")");
             }
-            fprintf(g_tfile, ",");
+            prt(",");
         }
     }
     fflush(g_tfile);
@@ -191,7 +191,7 @@ ExpRep * IR_EXPR_TAB::append_expr(IR * ir)
         ExpRep * ie = new_ir_expr();
         EXPR_id(ie) = ++m_expr_count;
         EXPR_ir(ie) = m_ru->dupIRTree(ir);
-        //dump_ir(EXPR_ir(ie));
+        //dumpIR(EXPR_ir(ie));
         m_ir_expr_vec.set(EXPR_id(ie), ie);
 
         //Enter into 'ir'
@@ -208,7 +208,7 @@ ExpRep * IR_EXPR_TAB::append_expr(IR * ir)
         ie = new_ir_expr();
         EXPR_id(ie) = ++m_expr_count;
         EXPR_ir(ie) = m_ru->dupIRTree(ir);
-        //dump_ir(EXPR_ir(ie));
+        //dumpIR(EXPR_ir(ie));
         m_ir_expr_vec.set(EXPR_id(ie), ie);
 
         //Enter into 'ir'
@@ -230,7 +230,7 @@ ExpRep * IR_EXPR_TAB::append_expr(IR * ir)
     ie = new_ir_expr();
     EXPR_id(ie) = ++m_expr_count;
     EXPR_ir(ie) = m_ru->dupIRTree(ir);
-    //dump_ir(EXPR_ir(ie));
+    //dumpIR(EXPR_ir(ie));
     m_ir_expr_vec.set(EXPR_id(ie), ie);
 
     //Enter into 'ir'
