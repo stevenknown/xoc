@@ -164,7 +164,8 @@ public:
         VMD_occs(this).init(sm);
     }
 
-    void destroy() { VMD_occs(this).destroy(); }
+    void destroy() { VMD_occs(this).destroy(); }    
+    void dump(); //Concisely dump
     void dump(Region * rg, UseDefMgr * usedefmgr);
 
     MDDef * getDef() const { return VMD_def(this); }

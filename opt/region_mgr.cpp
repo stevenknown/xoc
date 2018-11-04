@@ -208,6 +208,8 @@ void RegionMgr::addToRegionTab(Region * rg)
 
 bool RegionMgr::verifyPreDefinedInfo()
 {
+    checkMaxIRType();
+    checkIRDesc();
     ASSERT0_DUMMYUSE(WORD_LENGTH_OF_TARGET_MACHINE <=
             sizeof(TMWORD) * HOST_BIT_PER_BYTE);
     ASSERT0_DUMMYUSE(BIT_PER_BYTE == HOST_BIT_PER_BYTE);

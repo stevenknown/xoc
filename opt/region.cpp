@@ -273,19 +273,6 @@ size_t AnalysisInstrument::count_mem()
 //
 //START Region
 //
-#ifdef _DEBUG_
-//Make sure IR_ICALL is the largest ir.
-static bool ck_max_ir_size()
-{
-    //Change MAX_OFFSET_AT_FREE_TABLE if IR_ICALL is not the largest.
-    for (UINT i = IR_UNDEF; i < IR_TYPE_NUM; i++) {
-        ASSERT0(IRTSIZE(i) <= IRTSIZE(IR_ICALL));
-    }
-    return true;
-}
-#endif
-
-
 void Region::init(REGION_TYPE rt, RegionMgr * rm)
 {
     //Reset
@@ -316,7 +303,6 @@ void Region::init(REGION_TYPE rt, RegionMgr * rm)
             ANA_INS_ru_mgr(REGION_analysis_instrument(this)) = rm;
         }
     }
-    ASSERT0(ck_max_ir_size());
 }
 
 
@@ -2427,6 +2413,7 @@ IR * Region::allocIR(IR_TYPE irt)
 {
     IR * ir = NULL;
     UINT idx = IRTSIZE(irt) - sizeof(IR);
+    ASSERTN(idx < 1000, ("weird index"));
     bool lookup = false; //lookup freetab will save more memory, but slower.
 
     #ifndef CONST_IRT_SZ
@@ -2912,8 +2899,8 @@ void Region::dump(bool dump_inner_region)
     IR * irlst = getIRList();
     if (irlst != NULL) {
         note("\n==---- IR List ----==");
-        dumpIRList(irlst, getTypeMgr(), NULL, true,
-                 true, false, dump_inner_region);
+		dumpIRList(irlst, getTypeMgr(), NULL,
+			IR_DUMP_KID | IR_DUMP_SRC_LINE | (dump_inner_region ? IR_DUMP_INNER_REGION : 0));
         return;
     }
 
@@ -3809,7 +3796,7 @@ bool Region::process(OptCtx * oc)
         return true;
     }
 
-    OC_show_comp_time(*oc) = g_show_comp_time;
+    OC_show_comp_time(*oc) = g_show_time;
     initPassMgr();
 
     if (g_do_inline && is_program()) {

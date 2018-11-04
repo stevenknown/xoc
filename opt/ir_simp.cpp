@@ -1286,9 +1286,9 @@ IR * Region::simplifyArrayAddrExp(IR * ir, SimpCtx * ctx)
                 ("Incomplete array dimension info, we need to "
                     "know how many elements in each dimension."));
             if (dim == 0) {
-                enumb = elemnumbuf[dim];
+                enumb = (UINT)elemnumbuf[dim];
             } else {
-                enumb *= elemnumbuf[dim];
+                enumb *= (UINT)elemnumbuf[dim];
             }
         }
     }

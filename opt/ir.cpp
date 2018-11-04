@@ -340,10 +340,7 @@ UINT checkStArrayDimension(IR const* ir, UINT n)
 void dumpIRList(IR * ir_list,
                 TypeMgr const* tm,
                 CHAR * attr,
-                bool dump_kid,
-                bool dump_src_line,
-                bool dump_addr,
-                bool dump_inner_region)
+                UINT dumpflag)
 {
     if (g_tfile == NULL) { return; }
 
@@ -351,11 +348,9 @@ void dumpIRList(IR * ir_list,
     for (; ir_list != NULL; ir_list = ir_list->get_next()) {
         if (first_one) {
             first_one = false;
-            dumpIR(ir_list, tm, attr, dump_kid,
-                   dump_src_line, dump_addr, dump_inner_region);
+            dumpIR(ir_list, tm, attr, dumpflag);
         } else {
-            dumpIR(ir_list, tm, attr, dump_kid,
-                   dump_src_line, dump_addr, dump_inner_region);
+            dumpIR(ir_list, tm, attr, dumpflag);
         }
     }
 }
@@ -565,16 +560,18 @@ static void dump_ai(OUT CHAR * buf, IR const* ir)
 //Dump IR and all of its kids.
 //'attr': miscellaneous string which following 'ir'.
 void dumpIR(IR const* ir,
-             TypeMgr const* tm,
-             IN CHAR * attr,
-             bool dump_kid,
-             bool dump_src_line,
-             bool dump_addr,
-             bool dump_inner_region)
+            TypeMgr const* tm,
+            IN CHAR * attr,
+            UINT dumpflag)
 {
-    DUMMYUSE(dump_addr);
+    bool dump_addr = HAVE_FLAG(dumpflag, IR_DUMP_ADDR);
+    bool dump_src_line = HAVE_FLAG(dumpflag, IR_DUMP_SRC_LINE);
+    bool dump_kid = HAVE_FLAG(dumpflag, IR_DUMP_KID);
+	bool dump_inner_region = HAVE_FLAG(dumpflag, IR_DUMP_INNER_REGION);
     DUMMYUSE(dump_src_line);
     DUMMYUSE(dump_kid);
+    DUMMYUSE(dump_addr);
+	DUMMYUSE(dump_inner_region);
     DUMMYUSE(attr);
     DUMMYUSE(tm);
     DUMMYUSE(ir);
@@ -655,8 +652,7 @@ void dumpIR(IR const* ir,
 
         if (dump_kid) {
             g_indent += dn;
-            dumpIRList(ST_rhs(ir), tm, NULL, dump_kid,
-                dump_src_line, dump_addr, dump_inner_region);
+            dumpIRList(ST_rhs(ir), tm, NULL, dumpflag);
             g_indent -= dn;
         }
         break;
@@ -668,8 +664,7 @@ void dumpIR(IR const* ir,
 
         if (dump_kid) {
             g_indent += dn;
-            dumpIRList(STPR_rhs(ir), tm, NULL, dump_kid,
-                     dump_src_line, dump_addr, dump_inner_region);
+            dumpIRList(STPR_rhs(ir), tm, NULL, dumpflag);
             g_indent -= dn;
         }
         break;
@@ -679,12 +674,9 @@ void dumpIR(IR const* ir,
         prt("%s", attr);
         if (dump_kid) {
             g_indent += dn;
-            dumpIRList(SETELEM_base(ir), tm, NULL, dump_kid,
-                       dump_src_line, dump_addr, dump_inner_region);
-            dumpIRList(SETELEM_val(ir), tm, NULL, dump_kid,
-                     dump_src_line, dump_addr, dump_inner_region);
-            dumpIRList(SETELEM_ofst(ir), tm, (CHAR*)" offset", dump_kid,
-                     dump_src_line, dump_addr, dump_inner_region);
+            dumpIRList(SETELEM_base(ir), tm, NULL, dumpflag);
+            dumpIRList(SETELEM_val(ir), tm, NULL, dumpflag);
+            dumpIRList(SETELEM_ofst(ir), tm, (CHAR*)" offset", dumpflag);
             g_indent -= dn;
         }
         break;
@@ -694,10 +686,8 @@ void dumpIR(IR const* ir,
         prt("%s", attr);
         if (dump_kid) {
             g_indent += dn;
-            dumpIRList(GETELEM_base(ir), tm, (CHAR*)" base", dump_kid,
-                     dump_src_line, dump_addr, dump_inner_region);
-            dumpIRList(GETELEM_ofst(ir), tm, (CHAR*)" offset", dump_kid,
-                     dump_src_line, dump_addr, dump_inner_region);
+            dumpIRList(GETELEM_base(ir), tm, (CHAR*)" base", dumpflag);
+            dumpIRList(GETELEM_ofst(ir), tm, (CHAR*)" offset", dumpflag);
             g_indent -= dn;
         }
         break;
@@ -739,18 +729,15 @@ void dumpIR(IR const* ir,
                  sub != NULL; sub = sub->get_next()) {
                 CHAR tt[40];
                 sprintf(tt, " dim%d", dim);
-                dumpIR(sub, tm, (CHAR*)tt, dump_kid,
-                        dump_src_line, dump_addr, dump_inner_region);
+                dumpIR(sub, tm, (CHAR*)tt, dumpflag);
                 dim++;
             }
             g_indent -= dn;
         }
         if (dump_kid) {
             g_indent += dn;
-            dumpIRList(ARR_base(ir), tm, (CHAR*)" array_base", dump_kid,
-                     dump_src_line, dump_addr, dump_inner_region);
-            dumpIRList(STARR_rhs(ir), tm, (CHAR*)" rhs", dump_kid,
-                     dump_src_line, dump_addr, dump_inner_region);
+            dumpIRList(ARR_base(ir), tm, (CHAR*)" array_base", dumpflag);
+            dumpIRList(STARR_rhs(ir), tm, (CHAR*)" rhs", dumpflag);
             g_indent -= dn;
         }
         break;
@@ -767,10 +754,8 @@ void dumpIR(IR const* ir,
 
         if (dump_kid) {
             g_indent += dn;
-            dumpIRList(IST_base(ir), tm, (CHAR*)" base", dump_kid,
-                     dump_src_line, dump_addr, dump_inner_region);
-            dumpIRList(IST_rhs(ir), tm, NULL, dump_kid,
-                     dump_src_line, dump_addr, dump_inner_region);
+            dumpIRList(IST_base(ir), tm, (CHAR*)" base", dumpflag);
+            dumpIRList(IST_rhs(ir), tm, NULL, dumpflag);
             g_indent -= dn;
         }
         break;
@@ -811,8 +796,7 @@ void dumpIR(IR const* ir,
         prt("%s", attr);
         if (dump_kid) {
             g_indent += dn;
-            dumpIRList(ILD_base(ir), tm, NULL, dump_kid,
-                     dump_src_line, dump_addr, dump_inner_region);
+            dumpIRList(ILD_base(ir), tm, NULL, dumpflag);
             g_indent -= dn;
         }
         break;
@@ -914,8 +898,7 @@ void dumpIR(IR const* ir,
             for (UINT i = 0; i < IR_MAX_KID_NUM(ir); i++) {
                 IR * k = ir->getKid(i);
                 if (k == NULL) { continue; }
-                dumpIRList(k, tm, NULL, dump_kid,
-                    dump_src_line, dump_addr, dump_inner_region);
+                dumpIRList(k, tm, NULL, dumpflag);
             } 
             g_indent -= dn;
         }
@@ -926,14 +909,12 @@ void dumpIR(IR const* ir,
         prt("%s", attr);
         if (dump_kid) {
             g_indent += dn;
-            dumpIRList(IF_det(ir), tm, NULL, dump_kid,
-                     dump_src_line, dump_addr, dump_inner_region);
+            dumpIRList(IF_det(ir), tm, NULL, dumpflag);
             g_indent -= dn;
 
             note("\n{");
             g_indent += dn;
-            dumpIRList(IF_truebody(ir), tm, NULL, dump_kid,
-                     dump_src_line, dump_addr, dump_inner_region);
+            dumpIRList(IF_truebody(ir), tm, NULL, dumpflag);
             g_indent -= dn;
             note("\n}");
 
@@ -941,8 +922,7 @@ void dumpIR(IR const* ir,
                 note("\nelse");
                 note("\n{");
                 g_indent += dn;
-                dumpIRList(IF_falsebody(ir), tm, NULL, dump_kid,
-                         dump_src_line, dump_addr, dump_inner_region);
+                dumpIRList(IF_falsebody(ir), tm, NULL, dumpflag);
                 g_indent -= dn;
                 note("\n}");
             }
@@ -955,14 +935,12 @@ void dumpIR(IR const* ir,
         if (dump_kid) {
             note("\nbody:");
             g_indent += dn;
-            dumpIRList(LOOP_body(ir), tm, NULL, dump_kid,
-                     dump_src_line, dump_addr, dump_inner_region);
+            dumpIRList(LOOP_body(ir), tm, NULL, dumpflag);
             g_indent -= dn;
 
             note("\ndet:");
             g_indent += dn;
-            dumpIRList(LOOP_det(ir), tm, NULL, dump_kid,
-                     dump_src_line, dump_addr, dump_inner_region);
+            dumpIRList(LOOP_det(ir), tm, NULL, dumpflag);
             g_indent -= dn;
 
             note("\nend_dowhile");
@@ -976,15 +954,13 @@ void dumpIR(IR const* ir,
         if (dump_kid) {
             note("\ndet:");
             g_indent += dn;
-            dumpIRList(LOOP_det(ir), tm, NULL, dump_kid,
-                     dump_src_line, dump_addr, dump_inner_region);
+            dumpIRList(LOOP_det(ir), tm, NULL, dumpflag);
             g_indent -= dn;
 
             note("\nbody:");
 
             g_indent += dn;
-            dumpIRList(LOOP_body(ir), tm, NULL, dump_kid,
-                     dump_src_line, dump_addr, dump_inner_region);
+            dumpIRList(LOOP_body(ir), tm, NULL, dumpflag);
             g_indent -= dn;
 
             note("\nend_whiledo");
@@ -997,32 +973,27 @@ void dumpIR(IR const* ir,
         if (dump_kid) {
             note("\niv:");
             g_indent += dn;
-            dumpIRList(LOOP_iv(ir), tm, NULL, dump_kid,
-                     dump_src_line, dump_addr, dump_inner_region);
+            dumpIRList(LOOP_iv(ir), tm, NULL, dumpflag);
             g_indent -= dn;
 
             note("\ninit:");
             g_indent += dn;
-            dumpIRList(LOOP_init(ir), tm, NULL, dump_kid,
-                     dump_src_line, dump_addr, dump_inner_region);
+            dumpIRList(LOOP_init(ir), tm, NULL, dumpflag);
             g_indent -= dn;
 
             note("\ndet:");
             g_indent += dn;
-            dumpIRList(LOOP_det(ir), tm, NULL, dump_kid,
-                     dump_src_line, dump_addr, dump_inner_region);
+            dumpIRList(LOOP_det(ir), tm, NULL, dumpflag);
             g_indent -= dn;
 
             note("\nstep:");
             g_indent += dn;
-            dumpIRList(LOOP_step(ir), tm, NULL, dump_kid,
-                     dump_src_line, dump_addr, dump_inner_region);
+            dumpIRList(LOOP_step(ir), tm, NULL, dumpflag);
             g_indent -= dn;
 
             note("\nbody:");
             g_indent += dn;
-            dumpIRList(LOOP_body(ir), tm, NULL, dump_kid,
-                     dump_src_line, dump_addr, dump_inner_region);
+            dumpIRList(LOOP_body(ir), tm, NULL, dumpflag);
             g_indent -= dn;
 
             note("\nend_doloop");
@@ -1044,8 +1015,7 @@ void dumpIR(IR const* ir,
         prt("%s", attr);
         if (dump_kid) {
             g_indent += dn;
-            dumpIR(RET_exp(ir), tm, NULL, dump_kid,
-                    dump_src_line, dump_addr);
+            dumpIR(RET_exp(ir), tm, NULL, dumpflag);
             g_indent -= dn;
         }
         break;
@@ -1061,14 +1031,12 @@ void dumpIR(IR const* ir,
         prt("%s", attr);
         if (dump_kid) {
             g_indent += dn;
-            dumpIRList(IGOTO_vexp(ir), tm, NULL, dump_kid,
-                     dump_src_line, dump_addr, dump_inner_region);
+            dumpIRList(IGOTO_vexp(ir), tm, NULL, dumpflag);
             g_indent -= dn;
 
             note("\ncase_list");
             g_indent += dn;
-            dumpIRList(IGOTO_case_list(ir), tm, NULL, dump_kid,
-                     dump_src_line, dump_addr, dump_inner_region);
+            dumpIRList(IGOTO_case_list(ir), tm, NULL, dumpflag);
             g_indent -= dn;
         }
         break;
@@ -1120,18 +1088,15 @@ void dumpIR(IR const* ir,
         PADDR(ir); prt("%s", attr);
         if (dump_kid) {
             g_indent += dn;
-            dumpIRList(SELECT_pred(ir), tm, NULL, dump_kid,
-                     dump_src_line, dump_addr, dump_inner_region);
+            dumpIRList(SELECT_pred(ir), tm, NULL, dumpflag);
             g_indent -= dn;
 
             g_indent += dn;
-            dumpIRList(SELECT_trueexp(ir), tm, (CHAR*)" true_exp", dump_kid,
-                     dump_src_line, dump_addr, dump_inner_region);
+            dumpIRList(SELECT_trueexp(ir), tm, (CHAR*)" true_exp", dumpflag);
             g_indent -= dn;
 
             g_indent += dn;
-            dumpIRList(SELECT_falseexp(ir), tm, (CHAR*)" false_exp", dump_kid,
-                     dump_src_line, dump_addr, dump_inner_region);
+            dumpIRList(SELECT_falseexp(ir), tm, (CHAR*)" false_exp", dumpflag);
             g_indent -= dn;
         }
         break;
@@ -1169,8 +1134,7 @@ void dumpIR(IR const* ir,
             g_indent += dn;
             IR * opnd = PHI_opnd_list(ir);
             while (opnd != NULL) {
-                dumpIR(opnd, tm, NULL, dump_kid,
-                        dump_src_line, dump_addr, dump_inner_region);
+                dumpIR(opnd, tm, NULL, dumpflag);
                 opnd = opnd->get_next();
             }
             g_indent -= dn;
@@ -1186,20 +1150,17 @@ void dumpIR(IR const* ir,
         prt("%s", attr);
         if (dump_kid) {
             g_indent += dn;
-            dumpIRList(SWITCH_vexp(ir), tm, NULL, dump_kid,
-                     dump_src_line, dump_addr, dump_inner_region);
+            dumpIRList(SWITCH_vexp(ir), tm, NULL, dumpflag);
             g_indent -= dn;
 
             if (SWITCH_case_list(ir) != NULL) {
-                dumpIRList(SWITCH_case_list(ir), tm, NULL, dump_kid,
-                    dump_src_line, dump_addr, dump_inner_region);
+                dumpIRList(SWITCH_case_list(ir), tm, NULL, dumpflag);
             }
 
             if (SWITCH_body(ir) != NULL) {
                 note("\nbody:");
                 g_indent += dn;
-                dumpIRList(SWITCH_body(ir), tm, NULL, dump_kid,
-                         dump_src_line, dump_addr, dump_inner_region);
+                dumpIRList(SWITCH_body(ir), tm, NULL, dumpflag);
                 g_indent -= dn;
             }
             note("\nend_switch");
@@ -1213,8 +1174,7 @@ void dumpIR(IR const* ir,
         prt("%s", attr);
 
         g_indent += dn;
-        dumpIRList(CASE_vexp(ir), tm, NULL, dump_kid,
-                 dump_src_line, dump_addr, dump_inner_region);
+        dumpIRList(CASE_vexp(ir), tm, NULL, dumpflag);
         note("\n");
         dump_lab_decl(ir->getLabel());
         g_indent -= dn;
@@ -1257,8 +1217,7 @@ void dumpIR(IR const* ir,
                  sub != NULL; sub = sub->get_next()) {
                 CHAR tt[40];
                 sprintf(tt, " dim%d", dim);
-                dumpIR(sub, tm, (CHAR*)tt, dump_kid,
-                        dump_src_line, dump_addr, dump_inner_region);
+                dumpIR(sub, tm, (CHAR*)tt, dumpflag);
                 dim++;
             }
             g_indent -= dn;
@@ -1266,8 +1225,7 @@ void dumpIR(IR const* ir,
 
         if (dump_kid) {
             g_indent += dn;
-            dumpIRList(ARR_base(ir), tm, (CHAR*)" array_base", dump_kid,
-                     dump_src_line, dump_addr, dump_inner_region);
+            dumpIRList(ARR_base(ir), tm, (CHAR*)" array_base", dumpflag);
             g_indent -= dn;
         }
         break;
@@ -1302,8 +1260,7 @@ void dumpIR(IR const* ir,
         if (dump_kid) {
             if (ir->is_icall()) {
                 g_indent += dn;
-                dumpIR(ICALL_callee(ir), tm, (CHAR*)" callee",
-                        dump_kid, dump_src_line, dump_addr);
+                dumpIR(ICALL_callee(ir), tm, (CHAR*)" callee", dumpflag);
                 g_indent -= dn;
             }
 
@@ -1315,8 +1272,7 @@ void dumpIR(IR const* ir,
                  p2 != NULL; p2 = p2->get_next()) {
                 sprintf(tmpbuf, " param%d", i);
                 g_indent += dn;
-                dumpIR(p2, tm, tmpbuf, dump_kid,
-                        dump_src_line, dump_addr, dump_inner_region);
+                dumpIR(p2, tm, tmpbuf, dumpflag);
                 g_indent -= dn;
                 i++;
             }
@@ -1327,8 +1283,7 @@ void dumpIR(IR const* ir,
                  p2 != NULL; p2 = p2->get_next()) {
                 sprintf(tmpbuf, " dummy%d", i);
                 g_indent += dn;
-                dumpIR(p2, tm, tmpbuf, dump_kid,
-                        dump_src_line, dump_addr, dump_inner_region);
+                dumpIR(p2, tm, tmpbuf, dumpflag);
                 g_indent -= dn;
                 i++;
             }
@@ -1342,8 +1297,7 @@ void dumpIR(IR const* ir,
         prt("%s", attr);
         if (dump_kid) {
             g_indent += dn;
-            dumpIRList(BR_det(ir), tm, NULL, dump_kid,
-                     dump_src_line, dump_addr, dump_inner_region);
+            dumpIRList(BR_det(ir), tm, NULL, dumpflag);
             g_indent -= dn;
         }
         break;
@@ -1354,8 +1308,7 @@ void dumpIR(IR const* ir,
         prt("%s", attr);
         if (dump_kid) {
             g_indent += dn;
-            dumpIRList(BR_det(ir), tm, NULL, dump_kid,
-                     dump_src_line, dump_addr, dump_inner_region);
+            dumpIRList(BR_det(ir), tm, NULL, dumpflag);
             g_indent -= dn;
         }
         break;
@@ -3460,5 +3413,29 @@ void dumpGRInBBList(List<IRBB*> * bblist, TypeMgr * tm, DumpGRCtx * ctx)
     }
 }
 //END IR
+
+
+//Make sure IR_ICALL is the largest ir.
+bool checkMaxIRType()
+{
+    //Change MAX_OFFSET_AT_FREE_TABLE if IR_ICALL is not the largest.
+    for (UINT i = IR_UNDEF; i < IR_TYPE_NUM; i++) {
+        ASSERT0(IRTSIZE(i) <= IRTSIZE(IR_ICALL));
+    }
+    return true;
+}
+
+
+bool checkIRDesc()
+{
+    UINT sz = 1 << IR_TYPE_BIT_SIZE;
+    ASSERTN(IR_TYPE_NUM <= sz, ("code field is too small"));
+    for (UINT i = IR_UNDEF; i < IR_TYPE_NUM; i++) {
+        ASSERT0(i == (UINT)IRDES_code(g_ir_desc[i]));
+    }
+    UINT descnum = sizeof(g_ir_desc) / sizeof(g_ir_desc[0]);
+    ASSERTN(descnum - 1 == IR_TYPE_NUM, ("miss IRDesc declaration"));
+	return true;
+}
 
 } //namespace xoc

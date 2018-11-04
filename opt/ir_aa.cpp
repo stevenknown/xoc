@@ -800,11 +800,11 @@ void IR_AA::processArray(
     if (array_base->is_lda()) {
         //Array base is LDA operation.
         inferArrayLdabase(ir, array_base, is_ofst_predicable,
-                          ofst_val, mds, &tic);
+                          (UINT)ofst_val, mds, &tic);
     } else {
         //Array base is a computational expression.
         inferArrayExpBase(ir, array_base, is_ofst_predicable,
-                          ofst_val, mds, &mds_is_may_pt,
+                          (UINT)ofst_val, mds, &mds_is_may_pt,
                           &tic, mx);
     }
     ic->copyBottomUpFlag(tic);
@@ -3000,7 +3000,7 @@ void IR_AA::dumpIRPointTo(IN IR * ir, bool dump_kid, IN MD2MDSet * mx)
     MDSet const* may = getMayAddr(ir);
     if (must != NULL ||
         (may != NULL && may->get_elem_count() > 0)) {
-        dumpIR(ir, m_tm, NULL, false, false, false, false);
+        dumpIR(ir, m_tm, NULL, 0);
     }
 
     switch (ir->getCode()) {
@@ -3068,7 +3068,7 @@ void IR_AA::dumpIRPointToForBB(IRBB * bb, bool dump_kid)
          ir != NULL; ir = BB_irlist(bb).get_next(&ct)) {
         note("\n---------");
         g_indent = 4;
-        dumpIRList(ir, m_tm, NULL, true, true, false, false);
+        dumpIRList(ir, m_tm, NULL, IR_DUMP_KID | IR_DUMP_SRC_LINE);
         note("\n");
 
         ASSERT0(isValidStmtToAA(ir));

@@ -164,6 +164,17 @@ typedef enum {
     case IR_NEG:  \
     case IR_CVT
 
+#define SWITCH_CASE_STMT_IN_BB_NO_KID \
+	case IR_REGION: \
+	case IR_GOTO: \
+	case IR_LABEL
+
+#define SWITCH_CASE_STMT_NO_KID \
+	SWITCH_CASE_STMT_IN_BB_NO_KID: \
+	case IR_BREAK: \
+	case IR_CASE: \
+	case IR_CONTINUE
+
 //Describe miscellaneous information for IR.
 #define IRT_IS_STMT             0x1 //statement.
 #define IRT_IS_BIN              0x2 //binary operation.
@@ -188,7 +199,7 @@ typedef enum {
 #define IRT_WRITE_WHOLE_PR      0x8000
 #define IRT_HAS_OFFSET          0x10000
 
-#define IRDES_type(m)              ((m).code)
+#define IRDES_code(m)              ((m).code)
 #define IRDES_name(m)              ((m).name)
 #define IRDES_kid_map(m)           ((m).kid_map)
 #define IRDES_kid_num(m)           ((m).kid_num)
@@ -295,6 +306,12 @@ extern IRDesc const g_ir_desc[];
 #define CKID_ARR(ir, n)       CK_KID_NUM_ARR(ir, n, __FILE__, __LINE__)
 
 //Used by all IR.
+#define IR_DUMP_KID          0x1
+#define IR_DUMP_SRC_LINE     0x2
+#define IR_DUMP_ADDR         0x4
+#define IR_DUMP_INNER_REGION 0x8
+
+#define IR_TYPE_BIT_SIZE 6
 #define IRNAME(ir)               (IRDES_name(g_ir_desc[IR_code(ir)]))
 #define IRTNAME(irt)             (IRDES_name(g_ir_desc[irt]))
 #define IRTSIZE(irt)             (IRDES_size(g_ir_desc[irt]))
@@ -376,7 +393,7 @@ public:
     #ifdef _DEBUG_
     IR_TYPE code;
     #else
-    UINT code:6;
+    UINT code:IR_TYPE_BIT_SIZE;
     #endif
 
     //True if IR may throw excetion.
@@ -2509,19 +2526,13 @@ void IR::setDU(DU * du)
 //Exported Functions.
 CHAR const* compositeName(SYM const* n, xcom::StrBuf & buf);
 void dumpIR(IR const* ir,
-             TypeMgr const* tm,
-             CHAR * attr = NULL,
-             bool dump_kid = true,
-             bool dump_src_line = true,
-             bool dump_addr = false,
-             bool dump_inner_region = true);
+            TypeMgr const* tm,
+            CHAR * attr = NULL,
+            UINT dumpflag = IR_DUMP_KID|IR_DUMP_SRC_LINE|IR_DUMP_INNER_REGION);
 void dumpIRList(IR * ir_list,
                 TypeMgr const* tm,
                 CHAR * attr = NULL,
-                bool dump_kid = true,
-                bool dump_src_line = true,
-                bool dump_addr = false,
-                bool dump_inner_region = true);
+                UINT dumpflag = IR_DUMP_KID|IR_DUMP_SRC_LINE|IR_DUMP_INNER_REGION);
 void dumpIRList(IRList & ir_list, TypeMgr const* tm);
 void dumpIRList(List<IR*> & ir_list, TypeMgr const* tm);
 
@@ -2772,6 +2783,7 @@ void setParentPointerForIRList(IR * ir_list);
 UINT getArithPrecedence(IR_TYPE ty);
 bool allBeExp(IR * irlst);
 bool allBeStmt(IR * irlst);
-
+bool checkMaxIRType();
+bool checkIRDesc();
 } //namespace xoc
 #endif

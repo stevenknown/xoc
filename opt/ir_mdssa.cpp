@@ -503,7 +503,9 @@ void MDSSAMgr::dumpDUChain()
 
                         IR * use = m_ru->getIR(i2);
                         ASSERT0(use && (use->isMemoryRef() || use->is_id()));
-                        prt("%s(id:%d)", IRNAME(use), use->id());
+                        prt("%s(id:%d(", IRNAME(use), use->id());
+                        vopnd->dump();
+                        prt("))");
                     }
                 }
             }

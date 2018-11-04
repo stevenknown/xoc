@@ -145,7 +145,7 @@ void MDId2IRlist::dump()
             IR * d = m_ru->getIR(i);
             g_indent = 4;
             note("\n------------------");
-            dumpIR(d, m_tm, NULL, false, false, false);
+            dumpIR(d, m_tm, NULL, 0);
 
             note("\n\t\tdef:");
             MDSet const* ms = m_du->getMayDef(d);

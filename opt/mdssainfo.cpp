@@ -119,6 +119,13 @@ UINT UINT2VMDVec::count_mem() const
 //
 //START VMD
 //
+//Concisely dump.
+void VMD::dump()
+{
+    prt("MD%dV%d", mdid(), version());
+}
+
+
 void VMD::dump(Region * rg, UseDefMgr * mgr)
 {
     if (g_tfile == NULL) { return; }

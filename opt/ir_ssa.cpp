@@ -343,7 +343,7 @@ void SSAGraph::dump(CHAR const* name, bool detail)
         }
         if (detail) {
             //TODO: implement dump_ir_buf();
-            dumpIR(def, dm, NULL, true, false);
+            dumpIR(def, dm, NULL, IR_DUMP_KID);
         }
         fprintf(h, "\"}");
     }

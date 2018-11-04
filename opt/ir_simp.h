@@ -274,6 +274,12 @@ public:
         setSimpLnot();
         setSimpToLowestHeight();
     }
+
+	void dump(TypeMgr const* tm) {
+		ASSERT0(tm);
+		note("\n==---- DUMP SimpCtx IR List ----==");
+		dumpIRList(ir_stmt_list, tm);
+	}
 };
 
 } //namespace xoc

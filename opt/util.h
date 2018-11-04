@@ -43,12 +43,12 @@ namespace xoc {
 //    END_TIMER(t, "My Pass");
 #define START_TIMER(_timer_, s)                      \
     LONG _timer_ = 0;                                \
-    if (g_show_comp_time) {                          \
+    if (g_show_time) {                          \
         _timer_ = getclockstart();                   \
         prt2C("\n==-- START %s", (s));               \
     }
 #define END_TIMER(_timer_, s)                        \
-    if (g_show_comp_time) {                          \
+    if (g_show_time) {                          \
         prt2C("\n==-- END %s", s);                   \
         prt2C(" Time:%fsec", getclockend(_timer_));  \
     }
@@ -61,13 +61,13 @@ namespace xoc {
 //    END_TIMER(t, ("My Pass Name:%s", getPassName()));
 #define START_TIMER_FMT(_timer_, s)                  \
     LONG _timer_ = 0;                                \
-    if (g_show_comp_time) {                          \
+    if (g_show_time) {                          \
         _timer_ = getclockstart();                   \
         prt2C("\n==-- START ");                      \
         prt2C s;                                     \
     }
 #define END_TIMER_FMT(_timer_, s)                    \
-    if (g_show_comp_time) {                          \
+    if (g_show_time) {                          \
         prt2C("\n==-- END ");                        \
         prt2C s;                                     \
         prt2C(" Time:%fsec", getclockend(_timer_)); \

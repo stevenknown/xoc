@@ -160,7 +160,7 @@ bool g_do_ipa = false;
 bool g_do_call_graph = false;
 
 //If true to show compilation time.
-bool g_show_comp_time = false;
+bool g_show_time = false;
 
 //If true to show memory usage for each Region.
 bool g_show_memory_usage = true;

@@ -524,7 +524,7 @@ void IR_IVR::_dump(LI<IRBB> * li, UINT indent)
                 prt("Def-Stmt:");
                 ASSERT0(IV_iv_def(iv));
                 g_indent = indent + 2;
-                dumpIR(IV_iv_def(iv), m_tm, NULL, true, false, false);
+                dumpIR(IV_iv_def(iv), m_tm, NULL, IR_DUMP_KID);
 
                 //Dump IV's occ-exp.
                 note("\n");
@@ -532,7 +532,7 @@ void IR_IVR::_dump(LI<IRBB> * li, UINT indent)
                 prt("Occ-Exp:");
                 ASSERT0(IV_iv_occ(iv));
                 g_indent = indent + 2;
-                dumpIR(IV_iv_occ(iv), m_tm, NULL, true, false, false);
+                dumpIR(IV_iv_occ(iv), m_tm, NULL, IR_DUMP_KID);
 
                 //Dump IV's init-stmt.
                 if (iv->getInitValStmt() != NULL) {
@@ -540,7 +540,7 @@ void IR_IVR::_dump(LI<IRBB> * li, UINT indent)
                     for (UINT i = 0; i < indent; i++) { prt(" "); }
                     prt("Init-Stmt:");
                     g_indent = indent + 2;
-                    dumpIR(iv->getInitValStmt(), m_tm, NULL, true, false, false);
+                    dumpIR(iv->getInitValStmt(), m_tm, NULL, IR_DUMP_KID);
                 }
             }
         } else { prt("(NO BIV)"); }
@@ -557,7 +557,7 @@ void IR_IVR::_dump(LI<IRBB> * li, UINT indent)
                 IR const* iv = sc->val();
                 ASSERT0(iv);
                 g_indent = indent + 2;
-                dumpIR(iv, m_tm, NULL, true, false, false);
+                dumpIR(iv, m_tm, NULL, IR_DUMP_KID);
             }
         } else { prt("(NO DIV)"); }
 

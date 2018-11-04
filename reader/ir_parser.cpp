@@ -788,7 +788,7 @@ bool IRParser::parseStmtList(ParseCtx * ctx)
             return false;
         }
 
-        //dump_irs_h(ctx->stmt_list, m_tm);
+        //dumpIRList(ctx->stmt_list, m_tm);
     }
     UNREACHABLE();
     return true;
@@ -2245,29 +2245,57 @@ bool IRParser::parseModifyPR(X_CODE code, ParseCtx * ctx)
         return false;
     }
 
-    tok = m_lexer->getNextToken();
-    if (!parseExp(ctx)) {
-        return false;
-    }
-    IR * rhs = ctx->returned_exp;
-
-    tok = m_lexer->getCurrentToken();
-    if (tok != T_COMMA) {
-        error(tok, "miss ','");
-        return false;
-    }
-
-    tok = m_lexer->getNextToken();
-    if (!parseExp(ctx)) {
-        return false;
-    }
-    IR * offset = ctx->returned_exp;
-
     IR * ir;
     if (code == X_GETELEM) {
-        ir = ctx->current_region->buildGetElem(prno, ty, rhs, offset);
+        tok = m_lexer->getNextToken();
+        if (!parseExp(ctx)) {
+            return false;
+        }
+        IR * val = ctx->returned_exp;
+
+        tok = m_lexer->getCurrentToken();
+        if (tok != T_COMMA) {
+            error(tok, "miss ','");
+            return false;
+        }
+
+        tok = m_lexer->getNextToken();
+        if (!parseExp(ctx)) {
+            return false;
+        }
+        IR * offset = ctx->returned_exp;
+        ir = ctx->current_region->buildGetElem(prno, ty, val, offset);
     } else {
-        ir = ctx->current_region->buildSetElem(prno, ty, rhs, offset);
+        tok = m_lexer->getNextToken();
+        if (!parseExp(ctx)) {
+            return false;
+        }
+        IR * base = ctx->returned_exp;
+
+        tok = m_lexer->getCurrentToken();
+        if (tok != T_COMMA) {
+            error(tok, "miss ','");
+            return false;
+        }
+
+        tok = m_lexer->getNextToken();
+        if (!parseExp(ctx)) {
+            return false;
+        }
+        IR * val = ctx->returned_exp;
+
+        tok = m_lexer->getCurrentToken();
+        if (tok != T_COMMA) {
+            error(tok, "miss ','");
+            return false;
+        }
+
+        tok = m_lexer->getNextToken();
+        if (!parseExp(ctx)) {
+            return false;
+        }
+        IR * offset = ctx->returned_exp;
+        ir = ctx->current_region->buildSetElem(prno, ty, base, val, offset);
     }
     ctx->addIR(ir);
     ctx->returned_exp = NULL;

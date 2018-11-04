@@ -292,7 +292,7 @@ void IR_RP::dump_occ_list(List<IR*> & occs, TypeMgr * dm)
     if (g_tfile == NULL) { return; }
     note("\n---- DUMP exact occ list ----");
     for (IR * x = occs.get_head(); x != NULL; x = occs.get_next()) {
-        dumpIR(x, dm, NULL, true, false, false);
+        dumpIR(x, dm, NULL, IR_DUMP_KID);
         note("\n");
     }
     note("\n");
