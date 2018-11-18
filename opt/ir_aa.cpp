@@ -1444,7 +1444,7 @@ void IR_AA::processIld(
         IN OUT MD2MDSet * mx)
 {
     ASSERT0(ir->is_ild());
-    ASSERT0(ILD_base(ir)->is_ptr());
+    ASSERT0(g_is_support_dynamic_type || ILD_base(ir)->is_ptr());
 
     //... = *q, if q->x, set ir's MD to be 'x'.
     AACtx tic(*ic);
@@ -2194,7 +2194,7 @@ FIN:
 void IR_AA::processIst(IN IR * ir, IN MD2MDSet * mx)
 {
     ASSERT0(ir->is_ist());
-    ASSERT0(IST_base(ir)->is_ptr());
+    ASSERT0(g_is_support_dynamic_type || IST_base(ir)->is_ptr());
 
     //mem location may pointed to set.
     MDSet ml_may_pt;
@@ -2656,7 +2656,8 @@ void IR_AA::inferExpression(
             }
         }
         return;
-    case IR_LABEL: return;
+    case IR_LABEL:
+        return;
     case IR_SELECT:
         {
             AACtx tic(*ic);

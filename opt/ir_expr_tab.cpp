@@ -407,39 +407,16 @@ ExpRep * IR_EXPR_TAB::encode_expr(IN IR * ir)
     case IR_PR:
         return NULL;
     case IR_ILD:
-    case IR_ADD:
-    case IR_SUB:
-    case IR_MUL:
-    case IR_DIV:
-    case IR_REM:
-    case IR_MOD:
-    case IR_LAND: //logical and &&
-    case IR_LOR: //logical or ||
-    case IR_BAND: //bit and &
-    case IR_BOR: //bit or |
-    case IR_XOR:
-    case IR_BNOT: //bitwise not
-    case IR_LNOT: //logical not
-    case IR_NEG:
-    case IR_LT:
-    case IR_LE:
-    case IR_GT:
-    case IR_GE:
-    case IR_EQ:
-    case IR_NE:
+	SWITCH_CASE_BIN:
+	SWITCH_CASE_UNA:
     case IR_ARRAY:
-    case IR_ASR:
-    case IR_LSR:
-    case IR_LSL:
-    case IR_CVT: //type convertion
-    case IR_SELECT: //formulized determinate-expr?exp:exp
-        {
-            ExpRep * ie = append_expr(ir);
-            ASSERTN(!EXPR_occ_list(ie).find(ir),
-                    ("process same IR repeated."));
-            EXPR_occ_list(ie).append_tail(ir);
-            return ie;
-        }
+    case IR_SELECT: { //formulized determinate-expr?exp:exp
+        ExpRep * ie = append_expr(ir);
+        ASSERTN(!EXPR_occ_list(ie).find(ir),
+                ("process same IR repeated."));
+        EXPR_occ_list(ie).append_tail(ir);
+        return ie;
+    }
     default: UNREACHABLE();
     }
     return NULL;

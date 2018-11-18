@@ -616,7 +616,7 @@ bool IR_CP::doProp(
                 continue;
             }
 
-            if (m_is_dump_cp) {
+            if (m_is_dump_cp && g_is_dump_after_pass) {
                 dumpCopyPropagationAction(def_stmt, prop_value, use, mdssamgr);
             }
 

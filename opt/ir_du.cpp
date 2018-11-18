@@ -840,34 +840,13 @@ void IR_DU_MGR::computeExpression(
             UNREACHABLE();
         }
         break;
-    case IR_ADD:
-    case IR_SUB:
-    case IR_MUL:
-    case IR_DIV:
-    case IR_REM:
-    case IR_MOD:
-    case IR_LAND:
-    case IR_LOR:
-    case IR_BAND:
-    case IR_BOR:
-    case IR_XOR:
-    case IR_LT:
-    case IR_LE:
-    case IR_GT:
-    case IR_GE:
-    case IR_EQ:
-    case IR_NE:
-    case IR_ASR:
-    case IR_LSR:
-    case IR_LSL:
+	SWITCH_CASE_BIN:
         //Binary operation.
         computeExpression(BIN_opnd0(ir), ret_mds, compflag, duflag);
         computeExpression(BIN_opnd1(ir), ret_mds, compflag, duflag);
         ASSERT0(ir->getDU() == NULL);
         break;
-    case IR_BNOT:
-    case IR_LNOT:
-    case IR_NEG:
+	SWITCH_CASE_UNA:
         computeExpression(UNA_opnd(ir), ret_mds, compflag, duflag);
         ASSERT0(ir->getDU() == NULL);
         break;
@@ -875,9 +854,6 @@ void IR_DU_MGR::computeExpression(
         break;
     case IR_ARRAY:
         computeArrayRef(ir, ret_mds, compflag, duflag);
-        break;
-    case IR_CVT:
-        computeExpression(CVT_exp(ir), ret_mds, compflag, duflag);
         break;
     case IR_PR:
         ASSERT0(ir->getRefMDSet() == NULL);
@@ -2617,7 +2593,6 @@ void IR_DU_MGR::collectMayUseRecursive(
         }
         return;
     case IR_CONST:
-    case IR_CVT:
         //CVT should not has any use-mds. Even if the operation
         //will genrerate different type.
         //Fall through
@@ -2637,29 +2612,8 @@ void IR_DU_MGR::collectMayUseRecursive(
     case IR_LABEL:
     case IR_IGOTO:
     case IR_SWITCH:
-    case IR_ADD:
-    case IR_SUB:
-    case IR_MUL:
-    case IR_DIV:
-    case IR_REM:
-    case IR_MOD:
-    case IR_LAND:
-    case IR_LOR:
-    case IR_BAND:
-    case IR_BOR:
-    case IR_XOR:
-    case IR_LT:
-    case IR_LE:
-    case IR_GT:
-    case IR_GE:
-    case IR_EQ:
-    case IR_NE:
-    case IR_ASR:
-    case IR_LSR:
-    case IR_LSL:
-    case IR_BNOT:
-    case IR_LNOT:
-    case IR_NEG:
+	SWITCH_CASE_BIN:
+	SWITCH_CASE_UNA:
         for (UINT i = 0; i < IR_MAX_KID_NUM(ir); i++) {
             IR * k = ir->getKid(i);
             if (k == NULL) { continue; }
@@ -3185,26 +3139,7 @@ bool IR_DU_MGR::canBeLiveExprCand(IR const* ir) const
 {
     ASSERT0(ir);
     switch (ir->getCode()) {
-    case IR_ADD:
-    case IR_SUB:
-    case IR_MUL:
-    case IR_DIV:
-    case IR_REM:
-    case IR_MOD:
-    case IR_LAND:
-    case IR_LOR:
-    case IR_BAND:
-    case IR_BOR:
-    case IR_XOR:
-    case IR_LT:
-    case IR_LE:
-    case IR_GT:
-    case IR_GE:
-    case IR_EQ:
-    case IR_NE:
-    case IR_ASR:
-    case IR_LSR:
-    case IR_LSL:
+	SWITCH_CASE_BIN:
     case IR_BNOT:
     case IR_LNOT:
     case IR_NEG:
@@ -3941,26 +3876,7 @@ void IR_DU_MGR::checkAndBuildChainRecursive(
     case IR_CONST:
     case IR_LDA:
         return;
-    case IR_ADD:
-    case IR_SUB:
-    case IR_MUL:
-    case IR_DIV:
-    case IR_REM:
-    case IR_MOD:
-    case IR_BAND:
-    case IR_BOR:
-    case IR_XOR:
-    case IR_ASR:
-    case IR_LSR:
-    case IR_LSL:
-    case IR_LT:
-    case IR_LE:
-    case IR_GT:
-    case IR_GE:
-    case IR_EQ:
-    case IR_NE:
-    case IR_LAND:
-    case IR_LOR:
+	SWITCH_CASE_BIN:
         checkAndBuildChainRecursive(bb, BIN_opnd0(exp), ct, flag);
         checkAndBuildChainRecursive(bb, BIN_opnd1(exp), ct, flag);
         return;
@@ -3969,13 +3885,8 @@ void IR_DU_MGR::checkAndBuildChainRecursive(
         checkAndBuildChainRecursive(bb, SELECT_trueexp(exp), ct, flag);
         checkAndBuildChainRecursive(bb, SELECT_falseexp(exp), ct, flag);
         return;
-    case IR_BNOT:
-    case IR_LNOT:
-    case IR_NEG:
+    SWITCH_CASE_UNA:
         checkAndBuildChainRecursive(bb, UNA_opnd(exp), ct, flag);
-        return;
-    case IR_CVT:
-        checkAndBuildChainRecursive(bb, CVT_exp(exp), ct, flag);
         return;
     case IR_CASE:
         checkAndBuildChainRecursive(bb, CASE_vexp(exp), ct, flag);

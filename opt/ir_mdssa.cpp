@@ -159,7 +159,7 @@ void MDSSAMgr::dump()
     List<IR const*> lst;
     List<IR const*> opnd_lst;
 
-    g_indent = 4;
+    g_indent = 0;
     for (IRBB * bb = bbl->get_head(); bb != NULL; bb = bbl->get_next()) {
         note("\n--- BB%d ---", BB_id(bb));
 
@@ -454,7 +454,7 @@ void MDSSAMgr::dumpDUChain()
     List<IR const*> lst;
     List<IR const*> opnd_lst;
 
-    g_indent = 4;
+    g_indent = 0;
     for (IRBB * bb = bbl->get_head(); bb != NULL; bb = bbl->get_next()) {
         note("\n--- BB%d ---", BB_id(bb));
         MDPhiList * philist = m_usedef_mgr.genBBPhiList(BB_id(bb));
@@ -902,7 +902,17 @@ void MDSSAMgr::renameBB(IN IRBB * bb)
                      i >= 0; i = refset->get_next((UINT)i, &iter)) {
                     MD * md = m_md_sys->getMD(i);
                     ASSERT0(md);
-                    if (!md->is_effect()) { continue; }
+
+                    //In memory SSA, rename the MD even
+                    //if it is ineffect to keep DU relation, e.g:
+                    //  int bar(int * p, int * q, int * m, int * n)
+                    //  {
+                    //      *p = *q + 20; *p define MD2V1
+                    //      *m = *n - 64; *n use MD2V1
+                    //      return 0;
+                    //  }
+                    //if (!md->is_effect()) { continue; }
+
                     renameUse(opnd);
                 }
             }
@@ -1864,6 +1874,7 @@ bool MDSSAMgr::construction(DomTree & domtree)
     ASSERT0(verifyPhi(false) && verifyVMD());
 
     if (g_is_dump_after_pass) {
+        g_indent = 0;
         m_md_sys->dump();
         dump();
         dumpDUChain();

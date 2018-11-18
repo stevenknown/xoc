@@ -1542,17 +1542,18 @@ bool IR::verify(Region const* rg) const
     case IR_ILD:
         ASSERT0(d);
         ASSERT0(getDType() != D_UNDEF);
-
         ASSERT0(ILD_base(this));
-
-        ASSERTN(ILD_base(this)->is_ptr(), ("base must be pointer"));
-
+        if (!g_is_support_dynamic_type) {
+            ASSERTN(ILD_base(this)->is_ptr(), ("base must be pointer"));
+        }
         ASSERT0(ILD_base(this)->is_exp());
         ASSERT0(ILD_base(this)->is_single());
         break;
     case IR_IST:
         ASSERT0(d);
-        ASSERTN(IST_base(this)->is_ptr(), ("base must be pointer"));
+        if (!g_is_support_dynamic_type) {
+            ASSERTN(IST_base(this)->is_ptr(), ("base must be pointer"));
+        }
         ASSERT0(IST_rhs(this));
         ASSERT0(IST_rhs(this)->is_exp());
         ASSERTN(getDType() != D_UNDEF, ("size of istore value cannot be zero"));

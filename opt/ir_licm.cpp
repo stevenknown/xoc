@@ -380,7 +380,8 @@ void IR_LICM::dumpInvariantExpStmt(
         TTab<IR*> const& invariant_exp)
 {
     if (g_tfile == NULL) { return; }
-    note("\n==---- DUMP LICM Analysis Result ----==\n");
+    note("\n==---- DUMP LICM Analysis Result '%s' ----==\n",
+        m_ru->getRegionName());
     if (invariant_exp.get_elem_count() > 0) {
         TabIter<IR*> ti;
         prt("-- Invariant Expression (num=%d) -- :",
@@ -763,7 +764,10 @@ bool IR_LICM::doLoopTree(
         doit |= doLoopTree(LI_inner_list(tli), du_set_info_changed,
                    insert_bb, invariant_stmt, invariant_exp);
         analysis(tli, invariant_stmt, invariant_exp);
-        //dumpInvariantExpStmt(invariant_stmt, invariant_exp);
+
+        if (g_is_dump_after_pass) {
+            dumpInvariantExpStmt(invariant_stmt, invariant_exp);
+        }
 
         if (invariant_exp.get_elem_count() == 0) {
             continue;

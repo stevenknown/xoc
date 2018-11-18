@@ -293,29 +293,10 @@ bool IR_GCSE::isCseCandidate(IR * ir)
 {
     ASSERT0(ir);
     switch (ir->getCode()) {
-    case IR_ADD:
-    case IR_SUB:
-    case IR_MUL:
-    case IR_DIV:
-    case IR_REM:
-    case IR_MOD:
-    case IR_LAND:
-    case IR_LOR:
-    case IR_BAND:
-    case IR_BOR:
-    case IR_XOR:
+	SWITCH_CASE_BIN:
     case IR_BNOT:
     case IR_LNOT:
     case IR_NEG:
-    case IR_LT:
-    case IR_LE:
-    case IR_GT:
-    case IR_GE:
-    case IR_EQ:
-    case IR_NE:
-    case IR_ASR:
-    case IR_LSR:
-    case IR_LSL:
     case IR_ILD:
         return true;
     default: break;

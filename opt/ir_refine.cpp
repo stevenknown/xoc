@@ -2280,26 +2280,7 @@ IR * Region::foldConst(IR * ir, bool & change)
 
     TypeMgr * dm = getTypeMgr();
     switch (ir->getCode()) {
-    case IR_ADD:
-    case IR_SUB:
-    case IR_MUL:
-    case IR_DIV:
-    case IR_REM:
-    case IR_MOD:
-    case IR_LAND:
-    case IR_LOR:
-    case IR_BAND:
-    case IR_BOR:
-    case IR_XOR:
-    case IR_LT:
-    case IR_LE:
-    case IR_GT:
-    case IR_GE:
-    case IR_EQ:
-    case IR_NE:
-    case IR_ASR:
-    case IR_LSR:
-    case IR_LSL:
+    SWITCH_CASE_BIN:
         {
             IR * t0 = BIN_opnd0(ir);
             IR * t1 = BIN_opnd1(ir);

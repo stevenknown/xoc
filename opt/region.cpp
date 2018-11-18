@@ -1685,26 +1685,7 @@ bool Region::evaluateConstInteger(IR const* ir, OUT ULONGLONG * const_value)
         if (!ir->is_int()) { return false; }
         *const_value = CONST_int_val(ir);
         return true;
-    case IR_ADD:
-    case IR_SUB:
-    case IR_MUL:
-    case IR_DIV:
-    case IR_REM:
-    case IR_MOD:
-    case IR_LAND: //logical and &&
-    case IR_LOR: //logical or ||
-    case IR_BAND: //inclusive and &
-    case IR_BOR: //inclusive or |
-    case IR_XOR: //exclusive or
-    case IR_LT:
-    case IR_LE:
-    case IR_GT:
-    case IR_GE:
-    case IR_EQ:
-    case IR_NE:
-    case IR_ASR:
-    case IR_LSR:
-    case IR_LSL: {
+    SWITCH_CASE_BIN: {
         IR const* opnd0 = BIN_opnd0(ir);
         IR const* opnd1 = BIN_opnd1(ir);
 
@@ -2131,6 +2112,7 @@ VAR * Region::genVARforPR(UINT prno, Type const* type)
     SET_FLAG(flag, VAR_IS_PR);
     pr_var = getVarMgr()->registerVar(name, type, 0, flag);
     setMapPR2Var(prno, pr_var);
+    VAR_prno(pr_var) = prno;
 
     //Set the pr-var to be unallocable, means do NOT add
     //pr-var immediately as a memory-variable.
@@ -3199,35 +3181,13 @@ bool Region::verifyMDRef()
                     ASSERT0(t->getEffectRef() && t->getEffectRef()->is_pr());
                     ASSERT0(t->getRefMDSet() == NULL);
                     break;
-                case IR_CVT:
-                    //CVT should not have any reference. Even if the
-                    //operation will genrerate different type memory
-                    //accessing.
+                SWITCH_CASE_BIN:
+                SWITCH_CASE_UNA:
+                //CVT should not have any reference. Even if the
+                //operation will genrerate different type memory
+                //accessing.
                 case IR_CONST:
                 case IR_LDA:
-                case IR_ADD:
-                case IR_SUB:
-                case IR_MUL:
-                case IR_DIV:
-                case IR_REM:
-                case IR_MOD:
-                case IR_LAND:
-                case IR_LOR:
-                case IR_BAND:
-                case IR_BOR:
-                case IR_XOR:
-                case IR_BNOT:
-                case IR_LNOT:
-                case IR_NEG:
-                case IR_LT:
-                case IR_LE:
-                case IR_GT:
-                case IR_GE:
-                case IR_EQ:
-                case IR_NE:
-                case IR_ASR:
-                case IR_LSR:
-                case IR_LSL:
                 case IR_SELECT:
                 case IR_CASE:
                 case IR_BREAK:
@@ -3452,7 +3412,8 @@ void Region::copyAI(IR const* src, IR * tgt)
 
 void Region::checkValidAndRecompute(OptCtx * oc, ...)
 {
-    xcom::BitSet opts;
+    BitSet opts;
+    List<PASS_TYPE> optlist;
     UINT num = 0;
     va_list ptr;
     va_start(ptr, oc);
@@ -3460,189 +3421,182 @@ void Region::checkValidAndRecompute(OptCtx * oc, ...)
     while (opty != PASS_UNDEF && num < 1000) {
         ASSERTN(opty < PASS_NUM, ("You should append PASS_UNDEF to pass list."));
         opts.bunion(opty);
+        optlist.append_tail(opty);
         num++;
         opty = (PASS_TYPE)va_arg(ptr, UINT);
     }
     va_end(ptr);
     ASSERTN(num < 1000, ("too many pass queried or miss ending placeholder"));
-
     if (num == 0) { return; }
 
     PassMgr * passmgr = getPassMgr();
     ASSERTN(passmgr, ("PassMgr is not enable"));
-
     IR_CFG * cfg = (IR_CFG*)passmgr->queryPass(PASS_CFG);
     IR_AA * aa = NULL;
     IR_DU_MGR * dumgr = NULL;
 
-    if (opts.is_contain(PASS_CFG) && !OC_is_cfg_valid(*oc)) {
-        if (cfg == NULL) {
-            //CFG is not constructed.
-            cfg = (IR_CFG*)getPassMgr()->registerPass(PASS_CFG);
-            cfg->initCfg(*oc);
-        } else {
-            //Caution: the validation of cfg should maintained by user.
-            cfg->rebuild(*oc);
-            cfg->removeEmptyBB(*oc);
-            cfg->computeExitList();
-        }
-    }
-
-    if (opts.is_contain(PASS_LOOP_INFO) && !OC_is_loopinfo_valid(*oc)) {
-        ASSERTN(cfg && OC_is_cfg_valid(*oc),
-            ("You should make CFG available first."));
-        cfg->LoopAnalysis(*oc);
-    }
-
-    if (opts.is_contain(PASS_RPO)) {
-        ASSERTN(cfg && OC_is_cfg_valid(*oc),
-            ("You should make CFG available first."));
-        if (!OC_is_rpo_valid(*oc)) {
-            cfg->computeRPO(*oc);
-        } else {
-            ASSERTN(cfg->getBBListInRPO()->get_elem_count() ==
-                getBBList()->get_elem_count(),
-                ("Previous pass has changed RPO, "
-                    "and you should set it to be invalid"));
-        }
-    }
-
-    if (opts.is_contain(PASS_CDG) &&
-        !OC_is_aa_valid(*oc) &&
-        getBBList() != NULL &&
-        getBBList()->get_elem_count() != 0) {
-        ASSERTN(cfg && OC_is_cfg_valid(*oc),
-           ("You should make CFG available first."));
-        if (aa == NULL) {
-            aa = (IR_AA*)passmgr->registerPass(PASS_AA);
-            if (!aa->is_init()) {
-                aa->initAliasAnalysis();
+    C<PASS_TYPE> * it;
+    for (optlist.get_head(&it); it != optlist.end(); it = optlist.get_next(it)) {
+        PASS_TYPE pt = it->val();
+        switch (pt) {
+        case PASS_CFG:
+            if (!OC_is_cfg_valid(*oc)) {
+                if (cfg == NULL) {
+                    //CFG is not constructed.
+                    cfg = (IR_CFG*)getPassMgr()->registerPass(PASS_CFG);
+                    cfg->initCfg(*oc);
+                } else {
+                    //Caution: the validation of cfg should maintained by user.
+                    cfg->rebuild(*oc);
+                    cfg->removeEmptyBB(*oc);
+                    cfg->computeExitList();
+                }
             }
-        }
-
-        ASSERT0(OC_is_cfg_valid(*oc));
-        aa->perform(*oc);
-    }
-
-    if (opts.is_contain(PASS_DOM) && !OC_is_dom_valid(*oc)) {
-        ASSERTN(cfg && OC_is_cfg_valid(*oc),
-               ("You should make CFG available first."));
-        cfg->computeDomAndIdom(*oc);
-    }
-
-    if (opts.is_contain(PASS_PDOM) && !OC_is_pdom_valid(*oc)) {
-        ASSERTN(cfg && OC_is_cfg_valid(*oc),
-               ("You should make CFG available first."));
-        cfg->computePdomAndIpdom(*oc);
-    }
-
-    if (opts.is_contain(PASS_CDG) && !OC_is_cdg_valid(*oc)) {
-        ASSERT0(passmgr);
-        CDG * cdg = (CDG*)passmgr->registerPass(PASS_CDG);
-        ASSERT0(cdg); //cdg is not enable.
-        ASSERTN(cfg && OC_is_cfg_valid(*oc),
-               ("You should make CFG available first."));
-        cdg->rebuild(*oc, *cfg);
-    }
-
-    UINT f = 0;
-    if (opts.is_contain(PASS_DU_REF) && !OC_is_ref_valid(*oc)) {
-        f |= SOL_REF;
-    }
-
-    if (opts.is_contain(PASS_LIVE_EXPR) && !OC_is_live_expr_valid(*oc)) {
-        f |= SOL_AVAIL_EXPR;
-    }
-
-    if (opts.is_contain(PASS_EXPR_TAB) && !OC_is_live_expr_valid(*oc)) {
-        f |= SOL_AVAIL_EXPR;
-    }
-
-    if (opts.is_contain(PASS_AVAIL_REACH_DEF) &&
-        !OC_is_avail_reach_def_valid(*oc)) {
-        f |= SOL_AVAIL_REACH_DEF;
-    }
-
-    if (opts.is_contain(PASS_DU_CHAIN) &&
-        !OC_is_du_chain_valid(*oc) &&
-        !OC_is_reach_def_valid(*oc)) {
-        f |= SOL_REACH_DEF;
-    }
-
-    if ((HAVE_FLAG(f, SOL_REF) || opts.is_contain(PASS_AA)) &&
-        !OC_is_aa_valid(*oc) &&
-        getBBList() != NULL &&
-        getBBList()->get_elem_count() != 0) {
-        ASSERTN(cfg && OC_is_cfg_valid(*oc),
-            ("You should make CFG available first."));
-        if (aa == NULL) {
-            aa = (IR_AA*)passmgr->registerPass(PASS_AA);
-            if (!aa->is_init()) {
-                aa->initAliasAnalysis();
+            break;
+        case PASS_CDG:
+            if (!OC_is_cdg_valid(*oc)) {
+                ASSERT0(passmgr);
+                CDG * cdg = (CDG*)passmgr->registerPass(PASS_CDG);
+                ASSERT0(cdg); //cdg is not enable.
+                ASSERTN(cfg && OC_is_cfg_valid(*oc),
+                       ("You should make CFG available first."));
+                cdg->rebuild(*oc, *cfg);
             }
+            break;
+        case PASS_DOM:
+            if (!OC_is_dom_valid(*oc)) {
+                ASSERTN(cfg && OC_is_cfg_valid(*oc),
+                       ("You should make CFG available first."));
+                cfg->computeDomAndIdom(*oc);
+            }
+            break;
+        case PASS_PDOM:
+            if (!OC_is_pdom_valid(*oc)) {
+                ASSERTN(cfg && OC_is_cfg_valid(*oc),
+                        ("You should make CFG available first."));
+                cfg->computePdomAndIpdom(*oc);
+            }
+            break;
+        case PASS_EXPR_TAB:
+            if (!OC_is_expr_tab_valid(*oc) &&
+                getBBList() != NULL &&
+                getBBList()->get_elem_count() != 0) {
+                IR_EXPR_TAB * exprtab =
+                    (IR_EXPR_TAB*)passmgr->registerPass(PASS_EXPR_TAB);
+                ASSERT0(exprtab);
+                exprtab->reperform(*oc);
+            }
+            break;
+        case PASS_LOOP_INFO:
+            if (!OC_is_loopinfo_valid(*oc)) {
+                ASSERTN(cfg && OC_is_cfg_valid(*oc),
+                    ("You should make CFG available first."));
+                cfg->LoopAnalysis(*oc);
+            }
+            break;
+        case PASS_RPO:
+            ASSERTN(cfg && OC_is_cfg_valid(*oc),
+                ("You should make CFG available first."));
+            if (!OC_is_rpo_valid(*oc)) {
+                cfg->computeRPO(*oc);
+            } else {
+                ASSERTN(cfg->getBBListInRPO()->get_elem_count() ==
+                    getBBList()->get_elem_count(),
+                    ("Previous pass has changed RPO, "
+                        "and you should set it to be invalid"));
+            }
+            break;
+        case PASS_AA:
+        case PASS_DU_REF:
+        case PASS_LIVE_EXPR:
+        case PASS_AVAIL_REACH_DEF: {
+            UINT f = 0;
+            if (opts.is_contain(PASS_DU_REF) && !OC_is_ref_valid(*oc)) {
+                f |= SOL_REF;
+            }
+            if (opts.is_contain(PASS_LIVE_EXPR) && !OC_is_live_expr_valid(*oc)) {
+                f |= SOL_AVAIL_EXPR;
+            }
+            if (opts.is_contain(PASS_EXPR_TAB) && !OC_is_live_expr_valid(*oc)) {
+                f |= SOL_AVAIL_EXPR;
+            }
+            if (opts.is_contain(PASS_AVAIL_REACH_DEF) &&
+                !OC_is_avail_reach_def_valid(*oc)) {
+                f |= SOL_AVAIL_REACH_DEF;
+            }
+            if (opts.is_contain(PASS_DU_CHAIN) &&
+                !OC_is_du_chain_valid(*oc) &&
+                !OC_is_reach_def_valid(*oc)) {
+                f |= SOL_REACH_DEF;
+            }
+            if ((HAVE_FLAG(f, SOL_REF) || opts.is_contain(PASS_AA)) &&
+                !OC_is_aa_valid(*oc) &&
+                getBBList() != NULL &&
+                getBBList()->get_elem_count() != 0) {
+                ASSERTN(cfg && OC_is_cfg_valid(*oc),
+                    ("You should make CFG available first."));
+                if (aa == NULL) {
+                    aa = (IR_AA*)passmgr->registerPass(PASS_AA);
+                    if (!aa->is_init()) {
+                        aa->initAliasAnalysis();
+                    }
+                }
+                UINT numir = 0;
+                UINT max_numir_in_bb = 0;
+                for (IRBB * bb = getBBList()->get_head();
+                    bb != NULL; bb = getBBList()->get_next()) {
+                    numir += bb->getNumOfIR();
+                    max_numir_in_bb = MAX(max_numir_in_bb, bb->getNumOfIR());
+                }
+                if (numir > g_thres_opt_ir_num ||
+                    max_numir_in_bb > g_thres_opt_ir_num_in_bb) {
+                    aa->set_flow_sensitive(false);
+                }
+                aa->perform(*oc);
+            }
+            if (f != 0 &&
+                getBBList() != NULL &&
+                getBBList()->get_elem_count() != 0) {
+                if (dumgr == NULL) {
+                    dumgr = (IR_DU_MGR*)passmgr->registerPass(PASS_DU_MGR);
+                }
+                f |= COMPUTE_NOPR_DU|COMPUTE_PR_DU;
+                dumgr->perform(*oc, f);
+                if (HAVE_FLAG(f, SOL_REF)) {
+                    ASSERT0(verifyMDRef());
+                }
+                if (HAVE_FLAG(f, SOL_AVAIL_EXPR)) {
+                    ASSERT0(dumgr->verifyLiveinExp());
+                }
+            }
+            break;
         }
-        UINT numir = 0;
-        UINT max_numir_in_bb = 0;
-        for (IRBB * bb = getBBList()->get_head();
-            bb != NULL; bb = getBBList()->get_next()) {
-            numir += bb->getNumOfIR();
-            max_numir_in_bb = MAX(max_numir_in_bb, bb->getNumOfIR());
+        case PASS_DU_CHAIN:
+            if (!OC_is_du_chain_valid(*oc) &&
+                getBBList() != NULL &&
+                getBBList()->get_elem_count() != 0) {
+                if (dumgr == NULL) {
+                    dumgr = (IR_DU_MGR*)passmgr->registerPass(PASS_DU_MGR);
+                }
+  
+                UINT flag = COMPUTE_NOPR_DU;
+  
+                //If PRs have already been in SSA form, compute
+                //DU chain doesn't make any sense.
+                PRSSAMgr * ssamgr = (PRSSAMgr*)passmgr->queryPass(PASS_PR_SSA_MGR);
+                if (ssamgr == NULL) {
+                    flag |= COMPUTE_PR_DU;
+                }
+  
+                if (opts.is_contain(PASS_REACH_DEF)) {
+                    dumgr->computeMDDUChain(*oc, true, flag);
+                } else {
+                    dumgr->computeMDDUChain(*oc, false, flag);
+                }
+            }
+            break;
+        default: {}
         }
-        if (numir > g_thres_opt_ir_num ||
-            max_numir_in_bb > g_thres_opt_ir_num_in_bb) {
-            aa->set_flow_sensitive(false);
-        }
-        aa->perform(*oc);
-    }
-
-    if (f != 0 &&
-        getBBList() != NULL &&
-        getBBList()->get_elem_count() != 0) {
-        if (dumgr == NULL) {
-            dumgr = (IR_DU_MGR*)passmgr->registerPass(PASS_DU_MGR);
-        }
-        f |= COMPUTE_NOPR_DU|COMPUTE_PR_DU;
-        dumgr->perform(*oc, f);
-        if (HAVE_FLAG(f, SOL_REF)) {
-            ASSERT0(verifyMDRef());
-        }
-        if (HAVE_FLAG(f, SOL_AVAIL_EXPR)) {
-            ASSERT0(dumgr->verifyLiveinExp());
-        }
-    }
-
-    if (opts.is_contain(PASS_DU_CHAIN) &&
-        !OC_is_du_chain_valid(*oc) &&
-        getBBList() != NULL &&
-        getBBList()->get_elem_count() != 0) {
-        if (dumgr == NULL) {
-            dumgr = (IR_DU_MGR*)passmgr->registerPass(PASS_DU_MGR);
-        }
-
-        UINT flag = COMPUTE_NOPR_DU;
-
-        //If PRs have already been in SSA form, compute
-        //DU chain doesn't make any sense.
-        PRSSAMgr * ssamgr = (PRSSAMgr*)passmgr->queryPass(PASS_PR_SSA_MGR);
-        if (ssamgr == NULL) {
-            flag |= COMPUTE_PR_DU;
-        }
-
-        if (opts.is_contain(PASS_REACH_DEF)) {
-            dumgr->computeMDDUChain(*oc, true, flag);
-        } else {
-            dumgr->computeMDDUChain(*oc, false, flag);
-        }
-    }
-
-    if (opts.is_contain(PASS_EXPR_TAB) &&
-        !OC_is_expr_tab_valid(*oc) &&
-        getBBList() != NULL &&
-        getBBList()->get_elem_count() != 0) {
-        IR_EXPR_TAB * exprtab =
-            (IR_EXPR_TAB*)passmgr->registerPass(PASS_EXPR_TAB);
-        ASSERT0(exprtab);
-        exprtab->reperform(*oc);
     }
 }
 

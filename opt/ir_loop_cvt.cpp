@@ -218,6 +218,10 @@ bool IR_LOOP_CVT::perform(OptCtx & oc)
 
     bool change = find_and_convert(worklst);
     if (change) {
+        if (g_is_dump_after_pass) {
+            dumpBBList(m_ru->getBBList(), m_ru);
+        }
+
         //DU reference and du chain has maintained.
         ASSERT0(m_ru->verifyMDRef());
         ASSERT0(m_du->verifyMDDUChain(COMPUTE_PR_DU | COMPUTE_NOPR_DU));

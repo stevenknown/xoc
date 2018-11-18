@@ -852,26 +852,7 @@ VN * IR_GVN::computeVN(IR const* exp, bool & change)
 {
     ASSERT0(exp);
     switch (exp->getCode()) {
-    case IR_ADD:
-    case IR_SUB:
-    case IR_MUL:
-    case IR_DIV:
-    case IR_REM:
-    case IR_MOD:
-    case IR_LAND: //logical and &&
-    case IR_LOR: //logical or ||
-    case IR_BAND: //inclusive and &
-    case IR_BOR: //inclusive or |
-    case IR_XOR: //exclusive or
-    case IR_LT:
-    case IR_LE:
-    case IR_GT:
-    case IR_GE:
-    case IR_EQ: //==
-    case IR_NE: //!=
-    case IR_ASR:
-    case IR_LSR:
-    case IR_LSL: {
+	SWITCH_CASE_BIN: {
         VN * vn1 = computeVN(BIN_opnd0(exp), change);
         VN * vn2 = computeVN(BIN_opnd1(exp), change);
         if (vn1 == NULL || vn2 == NULL) {
@@ -888,26 +869,8 @@ VN * IR_GVN::computeVN(IR const* exp, bool & change)
         }
         return x;
     }
-    case IR_BNOT: //bitwise not
-    case IR_LNOT: //logical not
-    case IR_NEG: { //negative
+	SWITCH_CASE_UNA: {
         VN * x = computeVN(UNA_opnd(exp), change);
-        if (x == NULL) {
-            if (m_ir2vn.get(IR_id(exp)) != NULL) {
-                m_ir2vn.set(IR_id(exp), NULL);
-                change = true;
-            }
-            return NULL;
-        }
-        x = registerUnaVN(exp->getCode(), x);
-        if (m_ir2vn.get(IR_id(exp)) != x) {
-            m_ir2vn.set(IR_id(exp), x);
-            change = true;
-        }
-        return x;
-    }
-    case IR_CVT: { //type convertion
-        VN * x = computeVN(CVT_exp(exp), change);
         if (x == NULL) {
             if (m_ir2vn.get(IR_id(exp)) != NULL) {
                 m_ir2vn.set(IR_id(exp), NULL);
@@ -1481,7 +1444,9 @@ bool IR_GVN::perform(OptCtx & oc)
     ASSERT0(!change && count <= 2);
     #endif
 
-    //dump();
+    if (g_is_dump_after_pass) {
+        dump();
+    }    
     END_TIMER(t, getPassName());
     ASSERT0(verify());
     m_is_valid = true;

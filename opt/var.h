@@ -125,8 +125,12 @@ public:
 //Record the initial valud index.
 #define VAR_byte_val(v)          ((v)->u1.byte_val)
 
+//Record prno.
+#define VAR_prno(v)              ((v)->u1.prno)
+
 //Variable has initial value.
-#define VAR_has_init_val(v)      (VAR_byte_val(v) != NULL)
+#define VAR_has_init_val(v)      ((v)->u2.s1.has_init_val)
+//#define VAR_has_init_val(v)      (VAR_byte_val(v) != NULL)
 
 //Variable is region.
 #define VAR_is_func_decl(v)      ((v)->u2.s1.is_func_decl)
@@ -182,8 +186,11 @@ public:
         //Record byte code if VAR has constant initial value.
         ByteBuf * byte_val;
 
-		//Record labelinfo if VAR is label.
-		LabelInfo * labinfo;
+        //Record labelinfo if VAR is label.
+        LabelInfo * labinfo;
+
+        //Record Prno if VAR is pr.
+        UINT prno;
     } u1;
 
     union {

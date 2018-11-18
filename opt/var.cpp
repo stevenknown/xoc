@@ -224,7 +224,9 @@ void VAR::dumpProp(xcom::StrBuf & buf, bool grmode) const
         if (local_buf != NULL && len >= HOST_STACK_MAX_USABLE_MEMORY_BYTE_SIZE) {
             ::free(local_buf);
         }
-    } else if (getByteValue() != NULL) {
+    } else if (VAR_has_init_val(this)) {
+        ASSERT0(getByteValue());
+        //Initial value can NOT be NULL.
         if (!first) {
             buf.strcat(",");
         }
@@ -238,7 +240,7 @@ void VAR::dumpProp(xcom::StrBuf & buf, bool grmode) const
         for (p++; i < size; i++, p++) {
             buf.strcat(",0x%x", (BYTE)*p);
         }
-        buf.strcat(")");
+        buf.strcat(")");        
     }
 }
 

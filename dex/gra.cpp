@@ -87,26 +87,7 @@ public:
         if (res != NULL) { *res = ir; }
 
         switch (ST_rhs(ir)->getCode()) {
-        case IR_ADD:
-        case IR_SUB:
-        case IR_MUL:
-        case IR_DIV:
-        case IR_REM:
-        case IR_MOD:
-        case IR_LAND:
-        case IR_LOR:
-        case IR_BAND:
-        case IR_BOR:
-        case IR_XOR:
-        case IR_ASR:
-        case IR_LSR:
-        case IR_LSL:
-        case IR_LT:
-        case IR_LE:
-        case IR_GT:
-        case IR_GE:
-        case IR_EQ:
-        case IR_NE:
+        SWITCH_CASE_BIN:
             break;
         default: return false;
         }
@@ -587,32 +568,11 @@ void RSC::comp_ir_fmt(IR const* ir)
     case IR_ICALL:
         comp_call_fmt(ir);
         return;
-    case IR_ADD:
-    case IR_SUB:
-    case IR_MUL:
-    case IR_DIV:
-    case IR_REM:
-    case IR_MOD:
-    case IR_LAND:
-    case IR_LOR:
-    case IR_BAND:
-    case IR_BOR:
-    case IR_XOR:
-    case IR_LT:
-    case IR_LE:
-    case IR_GT:
-    case IR_GE:
-    case IR_EQ:
-    case IR_NE:
-    case IR_ASR:
-    case IR_LSR:
-    case IR_LSL:
+    SWITCH_CASE_BIN:
         comp_ir_fmt(BIN_opnd0(ir));
         comp_ir_fmt(BIN_opnd1(ir));
         return;
-    case IR_BNOT:
-    case IR_LNOT:
-    case IR_NEG:
+    SWITCH_CASE_UNA:    
         comp_ir_fmt(UNA_opnd(ir));
         return;
     case IR_GOTO:
@@ -627,9 +587,6 @@ void RSC::comp_ir_fmt(IR const* ir)
         ASSERT0(((CArray*)ir)->getDimNum() == 1);
         comp_ir_fmt(ARR_base(ir));
         comp_ir_fmt(ARR_sub_list(ir));
-        return;
-    case IR_CVT:
-        comp_ir_fmt(CVT_exp(ir));
         return;
     case IR_PR:
         return;
@@ -2666,37 +2623,13 @@ void LTMgr::renameUse(IR * ir, LT * l, IR ** newpr)
         UNREACHABLE();
         break;
     case IR_GOTO: break;
-    case IR_ADD:
-    case IR_SUB:
-    case IR_MUL:
-    case IR_DIV:
-    case IR_REM:
-    case IR_MOD:
-    case IR_LAND: //logical and &&
-    case IR_LOR: //logical or ||
-    case IR_BAND: //inclusive and &
-    case IR_BOR: //inclusive or |
-    case IR_XOR: //exclusive or
-    case IR_LT:
-    case IR_LE:
-    case IR_GT:
-    case IR_GE:
-    case IR_EQ: //==
-    case IR_NE: //!=
-    case IR_ASR:
-    case IR_LSR:
-    case IR_LSL:
+    SWITCH_CASE_BIN:
         renameUse(BIN_opnd0(ir), l, newpr);
         renameUse(BIN_opnd1(ir), l, newpr);
         break;
-    case IR_BNOT: //bitwise not
-    case IR_LNOT: //logical not
-    case IR_NEG: //negative
+    SWITCH_CASE_UNA:
         renameUse(UNA_opnd(ir), l, newpr);
-        break;
-    case IR_CVT: //type convertion
-        renameUse(CVT_exp(ir), l, newpr);
-        break;
+        break;        
     case IR_LDA:
     case IR_ID:
     case IR_LD:

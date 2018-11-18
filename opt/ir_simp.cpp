@@ -38,41 +38,6 @@ author: Su Zhenyu
 
 namespace xoc {
 
-#ifdef _DEBUG_
-static bool isBinAndUniExp(IR const* ir)
-{
-    switch (ir->getCode()) {
-    case IR_ILD:
-    case IR_BAND: //inclusive and &
-    case IR_BOR: //inclusive or  |
-    case IR_XOR: //exclusive or ^
-    case IR_BNOT: //bitwise not
-    case IR_NEG: //negative
-    case IR_EQ: //==
-    case IR_NE: //!=
-    case IR_LT:
-    case IR_GT:
-    case IR_GE:
-    case IR_LE:
-    case IR_ADD:
-    case IR_SUB:
-    case IR_MUL:
-    case IR_DIV:
-    case IR_REM:
-    case IR_MOD:
-    case IR_LABEL:
-    case IR_ASR:
-    case IR_LSR:
-    case IR_LSL:
-    case IR_CVT: //data type convertion
-        return true;
-    default: break;
-    }
-    return false;
-}
-#endif
-
-
 static bool isLowest(IR const* ir)
 {
     ASSERT0(ir->is_exp());
@@ -250,7 +215,7 @@ bool Region::isLowestHeight(IR const* ir, SimpCtx const* ctx) const
 //  IF_END:
 IR * Region::simplifyIfSelf(IR * ir, SimpCtx * ctx)
 {
-    if (ir == NULL) return NULL;
+    if (ir == NULL) { return NULL; }
     ASSERTN(ir->is_if(), ("expect IR_IF node"));
     SimpCtx tcont(*ctx);
     SIMP_ret_array_val(&tcont) = true;
@@ -1365,7 +1330,7 @@ IR * Region::simplifyArrayAddrExp(IR * ir, SimpCtx * ctx)
 
 IR * Region::simplifyBinAndUniExpression(IR * ir, SimpCtx * ctx)
 {
-    ASSERT0(ir && isBinAndUniExp(ir));
+    ASSERT0(ir && (ir->isBinaryOp() || ir->isUnaryOp()));
 
     if (ir->is_ild() && !SIMP_ild_ist(ctx)) { return ir; }
 
@@ -1452,7 +1417,7 @@ IR * Region::simplifyExpression(IR * ir, SimpCtx * ctx)
     case IR_GE:
     case IR_LE:
         return simplifyJudgeDet(ir, ctx);
-    case IR_ILD:
+    case IR_ILD:    
     case IR_BAND: //inclusive and &
     case IR_BOR: //inclusive or  |
     case IR_XOR: //exclusive or ^
@@ -1464,7 +1429,6 @@ IR * Region::simplifyExpression(IR * ir, SimpCtx * ctx)
     case IR_DIV:
     case IR_REM:
     case IR_MOD:
-    case IR_LABEL:
     case IR_ASR:
     case IR_LSR:
     case IR_LSL:

@@ -172,8 +172,14 @@ typedef enum {
 #define SWITCH_CASE_STMT_NO_KID \
 	SWITCH_CASE_STMT_IN_BB_NO_KID: \
 	case IR_BREAK: \
-	case IR_CASE: \
 	case IR_CONTINUE
+
+#define SWITCH_CASE_EXP_NO_KID \
+    case IR_ID: \
+    case IR_LD: \
+    case IR_PR: \
+    case IR_LDA: \
+    case IR_CONST
 
 //Describe miscellaneous information for IR.
 #define IRT_IS_STMT             0x1 //statement.
@@ -1130,7 +1136,7 @@ public:
 //    2. res = ild (p + ILD_ofst) if ILD_ofst is not 0.
 #define ILD_ofst(ir)        (((CIld*)CK_IRT(ir, IR_ILD))->field_offset)
 #define ILD_du(ir)          (((CIld*)CK_IRT(ir, IR_ILD))->du)
-#define ILD_base(ir)        (((CIld*)ir)->opnd[CKID_TY(ir, IR_ILD, 0)])
+#define ILD_base(ir)        ILD_kid(ir, 0)
 #define ILD_kid(ir, idx)    (((CIld*)ir)->opnd[CKID_TY(ir, IR_ILD, idx)])
 class CIld : public DuProp, public OffsetProp {
 public:
@@ -1157,7 +1163,7 @@ public:
 #define ST_idinfo(ir)        (((CSt*)CK_IRT(ir, IR_ST))->id_info)
 #define ST_ofst(ir)          (((CSt*)CK_IRT(ir, IR_ST))->field_offset)
 #define ST_du(ir)            (((CSt*)CK_IRT(ir, IR_ST))->du)
-#define ST_rhs(ir)           (((CSt*)ir)->opnd[CKID_TY(ir, IR_ST, 0)])
+#define ST_rhs(ir)           ST_kid(ir, 0)
 #define ST_kid(ir, idx)      (((CSt*)ir)->opnd[CKID_TY(ir, IR_ST, idx)])
 class CSt: public CLd, public StmtProp {
 public:
@@ -1172,7 +1178,7 @@ public:
 #define STPR_no(ir)         (((CStpr*)CK_IRT(ir, IR_STPR))->prno)
 #define STPR_ssainfo(ir)    (((CStpr*)CK_IRT(ir, IR_STPR))->ssainfo)
 #define STPR_du(ir)         (((CStpr*)CK_IRT(ir, IR_STPR))->du)
-#define STPR_rhs(ir)        (((CStpr*)ir)->opnd[CKID_TY(ir, IR_STPR, 0)])
+#define STPR_rhs(ir)        STPR_kid(ir, 0)
 #define STPR_kid(ir, idx)   (((CStpr*)ir)->opnd[CKID_TY(ir, IR_STPR, idx)])
 class CStpr: public DuProp, public StmtProp {
 public:
@@ -1200,9 +1206,9 @@ public:
 #define SETELEM_prno(ir)    (((CSetElem*)CK_IRT(ir, IR_SETELEM))->prno)
 #define SETELEM_ssainfo(ir) (((CSetElem*)CK_IRT(ir, IR_SETELEM))->ssainfo)
 #define SETELEM_du(ir)      (((CSetElem*)CK_IRT(ir, IR_SETELEM))->du)
-#define SETELEM_base(ir)    (((CSetElem*)ir)->opnd[CKID_TY(ir, IR_SETELEM, 0)])
-#define SETELEM_val(ir)     (((CSetElem*)ir)->opnd[CKID_TY(ir, IR_SETELEM, 1)])
-#define SETELEM_ofst(ir)    (((CSetElem*)ir)->opnd[CKID_TY(ir, IR_SETELEM, 2)])
+#define SETELEM_base(ir)    SETELEM_kid(ir, 0)
+#define SETELEM_val(ir)     SETELEM_kid(ir, 1)
+#define SETELEM_ofst(ir)    SETELEM_kid(ir, 2)
 #define SETELEM_kid(ir, idx)(((CSetElem*)ir)->opnd[CKID_TY(ir, IR_SETELEM, idx)])
 class CSetElem: public DuProp, public StmtProp {
 public:
@@ -1225,8 +1231,8 @@ public:
 #define GETELEM_prno(ir)    (((CGetElem*)CK_IRT(ir, IR_GETELEM))->prno)
 #define GETELEM_ssainfo(ir) (((CGetElem*)CK_IRT(ir, IR_GETELEM))->ssainfo)
 #define GETELEM_du(ir)      (((CGetElem*)CK_IRT(ir, IR_GETELEM))->du)
-#define GETELEM_base(ir)    (((CGetElem*)ir)->opnd[CKID_TY(ir, IR_GETELEM, 0)])
-#define GETELEM_ofst(ir)    (((CGetElem*)ir)->opnd[CKID_TY(ir, IR_GETELEM, 1)])
+#define GETELEM_base(ir)    GETELEM_kid(ir, 0)
+#define GETELEM_ofst(ir)    GETELEM_kid(ir, 1)
 #define GETELEM_kid(ir, idx)(((CGetElem*)ir)->opnd[CKID_TY(ir, IR_GETELEM, idx)])
 class CGetElem : public DuProp, public StmtProp {
 public:
@@ -1252,8 +1258,8 @@ public:
 #define IST_bb(ir)          (((CIst*)CK_IRT(ir, IR_IST))->bb)
 #define IST_ofst(ir)        (((CIst*)CK_IRT(ir, IR_IST))->field_offset)
 #define IST_du(ir)          (((CIst*)CK_IRT(ir, IR_IST))->du)
-#define IST_base(ir)        (((CIst*)ir)->opnd[CKID_TY(ir, IR_IST, 0)])
-#define IST_rhs(ir)         (((CIst*)ir)->opnd[CKID_TY(ir, IR_IST, 1)])
+#define IST_base(ir)        IST_kid(ir, 0)
+#define IST_rhs(ir)         IST_kid(ir, 1)
 #define IST_kid(ir, idx)    (((CIst*)ir)->opnd[CKID_TY(ir, IR_IST, idx)])
 class CIst : public DuProp, public OffsetProp, public StmtProp {
 public:
@@ -1306,9 +1312,9 @@ public:
 #define CALL_du(ir)              (((CCall*)CK_IRT_CALL(ir))->du)
 
 //Parameter list of call.
-#define CALL_param_list(ir)      (((CCall*)ir)->opnd[CKID_CALL(ir, 0)])
+#define CALL_param_list(ir)      CALL_kid(ir, 0)
 //Record dummy referenced IR.
-#define CALL_dummyuse(ir)        (((CCall*)ir)->opnd[CKID_CALL(ir, 1)])
+#define CALL_dummyuse(ir)        CALL_kid(ir, 1)
 #define CALL_kid(ir, idx)        (((CCall*)ir)->opnd[CKID_CALL(ir, idx)])
 class CCall : public DuProp, public VarProp, public StmtProp {
 public:
@@ -1382,8 +1388,8 @@ public:
 
 //Binary Operations, include add, sub, mul, div, rem, mod,
 //land, lor, band, bor, xor, lt, le, gt, ge, eq, ne, asr, lsr, lsl.
-#define BIN_opnd0(ir)        (((CBin*)ir)->opnd[CKID_BIN(ir, 0)])
-#define BIN_opnd1(ir)        (((CBin*)ir)->opnd[CKID_BIN(ir, 1)])
+#define BIN_opnd0(ir)        BIN_kid(ir, 0)
+#define BIN_opnd1(ir)        BIN_kid(ir, 1)
 #define BIN_kid(ir, idx)     (((CBin*)ir)->opnd[CKID_BIN(ir, idx)])
 class CBin : public IR {
 public:
@@ -1392,7 +1398,7 @@ public:
 
 
 //Unary Operations, include neg, bnot, lnot.
-#define UNA_opnd(ir)        (((CUna*)ir)->opnd[CKID_UNA(ir, 0)])
+#define UNA_opnd(ir)        UNA_kid(ir, 0)
 #define UNA_kid(ir, idx)    (((CUna*)ir)->opnd[CKID_UNA(ir, idx)])
 class CUna : public IR {
 public:
@@ -1416,10 +1422,10 @@ public:
 #define IGOTO_bb(ir)        (((CIGoto*)CK_IRT(ir, IR_IGOTO))->bb)
 
 //Value expression.
-#define IGOTO_vexp(ir)      (((CIGoto*)ir)->opnd[CKID_TY(ir, IR_IGOTO, 0)])
+#define IGOTO_vexp(ir)      IGOTO_kid(ir, 0)
 
 //Record a list pairs of <case-value, jump label>.
-#define IGOTO_case_list(ir) (((CIGoto*)ir)->opnd[CKID_TY(ir, IR_IGOTO, 1)])
+#define IGOTO_case_list(ir) IGOTO_kid(ir, 1)
 
 #define IGOTO_kid(ir, idx)  (((CIGoto*)ir)->opnd[CKID_TY(ir, IR_IGOTO, idx)])
 class CIGoto : public IR, public StmtProp {
@@ -1437,10 +1443,10 @@ public:
 //    * The member layout should be same as do_while.
 //    * 'opnd' must be the last member of CWhileDo.
 //Determinate expression.
-#define LOOP_det(ir)        (((CWhileDo*)ir)->opnd[CKID_LOOP(ir, 0)])
+#define LOOP_det(ir)        LOOP_kid(ir, 0)
 
 //Loop body.
-#define LOOP_body(ir)       (((CWhileDo*)ir)->opnd[CKID_LOOP(ir, 1)])
+#define LOOP_body(ir)       LOOP_kid(ir, 1)
 #define LOOP_kid(ir, idx)   (((CWhileDo*)ir)->opnd[CKID_LOOP(ir, idx)])
 class CWhileDo : public IR {
 public:
@@ -1506,9 +1512,9 @@ public:
 //      truebody
 //      falsebody
 //    endif
-#define IF_det(ir)          (((CIf*)ir)->opnd[CKID_TY(ir, IR_IF, 0)])
-#define IF_truebody(ir)     (((CIf*)ir)->opnd[CKID_TY(ir, IR_IF, 1)])
-#define IF_falsebody(ir)    (((CIf*)ir)->opnd[CKID_TY(ir, IR_IF, 2)])
+#define IF_det(ir)          IF_kid(ir, 0)
+#define IF_truebody(ir)     IF_kid(ir, 1)
+#define IF_falsebody(ir)    IF_kid(ir, 2)
 #define IF_kid(ir, idx)     (((CIf*)ir)->opnd[CKID_TY(ir, IR_IF, idx)])
 class CIf : public IR {
 public:
@@ -1540,13 +1546,13 @@ public:
 #define SWITCH_deflab(ir)    (((CSwitch*)CK_IRT(ir, IR_SWITCH))->default_label)
 
 //Value expression.
-#define SWITCH_vexp(ir)      (((CSwitch*)ir)->opnd[CKID_TY(ir, IR_SWITCH, 0)])
+#define SWITCH_vexp(ir)      SWITCH_kid(ir, 0)
 
 //Switch body.
-#define SWITCH_body(ir)      (((CSwitch*)ir)->opnd[CKID_TY(ir, IR_SWITCH, 1)])
+#define SWITCH_body(ir)      SWITCH_kid(ir, 1)
 
 //Record a list pair of <case-value, jump label>.
-#define SWITCH_case_list(ir) (((CSwitch*)ir)->opnd[CKID_TY(ir, IR_SWITCH, 2)])
+#define SWITCH_case_list(ir) SWITCH_kid(ir, 2)
 
 #define SWITCH_kid(ir, idx)  (((CSwitch*)ir)->opnd[CKID_TY(ir, IR_SWITCH, idx)])
 class CSwitch : public IR, public StmtProp {
@@ -1561,7 +1567,7 @@ public:
 #define CASE_lab(ir)         (((CCase*)CK_IRT(ir, IR_CASE))->jump_target_label)
 
 //Value expression.
-#define CASE_vexp(ir)        (((CCase*)ir)->opnd[CKID_TY(ir, IR_CASE, 0)])
+#define CASE_vexp(ir)        CASE_kid(ir, 0)
 
 #define CASE_kid(ir, idx)    (((CCase*)ir)->opnd[CKID_TY(ir, IR_CASE, idx)])
 class CCase : public IR {
@@ -1608,10 +1614,10 @@ public:
 #define ARR_elem_num_buf(ir)  (((CArray*)CK_IRT_ARR(ir))->elem_num)
 
 //Array base.
-#define ARR_base(ir)          (((CArray*)ir)->opnd[CKID_ARR(ir, 0)])
+#define ARR_base(ir)          ARR_kid(ir, 0)
 
 //Array subscript expression.
-#define ARR_sub_list(ir)      (((CArray*)ir)->opnd[CKID_ARR(ir, 1)])
+#define ARR_sub_list(ir)      ARR_kid(ir, 1)
 #define ARR_kid(ir, idx)      (((CArray*)ir)->opnd[CKID_ARR(ir, idx)])
 class CArray : public DuProp, public OffsetProp {
 public:
@@ -1745,7 +1751,7 @@ public:
 #define BR_lab(ir)           (((CTruebr*)CK_IRT_BR(ir))->jump_target_lab)
 
 //Determinant expression.
-#define BR_det(ir)           (((CTruebr*)ir)->opnd[CKID_BR(ir, 0)])
+#define BR_det(ir)           BR_kid(ir, 0)
 #define BR_kid(ir, idx)      (((CTruebr*)ir)->opnd[CKID_BR(ir, idx)])
 class CTruebr : public IR, public StmtProp {
 public:
@@ -1767,7 +1773,7 @@ public:
 //Return value expressions list.
 //usage: return a, b, c;  a, b, c are return value expressions.
 #define RET_bb(ir)           (((CRet*)CK_IRT(ir, IR_RETURN))->bb)
-#define RET_exp(ir)          (((CRet*)ir)->opnd[CKID_TY(ir, IR_RETURN, 0)])
+#define RET_exp(ir)          RET_kid(ir, 0)
 #define RET_kid(ir, idx)     (((CRet*)ir)->opnd[CKID_TY(ir, IR_RETURN, idx)])
 class CRet : public IR, public StmtProp {
 public:
@@ -1786,11 +1792,13 @@ public:
 //SELECT_trueexp, otherwise return SELECT_falseexp.
 
 //Predicator expression.
-#define SELECT_pred(ir)       (((CSelect*)ir)->opnd[CKID_TY(ir, IR_SELECT, 0)])
+#define SELECT_pred(ir)      SELECT_kid(ir, 0)
 
 //True part
-#define SELECT_trueexp(ir)   (((CSelect*)ir)->opnd[CKID_TY(ir, IR_SELECT, 1)])
-#define SELECT_falseexp(ir)  (((CSelect*)ir)->opnd[CKID_TY(ir, IR_SELECT, 2)])
+#define SELECT_trueexp(ir)   SELECT_kid(ir, 1)
+
+//False part
+#define SELECT_falseexp(ir)  SELECT_kid(ir, 2)
 #define SELECT_kid(ir, idx)  (((CSelect*)ir)->opnd[CKID_TY(ir, IR_SELECT, idx)])
 class CSelect : public IR {
 public:
@@ -1816,7 +1824,7 @@ class CContinue : public IR {};
 #define PHI_bb(ir)           (((CPhi*)CK_IRT(ir, IR_PHI))->bb)
 #define PHI_prno(ir)         (((CPhi*)CK_IRT(ir, IR_PHI))->prno)
 #define PHI_ssainfo(ir)      (((CPhi*)CK_IRT(ir, IR_PHI))->ssainfo)
-#define PHI_opnd_list(ir)    (((CPhi*)ir)->opnd[CKID_TY(ir, IR_PHI, 0)])
+#define PHI_opnd_list(ir)    PHI_kid(ir, 0)
 #define PHI_kid(ir, idx)     (((CPhi*)ir)->opnd[CKID_TY(ir, IR_PHI, idx)])
 class CPhi : public DuProp, public StmtProp {
 public:
@@ -1916,9 +1924,6 @@ IR * IR::getKid(UINT idx) const
 {
     switch (getCode()) {
     case IR_UNDEF: ASSERTN(0, ("ir should not be undef")); break;
-    case IR_CONST:
-    case IR_ID:
-    case IR_LD: return NULL;
     case IR_ST: return ST_kid(this, idx);
     case IR_STPR: return STPR_kid(this, idx);
     case IR_STARRAY: return ARR_kid(this, idx);
@@ -1926,52 +1931,25 @@ IR * IR::getKid(UINT idx) const
     case IR_GETELEM: return GETELEM_kid(this, idx);
     case IR_ILD: return ILD_kid(this, idx);
     case IR_IST: return IST_kid(this, idx);
-    case IR_LDA: return NULL;
     case IR_CALL: return CALL_kid(this, idx);
     case IR_ICALL: return ICALL_kid(this, idx);
-    case IR_ADD:
-    case IR_SUB:
-    case IR_MUL:
-    case IR_DIV:
-    case IR_REM:
-    case IR_MOD:
-    case IR_LAND:
-    case IR_LOR:
-    case IR_XOR:
-    case IR_LT:
-    case IR_LE:
-    case IR_GT:
-    case IR_GE:
-    case IR_EQ:
-    case IR_NE:
-    case IR_ASR:
-    case IR_LSR:
-    case IR_LSL:
-    case IR_BAND:
-    case IR_BOR: return BIN_kid(this, idx);
-    case IR_BNOT:
-    case IR_LNOT:
-    case IR_NEG: return UNA_kid(this, idx);
-    case IR_GOTO: return NULL;
+    SWITCH_CASE_BIN: return BIN_kid(this, idx);
+    SWITCH_CASE_UNA: return UNA_kid(this, idx);
     case IR_IGOTO: return IGOTO_kid(this, idx);
     case IR_DO_WHILE:
     case IR_WHILE_DO: return LOOP_kid(this, idx);
     case IR_DO_LOOP: return DOLOOP_kid(this, idx);
     case IR_IF: return IF_kid(this, idx);
-    case IR_LABEL: return NULL;
     case IR_SWITCH: return SWITCH_kid(this, idx);
     case IR_CASE: return CASE_kid(this, idx);
     case IR_ARRAY: return ARR_kid(this, idx);
-    case IR_CVT: return CVT_kid(this, idx);
-    case IR_PR: return NULL;
     case IR_TRUEBR:
     case IR_FALSEBR: return BR_kid(this, idx);
     case IR_RETURN: return RET_kid(this, idx);
     case IR_SELECT: return SELECT_kid(this, idx);
-    case IR_BREAK:
-    case IR_CONTINUE: return NULL;
+    SWITCH_CASE_EXP_NO_KID:
+    SWITCH_CASE_STMT_NO_KID: return NULL;
     case IR_PHI: return PHI_kid(this, idx);
-    case IR_REGION: return NULL;
     default: ASSERTN(0, ("Unknown IR type"));
     }
     return NULL;
@@ -2131,10 +2109,22 @@ void IR::setBB(IRBB * bb)
 void IR::setRHS(IR * rhs)
 {
     switch (getCode()) {
-    case IR_ST: ST_rhs(this) = rhs; return;
-    case IR_STPR: STPR_rhs(this) = rhs; return;
-    case IR_STARRAY: STARR_rhs(this) = rhs; return;
-    case IR_IST: IST_rhs(this) = rhs; return;
+    case IR_ST:
+		ST_rhs(this) = rhs;
+		IR_parent(rhs) = this;
+		return;
+    case IR_STPR:
+		STPR_rhs(this) = rhs;
+		IR_parent(rhs) = this;
+		return;
+    case IR_STARRAY:
+		STARR_rhs(this) = rhs;
+		IR_parent(rhs) = this;
+		return;
+    case IR_IST:
+		IST_rhs(this) = rhs;
+		IR_parent(rhs) = this;
+		return;
     default: ASSERTN(0, ("not store operation."));
     }
 }
@@ -2227,9 +2217,6 @@ void IR::setKid(UINT idx, IR * kid)
 {
     switch (getCode()) {
     case IR_UNDEF: ASSERTN(0, ("ir should not be undef")); return;
-    case IR_CONST:
-    case IR_ID:
-    case IR_LD: return; //No kids.
     case IR_ST: ST_kid(this, idx) = kid; break;
     case IR_STPR: STPR_kid(this, idx) = kid; break;
     case IR_STARRAY: ARR_kid(this, idx) = kid; break;
@@ -2237,52 +2224,25 @@ void IR::setKid(UINT idx, IR * kid)
     case IR_GETELEM: GETELEM_kid(this, idx) = kid; break;
     case IR_ILD: ILD_kid(this, idx) = kid; break;
     case IR_IST: IST_kid(this, idx) = kid; break;
-    case IR_LDA: return; //No kids.
     case IR_CALL: CALL_kid(this, idx) = kid; break;
     case IR_ICALL: ICALL_kid(this, idx) = kid; break;
-    case IR_ADD:
-    case IR_SUB:
-    case IR_MUL:
-    case IR_DIV:
-    case IR_REM:
-    case IR_MOD:
-    case IR_LAND:
-    case IR_LOR:
-    case IR_XOR:
-    case IR_LT:
-    case IR_LE:
-    case IR_GT:
-    case IR_GE:
-    case IR_EQ:
-    case IR_NE:
-    case IR_ASR:
-    case IR_LSR:
-    case IR_LSL:
-    case IR_BAND:
-    case IR_BOR: BIN_kid(this, idx) = kid; break;
-    case IR_BNOT:
-    case IR_LNOT:
-    case IR_NEG: UNA_kid(this, idx) = kid; break;
-    case IR_GOTO: return; //No kids.
+    SWITCH_CASE_BIN: BIN_kid(this, idx) = kid; break;
+    SWITCH_CASE_UNA: UNA_kid(this, idx) = kid; break;
+    SWITCH_CASE_EXP_NO_KID:
+    SWITCH_CASE_STMT_NO_KID: return;
     case IR_IGOTO: IGOTO_kid(this, idx) = kid; break;
     case IR_DO_WHILE:
     case IR_WHILE_DO: LOOP_kid(this, idx) = kid; break;
     case IR_DO_LOOP: DOLOOP_kid(this, idx) = kid; break;
     case IR_IF: IF_kid(this, idx) = kid; break;
-    case IR_LABEL: return; //No kids.
     case IR_SWITCH: SWITCH_kid(this, idx) = kid; break;
     case IR_CASE: CASE_kid(this, idx) = kid; break;
     case IR_ARRAY: ARR_kid(this, idx) = kid; break;
-    case IR_CVT: CVT_kid(this, idx) = kid; break;
-    case IR_PR: return; //No kids.
     case IR_TRUEBR:
     case IR_FALSEBR: BR_kid(this, idx) = kid; break;
     case IR_RETURN: RET_kid(this, idx) = kid; break;
     case IR_SELECT: SELECT_kid(this, idx) = kid; break;
-    case IR_BREAK:
-    case IR_CONTINUE: return; //No kids.
     case IR_PHI: PHI_kid(this, idx) = kid; break;
-    case IR_REGION: return; //No kids.
     default: ASSERTN(0, ("Unknown IR type"));
     }
 

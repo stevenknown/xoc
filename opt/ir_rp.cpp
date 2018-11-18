@@ -246,7 +246,8 @@ static void dump_delegate_tab(RefTab & dele_tab, TypeMgr * dm)
 void IR_RP::dump()
 {
     if (g_tfile == NULL) { return; }
-    note("\n==---- DUMP IR_RP ----==\n");
+    g_indent = 0;
+    note("\n==---- DUMP IR_RP '%s' ----==\n", m_ru->getRegionName());
 
     g_indent = 2;
     BBList * bbl = m_ru->getBBList();
@@ -2209,6 +2210,9 @@ bool IR_RP::perform(OptCtx & oc)
     }
 
 FIN:
+    if (g_is_dump_after_pass) {
+        dump();
+    }
     //buildLifeTime();
     //dump_mdlt();
     smpoolDelete(cspool);
