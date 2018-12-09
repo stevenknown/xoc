@@ -85,6 +85,17 @@ bool g_do_cfg_remove_unreach_bb = true;
 //    BB1: goto L2
 bool g_do_cfg_remove_trampolin_bb = true;
 
+//Perform cfg optimization: invert branch condition and
+//remove redundant trampoline bb.
+//e.g:
+//    truebr L4 | false L4
+//    goto L3
+//    L4
+//    ...
+//    L3:
+//    ...
+bool g_do_cfg_invert_condition_and_remove_trampolin_bb = true;
+
 //Perform cfg optimization: remove redundant branch.
 //e.g:
 //    BB1:

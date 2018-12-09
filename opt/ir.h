@@ -204,6 +204,7 @@ typedef enum {
 #define IRT_WRITE_PR            0x4000
 #define IRT_WRITE_WHOLE_PR      0x8000
 #define IRT_HAS_OFFSET          0x10000
+#define IRT_HAS_IDINFO          0x20000
 
 #define IRDES_code(m)              ((m).code)
 #define IRDES_name(m)              ((m).name)
@@ -223,6 +224,7 @@ typedef enum {
 #define IRDES_is_non_pr_memref(m)  (HAVE_FLAG(((m).attr), IRT_IS_NON_PR_MEMREF))
 #define IRDES_has_result(m)        (HAVE_FLAG(((m).attr), IRT_HAS_RESULT))
 #define IRDES_has_offset(m)        (HAVE_FLAG(((m).attr), IRT_HAS_OFFSET))
+#define IRDES_has_idinfo(m)        (HAVE_FLAG(((m).attr), IRT_HAS_IDINFO))
 #define IRDES_has_du(m)            (HAVE_FLAG(((m).attr), IRT_HAS_DU))
 #define IRDES_is_write_pr(m)       (HAVE_FLAG(((m).attr), IRT_WRITE_PR))
 #define IRDES_is_write_whole_pr(m) (HAVE_FLAG(((m).attr), IRT_WRITE_WHOLE_PR))
@@ -247,8 +249,16 @@ INT checkKidNumValid(IR const* ir, UINT n, CHAR const* file, INT lineno);
 INT checkKidNumValidCall(IR const* ir, UINT n, CHAR const* filename, INT line);
 INT checkKidNumValidArray(IR const* ir, UINT n, CHAR const* filename, INT line);
 INT checkKidNumValidLoop(IR const* ir, UINT n, CHAR const* filename, INT line);
-INT checkKidNumValidBranch(IR const* ir, UINT n, CHAR const* filename, INT line);
-INT checkKidNumValidBinary(IR const* ir, UINT n, CHAR const* filename, INT line);
+INT checkKidNumValidBranch(
+        IR const* ir,
+        UINT n,
+        CHAR const* filename,
+        INT line);
+INT checkKidNumValidBinary(
+        IR const* ir,
+        UINT n,
+        CHAR const* filename,
+        INT line);
 INT checkKidNumValidUnary(IR const* ir, UINT n, CHAR const* filename, INT line);
 INT checkKidNumIRtype(
         IR const* ir,
@@ -265,9 +275,60 @@ IR const* checkIRTOnlyIcall(IR const* ir);
 UINT checkArrayDimension(IR const* ir, UINT n);
 #endif
 
+//Defined rounding type that CVT operation used.
+typedef enum _ROUND_TYPE {
+    ROUND_UNDEF = 0,
+
+    //Rounding down (or take the floor, or round towards minus infinity)
+    ROUND_DOWN,
+
+    //Rounding up (or take the ceiling, or round towards plus infinity)
+    ROUND_UP,
+
+    //Rounding towards zero (or truncate, or round away from infinity)
+    ROUND_TOWARDS_ZERO,
+
+    //Rounding away from zero (or round towards infinity)
+    ROUND_AWAY_FROM_ZERO,
+
+    //Rounding to the nearest integer
+    ROUND_TO_NEAREST_INTEGER,
+
+    //Rounding half up
+    ROUND_HALF_UP,
+
+    //Rounding half down
+    ROUND_HALF_DOWN,
+
+    //Rounding half towards zero
+    ROUND_HALF_TOWARDS_ZERO,
+
+    //Rounding half away from zero
+    ROUND_HALF_AWAY_FROM_ZERO,
+
+    //Rounding half to even
+    ROUND_HALF_TO_EVEN,
+
+    //Rounding half to odd
+    ROUND_HALF_TO_ODD,
+    ROUND_TYPE_NUM,
+} ROUND_TYPE;
+
+#define ROUND_NAME(r) (ROUNDDESC_name(g_round_desc[(r)]))
+
+#define ROUNDDESC_type(r) ((r).type)
+#define ROUNDDESC_name(r) ((r).name)
+class RoundDesc {
+public:
+    //Note: do not change the layout of members because they are
+    //corresponding to the special initializing value.
+    ROUND_TYPE type;
+    CHAR const* name;
+};
 
 //Exported Variables.
 extern IRDesc const g_ir_desc[];
+extern RoundDesc const g_round_desc[];
 
 #ifdef _DEBUG_
 #define CK_KID_NUM(ir, n, f, l)            (checkKidNumValid(ir, n, f, l))
@@ -352,22 +413,33 @@ extern IRDesc const g_ir_desc[];
 //Record attached info container.
 #define IR_ai(ir)                ((ir)->attach_info_container)
 
-//True if current operation is atomic. If ir is atomic load, write or
-//read-modify-write.
-//Read barrier: such as LD/ILD/PR/ARRAY may be regarded as read
+//This flag describe concurrency semantics.
+//True if current operation is atomic. If ir is atomic load, atomic write or
+//atomic read-modify-write.
+//Read barrier: such as ID/LD/ILD/PR/ARRAY may be regarded as read
 //barrier if the flag is true.
 //Analogously, ST/STPR/IST/STARRAY/CALL may be regarded as write barrier.
+//NOTE: do NOT replace replace an atomic operation with a non-atomic operation.
 #define IR_is_atomic(ir)         ((ir)->is_atomic_op)
 
+//This flag describe concurrency semantics.
 //True if current operation is atomic read-modify-write.
 //For given variable, RMW operation read the old value, then compare
-//with new value, then write the new value to the variable. The write
-//operation may be failed. If the variable is volatile, one should
+//with new value, then write the new value to the variable, finally return
+//old value.
+//NOTE: The write operation may be failed.
+//
+//If the variable is volatile, one should
 //not change the order of this operation with other memory operations.
 //The flag can be used to represent safepoint in code generation, and
 //if it is, the IR modified/invalided each pointers previous defined,
 //and this cuts off the Def-Use chain of those pointers immediately
 //after the IR.
+//Usually, RMW could be simulated by IR_CALL with 3 arguments, e.g:
+//  call Opcode:i32, MemoryBase:ptr<valuetype>, NewValue:valuetype;
+//  where Opcode defined the RMW operations, MemoryBase is pointer that point to
+//  the memory location with valuetype that hold oldvalue, and NewValue is the
+//  value to be set.
 #define IR_is_read_mod_write(ir) ((ir)->is_read_mod_write)
 
 //True if ir has sideeffect. This flag often be used to prevent user
@@ -513,6 +585,7 @@ public:
     IR * get_next() const { return IR_next(this); }
     IR * get_prev() const { return IR_prev(this); }
     inline UINT getOffset() const; //Get byte offset if any.
+    inline VAR * getIdinfo() const; //Get idinfo if any.
     IR * getParent() const { return IR_parent(this); }
     inline IR * getKid(UINT idx) const;
     inline IRBB * getBB() const;
@@ -635,6 +708,9 @@ public:
 
     //Return true if ir has constant offset.
     bool hasOffset() const { return IRDES_has_offset(g_ir_desc[getCode()]); }
+
+    //Return true if ir has idinfo.
+    bool hasIdinfo() const { return IRDES_has_idinfo(g_ir_desc[getCode()]); }
 
     //Return true if ir has DU Info.
     bool hasDU() const { return IRDES_has_du(g_ir_desc[getCode()]); }
@@ -888,11 +964,11 @@ public:
     bool isMemoryRefNotOperatePR() const
     { return IRDES_is_non_pr_memref(g_ir_desc[getCode()]); }
 
-    //True if ir is atomic read-modify-write.
-    inline bool isReadModWrite() const;
-
     //True if ir is atomic operation.
     bool is_atomic() const { return IR_is_atomic(this); }
+
+    //True if ir is read-modify-write.
+    bool is_rmw() const { return IR_is_read_mod_write(this); }    
     bool is_judge() const { return is_relation() || is_logical(); }
     bool is_logical() const { return IRDES_is_logical(g_ir_desc[getCode()]); }
     bool is_relation() const { return IRDES_is_relation(g_ir_desc[getCode()]); }
@@ -951,6 +1027,7 @@ public:
 
     inline void setPrno(UINT prno);
     inline void setOffset(UINT ofst);
+    inline void setIdinfo(VAR * idinfo);
     inline void setLabel(LabelInfo const* li);
     inline void setBB(IRBB * bb);
     inline void setRHS(IR * rhs);
@@ -1696,12 +1773,10 @@ public:
 //If 'elem_tyid' is vector, ARR_ofst refers the referrenced element byte offset.
 #define STARR_bb(ir)        (((CStArray*)CK_IRT(ir, IR_STARRAY))->bb)
 #define STARR_rhs(ir)       (*(((CStArray*)ir)->opnd + CKID_TY(ir, IR_STARRAY, 0)))
-class CStArray: public CArray {
+class CStArray: public CArray, public StmtProp {
 public:
     //NOTE: 'opnd' must be the first member of CStArray.
     IR * opnd[1];
-
-    IRBB * bb;
 };
 
 
@@ -1709,8 +1784,12 @@ public:
 //Record the expression to be converted.
 #define CVT_exp(ir)         (UNA_opnd(ir))
 #define CVT_kid(ir, idx)    (UNA_kid(ir, idx))
+#define CVT_round(ir)       (((CCvt*)ir)->round)
 class CCvt : public CUna {
 public:
+   ROUND_TYPE round;
+
+public:    
     //Get the leaf expression.
     //e.g: cvt:i32(cvt:u8(x)), this function will return x;
     IR * getLeafExp()
@@ -1978,6 +2057,37 @@ IRBB * IR::getBB() const
     default: ASSERTN(0, ("This stmt can not be placed in basic block."));
     }
     return NULL;
+}
+
+
+VAR * IR::getIdinfo() const
+{
+    ASSERT0(hasIdinfo());
+	//DO NOT ASSERT even if current IR has no offset.
+    switch (getCode()) {
+    case IR_ID: return ID_info(this);
+    case IR_LD: return LD_idinfo(this);
+    case IR_LDA: return LDA_idinfo(this);
+    case IR_ST: return ST_idinfo(this);
+    case IR_CALL: return CALL_idinfo(this);
+    default: UNREACHABLE();
+    }
+    return NULL;
+}
+
+
+void IR::setIdinfo(VAR * idinfo)
+{
+    ASSERT0(hasIdinfo());
+	//DO NOT ASSERT even if current IR has no offset.
+    switch (getCode()) {
+    case IR_ID: ID_info(this) = idinfo; break;
+    case IR_LD: LD_idinfo(this) = idinfo; break;
+    case IR_LDA: LDA_idinfo(this) = idinfo; break;
+    case IR_ST: ST_idinfo(this) = idinfo; break;
+    case IR_CALL: CALL_idinfo(this) = idinfo; break;
+    default: UNREACHABLE();
+    }
 }
 
 
@@ -2259,32 +2369,12 @@ bool IR::isPREqual(IR const* src) const
 }
 
 
-bool IR::isReadModWrite() const
-{
-    if (IR_is_read_mod_write(this)) {
-        //Code pattern: $x = call(oldvalue, newvalue)
-        //oldvalue must be [ld].
-        //newvalue could be [ld|pr|const].
-        ASSERT0(is_call() &&
-                CALL_param_list(this) != NULL &&
-                CALL_param_list(this)->is_ld() &&
-                CALL_param_list(this)->get_next() != NULL &&
-                (CALL_param_list(this)->get_next()->is_ld() ||
-                 CALL_param_list(this)->get_next()->is_pr() ||
-                 CALL_param_list(this)->get_next()->is_const()) &&
-                CALL_prno(this) != 0);
-        return true;
-    }
-    return false;
-}
-
-
 //Check if 'exp' is child or grandchildren of current ir.
 //Here we only compare equality of two IR pointer to determine and apply
 //the DFS searching in tree.
 bool IR::is_kids(IR const* exp) const
 {
-    if (exp == NULL) return false;
+    if (exp == NULL) { return false; }
     IR * tmp;
     for (UINT i = 0; i < IR_MAX_KID_NUM(this); i++) {
         tmp = getKid(i);
@@ -2396,12 +2486,11 @@ DU * IR::cleanDU()
     case IR_GETELEM:
     case IR_IST:
     case IR_CALL:
-    case IR_ICALL:
-        {
-            DU * du = DUPROP_du(this);
-            DUPROP_du(this) = NULL;
-            return du;
-        }
+    case IR_ICALL: {
+        DU * du = DUPROP_du(this);
+        DUPROP_du(this) = NULL;
+        return du;
+    }
     default:;
     }
     return NULL;
@@ -2486,15 +2575,15 @@ void IR::setDU(DU * du)
 //Exported Functions.
 CHAR const* compositeName(SYM const* n, xcom::StrBuf & buf);
 void dumpIR(IR const* ir,
-            TypeMgr const* tm,
+            Region * rg, 
             CHAR * attr = NULL,
             UINT dumpflag = IR_DUMP_KID|IR_DUMP_SRC_LINE|IR_DUMP_INNER_REGION);
 void dumpIRList(IR * ir_list,
-                TypeMgr const* tm,
+                Region * rg,
                 CHAR * attr = NULL,
                 UINT dumpflag = IR_DUMP_KID|IR_DUMP_SRC_LINE|IR_DUMP_INNER_REGION);
-void dumpIRList(IRList & ir_list, TypeMgr const* tm);
-void dumpIRList(List<IR*> & ir_list, TypeMgr const* tm);
+void dumpIRList(IRList & ir_list, Region * rg);
+void dumpIRList(List<IR*> & ir_list, Region * rg);
 
 class DumpGRCtx {
 public:
@@ -2745,5 +2834,6 @@ bool allBeExp(IR * irlst);
 bool allBeStmt(IR * irlst);
 bool checkMaxIRType();
 bool checkIRDesc();
+bool checkRoundDesc();
 } //namespace xoc
 #endif

@@ -788,7 +788,7 @@ bool IRParser::parseStmtList(ParseCtx * ctx)
             return false;
         }
 
-        //dumpIRList(ctx->stmt_list, m_tm);
+        //dumpIRList(ctx->stmt_list, m_ru);
     }
     UNREACHABLE();
     return true;

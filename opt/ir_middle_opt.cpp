@@ -129,6 +129,11 @@ bool Region::performSimplify(OptCtx & oc)
             getDUMgr()->verifyMDDUChain(COMPUTE_PR_DU | COMPUTE_NOPR_DU));
     }
 
+    if (g_is_dump_after_pass) {
+        g_indent = 0;
+        note("\n==---- DUMP AFTER SIMPLIFY IRBB LIST ----==");
+        dumpBBList(getBBList(), this);
+    }
     return true;
 }
 

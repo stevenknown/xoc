@@ -648,6 +648,10 @@ public:
     //Return byte size according to given tyid.
     UINT get_bytesize(UINT tyid) const { return get_bytesize(getType(tyid)); }
 
+    //Return byte size according to given Type.
+    UINT get_bitsize(Type const* dtd) const
+    { return get_bytesize(dtd) * BITS_PER_BYTE; }
+
     bool is_scalar(UINT tyid) { return tyid >= D_B && tyid <= D_F128; }
 
     //Return true if tyid is signed.

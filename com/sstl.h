@@ -778,7 +778,7 @@ public:
             t = C_next(t);
         }
 
-        for (; t != T(0); t = C_next(t)) {
+        for (; t != NULL; t = C_next(t)) {
             C<T> * c  = newc();
             ASSERT0(c);
             C_val(c) = C_val(t);
@@ -865,7 +865,7 @@ public:
             t = C_prev(t);
         }
 
-        for (; t != T(0); t = C_prev(t)) {
+        for (; t != NULL; t = C_prev(t)) {
             C<T> * c  = newc();
             ASSERT0(c);
             C_val(c) = C_val(t);
@@ -2535,10 +2535,10 @@ public:
     Vector const& operator = (Vector const&);
     ~Vector() { destroy();    }
 
-    void add(T t)
+    void append(T t)
     {
         ASSERTN(is_init(), ("VECTOR not yet initialized."));
-        set(m_last_idx < 0 ? 0 : m_last_idx, t);
+        set(m_last_idx < 0 ? 0 : m_last_idx + 1, t);
     }
 
     inline void init()
@@ -3087,7 +3087,7 @@ public:
 
     UINT get_hash_value(OBJTY v, UINT bucket_size) const
     {
-        ASSERT_DUMMYUSE(sizeof(OBJTY) == sizeof(CHAR*),
+        ASSERTN_DUMMYUSE(sizeof(OBJTY) == sizeof(CHAR*),
             ("exception will taken place in type-cast"));
         return get_hash_value((CHAR const*)v, bucket_size);
     }
@@ -3097,7 +3097,7 @@ public:
 
     bool compare(CHAR const* s, OBJTY val) const
     {
-        ASSERT_DUMMYUSE(sizeof(OBJTY) == sizeof(CHAR const*),
+        ASSERTN_DUMMYUSE(sizeof(OBJTY) == sizeof(CHAR const*),
             ("exception will taken place in type-cast"));
         return (strcmp(s,  (CHAR const*)val) == 0);
     }

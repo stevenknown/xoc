@@ -47,15 +47,21 @@ template <typename T> int dummy_use(T const&) { return 0; }
 #define DUMMYUSE(v) xcom::dummy_use(v)
 
 #ifdef _DEBUG_
-#define CHECK_DUMMYUSE(a)    ASSERT0(a)
-#define ASSERT_DUMMYUSE(a, b)  \
-    ((a) ? DUMMYUSE(0) : (m022138(__FILE__, __LINE__), m518087 b))
+//Do assert at debug mode, and do dummyuse at release mode.
+#define CHECK_DUMMYUSE(a) ASSERT0(a)
+
+//Do both assert and dummyuse at debug mode, do dummyuse at release mode.
+#define ASSERTN_DUMMYUSE(a, b)  \
+    ((a) ? DUMMYUSE(a) : (m022138(__FILE__, __LINE__), m518087 b))
 #define ASSERT0_DUMMYUSE(a)  \
-    ((a) ? DUMMYUSE(0) : (m022138(__FILE__, __LINE__), m518087 ("")))
+    ((a) ? DUMMYUSE(a) : (m022138(__FILE__, __LINE__), m518087 ("")))
 #else
-#define CHECK_DUMMYUSE(a)    DUMMYUSE(a)
-#define ASSERT_DUMMYUSE(a, b)
-#define ASSERT0_DUMMYUSE(a)
+//Do assert at debug mode, and do dummyuse at release mode.
+#define CHECK_DUMMYUSE(a) DUMMYUSE(a)
+
+//Do both assert and dummyuse at debug mode, do dummyuse at release mode.
+#define ASSERTN_DUMMYUSE(a, b) DUMMYUSE(a)
+#define ASSERT0_DUMMYUSE(a) DUMMYUSE(a)
 #endif
 
 

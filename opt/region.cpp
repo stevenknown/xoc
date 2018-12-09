@@ -2881,8 +2881,9 @@ void Region::dump(bool dump_inner_region)
     IR * irlst = getIRList();
     if (irlst != NULL) {
         note("\n==---- IR List ----==");
-		dumpIRList(irlst, getTypeMgr(), NULL,
-			IR_DUMP_KID | IR_DUMP_SRC_LINE | (dump_inner_region ? IR_DUMP_INNER_REGION : 0));
+		dumpIRList(irlst, this, NULL,
+			IR_DUMP_KID | IR_DUMP_SRC_LINE |
+			(dump_inner_region ? IR_DUMP_INNER_REGION : 0));
         return;
     }
 
@@ -3657,22 +3658,22 @@ bool Region::partitionRegion()
         freeIRTree(t);
         inner_ru->addToIRList(inner_ir);
     }
-    dumpIRList(inner_ru->getIRList(), getTypeMgr());
+    dumpIRList(inner_ru->getIRList(), this);
     insertafter_one(&start_pos, ir_ru);
-    dumpIRList(getIRList(), getTypeMgr());
+    dumpIRList(getIRList(), this);
     //-------------
     OptCtx oc;
     bool succ = REGION_ru(ir_ru)->process(&oc);
     ASSERT0(succ);
     DUMMYUSE(succ);
 
-    dumpIRList(getIRList(), getTypeMgr());
+    dumpIRList(getIRList(), this);
 
     //Merger IR list in inner-region to outer region.
     //remove(&REGION_analysis_instrument(this)->m_ir_list, ir_ru);
     //IR * head = inner_ru->constructIRlist();
     //insertafter(&split_pos, dupIRTreeList(head));
-    //dumpIRList(getIRList());
+    //dumpIRList(getIRList(), this);
 
     delete inner_ru;
     return false;

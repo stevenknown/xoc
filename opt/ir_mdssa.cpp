@@ -175,7 +175,7 @@ void MDSSAMgr::dump()
 
         for (IR * ir = BB_first_ir(bb);
             ir != NULL; ir = BB_next_ir(bb)) {
-            dumpIR(ir, m_tm);
+            dumpIR(ir, m_ru);
             ir->dumpRef(m_ru, g_indent);
 
             bool parting_line = false;
@@ -188,7 +188,7 @@ void MDSSAMgr::dump()
                     note("\n----------------");
                     parting_line = true;
                 }
-                dumpIR(ir, m_tm, NULL, false);
+                dumpIR(ir, m_ru, NULL, false);
 
                 for (INT i = mdssainfo->getVOpndSet()->get_first(&iter);
                      i >= 0; i = mdssainfo->getVOpndSet()->get_next(i, &iter)) {
@@ -218,7 +218,7 @@ void MDSSAMgr::dump()
                     note("\n----------------");
                     parting_line = true;
                 }
-                dumpIR(opnd, m_tm, NULL, false);
+                dumpIR(opnd, m_ru, NULL, false);
                 note("\n--USE:");
                 bool first = true;
                 for (INT i = mdssainfo->getVOpndSet()->get_first(&iter);
@@ -469,7 +469,7 @@ void MDSSAMgr::dumpDUChain()
 
         for (IR * ir = BB_first_ir(bb);
              ir != NULL; ir = BB_next_ir(bb)) {
-            dumpIR(ir, m_tm);
+            dumpIR(ir, m_ru);
 
             bool parting_line = false;
             //Result
@@ -901,7 +901,7 @@ void MDSSAMgr::renameBB(IN IRBB * bb)
                 for (INT i = refset->get_first(&iter);
                      i >= 0; i = refset->get_next((UINT)i, &iter)) {
                     MD * md = m_md_sys->getMD(i);
-                    ASSERT0(md);
+                    CHECK_DUMMYUSE(md);
 
                     //In memory SSA, rename the MD even
                     //if it is ineffect to keep DU relation, e.g:

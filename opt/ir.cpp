@@ -39,135 +39,149 @@ namespace xoc {
 #define PADDR(ir) (dump_addr ? prt(" 0x%p", (ir)) : 0)
 
 IRDesc const g_ir_desc[] = {
-    {IR_UNDEF,    "undef",        0x0, 0, 0,
-     0,},
-    {IR_CONST,    "const",        0x0, 0, sizeof(CConst),
-     IRT_IS_LEAF,},
-    {IR_ID,       "id",           0x0, 0, sizeof(CId),
-     IRT_IS_LEAF|IRT_IS_NON_PR_MEMREF|IRT_HAS_DU,},
-    {IR_LD,       "ld",           0x0, 0, sizeof(CLd),
-     IRT_IS_MEM_REF|IRT_IS_MEM_OPND|IRT_IS_LEAF|
-     IRT_IS_NON_PR_MEMREF|IRT_HAS_DU|IRT_HAS_OFFSET,},
-    {IR_ILD,      "ild",          0x1, 1, sizeof(CIld),
-     IRT_IS_UNA|IRT_IS_MEM_REF|IRT_IS_MEM_OPND|
-     IRT_IS_NON_PR_MEMREF|IRT_HAS_DU|IRT_HAS_OFFSET,  },
-    {IR_PR,       "pr",           0x0, 0, sizeof(CPr),
-     IRT_IS_MEM_REF|IRT_IS_MEM_OPND|IRT_IS_LEAF|IRT_HAS_DU,},
-    {IR_ARRAY,    "array",        0x3, 2, sizeof(CArray),
-     IRT_IS_MEM_REF|IRT_IS_MEM_OPND|IRT_IS_NON_PR_MEMREF|
-     IRT_HAS_DU|IRT_HAS_OFFSET, },
-    {IR_ST,       "st",           0x1, 1, sizeof(CSt),
-     IRT_IS_STMT|IRT_IS_MEM_REF|IRT_HAS_RESULT|
-     IRT_IS_STMT_IN_BB|IRT_IS_NON_PR_MEMREF|IRT_HAS_DU|IRT_HAS_OFFSET, },
-    {IR_STPR,     "stpr",         0x1, 1, sizeof(CStpr),
-     IRT_IS_STMT|IRT_IS_MEM_REF|IRT_HAS_RESULT|
-     IRT_IS_STMT_IN_BB|IRT_HAS_DU|IRT_WRITE_PR|IRT_WRITE_WHOLE_PR, },
-    {IR_STARRAY,  "starray",      0x7, 3, sizeof(CStArray),
-     IRT_IS_STMT|IRT_IS_MEM_REF|IRT_HAS_RESULT|
-     IRT_IS_STMT_IN_BB|IRT_IS_NON_PR_MEMREF|IRT_HAS_DU|IRT_HAS_OFFSET, },
-    {IR_IST,      "ist",          0x3, 2, sizeof(CIst),
-     IRT_IS_STMT|IRT_IS_MEM_REF|IRT_HAS_RESULT|
-     IRT_IS_STMT_IN_BB|IRT_IS_NON_PR_MEMREF|IRT_HAS_DU|IRT_HAS_OFFSET, },
-    {IR_SETELEM,  "setelem",      0x7, 3, sizeof(CSetElem),
-     IRT_IS_STMT|IRT_IS_MEM_REF|IRT_HAS_RESULT|
-     IRT_IS_STMT_IN_BB|IRT_HAS_DU|IRT_WRITE_PR, },
-    {IR_GETELEM,  "getelem",      0x3, 2, sizeof(CGetElem),
-     IRT_IS_STMT|IRT_IS_MEM_REF|IRT_HAS_RESULT|
-     IRT_IS_STMT_IN_BB|IRT_HAS_DU|IRT_WRITE_PR|IRT_WRITE_WHOLE_PR, },
-    {IR_CALL,     "call",         0x3, 2, sizeof(CCall),
-     IRT_IS_STMT|IRT_IS_MEM_REF|IRT_HAS_RESULT|
-     IRT_IS_STMT_IN_BB|IRT_HAS_DU, },
-    {IR_ICALL,    "icall",        0x7, 3, sizeof(CICall),
-     IRT_IS_STMT|IRT_IS_MEM_REF|IRT_HAS_RESULT|
-     IRT_IS_STMT_IN_BB|IRT_HAS_DU, },
-    {IR_LDA,      "lda",          0x0, 0, sizeof(CLda),
-     IRT_IS_UNA|IRT_IS_LEAF|IRT_HAS_OFFSET, },
-    {IR_ADD,      "add",          0x3, 2, sizeof(CBin),
-     IRT_IS_BIN|IRT_IS_ASSOCIATIVE|IRT_IS_COMMUTATIVE, },
-    {IR_SUB,      "sub",          0x3, 2, sizeof(CBin),
-     IRT_IS_BIN|IRT_IS_ASSOCIATIVE, },
-    {IR_MUL,      "mul",          0x3, 2, sizeof(CBin),
-     IRT_IS_BIN|IRT_IS_ASSOCIATIVE|IRT_IS_COMMUTATIVE, },
-    {IR_DIV,      "div",          0x3, 2, sizeof(CBin),
-     IRT_IS_BIN, },
-    {IR_REM,      "rem",          0x3, 2, sizeof(CBin),
-     IRT_IS_BIN, },
-    {IR_MOD,      "mod",          0x3, 2, sizeof(CBin),
-     IRT_IS_BIN, },
-    {IR_LAND,     "land",         0x3, 2, sizeof(CBin),
-     IRT_IS_BIN|IRT_IS_LOGICAL, },
-    {IR_LOR,      "lor",          0x3, 2, sizeof(CBin),
-     IRT_IS_BIN|IRT_IS_LOGICAL, },
-    {IR_BAND,     "band",         0x3, 2, sizeof(CBin),
-     IRT_IS_BIN|IRT_IS_ASSOCIATIVE|IRT_IS_COMMUTATIVE, },
-    {IR_BOR,      "bor",          0x3, 2, sizeof(CBin),
-     IRT_IS_BIN|IRT_IS_ASSOCIATIVE, },
-    {IR_XOR,      "xor",          0x3, 2, sizeof(CBin),
-     IRT_IS_BIN|IRT_IS_ASSOCIATIVE|IRT_IS_COMMUTATIVE,},
-    {IR_ASR,      "asr",          0x3, 2, sizeof(CBin),
-     IRT_IS_BIN, },
-    {IR_LSR,      "lsr",          0x3, 2, sizeof(CBin),
-     IRT_IS_BIN, },
-    {IR_LSL,      "lsl",          0x3, 2, sizeof(CBin),
-     IRT_IS_BIN, },
-    {IR_LT,       "lt",           0x3, 2, sizeof(CBin),
-     IRT_IS_BIN|IRT_IS_RELATION, },
-    {IR_LE,       "le",           0x3, 2, sizeof(CBin),
-     IRT_IS_BIN|IRT_IS_RELATION, },
-    {IR_GT,       "gt",           0x3, 2, sizeof(CBin),
-     IRT_IS_BIN|IRT_IS_RELATION, },
-    {IR_GE,       "ge",           0x3, 2, sizeof(CBin),
-     IRT_IS_BIN|IRT_IS_RELATION, },
-    {IR_EQ,       "eq",           0x3, 2, sizeof(CBin),
-     IRT_IS_BIN|IRT_IS_ASSOCIATIVE|IRT_IS_COMMUTATIVE|IRT_IS_RELATION,},
-    {IR_NE,       "ne",           0x3, 2, sizeof(CBin),
-     IRT_IS_BIN|IRT_IS_ASSOCIATIVE|IRT_IS_COMMUTATIVE|IRT_IS_RELATION,},
-    {IR_BNOT,     "bnot",         0x1, 1, sizeof(CUna),
-     IRT_IS_UNA, },
-    {IR_LNOT,     "lnot",         0x1, 1, sizeof(CUna),
-     IRT_IS_UNA|IRT_IS_LOGICAL, },
-    {IR_NEG,      "neg",          0x1, 1, sizeof(CUna),
-     IRT_IS_UNA, },
-    {IR_CVT,      "cvt",          0x1, 1, sizeof(CCvt),
-     IRT_IS_UNA, },
-    {IR_GOTO,     "goto",         0x0, 0, sizeof(CGoto),
-     IRT_IS_STMT|IRT_IS_STMT_IN_BB, },
-    {IR_IGOTO,    "igoto",        0x3, 2, sizeof(CIGoto),
-     IRT_IS_STMT|IRT_IS_STMT_IN_BB, },
-    {IR_DO_WHILE, "dowhile",      0x3, 2, sizeof(CDoWhile),
-     IRT_IS_STMT, },
-    {IR_WHILE_DO, "whiledo",      0x3, 2, sizeof(CWhileDo),
-     IRT_IS_STMT, },
-    {IR_DO_LOOP,  "doloop",       0x1F,5, sizeof(CDoLoop),
-     IRT_IS_STMT, },
-    {IR_IF,       "if",           0x7, 3, sizeof(CIf),
-     IRT_IS_STMT, },
-    {IR_LABEL,    "label",        0x0, 0, sizeof(CLab),
-     IRT_IS_STMT, },
-    {IR_SWITCH,   "switch",       0x7, 3, sizeof(CSwitch),
-     IRT_IS_STMT|IRT_IS_STMT_IN_BB, },
-    {IR_CASE,     "case",         0x1, 1, sizeof(CCase),
-     0, },
-    {IR_TRUEBR,   "truebr",       0x1, 1, sizeof(CTruebr),
-     IRT_IS_STMT|IRT_IS_STMT_IN_BB, },
-    {IR_FALSEBR,  "falsebr",      0x1, 1, sizeof(CFalsebr),
-     IRT_IS_STMT|IRT_IS_STMT_IN_BB, },
-    {IR_RETURN,   "return",       0x1, 1, sizeof(CRet),
-     IRT_IS_STMT|IRT_IS_STMT_IN_BB, },
-    {IR_SELECT,   "select",       0x7, 3, sizeof(CSelect),
-     0, },
-    {IR_BREAK,    "break",        0x0, 0, sizeof(CBreak),
-     IRT_IS_STMT, },
-    {IR_CONTINUE, "continue",     0x0, 0, sizeof(CContinue),
-     IRT_IS_STMT, },
-    {IR_PHI,      "phi",          0x1, 1, sizeof(CPhi),
-     IRT_IS_STMT|IRT_HAS_RESULT|IRT_IS_MEM_REF|
-     IRT_IS_STMT_IN_BB|IRT_HAS_DU|IRT_WRITE_PR|IRT_WRITE_WHOLE_PR, },
-    {IR_REGION,   "region",       0x0, 0, sizeof(CRegion),
-     IRT_IS_STMT|IRT_IS_STMT_IN_BB, },
-    {IR_TYPE_NUM, "LAST IR Code", 0x0, 0, 0, 0, },
+    { IR_UNDEF,    "undef",        0x0, 0, 0,
+      0,},
+    { IR_CONST,    "const",        0x0, 0, sizeof(CConst),
+      IRT_IS_LEAF,},
+    { IR_ID,       "id",           0x0, 0, sizeof(CId),
+      IRT_HAS_IDINFO|IRT_IS_LEAF|IRT_IS_NON_PR_MEMREF|IRT_HAS_DU,},
+    { IR_LD,       "ld",           0x0, 0, sizeof(CLd),
+      IRT_HAS_IDINFO|IRT_IS_MEM_REF|IRT_IS_MEM_OPND|IRT_IS_LEAF|
+      IRT_IS_NON_PR_MEMREF|IRT_HAS_DU|IRT_HAS_OFFSET,},
+    { IR_ILD,      "ild",          0x1, 1, sizeof(CIld),
+      IRT_IS_UNA|IRT_IS_MEM_REF|IRT_IS_MEM_OPND|
+      IRT_IS_NON_PR_MEMREF|IRT_HAS_DU|IRT_HAS_OFFSET,  },
+    { IR_PR,       "pr",           0x0, 0, sizeof(CPr),
+      IRT_IS_MEM_REF|IRT_IS_MEM_OPND|IRT_IS_LEAF|IRT_HAS_DU,},
+    { IR_ARRAY,    "array",        0x3, 2, sizeof(CArray),
+      IRT_IS_MEM_REF|IRT_IS_MEM_OPND|IRT_IS_NON_PR_MEMREF|
+      IRT_HAS_DU|IRT_HAS_OFFSET, },
+    { IR_ST,       "st",           0x1, 1, sizeof(CSt),
+      IRT_HAS_IDINFO|IRT_IS_STMT|IRT_IS_MEM_REF|IRT_HAS_RESULT|
+      IRT_IS_STMT_IN_BB|IRT_IS_NON_PR_MEMREF|IRT_HAS_DU|IRT_HAS_OFFSET, },
+    { IR_STPR,     "stpr",         0x1, 1, sizeof(CStpr),
+      IRT_IS_STMT|IRT_IS_MEM_REF|IRT_HAS_RESULT|
+      IRT_IS_STMT_IN_BB|IRT_HAS_DU|IRT_WRITE_PR|IRT_WRITE_WHOLE_PR, },
+    { IR_STARRAY,  "starray",      0x7, 3, sizeof(CStArray),
+      IRT_IS_STMT|IRT_IS_MEM_REF|IRT_HAS_RESULT|
+      IRT_IS_STMT_IN_BB|IRT_IS_NON_PR_MEMREF|IRT_HAS_DU|IRT_HAS_OFFSET, },
+    { IR_IST,      "ist",          0x3, 2, sizeof(CIst),
+      IRT_IS_STMT|IRT_IS_MEM_REF|IRT_HAS_RESULT|
+      IRT_IS_STMT_IN_BB|IRT_IS_NON_PR_MEMREF|IRT_HAS_DU|IRT_HAS_OFFSET, },
+    { IR_SETELEM,  "setelem",      0x7, 3, sizeof(CSetElem),
+      IRT_IS_STMT|IRT_IS_MEM_REF|IRT_HAS_RESULT|
+      IRT_IS_STMT_IN_BB|IRT_HAS_DU|IRT_WRITE_PR, },
+    { IR_GETELEM,  "getelem",      0x3, 2, sizeof(CGetElem),
+      IRT_IS_STMT|IRT_IS_MEM_REF|IRT_HAS_RESULT|
+      IRT_IS_STMT_IN_BB|IRT_HAS_DU|IRT_WRITE_PR|IRT_WRITE_WHOLE_PR, },
+    { IR_CALL,     "call",         0x3, 2, sizeof(CCall),
+      IRT_IS_STMT|IRT_IS_MEM_REF|IRT_HAS_RESULT|
+      IRT_HAS_IDINFO|IRT_IS_STMT_IN_BB|IRT_HAS_DU, },
+    { IR_ICALL,    "icall",        0x7, 3, sizeof(CICall),
+      IRT_IS_STMT|IRT_IS_MEM_REF|IRT_HAS_RESULT|
+      IRT_IS_STMT_IN_BB|IRT_HAS_DU, },
+    { IR_LDA,      "lda",          0x0, 0, sizeof(CLda),
+      IRT_HAS_IDINFO|IRT_IS_UNA|IRT_IS_LEAF|IRT_HAS_OFFSET, },
+    { IR_ADD,      "add",          0x3, 2, sizeof(CBin),
+      IRT_IS_BIN|IRT_IS_ASSOCIATIVE|IRT_IS_COMMUTATIVE, },
+    { IR_SUB,      "sub",          0x3, 2, sizeof(CBin),
+      IRT_IS_BIN|IRT_IS_ASSOCIATIVE, },
+    { IR_MUL,      "mul",          0x3, 2, sizeof(CBin),
+      IRT_IS_BIN|IRT_IS_ASSOCIATIVE|IRT_IS_COMMUTATIVE, },
+    { IR_DIV,      "div",          0x3, 2, sizeof(CBin),
+      IRT_IS_BIN, },
+    { IR_REM,      "rem",          0x3, 2, sizeof(CBin),
+      IRT_IS_BIN, },
+    { IR_MOD,      "mod",          0x3, 2, sizeof(CBin),
+      IRT_IS_BIN, },
+    { IR_LAND,     "land",         0x3, 2, sizeof(CBin),
+      IRT_IS_BIN|IRT_IS_LOGICAL, },
+    { IR_LOR,      "lor",          0x3, 2, sizeof(CBin),
+      IRT_IS_BIN|IRT_IS_LOGICAL, },
+    { IR_BAND,     "band",         0x3, 2, sizeof(CBin),
+      IRT_IS_BIN|IRT_IS_ASSOCIATIVE|IRT_IS_COMMUTATIVE, },
+    { IR_BOR,      "bor",          0x3, 2, sizeof(CBin),
+      IRT_IS_BIN|IRT_IS_ASSOCIATIVE, },
+    { IR_XOR,      "xor",          0x3, 2, sizeof(CBin),
+      IRT_IS_BIN|IRT_IS_ASSOCIATIVE|IRT_IS_COMMUTATIVE,},
+    { IR_ASR,      "asr",          0x3, 2, sizeof(CBin),
+      IRT_IS_BIN, },
+    { IR_LSR,      "lsr",          0x3, 2, sizeof(CBin),
+      IRT_IS_BIN, },
+    { IR_LSL,      "lsl",          0x3, 2, sizeof(CBin),
+      IRT_IS_BIN, },
+    { IR_LT,       "lt",           0x3, 2, sizeof(CBin),
+      IRT_IS_BIN|IRT_IS_RELATION, },
+    { IR_LE,       "le",           0x3, 2, sizeof(CBin),
+      IRT_IS_BIN|IRT_IS_RELATION, },
+    { IR_GT,       "gt",           0x3, 2, sizeof(CBin),
+      IRT_IS_BIN|IRT_IS_RELATION, },
+    { IR_GE,       "ge",           0x3, 2, sizeof(CBin),
+      IRT_IS_BIN|IRT_IS_RELATION, },
+    { IR_EQ,       "eq",           0x3, 2, sizeof(CBin),
+      IRT_IS_BIN|IRT_IS_ASSOCIATIVE|IRT_IS_COMMUTATIVE|IRT_IS_RELATION,},
+    { IR_NE,       "ne",           0x3, 2, sizeof(CBin),
+      IRT_IS_BIN|IRT_IS_ASSOCIATIVE|IRT_IS_COMMUTATIVE|IRT_IS_RELATION,},
+    { IR_BNOT,     "bnot",         0x1, 1, sizeof(CUna),
+      IRT_IS_UNA, },
+    { IR_LNOT,     "lnot",         0x1, 1, sizeof(CUna),
+      IRT_IS_UNA|IRT_IS_LOGICAL, },
+    { IR_NEG,      "neg",          0x1, 1, sizeof(CUna),
+      IRT_IS_UNA, },
+    { IR_CVT,      "cvt",          0x1, 1, sizeof(CCvt),
+      IRT_IS_UNA, },
+    { IR_GOTO,     "goto",         0x0, 0, sizeof(CGoto),
+      IRT_IS_STMT|IRT_IS_STMT_IN_BB, },
+    { IR_IGOTO,    "igoto",        0x3, 2, sizeof(CIGoto),
+      IRT_IS_STMT|IRT_IS_STMT_IN_BB, },
+    { IR_DO_WHILE, "dowhile",      0x3, 2, sizeof(CDoWhile),
+      IRT_IS_STMT, },
+    { IR_WHILE_DO, "whiledo",      0x3, 2, sizeof(CWhileDo),
+      IRT_IS_STMT, },
+    { IR_DO_LOOP,  "doloop",       0x1F,5, sizeof(CDoLoop),
+      IRT_IS_STMT, },
+    { IR_IF,       "if",           0x7, 3, sizeof(CIf),
+      IRT_IS_STMT, },
+    { IR_LABEL,    "label",        0x0, 0, sizeof(CLab),
+      IRT_IS_STMT, },
+    { IR_SWITCH,   "switch",       0x7, 3, sizeof(CSwitch),
+      IRT_IS_STMT|IRT_IS_STMT_IN_BB, },
+    { IR_CASE,     "case",         0x1, 1, sizeof(CCase),
+      0, },
+    { IR_TRUEBR,   "truebr",       0x1, 1, sizeof(CTruebr),
+      IRT_IS_STMT|IRT_IS_STMT_IN_BB, },
+    { IR_FALSEBR,  "falsebr",      0x1, 1, sizeof(CFalsebr),
+      IRT_IS_STMT|IRT_IS_STMT_IN_BB, },
+    { IR_RETURN,   "return",       0x1, 1, sizeof(CRet),
+      IRT_IS_STMT|IRT_IS_STMT_IN_BB, },
+    { IR_SELECT,   "select",       0x7, 3, sizeof(CSelect),
+      0, },
+    { IR_BREAK,    "break",        0x0, 0, sizeof(CBreak),
+      IRT_IS_STMT, },
+    { IR_CONTINUE, "continue",     0x0, 0, sizeof(CContinue),
+      IRT_IS_STMT, },
+    { IR_PHI,      "phi",          0x1, 1, sizeof(CPhi),
+      IRT_IS_STMT|IRT_HAS_RESULT|IRT_IS_MEM_REF|
+      IRT_IS_STMT_IN_BB|IRT_HAS_DU|IRT_WRITE_PR|IRT_WRITE_WHOLE_PR, },
+    { IR_REGION,   "region",       0x0, 0, sizeof(CRegion),
+      IRT_IS_STMT|IRT_IS_STMT_IN_BB, },
+    { IR_TYPE_NUM, "LAST IR Code", 0x0, 0, 0, 0, },
 };
 
+RoundDesc const g_round_desc[] = {
+    { ROUND_UNDEF, "undef" },
+    { ROUND_DOWN, "down" },
+    { ROUND_UP, "up" },
+    { ROUND_TOWARDS_ZERO, "twards_zero" },
+    { ROUND_AWAY_FROM_ZERO, "awayfromzero" },
+    { ROUND_TO_NEAREST_INTEGER, "tonearestinteger" },
+    { ROUND_HALF_UP, "halfup" },
+    { ROUND_HALF_DOWN, "halfdown" },
+    { ROUND_HALF_TOWARDS_ZERO, "halftowardszero" },
+    { ROUND_HALF_AWAY_FROM_ZERO, "halfawayfromzero" },
+    { ROUND_HALF_TO_EVEN, "halftoeven" },
+    { ROUND_HALF_TO_ODD, "halftoodd" },
+};
 
 #ifdef _DEBUG_
 bool allBeStmt(IR * irlst)
@@ -338,7 +352,7 @@ UINT checkStArrayDimension(IR const* ir, UINT n)
 
 //Dump IR, and both its kids and siblings.
 void dumpIRList(IR * ir_list,
-                TypeMgr const* tm,
+                Region * rg,
                 CHAR * attr,
                 UINT dumpflag)
 {
@@ -348,9 +362,9 @@ void dumpIRList(IR * ir_list,
     for (; ir_list != NULL; ir_list = ir_list->get_next()) {
         if (first_one) {
             first_one = false;
-            dumpIR(ir_list, tm, attr, dumpflag);
+            dumpIR(ir_list, rg, attr, dumpflag);
         } else {
-            dumpIR(ir_list, tm, attr, dumpflag);
+            dumpIR(ir_list, rg, attr, dumpflag);
         }
     }
 }
@@ -441,23 +455,23 @@ bool verifyIRList(IR * ir, IRAddressHash * irh, Region const* rg)
 }
 
 
-void dumpIRList(IN List<IR*> & ir_list, TypeMgr const* tm)
+void dumpIRList(IN List<IR*> & ir_list, Region * rg)
 {
     if (g_tfile == NULL) { return; }
     note("\n==---- DUMP IR List ----==\n");
-    ASSERT0(tm);
+    ASSERT0(rg);
     for (IR * ir = ir_list.get_head();
          ir != NULL; ir = ir_list.get_next()) {
         ASSERT0(ir->is_single());
-        dumpIR(ir, tm);
+        dumpIR(ir, rg);
     }
     fflush(g_tfile);
 }
 
 
-void dumpIRList(IRList & ir_list, TypeMgr const* tm)
+void dumpIRList(IRList & ir_list, Region * rg)
 {
-    dumpIRList((List<IR*>&)ir_list, tm);
+    dumpIRList((List<IR*>&)ir_list, rg);
 }
 
 
@@ -559,10 +573,7 @@ static void dump_ai(OUT CHAR * buf, IR const* ir)
 
 //Dump IR and all of its kids.
 //'attr': miscellaneous string which following 'ir'.
-void dumpIR(IR const* ir,
-            TypeMgr const* tm,
-            IN CHAR * attr,
-            UINT dumpflag)
+void dumpIR(IR const* ir, Region * rg, IN CHAR * attr, UINT dumpflag)
 {
     bool dump_addr = HAVE_FLAG(dumpflag, IR_DUMP_ADDR);
     bool dump_src_line = HAVE_FLAG(dumpflag, IR_DUMP_SRC_LINE);
@@ -573,8 +584,9 @@ void dumpIR(IR const* ir,
     DUMMYUSE(dump_addr);
 	DUMMYUSE(dump_inner_region);
     DUMMYUSE(attr);
-    DUMMYUSE(tm);
+    DUMMYUSE(rg);
     DUMMYUSE(ir);
+    TypeMgr * tm = rg->getTypeMgr();
 
     ASSERT0(tm);
     UINT dn = 4;
@@ -601,7 +613,7 @@ void dumpIR(IR const* ir,
     if (ir->is_atomic()) {
         strcat(p, " atom");
     }
-    if (ir->isReadModWrite()) {
+    if (ir->is_rmw()) {
         strcat(p, " rmw");
     }
     if (ir->hasSideEffect()) {
@@ -652,7 +664,7 @@ void dumpIR(IR const* ir,
 
         if (dump_kid) {
             g_indent += dn;
-            dumpIRList(ST_rhs(ir), tm, NULL, dumpflag);
+            dumpIRList(ST_rhs(ir), rg, NULL, dumpflag);
             g_indent -= dn;
         }
         break;
@@ -664,7 +676,7 @@ void dumpIR(IR const* ir,
 
         if (dump_kid) {
             g_indent += dn;
-            dumpIRList(STPR_rhs(ir), tm, NULL, dumpflag);
+            dumpIRList(STPR_rhs(ir), rg, NULL, dumpflag);
             g_indent -= dn;
         }
         break;
@@ -674,9 +686,9 @@ void dumpIR(IR const* ir,
         prt("%s", attr);
         if (dump_kid) {
             g_indent += dn;
-            dumpIRList(SETELEM_base(ir), tm, NULL, dumpflag);
-            dumpIRList(SETELEM_val(ir), tm, NULL, dumpflag);
-            dumpIRList(SETELEM_ofst(ir), tm, (CHAR*)" offset", dumpflag);
+            dumpIRList(SETELEM_base(ir), rg, NULL, dumpflag);
+            dumpIRList(SETELEM_val(ir), rg, NULL, dumpflag);
+            dumpIRList(SETELEM_ofst(ir), rg, (CHAR*)" offset", dumpflag);
             g_indent -= dn;
         }
         break;
@@ -686,8 +698,8 @@ void dumpIR(IR const* ir,
         prt("%s", attr);
         if (dump_kid) {
             g_indent += dn;
-            dumpIRList(GETELEM_base(ir), tm, (CHAR*)" base", dumpflag);
-            dumpIRList(GETELEM_ofst(ir), tm, (CHAR*)" offset", dumpflag);
+            dumpIRList(GETELEM_base(ir), rg, (CHAR*)" base", dumpflag);
+            dumpIRList(GETELEM_ofst(ir), rg, (CHAR*)" offset", dumpflag);
             g_indent -= dn;
         }
         break;
@@ -729,15 +741,15 @@ void dumpIR(IR const* ir,
                  sub != NULL; sub = sub->get_next()) {
                 CHAR tt[40];
                 sprintf(tt, " dim%d", dim);
-                dumpIR(sub, tm, (CHAR*)tt, dumpflag);
+                dumpIR(sub, rg, (CHAR*)tt, dumpflag);
                 dim++;
             }
             g_indent -= dn;
         }
         if (dump_kid) {
             g_indent += dn;
-            dumpIRList(ARR_base(ir), tm, (CHAR*)" array_base", dumpflag);
-            dumpIRList(STARR_rhs(ir), tm, (CHAR*)" rhs", dumpflag);
+            dumpIRList(ARR_base(ir), rg, (CHAR*)" array_base", dumpflag);
+            dumpIRList(STARR_rhs(ir), rg, (CHAR*)" rhs", dumpflag);
             g_indent -= dn;
         }
         break;
@@ -754,8 +766,8 @@ void dumpIR(IR const* ir,
 
         if (dump_kid) {
             g_indent += dn;
-            dumpIRList(IST_base(ir), tm, (CHAR*)" base", dumpflag);
-            dumpIRList(IST_rhs(ir), tm, NULL, dumpflag);
+            dumpIRList(IST_base(ir), rg, (CHAR*)" base", dumpflag);
+            dumpIRList(IST_rhs(ir), rg, NULL, dumpflag);
             g_indent -= dn;
         }
         break;
@@ -796,7 +808,7 @@ void dumpIR(IR const* ir,
         prt("%s", attr);
         if (dump_kid) {
             g_indent += dn;
-            dumpIRList(ILD_base(ir), tm, NULL, dumpflag);
+            dumpIRList(ILD_base(ir), rg, NULL, dumpflag);
             g_indent -= dn;
         }
         break;
@@ -847,7 +859,7 @@ void dumpIR(IR const* ir,
                  CONST_int_val(ir), CONST_int_val(ir));
         } else if (ir->is_fp()) {
             CHAR fpformat[128];
-            ::snprintf(fpformat, 127, "fpconst:%%s %%.%df", CONST_fp_mant(ir));
+            ::snprintf(fpformat, 127, "\nfpconst:%%s %%.%df", CONST_fp_mant(ir));
             note(fpformat, xdm->dump_type(d, buf), CONST_fp_val(ir));
         } else if (ir->is_bool()) {
             note("\nboolconst:%s %d", xdm->dump_type(d, buf), CONST_int_val(ir));
@@ -891,6 +903,9 @@ void dumpIR(IR const* ir,
     SWITCH_CASE_BIN:
     SWITCH_CASE_UNA:
         note("\n%s:%s", IRNAME(ir), xdm->dump_type(d, buf));
+        if (ir->is_cvt() && CVT_round(ir) != ROUND_UNDEF) {
+          prt(":round(%s)", ROUND_NAME(CVT_round(ir)));
+        }
         PADDR(ir);
         prt("%s", attr);
         if (dump_kid) {
@@ -898,7 +913,7 @@ void dumpIR(IR const* ir,
             for (UINT i = 0; i < IR_MAX_KID_NUM(ir); i++) {
                 IR * k = ir->getKid(i);
                 if (k == NULL) { continue; }
-                dumpIRList(k, tm, NULL, dumpflag);
+                dumpIRList(k, rg, NULL, dumpflag);
             } 
             g_indent -= dn;
         }
@@ -909,12 +924,12 @@ void dumpIR(IR const* ir,
         prt("%s", attr);
         if (dump_kid) {
             g_indent += dn;
-            dumpIRList(IF_det(ir), tm, NULL, dumpflag);
+            dumpIRList(IF_det(ir), rg, NULL, dumpflag);
             g_indent -= dn;
 
             note("\n{");
             g_indent += dn;
-            dumpIRList(IF_truebody(ir), tm, NULL, dumpflag);
+            dumpIRList(IF_truebody(ir), rg, NULL, dumpflag);
             g_indent -= dn;
             note("\n}");
 
@@ -922,7 +937,7 @@ void dumpIR(IR const* ir,
                 note("\nelse");
                 note("\n{");
                 g_indent += dn;
-                dumpIRList(IF_falsebody(ir), tm, NULL, dumpflag);
+                dumpIRList(IF_falsebody(ir), rg, NULL, dumpflag);
                 g_indent -= dn;
                 note("\n}");
             }
@@ -935,12 +950,12 @@ void dumpIR(IR const* ir,
         if (dump_kid) {
             note("\nbody:");
             g_indent += dn;
-            dumpIRList(LOOP_body(ir), tm, NULL, dumpflag);
+            dumpIRList(LOOP_body(ir), rg, NULL, dumpflag);
             g_indent -= dn;
 
             note("\ndet:");
             g_indent += dn;
-            dumpIRList(LOOP_det(ir), tm, NULL, dumpflag);
+            dumpIRList(LOOP_det(ir), rg, NULL, dumpflag);
             g_indent -= dn;
 
             note("\nend_dowhile");
@@ -954,13 +969,13 @@ void dumpIR(IR const* ir,
         if (dump_kid) {
             note("\ndet:");
             g_indent += dn;
-            dumpIRList(LOOP_det(ir), tm, NULL, dumpflag);
+            dumpIRList(LOOP_det(ir), rg, NULL, dumpflag);
             g_indent -= dn;
 
             note("\nbody:");
 
             g_indent += dn;
-            dumpIRList(LOOP_body(ir), tm, NULL, dumpflag);
+            dumpIRList(LOOP_body(ir), rg, NULL, dumpflag);
             g_indent -= dn;
 
             note("\nend_whiledo");
@@ -973,27 +988,27 @@ void dumpIR(IR const* ir,
         if (dump_kid) {
             note("\niv:");
             g_indent += dn;
-            dumpIRList(LOOP_iv(ir), tm, NULL, dumpflag);
+            dumpIRList(LOOP_iv(ir), rg, NULL, dumpflag);
             g_indent -= dn;
 
             note("\ninit:");
             g_indent += dn;
-            dumpIRList(LOOP_init(ir), tm, NULL, dumpflag);
+            dumpIRList(LOOP_init(ir), rg, NULL, dumpflag);
             g_indent -= dn;
 
             note("\ndet:");
             g_indent += dn;
-            dumpIRList(LOOP_det(ir), tm, NULL, dumpflag);
+            dumpIRList(LOOP_det(ir), rg, NULL, dumpflag);
             g_indent -= dn;
 
             note("\nstep:");
             g_indent += dn;
-            dumpIRList(LOOP_step(ir), tm, NULL, dumpflag);
+            dumpIRList(LOOP_step(ir), rg, NULL, dumpflag);
             g_indent -= dn;
 
             note("\nbody:");
             g_indent += dn;
-            dumpIRList(LOOP_body(ir), tm, NULL, dumpflag);
+            dumpIRList(LOOP_body(ir), rg, NULL, dumpflag);
             g_indent -= dn;
 
             note("\nend_doloop");
@@ -1015,7 +1030,7 @@ void dumpIR(IR const* ir,
         prt("%s", attr);
         if (dump_kid) {
             g_indent += dn;
-            dumpIR(RET_exp(ir), tm, NULL, dumpflag);
+            dumpIR(RET_exp(ir), rg, NULL, dumpflag);
             g_indent -= dn;
         }
         break;
@@ -1031,12 +1046,12 @@ void dumpIR(IR const* ir,
         prt("%s", attr);
         if (dump_kid) {
             g_indent += dn;
-            dumpIRList(IGOTO_vexp(ir), tm, NULL, dumpflag);
+            dumpIRList(IGOTO_vexp(ir), rg, NULL, dumpflag);
             g_indent -= dn;
 
             note("\ncase_list");
             g_indent += dn;
-            dumpIRList(IGOTO_case_list(ir), tm, NULL, dumpflag);
+            dumpIRList(IGOTO_case_list(ir), rg, NULL, dumpflag);
             g_indent -= dn;
         }
         break;
@@ -1088,15 +1103,15 @@ void dumpIR(IR const* ir,
         PADDR(ir); prt("%s", attr);
         if (dump_kid) {
             g_indent += dn;
-            dumpIRList(SELECT_pred(ir), tm, NULL, dumpflag);
+            dumpIRList(SELECT_pred(ir), rg, NULL, dumpflag);
             g_indent -= dn;
 
             g_indent += dn;
-            dumpIRList(SELECT_trueexp(ir), tm, (CHAR*)" true_exp", dumpflag);
+            dumpIRList(SELECT_trueexp(ir), rg, (CHAR*)" true_exp", dumpflag);
             g_indent -= dn;
 
             g_indent += dn;
-            dumpIRList(SELECT_falseexp(ir), tm, (CHAR*)" false_exp", dumpflag);
+            dumpIRList(SELECT_falseexp(ir), rg, (CHAR*)" false_exp", dumpflag);
             g_indent -= dn;
         }
         break;
@@ -1134,7 +1149,7 @@ void dumpIR(IR const* ir,
             g_indent += dn;
             IR * opnd = PHI_opnd_list(ir);
             while (opnd != NULL) {
-                dumpIR(opnd, tm, NULL, dumpflag);
+                dumpIR(opnd, rg, NULL, dumpflag);
                 opnd = opnd->get_next();
             }
             g_indent -= dn;
@@ -1150,17 +1165,17 @@ void dumpIR(IR const* ir,
         prt("%s", attr);
         if (dump_kid) {
             g_indent += dn;
-            dumpIRList(SWITCH_vexp(ir), tm, NULL, dumpflag);
+            dumpIRList(SWITCH_vexp(ir), rg, NULL, dumpflag);
             g_indent -= dn;
 
             if (SWITCH_case_list(ir) != NULL) {
-                dumpIRList(SWITCH_case_list(ir), tm, NULL, dumpflag);
+                dumpIRList(SWITCH_case_list(ir), rg, NULL, dumpflag);
             }
 
             if (SWITCH_body(ir) != NULL) {
                 note("\nbody:");
                 g_indent += dn;
-                dumpIRList(SWITCH_body(ir), tm, NULL, dumpflag);
+                dumpIRList(SWITCH_body(ir), rg, NULL, dumpflag);
                 g_indent -= dn;
             }
             note("\nend_switch");
@@ -1174,7 +1189,7 @@ void dumpIR(IR const* ir,
         prt("%s", attr);
 
         g_indent += dn;
-        dumpIRList(CASE_vexp(ir), tm, NULL, dumpflag);
+        dumpIRList(CASE_vexp(ir), rg, NULL, dumpflag);
         note("\n");
         dump_lab_decl(ir->getLabel());
         g_indent -= dn;
@@ -1217,7 +1232,7 @@ void dumpIR(IR const* ir,
                  sub != NULL; sub = sub->get_next()) {
                 CHAR tt[40];
                 sprintf(tt, " dim%d", dim);
-                dumpIR(sub, tm, (CHAR*)tt, dumpflag);
+                dumpIR(sub, rg, (CHAR*)tt, dumpflag);
                 dim++;
             }
             g_indent -= dn;
@@ -1225,7 +1240,7 @@ void dumpIR(IR const* ir,
 
         if (dump_kid) {
             g_indent += dn;
-            dumpIRList(ARR_base(ir), tm, (CHAR*)" array_base", dumpflag);
+            dumpIRList(ARR_base(ir), rg, (CHAR*)" array_base", dumpflag);
             g_indent -= dn;
         }
         break;
@@ -1260,7 +1275,7 @@ void dumpIR(IR const* ir,
         if (dump_kid) {
             if (ir->is_icall()) {
                 g_indent += dn;
-                dumpIR(ICALL_callee(ir), tm, (CHAR*)" callee", dumpflag);
+                dumpIR(ICALL_callee(ir), rg, (CHAR*)" callee", dumpflag);
                 g_indent -= dn;
             }
 
@@ -1272,7 +1287,7 @@ void dumpIR(IR const* ir,
                  p2 != NULL; p2 = p2->get_next()) {
                 sprintf(tmpbuf, " param%d", i);
                 g_indent += dn;
-                dumpIR(p2, tm, tmpbuf, dumpflag);
+                dumpIR(p2, rg, tmpbuf, dumpflag);
                 g_indent -= dn;
                 i++;
             }
@@ -1283,7 +1298,7 @@ void dumpIR(IR const* ir,
                  p2 != NULL; p2 = p2->get_next()) {
                 sprintf(tmpbuf, " dummy%d", i);
                 g_indent += dn;
-                dumpIR(p2, tm, tmpbuf, dumpflag);
+                dumpIR(p2, rg, tmpbuf, dumpflag);
                 g_indent -= dn;
                 i++;
             }
@@ -1297,7 +1312,7 @@ void dumpIR(IR const* ir,
         prt("%s", attr);
         if (dump_kid) {
             g_indent += dn;
-            dumpIRList(BR_det(ir), tm, NULL, dumpflag);
+            dumpIRList(BR_det(ir), rg, NULL, dumpflag);
             g_indent -= dn;
         }
         break;
@@ -1308,7 +1323,7 @@ void dumpIR(IR const* ir,
         prt("%s", attr);
         if (dump_kid) {
             g_indent += dn;
-            dumpIRList(BR_det(ir), tm, NULL, dumpflag);
+            dumpIRList(BR_det(ir), rg, NULL, dumpflag);
             g_indent -= dn;
         }
         break;
@@ -2635,7 +2650,7 @@ static bool hasProp(IR const* ir)
     return ir->isMayThrow() ||
         ir->is_terminate() ||
         ir->is_atomic() ||
-        ir->isReadModWrite() ||
+        ir->is_rmw() ||
         ir->hasSideEffect() ||
         ir->isNoMove();
 }
@@ -2647,7 +2662,7 @@ void IR::dumpRef(Region * r, UINT indent)
     if (this == NULL || g_tfile == NULL || is_const()) { return; }
     UINT oldindent = g_indent;
     g_indent = indent;
-    dumpIR(this, r->getTypeMgr(), NULL, false);
+    dumpIR(this, r, NULL, false);
 
     //Dump mustref MD.
     MD const* md = getRefMD();
@@ -2787,7 +2802,7 @@ static void dumpProp(IR const* ir, TypeMgr * tm, DumpGRCtx * ctx)
         prt("atom");
         first = false;
     }
-    if (ir->isReadModWrite()) {
+    if (ir->is_rmw()) {
         if (!first) { prt(","); }
         else { prt(":("); }
         prt("rmw");
@@ -3429,14 +3444,25 @@ bool checkMaxIRType()
 
 bool checkIRDesc()
 {
-    UINT sz = 1 << IR_TYPE_BIT_SIZE;
+    UINT sz = (UINT)(1 << IR_TYPE_BIT_SIZE);
     ASSERTN(IR_TYPE_NUM <= sz, ("code field is too small"));
+    DUMMYUSE(sz);
     for (UINT i = IR_UNDEF; i < IR_TYPE_NUM; i++) {
         ASSERT0(i == (UINT)IRDES_code(g_ir_desc[i]));
     }
     UINT descnum = sizeof(g_ir_desc) / sizeof(g_ir_desc[0]);
     ASSERTN(descnum - 1 == IR_TYPE_NUM, ("miss IRDesc declaration"));
-	return true;
+    return true;
+}
+
+bool checkRoundDesc()
+{
+    for (UINT i = ROUND_UNDEF; i < ROUND_TYPE_NUM; i++) {
+        ASSERT0(i == (UINT)ROUNDDESC_type(g_round_desc[i]));
+    }
+    UINT descnum = sizeof(g_round_desc) / sizeof(g_round_desc[0]);
+    ASSERTN(descnum == ROUND_TYPE_NUM, ("miss RoundDesc declaration"));
+    return true;
 }
 
 } //namespace xoc

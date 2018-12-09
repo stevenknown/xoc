@@ -2326,7 +2326,11 @@ IR * Region::simplifyStmtList(IR * ir_list, SimpCtx * ctx)
             ret_list = NULL;
         }
     }
-
+    if (g_is_dump_after_pass) {
+        g_indent = 0;
+        note("\n==---- DUMP AFTER SIMPLIFY STMT LIST ----==");
+        dumpIRList(ret_list, this);
+    }
     return ret_list;
 }
 
@@ -2363,6 +2367,8 @@ void Region::simplifyBBlist(BBList * bbl, SimpCtx * ctx)
         simplifyBB(bb, ctx);
     }
     END_TIMER(t, "Simplify IRBB list");
+
+    //NOTE: Do NOT dumpBBList here because new IR_LABEL may be generated.
 }
 
 } //namespace xoc

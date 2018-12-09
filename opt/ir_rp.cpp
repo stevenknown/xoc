@@ -288,12 +288,12 @@ void IR_RP::dump()
 }
 
 
-void IR_RP::dump_occ_list(List<IR*> & occs, TypeMgr * dm)
+void IR_RP::dump_occ_list(List<IR*> & occs)
 {
     if (g_tfile == NULL) { return; }
     note("\n---- DUMP exact occ list ----");
     for (IR * x = occs.get_head(); x != NULL; x = occs.get_next()) {
-        dumpIR(x, dm, NULL, IR_DUMP_KID);
+        dumpIR(x, m_ru, NULL, IR_DUMP_KID);
         note("\n");
     }
     note("\n");
@@ -301,14 +301,14 @@ void IR_RP::dump_occ_list(List<IR*> & occs, TypeMgr * dm)
 }
 
 
-void IR_RP::dump_access2(TTab<IR*> & access, TypeMgr * dm)
+void IR_RP::dump_access2(TTab<IR*> & access)
 {
     if (g_tfile == NULL) { return; }
     note("\n---- DUMP inexact access ----");
     TabIter<IR*> iter;
     for (IR * ir = access.get_first(iter);
         ir != NULL; ir = access.get_next(iter)) {
-        dumpIR(ir, dm);
+        dumpIR(ir, m_ru);
         note("\n");
     }
     note("\n");
@@ -316,7 +316,7 @@ void IR_RP::dump_access2(TTab<IR*> & access, TypeMgr * dm)
 }
 
 
-void IR_RP::dump_access(TMap<MD const*, IR*> & access, TypeMgr * dm)
+void IR_RP::dump_access(TMap<MD const*, IR*> & access)
 {
     if (g_tfile == NULL) { return; }
     note("\n---- DUMP exact access ----");
@@ -324,8 +324,8 @@ void IR_RP::dump_access(TMap<MD const*, IR*> & access, TypeMgr * dm)
     IR * ref;
     for (MD const* md = access.get_first(iter, &ref);
          ref != NULL; md = access.get_next(iter, &ref)) {
-        md->dump(dm);
-        dumpIR(ref, dm);
+        md->dump(m_ru->getTypeMgr());
+        dumpIR(ref, m_ru);
         note("\n");
     }
     note("\n");

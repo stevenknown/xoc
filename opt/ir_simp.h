@@ -275,10 +275,10 @@ public:
         setSimpToLowestHeight();
     }
 
-	void dump(TypeMgr const* tm) {
-		ASSERT0(tm);
+	void dump(Region * rg) {
+		ASSERT0(rg);
 		note("\n==---- DUMP SimpCtx IR List ----==");
-		dumpIRList(ir_stmt_list, tm);
+		dumpIRList(ir_stmt_list, rg);
 	}
 };
 

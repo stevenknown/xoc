@@ -1147,7 +1147,7 @@ void IR_GVN::dump_bb(UINT bbid)
     note("\n");
     for (IR * ir = BB_first_ir(bb);
          ir != NULL; ir = BB_next_ir(bb)) {
-        dumpIR(ir, m_ru->getTypeMgr());
+        dumpIR(ir, m_ru);
         note("\n");
         VN * x = m_ir2vn.get(ir->id());
         if (x != NULL) {

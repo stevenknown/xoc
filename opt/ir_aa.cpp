@@ -3001,7 +3001,7 @@ void IR_AA::dumpIRPointTo(IN IR * ir, bool dump_kid, IN MD2MDSet * mx)
     MDSet const* may = getMayAddr(ir);
     if (must != NULL ||
         (may != NULL && may->get_elem_count() > 0)) {
-        dumpIR(ir, m_tm, NULL, 0);
+        dumpIR(ir, m_ru, NULL, 0);
     }
 
     switch (ir->getCode()) {
@@ -3069,7 +3069,7 @@ void IR_AA::dumpIRPointToForBB(IRBB * bb, bool dump_kid)
          ir != NULL; ir = BB_irlist(bb).get_next(&ct)) {
         note("\n---------");
         g_indent = 4;
-        dumpIRList(ir, m_tm, NULL, IR_DUMP_KID | IR_DUMP_SRC_LINE);
+        dumpIRList(ir, m_ru, NULL, IR_DUMP_KID | IR_DUMP_SRC_LINE);
         note("\n");
 
         ASSERT0(isValidStmtToAA(ir));

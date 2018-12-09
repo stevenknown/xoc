@@ -130,7 +130,6 @@ public:
 
 //Variable has initial value.
 #define VAR_has_init_val(v)      ((v)->u2.s1.has_init_val)
-//#define VAR_has_init_val(v)      (VAR_byte_val(v) != NULL)
 
 //Variable is region.
 #define VAR_is_func_decl(v)      ((v)->u2.s1.is_func_decl)

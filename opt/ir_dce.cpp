@@ -62,7 +62,7 @@ void IR_DCE::dump(EFFECT_STMT const& is_stmt_effect,
             IR * ir = ir_vec->get(j);
             ASSERT0(ir != NULL);
             note("\n");
-            dumpIR(ir, m_tm);
+            dumpIR(ir, m_ru);
             if (!is_stmt_effect.is_contain(ir->id())) {
                 prt("\t\tremove!");
             }
@@ -84,7 +84,7 @@ void IR_DCE::dump(EFFECT_STMT const& is_stmt_effect,
             ASSERT0(ir != NULL);
             if (!is_stmt_effect.is_contain(ir->id())) {
                 note("\n");
-                dumpIR(ir, m_tm);
+                dumpIR(ir, m_ru);
                 prt("\t\tremove!");
             }
         }

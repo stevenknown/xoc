@@ -343,7 +343,7 @@ void SSAGraph::dump(CHAR const* name, bool detail)
         }
         if (detail) {
             //TODO: implement dump_ir_buf();
-            dumpIR(def, dm, NULL, IR_DUMP_KID);
+            dumpIR(def, m_ru, NULL, IR_DUMP_KID);
         }
         fprintf(h, "\"}");
     }
@@ -476,7 +476,7 @@ void PRSSAMgr::dump()
              ir != NULL; ir = BB_next_ir(bb)) {
             g_indent = 4;
             note("\n------------------");
-            dumpIR(ir, m_tm);
+            dumpIR(ir, m_ru);
             lst.clean();
             opnd_lst.clean();
             for (IR const* opnd = iterInitC(ir, lst);

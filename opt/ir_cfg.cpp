@@ -584,6 +584,7 @@ void IR_CFG::insertBBbetween(
     xcom::C<IRBB*> * tmp_ct = from_ct;
     if (BB_is_fallthrough(from) && bblst->get_next(&tmp_ct) == to) {
         bblst->insert_after(newbb, from);
+        add_bb(newbb);
         insertVertexBetween(BB_id(from), BB_id(to), BB_id(newbb));
         BB_is_fallthrough(newbb) = true;
         return;
@@ -1196,7 +1197,7 @@ void IR_CFG::dump_dot(CHAR const* name, bool detail, bool dump_eh)
                 fprintf(h, "\\l");
 
                  //TODO: implement dump_ir_buf();
-                dumpIR(ir, m_tm, NULL, IR_DUMP_KID);
+                dumpIR(ir, m_ru, NULL, IR_DUMP_KID);
             }
 
             //The last \l is very important to display DOT in a fine manner.
@@ -1292,7 +1293,7 @@ void IR_CFG::dump_node(FILE * h, bool detail)
                 //fprintf(h, "%s\n", dump_ir_buf(ir, buf));
 
                 //TODO: implement dump_ir_buf();
-                dumpIR(ir, m_tm, NULL, IR_DUMP_KID);
+                dumpIR(ir, m_ru, NULL, IR_DUMP_KID);
             }
             fprintf(h, "\"}");
         } else {
@@ -1526,6 +1527,9 @@ bool IR_CFG::performMiscOpt(OptCtx & oc)
 
         if (g_do_cfg_remove_trampolin_bb) {
             lchange |= removeTrampolinEdge();
+        }
+
+        if (g_do_cfg_invert_condition_and_remove_trampolin_bb) {
             lchange |= inverseAndRemoveTrampolineBranch();
         }
 

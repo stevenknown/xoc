@@ -134,11 +134,10 @@ void IRBB::dump(Region * rg, bool dump_inner_region)
     //IR list
     note("\nSTMT NUM:%d", getNumOfIR());
     g_indent += 3;
-    TypeMgr * dm = rg->getTypeMgr();
     for (IR * ir = BB_first_ir(this);
          ir != NULL; ir = BB_irlist(this).get_next()) {
         ASSERT0(ir->is_single() && ir->getBB() == this);
-		dumpIR(ir, dm, NULL, IR_DUMP_KID | IR_DUMP_SRC_LINE |
+		dumpIR(ir, rg, NULL, IR_DUMP_KID | IR_DUMP_SRC_LINE |
 			(dump_inner_region ? IR_DUMP_INNER_REGION : 0));		
     }
     g_indent -= 3;

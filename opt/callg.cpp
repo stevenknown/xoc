@@ -167,7 +167,7 @@ void CallGraph::dump_vcg(CHAR const* name, INT flag)
                 for (; irs != NULL; irs = irs->get_next()) {
                     //fprintf(h, "%s\n", dump_ir_buf(ir, buf));
                     //TODO: implement dump_ir_buf();
-                    dumpIR(irs, m_tm, NULL, IR_DUMP_KID|
+                    dumpIR(irs, CN_ru(cn), NULL, IR_DUMP_KID|
                         (dump_src_line ? IR_DUMP_SRC_LINE : 0)|
 						(dump_inner_region ? IR_DUMP_INNER_REGION : 0));
                 }

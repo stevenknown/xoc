@@ -113,7 +113,7 @@ void IR_EXPR_TAB::dump_ir_expr_tab()
         if (ie == NULL) { continue; }
         ASSERT0(EXPR_id(ie) == (UINT)i);
         note("\n\n----------- ExpRep(%d)", i);
-        dumpIR(EXPR_ir(ie), m_tm);
+        dumpIR(EXPR_ir(ie), m_ru);
         note("\n\tOCC:");
         for (IR * occ = EXPR_occ_list(ie).get_head();
              occ != NULL; occ = EXPR_occ_list(ie).get_next()) {

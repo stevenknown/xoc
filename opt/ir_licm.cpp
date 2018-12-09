@@ -389,7 +389,7 @@ void IR_LICM::dumpInvariantExpStmt(
         g_indent = 3;
         for (IR * c = invariant_exp.get_first(ti);
              c != NULL; c = invariant_exp.get_next(ti)) {
-             dumpIR(c, m_tm);
+             dumpIR(c, m_ru);
         }
 
     }
@@ -401,7 +401,7 @@ void IR_LICM::dumpInvariantExpStmt(
         g_indent = 3;
         for (IR * c = invariant_stmt.get_first(ti);
              c != NULL; c = invariant_stmt.get_next(ti)) {
-             dumpIR(c, m_tm);
+             dumpIR(c, m_ru);
         }
     }
 }

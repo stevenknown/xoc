@@ -210,6 +210,7 @@ bool RegionMgr::verifyPreDefinedInfo()
 {
     checkMaxIRType();
     checkIRDesc();
+    checkRoundDesc();
     ASSERT0_DUMMYUSE(WORD_LENGTH_OF_TARGET_MACHINE <=
             sizeof(TMWORD) * HOST_BIT_PER_BYTE);
     ASSERT0_DUMMYUSE(BIT_PER_BYTE == HOST_BIT_PER_BYTE);

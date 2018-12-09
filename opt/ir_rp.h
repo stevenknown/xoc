@@ -354,9 +354,9 @@ public:
 
     void dump();
     void dump_mdlt();
-    void dump_occ_list(List<IR*> & occs, TypeMgr * dm);
-    void dump_access2(TTab<IR*> & access, TypeMgr * dm);
-    void dump_access(TMap<MD const*, IR*> & access, TypeMgr * dm);
+    void dump_occ_list(List<IR*> & occs);
+    void dump_access2(TTab<IR*> & access);
+    void dump_access(TMap<MD const*, IR*> & access);
 
     //Return true if 'ir' can be promoted.
     //Note ir must be memory reference.

@@ -145,7 +145,7 @@ void MDId2IRlist::dump()
             IR * d = m_ru->getIR(i);
             g_indent = 4;
             note("\n------------------");
-            dumpIR(d, m_tm, NULL, 0);
+            dumpIR(d, m_ru, NULL, 0);
 
             note("\n\t\tdef:");
             MDSet const* ms = m_du->getMayDef(d);
@@ -971,7 +971,7 @@ void IR_DU_MGR::dumpDUGraph(CHAR const* name, bool detail)
                         "fontname:\"courB\" label:\"", id);
             IR * ir = m_ru->getIR(id);
             ASSERT0(ir != NULL);
-            dumpIR(ir, m_tm);
+            dumpIR(ir, m_ru);
             fprintf(h, "\"}");
         } else {
             fprintf(h, "\nnode: { title:\"%d\" shape:box color:gold "
@@ -1018,7 +1018,7 @@ void IR_DU_MGR::dumpMemUsageForMDRef()
         note("\n--- BB%d ---", BB_id(bb));
         for (IR * ir = BB_first_ir(bb);
              ir != NULL; ir = BB_next_ir(bb)) {
-            dumpIR(ir, m_tm);
+            dumpIR(ir, m_ru);
             note("\n");
             m_citer.clean();
             for (IR const* x = iterInitC(ir, m_citer);
@@ -1334,7 +1334,7 @@ void IR_DU_MGR::dumpBBDUChainDetail(IRBB * bb)
 
     for (IR * ir = BB_irlist(bb).get_head();
          ir != NULL; ir = BB_irlist(bb).get_next()) {
-        dumpIR(ir, m_tm);
+        dumpIR(ir, m_ru);
         note("\n");
 
         IRIter ii;
@@ -1457,7 +1457,7 @@ void IR_DU_MGR::dumpDUChain()
         note("\n--- BB%d ---", BB_id(bb));
         for (IR * ir = BB_irlist(bb).get_head();
              ir != NULL; ir = BB_irlist(bb).get_next()) {
-            dumpIR(ir, m_tm);
+            dumpIR(ir, m_ru);
             note("\n>>");
 
             //MustDef
@@ -2398,6 +2398,7 @@ void IR_DU_MGR::inferIstore(IR * ir, UINT duflag)
 
 
 //Inference call's MayDef MD set.
+//Regard both USE and DEF as ir's RefMDSet.
 //Call may modify addressable local variables and globals in indefinite ways.
 void IR_DU_MGR::inferCallAndIcall(IR * ir, UINT duflag, IN MD2MDSet * mx)
 {
@@ -2423,8 +2424,9 @@ void IR_DU_MGR::inferCallAndIcall(IR * ir, UINT duflag, IN MD2MDSet * mx)
     for (IR * p = CALL_param_list(ir); p != NULL; p = p->get_next()) {
         if (p->is_ptr() || p->is_void()) {
             //Compute the point-to set p pointed to.
-            //e.g: foo(p); where p->{xcom::EdgeC, b}, then foo may use p, xcom::EdgeC, b.
-            //Note that point-to set is only avaiable for the
+            //e.g: foo(p); where p->{x, y, z},
+            //     then foo() may use {p, x, y, z}.
+            //NOTE that point-to set is only avaiable for the
             //last stmt of BB. The call is just in the situation.
             ASSERTN(mx, ("needed by computation of NOPR du chain"));
             ASSERT0(m_aa);
@@ -2479,6 +2481,7 @@ void IR_DU_MGR::inferCallAndIcall(IR * ir, UINT duflag, IN MD2MDSet * mx)
     maydefuse.bunion_pure(tmpmds, *m_misc_bs_mgr);
 
     //Register the MD set.
+    //Regard both USE and DEF as ir's RefMDSet.
     ir->setRefMDSet(m_mds_hash->append(maydefuse), m_ru);
     maydefuse.clean(*m_misc_bs_mgr);
     tmpmds.clean(*m_misc_bs_mgr);
