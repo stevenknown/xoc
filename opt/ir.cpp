@@ -351,13 +351,19 @@ UINT checkStArrayDimension(IR const* ir, UINT n)
 
 
 //Dump IR, and both its kids and siblings.
-void dumpIRList(IR * ir_list,
-                Region * rg,
-                CHAR * attr,
-                UINT dumpflag)
+void dumpIRListH(IR * ir_list, Region * rg, CHAR * attr, UINT dumpflag)
 {
     if (g_tfile == NULL) { return; }
+    note("\n==---- DUMP IR List ----==");
+    dumpIRList(ir_list, rg, attr, dumpflag);
+}
 
+
+//Dump IR, and both its kids and siblings.
+void dumpIRList(IR * ir_list, Region * rg, CHAR * attr, UINT dumpflag)
+{
+    if (g_tfile == NULL) { return; }
+    note("");
     bool first_one = true;
     for (; ir_list != NULL; ir_list = ir_list->get_next()) {
         if (first_one) {
