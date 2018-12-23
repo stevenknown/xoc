@@ -364,7 +364,7 @@ protected:
             VAR * v,
             MD2MDSet * mx,
             ConstMDIter & iter);
-    void inferPtArith(
+    void inferPointerArith(
             IR const* ir, IN OUT MDSet & mds,
             IN OUT MDSet & opnd0_mds,
             IN OUT AACtx * opnd0_ic,
@@ -476,6 +476,7 @@ public:
     void cleanPointTo(UINT mdid, IN OUT MD2MDSet & ctx)
     { ctx.setAlways(mdid, NULL); }
 
+    bool computeMayPointToViaTBAA(IR * pointer, IN OUT MDSet * point_to_set);
     bool computeFlowSensitive(List<IRBB*> const& bbl);
     void computeStmt(IRBB const* bb, IN OUT MD2MDSet * mx);
     void computeFlowInsensitive();

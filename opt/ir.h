@@ -1221,6 +1221,13 @@ public:
 };
 
 
+//This class represent properties of stmt.
+class StmtProp {
+public:
+    IRBB * bb;
+};
+
+
 //This class represent memory store operation.
 //ST_ofst descibe the byte offset that is the addend to address.
 //ST_idinfo describe the memory variable.
@@ -1235,10 +1242,9 @@ public:
 #define ST_du(ir)            (((CSt*)CK_IRT(ir, IR_ST))->du)
 #define ST_rhs(ir)           ST_kid(ir, 0)
 #define ST_kid(ir, idx)      (((CSt*)ir)->opnd[CKID_TY(ir, IR_ST, idx)])
-class CSt: public CLd {
+class CSt: public CLd, public StmtProp {
 public:
     IR * opnd[1];
-    IRBB * bb;
 };
 
 
@@ -1251,12 +1257,11 @@ public:
 #define STPR_du(ir)         (((CStpr*)CK_IRT(ir, IR_STPR))->du)
 #define STPR_rhs(ir)        STPR_kid(ir, 0)
 #define STPR_kid(ir, idx)   (((CStpr*)ir)->opnd[CKID_TY(ir, IR_STPR, idx)])
-class CStpr: public DuProp {
+class CStpr: public DuProp, public StmtProp {
 public:
     UINT prno; //PR number.
     SSAInfo * ssainfo; //Present ssa def and use set.
     IR * opnd[1];
-    IRBB * bb;
 };
 
 
@@ -1282,12 +1287,11 @@ public:
 #define SETELEM_val(ir)     SETELEM_kid(ir, 1)
 #define SETELEM_ofst(ir)    SETELEM_kid(ir, 2)
 #define SETELEM_kid(ir, idx)(((CSetElem*)ir)->opnd[CKID_TY(ir, IR_SETELEM, idx)])
-class CSetElem: public DuProp {
+class CSetElem: public DuProp, public StmtProp {
 public:
     UINT prno; //PR number.
     SSAInfo * ssainfo; //Present ssa def and use set.
     IR * opnd[3];
-    IRBB * bb;
 };
 
 
@@ -1307,7 +1311,7 @@ public:
 #define GETELEM_base(ir)    GETELEM_kid(ir, 0)
 #define GETELEM_ofst(ir)    GETELEM_kid(ir, 1)
 #define GETELEM_kid(ir, idx)(((CGetElem*)ir)->opnd[CKID_TY(ir, IR_GETELEM, idx)])
-class CGetElem : public DuProp {
+class CGetElem : public DuProp, public StmtProp {
 public:
     UINT prno; //PR number.
 
@@ -1316,8 +1320,6 @@ public:
     SSAInfo * ssainfo;
 
     IR * opnd[2];
-
-    IRBB * bb;
 };
 
 
@@ -1336,10 +1338,9 @@ public:
 #define IST_base(ir)        IST_kid(ir, 0)
 #define IST_rhs(ir)         IST_kid(ir, 1)
 #define IST_kid(ir, idx)    (((CIst*)ir)->opnd[CKID_TY(ir, IR_IST, idx)])
-class CIst : public DuProp, public OffsetProp {
+class CIst : public DuProp, public OffsetProp, public StmtProp {
 public:
     IR * opnd[2];
-    IRBB * bb;
 };
 
 
@@ -1392,7 +1393,7 @@ public:
 //Record dummy referenced IR.
 #define CALL_dummyuse(ir)        CALL_kid(ir, 1)
 #define CALL_kid(ir, idx)        (((CCall*)ir)->opnd[CKID_CALL(ir, idx)])
-class CCall : public DuProp, public VarProp {
+class CCall : public DuProp, public VarProp, public StmtProp {
 public:
     //True if current call is intrinsic call.
     BYTE is_intrinsic:1;
@@ -1413,8 +1414,6 @@ public:
     UINT prno; //Result PR number if any.
 
     SSAInfo * prssainfo; //indicates PR ssa def and use set.
-
-    IRBB * bb;
 
     //NOTE: 'opnd' must be the last member.
     IR * opnd[2];
@@ -1487,10 +1486,9 @@ public:
 //This class represent goto operation, unconditional jump to target label.
 #define GOTO_bb(ir)         (((CGoto*)CK_IRT(ir, IR_GOTO))->bb)
 #define GOTO_lab(ir)        (((CGoto*)CK_IRT(ir, IR_GOTO))->jump_target_lab)
-class CGoto : public IR {
+class CGoto : public IR, public StmtProp {
 public:
     LabelInfo const* jump_target_lab;
-    IRBB * bb;
 };
 
 
@@ -1507,10 +1505,9 @@ public:
 #define IGOTO_case_list(ir) IGOTO_kid(ir, 1)
 
 #define IGOTO_kid(ir, idx)  (((CIGoto*)ir)->opnd[CKID_TY(ir, IR_IGOTO, idx)])
-class CIGoto : public IR {
+class CIGoto : public IR, public StmtProp {
 public:
     IR * opnd[2];
-    IRBB * bb;
 };
 
 
@@ -1635,11 +1632,10 @@ public:
 #define SWITCH_case_list(ir) SWITCH_kid(ir, 2)
 
 #define SWITCH_kid(ir, idx)  (((CSwitch*)ir)->opnd[CKID_TY(ir, IR_SWITCH, idx)])
-class CSwitch : public IR {
+class CSwitch : public IR, public StmtProp {
 public:
     IR * opnd[3];
     LabelInfo const* default_label;
-    IRBB * bb;
 };
 
 
@@ -1774,21 +1770,17 @@ public:
 //
 //'elem_num' represent the number of array element in given dimension.
 //
-//If 'elem_tyid' is vector, ARR_ofst refers the
-//referrenced element byte offset.
-#define STARR_bb(ir)  (((CStArray*)CK_IRT(ir, IR_STARRAY))->bb)
+//If 'elem_tyid' is vector, ARR_ofst refers the referrenced element byte offset.
+#define STARR_bb(ir) (((CStArray*)CK_IRT(ir, IR_STARRAY))->stmtprop.bb)
 #define STARR_rhs(ir) \
-    (*(((CStArray*)ir)->opnd_pad + CKID_TY(ir, IR_STARRAY, 0)))
+	(*(((CStArray*)ir)->opnd_pad + CKID_TY(ir, IR_STARRAY, 0)))
 class CStArray: public CArray {
 public:
     //NOTE: 'opnd' must be the first member of CStArray.
     IR * opnd_pad[1];
 
-    /////////////////////////////////////////
-    //DO NOT PLACE MEMBER BEFORE 'opnd_pad'//
-    /////////////////////////////////////////
-
-    IRBB * bb;
+	//DO NOT PLACE MEMBER BEFORE opnd_pad
+	StmtProp stmtprop;
 };
 
 
@@ -1844,11 +1836,10 @@ public:
 //Determinant expression.
 #define BR_det(ir)           BR_kid(ir, 0)
 #define BR_kid(ir, idx)      (((CTruebr*)ir)->opnd[CKID_BR(ir, idx)])
-class CTruebr : public IR {
+class CTruebr : public IR, public StmtProp {
 public:
     IR * opnd[1];
     LabelInfo const* jump_target_lab; //jump target label.
-    IRBB * bb;
 };
 
 
@@ -1867,10 +1858,9 @@ public:
 #define RET_bb(ir)           (((CRet*)CK_IRT(ir, IR_RETURN))->bb)
 #define RET_exp(ir)          RET_kid(ir, 0)
 #define RET_kid(ir, idx)     (((CRet*)ir)->opnd[CKID_TY(ir, IR_RETURN, idx)])
-class CRet : public IR {
+class CRet : public IR, public StmtProp {
 public:
     IR * opnd[1];
-    IRBB * bb;
 };
 
 
@@ -1919,12 +1909,11 @@ class CContinue : public IR {};
 #define PHI_ssainfo(ir)      (((CPhi*)CK_IRT(ir, IR_PHI))->ssainfo)
 #define PHI_opnd_list(ir)    PHI_kid(ir, 0)
 #define PHI_kid(ir, idx)     (((CPhi*)ir)->opnd[CKID_TY(ir, IR_PHI, idx)])
-class CPhi : public DuProp {
+class CPhi : public DuProp, public StmtProp {
 public:
     UINT prno; //PR number.
     SSAInfo * ssainfo; //Present ssa def and use set.
     IR * opnd[1];
-    IRBB * bb;
 
 public:
     void removeOpnd(IR * ir)
@@ -1950,12 +1939,10 @@ public:
 //it might be reduced from reducible graph.
 #define REGION_bb(ir)        (((CRegion*)CK_IRT(ir, IR_REGION))->bb)
 #define REGION_ru(ir)        (((CRegion*)CK_IRT(ir, IR_REGION))->rg)
-class CRegion : public IR {
+class CRegion : public IR, public StmtProp {
 public:
     Region * rg;
-    IRBB * bb;
-    
-public:
+
     //True if region is readonly.
     //This property is very useful if region is a blackbox.
     //And readonly region will alleviate the burden of optimizor.

@@ -182,7 +182,7 @@ public:
 
     //Unify the actions which propagated top down
     //during processing IR tree.
-    void copyTopdownFlag(SimpCtx & c)
+    void copyTopdownFlag(SimpCtx const& c)
     {
         prop_top_down = c.prop_top_down;
         cfs_mgr = c.cfs_mgr;
@@ -190,11 +190,12 @@ public:
 
     //Copy the actions which propagated bottom up
     //during processing IR tree.
-    void copyBottomupFlag(SimpCtx & c) { prop_bottom_up = c.prop_bottom_up; }
+    void copyBottomupFlag(SimpCtx const& c)
+	{ prop_bottom_up = c.prop_bottom_up; }
 
     //Unify the actions which propagated bottom up
     //during processing IR tree.
-    void unionBottomupFlag(SimpCtx & c)
+    void unionBottomupFlag(SimpCtx const& c)
     {
         SIMP_changed(this) |= SIMP_changed(&c);
         SIMP_need_recon_bblist(this) |= SIMP_need_recon_bblist(&c);
