@@ -1150,7 +1150,7 @@ void IR_RP::handleRestore2Mem(
             IR * lhs = m_ru->dupIRTree(IST_base(delegate));
             m_du->copyIRTreeDU(lhs, IST_base(delegate), true);
 
-            stmt = m_ru->buildIstore(lhs, pr,
+            stmt = m_ru->buildIStore(lhs, pr,
                 IST_ofst(delegate), IR_dt(delegate));
             break;
         }
@@ -1160,7 +1160,7 @@ void IR_RP::handleRestore2Mem(
             break;
         case IR_ILD: {
             IR * base = m_ru->dupIRTree(ILD_base(delegate));
-            stmt = m_ru->buildIstore(base, pr,
+            stmt = m_ru->buildIStore(base, pr,
                 ILD_ofst(delegate), IR_dt(delegate));
             m_du->copyIRTreeDU(base, ILD_base(delegate), true);
             break;
@@ -1704,7 +1704,7 @@ void IR_RP::handlePrelog(
         stpr = m_ru->buildStorePR(PR_no(pr), IR_dt(pr), rhs);
     } else if (delegate->is_ist()) {
         //Load indirect value into PR.
-        rhs = m_ru->buildIload(m_ru->dupIRTree(IST_base(delegate)),
+        rhs = m_ru->buildILoad(m_ru->dupIRTree(IST_base(delegate)),
             IST_ofst(delegate), IR_dt(delegate));
         m_du->copyIRTreeDU(ILD_base(rhs), IST_base(delegate), true);
 

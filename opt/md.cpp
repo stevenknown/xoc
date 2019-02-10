@@ -681,6 +681,25 @@ void MDSystem::initImportVar(VarMgr * vm)
     m_import_var = NULL;
     if (vm == NULL) { return; }
 
+	//The design goal of IMPORT MD set is attempt to describe non-global variables
+	//precisely that located in outer region.
+	//WORKAROUND: In order to speedup analysis, and shrink POINT-TO set size, set
+	//IMPORT MD to be GLOBAL, which means GLOBAL variable and IMPORT variable are
+	//the same.
+	//Primitive design of IMPORT variable is using a fake variable to stand for
+	//those local variables that are not located in current region. says outer
+	//region.
+	//e.g:
+	//  Program Region {
+	//    VAR a; # global variable
+	//    Func Region {
+	//      VAR b; # local
+	//      Func Region {
+	//        VAR c; # local
+	//        # b is regarded as the variable that located in IMPORT variable set.
+	//      }
+    //    }
+    //  }
     m_import_var = vm->registerVar(
                         (CHAR*)".import_var",
                         getTypeMgr()->getMCType(0),
@@ -995,13 +1014,20 @@ void MDSystem::clean()
 }
 
 
-void MDSystem::dump()
+void MDSystem::dump(bool only_dump_nonpr_md)
 {
     if (g_tfile == NULL) { return; }
-    note("\n==---- DUMP ALL MD ----==");
+    if (only_dump_nonpr_md) {
+        note("\n==---- DUMP NON-PR MD ----==");
+    } else {
+        note("\n==---- DUMP ALL MD ----==");
+    }
     for (INT i = 0; i <= m_id2md_map.get_last_idx(); i++) {
         MD * md = m_id2md_map.get(i);
-        if (md == NULL) { continue; }
+        if (md == NULL ||
+            (only_dump_nonpr_md && MD_is_pr(md))) {
+            continue;
+        }
         ASSERT0(MD_id(md) == (UINT)i);
         md->dump(getTypeMgr());
         fflush(g_tfile);

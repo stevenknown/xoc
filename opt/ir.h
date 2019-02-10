@@ -271,7 +271,7 @@ IR const* checkIRTBranch(IR const* ir);
 IR const* checkIRTCall(IR const* ir);
 IR const* checkIRTArray(IR const* ir);
 IR const* checkIRTOnlyCall(IR const* ir);
-IR const* checkIRTOnlyIcall(IR const* ir);
+IR const* checkIRTOnlyICall(IR const* ir);
 UINT checkArrayDimension(IR const* ir, UINT n);
 #endif
 
@@ -344,7 +344,7 @@ extern RoundDesc const g_round_desc[];
 #define CK_IRT_CALL(ir)                    (checkIRTCall(ir))
 #define CK_IRT_ARR(ir)                     (checkIRTArray(ir))
 #define CK_IRT_ONLY_CALL(ir)               (checkIRTOnlyCall(ir))
-#define CK_IRT_ONLY_ICALL(ir)              (checkIRTOnlyIcall(ir))
+#define CK_IRT_ONLY_ICALL(ir)              (checkIRTOnlyICall(ir))
 #define CK_ARRAY_DIM(ir, n)                (checkArrayDimension(ir, n))
 #else
 #define CK_KID_NUM(ir, n, f, l)            (n)
@@ -968,7 +968,7 @@ public:
     bool is_atomic() const { return IR_is_atomic(this); }
 
     //True if ir is read-modify-write.
-    bool is_rmw() const { return IR_is_read_mod_write(this); }    
+    bool is_rmw() const { return IR_is_read_mod_write(this); }
     bool is_judge() const { return is_relation() || is_logical(); }
     bool is_logical() const { return IRDES_is_logical(g_ir_desc[getCode()]); }
     bool is_relation() const { return IRDES_is_relation(g_ir_desc[getCode()]); }
@@ -1095,7 +1095,7 @@ public:
     //If S1 will be deleted, pr1 should be removed from its SSA_uses.
     void removeSSAUse();
 
-    //This function only handle Call/Icall stmt, it find PR and remove
+    //This function only handle Call/ICall stmt, it find PR and remove
     //them out of UseSet.
     //Note this function does not maintain DU chain between call and its use.
     void removePROutFromUseset(DefMiscBitSetMgr & sbs_mgr, Region * rg);
@@ -1211,11 +1211,11 @@ public:
 //usage: ild p, where p is ILD_base, it must be pointer.
 //    1. res = ild (p), if ILD_ofst is 0.
 //    2. res = ild (p + ILD_ofst) if ILD_ofst is not 0.
-#define ILD_ofst(ir)        (((CIld*)CK_IRT(ir, IR_ILD))->field_offset)
-#define ILD_du(ir)          (((CIld*)CK_IRT(ir, IR_ILD))->du)
+#define ILD_ofst(ir)        (((CILd*)CK_IRT(ir, IR_ILD))->field_offset)
+#define ILD_du(ir)          (((CILd*)CK_IRT(ir, IR_ILD))->du)
 #define ILD_base(ir)        ILD_kid(ir, 0)
-#define ILD_kid(ir, idx)    (((CIld*)ir)->opnd[CKID_TY(ir, IR_ILD, idx)])
-class CIld : public DuProp, public OffsetProp {
+#define ILD_kid(ir, idx)    (((CILd*)ir)->opnd[CKID_TY(ir, IR_ILD, idx)])
+class CILd : public DuProp, public OffsetProp {
 public:
     IR * opnd[1];
 };
@@ -1299,7 +1299,8 @@ public:
 //location and store the element to a PR.
 //
 //The the number of byte of GETELEM_base must be
-//an integer multiple of the number of byte of result PR if base memory is vector.
+//an integer multiple of the number of byte of result
+//PR if base is vector.
 //
 //usage: getelem $1(i32) $2(vec<4*i32>), 4.
 //    The base memory location is a PR, which is a vector.
@@ -1332,13 +1333,13 @@ public:
 //to be stored. The followed code exhibits the behaivor of such usage.
 //    1. [p] = rhs, if IST_ofst is 0.
 //    2. [p + IST_ofst] = rhs, if IST_ofst is not 0.
-#define IST_bb(ir)          (((CIst*)CK_IRT(ir, IR_IST))->bb)
-#define IST_ofst(ir)        (((CIst*)CK_IRT(ir, IR_IST))->field_offset)
-#define IST_du(ir)          (((CIst*)CK_IRT(ir, IR_IST))->du)
+#define IST_bb(ir)          (((CISt*)CK_IRT(ir, IR_IST))->bb)
+#define IST_ofst(ir)        (((CISt*)CK_IRT(ir, IR_IST))->field_offset)
+#define IST_du(ir)          (((CISt*)CK_IRT(ir, IR_IST))->du)
 #define IST_base(ir)        IST_kid(ir, 0)
 #define IST_rhs(ir)         IST_kid(ir, 1)
-#define IST_kid(ir, idx)    (((CIst*)ir)->opnd[CKID_TY(ir, IR_IST, idx)])
-class CIst : public DuProp, public OffsetProp, public StmtProp {
+#define IST_kid(ir, idx)    (((CISt*)ir)->opnd[CKID_TY(ir, IR_IST, idx)])
+class CISt : public DuProp, public OffsetProp, public StmtProp {
 public:
     IR * opnd[2];
 };
@@ -1793,7 +1794,7 @@ class CCvt : public CUna {
 public:
    ROUND_TYPE round;
 
-public:    
+public:
     //Get the leaf expression.
     //e.g: cvt:i32(cvt:u8(x)), this function will return x;
     IR * getLeafExp()
@@ -2579,7 +2580,7 @@ void IR::setDU(DU * du)
 //Exported Functions.
 CHAR const* compositeName(SYM const* n, xcom::StrBuf & buf);
 void dumpIR(IR const* ir,
-            Region * rg, 
+            Region * rg,
             CHAR * attr = NULL,
             UINT dumpflag = IR_DUMP_KID|IR_DUMP_SRC_LINE|IR_DUMP_INNER_REGION);
 void dumpIRListH(IR * ir_list, Region * rg,

@@ -240,7 +240,7 @@ void VAR::dumpProp(xcom::StrBuf & buf, bool grmode) const
         for (p++; i < size; i++, p++) {
             buf.strcat(",0x%x", (BYTE)*p);
         }
-        buf.strcat(")");        
+        buf.strcat(")");
     }
 }
 

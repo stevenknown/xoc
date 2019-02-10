@@ -164,7 +164,7 @@ void IPA::createCallDummyuse(OptCtx & oc)
         if (rg == NULL) { continue; }
         createCallDummyuse(rg);
 
-        if (g_compute_du_chain) {
+        if (g_compute_classic_du_chain) {
             OptCtx loc(oc);
             recomputeDUChain(rg, loc);
             if (!m_is_keep_dumgr && rg->getPassMgr() != NULL) {
@@ -173,7 +173,7 @@ void IPA::createCallDummyuse(OptCtx & oc)
         }
     }
 
-    if (g_compute_du_chain) {
+    if (g_compute_classic_du_chain) {
         OC_is_du_chain_valid(oc) = true;
         if (m_is_keep_reachdef) {
             OC_is_reach_def_valid(oc) = true;
@@ -190,16 +190,13 @@ void IPA::recomputeDUChain(Region * rg, OptCtx & oc)
          rg->getBBList()->get_elem_count() == 0)) {
         return;
     }
-
     if (rg->getPassMgr() == NULL) {
         rg->initPassMgr();
     }
-
-    //IR_DU_MGR need AA
-    rg->getPassMgr()->registerPass(PASS_AA);
-
-    ASSERT0(!OC_is_du_chain_valid(oc));
-
+    if (!OC_is_aa_valid(oc)) {
+        //IR_DU_MGR need IR_AA
+        rg->getPassMgr()->registerPass(PASS_AA);
+    }
     if (g_do_md_ssa) {
         //Build MD SSA du chain.
         if (m_is_recompute_du_ref) {
@@ -226,7 +223,7 @@ void IPA::recomputeDUChain(Region * rg, OptCtx & oc)
         return;
     }
 
-    //Build typeical du chain.
+    //Build classic du chain.
     if (m_is_recompute_du_ref) {
         if (m_is_keep_reachdef) {
             rg->checkValidAndRecompute(&oc,

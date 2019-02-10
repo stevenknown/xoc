@@ -591,7 +591,7 @@ IR * Region::buildCall(
 //    0 means the call does not have a return value.
 //'type': result PR data type.
 //    0 means the call does not have a return value.
-IR * Region::buildIcall(
+IR * Region::buildICall(
         IR * callee,
         IR * param_list,
         UINT result_prno,
@@ -712,7 +712,7 @@ IR * Region::buildLoad(VAR * var, Type const* type)
 //    pointer_base_size; or if result is memory chunk, it records
 //    the size of memory chunk.
 //NOTICE: The ofst of ILD requires to maintain when after return.
-IR * Region::buildIload(IR * base, Type const* type)
+IR * Region::buildILoad(IR * base, Type const* type)
 {
     ASSERT0(type);
     ASSERTN(base && base->is_ptr(), ("mem-address of ILD must be pointer"));
@@ -725,10 +725,10 @@ IR * Region::buildIload(IR * base, Type const* type)
 
 
 //Build IR_ILD operation.
-IR * Region::buildIload(IR * base, UINT ofst, Type const* type)
+IR * Region::buildILoad(IR * base, UINT ofst, Type const* type)
 {
     ASSERT0(type);
-    IR * ir = buildIload(base, type);
+    IR * ir = buildILoad(base, type);
     ILD_ofst(ir) = ofst;
     return ir;
 }
@@ -884,10 +884,10 @@ IR * Region::buildStore(VAR * lhs, Type const* type, UINT ofst, IR * rhs)
 
 
 //Build IR_IST operation.
-IR * Region::buildIstore(IR * base, IR * rhs, UINT ofst, Type const* type)
+IR * Region::buildIStore(IR * base, IR * rhs, UINT ofst, Type const* type)
 {
     ASSERT0(type);
-    IR * ir = buildIstore(base, rhs, type);
+    IR * ir = buildIStore(base, rhs, type);
     IST_ofst(ir) = ofst;
     return ir;
 }
@@ -898,7 +898,7 @@ IR * Region::buildIstore(IR * base, IR * rhs, UINT ofst, Type const* type)
 //'rhs: value expected to store.
 //'type': result type of indirect memory operation, note type is not the
 //data type of lhs.
-IR * Region::buildIstore(IR * base, IR * rhs, Type const* type)
+IR * Region::buildIStore(IR * base, IR * rhs, Type const* type)
 {
     ASSERT0(type);
     ASSERT0(base && rhs && rhs->is_exp());
@@ -1837,7 +1837,7 @@ void Region::registerGlobalVAR()
 //    BB5:
 //    L2:
 //    a = pr
-bool Region::reconstructBBlist(OptCtx & oc)
+bool Region::reconstructBBList(OptCtx & oc)
 {
     START_TIMER(t, "Reconstruct IRBB list");
     ASSERTN(getCFG(), ("CFG is not available"));
@@ -1944,7 +1944,7 @@ IR * Region::constructIRlist(bool clean_ir_list)
 
 //1. Split list of IRs into basic-block list.
 //2. Set BB propeties. e.g: entry-bb, exit-bb.
-void Region::constructIRBBlist()
+void Region::constructBBList()
 {
     if (getIRList() == NULL) { return; }
     START_TIMER(t, "Construct IRBB list");
@@ -3579,16 +3579,16 @@ void Region::checkValidAndRecompute(OptCtx * oc, ...)
                 if (dumgr == NULL) {
                     dumgr = (IR_DU_MGR*)passmgr->registerPass(PASS_DU_MGR);
                 }
-  
+
                 UINT flag = COMPUTE_NOPR_DU;
-  
+
                 //If PRs have already been in SSA form, compute
                 //DU chain doesn't make any sense.
                 PRSSAMgr * ssamgr = (PRSSAMgr*)passmgr->queryPass(PASS_PR_SSA_MGR);
                 if (ssamgr == NULL) {
                     flag |= COMPUTE_PR_DU;
                 }
-  
+
                 if (opts.is_contain(PASS_REACH_DEF)) {
                     dumgr->computeMDDUChain(*oc, true, flag);
                 } else {
@@ -3731,8 +3731,14 @@ bool Region::processIRList(OptCtx & oc)
     START_TIMER(t, "PreScan");
     prescan(getIRList());
     END_TIMER(t, "PreScan");
+	if (g_is_dump_after_pass) {
+		g_indent = 0;
+		note("\n==--- DUMP PRIMITIVE IR LIST ----==");
+		dumpIRList(getIRList(), this);
+	}
     if (!HighProcess(oc)) { return false; }
-    ASSERT0(getDUMgr()->verifyMDDUChain(COMPUTE_PR_DU|COMPUTE_NOPR_DU));
+    ASSERT0(getDUMgr() == NULL ||
+        getDUMgr()->verifyMDDUChain(COMPUTE_PR_DU|COMPUTE_NOPR_DU));
     if (!MiddleProcess(oc)) { return false; }
 
     return true;

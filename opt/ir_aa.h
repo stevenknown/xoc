@@ -376,7 +376,7 @@ protected:
             IN AACtx * ic,
             IN MD2MDSet * mx);
     void inferStoreArrayValue(IN IR * ir, IN AACtx * ic, IN MD2MDSet * mx);
-    void inferIstoreValue(IN IR * ir, IN AACtx * ic, IN MD2MDSet * mx);
+    void inferIStoreValue(IN IR * ir, IN AACtx * ic, IN MD2MDSet * mx);
     void inferArrayInfinite(
             INT ofst,
             bool is_ofst_pred,
@@ -409,7 +409,7 @@ protected:
             IN OUT MD2MDSet * mx);
     void processGetelem(IR * ir, IN MD2MDSet * mx);
     void processSetelem(IR * ir, IN MD2MDSet * mx);
-    void processIld(
+    void processILd(
             IR * ir,
             IN OUT MDSet & mds,
             IN OUT AACtx * ic,
@@ -430,7 +430,7 @@ protected:
             IN OUT AACtx * ic);
     void processStore(IN IR * ir, IN OUT MD2MDSet * mx);
     void processStorePR(IN IR * ir, IN MD2MDSet * mx);
-    void processIst(IN IR * ir, IN OUT MD2MDSet * mx);
+    void processISt(IN IR * ir, IN OUT MD2MDSet * mx);
     void processStoreArray(IN IR * ir, IN MD2MDSet * mx);
     void processPhi(IN IR * ir, IN MD2MDSet * mx);
     void processCallSideeffect(IN OUT MD2MDSet & mx, MDSet const& by_addr_mds);

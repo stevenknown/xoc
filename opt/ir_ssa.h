@@ -142,7 +142,7 @@ protected:
     void destructionInDomTreeOrder(IRBB * root, xcom::Graph & domtree);
 
     void handleBBRename(IRBB * bb,
-                        IN DefSBitSet & defed_prs,
+                        IN DefSBitSet const& defined_prs,
                         IN OUT BB2VPMap & bb2vp);
 
     Stack<VP*> * mapPRNO2VPStack(UINT prno);
@@ -158,14 +158,14 @@ protected:
     }
 
     void refinePhi(List<IRBB*> & wl);
-    void rename(DefSBitSet & effect_prs,
-                Vector<DefSBitSet*> & defed_prs_vec,
-                xcom::Graph & domtree);
+    void rename(DefSBitSet const& effect_prs,
+                Vector<DefSBitSet*> const& defined_prs_vec,
+                xcom::Graph const& domtree);
     void renameBB(IRBB * bb);
     void renameInDomTreeOrder(
                 IRBB * root,
-                xcom::Graph & dtree,
-                Vector<DefSBitSet*> & defed_prs_vec);
+                xcom::Graph const& dtree,
+                Vector<DefSBitSet*> const& defined_prs_vec);
 
     void stripVersionForBBList();
     void stripVersionForAllVP();
@@ -178,11 +178,11 @@ protected:
                        DfMgr const& dfm,
                        xcom::BitSet & visited,
                        List<IRBB*> & wl,
-                       Vector<DefSBitSet*> & defed_prs_vec);
+                       Vector<DefSBitSet*> & defined_prs_vec);
     void placePhi(DfMgr const& dfm,
                   IN OUT DefSBitSet & effect_prs,
                   DefMiscBitSetMgr & bs_mgr,
-                  Vector<DefSBitSet*> & defed_prs_vec,
+                  Vector<DefSBitSet*> & defined_prs_vec,
                   List<IRBB*> & wl);
 public:
     explicit PRSSAMgr(Region * rg)

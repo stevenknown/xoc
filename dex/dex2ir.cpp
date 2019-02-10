@@ -575,7 +575,7 @@ IR * Dex2IR::convertIput(IN LIR * lir)
                                 thisptr,
                                 m_ru->buildImmInt(ofst, m_ptr_addend));
     */
-    IR * c = m_ru->buildIstore(addr, stv, stv->getType());
+    IR * c = m_ru->buildIStore(addr, stv, stv->getType());
     IST_ofst(c) = LIR_op1(lir) * m_ofst_addend;
 
     IR_may_throw(c) = true;
@@ -758,10 +758,10 @@ IR * Dex2IR::convertIget(IN LIR * lir)
                             IR_dt(obj),
                             obj,
                             m_ru->buildImmInt(objofst, m_ptr_addend));
-    IR * ild = m_ru->buildIload(addr, getType(lir));
+    IR * ild = m_ru->buildILoad(addr, getType(lir));
     */
 
-    IR * ild = m_ru->buildIload(obj, ty);
+    IR * ild = m_ru->buildILoad(obj, ty);
     ILD_ofst(ild) = objofst; //ILD(MEM_ADDR+ofst)
     IR_may_throw(ild) = true;
     IR * c = m_ru->buildStorePR(PR_no(res), res->getType(), ild);

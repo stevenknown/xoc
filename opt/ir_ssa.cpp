@@ -301,7 +301,6 @@ void SSAGraph::dump(CHAR const* name, bool detail)
     old = g_tfile;
     g_tfile = h;
     List<IR const*> lst;
-    TypeMgr * dm = m_ru->getTypeMgr();
     INT c;
     for (xcom::Vertex * v = m_vertices.get_first(c);
          v != NULL; v = m_vertices.get_next(c)) {
@@ -587,7 +586,7 @@ void PRSSAMgr::placePhiForPR(
         DfMgr const& dfm,
         xcom::BitSet & visited,
         List<IRBB*> & wl,
-        Vector<DefSBitSet*> & defed_prs_vec)
+        Vector<DefSBitSet*> & defined_prs_vec)
 {
     visited.clean();
     wl.clean();
@@ -600,7 +599,7 @@ void PRSSAMgr::placePhiForPR(
     while (wl.get_elem_count() != 0) {
         IRBB * bb = wl.remove_head();
 
-        //Each basic block in dfcs is in dominance frontier of 'bb'.
+        //Each BB in Set dfcs is in dominance frontier of 'bb'.
         xcom::BitSet const* dfcs = dfm.getDFControlSet(BB_id(bb));
         if (dfcs == NULL) { continue; }
 
@@ -620,8 +619,8 @@ void PRSSAMgr::placePhiForPR(
             //Redundant phi will be removed during refinePhi().
             insertPhi(prno, ibb);
 
-            ASSERT0(defed_prs_vec.get(i));
-            defed_prs_vec.get(i)->bunion(prno);
+            ASSERT0(defined_prs_vec.get(i));
+            defined_prs_vec.get(i)->bunion(prno);
 
             wl.append_tail(ibb);
         }
@@ -662,7 +661,8 @@ bool PRSSAMgr::isRedundantPHI(IR const* phi, OUT IR ** common_def) const
                 break;
             }
         } else {
-            //Assign def a dummy value to inidcate the region live-in PR.
+            //Assign def a dummy value to inidcate the region-live-in
+            //PR(or so called argument).
             def = (IR*)DUMMY_DEF_ADDR;
         }
     }
@@ -682,10 +682,10 @@ bool PRSSAMgr::isRedundantPHI(IR const* phi, OUT IR ** common_def) const
 void PRSSAMgr::placePhi(DfMgr const& dfm,
                         OUT DefSBitSet & effect_prs,
                         DefMiscBitSetMgr & bs_mgr,
-                        Vector<DefSBitSet*> & defed_prs_vec,
+                        Vector<DefSBitSet*> & defined_prs_vec,
                         List<IRBB*> & wl)
 {
-    START_TIMER(t, "SSA: Place phi");
+    START_TIMER(t, "PRSSA: Place phi");
 
     //Record BBs which modified each PR.
     BBList * bblst = m_ru->getBBList();
@@ -693,7 +693,7 @@ void PRSSAMgr::placePhi(DfMgr const& dfm,
 
     for (IRBB * bb = bblst->get_head(); bb != NULL; bb = bblst->get_next()) {
         DefSBitSet * bs = bs_mgr.allocSBitSet();
-        defed_prs_vec.set(BB_id(bb), bs);
+        defined_prs_vec.set(BB_id(bb), bs);
         collectDefinedPR(bb, *bs);
 
         //Regard all defined PR as effect, and they will be versioned later.
@@ -712,14 +712,13 @@ void PRSSAMgr::placePhi(DfMgr const& dfm,
     }
 
     //Place phi for lived effect prs.
-    wl.clean();
     xcom::BitSet visited((bblst->get_elem_count()/8)+1);
     SEGIter * cur = NULL;
     for (INT i = effect_prs.get_first(&cur);
          i >= 0; i = effect_prs.get_next(i, &cur)) {
-        placePhiForPR(i, pr2defbb.get(i), dfm, visited, wl, defed_prs_vec);
+        placePhiForPR(i, pr2defbb.get(i), dfm, visited, wl, defined_prs_vec);
     }
-    END_TIMER(t, "SSA: Place phi");
+    END_TIMER(t, "PRSSA: Place phi");
 
     //Free local used objects.
     for (INT i = 0; i <= pr2defbb.get_last_idx(); i++) {
@@ -816,7 +815,7 @@ Stack<VP*> * PRSSAMgr::mapPRNO2VPStack(UINT prno)
 
 void PRSSAMgr::handleBBRename(
         IRBB * bb,
-        DefSBitSet & defed_prs,
+        DefSBitSet const& defined_prs,
         IN OUT BB2VPMap & bb2vp)
 {
     ASSERT0(bb2vp.get(BB_id(bb)) == NULL);
@@ -824,8 +823,8 @@ void PRSSAMgr::handleBBRename(
     bb2vp.set(BB_id(bb), prno2vp);
 
     SEGIter * cur = NULL;
-    for (INT prno = defed_prs.get_first(&cur);
-         prno >= 0; prno = defed_prs.get_next(prno, &cur)) {
+    for (INT prno = defined_prs.get_first(&cur);
+         prno >= 0; prno = defined_prs.get_next(prno, &cur)) {
         VP * vp = mapPRNO2VPStack(prno)->get_top();
         ASSERT0(vp);
         prno2vp->set(VP_prno(vp), vp);
@@ -904,11 +903,12 @@ void PRSSAMgr::handleBBRename(
 }
 
 
-//defed_prs_vec: for each BB, indicate PRs which has been defined.
+//Linear renaming algorithm.
+//defined_prs_vec: for each BB, indicate PRs which has been defined.
 void PRSSAMgr::renameInDomTreeOrder(
         IRBB * root,
-        xcom::Graph & domtree,
-        Vector<DefSBitSet*> & defed_prs_vec)
+        xcom::Graph const& domtree,
+        Vector<DefSBitSet*> const& defined_prs_vec)
 {
     Stack<IRBB*> stk;
     UINT n = m_ru->getBBList()->get_elem_count();
@@ -920,9 +920,9 @@ void PRSSAMgr::renameInDomTreeOrder(
     while ((v = stk.get_top()) != NULL) {
         if (!visited.is_contain(BB_id(v))) {
             visited.bunion(BB_id(v));
-            DefSBitSet * defed_prs = defed_prs_vec.get(BB_id(v));
-            ASSERT0(defed_prs);
-            handleBBRename(v, *defed_prs, bb2vpmap);
+            DefSBitSet * defined_prs = defined_prs_vec.get(BB_id(v));
+            ASSERT0(defined_prs);
+            handleBBRename(v, *defined_prs, bb2vpmap);
         }
 
         xcom::Vertex const* bbv = domtree.get_vertex(BB_id(v));
@@ -946,12 +946,12 @@ void PRSSAMgr::renameInDomTreeOrder(
             //Do post-processing while all kids of BB has been processed.
             TMap<UINT, VP*> * prno2vp = bb2vpmap.get(BB_id(v));
             ASSERT0(prno2vp);
-            DefSBitSet * defed_prs = defed_prs_vec.get(BB_id(v));
-            ASSERT0(defed_prs);
+            DefSBitSet const* defined_prs = defined_prs_vec.get(BB_id(v));
+            ASSERT0(defined_prs);
 
             SEGIter * cur = NULL;
-            for (INT i = defed_prs->get_first(&cur);
-                 i >= 0; i = defed_prs->get_next(i, &cur)) {
+            for (INT i = defined_prs->get_first(&cur);
+                 i >= 0; i = defined_prs->get_next(i, &cur)) {
                 Stack<VP*> * vs = mapPRNO2VPStack(i);
                 ASSERT0(vs->get_bottom() != NULL);
                 VP * vp = prno2vp->get(VP_prno(vs->get_top()));
@@ -977,14 +977,12 @@ void PRSSAMgr::renameInDomTreeOrder(
 
 //Rename variables.
 void PRSSAMgr::rename(
-        DefSBitSet & effect_prs,
-        Vector<DefSBitSet*> & defed_prs_vec,
-        xcom::Graph & domtree)
+        DefSBitSet const& effect_prs,
+        Vector<DefSBitSet*> const& defined_prs_vec,
+        xcom::Graph const& domtree)
 {
-    START_TIMER(t, "SSA: Rename");
-    BBList * bblst = m_ru->getBBList();
-    if (bblst->get_elem_count() == 0) { return; }
-
+    START_TIMER(t, "PRSSA: Rename");
+    if (m_ru->getBBList()->get_elem_count() == 0) { return; }
     SEGIter * cur = NULL;
     for (INT prno = effect_prs.get_first(&cur);
          prno >= 0; prno = effect_prs.get_next(prno, &cur)) {
@@ -993,8 +991,8 @@ void PRSSAMgr::rename(
     }
 
     ASSERT0(m_cfg->get_entry());
-    renameInDomTreeOrder(m_cfg->get_entry(), domtree, defed_prs_vec);
-    END_TIMER(t, "SSA: Rename");
+    renameInDomTreeOrder(m_cfg->get_entry(), domtree, defined_prs_vec);
+    END_TIMER(t, "PRSSA: Rename");
 }
 
 
@@ -1060,7 +1058,7 @@ void PRSSAMgr::destructionInDomTreeOrder(IRBB * root, xcom::Graph & domtree)
 //of current BB's predessor.
 void PRSSAMgr::destruction(DomTree & domtree)
 {
-    START_TIMER(t, "SSA: destruction in dom tree order");
+    START_TIMER(t, "PRSSA: destruction in dom tree order");
 
     BBList * bblst = m_ru->getBBList();
     if (bblst->get_elem_count() == 0) { return; }
@@ -1069,7 +1067,7 @@ void PRSSAMgr::destruction(DomTree & domtree)
     cleanPRSSAInfo();
     m_is_ssa_constructed = false;
 
-    END_TIMER(t, "SSA: destruction in dom tree order");
+    END_TIMER(t, "PRSSA: destruction in dom tree order");
 }
 
 
@@ -1448,7 +1446,7 @@ void PRSSAMgr::cleanPRSSAInfo()
 }
 
 
-static void revise_phi_dt(IR * phi, Region * rg)
+static void revisePhiDataType(IR * phi, Region * rg)
 {
     ASSERT0(phi->is_phi());
     //The data type of phi is set to be same type as its USE.
@@ -1471,28 +1469,30 @@ static void revise_phi_dt(IR * phi, Region * rg)
 //wl: work list for temporary used.
 void PRSSAMgr::refinePhi(List<IRBB*> & wl)
 {
-    START_TIMER(t, "SSA: Refine phi");
+    START_TIMER(t, "PRSSA: Refine phi");
 
     BBList * bblst = m_ru->getBBList();
     xcom::C<IRBB*> * ct;
 
     wl.clean();
+    //Estimate memory usage.
+    BitSet in_list(bblst->get_elem_count() / BITS_PER_BYTE / 4);
     for (bblst->get_head(&ct); ct != bblst->end(); ct = bblst->get_next(ct)) {
         IRBB * bb = ct->val();
         ASSERT0(bb);
         wl.append_tail(bb);
+        in_list.bunion(bb->id());
     }
 
     IRBB * bb = NULL;
     while ((bb = wl.remove_head()) != NULL) {
+        in_list.diff(bb->id());
         xcom::C<IR*> * irct = NULL;
         xcom::C<IR*> * nextirct = NULL;
         for (BB_irlist(bb).get_head(&nextirct), irct = nextirct;
              irct != BB_irlist(bb).end(); irct = nextirct) {
             nextirct = BB_irlist(bb).get_next(nextirct);
-
             IR * ir = irct->val();
-
             if (!ir->is_phi()) { break; }
 
             IR * common_def = NULL;
@@ -1513,10 +1513,12 @@ void PRSSAMgr::refinePhi(List<IRBB*> & wl)
                     }
 
                     IRBB * defbb = SSA_def(si)->getBB();
-
                     ASSERTN(defbb, ("defbb does not belong to any BB"));
-
                     wl.append_tail(defbb);
+                    if (!in_list.is_contain(defbb->id())) {
+                        wl.append_tail(defbb);
+                        in_list.bunion(defbb->id());
+                    }
                 }
 
                 SSAInfo * curphi_ssainfo = PHI_ssainfo(ir);
@@ -1564,18 +1566,18 @@ void PRSSAMgr::refinePhi(List<IRBB*> & wl)
                 continue;
             }
 
-            revise_phi_dt(ir, m_ru);
+            revisePhiDataType(ir, m_ru);
         }
     }
 
-    END_TIMER(t, "SSA: Refine phi");
+    END_TIMER(t, "PRSSA: Refine phi");
 }
 
 
 //This function revise phi data type, and remove redundant phi.
 void PRSSAMgr::stripVersionForBBList()
 {
-    START_TIMER(t, "SSA: Strip version");
+    START_TIMER(t, "PRSSA: Strip version");
 
     BBList * bblst = m_ru->getBBList();
     if (bblst->get_elem_count() == 0) { return; }
@@ -1602,7 +1604,7 @@ void PRSSAMgr::stripVersionForBBList()
         }
     }
 
-    END_TIMER(t, "SSA: Strip version");
+    END_TIMER(t, "PRSSA: Strip version");
 }
 
 
@@ -1798,10 +1800,10 @@ void PRSSAMgr::construction(OptCtx & oc)
     m_ru->checkValidAndRecompute(&oc, PASS_DOM, PASS_UNDEF);
 
     //Extract dominate tree of CFG.
-    START_TIMER(t, "SSA: Extract Dom Tree");
+    START_TIMER(t, "PRSSA: Extract Dom Tree");
     DomTree domtree;
     m_cfg->get_dom_tree(domtree);
-    END_TIMER(t, "SSA: Extract Dom Tree");
+    END_TIMER(t, "PRSSA: Extract Dom Tree");
 
     if (!construction(domtree)) {
         return;
@@ -1818,11 +1820,11 @@ bool PRSSAMgr::construction(DomTree & domtree)
 {
     ASSERT0(m_ru);
 
-    START_TIMER(t, "SSA: Build dominance frontier");
+    START_TIMER(t, "PRSSA: Build dominance frontier");
     DfMgr dfm;
     dfm.build((xcom::DGraph&)*m_cfg);
 
-    END_TIMER(t, "SSA: Build dominance frontier");
+    END_TIMER(t, "PRSSA: Build dominance frontier");
     if (dfm.hasHighDFDensityVertex((xcom::DGraph&)*m_cfg)) {
         return false;
     }
@@ -1830,11 +1832,11 @@ bool PRSSAMgr::construction(DomTree & domtree)
     List<IRBB*> wl;
     DefMiscBitSetMgr sm;
     DefSBitSet effect_prs(sm.getSegMgr());
-    Vector<DefSBitSet*> defed_prs_vec;
+    Vector<DefSBitSet*> defined_prs_vec;
 
-    placePhi(dfm, effect_prs, sm, defed_prs_vec, wl);
+    placePhi(dfm, effect_prs, sm, defined_prs_vec, wl);
 
-    rename(effect_prs, defed_prs_vec, domtree);
+    rename(effect_prs, defined_prs_vec, domtree);
 
     ASSERT0(verifyPhi(true) && verifyPRNOofVP());
 
@@ -1849,8 +1851,10 @@ bool PRSSAMgr::construction(DomTree & domtree)
     stripVersionForBBList();
 
     if (g_is_dump_after_pass) {
+        START_TIMER(tdump, "PRSSA: Dump After Pass");
         dump();
         dfm.dump((xcom::DGraph&)*m_cfg);
+        END_TIMER(tdump, "PRSSA: Dump After Pass");
     }
 
     ASSERT0(verifyIRandBB(m_ru->getBBList(), m_ru));

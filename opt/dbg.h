@@ -53,13 +53,27 @@ public:
 
 class DbxMgr {
 public:
+    class PrtCtx {
+    public:
+        //Record the string will be prefix of dbx information.
+        char const* prefix;
+
+    public:
+        PrtCtx() { prefix = NULL; }
+    };
+
+public:
     virtual ~DbxMgr() {}
 
     //Do some prepare work before print source file.
     virtual void doPrepareWorkBeforePrint() {}
 
-    virtual void printSrcLine(IR const*);
-    virtual void printSrcLine(Dbx const*) {} //Taget Dependent Code
+    virtual void printSrcLine(IR const*, PrtCtx * ctx);
+    virtual void printSrcLine(Dbx const*, PrtCtx * ctx)
+    {
+        //Taget Dependent Code
+        //Nothing to do.
+    }
 };
 
 

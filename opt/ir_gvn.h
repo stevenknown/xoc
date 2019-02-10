@@ -492,7 +492,7 @@ protected:
             IR const* ild,
             IR const* domdef,
             bool & change);
-    VN * computeIloadByAnonDomDef(
+    VN * computeILoadByAnonDomDef(
             IR const* ild,
             VN const* mlvn,
             IR const* domdef,
@@ -507,7 +507,7 @@ protected:
     void computeArrayAddrRef(IR const* ir, bool & change);
     VN * computeArray(IR const* exp, bool & change);
     VN * computeScalar(IR const* exp, bool & change);
-    VN * computeIload(IR const* exp, bool & change);
+    VN * computeILoad(IR const* exp, bool & change);
     VN * computeExactMemory(IR const* exp, bool & change);
     VN * computePR(IR const* exp, bool & change);
     VN * computeVN(IR const* exp, bool & change);
@@ -581,7 +581,7 @@ public:
     void set_mapIR2VN(IR const* ir, VN * vn) { m_ir2vn.set(ir->id(), vn); }
     void setComputeVNForFP(bool doit) { m_is_vn_fp = doit; }
     void set_valid(bool valid) { m_is_valid = valid; }
-    void setComputeIloadVNviaDU(bool doit) { m_is_comp_ild_vn_by_du = doit; }
+    void setComputeILoadVNviaDU(bool doit) { m_is_comp_ild_vn_by_du = doit; }
 
     bool reperform(OptCtx & oc);
     bool verify();

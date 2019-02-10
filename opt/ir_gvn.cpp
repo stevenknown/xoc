@@ -522,7 +522,7 @@ VN * IR_GVN::computeExactMemory(IR const* exp, bool & change)
 
 
 //Compute VN for ild according to anonymous domdef.
-VN * IR_GVN::computeIloadByAnonDomDef(
+VN * IR_GVN::computeILoadByAnonDomDef(
         IR const* ild,
         VN const* mlvn,
         IR const* domdef,
@@ -557,7 +557,7 @@ VN * IR_GVN::computeIloadByAnonDomDef(
 }
 
 
-VN * IR_GVN::computeIload(IR const* exp, bool & change)
+VN * IR_GVN::computeILoad(IR const* exp, bool & change)
 {
     ASSERT0(exp->is_ild());
     VN * mlvn = computeVN(ILD_base(exp), change);
@@ -592,7 +592,7 @@ VN * IR_GVN::computeIload(IR const* exp, bool & change)
     }
     if (domdef == NULL) { return NULL; }
 
-    //ofst will be distinguished in computeIloadByAnonDomDef(), so
+    //ofst will be distinguished in computeILoadByAnonDomDef(), so
     //we do not need to differentiate the various offset of ild and ist.
     //if (domdef->is_ist() && IST_ofst(domdef) != ILD_ofst(exp)) {
     //    return NULL;
@@ -601,7 +601,7 @@ VN * IR_GVN::computeIload(IR const* exp, bool & change)
     if (!domdef->is_ist() ||
         domdef->is_starray() ||
         IST_ofst(domdef) != ILD_ofst(exp)) {
-        return computeIloadByAnonDomDef(exp, mlvn, domdef, change);
+        return computeILoadByAnonDomDef(exp, mlvn, domdef, change);
     }
 
     //domdef is ist and the offset is matched.
@@ -926,7 +926,7 @@ VN * IR_GVN::computeVN(IR const* exp, bool & change)
     case IR_ARRAY:
         return computeArray(exp, change);
     case IR_ILD:
-        return computeIload(exp, change);
+        return computeILoad(exp, change);
     case IR_CONST: {
         VN * x = m_ir2vn.get(IR_id(exp));
         if (x != NULL) { return x; }
@@ -1446,7 +1446,7 @@ bool IR_GVN::perform(OptCtx & oc)
 
     if (g_is_dump_after_pass) {
         dump();
-    }    
+    }
     END_TIMER(t, getPassName());
     ASSERT0(verify());
     m_is_valid = true;

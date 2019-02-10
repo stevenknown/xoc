@@ -52,6 +52,6 @@ class CDdxMgr : public DbxMgr {
 public:
     //Append src file line into dump file.
     //Only print statement line.
-    virtual void printSrcLine(Dbx const* dbx) {}
+    virtual void printSrcLine(Dbx const*, PrtCtx*) {}
 };
 #endif

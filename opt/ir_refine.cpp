@@ -41,7 +41,7 @@ author: Su Zhenyu
 namespace xoc {
 
 //Algebraic identities.
-IR * Region::refineIload1(IR * ir, bool & change)
+IR * Region::refineILoad1(IR * ir, bool & change)
 {
     ASSERT0(ir->is_ild());
     //Convert
@@ -85,7 +85,7 @@ IR * Region::refineIload1(IR * ir, bool & change)
 }
 
 
-IR * Region::refineIload2(IR * ir, bool & change)
+IR * Region::refineILoad2(IR * ir, bool & change)
 {
     ASSERT0(ir->is_ild() &&
             ILD_base(ir)->is_lda() &&
@@ -119,7 +119,7 @@ IR * Region::refineIload2(IR * ir, bool & change)
 }
 
 
-IR * Region::refineIload(IR * ir, bool & change, RefineCtx & rc)
+IR * Region::refineILoad(IR * ir, bool & change, RefineCtx & rc)
 {
     ASSERT0(ir->is_ild());
     ASSERT0(ir->is_single());
@@ -130,14 +130,14 @@ IR * Region::refineIload(IR * ir, bool & change, RefineCtx & rc)
         //     LDA
         //=>
         //    LD,ofst
-        return refineIload1(ir, change);
+        return refineILoad1(ir, change);
     } else if (base->is_lda() && LDA_ofst(base) != 0) {
         //Convert
         //    ILD,ofst1
         //     LDA,ofst2
         //=>
         //    LD,ofst1+ofst2
-        return refineIload2(ir, change);
+        return refineILoad2(ir, change);
     } else {
         ILD_base(ir) = refineIR(base, change, rc);
         if (change) {
@@ -148,7 +148,7 @@ IR * Region::refineIload(IR * ir, bool & change, RefineCtx & rc)
 }
 
 
-IR * Region::refineIstore(IR * ir, bool & change, RefineCtx & rc)
+IR * Region::refineIStore(IR * ir, bool & change, RefineCtx & rc)
 {
     ASSERT0(ir->is_ist());
     bool t = false;
@@ -425,7 +425,7 @@ IR * Region::refineCall(IR * ir, bool & change, RefineCtx & rc)
 }
 
 
-IR * Region::refineIcall(IR * ir, bool & change, RefineCtx & rc)
+IR * Region::refineICall(IR * ir, bool & change, RefineCtx & rc)
 {
     refineCall(ir, change, rc);
     return ir;
@@ -1490,7 +1490,7 @@ IR * Region::refineIR(IR * ir, bool & change, RefineCtx & rc)
         ir = refineLoad(ir);
         break;
     case IR_ILD:
-        ir = refineIload(ir, tmpc, rc);
+        ir = refineILoad(ir, tmpc, rc);
         break;
     case IR_STARRAY:
         ir = refineStoreArray(ir, tmpc, rc);
@@ -1506,7 +1506,7 @@ IR * Region::refineIR(IR * ir, bool & change, RefineCtx & rc)
         ir = refineGetelem(ir, tmpc, rc);
         break;
     case IR_IST:
-        ir = refineIstore(ir, tmpc, rc);
+        ir = refineIStore(ir, tmpc, rc);
         break;
     case IR_LDA:
         break;
@@ -1514,7 +1514,7 @@ IR * Region::refineIR(IR * ir, bool & change, RefineCtx & rc)
         ir = refineCall(ir, tmpc, rc);
         break;
     case IR_ICALL:
-        ir = refineIcall(ir, tmpc, rc);
+        ir = refineICall(ir, tmpc, rc);
         break;
     case IR_ADD:
     case IR_SUB:

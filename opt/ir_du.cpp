@@ -101,9 +101,8 @@ void MDId2IRlist::clean()
 //'md' corresponds to unique 'ir'.
 void MDId2IRlist::set(UINT mdid, IR * ir)
 {
-    ASSERTN(mdid != MD_GLOBAL_MEM &&
-           mdid != MD_FULL_MEM &&
-           mdid != MD_IMPORT_VAR,
+    ASSERTN(mdid != MD_GLOBAL_MEM && mdid != MD_FULL_MEM &&
+            mdid != MD_IMPORT_VAR,
         ("there is not any md could kill Fake-May-MD."));
     ASSERT0(ir);
     DefSBitSetCore * irtab = TMap<UINT, DefSBitSetCore*>::get(mdid);
@@ -132,7 +131,7 @@ void MDId2IRlist::append(UINT mdid, UINT irid)
 void MDId2IRlist::dump()
 {
     if (g_tfile == NULL) { return; }
-    m_md_sys->dump();
+    m_md_sys->dump(false);
     note("\n==-- DUMP MDID2IRLIST --==");
     TMapIter<UINT, DefSBitSetCore*> c;
     for (UINT mdid = get_first(c); mdid != MD_UNDEF; mdid = get_next(c)) {
@@ -1250,7 +1249,7 @@ void IR_DU_MGR::dumpRef(UINT indent)
     BBList * bbs = m_ru->getBBList();
     ASSERT0(bbs);
     if (bbs->get_elem_count() != 0) {
-        m_md_sys->dump();
+        m_md_sys->dump(false);
     }
 
     //Dump imported variables referenced.
@@ -2381,7 +2380,7 @@ void IR_DU_MGR::inferPhi(IR * ir, UINT duflag)
 }
 
 
-void IR_DU_MGR::inferIstore(IR * ir, UINT duflag)
+void IR_DU_MGR::inferIStore(IR * ir, UINT duflag)
 {
     ASSERT0(ir->is_ist());
     computeExpression(IST_base(ir), NULL, COMP_EXP_RECOMPUTE, duflag);
@@ -2399,20 +2398,24 @@ void IR_DU_MGR::inferIstore(IR * ir, UINT duflag)
 
 //Inference call's MayDef MD set.
 //Regard both USE and DEF as ir's RefMDSet.
-//Call may modify addressable local variables and globals in indefinite ways.
-void IR_DU_MGR::inferCallAndIcall(IR * ir, UINT duflag, IN MD2MDSet * mx)
+//NOTE: Call/ICall may modify addressable local
+//      variables and globals in any indefinite ways.
+void IR_DU_MGR::inferCallAndICall(IR * ir, UINT duflag, IN MD2MDSet * mx)
 {
     ASSERT0(ir->isCallStmt());
     if (ir->is_icall()) {
+        //Analysis callee's RefMDSet of IR_ICALL.
         computeExpression(ICALL_callee(ir), NULL, COMP_EXP_RECOMPUTE, duflag);
     }
 
     if (!HAVE_FLAG(duflag, COMPUTE_NOPR_DU)) {
         //Only compute du chain for PR.
         for (IR * p = CALL_param_list(ir); p != NULL; p = p->get_next()) {
+            //Analysis RefMDSet of given IR.
             computeExpression(p, NULL, COMP_EXP_RECOMPUTE, duflag);
         }
         for (IR * p = CALL_dummyuse(ir); p != NULL; p = p->get_next()) {
+             //Analysis RefMDSet of given IR.
              computeExpression(p, NULL, COMP_EXP_RECOMPUTE, duflag);
         }
         return;
@@ -2420,31 +2423,34 @@ void IR_DU_MGR::inferCallAndIcall(IR * ir, UINT duflag, IN MD2MDSet * mx)
 
     MDSet maydefuse;
 
-    //Set MD which parameters pointed to.
+    //Record MDSet that parameters pointed to as referred MDSet by call.
     for (IR * p = CALL_param_list(ir); p != NULL; p = p->get_next()) {
         if (p->is_ptr() || p->is_void()) {
-            //Compute the point-to set p pointed to.
+            //Get POINT-TO that p pointed to.
             //e.g: foo(p); where p->{x, y, z},
             //     then foo() may use {p, x, y, z}.
-            //NOTE that point-to set is only avaiable for the
+            //
+            //NOTE that POINT-TO is only available for the
             //last stmt of BB. The call is just in the situation.
             ASSERTN(mx, ("needed by computation of NOPR du chain"));
             ASSERT0(m_aa);
             m_aa->computeMayPointTo(p, mx, maydefuse);
         }
 
-        //Compute USE mdset.
+        //Analysis RefMDSet of given IR.
         computeExpression(p, NULL, COMP_EXP_RECOMPUTE, duflag);
     }
 
+    //Regard MDSet of dummyuse as referred MDSet by call.
     for (IR * p = CALL_dummyuse(ir); p != NULL; p = p->get_next()) {
-         computeExpression(p, NULL, COMP_EXP_RECOMPUTE, duflag);
-         if (p->getRefMD() != NULL) {
+        //Analysis RefMDSet of given IR.
+        computeExpression(p, NULL, COMP_EXP_RECOMPUTE, duflag);
+        if (p->getRefMD() != NULL) {
             maydefuse.bunion_pure(p->getRefMD()->id(), *m_misc_bs_mgr);
-         }
-         if (p->getRefMDSet() != NULL && !p->getRefMDSet()->is_empty()) {
+        }
+        if (p->getRefMDSet() != NULL && !p->getRefMDSet()->is_empty()) {
             maydefuse.bunion_pure(*p->getRefMDSet(), *m_misc_bs_mgr);
-         }
+        }
     }
 
     bool modify_global = true;
@@ -2482,6 +2488,8 @@ void IR_DU_MGR::inferCallAndIcall(IR * ir, UINT duflag, IN MD2MDSet * mx)
 
     //Register the MD set.
     //Regard both USE and DEF as ir's RefMDSet.
+    //TODO: differetiate the USE set and DEF set of CALL stmt
+    //      for better DefUse precision.
     ir->setRefMDSet(m_mds_hash->append(maydefuse), m_ru);
     maydefuse.clean(*m_misc_bs_mgr);
     tmpmds.clean(*m_misc_bs_mgr);
@@ -2927,7 +2935,7 @@ void IR_DU_MGR::computeCallRef(UINT duflag)
                 } else {
                     mx = m_aa->getUniqueMD2MDSet();
                 }
-                inferCallAndIcall(ir, duflag, mx);
+                inferCallAndICall(ir, duflag, mx);
                 break;
             }
             default:;
@@ -2972,7 +2980,7 @@ void IR_DU_MGR::computeMDRef(IN OUT OptCtx & oc, UINT duflag)
                 inferStoreArray(ir, duflag);
                 break;
             case IR_IST:
-                inferIstore(ir, duflag);
+                inferIStore(ir, duflag);
                 break;
             case IR_CALL:
             case IR_ICALL: {
@@ -2984,7 +2992,7 @@ void IR_DU_MGR::computeMDRef(IN OUT OptCtx & oc, UINT duflag)
                 } else {
                     mx = m_aa->getUniqueMD2MDSet();
                 }
-                inferCallAndIcall(ir, duflag, mx);
+                inferCallAndICall(ir, duflag, mx);
                 break;
             }
             case IR_RETURN:
@@ -4313,22 +4321,23 @@ void IR_DU_MGR::updateDef(IR * ir, UINT flag)
 }
 
 
-//Initialize md2maydef_irs for each bb.
+//Initialize md2maydef_ir_list for given BB according Reach-Def-In.
+//NOTE this function is used for classic data-flow analysis.
 void IR_DU_MGR::initMD2IRList(IRBB * bb)
 {
     DefDBitSetCore * reachdef_in = getInReachDef(BB_id(bb), m_misc_bs_mgr);
     ASSERT0(reachdef_in);
     m_md2irs->clean();
 
-    //Record DEF IR STMT for each MD.
+    //Record IR STMT that might modify given MD.
     SEGIter * st = NULL;
     for (INT i = reachdef_in->get_first(&st);
          i != -1; i = reachdef_in->get_next(i, &st)) {
         IR const* stmt = m_ru->getIR(i);
-        //stmt may be PHI, Region, CALL.
+        //stmt may be IR_PHI, IR_REGION, IR_CALL.
         //If stmt is IR_PHI, its maydef is NULL.
         //If stmt is IR_REGION, its mustdef is NULL, but the maydef
-        //may be not empty.
+        //may not be empty.
         MD const* mustdef = get_must_def(stmt);
         if (mustdef != NULL) {
             //mustdef may be fake object.
@@ -4341,21 +4350,23 @@ void IR_DU_MGR::initMD2IRList(IRBB * bb)
         //}
 
         MDSet const* maydef = getMayDef(stmt);
-        if (maydef != NULL) {
-            SEGIter * iter;
-            for (INT j = maydef->get_first(&iter);
-                 j != -1; j = maydef->get_next(j, &iter)) {
-                if (j == MD_GLOBAL_MEM ||
-                    j == MD_IMPORT_VAR ||
-                    j == MD_FULL_MEM) {
-                    m_md2irs->setHasIneffectDef();
-                } else if (mustdef != NULL && MD_id(mustdef) == (UINT)j) {
-                    continue;
-                }
+        if (maydef == NULL) { continue; }
 
-                ASSERT0(m_md_sys->getMD(j) != NULL);
-                m_md2irs->append(j, i);
+        //Create the map between MD and STMT,
+        //and record InEffect Definition if any.
+        SEGIter * iter;
+        for (INT j = maydef->get_first(&iter);
+             j != -1; j = maydef->get_next(j, &iter)) {
+            if (mustdef != NULL && MD_id(mustdef) == (UINT)j) {
+                continue;
             }
+            if (j == MD_GLOBAL_MEM ||
+                j == MD_IMPORT_VAR ||
+                j == MD_FULL_MEM) {
+                m_md2irs->setHasIneffectDef();
+            }
+            ASSERT0(m_md_sys->getMD(j) != NULL);
+            m_md2irs->append(j, i);
         }
     }
 }
@@ -5054,7 +5065,7 @@ void IR_DU_MGR::computeMDDUChain(
     OC_is_du_chain_valid(oc) = true;
 
     if (g_is_dump_after_pass && g_is_dump_du_chain) {
-        m_md_sys->dump();
+        m_md_sys->dump(false);
         dumpDUChainDetail();
     }
 

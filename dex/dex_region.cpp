@@ -86,7 +86,7 @@ bool DexRegion::HighProcess(OptCtx & oc)
     ASSERT0(verifySimp(getIRList(), simp));
     ASSERT0(verifyIRList(getIRList(), NULL, this));
 
-    constructIRBBlist();
+    constructBBList();
 
     ASSERT0(verifyIRandBB(getBBList(), this));
 
@@ -174,7 +174,7 @@ void DexRegion::processSimply()
 
     CHAR const* ru_name = getRegionName();
 
-    constructIRBBlist();
+    constructBBList();
 
     ASSERT0(verifyIRandBB(getBBList(), this));
 

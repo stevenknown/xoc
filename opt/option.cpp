@@ -131,10 +131,10 @@ bool g_build_cfs = false;
 bool g_do_aa = true;
 
 //Perform DU analysis for MD to build du chain.
-bool g_do_md_du_ana = true;
+bool g_do_md_du_analysis = true;
 
 //Compute DU chain.
-bool g_compute_du_chain = false;
+bool g_compute_classic_du_chain = false;
 
 //Computem available expression during du analysis to
 //build more precise du chain.

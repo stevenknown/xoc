@@ -1332,6 +1332,8 @@ bool MDSSAMgr::verifyPhi(bool is_vpinfo_avail)
 
 bool MDSSAMgr::verifyVMD()
 {
+    START_TIMER(tverify, "MDSSA: Verify VMD After Pass");
+
     //Check version for each vp.
     xcom::BitSet defset;
     Vector<VOpnd*> * vec = m_usedef_mgr.getVOpndVec();
@@ -1396,7 +1398,7 @@ bool MDSSAMgr::verifyVMD()
             }
         }
     }
-
+    END_TIMER(tverify, "MDSSA: Verify VMD After Pass");
     return true;
 }
 
@@ -1497,6 +1499,8 @@ void MDSSAMgr::verifySSAInfo(IR const* ir)
 //Current IR must be in SSA form.
 bool MDSSAMgr::verify()
 {
+    START_TIMER(tverify, "MDSSA: Verify After Pass");
+
     //Check version for each vp.
     BBList * bbl = m_ru->getBBList();
     xcom::C<IRBB*> * ct;
@@ -1537,6 +1541,7 @@ bool MDSSAMgr::verify()
             }
         }
     }
+    END_TIMER(tverify, "MDSSA: Verify After Pass");
     return true;
 }
 
@@ -1869,16 +1874,18 @@ bool MDSSAMgr::construction(DomTree & domtree)
     //Clean version stack after renaming.
     cleanMD2Stack();
 
+    if (g_is_dump_after_pass) {
+        START_TIMER(tdump, "MDSSA: Dump After Pass");
+        g_indent = 0;
+        m_md_sys->dump(false);
+        dump();
+        dumpDUChain();
+        END_TIMER(tdump, "MDSSA: Dump After Pass");
+    }
+
     ASSERT0(verify());
     ASSERT0(verifyIRandBB(m_ru->getBBList(), m_ru));
     ASSERT0(verifyPhi(false) && verifyVMD());
-
-    if (g_is_dump_after_pass) {
-        g_indent = 0;
-        m_md_sys->dump();
-        dump();
-        dumpDUChain();
-    }
 
     m_is_ssa_constructed = true;
 

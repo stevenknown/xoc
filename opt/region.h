@@ -336,15 +336,15 @@ public:
     IR * buildLdaString(CHAR const* varname, CHAR const * string);
     IR * buildLoad(VAR * var, Type const* type);
     IR * buildLoad(VAR * var);
-    IR * buildIload(IR * base, Type const* type);
-    IR * buildIload(IR * base, UINT ofst, Type const* type);
+    IR * buildILoad(IR * base, Type const* type);
+    IR * buildILoad(IR * base, UINT ofst, Type const* type);
     IR * buildStore(VAR * lhs, IR * rhs);
     IR * buildStore(VAR * lhs, Type const* type, IR * rhs);
     IR * buildStore(VAR * lhs, Type const* type, UINT ofst, IR * rhs);
     IR * buildStorePR(UINT prno, Type const* type, IR * rhs);
     IR * buildStorePR(Type const* type, IR * rhs);
-    IR * buildIstore(IR * base, IR * rhs, Type const* type);
-    IR * buildIstore(IR * base, IR * rhs, UINT ofst, Type const* type);
+    IR * buildIStore(IR * base, IR * rhs, Type const* type);
+    IR * buildIStore(IR * base, IR * rhs, UINT ofst, Type const* type);
     IR * buildString(SYM const* strtab);
     IR * buildStoreArray(
             IR * base,
@@ -365,12 +365,12 @@ public:
     IR * buildPhi(UINT prno, Type const* type, IR * opnd_list);
     IR * buildPhi(UINT prno, Type const* type, UINT num_opnd);
     IR * buildRegion(Region * rg);
-    IR * buildIcall(IR * callee,
+    IR * buildICall(IR * callee,
                     IR * param_list,
                     UINT result_prno,
                     Type const* type);
-    IR * buildIcall(IR * callee, IR * param_list)
-    { return buildIcall(callee, param_list, 0, getTypeMgr()->getVoid()); }
+    IR * buildICall(IR * callee, IR * param_list)
+    { return buildICall(callee, param_list, 0, getTypeMgr()->getVoid()); }
     IR * buildCall(VAR * callee,
                    IR * param_list,
                    UINT result_prno,
@@ -379,7 +379,7 @@ public:
     { return buildCall(callee, param_list, 0, getTypeMgr()->getVoid()); }
 
     IR * constructIRlist(bool clean_ir_list);
-    void constructIRBBlist();
+    void constructBBList();
     HOST_INT calcLSRIntVal(Type const* type, HOST_INT v0, HOST_INT v1);
     HOST_INT calcIntVal(IR_TYPE ty, HOST_INT v0, HOST_INT v1);
     double calcFloatVal(IR_TYPE ty, double v0, double v1);
@@ -823,7 +823,7 @@ public:
     IR * refineEq(IR * ir, bool & change, RefineCtx & rc);
     IR * refineMod(IR * ir, bool & change);
     IR * refineCall(IR * ir, bool & change, RefineCtx & rc);
-    IR * refineIcall(IR * ir, bool & change, RefineCtx & rc);
+    IR * refineICall(IR * ir, bool & change, RefineCtx & rc);
     IR * refineSwitch(IR * ir, bool & change, RefineCtx & rc);
     IR * refineReturn(IR * ir, bool & change, RefineCtx & rc);
     IR * refinePhi(IR * ir, bool & change, RefineCtx & rc);
@@ -835,20 +835,20 @@ public:
     IR * refineNot(IR * ir, bool & change, RefineCtx & rc);
     IR * refineBinaryOp(IR * ir, bool & change, RefineCtx & rc);
     IR * refineLoad(IR * ir);
-    IR * refineIload1(IR * ir, bool & change);
-    IR * refineIload2(IR * ir, bool & change);
-    IR * refineIload(IR * ir, bool & change, RefineCtx & rc);
+    IR * refineILoad1(IR * ir, bool & change);
+    IR * refineILoad2(IR * ir, bool & change);
+    IR * refineILoad(IR * ir, bool & change, RefineCtx & rc);
     IR * refineDetViaSSAdu(IR * ir, bool & change);
     IR * refineDet(IR * ir_list, bool & change, RefineCtx & rc);
     IR * refineStore(IR * ir, bool & change, RefineCtx & rc);
     IR * refineStoreArray(IR * ir, bool & change, RefineCtx & rc);
-    IR * refineIstore(IR * ir, bool & change, RefineCtx & rc);
+    IR * refineIStore(IR * ir, bool & change, RefineCtx & rc);
     IR * refineIR(IR * ir, bool & change, RefineCtx & rc);
     IR * refineIRlist(IR * ir_list, bool & change, RefineCtx & rc);
     bool refineStmtList(IN OUT BBIRList & ir_list, RefineCtx & rc);
     bool refineBBlist(IN OUT BBList * ir_bb_list, RefineCtx & rc);
     IR * reassociation(IR * ir, bool & change);
-    bool reconstructBBlist(OptCtx & oc);
+    bool reconstructBBList(OptCtx & oc);
     void registerGlobalVAR();
 
     IR * simpToPR(IR * ir, SimpCtx * ctx);
@@ -870,7 +870,7 @@ public:
     IR * simplifyStoreArray(IR * ir, SimpCtx * ctx);
     IR * simplifySetelem(IR * ir, SimpCtx * ctx);
     IR * simplifyGetelem(IR * ir, SimpCtx * ctx);
-    IR * simplifyIstore(IR * ir, SimpCtx * cont);
+    IR * simplifyIStore(IR * ir, SimpCtx * cont);
     IR * simplifyCall(IR * ir, SimpCtx * cont);
     IR * simplifyIf (IR * ir, SimpCtx * cont);
     IR * simplifyWhileDo(IR * ir, SimpCtx * cont);

@@ -36,7 +36,9 @@ author: Su Zhenyu
 
 namespace xoc {
 
-#define PADDR(ir) (dump_addr ? prt(" 0x%p", (ir)) : 0)
+//Use do-while to supress warning: value computed is not used
+#define PADDR(ir) \
+  do { int a = dump_addr ? prt(" 0x%p", (ir)) : 0; DUMMYUSE(a); } while (0)
 
 IRDesc const g_ir_desc[] = {
     { IR_UNDEF,    "undef",        0x0, 0, 0,
@@ -48,7 +50,7 @@ IRDesc const g_ir_desc[] = {
     { IR_LD,       "ld",           0x0, 0, sizeof(CLd),
       IRT_HAS_IDINFO|IRT_IS_MEM_REF|IRT_IS_MEM_OPND|IRT_IS_LEAF|
       IRT_IS_NON_PR_MEMREF|IRT_HAS_DU|IRT_HAS_OFFSET,},
-    { IR_ILD,      "ild",          0x1, 1, sizeof(CIld),
+    { IR_ILD,      "ild",          0x1, 1, sizeof(CILd),
       IRT_IS_UNA|IRT_IS_MEM_REF|IRT_IS_MEM_OPND|
       IRT_IS_NON_PR_MEMREF|IRT_HAS_DU|IRT_HAS_OFFSET,  },
     { IR_PR,       "pr",           0x0, 0, sizeof(CPr),
@@ -65,7 +67,7 @@ IRDesc const g_ir_desc[] = {
     { IR_STARRAY,  "starray",      0x7, 3, sizeof(CStArray),
       IRT_IS_STMT|IRT_IS_MEM_REF|IRT_HAS_RESULT|
       IRT_IS_STMT_IN_BB|IRT_IS_NON_PR_MEMREF|IRT_HAS_DU|IRT_HAS_OFFSET, },
-    { IR_IST,      "ist",          0x3, 2, sizeof(CIst),
+    { IR_IST,      "ist",          0x3, 2, sizeof(CISt),
       IRT_IS_STMT|IRT_IS_MEM_REF|IRT_HAS_RESULT|
       IRT_IS_STMT_IN_BB|IRT_IS_NON_PR_MEMREF|IRT_HAS_DU|IRT_HAS_OFFSET, },
     { IR_SETELEM,  "setelem",      0x7, 3, sizeof(CSetElem),
@@ -320,7 +322,7 @@ IR const* checkIRTOnlyCall(IR const* ir)
 }
 
 
-IR const* checkIRTOnlyIcall(IR const* ir)
+IR const* checkIRTOnlyICall(IR const* ir)
 {
     ASSERT0(ir->is_icall());
     return ir;
@@ -636,7 +638,7 @@ void dumpIR(IR const* ir, Region * rg, IN CHAR * attr, UINT dumpflag)
     StrBuf buf2(64);
 
     if (g_dbx_mgr != NULL && dump_src_line) {
-        g_dbx_mgr->printSrcLine(ir);
+        g_dbx_mgr->printSrcLine(ir, NULL);
     }
 
     Type const* d = NULL;
@@ -920,7 +922,7 @@ void dumpIR(IR const* ir, Region * rg, IN CHAR * attr, UINT dumpflag)
                 IR * k = ir->getKid(i);
                 if (k == NULL) { continue; }
                 dumpIRList(k, rg, NULL, dumpflag);
-            } 
+            }
             g_indent -= dn;
         }
         break;
@@ -1105,8 +1107,8 @@ void dumpIR(IR const* ir, Region * rg, IN CHAR * attr, UINT dumpflag)
     }
     case IR_SELECT: //formulized log_OR_exp?exp:cond_exp
         note("\nselect:%s", xdm->dump_type(d, buf));
-
-        PADDR(ir); prt("%s", attr);
+        PADDR(ir);
+        prt("%s", attr);
         if (dump_kid) {
             g_indent += dn;
             dumpIRList(SELECT_pred(ir), rg, NULL, dumpflag);
@@ -1342,7 +1344,7 @@ void dumpIR(IR const* ir, Region * rg, IN CHAR * attr, UINT dumpflag)
 
             //Dump variable info.
             xstrcat(tt, 40, "%s", SYM_name(ruvar->get_name()));
-            prt(" \'%s\',ruid:%d", tt,
+            prt(" \'%s\',id:%d", tt,
                     REGION_id(REGION_ru(ir)));
         }
 
@@ -1353,7 +1355,7 @@ void dumpIR(IR const* ir, Region * rg, IN CHAR * attr, UINT dumpflag)
             //Inner region.
             ASSERT0(REGION_ru(ir));
             g_indent += dn;
-            note("\nruinfo:");
+            note("\nregion-info:");
             REGION_ru(ir)->dump(dump_inner_region);
             g_indent -= dn;
         }
@@ -2396,8 +2398,8 @@ IR * IR::getOpndPR(UINT prno)
             if ((pr = k->getOpndPR(prno)) != NULL) {
                 return pr;
             }
-       } 
-       return NULL; 
+       }
+       return NULL;
     case IR_GOTO: return NULL;
     case IR_IGOTO:
         if ((pr = IGOTO_vexp(this)->getOpndPR(prno)) != NULL) {
@@ -2574,7 +2576,7 @@ void IR::invertLor(Region * rg)
 }
 
 
-//This function only handle Call/Icall stmt, it find PR and remove
+//This function only handle Call/ICall stmt, it find PR and remove
 //them out of UseSet.
 //Note this function does not maintain DU chain between call and its use.
 void IR::removePROutFromUseset(DefMiscBitSetMgr & sbs_mgr, Region * rg)

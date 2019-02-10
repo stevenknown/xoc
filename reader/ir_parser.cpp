@@ -594,7 +594,7 @@ bool IRParser::declareRegion(ParseCtx * ctx)
 
         bool buildcfg = false; //TODO: build cfg by given parameters.
 		if (buildcfg && !newctx.has_high_level_ir) {
-            newctx.current_region->constructIRBBlist();
+            newctx.current_region->constructBBList();
             newctx.current_region->setIRList(NULL);
             //dumpBBList(newctx.current_region->getBBList(),
             //    newctx.current_region);
@@ -810,7 +810,7 @@ bool IRParser::parseXOperator(ParseCtx * ctx)
     case X_LD:
         return parseLd(ctx);
     case X_ILD:
-        return parseIld(ctx);
+        return parseILd(ctx);
     case X_ARRAY:
         return parseArray(ctx);
     case X_LDA:
@@ -1413,7 +1413,7 @@ bool IRParser::parseArray(ParseCtx * ctx)
 }
 
 
-bool IRParser::parseIld(ParseCtx * ctx)
+bool IRParser::parseILd(ParseCtx * ctx)
 {
     ASSERT0(getCurrentXCode() == X_ILD);
     TOKEN tok = m_lexer->getNextToken();
@@ -1464,7 +1464,7 @@ bool IRParser::parseIld(ParseCtx * ctx)
     IR * base = ctx->returned_exp;
     ctx->returned_exp = NULL;
 
-    IR * ild = ctx->current_region->buildIload(base, ty);
+    IR * ild = ctx->current_region->buildILoad(base, ty);
     ILD_ofst(ild) = offset;
     copyProp(ild, cont, ctx);
     ctx->returned_exp = ild;
@@ -2373,7 +2373,7 @@ bool IRParser::parseIStore(ParseCtx * ctx)
     IR * rhs = ctx->returned_exp;
     ctx->returned_exp = NULL;
 
-    IR * ir = ctx->current_region->buildIstore(base, rhs, ty);
+    IR * ir = ctx->current_region->buildIStore(base, rhs, ty);
     copyProp(ir, cont, ctx);
     IST_ofst(ir) = offset;
     ctx->addIR(ir);
@@ -2522,7 +2522,7 @@ bool IRParser::parseCallAndICall(bool is_call, ParseCtx * ctx)
         ir = ctx->current_region->buildCall(
             callee_var, param_list, return_prno, return_ty);
     } else {
-        ir = ctx->current_region->buildIcall(
+        ir = ctx->current_region->buildICall(
             callee_exp, param_list, return_prno, return_ty);
     }
     if (cont.ir_use_list != NULL) {

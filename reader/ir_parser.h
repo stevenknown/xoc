@@ -301,7 +301,7 @@ protected:
     bool parseLda(ParseCtx * ctx);
     bool parseArrayDimension(List<TMWORD> & elem_dim);
     bool parseArray(ParseCtx * ctx);
-    bool parseIld(ParseCtx * ctx);
+    bool parseILd(ParseCtx * ctx);
     bool parseSelect(ParseCtx * ctx);
     bool parseIStore(ParseCtx * ctx);
     bool parseCallAndICall(bool is_call, ParseCtx * ctx);

@@ -354,7 +354,7 @@ protected:
             xcom::C<IR*> * expct);
     UINT checkIsNonLocalKillingDef(IR const* stmt, IR const* exp);
     inline bool canBeLiveExprCand(IR const* ir) const;
-    void computeArrayRefAtIstoreBase(IR * ir);
+    void computeArrayRefAtIStoreBase(IR * ir);
     void computeExpression(IR * ir, MDSet * ret_mds, UINT compflag, UINT duflag);
     void computeArrayRef(IR * ir,
             OUT MDSet * ret_mds,
@@ -432,14 +432,14 @@ protected:
             IR const* use);
     void initMD2IRList(IRBB * bb);
     void inferRegion(IR * ir, bool ruinfo_avail, IN MDSet * tmp);
-    void inferIstore(IR * ir, UINT duflag);
+    void inferIStore(IR * ir, UINT duflag);
     void inferStore(IR * ir, UINT duflag);
     void inferStorePR(IR * ir, UINT duflag);
     void inferGetelem(IR * ir, UINT duflag);
     void inferSetelem(IR * ir, UINT duflag);
     void inferStoreArray(IR * ir, UINT duflag);
     void inferPhi(IR * ir, UINT duflag);
-    void inferCallAndIcall(IR * ir, UINT duflag, IN MD2MDSet * mx);
+    void inferCallAndICall(IR * ir, UINT duflag, IN MD2MDSet * mx);
 
     void solve(DefDBitSetCore const& expr_universe,
                UINT const flag,

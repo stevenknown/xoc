@@ -74,7 +74,7 @@ void Region::HighProcessImpl(OptCtx & oc)
         checkValidAndRecompute(&oc, PASS_AA, PASS_UNDEF);
     }
 
-    if (g_do_md_du_ana) {
+    if (g_do_md_du_analysis) {
         ASSERT0(g_cst_bb_list && OC_is_cfg_valid(oc) && OC_is_aa_valid(oc));
         ASSERT0(getPassMgr());
         IR_DU_MGR * dumgr = (IR_DU_MGR*)getPassMgr()->
@@ -89,12 +89,12 @@ void Region::HighProcessImpl(OptCtx & oc)
             f |= SOL_RU_REF;
         }
 
-        if (g_compute_du_chain) {
+        if (g_compute_classic_du_chain) {
             f |= SOL_REACH_DEF;
         }
 
         if (dumgr->perform(oc, f) && OC_is_ref_valid(oc)) {
-            if (g_compute_du_chain) {
+            if (g_compute_classic_du_chain) {
                 UINT flag = COMPUTE_NOPR_DU;
                 ASSERT0(getPassMgr());
 
@@ -194,7 +194,7 @@ bool Region::HighProcess(OptCtx & oc)
     ASSERT0(verifyIRList(getIRList(), NULL, this));
 
     if (g_cst_bb_list) {
-        constructIRBBlist();
+        constructBBList();
         ASSERT0(verifyIRandBB(getBBList(), this));
         setIRList(NULL); //All IRs have been moved to each IRBB.
     }

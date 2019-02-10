@@ -63,35 +63,62 @@ LabelInfo * allocLabel(SMemPool * pool)
     return p;
 }
 
+void LabelInfo::dumpName() const
+{
+	if (g_tfile == NULL) { return; }
+	if (LABEL_INFO_type(this) == L_ILABEL) {
+        prt(ILABEL_STR_FORMAT, ILABEL_CONT(this));
+	} else if (LABEL_INFO_type(this) == L_CLABEL) {
+		prt("%s", SYM_name(LABEL_INFO_name(this)));
+	} else if (LABEL_INFO_type(this) == L_PRAGMA) {
+        ASSERT0(LABEL_INFO_pragma(this));
+        prt("%s", SYM_name(LABEL_INFO_pragma(this)));
+	} else { UNREACHABLE(); }
+}
 
-void dumpLabel(LabelInfo const* li)
+char const* LabelInfo::getLabelName(IN OUT StrBuf * buf) const
+{
+	if (g_tfile == NULL) { return NULL; }
+	if (LABEL_INFO_type(this) == L_ILABEL) {
+		buf->sprint(ILABEL_STR_FORMAT, ILABEL_CONT(this));
+	} else if (LABEL_INFO_type(this) == L_CLABEL) {
+		buf->strcat("%s", SYM_name(LABEL_INFO_name(this)));
+	} else if (LABEL_INFO_type(this) == L_PRAGMA) {
+		ASSERT0(LABEL_INFO_pragma(this));
+		buf->strcat("%s", SYM_name(LABEL_INFO_pragma(this)));
+	}
+	else { UNREACHABLE(); }
+	return buf->buf;
+}
+
+void LabelInfo::dump() const
 {
     if (g_tfile == NULL) { return; }
-    if (LABEL_INFO_type(li) == L_ILABEL) {
+	if (LABEL_INFO_type(this) == L_ILABEL) {
         note("\nilabel(" ILABEL_STR_FORMAT ")",
-                ILABEL_CONT(li));
-    } else if (LABEL_INFO_type(li) == L_CLABEL) {
+                ILABEL_CONT(this));
+    } else if (LABEL_INFO_type(this) == L_CLABEL) {
         note("\nclabel(" CLABEL_STR_FORMAT ")",
-                CLABEL_CONT(li));
-    } else if (LABEL_INFO_type(li) == L_PRAGMA) {
-        ASSERT0(LABEL_INFO_pragma(li));
+                CLABEL_CONT(this));
+    } else if (LABEL_INFO_type(this) == L_PRAGMA) {
+        ASSERT0(LABEL_INFO_pragma(this));
         note("\npragms(%s)",
-                SYM_name(LABEL_INFO_pragma(li)));
+                SYM_name(LABEL_INFO_pragma(this)));
     } else { UNREACHABLE(); }
 
-    if (LABEL_INFO_b1(li) != 0) {
+    if (LABEL_INFO_b1(this) != 0) {
         prt("(");
     }
-    if (LABEL_INFO_is_try_start(li)) {
+    if (LABEL_INFO_is_try_start(this)) {
         prt("try_start ");
     }
-    if (LABEL_INFO_is_try_end(li)) {
+    if (LABEL_INFO_is_try_end(this)) {
         prt("try_end ");
     }
-    if (LABEL_INFO_is_catch_start(li)) {
+    if (LABEL_INFO_is_catch_start(this)) {
         prt("catch_start ");
     }
-    if (LABEL_INFO_b1(li) != 0) {
+    if (LABEL_INFO_b1(this) != 0) {
         prt(")");
     }
     fflush(g_tfile);

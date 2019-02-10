@@ -123,13 +123,13 @@ Dbx * getDbx(IR const* ir)
 //
 //START DbxMgr
 //
-void DbxMgr::printSrcLine(IR const* ir)
+void DbxMgr::printSrcLine(IR const* ir, PrtCtx * ctx)
 {
     if (g_tfile == NULL) { return; }
     if (!ir->is_stmt()) { return; }
     Dbx * dbx = ::getDbx(ir);
     if (dbx != NULL) {
-        printSrcLine(dbx);
+        printSrcLine(dbx, ctx);
     }
 }
 //END DbxMgr

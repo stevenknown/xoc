@@ -572,7 +572,7 @@ void RSC::comp_ir_fmt(IR const* ir)
         comp_ir_fmt(BIN_opnd0(ir));
         comp_ir_fmt(BIN_opnd1(ir));
         return;
-    SWITCH_CASE_UNA:    
+    SWITCH_CASE_UNA:
         comp_ir_fmt(UNA_opnd(ir));
         return;
     case IR_GOTO:
@@ -652,7 +652,7 @@ void RSC::dump_ir_fmt()
              ir != NULL; ir = BB_next_ir(bb)) {
             FMT f = m_ir2fmt.get(ir->id());
             note("\nFMT:%s", g_fmt_name[f]);
-            dumpIR(ir, m_ru->getTypeMgr());
+            dumpIR(ir, m_ru);
         }
     }
     note("\n");
@@ -2629,7 +2629,7 @@ void LTMgr::renameUse(IR * ir, LT * l, IR ** newpr)
         break;
     SWITCH_CASE_UNA:
         renameUse(UNA_opnd(ir), l, newpr);
-        break;        
+        break;
     case IR_LDA:
     case IR_ID:
     case IR_LD:
@@ -5310,7 +5310,7 @@ void RA::dump_ltg()
         IR * ir = m_ru->getIR(id);
         ASSERT0(ir && is_range_call(ir) && ltg);
         IRBB * bb = ir->getBB();
-        dumpIR(ir, m_tm);
+        dumpIR(ir, m_ru);
         LTMgr * ltm = m_gltm.map_bb2ltm(bb);
         ASSERT0(ltm);
         ltm->dump();

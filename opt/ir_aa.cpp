@@ -1471,7 +1471,7 @@ MD const* IR_AA::allocStringMD(SYM const* string)
 
 
 //'mds' : record memory descriptor of 'ir'.
-void IR_AA::processIld(
+void IR_AA::processILd(
         IR * ir,
         IN OUT MDSet & mds,
         IN OUT AACtx * ic,
@@ -1904,7 +1904,7 @@ void IR_AA::processPhi(IN IR * ir, IN MD2MDSet * mx)
 }
 
 
-void IR_AA::inferIstoreValue(IN IR * ir, IN AACtx * ic, IN MD2MDSet * mx)
+void IR_AA::inferIStoreValue(IN IR * ir, IN AACtx * ic, IN MD2MDSet * mx)
 {
     ASSERT0(ir->is_ist());
     MDSet const* ist_mayaddr = getMayAddr(ir);
@@ -1918,17 +1918,17 @@ void IR_AA::inferIstoreValue(IN IR * ir, IN AACtx * ic, IN MD2MDSet * mx)
     //        e.g: *p=ILD(q), and p->x,q->a,a->w, then x->w,
     //    3. Propagate the MDSet that RHS pointed to the LHS.
     //        e.g: *p=q, and p->x,q->a, then x->a.
-    AACtx tic(*ic);
+    AACtx rhsic(*ic);
     if (ir->is_ptr() || ir->is_void()) {
-        AC_comp_pt(&tic) = true;
+        AC_comp_pt(&rhsic) = true;
     }
 
     IR * rhs = IST_rhs(ir);
     MDSet rhsrefmds;
-    inferExpression(rhs, rhsrefmds, &tic, mx);
-    recomputeDataType(tic, ir, rhsrefmds);
+    inferExpression(rhs, rhsrefmds, &rhsic, mx);
+    recomputeDataType(rhsic, ir, rhsrefmds);
 
-    if (AC_has_comp_lda(&tic) || AC_comp_pt(&tic)) {
+    if (AC_has_comp_lda(&rhsic) || AC_comp_pt(&rhsic)) {
         //If result type of IST is pointer, and the ptset is empty, then
         //it might point to anywhere.
         //e.g: Given p=&q and *p=(int*)0x1000;
@@ -1940,7 +1940,7 @@ void IR_AA::inferIstoreValue(IN IR * ir, IN AACtx * ic, IN MD2MDSet * mx)
         //
         //Update the POINT-TO of elems in p's point-to set.
         //Aware of whether if the result of IST is pointer.
-        if (AC_has_comp_lda(&tic)) {
+        if (AC_has_comp_lda(&rhsic)) {
             ASSERT0(!rhsrefmds.is_empty());
 
             //ptset may include element which also be in m_maypts.
@@ -2165,7 +2165,7 @@ FIN:
 //Indirect store.
 //Analyse pointers according to rules for individiual ir to
 //constructe the map-table that maps MD to an unique VAR.
-void IR_AA::processIst(IN IR * ir, IN MD2MDSet * mx)
+void IR_AA::processISt(IN IR * ir, IN MD2MDSet * mx)
 {
     ASSERT0(ir->is_ist());
     ASSERT0(g_is_support_dynamic_type || IST_base(ir)->is_ptr());
@@ -2186,7 +2186,7 @@ void IR_AA::processIst(IN IR * ir, IN MD2MDSet * mx)
         setMayAddr(ir, m_maypts);
 
         AACtx ic2;
-        inferIstoreValue(ir, &ic2, mx);
+        inferIStoreValue(ir, &ic2, mx);
         return;
     }
 
@@ -2246,7 +2246,7 @@ void IR_AA::processIst(IN IR * ir, IN MD2MDSet * mx)
     }
 
     AACtx ic2;
-    inferIstoreValue(ir, &ic2, mx);
+    inferIStoreValue(ir, &ic2, mx);
     ml_may_pt.clean(*m_misc_bs_mgr);
 }
 
@@ -2510,7 +2510,7 @@ void IR_AA::inferExpression(
         assignIdMD(expr, &mds, ic);
         return;
     case IR_ILD:
-        processIld(expr, mds, ic, mx);
+        processILd(expr, mds, ic, mx);
         return;
     case IR_LD:
         assignLoadMD(expr, &mds, ic, mx);
@@ -3234,7 +3234,7 @@ void IR_AA::dumpIRPointToForRegion(bool dump_kid)
     if (g_tfile == NULL) { return; }
     note("\n==--- DUMP IR_AA : IR ADDRESS and POINT-TO '%s' ----==",
          m_ru->getRegionName());
-    m_md_sys->dump();
+    m_md_sys->dump(false);
     note("\n---- All MD in MAY-POINT-TO SET : ");
 
     ASSERT0(m_maypts);
@@ -3466,7 +3466,7 @@ void IR_AA::computeStmt(IRBB const* bb, IN OUT MD2MDSet * mx)
             processGetelem(ir, mx);
             break;
         case IR_IST:
-            processIst(ir, mx);
+            processISt(ir, mx);
             break;
         case IR_CALL:
         case IR_ICALL:
@@ -3876,6 +3876,7 @@ void IR_AA::initEntryPtset(PtPairSet ** ptset_arr)
         setPointToAllMem(MD_FULL_MEM, *mx);
         setPointToGlobalMem(MD_GLOBAL_MEM, *mx);
         setPointToImportVar(MD_IMPORT_VAR, *mx);
+        setPointToGlobalMem(MD_IMPORT_VAR, *mx);
         VarTabIter c;
         for (VAR * v = vt->get_first(c); v != NULL; v = vt->get_next(c)) {
             if (!VAR_is_global(v) && !VAR_is_formal_param(v)) { continue; }
@@ -3893,6 +3894,7 @@ void IR_AA::initEntryPtset(PtPairSet ** ptset_arr)
         setPointToAllMem(MD_FULL_MEM, m_unique_md2mds);
         setPointToGlobalMem(MD_GLOBAL_MEM, m_unique_md2mds);
         setPointToImportVar(MD_IMPORT_VAR, m_unique_md2mds);
+        setPointToGlobalMem(MD_IMPORT_VAR, m_unique_md2mds);
         VarTabIter c;
         for (VAR * v = vt->get_first(c); v != NULL; v = vt->get_next(c)) {
             if (!VAR_is_global(v) && !VAR_is_formal_param(v)) { continue; }
@@ -4048,7 +4050,7 @@ bool IR_AA::perform(IN OUT OptCtx & oc)
         delete [] ptset_arr;
     }
     if (g_is_dump_after_pass && g_is_dump_alias_analysis) {
-        m_md_sys->dump();
+        m_md_sys->dump(false);
         dumpMD2MDSetForRegion(false);
         //dumpInOutPointToSetForBB();
         dumpIRPointToForRegion(true);

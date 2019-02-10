@@ -251,7 +251,7 @@ IR * Region::simplifyIfSelf(IR * ir, SimpCtx * ctx)
         //falsebody end label
         xcom::add_next(&elsebody, buildLabel(GOTO_lab(go)));
     } else {
-        //end label    of truebody.
+        //end label of truebody.
         xcom::add_next(&truebody, buildLabel(BR_lab(falsebr)));
     }
 
@@ -1370,6 +1370,7 @@ IR * Region::simpToPR(IR * ir, SimpCtx * ctx)
 {
     IR * pr = buildPR(ir->getType());
     allocRefForPR(pr);
+    copyDbx(pr, ir, this); //keep dbg info for new EXP.
 
     IR * st = buildStorePR(PR_no(pr), pr->getType(), ir);
     allocRefForPR(st);
@@ -1417,7 +1418,7 @@ IR * Region::simplifyExpression(IR * ir, SimpCtx * ctx)
     case IR_GE:
     case IR_LE:
         return simplifyJudgeDet(ir, ctx);
-    case IR_ILD:    
+    case IR_ILD:
     case IR_BAND: //inclusive and &
     case IR_BOR: //inclusive or  |
     case IR_XOR: //exclusive or ^
@@ -1631,7 +1632,7 @@ IR * Region::simplifyStoreArray(IR * ir, SimpCtx * ctx)
         xcom::add_next(&ret_list, &last, SIMP_stmtlist(&tcont));
     }
 
-    ret = buildIstore(array_addr, rhsval, type);
+    ret = buildIStore(array_addr, rhsval, type);
     ret->copyRef(ir, this);
     if (getMDSSAMgr() != NULL) {
         getMDSSAMgr()->changeDef(ir, ret);
@@ -1691,7 +1692,7 @@ IR * Region::simplifyArray(IR * ir, SimpCtx * ctx)
         }
 
         //Load array element value.
-        IR * elem_val = buildIload(array_addr, ir->getType());
+        IR * elem_val = buildILoad(array_addr, ir->getType());
         elem_val->copyRef(ir, this);
         if (getMDSSAMgr() != NULL) {
             getMDSSAMgr()->changeUse(ir, elem_val);
@@ -1720,7 +1721,7 @@ IR * Region::simplifyArray(IR * ir, SimpCtx * ctx)
         }
 
         //Load array element's value.
-        IR * elem_val = buildIload(array_addr, ir->getType());
+        IR * elem_val = buildILoad(array_addr, ir->getType());
         elem_val->copyRef(ir, this);
         if (getMDSSAMgr() != NULL) {
             getMDSSAMgr()->changeUse(ir, elem_val);
@@ -1744,7 +1745,7 @@ IR * Region::simplifyArray(IR * ir, SimpCtx * ctx)
     }
 
     //Load array element value.
-    IR * elem_val = buildIload(array_addr, ir->getType());
+    IR * elem_val = buildILoad(array_addr, ir->getType());
     elem_val->copyRef(ir, this);
     if (getMDSSAMgr() != NULL) {
         getMDSSAMgr()->changeUse(ir, elem_val);
@@ -1922,7 +1923,7 @@ IR * Region::simplifyGetelem(IR * ir, SimpCtx * ctx)
 }
 
 
-IR * Region::simplifyIstore(IR * ir, SimpCtx * ctx)
+IR * Region::simplifyIStore(IR * ir, SimpCtx * ctx)
 {
     ASSERT0(ir->is_ist());
     IR * ret_list = NULL;
@@ -2206,7 +2207,7 @@ IR * Region::simplifyStmt(IR * ir, SimpCtx * ctx)
         ret_list = simplifyGetelem(ir, ctx);
         break;
     case IR_IST:
-        ret_list = simplifyIstore(ir, ctx);
+        ret_list = simplifyIStore(ir, ctx);
         break;
     case IR_IGOTO:
         ASSERT0(SIMP_stmtlist(ctx) == NULL);

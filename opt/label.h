@@ -106,6 +106,11 @@ public:
         copy_flag(li);
     }
     void copy_flag(LabelInfo const& li) { u2.b1 = li.u2.b1; }
+
+	void dump() const;
+	void dumpName() const;
+
+	char const* getLabelName(IN OUT StrBuf * buf) const;
 };
 
 
@@ -142,7 +147,6 @@ inline bool isSameLabel(LabelInfo const* li1, LabelInfo const* li2)
     }
     return false;
 }
-void dumpLabel(LabelInfo const* li);
 
 
 class LabelHashFunc : public HashFuncBase<LabelInfo*> {

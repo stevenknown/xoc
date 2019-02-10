@@ -138,7 +138,7 @@ void IRBB::dump(Region * rg, bool dump_inner_region)
          ir != NULL; ir = BB_irlist(this).get_next()) {
         ASSERT0(ir->is_single() && ir->getBB() == this);
 		dumpIR(ir, rg, NULL, IR_DUMP_KID | IR_DUMP_SRC_LINE |
-			(dump_inner_region ? IR_DUMP_INNER_REGION : 0));		
+			(dump_inner_region ? IR_DUMP_INNER_REGION : 0));
     }
     g_indent -= 3;
     note("\n");

@@ -57,7 +57,7 @@ void Region::lowerIRTreeToLowestHeight(OptCtx & oc)
 
     if (SIMP_need_recon_bblist(&simp)) {
         //New BB boundary IR generated, rebuilding CFG.
-        if (reconstructBBlist(oc)) {
+        if (reconstructBBList(oc)) {
             getCFG()->rebuild(oc);
             getCFG()->removeEmptyBB(oc);
             getCFG()->computeExitList();
@@ -82,7 +82,7 @@ bool Region::performSimplify(OptCtx & oc)
     simp.setSimpSelect();
     simp.setSimpLandLor();
     simp.setSimpLnot();
-    simp.setSimpIldIst();
+    simp.setSimpILdISt();
     simp.setSimpToLowestHeight();
     if (g_is_lower_to_pr_mode) {
         simp.setSimpToPRmode();
@@ -93,7 +93,7 @@ bool Region::performSimplify(OptCtx & oc)
     if (g_do_cfg &&
         g_cst_bb_list &&
         SIMP_need_recon_bblist(&simp) &&
-        reconstructBBlist(oc)) {
+        reconstructBBList(oc)) {
 
         //Simplification may generate new memory operations.
         ASSERT0(verifyMDRef());
