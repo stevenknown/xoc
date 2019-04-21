@@ -93,7 +93,7 @@ public:
     PRECISION_TYPE f() const {return m_f;}
     PRECISION_TYPE& f() {return m_f;}
     void reduce() {}
-    CHAR * format(CHAR * buf);
+    CHAR const* format(StrBuf & buf);
 };
 
 

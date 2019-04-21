@@ -53,10 +53,9 @@ class BitSet
     friend BitSet * bs_diff(BitSet const& set1,
                             BitSet const& set2,
                             OUT BitSet & res);
-    friend BitSet * bs_intersect(
-                            BitSet const& set1,
-                            BitSet const& set2,
-                            OUT BitSet & res);
+    friend BitSet * bs_intersect(BitSet const& set1,
+                                 BitSet const& set2,
+                                 OUT BitSet & res);
 protected:
     UINT m_size;
     BYTE * m_ptr;
@@ -79,15 +78,17 @@ public:
     BitSet const& operator = (BitSet const& src);
     ~BitSet() { destroy(); }
 
+    //Initialize bit buffer.
     void init(UINT init_pool_size = 1)
     {
-        if (m_ptr != NULL) return;
+        if (m_ptr != NULL) { return; }
         m_size = init_pool_size;
-        if (init_pool_size == 0) return;
+        if (init_pool_size == 0) { return; }
         m_ptr = (BYTE*)::malloc(init_pool_size);
         ::memset(m_ptr, 0, m_size);
     }
 
+    //Destroy bit buffer memory.
     void destroy()
     {
         if (m_ptr == NULL) return;
@@ -97,16 +98,38 @@ public:
         m_size = 0;
     }
 
+    //Allocate bytes
     void alloc(UINT size);
+
+    //Returns a new set which is the union of set1 and set2,
+    //and modify set1 as result operand.
     void bunion(BitSet const& bs);
+
+    //Add a element which corresponding to 'elem' bit, and set this bit.
     void bunion(UINT elem);
 
+    //Do copy from 'src' to 'des'.
     void copy(BitSet const& src);
+
+    //Clean data in buffer with no memory deleted.
     void clean();
+
+    //Count total memory the bitset allocated.
     UINT count_mem() const { return get_byte_size() + sizeof(BitSet); }
+
+    //Complement set of s = univers - s.
     void complement(BitSet const& univers);
 
+    //The difference operation calculates the elements that
+    //distinguish one set from another.
+    //Remove a element which map with 'elem' bit, and clean this bit.
     void diff(UINT elem);
+
+    //The difference operation calculates the elements that
+    //distinguish one set from another.
+    //Subtracting set2 from set1
+    //Returns a new set which is
+    //  { x : member( x, 'set1' ) & ~ member( x, 'set2' ) }.
     void diff(BitSet const& bs);
     void dump(CHAR const* name = NULL, bool is_del = false,
               UINT flag = BS_DUMP_BITSET | BS_DUMP_POS,
@@ -114,26 +137,73 @@ public:
     void dump(FILE * h, UINT flag, INT last_pos) const;
     void dump(FILE * h) const { dump(h, BS_DUMP_BITSET|BS_DUMP_POS, -1); }
 
+    //Return the element count in 'set'
+    //Add up the population count of each byte in the set.  We get the
+    //population counts from the table above.  Great for a machine with
+    //effecient loadbyte instructions.
     UINT get_elem_count() const;
+
+    //Return position of first element, start from '0'.
+    //Return -1 if the bitset is empty.
     INT get_first() const;
+
+    //Get bit postition of the last element ONE.
+    //Return -1 if bitset is empty.
     INT get_last() const;
+
+    //Extract subset in range between 'low' and 'high'.
     BitSet * get_subset_in_range(UINT low, UINT high, OUT BitSet & subset);
+
+    //Get bit position of next element ONE to 'elem'.
+    //Return -1 if it has no other element.
+    //'elem': return next one to current element.
     INT get_next(UINT elem) const;
+
+    //Get byte size the bitset allocated.
     UINT get_byte_size() const { return m_size; }
+
+    //Get buffer pointer.
     BYTE const* get_byte_vec() const { return m_ptr; }
 
+    //Return true if there is elements in the range between 'low' and 'high'.
     bool has_elem_in_range(UINT low, UINT high) const;
 
+    //Returns the a new set which is intersection of 'set1' and 'set2'.
     void intersect(BitSet const& bs);
+
+    //Return true if all elements in current bitset is equal to 'bs'.
     bool is_equal(BitSet const& bs) const;
+
+    //Return true if this contain elem.
     bool is_contain(UINT elem) const;
+
+    //Return true if 'this' contains 'bs'.
+    //'strict': If it is false, we say the bitset contains bs;
+    //if it is true, the bitset must have at least one
+    //element that does not belong to 'bs'.
     bool is_contain(BitSet const& bs, bool strict = false) const;
+
+    //Return true if 'this' contained in range between 'low' and 'high'.
+    //'strict': 'this' strictly contained in range.
     bool is_contained_in_range(UINT low, UINT high, bool strict) const;
+
+    //Return true if 'this' contained range between 'low' and 'high'.
     bool is_contain_range(UINT low, UINT high, bool strict) const;
+
+    //Return true if current is intersect with 'bs'.
     bool is_intersect(BitSet const& bs) const;
+
+    //Return true if range between first_bit of 'this' and
+    //last_bit of 'this' overlapped with the range between
+    //'low' and 'high'.
     bool is_overlapped(UINT low, UINT high) const;
+
+    //Return true if there is no element ONE in bitset.
     bool is_empty() const;
 
+    //Reverse each bit.
+    //e.g: 1001 to 0110
+    //'last_bit_pos': start at 0, e.g:given '101', last bit pos is 2.
     void rev(UINT last_bit_pos);
 };
 

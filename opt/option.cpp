@@ -268,4 +268,11 @@ bool g_is_dump_alias_analysis = true;
 
 //Dump after each pass.
 bool g_is_dump_after_pass = true;
+
+//Dump before each pass.
+bool g_is_dump_before_pass = true;
+
+//Set true to enable searching debug-info from expression bottom up
+//to nearest stmt.
+bool g_is_search_and_copy_dbx = true;
 } //namespace xoc

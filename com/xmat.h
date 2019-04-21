@@ -72,9 +72,9 @@ public:
     void copy(INTMat const& r);
     UINT comden(UINT row, UINT col); //Common denominator
     void substit(RMat const& exp,
-                UINT v,
-                bool is_eq = true,
-                INT rhs_idx = -1);
+                 UINT v,
+                 bool is_eq = true,
+                 INT rhs_idx = -1);
     void intlize(INT row = -1); //Converting rational element to integer.
     RMat & operator = (RMat const& m);
     Rational reduce(UINT row, UINT col);
@@ -114,8 +114,8 @@ public:
     bool inv(OUT INTMat &e);
     INT det();
 
-    //Generate unimodular matrix to elimnate element.
-    void gen_elim_mat(UINT row, UINT col, OUT INTMat &elim);
+    //Generate unimodular matrix to eliminate element.
+    void genElimMat(UINT row, UINT col, OUT INTMat &elim);
 
     //Hermite Normal Form decomposition.
     void hnf(OUT INTMat &h, OUT INTMat &u);
@@ -151,12 +151,12 @@ public:
     void sete(UINT num,...);
     void setie(UINT num, ...);
     FloatMat& operator = (FloatMat const& m);
-    void set_sd(UINT sd); //Redefine the significant digit.
+    void setSigDigitDesc(UINT sd); //Redefine the significant digit.
     void substit(IN FloatMat const& exp, UINT v, bool is_eq, INT rhs_idx);
     bool is_imat(UINT * row, UINT * col);
 
     //Get the significant digit description string.
-    CHAR const* get_sd() const;
+    CHAR const* getSigDigitDesc() const;
     Float reduce(UINT row, UINT col) { return get(row, col); }
     void reduce() {}
 };

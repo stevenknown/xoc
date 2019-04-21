@@ -89,7 +89,7 @@ protected:
     bool scanOpnd(IN LI<IRBB> * li,
                   OUT TTab<IR*> & invariant_exp,
                   TTab<IR*> & invariant_stmt,
-                  bool * is_legal, bool first_scan);
+                  bool * isLegal, bool first_scan);
     bool scanResult(OUT TTab<IR*> & invariant_stmt);
     bool isStmtCanBeHoisted(IR * stmt, IRBB * backedge_bb);
     bool isUniqueDef(MD const* md);

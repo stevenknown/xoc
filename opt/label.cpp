@@ -76,7 +76,7 @@ void LabelInfo::dumpName() const
 	} else { UNREACHABLE(); }
 }
 
-char const* LabelInfo::getLabelName(IN OUT StrBuf * buf) const
+char const* LabelInfo::getName(IN OUT StrBuf * buf) const
 {
 	if (g_tfile == NULL) { return NULL; }
 	if (LABEL_INFO_type(this) == L_ILABEL) {

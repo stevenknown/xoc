@@ -1321,8 +1321,7 @@ bool BitSet::is_overlapped(UINT low, UINT high) const
 }
 
 
-//Return true if in the range between 'low' and 'high' has
-//any elements.
+//Return true if there is elements in the range between 'low' and 'high'.
 bool BitSet::has_elem_in_range(UINT low, UINT high) const
 {
     ASSERTN(low <= high, ("out of boundary"));
@@ -1379,10 +1378,11 @@ INT BitSet::get_first() const
 }
 
 
-//Get bit postition of the last element.
+//Get bit postition of the last element ONE.
+//Return -1 if bitset is empty.
 INT BitSet::get_last() const
 {
-    if (m_size == 0) return -1;
+    if (m_size == 0) { return -1; }
     INT i = m_size - 1;
     UINT m = m_size % BYTES_PER_UINT;
     if (m == 0) {

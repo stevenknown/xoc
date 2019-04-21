@@ -117,6 +117,8 @@ Matrix<T> operator - (Matrix<T> const& a, Matrix<T> const& b)
 }
 
 
+//Matrix use hooks to diverge customized function. This strategy
+//allows Matrix object could be allocated in mempool.
 template <class T> class Matrix {
 public:
     //Intra-class type, only used by Matrix and inherited classes.
@@ -160,7 +162,7 @@ public:
     void FullPermutationRecur(INT v, INT * posbuf, UINT posbufnum, INT n, T & det);
     INT ReverseOrderNumber(INT * numbuf, UINT numlen);
 
-    //Interior equal compare.
+    //Interior equality compare.
     bool _equal(T const& a, T const& b) const
     {
         if (HOOK_EQUAL != NULL) {
@@ -180,6 +182,7 @@ public:
         ASSERTN(0, ("_sqrt() need to implement"));
         return v;
     }
+	
 public:
     Matrix(INHR const* i = NULL)
     {
@@ -225,7 +228,7 @@ public:
         m_mat = NULL;
         m_is_init = true;
         set_hook(i);
-        grow_all(row, col);
+        growRowAndCol(row, col);
         if (HOOK_INIT != NULL) {
             (*HOOK_INIT)(this);
         }
@@ -278,9 +281,9 @@ public:
     void copy(Matrix<T> const& m);
     UINT count_mem() const;
 
-    UINT get_row_size() const { return m_row_size; }
-    UINT get_col_size() const { return m_col_size; }
-    T * get_matrix() const { return m_mat; }
+    UINT getRowSize() const { return m_row_size; }
+    UINT getColSize() const { return m_col_size; }
+    T * getMatrix() const { return m_mat; }
 
     //Get element of matrix.
     //Simulating function like as 'v = m_mat[row][col]'
@@ -293,43 +296,43 @@ public:
                 ("exception occur in get()"));
         return *(m_mat + (m_col_size * row + col));
     }
-    void grow_row(UINT size);
-    void grow_row(const T row[], UINT rowelemnum);
-    void grow_row(Vector<T> const& row, UINT rowelemnum)
+    void growRow(UINT size);
+    void growRow(const T row[], UINT rowelemnum);
+    void growRow(Vector<T> const& row, UINT rowelemnum)
     {
         ASSERTN(row.m_vec, ("vector is empty"));
-        grow_row(row.m_vec, rowelemnum);
+        growRow(row.m_vec, rowelemnum);
     }
-    void grow_row(Matrix<T> const& a); //Add row, a must be vector
+    void growRow(Matrix<T> const& a); //Add row, a must be vector
 
     //Add row from 'from' to 'to' of a.
-    void grow_row(Matrix<T> const& a, UINT from, UINT to);
-    void grow_col(UINT size);
-    void grow_col(const T col[], UINT colelemnum);
-    void grow_col(Vector<T> const& col, UINT colelemnum)
+    void growRow(Matrix<T> const& a, UINT from, UINT to);
+    void growCol(UINT size);
+    void growCol(const T col[], UINT colelemnum);
+    void growCol(Vector<T> const& col, UINT colelemnum)
     {
         ASSERTN(m_is_init, ("not yet initialize."));
         ASSERTN(col.m_vec, ("vector is empty"));
-        grow_col(col.m_vec, colelemnum);
+        growCol(col.m_vec, colelemnum);
     }
-    void grow_col(Matrix<T> const& a); //Add column, a must be vector
+    void growCol(Matrix<T> const& a); //Add column, a must be vector
 
     //Append columns from 'from' to 'to' of a.
-    void grow_col(Matrix<T> const& a, UINT from, UINT to);
-    void grow_all(UINT row_size, UINT col_size);
-    void del_row(UINT row)
+    void growCol(Matrix<T> const& a, UINT from, UINT to);
+    void growRowAndCol(UINT row_size, UINT col_size);
+    void deleteRow(UINT row)
     {
         ASSERTN(m_is_init, ("not yet initialize."));
-        del_row(row, row);
+        deleteRow(row, row);
     }
-    void del_row(UINT from, UINT to);
-    void del_col(UINT col)
+    void deleteRow(UINT from, UINT to);
+    void deleteCol(UINT col)
     {
         ASSERTN(m_is_init, ("not yet initialize."));
-        del_col(col, col);
+        deleteCol(col, col);
     }
-    void del_col(UINT from, UINT to);
-    void pad_quad(); //pad row and col to generate quad matrix
+    void deleteCol(UINT from, UINT to);
+    void padQuad(); //pad row and col to generate quad matrix
 
     //Get the number of elements.
     UINT size() const { return m_row_size * m_col_size; }
@@ -346,20 +349,20 @@ public:
     }
 
     void setg(UINT row, UINT col, T v);
-    void set_all(T v); //Set all element to 'v'
-    void set_row(UINT rows, T row[], INT num);
-    void set_row(UINT rows, Matrix<T> const& v);
-    void set_row(UINT rows, T v);
-    void set_rows(UINT from, UINT to, Matrix<T> const& m, UINT mfrom);
-    void set_rows(UINT from, UINT to, T v);
-    void set_col(UINT cols, T col[], INT num);
-    void set_col(UINT cols, Matrix<T> const& v);
-    void set_col(UINT cols, T v);
-    void set_cols(UINT from, UINT to, Matrix<T> const& m, UINT mfrom);
-    void set_cols(UINT from, UINT to, T v);
+    void setAllElem(T v); //Set all element to 'v'
+    void setRow(UINT rows, T row[], INT num);
+    void setRow(UINT rows, Matrix<T> const& v);
+    void setRow(UINT rows, T v);
+    void setRows(UINT from, UINT to, Matrix<T> const& m, UINT mfrom);
+    void setRows(UINT from, UINT to, T v);
+    void setCol(UINT cols, T col[], INT num);
+    void setCol(UINT cols, Matrix<T> const& v);
+    void setCol(UINT cols, T v);
+    void setCols(UINT from, UINT to, Matrix<T> const& m, UINT mfrom);
+    void setCols(UINT from, UINT to, T v);
 
-    void interch_col(UINT col1, UINT col2);
-    void interch_row(UINT row1, UINT row2);
+    void interchCol(UINT col1, UINT col2);
+    void interchRow(UINT row1, UINT row2);
     void trans(); //Transpose
 
     //Solve system of equaions, 'this' is coeff matirx
@@ -417,8 +420,8 @@ public:
     void negOfColumns(UINT from, UINT to);
 
     //v times row 'from', then add row to 'to'.
-    void mul_and_add_row(UINT from, T v, UINT to);
-    void mul_and_add_col(UINT from, T v, UINT to);
+    void mulAndAddRow(UINT from, T v, UINT to);
+    void mulAndAddCol(UINT from, T v, UINT to);
     bool inv(OUT Matrix<T> & e); //inverse of matrix
     bool rinv(OUT Matrix<T> & e); //right-inverse
     bool linv(OUT Matrix<T> & e); //left-inverse
@@ -528,12 +531,7 @@ public:
 template <class T>
 UINT Matrix<T>::count_mem() const
 {
-    UINT count = 0;
-    count += sizeof(m_inhr);
-    count += sizeof(m_row_size);
-    count += sizeof(m_col_size);
-    count += sizeof(m_mat);
-    count += sizeof(m_is_init);
+    UINT count = sizeof(*this);
     count += size() * sizeof(T);
     return count;
 }
@@ -554,7 +552,7 @@ void Matrix<T>::adjust()
 //'size': rows to be grown.
 //Note if matrix is empty, growing column vector contains 'size' rows.
 template <class T>
-void Matrix<T>::grow_row(UINT size)
+void Matrix<T>::growRow(UINT size)
 {
     ASSERTN(m_is_init, ("not yet initialize."));
     if (size == 0) { return; }
@@ -595,7 +593,7 @@ INIT:
 //If number of elememnt in 'row' less than m_col_size, set the
 //remain entries to zero.
 template <class T>
-void Matrix<T>::grow_row(const T row[], UINT rowelemnum)
+void Matrix<T>::growRow(const T row[], UINT rowelemnum)
 {
     ASSERTN(m_is_init, ("not yet initialize."));
     ASSERT0(row != NULL);
@@ -625,7 +623,7 @@ void Matrix<T>::grow_row(const T row[], UINT rowelemnum)
 
 //Add row from a vector 'a'.
 template <class T>
-void Matrix<T>::grow_row(Matrix<T> const& a)
+void Matrix<T>::growRow(Matrix<T> const& a)
 {
     ASSERTN(m_is_init, ("not yet initialize."));
     ASSERTN(a.is_vec(), ("a must be vector"));
@@ -637,13 +635,13 @@ void Matrix<T>::grow_row(Matrix<T> const& a)
         ASSERTN(!HOOK_EQUAL || HOOK_EQUAL == a.HOOK_EQUAL, ("unmatch hook"));
         m_inhr = a.m_inhr;
     }
-    grow_row(a.m_mat, a.size());
+    growRow(a.m_mat, a.size());
 }
 
 
 //Add row from 'from' to 'to' of a.
 template <class T>
-void Matrix<T>::grow_row(Matrix<T> const& a, UINT from, UINT to)
+void Matrix<T>::growRow(Matrix<T> const& a, UINT from, UINT to)
 {
     ASSERTN(m_is_init, ("not yet initialize."));
     ASSERTN(from < a.m_row_size && to < a.m_row_size && from <= to,
@@ -678,7 +676,7 @@ void Matrix<T>::grow_row(Matrix<T> const& a, UINT from, UINT to)
 //Note if matrix is empty, growing column vector contains a
 //number of 'size' of columns.
 template <class T>
-void Matrix<T>::grow_col(UINT size)
+void Matrix<T>::growCol(UINT size)
 {
     ASSERTN(m_is_init, ("not yet initialize."));
     if (size == 0) {
@@ -686,7 +684,7 @@ void Matrix<T>::grow_col(UINT size)
     }
     if (m_col_size == 0) { //matrix is empty
         //If matrix is empty, growing 'size' columns, but only one row.
-        ASSERTN(!m_row_size && m_mat == NULL, ("exception occur in grow_col()"));
+        ASSERTN(!m_row_size && m_mat == NULL, ("exception occur in growCol()"));
         m_mat = (T*)::malloc(sizeof(T) * size);
         ::memset(m_mat, 0, sizeof(T) * size);
         m_col_size = size;
@@ -698,13 +696,13 @@ void Matrix<T>::grow_col(UINT size)
         }
         return;
     }
-    grow_all(0, size);
+    growRowAndCol(0, size);
 }
 
 
 //Add column from a vector 'a'.
 template <class T>
-void Matrix<T>::grow_col(Matrix<T> const& a)
+void Matrix<T>::growCol(Matrix<T> const& a)
 {
     ASSERTN(m_is_init, ("not yet initialize."));
     ASSERTN(a.is_vec(), ("a must be vector"));
@@ -716,13 +714,13 @@ void Matrix<T>::grow_col(Matrix<T> const& a)
         ASSERTN(!HOOK_EQUAL || HOOK_EQUAL == a.HOOK_EQUAL, ("unmatch hook"));
         m_inhr = a.m_inhr;
     }
-    grow_col(a.m_mat, a.size());
+    growCol(a.m_mat, a.size());
 }
 
 
 //Add column from 'sl' to 'el' of 'a'.
 template <class T>
-void Matrix<T>::grow_col(Matrix<T> const& a, UINT from, UINT to)
+void Matrix<T>::growCol(Matrix<T> const& a, UINT from, UINT to)
 {
     ASSERTN(m_is_init && a.m_is_init, ("not yet initialize."));
     ASSERTN(from < a.m_col_size && to < a.m_col_size && from <= to,
@@ -732,7 +730,7 @@ void Matrix<T>::grow_col(Matrix<T> const& a, UINT from, UINT to)
 
         //m_row_size also be 0
         ASSERTN(!m_row_size && m_mat == NULL,
-                ("exception occur in grow_all()"));
+                ("exception occur in growRowAndCol()"));
         m_row_size = a.m_row_size;
         m_col_size = to - from + 1;
         m_mat = (T*)::malloc(sizeof(T) * m_row_size * m_col_size);
@@ -767,13 +765,13 @@ void Matrix<T>::grow_col(Matrix<T> const& a, UINT from, UINT to)
 //'col'  col which should copy to m_mat, and 'colelemnum' descripted
 //how many row the column is.
 template <class T>
-void Matrix<T>::grow_col(const T col[], UINT colelemnum)
+void Matrix<T>::growCol(const T col[], UINT colelemnum)
 {
     ASSERTN(m_is_init, ("not yet initialize."));
     ASSERT0(col != NULL);
     if (m_col_size == 0) {
         ASSERTN(!m_row_size && m_mat == NULL,
-               ("exception occur in grow_col()"));
+               ("exception occur in growCol()"));
         m_mat = (T*)::malloc(sizeof(T) * colelemnum);
         ::memcpy(m_mat, col, sizeof(T) * colelemnum);
         m_row_size = colelemnum;
@@ -801,7 +799,7 @@ void Matrix<T>::grow_col(const T col[], UINT colelemnum)
 
 
 template <class T>
-void Matrix<T>::grow_all(UINT row_size, UINT col_size)
+void Matrix<T>::growRowAndCol(UINT row_size, UINT col_size)
 {
     ASSERTN(m_is_init, ("not yet initialize."));
     UINT i,j;
@@ -811,7 +809,7 @@ void Matrix<T>::grow_all(UINT row_size, UINT col_size)
 
     //Only grow row
     if (row_size > 0 && col_size == 0) {
-        grow_row(row_size);
+        growRow(row_size);
         return;
     }
 
@@ -819,7 +817,7 @@ void Matrix<T>::grow_all(UINT row_size, UINT col_size)
     if (m_col_size == 0) { //matrix is empty
         //m_row_size also be 0
         ASSERTN(!m_row_size && m_mat == NULL,
-                ("exception occur in grow_all()"));
+                ("exception occur in growRowAndCol()"));
         m_mat = (T*)::malloc(sizeof(T) * row_size * col_size);
         ::memset(m_mat, 0 , sizeof(T) * row_size * col_size);
         m_row_size = row_size;
@@ -860,7 +858,7 @@ void Matrix<T>::grow_all(UINT row_size, UINT col_size)
 
 
 template <class T>
-void Matrix<T>::del_row(UINT from, UINT to)
+void Matrix<T>::deleteRow(UINT from, UINT to)
 {
     ASSERTN(m_is_init, ("not yet initialize."));
     ASSERTN(from < m_row_size && to < m_row_size && from <= to,
@@ -881,7 +879,7 @@ void Matrix<T>::del_row(UINT from, UINT to)
 
 
 template <class T>
-void Matrix<T>::del_col(UINT from, UINT to)
+void Matrix<T>::deleteCol(UINT from, UINT to)
 {
     ASSERTN(m_is_init, ("not yet initialize."));
     ASSERTN(from < m_col_size && to < m_col_size && from <= to,
@@ -906,15 +904,15 @@ void Matrix<T>::del_col(UINT from, UINT to)
 
 //Pading to quad matrix, and rank = MAX(row, col)
 template <class T>
-void Matrix<T>::pad_quad()
+void Matrix<T>::padQuad()
 {
     ASSERTN(m_is_init, ("not yet initialize."));
     if (m_row_size == m_col_size) { return;    }
 
     if (m_row_size < m_col_size) {
-        grow_row(m_col_size - m_row_size);
+        growRow(m_col_size - m_row_size);
     } else {
-        grow_col(m_row_size - m_col_size);
+        growCol(m_row_size - m_col_size);
     }
 }
 
@@ -927,11 +925,11 @@ void Matrix<T>::setg(UINT row, UINT col, T v)
 {
     ASSERTN(m_is_init, ("not yet initialize."));
     if (m_row_size <= row && m_col_size > col) { //grow row
-        grow_row(row + 1 - m_row_size);
+        growRow(row + 1 - m_row_size);
     } else if (m_row_size > row && m_col_size <= col) { //grow col
-        grow_col(col + 1 - m_col_size);
+        growCol(col + 1 - m_col_size);
     } else if (m_row_size <= row && m_col_size <= col) { //grow both
-        grow_all(row + 1 - m_row_size, col + 1 - m_col_size);
+        growRowAndCol(row + 1 - m_row_size, col + 1 - m_col_size);
     }
     set(row, col, v);
 }
@@ -940,7 +938,7 @@ void Matrix<T>::setg(UINT row, UINT col, T v)
 //Set all 'row' row elements of matrix.
 //rows: row need to set new value.
 template <class T>
-void Matrix<T>::set_row(UINT rows, T row[], INT num)
+void Matrix<T>::setRow(UINT rows, T row[], INT num)
 {
     ASSERTN(m_is_init, ("not yet initialize."));
     ASSERTN(rows < m_row_size && num == m_col_size,
@@ -953,7 +951,7 @@ void Matrix<T>::set_row(UINT rows, T row[], INT num)
 //rows: row need to set.
 //v: v must be vector.
 template <class T>
-void Matrix<T>::set_row(UINT rows, Matrix<T> const& v)
+void Matrix<T>::setRow(UINT rows, Matrix<T> const& v)
 {
     ASSERTN(m_is_init, ("not yet initialize."));
     ASSERTN(rows < m_row_size, ("exception occur in set()"));
@@ -975,7 +973,7 @@ void Matrix<T>::set_row(UINT rows, Matrix<T> const& v)
 
 //Overlays on elements.
 template <class T>
-void Matrix<T>::set_rows(UINT from, UINT to, Matrix<T> const& m, UINT mfrom)
+void Matrix<T>::setRows(UINT from, UINT to, Matrix<T> const& m, UINT mfrom)
 {
     ASSERTN(m_is_init, ("not yet initialize."));
     ASSERTN(m.m_col_size == m_col_size &&
@@ -983,7 +981,7 @@ void Matrix<T>::set_rows(UINT from, UINT to, Matrix<T> const& m, UINT mfrom)
             mfrom + to - from < m.m_row_size,
             ("illegal matrix"));
     for (UINT i = from; i <= to; i++, mfrom++) {
-        for (UINT j = 0; j < get_col_size(); j++) {
+        for (UINT j = 0; j < getColSize(); j++) {
             set(i, j, m.get(mfrom, j));
         }
     }
@@ -991,19 +989,19 @@ void Matrix<T>::set_rows(UINT from, UINT to, Matrix<T> const& m, UINT mfrom)
 
 
 template <class T>
-void Matrix<T>::set_rows(UINT from, UINT to, T v)
+void Matrix<T>::setRows(UINT from, UINT to, T v)
 {
     ASSERTN(m_is_init, ("not yet initialize."));
     ASSERTN(from <= to && to < m_row_size, ("illegal matrix"));
     for (UINT i = from; i <= to; i++) {
-        set_row(i, v);
+        setRow(i, v);
     }
 }
 
 
 //cols: column need to set new value.
 template <class T>
-void Matrix<T>::set_row(UINT rows, T v)
+void Matrix<T>::setRow(UINT rows, T v)
 {
     ASSERTN(m_is_init, ("not yet initialize."));
     ASSERTN(rows < m_row_size, ("exception occur in set()"));
@@ -1016,7 +1014,7 @@ void Matrix<T>::set_row(UINT rows, T v)
 //Set all 'col' column elements of matrix
 //cols: column need to set new value.
 template <class T>
-void Matrix<T>::set_col(UINT cols, T col[], INT num)
+void Matrix<T>::setCol(UINT cols, T col[], INT num)
 {
     ASSERTN(m_is_init, ("not yet initialize."));
     ASSERTN(cols < m_col_size && num == m_row_size,
@@ -1029,7 +1027,7 @@ void Matrix<T>::set_col(UINT cols, T col[], INT num)
 
 //cols: column need to set new value.
 template <class T>
-void Matrix<T>::set_col(UINT cols, Matrix<T> const& v)
+void Matrix<T>::setCol(UINT cols, Matrix<T> const& v)
 {
     ASSERTN(m_is_init, ("not yet initialize."));
     ASSERTN(cols < m_col_size, ("exception occur in set()"));
@@ -1053,13 +1051,13 @@ void Matrix<T>::set_col(UINT cols, Matrix<T> const& v)
 
 //Overlays on elements.
 template <class T>
-void Matrix<T>::set_cols(UINT from, UINT to, Matrix<T> const& m, UINT mfrom)
+void Matrix<T>::setCols(UINT from, UINT to, Matrix<T> const& m, UINT mfrom)
 {
     ASSERTN(m_is_init, ("not yet initialize."));
     ASSERTN(m.m_row_size == m_row_size &&
             from <= to && to < m_col_size && mfrom + to - from < m.m_col_size,
             ("illegal matrix"));
-    for (UINT i = 0; i < get_row_size(); i++) {
+    for (UINT i = 0; i < getRowSize(); i++) {
         UINT k = 0;
         for (UINT j = from; j <= to; j++, k++) {
             set(i, j, m.get(i, mfrom + k));
@@ -1069,12 +1067,12 @@ void Matrix<T>::set_cols(UINT from, UINT to, Matrix<T> const& m, UINT mfrom)
 
 
 template <class T>
-void Matrix<T>::set_cols(UINT from, UINT to, T v)
+void Matrix<T>::setCols(UINT from, UINT to, T v)
 {
     ASSERTN(m_is_init, ("not yet initialize."));
     ASSERTN(from <= to && to < m_col_size, ("illegal matrix"));
     for (UINT j = from; j <= to; j++) {
-        set_col(j, v);
+        setCol(j, v);
     }
 }
 
@@ -1082,7 +1080,7 @@ void Matrix<T>::set_cols(UINT from, UINT to, T v)
 //Set all element of column cols to be v.
 //cols: column need to set new value.
 template <class T>
-void Matrix<T>::set_col(UINT cols, T v)
+void Matrix<T>::setCol(UINT cols, T v)
 {
     ASSERTN(m_is_init, ("not yet initialize."));
     ASSERTN(cols < m_col_size, ("exception occur in set()"));
@@ -1094,11 +1092,11 @@ void Matrix<T>::set_col(UINT cols, T v)
 
 //Interchange row.
 template <class T>
-void Matrix<T>::interch_row(UINT row1, UINT row2)
+void Matrix<T>::interchRow(UINT row1, UINT row2)
 {
     ASSERTN(m_is_init, ("not yet initialize."));
     ASSERTN(row1 < m_row_size && row2 < m_row_size,
-            ("exception occur in interch_row()"));
+            ("exception occur in interchRow()"));
     if (row1 == row2) return;
     for (UINT i = 0 ; i < m_col_size ; i++) {
         T tmp = get(row1, i);
@@ -1110,11 +1108,11 @@ void Matrix<T>::interch_row(UINT row1, UINT row2)
 
 //Interchange column.
 template <class T>
-void Matrix<T>::interch_col(UINT col1, UINT col2)
+void Matrix<T>::interchCol(UINT col1, UINT col2)
 {
     ASSERTN(m_is_init, ("not yet initialize."));
     ASSERTN(col1 < m_row_size && col2 < m_row_size,
-            ("exception occur in interch_col()"));
+            ("exception occur in interchCol()"));
     if (col1 == col2) return;
     for (UINT i = 0 ; i < m_row_size ; i++) {
         T tmp = get(i,col1);
@@ -1359,7 +1357,7 @@ void Matrix<T>::mulOfRow(UINT row, T v)
         return;
     }
     if (_equal(v, T(0))) {
-        set_row(row, T(0));
+        setRow(row, T(0));
         return;
     }
     for (UINT j = 0; j < m_col_size; j++) {
@@ -1379,7 +1377,7 @@ void Matrix<T>::mulOfRows(UINT from, UINT to, T v)
         return;
     }
     if (_equal(v, T(0))) {
-        set_rows(from, to, T(0));
+        setRows(from, to, T(0));
         return;
     }
     for (UINT i = from; i <= to; i++) {
@@ -1401,7 +1399,7 @@ void Matrix<T>::mulOfColumn(UINT col, T v)
         return;
     }
     if (_equal(v, T(0))) {
-        set_col(col, T(0));
+        setCol(col, T(0));
         return;
     }
     for (UINT i = 0; i < m_row_size; i++) {
@@ -1421,7 +1419,7 @@ void Matrix<T>:: mulOfColumns(UINT from, UINT to, T v)
         return;
     }
     if (_equal(v, T(0))) {
-        set_cols(from, to, T(0));
+        setCols(from, to, T(0));
         return;
     }
     for (UINT j = from; j <= to; j++) {
@@ -1490,7 +1488,7 @@ void Matrix<T>::addColumnToColumn(IN Matrix<T> const& m,
 
 //Mutiply times v to element of row 'from', and add such element to row 'to'.
 template <class T>
-void Matrix<T>::mul_and_add_row(UINT from, T v, UINT to)
+void Matrix<T>::mulAndAddRow(UINT from, T v, UINT to)
 {
     ASSERTN(m_is_init, ("not yet initialize."));
     ASSERTN(m_row_size > 0 && m_col_size > 0 && from < m_row_size &&
@@ -1502,7 +1500,7 @@ void Matrix<T>::mul_and_add_row(UINT from, T v, UINT to)
 
 
 template <class T>
-void Matrix<T>::mul_and_add_col(UINT from, T v, UINT to)
+void Matrix<T>::mulAndAddCol(UINT from, T v, UINT to)
 {
     ASSERTN(m_is_init, ("not yet initialize."));
     ASSERTN(m_row_size > 0 && m_col_size > 0 && from < m_col_size &&
@@ -1515,7 +1513,7 @@ void Matrix<T>::mul_and_add_col(UINT from, T v, UINT to)
 
 //Set all elements to be value 'v'
 template <class T>
-void Matrix<T>::set_all(T v)
+void Matrix<T>::setAllElem(T v)
 {
     ASSERTN(m_is_init, ("not yet initialize."));
     for (UINT j = 0; j < m_row_size; j++) {
@@ -1708,7 +1706,7 @@ T Matrix<T>::det() const
             }
 
             if (swap_row != (INT)j) { //Ensure diagonal nonzero.
-                a.interch_row(swap_row, j);
+                a.interchRow(swap_row, j);
                 r++;
             }
 
@@ -1716,7 +1714,7 @@ T Matrix<T>::det() const
             for (UINT i = j+1; i < a.m_row_size; i++) {
                 if (!_equal(a.get(i,j), T(0))) {
                     T tmp = - (a.get(i,j) / a.get(j,j));
-                    a.mul_and_add_row(j, tmp, i);
+                    a.mulAndAddRow(j, tmp, i);
                 }
             }
         } //end for
@@ -1816,8 +1814,8 @@ bool Matrix<T>::inv(OUT Matrix<T> & e)
             goto FIN;
         }
         if (swap_row != (INT)j) {
-            p.interch_row(swap_row, j);
-            e.interch_row(swap_row, j);
+            p.interchRow(swap_row, j);
+            e.interchRow(swap_row, j);
         }
 
         //Reduce diagonal entry to unitary
@@ -1832,8 +1830,8 @@ bool Matrix<T>::inv(OUT Matrix<T> & e)
             if (i != j) {
                 if (!_equal(p.get(i,j), T(0))) {
                     T tmp = -1 * p.get(i,j);
-                    p.mul_and_add_row(j, tmp, i);
-                    e.mul_and_add_row(j, tmp, i);
+                    p.mulAndAddRow(j, tmp, i);
+                    e.mulAndAddRow(j, tmp, i);
                 }
             }
         }
@@ -1855,11 +1853,11 @@ void Matrix<T>::frd(OUT Matrix<T> & f, OUT Matrix<T> & g)
     ASSERTN(m_row_size > 1 && m_col_size > 1, ("strange matrix"));
     Matrix<T> tmp;
     UINT rankr = rank(&tmp, true);
-    g.grow_row(tmp, 0, rankr - 1);
+    g.growRow(tmp, 0, rankr - 1);
     UINT rank_row = 0;
     for (UINT j = 0; j < tmp.m_col_size; j++) {
         if (_equal(tmp.get(rank_row, j), T(1))) {
-            f.grow_col(*this, j, j);
+            f.growCol(*this, j, j);
             rank_row++;
             if (rank_row == rankr) {
                 break;
@@ -2094,8 +2092,8 @@ bool Matrix<T>::ginv(OUT Matrix<T> & x)
                 continue; //Try next column, trapezoid matrix
             }
             if (swap_row != (INT)row) {
-                tmpthis.interch_row(swap_row, row);
-                P.interch_row(swap_row, row);
+                tmpthis.interchRow(swap_row, row);
+                P.interchRow(swap_row, row);
             }
             col = w;
             break;
@@ -2122,8 +2120,8 @@ bool Matrix<T>::ginv(OUT Matrix<T> & x)
                 if (!_equal(tmpthis.get(i, col), T(0))) {
                     //T tmp = -1 * ptr->get(i, col);
                     T tmp = -(tmpthis.get(i, col)) / tmpthis.get(row, col);
-                    tmpthis.mul_and_add_row(row, tmp, i);
-                    P.mul_and_add_row(row, tmp, i);
+                    tmpthis.mulAndAddRow(row, tmp, i);
+                    P.mulAndAddRow(row, tmp, i);
                 }
             }
         }//end for
@@ -2148,8 +2146,8 @@ FIN:
             bool find = false;
             for (UINT col = row+1; col < tmpthis.m_col_size; col++) {
                 if (_equal(tmpthis.get(row, col), T(1))) {
-                    tmpthis.interch_col(row, col);
-                    Q.interch_col(row, col);
+                    tmpthis.interchCol(row, col);
+                    Q.interchCol(row, col);
                     find = true;
                     break;
                 }
@@ -2159,8 +2157,8 @@ FIN:
         for (UINT col = row+1; col < tmpthis.m_col_size; col++) {
             if (!_equal(tmpthis.get(row, col), T(0))) {
                 T tmp = -1 * tmpthis.get(row, col);
-                tmpthis.mul_and_add_col(row, tmp, col);
-                Q.mul_and_add_col(row, tmp, col);
+                tmpthis.mulAndAddCol(row, tmp, col);
+                Q.mulAndAddCol(row, tmp, col);
             }
         }//end for
     }//end for
@@ -2171,7 +2169,7 @@ FIN:
 
     Matrix<T> I(rankr, rankr, &m_inhr);
     I.eye(1);
-    I.grow_all(Q.m_col_size - rankr, P.m_row_size - rankr);
+    I.growRowAndCol(Q.m_col_size - rankr, P.m_row_size - rankr);
     x = Q*I*P;
 
 
@@ -2623,8 +2621,8 @@ UINT Matrix<T>::rank(OUT Matrix<T> * basis, bool is_unitarize)
     ASSERT0(ptr != this);
     ptr->copy(*this);
     if (!is_unitarize) {
-        rowpos = new Matrix<INT>(ptr->get_row_size(), 1);
-        for (UINT i = 0; i < rowpos->get_row_size(); i++) {
+        rowpos = new Matrix<INT>(ptr->getRowSize(), 1);
+        for (UINT i = 0; i < rowpos->getRowSize(); i++) {
             rowpos->set(i, 0, i);
         }
     }
@@ -2666,9 +2664,9 @@ UINT Matrix<T>::rank(OUT Matrix<T> * basis, bool is_unitarize)
                 continue; //Try next column, trapezoid matrix
             }
             if (swap_row != (INT)row) {
-                ptr->interch_row(swap_row, row);
+                ptr->interchRow(swap_row, row);
                 if (rowpos != NULL)
-                    rowpos->interch_row(swap_row, row);
+                    rowpos->interchRow(swap_row, row);
             }
             col = w;
             break;
@@ -2696,7 +2694,7 @@ UINT Matrix<T>::rank(OUT Matrix<T> * basis, bool is_unitarize)
                 if (!_equal(ptr->get(i, col), T(0))) {
                     //T tmp = -1 * ptr->get(i, col);
                     T tmp = -(ptr->get(i, col)) / ptr->get(row, col);
-                    ptr->mul_and_add_row(row, tmp, i);
+                    ptr->mulAndAddRow(row, tmp, i);
                 }
             }
         } //end for
@@ -2706,11 +2704,11 @@ UINT Matrix<T>::rank(OUT Matrix<T> * basis, bool is_unitarize)
 FIN:
     if (rowpos != NULL) {
         ASSERT0(ptr == basis);
-        ASSERT0(rankv <= rowpos->get_row_size());
-        if (rankv < this->get_row_size()) {
-            ptr->reinit(rankv, ptr->get_col_size());
+        ASSERT0(rankv <= rowpos->getRowSize());
+        if (rankv < this->getRowSize()) {
+            ptr->reinit(rankv, ptr->getColSize());
             for (UINT i = 0; i < rankv; i++) {
-                ptr->set_rows(i, i, *this, rowpos->get(i, 0));
+                ptr->setRows(i, i, *this, rowpos->get(i, 0));
             }
         }
         delete rowpos;
@@ -2730,14 +2728,14 @@ void Matrix<T>::insertRowBefore(UINT ridx)
     ASSERTN(ridx < m_row_size && m_row_size > 0, ("out of bound"));
     Matrix<T> tmp(&m_inhr);
     if (ridx == 0) {
-        tmp.grow_col(m_col_size);
-        tmp.grow_row(*this, 0, m_row_size - 1);
+        tmp.growCol(m_col_size);
+        tmp.growRow(*this, 0, m_row_size - 1);
         *this = tmp;
         return;
     }
     inner(tmp, 0, 0, ridx-1, m_col_size - 1);
-    tmp.grow_row(1);
-    tmp.grow_row(*this, ridx, m_row_size - 1);
+    tmp.growRow(1);
+    tmp.growRow(*this, ridx, m_row_size - 1);
     *this = tmp;
 }
 
@@ -2753,15 +2751,15 @@ void Matrix<T>::insertRowsBefore(UINT ridx, UINT rnum)
         return;
     }
     if (ridx == 0) {
-        tmp.grow_col(m_col_size);
-        tmp.grow_row(rnum - 1);
-        tmp.grow_row(*this, 0, m_row_size - 1);
+        tmp.growCol(m_col_size);
+        tmp.growRow(rnum - 1);
+        tmp.growRow(*this, 0, m_row_size - 1);
         *this = tmp;
         return;
     }
     inner(tmp, 0, 0, ridx-1, m_col_size - 1);
-    tmp.grow_row(rnum);
-    tmp.grow_row(*this, ridx, m_row_size - 1);
+    tmp.growRow(rnum);
+    tmp.growRow(*this, ridx, m_row_size - 1);
     *this = tmp;
 }
 
@@ -2781,16 +2779,16 @@ void Matrix<T>::insertRowsBefore(
             ("out of bound"));
     Matrix<T> tmp(&m_inhr);
     if (ridx == 0) {
-        tmp.grow_col(m_col_size);
-        tmp.grow_row(m, mfrom, mto);
-        tmp.grow_row(*this, 0, m_row_size - 1);
-        tmp.del_row(0);
+        tmp.growCol(m_col_size);
+        tmp.growRow(m, mfrom, mto);
+        tmp.growRow(*this, 0, m_row_size - 1);
+        tmp.deleteRow(0);
         *this = tmp;
         return;
     }
     inner(tmp, 0, 0, ridx-1, m_col_size - 1);
-    tmp.grow_row(m, mfrom, mto);
-    tmp.grow_row(*this, ridx, m_row_size - 1);
+    tmp.growRow(m, mfrom, mto);
+    tmp.growRow(*this, ridx, m_row_size - 1);
     *this = tmp;
 }
 
@@ -2803,14 +2801,14 @@ void Matrix<T>::insertColumnBefore(UINT cidx)
     ASSERTN(cidx < m_col_size && m_col_size > 0, ("out of bound"));
     Matrix<T> tmp(&m_inhr);
     if (cidx == 0) {
-        tmp.grow_row(m_row_size);
-        tmp.grow_col(*this, 0, m_col_size - 1);
+        tmp.growRow(m_row_size);
+        tmp.growCol(*this, 0, m_col_size - 1);
         *this = tmp;
         return;
     }
     inner(tmp, 0, 0, m_row_size - 1, cidx - 1);
-    tmp.grow_col(1);
-    tmp.grow_col(*this, cidx, m_col_size - 1);
+    tmp.growCol(1);
+    tmp.growCol(*this, cidx, m_col_size - 1);
     *this = tmp;
 }
 
@@ -2826,15 +2824,15 @@ void Matrix<T>::insertColumnsBefore(UINT cidx, UINT cnum)
         return;
     }
     if (cidx == 0) {
-        tmp.grow_row(m_row_size);
-        tmp.grow_col(cnum - 1);
-        tmp.grow_col(*this, 0, m_col_size - 1);
+        tmp.growRow(m_row_size);
+        tmp.growCol(cnum - 1);
+        tmp.growCol(*this, 0, m_col_size - 1);
         *this = tmp;
         return;
     }
     inner(tmp, 0, 0, m_row_size - 1, cidx - 1);
-    tmp.grow_col(cnum);
-    tmp.grow_col(*this, cidx, m_col_size - 1);
+    tmp.growCol(cnum);
+    tmp.growCol(*this, cidx, m_col_size - 1);
     *this = tmp;
 }
 
@@ -2854,16 +2852,16 @@ void Matrix<T>::insertColumnsBefore(
             mfrom <= mto,    ("out of bound"));
     Matrix<T> tmp(&m_inhr);
     if (cidx == 0) {
-        tmp.grow_row(m_row_size);
-        tmp.grow_col(m, mfrom, mto);
-        tmp.grow_col(*this, 0, m_col_size - 1);
-        tmp.del_col(0);
+        tmp.growRow(m_row_size);
+        tmp.growCol(m, mfrom, mto);
+        tmp.growCol(*this, 0, m_col_size - 1);
+        tmp.deleteCol(0);
         *this = tmp;
         return;
     }
     inner(tmp, 0, 0, m_row_size - 1, cidx - 1);
-    tmp.grow_col(m, mfrom, mto);
-    tmp.grow_col(*this, cidx, m_col_size - 1);
+    tmp.growCol(m, mfrom, mto);
+    tmp.growCol(*this, cidx, m_col_size - 1);
     *this = tmp;
 }
 
@@ -2955,8 +2953,8 @@ bool Matrix<T>::plu(OUT Matrix<T> & p, OUT Matrix<T> & l, OUT Matrix<T> & u)
                 continue; //try next column, trapezoid matrix
             }
             if (swap_row != (INT)row) {
-                u.interch_row(swap_row, row);
-                p.interch_row(swap_row, row); //Record permutate matrix
+                u.interchRow(swap_row, row);
+                p.interchRow(swap_row, row); //Record permutate matrix
             }
             col = w; //Record current non-zero column
             break;
@@ -2973,7 +2971,7 @@ bool Matrix<T>::plu(OUT Matrix<T> & p, OUT Matrix<T> & l, OUT Matrix<T> & u)
             //For reducing the computation cost.
             if (!_equal(u.get(i, col), T(0))) {
                 T tmp = -1 * u.get(i, col) / topent;
-                u.mul_and_add_row(row, tmp, i);
+                u.mulAndAddRow(row, tmp, i);
             }
         } //end for
     } //end for (INT row = 0...
@@ -3057,7 +3055,7 @@ bool Matrix<T>::lu(OUT Matrix<T> & l, OUT Matrix<T> & u)
         for (i = row + 1; i < u.m_row_size; i++) {
             if (!_equal(u.get(i, col), T(0))) {
                 T tmp = -1 * u.get(i, col) / topent;
-                u.mul_and_add_row(row, tmp, i);
+                u.mulAndAddRow(row, tmp, i);
             }
         }//end for
     }//end for (INT row = 0...
@@ -3372,7 +3370,7 @@ void Matrix<T>::cross(IN Matrix<T> & v, OUT Matrix<T> & u)
     ASSERTN(m_row_size == 1 || m_col_size == 1,
             ("not a vector, only one row or one col"));
     if (&v == this) {
-        u.reinit(1, MAX(v.get_col_size(), v.get_row_size()));
+        u.reinit(1, MAX(v.getColSize(), v.getRowSize()));
         u.zero();
         return;
     }
@@ -3386,9 +3384,9 @@ void Matrix<T>::cross(IN Matrix<T> & v, OUT Matrix<T> & u)
             v.trans();
         } else {
             //'v' is col vector
-            ASSERTN(m_col_size == 3 && v.get_row_size() == 3,
+            ASSERTN(m_col_size == 3 && v.getRowSize() == 3,
                     ("only valid for 3-dimension vector"));
-            u.reinit(1, v.get_row_size());
+            u.reinit(1, v.getRowSize());
             u.set(0, 0, get(0, 1)*v.get(2, 0) - get(0, 2)*v.get(1, 0));
             u.set(0, 1, get(0, 2)*v.get(0, 0) - get(0, 0)*v.get(2, 0));
             u.set(0, 2, get(0, 0)*v.get(1, 0) - get(0, 1)*v.get(0, 0));
@@ -3415,7 +3413,7 @@ void Matrix<T>::orthn(OUT Matrix<T> & z)
     innerRow(b1, 0, 0); //first row vector.
     T dotv = b1.dot(b1);
     b1.mulOfRow(0, _sqrt(1/dotv)); //normalize first dim.
-    z.set_row(0, b1);
+    z.setRow(0, b1);
     for (UINT row = 1; row < m_row_size; row++) {
         //Orthogonalizing: <Xn,Zi>*Zi
         Matrix<T> allzi(1,z.m_col_size, &m_inhr);
@@ -3432,7 +3430,7 @@ void Matrix<T>::orthn(OUT Matrix<T> & z)
         //Normalization: Zi = Zi/|Zi|
         Matrix<T> no = xi - allzi;
         no.mul(1/_sqrt(no.dot(no)));
-        z.set_row(row, no);
+        z.setRow(row, no);
     }
 }
 
@@ -3453,7 +3451,7 @@ void Matrix<T>::orth(OUT Matrix<T> & z)
     Matrix<T> b1;
     z.reinit(m_row_size, m_col_size, &m_inhr);
     innerRow(b1, 0, 0); //first row vector
-    z.set_row(0, b1);
+    z.setRow(0, b1);
     for (UINT row = 1; row < m_row_size; row++) {
         //Only orthogonalize: (<Xn,Zi>/<Zi,Zi>)*Zi
         Matrix<T> allzi(1,z.m_col_size, &m_inhr);
@@ -3478,7 +3476,7 @@ void Matrix<T>::orth(OUT Matrix<T> & z)
 
         //Store the component vector as the kth orthogonal
         //axis of row convention space.
-        z.set_row(row, xi - allzi);
+        z.setRow(row, xi - allzi);
     }
 }
 
@@ -3504,13 +3502,13 @@ void Matrix<T>::mls(OUT Matrix<T> & x, Matrix<T> const& b)
     A.trans();
     Matrix<T> a = A * b; //trans(A)*b, a is vector
     A = A * *this; //trans(A)*A
-    A.grow_col(a); //a is augment coefficient vector
+    A.growCol(a); //a is augment coefficient vector
 
     //For speed up, we do invoke nullspace() instead of sse(). It's only a trick.
     A.nullspace(x);
 
     //Contain the number of (m_row_size - 1) unknowns.
-    x.del_row(x.m_row_size - 1);
+    x.deleteRow(x.m_row_size - 1);
 }
 
 
@@ -3564,15 +3562,15 @@ bool Matrix<T>::sse(OUT Matrix<T> & x, Matrix<T> const& b)
     //Here we use the function nullspace() to reduce and format one
     //generating solution.
     //However, function nullspace() regard the last column of 'tmp' as
-    //one variable when we invoke grow_col(b).
+    //one variable when we invoke growCol(b).
     //Consequently, to get the correct solution from output of nullspace(), the
     //sign of the last column must be negative value of original.
-    tmp.grow_col(b);
+    tmp.growCol(b);
     tmp.nullspace(x);
 
     //There are number of (m_row_size - 1) unknowns.
-    x.del_row(x.m_row_size - 1);
-    x.mulOfColumn(x.get_col_size() - 1, -1);
+    x.deleteRow(x.m_row_size - 1);
+    x.mulOfColumn(x.getColSize() - 1, -1);
     return false;
 }
 
@@ -3731,7 +3729,7 @@ void Matrix<T>::eig(OUT Matrix<T> & eigv, OUT Matrix<T> & eigx)
             if (!zero_col) {
                 Matrix<T> tmpcol;
                 nul.innerColumn(tmpcol, j, j);
-                eigx.grow_col(tmpcol);
+                eigx.growCol(tmpcol);
             }
         }//end for
     }//end for
@@ -3836,7 +3834,7 @@ bool Matrix<T>::svd(OUT Matrix<T> & u, OUT Matrix<T> & s, OUT Matrix<T> & eigx)
         //of U. Delta1 is modular of Av1.
         tmp.mul(1/s.get(i, i));
 
-        subU.grow_row(tmp);
+        subU.growRow(tmp);
     }
 
     //To construct U, we need the quad-matrix to present R^n space,
@@ -3852,7 +3850,7 @@ bool Matrix<T>::svd(OUT Matrix<T> & u, OUT Matrix<T> & s, OUT Matrix<T> & eigx)
             if (!nulofu1.is_colequ(i, 0)) { //
                 Matrix tmp;
                 nulofu1.innerColumn(tmp, i, i);
-                subU.grow_row(tmp);
+                subU.growRow(tmp);
             }
         }
         ASSERTN(subU.is_quad(), ("too many basis"));
@@ -4056,11 +4054,11 @@ void Matrix<T>::padding()
         }
         if (allzero) {
             if (newrows.m_row_size == 0) {
-                newrows.grow_col(tmp.m_col_size);
+                newrows.growCol(tmp.m_col_size);
             } else {
-                newrows.grow_row(1);
+                newrows.growRow(1);
             }
-            newrows.set_row(newrows.m_row_size - 1, T(0));
+            newrows.setRow(newrows.m_row_size - 1, T(0));
             newrows.set(newrows.m_row_size - 1, j, 1);
         }
     }
@@ -4070,9 +4068,9 @@ void Matrix<T>::padding()
 
     if (tran) {
         newrows.trans();
-        grow_col(newrows, 0, newrows.m_col_size - 1);
+        growCol(newrows, 0, newrows.m_col_size - 1);
     } else {
-        grow_row(newrows, 0, newrows.m_row_size - 1);
+        growRow(newrows, 0, newrows.m_row_size - 1);
     }
 }
 

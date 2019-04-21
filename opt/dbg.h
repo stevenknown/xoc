@@ -69,7 +69,7 @@ public:
     virtual void doPrepareWorkBeforePrint() {}
 
     virtual void printSrcLine(IR const*, PrtCtx * ctx);
-    virtual void printSrcLine(Dbx const*, PrtCtx * ctx)
+    virtual void printSrcLine(Dbx const*, PrtCtx *)
     {
         //Taget Dependent Code
         //Nothing to do.

@@ -1634,6 +1634,7 @@ IR * Region::simplifyStoreArray(IR * ir, SimpCtx * ctx)
 
     ret = buildIStore(array_addr, rhsval, type);
     ret->copyRef(ir, this);
+    copyDbx(ret, ir, this);
     if (getMDSSAMgr() != NULL) {
         getMDSSAMgr()->changeDef(ir, ret);
     }

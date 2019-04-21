@@ -272,5 +272,12 @@ extern bool g_is_dump_alias_analysis;
 
 //Dump after each pass.
 extern bool g_is_dump_after_pass;
+
+//Dump before each pass.
+extern bool g_is_dump_before_pass;
+
+//Set true to enable searching debug-info from expression bottom up
+//to nearest stmt.
+extern bool g_is_search_and_copy_dbx;
 } //namespace xoc
 #endif

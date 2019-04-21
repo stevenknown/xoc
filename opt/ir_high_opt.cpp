@@ -80,7 +80,7 @@ void Region::HighProcessImpl(OptCtx & oc)
         IR_DU_MGR * dumgr = (IR_DU_MGR*)getPassMgr()->
             registerPass(PASS_DU_MGR);
         ASSERT0(dumgr);
-        UINT f = SOL_REF|COMPUTE_PR_DU|COMPUTE_NOPR_DU;
+        UINT f = SOL_REF|COMPUTE_PR_DU|COMPUTE_NONPR_DU;
         if (g_compute_available_exp) {
             f |= SOL_AVAIL_EXPR;
         }
@@ -95,7 +95,7 @@ void Region::HighProcessImpl(OptCtx & oc)
 
         if (dumgr->perform(oc, f) && OC_is_ref_valid(oc)) {
             if (g_compute_classic_du_chain) {
-                UINT flag = COMPUTE_NOPR_DU;
+                UINT flag = COMPUTE_NONPR_DU;
                 ASSERT0(getPassMgr());
 
                 //If PRs have already been in SSA form, compute

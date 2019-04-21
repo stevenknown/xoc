@@ -378,7 +378,7 @@ void dumpIRList(IR * ir_list, Region * rg, CHAR * attr, UINT dumpflag)
 }
 
 
-static void verifyIR(IR * ir, IRAddressHash * irh, Region const* rg)
+static void verifyIR(IR * ir, BitSet * irh, Region const* rg)
 {
     ASSERT0(irh != NULL);
     for (UINT i = 0; i < IR_MAX_KID_NUM(ir); i++) {
@@ -391,8 +391,8 @@ static void verifyIR(IR * ir, IRAddressHash * irh, Region const* rg)
 
     //IR can not be used more than twice. Since there will cause
     //memory crash during freeIR().
-    ASSERTN(!irh->find(ir), ("IR has been used again"));
-    irh->append(ir);
+    ASSERTN(!irh->is_contain(ir->id()), ("IR has been used again"));
+    irh->bunion(ir->id());
     ir->verify(rg);
 }
 
@@ -402,7 +402,8 @@ static void verifyIR(IR * ir, IRAddressHash * irh, Region const* rg)
 //Ensure that PHI must be the first stmt in basic block.
 bool verifyIRandBB(BBList * bblst, Region const* rg)
 {
-    IRAddressHash irh;
+    //IRAddressHash irh;
+    BitSet irh;
     for (IRBB * bb = bblst->get_head();
          bb != NULL; bb = bblst->get_next()) {
         bool should_not_phi = false;
@@ -445,11 +446,11 @@ bool verifySimp(IR * ir_list, SimpCtx & simp)
 
 
 //Check for IR sanity and uniqueness.
-bool verifyIRList(IR * ir, IRAddressHash * irh, Region const* rg)
+bool verifyIRList(IR * ir, BitSet * irh, Region const* rg)
 {
-    IRAddressHash * loc = NULL;
-    if (irh == NULL) {
-        loc = new IRAddressHash();
+    BitSet * loc = NULL;
+    if (irh == NULL) {        
+        loc = new BitSet();
         irh = loc;
     }
     while (ir != NULL) {
@@ -549,7 +550,7 @@ static void dump_label_ref(LabelInfo const* li)
 }
 
 
-static void dump_ai(OUT CHAR * buf, IR const* ir)
+static void dumpAttachInfo(OUT CHAR * buf, IR const* ir)
 {
     ASSERT0(ir && buf);
     AIContainer const* ai = ir->getAI();
@@ -559,7 +560,7 @@ static void dump_ai(OUT CHAR * buf, IR const* ir)
 
     if (!cont.is_init()) { return; }
 
-    strcat(buf, " ai:");
+    strcat(buf, " attachinfo:");
     CHAR * p = buf + strlen(buf);
     bool not_first = false;
     for (UINT i = 0; i < cont.get_capacity(); i++) {
@@ -631,7 +632,7 @@ void dumpIR(IR const* ir, Region * rg, IN CHAR * attr, UINT dumpflag)
         strcat(p, " nomove");
     }
 
-    dump_ai(p, ir);
+    dumpAttachInfo(p, ir);
 
     //Record type info and var decl.
     StrBuf buf(64);
@@ -1129,7 +1130,7 @@ void dumpIR(IR const* ir, Region * rg, IN CHAR * attr, UINT dumpflag)
 
         //Dump variable info.
         CHAR * name = xstrcat(tt, 40, "%s",
-                            SYM_name(LDA_idinfo(ir)->get_name()));
+            SYM_name(LDA_idinfo(ir)->get_name()));
         if (LDA_ofst(ir) != 0) {
             note("\nlda:%s:offset(%d) '%s'",
                  xdm->dump_type(d, buf), LDA_ofst(ir), name);
@@ -2648,8 +2649,11 @@ void IR::copyRef(IR const* src, Region * rg)
     ASSERTN(isMemoryRef(), ("not memory reference"));
     ASSERT0(!src->is_undef());
     setRefMD(src->getRefMD(), rg);
-    if (isReadPR() || isWritePR()) {;}
-    else { setRefMDSet(src->getRefMDSet(), rg); }
+    if (isReadPR() || isWritePR()) {
+        //PR operation does not have MDSet reference.
+        return;
+    }
+    setRefMDSet(src->getRefMDSet(), rg);
 }
 
 

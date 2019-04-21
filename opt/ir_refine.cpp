@@ -1778,10 +1778,20 @@ void Region::insertCvtForBinaryOp(IR * ir, bool & change)
     }
 
     if (op1->getTypeSize(dm) != dt_size) {
-        BIN_opnd1(ir) = buildCvt(op1, type);
-        copyDbx(BIN_opnd1(ir), op1, this);
-        change = true;
-        ir->setParentPointer(false);
+        if (ir->is_asr() || ir->is_lsl() || ir->is_lsr()) {
+            //CASE: Second operand of Shift operantion need NOT to be converted.
+            //      Second operand indicates the bit that expected to be shifted.
+            //e.g: $2(u64) = $8(u64) >> j(u32);
+            //  stpr $2 : u64 id : 37 attachinfo : Dbx
+            //      lsr : u64 id : 31 attachinfo : Dbx
+            //          $8 : u64 id : 59
+            //          ld : u32 'j' decl : unsigned int j  id : 30 attachinfo : Dbx, MDSSA
+        } else {
+            BIN_opnd1(ir) = buildCvt(op1, type);
+            copyDbx(BIN_opnd1(ir), op1, this);
+            change = true;
+            ir->setParentPointer(false);
+        }
     }
 }
 
@@ -1879,6 +1889,18 @@ IR * Region::insertCvt(IR * parent, IR * kid, bool & change)
                 parent->is_add() &&
                 BIN_opnd0(parent)->is_ptr()) {
                 //Skip pointer arithmetics.
+                return kid;
+            }
+
+            if ((parent->is_asr() || parent->is_lsl() || parent->is_lsr()) &&
+                kid == BIN_opnd1(parent)) {
+                //CASE: Second operand of Shift operantion need NOT to be converted.
+                //      Second operand indicates the bit that expected to be shifted.
+                //e.g: $2(u64) = $8(u64) >> j(u32);
+                //  stpr $2 : u64 id : 37 attachinfo : Dbx
+                //      lsr : u64 id : 31 attachinfo : Dbx
+                //          $8 : u64 id : 59
+                //          ld : u32 'j' decl : unsigned int j  id : 30 attachinfo : Dbx, MDSSA
                 return kid;
             }
 

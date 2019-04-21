@@ -217,8 +217,8 @@ Matrix<PRECISION_TYPE> operator - (Matrix<PRECISION_TYPE> const& a,
 static void init_den(Matrix<Rational> * pbasis)
 {
     Rational v(0);
-    for (UINT i = 0; i < pbasis->get_row_size(); i++) {
-        for (UINT j = 0; j < pbasis->get_col_size(); j++) {
+    for (UINT i = 0; i < pbasis->getRowSize(); i++) {
+        for (UINT j = 0; j < pbasis->getColSize(); j++) {
             pbasis->set(i, j, v);
         }
     }
@@ -237,9 +237,9 @@ static void rmat_dumpf_by_handle(void const* pbasis, FILE * h)
 {
     ASSERTN(h, ("dump file handle is NULL"));
     RMat * pthis = (RMat*)pbasis;
-    fprintf(h, "\nMATRIX(%d,%d)\n", pthis->get_row_size(), pthis->get_col_size());
-    for (UINT i = 0; i < pthis->get_row_size(); i++) {
-        for (UINT j = 0; j < pthis->get_col_size(); j++) {
+    fprintf(h, "\nMATRIX(%d,%d)\n", pthis->getRowSize(), pthis->getColSize());
+    for (UINT i = 0; i < pthis->getRowSize(); i++) {
+        for (UINT j = 0; j < pthis->getColSize(); j++) {
             Rational rat = pthis->get(i, j);
             CHAR const* blank = "      ";
             if (rat.den() == 1) {
@@ -283,8 +283,8 @@ static void rmat_dumps(void const* pbasis)
 {
     printf("\n");
     RMat * pthis = (RMat*)pbasis;
-    for (UINT i = 0; i < pthis->get_row_size(); i++) {
-        for (UINT j = 0; j < pthis->get_col_size(); j++) {
+    for (UINT i = 0; i < pthis->getRowSize(); i++) {
+        for (UINT j = 0; j < pthis->getColSize(); j++) {
             Rational rat = pthis->get(i, j);
             CHAR const* blank = "      ";
             if (rat.den() == 1) {
@@ -737,7 +737,7 @@ INTMat::INTMat(UINT row, UINT col)
 {
     m_is_init = false;
     init();
-    grow_all(row, col);
+    growRowAndCol(row, col);
 }
 
 
@@ -850,7 +850,7 @@ INT INTMat::det()
 
 
 //Generate unimodular matrix to elimnate element.
-void INTMat::gen_elim_mat(UINT row, UINT col, OUT INTMat & elim)
+void INTMat::genElimMat(UINT row, UINT col, OUT INTMat & elim)
 {
     ASSERTN(m_is_init, ("not yet initialize."));
     INT aii = get(row, row), aij = get(row, col), x, y;
@@ -923,7 +923,7 @@ void INTMat::hnf(OUT INTMat & h, OUT INTMat & u)
         for (j = i + 1; j < (INT)h.m_col_size; j++) {
             if (h.get(i, j) != 0) {
                 INTMat elim;
-                h.gen_elim_mat(i, j, elim);
+                h.genElimMat(i, j, elim);
 
                 //Compounding unimodular postmultiply matrix
                 //for each constituent transformation.
@@ -995,12 +995,12 @@ void INTMat::hnf(OUT INTMat & h, OUT INTMat & u)
 //Reduce matrix by GCD operation.
 void INTMat::gcd()
 {
-    if (get_col_size() == 1) return;
-    for (UINT i = 0; i < get_row_size(); i++) {
+    if (getColSize() == 1) return;
+    for (UINT i = 0; i < getRowSize(); i++) {
         UINT min = (UINT)-1;
         UINT j;
         bool allzero = true;
-        for (j = 0; j < get_col_size(); j++) {
+        for (j = 0; j < getColSize(); j++) {
             UINT x = abs(get(i, j));
             if (x != 0) {
                 min = MIN(min, x);
@@ -1011,7 +1011,7 @@ void INTMat::gcd()
             continue;
         }
         UINT mingcd = min;
-        for (j = 0; j < get_col_size(); j++) {
+        for (j = 0; j < getColSize(); j++) {
             UINT q = abs(get(i, j));
             if (q != 0 && q != mingcd) {
                 mingcd = sgcd(mingcd, q);
@@ -1023,7 +1023,7 @@ void INTMat::gcd()
         if (mingcd == 1) {
             continue;
         }
-        for (j = 0; j < get_col_size(); j++) {
+        for (j = 0; j < getColSize(); j++) {
             set(i, j, get(i, j)/(INT)mingcd);
         }
     }
@@ -1181,7 +1181,7 @@ void INTMat::dumpf(CHAR const* name, bool is_del) const
     }
     FILE * h = fopen(name, "a+");
     ASSERTN(h, ("%s create failed!!!", name));
-    fprintf(h, "\nMATRIX(%d,%d)\n", this->get_row_size(), this->get_col_size());
+    fprintf(h, "\nMATRIX(%d,%d)\n", this->getRowSize(), this->getColSize());
     for (UINT i = 0; i < m_row_size; i++) {
         fprintf(h, "\t");
         for (UINT j = 0; j < m_col_size; j++) {
@@ -1236,8 +1236,8 @@ static CHAR const* g_sd_str = "%f";
 static void val_adjust(Matrix<Float> * pbasis)
 {
     StrBuf buf(64);
-    for (UINT i = 0; i < pbasis->get_row_size(); i++) {
-        for (UINT j = 0; j < pbasis->get_col_size(); j++) {
+    for (UINT i = 0; i < pbasis->getRowSize(); i++) {
+        for (UINT j = 0; j < pbasis->getColSize(); j++) {
             buf.sprint(g_sd_str, pbasis->get(i,j).f());
             pbasis->set(i, j, atof(buf.buf));
         }
@@ -1256,10 +1256,10 @@ static void flt_dumpf_by_handle(void const* pbasis, FILE * h)
 {
     ASSERTN(h, ("file handle is NULL"));
     FloatMat * pthis = (FloatMat*)pbasis;
-    fprintf(h, "\nMATRIX(%d,%d)\n", pthis->get_row_size(), pthis->get_col_size());
-    for (UINT i = 0; i < pthis->get_row_size(); i++) {
+    fprintf(h, "\nMATRIX(%d,%d)\n", pthis->getRowSize(), pthis->getColSize());
+    for (UINT i = 0; i < pthis->getRowSize(); i++) {
         fprintf(h, "\t");
-        for (UINT j = 0; j < pthis->get_col_size(); j++) {
+        for (UINT j = 0; j < pthis->getColSize(); j++) {
             CHAR const* blank = " ";
             fprintf(h, "%10f%s", pthis->get(i,j).f(), blank);
         }
@@ -1289,9 +1289,9 @@ static void flt_dumps(void const* pbasis)
 {
     FloatMat * pthis = (FloatMat*)pbasis;
     printf("\n");
-    for (UINT i = 0; i < pthis->get_row_size(); i++) {
+    for (UINT i = 0; i < pthis->getRowSize(); i++) {
         printf("\t");
-        for (UINT j = 0; j < pthis->get_col_size(); j++) {
+        for (UINT j = 0; j < pthis->getColSize(); j++) {
             CHAR const* blank = "           ";
             printf("%5f%s", pthis->get(i,j).f(), blank);
         }
@@ -1335,7 +1335,7 @@ static Float fast_sqrt(Float n)
 #endif
 
 
-void FloatMat::set_sd(UINT sd)
+void FloatMat::setSigDigitDesc(UINT sd)
 {
     if (HOOK_ADJUST == NULL) {
         INHR i;
@@ -1361,7 +1361,7 @@ void FloatMat::set_sd(UINT sd)
 }
 
 
-CHAR const* FloatMat::get_sd() const
+CHAR const* FloatMat::getSigDigitDesc() const
 {
     return g_sd_str;
 }
@@ -1386,7 +1386,7 @@ FloatMat::FloatMat(UINT row, UINT col)
 {
     m_is_init = false;
     init();
-    grow_all(row, col);
+    growRowAndCol(row, col);
 }
 
 
@@ -1572,10 +1572,10 @@ static void bool_dumpf_by_handle(void const* pbasis, FILE * h)
 {
     ASSERTN(h != NULL, ("file handle is NULL"));
     BMat * pthis = (BMat*)pbasis;
-    fprintf(h, "\nMATRIX(%d,%d)\n", pthis->get_row_size(), pthis->get_col_size());
-    for (UINT i = 0; i < pthis->get_row_size(); i++) {
+    fprintf(h, "\nMATRIX(%d,%d)\n", pthis->getRowSize(), pthis->getColSize());
+    for (UINT i = 0; i < pthis->getRowSize(); i++) {
         fprintf(h, "\t");
-        for (UINT j = 0; j < pthis->get_col_size(); j++) {
+        for (UINT j = 0; j < pthis->getColSize(); j++) {
             CHAR const* blank = "           ";
             fprintf(h, "%10d%s", pthis->get(i,j), blank);
         }
@@ -1605,9 +1605,9 @@ static void bool_dumps(void const* pbasis)
 {
     BMat * pthis = (BMat*)pbasis;
     printf("\n");
-    for (UINT i = 0; i < pthis->get_row_size(); i++) {
+    for (UINT i = 0; i < pthis->getRowSize(); i++) {
         printf("\t");
-        for (UINT j = 0; j < pthis->get_col_size(); j++) {
+        for (UINT j = 0; j < pthis->getColSize(); j++) {
             CHAR const* blank = "           ";
             printf("%5d%s", pthis->get(i,j), blank);
         }
@@ -1635,7 +1635,7 @@ BMat::BMat(UINT row, UINT col)
 {
     m_is_init = false;
     init();
-    grow_all(row, col);
+    growRowAndCol(row, col);
 }
 
 

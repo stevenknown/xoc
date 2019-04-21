@@ -595,7 +595,7 @@ void MDSSAMgr::placePhiForMD(
     for (IRBB * defbb = defbbs->get_head();
          defbb != NULL; defbb = defbbs->get_next()) {
         wl.append_tail(defbb);
-        visited.bunion(BB_id(defbb));
+        //visited.bunion(BB_id(defbb));
     }
 
     while (wl.get_elem_count() != 0) {

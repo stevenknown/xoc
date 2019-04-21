@@ -17,6 +17,8 @@
 #include "xmat.h"
 #include "linsys.h"
 #include "lpsol.h"
+#include "sort.h"
+#include "bigint.h"
 
 using namespace xcom;
 #endif

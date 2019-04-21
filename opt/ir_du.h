@@ -240,7 +240,7 @@ typedef HMap<IR*, DUSet*> IR2DU;
 #define SOL_RU_REF                 0x8  //compute Region referenced MayDef/MayUse.
 #define SOL_REF                    0x10 //compute IR referenced MD/MDSet.
 #define COMPUTE_PR_DU              0x20 //compute PR du chain.
-#define COMPUTE_NOPR_DU            0x40 //compute Non-PR du chain.
+#define COMPUTE_NONPR_DU           0x40 //compute Non-PR du chain.
 
 class IR_DU_MGR : public Pass {
     friend class MDId2IRlist;

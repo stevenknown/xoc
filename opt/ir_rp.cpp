@@ -2191,7 +2191,7 @@ bool IR_RP::perform(OptCtx & oc)
     if (change) {
         //DU reference and du chain has maintained.
         ASSERT0(m_ru->verifyMDRef());
-        ASSERT0(m_du->verifyMDDUChain(COMPUTE_PR_DU | COMPUTE_NOPR_DU));
+        ASSERT0(m_du->verifyMDDUChain(COMPUTE_PR_DU | COMPUTE_NONPR_DU));
 
         OC_is_reach_def_valid(oc) = false;
         OC_is_avail_reach_def_valid(oc) = false;

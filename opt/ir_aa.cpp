@@ -2664,20 +2664,20 @@ void IR_AA::ElemUnionPointTo(
         MDSet const& pt_set,
         IN MD2MDSet * mx)
 {
-    bool set_all = false;
+    bool setAllElem = false;
     SEGIter * iter;
     for (INT i = mds.get_first(&iter);
          i >= 0; i = mds.get_next((UINT)i, &iter)) {
         ASSERT0(m_md_sys->getMD((UINT)i));
         if (isFullMem((UINT)i)) {
-            set_all = true;
+            setAllElem = true;
             MDId2MD const* id2md = m_md_sys->getID2MDMap();
             for (INT j = MD_FIRST; j <= id2md->get_last_idx(); j++) {
                 ASSERT0(id2md->get((UINT)j));
                 setPointToMDSetByAddMDSet((UINT)j, *mx, pt_set);
             }
         } else if (isHeapMem((UINT)i)) {
-            if (set_all) { continue; }
+            if (setAllElem) { continue; }
             for (INT j = m_id2heap_md_map.get_first();
                  j >= 0; j = m_id2heap_md_map.get_next((UINT)j)) {
                 ASSERT0(m_md_sys->getMD((UINT)j));
@@ -2697,13 +2697,13 @@ void IR_AA::ElemUnionPointTo(
         IN MD * pt_elem,
         IN MD2MDSet * mx)
 {
-    bool set_all = false;
+    bool setAllElem = false;
     SEGIter * iter;
     for (INT i = mds.get_first(&iter);
          i >= 0; i = mds.get_next((UINT)i, &iter)) {
         ASSERT0(m_md_sys->getMD((UINT)i));
         if (isFullMem((UINT)i)) {
-            set_all = true;
+            setAllElem = true;
             MDId2MD const* id2md = m_md_sys->getID2MDMap();
             for (INT j = MD_FIRST; j <= id2md->get_last_idx(); j++) {
                 ASSERT0(id2md->get((UINT)j));
@@ -2711,7 +2711,7 @@ void IR_AA::ElemUnionPointTo(
             }
             return;
         } else if (isHeapMem((UINT)i)) {
-            if (set_all) { continue; }
+            if (setAllElem) { continue; }
             for (INT j = m_id2heap_md_map.get_first();
                  j >= 0; j = m_id2heap_md_map.get_next((UINT)j)) {
                 ASSERT0(m_md_sys->getMD((UINT)j));
@@ -2732,13 +2732,13 @@ void IR_AA::ElemCopyAndUnionPointTo(
         MDSet const& pt_set,
         IN MD2MDSet * mx)
 {
-    bool set_all = false;
+    bool setAllElem = false;
     SEGIter * iter;
     for (INT i = mds.get_first(&iter);
          i >= 0; i = mds.get_next((UINT)i, &iter)) {
         ASSERT0(m_md_sys->getMD((UINT)i));
         if (isFullMem((UINT)i)) {
-            set_all = true;
+            setAllElem = true;
 
             MDId2MD const* id2md = m_md_sys->getID2MDMap();
             for (INT j = MD_FIRST; j <= id2md->get_last_idx(); j++) {
@@ -2751,7 +2751,7 @@ void IR_AA::ElemCopyAndUnionPointTo(
             }
             return;
         } else if (isHeapMem((UINT)i)) {
-            if (set_all) { continue; }
+            if (setAllElem) { continue; }
 
             for (INT j = m_id2heap_md_map.get_first();
                  j >= 0; j = m_id2heap_md_map.get_next((UINT)j)) {
@@ -2785,13 +2785,13 @@ void IR_AA::ElemCopyPointTo(
         IN MDSet & pt_set,
         IN MD2MDSet * mx)
 {
-    bool set_all = false;
+    bool setAllElem = false;
     SEGIter * iter;
     for (INT i = mds.get_first(&iter);
          i >= 0; i = mds.get_next((UINT)i, &iter)) {
         ASSERT0(m_md_sys->getMD((UINT)i));
         if (isFullMem((UINT)i)) {
-            set_all = true;
+            setAllElem = true;
             MDId2MD const* id2md = m_md_sys->getID2MDMap();
             for (INT j = MD_FIRST; j <= id2md->get_last_idx(); j++) {
                 ASSERT0(id2md->get((UINT)j));
@@ -2799,7 +2799,7 @@ void IR_AA::ElemCopyPointTo(
             }
             return;
         } else if (isHeapMem((UINT)i)) {
-            if (set_all) { continue; }
+            if (setAllElem) { continue; }
             for (INT j = m_id2heap_md_map.get_first();
                  j >= 0; j = m_id2heap_md_map.get_next((UINT)j)) {
                 ASSERT0(m_md_sys->getMD((UINT)j));
@@ -2816,13 +2816,13 @@ void IR_AA::ElemCopyPointTo(
 //Set each md in 'mds' points to May-Point-To set.
 void IR_AA::ElemCopyPointToAndMayPointTo(MDSet const& mds, IN MD2MDSet * mx)
 {
-    bool set_all = false;
+    bool setAllElem = false;
     SEGIter * iter;
     for (INT i = mds.get_first(&iter);
          i >= 0; i = mds.get_next((UINT)i, &iter)) {
         ASSERT0(m_md_sys->getMD((UINT)i));
         if (isFullMem((UINT)i)) {
-            set_all = true;
+            setAllElem = true;
             MDId2MD const* id2md = m_md_sys->getID2MDMap();
             for (INT j = MD_FIRST; j <= id2md->get_last_idx(); j++) {
                 ASSERT0(id2md->get((UINT)j));
@@ -2830,7 +2830,7 @@ void IR_AA::ElemCopyPointToAndMayPointTo(MDSet const& mds, IN MD2MDSet * mx)
             }
             return;
         } else if (isHeapMem((UINT)i)) {
-            if (set_all) { continue; }
+            if (setAllElem) { continue; }
             for (INT j = m_id2heap_md_map.get_first();
                  j >= 0; j = m_id2heap_md_map.get_next((UINT)j)) {
                 ASSERT0(m_md_sys->getMD((UINT)j));
@@ -2847,20 +2847,20 @@ void IR_AA::ElemCopyPointToAndMayPointTo(MDSet const& mds, IN MD2MDSet * mx)
 //Set md in 'mds' points to NULL if it is exact.
 void IR_AA::ElemCleanExactPointTo(MDSet const& mds, IN MD2MDSet * mx)
 {
-    bool set_all = false;
+    bool setAllElem = false;
     SEGIter * iter;
     for (INT i = mds.get_first(&iter);
          i >= 0; i = mds.get_next((UINT)i, &iter)) {
         ASSERT0(m_md_sys->getMD((UINT)i));
         if (isFullMem((UINT)i)) {
-            set_all = true;
+            setAllElem = true;
             MDId2MD const* id2md = m_md_sys->getID2MDMap();
             for (INT j = MD_FIRST; j <= id2md->get_last_idx(); j++) {
                 ASSERT0(id2md->get((UINT)j));
                 cleanPointTo((UINT)j, *mx);
             }
         } else if (isHeapMem((UINT)i)) {
-            if (set_all) { continue; }
+            if (setAllElem) { continue; }
             for (INT j = m_id2heap_md_map.get_first();
                  j >= 0; j = m_id2heap_md_map.get_next((UINT)j)) {
                 ASSERT0(m_md_sys->getMD((UINT)j));
@@ -2877,13 +2877,13 @@ void IR_AA::ElemCleanExactPointTo(MDSet const& mds, IN MD2MDSet * mx)
 //Set md in 'mds' points to NULL.
 void IR_AA::ElemCleanPointTo(MDSet const& mds, IN MD2MDSet * mx)
 {
-    bool set_all = false;
+    bool setAllElem = false;
     SEGIter * iter;
     for (INT i = mds.get_first(&iter);
          i >= 0; i = mds.get_next((UINT)i, &iter)) {
         ASSERT0(m_md_sys->getMD((UINT)i));
         if (isFullMem((UINT)i)) {
-            set_all = true;
+            setAllElem = true;
             MDId2MD const* id2md = m_md_sys->getID2MDMap();
             for (INT j = MD_FIRST; j <= id2md->get_last_idx(); j++) {
                 ASSERT0(id2md->get((UINT)j));
@@ -2891,7 +2891,7 @@ void IR_AA::ElemCleanPointTo(MDSet const& mds, IN MD2MDSet * mx)
             }
             return;
         } else if (isHeapMem((UINT)i)) {
-            if (set_all) { continue; }
+            if (setAllElem) { continue; }
             for (INT j = m_id2heap_md_map.get_first();
                  j >= 0; j = m_id2heap_md_map.get_next((UINT)j)) {
                 ASSERT0(m_md_sys->getMD((UINT)j));

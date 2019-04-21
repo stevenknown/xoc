@@ -1129,14 +1129,16 @@ void IR_CFG::dump_dot(CHAR const* name, bool detail, bool dump_eh)
     FILE * org_tfile = g_tfile;
     g_tfile = h;
 
-    fprintf(h, "\n/*");
-    for (IRBB * bb = m_bb_list->get_head();
-         bb != NULL; bb = m_bb_list->get_next()) {
-        fprintf(h, "\n--- BB%d ----", BB_id(bb));
-        dumpBBList(m_bb_list, m_ru);
-        //fprintf(h, "\n\t%s", dump_ir_buf(ir, buf));
+    if (detail) {
+        fprintf(h, "\n/*");
+        for (IRBB * bb = m_bb_list->get_head();
+             bb != NULL; bb = m_bb_list->get_next()) {
+            fprintf(h, "\n--- BB%d ----", BB_id(bb));
+            dumpBBList(m_bb_list, m_ru);
+            //fprintf(h, "\n\t%s", dump_ir_buf(ir, buf));
+        }
+        fprintf(h, "\n*/\n");
     }
-    fprintf(h, "\n*/\n");
     fprintf(h, "digraph G {\n");
 
     //fprintf(h, "rankdir=LR;\n"); //Layout from Left to Right.
@@ -1182,6 +1184,8 @@ void IR_CFG::dump_dot(CHAR const* name, bool detail, bool dump_eh)
         }
 
         if (detail) {
+            StrBuf namebuf(32);
+            
             fprintf(h,
                     "\nnode%d [font=\"%s\",fontsize=%d,color=%s,"
                     "shape=%s,style=%s,label=\" BB%d",
@@ -1192,6 +1196,21 @@ void IR_CFG::dump_dot(CHAR const* name, bool detail, bool dump_eh)
                     shape,
                     style,
                     id);
+            LabelInfo const* li = bb->getLabelList().get_head();            
+            if (li != NULL) {
+				LabelInfo const* head = li;
+                fprintf(h, ":");
+                for(; li != NULL; li = bb->getLabelList().get_next()) {
+                    if (li != head) {
+                        fprintf(h, ",");
+                    }
+                    namebuf.clean();
+                    fprintf(h, "%s", li->getName(&namebuf));
+                }
+            }
+            if (VERTEX_rpo(v) != 0) {
+                fprintf(h, " rpo:%d ", VERTEX_rpo(v));
+            }
             for (IR * ir = BB_first_ir(bb);
                  ir != NULL; ir = BB_next_ir(bb)) {
                 fprintf(h, "\\l");
@@ -1280,10 +1299,22 @@ void IR_CFG::dump_node(FILE * h, bool detail)
                 "fontname:\"%s\" scaling:%d label:\"",
                 id, vertical_order++, shape, color, font, scale);
             fprintf(h, "   BB%d ", id);
+            LabelInfo const* li = bb->getLabelList().get_head();            
+            if (li != NULL) {
+				LabelInfo const* head = li;
+                fprintf(h, ":");
+                StrBuf namebuf(32);
+                for(; li != NULL; li = bb->getLabelList().get_next()) {
+                    if (li != head) {
+                        fprintf(h, ",");
+                    }
+                    namebuf.clean();
+                    fprintf(h, "%s", li->getName(&namebuf));
+                }
+            }
             if (VERTEX_rpo(v) != 0) {
                 fprintf(h, " rpo:%d ", VERTEX_rpo(v));
             }
-
             IRBB * bb2 = getBB(id);
             ASSERT0(bb2 != NULL);
             dumpBBLabel(bb2->getLabelList(), h);
@@ -1448,6 +1479,9 @@ void IR_CFG::computeDomAndIdom(IN OUT OptCtx & oc, xcom::BitSet const* uni)
 
     OC_is_dom_valid(oc) = true;
     END_TIMER(t, "Compute Dom, IDom");
+    if (g_is_dump_after_pass) {
+        dump_dom(g_tfile, false);
+    }
 }
 
 

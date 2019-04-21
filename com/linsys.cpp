@@ -165,7 +165,7 @@ void Lineq::init(RMat * m, INT rhs_idx)
 {
     if (m_is_init) return;
     if (m != NULL) {
-        set_param(m, rhs_idx);
+        setParam(m, rhs_idx);
     } else {
         m_coeff = NULL;
         m_rhs_idx = -1;
@@ -184,15 +184,15 @@ void Lineq::destroy()
 
 
 //Set coeff matrix and index of start column of constant term.
-void Lineq::set_param(RMat * m, INT rhs_idx)
+void Lineq::setParam(RMat * m, INT rhs_idx)
 {
-    ASSERTN(m != NULL && m->get_col_size() > 0, ("coeff mat is empty"));
+    ASSERTN(m != NULL && m->getColSize() > 0, ("coeff mat is empty"));
     m_coeff = m;
     if (rhs_idx == -1) {
-        m_rhs_idx = m->get_col_size() -1;
+        m_rhs_idx = m->getColSize() -1;
         return;
     }
-    ASSERTN(rhs_idx < (INT)m->get_col_size() && rhs_idx >= 1,
+    ASSERTN(rhs_idx < (INT)m->getColSize() && rhs_idx >= 1,
             ("out of bound"));
     m_rhs_idx = rhs_idx;
 }
@@ -209,9 +209,9 @@ INT Lineq::compareConstIterm(
         Rational v)
 {
     ASSERTN(m_is_init == true, ("not yet initialize."));
-    ASSERTN(rhs_idx < m.get_col_size(), ("illegal param"));
+    ASSERTN(rhs_idx < m.getColSize(), ("illegal param"));
     bool has_cs1 = false; //has symbolic constant of eqt1
-    for (UINT i = rhs_idx + 1; i < m.get_col_size(); i++) {
+    for (UINT i = rhs_idx + 1; i < m.getColSize(); i++) {
         if (m.get(idx_of_eq, i) != 0) {
             has_cs1 = true;
             break;
@@ -237,13 +237,13 @@ INT Lineq::compareConstIterm(RMat const& m, UINT rhs_idx,
                            INT idx_of_eqt1, INT idx_of_eqt2)
 {
     ASSERTN(m_is_init == true, ("not yet initialize."));
-    ASSERTN(rhs_idx < m.get_col_size(), ("illegal param"));
+    ASSERTN(rhs_idx < m.getColSize(), ("illegal param"));
     bool has_cs1 = false; //has symbolic constant of eqt1
     bool has_cs2 = false; //has symbolic constant of eqt2
     bool has_same_cs = true; //eq1 and eqt2 have same symbolic constant
 
     //Check constant symbols
-    for (UINT i = rhs_idx + 1; i < m.get_col_size(); i++) {
+    for (UINT i = rhs_idx + 1; i < m.getColSize(); i++) {
         if (m.get(idx_of_eqt1, i) != 0) {
             has_cs1 = true;
         }
@@ -291,7 +291,7 @@ void Lineq::ConvexHullUnionAndIntersect(
         return;
     }
     RMat * p = chlst.get_head();
-    UINT first_cols = p->get_col_size();
+    UINT first_cols = p->getColSize();
     res.reinit(1, first_cols);
     //output
 
@@ -305,24 +305,24 @@ void Lineq::ConvexHullUnionAndIntersect(
     //Scanning each convex hull to compute boundary.
     Lineq lin(NULL);
     for (p = chlst.get_head(); p != NULL; p = chlst.get_next()) {
-        ASSERTN(first_cols == p->get_col_size(),
+        ASSERTN(first_cols == p->getColSize(),
                 ("matrix is not in homotype"));
         //FM-elim
-        lin.set_param(p, rhs_idx);
+        lin.setParam(p, rhs_idx);
         if (!lin.calcBound(bd)) { //elem of 'bd' would be modified.
             ASSERTN(0, ("inequalities in 'bd' are inconsistent!"));
         }
         UINT j = 0;
         for (RMat * t = bd.get_head(); t; t = bd.get_next(), j++) {
             if (t->size() != 0) {
-                res.grow_row(*t, 0, t->get_row_size() - 1);
+                res.growRow(*t, 0, t->getRowSize() - 1);
             }
         }
     }
     delete [] v;
 
     //ONLY for verification.
-    lin.set_param(&res, rhs_idx);
+    lin.setParam(&res, rhs_idx);
 
     //Union or intersect these hulls.
     if (!lin.reduce(res, rhs_idx, is_intersect)) {
@@ -359,7 +359,7 @@ void Lineq::ConvexHullUnionAndIntersect(
 bool Lineq::reduce(IN OUT RMat & m, UINT rhs_idx, bool is_intersect)
 {
     ASSERTN(m_is_init == true, ("not yet initialize."));
-    ASSERTN(m.size() != 0 && rhs_idx < m.get_col_size(), ("illegal param"));
+    ASSERTN(m.size() != 0 && rhs_idx < m.getColSize(), ("illegal param"));
     removeIdenRow(m);
     X2V_MAP x2v; //Mapping the index of eqution to corresponding variable.
                 //See following code for detailed usage.
@@ -373,7 +373,7 @@ bool Lineq::reduce(IN OUT RMat & m, UINT rhs_idx, bool is_intersect)
     //Performing reduction/relaxtion for inequlities which only involved single variable.
     //    e.g: x <= 100, valid
     //        x + y <= 100, invalid
-    for (UINT i = 0; i < m.get_row_size(); i++) {
+    for (UINT i = 0; i < m.getRowSize(); i++) {
         INT vars = 0;
         INT single_var_idx = -1;
         removed.set(i, false); //initializing 'removed' vector.
@@ -604,16 +604,16 @@ bool Lineq::reduce(IN OUT RMat & m, UINT rhs_idx, bool is_intersect)
     //Remove redundant inequalities.
     if (someone_removed) {
         UINT i, count = 0;
-        for (i = 0; i < m.get_row_size(); i++) {
+        for (i = 0; i < m.getRowSize(); i++) {
             if (!removed.get(i)) {
                 count++;
             }
         }
-        RMat tmpres(count, m.get_col_size());
+        RMat tmpres(count, m.getColSize());
         count = 0;
-        for (i = 0; i < m.get_row_size(); i++) {
+        for (i = 0; i < m.getRowSize(); i++) {
             if (!removed.get(i)) {
-                tmpres.set_rows(count, count, m, i);
+                tmpres.setRows(count, count, m, i);
                 count++;
             }
         }
@@ -663,14 +663,14 @@ bool Lineq::fme(UINT const u, OUT RMat & res, bool const darkshadow)
     }
 
     //Record the number of ineqts which coeff of variable 'u' is positive.
-    UINT * pos = (UINT*)::malloc(sizeof(UINT) * m_coeff->get_row_size());
+    UINT * pos = (UINT*)::malloc(sizeof(UINT) * m_coeff->getRowSize());
     UINT poscount = 0;
 
     //Record the number of ineqts which coeff of variable 'u' is negative.
-    UINT * negc = (UINT*)::malloc(sizeof(UINT) * m_coeff->get_row_size());
+    UINT * negc = (UINT*)::malloc(sizeof(UINT) * m_coeff->getRowSize());
     UINT negcount = 0;
     if (m_rhs_idx == -1) {
-        m_rhs_idx = m_coeff->get_col_size() -1;
+        m_rhs_idx = m_coeff->getColSize() -1;
     }
     ASSERTN(u < (UINT)m_rhs_idx, ("not a variable"));
     RMat tmp = *m_coeff;
@@ -678,7 +678,7 @@ bool Lineq::fme(UINT const u, OUT RMat & res, bool const darkshadow)
     bool consistency = true;
 
     //Perform two of primary operations at first.
-    for (UINT i = 0; i < m_coeff->get_row_size(); i++) {
+    for (UINT i = 0; i < m_coeff->getRowSize(); i++) {
         //1.Check simple bounds for consistencies.
         //    e.g: 0 <= -100
         bool have_vars = false;
@@ -725,7 +725,7 @@ bool Lineq::fme(UINT const u, OUT RMat & res, bool const darkshadow)
             //append to 'res' directly.
             RMat ineqt;
             tmp.innerRow(ineqt, i, i);
-            res.grow_row(ineqt);
+            res.growRow(ineqt);
         }
     } //end for each row
 
@@ -741,28 +741,28 @@ bool Lineq::fme(UINT const u, OUT RMat & res, bool const darkshadow)
         }
         RMat row;
         tmp.innerRow(row, pi, pi);
-        res.grow_row(row);
+        res.growRow(row);
     } else if (poscount + negcount > 1) { //More than 1 ineqt about of 'u'
         UINT rowstart;
         if (res.size() == 0) {
-            res.reinit(poscount * negcount, tmp.get_col_size());
+            res.reinit(poscount * negcount, tmp.getColSize());
             rowstart = 0;
         } else {
-            rowstart = res.get_row_size();
-            res.grow_row(poscount * negcount);
+            rowstart = res.getRowSize();
+            res.growRow(poscount * negcount);
         }
         for (UINT i = 0; i < poscount; i++) {
             UINT pi = pos[i]; //index of positive coeff
             for (UINT j = 0; j < negcount; j++) {
                 UINT ni = negc[j]; //index of negative coeff
-                res.set_rows(rowstart, rowstart, tmp, ni);
+                res.setRows(rowstart, rowstart, tmp, ni);
                 res.addRowToRow(tmp, pi, rowstart);
                 rowstart++;
             }
         }
     }
 
-    if (res.get_row_size() > 0) {
+    if (res.getRowSize() > 0) {
         consistency = reduce(res, m_rhs_idx, true);
     }
 
@@ -784,7 +784,7 @@ bool Lineq::is_consistent()
     RMat * orig_coeff = m_coeff;
     INT orig_rhs_idx = m_rhs_idx;
     RMat coeff = *orig_coeff;
-    set_param(&coeff, m_rhs_idx);
+    setParam(&coeff, m_rhs_idx);
     for (UINT i = 0; i < (UINT)m_rhs_idx; i++) {
         RMat res;
         if (!fme(i, res)) {
@@ -794,7 +794,7 @@ bool Lineq::is_consistent()
         coeff = res;
     }
 FIN:
-    set_param(orig_coeff, orig_rhs_idx);
+    setParam(orig_coeff, orig_rhs_idx);
     return consistency;
 }
 
@@ -806,7 +806,7 @@ void Lineq::initVarConstraint(
 {
     UINT nvar = rhs_idx;
     vc.reinit(nvar, nvar + 1);
-    vc.set_col(rhs_idx, Rational(0));
+    vc.setCol(rhs_idx, Rational(0));
     for (UINT i = 0; i < nvar; i++) {
         if ((sign != NULL && sign->get(i) >= 0) ||
             (sign == NULL)) {
@@ -820,7 +820,7 @@ void Lineq::initVarConstraint(
 
 //Return true if there is at least one rational/integer
 //solution of the system of inequlities.
-//Call set_param() to set coefficient and rhs_idx.
+//Call setParam() to set coefficient and rhs_idx.
 //
 //'coeff': coefficient matrix to constrains.
 //'vc': variable constrains.
@@ -845,16 +845,16 @@ bool Lineq::has_solution(RMat const& leq,
         return false;
     }
     ASSERT0(eq.size() == 0 || leq.size() == 0 ||
-            leq.get_col_size() == eq.get_col_size());
+            leq.getColSize() == eq.getColSize());
 
     //Prepare data for SIX/MIP solver.
     INT num_of_var = rhs_idx;
-    RMat tgtf(1, leq.get_col_size());
+    RMat tgtf(1, leq.getColSize());
     for (INT i = 0; i < num_of_var; i++) {
         tgtf.set(0, i, 1);
     }
-    ASSERT0(vc.get_row_size() == (UINT)num_of_var &&
-            vc.get_col_size() == (UINT)num_of_var + 1/*CSt*/);
+    ASSERT0(vc.getRowSize() == (UINT)num_of_var &&
+            vc.getColSize() == (UINT)num_of_var + 1/*CSt*/);
     RMat res;
     if (is_int_sol) {
         MIP<RMat, Rational> mip;
@@ -923,15 +923,15 @@ void Lineq::appendEquation(RMat const& eq)
 {
     ASSERTN(m_is_init == true, ("not yet initialize."));
     if (eq.size() == 0) return;
-    ASSERTN(eq.get_col_size() == m_coeff->get_col_size(), ("unmatch"));
-    if (eq.get_row_size() == 0) return;
+    ASSERTN(eq.getColSize() == m_coeff->getColSize(), ("unmatch"));
+    if (eq.getRowSize() == 0) return;
     RMat tmp = eq;
-    //if (tmp.get_col_size() < m_coeff->get_col_size()) {
-    //    tmp.grow_col(m_coeff->get_col_size() - eq.get_col_size());
+    //if (tmp.getColSize() < m_coeff->getColSize()) {
+    //    tmp.growCol(m_coeff->getColSize() - eq.getColSize());
     //}
-    m_coeff->grow_row(tmp, 0, tmp.get_row_size() - 1);
+    m_coeff->growRow(tmp, 0, tmp.getRowSize() - 1);
     tmp.mul(-1);
-    m_coeff->grow_row(tmp, 0, tmp.get_row_size() - 1);
+    m_coeff->growRow(tmp, 0, tmp.getRowSize() - 1);
 }
 
 
@@ -949,22 +949,22 @@ void Lineq::formatBound(UINT u, OUT RMat & ineqt_of_u)
 {
     ASSERTN(m_is_init == true, ("not yet initialize."));
     ASSERTN(m_coeff &&
-           m_coeff->get_row_size() > 0 &&
-           m_coeff->get_col_size() > 0, ("matrix is empty"));
+           m_coeff->getRowSize() > 0 &&
+           m_coeff->getColSize() > 0, ("matrix is empty"));
     ASSERTN((INT)u < m_rhs_idx, ("not a variable"));
 
     ineqt_of_u.reinit(0,0);
 
     //Get all of inequalities which has variable 'u'.
-    for (UINT i = 0; i < m_coeff->get_row_size(); i++) {
+    for (UINT i = 0; i < m_coeff->getRowSize(); i++) {
         if (m_coeff->get(i, u) != 0) {
             RMat m;
             m_coeff->innerRow(m, i, i);
-            ineqt_of_u.grow_row(m);
+            ineqt_of_u.growRow(m);
         }
     }
 
-    if (ineqt_of_u.get_row_size() == 0) {
+    if (ineqt_of_u.getRowSize() == 0) {
         //No constrains for u.
         return;
     }
@@ -972,12 +972,12 @@ void Lineq::formatBound(UINT u, OUT RMat & ineqt_of_u)
     //Reduce coeff of 'u' to 1 or -1, and shift each other
     //variables from left of inequality to right.
     if (m_rhs_idx != 1) { //Only one variable, column 0 indicate the variable.
-        UINT pos = ineqt_of_u.get_col_size();
-        ineqt_of_u.grow_col(m_rhs_idx - 1);
-        for (UINT i = 0; i < ineqt_of_u.get_row_size(); i++) {
+        UINT pos = ineqt_of_u.getColSize();
+        ineqt_of_u.growCol(m_rhs_idx - 1);
+        for (UINT i = 0; i < ineqt_of_u.getRowSize(); i++) {
 
             //Init element to 0
-            for (UINT i2 = pos; i2 < ineqt_of_u.get_col_size(); i2++) {
+            for (UINT i2 = pos; i2 < ineqt_of_u.getColSize(); i2++) {
                 ineqt_of_u.setr(i, i2, 0, 1);
             }
 
@@ -1000,13 +1000,13 @@ void Lineq::formatBound(UINT u, OUT RMat & ineqt_of_u)
             }//end for
         }//end for
         if ((INT)u != (m_rhs_idx - 1)) {
-            ineqt_of_u.del_col(u + 1, m_rhs_idx - 1);
+            ineqt_of_u.deleteCol(u + 1, m_rhs_idx - 1);
         }
         if (u > 0) { //u is not first variable
-            ineqt_of_u.del_col(0, u - 1);
+            ineqt_of_u.deleteCol(0, u - 1);
         }
     } else {
-        for (UINT i = 0; i < ineqt_of_u.get_row_size(); i++) {
+        for (UINT i = 0; i < ineqt_of_u.getRowSize(); i++) {
             Rational coeff = ineqt_of_u.get(i, u);
             if (coeff < 0) {
                 coeff = -coeff;
@@ -1024,7 +1024,7 @@ void Lineq::formatBound(UINT u, OUT RMat & ineqt_of_u)
     //        x1 <= 9/75 * y1 + 50/75 * y2.
     //So we can generate code as
     //        for (... x1 <= floor((9*y1+50*y2)/75) ...)
-    for (UINT i = 0; i < ineqt_of_u.get_row_size(); i++) {
+    for (UINT i = 0; i < ineqt_of_u.getRowSize(); i++) {
         ineqt_of_u.comden(i, 1); //start from 2nd column.
     }
 }
@@ -1057,7 +1057,7 @@ bool Lineq::calcBound(IN OUT List<RMat*> & limits)
     Lineq lineq(NULL);
     for (j = 0; j < m_rhs_idx; j++) {
         work = *m_coeff; //Recovery for next elimination.
-        lineq.set_param(&work, m_rhs_idx);
+        lineq.setParam(&work, m_rhs_idx);
         for (i = m_rhs_idx - 1; i >= 0; i--) {
             if (i == j) {
                 continue;
@@ -1101,19 +1101,19 @@ void Lineq::move2cstsym(IN OUT RMat & ieq,
                         OUT UINT * last_sym_idx)
 {
     ASSERTN(m_is_init == true, ("not yet initialized"));
-    ASSERTN(rhs_idx < ieq.get_col_size() && last_var < rhs_idx &&
+    ASSERTN(rhs_idx < ieq.getColSize() && last_var < rhs_idx &&
             first_var <= last_var,
             ("illegal info"));
     RMat colm;
     ieq.innerColumn(colm, first_var, last_var);
     colm.mul(-1);
-    ieq.grow_col(colm, 0, colm.get_col_size() - 1);
-    ieq.del_col(first_var, last_var);
+    ieq.growCol(colm, 0, colm.getColSize() - 1);
+    ieq.deleteCol(first_var, last_var);
     if (first_sym_idx) {
-        *first_sym_idx = ieq.get_col_size() - rhs_idx - 1;
+        *first_sym_idx = ieq.getColSize() - rhs_idx - 1;
     }
     if (last_sym_idx) {
-        *last_sym_idx = (ieq.get_col_size() - rhs_idx - 1) +
+        *last_sym_idx = (ieq.getColSize() - rhs_idx - 1) +
                         (last_var - first_var);
     }
 }
@@ -1132,13 +1132,13 @@ void Lineq::substituteAndExpand(
         UINT sub_var)
 {
     DUMMYUSE(rhs_idx);
-    ASSERT0(coeff.get_col_size() == p.get_col_size() && sub_var < rhs_idx);
+    ASSERT0(coeff.getColSize() == p.getColSize() && sub_var < rhs_idx);
     RMat tp;
-    for (UINT i = 0; i < p.get_row_size(); i++) {
+    for (UINT i = 0; i < p.getRowSize(); i++) {
         if (p.get(i, sub_var) == Rational(0)) {
             continue;
         }
-        for (UINT j = 0; j < coeff.get_row_size(); j++) {
+        for (UINT j = 0; j < coeff.getRowSize(); j++) {
             Rational v = coeff.get(j, sub_var);
             if (v == Rational(0)) {
                 continue;
@@ -1155,7 +1155,7 @@ void Lineq::substituteAndExpand(
             //to last one, beause these elements will be added to RHS of
             //inequalities.
             //e.g: Given i=2j-1+N, convert -1+N to 1-N.
-            for (UINT k = m_rhs_idx; k < tp.get_col_size(); k++) {
+            for (UINT k = m_rhs_idx; k < tp.getColSize(); k++) {
                 tp.set(0, k, -tp.get(0, k));
             }
             coeff.addRowToRow(tp, 0, j);
@@ -1182,15 +1182,15 @@ void Lineq::move2var(IN OUT RMat & ieq,
                      OUT UINT * last_var_idx)
 {
     ASSERTN(m_is_init == true, ("not yet initialized"));
-    ASSERTN(last_sym < ieq.get_col_size() &&
+    ASSERTN(last_sym < ieq.getColSize() &&
             first_sym > rhs_idx &&
             first_sym <= last_sym,
             ("illegal info"));
     RMat colm;
     ieq.innerColumn(colm, first_sym, last_sym);
-    ieq.del_col(first_sym, last_sym);
+    ieq.deleteCol(first_sym, last_sym);
     colm.mul(-1);
-    ieq.insertColumnsBefore(rhs_idx, colm, 0, colm.get_col_size() - 1);
+    ieq.insertColumnsBefore(rhs_idx, colm, 0, colm.getColSize() - 1);
     if (first_var_idx) {
         *first_var_idx = rhs_idx;
     }
@@ -1211,18 +1211,18 @@ void Lineq::removeIdenRow(IN OUT RMat & m)
     Vector<Rational> sum;
     Vector<bool> removed;
     UINT i;
-    for (i = 0; i < m.get_row_size(); i++) {
+    for (i = 0; i < m.getRowSize(); i++) {
         Rational s = 0;
-        for (UINT j = 0; j < m.get_col_size(); j++) {
+        for (UINT j = 0; j < m.getColSize(); j++) {
             s = s + m.get(i,j);
         }
         sum.set(i, s);
     }
-    for (i = 0; i < m.get_row_size(); i++) {
+    for (i = 0; i < m.getRowSize(); i++) {
         if (removed.get(i)) {
             continue;
         }
-        for (UINT j = i + 1; j < m.get_row_size(); j++) {
+        for (UINT j = i + 1; j < m.getRowSize(); j++) {
             if (sum.get(i) != sum.get(j)) {
                 continue;
             }
@@ -1236,7 +1236,7 @@ void Lineq::removeIdenRow(IN OUT RMat & m)
     INT end_of_row = -1;
     INT start_of_row = -1;
     bool doit = false;
-    for (i = 0; i < m.get_row_size(); i++) {
+    for (i = 0; i < m.getRowSize(); i++) {
         if (!removed.get(i)) {
             if (start_of_row == -1) {
                 start_of_row = i;
@@ -1244,7 +1244,7 @@ void Lineq::removeIdenRow(IN OUT RMat & m)
             } else {
                 end_of_row++;
             }
-            if (i < m.get_row_size() - 1) {
+            if (i < m.getRowSize() - 1) {
                 continue;
             }
         }
@@ -1255,10 +1255,10 @@ void Lineq::removeIdenRow(IN OUT RMat & m)
         ASSERT0(end_of_row >= start_of_row);
         RMat n;
         m.innerRow(n, start_of_row, end_of_row);
-        if (tmp.get_row_size() == 0) {
+        if (tmp.getRowSize() == 0) {
             tmp.copy(n);
         } else {
-            tmp.grow_row(n, 0, n.get_row_size() - 1);
+            tmp.growRow(n, 0, n.getRowSize() - 1);
         }
         start_of_row = -1;
     }
@@ -1308,11 +1308,11 @@ INT Lineq::selectLeadingColumn(
     //like, use MinIndex or MaxIndex. If the input contains many
     //redundant rows (say more than 80% redundant), you might want to
     //try MaxCutoff which might result in much faster termination.
-    for (UINT j = rhs_part; j < coeff.get_col_size(); j++) {
+    for (UINT j = rhs_part; j < coeff.getColSize(); j++) {
         if (is_noneg.get(j)) {
             continue;
         }
-        for (UINT i = 0; i < coeff.get_row_size(); i++) {
+        for (UINT i = 0; i < coeff.getRowSize(); i++) {
             if (coeff.get(i,j) < 0) {
                 return j;
             }
@@ -1349,7 +1349,7 @@ void Lineq::combine(OUT INTMat & res,
     INT m2 = 1;
     if (l1 != l) m1 = l/l1;
     if (l2 != l) m2 = l/l2;
-    for (UINT i = 0; i < coeff.get_col_size(); i++) {
+    for (UINT i = 0; i < coeff.getColSize(); i++) {
         res.set(pos, i, coeff.get(r1, i)*m1 + coeff.get(r2, i)*m2);
     }
 }
@@ -1458,7 +1458,7 @@ bool Lineq::convertConstraint2Ray(
         cs.innerColumn(coeff, 0, rhs_idx);
 
         //Trans the form as ¡Æai*xi>=0
-        coeff.negOfColumns(0, coeff.get_col_size() - 2);
+        coeff.negOfColumns(0, coeff.getColSize() - 2);
     } else {
         cs.innerColumn(coeff, 0, rhs_idx - 1);
         coeff.neg();
@@ -1480,9 +1480,9 @@ bool Lineq::convertConstraint2Ray(
 
     coeff.dumpf();
     coeff.trans();
-    coeff.insertColumnsBefore(0, coeff.get_row_size());
-    UINT rhs_part = coeff.get_row_size();
-    for (UINT i = 0; i < coeff.get_row_size(); i++) {
+    coeff.insertColumnsBefore(0, coeff.getRowSize());
+    UINT rhs_part = coeff.getRowSize();
+    for (UINT i = 0; i < coeff.getRowSize(); i++) {
         coeff.set(i, i, 1);
     }
     Vector<UINT> row_of_pos_coeff, row_of_neg_coeff;
@@ -1516,13 +1516,13 @@ bool Lineq::convertConstraint2Ray(
         if (lc < 0) {
             break;
         }
-        INT rem_rows = (INT)coeff.get_row_size();
+        INT rem_rows = (INT)coeff.getRowSize();
         rm.clean();
         row_of_pos_coeff.clean();
         row_of_neg_coeff.clean();
         INT m = 0, n = 0;
         UINT i = 0;
-        for (i = 0; i < coeff.get_row_size(); i++) {
+        for (i = 0; i < coeff.getRowSize(); i++) {
             if (coeff.get(i, lc) < 0) {
                 row_of_neg_coeff[m++] = i;
             } else if (coeff.get(i, lc) > 0) {
@@ -1537,8 +1537,8 @@ bool Lineq::convertConstraint2Ray(
         }
         INT p = n*m;
         if (p > 0) {
-            if (p > (INT)res.get_row_size()) {
-                res.reinit(p, coeff.get_col_size());
+            if (p > (INT)res.getRowSize()) {
+                res.reinit(p, coeff.getColSize());
             }
         } else { ASSERTN(0, ("Must have negative coeff")); }
         i = 0;
@@ -1568,18 +1568,18 @@ bool Lineq::convertConstraint2Ray(
 
         //Conjuntion of two parts.
         ASSERT0(rem_rows + p - omit_count >= 0);
-        tmp.reinit(rem_rows + p - omit_count, coeff.get_col_size());
+        tmp.reinit(rem_rows + p - omit_count, coeff.getColSize());
         INT row = 0;
-        for (UINT h = 0; h < coeff.get_row_size(); h++) {
+        for (UINT h = 0; h < coeff.getRowSize(); h++) {
             if (!rm[h]) {
-                tmp.set_rows(row, row, coeff, h);
+                tmp.setRows(row, row, coeff, h);
                 row++;
             }
         }
         ASSERT0(row <= row + p - 1 - omit_count);
-        tmp.set_rows(row, row + p - 1 - omit_count, res, 0);
+        tmp.setRows(row, row + p - 1 - omit_count, res, 0);
         coeff.copy(tmp);
-        if (coeff.get_row_size() > raylimit) {
+        if (coeff.getRowSize() > raylimit) {
             return false;
         }
     } //end while
@@ -1630,7 +1630,7 @@ void Lineq::combineRays(
     INT m2 = 1;
     if (l1 != l) m1 = l/l1;
     if (l2 != l) m2 = l/l2;
-    for (UINT i = 0; i < coeff.get_col_size(); i++) {
+    for (UINT i = 0; i < coeff.getColSize(); i++) {
         res.set(pos, i, coeff.get(r1, i)*m1 + coeff.get(r2, i)*m2);
     }
     if (coeff.get(r1, 0) == 1 || coeff.get(r2, 0) == 1) {
@@ -1648,10 +1648,10 @@ void Lineq::removeRedRow(
             INTMat const& org_cone,
             UINT rhs_part)
 {
-    UINT cs_rows = cs.get_row_size();
+    UINT cs_rows = cs.getRowSize();
     UINT cs_cols = rhs_part;
-    UINT o_rows = org_cone.get_row_size();
-    UINT o_cols = org_cone.get_col_size();
+    UINT o_rows = org_cone.getRowSize();
+    UINT o_cols = org_cone.getColSize();
     Vector<bool> rm;
     UINT rm_count = 0;
     for (UINT i = 1; i < cs_rows - 1; i++) {
@@ -1684,11 +1684,11 @@ void Lineq::removeRedRow(
         }
     }
     if (rm.get_last_idx() >= 0) {
-        INTMat res(cs_rows - rm_count, cs.get_col_size());
+        INTMat res(cs_rows - rm_count, cs.getColSize());
         UINT k = 0;
         for (UINT i = 0; i < cs_rows; i++) {
             if (!rm.get(i)) {
-                res.set_rows(k, k, cs, i);
+                res.setRows(k, k, cs, i);
                 k++;
             }
         }
@@ -1721,9 +1721,9 @@ bool Lineq::convertRay2Constraint(
     UINT rhs_part;
     {
         //Initializing cs=[R|A¦Ó]
-        UINT const nrow = gmat.get_col_size() +
+        UINT const nrow = gmat.getColSize() +
             1; //add a column for bidirectional coordinate 'u'
-        UINT const ncol = nrow + gmat.get_row_size() +
+        UINT const ncol = nrow + gmat.getRowSize() +
             1; //add a row for homogeneous coordinate '¦Ë'
         rhs_part = nrow;
         cs.reinit(nrow, ncol);
@@ -1734,7 +1734,7 @@ bool Lineq::convertRay2Constraint(
         cs.dumpf();
 
         //Set homogeneous coordinate.
-        cs.set(cs.get_row_size() - 1, cs.get_col_size() - 1, 1);
+        cs.set(cs.getRowSize() - 1, cs.getColSize() - 1, 1);
         cs.dumpf();
 
         //Set bidirectional coordinate.
@@ -1744,18 +1744,18 @@ bool Lineq::convertRay2Constraint(
         cs.dumpf();
 
         //Set the transpose data of 'gmat'.
-        for (i = 0; i < gmat.get_row_size(); i++) {
-            for (UINT j = 0; j < gmat.get_col_size(); j++) {
+        for (i = 0; i < gmat.getRowSize(); i++) {
+            for (UINT j = 0; j < gmat.getColSize(); j++) {
                 cs.set(1 + j, rhs_part + i, gmat.get(i, j));
             }
         }
         cs.dumpf();
 
-        org_cone.grow_row(1);
+        org_cone.growRow(1);
         org_cone.insertColumnBefore(0);
-        org_cone.set_col(0, 1);
-        org_cone.set(org_cone.get_row_size() - 1,
-                     org_cone.get_col_size() - 1, 1);
+        org_cone.setCol(0, 1);
+        org_cone.set(org_cone.getRowSize() - 1,
+                     org_cone.getColSize() - 1, 1);
         org_cone.dumpf();
     }
 
@@ -1782,7 +1782,7 @@ bool Lineq::convertRay2Constraint(
             row_of_pos_coeff.clean();
             row_of_neg_coeff.clean();
             INT m = 0, n = 0;
-            for (UINT i = 0; i < cs.get_row_size(); i++) {
+            for (UINT i = 0; i < cs.getRowSize(); i++) {
                 if (cs.get(i, lc) < 0) {
                     row_of_neg_coeff[m++] = i;
                 } else if (cs.get(i, lc) > 0) {
@@ -1798,8 +1798,8 @@ bool Lineq::convertRay2Constraint(
             }
             INT p = n*m;
             if (p > 0) {
-                if (p > (INT)res.get_row_size()) {
-                    res.reinit(p, cs.get_col_size());
+                if (p > (INT)res.getRowSize()) {
+                    res.reinit(p, cs.getColSize());
                 }
             } else {
                 ASSERTN(0, ("Must have negative coeff"));
@@ -1833,7 +1833,7 @@ bool Lineq::convertRay2Constraint(
                         cs.set(pcv, 0, 1);
                     }
                 }
-                for (UINT i2 = 1; i2 < cs.get_col_size(); i2++) {
+                for (UINT i2 = 1; i2 < cs.getColSize(); i2++) {
                     cs.set(ncv, i2, -cs.get(ncv, 2));
                 }
                 //
@@ -1841,11 +1841,11 @@ bool Lineq::convertRay2Constraint(
 
             //Add something here...
             is_noneg[lc] = true;
-            cs.grow_row(res, 0, res.get_row_size() - 1);
+            cs.growRow(res, 0, res.getRowSize() - 1);
             cs.dumpf();
             removeRedRow(cs, org_cone, rhs_part);
         }
-        cs.del_col(rhs_part, cs.get_col_size() - 1);
+        cs.deleteCol(rhs_part, cs.getColSize() - 1);
     }
     cs.gcd();
     return true;

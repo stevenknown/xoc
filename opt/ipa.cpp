@@ -149,7 +149,7 @@ void IPA::computeCallRefForAllRegion()
         IR_DU_MGR * dumgr = (IR_DU_MGR*)rg->getPassMgr()->
             registerPass(PASS_DU_MGR);
         ASSERT0(dumgr);
-        dumgr->computeCallRef(COMPUTE_PR_DU|COMPUTE_NOPR_DU);
+        dumgr->computeCallRef(COMPUTE_PR_DU|COMPUTE_NONPR_DU);
         rg->getPassMgr()->destroyPass(dumgr);
         rg->getPassMgr()->destroyPass(aa);
     }

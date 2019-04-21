@@ -1445,7 +1445,10 @@ bool CFG<BB, XR>::findLoop()
 
             xcom::BitSet * dom = m_dom_set.get(bb->id());
             ASSERTN(dom, ("should compute dominator first"));
-            if (!dom->is_contain(succ->id())) { continue; }
+            if (!dom->is_contain(succ->id()) &&
+                bb->id() != succ->id()) { //bb's successor is itself.
+              continue;
+            }
 
             //If the SUCC is one of the DOMINATOR of bb, then it
             //indicates a back-edge.

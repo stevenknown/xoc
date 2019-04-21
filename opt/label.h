@@ -110,7 +110,7 @@ public:
 	void dump() const;
 	void dumpName() const;
 
-	char const* getLabelName(IN OUT StrBuf * buf) const;
+	char const* getName(IN OUT StrBuf * buf) const;
 };
 
 

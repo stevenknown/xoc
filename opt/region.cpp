@@ -3561,7 +3561,7 @@ void Region::checkValidAndRecompute(OptCtx * oc, ...)
                 if (dumgr == NULL) {
                     dumgr = (IR_DU_MGR*)passmgr->registerPass(PASS_DU_MGR);
                 }
-                f |= COMPUTE_NOPR_DU|COMPUTE_PR_DU;
+                f |= COMPUTE_NONPR_DU|COMPUTE_PR_DU;
                 dumgr->perform(*oc, f);
                 if (HAVE_FLAG(f, SOL_REF)) {
                     ASSERT0(verifyMDRef());
@@ -3580,7 +3580,7 @@ void Region::checkValidAndRecompute(OptCtx * oc, ...)
                     dumgr = (IR_DU_MGR*)passmgr->registerPass(PASS_DU_MGR);
                 }
 
-                UINT flag = COMPUTE_NOPR_DU;
+                UINT flag = COMPUTE_NONPR_DU;
 
                 //If PRs have already been in SSA form, compute
                 //DU chain doesn't make any sense.
@@ -3738,7 +3738,7 @@ bool Region::processIRList(OptCtx & oc)
 	}
     if (!HighProcess(oc)) { return false; }
     ASSERT0(getDUMgr() == NULL ||
-        getDUMgr()->verifyMDDUChain(COMPUTE_PR_DU|COMPUTE_NOPR_DU));
+        getDUMgr()->verifyMDDUChain(COMPUTE_PR_DU|COMPUTE_NONPR_DU));
     if (!MiddleProcess(oc)) { return false; }
 
     return true;

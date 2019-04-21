@@ -33,6 +33,7 @@ author: Su Zhenyu
 @*/
 #include "ltype.h"
 #include "comf.h"
+#include "strbuf.h"
 #include "flty.h"
 #include "math.h"
 
@@ -172,10 +173,10 @@ PRECISION_TYPE integralize(PRECISION_TYPE const& a)
 }
 
 
-CHAR * Float::format(CHAR * buf)
+CHAR const* Float::format(StrBuf & buf)
 {
-    sprintf(buf, "%f", m_f);
-    return buf;
+    buf.sprint("%f", m_f);
+    return buf.buf;
 }
 
 

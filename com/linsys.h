@@ -118,7 +118,7 @@ public:
     void appendEquation(RMat const& eq);
 
     //Set index of const column and coeff matrix.
-    void set_param(RMat * m, INT rhs_idx = -1);
+    void setParam(RMat * m, INT rhs_idx = -1);
     bool reduce(IN OUT RMat & m, UINT rhs_idx, bool is_intersect);
     void ConvexHullUnionAndIntersect(
             OUT RMat & res,

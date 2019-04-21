@@ -667,7 +667,7 @@ bool IR_DCE::perform(OptCtx & oc)
 
         //AA, DU chain and du reference are maintained.
         ASSERT0(m_ru->verifyMDRef() &&
-            m_du->verifyMDDUChain(COMPUTE_PR_DU | COMPUTE_NOPR_DU));
+            m_du->verifyMDDUChain(COMPUTE_PR_DU | COMPUTE_NONPR_DU));
         OC_is_expr_tab_valid(oc) = false;
         OC_is_live_expr_valid(oc) = false;
         OC_is_reach_def_valid(oc) = false;

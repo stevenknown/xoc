@@ -126,7 +126,7 @@ bool Region::performSimplify(OptCtx & oc)
 
     if (g_verify_level >= VERIFY_LEVEL_3 && OC_is_du_chain_valid(oc)) {
         ASSERT0(getDUMgr() == NULL ||
-            getDUMgr()->verifyMDDUChain(COMPUTE_PR_DU | COMPUTE_NOPR_DU));
+            getDUMgr()->verifyMDDUChain(COMPUTE_PR_DU | COMPUTE_NONPR_DU));
     }
 
     if (g_is_dump_after_pass) {
@@ -168,7 +168,7 @@ bool Region::MiddleProcess(OptCtx & oc)
 
     if (g_verify_level >= VERIFY_LEVEL_3) {
         ASSERT0(getDUMgr() == NULL ||
-            getDUMgr()->verifyMDDUChain(COMPUTE_PR_DU | COMPUTE_NOPR_DU));
+            getDUMgr()->verifyMDDUChain(COMPUTE_PR_DU | COMPUTE_NONPR_DU));
     }
 
     bool do_simplification = true;
@@ -195,7 +195,7 @@ bool Region::MiddleProcess(OptCtx & oc)
             ASSERT0(verifyIRandBB(bbl, this));
             if (g_verify_level >= VERIFY_LEVEL_3 && OC_is_du_chain_valid(oc)) {
                 ASSERT0(getDUMgr() == NULL ||
-                    getDUMgr()->verifyMDDUChain(COMPUTE_PR_DU | COMPUTE_NOPR_DU));
+                    getDUMgr()->verifyMDDUChain(COMPUTE_PR_DU | COMPUTE_NONPR_DU));
             }
         } else { ASSERT0(verifyIRandBB(bbl, this)); }
     } else {

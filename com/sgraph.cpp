@@ -1609,8 +1609,8 @@ void DGraph::get_pdom_tree(OUT Graph & pdom)
 //  tree, and post dominate Tree.
 void DGraph::dump_dom(FILE * h, bool dump_dom_tree)
 {
-    if (h == NULL) return;
-    fprintf(h, "\n\n\n\n==---- DUMP DOM/PDOM/IDOM/IPDOM ----==");
+    if (h == NULL) { return; }
+    fprintf(h, "\n==---- DUMP DOM/PDOM/IDOM/IPDOM ----==");
     INT c;
     for (Vertex * v = m_vertices.get_first(c);
          v != NULL; v = m_vertices.get_next(c)) {

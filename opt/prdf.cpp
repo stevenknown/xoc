@@ -282,12 +282,13 @@ void PRDF::computeGlobal()
             xcom::EdgeC const* ec = VERTEX_out_list(
                 m_cfg->get_vertex(BB_id(bb)));
             if (ec != NULL) {
-                INT succ = VERTEX_id(EDGE_to(EC_edge(ec)));
-                news.copy(*m_livein.get(succ), m_sbs_mgr);
+                news.copy(*m_livein.get(
+                    VERTEX_id(EDGE_to(EC_edge(ec)))), m_sbs_mgr);
                 ec = EC_next(ec);
 
                 for (; ec != NULL; ec = EC_next(ec)) {
-                    news.bunion(*m_livein.get(succ), m_sbs_mgr);
+                    news.bunion(*m_livein.get(
+                        VERTEX_id(EDGE_to(EC_edge(ec)))), m_sbs_mgr);
                 }
 
                 if (!out->is_equal(news)) {
@@ -318,7 +319,6 @@ bool PRDF::perform(OptCtx & oc)
     m_ru->checkValidAndRecompute(&oc, PASS_RPO, PASS_UNDEF);
     List<IRBB*> * bbl = m_ru->getBBList();
     if (bbl->get_elem_count() == 0) { return false; }
-
     List<IR const*> lst;
     C<IRBB*> * ct;
     for (bbl->get_head(&ct); ct != bbl->end(); ct = bbl->get_next(ct)) {
@@ -326,11 +326,11 @@ bool PRDF::perform(OptCtx & oc)
         ASSERT0(bb);
         computeLocal(bb, lst);
     }
-
     computeGlobal();
-
-    //dump();
     END_TIMER(t, getPassName());
+    if (g_is_dump_after_pass) {
+        dump();
+    }
     return false;
 }
 //END PRDF

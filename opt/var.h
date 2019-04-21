@@ -74,10 +74,10 @@ class RegionMgr;
 #define VAR_IS_RESTRICT          0x4000 //var is restrict.
 #define VAR_IS_UNALLOCABLE       0x8000 //var is unallocable in memory.
 
-///////////////////////////////////////////////////////
-//NOTE: Do *NOT* forget modify the bit-field in VAR if
-//you remove/add flag here.
-///////////////////////////////////////////////////////
+////////////////////////////////////////////////////////
+//NOTE: Do *NOT* forget modify the bit-field in VAR if//
+//you remove/add flag here.                           //
+////////////////////////////////////////////////////////
 #define BYTEBUF_size(b)    ((b)->m_byte_size)
 #define BYTEBUF_buffer(b)  ((b)->m_byte_buffer)
 class ByteBuf {
@@ -291,7 +291,8 @@ public:
     UINT getStringLength() const
     {
         ASSERT0(VAR_type(this)->is_string());
-        return VAR_string(this) == NULL ? 0 : xstrlen(SYM_name(VAR_string(this)));
+        return VAR_string(this) == NULL ?
+            0 : xstrlen(SYM_name(VAR_string(this)));
     }
     SYM const* getString() const { return VAR_string(this); }
     ByteBuf const* getByteValue() const { return VAR_byte_val(this); }
@@ -380,7 +381,7 @@ typedef Vector<VAR*> VarVec;
 //This class is responsible for allocation and deallocation of VAR.
 //User can only create VAR via VarMgr, as well as delete it in the same way.
 class VarMgr {
-protected:
+private:
     size_t m_var_count;
     VarVec m_var_vec;
     ConstSym2Var m_str_tab;
@@ -389,7 +390,7 @@ protected:
     RegionMgr * m_ru_mgr;
     TypeMgr * m_tm;
 
-protected:
+private:
     inline void assignVarId(VAR * v);
 
 public:

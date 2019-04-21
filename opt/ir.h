@@ -2608,7 +2608,7 @@ void dumpGR(IR const* ir, TypeMgr * tm, DumpGRCtx * ctx);
 void dumpGRInBBList(List<IRBB*> * bblist, TypeMgr * tm, DumpGRCtx * ctx);
 void dumpGRList(IR * irlist, TypeMgr * tm, DumpGRCtx * ctx);
 
-bool verifyIRList(IR * ir, IRAddressHash * irh, Region const* rg);
+bool verifyIRList(IR * ir, BitSet * irh, Region const* rg);
 bool verifyIRandBB(BBList * ir_bb_list, Region const* rg);
 bool verifySimp(IR * ir, SimpCtx & simp);
 

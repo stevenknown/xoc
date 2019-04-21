@@ -86,11 +86,30 @@ UINT getLineNum(Dbx const* dbx)
 void copyDbx(IR * tgt, IR const* src, Region * rg)
 {
     ASSERT0(rg);
-    if (IR_ai(src) == NULL) { return; }
+    if (IR_ai(src) == NULL) {
+        if (g_is_search_and_copy_dbx &&
+            src->is_exp() &&
+            src->getParent() != NULL) {
+            //Attempt to copy nearest debug-info.
+            //IR exp's parent might be NULL during simplification.
+            copyDbx(tgt, src->getParent(), rg);
+        }
+        return;
+    }
 
     DbxAttachInfo * src_da = (DbxAttachInfo*)IR_ai(src)->get(AI_DBX);
     if (IR_ai(tgt) == NULL) {
-        if (src_da == NULL) { return; }
+        if (src_da == NULL) {
+            if (src->is_stmt()) {
+                return;
+            }
+            if (g_is_search_and_copy_dbx && src->getParent() != NULL) {
+                //Attempt to copy nearest debug-info.
+                //IR exp's parent might be NULL during simplification.
+                copyDbx(tgt, src->getParent(), rg);
+            }
+            return;
+        }
         IR_ai(tgt) = rg->allocAIContainer();
     }
     ASSERT0(IR_ai(tgt));

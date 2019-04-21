@@ -45,14 +45,14 @@ namespace xoc {
 
 //Scan operand to find invariant candidate.
 //'invariant_stmt': Record if the result of stmt is loop invariant.
-//'is_legal': set to true if loop is legal to perform invariant motion.
+//'isLegal': set to true if loop is legal to perform invariant motion.
 //  otherwise set to false to prohibit code motion.
 //Return true if find loop invariant expression.
 bool IR_LICM::scanOpnd(
         IN LI<IRBB> * li,
         OUT TTab<IR*> & invariant_exp,
         TTab<IR*> & invariant_stmt,
-        bool * is_legal,
+        bool * isLegal,
         bool first_scan)
 {
     bool change = false;
@@ -75,7 +75,7 @@ bool IR_LICM::scanOpnd(
             if ((ir->isCallStmt() && !ir->isReadOnlyCall()) ||
                 ir->is_region() || ir->is_phi()) {
                 //TODO: support call.
-                *is_legal = false;
+                *isLegal = false;
                 return false;
             }
             if (first_scan) { updateMD2Num(ir); }
@@ -424,11 +424,11 @@ bool IR_LICM::analysis(
     bool find = false;
     bool first_scan = true;
     while (change) {
-        bool is_legal = true;
+        bool isLegal = true;
         change = scanOpnd(li, invariant_exp, invariant_stmt,
-                          &is_legal, first_scan);
+                          &isLegal, first_scan);
 
-        if (!is_legal) {
+        if (!isLegal) {
             invariant_exp.clean();
             return false;
         }
@@ -822,7 +822,7 @@ bool IR_LICM::perform(OptCtx & oc)
 
         //DU chain and du ref is maintained.
         ASSERT0(m_ru->verifyMDRef());
-        ASSERT0(m_du->verifyMDDUChain(COMPUTE_PR_DU | COMPUTE_NOPR_DU));
+        ASSERT0(m_du->verifyMDDUChain(COMPUTE_PR_DU | COMPUTE_NONPR_DU));
 
         if (du_set_info_changed) {
             OC_is_live_expr_valid(oc) = false;

@@ -154,13 +154,13 @@ ASCII g_asc1[] = {
 UINT computeConstBitLen(ULONGLONG v)
 {
 #ifdef _VC6_
-    if (!(v & 0xffffffffffffff00)) return 8;
-    if (!(v & 0xffffffffffff0000)) return 16;
-    if (!(v & 0xffffffff00000000)) return 32;
+    if (!(v & 0xffffffffffffff00)) { return 8; }
+    if (!(v & 0xffffffffffff0000)) { return 16; }
+    if (!(v & 0xffffffff00000000)) { return 32; }
 #else
-    if (!(v & 0xffffffffffffff00ull)) return 8;
-    if (!(v & 0xffffffffffff0000ull)) return 16;
-    if (!(v & 0xffffffff00000000ull)) return 32;
+    if (!(v & 0xffffffffffffff00ull)) { return 8; }
+    if (!(v & 0xffffffffffff0000ull)) { return 16; }
+    if (!(v & 0xffffffff00000000ull)) { return 32; }
 #endif
     return 64;
 }
@@ -652,31 +652,28 @@ void dumps_svec(void * vec, UINT ty)
 {
     printf("\n");
     switch (ty) {
-    case D_BOOL:
-        {
-            Vector<bool> *p = (Vector<bool> *)vec;
-            for (INT i = 0; i <= p->get_last_idx(); i++) {
-                printf("%d", (INT)p->get(i));
-                if (i != p->get_last_idx()) {
-                    printf(", ");
-                }
+    case D_BOOL: {
+        Vector<bool> *p = (Vector<bool> *)vec;
+        for (INT i = 0; i <= p->get_last_idx(); i++) {
+            printf("%d", (INT)p->get(i));
+            if (i != p->get_last_idx()) {
+                printf(", ");
             }
-            break;
         }
-    case D_INT:
-        {
-            Vector<INT> *p = (Vector<INT> *)vec;
-            for (INT i = 0; i <= p->get_last_idx(); i++) {
-                printf("%d", (INT)p->get(i));
-                if (i != p->get_last_idx()) {
-                    printf(", ");
-                }
+        break;
+    }
+    case D_INT: {
+        Vector<INT> *p = (Vector<INT> *)vec;
+        for (INT i = 0; i <= p->get_last_idx(); i++) {
+            printf("%d", (INT)p->get(i));
+            if (i != p->get_last_idx()) {
+                printf(", ");
             }
-            break;
         }
-    default:
-        ASSERTN(0, ("illegal ty"));
-    }//end switch
+        break;
+    }
+    default: { ASSERTN(0, ("illegal ty")); }
+    } //end switch
     printf("\n");
 }
 
@@ -1158,7 +1155,7 @@ static bool prt_int(CHAR * buf, UINT buflen, UINT * pbufpos, INT v)
 
 
 static bool prt_ulong_hex(CHAR * buf, UINT buflen, UINT * pbufpos,
-                        ULONG v, INT format_size)
+                          ULONG v, INT format_size)
 {
     ULONG mask = 0xF0000000;
     INT shift = 28;

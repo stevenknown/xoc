@@ -3344,7 +3344,7 @@ public:
         ASSERTN(m_bucket != NULL, ("Hash not yet initialized."));
         T t = T(0);
         iter = -1;
-        if (m_elem_count <= 0) return T(0);
+        if (m_elem_count <= 0) { return T(0); }
         INT l = m_elem_vector.get_last_idx();
         for (INT i = 0; i <= l; i++) {
             if ((t = m_elem_vector.get((UINT)i)) != T(0)) {
@@ -4679,7 +4679,7 @@ public:
     //Establishing mapping in between 't' and 'mapped'.
     void set(Tsrc t, Ttgt mapped)
     {
-        if (t == Tsrc(0)) return;
+        if (t == Tsrc(0)) { return; }
         TAB_Ttgt * tgttab = HMap<Tsrc, TAB_Ttgt*, HF>::get(t);
         if (tgttab == NULL) {
             //Do NOT use Hash::xmalloc(sizeof(TAB_Ttgt)) to allocate memory,
@@ -4704,13 +4704,14 @@ public:
     void destroy()
     {
         if (!m_is_init) { return; }
-        TAB_Ttgt * tgttab = get(HMap<Tsrc, TAB_Ttgt*, HF>::get_first());
+        INT iter = 0;
+        TAB_Ttgt * tgttab = get(HMap<Tsrc, TAB_Ttgt*, HF>::get_first(iter));
         UINT n = HMap<Tsrc, TAB_Ttgt*, HF>::get_elem_count();
         for (UINT i = 0; i < n; i++) {
             ASSERT0(tgttab);
             delete tgttab;
             tgttab = HMap<Tsrc, TAB_Ttgt*, HF>::
-                            get(HMap<Tsrc, TAB_Ttgt*, HF>::get_next());
+                get(HMap<Tsrc, TAB_Ttgt*, HF>::get_next(iter));
         }
 
         HMap<Tsrc, TAB_Ttgt*, HF>::destroy();

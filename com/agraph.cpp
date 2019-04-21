@@ -60,12 +60,12 @@ void AGraph::ShortestPath(UINT infinite)
     ASSERTN(m_ec_pool != NULL, ("not yet initialized."));
     Matrix<UINT> adj_mat;
     buildAdjacentMatrix(adj_mat);
-    UINT row = adj_mat.get_row_size();
-    UINT col = adj_mat.get_col_size();
+    UINT row = adj_mat.getRowSize();
+    UINT col = adj_mat.getColSize();
     UINT i,j,k,min,v1,v2;
     if (m_spath_mat != NULL) { delete m_spath_mat; }
     m_spath_mat = new Matrix<UINT>(row, col);
-    m_spath_mat->set_all(infinite);
+    m_spath_mat->setAllElem(infinite);
 
     //Init path matrix
     for (i = 0; i < row; i++) {
