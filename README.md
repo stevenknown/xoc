@@ -9,6 +9,7 @@ What does XOC mean?
 	the last performance out of ordinary code.
 
 Contribution and License Agreement. 
+	The XOC Repo is licensed under the BSD license.
 	If you contribute code to this project, you are implicitly allowing your
 	code to be distributed under the BSD license.
 
