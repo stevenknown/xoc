@@ -351,8 +351,8 @@ public:
     bool clone(Graph const& src);
     size_t count_mem() const;
 
-    void dump_dot(CHAR const* name = NULL);
-    void dump_vcg(CHAR const* name = NULL);
+    void dump_dot(CHAR const* name = NULL) const;
+    void dump_vcg(CHAR const* name = NULL) const;
 
     //Return true if 'succ' is successor of 'v'.
     bool is_succ(Vertex * v, Vertex * succ) const
@@ -617,9 +617,11 @@ public:
         return read_pdom_set(v2)->is_contain(v1);
     }
 
+    //Sort node on graph in bfs-order.
     void sortInBfsOrder(Vector<UINT> & order_buf,
                         Vertex * root,
                         BitSet & visit);
+    //Sort node in dominator-tree in preorder.
     void sortDomTreeInPreorder(IN Vertex * root, OUT List<Vertex*> & lst);
     void sortDomTreeInPostrder(IN Vertex * root, OUT List<Vertex*> & lst);
     void setBitSetMgr(BitSetMgr * bs_mgr) { m_bs_mgr = bs_mgr; }

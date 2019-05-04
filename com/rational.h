@@ -63,10 +63,10 @@ public:
     bool is_int() { return m_den == 1; }
     void reduce();
     Rational rabs();
-    FRAC_TYPE num() const {return m_num;}
-    FRAC_TYPE& num() {return m_num;}
-    FRAC_TYPE den() const {return m_den;}
-    FRAC_TYPE& den() {return m_den;}
+    FRAC_TYPE num() const { return m_num; }
+    FRAC_TYPE& num() { return m_num; }
+    FRAC_TYPE den() const { return m_den; }
+    FRAC_TYPE& den() { return m_den; }
     CHAR const* format(StrBuf & buf);
 };
 

@@ -70,6 +70,8 @@ public:
     BYTE init_val_type:1; //initial value may be integer or variable.
 
 public:
+    COPY_CONSTRUCTOR(IV);
+
     bool has_init_val() const { return IV_initv_i(this) != NULL; }
 
     //Return true if initial value is const.
@@ -107,6 +109,7 @@ protected:
     //Map from a Def and Occ of basic induction var to its IV info.
     //This field will supply fast accessing to IV when giving an IR.
     TMap<IR const*, IV*> m_ir2iv;
+
 protected:
     void addDIVList(LI<IRBB> const* li, IR const* e);
     IR const* computeDomDef(
@@ -153,6 +156,7 @@ protected:
             IR * occ,
             IR * delta,
             bool is_increment);
+
 public:
     explicit IR_IVR(Region * rg)
     {

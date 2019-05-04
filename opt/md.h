@@ -163,6 +163,7 @@ public:
         MD_id(this) = 0;
         copy(&md);
     }
+    MD const& operator = (MD const&);
 
     inline void copy(MD const* md)
     {
@@ -296,8 +297,10 @@ class MDTab {
 protected:
     OffsetTab m_ofst_tab;
     MD const* m_invalid_ofst_md; //record MD with invalid ofst
+
 public:
     MDTab() { m_invalid_ofst_md = NULL; }
+    COPY_CONSTRUCTOR(MDTab);
 
     void init(UINT hash_bucket_size);
     void clean()
@@ -473,6 +476,7 @@ protected:
     SList<MDSet*> m_md_set_list;
     Region * m_ru;
     DefMiscBitSetMgr * m_misc_bs_mgr;
+
 public:
     MDSetMgr(Region * rg, DefMiscBitSetMgr * mbsm);
     COPY_CONSTRUCTOR(MDSetMgr);
@@ -509,8 +513,10 @@ public:
 
 class MDId2MD : public Vector<MD*> {
     UINT m_count;
+
 public:
     MDId2MD() { m_count = 0; }
+    COPY_CONSTRUCTOR(MDId2MD);
 
     void remove(UINT mdid)
     {
@@ -590,6 +596,7 @@ class MDSystem {
     void initGlobalMemMD(VarMgr * vm);
     void initImportVar(VarMgr * vm);
     void initAllMemMD(VarMgr * vm);
+
 public:
     MDSystem(VarMgr * vm) { init(vm); }
     COPY_CONSTRUCTOR(MDSystem);
@@ -700,6 +707,8 @@ typedef TMapIter<UINT, MDSet const*> MD2MDSetIter;
 //Note MD may mapped to NULL, means the MD does not point to anything.
 class MD2MDSet : public TMap<UINT, MDSet const*> {
 public:
+    MD2MDSet() {}
+    COPY_CONSTRUCTOR(MD2MDSet);
     ~MD2MDSet()
     {
         //Note all elements should be in MD_HASH.

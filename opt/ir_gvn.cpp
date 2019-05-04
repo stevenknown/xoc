@@ -188,7 +188,7 @@ VN * IR_GVN::registerVNviaINT(LONGLONG v)
     }
 
     if (m_ll2vn.get_bucket_size() == 0) {
-        m_ll2vn.init(10/*TO reevaluate*/);
+        m_ll2vn.init(10); //To be reevaluated
     }
 
     VN * vn = m_ll2vn.get(v);
@@ -1001,9 +1001,8 @@ void IR_GVN::processCall(IR const* ir, bool & change)
 
 void IR_GVN::processRegion(IR const* ir, bool & change)
 {
-    DUMMYUSE(change);
-    DUMMYUSE(ir);
-    UNREACHABLE(); //TODO
+    //Region effect should be simluated via call-stmt
+    //which will be handled.
 }
 
 
@@ -1028,7 +1027,7 @@ void IR_GVN::processBB(IRBB * bb, bool & change)
                     m_ir2vn.set(ir->id(), x);
                     change = true;
                 }
-                return;
+                //return;
             }
             break;
         case IR_STPR:
@@ -1041,7 +1040,7 @@ void IR_GVN::processBB(IRBB * bb, bool & change)
                     m_ir2vn.set(ir->id(), x);
                     change = true;
                 }
-                return;
+                //return;
             }
             break;
         case IR_STARRAY:
@@ -1057,7 +1056,7 @@ void IR_GVN::processBB(IRBB * bb, bool & change)
                     m_ir2vn.set(ir->id(), x);
                     change = true;
                 }
-                return;
+                //return;
             }
             break;
         case IR_IST:
@@ -1173,6 +1172,14 @@ void IR_GVN::dump_bb(UINT bbid)
                 dump_h1(k, x2);
             }
             break;
+        case IR_PHI:
+            ii.clean();
+            for (IR const* k = iterInitC(PHI_opnd_list(ir), ii);
+                k != NULL; k = iterNextC(ii)) {
+                VN * x2 = m_ir2vn.get(IR_id(k));
+                dump_h1(k, x2);
+            }
+            break;
         case IR_IST:
             ii.clean();
             for (IR const* k = iterInitC(IST_rhs(ir), ii);
@@ -1231,9 +1238,7 @@ void IR_GVN::dump_bb(UINT bbid)
             }
             break;
         case IR_GOTO: break;
-        case IR_REGION:
-            UNREACHABLE(); //TODO
-            break;
+        case IR_REGION: break;
         default: UNREACHABLE();
         }
         prt(" }");
@@ -1426,24 +1431,17 @@ bool IR_GVN::perform(OptCtx & oc)
 
     List<IRBB*> * tbbl = m_cfg->getBBListInRPO();
     ASSERT0(tbbl->get_elem_count() == bbl->get_elem_count());
-
     UINT count = 0;
     bool change = true;
-
-    #ifdef DEBUG_GVN
     while (change && count < 10) {
         change = false;
-    #endif
         for (IRBB * bb = tbbl->get_head();
              bb != NULL; bb = tbbl->get_next()) {
             processBB(bb, change);
-        } //end for BB
+        }
         count++;
-    #ifdef DEBUG_GVN
-    } //end while
-    ASSERT0(!change && count <= 2);
-    #endif
-
+    }
+    ASSERT0(!change);
     if (g_is_dump_after_pass) {
         dump();
     }

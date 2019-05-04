@@ -78,6 +78,7 @@ public:
 
 public:
     SSAInfo(DefSegMgr * sm) : use_exp_set(sm) { cleanMember(); }
+    COPY_CONSTRUCTOR(SSAInfo);
 
     inline void cleanDU()
     {
@@ -115,6 +116,7 @@ public:
     UINT prno;
 
     VP(DefSegMgr * sm) : SSAInfo(sm) { cleanMember(); }
+    COPY_CONSTRUCTOR(VP);
 
     inline void cleanMember()
     {

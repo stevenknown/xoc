@@ -42,6 +42,9 @@ namespace xoc {
 class SYM {
 public:
     CHAR * s;
+
+public:
+    COPY_CONSTRUCTOR(SYM);
 };
 
 
@@ -146,9 +149,11 @@ public:
 //
 class SymTabHash : public Hash<SYM*, SymbolHashFunc> {
     SMemPool * m_pool;
+
 public:
     explicit SymTabHash(UINT bsize) : Hash<SYM*, SymbolHashFunc>(bsize)
     { m_pool = smpoolCreate(64, MEM_COMM); }
+    COPY_CONSTRUCTOR(SymTabHash);
     virtual ~SymTabHash()
     { smpoolDelete(m_pool); }
 
@@ -203,8 +208,13 @@ class CompareSymTab {
         ns[l] = 0;
         return ns;
     }
+
 public:
     SMemPool * m_pool;
+
+public:
+    CompareSymTab() {}
+    COPY_CONSTRUCTOR(CompareSymTab);
 
     bool is_less(SYM * t1, SYM * t2) const
     { return ::strcmp(SYM_name(t1), SYM_name(t2)) < 0; }
@@ -223,6 +233,7 @@ public:
 class SymTab : public TTab<SYM*, CompareSymTab> {
     SYM * m_free_one;
     SMemPool * m_pool;
+
 public:
     SymTab()
     {
@@ -230,8 +241,8 @@ public:
         m_free_one = NULL;
         TTab<SYM*, CompareSymTab>::m_ck.m_pool = m_pool;
         ASSERT0(m_pool);
-
     }
+    COPY_CONSTRUCTOR(SymTab);
     virtual ~SymTab() { smpoolDelete(m_pool); }
 
     //Add const string into symbol table.

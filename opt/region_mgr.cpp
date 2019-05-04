@@ -53,6 +53,7 @@ RegionMgr::RegionMgr() : m_type_mgr(this)
     m_str_md = NULL;
     m_call_graph = NULL;
     m_targinfo = NULL;
+    m_pool = smpoolCreate(64, MEM_COMM);
 }
 
 
@@ -63,6 +64,7 @@ RegionMgr::~RegionMgr()
         if (rg == NULL) { continue; }
         deleteRegion(rg, false);
     }
+    m_id2ru.clean();
 
     #ifdef _DEBUG_
     ASSERTN(m_num_allocated == 0, ("there is still region leave out"));
@@ -82,6 +84,32 @@ RegionMgr::~RegionMgr()
         delete m_call_graph;
         m_call_graph = NULL;
     }
+
+    m_id2optctx.clean();
+
+    smpoolDelete(m_pool);
+    m_pool = NULL;
+}
+
+
+void * RegionMgr::xmalloc(UINT size)
+{
+    ASSERTN(m_pool != NULL, ("pool does not initialized"));
+    void * p = smpoolMalloc(size, m_pool);
+    ASSERT0(p != NULL);
+    ::memset(p, 0, size);
+    return p;
+}
+
+
+OptCtx * RegionMgr::getAndGenOptCtx(UINT id)
+{
+    OptCtx * oc = m_id2optctx.get(id);
+    if (oc == NULL) {
+        oc = (OptCtx*)xmalloc(sizeof(OptCtx));
+        m_id2optctx.set(id, oc);
+    }
+    return oc;
 }
 
 

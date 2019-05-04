@@ -36,30 +36,28 @@ author: Su Zhenyu
 
 namespace xoc {
 
-/* Perform Loop Convertion.
-Transform while-do loop to do-while loop.
-
-e.g: Given loop I, the loop induction variable is i, loop upper bound is N.
-
-while do loop is:
-    bb1:
-        if i > N, branch bb3;
-    bb2:
-        loop body;
-        goto bb1;
-    bb3:
-        ...
-
-after convertion:
-
-    bb1:
-        if i > N, branch bb3;
-    bb2:
-        loop body;
-        if i <= N, branch bb2;
-    bb3:
-        ...
-*/
+// Perform Loop Convertion.
+//Transform while-do loop to do-while loop.
+//e.g: Given loop I, the loop induction variable is i, loop upper bound is N.
+//
+//while do loop is:
+//    bb1:
+//        if i > N, branch bb3;
+//    bb2:
+//        loop body;
+//        goto bb1;
+//    bb3:
+//        ...
+//
+//after convertion:
+//
+//    bb1:
+//        if i > N, branch bb3;
+//    bb2:
+//        loop body;
+//        if i <= N, branch bb2;
+//    bb3:
+//        ...
 class IR_LOOP_CVT : public Pass {
 protected:
     Region * m_ru;
@@ -72,6 +70,7 @@ protected:
     bool try_convert(LI<IRBB> * li, IRBB * gobackbb,
                     UINT succ1, UINT succ2);
     bool find_and_convert(List<LI<IRBB>*> & worklst);
+
 public:
     explicit IR_LOOP_CVT(Region * rg)
     {

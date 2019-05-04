@@ -54,6 +54,7 @@ protected:
     Vector<UINT> m_max_version;
 
     UseDefMgr m_usedef_mgr;
+
 protected:
     void init()
     {
@@ -125,30 +126,30 @@ protected:
                   Vector<DefSBitSet*> & defined_md_vec,
                   List<IRBB*> & wl);
     void verifySSAInfo(IR const* ir);
+
 public:
-    explicit MDSSAMgr(Region * rg) : m_usedef_mgr(rg)
+    explicit MDSSAMgr(Region * rg) : m_usedef_mgr(rg, this)
     {
         cleanInConstructor();
         ASSERT0(rg);
         m_ru = rg;
-
         m_tm = rg->getTypeMgr();
         ASSERT0(m_tm);
-
         ASSERT0(rg->getMiscBitSetMgr());
         m_sbs_mgr = rg->getMiscBitSetMgr();
         m_seg_mgr = rg->getMiscBitSetMgr()->getSegMgr();
         ASSERT0(m_seg_mgr);
-
         m_cfg = rg->getCFG();
         ASSERTN(m_cfg, ("cfg is not available."));
-
         m_md_sys = rg->getMDSystem();
     }
     COPY_CONSTRUCTOR(MDSSAMgr);
     ~MDSSAMgr()
     {
-        ASSERTN(!isMDSSAConstructed(), ("should be destructed"));
+        //CAUTION: If you do not finish out-of-SSA prior to destory(),
+        //the reference to IR's MDSSA info will lead to undefined behaviors.
+        //ASSERTN(!isMDSSAConstructed(), ("should be destructed"));
+
         destroy();
     }
 
@@ -167,13 +168,13 @@ public:
         //    ssainfo = allocMDSSAInfo(def->getPrno());
         //    def->setSSAInfo(ssainfo);
         //    SSA_def(ssainfo) = def;
-
-            //You may be set multiple defs for use.
+        //
+        ///// You may be try to set multiple DEFs for USE.
         //    ASSERTN(use->getSSAInfo() == NULL, ("use already has SSA info."));
-
+        //
         //    use->setSSAInfo(ssainfo);
         //}
-
+        //
         //SSA_uses(ssainfo).append(use);
     }
 
@@ -199,7 +200,7 @@ public:
 
     void destroy();
     void destruction(DomTree & domtree);
-    void destruction();
+    void destruction(OptCtx * oc);
     void dump();
     void dumpDUChain();
     void dumpAllVMD();
@@ -247,6 +248,12 @@ public:
     { return "MD SSA Manager"; }
 
     PASS_TYPE getPassType() const { return PASS_MD_SSA_MGR; }
+
+    MDSSAInfo * getMDSSAInfoIfAny(IR const* ir)
+    { return hasMDSSAInfo(ir) ? getUseDefMgr()->getMDSSAInfo(ir) : NULL; }
+
+    bool hasMDSSAInfo(IR const* ir) const
+    { return ir->isMemoryRefNotOperatePR() || ir->isCallStmt(); }
 };
 
 } //namespace xoc

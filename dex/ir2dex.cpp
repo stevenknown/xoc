@@ -768,7 +768,7 @@ LIR * IR2Dex::convertStoreArray(IN OUT IR ** ir, IN IR2DexCtx * cont)
 
 
 //Bulid iput: res -> op0(obj-ptr), op1(ofst)
-LIR * IR2Dex::convertIstore(IN OUT IR ** ir, IN IR2DexCtx * cont)
+LIR * IR2Dex::convertIStore(IN OUT IR ** ir, IN IR2DexCtx * cont)
 {
     IR * tir = *ir;
     ASSERT0(tir->is_ist());
@@ -1175,7 +1175,7 @@ LIR * IR2Dex::convertCall(IN OUT IR ** ir, IN IR2DexCtx * cont)
 }
 
 
-LIR * IR2Dex::convertIcall(IN OUT IR ** ir, IN IR2DexCtx * cont)
+LIR * IR2Dex::convertICall(IN OUT IR ** ir, IN IR2DexCtx * cont)
 {
     *ir = IR_next(*ir);
     return NULL;
@@ -1371,11 +1371,11 @@ LIR * IR2Dex::convert(IN OUT IR ** ir, IN IR2DexCtx * cont)
     case IR_STARRAY:
         return convertStoreArray(ir, cont);
     case IR_IST:
-        return convertIstore(ir, cont);
+        return convertIStore(ir, cont);
     case IR_CALL:
         return convertCall(ir, cont);
     case IR_ICALL:
-        return convertIcall(ir, cont);
+        return convertICall(ir, cont);
     case IR_GOTO:
         return convertGoto(ir, cont);
     case IR_LABEL:

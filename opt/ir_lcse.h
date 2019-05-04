@@ -77,6 +77,7 @@ protected:
                     IN OUT xcom::BitSet & avail_ir_expr,
                     IN OUT Vector<IR*> & map_expr2avail_pos,
                     IN OUT Vector<IR*> & map_expr2avail_pr);
+
 public:
     explicit IR_LCSE(Region * rg);
     COPY_CONSTRUCTOR(IR_LCSE);

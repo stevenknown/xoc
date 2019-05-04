@@ -89,6 +89,7 @@ public:
     #ifdef _DEBUG_
     xcom::BitSet m_has_been_freed_irs;
     #endif
+
 public:
     explicit AnalysisInstrument(Region * rg);
     COPY_CONSTRUCTOR(AnalysisInstrument);
@@ -106,6 +107,9 @@ class RefInfo {
 public:
     MDSet may_def_mds; //Record the MD set for Region usage
     MDSet may_use_mds; //Record the MD set for Region usage
+
+public:
+    COPY_CONSTRUCTOR(RefInfo);
 
     size_t count_mem()
     {

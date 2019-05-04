@@ -43,6 +43,9 @@ class TimeInfo {
 public:
     CHAR const* pass_name;
     ULONGLONG pass_time;
+
+public:
+    COPY_CONSTRUCTOR(TimeInfo);
 };
 
 
@@ -57,6 +60,7 @@ protected:
     TMap<PASS_TYPE, Pass*> m_registered_pass;
     TMap<PASS_TYPE, xcom::Graph*> m_registered_graph_based_pass;
 
+protected:
     void * xmalloc(size_t size)
     {
         void * p = smpoolMalloc(size, m_pool);
@@ -65,6 +69,7 @@ protected:
         return p;
     }
     xcom::Graph * registerGraphBasedPass(PASS_TYPE opty);
+
 public:
     PassMgr(Region * rg);
     COPY_CONSTRUCTOR(PassMgr);

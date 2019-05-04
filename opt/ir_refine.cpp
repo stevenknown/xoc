@@ -275,12 +275,9 @@ static inline bool is_redundant_cvt(IR * ir)
 
 IR * Region::refineStore(IR * ir, bool & change, RefineCtx & rc)
 {
-    ASSERT0(ir->is_st() || ir->is_stpr());
-
+    ASSERT0(ir->is_st() || ir->is_stpr());    
     bool lchange = false;
-
     IR * rhs = ir->is_st() ? ST_rhs(ir) : STPR_rhs(ir);
-
     if (RC_refine_stmt(rc) &&
         rhs->is_pr() &&
         ir->is_stpr() &&
@@ -304,7 +301,6 @@ IR * Region::refineStore(IR * ir, bool & change, RefineCtx & rc)
 
     rhs = refineIR(rhs, lchange, rc);
     ir->setRHS(rhs);
-
     ASSERT0(!::is_redundant_cvt(rhs));
     if (RC_refine_stmt(rc)) {
         MD const* umd = rhs->getExactRef();
@@ -340,9 +336,7 @@ IR * Region::refineStore(IR * ir, bool & change, RefineCtx & rc)
     if (RC_insert_cvt(rc)) {
         ir->setRHS(insertCvt(ir, ir->getRHS(), lchange));
     }
-
     change |= lchange;
-
     if (lchange) {
         ir->setParentPointer(false);
         IR_DU_MGR * dumgr = getDUMgr();
@@ -350,7 +344,6 @@ IR * Region::refineStore(IR * ir, bool & change, RefineCtx & rc)
             ASSERT0(!dumgr->removeExpiredDU(ir));
         }
     }
-
     return ir;
 }
 

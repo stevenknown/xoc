@@ -45,8 +45,7 @@ namespace xcom {
 class BitSet;
 class BitSetMgr;
 
-class BitSet
-{
+class BitSet {
     friend BitSet * bs_union(BitSet const& set1,
                              BitSet const& set2,
                              OUT BitSet & res);
@@ -60,7 +59,9 @@ protected:
     UINT m_size;
     BYTE * m_ptr;
 
+protected:
     void * realloc(IN void * src, size_t orgsize, size_t newsize);
+
 public:
     BitSet(UINT init_pool_size = 1)
     {
@@ -91,7 +92,7 @@ public:
     //Destroy bit buffer memory.
     void destroy()
     {
-        if (m_ptr == NULL) return;
+        if (m_ptr == NULL) { return; }
         ASSERTN(m_size > 0, ("bitset is invalid"));
         ::free(m_ptr);
         m_ptr = NULL;
@@ -131,10 +132,14 @@ public:
     //Returns a new set which is
     //  { x : member( x, 'set1' ) & ~ member( x, 'set2' ) }.
     void diff(BitSet const& bs);
+
+    //Dump bit value and position.
     void dump(CHAR const* name = NULL, bool is_del = false,
               UINT flag = BS_DUMP_BITSET | BS_DUMP_POS,
               INT last_pos = -1) const;
+    //Dump bit value and position.
     void dump(FILE * h, UINT flag, INT last_pos) const;
+    //Dump bit value and position.
     void dump(FILE * h) const { dump(h, BS_DUMP_BITSET|BS_DUMP_POS, -1); }
 
     //Return the element count in 'set'
@@ -223,37 +228,40 @@ public:
 
     UINT count_mem() const { return get_byte_size(); }
 
+    //Dump bit value and position.
     void dump(CHAR const* name = NULL, bool is_del = false,
               UINT flag = BS_DUMP_BITSET | BS_DUMP_POS,
               INT last_pos = -1) const
     { BitSet::dump(name, is_del, flag, last_pos); }
-
+    //Dump bit value and position.
     void dump(FILE * h, UINT flag, INT last_pos) const
     { BitSet::dump(h, flag, last_pos); }
-
+    //Dump bit value and position.
     void dump(FILE * h) const { BitSet::dump(h); }
 
-    //The followed interfaces are prohibited to use.
-    void rev(UINT last_bit_pos);
-    void intersect(BitSet const& bs);
-    void diff(UINT elem);
-    void diff(BitSet const& bs);
-    void copy(BitSet const& src);
-    void clean();
-    void complement(BitSet const& univers);
-    void alloc(UINT size);
-    void bunion(BitSet const& bs);
-    void bunion(UINT elem);
+    //////////////////////////////////////////////////////////////
+    //NOTE: THE FOLLOWING INTERFACES ARE PROHIBITED TO BE USED.///
+    //////////////////////////////////////////////////////////////
+    void rev(UINT last_bit_pos) { UNREACHABLE(); }
+    void intersect(BitSet const& bs) { UNREACHABLE(); }
+    void diff(UINT elem) { UNREACHABLE(); }
+    void diff(BitSet const& bs) { UNREACHABLE(); }
+    void copy(BitSet const& src) { UNREACHABLE(); }
+    void clean() { UNREACHABLE(); }
+    void complement(BitSet const& univers) { UNREACHABLE(); }
+    void alloc(UINT size) { UNREACHABLE(); }
+    void bunion(BitSet const& bs) { UNREACHABLE(); }
+    void bunion(UINT elem) { UNREACHABLE(); }
 };
 
 
-class BitSetMgr
-{
+class BitSetMgr {
 protected:
     SMemPool * m_pool;
     List<BitSet*> m_bs_list;
     List<BitSet*> m_free_list;
 
+protected:
     inline void * xmalloc(size_t size)
     {
         ASSERTN(m_pool, ("not yet initialized."));
@@ -262,6 +270,7 @@ protected:
         ::memset(p, 0, size);
         return p;
     }
+
 public:
     BitSetMgr()
     {
@@ -353,6 +362,7 @@ public:
 template <class T> class BSVec : public Vector<T> {
 protected:
     BitSet m_bs; //Record position set by 'set()'
+
 public:
     BSVec() { init(); }
     BSVec(INT size)
@@ -364,14 +374,14 @@ public:
 
     void init()
     {
-        if (Vector<T>::m_is_init) return;
+        if (Vector<T>::m_is_init) { return; }
         Vector<T>::init();
         m_bs.init();
     }
 
     void destroy()
     {
-        if (!Vector<T>::m_is_init) return;
+        if (!Vector<T>::m_is_init) { return; }
         m_bs.destroy();
         Vector<T>::destroy();
     }
@@ -608,7 +618,7 @@ public:
 
     inline void free(IN BSVec<T> * bs) //free bs for next use.
     {
-        if (bs == NULL) return;
+        if (bs == NULL) { return; }
         bs->clean();
         m_free_list.append_head(bs);
     }

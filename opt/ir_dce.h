@@ -38,6 +38,8 @@ namespace xoc {
 
 class EFFECT_STMT : public xcom::BitSet {
 public:
+    EFFECT_STMT() {}
+    COPY_CONSTRUCTOR(EFFECT_STMT);
     void bunion(INT elem)
     {
         xcom::BitSet::bunion(elem);
@@ -97,6 +99,7 @@ protected:
 
     bool check_stmt(IR const* ir);
     bool check_call(IR const* ir);
+
 public:
     explicit IR_DCE(Region * rg)
     {
@@ -111,6 +114,7 @@ public:
         m_is_use_md_du = true;
         m_cdg = NULL;
     }
+    COPY_CONSTRUCTOR(IR_DCE);
     virtual ~IR_DCE() {}
 
     void dump(EFFECT_STMT const& is_stmt_effect,

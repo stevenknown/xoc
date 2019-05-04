@@ -40,6 +40,9 @@ namespace xoc {
 #define INLINFO_has_ret(i)        ((i)->has_ret)
 class InlineInfo {
 public:
+    InlineInfo() {}
+    COPY_CONSTRUCTOR(InlineInfo);
+
     BYTE need_el:1;
     BYTE has_ret:1;
 };
@@ -53,6 +56,7 @@ protected:
     Region * m_program;
     TMap<Region*, InlineInfo*> m_ru2inl;
 
+protected:
     void checkRegion(IN Region * rg,
                      OUT bool & need_el,
                      OUT bool & has_ret) const;
@@ -91,6 +95,7 @@ public:
         ASSERT0(m_call_graph);
         m_pool = smpoolCreate(16, MEM_COMM);
     }
+    COPY_CONSTRUCTOR(Inliner);
     virtual ~Inliner() { smpoolDelete(m_pool); }
 
     bool can_be_cand(Region * rg);

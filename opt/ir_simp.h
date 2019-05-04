@@ -164,6 +164,7 @@ public:
 public:
     SimpCtx() { init(); }
     SimpCtx(SimpCtx const& s) { copy(s); }
+    SimpCtx const& operator = (SimpCtx const&);
 
     //Only copy top-down informations.
     void copy(SimpCtx const& s)

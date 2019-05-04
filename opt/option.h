@@ -102,12 +102,14 @@ public:
             UINT show_compile_time:1; //Show compilation time.
         } s1;
     } u2;
+
 public:
     OptCtx()
     {
         set_all_invalid();
         u2.int1 = 0;
     }
+    OptCtx const& operator = (OptCtx const&);
 
     void set_all_valid() { u1.int1 = (UINT)-1; }
     void set_all_invalid() { u1.int1 = 0; }
@@ -115,7 +117,7 @@ public:
     //This function reset the flag if control flow changed.
     void set_flag_if_cfg_changed()
     {
-        OC_is_cfg_valid(*this) = false;
+        //OC_is_cfg_valid(*this) = false;
         OC_is_cdg_valid(*this) = false;
         OC_is_dom_valid(*this) = false;
         OC_is_pdom_valid(*this) = false;

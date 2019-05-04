@@ -228,6 +228,7 @@ public:
     //truebr freq, falsebr freq.
     INT * data;
 
+public:
     ProfileAttachInfo() : BaseAttachInfo(AI_DBX) { init(); }
     COPY_CONSTRUCTOR(ProfileAttachInfo);
 
@@ -244,6 +245,7 @@ class TbaaAttachInfo : public BaseAttachInfo {
 public:
     Type const* type;
 
+public:
     TbaaAttachInfo() : BaseAttachInfo(AI_TBAA) { type = NULL; }
     COPY_CONSTRUCTOR(TbaaAttachInfo);
 };

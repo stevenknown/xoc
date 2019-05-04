@@ -100,6 +100,7 @@ public:
         RC_stmt_removed(*this) = false;
         RC_hoist_to_lnot(*this) = true;
     }
+    RefineCtx const& operator = (RefineCtx const&);
 
     void setUnOptFlag()
     {

@@ -836,6 +836,7 @@ bool IR_LICM::perform(OptCtx & oc)
             OC_is_dom_valid(oc) = false;
             OC_is_pdom_valid(oc) = false;
             OC_is_cdg_valid(oc) = false;
+            //oc->set_flag_if_cfg_changed();
         }
     }
 

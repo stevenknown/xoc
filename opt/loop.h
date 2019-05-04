@@ -84,6 +84,10 @@ public:
                     //indicates a natural loop.
     xcom::BitSet * bb_set; //loop body elements
 
+public:
+    LI() {}
+    COPY_CONSTRUCTOR(LI);
+
     bool isLoopReduction() { return !has_early_exit; }
 
     //Return true if bb is belong to current loop.

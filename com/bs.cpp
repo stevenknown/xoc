@@ -1076,10 +1076,10 @@ bool BitSet::is_equal(BitSet const& bs) const
     UINT v2 = *(UINT*)ptr2;
     switch (size1) {
     case 1:
-        if ((v1&0xff) != (v2&0xff)) { return false;    }
+        if ((v1&0xff) != (v2&0xff)) { return false; }
         break;
     case 2:
-        if ((v1&0xffff) != (v2&0xffff)) { return false;    }
+        if ((v1&0xffff) != (v2&0xffff)) { return false; }
         break;
     case 3:
         if ((v1&0xffffff) != (v2&0xffffff)) { return false; }
@@ -1352,7 +1352,7 @@ bool BitSet::has_elem_in_range(UINT low, UINT high) const
 //Return -1 if the bitset is empty.
 INT BitSet::get_first() const
 {
-    if (m_size == 0) return -1;
+    if (m_size == 0) { return -1; }
     UINT i = 0;
     UINT m = m_size / BYTES_PER_UINT * BYTES_PER_UINT;
     for (UINT const* uint_ptr = ((UINT const*)(m_ptr));
@@ -1532,7 +1532,7 @@ BitSet * BitSet::get_subset_in_range(UINT low, UINT high, OUT BitSet & subset)
 //'elem': return next one to current element.
 INT BitSet::get_next(UINT elem) const
 {
-    if (m_size == 0) return -1;
+    if (m_size == 0) { return -1; }
     INT first_byte = DIVBPB(elem);
     if (((UINT)first_byte + 1) > m_size) {
         return -1;
@@ -1562,7 +1562,7 @@ INT BitSet::get_next(UINT elem) const
 
 void BitSet::clean()
 {
-    if (m_ptr == NULL) return;
+    if (m_ptr == NULL) { return; }
     ::memset(m_ptr, 0, m_size);
 }
 

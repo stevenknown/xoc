@@ -115,11 +115,12 @@ bool Region::performSimplify(OptCtx & oc)
 
         getCFG()->performMiscOpt(oc);
 
+        oc.set_flag_if_cfg_changed();
         if (g_do_cdg) {
             ASSERT0(getPassMgr());
             CDG * cdg = (CDG*)getPassMgr()->registerPass(PASS_CDG);
             cdg->rebuild(oc, *getCFG());
-        }
+        }       
     } else {
         ASSERT0(verifyMDRef());
     }

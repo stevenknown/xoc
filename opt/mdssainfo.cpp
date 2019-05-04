@@ -284,9 +284,9 @@ void MDPhi::dump(Region * rg, UseDefMgr * mgr)
 //
 //START UseDefMgr
 //
-UseDefMgr::UseDefMgr(Region * rg) : m_ru(rg)
+UseDefMgr::UseDefMgr(Region * rg, MDSSAMgr * mgr) : m_ru(rg), m_mdssa_mgr(mgr)
 {
-    ASSERT0(m_ru);
+    ASSERT0(m_ru && m_mdssa_mgr);    
 
     m_md_sys = m_ru->getMDSystem();
     m_sbs_mgr = m_ru->getMiscBitSetMgr();
@@ -413,7 +413,7 @@ void UseDefMgr::cleanOrDestroy(bool is_reinit)
 
 void UseDefMgr::setMDSSAInfo(IR * ir, MDSSAInfo * mdssainfo)
 {
-    ASSERT0(ir && mdssainfo);
+    ASSERT0(ir && mdssainfo && m_mdssa_mgr->hasMDSSAInfo(ir));
     if (ir->getAI() == NULL) {
         IR_ai(ir) = m_ru->allocAIContainer();
     }
@@ -423,7 +423,7 @@ void UseDefMgr::setMDSSAInfo(IR * ir, MDSSAInfo * mdssainfo)
 
 MDSSAInfo * UseDefMgr::genMDSSAInfo(IR * ir)
 {
-    ASSERT0(ir);
+    ASSERT0(ir && m_mdssa_mgr->hasMDSSAInfo(ir));
     if (ir->getAI() == NULL) {
         IR_ai(ir) = m_ru->allocAIContainer();
     }
@@ -440,6 +440,7 @@ MDSSAInfo * UseDefMgr::genMDSSAInfo(IR * ir)
 
 MDSSAInfo * UseDefMgr::getMDSSAInfo(IR const* ir) const
 {
+    ASSERT0(ir && m_mdssa_mgr->hasMDSSAInfo(ir));
     if (ir->getAI() == NULL) {
         return NULL;
     }

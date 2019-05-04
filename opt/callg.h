@@ -62,6 +62,7 @@ public:
 
 public:
     CallNode() { ::memset(this, 0, sizeof(CallNode)); }
+    COPY_CONSTRUCTOR(CallNode);
 };
 
 
@@ -78,6 +79,7 @@ typedef TMapIter<Region*, SYM2CN*> Region2SYM2CNIter;
 #define CALLG_DUMP_SRC_LINE      2
 #define CALLG_DUMP_INNER_REGION  4
 class CallGraph : public xcom::DGraph {
+private:
     RegionMgr * m_ru_mgr;
     TypeMgr * m_tm;
     SMemPool * m_cn_pool; //pool for call node.
@@ -86,6 +88,7 @@ class CallGraph : public xcom::DGraph {
     Vector<CallNode*> m_ruid2cn;
     Region2SYM2CN m_ru2sym2cn;
 
+private:
     CallNode * allocCallNode()
     {
         ASSERT0(m_cn_pool);

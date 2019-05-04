@@ -3504,7 +3504,7 @@ void Region::checkValidAndRecompute(OptCtx * oc, ...)
                 ASSERTN(cfg->getBBListInRPO()->get_elem_count() ==
                     getBBList()->get_elem_count(),
                     ("Previous pass has changed RPO, "
-                        "and you should set it to be invalid"));
+                     "and you should set it to be invalid"));
             }
             break;
         case PASS_AA:
@@ -3796,12 +3796,12 @@ bool Region::process(OptCtx * oc)
 
     ssamgr = (PRSSAMgr*)getPassMgr()->queryPass(PASS_PR_SSA_MGR);
     if (ssamgr != NULL && ssamgr->isSSAConstructed()) {
-        ssamgr->destruction();
+        ssamgr->destruction(oc);
     }
 
     mdssamgr = (MDSSAMgr*)getPassMgr()->queryPass(PASS_MD_SSA_MGR);
     if (mdssamgr != NULL && mdssamgr->isMDSSAConstructed()) {
-        mdssamgr->destruction();
+        mdssamgr->destruction(oc);
     }
 
     if (!g_retain_pass_mgr_for_region) {
@@ -3810,14 +3810,14 @@ bool Region::process(OptCtx * oc)
 
     updateCallAndReturnList(true);
     tfree();
-    oc->set_all_invalid();
+    //oc->set_all_invalid();
     return true;
 
 ERR_RET:
     ASSERT0(getPassMgr());
     ssamgr = (PRSSAMgr*)getPassMgr()->queryPass(PASS_PR_SSA_MGR);
     if (ssamgr != NULL && ssamgr->isSSAConstructed()) {
-        ssamgr->destruction();
+        ssamgr->destruction(oc);
     }
     if (!g_retain_pass_mgr_for_region) {
         destroyPassMgr();

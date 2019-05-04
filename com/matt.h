@@ -129,7 +129,8 @@ public:
     typedef void (*HOOK_ADJUST_FUNPTR)(Matrix<T> * pbasis);
     typedef T (*HOOK_SQRT_FUNPTR)(T t);
     typedef void (*HOOK_DUMPS_FUNPTR)(void const* pbasis);
-    typedef void (*HOOK_DUMPF_FUNPTR)(void const* pbasis, CHAR const* name, bool is_del);
+    typedef void (*HOOK_DUMPF_FUNPTR)(void const* pbasis,
+                                      CHAR const* name, bool is_del);
     typedef void (*HOOK_DUMPFH_FUNPTR)(void const* pbasis, FILE * h);
 
     //Packing initializing information for inherit class.
@@ -159,7 +160,8 @@ public:
 
 public:
     T FullPermutation(UINT n);
-    void FullPermutationRecur(INT v, INT * posbuf, UINT posbufnum, INT n, T & det);
+    void FullPermutationRecur(INT v, INT * posbuf,
+                              UINT posbufnum, INT n, T & det);
     INT ReverseOrderNumber(INT * numbuf, UINT numlen);
 
     //Interior equality compare.
@@ -257,7 +259,7 @@ public:
 
     void destroy()
     {
-        if (!m_is_init) return;
+        if (!m_is_init) { return; }
         m_row_size = 0;
         m_col_size = 0;
         if (m_mat != NULL) {
@@ -270,7 +272,7 @@ public:
 
     void clean() //Eliminating all elements.
     {
-        if (!m_is_init) return;
+        if (!m_is_init) { return; }
         m_row_size = 0;
         m_col_size = 0;
         if (m_mat != NULL) {
@@ -597,7 +599,7 @@ void Matrix<T>::growRow(const T row[], UINT rowelemnum)
 {
     ASSERTN(m_is_init, ("not yet initialize."));
     ASSERT0(row != NULL);
-    if (rowelemnum == 0) return;
+    if (rowelemnum == 0) { return; }
     if (m_row_size == 0) {
         ASSERTN(!m_col_size && m_mat == NULL, ("matrix should be empty"));
         m_mat = (T*)::malloc(sizeof(T) * rowelemnum);
@@ -894,7 +896,7 @@ void Matrix<T>::deleteCol(UINT from, UINT to)
             from * sizeof(T));
         ::memcpy(tmp_mat + i * col_size + from,
             m_mat + (i * m_col_size + to + 1),
-            (m_col_size - to  - 1)* sizeof(T));
+            (m_col_size - to - 1) * sizeof(T));
     }
     ::free(m_mat);
     m_mat = tmp_mat;
@@ -907,7 +909,7 @@ template <class T>
 void Matrix<T>::padQuad()
 {
     ASSERTN(m_is_init, ("not yet initialize."));
-    if (m_row_size == m_col_size) { return;    }
+    if (m_row_size == m_col_size) { return; }
 
     if (m_row_size < m_col_size) {
         growRow(m_col_size - m_row_size);
@@ -1097,7 +1099,7 @@ void Matrix<T>::interchRow(UINT row1, UINT row2)
     ASSERTN(m_is_init, ("not yet initialize."));
     ASSERTN(row1 < m_row_size && row2 < m_row_size,
             ("exception occur in interchRow()"));
-    if (row1 == row2) return;
+    if (row1 == row2) { return; }
     for (UINT i = 0 ; i < m_col_size ; i++) {
         T tmp = get(row1, i);
         set(row1, i, get(row2, i)); //Action: m_mat[row1][i] = m_mat[row2][i];
@@ -1113,7 +1115,7 @@ void Matrix<T>::interchCol(UINT col1, UINT col2)
     ASSERTN(m_is_init, ("not yet initialize."));
     ASSERTN(col1 < m_row_size && col2 < m_row_size,
             ("exception occur in interchCol()"));
-    if (col1 == col2) return;
+    if (col1 == col2) { return; }
     for (UINT i = 0 ; i < m_row_size ; i++) {
         T tmp = get(i,col1);
         set(i,col1, get(i,col2)); //Action: m_mat[i][col1] = m_mat[i][col2];
@@ -1128,7 +1130,7 @@ void Matrix<T>::trans()
 {
     ASSERTN(m_is_init, ("not yet initialize."));
     UINT i;
-    if (m_row_size == 0) return;
+    if (m_row_size == 0) { return; }
     ASSERTN(m_mat,("exception occur tranpose()"));
     T * tmp_mat = (T*)::malloc(m_row_size * m_col_size * sizeof(T));
     for (i = 0; i < m_row_size; i++) {
@@ -1150,7 +1152,7 @@ template <class T>
 void Matrix<T>::copy(IN Matrix<T> const& m)
 {
     ASSERTN(m_is_init && m.m_is_init, ("not yet initialize."));
-    if (this == &m) return;
+    if (this == &m) { return; }
     if (m.size() == 0) {
         clean();
     } else {
@@ -1174,8 +1176,8 @@ template <class T>
 bool Matrix<T>::is_nonsig() const
 {
     ASSERTN(m_is_init, ("not yet initialize."));
-    if (!is_quad()) return false;
-    if (_equal(det(), T(0))) return false;
+    if (!is_quad()) { return false; }
+    if (_equal(det(), T(0))) { return false; }
     return true;
 }
 
@@ -1195,7 +1197,7 @@ template <class T>
 bool Matrix<T>::is_unitary() const
 {
     ASSERTN(m_is_init, ("not yet initialize."));
-    if (!is_quad()) return false;
+    if (!is_quad()) { return false; }
     for (UINT i = 0; i < m_row_size; i++) {
         for (UINT j = 0; j < m_col_size; j++) {
             if (i == j) {
@@ -1215,7 +1217,7 @@ template <class T>
 bool Matrix<T>::is_symm() const
 {
     ASSERTN(m_is_init, ("not yet initialize."));
-    if (!is_quad()) return false;
+    if (!is_quad()) { return false; }
     for (UINT i = 0; i < m_row_size; i++) {
         for (UINT j = 0; j < m_col_size; j++) {
             if (i == j) {
@@ -1255,7 +1257,7 @@ template <class T>
 bool Matrix<T>::operator == (Matrix<T> const& m) const
 {
     ASSERTN(m_is_init && m.m_is_init, ("not yet initialize."));
-    if (this == &m) return true;
+    if (this == &m) { return true; }
     if (!is_homo(m)) {
         return false;
     }
@@ -1394,7 +1396,7 @@ void Matrix<T>::mulOfColumn(UINT col, T v)
 {
     ASSERTN(m_is_init, ("not yet initialize."));
     ASSERTN(m_row_size > 0 && m_col_size > 0 && col < m_col_size,
-                    ("invalid matrix or parameter"));
+            ("invalid matrix or parameter"));
     if (v == 1) {
         return;
     }
@@ -1474,7 +1476,7 @@ void Matrix<T>::addColumnToColumn(UINT from, UINT to)
 //Add one column of 'm' to one column of 'this'. Column 'to' changed.
 template <class T>
 void Matrix<T>::addColumnToColumn(IN Matrix<T> const& m,
-                               UINT mfrom, UINT to)
+                                  UINT mfrom, UINT to)
 {
     ASSERTN(m_is_init, ("not yet initialize."));
     ASSERTN(m_row_size > 0 && m_col_size > 0 && mfrom < m.m_col_size &&
@@ -1575,7 +1577,7 @@ void Matrix<T>::FullPermutationRecur(
                     t = t * get(j, (posbuf[j]-1));
                 }
                 INT ron = ReverseOrderNumber(posbuf, posbufnum);
-                if ((ron % 2) != 0)    {
+                if ((ron % 2) != 0) {
                     T minus;
                     minus = -1;
                     t = t * minus;

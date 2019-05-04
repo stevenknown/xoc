@@ -47,6 +47,7 @@ protected:
     //Use GVN info to determine if code is redundant.
     //Note that compute GVN is expensive.
     bool m_use_gvn;
+
 public:
     IR_RCE(Region * rg, IR_GVN * gvn)
     {

@@ -165,8 +165,9 @@ void IPA::createCallDummyuse(OptCtx & oc)
         createCallDummyuse(rg);
 
         if (g_compute_classic_du_chain) {
-            OptCtx loc(oc);
-            recomputeDUChain(rg, loc);
+            OptCtx * loc = m_rumgr->getAndGenOptCtx(rg->id());
+            ASSERT0(loc);
+            recomputeDUChain(rg, *loc);
             if (!m_is_keep_dumgr && rg->getPassMgr() != NULL) {
                 rg->getPassMgr()->destroyPass(PASS_DU_MGR);
             }

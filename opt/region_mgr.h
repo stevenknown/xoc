@@ -70,12 +70,13 @@ class IPA;
 //Region Manager is the top level manager.
 #define RM_label_count(r)        ((r)->m_label_count)
 class RegionMgr {
-friend class Region;
+    friend class Region;
 protected:
-    #ifdef _DEBUG_
+#ifdef _DEBUG_
     UINT m_num_allocated;
-    #endif
+#endif
     Vector<Region*> m_id2ru;
+    Vector<OptCtx*> m_id2optctx;
     xcom::BitSetMgr m_bs_mgr;
     xcom::DefMiscBitSetMgr m_sbs_mgr;
     SymTab m_sym_tab;
@@ -89,12 +90,15 @@ protected:
     UINT m_label_count;
     bool m_is_regard_str_as_same_md;
     TargInfo * m_targinfo;
+    SMemPool * m_pool;
 
 protected:
     void estimateEV(OUT UINT & num_call,
-                    OUT UINT & num_ru,
-                    bool scan_call,
-                    bool scan_inner_region);
+        OUT UINT & num_ru,
+        bool scan_call,
+        bool scan_inner_region);
+
+    void * xmalloc(UINT size);
 
 public:
     RegionMgr();
@@ -141,6 +145,7 @@ public:
     CallGraph * getCallGraph() const { return m_call_graph; }
     VarMgr * getVarMgr() const { return m_var_mgr; }
     TargInfo * getTargInfo() const { return m_targinfo; }
+    OptCtx * getAndGenOptCtx(UINT id);
 
     //Register exact MD for each global variable.
     //Note you should call this function as early as possible, e.g, before process

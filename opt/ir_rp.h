@@ -59,6 +59,7 @@ typedef HMap<MD*, MD_LT*> MD2MDLifeTime;
 class DontPromotTab : public MDSet {
     MDSystem * m_md_sys;
     Region * m_ru;
+
 public:
     explicit DontPromotTab(Region * rg)
     {
@@ -106,7 +107,7 @@ public:
 //Register Promotion combines multiple memory load of the
 //same memory location into one PR. */
 class IR_RP : public Pass {
-protected:
+private:
     Vector<MDSet*> m_livein_mds_vec;
     Vector<MDSet*> m_liveout_mds_vec;
     Vector<MDSet*> m_def_mds_vec;
@@ -128,7 +129,7 @@ protected:
     xcom::BitSetMgr m_bs_mgr;
     bool m_is_insert_bb; //indicate if new bb inserted and cfg changed.
 
-protected:
+private:
     UINT analyzeIndirectAccessStatus(IR const* ref1, IR const* ref2);
     UINT analyzeArrayStatus(IR const* ref1, IR const* ref2);
     void addExactAccess(
@@ -283,6 +284,7 @@ protected:
         ::memset(p, 0, size);
         return p;
     }
+
 public:
     IR_RP(Region * rg, IR_GVN * gvn) : m_dont_promot(rg)
     {

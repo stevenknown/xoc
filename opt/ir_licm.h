@@ -103,6 +103,7 @@ protected:
         ::memset(p, 0, size);
         return p;
     }
+
 public:
     explicit IR_LICM(Region * rg)
     {

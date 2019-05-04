@@ -232,7 +232,7 @@ bool IR_LOOP_CVT::perform(OptCtx & oc)
         OC_is_live_expr_valid(oc) = false;
 
         oc.set_flag_if_cfg_changed();
-        OC_is_cfg_valid(oc) = true; //Only cfg is avaiable.
+        //Only cfg is avaiable.
 
         //TODO: make rpo, dom valid.
     }

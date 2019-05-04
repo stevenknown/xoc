@@ -52,6 +52,7 @@ protected:
 
     //Generate the DF control set
     xcom::BitSet * genDFControlSet(UINT vid);
+
 public:
     explicit DfMgr(UINT thres = THRESHOLD_HIGH_DOMINATOR_FRONTIER_DENSITY) :
         m_thres(thres) {}
@@ -184,6 +185,7 @@ protected:
                   DefMiscBitSetMgr & bs_mgr,
                   Vector<DefSBitSet*> & defined_prs_vec,
                   List<IRBB*> & wl);
+
 public:
     explicit PRSSAMgr(Region * rg)
     {
@@ -217,13 +219,11 @@ public:
             ssainfo = allocSSAInfo(def->getPrno());
             def->setSSAInfo(ssainfo);
             SSA_def(ssainfo) = def;
-
-            //You may be set multiple defs for use.
-            ASSERTN(use->getSSAInfo() == NULL, ("use already has SSA info."));
-
-            use->setSSAInfo(ssainfo);
         }
 
+        //You may be set multiple defs for use.
+        ASSERTN(use->getSSAInfo() == NULL, ("use already has SSA info."));
+        use->setSSAInfo(ssainfo);
         SSA_uses(ssainfo).append(use);
     }
 
@@ -265,7 +265,7 @@ public:
     }
 
     void destruction(DomTree & domtree);
-    void destruction();
+    void destruction(OptCtx * oc);
     void dump();
     void dumpAllVP(bool have_renamed);
     CHAR * dumpVP(IN VP * v, OUT CHAR * buf);
@@ -281,7 +281,7 @@ public:
     size_t count_mem();
 
     Vector<VP*> const* getVPVec() const { return &m_vp_vec; }
-    VP * getVP(UINT id) const { return m_vp_vec.get(id); }
+    //VP * getVP(UINT id) const { return m_vp_vec.get(id); }
 
     IR * initVP(IN IR * ir);
     void insertPhi(UINT prno, IN IRBB * bb);

@@ -164,9 +164,9 @@ public:
     LIR * convertStoreVar(IN OUT IR ** ir, IN IR2DexCtx * cont);
     LIR * convertStorePR(IN OUT IR ** ir, IN IR2DexCtx * cont);
     LIR * convertStoreArray(IN OUT IR ** ir, IN IR2DexCtx * cont);
-    LIR * convertIstore(IN OUT IR ** ir, IN IR2DexCtx * cont);
+    LIR * convertIStore(IN OUT IR ** ir, IN IR2DexCtx * cont);
     LIR * convertCall(IN OUT IR ** ir, IN IR2DexCtx * cont);
-    LIR * convertIcall(IN OUT IR ** ir, IN IR2DexCtx * cont);
+    LIR * convertICall(IN OUT IR ** ir, IN IR2DexCtx * cont);
     LIR * convert(IN OUT IR ** ir, IN IR2DexCtx * cont);
     void convert(IN IR * ir_list, OUT List<LIR*> & newlirs);
 

@@ -46,6 +46,8 @@ public:
     UINT lineno; //Note line number can not be 0.
 
 public:
+    Dbx() {}
+    COPY_CONSTRUCTOR(Dbx);
     void clean() { lineno = 0; }
     void copy(Dbx const& dbx) { lineno = dbx.lineno; }
 };
@@ -63,6 +65,8 @@ public:
     };
 
 public:
+    DbxMgr() {}
+    COPY_CONSTRUCTOR(DbxMgr);
     virtual ~DbxMgr() {}
 
     //Do some prepare work before print source file.

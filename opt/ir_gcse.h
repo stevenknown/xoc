@@ -78,7 +78,7 @@ public:
 
 
 class IR_GCSE : public Pass {
-protected:
+private:
     bool m_enable_filter; //filter determines which expression can be CSE.
     bool m_is_in_ssa_form; //Set to true if PR is in SSA form.
     Region * m_ru;
@@ -86,6 +86,7 @@ protected:
     IR_DU_MGR * m_du;
     IR_AA * m_aa;
     PRSSAMgr * m_ssamgr;
+    MDSSAMgr * m_mdssamgr;
     IR_EXPR_TAB * m_expr_tab;
     TypeMgr * m_tm;
     IR_GVN * m_gvn;
@@ -95,8 +96,15 @@ protected:
     TMap<VN const*, IR*> m_vn2exp;
     List<IR*> m_newst_lst;
 
+    //ONLY USED FOR DEBUG PURPOSE
+    UINT m_num_of_elim;
+    Vector<UINT> m_elimed;
+
+private:
     bool doProp(IRBB * bb, List<IR*> & livexp);
     bool doPropVN(IRBB * bb, UINT entry_id);
+    bool doPropVNAtDomTreeOrder(xcom::Graph const* domtree);
+    bool doPropAtDomTreeOrder(xcom::Graph const* domtree);
     bool elim(IR * use, IR * use_stmt, IR * gen, IR * gen_stmt);
     bool findAndElim(IR * exp, IR * gen);
     void handleCandidate(IR * exp, IRBB * bb, UINT entry_id, bool & change);
@@ -105,9 +113,10 @@ protected:
     void elimCseAtCall(IR * use, IR * use_stmt, IR * gen);
     void elimCseAtReturn(IR * use, IR * use_stmt, IR * gen);
     void elimCseAtBranch(IR * use, IR * use_stmt, IR * gen);
-    void prcessCseGen(IR * cse, IR * cse_stmt, bool & change);
-    bool prcessCse(IR * ir, List<IR*> & livexp);
+    void processCseGen(IR * cse, IR * cse_stmt, bool & change);
+    bool processCse(IR * ir, List<IR*> & livexp);
     bool shouldBeCse(IR * det);
+
 public:
     IR_GCSE(Region * rg, IR_GVN * gvn)
     {
@@ -123,8 +132,14 @@ public:
         m_tg = NULL;
         m_is_in_ssa_form = false;
         m_ssamgr = NULL;
+        m_mdssamgr = NULL;
+        m_num_of_elim = 0;
     }
+    COPY_CONSTRUCTOR(IR_GCSE);
     virtual ~IR_GCSE() {}
+
+    void dump();
+        
     virtual CHAR const* getPassName() const
     { return "Global Command Subscript Elimination"; }
 

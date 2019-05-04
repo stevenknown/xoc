@@ -62,6 +62,7 @@ protected:
     void recomputeDUChain(Region * rg, OptCtx & oc);
 
     Region * findRegion(IR * call, Region * callru);
+
 public:
     IPA(Region * program)
     {
@@ -75,6 +76,7 @@ public:
         m_is_keep_reachdef = false;
         m_is_recompute_du_ref = true;
     }
+    COPY_CONSTRUCTOR(IPA);
     virtual ~IPA() { smpoolDelete(m_pool); }
 
     void computeCallRefForAllRegion();

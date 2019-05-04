@@ -122,6 +122,7 @@ public:
         m_loop_info = NULL;
         m_bs_mgr = NULL;
         m_li_count = 1;
+        m_has_eh_edge = false;
         m_entry = NULL; //entry will be computed during CFG::build().
         m_pool = smpoolCreate(sizeof(CFGEdgeInfo) * 4, MEM_COMM);
         set_dense(true); //We think CFG is always dense graph.
@@ -1458,7 +1459,7 @@ bool CFG<BB, XR>::findLoop()
             identifyNaturalLoop(bb->id(), succ->id(), *loop, tmp);
 
             //Handle some special cases.
-            addBreakOutLoop(succ, *loop);
+            //addBreakOutLoop(succ, *loop);
 
             //Loop may have multiple back edges.
             LI<BB> * li = head2li.get(succ);

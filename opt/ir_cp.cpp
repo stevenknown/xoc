@@ -32,11 +32,7 @@ IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 author: Su Zhenyu
 @*/
 #include "cominc.h"
-#include "prssainfo.h"
-#include "prdf.h"
-#include "ir_ssa.h"
-#include "ir_mdssa.h"
-#include "ir_cp.h"
+#include "comopt.h"
 
 namespace xoc {
 
@@ -152,20 +148,20 @@ void IR_CP::replaceExpViaSSADu(
 //        ...
 //        g = *q(MD3) //q point to MD3
 //
-//exp_use_ssadu: true if exp used SSA du info.
+//stmt_use_ssadu: true if stmt in which cand_expr located used SSA DU info.
+//stmt_use_mdssadu: true if stmt in which cand_exp used Memory SSA DU info.
 void IR_CP::replaceExp(
         IR * exp,
         IR const* cand_expr,
         IN OUT CPCtx & ctx,
-        bool exp_use_ssadu,
-        bool exp_use_mdssadu,
+        bool stmt_use_ssadu,
+        bool stmt_use_mdssadu,
         MDSSAMgr * mdssamgr)
 {
     ASSERT0(exp && exp->is_exp() && cand_expr);
     ASSERT0(exp->getExactRef() ||
-        exp->is_id() || //exp is operand of MD PHI
-        exp->is_pr());  //exp is operand of PR PHI
-
+            exp->is_id() || //exp is operand of MD PHI
+            exp->is_pr());  //exp is operand of PR PHI
     if (!checkTypeConsistency(exp, cand_expr)) {
         return;
     }
@@ -184,10 +180,15 @@ void IR_CP::replaceExp(
     //}
 
     IR * newir = m_ru->dupIRTree(cand_expr);
+
+    //Build DU chain between propagated exp 'newir' and its DEF.
+    //TODO: build MDSSA DU chain.
     m_du->copyIRTreeDU(newir, cand_expr, true);
 
     ASSERT0(cand_expr->getStmt());
-    if (exp_use_ssadu) {
+    SSAInfo * exp_ssainfo = exp->getSSAInfo();
+    MDSSAInfo * exp_mdssainfo = mdssamgr->getMDSSAInfoIfAny(exp);
+    if (exp_ssainfo != NULL) {
         //Remove exp SSA use.
         ASSERT0(exp->getSSAInfo());
         ASSERT0(exp->getSSAInfo()->get_uses().find(exp));
@@ -196,11 +197,9 @@ void IR_CP::replaceExp(
         bool doit = exp->getParent()->replaceKid(exp, newir, false);
         ASSERT0(doit);
         DUMMYUSE(doit);
-    } else if (exp_use_mdssadu) {
+    } else if (exp_mdssainfo != NULL) {
         //Remove exp MD SSA use.
         ASSERT0(mdssamgr);
-        MDSSAInfo * mdssainfo = mdssamgr->getUseDefMgr()->getMDSSAInfo(exp);
-		CHECK_DUMMYUSE(mdssainfo);
         mdssamgr->removeMDSSAUseRecur(exp);
         if (exp->is_id()) {
             ASSERT0(ID_phi(exp));
@@ -211,12 +210,18 @@ void IR_CP::replaceExp(
             DUMMYUSE(doit);
         }
 
-        MDSSAInfo * cand_exp_mdssainfo = mdssamgr->
-            getUseDefMgr()->getMDSSAInfo(cand_expr);
+        MDSSAInfo * cand_exp_mdssainfo =
+            mdssamgr->getMDSSAInfoIfAny(cand_expr);
         if (cand_exp_mdssainfo != NULL) {
             mdssamgr->getUseDefMgr()->setMDSSAInfo(newir, cand_exp_mdssainfo);
             mdssamgr->addMDSSAOcc(newir, cand_exp_mdssainfo);
         }
+
+        //To take care of classic DU info that used/maintained by
+        //other pass/phase even if MDSSA enabled, update classic
+        //DU chain as well. Nevertheless, some verification
+        //might complain.
+        m_du->removeUseOutFromDefset(exp);
     } else {
         m_du->removeUseOutFromDefset(exp);
         ASSERT0(exp->getStmt());
@@ -253,9 +258,10 @@ bool IR_CP::isCopyOR(IR * ir) const
 //    ..
 //    yy = xx  //use_ir
 //
-//'def_ir': ir stmt.
-//'occ': opnd of 'def_ir'
-//'use_ir': stmt in use-list of 'def_ir'.
+//'def_stmt': ir stmt.
+//'prop_value': exp that will be propagated.
+//'use_stmt': stmt in use-list of 'def_ir'.
+//'use_bb': IRBB that use_stmt be placed in.
 bool IR_CP::is_available(
         IR const* def_stmt,
         IR const* prop_value,
@@ -273,12 +279,14 @@ bool IR_CP::is_available(
     }
     if (prop_value->is_const() || prop_value->is_lda()) { return true; }
 
-    //Need check overlapped MDSet.
-    //e.g: Suppose occ is '*p + *q', p->a, q->b.
-    //occ can NOT reach 'def_ir' if one of p, q, a, b
-    //modified during the path.
-
+    //Need to check overlapped MDSet.
+    //e.g: Suppose occ is '*p + *q', {p->a}, {q->b}.
+    //occ can NOT get reach to 'def_ir' if one of p, q, a, b
+    //be modified during the path.
     IRBB * defbb = def_stmt->getBB();
+    if (defbb != usebb && !m_cfg->is_dom(defbb->id(), usebb->id())) {
+        return false;
+    }
 
     //Both def_ir and use_ir are in same BB.
     xcom::C<IR*> * ir_holder = NULL;
@@ -294,14 +302,14 @@ bool IR_CP::is_available(
     }
 
     if (ir == use_stmt) {
-        ASSERTN(defbb == usebb, ("def_ir should be in same bb to use_ir"));
+        ASSERTN(defbb == usebb,
+                ("def_stmt should be in same bb with use_stmt"));
         return true;
     }
 
     if (use_phi != NULL || use_stmt->is_phi()) {
         //Propagate value to phi operand.
-    } else {
-        ASSERT0(m_cfg->is_dom(defbb->id(), usebb->id()));
+        //Nothing to do.
     }
 
     List<IRBB*> wl;
@@ -520,14 +528,12 @@ bool IR_CP::doProp(
             continue;
         }
 
-        SSAInfo * ssainfo = NULL;
-        MDSSAInfo * mdssainfo = mdssamgr->getUseDefMgr()->
-            getMDSSAInfo(def_stmt);
+        SSAInfo * ssainfo = def_stmt->getSSAInfo();
+        MDSSAInfo * mdssainfo = mdssamgr->getMDSSAInfoIfAny(def_stmt);
         bool prssadu = false;
         bool mdssadu = false;
         useset.clean(*m_ru->getMiscBitSetMgr());
-        if ((ssainfo = def_stmt->getSSAInfo()) != NULL &&
-            SSA_uses(ssainfo).get_elem_count() != 0) {
+        if (ssainfo != NULL && SSA_uses(ssainfo).get_elem_count() != 0) {
             //Record use_stmt in another vector to facilitate this function
             //if it is not in use-list any more after copy-propagation.
             SEGIter * sc;
@@ -549,7 +555,7 @@ bool IR_CP::doProp(
             mdssainfo->collectUse(useset, mdssamgr->getUseDefMgr(),
                 m_ru->getMiscBitSetMgr());
             mdssadu = true;
-        } else  {
+        } else {
             continue;
         }
 
@@ -586,9 +592,11 @@ bool IR_CP::doProp(
                 use_stmt = use->getStmt();
                 ASSERT0(use_stmt->is_stmt() && use_stmt->getBB());
                 use_bb = use_stmt->getBB();
+                use_phi = NULL;
             }
 
-            if (!is_available(def_stmt, prop_value, use_stmt, use_phi, use_bb)) {
+            if (!is_available(def_stmt, prop_value,
+                              use_stmt, use_phi, use_bb)) {
                 //The value that will be propagated can
                 //not be killed during 'ir' and 'use_stmt'.
                 //e.g:
@@ -675,23 +683,31 @@ bool IR_CP::perform(OptCtx & oc)
         ASSERT0(bb);
         change |= doProp(bb, useset, mdssamgr);
     }
-
     useset.clean(*m_ru->getMiscBitSetMgr());
+    if (change) {
+        ASSERT0(mdssamgr == NULL || mdssamgr->verify());
+        doFinalRefine();
+    }
+    END_TIMER(t, getPassName());
 
     if (change) {
-        ASSERT0(mdssamgr->verify());
-        doFinalRefine();
         OC_is_expr_tab_valid(oc) = false;
-        OC_is_aa_valid(oc) = false;
-        OC_is_du_chain_valid(oc) = true; //already update.
+        OC_is_aa_valid(oc) = false;        
         OC_is_ref_valid(oc) = true; //already update.
-        ASSERT0(m_ru->verifyMDRef() &&
-            m_du->verifyMDDUChain(COMPUTE_PR_DU | COMPUTE_NONPR_DU));
-        ASSERT0(verifySSAInfo(m_ru));
-        ASSERT0(mdssamgr->verify());
+        ASSERT0(m_ru->verifyMDRef());
+        if (mdssamgr != NULL && mdssamgr->isMDSSAConstructed()) {
+            ASSERT0(mdssamgr->verify());
+            OC_is_du_chain_valid(oc) = false; //not update.
+        } else {
+            //Use classic DU chain.
+            m_du->verifyMDDUChain(COMPUTE_PR_DU | COMPUTE_NONPR_DU);
+            OC_is_du_chain_valid(oc) = true; //already update.
+        }
+        if (prssamgr != NULL && prssamgr->isSSAConstructed()) {
+            ASSERT0(verifySSAInfo(m_ru));
+            OC_is_du_chain_valid(oc) = false; //not update.
+        }
     }
-
-    END_TIMER(t, getPassName());
     return change;
 }
 //END IR_CP

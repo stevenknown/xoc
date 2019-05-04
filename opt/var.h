@@ -85,6 +85,9 @@ public:
     UINT m_byte_size;
     BYTE * m_byte_buffer;
 
+public:
+    COPY_CONSTRUCTOR(ByteBuf);
+
     BYTE * getBuffer() const { return m_byte_buffer; }
     UINT getSize() const { return m_byte_size; }
 };
@@ -218,6 +221,7 @@ public:
     } u2;
 public:
     VAR();
+    COPY_CONSTRUCTOR(VAR);
     virtual ~VAR() {}
 
     UINT id() const { return VAR_id(this); }
@@ -344,6 +348,9 @@ public:
 
 class VarTab : public TTab<VAR*, CompareVar> {
 public:
+    VarTab() {}
+    COPY_CONSTRUCTOR(VarTab);
+
     void dump(TypeMgr * dm)
     {
         if (g_tfile == NULL) { return; }

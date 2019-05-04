@@ -99,6 +99,8 @@ public:
     } u2;
 
 public:
+    COPY_CONSTRUCTOR(LabelInfo);
+
     void copy(LabelInfo const& li)
     {
         ltype = li.ltype;

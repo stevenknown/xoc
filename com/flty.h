@@ -90,8 +90,8 @@ public:
     }
 
     bool is_int();
-    PRECISION_TYPE f() const {return m_f;}
-    PRECISION_TYPE& f() {return m_f;}
+    PRECISION_TYPE f() const { return m_f; }
+    PRECISION_TYPE& f() { return m_f; }
     void reduce() {}
     CHAR const* format(StrBuf & buf);
 };

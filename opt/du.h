@@ -43,8 +43,10 @@ typedef SEGIter * DUIter;
 class DUSet : public DefSBitSetCore {
 protected:
     friend class IR_DU_MGR;
+
 public:
     DUSet() {}
+    COPY_CONSTRUCTOR(DUSet);
     ~DUSet()
     {
         //Do not free ref here. They are allocated in mempool,
@@ -69,6 +71,10 @@ public:
     MD const* md; //indicate the Must MD reference.
     MDSet const* mds; //indicate May MDSet reference.
     DUSet * duset; //indicate Def/Use of stmt/expr set.
+
+public:
+    DU() {}
+    COPY_CONSTRUCTOR(DU);
 
     void clean()
     {

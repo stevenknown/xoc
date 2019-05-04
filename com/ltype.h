@@ -94,24 +94,24 @@ author: Su Zhenyu
 #undef ULONGLONG
 #undef BOOL
 
-#define STATUS   int
-#define BYTE     unsigned char
-#define CHAR     char
-#define UCHAR    unsigned char
-#define SHORT    short
-#define USHORT   unsigned short
-#define INT      int
-#define UINT     unsigned int
-#define BOOL     unsigned int
-#define LONG     long
-#define ULONG    unsigned long
+typedef int STATUS;
+typedef unsigned char BYTE;
+typedef char CHAR;
+typedef unsigned char UCHAR;
+typedef short SHORT;
+typedef unsigned short USHORT;
+typedef int INT;
+typedef unsigned int UINT;
+typedef unsigned int BOOL;
+typedef long LONG;
+typedef unsigned long ULONG;
 
 #ifdef _ON_WINDOWS_
-    #define LONGLONG   __int64
-    #define ULONGLONG  unsigned __int64
+    typedef __int64 LONGLONG;
+    typedef unsigned __int64 ULONGLONG;
 #else
-    #define LONGLONG   long long
-    #define ULONGLONG  unsigned long long
+    typedef long long LONGLONG;
+    typedef unsigned long long ULONGLONG;
 #endif
 
 #ifndef va_copy
@@ -134,9 +134,9 @@ author: Su Zhenyu
 
 #ifdef _DEBUG_
     #ifdef __cplusplus
-    #define EXTERN_C extern "C"
+        #define EXTERN_C extern "C"
     #else
-    #define EXTERN_C extern
+        #define EXTERN_C extern
     #endif
     #include "stdio.h"
     EXTERN_C INT m518087(CHAR const* info, ...) CLANG_ANALYZER_NORETURN;
@@ -160,44 +160,44 @@ author: Su Zhenyu
 #define UNREACHABLE()  ASSERTN(0, ("Unreachable."))
 
 #undef MAX
-#define MAX(a,b)    ((a)>(b)?(a):(b))
+#define MAX(a,b) ((a)>(b)?(a):(b))
 
 #undef MIN
-#define MIN(a,b)    ((a)<(b)?(a):(b))
+#define MIN(a,b) ((a)<(b)?(a):(b))
 
 #undef DIFF
-#define DIFF(a,b)   (xabs((a)-(b)))
+#define DIFF(a,b) (xabs((a)-(b)))
 
 #undef ODD
-#define ODD(v)      ((v)%2!=0?1:0)
+#define ODD(v) ((v)%2!=0?1:0)
 
 #undef EVEN
-#define EVEN(v)     (!ODD(v))
+#define EVEN(v) (!ODD(v))
 
 #undef SET_FLAG
-#define SET_FLAG(flag, v)        ((flag) |= (v))
+#define SET_FLAG(flag, v) ((flag) |= (v))
 
 #undef HAVE_FLAG
-#define HAVE_FLAG(flag, v)       (((flag) & (v)) == (v))
+#define HAVE_FLAG(flag, v) (((flag) & (v)) == (v))
 
 #undef ONLY_HAVE_FLAG
-#define ONLY_HAVE_FLAG(flag, v)  (!((flag)&(~(v))))
+#define ONLY_HAVE_FLAG(flag, v) (!((flag)&(~(v))))
 
 #undef REMOVE_FLAG
-#define REMOVE_FLAG(flag, v)     ((flag) = ((flag) & (~(v))))
+#define REMOVE_FLAG(flag, v) ((flag) = ((flag) & (~(v))))
 
 #undef OFFSET_OF
 //Offset of field 'f' of struct type 'st'.
-#define OFFSET_OF(st, f)         ((size_t)&((st*)0)->f)
+#define OFFSET_OF(st, f) ((size_t)&((st*)0)->f)
 
 #undef GET_LOW_32BIT
-#define GET_LOW_32BIT(l)         ((l)&0xffffFFFF)
+#define GET_LOW_32BIT(l) ((l)&0xffffFFFF)
 
 #undef GET_HIGH_32BIT
-#define GET_HIGH_32BIT(l)        (((l)>>32)&0xffffFFFF)
+#define GET_HIGH_32BIT(l) (((l)>>32)&0xffffFFFF)
 
 //True if type is unsigned.
-#define IS_UNSIGN_TY(type)       ((type)(((type)0) - 1) > 0)
+#define IS_UNSIGN_TY(type) ((type)(((type)0) - 1) > 0)
 
 #undef IN
 #define IN  //indicate input argument
@@ -205,10 +205,7 @@ author: Su Zhenyu
 #undef OUT
 #define OUT //indicate output argument
 
-//#define MAX_BUF_LEN      1024
-
 //Misc Dumps/Dumpf of Vector<T>
 #define D_BOOL           1
 #define D_INT            2
-
 #endif

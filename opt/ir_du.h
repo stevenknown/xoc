@@ -102,6 +102,7 @@ class MDId2IRlist : public TMap<UINT, DefSBitSetCore*> {
 
     //Indicate if there exist stmt which only have MayDef.
     bool m_are_stmts_defed_ineffect_md;
+
 public:
     explicit MDId2IRlist(Region * rg);
     COPY_CONSTRUCTOR(MDId2IRlist);
@@ -149,9 +150,11 @@ public:
 
 class DefDBitSetCoreHashAllocator {
     DefMiscBitSetMgr * m_sbs_mgr;
+
 public:
     DefDBitSetCoreHashAllocator(DefMiscBitSetMgr * sbsmgr)
     { ASSERT0(sbsmgr); m_sbs_mgr = sbsmgr; }
+    COPY_CONSTRUCTOR(DefDBitSetCoreHashAllocator);
 
     DefSBitSetCore * alloc() { return m_sbs_mgr->allocDBitSetCore(); }
 
@@ -174,7 +177,7 @@ class DefDBitSetCoreReserveTab : public
 public:
     DefDBitSetCoreReserveTab(DefDBitSetCoreHashAllocator * allocator) :
         SBitSetCoreHash<DefDBitSetCoreHashAllocator>(allocator) {}
-
+    COPY_CONSTRUCTOR(DefDBitSetCoreReserveTab);
     virtual ~DefDBitSetCoreReserveTab()
     {
         #ifdef HASH_DBITSETCORE
@@ -324,6 +327,7 @@ protected:
     BSVec<DefDBitSetCore const*> m_bb_killed_exp; //killed EXPR
     BSVec<DefDBitSetCore*> m_bb_availin_exp; //available-in EXPR
     BSVec<DefDBitSetCore*> m_bb_availout_ir_expr; //available-out EXPR
+
 protected:
     bool buildLocalDUChain(
             IRBB * bb,
@@ -452,6 +456,7 @@ protected:
     void updateDefWithMustEffectMD(IR * ir, MD const* musteffect);
     void updateDefWithMustExactMD(IR * ir, MD const* mustexact);
     void updateDef(IR * ir, UINT flag);
+
 public:
     explicit IR_DU_MGR(Region * rg);
     COPY_CONSTRUCTOR(IR_DU_MGR);
@@ -461,6 +466,7 @@ public:
     void buildDUChain(IR * def, IR * use)
     {
         ASSERT0(def && def->is_stmt() && use && use->is_exp());
+        ASSERT0(def->isMemoryRef() && use->isMemoryOpnd());
         getAndAllocDUSet(def)->addUse(use, *m_misc_bs_mgr);
         getAndAllocDUSet(use)->addDef(def, *m_misc_bs_mgr);
     }

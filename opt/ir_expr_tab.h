@@ -49,6 +49,7 @@ public:
     ExpRep * prev;
     IRList occ_list;
 
+public:
     ExpRep()
     {
         id = 0;
@@ -92,6 +93,7 @@ class IR_EXPR_TAB : public Pass {
         }
         return encode_expr(ir);
     }
+
 public:
     explicit IR_EXPR_TAB(Region * rg);
     COPY_CONSTRUCTOR(IR_EXPR_TAB);

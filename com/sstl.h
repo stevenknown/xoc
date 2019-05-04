@@ -124,7 +124,7 @@ inline T * get_first(T * t)
 template <class T>
 inline void add_next(T ** pheader, T * t)
 {
-    if (pheader == NULL || t == NULL) return ;
+    if (pheader == NULL || t == NULL) { return; }
     T * p = NULL;
     t->prev = NULL;
     if ((*pheader) == NULL) {
@@ -150,7 +150,7 @@ inline void add_next(T ** pheader, T * t)
 template <class T>
 inline void add_next(IN OUT T ** pheader, IN OUT T ** last, IN T * t)
 {
-    if (pheader == NULL || t == NULL) { return ; }
+    if (pheader == NULL || t == NULL) { return; }
 
     t->prev = NULL;
     if ((*pheader) == NULL) {
@@ -243,7 +243,7 @@ inline void swap(T ** pheader, T * t1, T * t2)
 template <class T>
 inline void replace(T ** pheader, T * olds, T * news)
 {
-    if (pheader == NULL || olds == NULL) return;
+    if (pheader == NULL || olds == NULL) { return; }
     if (olds == news) { return; }
     if (news == NULL) {
         xcom::remove(pheader, olds);
@@ -281,7 +281,7 @@ inline void replace(T ** pheader, T * olds, T * news)
 template <class T>
 inline T * removehead(T ** pheader)
 {
-    if (pheader == NULL || *pheader == NULL) return NULL;
+    if (pheader == NULL || *pheader == NULL) { return NULL; }
     T * t = *pheader;
     *pheader = t->next;
     if (*pheader != NULL) {
@@ -295,7 +295,7 @@ inline T * removehead(T ** pheader)
 template <class T>
 inline T * removehead_single_list(T ** pheader)
 {
-    if (pheader == NULL || *pheader == NULL) return NULL;
+    if (pheader == NULL || *pheader == NULL) { return NULL; }
     T * t = *pheader;
     *pheader = t->next;
     t->next = NULL;
@@ -318,7 +318,7 @@ inline T * removetail(T ** pheader)
 template <class T>
 inline void insertbefore_one(T ** head, T * marker, T * t)
 {
-    if (t == NULL) return;
+    if (t == NULL) { return; }
     ASSERTN(head, ("absent parameter"));
     if (t == marker) return;
     if (*head == NULL) {
@@ -386,8 +386,8 @@ inline void insertbefore(T ** head, T * marker, T * t)
 template <class T>
 inline void insertafter_one(T ** marker, T * t)
 {
-    if (marker == NULL || t == NULL) return;
-    if (t == *marker) return;
+    if (marker == NULL || t == NULL) { return; }
+    if (t == *marker) { return; }
     if (*marker == NULL) {
         *marker = t;
         return;
@@ -427,8 +427,8 @@ inline void append_head(T ** head, T * t)
 template <class T>
 inline void insertafter(T ** marker, T * t)
 {
-    if (marker == NULL || t == NULL) return;
-    if (t == *marker) return;
+    if (marker == NULL || t == NULL) { return; }
+    if (t == *marker) { return; }
     if (*marker == NULL) {
         *marker = t;
         return;
@@ -548,7 +548,7 @@ public:
     //Do not clean t's content.
     inline void add_free_elem(T * t)
     {
-        if (t == NULL) {return;}
+        if (t == NULL) { return; }
         ASSERT0(t->next == NULL && t->prev == NULL); //clean by user.
         if (m_tail == NULL) {
             m_tail = t;
@@ -2144,7 +2144,7 @@ public:
         SC<T> * c = m_head;
         while (c != NULL) {
             if (c->val() == t) {
-                if (holder    != NULL) {
+                if (holder != NULL) {
                     *holder = c;
                 }
                 return true;
@@ -2533,7 +2533,7 @@ public:
 
     Vector(Vector const& vec) { copy(vec); }
     Vector const& operator = (Vector const&);
-    ~Vector() { destroy();    }
+    ~Vector() { destroy(); }
 
     void append(T t)
     {
@@ -2689,6 +2689,8 @@ public:
                 ("Last index ran over Vector's size."));
         return m_last_idx;
     }
+
+    UINT get_elem_count() const { return get_last_idx() + 1; }
 
     //Growing vector up to hold the most num_of_elem elements.
     //If 'm_elem_num' is 0 , alloc vector to hold num_of_elem elements.
@@ -3236,7 +3238,7 @@ public:
     T append(T t, OUT HC<T> ** hct = NULL, bool * find = NULL)
     {
         ASSERTN(m_bucket != NULL, ("Hash not yet initialized."));
-        if (t == T(0)) return T(0);
+        if (t == T(0)) { return T(0); }
 
         UINT hashv = m_hf.get_hash_value(t, m_bucket_size);
         ASSERTN(hashv < m_bucket_size,
@@ -3311,7 +3313,7 @@ public:
     //Clean the data structure but not destroy.
     void clean()
     {
-        if (m_bucket == NULL) return;
+        if (m_bucket == NULL) { return; }
         ::memset(m_bucket, 0, sizeof(HashBucket) * m_bucket_size);
         m_elem_count = 0;
         m_elem_vector.clean();
@@ -3367,7 +3369,7 @@ public:
     {
         ASSERTN(m_bucket != NULL && iter >= -1, ("Hash not yet initialized."));
         T t = T(0);
-        if (m_elem_count <= 0) return T(0);
+        if (m_elem_count <= 0) { return T(0); }
         INT l = m_elem_vector.get_last_idx();
         for (INT i = iter + 1; i <= l; i++) {
             if ((t = m_elem_vector.get((UINT)i)) != T(0)) {
@@ -3392,7 +3394,7 @@ public:
         ASSERTN(m_bucket != NULL, ("Hash not yet initialized."));
         T t = T(0);
         iter = -1;
-        if (m_elem_count <= 0) return T(0);
+        if (m_elem_count <= 0) { return T(0); }
         INT l = m_elem_vector.get_last_idx();
         for (INT i = l; i >= 0; i--) {
             if ((t = m_elem_vector.get((UINT)i)) != T(0)) {
@@ -3415,7 +3417,7 @@ public:
     {
         ASSERTN(m_bucket != NULL, ("Hash not yet initialized."));
         T t = T(0);
-        if (m_elem_count <= 0) return T(0);
+        if (m_elem_count <= 0) { return T(0); }
         for (INT i = iter - 1; i >= 0; i--) {
             if ((t = m_elem_vector.get((UINT)i)) != T(0)) {
                 iter = i;
@@ -3442,7 +3444,7 @@ public:
     //Free all memory objects.
     void destroy()
     {
-        if (m_bucket == NULL) return;
+        if (m_bucket == NULL) { return; }
         ::free(m_bucket);
         m_bucket = NULL;
         m_bucket_size = 0;
@@ -3455,7 +3457,7 @@ public:
     //Dump the distribution of element in hash.
     void dump_intersp(FILE * h) const
     {
-        if (h == NULL) return;
+        if (h == NULL) { return; }
         UINT bsize = get_bucket_size();
         HashBucket const* bucket = get_bucket();
         fprintf(h, "\n=== Hash ===");
@@ -3483,7 +3485,7 @@ public:
     T removed(T t)
     {
         ASSERTN(m_bucket != NULL, ("Hash not yet initialized."));
-        if (t == 0) return T(0);
+        if (t == 0) { return T(0); }
 
         UINT hashv = m_hf.get_hash_value(t, m_bucket_size);
         ASSERTN(hashv < m_bucket_size,
@@ -3732,7 +3734,7 @@ protected:
 
     void free_rbt(RBTNType * t)
     {
-        if (t == NULL) return;
+        if (t == NULL) { return; }
         t->prev = t->next = t->parent = NULL;
         t->key = T(0);
         t->mapped = Ttgt(0);

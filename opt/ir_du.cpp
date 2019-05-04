@@ -2066,11 +2066,11 @@ bool IR_DU_MGR::removeExpiredDUForOperand(IR * stmt)
 //e.g: Revise DU chain if stmt's rhs has changed.
 //    x=10 //S1
 //    ...
-//    xcom::EdgeC=x*0 //S2
+//    c=x*0 //S2
 //  =>
 //    x=10 //S1
 //    ...
-//    xcom::EdgeC=0 //S2
+//    c=0 //S2
 //Given S1 is def, S2 is use, after ir refinement, x in S2
 //is removed, remove the data dependence between S1
 //and S2 operand.
@@ -2435,12 +2435,9 @@ void IR_DU_MGR::inferPhi(IR * ir, UINT duflag)
 {
     ASSERT0(ir->is_phi() && ir->getRefMD() && ir->getRefMDSet() == NULL);
     //Set call result list MD.
-    IR * r = PHI_opnd_list(ir);
-    while (r != NULL) {
-        ASSERT0(r->getRefMD() && r->getRefMD()->is_pr());
-        ASSERT0(r->getRefMDSet() == NULL);
+    for (IR * r = PHI_opnd_list(ir); r != NULL; r = r->get_next()) {
+        ASSERT0(r->is_const() || r->is_pr());
         computeExpression(r, NULL, COMP_EXP_RECOMPUTE, duflag);
-        r = r->get_next();
     }
 }
 

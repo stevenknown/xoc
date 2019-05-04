@@ -44,24 +44,21 @@ typedef enum _ABS_TYPE {
 } ABS_TYPE;
 
 
-/*
-SCOP
-  |-SCOP_NODE:LOOP
-     |-SCOP_NODE:BB
-     |-SCOP_NODE:IF
-        |-SCOP_NODE:BB
-        |-SCOP_NODE:BB
-     |-SCOP_NODE:LOOP
-     |-...
-  |-SCOP_NODE:IF
-     |-SCOP_NODE:LOOP
-        |-SCOP_NODE:BB
-        |-SCOP_NODE:BB
-     |-SCOP_NODE:BB
-     |-...
-   ...
-
-*/
+//SCOP
+//  |-SCOP_NODE:LOOP
+//     |-SCOP_NODE:BB
+//     |-SCOP_NODE:IF
+//        |-SCOP_NODE:BB
+//        |-SCOP_NODE:BB
+//     |-SCOP_NODE:LOOP
+//     |-...
+//  |-SCOP_NODE:IF
+//     |-SCOP_NODE:LOOP
+//        |-SCOP_NODE:BB
+//        |-SCOP_NODE:BB
+//     |-SCOP_NODE:BB
+//     |-...
+//   ...
 #define ABS_NODE_prev(sn)            ((sn)->prev)
 #define ABS_NODE_next(sn)            ((sn)->next)
 #define ABS_NODE_parent(sn)          ((sn)->parent)
@@ -148,7 +145,7 @@ public:
         m_ru = rg;
         m_pool = smpoolCreate(64, MEM_COMM);
     }
-
+    COPY_CONSTRUCTOR(CfsMgr);
     ~CfsMgr() { smpoolDelete(m_pool); }
 
     AbsNode * constructAbsLoop(

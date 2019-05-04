@@ -40,6 +40,8 @@ class IR_CFS_OPT : public Pass {
 protected:
     Region * m_ru;
     TypeMgr * m_tm;
+
+protected:
     bool transformToDoWhile(IR ** head, IR * ir);
     bool transformIf1(IR ** head, IR * ir);
     bool transformIf2(IR ** head, IR * ir);
@@ -48,8 +50,10 @@ protected:
     bool transformIf5(IR ** head, IR * ir);
     bool hoistLoop(IR ** head, IR * ir);
     bool hoistIf(IR ** head, IR * ir);
+
 public:
     IR_CFS_OPT(Region * rg) { m_ru = rg; m_tm = rg->getTypeMgr(); }
+    COPY_CONSTRUCTOR(IR_CFS_OPT);
     ~IR_CFS_OPT() {}
 
     void dump();

@@ -51,8 +51,8 @@ void MDSSAMgr::destroy()
 {
     if (m_usedef_mgr.m_mdssainfo_pool == NULL) { return; }
 
-    //Caution: if you do not finish out-of-SSA prior to destory().
-    //The reference to IR's SSA info will lead to undefined behaviors.
+    //CAUTION: If you do not finish out-of-SSA prior to destory(),
+    //the reference to IR's MDSSA info will lead to undefined behaviors.
     //ASSERTN(!m_is_ssa_constructed,
     //   ("Still in ssa mode, you should do out of "
     //    "SSA before destroy"));
@@ -1362,7 +1362,7 @@ bool MDSSAMgr::verifyVMD()
 
             if (!def->is_phi()) {
                 ASSERT0(def->getOcc() && def->getOcc()->is_stmt() &&
-                    def->getOcc()->isMemoryRef());
+                        def->getOcc()->isMemoryRef());
 
                 bool findref = false;
                 if (def->getOcc()->getRefMD() != NULL &&
@@ -1675,7 +1675,7 @@ void MDSSAMgr::addMDSSAOcc(IR * ir, MDSSAInfo * mdssainfo)
 //be removed as well. And ld(y)'s MDSSAInfo will be updated as well.
 void MDSSAMgr::removeMDSSAUseRecur(IR * ir)
 {
-    MDSSAInfo * mdssainfo = getUseDefMgr()->getMDSSAInfo(ir);
+    MDSSAInfo * mdssainfo = getMDSSAInfoIfAny(ir);
     SSAInfo * prssainfo = NULL;
     if (mdssainfo != NULL) {
         //ir does not have SSA info
@@ -1695,11 +1695,11 @@ void MDSSAMgr::removeMDSSAUseRecur(IR * ir)
 
 
 //This function perform SSA destruction via scanning BB in sequential order.
-void MDSSAMgr::destruction()
+void MDSSAMgr::destruction(OptCtx * oc)
 {
     BBList * bblst = m_ru->getBBList();
     if (bblst->get_elem_count() == 0) { return; }
-
+    UINT bbnum = bblst->get_elem_count();
     xcom::C<IRBB*> * bbct;
     for (bblst->get_head(&bbct);
          bbct != bblst->end(); bbct = bblst->get_next(bbct)) {
@@ -1707,7 +1707,9 @@ void MDSSAMgr::destruction()
         ASSERT0(bb);
         destructBBSSAInfo(bb);
     }
-
+    if (bbnum != bblst->get_elem_count()) {
+        oc->set_flag_if_cfg_changed();
+    }
     m_is_ssa_constructed = false;
 }
 
@@ -1822,12 +1824,8 @@ void MDSSAMgr::reinit()
 void MDSSAMgr::construction(OptCtx & oc)
 {
     START_TIMER(t0, "MDSSA: Construction");
-
     m_ru->checkValidAndRecompute(&oc, PASS_DOM, PASS_UNDEF);
-
-    if (isMDSSAConstructed()) {
-        reinit();
-    }
+    reinit();
 
     //Extract dominate tree of CFG.
     START_TIMER(t1, "MDSSA: Extract Dom Tree");

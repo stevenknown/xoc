@@ -1395,16 +1395,21 @@ bool PRSSAMgr::verifySSAInfo()
 
 
 //This function perform SSA destruction via scanning BB in sequential order.
-void PRSSAMgr::destruction()
+void PRSSAMgr::destruction(OptCtx * oc)
 {
     BBList * bblst = m_ru->getBBList();
     if (bblst->get_elem_count() == 0) { return; }
+    UINT bbcnt = bblst->get_elem_count();
     xcom::C<IRBB*> * bbct;
     for (bblst->get_head(&bbct);
          bbct != bblst->end(); bbct = bblst->get_next(bbct)) {
         IRBB * bb = bbct->val();
         ASSERT0(bb);
         destructBBSSAInfo(bb);
+    }
+    if (bblst->get_elem_count() != bbcnt) {
+        ASSERT0(oc);
+        oc->set_flag_if_cfg_changed();
     }
 
     //Clean SSA info to avoid unnecessary abort or assert.
@@ -1623,7 +1628,7 @@ static IR * replace_res_pr(
     ASSERT0(stmt->getPrno() == oldprno);
     stmt->setPrno(newprno);
     IR_dt(stmt) = newprty;
-    return NULL;
+    return stmt;
 }
 
 

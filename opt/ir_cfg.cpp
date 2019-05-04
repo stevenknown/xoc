@@ -1567,12 +1567,8 @@ bool IR_CFG::performMiscOpt(OptCtx & oc)
             lchange |= inverseAndRemoveTrampolineBranch();
         }
 
-        if (lchange) {
-            OC_is_cdg_valid(oc) = false;
-            OC_is_dom_valid(oc) = false;
-            OC_is_pdom_valid(oc) = false;
-            OC_is_loopinfo_valid(oc) = false;
-            OC_is_rpo_valid(oc) = false;
+        if (lchange) {            
+            oc.set_flag_if_cfg_changed();
             ck_cfg = true;
         }
 

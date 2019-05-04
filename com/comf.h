@@ -260,8 +260,8 @@ inline bool xisspace(CHAR c) { return c == ' ' || c == '\t'; }
 inline bool xisdigit(CHAR c) { return c >= '0' && c <= '9'; }
 inline bool xisdigithex(CHAR d)
 {
-    if (xisdigit(d)) return true;
-    else if ((d >= 'a' && d <= 'f') || (d >= 'A' && d <= 'F')) return true;
+    if (xisdigit(d)) { return true; }
+    else if ((d >= 'a' && d <= 'f') || (d >= 'A' && d <= 'F')) { return true; }
     return false;
 }
 inline bool xisalpha(CHAR c)

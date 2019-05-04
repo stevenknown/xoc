@@ -82,8 +82,9 @@ public:
 
 
 class DOUBLE_HF : public HashFuncBase<double> {
-
 public:
+    DOUBLE_HF() {}
+    COPY_CONSTRUCTOR(DOUBLE_HF);
     UINT get_hash_value(double d, UINT bucket_size) const
     {
         double * p = &d;
@@ -102,11 +103,14 @@ typedef HMap<MD const*, VN*> MD2VN_MAP;
 class SYM2VN_MAP : public HMap<SYM const*, VN*, SymbolHashFunc> {
 public:
     SYM2VN_MAP() : HMap<SYM const*, VN*, SymbolHashFunc>(0) {}
+    COPY_CONSTRUCTOR(SYM2VN_MAP);
 };
 
 
 class IR2VN : public Vector<VN*> {
 public:
+    IR2VN() {}
+    COPY_CONSTRUCTOR(IR2VN);
     void set(INT i, VN * elem) { Vector<VN*>::set(i, elem); }
 };
 
@@ -118,12 +122,14 @@ public:
     UINT ofst;
     UINT sz;
 
+public:
     VNE_SC(UINT id, UINT o, UINT s)
     {
         mdid = id;
         ofst = o;
         sz = s;
     }
+    //COPY_CONSTRUCTOR(VNE_SC);
 
     bool is_equ(VNE_SC & ve)
     {
@@ -132,9 +138,7 @@ public:
                sz == ve.sz;
     }
 
-    void copy(VNE_SC & ve)
-    { *this = ve; }
-
+    void copy(VNE_SC & ve) { *this = ve; }
     void clean()
     {
         mdid = 0;
@@ -151,12 +155,14 @@ public:
     UINT ofst;
     UINT sz;
 
+public:
     VNE_ILD(UINT vnid, UINT o, UINT s)
     {
         base_vn_id = vnid;
         ofst = o;
         sz = s;
     }
+    //COPY_CONSTRUCTOR(VNE_ILD);
 
     bool is_equ(VNE_ILD & ve)
     {
@@ -165,9 +171,7 @@ public:
                sz == ve.sz;
     }
 
-    void copy(VNE_ILD & ve)
-    { *this = ve; }
-
+    void copy(VNE_ILD & ve) { *this = ve; }
     void clean()
     {
         base_vn_id = 0;
@@ -182,15 +186,15 @@ class VNE_ARR : public VNE_ILD {
 public:
     UINT ofst_vn_id;
 
+public:
     VNE_ARR(UINT bvnid, UINT ovnid, UINT o, UINT s) : VNE_ILD(bvnid, o, s)
     { ofst_vn_id = ovnid; }
+    //COPY_CONSTRUCTOR(VNE_ARR);
 
     bool is_equ(VNE_ARR & ve)
     { return VNE_ILD::is_equ(ve) && ofst_vn_id == ve.ofst_vn_id; }
 
-    void copy(VNE_ARR & ve)
-    { *this = ve; }
-
+    void copy(VNE_ARR & ve) { *this = ve; }
     void clean()
     {
         VNE_ILD::clean();
@@ -201,6 +205,9 @@ public:
 
 class VNE_SC_HF {
 public:
+    VNE_SC_HF() {}
+    COPY_CONSTRUCTOR(VNE_SC_HF);
+
     UINT get_hash_value(VNE_SC * x, UINT bucket_size) const
     {
         UINT n = (x->mdid << 20) | (x->ofst << 10) | x->sz;
@@ -223,6 +230,7 @@ class SCVNE2VN : public HMap<VNE_SC*, VN*, VNE_SC_HF> {
 protected:
     SMemPool * m_pool;
     List<VNE_SC*> m_free_lst;
+
 public:
     SCVNE2VN(SMemPool * pool, UINT bsize) :
         HMap<VNE_SC*, VN*, VNE_SC_HF>(bsize)
@@ -230,6 +238,7 @@ public:
         ASSERT0(pool);
         m_pool = pool;
     }
+    COPY_CONSTRUCTOR(SCVNE2VN);
     virtual ~SCVNE2VN() {}
 
     virtual VNE_SC * create(OBJTY v)
@@ -256,6 +265,9 @@ public:
 
 class VNE_ILD_HF {
 public:
+    VNE_ILD_HF() {}
+    COPY_CONSTRUCTOR(VNE_ILD_HF);
+
     UINT get_hash_value(VNE_ILD * x, UINT bucket_size) const
     {
         UINT n = (x->base_vn_id << 20) | (x->ofst << 10) | x->sz;
@@ -278,6 +290,7 @@ class ILD_VNE2VN : public HMap<VNE_ILD*, VN*, VNE_ILD_HF> {
 protected:
     SMemPool * m_pool;
     List<VNE_ILD*> m_free_lst;
+
 public:
     ILD_VNE2VN(SMemPool * pool, UINT bsize) :
         HMap<VNE_ILD*, VN*, VNE_ILD_HF>(bsize)
@@ -285,6 +298,7 @@ public:
         ASSERT0(pool);
         m_pool = pool;
     }
+    COPY_CONSTRUCTOR(ILD_VNE2VN);
     virtual ~ILD_VNE2VN() {}
 
     virtual VNE_ILD * create(OBJTY v)
@@ -312,6 +326,7 @@ public:
 class IR2SCVNE : public TMap<IR const*, SCVNE2VN*> {
 public:
     IR2SCVNE() {}
+    COPY_CONSTRUCTOR(IR2SCVNE);
     ~IR2SCVNE()
     {
         TMapIter<IR const*, SCVNE2VN*> ii;
@@ -335,6 +350,7 @@ public:
 class IR2ILDVNE : public TMap<IR const*, ILD_VNE2VN*> {
 public:
     IR2ILDVNE() {}
+    COPY_CONSTRUCTOR(IR2ILDVNE);
     ~IR2ILDVNE()
     {
         TMapIter<IR const*, ILD_VNE2VN*> ii;
@@ -357,6 +373,9 @@ public:
 
 class VNE_ARR_HF {
 public:
+    VNE_ARR_HF() {}
+    COPY_CONSTRUCTOR(VNE_ARR_HF);
+
     UINT get_hash_value(VNE_ARR * x, UINT bucket_size) const
     {
         UINT n = (x->base_vn_id << 24) | (x->ofst_vn_id << 16) |
@@ -380,6 +399,7 @@ class ARR_VNE2VN : public HMap<VNE_ARR*, VN*, VNE_ARR_HF> {
 protected:
     SMemPool * m_pool;
     List<VNE_ARR*> m_free_lst;
+
 public:
     ARR_VNE2VN(SMemPool * pool, UINT bsize) :
         HMap<VNE_ARR*, VN*, VNE_ARR_HF>(bsize)
@@ -387,6 +407,7 @@ public:
         ASSERT0(pool);
         m_pool = pool;
     }
+    COPY_CONSTRUCTOR(ARR_VNE2VN);
     virtual ~ARR_VNE2VN() {}
 
     VNE_ARR * create(OBJTY v)
@@ -414,6 +435,7 @@ public:
 class IR2ARRVNE : public TMap<IR const*, ARR_VNE2VN*> {
 public:
     IR2ARRVNE() {}
+    COPY_CONSTRUCTOR(IR2ARRVNE);
     virtual ~IR2ARRVNE()
     {
         TMapIter<IR const*, ARR_VNE2VN*> ii;
@@ -438,6 +460,7 @@ class IR2IR : public HMap<IR const*, IR const*,
                           HashFuncBase2<IR const*> > {
 public:
     IR2IR() : HMap<IR const*, IR const*, HashFuncBase2<IR const*> >(0) {}
+    COPY_CONSTRUCTOR(IR2IR);
 };
 
 
@@ -557,6 +580,7 @@ protected:
     void processCall(IR const* ir, bool & change);
     void processRegion(IR const* ir, bool & change);
     void processPhi(IR const* ir, bool & change);
+
 public:
     explicit IR_GVN(Region * rg);
     COPY_CONSTRUCTOR(IR_GVN);

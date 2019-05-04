@@ -324,7 +324,7 @@ INT exgcd(INT a, INT b, OUT INT & x, OUT INT & y)
 //Factorial of n, namely, requiring n!.
 UINT fact(UINT n)
 {
-    if (n == 0) return 1;
+    if (n == 0) { return 1; }
     UINT res = n;
     while (n >= 3) {
         n--;
@@ -379,7 +379,7 @@ INT xctoi(CHAR const* cl)
         #define BIT_PER_BYTE 8
     #endif
 
-    if (cl == NULL || strcmp(cl, "") == 0) return 0;
+    if (cl == NULL || strcmp(cl, "") == 0) { return 0; }
     INT l = (INT)strlen(cl);
     if (l > BYTE_PER_INT) {
         ASSERTN(0, ("too many characters in integer"));
@@ -401,7 +401,7 @@ INT xctoi(CHAR const* cl)
 //'is_oct': if true, nptr is octal digits.
 LONGLONG xatoll(CHAR const* nptr, bool is_oct)
 {
-    if (nptr == NULL) return 0;
+    if (nptr == NULL) { return 0; }
     while (*nptr == ' ' || *nptr == '\t') {
         nptr++;
     }
@@ -775,7 +775,7 @@ FIND:
 //e.g  v=17 , align=4 , the result is 20.
 LONGLONG ceil_align(LONGLONG v, LONGLONG align)
 {
-    if (align == 0 || align == 1) return v;
+    if (align == 0 || align == 1) { return v; }
     if ((v % align) != 0) {
         v = (v / align + 1) * align;
     }
@@ -947,7 +947,7 @@ UINT xstrlen(CHAR const* p)
 bool xstrcmp(CHAR const* p1, CHAR const* p2, INT n)
 {
     while (n-- > 0 && *p1++ == *p2++) { }
-    if (n >= 0) return true;
+    if (n >= 0) { return true; }
     return false;
 }
 
@@ -958,8 +958,9 @@ CHAR * upper(CHAR * n)
     LONG l = (LONG)strlen(n);
     l--;
     while (l >= 0) {
-        if (n[l] >= 'a' && n[l] <= 'z')
+        if (n[l] >= 'a' && n[l] <= 'z') {
             n[l] = n[l] - 32;
+        }
         l--;
     }
     return n;
@@ -972,8 +973,9 @@ CHAR * lower(CHAR * n)
     LONG l = (LONG)strlen(n);
     l--;
     while (l >= 0) {
-        if (n[l] >= 'A' && n[l] <= 'Z')
+        if (n[l] >= 'A' && n[l] <= 'Z') {
             n[l] = n[l] + 32;
+        }
         l--;
     }
     return n;
@@ -1044,8 +1046,8 @@ bool isPowerOf5(double f)
 //v: search v in array.
 bool binsearch(INT array[], UINT n, INT v, IN OUT UINT * ppos)
 {
-    if (n == 0) return false;
-    if (n == 1 && array[0] != v) return false;
+    if (n == 0) { return false; }
+    if (n == 1 && array[0] != v) { return false; }
 
     //n >= 2
     UINT lo = 0;
@@ -1183,7 +1185,7 @@ static bool prt_ansi_str(CHAR * buf, UINT buflen, UINT * pbufpos,
 {
     CHAR ch;
     bool sized = (format_size > 0);
-    if (s == NULL) return true;
+    if (s == NULL) { return true; }
     while ((ch = *s++) != 0) {
         if (!prtchar(buf, buflen, pbufpos, ch)) {
             return false;
@@ -1256,8 +1258,8 @@ static bool percent(CHAR * buf,
 
     if (ch == '%') {
         //put double '%' , if we encounter '%%...'
-        if (!prtchar(buf, buflen, bufpos, ch)) goto OVER;
-        if (!prtchar(buf, buflen, bufpos, ch)) goto OVER;
+        if (!prtchar(buf, buflen, bufpos, ch)) { goto OVER; }
+        if (!prtchar(buf, buflen, bufpos, ch)) { goto OVER; }
         ch = *format_pos++;
         goto FIN;
     }
@@ -1265,7 +1267,7 @@ static bool percent(CHAR * buf,
     //+/-/0/[0-9]
     if (ch == '+') {
         if (!is_exist_mark(format_pos)) {
-            if (!prtchar(buf, buflen, bufpos, '%')) goto OVER;
+            if (!prtchar(buf, buflen, bufpos, '%')) { goto OVER; }
             goto FIN;
         }
         is_mark_positive = true;  // add '+'
@@ -1273,7 +1275,7 @@ static bool percent(CHAR * buf,
         goto DIGIT0;
     } else if (ch == '-') {
         if (!is_exist_mark(format_pos)) {
-            if (!prtchar(buf, buflen, bufpos, '%')) goto OVER;
+            if (!prtchar(buf, buflen, bufpos, '%')) { goto OVER; }
             goto FIN;
         }
         is_align_left = true; //print digit left-align
@@ -1281,7 +1283,7 @@ static bool percent(CHAR * buf,
         goto DIGIT0;
     } else if (xisdigit(ch)) {
         if (!is_exist_mark(format_pos)) {
-            if (!prtchar(buf, buflen, bufpos, '%')) goto OVER;
+            if (!prtchar(buf, buflen, bufpos, '%')) { goto OVER; }
             goto FIN;
         }
         goto DIGIT0;
@@ -1321,39 +1323,45 @@ LETTER:
             //So you should pass 'INT' not 'CHAR' to 'va_arg'.
             //If this code is reached, the program will abort.
             CHAR c = (CHAR)va_arg(stack_start, INT);
-            if (!prtchar(buf, buflen, bufpos, c)) goto OVER;
+            if (!prtchar(buf, buflen, bufpos, c)) { goto OVER; }
         }
         break;
     case 'd'://    Integer
     case 'i'://    Integer
         {
             INT i = va_arg(stack_start, INT);
-            if (i < 0) is_nega = true;
-            if (!prt_int(sbuf, buflen, &tpos, i)) goto OVER;
+            if (i < 0) { is_nega = true; }
+            if (!prt_int(sbuf, buflen, &tpos, i)) { goto OVER; }
         }
         break;
     case 'u'://    ULONG as decimal
         {
             ULONG uv = va_arg(stack_start, ULONG);
-            if (!prt_ulong(sbuf, buflen, &tpos, uv)) goto OVER;
+            if (!prt_ulong(sbuf, buflen, &tpos, uv)) { goto OVER; }
         }
         break;
      case 'x':// ULONG as hex
         {
             ULONG uv = va_arg(stack_start, ULONG);
-            if(!prt_ulong_hex(sbuf, buflen, &tpos, uv, format_size)) goto OVER;
+            if (!prt_ulong_hex(sbuf, buflen, &tpos, uv, format_size)) {
+                goto OVER;
+            }
         }
         break;
     case 's'://    ANSI string
         {
             CHAR * s = va_arg(stack_start, CHAR*);
-            if (!prt_ansi_str(sbuf, buflen, &tpos, s, format_size)) goto OVER;
+            if (!prt_ansi_str(sbuf, buflen, &tpos, s, format_size)) {
+                goto OVER;
+            }
         }
         break;
     case 'S'://    Wide string
         {
             wchar_t * s = va_arg(stack_start, wchar_t*);
-            if (!prt_wide_str(sbuf, buflen, &tpos, s, format_size)) goto OVER;
+            if (!prt_wide_str(sbuf, buflen, &tpos, s, format_size)) {
+                goto OVER;
+            }
         }
         break;
     case 'f':
@@ -1364,17 +1372,17 @@ LETTER:
 
     if (is_mark_positive) {
         if (is_nega) {
-            if (!prtchar(buf, buflen, bufpos, '-')) goto OVER;
+            if (!prtchar(buf, buflen, bufpos, '-')) { goto OVER; }
 
             //remove '-'
             strshift(sbuf, -1);
             tpos -= 1;
         } else {
-            if(!prtchar(buf, buflen, bufpos, '+')) goto OVER;
+            if (!prtchar(buf, buflen, bufpos, '+')) { goto OVER; }
         }
     }
     if (is_align_left) {
-        if (tpos + *bufpos >= buflen) goto OVER;
+        if (tpos + *bufpos >= buflen) { goto OVER; }
         if (tpos < format_size) {
             ::memcpy(buf + *bufpos, sbuf, tpos);
             *bufpos += tpos;
@@ -1441,21 +1449,21 @@ static bool back_slash(CHAR * buf,
 
     // '\n' '\t' '\b'
     if (ch == '\\') {
-        if (!prtchar(buf, buflen, bufpos, ch)) goto OVER;
+        if (!prtchar(buf, buflen, bufpos, ch)) { goto OVER; }
         ch = *pos++;
     } else {
         switch (ch) {
         case 'n':
             ch = *pos++;
-            if (!prtchar(buf, buflen, bufpos, '\n')) goto OVER;
+            if (!prtchar(buf, buflen, bufpos, '\n')) { goto OVER; }
             break;
         case 't':
             ch = *pos++;
-            if (!prtchar(buf, buflen, bufpos, '\t')) goto OVER;
+            if (!prtchar(buf, buflen, bufpos, '\t')) { goto OVER; }
             break;
         case 'b':
             ch = *pos++;
-            if (!prtchar(buf, buflen, bufpos, ' ')) goto OVER;
+            if (!prtchar(buf, buflen, bufpos, ' ')) { goto OVER; }
             break;
         }
     }

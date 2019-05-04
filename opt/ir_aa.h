@@ -62,6 +62,9 @@ class MDA {
 public:
     MD const* md; //record single MD for IR such like, PR, LD, ST, ID.
     MDSet * mds; //record multpile MD for IR such like, ILD, IST, ARRAY.
+
+public:
+    COPY_CONSTRUCTOR(MDA);
 };
 
 
@@ -71,6 +74,7 @@ protected:
     SMemPool * m_pool;
     SList<PtPairSet*> m_free_pp_set;
     SList<PtPairSet*> m_pp_set_list;
+
 public:
     PPSetMgr()
     {
@@ -137,6 +141,7 @@ class PtPairMgr {
         ::memset(p, 0, sizeof(TMap<UINT, PtPair*>));
         return p;
     }
+
 public:
     PtPairMgr()
     {
@@ -234,9 +239,10 @@ public:
         //while finish processing kids.
         MDSet const* returned_pts;
     } u2;
-public:
 
+public:
     AACtx() { clean(); }
+    AACtx const& operator = (AACtx const&);
     AACtx(AACtx const& ic) { copy(ic); }
 
     void copy(AACtx const& ic) { u1.i1 = ic.u1.i1; }
@@ -318,6 +324,7 @@ protected:
     //If the flag is true, flow sensitive analysis is performed.
     //Or perform flow insensitive.
     BYTE m_flow_sensitive:1;
+
 protected:
     MD const* allocHeapobj(IR * ir);
     MD const* assignIdMD(
@@ -465,6 +472,7 @@ protected:
     }
 public:
     explicit IR_AA(Region * rg);
+    COPY_CONSTRUCTOR(IR_AA);
     virtual ~IR_AA();
 
     //Attemp to compute the type based may point to MD set.

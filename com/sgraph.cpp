@@ -899,7 +899,7 @@ void Graph::removeTransitiveEdge()
 }
 
 
-void Graph::dump_dot(CHAR const* name)
+void Graph::dump_dot(CHAR const* name) const
 {
     if (name == NULL) {
         name = "graph.dot";
@@ -930,7 +930,7 @@ void Graph::dump_dot(CHAR const* name)
 }
 
 
-void Graph::dump_vcg(CHAR const* name)
+void Graph::dump_vcg(CHAR const* name) const
 {
     ASSERTN(m_ec_pool != NULL, ("not yet initialized."));
     if (name == NULL) {
@@ -1665,6 +1665,7 @@ void DGraph::dump_dom(FILE * h, bool dump_dom_tree)
 }
 
 
+//Sort node in dominator-tree in preorder.
 void DGraph::sortDomTreeInPreorder(IN Vertex * root, OUT List<Vertex*> & lst)
 {
     ASSERT0(root);
@@ -1699,6 +1700,7 @@ void DGraph::sortDomTreeInPreorder(IN Vertex * root, OUT List<Vertex*> & lst)
 }
 
 
+//Sort node on graph in bfs-order.
 //'order_buf': record the bfs-order for each vertex.
 //NOTE: BFS does NOT keep the sequence if you are going to
 //access vertex in lexicographic order.

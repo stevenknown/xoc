@@ -43,6 +43,7 @@ protected:
     UINT m_threshold;
     Vector<Vector<VMD*>*> m_mdid2vmdvec_vec;
     TMap<UINT, Vector<VMD*>*> m_mdid2vmdvec_map;
+
 public:
     UINT2VMDVec(UINT threshold = 1000) { init(threshold); }
     COPY_CONSTRUCTOR(UINT2VMDVec);
@@ -118,6 +119,7 @@ public:
 class VConst : public VOpnd {
 public:
     IR const* m_const_val;
+
 public:
     VConst();
     COPY_CONSTRUCTOR(VConst);
@@ -190,8 +192,7 @@ class VOpndSet : public DefSBitSetCore {
 public:
     VOpndSet() { DefSBitSetCore::init(); }
     COPY_CONSTRUCTOR(VOpndSet);
-
-    //should call clean() before destruction,
+    //Should call clean() before destruction,
     //otherwise it will incur SegMgr assertion.
     ~VOpndSet() {}
 
@@ -367,11 +368,14 @@ protected:
     Vector<VOpnd*> m_vopnd_vec;
     Vector<MDPhiList*> m_philist_vec; //record the Phi list of BB.
     UINT2VMDVec m_map_md2vmd; //record version for each MD.
+    MDSSAMgr * m_mdssa_mgr;
+
 protected:
     void cleanOrDestroy(bool is_reinit);
     void destroyMD2VMDVec();
+
 public:
-    UseDefMgr(Region * rg);
+    UseDefMgr(Region * rg, MDSSAMgr * mgr);
     COPY_CONSTRUCTOR(UseDefMgr);
     ~UseDefMgr() { cleanOrDestroy(false); }
 

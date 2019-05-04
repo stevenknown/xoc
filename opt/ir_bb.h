@@ -44,6 +44,7 @@ class IRBB;
 //NOTE: Overload funtion when inserting or remving new IR.
 class BBIRList : public EList<IR*, IR2Holder> {
     IRBB * m_bb;
+
 public:
     BBIRList() { m_bb = NULL; }
     COPY_CONSTRUCTOR(BBIRList);

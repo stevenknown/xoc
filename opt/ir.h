@@ -511,6 +511,8 @@ public:
     AIContainer * attach_info_container;
 
 public:
+    COPY_CONSTRUCTOR(IR);
+
     bool calcArrayOffset(TMWORD * ofst, TypeMgr * tm) const;
     inline DU * cleanDU();
     inline void clearSSAInfo();
@@ -1141,6 +1143,8 @@ public:
         void * anonymous_value;
     } u1;
 
+public:
+    COPY_CONSTRUCTOR(CConst);
     HOST_FP getFP() const { return CONST_fp_val(this); }
     BYTE getMantissa() const { return CONST_fp_mant(this); }
     HOST_INT getINT() const { return CONST_int_val(this); }
@@ -1152,6 +1156,9 @@ class VarProp {
 public:
     //Record VAR if ir is IR_LD|IR_ID.
     VAR * id_info;
+
+public:
+    COPY_CONSTRUCTOR(VarProp);
 };
 
 
@@ -1160,6 +1167,9 @@ public:
 class DuProp : public IR {
 public:
     DU * du;
+
+public:
+    COPY_CONSTRUCTOR(DuProp);
 };
 
 
@@ -1170,6 +1180,9 @@ class CId : public DuProp, public VarProp {
 //ID need DU info, some Passes need it, e.g. GVN.
 public:
     MDPhi * phi; //record the MD PHI dummy stmt if ID is operand of MD PHI.
+
+public:
+    COPY_CONSTRUCTOR(CId);
 };
 
 
@@ -1187,6 +1200,9 @@ public:
     //    ARRAY<ofst:3>(LDA('x'), OFST:5) => *(&x[5] + 3) = pr or
     //                                       pr = *(&x[5] + 3)
     UINT field_offset;
+
+public:
+    COPY_CONSTRUCTOR(OffsetProp);
 };
 
 
@@ -1201,6 +1217,7 @@ public:
 #define LD_du(ir)           (((CLd*)CK_IRT(ir, IR_LD))->du)
 class CLd : public DuProp, public VarProp, public OffsetProp {
 public:
+    COPY_CONSTRUCTOR(CLd);
 };
 
 
@@ -1218,6 +1235,9 @@ public:
 class CILd : public DuProp, public OffsetProp {
 public:
     IR * opnd[1];
+
+public:
+    COPY_CONSTRUCTOR(CILd);
 };
 
 
@@ -1225,6 +1245,9 @@ public:
 class StmtProp {
 public:
     IRBB * bb;
+
+public:
+    COPY_CONSTRUCTOR(StmtProp);
 };
 
 
@@ -1245,6 +1268,9 @@ public:
 class CSt: public CLd, public StmtProp {
 public:
     IR * opnd[1];
+
+public:
+    COPY_CONSTRUCTOR(CSt);
 };
 
 
@@ -1262,6 +1288,9 @@ public:
     UINT prno; //PR number.
     SSAInfo * ssainfo; //Present ssa def and use set.
     IR * opnd[1];
+
+public:
+    COPY_CONSTRUCTOR(CStpr);
 };
 
 
@@ -1292,6 +1321,9 @@ public:
     UINT prno; //PR number.
     SSAInfo * ssainfo; //Present ssa def and use set.
     IR * opnd[3];
+
+public:
+    COPY_CONSTRUCTOR(CSetElem);
 };
 
 
@@ -1321,6 +1353,9 @@ public:
     SSAInfo * ssainfo;
 
     IR * opnd[2];
+
+public:
+    COPY_CONSTRUCTOR(CGetElem);
 };
 
 
@@ -1342,6 +1377,9 @@ public:
 class CISt : public DuProp, public OffsetProp, public StmtProp {
 public:
     IR * opnd[2];
+
+public:
+    COPY_CONSTRUCTOR(CISt);
 };
 
 
@@ -1356,6 +1394,7 @@ public:
 #define LDA_idinfo(ir)      (((CLda*)CK_IRT(ir, IR_LDA))->id_info)
 class CLda : public IR, public VarProp, public OffsetProp {
 public:
+    COPY_CONSTRUCTOR(CLda);
 };
 
 
@@ -1420,6 +1459,8 @@ public:
     IR * opnd[2];
 
 public:
+    COPY_CONSTRUCTOR(CCall);
+
     CHAR const* getCalleeNameString() const
     { return SYM_name(CALL_idinfo(this)->get_name()); }
 
@@ -1461,6 +1502,9 @@ public:
 
     //True if current call is readonly.
     BYTE is_readonly:1;
+
+public:
+    COPY_CONSTRUCTOR(CICall);
 };
 
 
@@ -1472,6 +1516,9 @@ public:
 class CBin : public IR {
 public:
     IR * opnd[2];
+
+public:
+    COPY_CONSTRUCTOR(CBin);
 };
 
 
@@ -1481,6 +1528,9 @@ public:
 class CUna : public IR {
 public:
     IR * opnd[1];
+
+public:
+    COPY_CONSTRUCTOR(CUna);
 };
 
 
@@ -1490,6 +1540,9 @@ public:
 class CGoto : public IR, public StmtProp {
 public:
     LabelInfo const* jump_target_lab;
+
+public:
+    COPY_CONSTRUCTOR(CGoto);
 };
 
 
@@ -1509,6 +1562,9 @@ public:
 class CIGoto : public IR, public StmtProp {
 public:
     IR * opnd[2];
+
+public:
+    COPY_CONSTRUCTOR(CIGoto);
 };
 
 
@@ -1530,6 +1586,9 @@ class CWhileDo : public IR {
 public:
     //NOTE: 'opnd' must be the last member of CWhileDo.
     IR * opnd[2];
+
+public:
+    COPY_CONSTRUCTOR(CWhileDo);
 };
 
 
@@ -1540,6 +1599,7 @@ public:
 //    } while (det)
 class CDoWhile : public CWhileDo {
 public:
+    COPY_CONSTRUCTOR(CDoWhile);
 };
 
 
@@ -1581,6 +1641,9 @@ class CDoLoop : public CWhileDo {
 public:
     //NOTE: 'opnd_pad' must be the first member of CDoLoop.
     IR * opnd_pad[3];
+
+public:
+    COPY_CONSTRUCTOR(CDoLoop);
 };
 
 
@@ -1597,6 +1660,9 @@ public:
 class CIf : public IR {
 public:
     IR * opnd[3];
+
+public:
+    COPY_CONSTRUCTOR(CIf);
 };
 
 
@@ -1605,6 +1671,9 @@ public:
 class CLab : public IR {
 public:
     LabelInfo const* label_info;
+
+public:
+    COPY_CONSTRUCTOR(CLab);
 };
 
 
@@ -1637,6 +1706,9 @@ class CSwitch : public IR, public StmtProp {
 public:
     IR * opnd[3];
     LabelInfo const* default_label;
+
+public:
+    COPY_CONSTRUCTOR(CSwitch);
 };
 
 
@@ -1652,6 +1724,9 @@ class CCase : public IR {
 public:
     IR * opnd[1]; //case-value
     LabelInfo const* jump_target_label; //jump lable for case.
+
+public:
+    COPY_CONSTRUCTOR(CCase);
 };
 
 
@@ -1718,7 +1793,9 @@ public:
 
     //NOTE: 'opnd' must be the last member of CArray.
     IR * opnd[2];
+
 public:
+    COPY_CONSTRUCTOR(CArray);
 
     //Return the number of dimensions.
     UINT getDimNum() const
@@ -1782,6 +1859,9 @@ public:
 
 	//DO NOT PLACE MEMBER BEFORE opnd_pad
 	StmtProp stmtprop;
+
+public:
+    COPY_CONSTRUCTOR(CStArray);
 };
 
 
@@ -1795,6 +1875,8 @@ public:
    ROUND_TYPE round;
 
 public:
+    COPY_CONSTRUCTOR(CCvt);
+
     //Get the leaf expression.
     //e.g: cvt:i32(cvt:u8(x)), this function will return x;
     IR * getLeafExp()
@@ -1824,6 +1906,9 @@ public:
     //versioned presentation or ssa def and use list in ssa mode.
     //Note this field only avaiable if SSA information is maintained.
     SSAInfo * ssainfo;
+
+public:
+    COPY_CONSTRUCTOR(CPr);
 };
 
 
@@ -1841,6 +1926,9 @@ class CTruebr : public IR, public StmtProp {
 public:
     IR * opnd[1];
     LabelInfo const* jump_target_lab; //jump target label.
+
+public:
+    COPY_CONSTRUCTOR(CTruebr);
 };
 
 
@@ -1850,6 +1938,7 @@ public:
 //NOTE: the lay out of truebr should same as falsebr.
 class CFalsebr : public CTruebr {
 public:
+    COPY_CONSTRUCTOR(CFalsebr);
 };
 
 
@@ -1862,6 +1951,9 @@ public:
 class CRet : public IR, public StmtProp {
 public:
     IR * opnd[1];
+
+public:
+    COPY_CONSTRUCTOR(CRet);
 };
 
 
@@ -1887,6 +1979,9 @@ public:
 class CSelect : public IR {
 public:
     IR * opnd[3];
+
+public:
+    COPY_CONSTRUCTOR(CSelect);
 };
 
 
@@ -1894,22 +1989,28 @@ public:
 //terminate current loop execution immediately without any
 //other operations.
 //This operation is used by do-loop, do-while, while-do.
-class CBreak : public IR {};
+class CBreak : public IR {
+public:
+    COPY_CONSTRUCTOR(CBreak);
+};
 
 
 //This class represent high level control structure, that
 //re-execute current loop immediately without any
 //other operations.
 //This operation is used by do-loop, do-while, while-do.
-class CContinue : public IR {};
+class CContinue : public IR {
+public:
+    COPY_CONSTRUCTOR(CContinue);
+};
 
 
 //This class represent phi operation.
-#define PHI_bb(ir)           (((CPhi*)CK_IRT(ir, IR_PHI))->bb)
-#define PHI_prno(ir)         (((CPhi*)CK_IRT(ir, IR_PHI))->prno)
-#define PHI_ssainfo(ir)      (((CPhi*)CK_IRT(ir, IR_PHI))->ssainfo)
-#define PHI_opnd_list(ir)    PHI_kid(ir, 0)
-#define PHI_kid(ir, idx)     (((CPhi*)ir)->opnd[CKID_TY(ir, IR_PHI, idx)])
+#define PHI_bb(ir) (((CPhi*)CK_IRT(ir, IR_PHI))->bb)
+#define PHI_prno(ir) (((CPhi*)CK_IRT(ir, IR_PHI))->prno)
+#define PHI_ssainfo(ir) (((CPhi*)CK_IRT(ir, IR_PHI))->ssainfo)
+#define PHI_opnd_list(ir) PHI_kid(ir, 0)
+#define PHI_kid(ir, idx) (((CPhi*)ir)->opnd[CKID_TY(ir, IR_PHI, idx)])
 class CPhi : public DuProp, public StmtProp {
 public:
     UINT prno; //PR number.
@@ -1917,6 +2018,8 @@ public:
     IR * opnd[1];
 
 public:
+    COPY_CONSTRUCTOR(CPhi);
+
     void removeOpnd(IR * ir)
     {
         ASSERT0(xcom::in_list(PHI_opnd_list(this), ir));
@@ -1943,6 +2046,9 @@ public:
 class CRegion : public IR, public StmtProp {
 public:
     Region * rg;
+
+public:
+    COPY_CONSTRUCTOR(CRegion);
 
     //True if region is readonly.
     //This property is very useful if region is a blackbox.
@@ -2445,7 +2551,8 @@ bool IR::isExactDef(MD const* md, MDSet const* mds) const
     MD const* cur_ir_defined_md = getRefMD();
 
     if (cur_ir_defined_md != NULL && cur_ir_defined_md->is_exact()) {
-        if (cur_ir_defined_md == md || cur_ir_defined_md->is_overlap(md)) {
+        if (md != NULL && 
+            (cur_ir_defined_md == md || cur_ir_defined_md->is_overlap(md))) {
             return true;
         }
 

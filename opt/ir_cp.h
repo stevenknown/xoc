@@ -37,8 +37,8 @@ author: Su Zhenyu
 namespace xoc {
 
 //Record Context info during Copy Propagation.
-#define CPC_change(c)            (c).change
-#define CPC_need_recomp_aa(c)    (c).need_recompute_alias_info
+#define CPC_change(c) (c).change
+#define CPC_need_recomp_aa(c) (c).need_recompute_alias_info
 class CPCtx {
 public:
     bool change;
@@ -60,18 +60,18 @@ public:
 
 
 //Propagate the constant operation, include CONST, LDA, CVT for const.
-#define CP_PROP_CONST                1
+#define CP_PROP_CONST 1
 
 //Propagate the simplex operation, include CONST, PR, LDA, CVT for simplex.
-#define CP_PROP_SIMPLEX                2
+#define CP_PROP_SIMPLEX 2
 
 //Propagate unary and simplex operations, include CONST, PR, LDA, CVT, LD,
 //ID, NEG, BNOT, LNOT, ILD.
-#define CP_PROP_UNARY_AND_SIMPLEX    3
+#define CP_PROP_UNARY_AND_SIMPLEX 3
 
 //Perform Copy Propagation
 class IR_CP : public Pass {
-protected:
+private:
     Region * m_ru;
     MDSystem * m_md_sys;
     IR_DU_MGR * m_du;
@@ -81,10 +81,8 @@ protected:
     UINT m_prop_kind;
     bool m_is_dump_cp;
 
-protected:
-    inline bool checkTypeConsistency(
-            IR const* ir,
-            IR const* cand_expr) const;
+private:
+    bool checkTypeConsistency(IR const* ir, IR const* cand_expr) const;
 
     bool doPropToMDPhi(
             bool prssadu,
@@ -122,13 +120,14 @@ protected:
             IR * exp,
             IR const* cand_expr,
             IN OUT CPCtx & ctx,
-            bool exp_use_ssadu,
-            bool exp_use_mdssadu,
+            bool stmt_use_ssadu,
+            bool stmt_use_mdssadu,
             MDSSAMgr * mdssamgr);
     void replaceExpViaSSADu(
             IR * exp,
             IR const* cand_expr,
             IN OUT CPCtx & ctx);
+
 public:
     IR_CP(Region * rg)
     {
@@ -143,6 +142,7 @@ public:
         m_prop_kind = CP_PROP_UNARY_AND_SIMPLEX;
         m_is_dump_cp = true;
     }
+    COPY_CONSTRUCTOR(IR_CP);
     virtual ~IR_CP() {}
 
     //Check if ir is appropriate for propagation.
