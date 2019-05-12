@@ -32,7 +32,7 @@ IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 author: Su Zhenyu
 @*/
 #include "cominc.h"
-#include "prdf.h"
+#include "liveness_mgr.h"
 #include "prssainfo.h"
 #include "ir_ssa.h"
 
@@ -286,7 +286,7 @@ void IR_CFG::buildAndRevisePhiEdge(xcom::TMap<IR*, LabelInfo*> & ir2label)
                         IRBB * incoming_bb = findBBbyLabel(opnd_label);
                         ASSERT0(incoming_bb);
                         if (VERTEX_id(EDGE_from(EC_edge(opnd_pred))) ==
-                                incoming_bb->id()) {
+                                      incoming_bb->id()) {
                             opnd_pred = EC_next(opnd_pred);
                             continue;
                         }
@@ -295,7 +295,7 @@ void IR_CFG::buildAndRevisePhiEdge(xcom::TMap<IR*, LabelInfo*> & ir2label)
                         for (q = EC_next(opnd_pred);
                              q != NULL; q = EC_next(q)) {
                             if (VERTEX_id(EDGE_from(EC_edge(q))) ==
-                                    incoming_bb->id()) {
+                                          incoming_bb->id()) {
                                 break;
                             }
                         }

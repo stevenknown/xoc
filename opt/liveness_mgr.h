@@ -31,8 +31,8 @@ IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 author: Su Zhenyu
 @*/
-#ifndef __PRDF_H__
-#define __PRDF_H__
+#ifndef __LIVENESS_MGR_H__
+#define __LIVENESS_MGR_H__
 
 namespace xoc {
 
@@ -40,7 +40,7 @@ namespace xoc {
 class VAR2PR : public TMap<VAR const*, UINT, CompareConstVar> {
 };
 
-class PRDF : public Pass {
+class LivenessMgr : public Pass {
     Region * m_ru;
     MDSystem * m_md_sys;
     VAR2PR * m_var2pr;
@@ -84,7 +84,7 @@ protected:
             DefSBitSetCore * use,
             bool is_lhs);
 public:
-    PRDF(Region * rg)
+    LivenessMgr(Region * rg)
     {
         m_ru = rg;
         m_md_sys = rg->getMDSystem();
@@ -92,8 +92,8 @@ public:
         m_var2pr = NULL;
         m_handle_may = false;
     }
-    COPY_CONSTRUCTOR(PRDF);
-    ~PRDF()
+    COPY_CONSTRUCTOR(LivenessMgr);
+    ~LivenessMgr()
     {
         for (INT i = 0; i <= m_def.get_last_idx(); i++) {
             DefSBitSetCore * bs = m_def.get((UINT)i);
@@ -168,8 +168,8 @@ public:
 
     void dump();
 
-    virtual CHAR const* getPassName() const { return "PRDF"; }
-    PASS_TYPE getPassType() const { return PASS_PRDF; }
+    virtual CHAR const* getPassName() const { return "LivenessMgr"; }
+    PASS_TYPE getPassType() const { return PASS_LIVENESS_MGR; }
 
     DefMiscBitSetMgr & getMiscBitSetMgr() { return m_sbs_mgr; }
 

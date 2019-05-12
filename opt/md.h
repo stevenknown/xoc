@@ -46,13 +46,15 @@ typedef enum _MD_TYPE {
 } MD_TYPE;
 
 #define MD_UNDEF              0 //Undefined.
-#define MD_FULL_MEM           1 //All program memory.
+#define MD_FULL_MEM           1 //Indicate all program memory.
 #define MD_FIRST              MD_FULL_MEM
-#define MD_GLOBAL_MEM         2 //Allocate at static data section
-                                //BYTE explicit definition.
-#define MD_IMPORT_VAR         3 //Not allocated in current region.
-#define MD_HEAP_MEM           4 //Allocate in heap.
-#define MD_STACK_MEM          5 //Allocate at stack.
+#define MD_GLOBAL_VAR         2 //Represent variables that 
+                                //allocated at global static data section
+                                //by explicit definition.
+#define MD_IMPORT_VAR         3 //Represent variables allocated at outer region
+                                //which nor global region.
+#define MD_HEAP_MEM           4 //Represent variables allocated in heap.
+#define MD_STACK_MEM          5 //Represent variables allocated at stack.
 //The first id which is allocable.
 #define MD_FIRST_ALLOCABLE (MD_IMPORT_VAR + 1)
 
@@ -378,7 +380,7 @@ public:
     //Return true if set contain global variable.
     bool is_contain_global() const
     {
-        return DefSBitSetCore::is_contain(MD_GLOBAL_MEM) ||
+        return DefSBitSetCore::is_contain(MD_GLOBAL_VAR) ||
                DefSBitSetCore::is_contain(MD_IMPORT_VAR) ||
                DefSBitSetCore::is_contain(MD_FULL_MEM);
     }
@@ -390,7 +392,9 @@ public:
     //Return true if set contain md.
     inline bool is_contain(MD const* md) const
     {
-        if (DefSBitSetCore::is_contain(MD_GLOBAL_MEM) && md->is_global()) {
+        if (md->is_global() &&
+            DefSBitSetCore::is_contain(MD_GLOBAL_VAR) &&            
+            MD_id(md) != MD_IMPORT_VAR) {
             return true;
         }
         if (DefSBitSetCore::is_contain(MD_FULL_MEM)) {
@@ -418,8 +422,8 @@ public:
     inline bool is_intersect(MDSet const& mds) const
     {
         if (this == &mds) { return true; }
-        if (DefSBitSetCore::is_contain(MD_GLOBAL_MEM) &&
-            ((DefSBitSetCore&)mds).is_contain(MD_GLOBAL_MEM)) {
+        if (DefSBitSetCore::is_contain(MD_GLOBAL_VAR) &&
+            ((DefSBitSetCore&)mds).is_contain(MD_GLOBAL_VAR)) {
             return true;
         }
 

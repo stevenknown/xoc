@@ -32,19 +32,19 @@ IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 author: Su Zhenyu
 @*/
 #include "cominc.h"
-#include "prdf.h"
+#include "liveness_mgr.h"
 
 namespace xoc {
 
-//#define STATISTIC_PRDF
+//#define STATISTIC_LIVENESS
 
 //
-//START PRDF
+//START LivenessMgr
 //
-void PRDF::dump()
+void LivenessMgr::dump()
 {
     if (g_tfile == NULL) { return; }
-    note("\n==---- DUMP PRDF : liveness of PR ----==\n");
+    note("\n==---- DUMP LivenessMgr : liveness of PR ----==\n");
     List<IRBB*> * bbl = m_ru->getBBList();
     g_indent = 2;
     for (IRBB * bb = bbl->get_head(); bb != NULL; bb = bbl->get_next()) {
@@ -70,7 +70,7 @@ void PRDF::dump()
 }
 
 
-void PRDF::processMay(
+void LivenessMgr::processMay(
             IR const* pr,
             DefSBitSetCore * gen,
             DefSBitSetCore * use,
@@ -106,7 +106,7 @@ void PRDF::processMay(
 }
 
 
-void PRDF::processOpnd(
+void LivenessMgr::processOpnd(
         IR const* ir,
         List<IR const*> & lst,
         DefSBitSetCore * use,
@@ -122,7 +122,7 @@ void PRDF::processOpnd(
 }
 
 
-void PRDF::computeLocal(IRBB * bb, List<IR const*> & lst)
+void LivenessMgr::computeLocal(IRBB * bb, List<IR const*> & lst)
 {
     DefSBitSetCore * gen = get_def(BB_id(bb));
     DefSBitSetCore * use = get_use(BB_id(bb));
@@ -238,10 +238,10 @@ void PRDF::computeLocal(IRBB * bb, List<IR const*> & lst)
 //In actually , $4 only lived out from BB1, and $3 only lived out
 //from BB2. For present, $4 both live out from BB1 and BB2, and $3
 //is similar.
-#ifdef STATISTIC_PRDF
+#ifdef STATISTIC_LIVENESS
 static UINT g_max_times = 0;
 #endif
-void PRDF::computeGlobal()
+void LivenessMgr::computeGlobal()
 {
     ASSERT0(m_cfg->get_entry() && BB_is_entry(m_cfg->get_entry()));
 
@@ -303,7 +303,7 @@ void PRDF::computeGlobal()
 
     news.clean(m_sbs_mgr);
 
-    #ifdef STATISTIC_PRDF
+    #ifdef STATISTIC_LIVENESS
     g_max_times = MAX(g_max_times, count);
     FILE * h = fopen("prdf.sat.dump", "a+");
     fprintf(h, "\n%s run %u times, maxtimes %u",
@@ -313,7 +313,7 @@ void PRDF::computeGlobal()
 }
 
 
-bool PRDF::perform(OptCtx & oc)
+bool LivenessMgr::perform(OptCtx & oc)
 {
     START_TIMER(t, getPassName());
     m_ru->checkValidAndRecompute(&oc, PASS_RPO, PASS_UNDEF);
@@ -333,6 +333,6 @@ bool PRDF::perform(OptCtx & oc)
     }
     return false;
 }
-//END PRDF
+//END LivenessMgr
 
 } //namespace xoc

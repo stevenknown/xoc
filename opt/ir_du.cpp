@@ -33,7 +33,7 @@ author: Su Zhenyu
 @*/
 #include "cominc.h"
 #include "callg.h"
-#include "prdf.h"
+#include "liveness_mgr.h"
 #include "prssainfo.h"
 #include "ir_ssa.h"
 
@@ -166,7 +166,7 @@ void MDId2IRlist::clean()
 //'md' corresponds to unique 'ir'.
 void MDId2IRlist::set(UINT mdid, IR * ir)
 {
-    ASSERTN(mdid != MD_GLOBAL_MEM && mdid != MD_FULL_MEM &&
+    ASSERTN(mdid != MD_GLOBAL_VAR && mdid != MD_FULL_MEM &&
             mdid != MD_IMPORT_VAR,
         ("there is not any md could kill Fake-May-MD."));
     ASSERT0(ir);
@@ -286,7 +286,7 @@ void IR_DU_MGR::computeOverlapUseMDSet(IR * ir, bool recompute)
     MD const* md = ir->getRefMD();
     MDSet tmpmds;
     if (md != NULL) {
-        if (MD_id(md) == MD_GLOBAL_MEM ||
+        if (MD_id(md) == MD_GLOBAL_VAR ||
             MD_id(md) == MD_IMPORT_VAR ||
             MD_id(md) == MD_FULL_MEM) {
             return;
@@ -853,10 +853,10 @@ void IR_DU_MGR::computeExpression(
                 //The result of ref info should be avaiable.
                 ASSERT0(ir->getRefMD());
 
-                //e.g: struct {int xcom::EdgeC;} s;
+                //e.g: struct {int a;} s;
                 //s = ...
-                //s.xcom::EdgeC = ...
-                //Where s and s.xcom::EdgeC is overlapped.
+                //s.a = ...
+                //Where s and s.a is overlapped.
 
                 computeOverlapUseMDSet(ir, false);
             }
@@ -871,8 +871,8 @@ void IR_DU_MGR::computeExpression(
     case IR_ILD:
         if (HAVE_FLAG(compflag, COMP_EXP_RECOMPUTE)) {
             //Sideeffect information should have been computed by AA.
-            //e.g: ... = ild(ld(p)) //p->xcom::EdgeC, p->b
-            //mayref of ild is: {xcom::EdgeC,b}, and mustref is NULL.
+            //e.g: ... = ild(ld(p)) //p->a, p->b
+            //mayref of ild is: {a,b}, and mustref is NULL.
             //mustref of ld is: {p}, and mayref is NULL.
             computeExpression(ILD_base(ir), ret_mds, compflag, duflag);
             if (HAVE_FLAG(duflag, COMPUTE_NONPR_DU)) {
@@ -891,8 +891,8 @@ void IR_DU_MGR::computeExpression(
     case IR_LDA:
         if (HAVE_FLAG(compflag, COMP_EXP_RECOMPUTE)) {
             //LDA do NOT reference any MD.
-            //e.g: p=&xcom::EdgeC; the stmt do not reference MD 'xcom::EdgeC',
-            //just only reference xcom::EdgeC's address.
+            //e.g: p=&a; the stmt do not reference MD 'a',
+            //just only reference a's address.
 
             //The result of MD ref should be avaiable.
 
@@ -975,7 +975,7 @@ void IR_DU_MGR::dumpDUGraph(CHAR const* name, bool detail)
         name = "graph_du.vcg";
     }
     UNLINK(name);
-    FILE * h = fopen(name, "xcom::EdgeC+");
+    FILE * h = fopen(name, "a+");
     ASSERTN(h != NULL, ("%s create failed!!!",name));
 
     FILE * old;
@@ -1474,7 +1474,7 @@ void IR_DU_MGR::dump(CHAR const* name)
     if (name != NULL) {
         old = g_tfile;
         //UNLINK(name);
-        g_tfile = fopen(name, "xcom::EdgeC+");
+        g_tfile = fopen(name, "a+");
         ASSERTN(g_tfile, ("%s create failed!!!", name));
     }
 
@@ -1505,7 +1505,7 @@ void IR_DU_MGR::dumpDUChainDetail()
 
 
 //Dump du chain only for stmt.
-//This function collects must and may USE of MD and regard stmt as xcom::EdgeC whole.
+//This function collects must and may USE of MD and regard stmt as a whole.
 //So this function does not distingwish individual memory operand inside the
 //stmt, but if you want, please invoke dumpDUChainDetail().
 void IR_DU_MGR::dumpDUChain()
@@ -2144,7 +2144,9 @@ void IR_DU_MGR::removeDefOutFromUseset(IR * def)
 
     //Could not just remove the SSA def, you should consider the SSA_uses
     //and make sure they are all removable. Use SSA form related api.
-    ASSERT0(def->getSSAInfo() == NULL);
+    //DO not assert here for convenient to experimental behaviors.
+    //PRSSA info should be maintained in PRSSAMgr.
+    //ASSERT0(def->getSSAInfo() == NULL);
 
     DUSet * useset = def->getDUSet();
     if (useset == NULL) { return; }
@@ -2176,9 +2178,7 @@ void IR_DU_MGR::removeIROutFromDUMgr(IR * ir)
     removeUseOutFromDefset(ir);
 
     //If stmt has SSA info, it should be maintained by SSA related api.
-    if (ir->getSSAInfo() == NULL) {
-        removeDefOutFromUseset(ir);
-    }
+    removeDefOutFromUseset(ir);
 }
 
 
@@ -2317,8 +2317,8 @@ size_t IR_DU_MGR::count_mem_duset()
 
 
 //Collect MustUse MDSet for both PR operation and Non-PR operation.
-//e.g: = xcom::EdgeC + b + *p;
-//    assume p->w,u, the MustUse is {xcom::EdgeC,b,p}, not include w,u.
+//e.g: = a + b + *p;
+//    assume p->w,u, the MustUse is {a,b,p}, not include w,u.
 void IR_DU_MGR::collectMustUsedMDs(IR const* ir, OUT MDSet & mustuse)
 {
     switch (ir->getCode()) {
@@ -2388,10 +2388,10 @@ void IR_DU_MGR::inferStore(IR * ir, UINT duflag)
 
     if (HAVE_FLAG(duflag, COMPUTE_NONPR_DU)) {
         //Find ovelapped MD.
-        //e.g: struct {int xcom::EdgeC;} s;
+        //e.g: struct {int a;} s;
         //s = ...
-        //s.xcom::EdgeC = ...
-        //Where s and s.xcom::EdgeC is overlapped.
+        //s.a = ...
+        //Where s and s.a is overlapped.
         computeOverlapDefMDSet(ir, false);
     }
 
@@ -2537,7 +2537,7 @@ void IR_DU_MGR::inferCallAndICall(IR * ir, UINT duflag, IN MD2MDSet * mx)
         //For conservative purpose.
         //Set to mod/ref global memor, all imported variables,
         //and all exposed local variables for conservative purpose.
-        maydefuse.bunion(m_md_sys->getMD(MD_GLOBAL_MEM), *m_misc_bs_mgr);
+        maydefuse.bunion(m_md_sys->getMD(MD_GLOBAL_VAR), *m_misc_bs_mgr);
         maydefuse.bunion(m_md_sys->getMD(MD_IMPORT_VAR), *m_misc_bs_mgr);
         ASSERT0(m_aa);
         maydefuse.bunion(*m_aa->getMayPointToMDSet(), *m_misc_bs_mgr);
@@ -2818,7 +2818,7 @@ void IR_DU_MGR::computeMayDef(
 
     //Computing May GEN set of reach-definition.
     //The computation of reach-definition problem is conservative.
-    //If we can not say whether xcom::EdgeC DEF is killed, regard it as lived STMT.
+    //If we can not say whether a DEF is killed, regard it as lived STMT.
     SEGIter * st = NULL;
     INT ni;
     for (INT i = maygen_stmt->get_first(&st); i != -1; i = ni) {
@@ -2927,10 +2927,24 @@ void IR_DU_MGR::computeMustExactDefMayDefMayUse(
         MDSet * bb_mustdefmds = NULL;
         MDSet * bb_maydefmds = NULL;
         UINT bbid = BB_id(bb);
-        if (mustdefmds != NULL && HAVE_FLAG(flag, SOL_AVAIL_REACH_DEF)) {
+        if (mustdefmds != NULL) {
+            //if (mustdefmds != NULL &&
+            //    HAVE_FLAG(flag, SOL_AVAIL_REACH_DEF)) {
             //For now, only the computation of available-reach-def need
             //MustGenStmt information. It is very slowly when compiling large
             //region.
+            //UPDATE: It is not arrurate or even correct if we only
+            //compute mustgen_stmt when computing available-reach-def.
+            //May be both available-reach-def, reach-def, and available-exp
+            //need mustgen_stmt information.
+            //Consider case:
+            //   BB1:p1 = 1
+            //  /             \
+            //BB2:p1 = 2  |  BB3:p1 = 3
+            //   \            /
+            //   BB4: ... = p1 
+            //where BB1 is precessor of BB2 and BB3.
+            //BB1:p1 should not reach-def at BB4.
             bb_mustdefmds = mustdefmds->get(bbid);
             mustgen_stmt = getMustGenDef(bbid, &bsmgr);
             mustgen_stmt->clean(bsmgr);
@@ -2964,7 +2978,23 @@ void IR_DU_MGR::computeMustExactDefMayDefMayUse(
 
             //Collect mustdef mds.
             if (bb_mustdefmds != NULL) {
-                ASSERT0(HAVE_FLAG(flag, SOL_AVAIL_REACH_DEF));
+                //For now, only the computation of available-reach-def need
+                //MustGenStmt information. It is very slowly when compiling large
+                //region.
+                //UPDATE: It is not arrurate or even correct if we only
+                //compute mustgen_stmt when computing available-reach-def.
+                //May be both available-reach-def, reach-def, and available-exp
+                //need mustgen_stmt information.
+                //Consider case:
+                //   BB1:p1 = 1
+                //  /             \
+                //BB2:p1 = 2  |  BB3:p1 = 3
+                //   \            /
+                //   BB4: ... = p1 
+                //where BB1 is precessor of BB2 and BB3.
+                //BB1:p1 should not reach-def at BB4.
+                //ASSERT0(HAVE_FLAG(flag, SOL_AVAIL_REACH_DEF));
+
                 ASSERT0(mustgen_stmt);
                 computeMustExactDef(ir, bb_mustdefmds,
                     mustgen_stmt, mditer, bsmgr, flag);
@@ -3819,7 +3849,7 @@ UINT IR_DU_MGR::checkIsLocalKillingDef(
 //Here we search exactly killing DEF from current stmt to previous
 //for expmd even if it is exact,
 //e.g: g is global variable, it is exact.
-//x is xcom::EdgeC pointer that we do not know where it pointed to.
+//x is a pointer that we do not know where it pointed to.
 //    1. *x += 1;
 //    2. g = 0;
 //    3. *x += 2; # *x may overlapped with global variable g.
@@ -3869,14 +3899,14 @@ IR const* IR_DU_MGR::findKillingLocalDef(
         //We need to check maydef.
         MDSet const* maydefs = ir->getRefMDSet();
         if (maydefs != NULL && maydefs->is_contain(expmd)) {
-            //There is xcom::EdgeC nonkilling DEF, ir may modified expmd.
+            //There is a nonkilling DEF, ir may modified expmd.
             //The subsequent searching is meaningless.
-            //We can not find xcom::EdgeC local killing DEF.
+            //We can not find a local killing DEF.
             return NULL;
         }
     }
 
-    //We can not find xcom::EdgeC local killing DEF.
+    //We can not find a local killing DEF.
     return NULL;
 }
 
@@ -4263,10 +4293,10 @@ void IR_DU_MGR::updateDefWithMustExactMD(IR * ir, MD const* mustexact)
     m_md2irs->set(MD_id(mustexact), ir);
 
     //Pick off stmt from md's definition-list.
-    //e.g: Assume the md of struct {int xcom::EdgeC;} s is MD13, and s.xcom::EdgeC is MD4,
+    //e.g: Assume the md of struct {int a;} s is MD13, and s.a is MD4,
     //then MD4 and MD13 are overlapped.
     //    MD13 has overlap-def in list:
-    //        s.xcom::EdgeC = 10;
+    //        s.a = 10;
     //When we meet exact definition to MD4, it kill all lived
     //stmts that exact-def MD4, also include the
     //stmt in MD13's def-list.
@@ -4428,7 +4458,7 @@ void IR_DU_MGR::initMD2IRList(IRBB * bb)
             if (mustdef != NULL && MD_id(mustdef) == (UINT)j) {
                 continue;
             }
-            if (j == MD_GLOBAL_MEM ||
+            if (j == MD_GLOBAL_VAR ||
                 j == MD_IMPORT_VAR ||
                 j == MD_FULL_MEM) {
                 m_md2irs->setHasIneffectDef();
@@ -4516,7 +4546,7 @@ bool IR_DU_MGR::checkIsTruelyDep(IR const* def, IR const* use)
                 ASSERT0(mayuse->is_overlap_ex(mustdef, m_ru, m_md_sys));
             }
         } else {
-            ASSERTN(0, ("Not xcom::EdgeC truely dependence"));
+            ASSERTN(0, ("Not a truely dependence"));
         }
     } else if (maydef != NULL) {
         if (mustuse != NULL) {
@@ -4524,10 +4554,10 @@ bool IR_DU_MGR::checkIsTruelyDep(IR const* def, IR const* use)
         } else if (mayuse != NULL) {
             ASSERT0(mayuse->is_intersect(*maydef));
         } else {
-            ASSERTN(0, ("Not xcom::EdgeC truely dependence"));
+            ASSERTN(0, ("Not a truely dependence"));
         }
     } else {
-        ASSERTN(0, ("Not xcom::EdgeC truely dependence"));
+        ASSERTN(0, ("Not a truely dependence"));
     }
     return true;
 }
@@ -4559,7 +4589,7 @@ bool IR_DU_MGR::verifyMDDUChainForIR(IR const* ir, UINT duflag)
                     ASSERT0(BB_irlist(
                         use->getStmt()->getBB()).find(use->getStmt()));
 
-                    //use must be xcom::EdgeC memory operation.
+                    //use must be a memory operation.
                     ASSERT0(use->isMemoryOpnd());
 
                     //ir must be DEF of 'use'.

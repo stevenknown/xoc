@@ -32,7 +32,7 @@ IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 author: Su Zhenyu
 @*/
 #include "cominc.h"
-#include "prdf.h"
+#include "liveness_mgr.h"
 #include "prssainfo.h"
 #include "ir_ssa.h"
 
@@ -3874,9 +3874,10 @@ void IR_AA::initEntryPtset(PtPairSet ** ptset_arr)
         ASSERT0(entry);
         MD2MDSet * mx = allocMD2MDSetForBB(BB_id(entry));
         setPointToAllMem(MD_FULL_MEM, *mx);
-        setPointToGlobalMem(MD_GLOBAL_MEM, *mx);
-        setPointToImportVar(MD_IMPORT_VAR, *mx);
+        setPointToGlobalMem(MD_GLOBAL_VAR, *mx);
+        setPointToImportVar(MD_GLOBAL_VAR, *mx);        
         setPointToGlobalMem(MD_IMPORT_VAR, *mx);
+        setPointToImportVar(MD_IMPORT_VAR, *mx);
         VarTabIter c;
         for (VAR * v = vt->get_first(c); v != NULL; v = vt->get_next(c)) {
             if (!VAR_is_global(v) && !VAR_is_formal_param(v)) { continue; }
@@ -3892,9 +3893,10 @@ void IR_AA::initEntryPtset(PtPairSet ** ptset_arr)
         convertMD2MDSet2PT(*getInPtPairSet(entry), m_pt_pair_mgr, mx);
     } else {
         setPointToAllMem(MD_FULL_MEM, m_unique_md2mds);
-        setPointToGlobalMem(MD_GLOBAL_MEM, m_unique_md2mds);
-        setPointToImportVar(MD_IMPORT_VAR, m_unique_md2mds);
+        setPointToGlobalMem(MD_GLOBAL_VAR, m_unique_md2mds);
+        setPointToImportVar(MD_GLOBAL_VAR, m_unique_md2mds);
         setPointToGlobalMem(MD_IMPORT_VAR, m_unique_md2mds);
+        setPointToImportVar(MD_IMPORT_VAR, m_unique_md2mds);        
         VarTabIter c;
         for (VAR * v = vt->get_first(c); v != NULL; v = vt->get_next(c)) {
             if (!VAR_is_global(v) && !VAR_is_formal_param(v)) { continue; }
@@ -3972,7 +3974,7 @@ void IR_AA::initMayPointToSet()
         ASSERT0(rg->is_subregion() || rg->is_function() || rg->is_eh());
     }
 
-    tmp.bunion(MD_GLOBAL_MEM, *m_misc_bs_mgr);
+    tmp.bunion(MD_GLOBAL_VAR, *m_misc_bs_mgr);
     tmp.bunion(MD_IMPORT_VAR, *m_misc_bs_mgr);
     m_maypts = m_mds_hash->append(tmp);
     tmp.clean(*m_misc_bs_mgr);

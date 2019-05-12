@@ -33,7 +33,7 @@ author: Su Zhenyu
 @*/
 #include "cominc.h"
 #include "ir_dce.h"
-#include "prdf.h"
+#include "liveness_mgr.h"
 #include "prssainfo.h"
 #include "ir_ssa.h"
 
@@ -621,6 +621,12 @@ bool IR_DCE::perform(OptCtx & oc)
             if (!is_stmt_effect.is_contain(IR_id(stmt))) {
                 //Revise SSA info if PR is in SSA form.
                 stmt->removeSSAUse();
+
+                //Could not just remove the SSA def,
+                //you should consider the SSA_uses
+                //and make sure they are all removable.
+                //Use SSA form related api.
+                //ASSERT0(stmt->getSSAInfo() == NULL);
 
                 //Revise DU chains.
                 //TODO: If ssa form is available, it doesn't need to maintain

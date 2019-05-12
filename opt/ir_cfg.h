@@ -96,7 +96,7 @@ public:
     }
 
     //Construct CFG edge for BB has phi.
-      void buildAndRevisePhiEdge(TMap<IR*, LabelInfo*> & ir2label);
+    void buildAndRevisePhiEdge(TMap<IR*, LabelInfo*> & ir2label);
 
     //Construct EH edge after cfg built.
     //This function use a conservative method, and this method

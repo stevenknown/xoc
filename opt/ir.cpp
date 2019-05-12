@@ -78,10 +78,13 @@ IRDesc const g_ir_desc[] = {
       IRT_IS_STMT_IN_BB|IRT_HAS_DU|IRT_WRITE_PR|IRT_WRITE_WHOLE_PR, },
     { IR_CALL,     "call",         0x3, 2, sizeof(CCall),
       IRT_IS_STMT|IRT_IS_MEM_REF|IRT_HAS_RESULT|
-      IRT_HAS_IDINFO|IRT_IS_STMT_IN_BB|IRT_HAS_DU, },
+      IRT_HAS_IDINFO|IRT_IS_STMT_IN_BB|IRT_HAS_DU, }, //CALL might not def PR if
+                                                      //there is not return
+                                                      //value.
     { IR_ICALL,    "icall",        0x7, 3, sizeof(CICall),
       IRT_IS_STMT|IRT_IS_MEM_REF|IRT_HAS_RESULT|
-      IRT_IS_STMT_IN_BB|IRT_HAS_DU, },
+      IRT_IS_STMT_IN_BB|IRT_HAS_DU, }, //ICALL might not def PR if
+                                       //there is not return value.
     { IR_LDA,      "lda",          0x0, 0, sizeof(CLda),
       IRT_HAS_IDINFO|IRT_IS_UNA|IRT_IS_LEAF|IRT_HAS_OFFSET, },
     { IR_ADD,      "add",          0x3, 2, sizeof(CBin),

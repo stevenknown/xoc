@@ -260,7 +260,9 @@ bool MDSet::is_overlap(MD const* md, Region * current_ru) const
 {
     ASSERT0(current_ru);
 
-    if (DefSBitSetCore::is_contain(MD_GLOBAL_MEM) && md->is_global()) {
+    if (md->is_global() &&
+        DefSBitSetCore::is_contain(MD_GLOBAL_VAR) &&
+        MD_id(md) != MD_IMPORT_VAR) {
         return true;
     }
     if ((DefSBitSetCore::is_contain(MD_FULL_MEM)) ||
@@ -661,17 +663,17 @@ void MDSystem::initGlobalMemMD(VarMgr * vm)
     if (vm == NULL) { return; }
 
     m_global_mem = vm->registerVar(
-                        (CHAR*)".global_mem",
-                        getTypeMgr()->getMCType(0),
-                        1, VAR_GLOBAL|VAR_FAKE|VAR_IS_UNALLOCABLE);
+        (CHAR*)".global_mem",
+        getTypeMgr()->getMCType(0),
+        1, VAR_GLOBAL|VAR_FAKE|VAR_IS_UNALLOCABLE);
     MD x;
     MD_base(&x) = m_global_mem;
     MD_size(&x) = 0;
     MD_ty(&x) = MD_UNBOUND;
-    MD_is_may(&x) = true; //MD_GLOBAL_MEM can only be May reference.
+    MD_is_may(&x) = true; //MD_GLOBAL_VAR can only be May reference.
     MD const* e = registerMD(x);
     CHECK_DUMMYUSE(e);
-    ASSERT0(MD_id(e) == MD_GLOBAL_MEM);
+    ASSERT0(MD_id(e) == MD_GLOBAL_VAR);
 }
 
 
@@ -790,7 +792,7 @@ void MDSystem::computeOverlap(
     ASSERT0(md && current_ru);
     if (strictly) {
         if (md->is_global()) {
-            output.bunion(MD_GLOBAL_MEM, mbsmgr);
+            output.bunion(MD_GLOBAL_VAR, mbsmgr);
         } else if (!current_ru->isRegionVAR(md->get_base())) {
             output.bunion(MD_IMPORT_VAR, mbsmgr);
         }
@@ -913,7 +915,7 @@ void MDSystem::computeOverlap(
 
     if (strictly) {
         if (set_global) {
-            mds.bunion(getMD(MD_GLOBAL_MEM), mbsmgr);
+            mds.bunion(getMD(MD_GLOBAL_VAR), mbsmgr);
         }
         if (set_import_var) {
             mds.bunion(getMD(MD_IMPORT_VAR), mbsmgr);
@@ -986,7 +988,7 @@ void MDSystem::computeOverlap(
 
     if (strictly) {
         if (set_global) {
-            output.bunion_pure(MD_GLOBAL_MEM, mbsmgr);
+            output.bunion_pure(MD_GLOBAL_VAR, mbsmgr);
         }
         if (set_import_var) {
             output.bunion_pure(MD_IMPORT_VAR, mbsmgr);

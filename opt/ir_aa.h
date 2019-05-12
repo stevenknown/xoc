@@ -675,7 +675,7 @@ public:
 
     //Set md points to whole global memory.
     void setPointToGlobalMem(UINT mdid, OUT MD2MDSet & ctx)
-    { setPointToMDSetByAddMD(mdid, ctx, m_md_sys->getMD(MD_GLOBAL_MEM)); }
+    { setPointToMDSetByAddMD(mdid, ctx, m_md_sys->getMD(MD_GLOBAL_VAR)); }
 
     //Set md points to imported variable.
     void setPointToImportVar(UINT mdid, OUT MD2MDSet & ctx)

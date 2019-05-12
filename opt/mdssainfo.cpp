@@ -421,6 +421,11 @@ void UseDefMgr::setMDSSAInfo(IR * ir, MDSSAInfo * mdssainfo)
 }
 
 
+//Generate MDSSAInfo for individual memory-ref IR stmt/exp since each IR
+//has its own specific MDSSA Memory Reference information.
+//It sounds there might be some waste to memory if many IRs mdssa-reference
+//could be represented by same MDSSAInfo. Nevertheless, the postulation 
+//is quite experimentally, and in practical very rarelly.
 MDSSAInfo * UseDefMgr::genMDSSAInfo(IR * ir)
 {
     ASSERT0(ir && m_mdssa_mgr->hasMDSSAInfo(ir));

@@ -281,7 +281,7 @@ public:
     size_t count_mem();
 
     Vector<VP*> const* getVPVec() const { return &m_vp_vec; }
-    //VP * getVP(UINT id) const { return m_vp_vec.get(id); }
+    VP * getVP(UINT id) const { return m_vp_vec.get(id); }
 
     IR * initVP(IN IR * ir);
     void insertPhi(UINT prno, IN IRBB * bb);

@@ -94,7 +94,7 @@ RegionMgr::~RegionMgr()
 
 void * RegionMgr::xmalloc(UINT size)
 {
-    ASSERTN(m_pool != NULL, ("pool does not initialized"));
+    ASSERTN(m_pool != NULL, ("pool not initialized"));
     void * p = smpoolMalloc(size, m_pool);
     ASSERT0(p != NULL);
     ::memset(p, 0, size);

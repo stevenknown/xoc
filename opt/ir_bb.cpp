@@ -32,7 +32,7 @@ IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 author: Su Zhenyu
 @*/
 #include "cominc.h"
-#include "prdf.h"
+#include "liveness_mgr.h"
 #include "prssainfo.h"
 #include "ir_ssa.h"
 

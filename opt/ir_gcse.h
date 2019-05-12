@@ -103,8 +103,8 @@ private:
 private:
     bool doProp(IRBB * bb, List<IR*> & livexp);
     bool doPropVN(IRBB * bb, UINT entry_id);
-    bool doPropVNAtDomTreeOrder(xcom::Graph const* domtree);
-    bool doPropAtDomTreeOrder(xcom::Graph const* domtree);
+    bool doPropVNInDomTreeOrder(xcom::Graph const* domtree);
+    bool doPropInDomTreeOrder(xcom::Graph const* domtree);
     bool elim(IR * use, IR * use_stmt, IR * gen, IR * gen_stmt);
     bool findAndElim(IR * exp, IR * gen);
     void handleCandidate(IR * exp, IRBB * bb, UINT entry_id, bool & change);

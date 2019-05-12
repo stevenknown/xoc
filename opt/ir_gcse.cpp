@@ -451,7 +451,7 @@ bool IR_GCSE::shouldBeCse(IR * det)
 }
 
 
-bool IR_GCSE::doPropAtDomTreeOrder(xcom::Graph const* domtree)
+bool IR_GCSE::doPropInDomTreeOrder(xcom::Graph const* domtree)
 {
     IRBB * entry = m_cfg->get_entry();
     ASSERTN(entry && BB_is_entry(entry), ("Not find CFG entry"));
@@ -491,7 +491,7 @@ bool IR_GCSE::doPropAtDomTreeOrder(xcom::Graph const* domtree)
 }
 
 
-bool IR_GCSE::doPropVNAtDomTreeOrder(xcom::Graph const* domtree)
+bool IR_GCSE::doPropVNInDomTreeOrder(xcom::Graph const* domtree)
 {
     IRBB * entry = m_cfg->get_entry();
     ASSERTN(entry && BB_is_entry(entry), ("Not find CFG entry"));
@@ -812,7 +812,7 @@ bool IR_GCSE::perform(OptCtx & oc)
     if (m_gvn != NULL) {
         m_vn2exp.clean();
         m_exp2pr.clean();
-        change |= doPropVNAtDomTreeOrder(&domtree);
+        change |= doPropVNInDomTreeOrder(&domtree);
 
         //Access IRBB in preorder on domtree.
         //List<xcom::Vertex*> lst;
@@ -825,7 +825,7 @@ bool IR_GCSE::perform(OptCtx & oc)
     } else {
         m_vn2exp.clean();
         m_exp2pr.clean();
-        change |= doPropAtDomTreeOrder(&domtree);
+        change |= doPropInDomTreeOrder(&domtree);
 
         //List<xcom::Vertex*> lst;
         //List<IR*> livexp;

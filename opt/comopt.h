@@ -32,7 +32,7 @@ IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 author: Su Zhenyu
 @*/
 //Optimizations
-#include "prdf.h"
+#include "liveness_mgr.h"
 #include "ir_ssa.h"
 #include "ir_mdssa.h"
 #include "cfs_mgr.h"

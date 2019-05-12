@@ -158,7 +158,7 @@ typedef enum _PASS_TYPE {
     PASS_LOOP_CVT,
     PASS_RPO,
     PASS_POLY,
-    PASS_PRDF,
+    PASS_LIVENESS_MGR,
     PASS_VRP,
     PASS_PR_SSA_MGR,
     PASS_MD_SSA_MGR,

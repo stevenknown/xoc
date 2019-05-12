@@ -1419,7 +1419,8 @@ public:
 #define CALL_is_not_bb_bound(ir) (((CCall*)CK_IRT_CALL(ir))->is_not_bb_bound)
 
 //True if this call does not modify any memory.
-#define CALL_is_readonly(ir)     (VAR_is_readonly(CALL_idinfo((CCall*)CK_IRT_CALL(ir))))
+#define CALL_is_readonly(ir) \
+    (VAR_is_readonly(CALL_idinfo((CCall*)CK_IRT_CALL(ir))))
 
 //True if this call do allocate memory from heap. It always the function
 //like malloc or new.
