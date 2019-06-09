@@ -85,11 +85,12 @@ void IR_GCSE::elimCseAtStore(IR * use, IR * use_stmt, IR * gen)
     }
 
     //Assign the identical vn to newrhs.
-    ASSERT0(m_gvn);
-    VN * vn = m_gvn->mapIR2VN(gen);
-    ASSERT0(vn);
-    m_gvn->set_mapIR2VN(newrhs_pr, vn);
-    m_gvn->set_mapIR2VN(use_stmt, vn);
+    if (m_gvn != NULL) {
+        VN * vn = m_gvn->mapIR2VN(gen);
+        ASSERT0(vn);
+        m_gvn->set_mapIR2VN(newrhs_pr, vn);
+        m_gvn->set_mapIR2VN(use_stmt, vn);
+    }
 
     //Assign MD to newrhs.
     MD const* r_md = m_ru->genMDforPR(newrhs_pr);
@@ -252,8 +253,10 @@ void IR_GCSE::processCseGen(IN IR * gen, IR * gen_stmt, bool & change)
     IR * new_stpr = m_ru->buildStorePR(PR_no(tmp_pr), IR_dt(tmp_pr), gen);
     new_stpr->setRefMD(tmp_pr_md, m_ru);
 
-    ASSERT0(m_gvn && m_gvn->mapIR2VN(gen));
-    m_gvn->set_mapIR2VN(new_stpr, m_gvn->mapIR2VN(gen));
+    if (m_gvn != NULL) {
+        ASSERT0(m_gvn->mapIR2VN(gen));
+        m_gvn->set_mapIR2VN(new_stpr, m_gvn->mapIR2VN(gen));
+    }
 
     copyDbx(new_stpr, gen_stmt, m_ru);
 
@@ -292,6 +295,7 @@ bool IR_GCSE::isCseCandidate(IR * ir)
     ASSERT0(ir);
     switch (ir->getCode()) {
 	SWITCH_CASE_BIN:
+    case IR_SELECT:
     case IR_BNOT:
     case IR_LNOT:
     case IR_NEG:
@@ -592,6 +596,7 @@ bool IR_GCSE::doProp(IRBB * bb, List<IR*> & livexp)
     SEGIter * st = NULL;
     for (INT i = x->get_first(&st); i != -1; i = x->get_next(i, &st)) {
         IR * y = m_ru->getIR(i);
+        if (y->is_undef() || y->is_pr()) { continue; }
         ASSERT0(y && y->is_exp());
         livexp.append_tail(y);
     }

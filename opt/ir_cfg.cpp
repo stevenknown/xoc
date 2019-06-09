@@ -1299,19 +1299,19 @@ void IR_CFG::dump_node(FILE * h, bool detail)
                 "fontname:\"%s\" scaling:%d label:\"",
                 id, vertical_order++, shape, color, font, scale);
             fprintf(h, "   BB%d ", id);
-            LabelInfo const* li = bb->getLabelList().get_head();            
-            if (li != NULL) {
-				LabelInfo const* head = li;
-                fprintf(h, ":");
-                StrBuf namebuf(32);
-                for(; li != NULL; li = bb->getLabelList().get_next()) {
-                    if (li != head) {
-                        fprintf(h, ",");
-                    }
-                    namebuf.clean();
-                    fprintf(h, "%s", li->getName(&namebuf));
-                }
-            }
+            //LabelInfo const* li = bb->getLabelList().get_head();            
+            //if (li != NULL) {
+			//	LabelInfo const* head = li;
+            //    fprintf(h, ":");
+            //    StrBuf namebuf(32);
+            //    for(; li != NULL; li = bb->getLabelList().get_next()) {
+            //        if (li != head) {
+            //            fprintf(h, ",");
+            //        }
+            //        namebuf.clean();
+            //        fprintf(h, "%s", li->getName(&namebuf));
+            //    }
+            //}
             if (VERTEX_rpo(v) != 0) {
                 fprintf(h, " rpo:%d ", VERTEX_rpo(v));
             }
@@ -1570,6 +1570,9 @@ bool IR_CFG::performMiscOpt(OptCtx & oc)
         if (lchange) {            
             oc.set_flag_if_cfg_changed();
             ck_cfg = true;
+
+            //Each pass maintain CFG by default.
+            OC_is_cfg_valid(oc) = true;
         }
 
         count++;

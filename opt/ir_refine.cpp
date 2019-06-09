@@ -312,10 +312,10 @@ IR * Region::refineStore(IR * ir, bool & change, RefineCtx & rc)
                 ;
             } else {
                 change = true;
-                if (getMDSSAMgr() != NULL) {
-                    getMDSSAMgr()->dump();
+                if (getMDSSAMgr() != NULL &&
+                    getMDSSAMgr()->hasMDSSAInfo(ir) &&
+                    getMDSSAMgr()->hasMDSSAInfo(rhs)) {
                     getMDSSAMgr()->coalesceVersion(ir, rhs);
-                    getMDSSAMgr()->dump();
                 }
                 if (getDUMgr() != NULL) {
                     getDUMgr()->removeIROutFromDUMgr(ir);

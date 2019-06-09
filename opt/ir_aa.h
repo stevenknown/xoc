@@ -455,6 +455,10 @@ protected:
             IN OUT AACtx * ic,
             IN OUT MD2MDSet * mx);
 
+    bool tryReshapeMDSet(MDSet const* mds,
+                         OUT MDSet * newmds,
+                         UINT newofst,
+                         UINT newsize);
     bool tryComputeConstOffset(
             IR const* ir,
             IR const* opnd1,

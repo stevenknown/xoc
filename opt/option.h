@@ -117,7 +117,7 @@ public:
     //This function reset the flag if control flow changed.
     void set_flag_if_cfg_changed()
     {
-        //OC_is_cfg_valid(*this) = false;
+        OC_is_cfg_valid(*this) = false;
         OC_is_cdg_valid(*this) = false;
         OC_is_dom_valid(*this) = false;
         OC_is_pdom_valid(*this) = false;

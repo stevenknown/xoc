@@ -130,9 +130,12 @@ public:
     COPY_CONSTRUCTOR(SegMgr);
     ~SegMgr()
     {
-        #ifdef _DEBUG_
-        UINT n = m_free_list.get_elem_count();
-
+        #ifdef _DEBUG_        
+        UINT n = m_free_list.get_elem_count();  
+        ///////////////////////////////////////////////////////////////
+        //NOTE: SBitSet or SBitSetCore's clean() should be invoked   //
+        //before destruction, otherwise it will lead to SegMgr leaks.//
+        ///////////////////////////////////////////////////////////////
         ASSERTN(seg_count == n, ("MemLeak! There still are SEGs not freed"));
         #endif
 

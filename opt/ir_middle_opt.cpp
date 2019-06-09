@@ -116,6 +116,8 @@ bool Region::performSimplify(OptCtx & oc)
         getCFG()->performMiscOpt(oc);
 
         oc.set_flag_if_cfg_changed();
+        //Each pass maintain CFG by default.
+        OC_is_cfg_valid(oc) = true;
         if (g_do_cdg) {
             ASSERT0(getPassMgr());
             CDG * cdg = (CDG*)getPassMgr()->registerPass(PASS_CDG);

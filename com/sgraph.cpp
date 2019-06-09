@@ -232,7 +232,7 @@ void Graph::computeRpoNoRecursive(Vertex * root, OUT List<Vertex const*> & vlst)
             VERTEX_rpo(v) = order--;
         }
     }
-    ASSERT0(order == 0);
+    ASSERTN(order == 0, ("still have some BBs that are not assigned an order"));
 }
 
 

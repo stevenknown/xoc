@@ -1410,6 +1410,8 @@ void PRSSAMgr::destruction(OptCtx * oc)
     if (bblst->get_elem_count() != bbcnt) {
         ASSERT0(oc);
         oc->set_flag_if_cfg_changed();
+        //Each pass maintain CFG by default.
+        OC_is_cfg_valid(*oc) = true;
     }
 
     //Clean SSA info to avoid unnecessary abort or assert.

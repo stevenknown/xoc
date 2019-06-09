@@ -1709,6 +1709,8 @@ void MDSSAMgr::destruction(OptCtx * oc)
     }
     if (bbnum != bblst->get_elem_count()) {
         oc->set_flag_if_cfg_changed();
+        //Each pass maintain CFG by default.
+        OC_is_cfg_valid(*oc) = true;
     }
     m_is_ssa_constructed = false;
 }

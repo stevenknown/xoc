@@ -705,6 +705,8 @@ void af2i(IN CHAR * f, OUT BYTE * buf, UINT buflen, bool is_double)
 //Note v must be power of 2.
 UINT getPowerOf2(ULONGLONG v)
 {
+    ASSERT0(v > 0);
+    ASSERT0(!(v & (v - 1)));
     UINT n = 0;
     while ((v & 1) == 0) {
         v = v >> 1;

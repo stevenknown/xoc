@@ -46,7 +46,7 @@ typedef enum _MD_TYPE {
 } MD_TYPE;
 
 #define MD_UNDEF              0 //Undefined.
-#define MD_FULL_MEM           1 //Indicate all program memory.
+#define MD_FULL_MEM           1 //Represent all program memory.
 #define MD_FIRST              MD_FULL_MEM
 #define MD_GLOBAL_VAR         2 //Represent variables that 
                                 //allocated at global static data section
@@ -263,7 +263,7 @@ public:
 			    (((ULONGLONG)MD_ofst(t1)) << 1) |
 			    (((ULONGLONG)MD_size(t1)) << 32)) <
 			   (((ULONGLONG)t2->is_range()) |
-			    (((ULONGLONG)MD_ofst(t1)) << 1) |
+			    (((ULONGLONG)MD_ofst(t2)) << 1) |
 			    (((ULONGLONG)MD_size(t2)) << 32));
     }
 
@@ -274,7 +274,7 @@ public:
 			    (((ULONGLONG)MD_ofst(t1)) << 1) |
 			    (((ULONGLONG)MD_size(t1)) << 32)) ==
 			   (((ULONGLONG)t2->is_range()) |
-			    (((ULONGLONG)MD_ofst(t1)) << 1) |
+			    (((ULONGLONG)MD_ofst(t2)) << 1) |
 			    (((ULONGLONG)MD_size(t2)) << 32));
     }
 

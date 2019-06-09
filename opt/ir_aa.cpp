@@ -1088,7 +1088,10 @@ bool IR_AA::tryComputeConstOffset(
     } else {
         return false;
     }
-
+    if (const_offset == 0) {
+        mds.copy(opnd0_mds, *m_misc_bs_mgr);
+        return true;
+    }
     mds.clean(*m_misc_bs_mgr);
 
     //In the case: LDA(x) + ofst, we can determine
@@ -1114,12 +1117,13 @@ bool IR_AA::tryComputeConstOffset(
         } else {
             //case: &x - ofst.
             //Keep offset validation unchanged.
-            INT s = (INT)MD_ofst(&x);
-            s -= (INT)const_offset;
+            INT s = ((INT)MD_ofst(&x)) - (INT)const_offset;
             if (s < 0) {
                 MD_ty(&x) = MD_UNBOUND;
                 MD_size(&x) = 0;
                 MD_ofst(&x) = 0;
+            } else {
+                MD_ofst(&x) = s;
             }
             entry = m_md_sys->registerMD(x);
             ASSERT0(MD_id(entry) > 0);
@@ -1498,34 +1502,13 @@ void IR_AA::processILd(
     }
 
     AC_is_mds_mod(ic) |= AC_is_mds_mod(&tic);
-    if (ILD_ofst(ir) != 0) {
-        UINT ild_ofst = ILD_ofst(ir);
+    if (!ir->is_void()) {
         MDSet tmp;
-        bool change = false;
-        SEGIter * iter;
-        for (INT i = mds.get_first(&iter);
-             i >= 0; i = mds.get_next((UINT)i, &iter)) {
-            MD * l = m_md_sys->getMD((UINT)i);
-            ASSERT0(l);
-
-            //Note if ir's type is VOID, size is 0.
-            //Thus the MD indicates a object that is p + ild_ofst + 0.
-            UINT size = ir->getTypeSize(m_tm);
-            if (l->is_exact() && MD_size(l) != size) {
-                MD md(*l);
-                MD_ofst(&md) += ild_ofst;
-                MD_size(&md) = size;
-                MD const* entry = m_md_sys->registerMD(md);
-                ASSERTN(MD_id(entry) > 0, ("Not yet registered"));
-                tmp.bunion(MD_id(entry), *m_misc_bs_mgr);
-                change = true;
-            } else {
-                tmp.bunion((UINT)i, *m_misc_bs_mgr);
-            }
+        bool change = tryReshapeMDSet(&mds, &tmp,
+            ILD_ofst(ir), ir->getTypeSize(m_tm));
+        if (change) {
+            mds.copy(tmp, *m_misc_bs_mgr);
         }
-
-        if (change) { mds.copy(tmp, *m_misc_bs_mgr); }
-
         ASSERT0(!mds.is_empty());
         tmp.clean(*m_misc_bs_mgr);
     }
@@ -2162,6 +2145,40 @@ FIN:
 }
 
 
+//Reshape MD in 'mds' if one of them need to be reshape.
+//Record reshaped MD in 'newmds' and return true.
+bool IR_AA::tryReshapeMDSet(MDSet const* mds,
+                            OUT MDSet * newmds,
+                            UINT newofst,
+                            UINT newsize)
+{
+    ASSERT0(mds && newmds);
+    bool change = false;
+    SEGIter * iter;
+    //Note if ir's type is VOID, size is 1, see details in data_type.h.
+    //Thus MD indicates an object that is p + ild_ofst + 0.
+    for (INT i = mds->get_first(&iter);
+         i >= 0; i = mds->get_next((UINT)i, &iter)) {
+        MD * l = m_md_sys->getMD((UINT)i);
+        ASSERT0(l);
+        if (l->is_exact() &&
+            (MD_size(l) != newsize || newofst != 0)) {
+            //Reshape MD in DU reference.
+            MD md(*l);
+            MD_ofst(&md) += newofst;
+            MD_size(&md) = newsize;
+            MD const* entry = m_md_sys->registerMD(md);
+            ASSERTN(MD_id(entry) > 0, ("Not yet registered"));
+            newmds->bunion(MD_id(entry), *m_misc_bs_mgr);
+            change = true;
+        } else {
+            newmds->bunion((UINT)i, *m_misc_bs_mgr);
+        }
+    }
+    return change;
+}
+
+
 //Indirect store.
 //Analyse pointers according to rules for individiual ir to
 //constructe the map-table that maps MD to an unique VAR.
@@ -2177,6 +2194,7 @@ void IR_AA::processISt(IN IR * ir, IN MD2MDSet * mx)
     //Compute where IST_base may point to.
     AC_comp_pt(&ic) = true;
 
+    //Compute where IST_base may point to.
     inferExpression(IST_base(ir), ml_may_pt, &ic, mx);
     if (ml_may_pt.is_empty()) {
         //If we can not exactly determine where IST_base pointed to,
@@ -2190,35 +2208,17 @@ void IR_AA::processISt(IN IR * ir, IN MD2MDSet * mx)
         return;
     }
 
-    UINT ist_size = ir->getTypeSize(m_tm);
-    if (IST_ofst(ir) != 0 || ist_size != IST_base(ir)->getTypeSize(m_tm)) {
-        UINT ist_ofst = IST_ofst(ir);
-        //Compute where IST_base may point to.
+    //ml_may_pt indicates a list of MD that IST may referenced.
+    //The PointTo set of IST recored in AC_returned_pts().
+    //if (IST_ofst(ir) != 0 ||
+    //    ir->getTypeSize(m_tm) != IST_base(ir)->getTypeSize(m_tm)) {
+    if (!ir->is_void()) {
         MDSet tmp;
-        bool change = false;
-        SEGIter * iter;
-        for (INT i = ml_may_pt.get_first(&iter);
-             i >= 0; i = ml_may_pt.get_next((UINT)i, &iter)) {
-            MD * l = m_md_sys->getMD((UINT)i);
-            ASSERT0(l);
-            if (l->is_exact()) {
-                MD md(*l);
-                MD_ofst(&md) += ist_ofst;
-
-                //Note if ir's type is VOID, size is 0.
-                //Thus the MD indicates a object that is
-                //p + ist_ofst + 0, if ist_ofst exist.
-                MD_size(&md) = ist_size;
-                MD const* entry = m_md_sys->registerMD(md);
-                ASSERTN(MD_id(entry) > 0, ("Not yet registered"));
-                tmp.bunion(entry, *m_misc_bs_mgr);
-                change = true;
-            } else {
-                tmp.bunion(l, *m_misc_bs_mgr);
-            }
+        bool change = tryReshapeMDSet(&ml_may_pt, &tmp,
+            IST_ofst(ir), ir->getTypeSize(m_tm));
+        if (change) {
+            ml_may_pt.copy(tmp, *m_misc_bs_mgr);
         }
-
-        if (change) { ml_may_pt.copy(tmp, *m_misc_bs_mgr); }
         tmp.clean(*m_misc_bs_mgr);
     }
 
@@ -2226,13 +2226,15 @@ void IR_AA::processISt(IN IR * ir, IN MD2MDSet * mx)
     SEGIter * iter;
     if (ml_may_pt.get_elem_count() == 1 &&
         !MD_is_may(x = m_md_sys->getMD((UINT)ml_may_pt.get_first(&iter)))) {
-        if (x->is_exact() && !ir->is_void() && ist_size != MD_size(x)) {
+        if (x->is_exact() &&
+            !ir->is_void() &&
+            ir->getTypeSize(m_tm) != MD_size(x)) {
             MD md(*x);
 
-            //Note if ir's type is VOID, size is 0.
-            //Thus the MD indicates a object that is
+            //Note if ir's type is VOID, size is 1.
+            //Thus the MD indicates an object that is
             //p + ist_ofst + 0, if ist_ofst exist.
-            MD_size(&md) = ist_size;
+            MD_size(&md) = ir->getTypeSize(m_tm);
             MD const* entry = m_md_sys->registerMD(md);
             ASSERTN(MD_id(entry) > 0, ("Not yet registered"));
             x = entry;

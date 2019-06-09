@@ -131,7 +131,22 @@ IRBB * findAndInsertPreheader(
     for (xcom::EdgeC const* ec = VERTEX_in_list(cfg->get_vertex(BB_id(head)));
          ec != NULL; ec = EC_next(ec)) {
         UINT pred = VERTEX_id(EDGE_from(EC_edge(ec)));
-        if (pred == BB_id(prev)) {
+        IRBB const* pred_bb = rg->getCFG()->getBB(pred);
+        ASSERT0(pred_bb);
+        if (pred == BB_id(prev) && !LI_bb_set(li)->is_contain(BB_id(prev))) {
+            //Try to find fallthrough prev BB.
+            //CASE:prev is not preheader of head. 
+            //      BB_prehead----
+            //                   |
+            //  ............     |
+            //                   |
+            //  ---->BB_prev     |
+            //  |      |         |
+            //  |      v         |
+            //  |   BB_head<------  
+            //  |      |
+            //  |      v      
+            //  ----BB_end
             find_appropriate_prev_bb = true;
             break;
         }
@@ -139,44 +154,88 @@ IRBB * findAndInsertPreheader(
 
     if (BB_last_ir(prev) != NULL &&
         prev->isDownBoundary(BB_last_ir(prev))) {
+        //prev should fallthrough to current BB.
         //Can not append IR to prev BB.
         find_appropriate_prev_bb = false;
     }
 
-    if (!force && find_appropriate_prev_bb) { return prev; }
+    if (!force) {
+        if (find_appropriate_prev_bb) {
+            return prev;
+        }
+        return NULL;
+    }    
 
     List<IRBB*> preds;
     cfg->get_preds(preds, head);
-    insert_bb = true;
-    IRBB * newbb = rg->allocBB();
-    bblst->insert_before(newbb, bbholder);
+    IRBB * preheader = rg->allocBB();
+    bblst->insert_before(preheader, bbholder);
+    LabelInfo const* preheader_lab = rg->genIlabel();
     xcom::BitSet * loop_body = LI_bb_set(li);
     for (IRBB * p = preds.get_head(); p != NULL; p = preds.get_next()) {
         if (loop_body->is_contain(BB_id(p))) {
+            //p is inside loop.
             continue;
         }
-        cfg->add_bb(newbb);
-        cfg->insertVertexBetween(BB_id(p), BB_id(head), BB_id(newbb));
-        BB_is_fallthrough(newbb) = true;
+        if (!insert_bb) {
+            //Insert preheader in front of head.
+            //Note preheader must fallthrough to head.
+            cfg->add_bb(preheader);
+            cfg->insertVertexBetween(BB_id(p), BB_id(head), BB_id(preheader));
+            BB_is_fallthrough(preheader) = true;
+            insert_bb = true;
+        }
+
+        //CASE1:
+        //  BB_p
+        //   |
+        //   v
+        //  BB_header
+        if (BB_is_fallthrough(p)) {
+            //Nothing to do.
+            continue;
+        }
+
+        //CASE2:
+        //  BB_p(goto lab1)
+        //   |
+        //   v
+        //  BB_header(lab1)
+        //=>
+        //  BB_p(goto lab2)
+        //   |
+        //   v
+        //  BB_preheader(lab2)      
+        //   |
+        //   v
+        //  BB_header(lab2)
+        IR * last_ir = BB_last_ir(p);
+        ASSERT0(last_ir &&
+                (last_ir->isConditionalBr() || last_ir->isUnconditionalBr()));
+        //Add newlabel to preheader if not exist.
+        preheader->addLabel(preheader_lab);
+        //Update branch-target of IR that located in predecessor of head.
+        last_ir->setLabel(preheader_lab);
     }
 
-    //Move LabelInfo from head to prehead except the LabelInfo which are the
-    //target of IR which belongs to loop body.
+    //Move LabelInfos from head to preheader except LabelInfos that
+    //are the target of IR that belongs to loop body.
     List<LabelInfo const*> & lablst = head->getLabelList();
     if (lablst.get_elem_count() <= 1) {
-        //The only label is the loop back edge target.
-        return newbb;
+        //The only label is the target of loop back-edge.
+        return preheader;
     }
 
     //Record if Labels which attached on head are
-    //the branch target of IR which inside the loop.
-    //The other Label can be moved to preheader.
-    TMap<LabelInfo const*, bool> head_labinfo;
+    //branch target of IR which inside loop.
+    //Other Labels can be moved to preheader.
+    TMap<LabelInfo const*, bool> lab_canbe_move_to_preheader;
     for (LabelInfo const* lab = lablst.get_head();
          lab != NULL; lab = lablst.get_next()) {
-        head_labinfo.set(lab, false);
+        lab_canbe_move_to_preheader.set(lab, false);
     }
 
+    //Mark labels that can not move to preheader.
     for (INT i = LI_bb_set(li)->get_first();
          i >= 0; i = LI_bb_set(li)->get_next(i)) {
         IRBB * bb = cfg->getBB(i);
@@ -187,8 +246,8 @@ IRBB * findAndInsertPreheader(
                      c != NULL; c = c->get_next()) {
                     LabelInfo const* lab = c->getLabel();
                     ASSERT0(lab);
-                    if (head_labinfo.find(lab)) {
-                        head_labinfo.setAlways(lab, true);
+                    if (lab_canbe_move_to_preheader.find(lab)) {
+                        lab_canbe_move_to_preheader.setAlways(lab, true);
                     }
                 }
                 continue;
@@ -197,24 +256,25 @@ IRBB * findAndInsertPreheader(
             LabelInfo const* lab = ir->getLabel();
             if (lab == NULL) { continue; }
 
-            if (!head_labinfo.find(lab)) { continue; }
+            if (!lab_canbe_move_to_preheader.find(lab)) { continue; }
 
-            head_labinfo.setAlways(lab, true);
+            lab_canbe_move_to_preheader.setAlways(lab, true);
         }
     }
 
+    //Move labels to preheader.
     xcom::C<LabelInfo const*> * ct;
     xcom::C<LabelInfo const*> * next_ct;
     for (lablst.get_head(&ct); ct != lablst.end(); ct = next_ct) {
         next_ct = lablst.get_next(ct);
         LabelInfo const* lab = ct->val();
-        if (head_labinfo.get(lab)) { continue; }
+        if (lab_canbe_move_to_preheader.get(lab)) { continue; }
         lablst.remove(ct);
-        newbb->addLabel(lab);
-        cfg->get_lab2bb_map()->setAlways(lab, newbb);
+        preheader->addLabel(lab);
+        cfg->getLabel2BBMap()->setAlways(lab, preheader);
     }
 
-    return newbb;
+    return preheader;
 }
 
 } //namespace xoc

@@ -1802,6 +1802,27 @@ public:
         m_elem_count--;
         return t;
     }
+
+    //Reverse elements in list.
+    //e.g: List is a->b->c->d, after rervse,
+    //list will be d->c->b->a.
+    void reverse_list()
+    {
+        SC<T> * head = NULL;
+        SC<T> * cur = m_head.next;
+        while (cur != &m_head) {
+            SC<T> * temp = cur->next;
+            if (head == NULL) {
+                head = cur;
+                head->next = &m_head;
+            } else {
+                cur->next = head;
+                head = cur;
+            }
+            cur = temp;
+        }
+        m_head.next = head; 
+    }
 };
 //END SListCore
 
@@ -2230,6 +2251,28 @@ public:
         free_sc(c, free_list);
         m_elem_count--;
         return t;
+    }
+
+    //Reverse elements in list.
+    //e.g: List is a->b->c->d, after rervse,
+    //list will be d->c->b->a.
+    void reverse_list()
+    {
+        SC<T> * head = NULL;
+        SC<T> * cur = m_head.next;
+        while (cur != &m_head) {
+            SC<T> * temp = cur->next;
+            if (head == NULL) {
+                head = cur;
+                head->next = NULL;
+                m_tail = cur;
+            } else {
+                cur->next = head;
+                head = cur;
+            }
+            cur = temp;
+        }
+        m_head = head;
     }
 };
 //END SListEx

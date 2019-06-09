@@ -101,7 +101,7 @@ private:
             IN IRBB * def_bb,
             IN OUT IRBB * use_bb,
             MDSSAMgr * mdssamgr);
-    bool doProp(IN IRBB * bb, IN DefSBitSetCore & useset, MDSSAMgr * mdssamgr);
+    bool doProp(IN IRBB * bb, IN DefSBitSetCore * useset, MDSSAMgr * mdssamgr);
     void doFinalRefine();
 
     bool isSimpCVT(IR const* ir) const;

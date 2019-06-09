@@ -1645,7 +1645,7 @@ xcom::C<IRBB*> * Region::splitIRlistIntoBB(
     IRBB * newbb = allocBB();
     cfg->add_bb(newbb);
     ctbb = bbl->insert_after(newbb, ctbb);
-    LAB2BB * lab2bb = cfg->get_lab2bb_map();
+    LAB2BB * lab2bb = cfg->getLabel2BBMap();
 
     while (irs != NULL) {
         IR * ir = xcom::removehead(&irs);
@@ -1894,7 +1894,7 @@ bool Region::reconstructBBList(OptCtx & oc)
 
     END_TIMER(t, "Reconstruct IRBB list");
 
-    if (change) {
+    if (change) {        
         //Must rebuild CFG and all other structures which are
         //closely related to CFG.
         oc.set_flag_if_cfg_changed();

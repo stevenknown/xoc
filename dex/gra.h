@@ -321,7 +321,7 @@ protected:
     Vector<IR*> m_pos2ir;
     IG m_ig;
     SMemPool * m_pool;
-    PRDF * m_prdf;
+    LivenessMgr * m_liveness_mgr;
     Prno2Vreg * m_pr2v;
     Vreg2PR * m_v2pr;
     GltMgr * m_gltm;
@@ -367,7 +367,7 @@ protected:
     void dump_allocated(FILE * h, BitSet & visited);
     void dump_unallocated(FILE * h, BitSet & visited);
 public:
-    LTMgr(IRBB * bb, PRDF * prdf, GltMgr * gltm, SMemPool * pool);
+    LTMgr(IRBB * bb, LivenessMgr * prdf, GltMgr * gltm, SMemPool * pool);
     COPY_CONSTRUCTOR(LTMgr);
     ~LTMgr() {}
 
@@ -401,7 +401,7 @@ public:
     { return m_tm->get_bytesize(IR_dt(ir))== 8; }
 
     inline bool is_livein(UINT prno) const
-    { return m_prdf->get_livein(BB_id(m_bb))->is_contain(prno); }
+    { return m_liveness_mgr->get_livein(BB_id(m_bb))->is_contain(prno); }
     inline bool is_livein(LT const* l) const
     {
         ASSERT0(LT_range(l));
@@ -409,7 +409,7 @@ public:
     }
 
     inline bool is_liveout(UINT prno) const
-    { return m_prdf->get_liveout(BB_id(m_bb))->is_contain(prno); }
+    { return m_liveness_mgr->get_liveout(BB_id(m_bb))->is_contain(prno); }
     inline bool is_liveout(LT const* l) const
     {
         ASSERT0(LT_range(l));
@@ -535,7 +535,7 @@ protected:
     RA * m_ra;
     RSC * m_rsc;
     SMemPool * m_pool;
-    PRDF * m_prdf;
+    LivenessMgr * m_liveness_mgr;
     TypeMgr * m_tm;
     UINT m_glt_count;
     bool m_is_consider_local_interf;
@@ -552,7 +552,7 @@ protected:
     }
     bool verify();
 public:
-    GltMgr(Region * rg, PRDF * prdf, RA * ra);
+    GltMgr(Region * rg, LivenessMgr * prdf, RA * ra);
     COPY_CONSTRUCTOR(GltMgr);
     ~GltMgr()
     {
@@ -809,7 +809,7 @@ protected:
     friend class LTMgr;
     friend class GltMgr;
 
-    PRDF m_prdf;
+    LivenessMgr m_liveness_mgr;
     GltMgr m_gltm;
     GIG m_ig;
     RSC m_rsc;
@@ -904,7 +904,7 @@ public:
        Vreg2PR * v2pr,
        Prno2Vreg * pr2v,
        VAR2PR * var2pr) :
-        m_prdf(rg), m_gltm(rg, &m_prdf, self()), m_ig(rg, &m_gltm),
+        m_liveness_mgr(rg), m_gltm(rg, &m_liveness_mgr, self()), m_ig(rg, &m_gltm),
         m_rsc(&m_gltm)
     {
         ASSERT0(rg && tr);

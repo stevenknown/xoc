@@ -8,6 +8,8 @@ com/rational.o \
 com/linsys.o \
 com/xmat.o \
 com/strbuf.o \
+com/bigint.o \
+com/birational.o \
 com/testbs.o \
 com/flty.o \
 com/bs.o
@@ -57,7 +59,7 @@ opt/callg.o\
 opt/loop.o\
 opt/ir_loop_cvt.o\
 opt/symtab.o\
-opt/prdf.o
+opt/liveness_mgr.o
 
 GRREADER_OBJS += \
 reader/ir_parser.o\

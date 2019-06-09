@@ -79,7 +79,8 @@ Matrix<Rational> operator + (Matrix<Rational> const& a,
 }
 
 
-Matrix<Rational> operator - (Matrix<Rational> const& a, Matrix<Rational> const& b)
+Matrix<Rational> operator - (Matrix<Rational> const& a,
+                             Matrix<Rational> const& b)
 {
     ASSERTN(a.m_is_init && b.m_is_init, ("not yet initialize."));
     ASSERTN(a.m_row_size == b.m_row_size && a.m_col_size == b.m_col_size,
@@ -290,18 +291,16 @@ static void rmat_dumps(void const* pbasis)
             if (rat.den() == 1) {
                 printf("%5d%s%s", (INT)rat.num(), PRT_COMMA, blank);
             } else if (rat.den() == -1) {
-                printf("%5d%s%s",
-                            -((INT)rat.num()), PRT_COMMA, blank);
+                printf("%5d%s%s", -((INT)rat.num()), PRT_COMMA, blank);
             } else if (rat.num() == 0) {
                 if (rat.den() == 1) {
                     printf("%5d %s%s", 0, PRT_COMMA, blank);
                 } else {
                     printf("%5d/%-5d%s",
-                              (INT)rat.num(), (INT)rat.den(), PRT_COMMA);
+                           (INT)rat.num(), (INT)rat.den(), PRT_COMMA);
                 }
             } else {
-                printf("%5d/%-5d%s",
-                          (INT)rat.num(), (INT)rat.den(), PRT_COMMA);
+                printf("%5d/%-5d%s", (INT)rat.num(), (INT)rat.den(), PRT_COMMA);
             }
         }
         printf("\n");
@@ -367,7 +366,7 @@ void RMat::_init_hook()
 
 void RMat::init()
 {
-    if (m_is_init) return;
+    if (m_is_init) { return; }
     ((Matrix<Rational>*)this)->init(); //Do initialization of base class here.
     m_is_init = true;
     _init_hook();
@@ -377,7 +376,7 @@ void RMat::init()
 
 void RMat::init(UINT row, UINT col)
 {
-    if (m_is_init) return;
+    if (m_is_init) { return; }
     ((Matrix<Rational>*)this)->init(row, col);
     m_is_init = true;
     _init_hook();
@@ -387,7 +386,7 @@ void RMat::init(UINT row, UINT col)
 
 void RMat::init(RMat const& m)
 {
-    if (m_is_init) return;
+    if (m_is_init) { return; }
     ((Matrix<Rational>*)this)->init();
     m_is_init = true;
     copy(m);
@@ -397,7 +396,7 @@ void RMat::init(RMat const& m)
 
 void RMat::init(INTMat const& m)
 {
-    if (m_is_init) return;
+    if (m_is_init) { return; }
     ((Matrix<Rational>*)this)->init();
     m_is_init = true;
     copy(m);
@@ -407,7 +406,7 @@ void RMat::init(INTMat const& m)
 
 void RMat::destroy()
 {
-    if (!m_is_init) return;
+    if (!m_is_init) { return; }
     Matrix<Rational>::destroy();
     m_is_init = false;
 }
@@ -436,7 +435,7 @@ void RMat::sete(UINT num, ...)
     if (num <= 0) {
         return;
     }
-    INT * ptr = (INT*) (((BYTE*)(&num)) + sizeof(UINT));
+    INT * ptr = (INT*)(((BYTE*)(&num)) + sizeof(UINT));
     UINT i = 0;
     UINT row = 0, col = 0;
     while (i < num) {
@@ -490,7 +489,7 @@ void RMat::copy(RMat const& r)
 void RMat::copy(INTMat const& m)
 {
     ASSERTN(m_is_init && m.m_is_init, ("not yet initialize."));
-    if (this == (RMat*)&m) return;
+    if (this == (RMat*)&m) { return; }
     if (m_mat) {
         ::free(m_mat);
     }
@@ -533,7 +532,7 @@ UINT RMat::comden(UINT row, UINT col)
     for (UINT j= col; j < m_col_size; j++) {
             Rational v = get(row, j);
             ASSERTN(v.den() > 0,
-                        ("should be converted positive in rational file"));
+                    ("should be converted positive in rational file"));
             if (v.num() == 0) {
                 continue;
             }
@@ -541,8 +540,7 @@ UINT RMat::comden(UINT row, UINT col)
                 lcm = slcm(lcm, v.den());
                 is_int = false;
             }
-    } //end for
-
+    }
     if (!is_int) {
         for (UINT j= col; j < m_col_size; j++) {
             Rational v = get(row, j);
@@ -552,7 +550,7 @@ UINT RMat::comden(UINT row, UINT col)
                 setr(row, j, num, lcm);
             }
         }
-    } //end if
+    }
     return lcm;
 }
 
@@ -570,8 +568,7 @@ UINT RMat::comden(UINT row, UINT col)
 //        x1 + 7x2 - 2x3  = -10
 void RMat::substit(RMat const& exp, UINT v, bool is_eq, INT rhs_idx)
 {
-    ASSERTN(m_is_init && exp.m_is_init,
-            ("not yet initialize."));
+    ASSERTN(m_is_init && exp.m_is_init, ("not yet initialize."));
     ASSERTN(m_col_size == exp.m_col_size && v < m_col_size &&
             exp.is_rowvec(), ("unmatch matrix"));
 
@@ -640,8 +637,7 @@ void RMat::reduce()
 
 RMat operator * (RMat const& a, RMat const& b)
 {
-    ASSERTN(a.m_is_init && b.m_is_init,
-            ("not yet initialize."));
+    ASSERTN(a.m_is_init && b.m_is_init, ("not yet initialize."));
     RMat c;
     Matrix<Rational> * cp = (Matrix<Rational>*)&c;
     Matrix<Rational> const* ap = (Matrix<Rational> const*)&a;
@@ -653,8 +649,7 @@ RMat operator * (RMat const& a, RMat const& b)
 
 RMat operator + (RMat const& a, RMat const& b)
 {
-    ASSERTN(a.m_is_init && b.m_is_init,
-            ("not yet initialize."));
+    ASSERTN(a.m_is_init && b.m_is_init, ("not yet initialize."));
     RMat c;
     Matrix<Rational> *cp = (Matrix<Rational>*)&c;
     Matrix<Rational> *ap = (Matrix<Rational>*)&a;
@@ -666,9 +661,7 @@ RMat operator + (RMat const& a, RMat const& b)
 
 RMat operator - (RMat const& a, RMat const& b)
 {
-    ASSERTN(a.m_is_init &&
-            b.m_is_init,
-            ("not yet initialize."));
+    ASSERTN(a.m_is_init && b.m_is_init, ("not yet initialize."));
     RMat c;
     Matrix<Rational> *cp = (Matrix<Rational>*)&c;
     Matrix<Rational> *ap = (Matrix<Rational>*)&a;

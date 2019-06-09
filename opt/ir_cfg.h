@@ -189,7 +189,7 @@ public:
     Region * getRegion() { return m_ru; }
     UINT getNumOfBB() const { return get_vertex_num(); }
     BBList * getBBList() { return m_bb_list; }
-    LAB2BB * get_lab2bb_map() { return &m_lab2bb; }
+    LAB2BB * getLabel2BBMap() { return &m_lab2bb; }
     IRBB * getBB(UINT id) const { return m_bb_vec.get(id); }
     virtual bool goto_opt(IRBB * bb);
     virtual CHAR const* getPassName() const { return "CFG"; }

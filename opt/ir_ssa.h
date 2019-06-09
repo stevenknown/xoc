@@ -351,6 +351,9 @@ public:
     { return "PR SSA Manager"; }
 
     PASS_TYPE getPassType() const { return PASS_PR_SSA_MGR; }
+
+    virtual bool perform(OptCtx & oc)
+    { construction(oc); return true; }
 };
 
 

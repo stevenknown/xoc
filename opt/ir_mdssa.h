@@ -254,6 +254,9 @@ public:
 
     bool hasMDSSAInfo(IR const* ir) const
     { return ir->isMemoryRefNotOperatePR() || ir->isCallStmt(); }
+
+    virtual bool perform(OptCtx & oc)
+    { construction(oc); return true; }
 };
 
 } //namespace xoc

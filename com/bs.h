@@ -242,16 +242,17 @@ public:
     //////////////////////////////////////////////////////////////
     //NOTE: THE FOLLOWING INTERFACES ARE PROHIBITED TO BE USED.///
     //////////////////////////////////////////////////////////////
-    void rev(UINT last_bit_pos) { UNREACHABLE(); }
-    void intersect(BitSet const& bs) { UNREACHABLE(); }
-    void diff(UINT elem) { UNREACHABLE(); }
-    void diff(BitSet const& bs) { UNREACHABLE(); }
-    void copy(BitSet const& src) { UNREACHABLE(); }
+    void rev(UINT last_bit_pos) { DUMMYUSE(last_bit_pos); UNREACHABLE(); }
+    void intersect(BitSet const& bs) { DUMMYUSE(bs); UNREACHABLE(); }
+    void diff(UINT elem) { DUMMYUSE(elem); UNREACHABLE(); }
+    void diff(BitSet const& bs) { DUMMYUSE(bs); UNREACHABLE(); }
+    void copy(BitSet const& src) { DUMMYUSE(src); UNREACHABLE(); }
     void clean() { UNREACHABLE(); }
-    void complement(BitSet const& univers) { UNREACHABLE(); }
-    void alloc(UINT size) { UNREACHABLE(); }
-    void bunion(BitSet const& bs) { UNREACHABLE(); }
-    void bunion(UINT elem) { UNREACHABLE(); }
+    void complement(BitSet const& univers)
+    { DUMMYUSE(univers); UNREACHABLE(); }
+    void alloc(UINT size) { DUMMYUSE(size); UNREACHABLE(); }
+    void bunion(BitSet const& bs) { DUMMYUSE(bs); UNREACHABLE(); }
+    void bunion(UINT elem) { DUMMYUSE(elem); UNREACHABLE(); }
 };
 
 

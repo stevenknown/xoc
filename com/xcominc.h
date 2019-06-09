@@ -19,6 +19,7 @@
 #include "lpsol.h"
 #include "sort.h"
 #include "bigint.h"
+#include "birational.h"
 
 using namespace xcom;
 #endif

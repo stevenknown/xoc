@@ -775,7 +775,7 @@ bool IR_LICM::doLoopTree(
 
         doit = true;
         bool flag;
-        IRBB * prehead = ::findAndInsertPreheader(tli, m_ru, flag, false);
+        IRBB * prehead = ::findAndInsertPreheader(tli, m_ru, flag, true);
         ASSERT0(prehead);
         insert_bb |= flag;
         if (flag && LI_outer(tli) != NULL) {

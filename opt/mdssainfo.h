@@ -237,9 +237,9 @@ public:
     VOpndSet const* readVOpndSet() const { return &m_vopnd_set; }
 
     //Collect all USE, where USE is IR expression.
-    void collectUse(OUT DefSBitSetCore & set,
-            IN UseDefMgr * usedefmgr,
-            IN DefMiscBitSetMgr * bsmgr);
+    void collectUse(OUT DefSBitSetCore * set,
+                    IN UseDefMgr * usedefmgr,
+                    IN DefMiscBitSetMgr * bsmgr);
 
     void removeUse(IR const* exp, IN UseDefMgr * usedefmgr);
 };

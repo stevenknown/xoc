@@ -233,6 +233,8 @@ bool IR_LOOP_CVT::perform(OptCtx & oc)
 
         oc.set_flag_if_cfg_changed();
         //Only cfg is avaiable.
+        //Each pass maintain CFG by default.
+        OC_is_cfg_valid(oc) = true;
 
         //TODO: make rpo, dom valid.
     }

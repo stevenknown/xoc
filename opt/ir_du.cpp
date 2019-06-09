@@ -3445,6 +3445,7 @@ void IR_DU_MGR::computeGenForBB(
             }
             break;
         case IR_PHI:
+            //Since phis are always at head of BB, no live-expr killed by them.
             for (IR * p = PHI_opnd_list(ir); p != NULL; p = p->get_next()) {
                 if (canBeLiveExprCand(p)) {
                     gen_ir_exprs->bunion(IR_id(p), bsmgr);
@@ -3685,6 +3686,8 @@ void IR_DU_MGR::solve(
         DefMiscBitSetMgr & bsmgr)
 {
     BBList * bbl = m_ru->getBBList();
+    IRBB const* entry = m_cfg->get_entry();
+    ASSERT0(entry && BB_is_entry(entry));
     for (IRBB * bb = bbl->get_tail(); bb != NULL; bb = bbl->get_prev()) {
         UINT bbid = BB_id(bb);
         if (HAVE_FLAG(flag, SOL_REACH_DEF)) {
@@ -3700,17 +3703,20 @@ void IR_DU_MGR::solve(
             //Initialize available in, available out expression.
             //IN-SET of BB must be universal of all IR-expressions.
             DefDBitSetCore * availin = getAvailInExpr(bbid, m_misc_bs_mgr);
-            availin->copy(expr_univers, *m_misc_bs_mgr);
-
-            DefDBitSetCore * liveout = getAvailOutExpr(bbid, &bsmgr);
-            liveout->copy(*availin, bsmgr);
-
-            DefDBitSetCore const* set = getKilledIRExpr(bbid);
-            if (set != NULL) {
-                liveout->diff(*set, bsmgr);
+            DefDBitSetCore * availout = getAvailOutExpr(bbid, &bsmgr);
+            if (bbid == entry->id()) {
+                //AvailIn and AvailOut of entry should be empty.
+                availin->clean(*m_misc_bs_mgr);
+                availout->clean(*m_misc_bs_mgr);
+            } else { 
+                availin->copy(expr_univers, *m_misc_bs_mgr);
+                availout->copy(*availin, bsmgr);
+                DefDBitSetCore const* set = getKilledIRExpr(bbid);
+                if (set != NULL) {
+                    availout->diff(*set, bsmgr);
+                }
+                availout->bunion(*getGenIRExpr(bbid, &bsmgr), bsmgr);
             }
-
-            liveout->bunion(*getGenIRExpr(bbid, &bsmgr), bsmgr);
         }
     }
 

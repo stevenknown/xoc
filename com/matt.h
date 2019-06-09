@@ -517,7 +517,7 @@ public:
     //Stranger value decomposition.
     bool svd(OUT Matrix<T> & u, OUT Matrix<T> & s, OUT Matrix<T> & eigx);
     bool diag(OUT Matrix<T> & p, OUT Matrix<T> & d); //Diagonalize matrix
-    T norm(INT p); //Calculate matrix/vector norm.
+    T norm(INT p); //Calculate matrix/vector Euclidean norm.
     bool cond(T & c, INT p = NORM_INF); //Calculate condition number.
     T sprad(); //Calculate spectral radius.
     void padding(); //complement to nonsingular

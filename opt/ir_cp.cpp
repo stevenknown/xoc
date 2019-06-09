@@ -504,7 +504,7 @@ void IR_CP::dumpCopyPropagationAction(
 //'usevec': for local used.
 bool IR_CP::doProp(
         IN IRBB * bb,
-        IN DefSBitSetCore & useset,
+        IN DefSBitSetCore * useset,
         MDSSAMgr * mdssamgr)
 {
     bool change = false;
@@ -530,9 +530,10 @@ bool IR_CP::doProp(
 
         SSAInfo * ssainfo = def_stmt->getSSAInfo();
         MDSSAInfo * mdssainfo = mdssamgr->getMDSSAInfoIfAny(def_stmt);
+        DUSet const* duset = NULL;
         bool prssadu = false;
         bool mdssadu = false;
-        useset.clean(*m_ru->getMiscBitSetMgr());
+        useset->clean(*m_ru->getMiscBitSetMgr());
         if (ssainfo != NULL && SSA_uses(ssainfo).get_elem_count() != 0) {
             //Record use_stmt in another vector to facilitate this function
             //if it is not in use-list any more after copy-propagation.
@@ -541,7 +542,7 @@ bool IR_CP::doProp(
                  u >= 0; u = SSA_uses(ssainfo).get_next(u, &sc)) {
                 IR * use = m_ru->getIR(u);
                 ASSERT0(use);
-                useset.bunion(use->id(), *m_ru->getMiscBitSetMgr());
+                useset->bunion(use->id(), *m_ru->getMiscBitSetMgr());
             }
             prssadu = true;
         } else if (mdssainfo != NULL &&
@@ -555,13 +556,22 @@ bool IR_CP::doProp(
             mdssainfo->collectUse(useset, mdssamgr->getUseDefMgr(),
                 m_ru->getMiscBitSetMgr());
             mdssadu = true;
+        } else if ((duset = def_stmt->readDUSet()) != NULL &&
+                   duset->get_elem_count() != 0) {
+            if (def_stmt->getRefMD() == NULL ||
+                !def_stmt->getRefMD()->is_exact()) {
+                continue;
+            }
+            //Record use_stmt in another Set to facilitate this function
+            //if it is not in use-list any more after copy-propagation.
+            useset->copy(*duset, *m_ru->getMiscBitSetMgr());
         } else {
             continue;
         }
 
         SEGIter * segiter;
-        for (INT i = useset.get_first(&segiter);
-             i != -1; i = useset.get_next(i, &segiter)) {
+        for (INT i = useset->get_first(&segiter);
+             i != -1; i = useset->get_next(i, &segiter)) {
             IR * use = m_ru->getIR(i);
             ASSERT0(use && use->is_exp());
             if (use->is_id() && !prop_value->is_const()) {
@@ -681,7 +691,7 @@ bool IR_CP::perform(OptCtx & oc)
     for (xcom::Vertex * v = lst.get_head(); v != NULL; v = lst.get_next()) {
         IRBB * bb = m_cfg->getBB(VERTEX_id(v));
         ASSERT0(bb);
-        change |= doProp(bb, useset, mdssamgr);
+        change |= doProp(bb, &useset, mdssamgr);
     }
     useset.clean(*m_ru->getMiscBitSetMgr());
     if (change) {

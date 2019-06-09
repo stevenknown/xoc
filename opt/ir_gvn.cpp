@@ -1021,9 +1021,10 @@ void IR_GVN::processBB(IRBB * bb, bool & change)
                 VN * x = computeVN(ST_rhs(ir), change);
                 if (x == NULL) { break; }
 
-                //IST's vn may be set by its dominated use-stmt ILD.
+                //ST's vn may be set by its dominated use-stmt ILD.
                 if (m_ir2vn.get(ir->id()) != x) {
-                    ASSERT0(m_ir2vn.get(ir->id()) == NULL);
+                    //ir2vn is NULL only the first iteration computation.
+                    //ASSERT0(m_ir2vn.get(ir->id()) == NULL);
                     m_ir2vn.set(ir->id(), x);
                     change = true;
                 }
@@ -1050,9 +1051,10 @@ void IR_GVN::processBB(IRBB * bb, bool & change)
                 VN * x = computeVN(STARR_rhs(ir), change);
                 if (x == NULL) { break; }
 
-                //IST's vn may be set by its dominated use-stmt ILD.
+                //STARRAY's vn may be set by its dominated use-stmt ILD.
                 if (m_ir2vn.get(ir->id()) != x) {
-                    ASSERT0(m_ir2vn.get(ir->id()) == NULL);
+                    //ir2vn is NULL only the first iteration computation.
+                    //ASSERT0(m_ir2vn.get(ir->id()) == NULL);
                     m_ir2vn.set(ir->id(), x);
                     change = true;
                 }
@@ -1064,11 +1066,12 @@ void IR_GVN::processBB(IRBB * bb, bool & change)
                 computeVN(IST_base(ir), change);
 
                 VN * x = computeVN(ir->getRHS(), change);
-                if (x == NULL) { return; }
+                if (x == NULL) { break; }
 
                 //IST's vn may be set by its dominated use-stmt ILD.
                 if (m_ir2vn.get(ir->id()) != x) {
-                    ASSERT0(m_ir2vn.get(ir->id()) == NULL);
+                    //ir2vn is NULL only the first iteration computation.
+                    //ASSERT0(m_ir2vn.get(ir->id()) == NULL);
                     m_ir2vn.set(ir->id(), x);
                     change = true;
                 }

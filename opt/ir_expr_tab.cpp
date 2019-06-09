@@ -544,8 +544,16 @@ void IR_EXPR_TAB::encode_bb(IRBB * bb)
                 }
             }
             break;
-        case IR_PHI:
+        case IR_PHI: {
+            for (IR * opnd = PHI_opnd_list(ir);
+                 opnd != NULL; opnd = opnd->get_next()) {
+                ExpRep * ie = encode_expr(opnd);
+                if (ie != NULL) {
+                    set_map_ir2ir_expr(opnd, ie);
+                }
+            }
             break;
+        }
         default: UNREACHABLE();
         } //end switch
     } //end for IR

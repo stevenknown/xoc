@@ -32,7 +32,7 @@ IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 author: Su Zhenyu
 @*/
 #include "../opt/cominc.h"
-#include "../opt/prdf.h"
+#include "../opt/liveness_mgr.h"
 #include "dex.h"
 #include "gra.h"
 
@@ -916,14 +916,14 @@ void RSC::perform(bool omit_constrain)
 //
 //START GltMgr Global Life Time Manager
 //
-GltMgr::GltMgr(Region * rg, PRDF * prdf, RA * ra)
+GltMgr::GltMgr(Region * rg, LivenessMgr * mgr, RA * ra)
 {
     m_glt_count = 1;
     m_ru = rg;
     m_ra = ra;
     m_rsc = ra->get_rsc();
     m_tm = rg->getTypeMgr();
-    m_prdf = prdf;
+    m_liveness_mgr = mgr;
     m_is_consider_local_interf = false;
     m_pool = smpoolCreate(sizeof(GLT) * 10, MEM_COMM);
 }
@@ -940,13 +940,13 @@ void GltMgr::localize(GLT * g)
     for (INT j = bbs->get_first(&sc); j >= 0; j = bbs->get_next(j, &sc)) {
         LTMgr * ltm = get_ltm(j);
         if (ltm == NULL) { continue; }
-        DefSBitSetCore * livein = m_prdf->get_livein(j);
-        DefSBitSetCore * liveout = m_prdf->get_liveout(j);
+        DefSBitSetCore * livein = m_liveness_mgr->get_livein(j);
+        DefSBitSetCore * liveout = m_liveness_mgr->get_liveout(j);
         if (livein != NULL) {
-            livein->diff(prno, m_prdf->getMiscBitSetMgr());
+            livein->diff(prno, m_liveness_mgr->getMiscBitSetMgr());
         }
         if (liveout != NULL) {
-            liveout->diff(prno, m_prdf->getMiscBitSetMgr());
+            liveout->diff(prno, m_liveness_mgr->getMiscBitSetMgr());
         }
         LT * gl = ltm->map_pr2lt(prno);
         ASSERT0(gl); //glt miss local part.
@@ -993,13 +993,13 @@ GLT * GltMgr::buildGltLike(IR * pr, GLT * cand)
         UINT candprno = GLT_prno(cand);
         UINT prno = GLT_prno(newglt);
         for (INT j = bbs->get_first(&sc); j >= 0; j = bbs->get_next(j, &sc)) {
-            DefSBitSetCore * livein = m_prdf->get_livein(j);
-            DefSBitSetCore * liveout = m_prdf->get_liveout(j);
+            DefSBitSetCore * livein = m_liveness_mgr->get_livein(j);
+            DefSBitSetCore * liveout = m_liveness_mgr->get_liveout(j);
             if (livein != NULL && livein->is_contain(candprno)) {
-                livein->bunion(prno, m_prdf->getMiscBitSetMgr());
+                livein->bunion(prno, m_liveness_mgr->getMiscBitSetMgr());
             }
             if (liveout != NULL && liveout->is_contain(candprno)) {
-                liveout->bunion(prno, m_prdf->getMiscBitSetMgr());
+                liveout->bunion(prno, m_liveness_mgr->getMiscBitSetMgr());
             }
         }
     }
@@ -1175,7 +1175,7 @@ LTMgr * GltMgr::map_bb2ltm(IRBB * bb)
     LTMgr * l = m_bb2ltmgr.get(BB_id(bb));
     if (l == NULL) {
         //Allocated object managed by RaMgr, and do not delete it youself.
-        l = new LTMgr(bb, m_prdf, this, m_pool);
+        l = new LTMgr(bb, m_liveness_mgr, this, m_pool);
         m_bb2ltmgr.set(BB_id(bb), l);
     }
     return l;
@@ -1275,8 +1275,8 @@ void GltMgr::build(bool build_group_part)
         m_params.set(i, prno);
     }
     for (IRBB * bb = bbl->get_head(); bb != NULL; bb = bbl->get_next()) {
-        DefSBitSetCore * livein = m_prdf->get_livein(BB_id(bb));
-        DefSBitSetCore * liveout = m_prdf->get_liveout(BB_id(bb));
+        DefSBitSetCore * livein = m_liveness_mgr->get_livein(BB_id(bb));
+        DefSBitSetCore * liveout = m_liveness_mgr->get_liveout(BB_id(bb));
         if (livein != NULL) {
             SEGIter * cur = NULL;
             for (INT i = livein->get_first(&cur);
@@ -1631,11 +1631,11 @@ void IG::dump_vcg(CHAR const* name)
 //
 //START LTMgr
 //
-LTMgr::LTMgr(IRBB * bb, PRDF * prdf, GltMgr * gltm, SMemPool * pool)
+LTMgr::LTMgr(IRBB * bb, LivenessMgr * mgr, GltMgr * gltm, SMemPool * pool)
 {
     m_bb = bb;
     m_pool = pool;
-    m_prdf = prdf;
+    m_liveness_mgr = mgr;
     m_gltm = gltm;
     m_tm = gltm->m_tm;
     m_ru = gltm->m_ru;
@@ -2298,7 +2298,7 @@ void LTMgr::processExitBB(
         lived_lt.bunion(prno);
         LT_range(lt)->bunion(pos);
         liveout_exitbb->append_tail(lt);
-        m_prdf->setPRToBeLiveout(m_bb, prno);
+        m_liveness_mgr->setPRToBeLiveout(m_bb, prno);
     }
 }
 
@@ -2311,7 +2311,7 @@ void LTMgr::processLivein(
         UINT pos,
         bool always_consider_glt)
 {
-    DefSBitSetCore * livein = m_prdf->get_livein(BB_id(m_bb));
+    DefSBitSetCore * livein = m_liveness_mgr->get_livein(BB_id(m_bb));
     SEGIter * cur = NULL;
     for (INT i = livein->get_first(&cur);
          i != -1; i = livein->get_next(i, &cur)) {
@@ -2348,7 +2348,7 @@ void LTMgr::processLiveout(
         UINT pos,
         bool always_consider_glt)
 {
-    DefSBitSetCore * liveout = m_prdf->get_liveout(BB_id(m_bb));
+    DefSBitSetCore * liveout = m_liveness_mgr->get_liveout(BB_id(m_bb));
 
     SEGIter * cur = NULL;
     for (INT i = liveout->get_first(&cur);
@@ -3056,7 +3056,7 @@ void LTMgr::dump()
 
     //Print live-in PR.
     note("\nlivein:");
-    DefSBitSetCore * livein = m_prdf->get_livein(BB_id(m_bb));
+    DefSBitSetCore * livein = m_liveness_mgr->get_livein(BB_id(m_bb));
     SEGIter * cur = NULL;
     for (INT i = livein->get_first(&cur);
          i != -1; i = livein->get_next(i, &cur)) {
@@ -3065,7 +3065,7 @@ void LTMgr::dump()
 
     //Print live-out PR.
     note("\nliveout:");
-    DefSBitSetCore * liveout = m_prdf->get_liveout(BB_id(m_bb));
+    DefSBitSetCore * liveout = m_liveness_mgr->get_liveout(BB_id(m_bb));
     for (INT i = liveout->get_first(&cur);
          i != -1; i = liveout->get_next(i, &cur)) {
         prt("pr%d, ", i);
@@ -5642,8 +5642,8 @@ bool RA::verify_lt_occ()
         UINT prno = GLT_prno(g);
         DUMMYUSE(prno);
         for (INT j = bbs->get_first(&sc); j >= 0; j = bbs->get_next(j, &sc)) {
-            DefSBitSetCore * livein = m_prdf.get_livein(j);
-            DefSBitSetCore * liveout = m_prdf.get_liveout(j);
+            DefSBitSetCore * livein = m_liveness_mgr.get_livein(j);
+            DefSBitSetCore * liveout = m_liveness_mgr.get_liveout(j);
             CHECK_DUMMYUSE(livein);
             CHECK_DUMMYUSE(liveout);
             ASSERT0(livein->is_contain(prno) || liveout->is_contain(prno));
@@ -5851,8 +5851,8 @@ bool RA::perform(OptCtx & oc)
     START_TIMER(t, "GRA");
 
     ASSERT0(m_var2pr);
-    m_prdf.setVAR2PR(m_var2pr);
-    m_prdf.perform(oc);
+    m_liveness_mgr.setVAR2PR(m_var2pr);
+    m_liveness_mgr.perform(oc);
     m_cfg->computeExitList();
     m_gltm.set_consider_local_interf(true);
     m_gltm.build(false);
