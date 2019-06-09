@@ -7,6 +7,8 @@ COM_OBJS +=\
 ../com/agraph.o \
 ../com/sgraph.o \
 ../com/rational.o \
+../com/birational.o \
+../com/bigint.o \
 ../com/testbs.o \
 ../com/flty.o \
 ../com/linsys.o \

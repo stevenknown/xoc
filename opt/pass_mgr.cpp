@@ -124,7 +124,8 @@ Pass * PassMgr::allocPRE()
 
 Pass * PassMgr::allocIVR()
 {
-    return new IR_IVR(m_ru);
+    //return new IR_IVR(m_ru);
+    return NULL;
 }
 
 
