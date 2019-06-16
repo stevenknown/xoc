@@ -1827,6 +1827,8 @@ void MDSSAMgr::construction(OptCtx & oc)
 {
     START_TIMER(t0, "MDSSA: Construction");
     m_ru->checkValidAndRecompute(&oc, PASS_DOM, PASS_UNDEF);
+    ASSERT0(OC_is_ref_valid(oc));
+    ASSERT0(OC_is_dom_valid(oc));
     reinit();
 
     //Extract dominate tree of CFG.

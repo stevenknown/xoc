@@ -50,6 +50,19 @@ GRReader::~GRReader()
 }
 
 
+void GRReader::setSrcFile(FILE * h)
+{
+    getLexer()->setSrcFile(h);
+}
+
+
+bool GRReader::parse()
+{
+    getLexer()->clean();
+    return getParser()->parse();
+}
+
+
 //Read IR from gr file.
 //Return true if no error find.
 bool readGRAndConstructRegion(RegionMgr * rumgr, CHAR const* grfile)
@@ -63,10 +76,8 @@ bool readGRAndConstructRegion(RegionMgr * rumgr, CHAR const* grfile)
 
     FILE * h = fopen(grfile, "r");
     ASSERT0(h);
-    reader.getLexer()->setSrcFile(h);
-    reader.getLexer()->clean();
-    bool succ = reader.getParser()->parse();
-    reader.getLexer()->setSrcFile(NULL);
+    reader.setSrcFile(h);
+    bool succ = reader.parse();
     END_TIMER(t, "readGRAndConstructRegion");
     fclose(h);
     return succ;

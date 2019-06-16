@@ -356,7 +356,7 @@ UINT checkStArrayDimension(IR const* ir, UINT n)
 
 
 //Dump IR, and both its kids and siblings.
-void dumpIRListH(IR * ir_list, Region * rg, CHAR * attr, UINT dumpflag)
+void dumpIRListH(IR * ir_list, Region const* rg, CHAR * attr, UINT dumpflag)
 {
     if (g_tfile == NULL) { return; }
     note("\n==---- DUMP IR List ----==");
@@ -365,7 +365,7 @@ void dumpIRListH(IR * ir_list, Region * rg, CHAR * attr, UINT dumpflag)
 
 
 //Dump IR, and both its kids and siblings.
-void dumpIRList(IR * ir_list, Region * rg, CHAR * attr, UINT dumpflag)
+void dumpIRList(IR * ir_list, Region const* rg, CHAR * attr, UINT dumpflag)
 {
     if (g_tfile == NULL) { return; }
     note("");
@@ -467,7 +467,7 @@ bool verifyIRList(IR * ir, BitSet * irh, Region const* rg)
 }
 
 
-void dumpIRList(IN List<IR*> & ir_list, Region * rg)
+void dumpIRList(IN List<IR*> & ir_list, Region const* rg)
 {
     if (g_tfile == NULL) { return; }
     note("\n==---- DUMP IR List ----==\n");
@@ -481,7 +481,7 @@ void dumpIRList(IN List<IR*> & ir_list, Region * rg)
 }
 
 
-void dumpIRList(IRList & ir_list, Region * rg)
+void dumpIRList(IRList & ir_list, Region const* rg)
 {
     dumpIRList((List<IR*>&)ir_list, rg);
 }
@@ -585,7 +585,7 @@ static void dumpAttachInfo(OUT CHAR * buf, IR const* ir)
 
 //Dump IR and all of its kids.
 //'attr': miscellaneous string which following 'ir'.
-void dumpIR(IR const* ir, Region * rg, IN CHAR * attr, UINT dumpflag)
+void dumpIR(IR const* ir, Region const* rg, IN CHAR * attr, UINT dumpflag)
 {
     bool dump_addr = HAVE_FLAG(dumpflag, IR_DUMP_ADDR);
     bool dump_src_line = HAVE_FLAG(dumpflag, IR_DUMP_SRC_LINE);

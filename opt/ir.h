@@ -2688,20 +2688,20 @@ void IR::setDU(DU * du)
 //Exported Functions.
 CHAR const* compositeName(SYM const* n, xcom::StrBuf & buf);
 void dumpIR(IR const* ir,
-            Region * rg,
+            Region const* rg,
             CHAR * attr = NULL,
             UINT dumpflag = IR_DUMP_KID|IR_DUMP_SRC_LINE|IR_DUMP_INNER_REGION);
-void dumpIRListH(IR * ir_list, Region * rg,
+void dumpIRListH(IR * ir_list, Region const* rg,
                  CHAR * attr = NULL,
                  UINT dumpflag = IR_DUMP_KID|
                     IR_DUMP_SRC_LINE|IR_DUMP_INNER_REGION);
 void dumpIRList(IR * ir_list,
-                Region * rg,
+                Region const* rg,
                 CHAR * attr = NULL,
                 UINT dumpflag = IR_DUMP_KID|
                     IR_DUMP_SRC_LINE|IR_DUMP_INNER_REGION);
-void dumpIRList(IRList & ir_list, Region * rg);
-void dumpIRList(List<IR*> & ir_list, Region * rg);
+void dumpIRList(IRList & ir_list, Region const* rg);
+void dumpIRList(List<IR*> & ir_list, Region const* rg);
 
 class DumpGRCtx {
 public:

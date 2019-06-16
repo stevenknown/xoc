@@ -557,6 +557,17 @@ VConst * UseDefMgr::allocVConst(IR const* ir)
 }
 
 
+VMD * UseDefMgr::getVMD(UINT mdid, UINT version)
+{
+    ASSERT0(mdid > 0);
+    Vector<VMD*> * vec = m_map_md2vmd.get(mdid);
+    if (vec == NULL) {
+        return NULL;
+    }
+    return vec->get(version);
+}
+
+
 //Allocate VMD and ensure it is unique according to 'version' and 'mdid'.
 VMD * UseDefMgr::allocVMD(UINT mdid, UINT version)
 {

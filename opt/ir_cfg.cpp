@@ -247,7 +247,7 @@ bool IR_CFG::verifyPhiEdge(IR * phi, xcom::TMap<IR*, LabelInfo*> & ir2label)
 
 
 //Construct CFG edge for BB has phi.
-void IR_CFG::buildAndRevisePhiEdge(xcom::TMap<IR*, LabelInfo*> & ir2label)
+void IR_CFG::revisePhiEdge(xcom::TMap<IR*, LabelInfo*> & ir2label)
 {
     ASSERTN(m_bb_list, ("bb_list is emt"));
     xcom::C<IRBB*> * ct;
@@ -264,54 +264,57 @@ void IR_CFG::buildAndRevisePhiEdge(xcom::TMap<IR*, LabelInfo*> & ir2label)
              ct2 != NULL; BB_irlist(const_cast<IRBB*>(bb)).get_next(&ct2)) {
             IR * x = ct2->val();
             ASSERT0(x);
-            if (x->is_phi()) {
+            if (!x->is_phi()) { continue; }
+
+            //CFG should have been built before revise Vertex order.
+            //for (IR * opnd = PHI_opnd_list(x);
+            //     opnd != NULL; opnd = opnd->get_next()) {
+            //    LabelInfo * opnd_label = ir2label.get(opnd);
+            //    ASSERTN(opnd_label, ("no corresponding label to opnd"));
+            //    IRBB * incoming_bb = findBBbyLabel(opnd_label);
+            //    ASSERT0(incoming_bb);
+            //    addEdge(incoming_bb->id(), bb->id());
+            //}
+
+            if (phi_opnd_num == -1) {
+                phi_opnd_num = xcom::cnt_list(PHI_opnd_list(x));
+
+                //Sort in-edge of bb to make sure the order of them are same
+                //with the phi-operands.
+                xcom::Vertex * bbvex = get_vertex(bb->id());
+                xcom::EdgeC * opnd_pred = VERTEX_in_list(bbvex);
                 for (IR * opnd = PHI_opnd_list(x);
                      opnd != NULL; opnd = opnd->get_next()) {
                     LabelInfo * opnd_label = ir2label.get(opnd);
-                    ASSERTN(opnd_label, ("no corresponding label to opnd"));
                     IRBB * incoming_bb = findBBbyLabel(opnd_label);
                     ASSERT0(incoming_bb);
-                    addEdge(incoming_bb->id(), bb->id());
-                }
-                if (phi_opnd_num == -1) {
-                    phi_opnd_num = xcom::cnt_list(PHI_opnd_list(x));
-
-                    //Sort in-edge of bb to make sure the order of them are same
-                    //with the phi-operands.
-                    xcom::Vertex * bbvex = get_vertex(bb->id());
-                    xcom::EdgeC * opnd_pred = VERTEX_in_list(bbvex);
-                    for (IR * opnd = PHI_opnd_list(x);
-                         opnd != NULL; opnd = opnd->get_next()) {
-                        LabelInfo * opnd_label = ir2label.get(opnd);
-                        IRBB * incoming_bb = findBBbyLabel(opnd_label);
-                        ASSERT0(incoming_bb);
-                        if (VERTEX_id(EDGE_from(EC_edge(opnd_pred))) ==
-                                      incoming_bb->id()) {
-                            opnd_pred = EC_next(opnd_pred);
-                            continue;
-                        }
-
-                        xcom::EdgeC * q;
-                        for (q = EC_next(opnd_pred);
-                             q != NULL; q = EC_next(q)) {
-                            if (VERTEX_id(EDGE_from(EC_edge(q))) ==
-                                          incoming_bb->id()) {
-                                break;
-                            }
-                        }
-                        ASSERTN(q, ("can not find needed xcom::EdgeC"));
-                        xcom::swap(&VERTEX_in_list(bbvex), opnd_pred, q);
-                        opnd_pred = EC_next(q);
+                    if (VERTEX_id(EDGE_from(EC_edge(opnd_pred))) ==
+                                  incoming_bb->id()) {
+                        opnd_pred = EC_next(opnd_pred);
+                        continue;
                     }
 
-                    ASSERT0(verifyPhiEdge(x, ir2label));
-                } else {
-                    ASSERTN((UINT)phi_opnd_num ==
-                        xcom::cnt_list(PHI_opnd_list(x)),
-                        ("the number of operand is inconsistent"));
-                    ASSERT0((UINT)phi_opnd_num ==
-                        get_in_degree(get_vertex(bb->id())));
+                    xcom::EdgeC * q;
+                    for (q = EC_next(opnd_pred);
+                         q != NULL; q = EC_next(q)) {
+                        if (VERTEX_id(EDGE_from(EC_edge(q))) ==
+                                      incoming_bb->id()) {
+                            break;
+                        }
+                    }
+                    ASSERTN(q, ("can not find needed xcom::EdgeC"));
+                    xcom::swap(&VERTEX_in_list(bbvex), opnd_pred, q);
+                    opnd_pred = EC_next(q);
                 }
+
+                ASSERT0(verifyPhiEdge(x, ir2label));
+            } else {
+                ASSERTN((UINT)phi_opnd_num ==
+                    xcom::cnt_list(PHI_opnd_list(x)),
+                    ("the number of operand is inconsistent"));
+                ASSERT0((UINT)phi_opnd_num ==
+                    get_in_degree(get_vertex(bb->id())));
+                ASSERT0(verifyPhiEdge(x, ir2label));
             }
         }
     }

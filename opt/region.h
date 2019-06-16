@@ -287,6 +287,7 @@ public:
 
     //Allocate AliasAnalysis.
     virtual IR_AA * allocAliasAnalysis();
+    void assignPRMD();
 
     IR * buildSetElem(Type const* type, IR * base, IR * val, IR * offset);
     IR * buildSetElem(UINT prno,

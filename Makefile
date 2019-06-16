@@ -93,6 +93,8 @@ opt_objs: $(OPT_OBJS)
 grreader_objs: $(GRREADER_OBJS)
 
 clean:
+	@find ./ -name "*.gcda" | xargs rm -f
+	@find ./ -name "*.gcno" | xargs rm -f
 	@find ./ -name "*.o" | xargs rm -f
 	@find ./ -name "*.a" | xargs rm -f
 	@find ./ -name "*.dot" | xargs rm -f
@@ -108,5 +110,4 @@ clean:
 	@find ./ -name "*.log" | xargs rm -f
 	@find ./ -name "*.LOGLOG" | xargs rm -f
 	@find ./ -name "LOGLOG" | xargs rm -f
-	@find ./ -name "test" | xargs rm -f
 

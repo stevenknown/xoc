@@ -349,7 +349,7 @@ public:
     ~MDPhiList();
 };
 
-
+//This class manages MDSSAInfo object allocation and destroy.
 class UseDefMgr {
 friend class MDSSAMgr;
 protected:
@@ -395,15 +395,21 @@ public:
     VMD * allocVMD(UINT mdid, UINT version);
     size_t count_mem();
 
+    //Get MDSSAInfo of ir.
     MDSSAInfo * genMDSSAInfo(IR * ir);
     MDSSAInfo * getMDSSAInfo(IR const* ir) const;
     xcom::SC<VOpnd*> ** getFreeSCListAddress() { return &m_free_sc_list; }
     Vector<VOpnd*> * getVOpndVec() { return &m_vopnd_vec; }
+    //Get specific VOpnd.
     VOpnd * getVOpnd(UINT i) const { return m_vopnd_vec.get(i); }
+    //Get MDPhi list of specific BB.
     MDPhiList * genBBPhiList(UINT bbid);
     MDDef * getMDDef(UINT id) const { return m_def_vec.get(id); }
+    //Get Versioned MD object by giving MD id and MD version.
+    VMD * getVMD(UINT mdid, UINT version);
     Region * getRegion() const { return m_ru; }
 
+    //Set MDSSAInfo of ir.
     void setMDSSAInfo(IR * ir, MDSSAInfo * mdssainfo);
 };
 

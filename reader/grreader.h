@@ -45,6 +45,8 @@ public:
 
     Lexer * getLexer() { return m_lexer; }
     IRParser * getParser() { return m_parser; }
+    void setSrcFile(FILE * h);
+    bool parse();
 };
 
 //Read IR from gr file.

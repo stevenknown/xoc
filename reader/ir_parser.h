@@ -350,6 +350,7 @@ public:
 
     void dump();
 
+    RegionMgr * getRegionMgr() { return m_rumgr; }
     List<ParseErrorMsg*> & getErrorMsgList() { return m_err_list; }
     CHAR const* getKeywordName(X_CODE code);
 

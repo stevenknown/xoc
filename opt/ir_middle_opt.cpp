@@ -123,8 +123,8 @@ bool Region::performSimplify(OptCtx & oc)
             CDG * cdg = (CDG*)getPassMgr()->registerPass(PASS_CDG);
             cdg->rebuild(oc, *getCFG());
         }       
-    } else {
-        ASSERT0(verifyMDRef());
+    } else {        
+        ASSERT0((!g_do_md_du_analysis && !g_do_md_ssa) || verifyMDRef());
     }
 
     if (g_verify_level >= VERIFY_LEVEL_3 && OC_is_du_chain_valid(oc)) {

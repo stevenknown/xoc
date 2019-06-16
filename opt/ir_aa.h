@@ -341,15 +341,9 @@ protected:
             IN OUT MDSet * mds,
             IN OUT AACtx * ic,
             IN OUT MD2MDSet * mx);
+    MD const* allocStoreMD(IR * ir);
     MD const* allocIdMD(IR * ir);
     MD const* allocLoadMD(IR * ir);
-    MD const* allocStoreMD(IR * ir);
-    MD const* allocPRMD(IR * ir);
-    MD const* allocPhiMD(IR * phi);
-    MD const* allocStorePRMD(IR * ir);
-    MD const* allocCallResultPRMD(IR * ir);
-    MD const* allocSetelemMD(IR * ir);
-    MD const* allocGetelemMD(IR * ir);
     MD const* allocStringMD(SYM const* string);
 
     void convertPT2MD2MDSet(
@@ -478,6 +472,13 @@ public:
     explicit IR_AA(Region * rg);
     COPY_CONSTRUCTOR(IR_AA);
     virtual ~IR_AA();
+    
+    MD const* allocPRMD(IR * ir);
+    MD const* allocPhiMD(IR * phi);
+    MD const* allocStorePRMD(IR * ir);
+    MD const* allocCallResultPRMD(IR * ir);
+    MD const* allocSetelemMD(IR * ir);
+    MD const* allocGetelemMD(IR * ir);
 
     //Attemp to compute the type based may point to MD set.
     //Return true if this function find the point-to MD set, otherwise

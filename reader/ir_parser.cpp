@@ -410,7 +410,7 @@ void IRParser::error(CHAR const* format, ...)
 
 void IRParser::error(TOKEN tok, CHAR const* format, ...)
 {
-	CHECK_DUMMYUSE(tok);
+    CHECK_DUMMYUSE(tok);
     StrBuf buf(64);
     va_list arg;
     va_start(arg, format);
@@ -426,7 +426,7 @@ void IRParser::error(TOKEN tok, CHAR const* format, ...)
 
 void IRParser::error(X_CODE xcode, CHAR const* format, ...)
 {
-	CHECK_DUMMYUSE(xcode);
+    CHECK_DUMMYUSE(xcode);
     StrBuf buf(64);
     va_list arg;
     va_start(arg, format);
@@ -581,7 +581,7 @@ bool IRParser::declareRegion(ParseCtx * ctx)
     }
 
     //Region body
-    START_TIMER_FMT(w, ("region(%d):%s",
+    START_TIMER_FMT(w, ("Parse Region(%d):%s",
         region->id(), region->getRegionName()));
     if (!parseRegionBody(&newctx)) {
         return false;
@@ -590,22 +590,30 @@ bool IRParser::declareRegion(ParseCtx * ctx)
 
     if (!newctx.has_error) {
         newctx.current_region->setIRList(newctx.stmt_list);
-        ASSERTN(!newctx.has_phi, ("TODO"));
-
         bool buildcfg = false; //TODO: build cfg by given parameters.
-		if (buildcfg && !newctx.has_high_level_ir) {
+        if (newctx.has_phi) {
+            ASSERT0(!newctx.has_high_level_ir);
+        }
+        if (newctx.has_phi) {
             newctx.current_region->constructBBList();
             newctx.current_region->setIRList(NULL);
-            //dumpBBList(newctx.current_region->getBBList(),
-            //    newctx.current_region);
-            OptCtx oc;
+            OptCtx * oc = getRegionMgr()->
+                getAndGenOptCtx(newctx.current_region->id());
             newctx.current_region->initPassMgr();
-            newctx.current_region->checkValidAndRecompute(&oc,
+            //IR_CFG * cfg = newctx.current_region->
+            //    getPassMgr()->registerPass(PASS_CFG);
+            ////Caution: the validation of cfg should maintained by user.
+            //cfg->rebuild(oc);
+            //cfg->removeEmptyBB(oc);
+            //cfg->computeExitList();
+            newctx.current_region->checkValidAndRecompute(oc,
                 PASS_CFG, PASS_UNDEF);
-            //newctx.current_region->getCFG()->dump_vcg();
+            newctx.current_region->getCFG()->dump_vcg();
+            dumpBBList(newctx.current_region->getBBList(),
+                newctx.current_region);
             if (newctx.has_phi) {
                 newctx.current_region->getCFG()->
-                    buildAndRevisePhiEdge(newctx.getIR2Label());
+                    revisePhiEdge(newctx.getIR2Label());
                 PRSSAMgr * prssamgr = (PRSSAMgr*)newctx.current_region->
                     getPassMgr()->registerPass(PASS_PR_SSA_MGR);
                 ASSERT0(prssamgr);
@@ -1024,8 +1032,12 @@ bool IRParser::parsePR(ParseCtx * ctx)
         prno = (UINT)xcom::xatoll(m_lexer->getCurrentTokenString(), false);
         ctx->current_region->setPRCount(
             MAX(ctx->current_region->getPRCount(), prno + 1));
+        if (prno == PRNO_UNDEF) {
+            error("use invalid PR number %d", prno);
+            return false;
+        }
     } else {
-        error(tok, "miss PR number");
+        error(tok, "not PR number");
         return false;
     }
 
@@ -1034,6 +1046,7 @@ bool IRParser::parsePR(ParseCtx * ctx)
     if (tok == T_COLON) {
         tok = m_lexer->getNextToken();
         if (!parseType(ctx, &ty) || ty == NULL) {
+            error(tok, "invalide type of PR");
             return false;
         }
     } else {
@@ -1571,7 +1584,9 @@ bool IRParser::parseImm(ParseCtx * ctx)
 {
     ASSERT0(m_lexer->getCurrentToken() == T_IMM);
 
+    StrBuf immstr(8);
     HOST_INT v = xcom::xatoll(m_lexer->getCurrentTokenString(), false);
+    immstr.strcat(m_lexer->getCurrentTokenString());
     TOKEN tok = m_lexer->getNextToken();
     Type const* ty = NULL;
     if (tok == T_COLON) {
@@ -1582,7 +1597,16 @@ bool IRParser::parseImm(ParseCtx * ctx)
     } else {
         ty = m_tm->getI32();
     }
-    IR * imm = ctx->current_region->buildImmInt(v, ty);
+
+    IR * imm = NULL;
+    if (ty->is_int()) {
+        imm = ctx->current_region->buildImmInt(v, ty);
+    } else if (ty->is_fp()) {
+        HOST_FP v = atof(immstr.buf);
+        imm = ctx->current_region->buildImmFp(v, ty);
+    } else {
+        UNREACHABLE();
+    }
     ctx->returned_exp = imm;
     return true;
 }
@@ -2138,10 +2162,14 @@ bool IRParser::parseStorePR(ParseCtx * ctx)
     UINT prno = 0;
     if (tok == T_IMM) {
         prno = (UINT)xcom::xatoll(m_lexer->getCurrentTokenString(), false);
+        if (prno == PRNO_UNDEF) {
+            error("use invalid PR number %d", prno);
+            return false;
+        }
         ctx->current_region->setPRCount(
-            MAX(ctx->current_region->getPRCount(), prno + 1));
+            MAX(ctx->current_region->getPRCount(), prno + 1));        
     } else {
-        error(tok, "miss PR number");
+        error(tok, "not PR number");
         return false;
     }
 
@@ -3400,11 +3428,12 @@ bool IRParser::parseParameterList(ParseCtx * ctx)
         if (getCurrentXCode() == X_UNDEFINED) {
             //The parameter is reserved.
             tok = m_lexer->getNextToken();
-        } else if(declareVar(ctx, &v)) {
+        } else if (declareVar(ctx, &v)) {
             ASSERT0(v);
             VAR_is_formal_param(v) = true;
             VAR_formal_param_pos(v) = i;
         } else {
+            error(tok, "invalide parameter list");
             return false;
         }
 
@@ -4083,8 +4112,6 @@ bool IRParser::parseProperty(PropertySet & cont, ParseCtx * ctx)
 }
 
 
-
-
 bool IRParser::declareVar(ParseCtx * ctx, VAR ** var)
 {
     if (getCurrentXCode() != X_VAR) {
@@ -4112,6 +4139,7 @@ bool IRParser::declareVar(ParseCtx * ctx, VAR ** var)
     if (tok == T_COLON) {
         tok = m_lexer->getNextToken();
         if (!parseType(ctx, &ty)) {
+            error(tok, "invalide type of variable");
             return false;
         }
     }
@@ -4152,7 +4180,7 @@ bool IRParser::declareVar(ParseCtx * ctx, VAR ** var)
 }
 
 
-//Dump token string.
+//This function parse token that returned by lexer untill meeting file end.
 //Return true if no error occur.
 bool IRParser::parse()
 {
@@ -4161,8 +4189,8 @@ bool IRParser::parse()
     TOKEN tok = m_lexer->getNextToken(); //Get first token.
     for (;; tok = m_lexer->getNextToken()) {
         switch (tok) {
-        case T_END: goto END;
-        case T_NUL: return false;
+        case T_END:
+        case T_NUL: goto END;
         case T_IDENTIFIER: {
             X_CODE code = getCurrentXCode();
             switch (code) {

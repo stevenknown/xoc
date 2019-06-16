@@ -2388,6 +2388,67 @@ void Region::dumpFreeTab()
 }
 
 
+static void assignPRMDImpl(IR * x, IR_AA * aa)
+{
+    ASSERT0(x && aa);
+    switch (x->getCode()) {
+    case IR_PR:
+        aa->allocPRMD(x);
+        break;
+    case IR_STPR:
+        aa->allocStorePRMD(x);
+        break;
+    case IR_GETELEM:
+        aa->allocGetelemMD(x);
+        break;
+    case IR_SETELEM:
+        aa->allocSetelemMD(x);
+        break;
+    case IR_PHI:
+        aa->allocPhiMD(x);
+        break;
+    case IR_CALL:                
+    case IR_ICALL:
+        if (x->hasReturnValue()) {
+            aa->allocCallResultPRMD(x);
+        }
+        break;
+    default: 
+        ASSERT0(!x->isReadPR() && !x->isWritePR());
+    }
+}
+
+
+//Assign MD for each ReadPR/WritePR operations.
+void Region::assignPRMD()
+{
+    IRIter ii;
+    ASSERT0(getPassMgr());
+    IR_AA * aa = (IR_AA*)getPassMgr()->registerPass(PASS_AA);
+    ASSERT0(aa);
+    if (getIRList() != NULL) {
+        IR * head = getIRList();
+        for (IR * x = iterInit(getIRList(), ii);
+             x != NULL; x = iterNext(ii)) {
+            assignPRMDImpl(x, aa);    
+        }
+        return;
+    }    
+    if (getBBList() == NULL) { return; }    
+    for (IRBB * bb = getBBList()->get_head();
+         bb != NULL; bb = getBBList()->get_next()) {
+        xcom::C<xoc::IR*> * ct;
+        for (xoc::IR * ir = BB_irlist(bb).get_head(&ct); ir != NULL;
+             ir = BB_irlist(bb).get_next(&ct)) {
+            for (IR * x = iterInit(ir, ii);
+                x != NULL; x = iterNext(ii)) {
+                assignPRMDImpl(x, aa);
+            }
+        }  
+    }
+}
+
+
 //Generate IR, invoke freeIR() or freeIRTree() if it is useless.
 //NOTE: Do NOT invoke ::free() to free IR, because all
 //    IR are allocated in the pool.

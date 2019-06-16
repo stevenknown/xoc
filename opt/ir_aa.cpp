@@ -4026,6 +4026,7 @@ bool IR_AA::perform(IN OUT OptCtx & oc)
     //because AA would not be invoked frequently.
     PtPairSet * ptset_arr = NULL;
     if (m_flow_sensitive) {
+        m_ru->checkValidAndRecompute(&oc, PASS_LOOP_INFO, PASS_UNDEF);
         ASSERTN(OC_is_loopinfo_valid(oc),
             ("infer pointer arith need loop info"));
         initEntryPtset(&ptset_arr);
