@@ -29,10 +29,18 @@ flexibility, and the capability of representing almost all popular languages.
 There are two level IR representations used throughout all phases of the
 compilation. You can use XOC to perform optimization, program analysis or build diagnostic tools.
 
-Build :
-	cd xoc &
-	make all
+Build libxoc.a on Linux:
+Default build host is Linux
+```cmd
+	cd xoc
+	make
+```
 
+Build libxoc.a on Windows:
+```cmd
+	cd xoc
+	make WIN=1
+```
 
 How to Contribute :
 	All contributors must sign a contributor license agreement (CLA). A CLA 

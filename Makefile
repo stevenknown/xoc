@@ -66,7 +66,12 @@ reader/ir_parser.o\
 reader/ir_lex.o\
 reader/grreader.o
 
-CFLAGS = -DFOR_DEX -D_DEBUG_ -O0 -g2 -Wno-write-strings -Wsign-promo \
+ifdef WIN
+#Add predefined macro if build host is Windows.
+CFLAGS += -D_ON_WINDOWS_
+endif
+
+CFLAGS += -DFOR_DEX -D_DEBUG_ -O2 -g2 -Wno-write-strings -Wsign-promo \
         -Wsign-compare -Wpointer-arith -Wno-multichar -Winit-self -Wswitch
 
 CC := $(shell which clang++ > /dev/null)
