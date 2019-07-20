@@ -2970,8 +2970,9 @@ bool Matrix<T>::plu(OUT Matrix<T> & p, OUT Matrix<T> & l, OUT Matrix<T> & u)
     l.eye(1);
     succ = permd.lu(l,u);
     if (succ) {
-        //In 'double' precison, the equation may be failed , the reason was
-        //caused by the precision. But the result is correct.
+        //By using 'double' precison, the equation 'permd == l * u'
+        //may be failed, because of accumulate error of precision.
+        //But the result is correct.
         //ASSERTN(permd == l * u, ("unequal for PA=L*U after decomposition"));
     }
 FIN:

@@ -62,10 +62,17 @@ BigInt::BigInt(UINT elemnum, ...)
 }
 
 
+void BigInt::setEqualTo(BigIntElemType elem)
+{
+    set(0, elem);
+    setSig(0);
+}
+
+
 //Set a list of integer that are expected
 //value for each element.
 //NOTE make sure the last element is 0x0.
-bool BigInt::initElem(UINT elemnum, ...)
+void BigInt::initElem(UINT elemnum, ...)
 {
     ASSERT0(elemnum > 0);
     va_list ptr;
@@ -80,8 +87,7 @@ bool BigInt::initElem(UINT elemnum, ...)
     //The last element is regarded as significant position
     //for big integer.
     setSig(elemnum - 1);
-    va_end(ptr);
-    return true;
+    va_end(ptr);    
 }
 
 
@@ -460,7 +466,7 @@ BigInt& bisAdd(IN BigInt const& a, IN BigInt const& b, IN OUT BigInt & res)
 
 //BigInt Unsigned Addition.
 //e.g: res = a + b;
-//Note addition support in-suitate operation.
+//Note unsigned addition support in-suitate operation.
 //e.g: res = res + b is legal.
 BigInt& biuAdd(IN BigInt const& a, IN BigInt const& b, IN OUT BigInt & res)
 {
@@ -468,15 +474,15 @@ BigInt& biuAdd(IN BigInt const& a, IN BigInt const& b, IN OUT BigInt & res)
     ASSERTN(b.getSigPos() >= 0, ("Miss significant elem"));
     ASSERTN(a.getSigPos() >= 0, ("Miss significant elem"));
     BigInt const* longer = NULL;
-	BigInt const* shorter = NULL;
-	if (b.getSigPos() > a.getSigPos()) {
+    BigInt const* shorter = NULL;
+    if (b.getSigPos() > a.getSigPos()) {
         //b's length > a's length
-		longer = &b;
-		shorter = &a;
-	} else {
-	    //b's length <= a's length
-	    longer = &a;
-		shorter = &b;
+        longer = &b;
+        shorter = &a;
+    } else {
+        //b's length <= a's length
+        longer = &a;
+        shorter = &b;
     }
 
     BigIntUElemType carry_part = 0;
@@ -629,6 +635,91 @@ BigInt& bisMul(IN BigInt const& a, IN BigInt const& b, IN OUT BigInt & res)
         }        
     }
     return res;
+}
+
+
+//BigInt Signed Division.
+//Return quotient and remainder of a divided by b.
+//The quotient and remainder respect a = quo * b + rem.
+void biDivRem(IN BigInt const& a, IN BigInt const& b,
+              IN OUT BigInt & quo, IN OUT BigInt & rem)
+
+{
+    bool is_a_neg = a.is_neg();
+    bool is_b_neg = b.is_neg();
+    if (!is_a_neg && !is_b_neg) {
+        biuDivRem(a, b, quo, rem);
+        return;
+    }
+
+    BigInt abs_a;
+    BigInt abs_b;
+    BigInt * pa = const_cast<BigInt*>(&a);
+    BigInt * pb = const_cast<BigInt*>(&b);
+    if (is_a_neg) {
+        abs_a = a;
+        abs_a.abs();
+        pa = &abs_a;
+    }
+    if (is_b_neg) {
+        abs_b = b;
+        abs_b.abs();
+        pb = &abs_b;
+    }
+    biuDivRem(*pa, *pb, quo, rem);
+}
+
+
+//BigInt Signed Division.
+//Return quotient and remainder of a divided by b.
+//The quotient and remainder respect a = quo * b + rem.
+void biuDivRem(IN BigInt const& a, IN BigInt const& b,
+               IN OUT BigInt & quo, IN OUT BigInt & rem)
+{
+    
+    if (a < b) {
+        quo.initElem(1, 0);
+        rem = a;
+        return;
+    }
+    BigInt copy_a = a;
+    BigInt * pa = &copy_a;
+    BigInt const* pb = &b;
+    BigInt * pc = &rem;
+    BigIntUElemType small_quo = 0;
+    //#define SMALL_QUO_MAX  REMOVE_FLAG((ULONGLONG)(-1) & ((ULONGLONG)0xF));
+    #define SMALL_QUO_MAX  (((BigIntUElemType)(-1) >> 2) << 2)
+    bool is_use_small_quo = true;
+    BigInt addend(1, 0x1);
+    while (true) {
+        printf("\na:"); pa->dump();
+        printf("\nb:"); pb->dump();
+        printf("\nc:"); pc->dump();
+        printf("\nsmall_quo:%u", small_quo);
+        biSub(*pa, *pb, *pc);
+        if (*pc < *pb) {
+            if (pc != &rem) {
+                rem = *pc;
+            }
+            if (is_use_small_quo) {
+                quo.initElem(1, small_quo);
+            }
+            break;
+        }
+        BigInt * t = pa;
+        pa = pc;
+        pc = t;
+        pc->setEqualTo(0);
+        if (is_use_small_quo) {
+            small_quo++;
+            if (small_quo > SMALL_QUO_MAX) {
+                quo.initElem(1, small_quo);
+                is_use_small_quo = false;
+            }
+        } else {
+            biuAdd(quo, addend, quo);    
+        }
+    }
 }
 
 

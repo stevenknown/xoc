@@ -66,11 +66,41 @@ bool operator <= (BigIntElemType v, BigInt const& a);
 bool operator > (BigIntElemType v, BigInt const& a);
 bool operator >= (BigIntElemType v, BigInt const& a);
 
+//BigInt Unsigned Addition.
+//e.g: res = a + b;
+//Note addition support in-suitate operation.
+//e.g: res = res + b is legal.
 BigInt& biuAdd(IN BigInt const& a, IN BigInt const& b, IN OUT BigInt & res);
+
+//BigInt Signed Addition.
+//e.g: res = a + b;
 BigInt& bisAdd(IN BigInt const& a, IN BigInt const& b, IN OUT BigInt & res);
+
+//BigInt substraction.
+//e.g: res = a - b;
+//Note substraction does not support in-suitate operation.
+//e.g: res = res - b is not legal.
 BigInt& biSub(IN BigInt const& a, IN BigInt const& b, IN OUT BigInt & res);
+
+//BigInt Signed Mutiplification.
+//e.g: res = a * b;
 BigInt& bisMul(IN BigInt const& a, IN BigInt const& b, IN OUT BigInt & res);
+
+//BigInt Unsigned Mutiplification.
+//e.g: res = a * b;
 BigInt& biuMul(IN BigInt const& a, IN BigInt const& b, IN OUT BigInt & res);
+
+//BigInt Signed Division.
+//Return quotient and remainder of a divided by b.
+//The quotient and remainder respect a = quo * b + rem.
+void biDivRem(IN BigInt const& a, IN BigInt const& b,
+              IN OUT BigInt & quo, IN OUT BigInt & rem);
+
+//BigInt Signed Division.
+//Return quotient and remainder of a divided by b.
+//The quotient and remainder respect a = quo * b + rem.
+void biuDivRem(IN BigInt const& a, IN BigInt const& b,
+               IN OUT BigInt & quo, IN OUT BigInt & rem);
 
 class BigInt : public xcom::Vector<BigIntElemType> {
     friend bool operator != (BigInt const& a, BigInt const& b);
@@ -113,6 +143,7 @@ private:
     INT m_sig_pos; //Record significant position.
 
 protected:
+    //Set the position of the most significant word.
     void setSig(INT pos) { m_sig_pos = pos; }
 
 public:
@@ -160,7 +191,14 @@ public:
     //Note this function makes sure the last element is significant number.
     //elemnum: the number of elements to be set.
     //...: list of value for each element.
-    bool initElem(UINT elemnum, ...);
+    void initElem(UINT elemnum, ...);
+
+    //Set current big-integer to be given value.
+    //Different from initElem(), this function set whole big-integer to be
+    //the value that described by 'elem'. Thus this function will faster
+    //than initElem().
+    //elem: value to be set
+    void setEqualTo(BigIntElemType elem);
 
     //Compare element value of bigint with a list of expected integer.
     //valnum: the number of values.

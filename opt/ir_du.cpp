@@ -4408,12 +4408,6 @@ void IR_DU_MGR::updateDefWithMustExactMD(IR * ir, MD const* mustexact)
 {
     ASSERT0(mustexact && mustexact->is_exact());
 
-    if (ir->id() == 3 || ir->id() == 6) {
-        int a = 0;
-        //hack
-    }
-
-
     //Handle exactly killing def. This def kills
     //prior DEF stmt to exact md.
     m_md2irs->set(MD_id(mustexact), ir);
@@ -4618,14 +4612,10 @@ void IR_DU_MGR::computeMDDUforBB(IN IRBB * bb, UINT flag)
         if (!ir->isContainMemRef()) { continue; }
 
         //Process USE
-        if (ir->id() == 15) {
-            int a = 0; //hack
-        }
         checkAndBuildChain(ir, ct, flag);
 
         //Process DEF.
         updateDef(ir, flag);
-        m_md2irs->dump(); //hack
     } //end for
 }
 

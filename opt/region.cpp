@@ -2427,7 +2427,6 @@ void Region::assignPRMD()
     IR_AA * aa = (IR_AA*)getPassMgr()->registerPass(PASS_AA);
     ASSERT0(aa);
     if (getIRList() != NULL) {
-        IR * head = getIRList();
         for (IR * x = iterInit(getIRList(), ii);
              x != NULL; x = iterNext(ii)) {
             assignPRMDImpl(x, aa);    
