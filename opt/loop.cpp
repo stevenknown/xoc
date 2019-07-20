@@ -191,10 +191,12 @@ IRBB * findAndInsertPreheader(
         //   |
         //   v
         //  BB_header
-        if (BB_is_fallthrough(p)) {
-            //Nothing to do.
-            continue;
-        }
+        //Have to get the last IR of
+        //BB and judge if it is conditional branch.
+        //if (BB_is_fallthrough(p)) {
+        //    //Nothing to do.
+        //    continue;
+        //}
 
         //CASE2:
         //  BB_p(goto lab1)
@@ -210,12 +212,15 @@ IRBB * findAndInsertPreheader(
         //   v
         //  BB_header(lab2)
         IR * last_ir = BB_last_ir(p);
-        ASSERT0(last_ir &&
-                (last_ir->isConditionalBr() || last_ir->isUnconditionalBr()));
-        //Add newlabel to preheader if not exist.
-        preheader->addLabel(preheader_lab);
-        //Update branch-target of IR that located in predecessor of head.
-        last_ir->setLabel(preheader_lab);
+        ASSERT0(last_ir);
+        if ((last_ir->isConditionalBr() || last_ir->isUnconditionalBr()) &&
+            head == cfg->findBBbyLabel(last_ir->getLabel())) {
+            //Add newlabel to preheader if not exist.
+            preheader->addLabel(preheader_lab);
+
+            //Update branch-target of IR that located in predecessor of head.
+            last_ir->setLabel(preheader_lab);
+        }
     }
 
     //Move LabelInfos from head to preheader except LabelInfos that

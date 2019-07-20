@@ -404,6 +404,8 @@ public:
     bool removeEmptyBB(OptCtx & oc);
     bool removeUnreachBB();
     bool removeRedundantBranch();
+    void removeLoopInfo(LI<BB>* loop);
+    bool reinsertLoopTree(LI<BB> ** lilist, LI<BB>* loop);
 
     //Insert unconditional branch to revise fall through bb.
     //e.g: Given bblist is bb1-bb2-bb3-bb4, bb4 is exit-BB,
@@ -616,17 +618,15 @@ bool CFG<BB, XR>::verifyIfBBRemoved(IN CDG * cdg, OptCtx & oc)
             //     L1:
             get_succs(succs, bb);
             ASSERTN(succs.get_elem_count() == 2, ("illegal number of edge"));
-            bool find_fallthrough_bb = false;
             for (BB * succ = succs.get_head();
                  succ != NULL; succ = succs.get_next()) {
                 if (succ == next_bb) {
-                    //find fallthrough bb.
-                    find_fallthrough_bb = true;
+                    //find fallthrough bb.            
                     continue;
                 }
                 ASSERT0(last_xr->getLabel());
                 ASSERTN(succ == findBBbyLabel(last_xr->getLabel()),
-                    ("miss target BB"));
+                        ("miss target BB"));
             }
         }
     } //end for each BB
@@ -1300,6 +1300,34 @@ void CFG<BB, XR>::collectLoopInfoRecur(LI<BB> * li)
 }
 
 
+//Remove 'loop' out of loop tree.
+template <class BB, class XR>
+void CFG<BB, XR>::removeLoopInfo(LI<BB>* loop)
+{
+    ASSERT0(loop != NULL);
+    LI<BB> * head = xcom::get_head(loop);
+    ASSERT0(head);
+    xcom::remove(&head, loop);
+    if (LI_outer(loop) != NULL) {
+        //Update inner-list header for outer-loop of 'loop'.
+        //Guarantee outer-loop have the correct inner-loop header.
+        LI_inner_list(LI_outer(loop)) = head;
+    }
+    loop->cleanAdjRelation();
+}
+
+
+//Reinsert loop into loop tree.
+//NOTE 'loop' has been inserted into the loop-tree.
+template <class BB, class XR>
+bool CFG<BB, XR>::reinsertLoopTree(LI<BB> ** lilist, LI<BB>* loop)
+{
+    ASSERT0(lilist != NULL && loop != NULL);
+    removeLoopInfo(loop);
+    return insertLoopTree(lilist, loop);
+}
+
+
 //Insert loop into loop tree.
 template <class BB, class XR>
 bool CFG<BB, XR>::insertLoopTree(LI<BB> ** lilist, LI<BB>* loop)
@@ -1316,15 +1344,28 @@ bool CFG<BB, XR>::insertLoopTree(LI<BB> ** lilist, LI<BB>* loop)
         li = LI_next(li);
         if (LI_bb_set(cur)->is_contain(*LI_bb_set(loop))) {
             if (insertLoopTree(&LI_inner_list(cur), loop)) {
+                if (LI_outer(loop) == NULL) {
+                    //Only record 'cur' as outermost loop when they
+                    //at are first meeting.
+                    LI_outer(loop) = cur;
+                }
                 return true;
             }
         } else if (LI_bb_set(loop)->is_contain(*LI_bb_set(cur))) {
-            remove(lilist, cur);
+            //Loop body of 'loop' contained 'cur'.
+            //Adjust inclusive-relation between 'loop' and 'cur' to
+            //have 'loop' become loop-parent of 'cur'.
+            xcom::remove(lilist, cur);
             insertLoopTree(&LI_inner_list(loop), cur);
+            if (LI_outer(cur) == NULL) {
+                //Only record 'loop' as outermost loop when they
+                //at are first meeting.
+                LI_outer(cur) = loop;
+            }
             ASSERTN(LI_inner_list(loop), ("illegal loop tree"));
-        } //end if
-    } //end while
-    add_next(lilist, loop);
+        }
+    }
+    xcom::add_next(lilist, loop);
     return true;
 }
 
@@ -1466,6 +1507,7 @@ bool CFG<BB, XR>::findLoop()
             if (li != NULL) {
                 //Multiple natural loops have the same loop header.
                 LI_bb_set(li)->bunion(*loop);
+                reinsertLoopTree(&m_loop_info, li);
                 continue;
             }
 
@@ -1537,6 +1579,7 @@ bool CFG<BB, XR>::isLoopHeadRecur(LI<BB> * li, BB * bb)
 template <class BB, class XR>
 void CFG<BB, XR>::dump_vcg(CHAR const* name)
 {
+    ASSERTN(g_tfile, ("usr do not intend to dump internal info."));
     if (!name) {
         name = "graph_cfg.vcg";
     }

@@ -396,7 +396,7 @@ IR * Region::refineCall(IR * ir, bool & change, RefineCtx & rc)
         IR * last = NULL;
         while (param != NULL) {
             IR * newp = refineIR(param, lchange, rc);
-            add_next(&newparamlst, &last, newp);
+            xcom::add_next(&newparamlst, &last, newp);
             last = newp;
             param = xcom::removehead(&CALL_param_list(ir));
         }
@@ -826,17 +826,27 @@ IR * Region::refineRem(IR * ir, bool & change)
     CHECK_DUMMYUSE(op0);
     CHECK_DUMMYUSE(op1);
 
-    if (op1->is_const() && op1->is_int() && CONST_int_val(op1) == 1) {
-        //rem X,1 => 0
-        IR * tmp = ir;
-        ir = dupIRTree(op1);
-        CONST_int_val(ir) = 0;
-        if (getDUMgr() != NULL) {
-            getDUMgr()->removeUseOutFromDefset(tmp);
+    if (op1->is_const() && op1->is_int()) {
+        if (CONST_int_val(op1) == 1) {
+            //rem X,1 => 0
+            IR * tmp = ir;
+            ir = dupIRTree(op1);
+            CONST_int_val(ir) = 0;
+            if (getDUMgr() != NULL) {
+                getDUMgr()->removeUseOutFromDefset(tmp);
+            }
+            freeIRTree(tmp);
+            change = true;
+            return ir;
         }
-        freeIRTree(tmp);
-        change = true;
-        return ir;
+
+        if (xcom::isPowerOf2(CONST_int_val(op1))) {
+            //rem X,2^N => band X,2^N-1
+            IR_code(ir) = IR_BAND;
+            CONST_int_val(op1) = CONST_int_val(op1) - 1;            
+            change = true;
+            return ir; //No need to update DU.
+        }        
     }
     return ir;
 }
@@ -1340,7 +1350,7 @@ IR * Region::refineArray(IR * ir, bool & change, RefineCtx & rc)
         if (newsub != s) {
             IR_parent(newsub) = ir;
         }
-        add_next(&newsublist, &last, newsub);
+        xcom::add_next(&newsublist, &last, newsub);
         s = xcom::removehead(&ARR_sub_list(ir));
     }
     ARR_sub_list(ir) = newsublist;
@@ -1661,7 +1671,7 @@ IR * Region::refineIRlist(IR * ir_list, bool & change, RefineCtx & rc)
         while (ir_list != NULL) {
             IR * ir = xcom::removehead(&ir_list);
             IR * newIR = refineIR(ir, lchange, rc);
-            add_next(&new_list, &last, newIR);
+            xcom::add_next(&new_list, &last, newIR);
         }
         change |= lchange;
         ir_list = new_list;

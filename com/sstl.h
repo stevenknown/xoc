@@ -106,6 +106,14 @@ bool in_list(T const* head, T const* p)
 
 
 template <class T>
+inline T * get_head(T * t)
+{
+    while (t != NULL && t->prev != NULL) { t = t->prev; }
+    return t;
+}
+
+
+template <class T>
 inline T * get_last(T * t)
 {
     while (t != NULL && t->next != NULL) { t = t->next; }
@@ -2549,7 +2557,6 @@ public:
 //NOTE: zero is reserved and regard it as the default NULL when we
 //determine whether an element is exist.
 //The vector grow dynamic.
-#define SVEC_init(s)        ((s)->m_is_init)
 template <class T, UINT GrowSize = 8> class Vector {
 protected:
     UINT m_elem_num:31; //The number of element in vector.
@@ -2563,19 +2570,19 @@ public:
 
     Vector()
     {
-        SVEC_init(this) = false;
+        m_is_init = false;
         init();
     }
 
     explicit Vector(INT size)
     {
-        SVEC_init(this) = false;
+        m_is_init = false;
         init();
         grow(size);
     }
 
     Vector(Vector const& vec) { copy(vec); }
-    Vector const& operator = (Vector const&);
+    Vector const& operator = (Vector const&); //DISALBE COPY-CONSTRUCTOR.
     ~Vector() { destroy(); }
 
     void append(T t)
@@ -2586,37 +2593,37 @@ public:
 
     inline void init()
     {
-        if (SVEC_init(this)) { return; }
+        if (m_is_init) { return; }
         m_elem_num = 0;
         m_vec = NULL;
         m_last_idx = -1;
-        SVEC_init(this) = true;
+        m_is_init = true;
     }
 
     inline void init(UINT size)
     {
-        if (SVEC_init(this)) { return; }
+        if (m_is_init) { return; }
         ASSERT0(size != 0);
         m_vec = (T*)::malloc(sizeof(T) * size);
         ASSERT0(m_vec);
         ::memset(m_vec, 0, sizeof(T) * size);
         m_elem_num = size;
         m_last_idx = -1;
-        SVEC_init(this) = true;
+        m_is_init = true;
     }
 
-    bool is_init() const { return SVEC_init(this); }
+    bool is_init() const { return m_is_init; }
 
     inline void destroy()
     {
-        if (!SVEC_init(this)) { return; }
+        if (!m_is_init) { return; }
         m_elem_num = 0;
         if (m_vec != NULL) {
             ::free(m_vec);
         }
         m_vec = NULL;
         m_last_idx = -1;
-        SVEC_init(this) = false;
+        m_is_init = false;
     }
 
     //The function often invoked by destructor, to speed up destruction time.
@@ -2785,10 +2792,11 @@ protected:
     //Always refers to free space to Vector,
     //and the first free space position is '0'
     UINT m_free_idx;
+
 public:
     VectorWithFreeIndex()
     {
-        SVEC_init(this) = false;
+        Vector<T, GrowSize>::m_is_init = false;
         init();
     }
     COPY_CONSTRUCTOR(VectorWithFreeIndex);
@@ -3545,7 +3553,7 @@ public:
             }
             if (elemhc != NULL) {
                 m_elem_vector.set(HC_vec_idx(elemhc), T(0));
-                remove((HC<T>**)&HB_member(m_bucket[hashv]), elemhc);
+                xcom::remove((HC<T>**)&HB_member(m_bucket[hashv]), elemhc);
                 m_free_list.add_free_elem(elemhc);
                 HB_count(m_bucket[hashv])--;
                 m_elem_count--;

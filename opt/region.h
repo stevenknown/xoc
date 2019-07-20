@@ -219,7 +219,7 @@ public:
 
     //Add irs into IR list of current region.
     void addToIRList(IR * irs)
-    { add_next(&REGION_analysis_instrument(this)->m_ir_list, irs); }
+    { xcom::add_next(&REGION_analysis_instrument(this)->m_ir_list, irs); }
 
     //The function generates new MD for all operations to PR.
     //It should be called if new PR generated in optimzations.

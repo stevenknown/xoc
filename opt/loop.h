@@ -94,6 +94,10 @@ public:
     //'bbid': id of BB.
     bool isInsideLoop(UINT bbid) const
     { return LI_bb_set(this)->is_contain(bbid); }
+
+    //Clean adjacent relation in loop-tree.
+    void cleanAdjRelation()
+    { LI_outer(this) = NULL; LI_next(this) = NULL; LI_prev(this) = NULL; }
 };
 
 

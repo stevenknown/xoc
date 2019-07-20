@@ -10,7 +10,7 @@ com/xmat.o \
 com/strbuf.o \
 com/bigint.o \
 com/birational.o \
-com/testbs.o \
+com/example/testbs.o \
 com/flty.o \
 com/bs.o
 
@@ -71,7 +71,7 @@ ifdef WIN
 CFLAGS += -D_ON_WINDOWS_
 endif
 
-CFLAGS += -DFOR_DEX -D_DEBUG_ -O2 -g2 -Wno-write-strings -Wsign-promo \
+CFLAGS += -DFOR_DEX -D_DEBUG_ -O2 -g2 -Wno-unknown-pragmas -Wno-write-strings -Wsign-promo \
         -Wsign-compare -Wpointer-arith -Wno-multichar -Winit-self -Wswitch
 
 CC := $(shell which clang++ > /dev/null)

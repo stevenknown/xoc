@@ -25,13 +25,7 @@ CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
 OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE
 USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 @*/
-#include "ltype.h"
-#include "comf.h"
-#include "smempool.h"
-#include "sstl.h"
-#include "bigint.h"
-#include "strbuf.h"
-#include "birational.h"
+#include "xcominc.h"
 
 namespace xcom {
 
@@ -52,21 +46,35 @@ BIRational BIRational::rabs()
 }
 
 
-void BIRational::dump(char const* name)
+void BIRational::dump() const
+{
+    dump(stdout);
+}
+
+
+void BIRational::dump(FILE * h) const
+{
+    ASSERT0(h);
+    if (m_den == 1) {
+        //Dump numerator.
+        m_num.dump(h, false, false);
+        fprintf(h, " / 1");
+    } else {
+        //Dump numerator.
+        m_num.dump(h, false, false);
+        fprintf(h, " / ");
+        //Dump denominator
+        m_den.dump(h, false, false);
+    }
+    fflush(h);
+}
+
+
+void BIRational::dump(char const* name) const
 {
     FILE * h = fopen(name, "a+");
     ASSERTN(h, ("%s create failed!!!", name));
-    if (m_den == 1) {
-        //Dump numerator.
-        m_num.dump(h, true);        
-        fprintf(h, " / 1");        
-    } else {
-        //Dump numerator.
-        m_num.dump(h, true);
-        fprintf(h, " / ");
-        //Dump denominator
-        m_den.dump(h, false);
-    }
+    dump(h);
     fclose(h);
 }
 

@@ -177,13 +177,13 @@ public:
     UINT align; //memory alignment of var.
     SYM const* name;
 
-	//Record the formal parameter position if VAR is parameter.
-	//Start from 0.
-	UINT formal_parameter_pos;
+    //Record the formal parameter position if VAR is parameter.
+    //Start from 0.
+    UINT formal_parameter_pos;
 
     union {
-		//Record string contents if VAR is const string.
-		SYM const* string;
+        //Record string contents if VAR is const string.
+        SYM const* string;
 
         //Record byte code if VAR has constant initial value.
         ByteBuf * byte_val;

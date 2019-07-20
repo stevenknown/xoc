@@ -72,11 +72,14 @@ public:
 
     bool is_int() { return m_den == BigInt(1,1); }
     BIRational rabs();
+    void reduce() { UNREACHABLE(); }
     BigInt num() const { return m_num; }
     BigInt& num() { return m_num; }
     BigInt den() const { return m_den; }
     BigInt& den() { return m_den; }
-    void dump(char const* name);
+    void dump(char const* name) const;
+    void dump(FILE * h) const;
+    void dump() const;
 
     void set(BigIntElemType num, BigIntElemType den)
     {

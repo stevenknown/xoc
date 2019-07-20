@@ -220,7 +220,6 @@ void IPA::recomputeDUChain(Region * rg, OptCtx & oc)
         if (!mdssamgr->isMDSSAConstructed()) {
             mdssamgr->construction(oc);
         }
-
         return;
     }
 

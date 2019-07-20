@@ -1865,7 +1865,7 @@ bool Region::reconstructBBList(OptCtx & oc)
                      ctir != NULL; ctir = next_ctir) {
                     irlst->get_next(&next_ctir);
                     irlst->remove(ctir);
-                    add_next(&restirs, &last, ctir->val());
+                    xcom::add_next(&restirs, &last, ctir->val());
                 }
 
                 ctbb = splitIRlistIntoBB(restirs, bbl, ctbb);
@@ -1883,7 +1883,7 @@ bool Region::reconstructBBList(OptCtx & oc)
                      ctir != NULL; ctir = next_ctir) {
                     irlst->get_next(&next_ctir);
                     irlst->remove(ctir);
-                    add_next(&restirs, &last, ctir->val());
+                    xcom::add_next(&restirs, &last, ctir->val());
                 }
 
                 ctbb = splitIRlistIntoBB(restirs, bbl, ctbb);
@@ -1921,12 +1921,12 @@ IR * Region::constructIRlist(bool clean_ir_list)
              lct = bb->getLabelList().get_next(lct)) {
             LabelInfo const* li = lct->val();
             //insertbefore_one(&ret_list, ret_list, buildLabel(li));
-            add_next(&ret_list, &last, buildLabel(li));
+            xcom::add_next(&ret_list, &last, buildLabel(li));
         }
 
         for (IR * ir = BB_first_ir(bb); ir != NULL; ir = BB_next_ir(bb)) {
             //insertbefore_one(&ret_list, ret_list, ir);
-            add_next(&ret_list, &last, ir);
+            xcom::add_next(&ret_list, &last, ir);
             if (clean_ir_list) {
                 ir->setBB(NULL);
             }
@@ -2183,7 +2183,7 @@ void Region::freeIRTreeList(IR * ir)
     IR * head = ir, * next = NULL;
     while (ir != NULL) {
         next = ir->get_next();
-        remove(&head, ir);
+        xcom::remove(&head, ir);
         freeIRTree(ir);
         ir = next;
     }
@@ -2510,7 +2510,7 @@ IR * Region::dupIRTreeList(IR const* ir)
     IR * new_list = NULL;
     while (ir != NULL) {
         IR * newir = dupIRTree(ir);
-        add_next(&new_list, newir);
+        xcom::add_next(&new_list, newir);
         ir = ir->get_next();
     }
     return new_list;
@@ -3714,7 +3714,7 @@ bool Region::partitionRegion()
     while (ir != end_pos) {
         IR * t = ir;
         ir = ir->get_next();
-        remove(&REGION_analysis_instrument(this)->m_ir_list, t);
+        xcom::remove(&REGION_analysis_instrument(this)->m_ir_list, t);
         IR * inner_ir = inner_ru->dupIRTree(t);
         freeIRTree(t);
         inner_ru->addToIRList(inner_ir);
@@ -3731,7 +3731,7 @@ bool Region::partitionRegion()
     dumpIRList(getIRList(), this);
 
     //Merger IR list in inner-region to outer region.
-    //remove(&REGION_analysis_instrument(this)->m_ir_list, ir_ru);
+    //xcom::remove(&REGION_analysis_instrument(this)->m_ir_list, ir_ru);
     //IR * head = inner_ru->constructIRlist();
     //insertafter(&split_pos, dupIRTreeList(head));
     //dumpIRList(getIRList(), this);

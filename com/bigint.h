@@ -134,8 +134,10 @@ public:
     void abs(); //Change value into absolute values.
 
     //Dump big-integer to specific file with 'name'.
-    void dump(CHAR const* name) const;
-    void dump(FILE * h, bool with_newline) const;
+    //is_seg_hex: true if dump each segments in Hex format.
+    void dump(CHAR const* name, bool is_seg_hex) const;
+    void dump(FILE * h, bool with_newline, bool is_seg_hex) const;
+    void dump() const;
 
     //Return significant number position.
     //Return -1 if BigInt has no initial value.
@@ -149,7 +151,7 @@ public:
     }
 
     bool isAllElemEqual(BigIntElemType elem) const;
-    bool is_neg() { return IS_NEG(getSig()) != 0; }
+    bool is_neg() const { return IS_NEG(getSig()) != 0; }
 
     //Support concatenation assignment, such as: a=b=c.
     BigInt const& operator = (BigInt const& src) { copy(src); return *this; }

@@ -96,7 +96,8 @@ bool BigInt::isAllElemEqual(BigIntElemType elem) const
 }
 
 
-void BigInt::dump(CHAR const* name) const
+//is_seg_hex: true if dump each segments in Hex format.
+void BigInt::dump(CHAR const* name, bool is_seg_hex) const
 {
 	#define BS_NAME "bigint.dump"
 	if (name == NULL) {
@@ -104,14 +105,21 @@ void BigInt::dump(CHAR const* name) const
 	}
 	FILE * h = fopen(name, "a+");
 	ASSERTN(h, ("%s create failed!!!", name));
-	dump(h, true);
+	dump(h, true, is_seg_hex);
 	fclose(h);
 }
 
 
-void BigInt::dump(FILE * h, bool with_newline) const
+void BigInt::dump() const
 {
-	ASSERTN(h, ("need file handler"));
+    dump(stdout, false, true);
+}
+
+
+//is_seg_hex: true if dump each segments in Hex format.
+void BigInt::dump(FILE * h, bool with_newline, bool is_seg_hex) const
+{
+    ASSERTN(h, ("need file handler"));
     if (getSigPos() >= 0 && with_newline) {
         fprintf(h, "\n");
     }
@@ -131,7 +139,6 @@ void BigInt::dump(FILE * h, bool with_newline) const
                 fprintf(h, "[");
             }
             for (UINT j = 0; j < len; j++) {
-                UINT xx = (UINT)(val & LOWER_4_BIT_MASK);
                 fprintf(h, "%01x", (UINT)(val & LOWER_4_BIT_MASK));
                 cnt++;
                 val >>= LOWER_4_BIT_SHIFT_SIZE;
@@ -148,7 +155,11 @@ void BigInt::dump(FILE * h, bool with_newline) const
             if (i == m_sig_pos) {
                 fprintf(h, "[");
             }
-            fprintf(h, "%08x", val);
+            if (is_seg_hex) {
+                fprintf(h, "%08x", val);
+            } else {
+                fprintf(h, "%d", val);
+            }
             if (i == m_sig_pos) {
                 fprintf(h, "]");
             }
@@ -449,6 +460,8 @@ BigInt& bisAdd(IN BigInt const& a, IN BigInt const& b, IN OUT BigInt & res)
 
 //BigInt Unsigned Addition.
 //e.g: res = a + b;
+//Note addition support in-suitate operation.
+//e.g: res = res + b is legal.
 BigInt& biuAdd(IN BigInt const& a, IN BigInt const& b, IN OUT BigInt & res)
 {
     ASSERT0(sizeof(SuperUElemType) >= 2 * sizeof(BigIntUElemType));
@@ -507,6 +520,8 @@ BigInt& biuAdd(IN BigInt const& a, IN BigInt const& b, IN OUT BigInt & res)
 
 //BigInt substraction.
 //e.g: res = a - b;
+//Note substraction does not support in-suitate operation.
+//e.g: res = res - b is not legal.
 BigInt& biSub(IN BigInt const& a, IN BigInt const& b, IN OUT BigInt & res)
 {
     ASSERT0(sizeof(SuperElemType) >= 2 * sizeof(BigIntElemType));
@@ -526,6 +541,7 @@ BigInt& biSub(IN BigInt const& a, IN BigInt const& b, IN OUT BigInt & res)
     BigInt addend(1, 0x1);
     biuAdd(res, addend, res);    
     biuAdd(a, res, res);
+    //Neglect the carray part if exist.
     res.setSig(i - 1); //Set significant.
     return res;
 }
@@ -538,9 +554,7 @@ BigInt& biuMul(IN BigInt const& a, IN BigInt const& b, IN OUT BigInt & res)
     ASSERT0(sizeof(SuperUElemType) >= 2 * sizeof(BigIntUElemType));
     ASSERTN(b.getSigPos() >= 0, ("Miss significant elem"));
     ASSERTN(a.getSigPos() >= 0, ("Miss significant elem"));
-    ASSERTN(b.getSigPos() >= 0, ("Miss significant elem"));
-    INT longer_pos = a.getSigPos() > b.getSigPos() ?
-        a.getSigPos() : b.getSigPos();
+    ASSERTN(b.getSigPos() >= 0, ("Miss significant elem"));    
     UINT shift_cnt = 0;
     BigInt tmpres;
     res.initElem(1, 0x0);
@@ -573,8 +587,7 @@ BigInt& biuMul(IN BigInt const& a, IN BigInt const& b, IN OUT BigInt & res)
 
             //Set significant position to result.
             tmpres.setSig(i + shift_cnt);
-        }
-        else {
+        } else {
             ASSERT0((i + shift_cnt - 1) >= 0);
             //Set significant position to result.
             tmpres.setSig(i + shift_cnt - 1);
@@ -611,7 +624,9 @@ BigInt& bisMul(IN BigInt const& a, IN BigInt const& b, IN OUT BigInt & res)
     }
     biuMul(*pa, *pb, res);
     if (is_a_neg ^ is_b_neg) {
-        res.neg();
+        if (!res.isAllElemEqual(0)) {
+            res.neg();
+        }        
     }
     return res;
 }
@@ -621,6 +636,9 @@ void BigInt::neg()
 {
     ASSERT0(sizeof(SuperElemType) >= 2 * sizeof(BigIntElemType));
     ASSERTN(getSigPos() >= 0, ("Miss significant elem"));
+    if (isAllElemEqual(0)) {
+        return;
+    }
     for (INT i = 0; i <= getSigPos(); i++) {
         set(i, ~(*this)[i]);
     }

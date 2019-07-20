@@ -25,16 +25,8 @@ CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
 OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE
 USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 @*/
-#include "ltype.h"
-#include "comf.h"
-#include "strbuf.h"
 #include "math.h"
-#include "smempool.h"
-#include "rational.h"
-#include "flty.h"
-#include "sstl.h"
-#include "matt.h"
-#include "xmat.h"
+#include "xcominc.h"
 
 namespace xcom {
 
@@ -238,7 +230,7 @@ static void rmat_dumpf_by_handle(void const* pbasis, FILE * h)
 {
     ASSERTN(h, ("dump file handle is NULL"));
     RMat * pthis = (RMat*)pbasis;
-    fprintf(h, "\nMATRIX(%d,%d)\n", pthis->getRowSize(), pthis->getColSize());
+    fprintf(h, "\nMATRIX(%dx%d)\n", pthis->getRowSize(), pthis->getColSize());
     for (UINT i = 0; i < pthis->getRowSize(); i++) {
         for (UINT j = 0; j < pthis->getColSize(); j++) {
             Rational rat = pthis->get(i, j);
@@ -1174,7 +1166,7 @@ void INTMat::dumpf(CHAR const* name, bool is_del) const
     }
     FILE * h = fopen(name, "a+");
     ASSERTN(h, ("%s create failed!!!", name));
-    fprintf(h, "\nMATRIX(%d,%d)\n", this->getRowSize(), this->getColSize());
+    fprintf(h, "\nMATRIX(%dx%d)\n", this->getRowSize(), this->getColSize());
     for (UINT i = 0; i < m_row_size; i++) {
         fprintf(h, "\t");
         for (UINT j = 0; j < m_col_size; j++) {
@@ -1249,7 +1241,7 @@ static void flt_dumpf_by_handle(void const* pbasis, FILE * h)
 {
     ASSERTN(h, ("file handle is NULL"));
     FloatMat * pthis = (FloatMat*)pbasis;
-    fprintf(h, "\nMATRIX(%d,%d)\n", pthis->getRowSize(), pthis->getColSize());
+    fprintf(h, "\nMATRIX(%dx%d)\n", pthis->getRowSize(), pthis->getColSize());
     for (UINT i = 0; i < pthis->getRowSize(); i++) {
         fprintf(h, "\t");
         for (UINT j = 0; j < pthis->getColSize(); j++) {
@@ -1565,7 +1557,7 @@ static void bool_dumpf_by_handle(void const* pbasis, FILE * h)
 {
     ASSERTN(h != NULL, ("file handle is NULL"));
     BMat * pthis = (BMat*)pbasis;
-    fprintf(h, "\nMATRIX(%d,%d)\n", pthis->getRowSize(), pthis->getColSize());
+    fprintf(h, "\nMATRIX(%dx%d)\n", pthis->getRowSize(), pthis->getColSize());
     for (UINT i = 0; i < pthis->getRowSize(); i++) {
         fprintf(h, "\t");
         for (UINT j = 0; j < pthis->getColSize(); j++) {

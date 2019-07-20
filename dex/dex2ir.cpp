@@ -1090,7 +1090,7 @@ IR * Dex2IR::convertNewInstance(IN LIR * lir)
 {
     //Region::buld_binary_op will detect the POINTER type, IR_ADD
     //computes the POINTER addend size automatically.
-    //Here we hacked it by change POINTER base type size to 1 byte.
+    //Here we workaround changed it by change POINTER base type size to 1 byte.
     Type const* ty = m_tr->ptr; //return value is referrence type.
 
     //AABBBB

@@ -181,12 +181,12 @@ public:
     //Append irs to current simplification context and
     //return back to up level.
     void appendStmt(SimpCtx & c)
-    { add_next(&SIMP_stmtlist(this), SIMP_stmtlist(&c)); }
+    { xcom::add_next(&SIMP_stmtlist(this), SIMP_stmtlist(&c)); }
 
     //Append irs to current simplification context and
     //return back to up level.
     void appendStmt(IR * irs)
-    { add_next(&SIMP_stmtlist(this), irs); }
+    { xcom::add_next(&SIMP_stmtlist(this), irs); }
 
     void clean()
     {

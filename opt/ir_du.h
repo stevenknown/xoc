@@ -334,8 +334,20 @@ protected:
             IR const* exp,
             MD const* expmd,
             DUSet * expdu,
-            xcom::C<IR*> * ct);
+            xcom::C<IR*> * ct,
+            bool * has_overlapped_def);
+    void buildLocalDUChainForNonKillingDef(
+            IRBB * bb,
+            xcom::C<IR*> const* ct,
+            IR const* exp,
+            MD const* expmd,
+            DUSet * expdu);
 
+    bool checkIsLocalKillingDefForDirectAccess(
+            MD const* defmd,
+            MD const* usemd,
+            IR const* stmt,
+            bool * has_overlapped_def);
     void checkDefSetToBuildDUChain(
             IR const* exp,
             MD const* expmd,
@@ -353,9 +365,14 @@ protected:
             MD const* expmd,
             DUSet * expdu);
     bool checkIsTruelyDep(IR const* def, IR const* use);
-    UINT checkIsLocalKillingDef(IR const* stmt,
+    bool checkIsLocalKillingDefForDirectAccess(
+            MD const* defmd,
+            MD const* usemd,
+            IR const* stmt);
+    UINT checkIsLocalKillingDefForIndirectAccess(
+            IR const* stmt,
             IR const* exp,
-            xcom::C<IR*> * expct);
+            xcom::C<IR*> const* expct);
     UINT checkIsNonLocalKillingDef(IR const* stmt, IR const* exp);
     inline bool canBeLiveExprCand(IR const* ir) const;
     void computeArrayRefAtIStoreBase(IR * ir);
@@ -814,9 +831,10 @@ public:
             bool omit_self);
     IR const* findKillingLocalDef(
             IRBB * bb,
-            xcom::C<IR*> * ct,
+            xcom::C<IR*> const* ct,
             IR const* exp,
-            MD const* md);
+            MD const* md,
+            bool * has_overlapped_def);
 
     void setMustKilledDef(UINT bbid, DefDBitSetCore const* set);
     void setMayKilledDef(UINT bbid, DefDBitSetCore const* set);

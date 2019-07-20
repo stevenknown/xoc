@@ -351,7 +351,7 @@ ExpRep * IR_EXPR_TAB::remove_expr(IR * ir)
     //Scanning in ExpRep list in level2 hash tab.
     while (ie != NULL) {
         if (ir->isIREqual(EXPR_ir(ie))) {
-            remove(&level2_hash_tab[level2_hashv], ie);
+            xcom::remove(&level2_hash_tab[level2_hashv], ie);
             m_ir_expr_vec.remove(EXPR_id(ie), NULL);
             return ie;
         }

@@ -44,10 +44,32 @@ handled by XOC, it needs to be converted to this representation.
 
 Programming Guides
 -----------------------------------
+¡ö Instrument library
 ¡ö High Level Structure
 ¡ö Type
 ¡ö IR Reference
+¡ö Basic Block.
+¡ö Control Flow Graph (CFG)
+¡ö Analysis and Transform Phase.
 ¡ö Quick Start
+
+-----------------------------------
+¡ö Instrument function library
+    XOC does not use any std library, it provides a general purpose function
+    library xcom that used to facilitate the development of compiler and any 
+    other complex software.
+
+    Features of xcom:
+      A template library to support almost all basic algorithms and structures
+      such as String, Vector, List, TMap(Tree Map), HMap(Hash Map), Dense Bitset,
+      Sparse Bitset, Graph, Mempool mananger, Big-Integer, Linear Algebraic
+      library, Linear Programming Solver, Integer Linear Programming solver,
+      Sort function, a number of utilities as well.
+
+    Source code of xcom are placed in the com/ directory, please go to this
+    directory to view the details.
+
+    Note xcom can be used and distributed independently with XOC.
 
 ¡ö High Level Structure
     ¡ñ RegionMgr
@@ -393,7 +415,7 @@ Programming Guides
         Operands:
         * IR_dt indicate the result type.
         * PR_no indicate the number of PR.
-        * PR_ssainfo indicate the SSA information if it exists.
+        * PR_ssainfo indicate the SSA information if exist.
 
     ¡ñ IR_STPR
         This operation stores value to a PR specified by PR_no.
@@ -408,7 +430,7 @@ Programming Guides
         Operands:
         * IR_dt indicate the result type.
         * STPR_no indicate the number of PR.
-        * STPR_ssainfo indicate the SSA information if it exists.
+        * STPR_ssainfo indicate the SSA information if exist.
         * STPR_rhs indicate the right-hand-side expression.
 
     ¡ñ IR_SETELEM
@@ -427,7 +449,7 @@ Programming Guides
 
         Operands:
         * SETELEM_prno      indicate the result PR number.
-        * SETELEM_ssainfo   indicate the SSA information if it exists.
+        * SETELEM_ssainfo   indicate the SSA information if exist.
         * SETELEM_du        indicate the DU_SET information if MD
                             du information is supplied.
         * SETELEM_rhs       indicate the value to be set.
@@ -449,7 +471,7 @@ Programming Guides
 
         Operands:
         * GETELEM_prno    indicate the result PR number.
-        * GETELEM_ssainfo indicate the SSA information if it exists.
+        * GETELEM_ssainfo indicate the SSA information if exist.
         * GETELEM_du      indicate the DU_SET information if MD
                           du information is supplied.
         * GETELEM_base    indicate the base.
@@ -608,7 +630,7 @@ Programming Guides
         * CALL_is_intrinsic  indicate whether function is intrinsic.
         * CALL_is_readonly   indicate whether this call would not modify any memory.
         * CALL_ssainfo       indicate the SSA information of return value
-                             PR if it exists.
+                             PR if exist.
         * CALL_is_alloc_heap indicate whether this call is memory allocation
                              function which alloc memory from heap, such as
                              malloc or new.
@@ -635,7 +657,7 @@ Programming Guides
         * CALL_is_readonly   indicate whether this call would not
                              modify any memory.
         * CALL_ssainfo       indicate the SSA information of return value
-                             PR if it exists.
+                             PR if exist.
         * CALL_is_alloc_heap indicate whether this call is memory allocation
                              function which alloc memory from heap, such as
                              malloc or new.
@@ -874,16 +896,21 @@ Programming Guides
         Operands:
         * LOOP_init  indicate the stmt that compute the initial value of
             induction variable.
-            It must be a stmt IR_ST or IR_STPR initialize the induction
-            variable, and can not be NULL.
+            It must be stmt, such as IR_ST or IR_STPR, initialize the induction
+            variable, the field can not be NULL as well.
         * LOOP_det  indicate the determinant expression.
-            It must be a comparison expression for the end condition.
-            The comparison must be IR_LT, IR_LE, IR_GT, IR_GE, and any other
-            than the induction variable in this expression must be loop invariant.
-        * LOOP_step  indicate the stmt that update the value of induction
-            variable by constant. It must be a stmt IR_ST or IR_STPR that
-            increment the induction variable via IR_ADD by a const step amount.
-        * LOOP_body indicate the a list of stmt.
+            It must be a comparison expression for computing the
+            loop terminate condition.
+            The operation of comparison could only be IR_LT, IR_LE, IR_GT, IR_GE,
+            Note any other variables except the induction variable
+            must be loop invariant.
+        * LOOP_step  indicate step operation to induction variable.
+            It must be a stmt that operator is either IR_ST or IR_STPR.
+            The stmt updates the value of induction
+            variable by constant incrementally.
+            A common example is incrementing the induction variable via IR_ADD
+            by a const step amount.
+        * LOOP_body indicate a list of stmt that inside loop body.
 
         Semantics: induction variable is i.
             init: i = 0
@@ -893,16 +920,17 @@ Programming Guides
             enddo
 
     ¡ñ IR_DO_WHILE
-        This operation is high level control loop operation.
+        This operation represents a high level loop control structure.
         LOOP_body is a list of IR node representing statements that is executed
         while LOOP_det returns nonzero.
         The condition is tested at the end of the loop, so the loop body is
         executed at least once.
-        If this statement has no LOOP_body, the field is NULL.
+        If there is no stmt inside the loop, LOOP_body should be NULL.
 
         Operands:
-        * LOOP_det  is a boolean expression, and indicate the determinant expression.
-        * LOOP_body indicate the a list of stmt.
+        * LOOP_det  is a boolean expression, that indicate the
+                    determinant expression.
+        * LOOP_body indicate a list of stmt that inside loop body.
 
         Semantics:
             while (det)
@@ -910,14 +938,15 @@ Programming Guides
             endwhile
 
     ¡ñ IR_WHILE_DO
-        This operation is high level control loop operation.
+        This operation represents a high level loop control structure.
         LOOP_body is a list of IR node representing statements that is executed
         while LOOP_det returns nonzero. The condition is tested at the start
         of the loop. If this statement has no LOOP_body, the field is NULL.
 
         Operands:
-        * LOOP_det  is a boolean expression, and indicate the determinant expression.
-        * LOOP_body indicate the a list of stmt.
+        * LOOP_det  is a boolean expression, that indicate the
+                    determinant expression.
+        * LOOP_body indicate a list of stmt that inside loop body.
 
         Semantics:
             do
@@ -925,11 +954,12 @@ Programming Guides
             while (det)
 
     ¡ñ IR_IF
-        This operation is high level control flow operation.
-        If this statement has no IF_falsebody, the field is NULL.
+        This operation represents a high level control flow structure.
+        If the statement has no IF_falsebody or IR_truebody,
+        the field should be NULL.
 
         Operands:
-        * IF_det  is a boolean expression, and indicate the
+        * IF_det  is a boolean expression, that indicate the
             determinant expression.
         * IF_truebody  specify a list of statements that is executed
                        if IF_det return true.
@@ -960,11 +990,15 @@ Programming Guides
     ¡ñ IR_CONTINUE
         This operation represents high level control structure, that stop the
         current loop iteration, immediately continue with the next one.
-        This operation is used by IR_DO_LOOP, IR_DO_WHILE, IR_WHILE_DO.
+        This operation is often used inside in loop body of IR_DO_LOOP,
+        IR_DO_WHILE, and IR_WHILE_DO.
         It is used to specify an unconditional branch from a loop body to the
-        start label of loop.
+        determinant expression at beginning of the loop statetment.
 
-        Semantics: Jump to the start of loop, the following loop can not terminate.
+        Semantics: Jump to beginning of loop to execute the determinant
+        expression.
+        Note in the example, followed stmts of IR_CONTINUE can not be
+        executed, thus loop statement will not be terminated.
             while (i < 10)
                 if (i ==3)
                     continue
@@ -975,27 +1009,33 @@ Programming Guides
     ¡ñ IR_PHI
         The operation is used to implement the ¦Õ node if region is in the SSA
         mode. Each operand of PHI must correspond to concerned predecessor basic
-        block in cfg. Only PR and CONST may be used as the operand to the PHI
-        node. PHI instructions must be first in a basic block.
+        block in CFG. Only PR and CONST could be used as the operand to the PHI
+        node. PHI instructions must be first stmt in IR list of basic block.
 
         Operands:
         * PHI_res        indicate the result PR.
-        * PHI_ssainfo    indicate the SSA information of result PR if it exists.
+        * PHI_ssainfo    indicate the SSA information of result PR if exist.
         * PHI_opnd_list  indicate the operand list, which only may be
                          PR and CONST.
 
     ¡ñ IR_LABEL
         This operation represents internal, customer defined label, and pragmas.
         Any branch to the label will transfer control to the statement
-        following this one. A flags field gives Operands about the label.
+        following the label.
 
         Operands:
-        * LAB_lab indicate a label info structure.
+        * LAB_lab indicate a LabelInfo structure which describe detailed
+                  information of the label.
 
 
 ¡ö Basic Block.
 
     Defined in ir_bb.h
+
+    A basic block is a straight-line code sequence
+    with no branches in except to the entry and no branches out except at
+    the exit. This restricted form makes a basic block highly amenable to
+    analysis.
 
     Stmt operations which can be placed in basic block are:
         IR_ST, IR_STPR, IR_STARRAY, IR_SETELEM, IR_GETELEM, IR_IST, IR_CALL,
@@ -1007,8 +1047,11 @@ Programming Guides
 
     Defined in cfg.h
 
-    Consist of a list basic blocks.
-    This class is inherited from the class Graph.
+    A control-flow graph is a representation, using graph notation, of all
+    paths that might be traversed through a program during its execution.
+
+    A control-flow graph is consist of a list basic blocks.
+    This class is inherited from the class Graph which defined in sgraph.h.
     You can access vertex and edge on CFG via the API of class Graph.
     Each vertex is corresponding to a unique basic block id. So you can access
     the basic block via get_bb(bbid).

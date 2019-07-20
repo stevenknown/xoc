@@ -29,6 +29,8 @@ flexibility, and the capability of representing almost all popular languages.
 There are two level IR representations used throughout all phases of the
 compilation. You can use XOC to perform optimization, program analysis or build diagnostic tools.
 
+The main documentation is in doc/Manual.txt.
+
 Build libxoc.a on Linux:
 Default build host is Linux
 ```cmd

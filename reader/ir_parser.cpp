@@ -590,7 +590,7 @@ bool IRParser::declareRegion(ParseCtx * ctx)
 
     if (!newctx.has_error) {
         newctx.current_region->setIRList(newctx.stmt_list);
-        bool buildcfg = false; //TODO: build cfg by given parameters.
+        //TODO: build cfg by given parameters.
         if (newctx.has_phi) {
             ASSERT0(!newctx.has_high_level_ir);
         }
@@ -599,6 +599,7 @@ bool IRParser::declareRegion(ParseCtx * ctx)
             newctx.current_region->setIRList(NULL);
             OptCtx * oc = getRegionMgr()->
                 getAndGenOptCtx(newctx.current_region->id());
+            ASSERT0(oc);
             newctx.current_region->initPassMgr();
             //IR_CFG * cfg = newctx.current_region->
             //    getPassMgr()->registerPass(PASS_CFG);

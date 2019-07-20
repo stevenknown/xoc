@@ -474,7 +474,7 @@ Edge * Graph::removeEdge(Edge * e)
         el = EC_next(el);
     }
     ASSERTN(el != NULL, ("can not find out-edge, it is illegal graph"));
-    remove(&VERTEX_out_list(from), el);
+    xcom::remove(&VERTEX_out_list(from), el);
     m_el_free_list.add_free_elem(el);
 
     //remove out of in-list of 'to'
@@ -484,7 +484,7 @@ Edge * Graph::removeEdge(Edge * e)
         el = EC_next(el);
     }
     ASSERTN(el != NULL, ("can not find in-edge, it is illegal graph"));
-    remove(&VERTEX_in_list(to), el);
+    xcom::remove(&VERTEX_in_list(to), el);
     m_el_free_list.add_free_elem(el);
 
     //remove edge out of edge-hash

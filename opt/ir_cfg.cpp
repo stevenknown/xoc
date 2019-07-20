@@ -1119,6 +1119,7 @@ bool IR_CFG::removeRedundantBranch()
 
 void IR_CFG::dump_dot(CHAR const* name, bool detail, bool dump_eh)
 {
+    if (g_tfile == NULL) { return; }
     //Note this function does not use g_tfile as output.
     //So it is dispensable to check g_tfile.
     if (name == NULL) {
@@ -1274,6 +1275,7 @@ void IR_CFG::dump_dot(CHAR const* name, bool detail, bool dump_eh)
 
 void IR_CFG::dump_node(FILE * h, bool detail)
 {
+    ASSERT0(h);
     ASSERT0(m_bb_list);
     xcom::C<IRBB*> * bbct;
     UINT vertical_order = 1;
@@ -1347,6 +1349,7 @@ void IR_CFG::dump_node(FILE * h, bool detail)
 //Print graph structure description.
 void IR_CFG::dump_head(FILE * h)
 {
+    ASSERT0(h);
     fprintf(h, "graph: {"
               "title: \"Graph\"\n"
               "shrink:    15\n"
@@ -1386,6 +1389,7 @@ void IR_CFG::dump_head(FILE * h)
 
 void IR_CFG::dump_edge(FILE * h, bool dump_eh)
 {
+    ASSERT0(h);
     INT c;
     for (xcom::Edge * e = m_edges.get_first(c);
          e != NULL; e = m_edges.get_next(c)) {
@@ -1414,6 +1418,7 @@ void IR_CFG::dump_edge(FILE * h, bool dump_eh)
 
 void IR_CFG::dump_vcg(CHAR const* name, bool detail, bool dump_eh)
 {
+    if (g_tfile == NULL) { return; }
     ASSERT0(m_ru);
 
     if (name == NULL) { name = "graph_cfg.vcg"; }

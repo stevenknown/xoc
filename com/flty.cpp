@@ -173,7 +173,7 @@ PRECISION_TYPE integralize(PRECISION_TYPE const& a)
 }
 
 
-CHAR const* Float::format(StrBuf & buf)
+CHAR const* Float::format(StrBuf & buf) const
 {
     buf.sprint("%f", m_f);
     return buf.buf;
@@ -199,6 +199,14 @@ bool Float::is_int()
         return true;
     }
     return false;
+}
+
+
+void Float::dump() const
+{
+    StrBuf buf(16);
+    format(buf);
+    fprintf(stdout, buf.buf);
 }
 
 } //namespace xcom

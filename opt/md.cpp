@@ -932,7 +932,7 @@ void MDSystem::computeOverlap(
 
 //Compute all other md which are overlapped with MD in set 'mds'.
 //e.g: mds contains {md1}, and md1 overlapped with md2, md3,
-//then output is {md1, md2, md3}.
+//then output is {md2, md3}.
 //
 //'mds': it is not only input but also output buffer.
 //'output': output md set.

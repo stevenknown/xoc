@@ -252,7 +252,7 @@ protected:
             if (EC_edge(el) == e) return;
         }
         ASSERT0(last == NULL || EC_next(last) == NULL);
-        add_next(&VERTEX_out_list(vex), &last, newEdgeC(e));
+        xcom::add_next(&VERTEX_out_list(vex), &last, newEdgeC(e));
     }
 
     //Add 'e' into in-edges of 'vex'
@@ -266,7 +266,7 @@ protected:
             if (EC_edge(el) == e) { return; }
         }
         ASSERT0(last == NULL || EC_next(last) == NULL);
-        add_next(&VERTEX_in_list(vex), &last, newEdgeC(e));
+        xcom::add_next(&VERTEX_in_list(vex), &last, newEdgeC(e));
     }
 
     virtual void * cloneEdgeInfo(Edge*)

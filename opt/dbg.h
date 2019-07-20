@@ -72,7 +72,9 @@ public:
     //Do some prepare work before print source file.
     virtual void doPrepareWorkBeforePrint() {}
 
+    //Print source code line in internal stream.
     virtual void printSrcLine(IR const*, PrtCtx * ctx);
+    //Print source code line in internal stream.
     virtual void printSrcLine(Dbx const*, PrtCtx *)
     {
         //Taget Dependent Code
