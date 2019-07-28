@@ -55,12 +55,13 @@ TypeDesc const g_type_desc[] = {
     {D_F80,   "f80",   80},
     {D_F128,  "f128",  128},
 
-    {D_MC,    "mc",    0}, //memory chunk, for structures
+    {D_MC,    "mc",    0}, //memory chunk, for structures, default bitsize is 0
     {D_STR,   "str",   BYTE_PER_POINTER * BIT_PER_BYTE}, //string is pointer
     {D_PTR,   "*",     BYTE_PER_POINTER * BIT_PER_BYTE}, //pointer
-    {D_VEC,   "vec",   0}, //vector
+    {D_VEC,   "vec",   0}, //vector, default bitsize is 0
 
-    {D_VOID,  "void",  0}, //void type
+    {D_VOID,  "void",  0}, //void type, default bitsize is 0
+    {D_TENSOR, "tensor", 0}, //tensor type, default bitsize is 0
 };
 
 
@@ -71,6 +72,31 @@ Type const* checkType(Type const* ty, DATA_TYPE dt)
     return ty;
 }
 #endif
+
+
+//
+//START TensorType
+//
+//Return byte size of total tensor.
+UINT TensorType::getByteSize(TypeMgr const* mgr) const
+{
+    UINT size = mgr->get_dtype_bytesize(getElemDataType());
+    for (UINT i = 0; i < degree_of_dimension.get_capacity(); i++) {
+        ASSERT0(degree_of_dimension[i] > 0);
+        size *= degree_of_dimension[i];
+    }
+    return size;
+}
+
+
+//Set degree to given dimension.
+//Note degree should not be 0.
+void TensorType::setDegreeOfDim(UINT dim, UINT degree)
+{
+    ASSERTN(degree != 0, ("Degree of dim%d is 0.", dim));
+    degree_of_dimension.set(dim, degree);
+}
+//END TensorType
 
 
 //The hoisting rules are:
@@ -192,7 +218,7 @@ DATA_TYPE TypeMgr::hoistBSdtype(UINT bit_size, bool is_signed) const
 }
 
 
-//Return ty-idx in m_type_tab.
+//Register a pointer data type.
 TypeContainer const* TypeMgr::registerPointer(Type const* type)
 {
     ASSERT0(type && type->is_pointer());
@@ -231,7 +257,7 @@ TypeContainer const* TypeMgr::registerVector(Type const* type)
     ASSERT0(TY_vec_size(type) >= get_dtype_bytesize(TY_vec_ety(type)) &&
             TY_vec_size(type) % get_dtype_bytesize(TY_vec_ety(type)) == 0);
 
-    ElemTypeTab * elemtab = m_vector_type_tab.get(type);
+    VectorElemTypeTab * elemtab = m_vector_type_tab.get(type);
     if (elemtab != NULL) {
         TypeContainer const* entry = elemtab->get(type);
         if (entry != NULL) {
@@ -241,13 +267,13 @@ TypeContainer const* TypeMgr::registerVector(Type const* type)
 
     //Add new element type into vector.
     //e.g:
-    //    MC,size=100,vec_ty=D_UNDEF
-    //    MC,size=200,vec_ty=D_UNDEF
-    //        MC,size=200,vec_ty=D_I8
-    //        MC,size=200,vec_ty=D_U8 //I8<U8
-    //        MC,size=200,vec_ty=D_F32
-    //    MC,size=300,vec_ty=D_UNDEF
-    //        MC,size=300,vec_ty=D_F32
+    //    VEC,size=100,vec_ty=D_UNDEF
+    //    VEC,size=200,vec_ty=D_UNDEF
+    //        VEC,size=200,vec_ty=D_I8
+    //        VEC,size=200,vec_ty=D_U8 //I8<U8
+    //        VEC,size=200,vec_ty=D_F32
+    //    VEC,size=300,vec_ty=D_UNDEF
+    //        VEC,size=300,vec_ty=D_F32
     //    ...
     TypeContainer * x = newTC();
     VectorType * ty = newVectorType();
@@ -255,13 +281,82 @@ TypeContainer const* TypeMgr::registerVector(Type const* type)
     ty->copy((VectorType const&)*type);
     if (elemtab == NULL) {
         //Add new vector into table.
-        elemtab = new ElemTypeTab();
+        elemtab = new VectorElemTypeTab();
         m_vector_type_tab.set(ty, elemtab);
     }
     elemtab->set(ty, x);
     TC_typeid(x) = m_type_count++;
     m_type_tab.set(TC_typeid(x), ty);
     return x;
+}
+
+
+//'type': it must be D_TENSOR type, and the tensor-element-type can not D_UNDEF,
+TypeContainer const* TypeMgr::registerTensor(Type const* type)
+{
+    ASSERT0(type->is_tensor() && TY_tensor_ety(type) != D_UNDEF);
+    ASSERT0(((TensorType const*)type)->getByteSize(this) >= 
+            get_dtype_bytesize(TY_tensor_ety(type)));
+    ASSERT0(((TensorType const*)type)->getByteSize(this) % 
+            get_dtype_bytesize(TY_tensor_ety(type)) == 0);
+
+    TensorElemTypeTab * elemtab = m_tensor_type_tab.get(type);
+    if (elemtab != NULL) {
+        TypeContainer const* entry = elemtab->get(type);
+        if (entry != NULL) {
+            return entry;
+        }
+    }
+
+    //Add new element type into table.
+    //e.g:
+    //    TENSOR,ety=D_U8
+    //        TENSOR,ety=D_U8,dim=<2,3>
+    //        TENSOR,ety=D_U8,dim=<2,3,4>
+    //        TENSOR,ety=D_U8,dim=<2,3,5>
+    //    TENSOR,ety=D_U16
+    //        TENSOR,ety=D_U16,dim=<2,3>
+    //        TENSOR,ety=D_U16,dim=<2,3,4>
+    //        TENSOR,ety=D_U16,dim=<2,3,5>
+    TypeContainer * x = newTC();
+    TensorType * ty = newTensorType();
+    TC_type(x) = ty;
+    ty->copy((TensorType const&)*type);
+    if (elemtab == NULL) {
+        //Add new tensor into table.
+        elemtab = new TensorElemTypeTab();
+        m_tensor_type_tab.set(ty, elemtab);
+    }
+    elemtab->set(ty, x);
+    TC_typeid(x) = m_type_count++;
+    m_type_tab.set(TC_typeid(x), ty);
+    return x;
+}
+
+
+//Return tensor type, total byte size of tensor =
+//degree_of_dim0 * degree_of_dim1 * ...  * degree_of_dimN * elem_byte_size.
+//e.g: Get tensor with type D_F32<2x3x4x5x1>. 
+//Type const* tensor = getTensorType(D_F32, 4, 2, 3, 5, 1);
+//Return type indicates there are 120 elements in tensor,
+//each element is D_F32, the degree of dimension 0 is 2, and degree of
+//dimenson 1 is 3, and so on. Total size of tensor is 480 bytes.
+Type const* TypeMgr::getTensorType(DATA_TYPE elem_ty, UINT dim, ...)
+{
+    ASSERT0(dim != 0 && elem_ty != D_UNDEF);
+    TensorType d;
+    TY_dtype(&d) = D_TENSOR;
+    TY_tensor_ety(&d) = elem_ty;
+    va_list args;
+    va_start(args, dim);
+    UINT i = 0;
+    while (i < dim) {
+        UINT degree = (UINT)va_arg(args, UINT);
+        d.setDegreeOfDim(i, degree);
+        i++;
+    }
+    va_end(args);
+    return TC_type(registerTensor(&d));
 }
 
 
@@ -346,13 +441,16 @@ Type * TypeMgr::registerType(Type const* type)
         return TC_type(registerMC(type));
     }
 
+    if (type->is_tensor()) {
+        return TC_type(registerTensor(type));
+    }
+
     ASSERTN(0, ("unsupport data type"));
 
     return NULL;
 }
 
 
-//READONLY
 UINT TypeMgr::get_bytesize(Type const* type) const
 {
     ASSERT0(type);
@@ -382,6 +480,8 @@ UINT TypeMgr::get_bytesize(Type const* type) const
         return TY_mc_size(type);
     case D_VEC:
         return TY_vec_size(type);
+    case D_TENSOR:
+        return ((TensorType const*)type)->getByteSize(this);
     default: ASSERTN(0, ("unsupport"));
     }
     return 0;
@@ -423,6 +523,21 @@ CHAR const* TypeMgr::dump_type(Type const* type, OUT StrBuf & buf)
         ASSERT0(get_bytesize(type) % elem_byte_size == 0);
         UINT elemnum = get_bytesize(type) / elem_byte_size;
         buf.strcat("%s<%d*%s>", DTNAME(dt), elemnum, DTNAME(TY_vec_ety(type)));
+        break;
+    }
+    case D_TENSOR: {
+        UINT elem_byte_size = get_dtype_bytesize(TY_tensor_ety(type));
+        ASSERT0(elem_byte_size != 0);
+        ASSERT0(get_bytesize(type) % elem_byte_size == 0);
+        buf.strcat("%s:%s<", DTNAME(dt), DTNAME(TY_tensor_ety(type)));
+        UINT dim = ((TensorType const*)type)->getDim();
+        for (UINT i = 0; i < dim; i++) {
+            if (i != 0) {
+                buf.strcat("x");
+            }
+            buf.strcat("%d", ((TensorType const*)type)->getDegreeOfDim(i));
+        }
+        buf.strcat(">");
         break;
     }
     case D_VOID:

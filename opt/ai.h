@@ -79,7 +79,7 @@ public:
 
 
 //This class represents container of miscellaneous AttachInfo.
-typedef SimpleVec<BaseAttachInfo*, 1> AICont;
+typedef xcom::SimpleVec<BaseAttachInfo*, 1> AICont;
 class AIContainer {
 protected:
     AICont cont;

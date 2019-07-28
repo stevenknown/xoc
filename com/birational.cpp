@@ -46,6 +46,76 @@ BIRational BIRational::rabs()
 }
 
 
+void BIRational::_gcd(BigInt const& a, BigInt const& b, BigInt & gcd)
+{
+    BigInt t;
+    BigInt x = a;
+    BigInt y = b;
+    if (x < 0) {
+        x.neg();
+    }
+    if (y < 0) {
+        y.neg();
+    }
+    if (x > y) {
+        t = x;
+        x = y;
+        y = t;
+    }
+    BigInt quo, rem;
+    while (x != 0) {
+        t = x;
+
+        biDivRem(y, x, quo, rem);
+        x = rem;
+        
+        //x = y % x;
+        y = t;
+    }
+    gcd = y;
+}
+
+
+void BIRational::reduce()
+{
+    if (m_num == BigInt(1, 0)) {
+        m_den.setEqualTo(1);
+        return;
+    }
+    BigInt gcd;
+    _gcd(m_num, m_den, gcd);
+    if (gcd == BigInt(1, 1)) {
+        if (m_den.is_neg()) {
+            m_den.neg();
+            m_num.neg();
+        }
+        return;
+    }
+    BigInt quo, rem;
+    biDivRem(m_num, gcd, quo, rem);
+    bool is_num_neg = m_num.is_neg();
+    m_num = quo;
+    biDivRem(m_den, gcd, quo, rem);
+    bool is_den_neg = m_den.is_neg();
+    m_den = quo;
+    if (is_num_neg ^ is_den_neg) {
+        if (!is_num_neg) {
+            m_num.neg();
+        }
+        if (is_den_neg) {
+            m_den.neg();
+        }
+    } else {
+        if (is_num_neg) {
+            m_num.neg();
+        }
+        if (is_den_neg) {
+            m_den.neg();
+        }
+    }
+}
+
+
 void BIRational::dump() const
 {
     dump(stdout);
@@ -105,8 +175,8 @@ BIRational operator * (BIRational const& a, BIRational const& b)
     bisMul(a.m_num, b.m_num, rnum);
     BIRational rat;
     if (rnum == BigInt(1, 0)) {
-        rat.m_num.initElem(1, 0);
-        rat.m_den.initElem(1, 1);
+        rat.m_num.setEqualTo(0);
+        rat.m_den.setEqualTo(1);
         return rat;
     }
     BigInt rden;

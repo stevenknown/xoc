@@ -141,12 +141,8 @@ class BigInt : public xcom::Vector<BigIntElemType> {
 
 private:
     INT m_sig_pos; //Record significant position.
-
-protected:
-    //Set the position of the most significant word.
-    void setSig(INT pos) { m_sig_pos = pos; }
-
-public:
+    
+public:    
     BigInt() { m_sig_pos = -1; }
     BigInt(BigInt const& bi) { copy(bi); }
     BigInt(UINT elemnum, ...);
@@ -168,7 +164,7 @@ public:
     //is_seg_hex: true if dump each segments in Hex format.
     void dump(CHAR const* name, bool is_seg_hex) const;
     void dump(FILE * h, bool with_newline, bool is_seg_hex) const;
-    void dump() const;
+    void dump(bool is_seg_hex = true) const;
 
     //Return significant number position.
     //Return -1 if BigInt has no initial value.
@@ -199,6 +195,9 @@ public:
     //than initElem().
     //elem: value to be set
     void setEqualTo(BigIntElemType elem);
+
+    //Set the position of the most significant word.
+    void setSigPos(INT pos) { m_sig_pos = pos; }
 
     //Compare element value of bigint with a list of expected integer.
     //valnum: the number of values.

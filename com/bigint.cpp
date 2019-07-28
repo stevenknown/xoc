@@ -57,7 +57,7 @@ BigInt::BigInt(UINT elemnum, ...)
     }
     //The last element is regarded as significant position
     //for big integer.
-    setSig(elemnum - 1);
+    setSigPos(elemnum - 1);
     va_end(ptr);
 }
 
@@ -65,7 +65,7 @@ BigInt::BigInt(UINT elemnum, ...)
 void BigInt::setEqualTo(BigIntElemType elem)
 {
     set(0, elem);
-    setSig(0);
+    setSigPos(0);
 }
 
 
@@ -86,7 +86,7 @@ void BigInt::initElem(UINT elemnum, ...)
     }
     //The last element is regarded as significant position
     //for big integer.
-    setSig(elemnum - 1);
+    setSigPos(elemnum - 1);
     va_end(ptr);    
 }
 
@@ -116,9 +116,9 @@ void BigInt::dump(CHAR const* name, bool is_seg_hex) const
 }
 
 
-void BigInt::dump() const
+void BigInt::dump(bool is_seg_hex) const
 {
-    dump(stdout, false, true);
+    dump(stdout, false, is_seg_hex);
 }
 
 
@@ -278,11 +278,38 @@ bool operator == (BigInt const& a, BigInt const& b)
 
 bool operator < (BigInt const& a, BigInt const& b)
 {
-    if (a.getSigPos() < b.getSigPos()) { return true; }
-    if (a.getSigPos() > b.getSigPos()) { return false; }
-    for (INT i = 0; i <= a.getSigPos(); i++) {
-        if (a[i] >= b[i]) {
-            return false;
+    bool is_a_neg = a.is_neg();
+    bool is_b_neg = b.is_neg();    
+    if (!is_a_neg && !is_a_neg) {
+        if (a.getSigPos() < b.getSigPos()) { return true; }
+        if (a.getSigPos() > b.getSigPos()) { return false; }
+        for (INT i = 0; i <= a.getSigPos(); i++) {
+            if (a[i] >= b[i]) {
+                return false;
+            }
+        }
+        return true;
+    }
+    if (is_a_neg && !is_b_neg) {
+        return true;
+    }
+    if (!is_a_neg && is_b_neg) {
+        return false;
+    }
+     
+    //Both a, b are negative.
+    BigInt const* shorter;
+    BigInt const* longer;
+    if (a.getSigPos() < b.getSigPos()) {
+        shorter = &a;
+        longer = &b;
+    } else {
+        shorter = &b;
+        longer = &a;
+    }
+    for (INT i = 0; i <= shorter->getSigPos(); i++) {
+        if ((*shorter)[i] < (*longer)[i]) {
+            return true;
         }
     }
 	return true;
@@ -291,14 +318,54 @@ bool operator < (BigInt const& a, BigInt const& b)
 
 bool operator <= (BigInt const& a, BigInt const& b)
 {
-    if (a.getSigPos() > b.getSigPos()) { return false; }
-    if (a.getSigPos() < b.getSigPos()) { return true; }
-    for (INT i = 0; i <= a.getSigPos(); i++) {
-        if (a[i] > b[i]) {
-            return false;
+    //if (a.getSigPos() > b.getSigPos()) { return false; }
+    //if (a.getSigPos() < b.getSigPos()) { return true; }
+    //for (INT i = 0; i <= a.getSigPos(); i++) {
+    //    if (a[i] > b[i]) {
+    //        return false;
+    //    }
+    //}
+    //return true;
+
+    bool is_a_neg = a.is_neg();
+    bool is_b_neg = b.is_neg();
+    if (!is_a_neg && !is_a_neg) {
+        //Both a, b are positive.
+        if (a.getSigPos() > b.getSigPos()) { return false; }
+        if (a.getSigPos() < b.getSigPos()) { return true; }
+        for (INT i = 0; i <= a.getSigPos(); i++) {
+            if (a[i] > b[i]) {
+                return false;
+            }
+        }
+        return true;
+    }
+    if (is_a_neg && !is_b_neg) {
+        return true;
+    }
+    if (!is_a_neg && is_b_neg) {
+        return false;
+    }
+
+    //Both a, b are negative.
+    BigInt const* shorter;
+    BigInt const* longer;
+    if (a.getSigPos() < b.getSigPos()) {
+        shorter = &a;
+        longer = &b;
+    } else {
+        shorter = &b;
+        longer = &a;
+    }
+    for (INT i = 0; i <= shorter->getSigPos(); i++) {
+        if ((*shorter)[i] < (*longer)[i]) {
+            return true;
         }
     }
-    return true;
+    if (a.getSigPos() == b.getSigPos()) {
+        return true;
+    }
+    return false;
 }
 
 
@@ -316,19 +383,26 @@ bool operator >= (BigInt const& a, BigInt const& b)
 
 bool operator == (BigInt const& a, BigIntElemType v)
 {
-    INT i = 0;
-    if (i <= a.getSigPos()) {
-        //Compare the first elem.
-        if (a[i] != v) {
-            return false;
-        }
-    }
-    for (i = 1; i <= a.getSigPos(); i++) {
-        if (a[i] != 0) {
-            return false;
-        }
-    }
-    return true;
+    BigInt vv;
+    vv.set_vec(&v, 1);
+    vv.setSigPos(0);
+    bool res = a == vv;
+    vv.set_vec(NULL, 0);
+    return res;
+
+    //INT i = 0;
+    //if (i <= a.getSigPos()) {
+    //    //Compare the first elem.
+    //    if (a[i] != v) {
+    //        return false;
+    //    }
+    //}
+    //for (i = 1; i <= a.getSigPos(); i++) {
+    //    if (a[i] != 0) {
+    //        return false;
+    //    }
+    //}
+    //return true;
 }
 
 
@@ -352,12 +426,19 @@ bool operator != (BigIntElemType v, BigInt const& a)
 
 bool operator < (BigInt const& a, BigIntElemType v)
 {
-    for (INT i = 0; i <= a.getSigPos(); i++) {
-        if (a[i] >= v) {
-            return false;
-        }
-    }
-    return true;
+    BigInt vv;
+    vv.set_vec(&v, 1);
+    vv.setSigPos(0);
+    bool res = a < vv;
+    vv.set_vec(NULL, 0);
+    return res;
+
+    //for (INT i = 0; i <= a.getSigPos(); i++) {
+    //    if (a[i] >= v) {
+    //        return false;
+    //    }
+    //}
+    //return true;
 }
 
 
@@ -387,12 +468,19 @@ bool operator >= (BigIntElemType v, BigInt const& a)
 
 bool operator <= (BigInt const& a, BigIntElemType v)
 {
-    for (INT i = 0; i <= a.getSigPos(); i++) {
-        if (a[i] > v) {
-            return false;
-        }
-    }
-    return true;
+    BigInt vv;
+    vv.set_vec(&v, 1);
+    vv.setSigPos(0);
+    bool res = a <= vv;
+    vv.set_vec(NULL, 0);
+    return res;
+    
+    //for (INT i = 0; i <= a.getSigPos(); i++) {
+    //    if (a[i] > v) {
+    //        return false;
+    //    }
+    //}
+    //return true;
 }
 
 
@@ -454,11 +542,11 @@ BigInt& bisAdd(IN BigInt const& a, IN BigInt const& b, IN OUT BigInt & res)
         res.set(i, carry_part);
 
         //Set significant position to result.
-        res.setSig(i);
+        res.setSigPos(i);
     } else {
         ASSERT0((i - 1) >= 0);
         //Set significant position to result.
-        res.setSig(i - 1);
+        res.setSigPos(i - 1);
     }
     return res;
 }
@@ -514,11 +602,11 @@ BigInt& biuAdd(IN BigInt const& a, IN BigInt const& b, IN OUT BigInt & res)
         res.set(i, carry_part);
 
         //Set significant position to result.
-        res.setSig(i);
+        res.setSigPos(i);
     } else {
         ASSERT0((i - 1) >= 0);
         //Set significant position to result.
-        res.setSig(i - 1);
+        res.setSigPos(i - 1);
     }
     return res;
 }
@@ -543,12 +631,12 @@ BigInt& biSub(IN BigInt const& a, IN BigInt const& b, IN OUT BigInt & res)
         res.set(i, ~((BigIntElemType)0));
     }
     ASSERT0((i - 1) >= 0);
-    res.setSig(i - 1); //Set significant.
+    res.setSigPos(i - 1); //Set significant.
     BigInt addend(1, 0x1);
     biuAdd(res, addend, res);    
     biuAdd(a, res, res);
     //Neglect the carray part if exist.
-    res.setSig(i - 1); //Set significant.
+    res.setSigPos(i - 1); //Set significant.
     return res;
 }
 
@@ -563,10 +651,10 @@ BigInt& biuMul(IN BigInt const& a, IN BigInt const& b, IN OUT BigInt & res)
     ASSERTN(b.getSigPos() >= 0, ("Miss significant elem"));    
     UINT shift_cnt = 0;
     BigInt tmpres;
-    res.initElem(1, 0x0);
+    res.setEqualTo(0);
     for (INT j = 0; j <= b.getSigPos(); j++) {
         tmpres.clean();
-        tmpres.initElem(1, 0x0);
+        tmpres.setEqualTo(0);
         if (shift_cnt != 0) {
             //Initialize shift-part of temporary result of multiple.
             //e.g: 21 * 34, first multiple result is 63, the second
@@ -576,7 +664,7 @@ BigInt& biuMul(IN BigInt const& a, IN BigInt const& b, IN OUT BigInt & res)
             for (; k < shift_cnt; k++) {
                 tmpres.set(k, 0);
             }
-            tmpres.setSig(k);
+            tmpres.setSigPos(k);
         }
         BigIntUElemType carry_part = 0;
         INT i = 0;
@@ -592,11 +680,11 @@ BigInt& biuMul(IN BigInt const& a, IN BigInt const& b, IN OUT BigInt & res)
             tmpres.set(i + shift_cnt, carry_part);
 
             //Set significant position to result.
-            tmpres.setSig(i + shift_cnt);
+            tmpres.setSigPos(i + shift_cnt);
         } else {
             ASSERT0((i + shift_cnt - 1) >= 0);
             //Set significant position to result.
-            tmpres.setSig(i + shift_cnt - 1);
+            tmpres.setSigPos(i + shift_cnt - 1);
         }
         biuAdd(res, tmpres, res);
         shift_cnt++;
@@ -667,6 +755,9 @@ void biDivRem(IN BigInt const& a, IN BigInt const& b,
         pb = &abs_b;
     }
     biuDivRem(*pa, *pb, quo, rem);
+    if (is_a_neg ^ is_b_neg) {
+        quo.neg();
+    }
 }
 
 
@@ -678,7 +769,7 @@ void biuDivRem(IN BigInt const& a, IN BigInt const& b,
 {
     
     if (a < b) {
-        quo.initElem(1, 0);
+        quo.setEqualTo(0);
         rem = a;
         return;
     }
@@ -690,19 +781,20 @@ void biuDivRem(IN BigInt const& a, IN BigInt const& b,
     //#define SMALL_QUO_MAX  REMOVE_FLAG((ULONGLONG)(-1) & ((ULONGLONG)0xF));
     #define SMALL_QUO_MAX  (((BigIntUElemType)(-1) >> 2) << 2)
     bool is_use_small_quo = true;
-    BigInt addend(1, 0x1);
+    BigInt const addend(1, 0x1);
     while (true) {
         printf("\na:"); pa->dump();
         printf("\nb:"); pb->dump();
         printf("\nc:"); pc->dump();
         printf("\nsmall_quo:%u", small_quo);
         biSub(*pa, *pb, *pc);
+        small_quo++;
         if (*pc < *pb) {
             if (pc != &rem) {
                 rem = *pc;
             }
             if (is_use_small_quo) {
-                quo.initElem(1, small_quo);
+                quo.setEqualTo(small_quo);
             }
             break;
         }
@@ -711,9 +803,8 @@ void biuDivRem(IN BigInt const& a, IN BigInt const& b,
         pc = t;
         pc->setEqualTo(0);
         if (is_use_small_quo) {
-            small_quo++;
             if (small_quo > SMALL_QUO_MAX) {
-                quo.initElem(1, small_quo);
+                quo.setEqualTo(small_quo);
                 is_use_small_quo = false;
             }
         } else {

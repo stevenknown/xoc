@@ -47,6 +47,9 @@ private:
     BigInt m_num;
     BigInt m_den;
 
+private:
+    void _gcd(BigInt const& a, BigInt const& b, BigInt & gcd);
+
 public:
     BIRational() { m_num = BigInt(1, 0); m_den = BigInt(1, 1); }
     BIRational(BIRational const& src)
@@ -72,7 +75,7 @@ public:
 
     bool is_int() { return m_den == BigInt(1,1); }
     BIRational rabs();
-    void reduce() { UNREACHABLE(); }
+    void reduce();
     BigInt num() const { return m_num; }
     BigInt& num() { return m_num; }
     BigInt den() const { return m_den; }

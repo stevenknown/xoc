@@ -38,9 +38,10 @@ namespace xoc {
 
 class IR;
 class Type;
+class TypeMgr;
 class RegionMgr;
 
-#define UNDEF_TYID        0
+#define UNDEF_TYID 0
 
 #define IS_INT(t)               ((t) >= D_I8 && (t) <= D_U128)
 #define IS_SINT(t)              ((t) >= D_I8 && (t) <= D_I128)
@@ -66,32 +67,35 @@ typedef enum _DATA_TYPE {
     D_UNDEF = 0,
 
     //Note the type between D_B and D_U128 must be integer.
-    D_B = 1,      //Boolean
-    D_I8 = 2,     //Signed integer 8 bit
+    D_B = 1, //Boolean
+    D_I8 = 2, //Signed integer 8 bit
     D_I16 = 3,
     D_I32 = 4,
     D_I64 = 5,
     D_I128 = 6,
-    D_U8 = 7,     //Unsigned integer 8 bit
+    D_U8 = 7, //Unsigned integer 8 bit
     D_U16 = 8,
     D_U32 = 9,
     D_U64 = 10,
     D_U128 = 11,
 
-    D_F32 = 12,   //Float point 32 bit
-    D_F64 = 13,   //Float point 64 bit
-    D_F80 = 14,   //Float point 96 bit
-    D_F128 = 15,  //Float point 128 bit
+    D_F32 = 12, //Float point 32 bit
+    D_F64 = 13, //Float point 64 bit
+    D_F80 = 14, //Float point 96 bit
+    D_F128 = 15, //Float point 128 bit
 
     //Note all above types are scalar.
 
-    D_MC = 16,    //MemoryChunk, used in structure/union/block type.
-    D_STR = 17,   //String
-    D_PTR = 18,   //Pointer
-    D_VEC = 19,   //Vector
-    D_VOID = 20,  //Void
-    D_LAST = 21,
-    //NOTE: Extend IR::rtype bit length if one extends type value large than 31.
+    D_MC = 16, //MemoryChunk, used in structure/union/block type.
+    D_STR = 17, //String
+    D_PTR = 18, //Pointer
+    D_VEC = 19, //Vector
+    D_VOID = 20, //Void
+    D_TENSOR = 21, //Tensor
+    D_LAST = 22,
+    ///////////////////////////////////////////////////////////////////////////
+    //Note:Extend IR::rtype bit length if it extends type value large than 31//
+    ///////////////////////////////////////////////////////////////////////////
 } DATA_TYPE;
 
 class TypeDesc {
@@ -100,38 +104,40 @@ public:
     CHAR const* name;
     UINT bitsize;
 };
-#define TYDES_dtype(d)             ((d)->dtype)
-#define TYDES_name(d)              ((d)->name)
-#define TYDES_bitsize(d)           ((d)->bitsize)
-
+#define TYDES_dtype(d) ((d)->dtype)
+#define TYDES_name(d) ((d)->name)
+#define TYDES_bitsize(d) ((d)->bitsize)
 
 #ifdef _DEBUG_
 Type const* checkType(Type const* ty, DATA_TYPE dt);
-
-#define CK_TY(ty, dt)         (checkType(ty, dt))
+#define CK_TY(ty, dt) (checkType(ty, dt))
 #else
-#define CK_TY(ty, dt)         (ty)
+//RELEASE MODE
+#define CK_TY(ty, dt) (ty)
 #endif
 
-#define DTNAME(type)          (TYDES_name(&g_type_desc[type]))
+#define DTNAME(type) (TYDES_name(&g_type_desc[type]))
 
 //Define target bit size of WORD length.
-#define WORD_BITSIZE    GENERAL_REGISTER_SIZE * BIT_PER_BYTE
+#define WORD_BITSIZE GENERAL_REGISTER_SIZE * BIT_PER_BYTE
 
 //Data Type Descriptor.
-#define TY_dtype(d)         ((d)->data_type)
+#define TY_dtype(d) ((d)->data_type)
 
 //Indicate the pointer base size.
 #define TY_ptr_base_size(d) (((PointerType*)CK_TY(d, D_PTR))->pointer_base_size)
 
 //Indicate the size of memory chunk.
-#define TY_mc_size(d)       (((MCType*)CK_TY(d, D_MC))->mc_size)
+#define TY_mc_size(d) (((MCType*)CK_TY(d, D_MC))->mc_size)
 
 //Indicate the total byte size of whole vector.
-#define TY_vec_size(d)      (((VectorType*)CK_TY(d, D_VEC))->total_vector_size)
+#define TY_vec_size(d) (((VectorType*)CK_TY(d, D_VEC))->total_vector_size)
 
 //Indicate the vector element size.
-#define TY_vec_ety(d)       (((VectorType*)CK_TY(d, D_VEC))->vector_elem_type)
+#define TY_vec_ety(d) (((VectorType*)CK_TY(d, D_VEC))->vector_elem_type)
+
+//Indicate the vector element size.
+#define TY_tensor_ety(d) (((TensorType*)CK_TY(d, D_TENSOR))->elem_type)
 
 //Date Type Description.
 class Type {
@@ -141,6 +147,8 @@ public:
 public:
     Type() { data_type = D_UNDEF; }
     COPY_CONSTRUCTOR(Type);
+
+    void copy(Type const& src) { data_type = src.data_type; }
 
     //Return true if data type is simplex type.
     bool is_simplex() const { return IS_SIMPLEX(TY_dtype(this)); }
@@ -159,6 +167,9 @@ public:
 
     //Return true if data type is void.
     bool is_void() const { return TY_dtype(this) == D_VOID; }
+
+    //Return true if data type is tensor.
+    bool is_tensor() const { return TY_dtype(this) == D_TENSOR; }
 
     //Return true if data type is boolean.
     bool is_bool() const { return TY_dtype(this) == D_B; }
@@ -208,8 +219,6 @@ public:
     //pointer's addend. e.g:The pointer arith, int * p; p = p + (type)value.
     bool is_ptr_addend() const
     { return !is_fp() && !is_mc() && !is_bool() && !is_pointer(); }
-
-    void copy(Type const& src) { data_type = src.data_type; }
 };
 
 
@@ -274,6 +283,46 @@ public:
 };
 
 
+class TensorType : public Type {
+public:
+    //Record the degree of each dimension.
+    //e.g: <3x2x7x1>, the degree of dimension 0 is 3, etc.
+    xcom::SimpleVec<UINT, 3> degree_of_dimension;
+
+    //Record data type of element in tensor.
+    DATA_TYPE elem_type;
+public:
+    TensorType()
+    {
+        TY_dtype(this) = D_TENSOR;
+        elem_type = D_UNDEF;
+    }
+    COPY_CONSTRUCTOR(TensorType);
+
+    void init() { degree_of_dimension.init(); }
+    void destroy() { degree_of_dimension.destroy(); }
+
+    void copy(TensorType const& src)
+    {
+        Type::copy(src);
+        elem_type = src.elem_type;
+        degree_of_dimension.copy(src.degree_of_dimension);
+    }
+
+    //Get data type of element in tensor.
+    DATA_TYPE getElemDataType() const { return elem_type; }
+    //Return the degree of given dimension in tensor.
+    UINT getDegreeOfDim(UINT dim) const { return degree_of_dimension.get(dim); }
+    //Return the number of dimensions of tensor.
+    UINT getDim() const { return degree_of_dimension.get_capacity(); }
+    //Return byte size of total tensor.
+    UINT getByteSize(TypeMgr const* mgr) const;
+
+    //Set degree to given dimension.
+    void setDegreeOfDim(UINT dim, UINT degree);
+};
+
+
 //Container of Type.
 #define TC_type(c)          ((c)->dtd)
 #define TC_typeid(c)        ((c)->tyid)
@@ -319,6 +368,7 @@ public:
 };
 
 
+//Comparison of data type of element in vector.
 class ComareTypeVectoElemType {
 public:
     bool is_less(Type const* t1, Type const* t2) const
@@ -331,11 +381,72 @@ public:
 };
 
 
-class ElemTypeTab : public
+//Comparison of data type of element in tensor.
+class ComareTypeTensorElemType {
+public:
+    bool is_less(Type const* t1, Type const* t2) const
+    {
+        ASSERT0(t1 && t2);
+        if (((TensorType const*)t1)->getDim() <
+            ((TensorType const*)t2)->getDim()) {
+            return true;
+        }
+        if (((TensorType const*)t1)->getDim() >
+            ((TensorType const*)t2)->getDim()) {
+            return false;
+        }
+        for (UINT i = 0; i < ((TensorType const*)t1)->getDim(); i++) {
+            if (((TensorType const*)t1)->getDegreeOfDim(i) <
+                ((TensorType const*)t2)->getDegreeOfDim(i)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    bool is_equ(Type const* t1, Type const* t2) const
+    {
+        ASSERT0(t1 && t2);
+        if (((TensorType const*)t1)->getDim() !=
+            ((TensorType const*)t2)->getDim()) {
+            return false;
+        }
+        for (UINT i = 0; i < ((TensorType const*)t1)->getDim(); i++) {
+            if (((TensorType const*)t1)->getDegreeOfDim(i) !=
+                ((TensorType const*)t2)->getDegreeOfDim(i)) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    Type const* createKey(Type const* t) { return t; }
+};
+
+
+//Comparison of data type of element in tensor.
+class ComareTypeTensor {
+public:
+    bool is_less(Type const* t1, Type const* t2) const
+    { return TY_tensor_ety(t1) < TY_tensor_ety(t2); }
+
+    bool is_equ(Type const* t1, Type const* t2) const
+    { return TY_tensor_ety(t1) == TY_tensor_ety(t2); }
+
+    Type const* createKey(Type const* t) { return t; }
+};
+
+
+class VectorElemTypeTab : public
     TMap<Type const*, TypeContainer const*, ComareTypeVectoElemType> {
 };
 
-typedef TMapIter<Type const*, ElemTypeTab*> ElemTypeTabIter;
+class TensorElemTypeTab : public
+    TMap<Type const*, TypeContainer const*, ComareTypeTensorElemType> {
+};
+
+typedef xcom::TMapIter<Type const*, VectorElemTypeTab*> VectorElemTypeTabIter;
+typedef xcom::TMapIter<Type const*, TensorElemTypeTab*> TensorElemTypeTabIter;
 
 
 class ComareTypeVector {
@@ -350,20 +461,29 @@ public:
 };
 
 
-//MD hashed by MD_ofst.
-class VectorTab : public TMap<Type const*, ElemTypeTab*, ComareTypeVector> {
+//Type Table that record all registered vector type.
+class VectorTab : public
+  xcom::TMap<Type const*, VectorElemTypeTab*, ComareTypeVector> {
+public:
+};
+
+
+//Type Table that record all registered tensor type.
+class TensorTab : public
+  xcom::TMap<Type const*, TensorElemTypeTab*, ComareTypeTensor> {
 public:
 };
 
 
 extern TypeDesc const g_type_desc[];
 class TypeMgr {
-	RegionMgr * m_rm;
-    Vector<Type*> m_type_tab;
+    RegionMgr * m_rm;
+    xcom::Vector<Type*> m_type_tab;
     SMemPool * m_pool;
     PointerTab m_pointer_type_tab;
     MCTab m_memorychunk_type_tab;
     VectorTab m_vector_type_tab;
+    TensorTab m_tensor_type_tab;
     TypeContainer * m_simplex_type[D_LAST];
     UINT m_type_count;
     Type const* m_void;
@@ -397,19 +517,27 @@ class TypeMgr {
     VectorType * newVectorType()
     { return (VectorType*)xmalloc(sizeof(VectorType)); }
 
+    TensorType * newTensorType()
+    {
+        TensorType * t = (TensorType*)xmalloc(sizeof(TensorType));
+        t->init();
+        return t;
+    }
+    
     MCType * newMCType() { return (MCType*)xmalloc(sizeof(MCType)); }
-
+    
     PointerType * newPointerType()
     { return (PointerType*)xmalloc(sizeof(PointerType)); }
 
     //Alloc TypeContainer.
     TypeContainer * newTC()
     { return (TypeContainer*)xmalloc(sizeof(TypeContainer)); }
+
 public:
     TypeMgr(RegionMgr * rm)
     {
-    	ASSERT0(rm);
-		m_rm = rm;
+        ASSERT0(rm);
+        m_rm = rm;
         m_type_tab.clean();
         m_pool = smpoolCreate(sizeof(Type) * 8, MEM_COMM);
         m_type_count = 1;
@@ -439,20 +567,38 @@ public:
         smpoolDelete(m_pool);
         m_pool = NULL;
 
-        ElemTypeTabIter iter;
-        ElemTypeTab * tab;
+        VectorElemTypeTabIter iter;
+        VectorElemTypeTab * tab;
         for (Type const* d = m_vector_type_tab.get_first(iter, &tab);
              d != NULL; d = m_vector_type_tab.get_next(iter, &tab)) {
             ASSERT0(tab);
             delete tab;
         }
+
+        TensorElemTypeTabIter iter2;
+        TensorElemTypeTab * tab2;
+        for (Type const* d = m_tensor_type_tab.get_first(iter2, &tab2);
+             d != NULL; d = m_tensor_type_tab.get_next(iter2, &tab2)) {
+            ASSERT0(tab2);
+            delete tab2;
+        }
     }
 
-    //Exported Functions.
+    //Register a memory-chunk data type.
     TypeContainer const* registerMC(Type const* ty);
+    //Register a vector data type.
+    //'type': it must be D_MC type, and the vector-element-type can not D_UNDEF,
+    //e.g: vector<I8,I8,I8,I8> type, which mc_size is 32 byte, vec-type is D_I8.
     TypeContainer const* registerVector(Type const* ty);
+    //Register a tensor data type.
+    //'type': it must be D_TENSOR type, and the
+    //tensor-element-type can not D_UNDEF.
+    TypeContainer const* registerTensor(Type const* ty);
+    //Register a pointer data type.
     TypeContainer const* registerPointer(Type const* ty);
+    //Register simplex type container, e.g:INT, UINT, FP, BOOL.
     TypeContainer const* registerSimplex(Type const* ty);
+    //Return data type that registered in m_type_tab.
     Type * registerType(Type const* dtd);
 
     CHAR const* dump_type(Type const* dtd, OUT StrBuf & buf);
@@ -466,7 +612,7 @@ public:
 
     Type const* hoistDtypeForBinop(IR const* opnd0, IR const* opnd1);
 
-	RegionMgr * getRegionMgr() const { return m_rm; }
+    RegionMgr * getRegionMgr() const { return m_rm; }
 
     //Return DATA_TYPE which 'bitsize' corresponding to
     inline DATA_TYPE get_fp_dtype(INT bitsize) const
@@ -509,7 +655,7 @@ public:
     //Return bits size of 'dtype' refers to.
     UINT get_dtype_bitsize(DATA_TYPE dtype) const
     {
-        ASSERTN(dtype != D_MC, ("this is memory chunk"));
+        ASSERTN(dtype != D_MC && dtype != D_TENSOR, ("complex type"));
         return TYDES_bitsize(&g_type_desc[dtype]);
     }
 
@@ -542,7 +688,7 @@ public:
         ASSERT0(dtype != D_UNDEF);
         UINT bitsize = get_dtype_bitsize(dtype);
         return bitsize < BIT_PER_BYTE ?
-                (UINT)1 : (UINT)xceiling((INT)bitsize, BIT_PER_BYTE);
+            (UINT)1 : (UINT)xceiling((INT)bitsize, BIT_PER_BYTE);
     }
 
     //Retrieve Type via 'type-index'.
@@ -606,6 +752,15 @@ public:
         return 0;
     }
 
+    //Return tensor type, total byte size of tensor =
+    //degree_of_dim0 * degree_of_dim1 * ...  * degree_of_dimN * elem_byte_size.
+    //e.g: Get tensor with type D_F32<2x3x4x5x1>. 
+    // Type const* tensor = getTensorType(D_F32, 4, 2, 3, 5, 1);
+    // Return type indicates there are 120 elements in tensor,
+    // each element is D_F32, the degree of dimension 0 is 2, and degree of
+    // dimenson 1 is 3, and so on. Total size of tensor is 480 bytes.
+    Type const* getTensorType(DATA_TYPE elem_ty, UINT dim, ...);
+ 
     //Return vector type, and vector total size = <vec_elem_num x vec_elem_ty>.
     //e.g: int<16 x D_I32> means there are 16 elems in vector, each elem is
     //D_I32 type, and vector total size is 64 bytes.

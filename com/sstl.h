@@ -2641,6 +2641,7 @@ public:
         return (index >= (UINT)m_elem_num) ? T(0) : m_vec[index];
     }
 
+    //Return vector buffer that hold elements.
     T * get_vec() { return m_vec; }
 
     //Overloaded [] for CONST array reference create an rvalue.
@@ -2723,6 +2724,19 @@ public:
         m_last_idx = MAX((INT)index, m_last_idx);
         m_vec[index] = elem;
         return;
+    }
+    
+    //Set vector buffer that will used to hold element.
+    //vec: vector buffer pointer
+    //     Note if vec is NULL, that means reset vector buffer to be NULL.
+    //elem_num: the number of element that could store into buffer.
+    //          Note the byte size of buffer is equal to elem_num*sizeof(T).
+    void set_vec(T * vec, UINT elem_num)
+    {
+        ASSERTN(is_init(), ("VECTOR not yet initialized."));
+        ASSERT0((vec && elem_num > 0) || (vec == NULL && elem_num == 0));
+        m_vec = vec;
+        m_elem_num = elem_num;
     }
 
     //Return the number of element the vector could hold.
@@ -2967,6 +2981,7 @@ public:
         return m_vec[i];
     }
 
+    //Return vector buffer that hold elements.
     T * get_vec() { return m_vec; }
 
     void copy(SimpleVec const& vec)
@@ -3033,6 +3048,35 @@ public:
         ::free(m_vec);
         m_vec = tmp;
         SVEC_elem_num(this) = size;
+    }
+
+    //Overloaded [] for CONST array reference create an rvalue.
+    //Similar to 'get()', the difference between this operation
+    //and get() is [] opeartion does not allow index is greater than
+    //or equal to m_elem_num.
+    //Note this operation can not be used to create lvalue.
+    //e.g: SimpleVector<int> const v;
+    //     int ex = v[i];
+    T const operator[](UINT index) const
+    {
+        ASSERTN(is_init(), ("VECTOR not yet initialized."));
+        ASSERTN(index < SVEC_elem_num(this),
+                ("array subscript over boundary."));
+        return m_vec[index];
+    }
+
+    //Overloaded [] for non-const array reference create an lvalue.
+    //Similar to set(), the difference between this operation
+    //and set() is [] opeartion does not allow index is greater than
+    //or equal to m_elem_num.
+    //e.g: SimpleVector<int> v;
+    //     v[i] = 20;
+    inline T & operator[](UINT index)
+    {
+        ASSERTN(is_init(), ("VECTOR not yet initialized."));
+        ASSERTN(index < SVEC_elem_num(this),
+                ("array subscript over boundary."));
+        return m_vec[index];
     }
 
     bool is_init() const { return s1.m_is_init; }
