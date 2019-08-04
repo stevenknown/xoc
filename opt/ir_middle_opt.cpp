@@ -122,8 +122,8 @@ bool Region::performSimplify(OptCtx & oc)
             ASSERT0(getPassMgr());
             CDG * cdg = (CDG*)getPassMgr()->registerPass(PASS_CDG);
             cdg->rebuild(oc, *getCFG());
-        }       
-    } else {        
+        }
+    } else {
         ASSERT0((!g_do_md_du_analysis && !g_do_md_ssa) || verifyMDRef());
     }
 

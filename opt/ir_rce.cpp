@@ -322,7 +322,7 @@ bool IR_RCE::perform(OptCtx & oc)
         //TODO: May be the change of CFG does not influence the
         //usage while we utilize du-chain and ir2mds.
         oc.set_flag_if_cfg_changed();
-        //CFG has been maintained.        
+        //CFG has been maintained.
         OC_is_cfg_valid(oc) = true;
         OC_is_expr_tab_valid(oc) = false;
         OC_is_du_chain_valid(oc) = false;

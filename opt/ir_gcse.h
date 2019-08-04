@@ -139,7 +139,7 @@ public:
     virtual ~IR_GCSE() {}
 
     void dump();
-        
+
     virtual CHAR const* getPassName() const
     { return "Global Command Subscript Elimination"; }
 

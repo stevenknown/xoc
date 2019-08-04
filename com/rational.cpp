@@ -39,7 +39,6 @@ author: Su Zhenyu
 namespace xcom {
 
 #define REDUCE
-#define abs(x) ((x) >= 0 ? (x) : -(x))
 
 Rational::Rational()
 {
@@ -97,7 +96,7 @@ void Rational::reduce()
 }
 
 
-Rational Rational::rabs()
+Rational Rational::abs()
 {
     ASSERTN(m_den != 0, ("denominator is 0!"));
     Rational b(*this);

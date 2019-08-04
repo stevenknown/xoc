@@ -621,7 +621,7 @@ bool CFG<BB, XR>::verifyIfBBRemoved(IN CDG * cdg, OptCtx & oc)
             for (BB * succ = succs.get_head();
                  succ != NULL; succ = succs.get_next()) {
                 if (succ == next_bb) {
-                    //find fallthrough bb.            
+                    //find fallthrough bb.
                     continue;
                 }
                 ASSERT0(last_xr->getLabel());

@@ -452,7 +452,7 @@ bool verifySimp(IR * ir_list, SimpCtx & simp)
 bool verifyIRList(IR * ir, BitSet * irh, Region const* rg)
 {
     BitSet * loc = NULL;
-    if (irh == NULL) {        
+    if (irh == NULL) {
         loc = new BitSet();
         irh = loc;
     }

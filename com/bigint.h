@@ -137,12 +137,12 @@ class BigInt : public xcom::Vector<BigIntElemType> {
     friend BigInt& biuMul(IN BigInt const& a,
                           IN BigInt const& b,
                           IN OUT BigInt & res);
-    
+
 
 private:
     INT m_sig_pos; //Record significant position.
-    
-public:    
+
+public:
     BigInt() { m_sig_pos = -1; }
     BigInt(BigInt const& bi) { copy(bi); }
     BigInt(UINT elemnum, ...);
@@ -170,7 +170,7 @@ public:
     //Return -1 if BigInt has no initial value.
     INT getSigPos() const { return m_sig_pos; }
 
-    //Return significant number.    
+    //Return significant number.
     BigIntElemType getSig() const
     {
         ASSERTN(getSigPos() >= 0, ("no initial value"));

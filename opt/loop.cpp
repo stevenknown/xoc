@@ -135,7 +135,7 @@ IRBB * findAndInsertPreheader(
         ASSERT0(pred_bb);
         if (pred == BB_id(prev) && !LI_bb_set(li)->is_contain(BB_id(prev))) {
             //Try to find fallthrough prev BB.
-            //CASE:prev is not preheader of head. 
+            //CASE:prev is not preheader of head.
             //      BB_prehead----
             //                   |
             //  ............     |
@@ -143,9 +143,9 @@ IRBB * findAndInsertPreheader(
             //  ---->BB_prev     |
             //  |      |         |
             //  |      v         |
-            //  |   BB_head<------  
+            //  |   BB_head<------
             //  |      |
-            //  |      v      
+            //  |      v
             //  ----BB_end
             find_appropriate_prev_bb = true;
             break;
@@ -164,7 +164,7 @@ IRBB * findAndInsertPreheader(
             return prev;
         }
         return NULL;
-    }    
+    }
 
     List<IRBB*> preds;
     cfg->get_preds(preds, head);
@@ -207,7 +207,7 @@ IRBB * findAndInsertPreheader(
         //  BB_p(goto lab2)
         //   |
         //   v
-        //  BB_preheader(lab2)      
+        //  BB_preheader(lab2)
         //   |
         //   v
         //  BB_header(lab2)

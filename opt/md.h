@@ -48,7 +48,7 @@ typedef enum _MD_TYPE {
 #define MD_UNDEF              0 //Undefined.
 #define MD_FULL_MEM           1 //Represent all program memory.
 #define MD_FIRST              MD_FULL_MEM
-#define MD_GLOBAL_VAR         2 //Represent variables that 
+#define MD_GLOBAL_VAR         2 //Represent variables that
                                 //allocated at global static data section
                                 //by explicit definition.
 #define MD_IMPORT_VAR         3 //Represent variables allocated at outer region
@@ -393,7 +393,7 @@ public:
     inline bool is_contain(MD const* md) const
     {
         if (md->is_global() &&
-            DefSBitSetCore::is_contain(MD_GLOBAL_VAR) &&            
+            DefSBitSetCore::is_contain(MD_GLOBAL_VAR) &&
             MD_id(md) != MD_IMPORT_VAR) {
             return true;
         }

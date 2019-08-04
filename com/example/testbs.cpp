@@ -121,7 +121,7 @@ void bs_test2(FILE * h)
 
     BitSet e,f;
     e.bunion(64);
-    
+
     SBitSet<BITS_PER_SEG> g(&sm),m(&sm);
     g.bunion(1);
     g.bunion(100);

@@ -2168,7 +2168,7 @@ bool IRParser::parseStorePR(ParseCtx * ctx)
             return false;
         }
         ctx->current_region->setPRCount(
-            MAX(ctx->current_region->getPRCount(), prno + 1));        
+            MAX(ctx->current_region->getPRCount(), prno + 1));
     } else {
         error(tok, "not PR number");
         return false;

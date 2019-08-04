@@ -351,7 +351,7 @@ bool IR_GCSE::findAndElim(IR * exp, IR * gen)
     IR * exp_stmt = exp->getStmt();
     IR * gen_stmt = gen->getStmt();
     ASSERT0(exp_stmt->getBB() && gen_stmt->getBB());
-   
+
     IRBB * gen_bb;
     IRBB * exp_bb;
     if (m_cfg->hasEHEdge()) {
@@ -781,10 +781,10 @@ bool IR_GCSE::perform(OptCtx & oc)
     m_num_of_elim = 0;
     m_elimed.clean();
     #endif
-   
+
     PRSSAMgr * ssamgr = (PRSSAMgr*)(m_ru->getPassMgr()->
         queryPass(PASS_PR_SSA_MGR));
-    if (ssamgr != NULL && ssamgr->isSSAConstructed()) {    
+    if (ssamgr != NULL && ssamgr->isSSAConstructed()) {
         m_ssamgr = ssamgr;
     } else {
         m_ssamgr = NULL;
@@ -856,8 +856,8 @@ bool IR_GCSE::perform(OptCtx & oc)
         //DU reference and du chain has maintained.
         ASSERT0(m_ru->verifyMDRef());
         ASSERT0(m_du->verifyMDDUChain(COMPUTE_PR_DU | COMPUTE_NONPR_DU));
-        if (m_ssamgr != NULL) {            
-            ASSERT0(verifySSAInfo(m_ru));        
+        if (m_ssamgr != NULL) {
+            ASSERT0(verifySSAInfo(m_ru));
         }
         //For now, gvn has updated correctly.
     }
@@ -865,9 +865,9 @@ bool IR_GCSE::perform(OptCtx & oc)
         ASSERT0(m_tg);
         delete m_tg;
         m_tg = NULL;
-    }    
+    }
     ASSERT0(m_tg == NULL);
-    ASSERT0(verifyIRandBB(m_ru->getBBList(), m_ru));    
+    ASSERT0(verifyIRandBB(m_ru->getBBList(), m_ru));
     return change;
 }
 //END IR_GCSE

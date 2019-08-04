@@ -2552,7 +2552,7 @@ bool IR::isExactDef(MD const* md, MDSet const* mds) const
     MD const* cur_ir_defined_md = getRefMD();
 
     if (cur_ir_defined_md != NULL && cur_ir_defined_md->is_exact()) {
-        if (md != NULL && 
+        if (md != NULL &&
             (cur_ir_defined_md == md || cur_ir_defined_md->is_overlap(md))) {
             return true;
         }

@@ -87,7 +87,7 @@ void BigInt::initElem(UINT elemnum, ...)
     //The last element is regarded as significant position
     //for big integer.
     setSigPos(elemnum - 1);
-    va_end(ptr);    
+    va_end(ptr);
 }
 
 
@@ -130,7 +130,7 @@ void BigInt::dump(FILE * h, bool with_newline, bool is_seg_hex) const
         fprintf(h, "\n");
     }
     bool reverse_order = false;
-    INT last_pos = get_last_idx();    
+    INT last_pos = get_last_idx();
     for (INT i = 0; i <= last_pos; i++) {
         BigIntElemType val = get(i);
         if (reverse_order) {
@@ -174,7 +174,7 @@ void BigInt::dump(FILE * h, bool with_newline, bool is_seg_hex) const
             }
         }
     }
-    
+
 	fflush(h);
 }
 
@@ -191,7 +191,7 @@ bool BigInt::verify(UINT elemnum, ...)
     for (; i < elemnum; i++) {
         BigIntElemType expected_val = va_arg(ptr, BigIntElemType);
         BigIntElemType val = get(i);
-        ASSERT0(val == expected_val);        
+        ASSERT0(val == expected_val);
     }
     va_end(ptr);
     return true;
@@ -259,7 +259,7 @@ bool operator == (BigInt const& a, BigInt const& b)
     for (i = 0; i <= shorter_elem_num; i++) {
         if (shorter->get(i) != longer->get(i)) {
             return false;
-        }        
+        }
     }
     INT longer_elem_num = longer->getSigPos();
     if (i <= longer_elem_num) {
@@ -279,7 +279,7 @@ bool operator == (BigInt const& a, BigInt const& b)
 bool operator < (BigInt const& a, BigInt const& b)
 {
     bool is_a_neg = a.is_neg();
-    bool is_b_neg = b.is_neg();    
+    bool is_b_neg = b.is_neg();
     if (!is_a_neg && !is_a_neg) {
         if (a.getSigPos() < b.getSigPos()) { return true; }
         if (a.getSigPos() > b.getSigPos()) { return false; }
@@ -296,7 +296,7 @@ bool operator < (BigInt const& a, BigInt const& b)
     if (!is_a_neg && is_b_neg) {
         return false;
     }
-     
+
     //Both a, b are negative.
     BigInt const* shorter;
     BigInt const* longer;
@@ -474,7 +474,7 @@ bool operator <= (BigInt const& a, BigIntElemType v)
     bool res = a <= vv;
     vv.set_vec(NULL, 0);
     return res;
-    
+
     //for (INT i = 0; i <= a.getSigPos(); i++) {
     //    if (a[i] > v) {
     //        return false;
@@ -633,7 +633,7 @@ BigInt& biSub(IN BigInt const& a, IN BigInt const& b, IN OUT BigInt & res)
     ASSERT0((i - 1) >= 0);
     res.setSigPos(i - 1); //Set significant.
     BigInt addend(1, 0x1);
-    biuAdd(res, addend, res);    
+    biuAdd(res, addend, res);
     biuAdd(a, res, res);
     //Neglect the carray part if exist.
     res.setSigPos(i - 1); //Set significant.
@@ -648,7 +648,7 @@ BigInt& biuMul(IN BigInt const& a, IN BigInt const& b, IN OUT BigInt & res)
     ASSERT0(sizeof(SuperUElemType) >= 2 * sizeof(BigIntUElemType));
     ASSERTN(b.getSigPos() >= 0, ("Miss significant elem"));
     ASSERTN(a.getSigPos() >= 0, ("Miss significant elem"));
-    ASSERTN(b.getSigPos() >= 0, ("Miss significant elem"));    
+    ASSERTN(b.getSigPos() >= 0, ("Miss significant elem"));
     UINT shift_cnt = 0;
     BigInt tmpres;
     res.setEqualTo(0);
@@ -720,7 +720,7 @@ BigInt& bisMul(IN BigInt const& a, IN BigInt const& b, IN OUT BigInt & res)
     if (is_a_neg ^ is_b_neg) {
         if (!res.isAllElemEqual(0)) {
             res.neg();
-        }        
+        }
     }
     return res;
 }
@@ -767,7 +767,7 @@ void biDivRem(IN BigInt const& a, IN BigInt const& b,
 void biuDivRem(IN BigInt const& a, IN BigInt const& b,
                IN OUT BigInt & quo, IN OUT BigInt & rem)
 {
-    
+
     if (a < b) {
         quo.setEqualTo(0);
         rem = a;
@@ -783,10 +783,6 @@ void biuDivRem(IN BigInt const& a, IN BigInt const& b,
     bool is_use_small_quo = true;
     BigInt const addend(1, 0x1);
     while (true) {
-        printf("\na:"); pa->dump();
-        printf("\nb:"); pb->dump();
-        printf("\nc:"); pc->dump();
-        printf("\nsmall_quo:%u", small_quo);
         biSub(*pa, *pb, *pc);
         small_quo++;
         if (*pc < *pb) {
@@ -808,7 +804,7 @@ void biuDivRem(IN BigInt const& a, IN BigInt const& b,
                 is_use_small_quo = false;
             }
         } else {
-            biuAdd(quo, addend, quo);    
+            biuAdd(quo, addend, quo);
         }
     }
 }

@@ -217,7 +217,7 @@ typedef SEGIter * VOpndSetIter;
 //Generate MDSSAInfo for individual memory-ref IR stmt/exp since each IR
 //has its own specific MDSSA Memory Reference information.
 //It sounds there might be some waste to memory if many IRs mdssa-reference
-//could be represented by same MDSSAInfo. Nevertheless, the postulation 
+//could be represented by same MDSSAInfo. Nevertheless, the postulation
 //is quite experimentally, and in practical very rarelly.
 class MDSSAInfo : public MDSSAInfoAttachInfo {
 protected:

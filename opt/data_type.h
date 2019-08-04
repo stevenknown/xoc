@@ -523,9 +523,9 @@ class TypeMgr {
         t->init();
         return t;
     }
-    
+
     MCType * newMCType() { return (MCType*)xmalloc(sizeof(MCType)); }
-    
+
     PointerType * newPointerType()
     { return (PointerType*)xmalloc(sizeof(PointerType)); }
 
@@ -754,13 +754,13 @@ public:
 
     //Return tensor type, total byte size of tensor =
     //degree_of_dim0 * degree_of_dim1 * ...  * degree_of_dimN * elem_byte_size.
-    //e.g: Get tensor with type D_F32<2x3x4x5x1>. 
+    //e.g: Get tensor with type D_F32<2x3x4x5x1>.
     // Type const* tensor = getTensorType(D_F32, 4, 2, 3, 5, 1);
     // Return type indicates there are 120 elements in tensor,
     // each element is D_F32, the degree of dimension 0 is 2, and degree of
     // dimenson 1 is 3, and so on. Total size of tensor is 480 bytes.
     Type const* getTensorType(DATA_TYPE elem_ty, UINT dim, ...);
- 
+
     //Return vector type, and vector total size = <vec_elem_num x vec_elem_ty>.
     //e.g: int<16 x D_I32> means there are 16 elems in vector, each elem is
     //D_I32 type, and vector total size is 64 bytes.

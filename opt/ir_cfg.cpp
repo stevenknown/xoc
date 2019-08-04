@@ -918,6 +918,27 @@ bool IR_CFG::removeTrampolinEdge()
             LabelInfo const* tgt_li = last_xr->getLabel();
             ASSERT0(tgt_li != NULL);
 
+            xcom::C<IRBB*> * next_ct = m_bb_list->get_next(ct);
+            if (next_ct != NULL) {
+                IRBB * target = findBBbyLabel(tgt_li);
+                if (target == next_ct->val()) {
+                    //Remove the redundant GOTO.
+                    //e.g: region func main () {
+                    //  truebr (eq $1, $2), L2;
+                    //  goto L1; //goto is actually fallthrough to label L1.
+                    //           //So it can be removed.
+                    //  label L1;
+                    //  goto L1;
+                    //  label L2;
+                    //};
+                    ASSERT0(bb->getNumOfIR() == 1);
+                    BB_irlist(bb).remove_tail();
+                    m_ru->freeIRTree(last_xr);
+                    removed = true;
+                    continue;
+                }
+            }
+
             List<IRBB*> preds; //use list because cfg may be modify.
             get_preds(preds, bb);
 
@@ -981,8 +1002,19 @@ bool IR_CFG::removeTrampolinEdge()
                     //        goto L2
                     ASSERT0(last_xr_of_pred->getLabel() &&
                             findBBbyLabel(last_xr_of_pred->getLabel()) == bb);
-
                     ASSERT0(last_xr_of_pred->getLabel() != NULL);
+                    if (BB_id(succ) == BB_id(bb)) {
+                        //CASE: pred->bb, bb's target is itself.
+                        //    pred is:
+                        //        goto L1;
+                        //    ...
+                        //    bb is:
+                        //        L1:
+                        //        goto L1;
+                        //Do nothing for this case.
+                        continue;
+                    }
+
                     GOTO_lab(last_xr_of_pred) = tgt_li;
                     removeEdge(pred, bb);
                     addEdge(BB_id(pred), BB_id(succ));
@@ -1037,7 +1069,7 @@ bool IR_CFG::removeTrampolinEdge()
                 } //end if
             }
         } //end if xr is uncond branch.
-    } //end for    each BB
+    } //end for each BB
     return removed;
 }
 
@@ -1189,7 +1221,7 @@ void IR_CFG::dump_dot(CHAR const* name, bool detail, bool dump_eh)
 
         if (detail) {
             StrBuf namebuf(32);
-            
+
             fprintf(h,
                     "\nnode%d [font=\"%s\",fontsize=%d,color=%s,"
                     "shape=%s,style=%s,label=\" BB%d",
@@ -1200,7 +1232,7 @@ void IR_CFG::dump_dot(CHAR const* name, bool detail, bool dump_eh)
                     shape,
                     style,
                     id);
-            LabelInfo const* li = bb->getLabelList().get_head();            
+            LabelInfo const* li = bb->getLabelList().get_head();
             if (li != NULL) {
 				LabelInfo const* head = li;
                 fprintf(h, ":");
@@ -1304,7 +1336,7 @@ void IR_CFG::dump_node(FILE * h, bool detail)
                 "fontname:\"%s\" scaling:%d label:\"",
                 id, vertical_order++, shape, color, font, scale);
             fprintf(h, "   BB%d ", id);
-            //LabelInfo const* li = bb->getLabelList().get_head();            
+            //LabelInfo const* li = bb->getLabelList().get_head();
             //if (li != NULL) {
 			//	LabelInfo const* head = li;
             //    fprintf(h, ":");
@@ -1575,7 +1607,7 @@ bool IR_CFG::performMiscOpt(OptCtx & oc)
             lchange |= inverseAndRemoveTrampolineBranch();
         }
 
-        if (lchange) {            
+        if (lchange) {
             oc.set_flag_if_cfg_changed();
             ck_cfg = true;
 

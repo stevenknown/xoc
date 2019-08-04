@@ -275,7 +275,7 @@ static inline bool is_redundant_cvt(IR * ir)
 
 IR * Region::refineStore(IR * ir, bool & change, RefineCtx & rc)
 {
-    ASSERT0(ir->is_st() || ir->is_stpr());    
+    ASSERT0(ir->is_st() || ir->is_stpr());
     bool lchange = false;
     IR * rhs = ir->is_st() ? ST_rhs(ir) : STPR_rhs(ir);
     if (RC_refine_stmt(rc) &&
@@ -843,10 +843,10 @@ IR * Region::refineRem(IR * ir, bool & change)
         if (xcom::isPowerOf2(CONST_int_val(op1))) {
             //rem X,2^N => band X,2^N-1
             IR_code(ir) = IR_BAND;
-            CONST_int_val(op1) = CONST_int_val(op1) - 1;            
+            CONST_int_val(op1) = CONST_int_val(op1) - 1;
             change = true;
             return ir; //No need to update DU.
-        }        
+        }
     }
     return ir;
 }

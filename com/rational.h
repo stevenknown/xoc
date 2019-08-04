@@ -36,7 +36,8 @@ author: Su Zhenyu
 
 namespace xcom {
 
-#define FRAC_TYPE INT
+typedef INT FRAC_TYPE;
+
 class Rational {
     friend bool operator != (Rational const& a, Rational const& b);
     friend bool operator == (Rational const& a, Rational const& b);
@@ -62,7 +63,7 @@ public:
     INT typecast2int() { return m_num / m_den; }
     bool is_int() { return m_den == 1; }
     void reduce();
-    Rational rabs();
+    Rational abs();
     FRAC_TYPE num() const { return m_num; }
     FRAC_TYPE& num() { return m_num; }
     FRAC_TYPE den() const { return m_den; }

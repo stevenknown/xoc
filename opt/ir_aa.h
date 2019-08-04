@@ -472,7 +472,7 @@ public:
     explicit IR_AA(Region * rg);
     COPY_CONSTRUCTOR(IR_AA);
     virtual ~IR_AA();
-    
+
     MD const* allocPRMD(IR * ir);
     MD const* allocPhiMD(IR * phi);
     MD const* allocStorePRMD(IR * ir);

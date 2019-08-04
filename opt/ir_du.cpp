@@ -61,7 +61,7 @@ static char const* getSolveFlagName(UINT flag)
             xcom::xstrcat(g_name_buf, 128, ", ");
         }
         is_first = false;
-        xcom::xstrcat(g_name_buf, 128, "SOL_AVAIL_REACH_DEF"); 
+        xcom::xstrcat(g_name_buf, 128, "SOL_AVAIL_REACH_DEF");
         REMOVE_FLAG(flag, SOL_AVAIL_REACH_DEF);
     }
     if (HAVE_FLAG(flag, SOL_REACH_DEF)) {
@@ -69,47 +69,47 @@ static char const* getSolveFlagName(UINT flag)
             xcom::xstrcat(g_name_buf, 128, ", ");
         }
         is_first = false;
-        xcom::xstrcat(g_name_buf, 128, "SOL_REACH_DEF"); 
+        xcom::xstrcat(g_name_buf, 128, "SOL_REACH_DEF");
         REMOVE_FLAG(flag, SOL_REACH_DEF);
     }
     if (HAVE_FLAG(flag, SOL_AVAIL_EXPR)) {
         if (!is_first) {
-            xcom::xstrcat(g_name_buf, 128, ", "); 
+            xcom::xstrcat(g_name_buf, 128, ", ");
         }
         is_first = false;
-        xcom::xstrcat(g_name_buf, 128, "SOL_AVAIL_EXPR"); 
+        xcom::xstrcat(g_name_buf, 128, "SOL_AVAIL_EXPR");
         REMOVE_FLAG(flag, SOL_AVAIL_EXPR);
     }
     if (HAVE_FLAG(flag, SOL_RU_REF)) {
         if (!is_first) {
-            xcom::xstrcat(g_name_buf, 128, ", "); 
+            xcom::xstrcat(g_name_buf, 128, ", ");
         }
         is_first = false;
-        xcom::xstrcat(g_name_buf, 128, "SOL_RU_REF"); 
+        xcom::xstrcat(g_name_buf, 128, "SOL_RU_REF");
         REMOVE_FLAG(flag, SOL_RU_REF);
     }
     if (HAVE_FLAG(flag, SOL_REF)) {
         if (!is_first) {
-            xcom::xstrcat(g_name_buf, 128, ", "); 
+            xcom::xstrcat(g_name_buf, 128, ", ");
         }
         is_first = false;
-        xcom::xstrcat(g_name_buf, 128, "SOL_REF"); 
+        xcom::xstrcat(g_name_buf, 128, "SOL_REF");
         REMOVE_FLAG(flag, SOL_REF);
     }
     if (HAVE_FLAG(flag, COMPUTE_PR_DU)) {
         if (!is_first) {
-            xcom::xstrcat(g_name_buf, 128, ", "); 
+            xcom::xstrcat(g_name_buf, 128, ", ");
         }
         is_first = false;
-        xcom::xstrcat(g_name_buf, 128, "COMPUTE_PR_DU"); 
+        xcom::xstrcat(g_name_buf, 128, "COMPUTE_PR_DU");
         REMOVE_FLAG(flag, COMPUTE_PR_DU);
     }
     if (HAVE_FLAG(flag, COMPUTE_NONPR_DU)) {
         if (!is_first) {
-            xcom::xstrcat(g_name_buf, 128, ", "); 
+            xcom::xstrcat(g_name_buf, 128, ", ");
         }
         is_first = false;
-        xcom::xstrcat(g_name_buf, 128, "COMPUTE_NONPR_DU"); 
+        xcom::xstrcat(g_name_buf, 128, "COMPUTE_NONPR_DU");
         REMOVE_FLAG(flag, COMPUTE_NONPR_DU);
     }
     return g_name_buf;
@@ -195,7 +195,7 @@ void MDId2IRlist::append(UINT mdid, UINT irid)
 
 void MDId2IRlist::dump()
 {
-    if (g_tfile == NULL) { return; }    
+    if (g_tfile == NULL) { return; }
     m_md_sys->dump(false);
     note("\n==-- DUMP MDID2IRLIST --==");
     TMapIter<UINT, DefSBitSetCore*> c;
@@ -3734,7 +3734,7 @@ void IR_DU_MGR::solve(
                 //AvailIn and AvailOut of entry should be empty.
                 availin->clean(*m_misc_bs_mgr);
                 availout->clean(*m_misc_bs_mgr);
-            } else { 
+            } else {
                 availin->copy(expr_univers, *m_misc_bs_mgr);
                 availout->copy(*availin, bsmgr);
                 DefDBitSetCore const* set = getKilledIRExpr(bbid);
@@ -3828,7 +3828,7 @@ bool IR_DU_MGR::checkIsLocalKillingDefForDirectAccess(
         if (defmd->is_cover(usemd)) {
             return true;
         }
-        *has_overlapped_def = true; 
+        *has_overlapped_def = true;
     }
     return false;
 }
@@ -4000,7 +4000,7 @@ void IR_DU_MGR::buildLocalDUChainForNonKillingDef(
             //Stmt is exact, but that is not killing def of exp.
             ASSERT0(expdu);
             expdu->addDef(ir, *m_misc_bs_mgr);
-            
+
             DUSet * xdu = ir->getDUSet();
             ASSERT0(xdu);
             if (!m_is_init->is_contain(ir->id())) {
@@ -4033,7 +4033,7 @@ bool IR_DU_MGR::buildLocalDUChain(
         //Found local killing-def, then build exact DefUse chain.
         ASSERT0(expdu);
         expdu->addDef(nearest_def, *m_misc_bs_mgr);
-       
+
         DUSet * xdu = nearest_def->getDUSet();
         ASSERT0(xdu);
         if (!m_is_init->is_contain(IR_id(nearest_def))) {
@@ -4445,7 +4445,7 @@ void IR_DU_MGR::updateDefWithMustExactMD(IR * ir, MD const* mustexact)
             if (mustexact == w || (w != NULL && mustexact->is_cover(w))) {
                 //Current ir stmt killed stmt k as well.
                 dlst->diff(k, *m_misc_bs_mgr);
-            }        
+            }
         }
 
         ASSERT0(m_md_sys->getMD(i));

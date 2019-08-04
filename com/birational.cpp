@@ -30,9 +30,8 @@ USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 namespace xcom {
 
 #define REDUCE
-#define abs(x) ((x) >= 0 ? (x) : -(x))
 
-BIRational BIRational::rabs()
+BIRational BIRational::abs()
 {
     ASSERTN(m_den != BigInt(1, 0), ("denominator is 0!"));
     BIRational b(*this);
@@ -68,7 +67,7 @@ void BIRational::_gcd(BigInt const& a, BigInt const& b, BigInt & gcd)
 
         biDivRem(y, x, quo, rem);
         x = rem;
-        
+
         //x = y % x;
         y = t;
     }

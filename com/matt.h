@@ -120,6 +120,7 @@ Matrix<T> operator - (Matrix<T> const& a, Matrix<T> const& b)
 //Matrix use hooks to diverge customized function. This strategy
 //allows Matrix object could be allocated in mempool.
 template <class T> class Matrix {
+protected:
     T * newT(UINT elem_num) { return new T[elem_num]; }
     void delT(T * tarray) { delete [] tarray; }
     void copyT(T * dst, T const* src, UINT elem_num)
@@ -198,7 +199,7 @@ public:
         ASSERTN(0, ("_sqrt() need to implement"));
         return v;
     }
-	
+
 public:
     Matrix(INHR const* i = NULL)
     {
@@ -242,7 +243,13 @@ public:
     //if it has numberical error.
     void adjust();
 
-    void clean() //Eliminating all elements.
+    void copy(Matrix<T> const& m);
+    UINT count_mem() const;
+    bool cond(T & c, INT p = NORM_INF); //Calculate condition number.
+    void cross(IN Matrix<T> & v, OUT Matrix<T> & u); //vector product.
+
+    //This function will destroy all elements in matrix.
+    void deleteAllElem()
     {
         if (!m_is_init) { return; }
         m_row_size = 0;
@@ -252,20 +259,11 @@ public:
         }
         m_mat = NULL;
     }
-    void copy(Matrix<T> const& m);
-    UINT count_mem() const;
-    bool cond(T & c, INT p = NORM_INF); //Calculate condition number.
-    void cross(IN Matrix<T> & v, OUT Matrix<T> & u); //vector product.
-
+    //This function will destroy matrix object.
     void destroy()
     {
         if (!m_is_init) { return; }
-        m_row_size = 0;
-        m_col_size = 0;
-        if (m_mat != NULL) {
-            delT(m_mat);
-        }
-        m_mat = NULL;
+        deleteAllElem();
         set_hook(NULL);
         m_is_init = false;
     }
@@ -281,7 +279,7 @@ public:
         ASSERTN(m_is_init, ("not yet initialize."));
         deleteCol(col, col);
     }
-    void deleteCol(UINT from, UINT to);    
+    void deleteCol(UINT from, UINT to);
     T dot(Matrix<T> const& v) const;
     T dot(UINT srow, UINT scol, UINT erow,
           UINT ecol, Matrix<T> const& v) const;
@@ -289,19 +287,19 @@ public:
           Matrix<T> const& v, UINT vsrow, UINT vscol,
           UINT verow, UINT vecol) const;
     T dotrow(UINT row, Matrix<T> const& v) const;
-    T dotcol(UINT col, Matrix<T> const& v) const;    
+    T dotcol(UINT col, Matrix<T> const& v) const;
     bool diag(OUT Matrix<T> & p, OUT Matrix<T> & d); //Diagonalize matrix
     //Print matrix element to file.
     void dumpf(FILE * h) const;
     void dumpf(CHAR * name = NULL, bool is_del = false) const;
     void dumps() const; //Print matrix element on screen.
-    
+
     void eig(OUT Matrix<T> & eigv); //Eigenvalues and eigenvectors
     void eig(OUT Matrix<T> & eigv, OUT Matrix<T> & eigx);
-    
+
     //Full rank decomposition
-    void frd(OUT Matrix<T> & f, OUT Matrix<T> & g);    
-    
+    void frd(OUT Matrix<T> & f, OUT Matrix<T> & g);
+
     void reinit(UINT row, UINT col, INHR const* i = NULL)
     {
         INHR inhr;
@@ -329,6 +327,17 @@ public:
                 ("exception occur in get()"));
         return *(m_mat + (m_col_size * row + col));
     }
+    //Get element address of matrix.
+    //Simulating function like as 'v = m_mat[row][col]'
+    //Because we allocated memory continuously, so we cannot access element
+    //of 'm_mat'by 'm_mat[row][col]' directly.
+    T * getElemAddr(UINT row, UINT col)
+    {
+        ASSERTN(m_is_init, ("not yet initialize."));
+        ASSERTN(row < m_row_size && col < m_col_size,
+                ("exception occur in get()"));
+        return m_mat + (m_col_size * row + col);
+    }
     void growRow(UINT size);
     void growRow(const T row[], UINT rowelemnum);
     void growRow(Vector<T> const& row, UINT rowelemnum)
@@ -352,9 +361,9 @@ public:
 
     //Append columns from 'from' to 'to' of a.
     void growCol(Matrix<T> const& a, UINT from, UINT to);
-    void growRowAndCol(UINT row_size, UINT col_size);    
+    void growRowAndCol(UINT row_size, UINT col_size);
     //Set 'v' to row vector by diagonal entry.
-    void getdiag(OUT Matrix<T> & v);    
+    void getdiag(OUT Matrix<T> & v);
 
     void init(INHR const* i = NULL)
     {
@@ -407,7 +416,7 @@ public:
     void innerRow(OUT Matrix<T> & in, UINT from, UINT to) const;
     //Get inner row of matrix
     void innerColumn(OUT Matrix<T> & in, UINT from, UINT to) const;
-    
+
     //Allow operation as 'x=y=z'
     Matrix<T> & operator = (Matrix<T> const& m)
     {
@@ -434,7 +443,7 @@ public:
     void mulAndAddCol(UINT from, T const& v, UINT to);
     T mod(); //Modular of vector, 'this' must be vector
     T modrow(UINT row); //Modular of row vector
-    T modcol(UINT col); //Modular of col vector    
+    T modcol(UINT col); //Modular of col vector
 
     void neg();
     void negOfRows(UINT from, UINT to);
@@ -443,7 +452,7 @@ public:
     void nullspace(Matrix<T> & ns);
     void nml(); //Normalize each row vector
     T norm(INT p); //Calculate matrix/vector Euclidean norm.
-    
+
     bool inv(OUT Matrix<T> & e); //inverse of matrix
     bool rinv(OUT Matrix<T> & e); //right-inverse
     bool linv(OUT Matrix<T> & e); //left-inverse
@@ -462,7 +471,7 @@ public:
 
     UINT rank(Matrix<T> * basis = NULL, bool is_unitarize = false);
     T tr(); //Computation of trace
-    void trans(); //Transpose    
+    void trans(); //Transpose
 
     //Non-pivot triangular decomposition
     bool lu(Matrix<T> & l, Matrix<T> & u);
@@ -477,7 +486,7 @@ public:
     bool pqr(Matrix<T> & p, Matrix<T> & q, Matrix<T> & r);
     //Computation of projection of vector 'v' in row space of 'this'.
     void proj(OUT Matrix<T> & proj, Matrix<T> const& p);
-    void padding(); //complement to nonsingular    
+    void padding(); //complement to nonsingular
     void padQuad(); //pad row and col to generate quad matrix
     //pivot triangular decomposition
     bool plu(Matrix<T> & p, Matrix<T> & l, Matrix<T> & u);
@@ -495,7 +504,7 @@ public:
         }
     }
     //Get the number of elements.
-    UINT size() const { return m_row_size * m_col_size; }    
+    UINT size() const { return m_row_size * m_col_size; }
     //Set element of matrix.
     //Simulating function like as 'm_mat[row][col] = v'
     //Because we allocated memory continuously, so we cannot access element
@@ -522,7 +531,7 @@ public:
     void setCols(UINT from, UINT to, T const& v);
     T sprad(); //Calculate spectral radius.
     //Stranger value decomposition.
-    bool svd(OUT Matrix<T> & u, OUT Matrix<T> & s, OUT Matrix<T> & eigx);    
+    bool svd(OUT Matrix<T> & u, OUT Matrix<T> & s, OUT Matrix<T> & eigx);
 
     //T integral(FUNCTY s, INT vidx, T lowb, T upperb);};
 };
@@ -655,7 +664,7 @@ void Matrix<T>::growRow(Matrix<T> const& a, UINT from, UINT to)
     ASSERTN(a.m_col_size == m_col_size, ("unmatch matrix"));
     INT row_size = to - from + 1;
     T * tmp_mat = newT((m_row_size + row_size) * m_col_size);
-                                
+
     ASSERTN(tmp_mat,("memory is low!!!"));
     UINT orig_size = m_col_size * m_row_size;
     copyT(tmp_mat, m_mat, orig_size);
@@ -1140,7 +1149,8 @@ void Matrix<T>::copy(IN Matrix<T> const& m)
     ASSERTN(m_is_init && m.m_is_init, ("not yet initialize."));
     if (this == &m) { return; }
     if (m.size() == 0) {
-        clean();
+        //clean();
+        deleteAllElem();
     } else {
         //m(a,b), m(x,y): a*b == x*y
         if (size() != m.size()) {
@@ -1731,7 +1741,7 @@ bool Matrix<T>::inv(OUT Matrix<T> & e)
     ASSERTN(m_is_init, ("not yet initialize."));
     ASSERTN(m_row_size >= 1 && m_col_size >= 1, ("strange matrix"));
     if (!is_quad()) {
-        e.clean();
+        e.deleteAllElem();
         return false;
     }
 
@@ -1753,7 +1763,7 @@ bool Matrix<T>::inv(OUT Matrix<T> & e)
         //         (-c a)
         T k = p.get(0,0) * p.get(1,1) - p.get(0,1) * p.get(1,0);
         if (_equal(k, T(0))) {
-            e.clean();
+            e.deleteAllElem();
             return false; //singular
         }
         k = 1 / k;
@@ -1798,7 +1808,7 @@ bool Matrix<T>::inv(OUT Matrix<T> & e)
         }
         if (swap_row == -1) {
             is_nonsingular = false;
-            e.clean();
+            e.deleteAllElem();
             goto FIN;
         }
         if (swap_row != (INT)j) {
@@ -1865,7 +1875,7 @@ bool Matrix<T>::linv(OUT Matrix<T> & x)
     ASSERTN(m_is_init, ("not yet initialize."));
     ASSERTN(m_row_size > 1 && m_col_size > 1, ("strange matrix"));
     ASSERTN(m_row_size >= m_col_size, ("unexpected matrix"));
-    x.clean();
+    x.deleteAllElem();
     Matrix<T> transm = *this;
     transm.trans();
     Matrix<T> prod = transm * *this;
@@ -1887,7 +1897,7 @@ bool Matrix<T>::rinv(OUT Matrix<T> & x)
     ASSERTN(m_is_init, ("not yet initialize."));
     ASSERTN(m_row_size > 1 && m_col_size > 1, ("strange matrix"));
     ASSERTN(m_row_size <= m_col_size, ("unexpected matrix"));
-    x.clean();
+    x.deleteAllElem();
     Matrix<T> transm = *this;
     transm.trans();
     Matrix<T> prod = *this * transm;
@@ -2912,8 +2922,8 @@ bool Matrix<T>::plu(OUT Matrix<T> & p, OUT Matrix<T> & l, OUT Matrix<T> & u)
     u = *this;
 
     for (UINT row = 0, col = 0;
-            row < u.m_row_size && col < u.m_col_size;
-            row++,     col++) {
+         row < u.m_row_size && col < u.m_col_size;
+         row++, col++) {
         //Finding the perfect pivot entry or permuting of non-zero pivot entry.
         INT swap_row = -1;
         T swap_entry;
@@ -2936,7 +2946,7 @@ bool Matrix<T>::plu(OUT Matrix<T> & p, OUT Matrix<T> & l, OUT Matrix<T> & u)
                     swap_row = k;
                     swap_entry = tmp;
                 }
-            } //end for
+            }
             if (swap_row == -1) {
                 continue; //try next column, trapezoid matrix
             }
@@ -2946,25 +2956,26 @@ bool Matrix<T>::plu(OUT Matrix<T> & p, OUT Matrix<T> & l, OUT Matrix<T> & u)
             }
             col = w; //Record current non-zero column
             break;
-        } //end for
+        } //end foreach column
+
         if (swap_row == -1) {
-            goto FIN; //All elements of row 'row' be zero.
+            //All elements of 'row' are zero.
+            goto FIN;
         }
 
-        //Reduce other column entries below pivot entry to zero.
+        //Reduce other column entries which below pivot-entry to be zero.
         T topent = u.get(row, col);
         ASSERTN(!_equal(topent, T(0)), ("zero entry"));
         for (i = row + 1; i < u.m_row_size; i++) {
-
-            //For reducing the computation cost.
+            //To reduce the computation cost.
             if (!_equal(u.get(i, col), T(0))) {
-                T tmp = -1 * u.get(i, col) / topent;
+                T tmp = T(-1) * u.get(i, col) / topent;
                 u.mulAndAddRow(row, tmp, i);
             }
-        } //end for
+        }
     } //end for (INT row = 0...
 
-    permd = *this; //Permuting this matrix by 'p'.
+    permd = *this; //Permute current matrix by matrix 'p'.
     permd = p * permd;
     l.reinit(m_row_size, m_row_size, &m_inhr);
     l.eye(1);

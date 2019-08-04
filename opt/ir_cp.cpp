@@ -702,7 +702,7 @@ bool IR_CP::perform(OptCtx & oc)
 
     if (change) {
         OC_is_expr_tab_valid(oc) = false;
-        OC_is_aa_valid(oc) = false;        
+        OC_is_aa_valid(oc) = false;
         OC_is_ref_valid(oc) = true; //already update.
         ASSERT0(m_ru->verifyMDRef());
         if (mdssamgr != NULL && mdssamgr->isMDSSAConstructed()) {

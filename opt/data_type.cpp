@@ -295,9 +295,9 @@ TypeContainer const* TypeMgr::registerVector(Type const* type)
 TypeContainer const* TypeMgr::registerTensor(Type const* type)
 {
     ASSERT0(type->is_tensor() && TY_tensor_ety(type) != D_UNDEF);
-    ASSERT0(((TensorType const*)type)->getByteSize(this) >= 
+    ASSERT0(((TensorType const*)type)->getByteSize(this) >=
             get_dtype_bytesize(TY_tensor_ety(type)));
-    ASSERT0(((TensorType const*)type)->getByteSize(this) % 
+    ASSERT0(((TensorType const*)type)->getByteSize(this) %
             get_dtype_bytesize(TY_tensor_ety(type)) == 0);
 
     TensorElemTypeTab * elemtab = m_tensor_type_tab.get(type);
@@ -336,7 +336,7 @@ TypeContainer const* TypeMgr::registerTensor(Type const* type)
 
 //Return tensor type, total byte size of tensor =
 //degree_of_dim0 * degree_of_dim1 * ...  * degree_of_dimN * elem_byte_size.
-//e.g: Get tensor with type D_F32<2x3x4x5x1>. 
+//e.g: Get tensor with type D_F32<2x3x4x5x1>.
 //Type const* tensor = getTensorType(D_F32, 4, 2, 3, 5, 1);
 //Return type indicates there are 120 elements in tensor,
 //each element is D_F32, the degree of dimension 0 is 2, and degree of

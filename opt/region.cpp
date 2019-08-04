@@ -1894,7 +1894,7 @@ bool Region::reconstructBBList(OptCtx & oc)
 
     END_TIMER(t, "Reconstruct IRBB list");
 
-    if (change) {        
+    if (change) {
         //Must rebuild CFG and all other structures which are
         //closely related to CFG.
         oc.set_flag_if_cfg_changed();
@@ -2407,13 +2407,13 @@ static void assignPRMDImpl(IR * x, IR_AA * aa)
     case IR_PHI:
         aa->allocPhiMD(x);
         break;
-    case IR_CALL:                
+    case IR_CALL:
     case IR_ICALL:
         if (x->hasReturnValue()) {
             aa->allocCallResultPRMD(x);
         }
         break;
-    default: 
+    default:
         ASSERT0(!x->isReadPR() && !x->isWritePR());
     }
 }
@@ -2429,11 +2429,11 @@ void Region::assignPRMD()
     if (getIRList() != NULL) {
         for (IR * x = iterInit(getIRList(), ii);
              x != NULL; x = iterNext(ii)) {
-            assignPRMDImpl(x, aa);    
+            assignPRMDImpl(x, aa);
         }
         return;
-    }    
-    if (getBBList() == NULL) { return; }    
+    }
+    if (getBBList() == NULL) { return; }
     for (IRBB * bb = getBBList()->get_head();
          bb != NULL; bb = getBBList()->get_next()) {
         xcom::C<xoc::IR*> * ct;
@@ -2443,7 +2443,7 @@ void Region::assignPRMD()
                 x != NULL; x = iterNext(ii)) {
                 assignPRMDImpl(x, aa);
             }
-        }  
+        }
     }
 }
 

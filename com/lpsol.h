@@ -2646,7 +2646,7 @@ UINT MIP<Mat, T>::maxm(
     ASSERTN(m_is_init, ("not yet initialize"));
     m_allow_rational_indicator = rational_indicator;
     verify(leq, eq, tgtf, vc, rhs_idx);
-    m_cur_best_sol.clean();
+    m_cur_best_sol.deleteAllElem();
     m_cur_best_v = 0;
     m_times = 0;
     m_indent = 0;
@@ -2691,7 +2691,7 @@ UINT MIP<Mat, T>::minm(
     ASSERTN(m_is_init, ("not yet initialize"));
     m_allow_rational_indicator = rational_indicator;
     verify(leq, eq, tgtf, vc, rhs_idx);
-    m_cur_best_sol.clean();
+    m_cur_best_sol.deleteAllElem();
     m_cur_best_v = 0;
     m_times = 0;
     m_indent = 0;

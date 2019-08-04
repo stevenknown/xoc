@@ -58,6 +58,13 @@ public:
         //ASSERTN(src.m_den != 0, ("denominator is 0!"));
         copy(src);
     }
+    BIRational(Rational const& src)
+    {
+        //Sometimes, src need not to be initialized always.
+        //ASSERTN(src.m_den != 0, ("denominator is 0!"));
+        m_num.setEqualTo(src.num());
+        m_den.setEqualTo(src.den());
+    }
     BIRational(BigIntElemType num, BigIntElemType den = 1) { set(num, den); }
     BIRational(BigInt num, BigInt den) { set(num, den); }
     BIRational & operator = (BIRational const& src)
@@ -74,7 +81,7 @@ public:
     }
 
     bool is_int() { return m_den == BigInt(1,1); }
-    BIRational rabs();
+    BIRational abs();
     void reduce();
     BigInt num() const { return m_num; }
     BigInt& num() { return m_num; }
@@ -84,11 +91,11 @@ public:
     void dump(FILE * h) const;
     void dump() const;
 
-    void set(BigIntElemType num, BigIntElemType den)
+    void set(BigIntElemType const num, BigIntElemType const den)
     {
-        ASSERTN(den != BigInt(1, 0), ("denominator can not be 0"));
-        m_num.initElem(1, num);
-        m_den.initElem(1, den);
+        ASSERTN(den != BigIntElemType(0), ("denominator can not be 0"));
+        m_num.setEqualTo(num);
+        m_den.setEqualTo(den);
     }
     void set(BigInt const& num, BigInt const& den)
     {

@@ -56,7 +56,7 @@ Programming Guides
 -----------------------------------
 ¡ö Instrument function library
     XOC does not use any std library, it provides a general purpose function
-    library xcom that used to facilitate the development of compiler and any 
+    library xcom that used to facilitate the development of compiler and any
     other complex software.
 
     Features of xcom:

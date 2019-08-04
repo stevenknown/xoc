@@ -427,19 +427,20 @@ void RMat::sete(UINT num, ...)
     if (num <= 0) {
         return;
     }
-    INT * ptr = (INT*)(((BYTE*)(&num)) + sizeof(UINT));
+    va_list ptr;
+    va_start(ptr, num);
     UINT i = 0;
     UINT row = 0, col = 0;
     while (i < num) {
-        INT numer = *ptr;
+        UINT numer = (UINT)va_arg(ptr, UINT);
         set(row, col++, numer);
         if (col >= m_col_size) {
             row++;
             col = 0;
         }
         i++;
-        ptr++; //stack growing down
     }
+    va_end(ptr);
 }
 
 

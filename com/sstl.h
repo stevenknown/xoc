@@ -1829,7 +1829,7 @@ public:
             }
             cur = temp;
         }
-        m_head.next = head; 
+        m_head.next = head;
     }
 };
 //END SListCore
@@ -2725,7 +2725,7 @@ public:
         m_vec[index] = elem;
         return;
     }
-    
+
     //Set vector buffer that will used to hold element.
     //vec: vector buffer pointer
     //     Note if vec is NULL, that means reset vector buffer to be NULL.

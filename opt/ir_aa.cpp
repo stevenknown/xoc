@@ -3877,7 +3877,7 @@ void IR_AA::initEntryPtset(PtPairSet ** ptset_arr)
         MD2MDSet * mx = allocMD2MDSetForBB(BB_id(entry));
         setPointToAllMem(MD_FULL_MEM, *mx);
         setPointToGlobalMem(MD_GLOBAL_VAR, *mx);
-        setPointToImportVar(MD_GLOBAL_VAR, *mx);        
+        setPointToImportVar(MD_GLOBAL_VAR, *mx);
         setPointToGlobalMem(MD_IMPORT_VAR, *mx);
         setPointToImportVar(MD_IMPORT_VAR, *mx);
         VarTabIter c;
@@ -3898,7 +3898,7 @@ void IR_AA::initEntryPtset(PtPairSet ** ptset_arr)
         setPointToGlobalMem(MD_GLOBAL_VAR, m_unique_md2mds);
         setPointToImportVar(MD_GLOBAL_VAR, m_unique_md2mds);
         setPointToGlobalMem(MD_IMPORT_VAR, m_unique_md2mds);
-        setPointToImportVar(MD_IMPORT_VAR, m_unique_md2mds);        
+        setPointToImportVar(MD_IMPORT_VAR, m_unique_md2mds);
         VarTabIter c;
         for (VAR * v = vt->get_first(c); v != NULL; v = vt->get_next(c)) {
             if (!VAR_is_global(v) && !VAR_is_formal_param(v)) { continue; }
