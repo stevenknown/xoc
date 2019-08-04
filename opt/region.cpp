@@ -3799,6 +3799,10 @@ bool Region::processIRList(OptCtx & oc)
     if (!HighProcess(oc)) { return false; }
     ASSERT0(getDUMgr() == NULL ||
         getDUMgr()->verifyMDDUChain(COMPUTE_PR_DU|COMPUTE_NONPR_DU));
+    if (g_opt_level != OPT_LEVEL0) {
+        //O0 does not build DU ref and DU chain.
+        ASSERT0(verifyMDRef());
+    }
     if (!MiddleProcess(oc)) { return false; }
 
     return true;

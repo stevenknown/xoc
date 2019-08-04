@@ -3825,7 +3825,7 @@ bool IR_DU_MGR::checkIsLocalKillingDefForDirectAccess(
         return true;
     }
     if (defmd->is_exact()) {
-        if (defmd->is_cover(usemd)) {
+        if (defmd == usemd || defmd->is_cover(usemd)) {
             return true;
         }
         *has_overlapped_def = true;

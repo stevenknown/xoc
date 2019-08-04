@@ -86,17 +86,22 @@ bool Region::performSimplify(OptCtx & oc)
     simp.setSimpToLowestHeight();
     if (g_is_lower_to_pr_mode) {
         simp.setSimpToPRmode();
+    }    
+    if (g_opt_level != OPT_LEVEL0) {
+        //O0 does not build DU ref.
+        ASSERT0(verifyMDRef());
     }
-
     simplifyBBlist(getBBList(), &simp);
-
     if (g_do_cfg &&
         g_cst_bb_list &&
         SIMP_need_recon_bblist(&simp) &&
         reconstructBBList(oc)) {
 
-        //Simplification may generate new memory operations.
-        ASSERT0(verifyMDRef());
+        //Simplification may generate new memory operations.        
+        if (g_opt_level != OPT_LEVEL0) {
+            //O0 does not build DU ref.
+            ASSERT0(verifyMDRef());
+        }
 
         //Before CFG building.
         getCFG()->removeEmptyBB(oc);
@@ -183,7 +188,7 @@ bool Region::MiddleProcess(OptCtx & oc)
 
     if (do_simplification) {
         performSimplify(oc);
-    }
+    }    
 
     if (g_opt_level > OPT_LEVEL0) {
         PassMgr * passmgr = getPassMgr();
