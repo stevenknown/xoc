@@ -105,14 +105,14 @@ bool BigInt::isAllElemEqual(BigIntElemType elem) const
 //is_seg_hex: true if dump each segments in Hex format.
 void BigInt::dump(CHAR const* name, bool is_seg_hex) const
 {
-	#define BS_NAME "bigint.dump"
-	if (name == NULL) {
-		name = BS_NAME;
-	}
-	FILE * h = fopen(name, "a+");
-	ASSERTN(h, ("%s create failed!!!", name));
-	dump(h, true, is_seg_hex);
-	fclose(h);
+    #define BS_NAME "bigint.dump"
+    if (name == NULL) {
+        name = BS_NAME;
+    }
+    FILE * h = fopen(name, "a+");
+    ASSERTN(h, ("%s create failed!!!", name));
+    dump(h, true, is_seg_hex);
+    fclose(h);
 }
 
 
@@ -175,7 +175,7 @@ void BigInt::dump(FILE * h, bool with_newline, bool is_seg_hex) const
         }
     }
 
-	fflush(h);
+    fflush(h);
 }
 
 
@@ -204,28 +204,28 @@ bool BigInt::verify(UINT elemnum, ...)
 //
 void BigIntMgr::clean()
 {
-	for (INT i = 0; i <= m_bi_vec.get_last_idx(); i++) {
+    for (INT i = 0; i <= m_bi_vec.get_last_idx(); i++) {
         BigInt * bi = m_bi_vec[i];
         ASSERT0(bi);
-		delete bi;
-	}
-	m_bi_vec.clean();
+        delete bi;
+    }
+    m_bi_vec.clean();
 }
 
 
 BigInt * BigIntMgr::create()
 {
-	BigInt * p = new BigInt();
-	m_bi_vec.append(p);
-	return p;
+    BigInt * p = new BigInt();
+    m_bi_vec.append(p);
+    return p;
 }
 
 
 BigInt * BigIntMgr::copy(BigInt const& src)
 {
-	BigInt * p = create();
-	p->copy(src);
-	return p;
+    BigInt * p = create();
+    p->copy(src);
+    return p;
 }
 //END BigIntMgr
 
@@ -235,22 +235,22 @@ BigInt * BigIntMgr::copy(BigInt const& src)
 //
 bool operator != (BigInt const& a, BigInt const& b)
 {
-	return !(a == b);
+    return !(a == b);
 }
 
 
 bool operator == (BigInt const& a, BigInt const& b)
 {
     BigInt const* longer = NULL;
-	BigInt const* shorter = NULL;
-	if (b.getSigPos() > a.getSigPos()) {
+    BigInt const* shorter = NULL;
+    if (b.getSigPos() > a.getSigPos()) {
         //b's length > a's length
-		longer = &b;
+        longer = &b;
         shorter = &a;
-	} else {
-	    //b's length <= a's length
-	    longer = &a;
-		shorter = &b;
+    } else {
+        //b's length <= a's length
+        longer = &a;
+        shorter = &b;
     }
 
     //The element number of shorter BigInt with no significant position.
@@ -272,7 +272,7 @@ bool operator == (BigInt const& a, BigInt const& b)
             return false;
         }
     }
-	return true;
+    return true;
 }
 
 
@@ -312,7 +312,7 @@ bool operator < (BigInt const& a, BigInt const& b)
             return true;
         }
     }
-	return true;
+    return true;
 }
 
 
@@ -371,13 +371,13 @@ bool operator <= (BigInt const& a, BigInt const& b)
 
 bool operator > (BigInt const& a, BigInt const& b)
 {
-	return !(a <= b);
+    return !(a <= b);
 }
 
 
 bool operator >= (BigInt const& a, BigInt const& b)
 {
-	return !(a < b);
+    return !(a < b);
 }
 
 

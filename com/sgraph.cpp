@@ -232,9 +232,11 @@ void Graph::computeRpoNoRecursive(Vertex * root, OUT List<Vertex const*> & vlst)
             VERTEX_rpo(v) = order--;
         }
     }
-    //If order is not zero, there are some BBs should be eliminated by CFG
-    //optimizations.
-    ASSERTN(order == 0, ("still have some BBs that are not assigned an order"));
+
+    //If order of BB is not zero, there must have some BBs should be
+    //eliminated by CFG optimizations.
+    ASSERTN(order == 0,
+            ("still have some BBs that are not assigned an order"));
 }
 
 
