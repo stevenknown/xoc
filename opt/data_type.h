@@ -133,11 +133,11 @@ Type const* checkType(Type const* ty, DATA_TYPE dt);
 //Indicate the total byte size of whole vector.
 #define TY_vec_size(d) (((VectorType*)CK_TY(d, D_VEC))->total_vector_size)
 
-//Indicate the vector element size.
+//Indicate the vector element data type.
 #define TY_vec_ety(d) (((VectorType*)CK_TY(d, D_VEC))->vector_elem_type)
 
-//Indicate the vector element size.
-#define TY_tensor_ety(d) (((TensorType*)CK_TY(d, D_TENSOR))->elem_type)
+//Indicate the tensor element data type.
+#define TY_tensor_ety(d) (((TensorType*)CK_TY(d, D_TENSOR))->tensor_elem_type)
 
 //Date Type Description.
 class Type {
@@ -290,12 +290,12 @@ public:
     xcom::SimpleVec<UINT, 3> degree_of_dimension;
 
     //Record data type of element in tensor.
-    DATA_TYPE elem_type;
+    DATA_TYPE tensor_elem_type;
 public:
     TensorType()
     {
         TY_dtype(this) = D_TENSOR;
-        elem_type = D_UNDEF;
+        tensor_elem_type = D_UNDEF;
     }
     COPY_CONSTRUCTOR(TensorType);
 
@@ -305,14 +305,15 @@ public:
     void copy(TensorType const& src)
     {
         Type::copy(src);
-        elem_type = src.elem_type;
+        tensor_elem_type = src.tensor_elem_type;
         degree_of_dimension.copy(src.degree_of_dimension);
     }
 
     //Get data type of element in tensor.
-    DATA_TYPE getElemDataType() const { return elem_type; }
+    DATA_TYPE getElemDataType() const { return tensor_elem_type; }
     //Return the degree of given dimension in tensor.
-    UINT getDegreeOfDim(UINT dim) const { return degree_of_dimension.get(dim); }
+    UINT getDegreeOfDim(UINT dim) const
+    { return degree_of_dimension.get(dim); }
     //Return the number of dimensions of tensor.
     UINT getDim() const { return degree_of_dimension.get_capacity(); }
     //Return byte size of total tensor.
@@ -333,7 +334,7 @@ public:
 };
 
 
-class ComareTypeMC {
+class CompareTypeMC {
 public:
     bool is_less(Type const* t1, Type const* t2) const
     { return TY_mc_size(t1) < TY_mc_size(t2); }
@@ -345,12 +346,12 @@ public:
 };
 
 
-class MCTab : public TMap<Type const*, TypeContainer const*, ComareTypeMC> {
+class MCTab : public TMap<Type const*, TypeContainer const*, CompareTypeMC> {
 public:
 };
 
 
-class ComareTypePointer {
+class CompareTypePointer {
 public:
     bool is_less(Type const* t1, Type const* t2) const
     { return TY_ptr_base_size(t1) < TY_ptr_base_size(t2); }
@@ -363,13 +364,13 @@ public:
 
 
 class PointerTab : public
-    TMap<Type const*, TypeContainer const*, ComareTypePointer> {
+    TMap<Type const*, TypeContainer const*, CompareTypePointer> {
 public:
 };
 
 
 //Comparison of data type of element in vector.
-class ComareTypeVectoElemType {
+class CompareTypeVectoElemType {
 public:
     bool is_less(Type const* t1, Type const* t2) const
     { return TY_vec_ety(t1) < TY_vec_ety(t2); }
@@ -382,20 +383,20 @@ public:
 
 
 //Comparison of data type of element in tensor.
-class ComareTypeTensorElemType {
+class CompareTypeTensorElemType {
 public:
     bool is_less(Type const* t1, Type const* t2) const
     {
         ASSERT0(t1 && t2);
-        if (((TensorType const*)t1)->getDim() <
-            ((TensorType const*)t2)->getDim()) {
+        UINT dim1 = ((TensorType const*)t1)->getDim();
+        UINT dim2 = ((TensorType const*)t2)->getDim();
+        if (dim1 < dim2) {
             return true;
         }
-        if (((TensorType const*)t1)->getDim() >
-            ((TensorType const*)t2)->getDim()) {
+        if (dim1 > dim2) {
             return false;
         }
-        for (UINT i = 0; i < ((TensorType const*)t1)->getDim(); i++) {
+        for (UINT i = 0; i < dim1; i++) {
             if (((TensorType const*)t1)->getDegreeOfDim(i) <
                 ((TensorType const*)t2)->getDegreeOfDim(i)) {
                 return true;
@@ -407,11 +408,11 @@ public:
     bool is_equ(Type const* t1, Type const* t2) const
     {
         ASSERT0(t1 && t2);
-        if (((TensorType const*)t1)->getDim() !=
-            ((TensorType const*)t2)->getDim()) {
+        UINT dim1 = ((TensorType const*)t1)->getDim();
+        if (dim1 != ((TensorType const*)t2)->getDim()) {
             return false;
         }
-        for (UINT i = 0; i < ((TensorType const*)t1)->getDim(); i++) {
+        for (UINT i = 0; i < dim1; i++) {
             if (((TensorType const*)t1)->getDegreeOfDim(i) !=
                 ((TensorType const*)t2)->getDegreeOfDim(i)) {
                 return false;
@@ -425,7 +426,7 @@ public:
 
 
 //Comparison of data type of element in tensor.
-class ComareTypeTensor {
+class CompareTypeTensor {
 public:
     bool is_less(Type const* t1, Type const* t2) const
     { return TY_tensor_ety(t1) < TY_tensor_ety(t2); }
@@ -438,18 +439,18 @@ public:
 
 
 class VectorElemTypeTab : public
-    TMap<Type const*, TypeContainer const*, ComareTypeVectoElemType> {
+    TMap<Type const*, TypeContainer const*, CompareTypeVectoElemType> {
 };
 
 class TensorElemTypeTab : public
-    TMap<Type const*, TypeContainer const*, ComareTypeTensorElemType> {
+    TMap<Type const*, TypeContainer const*, CompareTypeTensorElemType> {
 };
 
 typedef xcom::TMapIter<Type const*, VectorElemTypeTab*> VectorElemTypeTabIter;
 typedef xcom::TMapIter<Type const*, TensorElemTypeTab*> TensorElemTypeTabIter;
 
 
-class ComareTypeVector {
+class CompareTypeVector {
 public:
     bool is_less(Type const* t1, Type const* t2) const
     { return TY_vec_size(t1) < TY_vec_size(t2); }
@@ -463,14 +464,14 @@ public:
 
 //Type Table that record all registered vector type.
 class VectorTab : public
-  xcom::TMap<Type const*, VectorElemTypeTab*, ComareTypeVector> {
+  xcom::TMap<Type const*, VectorElemTypeTab*, CompareTypeVector> {
 public:
 };
 
 
 //Type Table that record all registered tensor type.
 class TensorTab : public
-  xcom::TMap<Type const*, TensorElemTypeTab*, ComareTypeTensor> {
+  xcom::TMap<Type const*, TensorElemTypeTab*, CompareTypeTensor> {
 public:
 };
 
@@ -755,7 +756,7 @@ public:
     //Return tensor type, total byte size of tensor =
     //degree_of_dim0 * degree_of_dim1 * ...  * degree_of_dimN * elem_byte_size.
     //e.g: Get tensor with type D_F32<2x3x4x5x1>.
-    // Type const* tensor = getTensorType(D_F32, 4, 2, 3, 5, 1);
+    // Type const* tensor = getTensorType(D_F32, 4, 2, 3, 4, 5, 1);
     // Return type indicates there are 120 elements in tensor,
     // each element is D_F32, the degree of dimension 0 is 2, and degree of
     // dimenson 1 is 3, and so on. Total size of tensor is 480 bytes.
