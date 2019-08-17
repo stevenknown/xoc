@@ -194,9 +194,6 @@ bool g_do_licm = false;
 //Perform global value numbering.
 bool g_do_gvn = true;
 
-//Perform global register allocation.
-bool g_do_gra = false;
-
 //Perform partial redundant elimination.
 bool g_do_pre = false;
 

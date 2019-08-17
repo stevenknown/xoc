@@ -1342,6 +1342,10 @@ bool CFG<BB, XR>::insertLoopTree(LI<BB> ** lilist, LI<BB>* loop)
     while (li != NULL) {
         cur = li;
         li = LI_next(li);
+        if (cur == loop) {
+            //loop has already in LoopInfo list.
+            return true;
+        }
         if (LI_bb_set(cur)->is_contain(*LI_bb_set(loop))) {
             if (insertLoopTree(&LI_inner_list(cur), loop)) {
                 if (LI_outer(loop) == NULL) {

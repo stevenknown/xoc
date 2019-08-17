@@ -172,7 +172,6 @@ typedef enum _PASS_TYPE {
 
 extern CHAR * g_func_or_bb_option;
 extern INT g_opt_level;
-extern bool g_do_gra;
 extern bool g_do_refine;
 extern bool g_do_refine_auto_insert_cvt;
 extern bool g_is_hoist_type; //Hoist data type from less than INT to INT.
