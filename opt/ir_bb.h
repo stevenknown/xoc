@@ -54,7 +54,7 @@ public:
         if (ir == NULL) { return NULL; }
         ASSERT0(m_bb != NULL);
         ir->setBB(m_bb);
-        return EList<IR*, IR2Holder>::append_head(ir);
+        return xcom::EList<IR*, IR2Holder>::append_head(ir);
     }
 
     inline xcom::C<IR*> * append_tail(IR * ir)
@@ -62,7 +62,7 @@ public:
         if (ir == NULL) { return NULL; }
         ASSERT0(m_bb != NULL);
         ir->setBB(m_bb);
-        return EList<IR*, IR2Holder>::append_tail(ir);
+        return xcom::EList<IR*, IR2Holder>::append_tail(ir);
     }
 
     //Insert ir prior to cond_br, uncond_br, call, return.
@@ -72,7 +72,7 @@ public:
     size_t count_mem() const
     {
         return (size_t)sizeof(m_bb) +
-               ((EList<IR*, IR2Holder>*)this)->count_mem();
+               ((xcom::EList<IR*, IR2Holder>*)this)->count_mem();
     }
 
     //Insert 'ir' before 'marker'.
@@ -82,7 +82,7 @@ public:
         ASSERT0(marker != NULL);
         ASSERT0(m_bb != NULL);
         ir->setBB(m_bb);
-        return EList<IR*, IR2Holder>::insert_before(ir, marker);
+        return xcom::EList<IR*, IR2Holder>::insert_before(ir, marker);
     }
 
     //Insert 'ir' before 'marker'. marker will be modified.
@@ -92,7 +92,7 @@ public:
         ASSERT0(marker != NULL);
         ASSERT0(m_bb != NULL);
         ir->setBB(m_bb);
-        return EList<IR*, IR2Holder>::insert_before(ir, marker);
+        return xcom::EList<IR*, IR2Holder>::insert_before(ir, marker);
     }
 
     //Insert 'ir' after 'marker'.
@@ -102,7 +102,7 @@ public:
         ASSERT0(marker != NULL);
         ASSERT0(m_bb != NULL);
         ir->setBB(m_bb);
-        return EList<IR*, IR2Holder>::insert_after(ir, marker);
+        return xcom::EList<IR*, IR2Holder>::insert_after(ir, marker);
     }
 
     //Insert 'ir' after 'marker'.
@@ -112,23 +112,24 @@ public:
         ASSERT0(marker != NULL);
         ASSERT0(m_bb != NULL);
         ir->setBB(m_bb);
-        return EList<IR*, IR2Holder>::insert_after(ir, marker);
+        return xcom::EList<IR*, IR2Holder>::insert_after(ir, marker);
     }
 
     //Remove ir that hold by 'holder'.
     inline IR * remove(IN xcom::C<IR*> * holder)
     {
-        if (holder == NULL) return NULL;
+        if (holder == NULL) { return NULL; }
+        ASSERT0(holder->val());
         holder->val()->setBB(NULL);
-        return EList<IR*, IR2Holder>::remove(holder);
+        return xcom::EList<IR*, IR2Holder>::remove(holder);
     }
 
-    //Remove ir.
+    //Remove ir out of list.
     inline IR * remove(IN IR * ir)
     {
-        if (ir == NULL) return NULL;
+        if (ir == NULL) { return NULL; }
         ir->setBB(NULL);
-        return EList<IR*, IR2Holder>::remove(ir);
+        return xcom::EList<IR*, IR2Holder>::remove(ir);
     }
 
     void setBB(IRBB * bb) { m_bb = bb; }
@@ -187,8 +188,8 @@ public:
     COPY_CONSTRUCTOR(IRBB);
     ~IRBB()
     {
-        //If BB destructed in ~IRBBMgr(), then it is
-        //dispensable to free them. Or the ir_list must be clean before
+        //BB will be destructed in ~IRBBMgr().
+        //No need to free it. Or the ir_list must be clean before
         //the deletion of BB.
         //for (IR * ir = ir_list.get_head(); ir != NULL; ir = ir_list.get_next()) {
         //    m_ru->freeIRTree(ir);
@@ -219,6 +220,15 @@ public:
     }
 
     size_t count_mem() const;
+    void clean()
+    {
+        //Do not erase BB's id because it may be reallocated later.
+        //IRBBMgr does not recycle BB's id.
+        ir_list.clean();
+        lab_list.clean();
+        u1.u1b1 = 0;
+        m_rpo = -1;
+    }
 
     //Clean attached label.
     void cleanLabelInfoList() { getLabelList().clean(); }
@@ -475,7 +485,8 @@ public:
 class IRBBMgr {
 protected:
     BBList m_bbs_list;
-    UINT m_bb_count; //counter of IRBB.
+    BBList m_free_list;
+    UINT m_bb_count; //counter of IRBB.   
 
 public:
     IRBBMgr() { m_bb_count = 1; }
@@ -490,10 +501,21 @@ public:
 
     inline IRBB * allocBB()
     {
-        IRBB * bb = new IRBB();
-        BB_id(bb) = m_bb_count++;
-        m_bbs_list.append_tail(bb);
+        IRBB * bb = m_free_list.remove_head();
+        if (bb == NULL) {
+            bb = new IRBB();
+            BB_id(bb) = m_bb_count++;
+            m_bbs_list.append_tail(bb);
+        }
         return bb;
+    }
+
+    void freeBB(IRBB * bb)
+    {
+        ASSERT0(bb);
+        ASSERTN(!m_free_list.find(bb), ("double free"));
+        bb->clean();
+        m_free_list.append_head(bb);
     }
 
     size_t count_mem()

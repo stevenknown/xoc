@@ -48,6 +48,7 @@ protected:
     LAB2BB m_lab2bb;
     Region * m_ru;
     TypeMgr * m_tm;
+    CFG_SHAPE m_cs;
 
 protected:
     void dump_node(FILE * h, bool detail);
@@ -161,6 +162,7 @@ public:
 
     //Allocate and initialize control flow graph.
     void initCfg(OptCtx & oc);
+    void initEntryAndExit(CFG_SHAPE cs);
     virtual bool if_opt(IRBB * bb);
     bool isRegionEntry(IRBB * bb) { return BB_is_entry(bb); }
     bool isRegionExit(IRBB * bb) { return BB_is_exit(bb); }
@@ -233,7 +235,7 @@ public:
     }
 
     //We only remove 'bb' from CF graph, vector and bb-list.
-       //You should clean the relation between Label and BB before remove BB.
+    //You should clean the relation between Label and BB before remove BB.
     virtual void remove_bb(IRBB * bb)
     {
         ASSERT0(bb);
@@ -244,6 +246,7 @@ public:
     bool removeTrampolinEdge();
     bool removeTrampolinBB();
     bool removeRedundantBranch();
+    void rebuild(OptCtx & oc);
     virtual void resetMapBetweenLabelAndBB(IRBB * bb);
 
     virtual void setRPO(IRBB * bb, INT order) { BB_rpo(bb) = order; }

@@ -28,6 +28,8 @@ USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #ifndef __MATT_H__
 #define __MATT_H__
 
+#define MATRIX_DUMP_FILE_NAME "dumpmatrix.tmp"
+
 namespace xcom {
 
 //START Matrix
@@ -291,7 +293,8 @@ public:
     bool diag(OUT Matrix<T> & p, OUT Matrix<T> & d); //Diagonalize matrix
     //Print matrix element to file.
     void dumpf(FILE * h) const;
-    void dumpf(CHAR * name = NULL, bool is_del = false) const;
+    void dumpf(CHAR const* name = MATRIX_DUMP_FILE_NAME,
+               bool is_del = false) const;
     void dumps() const; //Print matrix element on screen.
 
     void eig(OUT Matrix<T> & eigv); //Eigenvalues and eigenvectors
@@ -453,7 +456,7 @@ public:
     void nml(); //Normalize each row vector
     T norm(INT p); //Calculate matrix/vector Euclidean norm.
 
-    bool inv(OUT Matrix<T> & e); //inverse of matrix
+    bool inv(OUT Matrix<T> & e) const; //inverse of matrix
     bool rinv(OUT Matrix<T> & e); //right-inverse
     bool linv(OUT Matrix<T> & e); //left-inverse
     void refinv(OUT Matrix<T> & e); //reflexive g-inverse
@@ -1736,7 +1739,7 @@ FIN:
 //'e': inverted matrix.
 //Note matrix must be use row convention.
 template <class T>
-bool Matrix<T>::inv(OUT Matrix<T> & e)
+bool Matrix<T>::inv(OUT Matrix<T> & e) const
 {
     ASSERTN(m_is_init, ("not yet initialize."));
     ASSERTN(m_row_size >= 1 && m_col_size >= 1, ("strange matrix"));
@@ -4114,7 +4117,7 @@ void Matrix<T>::dumpf(FILE * h) const
 
 
 template <class T>
-void Matrix<T>::dumpf(CHAR * name, bool is_del) const
+void Matrix<T>::dumpf(CHAR const* name, bool is_del) const
 {
     ASSERTN(m_is_init, ("not yet initialize."));
 #ifdef NO_BASIC_MAT_DUMP
@@ -4134,9 +4137,7 @@ void Matrix<T>::dumpf(CHAR * name, bool is_del) const
     //printf("WARNING: dumpf should be overloaded!!!");
 
     //Default version regards T as 'int'.
-    if (!name) {
-        name = "matrix.tmp";
-    }
+    ASSERT0(name);
     if (is_del) {
         UNLINK(name);
     }

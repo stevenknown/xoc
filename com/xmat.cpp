@@ -257,9 +257,7 @@ static void rmat_dumpf_by_handle(void const* pbasis, FILE * h)
 
 static void rmat_dumpf(void const* pbasis, CHAR const* name, bool is_del)
 {
-    if (name == NULL) {
-        name = "matrix.tmp";
-    }
+    ASSERT0(name);
     if (is_del) {
         UNLINK(name);
     }
@@ -498,7 +496,7 @@ void RMat::copy(INTMat const& m)
 
 
 //Return true if matrix is nonsingular, otherwise return false.
-bool RMat::inv(RMat & e)
+bool RMat::inv(OUT RMat & e) const
 {
     ASSERTN(m_is_init, ("not yet initialize."));
     bool is_nonsingular = Matrix<Rational>::inv(e);
@@ -803,7 +801,7 @@ void INTMat::copy(RMat const& r)
 //Invering of Integer Matrix will be transformed to Rational
 //Matrix, and one exception will be thrown if there are some
 //element's denomiator is not '1'.
-bool INTMat::inv(OUT INTMat & e)
+bool INTMat::inv(OUT INTMat & e) const
 {
     ASSERTN(m_is_init, ("not yet initialize."));
     RMat tmp, v;
@@ -824,7 +822,7 @@ bool INTMat::inv(OUT INTMat & e)
 //Determinant of Integer Matrix will be transformed to Rational
 //Matrix, and one exception will be thrown if there are some
 //element's denomiator is not '1'.
-INT INTMat::det()
+INT INTMat::det() const
 {
     ASSERTN(m_is_init, ("not yet initialize."));
     RMat tmp;
@@ -1159,9 +1157,7 @@ void INTMat::dumps() const
 void INTMat::dumpf(CHAR const* name, bool is_del) const
 {
     ASSERTN(m_is_init, ("not yet initialize."));
-    if (name == NULL) {
-        name = "matrix.tmp";
-    }
+    ASSERT0(name);
     if (is_del) {
         UNLINK(name);
     }
@@ -1257,9 +1253,7 @@ static void flt_dumpf_by_handle(void const* pbasis, FILE * h)
 
 static void flt_dumpf(void const* pbasis, CHAR const* name, bool is_del)
 {
-    if (name == NULL) {
-        name = "matrix.tmp";
-    }
+    ASSERT0(name);
     if (is_del) {
         UNLINK(name);
     }
@@ -1573,9 +1567,7 @@ static void bool_dumpf_by_handle(void const* pbasis, FILE * h)
 
 static void bool_dumpf(void const* pbasis, CHAR const* name, bool is_del)
 {
-    if (name == NULL) {
-        name = "matrix.tmp";
-    }
+    ASSERT0(name);
     if (is_del) {
         UNLINK(name);
     }

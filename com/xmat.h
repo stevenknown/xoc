@@ -69,7 +69,7 @@ public:
     void setr(UINT row, UINT col, Rational rat);
     void getr(UINT row, UINT col, FRAC_TYPE * numer, FRAC_TYPE * denom);
     Rational getr(UINT row, UINT col);
-    bool inv(RMat & e);
+    bool inv(RMat & e) const;
     void ds(RMat const& c);
     void copy(RMat const& r);
     void copy(INTMat const& r);
@@ -115,8 +115,8 @@ public:
     //Invering of Integer Matrix will be transformed
     //to Rational Matrix, and one exception will be thrown
     //if there are some element's denomiator is not '1'.
-    bool inv(OUT INTMat &e);
-    INT det();
+    bool inv(OUT INTMat &e) const;
+    INT det() const;
 
     //Generate unimodular matrix to eliminate element.
     void genElimMat(UINT row, UINT col, OUT INTMat &elim);
@@ -131,7 +131,8 @@ public:
     void cvexhull(OUT INTMat &hull);
     INTMat & operator = (INTMat const& m);
     void copy(RMat const& r);
-    void dumpf(CHAR const* name = NULL, bool is_del = false) const;
+    void dumpf(CHAR const* name = MATRIX_DUMP_FILE_NAME,
+               bool is_del = false) const;
     void dumps() const;
 };
 

@@ -59,8 +59,6 @@ void Region::lowerIRTreeToLowestHeight(OptCtx & oc)
         //New BB boundary IR generated, rebuilding CFG.
         if (reconstructBBList(oc)) {
             getCFG()->rebuild(oc);
-            getCFG()->removeEmptyBB(oc);
-            getCFG()->computeExitList();
         }
     }
 
@@ -108,14 +106,6 @@ bool Region::performSimplify(OptCtx & oc)
 
         getCFG()->rebuild(oc);
 
-        //After CFG building.
-        //Remove empty bb when cfg rebuilted because
-        //rebuilding cfg may generate redundant empty bb.
-        //It disturbs the computation of entry and exit.
-        getCFG()->removeEmptyBB(oc);
-
-        //Compute exit bb while cfg rebuilt.
-        getCFG()->computeExitList();
         ASSERT0(getCFG()->verify());
 
         getCFG()->performMiscOpt(oc);

@@ -829,7 +829,7 @@ void Lineq::initVarConstraint(
 //'coeff': coefficient matrix to constrains.
 //'vc': variable constrains.
 //'is_int_sol': true if the solution must be integral.
-//'is_unique_sol': true if there is unique solution. */
+//'is_unique_sol': true if there exists unique solution.
 bool Lineq::has_solution(RMat const& leq,
                          RMat const& eq,
                          IN OUT RMat & vc,
@@ -864,9 +864,8 @@ bool Lineq::has_solution(RMat const& leq,
         MIP<RMat, Rational> mip;
         mip.reviseTargetFunc(tgtf, eq, leq, num_of_var);
         Rational v;
-        UINT st;
-        if ((st = mip.maxm(v, res, tgtf, vc, eq, leq,
-                           false, NULL, rhs_idx)) == IP_SUCC) {
+        UINT st = mip.maxm(v, res, tgtf, vc, eq, leq, false, NULL, rhs_idx);
+        if (st == IP_SUCC) {
             //printf("maxv is %d/%d\n", v.num(), v.den());
             //printf("solution is:\n"); res.dumpf();
             return true;
@@ -874,8 +873,8 @@ bool Lineq::has_solution(RMat const& leq,
         if (!is_unique_sol && st == IP_UNBOUND) {
             return true;
         }
-        if ((st = mip.minm(v, res, tgtf, vc, eq, leq,
-                           false, NULL, rhs_idx)) == IP_SUCC) {
+        st = mip.minm(v, res, tgtf, vc, eq, leq, false, NULL, rhs_idx);
+        if (st == IP_SUCC) {
             //printf("minv is %d/%d\n", v.num(), v.den());
             //printf("solution is:\n"); res.dumpf();
             return true;
@@ -888,8 +887,8 @@ bool Lineq::has_solution(RMat const& leq,
         SIX<RMat, Rational> six;
         six.reviseTargetFunc(tgtf, eq, leq, num_of_var);
         Rational v;
-        UINT st;
-        if ((st = six.maxm(v, res, tgtf, vc, eq, leq, rhs_idx)) == SIX_SUCC) {
+        UINT st = six.maxm(v, res, tgtf, vc, eq, leq, rhs_idx);
+        if (st == SIX_SUCC) {
             //printf("maxv is %d/%d\n", v.num(), v.den());
             //printf("solution is:\n"); res.dumpf();
             return true;
@@ -897,7 +896,8 @@ bool Lineq::has_solution(RMat const& leq,
         if (!is_unique_sol && st == SIX_UNBOUND) {
             return true;
         }
-        if ((st=six.minm(v, res, tgtf, vc, eq, leq, rhs_idx)) == SIX_SUCC) {
+        st = six.minm(v, res, tgtf, vc, eq, leq, rhs_idx);
+        if (st == SIX_SUCC) {
             //printf("minv is %d/%d\n", v.num(), v.den());
             //printf("solution is:\n"); res.dumpf();
             return true;
@@ -926,9 +926,9 @@ bool Lineq::has_solution(RMat const& leq,
 void Lineq::appendEquation(RMat const& eq)
 {
     ASSERTN(m_is_init == true, ("not yet initialize."));
-    if (eq.size() == 0) return;
+    if (eq.size() == 0) { return; }
     ASSERTN(eq.getColSize() == m_coeff->getColSize(), ("unmatch"));
-    if (eq.getRowSize() == 0) return;
+    if (eq.getRowSize() == 0) { return; }
     RMat tmp = eq;
     //if (tmp.getColSize() < m_coeff->getColSize()) {
     //    tmp.growCol(m_coeff->getColSize() - eq.getColSize());
@@ -953,8 +953,8 @@ void Lineq::formatBound(UINT u, OUT RMat & ineqt_of_u)
 {
     ASSERTN(m_is_init == true, ("not yet initialize."));
     ASSERTN(m_coeff &&
-           m_coeff->getRowSize() > 0 &&
-           m_coeff->getColSize() > 0, ("matrix is empty"));
+            m_coeff->getRowSize() > 0 &&
+            m_coeff->getColSize() > 0, ("matrix is empty"));
     ASSERTN((INT)u < m_rhs_idx, ("not a variable"));
 
     ineqt_of_u.reinit(0,0);
@@ -1052,7 +1052,7 @@ bool Lineq::calcBound(IN OUT List<RMat*> & limits)
 {
     ASSERTN(m_is_init == true, ("not yet initialized"));
     ASSERTN(m_coeff != NULL && limits.get_elem_count() == (UINT)m_rhs_idx,
-           ("unmatch coeff matrix info"));
+            ("unmatch coeff matrix info"));
 
     //Eliminating variable one by one, and inner to outer.
     INT i,j;
@@ -1129,11 +1129,10 @@ void Lineq::move2cstsym(IN OUT RMat & ieq,
 //
 //'p': each row indicates polynomial
 //'sub_var': index of variable to substitute.
-void Lineq::substituteAndExpand(
-        IN OUT RMat & coeff,
-        UINT rhs_idx,
-        RMat const& p,
-        UINT sub_var)
+void Lineq::substituteAndExpand(IN OUT RMat & coeff,
+                                UINT rhs_idx,
+                                RMat const& p,
+                                UINT sub_var)
 {
     DUMMYUSE(rhs_idx);
     ASSERT0(coeff.getColSize() == p.getColSize() && sub_var < rhs_idx);
@@ -1205,8 +1204,7 @@ void Lineq::move2var(IN OUT RMat & ieq,
 
 
 //Remove idendtical row.
-//e.g:
-//    1, 2, 3
+//e.g:1, 2, 3
 //    3, 4, 5
 //    1, 2, 3
 //    The third row will be removed.
@@ -1343,16 +1341,16 @@ void Lineq::combine(OUT INTMat & res,
                     UINT lc,
                     UINT pos)
 {
-    if (r1 == r2) return;
+    if (r1 == r2) { return; }
     INT l1 = coeff.get(r1, lc);
     INT l2 = coeff.get(r2, lc);
-    if (l1 < 0) l1 = -l1;
-    if (l2 < 0) l2 = -l2;
+    if (l1 < 0) { l1 = -l1; }
+    if (l2 < 0) { l2 = -l2; }
     INT l = slcm(l1, l2);
     INT m1 = 1;
     INT m2 = 1;
-    if (l1 != l) m1 = l/l1;
-    if (l2 != l) m2 = l/l2;
+    if (l1 != l) { m1 = l / l1; }
+    if (l2 != l) { m2 = l / l2; }
     for (UINT i = 0; i < coeff.getColSize(); i++) {
         res.set(pos, i, coeff.get(r1, i)*m1 + coeff.get(r2, i)*m2);
     }
@@ -1450,13 +1448,12 @@ bool Lineq::omit(INTMat const& coeff,
 //   to the vector (vertex) [0.5 1] in the affine space.
 //
 //'raylimit': is the maximum allowed ray.
-bool Lineq::convertConstraint2Ray(
-        OUT INTMat & gmat,
-        INTMat const& cs,
-        UINT rhs_idx,
-        UINT raylimit)
+bool Lineq::convertConstraint2Ray(OUT INTMat & gmat,
+                                  INTMat const& cs,
+                                  UINT rhs_idx,
+                                  UINT raylimit)
 {
-    if (cs.size() == 0) return false;
+    if (cs.size() == 0) { return false; }
     INTMat coeff;
     if (!cs.is_colequ(rhs_idx, 0)) { //Inhomogeneous system.
         cs.innerColumn(coeff, 0, rhs_idx);
@@ -1492,10 +1489,10 @@ bool Lineq::convertConstraint2Ray(
     Vector<UINT> row_of_pos_coeff, row_of_neg_coeff;
     Vector<bool> rm; //record idx of rows which marked removable.
     Vector<UINT> noneg; //record idx of columns which are non-negative column.
-    Vector<bool> is_noneg; //record idx of columns which
-                            //are non-negative column.
-    Vector<UINT> combined; //record idx of rows with positive-coeff
-                            //which has been combined.
+    //Record idx of columns which are non-negative column.
+    Vector<bool> is_noneg;
+    //Record idx of rows with positive-coeff which has been combined.
+    Vector<UINT> combined;
     UINT combined_count = 0;
     UINT noneg_count = 0;
     INTMat res, tmp;

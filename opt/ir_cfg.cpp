@@ -45,70 +45,9 @@ IR_CFG::IR_CFG(CFG_SHAPE cs, BBList * bbl, Region * rg,
 {
     m_ru = rg;
     m_tm = rg->getTypeMgr();
+    m_cs = cs;
     setBitSetMgr(rg->getBitSetMgr());
-    if (m_bb_list->get_elem_count() == 0) {
-        return;
-    }
-
-    //Add BB into graph.
-    ASSERT0(m_bb_vec.get_last_idx() == -1);
-    for (IRBB * bb = m_bb_list->get_tail();
-         bb != NULL; bb = m_bb_list->get_prev()) {
-        m_bb_vec.set(BB_id(bb), bb);
-        addVertex(BB_id(bb));
-        for (LabelInfo const* li = bb->getLabelList().get_head();
-             li != NULL; li = bb->getLabelList().get_next()) {
-            ASSERTN(m_lab2bb.get(li) == NULL,
-                   ("Label has been mapped to BB%d", BB_id(m_lab2bb.get(li))));
-            m_lab2bb.set(li, bb);
-            if (LABEL_INFO_is_catch_start(li)) {
-                BB_is_catch_start(bb) = true;
-            }
-            if (LABEL_INFO_is_terminate(li)) {
-                BB_is_terminate(bb) = true;
-            }
-        }
-    }
-
-    switch (cs) {
-    case C_SESE: {
-        //Make sure the region has the unique entry.
-        m_entry = m_ru->allocBB();
-        BB_is_entry(m_entry) = true;
-        BB_is_fallthrough(m_entry) = true;
-        add_bb(m_entry);
-        m_bb_list->append_head(m_entry);
-
-        //Create logical exit BB.
-        //NOTICE: In actually, the logical exit BB is ONLY
-        //used to solve diverse dataflow equations, whereas
-        //considering the requirement of ENTRY BB, EXIT BB.
-        IRBB * exit = m_ru->allocBB();
-        BB_is_fallthrough(exit) = true;
-        add_bb(exit);
-        m_bb_list->append_tail(exit);
-        m_exit_list.append_tail(exit);
-        break;
-    }
-    case C_SEME: {
-        //Create entry BB.
-        m_entry = m_ru->allocBB();
-        BB_is_entry(m_entry) = true;
-        //BB_is_fallthrough(entry) = true;
-        add_bb(m_entry);
-        m_bb_list->append_head(m_entry);
-
-        //Collect exit BB.
-        //for (IRBB * bb = m_bb_list->get_head();
-        //     bb != NULL; bb = m_bb_list->get_next()) {
-        //    if (IR_BB_is_func_exit(bb)) {
-        //        m_exit_list.append_tail(bb);
-        //    }
-        //}
-        break;
-    }
-    default: ASSERTN(0, ("strang shape of CFG"));
-    }
+    initEntryAndExit(m_cs);
 }
 
 
@@ -318,6 +257,133 @@ void IR_CFG::revisePhiEdge(xcom::TMap<IR*, LabelInfo*> & ir2label)
             }
         }
     }
+}
+
+
+void IR_CFG::initEntryAndExit(CFG_SHAPE cs)
+{
+    //This function may be called multiple times.
+    m_bb_vec.clean();
+    m_exit_list.clean();
+    m_lab2bb.clean();
+    if (m_bb_list->get_elem_count() == 0) {
+        return;
+    }
+
+    //Add BB into graph.
+    //ASSERT0(m_bb_vec.get_last_idx() == -1); 
+    for (IRBB * bb = m_bb_list->get_tail();
+         bb != NULL; bb = m_bb_list->get_prev()) {
+        m_bb_vec.set(BB_id(bb), bb);
+        for (LabelInfo const* li = bb->getLabelList().get_head();
+             li != NULL; li = bb->getLabelList().get_next()) {            
+            ASSERTN(m_lab2bb.get(li) == NULL,
+                   ("Label has been mapped to BB%d", BB_id(m_lab2bb.get(li))));
+            m_lab2bb.set(li, bb);
+            if (LABEL_INFO_is_catch_start(li)) {
+                BB_is_catch_start(bb) = true;
+            }
+            if (LABEL_INFO_is_terminate(li)) {
+                BB_is_terminate(bb) = true;
+            }
+        }
+    }
+
+    switch (cs) {
+    case C_SESE: {
+        //Make sure the region has the unique entry.
+        m_entry = m_ru->allocBB();
+        BB_is_entry(m_entry) = true;
+        BB_is_fallthrough(m_entry) = true;
+        add_bb(m_entry);
+        m_bb_list->append_head(m_entry);
+
+        //Create logical exit BB.
+        //NOTICE: In actually, the logical exit BB is ONLY
+        //used to solve diverse dataflow equations, whereas
+        //considering the requirement of ENTRY BB, EXIT BB.
+        IRBB * exit = m_ru->allocBB();
+        BB_is_fallthrough(exit) = true;
+        add_bb(exit);
+        m_bb_list->append_tail(exit);
+        m_exit_list.append_tail(exit);
+        break;
+    }
+    case C_SEME: {
+        //Create entry BB.
+        m_entry = m_ru->allocBB();
+        BB_is_entry(m_entry) = true;
+        //BB_is_fallthrough(entry) = true;
+        add_bb(m_entry);
+        m_bb_list->append_head(m_entry);
+
+        //Collect exit BB.
+        //for (IRBB * bb = m_bb_list->get_head();
+        //     bb != NULL; bb = m_bb_list->get_next()) {
+        //    if (IR_BB_is_func_exit(bb)) {
+        //        m_exit_list.append_tail(bb);
+        //    }
+        //}
+        break;
+    }
+    default: ASSERTN(0, ("strang shape of CFG"));
+    }
+}
+
+
+void IR_CFG::rebuild(OptCtx & oc)
+{
+    ASSERT0(m_cs != C_UNDEF);
+    initEntryAndExit(m_cs);
+    CFG<IRBB, IR>::rebuild(oc);
+    buildEHEdge();
+
+    //After CFG building.
+    //Remove empty bb when cfg rebuilted because
+    //Rebuild cfg may generate redundant empty bb, it
+    //disturb the computation of entry and exit.
+    removeEmptyBB(oc);
+
+    //Compute exit bb while cfg rebuilt.
+    computeExitList();
+
+    bool change = true;
+    UINT count = 0;
+    while (change && count < 20) {
+        change = false;
+        if (g_do_cfg_remove_empty_bb &&
+            removeEmptyBB(oc)) {
+            computeExitList();
+            change = true;
+        }
+
+        if (g_do_cfg_remove_unreach_bb &&
+            removeUnreachBB()) {
+            computeExitList();
+            change = true;
+        }
+
+        if (g_do_cfg_remove_trampolin_bb &&
+            removeTrampolinEdge()) {
+            computeExitList();
+            change = true;
+        }
+
+        if (g_do_cfg_remove_unreach_bb &&
+            removeUnreachBB()) {
+            computeExitList();
+            change = true;
+        }
+
+        if (g_do_cfg_remove_trampolin_bb &&
+            removeTrampolinBB()) {
+            computeExitList();
+            change = true;
+        }
+        count++;
+    }
+    ASSERT0(!change);
+    ASSERT0(verify());
 }
 
 

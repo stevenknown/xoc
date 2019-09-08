@@ -1514,18 +1514,17 @@ void SIX<Mat, T>::pivot(UINT nv, UINT bv, IN OUT PVParam<Mat> & pp)
 //Verify the legality of input data structures and
 //initialize the constant-term column.
 template <class Mat, class T>
-void SIX<Mat, T>::verify(
-        Mat const& leq,
-        Mat const& eq,
-        Mat const& tgtf,
-        Mat const& vc,
-        INT rhs_idx)
+void SIX<Mat, T>::verify(Mat const& leq,
+                         Mat const& eq,
+                         Mat const& tgtf,
+                         Mat const& vc,
+                         INT rhs_idx)
 {
     DUMMYUSE(vc);
     DUMMYUSE(tgtf);
     DUMMYUSE(rhs_idx);
     ASSERTN(rhs_idx == -1 ||
-           rhs_idx == (INT)leq.getColSize() -1, ("unsupport"));
+            rhs_idx == (INT)leq.getColSize() -1, ("unsupport"));
     INT max_cols = -1;
     if (eq.size() != 0 && leq.size() != 0) {
         ASSERTN(eq.getColSize() == leq.getColSize(), ("unmatch variables"));
@@ -1930,12 +1929,11 @@ UINT SIX<Mat, T>::TwoStageMethod(
 }
 
 
-//Check and alarm if one column all its element be 0 and 'tgtf'
+//Check and alarm if exists column that all of its element are 0 and 'tgtf'
 //expected the variable's result.
 //If it is the case, the variable that 0-column corresponds to
 //has no any constraint, then 'tgtf' could have infinite solution,
 //says, the system is unbounded.
-//
 //Return true if system is unbounded.
 //e.g:
 //    There are 3 variable i,j,k, but the second variable j's
@@ -1956,8 +1954,7 @@ bool SIX<Mat, T>::verifyEmptyVariableConstrain(
         INT rhs_idx)
 {
     Vector<bool> is_nonzero;
-    INT j;
-    for (j = 0; j < rhs_idx; j++) {
+    for (INT j = 0; j < rhs_idx; j++) {
         if (leq.getColSize() > 0 && !leq.is_colequ(j, 0)) {
             is_nonzero.set(j, true);
         }
@@ -1965,7 +1962,7 @@ bool SIX<Mat, T>::verifyEmptyVariableConstrain(
             is_nonzero.set(j, true);
         }
     }
-    for (j = 0; j < rhs_idx; j++) {
+    for (INT j = 0; j < rhs_idx; j++) {
         if (!is_nonzero.get(j) &&
             tgtf.get(0, j) != 0) {
             ASSERTN(0, ("%dth variable is unbounded, that will "
@@ -1990,14 +1987,13 @@ bool SIX<Mat, T>::verifyEmptyVariableConstrain(
 //NOTICE:
 //  The columns size of 'sol', 'tgtf', 'vc', 'eq', 'leq' must be same.
 template <class Mat, class T>
-UINT SIX<Mat, T>::maxm(
-        OUT T & maxv,
-        OUT Mat & sol,
-        Mat const& tgtf,
-        IN Mat & vc,
-        Mat const& eq,
-        Mat const& leq,
-        INT rhs_idx)
+UINT SIX<Mat, T>::maxm(OUT T & maxv,
+                       OUT Mat & sol,
+                       Mat const& tgtf,
+                       IN Mat & vc,
+                       Mat const& eq,
+                       Mat const& leq,
+                       INT rhs_idx)
 {
     ASSERTN(m_is_init, ("not yet initialize"));
     m_rhs_idx = rhs_idx;

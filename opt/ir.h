@@ -1410,9 +1410,10 @@ public:
 //SSA info of result PR.
 #define CALL_ssainfo(ir)         (((CCall*)CK_IRT_CALL(ir))->prssainfo)
 
-//True if this call is intrinsic function.
+//True if this call is intrinsic operation.
 #define CALL_is_intrinsic(ir)    (((CCall*)CK_IRT_CALL(ir))->is_intrinsic)
 
+//Record intrinsic operator if CALL_is_intrinsic is true.
 #define CALL_intrinsic_op(ir)    (((CCall*)CK_IRT_CALL(ir))->intrinsic_op)
 
 //Call does not necessarily to be BB boundary.

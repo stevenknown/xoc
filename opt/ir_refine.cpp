@@ -1482,8 +1482,9 @@ IR * Region::refineDetViaSSAdu(IR * ir, bool & change)
 //NOTE: This function do NOT generate new STMT.
 IR * Region::refineIR(IR * ir, bool & change, RefineCtx & rc)
 {
-    if (!g_do_refine) return ir;
-    if (ir == NULL) return NULL;
+    if (!g_do_refine) { return ir; }
+    if (ir == NULL) { return NULL; }
+    if (ir->hasSideEffect()) { return ir; }
     bool tmpc = false;
     switch (ir->getCode()) {
     case IR_CONST:

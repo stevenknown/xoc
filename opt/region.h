@@ -413,6 +413,7 @@ public:
     void freeIRTree(IR * ir);
     void freeIRTreeList(IR * ir);
     void freeIRTreeList(IRList & irs);
+    void freeIRBBList(BBList & bbl);
     IR * foldConstFloatUnary(IR * ir, bool & change);
     IR * foldConstFloatBinary(IR * ir, bool & change);
     IR * foldConstIntUnary(IR * ir, bool & change);

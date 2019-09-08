@@ -134,9 +134,7 @@ IR * IR_RCE::processBranch(IR * ir, IN OUT bool & cfg_mod)
             ir->removeSSAUse();
 
             //Revise the PHI operand to fallthrough successor.
-            ir->getBB()->removeSuccessorDesignatePhiOpnd(m_cfg, to);
-
-            m_ru->freeIRTree(ir);
+            ir->getBB()->removeSuccessorDesignatePhiOpnd(m_cfg, to);           
 
             //Revise cfg. remove fallthrough edge.
             m_cfg->removeEdge(from, to);
@@ -153,11 +151,7 @@ IR * IR_RCE::processBranch(IR * ir, IN OUT bool & cfg_mod)
 
             //Revise the PHI operand to target successor.
             ir->getBB()->removeSuccessorDesignatePhiOpnd(m_cfg, to);
-
-            m_ru->freeIRTree(ir);
-
             m_cfg->removeEdge(from, to);
-
             cfg_mod = true;
             return NULL;
         }
@@ -172,12 +166,8 @@ IR * IR_RCE::processBranch(IR * ir, IN OUT bool & cfg_mod)
             ir->removeSSAUse();
 
             //Revise the PHI operand to target successor.
-            ir->getBB()->removeSuccessorDesignatePhiOpnd(m_cfg, to);
-
-            m_ru->freeIRTree(ir);
-
+            ir->getBB()->removeSuccessorDesignatePhiOpnd(m_cfg, to);            
             m_cfg->removeEdge(from, to);
-
             cfg_mod = true;
             return NULL;
         } else if (must_false) {
@@ -192,9 +182,7 @@ IR * IR_RCE::processBranch(IR * ir, IN OUT bool & cfg_mod)
 
             //Revise the PHI operand to fallthrough successor.
             ir->getBB()->removeSuccessorDesignatePhiOpnd(m_cfg, to);
-
-            m_ru->freeIRTree(ir);
-
+            
             //Revise m_cfg. remove fallthrough edge.
             m_cfg->removeEdge(from, to);
             cfg_mod = true;
@@ -222,7 +210,6 @@ IR * IR_RCE::processStore(IR * ir)
     ASSERT0(ir->is_st());
     if (ST_rhs(ir)->getExactRef() == ir->getExactRef()) {
         ir->removeSSAUse();
-        m_ru->freeIRTree(ir);
         return NULL;
     }
     return ir;
@@ -235,7 +222,6 @@ IR * IR_RCE::processStorePR(IR * ir)
     ASSERT0(ir->is_stpr());
     if (STPR_rhs(ir)->getExactRef() == ir->getExactRef()) {
         ir->removeSSAUse();
-        m_ru->freeIRTree(ir);
         return NULL;
     }
     return ir;
@@ -274,6 +260,7 @@ bool IR_RCE::performSimplyRCE(IN OUT bool & cfg_mod)
 
             if (newIR != ir) {
                 ir_list->remove(ct);
+                m_ru->freeIRTree(ir);
                 if (newIR != NULL) {
                     if (next_ct != NULL) {
                         ir_list->insert_before(newIR, next_ct);

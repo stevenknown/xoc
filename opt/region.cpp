@@ -2190,6 +2190,20 @@ void Region::freeIRTreeList(IR * ir)
 }
 
 
+//Free IRBB list.
+//We can only utilizing the function to free the IRBB
+//which allocated by 'allocBB'.
+//NOTICE: bb will not be destroyed, it is just recycled.
+void Region::freeIRBBList(BBList & bbl)
+{
+    IRBBMgr * mgr = getBBMgr();
+    for (IRBB * bb = bbl.remove_head(); bb != NULL; bb = bbl.remove_head()) {
+        mgr->freeBB(bb);
+    }
+    bbl.clean();
+}
+
+
 //Free ir, and all its kids.
 //We can only utilizing the function to free the IR which allocated by 'allocIR'.
 void Region::freeIRTreeList(IRList & irs)
@@ -3507,10 +3521,8 @@ void Region::checkValidAndRecompute(OptCtx * oc, ...)
                     cfg = (IR_CFG*)getPassMgr()->registerPass(PASS_CFG);
                     cfg->initCfg(*oc);
                 } else {
-                    //Caution: the validation of cfg should maintained by user.
+                    //CAUTION: validation of CFG should maintained by user.
                     cfg->rebuild(*oc);
-                    cfg->removeEmptyBB(*oc);
-                    cfg->computeExitList();
                 }
             }
             break;

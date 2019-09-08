@@ -166,7 +166,7 @@ public:
     }
 
     //Initialize TargInfo.
-    //It is the first thing you should do after you declared a RegionMgr.
+    //It is the first thing one should do after declaring RegionMgr.
     void initTargInfo()
     {
         ASSERTN(m_targinfo == NULL, ("TargInfo already initialized"));
@@ -179,7 +179,14 @@ public:
 
     Region * newRegion(REGION_TYPE rt);
 
-    void setTargetInfo(TargInfo * ti) { m_targinfo = ti; }
+    //Note m_targinfo will be destructed when RegionMgr is destructed.
+    //m_targinfo should be set to NULL if given TargInfo object is not
+    //allocated by allocTargInfo() of current RegionMgr.
+    void setTargInfo(TargInfo * ti)
+    {
+        ASSERTN(m_targinfo == NULL, ("TargInfo has already been set"));        
+        m_targinfo = ti;
+    }
 
     //Process region in the form of function type.
     virtual bool processFuncRegion(IN Region * func, OptCtx * oc);
