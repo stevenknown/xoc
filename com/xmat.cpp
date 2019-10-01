@@ -509,7 +509,7 @@ bool RMat::inv(OUT RMat & e) const
 }
 
 
-//Reduction to a common denominator.
+//Reduce matrix elements to a common denominator.
 //Return the common denominator.
 //'row': Row to reduce
 //'col': The starting column to reduce.
@@ -517,27 +517,26 @@ UINT RMat::comden(UINT row, UINT col)
 {
     ASSERTN(m_is_init, ("not yet initialize."));
     ASSERTN(row < m_row_size, ("out of boundary"));
-
     bool is_int = true; //All elem is integer.
     INT lcm  = 1;
-    for (UINT j= col; j < m_col_size; j++) {
+    for (UINT j = col; j < m_col_size; j++) {
             Rational v = get(row, j);
             ASSERTN(v.den() > 0,
-                    ("should be converted positive in rational file"));
+                ("should be converted positive in rational file"));
             if (v.num() == 0) {
                 continue;
             }
             if (v.den() != 1) {
-                lcm = slcm(lcm, v.den());
+                lcm = xcom::slcm(lcm, v.den());
                 is_int = false;
             }
     }
     if (!is_int) {
-        for (UINT j= col; j < m_col_size; j++) {
+        for (UINT j = col; j < m_col_size; j++) {
             Rational v = get(row, j);
             if (v.den() != lcm) {
                 INT num = v.num() * (lcm / v.den());
-                ASSERTN(num < 0x7FFFffff, ("out of boundary"));
+                ASSERTN(num <= 0x7FFFffff, ("integer overflow"));
                 setr(row, j, num, lcm);
             }
         }

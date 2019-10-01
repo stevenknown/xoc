@@ -4053,11 +4053,10 @@ bool IR_DU_MGR::buildLocalDUChain(
 //Check memory operand and build DU chain for them.
 //Note we always find the nearest exact def, and build
 //the DU between the def and its use.
-void IR_DU_MGR::checkAndBuildChainRecursiveIRList(
-        IRBB * bb,
-        IR * exp,
-        xcom::C<IR*> * ct,
-        UINT flag)
+void IR_DU_MGR::checkAndBuildChainRecursiveIRList(IRBB * bb,
+                                                  IR * exp,
+                                                  xcom::C<IR*> * ct,
+                                                  UINT flag)
 {
     for (IR * e = exp; e != NULL; e = e->get_next()) {
         checkAndBuildChainRecursive(bb, e, ct, flag);
@@ -4068,11 +4067,10 @@ void IR_DU_MGR::checkAndBuildChainRecursiveIRList(
 //Check memory operand and build DU chain for them.
 //Note we always find the nearest exact def, and build
 //the DU between the def and its use.
-void IR_DU_MGR::checkAndBuildChainRecursive(
-        IRBB * bb,
-        IR * exp,
-        xcom::C<IR*> * ct,
-        UINT flag)
+void IR_DU_MGR::checkAndBuildChainRecursive(IRBB * bb,
+                                            IR * exp,
+                                            xcom::C<IR*> * ct,
+                                            UINT flag)
 {
     ASSERT0(exp && exp->is_exp());
     switch (exp->getCode()) {
@@ -4096,8 +4094,9 @@ void IR_DU_MGR::checkAndBuildChainRecursive(
         break;
     case IR_CONST:
     case IR_LDA:
+    case IR_ID:
         return;
-	SWITCH_CASE_BIN:
+    SWITCH_CASE_BIN:
         checkAndBuildChainRecursive(bb, BIN_opnd0(exp), ct, flag);
         checkAndBuildChainRecursive(bb, BIN_opnd1(exp), ct, flag);
         return;

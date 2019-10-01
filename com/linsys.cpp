@@ -803,17 +803,15 @@ FIN:
 }
 
 
-void Lineq::initVarConstraint(
-        Vector<INT> const* sign,
-        IN OUT RMat & vc,
-        UINT rhs_idx)
+void Lineq::initVarConstraint(Vector<INT> const& sign,
+                              IN OUT RMat & vc,
+                              UINT rhs_idx)
 {
     UINT nvar = rhs_idx;
     vc.reinit(nvar, nvar + 1);
     vc.setCol(rhs_idx, Rational(0));
     for (UINT i = 0; i < nvar; i++) {
-        if ((sign != NULL && sign->get(i) >= 0) ||
-            (sign == NULL)) {
+        if (sign.get(i) >= 0) {
             vc.set(i, i, -1);
         } else {
             //variable is unbound.

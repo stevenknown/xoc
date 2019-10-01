@@ -497,6 +497,7 @@ public:
              bb != NULL; bb = m_bbs_list.get_next()) {
             delete bb;
         }
+        //BB in free list will also be recorded in m_bbs_list.
     }
 
     inline IRBB * allocBB()

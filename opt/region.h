@@ -162,12 +162,11 @@ protected:
     } m_u1;
 
 protected:
-    void scanCallListImpl(
-            OUT UINT & num_inner_region,
-            IR * irlst,
-            OUT List<IR const*> * call_list,
-            OUT List<IR const*> * ret_list,
-            bool scan_inner_region);
+    void scanCallListImpl(OUT UINT & num_inner_region,
+                          IR * irlst,
+                          OUT List<IR const*> * call_list,
+                          OUT List<IR const*> * ret_list,
+                          bool scan_inner_region);
     bool processIRList(OptCtx & oc);
     bool processBBList(OptCtx & oc);
     void prescan(IR const* ir);
@@ -321,16 +320,14 @@ public:
     IR * buildPointerOp(IR_TYPE irt, IR * lchild, IR * rchild);
     IR * buildCmp(IR_TYPE irt, IR * lchild, IR * rchild);
     IR * buildJudge(IR * exp);
-    IR * buildBinaryOpSimp(
-            IR_TYPE irt,
-            Type const* type,
-            IR * lchild,
-            IR * rchild);
-    IR * buildBinaryOp(
-            IR_TYPE irt,
-            Type const* type,
-            IN IR * lchild,
-            IN IR * rchild);
+    IR * buildBinaryOpSimp(IR_TYPE irt,
+                           Type const* type,
+                           IR * lchild,
+                           IR * rchild);
+    IR * buildBinaryOp(IR_TYPE irt,
+                       Type const* type,
+                       IN IR * lchild,
+                       IN IR * rchild);
     IR * buildUnaryOp(IR_TYPE irt, Type const* type, IN IR * opnd);
     IR * buildLogicalNot(IR * opnd0);
     IR * buildLogicalOp(IR_TYPE irt, IR * opnd0, IR * opnd1);
@@ -351,14 +348,13 @@ public:
     IR * buildIStore(IR * base, IR * rhs, Type const* type);
     IR * buildIStore(IR * base, IR * rhs, UINT ofst, Type const* type);
     IR * buildString(SYM const* strtab);
-    IR * buildStoreArray(
-            IR * base,
-            IR * sublist,
-            Type const* type,
-            Type const* elemtype,
-            UINT dims,
-            TMWORD const* elem_num_buf,
-            IR * rhs);
+    IR * buildStoreArray(IR * base,
+                         IR * sublist,
+                         Type const* type,
+                         Type const* elemtype,
+                         UINT dims,
+                         TMWORD const* elem_num_buf,
+                         IR * rhs);
     IR * buildArray(IR * base,
                     IR * sublist,
                     Type const* type,
@@ -858,10 +854,9 @@ public:
     void registerGlobalVAR();
 
     IR * simpToPR(IR * ir, SimpCtx * ctx);
-    xcom::C<IRBB*> * splitIRlistIntoBB(
-            IR * irs,
-            BBList * bbl,
-            xcom::C<IRBB*> * ctbb);
+    xcom::C<IRBB*> * splitIRlistIntoBB(IR * irs,
+                                       BBList * bbl,
+                                       xcom::C<IRBB*> * ctbb);
     IR * simplifyLoopIngredient(IR * ir, SimpCtx * ctx);
     IR * simplifyBranch(IR * ir, SimpCtx * ctx);
     IR * simplifyIfSelf(IR * ir, SimpCtx * ctx);
@@ -927,14 +922,12 @@ public:
     IR * StrengthReduce(IN OUT IR * ir, IN OUT bool & change);
 
     //num_inner_region: count the number of inner regions.
-    void scanCallAndReturnList(
-            OUT UINT & num_inner_region,
-            OUT List<IR const*> * call_list,
-            OUT List<IR const*> * ret_list,
-            bool scan_inner_region);
-    void scanCallAndReturnList(
-            OUT UINT & num_inner_region,
-            bool scan_inner_region)
+    void scanCallAndReturnList(OUT UINT & num_inner_region,
+                               OUT List<IR const*> * call_list,
+                               OUT List<IR const*> * ret_list,
+                               bool scan_inner_region);
+    void scanCallAndReturnList(OUT UINT & num_inner_region,
+                               bool scan_inner_region)
     {
         getCallList()->clean();
         getReturnList()->clean(); //Scan RETURN as well.

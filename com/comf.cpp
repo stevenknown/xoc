@@ -247,7 +247,7 @@ INT sgcd(INT x, INT y)
 //Least common multiple.
 INT slcm(INT x, INT y)
 {
-    return x*y/sgcd(x,y);
+    return x * y / sgcd(x,y);
 }
 
 

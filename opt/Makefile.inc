@@ -6,6 +6,7 @@ OPT_OBJS +=\
 ../opt/du.o\
 ../opt/ir.o\
 ../opt/ir_bb.o\
+../opt/ir_builder.o\
 ../opt/ir_du.o\
 ../opt/ir_cfg.o\
 ../opt/ir_simp.o\

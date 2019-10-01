@@ -107,11 +107,10 @@ IRBB * findSingleBackedgeStartBB(LI<IRBB> const* li, IR_CFG * cfg)
 //Note if we find the preheader, the last IR of it may be call.
 //So if you are going to insert IR at the tail of preheader, the best is
 //force to insert a new bb.
-IRBB * findAndInsertPreheader(
-        LI<IRBB> const* li,
-        Region * rg,
-        OUT bool & insert_bb,
-        bool force)
+IRBB * findAndInsertPreheader(LI<IRBB> const* li,
+                              Region * rg,
+                              OUT bool & insert_bb,
+                              bool force)
 {
     ASSERT0(li && rg);
     insert_bb = false;
