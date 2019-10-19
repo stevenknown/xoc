@@ -43,7 +43,7 @@ namespace xcom {
 #define IS_GE(a, b)        ((a) >= (b))
 #define IS_LE(a, b)        ((a) <= (b))
 #define INVALID_EQNUM -1
-#define SIX_DUMP_NAME "zsix.cxx"
+#define SIX_DUMP_NAME "dumplp.tmp"
 
 class PivotPair {
 public:
@@ -195,13 +195,28 @@ public:
 //START SIX
 //
 //Definitive Simplex Method.
-#define SIX_SUCC                     0
-#define SIX_UNBOUND                  1
-#define SIX_NO_PRI_FEASIBLE_SOL      2
-#define SIX_OPTIMAL_IS_INFEASIBLE    3
-#define SIX_TIME_OUT                 4
+#define SIX_SUCC 0
+#define SIX_UNBOUND 1
+#define SIX_NO_PRI_FEASIBLE_SOL 2
+#define SIX_OPTIMAL_IS_INFEASIBLE 3
+#define SIX_TIME_OUT 4
+
+inline CHAR const* getStatusName(STATUS st)
+{
+    switch (st) {
+    case SIX_SUCC: return "success";
+    case SIX_UNBOUND: return "unbound";
+    case SIX_NO_PRI_FEASIBLE_SOL: return "no_prime_feasible_solution";
+    case SIX_OPTIMAL_IS_INFEASIBLE: return "optimal_is_infeasible";
+    case SIX_TIME_OUT: return "time_out";
+    default: UNREACHABLE();
+    }
+    return NULL;
+}
+
 
 template <class Mat, class T> class SIX : public Element<T> {
+    bool m_is_dump;
     bool m_is_init;
     INT m_rhs_idx;
     UINT m_indent;
@@ -219,21 +234,19 @@ template <class Mat, class T> class SIX : public Element<T> {
     void newPPT(INT rhs_idx);
     void pivot(UINT nv, UINT bv, IN OUT PVParam<Mat> & pp);
     INT findPivotBV(UINT pivot_nv, IN OUT PVParam<Mat> & pp);
-    INT findPivotNVandBVPair(
-            OUT INT & nvidx,
-            OUT INT & bvidx,
-            IN OUT PVParam<Mat> & pp);
-    UINT solveSlackForm(
-            IN OUT Mat & tgtf,
-            IN OUT Mat & eqc,
-            IN OUT Mat & vc,
-            OUT T & maxv,
-            OUT Mat & sol,
-            IN OUT Vector<bool> & nvset,
-            IN OUT Vector<bool> & bvset,
-            IN OUT Vector<INT> & bv2eqmap,
-            IN OUT Vector<INT> & eq2bvmap,
-            INT rhs_idx);
+    INT findPivotNVandBVPair(OUT INT & nvidx,
+                             OUT INT & bvidx,
+                             IN OUT PVParam<Mat> & pp);
+    UINT solveSlackForm(IN OUT Mat & tgtf,
+                        IN OUT Mat & eqc,
+                        IN OUT Mat & vc,
+                        OUT T & maxv,
+                        OUT Mat & sol,
+                        IN OUT Vector<bool> & nvset,
+                        IN OUT Vector<bool> & bvset,
+                        IN OUT Vector<INT> & bv2eqmap,
+                        IN OUT Vector<INT> & eq2bvmap,
+                        INT rhs_idx);
     void verify(Mat const& leq,
                 Mat const& eq,
                 Mat const& tgtf,
@@ -253,17 +266,44 @@ template <class Mat, class T> class SIX : public Element<T> {
                IN OUT Mat & vc,
                IN OUT INT & rhs_idx);
 public:
-    SIX();
-    ~SIX();
-    void init();
-    void destroy();
-    void setParam(UINT indent, UINT max_iter = 0xFFFFFFFF);
-    bool verifyEmptyVariableConstrain(
-            Mat const& tgtf,
-            IN Mat & vc,
-            Mat const& eq,
-            Mat const& leq,
-            INT rhs_idx);
+    SIX(UINT indent = 0, UINT max_iter = 0xFFFFFFFF, bool is_dump = false)
+    {
+        m_is_init = false;
+        m_rhs_idx = -1;
+        m_ppt = NULL;
+        init();
+        m_is_dump = is_dump;
+        setParam(indent, max_iter);
+    }
+    ~SIX() { destroy(); }
+    void init()
+    {
+        if (m_is_init) { return; }
+        m_indent = 0;
+        m_max_iter = 0xFFFFFFFF;
+        m_is_init = true;
+    }
+    void destroy()
+    {
+        if (!m_is_init) { return; }
+        m_rhs_idx = -1;
+        m_is_init = false;
+        if (m_ppt != NULL) {
+            delete m_ppt;
+        }
+    }
+
+    void setParam(UINT indent, UINT max_iter)
+    {
+        m_indent = indent;
+        m_max_iter = max_iter;
+    }
+
+    bool verifyEmptyVariableConstrain(Mat const& tgtf,
+                                      IN Mat & vc,
+                                      Mat const& eq,
+                                      Mat const& leq,
+                                      INT rhs_idx);
     UINT minm(OUT T & minv,
               OUT Mat & res,
               Mat const& tgtf,
@@ -278,111 +318,56 @@ public:
               Mat const& eq,
               Mat const& leq,
               INT rhs_idx = -1); //Linear maximum solution
-    UINT calcDualMaxm(
-            OUT T & dual_maxv,
-            OUT Mat & dual_slack_sol,
-            OUT Mat & dual_tgtf,
-            OUT INT & dual_rhs_idx,
-            OUT INT & dual_num_nv,
-            Mat const& tgtf,
-            IN Mat & vc,
-            Mat const& leq,
-            INT rhs_idx);
-    UINT TwoStageMethod(
-            IN OUT Mat & newleq,
-            IN OUT Mat & newvc,
-            IN OUT Mat & newtgtf,
-            IN OUT Mat & slack_sol,
-            IN OUT T & maxv,
-            IN OUT Vector<bool> & nvset,
-            IN OUT Vector<bool> & bvset,
-            IN OUT Vector<INT> & bv2eqmap,
-            IN OUT Vector<INT> & eq2bvmap,
-            IN OUT INT & new_rhs_idx);
-    void calcFinalSolution(
-            OUT Mat & sol,
-            OUT T & v,
-            IN OUT Mat & slack_sol,
-            IN INTMat & vcmap,
-            Mat const& orignal_tgtf,
-            INT rhs_idx);
+    UINT calcDualMaxm(OUT T & dual_maxv,
+                      OUT Mat & dual_slack_sol,
+                      OUT Mat & dual_tgtf,
+                      OUT INT & dual_rhs_idx,
+                      OUT INT & dual_num_nv,
+                      Mat const& tgtf,
+                      IN Mat & vc,
+                      Mat const& leq,
+                      INT rhs_idx);
+    UINT TwoStageMethod(IN OUT Mat & newleq,
+                        IN OUT Mat & newvc,
+                        IN OUT Mat & newtgtf,
+                        IN OUT Mat & slack_sol,
+                        IN OUT T & maxv,
+                        IN OUT Vector<bool> & nvset,
+                        IN OUT Vector<bool> & bvset,
+                        IN OUT Vector<INT> & bv2eqmap,
+                        IN OUT Vector<INT> & eq2bvmap,
+                        IN OUT INT & new_rhs_idx);
+    void calcFinalSolution(OUT Mat & sol,
+                           OUT T & v,
+                           IN OUT Mat & slack_sol,
+                           IN INTMat & vcmap,
+                           Mat const& orignal_tgtf,
+                           INT rhs_idx);
     void convertEq2Ineq(OUT Mat & leq, Mat const& eq);
-    bool calcSolution(
-            IN OUT Mat & sol,
-            Vector<bool> const& has_val,
-            Mat const& eqc, INT rhs_idx);
-    bool is_feasible(
-            Mat const& sol,
-            IN Mat & lc,
-            bool is_eqc,
-            Mat const& vc,
-            INT rhs_idx);
-    bool constructBasicFeasibleSolution(
-            IN OUT Mat & leq,
-            IN OUT Mat & tgtf,
-            IN OUT Mat & vc,
-            IN OUT Vector<bool> & nvset,
-            IN OUT Vector<bool> & bvset,
-            IN OUT Vector<INT> & bv2eqmap,
-            IN OUT Vector<INT> & eq2bvmap,
-            IN OUT INT & rhs_idx);
-    void reviseTargetFunc(
-            IN OUT Mat & tgtf,
-            Mat const& eq,
-            Mat const& leq,
-            INT rhs_idx);
-    CHAR const* get_status_name(UINT status) const;
+    bool calcSolution(IN OUT Mat & sol,
+                      Vector<bool> const& has_val,
+                      Mat const& eqc, INT rhs_idx);
+    bool is_feasible(Mat const& sol,
+                     IN Mat & lc,
+                     bool is_eqc,
+                     Mat const& vc,
+                     INT rhs_idx);
+    bool constructBasicFeasibleSolution(IN OUT Mat & leq,
+                                        IN OUT Mat & tgtf,
+                                        IN OUT Mat & vc,
+                                        IN OUT Vector<bool> & nvset,
+                                        IN OUT Vector<bool> & bvset,
+                                        IN OUT Vector<INT> & bv2eqmap,
+                                        IN OUT Vector<INT> & eq2bvmap,
+                                        IN OUT INT & rhs_idx);
+    void reviseTargetFunc(IN OUT Mat & tgtf,
+                          Mat const& eq,
+                          Mat const& leq,
+                          INT rhs_idx);
     FILE * dump_open_file();
     bool dump_prt_indent(FILE * h);
     bool dump_pivoting(UINT status, UINT iter_count);
 };
-
-
-template <class Mat, class T>
-SIX<Mat, T>::SIX()
-{
-    m_is_init = false;
-    m_rhs_idx = -1;
-    m_ppt = NULL;
-    init();
-}
-
-
-template <class Mat, class T>
-SIX<Mat, T>::~SIX()
-{
-      destroy();
-}
-
-
-template <class Mat, class T>
-void SIX<Mat, T>::init()
-{
-    if (m_is_init) return;
-    m_indent = 0;
-    m_max_iter = 0xFFFFFFFF;
-    m_is_init = true;
-}
-
-
-template <class Mat, class T>
-void SIX<Mat, T>::destroy()
-{
-    if (!m_is_init) return;
-    m_rhs_idx = -1;
-    m_is_init = false;
-    if (m_ppt) {
-        delete m_ppt;
-    }
-}
-
-
-template <class Mat, class T>
-void SIX<Mat, T>::setParam(UINT indent, UINT max_iter)
-{
-    m_indent = indent;
-    m_max_iter = max_iter;
-}
 
 
 //Generate new pivot-pair-tab.
@@ -390,7 +375,7 @@ template <class Mat, class T>
 void SIX<Mat, T>::newPPT(INT var_num)
 {
     ASSERT0(var_num > 0);
-    if (m_ppt) {
+    if (m_ppt != NULL) {
         m_ppt->destroy();
         m_ppt->init(var_num);
         return;
@@ -402,6 +387,7 @@ void SIX<Mat, T>::newPPT(INT var_num)
 template <class Mat, class T>
 FILE * SIX<Mat, T>::dump_open_file()
 {
+    if (!m_is_dump) { return NULL; }
     FILE * h = fopen(SIX_DUMP_NAME, "a+");
     ASSERTN(h, ("%s create failed!!!", SIX_DUMP_NAME));
     return h;
@@ -419,54 +405,38 @@ bool SIX<Mat, T>::dump_prt_indent(FILE * h)
 
 
 template <class Mat, class T>
-CHAR const* SIX<Mat, T>::get_status_name(UINT status) const
-{
-    CHAR const* s = NULL;
-    switch (status) {
-    case SIX_SUCC: s = "SUCC"; break;
-    case SIX_UNBOUND: s = "UNBOUND"; break;
-    case SIX_NO_PRI_FEASIBLE_SOL: s = "NO Prime SOL"; break;
-    case SIX_OPTIMAL_IS_INFEASIBLE: s = "Optimal SOL is infeasible"; break;
-    case SIX_TIME_OUT: s = "Time Out"; break;
-    default: UNREACHABLE();
-    }
-    return s;
-}
-
-
-template <class Mat, class T>
 bool SIX<Mat, T>::dump_pivoting(UINT status, UINT iter_count)
 {
     FILE * h = dump_open_file();
+    if (h == NULL) { return true; }
     dump_prt_indent(h);
-    fprintf(h, "PIVOT status=%s,iter_cnt=%u\n",
-            get_status_name(status), iter_count);
+    fprintf(h, "PIVOTING status=%s,number_of_iter=%u\n",
+            getStatusName(status), iter_count);
     fclose(h);
     return true;
 }
 
 
-//Calculate solution by given variable's value,
-//return true if solution is unique.
-//'has_val': presents which variable was depicted in 'sol'.
-//'eqc': equality constraint
-//'vc': variable constraint
+//Calculate solution by given variable's value.
+//Return true if solution is unique.
+//sol: record the solution computed.
+//has_val: represents which variable was depicted in 'sol'.
+//eqc: equality constraints
+//vc: variable constraints
+//rhs_idx: column index indicates the constant-column.
 template <class Mat, class T>
-bool SIX<Mat, T>::calcSolution(
-        IN OUT Mat & sol,
-        Vector<bool> const& has_val,
-        Mat const& eqc,
-        INT rhs_idx)
+bool SIX<Mat, T>::calcSolution(IN OUT Mat & sol,
+                               Vector<bool> const& has_val,
+                               Mat const& eqc,
+                               INT rhs_idx)
 {
     ASSERTN(m_is_init, ("not yet initialize"));
     ASSERTN(has_val.get_last_idx() + 1 == rhs_idx &&
-           sol.getColSize() == eqc.getColSize(), ("illegal info"));
+            sol.getColSize() == eqc.getColSize(), ("illegal info"));
     Mat tmpeqc = eqc;
-    UINT i;
-
     //Calc the number of variables which has value.
     UINT hasvalnum = 0;
-    for (i = 0; i < (UINT)rhs_idx; i++) {
+    for (UINT i = 0; i < (UINT)rhs_idx; i++) {
         if (has_val.get(i)) {
             hasvalnum++;
         }
@@ -477,12 +447,12 @@ bool SIX<Mat, T>::calcSolution(
         return true;
     }
 
-    //Computes the number of the variables which consist of each equations.
+    //Compute the number of the variables which consist of each equations.
     //If there are more than one variable in the equation, the solution
     //of the group equations will NOT be unique.
     Vector<UINT> eq2var; //When equation was processed, record the
                          //variable index that will be solved.
-    for (i = 0; i < tmpeqc.getRowSize(); i++) {
+    for (UINT i = 0; i < tmpeqc.getRowSize(); i++) {
         UINT nonzerocoeff = 0;
         for (UINT j = 0; j < (UINT)rhs_idx; j++) {
             if (has_val.get(j)) {
@@ -502,7 +472,7 @@ bool SIX<Mat, T>::calcSolution(
     }
 
     //Exam OK! Compute the solution.
-    for (i = 0; i < (UINT)rhs_idx; i++) {
+    for (UINT i = 0; i < (UINT)rhs_idx; i++) {
         if (!has_val.get(i)) {
             sol.set(0, i, 0); //do some cleaning
             continue;
@@ -511,9 +481,9 @@ bool SIX<Mat, T>::calcSolution(
         tmpeqc.mulOfColumn(i, val);
     }
 
-    //If variable has been computed, set relevant vector position to true.
+    //If variable has been computed, set relevant vector position to be true.
     Vector<bool> comped;
-    for (i = 0; i < tmpeqc.getRowSize(); i++) {
+    for (UINT i = 0; i < tmpeqc.getRowSize(); i++) {
         T temval = 0, varcoeff = 0;
         INT varidx = eq2var.get(i);
         ASSERTN(!comped.get(varidx), ("already has computed"));
@@ -609,7 +579,7 @@ INT SIX<Mat, T>::findPivotBV(UINT pivot_nv, IN OUT PVParam<Mat> & pp)
             minbval = v;
             eqidx = i;
         }
-    }//end for
+    }
 
     //None of basic variable that could form a bound for 'pivot_nv'.
     //Whereas contrasting the classical algorithm, we are going to relax
@@ -649,7 +619,7 @@ INT SIX<Mat, T>::findPivotBV(UINT pivot_nv, IN OUT PVParam<Mat> & pp)
                 minbval = v;
                 eqidx = i;
             }
-        } //end for
+        }
         if (eqidx == -1) {
             //All pair of (pivot_nv_idx, bv_idx) had processed.
             //Retry another nv to aviod cycle.
@@ -668,10 +638,9 @@ INT SIX<Mat, T>::findPivotBV(UINT pivot_nv, IN OUT PVParam<Mat> & pp)
 //  In order to avoid the degeneracy case, record the pivoting
 //  pair at a time.
 template <class Mat, class T>
-INT SIX<Mat, T>::findPivotNVandBVPair(
-        OUT INT & nvidx,
-        OUT INT & bvidx,
-        IN OUT PVParam<Mat> & pp)
+INT SIX<Mat, T>::findPivotNVandBVPair(OUT INT & nvidx,
+                                      OUT INT & bvidx,
+                                      IN OUT PVParam<Mat> & pp)
 {
     ASSERTN(m_is_init, ("not yet initialize"));
     Mat const& tgtf = *pp.tgtf;
@@ -681,7 +650,6 @@ INT SIX<Mat, T>::findPivotNVandBVPair(
     DUMMYUSE(bvset);
     PivotPairTab & ppt = *pp.ppt;
     INT rhs_idx = pp.rhs_idx;
-    UINT i;
 
     //If all variables with positive coefficient are examed,
     //try negative ones.
@@ -692,7 +660,7 @@ INT SIX<Mat, T>::findPivotNVandBVPair(
     bool try_neg_coeff_var = false;
     bool try_zero_coeff_var = false;
 AGAIN:
-    for (i = 0; i < (UINT)rhs_idx; i++) {
+    for (UINT i = 0; i < (UINT)rhs_idx; i++) {
         T coeff = tgtf.get(0, i);
         if (bvset.get(i)) {
             ASSERTN(coeff == 0, ("the coeff of 'bv' must be zero."));
@@ -781,28 +749,25 @@ FIN:
 //    and False indicate lc is inequality constraint.
 //'vc': variable constraint
 template <class Mat, class T>
-bool SIX<Mat, T>::is_feasible(
-        Mat const& sol,
-        IN Mat & lc,
-        bool is_eqc,
-        Mat const& vc,
-        INT rhs_idx)
+bool SIX<Mat, T>::is_feasible(Mat const& sol,
+                              IN Mat & lc,
+                              bool is_eqc,
+                              Mat const& vc,
+                              INT rhs_idx)
 {
     ASSERTN(m_is_init, ("not yet initialize"));
     ASSERTN(sol.getColSize() == lc.getColSize() &&
             lc.getColSize() == vc.getColSize(),
             ("illegal info"));
-    UINT i;
-
     //Check variable constraint
-    for (i = 0; i < (UINT)rhs_idx; i++) {
+    for (UINT i = 0; i < (UINT)rhs_idx; i++) {
         if (vc.get(i, i) * sol.get(0, i) > vc.get(i, rhs_idx)) {
             return false;
         }
     }
 
     //Check equality constraint
-    for (i = 0; i < lc.getRowSize(); i++) {
+    for (UINT i = 0; i < lc.getRowSize(); i++) {
         T sum = T(0);
         for (UINT j = 0; j < (UINT)rhs_idx; j++) {
             sum = sum + lc.get(i, j) * sol.get(0, j);
@@ -836,15 +801,14 @@ bool SIX<Mat, T>::is_feasible(
 //    And if L' has a maximum feasible solution: max(-x0)=0, x0=0,
 //    the slack form exists a feasible solution and L also has a solution.
 template <class Mat, class T>
-bool SIX<Mat, T>::constructBasicFeasibleSolution(
-        IN OUT Mat & leq,
-        IN OUT Mat & tgtf,
-        IN OUT Mat & vc,
-        IN OUT Vector<bool> & nvset,
-        IN OUT Vector<bool> & bvset,
-        IN OUT Vector<INT> & bv2eqmap,
-        IN OUT Vector<INT> & eq2bvmap,
-        IN OUT INT & rhs_idx)
+bool SIX<Mat, T>::constructBasicFeasibleSolution(IN OUT Mat & leq,
+                                                 IN OUT Mat & tgtf,
+                                                 IN OUT Mat & vc,
+                                                 IN OUT Vector<bool> & nvset,
+                                                 IN OUT Vector<bool> & bvset,
+                                                 IN OUT Vector<INT> & bv2eqmap,
+                                                 IN OUT Vector<INT> & eq2bvmap,
+                                                 IN OUT INT & rhs_idx)
 {
     ASSERTN(m_is_init, ("not yet initialize"));
     ASSERTN(rhs_idx > 0, ("illegal info"));
@@ -875,14 +839,13 @@ bool SIX<Mat, T>::constructBasicFeasibleSolution(
     slack(tgtf, leq, vc, rhs_idx);
 
     //Initializing basic-variable set and nonbasic-variable set.
-    //Establishing the mapping between variables and relevant equalities.
-    UINT i,j;
-    for (i = 0; i < bv_start_idx; i++) {
+    //Establishing the mapping between variables and relevant equalities.    
+    for (UINT i = 0; i < bv_start_idx; i++) {
         bv2eqmap.set(i, INVALID_EQNUM);
         nvset.set(i, true); //Initializing nonbasic variable set.
     }
-    j = 0; //Index that of mapping of bv and eq starting at 0.
-    for (i = bv_start_idx; i < (UINT)rhs_idx; i++, j++) {
+    UINT j = 0; //Index that of mapping of bv and eq starting at 0.
+    for (UINT i = bv_start_idx; i < (UINT)rhs_idx; i++, j++) {
         bvset.set(i, true);
         nvset.set(i, false);
         eq2bvmap.set(j, i);
@@ -893,7 +856,7 @@ bool SIX<Mat, T>::constructBasicFeasibleSolution(
     //to be the swap-out one.
     UINT pivot_bv_idx = 0;
     T minb;
-    for (i = 0; i < leq.getRowSize(); i++) {
+    for (UINT i = 0; i < leq.getRowSize(); i++) {
         if (i == 0) {
             minb = leq.get(i, rhs_idx);
             pivot_bv_idx = eq2bvmap.get(i);
@@ -910,7 +873,7 @@ bool SIX<Mat, T>::constructBasicFeasibleSolution(
     Mat sol;
     T maxv;
     if (SIX_SUCC != solveSlackForm(tgtf, leq, vc, maxv, sol,
-                            nvset, bvset, bv2eqmap, eq2bvmap, rhs_idx)) {
+                                   nvset, bvset, bv2eqmap, eq2bvmap, rhs_idx)) {
         return false;
     }
 
@@ -944,7 +907,7 @@ bool SIX<Mat, T>::constructBasicFeasibleSolution(
     UINT inccols = tgtf.getColSize() - origtgtf.getColSize();
     tgtf = origtgtf;
     tgtf.insertColumnsBefore(orig_rhs_idx, inccols);
-    for (i = 0; i < (UINT)rhs_idx; i++) {
+    for (UINT i = 0; i < (UINT)rhs_idx; i++) {
         if (IS_INEQ(tgtf.reduce(0, i), 0) && bvset.get(i)) {
             Mat exp;
             leq.innerRow(exp, bv2eqmap.get(i), bv2eqmap.get(i));
@@ -962,7 +925,7 @@ bool SIX<Mat, T>::constructBasicFeasibleSolution(
     j = 0;
     Vector<bool> tnvset, tbvset; //local use.
     Vector<INT> tbv2eqmap;
-    for (i = 0; i <= (UINT)nvset.get_last_idx(); i++) {
+    for (UINT i = 0; i <= (UINT)nvset.get_last_idx(); i++) {
         if (i != xa) {
             tnvset.set(j, nvset.get(i));
             tbvset.set(j, bvset.get(i));
@@ -975,7 +938,7 @@ bool SIX<Mat, T>::constructBasicFeasibleSolution(
     bv2eqmap.copy(tbv2eqmap);
 
     //Update the correspondence between eqnum and bv.
-    for (i = 0; i <= (UINT)eq2bvmap.get_last_idx(); i++) {
+    for (UINT i = 0; i <= (UINT)eq2bvmap.get_last_idx(); i++) {
         UINT bv = eq2bvmap.get(i);
         if (bv > xa) {
             eq2bvmap.set(i, bv - 1);
@@ -1005,38 +968,32 @@ bool SIX<Mat, T>::constructBasicFeasibleSolution(
 //    and variable constraint:
 //        x,y,z,s1,s2,s3 >= 0
 template <class Mat, class T>
-UINT SIX<Mat, T>::solveSlackForm(
-        IN OUT Mat & tgtf,
-        IN OUT Mat & eqc,
-        IN OUT Mat & vc,
-        OUT T & maxv,
-        OUT Mat & sol,
-        IN OUT Vector<bool> & nvset,
-        IN OUT Vector<bool> & bvset,
-        IN OUT Vector<INT> & bv2eqmap,
-        IN OUT Vector<INT> & eq2bvmap,
-        INT rhs_idx)
+UINT SIX<Mat, T>::solveSlackForm(IN OUT Mat & tgtf,
+                                 IN OUT Mat & eqc,
+                                 IN OUT Mat & vc,
+                                 OUT T & maxv,
+                                 OUT Mat & sol,
+                                 IN OUT Vector<bool> & nvset,
+                                 IN OUT Vector<bool> & bvset,
+                                 IN OUT Vector<INT> & bv2eqmap,
+                                 IN OUT Vector<INT> & eq2bvmap,
+                                 INT rhs_idx)
 {
     ASSERTN(m_is_init, ("not yet initialize"));
     newPPT(rhs_idx);
 
     //The initial-solution of target function is always be zero,
     //we get the solution by setting each of non-basic variables to be zero.
-    //e.g: max(x) = ax1 + bx2,
+    //e.g:max(x) = ax1 + bx2,
     //    Set x1, x2 to be zero, then the max(x) is a*0 + b*0 = 0.
     maxv = 0;
     sol.reinit(1, tgtf.getColSize());
 
     UINT cnt = 0; //The number of iterations
-    PVParam<Mat> pp(&eqc,
-                    &tgtf,
-                    &nvset,
-                    &bvset,
-                    &bv2eqmap,
-                    &eq2bvmap,
-                    m_ppt,
-                    rhs_idx);
+    PVParam<Mat> pp(&eqc, &tgtf, &nvset, &bvset, &bv2eqmap, &eq2bvmap,
+                    m_ppt, rhs_idx);
     while (cnt < m_max_iter) {
+        cnt++;
         {
             //m_ppt->m_pair.dumpf();
             //tgtf.dumpf();
@@ -1053,7 +1010,7 @@ UINT SIX<Mat, T>::solveSlackForm(
         bool all_coeffs_nonpositive = true;
         for (UINT i = 0; i < (UINT)rhs_idx; i++) {
             if (!nvset.get(i)) {
-                //May be the verify is unnecessary.
+                //May be the verification is unnecessary.
                 ASSERTN(IS_EQ(tgtf.reduce(0, i), 0),
                         ("bv must be zero in target function"));
                 tgtf.set(0, i, 0);
@@ -1065,42 +1022,40 @@ UINT SIX<Mat, T>::solveSlackForm(
                     pivot_nv_idx = i;
                     break;
                 }
-            } //end if
-        } //end for each NV
+            }
+        }
 
         INT pivot_bv_idx = -1;
         if (pivot_nv_idx == -1) {
-            //Each coeffs of target function either be zero or negaitive!
-            //It looks like that we could not gain more large value of target
-            //function by increase value of one of its variables.
+            //Each coeffs of target function variables either be zero or
+            //negaitive! It looks like that we could not get more larger
+            //value of target function by increase value of one
+            //of its variables.
             //So it has to perform feasibility verification.
-            //
-            //Now, we attempt to calculate the optimial solution,
-            //and target function was represented by Non-basic variable all
+            //Then, we attempt to calculate the optimial solution,
+            //whereas target function represented by Non-Basic Variable all
             //through.
             //So one simply method to get value of basic variable is
-            //that setting Non-basic variable all be zero.
-            //And the basic variables could consequently be worked out.
+            //to set non-basic variable all be zero. Then the basic variables
+            //could consequently be worked out.
             //The following code would do that operation accroding
             //to information in 'bvset'.
-            //
-            //There are two possibilities,  one is that the optimal solution
-            //is avaiable, and the else is that the solution is infeasible.
+            //There are two possibilities, the first is that the optimal
+            //solution is avaiable, the else indicates the solution is
+            //infeasible.
             if (all_coeffs_nonpositive) {
-                sol.zero(); //Set all nonbasic variables to zero.
-
+                sol.zero(); //Set all non-basic variables to zero.
                 //Each basic variables BVi is equal to corresponding Ci.
                 //e.g: Given slack form is:
                 //    BVi = Ci + f1(NVi)
                 //    BVj = Cj + f2(NVi)
                 //then BVi, BVj are equal to Ci, Cj respectively.
-            #ifdef _DEBUG_
-                //Also do some verifying work but is slow
+                #ifdef _DEBUG_
+                //Also do some verification which is slow
                 //and need more calculation.
-                if (!calcSolution(sol, nvset, eqc, rhs_idx)) {
-                    ASSERTN(0, ("exception!!"));
-                }
-            #else
+                ASSERTN(calcSolution(sol, nvset, eqc, rhs_idx),
+                        ("unexpected result"));                
+                #else
                 for (INT i = 0; i <= bvset.get_last_idx(); i++) {
                     if (bvset.get(i)) {
                         INT eqnum = bv2eqmap.get(i);
@@ -1108,14 +1063,14 @@ UINT SIX<Mat, T>::solveSlackForm(
                         sol.set(0, i, eqc.get(eqnum, rhs_idx));
                     }
                 }
-            #endif
+                #endif
                 if (is_feasible(sol, eqc, true, vc, rhs_idx)) {
                     //Calculating maximum value.
-                    //It should be noted that SIX only support linear
+                    //TODO: for now, SIX only support linear
                     //expression with single column constant term so far.
                     //e.g: maxv = ax1 + bx2 + Const,
-                    //The followed form should be considered,
-                    //    maxv = ax1 + bx2 + Const + ConstSym(x).
+                    //The followed form should be supported,
+                    //  maxv = ax1 + bx2 + Const + ConstSym(x).
                     maxv = tgtf.get(0, rhs_idx);
                     ASSERT0(dump_pivoting(SIX_SUCC, cnt));
                     return SIX_SUCC;
@@ -1166,26 +1121,23 @@ UINT SIX<Mat, T>::solveSlackForm(
         //        This is one cycle!
         //So the important work is to find mutually exclusive pivoting variables
         //pairs.
-
         pivot(pivot_nv_idx, pivot_bv_idx, pp);
-        #ifdef _DEBUG_
-        {
-            UINT count = 0;
-            for (UINT i = 0; i <= (UINT)bvset.get_last_idx();i++) {
-                ASSERTN(bvset.get(i) != nvset.get(i), ("illegal pivoting"));
-                if (bv2eqmap.get(i) != INVALID_EQNUM) {
-                    count++;
-                    ASSERTN((UINT)eq2bvmap.get(bv2eqmap.get(i)) == i,
-                            ("unmatch!"));
-                }
+        
+        #ifdef _DEBUG_        
+        UINT count = 0;
+        for (UINT i = 0; i <= (UINT)bvset.get_last_idx();i++) {
+            ASSERTN(bvset.get(i) != nvset.get(i), ("illegal pivoting"));
+            if (bv2eqmap.get(i) != INVALID_EQNUM) {
+                count++;
+                ASSERTN((UINT)eq2bvmap.get(bv2eqmap.get(i)) == i,
+                        ("unmatch!"));
             }
-            ASSERTN((UINT)eq2bvmap.get_last_idx() + 1 ==
-                    eqc.getRowSize(), ("illegal pivot"));
-            ASSERTN(count == eqc.getRowSize(), ("illegal pivot"));
         }
-        #endif
-        cnt++;
-    } //end while(status)
+        ASSERTN((UINT)eq2bvmap.get_last_idx() + 1 ==
+                eqc.getRowSize(), ("illegal pivot"));
+        ASSERTN(count == eqc.getRowSize(), ("illegal pivot"));        
+        #endif        
+    }
     ASSERT0(dump_pivoting(SIX_TIME_OUT, cnt));
     return SIX_TIME_OUT;
 }
@@ -1287,15 +1239,14 @@ void SIX<Mat, T>::convertEq2Ineq(OUT Mat & leq, Mat const& eq)
 //  Some new auxillary/dummy variables may be generated.
 //  Caller must ensure that 'leq' does not contain constraints of '>='.
 template <class Mat, class T>
-INT SIX<Mat, T>::normalize(
-        OUT Mat & newleq,
-        OUT Mat & newvc,
-        OUT INTMat & vcmap,
-        OUT Mat & newtgtf,
-        IN Mat & vc,
-        Mat const& eq,
-        Mat const& leq,
-        Mat const& tgtf)
+INT SIX<Mat, T>::normalize(OUT Mat & newleq,
+                           OUT Mat & newvc,
+                           OUT INTMat & vcmap,
+                           OUT Mat & newtgtf,
+                           IN Mat & vc,
+                           Mat const& eq,
+                           Mat const& leq,
+                           Mat const& tgtf)
 {
     ASSERTN(m_is_init, ("not yet initialize"));
     UINT col_last_var = m_rhs_idx - 1;
@@ -1317,8 +1268,7 @@ INT SIX<Mat, T>::normalize(
     //v1'' >= 0.
     UINT leqgrowcols = 0, tgtfgrowcols = 0;
     UINT vcgrowrows = 0, vcgrowcols = 0;
-    UINT i;
-    for (i = 0; i <= col_last_var; i++) {
+    for (UINT i = 0; i <= col_last_var; i++) {
         if (vc.is_colequ(i, 0)) { //No constraint for variable 'i'
             vcgrowrows++;
             vcgrowcols++;
@@ -1362,7 +1312,7 @@ INT SIX<Mat, T>::normalize(
     //Constructing an injective mapping between original variables and
     //auxillary/dummy variables.
     vcmap.reinit(0,0);
-    for (i = 0; i < vars; i++) {
+    for (UINT i = 0; i < vars; i++) {
         if (vc.is_colequ(i, 0)) { //No constraint of variable 'i'
             //Aforementioned formual wrote: v = v' - v'', 'newvc'
             //replaced v with v' and inserted a new column indicating the v'',
@@ -1403,11 +1353,10 @@ INT SIX<Mat, T>::normalize(
 //  the else two constraints as: f + s = c, s >= 0, where s is
 //  slack variable.
 template <class Mat, class T>
-void SIX<Mat, T>::slack(
-        IN OUT Mat & tgtf,
-        IN OUT Mat & leq,
-        IN OUT Mat & vc,
-        IN OUT INT & rhs_idx)
+void SIX<Mat, T>::slack(IN OUT Mat & tgtf,
+                        IN OUT Mat & leq,
+                        IN OUT Mat & vc,
+                        IN OUT INT & rhs_idx)
 {
     ASSERTN(m_is_init, ("not yet initialize"));
     UINT orig_leqs = leq.getRowSize();
@@ -1477,8 +1426,7 @@ void SIX<Mat, T>::pivot(UINT nv, UINT bv, IN OUT PVParam<Mat> & pp)
     //Substitute each nv for all equations with
     //a expression (ax1 + bx2 + cx3) such as:
     //  nv = ax1 + bx2 +cx3
-    UINT i;
-    for (i = 0; i < eq.getRowSize(); i++) {
+    for (UINT i = 0; i < eq.getRowSize(); i++) {
         if (i == (UINT)eqnum) {
             continue;
         }
@@ -1494,7 +1442,7 @@ void SIX<Mat, T>::pivot(UINT nv, UINT bv, IN OUT PVParam<Mat> & pp)
     //f(x) = w*nv + u*x4 =>
     //f(x) = w*(a*x1 + b*x2 + c*x3) + u*x4
     nvexp.mul(-1);
-    for (i = rhs_idx; i < nvexp.getColSize(); i++) {
+    for (UINT i = rhs_idx; i < nvexp.getColSize(); i++) {
         nvexp.set(0, i, -nvexp.get(0, i));
     }
     nvexp.mul(tgtf.get(0, nv));
@@ -1536,24 +1484,26 @@ void SIX<Mat, T>::verify(Mat const& leq,
     } else {
         ASSERTN(0, ("no constraints"));
     }
-    ASSERTN(rhs_idx == -1 || rhs_idx == (INT)leq.getColSize() -1, ("unsupport"));
+    ASSERTN(rhs_idx == -1 || rhs_idx == (INT)leq.getColSize() -1,
+            ("unsupport"));
 
     if (m_rhs_idx == -1) {
         m_rhs_idx = max_cols - 1; //Only one const-term.
     } else {
-        ASSERTN(m_rhs_idx < (INT)max_cols && m_rhs_idx >= 1, ("out of boundary"));
+        ASSERTN(m_rhs_idx < (INT)max_cols && m_rhs_idx >= 1,
+                ("out of boundary"));
     }
 
     UINT num_cols_of_const_term = max_cols - m_rhs_idx;
 
     DUMMYUSE(num_cols_of_const_term);
     ASSERTN(num_cols_of_const_term == 1,
-           ("No yet support const term with multi-columns."));
+            ("No yet support const term with multi-columns."));
     ASSERTN(tgtf.is_vec() && tgtf.getColSize() == (UINT)max_cols,
-           ("multi target functions"));
+            ("multi target functions"));
     ASSERTN(vc.getRowSize() == (UINT)m_rhs_idx &&
-           vc.getColSize() == (UINT)max_cols,
-           ("unmatch variables constraints"));
+            vc.getColSize() == (UINT)max_cols,
+            ("unmatch variables constraints"));
 }
 
 
@@ -1582,16 +1532,15 @@ void SIX<Mat, T>::verify(Mat const& leq,
 //
 //NOTICE: The duality theory: Ax¡Üb, max(cx) is the dual of A¦Óy¡Ýc¦Ó, min(b¦Óy)
 template <class Mat, class T>
-UINT SIX<Mat, T>::calcDualMaxm(
-        OUT T & dual_maxv,
-        OUT Mat & dual_slack_sol,
-        OUT Mat & dual_tgtf,
-        OUT INT & dual_rhs_idx,
-        OUT INT & dual_num_nv,
-        Mat const& tgtf,
-        IN OUT Mat &, //vc
-        Mat const& leq,
-        INT rhs_idx)
+UINT SIX<Mat, T>::calcDualMaxm(OUT T & dual_maxv,
+                               OUT Mat & dual_slack_sol,
+                               OUT Mat & dual_tgtf,
+                               OUT INT & dual_rhs_idx,
+                               OUT INT & dual_num_nv,
+                               Mat const& tgtf,
+                               IN OUT Mat &, //vc
+                               Mat const& leq,
+                               INT rhs_idx)
 {
     INT num_of_const_col = leq.getColSize() - rhs_idx;
     ASSERT0(num_of_const_col >= 1);
@@ -1658,14 +1607,13 @@ UINT SIX<Mat, T>::calcDualMaxm(
 #ifdef SOLVE_DUAL_PROBLEM
 //Solve the minmum problem of linear prgramming.
 template <class Mat, class T>
-UINT SIX<Mat, T>::minm(
-        OUT T & minv,
-        OUT Mat & sol,
-        Mat const& tgtf,
-        IN OUT Mat & vc,
-        Mat const& eq,
-        Mat const& leq,
-        INT rhs_idx)
+UINT SIX<Mat, T>::minm(OUT T & minv,
+                       OUT Mat & sol,
+                       Mat const& tgtf,
+                       IN OUT Mat & vc,
+                       Mat const& eq,
+                       Mat const& leq,
+                       INT rhs_idx)
 {
     ASSERTN(m_is_init, ("not yet initialize"));
     m_rhs_idx = rhs_idx;
@@ -1701,7 +1649,7 @@ UINT SIX<Mat, T>::minm(
         INT num_of_const_term = dual_tgtf.getColSize() - dual_rhs_idx;
         //yi = -Coeff(n+i), i¡ÊBs
         UINT num_of_orig_var = //also be the number of dual-bv.
-                (dual_tgtf.getColSize() - num_of_const_term) - dual_num_nv;
+            (dual_tgtf.getColSize() - num_of_const_term) - dual_num_nv;
 
         //Basic variables of dual solution represent
         //the nonbasic variables of original solution.
@@ -1733,14 +1681,13 @@ UINT SIX<Mat, T>::minm(
 
 //Solve minmum problem of linear prgramming naively.
 template <class Mat, class T>
-UINT SIX<Mat, T>::minm(
-        OUT T & minv,
-        OUT Mat & sol,
-        Mat const& tgtf,
-        IN Mat & vc,
-        Mat const& eq,
-        Mat const& leq,
-        INT rhs_idx)
+UINT SIX<Mat, T>::minm(OUT T & minv,
+                       OUT Mat & sol,
+                       Mat const& tgtf,
+                       IN Mat & vc,
+                       Mat const& eq,
+                       Mat const& leq,
+                       INT rhs_idx)
 {
     ASSERTN(m_is_init, ("not yet initialize"));
     Mat neg_tgtf = tgtf;
@@ -1780,15 +1727,14 @@ bool SIX<Mat, T>::constItermIsFeasible(Mat & newleq, INT rhs_idx)
 //    to the index of relevant equality.
 //'new_rhs_idx': column of constant term when the stage was finished.
 template <class Mat, class T>
-INT SIX<Mat, T>::stage1(
-        OUT Mat & newleq,
-        OUT Mat & newvc,
-        OUT Mat & newtgtf,
-        OUT Vector<bool> & nvset,
-        OUT Vector<bool> & bvset,
-        Vector<INT> & bv2eqmap,
-        Vector<INT> & eq2bvmap,
-        IN OUT INT & new_rhs_idx)
+INT SIX<Mat, T>::stage1(OUT Mat & newleq,
+                        OUT Mat & newvc,
+                        OUT Mat & newtgtf,
+                        OUT Vector<bool> & nvset,
+                        OUT Vector<bool> & bvset,
+                        Vector<INT> & bv2eqmap,
+                        Vector<INT> & eq2bvmap,
+                        IN OUT INT & new_rhs_idx)
 {
     bool has_pos_coeff_var = false;
     for (UINT i = 0; i < (UINT)new_rhs_idx; i++) {
@@ -1825,14 +1771,13 @@ INT SIX<Mat, T>::stage1(
         //Initializing basic-variable and non-basic-variable set.
         //Mapping from nonbasic-variable to its relevant referrenced
         //equalities.
-        UINT i;
-        for (i = 0; i < bv_start_idx; i++) {
+        for (UINT i = 0; i < bv_start_idx; i++) {
             bv2eqmap.set(i, INVALID_EQNUM);
             nvset.set(i, true);
         }
 
         UINT j = 0;
-        for (i = bv_start_idx; i < (UINT)new_rhs_idx; i++, j++) {
+        for (UINT i = bv_start_idx; i < (UINT)new_rhs_idx; i++, j++) {
             bvset.set(i, true);
             nvset.set(i, false);
             eq2bvmap.set(j, i);
@@ -1847,13 +1792,12 @@ INT SIX<Mat, T>::stage1(
 //original variable's value from the set of {Nonbasic var} ¡È {Basic var}.
 //'rhs_idx': column of const-term of 'slack_sol'.
 template <class Mat, class T>
-void SIX<Mat, T>::calcFinalSolution(
-        OUT Mat & sol,
-        OUT T & v,
-        IN OUT Mat & slack_sol,
-        IN INTMat & vcmap,
-        Mat const& orignal_tgtf,
-        INT rhs_idx)
+void SIX<Mat, T>::calcFinalSolution(OUT Mat & sol,
+                                    OUT T & v,
+                                    IN OUT Mat & slack_sol,
+                                    IN INTMat & vcmap,
+                                    Mat const& orignal_tgtf,
+                                    INT rhs_idx)
 {
     DUMMYUSE(rhs_idx);
 
@@ -1903,17 +1847,16 @@ void SIX<Mat, T>::calcFinalSolution(
 //  auxiliary variables and slack variables, the final solution
 //  resolved recorded temporarily with 'slack_sol'.
 template <class Mat, class T>
-UINT SIX<Mat, T>::TwoStageMethod(
-        IN OUT Mat & newleq,
-        IN OUT Mat & newvc,
-        IN OUT Mat & newtgtf,
-        IN OUT Mat & slack_sol,
-        IN OUT T & maxv,
-        IN OUT Vector<bool> & nvset,
-        IN OUT Vector<bool> & bvset,
-        IN OUT Vector<INT> & bv2eqmap,
-        IN OUT Vector<INT> & eq2bvmap,
-        IN OUT INT & new_rhs_idx)
+UINT SIX<Mat, T>::TwoStageMethod(IN OUT Mat & newleq,
+                                 IN OUT Mat & newvc,
+                                 IN OUT Mat & newtgtf,
+                                 IN OUT Mat & slack_sol,
+                                 IN OUT T & maxv,
+                                 IN OUT Vector<bool> & nvset,
+                                 IN OUT Vector<bool> & bvset,
+                                 IN OUT Vector<INT> & bv2eqmap,
+                                 IN OUT Vector<INT> & eq2bvmap,
+                                 IN OUT INT & new_rhs_idx)
 {
     UINT status = SIX_SUCC;
     if ((status = stage1(newleq, newvc, newtgtf, nvset, bvset,
@@ -1946,12 +1889,11 @@ UINT SIX<Mat, T>::TwoStageMethod(
 //    As aforementioned, the sysmtem is unbound because j
 //    can be any integer.
 template <class Mat, class T>
-bool SIX<Mat, T>::verifyEmptyVariableConstrain(
-        Mat const& tgtf,
-        IN Mat &, //variable constrain
-        Mat const& eq,
-        Mat const& leq,
-        INT rhs_idx)
+bool SIX<Mat, T>::verifyEmptyVariableConstrain(Mat const& tgtf,
+                                               IN Mat &, //variable constrain
+                                               Mat const& eq,
+                                               Mat const& leq,
+                                               INT rhs_idx)
 {
     Vector<bool> is_nonzero;
     for (INT j = 0; j < rhs_idx; j++) {
@@ -2046,15 +1988,13 @@ UINT SIX<Mat, T>::maxm(OUT T & maxv,
 //  Set the coefficient of variable in 'tgtf' to be 0 if no
 //  constraints related with it.
 template <class Mat, class T>
-void SIX<Mat, T>::reviseTargetFunc(
-        IN OUT Mat & tgtf,
-        Mat const& eq,
-        Mat const& leq,
-        INT rhs_idx)
+void SIX<Mat, T>::reviseTargetFunc(IN OUT Mat & tgtf,
+                                   Mat const& eq,
+                                   Mat const& leq,
+                                   INT rhs_idx)
 {
     Vector<bool> is_nonzero;
-    INT j;
-    for (j = 0; j < rhs_idx; j++) {
+    for (INT j = 0; j < rhs_idx; j++) {
         if (leq.getColSize() > 0 && !leq.is_colequ(j, 0)) {
             is_nonzero.set(j, true);
         }
@@ -2062,7 +2002,7 @@ void SIX<Mat, T>::reviseTargetFunc(
             is_nonzero.set(j, true);
         }
     }
-    for (j = 0; j < rhs_idx; j++) {
+    for (INT j = 0; j < rhs_idx; j++) {
         if (!is_nonzero.get(j)) {
             tgtf.set(0, j, 0);
         }
@@ -2075,77 +2015,98 @@ void SIX<Mat, T>::reviseTargetFunc(
 //
 //START MIP, Mix Integer Programming
 //
-#define IP_SUCC                       0
-#define IP_UNBOUND                    1
-#define IP_NO_PRI_FEASIBLE_SOL        2
-#define IP_NO_BETTER_THAN_BEST_SOL    3
+#define IP_SUCC 0
+#define IP_UNBOUND 1
+#define IP_NO_PRI_FEASIBLE_SOL 2
+#define IP_NO_BETTER_THAN_BEST_SOL 3
 
 template <class Mat, class T> class MIP : public Element<T> {
     bool m_is_init;
+    bool m_is_dump;
     Mat m_cur_best_sol;
     T m_cur_best_v;
     BMat * m_allow_rational_indicator;
     INT m_rhs_idx;
     UINT m_indent;
     UINT m_times;
-    UINT RecusivePart(
-            OUT T & v,
-            OUT Mat & sol,
-            Mat const& tgtf,
-            IN Mat & vc,
-            Mat const& eq,
-            Mat const& leq,
-            INT rhs_idx,
-            bool is_max,
-            bool is_bin,
-            IN INTMat & fork_count);
+    UINT RecusivePart(OUT T & v,
+                      OUT Mat & sol,
+                      Mat const& tgtf,
+                      IN Mat & vc,
+                      Mat const& eq,
+                      Mat const& leq,
+                      INT rhs_idx,
+                      bool is_max,
+                      bool is_bin,
+                      IN INTMat & fork_count);
 public:
-    MIP();
-    virtual ~MIP();
-    void init();
-    void destroy();
+    MIP(bool is_dump = false)
+    {
+        m_is_init = false;
+        m_rhs_idx = -1;
+        m_is_dump = is_dump;
+        init();
+    }
+    virtual ~MIP() { destroy(); }
+    
+    void init()
+    {
+        if (m_is_init) { return; }
+        m_cur_best_sol.init();
+        m_cur_best_v = 0;
+        m_allow_rational_indicator = NULL;
+        m_indent = 0;
+        m_times = 0;
+        m_is_init = true;
+    }
+
+    void destroy()
+    {
+        if (!m_is_init) { return; }
+        m_rhs_idx = -1;
+        m_cur_best_sol.destroy();
+        m_cur_best_v = 0;
+        m_allow_rational_indicator = NULL;
+        m_is_init = false;
+    }
+        
     void verify(Mat const& leq,
                 Mat const& eq,
                 Mat const& tgtf,
                 Mat const& vc,
                 INT rhs_idx);
-    virtual bool is_satisfying(
-                OUT UINT & row,
-                OUT UINT & col,
-                IN Mat & sol,
-                bool is_bin);
-    virtual UINT minm(
-                OUT T & minv,
-                OUT Mat & res,
-                Mat const& tgtf,
-                IN Mat & vc,
-                Mat const& eq,
-                Mat const& leq,
-                bool is_bin = false,
-                IN BMat * rational_indicator = NULL,
-                INT rhs_idx = -1); //Linear minmum solution
-    virtual UINT maxm(
-                OUT T & maxv,
-                OUT Mat & res,
-                Mat const& tgtf,
-                IN Mat & vc,
-                Mat const& eq,
-                Mat const& leq,
-                bool is_bin = false,
-                IN BMat * rational_indicator = NULL,
-                INT rhs_idx = -1); //Linear maximum solution
-    void reviseTargetFunc(
-                IN OUT Mat & tgtf,
-                Mat const& eq,
-                Mat const& leq,
-                INT rhs_idx);
+    virtual bool is_satisfying(OUT UINT & row,
+                               OUT UINT & col,
+                               IN Mat & sol,
+                               bool is_bin);
+    virtual UINT minm(OUT T & minv,
+                      OUT Mat & res,
+                      Mat const& tgtf,
+                      IN Mat & vc,
+                      Mat const& eq,
+                      Mat const& leq,
+                      bool is_bin = false,
+                      IN BMat * rational_indicator = NULL,
+                      INT rhs_idx = -1); //Linear minmum solution
+    virtual UINT maxm(OUT T & maxv,
+                      OUT Mat & res,
+                      Mat const& tgtf,
+                      IN Mat & vc,
+                      Mat const& eq,
+                      Mat const& leq,
+                      bool is_bin = false,
+                      IN BMat * rational_indicator = NULL,
+                      INT rhs_idx = -1); //Linear maximum solution
+    void reviseTargetFunc(IN OUT Mat & tgtf,
+                          Mat const& eq,
+                          Mat const& leq,
+                          INT rhs_idx);
     virtual FILE * dump_open_file();
     virtual bool dump_prt_indent(FILE * h);
-    virtual bool dump_start_six(
-                Mat const& tgtf,
-                Mat & vc,
-                Mat const& eq,
-                Mat const& leq);
+    virtual bool dump_start_six(Mat const& tgtf,
+                                Mat & vc,
+                                Mat const& eq,
+                                Mat const& leq);
     virtual bool dump_end_six(UINT status, T v, Mat & sol);
     virtual bool dump_is_satisfying();
     virtual bool dump_floor_branch(INT floor);
@@ -2153,53 +2114,13 @@ public:
 };
 
 
-template <class Mat, class T>
-MIP<Mat, T>::MIP()
-{
-    m_is_init = false;
-    m_rhs_idx = -1;
-    init();
-}
-
-
-template <class Mat, class T>
-MIP<Mat, T>::~MIP()
-{
-      destroy();
-}
-
-
-template <class Mat, class T>
-void MIP<Mat, T>::init()
-{
-    if (m_is_init) return;
-    m_cur_best_sol.init();
-    m_cur_best_v = 0;
-    m_allow_rational_indicator = NULL;
-    m_indent = 0;
-    m_times = 0;
-    m_is_init = true;
-}
-
-
-template <class Mat, class T>
-void MIP<Mat, T>::destroy()
-{
-    if (!m_is_init) return;
-
-    m_rhs_idx = -1;
-    m_cur_best_sol.destroy();
-    m_cur_best_v = 0;
-    m_allow_rational_indicator = NULL;
-    m_is_init = false;
-}
-
-
+//This function create file handler for dumpping.
 //Start dump functions
 template <class Mat, class T>
 FILE * MIP<Mat, T>::dump_open_file()
 {
-    FILE * h = fopen(SIX_DUMP_NAME, "a+");
+    if (!m_is_dump) { return NULL; }
+    FILE * h = ::fopen(SIX_DUMP_NAME, "a+");
     ASSERTN(h, ("%s create failed!!!", SIX_DUMP_NAME));
     return h;
 }
@@ -2222,13 +2143,14 @@ bool MIP<Mat, T>::dump_start_six(Mat const&, //target function
                                  Mat const&) //inequalities.
 {
     FILE * h = dump_open_file();
+    if (h == NULL) { return true; }
     if (m_times == 0) {
         fprintf(h, "\n");
     }
     dump_prt_indent(h);
     fprintf(h, "TIME=%u...\n", m_times);
     dump_prt_indent(h);
-    fprintf(h, "START SIX...\n");
+    fprintf(h, "BEGIN SIX...\n");
     fclose(h);
     return true;
 }
@@ -2238,9 +2160,11 @@ template <class Mat, class T>
 bool MIP<Mat, T>::dump_end_six(UINT status, T v, Mat & sol)
 {
     FILE * h = dump_open_file();
+    if (h == NULL) { return true; }
     StrBuf buf(32);
     dump_prt_indent(h);
-    fprintf(h, "END SIX,status=%d,v=%s,sol is {", status, v.format(buf));
+    fprintf(h, "END SIX,status=%s,target_value=%s,solution={",
+            getStatusName(status), v.format(buf));
     for (UINT i = 0; i < sol.getColSize(); i++) {
         fprintf(h, "%s,", sol.get(0, i).format(buf));
     }
@@ -2254,6 +2178,7 @@ template <class Mat, class T>
 bool MIP<Mat, T>::dump_is_satisfying()
 {
     FILE * h = dump_open_file();
+    if (h == NULL) { return true; }
     dump_prt_indent(h);
     fprintf(h, "SOL Satisfying!!! return IP_SUCC.\n");
     fclose(h);
@@ -2265,9 +2190,10 @@ template <class Mat, class T>
 bool MIP<Mat, T>::dump_floor_branch(INT floor)
 {
     FILE * h = dump_open_file();
+    if (h == NULL) { return true; }
     fprintf(h, "\n");
     dump_prt_indent(h);
-    fprintf(h, "ENTER floor(left) branch, floor value=%d\n", floor);
+    fprintf(h, "ENTER floor(left) branch, floor_value=%d\n", floor);
     fclose(h);
     return true;
 }
@@ -2277,9 +2203,10 @@ template <class Mat, class T>
 bool MIP<Mat, T>::dump_ceiling_branch(INT ceil)
 {
     FILE * h = dump_open_file();
+    if (h == NULL) { return true; }
     fprintf(h, "\n");
     dump_prt_indent(h);
-    fprintf(h, "ENTER ceiling(right) branch, ceiling value=%d\n", ceil);
+    fprintf(h, "ENTER ceiling(right) branch, ceiling_value=%d\n", ceil);
     fclose(h);
     return true;
 }
@@ -2364,9 +2291,9 @@ bool MIP<Mat, T>::is_satisfying(OUT UINT & row,
 {
     if (m_allow_rational_indicator != NULL) {
         ASSERT0(m_allow_rational_indicator->getRowSize() ==
-                 sol.getRowSize() &&
-                 m_allow_rational_indicator->getColSize() ==
-                 sol.getColSize());
+                sol.getRowSize() &&
+                m_allow_rational_indicator->getColSize() ==
+                sol.getColSize());
         for (UINT i = 0; i < sol.getRowSize(); i++) {
             for (UINT j = 0; j < sol.getColSize(); j++) {
                 T v = sol.reduce(i, j);
@@ -2405,13 +2332,12 @@ bool MIP<Mat, T>::is_satisfying(OUT UINT & row,
 
 
 template <class Mat, class T>
-void MIP<Mat, T>::reviseTargetFunc(
-        IN OUT Mat & tgtf,
-        Mat const& eq,
-        Mat const& leq,
-        INT rhs_idx)
+void MIP<Mat, T>::reviseTargetFunc(IN OUT Mat & tgtf,
+                                   Mat const& eq,
+                                   Mat const& leq,
+                                   INT rhs_idx)
 {
-    SIX<Mat, T> six;
+    SIX<Mat, T> six(0, 0xFFFFFFFF, m_is_dump);
     six.reviseTargetFunc(tgtf, eq, leq, rhs_idx);
 }
 
@@ -2420,21 +2346,19 @@ void MIP<Mat, T>::reviseTargetFunc(
 //'is_max': true refers to solve the maximum problem
 //'is_bin': true refers to solve the binary(0-1) programming
 template <class Mat, class T>
-UINT MIP<Mat, T>::RecusivePart(
-        OUT T & v,
-        OUT Mat & sol,
-        Mat const& tgtf,
-        IN Mat & vc,
-        Mat const& eq,
-        Mat const& leq,
-        INT rhs_idx,
-        bool is_max,
-        bool is_bin,
-        IN INTMat & fork_count)
+UINT MIP<Mat, T>::RecusivePart(OUT T & v,
+                               OUT Mat & sol,
+                               Mat const& tgtf,
+                               IN Mat & vc,
+                               Mat const& eq,
+                               Mat const& leq,
+                               INT rhs_idx,
+                               bool is_max,
+                               bool is_bin,
+                               IN INTMat & fork_count)
 {
     STATUS status;
-    SIX<Mat, T> six;
-    six.setParam(m_indent, 10000);
+    SIX<Mat, T> six(m_indent, 10000, m_is_dump);
     ASSERT0(dump_start_six(tgtf, vc, eq, leq));
     m_times++;
     if (is_max) {
@@ -2520,8 +2444,8 @@ UINT MIP<Mat, T>::RecusivePart(
     m_indent++;
     ASSERT0(dump_floor_branch(sol_floor));
     if (IP_SUCC == (status = RecusivePart(v, sol, tgtf, vc, teq,
-                                       tleq, rhs_idx, is_max,
-                                       is_bin, fork_count))) {
+                                          tleq, rhs_idx, is_max,
+                                          is_bin, fork_count))) {
         tmp_sol = sol;
         tmpv = v;
         if (is_max) {
@@ -2628,16 +2552,15 @@ UINT MIP<Mat, T>::RecusivePart(
 //NOTICE:
 //    The columns size of 'sol', 'tgtf', 'vc', 'eq', 'leq' must be same.
 template <class Mat, class T>
-UINT MIP<Mat, T>::maxm(
-        OUT T & maxv,
-        OUT Mat & sol,
-        Mat const& tgtf,
-        IN Mat & vc,
-        Mat const& eq,
-        Mat const& leq,
-        bool is_bin,
-        IN BMat * rational_indicator,
-        INT rhs_idx)
+UINT MIP<Mat, T>::maxm(OUT T & maxv,
+                       OUT Mat & sol,
+                       Mat const& tgtf,
+                       IN Mat & vc,
+                       Mat const& eq,
+                       Mat const& leq,
+                       bool is_bin,
+                       IN BMat * rational_indicator,
+                       INT rhs_idx)
 {
     ASSERTN(m_is_init, ("not yet initialize"));
     m_allow_rational_indicator = rational_indicator;
@@ -2673,16 +2596,15 @@ UINT MIP<Mat, T>::maxm(
 //NOTICE:
 //    The columns size of 'sol', 'tgtf', 'vc', 'eq', 'leq' must be same.
 template <class Mat, class T>
-UINT MIP<Mat, T>::minm(
-        OUT T & minv,
-        OUT Mat & sol,
-        Mat const& tgtf,
-        IN Mat & vc,
-        Mat const& eq,
-        Mat const& leq,
-        bool is_bin,
-        IN BMat * rational_indicator,
-        INT rhs_idx)
+UINT MIP<Mat, T>::minm(OUT T & minv,
+                       OUT Mat & sol,
+                       Mat const& tgtf,
+                       IN Mat & vc,
+                       Mat const& eq,
+                       Mat const& leq,
+                       bool is_bin,
+                       IN BMat * rational_indicator,
+                       INT rhs_idx)
 {
     ASSERTN(m_is_init, ("not yet initialize"));
     m_allow_rational_indicator = rational_indicator;

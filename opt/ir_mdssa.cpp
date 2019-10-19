@@ -158,7 +158,7 @@ void MDSSAMgr::dump()
     BBList * bbl = m_ru->getBBList();
     List<IR const*> lst;
     List<IR const*> opnd_lst;
-
+    UINT const indent = 2;
     g_indent = 0;
     for (IRBB * bb = bbl->get_head(); bb != NULL; bb = bbl->get_next()) {
         note("\n--- BB%d ---", BB_id(bb));
@@ -175,7 +175,9 @@ void MDSSAMgr::dump()
 
         for (IR * ir = BB_first_ir(bb);
             ir != NULL; ir = BB_next_ir(bb)) {
+            note("\n");
             dumpIR(ir, m_ru);
+            g_indent += indent;
             ir->dumpRef(m_ru, g_indent);
 
             bool parting_line = false;
@@ -185,7 +187,7 @@ void MDSSAMgr::dump()
                 ASSERT0(mdssainfo);
                 SEGIter * iter = NULL;
                 if (!parting_line) {
-                    note("\n----------------");
+                    note("\n----");
                     parting_line = true;
                 }
                 dumpIR(ir, m_ru, NULL, false);
@@ -215,7 +217,7 @@ void MDSSAMgr::dump()
                 ASSERT0(mdssainfo);
                 SEGIter * iter = NULL;
                 if (!parting_line) {
-                    note("\n----------------");
+                    note("\n----");
                     parting_line = true;
                 }
                 dumpIR(opnd, m_ru, NULL, false);
@@ -233,6 +235,7 @@ void MDSSAMgr::dump()
                     prt("MD%dV%d", vopnd->mdid(), vopnd->version());
                 }
             }
+            g_indent -= indent;
         }
     }
 

@@ -34,11 +34,9 @@ namespace xcom {
 //
 //START ZPoly
 //
-/*
-e.g: Integer Polyhedron Z=Q¡ÉL
-    domain  Q = {i,j|0<=i<=5, 0<=3j<=20}
-    lattice L = {i,j|2i+1, 3j+5|i,j¡ÊZ}
-*/
+//e.g: Integer Polyhedron Z=Q¡ÉL
+//    domain  Q = {i,j|0<=i<=5, 0<=3j<=20}
+//    lattice L = {i,j|2i+1, 3j+5|i,j¡ÊZ}
 class ZPoly {
     RMat m_domain;
     INTMat m_lattice; //an affine, invertible matrix.
@@ -48,15 +46,14 @@ public:
 //END ZPoly
 
 
-
 //
 //START Lineq
 //
 //System of Linear Inequalities and Equalities.
-#define CST_UNK       1 //unknown result of comparation of const term
-#define CST_LT        2 //less than
-#define CST_GT        3 //great than
-#define CST_EQ        4 //equal to
+#define CST_UNK 1 //unknown result of comparation of const term
+#define CST_LT 2 //less than
+#define CST_GT 3 //great than
+#define CST_EQ 4 //equal to
 
 class Lineq {
     bool m_is_init;

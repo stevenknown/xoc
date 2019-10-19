@@ -280,7 +280,10 @@ protected:
     void initKeyWordMap();
     bool isTooManyError() const { return m_err_list.get_elem_count() > 10; }
     bool isType(X_CODE code) const;
-    bool isEndOfScope() const;
+    bool isEndOfScope() const
+    { return m_lexer->getCurrentToken() == T_RLPAREN; }
+    bool isEndOfAll() const
+    { return m_lexer->getCurrentToken() == T_END; }
     bool isLabelDeclaration() const;
     bool isExp(X_CODE code);
     bool isExp();

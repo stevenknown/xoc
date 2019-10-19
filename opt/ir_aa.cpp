@@ -2972,7 +2972,7 @@ void IR_AA::dumpPtPairSet(PtPairSet & pps)
 //'dump_kid': dump kid's memory object if it exist.
 void IR_AA::dumpIRPointTo(IN IR * ir, bool dump_kid, IN MD2MDSet * mx)
 {
-    if (ir == NULL || g_tfile == NULL) return;
+    if (ir == NULL || g_tfile == NULL) { return; }
     MD const* must = getMustAddr(ir);
     MDSet const* may = getMayAddr(ir);
     if (must != NULL ||
@@ -3084,6 +3084,35 @@ void IR_AA::dumpIRPointToForBB(IRBB * bb, bool dump_kid)
                 for (IR * p = ARR_sub_list(ir); p != NULL; p = p->get_next()) {
                     dumpIRPointTo(p, true, mx);
                 }
+            }
+            break;
+        case IR_SETELEM:
+            prt("LHS:");
+            dumpIRPointTo(ir, false, mx);
+            note("\nBASE:");
+            dumpIRPointTo(SETELEM_base(ir), false, mx);
+            note("\nVALUE:");
+            dumpIRPointTo(SETELEM_val(ir), false, mx);
+            note("\nOFFSET:");
+            dumpIRPointTo(SETELEM_ofst(ir), false, mx);
+            if (dump_kid) {
+                note("\n>> MDSet DETAIL:");
+                dumpIRPointTo(SETELEM_base(ir), true, mx);
+                dumpIRPointTo(SETELEM_val(ir), true, mx);
+                dumpIRPointTo(SETELEM_ofst(ir), true, mx);
+            }
+            break;
+        case IR_GETELEM:
+            prt("LHS:");
+            dumpIRPointTo(ir, false, mx);
+            note("\nBASE:");
+            dumpIRPointTo(GETELEM_base(ir), false, mx);
+            note("\nOFFSET:");
+            dumpIRPointTo(GETELEM_ofst(ir), false, mx);
+            if (dump_kid) {
+                note("\n>> MDSet DETAIL:");
+                dumpIRPointTo(GETELEM_base(ir), true, mx);
+                dumpIRPointTo(GETELEM_ofst(ir), true, mx);
             }
             break;
         case IR_IST:

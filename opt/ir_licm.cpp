@@ -534,11 +534,10 @@ bool IR_LICM::isStmtCanBeHoisted(IR * stmt, IRBB * backedge_bb)
 }
 
 
-bool IR_LICM::hoistInvariantStmt(
-        TTab<IR*> & invariant_stmt,
-        IR * stmt,
-        IRBB * prehead,
-        IN LI<IRBB> * li)
+bool IR_LICM::hoistInvariantStmt(TTab<IR*> & invariant_stmt,
+                                 IR * stmt,
+                                 IRBB * prehead,
+                                 IN LI<IRBB> * li)
 {
     ASSERT0(stmt->getBB());
 

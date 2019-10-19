@@ -839,11 +839,10 @@ void IR_DU_MGR::computeArrayRef(
 //'ret_mds': In COMP_EXP_RECOMPUTE mode, it is used as tmp;
 //  and in COMP_EXP_COLLECT_MUST_USE mode, it is
 //  used to collect MUST-USE MD.
-void IR_DU_MGR::computeExpression(
-        IR * ir,
-        OUT MDSet * ret_mds,
-        UINT compflag,
-        UINT duflag)
+void IR_DU_MGR::computeExpression(IR * ir,
+                                  OUT MDSet * ret_mds,
+                                  UINT compflag,
+                                  UINT duflag)
 {
     if (ir == NULL) { return; }
     ASSERT0(ir->is_exp());
@@ -2503,8 +2502,8 @@ void IR_DU_MGR::inferCallAndICall(IR * ir, UINT duflag, IN MD2MDSet * mx)
             computeExpression(p, NULL, COMP_EXP_RECOMPUTE, duflag);
         }
         for (IR * p = CALL_dummyuse(ir); p != NULL; p = p->get_next()) {
-             //Analysis RefMDSet of given IR.
-             computeExpression(p, NULL, COMP_EXP_RECOMPUTE, duflag);
+            //Analysis RefMDSet of given IR.
+            computeExpression(p, NULL, COMP_EXP_RECOMPUTE, duflag);
         }
         return;
     }
@@ -3274,7 +3273,7 @@ bool IR_DU_MGR::canBeLiveExprCand(IR const* ir) const
 {
     ASSERT0(ir);
     switch (ir->getCode()) {
-	SWITCH_CASE_BIN:
+    SWITCH_CASE_BIN:
     case IR_BNOT:
     case IR_LNOT:
     case IR_NEG:
@@ -3288,10 +3287,9 @@ bool IR_DU_MGR::canBeLiveExprCand(IR const* ir) const
 
 
 //Compute generated-EXPR for BB.
-void IR_DU_MGR::computeGenForBB(
-        IRBB * bb,
-        OUT DefDBitSetCore & expr_univers,
-        DefMiscBitSetMgr & bsmgr)
+void IR_DU_MGR::computeGenForBB(IRBB * bb,
+                                OUT DefDBitSetCore & expr_univers,
+                                DefMiscBitSetMgr & bsmgr)
 {
     MDSet tmp;
     DefDBitSetCore * gen_ir_exprs = getGenIRExpr(BB_id(bb), &bsmgr);
@@ -3819,7 +3817,7 @@ bool IR_DU_MGR::checkIsLocalKillingDefForDirectAccess(
         MD const* defmd,
         MD const* usemd,
         IR const* stmt,
-        bool * has_overlapped_def)
+        bool * has_nonkilling_local_def)
 {
     if (stmt->isWriteWholePR()) {
         return true;
@@ -3828,7 +3826,7 @@ bool IR_DU_MGR::checkIsLocalKillingDefForDirectAccess(
         if (defmd == usemd || defmd->is_cover(usemd)) {
             return true;
         }
-        *has_overlapped_def = true;
+        *has_nonkilling_local_def = true;
     }
     return false;
 }
@@ -3917,16 +3915,15 @@ UINT IR_DU_MGR::checkIsLocalKillingDefForIndirectAccess(
 //    4. return g;
 //In the case, the last reference of g in stmt 4 may be defined by
 //stmt 2 or 3.
-IR const* IR_DU_MGR::findKillingLocalDef(
-            IRBB * bb,
-            xcom::C<IR*> const* ct,
-            IR const* exp,
-            MD const* expmd,
-            bool * has_overlapped_def)
+IR const* IR_DU_MGR::findKillingLocalDef(IRBB * bb,
+                                         xcom::C<IR*> const* ct,
+                                         IR const* exp,
+                                         MD const* expmd,
+                                         bool * has_local_nonkilling_def)
 {
     ASSERTN(expmd->is_exact() || exp->isReadPR(),
            ("only exact md or PR has killing-def"));
-    ASSERT0(has_overlapped_def);
+    ASSERT0(has_local_nonkilling_def);
 
     xcom::C<IR*> * localct = const_cast<C<IR*>*>(ct);
     for (IR * ir = BB_irlist(bb).get_prev(&localct);
@@ -3940,8 +3937,15 @@ IR const* IR_DU_MGR::findKillingLocalDef(
         if (defmd != NULL) {
             if (defmd == expmd || defmd->is_overlap(expmd)) {
                 if (checkIsLocalKillingDefForDirectAccess(
-                        defmd, expmd, ir, has_overlapped_def)) {
+                        defmd, expmd, ir, has_local_nonkilling_def)) {
                     return ir;
+                }
+
+                if (*has_local_nonkilling_def) {
+                    //Find an overlapped DEF that is
+                    //non-killing current expression.
+                    //Thereby, tell caller that we can not get killing def.
+                    return NULL;
                 }
 
                 UINT result = checkIsLocalKillingDefForIndirectAccess(
@@ -3976,17 +3980,18 @@ IR const* IR_DU_MGR::findKillingLocalDef(
 }
 
 
-//Build local non-killing def for exact MD within current BB.
-void IR_DU_MGR::buildLocalDUChainForNonKillingDef(
-            IRBB * bb,
-            xcom::C<IR*> const* ct,
-            IR const* exp,
-            MD const* expmd,
-            DUSet * expdu)
+//Build DU chain of local non-killing def for exact MD within current BB.
+void IR_DU_MGR::buildLocalDUChainForNonKillingDef(IRBB * bb,
+                                                  xcom::C<IR*> const* ct,
+                                                  IR const* exp,
+                                                  MD const* expmd,
+                                                  DUSet * expdu)
 {
+    ASSERT0(expmd && exp && expdu && ct && bb);
     ASSERTN(expmd->is_exact() || exp->isReadPR(),
             ("only exact md or PR has killing-def"));
 
+    IR const* nearest_def = NULL;
     xcom::C<IR*> * localct = const_cast<C<IR*>*>(ct);
     for (IR * ir = BB_irlist(bb).get_prev(&localct);
          ir != NULL; ir = BB_irlist(bb).get_prev(&localct)) {
@@ -3995,8 +4000,14 @@ void IR_DU_MGR::buildLocalDUChainForNonKillingDef(
                 ("call should not appear in local processing"));
 
         MD const* defmd = ir->getRefMD();
-        ASSERTN(defmd != expmd, ("should be processed at findKillingDef"));
-        if (defmd != NULL && defmd->is_overlap(expmd)) {
+        ASSERTN(defmd != expmd || ir != nearest_def,
+                ("should be processed at findKillingDef"));
+        if (defmd != NULL &&
+            (defmd == expmd || defmd->is_overlap(expmd))) {
+            if (nearest_def == NULL) {
+                //Record the nearest DEF to verify DU processing.
+                nearest_def = ir;
+            }
             //Stmt is exact, but that is not killing def of exp.
             ASSERT0(expdu);
             expdu->addDef(ir, *m_misc_bs_mgr);
@@ -4007,7 +4018,7 @@ void IR_DU_MGR::buildLocalDUChainForNonKillingDef(
                 m_is_init->bunion(ir->id());
                 xdu->clean(*m_misc_bs_mgr);
             }
-            xdu->addUse(exp, *m_misc_bs_mgr);
+            xdu->addUse(exp, *m_misc_bs_mgr);    
         }
     }
 }
@@ -4018,17 +4029,16 @@ void IR_DU_MGR::buildLocalDUChainForNonKillingDef(
 //non-killing but local def stmt will be scanned and processed.
 //Return true if find local killing def, otherwise means
 //there is not local killing def.
-bool IR_DU_MGR::buildLocalDUChain(
-        IRBB * bb,
-        IR const* exp,
-        MD const* expmd,
-        DUSet * expdu,
-        xcom::C<IR*> * ct,
-        bool * has_overlapped_def)
+bool IR_DU_MGR::buildLocalDUChain(IRBB * bb,
+                                  IR const* exp,
+                                  MD const* expmd,
+                                  DUSet * expdu,
+                                  xcom::C<IR*> * ct,
+                                  bool * has_local_nonkilling_def)
 {
-    ASSERT0(has_overlapped_def);
+    ASSERT0(has_local_nonkilling_def);
     IR const* nearest_def = findKillingLocalDef(bb, ct, exp, expmd,
-        has_overlapped_def);
+        has_local_nonkilling_def);
     if (nearest_def != NULL) {
         //Found local killing-def, then build exact DefUse chain.
         ASSERT0(expdu);
@@ -4043,9 +4053,6 @@ bool IR_DU_MGR::buildLocalDUChain(
         xdu->addUse(exp, *m_misc_bs_mgr);
         return true;
     }
-    //if (*has_overlapped_def) {
-    //    buildLocalDUChainForNonKillingDef(bb, ct, exp,expmd, expdu);
-    //}
     return false;
 }
 
@@ -4133,22 +4140,31 @@ void IR_DU_MGR::checkAndBuildChainForMemIR(IRBB * bb, IR * exp, xcom::C<IR*> * c
 
     MD const* expmd = getMustUse(exp);
     bool has_local_killing_def = false;
-    bool has_overlapped_def = false;
+    bool has_local_nonkilling_def = false;
     if ((expmd != NULL && expmd->is_exact()) || exp->isReadPR()) {
         //Only must-exact USE-ref has qualification to compute killing-def.
         has_local_killing_def = buildLocalDUChain(bb, exp, expmd, expdu, ct,
-            &has_overlapped_def);
+            &has_local_nonkilling_def);
     }
 
-    if (has_local_killing_def) { return; }
+    if (has_local_killing_def) {
+        //Find killing local def.
+        return;
+    }
 
     if (expmd != NULL) {
         //expmd might be either exact or inexact.
         //Find non-local/local DEF for exp/expmd.
-        checkMustMDAndBuildDUChain(exp, expmd, expdu);
+        checkMustMDAndBuildDUChainForPotentialDefList(exp, expmd, expdu);    
+        if (has_local_nonkilling_def) {
+            //Supplement DU chains for all stmt that overlapped-def exp.
+            buildLocalDUChainForNonKillingDef(bb, ct, exp, expmd, expdu);
+        }
     }
 
-    if (expmd == NULL || m_md2irs->hasIneffectDef() || has_overlapped_def) {
+    if (expmd == NULL ||
+        m_md2irs->hasIneffectDef() ||
+        has_local_nonkilling_def) {
         //If there is not MustUse of 'exp', scan MayUse is necessary to keep
         //the correctness of DU chain.
         //If has_overlapped_def is true, for the sanity of DU chain,
@@ -4369,12 +4385,12 @@ void IR_DU_MGR::checkDefSetToBuildDUChain(
 
 
 //Check and build DU chain to IR Expression accroding to MustUse MD.
-void IR_DU_MGR::checkMustMDAndBuildDUChain(
-        IR const* exp,
-        MD const* expmd,
-        DUSet * expdu)
+void IR_DU_MGR::checkMustMDAndBuildDUChainForPotentialDefList(IR const* exp,
+                                                              MD const* expmd,
+                                                              DUSet * expdu)
 {
     ASSERT0(exp && expmd && expdu);
+    ASSERT0(expmd == getMustUse(exp));
     //Get a list of stmts that contained all potential MayDef of expmd.
     DefSBitSetCore const* defset = m_md2irs->get(MD_id(expmd));
     if (defset == NULL) { return; }
@@ -4385,11 +4401,10 @@ void IR_DU_MGR::checkMustMDAndBuildDUChain(
 
 
 //Check and build DU chain to IR Expression accroding to MDSet.
-void IR_DU_MGR::checkMDSetAndBuildDUChain(
-        IR const* exp,
-        MD const* expmd,
-        MDSet const& expmds,
-        DUSet * expdu)
+void IR_DU_MGR::checkMDSetAndBuildDUChain(IR const* exp,
+                                          MD const* expmd,
+                                          MDSet const& expmds,
+                                          DUSet * expdu)
 {
     ASSERT0(expdu);
     IRBB * curbb = exp->getStmt()->getBB();
@@ -4422,7 +4437,7 @@ void IR_DU_MGR::updateDefWithMustExactMD(IR * ir, MD const* mustexact)
     MDSet const* maydef = getMayDef(ir);
     if (maydef == NULL) { return; }
 
-    SEGIter * iter;
+    SEGIter * iter = NULL;
     for (INT i = maydef->get_first(&iter);
          i >= 0; i = maydef->get_next(i, &iter)) {
         if (MD_id(mustexact) == (UINT)i) {
@@ -4479,7 +4494,7 @@ void IR_DU_MGR::updateDefWithMustEffectMD(IR * ir, MD const* musteffect)
     //ir might kill stmts which has overlapped MDSet with md.
     if (musteffect != NULL) {
         UINT mustid = MD_id(musteffect);
-        SEGIter * iter;
+        SEGIter * iter = NULL;
         for (INT i = maydef->get_first(&iter);
              i >= 0; i = maydef->get_next(i, &iter)) {
             if (mustid == (UINT)i) {
@@ -4491,7 +4506,7 @@ void IR_DU_MGR::updateDefWithMustEffectMD(IR * ir, MD const* musteffect)
             m_md2irs->append(i, ir);
         }
     } else {
-        SEGIter * iter;
+        SEGIter * iter = NULL;
         for (INT i = maydef->get_first(&iter);
              i >= 0; i = maydef->get_next(i, &iter)) {
             ASSERT0(m_md_sys->getMD(i));
@@ -4576,7 +4591,7 @@ void IR_DU_MGR::initMD2IRList(IRBB * bb)
 
         //Create the map between MD and STMT,
         //and record InEffect Definition if any.
-        SEGIter * iter;
+        SEGIter * iter = NULL;
         for (INT j = maydef->get_first(&iter);
              j != -1; j = maydef->get_next(j, &iter)) {
             if (mustdef != NULL && MD_id(mustdef) == (UINT)j) {
@@ -4601,7 +4616,7 @@ void IR_DU_MGR::initMD2IRList(IRBB * bb)
 void IR_DU_MGR::computeMDDUforBB(IN IRBB * bb, UINT flag)
 {
     initMD2IRList(bb);
-    xcom::C<IR*> * ct;
+    xcom::C<IR*> * ct = NULL;
     for (BB_irlist(bb).get_head(&ct);
          ct != BB_irlist(bb).end();
          ct = BB_irlist(bb).get_next(ct)) {
@@ -4615,7 +4630,7 @@ void IR_DU_MGR::computeMDDUforBB(IN IRBB * bb, UINT flag)
 
         //Process DEF.
         updateDef(ir, flag);
-    } //end for
+    }
 }
 
 
@@ -4650,7 +4665,8 @@ bool IR_DU_MGR::checkIsTruelyDep(IR const* def, IR const* use)
                 //them individually.
                 if (mustdef == mustuse || mustdef->is_overlap(mustuse)) {
                     ; //Do nothing.
-                } else if (maydef != NULL && maydef->is_overlap(mustuse, m_ru)) {
+                } else if (maydef != NULL &&
+                           maydef->is_overlap(mustuse, m_ru)) {
                     ; //Do nothing.
                 } else if (maydef != NULL &&
                            mayuse != NULL &&

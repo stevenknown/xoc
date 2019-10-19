@@ -768,7 +768,7 @@ bool IRParser::parseStmtList(ParseCtx * ctx)
             res = parseSwitch(ctx);
             break;
         default:
-            if (isEndOfScope()) {
+            if (isEndOfScope() || isEndOfAll()) {
                 ctx->has_phi |= has_phi;
                 ctx->has_high_level_ir |= has_high_level_ir;
                 return true;
@@ -801,12 +801,6 @@ bool IRParser::parseStmtList(ParseCtx * ctx)
     }
     UNREACHABLE();
     return true;
-}
-
-
-bool IRParser::isEndOfScope() const
-{
-    return m_lexer->getCurrentToken() == T_RLPAREN;
 }
 
 
@@ -2276,54 +2270,66 @@ bool IRParser::parseModifyPR(X_CODE code, ParseCtx * ctx)
 
     IR * ir;
     if (code == X_GETELEM) {
-        tok = m_lexer->getNextToken();
-        if (!parseExp(ctx)) {
-            return false;
-        }
-        IR * val = ctx->returned_exp;
-
-        tok = m_lexer->getCurrentToken();
-        if (tok != T_COMMA) {
-            error(tok, "miss ','");
-            return false;
-        }
-
-        tok = m_lexer->getNextToken();
-        if (!parseExp(ctx)) {
-            return false;
-        }
-        IR * offset = ctx->returned_exp;
-        ir = ctx->current_region->buildGetElem(prno, ty, val, offset);
-    } else {
+        //Parse base of getelem.
         tok = m_lexer->getNextToken();
         if (!parseExp(ctx)) {
             return false;
         }
         IR * base = ctx->returned_exp;
 
+        //Parse comma.
         tok = m_lexer->getCurrentToken();
         if (tok != T_COMMA) {
             error(tok, "miss ','");
             return false;
         }
 
+        //Parse offset of base of getelem.
+        tok = m_lexer->getNextToken();
+        if (!parseExp(ctx)) {
+            return false;
+        }
+        IR * offset = ctx->returned_exp;
+
+        //Build IR stmt.
+        ir = ctx->current_region->buildGetElem(prno, ty, base, offset);
+    } else {
+        //Parse base of setelem.
+        tok = m_lexer->getNextToken();
+        if (!parseExp(ctx)) {
+            return false;
+        }
+        IR * base = ctx->returned_exp;
+
+        //Parse comma.
+        tok = m_lexer->getCurrentToken();
+        if (tok != T_COMMA) {
+            error(tok, "miss ','");
+            return false;
+        }
+
+        //Parse value that to be set.
         tok = m_lexer->getNextToken();
         if (!parseExp(ctx)) {
             return false;
         }
         IR * val = ctx->returned_exp;
 
+        //Parse comma.
         tok = m_lexer->getCurrentToken();
         if (tok != T_COMMA) {
             error(tok, "miss ','");
             return false;
         }
-
+        
+        //Parse offset in base of setelem.
         tok = m_lexer->getNextToken();
         if (!parseExp(ctx)) {
             return false;
         }
         IR * offset = ctx->returned_exp;
+        
+        //Build IR stmt.
         ir = ctx->current_region->buildSetElem(prno, ty, base, val, offset);
     }
     ctx->addIR(ir);

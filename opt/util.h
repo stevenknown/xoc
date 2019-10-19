@@ -244,7 +244,21 @@ extern INT g_indent; //Only for dump.
 extern bool g_prt_carriage_return_for_dot; //Only for dump.
 
 void dumpIndent(FILE * h, UINT indent);
-void dumpIntVector(Vector<UINT> const& v);
+template <class T>
+void dumpVector(xcom::Vector<T> const& v, FILE * h)
+{
+    if (h == NULL) { return; }
+    fprintf(h, "\n");
+    for (INT i = 0; i <= v.get_last_idx(); i++) {
+        T x = v.get(i);
+        if (x == 0) {
+            fprintf(h, "0,");
+        } else {
+            fprintf(h, "0x%x,", x);
+        }
+    }
+    fflush(h);
+}
 
 //Get temporary memory pool handler.
 SMemPool * get_tmp_pool();

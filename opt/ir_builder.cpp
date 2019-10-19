@@ -517,6 +517,8 @@ IR * Region::buildGetElem(Type const* type, IR * base, IR * offset)
 //element of a PR.
 //'prno': target prno.
 //'type': data type of targe pr.
+//base: base of source.
+//value: value that need to be set.
 //'offset': byte offset to the start of result PR.
 //'rhs: value expected to store.
 IR * Region::buildSetElem(UINT prno,
@@ -532,6 +534,7 @@ IR * Region::buildSetElem(UINT prno,
     SETELEM_val(ir) = val;
     SETELEM_ofst(ir) = offset;
     IR_dt(ir) = type;
+    IR_parent(base) = ir;
     IR_parent(val) = ir;
     IR_parent(offset) = ir;
     return ir;

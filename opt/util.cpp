@@ -231,22 +231,6 @@ void dumpIndent(FILE * h, UINT indent)
 }
 
 
-void dumpIntVector(Vector<UINT> const& v)
-{
-    if (g_tfile == NULL) { return; }
-    note("\n");
-    for (INT i = 0; i <= v.get_last_idx(); i++) {
-        UINT x = v.get(i);
-        if (x == 0) {
-            prt("0,");
-        } else {
-            prt("0x%x,", x);
-        }
-    }
-    fflush(g_tfile);
-}
-
-
 //Integer TAB.
 class IT : public RBT<int, int> {
 public:

@@ -803,6 +803,12 @@ FIN:
 }
 
 
+//Build initial constrain.
+//e.g: if 'sign' vector indicates variable coefficient
+//is not-zero, then build greater-than inequlities to
+//i>=0, j>=0, etc.
+//Note for the sake of the xcom math library rules, we represent
+//inequality relation in form of -i<=0.
 void Lineq::initVarConstraint(Vector<INT> const& sign,
                               IN OUT RMat & vc,
                               UINT rhs_idx)
@@ -811,10 +817,11 @@ void Lineq::initVarConstraint(Vector<INT> const& sign,
     vc.reinit(nvar, nvar + 1);
     vc.setCol(rhs_idx, Rational(0));
     for (UINT i = 0; i < nvar; i++) {
-        if (sign.get(i) >= 0) {
+        if (sign.get(i) > 0) {
+            //Build -i<=0 constrain.
             vc.set(i, i, -1);
         } else {
-            //variable is unbound.
+            //current variable is unconstrained.
         }
     }
 }
@@ -858,10 +865,10 @@ bool Lineq::has_solution(RMat const& leq,
     ASSERT0(vc.getRowSize() == (UINT)num_of_var &&
             vc.getColSize() == (UINT)num_of_var + 1/*CSt*/);
     RMat res;
+    Rational v;
     if (is_int_sol) {
-        MIP<RMat, Rational> mip;
-        mip.reviseTargetFunc(tgtf, eq, leq, num_of_var);
-        Rational v;
+        MIP<RMat, Rational> mip(false);
+        mip.reviseTargetFunc(tgtf, eq, leq, num_of_var);        
         UINT st = mip.maxm(v, res, tgtf, vc, eq, leq, false, NULL, rhs_idx);
         if (st == IP_SUCC) {
             //printf("maxv is %d/%d\n", v.num(), v.den());
@@ -882,9 +889,8 @@ bool Lineq::has_solution(RMat const& leq,
         }
         return false;
     } else {
-        SIX<RMat, Rational> six;
+        SIX<RMat, Rational> six(0, 0xFFFFffff, false);
         six.reviseTargetFunc(tgtf, eq, leq, num_of_var);
-        Rational v;
         UINT st = six.maxm(v, res, tgtf, vc, eq, leq, rhs_idx);
         if (st == SIX_SUCC) {
             //printf("maxv is %d/%d\n", v.num(), v.den());
