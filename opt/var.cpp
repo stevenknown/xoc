@@ -249,8 +249,7 @@ CHAR const* VAR::dumpGR(StrBuf & buf, TypeMgr * dm) const
 {
     xcom::StrBuf buf2(32);
     xcom::StrBuf buf3(32);
-    buf.strcat("var %s:%s",
-        compositeName(VAR_name(this), buf3),
+    buf.strcat("var %s:%s", compositeName(VAR_name(this), buf3),
         dm->dump_type(getType(), buf2));
     if (hasGRFlag() || get_align() > 1) {
         buf.strcat(":(");

@@ -328,7 +328,7 @@ bool LivenessMgr::perform(OptCtx & oc)
     }
     computeGlobal();
     END_TIMER(t, getPassName());
-    if (g_is_dump_after_pass) {
+    if (g_is_dump_after_pass && g_dump_opt.isDumpLivenessMgr()) {
         dump();
     }
     return false;

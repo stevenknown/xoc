@@ -218,7 +218,7 @@ bool IR_LOOP_CVT::perform(OptCtx & oc)
 
     bool change = find_and_convert(worklst);
     if (change) {
-        if (g_is_dump_after_pass) {
+        if (g_is_dump_after_pass && g_dump_opt.isDumpLoopCVT()) {
             dumpBBList(m_ru->getBBList(), m_ru);
         }
 

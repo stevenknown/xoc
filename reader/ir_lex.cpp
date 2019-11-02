@@ -525,43 +525,35 @@ TOKEN Lexer::t_string()
                 //newline, 0xa
                 m_cur_token_string[m_cur_token_string_pos++] = '\n';
                 c = getNextChar();
-            }
-            else if (c == 't') {
+            } else if (c == 't') {
                 //horizontal tab
                 m_cur_token_string[m_cur_token_string_pos++] = '\t';
                 c = getNextChar();
-            }
-            else if (c == 'b') {
+            } else if (c == 'b') {
                 //backspace
                 m_cur_token_string[m_cur_token_string_pos++] = '\b';
                 c = getNextChar();
-            }
-            else if (c == 'r') {
+            } else if (c == 'r') {
                 //carriage return, 0xd
                 m_cur_token_string[m_cur_token_string_pos++] = '\r';
                 c = getNextChar();
-            }
-            else if (c == 'f') {
+            } else if (c == 'f') {
                 //form feed
                 m_cur_token_string[m_cur_token_string_pos++] = '\f';
                 c = getNextChar();
-            }
-            else if (c == '\\') {
+            } else if (c == '\\') {
                 //backslash
                 m_cur_token_string[m_cur_token_string_pos++] = '\\';
                 c = getNextChar();
-            }
-            else if (c == '\'') {
+            } else if (c == '\'') {
                 //single quote
                 m_cur_token_string[m_cur_token_string_pos++] = '\'';
                 c = getNextChar();
-            }
-            else if (c == '"') {
+            } else if (c == '"') {
                 //double quote
                 m_cur_token_string[m_cur_token_string_pos++] = '"';
                 c = getNextChar();
-            }
-            else if (c >= '0' && c <= '9') {
+            } else if (c >= '0' && c <= '9') {
                 //Finally, the escape \ddd consists of the backslash followed
                 //by
                 // 1. not more than 3 octal digits or
@@ -581,8 +573,7 @@ TOKEN Lexer::t_string()
                 CHAR o = (CHAR)xatoll(&m_cur_token_string[m_cur_token_string_pos],
                     true);
                 m_cur_token_string[m_cur_token_string_pos++] = o;
-            }
-            else if (c == 'x' || c == 'X' || (c >= 'a' && c <= 'f') ||
+            } else if (c == 'x' || c == 'X' || (c >= 'a' && c <= 'f') ||
                 (c >= 'A' && c <= 'Z')) {
                 //'\xdd' or '\aabb'
                 bool only_allow_two_hex = false;
@@ -600,14 +591,12 @@ TOKEN Lexer::t_string()
                     error(m_real_line_num,
                         "constant too big, only permit two hex digits");
                 }
-            }
-            else {
+            } else {
                 m_cur_token_string[m_cur_token_string_pos++] = '\\';
                 m_cur_token_string[m_cur_token_string_pos++] = c;
                 c = getNextChar();
             }
-        }
-        else {
+        } else {
             m_cur_token_string[m_cur_token_string_pos++] = c;
             c = getNextChar();
         }

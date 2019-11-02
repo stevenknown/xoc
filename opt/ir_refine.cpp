@@ -1736,7 +1736,7 @@ void Region::insertCvtForBinaryOp(IR * ir, bool & change)
     ASSERT0(ir->isBinaryOp());
     IR * op0 = BIN_opnd0(ir);
     IR * op1 = BIN_opnd1(ir);
-    if (op0->is_void() || op1->is_void()) { return; }
+    if (op0->is_any() || op1->is_any()) { return; }
 
     if (op0->getType() == op1->getType()) {
         if (op0->is_mc()) {
@@ -1869,7 +1869,7 @@ IR * Region::insertCvt(IR * parent, IR * kid, bool & change)
         {
             TypeMgr * dm = getTypeMgr();
             Type const* tgt_ty = parent->getType();
-            if (tgt_ty->is_void()) { return kid; }
+            if (tgt_ty->is_any()) { return kid; }
 
             UINT tgt_size = parent->getTypeSize(dm);
             UINT src_size = kid->getTypeSize(dm);

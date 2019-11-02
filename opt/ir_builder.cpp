@@ -233,7 +233,7 @@ IR * Region::buildSelect(
 IR * Region::buildIlabel()
 {
     IR * ir = allocIR(IR_LABEL);
-    IR_dt(ir) = getTypeMgr()->getVoid();
+    IR_dt(ir) = getTypeMgr()->getAny();
     LAB_lab(ir) = genIlabel();
     return ir;
 }
@@ -244,7 +244,7 @@ IR * Region::buildLabel(LabelInfo const* li)
 {
     ASSERT0(li && LABEL_INFO_type(li) != L_UNDEF);
     IR * ir = allocIR(IR_LABEL);
-    IR_dt(ir) = getTypeMgr()->getVoid();
+    IR_dt(ir) = getTypeMgr()->getAny();
     LAB_lab(ir) = li;
     return ir;
 }
@@ -367,7 +367,7 @@ IR * Region::buildRegion(Region * rg)
     ASSERT0(rg && !rg->is_undef());
     ASSERTN(rg->getRegionVar(), ("region should bond with a variable"));
     IR * ir = allocIR(IR_REGION);
-    IR_dt(ir) = getTypeMgr()->getVoid();
+    IR_dt(ir) = getTypeMgr()->getAny();
     REGION_ru(ir) = rg;
     REGION_parent(rg) = this;
 
@@ -392,7 +392,7 @@ IR * Region::buildIgoto(IR * vexp, IR * case_list)
     ASSERT0(case_list);
 
     IR * ir = allocIR(IR_IGOTO);
-    IR_dt(ir) = getTypeMgr()->getVoid();
+    IR_dt(ir) = getTypeMgr()->getAny();
     IGOTO_vexp(ir) = vexp;
     IGOTO_case_list(ir) = case_list;
     IR_parent(vexp) = ir;
@@ -412,7 +412,7 @@ IR * Region::buildGoto(LabelInfo const* li)
 {
     ASSERT0(li);
     IR * ir = allocIR(IR_GOTO);
-    IR_dt(ir) = getTypeMgr()->getVoid();
+    IR_dt(ir) = getTypeMgr()->getAny();
     ASSERT0(li != NULL);
     GOTO_lab(ir) = li;
     return ir;
@@ -774,7 +774,7 @@ IR * Region::buildStoreArray(IR * base,
                              IR * rhs)
 {
     ASSERT0(base && sublist && type);
-    ASSERT0(base->is_exp() && (base->is_ptr() || base->is_void()));
+    ASSERT0(base->is_exp() && (base->is_ptr() || base->is_any()));
     ASSERT0(rhs && rhs->is_exp());
     ASSERT0(allBeExp(sublist));
     CStArray * ir = (CStArray*)allocIR(IR_STARRAY);
@@ -807,7 +807,7 @@ IR * Region::buildStoreArray(IR * base,
 IR * Region::buildReturn(IR * retexp)
 {
     IR * ir = allocIR(IR_RETURN);
-    IR_dt(ir) = getTypeMgr()->getVoid();
+    IR_dt(ir) = getTypeMgr()->getAny();
     RET_exp(ir) = retexp;
     if (retexp != NULL) {
         ASSERT0(retexp->is_exp());
@@ -823,7 +823,7 @@ IR * Region::buildReturn(IR * retexp)
 IR * Region::buildContinue()
 {
     IR * ir = allocIR(IR_CONTINUE);
-    IR_dt(ir) = getTypeMgr()->getVoid();
+    IR_dt(ir) = getTypeMgr()->getAny();
     return ir;
 }
 
@@ -832,7 +832,7 @@ IR * Region::buildContinue()
 IR * Region::buildBreak()
 {
     IR * ir = allocIR(IR_BREAK);
-    IR_dt(ir) = getTypeMgr()->getVoid();
+    IR_dt(ir) = getTypeMgr()->getAny();
     return ir;
 }
 
@@ -843,7 +843,7 @@ IR * Region::buildCase(IR * casev_exp, LabelInfo const* jump_lab)
     ASSERT0(casev_exp && jump_lab);
     ASSERTN(casev_exp->is_const(), ("case value-expression must be const"));
     IR * ir = allocIR(IR_CASE);
-    IR_dt(ir) = getTypeMgr()->getVoid();
+    IR_dt(ir) = getTypeMgr()->getAny();
     CASE_lab(ir) = jump_lab;
     CASE_vexp(ir) = casev_exp;
     IR_parent(casev_exp) = ir;
@@ -874,7 +874,7 @@ IR * Region::buildDoLoop(IR * iv,
     DUMMYUSE(isReduction);
 
     IR * ir = allocIR(IR_DO_LOOP);
-    IR_dt(ir) = getTypeMgr()->getVoid();
+    IR_dt(ir) = getTypeMgr()->getAny();
 
     LOOP_iv(ir) = iv;
     IR_parent(iv) = ir;
@@ -907,7 +907,7 @@ IR * Region::buildDoWhile(IR * det, IR * loop_body)
     ASSERT0(det && det->is_judge());
 
     IR * ir = allocIR(IR_DO_WHILE);
-    IR_dt(ir) = getTypeMgr()->getVoid();
+    IR_dt(ir) = getTypeMgr()->getAny();
     LOOP_det(ir) = det;
     IR_parent(det) = ir;
 
@@ -930,7 +930,7 @@ IR * Region::buildWhileDo(IR * det, IR * loop_body)
     ASSERT0(det && det->is_judge());
 
     IR * ir = allocIR(IR_WHILE_DO);
-    IR_dt(ir) = getTypeMgr()->getVoid();
+    IR_dt(ir) = getTypeMgr()->getAny();
     LOOP_det(ir) = det;
     IR_parent(det) = ir;
 
@@ -954,7 +954,7 @@ IR * Region::buildIf(IR * det, IR * true_body, IR * false_body)
     ASSERT0(det && det->is_judge());
 
     IR * ir = allocIR(IR_IF);
-    IR_dt(ir) = getTypeMgr()->getVoid();
+    IR_dt(ir) = getTypeMgr()->getAny();
     IF_det(ir) = det;
     IR_parent(det) = ir;
 
@@ -992,7 +992,7 @@ IR * Region::buildSwitch(IR * vexp,
 {
     ASSERT0(vexp && vexp->is_exp());
     IR * ir = allocIR(IR_SWITCH);
-    IR_dt(ir) = getTypeMgr()->getVoid();
+    IR_dt(ir) = getTypeMgr()->getAny();
     SWITCH_vexp(ir) = vexp;
     SWITCH_case_list(ir) = case_list;
     SWITCH_body(ir) = body;
@@ -1026,7 +1026,7 @@ IR * Region::buildBranch(bool is_true_br, IR * det, LabelInfo const* lab)
     } else {
         ir = allocIR(IR_FALSEBR);
     }
-    IR_dt(ir) = getTypeMgr()->getVoid();
+    IR_dt(ir) = getTypeMgr()->getAny();
     BR_det(ir) = det;
     BR_lab(ir) = lab;
     IR_parent(det) = ir;
@@ -1141,7 +1141,7 @@ IR * Region::buildPointerOp(IR_TYPE irt, IR * lchild, IR * rchild)
                irt == IR_GE ||
                irt == IR_EQ ||
                irt == IR_NE, ("illegal pointer operation"));
-        ASSERTN(lchild->is_int() || lchild->is_mc() || lchild->is_void(),
+        ASSERTN(lchild->is_int() || lchild->is_mc() || lchild->is_any(),
                ("illegal pointer addend"));
         return buildPointerOp(irt, rchild, lchild);
     }

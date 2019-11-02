@@ -43,37 +43,24 @@ class IR_EXPR_TAB;
 class MDSSAMgr;
 
 //Make sure IR_ICALL is the largest ir.
-#define MAX_OFFSET_AT_FREE_TABLE    (sizeof(CICall) - sizeof(IR))
+#define MAX_OFFSET_AT_FREE_TABLE (sizeof(CICall) - sizeof(IR))
 
 #define PRNO_UNDEF 0
 
 //Analysis Instrument.
 //Record Data structure for IR analysis and transformation.
-#define ANA_INS_ru_mgr(a)    ((a)->m_ru_mgr)
-#define ANA_INS_pass_mgr(a)  ((a)->m_pass_mgr)
-#define ANA_INS_var_tab(a)   ((a)->m_ru_var_tab)
+#define ANA_INS_pass_mgr(a) ((a)->m_pass_mgr)
 class AnalysisInstrument {
 public:
     Region * m_ru;
-    UINT m_pr_count; //counter of IR_PR.
-
-    SMemPool * m_pool;
+    UINT m_pr_count; //counter of IR_PR.    
     SMemPool * m_du_pool;
     SMemPool * m_sc_labelinfo_pool;
-
     //Indicate a list of IR.
     IR * m_ir_list;
-
     List<IR const*> * m_call_list; //record CALL/ICALL in region.
-    List<IR const*> * m_return_list; //record RETURN in region.
-
-    RegionMgr * m_ru_mgr; //Region manager.
-    PassMgr * m_pass_mgr; //PASS manager.
-
-    //Record vars defined in current region,
-    //include the subregion defined variables.
-    //All LOCAL vars in the tab will be destroyed during region destruction.
-    VarTab m_ru_var_tab;
+    List<IR const*> * m_return_list; //record RETURN in region.    
+    PassMgr * m_pass_mgr; //PASS manager.    
     IR * m_free_tab[MAX_OFFSET_AT_FREE_TABLE + 1];
     Vector<VAR*> m_prno2var; //map prno to related VAR.
     Vector<IR*> m_ir_vector; //record IR which have allocated.
@@ -94,23 +81,19 @@ public:
     explicit AnalysisInstrument(Region * rg);
     COPY_CONSTRUCTOR(AnalysisInstrument);
     ~AnalysisInstrument();
-
     size_t count_mem();
-    bool verify_var(VarMgr * vm, VAR * v);
 };
 
 
 //Region referrence info.
-#define REF_INFO_maydef(ri)     ((ri)->may_def_mds)
-#define REF_INFO_mayuse(ri)     ((ri)->may_use_mds)
+#define REF_INFO_maydef(ri) ((ri)->may_def_mds)
+#define REF_INFO_mayuse(ri) ((ri)->may_use_mds)
 class RefInfo {
 public:
     MDSet may_def_mds; //Record the MD set for Region usage
     MDSet may_use_mds; //Record the MD set for Region usage
-
 public:
     COPY_CONSTRUCTOR(RefInfo);
-
     size_t count_mem()
     {
         size_t c = sizeof(RefInfo);
@@ -125,33 +108,34 @@ public:
 //START Region
 //
 //Record unique id in RegionMgr.
-#define REGION_id(r)                    ((r)->m_id)
-#define REGION_type(r)                  ((r)->m_ru_type)
-#define REGION_parent(r)                ((r)->m_parent)
+#define REGION_id(r) ((r)->m_id)
+#define REGION_type(r) ((r)->m_ru_type)
+#define REGION_parent(r) ((r)->m_parent)
+#define REGION_region_mgr(r) ((r)->m_region_mgr)
 
 //Record analysis data structure for code region.
-#define REGION_analysis_instrument(r)   ((r)->m_u1.m_ana_ins)
+#define REGION_analysis_instrument(r) ((r)->m_u1.m_ana_ins)
 
 //Record the binary data for black box region.
-#define REGION_blx_data(r)              ((r)->m_u1.m_blx_data)
+#define REGION_blackbox_data(r) ((r)->m_u1.m_blx_data)
 
 //Set to true if Region is expected to be inlined.
-#define REGION_is_expect_inline(r)      ((r)->m_u2.s1.is_expect_inline)
+#define REGION_is_expect_inline(r) ((r)->m_u2.s1.is_expect_inline)
 
 //Set to true if Region can be inlined.
-#define REGION_is_inlinable(r)          ((r)->m_u2.s1.is_inlinable)
+#define REGION_is_inlinable(r) ((r)->m_u2.s1.is_inlinable)
 
 //True value means MustDef, MayDef, MayUse are available.
-#define REGION_is_mddu_valid(r)         ((r)->m_u2.s1.is_du_valid)
+#define REGION_is_mddu_valid(r) ((r)->m_u2.s1.is_du_valid)
 
 //Record memory reference for region.
-#define REGION_refinfo(r)               ((r)->m_ref_info)
+#define REGION_refinfo(r) ((r)->m_ref_info)
 
 //True if region does not modify any memory and live-in variables which
 //include VAR and PR.
 //This property is very useful if region is a blackbox.
 //And readonly region will alleviate the burden of optimizor.
-#define REGION_is_readonly(r)            ((r)->m_u2.s1.is_readonly)
+#define REGION_is_readonly(r) ((r)->m_u2.s1.is_readonly)
 
 class Region {
 friend class RegionMgr;
@@ -161,6 +145,11 @@ protected:
         void * m_blx_data; //Black box data.
     } m_u1;
 
+    //Record vars defined in current region,
+    //include the subregion defined variables.
+    //All LOCAL vars in the tab will be destroyed during region destruction.
+    VarTab m_ru_var_tab;
+    SMemPool * m_pool;
 protected:
     void scanCallListImpl(OUT UINT & num_inner_region,
                           IR * irlst,
@@ -174,12 +163,13 @@ protected:
     bool performSimplify(OptCtx & oc);
     void HighProcessImpl(OptCtx & oc);
 
-public:
+public:        
     RefInfo * m_ref_info; //record use/def info if Region has.
     REGION_TYPE m_ru_type; //region type.
     UINT m_id; //region unique id.
     VAR * m_var; //record VAR if RU has.
     Region * m_parent; //record parent region.
+    RegionMgr * m_region_mgr; //Region manager.
     union {
         struct {
             BYTE is_expect_inline:1; //see above macro declaration.
@@ -203,9 +193,8 @@ public:
 
     void * xmalloc(UINT size)
     {
-        ASSERTN(REGION_analysis_instrument(this)->m_pool != NULL,
-               ("pool does not initialized"));
-        void * p = smpoolMalloc(size, REGION_analysis_instrument(this)->m_pool);
+        ASSERTN(m_pool != NULL, ("pool does not initialized"));
+        void * p = smpoolMalloc(size, m_pool);
         ASSERT0(p != NULL);
         ::memset(p, 0, size);
         return p;
@@ -213,8 +202,7 @@ public:
 
     //Add var which used inside current or inner Region.
     //Once the region destructing, all local vars are deleted.
-    void addToVarTab(VAR * v)
-    { REGION_analysis_instrument(this)->m_ru_var_tab.append(v); }
+    void addToVarTab(VAR * v) { m_ru_var_tab.append(v); }
 
     //Add irs into IR list of current region.
     void addToIRList(IR * irs)
@@ -371,13 +359,13 @@ public:
                     UINT result_prno,
                     Type const* type);
     IR * buildICall(IR * callee, IR * param_list)
-    { return buildICall(callee, param_list, 0, getTypeMgr()->getVoid()); }
+    { return buildICall(callee, param_list, 0, getTypeMgr()->getAny()); }
     IR * buildCall(VAR * callee,
                    IR * param_list,
                    UINT result_prno,
                    Type const* type);
     IR * buildCall(VAR * callee,  IR * param_list)
-    { return buildCall(callee, param_list, 0, getTypeMgr()->getVoid()); }
+    { return buildCall(callee, param_list, 0, getTypeMgr()->getAny()); }
 
     IR * constructIRlist(bool clean_ir_list);
     void constructBBList();
@@ -427,53 +415,38 @@ public:
         return IRTSIZE(ir->getCode());
         #endif
     }
-
     MDSystem * getMDSystem() const { return getRegionMgr()->getMDSystem(); }
     TypeMgr * getTypeMgr() const { return getRegionMgr()->getTypeMgr(); }
     TargInfo * getTargInfo() const
-    { return getRegionMgr()->getTargInfo(); }
-
-    SMemPool * get_pool() const
-    { return REGION_analysis_instrument(this)->m_pool; }
-
+    {
+        ASSERT0(getRegionMgr());
+        return getRegionMgr()->getTargInfo();
+    }
+    SMemPool * get_pool() const { return m_pool; }
     SMemPool * getSCLabelInfoPool() const
     { return REGION_analysis_instrument(this)->m_sc_labelinfo_pool; }
-
     UINT getPRCount() const
     { return REGION_analysis_instrument(this)->m_pr_count; }
-
     VAR * getRegionVar() const { return m_var; }
-
-    inline RegionMgr * getRegionMgr() const
-    {
-        ASSERT0(is_function() || is_program());
-        ASSERT0(REGION_analysis_instrument(this));
-        return ANA_INS_ru_mgr(REGION_analysis_instrument(this));
-    }
-
+    RegionMgr * getRegionMgr() const { return REGION_region_mgr(this); }
     IR * getIRList() const
     { return REGION_analysis_instrument(this)->m_ir_list; }
-
-    VarMgr * getVarMgr() const { return getRegionMgr()->getVarMgr(); }
-
-    VarTab * getVarTab() const
-    { return &REGION_analysis_instrument(this)->m_ru_var_tab; }
-
+    VarMgr * getVarMgr() const
+    {
+        ASSERT0(getRegionMgr());
+        return getRegionMgr()->getVarMgr();
+    }
+    VarTab * getVarTab() { return &m_ru_var_tab; }
     xcom::BitSetMgr * getBitSetMgr() const
     { return &REGION_analysis_instrument(this)->m_bs_mgr; }
-
     xcom::DefMiscBitSetMgr * getMiscBitSetMgr() const
     { return &REGION_analysis_instrument(this)->m_sbs_mgr; }
-
     MDSetMgr * getMDSetMgr() const
     { return &REGION_analysis_instrument(this)->m_mds_mgr; }
-
     BBList * getBBList() const
     { return &REGION_analysis_instrument(this)->m_ir_bb_list; }
-
     IRBBMgr * getBBMgr() const
     { return &REGION_analysis_instrument(this)->m_ir_bb_mgr; }
-
     //Get MDSetHash.
     MDSetHash * getMDSetHash() const
     { return &REGION_analysis_instrument(this)->m_mds_hash; }
@@ -494,7 +467,7 @@ public:
     IR_CFG * getCFG() const
     {
         return getPassMgr() != NULL ?
-                   (IR_CFG*)getPassMgr()->queryPass(PASS_CFG) : NULL;
+            (IR_CFG*)getPassMgr()->queryPass(PASS_CFG) : NULL;
     }
 
     //Get Alias Analysis.
@@ -508,14 +481,14 @@ public:
     IR_DU_MGR * getDUMgr() const
     {
         return getPassMgr() != NULL ?
-                (IR_DU_MGR*)getPassMgr()->queryPass(PASS_DU_MGR) : NULL;
+            (IR_DU_MGR*)getPassMgr()->queryPass(PASS_DU_MGR) : NULL;
     }
 
     //Return DU info manager.
     MDSSAMgr * getMDSSAMgr() const
     {
         return getPassMgr() != NULL ?
-                (MDSSAMgr*)getPassMgr()->queryPass(PASS_MD_SSA_MGR) : NULL;
+            (MDSSAMgr*)getPassMgr()->queryPass(PASS_MD_SSA_MGR) : NULL;
     }
 
     Region * getParent() const { return REGION_parent(this); }
@@ -615,7 +588,7 @@ public:
         MD md;
         MD_base(&md) = var;
 
-        if (type->is_void()) {
+        if (type->is_any()) {
             MD_ty(&md) = MD_UNBOUND;
         } else {
             MD_size(&md) = getTypeMgr()->get_bytesize(type);
@@ -791,7 +764,7 @@ public:
     bool is_function() const { return REGION_type(this) == REGION_FUNC; }
     bool is_blackbox() const { return REGION_type(this) == REGION_BLACKBOX; }
     bool is_program() const { return REGION_type(this) == REGION_PROGRAM; }
-    bool is_subregion() const { return REGION_type(this) == REGION_INNER; }
+    bool is_inner() const { return REGION_type(this) == REGION_INNER; }
     bool is_eh() const { return REGION_type(this) == REGION_EH; }
     bool is_readonly() const { return REGION_is_readonly(this); }
 
@@ -918,7 +891,7 @@ public:
     void setRegionVar(VAR * v) { m_var = v; }
     void setIRList(IR * irs)
     { REGION_analysis_instrument(this)->m_ir_list = irs; }
-    void setBlackBoxData(void * d) { REGION_blx_data(this) = d; }
+    void setBlackBoxData(void * d) { REGION_blackbox_data(this) = d; }
     IR * StrengthReduce(IN OUT IR * ir, IN OUT bool & change);
 
     //num_inner_region: count the number of inner regions.

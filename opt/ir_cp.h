@@ -79,54 +79,52 @@ private:
     MDSetMgr * m_md_set_mgr;
     TypeMgr * m_tm;
     UINT m_prop_kind;
-    bool m_is_dump_cp;
 
 private:
     bool checkTypeConsistency(IR const* ir, IR const* cand_expr) const;
 
-    bool doPropToMDPhi(
-            bool prssadu,
-            bool mdssadu,
-            IN IR const* prop_value,
-            IN IR * use,
-            MDSSAMgr * mdssamgr);
-    bool doPropToNormalStmt(
-            xcom::C<IR*> * cur_iter,
-            xcom::C<IR*> ** next_iter,
-            bool prssadu,
-            bool mdssadu,
-            IN IR const* prop_value,
-            IN IR * use,
-            IN IR * use_stmt,
-            IN IRBB * def_bb,
-            IN OUT IRBB * use_bb,
-            MDSSAMgr * mdssamgr);
+    bool doPropToMDPhi(bool prssadu,
+                       bool mdssadu,
+                       IN IR const* prop_value,
+                       IN IR * use,
+                       MDSSAMgr * mdssamgr);
+    bool doPropToNormalStmt(xcom::C<IR*> * cur_iter,
+                            xcom::C<IR*> ** next_iter,
+                            bool prssadu,
+                            bool mdssadu,
+                            IN IR const* prop_value,
+                            IN IR * use,
+                            IN IR * use_stmt,
+                            IN IRBB * def_bb,
+                            IN OUT IRBB * use_bb,
+                            MDSSAMgr * mdssamgr);
     bool doProp(IN IRBB * bb, IN DefSBitSetCore * useset, MDSSAMgr * mdssamgr);
     void doFinalRefine();
+    void dumpCopyPropagationAction(IR const* def_stmt,
+                                   IR const* prop_value,
+                                   IR const* use,
+                                   MDSSAMgr * mdssamgr);    
 
     bool isSimpCVT(IR const* ir) const;
     bool isConstCVT(IR const* ir) const;
-    bool is_available(
-            IR const* def_stmt,
-            IR const* prop_value,
-            IR * use_stmt,
-            MDPhi * use_phi,
-            IRBB * usebb);
+    bool is_available(IR const* def_stmt,
+                      IR const* prop_value,
+                      IR * use_stmt,
+                      MDPhi * use_phi,
+                      IRBB * usebb);
     inline bool isCopyOR(IR * ir) const;
 
     bool performDomTree(IN xcom::Vertex * v, IN xcom::Graph & domtree);
 
-    void replaceExp(
-            IR * exp,
-            IR const* cand_expr,
-            IN OUT CPCtx & ctx,
-            bool stmt_use_ssadu,
-            bool stmt_use_mdssadu,
-            MDSSAMgr * mdssamgr);
-    void replaceExpViaSSADu(
-            IR * exp,
-            IR const* cand_expr,
-            IN OUT CPCtx & ctx);
+    void replaceExp(IR * exp,
+                    IR const* cand_expr,
+                    IN OUT CPCtx & ctx,
+                    bool stmt_use_ssadu,
+                    bool stmt_use_mdssadu,
+                    MDSSAMgr * mdssamgr);
+    void replaceExpViaSSADu(IR * exp,
+                            IR const* cand_expr,
+                            IN OUT CPCtx & ctx);
 
 public:
     IR_CP(Region * rg)
@@ -139,8 +137,7 @@ public:
         m_md_set_mgr = rg->getMDSetMgr();
         m_tm = rg->getTypeMgr();
         ASSERT0(m_cfg && m_du && m_md_sys && m_tm && m_md_set_mgr);
-        m_prop_kind = CP_PROP_UNARY_AND_SIMPLEX;
-        m_is_dump_cp = true;
+        m_prop_kind = CP_PROP_UNARY_AND_SIMPLEX;     
     }
     COPY_CONSTRUCTOR(IR_CP);
     virtual ~IR_CP() {}
@@ -157,7 +154,7 @@ public:
             case IR_ID:
             case IR_CONST:
             case IR_PR:
-                return true;
+                return true;            
             default: return isSimpCVT(ir);
             }
         case CP_PROP_UNARY_AND_SIMPLEX:
@@ -179,19 +176,11 @@ public:
         }
         return false;
     }
-
-    void dumpCopyPropagationAction(
-        IR const* def_stmt,
-        IR const* prop_value,
-        IR const* use,
-        MDSSAMgr * mdssamgr);
-
     virtual CHAR const* getPassName() const { return "Copy Propagation"; }
     virtual PASS_TYPE getPassType() const { return PASS_CP; }
     IR const* getSimpCVTValue(IR const* ir) const;
 
     void setPropagationKind(UINT kind) { m_prop_kind = kind; }
-    void setDumpCP(bool dump) { m_is_dump_cp = dump; }
 
     virtual bool perform(OptCtx & oc);
 };

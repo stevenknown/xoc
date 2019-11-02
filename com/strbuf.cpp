@@ -96,6 +96,8 @@ void StrBuf::sprint(CHAR const* format, ...)
 }
 
 
+//This function print string according to 'format'.
+//args: a list of argument store in stack.
 void StrBuf::vsprint(CHAR const* format, va_list args)
 {
     clean();
@@ -105,6 +107,7 @@ void StrBuf::vsprint(CHAR const* format, va_list args)
 
 //The functions snprintf() and vsnprintf() do not write more than size
 //bytes (including the terminating null byte ('\0')).
+//size: the maximum possible byte size of string.
 void StrBuf::nstrcat(UINT size, CHAR const* format, ...)
 {
     va_list args;

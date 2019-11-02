@@ -56,12 +56,38 @@ public:
         ASSERT0(buf);
         buf[0] = 0;
     }
+    //Composes a string that formed by 'format'.
     void sprint(CHAR const* format, ...);
+
+    //This function print string according to 'format'.
+    //args: a list of argument store in stack.
     void vsprint(CHAR const* format, va_list args);
+
+    //Concatenate original string and new strings.
+    //Appends a copy of the source string to the current string buffer,
+    //the new string is consist of original string and the string formed
+    //by 'format'.
     void strcat(CHAR const* format, ...);
+
+    //Concatenate original string and new strings.
+    //Appends a copy of the source string to the current string buffer,
+    //the new string is consist of original string and the string formed
+    //by 'format'.
+    //size: the maximum possible byte size of string.
     void strcat(UINT l, CHAR const* format, va_list args);
+
+    //Return byte size of current string.
     size_t strlen() const { return ::strlen(buf); }
+
+    //The functions snprintf() and vsnprintf() do not write more than size
+    //bytes (including the terminating null byte ('\0')).
+    //size: the maximum possible byte size of string.
     void nstrcat(UINT size, CHAR const* format, ...);
+
+    //Concatenate original string and new strings.
+    //Appends a copy of the source string to the current string buffer,
+    //the new string is consist of original string and the string formed
+    //by 'args'.
     void vstrcat(CHAR const* format, va_list args);
 };
 

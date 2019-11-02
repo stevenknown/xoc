@@ -1857,7 +1857,7 @@ bool PRSSAMgr::construction(DomTree & domtree)
 
     stripVersionForBBList();
 
-    if (g_is_dump_after_pass) {
+    if (g_is_dump_after_pass && g_dump_opt.isDumpPRSSAMgr()) {
         START_TIMER(tdump, "PRSSA: Dump After Pass");
         dump();
         dfm.dump((xcom::DGraph&)*m_cfg);

@@ -43,7 +43,9 @@ public:
     ~ParseErrorMsg() { delete error_msg; }
 };
 
-
+#define PARSECTX_returned_imm_intval(p) ((p)->s1.u1.returned_imm_intval)
+#define PARSECTX_returned_imm_fpval(p) ((p)->s1.u1.returned_imm_fpval)
+#define PARSECTX_returned_imm_ty(p) ((p)->s1.returned_imm_ty)
 class ParseCtx {
     xcom::TMap<SYM const*, LabelInfo*> m_sym2label;
     xcom::TMap<IR*, LabelInfo*> m_ir2label;
@@ -56,6 +58,13 @@ public:
     bool has_high_level_ir;
     bool has_error;
     IR_TYPE ircode; //for temporary used
+    struct {
+        union {
+            HOST_INT returned_imm_intval;
+            HOST_FP returned_imm_fpval;
+        } u1;
+        Type const* returned_imm_ty;
+    } s1;
 
 public:
     ParseCtx()
@@ -68,6 +77,7 @@ public:
         has_high_level_ir = false;
         has_error = false;
         ircode = IR_UNDEF;
+        PARSECTX_returned_imm_ty(this) = NULL;
     }
     ~ParseCtx() {}
 
@@ -161,6 +171,8 @@ typedef enum {
     X_VAR,
     X_FUNC,
     X_PROGRAM,
+    X_INNER,
+    X_BLACKBOX,
     X_I8,
     X_U8,
     X_I16,
@@ -179,7 +191,7 @@ typedef enum {
     X_STR,
     X_VEC,
     X_BOOL,
-    X_VOID,
+    X_ANY,
     X_READONLY,
     X_TRY_START,
     X_TRY_END,
@@ -329,8 +341,11 @@ protected:
     bool parseUnaryOp(IR_TYPE code, ParseCtx * ctx);
     bool parseLd(ParseCtx * ctx);
     bool parseSignImm(TOKEN tok, ParseCtx * ctx);
-    bool parseImm(ParseCtx * ctx);
+    bool parseImmIR(ParseCtx * ctx);
+    bool parseImmVal(ParseCtx * ctx);
     bool parseFp(ParseCtx * ctx);
+    bool parseString(ParseCtx * ctx);
+    bool parseBool(ParseCtx * ctx);
     bool parsePR(ParseCtx * ctx);
     bool parseIf(ParseCtx * ctx);
     bool parseParameterList(ParseCtx * ctx);

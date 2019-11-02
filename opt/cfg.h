@@ -855,8 +855,8 @@ bool CFG<BB, XR>::removeRedundantBranch()
             //which may have dedicated usage. Do not remove it for
             //convservative purpose.
             ASSERTN(isCFGEntry(bb->id()) || isCFGExit(bb->id()) ||
-                   bb->getLabelList().get_elem_count() != 0,
-                   ("should call removeEmptyBB() first."));
+                    bb->getLabelList().get_elem_count() != 0,
+                    ("should call removeEmptyBB() first."));
             continue;
         }
 

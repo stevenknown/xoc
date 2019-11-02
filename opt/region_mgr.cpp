@@ -433,7 +433,8 @@ void RegionMgr::buildCallGraph(
 //Process function level region.
 bool RegionMgr::processFuncRegion(Region * func, OptCtx * oc)
 {
-    ASSERT0(func->is_function());
+    ASSERTN(!func->is_blackbox(),
+            ("can not generate code for blackbox region"));
     g_indent = 0;
     bool s = func->process(oc);
     tfree();

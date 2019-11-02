@@ -402,7 +402,7 @@ public:
             OUT Edge ** e2 = NULL,
             bool sort = true);
     bool is_graph_entry(Vertex const* v) const
-    { return VERTEX_in_list(v) == NULL;    }
+    { return VERTEX_in_list(v) == NULL; }
 
     //Return true if vertex is exit node of graph.
     bool is_graph_exit(Vertex const* v) const

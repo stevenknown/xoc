@@ -119,11 +119,10 @@ protected:
     }
 
     //dump_helper for SBitSetCore.
-    void dump_helper_set(
-            FILE * h,
-            SBitSetCore<BitsPerSeg> const* set,
-            UINT indent,
-            UINT id) const
+    void dump_helper_set(FILE * h,
+                         SBitSetCore<BitsPerSeg> const* set,
+                         UINT indent,
+                         UINT id) const
     {
         fprintf(h, "\n");
 

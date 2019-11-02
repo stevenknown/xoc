@@ -60,8 +60,11 @@ public:
         //Record the string will be prefix of dbx information.
         char const* prefix;
 
+        //Record the IO handler.
+        FILE * handler;
+
     public:
-        PrtCtx() { prefix = NULL; }
+        PrtCtx() { prefix = NULL; handler = NULL; }
     };
 
 public:
@@ -75,11 +78,20 @@ public:
     //Print source code line in internal stream.
     virtual void printSrcLine(IR const*, PrtCtx * ctx);
     //Print source code line in internal stream.
+    virtual void printSrcLine(StrBuf &, IR const*, PrtCtx * ctx);
+    //Print source code line in internal stream.
     virtual void printSrcLine(Dbx const*, PrtCtx *)
     {
         //Taget Dependent Code
         //Nothing to do.
     }
+    //Print source code line in StrBuf.
+    virtual void printSrcLine(StrBuf &, Dbx const*, PrtCtx *)
+    {
+        //Taget Dependent Code
+        //Nothing to do.
+    }
+
 };
 
 

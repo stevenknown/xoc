@@ -1445,7 +1445,7 @@ bool IR_GVN::perform(OptCtx & oc)
         count++;
     }
     ASSERT0(!change);
-    if (g_is_dump_after_pass) {
+    if (g_is_dump_after_pass && g_dump_opt.isDumpGVN()) {
         dump();
     }
     END_TIMER(t, getPassName());

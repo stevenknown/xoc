@@ -104,11 +104,7 @@ public:
     } u2;
 
 public:
-    OptCtx()
-    {
-        set_all_invalid();
-        u2.int1 = 0;
-    }
+    OptCtx() { set_all_invalid(); u2.int1 = 0; }
     OptCtx const& operator = (OptCtx const&);
 
     void set_all_valid() { u1.int1 = (UINT)-1; }
@@ -125,6 +121,61 @@ public:
         OC_is_loopinfo_valid(*this) = false;
     }
 };
+
+
+class DumpOpt {
+public:
+    //Dump all information.
+    //Note is_dump_all and is_dump_nothing can not all be true.
+    bool is_dump_all;
+    //Do not dump anything.
+    //Note is_dump_all and is_dump_nothing can not all be true.
+    bool is_dump_nothing;
+    bool is_dump_aa; //Dump Alias Analysis information.    
+    bool is_dump_dumgr; //Dump MD Def-Use chain built by DU Manager.    
+    bool is_dump_mdset_hash; //Dump MD Set Hash Table.   
+    bool is_dump_dom; //Dump Dom/Pdom/Idom/Pidom.
+    bool is_dump_cp; //Dump copy-propagation.
+    bool is_dump_rp; //Dump register-promotion.
+    bool is_dump_dce; //Dump dead-code-elimination.
+    bool is_dump_gvn; //Dump global-value-numbering.
+    bool is_dump_gcse; //Dump global-common-subscript-expression.
+    bool is_dump_licm; //Dump loop-invariant-code-motion.
+    bool is_dump_loopcvt; //Dump loop-convertion.
+    bool is_dump_simplification; //Dump IR simplification.
+    bool is_dump_prssamgr; //Dump PRSSAMgr.
+    bool is_dump_mdssamgr; //Dump MDSSAMgr.
+    bool is_dump_cg; //Dump CodeGeneration.
+    bool is_dump_ra; //Dump register allocation.
+    bool is_dump_memusage; //Dump memory usage.
+    bool is_dump_livenessmgr; //Dump LivenessMgr.
+
+public:    
+    DumpOpt();
+    DumpOpt const& operator = (DumpOpt const&); //Disable operator =.
+
+    bool isDumpALL() const;
+    bool isDumpNothing() const;
+    bool isDumpAA() const;
+    bool isDumpDUMgr() const;
+    bool isDumpMDSetHash() const;
+    bool isDumpDOM() const;
+    bool isDumpCP() const;
+    bool isDumpRP() const;
+    bool isDumpDCE() const;
+    bool isDumpGVN() const;
+    bool isDumpGCSE() const;
+    bool isDumpLICM() const;
+    bool isDumpLoopCVT() const;
+    bool isDumpSimp() const;
+    bool isDumpPRSSAMgr() const;
+    bool isDumpMDSSAMgr() const;
+    bool isDumpCG() const;
+    bool isDumpRA() const;
+    bool isDumpMemUsage() const;
+    bool isDumpLivenessMgr() const;
+};
+
 
 //Declare the optimization.
 typedef enum _PASS_TYPE {
@@ -178,7 +229,6 @@ extern bool g_is_hoist_type; //Hoist data type from less than INT to INT.
 extern bool g_do_ipa;
 extern bool g_do_call_graph; //Build call graph.
 extern bool g_show_time;
-extern bool g_show_memory_usage; //Show the memory usage to dump file.
 extern bool g_do_inline;
 extern UINT g_inline_threshold;
 extern bool g_is_opt_float; //Optimize float point operation.
@@ -187,7 +237,6 @@ extern bool g_is_lower_to_pr_mode; //Lower IR to PR mode.
 //Enable XOC support dynamic type.
 //That means the type of IR_ST, IR_LD, IR_STPR, IR_PR may be VOID.
 extern bool g_is_support_dynamic_type;
-
 extern bool g_do_pr_ssa; //Do optimization in SSA.
 extern bool g_do_md_ssa; //Do optimization in Memory SSA.
 extern bool g_do_cfg;
@@ -207,7 +256,6 @@ extern bool g_compute_classic_du_chain;
 extern bool g_compute_available_exp;
 extern bool g_compute_region_imported_defuse_md;
 extern bool g_do_expr_tab;
-
 extern bool g_do_dce;
 
 //Set true to eliminate control-flow-structures.
@@ -219,7 +267,6 @@ extern bool g_do_dce;
 //    }
 //Aggressive DCE will remove the above dead cycle.
 extern bool g_do_dce_aggressive;
-
 extern bool g_do_cp_aggressive; //It may cost much compile time.
 extern bool g_do_cp;
 extern bool g_do_rp;
@@ -262,15 +309,6 @@ extern UINT g_verify_level;
 //of parameters of call can be left out if the flag set to false.
 extern bool g_is_simplify_parameter;
 
-//Dump MD Set Hash Table.
-extern bool g_is_dump_mdset_hash;
-
-//Dump MD DU chain built by DU Manager.
-extern bool g_is_dump_du_chain;
-
-//Dump Alias Analysis miscellaneous info.
-extern bool g_is_dump_alias_analysis;
-
 //Dump after each pass.
 extern bool g_is_dump_after_pass;
 
@@ -280,5 +318,8 @@ extern bool g_is_dump_before_pass;
 //Set true to enable searching debug-info from expression bottom up
 //to nearest stmt.
 extern bool g_is_search_and_copy_dbx;
+
+//Record dump options for each Pass.
+extern DumpOpt g_dump_opt;
 } //namespace xoc
 #endif

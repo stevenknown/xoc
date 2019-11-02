@@ -1248,8 +1248,8 @@ IR * Region::simplifyArrayAddrExp(IR * ir, SimpCtx * ctx)
 
         if (elemnumbuf != NULL) {
             ASSERTN(elemnumbuf[dim] != 0,
-                ("Incomplete array dimension info, we need to "
-                    "know how many elements in each dimension."));
+                    ("Incomplete array dimension, we need to "
+                     "know how many elements in dimension %d.", dim));
             if (dim == 0) {
                 enumb = (UINT)elemnumbuf[dim];
             } else {
@@ -1277,14 +1277,14 @@ IR * Region::simplifyArrayAddrExp(IR * ir, SimpCtx * ctx)
     }
 
     ASSERT0(ARR_base(ir) &&
-        (ARR_base(ir)->is_ptr() || ARR_base(ir)->is_void()));
+        (ARR_base(ir)->is_ptr() || ARR_base(ir)->is_any()));
     SimpCtx tcont(*ctx);
     SIMP_ret_array_val(&tcont) = false;
     IR * newbase = simplifyExpression(ARR_base(ir), &tcont);
     ctx->appendStmt(tcont);
     ctx->unionBottomupFlag(tcont);
 
-    ASSERT0(newbase && (newbase->is_ptr() || newbase->is_void()));
+    ASSERT0(newbase && (newbase->is_ptr() || newbase->is_any()));
     ARR_base(ir) = NULL;
 
     //'array_addr' is address of an ARRAY, and it is pointer type.
@@ -2328,7 +2328,7 @@ IR * Region::simplifyStmtList(IR * ir_list, SimpCtx * ctx)
             ret_list = NULL;
         }
     }
-    if (g_is_dump_after_pass) {
+    if (g_is_dump_after_pass && g_dump_opt.isDumpSimp()) {
         g_indent = 0;
         note("\n==---- DUMP AFTER SIMPLIFY STMT LIST ----==");
         dumpIRList(ret_list, this);

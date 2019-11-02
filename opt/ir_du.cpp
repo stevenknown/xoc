@@ -1317,14 +1317,13 @@ void IR_DU_MGR::dumpMemUsageForEachSet()
 }
 
 
-
 //Dump Region's IR BB list.
 //DUMP ALL BBList DEF/USE/OVERLAP_DEF/OVERLAP_USE"
 void IR_DU_MGR::dumpRef(UINT indent)
 {
     if (g_tfile == NULL) { return; }
-    note("\n\n==---- DUMP '%s' IR_DU_MGR : DU Reference ----==\n",
-            m_ru->getRegionName());
+    note("\n\n==---- DUMP IR_DU_MGR: IR REFERENCE '%s' ----==\n",
+         m_ru->getRegionName());
     BBList * bbs = m_ru->getBBList();
     ASSERT0(bbs);
     if (bbs->get_elem_count() != 0) {
@@ -2512,7 +2511,7 @@ void IR_DU_MGR::inferCallAndICall(IR * ir, UINT duflag, IN MD2MDSet * mx)
 
     //Record MDSet that parameters pointed to as referred MDSet by call.
     for (IR * p = CALL_param_list(ir); p != NULL; p = p->get_next()) {
-        if (p->is_ptr() || p->is_void()) {
+        if (p->is_ptr() || p->is_any()) {
             //Get POINT-TO that p pointed to.
             //e.g: foo(p); where p->{x, y, z},
             //     then foo() may use {p, x, y, z}.
@@ -3888,7 +3887,7 @@ UINT IR_DU_MGR::checkIsLocalKillingDefForIndirectAccess(
         }
     }
 
-    if (exp->is_void() || stmt->is_void()) {
+    if (exp->is_any() || stmt->is_any()) {
         return CK_OVERLAP;
     }
 
@@ -4088,39 +4087,24 @@ void IR_DU_MGR::checkAndBuildChainRecursive(IRBB * bb,
         if (!HAVE_FLAG(flag, COMPUTE_PR_DU)) { return; }
         break;
     case IR_ILD:
-        checkAndBuildChainRecursive(bb, ILD_base(exp), ct, flag);
-        if (!HAVE_FLAG(flag, COMPUTE_NONPR_DU)) { return; }
-        break;
     case IR_ARRAY:
-        for (IR * sub = ARR_sub_list(exp);
-             sub != NULL; sub = sub->get_next()) {
-            checkAndBuildChainRecursive(bb, sub, ct, flag);
+    SWITCH_CASE_BIN:
+    SWITCH_CASE_UNA:
+    case IR_SELECT:
+    case IR_CASE:
+        for (UINT i = 0; i < IR_MAX_KID_NUM(exp); i++) {
+            IR * kid = exp->getKid(i);
+            if (kid == NULL) { continue; }
+            checkAndBuildChainRecursiveIRList(bb, kid, ct, flag);
         }
-        checkAndBuildChainRecursive(bb, ARR_base(exp), ct, flag);
         if (!HAVE_FLAG(flag, COMPUTE_NONPR_DU)) { return; }
         break;
     case IR_CONST:
     case IR_LDA:
     case IR_ID:
         return;
-    SWITCH_CASE_BIN:
-        checkAndBuildChainRecursive(bb, BIN_opnd0(exp), ct, flag);
-        checkAndBuildChainRecursive(bb, BIN_opnd1(exp), ct, flag);
-        return;
-    case IR_SELECT:
-        checkAndBuildChainRecursive(bb, SELECT_pred(exp), ct, flag);
-        checkAndBuildChainRecursive(bb, SELECT_trueexp(exp), ct, flag);
-        checkAndBuildChainRecursive(bb, SELECT_falseexp(exp), ct, flag);
-        return;
-    SWITCH_CASE_UNA:
-        checkAndBuildChainRecursive(bb, UNA_opnd(exp), ct, flag);
-        return;
-    case IR_CASE:
-        checkAndBuildChainRecursive(bb, CASE_vexp(exp), ct, flag);
-        return;
     default: UNREACHABLE();
     }
-
     checkAndBuildChainForMemIR(bb, exp, ct);
 }
 
@@ -4128,7 +4112,9 @@ void IR_DU_MGR::checkAndBuildChainRecursive(IRBB * bb,
 //Check memory operand and build DU chain for them.
 //Note we always find the nearest exact def, and build
 //the DU between the def and its use.
-void IR_DU_MGR::checkAndBuildChainForMemIR(IRBB * bb, IR * exp, xcom::C<IR*> * ct)
+void IR_DU_MGR::checkAndBuildChainForMemIR(IRBB * bb,
+                                           IR * exp,
+                                           xcom::C<IR*> * ct)
 {
     ASSERT0(exp && exp->is_exp());
 
@@ -4681,6 +4667,7 @@ bool IR_DU_MGR::checkIsTruelyDep(IR const* def, IR const* use)
         } else if (mayuse != NULL) {
             if (def->isCallStmt()) {
                 ASSERT0(mayuse->is_overlap_ex(mustdef, m_ru, m_md_sys) ||
+                        maydef == mayuse ||
                         (maydef != NULL && mayuse->is_intersect(*maydef)));
             } else {
                 ASSERT0(mayuse->is_overlap_ex(mustdef, m_ru, m_md_sys));
@@ -4692,7 +4679,7 @@ bool IR_DU_MGR::checkIsTruelyDep(IR const* def, IR const* use)
         if (mustuse != NULL) {
             ASSERT0(maydef->is_overlap_ex(mustuse, m_ru, m_md_sys));
         } else if (mayuse != NULL) {
-            ASSERT0(mayuse->is_intersect(*maydef));
+            ASSERT0(mayuse == maydef || mayuse->is_intersect(*maydef));
         } else {
             ASSERTN(0, ("Not a truely dependence"));
         }
@@ -5240,13 +5227,12 @@ bool IR_DU_MGR::perform(IN OUT OptCtx & oc, UINT flag)
         resetLocalAuxSet(bsmgr);
     }
 
-    if (g_is_dump_after_pass) {
-        if (g_is_dump_mdset_hash) {
+    if (g_is_dump_after_pass && g_dump_opt.isDumpDUMgr()) {
+        if (g_dump_opt.isDumpMDSetHash()) {
             m_mds_hash->dump();
         }
         dumpRef();
     }
-
     return true;
 }
 
@@ -5255,10 +5241,9 @@ bool IR_DU_MGR::perform(IN OUT OptCtx & oc, UINT flag)
 //NOTICE: Reach-Definition and Must-Def, May-Def,
 //May-Use must be avaliable.
 //retain_reach_def: true to reserve reach-def stmt set.
-void IR_DU_MGR::computeMDDUChain(
-        IN OUT OptCtx & oc,
-        bool retain_reach_def,
-        UINT duflag)
+void IR_DU_MGR::computeMDDUChain(IN OUT OptCtx & oc,
+                                 bool retain_reach_def,
+                                 UINT duflag)
 {
     if (m_ru->getBBList()->get_elem_count() == 0) { return; }
 
@@ -5307,7 +5292,7 @@ void IR_DU_MGR::computeMDDUChain(
 
     OC_is_du_chain_valid(oc) = true;
 
-    if (g_is_dump_after_pass && g_is_dump_du_chain) {
+    if (g_is_dump_after_pass && g_dump_opt.isDumpDUMgr()) {
         m_md_sys->dump(false);
         dumpDUChainDetail();
     }

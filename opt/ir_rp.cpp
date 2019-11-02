@@ -2210,7 +2210,7 @@ bool IR_RP::perform(OptCtx & oc)
     }
 
 FIN:
-    if (g_is_dump_after_pass) {
+    if (g_is_dump_after_pass && g_dump_opt.isDumpRP()) {
         dump();
     }
     //buildLifeTime();

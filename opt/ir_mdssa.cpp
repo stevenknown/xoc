@@ -1879,7 +1879,7 @@ bool MDSSAMgr::construction(DomTree & domtree)
     //Clean version stack after renaming.
     cleanMD2Stack();
 
-    if (g_is_dump_after_pass) {
+    if (g_is_dump_after_pass && g_dump_opt.isDumpMDSSAMgr()) {
         START_TIMER(tdump, "MDSSA: Dump After Pass");
         g_indent = 0;
         m_md_sys->dump(false);

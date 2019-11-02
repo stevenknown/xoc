@@ -46,130 +46,131 @@ IRDesc const g_ir_desc[] = {
     { IR_CONST,    "const",        0x0, 0, sizeof(CConst),
       IRT_IS_LEAF,},
     { IR_ID,       "id",           0x0, 0, sizeof(CId),
-      IRT_HAS_IDINFO|IRT_IS_LEAF|IRT_IS_NON_PR_MEMREF|IRT_HAS_DU,},
+      IRT_HAS_IDINFO|IRT_IS_LEAF|IRT_IS_NON_PR_MEMREF|
+      IRT_IS_MEM_OPND|IRT_HAS_DU },
     { IR_LD,       "ld",           0x0, 0, sizeof(CLd),
       IRT_HAS_IDINFO|IRT_IS_MEM_REF|IRT_IS_MEM_OPND|IRT_IS_LEAF|
-      IRT_IS_NON_PR_MEMREF|IRT_HAS_DU|IRT_HAS_OFFSET,},
+      IRT_IS_NON_PR_MEMREF|IRT_HAS_DU|IRT_HAS_OFFSET },
     { IR_ILD,      "ild",          0x1, 1, sizeof(CILd),
       IRT_IS_UNA|IRT_IS_MEM_REF|IRT_IS_MEM_OPND|
-      IRT_IS_NON_PR_MEMREF|IRT_HAS_DU|IRT_HAS_OFFSET,  },
+      IRT_IS_NON_PR_MEMREF|IRT_HAS_DU|IRT_HAS_OFFSET },
     { IR_PR,       "pr",           0x0, 0, sizeof(CPr),
-      IRT_IS_MEM_REF|IRT_IS_MEM_OPND|IRT_IS_LEAF|IRT_HAS_DU,},
+      IRT_IS_MEM_REF|IRT_IS_MEM_OPND|IRT_IS_LEAF|IRT_HAS_DU },
     { IR_ARRAY,    "array",        0x3, 2, sizeof(CArray),
       IRT_IS_MEM_REF|IRT_IS_MEM_OPND|IRT_IS_NON_PR_MEMREF|
-      IRT_HAS_DU|IRT_HAS_OFFSET, },
+      IRT_HAS_DU|IRT_HAS_OFFSET },
     { IR_ST,       "st",           0x1, 1, sizeof(CSt),
       IRT_HAS_IDINFO|IRT_IS_STMT|IRT_IS_MEM_REF|IRT_HAS_RESULT|
-      IRT_IS_STMT_IN_BB|IRT_IS_NON_PR_MEMREF|IRT_HAS_DU|IRT_HAS_OFFSET, },
+      IRT_IS_STMT_IN_BB|IRT_IS_NON_PR_MEMREF|IRT_HAS_DU|IRT_HAS_OFFSET },
     { IR_STPR,     "stpr",         0x1, 1, sizeof(CStpr),
       IRT_IS_STMT|IRT_IS_MEM_REF|IRT_HAS_RESULT|
-      IRT_IS_STMT_IN_BB|IRT_HAS_DU|IRT_WRITE_PR|IRT_WRITE_WHOLE_PR, },
+      IRT_IS_STMT_IN_BB|IRT_HAS_DU|IRT_WRITE_PR|IRT_WRITE_WHOLE_PR },
     { IR_STARRAY,  "starray",      0x7, 3, sizeof(CStArray),
       IRT_IS_STMT|IRT_IS_MEM_REF|IRT_HAS_RESULT|
-      IRT_IS_STMT_IN_BB|IRT_IS_NON_PR_MEMREF|IRT_HAS_DU|IRT_HAS_OFFSET, },
+      IRT_IS_STMT_IN_BB|IRT_IS_NON_PR_MEMREF|IRT_HAS_DU|IRT_HAS_OFFSET },
     { IR_IST,      "ist",          0x3, 2, sizeof(CISt),
       IRT_IS_STMT|IRT_IS_MEM_REF|IRT_HAS_RESULT|
-      IRT_IS_STMT_IN_BB|IRT_IS_NON_PR_MEMREF|IRT_HAS_DU|IRT_HAS_OFFSET, },
+      IRT_IS_STMT_IN_BB|IRT_IS_NON_PR_MEMREF|IRT_HAS_DU|IRT_HAS_OFFSET },
     { IR_SETELEM,  "setelem",      0x7, 3, sizeof(CSetElem),
       IRT_IS_STMT|IRT_IS_MEM_REF|IRT_HAS_RESULT|
-      IRT_IS_STMT_IN_BB|IRT_HAS_DU|IRT_WRITE_PR, },
+      IRT_IS_STMT_IN_BB|IRT_HAS_DU|IRT_WRITE_PR },
     { IR_GETELEM,  "getelem",      0x3, 2, sizeof(CGetElem),
       IRT_IS_STMT|IRT_IS_MEM_REF|IRT_HAS_RESULT|
-      IRT_IS_STMT_IN_BB|IRT_HAS_DU|IRT_WRITE_PR|IRT_WRITE_WHOLE_PR, },
+      IRT_IS_STMT_IN_BB|IRT_HAS_DU|IRT_WRITE_PR|IRT_WRITE_WHOLE_PR },
     { IR_CALL,     "call",         0x3, 2, sizeof(CCall),
       IRT_IS_STMT|IRT_IS_MEM_REF|IRT_HAS_RESULT|
-      IRT_HAS_IDINFO|IRT_IS_STMT_IN_BB|IRT_HAS_DU, }, //CALL might not def PR if
-                                                      //there is not return
-                                                      //value.
+      IRT_HAS_IDINFO|IRT_IS_STMT_IN_BB|IRT_HAS_DU }, //CALL might not def PR if
+                                                     //there is not return
+                                                     //value.
     { IR_ICALL,    "icall",        0x7, 3, sizeof(CICall),
       IRT_IS_STMT|IRT_IS_MEM_REF|IRT_HAS_RESULT|
-      IRT_IS_STMT_IN_BB|IRT_HAS_DU, }, //ICALL might not def PR if
-                                       //there is not return value.
+      IRT_IS_STMT_IN_BB|IRT_HAS_DU }, //ICALL might not def PR if
+                                      //there is not return value.
     { IR_LDA,      "lda",          0x0, 0, sizeof(CLda),
-      IRT_HAS_IDINFO|IRT_IS_UNA|IRT_IS_LEAF|IRT_HAS_OFFSET, },
+      IRT_HAS_IDINFO|IRT_IS_UNA|IRT_IS_LEAF|IRT_HAS_OFFSET },
     { IR_ADD,      "add",          0x3, 2, sizeof(CBin),
-      IRT_IS_BIN|IRT_IS_ASSOCIATIVE|IRT_IS_COMMUTATIVE, },
+      IRT_IS_BIN|IRT_IS_ASSOCIATIVE|IRT_IS_COMMUTATIVE },
     { IR_SUB,      "sub",          0x3, 2, sizeof(CBin),
-      IRT_IS_BIN|IRT_IS_ASSOCIATIVE, },
+      IRT_IS_BIN|IRT_IS_ASSOCIATIVE },
     { IR_MUL,      "mul",          0x3, 2, sizeof(CBin),
-      IRT_IS_BIN|IRT_IS_ASSOCIATIVE|IRT_IS_COMMUTATIVE, },
+      IRT_IS_BIN|IRT_IS_ASSOCIATIVE|IRT_IS_COMMUTATIVE },
     { IR_DIV,      "div",          0x3, 2, sizeof(CBin),
-      IRT_IS_BIN, },
+      IRT_IS_BIN },
     { IR_REM,      "rem",          0x3, 2, sizeof(CBin),
-      IRT_IS_BIN, },
+      IRT_IS_BIN },
     { IR_MOD,      "mod",          0x3, 2, sizeof(CBin),
-      IRT_IS_BIN, },
+      IRT_IS_BIN },
     { IR_LAND,     "land",         0x3, 2, sizeof(CBin),
-      IRT_IS_BIN|IRT_IS_LOGICAL, },
+      IRT_IS_BIN|IRT_IS_LOGICAL },
     { IR_LOR,      "lor",          0x3, 2, sizeof(CBin),
-      IRT_IS_BIN|IRT_IS_LOGICAL, },
+      IRT_IS_BIN|IRT_IS_LOGICAL },
     { IR_BAND,     "band",         0x3, 2, sizeof(CBin),
-      IRT_IS_BIN|IRT_IS_ASSOCIATIVE|IRT_IS_COMMUTATIVE, },
+      IRT_IS_BIN|IRT_IS_ASSOCIATIVE|IRT_IS_COMMUTATIVE },
     { IR_BOR,      "bor",          0x3, 2, sizeof(CBin),
-      IRT_IS_BIN|IRT_IS_ASSOCIATIVE, },
+      IRT_IS_BIN|IRT_IS_ASSOCIATIVE },
     { IR_XOR,      "xor",          0x3, 2, sizeof(CBin),
-      IRT_IS_BIN|IRT_IS_ASSOCIATIVE|IRT_IS_COMMUTATIVE,},
+      IRT_IS_BIN|IRT_IS_ASSOCIATIVE|IRT_IS_COMMUTATIVE },
     { IR_ASR,      "asr",          0x3, 2, sizeof(CBin),
-      IRT_IS_BIN, },
+      IRT_IS_BIN },
     { IR_LSR,      "lsr",          0x3, 2, sizeof(CBin),
-      IRT_IS_BIN, },
+      IRT_IS_BIN },
     { IR_LSL,      "lsl",          0x3, 2, sizeof(CBin),
-      IRT_IS_BIN, },
+      IRT_IS_BIN },
     { IR_LT,       "lt",           0x3, 2, sizeof(CBin),
-      IRT_IS_BIN|IRT_IS_RELATION, },
+      IRT_IS_BIN|IRT_IS_RELATION },
     { IR_LE,       "le",           0x3, 2, sizeof(CBin),
-      IRT_IS_BIN|IRT_IS_RELATION, },
+      IRT_IS_BIN|IRT_IS_RELATION },
     { IR_GT,       "gt",           0x3, 2, sizeof(CBin),
-      IRT_IS_BIN|IRT_IS_RELATION, },
+      IRT_IS_BIN|IRT_IS_RELATION },
     { IR_GE,       "ge",           0x3, 2, sizeof(CBin),
-      IRT_IS_BIN|IRT_IS_RELATION, },
+      IRT_IS_BIN|IRT_IS_RELATION },
     { IR_EQ,       "eq",           0x3, 2, sizeof(CBin),
-      IRT_IS_BIN|IRT_IS_ASSOCIATIVE|IRT_IS_COMMUTATIVE|IRT_IS_RELATION,},
+      IRT_IS_BIN|IRT_IS_ASSOCIATIVE|IRT_IS_COMMUTATIVE|IRT_IS_RELATION },
     { IR_NE,       "ne",           0x3, 2, sizeof(CBin),
-      IRT_IS_BIN|IRT_IS_ASSOCIATIVE|IRT_IS_COMMUTATIVE|IRT_IS_RELATION,},
+      IRT_IS_BIN|IRT_IS_ASSOCIATIVE|IRT_IS_COMMUTATIVE|IRT_IS_RELATION },
     { IR_BNOT,     "bnot",         0x1, 1, sizeof(CUna),
-      IRT_IS_UNA, },
+      IRT_IS_UNA },
     { IR_LNOT,     "lnot",         0x1, 1, sizeof(CUna),
-      IRT_IS_UNA|IRT_IS_LOGICAL, },
+      IRT_IS_UNA|IRT_IS_LOGICAL },
     { IR_NEG,      "neg",          0x1, 1, sizeof(CUna),
-      IRT_IS_UNA, },
+      IRT_IS_UNA },
     { IR_CVT,      "cvt",          0x1, 1, sizeof(CCvt),
-      IRT_IS_UNA, },
+      IRT_IS_UNA },
     { IR_GOTO,     "goto",         0x0, 0, sizeof(CGoto),
-      IRT_IS_STMT|IRT_IS_STMT_IN_BB, },
+      IRT_IS_STMT|IRT_IS_STMT_IN_BB },
     { IR_IGOTO,    "igoto",        0x3, 2, sizeof(CIGoto),
-      IRT_IS_STMT|IRT_IS_STMT_IN_BB, },
+      IRT_IS_STMT|IRT_IS_STMT_IN_BB },
     { IR_DO_WHILE, "dowhile",      0x3, 2, sizeof(CDoWhile),
-      IRT_IS_STMT, },
+      IRT_IS_STMT },
     { IR_WHILE_DO, "whiledo",      0x3, 2, sizeof(CWhileDo),
-      IRT_IS_STMT, },
+      IRT_IS_STMT },
     { IR_DO_LOOP,  "doloop",       0x1F,5, sizeof(CDoLoop),
-      IRT_IS_STMT, },
+      IRT_IS_STMT },
     { IR_IF,       "if",           0x7, 3, sizeof(CIf),
-      IRT_IS_STMT, },
+      IRT_IS_STMT },
     { IR_LABEL,    "label",        0x0, 0, sizeof(CLab),
-      IRT_IS_STMT, },
+      IRT_IS_STMT },
     { IR_SWITCH,   "switch",       0x7, 3, sizeof(CSwitch),
-      IRT_IS_STMT|IRT_IS_STMT_IN_BB, },
+      IRT_IS_STMT|IRT_IS_STMT_IN_BB },
     { IR_CASE,     "case",         0x1, 1, sizeof(CCase),
       0, },
     { IR_TRUEBR,   "truebr",       0x1, 1, sizeof(CTruebr),
-      IRT_IS_STMT|IRT_IS_STMT_IN_BB, },
+      IRT_IS_STMT|IRT_IS_STMT_IN_BB },
     { IR_FALSEBR,  "falsebr",      0x1, 1, sizeof(CFalsebr),
-      IRT_IS_STMT|IRT_IS_STMT_IN_BB, },
+      IRT_IS_STMT|IRT_IS_STMT_IN_BB },
     { IR_RETURN,   "return",       0x1, 1, sizeof(CRet),
-      IRT_IS_STMT|IRT_IS_STMT_IN_BB, },
+      IRT_IS_STMT|IRT_IS_STMT_IN_BB },
     { IR_SELECT,   "select",       0x7, 3, sizeof(CSelect),
       0, },
     { IR_BREAK,    "break",        0x0, 0, sizeof(CBreak),
-      IRT_IS_STMT, },
+      IRT_IS_STMT },
     { IR_CONTINUE, "continue",     0x0, 0, sizeof(CContinue),
-      IRT_IS_STMT, },
+      IRT_IS_STMT },
     { IR_PHI,      "phi",          0x1, 1, sizeof(CPhi),
       IRT_IS_STMT|IRT_HAS_RESULT|IRT_IS_MEM_REF|
-      IRT_IS_STMT_IN_BB|IRT_HAS_DU|IRT_WRITE_PR|IRT_WRITE_WHOLE_PR, },
+      IRT_IS_STMT_IN_BB|IRT_HAS_DU|IRT_WRITE_PR|IRT_WRITE_WHOLE_PR },
     { IR_REGION,   "region",       0x0, 0, sizeof(CRegion),
-      IRT_IS_STMT|IRT_IS_STMT_IN_BB, },
+      IRT_IS_STMT|IRT_IS_STMT_IN_BB },
     { IR_TYPE_NUM, "LAST IR Code", 0x0, 0, 0, 0, },
 };
 
@@ -642,7 +643,9 @@ void dumpIR(IR const* ir, Region const* rg, IN CHAR * attr, UINT dumpflag)
     StrBuf buf2(64);
 
     if (g_dbx_mgr != NULL && dump_src_line) {
-        g_dbx_mgr->printSrcLine(ir, NULL);
+        DbxMgr::PrtCtx prtctx;
+        prtctx.handler = g_tfile;
+        g_dbx_mgr->printSrcLine(ir, &prtctx);
     }
 
     Type const* d = NULL;
@@ -1776,9 +1779,9 @@ bool IR::verify(Region const* rg) const
     case IR_ARRAY:
         ASSERT0(d);
         ASSERT0(TY_dtype(d) != D_UNDEF);
-        ASSERT0(ARR_base(this)->is_ptr() || ARR_base(this)->is_void());
+        ASSERT0(ARR_base(this)->is_ptr() || ARR_base(this)->is_any());
         ASSERT0(ARR_elemtype(this));
-        if (ARR_ofst(this) != 0 && !ARR_elemtype(this)->is_void()) {
+        if (ARR_ofst(this) != 0 && !ARR_elemtype(this)->is_any()) {
             UINT elem_data_size = tm->get_bytesize(ARR_elemtype(this));
             UINT result_data_size = tm->get_bytesize(d);
 			DUMMYUSE(elem_data_size | result_data_size);
@@ -3379,13 +3382,14 @@ void dumpGR(IR const* ir, TypeMgr * tm, DumpGRCtx * ctx)
         ASSERT0(REGION_ru(ir));
         if (ctx != NULL && ctx->dump_inner_region) {
             //g_indent += dn;
+            ASSERT0(REGION_ru(ir));
             REGION_ru(ir)->dumpGR(ctx->dump_inner_region);
             //g_indent -= dn;
         } else {
             note("\nregion ");
             switch (REGION_type(REGION_ru(ir))) {
             case REGION_PROGRAM: prt("program "); break;
-            case REGION_BLACKBOX: prt("blx "); break;
+            case REGION_BLACKBOX: prt("blackbox "); break;
             case REGION_FUNC: prt("func "); break;
             case REGION_INNER: prt("inner "); break;
             default: ASSERT0(0); //TODO

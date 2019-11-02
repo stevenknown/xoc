@@ -45,7 +45,6 @@ AnalysisInstrument::AnalysisInstrument(Region * rg) :
     m_mds_hash(&m_mds_hash_allocator)
 {
     m_ru = rg;
-    m_ru_mgr = NULL;
     m_call_list = NULL;
     m_return_list = NULL;
     m_ir_list = NULL;
@@ -53,7 +52,6 @@ AnalysisInstrument::AnalysisInstrument(Region * rg) :
 
     //Counter of IR_PR, and do not use '0' as prno.
     m_pr_count = PRNO_UNDEF + 1;
-    m_pool = smpoolCreate(256, MEM_COMM);
     m_du_pool = smpoolCreate(sizeof(DU) * 4, MEM_CONST_SIZE);
     m_sc_labelinfo_pool = smpoolCreate(sizeof(xcom::SC<LabelInfo*>) * 4,
         MEM_CONST_SIZE);
@@ -61,19 +59,46 @@ AnalysisInstrument::AnalysisInstrument(Region * rg) :
 }
 
 
+static bool verifyVar(Region * rg, VarMgr * vm, VAR * v)
+{
+    CHECK_DUMMYUSE(v);
+    CHECK_DUMMYUSE(vm);
+    if (rg->is_function() || rg->is_eh() ||
+        REGION_type(rg) == REGION_INNER) {
+        //If var is global but unallocable, it often be
+        //used as placeholder or auxilary var.
+
+        //For these kind of regions, there are only local variable or
+        //unablable global variable is legal.
+        ASSERT0(VAR_is_local(v) || VAR_is_unallocable(v));
+    }
+    else if (rg->is_program()) {
+        //Theoretically, only global variable is legal in program region.
+        //However even if the program region there may be local
+        //variables, e.g: PR, a kind of local variable.
+        //ASSERT0(VAR_is_global(v));
+    }
+    else {
+        ASSERTN(0, ("unsupport variable type."));
+    }
+    return true;
+}
+
+
 //Free md's id and local-var's id back to MDSystem and VarMgr.
 //The index of MD and VAR is important resource if there
 //are a lot of REGIONs in RegionMgr.
 //Note this function does NOT process GLOBAL variable.
-static void destroyVARandMD(Region * rg, AnalysisInstrument * anainstr)
+static void destroyVARandMD(Region * rg)
 {
     VarMgr * varmgr = rg->getVarMgr();
     MDSystem * mdsys = rg->getMDSystem();
     VarTabIter c;
     ConstMDIter iter;
-    for (VAR * v = ANA_INS_var_tab(anainstr).get_first(c);
-         v != NULL; v = ANA_INS_var_tab(anainstr).get_next(c)) {
-        ASSERT0(anainstr->verify_var(varmgr, v));
+    VarTab * vartab = rg->getVarTab();
+    ASSERT0(vartab);
+    for (VAR * v = vartab->get_first(c); v != NULL; v = vartab->get_next(c)) {
+        ASSERT0(verifyVar(rg, varmgr, v));
         mdsys->removeMDforVAR(v, iter);
         varmgr->destroyVar(v);
     }
@@ -112,7 +137,7 @@ AnalysisInstrument::~AnalysisInstrument()
     }
 
     //Free local VAR id and related MD id, and destroy the memory.
-    destroyVARandMD(m_ru, this);
+    destroyVARandMD(m_ru);
 
     //Destroy reference info.
     if (REGION_refinfo(m_ru) != NULL) {
@@ -138,11 +163,6 @@ AnalysisInstrument::~AnalysisInstrument()
     ////////////////////////////////////////////////////////////
     //Do NOT destroy member which allocated in pool after here//
     ////////////////////////////////////////////////////////////
-
-    //Destroy all IR. IR allocated in the pool.
-    smpoolDelete(m_pool);
-    m_pool = NULL;
-
     //Destroy all DUSet which allocated in the du_pool.
     smpoolDelete(m_du_pool);
     smpoolDelete(m_sc_labelinfo_pool);
@@ -152,42 +172,14 @@ AnalysisInstrument::~AnalysisInstrument()
 }
 
 
-bool AnalysisInstrument::verify_var(VarMgr * vm, VAR * v)
-{
-    CHECK_DUMMYUSE(v);
-    CHECK_DUMMYUSE(vm);
-    if (m_ru->is_function() || m_ru->is_eh() ||
-        REGION_type(m_ru) == REGION_INNER) {
-        //If var is global but unallocable, it often be
-        //used as placeholder or auxilary var.
-
-        //For these kind of regions, there are only local variable or
-        //unablable global variable is legal.
-        ASSERT0(VAR_is_local(v) || VAR_is_unallocable(v));
-    } else if (m_ru->is_program()) {
-        //Theoretically, only global variable is legal in program region.
-        //However even if the program region there may be local
-        //variables, e.g: PR, a kind of local variable.
-        //ASSERT0(VAR_is_global(v));
-    } else {
-        ASSERTN(0, ("unsupport variable type."));
-    }
-    return true;
-}
-
-
 size_t AnalysisInstrument::count_mem()
 {
     size_t count = 0;
     if (m_call_list != NULL) {
         count += m_call_list->count_mem();
     }
-
-    count += smpoolGetPoolSize(m_pool);
     count += smpoolGetPoolSize(m_du_pool);
     count += smpoolGetPoolSize(m_sc_labelinfo_pool);
-
-    count += m_ru_var_tab.count_mem();
     count += m_ir_bb_mgr.count_mem();
     count += m_prno2var.count_mem();
     count += m_bs_mgr.count_mem();
@@ -212,69 +204,58 @@ void Region::init(REGION_TYPE rt, RegionMgr * rm)
     //REGION_is_mddu_valid(r),
     //REGION_is_readonly(r)
     m_u2.s1b1 = 0;
-
     REGION_type(this) = rt;
-    REGION_blx_data(this) = NULL;
+    REGION_blackbox_data(this) = NULL;
     m_var = NULL;
-
+    m_region_mgr = NULL;
     REGION_id(this) = 0;
     REGION_parent(this) = NULL;
     REGION_refinfo(this) = NULL;
     REGION_analysis_instrument(this) = NULL;
-
-    if (is_program() ||
-        is_function() ||
-        is_eh() ||
-        is_subregion()) {
-        //All these Region involve ir list.
+    if (is_program() || is_function() || is_eh() || is_inner()) {
+        //All these Regions could involve ir stmt list.
         REGION_analysis_instrument(this) = new AnalysisInstrument(this);
-        if (is_program() || is_function()) {
-            //All these Region involve ir list.
-            ASSERT0(rm);
-            ANA_INS_ru_mgr(REGION_analysis_instrument(this)) = rm;
-        }
     }
+    REGION_region_mgr(this) = rm;
+    m_pool = smpoolCreate(256, MEM_COMM);
 }
 
 
 void Region::destroy()
 {
     destroyPassMgr();
-
-    if ((is_subregion() ||
-         is_function() ||
-         is_eh() ||
-         is_program()) &&
+    if ((is_inner() || is_function() || is_eh() || is_program()) &&
         REGION_analysis_instrument(this) != NULL) {
         delete REGION_analysis_instrument(this);
     }
     REGION_analysis_instrument(this) = NULL;
-
-    m_var = NULL;
-
-    //MDSET would be freed by MDSetMgr.
+    //MDSET destroied by MDSetMgr.
     REGION_refinfo(this) = NULL;
     REGION_id(this) = 0;
     REGION_parent(this) = NULL;
     REGION_type(this) = REGION_UNDEF;
+    //Destroy all IR. IR allocated in the pool.
+    smpoolDelete(m_pool);
+    m_pool = NULL;
+    m_var = NULL;
 }
 
 
 size_t Region::count_mem()
 {
-    size_t count = 0;
-    if ((is_subregion() ||
-         is_function() ||
-         is_eh() ||
-         is_program()) &&
+    //Because analysis_instrument is pointer, sizeof(Region) does
+    //not contain its class size.
+    size_t count = sizeof(Region);
+    if ((is_inner() || is_function() || is_eh() || is_program()) &&
         REGION_analysis_instrument(this) != NULL) {
         count += REGION_analysis_instrument(this)->count_mem();
-        count += sizeof(*REGION_analysis_instrument(this));
     }
-
+    count += m_ru_var_tab.count_mem();
     if (m_ref_info != NULL) {
         count += m_ref_info->count_mem();
     }
+    ASSERT0(m_pool);
+    count += smpoolGetPoolSize(m_pool);
     return count;
 }
 
@@ -283,10 +264,9 @@ size_t Region::count_mem()
 //'irs': a list of ir.
 //'bbl': a list of bb.
 //'ctbb': marker current bb container.
-xcom::C<IRBB*> * Region::splitIRlistIntoBB(
-        IR * irs,
-        BBList * bbl,
-        xcom::C<IRBB*> * ctbb)
+xcom::C<IRBB*> * Region::splitIRlistIntoBB(IR * irs,
+                                           BBList * bbl,
+                                           xcom::C<IRBB*> * ctbb)
 {
     IR_CFG * cfg = getCFG();
     ASSERTN(cfg, ("CFG is not available"));
@@ -788,7 +768,7 @@ MD const* Region::genMDforPR(UINT prno, Type const* type)
     MD md;
     MD_base(&md) = pr_var; //correspond to VAR
     MD_ofst(&md) = 0;
-    if (pr_var->getType()->is_void()) {
+    if (pr_var->getType()->is_any()) {
         MD_ty(&md) = MD_UNBOUND;
     } else {
         MD_ty(&md) = MD_EXACT;
@@ -1432,8 +1412,12 @@ void Region::dumpMemUsage()
     else if (count < 1024 * 1024) { count /= 1024; str = "KB"; }
     else if (count < 1024 * 1024 * 1024) { count /= 1024 * 1024; str = "MB"; }
     else { count /= 1024 * 1024 * 1024; str = "GB"; }
-
     note("\n'%s' use %lu%s memory", getRegionName(), count, str);
+
+    if (is_blackbox()) {
+        //Blackbox does not contain stmt.
+        return;
+    }
 
     Vector<IR*> * v = getIRVec();
     UINT nid = 0;
@@ -1497,29 +1481,30 @@ void Region::dumpGR(bool dump_inner_region)
     note("\nregion ");
     switch (REGION_type(this)) {
     case REGION_PROGRAM: prt("program "); break;
-    case REGION_BLACKBOX: prt("blx "); break;
+    case REGION_BLACKBOX: prt("blackbox "); break;
     case REGION_FUNC: prt("func "); break;
-    case REGION_INNER: prt("sub "); break;
+    case REGION_INNER: prt("inner "); break;
     default: ASSERT0(0); //TODO
     }
     if (getRegionVar() != NULL) {
         xcom::StrBuf buf(32);
         prt("%s ", compositeName(getRegionVar()->get_name(), buf));
     }
-
     prt("(");
     dumpParameter();
     prt(")");
     prt(" {\n");
     g_indent += DUMP_INDENT_NUM;
     dumpVarTab();
-    DumpGRCtx ctx;
-    ctx.dump_inner_region = dump_inner_region;
-    ctx.cfg = getCFG();
-    if (getIRList() != NULL) {
-        dumpGRList(getIRList(), getTypeMgr(), &ctx);
-    } else {
-        dumpGRInBBList(getBBList(), getTypeMgr(), &ctx);
+    if (!is_blackbox()) {
+        DumpGRCtx ctx;
+        ctx.dump_inner_region = dump_inner_region;
+        ctx.cfg = getCFG();
+        if (getIRList() != NULL) {
+            dumpGRList(getIRList(), getTypeMgr(), &ctx);
+        } else {
+            dumpGRInBBList(getBBList(), getTypeMgr(), &ctx);
+        }
     }
     g_indent -= DUMP_INDENT_NUM;
     note("\n}");
@@ -1532,6 +1517,20 @@ void Region::dumpVarTab()
     if (vt->get_elem_count() == 0) { return; }
     VarTabIter c;
     StrBuf buf(64);
+    bool sort = true; //sort variable in index ascending order.
+    if (is_blackbox()) {
+        //Blackbox region does not contain SBitSetMgr field, thus
+        //it can not create SBitSet.
+        sort = false;
+    }
+    if (!sort) {
+        for (VAR * v = vt->get_first(c); v != NULL; v = vt->get_next(c)) {
+            if (v->is_formal_param() || v->is_pr()) { continue; }
+            buf.clean();
+            note("\n%s;", v->dumpGR(buf, getTypeMgr()));
+        }
+        return;
+    }
 
     //Sort var in id order.
     DefSBitSet set(getMiscBitSetMgr()->getSegMgr());
@@ -1602,13 +1601,14 @@ void Region::dump(bool dump_inner_region)
     }
 
     dumpMemUsage();
+    if (is_blackbox()) { return; }
 
     IR * irlst = getIRList();
     if (irlst != NULL) {
         note("\n==---- IR List ----==");
-		dumpIRList(irlst, this, NULL,
-			IR_DUMP_KID | IR_DUMP_SRC_LINE |
-			(dump_inner_region ? IR_DUMP_INNER_REGION : 0));
+        dumpIRList(irlst, this, NULL,
+            IR_DUMP_KID | IR_DUMP_SRC_LINE |
+            (dump_inner_region ? IR_DUMP_INNER_REGION : 0));
         return;
     }
 
@@ -2454,11 +2454,11 @@ bool Region::processIRList(OptCtx & oc)
     START_TIMER(t, "PreScan");
     prescan(getIRList());
     END_TIMER(t, "PreScan");
-	if (g_is_dump_after_pass) {
-		g_indent = 0;
-		note("\n==--- DUMP PRIMITIVE IR LIST ----==");
-		dumpIRList(getIRList(), this);
-	}
+    if (g_is_dump_after_pass && g_dump_opt.isDumpALL()) {
+        g_indent = 0;
+        note("\n==--- DUMP PRIMITIVE IR LIST ----==");
+        dumpIRList(getIRList(), this);
+    }
     if (!HighProcess(oc)) { return false; }
     ASSERT0(getDUMgr() == NULL ||
         getDUMgr()->verifyMDDUChain(COMPUTE_PR_DU|COMPUTE_NONPR_DU));
@@ -2477,7 +2477,6 @@ bool Region::process(OptCtx * oc)
 {
     ASSERTN(oc, ("Need OptCtx"));
     ASSERT0(verifyIRinRegion());
-    note("\nREGION_NAME:%s", getRegionName());
 
     if (getIRList() == NULL &&
         getBBList()->get_elem_count() == 0) {

@@ -51,7 +51,7 @@ class RegionMgr;
 #define IS_VEC(t)               ((t) == D_VEC)
 #define IS_PTR(t)               ((t) == D_PTR)
 #define IS_SIMPLEX(t)           (IS_INT(t) || IS_FP(t) || IS_BOOL(t) || \
-                                 t == D_STR || t == D_VOID)
+                                 t == D_STR || t == D_ANY)
 
 //Data Type, represented with bit length.
 //
@@ -90,7 +90,7 @@ typedef enum _DATA_TYPE {
     D_STR = 17, //String
     D_PTR = 18, //Pointer
     D_VEC = 19, //Vector
-    D_VOID = 20, //Void
+    D_ANY = 20, //Any
     D_TENSOR = 21, //Tensor
     D_LAST = 22,
     ///////////////////////////////////////////////////////////////////////////
@@ -165,8 +165,8 @@ public:
     //Return true if data type is memory chunk.
     bool is_mc() const { return TY_dtype(this) == D_MC; }
 
-    //Return true if data type is void.
-    bool is_void() const { return TY_dtype(this) == D_VOID; }
+    //Return true if data type is any.
+    bool is_any() const { return TY_dtype(this) == D_ANY; }
 
     //Return true if data type is tensor.
     bool is_tensor() const { return TY_dtype(this) == D_TENSOR; }
@@ -487,7 +487,7 @@ class TypeMgr {
     TensorTab m_tensor_type_tab;
     TypeContainer * m_simplex_type[D_LAST];
     UINT m_type_count;
-    Type const* m_void;
+    Type const* m_any;
     Type const* m_b;
     Type const* m_i8;
     Type const* m_i16;
@@ -560,7 +560,7 @@ public:
         m_f80 = getSimplexType(D_F80);
         m_f128 = getSimplexType(D_F128);
         m_str = getSimplexType(D_STR);
-        m_void = getSimplexType(D_VOID);
+        m_any = getSimplexType(D_ANY);
     }
     COPY_CONSTRUCTOR(TypeMgr);
     ~TypeMgr()
@@ -716,7 +716,7 @@ public:
     Type const* getF80() const { return m_f80; }
     Type const* getF128() const { return m_f128; }
     Type const* getString() const { return m_str; }
-    Type const* getVoid() const { return m_void; }
+    Type const* getAny() const { return m_any; }
 
     //Return tyid accroding to DATA_TYPE.
     Type const* getSimplexType(DATA_TYPE dt)
@@ -747,7 +747,7 @@ public:
         case D_F80: return m_f80;
         case D_F128: return m_f128;
         case D_STR: return m_str;
-        case D_VOID: return m_void;
+        case D_ANY: return m_any;
         default: ASSERTN(0, ("not simplex type")); break;
         }
         return 0;
@@ -834,8 +834,8 @@ public:
     //Return true if tyid is Pointer.
     bool is_ptr(UINT tyid) const { return getType(tyid)->is_pointer(); }
 
-    //Return true if tyid is Void.
-    bool is_void(UINT tyid) const { return getType(tyid)->is_void(); }
+    //Return true if tyid is Any.
+    bool is_any(UINT tyid) const { return getType(tyid)->is_any(); }
 
     //Return true if data type is Vector.
     bool is_vec(UINT tyid) const { return getType(tyid)->is_vector(); }

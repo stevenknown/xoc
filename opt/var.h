@@ -65,7 +65,7 @@ class RegionMgr;
 #define VAR_HAS_INIT_VAL         0x20   //var with initialied value.
 #define VAR_FAKE                 0x40   //var is fake
 #define VAR_IS_LABEL             0x80   //var is label.
-#define VAR_FUNC_DECL            0x100  //var is function declaration.
+#define VAR_FUNC_DECL            0x100  //var is function region declaration.
 #define VAR_IS_ARRAY             0x200  //var is array.
 #define VAR_IS_FORMAL_PARAM      0x400  //var is formal parameter.
 #define VAR_IS_SPILL             0x800  //var is spill location.
@@ -134,7 +134,7 @@ public:
 //Variable has initial value.
 #define VAR_has_init_val(v)      ((v)->u2.s1.has_init_val)
 
-//Variable is region.
+//Variable is function region.
 #define VAR_is_func_decl(v)      ((v)->u2.s1.is_func_decl)
 
 //Variable is aritifical or spurious that used to
@@ -240,10 +240,10 @@ public:
     bool is_addr_taken() const { return VAR_is_addr_taken(this); }
     bool is_pr() const { return VAR_is_pr(this); }
     bool is_restrict() const { return VAR_is_restrict(this); }
-    bool is_void() const
+    bool is_any() const
     {
         ASSERT0(VAR_type(this));
-        return VAR_type(this)->is_void();
+        return VAR_type(this)->is_any();
     }
 
     bool is_pointer() const
@@ -423,16 +423,14 @@ public:
     virtual VAR * allocVAR() { return new VAR(); }
 
     //Create a VAR.
-    VAR * registerVar(
-            CHAR const* varname,
-            Type const* type,
-            UINT align,
-            UINT flag);
-    VAR * registerVar(
-            SYM const* var_name,
-            Type const* type,
-            UINT align,
-            UINT flag);
+    VAR * registerVar(CHAR const* varname,
+                      Type const* type,
+                      UINT align,
+                      UINT flag);
+    VAR * registerVar(SYM const* var_name,
+                      Type const* type,
+                      UINT align,
+                      UINT flag);
 
     //Create a String VAR.
     VAR * registerStringVar(CHAR const* var_name, SYM const* s, UINT align);

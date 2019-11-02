@@ -288,7 +288,10 @@ void IR_CFG::initEntryAndExit(CFG_SHAPE cs)
             }
         }
     }
-
+    if (m_entry != NULL) {
+        //Already have entry BB.
+        return;
+    }
     switch (cs) {
     case C_SESE: {
         //Make sure the region has the unique entry.
@@ -1585,7 +1588,7 @@ void IR_CFG::computeDomAndIdom(IN OUT OptCtx & oc, xcom::BitSet const* uni)
 
     OC_is_dom_valid(oc) = true;
     END_TIMER(t, "Compute Dom, IDom");
-    if (g_is_dump_after_pass) {
+    if (g_is_dump_after_pass && g_dump_opt.isDumpDOM()) {
         dump_dom(g_tfile, false);
     }
 }
@@ -1644,12 +1647,10 @@ void IR_CFG::remove_xr(IRBB * bb, IR * ir)
 bool IR_CFG::performMiscOpt(OptCtx & oc)
 {
     START_TIMER(t, "CFG Optimizations");
-
     bool change = false;
     bool ck_cfg = false;
     bool lchange;
     UINT count = 0;
-
     do {
         lchange = false;
 

@@ -367,7 +367,8 @@ public:
     ~MDSet() {} //should call clean() before destruction.
 
     void bunion(MDSet const& pt, DefMiscBitSetMgr & mbsmgr);
-    void bunion(MD const* md, DefMiscBitSetMgr & mbsmgr);
+    void bunion(MD const* md, DefMiscBitSetMgr & mbsmgr)
+    { bunion(MD_id(md), mbsmgr); }
     void bunion(UINT mdid, DefMiscBitSetMgr & mbsmgr);
     void bunion_pure(UINT mdid, DefMiscBitSetMgr & m)
     { DefSBitSetCore::bunion(mdid, m); }
@@ -381,13 +382,16 @@ public:
     bool is_contain_global() const
     {
         return DefSBitSetCore::is_contain(MD_GLOBAL_VAR) ||
-               DefSBitSetCore::is_contain(MD_IMPORT_VAR) ||
-               DefSBitSetCore::is_contain(MD_FULL_MEM);
+               DefSBitSetCore::is_contain(MD_IMPORT_VAR);
+               //|| DefSBitSetCore::is_contain(MD_FULL_MEM);
     }
 
     //Return true if set contain all memory variable.
     bool is_contain_all() const
-    { return DefSBitSetCore::is_contain(MD_FULL_MEM); }
+    { 
+        //return DefSBitSetCore::is_contain(MD_FULL_MEM);
+        return false;
+    }
 
     //Return true if set contain md.
     inline bool is_contain(MD const* md) const
@@ -397,22 +401,31 @@ public:
             MD_id(md) != MD_IMPORT_VAR) {
             return true;
         }
-        if (DefSBitSetCore::is_contain(MD_FULL_MEM)) {
-            return true;
-        }
+
+        //TO BE CONFIRMED: Does it necessary to judge if either current
+        //MD or input MD is FULL_MEM?
+        //As we observed, passes that utilize MD relationship add
+        //MD2 to accroding IR's MDSet, which can keep global variables
+        //and MD2 dependence.
+        //e.g: g=10, #mustdef=MD10, maydef={MD2, MD10}, g is global variable that
+        //           #represented in Program Region.
+        //     foo(); #maydef={MD2, MD10}
+        //if (DefSBitSetCore::is_contain(MD_FULL_MEM)) {
+        //    return true;
+        //}
+
         return DefSBitSetCore::is_contain(MD_id(md));
     }
 
     //Return true if md is overlap with the elements in set.
     bool is_overlap(MD const* md, Region * current_ru) const;
 
-    //Return true if md is overlapped with element in current MDSet.
+    //Return true if md overlaps with element in current MDSet.
     //Note this function will iterate elements in set which is costly.
     //Use it carefully.
-    bool is_overlap_ex(
-            MD const* md,
-            Region * current_ru,
-            MDSystem const* mdsys) const;
+    bool is_overlap_ex(MD const* md,
+                       Region * current_ru,
+                       MDSystem const* mdsys) const;
 
     bool is_contain_inexact(MDSystem * ms) const;
     bool is_contain_only_exact_and_str(MDSystem * ms) const;
@@ -421,17 +434,27 @@ public:
     //Return true if set intersect with 'mds'.
     inline bool is_intersect(MDSet const& mds) const
     {
-        if (this == &mds) { return true; }
-        if (DefSBitSetCore::is_contain(MD_GLOBAL_VAR) &&
-            ((DefSBitSetCore&)mds).is_contain(MD_GLOBAL_VAR)) {
-            return true;
-        }
+        ASSERT0(this != &mds);
+        //Use function of base class (DefSBitSetCore) instead of.
+        //if (DefSBitSetCore::is_contain(MD_GLOBAL_VAR) &&
+        //    ((DefSBitSetCore&)mds).is_contain(MD_GLOBAL_VAR)) {
+        //    return true;
+        //}
 
-        if ((DefSBitSetCore::is_contain(MD_FULL_MEM) && !mds.is_empty()) ||
-            (((DefSBitSetCore&)mds).is_contain(MD_FULL_MEM) &&
-             !DefSBitSetCore::is_empty())) {
-            return true;
-        }
+        //TO BE CONFIRMED: Does it necessary to judge if either current
+        //MD or input MD is FULL_MEM?
+        //As we observed, passes that utilize MD relationship add
+        //MD2 to accroding IR's MDSet, which can keep global variables
+        //and MD2 dependence.
+        //e.g: g=10, #mustdef=MD10, maydef={MD2, MD10}, g is global variable that
+        //           #represented in Program Region.
+        //     foo(); #maydef={MD2, MD10}
+        //if ((DefSBitSetCore::is_contain(MD_FULL_MEM) && !mds.is_empty()) ||
+        //    (((DefSBitSetCore&)mds).is_contain(MD_FULL_MEM) &&
+        //     !DefSBitSetCore::is_empty())) {
+        //    return true;
+        //}
+
         return DefSBitSetCore::is_intersect(mds);
     }
 
@@ -450,10 +473,19 @@ public:
     {
         ASSERT0(this != &mds);
         ASSERTN(!DefSBitSetCore::is_contain(MD_FULL_MEM), ("low performance"));
-        if (((DefSBitSetCore const&)mds).is_contain(MD_FULL_MEM)) {
-            clean(m);
-            return;
-        }
+
+        //TO BE CONFIRMED: Does it necessary to judge if either current
+        //MD or input MD is FULL_MEM?
+        //As we observed, passes that utilize MD relationship add
+        //MD2 to accroding IR's MDSet, which can keep global variables
+        //and MD2 dependence.
+        //e.g: g=10, #mustdef=MD10, maydef={MD2, MD10}, g is global variable that
+        //           #represented in Program Region.
+        //     foo(); #maydef={MD2, MD10}
+        //if (((DefSBitSetCore const&)mds).is_contain(MD_FULL_MEM)) {
+        //    clean(m);
+        //    return;
+        //}
         DefSBitSetCore::diff(mds, m);
     }
     void dump(MDSystem * ms, bool detail = false) const;

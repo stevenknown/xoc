@@ -751,7 +751,7 @@ public:
     //Return true if ir's data type is memory chunk.
     bool is_mc() const { return IR_dt(this)->is_mc(); }
 
-    bool is_void() const { return IR_dt(this)->is_void(); }
+    bool is_any() const { return IR_dt(this)->is_any(); }
 
     //Return true if ir data type is signed, and the type
     //may be integer or float.

@@ -764,7 +764,7 @@ bool IR_LICM::doLoopTree(
                    insert_bb, invariant_stmt, invariant_exp);
         analysis(tli, invariant_stmt, invariant_exp);
 
-        if (g_is_dump_after_pass) {
+        if (g_is_dump_after_pass && g_dump_opt.isDumpLICM()) {
             dumpInvariantExpStmt(invariant_stmt, invariant_exp);
         }
 

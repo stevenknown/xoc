@@ -60,7 +60,7 @@ TypeDesc const g_type_desc[] = {
     {D_PTR,   "*",     BYTE_PER_POINTER * BIT_PER_BYTE}, //pointer
     {D_VEC,   "vec",   0}, //vector, default bitsize is 0
 
-    {D_VOID,  "void",  0}, //void type, default bitsize is 0
+    {D_ANY,  "void",  0}, //void type, default bitsize is 0
     {D_TENSOR, "tensor", 0}, //tensor type, default bitsize is 0
 };
 
@@ -116,7 +116,7 @@ Type const* TypeMgr::hoistDtypeForBinop(IR const* opnd0, IR const* opnd1)
 {
     Type const* d0 = opnd0->getType();
     Type const* d1 = opnd1->getType();
-    ASSERT0(!d0->is_void() && !d1->is_void());
+    ASSERT0(!d0->is_any() && !d1->is_any());
     ASSERTN(!d0->is_vector() && !d1->is_vector(),
            ("Can not hoist vector type."));
     ASSERTN(!d0->is_pointer() && !d1->is_pointer(),
@@ -472,7 +472,7 @@ UINT TypeMgr::get_bytesize(Type const* type) const
     case D_F80:
     case D_F128:
     case D_STR:
-    case D_VOID:
+    case D_ANY:
         return get_dtype_bytesize(dt);
     case D_PTR:
         return get_pointer_bytesize();
@@ -540,7 +540,7 @@ CHAR const* TypeMgr::dump_type(Type const* type, OUT StrBuf & buf)
         buf.strcat(">");
         break;
     }
-    case D_VOID:
+    case D_ANY:
         buf.strcat("%s", DTNAME(dt));
         break;
     default: UNREACHABLE();

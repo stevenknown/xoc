@@ -39,9 +39,9 @@ namespace xoc {
 class IR_CFG;
 
 //PtPair
-#define PP_id(pp)        ((pp)->id)
-#define PP_from(pp)      ((pp)->from)
-#define PP_to(pp)        ((pp)->to)
+#define PP_id(pp) ((pp)->id)
+#define PP_from(pp) ((pp)->from)
+#define PP_to(pp) ((pp)->to)
 class PtPair {
 public:
     UINT id;
@@ -56,8 +56,8 @@ typedef xcom::BitSet PtPairSet;
 
 
 //MD Addendum
-#define MDA_md(m)        ((m)->md)
-#define MDA_mds(m)       ((m)->mds)
+#define MDA_md(m) ((m)->md)
+#define MDA_mds(m) ((m)->mds)
 class MDA {
 public:
     MD const* md; //record single MD for IR such like, PR, LD, ST, ID.
@@ -133,10 +133,8 @@ class PtPairMgr {
 
     inline TMap<UINT, PtPair*> * xmalloc_tmap()
     {
-        TMap<UINT, PtPair*> * p =
-            (TMap<UINT, PtPair*>*)smpoolMallocConstSize(
-                                    sizeof(TMap<UINT, PtPair*>),
-                                    m_pool_tmap);
+        TMap<UINT, PtPair*> * p = (TMap<UINT, PtPair*>*)smpoolMallocConstSize(
+            sizeof(TMap<UINT, PtPair*>), m_pool_tmap);
         ASSERT0(p);
         ::memset(p, 0, sizeof(TMap<UINT, PtPair*>));
         return p;
@@ -226,7 +224,9 @@ public:
             //Transfer flag top down to indicate that we need
             //current function to compute the MD that the IR
             //expression may pointed to.
-            //e.g: Given (p+1), we want to know the expression pointed to.
+            //e.g: Given (p+1), we want to know the expression IR_ADD
+            //pointed to. The POINT-TO set recorded in returned_pts or parameter
+            //that used to record output MDSet.
             //Presumedly, p->&a[0], we can figure out MD that dereferencing
             //the expression *(p+1) is a[1].
             UINT comp_pt:1;
@@ -235,8 +235,9 @@ public:
     } u1;
 
     union {
-        //Transfer const MDSet bottom up to collect the point-to set
-        //while finish processing kids.
+        //Transfer hashed POINT-TO set bottom up when finish processing kids.
+        //Note inference of POINT-TO set can transfer the middle result either
+        //through 'returned_ptr' or 'mds' of parameter.
         MDSet const* returned_pts;
     } u2;
 
@@ -327,33 +328,28 @@ protected:
 
 protected:
     MD const* allocHeapobj(IR * ir);
-    MD const* assignIdMD(
-            IN IR * ir,
-            IN OUT MDSet * mds,
-            IN OUT AACtx * ic);
-    MD const* assignLoadMD(
-            IN IR * ir,
-            IN OUT MDSet * mds,
-            IN OUT AACtx * ic,
-            IN OUT MD2MDSet * mx);
-    MD const* assignPRMD(
-            IN IR * ir,
-            IN OUT MDSet * mds,
-            IN OUT AACtx * ic,
-            IN OUT MD2MDSet * mx);
+    MD const* assignIdMD(IN IR * ir,
+                         IN OUT MDSet * mds,
+                         IN OUT AACtx * ic);
+    MD const* assignLoadMD(IN IR * ir,
+                           IN OUT MDSet * mds,
+                           IN OUT AACtx * ic,
+                           IN OUT MD2MDSet * mx);
+    MD const* assignPRMD(IN IR * ir,
+                         IN OUT MDSet * mds,
+                         IN OUT AACtx * ic,
+                         IN OUT MD2MDSet * mx);
     MD const* allocStoreMD(IR * ir);
     MD const* allocIdMD(IR * ir);
     MD const* allocLoadMD(IR * ir);
     MD const* allocStringMD(SYM const* string);
 
-    void convertPT2MD2MDSet(
-            PtPairSet const& pps,
-            IN PtPairMgr & pt_pair_mgr,
-            IN OUT MD2MDSet * ctx);
-    bool convertMD2MDSet2PT(
-            OUT PtPairSet & pps,
-            IN PtPairMgr & pt_pair_mgr,
-            IN MD2MDSet * mx);
+    void convertPT2MD2MDSet(PtPairSet const& pps,
+                            IN PtPairMgr & pt_pair_mgr,
+                            IN OUT MD2MDSet * ctx);
+    bool convertMD2MDSet2PT(OUT PtPairSet & pps,
+                            IN PtPairMgr & pt_pair_mgr,
+                            IN MD2MDSet * mx);
     void convertExact2Unbound(MDSet const* src, MDSet * tgt);
 
     bool evaluateFromLda(IR const* ir);
@@ -361,74 +357,71 @@ protected:
     bool isInLoop(IR const* ir);
     bool isFlowSensitiveProperly();
     void initEntryPtset(PtPairSet ** ptset_arr);
-    void initGlobalAndParameterVarPtset(
-            VAR * v,
-            MD2MDSet * mx,
-            ConstMDIter & iter);
-    void inferPointerArith(
-            IR const* ir, IN OUT MDSet & mds,
-            IN OUT MDSet & opnd0_mds,
-            IN OUT AACtx * opnd0_ic,
-            IN OUT MD2MDSet * mx);
-    void inferStoreValue(
-            IN IR * ir,
-            IN IR * rhs,
-            MD const* lhs_md,
-            IN AACtx * ic,
-            IN MD2MDSet * mx);
-    void inferStoreArrayValue(IN IR * ir, IN AACtx * ic, IN MD2MDSet * mx);
-    void inferIStoreValue(IN IR * ir, IN AACtx * ic, IN MD2MDSet * mx);
-    void inferArrayInfinite(
-            INT ofst,
-            bool is_ofst_pred,
-            UINT md_size,
-            MDSet const& in,
-            OUT MDSet & out);
-    void inferArrayLdabase(
-            IR * ir,
-            IR * array_base,
-            bool is_ofst_pred,
-            UINT ofst,
-            OUT MDSet & mds,
-            IN OUT AACtx * ic);
-    void inferExpression(
-            IR * ir,
-            IN OUT MDSet & mds,
-            IN OUT AACtx * ic,
-            IN OUT MD2MDSet * mx);
+    void initGlobalAndParameterVarPtset(VAR * v,
+                                        MD2MDSet * mx,
+                                        ConstMDIter & iter);
+    void inferPointerArith(IR const* ir,
+                           IN OUT MDSet & mds,
+                           IN OUT MDSet & opnd0_mds,
+                           IN OUT AACtx * opnd0_ic,
+                           IN OUT MD2MDSet * mx);
+    void inferStoreValue(IR const* ir,
+                         IR * rhs,
+                         MD const* lhs_md,
+                         AACtx const* ic,
+                         IN MD2MDSet * mx);
+    void inferStoreArrayValue(IR const* ir, AACtx const* ic, IN MD2MDSet * mx);
+    void inferIStoreValue(IR const* ir, AACtx const* ic, IN MD2MDSet * mx);
+    void inferArrayInfinite(INT ofst,
+                            bool is_ofst_pred,
+                            UINT md_size,
+                            MDSet const& in,
+                            OUT MDSet & out);
+    void inferArrayLdabase(IR * ir,
+                           IR * array_base,
+                           bool is_ofst_pred,
+                           UINT ofst,
+                           OUT MDSet & mds,
+                           IN OUT AACtx * ic);
+    void inferExpression(IR * ir,
+                         IN OUT MDSet & mds,
+                         IN OUT AACtx * ic,
+                         IN OUT MD2MDSet * mx);
+    void inferArrayExpBase(IR * ir,
+                           IR * array_base,
+                           bool is_ofst_predicable,
+                           UINT ofst,
+                           OUT MDSet & mds,
+                           OUT bool * mds_is_may_pt,
+                           IN OUT AACtx * ic,
+                           IN OUT MD2MDSet * mx);
 
     void processLda(IR * ir, IN OUT MDSet & mds, IN OUT AACtx * ic);
-    void processCvt(
-            IR const* ir,
-            IN OUT MDSet & mds,
-            IN OUT AACtx * ic,
-            IN OUT MD2MDSet * mx);
-    void processGetelem(
-            IR * ir,
-            IN OUT MDSet & mds,
-            IN OUT AACtx * ic,
-            IN OUT MD2MDSet * mx);
+    void processCvt(IR const* ir,
+                    IN OUT MDSet & mds,
+                    IN OUT AACtx * ic,
+                    IN OUT MD2MDSet * mx);
+    void processGetelem(IR * ir,
+                        IN OUT MDSet & mds,
+                        IN OUT AACtx * ic,
+                        IN OUT MD2MDSet * mx);
     void processGetelem(IR * ir, IN MD2MDSet * mx);
     void processSetelem(IR * ir, IN MD2MDSet * mx);
-    void processILd(
-            IR * ir,
-            IN OUT MDSet & mds,
-            IN OUT AACtx * ic,
-            IN OUT MD2MDSet * mx);
-    void processPointerArith(
-            IR * ir,
-            IN OUT MDSet & mds,
-            IN OUT AACtx * ic,
-            IN OUT MD2MDSet * mx);
-    void processArray(
-            IR * ir,
-            IN OUT MDSet & mds,
-            IN OUT AACtx * ic,
-            IN OUT MD2MDSet * mx);
-    void processConst(
-            IR * ir,
-            IN OUT MDSet & mds,
-            IN OUT AACtx * ic);
+    void processILd(IR * ir,
+                    IN OUT MDSet & mds,
+                    IN OUT AACtx * ic,
+                    IN OUT MD2MDSet * mx);
+    void processPointerArith(IR * ir,
+                             IN OUT MDSet & mds,
+                             IN OUT AACtx * ic,
+                             IN OUT MD2MDSet * mx);
+    void processArray(IR * ir,
+                      IN OUT MDSet & mds,
+                      IN OUT AACtx * ic,
+                      IN OUT MD2MDSet * mx);
+    void processConst(IR * ir,
+                      IN OUT MDSet & mds,
+                      IN OUT AACtx * ic);
     void processStore(IN IR * ir, IN OUT MD2MDSet * mx);
     void processStorePR(IN IR * ir, IN MD2MDSet * mx);
     void processISt(IN IR * ir, IN OUT MD2MDSet * mx);
@@ -439,27 +432,30 @@ protected:
     void processReturn(IN IR * ir, IN MD2MDSet * mx);
     void processRegionSideeffect(IN OUT MD2MDSet & mx);
     void processRegion(IR const* ir, IN MD2MDSet * mx);
-    void inferArrayExpBase(
-            IR * ir,
-            IR * array_base,
-            bool is_ofst_predicable,
-            UINT ofst,
-            OUT MDSet & mds,
-            OUT bool * mds_is_may_pt,
-            IN OUT AACtx * ic,
-            IN OUT MD2MDSet * mx);
+
+    //This function set MustAddr or MayAddr of ir by analyszing given MDSet.
+    //mds: mds may be the MayAddr MDSet. Note mds should have been hashed.
+    void setMustOrMayAddr(MDSet const* mds, IR * ir);
 
     bool tryReshapeMDSet(MDSet const* mds,
                          OUT MDSet * newmds,
                          UINT newofst,
                          UINT newsize);
-    bool tryComputeConstOffset(
-            IR const* ir,
-            IR const* opnd1,
-            IN OUT MDSet & mds,
-            IN OUT MDSet & opnd0_mds);
+    bool tryComputeConstOffset(IR const* ir,
+                               IR const* opnd1,
+                               IN OUT MDSet & mds,
+                               IN OUT MDSet & opnd0_mds);
     void recomputeDataType(AACtx const& ic, IR const* ir, OUT MDSet & pts);
-    void reviseMDsize(IN OUT MDSet & mds, UINT size);
+    void reviseMDSize(IN OUT MDSet & mds, UINT size);
+
+    //refmds: ref MDSet of ir.
+    //ir: given indirect operation, such as IST, ILD.
+    //comp_ir_pt: true if caller require to compute the POINT-TO set of ir.
+    //Return POINT-TO set of ir, if comp_ir_pts is true.
+    MDSet const* updateIndirectOpAddrAndPointToSet(MDSet const* refmds,
+                                                   IR * ir,
+                                                   bool comp_ir_pts,
+                                                   MD2MDSet * mx);
 
     inline void * xmalloc(size_t size)
     {
@@ -489,7 +485,12 @@ public:
     void cleanPointTo(UINT mdid, IN OUT MD2MDSet & ctx)
     { ctx.setAlways(mdid, NULL); }
 
-    bool computeMayPointToViaTBAA(IR * pointer, IN OUT MDSet * point_to_set);
+    //Compute and update point_to_set with TBAA info.
+    //pointer: IR expression that pointed to memory.
+    //point_to_set: POINT_TO set of pointer, genernate new set if TBAA exist.
+    //Return true if pointer pointed to MAY-POINT-TO set.
+    MDSet const* computeMayPointToViaTBAA(IR const* pointer,
+                                          MDSet const* point_to_set);
     bool computeFlowSensitive(List<IRBB*> const& bbl);
     void computeStmt(IRBB const* bb, IN OUT MD2MDSet * mx);
     void computeFlowInsensitive();
@@ -509,17 +510,15 @@ public:
     void dumpMayPointTo();
     void dump(CHAR const* name);
 
-    void ElemUnionPointTo(
-            MDSet const& mds,
-            MDSet const& in_set,
-            IN MD2MDSet * mx);
+    void ElemUnionPointTo(MDSet const& mds,
+                          MDSet const& in_set,
+                          IN MD2MDSet * mx);
     void ElemUnionPointTo(MDSet const& mds, IN MD * in_elem, IN MD2MDSet * mx);
     void ElemCopyPointTo(MDSet const& mds, IN MDSet & in_set, IN MD2MDSet * mx);
     void ElemCopyPointToAndMayPointTo(MDSet const& mds, IN MD2MDSet * mx);
-    void ElemCopyAndUnionPointTo(
-            MDSet const& mds,
-            MDSet const& pt_set,
-            IN MD2MDSet * mx);
+    void ElemCopyAndUnionPointTo(MDSet const& mds,
+                                 MDSet const& pt_set,
+                                 IN MD2MDSet * mx);
     void ElemCleanPointTo(MDSet const& mds, IN MD2MDSet * mx);
     void ElemCleanExactPointTo(MDSet const& mds, IN MD2MDSet * mx);
 
@@ -589,7 +588,7 @@ public:
 
     //For given MD2MDSet, set the point-to set to 'md'.
     //ctx: context of point-to analysis.
-    inline void setPointTo(UINT mdid, MD2MDSet & ctx, MDSet const* ptset)
+    void setPointTo(UINT mdid, MD2MDSet & ctx, MDSet const* ptset)
     {
         ASSERT0(ptset);
         ASSERTN(m_mds_hash->find(*ptset), ("ptset should be in hash"));
@@ -597,10 +596,9 @@ public:
     }
 
     //Set pointer points to 'target'.
-    inline void setPointToUniqueMD(
-            UINT pointer_mdid,
-            MD2MDSet & ctx,
-            MD const* target)
+    inline void setPointToUniqueMD(UINT pointer_mdid,
+                                   MD2MDSet & ctx,
+                                   MD const* target)
     {
         ASSERT0(target);
         MDSet tmp;
@@ -611,10 +609,9 @@ public:
     }
 
     //Set pointer points to 'target_set' in the context.
-    inline void setPointToMDSet(
-            UINT pointer_mdid,
-            MD2MDSet & ctx,
-            MDSet const& target_set)
+    void setPointToMDSet(UINT pointer_mdid,
+                         MD2MDSet & ctx,
+                         MDSet const& target_set)
     {
         MDSet const* hashed = m_mds_hash->append(target_set);
         setPointTo(pointer_mdid, ctx, hashed);
@@ -622,10 +619,9 @@ public:
 
     //Set pointer points to new MDSet by appending a new element 'newmd'
     //in the context.
-    inline void setPointToMDSetByAddMD(
-            UINT pointer_mdid,
-            MD2MDSet & ctx,
-            MD const* newmd)
+    inline void setPointToMDSetByAddMD(UINT pointer_mdid,
+                                       MD2MDSet & ctx,
+                                       MD const* newmd)
     {
         MDSet tmp;
         MDSet const* pts = getPointTo(pointer_mdid, ctx);
@@ -645,10 +641,9 @@ public:
     }
 
     //Set pointer points to MD set by appending a MDSet.
-    inline void setPointToMDSetByAddMDSet(
-            UINT pointer_mdid,
-            MD2MDSet & ctx,
-            MDSet const& set)
+    inline void setPointToMDSetByAddMDSet(UINT pointer_mdid,
+                                          MD2MDSet & ctx,
+                                          MDSet const& set)
     {
         MDSet const* pts = getPointTo(pointer_mdid, ctx);
         if (pts == NULL) {
@@ -689,6 +684,13 @@ public:
     void set_flow_sensitive(bool is_sensitive)
     { m_flow_sensitive = (BYTE)is_sensitive; }
 
+    //Set the POINT-TO set of LHS MD and LHS MDSet.
+    //pts: POINT-TO set that have been hashed.
+    void setLHSPointToSet(MD const* lhs_mustaddr,
+                          MDSet const* lhs_mayaddr,
+                          MDSet const* pts,
+                          IN MD2MDSet * mx);
+
     //Function return the POINT-TO pair for each BB.
     //Only used in flow-sensitive analysis.
     MD2MDSet * mapBBtoMD2MDSet(UINT bbid) const
@@ -706,6 +708,29 @@ public:
         }
         return mx;
     }
+
+    //This function update LHS's POINT-TO set accroding to RHS.
+    //is_lhs_pointer: true if transit rhs's POINT-TO set to lhs.
+    //rhs: RHS expression of stmt, which are IR_ST, IR_IST, IR_STARRAY.
+    //rhsrefmds: record memory descriptor of 'rhs' if AC_comp_pt() is false, or
+    //           record the POINT-TO set of 'rhs' if AC_comp_pt() is true.
+    //           Note if AC_comp_pt() is true, the returned POINT-TO set may be
+    //           recorded in 'rhsrefmds' or AC_returned_pts.
+    //returned_pts: record the POINT-TO set of 'rhs' if AC_comp_pt() is true.
+    //              Note if AC_comp_pt() is true, the returned POINT-TO set may
+    //              be recorded in 'rhsrefmds' or AC_returned_pts.
+    void updateLHSPointToSet(bool is_lhs_pointer,
+                             bool rhs_taken_address,
+                             MD const* lhs_mustaddr,
+                             MDSet const* lhs_mayaddr,
+                             IR const* rhs,
+                             MDSet & rhsrefmds,
+                             MDSet const* returned_pts,
+                             MD2MDSet * mx);
+    //Union POINT-TO set for each element in 'mds', and hash the unified result
+    //return it.
+    //mds: represents address of current ILD.
+    MDSet const* unifyPointToSet(MDSet const& mds, MD2MDSet const* mx);
 
     bool verifyIR(IR * ir);
     bool verify();

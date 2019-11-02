@@ -39,7 +39,7 @@ DbxMgr * g_dbx_mgr = NULL;
 
 void setLineNum(IR * ir, UINT lineno, Region * rg)
 {
-    DbxAttachInfo * da;
+    DbxAttachInfo * da = NULL;
     ASSERT0(rg);
     if (IR_ai(ir) == NULL) {
         IR_ai(ir) = rg->allocAIContainer();
@@ -70,7 +70,6 @@ UINT getLineNum(IR const* ir)
     if (IR_ai(ir) == NULL || !IR_ai(ir)->is_init()) { return 0; }
     DbxAttachInfo * da = (DbxAttachInfo*)IR_ai(ir)->get(AI_DBX);
     if (da == NULL) { return 0; }
-
     return DBX_lineno(&da->dbx);
 }
 
@@ -144,11 +143,23 @@ Dbx * getDbx(IR const* ir)
 //
 void DbxMgr::printSrcLine(IR const* ir, PrtCtx * ctx)
 {
+    ASSERT0(ir);
     if (g_tfile == NULL) { return; }
     if (!ir->is_stmt()) { return; }
     Dbx * dbx = ::getDbx(ir);
     if (dbx != NULL) {
         printSrcLine(dbx, ctx);
+    }
+}
+
+
+void DbxMgr::printSrcLine(xcom::StrBuf & output, IR const* ir, PrtCtx * ctx)
+{
+    ASSERT0(ir);
+    if (!ir->is_stmt()) { return; }
+    Dbx * dbx = ::getDbx(ir);
+    if (dbx != NULL) {
+        printSrcLine(output, dbx, ctx);
     }
 }
 //END DbxMgr

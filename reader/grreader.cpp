@@ -75,7 +75,9 @@ bool readGRAndConstructRegion(RegionMgr * rumgr, CHAR const* grfile)
     //END_TIMER(t, "lexer dump");
 
     FILE * h = fopen(grfile, "r");
-    ASSERT0(h);
+    if (h == NULL) {
+        return false;
+    }
     reader.setSrcFile(h);
     bool succ = reader.parse();
     END_TIMER(t, "readGRAndConstructRegion");

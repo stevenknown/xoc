@@ -634,7 +634,7 @@ bool IR_CP::doProp(
                 continue;
             }
 
-            if (m_is_dump_cp && g_is_dump_after_pass) {
+            if (g_is_dump_after_pass && g_dump_opt.isDumpCP()) {
                 dumpCopyPropagationAction(def_stmt, prop_value, use, mdssamgr);
             }
 

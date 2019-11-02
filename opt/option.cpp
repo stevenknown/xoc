@@ -173,9 +173,6 @@ bool g_do_call_graph = false;
 //If true to show compilation time.
 bool g_show_time = false;
 
-//If true to show memory usage for each Region.
-bool g_show_memory_usage = true;
-
 //Perform function inline.
 bool g_do_inline = false;
 
@@ -254,15 +251,6 @@ UINT g_verify_level = VERIFY_LEVEL_2;
 //               intconst 24|0x18 (u32) id:14
 bool g_is_simplify_parameter = true;
 
-//Dump MD Set Hash Table.
-bool g_is_dump_mdset_hash = true;
-
-//Dump MD DU chain built by DU Manager.
-bool g_is_dump_du_chain = true;
-
-//Dump Alias Analysis miscellaneous info.
-bool g_is_dump_alias_analysis = true;
-
 //Dump after each pass.
 bool g_is_dump_after_pass = true;
 
@@ -272,4 +260,155 @@ bool g_is_dump_before_pass = true;
 //Set true to enable searching debug-info from expression bottom up
 //to nearest stmt.
 bool g_is_search_and_copy_dbx = true;
+
+//Record dump options for each Pass.
+DumpOpt g_dump_opt;
+
+DumpOpt::DumpOpt()
+{
+    is_dump_all = false;
+    is_dump_nothing = false;
+    is_dump_aa = false;
+    is_dump_dumgr = false;
+    is_dump_mdset_hash = false;
+    is_dump_dom = false;
+    is_dump_cp = false;
+    is_dump_rp = false;
+    is_dump_dce = false;
+    is_dump_gvn = false;
+    is_dump_gcse = false;
+    is_dump_licm = false;
+    is_dump_loopcvt = false;
+    is_dump_simplification = false;
+    is_dump_prssamgr = false;
+    is_dump_mdssamgr = false;
+    is_dump_cg = false;
+    is_dump_ra = false;
+    is_dump_memusage = false;
+    is_dump_livenessmgr = false;    
+}
+ 
+
+bool DumpOpt::isDumpALL() const
+{
+    //is_dump_all and is_dump_nothing can not all be true.
+    ASSERT0(!(is_dump_nothing & is_dump_all));
+    return is_dump_all;
+}
+
+
+bool DumpOpt::isDumpNothing() const
+{
+    //is_dump_all and is_dump_nothing can not all be true.
+    ASSERT0(!(is_dump_nothing & is_dump_all));
+    return is_dump_nothing;
+}
+
+
+bool DumpOpt::isDumpAA() const
+{
+    return is_dump_all || (!is_dump_nothing && is_dump_aa);
+}
+
+
+bool DumpOpt::isDumpDUMgr() const
+{
+    return is_dump_all || (!is_dump_nothing && is_dump_dumgr);
+}
+
+
+bool DumpOpt::isDumpMDSetHash() const
+{
+    return is_dump_all || (!is_dump_nothing && is_dump_mdset_hash);
+}
+
+
+bool DumpOpt::isDumpDOM() const
+{
+    return is_dump_all || (!is_dump_nothing && is_dump_dom);
+}
+
+
+bool DumpOpt::isDumpCP() const
+{
+    return is_dump_all || (!is_dump_nothing && is_dump_cp);
+}
+
+
+bool DumpOpt::isDumpRP() const
+{
+    return is_dump_all || (!is_dump_nothing && is_dump_rp);
+}
+
+
+bool DumpOpt::isDumpDCE() const
+{
+    return is_dump_all || (!is_dump_nothing && is_dump_dce);
+}
+
+
+bool DumpOpt::isDumpGVN() const
+{
+    return is_dump_all || (!is_dump_nothing && is_dump_gvn);
+}
+
+
+bool DumpOpt::isDumpGCSE() const
+{
+    return is_dump_all || (!is_dump_nothing && is_dump_gcse);
+}
+
+
+bool DumpOpt::isDumpLICM() const
+{
+    return is_dump_all || (!is_dump_nothing && is_dump_licm);
+}
+
+
+bool DumpOpt::isDumpLoopCVT() const
+{
+    return is_dump_all || (!is_dump_nothing && is_dump_loopcvt);
+}
+
+
+bool DumpOpt::isDumpSimp() const
+{
+    return is_dump_all || (!is_dump_nothing && is_dump_simplification);
+}
+
+
+bool DumpOpt::isDumpPRSSAMgr() const
+{
+    return is_dump_all || (!is_dump_nothing && is_dump_prssamgr);
+}
+
+
+bool DumpOpt::isDumpMDSSAMgr() const
+{
+    return is_dump_all || (!is_dump_nothing && is_dump_mdssamgr);
+}
+
+
+bool DumpOpt::isDumpCG() const
+{
+    return is_dump_all || (!is_dump_nothing && is_dump_cg);
+}
+
+
+bool DumpOpt::isDumpRA() const
+{
+    return is_dump_all || (!is_dump_nothing && is_dump_ra);
+}
+
+
+bool DumpOpt::isDumpMemUsage() const
+{
+    return is_dump_all || (!is_dump_nothing && is_dump_memusage);
+}
+
+bool DumpOpt::isDumpLivenessMgr() const
+{
+    return is_dump_all || (!is_dump_nothing && is_dump_livenessmgr);
+}
+
 } //namespace xoc

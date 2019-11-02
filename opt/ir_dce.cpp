@@ -585,8 +585,8 @@ bool IR_DCE::perform(OptCtx & oc)
 
     //#define _DEBUG_DCE_
     #ifdef _DEBUG_DCE_
-    Vector<Vector<IR*>*> all_ir;
-    if (g_tfile != NULL) {
+    xcom::Vector<xcom::Vector<IR*>*> all_ir;
+    if (g_is_dump_after_pass && g_dump_opt.isDumpDCE()) {
         record_all_ir(all_ir);
     }
     #endif
@@ -657,15 +657,15 @@ bool IR_DCE::perform(OptCtx & oc)
     //fix_control_flow(bblst, ctlst);
 
     #ifdef _DEBUG_DCE_
-    if (g_tfile != NULL) {
+    if (g_is_dump_after_pass && g_dump_opt.isDumpDCE()) {
         dump(is_stmt_effect, is_bb_effect, all_ir);
-        for (INT i = 0; i <= all_ir.get_last_idx(); i++) {
-            Vector<IR*> * ir_vec = all_ir.get(i);
-            if (ir_vec != NULL) {
-                delete ir_vec;
-            }
-        }
     }
+    for (INT i = 0; i <= all_ir.get_last_idx(); i++) {
+        xcom::Vector<IR*> * ir_vec = all_ir.get(i);
+        if (ir_vec != NULL) {
+            delete ir_vec;
+        }
+    }    
     #endif
 
     if (change) {
