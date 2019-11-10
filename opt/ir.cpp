@@ -1517,12 +1517,12 @@ bool IR::verify(Region const* rg) const
         ASSERTN(IS_SIMPLEX(TY_vec_ety(d)) || IS_PTR(TY_vec_ety(d)),
                ("illegal vector elem type"));
 
-        ASSERT0(TY_vec_size(d) >= tm->get_dtype_bytesize(TY_vec_ety(d)) &&
-                TY_vec_size(d) % tm->get_dtype_bytesize(TY_vec_ety(d)) == 0);
+        ASSERT0(TY_vec_size(d) >= tm->getDTypeByteSize(TY_vec_ety(d)) &&
+                TY_vec_size(d) % tm->getDTypeByteSize(TY_vec_ety(d)) == 0);
 
         UINT ofst = getOffset();
         if (ofst != 0) {
-            ASSERT0((ofst % tm->get_dtype_bytesize(TY_vec_ety(d))) == 0);
+            ASSERT0((ofst % tm->getDTypeByteSize(TY_vec_ety(d))) == 0);
         }
     }
 
@@ -1556,8 +1556,8 @@ bool IR::verify(Region const* rg) const
         ASSERT0(ST_rhs(this)->is_single());
         if (d->is_vector()) {
             ASSERT0(TY_vec_ety(d) != D_UNDEF);
-            ASSERT0(tm->get_dtype_bytesize(TY_vec_ety(d)) >=
-                    tm->get_bytesize(ST_rhs(this)->getType()));
+            ASSERT0(tm->getDTypeByteSize(TY_vec_ety(d)) >=
+                    tm->getByteSize(ST_rhs(this)->getType()));
         }
         break;
     case IR_STPR:
@@ -1599,8 +1599,8 @@ bool IR::verify(Region const* rg) const
 
             //Note if the value size less than elemsize, it will be hoist to
             //elemsize.
-            ASSERT0(tm->get_dtype_bytesize(TY_vec_ety(d)) >=
-                    tm->get_bytesize(SETELEM_val(this)->getType()));
+            ASSERT0(tm->getDTypeByteSize(TY_vec_ety(d)) >=
+                    tm->getByteSize(SETELEM_val(this)->getType()));
         }
         ASSERT0(SETELEM_base(this)->is_exp());
         ASSERT0(SETELEM_base(this)->is_single());
@@ -1617,8 +1617,8 @@ bool IR::verify(Region const* rg) const
         Type const* basedtd = base->getType();
         if (basedtd->is_vector()) {
             ASSERT0(TY_vec_ety(basedtd) != D_UNDEF);
-            ASSERT0(tm->get_dtype_bytesize(TY_vec_ety(basedtd)) >=
-                    tm->get_bytesize(d));
+            ASSERT0(tm->getDTypeByteSize(TY_vec_ety(basedtd)) >=
+                    tm->getByteSize(d));
         }
         break;
     }
@@ -1782,8 +1782,8 @@ bool IR::verify(Region const* rg) const
         ASSERT0(ARR_base(this)->is_ptr() || ARR_base(this)->is_any());
         ASSERT0(ARR_elemtype(this));
         if (ARR_ofst(this) != 0 && !ARR_elemtype(this)->is_any()) {
-            UINT elem_data_size = tm->get_bytesize(ARR_elemtype(this));
-            UINT result_data_size = tm->get_bytesize(d);
+            UINT elem_data_size = tm->getByteSize(ARR_elemtype(this));
+            UINT result_data_size = tm->getByteSize(d);
 			DUMMYUSE(elem_data_size | result_data_size);
             ASSERTN(result_data_size + ARR_ofst(this) <= elem_data_size,
                 ("result data size should be less than element data size"));
@@ -1982,7 +1982,7 @@ bool IR::calcArrayOffset(TMWORD * ofst_val, TypeMgr * tm) const
         }
     }
 
-    aggr *= tm->get_bytesize(ARR_elemtype(this));
+    aggr *= tm->getByteSize(ARR_elemtype(this));
     ASSERT0(ofst_val);
     *ofst_val = aggr;
     return true;
@@ -3482,6 +3482,26 @@ bool checkRoundDesc()
     UINT descnum = sizeof(g_round_desc) / sizeof(g_round_desc[0]);
     ASSERTN(descnum == ROUND_TYPE_NUM, ("miss RoundDesc declaration"));
     return true;
+}
+
+
+bool IR::isNotOverLap(IR const* ir2, Region * rg) const
+{
+    ASSERT0(rg);
+    IR const* ir1 = this; 
+    ASSERT0(ir1 && ir2);
+    ASSERT0(ir1->hasOffset() && ir2->hasOffset());
+    if (!ir1->getType()->is_scalar() || !ir2->getType()->is_scalar()) {
+        return false;
+    }
+    UINT offset1 = ir1->getOffset();
+    UINT offset2 = ir2->getOffset();
+    UINT size1 = rg->getTypeMgr()->getByteSize(ir1->getType());
+    UINT size2 = rg->getTypeMgr()->getByteSize(ir2->getType());
+    if ((offset1 + size1 <= offset2) || (offset2 + size2 <= offset1)) {
+        return true;
+    }
+    return false;
 }
 
 } //namespace xoc

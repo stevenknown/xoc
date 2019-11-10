@@ -1773,7 +1773,7 @@ void Region::insertCvtForBinaryOp(IR * ir, bool & change)
     //Both op0 and op1 are NOT vector type.
     TypeMgr * dm = getTypeMgr();
     Type const* type = dm->hoistDtypeForBinop(op0, op1);
-    UINT dt_size = dm->get_bytesize(type);
+    UINT dt_size = dm->getByteSize(type);
     if (op0->getTypeSize(dm) != dt_size) {
         BIN_opnd0(ir) = buildCvt(op0, type);
         copyDbx(BIN_opnd0(ir), op0, this);
@@ -2068,7 +2068,7 @@ IR * Region::foldConstIntUnary(IR * ir, bool & change)
     ASSERT0(UNA_opnd(ir)->is_const());
     HOST_INT v0 = CONST_int_val(UNA_opnd(ir));
     if (ir->is_neg()) {
-        ASSERTN(dm->get_bytesize(UNA_opnd(ir)->getType()) <= 8, ("TODO"));
+        ASSERTN(dm->getByteSize(UNA_opnd(ir)->getType()) <= 8, ("TODO"));
         IR * oldir = ir;
         ir = buildImmInt(-v0, ir->getType());
         copyDbx(ir, oldir, this);
@@ -2076,7 +2076,7 @@ IR * Region::foldConstIntUnary(IR * ir, bool & change)
         change = true;
         return ir;
     } else if (ir->is_lnot()) {
-        ASSERTN(dm->get_bytesize(UNA_opnd(ir)->getType()) <= 8, ("TODO"));
+        ASSERTN(dm->getByteSize(UNA_opnd(ir)->getType()) <= 8, ("TODO"));
         IR * oldir = ir;
         ir = buildImmInt(!v0, ir->getType());
         copyDbx(ir, oldir, this);
@@ -2084,7 +2084,7 @@ IR * Region::foldConstIntUnary(IR * ir, bool & change)
         change = true;
         return ir;
     } else if (ir->is_bnot()) {
-        ASSERTN(dm->get_bytesize(UNA_opnd(ir)->getType()) <= 8, ("TODO"));
+        ASSERTN(dm->getByteSize(UNA_opnd(ir)->getType()) <= 8, ("TODO"));
         IR * oldir = ir;
         ir = buildImmInt(~v0, ir->getType());
         copyDbx(ir, oldir, this);
@@ -2217,7 +2217,7 @@ IR * Region::foldConstFloatUnary(IR * ir, bool & change)
     DUMMYUSE(dm);
 
     if (ir->is_neg()) {
-        ASSERTN(dm->get_bytesize(UNA_opnd(ir)->getType()) <= 8, ("TODO"));
+        ASSERTN(dm->getByteSize(UNA_opnd(ir)->getType()) <= 8, ("TODO"));
         IR * oldir = ir;
         ir = buildImmFp(-CONST_fp_val(UNA_opnd(ir)), ir->getType());
         copyDbx(ir, oldir, this);
@@ -2225,7 +2225,7 @@ IR * Region::foldConstFloatUnary(IR * ir, bool & change)
         change = true;
         return ir; //No need to update DU.
     } else if (ir->is_lnot()) {
-        ASSERTN(dm->get_bytesize(UNA_opnd(ir)->getType()) <= 8, ("TODO"));
+        ASSERTN(dm->getByteSize(UNA_opnd(ir)->getType()) <= 8, ("TODO"));
         IR * oldir = ir;
         HOST_FP t = CONST_fp_val(UNA_opnd(ir));
         if (t == 0.0) {
@@ -2252,8 +2252,8 @@ IR * Region::foldConstFloatBinary(IR * ir, bool & change)
             BIN_opnd1(ir)->is_const() && BIN_opnd1(ir)->is_fp());
     double v0 = CONST_fp_val(BIN_opnd0(ir));
     double v1 = CONST_fp_val(BIN_opnd1(ir));
-    INT tylen = MAX(dm->get_bytesize(BIN_opnd0(ir)->getType()),
-                    dm->get_bytesize(BIN_opnd1(ir)->getType()));
+    INT tylen = MAX(dm->getByteSize(BIN_opnd0(ir)->getType()),
+                    dm->getByteSize(BIN_opnd1(ir)->getType()));
     DUMMYUSE(tylen);
 
     ASSERTN(tylen <= 8, ("TODO"));

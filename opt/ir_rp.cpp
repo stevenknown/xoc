@@ -1548,7 +1548,7 @@ void IR_RP::handleAccessInBody(
             m_ru->allocRefForPR(stpr);
 
             //New IR has same VN with original one.
-            m_gvn->set_mapIR2VN(stpr, m_gvn->mapIR2VN(ref));
+            m_gvn->setMapIR2VN(stpr, m_gvn->mapIR2VN(ref));
 
             if (has_use) {
                 restore2mem.append_and_retrieve(delegate);
@@ -1604,7 +1604,7 @@ void IR_RP::handleAccessInBody(
             m_ru->allocRefForPR(stpr);
 
             //New IR has same VN with original one.
-            m_gvn->set_mapIR2VN(stpr, m_gvn->mapIR2VN(stmt));
+            m_gvn->setMapIR2VN(stpr, m_gvn->mapIR2VN(stmt));
 
             if (has_use) {
                 restore2mem.append_and_retrieve(delegate);
@@ -1643,7 +1643,7 @@ void IR_RP::handleAccessInBody(
             m_ru->allocRefForPR(pr);
 
             //New IR has same VN with original one.
-            m_gvn->set_mapIR2VN(pr, m_gvn->mapIR2VN(ref));
+            m_gvn->setMapIR2VN(pr, m_gvn->mapIR2VN(ref));
 
             //Find the stpr that correspond to delegate MD,
             //and build DU chain bewteen stpr and new ref PR.

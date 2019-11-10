@@ -88,8 +88,8 @@ void IR_GCSE::elimCseAtStore(IR * use, IR * use_stmt, IR * gen)
     if (m_gvn != NULL) {
         VN * vn = m_gvn->mapIR2VN(gen);
         ASSERT0(vn);
-        m_gvn->set_mapIR2VN(newrhs_pr, vn);
-        m_gvn->set_mapIR2VN(use_stmt, vn);
+        m_gvn->setMapIR2VN(newrhs_pr, vn);
+        m_gvn->setMapIR2VN(use_stmt, vn);
     }
 
     //Assign MD to newrhs.
@@ -133,7 +133,7 @@ void IR_GCSE::elimCseAtBranch(IR * use, IR * use_stmt, IN IR * gen)
     ASSERT0(m_gvn);
     VN * vn = m_gvn->mapIR2VN(gen);
     ASSERT0(vn);
-    m_gvn->set_mapIR2VN(new_pr, vn);
+    m_gvn->setMapIR2VN(new_pr, vn);
 
     //Assign MD to PR.
     MD const* r_md = m_ru->genMDforPR(new_pr);
@@ -184,7 +184,7 @@ void IR_GCSE::elimCseAtCall(IR * use, IR * use_stmt, IR * gen)
     ASSERT0(m_gvn);
     VN * vn = m_gvn->mapIR2VN(gen);
     ASSERT0(vn);
-    m_gvn->set_mapIR2VN(use_pr, vn);
+    m_gvn->setMapIR2VN(use_pr, vn);
 
     //Allocate MD to use_pr to make up DU manager request.
     MD const* r_md = m_ru->genMDforPR(use_pr);
@@ -255,7 +255,7 @@ void IR_GCSE::processCseGen(IN IR * gen, IR * gen_stmt, bool & change)
 
     if (m_gvn != NULL) {
         ASSERT0(m_gvn->mapIR2VN(gen));
-        m_gvn->set_mapIR2VN(new_stpr, m_gvn->mapIR2VN(gen));
+        m_gvn->setMapIR2VN(new_stpr, m_gvn->mapIR2VN(gen));
     }
 
     copyDbx(new_stpr, gen_stmt, m_ru);

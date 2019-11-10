@@ -1318,7 +1318,7 @@ void IR_DU_MGR::dumpMemUsageForEachSet()
 
 
 //Dump Region's IR BB list.
-//DUMP ALL BBList DEF/USE/OVERLAP_DEF/OVERLAP_USE"
+//DUMP ALL BBList DEF/USE/OVERLAP_DEF/OVERLAP_USE.
 void IR_DU_MGR::dumpRef(UINT indent)
 {
     if (g_tfile == NULL) { return; }
@@ -1431,9 +1431,9 @@ void IR_DU_MGR::dumpBBDUChainDetail(IRBB * bb)
             prt("(id:%d) ", IR_id(k));
 
             if (k->is_stmt()) {
-                prt("Dref:");
+                prt("DEFREF:");
             } else {
-                prt("Uref:");
+                prt("USEREF:");
             }
 
             //Dump must ref.
@@ -1445,7 +1445,9 @@ void IR_DU_MGR::dumpBBDUChainDetail(IRBB * bb)
             //Dump may ref.
             MDSet const* mds = k->getRefMDSet();
             if (mds != NULL && !mds->is_empty()) {
-                prt(",");
+                if (md != NULL) {
+                    prt(",");
+                }
                 SEGIter * iter;
                 for (INT i = mds->get_first(&iter); i >= 0; ) {
                     prt("MD%d", i);
@@ -1456,9 +1458,9 @@ void IR_DU_MGR::dumpBBDUChainDetail(IRBB * bb)
 
             //Dump def/use list.
             if (k->is_stmt() || ir->is_lhs(k)) {
-                note("\n\t  USE List:");
+                note("\n\t  USE-EXP LIST:");
             } else {
-                note("\n\t  DEF List:");
+                note("\n\t  DEF-STMT LIST:");
             }
 
             DUSet const* set = k->readDUSet();

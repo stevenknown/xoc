@@ -320,7 +320,7 @@ bool IR_CFS_OPT::transformIf3(IR ** head, IR * ir)
             opnd1->is_const() &&
             opnd1->is_int() &&
             m_ru->getIntegerInDataTypeValueRange(opnd1) ==
-              m_ru->getMaxInteger(m_tm->get_dtype_bitsize(
+              m_ru->getMaxInteger(m_tm->getDTypeBitSize(
                 TY_dtype(opnd1->getType())), opnd1->is_signed())) {
             //e.g:
             //x is unsigned, if(x>0xFFFFFFFF) {a=1} else {b=1} => b=1
@@ -347,7 +347,7 @@ bool IR_CFS_OPT::transformIf3(IR ** head, IR * ir)
             opnd1->is_const() &&
             opnd1->is_int() &&
             m_ru->getIntegerInDataTypeValueRange(opnd1) ==
-              m_ru->getMinInteger(m_tm->get_dtype_bitsize(
+              m_ru->getMinInteger(m_tm->getDTypeBitSize(
                 TY_dtype(opnd1->getType())), opnd1->is_signed())) {
             //x is signed, IF(x < 0x80000000) {a=1} ELSE {b=1}  =>  b=1
             IR * allocIR = NULL;

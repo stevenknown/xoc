@@ -227,6 +227,9 @@ bool g_do_loop_convert = false;
 //Polyhedral Transformations.
 bool g_do_poly_tran = false;
 
+//Refine DefUse Chain.
+bool g_do_refine_duchain = true;
+
 //Set to true to retain the PassMgr even if Region processing finished.
 bool g_retain_pass_mgr_for_region = false;
 
@@ -409,6 +412,11 @@ bool DumpOpt::isDumpMemUsage() const
 bool DumpOpt::isDumpLivenessMgr() const
 {
     return is_dump_all || (!is_dump_nothing && is_dump_livenessmgr);
+}
+
+bool DumpOpt::isDumpRefineDUChain() const
+{
+    return is_dump_all || (!is_dump_nothing && is_dump_refine_duchain);
 }
 
 } //namespace xoc

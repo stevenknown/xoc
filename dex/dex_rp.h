@@ -82,7 +82,7 @@ public:
             IR_may_throw(stpr) = true;
 
             //New IR has same VN with original one.
-            gvn->set_mapIR2VN(stpr, gvn->mapIR2VN(ref));
+            gvn->setMapIR2VN(stpr, gvn->mapIR2VN(ref));
 
             BB_irlist(stmt_bb).insert_before(stpr, ct);
         }

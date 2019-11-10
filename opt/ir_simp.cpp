@@ -1260,7 +1260,7 @@ IR * Region::simplifyArrayAddrExp(IR * ir, SimpCtx * ctx)
 
     ASSERT0(ofst_exp);
 
-    UINT elemsize = dm->get_bytesize(ARR_elemtype(ir));
+    UINT elemsize = dm->getByteSize(ARR_elemtype(ir));
     if (elemsize != 1) {
         //e.g: short g[i], subexp is i*sizeof(short)
         ofst_exp = buildBinaryOp(IR_MUL, indextyid,

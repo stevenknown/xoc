@@ -235,6 +235,12 @@ Pass * PassMgr::allocCFG()
 }
 
 
+Pass * PassMgr::allocRefineDUChain()
+{
+    return new RefineDUChain(m_ru);
+}
+
+
 xcom::Graph * PassMgr::registerGraphBasedPass(PASS_TYPE opty)
 {
     xcom::Graph * pass = NULL;
@@ -324,6 +330,9 @@ Pass * PassMgr::registerPass(PASS_TYPE opty)
         break;
     case PASS_INLINER:
         pass = allocInliner();
+        break;
+    case PASS_REFINE_DUCHAIN:
+        pass = allocRefineDUChain();
         break;
     default: ASSERTN(0, ("Unsupport Optimization."));
     }

@@ -753,19 +753,41 @@ void INTMat::sete(UINT num, ...)
     if (num <= 0) {
         return;
     }
-    INT * ptr = (INT*) (((BYTE*)(&num)) + sizeof(UINT));
-    UINT i = 0;
-    UINT row = 0, col = 0;
-    while (i < num) {
-        INT numer = *ptr;
+
+//#define VARIADIC_PARAMETER_ACCESS
+#ifdef VARIADIC_PARAMETER_ACCESS
+    //The following algorithm to access variadic parameter may not
+    //compatible with current stack layout and stack alignment,
+    //says the code work well on Linux with gcc4.8, but
+    //it does not work on Windows with VS2015. Therefore
+    //a better advise is to use va_arg().
+    //INT * ptr = (INT*) (((BYTE*)(&num)) + sizeof(UINT));
+    //UINT i = 0;
+    //UINT row = 0, col = 0;
+    //while (i < num) {
+    //    INT numer = *ptr;
+    //    set(row, col++, numer);
+    //    if (col >= m_col_size) {
+    //        row++;
+    //        col = 0;
+    //    }
+    //    i++;
+    //    ptr++; //stack growing down
+    //}
+#else
+    va_list ptr;
+    va_start(ptr, num);
+    UINT row = 0, col = 0;    
+    for (UINT i = 0; i < num; i++) {
+        INT numer = va_arg(ptr, UINT);
         set(row, col++, numer);
         if (col >= m_col_size) {
             row++;
             col = 0;
         }
-        i++;
-        ptr++; //stack growing down
     }
+    va_end(ptr);
+#endif
 }
 
 

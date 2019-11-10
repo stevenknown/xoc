@@ -90,6 +90,16 @@ typedef enum _VOPND_CODE {
 
 
 //Virtual Operand.
+//This class represents the virtual operand that a stmt may defined or
+//an expression may used. There are only 2 kind of virtual operand, MD and
+//CONST.
+//e.g: var a;
+//     st a:any = 10;
+//  Assume MD of a is MD10;
+//  The virtual operand of 'a' represent MD10, and its code is VOPND_MD.
+//e.g2: mdphi a_v1 = (a_v0, L1), (0x20, L3)
+//  Given mdphi operation, the second operand is 0x20, a immediate.
+//  Thus it's virtual operand code is VOPND_CONST.
 #define VOPND_id(v)         ((v)->m_id)
 #define VOPND_code(v)       ((v)->m_code)
 class VOpnd {
@@ -115,6 +125,11 @@ public:
 };
 
 
+//Virtual Const Operand.
+//This class represents the virtual const operand that inherit from VOpnd.
+//e.g: mdphi a_v1 = (a_v0, L1), (0x20, L3)
+//  Given mdphi operation, the second operand is 0x20, a immediate.
+//  Thus it's virtual operand code is VOPND_CONST.
 #define VCONST_val(v)      (((VConst*)v)->m_const_val)
 class VConst : public VOpnd {
 public:
@@ -134,16 +149,26 @@ public:
 
 
 //Versioning MD.
+//This class represents the versioned MD.
+//In MDSSA form, reference MD of stmt/expression will be versioned.
+//Each MD will be assigned an unique version number at individual
+//stmt/exp operation. Note the MD that without definition will be
+//assigned zero version.
+//e.g: st a:any = 10 + ld b; //S1
+//     st a:any = 20; //S2
+//  Assume a's reference MD is MD10.
+//  Stmt S1 generate MD10v1, whereas stmt S2 generate MD10v2.
+//  Assume b's reference MD is MD11, ld b generate MD11v0.
 #define VMD_mdid(v)       (((VMD*)v)->m_mdid)
 #define VMD_version(v)    (((VMD*)v)->m_version)
 #define VMD_def(v)        (((VMD*)v)->m_def_stmt)
 #define VMD_occs(v)       (((VMD*)v)->m_occs)
 class VMD : public VOpnd {
 public:
-    UINT m_version;
-    UINT m_mdid;
-    MDDef * m_def_stmt;
-    IRSet m_occs;
+    UINT m_version; //unique version of MD.
+    UINT m_mdid; //id of current virtual MD.
+    MDDef * m_def_stmt; //each versioned MD has an unique Definition.
+    IRSet m_occs; //each versioned MD has a set of USE occurrences.
 
 public:
     VMD();
@@ -167,11 +192,11 @@ public:
     }
 
     void destroy() { VMD_occs(this).destroy(); }
-    void dump(); //Concisely dump
-    void dump(Region * rg, UseDefMgr * usedefmgr);
+    void dump() const; //Concisely dump
+    void dump(Region const* rg, UseDefMgr const* usedefmgr) const;
 
     MDDef * getDef() const { return VMD_def(this); }
-    IRSet * getOccSet() { return &VMD_occs(this); }
+    IRSet * getUseSet() { return &VMD_occs(this); }
 
     UINT mdid() const
     {
@@ -229,6 +254,7 @@ public:
 
     void init() { BaseAttachInfo::init(AI_MD_SSA); }
     void destroy(DefMiscBitSetMgr & m) { m_vopnd_set.clean(m); }
+    void dump(MDSSAMgr const* mgr) const;
 
     VOpndSet * getVOpndSet() { return &m_vopnd_set; }
 

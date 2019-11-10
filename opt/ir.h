@@ -624,7 +624,7 @@ public:
 
     //Return byte size of ir data type.
     UINT getTypeSize(TypeMgr const* tm) const
-    { return tm->get_bytesize(getType()); }
+    { return tm->getByteSize(getType()); }
 
     DATA_TYPE getDType() const { return TY_dtype(getType()); }
 
@@ -723,6 +723,13 @@ public:
     UINT id() const { return IR_id(this); }
     void invertLand(Region * rg);
     void invertLor(Region * rg);
+
+    //Return true if current ir does not overlap to ir2.
+    //ir2: stmt or expression to be compared.
+    //Note this function does not need RefMD information.
+    //It just determine overlapping of given two IR according to
+    //their data-type and offset.
+    bool isNotOverLap(IR const* ir2, Region * rg) const;
     bool isNoMove() const { return IR_no_move(this); }
     //Return true if current IR may contain memory reference.
     bool isContainMemRef() const
@@ -2242,7 +2249,7 @@ LabelInfo const* IR::getLabel() const
 UINT IR::getArrayElemDtSize(TypeMgr const* tm) const
 {
     ASSERT0(is_array() || is_starray());
-    return tm->get_bytesize(ARR_elemtype(this));
+    return tm->getByteSize(ARR_elemtype(this));
 }
 
 

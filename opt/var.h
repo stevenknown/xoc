@@ -307,7 +307,7 @@ public:
         //Length of string var should include '\0'.
         return is_string() ?
             getStringLength() + 1:
-            dm->get_bytesize(VAR_type(this));
+            dm->getByteSize(VAR_type(this));
     }
 
     virtual CHAR const* dumpVARDecl(StrBuf &) const { return NULL; }
@@ -354,7 +354,6 @@ public:
     void dump(TypeMgr * dm)
     {
         if (g_tfile == NULL) { return; }
-
         ASSERT0(dm);
         VarTabIter iter;
         for (VAR * v = get_first(iter); v != NULL; v = get_next(iter)) {

@@ -80,7 +80,7 @@ Type const* checkType(Type const* ty, DATA_TYPE dt)
 //Return byte size of total tensor.
 UINT TensorType::getByteSize(TypeMgr const* mgr) const
 {
-    UINT size = mgr->get_dtype_bytesize(getElemDataType());
+    UINT size = mgr->getDTypeByteSize(getElemDataType());
     for (UINT i = 0; i < degree_of_dimension.get_capacity(); i++) {
         ASSERT0(degree_of_dimension[i] > 0);
         size *= degree_of_dimension[i];
@@ -131,7 +131,7 @@ Type const* TypeMgr::hoistDtypeForBinop(IR const* opnd0, IR const* opnd1)
 
     if (t0 == D_MC) {
         ASSERT0(TY_mc_size(d0) != 0);
-        UINT ty_size = MAX(TY_mc_size(d0), get_bytesize(d1));
+        UINT ty_size = MAX(TY_mc_size(d0), getByteSize(d1));
         if (ty_size == TY_mc_size(d0)) {
             return opnd0->getType();
         }
@@ -140,7 +140,7 @@ Type const* TypeMgr::hoistDtypeForBinop(IR const* opnd0, IR const* opnd1)
 
     if (t1 == D_MC) {
         ASSERT0(TY_mc_size(d1) != 0);
-        UINT ty_size = MAX(TY_mc_size(d1), get_bytesize(d0));
+        UINT ty_size = MAX(TY_mc_size(d1), getByteSize(d0));
         if (ty_size == TY_mc_size(d1)) {
             return opnd1->getType();
         }
@@ -152,7 +152,7 @@ Type const* TypeMgr::hoistDtypeForBinop(IR const* opnd0, IR const* opnd1)
     //t1 = hoistDtype(t1);
 
     //Generic data type.
-    INT bitsize = MAX(get_dtype_bitsize(t0), get_dtype_bitsize(t1));
+    INT bitsize = MAX(getDTypeBitSize(t0), getDTypeBitSize(t1));
     DATA_TYPE res;
     if (IS_FP(t0) || IS_FP(t1)) {
         res = get_fp_dtype(bitsize);
@@ -172,13 +172,13 @@ Type const* TypeMgr::hoistDtypeForBinop(IR const* opnd0, IR const* opnd1)
 DATA_TYPE TypeMgr::hoistDtype(UINT data_size, OUT UINT * hoisted_data_size)
 {
     DATA_TYPE dt = D_UNDEF;
-    if (data_size > get_dtype_bitsize(D_I128)) {
+    if (data_size > getDTypeBitSize(D_I128)) {
         //Memory chunk
         dt = D_MC;
         *hoisted_data_size = data_size;
     } else {
         dt = hoistBSdtype(data_size, false);
-        *hoisted_data_size = get_dtype_bytesize(dt);
+        *hoisted_data_size = getDTypeByteSize(dt);
     }
     return dt;
 }
@@ -188,7 +188,7 @@ DATA_TYPE TypeMgr::hoistDtype(UINT data_size, OUT UINT * hoisted_data_size)
 DATA_TYPE TypeMgr::hoistDtype(IN DATA_TYPE dt) const
 {
     if (IS_INT(dt) &&
-        get_dtype_bitsize(dt) < (BYTE_PER_INT * BIT_PER_BYTE)) {
+        getDTypeBitSize(dt) < (BYTE_PER_INT * BIT_PER_BYTE)) {
         //Hoist to longest INT type.
         return hoistBSdtype(BYTE_PER_INT * BIT_PER_BYTE, IS_SINT(dt));
     }
@@ -254,8 +254,8 @@ TypeContainer const* TypeMgr::registerPointer(Type const* type)
 TypeContainer const* TypeMgr::registerVector(Type const* type)
 {
     ASSERT0(type->is_vector() && TY_vec_ety(type) != D_UNDEF);
-    ASSERT0(TY_vec_size(type) >= get_dtype_bytesize(TY_vec_ety(type)) &&
-            TY_vec_size(type) % get_dtype_bytesize(TY_vec_ety(type)) == 0);
+    ASSERT0(TY_vec_size(type) >= getDTypeByteSize(TY_vec_ety(type)) &&
+            TY_vec_size(type) % getDTypeByteSize(TY_vec_ety(type)) == 0);
 
     VectorElemTypeTab * elemtab = m_vector_type_tab.get(type);
     if (elemtab != NULL) {
@@ -296,9 +296,9 @@ TypeContainer const* TypeMgr::registerTensor(Type const* type)
 {
     ASSERT0(type->is_tensor() && TY_tensor_ety(type) != D_UNDEF);
     ASSERT0(((TensorType const*)type)->getByteSize(this) >=
-            get_dtype_bytesize(TY_tensor_ety(type)));
+            getDTypeByteSize(TY_tensor_ety(type)));
     ASSERT0(((TensorType const*)type)->getByteSize(this) %
-            get_dtype_bytesize(TY_tensor_ety(type)) == 0);
+            getDTypeByteSize(TY_tensor_ety(type)) == 0);
 
     TensorElemTypeTab * elemtab = m_tensor_type_tab.get(type);
     if (elemtab != NULL) {
@@ -451,7 +451,7 @@ Type * TypeMgr::registerType(Type const* type)
 }
 
 
-UINT TypeMgr::get_bytesize(Type const* type) const
+UINT TypeMgr::getByteSize(Type const* type) const
 {
     ASSERT0(type);
     DATA_TYPE dt = TY_dtype(type);
@@ -473,9 +473,9 @@ UINT TypeMgr::get_bytesize(Type const* type) const
     case D_F128:
     case D_STR:
     case D_ANY:
-        return get_dtype_bytesize(dt);
+        return getDTypeByteSize(dt);
     case D_PTR:
-        return get_pointer_bytesize();
+        return getPointerByteSize();
     case D_MC:
         return TY_mc_size(type);
     case D_VEC:
@@ -512,23 +512,23 @@ CHAR const* TypeMgr::dump_type(Type const* type, OUT StrBuf & buf)
         buf.strcat("%s", DTNAME(dt));
         break;
     case D_MC:
-        buf.strcat("%s<%d>", DTNAME(dt), get_bytesize(type));
+        buf.strcat("%s<%d>", DTNAME(dt), getByteSize(type));
         break;
     case D_PTR:
         buf.strcat("%s<%d>", DTNAME(dt), TY_ptr_base_size(type));
         break;
     case D_VEC: {
-        UINT elem_byte_size = get_dtype_bytesize(TY_vec_ety(type));
+        UINT elem_byte_size = getDTypeByteSize(TY_vec_ety(type));
         ASSERT0(elem_byte_size != 0);
-        ASSERT0(get_bytesize(type) % elem_byte_size == 0);
-        UINT elemnum = get_bytesize(type) / elem_byte_size;
+        ASSERT0(getByteSize(type) % elem_byte_size == 0);
+        UINT elemnum = getByteSize(type) / elem_byte_size;
         buf.strcat("%s<%d*%s>", DTNAME(dt), elemnum, DTNAME(TY_vec_ety(type)));
         break;
     }
     case D_TENSOR: {
-        UINT elem_byte_size = get_dtype_bytesize(TY_tensor_ety(type));
+        UINT elem_byte_size = getDTypeByteSize(TY_tensor_ety(type));
         ASSERT0(elem_byte_size != 0);
-        ASSERT0(get_bytesize(type) % elem_byte_size == 0);
+        ASSERT0(getByteSize(type) % elem_byte_size == 0);
         buf.strcat("%s:%s<", DTNAME(dt), DTNAME(TY_tensor_ety(type)));
         UINT dim = ((TensorType const*)type)->getDim();
         for (UINT i = 0; i < dim; i++) {

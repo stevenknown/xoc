@@ -2871,7 +2871,7 @@ void Matrix<T>::insertColumnsBefore(
 //(sr,sl) in matrix, and end point (er,el).
 template <class T>
 void Matrix<T>::inner(Matrix<T> & in,
-                    UINT sr, UINT sl, UINT er, UINT el) const
+                      UINT sr, UINT sl, UINT er, UINT el) const
 {
     ASSERTN(m_is_init, ("not yet initialize."));
     ASSERTN(sr <= er && sl <= el && er < m_row_size && el < m_col_size,

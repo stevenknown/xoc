@@ -772,7 +772,7 @@ MD const* Region::genMDforPR(UINT prno, Type const* type)
         MD_ty(&md) = MD_UNBOUND;
     } else {
         MD_ty(&md) = MD_EXACT;
-        MD_size(&md) = getTypeMgr()->get_bytesize(pr_var->getType());
+        MD_size(&md) = getTypeMgr()->getByteSize(pr_var->getType());
     }
     MD const* e = getMDSystem()->registerMD(md);
     ASSERT0(MD_id(e) > 0);
@@ -2106,10 +2106,31 @@ void Region::dumpVARInRegion()
     //Dump local varibles.
     VarTab * vt = getVarTab();
     if (vt->get_elem_count() > 0) {
-        note("\nVARIABLES:");
+        note("\nVARIABLES:%d", vt->get_elem_count());
         g_indent += 2;
         VarTabIter c;
+
+        //Sort VAR in ascending order because test tools will compare
+        //VAR dump information and require all variable have to be ordered.
+        xcom::List<VAR*> varlst;
         for (VAR * v = vt->get_first(c); v != NULL; v = vt->get_next(c)) {
+            C<VAR*> * ct = NULL;
+            bool find = false;
+            for (varlst.get_head(&ct); ct != NULL; ct = varlst.get_next(ct)) {
+                VAR * v_in_lst = C_val(ct);
+                if (v_in_lst->id() > v->id()) {
+                    varlst.insert_before(v, ct);
+                    find = true;
+                    break;
+                }
+            }
+            if (!find) {
+                varlst.append_tail(v);
+            }
+        }
+        C<VAR*> * ct = NULL;
+        for (varlst.get_head(&ct); ct != NULL; ct = varlst.get_next(ct)) {
+            VAR * v = C_val(ct);
             buf.clean();
             v->dump(buf, getTypeMgr());
             note("\n%s", buf.buf);
@@ -2161,7 +2182,7 @@ void Region::checkValidAndRecompute(OptCtx * oc, ...)
     IR_AA * aa = NULL;
     IR_DU_MGR * dumgr = NULL;
 
-    C<PASS_TYPE> * it;
+    C<PASS_TYPE> * it = NULL;
     for (optlist.get_head(&it); it != optlist.end(); it = optlist.get_next(it)) {
         PASS_TYPE pt = it->val();
         switch (pt) {

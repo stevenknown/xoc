@@ -1183,7 +1183,7 @@ bool IRParser::parseLda(ParseCtx * ctx)
 
     IR * lda = ctx->current_region->buildLda(var);
     LDA_ofst(lda) = (UINT)offset;
-    IR_dt(lda) = m_tm->getPointerType(m_tm->get_bytesize(var->getType()));
+    IR_dt(lda) = m_tm->getPointerType(m_tm->getByteSize(var->getType()));
     ctx->returned_exp = lda;
     m_lexer->getNextToken();
     return true;

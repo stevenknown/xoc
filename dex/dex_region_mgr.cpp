@@ -49,7 +49,7 @@ author: Su Zhenyu
 VAR * DexRegionMgr::addVarForBuiltin(CHAR const* name)
 {
     SYM * sym = addToSymbolTab(name);
-    return getVarMgr()->registerVar(sym, getTypeMgr()->getVoid(),
+    return getVarMgr()->registerVar(sym, getTypeMgr()->getAny(),
         0, VAR_FUNC_DECL|VAR_GLOBAL);
 }
 

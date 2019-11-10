@@ -53,7 +53,7 @@ bool IR_CP::checkTypeConsistency(IR const* ir, IR const* cand_expr) const
             //Sign must be consistent.
             return false;
         }
-        if (m_tm->get_bytesize(t1) < m_tm->get_bytesize(t2)) {
+        if (m_tm->getByteSize(t1) < m_tm->getByteSize(t2)) {
             //ir size must be equal or great than cand.
             return false;
         }
@@ -78,10 +78,9 @@ bool IR_CP::checkTypeConsistency(IR const* ir, IR const* cand_expr) const
 //        g = 10
 //
 //NOTE: Do NOT handle stmt.
-void IR_CP::replaceExpViaSSADu(
-        IR * exp,
-        IR const* cand_expr,
-        IN OUT CPCtx & ctx)
+void IR_CP::replaceExpViaSSADu(IR * exp,
+                               IR const* cand_expr,
+                               IN OUT CPCtx & ctx)
 {
     ASSERT0(exp && exp->is_exp() && cand_expr && cand_expr->is_exp());
     ASSERT0(exp->getExactRef());
@@ -150,13 +149,12 @@ void IR_CP::replaceExpViaSSADu(
 //
 //stmt_use_ssadu: true if stmt in which cand_expr located used SSA DU info.
 //stmt_use_mdssadu: true if stmt in which cand_exp used Memory SSA DU info.
-void IR_CP::replaceExp(
-        IR * exp,
-        IR const* cand_expr,
-        IN OUT CPCtx & ctx,
-        bool stmt_use_ssadu,
-        bool stmt_use_mdssadu,
-        MDSSAMgr * mdssamgr)
+void IR_CP::replaceExp(IR * exp,
+                       IR const* cand_expr,
+                       IN OUT CPCtx & ctx,
+                       bool stmt_use_ssadu,
+                       bool stmt_use_mdssadu,
+                       MDSSAMgr * mdssamgr)
 {
     ASSERT0(exp && exp->is_exp() && cand_expr);
     ASSERT0(exp->getExactRef() ||

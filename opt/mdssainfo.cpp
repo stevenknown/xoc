@@ -45,7 +45,7 @@ bool MDSSAInfo::isUseReachable(IN UseDefMgr * usedefmgr, IR const* exp)
          i >= 0; i = getVOpndSet()->get_next(i, &iter)) {
         VMD * vopnd = (VMD*)usedefmgr->getVOpnd(i);
         ASSERT0(vopnd && vopnd->is_md());
-        if (!vopnd->getOccSet()->is_contain(exp->id())) {
+        if (!vopnd->getUseSet()->is_contain(exp->id())) {
             return false;
         }
     }
@@ -54,10 +54,9 @@ bool MDSSAInfo::isUseReachable(IN UseDefMgr * usedefmgr, IR const* exp)
 
 
 //Collect all USE, where USE is IR expression.
-void MDSSAInfo::collectUse(
-        OUT DefSBitSetCore * set,
-        IN UseDefMgr * usedefmgr,
-        IN DefMiscBitSetMgr * bsmgr)
+void MDSSAInfo::collectUse(OUT DefSBitSetCore * set,
+                           IN UseDefMgr * usedefmgr,
+                           IN DefMiscBitSetMgr * bsmgr)
 {
     ASSERT0(set && usedefmgr && bsmgr);
     SEGIter * iter = NULL;
@@ -68,8 +67,8 @@ void MDSSAInfo::collectUse(
         ASSERT0(vopnd && vopnd->is_md());
 
         SEGIter * vit = NULL;
-        for (INT i2 = vopnd->getOccSet()->get_first(&vit);
-            i2 >= 0; i2 = vopnd->getOccSet()->get_next(i2, &vit)) {
+        for (INT i2 = vopnd->getUseSet()->get_first(&vit);
+            i2 >= 0; i2 = vopnd->getUseSet()->get_next(i2, &vit)) {
             IR * use = rg->getIR(i2);
             ASSERT0(use && (use->isMemoryRef() || use->is_id()));
             set->bunion(use->id(), *bsmgr);
@@ -78,7 +77,8 @@ void MDSSAInfo::collectUse(
 }
 
 
-//Remove given USE from occurence set.
+//Remove given IR expression from occurence set.
+//exp: IR expression to be removed.
 void MDSSAInfo::removeUse(IR const* exp, IN UseDefMgr * usedefmgr)
 {
     ASSERT0(exp && exp->is_exp() && usedefmgr);
@@ -87,7 +87,24 @@ void MDSSAInfo::removeUse(IR const* exp, IN UseDefMgr * usedefmgr)
          i >= 0; i = getVOpndSet()->get_next(i, &iter)) {
         VMD * vopnd = (VMD*)usedefmgr->getVOpnd(i);
         ASSERT0(vopnd && vopnd->is_md());
-        vopnd->getOccSet()->diff(exp->id());
+        vopnd->getUseSet()->diff(exp->id());
+    }
+}
+
+
+void MDSSAInfo::dump(MDSSAMgr const* mgr) const
+{
+    if (g_tfile == NULL) { return; }
+    SEGIter * iter = NULL;
+    MDSSAInfo * pthis = const_cast<MDSSAInfo*>(this);
+    for (INT i = pthis->getVOpndSet()->get_first(&iter);
+         i >= 0; i = pthis->getVOpndSet()->get_next(i, &iter)) {
+        note("\nREF:");
+        VMD const* vopnd = (VMD*)const_cast<MDSSAMgr*>(mgr)->
+            getUseDefMgr()->getVOpnd(i);
+        ASSERT0(vopnd && vopnd->is_md());
+        vopnd->dump(mgr->getRegion(),
+            const_cast<MDSSAMgr*>(mgr)->getUseDefMgr());
     }
 }
 //END MDSSAInfo
@@ -120,13 +137,13 @@ UINT UINT2VMDVec::count_mem() const
 //START VMD
 //
 //Concisely dump.
-void VMD::dump()
+void VMD::dump() const
 {
     prt("MD%dV%d", mdid(), version());
 }
 
 
-void VMD::dump(Region * rg, UseDefMgr * mgr)
+void VMD::dump(Region const* rg, UseDefMgr const* mgr) const
 {
     if (g_tfile == NULL) { return; }
     ASSERT0(is_md() && rg);
@@ -172,8 +189,9 @@ void VMD::dump(Region * rg, UseDefMgr * mgr)
     prt("|UsedBy:");
     SEGIter * vit = NULL;
     bool first = true;
-    for (INT i2 = getOccSet()->get_first(&vit);
-        i2 >= 0; i2 = getOccSet()->get_next(i2, &vit)) {
+    VMD * pthis = const_cast<VMD*>(this);
+    for (INT i2 = pthis->getUseSet()->get_first(&vit);
+        i2 >= 0; i2 = pthis->getUseSet()->get_next(i2, &vit)) {
         if (first) {
             first = false;
         } else {
@@ -263,8 +281,8 @@ void MDPhi::dump(Region * rg, UseDefMgr * mgr)
     prt("|UsedBy:");
     SEGIter * vit = NULL;
     bool first = true;
-    for (INT i2 = res->getOccSet()->get_first(&vit);
-        i2 >= 0; i2 = res->getOccSet()->get_next(i2, &vit)) {
+    for (INT i2 = res->getUseSet()->get_first(&vit);
+        i2 >= 0; i2 = res->getUseSet()->get_next(i2, &vit)) {
         if (first) {
             first = false;
         } else {

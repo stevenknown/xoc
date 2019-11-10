@@ -149,6 +149,7 @@ public:
     bool is_dump_ra; //Dump register allocation.
     bool is_dump_memusage; //Dump memory usage.
     bool is_dump_livenessmgr; //Dump LivenessMgr.
+    bool is_dump_refine_duchain; //Dump RefineDUChain.
 
 public:    
     DumpOpt();
@@ -174,6 +175,7 @@ public:
     bool isDumpRA() const;
     bool isDumpMemUsage() const;
     bool isDumpLivenessMgr() const;
+    bool isDumpRefineDUChain() const;
 };
 
 
@@ -218,6 +220,7 @@ typedef enum _PASS_TYPE {
     PASS_MD_BUGPATTERN_MGR,
     PASS_IPA,
     PASS_INLINER,
+    PASS_REFINE_DUCHAIN,
     PASS_NUM,
 } PASS_TYPE;
 
@@ -287,6 +290,7 @@ extern UINT g_thres_opt_ir_num_in_bb;
 extern UINT g_thres_flow_sensitive_aa;
 extern bool g_do_loop_convert;
 extern bool g_do_poly_tran;
+extern bool g_do_refine_duchain;
 extern bool g_retain_pass_mgr_for_region;
 extern UINT g_verify_level;
 

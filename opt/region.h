@@ -591,7 +591,7 @@ public:
         if (type->is_any()) {
             MD_ty(&md) = MD_UNBOUND;
         } else {
-            MD_size(&md) = getTypeMgr()->get_bytesize(type);
+            MD_size(&md) = getTypeMgr()->getByteSize(type);
             MD_ty(&md) = MD_EXACT;
         }
 
@@ -633,7 +633,7 @@ public:
     inline HOST_INT getIntegerInDataTypeValueRange(IR * ir) const
     {
         ASSERT0(ir->is_const() && ir->is_int());
-        UINT bitsz = getTypeMgr()->get_dtype_bitsize(
+        UINT bitsz = getTypeMgr()->getDTypeBitSize(
             TY_dtype(ir->getType()));
         ASSERTN(sizeof(HOST_INT) * BIT_PER_BYTE >= bitsz,
             ("integer might be truncated"));

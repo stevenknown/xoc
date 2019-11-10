@@ -598,11 +598,11 @@ public:
 
     bool is_triple(IR_TYPE i) const { return i == IR_ILD; }
     bool is_quad(IR_TYPE i) const { return i == IR_ARRAY; }
-    bool is_valid() { return m_is_valid; }
+    bool is_valid() const { return m_is_valid; }
 
     VN * mapIR2VN(IR const* ir) { return m_ir2vn.get(ir->id()); }
 
-    void set_mapIR2VN(IR const* ir, VN * vn) { m_ir2vn.set(ir->id(), vn); }
+    void setMapIR2VN(IR const* ir, VN * vn) { m_ir2vn.set(ir->id(), vn); }
     void setComputeVNForFP(bool doit) { m_is_vn_fp = doit; }
     void set_valid(bool valid) { m_is_valid = valid; }
     void setComputeILoadVNviaDU(bool doit) { m_is_comp_ild_vn_by_du = doit; }

@@ -398,7 +398,7 @@ public:
     bool has_pair_res(IR * ir);
 
     inline bool is_pair(IR const* ir) const
-    { return m_tm->get_bytesize(IR_dt(ir))== 8; }
+    { return m_tm->getByteSize(IR_dt(ir))== 8; }
 
     inline bool is_livein(UINT prno) const
     { return m_liveness_mgr->get_livein(BB_id(m_bb))->is_contain(prno); }

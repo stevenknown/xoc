@@ -1167,6 +1167,19 @@ Programming Guides
         The attached information of IR is used to represent additional
         information for specialized optimization or function.
 
+¡ö IR Reader
+    XOC provide text format of IR.
+    ¡ñ setelem
+        * Syntax: setelem $<prno>:<type>:(property) = <expression1>,
+                                                      <expression2>,
+                                                      <expression3>
+        prno: immediate that indicate the index of result PR.
+        type: data type of value that will set to result PR.
+        property: stmt property.
+        expression1: base of source.
+        expression2: value that need to be set.
+        expression3: byte offset to the begin of result PR.
+
 ¡ö Quick Start
     ¡ñ How to dump IR during compilation
         Add predefined macro to command line: -D_DEBUG_

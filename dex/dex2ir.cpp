@@ -77,7 +77,7 @@ Dex2IR::Dex2IR(IN Region * rg,
     m_pool = smpoolCreate(16, MEM_COMM);
     m_pr2v.init(MAX(4, getNearestPowerOf2(fu->maxVars)));
     m_ptr_addend = m_tm->getSimplexType(D_U32);
-    m_ofst_addend = m_tm->get_dtype_bytesize(D_I64);
+    m_ofst_addend = m_tm->getDTypeByteSize(D_I64);
     m_pr2v.maxreg = fu->maxVars - 1;
     m_pr2v.paramnum = fu->numArgs;
     m_current_catch_list = NULL;
@@ -406,7 +406,7 @@ Type const* Dex2IR::mapDexType2XocType(CHAR charty)
 {
     Type const* ty = NULL;
     switch (charty) {
-    case 'V': ty = m_tm->getSimplexTypeEx(D_VOID); break;
+    case 'V': ty = m_tm->getSimplexTypeEx(D_ANY); break;
     case 'Z': ty = m_tm->getSimplexTypeEx(D_B); break;
     case 'B': ty = m_tm->getSimplexTypeEx(D_U8); break;
     case 'S': ty = m_tm->getSimplexTypeEx(D_I16); break;
@@ -726,7 +726,7 @@ UINT Dex2IR::computeFieldOffset(UINT field_id)
     for (UINT i = 0; i < class_data->header.instanceFieldsSize; i++) {
         DexField * finfo = &class_data->instanceFields[i];
         if (finfo->fieldIdx == field_id) {
-            return i * m_tm->get_dtype_bytesize(D_I64);
+            return i * m_tm->getDTypeByteSize(D_I64);
         }
         //dumpf_field(df, finfo, 4);
     }
@@ -1075,7 +1075,7 @@ IR * Dex2IR::convertInvoke(IN LIR * lir)
         add_next(&param_list, &last, param);
     }
     ASSERT0(*paramty == 0);
-    IR * c = m_ru->buildCall(v, param_list, 0, m_tm->getVoid());
+    IR * c = m_ru->buildCall(v, param_list, 0, m_tm->getAny());
     IR_may_throw(c) = true;
     CALL_is_readonly(c) = VAR_is_readonly(v);
     IR_has_sideeffect(c) = true;
@@ -1198,7 +1198,7 @@ IR * Dex2IR::convertMonitorExit(IN LIR * lir)
 {
     VAR * v = getBuiltinVar(BLTIN_MONITOR_EXIT, m_ru_mgr);
     IR * c = m_ru->buildCall(v, genMappedPR(LIR_res(lir), m_tr->i32),
-                             0, m_tm->getVoid());
+                             0, m_tm->getAny());
     IR_may_throw(c) = true;
     CALL_is_intrinsic(c) = true;
     IR_has_sideeffect(c) = true;
@@ -1213,7 +1213,7 @@ IR * Dex2IR::convertMonitorEnter(IN LIR * lir)
 {
     VAR * v = getBuiltinVar(BLTIN_MONITOR_ENTER, m_ru_mgr);
     IR * c = m_ru->buildCall(v, genMappedPR(LIR_res(lir), m_tr->i32),
-                             0, m_tm->getVoid());
+                             0, m_tm->getAny());
     IR_may_throw(c) = true;
     CALL_is_intrinsic(c) = true;
     IR_has_sideeffect(c) = true;
@@ -1283,7 +1283,7 @@ IR * Dex2IR::convertFillArrayData(IN LIR * lir)
     #endif
 
     VAR * v = getBuiltinVar(BLTIN_FILL_ARRAY_DATA, m_ru_mgr);
-    IR * call = m_ru->buildCall(v, NULL, 0, m_tm->getVoid());
+    IR * call = m_ru->buildCall(v, NULL, 0, m_tm->getAny());
 
     //The first parameter is array obj-ptr.
     IR * p = genMappedPR(l->value, m_tr->ptr);
@@ -1368,7 +1368,7 @@ IR * Dex2IR::convertCheckCast(IN LIR * lir)
     VAR * v = getBuiltinVar(BLTIN_CHECK_CAST, m_ru_mgr);
     IR * p = genMappedPR(LIR_res(lir), m_tr->i32);
     add_next(&p, m_ru->buildImmInt(LIR_op0(lir), m_tr->i32));
-    IR * c = m_ru->buildCall(v, p, 0, m_tm->getVoid());
+    IR * c = m_ru->buildCall(v, p, 0, m_tm->getAny());
     IR_may_throw(c) = true;
     CALL_is_intrinsic(c) = true;
     CALL_is_readonly(c) = true;
@@ -1406,7 +1406,7 @@ IR * Dex2IR::convertFilledNewArray(IN LIR * lir)
     for (UINT i = 0; i < r->argc; i++) {
         add_next(&p, &last, genMappedPR(r->args[i], m_tr->i32));
     }
-    IR * c = m_ru->buildCall(v, p, 0, m_tm->getVoid());
+    IR * c = m_ru->buildCall(v, p, 0, m_tm->getAny());
     IR_may_throw(c) = true;
     CALL_is_intrinsic(c) = true;
     CALL_is_readonly(c) = true;
@@ -1420,7 +1420,7 @@ IR * Dex2IR::convertThrow(IN LIR * lir)
 {
     VAR * v = getBuiltinVar(BLTIN_THROW, m_ru_mgr);
     IR * c = m_ru->buildCall(v, genMappedPR(LIR_res(lir), m_tr->i32),
-                             0, m_tm->getVoid());
+                             0, m_tm->getAny());
     IR_may_throw(c) = true;
     CALL_is_readonly(c) = true;
     CALL_is_intrinsic(c) = true;

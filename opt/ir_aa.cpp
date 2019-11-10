@@ -420,11 +420,10 @@ void IR_AA::processLda(IR * ir, IN OUT MDSet & mds, IN OUT AACtx * ic)
 //e.g: int a; char b;
 //    a = (int)b
 //'mds' : record memory descriptor of 'ir'.
-void IR_AA::processCvt(
-        IR const* ir,
-        IN OUT MDSet & mds,
-        OUT AACtx * ic,
-        OUT MD2MDSet * mx)
+void IR_AA::processCvt(IR const* ir,
+                       IN OUT MDSet & mds,
+                       OUT AACtx * ic,
+                       OUT MD2MDSet * mx)
 {
     ASSERT0(ir->is_cvt());
     inferExpression(CVT_exp(ir), mds, ic, mx);
@@ -732,13 +731,12 @@ void IR_AA::inferArrayExpBase(
 //This function infer array element memory address according to
 //the LDA base of array operation.
 //This function will set the Ref MD and Ref MD set of array operation.
-void IR_AA::inferArrayLdabase(
-        IR * ir,
-        IR * array_base,
-        bool is_ofst_pred,
-        UINT ofst,
-        OUT MDSet & mds,
-        IN OUT AACtx * ic)
+void IR_AA::inferArrayLdabase(IR * ir,
+                              IR * array_base,
+                              bool is_ofst_pred,
+                              UINT ofst,
+                              OUT MDSet & mds,
+                              IN OUT AACtx * ic)
 {
     ASSERT0(ir->isArrayOp() && array_base->is_lda());
     AACtx tic(*ic);
@@ -1589,7 +1587,7 @@ void IR_AA::processILd(IR * ir,
     //Ask base-expression of ILD to compute what ILD stand for.
     AC_comp_pt(&tic) = true;
     
-    //Compute the memory address that ILD described.
+    //Compute the memory address that ILD described.    
     inferExpression(ILD_base(ir), mds, &tic, mx);
 
     if (mds.is_empty()) {
@@ -1600,11 +1598,24 @@ void IR_AA::processILd(IR * ir,
 
         //The POINT-TO set of base-expression indicates what ILD stand for.
         MDSet const* ildrefmds = AC_returned_pts(&tic);
+
+        MDSet tmp;
+        if (!ir->is_any()) {
+            //ir has exact type, try to reshape MD to make ir's
+            //reference MD more accurate.            
+            bool change = tryReshapeMDSet(ir, ildrefmds, &tmp);
+            if (change) {
+                //mds.copy(tmp, *m_misc_bs_mgr);
+                ildrefmds = &tmp;
+            }            
+        }
+        
         //According to the requirement of parent expression to
         //compute the POINT-TO set of ILD itself.
         //For conservatively, 
         AC_returned_pts(ic) = updateIndirectOpAddrAndPointToSet(
             ildrefmds, ir, AC_comp_pt(ic), mx);
+        tmp.clean(*m_misc_bs_mgr);
         return;
     }
     
@@ -1615,8 +1626,7 @@ void IR_AA::processILd(IR * ir,
         //ir has exact type, try to reshape MD to make ir's
         //reference MD more accurate.
         MDSet tmp;
-        bool change = tryReshapeMDSet(&mds, &tmp,
-            ILD_ofst(ir), ir->getTypeSize(m_tm));
+        bool change = tryReshapeMDSet(ir, &mds, &tmp);
         if (change) {
             mds.copy(tmp, *m_misc_bs_mgr);
         }
@@ -2245,15 +2255,18 @@ FIN:
 
 //Reshape MD in 'mds' if one of them need to be reshape.
 //Record reshaped MD in 'newmds' and return true.
-bool IR_AA::tryReshapeMDSet(MDSet const* mds,
-                            OUT MDSet * newmds,
-                            UINT newofst,
-                            UINT newsize)
+//This function will iterate MD in 'mds', new MD will be generated either
+//ir's MD size is different to MD in 'mds' or ir has offset.
+//Return true if new MD generated, and new MD record in 'newmds'.
+bool IR_AA::tryReshapeMDSet(IR const* ir, MDSet const* mds, OUT MDSet * newmds)
 {
+    if (ir->is_any()) { return false; }
+    UINT newofst = ir->getOffset();
+    UINT newsize = ir->getTypeSize(m_tm);
     ASSERT0(mds && newmds);
     bool change = false;
     xcom::SEGIter * iter;
-    //Note if ir's type is VOID, size is 1, see details in data_type.h.
+    //Note if ir's type is ANY, size is 1, see details in data_type.h.
     //Thus MD indicates an object that is p + ild_ofst + 0.
     for (INT i = mds->get_first(&iter);
          i >= 0; i = mds->get_next((UINT)i, &iter)) {
@@ -2325,8 +2338,7 @@ void IR_AA::processISt(IN IR * ir, IN MD2MDSet * mx)
     //    ir->getTypeSize(m_tm) != IST_base(ir)->getTypeSize(m_tm)) {
     if (!ir->is_any()) {
         MDSet tmp;
-        bool change = tryReshapeMDSet(&maypts, &tmp,
-            IST_ofst(ir), ir->getTypeSize(m_tm));
+        bool change = tryReshapeMDSet(ir, &maypts, &tmp);
         if (change) {
             maypts.copy(tmp, *m_misc_bs_mgr);
         }

@@ -42,5 +42,6 @@ OPT_OBJS +=\
 ../opt/ipa.o\
 ../opt/callg.o\
 ../opt/ir_loop_cvt.o\
+../opt/refine_duchain.o\
 ../opt/symtab.o
 

@@ -654,14 +654,14 @@ public:
     { return hoistBSdtype(bit_size, is_signed); }
 
     //Return bits size of 'dtype' refers to.
-    UINT get_dtype_bitsize(DATA_TYPE dtype) const
+    UINT getDTypeBitSize(DATA_TYPE dtype) const
     {
         ASSERTN(dtype != D_MC && dtype != D_TENSOR, ("complex type"));
         return TYDES_bitsize(&g_type_desc[dtype]);
     }
 
     //Return bits size of 'dtype' refers to.
-    CHAR const* get_dtype_name(DATA_TYPE dtype) const
+    CHAR const* getDTypeName(DATA_TYPE dtype) const
     {
         ASSERT0(dtype < D_LAST);
         return TYDES_name(&g_type_desc[dtype]);
@@ -669,7 +669,7 @@ public:
 
     //Return byte size of a pointer.
     //e.g: 32bit processor return 4, 64bit processor return 8.
-    UINT get_pointer_bytesize() const { return BYTE_PER_POINTER; }
+    UINT getPointerByteSize() const { return BYTE_PER_POINTER; }
 
     //Return DATA-Type that has identical byte-size to pointer.
     //e.g: 32bit processor return U4, 64bit processor return U8.
@@ -684,10 +684,10 @@ public:
     }
 
     //Return bytes size of 'dtype' refer to.
-    UINT get_dtype_bytesize(DATA_TYPE dtype) const
+    UINT getDTypeByteSize(DATA_TYPE dtype) const
     {
         ASSERT0(dtype != D_UNDEF);
-        UINT bitsize = get_dtype_bitsize(dtype);
+        UINT bitsize = getDTypeBitSize(dtype);
         return bitsize < BIT_PER_BYTE ?
             (UINT)1 : (UINT)xceiling((INT)bitsize, BIT_PER_BYTE);
     }
@@ -770,7 +770,7 @@ public:
         ASSERT0(vec_elem_num != 0 && vec_elem_ty != D_UNDEF);
         VectorType d;
         TY_dtype(&d) = D_VEC;
-        TY_vec_size(&d) = vec_elem_num * get_dtype_bytesize(vec_elem_ty);
+        TY_vec_size(&d) = vec_elem_num * getDTypeByteSize(vec_elem_ty);
         TY_vec_ety(&d) = vec_elem_ty;
         return TC_type(registerVector(&d));
     }
@@ -799,14 +799,14 @@ public:
     }
 
     //Return byte size according to given Type.
-    UINT get_bytesize(Type const* dtd) const;
+    UINT getByteSize(Type const* dtd) const;
 
     //Return byte size according to given tyid.
-    UINT get_bytesize(UINT tyid) const { return get_bytesize(getType(tyid)); }
+    UINT getByteSize(UINT tyid) const { return getByteSize(getType(tyid)); }
 
     //Return byte size according to given Type.
-    UINT get_bitsize(Type const* dtd) const
-    { return get_bytesize(dtd) * BITS_PER_BYTE; }
+    UINT getBitSize(Type const* dtd) const
+    { return getByteSize(dtd) * BITS_PER_BYTE; }
 
     bool is_scalar(UINT tyid) { return tyid >= D_B && tyid <= D_F128; }
 

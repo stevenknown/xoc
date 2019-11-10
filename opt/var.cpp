@@ -285,7 +285,7 @@ CHAR const* VAR::dump(StrBuf & buf, TypeMgr const* dm) const
         buf.strcat(",pointer,pt_base_sz:%d", TY_ptr_base_size(ltype));
     }
 
-    buf.strcat(",%s", dm->get_dtype_name(TY_dtype(ltype)));
+    buf.strcat(",%s", dm->getDTypeName(TY_dtype(ltype)));
     if (TY_dtype(ltype) > D_F128) {
         buf.strcat(",mem_size:%d", getByteSize(dm));
     }

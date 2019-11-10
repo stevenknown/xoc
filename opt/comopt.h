@@ -56,3 +56,4 @@ author: Su Zhenyu
 #include "ir_loop_cvt.h"
 #include "ipa.h"
 #include "inliner.h"
+#include "refine_duchain.h"

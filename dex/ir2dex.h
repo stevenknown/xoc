@@ -192,7 +192,7 @@ public:
     }
 
     inline bool is_pair(IR const* ir)
-    { return m_tm->get_bytesize(IR_dt(ir))== 8; }
+    { return m_tm->getByteSize(IR_dt(ir))== 8; }
     void reloc();
 };
 #endif

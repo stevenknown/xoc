@@ -437,10 +437,12 @@ protected:
     //mds: mds may be the MayAddr MDSet. Note mds should have been hashed.
     void setMustOrMayAddr(MDSet const* mds, IR * ir);
 
-    bool tryReshapeMDSet(MDSet const* mds,
-                         OUT MDSet * newmds,
-                         UINT newofst,
-                         UINT newsize);
+    //Reshape MD in 'mds' if one of them need to be reshape.
+    //Record reshaped MD in 'newmds' and return true.
+    //This function will iterate MD in 'mds', new MD will be generated either
+    //ir's MD size is different to MD in 'mds' or ir has offset.
+    //Return true if new MD generated, and new MD record in 'newmds'.
+    bool tryReshapeMDSet(IR const* ir, MDSet const* mds, OUT MDSet * newmds);
     bool tryComputeConstOffset(IR const* ir,
                                IR const* opnd1,
                                IN OUT MDSet & mds,

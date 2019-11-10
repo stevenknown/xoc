@@ -110,6 +110,7 @@ public:
     virtual Pass * allocCfsMgr();
     virtual Pass * allocIPA();
     virtual Pass * allocInliner();
+    virtual Pass * allocRefineDUChain();
 
     void destroyAllPass();
     void destroyPass(Pass * pass);

@@ -35,6 +35,20 @@ typedef Vector<TMap<UINT, VMD*>*> BB2VMDMap;
 typedef TMap<UINT, MDPhiList*> BB2MDPhiList;
 typedef TMapIter<UINT, MDPhiList*> BB2MDPhiListIter;
 
+//This class construct MDSSA form and manage the MDSSA information for
+//stmt and expression.
+//MDSSAInfo is only avaiable to Memory Reference IR operations, include
+//IR_LD, IR_ST, IR_ILD, IR_IST, IR_ARRAY, IR_STARRAY, IR_ID.
+//MDSSA information is constructed for each MD of IR, thus for a given
+//IR stmt/expression, one can get a set of virtual MD. Each virtual MD
+//have an unique DEF IR stmt, and a list of USE IR expressions. There
+//is double link in bewteen any of two virtual MD that describe same real MD.
+//The DU Chain of stmt and expression is consist a DEF and its USE set.
+//The DU Chain of stmt and stmt is consist of a list of linked DEF of
+//virtual MD with different version.
+//If you are going to remove USE of virtual MD, remove IR expression from
+//USE set in paticular virtual MD, and remove the virtual MD from current
+//IR's MDSSAInfo.
 class MDSSAMgr : public Pass {
 protected:
     Region * m_ru;
@@ -82,18 +96,17 @@ protected:
 
     void destructBBSSAInfo(IRBB * bb);
     void destructionInDomTreeOrder(IRBB * root, xcom::Graph & domtree);
-    void dumpExpDUChainIter(
-            IR const* ir,
-            List<IR const*> & lst,
-            List<IR const*> & opnd_lst,
-            OUT bool * parting_line);
+    void dumpExpDUChainIter(IR const* ir,
+                            List<IR const*> & lst,
+                            List<IR const*> & opnd_lst,
+                            OUT bool * parting_line);
+    void dumpBBRef(IN IRBB * bb, UINT indent);
 
     void freePhiList();
 
-    void handleBBRename(
-            IRBB * bb,
-            IN DefSBitSet & defed_prs,
-            IN OUT BB2VMDMap & bb2vmdmap);
+    void handleBBRename(IRBB * bb,
+                        IN DefSBitSet & defed_prs,
+                        IN OUT BB2VMDMap & bb2vmdmap);
 
     Stack<VMD*> * mapMD2VMDStack(UINT mdid);
 
@@ -113,13 +126,12 @@ protected:
 
     void prunePhi(List<IRBB*> & wl);
     void prunePhiForBB(List<IRBB*> & wl, IRBB * bb);
-    void placePhiForMD(
-            UINT mdid,
-            IN List<IRBB*> * defbbs,
-            DfMgr const& dfm,
-            xcom::BitSet & visited,
-            List<IRBB*> & wl,
-            Vector<DefSBitSet*> & defmds_vec);
+    void placePhiForMD(UINT mdid,
+                       IN List<IRBB*> * defbbs,
+                       DfMgr const& dfm,
+                       xcom::BitSet & visited,
+                       List<IRBB*> & wl,
+                       Vector<DefSBitSet*> & defmds_vec);
     void placePhi(DfMgr const& dfm,
                   IN OUT DefSBitSet & effect_md,
                   DefMiscBitSetMgr & bs_mgr,
@@ -206,12 +218,22 @@ public:
     void dumpAllVMD();
     CHAR * dumpVMD(IN VMD * v, OUT CHAR * buf);
     void dumpSSAGraph(CHAR * name = NULL);
+    void dumpRef(UINT indent);
 
     //Find killing must-def for expression ir.
     MDDef * findKillingDef(IR const* ir);
     MDDef * findNearestDef(IR const* ir);
 
+    Region * getRegion() const { return m_ru; }
     UseDefMgr * getUseDefMgr() { return &m_usedef_mgr; }
+    virtual CHAR const* getPassName() const
+    { return "MD SSA Manager"; }
+    PASS_TYPE getPassType() const { return PASS_MD_SSA_MGR; }
+    MDSSAInfo * getMDSSAInfoIfAny(IR const* ir)
+    { return hasMDSSAInfo(ir) ? getUseDefMgr()->getMDSSAInfo(ir) : NULL; }
+
+    bool hasMDSSAInfo(IR const* ir) const
+    { return ir->isMemoryRefNotOperatePR() || ir->isCallStmt(); }
 
     void initVMD(IN IR * ir, OUT DefSBitSet & maydef_md);
     void insertPhi(UINT mdid, IN IRBB * bb);
@@ -239,21 +261,15 @@ public:
     //NOTE: If ir is a IR tree, e.g: ild(x, ld(y)), remove ild(x) means ld(y) will
     //be removed as well. And ld(y)'s MDSSAInfo will be updated as well.
     void removeMDSSAUseRecur(IR * ir);
+    //Remove DEF-USE chain if exist in between 'stmt' and 'exp'.
+    //This function will remove 'exp' from occurence set.
+    //stmt: IR stmt that is DEF of 'exp'.
+    //exp: IR expression to be removed.
+    void removeDUChain(IR const* stmt, IR const* exp);
 
     bool verifyPhi(bool is_vpinfo_avail);
     bool verifyVMD();
     bool verify();
-
-    virtual CHAR const* getPassName() const
-    { return "MD SSA Manager"; }
-
-    PASS_TYPE getPassType() const { return PASS_MD_SSA_MGR; }
-
-    MDSSAInfo * getMDSSAInfoIfAny(IR const* ir)
-    { return hasMDSSAInfo(ir) ? getUseDefMgr()->getMDSSAInfo(ir) : NULL; }
-
-    bool hasMDSSAInfo(IR const* ir) const
-    { return ir->isMemoryRefNotOperatePR() || ir->isCallStmt(); }
 
     virtual bool perform(OptCtx & oc)
     { construction(oc); return true; }
