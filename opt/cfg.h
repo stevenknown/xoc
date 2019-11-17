@@ -1267,6 +1267,8 @@ void CFG<BB, XR>::build(OptCtx & oc)
             if (next != NULL && !next->is_terminate()) {
                 addEdge(bb->id(), next->id());
             }
+        } else {
+            addVertex(bb->id());
         }
     }
     OC_is_cfg_valid(oc) = true;

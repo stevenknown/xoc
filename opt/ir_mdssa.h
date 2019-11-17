@@ -96,6 +96,9 @@ protected:
 
     void destructBBSSAInfo(IRBB * bb);
     void destructionInDomTreeOrder(IRBB * root, xcom::Graph & domtree);
+    void dumpDefChain(List<MDDef const*> & wl,
+                      IRSet & visited,
+                      VMD const* vopnd);
     void dumpExpDUChainIter(IR const* ir,
                             List<IR const*> & lst,
                             List<IR const*> & opnd_lst,

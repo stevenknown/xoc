@@ -28,6 +28,8 @@ USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include "math.h"
 #include "xcominc.h"
 
+//#define VARIADIC_PARAMETER_ACCESS
+
 namespace xcom {
 
 Matrix<Rational> operator * (Matrix<Rational> const& a,
@@ -754,7 +756,6 @@ void INTMat::sete(UINT num, ...)
         return;
     }
 
-//#define VARIADIC_PARAMETER_ACCESS
 #ifdef VARIADIC_PARAMETER_ACCESS
     //The following algorithm to access variadic parameter may not
     //compatible with current stack layout and stack alignment,
@@ -1431,7 +1432,7 @@ void FloatMat::destroy()
 //Set value of elements one by one.
 //'num': indicate the number of variant parameters.
 //NOTICE:
-// Pamaters after 'num' must be float/double.
+// Arguments after 'num' must be float/double.
 // e.g: sete(NUM, 2.0, 3.0...)
 void FloatMat::sete(UINT num, ...)
 {
@@ -1440,9 +1441,15 @@ void FloatMat::sete(UINT num, ...)
     if (num <= 0) {
         return;
     }
-    UINT i = 0;
     UINT row = 0, col = 0;
+#ifdef VARIADIC_PARAMETER_ACCESS
+    //The following algorithm to access variadic parameter may not
+    //compatible with current stack layout and stack alignment,
+    //says the code work well on Linux with gcc4.8, but
+    //it does not work on Windows with VS2015. Therefore
+    //a better advise is to use va_arg().
     BYTE * ptr =(BYTE*) (((BYTE*)(&num)) + sizeof(num));
+    UINT i = 0;
     while (i < num) {
         PRECISION_TYPE numer = (PRECISION_TYPE)*(double*)ptr;
         Matrix<Float>::set(row, col++, Float(numer));
@@ -1455,6 +1462,20 @@ void FloatMat::sete(UINT num, ...)
         //C++ default regard type of the parameter as double.
         ptr+=sizeof(double); //stack growing down
     }
+#else
+    va_list ptr;
+    va_start(ptr, num);
+    for (UINT i = 0; i < num; i++) {
+        //In C++ specification, FP immediate's type is regarded as 'double'.
+        PRECISION_TYPE numer = (PRECISION_TYPE)va_arg(ptr, double);
+        Matrix<Float>::set(row, col++, Float(numer));
+        if (col >= m_col_size) {
+            row++;
+            col = 0;
+        }
+    }
+    va_end(ptr);
+#endif
 }
 
 
@@ -1673,9 +1694,16 @@ void BMat::sete(UINT num, ...)
     if (num <= 0) {
         return;
     }
-    UINT i = 0;
     UINT row = 0, col = 0;
+
+#ifdef VARIADIC_PARAMETER_ACCESS
+    //The following algorithm to access variadic parameter may not
+    //compatible with current stack layout and stack alignment,
+    //says the code work well on Linux with gcc4.8, but
+    //it does not work on Windows with VS2015. Therefore
+    //a better advise is to use va_arg().
     bool * ptr = (bool*)(((BYTE*)(&num)) + sizeof(num));
+    UINT i = 0;
     while (i < num) {
         set(row, col++, *ptr);
         if (col >= m_col_size) {
@@ -1683,10 +1711,21 @@ void BMat::sete(UINT num, ...)
             col = 0;
         }
         i++;
-
-        //Default regard type of the parameter as double.
         ptr++; //stack growing down
     }
+#else
+    va_list ptr;
+    va_start(ptr, num);
+    for (UINT i = 0; i < num; i++) {
+        bool numer = va_arg(ptr, bool);
+        set(row, col++, numer);
+        if (col >= m_col_size) {
+            row++;
+            col = 0;
+        }
+    }
+    va_end(ptr);
+#endif
 }
 
 

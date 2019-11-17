@@ -273,8 +273,9 @@ protected:
     TOKEN t_string();
     TOKEN t_char_list();
     TOKEN t_id();
-    TOKEN t_solidus();
+    TOKEN t_solidus(bool * is_restart);
     TOKEN t_dot();
+    TOKEN t_rest(bool * is_restart);
 
     void * xmalloc(size_t size)
     {

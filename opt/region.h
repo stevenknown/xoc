@@ -595,7 +595,7 @@ public:
             MD_ty(&md) = MD_EXACT;
         }
 
-        MD const* e = getMDSystem()->registerMD(md);
+        MD const* e = getMDSystem()->registerMD(md);        
         ASSERT0(MD_id(e) > 0);
         return e;
     }

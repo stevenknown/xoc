@@ -736,7 +736,7 @@ TOKEN Lexer::t_id()
 //'m_cur_char' hold the current charactor right now.
 //You should assign 'm_cur_char' the next valid charactor before
 //the function return.
-TOKEN Lexer::t_solidus()
+TOKEN Lexer::t_solidus(bool * is_restart)
 {
     TOKEN t = T_NUL;
     INT st;
@@ -752,7 +752,7 @@ TOKEN Lexer::t_solidus()
             m_cur_char = m_cur_line[m_cur_line_pos];
             m_cur_line_pos++;
             if (m_cur_char == '/'){ // another single comment line
-                t = t_solidus();
+                t = t_solidus(is_restart);
                 goto FIN;
             } else {
                 t = getNextToken();
@@ -774,7 +774,14 @@ TOKEN Lexer::t_solidus()
                     //We meet the multipul comment terminated token '*/',
                     //so change the parsing state to normal.
                     m_cur_char = getNextChar();
-                    t = getNextToken();
+
+                    //CASE: recur_lex.c, Do NOT recursive call into
+                    //getNextToken() if meeting end of comments.
+                    //Avoid stack overflow.
+                    //t = getNextToken();
+                    t = T_NUL;
+                    ASSERT0(is_restart);
+                    *is_restart = true;
                     goto FIN;
                 } else {
                     c = c1;
@@ -783,7 +790,7 @@ TOKEN Lexer::t_solidus()
             } else if (c == ST_EOF || c1 == ST_EOF) {
                   t = T_END;
                 goto FIN;
-            }else{
+            } else {
                   c = c1;
             }
         } //end while
@@ -833,27 +840,271 @@ TOKEN Lexer::t_dot()
 }
 
 
+TOKEN Lexer::t_rest(bool * is_restart)
+{
+    TOKEN token = T_NUL;
+    switch (m_cur_char) {
+    case '-':
+        m_cur_token_string[m_cur_token_string_pos++] = m_cur_char;
+        m_cur_char = getNextChar();
+        switch (m_cur_char) {
+        case '=': //'-='
+            token = T_SUBEQU;
+            m_cur_token_string[m_cur_token_string_pos++] = m_cur_char;
+            m_cur_token_string[m_cur_token_string_pos] = 0;
+            m_cur_char = getNextChar();
+            break;
+        case '>': //'->'
+            token = T_ARROW;
+            m_cur_token_string[m_cur_token_string_pos++] = m_cur_char;
+            m_cur_token_string[m_cur_token_string_pos] = 0;
+            m_cur_char = getNextChar();
+            break;
+        case '-': //'--'
+            token = T_SUBSUB;
+            m_cur_token_string[m_cur_token_string_pos++] = m_cur_char;
+            m_cur_token_string[m_cur_token_string_pos] = 0;
+            m_cur_char = getNextChar();
+            break;
+        default: //'-'
+            token = T_SUB;
+            m_cur_token_string[m_cur_token_string_pos] = 0;
+        }
+        break;
+    case '+':
+        m_cur_token_string[m_cur_token_string_pos++] = m_cur_char;
+        m_cur_char = getNextChar();
+        switch (m_cur_char) {
+        case '=': //'+='
+            token = T_ADDEQU;
+            m_cur_token_string[m_cur_token_string_pos++] = m_cur_char;
+            m_cur_token_string[m_cur_token_string_pos] = 0;
+            m_cur_char = getNextChar();
+            break;
+        case '+': //'++'
+            token = T_ADDADD;
+            m_cur_token_string[m_cur_token_string_pos++] = m_cur_char;
+            m_cur_token_string[m_cur_token_string_pos] = 0;
+            m_cur_char = getNextChar();
+            break;
+        default: //'+'
+            token = T_ADD;
+            m_cur_token_string[m_cur_token_string_pos] = 0;
+        }
+        break;
+    case '%':
+        m_cur_token_string[m_cur_token_string_pos++] = m_cur_char;
+        m_cur_char = getNextChar();
+        switch (m_cur_char) {
+        case '=': //'%='
+            token = T_REMEQU;
+            m_cur_token_string[m_cur_token_string_pos++] = m_cur_char;
+            m_cur_token_string[m_cur_token_string_pos] = 0;
+            m_cur_char = getNextChar();
+            break;
+        default: //'%'
+            token = T_MOD;
+            m_cur_token_string[m_cur_token_string_pos] = 0;
+        }
+        break;
+    case '^':
+        m_cur_token_string[m_cur_token_string_pos++] = m_cur_char;
+        m_cur_char = getNextChar();
+        if (m_cur_char == '=') { //'^='
+            token = T_XOREQU;
+            m_cur_token_string[m_cur_token_string_pos++] = m_cur_char;
+            m_cur_token_string[m_cur_token_string_pos] = 0;
+            m_cur_char = getNextChar();
+        } else { //'^'
+            token = T_XOR;
+            m_cur_token_string[m_cur_token_string_pos] = 0;
+        }
+        break;
+    case '=':
+        m_cur_token_string[m_cur_token_string_pos++] = m_cur_char;
+        m_cur_char = getNextChar();
+        switch (m_cur_char) {
+        case '=': //'=='
+            token = T_EQU;
+            m_cur_token_string[m_cur_token_string_pos++] = m_cur_char;
+            m_cur_token_string[m_cur_token_string_pos] = 0;
+            m_cur_char = getNextChar();
+            break;
+        default: //'='
+            token = T_ASSIGN;
+            m_cur_token_string[m_cur_token_string_pos] = 0;
+        }
+        break;
+    case '*':
+        m_cur_token_string[m_cur_token_string_pos++] = m_cur_char;
+        m_cur_char = getNextChar();
+        switch (m_cur_char) {
+        case '=': //'*='
+            token = T_MULEQU;
+            m_cur_token_string[m_cur_token_string_pos++] = m_cur_char;
+            m_cur_token_string[m_cur_token_string_pos] = 0;
+            m_cur_char = getNextChar();
+            break;
+        default: //'*'
+            token = T_ASTERISK;
+            m_cur_token_string[m_cur_token_string_pos] = 0;
+        }
+        break;
+    case '&':
+        m_cur_token_string[m_cur_token_string_pos++] = m_cur_char;
+        m_cur_char = getNextChar();
+        switch (m_cur_char) {
+        case '&': //'&&'
+            token = T_AND;
+            m_cur_token_string[m_cur_token_string_pos++] = m_cur_char;
+            m_cur_token_string[m_cur_token_string_pos] = 0;
+            m_cur_char = getNextChar();
+            break;
+        case '=': //&=
+            token = T_BITANDEQU;
+            m_cur_token_string[m_cur_token_string_pos++] = m_cur_char;
+            m_cur_token_string[m_cur_token_string_pos] = 0;
+            m_cur_char = getNextChar();
+            break;
+        default: //'&'
+            token = T_BITAND;
+            m_cur_token_string[m_cur_token_string_pos] = 0;
+        }
+        break;
+    case '|':
+        m_cur_token_string[m_cur_token_string_pos++] = m_cur_char;
+        m_cur_char = getNextChar();
+        switch (m_cur_char) {
+        case '|': //'||'
+            token = T_OR;
+            m_cur_token_string[m_cur_token_string_pos++] = m_cur_char;
+            m_cur_token_string[m_cur_token_string_pos] = 0;
+            m_cur_char = getNextChar();
+            break;
+        case '=': //|=
+            token = T_BITOREQU;
+            m_cur_token_string[m_cur_token_string_pos++] = m_cur_char;
+            m_cur_token_string[m_cur_token_string_pos] = 0;
+            m_cur_char = getNextChar();
+            break;
+        default: // '|'
+            token = T_BITOR;
+            m_cur_token_string[m_cur_token_string_pos] = 0;
+        }
+        break;
+    case ':':
+        m_cur_token_string[m_cur_token_string_pos++] = m_cur_char;
+        m_cur_char = getNextChar();
+        token = T_COLON;
+        m_cur_token_string[m_cur_token_string_pos] = 0;
+         break;
+    case '>':
+        m_cur_token_string[m_cur_token_string_pos++] = m_cur_char;
+        m_cur_char = getNextChar();
+        switch (m_cur_char) {
+        case '>':
+            m_cur_token_string[m_cur_token_string_pos++] = m_cur_char;
+            m_cur_char = getNextChar();
+            if (m_cur_char == '=') { // >>=
+                token = T_RSHIFTEQU;
+                m_cur_token_string[m_cur_token_string_pos++] = m_cur_char;
+                m_cur_token_string[m_cur_token_string_pos] = 0;
+                m_cur_char = getNextChar();
+            } else { // >>
+                token = T_RSHIFT;
+                m_cur_token_string[m_cur_token_string_pos] = 0;
+            }
+            break;
+        case '=': // '>='
+            token = T_NOLESSTHAN;
+            m_cur_token_string[m_cur_token_string_pos++] = m_cur_char;
+            m_cur_token_string[m_cur_token_string_pos] = 0;
+            m_cur_char = getNextChar();
+            break;
+        default: //'>'
+            token = T_MORETHAN;
+            m_cur_token_string[m_cur_token_string_pos] = 0;
+        }
+        break;
+    case '<':
+        m_cur_token_string[m_cur_token_string_pos++] = m_cur_char;
+        m_cur_char = getNextChar();
+        switch (m_cur_char) {
+        case '<':
+            m_cur_token_string[m_cur_token_string_pos++] = m_cur_char;
+            m_cur_char = getNextChar();
+            if (m_cur_char == '=') { // <<=
+                token = T_LSHIFTEQU;
+                m_cur_token_string[m_cur_token_string_pos++] = m_cur_char;
+                m_cur_token_string[m_cur_token_string_pos] = 0;
+                m_cur_char = getNextChar();
+            } else { // <<
+                token = T_LSHIFT;
+                m_cur_token_string[m_cur_token_string_pos] = 0;
+            }
+            break;
+        case '=': // '<='
+            token = T_NOMORETHAN;
+            m_cur_token_string[m_cur_token_string_pos++] = m_cur_char;
+            m_cur_token_string[m_cur_token_string_pos] = 0;
+            m_cur_char = getNextChar();
+            break;
+        default: // '<'
+            token = T_LESSTHAN;
+            m_cur_token_string[m_cur_token_string_pos] = 0;
+        }
+        break;
+    case '!':
+        m_cur_token_string[m_cur_token_string_pos++] = m_cur_char;
+        m_cur_char = getNextChar();
+        switch (m_cur_char) {
+        case '=': // '!='
+            token = T_NOEQU;
+            m_cur_token_string[m_cur_token_string_pos++] = m_cur_char;
+            m_cur_token_string[m_cur_token_string_pos] = 0;
+            m_cur_char = getNextChar();
+            break;
+        default: // '!'
+            token = T_NOT;
+            m_cur_token_string[m_cur_token_string_pos] = 0;
+        }
+        break;
+    case '/':
+        token = t_solidus(is_restart);
+        break;
+    case '.':
+        token = t_dot();
+        break;
+    /////////////////////////////////////////
+    //DO NOT ADD NEW CASES AFTER THIS LINE.//
+    /////////////////////////////////////////
+    default:
+        if (m_cur_token == T_END) {
+            //Meet file end.
+            token = T_END;
+        } else {
+            //There may be error occurred.
+            token = T_NUL;
+        }
+    } //end switch
+    return token;
+}
+
+
 TOKEN Lexer::getNextToken()
 {
     ASSERT0(m_src_file);
-    TOKEN token;
     if (m_cur_token == T_END) {
         return m_cur_token;
     }
+    TOKEN token = T_NUL;
     m_cur_token_string_pos = 0;
     m_cur_token_string[0] = 0;
-    if (m_cur_char == 0) {
-        while (m_cur_char == 0) {
-            m_cur_char = getNextChar();
-            if (m_cur_char == ST_EOF) {
-                token = T_END;
-                goto FIN;
-            }
-         }
-    }
+    while (m_cur_char == 0) { m_cur_char = getNextChar(); }
+START:
     switch(m_cur_char){
     case ST_EOF:
-        token = T_END;
+        token = T_END; //Meet file end.
         break;
     case 0xa:
     case 0xd:
@@ -864,8 +1115,12 @@ TOKEN Lexer::getNextToken()
             m_cur_token_string[m_cur_token_string_pos] = 0;
             m_cur_char = getNextChar();
         } else  {
+            //CASE: recur_lex.c, Do NOT recursive call into
+            //getNextToken() if meeting end of source code line.
+            //Avoid stack overflow.
+            //token = getNextToken();
             m_cur_char = getNextChar();
-            token = getNextToken();
+            goto START;
         }
         break;
     case '\t':
@@ -980,51 +1235,60 @@ TOKEN Lexer::getNextToken()
         } else if(m_cur_char == '-') {
             m_cur_token_string[m_cur_token_string_pos++] = m_cur_char;
             m_cur_char = getNextChar();
-            if (m_cur_char == '=') { //'-='
+            switch (m_cur_char) {
+            case '=': //'-='
                 token = T_SUBEQU;
                 m_cur_token_string[m_cur_token_string_pos++] = m_cur_char;
                 m_cur_token_string[m_cur_token_string_pos] = 0;
                 m_cur_char = getNextChar();
-            } else if(m_cur_char == '>') { //'->'
+                break;
+            case '>': //'->'
                 token = T_ARROW;
                 m_cur_token_string[m_cur_token_string_pos++] = m_cur_char;
                 m_cur_token_string[m_cur_token_string_pos] = 0;
                 m_cur_char = getNextChar();
-            } else if (m_cur_char == '-') { //'--'
+                break;
+            case '-': //'--'
                 token = T_SUBSUB;
                 m_cur_token_string[m_cur_token_string_pos++] = m_cur_char;
                 m_cur_token_string[m_cur_token_string_pos] = 0;
                 m_cur_char = getNextChar();
-            } else { //'-'
+                break;
+            default: //'-'
                 token = T_SUB;
                 m_cur_token_string[m_cur_token_string_pos] = 0;
             }
         } else if (m_cur_char == '+') {
             m_cur_token_string[m_cur_token_string_pos++] = m_cur_char;
             m_cur_char = getNextChar();
-            if (m_cur_char == '=') { //'+='
+            switch (m_cur_char) {
+            case '=': //'+='
                 token = T_ADDEQU;
                 m_cur_token_string[m_cur_token_string_pos++] = m_cur_char;
                 m_cur_token_string[m_cur_token_string_pos] = 0;
                 m_cur_char = getNextChar();
-            } else if (m_cur_char == '+') { //'++'
+                break;
+            case '+': //'++'
                 token = T_ADDADD;
                 m_cur_token_string[m_cur_token_string_pos++] = m_cur_char;
                 m_cur_token_string[m_cur_token_string_pos] = 0;
                 m_cur_char = getNextChar();
-            } else { //'+'
+                break;
+            default: //'+'
                 token = T_ADD;
                 m_cur_token_string[m_cur_token_string_pos] = 0;
             }
         } else if(m_cur_char == '%') {
             m_cur_token_string[m_cur_token_string_pos++] = m_cur_char;
             m_cur_char = getNextChar();
-            if(m_cur_char == '='){ //'%='
+            switch (m_cur_char) {
+            case '=': //'%='
                 token = T_REMEQU;
                 m_cur_token_string[m_cur_token_string_pos++] = m_cur_char;
                 m_cur_token_string[m_cur_token_string_pos] = 0;
                 m_cur_char = getNextChar();
-            } else { //'%'
+                break;
+            default: //'%'
                 token = T_MOD;
                 m_cur_token_string[m_cur_token_string_pos] = 0;
             }
@@ -1084,17 +1348,20 @@ TOKEN Lexer::getNextToken()
         } else if (m_cur_char == '|') {
             m_cur_token_string[m_cur_token_string_pos++] = m_cur_char;
             m_cur_char = getNextChar();
-            if (m_cur_char == '|') { //'||'
+            switch (m_cur_char) {
+            case '|': //'||'
                 token = T_OR;
                 m_cur_token_string[m_cur_token_string_pos++] = m_cur_char;
                 m_cur_token_string[m_cur_token_string_pos] = 0;
                 m_cur_char = getNextChar();
-            } else if (m_cur_char == '=') { //|=
+                break;
+            case '=': //|=
                 token = T_BITOREQU;
                 m_cur_token_string[m_cur_token_string_pos++] = m_cur_char;
                 m_cur_token_string[m_cur_token_string_pos] = 0;
                 m_cur_char = getNextChar();
-            } else {  // '|'
+                break;
+            default: // '|'
                 token = T_BITOR;
                 m_cur_token_string[m_cur_token_string_pos] = 0;
             }
@@ -1106,7 +1373,8 @@ TOKEN Lexer::getNextToken()
         } else if (m_cur_char == '>') {
             m_cur_token_string[m_cur_token_string_pos++] = m_cur_char;
             m_cur_char = getNextChar();
-            if (m_cur_char == '>') {
+            switch (m_cur_char) {
+            case '>':
                 m_cur_token_string[m_cur_token_string_pos++] = m_cur_char;
                 m_cur_char = getNextChar();
                 if (m_cur_char == '=') { // >>=
@@ -1118,19 +1386,22 @@ TOKEN Lexer::getNextToken()
                     token = T_RSHIFT;
                     m_cur_token_string[m_cur_token_string_pos] = 0;
                 }
-            } else if (m_cur_char == '=') { // '>='
-                token =    T_NOLESSTHAN;
+                break;
+            case '=': // '>='
+                token = T_NOLESSTHAN;
                 m_cur_token_string[m_cur_token_string_pos++] = m_cur_char;
                 m_cur_token_string[m_cur_token_string_pos] = 0;
                 m_cur_char = getNextChar();
-            } else { //'>'
+                break;
+            default: // '>'
                 token = T_MORETHAN;
                 m_cur_token_string[m_cur_token_string_pos] = 0;
             }
         } else if (m_cur_char == '<') {
             m_cur_token_string[m_cur_token_string_pos++] = m_cur_char;
             m_cur_char = getNextChar();
-            if (m_cur_char == '<') {
+            switch (m_cur_char) {
+            case '<':
                 m_cur_token_string[m_cur_token_string_pos++] = m_cur_char;
                 m_cur_char = getNextChar();
                 if (m_cur_char == '=') { // <<=
@@ -1142,12 +1413,14 @@ TOKEN Lexer::getNextToken()
                     token = T_LSHIFT;
                     m_cur_token_string[m_cur_token_string_pos] = 0;
                 }
-            } else if (m_cur_char == '=') {// '<='
+                break;
+            case '=': // '<='
                 token =    T_NOMORETHAN;
                 m_cur_token_string[m_cur_token_string_pos++] = m_cur_char;
                 m_cur_token_string[m_cur_token_string_pos] = 0;
                 m_cur_char = getNextChar();
-            } else {  // '<'
+                break;
+            default: // '<'
                 token = T_LESSTHAN;
                 m_cur_token_string[m_cur_token_string_pos] = 0;
             }
@@ -1155,7 +1428,7 @@ TOKEN Lexer::getNextToken()
             m_cur_token_string[m_cur_token_string_pos++] = m_cur_char;
             m_cur_char = getNextChar();
             if (m_cur_char == '=') {// '!='
-                token =    T_NOEQU;
+                token = T_NOEQU;
                 m_cur_token_string[m_cur_token_string_pos++] = m_cur_char;
                 m_cur_token_string[m_cur_token_string_pos] = 0;
                 m_cur_char = getNextChar();
@@ -1164,18 +1437,26 @@ TOKEN Lexer::getNextToken()
                 m_cur_token_string[m_cur_token_string_pos] = 0;
             }
         } else if (m_cur_char == '/') {
-            token = t_solidus();
+            bool is_restart = false;
+            token = t_solidus(&is_restart);
+            if (is_restart) {
+                ASSERT0(token == T_NUL);
+                goto START;
+            }
         } else if (m_cur_char == '.') {
             token = t_dot();
         }
-        //Do not add anything after this line.
+        /////////////////////////////////////////
+        //DO NOT ADD NEW CASES AFTER THIS LINE.//
+        /////////////////////////////////////////
         else if (m_cur_token == T_END) {
+            //Meet file end.
             token = T_END;
         } else {
+            //There may be error occurred.
             token = T_NUL;
         }
     } //end switch
-FIN:
     m_cur_token = token;
     ASSERT0(m_cur_token_string_pos < m_cur_token_string_len);
     return token;

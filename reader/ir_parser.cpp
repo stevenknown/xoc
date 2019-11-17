@@ -4295,12 +4295,19 @@ bool IRParser::declareVar(ParseCtx * ctx, VAR ** var)
 bool IRParser::parse()
 {
     START_TIMER(t, "IR Parser");
-    ASSERT0(m_lexer);
-    TOKEN tok = m_lexer->getNextToken(); //Get first token.
+    ASSERT0(m_lexer);    
+    TOKEN tok = T_NUL;
+    //Get first token.
+    //CASE: There are T_NUL token return.
+    while ((tok = m_lexer->getNextToken()) == T_NUL) {;}
     for (;; tok = m_lexer->getNextToken()) {
         switch (tok) {
         case T_END:
-        case T_NUL: goto END;
+            //Mee the file end.
+            goto END;
+        case T_NUL:
+            //There may be error occurred, terminate parsing.
+            goto END;
         case T_IDENTIFIER: {
             X_CODE code = getCurrentXCode();
             switch (code) {
@@ -4311,10 +4318,14 @@ bool IRParser::parse()
             }
             default:
                 error(tok, "miss region declaration at top level");
+                //Still keep parsing, skip current error status in
+                //order to catch more errors.
             }
             break;
         }
         default:
+            //Still keep parsing, skip current error status in
+            //order to catch more errors.
             error(tok, "miss region declaration at top level");
         }
 

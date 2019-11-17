@@ -392,15 +392,88 @@ MDDef * MDSSAMgr::findKillingDef(IR const* ir)
 }
 
 
-void MDSSAMgr::dumpExpDUChainIter(
-        IR const* ir,
-        List<IR const*> & lst,
-        List<IR const*> & opnd_lst,
-        OUT bool * parting_line)
+void MDSSAMgr::dumpDefChain(List<MDDef const*> & wl,
+                            IRSet & visited,
+                            VMD const* vopnd)
+{
+    if (vopnd->getDef() == NULL) { return; }
+    MD const* vopndmd = m_ru->getMDSystem()->getMD(vopnd->mdid());
+    ASSERT0(vopndmd);
+    wl.clean();
+    wl.append_tail(vopnd->getDef());
+    xcom::BitSet visited_def;
+    bool prt_left_parenthesis = false;
+    bool need_comma = false;
+    for (MDDef const* def = wl.remove_head();
+         def != NULL; def = wl.remove_head()) {
+        visited_def.bunion(def->id());
+        if (need_comma) {
+            need_comma = false;
+            prt(",");
+        }
+
+        if (def->is_phi()) {
+            ASSERT0(def->getResult()->mdid() == vopnd->mdid());
+            if (!prt_left_parenthesis) {
+                prt("(");
+                prt_left_parenthesis = true;
+            }
+            prt("phi");
+            need_comma = true;
+            //Collect opnd of PHI to forward to
+            //retrieve corresponding DEFs.
+            for (IR const* phiopnd = MDPHI_opnd_list(def);
+                 phiopnd != NULL; phiopnd = phiopnd->get_next()) {
+                VMD * opndvmd = ((MDPhi*)def)->getOpndVMD(
+                    phiopnd, &m_usedef_mgr);
+                ASSERT0(opndvmd);
+                if (opndvmd->getDef() != NULL &&
+                    !visited_def.is_contain(
+                        opndvmd->getDef()->id())) {
+                    wl.append_tail(opndvmd->getDef());
+                }
+            }
+            continue;
+        }
+        ASSERT0(def->getOcc());
+        if (!visited.find(def->getOcc())) {
+            visited.append(def->getOcc());
+            if (!prt_left_parenthesis) {
+                prt("(");
+                prt_left_parenthesis = true;
+            }
+            prt("%s(id:%d)",
+                IRNAME(def->getOcc()), def->getOcc()->id());
+            need_comma = true;
+        }
+
+        MD const* defmd = def->getOcc()->getRefMD();
+        if (defmd != NULL &&
+            defmd->is_exact() &&
+            vopndmd->is_exact() &&
+            (defmd == vopndmd || defmd->is_cover(vopndmd))) {
+            ; //def is killing may-def.
+        } else {
+            if (def->getPrev() != NULL &&
+                !visited_def.is_contain(def->getPrev()->id())) {
+                wl.append_tail(def->getPrev());
+            }
+        }
+    }
+    if (prt_left_parenthesis) {
+        prt(")");
+    }
+}
+
+
+void MDSSAMgr::dumpExpDUChainIter(IR const* ir,
+                                  List<IR const*> & lst,
+                                  List<IR const*> & opnd_lst,
+                                  OUT bool * parting_line)
 {
 
     IRSet visited(m_sbs_mgr->getSegMgr());
-    List<MDDef*> wl;
+    List<MDDef const*> wl;
     lst.clean();
     opnd_lst.clean();
     for (IR const* opnd = iterInitC(ir, lst);
@@ -433,67 +506,10 @@ void MDSSAMgr::dumpExpDUChainIter(
              i >= 0; i = mdssainfo->getVOpndSet()->get_next(i, &iter)) {
             VMD * vopnd = (VMD*)m_usedef_mgr.getVOpnd(i);
             ASSERT0(vopnd && vopnd->is_md());
-
-            MD const* vopndmd = m_ru->getMDSystem()->getMD(vopnd->mdid());
-            ASSERT0(vopndmd);
-
             if (first) { first = false; }
             else { prt(","); }
-
             prt("MD%dV%d", vopnd->mdid(), vopnd->version());
-            if (vopnd->getDef() != NULL) {
-                wl.clean();
-                wl.append_tail(vopnd->getDef());
-
-                xcom::BitSet visited_def;
-                bool first2 = true;
-
-                prt("(");
-
-                for (MDDef * def = wl.remove_head();
-                     def != NULL; def = wl.remove_head()) {
-                    visited_def.bunion(def->id());
-                    if (first2) { first2 = false; }
-                    else { prt(","); }
-
-                    if (def->is_phi()) {
-                        ASSERT0(def->getResult()->mdid() == vopnd->mdid());
-                        prt("phi");
-                        for (IR const* phiopnd = MDPHI_opnd_list(def);
-                             phiopnd != NULL; phiopnd = phiopnd->get_next()) {
-                            VMD * opndvmd = ((MDPhi*)def)->getOpndVMD(
-                                phiopnd, &m_usedef_mgr);
-                            ASSERT0(opndvmd);
-                            if (opndvmd->getDef() != NULL &&
-                                !visited_def.is_contain(
-                                    opndvmd->getDef()->id())) {
-                                wl.append_tail(opndvmd->getDef());
-                            }
-                        }
-                    } else {
-                        ASSERT0(def->getOcc());
-                        if (!visited.find(def->getOcc())) {
-                            visited.append(def->getOcc());
-                            prt("%s(id:%d)",
-                                IRNAME(def->getOcc()), def->getOcc()->id());
-                        }
-
-                        MD const* defmd = def->getOcc()->getRefMD();
-                        if (defmd != NULL &&
-                            defmd->is_exact() &&
-                            vopndmd->is_exact() &&
-                            (defmd == vopndmd || defmd->is_cover(vopndmd))) {
-                            ; //def is killing may-def.
-                        } else {
-                            if (def->getPrev() != NULL &&
-                                !visited_def.is_contain(def->getPrev()->id())) {
-                                wl.append_tail(def->getPrev());
-                            }
-                        }
-                    }
-                }
-                prt(")");
-            }
+            dumpDefChain(wl, visited, vopnd);
         }
     }
 }
@@ -502,7 +518,7 @@ void MDSSAMgr::dumpExpDUChainIter(
 void MDSSAMgr::dumpDUChain()
 {
     if (g_tfile == NULL) { return; }
-    note("\n==---- DUMP MDSSAMgr DU Chain '%s' ----==\n",
+    note("\n==---- DUMP MDSSAMgr DU CHAIN '%s' ----==\n",
          m_ru->getRegionName());
 
     BBList * bbl = m_ru->getBBList();
@@ -1764,6 +1780,10 @@ void MDSSAMgr::removeDUChain(IR const* stmt, IR const* exp)
         next_i = mdssainfo->getVOpndSet()->get_next(i, &iter);
         VMD * vopnd = (VMD*)getUseDefMgr()->getVOpnd(i);
         ASSERT0(vopnd && vopnd->is_md());
+        if (vopnd->getDef() == NULL) {
+            ASSERTN(vopnd->version() == 0, ("Only zero version MD has no DEF"));
+            continue;
+        }
         if (vopnd->getDef()->getOcc() == stmt) {
             vopnd->getUseSet()->diff(exp->id());            
             mdssainfo->getVOpndSet()->remove(vopnd, *m_sbs_mgr);

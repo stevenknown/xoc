@@ -48,7 +48,7 @@ INT g_output_file_handler = 0;
 
 //Set true to disable all auxiliary informations which will output to stdout.
 bool g_silence = false;
-static CHAR const* g_version = "0.9.2";
+static CHAR const* g_version = "0.9.3";
 
 static void usage()
 {

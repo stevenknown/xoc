@@ -107,6 +107,9 @@ public:
     //Construct EH edge after cfg built.
     void buildEHEdge();
 
+    //Build CFG according to IRBB list.
+    void build(OptCtx & oc);
+
     virtual void cf_opt();
     void computeDomAndIdom(IN OUT OptCtx & oc, xcom::BitSet const* uni = NULL);
     void computePdomAndIpdom(IN OUT OptCtx & oc, xcom::BitSet const* uni = NULL);
@@ -139,14 +142,13 @@ public:
     virtual void dump_vcg(CHAR const* name)
     { CFG<IRBB, IR>::dump_vcg(name); }
 
-    void dump_vcg(
-            CHAR const* name = NULL,
-            bool detail = true,
-            bool dump_eh = true);
-    void dump_dot(
-            CHAR const* name = NULL,
-            bool detail = true,
-            bool dump_eh = true);
+    void dump_vcg(CHAR const* name = NULL,
+                  bool detail = true,
+                  bool dump_eh = true);
+    void dump_dot(CHAR const* name = NULL,
+                  bool detail = true,
+                  bool dump_eh = true);
+    void dump_dot(FILE * h, bool detail, bool dump_eh);
 
     void erase();
 
@@ -253,7 +255,7 @@ public:
 
     virtual void moveLabels(IRBB * src, IRBB * tgt);
 
-    virtual bool perform(OptCtx & oc) { DUMMYUSE(oc); return false; }
+    virtual bool perform(OptCtx & oc) { build(oc); return false; }
 
     //Perform miscellaneous control flow optimizations.
     //Include remove dead bb which is unreachable, remove empty bb as many

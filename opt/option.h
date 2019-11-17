@@ -132,8 +132,11 @@ public:
     //Note is_dump_all and is_dump_nothing can not all be true.
     bool is_dump_nothing;
     bool is_dump_aa; //Dump Alias Analysis information.    
-    bool is_dump_dumgr; //Dump MD Def-Use chain built by DU Manager.    
+    bool is_dump_dumgr; //Dump MD Def-Use chain built by DU Manager.
+    bool is_dump_duref; //Dump MD Def-Use reference built both
+                        //by AA and DU Manager.
     bool is_dump_mdset_hash; //Dump MD Set Hash Table.   
+    bool is_dump_cfg; //Dump CFG.
     bool is_dump_dom; //Dump Dom/Pdom/Idom/Pidom.
     bool is_dump_cp; //Dump copy-propagation.
     bool is_dump_rp; //Dump register-promotion.
@@ -160,6 +163,7 @@ public:
     bool isDumpAA() const;
     bool isDumpDUMgr() const;
     bool isDumpMDSetHash() const;
+    bool isDumpCFG() const;
     bool isDumpDOM() const;
     bool isDumpCP() const;
     bool isDumpRP() const;

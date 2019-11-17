@@ -332,7 +332,7 @@ typedef TabIter<VAR const*> ConstVarTabIter;
 
 class CompareVar {
 public:
-    bool is_less(VAR * t1, VAR * t2) const { return t1 < t2; }
+    bool is_less(VAR * t1, VAR * t2) const { return t1->id() < t2->id(); }
     bool is_equ(VAR * t1, VAR * t2) const { return t1 == t2; }
     VAR * createKey(VAR * t) { return t; }
 };
@@ -340,7 +340,8 @@ public:
 
 class CompareConstVar {
 public:
-    bool is_less(VAR const* t1, VAR const* t2) const { return t1 < t2; }
+    bool is_less(VAR const* t1, VAR const* t2) const
+    { return t1->id() < t2->id(); }
     bool is_equ(VAR const* t1, VAR const* t2) const { return t1 == t2; }
     VAR const* createKey(VAR const* t) { return t; }
 };

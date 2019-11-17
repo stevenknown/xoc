@@ -103,6 +103,10 @@ void RefineDUChain::processExpressionViaMDSSA(IR const* exp)
         next_i = mdssainfo->readVOpndSet()->get_next(i, &iter);
         VMD const* t = (VMD const*)m_mdssamgr->getUseDefMgr()->getVOpnd(i);
         ASSERT0(t && t->is_md());
+        if (t->getDef() == NULL) {
+            ASSERTN(t->version() == 0, ("Only zero version MD has no DEF"));
+            continue;
+        }
         IR const* defstmt = t->getDef()->getOcc();
         ASSERT0(defstmt);
         if (exp->isNotOverLap(defstmt, m_rg)) {

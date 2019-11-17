@@ -334,6 +334,13 @@ void IR_CFG::initEntryAndExit(CFG_SHAPE cs)
 }
 
 
+//Build CFG according to IRBB list.
+void IR_CFG::build(OptCtx & oc)
+{
+    CFG<IRBB, IR>::build(oc);
+}
+
+
 void IR_CFG::rebuild(OptCtx & oc)
 {
     ASSERT0(m_cs != C_UNDEF);
@@ -402,6 +409,9 @@ void IR_CFG::initCfg(OptCtx & oc)
     //cfg->removeEmptyBB();
     build(oc);
     buildEHEdge();
+    if (g_is_dump_after_pass && g_dump_opt.isDumpCFG()) {
+        dump_dot(g_tfile, true, true);
+    }
 
     //Rebuild cfg may generate redundant empty bb, it
     //disturb the computation of entry and exit.
@@ -448,9 +458,8 @@ void IR_CFG::initCfg(OptCtx & oc)
 }
 
 
-void IR_CFG::findTargetBBOfMulticondBranch(
-        IR const* ir,
-        OUT List<IRBB*> & tgt_bbs)
+void IR_CFG::findTargetBBOfMulticondBranch(IR const* ir,
+                                           OUT List<IRBB*> & tgt_bbs)
 {
     ASSERT0(ir->is_switch());
     tgt_bbs.clean();
@@ -1220,7 +1229,9 @@ bool IR_CFG::removeRedundantBranch()
 
 void IR_CFG::dump_dot(CHAR const* name, bool detail, bool dump_eh)
 {
+    //Do not dump if default dump file is not initialized.
     if (g_tfile == NULL) { return; }
+
     //Note this function does not use g_tfile as output.
     //So it is dispensable to check g_tfile.
     if (name == NULL) {
@@ -1229,12 +1240,18 @@ void IR_CFG::dump_dot(CHAR const* name, bool detail, bool dump_eh)
     UNLINK(name);
     FILE * h = fopen(name, "a+");
     ASSERTN(h, ("%s create failed!!!", name));
+    dump_dot(h, detail, dump_eh);
+    fclose(h);
+}
 
-    //Print comment
+
+void IR_CFG::dump_dot(FILE * h, bool detail, bool dump_eh)
+{
+    if (g_tfile == NULL || h == NULL) { return; }    
     FILE * org_tfile = g_tfile;
-    g_tfile = h;
-
+    g_tfile = h;   
     if (detail) {
+        //Print comment
         fprintf(h, "\n/*");
         for (IRBB * bb = m_bb_list->get_head();
              bb != NULL; bb = m_bb_list->get_next()) {
@@ -1264,33 +1281,27 @@ void IR_CFG::dump_dot(CHAR const* name, bool detail, bool dump_eh)
     for (xcom::Vertex * v = m_vertices.get_first(c);
          v != NULL; v = m_vertices.get_next(c)) {
         INT id = VERTEX_id(v);
-
         IRBB * bb = getBB(id);
         ASSERT0(bb);
-
         CHAR const* shape = "box";
         CHAR const* font = "courB";
         CHAR const* color = "black";
         CHAR const* style = "bold";
         UINT fontsize = 12;
-
         if (BB_is_catch_start(bb)) {
             font = "Times Bold";
             fontsize = 18;
             color = "lightblue";
             style = "filled";
         }
-
         if (BB_is_entry(bb) || BB_is_exit(bb)) {
             font = "Times Bold";
             fontsize = 18;
             color = "cyan";
             style = "filled";
         }
-
         if (detail) {
             StrBuf namebuf(32);
-
             fprintf(h,
                     "\nnode%d [font=\"%s\",fontsize=%d,color=%s,"
                     "shape=%s,style=%s,label=\" BB%d",
@@ -1303,7 +1314,7 @@ void IR_CFG::dump_dot(CHAR const* name, bool detail, bool dump_eh)
                     id);
             LabelInfo const* li = bb->getLabelList().get_head();
             if (li != NULL) {
-				LabelInfo const* head = li;
+                LabelInfo const* head = li;
                 fprintf(h, ":");
                 for(; li != NULL; li = bb->getLabelList().get_next()) {
                     if (li != head) {
@@ -1353,7 +1364,9 @@ void IR_CFG::dump_dot(CHAR const* name, bool detail, bool dump_eh)
                     VERTEX_id(EDGE_from(e)),
                     VERTEX_id(EDGE_to(e)),
                     "");
-        } else if (CFGEI_is_eh(ei)) {
+            continue;
+        }
+        if (CFGEI_is_eh(ei)) {
             if (dump_eh) {
                 fprintf(h,
                         "\nnode%d->node%d[style=dotted, "
@@ -1362,15 +1375,15 @@ void IR_CFG::dump_dot(CHAR const* name, bool detail, bool dump_eh)
                         VERTEX_id(EDGE_to(e)),
                         "");
             }
-        } else {
-            ASSERTN(0, ("unsupport EDGE_INFO"));
+            continue;
         }
+        ASSERTN(0, ("unsupport EDGE_INFO"));        
     }
 
     g_tfile = org_tfile;
     g_prt_carriage_return_for_dot = org_prt_cr;
     fprintf(h,"\n}\n");
-    fclose(h);
+    fflush(h);
 }
 
 
@@ -1378,13 +1391,17 @@ void IR_CFG::dump_node(FILE * h, bool detail)
 {
     ASSERT0(h);
     ASSERT0(m_bb_list);
-    xcom::C<IRBB*> * bbct;
     UINT vertical_order = 1;
-    for (IRBB * bb = m_bb_list->get_head(&bbct);
-         bb != NULL; bb = m_bb_list->get_next(&bbct)) {
-        INT id = BB_id(bb);
-        xcom::Vertex * v = get_vertex(id);
-        ASSERTN(v, ("bb is not in cfg"));
+    INT c;
+    for (xcom::Vertex const* v = get_first_vertex(c);
+        v != NULL; v = get_next_vertex(c)) {
+        INT id = VERTEX_id(v);
+        IRBB * bb = getBB(id);
+        ASSERTN(bb, ("Not find BB%d", id));
+    //for (IRBB * bb = m_bb_list->get_head(&bbct);
+    //     bb != NULL; bb = m_bb_list->get_next(&bbct)) {
+        ///INT id = BB_id(bb);        
+        
         CHAR const* shape = "box";
         if (BB_is_catch_start(bb)) {
             shape = "uptrapezoid";

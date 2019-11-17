@@ -274,6 +274,7 @@ DumpOpt::DumpOpt()
     is_dump_aa = false;
     is_dump_dumgr = false;
     is_dump_mdset_hash = false;
+    is_dump_cfg = false;
     is_dump_dom = false;
     is_dump_cp = false;
     is_dump_rp = false;
@@ -323,6 +324,12 @@ bool DumpOpt::isDumpDUMgr() const
 bool DumpOpt::isDumpMDSetHash() const
 {
     return is_dump_all || (!is_dump_nothing && is_dump_mdset_hash);
+}
+
+
+bool DumpOpt::isDumpCFG() const
+{
+    return is_dump_all || (!is_dump_nothing && is_dump_cfg);
 }
 
 

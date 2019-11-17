@@ -2204,14 +2204,14 @@ void Region::checkValidAndRecompute(OptCtx * oc, ...)
                 CDG * cdg = (CDG*)passmgr->registerPass(PASS_CDG);
                 ASSERT0(cdg); //cdg is not enable.
                 ASSERTN(cfg && OC_is_cfg_valid(*oc),
-                       ("You should make CFG available first."));
+                        ("You should make CFG available first."));
                 cdg->rebuild(*oc, *cfg);
             }
             break;
         case PASS_DOM:
             if (!OC_is_dom_valid(*oc)) {
                 ASSERTN(cfg && OC_is_cfg_valid(*oc),
-                       ("You should make CFG available first."));
+                        ("You should make CFG available first."));
                 cfg->computeDomAndIdom(*oc);
             }
             break;
@@ -2226,8 +2226,8 @@ void Region::checkValidAndRecompute(OptCtx * oc, ...)
             if (!OC_is_expr_tab_valid(*oc) &&
                 getBBList() != NULL &&
                 getBBList()->get_elem_count() != 0) {
-                IR_EXPR_TAB * exprtab =
-                    (IR_EXPR_TAB*)passmgr->registerPass(PASS_EXPR_TAB);
+                IR_EXPR_TAB * exprtab = (IR_EXPR_TAB*)passmgr->
+                    registerPass(PASS_EXPR_TAB);
                 ASSERT0(exprtab);
                 exprtab->reperform(*oc);
             }
@@ -2235,7 +2235,7 @@ void Region::checkValidAndRecompute(OptCtx * oc, ...)
         case PASS_LOOP_INFO:
             if (!OC_is_loopinfo_valid(*oc)) {
                 ASSERTN(cfg && OC_is_cfg_valid(*oc),
-                    ("You should make CFG available first."));
+                        ("You should make CFG available first."));
                 cfg->LoopAnalysis(*oc);
             }
             break;
@@ -2246,9 +2246,9 @@ void Region::checkValidAndRecompute(OptCtx * oc, ...)
                 cfg->computeRPO(*oc);
             } else {
                 ASSERTN(cfg->getBBListInRPO()->get_elem_count() ==
-                    getBBList()->get_elem_count(),
-                    ("Previous pass has changed RPO, "
-                     "and you should set it to be invalid"));
+                        getBBList()->get_elem_count(),
+                        ("Previous pass has changed RPO, "
+                         "and you should set it to be invalid"));
             }
             break;
         case PASS_AA:
@@ -2340,7 +2340,12 @@ void Region::checkValidAndRecompute(OptCtx * oc, ...)
                 }
             }
             break;
-        default: {}
+        default: {
+            Pass * pass = passmgr->queryPass(pt);
+            if (pass != NULL) {
+                if (!pass->perform(*oc)) { break; }
+            }
+        }
         }
     }
 }

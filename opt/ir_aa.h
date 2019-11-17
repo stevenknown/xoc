@@ -246,13 +246,18 @@ public:
     AACtx const& operator = (AACtx const&);
     AACtx(AACtx const& ic) { copy(ic); }
 
-    void copy(AACtx const& ic) { u1.i1 = ic.u1.i1; }
+    void copy(AACtx const& ic)
+    {
+        u1.i1 = ic.u1.i1;
+        AC_returned_pts(this) = NULL;
+    }
 
     //Only copy top down flag.
     inline void copyTopDownFlag(AACtx const& ic)
     {
         AC_comp_pt(this) = AC_comp_pt(&ic);
         AC_is_lda_base(this) = AC_is_lda_base(&ic);
+        AC_returned_pts(this) = NULL;
     }
 
     void clean() { u1.i1 = 0; AC_returned_pts(this) = NULL; }
@@ -377,12 +382,11 @@ protected:
                             UINT md_size,
                             MDSet const& in,
                             OUT MDSet & out);
-    void inferArrayLdabase(IR * ir,
-                           IR * array_base,
-                           bool is_ofst_pred,
-                           UINT ofst,
-                           OUT MDSet & mds,
-                           IN OUT AACtx * ic);
+    MD const* inferArrayLdabase(IR * ir,
+                                IR * array_base,
+                                bool is_ofst_pred,
+                                UINT ofst,
+                                IN OUT AACtx * ic);
     void inferExpression(IR * ir,
                          IN OUT MDSet & mds,
                          IN OUT AACtx * ic,
@@ -396,7 +400,7 @@ protected:
                            IN OUT AACtx * ic,
                            IN OUT MD2MDSet * mx);
 
-    void processLda(IR * ir, IN OUT MDSet & mds, IN OUT AACtx * ic);
+    MD const* processLda(IR * ir, IN OUT AACtx * ic);
     void processCvt(IR const* ir,
                     IN OUT MDSet & mds,
                     IN OUT AACtx * ic,
@@ -407,7 +411,7 @@ protected:
                         IN OUT MD2MDSet * mx);
     void processGetelem(IR * ir, IN MD2MDSet * mx);
     void processSetelem(IR * ir, IN MD2MDSet * mx);
-    void processILd(IR * ir,
+    void processILoad(IR * ir,
                     IN OUT MDSet & mds,
                     IN OUT AACtx * ic,
                     IN OUT MD2MDSet * mx);
@@ -424,7 +428,7 @@ protected:
                       IN OUT AACtx * ic);
     void processStore(IN IR * ir, IN OUT MD2MDSet * mx);
     void processStorePR(IN IR * ir, IN MD2MDSet * mx);
-    void processISt(IN IR * ir, IN OUT MD2MDSet * mx);
+    void processIStore(IN IR * ir, IN OUT MD2MDSet * mx);
     void processStoreArray(IN IR * ir, IN MD2MDSet * mx);
     void processPhi(IN IR * ir, IN MD2MDSet * mx);
     void processCallSideeffect(IN OUT MD2MDSet & mx, MDSet const& by_addr_mds);
@@ -515,7 +519,9 @@ public:
     void ElemUnionPointTo(MDSet const& mds,
                           MDSet const& in_set,
                           IN MD2MDSet * mx);
-    void ElemUnionPointTo(MDSet const& mds, IN MD * in_elem, IN MD2MDSet * mx);
+    void ElemUnionPointTo(MDSet const& mds,
+                          MD const* in_elem,
+                          IN MD2MDSet * mx);
     void ElemCopyPointTo(MDSet const& mds, IN MDSet & in_set, IN MD2MDSet * mx);
     void ElemCopyPointToAndMayPointTo(MDSet const& mds, IN MD2MDSet * mx);
     void ElemCopyAndUnionPointTo(MDSet const& mds,
@@ -615,6 +621,8 @@ public:
                          MD2MDSet & ctx,
                          MDSet const& target_set)
     {
+        ASSERTN(!m_mds_hash->find(target_set),
+                ("already hashed, there might be redundant function call"));
         MDSet const* hashed = m_mds_hash->append(target_set);
         setPointTo(pointer_mdid, ctx, hashed);
     }
@@ -643,28 +651,24 @@ public:
     }
 
     //Set pointer points to MD set by appending a MDSet.
+    //pt_set: POINT-TO set that has been hashed.
     inline void setPointToMDSetByAddMDSet(UINT pointer_mdid,
                                           MD2MDSet & ctx,
-                                          MDSet const& set)
+                                          MDSet const& pt_set)
     {
+        ASSERT0(m_mds_hash->find(pt_set));
         MDSet const* pts = getPointTo(pointer_mdid, ctx);
-        if (pts == NULL) {
-            if (&set == m_maypts) {
-                setPointTo(pointer_mdid, ctx, m_maypts);
-                return;
-            }
-            setPointToMDSet(pointer_mdid, ctx, set);
+        if (pts == NULL) {            
+            setPointTo(pointer_mdid, ctx, &pt_set);
             return;
         }
-
-        if (&set == m_maypts) {
+        if (&pt_set == m_maypts) {
             setPointTo(pointer_mdid, ctx, m_maypts);
             return;
         }
-
         MDSet tmp;
         tmp.copy(*pts, *m_misc_bs_mgr);
-        tmp.bunion(set, *m_misc_bs_mgr);
+        tmp.bunion(pt_set, *m_misc_bs_mgr);
 
         MDSet const* hashed = m_mds_hash->append(tmp);
         setPointTo(pointer_mdid, ctx, hashed);
