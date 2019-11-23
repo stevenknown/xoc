@@ -43,7 +43,7 @@ IR_CFG::IR_CFG(CFG_SHAPE cs, BBList * bbl, Region * rg,
                UINT edge_hash_size, UINT vertex_hash_size)
     : CFG<IRBB, IR>(bbl, edge_hash_size, vertex_hash_size)
 {
-    m_ru = rg;
+    m_rg = rg;
     m_tm = rg->getTypeMgr();
     m_cs = cs;
     setBitSetMgr(rg->getBitSetMgr());
@@ -271,12 +271,12 @@ void IR_CFG::initEntryAndExit(CFG_SHAPE cs)
     }
 
     //Add BB into graph.
-    //ASSERT0(m_bb_vec.get_last_idx() == -1); 
+    //ASSERT0(m_bb_vec.get_last_idx() == -1);
     for (IRBB * bb = m_bb_list->get_tail();
          bb != NULL; bb = m_bb_list->get_prev()) {
         m_bb_vec.set(BB_id(bb), bb);
         for (LabelInfo const* li = bb->getLabelList().get_head();
-             li != NULL; li = bb->getLabelList().get_next()) {            
+             li != NULL; li = bb->getLabelList().get_next()) {
             ASSERTN(m_lab2bb.get(li) == NULL,
                    ("Label has been mapped to BB%d", BB_id(m_lab2bb.get(li))));
             m_lab2bb.set(li, bb);
@@ -295,7 +295,7 @@ void IR_CFG::initEntryAndExit(CFG_SHAPE cs)
     switch (cs) {
     case C_SESE: {
         //Make sure the region has the unique entry.
-        m_entry = m_ru->allocBB();
+        m_entry = m_rg->allocBB();
         BB_is_entry(m_entry) = true;
         BB_is_fallthrough(m_entry) = true;
         add_bb(m_entry);
@@ -305,7 +305,7 @@ void IR_CFG::initEntryAndExit(CFG_SHAPE cs)
         //NOTICE: In actually, the logical exit BB is ONLY
         //used to solve diverse dataflow equations, whereas
         //considering the requirement of ENTRY BB, EXIT BB.
-        IRBB * exit = m_ru->allocBB();
+        IRBB * exit = m_rg->allocBB();
         BB_is_fallthrough(exit) = true;
         add_bb(exit);
         m_bb_list->append_tail(exit);
@@ -314,7 +314,7 @@ void IR_CFG::initEntryAndExit(CFG_SHAPE cs)
     }
     case C_SEME: {
         //Create entry BB.
-        m_entry = m_ru->allocBB();
+        m_entry = m_rg->allocBB();
         BB_is_entry(m_entry) = true;
         //BB_is_fallthrough(entry) = true;
         add_bb(m_entry);
@@ -410,7 +410,7 @@ void IR_CFG::initCfg(OptCtx & oc)
     build(oc);
     buildEHEdge();
     if (g_is_dump_after_pass && g_dump_opt.isDumpCFG()) {
-        dump_dot(g_tfile, true, true);
+        dumpDOT(g_tfile, true, true);
     }
 
     //Rebuild cfg may generate redundant empty bb, it
@@ -621,7 +621,7 @@ void IR_CFG::LoopAnalysis(OptCtx & oc)
         //OC_is_loopinfo_valid(oc) = true;
         return;
     }
-    m_ru->checkValidAndRecompute(&oc, PASS_DOM, PASS_UNDEF);
+    m_rg->checkValidAndRecompute(&oc, PASS_DOM, PASS_UNDEF);
     findLoop();
     collectLoopInfo();
     OC_is_loopinfo_valid(oc) = true;
@@ -700,9 +700,9 @@ void IR_CFG::insertBBbetween(
             //        L1:
             //        ...
             //        ...
-            IRBB * tmp_tramp_bb = m_ru->allocBB();
-            LabelInfo * li = m_ru->genIlabel();
-            IR * goto_ir = m_ru->buildGoto(li);
+            IRBB * tmp_tramp_bb = m_rg->allocBB();
+            LabelInfo * li = m_rg->genIlabel();
+            IR * goto_ir = m_rg->buildGoto(li);
             BB_irlist(tmp_tramp_bb).append_tail(goto_ir);
             to->addLabel(li);
             m_lab2bb.set(li, to);
@@ -723,7 +723,7 @@ void IR_CFG::insertBBbetween(
             findBBbyLabel(last_xr_of_from->getLabel()) == to);
     ASSERT0(last_xr_of_from->getLabel() != NULL);
 
-    LabelInfo * li = m_ru->genIlabel();
+    LabelInfo * li = m_rg->genIlabel();
     last_xr_of_from->setLabel(li);
 
     newbb->addLabel(li);
@@ -1011,7 +1011,7 @@ bool IR_CFG::removeTrampolinEdge()
                     //};
                     ASSERT0(bb->getNumOfIR() == 1);
                     BB_irlist(bb).remove_tail();
-                    m_ru->freeIRTree(last_xr);
+                    m_rg->freeIRTree(last_xr);
                     removed = true;
                     continue;
                 }
@@ -1053,12 +1053,12 @@ bool IR_CFG::removeTrampolinEdge()
                     //  bb is:
                     //      L1:
                     //      goto L2
-                    BB_irlist(pred).append_tail(m_ru->dupIRTree(last_xr));
+                    BB_irlist(pred).append_tail(m_rg->dupIRTree(last_xr));
                     BB_is_fallthrough(pred) = false;
                     removeEdge(pred, bb);
 
                     addEdge(BB_id(pred), BB_id(succ));
-                    bb->dupSuccessorPhiOpnd(this, m_ru, WhichPred(bb, succ));
+                    bb->dupSuccessorPhiOpnd(this, m_rg, WhichPred(bb, succ));
                     removed = true;
                     continue;
                 } //end if
@@ -1156,7 +1156,7 @@ bool IR_CFG::removeRedundantBranch()
 {
     bool removed = CFG<IRBB, IR>::removeRedundantBranch();
     xcom::C<IRBB*> * ct;
-    IR_DU_MGR * dumgr = m_ru->getDUMgr();
+    IR_DU_MGR * dumgr = m_rg->getDUMgr();
     List<IRBB*> succs;
     for (IRBB * bb = m_bb_list->get_head(&ct);
          bb != NULL; bb = m_bb_list->get_next(&ct)) {
@@ -1184,9 +1184,9 @@ bool IR_CFG::removeRedundantBranch()
                     dumgr->removeIROutFromDUMgr(last_xr);
                 }
 
-                m_ru->freeIRTree(last_xr);
+                m_rg->freeIRTree(last_xr);
 
-                IR * uncond_br = m_ru->buildGoto(tgt_li);
+                IR * uncond_br = m_rg->buildGoto(tgt_li);
                 BB_irlist(bb).append_tail(uncond_br);
 
                 //Remove fallthrough edge, leave branch edge.
@@ -1207,7 +1207,7 @@ bool IR_CFG::removeRedundantBranch()
                 if (dumgr != NULL) {
                     dumgr->removeIROutFromDUMgr(r);
                 }
-                m_ru->freeIRTree(r);
+                m_rg->freeIRTree(r);
 
                 //Remove branch edge, leave fallthrough edge.
                 get_succs(succs, bb);
@@ -1227,7 +1227,7 @@ bool IR_CFG::removeRedundantBranch()
 }
 
 
-void IR_CFG::dump_dot(CHAR const* name, bool detail, bool dump_eh)
+void IR_CFG::dumpDOT(CHAR const* name, bool detail, bool dump_eh)
 {
     //Do not dump if default dump file is not initialized.
     if (g_tfile == NULL) { return; }
@@ -1240,23 +1240,23 @@ void IR_CFG::dump_dot(CHAR const* name, bool detail, bool dump_eh)
     UNLINK(name);
     FILE * h = fopen(name, "a+");
     ASSERTN(h, ("%s create failed!!!", name));
-    dump_dot(h, detail, dump_eh);
+    dumpDOT(h, detail, dump_eh);
     fclose(h);
 }
 
 
-void IR_CFG::dump_dot(FILE * h, bool detail, bool dump_eh)
+void IR_CFG::dumpDOT(FILE * h, bool detail, bool dump_eh)
 {
-    if (g_tfile == NULL || h == NULL) { return; }    
+    if (g_tfile == NULL || h == NULL) { return; }
     FILE * org_tfile = g_tfile;
-    g_tfile = h;   
+    g_tfile = h;
     if (detail) {
         //Print comment
         fprintf(h, "\n/*");
         for (IRBB * bb = m_bb_list->get_head();
              bb != NULL; bb = m_bb_list->get_next()) {
             fprintf(h, "\n--- BB%d ----", BB_id(bb));
-            dumpBBList(m_bb_list, m_ru);
+            dumpBBList(m_bb_list, m_rg);
             //fprintf(h, "\n\t%s", dump_ir_buf(ir, buf));
         }
         fprintf(h, "\n*/\n");
@@ -1274,7 +1274,7 @@ void IR_CFG::dump_dot(FILE * h, bool detail, bool dump_eh)
     //Print Region name.
     fprintf(h, "\nstartnode [fontsize=24,style=filled, "
                "color=gold,shape=none,label=\"RegionName:%s\"];",
-               m_ru->getRegionName());
+               m_rg->getRegionName());
 
     //Print node
     INT c;
@@ -1332,7 +1332,7 @@ void IR_CFG::dump_dot(FILE * h, bool detail, bool dump_eh)
                 fprintf(h, "\\l");
 
                  //TODO: implement dump_ir_buf();
-                dumpIR(ir, m_ru, NULL, IR_DUMP_KID);
+                dumpIR(ir, m_rg, NULL, IR_DUMP_KID);
             }
 
             //The last \l is very important to display DOT in a fine manner.
@@ -1377,7 +1377,7 @@ void IR_CFG::dump_dot(FILE * h, bool detail, bool dump_eh)
             }
             continue;
         }
-        ASSERTN(0, ("unsupport EDGE_INFO"));        
+        ASSERTN(0, ("unsupport CFGEdgeInfo"));
     }
 
     g_tfile = org_tfile;
@@ -1400,8 +1400,8 @@ void IR_CFG::dump_node(FILE * h, bool detail)
         ASSERTN(bb, ("Not find BB%d", id));
     //for (IRBB * bb = m_bb_list->get_head(&bbct);
     //     bb != NULL; bb = m_bb_list->get_next(&bbct)) {
-        ///INT id = BB_id(bb);        
-        
+        ///INT id = BB_id(bb);
+
         CHAR const* shape = "box";
         if (BB_is_catch_start(bb)) {
             shape = "uptrapezoid";
@@ -1447,7 +1447,7 @@ void IR_CFG::dump_node(FILE * h, bool detail)
                 //fprintf(h, "%s\n", dump_ir_buf(ir, buf));
 
                 //TODO: implement dump_ir_buf();
-                dumpIR(ir, m_ru, NULL, IR_DUMP_KID);
+                dumpIR(ir, m_rg, NULL, IR_DUMP_KID);
             }
             fprintf(h, "\"}");
         } else {
@@ -1534,10 +1534,10 @@ void IR_CFG::dump_edge(FILE * h, bool dump_eh)
 }
 
 
-void IR_CFG::dump_vcg(CHAR const* name, bool detail, bool dump_eh)
+void IR_CFG::dumpVCG(CHAR const* name, bool detail, bool dump_eh)
 {
     if (g_tfile == NULL) { return; }
-    ASSERT0(m_ru);
+    ASSERT0(m_rg);
 
     if (name == NULL) { name = "graph_cfg.vcg"; }
 
@@ -1552,7 +1552,7 @@ void IR_CFG::dump_vcg(CHAR const* name, bool detail, bool dump_eh)
     //fprintf(h, "\n/*");
     //old = g_tfile;
     //g_tfile = h;
-    //dumpBBList(m_bb_list, m_ru);
+    //dumpBBList(m_bb_list, m_rg);
     //g_tfile = old;
     //fprintf(h, "\n*/\n");
     dump_head(h);
@@ -1561,7 +1561,7 @@ void IR_CFG::dump_vcg(CHAR const* name, bool detail, bool dump_eh)
     fprintf(h,
             "\nnode: {title:\"\" vertical_order:0 shape:box color:turquoise "
             "borderwidth:0 fontname:\"Courier Bold\" "
-            "scaling:2 label:\"RegionName:%s\" }", m_ru->getRegionName());
+            "scaling:2 label:\"RegionName:%s\" }", m_rg->getRegionName());
     old = g_tfile;
     g_tfile = h;
     dump_node(h, detail);
@@ -1582,9 +1582,9 @@ void IR_CFG::computeDomAndIdom(IN OUT OptCtx & oc, xcom::BitSet const* uni)
     ASSERT0(OC_is_cfg_valid(oc));
     ASSERTN(m_entry, ("ONLY support SESE or SEME"));
 
-    m_ru->checkValidAndRecompute(&oc, PASS_RPO, PASS_UNDEF);
+    m_rg->checkValidAndRecompute(&oc, PASS_RPO, PASS_UNDEF);
     List<IRBB*> * bblst = getBBListInRPO();
-    ASSERT0(bblst->get_elem_count() == m_ru->getBBList()->get_elem_count());
+    ASSERT0(bblst->get_elem_count() == m_rg->getBBList()->get_elem_count());
 
     List<xcom::Vertex const*> vlst;
     for (IRBB * bb = bblst->get_head(); bb != NULL; bb = bblst->get_next()) {
@@ -1618,9 +1618,9 @@ void IR_CFG::computePdomAndIpdom(IN OUT OptCtx & oc, xcom::BitSet const* uni)
     START_TIMER(t, "Compute PDom,IPDom");
     ASSERT0(OC_is_cfg_valid(oc));
 
-    m_ru->checkValidAndRecompute(&oc, PASS_RPO, PASS_UNDEF);
+    m_rg->checkValidAndRecompute(&oc, PASS_RPO, PASS_UNDEF);
     List<IRBB*> * bblst = getBBListInRPO();
-    ASSERT0(bblst->get_elem_count() == m_ru->getBBList()->get_elem_count());
+    ASSERT0(bblst->get_elem_count() == m_rg->getBBList()->get_elem_count());
 
     List<xcom::Vertex const*> vlst;
     for (IRBB * bb = bblst->get_tail(); bb != NULL; bb = bblst->get_prev()) {
@@ -1647,13 +1647,13 @@ void IR_CFG::computePdomAndIpdom(IN OUT OptCtx & oc, xcom::BitSet const* uni)
 
 void IR_CFG::remove_xr(IRBB * bb, IR * ir)
 {
-    IR_DU_MGR * dumgr = m_ru->getDUMgr();
+    IR_DU_MGR * dumgr = m_rg->getDUMgr();
     if (dumgr != NULL) {
         dumgr->removeIROutFromDUMgr(ir);
     }
     ir->removeSSAUse();
     ir = BB_irlist(bb).remove(ir);
-    m_ru->freeIRTree(ir);
+    m_rg->freeIRTree(ir);
 }
 
 
@@ -1707,7 +1707,7 @@ bool IR_CFG::performMiscOpt(OptCtx & oc)
     if (ck_cfg) {
         computeExitList();
 
-        ASSERT0(verifySSAInfo(m_ru));
+        ASSERT0(verifySSAInfo(m_rg));
 
         #ifdef _DEBUG_
         //Check cfg validation, which
@@ -1715,14 +1715,14 @@ bool IR_CFG::performMiscOpt(OptCtx & oc)
         //This check is only in debug mode.
         OC_is_rpo_valid(oc) = false;
         computePdomAndIpdom(oc, NULL);
-        CDG * cdg = (CDG*)m_ru->getPassMgr()->registerPass(PASS_CDG);
-        cdg->rebuild(oc, *m_ru->getCFG());
+        CDG * cdg = (CDG*)m_rg->getPassMgr()->registerPass(PASS_CDG);
+        cdg->rebuild(oc, *m_rg->getCFG());
         ASSERT0(verifyIfBBRemoved(cdg, oc));
         #endif
     }
 
-    ASSERT0(verifyIRandBB(getBBList(), m_ru));
-    ASSERT0(m_ru->verifyRPO(oc));
+    ASSERT0(verifyIRandBB(getBBList(), m_rg));
+    ASSERT0(m_rg->verifyRPO(oc));
 
     END_TIMER(t, "CFG Optimizations");
     return change;

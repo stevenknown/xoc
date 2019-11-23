@@ -84,7 +84,7 @@ bool Region::performSimplify(OptCtx & oc)
     simp.setSimpToLowestHeight();
     if (g_is_lower_to_pr_mode) {
         simp.setSimpToPRmode();
-    }    
+    }
     if (g_opt_level != OPT_LEVEL0) {
         //O0 does not build DU ref.
         ASSERT0(verifyMDRef());
@@ -95,7 +95,7 @@ bool Region::performSimplify(OptCtx & oc)
         SIMP_need_recon_bblist(&simp) &&
         reconstructBBList(oc)) {
 
-        //Simplification may generate new memory operations.        
+        //Simplification may generate new memory operations.
         if (g_opt_level != OPT_LEVEL0) {
             //O0 does not build DU ref.
             ASSERT0(verifyMDRef());
@@ -178,7 +178,7 @@ bool Region::MiddleProcess(OptCtx & oc)
 
     if (do_simplification) {
         performSimplify(oc);
-    }    
+    }
 
     if (g_opt_level > OPT_LEVEL0) {
         PassMgr * passmgr = getPassMgr();

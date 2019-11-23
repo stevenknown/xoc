@@ -467,7 +467,7 @@ public:
 //Perform Global Value Numbering.
 class IR_GVN : public Pass {
 protected:
-    Region * m_ru;
+    Region * m_rg;
     IR_DU_MGR * m_du;
     TypeMgr * m_tm;
     MDSystem * m_md_sys;
@@ -588,8 +588,8 @@ public:
 
     bool calcCondMustVal(IR const* ir, bool & must_true, bool & must_false);
     void dump();
-    void dump_bb(UINT bbid);
-    void dump_ir2vn();
+    void dumpBB(UINT bbid);
+    void dumpIR2VN();
 
     virtual CHAR const* getPassName() const
     { return "Global Value Numbering"; }

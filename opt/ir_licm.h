@@ -39,7 +39,7 @@ namespace xoc {
 //Loop Invariant code Motion.
 class IR_LICM : public Pass {
 protected:
-    Region * m_ru;
+    Region * m_rg;
     IR_AA * m_aa;
     IR_DU_MGR * m_du;
     IR_CFG * m_cfg;
@@ -108,7 +108,7 @@ public:
     explicit IR_LICM(Region * rg)
     {
         ASSERT0(rg != NULL);
-        m_ru = rg;
+        m_rg = rg;
         m_aa = rg->getAA();
         m_du = rg->getDUMgr();
         m_cfg = rg->getCFG();

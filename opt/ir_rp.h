@@ -58,20 +58,20 @@ typedef HMap<MD*, MD_LT*> MD2MDLifeTime;
 
 class DontPromotTab : public MDSet {
     MDSystem * m_md_sys;
-    Region * m_ru;
+    Region * m_rg;
 
 public:
     explicit DontPromotTab(Region * rg)
     {
         ASSERT0(rg);
-        m_ru = rg;
+        m_rg = rg;
         m_md_sys = rg->getMDSystem();
     }
     COPY_CONSTRUCTOR(DontPromotTab);
 
     inline bool is_overlap(MD const* md)
     {
-        if (MDSet::is_overlap(md, m_ru)) { return true; }
+        if (MDSet::is_overlap(md, m_rg)) { return true; }
         SEGIter * iter;
         for (INT i = get_first(&iter); i >= 0; i = get_next(i, &iter)) {
             MD const* t = m_md_sys->getMD(i);
@@ -113,7 +113,7 @@ private:
     Vector<MDSet*> m_def_mds_vec;
     Vector<MDSet*> m_use_mds_vec;
     MD2MDLifeTime * m_md2lt_map;
-    Region * m_ru;
+    Region * m_rg;
     UINT m_mdlt_count;
     SMemPool * m_pool;
     SMemPool * m_ir_ptr_pool;
@@ -289,7 +289,7 @@ public:
     IR_RP(Region * rg, IR_GVN * gvn) : m_dont_promot(rg)
     {
         ASSERT0(rg != NULL);
-        m_ru = rg;
+        m_rg = rg;
         m_md_sys = rg->getMDSystem();
         m_cfg = rg->getCFG();
         m_tm = rg->getTypeMgr();
@@ -300,7 +300,7 @@ public:
         m_is_insert_bb = false;
         m_ssamgr = NULL;
 
-        UINT c = MAX(11, m_ru->getMDSystem()->getNumOfMD());
+        UINT c = MAX(11, m_rg->getMDSystem()->getNumOfMD());
         m_md2lt_map = new MD2MDLifeTime(c);
         m_mdlt_count = 0;
         m_pool = smpoolCreate(2 * sizeof(MD_LT), MEM_COMM);

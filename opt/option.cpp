@@ -281,6 +281,7 @@ DumpOpt::DumpOpt()
     is_dump_dce = false;
     is_dump_gvn = false;
     is_dump_gcse = false;
+    is_dump_ivr = false;
     is_dump_licm = false;
     is_dump_loopcvt = false;
     is_dump_simplification = false;
@@ -289,9 +290,9 @@ DumpOpt::DumpOpt()
     is_dump_cg = false;
     is_dump_ra = false;
     is_dump_memusage = false;
-    is_dump_livenessmgr = false;    
+    is_dump_livenessmgr = false;
 }
- 
+
 
 bool DumpOpt::isDumpALL() const
 {
@@ -366,6 +367,12 @@ bool DumpOpt::isDumpGVN() const
 bool DumpOpt::isDumpGCSE() const
 {
     return is_dump_all || (!is_dump_nothing && is_dump_gcse);
+}
+
+
+bool DumpOpt::isDumpIVR() const
+{
+    return is_dump_all || (!is_dump_nothing && is_dump_ivr);
 }
 
 

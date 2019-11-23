@@ -74,7 +74,7 @@ void RefineDUChain::processBB(IRBB const* bb)
     ConstIRIter ii;
     for (IR * ir = BB_irlist(bb).get_head(&ct);
          ir != NULL; ir = BB_irlist(bb).get_next(&ct)) {
-        ii.clean();    
+        ii.clean();
         for (IR const* exp = iterRhsInitC(ir, ii);
              exp != NULL; exp = iterRhsNextC(ii)) {
             if (!exp->is_ild()) { continue; }
@@ -135,11 +135,11 @@ void RefineDUChain::processExpressionViaGVN(IR const* exp)
         //It is no need to analyze DEF set with have no VN.
         return;
     }
-    
+
     DUSet const* defset = exp->getDUSet();
     if (defset == NULL) { return; }
 
-    //Iterate each DEF stmt of 'exp'.            
+    //Iterate each DEF stmt of 'exp'.
     DUIter di = NULL;
     INT next_i = -1;
     for (INT i = defset->get_first(&di); i >= 0; i = next_i) {
@@ -163,7 +163,7 @@ void RefineDUChain::processExpressionViaGVN(IR const* exp)
             continue;
         }
         m_du->removeDUChain(stmt, exp);
-    }          
+    }
 }
 
 
@@ -179,7 +179,7 @@ void RefineDUChain::process()
 
 
 bool RefineDUChain::perform(OptCtx & oc)
-{    
+{
     if (m_is_use_gvn) {
         if (!OC_is_du_chain_valid(oc)) {
             return false;

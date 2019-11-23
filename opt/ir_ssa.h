@@ -78,7 +78,7 @@ public:
 
 //SSAGraph
 class SSAGraph : xcom::Graph {
-    Region * m_ru;
+    Region * m_rg;
     PRSSAMgr * m_ssa_mgr;
     TMap<UINT, VP*> m_vdefs;
 public:
@@ -94,7 +94,7 @@ typedef Vector<TMap<UINT, VP*>*> BB2VPMap;
 //Perform SSA based optimizations.
 class PRSSAMgr : public Pass {
 protected:
-    Region * m_ru;
+    Region * m_rg;
     SMemPool * m_vp_pool;
     TypeMgr * m_tm;
     IR_CFG * m_cfg;
@@ -126,7 +126,7 @@ protected:
 
     void clean()
     {
-        m_ru = NULL;
+        m_rg = NULL;
         m_tm = NULL;
         m_seg_mgr = NULL;
         m_cfg = NULL;
@@ -191,7 +191,7 @@ public:
     {
         clean();
         ASSERT0(rg);
-        m_ru = rg;
+        m_rg = rg;
 
         m_tm = rg->getTypeMgr();
         ASSERT0(m_tm);

@@ -55,13 +55,6 @@ PassMgr * DexRegion::allocPassMgr()
 }
 
 
-//Initialize alias analysis.
-IR_AA * DexRegion::allocAliasAnalysis()
-{
-    return new DEX_AA(this);
-}
-
-
 bool DexRegion::MiddleProcess(OptCtx & oc)
 {
    return Region::MiddleProcess(oc);

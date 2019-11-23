@@ -184,7 +184,7 @@ public:
     //allocated by allocTargInfo() of current RegionMgr.
     void setTargInfo(TargInfo * ti)
     {
-        ASSERTN(m_targinfo == NULL, ("TargInfo has already been set"));        
+        ASSERTN(m_targinfo == NULL, ("TargInfo has already been set"));
         m_targinfo = ti;
     }
 

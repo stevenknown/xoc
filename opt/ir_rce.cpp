@@ -45,7 +45,7 @@ void IR_RCE::dump()
     if (g_tfile == NULL) { return; }
     note("\n\n==---- DUMP IR_RCE ----==\n");
 
-    BBList * bbl = m_ru->getBBList();
+    BBList * bbl = m_rg->getBBList();
     for (IRBB * bb = bbl->get_head(); bb != NULL; bb = bbl->get_next()) {
         //TODO:
     }
@@ -74,7 +74,7 @@ IR * IR_RCE::calcCondMustVal(
     case IR_LAND:
     case IR_LOR:
     case IR_LNOT: {
-        ir = m_ru->foldConst(ir, changed);
+        ir = m_rg->foldConst(ir, changed);
         if (changed) {
             ASSERT0(ir->is_const() &&
                     (CONST_int_val(ir) == 0 || CONST_int_val(ir) == 1));
@@ -94,15 +94,15 @@ IR * IR_RCE::calcCondMustVal(
                     ASSERT0(!must_false);
                     Type const* type = ir->getType();
                     ir->removeSSAUse();
-                    m_ru->freeIRTree(ir);
-                    ir = m_ru->buildImmInt(1, type);
+                    m_rg->freeIRTree(ir);
+                    ir = m_rg->buildImmInt(1, type);
                     return ir;
                 } else {
                     ASSERT0(must_false);
                     Type const* type = ir->getType();
                     ir->removeSSAUse();
-                    m_ru->freeIRTree(ir);
-                    ir = m_ru->buildImmInt(0, type);
+                    m_rg->freeIRTree(ir);
+                    ir = m_rg->buildImmInt(0, type);
                     return ir;
                 }
             }
@@ -129,12 +129,12 @@ IR * IR_RCE::processBranch(IR * ir, IN OUT bool & cfg_mod)
             IRBB * from = ir->getBB();
             IRBB * to = m_cfg->getFallThroughBB(from);
             ASSERT0(from != NULL && to != NULL);
-            IR * newbr = m_ru->buildGoto(BR_lab(ir));
+            IR * newbr = m_rg->buildGoto(BR_lab(ir));
 
             ir->removeSSAUse();
 
             //Revise the PHI operand to fallthrough successor.
-            ir->getBB()->removeSuccessorDesignatePhiOpnd(m_cfg, to);           
+            ir->getBB()->removeSuccessorDesignatePhiOpnd(m_cfg, to);
 
             //Revise cfg. remove fallthrough edge.
             m_cfg->removeEdge(from, to);
@@ -166,7 +166,7 @@ IR * IR_RCE::processBranch(IR * ir, IN OUT bool & cfg_mod)
             ir->removeSSAUse();
 
             //Revise the PHI operand to target successor.
-            ir->getBB()->removeSuccessorDesignatePhiOpnd(m_cfg, to);            
+            ir->getBB()->removeSuccessorDesignatePhiOpnd(m_cfg, to);
             m_cfg->removeEdge(from, to);
             cfg_mod = true;
             return NULL;
@@ -176,13 +176,13 @@ IR * IR_RCE::processBranch(IR * ir, IN OUT bool & cfg_mod)
             IRBB * to = m_cfg->getFallThroughBB(from);
             ASSERT0(from != NULL && to != NULL);
 
-            IR * newbr = m_ru->buildGoto(BR_lab(ir));
+            IR * newbr = m_rg->buildGoto(BR_lab(ir));
 
             ir->removeSSAUse();
 
             //Revise the PHI operand to fallthrough successor.
             ir->getBB()->removeSuccessorDesignatePhiOpnd(m_cfg, to);
-            
+
             //Revise m_cfg. remove fallthrough edge.
             m_cfg->removeEdge(from, to);
             cfg_mod = true;
@@ -192,7 +192,7 @@ IR * IR_RCE::processBranch(IR * ir, IN OUT bool & cfg_mod)
 
     if (changed) {
         if (!new_det->is_judge()) {
-            new_det = m_ru->buildJudge(new_det);
+            new_det = m_rg->buildJudge(new_det);
         }
         BR_det(ir) = new_det;
         ir->setParent(new_det);
@@ -233,7 +233,7 @@ IR * IR_RCE::processStorePR(IR * ir)
 //2. b = b; remove redundant store.
 bool IR_RCE::performSimplyRCE(IN OUT bool & cfg_mod)
 {
-    BBList * bbl = m_ru->getBBList();
+    BBList * bbl = m_rg->getBBList();
     bool change = false;
     xcom::C<IRBB*> * ct_bb;
     for (IRBB * bb = bbl->get_head(&ct_bb);
@@ -260,7 +260,7 @@ bool IR_RCE::performSimplyRCE(IN OUT bool & cfg_mod)
 
             if (newIR != ir) {
                 ir_list->remove(ct);
-                m_ru->freeIRTree(ir);
+                m_rg->freeIRTree(ir);
                 if (newIR != NULL) {
                     if (next_ct != NULL) {
                         ir_list->insert_before(newIR, next_ct);
@@ -279,7 +279,7 @@ bool IR_RCE::performSimplyRCE(IN OUT bool & cfg_mod)
 bool IR_RCE::perform(OptCtx & oc)
 {
     START_TIMER(t, getPassName());
-    m_ru->checkValidAndRecompute(&oc, PASS_CFG,
+    m_rg->checkValidAndRecompute(&oc, PASS_CFG,
         PASS_DU_REF, PASS_DU_CHAIN, PASS_UNDEF);
 
     if (!OC_is_du_chain_valid(oc)) {
@@ -321,7 +321,7 @@ bool IR_RCE::perform(OptCtx & oc)
     }
 
     if (change) {
-        ASSERT0(verifySSAInfo(m_ru));
+        ASSERT0(verifySSAInfo(m_rg));
     }
 
     END_TIMER(t, getPassName());

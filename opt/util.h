@@ -82,9 +82,9 @@ namespace xoc {
 //dump_rbt((RBT<SYM*, SYM*, xoc::CompareSymTab>&)map, NULL, 1000, dumpTN);
 template <class T, class Ttgt, class CompareKey>
 void dump_rbt(RBT<T, Ttgt, CompareKey> & rbt,
-    CHAR const* name = NULL,
-    UINT nil_count = NIL_START,
-    CHAR const* (*dumpTN)(T, Ttgt) = NULL)
+              CHAR const* name = NULL,
+              UINT nil_count = NIL_START,
+              CHAR const* (*dumpTN)(T, Ttgt) = NULL)
 {
     typedef RBTNode<T, Ttgt> TN;
     Vector<TN*> nilvec;

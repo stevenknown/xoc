@@ -289,7 +289,7 @@ bool MDSet::is_overlap(MD const* md, Region * current_ru) const
     //    (MD_id(md) == MD_FULL_MEM && !DefSBitSetCore::is_empty())) {
     //    return true;
     //}
- 
+
     if (DefSBitSetCore::is_contain(MD_IMPORT_VAR) &&
         !current_ru->isRegionVAR(md->get_base())) {
         //If current MDSet contains imported variable, it
@@ -334,7 +334,7 @@ void MDSet::bunion(MDSet const& mds, DefMiscBitSetMgr & mbsmgr)
     //and MD2 dependence.
     //e.g: g=10, #mustdef=MD10, maydef={MD2, MD10}, g is global variable that
     //           #represented in Program Region.
-    //     foo(); #maydef={MD2, MD10}    
+    //     foo(); #maydef={MD2, MD10}
     //if (DefSBitSetCore::is_contain(MD_FULL_MEM)) {
     //    return;
     //}
@@ -399,7 +399,7 @@ MDSetMgr::MDSetMgr(Region * rg, DefMiscBitSetMgr * mbsm)
     m_sc_mds_pool = smpoolCreate(sizeof(xcom::SC<MDSet*>) * 8, MEM_CONST_SIZE);
     m_md_set_list.set_pool(m_sc_mds_pool);
     m_free_md_set.set_pool(m_sc_mds_pool);
-    m_ru = rg;
+    m_rg = rg;
     ASSERT0(mbsm);
     m_misc_bs_mgr = mbsm;
 }
@@ -658,8 +658,8 @@ MD const* MDSystem::registerMD(MD const& m)
         //    return ::getMD(MD_HEAP_MEM);
         //}
         //if (MD_base(md) == g_stack_mem) {
-        //    MD_id(md) = MD_STACK_MEM;
-        //    return ::getMD(MD_STACK_MEM);
+        //    MD_id(md) = MD_LOCAL_VAR;
+        //    return ::getMD(MD_LOCAL_VAR);
         //}
     }
 
@@ -698,10 +698,9 @@ void MDSystem::initGlobalMemMD(VarMgr * vm)
     m_global_mem = NULL;
     if (vm == NULL) { return; }
 
-    m_global_mem = vm->registerVar(
-        (CHAR*)".global_mem",
-        getTypeMgr()->getMCType(0),
-        1, VAR_GLOBAL|VAR_FAKE|VAR_IS_UNALLOCABLE);
+    m_global_mem = vm->registerVar((CHAR*)".global_mem",
+        getTypeMgr()->getMCType(0), 1,
+        VAR_GLOBAL|VAR_FAKE|VAR_IS_UNALLOCABLE);
     MD x;
     MD_base(&x) = m_global_mem;
     MD_size(&x) = 0;
@@ -719,29 +718,28 @@ void MDSystem::initImportVar(VarMgr * vm)
     m_import_var = NULL;
     if (vm == NULL) { return; }
 
-	//The design goal of IMPORT MD set is attempt to describe non-global variables
-	//precisely that located in outer region.
-	//WORKAROUND: In order to speedup analysis, and shrink POINT-TO set size, set
-	//IMPORT MD to be GLOBAL, which means GLOBAL variable and IMPORT variable are
-	//the same.
-	//Primitive design of IMPORT variable is using a fake variable to stand for
-	//those local variables that are not located in current region. says outer
-	//region.
-	//e.g:
-	//  Program Region {
-	//    VAR a; # global variable
-	//    Func Region {
-	//      VAR b; # local
-	//      Func Region {
-	//        VAR c; # local
-	//        # b is regarded as the variable that located in IMPORT variable set.
-	//      }
+    //The design goal of IMPORT MD set is attempt to describe non-global variables
+    //precisely that located in outer region.
+    //WORKAROUND: In order to speedup analysis, and shrink POINT-TO set size, set
+    //IMPORT MD to be GLOBAL, which means GLOBAL variable and IMPORT variable are
+    //the same.
+    //Primitive design of IMPORT variable is using a fake variable to stand for
+    //those local variables that are not located in current region. says outer
+    //region.
+    //e.g:
+    //  Program Region {
+    //    VAR a; # global variable
+    //    Func Region {
+    //      VAR b; # local
+    //      Func Region {
+    //        VAR c; # local
+    //        c = b # b is regarded as the variable that located in
+    //              # IMPORT variable set.
+    //      }
     //    }
     //  }
-    m_import_var = vm->registerVar(
-                        (CHAR*)".import_var",
-                        getTypeMgr()->getMCType(0),
-                        1, VAR_GLOBAL|VAR_FAKE|VAR_IS_UNALLOCABLE);
+    m_import_var = vm->registerVar((CHAR*)".import_var",
+        getTypeMgr()->getMCType(0), 1, VAR_GLOBAL|VAR_FAKE|VAR_IS_UNALLOCABLE);
     MD x;
     MD_base(&x) = m_import_var;
     MD_size(&x) = 0;
@@ -817,13 +815,12 @@ void MDSystem::destroy()
 //'strictly': set to true to compute if md may be overlapped with global memory.
 //
 //Note this function does NOT clean output, and will append result to output.
-void MDSystem::computeOverlap(
-        Region * current_ru,
-        MD const* md,
-        MDSet & output,
-        ConstMDIter & tabiter,
-        DefMiscBitSetMgr & mbsmgr,
-        bool strictly)
+void MDSystem::computeOverlap(Region * current_ru,
+                              MD const* md,
+                              MDSet & output,
+                              ConstMDIter & tabiter,
+                              DefMiscBitSetMgr & mbsmgr,
+                              bool strictly)
 {
     ASSERT0(md && current_ru);
     if (strictly) {

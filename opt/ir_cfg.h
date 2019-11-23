@@ -46,7 +46,7 @@ class IR_CFG : public Pass, public CFG<IRBB, IR> {
 protected:
     Vector<IRBB*> m_bb_vec;
     LAB2BB m_lab2bb;
-    Region * m_ru;
+    Region * m_rg;
     TypeMgr * m_tm;
     CFG_SHAPE m_cs;
 
@@ -139,16 +139,16 @@ public:
         }
     }
 
-    virtual void dump_vcg(CHAR const* name)
-    { CFG<IRBB, IR>::dump_vcg(name); }
+    virtual void dumpVCG(CHAR const* name)
+    { CFG<IRBB, IR>::dumpVCG(name); }
 
-    void dump_vcg(CHAR const* name = NULL,
+    void dumpVCG(CHAR const* name = NULL,
                   bool detail = true,
                   bool dump_eh = true);
-    void dump_dot(CHAR const* name = NULL,
+    void dumpDOT(CHAR const* name = NULL,
                   bool detail = true,
                   bool dump_eh = true);
-    void dump_dot(FILE * h, bool detail, bool dump_eh);
+    void dumpDOT(FILE * h, bool detail, bool dump_eh);
 
     void erase();
 
@@ -190,7 +190,7 @@ public:
         return BB_last_ir(bb);
     }
 
-    Region * getRegion() { return m_ru; }
+    Region * getRegion() { return m_rg; }
     UINT getNumOfBB() const { return get_vertex_num(); }
     BBList * getBBList() { return m_bb_list; }
     LAB2BB * getLabel2BBMap() { return &m_lab2bb; }

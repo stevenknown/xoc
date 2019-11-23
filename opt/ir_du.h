@@ -92,7 +92,7 @@ class IR_DU_MGR;
 //Mapping from MD to IR list, and to be responsible for
 //allocating and destroy List<IR*> objects.
 class MDId2IRlist : public TMap<UINT, DefSBitSetCore*> {
-    Region * m_ru;
+    Region * m_rg;
     MDSystem * m_md_sys;
     TypeMgr * m_tm;
     IR_DU_MGR * m_du;
@@ -249,7 +249,7 @@ class IR_DU_MGR : public Pass {
     friend class MDId2IRlist;
     friend class DUSet;
 protected:
-    Region * m_ru;
+    Region * m_rg;
     TypeMgr * m_tm;
     IR_AA * m_aa;
     IR_CFG * m_cfg;
@@ -572,7 +572,7 @@ public:
         DUIter di = NULL;
         for (UINT i = (UINT)from_du->get_first(&di);
              di != NULL; i = (UINT)from_du->get_next(i, &di)) {
-            IR const* ref = m_ru->getIR(i);
+            IR const* ref = m_rg->getIR(i);
             //ref may be stmt or exp.
 
             DUSet * ref_defuse_set = ref->getDUSet();
@@ -593,13 +593,13 @@ public:
                    DUSet * useset_of_from,
                    DefMiscBitSetMgr * m)
     {
-        ASSERT0(m_ru->getIR(from)->is_stmt() &&
-                m_ru->getIR(to)->is_stmt() &&
+        ASSERT0(m_rg->getIR(from)->is_stmt() &&
+                m_rg->getIR(to)->is_stmt() &&
                 useset_of_to && useset_of_from && m);
         DUIter di = NULL;
         for (INT i = useset_of_from->get_first(&di);
              di != NULL; i = useset_of_from->get_next((UINT)i, &di)) {
-            IR const* exp = m_ru->getIR((UINT)i);
+            IR const* exp = m_rg->getIR((UINT)i);
             ASSERT0(exp->isMemoryRef());
 
             DUSet * defset = exp->getDUSet();
@@ -638,12 +638,12 @@ public:
                    DUSet * defset_of_from,
                    DefMiscBitSetMgr * m)
     {
-        ASSERT0(m_ru->getIR(from)->is_exp() && m_ru->getIR(to)->is_exp() &&
+        ASSERT0(m_rg->getIR(from)->is_exp() && m_rg->getIR(to)->is_exp() &&
                 defset_of_from && defset_of_to && m);
         DUIter di = NULL;
         for (INT i = defset_of_from->get_first(&di);
              di != NULL; i = defset_of_from->get_next((UINT)i, &di)) {
-            IR * stmt = m_ru->getIR((UINT)i);
+            IR * stmt = m_rg->getIR((UINT)i);
             ASSERT0(stmt->is_stmt());
             DUSet * useset = stmt->getDUSet();
             if (useset == NULL) { continue; }
@@ -778,7 +778,7 @@ public:
     bool ForAvailExpression(UINT bbid,
                             List<IRBB*> & preds,
                             List<IRBB*> * lst,
-                            DefMiscBitSetMgr & bsmgr);    
+                            DefMiscBitSetMgr & bsmgr);
     void freeDU();
     IR * findDomDef(IR const* exp,
                     IR const* exp_stmt,
@@ -836,7 +836,7 @@ public:
         DUIter di = NULL;
         for (INT i = stmtset->get_first(&di);
              i >= 0; i = stmtset->get_next((UINT)i, &di)) {
-            IR * d = m_ru->getIR((UINT)i);
+            IR * d = m_rg->getIR((UINT)i);
             ASSERT0(d->is_stmt());
             getAndAllocDUSet(d)->addUse(exp, *m_misc_bs_mgr);
         }
@@ -882,7 +882,7 @@ public:
         DUIter di = NULL;
         for (INT i = expset->get_first(&di);
              i >= 0; i = expset->get_next((UINT)i, &di)) {
-            IR * u = m_ru->getIR((UINT)i);
+            IR * u = m_rg->getIR((UINT)i);
             ASSERT0(u->is_exp());
             getAndAllocDUSet(u)->addDef(stmt, *m_misc_bs_mgr);
         }

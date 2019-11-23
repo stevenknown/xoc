@@ -465,7 +465,7 @@ UINT IR2Dex::findFieldId(IR * ir, IR * objptr)
                 PR1 (r:PTR:4 ptbase:1) mem_addr id:19
     */
     ASSERT0(ir->is_stmt() && objptr->is_exp() && ir->is_kids(objptr));
-    IR_DU_MGR * du_mgr = m_ru->getDUMgr();
+    IR_DU_MGR * du_mgr = m_rg->getDUMgr();
     ASSERT0(du_mgr);
     IR const* def = du_mgr->getExactAndUniqueDef(objptr);
     ASSERT0(def);
@@ -1469,7 +1469,7 @@ void IR2Dex::dump_output(List<LIR*> & newlirs, Prno2Vreg const& prno2v)
     if (m_lab2idx.get_elem_count() != 0) {
         INT c;
         note("\n==== RU:%s, IR2Dex DUMP lab2idx ====",
-                m_ru->getRegionName());
+                m_rg->getRegionName());
         for (LabelInfo const* li = m_lab2idx.get_first(c);
              li != NULL; li = m_lab2idx.get_next(c)) {
             dumpLabel(li);
@@ -1477,7 +1477,7 @@ void IR2Dex::dump_output(List<LIR*> & newlirs, Prno2Vreg const& prno2v)
         }
     }
     note("\n==== RU:%s, DUMP lir list after reloc === vregnum:%d ",
-            m_ru->getRegionName(), prno2v.maxreg + 1);
+            m_rg->getRegionName(), prno2v.maxreg + 1);
     /*
     if (prno2v.maxreg >= 0) {
         prt("(");
@@ -1508,7 +1508,7 @@ void IR2Dex::convert(IR * ir_list, List<LIR*> & newlirs)
     bool dump = g_dump_ir2dex && g_tfile != NULL;
     if (dump) {
         note("\n\n==== IR->DEX CONVERT %s =====",
-                m_ru->getRegionName());
+                m_rg->getRegionName());
     }
     IR2DexCtx cont;
     UINT idx = 0;
@@ -1541,7 +1541,7 @@ void IR2Dex::convert(IR * ir_list, List<LIR*> & newlirs)
     if (g_dd) {
         ASSERT0(g_tfile);
         FILE * log = fopen("ir2dex.log", "a+");
-        fprintf(log, "\n== %s ==", m_ru->getRegionName());
+        fprintf(log, "\n== %s ==", m_rg->getRegionName());
         FILE * t = g_tfile;
         g_tfile = log;
         UINT j = 0;

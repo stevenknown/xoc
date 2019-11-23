@@ -72,7 +72,7 @@ public:
 //Perform Copy Propagation
 class IR_CP : public Pass {
 private:
-    Region * m_ru;
+    Region * m_rg;
     MDSystem * m_md_sys;
     IR_DU_MGR * m_du;
     IR_CFG * m_cfg;
@@ -103,7 +103,7 @@ private:
     void dumpCopyPropagationAction(IR const* def_stmt,
                                    IR const* prop_value,
                                    IR const* use,
-                                   MDSSAMgr * mdssamgr);    
+                                   MDSSAMgr * mdssamgr);
 
     bool isSimpCVT(IR const* ir) const;
     bool isConstCVT(IR const* ir) const;
@@ -130,14 +130,14 @@ public:
     IR_CP(Region * rg)
     {
         ASSERT0(rg != NULL);
-        m_ru = rg;
+        m_rg = rg;
         m_md_sys = rg->getMDSystem();
         m_du = rg->getDUMgr();
         m_cfg = rg->getCFG();
         m_md_set_mgr = rg->getMDSetMgr();
         m_tm = rg->getTypeMgr();
         ASSERT0(m_cfg && m_du && m_md_sys && m_tm && m_md_set_mgr);
-        m_prop_kind = CP_PROP_UNARY_AND_SIMPLEX;     
+        m_prop_kind = CP_PROP_UNARY_AND_SIMPLEX;
     }
     COPY_CONSTRUCTOR(IR_CP);
     virtual ~IR_CP() {}
@@ -154,7 +154,7 @@ public:
             case IR_ID:
             case IR_CONST:
             case IR_PR:
-                return true;            
+                return true;
             default: return isSimpCVT(ir);
             }
         case CP_PROP_UNARY_AND_SIMPLEX:

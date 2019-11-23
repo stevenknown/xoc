@@ -41,7 +41,7 @@ class VAR2PR : public TMap<VAR const*, UINT, CompareConstVar> {
 };
 
 class LivenessMgr : public Pass {
-    Region * m_ru;
+    Region * m_rg;
     MDSystem * m_md_sys;
     VAR2PR * m_var2pr;
     IR_CFG * m_cfg;
@@ -86,7 +86,7 @@ protected:
 public:
     LivenessMgr(Region * rg)
     {
-        m_ru = rg;
+        m_rg = rg;
         m_md_sys = rg->getMDSystem();
         m_cfg = rg->getCFG();
         m_var2pr = NULL;

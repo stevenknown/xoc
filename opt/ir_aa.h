@@ -298,8 +298,8 @@ protected:
     IR_CFG * m_cfg;
     VarMgr * m_var_mgr;
     TypeMgr * m_tm;
-    Region * m_ru;
-    RegionMgr * m_rumgr;
+    Region * m_rg;
+    RegionMgr * m_rgmgr;
     MDSystem * m_md_sys;
     SMemPool * m_pool;
     MDSetMgr * m_mds_mgr; //MDSet manager.
@@ -344,10 +344,6 @@ protected:
                          IN OUT MDSet * mds,
                          IN OUT AACtx * ic,
                          IN OUT MD2MDSet * mx);
-    MD const* allocStoreMD(IR * ir);
-    MD const* allocIdMD(IR * ir);
-    MD const* allocLoadMD(IR * ir);
-    MD const* allocStringMD(SYM const* string);
 
     void convertPT2MD2MDSet(PtPairSet const& pps,
                             IN PtPairMgr & pt_pair_mgr,
@@ -475,13 +471,6 @@ public:
     COPY_CONSTRUCTOR(IR_AA);
     virtual ~IR_AA();
 
-    MD const* allocPRMD(IR * ir);
-    MD const* allocPhiMD(IR * phi);
-    MD const* allocStorePRMD(IR * ir);
-    MD const* allocCallResultPRMD(IR * ir);
-    MD const* allocSetelemMD(IR * ir);
-    MD const* allocGetelemMD(IR * ir);
-
     //Attemp to compute the type based may point to MD set.
     //Return true if this function find the point-to MD set, otherwise
     //return false.
@@ -535,13 +524,13 @@ public:
     PtPairSet * getInPtPairSet(IRBB const* bb)
     {
         ASSERTN(m_in_pp_set.get(BB_id(bb)),
-               ("IN set is not yet initialized for BB%d", BB_id(bb)));
+                ("IN set is not yet initialized for BB%d", BB_id(bb)));
         return m_in_pp_set.get(BB_id(bb));
     }
     PtPairSet * getOutPtPairSet(IRBB const* bb)
     {
         ASSERTN(m_out_pp_set.get(BB_id(bb)),
-               ("OUT set is not yet initialized for BB%d", BB_id(bb)));
+                ("OUT set is not yet initialized for BB%d", BB_id(bb)));
         return m_out_pp_set.get(BB_id(bb));
     }
 
@@ -550,49 +539,27 @@ public:
     MDSet const* getPointTo(UINT mdid, MD2MDSet & ctx) const
     { return ctx.get(mdid); }
 
-    //Return the Memory Descriptor Set for given ir may describe.
-    MDSet const* getMayAddr(IR const* ir) { return ir->getRefMDSet(); }
-
     //Return the may-point-to Memory Descriptor Set.
     MDSet const* getMayPointToMDSet() const { return m_maypts; }
-
-    //Return the MemoryAddr for 'ir' must be.
-    MD const* getMustAddr(IR const* ir) { return ir->getRefMD(); }
-
     MD2MDSet * getUniqueMD2MDSet() { return &m_unique_md2mds; }
 
     void initAliasAnalysis();
-
     //Return true if Alias Analysis has initialized.
     bool is_init() const { return m_maypts != NULL; }
     bool isFlowSensitive() const { return m_flow_sensitive; }
     bool isValidStmtToAA(IR * ir);
-
     bool isFullMem(UINT mdid) const
     { return mdid == MD_FULL_MEM ? true : false; }
-
     bool isHeapMem(UINT mdid) const
     { //return mdid == MD_HEAP_MEM ? true : false;
       DUMMYUSE(mdid);
       return false;
     }
-
     //Return true if the MD of each PR corresponded is unique.
     void initMayPointToSet();
 
     void cleanContext(OptCtx & oc);
     void destroyContext(OptCtx & oc);
-
-    void setMustAddr(IR * ir, MD const* md)
-    {
-        ASSERT0(ir != NULL && md);
-        ir->setRefMD(md, m_ru);
-    }
-    void setMayAddr(IR * ir, MDSet const* mds)
-    {
-        ASSERT0(ir && mds && !mds->is_empty());
-        ir->setRefMDSet(mds, m_ru);
-    }
 
     //For given MD2MDSet, set the point-to set to 'md'.
     //ctx: context of point-to analysis.
@@ -658,7 +625,7 @@ public:
     {
         ASSERT0(m_mds_hash->find(pt_set));
         MDSet const* pts = getPointTo(pointer_mdid, ctx);
-        if (pts == NULL) {            
+        if (pts == NULL) {
             setPointTo(pointer_mdid, ctx, &pt_set);
             return;
         }

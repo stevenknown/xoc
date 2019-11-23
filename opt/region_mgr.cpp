@@ -338,7 +338,7 @@ void RegionMgr::dumpRelationGraph(CHAR const* name)
         if (rg == NULL || rg->getParent() == NULL) { continue; }
         g.addEdge(rg->getParent()->id(), rg->id());
     }
-    g.dump_vcg(name);
+    g.dumpVCG(name);
 }
 
 

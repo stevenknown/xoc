@@ -60,7 +60,7 @@ namespace xoc {
 //        ...
 class IR_LOOP_CVT : public Pass {
 protected:
-    Region * m_ru;
+    Region * m_rg;
     IR_CFG * m_cfg;
     IR_DU_MGR * m_du;
     IRIter m_ii;
@@ -75,9 +75,9 @@ public:
     explicit IR_LOOP_CVT(Region * rg)
     {
         ASSERT0(rg != NULL);
-        m_ru = rg;
+        m_rg = rg;
         m_du = rg->getDUMgr();
-        m_cfg = m_ru->getCFG();
+        m_cfg = m_rg->getCFG();
         ASSERT0(m_cfg && m_du);
     }
     COPY_CONSTRUCTOR(IR_LOOP_CVT);

@@ -40,7 +40,7 @@ namespace xoc {
 
 class TG : public xcom::DGraph {
 protected:
-    Region * m_ru;
+    Region * m_rg;
 
 protected:
     virtual void * cloneEdgeInfo(xcom::Edge *)
@@ -50,12 +50,12 @@ protected:
     { return NULL; }
 
 public:
-    explicit TG(Region * rg) { m_ru = rg; }
+    explicit TG(Region * rg) { m_rg = rg; }
     COPY_CONSTRUCTOR(TG);
 
     void pick_eh()
     {
-        List<IRBB*> * bbs = m_ru->getBBList();
+        List<IRBB*> * bbs = m_rg->getBBList();
         for (IRBB * bb = bbs->get_head(); bb != NULL; bb = bbs->get_next()) {
             if (bb->isExceptionHandler()) {
                 removeVertex(BB_id(bb));
@@ -81,7 +81,7 @@ class IR_GCSE : public Pass {
 private:
     bool m_enable_filter; //filter determines which expression can be CSE.
     bool m_is_in_ssa_form; //Set to true if PR is in SSA form.
-    Region * m_ru;
+    Region * m_rg;
     IR_CFG * m_cfg;
     IR_DU_MGR * m_du;
     IR_AA * m_aa;
@@ -121,7 +121,7 @@ public:
     IR_GCSE(Region * rg, IR_GVN * gvn)
     {
         ASSERT0(rg);
-        m_ru = rg;
+        m_rg = rg;
         m_cfg = rg->getCFG();
         m_du = rg->getDUMgr();
         m_aa = rg->getAA();

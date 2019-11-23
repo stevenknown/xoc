@@ -128,7 +128,7 @@ protected:
     xcom::BitSetMgr m_bs_mgr; //xcom::BitSet manager.
     SMemPool * m_pool;
     Vector<CFS_INFO*> m_map_ir2cfsinfo;
-    Region * m_ru;
+    Region * m_rg;
     Vector<AbsNode*> m_map_bb2abs;
 
 protected:
@@ -142,7 +142,7 @@ protected:
 public:
     CfsMgr(Region * rg)
     {
-        m_ru = rg;
+        m_rg = rg;
         m_pool = smpoolCreate(64, MEM_COMM);
     }
     COPY_CONSTRUCTOR(CfsMgr);

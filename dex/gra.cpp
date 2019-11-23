@@ -631,7 +631,7 @@ void RSC::comp_ir_fmt(IR const* ir)
 
 void RSC::comp_ir_constrain()
 {
-    List<IRBB*> * bbl = m_ru->getBBList();
+    List<IRBB*> * bbl = m_rg->getBBList();
     for (IRBB * bb = bbl->get_head(); bb != NULL; bb = bbl->get_next()) {
         for (IR const* ir = BB_first_ir(bb);
              ir != NULL; ir = BB_next_ir(bb)) {
@@ -645,14 +645,14 @@ void RSC::dump_ir_fmt()
 {
     if (g_tfile == NULL) { return; }
     note("\n==------- DUMP IR FMT --------==");
-    List<IRBB*> * bbl = m_ru->getBBList();
+    List<IRBB*> * bbl = m_rg->getBBList();
     for (IRBB * bb = bbl->get_head(); bb != NULL; bb = bbl->get_next()) {
         note("\n-- BB%d --", BB_id(bb));
         for (IR const* ir = BB_first_ir(bb);
              ir != NULL; ir = BB_next_ir(bb)) {
             FMT f = m_ir2fmt.get(ir->id());
             note("\nFMT:%s", g_fmt_name[f]);
-            dumpIR(ir, m_ru);
+            dumpIR(ir, m_rg);
         }
     }
     note("\n");
@@ -734,7 +734,7 @@ void RSC::dump()
     if (g_tfile == NULL) { return; }
     dump_ir_fmt();
     dump_glt_usable();
-    BBList * bbl = m_ru->getBBList();
+    BBList * bbl = m_rg->getBBList();
     for (IRBB * bb = bbl->get_head(); bb != NULL; bb = bbl->get_next()) {
         dump_bb(BB_id(bb));
     }
@@ -850,7 +850,7 @@ void RSC::comp_lt_usable(LT * lt, LTMgr * ltm)
 //Verify each stmt has instruction constrain.
 bool RSC::verify_fmt()
 {
-    List<IRBB*> * bbl = m_ru->getBBList();
+    List<IRBB*> * bbl = m_rg->getBBList();
     for (IRBB * bb = bbl->get_head(); bb != NULL; bb = bbl->get_next()) {
         for (IR const* ir = BB_first_ir(bb);
              ir != NULL; ir = BB_next_ir(bb)) {
@@ -896,7 +896,7 @@ void RSC::perform(bool omit_constrain)
         GLT_usable(g) = get_16();
     }
 
-    List<IRBB*> * bbl = m_ru->getBBList();
+    List<IRBB*> * bbl = m_rg->getBBList();
     for (IRBB * bb = bbl->get_head(); bb != NULL; bb = bbl->get_next()) {
         LTMgr * ltm = m_gltm->map_bb2ltm(bb);
         if (ltm == NULL) { continue; }
@@ -919,7 +919,7 @@ void RSC::perform(bool omit_constrain)
 GltMgr::GltMgr(Region * rg, LivenessMgr * mgr, RA * ra)
 {
     m_glt_count = 1;
-    m_ru = rg;
+    m_rg = rg;
     m_ra = ra;
     m_rsc = ra->get_rsc();
     m_tm = rg->getTypeMgr();
@@ -1036,7 +1036,7 @@ void GltMgr::dumpg()
 {
     if (g_tfile == NULL) { return; }
     BitSet prs;
-    List<IRBB*> * bbl = m_ru->getBBList();
+    List<IRBB*> * bbl = m_rg->getBBList();
     for (IRBB * bb = bbl->get_head(); bb != NULL; bb = bbl->get_next()) {
         for (IR const* o = BB_first_ir(bb);
              o != NULL; o = BB_next_ir(bb)) {
@@ -1075,9 +1075,8 @@ void GltMgr::dumpg()
     }
     litbuf2.sprint("pr%%-%dd", num2);
 
-    fprintf(g_tfile,
-            "\n=== DUMP Global Life Time = maxreg:%d = paramnum:%d ===",
-            m_ra->m_maxreg, m_ra->m_param_num);
+    note("\n=== DUMP Global Life Time = maxreg:%d = paramnum:%d ===",
+         m_ra->m_maxreg, m_ra->m_param_num);
     if (m_ra->m_param_num > 0) {
         prt("{");
         for (INT i = 0; i <= m_params.get_last_idx(); i++) {
@@ -1151,7 +1150,7 @@ void GltMgr::dump()
     dumpg();
     if (g_tfile == NULL) { return; }
     note("\n=== DUMP Local Life Time ===");
-    BBList * bbl = m_ru->getBBList();
+    BBList * bbl = m_rg->getBBList();
     for (IRBB * bb = bbl->get_head(); bb != NULL; bb = bbl->get_next()) {
         LTMgr * lltmgr = map_bb2ltm(bb);
         lltmgr->dump();
@@ -1217,7 +1216,7 @@ void GltMgr::renameGLT(GLT * g)
         GLT_prno(g) = PR_no(newpr);
         m_pr2glt.set(GLT_prno(g), g);
     }
-    m_ru->freeIR(newpr);
+    m_rg->freeIR(newpr);
 }
 
 
@@ -1227,7 +1226,7 @@ void GltMgr::renameLocal()
 {
     TMap<UINT, LT*> prno2lt;
     BitSet met;
-    List<IRBB*> * bbl = m_ru->getBBList();
+    List<IRBB*> * bbl = m_rg->getBBList();
     for (IRBB * bb = bbl->get_head(); bb != NULL; bb = bbl->get_next()) {
         LTMgr * ltm = m_bb2ltmgr.get(BB_id(bb));
         if (ltm == NULL) { continue; }
@@ -1256,7 +1255,7 @@ void GltMgr::rename()
 //Build global life time and set map between PR and Vreg parameter.
 void GltMgr::build(bool build_group_part)
 {
-    List<IRBB*> * bbl = m_ru->getBBList();
+    List<IRBB*> * bbl = m_rg->getBBList();
     INT vreg =     m_ra->m_vregnum - m_ra->m_param_num;
     for (UINT i = 0; i < m_ra->m_param_num; i++, vreg++) {
         ASSERT0(vreg >= 0 && vreg < (INT)m_ra->m_vregnum);
@@ -1328,7 +1327,7 @@ void GltMgr::build(bool build_group_part)
 //
 //START GIG
 //
-void GIG::dump_vcg(CHAR const* name)
+void GIG::dumpVCG(CHAR const* name)
 {
     if (name == NULL) {
         name = "graph_global_if.vcg";
@@ -1558,7 +1557,7 @@ void IG::get_neighbor(OUT List<LT*> & nis, LT * lt) const
 }
 
 
-void IG::dump_vcg(CHAR const* name)
+void IG::dumpVCG(CHAR const* name)
 {
     if (name == NULL) {
         name = "graph_local_if.vcg";
@@ -1638,7 +1637,7 @@ LTMgr::LTMgr(IRBB * bb, LivenessMgr * mgr, GltMgr * gltm, SMemPool * pool)
     m_liveness_mgr = mgr;
     m_gltm = gltm;
     m_tm = gltm->m_tm;
-    m_ru = gltm->m_ru;
+    m_rg = gltm->m_rg;
     m_ra = gltm->m_ra;
     m_lt_count = 1;
     m_pr2v = m_ra->m_pr2v;
@@ -1665,10 +1664,10 @@ LTMgr::LTMgr(IRBB * bb, LivenessMgr * mgr, GltMgr * gltm, SMemPool * pool)
 //    2. position in LT should be updated.
 IR * LTMgr::genSpill(LT * lt, INT pos)
 {
-    IR * spill_loc = m_ru->buildPR(m_tm->getSimplexType(D_I32));
-    IR * ltpr = m_ru->buildPR(m_tm->getSimplexType(D_I32));
+    IR * spill_loc = m_rg->buildPR(m_tm->getSimplexType(D_I32));
+    IR * ltpr = m_rg->buildPR(m_tm->getSimplexType(D_I32));
     PR_no(ltpr) = LT_prno(lt);
-    IR * spill = m_ru->buildStorePR(PR_no(spill_loc),
+    IR * spill = m_rg->buildStorePR(PR_no(spill_loc),
                                       IR_dt(spill_loc), ltpr);
     if (pos == (INT)get_first_pos()) {
         //Prepend store at start pos of BB.
@@ -1711,9 +1710,9 @@ IR * LTMgr::genSpillSwap(IR * stmt, UINT prno, Type const* prty, IR * spill_loc)
 
     //Generate and insert spilling operation.
     if (spill_loc == NULL) {
-        spill_loc = m_ru->buildPR(prty);
+        spill_loc = m_rg->buildPR(prty);
     }
-    IR * spill = m_ru->buildStorePR(prno, prty, spill_loc);
+    IR * spill = m_rg->buildStorePR(prno, prty, spill_loc);
     m_ra->get_rsc()->comp_ir_fmt(spill);
     BB_irlist(m_bb).insert_after(spill, stmt);
 
@@ -1740,10 +1739,10 @@ IR * LTMgr::genSpill(UINT prno, Type const* type, IR * marker, IR * spill_loc)
 {
     ASSERT0(prno > 0 && type && marker && marker->is_stmt());
     if (spill_loc == NULL) {
-        spill_loc = m_ru->buildPR(type);
+        spill_loc = m_rg->buildPR(type);
     }
-    IR * spill = m_ru->buildStorePR(PR_no(spill_loc), IR_dt(spill_loc),
-                                      m_ru->buildPRdedicated(prno, type));
+    IR * spill = m_rg->buildStorePR(PR_no(spill_loc), IR_dt(spill_loc),
+                                      m_rg->buildPRdedicated(prno, type));
     BB_irlist(m_bb).insert_after(spill, marker);
     m_ra->get_rsc()->comp_ir_fmt(spill);
     return spill_loc;
@@ -1767,12 +1766,12 @@ IR * LTMgr::genSpill(UINT prno, Type const* type, IR * marker, IR * spill_loc)
 //    Each reloads are executed unconditionally.
 IR * LTMgr::genReload(LT * lt, INT pos, IR * spill_loc)
 {
-    IR * ltpr = m_ru->buildPR(IR_dt(spill_loc));
+    IR * ltpr = m_rg->buildPR(IR_dt(spill_loc));
     if (LT_is_global(lt)) {
         //Keep original PR unchanged.
         PR_no(ltpr) = LT_prno(lt);
     }
-    IR * reload = m_ru->buildStorePR(PR_no(ltpr), IR_dt(ltpr), spill_loc);
+    IR * reload = m_rg->buildStorePR(PR_no(ltpr), IR_dt(ltpr), spill_loc);
     m_ra->get_rsc()->comp_ir_fmt(reload);
     if (pos == (INT)get_first_pos()) {
         //Prepend reload at start pos of BB.
@@ -1813,8 +1812,8 @@ IR * LTMgr::genReload(IR * newpr, IR * marker, IR * spill_loc)
 {
     ASSERT0(newpr && newpr->is_pr() &&
              marker && spill_loc && spill_loc->is_pr());
-    IR * reload = m_ru->buildStorePR(PR_no(newpr), IR_dt(newpr),
-                                       m_ru->dupIR(spill_loc));
+    IR * reload = m_rg->buildStorePR(PR_no(newpr), IR_dt(newpr),
+                                       m_rg->dupIR(spill_loc));
     m_ra->m_rsc.comp_ir_fmt(reload);
 
     IRBB * irbb = marker->getBB();
@@ -1838,9 +1837,9 @@ IR * LTMgr::genReloadSwap(IR * orgpr, IR * marker)
 {
     ASSERT0(marker && marker->is_stmt());
     ASSERT0(orgpr && orgpr->is_pr());
-    UINT spill_prno = m_ru->buildPrno(IR_dt(orgpr));
-    IR * reload = m_ru->buildStorePR(spill_prno, IR_dt(orgpr),
-                                       m_ru->dupIR(orgpr));
+    UINT spill_prno = m_rg->buildPrno(IR_dt(orgpr));
+    IR * reload = m_rg->buildStorePR(spill_prno, IR_dt(orgpr),
+                                       m_rg->dupIR(orgpr));
     m_ra->m_rsc.comp_ir_fmt(reload);
 
     IRBB * irbb = marker->getBB();
@@ -1911,20 +1910,20 @@ void LTMgr::processResultGroupPart(IR const* ir, UINT pos, OUT BitSet & lived_lt
         if (sib == NULL) {
             //low part is mapped during dex2ir, but high part may be not appear.
             //So its related IR is NULL.
-            sib = m_ru->buildPR(m_tm->getSimplexTypeEx(D_U32));
+            sib = m_rg->buildPR(m_tm->getSimplexTypeEx(D_U32));
         } else {
-            sib = m_ru->dupIR(sib);
+            sib = m_rg->dupIR(sib);
             IR_dt(sib) = m_tm->getSimplexTypeEx(D_U32);
         }
     } else if (LT_ltg(lt) != NULL) {
         //ir is generated by renaming. lt already has grouped.
-        sib = m_ru->buildPR(m_tm->getSimplexTypeEx(D_U32));
+        sib = m_rg->buildPR(m_tm->getSimplexTypeEx(D_U32));
         LT * pair = LT_ltg(lt)->get(1);
         ASSERT0(pair);
         PR_no(sib) = LT_prno(pair);
     } else {
         //ir is generated by renaming.
-        sib = m_ru->buildPR(m_tm->getSimplexTypeEx(D_U32));
+        sib = m_rg->buildPR(m_tm->getSimplexTypeEx(D_U32));
     }
 
     LT * siblt = processResultPR(PR_no(sib), pos, lived_lt);
@@ -1966,11 +1965,11 @@ IR * LTMgr::genMappedPR(UINT vid, Type const* ty)
 {
     IR * vx = m_ra->m_v2pr->get(vid);
     if (vx == NULL) {
-        vx = m_ru->buildPR(ty);
+        vx = m_rg->buildPR(ty);
         m_ra->m_v2pr->set(vid, vx);
         m_pr2v->set(PR_no(vx), vid);
     }
-    vx = m_ru->dupIR(vx);
+    vx = m_rg->dupIR(vx);
     IR_dt(vx) = ty;
     return vx;
 }
@@ -2084,20 +2083,20 @@ void LTMgr::processUseGroupPart(IR const* ir, UINT pos, OUT BitSet & lived_lt)
         if (sib == NULL) {
             //low part is mapped during dex2ir, but high part may be not appear.
             //So its related IR is NULL.
-            sib = m_ru->buildPR(m_tm->getSimplexTypeEx(D_U32));
+            sib = m_rg->buildPR(m_tm->getSimplexTypeEx(D_U32));
         } else {
-            sib = m_ru->dupIR(sib);
+            sib = m_rg->dupIR(sib);
             IR_dt(sib) = m_tm->getSimplexTypeEx(D_U32);
         }
     } else if (LT_ltg(lt) != NULL) {
         //ir is generated by renaming. lt already has grouped.
-        sib = m_ru->buildPR(m_tm->getSimplexTypeEx(D_U32));
+        sib = m_rg->buildPR(m_tm->getSimplexTypeEx(D_U32));
         LT * pair = LT_ltg(lt)->get(1);
         ASSERT0(pair);
         PR_no(sib) = LT_prno(pair);
     } else {
         //ir is generated by renaming.
-        sib = m_ru->buildPR(m_tm->getSimplexTypeEx(D_U32));
+        sib = m_rg->buildPR(m_tm->getSimplexTypeEx(D_U32));
     }
 
     LT * siblt = processUsePR(sib, pos, lived_lt);
@@ -2572,17 +2571,17 @@ void LTMgr::renameUse(IR * ir, LT * l, IR ** newpr)
                 if (p->is_pr()) {
                     if (PR_no(p) == LT_prno(l)) {
                         if (*newpr == NULL) {
-                            *newpr = m_ru->buildPR(IR_dt(p));
+                            *newpr = m_rg->buildPR(IR_dt(p));
                         }
-                        IR * newp = m_ru->dupIR(*newpr);
+                        IR * newp = m_rg->dupIR(*newpr);
                         IR_dt(newp) = IR_dt(p);
                         replace(&CALL_param_list(ir), p, newp);
                         IR_parent(newp) = ir;
-                        m_ru->freeIR(p);
+                        m_rg->freeIR(p);
                     } else if (gr != NULL &&
                                gr->is_member(PR_no(p))) {
                         if (*newpr == NULL) {
-                            *newpr = m_ru->buildPR(IR_dt(p));
+                            *newpr = m_rg->buildPR(IR_dt(p));
                         }
                     }
                 }
@@ -2603,17 +2602,17 @@ void LTMgr::renameUse(IR * ir, LT * l, IR ** newpr)
             if (rv != NULL && rv->is_pr()) {
                 if (PR_no(rv) == LT_prno(l)) {
                     if (*newpr == NULL) {
-                        *newpr = m_ru->buildPR(IR_dt(rv));
+                        *newpr = m_rg->buildPR(IR_dt(rv));
                     }
-                    IR * x = m_ru->dupIR(*newpr);
+                    IR * x = m_rg->dupIR(*newpr);
                     IR_dt(x) = IR_dt(rv);
                     RET_exp(ir) = x;
                     IR_parent(x) = ir;
-                    m_ru->freeIR(rv);
+                    m_rg->freeIR(rv);
                 } else if (gr != NULL &&
                            gr->is_member(PR_no(rv))) {
                     if (*newpr == NULL) {
-                        *newpr = m_ru->buildPR(IR_dt(rv));
+                        *newpr = m_rg->buildPR(IR_dt(rv));
                     }
                 }
             }
@@ -2643,16 +2642,16 @@ void LTMgr::renameUse(IR * ir, LT * l, IR ** newpr)
                 if (t == NULL || !t->is_pr()) { continue; }
                 if (PR_no(t) == LT_prno(l)) {
                     if (*newpr == NULL) {
-                        *newpr = m_ru->buildPR(IR_dt(t));
+                        *newpr = m_rg->buildPR(IR_dt(t));
                     }
-                    IR * x = m_ru->dupIR(*newpr);
+                    IR * x = m_rg->dupIR(*newpr);
                     IR_dt(x) = IR_dt(t);
                     p->setKid(i, x);
                     IR_parent(x) = p;
-                    m_ru->freeIR(t);
+                    m_rg->freeIR(t);
                 } else if (gr != NULL && gr->is_member(PR_no(t))) {
                     if (*newpr == NULL) {
-                        *newpr = m_ru->buildPR(IR_dt(t));
+                        *newpr = m_rg->buildPR(IR_dt(t));
                     }
                 }
             }
@@ -2689,7 +2688,7 @@ void LTMgr::renameLT(LT * l, IR ** newpr)
                     if (prno == LT_prno(l)) {
                         if (*newpr == NULL) {
                             //Generate new PR no.
-                            *newpr = m_ru->buildPR(IR_dt(ir));
+                            *newpr = m_rg->buildPR(IR_dt(ir));
                         }
                         ir->setPrno(PR_no(*newpr));
                     } else {
@@ -2697,7 +2696,7 @@ void LTMgr::renameLT(LT * l, IR ** newpr)
                         ASSERT0(LT_ltg(l) != NULL);
                         ASSERT0(LT_ltg(l)->is_member(prno));
                         if (*newpr == NULL) {
-                            *newpr = m_ru->buildPR(IR_dt(ir));
+                            *newpr = m_rg->buildPR(IR_dt(ir));
                         }
                     }
                 }
@@ -2706,7 +2705,7 @@ void LTMgr::renameLT(LT * l, IR ** newpr)
             case IR_ICALL:
                     if (CALL_prno(ir) == LT_prno(l)) {
                         if (*newpr == NULL) {
-                            *newpr = m_ru->buildPR(IR_dt(ir));
+                            *newpr = m_rg->buildPR(IR_dt(ir));
                         }
                         CALL_prno(ir) = PR_no(*newpr);
                     } else {
@@ -2714,7 +2713,7 @@ void LTMgr::renameLT(LT * l, IR ** newpr)
                         ASSERT0(LT_ltg(l) != NULL);
                         ASSERT0(LT_ltg(l)->is_member(CALL_prno(ir)));
                         if (*newpr == NULL) {
-                            *newpr = m_ru->buildPR(IR_dt(ir));
+                            *newpr = m_rg->buildPR(IR_dt(ir));
                         }
                     }
                 break;
@@ -2778,7 +2777,7 @@ void LTMgr::rename(TMap<UINT, LT*> & prno2lt, BitSet & met)
             if (newpr != NULL) {
                 met.bunion(PR_no(newpr));
             }
-            m_ru->freeIR(newpr);
+            m_rg->freeIR(newpr);
         }
     }
 }
@@ -3099,7 +3098,7 @@ BBRA::BBRA(IRBB * bb, RA * ra)
     m_ra = ra;
     m_rsc = ra->get_rsc();
     m_gltm = ra->get_gltm();
-    m_ru = ra->m_ru;
+    m_rg = ra->m_rg;
     ASSERT0(m_gltm);
     m_ltm = m_gltm->map_bb2ltm(bb);
     ASSERT0(m_ltm);
@@ -3901,7 +3900,7 @@ void BBRA::splitLTAt(
                                 ("o should be same result and operand."));
                         if (!isOpndSameWithResult(occ)) {
                             //Generate new sr again.
-                            newpr = m_ru->buildPR(IR_dt(newpr));
+                            newpr = m_rg->buildPR(IR_dt(newpr));
                         }
 
                         //Rename all follows REFs.
@@ -4088,7 +4087,7 @@ void RA::allocLocal(List<UINT> & nis, bool omit_constrain)
     List<LT*> unalloc;
     List<LT*> tmp;
     List<LT*> prios;
-    BBList * bbl = m_ru->getBBList();
+    BBList * bbl = m_rg->getBBList();
     for (IRBB * bb = bbl->get_head(); bb != NULL; bb = bbl->get_next()) {
         BBRA l(bb, this);
         l.set_tmp_lts(&unalloc);
@@ -4104,7 +4103,7 @@ void RA::allocLocal(List<UINT> & nis, bool omit_constrain)
 //Alloc phy-register for local lt which has specific constrain.
 void RA::allocLocalSpec(List<UINT> & nis)
 {
-    BBList * bbl = m_ru->getBBList();
+    BBList * bbl = m_rg->getBBList();
     Vector<IR*> need_to_alloc;
     for (IRBB * bb = bbl->get_head(); bb != NULL; bb = bbl->get_next()) {
         IR * lastir = BB_last_ir(bb);
@@ -4433,7 +4432,7 @@ UINT RA::computeReserveRegister(IRIter & ii, List<IR*> & resolve_list)
 {
     UINT max_rescount = 0;
     resolve_list.clean();
-    List<IRBB*> * bbl = m_ru->getBBList();
+    List<IRBB*> * bbl = m_rg->getBBList();
     for (IRBB * bb = bbl->get_head(); bb != NULL; bb = bbl->get_next()) {
         LTMgr * ltm = m_gltm.get_ltm(BB_id(bb));
         if (ltm == NULL) { continue; }
@@ -4617,7 +4616,7 @@ void RA::reviseRSC()
 void RA::shiftReg(UINT ofst)
 {
     ASSERT0(ofst < 60000);
-    BBList * bbl = m_ru->getBBList();
+    BBList * bbl = m_rg->getBBList();
     for (IRBB * bb = bbl->get_head(); bb != NULL; bb = bbl->get_next()) {
         LTMgr * ltm = m_gltm.map_bb2ltm(bb);
         if (ltm == NULL) { continue; }
@@ -4648,7 +4647,7 @@ void RA::rotateReg()
     if (m_param_num == 0 || m_gltm.m_params.get_last_idx() == -1) {
         return;
     }
-    BBList * bbl = m_ru->getBBList();
+    BBList * bbl = m_rg->getBBList();
     UINT regn = m_maxreg + 1;
     for (IRBB * bb = bbl->get_head(); bb != NULL; bb = bbl->get_next()) {
         LTMgr * ltm = m_gltm.map_bb2ltm(bb);
@@ -4815,7 +4814,7 @@ IR * RA::split(GLT * g)
                 ASSERT0(tgtpr && tgtpr->is_pr() &&
                          PR_no(tgtpr) == LT_prno(gl));
                 if (spill_loc == NULL) {
-                    spill_loc = m_ru->dupIR(tgtpr);
+                    spill_loc = m_rg->dupIR(tgtpr);
                 }
                 ltm->genReload(tgtpr, occ, spill_loc);
             }
@@ -5147,16 +5146,16 @@ INT RA::tryExtend(
 IR * RA::insertMoveBefore(IR * stmt, IR * src)
 {
     ASSERT0(stmt->is_kids(src));
-    IR * newkid = m_ru->buildPR(IR_dt(src));
-    IR * mv = m_ru->buildStorePR(PR_no(newkid), IR_dt(newkid),
-                                   m_ru->dupIR(src));
+    IR * newkid = m_rg->buildPR(IR_dt(src));
+    IR * mv = m_rg->buildStorePR(PR_no(newkid), IR_dt(newkid),
+                                   m_rg->dupIR(src));
     m_rsc.comp_ir_fmt(mv);
 
     IRBB * irbb = stmt->getBB();
     ASSERT0(irbb);
     BB_irlist(irbb).insert_before(mv, stmt);
     stmt->replaceKid(src, newkid, true);
-    m_ru->freeIRTree(src);
+    m_rg->freeIRTree(src);
     return newkid;
 }
 
@@ -5304,13 +5303,13 @@ void RA::dump_ltg()
     if (g_tfile == NULL) { return; }
     TMapIter<UINT, LTG*> iter;
     LTG * ltg;
-    note("\n=== DUMP LTG === %s ===\n", m_ru->getRegionName());
+    note("\n=== DUMP LTG === %s ===\n", m_rg->getRegionName());
     for (UINT id = m_gltm.m_ltgmgr.get_first(iter, &ltg);
          id != 0; id = m_gltm.m_ltgmgr.get_next(iter, &ltg)) {
-        IR * ir = m_ru->getIR(id);
+        IR * ir = m_rg->getIR(id);
         ASSERT0(ir && is_range_call(ir) && ltg);
         IRBB * bb = ir->getBB();
-        dumpIR(ir, m_ru);
+        dumpIR(ir, m_rg);
         LTMgr * ltm = m_gltm.map_bb2ltm(bb);
         ASSERT0(ltm);
         ltm->dump();
@@ -5479,7 +5478,7 @@ void RA::assignLTG(LTG * ltg, IR * ir)
 //  * This function does not check LT's usable set, only check instructions.
 bool RA::verify_rsc()
 {
-    BBList * bbl = m_ru->getBBList();
+    BBList * bbl = m_rg->getBBList();
     for (IRBB * bb = bbl->get_head(); bb != NULL; bb = bbl->get_next()) {
         LTMgr * ltm = m_gltm.map_bb2ltm(bb);
         if (ltm == NULL) { continue; }
@@ -5514,7 +5513,7 @@ bool RA::verify_rsc()
 //Verify the local part usable-set must be consistent with global.
 bool RA::verify_usable()
 {
-    BBList * bbl = m_ru->getBBList();
+    BBList * bbl = m_rg->getBBList();
     for (IRBB * bb = bbl->get_head(); bb != NULL; bb = bbl->get_next()) {
         LTMgr * ltm = m_gltm.map_bb2ltm(bb);
         if (ltm == NULL) { continue; }
@@ -5562,7 +5561,7 @@ bool RA::verify_reg(bool check_usable, bool check_alloc)
         }
     }
 
-    BBList * bbl = m_ru->getBBList();
+    BBList * bbl = m_rg->getBBList();
     for (IRBB * bb = bbl->get_head(); bb != NULL; bb = bbl->get_next()) {
         LTMgr * ltm = m_gltm.map_bb2ltm(bb);
         if (ltm == NULL) { continue; }
@@ -5607,7 +5606,7 @@ void RA::allocGroup()
     LTG * ltg;
     for (UINT id = m_gltm.m_ltgmgr.get_first(iter, &ltg);
          id != 0; id = m_gltm.m_ltgmgr.get_next(iter, &ltg)) {
-        IR * ir = m_ru->getIR(id);
+        IR * ir = m_rg->getIR(id);
         ASSERT0(ir && is_range_call(ir) && ltg);
         assignLTG(ltg, ir);
     }
@@ -5650,7 +5649,7 @@ bool RA::verify_lt_occ()
         }
     }
 
-    BBList * bbl = m_ru->getBBList();
+    BBList * bbl = m_rg->getBBList();
     for (IRBB * bb = bbl->get_head(); bb != NULL; bb = bbl->get_next()) {
         LTMgr * ltm = m_gltm.get_ltm(BB_id(bb));
         if (ltm == NULL) { continue; }
@@ -5734,7 +5733,7 @@ bool RA::verify_interf()
         }
     }
 
-    BBList * bbl = m_ru->getBBList();
+    BBList * bbl = m_rg->getBBList();
     for (IRBB * bb = bbl->get_head(); bb != NULL; bb = bbl->get_next()) {
         LTMgr * ltm = m_gltm.map_bb2ltm(bb);
         if (ltm == NULL) { continue; }
@@ -5781,7 +5780,7 @@ bool RA::verify_ltg()
     LTG * ltg;
     for (UINT id = m_gltm.m_ltgmgr.get_first(iter, &ltg);
          id != 0; id = m_gltm.m_ltgmgr.get_next(iter, &ltg)) {
-        IR * ir = m_ru->getIR(id);
+        IR * ir = m_rg->getIR(id);
         ASSERT0(ir && is_range_call(ir) && ltg);
 
         IR * arg = NULL;
@@ -5846,7 +5845,7 @@ bool RA::perform(OptCtx & oc)
     get_glt(10); //for debug symbol
     getLifeTime(1,0); //for debug symbol
 
-    //m_cfg->dump_vcg();
+    //m_cfg->dumpVCG();
     //m_pr2v->dump();
     START_TIMER(t, "GRA");
 

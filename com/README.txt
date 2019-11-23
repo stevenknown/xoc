@@ -14,5 +14,5 @@ It is well implemented and able to build whole compiler, or anyother project.
 
 The XCOM project is consist of following directories:
 |-- benchmark  # a list of testcases to estimate runtime performance compared
-               # to std library. 
+               # to std library.
 |-- example    # a list of concise examples to demostrate how to use XCOM.

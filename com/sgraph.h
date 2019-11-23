@@ -42,11 +42,11 @@ class Vertex;
 class Edge;
 class Graph;
 
-#define EDGE_next(e)        (e)->next
-#define EDGE_prev(e)        (e)->prev
-#define EDGE_from(e)        (e)->from
-#define EDGE_to(e)          (e)->to
-#define EDGE_info(e)        (e)->info
+#define EDGE_next(e) (e)->next
+#define EDGE_prev(e) (e)->prev
+#define EDGE_from(e) (e)->from
+#define EDGE_to(e)   (e)->to
+#define EDGE_info(e) (e)->info
 class Edge {
 public:
     Edge()
@@ -66,9 +66,9 @@ public:
 
 
 //The container of EDEG.
-#define EC_next(el)        (el)->next
-#define EC_prev(el)        (el)->prev
-#define EC_edge(el)        (el)->edge
+#define EC_next(el) (el)->next
+#define EC_prev(el) (el)->prev
+#define EC_edge(el) (el)->edge
 class EdgeC {
 public:
     EdgeC()
@@ -85,13 +85,13 @@ public:
 
 
 
-#define VERTEX_next(v)         (v)->next
-#define VERTEX_prev(v)         (v)->prev
-#define VERTEX_id(v)           (v)->id
-#define VERTEX_rpo(v)          (v)->rpo
-#define VERTEX_in_list(v)      (v)->in_list
-#define VERTEX_out_list(v)     (v)->out_list
-#define VERTEX_info(v)         (v)->info
+#define VERTEX_next(v)     (v)->next
+#define VERTEX_prev(v)     (v)->prev
+#define VERTEX_id(v)       (v)->id
+#define VERTEX_rpo(v)      (v)->rpo
+#define VERTEX_in_list(v)  (v)->in_list
+#define VERTEX_out_list(v) (v)->out_list
+#define VERTEX_info(v)     (v)->info
 class Vertex {
 public:
     Vertex()
@@ -345,14 +345,13 @@ public:
         return m_vertices.append(newVertex(vid));
     }
 
-    void computeRpoNoRecursive(
-            IN OUT Vertex * root,
-            OUT List<Vertex const*> & vlst);
+    void computeRpoNoRecursive(IN OUT Vertex * root,
+                               OUT List<Vertex const*> & vlst);
     bool clone(Graph const& src);
     size_t count_mem() const;
 
-    void dump_dot(CHAR const* name = NULL) const;
-    void dump_vcg(CHAR const* name = NULL) const;
+    void dumpDOT(CHAR const* name = NULL) const;
+    void dumpVCG(CHAR const* name = NULL) const;
 
     //Return true if 'succ' is successor of 'v'.
     bool is_succ(Vertex * v, Vertex * succ) const
@@ -387,20 +386,18 @@ public:
         return is_reachable(get_vertex(from), get_vertex(to));
     }
     bool is_reachable(Vertex * from, Vertex * to) const;
-    void insertVertexBetween(
-            IN Vertex * v1,
-            IN Vertex * v2,
-            IN Vertex * newv,
-            OUT Edge ** e1 = NULL,
-            OUT Edge ** e2 = NULL,
-            bool sort = true);
-    void insertVertexBetween(
-            UINT v1,
-            UINT v2,
-            UINT newv,
-            OUT Edge ** e1 = NULL,
-            OUT Edge ** e2 = NULL,
-            bool sort = true);
+    void insertVertexBetween(IN Vertex * v1,
+                             IN Vertex * v2,
+                             IN Vertex * newv,
+                             OUT Edge ** e1 = NULL,
+                             OUT Edge ** e2 = NULL,
+                             bool sort = true);
+    void insertVertexBetween(UINT v1,
+                             UINT v2,
+                             UINT newv,
+                             OUT Edge ** e1 = NULL,
+                             OUT Edge ** e2 = NULL,
+                             bool sort = true);
     bool is_graph_entry(Vertex const* v) const
     { return VERTEX_in_list(v) == NULL; }
 

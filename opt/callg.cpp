@@ -72,7 +72,7 @@ void CallGraph::computeExitList(List<CallNode*> & elst)
 //name: file name if you want to dump VCG to specified file.
 //flag: default is 0xFFFFffff(-1) means doing dumping
 //      with completely information.
-void CallGraph::dump_vcg(CHAR const* name, INT flag)
+void CallGraph::dumpVCG(CHAR const* name, INT flag)
 {
     if (name == NULL) {
         name = "graph_call_graph.vcg";

@@ -40,7 +40,7 @@ PassMgr::PassMgr(Region * rg)
 {
     ASSERT0(rg);
     m_pool = smpoolCreate(sizeof(TimeInfo) * 4, MEM_COMM);
-    m_ru = rg;
+    m_rg = rg;
     m_rumgr = rg->getRegionMgr();
     m_tm = rg->getTypeMgr();
     ASSERT0(m_tm);
@@ -89,7 +89,7 @@ void PassMgr::destroyAllPass()
 
 Pass * PassMgr::allocCopyProp()
 {
-    Pass * pass = new IR_CP(m_ru);
+    Pass * pass = new IR_CP(m_rg);
     SimpCtx * simp = (SimpCtx*)xmalloc(sizeof(SimpCtx));
     simp->init();
     pass->set_simp_cont(simp);
@@ -99,145 +99,145 @@ Pass * PassMgr::allocCopyProp()
 
 Pass * PassMgr::allocGCSE()
 {
-    return new IR_GCSE(m_ru, (IR_GVN*)registerPass(PASS_GVN));
+    return new IR_GCSE(m_rg, (IR_GVN*)registerPass(PASS_GVN));
 }
 
 
 Pass * PassMgr::allocLCSE()
 {
-    return new IR_LCSE(m_ru);
+    return new IR_LCSE(m_rg);
 }
 
 
 Pass * PassMgr::allocRP()
 {
-    return new IR_RP(m_ru, (IR_GVN*)registerPass(PASS_GVN));
+    return new IR_RP(m_rg, (IR_GVN*)registerPass(PASS_GVN));
 }
 
 
 Pass * PassMgr::allocPRE()
 {
-    //return new IR_PRE(m_ru);
+    //return new IR_PRE(m_rg);
     return NULL;
 }
 
 
 Pass * PassMgr::allocIVR()
 {
-    //return new IR_IVR(m_ru);
+    //return new IR_IVR(m_rg);
     return NULL;
 }
 
 
 Pass * PassMgr::allocLICM()
 {
-    return new IR_LICM(m_ru);
+    return new IR_LICM(m_rg);
 }
 
 
 Pass * PassMgr::allocDCE()
 {
-    return new IR_DCE(m_ru);
+    return new IR_DCE(m_rg);
 }
 
 
 Pass * PassMgr::allocDSE()
 {
-    //return new IR_DSE(m_ru);
+    //return new IR_DSE(m_rg);
     return NULL;
 }
 
 
 Pass * PassMgr::allocRCE()
 {
-    return new IR_RCE(m_ru, (IR_GVN*)registerPass(PASS_GVN));
+    return new IR_RCE(m_rg, (IR_GVN*)registerPass(PASS_GVN));
 }
 
 
 Pass * PassMgr::allocGVN()
 {
-    return new IR_GVN(m_ru);
+    return new IR_GVN(m_rg);
 }
 
 
 Pass * PassMgr::allocLoopCvt()
 {
-    return new IR_LOOP_CVT(m_ru);
+    return new IR_LOOP_CVT(m_rg);
 }
 
 
 Pass * PassMgr::allocPRSSAMgr()
 {
-    return new PRSSAMgr(m_ru);
+    return new PRSSAMgr(m_rg);
 }
 
 
 Pass * PassMgr::allocMDSSAMgr()
 {
-    return new MDSSAMgr(m_ru);
+    return new MDSSAMgr(m_rg);
 }
 
 
 xcom::Graph * PassMgr::allocCDG()
 {
-    return new CDG(m_ru);
+    return new CDG(m_rg);
 }
 
 
 Pass * PassMgr::allocCCP()
 {
-    //return new IR_CCP(m_ru, (PRSSAMgr*)registerPass(PASS_PR_SSA_MGR));
+    //return new IR_CCP(m_rg, (PRSSAMgr*)registerPass(PASS_PR_SSA_MGR));
     return NULL;
 }
 
 
 Pass * PassMgr::allocExprTab()
 {
-    return new IR_EXPR_TAB(m_ru);
+    return new IR_EXPR_TAB(m_rg);
 }
 
 
 Pass * PassMgr::allocCfsMgr()
 {
-    return new CfsMgr(m_ru);
+    return new CfsMgr(m_rg);
 }
 
 
 Pass * PassMgr::allocIPA()
 {
-    return new IPA(m_ru);
+    return new IPA(m_rg);
 }
 
 
 Pass * PassMgr::allocInliner()
 {
-    return new Inliner(m_ru);
+    return new Inliner(m_rg);
 }
 
 
 Pass * PassMgr::allocAA()
 {
-    return new IR_AA(m_ru);
+    return new IR_AA(m_rg);
 }
 
 
 Pass * PassMgr::allocDUMgr()
 {
-    return new IR_DU_MGR(m_ru);
+    return new IR_DU_MGR(m_rg);
 }
 
 
 Pass * PassMgr::allocCFG()
 {
-    BBList * bbl = m_ru->getBBList();
+    BBList * bbl = m_rg->getBBList();
     UINT n = MAX(8, xcom::getNearestPowerOf2(bbl->get_elem_count()));
-    return new IR_CFG(C_SEME, bbl, m_ru, n, n);
+    return new IR_CFG(C_SEME, bbl, m_rg, n, n);
 }
 
 
 Pass * PassMgr::allocRefineDUChain()
 {
-    return new RefineDUChain(m_ru);
+    return new RefineDUChain(m_rg);
 }
 
 
@@ -355,7 +355,7 @@ void PassMgr::performScalarOpt(OptCtx & oc)
         //Since it will incur the opposite effect with Copy-Propagation.
         Pass * pre = registerPass(PASS_PRE);
         pre->perform(oc);
-        ASSERT0(verifyIRandBB(m_ru->getBBList(), m_ru));
+        ASSERT0(verifyIRandBB(m_rg->getBBList(), m_rg));
     }
 
     if (g_do_dce) {
@@ -367,7 +367,7 @@ void PassMgr::performScalarOpt(OptCtx & oc)
     }
 
     bool in_ssa_form = false;
-    PRSSAMgr * ssamgr = (PRSSAMgr*)(m_ru->getPassMgr()->
+    PRSSAMgr * ssamgr = (PRSSAMgr*)(m_rg->getPassMgr()->
         queryPass(PASS_PR_SSA_MGR));
     if (ssamgr != NULL && ssamgr->isSSAConstructed()) {
         in_ssa_form = true;
@@ -425,26 +425,26 @@ void PassMgr::performScalarOpt(OptCtx & oc)
 
     bool change;
     UINT count = 0;
-    BBList * bbl = m_ru->getBBList();
-    IR_CFG * cfg = m_ru->getCFG();
+    BBList * bbl = m_rg->getBBList();
+    IR_CFG * cfg = m_rg->getCFG();
     DUMMYUSE(cfg);
     do {
         change = false;
         for (Pass * pass = passlist.get_head();
              pass != NULL; pass = passlist.get_next()) {
             CHAR const* passname = pass->getPassName();
-            ASSERT0(verifyIRandBB(bbl, m_ru));
+            ASSERT0(verifyIRandBB(bbl, m_rg));
             ULONGLONG t = getusec();
             bool doit = pass->perform(oc);
             appendTimeInfo(passname, getusec() - t);
             if (doit) {
                 change = true;
-                ASSERT0(verifyIRandBB(bbl, m_ru));
+                ASSERT0(verifyIRandBB(bbl, m_rg));
                 ASSERT0(cfg->verify());
             }
             RefineCtx rc;
-            m_ru->refineBBlist(bbl, rc);
-            ASSERT0(m_ru->verifyRPO(oc));
+            m_rg->refineBBlist(bbl, rc);
+            ASSERT0(m_rg->verifyRPO(oc));
         }
         count++;
     } while (change && count < 20);

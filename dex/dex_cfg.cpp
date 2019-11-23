@@ -180,7 +180,7 @@ void DEX_CFG::dump_vcg_ex(BitSet const& markbbs)
     //fprintf(h, "\n/*");
     //old = g_tfile;
     //g_tfile = h;
-    //dumpBBList(m_bb_list, m_ru);
+    //dumpBBList(m_bb_list, m_rg);
     //g_tfile = old;
     //fprintf(h, "\n*/\n");
     dump_head(h);
@@ -189,7 +189,7 @@ void DEX_CFG::dump_vcg_ex(BitSet const& markbbs)
     fprintf(h,
             "\nnode: {title:\"\" vertical_order:0 shape:box color:turquoise "
             "borderwidth:0 fontname:\"Courier Bold\" "
-            "scaling:2 label:\"RegionName:%s\" }", m_ru->getRegionName());
+            "scaling:2 label:\"RegionName:%s\" }", m_rg->getRegionName());
 
     old = g_tfile;
     g_tfile = h;
@@ -215,7 +215,7 @@ void DEX_CFG::dump_vcg_ex2(BitSet const& trybbs, BitSet const& catchbbs)
     //fprintf(h, "\n/*");
     //old = g_tfile;
     //g_tfile = h;
-    //dumpBBList(m_bb_list, m_ru);
+    //dumpBBList(m_bb_list, m_rg);
     //g_tfile = old;
     //fprintf(h, "\n*/\n");
     dump_head(h);
@@ -224,7 +224,7 @@ void DEX_CFG::dump_vcg_ex2(BitSet const& trybbs, BitSet const& catchbbs)
     fprintf(h,
             "\nnode: {title:\"\" vertical_order:0 shape:box color:turquoise "
             "borderwidth:0 fontname:\"Courier Bold\" "
-            "scaling:2 label:\"RegionName:%s\" }", m_ru->getRegionName());
+            "scaling:2 label:\"RegionName:%s\" }", m_rg->getRegionName());
 
     old = g_tfile;
     g_tfile = h;

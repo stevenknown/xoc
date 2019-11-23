@@ -1546,12 +1546,11 @@ INT Matrix<T>::ReverseOrderNumber(INT * numbuf, UINT numlen)
 //posbufnum: number of slot.
 //n: natural number.
 template <class T>
-void Matrix<T>::FullPermutationRecur(
-        INT v,
-        INT * posbuf,
-        UINT posbufnum,
-        INT n,
-        T & det)
+void Matrix<T>::FullPermutationRecur(INT v,
+                                     INT * posbuf,
+                                     UINT posbufnum,
+                                     INT n,
+                                     T & det)
 {
     for (UINT i = 0; i < posbufnum; i++) {
         if (posbuf[i] == 0) { //slot of position 'i' in 'posbuf' is avaible.
@@ -2173,8 +2172,7 @@ FIN:
     I.growRowAndCol(Q.m_col_size - rankr, P.m_row_size - rankr);
     x = Q*I*P;
 
-
-    ///test
+    ///TEST
     //t = *this * x * *this;
     ///
     return false;
@@ -2768,11 +2766,10 @@ void Matrix<T>::insertRowsBefore(UINT ridx, UINT rnum)
 //Insert rows before 'ridx' which rows copy from matrix 'm'
 //from 'from' to 'to'.
 template <class T>
-void Matrix<T>::insertRowsBefore(
-        UINT ridx,
-        Matrix<T> const& m,
-        UINT mfrom,
-        UINT mto)
+void Matrix<T>::insertRowsBefore(UINT ridx,
+                                 Matrix<T> const& m,
+                                 UINT mfrom,
+                                 UINT mto)
 {
     ASSERTN(m_is_init && m.m_is_init, ("not yet initialize."));
     ASSERTN(ridx < m_row_size && m_row_size > 0 &&
@@ -2841,11 +2838,10 @@ void Matrix<T>::insertColumnsBefore(UINT cidx, UINT cnum)
 //Inserting columns before 'cidx' which columns copy from matrix 'm'
 //from 'from' to 'to'.
 template <class T>
-void Matrix<T>::insertColumnsBefore(
-        UINT cidx,
-        Matrix<T> const& m,
-        UINT mfrom,
-        UINT mto)
+void Matrix<T>::insertColumnsBefore(UINT cidx,
+                                    Matrix<T> const& m,
+                                    UINT mfrom,
+                                    UINT mto)
 {
     ASSERTN(m_is_init && m.m_is_init, ("not yet initialize."));
     ASSERTN(cidx < m_col_size && m_col_size > 0 &&

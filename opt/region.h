@@ -52,15 +52,15 @@ class MDSSAMgr;
 #define ANA_INS_pass_mgr(a) ((a)->m_pass_mgr)
 class AnalysisInstrument {
 public:
-    Region * m_ru;
-    UINT m_pr_count; //counter of IR_PR.    
+    Region * m_rg;
+    UINT m_pr_count; //counter of IR_PR.
     SMemPool * m_du_pool;
     SMemPool * m_sc_labelinfo_pool;
     //Indicate a list of IR.
     IR * m_ir_list;
     List<IR const*> * m_call_list; //record CALL/ICALL in region.
-    List<IR const*> * m_return_list; //record RETURN in region.    
-    PassMgr * m_pass_mgr; //PASS manager.    
+    List<IR const*> * m_return_list; //record RETURN in region.
+    PassMgr * m_pass_mgr; //PASS manager.
     IR * m_free_tab[MAX_OFFSET_AT_FREE_TABLE + 1];
     Vector<VAR*> m_prno2var; //map prno to related VAR.
     Vector<IR*> m_ir_vector; //record IR which have allocated.
@@ -163,7 +163,7 @@ protected:
     bool performSimplify(OptCtx & oc);
     void HighProcessImpl(OptCtx & oc);
 
-public:        
+public:
     RefInfo * m_ref_info; //record use/def info if Region has.
     REGION_TYPE m_ru_type; //region type.
     UINT m_id; //region unique id.
@@ -271,9 +271,16 @@ public:
 
     //Allocate PassMgr
     virtual PassMgr * allocPassMgr();
-
-    //Allocate AliasAnalysis.
-    virtual IR_AA * allocAliasAnalysis();
+    MD const* allocStoreMD(IR * ir);
+    MD const* allocIdMD(IR * ir);
+    MD const* allocLoadMD(IR * ir);
+    MD const* allocStringMD(SYM const* string);
+    MD const* allocPRMD(IR * ir);
+    MD const* allocPhiMD(IR * phi);
+    MD const* allocStorePRMD(IR * ir);
+    MD const* allocCallResultPRMD(IR * ir);
+    MD const* allocSetelemMD(IR * ir);
+    MD const* allocGetelemMD(IR * ir);
     void assignPRMD();
 
     IR * buildSetElem(Type const* type, IR * base, IR * val, IR * offset);
@@ -530,7 +537,10 @@ public:
     //Get the MayUse MDSet of Region.
     MDSet * getMayUse() const
     { return m_ref_info != NULL ? &REF_INFO_mayuse(m_ref_info) : NULL; }
-
+    //Return the Memory Descriptor Set for given ir may describe.
+    MDSet const* getMayRef(IR const* ir) { return ir->getRefMDSet(); }
+    //Return the MemoryAddr for 'ir' must be.
+    MD const* getMustRef(IR const* ir) { return ir->getRefMD(); }
     Region * getTopRegion()
     {
         Region * rg = this;
@@ -595,7 +605,7 @@ public:
             MD_ty(&md) = MD_EXACT;
         }
 
-        MD const* e = getMDSystem()->registerMD(md);        
+        MD const* e = getMDSystem()->registerMD(md);
         ASSERT0(MD_id(e) > 0);
         return e;
     }
@@ -887,7 +897,17 @@ public:
     //referenced.
     void setPRCount(UINT cnt)
     { REGION_analysis_instrument(this)->m_pr_count = cnt; }
-
+    void setMustRef(IR * ir, MD const* md)
+    {
+        ASSERT0(ir != NULL && md);
+        ir->setRefMD(md, this);
+    }
+    //mds: record MayMDSet that have to be hashed.
+    void setMayRef(IR * ir, MDSet const* mds)
+    {
+        ASSERT0(ir && mds && !mds->is_empty());
+        ir->setRefMDSet(mds, this);
+    }
     void setRegionVar(VAR * v) { m_var = v; }
     void setIRList(IR * irs)
     { REGION_analysis_instrument(this)->m_ir_list = irs; }

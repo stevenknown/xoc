@@ -36,8 +36,8 @@ author: Su Zhenyu
 
 namespace xoc {
 
-#define IV_INIT_VAL_IS_CONST    1
-#define IV_INIT_VAL_IS_VAR      0
+#define IV_INIT_VAL_IS_CONST 1
+#define IV_INIT_VAL_IS_VAR 0
 
 
 //IV INFO.
@@ -89,7 +89,7 @@ typedef TMap<UINT, IR*> UINT2IR;
 //Induction Variable Recognization.
 class IR_IVR : public Pass {
 protected:
-    Region * m_ru;
+    Region * m_rg;
     MDSystem * m_md_sys;
     TypeMgr * m_tm;
     IR_DU_MGR * m_du;
@@ -112,11 +112,10 @@ protected:
 
 protected:
     void addDIVList(LI<IRBB> const* li, IR const* e);
-    IR const* computeDomDef(
-            IR const* exp,
-            IR const* exp_stmt,
-            SList<IR const*> * defs,
-            bool omit_self);
+    IR const* computeDomDef(IR const* exp,
+                            IR const* exp_stmt,
+                            SList<IR const*> * defs,
+                            bool omit_self);
     bool computeInitVal(IR const* ir, IV * iv);
 
     void findBIV(LI<IRBB> const* li,
@@ -124,8 +123,8 @@ protected:
                  Vector<UINT> & map_md2defcount,
                  UINT2IR & map_md2defir);
     void findDIV(LI<IRBB> const* li,
-        SList<IV*> const& bivlst,
-        xcom::BitSet & tmp);
+                 SList<IV*> const& bivlst,
+                 xcom::BitSet & tmp);
 
     //Find initialze value of IV, if found return true,
     //otherwise return false.
@@ -142,26 +141,24 @@ protected:
         ::memset(p, 0, size);
         return p;
     }
-    bool matchIVUpdate(
-            MD const* biv,
-            IR const* def,
-            IR ** occ,
-            IR ** delta,
-            bool & is_increment);
+    bool matchIVUpdate(MD const* biv,
+                       IR const* def,
+                       IR ** occ,
+                       IR ** delta,
+                       bool & is_increment);
     bool scanExp(IR const* ir, LI<IRBB> const* li, xcom::BitSet const& ivmds);
-    void recordIV(
-            MD * biv,
-            LI<IRBB> const* li,
-            IR * def,
-            IR * occ,
-            IR * delta,
-            bool is_increment);
+    void recordIV(MD * biv,
+                  LI<IRBB> const* li,
+                  IR * def,
+                  IR * occ,
+                  IR * delta,
+                  bool is_increment);
 
 public:
     explicit IR_IVR(Region * rg)
     {
         ASSERT0(rg != NULL);
-        m_ru = rg;
+        m_rg = rg;
         m_md_sys = rg->getMDSystem();
         m_du = rg->getDUMgr();
         m_cfg = rg->getCFG();

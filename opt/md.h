@@ -45,17 +45,17 @@ typedef enum _MD_TYPE {
     MD_RANGE,
 } MD_TYPE;
 
-#define MD_UNDEF              0 //Undefined.
-#define MD_FULL_MEM           1 //Represent all program memory.
-#define MD_FIRST              MD_FULL_MEM
-#define MD_GLOBAL_VAR         2 //Represent variables that
-                                //allocated at global static data section
-                                //by explicit definition.
-#define MD_IMPORT_VAR         3 //Represent variables allocated at outer region
-                                //which nor global region.
-#define MD_HEAP_MEM           4 //Represent variables allocated in heap.
-#define MD_STACK_MEM          5 //Represent variables allocated at stack.
-//The first id which is allocable.
+#define MD_UNDEF 0 //Undefined.
+#define MD_FULL_MEM 1 //Represent all program memory.
+#define MD_FIRST MD_FULL_MEM
+#define MD_GLOBAL_VAR 2 //Represent variables that
+                        //allocated at program region
+                        //by explicit definition.
+#define MD_IMPORT_VAR 3 //Represent variables allocated at outer region
+                        //which nor program region.
+#define MD_HEAP_MEM 4 //Represent variables allocated in heap.
+#define MD_LOCAL_VAR 5 //Represent variables allocated in current region.
+//The first id that is allocable.
 #define MD_FIRST_ALLOCABLE (MD_IMPORT_VAR + 1)
 
 //Memory Descriptor.
@@ -388,7 +388,7 @@ public:
 
     //Return true if set contain all memory variable.
     bool is_contain_all() const
-    { 
+    {
         //return DefSBitSetCore::is_contain(MD_FULL_MEM);
         return false;
     }
@@ -510,7 +510,7 @@ protected:
     SMemPool * m_sc_mds_pool;
     SList<MDSet*> m_free_md_set;
     SList<MDSet*> m_md_set_list;
-    Region * m_ru;
+    Region * m_rg;
     DefMiscBitSetMgr * m_misc_bs_mgr;
 
 public:

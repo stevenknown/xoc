@@ -778,7 +778,7 @@ void INTMat::sete(UINT num, ...)
 #else
     va_list ptr;
     va_start(ptr, num);
-    UINT row = 0, col = 0;    
+    UINT row = 0, col = 0;
     for (UINT i = 0; i < num; i++) {
         INT numer = va_arg(ptr, UINT);
         set(row, col++, numer);
@@ -1230,7 +1230,6 @@ INTMat operator - (INTMat const& a, INTMat const& b)
     *cp = *ap - *bp;
     return c;
 }
-
 
 
 //

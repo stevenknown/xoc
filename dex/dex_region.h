@@ -89,7 +89,6 @@ public:
     virtual bool MiddleProcess(OptCtx & oc);
 
     virtual PassMgr * allocPassMgr();
-    virtual IR_AA * allocAliasAnalysis();
 
     SMemPool * get_sc_pool() const { return m_sc_pool; }
 

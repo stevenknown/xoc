@@ -388,7 +388,7 @@ protected:
     SMemPool * m_philist_pool;
     SMemPool * m_philist_sc_pool;
     SMemPool * m_mdssainfo_pool;
-    Region * m_ru;
+    Region * m_rg;
     MDSystem * m_md_sys;
     DefMiscBitSetMgr * m_sbs_mgr;
     xcom::SC<VOpnd*> * m_free_sc_list;
@@ -433,7 +433,7 @@ public:
     MDDef * getMDDef(UINT id) const { return m_def_vec.get(id); }
     //Get Versioned MD object by giving MD id and MD version.
     VMD * getVMD(UINT mdid, UINT version);
-    Region * getRegion() const { return m_ru; }
+    Region * getRegion() const { return m_rg; }
 
     //Set MDSSAInfo of ir.
     void setMDSSAInfo(IR * ir, MDSSAInfo * mdssainfo);

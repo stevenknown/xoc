@@ -101,7 +101,7 @@ void IR_CP::replaceExpViaSSADu(IR * exp,
         CPC_need_recomp_aa(ctx) = true;
     }
 
-    IR * newir = m_ru->dupIRTree(cand_expr);
+    IR * newir = m_rg->dupIRTree(cand_expr);
 
     if (cand_expr->isReadPR() && PR_ssainfo(cand_expr) != NULL) {
         PR_ssainfo(newir) = PR_ssainfo(cand_expr);
@@ -111,7 +111,7 @@ void IR_CP::replaceExpViaSSADu(IR * exp,
     }
 
     //cand_expr may be IR tree. And there might be PR or LD on the tree.
-    newir->copyRefForTree(cand_expr, m_ru);
+    newir->copyRefForTree(cand_expr, m_rg);
 
     //Add SSA use for new exp.
     SSAInfo * cand_ssainfo = NULL;
@@ -131,7 +131,7 @@ void IR_CP::replaceExpViaSSADu(IR * exp,
     bool doit = parent->replaceKid(exp, newir, false);
     ASSERT0(doit);
     DUMMYUSE(doit);
-    m_ru->freeIRTree(exp);
+    m_rg->freeIRTree(exp);
 }
 
 
@@ -177,7 +177,7 @@ void IR_CP::replaceExp(IR * exp,
     //    CPC_need_recomp_aa(ctx) = true;
     //}
 
-    IR * newir = m_ru->dupIRTree(cand_expr);
+    IR * newir = m_rg->dupIRTree(cand_expr);
 
     //Build DU chain between propagated exp 'newir' and its DEF.
     //TODO: build MDSSA DU chain.
@@ -228,7 +228,7 @@ void IR_CP::replaceExp(IR * exp,
         DUMMYUSE(doit);
     }
     CPC_change(ctx) = true;
-    m_ru->freeIRTree(exp);
+    m_rg->freeIRTree(exp);
 }
 
 
@@ -431,7 +431,7 @@ bool IR_CP::doPropToNormalStmt(
     }
 
     RefineCtx rf;
-    use_stmt = m_ru->refineIR(use_stmt, change, rf);
+    use_stmt = m_rg->refineIR(use_stmt, change, rf);
     if (use_stmt == NULL && is_next) {
         //use_stmt has been optimized and removed by refineIR().
         *next_iter = cur_iter;
@@ -462,7 +462,7 @@ void IR_CP::dumpCopyPropagationAction(
     note("\n==---- DUMP CopyPropagation ----==");
     note("\nPropagating Candidate is %s(id:%d), that located in Stmt:",
         IRNAME(prop_value), prop_value->id());
-    dumpIR(def_stmt, m_ru);
+    dumpIR(def_stmt, m_rg);
     note("\nWill replace %s(id:%d), that located in Stmt:",
         IRNAME(use), use->id());
     if (use->is_id()) {
@@ -471,10 +471,10 @@ void IR_CP::dumpCopyPropagationAction(
 		CHECK_DUMMYUSE(mdssainfo);
         ASSERT0(ID_phi(use));
         note("\n");
-        ID_phi(use)->dump(m_ru, mdssamgr->getUseDefMgr());
+        ID_phi(use)->dump(m_rg, mdssamgr->getUseDefMgr());
     } else {
         ASSERT0(use->getStmt());
-        dumpIR(use->getStmt(), m_ru);
+        dumpIR(use->getStmt(), m_rg);
     }
     fflush(g_tfile);
 }
@@ -489,7 +489,7 @@ void IR_CP::dumpCopyPropagationAction(
 //    SEGIter * segiter;
 //    for (INT i = useset.get_first(&segiter);
 //         i != -1; i = useset.get_next(i, &segiter)) {
-//        IR * use = m_ru->getIR(i);
+//        IR * use = m_rg->getIR(i);
 //        ASSERT0(use && use->is_exp());
 //        if (use->is_id() && !prop_value->is_const()) {
 //            //Do NOT propagate non-const value to operand of MD PHI.
@@ -531,16 +531,16 @@ bool IR_CP::doProp(
         DUSet const* duset = NULL;
         bool prssadu = false;
         bool mdssadu = false;
-        useset->clean(*m_ru->getMiscBitSetMgr());
+        useset->clean(*m_rg->getMiscBitSetMgr());
         if (ssainfo != NULL && SSA_uses(ssainfo).get_elem_count() != 0) {
             //Record use_stmt in another vector to facilitate this function
             //if it is not in use-list any more after copy-propagation.
             SEGIter * sc;
             for (INT u = SSA_uses(ssainfo).get_first(&sc);
                  u >= 0; u = SSA_uses(ssainfo).get_next(u, &sc)) {
-                IR * use = m_ru->getIR(u);
+                IR * use = m_rg->getIR(u);
                 ASSERT0(use);
-                useset->bunion(use->id(), *m_ru->getMiscBitSetMgr());
+                useset->bunion(use->id(), *m_rg->getMiscBitSetMgr());
             }
             prssadu = true;
         } else if (mdssainfo != NULL &&
@@ -552,7 +552,7 @@ bool IR_CP::doProp(
             }
 
             mdssainfo->collectUse(useset, mdssamgr->getUseDefMgr(),
-                m_ru->getMiscBitSetMgr());
+                m_rg->getMiscBitSetMgr());
             mdssadu = true;
         } else if ((duset = def_stmt->readDUSet()) != NULL &&
                    duset->get_elem_count() != 0) {
@@ -562,7 +562,7 @@ bool IR_CP::doProp(
             }
             //Record use_stmt in another Set to facilitate this function
             //if it is not in use-list any more after copy-propagation.
-            useset->copy(*duset, *m_ru->getMiscBitSetMgr());
+            useset->copy(*duset, *m_rg->getMiscBitSetMgr());
         } else {
             continue;
         }
@@ -570,7 +570,7 @@ bool IR_CP::doProp(
         SEGIter * segiter;
         for (INT i = useset->get_first(&segiter);
              i != -1; i = useset->get_next(i, &segiter)) {
-            IR * use = m_ru->getIR(i);
+            IR * use = m_rg->getIR(i);
             ASSERT0(use && use->is_exp());
             if (use->is_id() && !prop_value->is_const()) {
                 //Do NOT propagate non-const value to operand of MD PHI.
@@ -653,7 +653,7 @@ void IR_CP::doFinalRefine()
 {
     RefineCtx rf;
     RC_insert_cvt(rf) = false;
-    m_ru->refineBBlist(m_ru->getBBList(), rf);
+    m_rg->refineBBlist(m_rg->getBBList(), rf);
 }
 
 
@@ -662,22 +662,22 @@ bool IR_CP::perform(OptCtx & oc)
     START_TIMER(t, getPassName());
     ASSERT0(OC_is_cfg_valid(oc));
 
-    m_ru->checkValidAndRecompute(&oc, PASS_DOM, PASS_DU_REF, PASS_UNDEF);
+    m_rg->checkValidAndRecompute(&oc, PASS_DOM, PASS_DU_REF, PASS_UNDEF);
 
-    PRSSAMgr * prssamgr = (PRSSAMgr*)m_ru->getPassMgr()->
+    PRSSAMgr * prssamgr = (PRSSAMgr*)m_rg->getPassMgr()->
         registerPass(PASS_PR_SSA_MGR);
     if (!prssamgr->isSSAConstructed()) {
         prssamgr->construction(oc);
     }
 
-    MDSSAMgr * mdssamgr = (MDSSAMgr*)m_ru->getPassMgr()->
+    MDSSAMgr * mdssamgr = (MDSSAMgr*)m_rg->getPassMgr()->
         registerPass(PASS_MD_SSA_MGR);
     if (!mdssamgr->isMDSSAConstructed()) {
         mdssamgr->construction(oc);
     }
 
     bool change = false;
-    IRBB * entry = m_ru->getCFG()->get_entry();
+    IRBB * entry = m_rg->getCFG()->get_entry();
     ASSERTN(entry, ("Not unique entry, invalid Region"));
     xcom::Graph domtree;
     m_cfg->get_dom_tree(domtree);
@@ -691,7 +691,7 @@ bool IR_CP::perform(OptCtx & oc)
         ASSERT0(bb);
         change |= doProp(bb, &useset, mdssamgr);
     }
-    useset.clean(*m_ru->getMiscBitSetMgr());
+    useset.clean(*m_rg->getMiscBitSetMgr());
     if (change) {
         ASSERT0(mdssamgr == NULL || mdssamgr->verify());
         doFinalRefine();
@@ -702,7 +702,7 @@ bool IR_CP::perform(OptCtx & oc)
         OC_is_expr_tab_valid(oc) = false;
         OC_is_aa_valid(oc) = false;
         OC_is_ref_valid(oc) = true; //already update.
-        ASSERT0(m_ru->verifyMDRef());
+        ASSERT0(m_rg->verifyMDRef());
         if (mdssamgr != NULL && mdssamgr->isMDSSAConstructed()) {
             ASSERT0(mdssamgr->verify());
             OC_is_du_chain_valid(oc) = false; //not update.
@@ -712,7 +712,7 @@ bool IR_CP::perform(OptCtx & oc)
             OC_is_du_chain_valid(oc) = true; //already update.
         }
         if (prssamgr != NULL && prssamgr->isSSAConstructed()) {
-            ASSERT0(verifySSAInfo(m_ru));
+            ASSERT0(verifySSAInfo(m_rg));
             OC_is_du_chain_valid(oc) = false; //not update.
         }
     }

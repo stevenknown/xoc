@@ -70,7 +70,7 @@ typedef TMap<LabelInfo const*, CatchInfo const*> Label2CatchInfo;
 //To wit, the class declared in class LIR2IR, that will be better.
 class Dex2IR {
 protected:
-    DexRegion * m_ru;
+    DexRegion * m_rg;
     DexRegionMgr * m_ru_mgr;
     TypeMgr * m_tm;
     DexFile * m_df;

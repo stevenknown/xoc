@@ -45,7 +45,7 @@ void LivenessMgr::dump()
 {
     if (g_tfile == NULL) { return; }
     note("\n==---- DUMP LivenessMgr : liveness of PR ----==\n");
-    List<IRBB*> * bbl = m_ru->getBBList();
+    List<IRBB*> * bbl = m_rg->getBBList();
     g_indent = 2;
     for (IRBB * bb = bbl->get_head(); bb != NULL; bb = bbl->get_next()) {
         note("\n\n\n-- BB%d --", BB_id(bb));
@@ -247,7 +247,7 @@ void LivenessMgr::computeGlobal()
 
     //Rpo should be available.
     List<IRBB*> * vlst = m_cfg->getBBListInRPO();
-    ASSERT0(vlst->get_elem_count() == m_ru->getBBList()->get_elem_count());
+    ASSERT0(vlst->get_elem_count() == m_rg->getBBList()->get_elem_count());
 
     C<IRBB*> * ct;
     for (vlst->get_head(&ct); ct != vlst->end(); ct = vlst->get_next(ct)) {
@@ -307,7 +307,7 @@ void LivenessMgr::computeGlobal()
     g_max_times = MAX(g_max_times, count);
     FILE * h = fopen("prdf.sat.dump", "a+");
     fprintf(h, "\n%s run %u times, maxtimes %u",
-            m_ru->getRegionName(), count, g_max_times);
+            m_rg->getRegionName(), count, g_max_times);
     fclose(h);
     #endif
 }
@@ -316,8 +316,8 @@ void LivenessMgr::computeGlobal()
 bool LivenessMgr::perform(OptCtx & oc)
 {
     START_TIMER(t, getPassName());
-    m_ru->checkValidAndRecompute(&oc, PASS_RPO, PASS_UNDEF);
-    List<IRBB*> * bbl = m_ru->getBBList();
+    m_rg->checkValidAndRecompute(&oc, PASS_RPO, PASS_UNDEF);
+    List<IRBB*> * bbl = m_rg->getBBList();
     if (bbl->get_elem_count() == 0) { return false; }
     List<IR const*> lst;
     C<IRBB*> * ct;

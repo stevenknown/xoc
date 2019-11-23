@@ -511,7 +511,7 @@ bool IRParser::declareRegion(ParseCtx * ctx)
     PropertySet cont;
     tok = m_lexer->getCurrentToken();
     if (tok == T_COLON) {
-        tok = m_lexer->getNextToken();        
+        tok = m_lexer->getNextToken();
         ctx->ircode = IR_REGION;
         if (!parseProperty(cont, ctx)) {
             error(tok, "illegal property declaration");
@@ -569,7 +569,7 @@ bool IRParser::declareRegion(ParseCtx * ctx)
     }
     if (regionvar == NULL) {
         regionvar = m_rumgr->getVarMgr()->registerVar(
-            sym, m_rumgr->getTypeMgr()->getAny(), 1, flag);        
+            sym, m_rumgr->getTypeMgr()->getAny(), 1, flag);
         if (region->is_function() || region->is_program()) {
             ASSERT0(regionvar);
             VAR_is_func_decl(regionvar) = true;
@@ -604,7 +604,7 @@ bool IRParser::declareRegion(ParseCtx * ctx)
 
     if (!newctx.has_error && !newctx.current_region->is_blackbox()) {
         newctx.current_region->setIRList(newctx.stmt_list);
-        
+
         //TODO: build cfg by given parameters.
         if (newctx.has_phi) {
             ASSERT0(!newctx.has_high_level_ir);
@@ -624,7 +624,7 @@ bool IRParser::declareRegion(ParseCtx * ctx)
             //cfg->computeExitList();
             newctx.current_region->checkValidAndRecompute(oc,
                 PASS_CFG, PASS_UNDEF);
-            newctx.current_region->getCFG()->dump_vcg();
+            newctx.current_region->getCFG()->dumpVCG();
             dumpBBList(newctx.current_region->getBBList(),
                 newctx.current_region);
             if (newctx.has_phi) {
@@ -642,7 +642,7 @@ bool IRParser::declareRegion(ParseCtx * ctx)
     ASSERT0(verifyIRList(newctx.current_region->getIRList(),
             NULL, newctx.current_region));
     exitRegion(&newctx);
-    if (ctx->current_region != NULL) {        
+    if (ctx->current_region != NULL) {
         IR * ir = ctx->current_region->buildRegion(region);
         copyProp(ir, cont, ctx);
         ctx->addIR(ir);
@@ -817,7 +817,7 @@ bool IRParser::parseStmtList(ParseCtx * ctx)
             return false;
         }
 
-        //dumpIRList(ctx->stmt_list, m_ru);
+        //dumpIRList(ctx->stmt_list, m_rg);
     }
     UNREACHABLE();
     return true;
@@ -1652,7 +1652,7 @@ bool IRParser::parseImmVal(ParseCtx * ctx)
 
     ASSERT0(ty);
     if (ty->is_int()) {
-        PARSECTX_returned_imm_intval(ctx) = v;        
+        PARSECTX_returned_imm_intval(ctx) = v;
     } else if (ty->is_fp()) {
         PARSECTX_returned_imm_fpval(ctx) = ::atof(immstr.buf);
     } else {
@@ -3907,7 +3907,7 @@ bool IRParser::parseByteValue(VAR * var, ParseCtx * ctx)
             error(tok, "not integer");
             return false;
         }
-        buf.set(bytesize, (BYTE)PARSECTX_returned_imm_intval(ctx));        
+        buf.set(bytesize, (BYTE)PARSECTX_returned_imm_intval(ctx));
         PARSECTX_returned_imm_ty(ctx) = NULL;
         bytesize++;
         tok = m_lexer->getCurrentToken();
@@ -4295,7 +4295,7 @@ bool IRParser::declareVar(ParseCtx * ctx, VAR ** var)
 bool IRParser::parse()
 {
     START_TIMER(t, "IR Parser");
-    ASSERT0(m_lexer);    
+    ASSERT0(m_lexer);
     TOKEN tok = T_NUL;
     //Get first token.
     //CASE: There are T_NUL token return.

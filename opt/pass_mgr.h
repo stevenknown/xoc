@@ -53,7 +53,7 @@ class PassMgr {
 protected:
     List<TimeInfo*> m_ti_list;
     SMemPool * m_pool;
-    Region * m_ru;
+    Region * m_rg;
     RegionMgr * m_rumgr;
     TypeMgr * m_tm;
     CDG * m_cdg;

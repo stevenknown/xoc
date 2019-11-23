@@ -64,8 +64,8 @@ void MDSSAMgr::destroy()
 
 void MDSSAMgr::freePhiList()
 {
-    for (IRBB * bb = m_ru->getBBList()->get_head();
-         bb != NULL; bb = m_ru->getBBList()->get_next()) {
+    for (IRBB * bb = m_rg->getBBList()->get_head();
+         bb != NULL; bb = m_rg->getBBList()->get_next()) {
         MDPhiList * philist = m_usedef_mgr.genBBPhiList(BB_id(bb));
         if (philist == NULL) { continue; }
 
@@ -73,7 +73,7 @@ void MDSSAMgr::freePhiList()
              sct != philist->end(); sct = philist->get_next(sct)) {
             MDPhi * phi = sct->val();
             ASSERT0(phi && phi->is_phi());
-            m_ru->freeIRTreeList(phi->getOpndList());
+            m_rg->freeIRTreeList(phi->getOpndList());
         }
     }
 }
@@ -96,8 +96,8 @@ void MDSSAMgr::dumpRef(UINT indent)
 {
     if (g_tfile == NULL) { return; }
     note("\n\n==---- DUMP MDSSAMgr: IR REFERENCE '%s' ----==\n",
-         m_ru->getRegionName());
-    BBList * bbs = m_ru->getBBList();
+         m_rg->getRegionName());
+    BBList * bbs = m_rg->getBBList();
     ASSERT0(bbs);
     if (bbs->get_elem_count() != 0) {
         m_md_sys->dump(false);
@@ -105,13 +105,13 @@ void MDSSAMgr::dumpRef(UINT indent)
 
     //Dump imported variables referenced.
     note("\n==----==");
-    MDSet * ru_maydef = m_ru->getMayDef();
+    MDSet * ru_maydef = m_rg->getMayDef();
     if (ru_maydef != NULL) {
         note("\nRegionMayDef(OuterRegion):");
         ru_maydef->dump(m_md_sys, true);
     }
 
-    MDSet * ru_mayuse = m_ru->getMayUse();
+    MDSet * ru_mayuse = m_rg->getMayUse();
     if (ru_mayuse != NULL) {
         note("\nRegionMayUse(OuterRegion):");
         ru_mayuse->dump(m_md_sys, true);
@@ -128,7 +128,7 @@ void MDSSAMgr::dumpBBRef(IN IRBB * bb, UINT indent)
 {
     if (g_tfile == NULL) { return; }
     for (IR * ir = BB_first_ir(bb); ir != NULL; ir = BB_next_ir(bb)) {
-        ir->dumpRef(m_ru, indent);
+        ir->dumpRef(m_rg, indent);
     }
 }
 
@@ -136,7 +136,7 @@ void MDSSAMgr::dumpBBRef(IN IRBB * bb, UINT indent)
 //Dump ssa du stmt graph.
 void MDSSAMgr::dumpSSAGraph(CHAR *)
 {
-    //MDSSAGraph sa(m_ru, this);
+    //MDSSAGraph sa(m_rg, this);
     //sa.dump(name, true);
 }
 
@@ -178,7 +178,7 @@ void MDSSAMgr::dumpAllVMD()
     //    INT nexti = 0;
     //    for (INT j = VMD_uses(v).get_first(&it); it != NULL; j = nexti) {
     //        nexti = VMD_uses(v).get_next(j, &it);
-    //        IR * use = m_ru->getIR(j);
+    //        IR * use = m_rg->getIR(j);
     //        ASSERT0(!use->isReadPR());
     //
     //        prt("(%s,id%d)", IRNAME(use), IR_id(use));
@@ -196,9 +196,9 @@ void MDSSAMgr::dump()
 {
     if (g_tfile == NULL) { return; }
     note("\n\n==---- DUMP MDSSAMgr '%s'----==\n",
-        m_ru->getRegionName());
+        m_rg->getRegionName());
 
-    BBList * bbl = m_ru->getBBList();
+    BBList * bbl = m_rg->getBBList();
     List<IR const*> lst;
     List<IR const*> opnd_lst;
     UINT const indent = 2;
@@ -213,15 +213,15 @@ void MDSSAMgr::dump()
             MDPhi * phi = sct->val();
             ASSERT0(phi && phi->is_phi());
             note("\n");
-            phi->dump(m_ru, &m_usedef_mgr);
+            phi->dump(m_rg, &m_usedef_mgr);
         }
 
         for (IR * ir = BB_first_ir(bb);
             ir != NULL; ir = BB_next_ir(bb)) {
             note("\n");
-            dumpIR(ir, m_ru);
+            dumpIR(ir, m_rg);
             g_indent += indent;
-            ir->dumpRef(m_ru, g_indent);
+            ir->dumpRef(m_rg, g_indent);
 
             bool parting_line = false;
             //Result
@@ -233,7 +233,7 @@ void MDSSAMgr::dump()
                     note("\n----");
                     parting_line = true;
                 }
-                dumpIR(ir, m_ru, NULL, false);
+                dumpIR(ir, m_rg, NULL, false);
 
                 for (INT i = mdssainfo->getVOpndSet()->get_first(&iter);
                      i >= 0; i = mdssainfo->getVOpndSet()->get_next(i, &iter)) {
@@ -243,7 +243,7 @@ void MDSSAMgr::dump()
                     if (vopnd->getDef() != NULL) {
                         ASSERT0(vopnd->getDef()->getOcc() == ir);
                     }
-                    vopnd->dump(m_ru, &m_usedef_mgr);
+                    vopnd->dump(m_rg, &m_usedef_mgr);
                 }
             }
 
@@ -263,7 +263,7 @@ void MDSSAMgr::dump()
                     note("\n----");
                     parting_line = true;
                 }
-                dumpIR(opnd, m_ru, NULL, false);
+                dumpIR(opnd, m_rg, NULL, false);
                 note("\n--USEREF:");
                 bool first = true;
                 for (INT i = mdssainfo->getVOpndSet()->get_first(&iter);
@@ -353,7 +353,7 @@ MDDef * MDSSAMgr::findNearestDef(IR const* ir)
         if (tbb->is_dom(tdef->getOcc(), last->getOcc(), true)) {
             //tdef is near more than 'last', then update 'last'.
             last = tdef;
-        }        
+        }
     }
     return last;
 }
@@ -397,7 +397,7 @@ void MDSSAMgr::dumpDefChain(List<MDDef const*> & wl,
                             VMD const* vopnd)
 {
     if (vopnd->getDef() == NULL) { return; }
-    MD const* vopndmd = m_ru->getMDSystem()->getMD(vopnd->mdid());
+    MD const* vopndmd = m_rg->getMDSystem()->getMD(vopnd->mdid());
     ASSERT0(vopndmd);
     wl.clean();
     wl.append_tail(vopnd->getDef());
@@ -519,9 +519,9 @@ void MDSSAMgr::dumpDUChain()
 {
     if (g_tfile == NULL) { return; }
     note("\n==---- DUMP MDSSAMgr DU CHAIN '%s' ----==\n",
-         m_ru->getRegionName());
+         m_rg->getRegionName());
 
-    BBList * bbl = m_ru->getBBList();
+    BBList * bbl = m_rg->getBBList();
     List<IR const*> lst;
     List<IR const*> opnd_lst;
 
@@ -535,12 +535,12 @@ void MDSSAMgr::dumpDUChain()
             MDPhi * phi = sct->val();
             ASSERT0(phi && phi->is_phi());
             note("\n");
-            phi->dump(m_ru, &m_usedef_mgr);
+            phi->dump(m_rg, &m_usedef_mgr);
         }
 
         for (IR * ir = BB_first_ir(bb);
              ir != NULL; ir = BB_next_ir(bb)) {
-            dumpIR(ir, m_ru);
+            dumpIR(ir, m_rg);
 
             bool parting_line = false;
             //Result
@@ -571,7 +571,7 @@ void MDSSAMgr::dumpDUChain()
                         } else {
                             prt(",");
                         }
-                        IR * use = m_ru->getIR(i2);
+                        IR * use = m_rg->getIR(i2);
                         ASSERT0(use && (use->isMemoryRef() || use->is_id()));
                         prt("%s(id:%d(", IRNAME(use), use->id());
                         vopnd->dump();
@@ -753,7 +753,7 @@ void MDSSAMgr::placePhi(DfMgr const& dfm,
     START_TIMER(t, "MDSSA: Place phi");
 
     //Record BBs which modified each MD.
-    BBList * bblst = m_ru->getBBList();
+    BBList * bblst = m_rg->getBBList();
     Vector<List<IRBB*>*> md2defbb(bblst->get_elem_count()); //for local used.
 
     for (IRBB * bb = bblst->get_head(); bb != NULL; bb = bblst->get_next()) {
@@ -1083,7 +1083,7 @@ void MDSSAMgr::renameInDomTreeOrder(
         Vector<DefSBitSet*> & defed_mds_vec)
 {
     Stack<IRBB*> stk;
-    UINT n = m_ru->getBBList()->get_elem_count();
+    UINT n = m_rg->getBBList()->get_elem_count();
     xcom::BitSet visited(n / BIT_PER_BYTE);
     BB2VMDMap bb2vmdmap;
     IRBB * v;
@@ -1168,7 +1168,7 @@ void MDSSAMgr::rename(
         xcom::Graph & domtree)
 {
     START_TIMER(t, "MDSSA: Rename");
-    BBList * bblst = m_ru->getBBList();
+    BBList * bblst = m_rg->getBBList();
     if (bblst->get_elem_count() == 0) { return; }
 
     SEGIter * cur = NULL;
@@ -1200,7 +1200,7 @@ void MDSSAMgr::destructBBSSAInfo(IRBB * bb)
 void MDSSAMgr::destructionInDomTreeOrder(IRBB * root, xcom::Graph & domtree)
 {
     Stack<IRBB*> stk;
-    UINT n = m_ru->getBBList()->get_elem_count();
+    UINT n = m_rg->getBBList()->get_elem_count();
     xcom::BitSet visited(n / BIT_PER_BYTE);
     BB2VMDMap bb2vmdmap(n);
     IRBB * v;
@@ -1244,7 +1244,7 @@ void MDSSAMgr::destruction(DomTree & domtree)
 {
     START_TIMER(t, "MDSSA: destruction in dom tree order");
 
-    BBList * bblst = m_ru->getBBList();
+    BBList * bblst = m_rg->getBBList();
     if (bblst->get_elem_count() == 0) { return; }
     ASSERT0(m_cfg->get_entry());
     destructionInDomTreeOrder(m_cfg->get_entry(), domtree);
@@ -1268,9 +1268,9 @@ void MDSSAMgr::stripPhi(MDPhi * phi)
     //ASSERT0(vex);
     //
     ////Temprarory RP to hold the result of PHI.
-    //IR * phicopy = m_ru->buildPR(phi->getType());
-    //phicopy->setRefMD(m_ru->genMDforPR(
-    //    PR_no(phicopy), phicopy->getType()), m_ru);
+    //IR * phicopy = m_rg->buildPR(phi->getType());
+    //phicopy->setRefMD(m_rg->genMDforPR(
+    //    PR_no(phicopy), phicopy->getType()), m_rg);
     //phicopy->cleanRefMDSet();
     //IR * opnd = PHI_opnd_list(phi);
     //
@@ -1287,15 +1287,15 @@ void MDSSAMgr::stripPhi(MDPhi * phi)
     //    INT pred = VERTEX_id(EDGE_from(EC_edge(el)));
     //
     //    ASSERT0(opnd);
-    //    IR * opndcopy = m_ru->dupIRTree(opnd);
+    //    IR * opndcopy = m_rg->dupIRTree(opnd);
     //    if (opndcopy->is_pr()) {
-    //        opndcopy->copyRef(opnd, m_ru);
+    //        opndcopy->copyRef(opnd, m_rg);
     //    }
     //
     //    //The copy will be inserted into related predecessor.
-    //    IR * store_to_phicopy = m_ru->buildStorePR(
+    //    IR * store_to_phicopy = m_rg->buildStorePR(
     //        PR_no(phicopy), phicopy->getType(), opndcopy);
-    //    store_to_phicopy->copyRef(phicopy, m_ru);
+    //    store_to_phicopy->copyRef(phicopy, m_rg);
     //
     //    IRBB * p = m_cfg->getBB(pred);
     //    ASSERT0(p);
@@ -1316,8 +1316,8 @@ void MDSSAMgr::stripPhi(MDPhi * phi)
     //                BB_irlist(fallthrough).append_head(store_to_phicopy);
     //            } else {
     //                //Insert block to hold the copy.
-    //                IRBB * newbb = m_ru->allocBB();
-    //                m_ru->getBBList()->insert_after(newbb, p);
+    //                IRBB * newbb = m_rg->allocBB();
+    //                m_rg->getBBList()->insert_after(newbb, p);
     //                m_cfg->add_bb(newbb);
     //                m_cfg->insertVertexBetween(
     //                    BB_id(p), BB_id(fallthrough), BB_id(newbb));
@@ -1338,9 +1338,9 @@ void MDSSAMgr::stripPhi(MDPhi * phi)
     //    }
     //}
     //
-    //IR * substitue_phi = m_ru->buildStorePR(
+    //IR * substitue_phi = m_rg->buildStorePR(
     //    PHI_prno(phi), phi->getType(), phicopy);
-    //substitue_phi->copyRef(phi, m_ru);
+    //substitue_phi->copyRef(phi, m_rg);
     //
     //BB_irlist(bb).insert_before(substitue_phi, phict);
     //
@@ -1354,7 +1354,7 @@ void MDSSAMgr::stripPhi(MDPhi * phi)
 bool MDSSAMgr::verifyPhi(bool is_vpinfo_avail)
 {
     DUMMYUSE(is_vpinfo_avail);
-    BBList * bblst = m_ru->getBBList();
+    BBList * bblst = m_rg->getBBList();
     List<IRBB*> preds;
     for (IRBB * bb = bblst->get_head(); bb != NULL; bb = bblst->get_next()) {
         m_cfg->get_preds(preds, bb);
@@ -1451,7 +1451,7 @@ bool MDSSAMgr::verifyVMD()
             SEGIter * vit = NULL;
             for (INT i2 = res->getUseSet()->get_first(&vit);
                  i2 >= 0; i2 = res->getUseSet()->get_next(i2, &vit)) {
-                IR * use = m_ru->getIR(i2);
+                IR * use = m_rg->getIR(i2);
 
                 ASSERT0(use->isMemoryRef() || use->is_id());
 
@@ -1530,7 +1530,7 @@ void MDSSAMgr::verifySSAInfo(IR const* ir)
         SEGIter * iter2;
         for (INT j = vopnd->getUseSet()->get_first(&iter2);
              j >= 0; j = vopnd->getUseSet()->get_next(j, &iter2)) {
-            IR const* occ = (IR*)m_ru->getIR(j);
+            IR const* occ = (IR*)m_rg->getIR(j);
             ASSERT0(occ);
 
             bool findref = false;
@@ -1574,7 +1574,7 @@ bool MDSSAMgr::verify()
     START_TIMER(tverify, "MDSSA: Verify After Pass");
 
     //Check version for each vp.
-    BBList * bbl = m_ru->getBBList();
+    BBList * bbl = m_rg->getBBList();
     xcom::C<IRBB*> * ct;
     for (bbl->get_head(&ct); ct != bbl->end(); ct = bbl->get_next(ct)) {
         IRBB * bb = ct->val();
@@ -1710,7 +1710,7 @@ void MDSSAMgr::coalesceVersion(IR const* src, IR const* tgt)
         SEGIter * iter3 = NULL;
         for (INT k = src_vopnd->getUseSet()->get_first(&iter3);
              k >= 0; k = src_vopnd->getUseSet()->get_next(k, &iter3)) {
-            IR const* occ = (IR*)m_ru->getIR(k);
+            IR const* occ = (IR*)m_rg->getIR(k);
             MDSSAInfo * occ_mdssainfo = getUseDefMgr()->getMDSSAInfo(occ);
             ASSERTN(occ_mdssainfo, ("occ miss MDSSAInfo"));
 
@@ -1785,7 +1785,7 @@ void MDSSAMgr::removeDUChain(IR const* stmt, IR const* exp)
             continue;
         }
         if (vopnd->getDef()->getOcc() == stmt) {
-            vopnd->getUseSet()->diff(exp->id());            
+            vopnd->getUseSet()->diff(exp->id());
             mdssainfo->getVOpndSet()->remove(vopnd, *m_sbs_mgr);
         }
     }
@@ -1795,7 +1795,7 @@ void MDSSAMgr::removeDUChain(IR const* stmt, IR const* exp)
 //This function perform SSA destruction via scanning BB in sequential order.
 void MDSSAMgr::destruction(OptCtx * oc)
 {
-    BBList * bblst = m_ru->getBBList();
+    BBList * bblst = m_rg->getBBList();
     if (bblst->get_elem_count() == 0) { return; }
     UINT bbnum = bblst->get_elem_count();
     xcom::C<IRBB*> * bbct;
@@ -1853,7 +1853,7 @@ void MDSSAMgr::prunePhiForBB(List<IRBB*> & wl, IRBB * bb)
                 IRSet * useset = phi->getResult()->getUseSet();
                 for (INT i = useset->get_first(&iter);
                      i >= 0; i = useset->get_next(i, &iter)) {
-                    IR * u = m_ru->getIR(i);
+                    IR * u = m_rg->getIR(i);
                     ASSERT0(u && m_usedef_mgr.getMDSSAInfo(u));
 
                     //Change DEF.
@@ -1879,7 +1879,7 @@ void MDSSAMgr::prunePhi(List<IRBB*> & wl)
 {
     START_TIMER(t, "MDSSA: Prune phi");
 
-    BBList * bblst = m_ru->getBBList();
+    BBList * bblst = m_rg->getBBList();
     xcom::C<IRBB*> * ct;
 
     wl.clean();
@@ -1901,8 +1901,8 @@ void MDSSAMgr::prunePhi(List<IRBB*> & wl)
 //Clean MDSSAInfo AI of all IR.
 void MDSSAMgr::cleanMDSSAInfoAI()
 {
-    for (INT i = 0; i <= m_ru->getIRVec()->get_last_idx(); i++) {
-        IR * ir = m_ru->getIR(i);
+    for (INT i = 0; i <= m_rg->getIRVec()->get_last_idx(); i++) {
+        IR * ir = m_rg->getIR(i);
         if (ir != NULL && ir->getAI() != NULL) {
             IR_ai(ir)->clean(AI_MD_SSA);
         }
@@ -1924,7 +1924,7 @@ void MDSSAMgr::reinit()
 void MDSSAMgr::construction(OptCtx & oc)
 {
     START_TIMER(t0, "MDSSA: Construction");
-    m_ru->checkValidAndRecompute(&oc, PASS_DOM, PASS_UNDEF);
+    m_rg->checkValidAndRecompute(&oc, PASS_DOM, PASS_UNDEF);
     ASSERT0(OC_is_ref_valid(oc));
     ASSERT0(OC_is_dom_valid(oc));
     reinit();
@@ -1948,7 +1948,7 @@ void MDSSAMgr::construction(OptCtx & oc)
 
 bool MDSSAMgr::construction(DomTree & domtree)
 {
-    ASSERT0(m_ru);
+    ASSERT0(m_rg);
 
     START_TIMER(t1, "MDSSA: Build dominance frontier");
     DfMgr dfm;
@@ -1984,7 +1984,7 @@ bool MDSSAMgr::construction(DomTree & domtree)
     }
 
     ASSERT0(verify());
-    ASSERT0(verifyIRandBB(m_ru->getBBList(), m_ru));
+    ASSERT0(verifyIRandBB(m_rg->getBBList(), m_rg));
     ASSERT0(verifyPhi(false) && verifyVMD());
 
     m_is_ssa_constructed = true;

@@ -50,11 +50,11 @@ typedef Vector<VN*> VEC1;
 IR_GVN::IR_GVN(Region * rg)
 {
     ASSERT0(rg != NULL);
-    m_ru = rg;
-    m_md_sys = m_ru->getMDSystem();
-    m_du = m_ru->getDUMgr();
-    m_tm = m_ru->getTypeMgr();
-    m_cfg = m_ru->getCFG();
+    m_rg = rg;
+    m_md_sys = m_rg->getMDSystem();
+    m_du = m_rg->getDUMgr();
+    m_tm = m_rg->getTypeMgr();
+    m_cfg = m_rg->getCFG();
     ASSERT0(m_cfg && m_du && m_md_sys && m_tm);
     m_vn_count = 1;
     m_is_vn_fp = false;
@@ -491,7 +491,7 @@ VN * IR_GVN::computeExactMemory(IR const* exp, bool & change)
         UINT defcount = 0;
         for (INT i = defset->get_first(&di);
              i >= 0; i = defset->get_next(i, &di), defcount++) {
-            IR const* dir = m_ru->getIR(i);
+            IR const* dir = m_rg->getIR(i);
             ASSERT0(dir->is_stmt());
             MD const* xd = m_du->get_must_def(dir);
             if (xd == NULL) {
@@ -852,7 +852,7 @@ VN * IR_GVN::computeVN(IR const* exp, bool & change)
 {
     ASSERT0(exp);
     switch (exp->getCode()) {
-	SWITCH_CASE_BIN: {
+    SWITCH_CASE_BIN: {
         VN * vn1 = computeVN(BIN_opnd0(exp), change);
         VN * vn2 = computeVN(BIN_opnd1(exp), change);
         if (vn1 == NULL || vn2 == NULL) {
@@ -869,7 +869,7 @@ VN * IR_GVN::computeVN(IR const* exp, bool & change)
         }
         return x;
     }
-	SWITCH_CASE_UNA: {
+    SWITCH_CASE_UNA: {
         VN * x = computeVN(UNA_opnd(exp), change);
         if (x == NULL) {
             if (m_ir2vn.get(IR_id(exp)) != NULL) {
@@ -890,7 +890,7 @@ VN * IR_GVN::computeVN(IR const* exp, bool & change)
         VN * basevn = NULL;
         if (v->is_string()) {
             if (m_is_comp_lda_string) {
-                MD const* emd = m_ru->genMDforVAR(v);
+                MD const* emd = m_rg->genMDforVAR(v);
                 ASSERTN(emd && emd->is_effect(),
                        ("string should have effect MD"));
                 basevn = registerVNviaMD(emd);
@@ -898,7 +898,7 @@ VN * IR_GVN::computeVN(IR const* exp, bool & change)
                 basevn = NULL;
             }
         } else {
-            MD const* emd = m_ru->genMDforVAR(v);
+            MD const* emd = m_rg->genMDforVAR(v);
             ASSERTN(emd && emd->is_effect(), ("string should have effect MD"));
             basevn = registerVNviaMD(emd);
         }
@@ -920,6 +920,8 @@ VN * IR_GVN::computeVN(IR const* exp, bool & change)
         return x;
     }
     //case IR_ID:
+    //Note IR_ID should not participate in GVN analysis because it does not
+    //represent a real operation.
     case IR_LD:
     case IR_PR:
         return computeScalar(exp, change);
@@ -960,7 +962,6 @@ VN * IR_GVN::computeVN(IR const* exp, bool & change)
 void IR_GVN::processPhi(IR const* ir, bool & change)
 {
     VN * phivn = NULL;
-
     IR const* p = PHI_opnd_list(ir);
     if (p != NULL) {
         phivn = computeVN(p, change);
@@ -1010,14 +1011,11 @@ void IR_GVN::processBB(IRBB * bb, bool & change)
 {
     xcom::C<IR*> * ct;
     for (BB_irlist(bb).get_head(&ct);
-         ct != BB_irlist(bb).end();
-         ct = BB_irlist(bb).get_next(ct)) {
+         ct != BB_irlist(bb).end(); ct = BB_irlist(bb).get_next(ct)) {
         IR * ir = ct->val();
         ASSERT0(ir);
-
         switch (ir->getCode()) {
-        case IR_ST:
-            {
+        case IR_ST: {
                 VN * x = computeVN(ST_rhs(ir), change);
                 if (x == NULL) { break; }
 
@@ -1028,11 +1026,10 @@ void IR_GVN::processBB(IRBB * bb, bool & change)
                     m_ir2vn.set(ir->id(), x);
                     change = true;
                 }
-                //return;
+                //return; keep going BB irlist.
             }
             break;
-        case IR_STPR:
-            {
+        case IR_STPR: {
                 VN * x = computeVN(STPR_rhs(ir), change);
                 if (x == NULL) { break; }
 
@@ -1041,11 +1038,10 @@ void IR_GVN::processBB(IRBB * bb, bool & change)
                     m_ir2vn.set(ir->id(), x);
                     change = true;
                 }
-                //return;
+                //return; keep going BB irlist.
             }
             break;
-        case IR_STARRAY:
-            {
+        case IR_STARRAY: {
                 computeArrayAddrRef(ir, change);
 
                 VN * x = computeVN(STARR_rhs(ir), change);
@@ -1058,11 +1054,10 @@ void IR_GVN::processBB(IRBB * bb, bool & change)
                     m_ir2vn.set(ir->id(), x);
                     change = true;
                 }
-                //return;
+                //return; keep going BB irlist.
             }
             break;
-        case IR_IST:
-            {
+        case IR_IST: {
                 computeVN(IST_base(ir), change);
 
                 VN * x = computeVN(ir->getRHS(), change);
@@ -1109,13 +1104,13 @@ void IR_GVN::processBB(IRBB * bb, bool & change)
 }
 
 
-void IR_GVN::dump_ir2vn()
+void IR_GVN::dumpIR2VN()
 {
     if (g_tfile == NULL) { return; }
     for (INT k = 0; k <= m_ir2vn.get_last_idx(); k++) {
         VN * x = m_ir2vn.get(k);
         if (x != NULL) {
-            fprintf(g_tfile,"\nIR%d : vn%d, %d", k, VN_id(x), (INT)VN_type(x));
+            note("\nIR%d : vn%d, %d", k, VN_id(x), (INT)VN_type(x));
         }
     }
     fflush(g_tfile);
@@ -1137,7 +1132,7 @@ void IR_GVN::dump_h1(IR const* k, VN * x)
 }
 
 
-void IR_GVN::dump_bb(UINT bbid)
+void IR_GVN::dumpBB(UINT bbid)
 {
     if (g_tfile == NULL) { return; }
     IRBB * bb = m_cfg->getBB(bbid);
@@ -1149,7 +1144,7 @@ void IR_GVN::dump_bb(UINT bbid)
     note("\n");
     for (IR * ir = BB_first_ir(bb);
          ir != NULL; ir = BB_next_ir(bb)) {
-        dumpIR(ir, m_ru);
+        dumpIR(ir, m_rg);
         note("\n");
         VN * x = m_ir2vn.get(ir->id());
         if (x != NULL) {
@@ -1253,10 +1248,10 @@ void IR_GVN::dump_bb(UINT bbid)
 void IR_GVN::dump()
 {
     if (g_tfile == NULL) { return; }
-    note("\n==---- DUMP GVN -- rg:'%s' ----==", m_ru->getRegionName());
-    BBList * bbl = m_ru->getBBList();
+    note("\n==---- DUMP GVN -- rg:'%s' ----==", m_rg->getRegionName());
+    BBList * bbl = m_rg->getBBList();
     for (IRBB * bb = bbl->get_head(); bb != NULL; bb = bbl->get_next()) {
-        dump_bb(BB_id(bb));
+        dumpBB(BB_id(bb));
     }
     fflush(g_tfile);
 }
@@ -1420,11 +1415,11 @@ bool IR_GVN::reperform(OptCtx & oc)
 //GVN try to assign a value numbers to expressions.
 bool IR_GVN::perform(OptCtx & oc)
 {
-    BBList * bbl = m_ru->getBBList();
+    BBList * bbl = m_rg->getBBList();
     if (bbl->get_elem_count() == 0) { return false; }
 
     START_TIMER(t, getPassName());
-    m_ru->checkValidAndRecompute(&oc, PASS_DU_CHAIN,
+    m_rg->checkValidAndRecompute(&oc, PASS_DU_CHAIN,
         PASS_DU_REF, PASS_RPO, PASS_DOM, PASS_UNDEF);
 
     if (!OC_is_du_chain_valid(oc)) {

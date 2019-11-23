@@ -3488,7 +3488,7 @@ bool checkRoundDesc()
 bool IR::isNotOverLap(IR const* ir2, Region * rg) const
 {
     ASSERT0(rg);
-    IR const* ir1 = this; 
+    IR const* ir1 = this;
     ASSERT0(ir1 && ir2);
     ASSERT0(ir1->hasOffset() && ir2->hasOffset());
     if (!ir1->getType()->is_scalar() || !ir2->getType()->is_scalar()) {

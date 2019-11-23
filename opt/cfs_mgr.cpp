@@ -160,7 +160,7 @@ AbsNode * CfsMgr::constructAbsLoop(
 {
     DUMMYUSE(cur_region);
     ASSERT0(cur_region == NULL || cur_region->is_contain(BB_id(entry)));
-    IR_CFG * cfg = m_ru->getCFG();
+    IR_CFG * cfg = m_rg->getCFG();
     LI<IRBB> * li = cfg->mapBB2LabelInfo(entry);
     ASSERT0(li != NULL && LI_loop_head(li) == entry);
 
@@ -199,7 +199,7 @@ AbsNode * CfsMgr::constructAbsIf(
     ABS_NODE_if_head(node) = entry;
 
     IRBB * true_body, * false_body;
-    IR_CFG * cfg = m_ru->getCFG();
+    IR_CFG * cfg = m_rg->getCFG();
     cfg->getKidOfIF(entry, &true_body, &false_body, NULL);
     CFS_INFO * ci = map_ir2cfsinfo(cfg->get_last_xr(entry));
     ASSERT0(ci != NULL && CFS_INFO_head(ci) == entry);
@@ -234,7 +234,7 @@ AbsNode * CfsMgr::constructAbsTree(
         IN xcom::Graph & cur_graph,
         IN OUT xcom::BitSet & visited)
 {
-    IR_CFG * cfg = m_ru->getCFG();
+    IR_CFG * cfg = m_rg->getCFG();
     AbsNode * lst = NULL;
     IRBB * bb = entry;
     xcom::Graph g;
@@ -329,7 +329,7 @@ AbsNode * CfsMgr::constructAbsTree(
 //Construct Control Flow Structure.
 AbsNode * CfsMgr::constructAbstractControlFlowStruct()
 {
-    IR_CFG * cfg = m_ru->getCFG();
+    IR_CFG * cfg = m_rg->getCFG();
     ASSERTN(cfg->get_entry(), ("CFG should be single-entry"));
     xcom::BitSet visited;
     AbsNode * a = constructAbsTree(cfg->get_entry(), NULL,

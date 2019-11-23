@@ -192,7 +192,7 @@ public:
         //No need to free it. Or the ir_list must be clean before
         //the deletion of BB.
         //for (IR * ir = ir_list.get_head(); ir != NULL; ir = ir_list.get_next()) {
-        //    m_ru->freeIRTree(ir);
+        //    m_rg->freeIRTree(ir);
         //}
     }
 
@@ -486,7 +486,7 @@ class IRBBMgr {
 protected:
     BBList m_bbs_list;
     BBList m_free_list;
-    UINT m_bb_count; //counter of IRBB.   
+    UINT m_bb_count; //counter of IRBB.
 
 public:
     IRBBMgr() { m_bb_count = 1; }

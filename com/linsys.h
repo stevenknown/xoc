@@ -123,7 +123,7 @@ public:
     bool is_consistent();
     bool has_solution(RMat const& leq,
                       RMat const& eq,
-                      IN OUT RMat & vc,
+                      RMat const& vc,
                       UINT rhs_idx,
                       bool is_int_sol,
                       bool is_unique_sol);

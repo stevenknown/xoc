@@ -1185,6 +1185,8 @@ public:
 #define ID_phi(ir)           (((CId*)CK_IRT(ir, IR_ID))->phi)
 class CId : public DuProp, public VarProp {
 //ID need DU info, some Passes need it, e.g. GVN.
+//Note IR_ID should not participate in GVN analysis because it does not
+//represent a real operation.
 public:
     MDPhi * phi; //record the MD PHI dummy stmt if ID is operand of MD PHI.
 

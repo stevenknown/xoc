@@ -84,15 +84,14 @@ public:
 
     void destroy()
     {
-        if (!m_is_init) return;
-        INT i;
-        for (i = 0; i <= m_x2pos.get_last_idx(); i++) {
+        if (!m_is_init) { return; }
+        for (INT i = 0; i <= m_x2pos.get_last_idx(); i++) {
             Vector<INT> *vec = m_x2pos.get(i);
             if (vec) {
                 vec->destroy();
             }
         }
-        for (i = 0; i <= m_x2neg.get_last_idx(); i++) {
+        for (INT i = 0; i <= m_x2neg.get_last_idx(); i++) {
             Vector<INT> * vec = m_x2neg.get(i);
             if (vec) {
                 vec->destroy();
@@ -202,11 +201,10 @@ void Lineq::setParam(RMat * m, INT rhs_idx)
 //
 //'m': system of inequalities
 //'idx_of_eq': index of inequality
-INT Lineq::compareConstIterm(
-        RMat const& m,
-        UINT rhs_idx,
-        INT idx_of_eq,
-        Rational v)
+INT Lineq::compareConstIterm(RMat const& m,
+                             UINT rhs_idx,
+                             INT idx_of_eq,
+                             Rational v)
 {
     ASSERTN(m_is_init == true, ("not yet initialize."));
     ASSERTN(rhs_idx < m.getColSize(), ("illegal param"));
@@ -234,7 +232,7 @@ INT Lineq::compareConstIterm(
 
 //Comparing constant term of ineqt1 and ineqt2.
 INT Lineq::compareConstIterm(RMat const& m, UINT rhs_idx,
-                           INT idx_of_eqt1, INT idx_of_eqt2)
+                             INT idx_of_eqt1, INT idx_of_eqt2)
 {
     ASSERTN(m_is_init == true, ("not yet initialize."));
     ASSERTN(rhs_idx < m.getColSize(), ("illegal param"));
@@ -280,11 +278,10 @@ INT Lineq::compareConstIterm(RMat const& m, UINT rhs_idx,
 //    Shape of resulting polyhedron by unifying is 10 <= z <= 200.
 //
 //'chlst': list of convex hulls which must be with the same dimension.
-void Lineq::ConvexHullUnionAndIntersect(
-        OUT RMat & res,
-        IN List<RMat*> & chlst,
-        UINT rhs_idx,
-        bool is_intersect)
+void Lineq::ConvexHullUnionAndIntersect(OUT RMat & res,
+                                        IN List<RMat*> & chlst,
+                                        UINT rhs_idx,
+                                        bool is_intersect)
 {
     if (chlst.get_elem_count() == 0) {
         res.deleteAllElem();
@@ -837,7 +834,7 @@ void Lineq::initVarConstraint(Vector<INT> const& sign,
 //'is_unique_sol': true if there exists unique solution.
 bool Lineq::has_solution(RMat const& leq,
                          RMat const& eq,
-                         IN OUT RMat & vc,
+                         RMat const& vc,
                          UINT rhs_idx,
                          bool is_int_sol,
                          bool is_unique_sol)
@@ -868,7 +865,7 @@ bool Lineq::has_solution(RMat const& leq,
     Rational v;
     if (is_int_sol) {
         MIP<RMat, Rational> mip(false);
-        mip.reviseTargetFunc(tgtf, eq, leq, num_of_var);        
+        mip.reviseTargetFunc(tgtf, eq, leq, num_of_var);
         UINT st = mip.maxm(v, res, tgtf, vc, eq, leq, false, NULL, rhs_idx);
         if (st == IP_SUCC) {
             //printf("maxv is %d/%d\n", v.num(), v.den());
@@ -1216,15 +1213,14 @@ void Lineq::removeIdenRow(IN OUT RMat & m)
 {
     Vector<Rational> sum;
     Vector<bool> removed;
-    UINT i;
-    for (i = 0; i < m.getRowSize(); i++) {
+    for (UINT i = 0; i < m.getRowSize(); i++) {
         Rational s = 0;
         for (UINT j = 0; j < m.getColSize(); j++) {
             s = s + m.get(i,j);
         }
         sum.set(i, s);
     }
-    for (i = 0; i < m.getRowSize(); i++) {
+    for (UINT i = 0; i < m.getRowSize(); i++) {
         if (removed.get(i)) {
             continue;
         }
@@ -1242,7 +1238,7 @@ void Lineq::removeIdenRow(IN OUT RMat & m)
     INT end_of_row = -1;
     INT start_of_row = -1;
     bool doit = false;
-    for (i = 0; i < m.getRowSize(); i++) {
+    for (UINT i = 0; i < m.getRowSize(); i++) {
         if (!removed.get(i)) {
             if (start_of_row == -1) {
                 start_of_row = i;
@@ -1275,10 +1271,10 @@ void Lineq::removeIdenRow(IN OUT RMat & m)
 
 
 //Dump bound of variable 'u'.
-//Forms as
+//Forms as:
 //    'ak*xk <= const + F(x) + a0x0 + a1x1 + ... + a(k-1)x(k-1) +
 //                a(k+1)x(k+1) + ... + anxn'
-//e.g: Given inequality: x + y <= 100 + F(x), output is
+//e.g: Given inequality: x + y <= 100 + F(x), output is:
 //    x <= 100  + F(x) + (-y)
 //
 //'u': index of variable that getting start with zero.
@@ -1299,10 +1295,9 @@ void Lineq::EhartPoly(OUT RMat & res, IN RMat & a, UINT rhs_idx)
 }
 
 
-INT Lineq::selectLeadingColumn(
-        INTMat const& coeff,
-        Vector<bool> const& is_noneg,
-        UINT rhs_part)
+INT Lineq::selectLeadingColumn(INTMat const& coeff,
+                               Vector<bool> const& is_noneg,
+                               UINT rhs_part)
 {
     //The selecting criteria include static/dynamic ordering,
     //they are MaxIndex, MinIndex, MinCutoff, MaxCutoff, MixCutoff,
@@ -1606,7 +1601,7 @@ bool Lineq::convertConstraint2Ray(OUT INTMat & gmat,
 
 
 //Generate a new row via combining row 'r1' and 'r2' that
-//eliminating column 'lc' to be zero.
+//eliminating column 'lc' to zero.
 //
 //'res': output constraints, and must be initialized by caller.
 //'r1, r2': row position of negative coeff
@@ -1617,24 +1612,23 @@ bool Lineq::convertConstraint2Ray(OUT INTMat & gmat,
 //  1 0 0 0 3  2 -4 -1 6
 //=>
 //  1 0 0 2 3  0  4  3 10
-void Lineq::combineRays(
-        OUT INTMat & res,
-        IN OUT INTMat & coeff,
-        UINT r1,
-        UINT r2,
-        UINT lc,
-        UINT pos)
+void Lineq::combineRays(OUT INTMat & res,
+                        IN OUT INTMat & coeff,
+                        UINT r1,
+                        UINT r2,
+                        UINT lc,
+                        UINT pos)
 {
-    if (r1 == r2) return;
+    if (r1 == r2) { return; }
     INT l1 = coeff.get(r1, lc);
     INT l2 = coeff.get(r2, lc);
-    if (l1 < 0) l1 = -l1;
-    if (l2 < 0) l2 = -l2;
+    if (l1 < 0) { l1 = -l1; }
+    if (l2 < 0) { l2 = -l2; }
     INT l = slcm(l1, l2);
     INT m1 = 1;
     INT m2 = 1;
-    if (l1 != l) m1 = l/l1;
-    if (l2 != l) m2 = l/l2;
+    if (l1 != l) { m1 = l/l1; }
+    if (l2 != l) { m2 = l/l2; }
     for (UINT i = 0; i < coeff.getColSize(); i++) {
         res.set(pos, i, coeff.get(r1, i)*m1 + coeff.get(r2, i)*m2);
     }
@@ -1648,10 +1642,9 @@ void Lineq::combineRays(
 }
 
 
-void Lineq::removeRedRow(
-            IN OUT INTMat & cs,
-            INTMat const& org_cone,
-            UINT rhs_part)
+void Lineq::removeRedRow(IN OUT INTMat & cs,
+                         INTMat const& org_cone,
+                         UINT rhs_part)
 {
     UINT cs_rows = cs.getRowSize();
     UINT cs_cols = rhs_part;
@@ -1711,10 +1704,9 @@ void Lineq::removeRedRow(
 //         x-y>=0
 //        -x+1>=0
 //'cslimit': is the maximum allowed constraints.
-bool Lineq::convertRay2Constraint(
-        INTMat const& gmat,
-        OUT INTMat & cs,
-        UINT cslimit)
+bool Lineq::convertRay2Constraint(INTMat const& gmat,
+                                  OUT INTMat & cs,
+                                  UINT cslimit)
 {
     DUMMYUSE(cslimit);
     if (gmat.size() == 0) {
@@ -1767,7 +1759,7 @@ bool Lineq::convertRay2Constraint(
     {
         //The succession of transformation computes a
         //fundamental set of rays on 'cs'.
-        //At each step, a hyperplane or constrain is selected.
+        //At each steps, a hyperplane or constrain is selected.
         Vector<bool> is_noneg; //record idx of columns
                                //which are non-negative column.
         Vector<UINT> row_of_pos_coeff, row_of_neg_coeff;
@@ -1777,7 +1769,6 @@ bool Lineq::convertRay2Constraint(
         UINT combined_count = 0;
 
         for (;;) {
-            cs.dumpf();
             INT lc = selectLeadingColumn(cs, is_noneg, rhs_part);
             if (lc < 0) {
                 break;
@@ -1822,8 +1813,6 @@ bool Lineq::convertRay2Constraint(
                     //idx of rows with positive-coeff.
                     UINT pcv = row_of_pos_coeff[pc];
                     combineRays(res, cs, ncv, pcv, lc, i++);
-                    res.dumpf();
-                    cs.dumpf();
                     combined[combined_count++] = pcv;
                 }
 
@@ -1841,13 +1830,12 @@ bool Lineq::convertRay2Constraint(
                 for (UINT i2 = 1; i2 < cs.getColSize(); i2++) {
                     cs.set(ncv, i2, -cs.get(ncv, 2));
                 }
-                //
+                //End modification.
             }
 
             //Add something here...
             is_noneg[lc] = true;
             cs.growRow(res, 0, res.getRowSize() - 1);
-            cs.dumpf();
             removeRedRow(cs, org_cone, rhs_part);
         }
         cs.deleteCol(rhs_part, cs.getColSize() - 1);
@@ -1872,8 +1860,14 @@ bool Lineq::convertRay2Constraint(
 void Lineq::PolyDiff(OUT RMat & res, IN RMat & a, IN RMat & b, UINT rhs_idx)
 {
     DUMMYUSE(rhs_idx);
-    if (a.size() == 0) { res.deleteAllElem(); return; }
-    if (b.size() == 0) { res.copy(a); return; }
+    if (a.size() == 0) {
+        res.deleteAllElem();
+        return;
+    }
+    if (b.size() == 0) {
+        res.copy(a);
+        return;
+    }
     ASSERT0(a.is_homo(b));
 
 }

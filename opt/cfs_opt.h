@@ -38,7 +38,7 @@ namespace xoc {
 
 class IR_CFS_OPT : public Pass {
 protected:
-    Region * m_ru;
+    Region * m_rg;
     TypeMgr * m_tm;
 
 protected:
@@ -52,7 +52,7 @@ protected:
     bool hoistIf(IR ** head, IR * ir);
 
 public:
-    IR_CFS_OPT(Region * rg) { m_ru = rg; m_tm = rg->getTypeMgr(); }
+    IR_CFS_OPT(Region * rg) { m_rg = rg; m_tm = rg->getTypeMgr(); }
     COPY_CONSTRUCTOR(IR_CFS_OPT);
     ~IR_CFS_OPT() {}
 

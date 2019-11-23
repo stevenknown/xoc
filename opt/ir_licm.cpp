@@ -114,7 +114,7 @@ bool IR_LICM::scanOpnd(
                 DUIter di = NULL;
                 for (INT i2 = defset->get_first(&di);
                      i2 >= 0; i2 = defset->get_next(i2, &di)) {
-                    IR const* d = m_ru->getIR(i2);
+                    IR const* d = m_rg->getIR(i2);
                     ASSERT0(d->getBB() && d->is_stmt());
                     if (!invariant_stmt.find(const_cast<IR*>(d)) &&
                         li->isInsideLoop(BB_id(d->getBB()))) {
@@ -381,7 +381,7 @@ void IR_LICM::dumpInvariantExpStmt(
 {
     if (g_tfile == NULL) { return; }
     note("\n==---- DUMP LICM Analysis Result '%s' ----==\n",
-        m_ru->getRegionName());
+        m_rg->getRegionName());
     if (invariant_exp.get_elem_count() > 0) {
         TabIter<IR*> ti;
         prt("-- Invariant Expression (num=%d) -- :",
@@ -389,7 +389,7 @@ void IR_LICM::dumpInvariantExpStmt(
         g_indent = 3;
         for (IR * c = invariant_exp.get_first(ti);
              c != NULL; c = invariant_exp.get_next(ti)) {
-             dumpIR(c, m_ru);
+             dumpIR(c, m_rg);
         }
 
     }
@@ -401,7 +401,7 @@ void IR_LICM::dumpInvariantExpStmt(
         g_indent = 3;
         for (IR * c = invariant_stmt.get_first(ti);
              c != NULL; c = invariant_stmt.get_next(ti)) {
-             dumpIR(c, m_ru);
+             dumpIR(c, m_rg);
         }
     }
 }
@@ -485,7 +485,7 @@ bool IR_LICM::is_dom_all_use_in_loop(IR const* ir, LI<IRBB> * li)
         SSAUseIter iter;
         for (INT i = SSA_uses(ssainfo).get_first(&iter);
              iter != NULL; i = SSA_uses(ssainfo).get_next(i, &iter)) {
-            IR const* use = m_ru->getIR(i);
+            IR const* use = m_rg->getIR(i);
 
             if (!use->is_pr()) {
                 ASSERT0(!use->isReadPR());
@@ -508,7 +508,7 @@ bool IR_LICM::is_dom_all_use_in_loop(IR const* ir, LI<IRBB> * li)
     DUIter di = NULL;
     for (INT i = useset->get_first(&di);
          i >= 0; i = useset->get_next(i, &di)) {
-        IR const* u = m_ru->getIR(i);
+        IR const* u = m_rg->getIR(i);
         ASSERT0(u->is_exp() && u->getStmt());
 
         if (!is_stmt_dom_its_use(ir, u, li, irbb)) {
@@ -563,7 +563,7 @@ bool IR_LICM::hoistInvariantStmt(TTab<IR*> & invariant_stmt,
         DUIter di = NULL;
         for (INT i = defset->get_first(&di);
              i >= 0; i = defset->get_next(i, &di)) {
-            IR * d = m_ru->getIR(i);
+            IR * d = m_rg->getIR(i);
             ASSERT0(d);
 
             if (!checkDefStmt(d, invariant_stmt, prehead, li)) {
@@ -653,7 +653,7 @@ bool IR_LICM::hoistCand(
                 DUIter di = NULL;
                 for (INT i = defset->get_first(&di);
                      i >= 0; i = defset->get_next(i, &di)) {
-                    IR * d = m_ru->getIR(i);
+                    IR * d = m_rg->getIR(i);
                     ASSERT0(d->is_stmt());
 
                     if (checkDefStmt(d, invariant_stmt, prehead, li)) {
@@ -711,11 +711,11 @@ bool IR_LICM::hoistCand(
                 //    p1 = cand_exp; //S2
                 //    n = p1; //S3
                 //move S2 into prehead BB.
-                IR * t = m_ru->buildPR(IR_dt(c));
+                IR * t = m_rg->buildPR(IR_dt(c));
                 bool f = stmt->replaceKid(c, t, false);
                 CHECK_DUMMYUSE(f);
 
-                IR * stpr = m_ru->buildStorePR(PR_no(t), IR_dt(t), c);
+                IR * stpr = m_rg->buildStorePR(PR_no(t), IR_dt(t), c);
 
                 if (m_ssamgr != NULL) {
                     //Generate SSA DU chain bewteen 'st' and 't'.
@@ -728,9 +728,9 @@ bool IR_LICM::hoistCand(
                 BB_irlist(prehead).append_tail(stpr);
 
                 //Revise MD info.
-                MD const* tmd = m_ru->genMDforPR(t);
-                t->setRefMD(tmd, m_ru);
-                stpr->setRefMD(tmd, m_ru);
+                MD const* tmd = m_rg->genMDforPR(t);
+                t->setRefMD(tmd, m_rg);
+                stpr->setRefMD(tmd, m_rg);
             }
             du_set_info_changed = true;
         }
@@ -774,7 +774,7 @@ bool IR_LICM::doLoopTree(
 
         doit = true;
         bool flag;
-        IRBB * prehead = ::findAndInsertPreheader(tli, m_ru, flag, true);
+        IRBB * prehead = ::findAndInsertPreheader(tli, m_rg, flag, true);
         ASSERT0(prehead);
         insert_bb |= flag;
         if (flag && LI_outer(tli) != NULL) {
@@ -792,7 +792,7 @@ bool IR_LICM::doLoopTree(
 bool IR_LICM::perform(OptCtx & oc)
 {
     START_TIMER(t, getPassName());
-    m_ru->checkValidAndRecompute(&oc, PASS_DOM,
+    m_rg->checkValidAndRecompute(&oc, PASS_DOM,
         PASS_DU_REF, PASS_LOOP_INFO, PASS_DU_CHAIN, PASS_UNDEF);
 
     if (!OC_is_du_chain_valid(oc)) {
@@ -806,7 +806,7 @@ bool IR_LICM::perform(OptCtx & oc)
     TTab<IR*> invariant_exp;
 
     m_ssamgr = NULL;
-    PRSSAMgr * ssamgr = (PRSSAMgr*)m_ru->getPassMgr()->
+    PRSSAMgr * ssamgr = (PRSSAMgr*)m_rg->getPassMgr()->
         queryPass(PASS_PR_SSA_MGR);
     if (ssamgr != NULL && ssamgr->isSSAConstructed()) {
         m_ssamgr = ssamgr;
@@ -820,7 +820,7 @@ bool IR_LICM::perform(OptCtx & oc)
         OC_is_expr_tab_valid(oc) = false;
 
         //DU chain and du ref is maintained.
-        ASSERT0(m_ru->verifyMDRef());
+        ASSERT0(m_rg->verifyMDRef());
         ASSERT0(m_du->verifyMDDUChain(COMPUTE_PR_DU | COMPUTE_NONPR_DU));
 
         if (du_set_info_changed) {

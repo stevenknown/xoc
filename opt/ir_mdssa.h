@@ -51,7 +51,7 @@ typedef TMapIter<UINT, MDPhiList*> BB2MDPhiListIter;
 //IR's MDSSAInfo.
 class MDSSAMgr : public Pass {
 protected:
-    Region * m_ru;
+    Region * m_rg;
     MDSystem * m_md_sys;
     TypeMgr * m_tm;
     IR_CFG * m_cfg;
@@ -79,7 +79,7 @@ protected:
     //NOTE this function only be called at constructor.
     void cleanInConstructor()
     {
-        m_ru = NULL;
+        m_rg = NULL;
         m_tm = NULL;
         m_seg_mgr = NULL;
         m_sbs_mgr = NULL;
@@ -147,7 +147,7 @@ public:
     {
         cleanInConstructor();
         ASSERT0(rg);
-        m_ru = rg;
+        m_rg = rg;
         m_tm = rg->getTypeMgr();
         ASSERT0(m_tm);
         ASSERT0(rg->getMiscBitSetMgr());
@@ -227,7 +227,7 @@ public:
     MDDef * findKillingDef(IR const* ir);
     MDDef * findNearestDef(IR const* ir);
 
-    Region * getRegion() const { return m_ru; }
+    Region * getRegion() const { return m_rg; }
     UseDefMgr * getUseDefMgr() { return &m_usedef_mgr; }
     virtual CHAR const* getPassName() const
     { return "MD SSA Manager"; }

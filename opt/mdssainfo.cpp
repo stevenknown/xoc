@@ -302,12 +302,12 @@ void MDPhi::dump(Region * rg, UseDefMgr * mgr)
 //
 //START UseDefMgr
 //
-UseDefMgr::UseDefMgr(Region * rg, MDSSAMgr * mgr) : m_ru(rg), m_mdssa_mgr(mgr)
+UseDefMgr::UseDefMgr(Region * rg, MDSSAMgr * mgr) : m_rg(rg), m_mdssa_mgr(mgr)
 {
-    ASSERT0(m_ru && m_mdssa_mgr);
+    ASSERT0(m_rg && m_mdssa_mgr);
 
-    m_md_sys = m_ru->getMDSystem();
-    m_sbs_mgr = m_ru->getMiscBitSetMgr();
+    m_md_sys = m_rg->getMDSystem();
+    m_sbs_mgr = m_rg->getMiscBitSetMgr();
 
     //Single List Core need user declared a mempool.
     m_vopnd_sc_pool = smpoolCreate(sizeof(xcom::SC<VOpnd*>) * 4, MEM_CONST_SIZE);
@@ -352,7 +352,7 @@ void UseDefMgr::destroyMD2VMDVec()
 
 void UseDefMgr::cleanOrDestroy(bool is_reinit)
 {
-    ASSERT0(m_ru);
+    ASSERT0(m_rg);
 
     for (INT i = 0; i <= m_vopnd_vec.get_last_idx(); i++) {
         VOpnd * v = m_vopnd_vec.get((UINT)i);
@@ -433,7 +433,7 @@ void UseDefMgr::setMDSSAInfo(IR * ir, MDSSAInfo * mdssainfo)
 {
     ASSERT0(ir && mdssainfo && m_mdssa_mgr->hasMDSSAInfo(ir));
     if (ir->getAI() == NULL) {
-        IR_ai(ir) = m_ru->allocAIContainer();
+        IR_ai(ir) = m_rg->allocAIContainer();
     }
     IR_ai(ir)->set(mdssainfo);
 }
@@ -448,7 +448,7 @@ MDSSAInfo * UseDefMgr::genMDSSAInfo(IR * ir)
 {
     ASSERT0(ir && m_mdssa_mgr->hasMDSSAInfo(ir));
     if (ir->getAI() == NULL) {
-        IR_ai(ir) = m_ru->allocAIContainer();
+        IR_ai(ir) = m_rg->allocAIContainer();
     }
 
     MDSSAInfo * mdssainfo = (MDSSAInfo*)ir->getAI()->get(AI_MD_SSA);
@@ -510,8 +510,8 @@ MDPhi * UseDefMgr::allocMDPhi(UINT mdid, UINT num_operands)
     ASSERT0(md);
     IR * last = NULL;
     for (UINT i = 0; i < num_operands; i++) {
-        IR * opnd = m_ru->buildId(md->get_base());
-        opnd->setRefMD(md, m_ru);
+        IR * opnd = m_rg->buildId(md->get_base());
+        opnd->setRefMD(md, m_rg);
 
         MDSSAInfo * mdssainfo = genMDSSAInfo(opnd);
 
@@ -605,7 +605,7 @@ VMD * UseDefMgr::allocVMD(UINT mdid, UINT version)
     v = (VMD*)smpoolMallocConstSize(sizeof(VMD), m_vmd_pool);
     ASSERT0(v);
     ::memset(v, 0, sizeof(VMD));
-    v->init(m_ru->getMiscBitSetMgr()->getSegMgr());
+    v->init(m_rg->getMiscBitSetMgr()->getSegMgr());
     VOPND_code(v) = VOPND_MD;
     VOPND_id(v) = m_vopnd_count++;
     VMD_mdid(v) = mdid;

@@ -40,7 +40,7 @@ namespace xoc {
 //
 void CDG::dump()
 {
-    dump_vcg("graph_cd_tree.vcg");
+    dumpVCG("graph_cd_tree.vcg");
     if (g_tfile == NULL) { return; }
     note("\n==---- DUMP Control Dependence ----==");
     INT c;
@@ -133,7 +133,7 @@ void CDG::build(IN OUT OptCtx & oc, xcom::DGraph & cfg)
 
     START_TIMER(t, "CDG");
     ASSERT0(OC_is_cfg_valid(oc));
-    m_ru->checkValidAndRecompute(&oc, PASS_PDOM, PASS_UNDEF);
+    m_rg->checkValidAndRecompute(&oc, PASS_PDOM, PASS_UNDEF);
 
     xcom::Graph pdom_tree;
     cfg.get_pdom_tree(pdom_tree);

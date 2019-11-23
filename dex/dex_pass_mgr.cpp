@@ -47,15 +47,15 @@ author: Su Zhenyu
 
 Pass * DexPassMgr::allocCFG()
 {
-    BBList * bbl = m_ru->getBBList();
+    BBList * bbl = m_rg->getBBList();
     UINT n = MAX(8, xcom::getNearestPowerOf2(bbl->get_elem_count()));
-    return new DEX_CFG(C_SEME, bbl, m_ru, n, n);
+    return new DEX_CFG(C_SEME, bbl, m_rg, n, n);
 }
 
 
 Pass * DexPassMgr::allocDCE()
 {
-    IR_DCE * pass = new IR_DCE(m_ru);
+    IR_DCE * pass = new IR_DCE(m_rg);
     pass->set_elim_cfs(true);
     return pass;
 }
@@ -63,7 +63,7 @@ Pass * DexPassMgr::allocDCE()
 
 Pass * DexPassMgr::allocCopyProp()
 {
-    Pass * pass = new DEX_CP(m_ru);
+    Pass * pass = new DEX_CP(m_rg);
     SimpCtx simp;
     pass->set_simp_cont(&simp);
     return pass;
@@ -72,7 +72,7 @@ Pass * DexPassMgr::allocCopyProp()
 
 Pass * DexPassMgr::allocRP()
 {
-    Pass * pass = new DEX_RP(m_ru, (IR_GVN*)registerPass(PASS_GVN));
+    Pass * pass = new DEX_RP(m_rg, (IR_GVN*)registerPass(PASS_GVN));
     return pass;
 }
 
@@ -102,7 +102,7 @@ void DexPassMgr::performScalarOpt(OptCtx & oc)
     ((IR_DCE*)registerPass(PASS_DCE))->set_elim_cfs(false);
 
     if (passlist.get_elem_count() != 0) {
-        LOG("\tScalar optimizations for '%s'", m_ru->getRegionName());
+        LOG("\tScalar optimizations for '%s'", m_rg->getRegionName());
     }
 
     bool change;
@@ -113,23 +113,23 @@ void DexPassMgr::performScalarOpt(OptCtx & oc)
              pass != NULL; pass = passlist.get_next()) {
             CHAR const* passname = pass->getPassName();
             LOG("\t\tpass %s", passname);
-            ASSERT0(verifyIRandBB(m_ru->getBBList(), m_ru));
+            ASSERT0(verifyIRandBB(m_rg->getBBList(), m_rg));
             ULONGLONG t = getusec();
 
-            //dumpBBList(m_ru->getBBList(), m_ru, "before");
-            //m_ru->getCFG()->dump_vcg("before.vcg");
+            //dumpBBList(m_rg->getBBList(), m_rg, "before");
+            //m_rg->getCFG()->dumpVCG("before.vcg");
 
             bool doit = pass->perform(oc);
 
-            //dumpBBList(m_ru->getBBList(), m_ru, "after");
-            //m_ru->getCFG()->dump_vcg("after.vcg");
+            //dumpBBList(m_rg->getBBList(), m_rg, "after");
+            //m_rg->getCFG()->dumpVCG("after.vcg");
 
             appendTimeInfo(pass->getPassName(), getusec() - t);
             if (doit) {
                 LOG("\t\t\tchanged");
                 change = true;
-                ASSERT0(verifyIRandBB(m_ru->getBBList(), m_ru));
-                ASSERT0(m_ru->getCFG()->verify());
+                ASSERT0(verifyIRandBB(m_rg->getBBList(), m_rg));
+                ASSERT0(m_rg->getCFG()->verify());
             }
         }
         count++;

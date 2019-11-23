@@ -266,7 +266,7 @@ public:
         dumpLoopTree(m_loop_info, 0, h);
         fflush(h);
     }
-    virtual void dump_vcg(CHAR const* name = NULL);
+    virtual void dumpVCG(CHAR const* name = NULL);
 
     bool findLoop();
 
@@ -1583,7 +1583,7 @@ bool CFG<BB, XR>::isLoopHeadRecur(LI<BB> * li, BB * bb)
 
 
 template <class BB, class XR>
-void CFG<BB, XR>::dump_vcg(CHAR const* name)
+void CFG<BB, XR>::dumpVCG(CHAR const* name)
 {
     ASSERTN(g_tfile, ("usr do not intend to dump internal info."));
     if (!name) {

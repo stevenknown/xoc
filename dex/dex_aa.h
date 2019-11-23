@@ -65,7 +65,7 @@ public:
                         buf, ty->type, 1, VAR_GLOBAL);
         VAR_is_addr_taken(dummy) = true;
         VAR_is_unallocable(dummy) = true;
-        m_ru->addToVarTab(dummy);
+        m_rg->addToVarTab(dummy);
 
         MD dummy_md;
         MD_base(&dummy_md) = dummy;
@@ -98,7 +98,7 @@ public:
                     buf, m_tm->getMCType(0), 1, VAR_GLOBAL);
         VAR_is_addr_taken(dummy) = true;
         VAR_is_unallocable(dummy) = true;
-        m_ru->addToVarTab(dummy);
+        m_rg->addToVarTab(dummy);
 
         MD dummy_md;
         MD_base(&dummy_md) = dummy;

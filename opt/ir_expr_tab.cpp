@@ -41,7 +41,7 @@ namespace xoc {
 IR_EXPR_TAB::IR_EXPR_TAB(Region * rg)
 {
     m_expr_count = 0;
-    m_ru = rg;
+    m_rg = rg;
     m_tm = rg->getTypeMgr();
     ::memset(m_level1_hash_tab, 0,
            sizeof(ExpRep*) * IR_EXPR_TAB_LEVEL1_HASH_BUCKET);
@@ -70,7 +70,7 @@ size_t IR_EXPR_TAB::count_mem()
 {
     size_t count = 0;
     count += sizeof(m_expr_count);
-    count += sizeof(m_ru);
+    count += sizeof(m_rg);
     count += m_ir_expr_vec.count_mem();
     count += m_ir_expr_lst.count_mem();
     count += smpoolGetPoolSize(m_pool);
@@ -106,14 +106,14 @@ void IR_EXPR_TAB::dump_ir_expr_tab()
 {
     if (g_tfile == NULL) { return; }
     note("\n==---- DUMP IR_EXPR_TAB ----==");
-    IR_DU_MGR * du_mgr = m_ru->getDUMgr();
+    IR_DU_MGR * du_mgr = m_rg->getDUMgr();
     INT last = m_ir_expr_vec.get_last_idx();
     for (INT i = 0; i <= last; i++) {
         ExpRep * ie = m_ir_expr_vec.get(i);
         if (ie == NULL) { continue; }
         ASSERT0(EXPR_id(ie) == (UINT)i);
         note("\n\n----------- ExpRep(%d)", i);
-        dumpIR(EXPR_ir(ie), m_ru);
+        dumpIR(EXPR_ir(ie), m_rg);
         note("\n\tOCC:");
         for (IR * occ = EXPR_occ_list(ie).get_head();
              occ != NULL; occ = EXPR_occ_list(ie).get_next()) {
@@ -121,7 +121,7 @@ void IR_EXPR_TAB::dump_ir_expr_tab()
             MDSet const* use_mds = du_mgr->getMayUse(occ);
             if (use_mds != NULL) {
                 prt("(use:");
-                use_mds->dump(m_ru->getMDSystem());
+                use_mds->dump(m_rg->getMDSystem());
                 prt(")");
             }
             prt(",");
@@ -190,7 +190,7 @@ ExpRep * IR_EXPR_TAB::append_expr(IR * ir)
         //Generate copy of 'ir'.
         ExpRep * ie = new_ir_expr();
         EXPR_id(ie) = ++m_expr_count;
-        EXPR_ir(ie) = m_ru->dupIRTree(ir);
+        EXPR_ir(ie) = m_rg->dupIRTree(ir);
         //dumpIR(EXPR_ir(ie));
         m_ir_expr_vec.set(EXPR_id(ie), ie);
 
@@ -207,7 +207,7 @@ ExpRep * IR_EXPR_TAB::append_expr(IR * ir)
         //Generate copy of 'ir'.
         ie = new_ir_expr();
         EXPR_id(ie) = ++m_expr_count;
-        EXPR_ir(ie) = m_ru->dupIRTree(ir);
+        EXPR_ir(ie) = m_rg->dupIRTree(ir);
         //dumpIR(EXPR_ir(ie));
         m_ir_expr_vec.set(EXPR_id(ie), ie);
 
@@ -229,7 +229,7 @@ ExpRep * IR_EXPR_TAB::append_expr(IR * ir)
     //Generate copy of 'ir'.
     ie = new_ir_expr();
     EXPR_id(ie) = ++m_expr_count;
-    EXPR_ir(ie) = m_ru->dupIRTree(ir);
+    EXPR_ir(ie) = m_rg->dupIRTree(ir);
     //dumpIR(EXPR_ir(ie));
     m_ir_expr_vec.set(EXPR_id(ie), ie);
 
@@ -574,7 +574,7 @@ void IR_EXPR_TAB::reperform(IN OUT OptCtx & oc)
 //the 'GEN-SET' and 'KILL-SET' of IR-EXPR for BB as well as.
 bool IR_EXPR_TAB::perform(IN OUT OptCtx & oc)
 {
-    BBList * bbl = m_ru->getBBList();
+    BBList * bbl = m_rg->getBBList();
     if (bbl->get_elem_count() == 0) { return false; }
 
     xcom::C<IRBB*> * cb;

@@ -99,12 +99,12 @@ public:
     {
         if (!m_has_insert_stuff &&
             ref->is_array() &&
-            (m_ru->isRegionName(
+            (m_rg->isRegionName(
                 "Lsoftweg/hw/performance/CPUTest;::arrayElementsDouble") ||
-             m_ru->isRegionName(
+             m_rg->isRegionName(
                  "Lsoftweg/hw/performance/CPUTest;::arrayElementsSingle"))) {
             m_has_insert_stuff = true;
-            insert_stuff_code(ref, m_ru, m_gvn);
+            insert_stuff_code(ref, m_rg, m_gvn);
         }
         IR_RP::handleAccessInBody(ref, delegate, delegate_pr,
                                 delegate2has_outside_uses_ir_list,

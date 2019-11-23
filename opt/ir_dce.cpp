@@ -48,7 +48,7 @@ void IR_DCE::dump(EFFECT_STMT const& is_stmt_effect,
 {
     if (g_tfile == NULL) { return; }
     note("\n==---- DUMP IR_DCE ----==\n");
-    BBList * bbl = m_ru->getBBList();
+    BBList * bbl = m_rg->getBBList();
     for (IRBB * bb = bbl->get_head(); bb != NULL; bb = bbl->get_next()) {
         note("\n------- BB%d", BB_id(bb));
         if (!is_bb_effect.is_contain(BB_id(bb))) {
@@ -62,7 +62,7 @@ void IR_DCE::dump(EFFECT_STMT const& is_stmt_effect,
             IR * ir = ir_vec->get(j);
             ASSERT0(ir != NULL);
             note("\n");
-            dumpIR(ir, m_ru);
+            dumpIR(ir, m_rg);
             if (!is_stmt_effect.is_contain(ir->id())) {
                 prt("\t\tremove!");
             }
@@ -84,7 +84,7 @@ void IR_DCE::dump(EFFECT_STMT const& is_stmt_effect,
             ASSERT0(ir != NULL);
             if (!is_stmt_effect.is_contain(ir->id())) {
                 note("\n");
-                dumpIR(ir, m_ru);
+                dumpIR(ir, m_rg);
                 prt("\t\tremove!");
             }
         }
@@ -172,7 +172,7 @@ void IR_DCE::mark_effect_ir(IN OUT EFFECT_STMT & is_stmt_effect,
                             IN OUT xcom::BitSet & is_bb_effect,
                             IN OUT List<IR const*> & work_list)
 {
-    List<IRBB*> * bbl = m_ru->getBBList();
+    List<IRBB*> * bbl = m_rg->getBBList();
     xcom::C<IRBB*> * ct;
     for (IRBB * bb = bbl->get_head(&ct);
          bb != NULL; bb = bbl->get_next(&ct)) {
@@ -274,7 +274,7 @@ bool IR_DCE::preserve_cd(IN OUT xcom::BitSet & is_bb_effect,
     ASSERT0(m_cfg && m_cdg);
     bool change = false;
     List<IRBB*> lst_2;
-    BBList * bbl = m_ru->getBBList();
+    BBList * bbl = m_rg->getBBList();
     xcom::C<IRBB*> * ct;
     for (bbl->get_head(&ct); ct != bbl->end(); ct = bbl->get_next(ct)) {
         IRBB * bb = ct->val();
@@ -390,7 +390,7 @@ void IR_DCE::iter_collect(IN OUT EFFECT_STMT & is_stmt_effect,
                     DUIter di = NULL;
                     for (INT i = defset->get_first(&di);
                          i >= 0; i = defset->get_next(i, &di)) {
-                        IR const* d = m_ru->getIR(i);
+                        IR const* d = m_rg->getIR(i);
                         ASSERT0(d->is_stmt());
                         if (!is_stmt_effect.is_contain(IR_id(d))) {
                             change = true;
@@ -422,7 +422,7 @@ void IR_DCE::iter_collect(IN OUT EFFECT_STMT & is_stmt_effect,
 //It will be illegal if empty BB has non-taken branch.
 void IR_DCE::fix_control_flow(List<IRBB*> & bblst, List<C<IRBB*>*> & ctlst)
 {
-    BBList * bbl = m_ru->getBBList();
+    BBList * bbl = m_rg->getBBList();
     xcom::C<IRBB*> * ct = ctlst.get_head();
 
     xcom::C<IRBB*> * bbct;
@@ -476,7 +476,7 @@ void IR_DCE::fix_control_flow(List<IRBB*> & bblst, List<C<IRBB*>*> & ctlst)
                 }
                 ASSERT0(li);
 
-                IR * g = m_ru->buildGoto(li);
+                IR * g = m_rg->buildGoto(li);
                 BB_irlist(bb).append_tail(g);
                 bool change = true;
                 xcom::Vertex * bbv = m_cfg->get_vertex(BB_id(bb));
@@ -509,7 +509,7 @@ void IR_DCE::record_all_ir(IN OUT Vector<Vector<IR*>*> & all_ir)
 {
     DUMMYUSE(all_ir);
     #ifdef _DEBUG_
-    BBList * bbl = m_ru->getBBList();
+    BBList * bbl = m_rg->getBBList();
     for (IRBB * bb = bbl->get_head(); bb != NULL; bb = bbl->get_next()) {
         if (BB_irlist(bb).get_elem_count() == 0) { continue; }
         Vector<IR*> * ir_vec = new Vector<IR*>();
@@ -569,11 +569,11 @@ bool IR_DCE::perform(OptCtx & oc)
 {
     START_TIMER(t, getPassName());
     if (m_is_elim_cfs) {
-        m_ru->checkValidAndRecompute(&oc, PASS_DU_REF, PASS_CDG,PASS_PDOM,
+        m_rg->checkValidAndRecompute(&oc, PASS_DU_REF, PASS_CDG,PASS_PDOM,
             PASS_DU_CHAIN, PASS_CDG, PASS_UNDEF);
-        m_cdg = (CDG*)m_ru->getPassMgr()->registerPass(PASS_CDG);
+        m_cdg = (CDG*)m_rg->getPassMgr()->registerPass(PASS_CDG);
     } else {
-        m_ru->checkValidAndRecompute(&oc, PASS_DU_REF, PASS_PDOM,
+        m_rg->checkValidAndRecompute(&oc, PASS_DU_REF, PASS_PDOM,
             PASS_DU_CHAIN, PASS_UNDEF);
         m_cdg = NULL;
     }
@@ -606,7 +606,7 @@ bool IR_DCE::perform(OptCtx & oc)
     iter_collect(is_stmt_effect, is_bb_effect, work_list);
 
     bool change = false;
-    BBList * bbl = m_ru->getBBList();
+    BBList * bbl = m_rg->getBBList();
     xcom::C<IRBB*> * ctbb;
     List<IRBB*> bblst;
     List<C<IRBB*>*> ctlst;
@@ -640,7 +640,7 @@ bool IR_DCE::perform(OptCtx & oc)
 
                 BB_irlist(bb).remove(ctir);
 
-                m_ru->freeIRTree(stmt);
+                m_rg->freeIRTree(stmt);
 
                 change = true;
 
@@ -665,21 +665,21 @@ bool IR_DCE::perform(OptCtx & oc)
         if (ir_vec != NULL) {
             delete ir_vec;
         }
-    }    
+    }
     #endif
 
     if (change) {
         m_cfg->performMiscOpt(oc);
 
         //AA, DU chain and du reference are maintained.
-        ASSERT0(m_ru->verifyMDRef() &&
+        ASSERT0(m_rg->verifyMDRef() &&
             m_du->verifyMDDUChain(COMPUTE_PR_DU | COMPUTE_NONPR_DU));
         OC_is_expr_tab_valid(oc) = false;
         OC_is_live_expr_valid(oc) = false;
         OC_is_reach_def_valid(oc) = false;
         OC_is_avail_reach_def_valid(oc) = false;
 
-        ASSERT0(verifySSAInfo(m_ru));
+        ASSERT0(verifySSAInfo(m_rg));
     }
 
     END_TIMER(t, getPassName());

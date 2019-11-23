@@ -79,7 +79,7 @@ public:
 //Transformator from IR to LIR/DEX.
 class IR2Dex {
 protected:
-    DexRegion * m_ru;
+    DexRegion * m_rg;
     DexRegionMgr * m_ru_mgr;
     TypeMgr * m_tm;
     TypeIndexRep * m_tr;
@@ -108,7 +108,7 @@ public:
     IR2Dex(IN Region * rg, IN DexFile * df)
     {
         ASSERT0(rg && df);
-        m_ru = (DexRegion*)rg;
+        m_rg = (DexRegion*)rg;
         m_ru_mgr = (DexRegionMgr*)rg->getRegionMgr();
         m_df = df;
         m_tm = rg->getTypeMgr();
@@ -118,7 +118,7 @@ public:
         m_org_pr2v = m_d2ir->getPR2Vreg();
         ASSERT0(m_org_pr2v);
 
-        m_var2fieldid = m_ru->getVAR2Fieldid();
+        m_var2fieldid = m_rg->getVAR2Fieldid();
         m_lab2idx.init(getNearestPowerOf2(
                         MAX(4, rg->getBBList()->get_elem_count())));
         m_pool = smpoolCreate(16, MEM_COMM);

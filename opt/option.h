@@ -131,11 +131,11 @@ public:
     //Do not dump anything.
     //Note is_dump_all and is_dump_nothing can not all be true.
     bool is_dump_nothing;
-    bool is_dump_aa; //Dump Alias Analysis information.    
+    bool is_dump_aa; //Dump Alias Analysis information.
     bool is_dump_dumgr; //Dump MD Def-Use chain built by DU Manager.
     bool is_dump_duref; //Dump MD Def-Use reference built both
                         //by AA and DU Manager.
-    bool is_dump_mdset_hash; //Dump MD Set Hash Table.   
+    bool is_dump_mdset_hash; //Dump MD Set Hash Table.
     bool is_dump_cfg; //Dump CFG.
     bool is_dump_dom; //Dump Dom/Pdom/Idom/Pidom.
     bool is_dump_cp; //Dump copy-propagation.
@@ -143,6 +143,7 @@ public:
     bool is_dump_dce; //Dump dead-code-elimination.
     bool is_dump_gvn; //Dump global-value-numbering.
     bool is_dump_gcse; //Dump global-common-subscript-expression.
+    bool is_dump_ivr; //Dump induction variable recognization.
     bool is_dump_licm; //Dump loop-invariant-code-motion.
     bool is_dump_loopcvt; //Dump loop-convertion.
     bool is_dump_simplification; //Dump IR simplification.
@@ -154,7 +155,7 @@ public:
     bool is_dump_livenessmgr; //Dump LivenessMgr.
     bool is_dump_refine_duchain; //Dump RefineDUChain.
 
-public:    
+public:
     DumpOpt();
     DumpOpt const& operator = (DumpOpt const&); //Disable operator =.
 
@@ -170,6 +171,7 @@ public:
     bool isDumpDCE() const;
     bool isDumpGVN() const;
     bool isDumpGCSE() const;
+    bool isDumpIVR() const;
     bool isDumpLICM() const;
     bool isDumpLoopCVT() const;
     bool isDumpSimp() const;

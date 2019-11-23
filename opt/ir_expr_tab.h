@@ -67,7 +67,7 @@ public:
 #define IR_EXPR_TAB_LEVEL2_HASH_BUCKET    128
 class IR_EXPR_TAB : public Pass {
     UINT m_expr_count; //the encode-number expression.
-    Region * m_ru;
+    Region * m_rg;
     TypeMgr * m_tm;
     BSVec<ExpRep*> m_ir_expr_vec;
 

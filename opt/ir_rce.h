@@ -39,7 +39,7 @@ namespace xoc {
 //Perform Redundant Code Elimination.
 class IR_RCE : public Pass {
 protected:
-    Region * m_ru;
+    Region * m_rg;
     IR_CFG * m_cfg;
     IR_GVN * m_gvn;
     IR_DU_MGR * m_du;
@@ -52,10 +52,10 @@ public:
     IR_RCE(Region * rg, IR_GVN * gvn)
     {
         ASSERT0(rg != NULL);
-        m_ru = rg;
+        m_rg = rg;
         m_gvn = gvn;
         m_cfg = rg->getCFG();
-        m_du = m_ru->getDUMgr();
+        m_du = m_rg->getDUMgr();
         ASSERT0(m_cfg && m_du);
         m_use_gvn = false;
     }

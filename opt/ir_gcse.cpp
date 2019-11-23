@@ -68,7 +68,7 @@ void IR_GCSE::elimCseAtStore(IR * use, IR * use_stmt, IR * gen)
     IR * gen_pr = m_exp2pr.get(gen);
     ASSERT0(gen_pr);
 
-    IR * newrhs_pr = m_ru->dupIRTree(gen_pr);
+    IR * newrhs_pr = m_rg->dupIRTree(gen_pr);
     use_stmt->setRHS(newrhs_pr);
     IR_parent(newrhs_pr) = use_stmt;
 
@@ -93,14 +93,14 @@ void IR_GCSE::elimCseAtStore(IR * use, IR * use_stmt, IR * gen)
     }
 
     //Assign MD to newrhs.
-    MD const* r_md = m_ru->genMDforPR(newrhs_pr);
+    MD const* r_md = m_rg->genMDforPR(newrhs_pr);
     ASSERT0(r_md);
-    newrhs_pr->setRefMD(r_md, m_ru);
+    newrhs_pr->setRefMD(r_md, m_rg);
 
     if (m_mdssamgr != NULL) {
         m_mdssamgr->removeMDSSAUseRecur(use);
     }
-    m_ru->freeIRTree(use);
+    m_rg->freeIRTree(use);
 }
 
 
@@ -117,7 +117,7 @@ void IR_GCSE::elimCseAtBranch(IR * use, IR * use_stmt, IN IR * gen)
     IR * gen_pr = m_exp2pr.get(gen);
     ASSERT0(gen_pr);
     ASSERT0(BR_det(use_stmt) == use);
-    IR * new_pr = m_ru->dupIRTree(gen_pr);
+    IR * new_pr = m_rg->dupIRTree(gen_pr);
 
     //Add du chain.
     IR * gen_stmt = gen->getStmt();
@@ -136,12 +136,12 @@ void IR_GCSE::elimCseAtBranch(IR * use, IR * use_stmt, IN IR * gen)
     m_gvn->setMapIR2VN(new_pr, vn);
 
     //Assign MD to PR.
-    MD const* r_md = m_ru->genMDforPR(new_pr);
+    MD const* r_md = m_rg->genMDforPR(new_pr);
     ASSERT0(r_md);
-    new_pr->setRefMD(r_md, m_ru);
+    new_pr->setRefMD(r_md, m_rg);
 
     //Det of branch stmt have to be judgement operation.
-    IR * newdet = m_ru->buildJudge(new_pr);
+    IR * newdet = m_rg->buildJudge(new_pr);
     IR_parent(newdet) = use_stmt;
     BR_det(use_stmt) = newdet;
     IR_may_throw(use_stmt) = false;
@@ -149,7 +149,7 @@ void IR_GCSE::elimCseAtBranch(IR * use, IR * use_stmt, IN IR * gen)
     if (m_mdssamgr != NULL) {
         m_mdssamgr->removeMDSSAUseRecur(use);
     }
-    m_ru->freeIRTree(use);
+    m_rg->freeIRTree(use);
 }
 
 
@@ -177,7 +177,7 @@ void IR_GCSE::elimCseAtCall(IR * use, IR * use_stmt, IR * gen)
 
     IR * gen_pr = m_exp2pr.get(gen);
     ASSERT0(gen_pr && gen_pr->is_pr());
-    IR * use_pr = m_ru->dupIRTree(gen_pr);
+    IR * use_pr = m_rg->dupIRTree(gen_pr);
 
     //Set identical vn to use_pr with CSE.
     IR * gen_stmt = gen->getStmt();
@@ -187,9 +187,9 @@ void IR_GCSE::elimCseAtCall(IR * use, IR * use_stmt, IR * gen)
     m_gvn->setMapIR2VN(use_pr, vn);
 
     //Allocate MD to use_pr to make up DU manager request.
-    MD const* r_md = m_ru->genMDforPR(use_pr);
+    MD const* r_md = m_rg->genMDforPR(use_pr);
     ASSERT0(r_md);
-    use_pr->setRefMD(r_md, m_ru);
+    use_pr->setRefMD(r_md, m_rg);
 
     //Add du chain from gen_pr's stmt to the use of pr.
     bool f = use_stmt->replaceKid(use, use_pr, false);
@@ -197,7 +197,7 @@ void IR_GCSE::elimCseAtCall(IR * use, IR * use_stmt, IR * gen)
     if (m_mdssamgr != NULL) {
         m_mdssamgr->removeMDSSAUseRecur(use);
     }
-    m_ru->freeIRTree(use);
+    m_rg->freeIRTree(use);
 
     if (m_ssamgr != NULL) {
         m_ssamgr->buildDUChain(gen_stmt, use_pr);
@@ -241,24 +241,24 @@ void IR_GCSE::processCseGen(IN IR * gen, IR * gen_stmt, bool & change)
     if (tmp_pr != NULL) { return; }
 
     //First process cse generation point.
-    tmp_pr = m_ru->buildPR(IR_dt(gen));
+    tmp_pr = m_rg->buildPR(IR_dt(gen));
     m_exp2pr.set(gen, tmp_pr);
 
     //Assign MD to PR.
-    MD const* tmp_pr_md = m_ru->genMDforPR(tmp_pr);
+    MD const* tmp_pr_md = m_rg->genMDforPR(tmp_pr);
     ASSERT0(tmp_pr_md);
-    tmp_pr->setRefMD(tmp_pr_md, m_ru);
+    tmp_pr->setRefMD(tmp_pr_md, m_rg);
 
     //Assign MD to ST.
-    IR * new_stpr = m_ru->buildStorePR(PR_no(tmp_pr), IR_dt(tmp_pr), gen);
-    new_stpr->setRefMD(tmp_pr_md, m_ru);
+    IR * new_stpr = m_rg->buildStorePR(PR_no(tmp_pr), IR_dt(tmp_pr), gen);
+    new_stpr->setRefMD(tmp_pr_md, m_rg);
 
     if (m_gvn != NULL) {
         ASSERT0(m_gvn->mapIR2VN(gen));
         m_gvn->setMapIR2VN(new_stpr, m_gvn->mapIR2VN(gen));
     }
 
-    copyDbx(new_stpr, gen_stmt, m_ru);
+    copyDbx(new_stpr, gen_stmt, m_rg);
 
     //The 'find()' is fast because it is implemented with hash.
     xcom::C<IR*> * holder = NULL;
@@ -270,8 +270,8 @@ void IR_GCSE::processCseGen(IN IR * gen, IR * gen_stmt, bool & change)
     IR * newkid = tmp_pr;
     if (gen_stmt->isConditionalBr() && gen == BR_det(gen_stmt)) {
         //Det of branch stmt have to be judgement expression.
-        newkid = m_ru->buildJudge(tmp_pr);
-        copyDbx(newkid, tmp_pr, m_ru);
+        newkid = m_rg->buildJudge(tmp_pr);
+        copyDbx(newkid, tmp_pr, m_rg);
     }
 
     bool v = gen_stmt->replaceKid(gen, newkid, false);
@@ -595,7 +595,7 @@ bool IR_GCSE::doProp(IRBB * bb, List<IR*> & livexp)
     DefDBitSetCore * x = m_du->getAvailInExpr(BB_id(bb), NULL);
     SEGIter * st = NULL;
     for (INT i = x->get_first(&st); i != -1; i = x->get_next(i, &st)) {
-        IR * y = m_ru->getIR(i);
+        IR * y = m_rg->getIR(i);
         if (y->is_undef() || y->is_pr()) { continue; }
         ASSERT0(y && y->is_exp());
         livexp.append_tail(y);
@@ -725,7 +725,7 @@ bool IR_GCSE::doProp(IRBB * bb, List<IR*> & livexp)
                         tmp.clean(m_misc_bs_mgr);
                         m_du->collectMayUseRecursive(x2,
                             tmp, true, m_misc_bs_mgr);
-                        if (tmp.is_overlap(mustdef, m_ru)) {
+                        if (tmp.is_overlap(mustdef, m_rg)) {
                             livexp.remove(ct2);
                         }
                     }
@@ -743,7 +743,7 @@ bool IR_GCSE::doProp(IRBB * bb, List<IR*> & livexp)
 
 void IR_GCSE::dump()
 {
-    note("\n==---- DUMP IR_GCSE '%s' ----==\n", m_ru->getRegionName());
+    note("\n==---- DUMP IR_GCSE '%s' ----==\n", m_rg->getRegionName());
     note("\nNumOfEliminatedCSE:%d", m_elimed.get_elem_count());
     note("\nEliminated IR: ");
     for (INT i = 0; i <= m_elimed.get_last_idx(); i++) {
@@ -759,16 +759,16 @@ bool IR_GCSE::perform(OptCtx & oc)
 {
     START_TIMER(t, getPassName());
     if (m_gvn != NULL) {
-        m_ru->checkValidAndRecompute(&oc, PASS_DOM, PASS_PDOM,
+        m_rg->checkValidAndRecompute(&oc, PASS_DOM, PASS_PDOM,
             PASS_DU_REF, PASS_DU_CHAIN, PASS_UNDEF);
         if (!m_gvn->is_valid()) {
             m_gvn->reperform(oc);
         }
         m_expr_tab = NULL;
     } else {
-        m_ru->checkValidAndRecompute(&oc, PASS_DOM, PASS_PDOM, PASS_EXPR_TAB,
+        m_rg->checkValidAndRecompute(&oc, PASS_DOM, PASS_PDOM, PASS_EXPR_TAB,
             PASS_DU_REF, PASS_DU_CHAIN, PASS_UNDEF);
-        m_expr_tab = (IR_EXPR_TAB*)m_ru->getPassMgr()->
+        m_expr_tab = (IR_EXPR_TAB*)m_rg->getPassMgr()->
             registerPass(PASS_EXPR_TAB);
     }
 
@@ -782,7 +782,7 @@ bool IR_GCSE::perform(OptCtx & oc)
     m_elimed.clean();
     #endif
 
-    PRSSAMgr * ssamgr = (PRSSAMgr*)(m_ru->getPassMgr()->
+    PRSSAMgr * ssamgr = (PRSSAMgr*)(m_rg->getPassMgr()->
         queryPass(PASS_PR_SSA_MGR));
     if (ssamgr != NULL && ssamgr->isSSAConstructed()) {
         m_ssamgr = ssamgr;
@@ -790,7 +790,7 @@ bool IR_GCSE::perform(OptCtx & oc)
         m_ssamgr = NULL;
     }
 
-    MDSSAMgr * mdssamgr = (MDSSAMgr*)(m_ru->getPassMgr()->
+    MDSSAMgr * mdssamgr = (MDSSAMgr*)(m_rg->getPassMgr()->
         queryPass(PASS_MD_SSA_MGR));
     if (mdssamgr != NULL && mdssamgr->isMDSSAConstructed()) {
         m_mdssamgr = mdssamgr;
@@ -806,7 +806,7 @@ bool IR_GCSE::perform(OptCtx & oc)
     xcom::Vertex * root = domtree.get_vertex(BB_id(entry));
     if (m_cfg->hasEHEdge()) {
         //Initialize Temp CFG and pick out exception-edge.
-        m_tg = new TG(m_ru);
+        m_tg = new TG(m_rg);
         m_tg->clone(*m_cfg);
         m_tg->pick_eh();
         m_tg->removeUnreachNode(BB_id(entry));
@@ -854,10 +854,10 @@ bool IR_GCSE::perform(OptCtx & oc)
         OC_is_reach_def_valid(oc) = false;
 
         //DU reference and du chain has maintained.
-        ASSERT0(m_ru->verifyMDRef());
+        ASSERT0(m_rg->verifyMDRef());
         ASSERT0(m_du->verifyMDDUChain(COMPUTE_PR_DU | COMPUTE_NONPR_DU));
         if (m_ssamgr != NULL) {
-            ASSERT0(verifySSAInfo(m_ru));
+            ASSERT0(verifySSAInfo(m_rg));
         }
         //For now, gvn has updated correctly.
     }
@@ -867,7 +867,7 @@ bool IR_GCSE::perform(OptCtx & oc)
         m_tg = NULL;
     }
     ASSERT0(m_tg == NULL);
-    ASSERT0(verifyIRandBB(m_ru->getBBList(), m_ru));
+    ASSERT0(verifyIRandBB(m_rg->getBBList(), m_rg));
     return change;
 }
 //END IR_GCSE

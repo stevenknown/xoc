@@ -64,7 +64,7 @@ public:
     virtual ~RefineDUChain() {}
 
     bool dump();
-    
+
     //True to use GVN and classic DU chain to perform optimization.
     void setUseGvn(bool use_gvn) { m_is_use_gvn = use_gvn; }
 

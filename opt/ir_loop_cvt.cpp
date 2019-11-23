@@ -110,7 +110,7 @@ bool IR_LOOP_CVT::try_convert(LI<IRBB> * li, IRBB * gobackbb,
     Vector<IR*> rmvec;
     for (IR * ir = BB_first_ir(head);
          ir != NULL; ir = BB_next_ir(head)) {
-        IR * newir = m_ru->dupIRTree(ir);
+        IR * newir = m_rg->dupIRTree(ir);
 
         m_du->copyIRTreeDU(newir, ir, true);
 
@@ -132,7 +132,7 @@ bool IR_LOOP_CVT::try_convert(LI<IRBB> * li, IRBB * gobackbb,
 
                 for (INT d = defset->get_first(&di);
                      d >= 0; d = defset->get_next(d, &di)) {
-                    IR * def = m_ru->getIR(d);
+                    IR * def = m_rg->getIR(d);
 
                     ASSERT0(def->getBB());
                     if (li->isInsideLoop(BB_id(def->getBB()))) {
@@ -153,19 +153,19 @@ bool IR_LOOP_CVT::try_convert(LI<IRBB> * li, IRBB * gobackbb,
         if (newir->isConditionalBr()) {
             ASSERT0(ir == BB_last_ir(head));
             last_cond_br = newir;
-            newir->invertIRType(m_ru);
+            newir->invertIRType(m_rg);
         }
     }
 
     ASSERT0(last_cond_br);
     BB_irlist(gobackbb).remove(irct);
-    m_ru->freeIR(lastir);
+    m_rg->freeIR(lastir);
     m_cfg->removeEdge(gobackbb, head); //revise cfg.
 
     LabelInfo const* loopbody_start_lab =
             loopbody_start_bb->getLabelList().get_head();
     if (loopbody_start_lab == NULL) {
-        loopbody_start_lab = ::allocInternalLabel(m_ru->get_pool());
+        loopbody_start_lab = ::allocInternalLabel(m_rg->get_pool());
         m_cfg->add_lab(loopbody_start_bb, loopbody_start_lab);
     }
     last_cond_br->setLabel(loopbody_start_lab);
@@ -205,7 +205,7 @@ bool IR_LOOP_CVT::find_and_convert(List<LI<IRBB>*> & worklst)
 bool IR_LOOP_CVT::perform(OptCtx & oc)
 {
     START_TIMER(t, getPassName());
-    m_ru->checkValidAndRecompute(&oc, PASS_LOOP_INFO, PASS_RPO, PASS_UNDEF);
+    m_rg->checkValidAndRecompute(&oc, PASS_LOOP_INFO, PASS_RPO, PASS_UNDEF);
 
     LI<IRBB> * li = m_cfg->getLoopInfo();
     if (li == NULL) { return false; }
@@ -219,11 +219,11 @@ bool IR_LOOP_CVT::perform(OptCtx & oc)
     bool change = find_and_convert(worklst);
     if (change) {
         if (g_is_dump_after_pass && g_dump_opt.isDumpLoopCVT()) {
-            dumpBBList(m_ru->getBBList(), m_ru);
+            dumpBBList(m_rg->getBBList(), m_rg);
         }
 
         //DU reference and du chain has maintained.
-        ASSERT0(m_ru->verifyMDRef());
+        ASSERT0(m_rg->verifyMDRef());
         ASSERT0(m_du->verifyMDDUChain(COMPUTE_PR_DU | COMPUTE_NONPR_DU));
 
         //All these changed.

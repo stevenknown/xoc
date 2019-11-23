@@ -301,7 +301,7 @@ public:
     void set_ltm(LTMgr * ltm) { ASSERT0(ltm); m_ltm = ltm; }
     bool is_interf(LT const* lt1, LT const* lt2) const;
     void build();
-    void dump_vcg(CHAR const* name = NULL);
+    void dumpVCG(CHAR const* name = NULL);
     void get_neighbor(OUT List<LT*> & nis, LT * lt) const;
 };
 
@@ -326,7 +326,7 @@ protected:
     Vreg2PR * m_v2pr;
     GltMgr * m_gltm;
     TypeMgr * m_tm;
-    Region * m_ru;
+    Region * m_rg;
     RA * m_ra;
     UINT m_lt_count; //local lt count.
     UINT m_max_lt_len;
@@ -531,7 +531,7 @@ protected:
     Vector<GLT*> m_pr2glt;
     Vector<UINT> m_params;
     ConstIRIter m_cii; //const IR iter.
-    Region * m_ru;
+    Region * m_rg;
     RA * m_ra;
     RSC * m_rsc;
     SMemPool * m_pool;
@@ -573,7 +573,7 @@ public:
 
     //Get LTMgr via BB's id.
     LTMgr * get_ltm(UINT bbid) { return m_bb2ltmgr.get(bbid); }
-    Region * getRegion() { return m_ru; }
+    Region * getRegion() { return m_rg; }
     BitSetMgr * getBitSetMgr() { return &m_bs_mgr; }
     Vector<GLT*> * get_pr2glt_map() { return &m_pr2glt; }
     UINT get_num_of_glt() const { return m_glt_count - 1; }
@@ -621,12 +621,12 @@ public:
 
 
 //Global Interference Graph.
-#define GIG_ru(g)            ((g)->m_ru)
+#define GIG_ru(g)            ((g)->m_rg)
 #define GIG_glt_mgr(g)        ((g)->m_glt_mgr)
 class GIG : public Graph {
 protected:
 public:
-    Region * m_ru;
+    Region * m_rg;
     IR_CFG * m_cfg;
     GltMgr * m_gltm;
 
@@ -638,14 +638,14 @@ public:
     {
         ASSERT0(rg && glt_mgr);
         m_gltm = glt_mgr;
-        m_ru = rg;
-        m_cfg = m_ru->getCFG();
+        m_rg = rg;
+        m_cfg = m_rg->getCFG();
         m_is_consider_local_interf = false;
         set_direction(false);
     }
 
     void add_glt(GLT * g) { addVertex(GLT_id(g)); }
-    void dump_vcg(CHAR const* name = NULL);
+    void dumpVCG(CHAR const* name = NULL);
     void remove_glt(GLT * g) { removeVertex(GLT_id(g)); }
     bool is_interf(IN GLT * glt1, IN GLT * glt2);
     bool is_interf_with_neighbour(GLT * g, DefSBitSet & nis, UINT phy);
@@ -670,7 +670,7 @@ protected:
     BitSet * m_4;
     BitSet * m_8;
     BitSet * m_16;
-    Region * m_ru;
+    Region * m_rg;
     GltMgr * m_gltm;
     TypeMgr * m_tm;
     BitSetMgr * m_bsm;
@@ -684,8 +684,8 @@ public:
     {
         ASSERT0(gltm);
         m_gltm = gltm;
-        m_ru = gltm->getRegion();
-        m_tm = m_ru->getTypeMgr();
+        m_rg = gltm->getRegion();
+        m_tm = m_rg->getTypeMgr();
         m_bsm = gltm->getBitSetMgr();
         m_4 = NULL;
         m_8 = NULL;
@@ -737,7 +737,7 @@ protected:
     RA * m_ra;
     GltMgr * m_gltm;
     LTMgr * m_ltm;
-    Region * m_ru;
+    Region * m_rg;
     RSC * m_rsc;
     IG * m_ig;
 
@@ -813,7 +813,7 @@ protected:
     GltMgr m_gltm;
     GIG m_ig;
     RSC m_rsc;
-    Region * m_ru;
+    Region * m_rg;
     IR_CFG * m_cfg;
     TypeMgr * m_tm;
     TypeIndexRep * m_tr;
@@ -908,7 +908,7 @@ public:
         m_rsc(&m_gltm)
     {
         ASSERT0(rg && tr);
-        m_ru = rg;
+        m_rg = rg;
         m_cfg = rg->getCFG();
         m_tm = rg->getTypeMgr();
         m_tr = tr;

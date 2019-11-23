@@ -44,7 +44,7 @@ AnalysisInstrument::AnalysisInstrument(Region * rg) :
     m_mds_hash_allocator(&m_sbs_mgr),
     m_mds_hash(&m_mds_hash_allocator)
 {
-    m_ru = rg;
+    m_rg = rg;
     m_call_list = NULL;
     m_return_list = NULL;
     m_ir_list = NULL;
@@ -137,15 +137,15 @@ AnalysisInstrument::~AnalysisInstrument()
     }
 
     //Free local VAR id and related MD id, and destroy the memory.
-    destroyVARandMD(m_ru);
+    destroyVARandMD(m_rg);
 
     //Destroy reference info.
-    if (REGION_refinfo(m_ru) != NULL) {
-        REF_INFO_mayuse(REGION_refinfo(m_ru)).clean(m_sbs_mgr);
-        REF_INFO_maydef(REGION_refinfo(m_ru)).clean(m_sbs_mgr);
+    if (REGION_refinfo(m_rg) != NULL) {
+        REF_INFO_mayuse(REGION_refinfo(m_rg)).clean(m_sbs_mgr);
+        REF_INFO_maydef(REGION_refinfo(m_rg)).clean(m_sbs_mgr);
 
         //REGION_refinfo allocated in pool.
-        REGION_refinfo(m_ru) = NULL;
+        REGION_refinfo(m_rg) = NULL;
     }
 
     //Destory CALL list.
@@ -993,17 +993,187 @@ VAR const* Region::findFormalParam(UINT position)
 }
 
 
+//The function generates new MD for given PR.
+//It should be called if new PR generated in optimzations.
+MD const* Region::allocPRMD(IR * pr)
+{
+    ASSERT0(pr->is_pr());
+    MD const* md = genMDforPR(pr);
+    setMustRef(pr, md);
+    pr->cleanRefMDSet();
+    return md;
+}
+
+
+//The function generates new MD for given PR.
+//It should be called if new PR generated in optimzations.
+MD const* Region::allocPhiMD(IR * phi)
+{
+    ASSERT0(phi->is_phi());
+    MD const* md = genMDforPR(phi);
+    setMustRef(phi, md);
+    phi->cleanRefMDSet();
+    return md;
+}
+
+
+MD const* Region::allocIdMD(IR * ir)
+{
+    ASSERT0(ir->is_id());
+    MD const* t = genMDforId(ir);
+    setMustRef(ir, t);
+    ir->cleanRefMDSet();
+    return t;
+}
+
+
+MD const* Region::allocLoadMD(IR * ir)
+{
+    ASSERT0(ir->is_ld());
+    MD const* t = genMDforLoad(ir);
+    ASSERT0(t);
+    ir->cleanRefMDSet();
+    if (LD_ofst(ir) != 0) {
+        MD t2(*t);
+        ASSERT0(t2.is_exact());
+        MD_ofst(&t2) += LD_ofst(ir);
+        MD_size(&t2) = ir->getTypeSize(getTypeMgr());
+        MD const* entry = getMDSystem()->registerMD(t2);
+        ASSERTN(MD_id(entry) > 0, ("Not yet registered"));
+        t = entry; //regard MD with offset as return result.
+    }
+    setMustRef(ir, t);
+    return t;
+}
+
+
+MD const* Region::allocStorePRMD(IR * ir)
+{
+    ASSERT0(ir->is_stpr());
+    MD const* md = genMDforPR(ir);
+    setMustRef(ir, md);
+    ir->cleanRefMDSet();
+    return md;
+}
+
+
+MD const* Region::allocCallResultPRMD(IR * ir)
+{
+    ASSERT0(ir->isCallStmt());
+    MD const* md = genMDforPR(ir);
+    setMustRef(ir, md);
+    ir->cleanRefMDSet();
+    return md;
+}
+
+
+MD const* Region::allocSetelemMD(IR * ir)
+{
+    ASSERT0(ir->is_setelem());
+    MD const* md = genMDforPR(ir);
+    IR const* ofst = SETELEM_ofst(ir);
+    ASSERT0(ofst);
+    if (md->is_exact()) {
+        if (ofst->is_const()) {
+            ASSERTN(ofst->is_int(), ("offset of SETELEM must be integer."));
+
+            //Accumulating offset of identifier.
+            //e.g: struct {int a,b; } s; s.a = 10
+            //generate: st s:offset(4) = 10;
+            MD t(*md);
+            ASSERT0(ir->getTypeSize(getTypeMgr()) > 0);
+            MD_ofst(&t) += (UINT)CONST_int_val(ofst);
+            MD_size(&t) = ir->getTypeSize(getTypeMgr());
+            MD const* entry = getMDSystem()->registerMD(t);
+            ASSERTN(MD_id(entry) > 0, ("Not yet registered"));
+            md = entry; //regard MD with offset as return result.
+        } else {
+            //Offset is variable.
+            //e.g: vector<4xi32> v; v[i] = 34;
+            //will generate:
+            //    st $1 = ld v;
+            //    setelem $1 = 34, ld i;
+            //    st v = $1;
+
+            MD t(*md);
+            ASSERT0(ir->getTypeSize(getTypeMgr()) > 0);
+            MD_ty(&t) = MD_RANGE;
+            MD_ofst(&t) = 0;
+            MD_size(&t) = ir->getTypeSize(getTypeMgr());
+            MD const* entry = getMDSystem()->registerMD(t);
+            ASSERTN(MD_id(entry) > 0, ("Not yet registered"));
+            md = entry; //regard MD with range as return result.
+        }
+    }
+
+    setMustRef(ir, md);
+    ir->cleanRefMDSet();
+    return md;
+}
+
+
+MD const* Region::allocGetelemMD(IR * ir)
+{
+    ASSERT0(ir->is_getelem());
+    MD const* md = genMDforPR(ir);
+    setMustRef(ir, md);
+    ir->cleanRefMDSet();
+    return md;
+}
+
+
+MD const* Region::allocStoreMD(IR * ir)
+{
+    ASSERT0(ir->is_st());
+    MD const* md = genMDforStore(ir);
+    ASSERT0(md);
+    ir->cleanRefMDSet();
+    if (ST_ofst(ir) != 0) {
+        //Accumulating offset of identifier.
+        //e.g: struct {int a,b; } s; s.a = 10
+        //generate: st('s', ofst:4) = 10
+        MD t(*md);
+        ASSERT0(t.is_exact());
+        ASSERT0(ir->getTypeSize(getTypeMgr()) > 0);
+        MD_ofst(&t) += ST_ofst(ir);
+        MD_size(&t) = ir->getTypeSize(getTypeMgr());
+        MD const* entry = getMDSystem()->registerMD(t);
+        ASSERTN(MD_id(entry) > 0, ("Not yet registered"));
+        md = entry; //regard MD with offset as return result.
+    }
+    setMustRef(ir, md);
+    return md;
+}
+
+
+//Alloc MD for const string.
+MD const* Region::allocStringMD(SYM const* string)
+{
+    ASSERT0(string);
+    MD const* strmd = getRegionMgr()->genDedicateStrMD();
+    if (strmd != NULL) { return strmd; }
+
+    VAR * v = getVarMgr()->registerStringVar(NULL,
+        string, MEMORY_ALIGNMENT);
+    //Set string address to be taken only if it is base of LDA.
+    //VAR_is_addr_taken(v) = true;
+    MD md;
+    MD_base(&md) = v;
+    MD_size(&md) = (UINT)strlen(SYM_name(string)) + 1;
+    MD_ofst(&md) = 0;
+    MD_ty(&md) = MD_EXACT;
+    ASSERT0(v->is_string());
+
+    MD const* e = getMDSystem()->registerMD(md);
+    ASSERT0(MD_id(e) > 0);
+    return e;
+}
+
+
 //Allocate PassMgr
 PassMgr * Region::allocPassMgr()
 {
     return new PassMgr(this);
-}
-
-
-//Allocate AliasAnalysis.
-IR_AA * Region::allocAliasAnalysis()
-{
-    return new IR_AA(this);
 }
 
 
@@ -1033,29 +1203,29 @@ void Region::dumpFreeTab()
 }
 
 
-static void assignPRMDImpl(IR * x, IR_AA * aa)
+static void assignPRMDImpl(IR * x, Region * rg)
 {
-    ASSERT0(x && aa);
+    ASSERT0(x && rg);
     switch (x->getCode()) {
     case IR_PR:
-        aa->allocPRMD(x);
+        rg->allocPRMD(x);
         break;
     case IR_STPR:
-        aa->allocStorePRMD(x);
+        rg->allocStorePRMD(x);
         break;
     case IR_GETELEM:
-        aa->allocGetelemMD(x);
+        rg->allocGetelemMD(x);
         break;
     case IR_SETELEM:
-        aa->allocSetelemMD(x);
+        rg->allocSetelemMD(x);
         break;
     case IR_PHI:
-        aa->allocPhiMD(x);
+        rg->allocPhiMD(x);
         break;
     case IR_CALL:
     case IR_ICALL:
         if (x->hasReturnValue()) {
-            aa->allocCallResultPRMD(x);
+            rg->allocCallResultPRMD(x);
         }
         break;
     default:
@@ -1068,13 +1238,10 @@ static void assignPRMDImpl(IR * x, IR_AA * aa)
 void Region::assignPRMD()
 {
     IRIter ii;
-    ASSERT0(getPassMgr());
-    IR_AA * aa = (IR_AA*)getPassMgr()->registerPass(PASS_AA);
-    ASSERT0(aa);
     if (getIRList() != NULL) {
         for (IR * x = iterInit(getIRList(), ii);
              x != NULL; x = iterNext(ii)) {
-            assignPRMDImpl(x, aa);
+            assignPRMDImpl(x, this);
         }
         return;
     }
@@ -1086,7 +1253,7 @@ void Region::assignPRMD()
              ir = BB_irlist(bb).get_next(&ct)) {
             for (IR * x = iterInit(ir, ii);
                 x != NULL; x = iterNext(ii)) {
-                assignPRMDImpl(x, aa);
+                assignPRMDImpl(x, this);
             }
         }
     }
@@ -1707,9 +1874,7 @@ PassMgr * Region::initPassMgr()
     if (REGION_analysis_instrument(this)->m_pass_mgr != NULL) {
         return REGION_analysis_instrument(this)->m_pass_mgr;
     }
-
     REGION_analysis_instrument(this)->m_pass_mgr = allocPassMgr();
-
     return REGION_analysis_instrument(this)->m_pass_mgr;
 }
 
@@ -1942,9 +2107,9 @@ bool Region::verifyRPO(OptCtx & oc)
     ASSERT0(getBBList());
     if (OC_is_rpo_valid(oc)) {
         ASSERTN(getCFG()->getBBListInRPO()->get_elem_count() ==
-               getBBList()->get_elem_count(),
-               ("Previous pass has changed RPO, "
-                "and you should set it to be invalid"));
+                getBBList()->get_elem_count(),
+                ("Previous pass has changed RPO, "
+                 "and you should set it to be invalid"));
     }
     return true;
 }

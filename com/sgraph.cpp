@@ -903,7 +903,7 @@ void Graph::removeTransitiveEdge()
 }
 
 
-void Graph::dump_dot(CHAR const* name) const
+void Graph::dumpDOT(CHAR const* name) const
 {
     if (name == NULL) {
         name = "graph.dot";
@@ -934,7 +934,7 @@ void Graph::dump_dot(CHAR const* name) const
 }
 
 
-void Graph::dump_vcg(CHAR const* name) const
+void Graph::dumpVCG(CHAR const* name) const
 {
     ASSERTN(m_ec_pool != NULL, ("not yet initialized."));
     if (name == NULL) {
@@ -1661,10 +1661,10 @@ void DGraph::dump_dom(FILE * h, bool dump_dom_tree)
     if (dump_dom_tree) {
         Graph dom;
         get_dom_tree(dom);
-        dom.dump_vcg("graph_dom_tree.vcg");
+        dom.dumpVCG("graph_dom_tree.vcg");
         dom.erase();
         get_pdom_tree(dom);
-        dom.dump_vcg("graph_pdom_tree.vcg");
+        dom.dumpVCG("graph_pdom_tree.vcg");
     }
 }
 

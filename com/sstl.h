@@ -978,11 +978,10 @@ public:
     //Insert 'src' before 'marker', and return the CONTAINER
     //of src head and src tail.
     //This function move all element in 'src' into current list.
-    void insert_before(
-            IN OUT List<T> & src,
-            IN C<T> * marker,
-            OUT C<T> ** list_head_ct = NULL,
-            OUT C<T> ** list_tail_ct = NULL)
+    void insert_before(IN OUT List<T> & src,
+                       IN C<T> * marker,
+                       OUT C<T> ** list_head_ct = NULL,
+                       OUT C<T> ** list_tail_ct = NULL)
     {
         if (src.m_head == NULL) { return; }
         ASSERT0(m_head && marker);
@@ -1019,11 +1018,10 @@ public:
 
     //Insert 'list' before 'marker', and return the CONTAINER
     //of list head and list tail.
-    void insert_and_copy_before(
-            List<T> const& list,
-            T marker,
-            OUT C<T> ** list_head_ct = NULL,
-            OUT C<T> ** list_tail_ct = NULL)
+    void insert_and_copy_before(List<T> const& list,
+                                T marker,
+                                OUT C<T> ** list_head_ct = NULL,
+                                OUT C<T> ** list_tail_ct = NULL)
     {
         C<T> * ct = NULL;
         find(marker, &ct);
@@ -1032,11 +1030,10 @@ public:
 
     //Insert 'list' before 'marker', and return the CONTAINER
     //of list head and list tail.
-    void insert_and_copy_before(
-            List<T> const& list,
-            IN C<T> * marker,
-            OUT C<T> ** list_head_ct = NULL,
-            OUT C<T> ** list_tail_ct = NULL)
+    void insert_and_copy_before(List<T> const& list,
+                                IN C<T> * marker,
+                                OUT C<T> ** list_head_ct = NULL,
+                                OUT C<T> ** list_tail_ct = NULL)
     {
         if (list.m_head == NULL) { return; }
         ASSERT0(marker);
@@ -1133,11 +1130,10 @@ public:
     //Insert 'src' after 'marker', and return the CONTAINER
     //of src head and src tail.
     //This function move all element in 'src' into current list.
-    void insert_after(
-            IN OUT List<T> & src,
-            IN C<T> * marker,
-            OUT C<T> ** list_head_ct = NULL,
-            OUT C<T> ** list_tail_ct = NULL)
+    void insert_after(IN OUT List<T> & src,
+                      IN C<T> * marker,
+                      OUT C<T> ** list_head_ct = NULL,
+                      OUT C<T> ** list_tail_ct = NULL)
     {
         if (src.m_head == NULL) { return; }
         ASSERT0(m_head && marker);
@@ -1174,11 +1170,10 @@ public:
 
     //Insert 'list' after 'marker', and return the CONTAINER
     //of list head and list tail.
-    void insert_and_copy_after(
-            List<T> const& list,
-            T marker,
-            OUT C<T> ** list_head_ct = NULL,
-            OUT C<T> ** list_tail_ct = NULL)
+    void insert_and_copy_after(List<T> const& list,
+                               T marker,
+                               OUT C<T> ** list_head_ct = NULL,
+                               OUT C<T> ** list_tail_ct = NULL)
     {
         C<T> * ct = NULL;
         find(marker, &ct);
@@ -1187,11 +1182,10 @@ public:
 
     //Insert 'list' after 'marker', and return the CONTAINER
     //of head and tail of members in 'list'.
-    void insert_and_copy_after(
-            List<T> const& list,
-            IN C<T> * marker,
-            OUT C<T> ** list_head_ct = NULL,
-            OUT C<T> ** list_tail_ct = NULL)
+    void insert_and_copy_after(List<T> const& list,
+                               IN C<T> * marker,
+                               OUT C<T> ** list_head_ct = NULL,
+                               OUT C<T> ** list_tail_ct = NULL)
     {
         if (list.m_head == NULL) { return; }
 
@@ -1705,11 +1699,10 @@ public:
     //Insert value 't' after the 'marker'.
     //free_list: a list record free containers.
     //pool: memory pool which is used to allocate container.
-    inline SC<T> * insert_after(
-            T t,
-            IN SC<T> * marker,
-            SC<T> ** free_list,
-            SMemPool * pool)
+    inline SC<T> * insert_after(T t,
+                                IN SC<T> * marker,
+                                SC<T> ** free_list,
+                                SMemPool * pool)
     {
         ASSERT0(marker);
         #ifdef _SLOW_CHECK_
@@ -2132,11 +2125,10 @@ public:
     }
 
     //Insert 't' into list after the 'marker'.
-    inline SC<T> * insert_after(
-            T t,
-            IN SC<T> * marker,
-            SC<T> ** free_list,
-            SMemPool * pool)
+    inline SC<T> * insert_after(T t,
+                                IN SC<T> * marker,
+                                SC<T> ** free_list,
+                                SMemPool * pool)
     {
         ASSERT0(marker);
         #ifdef _SLOW_CHECK_
@@ -4484,7 +4476,8 @@ public:
 //    typedef HMap<OPND*, OPER*, HashFuncBase<OPND*> > OPND2OPER_MAP;
 //
 //NOTICE:
-//    1. Tsrc(0) is defined as default NULL in HMap, so do not use T(0) as element.
+//    1. Tsrc(0) is defined as default NULL in HMap, so do
+//       not use T(0) as element.
 //    2. The map is implemented base on Hash, and one hash function class
 //       have been given.
 //
@@ -4623,9 +4616,9 @@ public:
         Hash<Tsrc, HF>::append(t, &elemhc, NULL);
 
         ASSERTN(elemhc != NULL,
-               ("Element does not append into hash table yet."));
+                ("Element does not append into hash table yet."));
         ASSERTN(Ttgt(0) == m_mapped_elem_table.get(HC_vec_idx(elemhc)),
-               ("Already be mapped"));
+                ("Already be mapped"));
         m_mapped_elem_table.set(HC_vec_idx(elemhc), mapped);
     }
 
@@ -4728,19 +4721,20 @@ public:
 //    1. Tsrc(0) is defined as default NULL in MMap, do not use T(0) as element.
 //
 //    2. MMap allocate memory for 'TAB_Ttgt' and return 'TAB_Ttgt *'
-//        when get(Tsrc) be invoked. DO NOT free these objects yourself.
+//       when get(Tsrc) be invoked. DO NOT free these objects yourself.
 //
 //    3. TAB_Ttgt should be pointer type.
-//        e.g: Given type of tgt's table is a class that
+//       e.g: Given type of tgt's table is a class that
 //            OP_HASH : public Hash<OPER*>,
 //            then type MMap<OPND*, OPER*, OP_HASH> is ok, but
 //            type MMap<OPND*, OPER*, OP_HASH*> is not expected.
 //
-//    4. Do not use DMap directly, please overload following functions optionally:
-//        * create hash-element container.
-//            T * create(OBJTY v)
+//    4. Do not use DMap directly, please overload following
+//       functions optionally:
+//       * create hash-element container.
+//         T * create(OBJTY v)
 //
-//        e.g: Mapping one OPND to a number of OPERs.
+//         e.g: Mapping one OPND to a number of OPERs.
 //            class OPND2OPER_MMAP : public MMap<OPND*, OPER*, OP_TAB> {
 //            public:
 //                virtual T create(OBJTY id)

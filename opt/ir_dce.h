@@ -51,7 +51,7 @@ class IR_DCE : public Pass {
 protected:
     MDSystem * m_md_sys;
     TypeMgr * m_tm;
-    Region * m_ru;
+    Region * m_rg;
     IR_CFG * m_cfg;
     CDG * m_cdg;
     IR_DU_MGR * m_du;
@@ -104,7 +104,7 @@ public:
     explicit IR_DCE(Region * rg)
     {
         ASSERT0(rg != NULL);
-        m_ru = rg;
+        m_rg = rg;
         m_tm = rg->getTypeMgr();
         m_cfg = rg->getCFG();
         m_du = rg->getDUMgr();

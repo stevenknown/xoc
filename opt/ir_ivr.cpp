@@ -126,12 +126,11 @@ IR * IR_IVR::findMatchedOcc(MD const* biv, IR * start)
 }
 
 
-bool IR_IVR::matchIVUpdate(
-        MD const* biv,
-        IR const* def,
-        IR ** occ,
-        IR ** delta,
-        bool & is_increment)
+bool IR_IVR::matchIVUpdate(MD const* biv,
+                           IR const* def,
+                           IR ** occ,
+                           IR ** delta,
+                           bool & is_increment)
 {
     ASSERT0(def->is_st());
     IR * rhs = ST_rhs(def);
@@ -181,13 +180,12 @@ bool IR_IVR::matchIVUpdate(
 }
 
 
-void IR_IVR::recordIV(
-        MD * biv,
-        LI<IRBB> const* li,
-        IR * def,
-        IR * occ,
-        IR * delta,
-        bool is_increment)
+void IR_IVR::recordIV(MD * biv,
+                      LI<IRBB> const* li,
+                      IR * def,
+                      IR * occ,
+                      IR * delta,
+                      bool is_increment)
 {
     ASSERT0(biv && li && def && occ && delta && delta->is_const());
     IV * x = allocIV();
@@ -199,7 +197,7 @@ void IR_IVR::recordIV(
     IV_is_inc(x) = is_increment;
     findInitVal(x);
 
-    //same occ may correspond to multiple LI.
+    //Same occ may correspond to multiple Loop Info.
     //e.g: c4.c
     //  while () {
     //    while () {
@@ -222,12 +220,11 @@ void IR_IVR::recordIV(
 
 //Find Basic IV.
 //'map_md2defcount': record the number of definitions to MD.
-//'map_md2defir': map MD to define stmt.
-void IR_IVR::findBIV(
-        LI<IRBB> const* li,
-        xcom::BitSet & tmp,
-        Vector<UINT> & map_md2defcount,
-        UINT2IR & map_md2defir)
+//'map_md2defir': map MD to definition stmt.
+void IR_IVR::findBIV(LI<IRBB> const* li,
+                     xcom::BitSet & tmp,
+                     Vector<UINT> & map_md2defcount,
+                     UINT2IR & map_md2defir)
 {
     IRBB * head = LI_loop_head(li);
     UINT headi = BB_id(head);
@@ -254,22 +251,22 @@ void IR_IVR::findBIV(
                     UINT c = map_md2defcount.get(emdid) + 1;
                     map_md2defcount.set(emdid, c);
                     if (c == 1) {
+                        //There is only one DEF of 'emdid'.
                         ASSERT0(map_md2defir.get(emdid) == NULL);
                         map_md2defir.setAlways(emdid, ir);
                         map_md2defcount.set(emdid, 1);
                     } else {
-                        //For performance, we do not remove the TN of TMap.
-                        //Just the mapped value to be NULL.
+                        //For locality and performance, we do not remove
+                        //node of TMap. Just reset the mapped value to be NULL.
                         map_md2defir.setAlways(emdid, NULL);
                         tmp.diff(emdid);
                     }
                 }
             }
-
-            //The stmt may-kill other definitions for same MD.
             MDSet const* maydef = m_du->getMayDef(ir);
             if (maydef == NULL) { continue; }
 
+            //Check MayDef of stmt because 'ir' may-kill other definitions.
             for (INT i2 = tmp.get_first(); i2 != -1; i2 = tmp.get_next(i2)) {
                 MD const* md = m_md_sys->getMD(i2);
                 ASSERT0(!m_is_only_handle_exact_md || md->is_exact());
@@ -285,11 +282,11 @@ void IR_IVR::findBIV(
         } //end for each IR.
     } //for each IRBB.
 
-    //Find BIV.
+    //Begin to find BIV.
 
     //First, find the stmt that is single def-stmt of exact/effect MD.
     bool find = false;
-    List<MD*> sdlst; //single def md lst.
+    List<MD*> sdlst; //record list of MD that has single DEF stmt.
     for (INT i = tmp.get_first(); i != -1; i = tmp.get_next(i)) {
         if (map_md2defcount.get(i) != 1) { continue; }
         IR * def = map_md2defir.get(i);
@@ -297,14 +294,14 @@ void IR_IVR::findBIV(
 
         //def stmt is reach-in of loop head.
         if (m_du->getInReachDef(headi, NULL)->is_contain(def->id())) {
-            //MD i is biv.
+            //It looks MD 'i' is biv.
             sdlst.append_head(m_md_sys->getMD(i));
             find = true;
         }
     }
     if (!find) { return; }
 
-    //Find induction operation from the stmt list.
+    //Find induction operation from the candidate stmt list.
     for (MD * biv = sdlst.get_head(); biv != NULL; biv = sdlst.get_next()) {
         IR * def = map_md2defir.get(MD_id(biv));
         ASSERT0(def);
@@ -319,7 +316,7 @@ void IR_IVR::findBIV(
         DUIter di = NULL;
         for (INT i = useset->get_first(&di);
              i >= 0; i = useset->get_next(i, &di)) {
-            IR const* use = m_ru->getIR(i);
+            IR const* use = m_rg->getIR(i);
             ASSERT0(use->is_exp());
 
             IR const* use_stmt = use->getStmt();
@@ -352,7 +349,7 @@ bool IR_IVR::is_loop_invariant(LI<IRBB> const* li, IR const* ir)
     if (defs == NULL) { return true; }
     DUIter di = NULL;
     for (INT i = defs->get_first(&di); i >= 0; i = defs->get_next(i, &di)) {
-        IR const* d = m_ru->getIR(i);
+        IR const* d = m_rg->getIR(i);
         ASSERT0(d->is_stmt() && d->getBB());
         if (li->isInsideLoop(BB_id(d->getBB()))) {
             return false;
@@ -364,7 +361,9 @@ bool IR_IVR::is_loop_invariant(LI<IRBB> const* li, IR const* ir)
 
 //Return true if ir can be regard as induction expression.
 //'defs': def list of 'ir'.
-bool IR_IVR::scanExp(IR const* ir, LI<IRBB> const* li, xcom::BitSet const& ivmds)
+bool IR_IVR::scanExp(IR const* ir,
+                     LI<IRBB> const* li,
+                     xcom::BitSet const& ivmds)
 {
     ASSERT0(ir->is_exp());
     switch (ir->getCode()) {
@@ -430,7 +429,9 @@ void IR_IVR::addDIVList(LI<IRBB> const* li, IR const* e)
 }
 
 
-void IR_IVR::findDIV(LI<IRBB> const* li, SList<IV*> const& bivlst, xcom::BitSet & tmp)
+void IR_IVR::findDIV(LI<IRBB> const* li, 
+                     SList<IV*> const& bivlst,
+                     xcom::BitSet & tmp)
 {
     if (bivlst.get_elem_count() == 0) { return; }
 
@@ -450,8 +451,7 @@ void IR_IVR::findDIV(LI<IRBB> const* li, SList<IV*> const& bivlst, xcom::BitSet 
             switch (ir->getCode()) {
             case IR_ST:
             case IR_STPR:
-            case IR_IST:
-                {
+            case IR_IST: {
                     IR * rhs = ir->getRHS();
                     if (scanExp(rhs, li, tmp)) {
                         addDIVList(li, rhs);
@@ -460,7 +460,8 @@ void IR_IVR::findDIV(LI<IRBB> const* li, SList<IV*> const& bivlst, xcom::BitSet 
                 break;
             case IR_CALL:
             case IR_ICALL:
-                for (IR * p = CALL_param_list(ir); p != NULL; p = p->get_next()) {
+                for (IR * p = CALL_param_list(ir);
+                     p != NULL; p = p->get_next()) {
                     if (scanExp(p, li, tmp)) {
                         addDIVList(li, p);
                     }
@@ -524,7 +525,7 @@ void IR_IVR::_dump(LI<IRBB> * li, UINT indent)
                 prt("Def-Stmt:");
                 ASSERT0(IV_iv_def(iv));
                 g_indent = indent + 2;
-                dumpIR(IV_iv_def(iv), m_ru, NULL, IR_DUMP_KID);
+                dumpIR(IV_iv_def(iv), m_rg, NULL, IR_DUMP_KID);
 
                 //Dump IV's occ-exp.
                 note("\n");
@@ -532,7 +533,7 @@ void IR_IVR::_dump(LI<IRBB> * li, UINT indent)
                 prt("Occ-Exp:");
                 ASSERT0(IV_iv_occ(iv));
                 g_indent = indent + 2;
-                dumpIR(IV_iv_occ(iv), m_ru, NULL, IR_DUMP_KID);
+                dumpIR(IV_iv_occ(iv), m_rg, NULL, IR_DUMP_KID);
 
                 //Dump IV's init-stmt.
                 if (iv->getInitValStmt() != NULL) {
@@ -540,7 +541,7 @@ void IR_IVR::_dump(LI<IRBB> * li, UINT indent)
                     for (UINT i = 0; i < indent; i++) { prt(" "); }
                     prt("Init-Stmt:");
                     g_indent = indent + 2;
-                    dumpIR(iv->getInitValStmt(), m_ru, NULL, IR_DUMP_KID);
+                    dumpIR(iv->getInitValStmt(), m_rg, NULL, IR_DUMP_KID);
                 }
             }
         } else { prt("(NO BIV)"); }
@@ -557,7 +558,7 @@ void IR_IVR::_dump(LI<IRBB> * li, UINT indent)
                 IR const* iv = sc->val();
                 ASSERT0(iv);
                 g_indent = indent + 2;
-                dumpIR(iv, m_ru, NULL, IR_DUMP_KID);
+                dumpIR(iv, m_rg, NULL, IR_DUMP_KID);
             }
         } else { prt("(NO DIV)"); }
 
@@ -572,7 +573,7 @@ void IR_IVR::_dump(LI<IRBB> * li, UINT indent)
 void IR_IVR::dump()
 {
     if (g_tfile == NULL) { return; }
-    note("\n==---- DUMP IVR -- rg:'%s' ----==", m_ru->getRegionName());
+    note("\n==---- DUMP IVR -- rg:'%s' ----==", m_rg->getRegionName());
     _dump(m_cfg->getLoopInfo(), 0);
     fflush(g_tfile);
 }
@@ -597,11 +598,11 @@ void IR_IVR::clean()
 bool IR_IVR::perform(OptCtx & oc)
 {
     START_TIMER(t, getPassName());
-    UINT n = m_ru->getBBList()->get_elem_count();
+    UINT n = m_rg->getBBList()->get_elem_count();
     if (n == 0) { return false; }
     ASSERT0(m_cfg && m_du && m_md_sys && m_tm);
 
-    m_ru->checkValidAndRecompute(&oc, PASS_REACH_DEF,
+    m_rg->checkValidAndRecompute(&oc, PASS_REACH_DEF,
         PASS_DU_REF, PASS_DOM, PASS_LOOP_INFO,
         PASS_DU_CHAIN, PASS_RPO, PASS_UNDEF);
 
@@ -610,7 +611,7 @@ bool IR_IVR::perform(OptCtx & oc)
         return false;
     }
 
-    m_du = (IR_DU_MGR*)m_ru->getPassMgr()->queryPass(PASS_DU_MGR);
+    m_du = (IR_DU_MGR*)m_rg->getPassMgr()->queryPass(PASS_DU_MGR);
 
     LI<IRBB> const* li = m_cfg->getLoopInfo();
     clean();
@@ -639,8 +640,9 @@ bool IR_IVR::perform(OptCtx & oc)
             x = LI_next(x);
         }
     }
-
-    //dump();
+    if (g_is_dump_after_pass && g_dump_opt.isDumpIVR()) {
+        dump();
+    }
     END_TIMER(t, getPassName());
     return false;
 }

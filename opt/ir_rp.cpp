@@ -247,10 +247,10 @@ void IR_RP::dump()
 {
     if (g_tfile == NULL) { return; }
     g_indent = 0;
-    note("\n==---- DUMP IR_RP '%s' ----==\n", m_ru->getRegionName());
+    note("\n==---- DUMP IR_RP '%s' ----==\n", m_rg->getRegionName());
 
     g_indent = 2;
-    BBList * bbl = m_ru->getBBList();
+    BBList * bbl = m_rg->getBBList();
     for (IRBB * bb = bbl->get_head(); bb != NULL; bb = bbl->get_next()) {
         note("\n---- BB%d -----", BB_id(bb));
         MDSet * live_in = getLiveInMDSet(bb);
@@ -293,7 +293,7 @@ void IR_RP::dump_occ_list(List<IR*> & occs)
     if (g_tfile == NULL) { return; }
     note("\n---- DUMP exact occ list ----");
     for (IR * x = occs.get_head(); x != NULL; x = occs.get_next()) {
-        dumpIR(x, m_ru, NULL, IR_DUMP_KID);
+        dumpIR(x, m_rg, NULL, IR_DUMP_KID);
         note("\n");
     }
     note("\n");
@@ -308,7 +308,7 @@ void IR_RP::dump_access2(TTab<IR*> & access)
     TabIter<IR*> iter;
     for (IR * ir = access.get_first(iter);
         ir != NULL; ir = access.get_next(iter)) {
-        dumpIR(ir, m_ru);
+        dumpIR(ir, m_rg);
         note("\n");
     }
     note("\n");
@@ -324,8 +324,8 @@ void IR_RP::dump_access(TMap<MD const*, IR*> & access)
     IR * ref;
     for (MD const* md = access.get_first(iter, &ref);
          ref != NULL; md = access.get_next(iter, &ref)) {
-        md->dump(m_ru->getTypeMgr());
-        dumpIR(ref, m_ru);
+        md->dump(m_rg->getTypeMgr());
+        dumpIR(ref, m_rg);
         note("\n");
     }
     note("\n");
@@ -431,7 +431,7 @@ void IR_RP::dump_mdlt()
 {
     if (g_tfile == NULL) { return; }
     MDSet mdbs;
-    BBList * bbl = m_ru->getBBList();
+    BBList * bbl = m_rg->getBBList();
     for (IRBB * bb = bbl->get_head(); bb != NULL; bb = bbl->get_next()) {
         MDSet * livein = getLiveInMDSet(bb);
         MDSet * liveout = getLiveOutMDSet(bb);
@@ -480,7 +480,7 @@ void IR_RP::buildLifeTime()
     cleanLiveBBSet();
 
     //Rebuild life time.
-    BBList * bbl = m_ru->getBBList();
+    BBList * bbl = m_rg->getBBList();
     for (IRBB * bb = bbl->get_head(); bb != NULL; bb = bbl->get_next()) {
         MDSet * livein = getLiveInMDSet(bb);
         MDSet * liveout = getLiveOutMDSet(bb);
@@ -503,14 +503,14 @@ void IR_RP::buildLifeTime()
 
 void IR_RP::computeGlobalLiveness()
 {
-    BBList * bbl = m_ru->getBBList();
+    BBList * bbl = m_rg->getBBList();
     for (IRBB * bb = bbl->get_head(); bb != NULL; bb = bbl->get_next()) {
         getLiveInMDSet(bb)->clean(*m_misc_bs_mgr);
         getLiveOutMDSet(bb)->clean(*m_misc_bs_mgr);
     }
     bool change;
     INT count = 0;
-    IR_CFG * cfg = m_ru->getCFG();
+    IR_CFG * cfg = m_rg->getCFG();
     MDSet news;
     List<IRBB*> succs;
     do {
@@ -545,8 +545,8 @@ void IR_RP::computeGlobalLiveness()
 
 void IR_RP::computeLiveness()
 {
-    IR_DU_MGR * du_mgr = m_ru->getDUMgr();
-    BBList * bbl = m_ru->getBBList();
+    IR_DU_MGR * du_mgr = m_rg->getDUMgr();
+    BBList * bbl = m_rg->getBBList();
     for (IRBB * bb = bbl->get_head(); bb != NULL; bb = bbl->get_next()) {
         computeLocalLiveness(bb, *du_mgr);
     }
@@ -596,7 +596,7 @@ bool IR_RP::checkExpressionIsLoopInvariant(IN IR * ir, LI<IRBB> const* li)
         DUIter dui = NULL;
         for (INT i = duset->get_first(&dui);
              i >= 0; i = duset->get_next(i, &dui)) {
-            IR const* defstmt = m_ru->getIR(i);
+            IR const* defstmt = m_rg->getIR(i);
             ASSERT0(defstmt->is_stmt());
             IRBB * bb = defstmt->getBB();
 
@@ -839,7 +839,7 @@ void IR_RP::clobberAccessInList(
                     need_to_be_removed2.set(cnt, acc);
                     cnt++;
                 }
-            } else if (acc_mds != NULL && acc_mds->is_overlap(mustdef, m_ru)) {
+            } else if (acc_mds != NULL && acc_mds->is_overlap(mustdef, m_rg)) {
                 //ir is not suite to promot any more, all mds which
                 //overlapped with it are also not promotable.
                 need_to_be_removed2.set(cnt, acc);
@@ -851,7 +851,7 @@ void IR_RP::clobberAccessInList(
              acc != NULL; acc = inexact_access.get_next(iter2)) {
             MD const* acc_md = acc->getRefMD();
             MDSet const* acc_mds = acc->getRefMDSet();
-            if ((acc_md != NULL && maydef->is_overlap(acc_md, m_ru)) ||
+            if ((acc_md != NULL && maydef->is_overlap(acc_md, m_rg)) ||
                 (acc_mds != NULL &&
                  (acc_mds == maydef || maydef->is_intersect(*acc_mds)))) {
                 //ir is not suite to promot any more, all mds which
@@ -1083,14 +1083,14 @@ void IR_RP::replaceUseForTree(IR * oldir, IR * newir)
 {
     ASSERT0(oldir->is_exp() && newir->is_exp());
     if (oldir->is_ld()) {
-        m_du->changeUse(newir, oldir, m_ru->getMiscBitSetMgr());
+        m_du->changeUse(newir, oldir, m_rg->getMiscBitSetMgr());
     } else if (oldir->is_ild()) {
         m_du->removeUseOutFromDefset(ILD_base(oldir));
-        m_du->changeUse(newir, oldir, m_ru->getMiscBitSetMgr());
+        m_du->changeUse(newir, oldir, m_rg->getMiscBitSetMgr());
     } else if (oldir->is_array()) {
         m_du->removeUseOutFromDefset(ARR_base(oldir));
         m_du->removeUseOutFromDefset(ARR_sub_list(oldir));
-        m_du->changeUse(newir, oldir, m_ru->getMiscBitSetMgr());
+        m_du->changeUse(newir, oldir, m_rg->getMiscBitSetMgr());
     } else {
         UNREACHABLE(); //TODO
     }
@@ -1110,8 +1110,8 @@ void IR_RP::handleRestore2Mem(
     ti.clean();
     for (IR * delegate = restore2mem.get_first(ti);
          delegate != NULL; delegate = restore2mem.get_next(ti)) {
-        IR * pr = m_ru->dupIRTree(delegate2pr.get(delegate));
-        m_ru->allocRefForPR(pr);
+        IR * pr = m_rg->dupIRTree(delegate2pr.get(delegate));
+        m_rg->allocRefForPR(pr);
 
         IR * stpr = delegate2stpr.get(delegate);
         if (m_ssamgr != NULL) {
@@ -1127,15 +1127,15 @@ void IR_RP::handleRestore2Mem(
             ASSERTN(delegate->getOffset() == 0, ("TODO: not yet support."));
 
             //Prepare base and subscript expression list.
-            IR * base = m_ru->dupIRTree(ARR_base(delegate));
-            IR * sublist = m_ru->dupIRTree(ARR_sub_list(delegate));
+            IR * base = m_rg->dupIRTree(ARR_base(delegate));
+            IR * sublist = m_rg->dupIRTree(ARR_sub_list(delegate));
 
             //Copy DU chain and MD reference.
             m_du->copyIRTreeDU(base, ARR_base(delegate), true);
             m_du->copyIRTreeDU(sublist, ARR_sub_list(delegate), true);
 
             //Build Store Array operation.
-            stmt = m_ru->buildStoreArray(
+            stmt = m_rg->buildStoreArray(
                 base, sublist, IR_dt(delegate),
                 ARR_elemtype(delegate),
                 ((CArray*)delegate)->getDimNum(),
@@ -1143,30 +1143,30 @@ void IR_RP::handleRestore2Mem(
                 pr);
 
             //Copy MD reference for store array operation.
-            stmt->copyRef(delegate, m_ru);
+            stmt->copyRef(delegate, m_rg);
             break;
         }
         case IR_IST: {
-            IR * lhs = m_ru->dupIRTree(IST_base(delegate));
+            IR * lhs = m_rg->dupIRTree(IST_base(delegate));
             m_du->copyIRTreeDU(lhs, IST_base(delegate), true);
 
-            stmt = m_ru->buildIStore(lhs, pr,
+            stmt = m_rg->buildIStore(lhs, pr,
                 IST_ofst(delegate), IR_dt(delegate));
             break;
         }
         case IR_ST:
-            stmt = m_ru->buildStore(ST_idinfo(delegate),
+            stmt = m_rg->buildStore(ST_idinfo(delegate),
                 IR_dt(delegate), ST_ofst(delegate), pr);
             break;
         case IR_ILD: {
-            IR * base = m_ru->dupIRTree(ILD_base(delegate));
-            stmt = m_ru->buildIStore(base, pr,
+            IR * base = m_rg->dupIRTree(ILD_base(delegate));
+            stmt = m_rg->buildIStore(base, pr,
                 ILD_ofst(delegate), IR_dt(delegate));
             m_du->copyIRTreeDU(base, ILD_base(delegate), true);
             break;
         }
         case IR_LD:
-            stmt = m_ru->buildStore(LD_idinfo(delegate),
+            stmt = m_rg->buildStore(LD_idinfo(delegate),
                                     IR_dt(delegate),
                                     LD_ofst(delegate), pr);
             break;
@@ -1182,7 +1182,7 @@ void IR_RP::handleRestore2Mem(
             m_du->unionDef(set, stmt);
         }
 
-        stmt->copyRef(delegate, m_ru);
+        stmt->copyRef(delegate, m_rg);
 
         SList<IR*> * irlst = delegate2has_outside_uses_ir_list.get(delegate);
         ASSERT0(irlst);
@@ -1240,7 +1240,7 @@ bool IR_RP::promoteExactAccess(
     CHECK_DUMMYUSE(bbset);
     ASSERT0(!bbset->is_empty()); //loop is empty.
 
-    DefMiscBitSetMgr * sbs_mgr = m_ru->getMiscBitSetMgr();
+    DefMiscBitSetMgr * sbs_mgr = m_rg->getMiscBitSetMgr();
 
     TMapIter<MD const*, IR*> mi;
     IR * delegate = NULL;
@@ -1293,7 +1293,7 @@ bool IR_RP::promoteExactAccess(
     //They may be freed.
     //e.g: a[i], if array referrence is freed, the occurrence of variable
     //i also be freed.
-    PromotedTab promoted(m_ru->getMiscBitSetMgr()->getSegMgr());
+    PromotedTab promoted(m_rg->getMiscBitSetMgr()->getSegMgr());
 
     for (IR * ref = exact_occ_list.get_head();
          ref != NULL; ref = exact_occ_list.get_next()) {
@@ -1317,7 +1317,7 @@ bool IR_RP::promoteExactAccess(
         promoted.add(ref, ii);
     }
 
-    ASSERT0(verifyIRandBB(m_ru->getBBList(), m_ru));
+    ASSERT0(verifyIRandBB(m_rg->getBBList(), m_rg));
 
     handleRestore2Mem(restore2mem, delegate2stpr, delegate2pr, delegate2use,
                       delegate2has_outside_uses_ir_list, ti, exit_bb);
@@ -1347,7 +1347,7 @@ bool IR_RP::promoteExactAccess(
             continue;
         }
 
-        m_ru->freeIRTree(ref);
+        m_rg->freeIRTree(ref);
     }
     return true;
 }
@@ -1384,7 +1384,7 @@ bool IR_RP::hasLoopOutsideUse(IR const* stmt, LI<IRBB> const* li)
     DUIter di = NULL;
     for (INT i = useset->get_first(&di);
          i >= 0; i = useset->get_next(i, &di)) {
-        IR const* u = m_ru->getIR(i);
+        IR const* u = m_rg->getIR(i);
         ASSERT0(u->is_exp());
         ASSERT0(u->getStmt());
         IR * s = u->getStmt();
@@ -1419,7 +1419,7 @@ void IR_RP::removeRedundantDUChain(List<IR*> & fixup_list)
                 for (INT i = SSA_uses(STPR_ssainfo(ref)).get_first(&useiter);
                      useiter != NULL;
                      i = SSA_uses(STPR_ssainfo(ref)).get_next(i, &useiter)) {
-                    IR const* use = m_ru->getIR(i);
+                    IR const* use = m_rg->getIR(i);
 
                     ASSERT0(use->is_exp());
                     if (use->is_pr()) {
@@ -1440,7 +1440,7 @@ void IR_RP::removeRedundantDUChain(List<IR*> & fixup_list)
             } else {
                 for (INT i = duset->get_first(&di);
                      i >= 0; i = duset->get_next(i, &di)) {
-                    IR const* use = m_ru->getIR(i);
+                    IR const* use = m_rg->getIR(i);
                     ASSERT0(use->is_exp());
                     if (use->is_pr()) {
                         if (PR_no(use) == prno) { continue; }
@@ -1474,7 +1474,7 @@ void IR_RP::removeRedundantDUChain(List<IR*> & fixup_list)
             } else {
                 for (INT i = duset->get_first(&di);
                      i >= 0; i = duset->get_next(i, &di)) {
-                    IR const* d = m_ru->getIR(i);
+                    IR const* d = m_rg->getIR(i);
                     ASSERT0(d->is_stmt());
 
                     if ((d->isWritePR() || d->isCallHasRetVal()) &&
@@ -1541,11 +1541,11 @@ void IR_RP::handleAccessInBody(
             }
 
             //Substitute STPR(ARRAY) for STARRAY.
-            IR * stpr = m_ru->buildStorePR(PR_no(delegate_pr),
+            IR * stpr = m_rg->buildStorePR(PR_no(delegate_pr),
                                            IR_dt(delegate_pr),
                                            STARR_rhs(ref));
 
-            m_ru->allocRefForPR(stpr);
+            m_rg->allocRefForPR(stpr);
 
             //New IR has same VN with original one.
             m_gvn->setMapIR2VN(stpr, m_gvn->mapIR2VN(ref));
@@ -1561,7 +1561,7 @@ void IR_RP::handleAccessInBody(
             m_du->removeUseOutFromDefset(ref);
 
             //Change DU chain.
-            m_du->changeDef(stpr, ref, m_ru->getMiscBitSetMgr());
+            m_du->changeDef(stpr, ref, m_rg->getMiscBitSetMgr());
             fixup_list.append_tail(stpr);
 
             STARR_rhs(ref) = NULL;
@@ -1576,7 +1576,7 @@ void IR_RP::handleAccessInBody(
             BB_irlist(refbb).remove(ct);
 
             //Do not free stmt here since it will be freed later.
-            //m_ru->freeIRTree(ref);
+            //m_rg->freeIRTree(ref);
         }
         break;
     case IR_IST:
@@ -1598,10 +1598,10 @@ void IR_RP::handleAccessInBody(
             //Substitute STPR(exp) for IST(exp) or
             //substitute STPR(exp) for ST(exp).
 
-            IR * stpr = m_ru->buildStorePR(PR_no(delegate_pr),
+            IR * stpr = m_rg->buildStorePR(PR_no(delegate_pr),
                                            IR_dt(delegate_pr),
                                            ref->getRHS());
-            m_ru->allocRefForPR(stpr);
+            m_rg->allocRefForPR(stpr);
 
             //New IR has same VN with original one.
             m_gvn->setMapIR2VN(stpr, m_gvn->mapIR2VN(stmt));
@@ -1619,7 +1619,7 @@ void IR_RP::handleAccessInBody(
             }
 
             //Change DU chain.
-            m_du->changeDef(stpr, ref, m_ru->getMiscBitSetMgr());
+            m_du->changeDef(stpr, ref, m_rg->getMiscBitSetMgr());
             fixup_list.append_tail(stpr);
 
             ref->setRHS(NULL);
@@ -1639,8 +1639,8 @@ void IR_RP::handleAccessInBody(
     default:
         {
             ASSERT0(ref->is_ild() || ref->is_ld() || ref->is_array());
-            IR * pr = m_ru->dupIR(delegate_pr);
-            m_ru->allocRefForPR(pr);
+            IR * pr = m_rg->dupIR(delegate_pr);
+            m_rg->allocRefForPR(pr);
 
             //New IR has same VN with original one.
             m_gvn->setMapIR2VN(pr, m_gvn->mapIR2VN(ref));
@@ -1683,15 +1683,15 @@ void IR_RP::handlePrelog(
     IR * stpr = NULL;
     if (delegate->is_array()) {
         //Load array value into PR.
-        rhs = m_ru->dupIRTree(delegate);
+        rhs = m_rg->dupIRTree(delegate);
         m_du->copyIRTreeDU(ARR_base(rhs), ARR_base(delegate), true);
         m_du->copyIRTreeDU(ARR_sub_list(rhs),
                                 ARR_sub_list(delegate), true);
-        stpr = m_ru->buildStorePR(PR_no(pr), IR_dt(pr), rhs);
+        stpr = m_rg->buildStorePR(PR_no(pr), IR_dt(pr), rhs);
     } else if (delegate->is_starray()) {
         //Load array value into PR.
-        rhs = m_ru->buildArray(m_ru->dupIRTree(ARR_base(delegate)),
-            m_ru->dupIRTree(ARR_sub_list(delegate)),
+        rhs = m_rg->buildArray(m_rg->dupIRTree(ARR_base(delegate)),
+            m_rg->dupIRTree(ARR_sub_list(delegate)),
             IR_dt(delegate),
             ARR_elemtype(delegate),
             ((CArray*)delegate)->getDimNum(),
@@ -1701,36 +1701,36 @@ void IR_RP::handlePrelog(
 
         m_du->copyIRTreeDU(ARR_sub_list(rhs), ARR_sub_list(delegate), true);
 
-        stpr = m_ru->buildStorePR(PR_no(pr), IR_dt(pr), rhs);
+        stpr = m_rg->buildStorePR(PR_no(pr), IR_dt(pr), rhs);
     } else if (delegate->is_ist()) {
         //Load indirect value into PR.
-        rhs = m_ru->buildILoad(m_ru->dupIRTree(IST_base(delegate)),
+        rhs = m_rg->buildILoad(m_rg->dupIRTree(IST_base(delegate)),
             IST_ofst(delegate), IR_dt(delegate));
         m_du->copyIRTreeDU(ILD_base(rhs), IST_base(delegate), true);
 
-        stpr = m_ru->buildStorePR(PR_no(pr), IR_dt(pr), rhs);
+        stpr = m_rg->buildStorePR(PR_no(pr), IR_dt(pr), rhs);
     } else if (delegate->is_ild()) {
         //Load indirect value into PR.
-        rhs = m_ru->dupIRTree(delegate);
+        rhs = m_rg->dupIRTree(delegate);
         m_du->copyIRTreeDU(ILD_base(rhs), ILD_base(delegate), true);
-        stpr = m_ru->buildStorePR(PR_no(pr), IR_dt(pr), rhs);
+        stpr = m_rg->buildStorePR(PR_no(pr), IR_dt(pr), rhs);
     } else if (delegate->is_ld()) {
         //Load scalar into PR.
-        rhs = m_ru->dupIRTree(delegate);
+        rhs = m_rg->dupIRTree(delegate);
         m_du->copyIRTreeDU(rhs, delegate, false);
-        stpr = m_ru->buildStorePR(PR_no(pr), IR_dt(pr), rhs);
+        stpr = m_rg->buildStorePR(PR_no(pr), IR_dt(pr), rhs);
     } else if (delegate->is_st()) {
         //Load scalar into PR.
-        rhs = m_ru->buildLoad(ST_idinfo(delegate));
+        rhs = m_rg->buildLoad(ST_idinfo(delegate));
         LD_ofst(rhs) = ST_ofst(delegate);
-        stpr = m_ru->buildStorePR(PR_no(pr), IR_dt(pr), rhs);
+        stpr = m_rg->buildStorePR(PR_no(pr), IR_dt(pr), rhs);
     } else {
         UNREACHABLE(); //unsupport.
     }
 
     ASSERT0(rhs && stpr);
 
-    rhs->copyRef(delegate, m_ru);
+    rhs->copyRef(delegate, m_rg);
 
     //Build DU chain if there exist outer loop reach-def.
     DUSet const* set = delegate2def.get(delegate);
@@ -1739,7 +1739,7 @@ void IR_RP::handlePrelog(
         m_du->unionUse(set, rhs);
     }
 
-    m_ru->allocRefForPR(stpr);
+    m_rg->allocRefForPR(stpr);
 
     ASSERT0(delegate2stpr.get(pr) == NULL);
     delegate2stpr.set(delegate, stpr);
@@ -1771,7 +1771,7 @@ void IR_RP::computeOuterDefUse(
             DUIter di = NULL;
             for (INT i = refduset->get_first(&di);
                  i >= 0; i = refduset->get_next(i, &di)) {
-                IR const* d = m_ru->getIR(i);
+                IR const* d = m_rg->getIR(i);
                 ASSERT0(d->is_stmt());
                 if (!li->isInsideLoop(BB_id(d->getBB()))) {
                     defset->bunion(i, *sbs_mgr);
@@ -1792,7 +1792,7 @@ void IR_RP::computeOuterDefUse(
             DUIter di = NULL;
             for (INT i = refduset->get_first(&di);
                  i >= 0; i = refduset->get_next(i, &di)) {
-                IR const* u = m_ru->getIR(i);
+                IR const* u = m_rg->getIR(i);
                 ASSERT0(u->is_exp());
                 if (!li->isInsideLoop(BB_id(u->getStmt()->getBB()))) {
                     set->bunion(i, *sbs_mgr);
@@ -1815,7 +1815,7 @@ void IR_RP::createDelegateInfo(
     //Ref is the delegate of all the semantic equivalent expressions.
     IR * pr = delegate2pr.get(delegate);
     if (pr == NULL) {
-        pr = m_ru->buildPR(IR_dt(delegate));
+        pr = m_rg->buildPR(IR_dt(delegate));
         delegate2pr.set(delegate, pr);
     }
 }
@@ -1860,7 +1860,7 @@ bool IR_RP::promoteInexactAccess(
     CHECK_DUMMYUSE(bbset);
     ASSERT0(!bbset->is_empty()); //loop is empty.
 
-    DefMiscBitSetMgr * sbs_mgr = m_ru->getMiscBitSetMgr();
+    DefMiscBitSetMgr * sbs_mgr = m_rg->getMiscBitSetMgr();
 
     //Prepare delegate table and related information.
     for (IR * ref = inexact_access.get_first(ti);
@@ -1920,7 +1920,7 @@ bool IR_RP::promoteInexactAccess(
                            restore2mem, fixup_list, delegate2stpr, li, ii);
     }
 
-    ASSERT0(verifyIRandBB(m_ru->getBBList(), m_ru));
+    ASSERT0(verifyIRandBB(m_rg->getBBList(), m_rg));
 
     handleRestore2Mem(restore2mem, delegate2stpr, delegate2pr, delegate2use,
                       delegate2has_outside_uses_ir_list, ti, exit_bb);
@@ -1936,7 +1936,7 @@ bool IR_RP::promoteInexactAccess(
             //If delegate does not exist, the reference still in its place.
             continue;
         }
-        m_ru->freeIRTree(ref);
+        m_rg->freeIRTree(ref);
     }
 
     freeLocalStruct(delegate2use, delegate2def, delegate2pr, sbs_mgr);
@@ -1971,7 +1971,7 @@ void IR_RP::freeLocalStruct(
     IR * pr;
     for (IR * x = delegate2pr.get_first(map_iter, &pr);
          x != NULL; x = delegate2pr.get_next(map_iter, &pr)) {
-        m_ru->freeIRTree(pr);
+        m_rg->freeIRTree(pr);
     }
 }
 
@@ -2077,11 +2077,11 @@ bool IR_RP::tryPromote(
     IRBB * preheader = NULL;
     if (exact_access.get_elem_count() != 0 ||
         inexact_access.get_elem_count() != 0) {
-        preheader = ::findAndInsertPreheader(li, m_ru, m_is_insert_bb, false);
+        preheader = ::findAndInsertPreheader(li, m_rg, m_is_insert_bb, false);
         ASSERT0(preheader);
         IR const* last = BB_last_ir(preheader);
         if (last != NULL && last->isCallStmt()) {
-            preheader = ::findAndInsertPreheader(li, m_ru,
+            preheader = ::findAndInsertPreheader(li, m_rg,
                                                 m_is_insert_bb, true);
             ASSERT0(preheader);
             ASSERT0(BB_last_ir(preheader) == NULL);
@@ -2147,7 +2147,7 @@ bool IR_RP::EvaluableScalarReplacement(List<LI<IRBB> const*> & worklst)
 bool IR_RP::perform(OptCtx & oc)
 {
     START_TIMER(t, getPassName());
-    m_ru->checkValidAndRecompute(&oc, PASS_DU_CHAIN, PASS_LOOP_INFO,
+    m_rg->checkValidAndRecompute(&oc, PASS_DU_CHAIN, PASS_LOOP_INFO,
                                  PASS_DU_REF, PASS_UNDEF);
 
     if (!OC_is_du_chain_valid(oc)) {
@@ -2158,7 +2158,7 @@ bool IR_RP::perform(OptCtx & oc)
     //computeLiveness();
     m_ssamgr = NULL;
     PRSSAMgr * ssamgr =
-            (PRSSAMgr*)(m_ru->getPassMgr()->queryPass(PASS_PR_SSA_MGR));
+            (PRSSAMgr*)(m_rg->getPassMgr()->queryPass(PASS_PR_SSA_MGR));
     if (ssamgr != NULL && ssamgr->isSSAConstructed()) {
         m_ssamgr = ssamgr;
     }
@@ -2190,7 +2190,7 @@ bool IR_RP::perform(OptCtx & oc)
     change = EvaluableScalarReplacement(worklst);
     if (change) {
         //DU reference and du chain has maintained.
-        ASSERT0(m_ru->verifyMDRef());
+        ASSERT0(m_rg->verifyMDRef());
         ASSERT0(m_du->verifyMDDUChain(COMPUTE_PR_DU | COMPUTE_NONPR_DU));
 
         OC_is_reach_def_valid(oc) = false;
