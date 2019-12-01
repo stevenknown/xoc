@@ -77,7 +77,7 @@ int main()
          src != 0; src = mymap.get_next(iter, &tgt)) {
         sum += tgt;
     }
-    
+
     int x2 = 1;
     for (; mymap.get_elem_count() != 0;) {
         int v = x2++;

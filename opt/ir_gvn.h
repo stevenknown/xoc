@@ -35,6 +35,11 @@ author: Su Zhenyu
 #define _IR_GVN_H_
 
 namespace xoc {
+class VN;
+typedef Vector<VN*> VEC1;
+typedef Vector<VEC1*> VEC2;
+typedef Vector<VEC2*> VEC3;
+typedef Vector<VEC3*> VEC4;
 
 typedef enum _VN_TYPE {
     VN_UNKNOWN = 0,
@@ -476,7 +481,7 @@ protected:
     VN * m_mc_zero_vn;
     UINT m_vn_count;
     IR2VN m_ir2vn;
-    Vector<Vector<Vector<VN*>*>*> m_irt_vec;
+    VEC3 m_irt_vec;
     SMemPool * m_pool;
     LONGLONG2VN_MAP m_ll2vn;
     LONGLONGMC2VN_MAP m_llmc2vn;
@@ -511,21 +516,18 @@ protected:
     VN * allocLiveinVN(IR const* exp, MD const* emd, bool & change);
 
     void clean();
-    VN * computeScalarByAnonDomDef(
-            IR const* ild,
-            IR const* domdef,
-            bool & change);
-    VN * computeILoadByAnonDomDef(
-            IR const* ild,
-            VN const* mlvn,
-            IR const* domdef,
-            bool & change);
-    VN * computeArrayByAnonDomDef(
-            IR const* arr,
-            VN const* basevn,
-            VN const* ofstvn,
-            IR const* domdef,
-            bool & change);
+    VN * computeScalarByAnonDomDef(IR const* ild,
+                                   IR const* domdef,
+                                   bool & change);
+    VN * computeILoadByAnonDomDef(IR const* ild,
+                                  VN const* mlvn,
+                                  IR const* domdef,
+                                  bool & change);
+    VN * computeArrayByAnonDomDef(IR const* arr,
+                                  VN const* basevn,
+                                  VN const* ofstvn,
+                                  IR const* domdef,
+                                  bool & change);
     IR const* computeDomDef(IR const* exp, IR const* exp_stmt, SList<IR*> * defs);
     void computeArrayAddrRef(IR const* ir, bool & change);
     VN * computeArray(IR const* exp, bool & change);
@@ -543,17 +545,15 @@ protected:
         return p;
     }
 
-    VN * registerQuadVN(
-            IR_TYPE irt,
-            VN const* v0,
-            VN const* v1,
-            VN const* v2,
-            VN const* v3);
-    VN * registerTripleVN(
-            IR_TYPE irt,
-            VN const* v0,
-            VN const* v1,
-            VN const* v2);
+    VN * registerQuadVN(IR_TYPE irt,
+                        VN const* v0,
+                        VN const* v1,
+                        VN const* v2,
+                        VN const* v3);
+    VN * registerTripleVN(IR_TYPE irt,
+                          VN const* v0,
+                          VN const* v1,
+                          VN const* v2);
     VN * registerBinVN(IR_TYPE irt, VN const* v0, VN const* v1);
     VN * registerUnaVN(IR_TYPE irt, VN const* v0);
     VN * registerVNviaMD(MD const* md);

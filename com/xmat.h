@@ -73,6 +73,7 @@ public:
     void ds(RMat const& c);
     void copy(RMat const& r);
     void copy(INTMat const& r);
+    void clean() { zero(); }
     UINT comden(UINT row, UINT col); //Common denominator
     void substit(RMat const& exp,
                  UINT v,
@@ -105,18 +106,24 @@ public:
     INTMat(INT v);
     INTMat(UINT row, UINT col);
     ~INTMat();
-    void init();
-    void destroy();
-    bool is_init() const { return m_is_init; }
-
-    //Set entry value one by one, 'num' indicate entry number.
-    void sete(UINT num,...);
+    //Find convex hull of a set of points.
+    void cvexhull(OUT INTMat &hull);
+    INTMat & operator = (INTMat const& m);
+    void copy(RMat const& r);
+    void clean() { fzero(); }
 
     //Invering of Integer Matrix will be transformed
     //to Rational Matrix, and one exception will be thrown
     //if there are some element's denomiator is not '1'.
     bool inv(OUT INTMat &e) const;
+    void init();
+    bool is_init() const { return m_is_init; }
+
+    void destroy();
     INT det() const;
+
+    //Set entry value one by one, 'num' indicate entry number.
+    void sete(UINT num,...);
 
     //Generate unimodular matrix to eliminate element.
     void genElimMat(UINT row, UINT col, OUT INTMat &elim);
@@ -126,11 +133,7 @@ public:
 
     //Reduce matrix by GCD operation.
     void gcd();
-
-    //Find convex hull of a set of points.
-    void cvexhull(OUT INTMat &hull);
-    INTMat & operator = (INTMat const& m);
-    void copy(RMat const& r);
+    
     void dumpf(CHAR const* name = MATRIX_DUMP_FILE_NAME,
                bool is_del = false) const;
     void dumps() const;

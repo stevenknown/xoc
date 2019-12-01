@@ -12,7 +12,7 @@ test_list.cpp:
     command line:
       >g++ test_list.cpp -DRUN_STL; time ./a.out
       >g++ test_list.cpp; time ./a.out
- 
+
 test_map.cpp:
     Evaluate the runtime performance of map structure.
     command line:

@@ -38,6 +38,7 @@ opt/ir_high_opt.o\
 opt/ir_expr_tab.o\
 opt/cdg.o\
 opt/ir_refine.o\
+opt/refine_duchain.o\
 opt/ir_rp.o\
 opt/ir_aa.o\
 opt/ir_ssa.o\

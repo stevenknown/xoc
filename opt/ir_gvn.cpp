@@ -42,11 +42,6 @@ namespace xoc {
 //
 //START IR_GVN
 //
-typedef Vector<Vector<Vector<Vector<VN*>*>*>*> VEC4;
-typedef Vector<Vector<Vector<VN*>*>*> VEC3;
-typedef Vector<Vector<VN*>*> VEC2;
-typedef Vector<VN*> VEC1;
-
 IR_GVN::IR_GVN(Region * rg)
 {
     ASSERT0(rg != NULL);
@@ -69,14 +64,14 @@ IR_GVN::IR_GVN(Region * rg)
     for (IRBB * bb = bbl->get_head(); bb != NULL; bb = bbl->get_next()) {
         n += bb->getNumOfIR();
     }
-    m_stmt2domdef.init(MAX(4, getNearestPowerOf2(n/2)));
+    m_stmt2domdef.init(MAX(4, xcom::getNearestPowerOf2(n/2)));
     m_pool = smpoolCreate(sizeof(VN) * 4, MEM_COMM);
 }
 
 
 IR_GVN::~IR_GVN()
 {
-    for (Vector<VN*> * v = m_vec_lst.get_head();
+    for (VEC1 * v = m_vec_lst.get_head();
          v != NULL; v = m_vec_lst.get_next()) {
         delete v;
     }
@@ -108,7 +103,7 @@ void IR_GVN::clean()
         }
     }
     m_ir2vn.clean();
-    for (Vector<VN*> * v = m_vnvec_lst.get_head();
+    for (VEC1 * v = m_vnvec_lst.get_head();
          v != NULL; v = m_vnvec_lst.get_next()) {
         v->clean();
     }
@@ -126,16 +121,16 @@ bool IR_GVN::verify()
 {
     for (INT i = 0; i <= m_irt_vec.get_last_idx(); i++) {
         if (isBinaryOp((IR_TYPE)i) || i == IR_LDA) {
-            Vector<Vector<VN*>*> * v0_vec = m_irt_vec.get(i);
+            VEC2 * v0_vec = m_irt_vec.get(i);
             if (v0_vec == NULL) { continue; }
             for (INT j = 0; j <= v0_vec->get_last_idx(); j++) {
-                Vector<VN*> * v1_vec = v0_vec->get(j);
+                VEC1 * v1_vec = v0_vec->get(j);
                 if (v1_vec == NULL) { continue; }
                 //v1_vec->clean();
             }
         } else if (i == IR_BNOT || i == IR_LNOT ||
                    i == IR_NEG || i == IR_CVT) {
-            Vector<VN*> * v0_vec = (Vector<VN*>*)m_irt_vec.get(i);
+            VEC1 * v0_vec = (VEC1*)m_irt_vec.get(i);
             if (v0_vec == NULL) { continue; }
             //v0_vec->clean();
         } else if (is_triple((IR_TYPE)i)) {
@@ -269,12 +264,12 @@ VN * IR_GVN::registerVNviaFP(double v)
 
 VN * IR_GVN::registerUnaVN(IR_TYPE irt, VN const* v0)
 {
-    Vector<VN*> * v1_vec = (Vector<VN*>*)m_irt_vec.get(irt);
+    VEC1 * v1_vec = (VEC1*)m_irt_vec.get(irt);
     if (v1_vec == NULL) {
-        v1_vec = new Vector<VN*>();
+        v1_vec = new VEC1();
         m_vec_lst.append_tail(v1_vec);
         m_vnvec_lst.append_tail(v1_vec);
-        m_irt_vec.set(irt, (Vector<Vector<VN*>*>*)v1_vec);
+        m_irt_vec.set(irt, (VEC2*)v1_vec);
     }
     VN * res = v1_vec->get(VN_id(v0));
     if (res == NULL) {
@@ -300,14 +295,14 @@ VN * IR_GVN::registerBinVN(IR_TYPE irt, VN const* v0, VN const* v1)
     VEC2 * v0_vec = m_irt_vec.get(irt);
     if (v0_vec == NULL) {
         v0_vec = new VEC2();
-        m_vec_lst.append_tail((Vector<VN*>*)v0_vec);
+        m_vec_lst.append_tail((VEC1*)v0_vec);
         m_irt_vec.set(irt, v0_vec);
     }
 
     VEC1 * v1_vec = v0_vec->get(VN_id(v0));
     if (v1_vec == NULL) {
         v1_vec = new VEC1();
-        m_vec_lst.append_tail((Vector<VN*>*)v1_vec);
+        m_vec_lst.append_tail((VEC1*)v1_vec);
         m_vnvec_lst.append_tail(v1_vec);
         v0_vec->set(VN_id(v0), v1_vec);
     }
@@ -323,11 +318,10 @@ VN * IR_GVN::registerBinVN(IR_TYPE irt, VN const* v0, VN const* v1)
 }
 
 
-VN * IR_GVN::registerTripleVN(
-        IR_TYPE irt,
-        VN const* v0,
-        VN const* v1,
-        VN const* v2)
+VN * IR_GVN::registerTripleVN(IR_TYPE irt,
+                              VN const* v0,
+                              VN const* v1,
+                              VN const* v2)
 {
     ASSERT0(v0 && v1 && v2);
     ASSERT0(is_triple(irt));
@@ -364,12 +358,11 @@ VN * IR_GVN::registerTripleVN(
 }
 
 
-VN * IR_GVN::registerQuadVN(
-        IR_TYPE irt,
-        VN const* v0,
-        VN const* v1,
-        VN const* v2,
-        VN const* v3)
+VN * IR_GVN::registerQuadVN(IR_TYPE irt,
+                            VN const* v0,
+                            VN const* v1,
+                            VN const* v2,
+                            VN const* v3)
 {
     ASSERT0(v0 && v1 && v2 && v3);
     ASSERT0(is_quad(irt));
@@ -522,11 +515,10 @@ VN * IR_GVN::computeExactMemory(IR const* exp, bool & change)
 
 
 //Compute VN for ild according to anonymous domdef.
-VN * IR_GVN::computeILoadByAnonDomDef(
-        IR const* ild,
-        VN const* mlvn,
-        IR const* domdef,
-        bool & change)
+VN * IR_GVN::computeILoadByAnonDomDef(IR const* ild,
+                                      VN const* mlvn,
+                                      IR const* domdef,
+                                      bool & change)
 {
     ASSERT0(ild->is_ild() && m_du->is_may_def(domdef, ild, false));
     ILD_VNE2VN * vnexp_map = m_def2ildtab.get(domdef);
@@ -634,12 +626,11 @@ void IR_GVN::computeArrayAddrRef(IR const* ir, bool & change)
 
 
 //Compute VN for array according to anonymous domdef.
-VN * IR_GVN::computeArrayByAnonDomDef(
-        IR const* arr,
-        VN const* basevn,
-        VN const* ofstvn,
-        IR const* domdef,
-        bool & change)
+VN * IR_GVN::computeArrayByAnonDomDef(IR const* arr,
+                                      VN const* basevn,
+                                      VN const* ofstvn,
+                                      IR const* domdef,
+                                      bool & change)
 {
     ASSERT0(arr->is_array() && m_du->is_may_def(domdef, arr, false));
     ARR_VNE2VN * vnexp_map = m_def2arrtab.get(domdef);
@@ -753,10 +744,9 @@ VN * IR_GVN::computeArray(IR const* exp, bool & change)
 }
 
 
-VN * IR_GVN::computeScalarByAnonDomDef(
-        IR const* exp,
-        IR const* domdef,
-        bool & change)
+VN * IR_GVN::computeScalarByAnonDomDef(IR const* exp,
+                                       IR const* domdef,
+                                       bool & change)
 {
     ASSERT0((exp->is_ld() || exp->is_pr()) &&
             m_du->is_may_def(domdef, exp, false));
