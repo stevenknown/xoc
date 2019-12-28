@@ -84,7 +84,9 @@ void DfMgr::dump(xcom::DGraph & g)
 
 
 //This function compute dominance frontier to graph g.
-void DfMgr::buildRecur(xcom::Vertex const* v, xcom::DGraph const& g, DomTree const& domtree)
+void DfMgr::buildRecur(xcom::Vertex const* v,
+                       xcom::DGraph const& g,
+                       DomTree const& domtree)
 {
     UINT vid = VERTEX_id(v);
     xcom::Vertex * v_domtree = domtree.get_vertex(vid);
@@ -463,7 +465,7 @@ void PRSSAMgr::dump()
 {
     if (g_tfile == NULL) { return; }
     note("\n==---- DUMP Result of PRSSAMgr '%s' ----==\n",
-        m_rg->getRegionName());
+         m_rg->getRegionName());
 
     BBList * bbl = m_rg->getBBList();
     List<IR const*> lst;
@@ -568,7 +570,8 @@ void PRSSAMgr::insertPhi(UINT prno, IN IRBB * bb)
 
     m_rg->allocRefForPR(phi);
 
-    for (IR * opnd = PHI_opnd_list(phi); opnd != NULL; opnd = opnd->get_next()) {
+    for (IR * opnd = PHI_opnd_list(phi);
+         opnd != NULL; opnd = opnd->get_next()) {
         opnd->copyRef(phi, m_rg);
     }
 
@@ -813,10 +816,9 @@ Stack<VP*> * PRSSAMgr::mapPRNO2VPStack(UINT prno)
 }
 
 
-void PRSSAMgr::handleBBRename(
-        IRBB * bb,
-        DefSBitSet const& defined_prs,
-        IN OUT BB2VPMap & bb2vp)
+void PRSSAMgr::handleBBRename(IRBB * bb,
+                              DefSBitSet const& defined_prs,
+                              IN OUT BB2VPMap & bb2vp)
 {
     ASSERT0(bb2vp.get(BB_id(bb)) == NULL);
     TMap<UINT, VP*> * prno2vp = new TMap<UINT, VP*>();
@@ -905,10 +907,9 @@ void PRSSAMgr::handleBBRename(
 
 //Linear renaming algorithm.
 //defined_prs_vec: for each BB, indicate PRs which has been defined.
-void PRSSAMgr::renameInDomTreeOrder(
-        IRBB * root,
-        xcom::Graph const& domtree,
-        Vector<DefSBitSet*> const& defined_prs_vec)
+void PRSSAMgr::renameInDomTreeOrder(IRBB * root,
+                                    xcom::Graph const& domtree,
+                                    Vector<DefSBitSet*> const& defined_prs_vec)
 {
     Stack<IRBB*> stk;
     UINT n = m_rg->getBBList()->get_elem_count();
@@ -976,14 +977,13 @@ void PRSSAMgr::renameInDomTreeOrder(
 
 
 //Rename variables.
-void PRSSAMgr::rename(
-        DefSBitSet const& effect_prs,
-        Vector<DefSBitSet*> const& defined_prs_vec,
-        xcom::Graph const& domtree)
+void PRSSAMgr::rename(DefSBitSet const& effect_prs,
+                      Vector<DefSBitSet*> const& defined_prs_vec,
+                      xcom::Graph const& domtree)
 {
     START_TIMER(t, "PRSSA: Rename");
     if (m_rg->getBBList()->get_elem_count() == 0) { return; }
-    SEGIter * cur = NULL;
+    xcom::SEGIter * cur = NULL;
     for (INT prno = effect_prs.get_first(&cur);
          prno >= 0; prno = effect_prs.get_next(prno, &cur)) {
         VP * vp = allocVP(prno, 0);
@@ -1183,7 +1183,7 @@ bool PRSSAMgr::verifyPhi(bool is_vpinfo_avail)
             //Check phi result.
             VP * resvp = (VP*)PHI_ssainfo(ir);
             ASSERTN(!is_vpinfo_avail || VP_prno(resvp) == PHI_prno(ir),
-                   ("prno unmatch"));
+                    ("prno unmatch"));
 
             //Check the number of phi opnds.
             UINT num_opnd = 0;
@@ -1192,8 +1192,8 @@ bool PRSSAMgr::verifyPhi(bool is_vpinfo_avail)
                  opnd != NULL; opnd = opnd->get_next()) {
                 //Opnd may be PR, CONST or LDA.
                 ASSERTN(!is_vpinfo_avail ||
-                       VP_prno((VP*)PR_ssainfo(opnd)) == PR_no(opnd),
-                       ("prno of VP is unmatched"));
+                        VP_prno((VP*)PR_ssainfo(opnd)) == PR_no(opnd),
+                        ("prno of VP is unmatched"));
 
                 //Ver0 is input parameter, and it has no SSA_def.
                 //ASSERT0(VP_ver(PR_ssainfo(opnd)) > 0);
@@ -1202,8 +1202,8 @@ bool PRSSAMgr::verifyPhi(bool is_vpinfo_avail)
             }
 
             ASSERTN(num_opnd == preds.get_elem_count(),
-                  ("The number of phi operand must same with "
-                   "the number of BB predecessors."));
+                   ("The number of phi operand must same with "
+                    "the number of BB predecessors."));
 
             //Check SSA uses.
             SSAUseIter vit = NULL;
@@ -1259,7 +1259,8 @@ bool PRSSAMgr::verifyVP()
         ASSERT0(v != NULL);
         IR * def = SSA_def(v);
         if (def == NULL) {
-            //ver0 used to indicate the Region live-in PR. It may be a parameter.
+            //ver0 used to indicate the Region live-in PR.
+            //It may be a parameter.
             ASSERTN(VP_ver(v) == 0, ("Nondef vp's version must be 0"));
         } else {
             ASSERTN(VP_ver(v) != 0, ("version can not be 0"));
@@ -1281,7 +1282,7 @@ bool PRSSAMgr::verifyVP()
         }
 
         SSAUseIter vit = NULL;
-        UINT opndprno = 0;
+        UINT opndprno = PRNO_UNDEF;
         for (INT i2 = SSA_uses(v).get_first(&vit);
              vit != NULL; i2 = SSA_uses(v).get_next(i2, &vit)) {
             IR * use = m_rg->getIR(i2);
@@ -1289,7 +1290,7 @@ bool PRSSAMgr::verifyVP()
             ASSERT0(use->is_pr() || use->is_const());
 
             if (use->is_pr()) {
-                if (opndprno == 0) {
+                if (opndprno == PRNO_UNDEF) {
                     opndprno = PR_no(use);
                 } else {
                     //All opnd should have same PR no.
@@ -1301,7 +1302,7 @@ bool PRSSAMgr::verifyVP()
             }
         }
 
-        if (opndprno != 0 && defprno != 0) {
+        if (opndprno != PRNO_UNDEF && defprno != PRNO_UNDEF) {
             //Def should have same PR no with USE.
             ASSERT0(opndprno == defprno);
         }
@@ -1326,7 +1327,7 @@ static void verify_ssainfo_core(IR * ir, xcom::BitSet & defset, Region * rg)
     }
 
     IR const* respr = NULL;
-    UINT defprno = 0;
+    UINT defprno = PRNO_UNDEF;
     if (def != NULL) {
         ASSERT0(def->is_stmt());
         respr = def->getResultPR();
@@ -1345,7 +1346,7 @@ static void verify_ssainfo_core(IR * ir, xcom::BitSet & defset, Region * rg)
         ASSERT0(use->is_pr() || use->is_const() || use->is_lda());
 
         if (use->is_pr()) {
-            if (opndprno == 0) {
+            if (opndprno == PRNO_UNDEF) {
                 opndprno = PR_no(use);
             } else {
                 //All opnd should have same PR no.
@@ -1357,7 +1358,7 @@ static void verify_ssainfo_core(IR * ir, xcom::BitSet & defset, Region * rg)
         }
     }
 
-    if (opndprno != 0 && defprno != 0) {
+    if (opndprno != PRNO_UNDEF && defprno != PRNO_UNDEF) {
         //Def should have same PR no with USE.
         ASSERT0(opndprno == defprno);
     }
@@ -1424,24 +1425,21 @@ void PRSSAMgr::destruction(OptCtx * oc)
 void PRSSAMgr::cleanPRSSAInfo()
 {
     BBList * bblst = m_rg->getBBList();
-    xcom::C<IRBB*> * bbct;
+    xcom::C<IRBB*> * bbct = NULL;
     for (bblst->get_head(&bbct);
          bbct != bblst->end(); bbct = bblst->get_next(bbct)) {
         IRBB * bb = bbct->val();
         ASSERT0(bb);
 
-        xcom::C<IR*> * irct;
+        xcom::C<IR*> * irct = NULL;
         for (BB_irlist(bb).get_head(&irct);
-             irct != BB_irlist(bb).end();
-             irct = BB_irlist(bb).get_next(irct)) {
+             irct != BB_irlist(bb).end(); irct = BB_irlist(bb).get_next(irct)) {
             IR * ir = irct->val();
             ASSERT0(ir);
-
             m_iter.clean();
             for (IR * x = iterInit(ir, m_iter);
                  x != NULL; x = iterNext(m_iter)) {
                 ASSERTN(!x->is_phi(), ("phi should have been striped."));
-
                 if (x->isReadPR() ||
                     x->isWritePR() ||
                     x->isCallHasRetVal()) {
@@ -1479,7 +1477,7 @@ void PRSSAMgr::refinePhi(List<IRBB*> & wl)
     START_TIMER(t, "PRSSA: Refine phi");
 
     BBList * bblst = m_rg->getBBList();
-    xcom::C<IRBB*> * ct;
+    xcom::C<IRBB*> * ct = NULL;
 
     wl.clean();
     //Estimate memory usage.
@@ -1503,80 +1501,74 @@ void PRSSAMgr::refinePhi(List<IRBB*> & wl)
             if (!ir->is_phi()) { break; }
 
             IR * common_def = NULL;
-            if (isRedundantPHI(ir, &common_def)) {
-                for (IR const* opnd = PHI_opnd_list(ir);
-                     opnd != NULL; opnd = opnd->get_next()) {
-                    ASSERT0(opnd->is_phi_opnd());
-
-                    if (!opnd->is_pr()) { continue; }
-
-                    SSAInfo * si = PR_ssainfo(opnd);
-                    ASSERTN(si, ("Miss SSAInfo."));
-
-                    SSA_uses(si).remove(opnd);
-
-                    if (SSA_def(si) == NULL || !SSA_def(si)->is_phi()) {
-                        continue;
-                    }
-
-                    IRBB * defbb = SSA_def(si)->getBB();
-                    ASSERTN(defbb, ("defbb does not belong to any BB"));
-                    wl.append_tail(defbb);
-                    if (!in_list.is_contain(defbb->id())) {
-                        wl.append_tail(defbb);
-                        in_list.bunion(defbb->id());
-                    }
-                }
-
-                SSAInfo * curphi_ssainfo = PHI_ssainfo(ir);
-                ASSERT0(curphi_ssainfo);
-                ASSERT0(SSA_def(curphi_ssainfo) == ir);
-
-                if (common_def != NULL && ir != common_def) {
-                    //All operands of PHI are defined by same alternative stmt,
-                    //just call it common_def. Replace the SSA_def of
-                    //current SSAInfo to the common_def.
-
-                    ASSERT0(common_def->getResultPR(PHI_prno(ir)));
-                    ASSERTN(common_def->getResultPR(PHI_prno(ir))->getPrno()
-                            == PHI_prno(ir), ("not same PR"));
-
-                    IR * respr = common_def->getResultPR(PHI_prno(ir));
-                    ASSERT0(respr);
-
-                    SSAInfo * commdef_ssainfo = respr->getSSAInfo();
-                    ASSERT0(commdef_ssainfo);
-
-                    SSA_uses(commdef_ssainfo).bunion(SSA_uses(curphi_ssainfo));
-
-                    SSAUseIter si = NULL;
-                    for (INT i = SSA_uses(curphi_ssainfo).get_first(&si);
-                         si != NULL;
-                         i = SSA_uses(curphi_ssainfo).get_next(i, &si)) {
-                        IR * use = m_rg->getIR(i);
-                        ASSERT0(use->is_pr());
-
-                        ASSERT0(PR_ssainfo(use) &&
-                                 PR_ssainfo(use) == curphi_ssainfo);
-
-                        PR_ssainfo(use) = commdef_ssainfo;
-                    }
-                }
-
-                ((VP*)curphi_ssainfo)->cleanMember();
-                curphi_ssainfo->cleanDU();
-
-                BB_irlist(bb).remove(irct);
-
-                m_rg->freeIR(ir);
-
+            if (!isRedundantPHI(ir, &common_def)) {
+                revisePhiDataType(ir, m_rg);
                 continue;
             }
+            for (IR const* opnd = PHI_opnd_list(ir);
+                 opnd != NULL; opnd = opnd->get_next()) {
+                ASSERT0(opnd->is_phi_opnd());
+                if (!opnd->is_pr()) { continue; }
 
-            revisePhiDataType(ir, m_rg);
+                SSAInfo * si = PR_ssainfo(opnd);
+                ASSERTN(si, ("Miss SSAInfo."));
+
+                SSA_uses(si).remove(opnd);
+
+                if (SSA_def(si) == NULL || !SSA_def(si)->is_phi()) {
+                    continue;
+                }
+
+                IRBB * defbb = SSA_def(si)->getBB();
+                ASSERTN(defbb, ("defbb does not belong to any BB"));
+                wl.append_tail(defbb);
+                if (!in_list.is_contain(defbb->id())) {
+                    wl.append_tail(defbb);
+                    in_list.bunion(defbb->id());
+                }
+            }
+
+            SSAInfo * curphi_ssainfo = PHI_ssainfo(ir);
+            ASSERT0(curphi_ssainfo);
+            ASSERT0(SSA_def(curphi_ssainfo) == ir);
+
+            if (common_def != NULL && ir != common_def) {
+                //All operands of PHI are defined by same alternative stmt,
+                //just call it common_def. Replace the SSA_def of
+                //current SSAInfo to the common_def.
+
+                ASSERT0(common_def->getResultPR(PHI_prno(ir)));
+                ASSERTN(common_def->getResultPR(PHI_prno(ir))->getPrno()
+                        == PHI_prno(ir), ("not same PR"));
+
+                IR * respr = common_def->getResultPR(PHI_prno(ir));
+                ASSERT0(respr);
+
+                SSAInfo * commdef_ssainfo = respr->getSSAInfo();
+                ASSERT0(commdef_ssainfo);
+
+                SSA_uses(commdef_ssainfo).bunion(SSA_uses(curphi_ssainfo));
+
+                SSAUseIter si = NULL;
+                for (INT i = SSA_uses(curphi_ssainfo).get_first(&si);
+                     si != NULL;
+                     i = SSA_uses(curphi_ssainfo).get_next(i, &si)) {
+                    IR * use = m_rg->getIR(i);
+                    ASSERT0(use->is_pr());
+
+                    ASSERT0(PR_ssainfo(use) &&
+                             PR_ssainfo(use) == curphi_ssainfo);
+
+                    PR_ssainfo(use) = commdef_ssainfo;
+                }
+            }
+
+            ((VP*)curphi_ssainfo)->cleanMember();
+            curphi_ssainfo->cleanDU();
+            BB_irlist(bb).remove(irct);
+            m_rg->freeIR(ir);
         }
     }
-
     END_TIMER(t, "PRSSA: Refine phi");
 }
 
@@ -1589,8 +1581,7 @@ void PRSSAMgr::stripVersionForBBList()
     BBList * bblst = m_rg->getBBList();
     if (bblst->get_elem_count() == 0) { return; }
 
-    xcom::C<IRBB*> * ct;
-
+    xcom::C<IRBB*> * ct = NULL;
     xcom::BitSet visited;
 
     //Ensure the first allocation of bitset could
@@ -1601,11 +1592,10 @@ void PRSSAMgr::stripVersionForBBList()
     for (bblst->get_head(&ct); ct != bblst->end(); ct = bblst->get_next(ct)) {
         IRBB * bb = ct->val();
         xcom::C<IR*> * irct = NULL;
-        xcom::C<IR*> * nextirct;
+        xcom::C<IR*> * nextirct = NULL;
         for (BB_irlist(bb).get_head(&nextirct), irct = nextirct;
              irct != BB_irlist(bb).end(); irct = nextirct) {
             nextirct = BB_irlist(bb).get_next(nextirct);
-
             IR * ir = irct->val();
             stripStmtVersion(ir, visited);
         }
@@ -1616,11 +1606,10 @@ void PRSSAMgr::stripVersionForBBList()
 
 
 //Return the replaced one.
-static IR * replace_res_pr(
-        IR * stmt,
-        UINT oldprno,
-        UINT newprno,
-        Type const* newprty)
+static IR * replace_res_pr(IR * stmt,
+                           UINT oldprno,
+                           UINT newprno,
+                           Type const* newprty)
 {
     DUMMYUSE(oldprno);
     //newprty may be VOID.
@@ -1686,17 +1675,13 @@ void PRSSAMgr::stripSpecifiedVP(VP * vp)
 void PRSSAMgr::stripStmtVersion(IR * stmt, xcom::BitSet & visited)
 {
     ASSERT0(stmt->is_stmt());
-
     if (stmt->isWritePR() || stmt->isCallHasRetVal()) {
         VP * vp = (VP*)stmt->getSSAInfo();
         ASSERT0(vp);
-
         if (!visited.is_contain(SSA_id(vp))) {
             ASSERT0(VP_ver(vp) != 0);
-
             //Avoid restriping again.
             visited.bunion(SSA_id(vp));
-
             stripSpecifiedVP(vp);
         }
     }
@@ -1709,7 +1694,6 @@ void PRSSAMgr::stripStmtVersion(IR * stmt, xcom::BitSet & visited)
 
         VP * vp = (VP*)k->getSSAInfo();
         ASSERT0(vp);
-
         if (!visited.is_contain(SSA_id(vp))) {
             //Version may be zero if there is not any DEF for k.
             //ASSERT0(VP_ver(vp) != 0);
@@ -1783,14 +1767,15 @@ void PRSSAMgr::computeSSAInfo()
             IR * ir = irct->val();
             ii.clean();
             for (IR * x = iterInit(ir, ii); x != NULL; x = iterNext(ii)) {
-                if (x->isReadPR() || (x->is_stmt() && x->getResultPR() != NULL)) {
+                if (x->isReadPR() ||
+                    (x->is_stmt() && x->getResultPR() != NULL)) {
                     SSAInfo * ssainfo = allocSSAInfo(x->getPrno());
                     x->setSSAInfo(ssainfo);
                     if (x->isReadPR()) {
                         SSA_uses(ssainfo).append(x);
                     } else {
                         ASSERTN(SSA_def(ssainfo) == NULL,
-                            ("multidefinition in for PR%d", x->getPrno()));
+                                ("multidefinition in for PR%d", x->getPrno()));
                         SSA_def(ssainfo) = x;
                     }
                 }
@@ -1874,8 +1859,8 @@ bool PRSSAMgr::construction(DomTree & domtree)
 
 bool verifySSAInfo(Region * rg)
 {
-    PRSSAMgr * ssamgr =
-        (PRSSAMgr*)(rg->getPassMgr()->queryPass(PASS_PR_SSA_MGR));
+    PRSSAMgr * ssamgr = (PRSSAMgr*)(rg->getPassMgr()->
+        queryPass(PASS_PR_SSA_MGR));
     if (ssamgr != NULL && ssamgr->isSSAConstructed()) {
         ASSERT0(ssamgr->verifySSAInfo());
         ASSERT0(ssamgr->verifyPhi(false));

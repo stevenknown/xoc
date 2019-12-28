@@ -148,6 +148,7 @@ public:
 Lineq::Lineq(RMat * m, INT rhs_idx)
 {
     m_is_init = false;
+    m_is_dump = false;
     m_rhs_idx = -1;
     m_coeff = NULL;
     init(m, rhs_idx);
@@ -816,7 +817,13 @@ void Lineq::initVarConstraint(Vector<INT> const& sign,
     for (UINT i = 0; i < nvar; i++) {
         if (sign.get(i) > 0) {
             //Build -i<=0 constrain.
-            vc.set(i, i, -1);
+            //Do we really need Variable Constrains?
+            //Because when variable is negative, we have to set the variabe
+            //not any constrains, whereas add negative constrains to
+            //Leq or Eq part to circumvent solver's rules.
+            //For now, it seems we can solve and constrains and get correct
+            //solution even if VC are unconstrained at all.
+            //vc.set(i, i, -1); //hack
         } else {
             //current variable is unconstrained.
         }
@@ -864,7 +871,7 @@ bool Lineq::has_solution(RMat const& leq,
     RMat res;
     Rational v;
     if (is_int_sol) {
-        MIP<RMat, Rational> mip(false);
+        MIP<RMat, Rational> mip(m_is_dump);
         mip.reviseTargetFunc(tgtf, eq, leq, num_of_var);
         UINT st = mip.maxm(v, res, tgtf, vc, eq, leq, false, NULL, rhs_idx);
         if (st == IP_SUCC) {
@@ -886,7 +893,7 @@ bool Lineq::has_solution(RMat const& leq,
         }
         return false;
     } else {
-        SIX<RMat, Rational> six(0, 0xFFFFffff, false);
+        SIX<RMat, Rational> six(0, 0xFFFFffff, m_is_dump);
         six.reviseTargetFunc(tgtf, eq, leq, num_of_var);
         UINT st = six.maxm(v, res, tgtf, vc, eq, leq, rhs_idx);
         if (st == SIX_SUCC) {
@@ -1002,8 +1009,8 @@ void Lineq::formatBound(UINT u, OUT RMat & ineqt_of_u)
                     ineqt_of_u.set(i, k, -ineqt_of_u.get(i, j));
                     k++;
                 }
-            }//end for
-        }//end for
+            }
+        }
         if ((INT)u != (m_rhs_idx - 1)) {
             ineqt_of_u.deleteCol(u + 1, m_rhs_idx - 1);
         }

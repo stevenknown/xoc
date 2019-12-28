@@ -594,8 +594,7 @@ IR * Region::refineSelect(IR * ir, bool & change, RefineCtx & rc)
     SELECT_trueexp(ir) = refineIRlist(SELECT_trueexp(ir), change, rc);
     SELECT_falseexp(ir) = refineIRlist(SELECT_falseexp(ir), change, rc);
     IR * det = foldConst(SELECT_pred(ir), change);
-
-    IR * gen;
+    IR * gen = NULL;
     if (det->is_const() && det->is_int()) {
         HOST_INT v = CONST_int_val(det);
         if (v == 0) {
@@ -739,17 +738,20 @@ IR * Region::refineDiv(IR * ir, bool & change, RefineCtx & rc)
             //X/0
             return ir;
         }
-        if ((xcom::isPowerOf2(abs((INT)(fp_imm))) || xcom::isPowerOf5(fp_imm))) {
+        if (xcom::isPowerOf2(::abs((INT)(fp_imm))) ||
+            xcom::isPowerOf5(fp_imm)) {
             //X/n => X*(1.0/n)
             IR_code(ir) = IR_MUL;
             CONST_fp_val(op1) = ((HOST_FP)1.0) / fp_imm;
             change = true;
             return ir;
         }
-    } else if (op1->is_const() &&
-               op1->is_int() &&
-               xcom::isPowerOf2(CONST_int_val(op1)) &&
-               RC_refine_div_const(rc)) {
+        return ir;
+    }
+    if (op1->is_const() &&
+        op1->is_int() &&
+        xcom::isPowerOf2(CONST_int_val(op1)) &&
+        RC_refine_div_const(rc)) {
         //X/2 => X>>1, arith shift right.
         if (op0->is_sint()) {
             IR_code(ir) = IR_ASR;
@@ -762,7 +764,8 @@ IR * Region::refineDiv(IR * ir, bool & change, RefineCtx & rc)
         CONST_int_val(op1) = xcom::getPowerOf2(CONST_int_val(op1));
         change = true;
         return ir; //No need to update DU.
-    } else if (op0->isIREqual(op1, true)) {
+    }
+    if (op0->isIREqual(op1, true)) {
         //X/X => 1.
         IR * tmp = ir;
         Type const* ty;
@@ -800,7 +803,6 @@ IR * Region::refineMod(IR * ir, bool & change)
     IR * op1 = BIN_opnd1(ir);
     CHECK_DUMMYUSE(op0);
     CHECK_DUMMYUSE(op1);
-
     if (op1->is_const() && op1->is_int() && CONST_int_val(op1) == 1) {
         //mod X,1 => 0
         IR * tmp = ir;
@@ -822,10 +824,8 @@ IR * Region::refineRem(IR * ir, bool & change)
     ASSERT0(ir->is_rem());
     IR * op0 = BIN_opnd0(ir);
     IR * op1 = BIN_opnd1(ir);
-
     CHECK_DUMMYUSE(op0);
     CHECK_DUMMYUSE(op1);
-
     if (op1->is_const() && op1->is_int()) {
         if (CONST_int_val(op1) == 1) {
             //rem X,1 => 0
@@ -866,6 +866,12 @@ IR * Region::refineAdd(IR * ir, bool & change)
         change = true;
         return ir; //No need to update DU.
     }
+    
+    //add X,0.0 => X
+    //Under the default rounding mode, in add X,0.0, if x
+    //is not -0.0, then add X,0 is identical to X.
+    //If x is -0.0, then the output of add X,0 must be +0.0,
+    //which is not bitwise identical to -0.0.
     return ir;
 }
 
@@ -876,25 +882,39 @@ IR * Region::refineMul(IR * ir, bool & change, RefineCtx & rc)
     IR * op0 = BIN_opnd0(ir);
     IR * op1 = BIN_opnd1(ir);
     ASSERT0(op0 != NULL && op1 != NULL);
-    if (g_is_opt_float &&
-        op1->is_const() &&
-        op1->is_fp() &&
-        CONST_fp_val(op1) == 2.0) {
-        //mul X,2.0 => add.fp X,X
-        IR_code(ir) = IR_ADD;
-        freeIRTree(BIN_opnd1(ir));
-        BIN_opnd1(ir) = dupIRTree(BIN_opnd0(ir));
+    if (op1->is_const() && op1->is_fp()) {        
+        if (g_is_opt_float && CONST_fp_val(op1) == 2.0) {
+            //mul X,2.0 => add.fp X,X
+            IR_code(ir) = IR_ADD;
+            freeIRTree(BIN_opnd1(ir));
+            BIN_opnd1(ir) = dupIRTree(BIN_opnd0(ir));
 
-        if (getDUMgr() != NULL) {
-            getDUMgr()->copyIRTreeDU(BIN_opnd1(ir), BIN_opnd0(ir), true);
+            if (getDUMgr() != NULL) {
+                getDUMgr()->copyIRTreeDU(BIN_opnd1(ir), BIN_opnd0(ir), true);
+            }
+
+            ir->setParentPointer(false);
+            change = true;
+            return ir; //No need to update DU.
         }
-
-        ir->setParentPointer(false);
-        change = true;
-        return ir; //No need to update DU.
-    } else if (op1->is_const() &&
-               op1->is_int() &&
-               CONST_int_val(op1) == 2) {
+        if (CONST_fp_val(op1) == 1.0) {
+            //For multiplication, float optimization is always safe.
+            //e.g: optimize x*1.0 => x.
+            //Under the default rounding mode, if x is a (sub)normal number,
+            //x*1.0 == x always. If x is +/- infinity, then the output value
+            //is +/- infinity of the same sign. If x is NaN, the exponent and
+            //mantissa of NaN*1.0 are unchanged from NaN. The sign is also
+            //identical to the input NaN.
+            //mul X,1.0 => X
+            BIN_opnd0(ir) = NULL;
+            freeIRTree(ir);
+            ir = op0;
+            change = true;
+            return ir; //No need to update DU.
+        }
+        return ir;
+    }
+    if (op1->is_const() && op1->is_int() && CONST_int_val(op1) == 2) {
         //mul X,2 => add.int X,X
         IR_code(ir) = IR_ADD;
         freeIRTree(BIN_opnd1(ir));
@@ -908,7 +928,8 @@ IR * Region::refineMul(IR * ir, bool & change, RefineCtx & rc)
         ir->setParentPointer(false);
         change = true;
         return ir; //No need to update DU.
-    } else if (op1->is_const() && op1->is_int()) {
+    }
+    if (op1->is_const() && op1->is_int()) {
         if (CONST_int_val(op1) == 1) {
             //mul X,1 => X
             IR * newir = op0;
@@ -917,7 +938,8 @@ IR * Region::refineMul(IR * ir, bool & change, RefineCtx & rc)
             freeIRTree(ir);
             change = true;
             return newir;
-        } else if (CONST_int_val(op1) == 0) {
+        }
+        if (CONST_int_val(op1) == 0) {
             //mul X,0 => 0
             if (getDUMgr() != NULL) {
                 getDUMgr()->removeUseOutFromDefset(ir);
@@ -927,15 +949,17 @@ IR * Region::refineMul(IR * ir, bool & change, RefineCtx & rc)
             freeIRTree(ir);
             change = true;
             return newir;
-        } else if (RC_refine_mul_const(rc) &&
-                   op0->is_int() &&
-                   xcom::isPowerOf2(CONST_int_val(op1))) {
+        }
+        if (RC_refine_mul_const(rc) &&
+            op0->is_int() &&
+            xcom::isPowerOf2(CONST_int_val(op1))) {
             //mul X,4 => lsl X,2, logical shift left.
             CONST_int_val(op1) = xcom::getPowerOf2(CONST_int_val(op1));
             IR_code(ir) = IR_LSL;
             change = true;
             return ir; //No need to update DU.
         }
+        return ir;
     }
     return ir;
 }

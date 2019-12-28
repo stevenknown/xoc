@@ -286,7 +286,8 @@ public:
 class TensorType : public Type {
 public:
     //Record the degree of each dimension.
-    //e.g: <3x2x7x1>, the degree of dimension 0 is 3, etc.
+    //e.g: <3x2x7x1>, the degree of dimension 0 is 3,
+    //degree of dimension 1 is 2, degree of dimension 2 is 7, etc.
     xcom::SimpleVec<UINT, 3> degree_of_dimension;
 
     //Record data type of element in tensor.

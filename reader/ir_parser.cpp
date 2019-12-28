@@ -3918,11 +3918,8 @@ bool IRParser::parseByteValue(VAR * var, ParseCtx * ctx)
             tok = m_lexer->getNextToken();
         }
     }
-    VAR_byte_val(var) = (ByteBuf*)ctx->current_region->xmalloc(sizeof(ByteBuf));
-    VAR_has_init_val(var) = true;
-    BYTEBUF_size(VAR_byte_val(var)) = bytesize;
-    BYTEBUF_buffer(VAR_byte_val(var)) =
-        (BYTE*)ctx->current_region->xmalloc(bytesize);
+    VAR_byte_val(var) = ctx->current_region->allocByteBuf(bytesize);        
+    VAR_has_init_val(var) = true;    
     ::memcpy(BYTEBUF_buffer(VAR_byte_val(var)), buf.get_vec(), bytesize);
     if (m_lexer->getCurrentToken() != T_RPAREN) {
         error(tok, "miss ')'");

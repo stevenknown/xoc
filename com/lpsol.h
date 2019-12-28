@@ -2318,6 +2318,7 @@ void MIP<Mat, T>::verify(Mat const& leq,
     //For now, we only permit Variable constraint 'vc' of each
     //variable to be 0, namely only i>=0 is allowed. One should
     //establish constraints i'>=0, and i=i'+3 if i>=3 is required.
+    //Similar, if i<=0, add constrains i=x-y, x>=0, y>=0, x<=y.
     if (!vc.is_colequ(m_rhs_idx, 0)) {
         ASSERTN(num_cols_of_const_term == 1,
                 ("no yet support const term with multi-columns."));

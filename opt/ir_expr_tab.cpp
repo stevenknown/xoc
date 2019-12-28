@@ -44,7 +44,7 @@ IR_EXPR_TAB::IR_EXPR_TAB(Region * rg)
     m_rg = rg;
     m_tm = rg->getTypeMgr();
     ::memset(m_level1_hash_tab, 0,
-           sizeof(ExpRep*) * IR_EXPR_TAB_LEVEL1_HASH_BUCKET);
+        sizeof(ExpRep*) * IR_EXPR_TAB_LEVEL1_HASH_BUCKET);
     m_pool = smpoolCreate(sizeof(ExpRep*) * 128, MEM_COMM);
     m_sc_pool = smpoolCreate(sizeof(xcom::SC<ExpRep*>) * 4, MEM_CONST_SIZE);
     m_ir_expr_lst.set_pool(m_sc_pool);
@@ -134,7 +134,7 @@ void IR_EXPR_TAB::dump_ir_expr_tab()
 //If 'ir' has been inserted in the table with an ExpRep, get that and return.
 ExpRep * IR_EXPR_TAB::map_ir2ir_expr(IR const* ir)
 {
-    if (ir == NULL) return NULL;
+    if (ir == NULL) { return NULL; }
     return m_map_ir2ir_expr.get(ir->id());
 }
 
@@ -174,7 +174,7 @@ UINT IR_EXPR_TAB::compute_hash_key_for_tree(IR * ir)
 //get that and return.
 ExpRep * IR_EXPR_TAB::append_expr(IR * ir)
 {
-    if (ir == NULL) return NULL;
+    if (ir == NULL) { return NULL; }
     UINT key = compute_hash_key_for_tree(ir);
 
     //First level hashing.
@@ -224,7 +224,7 @@ ExpRep * IR_EXPR_TAB::append_expr(IR * ir)
         }
         last = ie;
         ie = EXPR_next(ie);
-    } //end while
+    }
 
     //Generate copy of 'ir'.
     ie = new_ir_expr();
@@ -235,7 +235,7 @@ ExpRep * IR_EXPR_TAB::append_expr(IR * ir)
 
     //Enter into 'ir'
     ASSERT0(level2_hash_tab[level2_hashv] != NULL);
-    insertafter_one(&last, ie);
+    xcom::insertafter_one(&last, ie);
     return ie;
 }
 
@@ -251,10 +251,10 @@ ExpRep * IR_EXPR_TAB::new_ir_expr()
 //Remove occurence of ExpRep.
 IR * IR_EXPR_TAB::remove_occ(IR * occ)
 {
-    if (occ == NULL) return NULL;
+    if (occ == NULL) { return NULL; }
     ASSERT0(occ->is_exp());
     ExpRep * ie = map_ir2ir_expr(occ);
-    if (ie == NULL) return NULL;
+    if (ie == NULL) { return NULL; }
     return EXPR_occ_list(ie).remove(occ);
 }
 
@@ -356,8 +356,7 @@ ExpRep * IR_EXPR_TAB::remove_expr(IR * ir)
             return ie;
         }
         ie = EXPR_next(ie);
-    } //end while
-
+    }
     return NULL;
 }
 
@@ -366,7 +365,7 @@ ExpRep * IR_EXPR_TAB::remove_expr(IR * ir)
 //otherwise return NULL.
 ExpRep * IR_EXPR_TAB::find_expr(IR * ir)
 {
-    if (ir == NULL) return NULL;
+    if (ir == NULL) { return NULL; }
     UINT key = compute_hash_key_for_tree(ir);
 
     //First level hashing.
@@ -389,31 +388,30 @@ ExpRep * IR_EXPR_TAB::find_expr(IR * ir)
             return ie;
         }
         ie = EXPR_next(ie);
-    } //end while
+    }
     return NULL;
 }
 
 
 ExpRep * IR_EXPR_TAB::encode_expr(IN IR * ir)
 {
-    if (ir == NULL) return NULL;
+    if (ir == NULL) { return NULL; }
 
     ASSERT0(ir->is_exp());
     switch (ir->getCode()) {
     case IR_ID:
     case IR_LD:
+    case IR_ILD:
     case IR_LDA:
     case IR_CONST:
     case IR_PR:
         return NULL;
-    case IR_ILD:
-	SWITCH_CASE_BIN:
-	SWITCH_CASE_UNA:
+    SWITCH_CASE_BIN:
+    SWITCH_CASE_UNA:
     case IR_ARRAY:
     case IR_SELECT: { //formulized determinate-expr?exp:exp
         ExpRep * ie = append_expr(ir);
-        ASSERTN(!EXPR_occ_list(ie).find(ir),
-                ("process same IR repeated."));
+        ASSERTN(!EXPR_occ_list(ie).find(ir), ("process same IR repeated."));
         EXPR_occ_list(ie).append_tail(ir);
         return ie;
     }
@@ -429,29 +427,26 @@ ExpRep * IR_EXPR_TAB::encode_expr(IN IR * ir)
 //the 'GEN-SET' and 'KILL-SET' of IR-EXPR for BB as well as.
 void IR_EXPR_TAB::encode_bb(IRBB * bb)
 {
-    xcom::C<IR*> * ct;
+    xcom::C<IR*> * ct = NULL;
     for (IR * ir = BB_irlist(bb).get_head(&ct);
          ir != NULL; ir = BB_irlist(bb).get_next(&ct)) {
         ASSERT0(ir->is_stmt());
         switch (ir->getCode()) {
-        case IR_ST:
-            {
+        case IR_ST: {
                 ExpRep * ie = encode_expr(ST_rhs(ir));
                 if (ie != NULL) {
                     set_map_ir2ir_expr(ST_rhs(ir), ie);
                 }
             }
             break;
-        case IR_STPR:
-            {
+        case IR_STPR: {
                 ExpRep * ie = encode_expr(STPR_rhs(ir));
                 if (ie != NULL) {
                     set_map_ir2ir_expr(STPR_rhs(ir), ie);
                 }
             }
             break;
-        case IR_STARRAY:
-            {
+        case IR_STARRAY: {
                 ExpRep * ie = encode_expr(ARR_base(ir));
                 if (ie != NULL) {
                     set_map_ir2ir_expr(ARR_base(ir), ie);
@@ -470,8 +465,7 @@ void IR_EXPR_TAB::encode_bb(IRBB * bb)
                 }
             }
             break;
-        case IR_IST:
-            {
+        case IR_IST: {
                 ExpRep * ie = encode_expr(IST_rhs(ir));
                 if (ie != NULL) {
                     set_map_ir2ir_expr(IST_rhs(ir), ie);
@@ -483,8 +477,7 @@ void IR_EXPR_TAB::encode_bb(IRBB * bb)
                 }
             }
             break;
-        case IR_ICALL: //indirective call
-            {
+        case IR_ICALL: { //indirective call
                 ExpRep * ie = encode_expr(ICALL_callee(ir));
                 if (ie != NULL) {
                     set_map_ir2ir_expr(ICALL_callee(ir), ie);
@@ -500,8 +493,7 @@ void IR_EXPR_TAB::encode_bb(IRBB * bb)
             break;
         case IR_GOTO:
             break;
-        case IR_IGOTO:
-            {
+        case IR_IGOTO: {
                 ExpRep * ie = encode_expr(IGOTO_vexp(ir));
                 if (ie != NULL) {
                     set_map_ir2ir_expr(IGOTO_vexp(ir), ie);
@@ -520,24 +512,21 @@ void IR_EXPR_TAB::encode_bb(IRBB * bb)
         case IR_REGION:
             break;
         case IR_TRUEBR:
-        case IR_FALSEBR:
-            {
+        case IR_FALSEBR: {
                 ExpRep * ie = encode_expr(BR_det(ir));
                 if (ie != NULL) {
                     set_map_ir2ir_expr(BR_det(ir), ie);
                 }
             }
             break;
-        case IR_SWITCH:
-            {
+        case IR_SWITCH: {
                 ExpRep * ie = encode_expr(SWITCH_vexp(ir));
                 if (ie != NULL) {
                     set_map_ir2ir_expr(SWITCH_vexp(ir), ie);
                 }
             }
             break;
-        case IR_RETURN:
-            {
+        case IR_RETURN: {
                 ExpRep * ie = encode_expr(RET_exp(ir));
                 if (ie != NULL) {
                     set_map_ir2ir_expr(RET_exp(ir), ie);
@@ -555,8 +544,8 @@ void IR_EXPR_TAB::encode_bb(IRBB * bb)
             break;
         }
         default: UNREACHABLE();
-        } //end switch
-    } //end for IR
+        }
+    }
     //dump_ir_expr_tab();
 }
 

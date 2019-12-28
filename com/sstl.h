@@ -469,9 +469,9 @@ inline T * reverse_list(T * t)
 
 
 //Double Chain Container.
-#define C_val(c)    ((c)->value)
-#define C_next(c)   ((c)->next)
-#define C_prev(c)   ((c)->prev)
+#define C_val(c) ((c)->value)
+#define C_next(c) ((c)->next)
+#define C_prev(c) ((c)->prev)
 template <class T> class C {
 public:
     C<T> * prev;
@@ -489,12 +489,14 @@ public:
     }
 
     T val() { return value; }
+    C<T> * get_prev() const { return prev; }
+    C<T> * get_next() const { return next; }
 };
 
 
 //Single Chain Container.
-#define SC_val(c)    ((c)->value)
-#define SC_next(c)   ((c)->next)
+#define SC_val(c) ((c)->value)
+#define SC_next(c) ((c)->next)
 template <class T> class SC {
 public:
     SC<T> * next;
@@ -511,6 +513,7 @@ public:
     }
 
     T val() { return value; }
+    SC<T> * get_next() const { return next; }
 };
 
 
@@ -2972,7 +2975,7 @@ public:
         if (i >= SVEC_elem_num(this)) { return T(0); }
         return m_vec[i];
     }
-
+    UINT getElemNum() const { return SVEC_elem_num(this); }
     //Return vector buffer that hold elements.
     T * get_vec() { return m_vec; }
 
@@ -3102,10 +3105,10 @@ public:
 //
 //    3.Use 'new'/'delete' operator to allocate/free the memory
 //      of dynamic object and the virtual function pointers.
-#define HC_val(c)            (c)->val
-#define HC_vec_idx(c)        (c)->vec_idx
-#define HC_next(c)           (c)->next
-#define HC_prev(c)           (c)->prev
+#define HC_val(c) (c)->val
+#define HC_vec_idx(c) (c)->vec_idx
+#define HC_next(c) (c)->next
+#define HC_prev(c) (c)->prev
 template <class T> struct HC {
     HC<T> * prev;
     HC<T> * next;
@@ -3113,12 +3116,12 @@ template <class T> struct HC {
     T val;
 };
 
-#define HB_member(hm)        (hm).hash_member
-#define HB_count(hm)         (hm).hash_member_count
+#define HB_member(hm) (hm).hash_member
+#define HB_count(hm) (hm).hash_member_count
 class HashBucket {
 public:
-    void * hash_member; //hash member list
-    UINT hash_member_count; //
+    void * hash_member; //hash member list.
+    UINT hash_member_count; //the number of member in list.
 };
 
 

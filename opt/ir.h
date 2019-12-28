@@ -435,11 +435,11 @@ extern RoundDesc const g_round_desc[];
 //if it is, the IR modified/invalided each pointers previous defined,
 //and this cuts off the Def-Use chain of those pointers immediately
 //after the IR.
-//Usually, RMW could be simulated by IR_CALL with 3 arguments, e.g:
-//  call Opcode:i32, MemoryBase:ptr<valuetype>, NewValue:valuetype;
-//  where Opcode defined the RMW operations, MemoryBase is pointer that point to
-//  the memory location with valuetype that hold oldvalue, and NewValue is the
-//  value to be set.
+//By default, RMW could be simulated by IR_CALL with 3 arguments,
+//e.g: call Opcode:i32, OldValueMemory:<valuetype>, NewValue:valuetype;
+//where Opcode defined the RMW operations, OldValueMemory indicates
+//the memory location with valuetype that hold old-value, and NewValue
+//is the value to be set.
 #define IR_is_read_mod_write(ir) ((ir)->is_read_mod_write)
 
 //True if ir has sideeffect. This flag often be used to prevent user

@@ -282,6 +282,14 @@ public:
     MD const* allocSetelemMD(IR * ir);
     MD const* allocGetelemMD(IR * ir);
     void assignPRMD();
+    //Note the returned ByteBuf does not need to free by user.
+    ByteBuf * allocByteBuf(UINT bytesize)
+    {
+        ByteBuf * buf = (ByteBuf*)xmalloc(sizeof(ByteBuf));
+        BYTEBUF_size(buf) = bytesize;
+        BYTEBUF_buffer(buf) = (BYTE*)xmalloc(bytesize);
+        return buf;
+    }
 
     IR * buildSetElem(Type const* type, IR * base, IR * val, IR * offset);
     IR * buildSetElem(UINT prno,

@@ -240,7 +240,7 @@ bool IR_CP::isCopyOR(IR * ir) const
     case IR_IST:
         return canBeCandidate(ir->getRHS());
     case IR_PHI:
-        if (cnt_list(PHI_opnd_list(ir)) == 1) {
+        if (xcom::cnt_list(PHI_opnd_list(ir)) == 1) {
             return true;
         }
     default: break;
@@ -260,12 +260,11 @@ bool IR_CP::isCopyOR(IR * ir) const
 //'prop_value': exp that will be propagated.
 //'use_stmt': stmt in use-list of 'def_ir'.
 //'use_bb': IRBB that use_stmt be placed in.
-bool IR_CP::is_available(
-        IR const* def_stmt,
-        IR const* prop_value,
-        IR * use_stmt,
-        MDPhi * use_phi,
-        IRBB * usebb)
+bool IR_CP::is_available(IR const* def_stmt,
+                         IR const* prop_value,
+                         IR * use_stmt,
+                         MDPhi * use_phi,
+                         IRBB * usebb)
 {
     ASSERT0(usebb);
     ASSERT0(use_stmt || use_phi);
@@ -391,12 +390,11 @@ inline static IR * get_propagated_value(IR * stmt)
 
 
 //'usevec': for local used.
-bool IR_CP::doPropToMDPhi(
-        bool prssadu,
-        bool mdssadu,
-        IN IR const* prop_value,
-        IN IR * use,
-        MDSSAMgr * mdssamgr)
+bool IR_CP::doPropToMDPhi(bool prssadu,
+                          bool mdssadu,
+                          IN IR const* prop_value,
+                          IN IR * use,
+                          MDSSAMgr * mdssamgr)
 {
     CPCtx lchange;
     replaceExp(use, prop_value, lchange, prssadu, mdssadu, mdssamgr);
@@ -405,17 +403,16 @@ bool IR_CP::doPropToMDPhi(
 
 
 //'usevec': for local used.
-bool IR_CP::doPropToNormalStmt(
-        xcom::C<IR*> * cur_iter,
-        xcom::C<IR*> ** next_iter,
-        bool prssadu,
-        bool mdssadu,
-        IN IR const* prop_value,
-        IN IR * use,
-        IN IR * use_stmt,
-        IN IRBB * def_bb,
-        IN OUT IRBB * use_bb,
-        MDSSAMgr * mdssamgr)
+bool IR_CP::doPropToNormalStmt(xcom::C<IR*> * cur_iter,
+                               xcom::C<IR*> ** next_iter,
+                               bool prssadu,
+                               bool mdssadu,
+                               IN IR const* prop_value,
+                               IN IR * use,
+                               IN IR * use_stmt,
+                               IN IRBB * def_bb,
+                               IN OUT IRBB * use_bb,
+                               MDSSAMgr * mdssamgr)
 {
     bool change = false;
     CPCtx lchange;
@@ -433,30 +430,39 @@ bool IR_CP::doPropToNormalStmt(
     RefineCtx rf;
     use_stmt = m_rg->refineIR(use_stmt, change, rf);
     if (use_stmt == NULL && is_next) {
-        //use_stmt has been optimized and removed by refineIR().
+        //old_use_stmt has been optimized and removed by refineIR().
         *next_iter = cur_iter;
         BB_irlist(def_bb).get_next(next_iter);
     }
 
     if (use_stmt != NULL && use_stmt != old_use_stmt) {
-        //use_stmt has been removed and new stmt generated.
+        //old_use_stmt has been removed and new stmt generated.
         ASSERTN(old_use_stmt->is_undef(), ("the old one should be freed"));
 
         xcom::C<IR*> * irct = NULL;
         BB_irlist(use_bb).find(old_use_stmt, &irct);
-        ASSERT0(irct);
+        ASSERTN(irct, ("old one should still left in BB"));
         BB_irlist(use_bb).insert_before(use_stmt, irct);
         BB_irlist(use_bb).remove(irct);
+        if (is_next) {
+            //Update next_iter to reflect the change of old_use_stmt.
+            //e.g: st x = lda y;
+            //     ist(x) = 0; #old_use_stmt
+            // ====>
+            //     st x = lda y;
+            //     st y = 0; #use_stmt(new generated)
+            *next_iter = cur_iter;
+            BB_irlist(def_bb).get_next(next_iter);
+        }
     }
     return true;
 }
 
 
-void IR_CP::dumpCopyPropagationAction(
-        IR const* def_stmt,
-        IR const* prop_value,
-        IR const* use,
-        MDSSAMgr * mdssamgr)
+void IR_CP::dumpCopyPropagationAction(IR const* def_stmt,
+                                      IR const* prop_value,
+                                      IR const* use,
+                                      MDSSAMgr * mdssamgr)
 {
     if (g_tfile == NULL) { return; }
     note("\n==---- DUMP CopyPropagation ----==");
@@ -464,11 +470,11 @@ void IR_CP::dumpCopyPropagationAction(
         IRNAME(prop_value), prop_value->id());
     dumpIR(def_stmt, m_rg);
     note("\nWill replace %s(id:%d), that located in Stmt:",
-        IRNAME(use), use->id());
+         IRNAME(use), use->id());
     if (use->is_id()) {
         ASSERT0(mdssamgr);
         MDSSAInfo * mdssainfo = mdssamgr->getUseDefMgr()->getMDSSAInfo(use);
-		CHECK_DUMMYUSE(mdssainfo);
+        CHECK_DUMMYUSE(mdssainfo);
         ASSERT0(ID_phi(use));
         note("\n");
         ID_phi(use)->dump(m_rg, mdssamgr->getUseDefMgr());
@@ -480,10 +486,9 @@ void IR_CP::dumpCopyPropagationAction(
 }
 
 
-//bool IR_CP::isAllVMDReachAllUse(
-//        IR * ir,
-//        MDSSAInfo * mdssainfo,
-//        IN DefSBitSetCore & useset)
+//bool IR_CP::isAllVMDReachAllUse(IR * ir,
+//                                MDSSAInfo * mdssainfo,
+//                                IN DefSBitSetCore & useset)
 //{
 //    ASSERT0(ir && ir->isMemoryRef() && mdssainfo);
 //    SEGIter * segiter;
@@ -500,10 +505,9 @@ void IR_CP::dumpCopyPropagationAction(
 
 
 //'usevec': for local used.
-bool IR_CP::doProp(
-        IN IRBB * bb,
-        IN DefSBitSetCore * useset,
-        MDSSAMgr * mdssamgr)
+bool IR_CP::doProp(IN IRBB * bb,
+                   IN DefSBitSetCore * useset,
+                   MDSSAMgr * mdssamgr)
 {
     bool change = false;
     xcom::C<IR*> * cur_iter, * next_iter;
@@ -567,7 +571,7 @@ bool IR_CP::doProp(
             continue;
         }
 
-        SEGIter * segiter;
+        xcom::SEGIter * segiter;
         for (INT i = useset->get_first(&segiter);
              i != -1; i = useset->get_next(i, &segiter)) {
             IR * use = m_rg->getIR(i);

@@ -55,7 +55,7 @@ public:
 #define CST_GT 3 //great than
 #define CST_EQ 4 //equal to
 
-class Lineq {
+class Lineq {    
     bool m_is_init;
 
     //Index of right-hand-side, also the column index of constant coefficient
@@ -70,6 +70,8 @@ class Lineq {
     //Record coeff of inequality: Ax <= b+C(x), where C(x) is function of
     //symbolic constant.
     RMat * m_coeff;
+    bool m_is_dump;
+
     INT compareConstIterm(RMat const& m,
                           UINT rhs_idx,
                           INT idx_of_eqt1,
@@ -110,8 +112,14 @@ public:
 
     void appendEquation(RMat const& eq);
 
+    //Dumps variable, forms as
+    //  ak*xk <= const + F(x) + a0x0 + a1x1 + ... + a(k-1)x(k-1) +
+    //           a(k+1)x(k+1) + ... + anxn.
+    void dumps_var_bound(UINT u);
+
     //Set index of const column and coeff matrix.
     void setParam(RMat * m, INT rhs_idx = -1);
+    void set_dump(bool is_dump) { m_is_dump = is_dump; }
     bool reduce(IN OUT RMat & m, UINT rhs_idx, bool is_intersect);
     void ConvexHullUnionAndIntersect(OUT RMat & res,
                                      IN List<RMat*> & chulls,
@@ -166,10 +174,6 @@ public:
     void PolyImage(OUT RMat & res, IN RMat & a, UINT rhs_idx);
     void EhartPoly(OUT RMat & res, IN RMat & a, UINT rhs_idx);
 
-    //Dumps variable, forms as
-    //  ak*xk <= const + F(x) + a0x0 + a1x1 + ... + a(k-1)x(k-1) +
-    //           a(k+1)x(k+1) + ... + anxn.
-    void dumps_var_bound(UINT u);
 };
 
 } //namespace xcom

@@ -480,6 +480,7 @@ public:
                          DefMiscBitSetMgr & bsmgr);
     void computeMDDUforBB(IRBB * bb, UINT flag);
     void computeCallRef(UINT duflag);
+    virtual void computeAtomMDRef(IR * ir, UINT duflag);
     void computeMDRef(IN OUT OptCtx & oc, UINT duflag);
     void computeKillSet(DefDBitSetCoreReserveTab & dbitsetchash,
                         Vector<MDSet*> const* mustdefs,

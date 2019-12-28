@@ -42,14 +42,14 @@ namespace xoc {
 //Set the interal data attribute to no sparse
 //if you think the analysis objects are few enough,
 //and no-sparse set may speed up compilation.
-#define SOL_SET_IS_SPARSE    (true)
+#define SOL_SET_IS_SPARSE (true)
 
 //Iterative methodology.
 //#define WORK_LIST_DRIVE
 
-#define CK_UNKNOWN        0 //Can not determine if memory is overlap.
-#define CK_OVERLAP        1 //Can be confirmed memory is overlap.
-#define CK_NOT_OVERLAP    2 //Can be confirmed memory is not overlap.
+#define CK_UNKNOWN 0 //Can not determine if memory is overlap.
+#define CK_OVERLAP 1 //Can be confirmed memory is overlap.
+#define CK_NOT_OVERLAP 2 //Can be confirmed memory is not overlap.
 
 static char const* getSolveFlagName(UINT flag)
 {
@@ -168,7 +168,7 @@ void MDId2IRlist::set(UINT mdid, IR * ir)
 {
     ASSERTN(mdid != MD_GLOBAL_VAR && mdid != MD_FULL_MEM &&
             mdid != MD_IMPORT_VAR,
-        ("there is not any md could kill Fake-May-MD."));
+            ("there is not any md could kill Fake-May-MD."));
     ASSERT0(ir);
     DefSBitSetCore * irtab = TMap<UINT, DefSBitSetCore*>::get(mdid);
     if (irtab == NULL) {
@@ -371,7 +371,8 @@ DefDBitSetCore * IR_DU_MGR::getMustGenDef(UINT bbid, DefMiscBitSetMgr * mgr)
 }
 
 
-DefDBitSetCore * IR_DU_MGR::getAvailInReachDef(UINT bbid, DefMiscBitSetMgr * mgr)
+DefDBitSetCore * IR_DU_MGR::getAvailInReachDef(UINT bbid,
+                                               DefMiscBitSetMgr * mgr)
 {
     ASSERT0(m_cfg->getBB(bbid));
     DefDBitSetCore * set = m_bb_avail_in_reach_def.get(bbid);
@@ -384,7 +385,8 @@ DefDBitSetCore * IR_DU_MGR::getAvailInReachDef(UINT bbid, DefMiscBitSetMgr * mgr
 }
 
 
-DefDBitSetCore * IR_DU_MGR::getAvailOutReachDef(UINT bbid, DefMiscBitSetMgr * mgr)
+DefDBitSetCore * IR_DU_MGR::getAvailOutReachDef(UINT bbid,
+                                                DefMiscBitSetMgr * mgr)
 {
     ASSERT0(m_cfg->getBB(bbid));
     DefDBitSetCore * set = m_bb_avail_out_reach_def.get(bbid);
@@ -640,10 +642,9 @@ bool IR_DU_MGR::is_stpr_may_def(IR const* def, IR const* use, bool is_recur)
 }
 
 
-static bool is_call_may_def_core(
-            IR const* call,
-            IR const* use,
-            MDSet const* call_maydef)
+static bool is_call_may_def_core(IR const* call,
+                                 IR const* use,
+                                 MDSet const* call_maydef)
 {
     //MD of use may be exact or inexact.
     MD const* use_md = use->getEffectRef();
@@ -790,17 +791,15 @@ bool IR_DU_MGR::is_may_kill(IR const* def1, IR const* def2)
 }
 
 
-void IR_DU_MGR::computeArrayRef(
-        IR * ir,
-        OUT MDSet * ret_mds,
-        UINT compflag,
-        UINT duflag)
+void IR_DU_MGR::computeArrayRef(IR * ir,
+                                OUT MDSet * ret_mds,
+                                UINT compflag,
+                                UINT duflag)
 {
     ASSERT0(ir->isArrayOp());
-
     if (HAVE_FLAG(duflag, COMPUTE_NONPR_DU)) {
         ASSERT0((ir->getRefMDSet() && !ir->getRefMDSet()->is_empty()) ||
-                 ir->getRefMD());
+                ir->getRefMD());
     }
 
     if (HAVE_FLAG(compflag, COMP_EXP_RECOMPUTE)) {
@@ -1141,9 +1140,8 @@ void IR_DU_MGR::dumpMemUsageForMDRef()
 
                         SEGIter * iter;
                         prt("MayUs(%lu%s, %d elems, last %d), ",
-                                (ULONG)n, str,
-                                mds->get_elem_count(),
-                                mds->get_last(&iter));
+                            (ULONG)n, str, mds->get_elem_count(),
+                            mds->get_last(&iter));
                         count += n;
                     }
                 }
@@ -1662,7 +1660,7 @@ void IR_DU_MGR::dumpSet(bool is_bs)
         SEGIter * st = NULL;
         if (def_in != NULL) {
             note("\nDEF IN STMT: %lu byte ",
-                (ULONG)def_in->count_mem());
+                 (ULONG)def_in->count_mem());
             for (i = def_in->get_first(&st);
                  i != -1; i = def_in->get_next(i, &st)) {
                 IR * ir = m_rg->getIR(i);
@@ -1677,7 +1675,7 @@ void IR_DU_MGR::dumpSet(bool is_bs)
 
         if (def_out != NULL) {
             note("\nDEF OUT STMT: %lu byte ",
-                (ULONG)def_out->count_mem());
+                 (ULONG)def_out->count_mem());
             for (i = def_out->get_first(&st);
                  i != -1; i = def_out->get_next(i, &st)) {
                 IR * ir = m_rg->getIR(i);
@@ -1692,7 +1690,7 @@ void IR_DU_MGR::dumpSet(bool is_bs)
 
         if (avail_def_in != NULL) {
             note("\nDEF AVAIL_IN STMT: %lu byte ",
-                (ULONG)avail_def_in->count_mem());
+                 (ULONG)avail_def_in->count_mem());
             for (i = avail_def_in->get_first(&st);
                  i != -1; i = avail_def_in->get_next(i, &st)) {
                 IR * ir = m_rg->getIR(i);
@@ -1707,7 +1705,7 @@ void IR_DU_MGR::dumpSet(bool is_bs)
 
         if (avail_def_out != NULL) {
             note("\nDEF AVAIL_OUT STMT: %lu byte ",
-                (ULONG)avail_def_out->count_mem());
+                 (ULONG)avail_def_out->count_mem());
             for (i = avail_def_out->get_first(&st);
                  i != -1; i = avail_def_out->get_next(i, &st)) {
                 IR * ir = m_rg->getIR(i);
@@ -1737,7 +1735,7 @@ void IR_DU_MGR::dumpSet(bool is_bs)
 
         if (must_def_gen != NULL) {
             note("\nMUST GEN STMT: %lu byte ",
-                (ULONG)must_def_gen->count_mem());
+                 (ULONG)must_def_gen->count_mem());
             for (i = must_def_gen->get_first(&st);
                  i != -1; i = must_def_gen->get_next(i, &st)) {
                 IR * ir = m_rg->getIR(i);
@@ -1767,7 +1765,7 @@ void IR_DU_MGR::dumpSet(bool is_bs)
 
         if (may_def_kill != NULL) {
             note("\nMAY KILLED STMT: %lu byte ",
-                    (ULONG)may_def_kill->count_mem());
+                 (ULONG)may_def_kill->count_mem());
             for (i = may_def_kill->get_first(&st);
                  i != -1; i = may_def_kill->get_next(i, &st)) {
                 IR * ir = m_rg->getIR(i);
@@ -1920,10 +1918,9 @@ void IR_DU_MGR::removeDef(IR const* ir, IR const* def)
 
 
 //Return true if mustdef or maydef overlaped with use's referrence.
-bool IR_DU_MGR::isOverlapDefUse(
-        MD const* mustdef,
-        MDSet const* maydef,
-        IR const* use)
+bool IR_DU_MGR::isOverlapDefUse(MD const* mustdef,
+                                MDSet const* maydef,
+                                IR const* use)
 {
     if (maydef != NULL) {
         MDSet const* mayuse = getMayUse(use);
@@ -2655,11 +2652,10 @@ void IR_DU_MGR::collectMayUse(IR const* ir, MDSet & mayUse, bool computePR)
 
 
 //Collect MD which ir may use, include overlapped MD.
-void IR_DU_MGR::collectMayUseRecursiveIRList(
-        IR const* ir,
-        OUT MDSet & mayUse,
-        bool computePR,
-        DefMiscBitSetMgr & bsmgr)
+void IR_DU_MGR::collectMayUseRecursiveIRList(IR const* ir,
+                                             OUT MDSet & mayUse,
+                                             bool computePR,
+                                             DefMiscBitSetMgr & bsmgr)
 {
   for (IR const* e = ir; e != NULL; e = e->get_next()) {
     collectMayUseRecursive(e, mayUse, computePR, bsmgr);
@@ -2668,15 +2664,16 @@ void IR_DU_MGR::collectMayUseRecursiveIRList(
 
 
 //Collect MD which ir may use, include overlapped MD.
-void IR_DU_MGR::collectMayUseRecursive(
-        IR const* ir,
-        OUT MDSet & mayUse,
-        bool computePR,
-        DefMiscBitSetMgr & bsmgr)
+void IR_DU_MGR::collectMayUseRecursive(IR const* ir,
+                                       OUT MDSet & mayUse,
+                                       bool computePR,
+                                       DefMiscBitSetMgr & bsmgr)
 {
     if (ir == NULL) { return; }
     switch (ir->getCode()) {
     case IR_ID:
+        //Note IR_ID may be dummy-USE declared by User to
+        //notify DefUse analysis pass.
     case IR_LD:
         ASSERT0(ir->getParent() != NULL);
         if (!ir->getParent()->is_lda()) {
@@ -2709,8 +2706,8 @@ void IR_DU_MGR::collectMayUseRecursive(
     case IR_LABEL:
     case IR_IGOTO:
     case IR_SWITCH:
-	SWITCH_CASE_BIN:
-	SWITCH_CASE_UNA:
+    SWITCH_CASE_BIN:
+    SWITCH_CASE_UNA:
         for (UINT i = 0; i < IR_MAX_KID_NUM(ir); i++) {
             IR * k = ir->getKid(i);
             if (k == NULL) { continue; }
@@ -2798,12 +2795,11 @@ void IR_DU_MGR::collectMayUseRecursive(
 }
 
 
-void IR_DU_MGR::computeMayDef(
-        IR const* ir,
-        MDSet * bb_maydefmds,
-        DefDBitSetCore * maygen_stmt,
-        DefMiscBitSetMgr & bsmgr,
-        UINT flag)
+void IR_DU_MGR::computeMayDef(IR const* ir,
+                              MDSet * bb_maydefmds,
+                              DefDBitSetCore * maygen_stmt,
+                              DefMiscBitSetMgr & bsmgr,
+                              UINT flag)
 {
     ASSERT0(ir->is_stmt());
     switch (ir->getCode()) {
@@ -2857,13 +2853,12 @@ void IR_DU_MGR::computeMayDef(
 }
 
 
-void IR_DU_MGR::computeMustExactDef(
-        IR const* ir,
-        OUT MDSet * bb_mustdefmds,
-        DefDBitSetCore * mustgen_stmt,
-        ConstMDIter & mditer,
-        DefMiscBitSetMgr & bsmgr,
-        UINT flag)
+void IR_DU_MGR::computeMustExactDef(IR const* ir,
+                                    OUT MDSet * bb_mustdefmds,
+                                    DefDBitSetCore * mustgen_stmt,
+                                    ConstMDIter & mditer,
+                                    DefMiscBitSetMgr & bsmgr,
+                                    UINT flag)
 {
     switch (ir->getCode()) {
     case IR_ST:
@@ -2919,12 +2914,11 @@ void IR_DU_MGR::computeMustExactDef(
 //maydefs: record may modified MD for each bb.
 //mayuse: record may used MD for each bb.
 //        collect mayuse (NOPR-DU) to compute Region referred MD.
-void IR_DU_MGR::computeMustExactDefMayDefMayUse(
-        OUT Vector<MDSet*> * mustdefmds,
-        OUT Vector<MDSet*> * maydefmds,
-        OUT MDSet * mayusemds,
-        UINT flag,
-        DefMiscBitSetMgr & bsmgr)
+void IR_DU_MGR::computeMustExactDefMayDefMayUse(OUT Vector<MDSet*> * mustdefmds,
+                                                OUT Vector<MDSet*> * maydefmds,
+                                                OUT MDSet * mayusemds,
+                                                UINT flag,
+                                                DefMiscBitSetMgr & bsmgr)
 {
     if (HAVE_FLAG(flag, SOL_REACH_DEF) ||
         HAVE_FLAG(flag, SOL_AVAIL_REACH_DEF)) {
@@ -3149,6 +3143,9 @@ void IR_DU_MGR::computeMDRef(IN OUT OptCtx & oc, UINT duflag)
                 break;
             default: UNREACHABLE();
             }
+            if (ir->is_atomic()) {
+                computeAtomMDRef(ir, duflag);
+            }
         }
     }
 
@@ -3157,16 +3154,46 @@ void IR_DU_MGR::computeMDRef(IN OUT OptCtx & oc, UINT duflag)
 }
 
 
+//This function compute and update MDRef
+//according to operand in atom operation.
+void IR_DU_MGR::computeAtomMDRef(IR * ir, UINT duflag)
+{
+    ASSERT0(ir->is_atomic());
+    //By default, RMW could be simulated by IR_CALL with 3 arguments, e.g:
+    //call Opcode:i32, OldValueMemory:<valuetype>, NewValue:valuetype;
+    //where Opcode defined the RMW operations, OldValueMemory indicates
+    //the memory location with valuetype that hold oldvalue, and NewValue
+    //is the value to be set.
+    ASSERTN(!ir->is_call(), ("Target Dependent Code"));
+    IR const* oldvaluemem = CALL_param_list(ir);
+    ASSERTN(oldvaluemem, ("Target Dependent Code"));
+    MDSet atomdefmds;
+    if (ir->getRefMD() != NULL) {
+        atomdefmds.bunion(ir->getRefMD(), *m_misc_bs_mgr);
+    }
+    if (ir->getRefMDSet() != NULL) {
+        atomdefmds.bunion(*ir->getRefMDSet(), *m_misc_bs_mgr);
+    }
+    if (oldvaluemem->getRefMD() != NULL) {
+        atomdefmds.bunion(oldvaluemem->getRefMD(), *m_misc_bs_mgr);
+    }
+    if (oldvaluemem->getRefMDSet() != NULL) {
+        atomdefmds.bunion(*oldvaluemem->getRefMDSet(), *m_misc_bs_mgr);
+    }
+    ir->setRefMDSet(m_mds_hash->append(atomdefmds), m_rg);
+    atomdefmds.clean(*m_misc_bs_mgr);
+}
+
+
 //Compute must and may killed stmt.
 //mustdefs: record must modified MD for each bb.
 //maydefs: record may modified MD for each bb.
 //flag: switches.
 //NOTE: compute maykill and mustkill both need may-gen-def.
-void IR_DU_MGR::computeKillSet(
-        DefDBitSetCoreReserveTab & dbitsetchash,
-        Vector<MDSet*> const* mustexactdefmds,
-        Vector<MDSet*> const* maydefmds,
-        DefMiscBitSetMgr & bsmgr)
+void IR_DU_MGR::computeKillSet(DefDBitSetCoreReserveTab & dbitsetchash,
+                               Vector<MDSet*> const* mustexactdefmds,
+                               Vector<MDSet*> const* maydefmds,
+                               DefMiscBitSetMgr & bsmgr)
 {
     ASSERT0(mustexactdefmds || maydefmds);
 
@@ -3648,11 +3675,10 @@ bool IR_DU_MGR::ForReachDef(
 }
 
 
-bool IR_DU_MGR::ForAvailExpression(
-            UINT bbid,
-            List<IRBB*> & preds,
-            List<IRBB*> * lst,
-            DefMiscBitSetMgr & bsmgr)
+bool IR_DU_MGR::ForAvailExpression(UINT bbid,
+                                   List<IRBB*> & preds,
+                                   List<IRBB*> * lst,
+                                   DefMiscBitSetMgr & bsmgr)
 {
     DUMMYUSE(lst);
     bool change = false;
@@ -3703,10 +3729,9 @@ bool IR_DU_MGR::ForAvailExpression(
 //Solve reaching definitions problem for IR STMT and
 //computing LIVE IN and LIVE OUT IR expressions.
 //'expr_univers': the Universal SET for ExpRep.
-void IR_DU_MGR::solve(
-        DefDBitSetCore const& expr_univers,
-        UINT const flag,
-        DefMiscBitSetMgr & bsmgr)
+void IR_DU_MGR::solve(DefDBitSetCore const& expr_univers,
+                      UINT const flag,
+                      DefMiscBitSetMgr & bsmgr)
 {
     BBList * bbl = m_rg->getBBList();
     IRBB const* entry = m_cfg->get_entry();
@@ -4272,13 +4297,12 @@ UINT IR_DU_MGR::checkIsNonLocalKillingDef(IR const* stmt, IR const* exp)
 }
 
 
-void IR_DU_MGR::checkDefSetToBuildDUChain(
-        IR const* exp,
-        MD const* expmd,
-        MDSet const* expmds,
-        DUSet * expdu,
-        DefSBitSetCore const* defset,
-        IRBB * curbb)
+void IR_DU_MGR::checkDefSetToBuildDUChain(IR const* exp,
+                                          MD const* expmd,
+                                          MDSet const* expmds,
+                                          DUSet * expdu,
+                                          DefSBitSetCore const* defset,
+                                          IRBB * curbb)
 {
     SEGIter * sc = NULL;
     if (exp->isReadPR()) {
@@ -4909,11 +4933,10 @@ void IR_DU_MGR::resetLocalAuxSet(DefMiscBitSetMgr & bsmgr)
 //'exp_stmt': stmt that exp is belong to.
 //'expdu': def set of exp.
 //'omit_self': true if we do not consider the 'exp_stmt' itself.
-IR * IR_DU_MGR::findDomDef(
-        IR const* exp,
-        IR const* exp_stmt,
-        DUSet const* expdefset,
-        bool omit_self)
+IR * IR_DU_MGR::findDomDef(IR const* exp,
+                           IR const* exp_stmt,
+                           DUSet const* expdefset,
+                           bool omit_self)
 {
     ASSERT0(const_cast<IR_DU_MGR*>(this)->getMayUse(exp) != NULL ||
             const_cast<IR_DU_MGR*>(this)->getMustUse(exp) != NULL);
@@ -4970,10 +4993,9 @@ IR * IR_DU_MGR::findDomDef(
 
 
 //Compute maydef, mustdef, mayuse information for current region.
-void IR_DU_MGR::computeRegionMDDU(
-        Vector<MDSet*> const* mustexactdef_mds,
-        Vector<MDSet*> const* maydef_mds,
-        MDSet const* mayuse_mds)
+void IR_DU_MGR::computeRegionMDDU(Vector<MDSet*> const* mustexactdef_mds,
+                                  Vector<MDSet*> const* maydef_mds,
+                                  MDSet const* mayuse_mds)
 {
     ASSERT0(mustexactdef_mds && maydef_mds && mayuse_mds);
     m_rg->initRefInfo();
@@ -5032,14 +5054,13 @@ void IR_DU_MGR::computeRegionMDDU(
 }
 
 
-size_t IR_DU_MGR::count_mem_local_data(
-        DefDBitSetCore * expr_univers,
-        Vector<MDSet*> * maydef_mds,
-        Vector<MDSet*> * mustexactdef_mds,
-        MDSet * mayuse_mds,
-        MDSet mds_arr_for_must[],
-        MDSet mds_arr_for_may[],
-        UINT elemnum)
+size_t IR_DU_MGR::count_mem_local_data(DefDBitSetCore * expr_univers,
+                                       Vector<MDSet*> * maydef_mds,
+                                       Vector<MDSet*> * mustexactdef_mds,
+                                       MDSet * mayuse_mds,
+                                       MDSet mds_arr_for_must[],
+                                       MDSet mds_arr_for_may[],
+                                       UINT elemnum)
 {
     size_t count = 0;
     if (expr_univers != NULL) {

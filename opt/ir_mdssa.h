@@ -261,8 +261,9 @@ public:
     //e.g: ir=...
     //    =ir //S1
     //If S1 will be deleted, ir should be removed from its useset in MDSSAInfo.
-    //NOTE: If ir is a IR tree, e.g: ild(x, ld(y)), remove ild(x) means ld(y) will
-    //be removed as well. And ld(y)'s MDSSAInfo will be updated as well.
+    //NOTE: If ir is a IR tree, e.g: ild(x, ld(y)), remove ild(x) means
+    //ld(y) will be removed as well. And ld(y)'s MDSSAInfo will be
+    //updated as well.
     void removeMDSSAUseRecur(IR * ir);
     //Remove DEF-USE chain if exist in between 'stmt' and 'exp'.
     //This function will remove 'exp' from occurence set.

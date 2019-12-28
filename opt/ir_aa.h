@@ -548,8 +548,6 @@ public:
     bool is_init() const { return m_maypts != NULL; }
     bool isFlowSensitive() const { return m_flow_sensitive; }
     bool isValidStmtToAA(IR * ir);
-    bool isFullMem(UINT mdid) const
-    { return mdid == MD_FULL_MEM ? true : false; }
     bool isHeapMem(UINT mdid) const
     { //return mdid == MD_HEAP_MEM ? true : false;
       DUMMYUSE(mdid);
