@@ -1716,7 +1716,8 @@ void BMat::sete(UINT num, ...)
     va_list ptr;
     va_start(ptr, num);
     for (UINT i = 0; i < num; i++) {
-        bool numer = va_arg(ptr, bool);
+        //Note bool is promoted to int when passed through '...'.
+        bool numer = (bool)va_arg(ptr, int);
         set(row, col++, numer);
         if (col >= m_col_size) {
             row++;

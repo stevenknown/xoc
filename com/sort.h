@@ -81,27 +81,27 @@ T Bucket<T>::append(T t)
     if (t == 0) { return 0; }
 
     UINT hashv = bucket_get_hash_value(t);
-    HC<float> * elemhc = (HC<float>*)HB_member(Hash<T>::m_bucket[hashv]);
+    HC<T> * elemhc = (HC<T>*)HB_member(Hash<T>::m_bucket[hashv]);
     if (elemhc != NULL) {
         while (elemhc != NULL) {
-            ASSERTN(HC_val(elemhc) != float(0), ("Container is empty"));
+            ASSERTN(HC_val(elemhc) != T(0), ("Container is empty"));
             if (bucket_compare(HC_val(elemhc), t)) {
                 break;
             }
             elemhc = elemhc->next;
         }
 
-        HC<float> * new_insert_one = Hash<T>::newhc();
+        HC<T> * new_insert_one = Hash<T>::newhc();
         ASSERTN(new_insert_one, ("newhc return NULL"));
         HC_val(new_insert_one) = t;
 
         if (elemhc == NULL) {
             //Append on tail of element-list
-            insertafter((HC<float>**)&(HB_member(Hash<T>::m_bucket[hashv])),
+            insertafter((HC<T>**)&(HB_member(Hash<T>::m_bucket[hashv])),
                         new_insert_one);
         } else {
             //Insert before the larger one to generate increment-list.
-            insertbefore_one((HC<float>**)&(HB_member(
+            insertbefore_one((HC<T>**)&(HB_member(
                 Hash<T>::m_bucket[hashv])), elemhc, new_insert_one);
         }
         HB_count(Hash<T>::m_bucket[hashv])++;
@@ -127,8 +127,8 @@ template <class T>
 void Bucket<T>::extract_elem(OUT Vector<T> & data)
 {
     INT j = 0;
-    for (UINT i = 0; i < Hash<float>::m_bucket_size; i++) {
-        HC<float> * elemhc = (HC<float>*)HB_member(Hash<T>::m_bucket[i]);
+    for (UINT i = 0; i < Hash<T>::m_bucket_size; i++) {
+        HC<T> * elemhc = (HC<T>*)HB_member(Hash<T>::m_bucket[i]);
         while (elemhc != NULL) {
             data[j++] = HC_val(elemhc);
             elemhc = elemhc->next;
@@ -142,9 +142,9 @@ void Bucket<T>::dump()
 {
     INT j = 0;
     printf("\nBUCKET");
-    for (UINT i = 0; i < Hash<float>::m_bucket_size; i++) {
+    for (UINT i = 0; i < Hash<T>::m_bucket_size; i++) {
         printf("\n\tB%d:", i);
-        HC<float> * elemhc = (HC<float>*)HB_member(Hash<T>::m_bucket[i]);
+        HC<T> * elemhc = (HC<T>*)HB_member(Hash<T>::m_bucket[i]);
         while (elemhc != NULL) {
             printf("%f,", HC_val(elemhc));
             elemhc = elemhc->next;
