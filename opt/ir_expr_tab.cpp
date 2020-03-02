@@ -36,9 +36,9 @@ author: Su Zhenyu
 namespace xoc {
 
 //
-//START IR_EXPR_TAB
+//START ExprTab
 //
-IR_EXPR_TAB::IR_EXPR_TAB(Region * rg)
+ExprTab::ExprTab(Region * rg)
 {
     m_expr_count = 0;
     m_rg = rg;
@@ -53,7 +53,7 @@ IR_EXPR_TAB::IR_EXPR_TAB(Region * rg)
 }
 
 
-IR_EXPR_TAB::~IR_EXPR_TAB()
+ExprTab::~ExprTab()
 {
     for (xcom::SC<ExpRep*> * sc = m_ir_expr_lst.get_head();
          sc != m_ir_expr_lst.end(); sc = m_ir_expr_lst.get_next(sc)) {
@@ -66,7 +66,7 @@ IR_EXPR_TAB::~IR_EXPR_TAB()
 }
 
 
-size_t IR_EXPR_TAB::count_mem()
+size_t ExprTab::count_mem()
 {
     size_t count = 0;
     count += sizeof(m_expr_count);
@@ -80,7 +80,7 @@ size_t IR_EXPR_TAB::count_mem()
 }
 
 
-void * IR_EXPR_TAB::xmalloc(INT size)
+void * ExprTab::xmalloc(INT size)
 {
     void * p = smpoolMalloc(size, m_pool);
     ASSERT0(p);
@@ -89,7 +89,7 @@ void * IR_EXPR_TAB::xmalloc(INT size)
 }
 
 
-void IR_EXPR_TAB::clean_occ_list()
+void ExprTab::clean_occ_list()
 {
     INT last = m_ir_expr_vec.get_last_idx();
     for (INT i = 0; i <= last; i++) {
@@ -102,11 +102,11 @@ void IR_EXPR_TAB::clean_occ_list()
 
 
 //Dump all IR expressions of region and its used MDs.
-void IR_EXPR_TAB::dump_ir_expr_tab()
+void ExprTab::dump_ir_expr_tab()
 {
     if (g_tfile == NULL) { return; }
-    note("\n==---- DUMP IR_EXPR_TAB ----==");
-    IR_DU_MGR * du_mgr = m_rg->getDUMgr();
+    note("\n==---- DUMP ExprTab ----==");
+    DUMgr * du_mgr = m_rg->getDUMgr();
     INT last = m_ir_expr_vec.get_last_idx();
     for (INT i = 0; i <= last; i++) {
         ExpRep * ie = m_ir_expr_vec.get(i);
@@ -132,20 +132,20 @@ void IR_EXPR_TAB::dump_ir_expr_tab()
 
 
 //If 'ir' has been inserted in the table with an ExpRep, get that and return.
-ExpRep * IR_EXPR_TAB::map_ir2ir_expr(IR const* ir)
+ExpRep * ExprTab::map_ir2ir_expr(IR const* ir)
 {
     if (ir == NULL) { return NULL; }
     return m_map_ir2ir_expr.get(ir->id());
 }
 
 
-void IR_EXPR_TAB::set_map_ir2ir_expr(IR const* ir, ExpRep * ie)
+void ExprTab::set_map_ir2ir_expr(IR const* ir, ExpRep * ie)
 {
     m_map_ir2ir_expr.set(ir->id(), ie);
 }
 
 
-UINT IR_EXPR_TAB::compute_hash_key(IR const* ir)
+UINT ExprTab::compute_hash_key(IR const* ir)
 {
     ASSERT0(ir != NULL);
     UINT hval = ir->getCode() + (ir->getOffset() + 1) + (UINT)(size_t)IR_dt(ir);
@@ -157,7 +157,7 @@ UINT IR_EXPR_TAB::compute_hash_key(IR const* ir)
 }
 
 
-UINT IR_EXPR_TAB::compute_hash_key_for_tree(IR * ir)
+UINT ExprTab::compute_hash_key_for_tree(IR * ir)
 {
     UINT hval = 0;
     m_iter.clean();
@@ -172,7 +172,7 @@ UINT IR_EXPR_TAB::compute_hash_key_for_tree(IR * ir)
 //Append IR tree expression into HASH table and return the entry-info.
 //If 'ir' has already been inserted in the table with an ExpRep,
 //get that and return.
-ExpRep * IR_EXPR_TAB::append_expr(IR * ir)
+ExpRep * ExprTab::append_expr(IR * ir)
 {
     if (ir == NULL) { return NULL; }
     UINT key = compute_hash_key_for_tree(ir);
@@ -240,7 +240,7 @@ ExpRep * IR_EXPR_TAB::append_expr(IR * ir)
 }
 
 
-ExpRep * IR_EXPR_TAB::new_ir_expr()
+ExpRep * ExprTab::new_ir_expr()
 {
     ExpRep * ie = new ExpRep();
     m_ir_expr_lst.append_head(ie);
@@ -249,7 +249,7 @@ ExpRep * IR_EXPR_TAB::new_ir_expr()
 
 
 //Remove occurence of ExpRep.
-IR * IR_EXPR_TAB::remove_occ(IR * occ)
+IR * ExprTab::remove_occ(IR * occ)
 {
     if (occ == NULL) { return NULL; }
     ASSERT0(occ->is_exp());
@@ -260,7 +260,7 @@ IR * IR_EXPR_TAB::remove_occ(IR * occ)
 
 
 //Remove all expr for given stmt out of occ list in expr-tab.
-void IR_EXPR_TAB::remove_occs(IR * ir)
+void ExprTab::remove_occs(IR * ir)
 {
     ASSERT0(ir->is_stmt());
     switch (ir->getCode()) {
@@ -330,7 +330,7 @@ void IR_EXPR_TAB::remove_occs(IR * ir)
 
 //Remove IR tree expression out of HASH table and return the removed
 //entry-info if it was existed.
-ExpRep * IR_EXPR_TAB::remove_expr(IR * ir)
+ExpRep * ExprTab::remove_expr(IR * ir)
 {
     UINT key = compute_hash_key_for_tree(ir);
 
@@ -363,7 +363,7 @@ ExpRep * IR_EXPR_TAB::remove_expr(IR * ir)
 
 //Return entry-info if expression has been entered into HASH table,
 //otherwise return NULL.
-ExpRep * IR_EXPR_TAB::find_expr(IR * ir)
+ExpRep * ExprTab::find_expr(IR * ir)
 {
     if (ir == NULL) { return NULL; }
     UINT key = compute_hash_key_for_tree(ir);
@@ -393,7 +393,7 @@ ExpRep * IR_EXPR_TAB::find_expr(IR * ir)
 }
 
 
-ExpRep * IR_EXPR_TAB::encode_expr(IN IR * ir)
+ExpRep * ExprTab::encode_expr(IN IR * ir)
 {
     if (ir == NULL) { return NULL; }
 
@@ -425,7 +425,7 @@ ExpRep * IR_EXPR_TAB::encode_expr(IN IR * ir)
 //Scan IR statement literally, and encoding it for generating
 //the unique id for each individual expressions, and update
 //the 'GEN-SET' and 'KILL-SET' of IR-EXPR for BB as well as.
-void IR_EXPR_TAB::encode_bb(IRBB * bb)
+void ExprTab::encode_bb(IRBB * bb)
 {
     xcom::C<IR*> * ct = NULL;
     for (IR * ir = BB_irlist(bb).get_head(&ct);
@@ -550,7 +550,7 @@ void IR_EXPR_TAB::encode_bb(IRBB * bb)
 }
 
 
-void IR_EXPR_TAB::reperform(IN OUT OptCtx & oc)
+void ExprTab::reperform(IN OUT OptCtx & oc)
 {
     clean_occ_list();
     perform(oc);
@@ -561,7 +561,7 @@ void IR_EXPR_TAB::reperform(IN OUT OptCtx & oc)
 //Scan IR statement literally, and encoding it for generating
 //the unique id for each individual expressions, and update
 //the 'GEN-SET' and 'KILL-SET' of IR-EXPR for BB as well as.
-bool IR_EXPR_TAB::perform(IN OUT OptCtx & oc)
+bool ExprTab::perform(IN OUT OptCtx & oc)
 {
     BBList * bbl = m_rg->getBBList();
     if (bbl->get_elem_count() == 0) { return false; }
@@ -574,6 +574,6 @@ bool IR_EXPR_TAB::perform(IN OUT OptCtx & oc)
     OC_is_expr_tab_valid(oc) = true;
     return true;
 }
-//END IR_EXPR_TAB
+//END ExprTab
 
 } //namespace xoc

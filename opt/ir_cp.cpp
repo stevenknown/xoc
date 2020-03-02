@@ -37,10 +37,10 @@ author: Su Zhenyu
 namespace xoc {
 
 //
-//START IR_CP
+//START CopyProp
 //
 //Return true if ir's type is consistent with 'cand_expr'.
-bool IR_CP::checkTypeConsistency(IR const* ir, IR const* cand_expr) const
+bool CopyProp::checkTypeConsistency(IR const* ir, IR const* cand_expr) const
 {
     Type const* t1 = ir->getType();
     Type const* t2 = cand_expr->getType();
@@ -78,7 +78,7 @@ bool IR_CP::checkTypeConsistency(IR const* ir, IR const* cand_expr) const
 //        g = 10
 //
 //NOTE: Do NOT handle stmt.
-void IR_CP::replaceExpViaSSADu(IR * exp,
+void CopyProp::replaceExpViaSSADu(IR * exp,
                                IR const* cand_expr,
                                IN OUT CPCtx & ctx)
 {
@@ -149,7 +149,7 @@ void IR_CP::replaceExpViaSSADu(IR * exp,
 //
 //stmt_use_ssadu: true if stmt in which cand_expr located used SSA DU info.
 //stmt_use_mdssadu: true if stmt in which cand_exp used Memory SSA DU info.
-void IR_CP::replaceExp(IR * exp,
+void CopyProp::replaceExp(IR * exp,
                        IR const* cand_expr,
                        IN OUT CPCtx & ctx,
                        bool stmt_use_ssadu,
@@ -171,7 +171,9 @@ void IR_CP::replaceExp(IR * exp,
     //if (parent->is_ild()) {
     //    CPC_need_recomp_aa(ctx) = true;
     //} else if (parent->is_ist() && exp == IST_base(parent)) {
-    //    if (!cand_expr->is_ld() && !cand_expr->is_pr() && !cand_expr->is_lda()) {
+    //    if (!cand_expr->is_ld() &&
+    //        !cand_expr->is_pr() &&
+    //        !cand_expr->is_lda()) {
     //        return;
     //    }
     //    CPC_need_recomp_aa(ctx) = true;
@@ -232,7 +234,7 @@ void IR_CP::replaceExp(IR * exp,
 }
 
 
-bool IR_CP::isCopyOR(IR * ir) const
+bool CopyProp::isCopyOR(IR * ir) const
 {
     switch (ir->getCode()) {
     case IR_ST:
@@ -260,7 +262,7 @@ bool IR_CP::isCopyOR(IR * ir) const
 //'prop_value': exp that will be propagated.
 //'use_stmt': stmt in use-list of 'def_ir'.
 //'use_bb': IRBB that use_stmt be placed in.
-bool IR_CP::is_available(IR const* def_stmt,
+bool CopyProp::is_available(IR const* def_stmt,
                          IR const* prop_value,
                          IR * use_stmt,
                          MDPhi * use_phi,
@@ -325,7 +327,7 @@ bool IR_CP::is_available(IR const* def_stmt,
         }
 
         visited.bunion(t->id());
-        for (xcom::EdgeC * el = VERTEX_in_list(m_cfg->get_vertex(t->id()));
+        for (xcom::EdgeC * el = VERTEX_in_list(m_cfg->getVertex(t->id()));
              el != NULL; el = EC_next(el)) {
             INT pred = VERTEX_id(EDGE_from(EC_edge(el)));
             if (!visited.is_contain(pred)) {
@@ -339,7 +341,7 @@ bool IR_CP::is_available(IR const* def_stmt,
 
 
 //CVT with simply cvt-exp is copy-propagate candidate.
-bool IR_CP::isSimpCVT(IR const* ir) const
+bool CopyProp::isSimpCVT(IR const* ir) const
 {
     if (!ir->is_cvt()) return false;
 
@@ -357,7 +359,7 @@ bool IR_CP::isSimpCVT(IR const* ir) const
 
 
 //CVT with simply cvt-exp is copy-propagate candidate.
-IR const* IR_CP::getSimpCVTValue(IR const* ir) const
+IR const* CopyProp::getSimpCVTValue(IR const* ir) const
 {
     if (!ir->is_cvt()) { return NULL; }
 
@@ -390,11 +392,11 @@ inline static IR * get_propagated_value(IR * stmt)
 
 
 //'usevec': for local used.
-bool IR_CP::doPropToMDPhi(bool prssadu,
-                          bool mdssadu,
-                          IN IR const* prop_value,
-                          IN IR * use,
-                          MDSSAMgr * mdssamgr)
+bool CopyProp::doPropToMDPhi(bool prssadu,
+                             bool mdssadu,
+                             IN IR const* prop_value,
+                             IN IR * use,
+                             MDSSAMgr * mdssamgr)
 {
     CPCtx lchange;
     replaceExp(use, prop_value, lchange, prssadu, mdssadu, mdssamgr);
@@ -403,7 +405,7 @@ bool IR_CP::doPropToMDPhi(bool prssadu,
 
 
 //'usevec': for local used.
-bool IR_CP::doPropToNormalStmt(xcom::C<IR*> * cur_iter,
+bool CopyProp::doPropToNormalStmt(xcom::C<IR*> * cur_iter,
                                xcom::C<IR*> ** next_iter,
                                bool prssadu,
                                bool mdssadu,
@@ -459,7 +461,7 @@ bool IR_CP::doPropToNormalStmt(xcom::C<IR*> * cur_iter,
 }
 
 
-void IR_CP::dumpCopyPropagationAction(IR const* def_stmt,
+void CopyProp::dumpCopyPropagationAction(IR const* def_stmt,
                                       IR const* prop_value,
                                       IR const* use,
                                       MDSSAMgr * mdssamgr)
@@ -486,7 +488,7 @@ void IR_CP::dumpCopyPropagationAction(IR const* def_stmt,
 }
 
 
-//bool IR_CP::isAllVMDReachAllUse(IR * ir,
+//bool CopyProp::isAllVMDReachAllUse(IR * ir,
 //                                MDSSAInfo * mdssainfo,
 //                                IN DefSBitSetCore & useset)
 //{
@@ -505,7 +507,7 @@ void IR_CP::dumpCopyPropagationAction(IR const* def_stmt,
 
 
 //'usevec': for local used.
-bool IR_CP::doProp(IN IRBB * bb,
+bool CopyProp::doProp(IN IRBB * bb,
                    IN DefSBitSetCore * useset,
                    MDSSAMgr * mdssamgr)
 {
@@ -653,7 +655,7 @@ bool IR_CP::doProp(IN IRBB * bb,
 }
 
 
-void IR_CP::doFinalRefine()
+void CopyProp::doFinalRefine()
 {
     RefineCtx rf;
     RC_insert_cvt(rf) = false;
@@ -661,7 +663,7 @@ void IR_CP::doFinalRefine()
 }
 
 
-bool IR_CP::perform(OptCtx & oc)
+bool CopyProp::perform(OptCtx & oc)
 {
     START_TIMER(t, getPassName());
     ASSERT0(OC_is_cfg_valid(oc));
@@ -686,7 +688,7 @@ bool IR_CP::perform(OptCtx & oc)
     xcom::Graph domtree;
     m_cfg->get_dom_tree(domtree);
     List<xcom::Vertex*> lst;
-    xcom::Vertex * root = domtree.get_vertex(entry->id());
+    xcom::Vertex * root = domtree.getVertex(entry->id());
     m_cfg->sortDomTreeInPreorder(root, lst);
     DefSBitSetCore useset;
 
@@ -722,6 +724,6 @@ bool IR_CP::perform(OptCtx & oc)
     }
     return change;
 }
-//END IR_CP
+//END CopyProp
 
 } //namespace xoc

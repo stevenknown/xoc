@@ -37,9 +37,9 @@ author: Su Zhenyu
 namespace xoc {
 class IPA;
 class CfsMgr;
-class IR_DU_MGR;
-class IR_AA;
-class IR_EXPR_TAB;
+class DUMgr;
+class AliasAnalysis;
+class ExprTab;
 class MDSSAMgr;
 
 //Make sure IR_ICALL is the largest ir.
@@ -246,10 +246,11 @@ public:
 
     inline DU * allocDU()
     {
-        DU * du = REGION_analysis_instrument(this)->m_free_du_list.remove_head();
+        DU * du = REGION_analysis_instrument(this)->
+            m_free_du_list.remove_head();
         if (du == NULL) {
             du = (DU*)smpoolMallocConstSize(sizeof(DU),
-                            REGION_analysis_instrument(this)->m_du_pool);
+                REGION_analysis_instrument(this)->m_du_pool);
             ::memset(du, 0, sizeof(DU));
         }
         return du;
@@ -478,25 +479,25 @@ public:
     PassMgr * getPassMgr() const
     { return REGION_analysis_instrument(this)->m_pass_mgr; }
 
-    //Return IR_CFG.
-    IR_CFG * getCFG() const
+    //Return IRCFG.
+    IRCFG * getCFG() const
     {
         return getPassMgr() != NULL ?
-            (IR_CFG*)getPassMgr()->queryPass(PASS_CFG) : NULL;
+            (IRCFG*)getPassMgr()->queryPass(PASS_CFG) : NULL;
     }
 
     //Get Alias Analysis.
-    IR_AA * getAA() const
+    AliasAnalysis * getAA() const
     {
         return getPassMgr() != NULL ?
-            (IR_AA*)getPassMgr()->queryPass(PASS_AA) : NULL;
+            (AliasAnalysis*)getPassMgr()->queryPass(PASS_AA) : NULL;
     }
 
     //Return DU info manager.
-    IR_DU_MGR * getDUMgr() const
+    DUMgr * getDUMgr() const
     {
         return getPassMgr() != NULL ?
-            (IR_DU_MGR*)getPassMgr()->queryPass(PASS_DU_MGR) : NULL;
+            (DUMgr*)getPassMgr()->queryPass(PASS_DU_MGR) : NULL;
     }
 
     //Return DU info manager.
@@ -529,7 +530,7 @@ public:
     {
         if (REGION_analysis_instrument(this)->m_return_list == NULL) {
             REGION_analysis_instrument(this)->m_return_list =
-                                        new List<IR const*>();
+                new List<IR const*>();
         }
         return REGION_analysis_instrument(this)->m_return_list;
     }
@@ -559,7 +560,7 @@ public:
     }
 
     //Allocate a internal LabelInfo that is not declared by compiler user.
-    inline LabelInfo * genIlabel()
+    LabelInfo * genIlabel()
     {
         LabelInfo * li = genIlabel(RM_label_count(getRegionMgr()));
         RM_label_count(getRegionMgr())++;

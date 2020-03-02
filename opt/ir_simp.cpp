@@ -1109,7 +1109,7 @@ IR * Region::simplifySwitchSelf(IR * ir, SimpCtx * ctx)
     LabelInfo * switch_endlab = NULL;
 
     //Simplify CASE list into IF as default to enable
-    //more advantage high level optimizations.
+    //more advanced middle level optimizations.
     if (SWITCH_deflab(ir) != NULL) {
         prev_ir_tree = buildGoto(SWITCH_deflab(ir));
         copyDbx(prev_ir_tree, ir, this);
@@ -1778,7 +1778,7 @@ IR * Region::simplifyCall(IR * ir, SimpCtx * ctx)
         if (g_is_simplify_parameter && !p->isMemoryOpnd() && !p->is_lda()) {
             //We always simplify parameters to lowest height to
             //facilitate the query of point-to set.
-            //e.g: IR_DU_MGR is going to compute may point-to while
+            //e.g: DUMgr is going to compute may point-to while
             //ADD is pointer type. But only MD has point-to set.
             //The query of point-to to ADD(id:6) is failed.
             //So we need to store the add's value to a PR,
@@ -2185,7 +2185,10 @@ IR * Region::simplifyStmt(IR * ir, SimpCtx * ctx)
     if (ir == NULL) { return NULL; }
     ASSERTN(ir->is_stmt(), ("expect statement node"));
     ASSERTN(ir->is_single(), ("ir should be remove out of list"));
+    if (ctx->isSimpCFSOnly() && ir->isStmtInBB()) { return ir; }
 
+    bool has_side_effect = ir->hasSideEffect();
+    bool is_no_move = ir->isNoMove();
     IR * ret_list = NULL;
     switch (ir->getCode()) {
     case IR_CALL:
@@ -2217,25 +2220,24 @@ IR * Region::simplifyStmt(IR * ir, SimpCtx * ctx)
     case IR_GOTO:
     case IR_LABEL:
     case IR_CASE:
-    case IR_RETURN:
-        {
-            SimpCtx tcont(*ctx);
-            ASSERT0(SIMP_stmtlist(ctx) == NULL);
-            SIMP_ret_array_val(&tcont) = true;
-            for (INT i = 0; i < IR_MAX_KID_NUM(ir); i++) {
-                IR * kid = ir->getKid(i);
-                if (kid != NULL) {
-                    ir->setKid(i, simplifyExpression(kid, &tcont));
-                    ctx->unionBottomupFlag(tcont);
-                    if (SIMP_stmtlist(&tcont) != NULL) {
-                        xcom::add_next(&ret_list, SIMP_stmtlist(&tcont));
-                        SIMP_stmtlist(&tcont) = NULL;
-                    }
+    case IR_RETURN: {
+        SimpCtx tcont(*ctx);
+        ASSERT0(SIMP_stmtlist(ctx) == NULL);
+        SIMP_ret_array_val(&tcont) = true;
+        for (INT i = 0; i < IR_MAX_KID_NUM(ir); i++) {
+            IR * kid = ir->getKid(i);
+            if (kid != NULL) {
+                ir->setKid(i, simplifyExpression(kid, &tcont));
+                ctx->unionBottomupFlag(tcont);
+                if (SIMP_stmtlist(&tcont) != NULL) {
+                    xcom::add_next(&ret_list, SIMP_stmtlist(&tcont));
+                    SIMP_stmtlist(&tcont) = NULL;
                 }
             }
-            xcom::add_next(&ret_list, ir);
         }
+        xcom::add_next(&ret_list, ir);
         break;
+    }
     case IR_TRUEBR:
     case IR_FALSEBR:
         ret_list = simplifyBranch(ir, ctx);
@@ -2288,6 +2290,12 @@ IR * Region::simplifyStmt(IR * ir, SimpCtx * ctx)
     default: ASSERTN(0, ("'%s' is not a statement",IRNAME(ir)));
     }
     setParentPointerForIRList(ret_list);
+    if (has_side_effect || is_no_move) {
+        for (IR * t = ret_list; t != NULL; t = t->get_next()) {
+            IR_has_sideeffect(t) = has_side_effect ? true : t->hasSideEffect();
+            IR_no_move(t) = is_no_move ? true : t->isNoMove();
+        }
+    }
     return ret_list;
 }
 

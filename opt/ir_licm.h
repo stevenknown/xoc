@@ -37,12 +37,12 @@ author: Su Zhenyu
 namespace xoc {
 
 //Loop Invariant code Motion.
-class IR_LICM : public Pass {
+class LICM : public Pass {
 protected:
     Region * m_rg;
-    IR_AA * m_aa;
-    IR_DU_MGR * m_du;
-    IR_CFG * m_cfg;
+    AliasAnalysis * m_aa;
+    DUMgr * m_du;
+    IRCFG * m_cfg;
     ConstIRIter m_iriter;
     ConstMDIter m_mditer;
     TypeMgr * m_tm;
@@ -105,7 +105,7 @@ protected:
     }
 
 public:
-    explicit IR_LICM(Region * rg)
+    explicit LICM(Region * rg)
     {
         ASSERT0(rg != NULL);
         m_rg = rg;
@@ -118,8 +118,8 @@ public:
         m_pool = smpoolCreate(4 * sizeof(UINT), MEM_CONST_SIZE);
         m_ssamgr = NULL;
     }
-    COPY_CONSTRUCTOR(IR_LICM);
-    virtual ~IR_LICM() { smpoolDelete(m_pool); }
+    COPY_CONSTRUCTOR(LICM);
+    virtual ~LICM() { smpoolDelete(m_pool); }
 
     bool analysis(IN LI<IRBB> * li,
                   OUT TTab<IR*> & invariant_stmt,

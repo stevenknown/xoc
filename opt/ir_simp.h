@@ -56,6 +56,7 @@ class CfsMgr;
 #define SIMP_array_to_pr_mode(s)   (s)->prop_top_down.s1.simp_array_to_pr_mode
 #define SIMP_to_lowest_height(s)   (s)->prop_top_down.s1.simp_to_lowest_height
 #define SIMP_ret_array_val(s)      (s)->prop_top_down.s1.simp_to_get_array_value
+#define SIMP_cfs_only(s)           (s)->prop_top_down.s1.simp_cfs_only
 #define SIMP_is_record_cfs(s)      (s)->prop_top_down.s1.is_record_cfs
 #define SIMP_stmtlist(s)           (s)->ir_stmt_list
 #define SIMP_break_label(s)        (s)->break_label
@@ -125,6 +126,10 @@ public:
             //    &a + i*elem_size + j,
             //Or else return ILD(&a + i*elem_size + j).
             UINT simp_to_get_array_value:1;
+
+            //Propagate info top down.
+            //If it is true, simplfy Control-Flow-Struct stmt only.
+            UINT simp_cfs_only:1;
 
             //Propagate info top down.
             //Record high level Control-Flow-Struct info.
@@ -209,7 +214,7 @@ public:
     //Copy the actions which propagated bottom up
     //during processing IR tree.
     void copyBottomupFlag(SimpCtx const& c)
-	{ prop_bottom_up.flag_value = c.prop_bottom_up.flag_value; }
+    { prop_bottom_up.flag_value = c.prop_bottom_up.flag_value; }
 
     //Unify the actions which propagated bottom up
     //during processing IR tree.
@@ -243,6 +248,9 @@ public:
                SIMP_break(this) ||
                SIMP_continue(this);
     }
+
+    //Return true if only simply CFS.
+    bool isSimpCFSOnly() const { return SIMP_cfs_only(this); }
 
     //Simplify IR_ARRAY to linear address computational stmt/expression.
     void setSimpArray() { SIMP_array(this) = true; }
@@ -294,11 +302,11 @@ public:
         setSimpToLowestHeight();
     }
 
-	void dump(Region * rg) {
-		ASSERT0(rg);
-		note("\n==---- DUMP SimpCtx IR List ----==");
-		dumpIRList(ir_stmt_list, rg);
-	}
+    void dump(Region * rg) {
+        ASSERT0(rg);
+        note("\n==---- DUMP SimpCtx IR List ----==");
+        dumpIRList(ir_stmt_list, rg);
+    }
 };
 
 } //namespace xoc

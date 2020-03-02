@@ -847,7 +847,7 @@ void RSC::comp_lt_usable(LT * lt, LTMgr * ltm)
 }
 
 
-//Verify each stmt has instruction constrain.
+//Verify each stmt has instruction constraint.
 bool RSC::verify_fmt()
 {
     List<IRBB*> * bbl = m_rg->getBBList();
@@ -863,7 +863,7 @@ bool RSC::verify_fmt()
 }
 
 
-//'omit_constrain': true if all constrain is omit, and
+//'omit_constrain': true if all constraint is omit, and
 //                    only initialize usable set to the largest.
 void RSC::comp_local_usage(LTMgr * ltm, bool only_local, bool omit_constrain)
 {
@@ -881,7 +881,7 @@ void RSC::comp_local_usage(LTMgr * ltm, bool only_local, bool omit_constrain)
 }
 
 
-//Recompute all global and local lt constrain.
+//Recompute all global and local lt constraint.
 //Note an explictly clean() is dispensable before this call.
 void RSC::perform(bool omit_constrain)
 {
@@ -1404,7 +1404,7 @@ bool GIG::is_interf_with_neighbour(GLT * g, DefSBitSet & nis, UINT phy)
 {
     ASSERT0(g && phy < 65000);
     nis.clean();
-    get_neighbor_set(nis, GLT_id(g));
+    getNeighborSet(nis, GLT_id(g));
     SEGIter * cur = NULL;
     for (INT ltid = nis.get_first(&cur);
          ltid >= 0; ltid = nis.get_next(ltid, &cur)) {
@@ -3172,7 +3172,7 @@ float BBRA::computePrio(LT const* lt)
     //If there is not avaiable register for parameters, we
     //need to spill other LT. Here we can not spill live through
     //global lt, because a reload need to be inserted at the end
-    //of BB. That violates the constrain of BB.
+    //of BB. That violates the constraint of BB.
     //In order to avoid the rarely situation, lt with branch should get a
     //highest priority.
     if (lt->has_branch(m_ltm)) {
@@ -3405,7 +3405,7 @@ bool BBRA::is_live_through(LT const* l) const
 }
 
 
-//Return true if the phy of cand satisified lt's constrain.
+//Return true if the phy of cand satisified lt's constraint.
 bool BBRA::isSatisfiedConstrain(LT * lt, LT * cand)
 {
     if (!cand->has_allocated()) { return false; }
@@ -4100,7 +4100,7 @@ void RA::allocLocal(List<UINT> & nis, bool omit_constrain)
 }
 
 
-//Alloc phy-register for local lt which has specific constrain.
+//Alloc phy-register for local lt which has specific constraint.
 void RA::allocLocalSpec(List<UINT> & nis)
 {
     BBList * bbl = m_rg->getBBList();
@@ -4508,7 +4508,7 @@ bool RA::checkIfNeedSpill(UINT prno, FMT fmt, LTMgr const* ltm)
 }
 
 
-//Revise resource constrain.
+//Revise resource constraint.
 void RA::reviseRSC()
 {
     UINT resc = 0;
@@ -4904,7 +4904,7 @@ bool RA::overlapParam(LT const* l) const
 
 
 //Try to compute the maximum number of registers that
-//satisfied register group constrains when range starts at 'rangestart'.
+//satisfied register group constraints when range starts at 'rangestart'.
 //'occupied': phy that has assigned to neighbours of ltg member.
 //'assigend': phy that has assigned to ltg member.
 UINT RA::computeSatisfiedNumRegister(
@@ -4971,7 +4971,7 @@ UINT RA::computeSatisfiedNumRegister(
 
 
 //Compute the number of registers that satisfied register
-//group constrains when range starts at 'rangestart'.
+//group constraints when range starts at 'rangestart'.
 //NOTE: This function must find a legal range even if
 //inserting move.
 UINT RA::computeNumRegister(
@@ -5338,12 +5338,12 @@ void RA::assignLTG(LTG * ltg, IR * ir)
     for (INT i = 0; i <= ltg->get_last_idx(); i++) {
         LT * l = ltg->get(i);
         ASSERT0(l);
-        ig->get_neighbor_set(nis, LT_uid(l));
+        ig->getNeighborSet(nis, LT_uid(l));
 
         //if (LT_is_global(l)) {
         //    GLT * g = m_gltm.map_pr2glt(LT_prno(l));
         //    ASSERT0(g);
-        //    m_ig.get_neighbor_set(gnis, GLT_id(g));
+        //    m_ig.getNeighborSet(gnis, GLT_id(g));
         //}
 
         if (l->has_allocated()) {
@@ -5442,7 +5442,7 @@ void RA::assignLTG(LTG * ltg, IR * ir)
             IG * nig = nltm->get_ig();
             ASSERT0(nig);
             nis.clean();
-            nig->get_neighbor_set(nis, LT_uid(gl));
+            nig->getNeighborSet(nis, LT_uid(gl));
 
             //Compute the phy occupied by local part.
             SEGIter * cur2 = NULL;
@@ -5472,7 +5472,7 @@ void RA::assignLTG(LTG * ltg, IR * ir)
 }
 
 
-//Verify lt's phy satisfied the constrains of occ.
+//Verify lt's phy satisfied the constraints of occ.
 //Note
 //  * This function should be invoked after all lts has allocated.
 //  * This function does not check LT's usable set, only check instructions.

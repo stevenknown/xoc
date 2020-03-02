@@ -627,7 +627,7 @@ class GIG : public Graph {
 protected:
 public:
     Region * m_rg;
-    IR_CFG * m_cfg;
+    IRCFG * m_cfg;
     GltMgr * m_gltm;
 
     //consider local life time interference during global allocation.
@@ -663,7 +663,7 @@ public:
 };
 
 
-//Compute the Resource Constrains
+//Compute the Resource Constraints
 class RSC {
     friend class RA;
 protected:
@@ -741,7 +741,7 @@ protected:
     RSC * m_rsc;
     IG * m_ig;
 
-    //true if omit constrain when compute lt usable-regs set.
+    //true if omit constraint when compute lt usable-regs set.
     BYTE m_omit_constrain:1;
 
     List<LT*> * m_tmp_lts; //for local tmp use.
@@ -814,7 +814,7 @@ protected:
     GIG m_ig;
     RSC m_rsc;
     Region * m_rg;
-    IR_CFG * m_cfg;
+    IRCFG * m_cfg;
     TypeMgr * m_tm;
     TypeIndexRep * m_tr;
     Vreg2PR * m_v2pr;

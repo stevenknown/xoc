@@ -35,7 +35,7 @@ author: Su Zhenyu
 
 namespace xoc {
 
-bool IR_CFG::goto_opt(IRBB * bb)
+bool IRCFG::goto_opt(IRBB * bb)
 {
     DUMMYUSE(bb);
     return false;

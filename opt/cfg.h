@@ -94,14 +94,12 @@ protected:
 
     void dumpLoopTree(LI<BB> * looplist, UINT indent, FILE * h);
 
-    bool removeRedundantBranchCase1(
-            BB *RESTRICT bb,
-            BB const*RESTRICT next_bb,
-            XR * xr);
+    bool removeRedundantBranchCase1(BB *RESTRICT bb,
+                                    BB const*RESTRICT next_bb,
+                                    XR * xr);
     void removeUnreachableBB(UINT id, xcom::BitSet & visited);
     void removeUnreachableBB2(UINT id, xcom::BitSet & visited);
-    void sortByDFSRecur(List<BB*> & new_bbl, BB * bb,
-        Vector<bool> & visited);
+    void sortByDFSRecur(List<BB*> & new_bbl, BB * bb, Vector<bool> & visited);
 
     void * xmalloc(size_t size)
     {
@@ -150,7 +148,7 @@ public:
     {
         ASSERTN(m_entry, ("Not found entry"));
         List<xcom::Vertex const*> vlst;
-        computeRpoNoRecursive(get_vertex(m_entry->id()), vlst);
+        computeRpoNoRecursive(getVertex(m_entry->id()), vlst);
         return xcom::DGraph::computeDom(&vlst, uni);
     }
 
@@ -161,7 +159,7 @@ public:
         //ASSERTN(m_exit_list.get_elem_count() == 1,
         //   ("ONLY support SESE or SEME"));
         ASSERTN(m_entry, ("Not found entry"));
-        return xcom::DGraph::computePdomByRpo(get_vertex(m_entry->id()), uni);
+        return xcom::DGraph::computePdomByRpo(getVertex(m_entry->id()), uni);
     }
 
     //Compute all reachable BBs start from 'startbb'.
@@ -172,8 +170,8 @@ public:
         ASSERT0(startbb);
         List<xcom::Vertex const*> wl;
         UINT id = startbb->id();
-        ASSERT0(get_vertex(id));
-        wl.append_tail(get_vertex(id));
+        ASSERT0(getVertex(id));
+        wl.append_tail(getVertex(id));
 
         xcom::Vertex const* v;
         while ((v = wl.remove_head()) != NULL) {
@@ -202,8 +200,8 @@ public:
         ASSERT0(startbb);
         List<xcom::Vertex const*> wl;
         UINT id = startbb->id();
-        ASSERT0(get_vertex(id));
-        wl.append_tail(get_vertex(id));
+        ASSERT0(getVertex(id));
+        wl.append_tail(getVertex(id));
 
         xcom::Vertex const* v;
         while ((v = wl.remove_head()) != NULL) {
@@ -239,7 +237,7 @@ public:
             BB * bb = ct->val();
             ASSERT0(bb);
 
-            ASSERTN(get_vertex(bb->id()),
+            ASSERTN(getVertex(bb->id()),
                 ("No vertex corresponds to BB%d", bb->id()));
 
             if (isCFGExit(bb->id())) {
@@ -316,7 +314,7 @@ public:
     BB * get_first_succ(BB const* bb) const
     {
         ASSERT0(bb);
-        xcom::Vertex * vex = get_vertex(bb->id());
+        xcom::Vertex * vex = getVertex(bb->id());
         ASSERT0(vex);
 
         xcom::EdgeC * ec = VERTEX_out_list(vex);
@@ -341,11 +339,10 @@ public:
 
     //Return the root node of LoopInfo tree.
     LI<BB> * getLoopInfo() { return m_loop_info; }
-    void getKidOfIF(
-            BB * bb,
-            BB ** true_body,
-            BB ** false_body,
-            BB ** sibling);
+    void getKidOfIF(BB * bb,
+                    BB ** true_body,
+                    BB ** false_body,
+                    BB ** sibling);
     void getKidOfLoop(IN BB * bb, OUT BB ** sibling, OUT BB ** body_root);
 
     //Return the last instruction of BB.
@@ -358,18 +355,17 @@ public:
     //True if has exception handler edge.
     bool hasEHEdge() const { return m_has_eh_edge; }
 
-    void identifyNaturalLoop(
-            UINT x,
-            UINT y,
-            IN OUT xcom::BitSet & loop,
-            List<UINT> & tmp);
+    void identifyNaturalLoop(UINT x,
+                             UINT y,
+                             IN OUT xcom::BitSet & loop,
+                             List<UINT> & tmp);
 
     bool isCFGEntry(UINT bbid)
-    { return xcom::Graph::is_graph_entry(get_vertex(bbid)); }
+    { return xcom::Graph::is_graph_entry(getVertex(bbid)); }
 
     //Return true if bb is exit BB of CFG.
     bool isCFGExit(UINT bbid)
-    { return xcom::Graph::is_graph_exit(get_vertex(bbid)); }
+    { return xcom::Graph::is_graph_exit(getVertex(bbid)); }
 
     //Return true if bb is entry BB of function.
     //In some case, BB is not Region entry even if it is the CFG entry.
@@ -396,7 +392,7 @@ public:
 
     void removeEdge(BB * from, BB * to)
     {
-        xcom::Edge * e = xcom::Graph::get_edge(from->id(), to->id());
+        xcom::Edge * e = xcom::Graph::getEdge(from->id(), to->id());
         ASSERT0(e != NULL);
         xcom::Graph::removeEdge(e);
     }
@@ -439,14 +435,14 @@ public:
     {
         //The entry node can not have any predecessors.
         ASSERT0(m_entry);
-        xcom::Vertex * vex = get_vertex(m_entry->id());
-        CHECK_DUMMYUSE(vex && get_in_degree(vex) == 0);
+        xcom::Vertex * vex = getVertex(m_entry->id());
+        CHECK_DUMMYUSE(vex && getInDegree(vex) == 0);
 
         //The exit node can not have successors.
         for (BB * bb = m_exit_list.get_head();
              bb != NULL; bb = m_exit_list.get_next()) {
-            xcom::Vertex * vex2 = get_vertex(bb->id());
-            CHECK_DUMMYUSE(vex2 && get_out_degree(vex2) == 0);
+            xcom::Vertex * vex2 = getVertex(bb->id());
+            CHECK_DUMMYUSE(vex2 && getOutDegree(vex2) == 0);
         }
         return true;
     }
@@ -460,10 +456,7 @@ public:
 //    END_LOOP
 //    LOOP_SIBLING
 template <class BB, class XR>
-void CFG<BB, XR>::getKidOfLoop(
-        IN BB * bb,
-        OUT BB ** sibling,
-        OUT BB ** body_root)
+void CFG<BB, XR>::getKidOfLoop(BB * bb, OUT BB ** sibling, OUT BB ** body_root)
 {
     LI<BB> * li = mapBB2LabelInfo(bb);
     ASSERT0(li != NULL && LI_loop_head(li) == bb);
@@ -490,11 +483,10 @@ void CFG<BB, XR>::getKidOfLoop(
 //    END_IF
 //    IF_SIBLING
 template <class BB, class XR>
-void CFG<BB, XR>::getKidOfIF(
-        BB * bb,
-        BB ** true_body,
-        BB ** false_body,
-        BB ** sibling)
+void CFG<BB, XR>::getKidOfIF(BB * bb,
+                             BB ** true_body,
+                             BB ** false_body,
+                             BB ** sibling)
 {
     if (true_body != NULL || false_body != NULL) {
         UINT ipdom = xcom::DGraph::get_ipdom(bb->id());
@@ -599,7 +591,7 @@ bool CFG<BB, XR>::verifyIfBBRemoved(IN CDG * cdg, OptCtx & oc)
                  succ != NULL; succ = succs.get_next()) {
                 if (succ == next_bb || succ == bb) { continue; }
 
-                xcom::Edge * e = get_edge(bb->id(), succ->id());
+                xcom::Edge * e = getEdge(bb->id(), succ->id());
                 if (EDGE_info(e) != NULL &&
                     CFGEI_is_eh((CFGEdgeInfo*)EDGE_info(e))) {
                     continue;
@@ -708,11 +700,11 @@ bool CFG<BB, XR>::removeEmptyBB(OptCtx & oc)
                  ct2 != preds.end(); ct2 = preds.get_next(ct2)) {
                 BB * pred = ct2->val();
                 ASSERT0(pred);
-                if (get_vertex(pred->id()) == NULL) {
+                if (getVertex(pred->id()) == NULL) {
                     continue;
                 }
 
-                if (get_edge(pred->id(), next_bb->id()) != NULL) {
+                if (getEdge(pred->id(), next_bb->id()) != NULL) {
                     //If bb removed, the number of its successors will decrease.
                     //Then the number of PHI of bb's successors must be revised.
                     bb->removeSuccessorPhiOpnd(this);
@@ -724,7 +716,7 @@ bool CFG<BB, XR>::removeEmptyBB(OptCtx & oc)
             for (succs.get_head(&ct2);
                  ct2 != succs.end(); ct2 = succs.get_next(ct2)) {
                 BB * succ = ct2->val();
-                if (get_vertex(succ->id()) == NULL || succ == next_bb) {
+                if (getVertex(succ->id()) == NULL || succ == next_bb) {
                     continue;
                 }
 
@@ -761,6 +753,9 @@ bool CFG<BB, XR>::removeEmptyBB(OptCtx & oc)
                 } else if (last_xr != NULL &&
                            last_xr->isUnconditionalBr() &&
                            !last_xr->isIndirectBr()) {
+                    if (last_xr->hasSideEffect()) {
+                        continue;
+                    }
                     //Add fall-through edge between prev_of_succ and succ.
                     //e.g:
                     //prev_of_succ:
@@ -790,10 +785,9 @@ bool CFG<BB, XR>::removeEmptyBB(OptCtx & oc)
 
 //Remove redundant branch edge.
 template <class BB, class XR>
-bool CFG<BB, XR>::removeRedundantBranchCase1(
-        BB *RESTRICT bb,
-        BB const*RESTRICT next_bb,
-        XR * xr)
+bool CFG<BB, XR>::removeRedundantBranchCase1(BB *RESTRICT bb,
+                                             BB const*RESTRICT next_bb,
+                                             XR * xr)
 {
     ASSERT0(bb && xr);
     //CASE:
@@ -805,7 +799,7 @@ bool CFG<BB, XR>::removeRedundantBranchCase1(
     //    ... //S3
     //
     //S1 is redundant branch.
-    xcom::Vertex * v = get_vertex(bb->id());
+    xcom::Vertex * v = getVertex(bb->id());
     xcom::EdgeC * last_el = NULL;
     bool find = false; //find another successor with different target.
     for (xcom::EdgeC * el = VERTEX_out_list(v); el != NULL; el = EC_next(el)) {
@@ -859,7 +853,9 @@ bool CFG<BB, XR>::removeRedundantBranch()
                     ("should call removeEmptyBB() first."));
             continue;
         }
-
+        if (xr->hasSideEffect()) {
+            continue;
+        }
         if (xr->isConditionalBr()) {
             doit |= removeRedundantBranchCase1(bb, next_bb, xr);
         } else if (xr->isUnconditionalBr() && !xr->isIndirectBr()) {
@@ -883,10 +879,9 @@ bool CFG<BB, XR>::removeRedundantBranch()
 
 
 template <class BB, class XR>
-void CFG<BB, XR>::sortByDFSRecur(
-        List<BB*> & new_bbl,
-        BB * bb,
-        Vector<bool> & visited)
+void CFG<BB, XR>::sortByDFSRecur(List<BB*> & new_bbl,
+                                 BB * bb,
+                                 Vector<bool> & visited)
 {
     if (bb == NULL) return;
     visited.set(bb->id(), true);
@@ -1004,11 +999,11 @@ void CFG<BB, XR>::sortByTopological()
     List<xcom::Vertex*> succ;
     INT c;
     List<xcom::Vertex*> header;
-    while (g.get_vertex_num() > 0) {
+    while (g.getVertexNum() > 0) {
         header.clean();
         for (xcom::Vertex * vex = g.get_first_vertex(c);
              vex != NULL; vex = g.get_next_vertex(c)) {
-            if (g.get_in_degree(vex) == 0) {
+            if (g.getInDegree(vex) == 0) {
                 header.append_tail(vex);
             }
         }
@@ -1042,7 +1037,7 @@ template <class BB, class XR>
 void CFG<BB, XR>::removeUnreachableBB2(UINT id, xcom::BitSet & visited)
 {
     visited.bunion(id);
-    xcom::EdgeC * el = VERTEX_out_list(get_vertex(id));
+    xcom::EdgeC * el = VERTEX_out_list(getVertex(id));
     while (el != NULL) {
         UINT succ = VERTEX_id(EDGE_to(EC_edge(el)));
         if (!visited.is_contain(succ)) {
@@ -1057,8 +1052,8 @@ template <class BB, class XR>
 void CFG<BB, XR>::removeUnreachableBB(UINT id, xcom::BitSet & visited)
 {
     List<xcom::Vertex*> wl;
-    ASSERT0(get_vertex(id));
-    wl.append_tail(get_vertex(id));
+    ASSERT0(getVertex(id));
+    wl.append_tail(getVertex(id));
     visited.bunion(id);
 
     xcom::Vertex * v;
@@ -1124,13 +1119,13 @@ bool CFG<BB, XR>::removeUnreachBB()
 template <class BB, class XR>
 void CFG<BB, XR>::chainPredAndSucc(UINT vid, bool is_single_pred_succ)
 {
-    xcom::Vertex * v = get_vertex(vid);
+    xcom::Vertex * v = getVertex(vid);
     ASSERT0(v);
     xcom::EdgeC * pred_lst = VERTEX_in_list(v);
     xcom::EdgeC * succ_lst = VERTEX_out_list(v);
     if (is_single_pred_succ) {
-        ASSERTN(get_in_degree(v) <= 1 &&
-                get_out_degree(v) <= 1,
+        ASSERTN(getInDegree(v) <= 1 &&
+                getOutDegree(v) <= 1,
                 ("BB only has solely pred and succ."));
     }
     while (pred_lst != NULL) {
@@ -1151,7 +1146,7 @@ template <class BB, class XR>
 void CFG<BB, XR>::get_succs(IN OUT List<BB*> & succs, BB const* v)
 {
     ASSERT0(v);
-    xcom::Vertex * vex = get_vertex(v->id());
+    xcom::Vertex * vex = getVertex(v->id());
     xcom::EdgeC * el = VERTEX_out_list(vex);
     succs.clean();
     while (el != NULL) {
@@ -1167,7 +1162,7 @@ template <class BB, class XR>
 void CFG<BB, XR>::get_preds(IN OUT List<BB*> & preds, BB const* v)
 {
     ASSERT0(v);
-    xcom::Vertex * vex = get_vertex(v->id());
+    xcom::Vertex * vex = getVertex(v->id());
     xcom::EdgeC * el = VERTEX_in_list(vex);
     preds.clean();
     while (el != NULL) {
@@ -1396,7 +1391,7 @@ void CFG<BB, XR>::addBreakOutLoop(BB * loop_head, xcom::BitSet & body_set)
 {
     for (INT i = body_set.get_first(); i >= 0; i = body_set.get_next((UINT)i)) {
         if (i == (INT)loop_head->id()) { continue; }
-        xcom::Vertex * v = get_vertex((UINT)i);
+        xcom::Vertex * v = getVertex((UINT)i);
         ASSERT0(v);
         xcom::EdgeC * out = VERTEX_out_list(v);
         UINT c = 0;
@@ -1484,7 +1479,7 @@ bool CFG<BB, XR>::findLoop()
         BB * bb = ct->val();
 
         //Access each sussessor of bb.
-        xcom::Vertex * vex = get_vertex(bb->id());
+        xcom::Vertex * vex = getVertex(bb->id());
         ASSERT0(vex);
         for (xcom::EdgeC * el = VERTEX_out_list(vex);
              el != NULL; el = EC_next(el)) {
@@ -1532,11 +1527,10 @@ bool CFG<BB, XR>::findLoop()
 
 //Back edge: y dominate x, back-edge is : x->y
 template <class BB, class XR>
-void CFG<BB, XR>::identifyNaturalLoop(
-        UINT x,
-        UINT y,
-        IN OUT xcom::BitSet & loop,
-        List<UINT> & tmp)
+void CFG<BB, XR>::identifyNaturalLoop(UINT x,
+                                      UINT y,
+                                      IN OUT xcom::BitSet & loop,
+                                      List<UINT> & tmp)
 {
     //Both x,y are node in loop.
     loop.bunion(x);
@@ -1550,7 +1544,7 @@ void CFG<BB, XR>::identifyNaturalLoop(
             //All nodes in the path among from 'x' to 'y'
             //are belong to natural loop.
             UINT bb = tmp.remove_tail();
-            xcom::EdgeC const* ec = VERTEX_in_list(get_vertex(bb));
+            xcom::EdgeC const* ec = VERTEX_in_list(getVertex(bb));
             while (ec != NULL) {
                 INT pred = VERTEX_id(EDGE_from(EC_edge(ec)));
                 if (!loop.is_contain(pred)) {
@@ -1644,7 +1638,7 @@ void CFG<BB, XR>::dumpVCG(CHAR const* name)
             "\nnode: {title:\"%d\" vertical_order:%d shape:%s color:%s "
             "fontname:\"%s\" scaling:%d label:\"",
             bb->id(), vertical_order++, shape, color, font, scale);
-        xcom::Vertex * v = get_vertex(bb->id());
+        xcom::Vertex * v = getVertex(bb->id());
         fprintf(hvcg, "   BB%d ", bb->id());
         if (VERTEX_rpo(v) != 0) {
             fprintf(hvcg, " rpo:%d", VERTEX_rpo(v));
@@ -1675,10 +1669,9 @@ void CFG<BB, XR>::dumpVCG(CHAR const* name)
 
 
 template <class BB, class XR>
-void CFG<BB, XR>::computeRPOImpl(
-        IN OUT xcom::BitSet & is_visited,
-        IN xcom::Vertex * v,
-        IN OUT INT & order)
+void CFG<BB, XR>::computeRPOImpl(IN OUT xcom::BitSet & is_visited,
+                                 IN xcom::Vertex * v,
+                                 IN OUT INT & order)
 {
     is_visited.bunion(VERTEX_id(v));
     xcom::EdgeC * el = VERTEX_out_list(v);
@@ -1717,10 +1710,10 @@ void CFG<BB, XR>::computeRPO(OptCtx & oc)
 
     #ifdef RECURSIVE_ALGO
     INT order = m_bb_list->get_elem_count();
-    computeRPOImpl(is_visited, get_vertex(m_entry->id()), order);
+    computeRPOImpl(is_visited, getVertex(m_entry->id()), order);
     #else
     List<xcom::Vertex const*> vlst;
-    computeRpoNoRecursive(get_vertex(m_entry->id()), vlst);
+    computeRpoNoRecursive(getVertex(m_entry->id()), vlst);
     #endif
 
     m_rpo_bblst.clean();

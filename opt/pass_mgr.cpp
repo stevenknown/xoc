@@ -89,7 +89,7 @@ void PassMgr::destroyAllPass()
 
 Pass * PassMgr::allocCopyProp()
 {
-    Pass * pass = new IR_CP(m_rg);
+    Pass * pass = new CopyProp(m_rg);
     SimpCtx * simp = (SimpCtx*)xmalloc(sizeof(SimpCtx));
     simp->init();
     pass->set_simp_cont(simp);
@@ -99,70 +99,70 @@ Pass * PassMgr::allocCopyProp()
 
 Pass * PassMgr::allocGCSE()
 {
-    return new IR_GCSE(m_rg, (IR_GVN*)registerPass(PASS_GVN));
+    return new GCSE(m_rg, (GVN*)registerPass(PASS_GVN));
 }
 
 
 Pass * PassMgr::allocLCSE()
 {
-    return new IR_LCSE(m_rg);
+    return new LCSE(m_rg);
 }
 
 
 Pass * PassMgr::allocRP()
 {
-    return new IR_RP(m_rg, (IR_GVN*)registerPass(PASS_GVN));
+    return new RegPromot(m_rg, (GVN*)registerPass(PASS_GVN));
 }
 
 
 Pass * PassMgr::allocPRE()
 {
-    //return new IR_PRE(m_rg);
+    //return new PRE(m_rg);
     return NULL;
 }
 
 
 Pass * PassMgr::allocIVR()
 {
-    //return new IR_IVR(m_rg);
+    //return new IVR(m_rg);
     return NULL;
 }
 
 
 Pass * PassMgr::allocLICM()
 {
-    return new IR_LICM(m_rg);
+    return new LICM(m_rg);
 }
 
 
 Pass * PassMgr::allocDCE()
 {
-    return new IR_DCE(m_rg);
+    return new DeadCodeElim(m_rg);
 }
 
 
 Pass * PassMgr::allocDSE()
 {
-    //return new IR_DSE(m_rg);
+    //return new DSE(m_rg);
     return NULL;
 }
 
 
 Pass * PassMgr::allocRCE()
 {
-    return new IR_RCE(m_rg, (IR_GVN*)registerPass(PASS_GVN));
+    return new RCE(m_rg, (GVN*)registerPass(PASS_GVN));
 }
 
 
 Pass * PassMgr::allocGVN()
 {
-    return new IR_GVN(m_rg);
+    return new GVN(m_rg);
 }
 
 
 Pass * PassMgr::allocLoopCvt()
 {
-    return new IR_LOOP_CVT(m_rg);
+    return new LoopCvt(m_rg);
 }
 
 
@@ -186,14 +186,14 @@ xcom::Graph * PassMgr::allocCDG()
 
 Pass * PassMgr::allocCCP()
 {
-    //return new IR_CCP(m_rg, (PRSSAMgr*)registerPass(PASS_PR_SSA_MGR));
+    //return new CondConstProp(m_rg, (PRSSAMgr*)registerPass(PASS_PR_SSA_MGR));
     return NULL;
 }
 
 
 Pass * PassMgr::allocExprTab()
 {
-    return new IR_EXPR_TAB(m_rg);
+    return new ExprTab(m_rg);
 }
 
 
@@ -217,13 +217,13 @@ Pass * PassMgr::allocInliner()
 
 Pass * PassMgr::allocAA()
 {
-    return new IR_AA(m_rg);
+    return new AliasAnalysis(m_rg);
 }
 
 
 Pass * PassMgr::allocDUMgr()
 {
-    return new IR_DU_MGR(m_rg);
+    return new DUMgr(m_rg);
 }
 
 
@@ -231,7 +231,7 @@ Pass * PassMgr::allocCFG()
 {
     BBList * bbl = m_rg->getBBList();
     UINT n = MAX(8, xcom::getNearestPowerOf2(bbl->get_elem_count()));
-    return new IR_CFG(C_SEME, bbl, m_rg, n, n);
+    return new IRCFG(C_SEME, bbl, m_rg, n, n);
 }
 
 
@@ -359,7 +359,7 @@ void PassMgr::performScalarOpt(OptCtx & oc)
     }
 
     if (g_do_dce) {
-        IR_DCE * dce = (IR_DCE*)registerPass(PASS_DCE);
+        DeadCodeElim * dce = (DeadCodeElim*)registerPass(PASS_DCE);
         passlist.append_tail(dce);
         if (g_do_dce_aggressive) {
             dce->set_elim_cfs(true);
@@ -385,7 +385,7 @@ void PassMgr::performScalarOpt(OptCtx & oc)
     }
 
     if (g_do_cp) {
-        IR_CP * pass = (IR_CP*)registerPass(PASS_CP);
+        CopyProp * pass = (CopyProp*)registerPass(PASS_CP);
         pass->setPropagationKind(CP_PROP_SIMPLEX);
         passlist.append_tail(pass);
     }
@@ -426,7 +426,7 @@ void PassMgr::performScalarOpt(OptCtx & oc)
     bool change;
     UINT count = 0;
     BBList * bbl = m_rg->getBBList();
-    IR_CFG * cfg = m_rg->getCFG();
+    IRCFG * cfg = m_rg->getCFG();
     DUMMYUSE(cfg);
     do {
         change = false;
@@ -434,9 +434,9 @@ void PassMgr::performScalarOpt(OptCtx & oc)
              pass != NULL; pass = passlist.get_next()) {
             CHAR const* passname = pass->getPassName();
             ASSERT0(verifyIRandBB(bbl, m_rg));
-            ULONGLONG t = getusec();
+            ULONGLONG t = xcom::getusec();
             bool doit = pass->perform(oc);
-            appendTimeInfo(passname, getusec() - t);
+            appendTimeInfo(passname, xcom::getusec() - t);
             if (doit) {
                 change = true;
                 ASSERT0(verifyIRandBB(bbl, m_rg));
@@ -451,19 +451,19 @@ void PassMgr::performScalarOpt(OptCtx & oc)
     ASSERT0(!change);
 
     if (g_do_lcse) {
-        IR_LCSE * lcse = (IR_LCSE*)registerPass(PASS_LCSE);
+        LCSE * lcse = (LCSE*)registerPass(PASS_LCSE);
         lcse->set_enable_filter(false);
-        ULONGLONG t = getusec();
+        ULONGLONG t = xcom::getusec();
         lcse->perform(oc);
-        t = getusec() - t;
+        t = xcom::getusec() - t;
         appendTimeInfo(lcse->getPassName(), t);
     }
 
     if (g_do_rp) {
-        IR_RP * r = (IR_RP*)registerPass(PASS_RP);
-        ULONGLONG t = getusec();
+        RegPromot * r = (RegPromot*)registerPass(PASS_RP);
+        ULONGLONG t = xcom::getusec();
         r->perform(oc);
-        appendTimeInfo(r->getPassName(), getusec() - t);
+        appendTimeInfo(r->getPassName(), xcom::getusec() - t);
     }
 }
 

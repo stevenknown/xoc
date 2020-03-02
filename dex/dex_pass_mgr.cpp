@@ -55,7 +55,7 @@ Pass * DexPassMgr::allocCFG()
 
 Pass * DexPassMgr::allocDCE()
 {
-    IR_DCE * pass = new IR_DCE(m_rg);
+    DeadCodeElim * pass = new DeadCodeElim(m_rg);
     pass->set_elim_cfs(true);
     return pass;
 }
@@ -72,7 +72,7 @@ Pass * DexPassMgr::allocCopyProp()
 
 Pass * DexPassMgr::allocRP()
 {
-    Pass * pass = new DEX_RP(m_rg, (IR_GVN*)registerPass(PASS_GVN));
+    Pass * pass = new DEX_RP(m_rg, (GVN*)registerPass(PASS_GVN));
     return pass;
 }
 
@@ -99,7 +99,7 @@ void DexPassMgr::performScalarOpt(OptCtx & oc)
     passlist.append_tail(registerPass(PASS_LICM));
     passlist.append_tail(registerPass(PASS_GCSE));
 
-    ((IR_DCE*)registerPass(PASS_DCE))->set_elim_cfs(false);
+    ((DeadCodeElim*)registerPass(PASS_DCE))->set_elim_cfs(false);
 
     if (passlist.get_elem_count() != 0) {
         LOG("\tScalar optimizations for '%s'", m_rg->getRegionName());

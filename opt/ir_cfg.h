@@ -42,7 +42,7 @@ typedef TMap<LabelInfo const*, IRBB*> LAB2BB;
 //1. For accelerating perform operation of each vertex, e.g
 //   compute dominator, please try best to add vertex with
 //   topological order.
-class IR_CFG : public Pass, public CFG<IRBB, IR> {
+class IRCFG : public Pass, public CFG<IRBB, IR> {
 protected:
     Vector<IRBB*> m_bb_vec;
     LAB2BB m_lab2bb;
@@ -70,13 +70,13 @@ protected:
     }
 
 public:
-    IR_CFG(CFG_SHAPE cs, BBList * bbl, Region * rg,
-           UINT edge_hash_size = 16, UINT vertex_hash_size = 16);
-    COPY_CONSTRUCTOR(IR_CFG);
-    virtual ~IR_CFG() {}
+    IRCFG(CFG_SHAPE cs, BBList * bbl, Region * rg,
+          UINT edge_hash_size = 16, UINT vertex_hash_size = 16);
+    COPY_CONSTRUCTOR(IRCFG);
+    virtual ~IRCFG() {}
 
     //Add LABEL to bb, and establish map between label and bb.
-    void add_lab(IRBB * src, LabelInfo const* li)
+    void addLabel(IRBB * src, LabelInfo const* li)
     {
         src->addLabel(li);
 
@@ -88,16 +88,13 @@ public:
     //out of this function.
     //Namely, you should use 'insertBBbetween()' to insert BB into list.
     //And you must consider the right insertion.
-    inline void add_bb(IRBB * bb)
+    void addBB(IRBB * bb)
     {
         ASSERT0(bb && m_bb_vec.get(BB_id(bb)) == NULL);
         ASSERTN(BB_id(bb) != 0, ("bb id should start at 1"));
         m_bb_vec.set(BB_id(bb), bb);
         addVertex(BB_id(bb));
     }
-
-    //Construct CFG edge for BB has phi.
-    void revisePhiEdge(TMap<IR*, LabelInfo*> & ir2label);
 
     //Construct EH edge after cfg built.
     //This function use a conservative method, and this method
@@ -112,13 +109,14 @@ public:
 
     virtual void cf_opt();
     void computeDomAndIdom(IN OUT OptCtx & oc, xcom::BitSet const* uni = NULL);
-    void computePdomAndIpdom(IN OUT OptCtx & oc, xcom::BitSet const* uni = NULL);
+    void computePdomAndIpdom(IN OUT OptCtx & oc,
+                             xcom::BitSet const* uni = NULL);
 
     //Record the Exit BB here.
     virtual void computeExitList()
     {
         //Clean the Exit flag.
-        xcom::C<IRBB*> * ct;
+        xcom::C<IRBB*> * ct = NULL;
         for (m_exit_list.get_head(&ct);
              ct != m_exit_list.end();
              ct = m_exit_list.get_next(ct)) {
@@ -139,15 +137,14 @@ public:
         }
     }
 
-    virtual void dumpVCG(CHAR const* name)
-    { CFG<IRBB, IR>::dumpVCG(name); }
+    virtual void dumpVCG(CHAR const* name) { CFG<IRBB, IR>::dumpVCG(name); }
 
     void dumpVCG(CHAR const* name = NULL,
-                  bool detail = true,
-                  bool dump_eh = true);
+                 bool detail = true,
+                 bool dump_eh = true);
     void dumpDOT(CHAR const* name = NULL,
-                  bool detail = true,
-                  bool dump_eh = true);
+                 bool detail = true,
+                 bool dump_eh = true);
     void dumpDOT(FILE * h, bool detail, bool dump_eh);
 
     void erase();
@@ -155,10 +152,9 @@ public:
     virtual void findTargetBBOfMulticondBranch(IR const*, OUT List<IRBB*>&);
     virtual IRBB * findBBbyLabel(LabelInfo const* lab);
     virtual void findTargetBBOfIndirectBranch(IR const*, OUT List<IRBB*>&);
-    void findEHRegion(
-            IRBB const* catch_start,
-            xcom::BitSet const& mainstreambbs,
-            OUT xcom::BitSet & ehbbs);
+    void findEHRegion(IRBB const* catch_start,
+                      xcom::BitSet const& mainstreambbs,
+                      OUT xcom::BitSet & ehbbs);
     void findTryRegion(IRBB const* try_start, OUT xcom::BitSet & ehbbs);
     void findAllTryRegions(OUT xcom::BitSet & trybbs);
 
@@ -168,12 +164,11 @@ public:
     virtual bool if_opt(IRBB * bb);
     bool isRegionEntry(IRBB * bb) { return BB_is_entry(bb); }
     bool isRegionExit(IRBB * bb) { return BB_is_exit(bb); }
-    void insertBBbetween(
-            IN IRBB * from,
-            IN xcom::C<IRBB*> * from_ct,
-            IN IRBB * to,
-            IN xcom::C<IRBB*> * to_ct,
-            IN IRBB * newbb);
+    void insertBBbetween(IN IRBB * from,
+                         IN xcom::C<IRBB*> * from_ct,
+                         IN IRBB * to,
+                         IN xcom::C<IRBB*> * to_ct,
+                         IN IRBB * newbb);
     bool inverseAndRemoveTrampolineBranch();
 
     //Return the first operation of 'bb'.
@@ -191,7 +186,7 @@ public:
     }
 
     Region * getRegion() { return m_rg; }
-    UINT getNumOfBB() const { return get_vertex_num(); }
+    UINT getNumOfBB() const { return getVertexNum(); }
     BBList * getBBList() { return m_bb_list; }
     LAB2BB * getLabel2BBMap() { return &m_lab2bb; }
     IRBB * getBB(UINT id) const { return m_bb_vec.get(id); }
@@ -207,7 +202,7 @@ public:
     //pred: BB id of predecessor.
     UINT WhichPred(IRBB const* pred, IRBB const* bb) const
     {
-        xcom::Vertex * bb_vex = get_vertex(BB_id(bb));
+        xcom::Vertex * bb_vex = getVertex(BB_id(bb));
         ASSERT0(bb_vex);
 
         UINT n = 0;
@@ -250,6 +245,8 @@ public:
     bool removeRedundantBranch();
     void rebuild(OptCtx & oc);
     virtual void resetMapBetweenLabelAndBB(IRBB * bb);
+    //Construct CFG edge for BB has phi.
+    void revisePhiEdge(TMap<IR*, LabelInfo*> & ir2label);
 
     virtual void setRPO(IRBB * bb, INT order) { BB_rpo(bb) = order; }
 

@@ -201,7 +201,7 @@ void Lexer::error(UINT line_num, CHAR const* msg, ...)
 {
     if (msg == NULL) { return; }
     LexErrorMsg * p = NULL;
-    StrBuf sbuf(64);
+    xcom::StrBuf sbuf(64);
     va_list arg;
     va_start(arg, msg);
     sbuf.vsprint(msg, arg);
@@ -245,7 +245,7 @@ INT Lexer::getLine()
         //Read MAX_BUF_LINE characters from src file.
         if (m_file_buf_pos >= m_last_read_num) {
             ASSERT0(m_src_file != NULL);
-            INT dw = (INT)fread(m_file_buf, 1, MAX_BUF_LINE, m_src_file);
+            INT dw = (INT)::fread(m_file_buf, 1, MAX_BUF_LINE, m_src_file);
             if (dw == 0) {
                 if (!is_some_chars_in_cur_line) {
                     //Some characters had been put into 'm_cur_line',
@@ -426,7 +426,7 @@ TOKEN Lexer::t_num()
     if (m_cur_char == '0' && (c == 'x' || c == 'X')) {
         //hex
         m_cur_token_string[m_cur_token_string_pos++] = c;
-        while (xisdigithex(c = getNextChar())) {
+        while (xcom::xisdigithex(c = getNextChar())) {
             m_cur_token_string[m_cur_token_string_pos++] = c;
         }
         m_cur_token_string[m_cur_token_string_pos] = 0;
@@ -442,11 +442,11 @@ TOKEN Lexer::t_num()
         }
         m_cur_token_string[m_cur_token_string_pos++] = c;
          if (b_is_fp) { //there is already present '.'
-            while (xisdigit(c = getNextChar())) {
+            while (xcom::xisdigit(c = getNextChar())) {
                 m_cur_token_string[m_cur_token_string_pos++] = c;
             }
          } else {
-             while (xisdigit(c = getNextChar()) || c == '.') {
+             while (xcom::xisdigit(c = getNextChar()) || c == '.') {
                 if (c == '.') {
                     if (!b_is_fp){
                         b_is_fp=1;
@@ -570,8 +570,8 @@ TOKEN Lexer::t_string()
                 m_cur_token_string_pos -= n;
 
                 //long type truncated to char type.
-                CHAR o = (CHAR)xatoll(&m_cur_token_string[m_cur_token_string_pos],
-                    true);
+                CHAR o = (CHAR)xcom::xatoll(
+                    &m_cur_token_string[m_cur_token_string_pos], true);
                 m_cur_token_string[m_cur_token_string_pos++] = o;
             } else if (c == 'x' || c == 'X' || (c >= 'a' && c <= 'f') ||
                 (c >= 'A' && c <= 'Z')) {
@@ -582,7 +582,7 @@ TOKEN Lexer::t_string()
                     c = getNextChar();
                 }
                 UINT n = 0;
-                while (xisdigithex(c)) {
+                while (xcom::xisdigithex(c)) {
                     m_cur_token_string[m_cur_token_string_pos++] = c;
                     n++;
                     c = getNextChar();
@@ -673,8 +673,8 @@ TOKEN Lexer::t_char_list()
                 m_cur_token_string[m_cur_token_string_pos] = 0;
                 m_cur_token_string_pos -= n;
                 //long type truncated to char type.
-                CHAR o = (CHAR)xatoll(&m_cur_token_string[m_cur_token_string_pos],
-                    true);
+                CHAR o = (CHAR)xcom::xatoll(
+                    &m_cur_token_string[m_cur_token_string_pos], true);
                 m_cur_token_string[m_cur_token_string_pos++] = o;
             } else if (c == 'x' || c == 'X' || (c >= 'a' && c <= 'f') ||
                        (c >= 'A' && c <= 'Z')) {
@@ -685,7 +685,7 @@ TOKEN Lexer::t_char_list()
                     c = getNextChar();
                 }
                 UINT n = 0;
-                while (xisdigithex(c)) {
+                while (xcom::xisdigithex(c)) {
                     m_cur_token_string[m_cur_token_string_pos++] = c;
                     n++;
                     c = getNextChar();
@@ -718,7 +718,7 @@ TOKEN Lexer::t_char_list()
 TOKEN Lexer::t_id()
 {
     CHAR c = getNextChar();
-    while (xisalpha(c) || c == '_' || xisdigit(c)) {
+    while (xcom::xisalpha(c) || c == '_' || xcom::xisdigit(c)) {
         m_cur_token_string[m_cur_token_string_pos++] = c;
         c = getNextChar();
     }
@@ -1214,7 +1214,8 @@ START:
             token = t_string();
         } else if (m_cur_char == '\'') { //char list
             token = t_char_list();
-        } else if (xisalpha(m_cur_char) || m_cur_char == '_') { //identifier
+        } else if (xcom::xisalpha(m_cur_char) ||
+                   m_cur_char == '_') { //identifier
             m_cur_token_string[m_cur_token_string_pos++] = m_cur_char;
             token = t_id();
             if (m_enable_true_false_token &&
@@ -1229,7 +1230,7 @@ START:
                 token = T_IMM;
                 m_cur_token_string_pos = 1;
             }
-        } else if (xisdigit(m_cur_char) != 0) { //imm
+        } else if (xcom::xisdigit(m_cur_char) != 0) { //imm
             m_cur_token_string[m_cur_token_string_pos++] = m_cur_char;
             token = t_num();
         } else if(m_cur_char == '-') {
@@ -1498,7 +1499,6 @@ void Lexer::dump(CHAR const* input, FILE * output)
         fflush(output);
     }
     fclose(h);
-
 }
 
 } //namespace xoc

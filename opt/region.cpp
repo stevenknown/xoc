@@ -268,11 +268,11 @@ xcom::C<IRBB*> * Region::splitIRlistIntoBB(IR * irs,
                                            BBList * bbl,
                                            xcom::C<IRBB*> * ctbb)
 {
-    IR_CFG * cfg = getCFG();
+    IRCFG * cfg = getCFG();
     ASSERTN(cfg, ("CFG is not available"));
 
     IRBB * newbb = allocBB();
-    cfg->add_bb(newbb);
+    cfg->addBB(newbb);
     ctbb = bbl->insert_after(newbb, ctbb);
     LAB2BB * lab2bb = cfg->getLabel2BBMap();
 
@@ -281,13 +281,13 @@ xcom::C<IRBB*> * Region::splitIRlistIntoBB(IR * irs,
         if (newbb->isDownBoundary(ir)) {
             BB_irlist(newbb).append_tail(ir);
             newbb = allocBB();
-            cfg->add_bb(newbb);
+            cfg->addBB(newbb);
             ctbb = bbl->insert_after(newbb, ctbb);
         } else if (newbb->isUpperBoundary(ir)) {
             ASSERT0(ir->is_label());
 
             newbb = allocBB();
-            cfg->add_bb(newbb);
+            cfg->addBB(newbb);
             ctbb = bbl->insert_after(newbb, ctbb);
 
             //Regard label-info as add-on info that attached on newbb, and
@@ -2343,9 +2343,9 @@ void Region::checkValidAndRecompute(OptCtx * oc, ...)
 
     PassMgr * passmgr = getPassMgr();
     ASSERTN(passmgr, ("PassMgr is not enable"));
-    IR_CFG * cfg = (IR_CFG*)passmgr->queryPass(PASS_CFG);
-    IR_AA * aa = NULL;
-    IR_DU_MGR * dumgr = NULL;
+    IRCFG * cfg = (IRCFG*)passmgr->queryPass(PASS_CFG);
+    AliasAnalysis * aa = NULL;
+    DUMgr * dumgr = NULL;
 
     C<PASS_TYPE> * it = NULL;
     for (optlist.get_head(&it); it != optlist.end(); it = optlist.get_next(it)) {
@@ -2355,7 +2355,7 @@ void Region::checkValidAndRecompute(OptCtx * oc, ...)
             if (!OC_is_cfg_valid(*oc)) {
                 if (cfg == NULL) {
                     //CFG is not constructed.
-                    cfg = (IR_CFG*)getPassMgr()->registerPass(PASS_CFG);
+                    cfg = (IRCFG*)getPassMgr()->registerPass(PASS_CFG);
                     cfg->initCfg(*oc);
                 } else {
                     //CAUTION: validation of CFG should maintained by user.
@@ -2391,7 +2391,7 @@ void Region::checkValidAndRecompute(OptCtx * oc, ...)
             if (!OC_is_expr_tab_valid(*oc) &&
                 getBBList() != NULL &&
                 getBBList()->get_elem_count() != 0) {
-                IR_EXPR_TAB * exprtab = (IR_EXPR_TAB*)passmgr->
+                ExprTab * exprtab = (ExprTab*)passmgr->
                     registerPass(PASS_EXPR_TAB);
                 ASSERT0(exprtab);
                 exprtab->reperform(*oc);
@@ -2446,7 +2446,7 @@ void Region::checkValidAndRecompute(OptCtx * oc, ...)
                 ASSERTN(cfg && OC_is_cfg_valid(*oc),
                     ("You should make CFG available first."));
                 if (aa == NULL) {
-                    aa = (IR_AA*)passmgr->registerPass(PASS_AA);
+                    aa = (AliasAnalysis*)passmgr->registerPass(PASS_AA);
                     if (!aa->is_init()) {
                         aa->initAliasAnalysis();
                     }
@@ -2468,7 +2468,7 @@ void Region::checkValidAndRecompute(OptCtx * oc, ...)
                 getBBList() != NULL &&
                 getBBList()->get_elem_count() != 0) {
                 if (dumgr == NULL) {
-                    dumgr = (IR_DU_MGR*)passmgr->registerPass(PASS_DU_MGR);
+                    dumgr = (DUMgr*)passmgr->registerPass(PASS_DU_MGR);
                 }
                 f |= COMPUTE_NONPR_DU|COMPUTE_PR_DU;
                 dumgr->perform(*oc, f);
@@ -2486,7 +2486,7 @@ void Region::checkValidAndRecompute(OptCtx * oc, ...)
                 getBBList() != NULL &&
                 getBBList()->get_elem_count() != 0) {
                 if (dumgr == NULL) {
-                    dumgr = (IR_DU_MGR*)passmgr->registerPass(PASS_DU_MGR);
+                    dumgr = (DUMgr*)passmgr->registerPass(PASS_DU_MGR);
                 }
 
                 UINT flag = COMPUTE_NONPR_DU;

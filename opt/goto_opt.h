@@ -36,7 +36,7 @@ author: Su Zhenyu
 
 namespace xoc {
 
-bool goto_opt(IR_CFG * cfg, IRBB * bb);
+bool goto_opt(IRCFG * cfg, IRBB * bb);
 
 } //namespace xoc
 #endif

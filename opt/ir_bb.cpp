@@ -137,8 +137,8 @@ void IRBB::dump(Region * rg, bool dump_inner_region)
     for (IR * ir = BB_first_ir(this);
          ir != NULL; ir = BB_irlist(this).get_next()) {
         ASSERT0(ir->is_single() && ir->getBB() == this);
-		dumpIR(ir, rg, NULL, IR_DUMP_KID | IR_DUMP_SRC_LINE |
-			(dump_inner_region ? IR_DUMP_INNER_REGION : 0));
+        dumpIR(ir, rg, NULL, IR_DUMP_KID | IR_DUMP_SRC_LINE |
+            (dump_inner_region ? IR_DUMP_INNER_REGION : 0));
     }
     g_indent -= 3;
     note("\n");
@@ -168,7 +168,7 @@ void IRBB::verify()
 //Return true if one of bb's successor has a phi.
 bool IRBB::successorHasPhi(CFG<IRBB, IR> * cfg)
 {
-    xcom::Vertex * vex = cfg->get_vertex(BB_id(this));
+    xcom::Vertex * vex = cfg->getVertex(BB_id(this));
     ASSERT0(vex);
     for (xcom::EdgeC * out = VERTEX_out_list(vex);
          out != NULL; out = EC_next(out)) {
@@ -189,8 +189,8 @@ bool IRBB::successorHasPhi(CFG<IRBB, IR> * cfg)
 //in one of bb's successors.
 void IRBB::dupSuccessorPhiOpnd(CFG<IRBB, IR> * cfg, Region * rg, UINT opnd_pos)
 {
-    IR_CFG * ircfg = (IR_CFG*)cfg;
-    xcom::Vertex * vex = ircfg->get_vertex(BB_id(this));
+    IRCFG * ircfg = (IRCFG*)cfg;
+    xcom::Vertex * vex = ircfg->getVertex(BB_id(this));
     ASSERT0(vex);
     for (xcom::EdgeC * out = VERTEX_out_list(vex);
          out != NULL; out = EC_next(out)) {
@@ -232,7 +232,7 @@ void IRBB::dupSuccessorPhiOpnd(CFG<IRBB, IR> * cfg, Region * rg, UINT opnd_pos)
 void IRBB::removeSuccessorDesignatePhiOpnd(CFG<IRBB, IR> * cfg, IRBB * succ)
 {
     ASSERT0(cfg && succ);
-    IR_CFG * ircfg = (IR_CFG*)cfg;
+    IRCFG * ircfg = (IRCFG*)cfg;
     Region * rg = ircfg->getRegion();
     UINT const pos = ircfg->WhichPred(this, succ);
     for (IR * ir = BB_first_ir(succ); ir != NULL; ir = BB_next_ir(succ)) {
@@ -263,10 +263,10 @@ void IRBB::removeSuccessorDesignatePhiOpnd(CFG<IRBB, IR> * cfg, IRBB * succ)
 //you need remove the related PHI operand if BB successor has PHI stmt.
 void IRBB::removeSuccessorPhiOpnd(CFG<IRBB, IR> * cfg)
 {
-    xcom::Vertex * vex = cfg->get_vertex(BB_id(this));
+    xcom::Vertex * vex = cfg->getVertex(BB_id(this));
     ASSERT0(vex);
     for (xcom::EdgeC * out = VERTEX_out_list(vex); out != NULL; out = EC_next(out)) {
-        IRBB * succ = ((IR_CFG*)cfg)->getBB(VERTEX_id(EDGE_to(EC_edge(out))));
+        IRBB * succ = ((IRCFG*)cfg)->getBB(VERTEX_id(EDGE_to(EC_edge(out))));
         ASSERT0(succ);
         removeSuccessorDesignatePhiOpnd(cfg, succ);
     }

@@ -77,19 +77,19 @@ public:
 };
 
 
-class IR_GCSE : public Pass {
+class GCSE : public Pass {
 private:
     bool m_enable_filter; //filter determines which expression can be CSE.
     bool m_is_in_ssa_form; //Set to true if PR is in SSA form.
     Region * m_rg;
-    IR_CFG * m_cfg;
-    IR_DU_MGR * m_du;
-    IR_AA * m_aa;
+    IRCFG * m_cfg;
+    DUMgr * m_du;
+    AliasAnalysis * m_aa;
     PRSSAMgr * m_ssamgr;
     MDSSAMgr * m_mdssamgr;
-    IR_EXPR_TAB * m_expr_tab;
+    ExprTab * m_expr_tab;
     TypeMgr * m_tm;
-    IR_GVN * m_gvn;
+    GVN * m_gvn;
     TG * m_tg;
     DefMiscBitSetMgr m_misc_bs_mgr;
     TMap<IR*, IR*> m_exp2pr;
@@ -118,7 +118,7 @@ private:
     bool shouldBeCse(IR * det);
 
 public:
-    IR_GCSE(Region * rg, IR_GVN * gvn)
+    GCSE(Region * rg, GVN * gvn)
     {
         ASSERT0(rg);
         m_rg = rg;
@@ -135,8 +135,8 @@ public:
         m_mdssamgr = NULL;
         m_num_of_elim = 0;
     }
-    COPY_CONSTRUCTOR(IR_GCSE);
-    virtual ~IR_GCSE() {}
+    COPY_CONSTRUCTOR(GCSE);
+    virtual ~GCSE() {}
 
     void dump();
 

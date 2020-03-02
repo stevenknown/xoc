@@ -36,7 +36,7 @@ author: Su Zhenyu
 
 namespace xoc {
 //
-//START IR_GCSE
+//START GCSE
 //
 
 //Replace use cse with PR related to gen.
@@ -51,7 +51,7 @@ namespace xoc {
 //
 //NOTE: 'use' should be freed.
 //      'use' must be rhs of 'use_stmt'.
-void IR_GCSE::elimCseAtStore(IR * use, IR * use_stmt, IR * gen)
+void GCSE::elimCseAtStore(IR * use, IR * use_stmt, IR * gen)
 {
     ASSERT0(use_stmt->is_st() || use_stmt->is_stpr() || use_stmt->is_ist());
     #ifdef _DEBUG_
@@ -104,7 +104,7 @@ void IR_GCSE::elimCseAtStore(IR * use, IR * use_stmt, IR * gen)
 }
 
 
-void IR_GCSE::elimCseAtBranch(IR * use, IR * use_stmt, IN IR * gen)
+void GCSE::elimCseAtBranch(IR * use, IR * use_stmt, IN IR * gen)
 {
     #ifdef _DEBUG_
     m_elimed.append(use->id());
@@ -165,7 +165,7 @@ void IR_GCSE::elimCseAtBranch(IR * use, IR * use_stmt, IN IR * gen)
 //'gen': the first occurrence of CSE.
 //
 //NOTE: 'use' should be freed.
-void IR_GCSE::elimCseAtCall(IR * use, IR * use_stmt, IR * gen)
+void GCSE::elimCseAtCall(IR * use, IR * use_stmt, IR * gen)
 {
     #ifdef _DEBUG_
     m_elimed.append(use->id());
@@ -217,7 +217,7 @@ void IR_GCSE::elimCseAtCall(IR * use, IR * use_stmt, IR * gen)
 //'gen': the first occurrence of CSE.
 //
 //NOTE: 'use' should be freed.
-void IR_GCSE::elimCseAtReturn(IR * use, IR * use_stmt, IR * gen)
+void GCSE::elimCseAtReturn(IR * use, IR * use_stmt, IR * gen)
 {
     return elimCseAtCall(use, use_stmt, gen);
 }
@@ -230,7 +230,7 @@ void IR_GCSE::elimCseAtReturn(IR * use, IR * use_stmt, IR * gen)
 //     ...
 //     ...=a+b <--use CSE
 //'gen': generated cse.
-void IR_GCSE::processCseGen(IN IR * gen, IR * gen_stmt, bool & change)
+void GCSE::processCseGen(IN IR * gen, IR * gen_stmt, bool & change)
 {
     ASSERT0(gen->is_exp() && gen_stmt->is_stmt());
     //Move STORE_VAL to temp PR.
@@ -290,11 +290,11 @@ void IR_GCSE::processCseGen(IN IR * gen, IR * gen_stmt, bool & change)
 }
 
 
-bool IR_GCSE::isCseCandidate(IR * ir)
+bool GCSE::isCseCandidate(IR * ir)
 {
     ASSERT0(ir);
     switch (ir->getCode()) {
-	SWITCH_CASE_BIN:
+    SWITCH_CASE_BIN:
     case IR_SELECT:
     case IR_BNOT:
     case IR_LNOT:
@@ -307,7 +307,7 @@ bool IR_GCSE::isCseCandidate(IR * ir)
 }
 
 
-bool IR_GCSE::elim(IR * use, IR * use_stmt, IR * gen, IR * gen_stmt)
+bool GCSE::elim(IR * use, IR * use_stmt, IR * gen, IR * gen_stmt)
 {
     //exp is CSE.
     //e.g: ...=a+b <--generate CSE
@@ -344,7 +344,7 @@ bool IR_GCSE::elim(IR * use, IR * use_stmt, IR * gen, IR * gen_stmt)
 
 // If find 'exp' is cse, replace it with related pr.
 //NOTE: exp should be freed.
-bool IR_GCSE::findAndElim(IR * exp, IR * gen)
+bool GCSE::findAndElim(IR * exp, IR * gen)
 {
     ASSERT0(exp && gen);
     ASSERT0(exp != gen);
@@ -378,7 +378,7 @@ bool IR_GCSE::findAndElim(IR * exp, IR * gen)
 
 //If find 'exp' is cse, replace it with related pr.
 //NOTE: exp should be freed.
-bool IR_GCSE::processCse(IN IR * exp, IN List<IR*> & livexp)
+bool GCSE::processCse(IN IR * exp, IN List<IR*> & livexp)
 {
     IR * expstmt = exp->getStmt();
     ExpRep * irie = m_expr_tab->map_ir2ir_expr(exp);
@@ -403,7 +403,7 @@ bool IR_GCSE::processCse(IN IR * exp, IN List<IR*> & livexp)
 }
 
 
-void IR_GCSE::handleCandidate(IR * exp, IRBB * bb,
+void GCSE::handleCandidate(IR * exp, IRBB * bb,
                               UINT entry_id, bool & change)
 {
     VN const* vn = NULL;
@@ -427,7 +427,7 @@ void IR_GCSE::handleCandidate(IR * exp, IRBB * bb,
 
 
 //Determine if det-exp of truebr/falsebr ought to be cse.
-bool IR_GCSE::shouldBeCse(IR * det)
+bool GCSE::shouldBeCse(IR * det)
 {
     ASSERT0(det->is_judge());
 
@@ -455,12 +455,12 @@ bool IR_GCSE::shouldBeCse(IR * det)
 }
 
 
-bool IR_GCSE::doPropInDomTreeOrder(xcom::Graph const* domtree)
+bool GCSE::doPropInDomTreeOrder(xcom::Graph const* domtree)
 {
     IRBB * entry = m_cfg->get_entry();
     ASSERTN(entry && BB_is_entry(entry), ("Not find CFG entry"));
     ASSERT0(domtree);
-    xcom::Vertex * root = domtree->get_vertex(BB_id(entry));
+    xcom::Vertex * root = domtree->getVertex(BB_id(entry));
     ASSERT0(root);
     BitSet is_visited;
     Vertex * v;
@@ -495,12 +495,12 @@ bool IR_GCSE::doPropInDomTreeOrder(xcom::Graph const* domtree)
 }
 
 
-bool IR_GCSE::doPropVNInDomTreeOrder(xcom::Graph const* domtree)
+bool GCSE::doPropVNInDomTreeOrder(xcom::Graph const* domtree)
 {
     IRBB * entry = m_cfg->get_entry();
     ASSERTN(entry && BB_is_entry(entry), ("Not find CFG entry"));
     ASSERT0(domtree);
-    xcom::Vertex * root = domtree->get_vertex(BB_id(entry));
+    xcom::Vertex * root = domtree->getVertex(BB_id(entry));
     ASSERT0(root);
     BitSet is_visited;
     Vertex * v;
@@ -535,7 +535,7 @@ bool IR_GCSE::doPropVNInDomTreeOrder(xcom::Graph const* domtree)
 
 
 //Do propagation according to value numbering.
-bool IR_GCSE::doPropVN(IRBB * bb, UINT entry_id)
+bool GCSE::doPropVN(IRBB * bb, UINT entry_id)
 {
     bool change = false;
     xcom::C<IR*> * ct;
@@ -589,7 +589,7 @@ bool IR_GCSE::doPropVN(IRBB * bb, UINT entry_id)
 
 
 //Do propagation according to lexciographic equivalence.
-bool IR_GCSE::doProp(IRBB * bb, List<IR*> & livexp)
+bool GCSE::doProp(IRBB * bb, List<IR*> & livexp)
 {
     livexp.clean();
     DefDBitSetCore * x = m_du->getAvailInExpr(BB_id(bb), NULL);
@@ -741,9 +741,9 @@ bool IR_GCSE::doProp(IRBB * bb, List<IR*> & livexp)
 }
 
 
-void IR_GCSE::dump()
+void GCSE::dump()
 {
-    note("\n==---- DUMP IR_GCSE '%s' ----==\n", m_rg->getRegionName());
+    note("\n==---- DUMP GCSE '%s' ----==\n", m_rg->getRegionName());
     note("\nNumOfEliminatedCSE:%d", m_elimed.get_elem_count());
     note("\nEliminated IR: ");
     for (INT i = 0; i <= m_elimed.get_last_idx(); i++) {
@@ -755,7 +755,7 @@ void IR_GCSE::dump()
 }
 
 
-bool IR_GCSE::perform(OptCtx & oc)
+bool GCSE::perform(OptCtx & oc)
 {
     START_TIMER(t, getPassName());
     if (m_gvn != NULL) {
@@ -768,7 +768,7 @@ bool IR_GCSE::perform(OptCtx & oc)
     } else {
         m_rg->checkValidAndRecompute(&oc, PASS_DOM, PASS_PDOM, PASS_EXPR_TAB,
             PASS_DU_REF, PASS_DU_CHAIN, PASS_UNDEF);
-        m_expr_tab = (IR_EXPR_TAB*)m_rg->getPassMgr()->
+        m_expr_tab = (ExprTab*)m_rg->getPassMgr()->
             registerPass(PASS_EXPR_TAB);
     }
 
@@ -803,7 +803,7 @@ bool IR_GCSE::perform(OptCtx & oc)
     ASSERTN(entry && BB_is_entry(entry), ("Not find CFG entry"));
     xcom::Graph domtree;
     m_cfg->get_dom_tree(domtree);
-    xcom::Vertex * root = domtree.get_vertex(BB_id(entry));
+    xcom::Vertex * root = domtree.getVertex(BB_id(entry));
     if (m_cfg->hasEHEdge()) {
         //Initialize Temp CFG and pick out exception-edge.
         m_tg = new TG(m_rg);
@@ -870,6 +870,6 @@ bool IR_GCSE::perform(OptCtx & oc)
     ASSERT0(verifyIRandBB(m_rg->getBBList(), m_rg));
     return change;
 }
-//END IR_GCSE
+//END GCSE
 
 } //namespace xoc

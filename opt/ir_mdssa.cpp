@@ -636,7 +636,7 @@ void MDSSAMgr::collectDefinedMD(IN IRBB * bb, OUT DefSBitSet & maydef_md)
 
 void MDSSAMgr::insertPhi(UINT mdid, IN IRBB * bb)
 {
-    UINT num_opnd = m_cfg->get_in_degree(m_cfg->get_vertex(BB_id(bb)));
+    UINT num_opnd = m_cfg->getInDegree(m_cfg->getVertex(BB_id(bb)));
 
     //Here each operand and result of phi set to same type.
     //They will be revised to correct type during renaming.
@@ -824,7 +824,7 @@ void MDSSAMgr::renameUse(IR * ir)
         //    VMD1 will be renamed to VMD2, so VMD1 will not
         //    be there in current IR any more.
 
-        //Set newest version of VMD be the USE of current opnd.
+        //Set latest version of VMD be the USE of current opnd.
         if (topv->version() == 0) {
             //Do nothing.
             ASSERT0(vopnd == topv);
@@ -1093,7 +1093,7 @@ void MDSSAMgr::renameInDomTreeOrder(IRBB * root,
             handleBBRename(v, *defed_mds, bb2vmdmap);
         }
 
-        xcom::Vertex const* bbv = domtree.get_vertex(BB_id(v));
+        xcom::Vertex const* bbv = domtree.getVertex(BB_id(v));
         bool all_visited = true;
         for (xcom::EdgeC const* c = VERTEX_out_list(bbv);
              c != NULL; c = EC_next(c)) {
@@ -1206,7 +1206,7 @@ void MDSSAMgr::destructionInDomTreeOrder(IRBB * root, xcom::Graph & domtree)
             destructBBSSAInfo(v);
         }
 
-        xcom::Vertex * bbv = domtree.get_vertex(BB_id(v));
+        xcom::Vertex * bbv = domtree.getVertex(BB_id(v));
         ASSERTN(bbv, ("dom tree is invalid."));
 
         xcom::EdgeC * c = VERTEX_out_list(bbv);
@@ -1259,7 +1259,7 @@ void MDSSAMgr::stripPhi(MDPhi * phi)
     //IRBB * bb = phi->getBB();
     //ASSERT0(bb);
     //
-    //xcom::Vertex const* vex = m_cfg->get_vertex(BB_id(bb));
+    //xcom::Vertex const* vex = m_cfg->getVertex(BB_id(bb));
     //ASSERT0(vex);
     //
     ////Temprarory RP to hold the result of PHI.
@@ -1313,7 +1313,7 @@ void MDSSAMgr::stripPhi(MDPhi * phi)
     //                //Insert block to hold the copy.
     //                IRBB * newbb = m_rg->allocBB();
     //                m_rg->getBBList()->insert_after(newbb, p);
-    //                m_cfg->add_bb(newbb);
+    //                m_cfg->addBB(newbb);
     //                m_cfg->insertVertexBetween(
     //                    BB_id(p), BB_id(fallthrough), BB_id(newbb));
     //                BB_is_fallthrough(newbb) = true;

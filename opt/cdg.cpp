@@ -65,7 +65,7 @@ void CDG::dump()
 
 void CDG::get_cd_preds(UINT id, OUT List<xcom::Vertex*> & lst)
 {
-    xcom::Vertex * v = get_vertex(id);
+    xcom::Vertex * v = getVertex(id);
     ASSERT0(v != NULL);
     xcom::EdgeC * in = VERTEX_in_list(v);
     while (in != NULL) {
@@ -79,8 +79,8 @@ void CDG::get_cd_preds(UINT id, OUT List<xcom::Vertex*> & lst)
 //Return true if b is control dependent on a.
 bool CDG::is_cd(UINT a, UINT b)
 {
-    ASSERT0(get_vertex(b));
-    xcom::Vertex * v = get_vertex(a);
+    ASSERT0(getVertex(b));
+    xcom::Vertex * v = getVertex(a);
     ASSERT0(v != NULL);
     xcom::EdgeC * out = VERTEX_out_list(v);
     while (out != NULL) {
@@ -95,7 +95,7 @@ bool CDG::is_cd(UINT a, UINT b)
 
 bool CDG::is_only_cd_self(UINT id)
 {
-    xcom::Vertex * v = get_vertex(id);
+    xcom::Vertex * v = getVertex(id);
     ASSERT0(v != NULL);
     xcom::EdgeC * out = VERTEX_out_list(v);
     while (out != NULL) {
@@ -109,7 +109,7 @@ bool CDG::is_only_cd_self(UINT id)
 
 void CDG::get_cd_succs(UINT id, OUT List<xcom::Vertex*> & lst)
 {
-    xcom::Vertex * v = get_vertex(id);
+    xcom::Vertex * v = getVertex(id);
     ASSERT0(v != NULL);
     xcom::EdgeC * out = VERTEX_out_list(v);
     while (out != NULL) {
@@ -129,7 +129,7 @@ void CDG::rebuild(IN OUT OptCtx & oc, xcom::DGraph & cfg)
 
 void CDG::build(IN OUT OptCtx & oc, xcom::DGraph & cfg)
 {
-    if (cfg.get_vertex_num() == 0) { return; }
+    if (cfg.getVertexNum() == 0) { return; }
 
     START_TIMER(t, "CDG");
     ASSERT0(OC_is_cfg_valid(oc));
@@ -137,7 +137,7 @@ void CDG::build(IN OUT OptCtx & oc, xcom::DGraph & cfg)
 
     xcom::Graph pdom_tree;
     cfg.get_pdom_tree(pdom_tree);
-    if (pdom_tree.get_vertex_num() == 0) { return; }
+    if (pdom_tree.getVertexNum() == 0) { return; }
 
     Vector<UINT> top_order;
     pdom_tree.sortInToplogOrder(top_order, false);
@@ -147,7 +147,7 @@ void CDG::build(IN OUT OptCtx & oc, xcom::DGraph & cfg)
     Vector<xcom::BitSet*> cd_set;
     for (INT j = 0; j <= top_order.get_last_idx(); j++) {
         UINT ii = top_order.get(j);
-        xcom::Vertex * v = cfg.get_vertex(ii);
+        xcom::Vertex * v = cfg.getVertex(ii);
         ASSERT0(v != NULL);
         addVertex(VERTEX_id(v));
         xcom::BitSet * cd_of_v = cd_set.get(VERTEX_id(v));

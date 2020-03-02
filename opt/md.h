@@ -118,30 +118,30 @@ typedef enum _MD_TYPE {
 //    MD_UNBOUND. An unbound MD may be effect, but is definitly inexact.
 
 //Unique id of memory object.
-#define MD_id(md)                ((md)->uid)
+#define MD_id(md) ((md)->uid)
 
 //Each MD has a base, it is corresponding to an unique variable.
-#define MD_base(md)              ((md)->base)
+#define MD_base(md) ((md)->base)
 
 //Record the offset from base if MD is exact or range, or it is not available.
-#define MD_ofst(md)              ((md)->ofst)
+#define MD_ofst(md) ((md)->ofst)
 
 //Record the byte size of memory object if MD is exact or range,
 //or it is not available.
-#define MD_size(md)              ((md)->size)
+#define MD_size(md) ((md)->size)
 
 //Memory object type. If it is MD_EXACT, there will be exact use/def.
 //If it is MD_RANGE, there will be inexact use/def, but the accessing restricted
 //into a computable range. If it is MD_UNBOUND, there will be inexact use/def,
 //and we do not know where to be access.
-#define MD_ty(md)                ((md)->u2.s1.type)
+#define MD_ty(md) ((md)->u2.s1.type)
 
 //The memory object is a PR.
-#define MD_is_pr(md)             (VAR_is_pr(MD_base(md)))
+#define MD_is_pr(md) (VAR_is_pr(MD_base(md)))
 
 //True indicates MD will not be effect MD, namely,
 //the MD only could be put in MayDef or MayUse md set.
-#define MD_is_may(md)            ((md)->u2.s1.is_may_reference)
+#define MD_is_may(md) ((md)->u2.s1.is_may_reference)
 
 class MD {
 public:
@@ -260,22 +260,22 @@ public:
     {
         ASSERT0(MD_base(t1) == MD_base(t2));
         return (((ULONGLONG)t1->is_range()) |
-			    (((ULONGLONG)MD_ofst(t1)) << 1) |
-			    (((ULONGLONG)MD_size(t1)) << 32)) <
-			   (((ULONGLONG)t2->is_range()) |
-			    (((ULONGLONG)MD_ofst(t2)) << 1) |
-			    (((ULONGLONG)MD_size(t2)) << 32));
+                (((ULONGLONG)MD_ofst(t1)) << 1) |
+                (((ULONGLONG)MD_size(t1)) << 32)) <
+               (((ULONGLONG)t2->is_range()) |
+                (((ULONGLONG)MD_ofst(t2)) << 1) |
+                (((ULONGLONG)MD_size(t2)) << 32));
     }
 
     bool is_equ(MD const* t1, MD const* t2) const
     {
         ASSERT0(MD_base(t1) == MD_base(t2));
         return (((ULONGLONG)t1->is_range()) |
-			    (((ULONGLONG)MD_ofst(t1)) << 1) |
-			    (((ULONGLONG)MD_size(t1)) << 32)) ==
-			   (((ULONGLONG)t2->is_range()) |
-			    (((ULONGLONG)MD_ofst(t2)) << 1) |
-			    (((ULONGLONG)MD_size(t2)) << 32));
+                (((ULONGLONG)MD_ofst(t1)) << 1) |
+                (((ULONGLONG)MD_size(t1)) << 32)) ==
+               (((ULONGLONG)t2->is_range()) |
+                (((ULONGLONG)MD_ofst(t2)) << 1) |
+                (((ULONGLONG)MD_size(t2)) << 32));
     }
 
     MD const* createKey(MD const* t) { return t; }
@@ -426,13 +426,12 @@ public:
     bool is_overlap_ex(MD const* md,
                        Region * current_ru,
                        MDSystem const* mdsys) const;
-
     bool is_contain_inexact(MDSystem * ms) const;
     bool is_contain_only_exact_and_str(MDSystem * ms) const;
     bool is_exact_equal(MDSet const& mds, MDSystem * ms) const;
 
     //Return true if set intersect with 'mds'.
-    inline bool is_intersect(MDSet const& mds) const
+    bool is_intersect(MDSet const& mds) const
     {
         ASSERT0(this != &mds);
         //Use function of base class (DefSBitSetCore) instead of.
@@ -468,8 +467,7 @@ public:
     }
 
     void diff(UINT id, DefMiscBitSetMgr & m) { DefSBitSetCore::diff(id, m); }
-
-    inline void diff(MDSet const& mds, DefMiscBitSetMgr & m)
+    void diff(MDSet const& mds, DefMiscBitSetMgr & m)
     {
         ASSERT0(this != &mds);
         ASSERTN(!DefSBitSetCore::is_contain(MD_FULL_MEM), ("low performance"));

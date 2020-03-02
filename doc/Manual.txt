@@ -3,24 +3,24 @@ Welcome to XOC
 XOC Design & Overview
 -----------------------------------
 What does XOC mean
-    eXtremely Optimizing Compiler.
-    We build XOC compiler that intent to be a finely honed tool to squeezing
-    the last performance out of ordinary code.
+  eXtremely Optimizing Compiler.
+  We build XOC compiler that intent to be a finely honed tool to squeezing
+  the last performance out of ordinary code.
 
 Contribution and License Agreement
-    If you contribute code to this project, you are implicitly allowing your
-    code to be distributed under the BSD license.
+  If you contribute code to this project, you are implicitly allowing your
+  code to be distributed under the BSD license.
 
 Your ideas have no limits.
-    Surprisingly powerful.
-    Why let programming tools shackle your mind?
-    XOC was designed for extensibility.
-    Tailoring and retargeting the compiler is easy, and fun.
+  Surprisingly powerful.
+  Why let programming tools shackle your mind?
+  XOC was designed for extensibility.
+  Tailoring and retargeting the compiler is easy, and fun.
 
 Truly open.
-    XOC is not just open-source, it is open from end to end.
-    You can tune its syntax, add new instructions, integrate arbitrary system
-    capabilities,  enforce custom policies, add specific optimizations ...
+  XOC is not just open-source, it is open from end to end.
+  You can tune its syntax, add new instructions, integrate arbitrary system
+  capabilities,  enforce custom policies, add specific optimizations ...
 
 XOC is a compiler infrastructure that provides multi-level operations,
 flexibility, and the capability of representing almost all popular languages.
@@ -28,9 +28,9 @@ There are two level IR representations used throughout all phases of the
 compilation.
 
 XOC IR is designed to be used in three forms:
-    1. in-memory IR that used by compiler components and optimizations
-    2. on-disk bitcode representation.
-    3. human readable high-level language representation.
+  1. in-memory IR that used by compiler components and optimizations
+  2. on-disk bitcode representation.
+  3. human readable high-level language representation.
 
 The third human readable representation allows user to use XOC IR as a special
 high-level language that provides many conveninet control flow structures, such
@@ -55,1254 +55,1251 @@ Programming Guides
 
 -----------------------------------
 ¡ö Instrument function library
-    XOC does not use any std library, it provides a general purpose function
-    library xcom that used to facilitate the development of compiler and any
-    other complex software.
+  XOC does not use any std library, it provides a general purpose function
+  library xcom that used to facilitate the development of compiler and any
+  other complex software.
 
-    Features of xcom:
-      A template library to support almost all basic algorithms and structures
-      such as String, Vector, List, TMap(Tree Map), HMap(Hash Map), Dense Bitset,
-      Sparse Bitset, Graph, Mempool mananger, Big-Integer, Linear Algebraic
-      library, Linear Programming Solver, Integer Linear Programming solver,
-      Sort function, a number of utilities as well.
+  Features of xcom:
+    A template library to support almost all basic algorithms and structures
+    such as String, Vector, List, TMap(Tree Map), HMap(Hash Map), Dense Bitset,
+    Sparse Bitset, Graph, Mempool mananger, Big-Integer, Linear Algebraic
+    library, Linear Programming Solver, Integer Linear Programming solver,
+    Sort function, a number of utilities as well.
 
-    Source code of xcom are placed in the com/ directory, please go to this
-    directory to view the details.
+  Source code of xcom are placed in the com/ directory, please go to this
+  directory to view the details.
 
-    Note xcom can be used and distributed independently with XOC.
+  Note xcom can be used and distributed independently with XOC.
 
 ¡ö High Level Structure
-    ¡ñ RegionMgr
-        Region manager is the top structure to perform all kinds of analysis
-        and transformtion. It allocate region and concerned data structure.
+  ¡ñ RegionMgr
+    Region manager is the top structure to perform all kinds of analysis
+    and transformtion. It allocate region and concerned data structure.
 
-    ¡ñ Region
-        Defined in region.h
-        The program code organized in region, each region has it own IR stmt
-        list, local VAR table, and many kinds of analysis and transformation
-        modules.
+  ¡ñ Region
+    Defined in region.h
+    The program code organized in region, each region has it own IR stmt
+    list, local VAR table, and many kinds of analysis and transformation
+    modules.
 
-        The kind of region can be blackbox, subregion, exception handling,
-        function unit, and program unit.
-        * blackbox
-            The region is a black box that attached customized data.
-            Black box is a single entry, single exit region.
+    The kind of region can be blackbox, subregion, exception handling,
+    function unit, and program unit.
+    * blackbox
+      The region is a black box that attached customized data.
+      Black box is a single entry, single exit region.
 
-        * subregion
-            This kind of region serves as a unit of compilation. Subregion
-            can be nested one inside another, which contains a list of IR.
-            Subregion is single entry, multiple exits region. The different
-            between subregion and function unit is subregion has neither
-            epilog and prolog part of function, nor the landing part of
-            exception handling. In general, subregions should be compiled
-            inside-out. An additional use of this node is to specify a region
-            to be parallelized.
+    * subregion
+      This kind of region serves as a unit of compilation. Subregion
+      can be nested one inside another, which contains a list of IR.
+      Subregion is single entry, multiple exits region. The different
+      between subregion and function unit is subregion has neither
+      epilog and prolog part of function, nor the landing part of
+      exception handling. In general, subregions should be compiled
+      inside-out. An additional use of this node is to specify a region
+      to be parallelized.
 
-        * exception handling
-            It is region that represent exception handler and try block.
+    * exception handling
+      It is region that represent exception handler and try block.
 
-        * function unit
-            The region represent normal function unit.
-            Function unit may be multiple entries, and multiple exits.
-            Most of optimizations apply on function unit. In general, the
-            compilation of region unit include following phases:
-                * Prescan IR list to specify which variable is taken address.
-                * High level process to perform miscellaneous high
-                  level IR transformations accroding to syntactics analysis.
-                  This process is also responsible to simpify high level IR
-                  down to low level, and construct basic blocks.
-                * Both high level and middle level will perform these passes,
-                    * Build control flow graph.
-                    * Flow sensitive or insensitive alias analysis.
-                    * Def-Use analysis.
-                    * Control dependence analysis.
-                * Middle level optimizations are all based on low level IR,
-                  such as copy propagation, dead code elimination, global value
-                  numbering, and global common subexpression elimination.
+    * function unit
+      The region represent normal function unit.
+      Function unit may be multiple entries, and multiple exits.
+      Most of optimizations apply on function unit. In general, the
+      compilation of region unit include following phases:
+        * Prescan IR list to specify which variable is taken address.
+        * High level process to perform miscellaneous high
+          level IR transformations accroding to syntactics analysis.
+          This process is also responsible to simpify high level IR
+          down to low level, and construct basic blocks.
+        * Both high level and middle level will perform these passes,
+          * Build control flow graph.
+          * Flow sensitive or insensitive alias analysis.
+          * Def-Use analysis.
+          * Control dependence analysis.
+        * Middle level optimizations are all based on low level IR,
+          such as copy propagation, dead code elimination, global value
+          numbering, and global common subexpression elimination.
 
-        * program unit
-            The region represent all program unit. A program unit contains a
-            number of function units.
-            Program unit is single entry and multiple exits region.
-            XOC apply interprocedural analysis and optimization and inlining
-            on program unit.
+    * program unit
+      The region represent all program unit. A program unit contains a
+      number of function units.
+      Program unit is single entry and multiple exits region.
+      XOC apply interprocedural analysis and optimization and inlining
+      on program unit.
 
-    ¡ñ SYM, SymTab
-        Symbol represent identifier name, pseudo register name and string.
-        Each region manager has one unique symbol table. In general,
-        any symbol with a name occupies an entry in symbol table.
-        Any string constant value that reside in memory also occupies an entry
-        in symbol table.
+  ¡ñ SYM, SymTab
+    Symbol represent identifier name, pseudo register name and string.
+    Each region manager has one unique symbol table. In general,
+    any symbol with a name occupies an entry in symbol table.
+    Any string constant value that reside in memory also occupies an entry
+    in symbol table.
 
-    ¡ñ TypeMgr
-        Type manager represent all kind of distinct type in the region manager.
+  ¡ñ TypeMgr
+    Type manager represent all kind of distinct type in the region manager.
 
-    ¡ñ VAR
-        Defined in var.h
-        Variable, is used to represent each memory object.
-        The attributes of variable include:
-            * global: can be seen by all region with function unit type.
-            * local: can be seen in current function unit region.
-            * static: if variable is global, it can be seen by all function
-              region; or if variable is local, it only can be seen by current
-              function unit region.
-            * readonly: variable can not be modified.
-            * volatile: variable is volatile.
-            * is_array: variable is array.
-            * is_formal_param: variable is formal parameter of current function
-              unit region.
-            * is_spill: variable is spilling location during register allocation.
-            * addr_taken: variable address has been taken.
-            * is_pr: variable is pseudo register.
-            * is_restrict: variable is pointer type, and it is restrict.
-            * is_allocable: variable should be allocated in target machine memory.
+  ¡ñ VAR
+    Defined in var.h
+    Variable, is used to represent each memory object.
+    The attributes of variable include:
+      * global: can be seen by all region with function unit type.
+      * local: can be seen in current function unit region.
+      * static: if variable is global, it can be seen by all function
+        region; or if variable is local, it only can be seen by current
+        function unit region.
+      * readonly: variable can not be modified.
+      * volatile: variable is volatile.
+      * is_array: variable is array.
+      * is_formal_param: variable is formal parameter of current function
+        unit region.
+      * is_spill: variable is spilling location during register allocation.
+      * addr_taken: variable address has been taken.
+      * is_pr: variable is pseudo register.
+      * is_restrict: variable is pointer type, and it is restrict.
+      * is_allocable: variable should be allocated in target machine memory.
 
-    ¡ñ MD
-        Defined in md.h
-        Abstract variable, is used to represent different memory object with
-        same base. Attributes of MD may be Id, Base Variable, Size, Offset,
-        Effect, Exact, Range, Unbound.
-        ¡ð  Id
-            Unique id of abstract memory object.
+  ¡ñ MD
+    Defined in md.h
+    Abstract variable, is used to represent different memory object with
+    same base. Attributes of MD may be Id, Base Variable, Size, Offset,
+    Effect, Exact, Range, Unbound.
+    ¡ð  Id
+      Unique id of abstract memory object.
 
-        ¡ð  Base Variable
-            Since MD is the abstract version of VAR, it is closely related to
-            individual variable. This variable may be the base of several MD.
+    ¡ð  Base Variable
+      Since MD is the abstract version of VAR, it is closely related to
+      individual variable. This variable may be the base of several MD.
 
-        ¡ð Type
-            This attribute represent abstract memory object type.
-            * MD_UNBOUND
-                The object is unbound if we have no knowledge about MD size or
-                MD offset. The Def-Use relation to the object is inexact. The
-                store to object is nonkilling definition.
+    ¡ð Type
+      This attribute represent abstract memory object type.
+      * MD_UNBOUND
+      The object is unbound if we have no knowledge about MD size or
+      MD offset. The Def-Use relation to the object is inexact. The
+      store to object is nonkilling definition.
 
-            * MD_EXACT
-                The object is exact indicate the memory address and size is
-                determinate when load or store to the object. The Def-Use
-                relation to the object is exact. In general, the memory load
-                or store will be exact if its data type is primitive.
-                The store to object is killing definition.
+      * MD_EXACT
+      The object is exact indicate the memory address and size is
+      determinate when load or store to the object. The Def-Use
+      relation to the object is exact. In general, the memory load
+      or store will be exact if its data type is primitive.
+      The store to object is killing definition.
 
-            * MD_RANGE
-                The object is range if we both know the MD offset of base
-                variable and MD size, but the precise address and byte size
-                may be uncertain when load or store to the object. The Def-Use
-                relation to the object is inexact. The store to object is
-                nonkilling definition.
+      * MD_RANGE
+      The object is range if we both know the MD offset of base
+      variable and MD size, but the precise address and byte size
+      may be uncertain when load or store to the object. The Def-Use
+      relation to the object is inexact. The store to object is
+      nonkilling definition.
 
-        ¡ð Size
-            This attribute represents byte size of the abstract memory object.
+    ¡ð Size
+      This attribute represents byte size of the abstract memory object.
 
-        ¡ð Offset
-            This attribute represents byte size offset to the base variable.
+    ¡ð Offset
+      This attribute represents byte size offset to the base variable.
 
-        ¡ð Effect
-            This attribute refers to variables which are definitely declared
-            by user or compiler and existed in the concrete. In contrast to
-            effect MD, ALL_MEM memory object is ineffect.
+    ¡ð Effect
+      This attribute refers to variables which are definitely declared
+      by user or compiler and existed in the concrete. In contrast to
+      effect MD, ALL_MEM memory object is ineffect.
 
-        ¡ð Exact
-            This attribute represent abstract memory object with type is
-            MD_EXACT. An exact MD is also effect.
+    ¡ð Exact
+      This attribute represent abstract memory object with type is
+      MD_EXACT. An exact MD is also effect.
 
-        ¡ð Range
-            This attribute represent abstract memory object with type is
-            MD_RANGE. An range MD is also effect, but is not exact.
+    ¡ð Range
+      This attribute represent abstract memory object with type is
+      MD_RANGE. An range MD is also effect, but is not exact.
 
-        ¡ð Unbound
-            This attribute represent abstract memory object with type is
-            MD_UNBOUND. An unbound MD may be effect, but is definitly inexact.
+    ¡ð Unbound
+      This attribute represent abstract memory object with type is
+      MD_UNBOUND. An unbound MD may be effect, but is definitly inexact.
 
-    ¡ñ MDSystem
-        MD system is used to manage MD. It includes a MD table, each entry
-        of this table is a MD pointer, which gives the information associated
-        with MD. MD numbers 1 are reserved for dedicated variable, ALL_MEM, all
-        customer specified and compiler-generated pseudo-registers start with
-        number 2.
+  ¡ñ MDSystem
+    MD system is used to manage MD. It includes a MD table, each entry
+    of this table is a MD pointer, which gives the information associated
+    with MD. MD numbers 1 are reserved for dedicated variable, ALL_MEM, all
+    customer specified and compiler-generated pseudo-registers start with
+    number 2.
 
 
 ¡ö Type
-    XOC type system include integer, float point, memory chunk, pointer, string,
-    and vector. Class Type used to describe the minimal core type system are
-    shown in the data_type.h.
+  XOC type system include integer, float point, memory chunk, pointer, string,
+  and vector. Class Type used to describe the minimal core type system are
+  shown in the data_type.h.
 
-    ¡ñ The first class type
-    Type                Description
-    D_B                 1 boolean
-    D_I8                8 bit signed integer
-    D_I16               16 bit signed integer
-    D_I32               32 bit signed integer
-    D_I64               64 bit signed integer
-    D_I128              128 bit signed integer
-    D_U8                8 bit unsigned integer
-    D_U16               16 bit unsigned integer
-    D_U32               32 bit unsigned integer
-    D_U64               64 bit unsigned integer
-    D_U128              128 bit unsigned integer
-    D_F32               32 bit float point value
-    D_F64               64 bit float point value
-    D_F80               80 bit float point value
-    D_F128              128 bit float point value
-    D_MC                Memory Chunk
-    D_STR               String
-    D_PTR               Pointer
-    D_VEC               Vector
-    D_VOID              Void type
+  ¡ñ The first class type
+  Type       Description
+  D_B        1 boolean
+  D_I8       8 bit signed integer
+  D_I16      16 bit signed integer
+  D_I32      32 bit signed integer
+  D_I64      64 bit signed integer
+  D_I128     128 bit signed integer
+  D_U8       8 bit unsigned integer
+  D_U16      16 bit unsigned integer
+  D_U32      32 bit unsigned integer
+  D_U64      64 bit unsigned integer
+  D_U128     128 bit unsigned integer
+  D_F32      32 bit float point value
+  D_F64      64 bit float point value
+  D_F80      80 bit float point value
+  D_F128     128 bit float point value
+  D_MC       Memory Chunk
+  D_STR      String
+  D_PTR      Pointer
+  D_VEC      Vector
+  D_ANY      Any type
+  D_TENSOR   Tensor type
 
-    ¡ñ Pointer type
-    The pointer type is used to describe memory locations. To define a pointer
-    type, the pointer-base-size must be given. That specify a pointer that point
-    to the memory with the given size.
-    e.g:
-    D_PTR, pointer-base-size is 128, then the pointer points to a memory object
-    with size is 128 byte. Note the size of pointer itself for each target
-    machine is defined by BYTE_PER_POINTER.
+  ¡ñ Pointer type
+  The pointer type is used to describe memory locations. To define a pointer
+  type, the pointer-base-size must be given. That specify a pointer that point
+  to the memory with the given size.
+  e.g:
+  D_PTR, pointer-base-size is 128, then the pointer points to a memory object
+  with size is 128 byte. Note the size of pointer itself for each target
+  machine is defined by BYTE_PER_POINTER.
 
-    ¡ñ Vector type
-    Vector type is derived from D_MC type if vector-elem-type is given. It is
-    used to describe multiple primitive data are operated in parallel. The
-    vector-elem-type may be all first class type.
-    e.g:
-    D_MC, mc-size is 64, vector elem type is i16, then the vector is <4 ¡Á i16>
-    D_MC, mc-size is 64, vector elem type is f32, then the vector is <2 ¡Á f32>
-    If the type is vector, make sure the MC size is the multiple of
-    vector-elem-type.
+  ¡ñ Vector type
+  Vector type is derived from D_MC type if vector-elem-type is given. It is
+  used to describe multiple primitive data are operated in parallel. The
+  vector-elem-type may be all first class type.
+  e.g:
+  D_MC, mc-size is 64, vector elem type is i16, then the vector is <4 ¡Á i16>
+  D_MC, mc-size is 64, vector elem type is f32, then the vector is <2 ¡Á f32>
+  If the type is vector, make sure the MC size is the multiple of
+  vector-elem-type.
 
-    ¡ñ Void type
-    Variables of this type refer to the data of unspecified type, so in this
-    context, void acts as a universal type. A program can convert a void type
-    to any type of data.
+  ¡ñ Any type
+  Variables of this type refer to the data of unspecified type, so in this
+  context, ANY acts as a universal type. A program can convert a ANY type
+  to any type of data.
 
-    Each IR occurrence has a specific type, and the type is determined by how
-    the value is used.
+  Each IR occurrence has a specific type, and the type is determined by how
+  the value is used.
 
 ¡ö IR Reference
 
-    Defined in ir.h
+  Defined in ir.h
 
-    IR, the intermediate language for the XOC compiler, serves as the common
-    interface among almost all the components. IR is defined to be capable of
-    representing any level of semantics except the level that corresponds to
-    the machine instructions. Two different levels of IR are defined, and each
-    optimization phase is defined to work at a specific level of IR. The
-    front-ends may generate the highest level of IR. Optimization proceeds
-    together with the process of continuous simplification, in which a
-    simplification of IR is called to translate IR from the current level to
-    the next lower level.
+  IR, the intermediate language for the XOC compiler, serves as the common
+  interface among almost all the components. IR is defined to be capable of
+  representing any level of semantics except the level that corresponds to
+  the machine instructions. Two different levels of IR are defined, and each
+  optimization phase is defined to work at a specific level of IR. The
+  front-ends may generate the highest level of IR. Optimization proceeds
+  together with the process of continuous simplification, in which a
+  simplification of IR is called to translate IR from the current level to
+  the next lower level.
 
-    At the end, the code generator translates the lowest level of IR to its own
-    internal representation that matches the target machine instructions.
+  At the end, the code generator translates the lowest level of IR to its own
+  internal representation that matches the target machine instructions.
 
-    High level IR preserve the high level control flow constructs, such as
-    DO_LOOP, DO_WHILE, WHILE_DO, SWITCH, IF, BREAK and CONTINUE.
-    Operations can be divided into two categories: statements, and expressions.
-    Statement implies which variable is defined, or control flow transfering.
-    Expression implies which variable is used, or operation without sideeffect,
-    and expression does not transfer control flow. Both statement and expression
-    node have NEXT and PREV pointers which link them together.
-    Statment can not be kid of other statement, and expression can be kid of
-    both expression and statement.
-    In a simple word, statements have side effects, and can be reordered only
-    if dependencies preserved. Expressions do not have side effect, expression
-    trees hung from statement, and they contain only uses and can be
-    aggressively optimized.
+  High level IR preserve the high level control flow constructs, such as
+  DO_LOOP, DO_WHILE, WHILE_DO, SWITCH, IF, BREAK and CONTINUE.
+  Operations can be divided into two categories: statements, and expressions.
+  Statement implies which variable is defined, or control flow transfering.
+  Expression implies which variable is used, or operation without sideeffect,
+  and expression does not transfer control flow. Both statement and expression
+  node have NEXT and PREV pointers which link them together.
+  Statment can not be kid of other statement, and expression can be kid of
+  both expression and statement.
+  In a simple word, statements have side effects, and can be reordered only
+  if dependencies preserved. Expressions do not have side effect, expression
+  trees hung from statement, and they contain only uses and can be
+  aggressively optimized.
 
-    ¡ñ IR_ID
-        Identifier, represents a memory variable, namely, VAR.
+  ¡ñ IR_ID
+      Identifier, represents a memory variable, namely, VAR.
 
-        Operands:
-        * IR_dt indicate the result type.
-        * ID_info indicate the VAR.
+      Operands:
+      * IR_dt indicate the result type.
+      * ID_info indicate the VAR.
 
-    ¡ñ IR_LDA
-        This operation computes the pointer value of the memory address of a
-        variable, the variable can be general identifier, label, or string.
-        e.g:
-            Semantics: pr1 = &a
-            IR tree is:
-                stpr:i32 $pr1
-                  lda:ptr a
+  ¡ñ IR_LDA
+      This operation computes the pointer value of the memory address of a
+      variable, the variable can be general identifier, label, or string.
+      e.g:
+          Semantics: pr1 = &a
+          IR tree is:
+              stpr:i32 $pr1
+                lda:ptr a
 
-        There is a difference in usage if LDA_ofst is not 0.
-            1. p = lda:i32 a
-                if LDA_ofst is 0, LDA operation return the address of
-                variable a.
+      There is a difference in usage if LDA_ofst is not 0.
+          1. p = lda:i32 a
+              if LDA_ofst is 0, LDA operation return the address of
+              variable a.
 
-            2. p = lda:i32 a + LDA_ofst
-                if LDA_ofst is not 0, LDA operation return the sum of
-                address of variable a and LDA_ofst.
+          2. p = lda:i32 a + LDA_ofst
+              if LDA_ofst is not 0, LDA operation return the sum of
+              address of variable a and LDA_ofst.
 
-        Operands:
-        * IR_dt indicate the result type.
-        * LDA_ofst indicate the offset related to the address of varaible.
-        * LDA_idinfo indicate the varaible which to be taken address.
+      Operands:
+      * IR_dt indicate the result type.
+      * LDA_ofst indicate the offset related to the address of varaible.
+      * LDA_idinfo indicate the varaible which to be taken address.
 
-        Note that the LDA base can only be variable.
-        The operation does not have the ability to access memory.
-        e.g:
-            Type * p = &a;
-            x = &(p->f);
-        The address we are going to take is the address of field f in the
-        memory chunk which p pointed to.
+      Note that the LDA base can only be variable.
+      The operation does not have the ability to access memory.
+      e.g:
+          Type * p = &a;
+          x = &(p->f);
+      The address we are going to take is the address of field f in the
+      memory chunk which p pointed to.
 
-        In order to take the address, we need to generate two operations.
+      In order to take the address, we need to generate two operations.
 
-        First, loading the pointer value,
-            st:ptr p = lda:ptr a
-        then plus the offset of field f.
-            st:ptr x = ld:ptr p + intconst:i32 FieldOffsetInType(Type, f)
+      First, loading the pointer value,
+          st:ptr p = lda:ptr a
+      then plus the offset of field f.
+          st:ptr x = ld:ptr p + intconst:i32 FieldOffsetInType(Type, f)
 
-            The FieldOffsetInType(Type, f) function computes the byte offset
-            for given 'Type' and field name 'f'.
+          The FieldOffsetInType(Type, f) function computes the byte offset
+          for given 'Type' and field name 'f'.
 
-        A more complex example:
-            pb is a field of TypeB, pc is a field of TypeC.
-            q = &(pa->pb->pc)
-        generate operations:
-            $pr1:ptr = ld:ptr pa + FieldOffsetInType(TypeB, pb)
-            $pr2:ptr = $pr1:ptr + FieldOffsetInType(TypeC, pc)
-            st:ptr q = $pr2:ptr
-            As you see, in actually, there are not any IR_LDA operation in
-        above example code.
+      A more complex example:
+          pb is a field of TypeB, pc is a field of TypeC.
+          q = &(pa->pb->pc)
+      generate operations:
+          $pr1:ptr = ld:ptr pa + FieldOffsetInType(TypeB, pb)
+          $pr2:ptr = $pr1:ptr + FieldOffsetInType(TypeC, pc)
+          st:ptr q = $pr2:ptr
+          As you see, in actually, there are not any IR_LDA operation in
+      above example code.
 
-    ¡ñ IR_LD
-        This operation loads value from a memory address specified by LD_idinfo.
-        The result type of IR_LD indicates the size and type of the memory from
-        which to load, as well as the interpretation of the value.
-        e.g:
-            semantics: a = b
-            IR tree is:
-              st:i32 a = ld:i32 b
+  ¡ñ IR_LD
+      This operation loads value from a memory address specified by LD_idinfo.
+      The result type of IR_LD indicates the size and type of the memory from
+      which to load, as well as the interpretation of the value.
+      e.g:
+          semantics: a = b
+          IR tree is:
+            st:i32 a = ld:i32 b
 
-        There is a difference in usage if LD_ofst is not 0.
-            1. lhs = [LD_idinfo + 0], if LD_ofst is 0.
-            2. lhs = [LD_idinfo + LD_ofst], if LD_ofst is not 0.
+      There is a difference in usage if LD_ofst is not 0.
+          1. lhs = [LD_idinfo + 0], if LD_ofst is 0.
+          2. lhs = [LD_idinfo + LD_ofst], if LD_ofst is not 0.
 
-        Operands:
-        * IR_dt indicate the result type.
-        * LD_idinfo indicate the variable to be load
-        * LD_ofst indicate the offset related to the variable.
+      Operands:
+      * IR_dt indicate the result type.
+      * LD_idinfo indicate the variable to be load
+      * LD_ofst indicate the offset related to the variable.
 
-    ¡ñ IR_ST
-        This operation stores value to a memory address specified by ST_idinfo.
-        The result type of IR_ST indicates the size and type of the memory from
-        which to store, as well as the interpretation of the value.
-        e.g:
-            semantics: a = a + 1
-            IR tree is:
-              st:i32 a =
-                  add:i32
-                      ld:i32 a
-                      intconst:i32 1
+  ¡ñ IR_ST
+      This operation stores value to a memory address specified by ST_idinfo.
+      The result type of IR_ST indicates the size and type of the memory from
+      which to store, as well as the interpretation of the value.
+      e.g:
+          semantics: a = a + 1
+          IR tree is:
+            st:i32 a =
+                add:i32
+                    ld:i32 a
+                    intconst:i32 1
 
-        There is a difference in usage if ST_ofst is not 0.
-            1. [p] = rhs, if ST_ofst is 0.
-            2. [p + ST_ofst] = rhs if ST_ofst is not 0.
+      There is a difference in usage if ST_ofst is not 0.
+          1. [p] = rhs, if ST_ofst is 0.
+          2. [p + ST_ofst] = rhs if ST_ofst is not 0.
 
-        Operands:
-        * IR_dt indicate the result type.
-        * ST_idinfo indicate the variable to be store.
-        * ST_ofst indicate the offset related to the target variable.
-        * ST_rhs  indicate the right-hand-side expression.
+      Operands:
+      * IR_dt indicate the result type.
+      * ST_idinfo indicate the variable to be store.
+      * ST_ofst indicate the offset related to the target variable.
+      * ST_rhs  indicate the right-hand-side expression.
 
-    ¡ñ IR_PR
-        PR means Pseudo Representation, that present a temporary variable
-        that can not be taken address, and allocated on stack. This operation
-        load value from the temporary variable specified by PR_no. The result
-        data type of IR_PR indicates the size and type of the value from which
-        to load.
+  ¡ñ IR_PR
+      PR means Pseudo Representation, that present a temporary variable
+      that can not be taken address, and allocated on stack. This operation
+      load value from the temporary variable specified by PR_no. The result
+      data type of IR_PR indicates the size and type of the value from which
+      to load.
 
-        Operands:
-        * IR_dt indicate the result type.
-        * PR_no indicate the number of PR.
-        * PR_ssainfo indicate the SSA information if exist.
+      Operands:
+      * IR_dt indicate the result type.
+      * PR_no indicate the number of PR.
+      * PR_ssainfo indicate the SSA information if exist.
 
-    ¡ñ IR_STPR
-        This operation stores value to a PR specified by PR_no.
-        The result type of IR_STPR indicates the size and type of the value
-        to which to store.
-        e.g: semantics: store value of a to b.
-            IR tree is:
-              i32 a, b;
-              stpr:i32 $pr1 = ld a:i32
-              st:i32 b = $pr1:i32
+  ¡ñ IR_STPR
+      This operation stores value to a PR specified by PR_no.
+      The result type of IR_STPR indicates the size and type of the value
+      to which to store.
+      e.g: semantics: store value of a to b.
+          IR tree is:
+            i32 a, b;
+            stpr:i32 $pr1 = ld a:i32
+            st:i32 b = $pr1:i32
 
-        Operands:
-        * IR_dt indicate the result type.
-        * STPR_no indicate the number of PR.
-        * STPR_ssainfo indicate the SSA information if exist.
-        * STPR_rhs indicate the right-hand-side expression.
+      Operands:
+      * IR_dt indicate the result type.
+      * STPR_no indicate the number of PR.
+      * STPR_ssainfo indicate the SSA information if exist.
+      * STPR_rhs indicate the right-hand-side expression.
 
-    ¡ñ IR_SETELEM
-        This operation stores value to one of element of a temporary
-        location named pseudo register.
+  ¡ñ IR_SETELEM
+      This operation stores value to one of element of a temporary
+      location named pseudo register.
 
-        SETEPR_ofst descibe the byte offset that is the addend to address.
+      SETEPR_ofst descibe the byte offset that is the addend to address.
 
-        If SETEPR_ofst is not 0, the base memory address must add the offset.
-        The the number of byte of SETEPR_base must be an integer multiple of
-        the number of byte of SETEPR_rhs.
+      If SETEPR_ofst is not 0, the base memory address must add the offset.
+      The the number of byte of SETEPR_base must be an integer multiple of
+      the number of byte of SETEPR_rhs.
 
-        usage: setepr(prno:1, val, ofst), where PR1 must be memory chunk or
-        vector. This operation will store value to the memory which offset to
-        the memory chunk or vector's base address.
+      usage: setepr(prno:1, val, ofst), where PR1 must be memory chunk or
+      vector. This operation will store value to the memory which offset to
+      the memory chunk or vector's base address.
 
-        Operands:
-        * SETELEM_prno      indicate the result PR number.
-        * SETELEM_ssainfo   indicate the SSA information if exist.
-        * SETELEM_du        indicate the DU_SET information if MD
-                            du information is supplied.
-        * SETELEM_rhs       indicate the value to be set.
-        * SETELEM_base      indicate the base.
-        * SETELEM_ofst      indicate the offset expression. This expression
-                            compute a byte offset to the base.
-
-    ¡ñ IR_GETELEM
-        This operation get an element from a temporary location named pseudo
-        register. The the number of byte of GETEPR_base must be an integer
-        multiple of the number of byte of current ir.
-
-        usage: getelem:i32 $pr1 $pr2:vec<4*i32>, 4.
-            Get value of the second element of pr2 to pr1.
-
-        NOTE:
-            1. PR can not be taken address.
-            2. PR is always allocate on stack.
-
-        Operands:
-        * GETELEM_prno    indicate the result PR number.
-        * GETELEM_ssainfo indicate the SSA information if exist.
-        * GETELEM_du      indicate the DU_SET information if MD
+      Operands:
+      * SETELEM_prno      indicate the result PR number.
+      * SETELEM_ssainfo   indicate the SSA information if exist.
+      * SETELEM_du        indicate the DUSet information if MD
                           du information is supplied.
-        * GETELEM_base    indicate the base.
-        * GETELEM_ofst    indicate the offset expression. This expression
+      * SETELEM_rhs       indicate the value to be set.
+      * SETELEM_base      indicate the base.
+      * SETELEM_ofst      indicate the offset expression. This expression
                           compute a byte offset to the base.
 
-    ¡ñ IR_IST
-        This operation represent indirect memory store operation.
-        IST_ofst descibe the byte offset that is the addend to address.
-
-        e.g: semantics: given p is pointer, store value of a to the memory
-             that p pointed to.
-             In C syntax: *p = a;
-             And the corresponding IR tree is:
-                ist:i32
-                    ld:ptr p
-                    ld:i32 a
-
-        If IST_ofst is not 0, the base memory address must add the offset.
-        There is a difference in usage if IST_ofst is not 0.
-            1. [p + 0] = rhs, if IST_ofst is 0.
-            2. [p + IST_ofst] = rhs if IST_ofst is not 0.
-
-        Operands:
-        * IR_dt    indicate the result type.
-        * IST_ofst indicate the offset related to the target memory address.
-        * IST_base indicate the left-hand-side expression, this expression
-                   is used to compute the indirect memory address.
-        * IST_rhs  indicate the right-hand-side expression.
-
-    ¡ñ IR_ILD
-        This operation represent indirect memory load operation.
-        ILD_ofst descibe the byte offset that is the addend to address.
-
-        e.g: semantics: given p is pointer, load the value that p pointed to,
-        and store it to a.
-             In C syntax: int a = *p;
-             And the corresponding IR tree is:
-                st:i32, a
-                    ild:i32
-                        ld:ptr p
-
-        There is a difference in usage if ILD_ofst is not 0.
-        If ILD_ofst is not 0, the base memory address must add the offset.
-            1. lhs = [p + 0], if ILD_ofst is 0.
-            2. lhs = [p + ILD_ofst], if ILD_ofst is not 0.
-
-        Operands:
-        * IR_dt    indicate the result type.
-        * ILD_ofst indicate the offset related to the target memory address.
-        * ILD_base indicate the base address expression, this expression
-                   is used to compute the indirect memory address.
-
-    ¡ñ IR_REGION
-        Region semantics is a key feature of XOC, and the concept allows IR
-        to be customized in powerful ways.
-        The kind of region can be blackbox, subregion, exception handling,
-        function unit, and program unit.
-            * blackbox
-                The region is a black box that attached customized data.
-                Black box is a single entry, single exit region, and without
-                any IR.
-
-            * subregion
-                It is a region which contains a list of IR, subregion is
-                single entry, multiple exits region.
-                The different between subregion and function unit is subregion
-                has neither epilog and prolog part of function, nor the landing
-                part of exception handling.
-
-            * exception handling
-                It is region that represent exception handler and try block.
-
-            * function unit
-                The region represent normal function unit.
-                Function unit may be multiple entries, and multiple exits.
-                Most of optimizations applied on function unit.
-
-            * program unit
-                The region represent all program unit. A program unit contains
-                a number of function unit.
-                Program unit is single entry and multiple exits region.
-                XOC apply interprocedural analysis and optimization on
-                program unit.
-
-        Operands:
-        * REGION_ru  indicate the REGION structure.
-
-    ¡ñ  IR_SWITCH
-        This operation represents multiple target branch or indirect
-        unconditional branch.
-        Usage:
-        switch vexp, default label, [end label], [val1:label1, val2:label2, ...], [body].
-
-        If SWITCH_is_uncondbr is false, the operation is a conditional direct
-        jump to one of the label in case list. If SWITCH_is_uncondbr is true,
-        the operation is an unconditional indirect jump to vexp, at this
-        situation, default label, end label, case list is useless.
-
-        e.g: demostrate how to use IR_SWITCH if SWITCH_is_uncondbr is true.
-            pr1 = ...   //compute the target address, store it to pr1.
-            switch(pr1) //unconditional jump to pr1.
-
-        end label: a label repesent the end position of IR_SWITCH.
-            The label is optional, but it must be given if one is going
-            to simplify IR_SWITCH to IR_IF or IR_TRUEBR and IR_FALSEBR.
-
-        default label: a label repesent the default jump target of IR_SWITCH.
-            The label is optional. If there are not any cases matched, the
-            control flow will jump to the default label if it is given.
-
-        e.g: demostrate how to use IR_SWITCH if SWITCH_is_uncondbr is false.
-            In this example, switch operation jump to label accroding to the
-            value of a.
-            switch (ld(i32, a)) (deflab, L3) (0, L1), (1, L2)
-            ...
-            L1:
-            ...
-            L2:
-            ...
-            L3:
-
-        Operands:
-        * SWITCH_is_uncondbr indicate whether switch is unconditional indirect branch.
-        * SWITCH_deflab    default label.
-        * SWITCH_endlab    label that indicate the end of switch body.
-        * SWITCH_vexp      value expression.
-        * SWITCH_body      record a list of stmts which are body of switch.
-        * SWITCH_case_list record a list of case expression.
-
-    ¡ñ IR_CASE
-        This operation represents the pair of comparison value and target
-        jump label.
-        NOTE: this operation is used only within IR_SWITCH to specify
-        jump target for individual case values.
-
-        Operands:
-        * CASE_vexp indicate case value expression that compute the value
-          compared with SWITCH_vexp.
-        * CASE_lab  gives the target label of the jump if switch value
-          expression evaluates to the given case value.
-
-    ¡ñ IR_CALL
-        This operation represent direct function call. It include a list of
-        parameters and a return value. The return value is IR_PR.
-        Usage:
-        pr = call, foo, parameter list,  where pr is the return value.
-
-        e.g: Invoke function foo with 2 parameter a, b, then store
-            result value to them.
-            $pr1:i32 = call foo, ld:i32 a, ld:i32 b
-            st:i32 a = $pr1:i32
-
-        Operands:
-        * CALL_idinfo        record the function identifier.
-        * CALL_is_intrinsic  indicate whether function is intrinsic.
-        * CALL_is_readonly   indicate whether this call would not modify any memory.
-        * CALL_ssainfo       indicate the SSA information of return value
-                             PR if exist.
-        * CALL_is_alloc_heap indicate whether this call is memory allocation
-                             function which alloc memory from heap, such as
-                             malloc or new.
-
-    ¡ñ IR_ICALL
-        This operation represent indirect function call. It invoke function
-        via a computational expression. This operation include a list of
-        parameters and a return value. The return value is IR_PR.
-
-        Usage:
-        $pr1:ptr = lda:ptr foo
-        $pr2:i32 = icall, $pr1:ptr, parameter-list,  where pr1 is a pointer pointed to
-        function, and pr2 is the return value.
-
-        e.g: Invoke function foo with 2 parameter a, b, and then store
-            result value to them.
-            st:ptr $pr3 = lda:ptr foo
-            $pr1:i32 = icall, pr3:ptr, ld:i32 a, ld:i32 b
-            st:i32 a = $pr1:i32
-
-        Operands:
-        * CALL_callee        record the function address.
-        * CALL_is_intrinsic  indicate whether function is intrinsic.
-        * CALL_is_readonly   indicate whether this call would not
-                             modify any memory.
-        * CALL_ssainfo       indicate the SSA information of return value
-                             PR if exist.
-        * CALL_is_alloc_heap indicate whether this call is memory allocation
-                             function which alloc memory from heap, such as
-                             malloc or new.
-
-    ¡ñ Binary Operations
-        Binary operation require two operands of the same type, execute an
-        operation on them, and produce a single value.
-        The result value may not have the same type as its operands.
-        Binary operation include:
-            IR_ADD  compute the sum of its two operands.
-            IR_SUB  compute the difference of its two operands.
-            IR_MUL  compute the product of its two operands.
-            IR_DIV  compute the quotient of its two operands.
-                    Division by zero leads to undefined behavior.
-                    If the value of opnd0 is not a multiple of opnd1,
-                    ((opnd0 div opnd1) mul opnd1) may not equal to opnd0.
-            IR_REM  compute the reminder of its two operands.
-            IR_MOD  compute the modulo of its two operands. The result is
-                    either zero or has the same sign as the divisor, BIN_opnd1.
-            IR_LAND compute the logical AND, logical operators are typically
-                    used with boolean (logical) values.
-                    When they are, they return a boolean value.
-            IR_LOR  compute the logical OR, logical operators are typically
-                    used with boolean (logical) values.
-                    When they are, they return a boolean value.
-            IR_BAND compute the bitwise logical AND of its two operands.
-            IR_BOR  compute the bitwise logical OR of its two operands.
-            IR_XOR  compute the bitwise logical exclusive OR of its two operands.
-            IR_LT   less than
-            IR_LE   less or equal than
-            IR_GT   great than
-            IR_GE   great or equal than
-            IR_EQ   equal
-            IR_NE   not equal£¬ compute the boolean value of its two operands.
-            IR_ASR  perform arithmetical shift-right for BIN_opnd0 accroding
-                    to value of BIN_opnd1, and return the shifted value as result.
-            IR_LSR  perform logical shift-right for BIN_opnd0 accroding to
-                    value of BIN_opnd1, and return the shifted value as result.
-            IR_LSL  perform logical shift-left for BIN_opnd0 accroding to
-                    value of BIN_opnd1, and return the shifted value as result.
-
-        Operands:
-        * IR_dt indicate the result type.
-        * BIN_opnd0 indicate the first operand.
-        * BIN_opnd1 indicate the second operand.
-
-    ¡ñ Unary Operations
-        Unary operation require one operand, execute an operation on them,
-        and produce a single value.
-        The result value may not have the same type as its operand.
-        Unary operation include:
-            IR_LNOT compute the logical NOT, returns false if its UNA_opnd
-                    can be converted to true; otherwise, returns true.
-            IR_NEG  compute the negative value of IR_opnd0.
-            IR_BNOT compute the bitwise NOT of IR_opnd0.
-
-        Operands:
-        * IR_dt     indicate the result type.
-        * UNA_opnd indicate the single operand.
-
-    ¡ñ IR_GOTO
-        This operation represent unconditional branch that cause control
-        flow to transfer to a label, the label should be defined in current
-        region.
-
-        Operands:
-        * GOTO_lab indicate the target label.
-
-    ¡ñ IR_IGOTO
-        This operation represent indirect goto operation.
-        The control flow will unconditional jump to one target label of a
-        list of label which determined by value-exp.
-
-        usage: igoto (value-exp) case_list.
-
-        Operands:
-        * IGOTO_vexp      indicate a value expression to determine
-                          which label will be target.
-        * IGOTO_case_list indicate a list of target.
-
-    ¡ñ IR_ARRAY
-        This operation represent array load operation that load a value
-        from an array element.
-
-        Operands:
-        * IR_dt       indicate the result type.
-        * ARR_base    indicate the target label.
-        * ARR_sub     indicate the subscript expression.
-        * ARR_elem_ty indicate the array element type.
-
-        NOTE: The base of array can be IR_LDA, or other computational
-        expression. If array base is LDA, it denotes that the base of
-        array is an array type VAR,
-        e.g: char p[N]; (&p)[i] = ...
-
-        If array base is computational expression, it denotes that the
-        base of array is a pointer, and the pointer point to an array.
-        e.g: char * p; (p+1)[i] = ...
-
-        ARR_elem_ty indicate the type of each element.
-        Moreover, element may be array as well.
-        If ARR_elem_ty is vector, ARR_ofst refers the referrenced element idx.
-
-        IR_dt describe the data-type of ARRAY operation + ARR_ofst.
-        ARR_elem_ty describe array element type.
-        e.g: struct {int a, b; } s[100];
-             ... = s[2].b;
-            data-type of array operation is D_I32, because ARR_ofst is 4,
-            that means we take the value of second field of struct, meanwhile
-            data-type of array element is D_MC, size is 8, (struct {int a, b;}).
-
-    ¡ñ IR_STARRAY
-        This operation represent array store operation that store a value to
-        an array element.
-        The most operations and properties are same as IR_ARRAY.
-
-        Operands:
-        * IR_dt        indicate the result type.
-        * ARR_base     indicate the target label.
-        * ARR_sub      indicate the subscript expression.
-        * ARR_elem_ty  indicate the array element type.
-        * STARR_rhs    indicate the Right Hand Side expression that computing
-                       a value to be stored to array element.
-
-        NOTE: The base of array can be IR_LDA, or other computational
-        expression. If array base is LDA, it denotes that the base of
-        array is an array type VAR,
-        e.g: char p[N]; (&p)[i] = ...
-
-        If array base is computational expression, it denotes that the
-        base of array is a pointer, and the pointer point to an array.
-        e.g: char * p; (p+1)[i] = ...
-
-        ARR_elem_ty indicate the type of each element.
-        Moreover, element may be array as well.
-        If ARR_elem_ty is vector, ARR_ofst refers the referrenced element idx.
-
-        IR_dt describe the data-type of ARRAY operation + ARR_ofst.
-        ARR_elemdt describe array element type.
-
-        e.g: struct {int a, b; } s[100];
-             ... = s[2].b;
-
-            data-type of array operation is D_I32, because ARR_ofst is 4,
-            that means we take the value of second field of struct, meanwhile
-            data-type of array element is D_MC, size is 8, (struct {int a, b;}).
-
-    ¡ñ IR_CVT
-        This operation represents data type convertion.
-
-        Type conversions for memory objects that have substantial effect must
-        be represented explicitly by IR_CVT.
-
-        Operands:
-        * IR_dt    indicate the result type.
-        * CVT_exp  indicate the IR expression to be converted.
-
-    ¡ñ IR_TRUEBR
-        This operation represent branch operation. The branch is taken if
-        determinant expression return true, otherwise the control flow does
-        not change.
-
-        e.g: comparison and jump if condition is true.
-            truebr ilabel(L24)
-                ne (bool)
-                    pr1 (i32)
-                    intconst 1
-            st(i32 'a')
-                pr1 (i32)
-        Semantics is: if pr1 != 1, then jump to L24, otherwise go
-        fallthrough to the following statement.
-
-        Operands:
-        * BR_det  indicate the determinate expression.
-        * BR_lab  indicate the target label if branch is taken.
-
-    ¡ñ IR_FALSEBR
-        This operation represent branch operation. The branch is taken if
-        determinant expression return false, otherwise the control flow does
-        not change.
-
-        e.g: comparison and jump if condition is false.
-            falsebr ilabel(L24)
-                ne (bool)
-                    pr1 (i32)
-                    intconst 1
-            st(i32 'a')
-                pr1 (i32)
-        Semantics is: if !(pr1 != 1), then jump to L24, otherwise go
-        fallthrough to the following statement.
-
-        Operands:
-        * BR_det  indicate the determinant expression.
-        * BR_lab  indicate the target label if branch is taken.
-
-    ¡ñ IR_RETURN
-        This operation represents function unit return operation.
-        The operation has a list of return value list, so it may return multiple
-        value at a time.
-
-        e.g: return two computed value store in pr1, pr2
-            stpr1 (i32)
-                ld(i32 a)
-            stpr2 (i32)
-                ld(i32 b)
-            return
-                pr1(i32), pr2(i32)
-
-        Operands:
-        * RET_exp_list  indicate return value expressions list.
-
-    ¡ñ IR_SELECT
-        This operation represents conditional execute operation. It computes
-        the value accroding to the result of predicator expression, if the
-        result value is true, return CONDEXE_trueexp, otherwise return
-        CONDEXE_falseexp.
-
-        e.g: res = select(a > b), (10), (20)
-        Semantics:
-            if (a > b) res = 10;
-            else res = 20;
-        where a > b is the predicator.
-
-        Operands:
-        * SELECT_pred     indicate predicator expression.
-        * SELECT_trueexp  indicate the true-value expressions.
-        * SELECT_falseexp indicate the false-value expressions.
-
-    ¡ñ IR_DO_LOOP
-        This operation is high level control loop operation, it represents a
-        kind of loop with plainly definition of INIT(low bound),
-        DET(HIGH bound), LOOP-BODY and STEP(Increment or Dcrement)
-        of induction variable. If this statement has no LOOP_body,
-        the field is NULL.
-
-        Operands:
-        * LOOP_init  indicate the stmt that compute the initial value of
-            induction variable.
-            It must be stmt, such as IR_ST or IR_STPR, initialize the induction
-            variable, the field can not be NULL as well.
-        * LOOP_det  indicate the determinant expression.
-            It must be a comparison expression for computing the
-            loop terminate condition.
-            The operation of comparison could only be IR_LT, IR_LE, IR_GT, IR_GE,
-            Note any other variables except the induction variable
-            must be loop invariant.
-        * LOOP_step  indicate step operation to induction variable.
-            It must be a stmt that operator is either IR_ST or IR_STPR.
-            The stmt updates the value of induction
-            variable by constant incrementally.
-            A common example is incrementing the induction variable via IR_ADD
-            by a const step amount.
-        * LOOP_body indicate a list of stmt that inside loop body.
-
-        Semantics: induction variable is i.
-            init: i = 0
-            do (det: i<=10)
-                body
-                step: i = i+1
-            enddo
-
-    ¡ñ IR_DO_WHILE
-        This operation represents a high level loop control structure.
-        LOOP_body is a list of IR node representing statements that is executed
-        while LOOP_det returns nonzero.
-        The condition is tested at the end of the loop, so the loop body is
-        executed at least once.
-        If there is no stmt inside the loop, LOOP_body should be NULL.
-
-        Operands:
-        * LOOP_det  is a boolean expression, that indicate the
-                    determinant expression.
-        * LOOP_body indicate a list of stmt that inside loop body.
-
-        Semantics:
-            while (det)
+  ¡ñ IR_GETELEM
+      This operation get an element from a temporary location named pseudo
+      register. The the number of byte of GETEPR_base must be an integer
+      multiple of the number of byte of current ir.
+
+      usage: getelem:i32 $pr1 $pr2:vec<4*i32>, 4.
+          Get value of the second element of pr2 to pr1.
+
+      NOTE:
+          1. PR can not be taken address.
+          2. PR is always allocate on stack.
+
+      Operands:
+      * GETELEM_prno    indicate the result PR number.
+      * GETELEM_ssainfo indicate the SSA information if exist.
+      * GETELEM_du      indicate the DUSet information if MD
+                        du information is supplied.
+      * GETELEM_base    indicate the base.
+      * GETELEM_ofst    indicate the offset expression. This expression
+                        compute a byte offset to the base.
+
+  ¡ñ IR_IST
+      This operation represent indirect memory store operation.
+      IST_ofst descibe the byte offset that is the addend to address.
+
+      e.g: semantics: given p is pointer, store value of a to the memory
+           that p pointed to.
+           In C syntax: *p = a;
+           And the corresponding IR tree is:
+              ist:i32
+                  ld:ptr p
+                  ld:i32 a
+
+      If IST_ofst is not 0, the base memory address must add the offset.
+      There is a difference in usage if IST_ofst is not 0.
+          1. [p + 0] = rhs, if IST_ofst is 0.
+          2. [p + IST_ofst] = rhs if IST_ofst is not 0.
+
+      Operands:
+      * IR_dt    indicate the result type.
+      * IST_ofst indicate the offset related to the target memory address.
+      * IST_base indicate the left-hand-side expression, this expression
+                 is used to compute the indirect memory address.
+      * IST_rhs  indicate the right-hand-side expression.
+
+  ¡ñ IR_ILD
+      This operation represent indirect memory load operation.
+      ILD_ofst descibe the byte offset that is the addend to address.
+
+      e.g: semantics: given p is pointer, load the value that p pointed to,
+      and store it to a.
+           In C syntax: int a = *p;
+           And the corresponding IR tree is:
+              st:i32, a
+                  ild:i32
+                      ld:ptr p
+
+      There is a difference in usage if ILD_ofst is not 0.
+      If ILD_ofst is not 0, the base memory address must add the offset.
+          1. lhs = [p + 0], if ILD_ofst is 0.
+          2. lhs = [p + ILD_ofst], if ILD_ofst is not 0.
+
+      Operands:
+      * IR_dt    indicate the result type.
+      * ILD_ofst indicate the offset related to the target memory address.
+      * ILD_base indicate the base address expression, this expression
+                 is used to compute the indirect memory address.
+
+  ¡ñ IR_REGION
+      Region semantics is a key feature of XOC, and the concept allows IR
+      to be customized in powerful ways.
+      The kind of region can be blackbox, subregion, exception handling,
+      function unit, and program unit.
+        * blackbox
+          The region is a black box that attached customized data.
+          Black box is a single entry, single exit region, and without
+          any IR.
+
+        * subregion
+          It is a region which contains a list of IR, subregion is
+          single entry, multiple exits region.
+          The different between subregion and function unit is subregion
+          has neither epilog and prolog part of function, nor the landing
+          part of exception handling.
+
+        * exception handling
+          It is region that represent exception handler and try block.
+
+        * function unit
+          The region represent normal function unit.
+          Function unit may be multiple entries, and multiple exits.
+          Most of optimizations applied on function unit.
+
+        * program unit
+          The region represent all program unit. A program unit contains
+          a number of function unit.
+          Program unit is single entry and multiple exits region.
+          XOC apply interprocedural analysis and optimization on
+          program unit.
+
+      Operands:
+      * REGION_ru  indicate the REGION structure.
+
+  ¡ñ  IR_SWITCH
+      This operation represents multiple target branch.
+      Usage:
+      switch vexp, default label, [end label], [val1:label1, val2:label2, ...], [body].
+
+      The operation is a multiple conditional direct which jumping to one
+      of the label that indicated in case list.
+
+      default label: a label repesent the default jump target of IR_SWITCH.
+          The label is optional. If there are not any cases matched, the
+          control flow will jump to the default label if it is given.
+
+      e.g: demostrate how to use IR_SWITCH.
+          pr1 = ...   //compute the target address, store it to pr1.
+          switch(pr1) //unconditional jump to pr1.
+
+      e.g: demostrate how to use IR_SWITCH.
+          In this example, switch operation jump to label accroding to the
+          value of a.
+          switch (ld(i32, a)) (deflab, L3) (0, L1), (1, L2)
+          ...
+          L1:
+          ...
+          L2:
+          ...
+          L3:
+
+      Operands:
+      * SWITCH_deflab    default jumping label.
+      * SWITCH_vexp      value expression.
+      * SWITCH_body      record a list of stmts which are body of switch.
+      * SWITCH_case_list record a list of case expression.
+
+      Note an end label will be generated during simplification.
+      An end lable repesents the end position of IR_SWITCH.
+      It is useful when simplifying IR_SWITCH to IR_IF or IR_TRUEBR
+      and IR_FALSEBR.
+
+  ¡ñ IR_CASE
+      This operation represents the pair of comparison value and target
+      jump label.
+      NOTE: this operation is used only within IR_SWITCH to specify
+      jump target for individual case values.
+
+      Operands:
+      * CASE_vexp indicate case value expression that compute the value
+        compared with SWITCH_vexp.
+      * CASE_lab  gives the target label of the jump if switch value
+        expression evaluates to the given case value.
+
+  ¡ñ IR_CALL
+      This operation represent direct function call. It include a list of
+      parameters and a return value. The return value is IR_PR.
+      Usage:
+      pr = call, foo, parameter list,  where pr is the return value.
+
+      e.g: Invoke function foo with 2 parameter a, b, then store
+          result value to them.
+          $pr1:i32 = call foo, ld:i32 a, ld:i32 b
+          st:i32 a = $pr1:i32
+
+      Operands:
+      * CALL_idinfo        record the function identifier.
+      * CALL_is_intrinsic  indicate whether function is intrinsic.
+      * CALL_is_readonly   indicate whether this call would not modify any memory.
+      * CALL_ssainfo       indicate the SSA information of return value
+                           PR if exist.
+      * CALL_is_alloc_heap indicate whether this call is memory allocation
+                           function which alloc memory from heap, such as
+                           malloc or new.
+
+  ¡ñ IR_ICALL
+      This operation represent indirect function call. It invoke function
+      via a computational expression. This operation include a list of
+      parameters and a return value. The return value is IR_PR.
+
+      Usage:
+      $pr1:ptr = lda:ptr foo
+      $pr2:i32 = icall, $pr1:ptr, parameter-list,  where pr1 is a pointer pointed to
+      function, and pr2 is the return value.
+
+      e.g: Invoke function foo with 2 parameter a, b, and then store
+          result value to them.
+          st:ptr $pr3 = lda:ptr foo
+          $pr1:i32 = icall, pr3:ptr, ld:i32 a, ld:i32 b
+          st:i32 a = $pr1:i32
+
+      Operands:
+      * CALL_callee        record the function address.
+      * CALL_is_intrinsic  indicate whether function is intrinsic.
+      * CALL_is_readonly   indicate whether this call would not
+                           modify any memory.
+      * CALL_ssainfo       indicate the SSA information of return value
+                           PR if exist.
+      * CALL_is_alloc_heap indicate whether this call is memory allocation
+                           function which alloc memory from heap, such as
+                           malloc or new.
+
+  ¡ñ Binary Operations
+      Binary operation require two operands of the same type, execute an
+      operation on them, and produce a single value.
+      The result value may not have the same type as its operands.
+      Binary operation include:
+          IR_ADD  compute the sum of its two operands.
+          IR_SUB  compute the difference of its two operands.
+          IR_MUL  compute the product of its two operands.
+          IR_DIV  compute the quotient of its two operands.
+                  Division by zero leads to undefined behavior.
+                  If the value of opnd0 is not a multiple of opnd1,
+                  ((opnd0 div opnd1) mul opnd1) may not equal to opnd0.
+          IR_REM  compute the reminder of its two operands.
+          IR_MOD  compute the modulo of its two operands. The result is
+                  either zero or has the same sign as the divisor, BIN_opnd1.
+          IR_LAND compute the logical AND, logical operators are typically
+                  used with boolean (logical) values.
+                  When they are, they return a boolean value.
+          IR_LOR  compute the logical OR, logical operators are typically
+                  used with boolean (logical) values.
+                  When they are, they return a boolean value.
+          IR_BAND compute the bitwise logical AND of its two operands.
+          IR_BOR  compute the bitwise logical OR of its two operands.
+          IR_XOR  compute the bitwise logical exclusive OR of its two operands.
+          IR_LT   less than
+          IR_LE   less or equal than
+          IR_GT   great than
+          IR_GE   great or equal than
+          IR_EQ   equal
+          IR_NE   not equal£¬ compute the boolean value of its two operands.
+          IR_ASR  perform arithmetical shift-right for BIN_opnd0 accroding
+                  to value of BIN_opnd1, and return the shifted value as result.
+          IR_LSR  perform logical shift-right for BIN_opnd0 accroding to
+                  value of BIN_opnd1, and return the shifted value as result.
+          IR_LSL  perform logical shift-left for BIN_opnd0 accroding to
+                  value of BIN_opnd1, and return the shifted value as result.
+
+      Operands:
+      * IR_dt indicate the result type.
+      * BIN_opnd0 indicate the first operand.
+      * BIN_opnd1 indicate the second operand.
+
+  ¡ñ Unary Operations
+      Unary operation require one operand, execute an operation on them,
+      and produce a single value.
+      The result value may not have the same type as its operand.
+      Unary operation include:
+          IR_LNOT compute the logical NOT, returns false if its UNA_opnd
+                  can be converted to true; otherwise, returns true.
+          IR_NEG  compute the negative value of IR_opnd0.
+          IR_BNOT compute the bitwise NOT of IR_opnd0.
+
+      Operands:
+      * IR_dt     indicate the result type.
+      * UNA_opnd indicate the single operand.
+
+  ¡ñ IR_GOTO
+      This operation represent unconditional branch that cause control
+      flow to transfer to a label, the label should be defined in current
+      region.
+
+      Operands:
+      * GOTO_lab indicate the target label.
+
+  ¡ñ IR_IGOTO
+      This operation represent indirect goto operation.
+      The control flow will unconditional jump to one target label of a
+      list of label which determined by value-exp.
+
+      usage: igoto (value-exp) case_list.
+
+      Operands:
+      * IGOTO_vexp      indicate a value expression to determine
+                        which label will be target.
+      * IGOTO_case_list indicate a list of target.
+
+  ¡ñ IR_ARRAY
+      This operation represent array load operation that load a value
+      from an array element.
+
+      Operands:
+      * IR_dt       indicate the result type.
+      * ARR_base    indicate the target label.
+      * ARR_sub     indicate the subscript expression.
+      * ARR_elem_ty indicate the array element type.
+
+      NOTE: The base of array can be IR_LDA, or other computational
+      expression. If array base is LDA, it denotes that the base of
+      array is an array type VAR,
+      e.g: char p[N]; (&p)[i] = ...
+
+      If array base is computational expression, it denotes that the
+      base of array is a pointer, and the pointer point to an array.
+      e.g: char * p; (p+1)[i] = ...
+
+      ARR_elem_ty indicate the type of each element.
+      Moreover, element may be array as well.
+      If ARR_elem_ty is vector, ARR_ofst refers the referrenced element idx.
+
+      IR_dt describe the data-type of ARRAY operation + ARR_ofst.
+      ARR_elem_ty describe array element type.
+      e.g: struct {int a, b; } s[100];
+           ... = s[2].b;
+          data-type of array operation is D_I32, because ARR_ofst is 4,
+          that means we take the value of second field of struct, meanwhile
+          data-type of array element is D_MC, size is 8, (struct {int a, b;}).
+
+  ¡ñ IR_STARRAY
+      This operation represent array store operation that store a value to
+      an array element.
+      The most operations and properties are same as IR_ARRAY.
+
+      Operands:
+      * IR_dt        indicate the result type.
+      * ARR_base     indicate the target label.
+      * ARR_sub      indicate the subscript expression.
+      * ARR_elem_ty  indicate the array element type.
+      * STARR_rhs    indicate the Right Hand Side expression that computing
+                     a value to be stored to array element.
+
+      NOTE: The base of array can be IR_LDA, or other computational
+      expression. If array base is LDA, it denotes that the base of
+      array is an array type VAR,
+      e.g: char p[N]; (&p)[i] = ...
+
+      If array base is computational expression, it denotes that the
+      base of array is a pointer, and the pointer point to an array.
+      e.g: char * p; (p+1)[i] = ...
+
+      ARR_elem_ty indicate the type of each element.
+      Moreover, element may be array as well.
+      If ARR_elem_ty is vector, ARR_ofst refers the referrenced element idx.
+
+      IR_dt describe the data-type of ARRAY operation + ARR_ofst.
+      ARR_elemdt describe array element type.
+
+      e.g: struct {int a, b; } s[100];
+           ... = s[2].b;
+
+          data-type of array operation is D_I32, because ARR_ofst is 4,
+          that means we take the value of second field of struct, meanwhile
+          data-type of array element is D_MC, size is 8, (struct {int a, b;}).
+
+  ¡ñ IR_CVT
+      This operation represents data type convertion.
+
+      Type conversions for memory objects that have substantial effect must
+      be represented explicitly by IR_CVT.
+
+      Operands:
+      * IR_dt    indicate the result type.
+      * CVT_exp  indicate the IR expression to be converted.
+
+  ¡ñ IR_TRUEBR
+      This operation represent branch operation. The branch is taken if
+      determinant expression return true, otherwise the control flow does
+      not change.
+
+      e.g: comparison and jump if condition is true.
+          truebr ilabel(L24)
+              ne (bool)
+                  pr1 (i32)
+                  intconst 1
+          st(i32 'a')
+              pr1 (i32)
+      Semantics is: if pr1 != 1, then jump to L24, otherwise go
+      fallthrough to the following statement.
+
+      Operands:
+      * BR_det  indicate the determinate expression.
+      * BR_lab  indicate the target label if branch is taken.
+
+  ¡ñ IR_FALSEBR
+      This operation represent branch operation. The branch is taken if
+      determinant expression return false, otherwise the control flow does
+      not change.
+
+      e.g: comparison and jump if condition is false.
+          falsebr ilabel(L24)
+              ne (bool)
+                  pr1 (i32)
+                  intconst 1
+          st(i32 'a')
+              pr1 (i32)
+      Semantics is: if !(pr1 != 1), then jump to L24, otherwise go
+      fallthrough to the following statement.
+
+      Operands:
+      * BR_det  indicate the determinant expression.
+      * BR_lab  indicate the target label if branch is taken.
+
+  ¡ñ IR_RETURN
+      This operation represents function unit return operation.
+      The operation has a list of return value list, so it may return multiple
+      value at a time.
+
+      e.g: return two computed value store in pr1, pr2
+          stpr1 (i32)
+              ld(i32 a)
+          stpr2 (i32)
+              ld(i32 b)
+          return
+              pr1(i32), pr2(i32)
+
+      Operands:
+      * RET_exp_list  indicate return value expressions list.
+
+  ¡ñ IR_SELECT
+      This operation represents conditional execute operation. It computes
+      the value accroding to the result of predicator expression, if the
+      result value is true, return CONDEXE_trueexp, otherwise return
+      CONDEXE_falseexp.
+
+      e.g: res = select(a > b), (10), (20)
+      Semantics:
+          if (a > b) res = 10;
+          else res = 20;
+      where a > b is the predicator.
+
+      Operands:
+      * SELECT_pred     indicate predicator expression.
+      * SELECT_trueexp  indicate the true-value expressions.
+      * SELECT_falseexp indicate the false-value expressions.
+
+  ¡ñ IR_DO_LOOP
+      This operation is high level control loop operation, it represents a
+      kind of loop with plainly definition of INIT(low bound),
+      DET(HIGH bound), LOOP-BODY and STEP(Increment or Dcrement)
+      of induction variable. If this statement has no LOOP_body,
+      the field is NULL.
+
+      Operands:
+      * LOOP_init  indicate the stmt that compute the initial value of
+          induction variable.
+          It must be stmt, such as IR_ST or IR_STPR, initialize the induction
+          variable, the field can not be NULL as well.
+      * LOOP_det  indicate the determinant expression.
+          It must be a comparison expression for computing the
+          loop terminate condition.
+          The operation of comparison could only be IR_LT, IR_LE, IR_GT, IR_GE,
+          Note any other variables except the induction variable
+          must be loop invariant.
+      * LOOP_step  indicate step operation to induction variable.
+          It must be a stmt that operator is either IR_ST or IR_STPR.
+          The stmt updates the value of induction
+          variable by constant incrementally.
+          A common example is incrementing the induction variable via IR_ADD
+          by a const step amount.
+      * LOOP_body indicate a list of stmt that inside loop body.
+
+      Semantics: induction variable is i.
+          init: i = 0
+          do (det: i<=10)
               body
-            endwhile
+              step: i = i+1
+          enddo
 
-    ¡ñ IR_WHILE_DO
-        This operation represents a high level loop control structure.
-        LOOP_body is a list of IR node representing statements that is executed
-        while LOOP_det returns nonzero. The condition is tested at the start
-        of the loop. If this statement has no LOOP_body, the field is NULL.
+  ¡ñ IR_DO_WHILE
+      This operation represents a high level loop control structure.
+      LOOP_body is a list of IR node representing statements that is executed
+      while LOOP_det returns nonzero.
+      The condition is tested at the end of the loop, so the loop body is
+      executed at least once.
+      If there is no stmt inside the loop, LOOP_body should be NULL.
 
-        Operands:
-        * LOOP_det  is a boolean expression, that indicate the
-                    determinant expression.
-        * LOOP_body indicate a list of stmt that inside loop body.
+      Operands:
+      * LOOP_det  is a boolean expression, that indicate the
+                  determinant expression.
+      * LOOP_body indicate a list of stmt that inside loop body.
 
-        Semantics:
-            do
-              body
-            while (det)
+      Semantics:
+          while (det)
+            body
+          endwhile
 
-    ¡ñ IR_IF
-        This operation represents a high level control flow structure.
-        If the statement has no IF_falsebody or IR_truebody,
-        the field should be NULL.
+  ¡ñ IR_WHILE_DO
+      This operation represents a high level loop control structure.
+      LOOP_body is a list of IR node representing statements that is executed
+      while LOOP_det returns nonzero. The condition is tested at the start
+      of the loop. If this statement has no LOOP_body, the field is NULL.
 
-        Operands:
-        * IF_det  is a boolean expression, that indicate the
-            determinant expression.
-        * IF_truebody  specify a list of statements that is executed
-                       if IF_det return true.
-        * IF_falsebody specify a list of statements that is executed
-                       if IF_det return false.
+      Operands:
+      * LOOP_det  is a boolean expression, that indicate the
+                  determinant expression.
+      * LOOP_body indicate a list of stmt that inside loop body.
 
-        Semantics:
-            if (det)
-                truebody
-            else
-                falsebody
-            endif
+      Semantics:
+          do
+            body
+          while (det)
 
-    ¡ñ IR_BREAK
-        This operation represents high level control structure, that terminate
-        current loop execution immediately without any other operations. It is
-        used to specify an unconditional branch from a loop body to the end
-        label of loop.
+  ¡ñ IR_IF
+      This operation represents a high level control flow structure.
+      If the statement has no IF_falsebody or IR_truebody,
+      the field should be NULL.
 
-        Semantics: Jump out of loop.
-            while (i < 10)
-                if (i ==3)
-                    break
-                endif
-                i = i+1
-            endwhile
+      Operands:
+      * IF_det  is a boolean expression, that indicate the
+          determinant expression.
+      * IF_truebody  specify a list of statements that is executed
+                     if IF_det return true.
+      * IF_falsebody specify a list of statements that is executed
+                     if IF_det return false.
 
-    ¡ñ IR_CONTINUE
-        This operation represents high level control structure, that stop the
-        current loop iteration, immediately continue with the next one.
-        This operation is often used inside in loop body of IR_DO_LOOP,
-        IR_DO_WHILE, and IR_WHILE_DO.
-        It is used to specify an unconditional branch from a loop body to the
-        determinant expression at beginning of the loop statetment.
+      Semantics:
+          if (det)
+              truebody
+          else
+              falsebody
+          endif
 
-        Semantics: Jump to beginning of loop to execute the determinant
-        expression.
-        Note in the example, followed stmts of IR_CONTINUE can not be
-        executed, thus loop statement will not be terminated.
-            while (i < 10)
-                if (i ==3)
-                    continue
-                endif
-                i = i+1
-            endwhile
+  ¡ñ IR_BREAK
+      This operation represents high level control structure, that terminate
+      current loop execution immediately without any other operations. It is
+      used to specify an unconditional branch from a loop body to the end
+      label of loop.
 
-    ¡ñ IR_PHI
-        The operation is used to implement the ¦Õ node if region is in the SSA
-        mode. Each operand of PHI must correspond to concerned predecessor basic
-        block in CFG. Only PR and CONST could be used as the operand to the PHI
-        node. PHI instructions must be first stmt in IR list of basic block.
+      Semantics: Jump out of loop.
+          while (i < 10)
+              if (i ==3)
+                  break
+              endif
+              i = i+1
+          endwhile
 
-        Operands:
-        * PHI_res        indicate the result PR.
-        * PHI_ssainfo    indicate the SSA information of result PR if exist.
-        * PHI_opnd_list  indicate the operand list, which only may be
-                         PR and CONST.
+  ¡ñ IR_CONTINUE
+      This operation represents high level control structure, that stop the
+      current loop iteration, immediately continue with the next one.
+      This operation is often used inside in loop body of IR_DO_LOOP,
+      IR_DO_WHILE, and IR_WHILE_DO.
+      It is used to specify an unconditional branch from a loop body to the
+      determinant expression at beginning of the loop statetment.
 
-    ¡ñ IR_LABEL
-        This operation represents internal, customer defined label, and pragmas.
-        Any branch to the label will transfer control to the statement
-        following the label.
+      Semantics: Jump to beginning of loop to execute the determinant
+      expression.
+      Note in the example, followed stmts of IR_CONTINUE can not be
+      executed, thus loop statement will not be terminated.
+          while (i < 10)
+              if (i ==3)
+                  continue
+              endif
+              i = i+1
+          endwhile
 
-        Operands:
-        * LAB_lab indicate a LabelInfo structure which describe detailed
-                  information of the label.
+  ¡ñ IR_PHI
+      The operation is used to implement the ¦Õ node if region is in the SSA
+      mode. Each operand of PHI must correspond to concerned predecessor basic
+      block in CFG. Only PR and CONST could be used as the operand to the PHI
+      node. PHI instructions must be first stmt in IR list of basic block.
+
+      Operands:
+      * PHI_res        indicate the result PR.
+      * PHI_ssainfo    indicate the SSA information of result PR if exist.
+      * PHI_opnd_list  indicate the operand list, which only may be
+                       PR and CONST.
+
+  ¡ñ IR_LABEL
+      This operation represents internal, customer defined label, and pragmas.
+      Any branch to the label will transfer control to the statement
+      following the label.
+
+      Operands:
+      * LAB_lab indicate a LabelInfo structure which describe detailed
+                information of the label.
 
 
-¡ö Basic Block.
+¡ö Basic Block
 
-    Defined in ir_bb.h
+  Defined in ir_bb.h
 
-    A basic block is a straight-line code sequence
-    with no branches in except to the entry and no branches out except at
-    the exit. This restricted form makes a basic block highly amenable to
-    analysis.
+  A basic block is a straight-line code sequence
+  with no branches in except to the entry and no branches out except at
+  the exit. This restricted form makes a basic block highly amenable to
+  analysis.
 
-    Stmt operations which can be placed in basic block are:
-        IR_ST, IR_STPR, IR_STARRAY, IR_SETELEM, IR_GETELEM, IR_IST, IR_CALL,
-        IR_ICALL, IR_GOTO, IR_IGOTO, IR_SWITCH, IR_TRUEBR, IR_FALSEBR,
-        IR_RETURN, IR_PHI, IR_REGION.
+  Stmt operations which can be placed in basic block are:
+    IR_ST, IR_STPR, IR_STARRAY, IR_SETELEM, IR_GETELEM, IR_IST, IR_CALL,
+    IR_ICALL, IR_GOTO, IR_IGOTO, IR_SWITCH, IR_TRUEBR, IR_FALSEBR,
+    IR_RETURN, IR_PHI, IR_REGION.
 
 
 ¡ö Control Flow Graph (CFG)
 
-    Defined in cfg.h
+  Defined in cfg.h
 
-    A control-flow graph is a representation, using graph notation, of all
-    paths that might be traversed through a program during its execution.
+  A control-flow graph is a representation, using graph notation, of all
+  paths that might be traversed through a program during its execution.
 
-    A control-flow graph is consist of a list basic blocks.
-    This class is inherited from the class Graph which defined in sgraph.h.
-    You can access vertex and edge on CFG via the API of class Graph.
-    Each vertex is corresponding to a unique basic block id. So you can access
-    the basic block via get_bb(bbid).
+  A control-flow graph is consist of a list basic blocks.
+  This class is inherited from the class Graph which defined in sgraph.h.
+  You can access vertex and edge on CFG via the API of class Graph.
+  Each vertex is corresponding to a unique basic block id. So you can access
+  the basic block via get_bb(bbid).
 
-    The class CFG supplied a bulk of APIs to manapulate the contrl flow graph.
+  The class CFG supplied a bulk of APIs to manapulate the contrl flow graph.
 
-¡ö Analysis and Transform Phase.
-    XOC uses two different kinds of data flow analysis technologies based on
-    bit-vectors and SSA form respectively. Most optimization use use-def info
-    produced by the IR_DU_MGR phase. Bit-vectors data flow analyses is based
-    on MD, and SSA form is based on PR. XOC creates the dominator tree,
-    postdominator tree, dominance frontier, as well as computing the SSA form
-    and the control-dependence set of CFG.
+¡ö Analysis and Transform Phase
+  XOC uses two different kinds of data flow analysis technologies based on
+  bit-vectors and SSA form respectively. Most optimization use use-def info
+  produced by the DUMgr phase. Bit-vectors data flow analyses is based
+  on MD, and SSA form is based on PR. XOC creates the dominator tree,
+  postdominator tree, dominance frontier, as well as computing the SSA form
+  and the control-dependence set of CFG.
 
-    ¡ñ Alias Analysis
-        We implement three analyses: address-taken, flow sensitive, flow
-        insensitive. Our analysis has a subtle difference with other algorithms,
-        we perform alias analysis and compute the exact and inexact MD.
-        These MDs describe the shape of the store and load and every function
-        uses them to specify the store and load that it expects.
-        When alias analysis is finished, we define an unique VAR for each alias
-        group, which are sets of MD that share the same aliases.
+  ¡ñ Alias Analysis
+    We implement three analyses: address-taken, flow sensitive, flow
+    insensitive. Our analysis has a subtle difference with other algorithms,
+    we perform alias analysis and compute the exact and inexact MD.
+    These MDs describe the shape of the store and load and every function
+    uses them to specify the store and load that it expects.
+    When alias analysis is finished, we define an unique VAR for each alias
+    group, which are sets of MD that share the same aliases.
 
-    ¡ñ DU Manager
-        This is one of the most important data structure used in XOC. This
-        manager computes the result of memory dependency analysis, du-chain
-        of each stmt, and liveness expression. Most of the optimizations rely
-        on the data flow information provided by DU manager.
-        ¡ð Key Concept
-            * May Def, May Use, Must Def, Must Use.
-                If a statement def an exact MD, we call it Must Def.
-                If a statement def an inexact MD, we call it Must Def, but the Def
-                is nonkilling def.
-                If a statement def more than one MD, we call it May Def, these Def
-                are nonkilling def.
-                If an expression use one exact MD, we call it Must Use.
-                If an expression use one inexact MD, we call it Must Use, the use
-                is conservative.
-                If an expression use more than one MD, we call it May Use, these
-                uses are conservative.
+  ¡ñ DU Manager
+    This is one of the most important data structure used in XOC. This
+    manager computes the result of memory dependency analysis, du-chain
+    of each stmt, and liveness expression. Most of the optimizations rely
+    on the data flow information provided by DU manager.
+    ¡ð Key Concept
+      * May Def, May Use, Must Def, Must Use.
+        If a statement def an exact MD, we call it Must Def.
+        If a statement def an inexact MD, we call it Must Def, but the Def
+        is nonkilling def.
+        If a statement def more than one MD, we call it May Def, these Def
+        are nonkilling def.
+        If an expression use one exact MD, we call it Must Use.
+        If an expression use one inexact MD, we call it Must Use, the use
+        is conservative.
+        If an expression use more than one MD, we call it May Use, these
+        uses are conservative.
 
-            * DU chain
-                DU manager build Def-Use chain via MD reference.
+      * Def-Use chain
+        DU manager build Def-Use chain via MD reference.
 
-        ¡ð Utility functions provided by IR_DU_MGR that one can easily run and
-          tweaked to get a better understanding of how the module works.
+    ¡ð Utility functions provided by DUMgr that one can easily run and
+       tweaked to get a better understanding of how the module works.
 
-            * These functions manipulate the reference of IR.
-                IR may reference MD, or MD_SET, or both MD and MD_SET.
+      * These functions manipulate the reference of IR.
+          IR may reference MD, or MDSet, or both MD and MDSet.
 
-            add_referred_mds
-            compute_overlap_def_mds
-            compute_overlap_use_mds
-            collect_must_use
-            collect_must_may_use
-            clean_du_and_mds
-            copy_ir_tree_use_mds
-            copy_referred_mds
-            clean_use_mds
-            clean_def_mds
-            getMayDef
-            getMustUse
-            getMayUse
-            get_must_def
-            get_effect_def_md
-            get_exact_def_md
-            get_effect_use_md
-            get_exact_use_md
-            get_exact_unique_def
-            free_mds
-            map_call2mayuse
-            set_map_call2mayuse
-            has_no_du
-            is_may_def
-            is_may_kill
-            is_must_kill
-            is_must_def
-            is_exact_unique_def
+      add_referred_mds
+      compute_overlap_def_mds
+      compute_overlap_use_mds
+      collect_must_use
+      collect_must_may_use
+      clean_du_and_mds
+      copy_ir_tree_use_mds
+      copy_referred_mds
+      clean_use_mds
+      clean_def_mds
+      getMayDef
+      getMustUse
+      getMayUse
+      get_must_def
+      get_effect_def_md
+      get_exact_def_md
+      get_effect_use_md
+      get_exact_use_md
+      get_exact_unique_def
+      free_mds
+      map_call2mayuse
+      set_map_call2mayuse
+      has_no_du
+      is_may_def
+      is_may_kill
+      is_must_kill
+      is_must_def
+      is_exact_unique_def
 
-            * These functions manipulate the DU chain.
+      * These functions manipulate the DU chain.
 
-            build_du_chain
-            clean_du_and_mds
-            copy_du_info
-            get_du
-            get_du_c
-            free_du_info
-            is_du_exist
-            union_use
-            union_useset
-            union_def
-            union_defset
-            remove_du_chain
-            remove_expired_du_chain
-            remove_def
-            remove_use_out_from_defset
-            remove_def_out_from_useset
-            remove_ir_out_from_du_mgr
+      build_du_chain
+      clean_du_and_mds
+      copy_du_info
+      get_du
+      get_du_c
+      free_du_info
+      is_du_exist
+      union_use
+      union_useset
+      union_def
+      union_defset
+      remove_du_chain
+      remove_expired_du_chain
+      remove_def
+      remove_use_out_from_defset
+      remove_def_out_from_useset
+      remove_ir_out_from_du_mgr
 
-    ¡ñ SSA Manager
-        The SSA form is based on the premise that program variables are assigned
-        in exactly one location in the program. Multiple assignments to the same
-        variable create new versions of that variable. Actually, the IR
-        representation are not in SSA form initially because XOC also uses
-        normal data flow analysis based on bit-vector and provids high level IR
-        operations. SSA manager modifies the IR representation so that every
-        time a PR is assigned in the code, a new version of the PR is created.
-        Different versions of the same PR are distinguished by subscripting
-        the variable name with its version number, we call this structure
-        Versioned PR(VP).
+  ¡ñ SSA Manager
+    The SSA form is based on the premise that program variables are assigned
+    in exactly one location in the program. Multiple assignments to the same
+    variable create new versions of that variable. Actually, the IR
+    representation are not in SSA form initially because XOC also uses
+    normal data flow analysis based on bit-vector and provids high level IR
+    operations. SSA manager modifies the IR representation so that every
+    time a PR is assigned in the code, a new version of the PR is created.
+    Different versions of the same PR are distinguished by subscripting
+    the variable name with its version number, we call this structure
+    Versioned PR(VP).
 
-    ¡ñ AttachInfo
-        The attached information of IR is used to represent additional
-        information for specialized optimization or function.
+  ¡ñ AttachInfo
+    The attached information of IR is used to represent additional
+    information for specialized optimization or function.
 
 ¡ö IR Reader
-    XOC provide text format of IR.
-    ¡ñ setelem
-        * Syntax: setelem $<prno>:<type>:(property) = <expression1>,
-                                                      <expression2>,
-                                                      <expression3>
-        prno: immediate that indicate the index of result PR.
-        type: data type of value that will set to result PR.
-        property: stmt property.
-        expression1: base of source.
-        expression2: value that need to be set.
-        expression3: byte offset to the begin of result PR.
+  XOC provide text format of IR.
+  ¡ñ setelem
+    * Syntax: setelem $<prno>:<type>:(property) = <expression1>,
+                                                  <expression2>,
+                                                  <expression3>
+    prno: immediate that indicate the index of result PR.
+    type: data type of value that will set to result PR.
+    property: stmt property.
+    expression1: base of source.
+    expression2: value that need to be set.
+    expression3: byte offset to the begin of result PR.
 
 ¡ö Quick Start
-    ¡ñ How to dump IR during compilation
-        Add predefined macro to command line: -D_DEBUG_
-        e.g: gcc -D_DEBUG_ ir_opt.cpp -S -O2
+  ¡ñ How to dump IR during compilation
+    Add predefined macro to command line: -D_DEBUG_
+    e.g: gcc -D_DEBUG_ ir_opt.cpp -S -O2
 
-    ¡ñ How to build XOC project under Visual Studio 2010(VS2010)
-        Add to command line: /D "_CRT_SECURE_NO_WARNINGS" /D "_VC2010_" -D "FOR_DEX" /D "_DEBUG_"
+  ¡ñ How to build XOC project under Visual Studio 2010(VS2010)
+    Add to command line: /D "_CRT_SECURE_NO_WARNINGS" /D "_VC2010_" -D "FOR_DEX" /D "_DEBUG_"
 
-    ¡ñ How to build XOC project under Windows
-        Add predefined macro to command line: -D_ON_WINDOWS_
+  ¡ñ How to build XOC project under Windows
+    Add predefined macro to command line: -D_ON_WINDOWS_
 
-    ¡ñ Setting up the build environment
-        This is an example to demostrate how to drive XOC to compile user
-        input data. Note the header file cominc.h is important and necessary.
+  ¡ñ Setting up the build environment
+    This is an example to demostrate how to drive XOC to compile user
+    input data. Note the header file cominc.h is important and necessary.
 
-        #include "cominc.h"
-        void main(int argc, char * argv[])
+    #include "cominc.h"
+    void main(int argc, char * argv[])
+    {
+        //Create region manager, since it is the top data structure of XOC.
+        REGION_MGR rm;
+        rm.init_var_mgr();
+
+        //Generate IR list, VAR and REGION accroding to user input.
+        generate_ir_list(&rm);
+        generate_var_tab(&rm);
+
+        //Process all REGIONs, and do specified analysis and transformation.
+        rm.process();
+
+        //Delete REGION_MGR
+        delete rm;
+    }
+
+  ¡ñ How to write a pass
+    This is an example to demostrate how to write a pass.
+    Note the header file cominc.h is important and necessary.
+    New pass must public derived from class IR_OPT, it is the base class.
+    Note the following three functions must be implement by user,
+    class destructor, get_opt_name, and perform, all of them must be
+    virtual.
+
+    #include "cominc.h"
+    class MY_OPT : public IR_OPT {
+    REGION * m_ru;
+    public:
+        MY_OPT(REGION * ru) { m_ru = ru; }
+        virtual ~MY_OPT () {}
+        virtual CHAR const* get_opt_name()
         {
-            //Create region manager, since it is the top data structure of XOC.
-            REGION_MGR rm;
-            rm.init_var_mgr();
-
-            //Generate IR list, VAR and REGION accroding to user input.
-            generate_ir_list(&rm);
-            generate_var_tab(&rm);
-
-            //Process all REGIONs, and do specified analysis and transformation.
-            rm.process();
-
-            //Delete REGION_MGR
-            delete rm;
+            return ¡±My optimization¡±;
         }
 
-    ¡ñ How to write a pass
-        This is an example to demostrate how to write a pass.
-        Note the header file cominc.h is important and necessary.
-        New pass must public derived from class IR_OPT, it is the base class.
-        Note the following three functions must be implement by user,
-        class destructor, get_opt_name, and perform, all of them must be
-        virtual.
+        virtual bool perform(OPT_CONT & opt_cont)
+        {
+            //Do nothing.
+            return false;
+        }
+    };
 
-        #include "cominc.h"
-        class MY_OPT : public IR_OPT {
-        REGION * m_ru;
-        public:
-            MY_OPT(REGION * ru) { m_ru = ru; }
-            virtual ~MY_OPT () {}
-            virtual CHAR const* get_opt_name()
-            {
-                return ¡±My optimization¡±;
-            }
+    Now we declare our pass, MY_OPT.
+    If we add it into pass_manager optimization list, it is a working class,
+    and class member function get_opt_name() will be invoked when the class
+    is running.
 
-            virtual bool perform(OPT_CONT & opt_cont)
-            {
-                //Do nothing.
-                return false;
-            }
-        };
+    Let's make our pass fully-fledged. If the global option g_show_comp_time
+    is set to true, the pass should print compiling time. XOC provids
+    several nice functions to allow you to get information about the
+    execution time of the pass. They are declared in comf.h. Following code
+    fragment is a demo to use them.
 
-        Now we declare our pass, MY_OPT.
-        If we add it into pass_manager optimization list, it is a working class,
-        and class member function get_opt_name() will be invoked when the class
-        is running.
+        virtual bool perform(OPT_CONT & opt_cont)
+        {
+            START_TIMER(get_opt_name());
 
-        Let's make our pass fully-fledged. If the global option g_show_comp_time
-        is set to true, the pass should print compiling time. XOC provids
-        several nice functions to allow you to get information about the
-        execution time of the pass. They are declared in comf.h. Following code
-        fragment is a demo to use them.
+            //Do nothing.
 
-            virtual bool perform(OPT_CONT & opt_cont)
-            {
-                START_TIMER(get_opt_name());
+            END_TIMER();
+            return false;
+        }
 
-                //Do nothing.
+    For now, the most important thing you should do is decide what
+    information should be avaiable for your class. For example, our
+    MY_OPT class need DU reference information, and DU chain for its
+    implementation, the general step is to utilize the input parameter
+    opt_cont,
 
-                END_TIMER();
-                return false;
-            }
-
-        For now, the most important thing you should do is decide what
-        information should be avaiable for your class. For example, our
-        MY_OPT class need DU reference information, and DU chain for its
-        implementation, the general step is to utilize the input parameter
-        opt_cont,
-
-            virtual bool perform(OPT_CONT & opt_cont)
-            {
-                START_TIMER(get_opt_name());
-                if (!OPTC_is_du_chain_valid(oc)) {
-                    if (!OPTC_is_ref_valid(oc)) {
-                        if (!OPTC_is_aa_valid(oc)) {
-                            m_ru->getAA()->perform(oc);
-                        }
-                        m_ru->getDUMgr()->perform(oc, SOL_REF);
+        virtual bool perform(OPT_CONT & opt_cont)
+        {
+            START_TIMER(get_opt_name());
+            if (!OPTC_is_du_chain_valid(oc)) {
+                if (!OPTC_is_ref_valid(oc)) {
+                    if (!OPTC_is_aa_valid(oc)) {
+                        m_ru->getAA()->perform(oc);
                     }
-                    IS_TRUE0(m_ru->getDUMgr()->verify());
-                    m_ru->getDUMgr()->compute_du_chain(oc);
+                    m_ru->getDUMgr()->perform(oc, SOL_REF);
                 }
-
-                //Do nothing.
-
-                END_TIMER();
-                return false;
+                IS_TRUE0(m_ru->getDUMgr()->verify());
+                m_ru->getDUMgr()->compute_du_chain(oc);
             }
 
-        The code fragment check and recompute the DU chain, DU reference and
-        alias analysis information if necessary.
-        As it show, your pass should determine and recompute the infrastructure
-        information necessary to do optimization so that the pass is running
-        as rapid as possible.
+            //Do nothing.
 
-    ¡ñ How to add a new target
-        e.g: We are going to add a new target, named NT.
-        1. Create a directory under xoc/nt
-        2. Generate a header file that includes all predefined macros for const
-           values which compiler used, named nt_const_info.h
-        3. Define a marco FOR_NT and add nt_const_info.h into
-           xoc/opt/targ_const_info.h, such as:
-             ...
-             #elif defined(FOR_NT)
-             #include "../nt/nt_const_info.h"
-             ...
-           Add -DFOR_NT into build system.
-        4. Add compiler driver files ntdriver.cpp and ntdriver.h, and place
-           them under xoc/nt.
+            END_TIMER();
+            return false;
+        }
+
+    The code fragment check and recompute the DU chain, DU reference and
+    alias analysis information if necessary.
+    As it show, your pass should determine and recompute the infrastructure
+    information necessary to do optimization so that the pass is running
+    as rapid as possible.
+
+  ¡ñ How to add a new target
+    e.g: We are going to add a new target, named NT.
+    1. Create a directory under xoc/nt
+    2. Generate a header file that includes all predefined macros for const
+       values which compiler used, named nt_const_info.h
+    3. Define a marco FOR_NT and add nt_const_info.h into
+       xoc/opt/targ_const_info.h, such as:
+         ...
+         #elif defined(FOR_NT)
+         #include "../nt/nt_const_info.h"
+         ...
+       Add -DFOR_NT into build system.
+    4. Add compiler driver files ntdriver.cpp and ntdriver.h, and place
+       them under xoc/nt.

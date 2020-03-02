@@ -70,12 +70,12 @@ public:
 #define CP_PROP_UNARY_AND_SIMPLEX 3
 
 //Perform Copy Propagation
-class IR_CP : public Pass {
+class CopyProp : public Pass {
 private:
     Region * m_rg;
     MDSystem * m_md_sys;
-    IR_DU_MGR * m_du;
-    IR_CFG * m_cfg;
+    DUMgr * m_du;
+    IRCFG * m_cfg;
     MDSetMgr * m_md_set_mgr;
     TypeMgr * m_tm;
     UINT m_prop_kind;
@@ -127,7 +127,7 @@ private:
                             IN OUT CPCtx & ctx);
 
 public:
-    IR_CP(Region * rg)
+    CopyProp(Region * rg)
     {
         ASSERT0(rg != NULL);
         m_rg = rg;
@@ -139,8 +139,8 @@ public:
         ASSERT0(m_cfg && m_du && m_md_sys && m_tm && m_md_set_mgr);
         m_prop_kind = CP_PROP_UNARY_AND_SIMPLEX;
     }
-    COPY_CONSTRUCTOR(IR_CP);
-    virtual ~IR_CP() {}
+    COPY_CONSTRUCTOR(CopyProp);
+    virtual ~CopyProp() {}
 
     //Check if ir is appropriate for propagation.
     virtual bool canBeCandidate(IR const* ir) const

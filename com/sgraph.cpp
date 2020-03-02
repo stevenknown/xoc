@@ -50,8 +50,8 @@ namespace xcom {
 Edge * EdgeHash::create(OBJTY v)
 {
     Edge * t = (Edge*)v;
-    Vertex * from = m_g->get_vertex(VERTEX_id(EDGE_from(t)));
-    Vertex * to = m_g->get_vertex(VERTEX_id(EDGE_to(t)));
+    Vertex * from = m_g->getVertex(VERTEX_id(EDGE_from(t)));
+    Vertex * to = m_g->getVertex(VERTEX_id(EDGE_to(t)));
     ASSERT0(from && to);
     t = m_g->newEdgeImpl(from, to);
     return t;
@@ -212,7 +212,7 @@ void Graph::computeRpoNoRecursive(Vertex * root, OUT List<Vertex const*> & vlst)
     Stack<Vertex*> stk;
     stk.push(root);
     Vertex * v;
-    UINT order = get_vertex_num();
+    UINT order = getVertexNum();
     while ((v = stk.get_top()) != NULL) {
         is_visited.bunion(VERTEX_id(v));
         EdgeC * el = VERTEX_out_list(v);
@@ -372,15 +372,14 @@ void Graph::reverseEdges()
 //Insert 'newv' between 'v1' and 'v2'.
 //e.g: given edge v1->v2, the result is v1->newv->v2.
 //Return edge v1->newv, newv->v2.
-void Graph::insertVertexBetween(
-        IN Vertex * v1,
-        IN Vertex * v2,
-        IN Vertex * newv,
-        OUT Edge ** e1,
-        OUT Edge ** e2,
-        bool sort)
+void Graph::insertVertexBetween(IN Vertex * v1,
+                                IN Vertex * v2,
+                                IN Vertex * newv,
+                                OUT Edge ** e1,
+                                OUT Edge ** e2,
+                                bool sort)
 {
-    Edge * e = get_edge(v1, v2);
+    Edge * e = getEdge(v1, v2);
 
     EdgeC * v2pos_in_list = NULL;
     EdgeC * v1pos_in_list = NULL;
@@ -448,17 +447,16 @@ void Graph::insertVertexBetween(
 //Return edge v1->newv, newv->v2.
 //
 //NOTICE: newv must be node in graph.
-void Graph::insertVertexBetween(
-        UINT v1,
-        UINT v2,
-        UINT newv,
-        OUT Edge ** e1,
-        OUT Edge ** e2,
-        bool sort)
+void Graph::insertVertexBetween(UINT v1,
+                                UINT v2,
+                                UINT newv,
+                                OUT Edge ** e1,
+                                OUT Edge ** e2,
+                                bool sort)
 {
-    Vertex * pv1 = get_vertex(v1);
-    Vertex * pv2 = get_vertex(v2);
-    Vertex * pnewv = get_vertex(newv);
+    Vertex * pv1 = getVertex(v1);
+    Vertex * pv2 = getVertex(v2);
+    Vertex * pnewv = getVertex(newv);
     ASSERT0(pv1 && pv2 && pnewv);
     insertVertexBetween(pv1, pv2, pnewv, e1, e2, sort);
 }
@@ -537,7 +535,7 @@ bool Graph::getNeighborList(OUT List<UINT> & ni_list, UINT vid) const
 
     //Ensure VertexHash::find is readonly.
     Graph * pthis = const_cast<Graph*>(this);
-    Vertex * vex  = pthis->get_vertex(vid);
+    Vertex * vex  = pthis->getVertex(vid);
     if (vex == NULL) { return false; }
 
     EdgeC * el = VERTEX_in_list(vex);
@@ -566,12 +564,12 @@ bool Graph::getNeighborList(OUT List<UINT> & ni_list, UINT vid) const
 //'niset': record the neighbours of 'vid'.
 //    Note that this function ensure each neighbours in niset is unique.
 //    Using sparse bitset is faster than list in most cases.
-bool Graph::get_neighbor_set(OUT DefSBitSet & niset, UINT vid) const
+bool Graph::getNeighborSet(OUT DefSBitSet & niset, UINT vid) const
 {
     ASSERTN(m_ec_pool != NULL, ("not yet initialized."));
     //Ensure VertexHash::find is readonly.
     Graph * pthis = const_cast<Graph*>(this);
-    Vertex * vex  = pthis->get_vertex(vid);
+    Vertex * vex  = pthis->getVertex(vid);
     if (vex == NULL) { return false; }
 
     EdgeC * el = VERTEX_in_list(vex);
@@ -591,15 +589,15 @@ bool Graph::get_neighbor_set(OUT DefSBitSet & niset, UINT vid) const
 }
 
 
-UINT Graph::get_degree(Vertex const* vex) const
+UINT Graph::getDegree(Vertex const* vex) const
 {
     ASSERTN(m_ec_pool != NULL, ("not yet initialized."));
     if (vex == NULL) return 0;
-    return get_in_degree(vex) + get_out_degree(vex);
+    return getInDegree(vex) + getOutDegree(vex);
 }
 
 
-UINT Graph::get_in_degree(Vertex const* vex) const
+UINT Graph::getInDegree(Vertex const* vex) const
 {
     ASSERTN(m_ec_pool != NULL, ("not yet initialized."));
     if (vex == NULL) { return 0; }
@@ -613,7 +611,7 @@ UINT Graph::get_in_degree(Vertex const* vex) const
 }
 
 
-UINT Graph::get_out_degree(Vertex const* vex) const
+UINT Graph::getOutDegree(Vertex const* vex) const
 {
     ASSERTN(m_ec_pool != NULL, ("not yet initialized."));
     if (vex == NULL) { return 0; }
@@ -628,7 +626,7 @@ UINT Graph::get_out_degree(Vertex const* vex) const
 }
 
 
-Edge * Graph::get_edge(Vertex const* from, Vertex const* to) const
+Edge * Graph::getEdge(Vertex const* from, Vertex const* to) const
 {
     ASSERTN(m_ec_pool != NULL, ("not yet initialized."));
     if (from == NULL || to == NULL) { return NULL; }
@@ -660,19 +658,19 @@ Edge * Graph::get_edge(Vertex const* from, Vertex const* to) const
 }
 
 
-Edge * Graph::get_edge(UINT from, UINT to) const
+Edge * Graph::getEdge(UINT from, UINT to) const
 {
     ASSERTN(m_ec_pool != NULL, ("not yet initialized."));
-    Vertex * fp = get_vertex(from);
-    Vertex * tp = get_vertex(to);
-    return get_edge(fp, tp);
+    Vertex * fp = getVertex(from);
+    Vertex * tp = getVertex(to);
+    return getEdge(fp, tp);
 }
 
 
 bool Graph::is_equal(Graph & g) const
 {
-    if (get_vertex_num() != g.get_vertex_num() ||
-        get_edge_num() != g.get_edge_num()) {
+    if (getVertexNum() != g.getVertexNum() ||
+        getEdgeNum() != g.getEdgeNum()) {
         return false;
     }
 
@@ -680,7 +678,7 @@ bool Graph::is_equal(Graph & g) const
     INT c;
     for (Vertex * v1 = get_first_vertex(c);
          v1 != NULL; v1 = get_next_vertex(c)) {
-        Vertex * v2 = g.get_vertex(VERTEX_id(v1));
+        Vertex * v2 = g.getVertex(VERTEX_id(v1));
         if (v2 == NULL) {
             return false;
         }
@@ -746,30 +744,31 @@ bool Graph::is_reachable(Vertex * from, Vertex * to) const
 
 
 //Sort graph vertices in topological order.
-//'vex_vec': record nodes with topological sort.
+//vex_vec: record nodes with topological sort.
+//is_topdown: true to sort vertex in topdown order, false to sort in
+//            bottomup order.
 //NOTE: current graph will be empty at function return.
 //    If one need to keep the graph unchanged, clone graph
 //    as a tmpgraph and operate on the tmpgraph.
 //    e.g: Graph org;
-//        And org must be unchanged,
-//        Graph tmp(org);
-//        tmp.sortInToplogOrder(...)
+//         And org must be unchanged,
+//         Graph tmp(org);
+//         tmp.sortInToplogOrder(...)
 bool Graph::sortInToplogOrder(OUT Vector<UINT> & vex_vec, bool is_topdown)
 {
     ASSERTN(m_ec_pool != NULL, ("Graph still not yet initialize."));
-    if (get_vertex_num() == 0) {
+    if (getVertexNum() == 0) {
         return true;
     }
     List<Vertex*> vlst;
     UINT pos = 0;
     vex_vec.clean();
-    vex_vec.grow(get_vertex_num());
-    while (this->get_vertex_num() != 0) {
+    vex_vec.grow(getVertexNum());
+    while (getVertexNum() != 0) {
         vlst.clean();
-        Vertex * v;
         INT c;
-        for (v = this->get_first_vertex(c);
-             v != NULL; v = this->get_next_vertex(c)) {
+        for (Vertex * v = get_first_vertex(c);
+             v != NULL; v = get_next_vertex(c)) {
             if (is_topdown) {
                 if (VERTEX_in_list(v) == NULL) {
                     vlst.append_tail(v);
@@ -778,14 +777,14 @@ bool Graph::sortInToplogOrder(OUT Vector<UINT> & vex_vec, bool is_topdown)
                 vlst.append_tail(v);
             }
         }
-        if (vlst.get_elem_count() == 0 && this->get_vertex_num() != 0) {
+        if (vlst.get_elem_count() == 0 && getVertexNum() != 0) {
             ASSERTN(0, ("exist cycle in graph"));
             return false;
         }
-        for (v = vlst.get_head(); v != NULL; v = vlst.get_next()) {
+        for (Vertex * v = vlst.get_head(); v != NULL; v = vlst.get_next()) {
             vex_vec.set(pos, VERTEX_id(v));
             pos++;
-            this->removeVertex(v);
+            removeVertex(v);
         }
     }
     return true;
@@ -820,15 +819,14 @@ void Graph::removeEdgeBetween(Vertex * v1, Vertex * v2)
 
 
 //Remove transitive edge.
-//e.g: Given edges of G, there are v1->v2->v3, v1->v3, then v1->v3 named
+//e.g: Given edges of G, there are v0->v1->v2->v3, v0->v3, then v0->v3 named
 //transitive edge.
-//
-//Algo:
-//    INPUT: Graph with N edges.
+//ALGO:
+//    INPUT: Graph with N vertices.
 //    1. Sort vertices in topological order.
 //    2. Associate each edges with indicator respective,
 //       and recording them in one matrix(N*N)
-//        e.g: e1:v0->v2, e2:v1->v2, e3:v0->v1
+//       e.g: e1:v0->v2, e2:v1->v2, e3:v0->v1
 //              0   1    2
 //            0 --  e3   e1
 //            1 --  --   e2
@@ -837,69 +835,107 @@ void Graph::removeEdgeBetween(Vertex * v1, Vertex * v2)
 //    3. Scan vertices according to toplogical order,
 //       remove all edges which the target-node has been
 //       marked at else rows.
-//        e.g: There are dependence edges: v0->v1, v0->v2.
-//         If v1->v2 has been marked, we said v0->v2 is removable,
-//         and the same goes for the rest of edges.
+//       e.g: There are dependence edges: v0->v1, v0->v2.
+//       If v1->v2 has been marked, we said v0->v2 is removable,
+//       and the same goes for the rest of edges.
 void Graph::removeTransitiveEdge()
 {
-    BitSetMgr bs_mgr;
     Vector<UINT> vex_vec;
-    sortInToplogOrder(vex_vec, true);
-    Vector<UINT> vid2pos_in_bitset_map; //Map from Vertex-ID to BitSet.
-
-    //Mapping vertex id to its position in 'vex_vec'.
+    Graph tmp(*this);
+    tmp.sortInToplogOrder(vex_vec, true);
+    DefMiscBitSetMgr bs_mgr;
+    Vector<DefSBitSetCore*> reachset_vec;
+    TMap<UINT, DefSBitSetCore*> reachset_map;
+    BitSet is_visited;
+    //Scanning vertices in topological order.
     for (INT i = 0; i <= vex_vec.get_last_idx(); i++) {
-        vid2pos_in_bitset_map.set(vex_vec.get((UINT)i), (UINT)i);
+        Vertex const* fromvex = getVertex(vex_vec.get(i));
+        ASSERT0(fromvex);
+        if (is_dense()) {
+            removeTransitiveEdgeHelper(fromvex,
+                &reachset_vec, is_visited, bs_mgr);
+        } else {
+            removeTransitiveEdgeHelper(fromvex,
+                (Vector<DefSBitSetCore*>*)&reachset_map, is_visited, bs_mgr);
+        }
+    }
+    if (is_dense()) {
+        for (INT i = 0; i <= reachset_vec.get_last_idx(); i++) {
+            DefSBitSetCore * bs = reachset_vec.get(i);
+            if (bs != NULL) {
+                bs->clean(bs_mgr);
+            }
+        }
+    } else {
+        TMapIter<UINT, DefSBitSetCore*> iter;
+        DefSBitSetCore * bs = NULL;
+        for (reachset_map.get_first(iter, &bs);
+             bs != NULL; reachset_map.get_next(iter, &bs)) {
+            bs->clean(bs_mgr);
+        }
+    }
+}
+
+
+void Graph::removeTransitiveEdgeHelper(Vertex const* fromvex,
+                                       Vector<DefSBitSetCore*> * reachset,
+                                       BitSet & is_visited,
+                                       DefMiscBitSetMgr & bs_mgr)
+{
+    ASSERT0(reachset);
+    if (is_visited.is_contain(VERTEX_id(fromvex))) { return; }
+    is_visited.bunion(VERTEX_id(fromvex));
+
+    ASSERT0(fromvex);
+    if (VERTEX_out_list(fromvex) == NULL) { return; }
+    DefSBitSetCore * from_reachset = is_dense() ?
+        reachset->get(VERTEX_id(fromvex)) :
+        ((TMap<UINT, DefSBitSetCore*>*)reachset)->get(VERTEX_id(fromvex));
+    if (from_reachset == NULL) {
+        from_reachset = bs_mgr.allocSBitSetCore();
+        if (is_dense()) {
+            reachset->set(VERTEX_id(fromvex), from_reachset);
+        } else {
+            ((TMap<UINT, DefSBitSetCore*>*)reachset)->set(
+                VERTEX_id(fromvex), from_reachset);
+        }
     }
 
-    //Associate each edges with indicator respective.
-    Vector<BitSet*> edge_indicator; //container of bitset.
-    INT c;
-    for (Edge * e = m_edges.get_first(c); e != NULL; e = m_edges.get_next(c)) {
-        UINT from = VERTEX_id(EDGE_from(e));
-        UINT to = VERTEX_id(EDGE_to(e));
+    //Position in bitset has been sorted in topological order.
+    EdgeC const* next_ec = NULL;
+    for (EdgeC const* ec = VERTEX_out_list(fromvex);
+         ec != NULL; ec = next_ec) {
+        next_ec = EC_next(ec);
+        Vertex const* tovex = EDGE_to(EC_edge(ec));
 
-        UINT frompos = vid2pos_in_bitset_map.get(from);
-        BitSet * bs = edge_indicator.get(frompos);
-        if (bs == NULL) {
-            bs = bs_mgr.create();
-            edge_indicator.set(frompos, bs);
+        from_reachset->bunion(VERTEX_id(tovex), bs_mgr);
+        removeTransitiveEdgeHelper(tovex, reachset, is_visited, bs_mgr);
+
+        DefSBitSetCore * to_reachset = is_dense() ?
+            reachset->get(VERTEX_id(tovex)) :
+            ((TMap<UINT, DefSBitSetCore*>*)reachset)->get(VERTEX_id(tovex));
+        if (to_reachset == NULL) { continue; }
+        from_reachset->bunion(*to_reachset, bs_mgr);
+
+        //Get successor set correspond to to_dense.
+        if (VERTEX_out_list(tovex) == NULL) { continue; }
+
+        //Iterate other successors except 'to'.
+        EdgeC const* next_ec2 = NULL;
+        for (EdgeC const* ec2 = VERTEX_out_list(fromvex);
+             ec2 != NULL; ec2 = next_ec2) {
+            next_ec2 = EC_next(ec2);
+            Vertex const* othervex = EDGE_to(EC_edge(ec2));
+            if (othervex == tovex ||
+                !to_reachset->is_contain(VERTEX_id(othervex))) {
+                continue;
+            }
+            if (next_ec == ec2) {
+                next_ec = EC_next(ec);
+            }
+            removeEdge(EC_edge(ec2));
         }
-
-        //Each from-vertex is associated with
-        //a bitset to record all to-vertices.
-        bs->bunion(vid2pos_in_bitset_map.get(to));
-    } //end for each of edge
-
-    //Scanning vertices in topological order.
-    for (INT i = 0; i < vex_vec.get_last_idx(); i++) {
-        //Get the successor vector.
-        BitSet * bs = edge_indicator.get((UINT)i);
-        if (bs != NULL && bs->get_elem_count() >= 2) {
-            //Do NOT remove the first edge. Position in bitset
-            //has been sorted in topological order.
-            for (INT pos_i = bs->get_first(); pos_i >= 0;
-                 pos_i = bs->get_next((UINT)pos_i)) {
-                UINT kid_from_vid = vex_vec.get((UINT)pos_i);
-                UINT kid_from_pos = vid2pos_in_bitset_map.get(kid_from_vid);
-
-                //Get bitset that 'pos_i' associated.
-                BitSet * kid_from_bs = edge_indicator.get(kid_from_pos);
-                if (kid_from_bs != NULL) {
-                    for (INT pos_j = bs->get_next((UINT)pos_i); pos_j >= 0;
-                         pos_j = bs->get_next((UINT)pos_j)) {
-                        if (kid_from_bs->is_contain((UINT)pos_j)) {
-                            //The edge 'i->pos_j' is redundant.
-                            UINT to_vid = vex_vec.get((UINT)pos_j);
-                            UINT src_vid = vex_vec.get((UINT)i);
-                            removeEdge(get_edge(src_vid, to_vid));
-                            bs->diff((UINT)pos_j);
-                        }
-                    }
-                } //end if
-            } //end for
-        } //end if
-    } //end for each vertex
+    }
 }
 
 
@@ -1026,7 +1062,7 @@ bool DGraph::cloneDomAndPdom(DGraph const& src)
     for (Vertex * srcv = src.m_vertices.get_first(c);
          srcv != NULL; srcv = src.m_vertices.get_next(c)) {
         UINT src_vid = VERTEX_id(srcv);
-        Vertex * tgtv = get_vertex(src_vid);
+        Vertex * tgtv = getVertex(src_vid);
         ASSERT0(tgtv != NULL);
 
         BitSet const* set = src.read_dom_set(VERTEX_id(srcv));
@@ -1424,14 +1460,14 @@ bool DGraph::computeIdom2(List<Vertex const*> const& vlst)
                 Vertex const* k = idom;
                 while (j != k) {
                     while (VERTEX_rpo(j) > VERTEX_rpo(k)) {
-                        j = get_vertex((UINT)m_idom_set.get(VERTEX_id(j)));
+                        j = getVertex((UINT)m_idom_set.get(VERTEX_id(j)));
                         ASSERT0(j);
                         if (is_graph_entry(j)) {
                             break;
                         }
                     }
                     while (VERTEX_rpo(j) < VERTEX_rpo(k)) {
-                        k = get_vertex((UINT)m_idom_set.get(VERTEX_id(k)));
+                        k = getVertex((UINT)m_idom_set.get(VERTEX_id(k)));
                         ASSERT0(k);
                         if (is_graph_entry(k)) {
                             break;
@@ -1771,7 +1807,7 @@ void DGraph::sortDomTreeInPostrder(IN Vertex * root, OUT List<Vertex*> & lst)
 void DGraph::_removeUnreachNode(UINT id, BitSet & visited)
 {
     visited.bunion(id);
-    Vertex * vex = get_vertex(id);
+    Vertex * vex = getVertex(id);
     EdgeC * el = VERTEX_out_list(vex);
     while (el != NULL) {
         UINT succ = VERTEX_id(EDGE_to(EC_edge(el)));
@@ -1787,7 +1823,7 @@ void DGraph::_removeUnreachNode(UINT id, BitSet & visited)
 //Return true if some nodes removed.
 bool DGraph::removeUnreachNode(UINT entry_id)
 {
-    if (get_vertex_num() == 0) return false;
+    if (getVertexNum() == 0) return false;
     bool removed = false;
     BitSet visited;
     _removeUnreachNode(entry_id, visited);

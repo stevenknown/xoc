@@ -77,7 +77,7 @@ void Region::HighProcessImpl(OptCtx & oc)
     if (g_do_md_du_analysis) {
         ASSERT0(g_cst_bb_list && OC_is_cfg_valid(oc) && OC_is_aa_valid(oc));
         ASSERT0(getPassMgr());
-        IR_DU_MGR * dumgr = (IR_DU_MGR*)getPassMgr()->
+        DUMgr * dumgr = (DUMgr*)getPassMgr()->
             registerPass(PASS_DU_MGR);
         ASSERT0(dumgr);
         UINT f = SOL_REF|COMPUTE_PR_DU|COMPUTE_NONPR_DU;

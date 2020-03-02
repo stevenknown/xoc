@@ -34,10 +34,10 @@ author: Su Zhenyu
 #ifndef _DEX_RP_H_
 #define _DEX_RP_H_
 
-class DEX_RP : public IR_RP {
+class DEX_RP : public RegPromot {
     bool m_has_insert_stuff;
 public:
-    DEX_RP(Region * rg, IR_GVN * gvn) : IR_RP(rg, gvn)
+    DEX_RP(Region * rg, GVN * gvn) : RegPromot(rg, gvn)
     { m_has_insert_stuff = false; }
     virtual ~DEX_RP() {}
 
@@ -53,10 +53,10 @@ public:
                 }
             }
         }
-        return IR_RP::isPromotable(ir);
+        return RegPromot::isPromotable(ir);
     }
 
-    void insert_stuff_code(IR const* ref, Region * rg, IR_GVN * gvn)
+    void insert_stuff_code(IR const* ref, Region * rg, GVN * gvn)
     {
         ASSERT0(ref->is_array());
 
@@ -65,7 +65,7 @@ public:
         IRBB * stmt_bb = stmt->getBB();
         ASSERT0(stmt_bb);
 
-        IR_DU_MGR * dumgr = rg->getDUMgr();
+        DUMgr * dumgr = rg->getDUMgr();
 
         C<IR*> * ct = NULL;
         BB_irlist(stmt_bb).find(stmt, &ct);
@@ -106,7 +106,7 @@ public:
             m_has_insert_stuff = true;
             insert_stuff_code(ref, m_rg, m_gvn);
         }
-        IR_RP::handleAccessInBody(ref, delegate, delegate_pr,
+        RegPromot::handleAccessInBody(ref, delegate, delegate_pr,
                                 delegate2has_outside_uses_ir_list,
                                 restore2mem, fixup_list,
                                 delegate2stpr, li, ii);

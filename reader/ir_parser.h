@@ -304,7 +304,7 @@ protected:
     bool parseDimProperty(PropertySet & cont, ParseCtx * ctx);
     bool parseElemTypeProperty(PropertySet & cont, ParseCtx * ctx);
     bool parseAlign(VAR * var, ParseCtx * ctx);
-	bool parseByteValue(VAR * var, ParseCtx * ctx);
+    bool parseByteValue(VAR * var, ParseCtx * ctx);
     bool parseStringValue(VAR * var, ParseCtx * ctx);
     bool parseThrowTarget(PropertySet & cont, ParseCtx * ctx);
     bool parseDefProperty(PropertySet & cont, ParseCtx * ctx);

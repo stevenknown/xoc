@@ -43,15 +43,15 @@ class RegionMgr;
 
 #define UNDEF_TYID 0
 
-#define IS_INT(t)               ((t) >= D_I8 && (t) <= D_U128)
-#define IS_SINT(t)              ((t) >= D_I8 && (t) <= D_I128)
-#define IS_FP(t)                ((t) >= D_F32 && (t) <= D_F128)
-#define IS_BOOL(t)              ((t) == D_B)
-#define IS_MC(t)                ((t) == D_MC)
-#define IS_VEC(t)               ((t) == D_VEC)
-#define IS_PTR(t)               ((t) == D_PTR)
-#define IS_SIMPLEX(t)           (IS_INT(t) || IS_FP(t) || IS_BOOL(t) || \
-                                 t == D_STR || t == D_ANY)
+#define IS_INT(t) ((t) >= D_I8 && (t) <= D_U128)
+#define IS_SINT(t) ((t) >= D_I8 && (t) <= D_I128)
+#define IS_FP(t) ((t) >= D_F32 && (t) <= D_F128)
+#define IS_BOOL(t) ((t) == D_B)
+#define IS_MC(t) ((t) == D_MC)
+#define IS_VEC(t) ((t) == D_VEC)
+#define IS_PTR(t) ((t) == D_PTR)
+#define IS_SIMPLEX(t) (IS_INT(t) || IS_FP(t) || IS_BOOL(t) || \
+                      t == D_STR || t == D_ANY)
 
 //Data Type, represented with bit length.
 //
@@ -59,10 +59,10 @@ class RegionMgr;
 //
 //Java, for example, gets rid of signed/unsigned mixup issues by eliminating
 //unsigned types. This goes down a little hard for type convertion, although
-//some argue that Java has demonstrated that unsigned types really aren't necessary.
-//But unsigned types are useful for implementing memory operation for that span
-//more than half of the memory address space, and useful for primitives
-//implementing multiprecision arithmetic, etc.
+//some argue that Java has demonstrated that unsigned types really aren't
+//necessary. But unsigned types are useful for implementing memory operation
+//for that span more than half of the memory address space, and useful for
+//primitives implementing multiprecision arithmetic, etc.
 typedef enum _DATA_TYPE {
     D_UNDEF = 0,
 
@@ -79,6 +79,7 @@ typedef enum _DATA_TYPE {
     D_U64 = 10,
     D_U128 = 11,
 
+    //Float type.
     D_F32 = 12, //Float point 32 bit
     D_F64 = 13, //Float point 64 bit
     D_F80 = 14, //Float point 96 bit
@@ -86,7 +87,7 @@ typedef enum _DATA_TYPE {
 
     //Note all above types are scalar.
 
-    D_MC = 16, //MemoryChunk, used in structure/union/block type.
+    D_MC = 16, //MemoryChunk, used to represent structure/union/block type.
     D_STR = 17, //String
     D_PTR = 18, //Pointer
     D_VEC = 19, //Vector

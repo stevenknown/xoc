@@ -34,9 +34,9 @@ author: Su Zhenyu
 #ifndef _DEX_CP_H_
 #define _DEX_CP_H_
 
-class DEX_CP : public IR_CP {
+class DEX_CP : public CopyProp {
 public:
-    DEX_CP(Region * rg) : IR_CP(rg) {}
+    DEX_CP(Region * rg) : CopyProp(rg) {}
     virtual ~DEX_CP() {}
 
     //Check if ir is appropriate for propagation.

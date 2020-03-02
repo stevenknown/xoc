@@ -36,10 +36,10 @@ author: Su Zhenyu
 
 namespace xoc {
 
-class EFFECT_STMT : public xcom::BitSet {
+class EffectStmt : public xcom::BitSet {
 public:
-    EFFECT_STMT() {}
-    COPY_CONSTRUCTOR(EFFECT_STMT);
+    EffectStmt() {}
+    COPY_CONSTRUCTOR(EffectStmt);
     void bunion(INT elem)
     {
         xcom::BitSet::bunion(elem);
@@ -47,14 +47,14 @@ public:
 };
 
 //Perform dead code and redundant control flow elimination.
-class IR_DCE : public Pass {
+class DeadCodeElim : public Pass {
 protected:
     MDSystem * m_md_sys;
     TypeMgr * m_tm;
     Region * m_rg;
-    IR_CFG * m_cfg;
+    IRCFG * m_cfg;
     CDG * m_cdg;
-    IR_DU_MGR * m_du;
+    DUMgr * m_du;
     ConstIRIter m_citer;
     bool m_is_elim_cfs; //Eliminate control flow structure if necessary.
 
@@ -65,11 +65,11 @@ protected:
 
     void fix_control_flow(List<IRBB*> & bblst, List<C<IRBB*>*> & ctlst);
     bool find_effect_kid(IN IRBB * bb, IN IR * ir,
-                         IN EFFECT_STMT & is_stmt_effect);
+                         IN EffectStmt & is_stmt_effect);
     bool preserve_cd(IN OUT xcom::BitSet & is_bb_effect,
-                     IN OUT EFFECT_STMT & is_stmt_effect,
+                     IN OUT EffectStmt & is_stmt_effect,
                      IN OUT List<IR const*> & act_ir_lst);
-    void mark_effect_ir(IN OUT EFFECT_STMT & is_stmt_effect,
+    void mark_effect_ir(IN OUT EffectStmt & is_stmt_effect,
                         IN OUT xcom::BitSet & is_bb_effect,
                         IN OUT List<IR const*> & work_list);
 
@@ -91,7 +91,7 @@ protected:
         return false;
     }
 
-    void iter_collect(IN OUT EFFECT_STMT & is_stmt_effect,
+    void iter_collect(IN OUT EffectStmt & is_stmt_effect,
                       IN OUT xcom::BitSet & is_bb_effect,
                       IN OUT List<IR const*> & work_list);
     void record_all_ir(IN OUT Vector<Vector<IR*>*> & all_ir);
@@ -101,7 +101,7 @@ protected:
     bool check_call(IR const* ir);
 
 public:
-    explicit IR_DCE(Region * rg)
+    explicit DeadCodeElim(Region * rg)
     {
         ASSERT0(rg != NULL);
         m_rg = rg;
@@ -114,10 +114,10 @@ public:
         m_is_use_md_du = true;
         m_cdg = NULL;
     }
-    COPY_CONSTRUCTOR(IR_DCE);
-    virtual ~IR_DCE() {}
+    COPY_CONSTRUCTOR(DeadCodeElim);
+    virtual ~DeadCodeElim() {}
 
-    void dump(EFFECT_STMT const& is_stmt_effect,
+    void dump(EffectStmt const& is_stmt_effect,
               xcom::BitSet const& is_bb_effect,
               IN Vector<Vector<IR*>*> & all_ir);
 

@@ -46,32 +46,112 @@ public:
         ::memset((CHAR*)kid, 0, sizeof(NTREE) * NTREE_KIDS);
     }
 };
-#define NTREE_id(t)             ((t)->id)
-#define NTREE_kid(t, n)         ((t)->kid[n])
-#define NTREE_parent(t)         ((t)->parent)
-#define NTREE_is_active(t)      ((t)->is_active)
-#define NTREE_val(t)            ((t)->val)
+#define NTREE_id(t) ((t)->id)
+#define NTREE_kid(t, n) ((t)->kid[n])
+#define NTREE_parent(t) ((t)->parent)
+#define NTREE_is_active(t) ((t)->is_active)
+#define NTREE_val(t) ((t)->val)
 
 
 //
 //START Bucket
 //
-class Bucket : public Hash<float> {
+template <class T> class Bucket : public Hash<T> {
     float m_factor;
 public:
-    Bucket(UINT elem_num) : Hash<float>(elem_num)
+    Bucket(UINT elem_num) : Hash<T>(elem_num)
     { m_factor = ((float)1.0) / elem_num; }
 
-    UINT bucket_get_hash_value(float t)
+    UINT bucket_get_hash_value(T t)
     { return (UINT)(t / m_factor); }
 
-    bool bucket_compare(float elem_in_buck, float elem_input)
+    bool bucket_compare(T elem_in_buck, T elem_input)
     { return elem_input < elem_in_buck; }
 
-    float append(float t);
-    void extract_elem(OUT Vector<float> & data);
+    T append(T t);
+    void extract_elem(OUT Vector<T> & data);
     void dump();
 };
+
+
+template <class T>
+T Bucket<T>::append(T t)
+{
+    ASSERTN(Hash<T>::m_bucket, ("Hash not yet initialized."));
+    if (t == 0) { return 0; }
+
+    UINT hashv = bucket_get_hash_value(t);
+    HC<float> * elemhc = (HC<float>*)HB_member(Hash<T>::m_bucket[hashv]);
+    if (elemhc != NULL) {
+        while (elemhc != NULL) {
+            ASSERTN(HC_val(elemhc) != float(0), ("Container is empty"));
+            if (bucket_compare(HC_val(elemhc), t)) {
+                break;
+            }
+            elemhc = elemhc->next;
+        }
+
+        HC<float> * new_insert_one = Hash<T>::newhc();
+        ASSERTN(new_insert_one, ("newhc return NULL"));
+        HC_val(new_insert_one) = t;
+
+        if (elemhc == NULL) {
+            //Append on tail of element-list
+            insertafter((HC<float>**)&(HB_member(Hash<T>::m_bucket[hashv])),
+                        new_insert_one);
+        } else {
+            //Insert before the larger one to generate increment-list.
+            insertbefore_one((HC<float>**)&(HB_member(
+                Hash<T>::m_bucket[hashv])), elemhc, new_insert_one);
+        }
+        HB_count(Hash<T>::m_bucket[hashv])++;
+        Hash<T>::m_elem_count++;
+
+        //Get a free slot in elem-vector
+        HC_vec_idx(elemhc) = Hash<T>::m_elem_vector.get_free_idx();
+    } else {
+        elemhc = Hash<T>::newhc();
+        ASSERTN(elemhc, ("newhc return NULL"));
+        HC_val(elemhc) = t;
+        HB_member(Hash<T>::m_bucket[hashv]) = elemhc;
+        HB_count(Hash<T>::m_bucket[hashv])++;
+        Hash<T>::m_elem_count++;
+        HC_vec_idx(elemhc) = Hash<T>::m_elem_vector.get_free_idx();
+    }
+    Hash<T>::m_elem_vector.set(HC_vec_idx(elemhc), t);
+    return t;
+}
+
+
+template <class T>
+void Bucket<T>::extract_elem(OUT Vector<T> & data)
+{
+    INT j = 0;
+    for (UINT i = 0; i < Hash<float>::m_bucket_size; i++) {
+        HC<float> * elemhc = (HC<float>*)HB_member(Hash<T>::m_bucket[i]);
+        while (elemhc != NULL) {
+            data[j++] = HC_val(elemhc);
+            elemhc = elemhc->next;
+        }
+    }
+}
+
+
+template <class T>
+void Bucket<T>::dump()
+{
+    INT j = 0;
+    printf("\nBUCKET");
+    for (UINT i = 0; i < Hash<float>::m_bucket_size; i++) {
+        printf("\n\tB%d:", i);
+        HC<float> * elemhc = (HC<float>*)HB_member(Hash<T>::m_bucket[i]);
+        while (elemhc != NULL) {
+            printf("%f,", HC_val(elemhc));
+            elemhc = elemhc->next;
+        }
+    }
+}
+//END Bucket
 
 
 //NOTICE: compare() operator of type 'T' is necessary.
@@ -80,7 +160,7 @@ template <class T> class Sort {
     UINT m_tree_id;
 
     void _qsort(IN Vector<T> & data, INT first_idx, INT last_idx);
-    void _merge_sort(IN Vector<T> const& data,
+    void _merge_sort(Vector<T> const& data,
                      INT start_idx,
                      INT end_idx,
                      OUT Vector<T> & output);
@@ -112,7 +192,7 @@ public:
 
 
 template <class T>
-void Sort<T>::_qsort(IN Vector<T> & data, INT first_idx, INT last_idx)
+void Sort<T>::_qsort(Vector<T> & data, INT first_idx, INT last_idx)
 {
     if (first_idx >= last_idx || first_idx < 0 || last_idx < 0) {
         return;
@@ -203,7 +283,7 @@ void Sort<T>::bubble_sort(IN OUT Vector<T> & data)
 
 //2-ways merger sort.
 template <class T>
-void Sort<T>::_merge_sort(IN Vector<T> const& data,
+void Sort<T>::_merge_sort(Vector<T> const& data,
                           INT start_idx,
                           INT end_idx,
                           OUT Vector<T> & output)
@@ -226,8 +306,8 @@ void Sort<T>::_merge_sort(IN Vector<T> const& data,
         return;
     } else {
         INT mid_idx = (start_idx + end_idx + 1) / 2;
-        Vector<T, 32> left_output;
-        Vector<T, 32> right_output;
+        Vector<T> left_output;
+        Vector<T> right_output;
         _merge_sort(data, start_idx, mid_idx - 1, left_output);
         _merge_sort(data, mid_idx, end_idx, right_output);
         INT lidx = 0, ridx = 0;
@@ -268,7 +348,7 @@ void Sort<T>::merge_sort(IN OUT Vector<T> & data)
 {
     Vector<T> output;
     _merge_sort(data, 0, data.get_last_idx(), output);
-    data.clone(output);
+    data.copy(output);
 }
 
 
@@ -331,9 +411,9 @@ NTREE<T> * Sort<T>::_build_heap(IN OUT Vector<T> & data,
     for (NTREE<T> * p = treenode_list.get_head();
          p != NULL; p = treenode_list.get_next()) {
         printf("(T%d,%s,val:%d),",
-                NTREE_id(p),
-                NTREE_is_active(p)?"act":"no-act",
-                NTREE_val(p));
+               NTREE_id(p),
+               NTREE_is_active(p)?"act":"no-act",
+               NTREE_val(p));
     }
     printf("\n");
     #endif
@@ -442,7 +522,7 @@ void Sort<T>::counting_sort(IN OUT Vector<T> & data)
         res[idx] = v;
         c[v] = idx - 1;
     }
-    data.clone(res);
+    data.copy(res);
 }
 
 
@@ -460,12 +540,11 @@ bool Sort<T>::_bucket_sort_check(IN OUT Vector<T> & data)
 template <class T>
 void Sort<T>::bucket_sort(IN OUT Vector<T> & data)
 {
-    Bucket bk(data.get_last_idx() + 1);
+    Bucket<T> bk(data.get_last_idx() + 1);
     ASSERT0(_bucket_sort_check(data));
     for (INT i = 0; i <= data.get_last_idx(); i++) {
         bk.append(data[i]);
     }
-
     bk.extract_elem(data);
 }
 

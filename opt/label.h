@@ -109,10 +109,10 @@ public:
     }
     void copy_flag(LabelInfo const& li) { u2.b1 = li.u2.b1; }
 
-	void dump() const;
-	void dumpName() const;
+    void dump() const;
+    void dumpName() const;
 
-	char const* getName(IN OUT StrBuf * buf) const;
+    char const* getName(IN OUT StrBuf * buf) const;
 };
 
 

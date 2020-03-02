@@ -169,7 +169,7 @@ void CallGraph::dumpVCG(CHAR const* name, INT flag)
                     //TODO: implement dump_ir_buf();
                     dumpIR(irs, CN_ru(cn), NULL, IR_DUMP_KID|
                         (dump_src_line ? IR_DUMP_SRC_LINE : 0)|
-						(dump_inner_region ? IR_DUMP_INNER_REGION : 0));
+                        (dump_inner_region ? IR_DUMP_INNER_REGION : 0));
                 }
             } else {
                 dumpBBList(CN_ru(cn)->getBBList(),

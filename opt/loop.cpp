@@ -43,15 +43,15 @@ namespace xoc {
 //BB2 is the loop header fallthrough bb.
 bool findTwoSuccessorBBOfLoopHeader(
         LI<IRBB> const* li,
-        IR_CFG * cfg,
+        IRCFG * cfg,
         UINT * succ1,
         UINT * succ2)
 {
     ASSERT0(li && cfg && succ1 && succ2);
     IRBB * head = LI_loop_head(li);
 
-    xcom::Vertex * headvex = cfg->get_vertex(BB_id(head));
-    if (cfg->get_out_degree(headvex) != 2) {
+    xcom::Vertex * headvex = cfg->getVertex(BB_id(head));
+    if (cfg->getOutDegree(headvex) != 2) {
         //Not natural loop.
         return false;
     }
@@ -71,14 +71,14 @@ bool findTwoSuccessorBBOfLoopHeader(
 //  BB3: goto loop start bb
 //
 //BB3 is the backedge start bb.
-IRBB * findSingleBackedgeStartBB(LI<IRBB> const* li, IR_CFG * cfg)
+IRBB * findSingleBackedgeStartBB(LI<IRBB> const* li, IRCFG * cfg)
 {
     ASSERT0(li && cfg);
     IRBB * head = LI_loop_head(li);
 
     UINT backedgebbid = 0;
     UINT backedgecount = 0;
-    xcom::EdgeC const* ec = VERTEX_in_list(cfg->get_vertex(BB_id(head)));
+    xcom::EdgeC const* ec = VERTEX_in_list(cfg->getVertex(BB_id(head)));
     while (ec != NULL) {
         backedgecount++;
         UINT pred = VERTEX_id(EDGE_from(EC_edge(ec)));
@@ -114,7 +114,7 @@ IRBB * findAndInsertPreheader(LI<IRBB> const* li,
 {
     ASSERT0(li && rg);
     insert_bb = false;
-    IR_CFG * cfg = rg->getCFG();
+    IRCFG * cfg = rg->getCFG();
     BBList * bblst = rg->getBBList();
     IRBB * head = LI_loop_head(li);
 
@@ -127,7 +127,7 @@ IRBB * findAndInsertPreheader(LI<IRBB> const* li,
     //Find appropriate BB to be prehead.
     bool find_appropriate_prev_bb = false;
 
-    for (xcom::EdgeC const* ec = VERTEX_in_list(cfg->get_vertex(BB_id(head)));
+    for (xcom::EdgeC const* ec = VERTEX_in_list(cfg->getVertex(BB_id(head)));
          ec != NULL; ec = EC_next(ec)) {
         UINT pred = VERTEX_id(EDGE_from(EC_edge(ec)));
         IRBB const* pred_bb = rg->getCFG()->getBB(pred);
@@ -179,7 +179,7 @@ IRBB * findAndInsertPreheader(LI<IRBB> const* li,
         if (!insert_bb) {
             //Insert preheader in front of head.
             //Note preheader must fallthrough to head.
-            cfg->add_bb(preheader);
+            cfg->addBB(preheader);
             cfg->insertVertexBetween(BB_id(p), BB_id(head), BB_id(preheader));
             BB_is_fallthrough(preheader) = true;
             insert_bb = true;

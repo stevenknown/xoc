@@ -65,36 +65,36 @@ LabelInfo * allocLabel(SMemPool * pool)
 
 void LabelInfo::dumpName() const
 {
-	if (g_tfile == NULL) { return; }
-	if (LABEL_INFO_type(this) == L_ILABEL) {
+    if (g_tfile == NULL) { return; }
+    if (LABEL_INFO_type(this) == L_ILABEL) {
         prt(ILABEL_STR_FORMAT, ILABEL_CONT(this));
-	} else if (LABEL_INFO_type(this) == L_CLABEL) {
-		prt("%s", SYM_name(LABEL_INFO_name(this)));
-	} else if (LABEL_INFO_type(this) == L_PRAGMA) {
+    } else if (LABEL_INFO_type(this) == L_CLABEL) {
+        prt("%s", SYM_name(LABEL_INFO_name(this)));
+    } else if (LABEL_INFO_type(this) == L_PRAGMA) {
         ASSERT0(LABEL_INFO_pragma(this));
         prt("%s", SYM_name(LABEL_INFO_pragma(this)));
-	} else { UNREACHABLE(); }
+    } else { UNREACHABLE(); }
 }
 
 char const* LabelInfo::getName(IN OUT StrBuf * buf) const
 {
-	if (g_tfile == NULL) { return NULL; }
-	if (LABEL_INFO_type(this) == L_ILABEL) {
-		buf->sprint(ILABEL_STR_FORMAT, ILABEL_CONT(this));
-	} else if (LABEL_INFO_type(this) == L_CLABEL) {
-		buf->strcat("%s", SYM_name(LABEL_INFO_name(this)));
-	} else if (LABEL_INFO_type(this) == L_PRAGMA) {
-		ASSERT0(LABEL_INFO_pragma(this));
-		buf->strcat("%s", SYM_name(LABEL_INFO_pragma(this)));
-	}
-	else { UNREACHABLE(); }
-	return buf->buf;
+    if (g_tfile == NULL) { return NULL; }
+    if (LABEL_INFO_type(this) == L_ILABEL) {
+        buf->sprint(ILABEL_STR_FORMAT, ILABEL_CONT(this));
+    } else if (LABEL_INFO_type(this) == L_CLABEL) {
+        buf->strcat("%s", SYM_name(LABEL_INFO_name(this)));
+    } else if (LABEL_INFO_type(this) == L_PRAGMA) {
+        ASSERT0(LABEL_INFO_pragma(this));
+        buf->strcat("%s", SYM_name(LABEL_INFO_pragma(this)));
+    }
+    else { UNREACHABLE(); }
+    return buf->buf;
 }
 
 void LabelInfo::dump() const
 {
     if (g_tfile == NULL) { return; }
-	if (LABEL_INFO_type(this) == L_ILABEL) {
+    if (LABEL_INFO_type(this) == L_ILABEL) {
         note("\nilabel(" ILABEL_STR_FORMAT ")",
                 ILABEL_CONT(this));
     } else if (LABEL_INFO_type(this) == L_CLABEL) {

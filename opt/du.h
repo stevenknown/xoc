@@ -36,13 +36,13 @@ author: Su Zhenyu
 
 namespace xoc {
 
-class IR_DU_MGR;
+class DUMgr;
 
 typedef SEGIter * DUIter;
 
 class DUSet : public DefSBitSetCore {
 protected:
-    friend class IR_DU_MGR;
+    friend class DUMgr;
 
 public:
     DUSet() {}

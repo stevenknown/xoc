@@ -280,7 +280,7 @@ void LivenessMgr::computeGlobal()
             m_livein.get(bbid)->copy(news, m_sbs_mgr);
 
             xcom::EdgeC const* ec = VERTEX_out_list(
-                m_cfg->get_vertex(BB_id(bb)));
+                m_cfg->getVertex(BB_id(bb)));
             if (ec != NULL) {
                 news.copy(*m_livein.get(
                     VERTEX_id(EDGE_to(EC_edge(ec)))), m_sbs_mgr);

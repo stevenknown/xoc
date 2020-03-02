@@ -37,9 +37,9 @@ author: Su Zhenyu
 namespace xoc {
 
 //
-//START IR_LCSE
+//START LCSE
 //
-IR_LCSE::IR_LCSE(Region * rg)
+LCSE::LCSE(Region * rg)
 {
     ASSERT0(rg != NULL);
     m_rg = rg;
@@ -53,7 +53,7 @@ IR_LCSE::IR_LCSE(Region * rg)
 
 
 //Hoist CSE's computation, and replace its occurrence with the result pr.
-IR * IR_LCSE::hoist_cse(IN IRBB * bb, IN IR * ir_pos, IN ExpRep * ie)
+IR * LCSE::hoist_cse(IN IRBB * bb, IN IR * ir_pos, IN ExpRep * ie)
 {
     xcom::C<IR*> * pos_holder = NULL;
     bool f = BB_irlist(bb).find(ir_pos, &pos_holder);
@@ -68,7 +68,7 @@ IR * IR_LCSE::hoist_cse(IN IRBB * bb, IN IR * ir_pos, IN ExpRep * ie)
         IR * rhs = ir_pos->getRHS();
         ExpRep * tie = m_expr_tab->map_ir2ir_expr(rhs);
         if (tie != NULL && tie == ie) {
-            //e.g: a = 10, expression of store_val is NULL.            
+            //e.g: a = 10, expression of store_val is NULL.
             ret = m_rg->buildPR(IR_dt(rhs));
             ret->setRefMD(m_rg->genMDforPR(ret), m_rg);
             IR * new_st = m_rg->buildStorePR(PR_no(ret), ret->getType(), rhs);
@@ -216,7 +216,7 @@ IR * IR_LCSE::hoist_cse(IN IRBB * bb, IN IR * ir_pos, IN ExpRep * ie)
 }
 
 
-bool IR_LCSE::processBranch(IN IRBB * bb,
+bool LCSE::processBranch(IN IRBB * bb,
                             IN IR * ir,
                             IN OUT xcom::BitSet & avail_ir_expr,
                             IN OUT Vector<IR*> & map_expr2avail_pos,
@@ -266,7 +266,7 @@ bool IR_LCSE::processBranch(IN IRBB * bb,
 //    return p1 as new expression.
 //'ie': cse candidate expression indicator.
 //'stmt': the stmt contains 'exp'.
-IR * IR_LCSE::processExp(IN IRBB * bb,
+IR * LCSE::processExp(IN IRBB * bb,
                          IN ExpRep * ie,
                          IN IR * stmt,
                          IN OUT xcom::BitSet & avail_ir_expr,
@@ -304,7 +304,7 @@ IR * IR_LCSE::processExp(IN IRBB * bb,
 }
 
 
-bool IR_LCSE::canBeCandidate(IR * ir)
+bool LCSE::canBeCandidate(IR * ir)
 {
     ASSERT0(ir);
     if (!m_enable_filter) {
@@ -329,7 +329,7 @@ bool IR_LCSE::canBeCandidate(IR * ir)
 }
 
 
-bool IR_LCSE::processRhsOfStore(IN IRBB * bb,
+bool LCSE::processRhsOfStore(IN IRBB * bb,
                                 IN IR * ir,
                                 IN OUT xcom::BitSet & avail_ir_expr,
                                 IN OUT xcom::Vector<IR*> & map_expr2avail_pos,
@@ -406,7 +406,7 @@ bool IR_LCSE::processRhsOfStore(IN IRBB * bb,
 }
 
 
-bool IR_LCSE::processParamList(IN IRBB * bb,
+bool LCSE::processParamList(IN IRBB * bb,
                                IN IR * ir,
                                IN OUT xcom::BitSet & avail_ir_expr,
                                IN OUT Vector<IR*> & map_expr2avail_pos,
@@ -437,11 +437,11 @@ bool IR_LCSE::processParamList(IN IRBB * bb,
 }
 
 
-bool IR_LCSE::processUse(IN IRBB * bb,
-                         IN IR * ir,
-                         IN OUT xcom::BitSet & avail_ir_expr,
-                         IN OUT Vector<IR*> & map_expr2avail_pos,
-                         IN OUT Vector<IR*> & map_expr2avail_pr)
+bool LCSE::processUse(IN IRBB * bb,
+                      IN IR * ir,
+                      IN OUT xcom::BitSet & avail_ir_expr,
+                      IN OUT Vector<IR*> & map_expr2avail_pos,
+                      IN OUT Vector<IR*> & map_expr2avail_pr)
 {
     bool change = false;
     switch (ir->getCode()) {
@@ -467,79 +467,79 @@ bool IR_LCSE::processUse(IN IRBB * bb,
         break;
     case IR_TRUEBR:
     case IR_FALSEBR: {
-            ASSERT0(BR_det(ir));
-            if (!canBeCandidate(BR_det(ir))) { break; }
-            ExpRep * ie = m_expr_tab->map_ir2ir_expr(BR_det(ir));
-            ASSERT0(ie);
-            IR * cse_val = processExp(bb, ie, ir, avail_ir_expr,
-                                      map_expr2avail_pos,
-                                      map_expr2avail_pr);
-            if (cse_val != NULL) {
-                if (!cse_val->is_judge()) {
-                    cse_val = m_rg->buildJudge(m_rg->dupIRTree(cse_val));
-                    BR_det(ir) = cse_val;
-                } else {
-                    BR_det(ir) = m_rg->dupIRTree(cse_val);
-                }
-                ir->setParentPointer();
-                change = true;
+        ASSERT0(BR_det(ir));
+        if (!canBeCandidate(BR_det(ir))) { break; }
+        ExpRep * ie = m_expr_tab->map_ir2ir_expr(BR_det(ir));
+        ASSERT0(ie);
+        IR * cse_val = processExp(bb, ie, ir, avail_ir_expr,
+                                  map_expr2avail_pos,
+                                  map_expr2avail_pr);
+        if (cse_val != NULL) {
+            if (!cse_val->is_judge()) {
+                cse_val = m_rg->buildJudge(m_rg->dupIRTree(cse_val));
+                BR_det(ir) = cse_val;
+            } else {
+                BR_det(ir) = m_rg->dupIRTree(cse_val);
             }
+            ir->setParentPointer();
+            change = true;
         }
         break;
+    }
     case IR_IGOTO: {
-            ASSERT0(IGOTO_vexp(ir));
-            if (!canBeCandidate(IGOTO_vexp(ir))) { break; }
-            ExpRep * ie = m_expr_tab->map_ir2ir_expr(IGOTO_vexp(ir));
-            ASSERT0(ie);
-            IR * cse_val = processExp(bb, ie, ir, avail_ir_expr,
-                                      map_expr2avail_pos,
-                                      map_expr2avail_pr);
-            if (IGOTO_vexp(ir) != cse_val) {
-                if (!cse_val->is_judge()) {
-                    cse_val = m_rg->buildJudge(m_rg->dupIRTree(cse_val));
-                    IGOTO_vexp(ir) = cse_val;
-                } else {
-                    IGOTO_vexp(ir) = m_rg->dupIRTree(cse_val);
-                }
-                ir->setParentPointer();
-                change = true;
+        ASSERT0(IGOTO_vexp(ir));
+        if (!canBeCandidate(IGOTO_vexp(ir))) { break; }
+        ExpRep * ie = m_expr_tab->map_ir2ir_expr(IGOTO_vexp(ir));
+        ASSERT0(ie);
+        IR * cse_val = processExp(bb, ie, ir, avail_ir_expr,
+                                  map_expr2avail_pos,
+                                  map_expr2avail_pr);
+        if (IGOTO_vexp(ir) != cse_val) {
+            if (!cse_val->is_judge()) {
+                cse_val = m_rg->buildJudge(m_rg->dupIRTree(cse_val));
+                IGOTO_vexp(ir) = cse_val;
+            } else {
+                IGOTO_vexp(ir) = m_rg->dupIRTree(cse_val);
             }
+            ir->setParentPointer();
+            change = true;
         }
         break;
+    }
     case IR_SWITCH: {
-            ASSERT0(SWITCH_vexp(ir));
-            if (!canBeCandidate(SWITCH_vexp(ir))) { break; }
-            ExpRep * ie = m_expr_tab->map_ir2ir_expr(SWITCH_vexp(ir));
-            ASSERT0(ie);
-            IR * cse_val = processExp(bb, ie, ir, avail_ir_expr,
-                map_expr2avail_pos, map_expr2avail_pr);
-            if (SWITCH_vexp(ir) != cse_val) {
-                if (!cse_val->is_judge()) {
-                    cse_val = m_rg->buildJudge(m_rg->dupIRTree(cse_val));
-                    SWITCH_vexp(ir) = cse_val;
-                } else {
-                    SWITCH_vexp(ir) = m_rg->dupIRTree(cse_val);
-                }
-                ir->setParentPointer();
-                change = true;
+        ASSERT0(SWITCH_vexp(ir));
+        if (!canBeCandidate(SWITCH_vexp(ir))) { break; }
+        ExpRep * ie = m_expr_tab->map_ir2ir_expr(SWITCH_vexp(ir));
+        ASSERT0(ie);
+        IR * cse_val = processExp(bb, ie, ir, avail_ir_expr,
+            map_expr2avail_pos, map_expr2avail_pr);
+        if (SWITCH_vexp(ir) != cse_val) {
+            if (!cse_val->is_judge()) {
+                cse_val = m_rg->buildJudge(m_rg->dupIRTree(cse_val));
+                SWITCH_vexp(ir) = cse_val;
+            } else {
+                SWITCH_vexp(ir) = m_rg->dupIRTree(cse_val);
             }
+            ir->setParentPointer();
+            change = true;
         }
         break;
+    }
     case IR_RETURN: {
-            if (RET_exp(ir) == NULL || !canBeCandidate(RET_exp(ir))) {
-                break;
-            }
-            ExpRep * ie = m_expr_tab->map_ir2ir_expr(RET_exp(ir));
-            ASSERT0(ie);
-            IR * cse_val = processExp(bb, ie, ir, avail_ir_expr,
-                map_expr2avail_pos, map_expr2avail_pr);
-            if (RET_exp(ir) != cse_val) {
-                RET_exp(ir) = m_rg->dupIRTree(cse_val);
-                ir->setParentPointer();
-                change = true;
-            }
+        if (RET_exp(ir) == NULL || !canBeCandidate(RET_exp(ir))) {
+            break;
+        }
+        ExpRep * ie = m_expr_tab->map_ir2ir_expr(RET_exp(ir));
+        ASSERT0(ie);
+        IR * cse_val = processExp(bb, ie, ir, avail_ir_expr,
+            map_expr2avail_pos, map_expr2avail_pr);
+        if (RET_exp(ir) != cse_val) {
+            RET_exp(ir) = m_rg->dupIRTree(cse_val);
+            ir->setParentPointer();
+            change = true;
         }
         break;
+    }
     default: UNREACHABLE();
     }
     return change;
@@ -547,12 +547,12 @@ bool IR_LCSE::processUse(IN IRBB * bb,
 
 
 //Return true if common expression has been substituted.
-bool IR_LCSE::processDef(IN IRBB * bb,
-                         IN IR * ir,
-                         IN OUT xcom::BitSet & avail_ir_expr,
-                         IN OUT Vector<IR*> & map_expr2avail_pos,
-                         IN OUT Vector<IR*> & map_expr2avail_pr,
-                         IN MDSet & tmp)
+bool LCSE::processDef(IN IRBB * bb,
+                      IN IR * ir,
+                      IN OUT xcom::BitSet & avail_ir_expr,
+                      IN OUT Vector<IR*> & map_expr2avail_pos,
+                      IN OUT Vector<IR*> & map_expr2avail_pr,
+                      IN MDSet & tmp)
 {
     bool change = false;
     switch (ir->getCode()) {
@@ -562,37 +562,37 @@ bool IR_LCSE::processDef(IN IRBB * bb,
     case IR_CALL:
     case IR_ICALL:
     case IR_RETURN: {
-            //Compute killed ir-expr.
-            MDSet const* maydef = m_du->getMayDef(ir);
-            MD const* mustdef = m_du->get_must_def(ir);
-            if ((maydef == NULL || maydef->is_empty()) && mustdef == NULL) {
-                break;
-            }
-            for (INT j = avail_ir_expr.get_first();
-                 j != -1; j = avail_ir_expr.get_next(j)) {
-                ExpRep * ie = m_expr_vec->get(j);
-                ASSERT0(ie != NULL);
-                for (IR * occ = EXPR_occ_list(ie).get_head();
-                     occ != NULL; occ = EXPR_occ_list(ie).get_next()) {
-                    IR * occ_stmt = occ->getStmt();
-                    ASSERT0(occ_stmt != NULL && occ_stmt->getBB());
-                    ASSERT0(ir->getBB() == bb);
-                    if (occ_stmt->getBB() != bb) {
-                        continue;
-                    }
-                    tmp.clean(m_misc_bs_mgr);
-                    m_du->collectMayUseRecursive(occ,
-                        tmp, true, m_misc_bs_mgr);
-                    if ((maydef != NULL && maydef->is_intersect(tmp)) ||
-                        (mustdef != NULL && tmp.is_contain(mustdef))) {
-                        avail_ir_expr.diff(EXPR_id(ie));
-                        map_expr2avail_pos.set(EXPR_id(ie), NULL);
-                        map_expr2avail_pr.set(EXPR_id(ie), NULL);
-                    }
+        //Compute killed ir-expr.
+        MDSet const* maydef = m_du->getMayDef(ir);
+        MD const* mustdef = m_du->get_must_def(ir);
+        if ((maydef == NULL || maydef->is_empty()) && mustdef == NULL) {
+            break;
+        }
+        for (INT j = avail_ir_expr.get_first();
+             j != -1; j = avail_ir_expr.get_next(j)) {
+            ExpRep * ie = m_expr_vec->get(j);
+            ASSERT0(ie != NULL);
+            for (IR * occ = EXPR_occ_list(ie).get_head();
+                 occ != NULL; occ = EXPR_occ_list(ie).get_next()) {
+                IR * occ_stmt = occ->getStmt();
+                ASSERT0(occ_stmt != NULL && occ_stmt->getBB());
+                ASSERT0(ir->getBB() == bb);
+                if (occ_stmt->getBB() != bb) {
+                    continue;
                 }
-            }            
+                tmp.clean(m_misc_bs_mgr);
+                m_du->collectMayUseRecursive(occ,
+                    tmp, true, m_misc_bs_mgr);
+                if ((maydef != NULL && maydef->is_intersect(tmp)) ||
+                    (mustdef != NULL && tmp.is_contain(mustdef))) {
+                    avail_ir_expr.diff(EXPR_id(ie));
+                    map_expr2avail_pos.set(EXPR_id(ie), NULL);
+                    map_expr2avail_pr.set(EXPR_id(ie), NULL);
+                }
+            }
         }
         break;
+    }
     case IR_GOTO:
     case IR_IGOTO:
     case IR_DO_WHILE:
@@ -611,7 +611,7 @@ bool IR_LCSE::processDef(IN IRBB * bb,
 }
 
 
-bool IR_LCSE::perform(OptCtx & oc)
+bool LCSE::perform(OptCtx & oc)
 {
     START_TIMER(t, getPassName());
     m_rg->checkValidAndRecompute(&oc, PASS_DU_REF, PASS_DU_CHAIN,
@@ -622,7 +622,7 @@ bool IR_LCSE::perform(OptCtx & oc)
         return false;
     }
 
-    m_expr_tab = (IR_EXPR_TAB*)m_rg->getPassMgr()->registerPass(PASS_EXPR_TAB);
+    m_expr_tab = (ExprTab*)m_rg->getPassMgr()->registerPass(PASS_EXPR_TAB);
     ASSERT0(m_expr_tab);
 
     m_expr_vec = m_expr_tab->get_expr_vec();
@@ -652,6 +652,7 @@ bool IR_LCSE::perform(OptCtx & oc)
         for (BB_irlist(bb).get_head(&ct);
              ct != BB_irlist(bb).end(); ct = BB_irlist(bb).get_next(ct)) {
             IR * ir = ct->val();
+            if (ir->hasSideEffect()) { continue; }
             change |= processUse(bb, ir, avail_ir_expr,
                 map_expr2avail_pos, map_expr2avail_pr);
             if (!ir->hasResult()) { continue; }
@@ -672,9 +673,9 @@ bool IR_LCSE::perform(OptCtx & oc)
         OC_is_du_chain_valid(oc) = false;
         OC_is_ref_valid(oc) = false;
     }
-    END_TIMER(t, getPassName());    
+    END_TIMER(t, getPassName());
     return change;
 }
-//END IR_LCSE
+//END LCSE
 
 } //namespace xoc

@@ -44,7 +44,7 @@ class LivenessMgr : public Pass {
     Region * m_rg;
     MDSystem * m_md_sys;
     VAR2PR * m_var2pr;
-    IR_CFG * m_cfg;
+    IRCFG * m_cfg;
     DefMiscBitSetMgr m_sbs_mgr;
     Vector<DefSBitSetCore*> m_def;
     Vector<DefSBitSetCore*> m_use;

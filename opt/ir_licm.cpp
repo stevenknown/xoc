@@ -40,7 +40,7 @@ author: Su Zhenyu
 namespace xoc {
 
 //
-//START IR_LICM
+//START LICM
 //
 
 //Scan operand to find invariant candidate.
@@ -48,7 +48,7 @@ namespace xoc {
 //'isLegal': set to true if loop is legal to perform invariant motion.
 //  otherwise set to false to prohibit code motion.
 //Return true if find loop invariant expression.
-bool IR_LICM::scanOpnd(
+bool LICM::scanOpnd(
         IN LI<IRBB> * li,
         OUT TTab<IR*> & invariant_exp,
         TTab<IR*> & invariant_stmt,
@@ -68,10 +68,10 @@ bool IR_LICM::scanOpnd(
         }
 
         IRBB * bb = m_cfg->getBB(i);
-        ASSERT0(bb && m_cfg->get_vertex(i));
+        ASSERT0(bb && m_cfg->getVertex(i));
         for (IR * ir = BB_first_ir(bb);
              ir != NULL; ir = BB_next_ir(bb)) {
-            if (!ir->isContainMemRef()) { continue; }
+            if (!ir->isContainMemRef() || ir->isNoMove()) { continue; }
             if ((ir->isCallStmt() && !ir->isReadOnlyCall()) ||
                 ir->is_region() || ir->is_phi()) {
                 //TODO: support call.
@@ -138,7 +138,7 @@ bool IR_LICM::scanOpnd(
 //Record rhs of ir to be invariant, and record the stmt in
 //work list to next round analysis.
 //Return true if we find new invariant expression.
-bool IR_LICM::markExpAndStmt(IR * ir, TTab<IR*> & invariant_exp)
+bool LICM::markExpAndStmt(IR * ir, TTab<IR*> & invariant_exp)
 {
     bool change = false;
     IR * e;
@@ -240,7 +240,7 @@ bool IR_LICM::markExpAndStmt(IR * ir, TTab<IR*> & invariant_exp)
 
 
 //Return true if md is modified in loop only once.
-bool IR_LICM::isUniqueDef(MD const* md)
+bool LICM::isUniqueDef(MD const* md)
 {
     UINT * n = m_md2num.get(md);
     ASSERT0(n);
@@ -276,7 +276,7 @@ bool IR_LICM::isUniqueDef(MD const* md)
 //Propagate invariant property to result.
 //This operation will generate more invariant.
 //'invariant_stmt': Record if the result of stmt is loop invariant.
-bool IR_LICM::scanResult(OUT TTab<IR*> & invariant_stmt)
+bool LICM::scanResult(OUT TTab<IR*> & invariant_stmt)
 {
     bool change = false;
     for (IR * stmt = m_analysable_stmt_list.remove_head(); stmt != NULL;
@@ -314,7 +314,7 @@ bool IR_LICM::scanResult(OUT TTab<IR*> & invariant_stmt)
 }
 
 
-void IR_LICM::updateMD2Num(IR * ir)
+void LICM::updateMD2Num(IR * ir)
 {
     switch (ir->getCode()) {
     case IR_ST:
@@ -375,7 +375,7 @@ void IR_LICM::updateMD2Num(IR * ir)
 
 
 //Given loop info li, dump the invariant stmt and invariant expression.
-void IR_LICM::dumpInvariantExpStmt(
+void LICM::dumpInvariantExpStmt(
         TTab<IR*> const& invariant_stmt,
         TTab<IR*> const& invariant_exp)
 {
@@ -409,7 +409,7 @@ void IR_LICM::dumpInvariantExpStmt(
 
 //Analysis loop invariant expression and stmt.
 //Return true if find them, otherwise return false.
-bool IR_LICM::analysis(
+bool LICM::analysis(
         IN LI<IRBB> * li,
         OUT TTab<IR*> & invariant_stmt,
         OUT TTab<IR*> & invariant_exp)
@@ -450,7 +450,7 @@ bool IR_LICM::analysis(
 }
 
 
-bool IR_LICM::is_stmt_dom_its_use(
+bool LICM::is_stmt_dom_its_use(
         IR const* stmt,
         IR const* use,
         LI<IRBB> const* li,
@@ -471,7 +471,7 @@ bool IR_LICM::is_stmt_dom_its_use(
 
 
 //Return true if ir dominate all USE which in loop.
-bool IR_LICM::is_dom_all_use_in_loop(IR const* ir, LI<IRBB> * li)
+bool LICM::is_dom_all_use_in_loop(IR const* ir, LI<IRBB> * li)
 {
     ASSERT0(ir->is_stmt());
 
@@ -520,21 +520,25 @@ bool IR_LICM::is_dom_all_use_in_loop(IR const* ir, LI<IRBB> * li)
 }
 
 
-bool IR_LICM::isStmtCanBeHoisted(IR * stmt, IRBB * backedge_bb)
+bool LICM::isStmtCanBeHoisted(IR * stmt, IRBB * backedge_bb)
 {
-    //Loop has multiple exits.
-    if (backedge_bb == NULL) { return false; }
-
-    //Stmt is at the dominate path in loop.
+    if (backedge_bb == NULL) {
+        //Loop has multiple exits.
+        return false;
+    }
+    if (stmt->isNoMove()) {
+        return false;
+    }
     if (stmt->getBB() != backedge_bb &&
         !m_cfg->is_dom(BB_id(stmt->getBB()), BB_id(backedge_bb))) {
+        //Stmt is at the dominate path in loop.
         return false;
     }
     return true;
 }
 
 
-bool IR_LICM::hoistInvariantStmt(TTab<IR*> & invariant_stmt,
+bool LICM::hoistInvariantStmt(TTab<IR*> & invariant_stmt,
                                  IR * stmt,
                                  IRBB * prehead,
                                  IN LI<IRBB> * li)
@@ -579,7 +583,7 @@ bool IR_LICM::hoistInvariantStmt(TTab<IR*> & invariant_stmt,
 }
 
 
-bool IR_LICM::checkDefStmt(
+bool LICM::checkDefStmt(
         IR * def,
         TTab<IR*> & invariant_stmt,
         IN IRBB * prehead,
@@ -607,7 +611,7 @@ bool IR_LICM::checkDefStmt(
 
 
 //Hoist candidate IRs to preheader BB.
-bool IR_LICM::hoistCand(
+bool LICM::hoistCand(
         TTab<IR*> & invariant_exp,
         TTab<IR*> & invariant_stmt,
         IN IRBB * prehead,
@@ -750,7 +754,7 @@ bool IR_LICM::hoistCand(
 
 //Return true if do code motion successfully.
 //This funtion maintain LOOP INFO.
-bool IR_LICM::doLoopTree(
+bool LICM::doLoopTree(
         LI<IRBB> * li,
         OUT bool & du_set_info_changed,
         OUT bool & insert_bb,
@@ -789,7 +793,7 @@ bool IR_LICM::doLoopTree(
 }
 
 
-bool IR_LICM::perform(OptCtx & oc)
+bool LICM::perform(OptCtx & oc)
 {
     START_TIMER(t, getPassName());
     m_rg->checkValidAndRecompute(&oc, PASS_DOM,
@@ -842,6 +846,6 @@ bool IR_LICM::perform(OptCtx & oc)
     END_TIMER(t, getPassName());
     return change;
 }
-//END IR_LICM
+//END LICM
 
 } //namespace xoc

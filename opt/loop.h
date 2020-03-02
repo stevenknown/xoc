@@ -103,14 +103,14 @@ public:
 
 class IRBB;
 class Region;
-class IR_CFG;
+class IRCFG;
 
 IRBB * findAndInsertPreheader(
             LI<IRBB> const* li, Region * rg,
             OUT bool & insert_bb, bool force);
-IRBB * findSingleBackedgeStartBB(LI<IRBB> const* li, IR_CFG * cfg);
+IRBB * findSingleBackedgeStartBB(LI<IRBB> const* li, IRCFG * cfg);
 bool findTwoSuccessorBBOfLoopHeader(
-            LI<IRBB> const* li, IR_CFG * cfg,
+            LI<IRBB> const* li, IRCFG * cfg,
             UINT * succ1, UINT * succ2);
 
 } //namespace xoc

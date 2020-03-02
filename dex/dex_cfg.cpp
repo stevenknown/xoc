@@ -97,7 +97,7 @@ void DEX_CFG::dump_node(FILE * h, bool detail, BitSet const& markbbs)
         UINT id = BB_id(bb);
         UINT scale = 1;
 
-        Vertex * v = get_vertex(id);
+        Vertex * v = getVertex(id);
         ASSERTN(v, ("bb is not in cfg"));
 
         CHAR const* shape = "box";
@@ -137,7 +137,7 @@ void DEX_CFG::dump_node2(
         UINT id = BB_id(bb);
         UINT scale = 1;
 
-        Vertex * v = get_vertex(id);
+        Vertex * v = getVertex(id);
         ASSERTN(v, ("bb is not in cfg"));
 
         CHAR const* shape = "box";

@@ -51,7 +51,7 @@ public:
 };
 //END MD_LT
 
-class IR_GVN;
+class GVN;
 
 typedef HMap<MD*, MD_LT*> MD2MDLifeTime;
 
@@ -106,7 +106,7 @@ public:
 //Perform Register Promotion.
 //Register Promotion combines multiple memory load of the
 //same memory location into one PR. */
-class IR_RP : public Pass {
+class RegPromot : public Pass {
 private:
     Vector<MDSet*> m_livein_mds_vec;
     Vector<MDSet*> m_liveout_mds_vec;
@@ -119,10 +119,10 @@ private:
     SMemPool * m_ir_ptr_pool;
     MDSystem * m_md_sys;
     MDSetMgr * m_mds_mgr;
-    IR_CFG * m_cfg;
+    IRCFG * m_cfg;
     TypeMgr * m_tm;
-    IR_DU_MGR * m_du;
-    IR_GVN * m_gvn;
+    DUMgr * m_du;
+    GVN * m_gvn;
     PRSSAMgr * m_ssamgr;
     xcom::DefMiscBitSetMgr * m_misc_bs_mgr;
     DontPromotTab m_dont_promot;
@@ -286,7 +286,7 @@ private:
     }
 
 public:
-    IR_RP(Region * rg, IR_GVN * gvn) : m_dont_promot(rg)
+    RegPromot(Region * rg, GVN * gvn) : m_dont_promot(rg)
     {
         ASSERT0(rg != NULL);
         m_rg = rg;
@@ -306,8 +306,8 @@ public:
         m_pool = smpoolCreate(2 * sizeof(MD_LT), MEM_COMM);
         m_ir_ptr_pool = smpoolCreate(4 * sizeof(xcom::SC<IR*>), MEM_CONST_SIZE);
     }
-    COPY_CONSTRUCTOR(IR_RP);
-    virtual ~IR_RP()
+    COPY_CONSTRUCTOR(RegPromot);
+    virtual ~RegPromot()
     {
         for (INT i = 0; i <= m_livein_mds_vec.get_last_idx(); i++) {
             MDSet * mds = m_livein_mds_vec.get(i);
@@ -344,7 +344,7 @@ public:
     void buildLifeTime();
 
     void cleanLiveBBSet();
-    void computeLocalLiveness(IRBB * bb, IR_DU_MGR & du_mgr);
+    void computeLocalLiveness(IRBB * bb, DUMgr & du_mgr);
     void computeGlobalLiveness();
     void computeLiveness();
 

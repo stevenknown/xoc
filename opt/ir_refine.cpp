@@ -60,7 +60,7 @@ IR * Region::refineILoad1(IR * ir, bool & change)
     copyDbx(ld, base, this);
 
     LD_ofst(ld) += ild_ofst;
-    IR_DU_MGR * dumgr = getDUMgr();
+    DUMgr * dumgr = getDUMgr();
     if (dumgr != NULL) {
         //Consider the ir->getOffset() and copying MDSet info from 'ir' to 'ld.
         //Note: do not recompute MD and overlap set to ld because that
@@ -164,7 +164,7 @@ IR * Region::refineIStore(IR * ir, bool & change, RefineCtx & rc)
 
     IR * lhs = IST_base(ir);
     IR * rhs = IST_rhs(ir);
-    IR_DU_MGR * dumgr = getDUMgr();
+    DUMgr * dumgr = getDUMgr();
     if (lhs->is_lda()) {
         //Convert :
         //1. IST(LDA(var))=X to ST(var)=X
@@ -339,7 +339,7 @@ IR * Region::refineStore(IR * ir, bool & change, RefineCtx & rc)
     change |= lchange;
     if (lchange) {
         ir->setParentPointer(false);
-        IR_DU_MGR * dumgr = getDUMgr();
+        DUMgr * dumgr = getDUMgr();
         if (dumgr != NULL) {
             ASSERT0(!dumgr->removeExpiredDU(ir));
         }
@@ -409,7 +409,7 @@ IR * Region::refineCall(IR * ir, bool & change, RefineCtx & rc)
     }
 
     if (lchange) {
-        IR_DU_MGR * dumgr = getDUMgr();
+        DUMgr * dumgr = getDUMgr();
         if (dumgr != NULL) {
             ASSERT0(!dumgr->removeExpiredDU(ir));
         }
@@ -866,7 +866,7 @@ IR * Region::refineAdd(IR * ir, bool & change)
         change = true;
         return ir; //No need to update DU.
     }
-    
+
     //add X,0.0 => X
     //Under the default rounding mode, in add X,0.0, if x
     //is not -0.0, then add X,0 is identical to X.
@@ -882,7 +882,7 @@ IR * Region::refineMul(IR * ir, bool & change, RefineCtx & rc)
     IR * op0 = BIN_opnd0(ir);
     IR * op1 = BIN_opnd1(ir);
     ASSERT0(op0 != NULL && op1 != NULL);
-    if (op1->is_const() && op1->is_fp()) {        
+    if (op1->is_const() && op1->is_fp()) {
         if (g_is_opt_float && CONST_fp_val(op1) == 2.0) {
             //mul X,2.0 => add.fp X,X
             IR_code(ir) = IR_ADD;
@@ -934,7 +934,7 @@ IR * Region::refineMul(IR * ir, bool & change, RefineCtx & rc)
             //mul X,1 => X
             IR * newir = op0;
             BIN_opnd0(ir) = NULL;
-            //Do MOT need revise IR_DU_MGR, just keep X original DU info.
+            //Do MOT need revise DUMgr, just keep X original DU info.
             freeIRTree(ir);
             change = true;
             return newir;

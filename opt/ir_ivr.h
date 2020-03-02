@@ -41,17 +41,17 @@ namespace xoc {
 
 
 //IV INFO.
-#define IV_iv(d)              ((d)->iv)
-#define IV_li(d)              ((d)->li)
-#define IV_iv_def(d)          ((d)->iv_def)
-#define IV_iv_occ(d)          ((d)->iv_occ)
-#define IV_step(d)            ((d)->step)
-#define IV_initv_stmt(d)      ((d)->init_val_stmt)
-#define IV_initv_i(d)         ((d)->u1.init_val_int)
-#define IV_initv_md(d)        ((d)->u1.init_val_md)
+#define IV_iv(d) ((d)->iv)
+#define IV_li(d) ((d)->li)
+#define IV_iv_def(d) ((d)->iv_def)
+#define IV_iv_occ(d) ((d)->iv_occ)
+#define IV_step(d) ((d)->step)
+#define IV_initv_stmt(d) ((d)->init_val_stmt)
+#define IV_initv_i(d) ((d)->u1.init_val_int)
+#define IV_initv_md(d) ((d)->u1.init_val_md)
 #define IV_initv_data_type(d) ((d)->init_val_data_type)
-#define IV_initv_type(d)      ((d)->init_val_type)
-#define IV_is_inc(d)          ((d)->is_inc)
+#define IV_initv_type(d) ((d)->init_val_type)
+#define IV_is_inc(d) ((d)->is_inc)
 class IV {
 public:
     LI<IRBB> const* li;
@@ -87,13 +87,13 @@ typedef TMap<UINT, IR*> UINT2IR;
 
 
 //Induction Variable Recognization.
-class IR_IVR : public Pass {
+class IVR : public Pass {
 protected:
     Region * m_rg;
     MDSystem * m_md_sys;
     TypeMgr * m_tm;
-    IR_DU_MGR * m_du;
-    IR_CFG * m_cfg;
+    DUMgr * m_du;
+    IRCFG * m_cfg;
     SMemPool * m_pool;
     SMemPool * m_sc_pool;
     Vector<SList<IV*>*> m_li2bivlst;
@@ -155,7 +155,7 @@ protected:
                   bool is_increment);
 
 public:
-    explicit IR_IVR(Region * rg)
+    explicit IVR(Region * rg)
     {
         ASSERT0(rg != NULL);
         m_rg = rg;
@@ -168,8 +168,8 @@ public:
         m_is_only_handle_exact_md = true;
         m_is_strictly_match_pattern = false;
     }
-    COPY_CONSTRUCTOR(IR_IVR);
-    virtual ~IR_IVR()
+    COPY_CONSTRUCTOR(IVR);
+    virtual ~IVR()
     {
         smpoolDelete(m_pool);
         smpoolDelete(m_sc_pool);

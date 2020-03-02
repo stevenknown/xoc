@@ -242,7 +242,7 @@ public:
     UINT getNumOfPred(CFG<IRBB, IR> * cfg) const
     {
         ASSERT0(cfg);
-        xcom::Vertex const* vex = cfg->get_vertex(id());
+        xcom::Vertex const* vex = cfg->getVertex(id());
         ASSERT0(vex);
         UINT n = 0;
         for (xcom::EdgeC const* in = VERTEX_in_list(vex);
@@ -253,7 +253,7 @@ public:
     UINT getNumOfSucc(CFG<IRBB, IR> * cfg) const
     {
         ASSERT0(cfg);
-        xcom::Vertex const* vex = cfg->get_vertex(BB_id(this));
+        xcom::Vertex const* vex = cfg->getVertex(BB_id(this));
         ASSERT0(vex);
         UINT n = 0;
         for (xcom::EdgeC const* out = VERTEX_out_list(vex);

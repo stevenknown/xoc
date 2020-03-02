@@ -36,7 +36,7 @@ author: Su Zhenyu
 
 namespace xoc {
 
-//Util Functions supplied by IR_DU_MGR
+//Util Functions supplied by DUMgr
 // These functions manipulate the reference of IR.
 // IR may reference MD, or MDSet, or both MD and MDSet.
 //
@@ -87,7 +87,7 @@ namespace xoc {
 //Mapping from IR to index.
 typedef HMap<IR const*, UINT, HashFuncBase2<IR const*> > IR2UINT;
 
-class IR_DU_MGR;
+class DUMgr;
 
 //Mapping from MD to IR list, and to be responsible for
 //allocating and destroy List<IR*> objects.
@@ -95,7 +95,7 @@ class MDId2IRlist : public TMap<UINT, DefSBitSetCore*> {
     Region * m_rg;
     MDSystem * m_md_sys;
     TypeMgr * m_tm;
-    IR_DU_MGR * m_du;
+    DUMgr * m_du;
     DefMiscBitSetMgr * m_misc_bs_mgr;
     TMapIter<UINT, DefSBitSetCore*> m_iter;
     DefSBitSetCore m_global_md;
@@ -245,14 +245,14 @@ typedef HMap<IR*, DUSet*> IR2DU;
 #define COMPUTE_PR_DU              0x20 //compute PR du chain.
 #define COMPUTE_NONPR_DU           0x40 //compute Non-PR du chain.
 
-class IR_DU_MGR : public Pass {
+class DUMgr : public Pass {
     friend class MDId2IRlist;
     friend class DUSet;
 protected:
     Region * m_rg;
     TypeMgr * m_tm;
-    IR_AA * m_aa;
-    IR_CFG * m_cfg;
+    AliasAnalysis * m_aa;
+    IRCFG * m_cfg;
     MDSystem * m_md_sys;
     SMemPool * m_pool;
     MDSetMgr * m_mds_mgr;
@@ -314,13 +314,16 @@ protected:
     //
     //    Here we do not known where p pointed to.
     //    The reach-def of BB3 is {S1, S2}
-    Vector<DefDBitSetCore*> m_bb_avail_in_reach_def; //avail reach-in def of STMT
-    Vector<DefDBitSetCore*> m_bb_avail_out_reach_def; //avail reach-out def of STMT
+    //avail reach-in def of STMT
+    Vector<DefDBitSetCore*> m_bb_avail_in_reach_def;
+    //avail reach-out def of STMT
+    Vector<DefDBitSetCore*> m_bb_avail_out_reach_def;
     Vector<DefDBitSetCore*> m_bb_in_reach_def; //reach-in def of STMT
     Vector<DefDBitSetCore*> m_bb_out_reach_def; //reach-out def of STMT
     Vector<DefDBitSetCore*> m_bb_may_gen_def; //generated-def of STMT
     Vector<DefDBitSetCore*> m_bb_must_gen_def; //generated-def of STMT
-    Vector<DefDBitSetCore const*> m_bb_must_killed_def; //must-killed def of STMT
+    //must-killed def of STMT
+    Vector<DefDBitSetCore const*> m_bb_must_killed_def;
     Vector<DefDBitSetCore const*> m_bb_may_killed_def; //may-killed def of STMT
 
     BSVec<DefDBitSetCore*> m_bb_gen_exp; //generate EXPR
@@ -368,7 +371,10 @@ protected:
     UINT checkIsNonLocalKillingDef(IR const* stmt, IR const* exp);
     inline bool canBeLiveExprCand(IR const* ir) const;
     void computeArrayRefAtIStoreBase(IR * ir);
-    void computeExpression(IR * ir, MDSet * ret_mds, UINT compflag, UINT duflag);
+    void computeExpression(IR * ir,
+                           MDSet * ret_mds,
+                           UINT compflag,
+                           UINT duflag);
     void computeArrayRef(IR * ir,
                          OUT MDSet * ret_mds,
                          UINT compflag,
@@ -447,9 +453,9 @@ protected:
     void updateDef(IR * ir, UINT flag);
 
 public:
-    explicit IR_DU_MGR(Region * rg);
-    COPY_CONSTRUCTOR(IR_DU_MGR);
-    ~IR_DU_MGR();
+    explicit DUMgr(Region * rg);
+    COPY_CONSTRUCTOR(DUMgr);
+    ~DUMgr();
 
     //Build DU chain : def->use.
     void buildDUChain(IR * def, IR * use)
@@ -500,7 +506,7 @@ public:
     //DU chain and Memory Object reference operation.
     void copyIRTreeDU(IR * to, IR const* from, bool copy_du_info);
 
-    //Count the memory usage to IR_DU_MGR.
+    //Count the memory usage to DUMgr.
     size_t count_mem();
     size_t count_mem_duset();
     size_t count_mem_local_data(DefDBitSetCore * expr_univers,

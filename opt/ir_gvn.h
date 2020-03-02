@@ -86,10 +86,10 @@ public:
 };
 
 
-class DOUBLE_HF : public HashFuncBase<double> {
+class DoubleHashFunc : public HashFuncBase<double> {
 public:
-    DOUBLE_HF() {}
-    COPY_CONSTRUCTOR(DOUBLE_HF);
+    DoubleHashFunc() {}
+    COPY_CONSTRUCTOR(DoubleHashFunc);
     UINT get_hash_value(double d, UINT bucket_size) const
     {
         double * p = &d;
@@ -98,7 +98,7 @@ public:
     }
 };
 
-typedef HMap<double, VN*, DOUBLE_HF> FP2VN_MAP;
+typedef HMap<double, VN*, DoubleHashFunc> FP2VN_MAP;
 typedef HMap<LONGLONG, VN*> LONGLONG2VN_MAP;
 typedef HMap<LONGLONG, VN*> LONGLONGMC2VN_MAP;
 typedef HMap<MD const*, VN*> MD2VN_MAP;
@@ -470,13 +470,13 @@ public:
 
 
 //Perform Global Value Numbering.
-class IR_GVN : public Pass {
+class GVN : public Pass {
 protected:
     Region * m_rg;
-    IR_DU_MGR * m_du;
+    DUMgr * m_du;
     TypeMgr * m_tm;
     MDSystem * m_md_sys;
-    IR_CFG * m_cfg;
+    IRCFG * m_cfg;
     VN * m_zero_vn;
     VN * m_mc_zero_vn;
     UINT m_vn_count;
@@ -582,9 +582,9 @@ protected:
     void processPhi(IR const* ir, bool & change);
 
 public:
-    explicit IR_GVN(Region * rg);
-    COPY_CONSTRUCTOR(IR_GVN);
-    virtual ~IR_GVN();
+    explicit GVN(Region * rg);
+    COPY_CONSTRUCTOR(GVN);
+    virtual ~GVN();
 
     bool calcCondMustVal(IR const* ir, bool & must_true, bool & must_false);
     void dump();

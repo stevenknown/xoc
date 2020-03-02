@@ -251,8 +251,8 @@ bool MDSet::is_contain_inexact(MDSystem * ms) const
         //As we observed, passes that utilize MD relationship add
         //MD2 to accroding IR's MDSet, which can keep global variables
         //and MD2 dependence.
-        //e.g: g=10, #mustdef=MD10, maydef={MD2, MD10}, g is global variable that
-        //           #represented in Program Region.
+        //e.g: g=10,  #mustdef=MD10, maydef={MD2, MD10}, g is global
+        //            #variable that represented in Program Region.
         //     foo(); #maydef={MD2, MD10}
         //if (MD_id(tmd) == MD_FULL_MEM) {
         //    return true;

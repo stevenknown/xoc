@@ -115,7 +115,7 @@ static bool isAllElementDerivedFromSameEffectVar(MDSet const& mds,
 {
     ASSERT0(!mds.is_empty() && mustref);
 
-    SEGIter * iter;
+    SEGIter * iter = NULL;
     INT i = mds.get_first(&iter);
     MD const* md = mdsys->getMD((UINT)i);
     if (!md->is_effect() || MD_is_may(md)) {
@@ -145,9 +145,9 @@ static bool isAllElementDerivedFromSameEffectVar(MDSet const& mds,
 
 
 //
-//START IR_AA
+//START AliasAnalysis
 //
-IR_AA::IR_AA(Region * rg)
+AliasAnalysis::AliasAnalysis(Region * rg)
 {
     ASSERT0(rg);
     m_cfg = rg->getCFG();
@@ -167,7 +167,7 @@ IR_AA::IR_AA(Region * rg)
 }
 
 
-IR_AA::~IR_AA()
+AliasAnalysis::~AliasAnalysis()
 {
     OptCtx oc;
     destroyContext(oc);
@@ -175,7 +175,7 @@ IR_AA::~IR_AA()
 }
 
 
-size_t IR_AA::count_mem()
+size_t AliasAnalysis::count_mem()
 {
     size_t count = 0;
     count += sizeof(m_cfg);
@@ -200,7 +200,7 @@ size_t IR_AA::count_mem()
 }
 
 
-size_t IR_AA::countMD2MDSetMemory()
+size_t AliasAnalysis::countMD2MDSetMemory()
 {
     size_t count = 0;
     BBList * bbl = m_rg->getBBList();
@@ -226,7 +226,7 @@ size_t IR_AA::countMD2MDSetMemory()
 //Destroy all context data structure.
 //DU and another info do not need these info.
 //If you query sideeffect md or mdset, these data structure must be recomputed.
-void IR_AA::destroyContext(OptCtx & oc)
+void AliasAnalysis::destroyContext(OptCtx & oc)
 {
     for (INT i = 0; i <= m_md2mds_vec.get_last_idx(); i++) {
         MD2MDSet * mx = m_md2mds_vec.get((UINT)i);
@@ -238,7 +238,7 @@ void IR_AA::destroyContext(OptCtx & oc)
 
 
 //Clean but not destory context data structures.
-void IR_AA::cleanContext(OptCtx & oc)
+void AliasAnalysis::cleanContext(OptCtx & oc)
 {
     for (INT i = 0; i <= m_md2mds_vec.get_last_idx(); i++) {
         MD2MDSet * mx = m_md2mds_vec.get((UINT)i);
@@ -252,7 +252,7 @@ void IR_AA::cleanContext(OptCtx & oc)
 //This function do clean and free operation, but do not
 //destroy any data structure. Clean PT_SET for each BB.
 //Free MDSet of MDA back to MDSetMgr.
-void IR_AA::clean()
+void AliasAnalysis::clean()
 {
     m_is_visit.clean();
     m_in_pp_set.clean();
@@ -276,7 +276,7 @@ void IR_AA::clean()
 //
 //'size': pointer base size.
 //NOTICE: MD should be taken address.
-void IR_AA::reviseMDSize(IN OUT MDSet & mds, UINT size)
+void AliasAnalysis::reviseMDSize(IN OUT MDSet & mds, UINT size)
 {
     ASSERT0(size > 0);
     xcom::Vector<MD const*> res;
@@ -316,7 +316,7 @@ void IR_AA::reviseMDSize(IN OUT MDSet & mds, UINT size)
 
 //Return true if IR is a valid statement that could be handled by AA.
 //NOTICE: High level control flow or similar statements are unacceptable here.
-bool IR_AA::isValidStmtToAA(IR * ir)
+bool AliasAnalysis::isValidStmtToAA(IR * ir)
 {
     switch(ir->getCode()) {
     case IR_ST: //store
@@ -348,7 +348,7 @@ bool IR_AA::isValidStmtToAA(IR * ir)
 //Note this function does not handle array's LDA base.
 //e.g: y = &x or y = &a[i]
 //'mds' : record output memory descriptor of 'ir'
-MD const* IR_AA::processLda(IR * ir, IN OUT AACtx * ic)
+MD const* AliasAnalysis::processLda(IR * ir, IN OUT AACtx * ic)
 {
     ASSERT0(ir->is_lda() && ir->is_ptr());
     ASSERT0(ic);
@@ -429,10 +429,10 @@ MD const* IR_AA::processLda(IR * ir, IN OUT AACtx * ic)
 //e.g: int a; char b;
 //    a = (int)b
 //'mds' : record memory descriptor of 'ir'.
-void IR_AA::processCvt(IR const* ir,
-                       IN OUT MDSet & mds,
-                       OUT AACtx * ic,
-                       OUT MD2MDSet * mx)
+void AliasAnalysis::processCvt(IR const* ir,
+                               IN OUT MDSet & mds,
+                               OUT AACtx * ic,
+                               OUT MD2MDSet * mx)
 {
     ASSERT0(ir->is_cvt());
     inferExpression(CVT_exp(ir), mds, ic, mx);
@@ -463,11 +463,11 @@ void IR_AA::processCvt(IR const* ir,
 
 
 //Infer the unbounded set.
-void IR_AA::inferArrayInfinite(INT ofst,
-                               bool is_ofst_pred,
-                               UINT md_size,
-                               MDSet const& in,
-                               OUT MDSet & out)
+void AliasAnalysis::inferArrayInfinite(INT ofst,
+                                       bool is_ofst_pred,
+                                       UINT md_size,
+                                       MDSet const& in,
+                                       OUT MDSet & out)
 {
     SEGIter * iter;
     for (INT i = in.get_first(&iter); i >= 0; i = in.get_next((UINT)i, &iter)) {
@@ -496,8 +496,8 @@ void IR_AA::inferArrayInfinite(INT ofst,
 //pointer: IR expression that pointed to memory.
 //point_to_set: POINT_TO set of pointer, genernate new set if TBAA exist.
 //Return true if pointer pointed to MAY-POINT-TO set.
-MDSet const* IR_AA::computeMayPointToViaTBAA(IR const* pointer,
-                                             MDSet const* point_to_set)
+MDSet const* AliasAnalysis::computeMayPointToViaTBAA(IR const* pointer,
+                                                     MDSet const* point_to_set)
 {
     ASSERT0(pointer && point_to_set && !point_to_set->is_empty());
     MD const* typed_md = NULL;
@@ -532,7 +532,7 @@ MDSet const* IR_AA::computeMayPointToViaTBAA(IR const* pointer,
 
 //Get to know where the pointer pointed to.
 //This function will not clean 'mds' since user may be perform union operation.
-void IR_AA::computeMayPointTo(IR * pointer, OUT MDSet & mds)
+void AliasAnalysis::computeMayPointTo(IR * pointer, OUT MDSet & mds)
 {
     ASSERT0(pointer && (pointer->is_ptr() || pointer->is_any()));
 
@@ -552,7 +552,9 @@ void IR_AA::computeMayPointTo(IR * pointer, OUT MDSet & mds)
 //This function will not clean 'mds' since caller may
 //perform union operations to 'mds'.
 //mx: may be NULL.
-void IR_AA::computeMayPointTo(IR * pointer, IN MD2MDSet * mx, OUT MDSet & mds)
+void AliasAnalysis::computeMayPointTo(IR * pointer,
+                                      IN MD2MDSet * mx,
+                                      OUT MDSet & mds)
 {
     ASSERT0(pointer && (pointer->is_ptr() || pointer->is_any()));
     if (pointer->is_lda()) {
@@ -640,14 +642,14 @@ void IR_AA::computeMayPointTo(IR * pointer, IN MD2MDSet * mx, OUT MDSet & mds)
 //'array_base': base of array, must be pointer type.
 //'is_ofst_predicable': true if array element offset is constant.
 //This function will set the Ref MD and Ref MD set of array operation.
-void IR_AA::inferArrayExpBase(IR * ir,
-                              IR * array_base,
-                              bool is_ofst_predicable,
-                              UINT ofst,
-                              OUT MDSet & mds,
-                              OUT bool * mds_is_may_pt,
-                              IN OUT AACtx * ic,
-                              IN OUT MD2MDSet * mx)
+void AliasAnalysis::inferArrayExpBase(IR * ir,
+                                      IR * array_base,
+                                      bool is_ofst_predicable,
+                                      UINT ofst,
+                                      OUT MDSet & mds,
+                                      OUT bool * mds_is_may_pt,
+                                      IN OUT AACtx * ic,
+                                      IN OUT MD2MDSet * mx)
 {
     ASSERT0(ir->isArrayOp() && (array_base->is_ptr() || array_base->is_any()));
     MDSet tmp;
@@ -733,11 +735,11 @@ void IR_AA::inferArrayExpBase(IR * ir,
 //is_ofst_pred: true if 'ofst' describe the computed byte offset related to
 //              'array_base'.
 //ofst: byte offset, only valid if 'is_ofst_pred' is true.
-MD const* IR_AA::inferArrayLdabase(IR * ir,
-                                   IR * array_base,
-                                   bool is_ofst_pred,
-                                   UINT ofst,
-                                   IN OUT AACtx * ic)
+MD const* AliasAnalysis::inferArrayLdabase(IR * ir,
+                                           IR * array_base,
+                                           bool is_ofst_pred,
+                                           UINT ofst,
+                                           IN OUT AACtx * ic)
 {
     ASSERT0(ir->isArrayOp() && array_base->is_lda());
     AACtx tic(*ic);
@@ -822,10 +824,10 @@ MD const* IR_AA::inferArrayLdabase(IR * ir,
 //ARRAY node's memory address.
 //'mds' : record memory descriptor of 'ir'.
 //This function will set the Ref MD and Ref MD set of array operation.
-void IR_AA::processArray(IR * ir,
-                         IN OUT MDSet & mds,
-                         IN OUT AACtx * ic,
-                         IN OUT MD2MDSet * mx)
+void AliasAnalysis::processArray(IR * ir,
+                                 IN OUT MDSet & mds,
+                                 IN OUT AACtx * ic,
+                                 IN OUT MD2MDSet * mx)
 {
     ASSERT0(ir->isArrayOp());
 
@@ -924,7 +926,7 @@ void IR_AA::processArray(IR * ir,
 }
 
 
-bool IR_AA::evaluateFromLda(IR const* ir)
+bool AliasAnalysis::evaluateFromLda(IR const* ir)
 {
     //Attempt to infer more presicion point-to if ssa info is avaiable.
     if (ir->is_cvt()) { return evaluateFromLda(CVT_exp(ir)); }
@@ -974,10 +976,10 @@ END:
 //Return true if the offset can be confirmed via
 //simply calculation, and has been determined by this function.
 //Return false if caller need to keep evaluating the offset.
-bool IR_AA::tryComputeConstOffset(IR const* ir,
-                                  IR const* opnd1,
-                                  IN OUT MDSet & mds,
-                                  IN OUT MDSet & opnd0_mds)
+bool AliasAnalysis::tryComputeConstOffset(IR const* ir,
+                                          IR const* opnd1,
+                                          IN OUT MDSet & mds,
+                                          IN OUT MDSet & opnd0_mds)
 {
     //Compute the offset for pointer arithmetic.
     if (opnd1->is_const() && opnd1->is_int() && CONST_int_val(opnd1) == 0) {
@@ -1047,11 +1049,11 @@ bool IR_AA::tryComputeConstOffset(IR const* ir,
 //registered to be unbound. Since if p+1 is placed in a loop,
 //we could not determine the exact MD where p pointed to.
 //'mds' : record memory descriptor of 'ir'.
-void IR_AA::inferPointerArith(IR const* ir,
-                              IN OUT MDSet & mds,
-                              IN OUT MDSet & opnd0_mds,
-                              IN OUT AACtx * opnd0_ic,
-                              IN OUT MD2MDSet * mx)
+void AliasAnalysis::inferPointerArith(IR const* ir,
+                                      IN OUT MDSet & mds,
+                                      IN OUT MDSet & opnd0_mds,
+                                      IN OUT AACtx * opnd0_ic,
+                                      IN OUT MD2MDSet * mx)
 {
     ASSERT0(ir->is_add() || ir->is_sub());
     IR * opnd1 = BIN_opnd1(ir);
@@ -1095,7 +1097,7 @@ void IR_AA::inferPointerArith(IR const* ir,
 }
 
 
-void IR_AA::convertExact2Unbound(MDSet const* src, MDSet * tgt)
+void AliasAnalysis::convertExact2Unbound(MDSet const* src, MDSet * tgt)
 {
     SEGIter * iter;
     for (INT i = src->get_first(&iter);
@@ -1115,7 +1117,7 @@ void IR_AA::convertExact2Unbound(MDSet const* src, MDSet * tgt)
 }
 
 
-bool IR_AA::isInLoop(IR const* ir)
+bool AliasAnalysis::isInLoop(IR const* ir)
 {
     ASSERT0(ir && ir->is_stmt());
     IRBB * bb = ir->getBB();
@@ -1136,10 +1138,10 @@ bool IR_AA::isInLoop(IR const* ir)
 //ir may be pointer arithmetic, even if opnd0 is not pointer type.
 //'mds' : record memory-descriptor set or
 //    point-to set of 'ir' if AC_comp_pt(ic) is true.
-void IR_AA::processPointerArith(IR * ir,
-                                IN OUT MDSet & mds,
-                                IN OUT AACtx * ic,
-                                IN OUT MD2MDSet * mx)
+void AliasAnalysis::processPointerArith(IR * ir,
+                                        IN OUT MDSet & mds,
+                                        IN OUT AACtx * ic,
+                                        IN OUT MD2MDSet * mx)
 {
     ASSERT0(ir->is_add() || ir->is_sub());
     IR * opnd0 = BIN_opnd0(ir);
@@ -1202,10 +1204,10 @@ void IR_AA::processPointerArith(IR * ir,
 //        Note if AC_comp_pt() is true, the returned POINT-TO set may be
 //        recorded in 'mds' or AC_returned_pts.
 //Return MD of ir.
-MD const* IR_AA::assignPRMD(IR * ir,
-                            IN OUT MDSet * mds,
-                            IN OUT AACtx * ic,
-                            IN OUT MD2MDSet * mx)
+MD const* AliasAnalysis::assignPRMD(IR * ir,
+                                    IN OUT MDSet * mds,
+                                    IN OUT AACtx * ic,
+                                    IN OUT MD2MDSet * mx)
 {
     ASSERT0(ir->is_pr());
     ASSERT0(mds && ic);
@@ -1270,10 +1272,10 @@ MD const* IR_AA::assignPRMD(IR * ir,
 
 
 //'mds' : record memory descriptor of 'ir'
-MD const* IR_AA::assignLoadMD(IR * ir,
-                              IN OUT MDSet * mds,
-                              IN OUT AACtx * ic,
-                              IN OUT MD2MDSet * mx)
+MD const* AliasAnalysis::assignLoadMD(IR * ir,
+                                      IN OUT MDSet * mds,
+                                      IN OUT AACtx * ic,
+                                      IN OUT MD2MDSet * mx)
 {
     ASSERT0(ir->is_ld());
     ASSERT0(mds && ic);
@@ -1327,9 +1329,9 @@ MD const* IR_AA::assignLoadMD(IR * ir,
 
 //Assign unique MD to 'id'.
 //'mds': record memory descriptor of 'ir'.
-MD const* IR_AA::assignIdMD(IR * ir,
-                            IN OUT MDSet * mds,
-                            IN OUT AACtx * ic)
+MD const* AliasAnalysis::assignIdMD(IR * ir,
+                                    IN OUT MDSet * mds,
+                                    IN OUT AACtx * ic)
 {
     ASSERT0(ir->is_id());
     ASSERT0(ic && mds);
@@ -1362,7 +1364,8 @@ MD const* IR_AA::assignIdMD(IR * ir,
 //Union POINT-TO set for each element in 'mds', and hash the unified result
 //return it.
 //mds: represents address of current ILD.
-MDSet const* IR_AA::unifyPointToSet(MDSet const& mds, MD2MDSet const* mx)
+MDSet const* AliasAnalysis::unifyPointToSet(MDSet const& mds,
+                                            MD2MDSet const* mx)
 {
     UINT cnt = mds.get_elem_count();
     if (cnt == 0) { return m_maypts; }
@@ -1400,7 +1403,7 @@ MDSet const* IR_AA::unifyPointToSet(MDSet const& mds, MD2MDSet const* mx)
 
 //This function set MustAddr or MayAddr of ir by analyszing given MDSet.
 //mds: mds may be the MayAddr MDSet. Note mds should have been hashed.
-void IR_AA::setMustOrMayAddr(MDSet const* mds, IR * ir)
+void AliasAnalysis::setMustOrMayAddr(MDSet const* mds, IR * ir)
 {
     ASSERT0(mds && ir && m_mds_hash->find(*mds));
     ir->cleanRefMD();
@@ -1418,10 +1421,11 @@ void IR_AA::setMustOrMayAddr(MDSet const* mds, IR * ir)
 //ir: given indirect operation, such as IST, ILD.
 //comp_ir_pt: true if caller require to compute the POINT-TO set of ir.
 //Return POINT-TO set of ir, if comp_ir_pts is true.
-MDSet const* IR_AA::updateIndirectOpAddrAndPointToSet(MDSet const* refmds,
-                                                      IR * ir,
-                                                      bool comp_ir_pts,
-                                                      MD2MDSet * mx)
+MDSet const* AliasAnalysis::updateIndirectOpAddrAndPointToSet(
+        MDSet const* refmds,
+        IR * ir,
+        bool comp_ir_pts,
+        MD2MDSet * mx)
 {
     ASSERT0(refmds && ir);
     ASSERT0(ir->is_ist() || ir->is_ild());
@@ -1442,10 +1446,10 @@ MDSet const* IR_AA::updateIndirectOpAddrAndPointToSet(MDSet const* refmds,
 //'ir': IR expressions that describing memory address.
 //'mds': record memory descriptors which 'ir' represented.
 //'ic': context of analysis.
-void IR_AA::processILoad(IR * ir,
-                         IN OUT MDSet & mds,
-                         IN OUT AACtx * ic,
-                         IN OUT MD2MDSet * mx)
+void AliasAnalysis::processILoad(IR * ir,
+                                 IN OUT MDSet & mds,
+                                 IN OUT AACtx * ic,
+                                 IN OUT MD2MDSet * mx)
 {
     ASSERT0(ir->is_ild());
     ASSERT0(g_is_support_dynamic_type || ILD_base(ir)->is_ptr());
@@ -1564,9 +1568,9 @@ void IR_AA::processILoad(IR * ir,
 
 
 //'mds' : record memory descriptor of 'ir'.
-void IR_AA::processConst(IR * ir,
-                         IN OUT MDSet & mds,
-                         IN OUT AACtx * ic)
+void AliasAnalysis::processConst(IR * ir,
+                                 IN OUT MDSet & mds,
+                                 IN OUT AACtx * ic)
 {
     ASSERT0(ir->is_const());
     ASSERT0(ic);
@@ -1604,7 +1608,9 @@ void IR_AA::processConst(IR * ir,
 //For those MDs in 'returned_pts' when 'mds' is empty, we just keep them
 //unchanged.
 //It have to note that if LDA appeared in RHS, mds should not be empty.
-void IR_AA::recomputeDataType(AACtx const& ic, IR const* ir, OUT MDSet & mds)
+void AliasAnalysis::recomputeDataType(AACtx const& ic,
+                                      IR const* ir,
+                                      OUT MDSet & mds)
 {
     ASSERT0(ir && ir->is_stmt());
     if (!AC_has_comp_lda(&ic) || ir->is_any() || !ir->is_ptr()) { return; }
@@ -1633,11 +1639,11 @@ void IR_AA::recomputeDataType(AACtx const& ic, IR const* ir, OUT MDSet & mds)
 //rhs: RHS expression of ir. It's refdu might be updated by this function.
 //lhs_md: MD of LHS of 'ir'.
 //ic: analysis context.
-void IR_AA::inferStoreValue(IR const* ir,
-                            IR * rhs,
-                            MD const* lhs_md,
-                            AACtx const* ic,
-                            IN MD2MDSet * mx)
+void AliasAnalysis::inferStoreValue(IR const* ir,
+                                    IR * rhs,
+                                    MD const* lhs_md,
+                                    AACtx const* ic,
+                                    IN MD2MDSet * mx)
 {
     ASSERT0(ir->is_st() || ir->is_stpr() || ir->is_setelem());
 
@@ -1689,7 +1695,7 @@ void IR_AA::inferStoreValue(IR const* ir,
 //    this make the point-to set of 'p' to be {p->c, p->d}.
 //    and the formally formular form is:
 //    MDSet(p) = MDSet(q)
-void IR_AA::processStore(IN IR * ir, IN MD2MDSet * mx)
+void AliasAnalysis::processStore(IN IR * ir, IN MD2MDSet * mx)
 {
     ASSERT0(ir->is_st());
     MD const* t;
@@ -1712,7 +1718,7 @@ void IR_AA::processStore(IN IR * ir, IN MD2MDSet * mx)
 //    this make the point-to set of 'p' to be {p->c, p->d}.
 //    and the formally formular form is:
 //    MDSet(p) = MDSet(q)
-void IR_AA::processStorePR(IN IR * ir, IN MD2MDSet * mx)
+void AliasAnalysis::processStorePR(IN IR * ir, IN MD2MDSet * mx)
 {
     ASSERT0(ir->is_stpr());
     MD const* t;
@@ -1729,7 +1735,7 @@ void IR_AA::processStorePR(IN IR * ir, IN MD2MDSet * mx)
 
 
 //Compute the point to info for IR_SETELEM.
-void IR_AA::processSetelem(IR * ir, IN MD2MDSet * mx)
+void AliasAnalysis::processSetelem(IR * ir, IN MD2MDSet * mx)
 {
     ASSERT0(ir->is_setelem());
     MD const* t;
@@ -1755,7 +1761,7 @@ void IR_AA::processSetelem(IR * ir, IN MD2MDSet * mx)
 
 
 //Compute the point to info for IR_GETELEM.
-void IR_AA::processGetelem(IR * ir, IN MD2MDSet * mx)
+void AliasAnalysis::processGetelem(IR * ir, IN MD2MDSet * mx)
 {
     ASSERT0(ir->is_getelem() && GETELEM_ofst(ir));
     if (!m_is_visit.is_contain(ir->id())) {
@@ -1777,7 +1783,7 @@ void IR_AA::processGetelem(IR * ir, IN MD2MDSet * mx)
 }
 
 
-void IR_AA::processPhi(IN IR * ir, IN MD2MDSet * mx)
+void AliasAnalysis::processPhi(IN IR * ir, IN MD2MDSet * mx)
 {
     ASSERT0(ir->is_phi());
     MD const* phi_md;
@@ -1856,14 +1862,14 @@ void IR_AA::processPhi(IN IR * ir, IN MD2MDSet * mx)
 //returned_pts: record the POINT-TO set of 'rhs' if AC_comp_pt() is true.
 //              Note if AC_comp_pt() is true, the returned POINT-TO set may be
 //              recorded in 'rhsrefmds' or AC_returned_pts.
-void IR_AA::updateLHSPointToSet(bool is_lhs_pointer,
-                                bool rhs_taken_address,
-                                MD const* lhs_mustaddr,
-                                MDSet const* lhs_mayaddr,
-                                IR const* rhs,
-                                MDSet & rhsrefmds,
-                                MDSet const* returned_pts,
-                                MD2MDSet * mx)
+void AliasAnalysis::updateLHSPointToSet(bool is_lhs_pointer,
+                                        bool rhs_taken_address,
+                                        MD const* lhs_mustaddr,
+                                        MDSet const* lhs_mayaddr,
+                                        IR const* rhs,
+                                        MDSet & rhsrefmds,
+                                        MDSet const* returned_pts,
+                                        MD2MDSet * mx)
 {
     if (rhs_taken_address || is_lhs_pointer) {
         //If result type of IST is pointer, and the ptset is empty, then
@@ -1886,7 +1892,7 @@ void IR_AA::updateLHSPointToSet(bool is_lhs_pointer,
             ASSERT0(rhsrefmds.get_elem_count() == 1);
 
             //POINT-TO set may include element which also have been in m_maypts.
-            //CASE: =&g[i] violate this constrain.
+            //CASE: =&g[i] violate this constraint.
             //ASSERT0(!ptset->is_intersect(m_maypts));
         }
 
@@ -1933,7 +1939,9 @@ void IR_AA::updateLHSPointToSet(bool is_lhs_pointer,
 }
 
 
-void IR_AA::inferIStoreValue(IR const* ir, AACtx const* ic, IN MD2MDSet * mx)
+void AliasAnalysis::inferIStoreValue(IR const* ir,
+                                     AACtx const* ic,
+                                     IN MD2MDSet * mx)
 {
     ASSERT0(ir->is_ist());
     MDSet const* ist_mayaddr = m_rg->getMayRef(ir);
@@ -1970,10 +1978,10 @@ void IR_AA::inferIStoreValue(IR const* ir, AACtx const* ic, IN MD2MDSet * mx)
 
 //Set the POINT-TO set of LHS MD and LHS MDSet.
 //pts: POINT-TO set that have been hashed.
-void IR_AA::setLHSPointToSet(MD const* lhs_mustaddr,
-                             MDSet const* lhs_mayaddr,
-                             MDSet const* pts,
-                             MD2MDSet * mx)
+void AliasAnalysis::setLHSPointToSet(MD const* lhs_mustaddr,
+                                     MDSet const* lhs_mayaddr,
+                                     MDSet const* pts,
+                                     MD2MDSet * mx)
 {
     ASSERT0(pts && m_mds_hash->find(*pts));
     if (m_flow_sensitive) {
@@ -2000,9 +2008,9 @@ void IR_AA::setLHSPointToSet(MD const* lhs_mustaddr,
 }
 
 
-void IR_AA::inferStoreArrayValue(IR const* ir,
-                                 AACtx const* ic,
-                                 IN MD2MDSet * mx)
+void AliasAnalysis::inferStoreArrayValue(IR const* ir,
+                                         AACtx const* ic,
+                                         IN MD2MDSet * mx)
 {
     ASSERT0(ir->is_starray());
     MDSet const* lhs_mayaddr = m_rg->getMayRef(ir);
@@ -2038,7 +2046,7 @@ void IR_AA::inferStoreArrayValue(IR const* ir,
 //  store array can be demonstrated as
 //    a[x] = q;
 //  this changes POINT-TO set of a[x] to {a[x]->c, a[x]->d}.
-void IR_AA::processStoreArray(IN IR * ir, IN MD2MDSet * mx)
+void AliasAnalysis::processStoreArray(IN IR * ir, IN MD2MDSet * mx)
 {
     ASSERT0(ir->is_starray());
     //mem location may pointed to set.
@@ -2072,7 +2080,9 @@ void IR_AA::processStoreArray(IN IR * ir, IN MD2MDSet * mx)
 //This function will iterate MD in 'mds', new MD will be generated either
 //ir's MD size is different to MD in 'mds' or ir has offset.
 //Return true if new MD generated, and new MD record in 'newmds'.
-bool IR_AA::tryReshapeMDSet(IR const* ir, MDSet const* mds, OUT MDSet * newmds)
+bool AliasAnalysis::tryReshapeMDSet(IR const* ir,
+                                    MDSet const* mds,
+                                    OUT MDSet * newmds)
 {
     if (ir->is_any()) { return false; }
     UINT newofst = ir->getOffset();
@@ -2108,7 +2118,7 @@ bool IR_AA::tryReshapeMDSet(IR const* ir, MDSet const* mds, OUT MDSet * newmds)
 //Indirect store.
 //Analyse pointers according to rules for individiual ir to
 //constructe the map-table that maps MD to an unique VAR.
-void IR_AA::processIStore(IN IR * ir, IN MD2MDSet * mx)
+void AliasAnalysis::processIStore(IN IR * ir, IN MD2MDSet * mx)
 {
     ASSERT0(ir->is_ist());
     ASSERT0(g_is_support_dynamic_type || IST_base(ir)->is_ptr());
@@ -2202,11 +2212,12 @@ void IR_AA::processIStore(IN IR * ir, IN MD2MDSet * mx)
 
 //NOTE: The def and use info should be available for region, otherwise
 //this function will be costly.
-void IR_AA::processRegion(IR const* ir, IN MD2MDSet * mx)
+void AliasAnalysis::processRegion(IR const* ir, IN MD2MDSet * mx)
 {
     Region * rg = REGION_ru(ir);
     ASSERT0(rg);
-    //ASSERT0(REGION_type(rg) == REGION_BLACKBOX || REGION_type(rg) == REGION_INNER);
+    //ASSERT0(REGION_type(rg) == REGION_BLACKBOX ||
+    //        REGION_type(rg) == REGION_INNER);
 
     if (rg->is_readonly()) { return; }
 
@@ -2227,7 +2238,7 @@ void IR_AA::processRegion(IR const* ir, IN MD2MDSet * mx)
 }
 
 
-void IR_AA::processRegionSideeffect(IN OUT MD2MDSet & mx)
+void AliasAnalysis::processRegionSideeffect(IN OUT MD2MDSet & mx)
 {
     //Set all mds which are global pointers or parameters which taken
     //address point to maypts.
@@ -2253,7 +2264,7 @@ void IR_AA::processRegionSideeffect(IN OUT MD2MDSet & mx)
 }
 
 
-void IR_AA::processReturn(IN IR * ir, IN MD2MDSet * mx)
+void AliasAnalysis::processReturn(IN IR * ir, IN MD2MDSet * mx)
 {
     ASSERT0(ir->is_return());
     if (RET_exp(ir) != NULL) {
@@ -2265,7 +2276,8 @@ void IR_AA::processReturn(IN IR * ir, IN MD2MDSet * mx)
 }
 
 
-void IR_AA::processCallSideeffect(IN OUT MD2MDSet & mx, MDSet const& by_addr_mds)
+void AliasAnalysis::processCallSideeffect(IN OUT MD2MDSet & mx,
+                                          MDSet const& by_addr_mds)
 {
     //Set all mds which are global pointers or parameters which taken
     //address point to maypts.
@@ -2309,7 +2321,7 @@ void IR_AA::processCallSideeffect(IN OUT MD2MDSet & mx, MDSet const& by_addr_mds
 }
 
 
-MD const* IR_AA::allocHeapobj(IR * ir)
+MD const* AliasAnalysis::allocHeapobj(IR * ir)
 {
     MD const* heap_obj = m_ir2heapobj.get(ir);
     if (heap_obj != NULL) {
@@ -2343,7 +2355,7 @@ MD const* IR_AA::allocHeapobj(IR * ir)
 
 
 //Compute the point-to set modification when we meet call.
-void IR_AA::processCall(IN IR * ir, IN MD2MDSet * mx)
+void AliasAnalysis::processCall(IN IR * ir, IN MD2MDSet * mx)
 {
     ASSERT0(ir->isCallStmt());
 
@@ -2448,10 +2460,10 @@ void IR_AA::processCall(IN IR * ir, IN MD2MDSet * mx)
 //'expr': IR expressions that describing memory address.
 //'mds': record memory descriptors which 'expr' might express.
 //'ic': context of analysis.
-void IR_AA::inferExpression(IR * expr,
-                            IN OUT MDSet & mds,
-                            IN OUT AACtx * ic,
-                            IN OUT MD2MDSet * mx)
+void AliasAnalysis::inferExpression(IR * expr,
+                                    IN OUT MDSet & mds,
+                                    IN OUT AACtx * ic,
+                                    IN OUT MD2MDSet * mx)
 {
     switch (expr->getCode()) {
     case IR_ID:
@@ -2611,9 +2623,9 @@ void IR_AA::inferExpression(IR * expr,
 //Set POINT TO info.
 //Set each md in 'mds' add set 'pt_set'.
 //pt_set: POINT-TO set that has been hashed.
-void IR_AA::ElemUnionPointTo(MDSet const& mds,
-                             MDSet const& pt_set,
-                             IN MD2MDSet * mx)
+void AliasAnalysis::ElemUnionPointTo(MDSet const& mds,
+                                     MDSet const& pt_set,
+                                     IN MD2MDSet * mx)
 {
     ASSERT0(m_mds_hash->find(pt_set));
     xcom::SEGIter * iter;
@@ -2627,9 +2639,9 @@ void IR_AA::ElemUnionPointTo(MDSet const& mds,
 
 //Set POINT TO info.
 //Set each md in 'mds' add 'pt_elem'.
-void IR_AA::ElemUnionPointTo(MDSet const& mds,
-                             MD const* pt_elem,
-                             IN MD2MDSet * mx)
+void AliasAnalysis::ElemUnionPointTo(MDSet const& mds,
+                                     MD const* pt_elem,
+                                     IN MD2MDSet * mx)
 {
     xcom::SEGIter * iter;
     for (INT i = mds.get_first(&iter);
@@ -2644,9 +2656,9 @@ void IR_AA::ElemUnionPointTo(MDSet const& mds,
 //Set each md in 'mds' points to 'pt_set' if it is exact, or
 //else unify the set.
 //pt_set: POINT-TO set that have been hashed.
-void IR_AA::ElemCopyAndUnionPointTo(MDSet const& mds,
-                                    MDSet const& pt_set,
-                                    IN MD2MDSet * mx)
+void AliasAnalysis::ElemCopyAndUnionPointTo(MDSet const& mds,
+                                            MDSet const& pt_set,
+                                            IN MD2MDSet * mx)
 {
     ASSERT0(m_mds_hash->find(pt_set));
     xcom::SEGIter * iter = NULL;
@@ -2664,22 +2676,23 @@ void IR_AA::ElemCopyAndUnionPointTo(MDSet const& mds,
 
 //Set POINT TO info.
 //Set each md in 'mds' points to 'pt_set'.
-void IR_AA::ElemCopyPointTo(MDSet const& mds,
-                            IN MDSet & pt_set,
-                            IN MD2MDSet * mx)
+void AliasAnalysis::ElemCopyPointTo(MDSet const& mds,
+                                    IN MDSet & pt_set,
+                                    IN MD2MDSet * mx)
 {
     xcom::SEGIter * iter = NULL;
     for (INT i = mds.get_first(&iter);
          i >= 0; i = mds.get_next((UINT)i, &iter)) {
         ASSERT0(m_md_sys->getMD((UINT)i));
-        setPointToMDSet((UINT)i, *mx, pt_set); 
+        setPointToMDSet((UINT)i, *mx, pt_set);
     }
 }
 
 
 //Set POINT TO info.
 //Set each md in 'mds' points to May-Point-To set.
-void IR_AA::ElemCopyPointToAndMayPointTo(MDSet const& mds, IN MD2MDSet * mx)
+void AliasAnalysis::ElemCopyPointToAndMayPointTo(MDSet const& mds,
+                                                 IN MD2MDSet * mx)
 {
     xcom::SEGIter * iter = NULL;
     for (INT i = mds.get_first(&iter);
@@ -2692,7 +2705,7 @@ void IR_AA::ElemCopyPointToAndMayPointTo(MDSet const& mds, IN MD2MDSet * mx)
 
 //Set POINT TO info.
 //Set md in 'mds' points to NULL if it is exact.
-void IR_AA::ElemCleanExactPointTo(MDSet const& mds, IN MD2MDSet * mx)
+void AliasAnalysis::ElemCleanExactPointTo(MDSet const& mds, IN MD2MDSet * mx)
 {
     xcom::SEGIter * iter = NULL;
     for (INT i = mds.get_first(&iter);
@@ -2707,7 +2720,7 @@ void IR_AA::ElemCleanExactPointTo(MDSet const& mds, IN MD2MDSet * mx)
 
 //Set POINT TO info.
 //Set md in 'mds' points to NULL.
-void IR_AA::ElemCleanPointTo(MDSet const& mds, IN MD2MDSet * mx)
+void AliasAnalysis::ElemCleanPointTo(MDSet const& mds, IN MD2MDSet * mx)
 {
     xcom::SEGIter * iter = NULL;
     for (INT i = mds.get_first(&iter);
@@ -2719,7 +2732,7 @@ void IR_AA::ElemCleanPointTo(MDSet const& mds, IN MD2MDSet * mx)
 
 
 //Dump IR's point-to of each BB.
-void IR_AA::dumpInOutPointToSetForBB()
+void AliasAnalysis::dumpInOutPointToSetForBB()
 {
     if (g_tfile == NULL) { return; }
     note("\n==---- DUMP POINT TO INFO ----==");
@@ -2738,7 +2751,7 @@ void IR_AA::dumpInOutPointToSetForBB()
 
 
 //Dump POINT-TO pair record in 'pps'.
-void IR_AA::dumpPtPairSet(PtPairSet & pps)
+void AliasAnalysis::dumpPtPairSet(PtPairSet & pps)
 {
     if (g_tfile == NULL) { return; }
     StrBuf buf(256);
@@ -2782,7 +2795,7 @@ void IR_AA::dumpPtPairSet(PtPairSet & pps)
 
 //Dump 'ir' point-to according to 'mx'.
 //'dump_kid': dump kid's memory object if it exist.
-void IR_AA::dumpIRPointTo(IN IR * ir, bool dump_kid, IN MD2MDSet * mx)
+void AliasAnalysis::dumpIRPointTo(IN IR * ir, bool dump_kid, IN MD2MDSet * mx)
 {
     if (ir == NULL || g_tfile == NULL) { return; }
     MD const* must = m_rg->getMustRef(ir);
@@ -2829,7 +2842,7 @@ void IR_AA::dumpIRPointTo(IN IR * ir, bool dump_kid, IN MD2MDSet * mx)
 
 //Dump all relations between IR, MD, and MDSet.
 //'md2mds': mapping from 'md' to an md-set it pointed to.
-void IR_AA::dumpIRPointToForBB(IRBB * bb, bool dump_kid)
+void AliasAnalysis::dumpIRPointToForBB(IRBB * bb, bool dump_kid)
 {
     if (g_tfile == NULL) { return; }
     note("\n--- BB%u ---", BB_id(bb));
@@ -2947,7 +2960,8 @@ void IR_AA::dumpIRPointToForBB(IRBB * bb, bool dump_kid)
                 }
 
                 UINT i = 0;
-                for (IR * p = CALL_param_list(ir); p != NULL; p = p->get_next()) {
+                for (IR * p = CALL_param_list(ir);
+                     p != NULL; p = p->get_next()) {
                     note("\nPARAM%u:", i++);
                     dumpIRPointTo(p, false, mx);
                 }
@@ -3071,10 +3085,10 @@ void IR_AA::dumpIRPointToForBB(IRBB * bb, bool dump_kid)
 
 //Dump all relations between IR, MD, and MDSet.
 //'md2mds': mapping from 'md' to an md-set it pointed to.
-void IR_AA::dumpIRPointToForRegion(bool dump_kid)
+void AliasAnalysis::dumpIRPointToForRegion(bool dump_kid)
 {
     if (g_tfile == NULL) { return; }
-    note("\n==--- DUMP IR_AA '%s' ----==", m_rg->getRegionName());
+    note("\n==--- DUMP AliasAnalysis '%s' ----==", m_rg->getRegionName());
     m_md_sys->dump(false);
 
     note("\n---- MAY-POINT-TO SET :");
@@ -3091,7 +3105,7 @@ void IR_AA::dumpIRPointToForRegion(bool dump_kid)
 }
 
 
-void IR_AA::dumpMayPointTo()
+void AliasAnalysis::dumpMayPointTo()
 {
     if (g_tfile == NULL || m_maypts == NULL) { return; }
 
@@ -3106,7 +3120,7 @@ void IR_AA::dumpMayPointTo()
 }
 
 
-void IR_AA::dump(CHAR const* name)
+void AliasAnalysis::dump(CHAR const* name)
 {
     FILE * old = NULL;
     if (name != NULL) {
@@ -3127,12 +3141,12 @@ void IR_AA::dump(CHAR const* name)
 
 
 //Dump MD's point-to for each BB.
-void IR_AA::dumpMD2MDSetForRegion(bool dump_pt_graph)
+void AliasAnalysis::dumpMD2MDSetForRegion(bool dump_pt_graph)
 {
     if (g_tfile == NULL) { return; }
     if (m_flow_sensitive) {
         note("\n==---- DUMP POINT-TO OUT-SET (FLOW SENSITIVE) '%s' ----==",
-            m_rg->getRegionName());
+             m_rg->getRegionName());
         BBList * bbl = m_cfg->getBBList();
         for (IRBB * bb = bbl->get_head(); bb != NULL; bb = bbl->get_next()) {
             note("\n--- BB%u ---", BB_id(bb));
@@ -3141,7 +3155,7 @@ void IR_AA::dumpMD2MDSetForRegion(bool dump_pt_graph)
         }
     } else {
         note("\n==---- DUMP POINT-TO OUT-SET (FLOW-INSENSITIVE) '%s' ----==",
-            m_rg->getRegionName());
+             m_rg->getRegionName());
         dumpMD2MDSet(&m_unique_md2mds, dump_pt_graph);
     }
     fflush(g_tfile);
@@ -3150,7 +3164,7 @@ void IR_AA::dumpMD2MDSetForRegion(bool dump_pt_graph)
 
 //Dump MD's point-to according to individual 'mx'.
 //'dump_ptg': dump POINT-TO graph.
-void IR_AA::dumpMD2MDSet(IN MD2MDSet * mx, bool dump_ptg)
+void AliasAnalysis::dumpMD2MDSet(IN MD2MDSet * mx, bool dump_ptg)
 {
     if (g_tfile == NULL || mx == NULL) return;
     xcom::Graph g;
@@ -3185,7 +3199,7 @@ void IR_AA::dumpMD2MDSet(IN MD2MDSet * mx, bool dump_ptg)
 //Dump relations between MD, MDSet.
 //'md': candidate to dump.
 //'md2mds': mapping from 'md' to an md-set it pointed to.
-void IR_AA::dumpMD2MDSet(MD const* md, IN MD2MDSet * mx)
+void AliasAnalysis::dumpMD2MDSet(MD const* md, IN MD2MDSet * mx)
 {
     if (g_tfile == NULL) { return; }
 
@@ -3214,9 +3228,9 @@ void IR_AA::dumpMD2MDSet(MD const* md, IN MD2MDSet * mx)
 
 
 //Return false if flow sensitive analysis is inproperly.
-bool IR_AA::convertMD2MDSet2PT(OUT PtPairSet & pps,
-                               IN PtPairMgr & pt_pair_mgr,
-                               IN MD2MDSet * mx)
+bool AliasAnalysis::convertMD2MDSet2PT(OUT PtPairSet & pps,
+                                       IN PtPairMgr & pt_pair_mgr,
+                                       IN MD2MDSet * mx)
 {
     MD2MDSetIter mxiter;
     MDSet const* from_md_pts = NULL;
@@ -3255,7 +3269,8 @@ bool IR_AA::convertMD2MDSet2PT(OUT PtPairSet & pps,
         } else {
             xcom::SEGIter * segiter;
             for (INT toid = from_md_pts->get_first(&segiter);
-                 toid >= 0; toid = from_md_pts->get_next((UINT)toid, &segiter)) {
+                 toid >= 0;
+                 toid = from_md_pts->get_next((UINT)toid, &segiter)) {
                 ASSERT0(m_md_sys->getMD((UINT)toid));
                 PtPair const* pp = pt_pair_mgr.add(fromid, (UINT)toid);
                 ASSERT0(pp);
@@ -3267,9 +3282,9 @@ bool IR_AA::convertMD2MDSet2PT(OUT PtPairSet & pps,
 }
 
 
-void IR_AA::convertPT2MD2MDSet(PtPairSet const& pps,
-                               IN PtPairMgr & pt_pair_mgr,
-                               IN OUT MD2MDSet * ctx)
+void AliasAnalysis::convertPT2MD2MDSet(PtPairSet const& pps,
+                                       IN PtPairMgr & pt_pair_mgr,
+                                       IN OUT MD2MDSet * ctx)
 {
     for (INT i = pps.get_first(); i >= 0; i = pps.get_next((UINT)i)) {
         PtPair * pp = pt_pair_mgr.get((UINT)i);
@@ -3282,7 +3297,7 @@ void IR_AA::convertPT2MD2MDSet(PtPairSet const& pps,
 //Solving POINT-TO out set.
 //While the function terminiate, OUT info has been recorded
 //in related 'mx'.
-void IR_AA::computeStmt(IRBB const* bb, IN OUT MD2MDSet * mx)
+void AliasAnalysis::computeStmt(IRBB const* bb, IN OUT MD2MDSet * mx)
 {
     ASSERT0(mx != NULL);
     xcom::C<IR*> * ct;
@@ -3357,7 +3372,7 @@ void IR_AA::computeStmt(IRBB const* bb, IN OUT MD2MDSet * mx)
 }
 
 
-bool IR_AA::verifyIR(IR * ir)
+bool AliasAnalysis::verifyIR(IR * ir)
 {
     switch (ir->getCode()) {
     case IR_ID:
@@ -3461,7 +3476,7 @@ bool IR_AA::verifyIR(IR * ir)
 }
 
 
-bool IR_AA::verify()
+bool AliasAnalysis::verify()
 {
     BBList * bbl = m_rg->getBBList();
     for (IRBB * bb = bbl->get_head();
@@ -3480,7 +3495,7 @@ bool IR_AA::verify()
 //it supplied the POINT TO information for subsequently
 //optimizations.
 //Return false if flow sensitive analysis is inproperly.
-bool IR_AA::computeFlowSensitive(List<IRBB*> const& bbl)
+bool AliasAnalysis::computeFlowSensitive(List<IRBB*> const& bbl)
 {
     bool change = true;
     UINT count = 0;
@@ -3495,7 +3510,7 @@ bool IR_AA::computeFlowSensitive(List<IRBB*> const& bbl)
 
             MD2MDSet * md2mds = allocMD2MDSetForBB(BB_id(bb));
             tmp.clean();
-            xcom::Vertex * vex = m_cfg->get_vertex(BB_id(bb));
+            xcom::Vertex * vex = m_cfg->getVertex(BB_id(bb));
             xcom::EdgeC * el = VERTEX_in_list(vex);
             if (el != NULL) {
                 while (el != NULL) {
@@ -3548,9 +3563,9 @@ bool IR_AA::computeFlowSensitive(List<IRBB*> const& bbl)
 //The pointer includes global pointer and formal parameter pointer.
 //'param': formal parameter.
 //Note May-POINT-TO set must be available before call this function.
-void IR_AA::initGlobalAndParameterVarPtset(VAR * param,
-                                           MD2MDSet * mx,
-                                           ConstMDIter & iter)
+void AliasAnalysis::initGlobalAndParameterVarPtset(VAR * param,
+                                                   MD2MDSet * mx,
+                                                   ConstMDIter & iter)
 {
     MD const* dmd = NULL; //record dedicated MD which parameter pointed to.
     if (VAR_is_restrict(param)) {
@@ -3633,7 +3648,7 @@ void IR_AA::initGlobalAndParameterVarPtset(VAR * param,
 
 
 //Determine if flow sensitive analysis is properly.
-bool IR_AA::isFlowSensitiveProperly()
+bool AliasAnalysis::isFlowSensitiveProperly()
 {
     IRBB * entry = m_cfg->get_entry();
     ASSERT0(entry);
@@ -3668,7 +3683,7 @@ bool IR_AA::isFlowSensitiveProperly()
 //    }
 //    where p and q are entry MD.
 //ptset_arr: used to record all the PtPair set. It will be deleted by caller.
-void IR_AA::initEntryPtset(PtPairSet ** ptset_arr)
+void AliasAnalysis::initEntryPtset(PtPairSet ** ptset_arr)
 {
     ConstMDIter iter;
     VarTab * vt = m_rg->getVarTab();
@@ -3753,7 +3768,7 @@ void IR_AA::initEntryPtset(PtPairSet ** ptset_arr)
 
 //This function initialize May Point-To set.
 //Note that this function should only be invoked once.
-void IR_AA::initMayPointToSet()
+void AliasAnalysis::initMayPointToSet()
 {
     //Record MDs whose address have been takens or it is global variable.
     Region * rg = m_rg;
@@ -3761,7 +3776,7 @@ void IR_AA::initMayPointToSet()
     VarTabIter c;
     ConstMDIter iter;
     MDSet tmp;
-    for (;!rg->is_program();) {
+    for (; !rg->is_program();) {
         VarTab * vtab = rg->getVarTab();
         c.clean();
         for (VAR * v = vtab->get_first(c); v != NULL; v = vtab->get_next(c)) {
@@ -3769,7 +3784,7 @@ void IR_AA::initMayPointToSet()
             ASSERT0(!v->is_global());
 
             //Handle dedicated string md which has been taken address.
-            MD const* strmd;
+            MD const* strmd = NULL;
             if (v->is_string() &&
                 (strmd = rm->genDedicateStrMD()) != NULL) {
                 tmp.bunion_pure(MD_id(strmd), *m_misc_bs_mgr);
@@ -3819,7 +3834,7 @@ void IR_AA::initMayPointToSet()
 }
 
 
-void IR_AA::computeFlowInsensitive()
+void AliasAnalysis::computeFlowInsensitive()
 {
     BBList * bbl = m_cfg->getBBList();
     xcom::C<IRBB*> * ct = NULL;
@@ -3836,7 +3851,7 @@ void IR_AA::computeFlowInsensitive()
 
 
 //Initialize alias analysis.
-void IR_AA::initAliasAnalysis()
+void AliasAnalysis::initAliasAnalysis()
 {
     ASSERTN(!is_init(), ("already initialized"));
     initMayPointToSet();
@@ -3845,7 +3860,7 @@ void IR_AA::initAliasAnalysis()
 
 
 //Calculate point-to set.
-bool IR_AA::perform(IN OUT OptCtx & oc)
+bool AliasAnalysis::perform(IN OUT OptCtx & oc)
 {
     ASSERTN(m_maypts, ("Should invoke initAliasAnalysis() first."));
     if (m_rg->getBBList()->get_elem_count() == 0) { return true; }
@@ -3874,7 +3889,8 @@ bool IR_AA::perform(IN OUT OptCtx & oc)
         END_TIMER_FMT(t2, ("%s:flow sensitive analysis", getPassName()));
         if (!is_succ) {
             m_flow_sensitive = false;
-            START_TIMER_FMT(t4, ("%s:flow insensitive analysis", getPassName()));
+            START_TIMER_FMT(t4, ("%s:flow insensitive analysis",
+                                 getPassName()));
             initEntryPtset(NULL);
             computeFlowInsensitive();
             END_TIMER_FMT(t4, ("%s:flow insensitive analysis", getPassName()));

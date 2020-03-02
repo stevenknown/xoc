@@ -242,7 +242,7 @@ void MDPhi::dump(Region * rg, UseDefMgr * mgr)
     if (g_tfile == NULL) { return; }
 
     List<IRBB*> preds;
-    IR_CFG * cfg = rg->getCFG();
+    IRCFG * cfg = rg->getCFG();
     ASSERT0(cfg);
     cfg->get_preds(preds, getBB());
     IRBB * pred = preds.get_head();
@@ -450,13 +450,11 @@ MDSSAInfo * UseDefMgr::genMDSSAInfo(IR * ir)
     if (ir->getAI() == NULL) {
         IR_ai(ir) = m_rg->allocAIContainer();
     }
-
     MDSSAInfo * mdssainfo = (MDSSAInfo*)ir->getAI()->get(AI_MD_SSA);
     if (mdssainfo == NULL) {
         mdssainfo = allocMDSSAInfo();
         IR_ai(ir)->set(mdssainfo);
     }
-
     return mdssainfo;
 }
 
@@ -487,7 +485,7 @@ MDSSAInfo * UseDefMgr::allocMDSSAInfo()
     ::memset(p, 0, sizeof(MDSSAInfo));
     p->init();
     ASSERT0(m_mdssainfo_vec.get_last_idx() == -1 ||
-        m_mdssainfo_vec.get_last_idx() >= 0);
+            m_mdssainfo_vec.get_last_idx() >= 0);
     m_mdssainfo_vec.set(m_mdssainfo_vec.get_last_idx() + 1, p);
     return p;
 }

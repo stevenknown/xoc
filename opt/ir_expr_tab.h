@@ -65,7 +65,7 @@ public:
 //Compute LIVE IN and LIVE OUT IR expressions for each BB.
 #define IR_EXPR_TAB_LEVEL1_HASH_BUCKET    256
 #define IR_EXPR_TAB_LEVEL2_HASH_BUCKET    128
-class IR_EXPR_TAB : public Pass {
+class ExprTab : public Pass {
     UINT m_expr_count; //the encode-number expression.
     Region * m_rg;
     TypeMgr * m_tm;
@@ -95,9 +95,9 @@ class IR_EXPR_TAB : public Pass {
     }
 
 public:
-    explicit IR_EXPR_TAB(Region * rg);
-    COPY_CONSTRUCTOR(IR_EXPR_TAB);
-    ~IR_EXPR_TAB();
+    explicit ExprTab(Region * rg);
+    COPY_CONSTRUCTOR(ExprTab);
+    ~ExprTab();
 
     ExpRep * append_expr(IR * ir);
     void clean_occ_list();

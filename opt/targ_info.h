@@ -40,10 +40,10 @@ public:
     COPY_CONSTRUCTOR(TargInfo);
     virtual ~TargInfo() {}
 
-	// Return the number of allocable integer register.
+    // Return the number of allocable integer register.
     virtual UINT getNumOfAllocableIntegerRegister() const = 0;
 
-	// Return the number of allocable float register.
+    // Return the number of allocable float register.
     virtual UINT getNumOfAllocableFloatRegister() const = 0;
 
     //Return byte size of data cache.
@@ -58,7 +58,7 @@ public:
     //Return byte size of instruction cache line.
     virtual UINT getICacheLineSize() const = 0;
 
-	//Return byte size of TLB if any.
+    //Return byte size of TLB if any.
     virtual UINT getTLBSize() const = 0;
 
     //Approximate the cycles to execute ir operation.

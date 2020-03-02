@@ -66,14 +66,13 @@ typedef enum _AI_TYPE {
 
 
 class BaseAttachInfo {
+    COPY_CONSTRUCTOR(BaseAttachInfo);
 public:
     AI_TYPE type;
 
 public:
     explicit BaseAttachInfo(AI_TYPE t) { init(t); }
-    COPY_CONSTRUCTOR(BaseAttachInfo);
     ~BaseAttachInfo() {}
-
     void init(AI_TYPE t) { type = t; }
 };
 
@@ -81,12 +80,12 @@ public:
 //This class represents container of miscellaneous AttachInfo.
 typedef xcom::SimpleVec<BaseAttachInfo*, 1> AICont;
 class AIContainer {
+    COPY_CONSTRUCTOR(AIContainer);
 protected:
     AICont cont;
 
 public:
     AIContainer() { init(); }
-    COPY_CONSTRUCTOR(AIContainer);
     ~AIContainer() {}
 
     void init()
@@ -186,13 +185,13 @@ public:
 
 //Exception Handler Labels.
 class EHLabelAttachInfo : public BaseAttachInfo {
+    COPY_CONSTRUCTOR(EHLabelAttachInfo);
 public:
     SList<LabelInfo*> labels; //record a list of Labels.
 
 public:
     EHLabelAttachInfo(SMemPool * pool = NULL) : BaseAttachInfo(AI_EH_LABEL)
     { init(pool); }
-    COPY_CONSTRUCTOR(EHLabelAttachInfo);
 
     //This function must be invoked during construction.
     void init(SMemPool * pool)
@@ -207,12 +206,10 @@ public:
 
 
 class DbxAttachInfo : public BaseAttachInfo {
+    COPY_CONSTRUCTOR(DbxAttachInfo);
 public:
     Dbx dbx; //record debug info.
-
     DbxAttachInfo() : BaseAttachInfo(AI_DBX) { init(); }
-    COPY_CONSTRUCTOR(DbxAttachInfo);
-
     void init()
     {
         BaseAttachInfo::init(AI_DBX);
@@ -222,16 +219,13 @@ public:
 
 
 class ProfileAttachInfo : public BaseAttachInfo {
+    COPY_CONSTRUCTOR(ProfileAttachInfo);
 public:
     SYM const* tag;
-
-    //truebr freq, falsebr freq.
-    INT * data;
+    INT * data; //truebr freq, falsebr freq.
 
 public:
     ProfileAttachInfo() : BaseAttachInfo(AI_DBX) { init(); }
-    COPY_CONSTRUCTOR(ProfileAttachInfo);
-
     void init()
     {
         BaseAttachInfo::init(AI_PROF);
@@ -242,19 +236,18 @@ public:
 
 
 class TbaaAttachInfo : public BaseAttachInfo {
+    COPY_CONSTRUCTOR(TbaaAttachInfo);
 public:
     Type const* type;
-
 public:
     TbaaAttachInfo() : BaseAttachInfo(AI_TBAA) { type = NULL; }
-    COPY_CONSTRUCTOR(TbaaAttachInfo);
 };
 
 
 class MDSSAInfoAttachInfo : public BaseAttachInfo {
+    COPY_CONSTRUCTOR(MDSSAInfoAttachInfo);
 public:
     MDSSAInfoAttachInfo() : BaseAttachInfo(AI_MD_SSA) {}
-    COPY_CONSTRUCTOR(MDSSAInfoAttachInfo);
 };
 
 } //namespace xoc

@@ -63,7 +63,7 @@ VN const* RefineDUChain::getVNOfIndirectOp(IR const* ir, UINT * indirect_level)
     ASSERT0(base);
 
     //Get the VN of base expression.
-    return const_cast<IR_GVN*>(m_gvn)->mapIR2VN(base);
+    return const_cast<GVN*>(m_gvn)->mapIR2VN(base);
 }
 
 
@@ -184,7 +184,7 @@ bool RefineDUChain::perform(OptCtx & oc)
         if (!OC_is_du_chain_valid(oc)) {
             return false;
         }
-        m_gvn = (IR_GVN const*)m_rg->getPassMgr()->queryPass(PASS_GVN);
+        m_gvn = (GVN const*)m_rg->getPassMgr()->queryPass(PASS_GVN);
         if (m_gvn == NULL || !m_gvn->is_valid()) {
             return false;
         }
@@ -205,6 +205,6 @@ bool RefineDUChain::perform(OptCtx & oc)
     //This pass does not affect IR stmt/exp.
     return false;
 }
-//END IR_PRE
+//END PRE
 
 } //namespace xoc

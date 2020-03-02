@@ -58,11 +58,11 @@ namespace xoc {
 //        if i <= N, branch bb2;
 //    bb3:
 //        ...
-class IR_LOOP_CVT : public Pass {
+class LoopCvt : public Pass {
 protected:
     Region * m_rg;
-    IR_CFG * m_cfg;
-    IR_DU_MGR * m_du;
+    IRCFG * m_cfg;
+    DUMgr * m_du;
     IRIter m_ii;
 
     bool is_while_do(LI<IRBB> const* li, IRBB ** gobackbb,
@@ -72,7 +72,7 @@ protected:
     bool find_and_convert(List<LI<IRBB>*> & worklst);
 
 public:
-    explicit IR_LOOP_CVT(Region * rg)
+    explicit LoopCvt(Region * rg)
     {
         ASSERT0(rg != NULL);
         m_rg = rg;
@@ -80,8 +80,8 @@ public:
         m_cfg = m_rg->getCFG();
         ASSERT0(m_cfg && m_du);
     }
-    COPY_CONSTRUCTOR(IR_LOOP_CVT);
-    virtual ~IR_LOOP_CVT() {}
+    COPY_CONSTRUCTOR(LoopCvt);
+    virtual ~LoopCvt() {}
 
     virtual CHAR const* getPassName() const { return "Loop Convertion"; }
     PASS_TYPE getPassType() const { return PASS_LOOP_CVT; }

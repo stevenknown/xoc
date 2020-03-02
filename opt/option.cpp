@@ -239,7 +239,7 @@ UINT g_verify_level = VERIFY_LEVEL_2;
 
 //We always simplify parameters to lowest height to
 //facilitate the query of point-to set.
-//e.g: IR_DU_MGR is going to compute may point-to while
+//e.g: DUMgr is going to compute may point-to while
 //ADD is pointer type. But only MD has point-to set.
 //The query of point-to to ADD(id:6) is failed.
 //So we need to store the add's value to a PR,

@@ -40,14 +40,14 @@ author: Su Zhenyu
 namespace xoc {
 
 //
-//START IR_DCE
+//START DeadCodeElim
 //
-void IR_DCE::dump(EFFECT_STMT const& is_stmt_effect,
+void DeadCodeElim::dump(EffectStmt const& is_stmt_effect,
                   xcom::BitSet const& is_bb_effect,
                   IN Vector<Vector<IR*>*> & all_ir)
 {
     if (g_tfile == NULL) { return; }
-    note("\n==---- DUMP IR_DCE ----==\n");
+    note("\n==---- DUMP DeadCodeElim ----==\n");
     BBList * bbl = m_rg->getBBList();
     for (IRBB * bb = bbl->get_head(); bb != NULL; bb = bbl->get_next()) {
         note("\n------- BB%d", BB_id(bb));
@@ -94,7 +94,7 @@ void IR_DCE::dump(EFFECT_STMT const& is_stmt_effect,
 
 
 //Return true if ir can be optimized.
-bool IR_DCE::check_stmt(IR const* ir)
+bool DeadCodeElim::check_stmt(IR const* ir)
 {
     if (ir->isMayThrow() || ir->hasSideEffect() || ir->isNoMove()) {
         return true;
@@ -161,14 +161,14 @@ bool IR_DCE::check_stmt(IR const* ir)
 
 
 //Return true if ir is effect.
-bool IR_DCE::check_call(IR const* ir)
+bool DeadCodeElim::check_call(IR const* ir)
 {
     ASSERT0(ir->isCallStmt());
     return !ir->isReadOnlyCall() || IR_has_sideeffect(ir) || IR_no_move(ir);
 }
 
 
-void IR_DCE::mark_effect_ir(IN OUT EFFECT_STMT & is_stmt_effect,
+void DeadCodeElim::mark_effect_ir(IN OUT EffectStmt & is_stmt_effect,
                             IN OUT xcom::BitSet & is_bb_effect,
                             IN OUT List<IR const*> & work_list)
 {
@@ -222,14 +222,14 @@ void IR_DCE::mark_effect_ir(IN OUT EFFECT_STMT & is_stmt_effect,
 }
 
 
-bool IR_DCE::find_effect_kid(IN IRBB * bb,
+bool DeadCodeElim::find_effect_kid(IN IRBB * bb,
                              IN IR * ir,
-                             IN EFFECT_STMT & is_stmt_effect)
+                             IN EffectStmt & is_stmt_effect)
 {
     ASSERT0(m_cfg && m_cdg);
     ASSERT0(ir->getBB() == bb);
     if (ir->isConditionalBr() || ir->isMultiConditionalBr()) {
-        xcom::EdgeC const* ec = VERTEX_out_list(m_cdg->get_vertex(BB_id(bb)));
+        xcom::EdgeC const* ec = VERTEX_out_list(m_cdg->getVertex(BB_id(bb)));
         while (ec != NULL) {
             IRBB * succ = m_cfg->getBB(VERTEX_id(EDGE_to(EC_edge(ec))));
             ASSERT0(succ != NULL);
@@ -242,10 +242,10 @@ bool IR_DCE::find_effect_kid(IN IRBB * bb,
             ec = EC_next(ec);
         }
     } else if (ir->isUnconditionalBr()) {
-        xcom::EdgeC const* ecp = VERTEX_in_list(m_cdg->get_vertex(BB_id(bb)));
+        xcom::EdgeC const* ecp = VERTEX_in_list(m_cdg->getVertex(BB_id(bb)));
         while (ecp != NULL) {
             INT cd_pred = VERTEX_id(EDGE_from(EC_edge(ecp)));
-            xcom::EdgeC const* ecs = VERTEX_out_list(m_cdg->get_vertex(cd_pred));
+            xcom::EdgeC const* ecs = VERTEX_out_list(m_cdg->getVertex(cd_pred));
             while (ecs != NULL) {
                 INT cd_succ = VERTEX_id(EDGE_to(EC_edge(ecs)));
                 IRBB * succ = m_cfg->getBB(cd_succ);
@@ -267,8 +267,8 @@ bool IR_DCE::find_effect_kid(IN IRBB * bb,
 }
 
 
-bool IR_DCE::preserve_cd(IN OUT xcom::BitSet & is_bb_effect,
-                         IN OUT EFFECT_STMT & is_stmt_effect,
+bool DeadCodeElim::preserve_cd(IN OUT xcom::BitSet & is_bb_effect,
+                         IN OUT EffectStmt & is_stmt_effect,
                          IN OUT List<IR const*> & act_ir_lst)
 {
     ASSERT0(m_cfg && m_cdg);
@@ -282,8 +282,8 @@ bool IR_DCE::preserve_cd(IN OUT xcom::BitSet & is_bb_effect,
         if (is_bb_effect.is_contain(BB_id(bb))) {
             UINT bbid = BB_id(bb);
             //Set control dep bb to be effective.
-            ASSERT0(m_cdg->get_vertex(bbid));
-            for (xcom::EdgeC const* ec = VERTEX_in_list(m_cdg->get_vertex(bbid));
+            ASSERT0(m_cdg->getVertex(bbid));
+            for (xcom::EdgeC const* ec = VERTEX_in_list(m_cdg->getVertex(bbid));
                  ec != NULL; ec = EC_next(ec)) {
                 INT cd_pred = VERTEX_id(EDGE_from(EC_edge(ec)));
                 if (!is_bb_effect.is_contain(cd_pred)) {
@@ -292,8 +292,8 @@ bool IR_DCE::preserve_cd(IN OUT xcom::BitSet & is_bb_effect,
                 }
             }
 
-            ASSERT0(m_cfg->get_vertex(bbid));
-            xcom::EdgeC const* ec = VERTEX_in_list(m_cfg->get_vertex(bbid));
+            ASSERT0(m_cfg->getVertex(bbid));
+            xcom::EdgeC const* ec = VERTEX_in_list(m_cfg->getVertex(bbid));
             if (cnt_list(ec) >= 2) {
                 ASSERT0(BB_rpo(bb) >= 0);
                 UINT bbto = BB_rpo(bb);
@@ -351,7 +351,7 @@ bool IR_DCE::preserve_cd(IN OUT xcom::BitSet & is_bb_effect,
 
 //Iterative record effect IRs, according to DU chain,
 //and preserving the control flow dependence.
-void IR_DCE::iter_collect(IN OUT EFFECT_STMT & is_stmt_effect,
+void DeadCodeElim::iter_collect(IN OUT EffectStmt & is_stmt_effect,
                           IN OUT xcom::BitSet & is_bb_effect,
                           IN OUT List<IR const*> & work_list)
 {
@@ -420,7 +420,7 @@ void IR_DCE::iter_collect(IN OUT EFFECT_STMT & is_stmt_effect,
 
 //Fix control flow if BB is empty.
 //It will be illegal if empty BB has non-taken branch.
-void IR_DCE::fix_control_flow(List<IRBB*> & bblst, List<C<IRBB*>*> & ctlst)
+void DeadCodeElim::fix_control_flow(List<IRBB*> & bblst, List<C<IRBB*>*> & ctlst)
 {
     BBList * bbl = m_rg->getBBList();
     xcom::C<IRBB*> * ct = ctlst.get_head();
@@ -432,7 +432,7 @@ void IR_DCE::fix_control_flow(List<IRBB*> & bblst, List<C<IRBB*>*> & ctlst)
         ASSERT0(ct && bb);
         if (BB_irlist(bb).get_elem_count() != 0) { continue; }
 
-        xcom::EdgeC * vout = VERTEX_out_list(m_cfg->get_vertex(BB_id(bb)));
+        xcom::EdgeC * vout = VERTEX_out_list(m_cfg->getVertex(BB_id(bb)));
         if (vout == NULL || cnt_list(vout) <= 1) { continue; }
 
         xcom::C<IRBB*> * next_ct = ct;
@@ -479,7 +479,7 @@ void IR_DCE::fix_control_flow(List<IRBB*> & bblst, List<C<IRBB*>*> & ctlst)
                 IR * g = m_rg->buildGoto(li);
                 BB_irlist(bb).append_tail(g);
                 bool change = true;
-                xcom::Vertex * bbv = m_cfg->get_vertex(BB_id(bb));
+                xcom::Vertex * bbv = m_cfg->getVertex(BB_id(bb));
                 while (change) {
                     xcom::EdgeC * ec = VERTEX_out_list(bbv);
                     change = false;
@@ -505,7 +505,7 @@ void IR_DCE::fix_control_flow(List<IRBB*> & bblst, List<C<IRBB*>*> & ctlst)
 }
 
 
-void IR_DCE::record_all_ir(IN OUT Vector<Vector<IR*>*> & all_ir)
+void DeadCodeElim::record_all_ir(IN OUT Vector<Vector<IR*>*> & all_ir)
 {
     DUMMYUSE(all_ir);
     #ifdef _DEBUG_
@@ -526,10 +526,10 @@ void IR_DCE::record_all_ir(IN OUT Vector<Vector<IR*>*> & all_ir)
 
 //Fix control flow if BB is empty.
 //It is illegal if empty BB has non-taken branch.
-void IR_DCE::revise_successor(IRBB * bb, xcom::C<IRBB*> * bbct, BBList * bbl)
+void DeadCodeElim::revise_successor(IRBB * bb, xcom::C<IRBB*> * bbct, BBList * bbl)
 {
     ASSERT0(bb && bbct);
-    xcom::EdgeC * ec = VERTEX_out_list(m_cfg->get_vertex(BB_id(bb)));
+    xcom::EdgeC * ec = VERTEX_out_list(m_cfg->getVertex(BB_id(bb)));
     if (ec == NULL) { return; }
 
     xcom::C<IRBB*> * next_ct = bbct;
@@ -565,7 +565,7 @@ void IR_DCE::revise_successor(IRBB * bb, xcom::C<IRBB*> * bbct, BBList * bbl)
 
 
 //An aggressive algo will be used if cdg is avaliable.
-bool IR_DCE::perform(OptCtx & oc)
+bool DeadCodeElim::perform(OptCtx & oc)
 {
     START_TIMER(t, getPassName());
     if (m_is_elim_cfs) {
@@ -592,7 +592,7 @@ bool IR_DCE::perform(OptCtx & oc)
     #endif
 
     //Mark effect IRs.
-    EFFECT_STMT is_stmt_effect;
+    EffectStmt is_stmt_effect;
     List<IR const*> work_list;
     xcom::BitSet is_bb_effect;
 
@@ -685,6 +685,6 @@ bool IR_DCE::perform(OptCtx & oc)
     END_TIMER(t, getPassName());
     return change;
 }
-//END IR_DCE
+//END DeadCodeElim
 
 } //namespace xoc

@@ -34,8 +34,8 @@ namespace xoc {
 class RefineDUChain : public Pass {
 protected:
     Region * m_rg;
-    IR_DU_MGR * m_du;
-    IR_GVN const* m_gvn;
+    DUMgr * m_du;
+    GVN const* m_gvn;
     MDSSAMgr * m_mdssamgr;
     bool m_is_use_gvn;
     DefMiscBitSetMgr * m_sbs_mgr;

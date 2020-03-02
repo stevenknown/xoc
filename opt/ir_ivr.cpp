@@ -37,24 +37,21 @@ author: Su Zhenyu
 namespace xoc {
 
 //
-//START IR_IVR
+//START IVR
 //
-bool IR_IVR::computeInitVal(IR const* ir, IV * iv)
+bool IVR::computeInitVal(IR const* ir, IV * iv)
 {
-    if (!ir->is_st() && !ir->is_ist()) {
+    if (!ir->is_st() && !ir->is_ist() && !ir->is_stpr() && !ir->is_starray()) {
         return false;
     }
 
     IV_initv_stmt(iv) = ir;
-
     IR const* v = ST_rhs(ir); //v is the initial value.
     if (v->is_cvt()) {
-        //You should have performed refineIR to optimize cvt.
         v = ((CCvt*)v)->getLeafExp();
     }
 
     IV_initv_data_type(iv) = v->getType();
-
     if (v->is_const() && v->is_int()) {
         if (IV_initv_i(iv) == NULL) {
             IV_initv_i(iv) = (LONGLONG*)xmalloc(sizeof(LONGLONG));
@@ -76,9 +73,8 @@ bool IR_IVR::computeInitVal(IR const* ir, IV * iv)
 }
 
 
-//Find initialze value of IV, if found return true,
-//otherwise return false.
-bool IR_IVR::findInitVal(IV * iv)
+//Find initialze value of IV, if found return true, otherwise return false.
+bool IVR::findInitVal(IV * iv)
 {
     DUSet const* defs = IV_iv_occ(iv)->readDUSet();
     ASSERT0(defs);
@@ -110,7 +106,7 @@ bool IR_IVR::findInitVal(IV * iv)
 }
 
 
-IR * IR_IVR::findMatchedOcc(MD const* biv, IR * start)
+IR * IVR::findMatchedOcc(MD const* biv, IR * start)
 {
     ASSERT0(start->is_exp());
     IRIter ii;
@@ -126,7 +122,7 @@ IR * IR_IVR::findMatchedOcc(MD const* biv, IR * start)
 }
 
 
-bool IR_IVR::matchIVUpdate(MD const* biv,
+bool IVR::matchIVUpdate(MD const* biv,
                            IR const* def,
                            IR ** occ,
                            IR ** delta,
@@ -180,12 +176,12 @@ bool IR_IVR::matchIVUpdate(MD const* biv,
 }
 
 
-void IR_IVR::recordIV(MD * biv,
-                      LI<IRBB> const* li,
-                      IR * def,
-                      IR * occ,
-                      IR * delta,
-                      bool is_increment)
+void IVR::recordIV(MD * biv,
+                   LI<IRBB> const* li,
+                   IR * def,
+                   IR * occ,
+                   IR * delta,
+                   bool is_increment)
 {
     ASSERT0(biv && li && def && occ && delta && delta->is_const());
     IV * x = allocIV();
@@ -221,10 +217,10 @@ void IR_IVR::recordIV(MD * biv,
 //Find Basic IV.
 //'map_md2defcount': record the number of definitions to MD.
 //'map_md2defir': map MD to definition stmt.
-void IR_IVR::findBIV(LI<IRBB> const* li,
-                     xcom::BitSet & tmp,
-                     Vector<UINT> & map_md2defcount,
-                     UINT2IR & map_md2defir)
+void IVR::findBIV(LI<IRBB> const* li,
+                  xcom::BitSet & tmp,
+                  Vector<UINT> & map_md2defcount,
+                  UINT2IR & map_md2defir)
 {
     IRBB * head = LI_loop_head(li);
     UINT headi = BB_id(head);
@@ -235,9 +231,13 @@ void IR_IVR::findBIV(LI<IRBB> const* li,
          i != -1; i = LI_bb_set(li)->get_next(i)) {
         //if ((UINT)i == headi) { continue; }
         IRBB * bb = m_cfg->getBB(i);
-        ASSERT0(bb && m_cfg->get_vertex(BB_id(bb)));
+        ASSERT0(bb && m_cfg->getVertex(BB_id(bb)));
         for (IR * ir = BB_first_ir(bb); ir != NULL; ir = BB_next_ir(bb)) {
-            if (!ir->is_st() && !ir->is_ist() && !ir->isCallStmt()) {
+            if (!ir->is_st() &&
+                !ir->is_ist() &&
+                !ir->is_stpr() &&
+                !ir->is_starray() &&
+                !ir->isCallStmt()) {
                 continue;
             }
 
@@ -305,7 +305,10 @@ void IR_IVR::findBIV(LI<IRBB> const* li,
     for (MD * biv = sdlst.get_head(); biv != NULL; biv = sdlst.get_next()) {
         IR * def = map_md2defir.get(MD_id(biv));
         ASSERT0(def);
-        if (!def->is_st() && !def->is_stpr() && !def->is_ist()) {
+        if (!def->is_st() &&
+            !def->is_stpr() &&
+            !def->is_ist() &&
+            !def->is_starray()) {
             continue;
         }
 
@@ -342,7 +345,7 @@ void IR_IVR::findBIV(LI<IRBB> const* li,
 
 //Return true if 'ir' is loop invariant expression.
 //'defs': def set of 'ir'.
-bool IR_IVR::is_loop_invariant(LI<IRBB> const* li, IR const* ir)
+bool IVR::is_loop_invariant(LI<IRBB> const* li, IR const* ir)
 {
     ASSERT0(ir->is_exp());
     DUSet const* defs = ir->readDUSet();
@@ -361,9 +364,9 @@ bool IR_IVR::is_loop_invariant(LI<IRBB> const* li, IR const* ir)
 
 //Return true if ir can be regard as induction expression.
 //'defs': def list of 'ir'.
-bool IR_IVR::scanExp(IR const* ir,
-                     LI<IRBB> const* li,
-                     xcom::BitSet const& ivmds)
+bool IVR::scanExp(IR const* ir,
+                  LI<IRBB> const* li,
+                  xcom::BitSet const& ivmds)
 {
     ASSERT0(ir->is_exp());
     switch (ir->getCode()) {
@@ -405,7 +408,7 @@ bool IR_IVR::scanExp(IR const* ir,
 
 
 //Try to add IV expresion into div list if 'e' do not exist in the list.
-void IR_IVR::addDIVList(LI<IRBB> const* li, IR const* e)
+void IVR::addDIVList(LI<IRBB> const* li, IR const* e)
 {
     SList<IR const*> * divlst = m_li2divlst.get(LI_id(li));
     if (divlst == NULL) {
@@ -429,13 +432,13 @@ void IR_IVR::addDIVList(LI<IRBB> const* li, IR const* e)
 }
 
 
-void IR_IVR::findDIV(LI<IRBB> const* li, 
-                     SList<IV*> const& bivlst,
-                     xcom::BitSet & tmp)
+void IVR::findDIV(LI<IRBB> const* li,
+                  xcom::SList<IV*> const& bivlst,
+                  xcom::BitSet & tmp)
 {
     if (bivlst.get_elem_count() == 0) { return; }
 
-    tmp.clean();
+    tmp.clean(); //for tmp used.
     for (xcom::SC<IV*> * sc = bivlst.get_head();
          sc != bivlst.end(); sc = bivlst.get_next(sc)) {
         IV * iv = sc->val();
@@ -446,18 +449,19 @@ void IR_IVR::findDIV(LI<IRBB> const* li,
     for (INT i = LI_bb_set(li)->get_first();
          i != -1; i = LI_bb_set(li)->get_next(i)) {
         IRBB * bb = m_cfg->getBB(i);
-        ASSERT0(bb && m_cfg->get_vertex(BB_id(bb)));
+        ASSERT0(bb && m_cfg->getVertex(BB_id(bb)));
         for (IR * ir = BB_first_ir(bb); ir != NULL; ir = BB_next_ir(bb)) {
             switch (ir->getCode()) {
             case IR_ST:
             case IR_STPR:
-            case IR_IST: {
-                    IR * rhs = ir->getRHS();
-                    if (scanExp(rhs, li, tmp)) {
-                        addDIVList(li, rhs);
-                    }
+            case IR_IST:
+            case IR_STARRAY: {
+                IR * rhs = ir->getRHS();
+                if (scanExp(rhs, li, tmp)) {
+                    addDIVList(li, rhs);
                 }
                 break;
+            }
             case IR_CALL:
             case IR_ICALL:
                 for (IR * p = CALL_param_list(ir);
@@ -480,7 +484,7 @@ void IR_IVR::findDIV(LI<IRBB> const* li,
 }
 
 
-void IR_IVR::_dump(LI<IRBB> * li, UINT indent)
+void IVR::_dump(LI<IRBB> * li, UINT indent)
 {
     while (li != NULL) {
         note("\n");
@@ -492,7 +496,7 @@ void IR_IVR::_dump(LI<IRBB> * li, UINT indent)
             prt("%d,", i);
         }
 
-        SList<IV*> * bivlst = m_li2bivlst.get(LI_id(li));
+        xcom::SList<IV*> * bivlst = m_li2bivlst.get(LI_id(li));
         if (bivlst != NULL) {
             for (xcom::SC<IV*> * sc = bivlst->get_head();
                  sc != bivlst->end(); sc = bivlst->get_next(sc)) {
@@ -510,11 +514,9 @@ void IR_IVR::_dump(LI<IRBB> * li, UINT indent)
 
                 if (iv->has_init_val()) {
                     if (iv->isInitConst()) {
-                        prt(",init=%lld",
-                                (LONGLONG)*IV_initv_i(iv));
+                        prt(",init=%lld", (LONGLONG)*IV_initv_i(iv));
                     } else {
-                        prt(",init=md%d",
-                                (INT)MD_id(IV_initv_md(iv)));
+                        prt(",init=md%d", (INT)MD_id(IV_initv_md(iv)));
                     }
                 }
                 prt(")");
@@ -546,7 +548,7 @@ void IR_IVR::_dump(LI<IRBB> * li, UINT indent)
             }
         } else { prt("(NO BIV)"); }
 
-        SList<IR const*> * divlst = m_li2divlst.get(LI_id(li));
+        xcom::SList<IR const*> * divlst = m_li2divlst.get(LI_id(li));
         if (divlst != NULL) {
             if (divlst->get_elem_count() > 0) {
                 note("\n");
@@ -570,7 +572,7 @@ void IR_IVR::_dump(LI<IRBB> * li, UINT indent)
 
 
 //Dump IVR info for loop.
-void IR_IVR::dump()
+void IVR::dump()
 {
     if (g_tfile == NULL) { return; }
     note("\n==---- DUMP IVR -- rg:'%s' ----==", m_rg->getRegionName());
@@ -579,7 +581,7 @@ void IR_IVR::dump()
 }
 
 
-void IR_IVR::clean()
+void IVR::clean()
 {
     for (INT i = 0; i <= m_li2bivlst.get_last_idx(); i++) {
         SList<IV*> * ivlst = m_li2bivlst.get(i);
@@ -595,7 +597,7 @@ void IR_IVR::clean()
 }
 
 
-bool IR_IVR::perform(OptCtx & oc)
+bool IVR::perform(OptCtx & oc)
 {
     START_TIMER(t, getPassName());
     UINT n = m_rg->getBBList()->get_elem_count();
@@ -611,17 +613,17 @@ bool IR_IVR::perform(OptCtx & oc)
         return false;
     }
 
-    m_du = (IR_DU_MGR*)m_rg->getPassMgr()->queryPass(PASS_DU_MGR);
+    m_du = (DUMgr*)m_rg->getPassMgr()->queryPass(PASS_DU_MGR);
 
     LI<IRBB> const* li = m_cfg->getLoopInfo();
     clean();
     if (li == NULL) { return false; }
 
     xcom::BitSet tmp;
-    Vector<UINT> map_md2defcount;
+    xcom::Vector<UINT> map_md2defcount;
     UINT2IR map_md2defir;
 
-    List<LI<IRBB> const*> worklst;
+    xcom::List<LI<IRBB> const*> worklst;
     while (li != NULL) {
         worklst.append_tail(li);
         li = LI_next(li);
@@ -630,7 +632,7 @@ bool IR_IVR::perform(OptCtx & oc)
     while (worklst.get_elem_count() > 0) {
         LI<IRBB> const* x = worklst.remove_head();
         findBIV(x, tmp, map_md2defcount, map_md2defir);
-        SList<IV*> const* bivlst = m_li2bivlst.get(LI_id(x));
+        xcom::SList<IV*> const* bivlst = m_li2bivlst.get(LI_id(x));
         if (bivlst != NULL && bivlst->get_elem_count() > 0) {
             findDIV(x, *bivlst, tmp);
         }
@@ -646,6 +648,6 @@ bool IR_IVR::perform(OptCtx & oc)
     END_TIMER(t, getPassName());
     return false;
 }
-//END IR_IVR
+//END IVR
 
 } //namespace xoc

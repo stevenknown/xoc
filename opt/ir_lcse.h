@@ -36,15 +36,15 @@ author: Su Zhenyu
 
 namespace xoc {
 
-//IR_LCSE
+//LCSE
 //Perform Local Common Subexpression Elimination.
-class IR_LCSE : public Pass {
+class LCSE : public Pass {
 protected:
     bool m_enable_filter; //filter determines which expression can be CSE.
     Region * m_rg;
     TypeMgr * m_tm;
-    IR_EXPR_TAB * m_expr_tab;
-    IR_DU_MGR * m_du;
+    ExprTab * m_expr_tab;
+    DUMgr * m_du;
     BSVec<ExpRep*> * m_expr_vec;
     DefMiscBitSetMgr m_misc_bs_mgr;
 
@@ -79,9 +79,9 @@ protected:
                     IN OUT Vector<IR*> & map_expr2avail_pr);
 
 public:
-    explicit IR_LCSE(Region * rg);
-    COPY_CONSTRUCTOR(IR_LCSE);
-    virtual ~IR_LCSE() {}
+    explicit LCSE(Region * rg);
+    COPY_CONSTRUCTOR(LCSE);
+    virtual ~LCSE() {}
 
     bool canBeCandidate(IR * ir);
     virtual CHAR const* getPassName() const

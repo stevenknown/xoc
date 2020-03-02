@@ -34,7 +34,7 @@ author: Su Zhenyu
 #ifndef _DEX_CFG_H_
 #define _DEX_CFG_H_
 
-class DEX_CFG : public IR_CFG {
+class DEX_CFG : public IRCFG {
 protected:
     void dump_node(FILE * h, bool detail, BitSet const& tryblock);
     void dump_node2(
@@ -58,7 +58,7 @@ public:
             Region * rg,
             UINT edge_hash_size = 16,
             UINT vertex_hash_size = 16) :
-        IR_CFG(cs, bbl, rg, edge_hash_size, vertex_hash_size) {}
+        IRCFG(cs, bbl, rg, edge_hash_size, vertex_hash_size) {}
     virtual ~DEX_CFG() {}
 
     void dump_vcg_ex(BitSet const& markbbs);

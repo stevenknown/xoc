@@ -97,7 +97,7 @@ protected:
     Region * m_rg;
     SMemPool * m_vp_pool;
     TypeMgr * m_tm;
-    IR_CFG * m_cfg;
+    IRCFG * m_cfg;
     DefSegMgr * m_seg_mgr;
     bool m_is_ssa_constructed;
     UINT m_vp_count;

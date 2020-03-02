@@ -100,8 +100,8 @@ typedef enum _VOPND_CODE {
 //e.g2: mdphi a_v1 = (a_v0, L1), (0x20, L3)
 //  Given mdphi operation, the second operand is 0x20, a immediate.
 //  Thus it's virtual operand code is VOPND_CONST.
-#define VOPND_id(v)         ((v)->m_id)
-#define VOPND_code(v)       ((v)->m_code)
+#define VOPND_id(v) ((v)->m_id)
+#define VOPND_code(v) ((v)->m_code)
 class VOpnd {
 public:
     VOPND_CODE m_code;
@@ -130,7 +130,7 @@ public:
 //e.g: mdphi a_v1 = (a_v0, L1), (0x20, L3)
 //  Given mdphi operation, the second operand is 0x20, a immediate.
 //  Thus it's virtual operand code is VOPND_CONST.
-#define VCONST_val(v)      (((VConst*)v)->m_const_val)
+#define VCONST_val(v) (((VConst*)v)->m_const_val)
 class VConst : public VOpnd {
 public:
     IR const* m_const_val;
@@ -159,10 +159,10 @@ public:
 //  Assume a's reference MD is MD10.
 //  Stmt S1 generate MD10v1, whereas stmt S2 generate MD10v2.
 //  Assume b's reference MD is MD11, ld b generate MD11v0.
-#define VMD_mdid(v)       (((VMD*)v)->m_mdid)
-#define VMD_version(v)    (((VMD*)v)->m_version)
-#define VMD_def(v)        (((VMD*)v)->m_def_stmt)
-#define VMD_occs(v)       (((VMD*)v)->m_occs)
+#define VMD_mdid(v) (((VMD*)v)->m_mdid)
+#define VMD_version(v) (((VMD*)v)->m_version)
+#define VMD_def(v) (((VMD*)v)->m_def_stmt)
+#define VMD_occs(v) (((VMD*)v)->m_occs)
 class VMD : public VOpnd {
 public:
     UINT m_version; //unique version of MD.
@@ -172,7 +172,7 @@ public:
 
 public:
     VMD();
-    VMD(DefSegMgr * sm);
+    VMD(xcom::DefSegMgr * sm);
     COPY_CONSTRUCTOR(VMD);
     ~VMD();
 
@@ -185,7 +185,7 @@ public:
         VMD_occs(this).clean();
     }
 
-    void init(DefSegMgr * sm)
+    void init(xcom::DefSegMgr * sm)
     {
         clean();
         VMD_occs(this).init(sm);
@@ -215,29 +215,29 @@ public:
 //Set of Virtual Operand.
 class VOpndSet : public DefSBitSetCore {
 public:
-    VOpndSet() { DefSBitSetCore::init(); }
+    VOpndSet() { xcom::DefSBitSetCore::init(); }
     COPY_CONSTRUCTOR(VOpndSet);
     //Should call clean() before destruction,
     //otherwise it will incur SegMgr assertion.
     ~VOpndSet() {}
 
-    void append(VOpnd const* v, DefMiscBitSetMgr & m)
-    { DefSBitSetCore::bunion(v->id(), m); }
+    void append(VOpnd const* v, xcom::DefMiscBitSetMgr & m)
+    { xcom::DefSBitSetCore::bunion(v->id(), m); }
 
     bool find(VOpnd const* v) const
     {
         ASSERT0(v);
-        return DefSBitSetCore::is_contain(v->id());
+        return xcom::DefSBitSetCore::is_contain(v->id());
     }
 
-    void remove(VOpnd const* v, DefMiscBitSetMgr & m)
+    void remove(VOpnd const* v, xcom::DefMiscBitSetMgr & m)
     {
         ASSERT0(v);
-        DefSBitSetCore::diff(v->id(), m);
+        xcom::DefSBitSetCore::diff(v->id(), m);
     }
 };
 
-typedef SEGIter * VOpndSetIter;
+typedef xcom::SEGIter * VOpndSetIter;
 
 //Generate MDSSAInfo for individual memory-ref IR stmt/exp since each IR
 //has its own specific MDSSA Memory Reference information.
@@ -253,7 +253,7 @@ public:
     COPY_CONSTRUCTOR(MDSSAInfo);
 
     void init() { BaseAttachInfo::init(AI_MD_SSA); }
-    void destroy(DefMiscBitSetMgr & m) { m_vopnd_set.clean(m); }
+    void destroy(xcom::DefMiscBitSetMgr & m) { m_vopnd_set.clean(m); }
     void dump(MDSSAMgr const* mgr) const;
 
     VOpndSet * getVOpndSet() { return &m_vopnd_set; }
@@ -263,29 +263,31 @@ public:
     VOpndSet const* readVOpndSet() const { return &m_vopnd_set; }
 
     //Collect all USE, where USE is IR expression.
-    void collectUse(OUT DefSBitSetCore * set,
+    void collectUse(OUT xcom::DefSBitSetCore * set,
                     IN UseDefMgr * usedefmgr,
-                    IN DefMiscBitSetMgr * bsmgr);
+                    IN xcom::DefMiscBitSetMgr * bsmgr);
 
     void removeUse(IR const* exp, IN UseDefMgr * usedefmgr);
 };
 
 
 //This class represent MD Definition.
-#define MDDEF_id(m)       (((MDDef*)m)->m_id)
-#define MDDEF_bb(m)       (((MDDef*)m)->m_bb)
-#define MDDEF_is_phi(m)   (((MDDef*)m)->m_is_phi)
-#define MDDEF_result(m)   (((MDDef*)m)->m_result)
-#define MDDEF_prev(m)     (((MDDef*)m)->m_prev)
-#define MDDEF_nextset(m)  (((MDDef*)m)->m_nextset)
-#define MDDEF_occ(m)      (((MDDef*)m)->m_occ)
+//A SSA definition of MD must be placed in BB. It could be either IR stmt
+//or MDPhi.
+#define MDDEF_id(m) (((MDDef*)m)->m_id)
+#define MDDEF_bb(m) (((MDDef*)m)->m_bb)
+#define MDDEF_is_phi(m) (((MDDef*)m)->m_is_phi)
+#define MDDEF_result(m) (((MDDef*)m)->m_result)
+#define MDDEF_prev(m) (((MDDef*)m)->m_prev)
+#define MDDEF_nextset(m) (((MDDef*)m)->m_nextset)
+#define MDDEF_occ(m) (((MDDef*)m)->m_occ)
 class MDDef {
 public:
     UINT m_id;
     VMD * m_result; //the MD defined.
     MDDef * m_prev; //the nearest previous MDDef.
     MDDefSet * m_nextset; //the nearest next MDDefs.
-    IRBB * m_bb;
+    IRBB * m_bb; //the BB in which phi placed.
     IR * m_occ; //record IR stmt.
     BYTE m_is_phi:1; //is MDPhi.
 
@@ -319,32 +321,32 @@ public:
 //Set of MDDef.
 class MDDefSet : public DefSBitSetCore {
 public:
-    MDDefSet() { DefSBitSetCore::init(); }
+    MDDefSet() { xcom::DefSBitSetCore::init(); }
     COPY_CONSTRUCTOR(MDDefSet);
 
     //should call clean() before destruction,
     //otherwise it will incur SegMgr assertion.
     ~MDDefSet() {}
 
-    void append(MDDef const* v, DefMiscBitSetMgr & m)
-    { DefSBitSetCore::bunion(v->id(), m); }
+    void append(MDDef const* v, xcom::DefMiscBitSetMgr & m)
+    { xcom::DefSBitSetCore::bunion(v->id(), m); }
 
     bool find(MDDef const* v) const
     {
         ASSERT0(v);
-        return DefSBitSetCore::is_contain(v->id());
+        return xcom::DefSBitSetCore::is_contain(v->id());
     }
 
-    void remove(MDDef const* v, DefMiscBitSetMgr & m)
+    void remove(MDDef const* v, xcom::DefMiscBitSetMgr & m)
     {
         ASSERT0(v);
-        DefSBitSetCore::diff(v->id(), m);
+        xcom::DefSBitSetCore::diff(v->id(), m);
     }
 };
 
 
 //This class represent MD phi operation.
-#define MDPHI_opnd_list(p)   (((MDPhi*)p)->m_opnd_list)
+#define MDPHI_opnd_list(p) (((MDPhi*)p)->m_opnd_list)
 class MDPhi : public MDDef {
 public:
     IR * m_opnd_list;
@@ -390,14 +392,14 @@ protected:
     SMemPool * m_mdssainfo_pool;
     Region * m_rg;
     MDSystem * m_md_sys;
-    DefMiscBitSetMgr * m_sbs_mgr;
+    xcom::DefMiscBitSetMgr * m_sbs_mgr;
     xcom::SC<VOpnd*> * m_free_sc_list;
     UINT m_def_count;
     UINT m_vopnd_count;
-    Vector<MDSSAInfo*> m_mdssainfo_vec;
-    Vector<MDDef*> m_def_vec;
-    Vector<VOpnd*> m_vopnd_vec;
-    Vector<MDPhiList*> m_philist_vec; //record the Phi list of BB.
+    xcom::Vector<MDSSAInfo*> m_mdssainfo_vec;
+    xcom::Vector<MDDef*> m_def_vec;
+    xcom::Vector<VOpnd*> m_vopnd_vec;
+    xcom::Vector<MDPhiList*> m_philist_vec; //record the Phi list of BB.
     UINT2VMDVec m_map_md2vmd; //record version for each MD.
     MDSSAMgr * m_mdssa_mgr;
 
@@ -425,7 +427,7 @@ public:
     MDSSAInfo * genMDSSAInfo(IR * ir);
     MDSSAInfo * getMDSSAInfo(IR const* ir) const;
     xcom::SC<VOpnd*> ** getFreeSCListAddress() { return &m_free_sc_list; }
-    Vector<VOpnd*> * getVOpndVec() { return &m_vopnd_vec; }
+    xcom::Vector<VOpnd*> * getVOpndVec() { return &m_vopnd_vec; }
     //Get specific VOpnd.
     VOpnd * getVOpnd(UINT i) const { return m_vopnd_vec.get(i); }
     //Get MDPhi list of specific BB.

@@ -248,7 +248,7 @@ void Inliner::do_inline(Region * cand)
 {
     CallNode * cn = m_call_graph->mapRegion2CallNode(cand);
     ASSERT0(cn);
-    xcom::Vertex * v = m_call_graph->get_vertex(CN_id(cn));
+    xcom::Vertex * v = m_call_graph->getVertex(CN_id(cn));
     ASSERT0(v);
     for (xcom::EdgeC * el = VERTEX_in_list(v);
          el != NULL; el = EC_next(el)) {

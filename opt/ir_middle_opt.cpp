@@ -172,7 +172,8 @@ bool Region::MiddleProcess(OptCtx & oc)
     bool do_simplification = true;
     if (getPassMgr() != NULL &&
         (getPassMgr()->queryPass(PASS_PR_SSA_MGR) != NULL &&
-          ((PRSSAMgr*)getPassMgr()->queryPass(PASS_PR_SSA_MGR))->isSSAConstructed())) {
+         ((PRSSAMgr*)getPassMgr()->queryPass(PASS_PR_SSA_MGR))->
+              isSSAConstructed())) {
         do_simplification = false;
     }
 
@@ -193,7 +194,8 @@ bool Region::MiddleProcess(OptCtx & oc)
             ASSERT0(verifyIRandBB(bbl, this));
             if (g_verify_level >= VERIFY_LEVEL_3 && OC_is_du_chain_valid(oc)) {
                 ASSERT0(getDUMgr() == NULL ||
-                    getDUMgr()->verifyMDDUChain(COMPUTE_PR_DU | COMPUTE_NONPR_DU));
+                        getDUMgr()->verifyMDDUChain(
+                            COMPUTE_PR_DU | COMPUTE_NONPR_DU));
             }
         } else { ASSERT0(verifyIRandBB(bbl, this)); }
     } else {

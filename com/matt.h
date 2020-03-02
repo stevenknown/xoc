@@ -472,7 +472,7 @@ public:
     void eche(); //Reduce matrix to row-echelon normal form.
     void basis(OUT Matrix<T> & b); //Calculate basis
 
-    UINT rank(Matrix<T> * basis = NULL, bool is_unitarize = false);
+    UINT rank(Matrix<T> * basis = NULL, bool is_unitarize = false) const;
     T tr(); //Computation of trace
     void trans(); //Transpose
 
@@ -2604,7 +2604,7 @@ T Matrix<T>::tr()
 //    See details in "Numerical Linear Algebra and Optimization" ,
 //    Philip E. Gill.
 template <class T>
-UINT Matrix<T>::rank(OUT Matrix<T> * basis, bool is_unitarize)
+UINT Matrix<T>::rank(OUT Matrix<T> * basis, bool is_unitarize) const
 {
     ASSERTN(m_is_init, ("not yet initialize."));
     ASSERTN(m_row_size > 0 && m_col_size > 0, ("strange matrix"));

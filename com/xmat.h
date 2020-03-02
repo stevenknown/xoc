@@ -133,7 +133,7 @@ public:
 
     //Reduce matrix by GCD operation.
     void gcd();
-    
+
     void dumpf(CHAR const* name = MATRIX_DUMP_FILE_NAME,
                bool is_del = false) const;
     void dumps() const;

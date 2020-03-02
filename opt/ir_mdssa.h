@@ -54,7 +54,7 @@ protected:
     Region * m_rg;
     MDSystem * m_md_sys;
     TypeMgr * m_tm;
-    IR_CFG * m_cfg;
+    IRCFG * m_cfg;
     DefSegMgr * m_seg_mgr;
     DefMiscBitSetMgr * m_sbs_mgr;
     bool m_is_ssa_constructed;

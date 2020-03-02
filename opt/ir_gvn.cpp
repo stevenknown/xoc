@@ -40,9 +40,9 @@ author: Su Zhenyu
 namespace xoc {
 
 //
-//START IR_GVN
+//START GVN
 //
-IR_GVN::IR_GVN(Region * rg)
+GVN::GVN(Region * rg)
 {
     ASSERT0(rg != NULL);
     m_rg = rg;
@@ -69,7 +69,7 @@ IR_GVN::IR_GVN(Region * rg)
 }
 
 
-IR_GVN::~IR_GVN()
+GVN::~GVN()
 {
     for (VEC1 * v = m_vec_lst.get_head();
          v != NULL; v = m_vec_lst.get_next()) {
@@ -79,7 +79,7 @@ IR_GVN::~IR_GVN()
 }
 
 
-void IR_GVN::clean()
+void GVN::clean()
 {
     m_vn_count = 1;
     if (m_md2vn.get_bucket_size() != 0) {
@@ -117,7 +117,7 @@ void IR_GVN::clean()
 }
 
 
-bool IR_GVN::verify()
+bool GVN::verify()
 {
     for (INT i = 0; i <= m_irt_vec.get_last_idx(); i++) {
         if (isBinaryOp((IR_TYPE)i) || i == IR_LDA) {
@@ -156,7 +156,7 @@ bool IR_GVN::verify()
 }
 
 
-VN * IR_GVN::registerVNviaMD(MD const* md)
+VN * GVN::registerVNviaMD(MD const* md)
 {
     if (m_md2vn.get_bucket_size() == 0) {
         m_md2vn.init(10); //to be evaluated
@@ -171,7 +171,7 @@ VN * IR_GVN::registerVNviaMD(MD const* md)
 }
 
 
-VN * IR_GVN::registerVNviaINT(LONGLONG v)
+VN * GVN::registerVNviaINT(LONGLONG v)
 {
     if (v == 0) {
         if (m_zero_vn == NULL) {
@@ -199,7 +199,7 @@ VN * IR_GVN::registerVNviaINT(LONGLONG v)
 }
 
 
-VN * IR_GVN::registerVNviaMC(LONGLONG v)
+VN * GVN::registerVNviaMC(LONGLONG v)
 {
     if (v == 0) {
         if (m_mc_zero_vn == NULL) {
@@ -227,7 +227,7 @@ VN * IR_GVN::registerVNviaMC(LONGLONG v)
 }
 
 
-VN * IR_GVN::registerVNviaSTR(SYM const* v)
+VN * GVN::registerVNviaSTR(SYM const* v)
 {
     if (m_str2vn.get_bucket_size() == 0) {
         m_str2vn.init(16/*TO reevaluate*/);
@@ -245,7 +245,7 @@ VN * IR_GVN::registerVNviaSTR(SYM const* v)
 }
 
 
-VN * IR_GVN::registerVNviaFP(double v)
+VN * GVN::registerVNviaFP(double v)
 {
     if (m_fp2vn.get_bucket_size() == 0) {
         m_fp2vn.init(10/*TO reevaluate*/);
@@ -262,7 +262,7 @@ VN * IR_GVN::registerVNviaFP(double v)
 }
 
 
-VN * IR_GVN::registerUnaVN(IR_TYPE irt, VN const* v0)
+VN * GVN::registerUnaVN(IR_TYPE irt, VN const* v0)
 {
     VEC1 * v1_vec = (VEC1*)m_irt_vec.get(irt);
     if (v1_vec == NULL) {
@@ -282,7 +282,7 @@ VN * IR_GVN::registerUnaVN(IR_TYPE irt, VN const* v0)
 }
 
 
-VN * IR_GVN::registerBinVN(IR_TYPE irt, VN const* v0, VN const* v1)
+VN * GVN::registerBinVN(IR_TYPE irt, VN const* v0, VN const* v1)
 {
     ASSERT0(v0 && v1);
     if (is_commutative(irt) && (VN_id(v0) > VN_id(v1))) {
@@ -318,7 +318,7 @@ VN * IR_GVN::registerBinVN(IR_TYPE irt, VN const* v0, VN const* v1)
 }
 
 
-VN * IR_GVN::registerTripleVN(IR_TYPE irt,
+VN * GVN::registerTripleVN(IR_TYPE irt,
                               VN const* v0,
                               VN const* v1,
                               VN const* v2)
@@ -358,7 +358,7 @@ VN * IR_GVN::registerTripleVN(IR_TYPE irt,
 }
 
 
-VN * IR_GVN::registerQuadVN(IR_TYPE irt,
+VN * GVN::registerQuadVN(IR_TYPE irt,
                             VN const* v0,
                             VN const* v1,
                             VN const* v2,
@@ -409,7 +409,7 @@ VN * IR_GVN::registerQuadVN(IR_TYPE irt,
 
 //Memory location may be parameter or global variable.
 //'emd': exact md
-VN * IR_GVN::allocLiveinVN(IR const* exp, MD const* emd, bool & change)
+VN * GVN::allocLiveinVN(IR const* exp, MD const* emd, bool & change)
 {
     VN * x = m_ir2vn.get(IR_id(exp));
     if (x == NULL) {
@@ -422,7 +422,7 @@ VN * IR_GVN::allocLiveinVN(IR const* exp, MD const* emd, bool & change)
 
 
 //Only compute memory operation's vn.
-VN * IR_GVN::computePR(IR const* exp, bool & change)
+VN * GVN::computePR(IR const* exp, bool & change)
 {
     SSAInfo * ssainfo = PR_ssainfo(exp);
     ASSERT0(exp->isReadPR() && ssainfo);
@@ -446,7 +446,7 @@ VN * IR_GVN::computePR(IR const* exp, bool & change)
 
 
 //Only compute memory operation's vn.
-VN * IR_GVN::computeExactMemory(IR const* exp, bool & change)
+VN * GVN::computeExactMemory(IR const* exp, bool & change)
 {
     ASSERT0(exp->isMemoryOpnd());
     MD const* emd = exp->getExactRef();
@@ -515,7 +515,7 @@ VN * IR_GVN::computeExactMemory(IR const* exp, bool & change)
 
 
 //Compute VN for ild according to anonymous domdef.
-VN * IR_GVN::computeILoadByAnonDomDef(IR const* ild,
+VN * GVN::computeILoadByAnonDomDef(IR const* ild,
                                       VN const* mlvn,
                                       IR const* domdef,
                                       bool & change)
@@ -549,7 +549,7 @@ VN * IR_GVN::computeILoadByAnonDomDef(IR const* ild,
 }
 
 
-VN * IR_GVN::computeILoad(IR const* exp, bool & change)
+VN * GVN::computeILoad(IR const* exp, bool & change)
 {
     ASSERT0(exp->is_ild());
     VN * mlvn = computeVN(ILD_base(exp), change);
@@ -615,7 +615,7 @@ VN * IR_GVN::computeILoad(IR const* exp, bool & change)
 }
 
 
-void IR_GVN::computeArrayAddrRef(IR const* ir, bool & change)
+void GVN::computeArrayAddrRef(IR const* ir, bool & change)
 {
     ASSERT0(ir->is_starray());
     computeVN(ARR_base(ir), change);
@@ -626,7 +626,7 @@ void IR_GVN::computeArrayAddrRef(IR const* ir, bool & change)
 
 
 //Compute VN for array according to anonymous domdef.
-VN * IR_GVN::computeArrayByAnonDomDef(IR const* arr,
+VN * GVN::computeArrayByAnonDomDef(IR const* arr,
                                       VN const* basevn,
                                       VN const* ofstvn,
                                       IR const* domdef,
@@ -659,7 +659,7 @@ VN * IR_GVN::computeArrayByAnonDomDef(IR const* arr,
 }
 
 
-VN * IR_GVN::computeArray(IR const* exp, bool & change)
+VN * GVN::computeArray(IR const* exp, bool & change)
 {
     ASSERT0(exp->is_array());
     for (IR const* s = ARR_sub_list(exp); s != NULL; s = s->get_next()) {
@@ -744,7 +744,7 @@ VN * IR_GVN::computeArray(IR const* exp, bool & change)
 }
 
 
-VN * IR_GVN::computeScalarByAnonDomDef(IR const* exp,
+VN * GVN::computeScalarByAnonDomDef(IR const* exp,
                                        IR const* domdef,
                                        bool & change)
 {
@@ -777,7 +777,7 @@ VN * IR_GVN::computeScalarByAnonDomDef(IR const* exp,
 }
 
 
-VN * IR_GVN::computeScalar(IR const* exp, bool & change)
+VN * GVN::computeScalar(IR const* exp, bool & change)
 {
     VN * evn = m_ir2vn.get(IR_id(exp));
     if (evn != NULL) { return evn; }
@@ -838,7 +838,7 @@ VN * IR_GVN::computeScalar(IR const* exp, bool & change)
 }
 
 
-VN * IR_GVN::computeVN(IR const* exp, bool & change)
+VN * GVN::computeVN(IR const* exp, bool & change)
 {
     ASSERT0(exp);
     switch (exp->getCode()) {
@@ -949,7 +949,7 @@ VN * IR_GVN::computeVN(IR const* exp, bool & change)
 }
 
 
-void IR_GVN::processPhi(IR const* ir, bool & change)
+void GVN::processPhi(IR const* ir, bool & change)
 {
     VN * phivn = NULL;
     IR const* p = PHI_opnd_list(ir);
@@ -973,7 +973,7 @@ void IR_GVN::processPhi(IR const* ir, bool & change)
 }
 
 
-void IR_GVN::processCall(IR const* ir, bool & change)
+void GVN::processCall(IR const* ir, bool & change)
 {
     for (IR const* p = CALL_param_list(ir); p != NULL; p = p->get_next()) {
         computeVN(p, change);
@@ -990,14 +990,14 @@ void IR_GVN::processCall(IR const* ir, bool & change)
 }
 
 
-void IR_GVN::processRegion(IR const* ir, bool & change)
+void GVN::processRegion(IR const* ir, bool & change)
 {
     //Region effect should be simluated via call-stmt
     //which will be handled.
 }
 
 
-void IR_GVN::processBB(IRBB * bb, bool & change)
+void GVN::processBB(IRBB * bb, bool & change)
 {
     xcom::C<IR*> * ct;
     for (BB_irlist(bb).get_head(&ct);
@@ -1005,26 +1005,15 @@ void IR_GVN::processBB(IRBB * bb, bool & change)
         IR * ir = ct->val();
         ASSERT0(ir);
         switch (ir->getCode()) {
-        case IR_ST: {
-                VN * x = computeVN(ST_rhs(ir), change);
+        case IR_ST:
+        case IR_STPR: {
+                VN * x = computeVN(ir->getRHS(), change);
                 if (x == NULL) { break; }
 
                 //ST's vn may be set by its dominated use-stmt ILD.
                 if (m_ir2vn.get(ir->id()) != x) {
                     //ir2vn is NULL only the first iteration computation.
                     //ASSERT0(m_ir2vn.get(ir->id()) == NULL);
-                    m_ir2vn.set(ir->id(), x);
-                    change = true;
-                }
-                //return; keep going BB irlist.
-            }
-            break;
-        case IR_STPR: {
-                VN * x = computeVN(STPR_rhs(ir), change);
-                if (x == NULL) { break; }
-
-                if (m_ir2vn.get(ir->id()) != x) {
-                    ASSERT0(m_ir2vn.get(ir->id()) == NULL);
                     m_ir2vn.set(ir->id(), x);
                     change = true;
                 }
@@ -1094,7 +1083,7 @@ void IR_GVN::processBB(IRBB * bb, bool & change)
 }
 
 
-void IR_GVN::dumpIR2VN()
+void GVN::dumpIR2VN()
 {
     if (g_tfile == NULL) { return; }
     for (INT k = 0; k <= m_ir2vn.get_last_idx(); k++) {
@@ -1107,7 +1096,7 @@ void IR_GVN::dumpIR2VN()
 }
 
 
-void IR_GVN::dump_h1(IR const* k, VN * x)
+void GVN::dump_h1(IR const* k, VN * x)
 {
     note("\n\t%s", IRTNAME(k->getCode()));
     if (k->is_pr()) {
@@ -1122,7 +1111,7 @@ void IR_GVN::dump_h1(IR const* k, VN * x)
 }
 
 
-void IR_GVN::dumpBB(UINT bbid)
+void GVN::dumpBB(UINT bbid)
 {
     if (g_tfile == NULL) { return; }
     IRBB * bb = m_cfg->getBB(bbid);
@@ -1235,7 +1224,7 @@ void IR_GVN::dumpBB(UINT bbid)
 }
 
 
-void IR_GVN::dump()
+void GVN::dump()
 {
     if (g_tfile == NULL) { return; }
     note("\n==---- DUMP GVN -- rg:'%s' ----==", m_rg->getRegionName());
@@ -1248,7 +1237,7 @@ void IR_GVN::dump()
 
 
 //Return true if gvn is able to determine the result of 'ir'.
-bool IR_GVN::calcCondMustVal(IR const* ir, bool & must_true, bool & must_false)
+bool GVN::calcCondMustVal(IR const* ir, bool & must_true, bool & must_false)
 {
     must_true = false;
     must_false = false;
@@ -1395,7 +1384,7 @@ bool IR_GVN::calcCondMustVal(IR const* ir, bool & must_true, bool & must_false)
 }
 
 
-bool IR_GVN::reperform(OptCtx & oc)
+bool GVN::reperform(OptCtx & oc)
 {
     clean();
     return perform(oc);
@@ -1403,7 +1392,7 @@ bool IR_GVN::reperform(OptCtx & oc)
 
 
 //GVN try to assign a value numbers to expressions.
-bool IR_GVN::perform(OptCtx & oc)
+bool GVN::perform(OptCtx & oc)
 {
     BBList * bbl = m_rg->getBBList();
     if (bbl->get_elem_count() == 0) { return false; }
@@ -1438,6 +1427,6 @@ bool IR_GVN::perform(OptCtx & oc)
     m_is_valid = true;
     return true;
 }
-//END IR_GVN
+//END GVN
 
 } //namespace xoc

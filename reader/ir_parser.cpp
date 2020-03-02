@@ -616,7 +616,7 @@ bool IRParser::declareRegion(ParseCtx * ctx)
                 getAndGenOptCtx(newctx.current_region->id());
             ASSERT0(oc);
             newctx.current_region->initPassMgr();
-            //IR_CFG * cfg = newctx.current_region->
+            //IRCFG * cfg = newctx.current_region->
             //    getPassMgr()->registerPass(PASS_CFG);
             ////Caution: the validation of cfg should maintained by user.
             //cfg->rebuild(oc);
@@ -3918,8 +3918,8 @@ bool IRParser::parseByteValue(VAR * var, ParseCtx * ctx)
             tok = m_lexer->getNextToken();
         }
     }
-    VAR_byte_val(var) = ctx->current_region->allocByteBuf(bytesize);        
-    VAR_has_init_val(var) = true;    
+    VAR_byte_val(var) = ctx->current_region->allocByteBuf(bytesize);
+    VAR_has_init_val(var) = true;
     ::memcpy(BYTEBUF_buffer(VAR_byte_val(var)), buf.get_vec(), bytesize);
     if (m_lexer->getCurrentToken() != T_RPAREN) {
         error(tok, "miss ')'");

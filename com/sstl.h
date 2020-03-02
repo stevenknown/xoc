@@ -1530,6 +1530,14 @@ public:
         m_elem_count--;
         return c->val();
     }
+
+    //Set list head container.
+    //This function does not modify m_cur.
+    void set_head(C<T> * t) { m_head = t; }
+
+    //Set list tail container.
+    //This function does not modify m_cur.
+    void set_tail(C<T> * t) { m_tail = t; }
 };
 
 

@@ -410,7 +410,7 @@ bool Lineq::reduce(IN OUT RMat & m, UINT rhs_idx, bool is_intersect)
                 removed.set(i, true);
                 break;
             case CST_UNK: //0 <= -100 + M
-                //Do NOT remove this constrain.
+                //Do NOT remove this constraint.
                 //TODO: Check the domain of constant symbol.
                 break;
             default: UNREACHABLE();;
@@ -776,7 +776,7 @@ FIN:
 
 
 //Return true if there are no contradictory
-//constrains of the system of inequlities.
+//constraints of the system of inequlities.
 bool Lineq::is_consistent()
 {
     ASSERTN(m_is_init == true, ("not yet initialize."));
@@ -801,7 +801,7 @@ FIN:
 }
 
 
-//Build initial constrain.
+//Build initial constraint.
 //e.g: if 'sign' vector indicates variable coefficient
 //is not-zero, then build greater-than inequlities to
 //i>=0, j>=0, etc.
@@ -816,14 +816,17 @@ void Lineq::initVarConstraint(Vector<INT> const& sign,
     vc.setCol(rhs_idx, Rational(0));
     for (UINT i = 0; i < nvar; i++) {
         if (sign.get(i) > 0) {
-            //Build -i<=0 constrain.
-            //Do we really need Variable Constrains?
-            //Because when variable is negative, we have to set the variabe
-            //not any constrains, whereas add negative constrains to
-            //Leq or Eq part to circumvent solver's rules.
-            //For now, it seems we can solve and constrains and get correct
+            //Build -i<=0 constraint.
+            //Do we really need Variable Constraints? I think YES.
+            //e.g: given inequality: -i + j <= -1, if there is no
+            //variable constraint provide, the ILP solution is UNBOUND.
+            //But as an exceptional case, we have to set the variabe with no
+            //constraints when variable is negative, whereas add variable <= 0
+            //into DomainMatrix to conform the constraint on negative variable.
+            //This is a tricky method to circumvent LP solver's demand.
+            //For now, it seems we can solve and constraints and get correct
             //solution even if VC are unconstrained at all.
-            //vc.set(i, i, -1); //hack
+            vc.set(i, i, -1);
         } else {
             //current variable is unconstrained.
         }
@@ -835,8 +838,8 @@ void Lineq::initVarConstraint(Vector<INT> const& sign,
 //solution of the system of inequlities.
 //Call setParam() to set coefficient and rhs_idx.
 //
-//'coeff': coefficient matrix to constrains.
-//'vc': variable constrains.
+//'coeff': coefficient matrix to constraints.
+//'vc': variable constraints.
 //'is_int_sol': true if the solution must be integral.
 //'is_unique_sol': true if there exists unique solution.
 bool Lineq::has_solution(RMat const& leq,
@@ -875,21 +878,37 @@ bool Lineq::has_solution(RMat const& leq,
         mip.reviseTargetFunc(tgtf, eq, leq, num_of_var);
         UINT st = mip.maxm(v, res, tgtf, vc, eq, leq, false, NULL, rhs_idx);
         if (st == IP_SUCC) {
-            //printf("maxv is %d/%d\n", v.num(), v.den());
-            //printf("solution is:\n"); res.dumpf();
+            //max value is 'v', solution is 'res'.
             return true;
-        }
-        if (!is_unique_sol && st == IP_UNBOUND) {
-            return true;
+        } else if (st == IP_UNBOUND && !is_unique_sol) {
+            //Note if SIX solver return SIX_UNBOUND, there are two
+            //means, one is the solution is not unique, the
+            //other is there is no solution.
+            //Here we can not differentiate these two situations.
+            //Return false for conservative purpose.
+            //e.g: for {i > 0}, there is a unbound result, and infinit
+            //solution could satified the system.
+            //For {i=0,j=0,i+1<=j}, there is also a unbound result,
+            //but there is no solution for i,j to satisfied the system.
+            //
+            //return true;
         }
         st = mip.minm(v, res, tgtf, vc, eq, leq, false, NULL, rhs_idx);
         if (st == IP_SUCC) {
-            //printf("minv is %d/%d\n", v.num(), v.den());
-            //printf("solution is:\n"); res.dumpf();
+            //min value is 'v', solution is 'res'.
             return true;
-        }
-        if (!is_unique_sol && st == IP_UNBOUND) {
-            return true;
+        } else if (st == IP_UNBOUND && !is_unique_sol) {
+            //Note if SIX solver return SIX_UNBOUND, there are two
+            //means, one is the solution is not unique, the
+            //other is there is no solution.
+            //Here we can not differentiate these two situations.
+            //Return false for conservative purpose.
+            //e.g: for {i > 0}, there is a unbound result, and infinit
+            //solution could satified the system.
+            //For {i=0,j=0,i+1<=j}, there is also a unbound result,
+            //but there is no solution for i,j to satisfied the system.
+            //
+            //return true;
         }
         return false;
     } else {
@@ -897,21 +916,37 @@ bool Lineq::has_solution(RMat const& leq,
         six.reviseTargetFunc(tgtf, eq, leq, num_of_var);
         UINT st = six.maxm(v, res, tgtf, vc, eq, leq, rhs_idx);
         if (st == SIX_SUCC) {
-            //printf("maxv is %d/%d\n", v.num(), v.den());
-            //printf("solution is:\n"); res.dumpf();
+            //max value is 'v', solution is 'res'.
             return true;
-        }
-        if (!is_unique_sol && st == SIX_UNBOUND) {
-            return true;
+        } else if (st == SIX_UNBOUND && !is_unique_sol) {
+            //Note if SIX solver return SIX_UNBOUND, there are two
+            //means, one is the solution is not unique, the
+            //other is there is no solution.
+            //Here we can not differentiate these two situations.
+            //Return false for conservative purpose.
+            //e.g: for {i > 0}, there is a unbound result, and infinit
+            //solution could satified the system.
+            //For {i=0,j=0,i+1<=j}, there is also a unbound result,
+            //but there is no solution for i,j to satisfied the system.
+            //
+            //return true;
         }
         st = six.minm(v, res, tgtf, vc, eq, leq, rhs_idx);
         if (st == SIX_SUCC) {
-            //printf("minv is %d/%d\n", v.num(), v.den());
-            //printf("solution is:\n"); res.dumpf();
+            //min value is 'v', solution is 'res'.
             return true;
-        }
-        if (!is_unique_sol && st == SIX_UNBOUND) {
-            return true;
+        } else if (st == SIX_UNBOUND && !is_unique_sol) {
+            //Note if SIX solver return SIX_UNBOUND, there are two
+            //means, one is the solution is not unique, the
+            //other is there is no solution.
+            //Here we can not differentiate these two situations.
+            //Return false for conservative purpose.
+            //e.g: for {i > 0}, there is a unbound result, and infinit
+            //solution could satified the system.
+            //For {i=0,j=0,i+1<=j}, there is also a unbound result,
+            //but there is no solution for i,j to satisfied the system.
+            //
+            //return true;
         }
         return false;
     }
@@ -977,7 +1012,7 @@ void Lineq::formatBound(UINT u, OUT RMat & ineqt_of_u)
     }
 
     if (ineqt_of_u.getRowSize() == 0) {
-        //No constrains for u.
+        //No constraints for u.
         return;
     }
 
@@ -1231,6 +1266,11 @@ void Lineq::removeIdenRow(IN OUT RMat & m)
         if (removed.get(i)) {
             continue;
         }
+        if (m.is_rowequ(i, 0)) {
+            //Remove 0 <= 0.
+            removed.set(i, true);
+            continue;
+        }
         for (UINT j = i + 1; j < m.getRowSize(); j++) {
             if (sum.get(i) != sum.get(j)) {
                 continue;
@@ -1330,7 +1370,7 @@ INT Lineq::selectLeadingColumn(INTMat const& coeff,
 }
 
 
-//Combine constrains.
+//Combine constraints.
 //'res': output constraints, and must be initialized by caller.
 //'r1, r2': row position of negative coeff
 //'lc': leading column
@@ -1705,11 +1745,11 @@ void Lineq::removeRedRow(IN OUT INTMat & cs,
 //Generate constraints according to given matrix of rays.
 //'gmat': general matrix, and must be formed as: Ax+b>=0
 //    e.g: Given matrix
-//         1 -1 0 // x-y>=0
-//        -1  0 1 //-x+1>=0
+//         1 -1  0 // x-y>=0
+//        -1  0 -1 //-x>=-1
 //      for system with x,y varible:
 //         x-y>=0
-//        -x+1>=0
+//        -x>=-1
 //'cslimit': is the maximum allowed constraints.
 bool Lineq::convertRay2Constraint(INTMat const& gmat,
                                   OUT INTMat & cs,
@@ -1766,7 +1806,7 @@ bool Lineq::convertRay2Constraint(INTMat const& gmat,
     {
         //The succession of transformation computes a
         //fundamental set of rays on 'cs'.
-        //At each steps, a hyperplane or constrain is selected.
+        //At each steps, a hyperplane or constraint is selected.
         Vector<bool> is_noneg; //record idx of columns
                                //which are non-negative column.
         Vector<UINT> row_of_pos_coeff, row_of_neg_coeff;
@@ -1787,9 +1827,11 @@ bool Lineq::convertRay2Constraint(INTMat const& gmat,
             INT m = 0, n = 0;
             for (UINT i = 0; i < cs.getRowSize(); i++) {
                 if (cs.get(i, lc) < 0) {
-                    row_of_neg_coeff[m++] = i;
+                    m++;
+                    row_of_neg_coeff.set(m, i);
                 } else if (cs.get(i, lc) > 0) {
-                    row_of_pos_coeff[n++] = i;
+                    n++;
+                    row_of_pos_coeff.set(n, i);
                 }
             }
             if (n == 0) {
@@ -1820,7 +1862,8 @@ bool Lineq::convertRay2Constraint(INTMat const& gmat,
                     //idx of rows with positive-coeff.
                     UINT pcv = row_of_pos_coeff[pc];
                     combineRays(res, cs, ncv, pcv, lc, i++);
-                    combined[combined_count++] = pcv;
+                    combined_count++;
+                    combined.set(combined_count, pcv);
                 }
 
                 //Modify conserved rays.

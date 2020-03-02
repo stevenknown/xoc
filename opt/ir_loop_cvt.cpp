@@ -39,7 +39,7 @@ author: Su Zhenyu
 
 namespace xoc {
 
-bool IR_LOOP_CVT::is_while_do(LI<IRBB> const* li, OUT IRBB ** gobackbb,
+bool LoopCvt::is_while_do(LI<IRBB> const* li, OUT IRBB ** gobackbb,
                               UINT * succ1, UINT * succ2)
 {
     ASSERT0(gobackbb);
@@ -72,7 +72,7 @@ bool IR_LOOP_CVT::is_while_do(LI<IRBB> const* li, OUT IRBB ** gobackbb,
 }
 
 
-bool IR_LOOP_CVT::try_convert(LI<IRBB> * li, IRBB * gobackbb,
+bool LoopCvt::try_convert(LI<IRBB> * li, IRBB * gobackbb,
                               UINT succ1, UINT succ2)
 {
     ASSERT0(gobackbb);
@@ -166,7 +166,7 @@ bool IR_LOOP_CVT::try_convert(LI<IRBB> * li, IRBB * gobackbb,
             loopbody_start_bb->getLabelList().get_head();
     if (loopbody_start_lab == NULL) {
         loopbody_start_lab = ::allocInternalLabel(m_rg->get_pool());
-        m_cfg->add_lab(loopbody_start_bb, loopbody_start_lab);
+        m_cfg->addLabel(loopbody_start_bb, loopbody_start_lab);
     }
     last_cond_br->setLabel(loopbody_start_lab);
 
@@ -180,7 +180,7 @@ bool IR_LOOP_CVT::try_convert(LI<IRBB> * li, IRBB * gobackbb,
 }
 
 
-bool IR_LOOP_CVT::find_and_convert(List<LI<IRBB>*> & worklst)
+bool LoopCvt::find_and_convert(List<LI<IRBB>*> & worklst)
 {
     bool change = false;
     while (worklst.get_elem_count() > 0) {
@@ -202,7 +202,7 @@ bool IR_LOOP_CVT::find_and_convert(List<LI<IRBB>*> & worklst)
 }
 
 
-bool IR_LOOP_CVT::perform(OptCtx & oc)
+bool LoopCvt::perform(OptCtx & oc)
 {
     START_TIMER(t, getPassName());
     m_rg->checkValidAndRecompute(&oc, PASS_LOOP_INFO, PASS_RPO, PASS_UNDEF);

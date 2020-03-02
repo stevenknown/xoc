@@ -55,8 +55,9 @@ public:
 #define CST_GT 3 //great than
 #define CST_EQ 4 //equal to
 
-class Lineq {    
+class Lineq {
     bool m_is_init;
+    bool m_is_dump;
 
     //Index of right-hand-side, also the column index of constant coefficient
     //vector, start from zero, named by Mathematical Programming System.
@@ -70,7 +71,6 @@ class Lineq {
     //Record coeff of inequality: Ax <= b+C(x), where C(x) is function of
     //symbolic constant.
     RMat * m_coeff;
-    bool m_is_dump;
 
     INT compareConstIterm(RMat const& m,
                           UINT rhs_idx,

@@ -36,7 +36,7 @@ author: Su Zhenyu
 
 namespace xoc {
 
-class IR_CFG;
+class IRCFG;
 
 //PtPair
 #define PP_id(pp) ((pp)->id)
@@ -193,18 +193,18 @@ public:
 };
 
 
-#define AC_is_mds_mod(c)        ((c)->u1.s1.is_mds_modify)
-#define AC_is_lda_base(c)       ((c)->u1.s1.is_lda_base)
-#define AC_has_comp_lda(c)      ((c)->u1.s1.has_comp_lda)
-#define AC_comp_pt(c)           ((c)->u1.s1.comp_pt)
-#define AC_returned_pts(c)      ((c)->u2.returned_pts)
+#define AC_is_mds_mod(c) ((c)->u1.s1.is_mds_modify)
+#define AC_is_lda_base(c) ((c)->u1.s1.is_lda_base)
+#define AC_has_comp_lda(c) ((c)->u1.s1.has_comp_lda)
+#define AC_comp_pt(c) ((c)->u1.s1.comp_pt)
+#define AC_returned_pts(c) ((c)->u2.returned_pts)
 class AACtx {
 public:
     union {
         struct {
             //Transfer flag bottom up to indicate whether new
             //MDS generate while processing kids.
-            UINT is_mds_modify:1; //Analysis context for IR_AA.
+            UINT is_mds_modify:1; //Analysis context for AliasAnalysis.
 
             //Transfer flag top down to indicate the Parent or Grandfather
             //IR (or Parent of grandfather ...) is IR_LDA/IR_ARRAY.
@@ -293,9 +293,9 @@ typedef TMap<IR const*, MD const*> IR2Heapobj;
 //Heap is a unique object. That means the whole
 //HEAP is modified/referrenced if a LOAD/STORE operates
 //MD that describes variable belongs to HEAP.
-class IR_AA : public Pass {
+class AliasAnalysis : public Pass {
 protected:
-    IR_CFG * m_cfg;
+    IRCFG * m_cfg;
     VarMgr * m_var_mgr;
     TypeMgr * m_tm;
     Region * m_rg;
@@ -467,9 +467,9 @@ protected:
         return p;
     }
 public:
-    explicit IR_AA(Region * rg);
-    COPY_CONSTRUCTOR(IR_AA);
-    virtual ~IR_AA();
+    explicit AliasAnalysis(Region * rg);
+    COPY_CONSTRUCTOR(AliasAnalysis);
+    virtual ~AliasAnalysis();
 
     //Attemp to compute the type based may point to MD set.
     //Return true if this function find the point-to MD set, otherwise

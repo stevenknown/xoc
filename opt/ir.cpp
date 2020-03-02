@@ -591,11 +591,11 @@ void dumpIR(IR const* ir, Region const* rg, IN CHAR * attr, UINT dumpflag)
     bool dump_addr = HAVE_FLAG(dumpflag, IR_DUMP_ADDR);
     bool dump_src_line = HAVE_FLAG(dumpflag, IR_DUMP_SRC_LINE);
     bool dump_kid = HAVE_FLAG(dumpflag, IR_DUMP_KID);
-	bool dump_inner_region = HAVE_FLAG(dumpflag, IR_DUMP_INNER_REGION);
+    bool dump_inner_region = HAVE_FLAG(dumpflag, IR_DUMP_INNER_REGION);
     DUMMYUSE(dump_src_line);
     DUMMYUSE(dump_kid);
     DUMMYUSE(dump_addr);
-	DUMMYUSE(dump_inner_region);
+    DUMMYUSE(dump_inner_region);
     DUMMYUSE(attr);
     DUMMYUSE(rg);
     DUMMYUSE(ir);
@@ -1784,7 +1784,7 @@ bool IR::verify(Region const* rg) const
         if (ARR_ofst(this) != 0 && !ARR_elemtype(this)->is_any()) {
             UINT elem_data_size = tm->getByteSize(ARR_elemtype(this));
             UINT result_data_size = tm->getByteSize(d);
-			DUMMYUSE(elem_data_size | result_data_size);
+            DUMMYUSE(elem_data_size | result_data_size);
             ASSERTN(result_data_size + ARR_ofst(this) <= elem_data_size,
                 ("result data size should be less than element data size"));
         }
@@ -1861,7 +1861,7 @@ bool IR::verifyPhi(Region const* rg) const
 {
     ASSERT0(is_phi());
     List<IRBB*> preds;
-    IR_CFG * cfg = rg->getCFG();
+    IRCFG * cfg = rg->getCFG();
     IRBB * bb = getBB();
     ASSERT0(bb);
     cfg->get_preds(preds, bb);

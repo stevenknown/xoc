@@ -43,7 +43,7 @@ namespace xcom {
 #define IS_GE(a, b)        ((a) >= (b))
 #define IS_LE(a, b)        ((a) <= (b))
 #define INVALID_EQNUM -1
-#define SIX_DUMP_NAME "dumplp.tmp"
+#define SIX_DUMP_NAME "dumpmatrix.tmp"
 
 class PivotPair {
 public:
@@ -578,13 +578,13 @@ INT SIX<Mat, T>::findPivotBV(UINT pivot_nv, IN OUT PVParam<Mat> & pp)
             //xi is unbound!
             //e.g:Given x1 is basic variable, x2 is non-basic variable, and
             //  the equality as:
-            //      x1 = 28 + x2 + 0 + 0 (our form is: x1 - x2 - 0 - 0 = 28)
+            //    #i: x1 = 28 + x2 + 0 + 0 (our form is: x1 - x2 - 0 - 0 = 28)
             //  No matter how we increase the value of x2,
             //  x1 is always positive, and also satified x1's
             //  limits( x1 >= 0 ) at the same time.
-            //  We said x1 is unconstrained to x2.
-            //  So this equality(constraint) 'i' could not limit x2.
-            //  Similarly for situation that x2 is zero.
+            //  We said x1 is unconstrained to x2, x1 is unbound.
+            //  So this equality(constraint) '#i' could not limit x2.
+            //  Similarly for situation which x2 is zero.
             continue;
         }
 
@@ -616,7 +616,7 @@ INT SIX<Mat, T>::findPivotBV(UINT pivot_nv, IN OUT PVParam<Mat> & pp)
     //None of basic variable that could form a bound for 'pivot_nv'.
     //Whereas contrasting the classical algorithm, we are going to relax
     //the choice condition, that is finding a basic variable as the
-    //tightest bound of 'pivot_nv', even if coeff of 'pivot_nv' is not
+    //tightest bound of 'pivot_nv', even if coefficient of 'pivot_nv' is not
     //positive(in our presentation).
     //
     //Well, the new policy we applied is looking for the equality with the
@@ -994,8 +994,8 @@ bool SIX<Mat, T>::constructBasicFeasibleSolution(IN OUT Mat & leq,
 //    The slack form can be illustrated as:
 //        10x + 11y + 60z ¡ú min
 //        -0.1x + (-1.2y) + (-3.3z) + s1 = -50
-//        -73x + (-96y) + (-253z) + s2 = -3200
-//        -9.6x + (-7y) + (-19z) + s3 = -1000
+//        -73x  + (-96y)  + (-253z) + s2 = -3200
+//        -9.6x + (-7y)   + (-19z)  + s3 = -1000
 //    and variable constraint:
 //        x,y,z,s1,s2,s3 >= 0
 template <class Mat, class T>
@@ -1015,7 +1015,7 @@ UINT SIX<Mat, T>::solveSlackForm(IN OUT Mat & tgtf,
 
     //The initial-solution of target function is always be zero,
     //we get the solution by setting each of non-basic variables to be zero.
-    //e.g:max(x) = ax1 + bx2,
+    //e.g:max(x) = a*x1 + b*x2,
     //    Set x1, x2 to be zero, then the max(x) is a*0 + b*0 = 0.
     maxv = T(0);
     sol.reinit(1, tgtf.getColSize());
@@ -1118,6 +1118,15 @@ UINT SIX<Mat, T>::solveSlackForm(IN OUT Mat & tgtf,
             if (!findPivotNVandBVPair(pivot_nv_idx, pivot_bv_idx, pp)) {
                 ASSERT0(dump_str("\nPIVOTING status=%s,number_of_iter=%u",
                                  getStatusName(SIX_UNBOUND), cnt));
+                //Note if SIX solver return SIX_UNBOUND, there are two
+                //means, one is the solution is not unique, the
+                //other is there is no solution.
+                //We can not differentiate these two situations.
+                //Return false for conservative purpose.
+                //e.g: for {i > 0}, there is a unbound result, and infinit
+                //solution could satified the system.
+                //For {i=0,j=0,i+1<=j}, there is also a unbound result,
+                //but there is no solution for <i,j> to satisfied the system.
                 return SIX_UNBOUND;
             }
         } else {
@@ -1128,6 +1137,8 @@ UINT SIX<Mat, T>::solveSlackForm(IN OUT Mat & tgtf,
                 //Can not find any basic variable to swap out.
                 //Try another non-basic variable.
                 m_ppt->disableNV(pivot_nv_idx);
+                ASSERT0(dump_str("\nNOT FIND BV bv=%d,nv=%d,number_of_iter=%u\n",
+                                 pivot_bv_idx, pivot_nv_idx, cnt));
                 continue;
             }
         }
@@ -1178,7 +1189,6 @@ UINT SIX<Mat, T>::solveSlackForm(IN OUT Mat & tgtf,
 template <class Mat, class T>
 void SIX<Mat, T>::convertEq2Ineq(OUT Mat & leq, Mat const& eq)
 {
-#if 1
     //Substitute equalitions into inequality system.
     if (eq.size() == 0) { return; }
     Vector<bool> eq_removed;
@@ -1196,38 +1206,37 @@ void SIX<Mat, T>::convertEq2Ineq(OUT Mat & leq, Mat const& eq)
                     pos_nonzero = i;
                 }
             }
-            if (num_nonzero == 1) {
-                eq_removed.set(pos_nonzero, true);
-                eq_count--;
+            if (num_nonzero != 1) { continue; }
+            eq_removed.set(pos_nonzero, true);
+            eq_count--;
 
-                //Substitute variable with linear polynomials.
-                //e.g: Given -2i+N<=0, 0=-i+4j-3N-1
-                //substitute i with 4j-3N-1, one will get:
-                //    -2(4j-3N-1)+N<=0, then simplied to -8j+7N+2<=0.
-                Mat tp;
-                for (UINT m = 0; m < leq.getRowSize(); m++) {
-                    T v = leq.get(m, j);
-                    if (v == T(0)) {
-                        continue;
-                    }
-                    eq.innerRow(tp, pos_nonzero, pos_nonzero);
-                    T tpv = tp.get(0, m);
-                    if (tpv != T(1)) {
-                        tp.mulOfRow(0, T(1)/tpv);
-                    }
-                    tp.mulOfRow(0, v);
-                    leq.set(m, j, T(0));
-                    //Convert the sign of element by doing negtive
-                    //operation from column 'rhs_idx' to last one,
-                    //since these elements will be added to RHS of
-                    //inequalities.
-                    //e.g: Given i=2j-1+N, convert -1+N to 1-N.
-                    for (UINT k = m_rhs_idx; k < tp.getColSize(); k++) {
-                        tp.set(0, k, -tp.get(0, k));
-                    }
-                    leq.addRowToRow(tp, 0, m);
+            //Substitute variable with linear polynomials.
+            //e.g: Given -2i+N<=0, -i+4j-3N=1
+            //substitute i with 4j-3N-1, will get:-2(4j-3N-1)+N<=0,
+            //then simplied to -8j+7N+2<=0, i reduced.
+            Mat tp;
+            for (UINT m = 0; m < leq.getRowSize(); m++) {
+                T v = leq.get(m, j);
+                if (v == T(0)) {
+                    continue;
                 }
-            } //end if
+                eq.innerRow(tp, pos_nonzero, pos_nonzero);
+                T tpv = tp.get(0, j);
+                if (tpv != T(1) && tpv != T(0)) {
+                    tp.mulOfRow(0, T(1)/tpv);
+                }
+                tp.mulOfRow(0, v);
+                leq.set(m, j, T(0));
+                //Convert the sign of element by taking negative
+                //from column 'rhs_idx' to last column of 'eq',
+                //since these elements will be added to RHS of
+                //inequalities 'leq'.
+                //e.g: Given i=2j-1+N, convert -1+N to 1-N.
+                for (UINT k = m_rhs_idx; k < tp.getColSize(); k++) {
+                    tp.set(0, k, -tp.get(0, k));
+                }
+                leq.addRowToRow(tp, 0, m);
+            }
         } //end for
     } //end if
 
@@ -1235,8 +1244,9 @@ void SIX<Mat, T>::convertEq2Ineq(OUT Mat & leq, Mat const& eq)
         UINT c = leq.getRowSize();
         if (leq.size() == 0) {
             leq.reinit(eq_count * 2, eq.getColSize());
+        } else {
+            leq.growRow(eq_count*2);
         }
-        else { leq.growRow(eq_count*2); }
         for (UINT i = 0; i < eq.getRowSize(); i++) {
             if (eq_removed.get(i)) {
                 continue;
@@ -1247,16 +1257,6 @@ void SIX<Mat, T>::convertEq2Ineq(OUT Mat & leq, Mat const& eq)
             c+=2;
         }
     }
-#else
-    if (eq.size() != 0) {
-        leq.growRow(eq, 0, eq.getRowSize() - 1);
-        UINT rows = leq.getRowSize();
-        leq.growRow(eq, 0, eq.getRowSize() - 1);
-        for (UINT j = rows; j < leq.getRowSize(); j++) {
-            leq.mulOfRow(j, -1);
-        }
-    }
-#endif
 }
 
 
@@ -1289,7 +1289,7 @@ INT SIX<Mat, T>::normalize(OUT Mat & newleq,
     //   -1   0   0   0
     //    0   0   0   0
     //    0   0  -1   0
-    //it means that given constraints are -v0 <= 0 , -v2 <= 0,
+    //it means that given constraints are v0 >= 0 , v2 >= 0,
     //but there is no knownledge about v1£¬ thus v1 might be
     //negative!
     //Thus here introduce new auxillary/dummy variables v1' and v1'',
@@ -1301,7 +1301,7 @@ INT SIX<Mat, T>::normalize(OUT Mat & newleq,
         bool has_constrain = false;
         for (UINT row = 0; row < vc.getRowSize(); row++) {
             if (vc.get(row, col) != 0) {
-                //There are constrains for variable 'i'.
+                //There are constraints for variable 'i'.
                 has_constrain = true;
             }
             if (vc.get(row, col) > 0) {
@@ -1309,12 +1309,12 @@ INT SIX<Mat, T>::normalize(OUT Mat & newleq,
                 //e.g: xi <= N, so it was necessary to generate leq
                 //constraints.
                 ASSERTN(0, ("constraint for No.%d variable is negative. "
-                            "Set the variable unbound and insert v<=0 "
-                            "into inequalities please.", col));
+                            "Please set the variable unbound or insert v<=0 "
+                            "into inequalities before invoke SIX.", col));
             }
         }
         if (!has_constrain) {
-            //No constrains for variable 'i', thus
+            //No constraints for variable 'i', thus
             //introduce auxillary variable.
             //Replaces v with v' and insert a new column indicating the v''.
             vcgrowrows++;
@@ -1340,7 +1340,7 @@ INT SIX<Mat, T>::normalize(OUT Mat & newleq,
     newleq = tmpleq;
     newleq.insertColumnsBefore(m_rhs_idx, leqgrowcols);
 
-    //Growing target function for substituting an original unbounded
+    //Growing target function for substituting an original unbound
     //variable with new auxillary/dummy variables.
     newtgtf = tgtf;
     newtgtf.insertColumnsBefore(m_rhs_idx, tgtfgrowcols);
@@ -1922,8 +1922,8 @@ UINT SIX<Mat, T>::TwoStageMethod(IN OUT Mat & newleq,
 //expected the variable's result.
 //If it is the case, the variable that 0-column corresponds to
 //has no any constraint, then 'tgtf' could have infinite solution,
-//says, the system is unbounded.
-//Return true if system is unbounded.
+//says, the system is unbound.
+//Return true if system is unbound.
 //e.g:
 //    There are 3 variable i,j,k, but the second variable j's
 //    boundary is empty. And target function is MAX:i+2j+k
@@ -1936,7 +1936,7 @@ UINT SIX<Mat, T>::TwoStageMethod(IN OUT Mat & newleq,
 //    can be any integer.
 template <class Mat, class T>
 bool SIX<Mat, T>::verifyEmptyVariableConstrain(Mat const& tgtf,
-                                               Mat const&, //variable constrain
+                                               Mat const&, //variable constraint
                                                Mat const& eq,
                                                Mat const& leq,
                                                INT rhs_idx)
@@ -1970,7 +1970,9 @@ bool SIX<Mat, T>::verifyEmptyVariableConstrain(Mat const& tgtf,
 //sol: optimum feasible solution.
 //vc: variable constraints, one variable one row.
 //eq: equalites which the solution should subject to .
+//    e.g: i-j=10, eq is [1,-1,10], where the last column is rhs_idx.
 //leq: inequalites which the solution should subject to .
+//    e.g: i-j<=10, leq is [1,-1,10], where the last column is rhs_idx.
 //rhs_idx: index number of constant column.
 //    e.g: Given tgtf as [a*x1, b*x2, c*x3, 100], then rhs_idx is 3.
 //
@@ -2023,7 +2025,7 @@ UINT SIX<Mat, T>::maxm(OUT T & maxv,
 //Check if one column of eq/leq that all elements be 0 and 'tgtf'
 //expects the result of the variable. If it is the case, the variable
 //has not any constraints, and 'tgtf' might have infinite solutions,
-//that is the system is unbounded.
+//that is the system is unbound.
 //e.g:
 //  There are 3 variable i,j,k, but the second variable j's
 //  boundary is empty. And target function is MAX:i+2j+k
@@ -2156,7 +2158,7 @@ public:
                                 Mat const& vc,
                                 Mat const& eq,
                                 Mat const& leq) const;
-    virtual bool dump_end_six(UINT status, T v, Mat & sol) const;
+    virtual bool dump_end_six(UINT status, T v, Mat & sol, bool is_maxm) const;
     virtual bool dump_is_satisfying() const;
     virtual bool dump_floor_branch(INT floor) const;
     virtual bool dump_ceiling_branch(INT ceil) const;
@@ -2187,7 +2189,7 @@ bool MIP<Mat, T>::dump_prt_indent(FILE * h) const
 
 template <class Mat, class T>
 bool MIP<Mat, T>::dump_start_six(Mat const&, //target function
-                                 Mat const&, //variable constrain.
+                                 Mat const&, //variable constraint.
                                  Mat const&, //equations.
                                  Mat const&) const //inequalities.
 {
@@ -2206,14 +2208,16 @@ bool MIP<Mat, T>::dump_start_six(Mat const&, //target function
 
 
 template <class Mat, class T>
-bool MIP<Mat, T>::dump_end_six(UINT status, T v, Mat & sol) const
+bool MIP<Mat, T>::dump_end_six(UINT status, T v, Mat & sol, bool is_maxm) const
 {
     FILE * h = dump_open_file();
     if (h == NULL) { return true; }
     StrBuf buf(32);
     dump_prt_indent(h);
-    fprintf(h, "END SIX,status=%s,target_value=%s,solution={",
-            getStatusName(status), v.format(buf));
+    fprintf(h, "\nEND SIX,status=%s,%s_value=%s,solution={",
+            getStatusName(status),
+            is_maxm ? "max" : "min",
+            v.format(buf));
     for (UINT i = 0; i < sol.getColSize(); i++) {
         fprintf(h, "%s,", sol.get(0, i).format(buf));
     }
@@ -2318,7 +2322,7 @@ void MIP<Mat, T>::verify(Mat const& leq,
     //For now, we only permit Variable constraint 'vc' of each
     //variable to be 0, namely only i>=0 is allowed. One should
     //establish constraints i'>=0, and i=i'+3 if i>=3 is required.
-    //Similar, if i<=0, add constrains i=x-y, x>=0, y>=0, x<=y.
+    //Similar, if i<=0, add constraints i=x-y, x>=0, y>=0, x<=y.
     if (!vc.is_colequ(m_rhs_idx, 0)) {
         ASSERTN(num_cols_of_const_term == 1,
                 ("no yet support const term with multi-columns."));
@@ -2413,10 +2417,11 @@ UINT MIP<Mat, T>::RecusivePart(OUT T & v,
     m_times++;
     if (is_max) {
         status = six.maxm(v, sol, tgtf, vc, eq, leq, rhs_idx);
+        ASSERT0(dump_end_six(status, v, sol,true));
     } else {
         status = six.minm(v, sol, tgtf, vc, eq, leq, rhs_idx);
+        ASSERT0(dump_end_six(status, v, sol, false));
     }
-    ASSERT0(dump_end_six(status, v, sol));
     if (SIX_SUCC != status) {
         switch (status) {
         case SIX_UNBOUND:

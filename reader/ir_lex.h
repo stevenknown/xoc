@@ -210,10 +210,10 @@ protected:
     //Inpute source file handler.
     FILE * m_src_file;
 
-    //Record the line number that may be backed tracking from the newest line.
+    //Record the line number that may be backed tracking from the latest line.
     UINT m_real_line_num;
 
-    //Record the newest line number of src file.
+    //Record the latest line number of src file.
     UINT m_src_line_num;
 
     //Current parsing line of src file

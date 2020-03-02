@@ -49,9 +49,9 @@ Region * IPA::findRegion(IR * call, Region * callru)
     SYM const* callname = CALL_idinfo(call)->get_name();
 
     //Iterate accessing successors.
-    ASSERT0(cg->get_vertex(CN_id(callercn)));
+    ASSERT0(cg->getVertex(CN_id(callercn)));
     for (xcom::EdgeC const* ec =
-             VERTEX_out_list(cg->get_vertex(CN_id(callercn)));
+             VERTEX_out_list(cg->getVertex(CN_id(callercn)));
          ec != NULL; ec = EC_next(ec)) {
         CallNode * calleecn = cg->mapId2CallNode(
             VERTEX_id(EDGE_to(EC_edge(ec))));
@@ -144,9 +144,9 @@ void IPA::computeCallRefForAllRegion()
         }
 
         rg->initPassMgr();
-        IR_AA * aa = (IR_AA*)rg->getPassMgr()->
+        AliasAnalysis * aa = (AliasAnalysis*)rg->getPassMgr()->
             registerPass(PASS_AA);
-        IR_DU_MGR * dumgr = (IR_DU_MGR*)rg->getPassMgr()->
+        DUMgr * dumgr = (DUMgr*)rg->getPassMgr()->
             registerPass(PASS_DU_MGR);
         ASSERT0(dumgr);
         dumgr->computeCallRef(COMPUTE_PR_DU|COMPUTE_NONPR_DU);
@@ -195,7 +195,7 @@ void IPA::recomputeDUChain(Region * rg, OptCtx & oc)
         rg->initPassMgr();
     }
     if (!OC_is_aa_valid(oc)) {
-        //IR_DU_MGR need IR_AA
+        //DUMgr need AliasAnalysis
         rg->getPassMgr()->registerPass(PASS_AA);
     }
     if (g_do_md_ssa) {
@@ -208,7 +208,7 @@ void IPA::recomputeDUChain(Region * rg, OptCtx & oc)
         }
 
         //Compute typical PR du chain.
-        IR_DU_MGR * dumgr = (IR_DU_MGR*)rg->getPassMgr()->
+        DUMgr * dumgr = (DUMgr*)rg->getPassMgr()->
             registerPass(PASS_DU_MGR);
         ASSERT0(dumgr);
         dumgr->perform(oc, SOL_REACH_DEF|COMPUTE_PR_DU);

@@ -178,7 +178,7 @@ void DexRegion::processSimply()
     ASSERT0(passmgr);
 
     ASSERT0(g_cst_bb_list);
-    IR_CFG * cfg = (IR_CFG*)passmgr->registerPass(PASS_CFG);
+    IRCFG * cfg = (IRCFG*)passmgr->registerPass(PASS_CFG);
     ASSERT0(cfg);
     cfg->initCfg(oc);
     ASSERT0(g_do_cfg_dom);

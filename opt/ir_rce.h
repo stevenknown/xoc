@@ -37,19 +37,19 @@ author: Su Zhenyu
 namespace xoc {
 
 //Perform Redundant Code Elimination.
-class IR_RCE : public Pass {
+class RCE : public Pass {
 protected:
     Region * m_rg;
-    IR_CFG * m_cfg;
-    IR_GVN * m_gvn;
-    IR_DU_MGR * m_du;
+    IRCFG * m_cfg;
+    GVN * m_gvn;
+    DUMgr * m_du;
 
     //Use GVN info to determine if code is redundant.
     //Note that compute GVN is expensive.
     bool m_use_gvn;
 
 public:
-    IR_RCE(Region * rg, IR_GVN * gvn)
+    RCE(Region * rg, GVN * gvn)
     {
         ASSERT0(rg != NULL);
         m_rg = rg;
@@ -59,8 +59,8 @@ public:
         ASSERT0(m_cfg && m_du);
         m_use_gvn = false;
     }
-    COPY_CONSTRUCTOR(IR_RCE);
-    virtual ~IR_RCE() {}
+    COPY_CONSTRUCTOR(RCE);
+    virtual ~RCE() {}
 
     IR * calcCondMustVal(
             IN IR * ir,

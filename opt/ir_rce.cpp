@@ -40,10 +40,10 @@ author: Su Zhenyu
 
 namespace xoc {
 
-void IR_RCE::dump()
+void RCE::dump()
 {
     if (g_tfile == NULL) { return; }
-    note("\n\n==---- DUMP IR_RCE ----==\n");
+    note("\n\n==---- DUMP RCE ----==\n");
 
     BBList * bbl = m_rg->getBBList();
     for (IRBB * bb = bbl->get_head(); bb != NULL; bb = bbl->get_next()) {
@@ -55,7 +55,7 @@ void IR_RCE::dump()
 
 //If 'ir' is always true, set 'must_true', or if it is
 //always false, set 'must_false'.
-IR * IR_RCE::calcCondMustVal(
+IR * RCE::calcCondMustVal(
         IN IR * ir,
         OUT bool & must_true,
         OUT bool & must_false,
@@ -116,7 +116,7 @@ IR * IR_RCE::calcCondMustVal(
 }
 
 
-IR * IR_RCE::processBranch(IR * ir, IN OUT bool & cfg_mod)
+IR * RCE::processBranch(IR * ir, IN OUT bool & cfg_mod)
 {
     ASSERT0(ir->isConditionalBr());
 
@@ -205,7 +205,7 @@ IR * IR_RCE::processBranch(IR * ir, IN OUT bool & cfg_mod)
 
 
 //Perform dead store elmination: x = x;
-IR * IR_RCE::processStore(IR * ir)
+IR * RCE::processStore(IR * ir)
 {
     ASSERT0(ir->is_st());
     if (ST_rhs(ir)->getExactRef() == ir->getExactRef()) {
@@ -217,7 +217,7 @@ IR * IR_RCE::processStore(IR * ir)
 
 
 //Perform dead store elmination: x = x;
-IR * IR_RCE::processStorePR(IR * ir)
+IR * RCE::processStorePR(IR * ir)
 {
     ASSERT0(ir->is_stpr());
     if (STPR_rhs(ir)->getExactRef() == ir->getExactRef()) {
@@ -231,7 +231,7 @@ IR * IR_RCE::processStorePR(IR * ir)
 //e.g:
 //1. if (a == a) { ... } , remove redundant comparation.
 //2. b = b; remove redundant store.
-bool IR_RCE::performSimplyRCE(IN OUT bool & cfg_mod)
+bool RCE::performSimplyRCE(IN OUT bool & cfg_mod)
 {
     BBList * bbl = m_rg->getBBList();
     bool change = false;
@@ -244,6 +244,8 @@ bool IR_RCE::performSimplyRCE(IN OUT bool & cfg_mod)
              ct != NULL; ct = next_ct) {
             IR * ir = ct->val();
             ir_list->get_next(&next_ct);
+            if (ir->hasSideEffect()) { continue; }
+
             IR * newIR = ir;
             switch (ir->getCode()) {
             case IR_TRUEBR:
@@ -276,7 +278,7 @@ bool IR_RCE::performSimplyRCE(IN OUT bool & cfg_mod)
 }
 
 
-bool IR_RCE::perform(OptCtx & oc)
+bool RCE::perform(OptCtx & oc)
 {
     START_TIMER(t, getPassName());
     m_rg->checkValidAndRecompute(&oc, PASS_CFG,

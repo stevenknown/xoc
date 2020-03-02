@@ -89,14 +89,14 @@ void DfMgr::buildRecur(xcom::Vertex const* v,
                        DomTree const& domtree)
 {
     UINT vid = VERTEX_id(v);
-    xcom::Vertex * v_domtree = domtree.get_vertex(vid);
+    xcom::Vertex * v_domtree = domtree.getVertex(vid);
     ASSERT0(v_domtree);
 
     //Access each succs.
     for (xcom::EdgeC const* ec = VERTEX_out_list(v_domtree);
          ec != NULL; ec = EC_next(ec)) {
         xcom::Vertex const* succ_domtree = EDGE_to(EC_edge(ec));
-        xcom::Vertex const* succ = g.get_vertex(VERTEX_id(succ_domtree));
+        xcom::Vertex const* succ = g.getVertex(VERTEX_id(succ_domtree));
         buildRecur(succ, g, domtree);
     }
 
@@ -142,7 +142,7 @@ void DfMgr::build(xcom::DGraph const& g, DomTree const& domtree)
 //ton of phis which will blow up memory.
 bool DfMgr::hasHighDFDensityVertex(xcom::DGraph const& g)
 {
-    Vector<UINT> counter_of_vex(g.get_vertex_num());
+    Vector<UINT> counter_of_vex(g.getVertexNum());
     INT c;
     for (xcom::Vertex const* v = g.get_first_vertex(c);
          v != NULL; v = g.get_next_vertex(c)) {
@@ -185,7 +185,7 @@ void DfMgr::build(xcom::DGraph const& g)
             for (INT i = pred_dom->get_first();
                  i >= 0; i = pred_dom->get_next(i)) {
                 if (!v_dom->is_contain(i)) {
-                    ASSERT0(g.get_vertex(i));
+                    ASSERT0(g.getVertex(i));
                     genDFControlSet(i)->bunion(vid);
                 }
             }
@@ -560,7 +560,7 @@ void PRSSAMgr::collectDefinedPR(IN IRBB * bb, OUT DefSBitSet & mustdef_pr)
 
 void PRSSAMgr::insertPhi(UINT prno, IN IRBB * bb)
 {
-    UINT num_opnd = m_cfg->get_in_degree(m_cfg->get_vertex(BB_id(bb)));
+    UINT num_opnd = m_cfg->getInDegree(m_cfg->getVertex(BB_id(bb)));
     IR * pr = m_prno2ir.get(prno);
     ASSERT0(pr);
 
@@ -764,7 +764,7 @@ void PRSSAMgr::renameBB(IN IRBB * bb)
                 VP * curv = (VP*)PR_ssainfo(opnd);
                 ASSERT0(curv && VP_prno(curv) == PR_no(opnd));
 
-                //Set newest version VP uses current opnd.
+                //Set latest version VP uses current opnd.
                 if (VP_ver(topv) == 0) {
                     //Each opnd only meet once.
                     ASSERT0(curv == topv);
@@ -926,7 +926,7 @@ void PRSSAMgr::renameInDomTreeOrder(IRBB * root,
             handleBBRename(v, *defined_prs, bb2vpmap);
         }
 
-        xcom::Vertex const* bbv = domtree.get_vertex(BB_id(v));
+        xcom::Vertex const* bbv = domtree.getVertex(BB_id(v));
         xcom::EdgeC const* c = VERTEX_out_list(bbv);
         bool all_visited = true;
         while (c != NULL) {
@@ -1027,7 +1027,7 @@ void PRSSAMgr::destructionInDomTreeOrder(IRBB * root, xcom::Graph & domtree)
             destructBBSSAInfo(v);
         }
 
-        xcom::Vertex * bbv = domtree.get_vertex(BB_id(v));
+        xcom::Vertex * bbv = domtree.getVertex(BB_id(v));
         ASSERTN(bbv, ("dom tree is invalid."));
 
         xcom::EdgeC * c = VERTEX_out_list(bbv);
@@ -1080,7 +1080,7 @@ void PRSSAMgr::stripPhi(IR * phi, xcom::C<IR*> * phict)
     IRBB * bb = phi->getBB();
     ASSERT0(bb);
 
-    xcom::Vertex const* vex = m_cfg->get_vertex(BB_id(bb));
+    xcom::Vertex const* vex = m_cfg->getVertex(BB_id(bb));
     ASSERT0(vex);
 
     //Temprarory RP to hold the result of PHI.
@@ -1134,7 +1134,7 @@ void PRSSAMgr::stripPhi(IR * phi, xcom::C<IR*> * phict)
                     //Insert block to hold the copy.
                     IRBB * newbb = m_rg->allocBB();
                     m_rg->getBBList()->insert_after(newbb, p);
-                    m_cfg->add_bb(newbb);
+                    m_cfg->addBB(newbb);
                     m_cfg->insertVertexBetween(
                         BB_id(p), BB_id(fallthrough), BB_id(newbb));
                     BB_is_fallthrough(newbb) = true;
@@ -1725,7 +1725,7 @@ void PRSSAMgr::stripVersionForAllVP()
 }
 
 
-//Construct DU chain which need by IR_DU_MGR.
+//Construct DU chain which need by DUMgr.
 //This function will build the DUSet for PHI and its USE.
 void PRSSAMgr::constructMDDUChainForPR()
 {

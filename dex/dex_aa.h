@@ -38,10 +38,10 @@ author: Su Zhenyu
 //tyid start from 1.
 typedef TMap<Type const*, MD const*> Type2MD;
 
-class DEX_AA : public IR_AA {
+class DEX_AA : public AliasAnalysis {
     Type2MD m_type2md;
 public:
-    DEX_AA(Region * rg) : IR_AA(rg) {}
+    DEX_AA(Region * rg) : AliasAnalysis(rg) {}
 
     //Attemp to compute POINT-TO set via data type.
     virtual MD const* computePointToViaType(IR const* ir)
