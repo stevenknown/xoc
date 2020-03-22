@@ -182,16 +182,14 @@ ExpRep * ExprTab::append_expr(IR * ir)
     ExpRep ** level2_hash_tab = m_level1_hash_tab[level1_hashv];
     if (level2_hash_tab == NULL) {
         //Generate level2
-        level2_hash_tab    =
-            (ExpRep *(*))xmalloc(sizeof(ExpRep*) *
-                                   IR_EXPR_TAB_LEVEL2_HASH_BUCKET);
+        level2_hash_tab = (ExpRep*(*))xmalloc(sizeof(ExpRep*)*
+            IR_EXPR_TAB_LEVEL2_HASH_BUCKET);
         m_level1_hash_tab[level1_hashv] = level2_hash_tab;
 
         //Generate copy of 'ir'.
         ExpRep * ie = new_ir_expr();
         EXPR_id(ie) = ++m_expr_count;
-        EXPR_ir(ie) = m_rg->dupIRTree(ir);
-        //dumpIR(EXPR_ir(ie));
+        EXPR_ir(ie) = m_rg->dupIRTree(ir);        
         m_ir_expr_vec.set(EXPR_id(ie), ie);
 
         //Enter into 'ir'
@@ -208,7 +206,6 @@ ExpRep * ExprTab::append_expr(IR * ir)
         ie = new_ir_expr();
         EXPR_id(ie) = ++m_expr_count;
         EXPR_ir(ie) = m_rg->dupIRTree(ir);
-        //dumpIR(EXPR_ir(ie));
         m_ir_expr_vec.set(EXPR_id(ie), ie);
 
         //Enter into 'ir'
@@ -230,7 +227,6 @@ ExpRep * ExprTab::append_expr(IR * ir)
     ie = new_ir_expr();
     EXPR_id(ie) = ++m_expr_count;
     EXPR_ir(ie) = m_rg->dupIRTree(ir);
-    //dumpIR(EXPR_ir(ie));
     m_ir_expr_vec.set(EXPR_id(ie), ie);
 
     //Enter into 'ir'
@@ -452,7 +448,8 @@ void ExprTab::encode_bb(IRBB * bb)
                     set_map_ir2ir_expr(ARR_base(ir), ie);
                 }
 
-                for (IR * sub = ARR_sub_list(ir); sub != NULL; sub = sub->get_next()) {
+                for (IR * sub = ARR_sub_list(ir);
+                     sub != NULL; sub = sub->get_next()) {
                     ExpRep * ie2 = encode_expr(sub);
                     if (ie2 != NULL) {
                         set_map_ir2ir_expr(sub, ie2);

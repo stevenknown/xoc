@@ -382,11 +382,10 @@ void RegionMgr::deleteRegion(Region * rg, bool collect_id)
 }
 
 
-void RegionMgr::estimateEV(
-        OUT UINT & num_call,
-        OUT UINT & num_ru,
-        bool scan_call,
-        bool scan_inner_region)
+void RegionMgr::estimateEV(OUT UINT & num_call,
+                           OUT UINT & num_ru,
+                           bool scan_call,
+                           bool scan_inner_region)
 {
     for (UINT i = 0; i < getNumOfRegion(); i++) {
         Region * rg = getRegion(i);
@@ -411,10 +410,9 @@ void RegionMgr::estimateEV(
 
 //Scan call site and build call graph.
 //Return true if building graph successfully, otherwise return false.
-void RegionMgr::buildCallGraph(
-        OptCtx & oc,
-        bool scan_call,
-        bool scan_inner_region)
+void RegionMgr::buildCallGraph(OptCtx & oc,
+                               bool scan_call,
+                               bool scan_inner_region)
 {
     //Generate call-list and return-list.
     UINT vn = 0, en = 0;

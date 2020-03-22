@@ -676,6 +676,17 @@ public:
         changeUse(IR_id(to), IR_id(from), defset_of_to, defset_of_from, m);
     }
 
+    //Coalesce DU chain of 'from' to 'to'.
+    //This function replace definition of USE of 'from' to DEF of 'to'.
+    //e.g: to_def=...
+    //     from=to
+    //     ...=from_use
+    //=> after coalescing, p1 is src, p0 is tgt
+    //     to_def=...
+    //     ------ //removed
+    //     ...=to
+    void coalesceDUChain(IR * from, IR * to);
+
     void dumpMemUsageForEachSet();
     void dumpMemUsageForMDRef();
     void dumpSet(bool is_bs = false);

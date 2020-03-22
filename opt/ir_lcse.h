@@ -58,25 +58,22 @@ protected:
                     IN OUT Vector<IR*> & map_expr2avail_pos,
                     IN OUT Vector<IR*> & map_expr2avail_pr,
                     IN MDSet & tmp);
-    bool processBranch(
-                    IN IRBB * bb, IN IR * ir,
-                    IN OUT xcom::BitSet & avail_ir_expr,
-                    IN OUT Vector<IR*> & map_expr2avail_pos,
-                    IN OUT Vector<IR*> & map_expr2avail_pr);
+    bool processBranch(IN IRBB * bb, IN IR * ir,
+                       IN OUT xcom::BitSet & avail_ir_expr,
+                       IN OUT Vector<IR*> & map_expr2avail_pos,
+                       IN OUT Vector<IR*> & map_expr2avail_pr);
     IR * processExp(IN IRBB * bb, IN ExpRep * ie,
                     IN IR * stmt, IN OUT xcom::BitSet & avail_ir_expr,
                     IN OUT Vector<IR*> & map_expr2avail_pos,
                     IN OUT Vector<IR*> & map_expr2avail_pr);
-    bool processParamList(
-                    IN IRBB * bb, IN IR * ir,
-                    IN OUT xcom::BitSet & avail_ir_expr,
-                    IN OUT Vector<IR*> & map_expr2avail_pos,
-                    IN OUT Vector<IR*> & map_expr2avail_pr);
-    bool processRhsOfStore(
-                    IN IRBB * bb, IN IR * ir,
-                    IN OUT xcom::BitSet & avail_ir_expr,
-                    IN OUT Vector<IR*> & map_expr2avail_pos,
-                    IN OUT Vector<IR*> & map_expr2avail_pr);
+    bool processParamList(IN IRBB * bb, IN IR * ir,
+                          IN OUT xcom::BitSet & avail_ir_expr,
+                          IN OUT Vector<IR*> & map_expr2avail_pos,
+                          IN OUT Vector<IR*> & map_expr2avail_pr);
+    bool processRhsOfStore(IN IRBB * bb, IN IR * ir,
+                           IN OUT xcom::BitSet & avail_ir_expr,
+                           IN OUT Vector<IR*> & map_expr2avail_pos,
+                           IN OUT Vector<IR*> & map_expr2avail_pr);
 
 public:
     explicit LCSE(Region * rg);

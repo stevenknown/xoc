@@ -150,11 +150,11 @@ void CopyProp::replaceExpViaSSADu(IR * exp,
 //stmt_use_ssadu: true if stmt in which cand_expr located used SSA DU info.
 //stmt_use_mdssadu: true if stmt in which cand_exp used Memory SSA DU info.
 void CopyProp::replaceExp(IR * exp,
-                       IR const* cand_expr,
-                       IN OUT CPCtx & ctx,
-                       bool stmt_use_ssadu,
-                       bool stmt_use_mdssadu,
-                       MDSSAMgr * mdssamgr)
+                          IR const* cand_expr,
+                          IN OUT CPCtx & ctx,
+                          bool stmt_use_ssadu,
+                          bool stmt_use_mdssadu,
+                          MDSSAMgr * mdssamgr)
 {
     ASSERT0(exp && exp->is_exp() && cand_expr);
     ASSERT0(exp->getExactRef() ||
@@ -213,8 +213,13 @@ void CopyProp::replaceExp(IR * exp,
         MDSSAInfo * cand_exp_mdssainfo =
             mdssamgr->getMDSSAInfoIfAny(cand_expr);
         if (cand_exp_mdssainfo != NULL) {
+            //CASE:copy MDSSAInfo from cand_exp to newir.
+            // .. = cand_exp
+            // .. = exp
             mdssamgr->getUseDefMgr()->setMDSSAInfo(newir, cand_exp_mdssainfo);
             mdssamgr->addMDSSAOcc(newir, cand_exp_mdssainfo);
+            //Remove 'exp' from OccSet of def_stmt of 'exp'.
+            mdssamgr->removeMDSSAUseRecur(exp);
         }
 
         //To take care of classic DU info that used/maintained by
@@ -263,10 +268,10 @@ bool CopyProp::isCopyOR(IR * ir) const
 //'use_stmt': stmt in use-list of 'def_ir'.
 //'use_bb': IRBB that use_stmt be placed in.
 bool CopyProp::is_available(IR const* def_stmt,
-                         IR const* prop_value,
-                         IR * use_stmt,
-                         MDPhi * use_phi,
-                         IRBB * usebb)
+                            IR const* prop_value,
+                            IR * use_stmt,
+                            MDPhi * use_phi,
+                            IRBB * usebb)
 {
     ASSERT0(usebb);
     ASSERT0(use_stmt || use_phi);
@@ -667,7 +672,7 @@ bool CopyProp::perform(OptCtx & oc)
 {
     START_TIMER(t, getPassName());
     ASSERT0(OC_is_cfg_valid(oc));
-
+    bool is_org_du_chain_valid = OC_is_du_chain_valid(oc);
     m_rg->checkValidAndRecompute(&oc, PASS_DOM, PASS_DU_REF, PASS_UNDEF);
 
     PRSSAMgr * prssamgr = (PRSSAMgr*)m_rg->getPassMgr()->
@@ -704,25 +709,31 @@ bool CopyProp::perform(OptCtx & oc)
     }
     END_TIMER(t, getPassName());
 
-    if (change) {
-        OC_is_expr_tab_valid(oc) = false;
-        OC_is_aa_valid(oc) = false;
-        OC_is_ref_valid(oc) = true; //already update.
-        ASSERT0(m_rg->verifyMDRef());
-        if (mdssamgr != NULL && mdssamgr->isMDSSAConstructed()) {
-            ASSERT0(mdssamgr->verify());
-            OC_is_du_chain_valid(oc) = false; //not update.
-        } else {
-            //Use classic DU chain.
-            m_du->verifyMDDUChain(COMPUTE_PR_DU | COMPUTE_NONPR_DU);
-            OC_is_du_chain_valid(oc) = true; //already update.
-        }
-        if (prssamgr != NULL && prssamgr->isSSAConstructed()) {
-            ASSERT0(verifySSAInfo(m_rg));
-            OC_is_du_chain_valid(oc) = false; //not update.
-        }
+    if (!change) { return false; }
+    
+    OC_is_expr_tab_valid(oc) = false;
+    OC_is_aa_valid(oc) = false;
+    OC_is_ref_valid(oc) = true; //already update.
+    ASSERT0(m_rg->verifyMDRef());
+    if (mdssamgr != NULL && mdssamgr->isMDSSAConstructed()) {
+        ASSERT0(mdssamgr->verify());
+        OC_is_du_chain_valid(oc) = false; //not update.
+    } else {
+        //Use classic DU chain.
+        m_du->verifyMDDUChain(COMPUTE_PR_DU | COMPUTE_NONPR_DU);
+        OC_is_du_chain_valid(oc) = true; //already update.
     }
-    return change;
+    
+    if (prssamgr != NULL && prssamgr->isSSAConstructed()) {
+        //Use PRSSA.
+        ASSERT0(verifySSAInfo(m_rg));
+        OC_is_du_chain_valid(oc) = false; //not update.
+    } else {
+        //Use classic DU chain.
+        //Keep DU chain unchanged.
+        ASSERT0(OC_is_du_chain_valid(oc) == is_org_du_chain_valid);
+    }    
+    return true;
 }
 //END CopyProp
 

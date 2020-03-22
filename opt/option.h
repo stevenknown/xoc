@@ -38,33 +38,33 @@ namespace xoc {
 
 class PassMgr;
 
-#define OPT_LEVEL0      0
-#define OPT_LEVEL1      1
-#define OPT_LEVEL2      2
-#define OPT_LEVEL3      3
-#define SIZE_OPT        4
+#define OPT_LEVEL0 0
+#define OPT_LEVEL1 1
+#define OPT_LEVEL2 2
+#define OPT_LEVEL3 3
+#define SIZE_OPT 4
 
-#define VERIFY_LEVEL_1  1 //only perform basic verifications.
-#define VERIFY_LEVEL_2  2 //do more aggressive check.
-#define VERIFY_LEVEL_3  3 //do all verifications.
+#define VERIFY_LEVEL_1 1 //only perform basic verifications.
+#define VERIFY_LEVEL_2 2 //do more aggressive check.
+#define VERIFY_LEVEL_3 3 //do all verifications.
 
 //Optimization Context
 //This class record and propagate auxiliary information to optimizations.
-#define OC_is_ref_valid(o)              ((o).u1.s1.is_du_ref_valid)
-#define OC_is_du_chain_valid(o)         ((o).u1.s1.is_du_chain_valid)
-#define OC_is_live_expr_valid(o)        ((o).u1.s1.is_live_expr_valid)
-#define OC_is_reach_def_valid(o)        ((o).u1.s1.is_reach_def_valid)
-#define OC_is_avail_reach_def_valid(o)  ((o).u1.s1.is_avail_reach_def_valid)
-#define OC_is_cfg_valid(o)              ((o).u1.s1.is_cfg_valid)
-#define OC_is_aa_valid(o)               ((o).u1.s1.is_aa_result_valid)
-#define OC_is_expr_tab_valid(o)         ((o).u1.s1.is_ir_expr_tab)
-#define OC_is_cdg_valid(o)              ((o).u1.s1.is_cdg_valid)
-#define OC_is_dom_valid(o)              ((o).u1.s1.is_dom_valid)
-#define OC_is_pdom_valid(o)             ((o).u1.s1.is_pdom_valid)
-#define OC_is_rpo_valid(o)              ((o).u1.s1.is_rpo_valid)
-#define OC_is_loopinfo_valid(o)         ((o).u1.s1.is_loopinfo_valid)
-#define OC_is_callg_valid(o)            ((o).u1.s1.is_callg_valid)
-#define OC_show_comp_time(o)            ((o).u2.s1.show_compile_time)
+#define OC_is_ref_valid(o) ((o).u1.s1.is_du_ref_valid)
+#define OC_is_du_chain_valid(o) ((o).u1.s1.is_du_chain_valid)
+#define OC_is_live_expr_valid(o) ((o).u1.s1.is_live_expr_valid)
+#define OC_is_reach_def_valid(o) ((o).u1.s1.is_reach_def_valid)
+#define OC_is_avail_reach_def_valid(o) ((o).u1.s1.is_avail_reach_def_valid)
+#define OC_is_cfg_valid(o) ((o).u1.s1.is_cfg_valid)
+#define OC_is_aa_valid(o) ((o).u1.s1.is_aa_result_valid)
+#define OC_is_expr_tab_valid(o) ((o).u1.s1.is_ir_expr_tab)
+#define OC_is_cdg_valid(o) ((o).u1.s1.is_cdg_valid)
+#define OC_is_dom_valid(o) ((o).u1.s1.is_dom_valid)
+#define OC_is_pdom_valid(o) ((o).u1.s1.is_pdom_valid)
+#define OC_is_rpo_valid(o) ((o).u1.s1.is_rpo_valid)
+#define OC_is_loopinfo_valid(o) ((o).u1.s1.is_loopinfo_valid)
+#define OC_is_callg_valid(o) ((o).u1.s1.is_callg_valid)
+#define OC_show_comp_time(o) ((o).u2.s1.show_compile_time)
 class OptCtx {
 public:
     union {

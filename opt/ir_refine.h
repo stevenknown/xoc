@@ -37,14 +37,14 @@ author: Su Zhenyu
 namespace xoc {
 
 //Refining context variable.
-//Set the following option true or false to enable or disable the refinement.
-#define RC_refine_div_const(r)       ((r).u1.s1.refine_div_const)
-#define RC_refine_mul_const(r)       ((r).u1.s1.refine_mul_const)
-#define RC_do_fold_const(r)          ((r).u1.s1.do_fold_const)
-#define RC_hoist_to_lnot(r)          ((r).u1.s1.hoist_to_lnot)
-#define RC_insert_cvt(r)             ((r).u1.s1.insertCvt)
-#define RC_refine_stmt(r)            ((r).u1.s1.refine_stmt)
-#define RC_stmt_removed(r)           ((r).u1.s1.stmt_has_been_removed)
+//Set the following options true or false to enable or disable the refinement.
+#define RC_refine_div_const(r) ((r).u1.s1.refine_div_const)
+#define RC_refine_mul_const(r) ((r).u1.s1.refine_mul_const)
+#define RC_do_fold_const(r) ((r).u1.s1.do_fold_const)
+#define RC_hoist_to_lnot(r) ((r).u1.s1.hoist_to_lnot)
+#define RC_insert_cvt(r) ((r).u1.s1.insertCvt)
+#define RC_refine_stmt(r) ((r).u1.s1.refine_stmt)
+#define RC_stmt_removed(r) ((r).u1.s1.stmt_has_been_removed)
 class RefineCtx {
 public:
     union {
@@ -102,6 +102,7 @@ public:
     }
     RefineCtx const& operator = (RefineCtx const&);
 
+    //Set flag to disable following optimizations.
     void setUnOptFlag()
     {
         RC_refine_div_const(*this) = false;

@@ -874,7 +874,7 @@ void INTMat::genElimMat(UINT row, UINT col, OUT INTMat & elim)
 }
 
 
-void INTMat::_verify_hnf(INTMat & h)
+void INTMat::_verify_hnf(INTMat & h) const
 {
     ASSERTN(m_is_init, ("not yet initialize."));
     for (UINT i = 0; i < MIN(h.m_row_size,h.m_col_size); i++) {
@@ -905,8 +905,6 @@ void INTMat::_verify_hnf(INTMat & h)
 //    2. h(ii)>0 for all i, and
 //    3. h(ij)<=0 and |h(ij)|<|h(ii)| for j<i
 //
-//Return true if succ.
-//
 //h: hermite matrix, it is a lower triangular matrix, row convention.
 //u: unimodular matrix, so 'this' and h and u satisfied:
 //    h = 'this' * u and
@@ -915,7 +913,7 @@ void INTMat::_verify_hnf(INTMat & h)
 //NOTICE:
 //  1. 'this' uses row convention.
 //  2. 'this' may be singular.
-void INTMat::hnf(OUT INTMat & h, OUT INTMat & u)
+void INTMat::hnf(OUT INTMat & h, OUT INTMat & u) const
 {
     ASSERTN(m_is_init, ("not yet initialize."));
     u.reinit(m_col_size, m_col_size);
@@ -937,8 +935,8 @@ void INTMat::hnf(OUT INTMat & h, OUT INTMat & u)
 
                 //HNF(notes as H): H=A*U
                 h = h * elim;
-            }//end if
-        }//end for
+            }
+        }
 
         //2. Make diagonal element positive.
         if (h.get(i, i) < 0) {
@@ -1716,8 +1714,8 @@ void BMat::sete(UINT num, ...)
     va_list ptr;
     va_start(ptr, num);
     for (UINT i = 0; i < num; i++) {
-        //Note bool is promoted to int when passed through '...'.
-        bool numer = (bool)va_arg(ptr, int);
+        //Note 'bool' is promoted to 'int' when passed through '...'.
+        bool numer = va_arg(ptr, int);
         set(row, col++, numer);
         if (col >= m_col_size) {
             row++;

@@ -217,10 +217,10 @@ IR * LCSE::hoist_cse(IN IRBB * bb, IN IR * ir_pos, IN ExpRep * ie)
 
 
 bool LCSE::processBranch(IN IRBB * bb,
-                            IN IR * ir,
-                            IN OUT xcom::BitSet & avail_ir_expr,
-                            IN OUT Vector<IR*> & map_expr2avail_pos,
-                            IN OUT Vector<IR*> & map_expr2avail_pr)
+                         IN IR * ir,
+                         IN OUT xcom::BitSet & avail_ir_expr,
+                         IN OUT Vector<IR*> & map_expr2avail_pos,
+                         IN OUT Vector<IR*> & map_expr2avail_pr)
 {
     ASSERT0(ir->isConditionalBr());
     bool change = false;
@@ -267,11 +267,11 @@ bool LCSE::processBranch(IN IRBB * bb,
 //'ie': cse candidate expression indicator.
 //'stmt': the stmt contains 'exp'.
 IR * LCSE::processExp(IN IRBB * bb,
-                         IN ExpRep * ie,
-                         IN IR * stmt,
-                         IN OUT xcom::BitSet & avail_ir_expr,
-                         IN OUT Vector<IR*> & map_expr2avail_pos,
-                         IN OUT Vector<IR*> & map_expr2avail_pr)
+                      IN ExpRep * ie,
+                      IN IR * stmt,
+                      IN OUT xcom::BitSet & avail_ir_expr,
+                      IN OUT Vector<IR*> & map_expr2avail_pos,
+                      IN OUT Vector<IR*> & map_expr2avail_pr)
 {
     ASSERT0(ie);
     avail_ir_expr.bunion(EXPR_id(ie));
@@ -309,9 +309,9 @@ bool LCSE::canBeCandidate(IR * ir)
     ASSERT0(ir);
     if (!m_enable_filter) {
         return ir->isBinaryOp() ||
-            ir->is_bnot() ||
-            ir->is_lnot() ||
-            ir->is_neg();
+               ir->is_bnot() ||
+               ir->is_lnot() ||
+               ir->is_neg();
     }
     ASSERT0(ir->is_exp());
     if (ir->is_ild()) {
@@ -330,10 +330,10 @@ bool LCSE::canBeCandidate(IR * ir)
 
 
 bool LCSE::processRhsOfStore(IN IRBB * bb,
-                                IN IR * ir,
-                                IN OUT xcom::BitSet & avail_ir_expr,
-                                IN OUT xcom::Vector<IR*> & map_expr2avail_pos,
-                                IN OUT xcom::Vector<IR*> & map_expr2avail_pr)
+                             IN IR * ir,
+                             IN OUT xcom::BitSet & avail_ir_expr,
+                             IN OUT xcom::Vector<IR*> & map_expr2avail_pos,
+                             IN OUT xcom::Vector<IR*> & map_expr2avail_pr)
 {
     ASSERT0(ir->is_st() || ir->is_ist() || ir->is_stpr());
     bool change = false;
@@ -407,10 +407,10 @@ bool LCSE::processRhsOfStore(IN IRBB * bb,
 
 
 bool LCSE::processParamList(IN IRBB * bb,
-                               IN IR * ir,
-                               IN OUT xcom::BitSet & avail_ir_expr,
-                               IN OUT Vector<IR*> & map_expr2avail_pos,
-                               IN OUT Vector<IR*> & map_expr2avail_pr)
+                            IN IR * ir,
+                            IN OUT xcom::BitSet & avail_ir_expr,
+                            IN OUT Vector<IR*> & map_expr2avail_pos,
+                            IN OUT Vector<IR*> & map_expr2avail_pr)
 {
     bool change = false;
     bool lchange = true;
@@ -614,14 +614,11 @@ bool LCSE::processDef(IN IRBB * bb,
 bool LCSE::perform(OptCtx & oc)
 {
     START_TIMER(t, getPassName());
-    m_rg->checkValidAndRecompute(&oc, PASS_DU_REF, PASS_DU_CHAIN,
-        PASS_EXPR_TAB, PASS_UNDEF);
-
-    if (!OC_is_du_chain_valid(oc)) {
+    if (!OC_is_du_chain_valid(oc) || !OC_is_ref_valid(oc)) {
         END_TIMER(t, getPassName());
         return false;
     }
-
+    m_rg->checkValidAndRecompute(&oc, PASS_EXPR_TAB, PASS_UNDEF);
     m_expr_tab = (ExprTab*)m_rg->getPassMgr()->registerPass(PASS_EXPR_TAB);
     ASSERT0(m_expr_tab);
 
@@ -629,7 +626,6 @@ bool LCSE::perform(OptCtx & oc)
     ASSERT0(m_expr_vec);
 
     BBList * bbl = m_rg->getBBList();
-
     bool change = false;
 
     //Record lived expression during analysis.

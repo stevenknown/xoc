@@ -285,7 +285,7 @@ IR * Region::refineStore(IR * ir, bool & change, RefineCtx & rc)
 
         //Remove pr1 = pr1.
         if (getDUMgr() != NULL) {
-            getDUMgr()->removeIROutFromDUMgr(ir);
+            getDUMgr()->coalesceDUChain(ir, rhs);
         }
 
         IRBB * bb = ir->getBB();
@@ -318,7 +318,7 @@ IR * Region::refineStore(IR * ir, bool & change, RefineCtx & rc)
                     getMDSSAMgr()->coalesceVersion(ir, rhs);
                 }
                 if (getDUMgr() != NULL) {
-                    getDUMgr()->removeIROutFromDUMgr(ir);
+                    getDUMgr()->coalesceDUChain(ir, rhs);
                 }
 
                 IRBB * bb = ir->getBB();
@@ -1339,7 +1339,7 @@ IR * Region::refineStoreArray(IR * ir, bool & change, RefineCtx & rc)
             } else {
                 change = true;
                 if (getDUMgr() != NULL) {
-                    getDUMgr()->removeIROutFromDUMgr(ir);
+                    getDUMgr()->coalesceDUChain(ir, newrhs);
                 }
 
                 IRBB * bb = ir->getBB();
@@ -1751,6 +1751,10 @@ bool Region::refineBBlist(IN OUT BBList * ir_bb_list, RefineCtx & rc)
         change |= refineStmtList(BB_irlist(bb), rc);
     }
     END_TIMER(t, "Refine IRBB list");
+    if (change) {
+        ASSERT0(verifyMDRef());
+        ASSERT0(getDUMgr()->verifyMDDUChain(COMPUTE_PR_DU|COMPUTE_NONPR_DU));
+    }
     return change;
 }
 
@@ -2424,6 +2428,9 @@ IR * Region::foldConst(IR * ir, bool & change)
                  opnd0->is_const() &&
                  opnd0->is_int() &&
                  CONST_int_val(opnd0) == 0)) {
+                if (getDUMgr() != NULL) {
+                    getDUMgr()->removeUseOutFromDefset(ir);
+                }
                 IR * x = buildImmInt(1, ir->getType());
                 copyDbx(x, ir, this);
                 freeIRTree(ir);
@@ -2449,6 +2456,9 @@ IR * Region::foldConst(IR * ir, bool & change)
                  opnd0->is_const() &&
                  opnd0->is_int() &&
                  CONST_int_val(opnd0) == 0)) {
+                if (getDUMgr() != NULL) {
+                    getDUMgr()->removeUseOutFromDefset(ir);
+                }
                 IR * x = buildImmInt(0, ir->getType());
                 copyDbx(x, ir, this);
                 freeIRTree(ir);
@@ -2473,6 +2483,9 @@ IR * Region::foldConst(IR * ir, bool & change)
             } else if (opnd1->is_const() &&
                        opnd1->is_int() &&
                        CONST_int_val(opnd1) == 0) {
+                if (getDUMgr() != NULL) {
+                    getDUMgr()->removeUseOutFromDefset(ir);
+                }       
                 IR * newir = opnd0;
                 BIN_opnd0(ir) = NULL;
                 freeIRTree(ir);
@@ -2496,6 +2509,9 @@ IR * Region::foldConst(IR * ir, bool & change)
             } else if (opnd1->is_const() && opnd1->is_int()) {
                 if (CONST_int_val(opnd1) == 0) {
                     //x<<0 => x
+                    if (getDUMgr() != NULL) {
+                        getDUMgr()->removeUseOutFromDefset(ir);
+                    }
                     IR * newir = opnd0;
                     BIN_opnd0(ir) = NULL;
                     freeIRTree(ir);
@@ -2504,6 +2520,9 @@ IR * Region::foldConst(IR * ir, bool & change)
                 } else if (opnd0->getTypeSize(dm) == 4 &&
                            CONST_int_val(opnd1) == 32) {
                     //x<<32 => 0, x is 32bit
+                    if (getDUMgr() != NULL) {
+                        getDUMgr()->removeUseOutFromDefset(ir);
+                    }
                     IR * newir = buildImmInt(0, ir->getType());
                     copyDbx(newir, ir, this);
                     freeIRTree(ir);

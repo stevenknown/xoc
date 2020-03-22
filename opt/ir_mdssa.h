@@ -279,5 +279,7 @@ public:
     { construction(oc); return true; }
 };
 
+bool verifyMDSSAInfo(Region * rg);
+
 } //namespace xoc
 #endif

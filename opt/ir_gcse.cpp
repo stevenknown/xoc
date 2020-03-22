@@ -241,7 +241,12 @@ void GCSE::processCseGen(IN IR * gen, IR * gen_stmt, bool & change)
     if (tmp_pr != NULL) { return; }
 
     //First process cse generation point.
-    tmp_pr = m_rg->buildPR(IR_dt(gen));
+    if (gen_stmt->is_truebr() || gen_stmt->is_falsebr()) {
+        //Expect opnd1's type is same with opnd0.
+        tmp_pr = m_rg->buildPR(BIN_opnd0(gen)->getType());
+    } else {
+        tmp_pr = m_rg->buildPR(gen->getType());
+    }
     m_exp2pr.set(gen, tmp_pr);
 
     //Assign MD to PR.
@@ -758,23 +763,20 @@ void GCSE::dump()
 bool GCSE::perform(OptCtx & oc)
 {
     START_TIMER(t, getPassName());
+    if (!OC_is_du_chain_valid(oc) || !OC_is_ref_valid(oc)) {
+        END_TIMER(t, getPassName());
+        return false;
+    }
     if (m_gvn != NULL) {
-        m_rg->checkValidAndRecompute(&oc, PASS_DOM, PASS_PDOM,
-            PASS_DU_REF, PASS_DU_CHAIN, PASS_UNDEF);
+        m_rg->checkValidAndRecompute(&oc, PASS_DOM, PASS_PDOM, PASS_UNDEF);
         if (!m_gvn->is_valid()) {
             m_gvn->reperform(oc);
         }
         m_expr_tab = NULL;
     } else {
         m_rg->checkValidAndRecompute(&oc, PASS_DOM, PASS_PDOM, PASS_EXPR_TAB,
-            PASS_DU_REF, PASS_DU_CHAIN, PASS_UNDEF);
-        m_expr_tab = (ExprTab*)m_rg->getPassMgr()->
-            registerPass(PASS_EXPR_TAB);
-    }
-
-    if (!OC_is_du_chain_valid(oc)) {
-        END_TIMER(t, getPassName());
-        return false;
+            PASS_UNDEF);
+        m_expr_tab = (ExprTab*)m_rg->getPassMgr()->registerPass(PASS_EXPR_TAB);
     }
 
     #ifdef _DEBUG_
@@ -822,7 +824,8 @@ bool GCSE::perform(OptCtx & oc)
         //Access IRBB in preorder on domtree.
         //List<xcom::Vertex*> lst;
         //m_cfg->sortDomTreeInPreorder(root, lst);
-        //for (xcom::Vertex * v = lst.get_head(); v != NULL; v = lst.get_next()) {
+        //for (xcom::Vertex * v = lst.get_head();
+        //     v != NULL; v = lst.get_next()) {
         //    IRBB * bb = m_cfg->getBB(VERTEX_id(v));
         //    ASSERT0(bb);
         //    change |= doPropVN(bb, BB_id(entry));

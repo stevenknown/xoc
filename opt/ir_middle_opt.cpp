@@ -191,16 +191,20 @@ bool Region::MiddleProcess(OptCtx & oc)
     if (g_do_refine) {
         RefineCtx rf;
         if (refineBBlist(bbl, rf)) {
+            OC_is_expr_tab_valid(oc) = false;
+            OC_is_live_expr_valid(oc) = false;
+            OC_is_reach_def_valid(oc) = false;
+            //DU chain is kept by refinement.
             ASSERT0(verifyIRandBB(bbl, this));
             if (g_verify_level >= VERIFY_LEVEL_3 && OC_is_du_chain_valid(oc)) {
                 ASSERT0(getDUMgr() == NULL ||
                         getDUMgr()->verifyMDDUChain(
                             COMPUTE_PR_DU | COMPUTE_NONPR_DU));
             }
-        } else { ASSERT0(verifyIRandBB(bbl, this)); }
-    } else {
-        ASSERT0(verifyIRandBB(bbl, this));
+            return true;
+        }        
     }
+    ASSERT0(verifyIRandBB(bbl, this));    
     return true;
 }
 

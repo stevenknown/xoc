@@ -568,19 +568,18 @@ void DeadCodeElim::revise_successor(IRBB * bb, xcom::C<IRBB*> * bbct, BBList * b
 bool DeadCodeElim::perform(OptCtx & oc)
 {
     START_TIMER(t, getPassName());
-    if (m_is_elim_cfs) {
-        m_rg->checkValidAndRecompute(&oc, PASS_DU_REF, PASS_CDG,PASS_PDOM,
-            PASS_DU_CHAIN, PASS_CDG, PASS_UNDEF);
-        m_cdg = (CDG*)m_rg->getPassMgr()->registerPass(PASS_CDG);
-    } else {
-        m_rg->checkValidAndRecompute(&oc, PASS_DU_REF, PASS_PDOM,
-            PASS_DU_CHAIN, PASS_UNDEF);
-        m_cdg = NULL;
-    }
-
-    if (!OC_is_du_chain_valid(oc)) {
+    if (!OC_is_du_chain_valid(oc) || !OC_is_ref_valid(oc)) {
+        //DCE use classic DU chain.
         END_TIMER(t, getPassName());
         return false;
+    }
+    if (m_is_elim_cfs) {
+        m_rg->checkValidAndRecompute(&oc, PASS_CDG, PASS_PDOM,
+            PASS_CDG, PASS_UNDEF);
+        m_cdg = (CDG*)m_rg->getPassMgr()->registerPass(PASS_CDG);
+    } else {
+        m_rg->checkValidAndRecompute(&oc, PASS_PDOM, PASS_UNDEF);
+        m_cdg = NULL;
     }
 
     //#define _DEBUG_DCE_
@@ -668,22 +667,25 @@ bool DeadCodeElim::perform(OptCtx & oc)
     }
     #endif
 
-    if (change) {
-        m_cfg->performMiscOpt(oc);
-
-        //AA, DU chain and du reference are maintained.
-        ASSERT0(m_rg->verifyMDRef() &&
-            m_du->verifyMDDUChain(COMPUTE_PR_DU | COMPUTE_NONPR_DU));
-        OC_is_expr_tab_valid(oc) = false;
-        OC_is_live_expr_valid(oc) = false;
-        OC_is_reach_def_valid(oc) = false;
-        OC_is_avail_reach_def_valid(oc) = false;
-
-        ASSERT0(verifySSAInfo(m_rg));
+    if (!change) {
+        END_TIMER(t, getPassName());
+        return false;
     }
 
+    //Remove empty BB.
+    m_cfg->performMiscOpt(oc);
+
+    //AA, DU chain and DU reference are maintained.
+    ASSERT0(m_rg->verifyMDRef() &&
+            m_du->verifyMDDUChain(COMPUTE_PR_DU | COMPUTE_NONPR_DU));
+    OC_is_expr_tab_valid(oc) = false;
+    OC_is_live_expr_valid(oc) = false;
+    OC_is_reach_def_valid(oc) = false;
+    OC_is_avail_reach_def_valid(oc) = false;
+
+    ASSERT0(verifySSAInfo(m_rg));
     END_TIMER(t, getPassName());
-    return change;
+    return true;
 }
 //END DeadCodeElim
 

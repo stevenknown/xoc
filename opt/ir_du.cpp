@@ -2328,6 +2328,58 @@ size_t DUMgr::count_mem_duset()
 }
 
 
+//Coalesce DU chain of 'from' to 'to'.
+//This function replace definition of USE of 'from' to defintion of 'to'.
+//e.g: to_def=...
+//     from=to
+//     ...=from_use
+//=> after coalescing, p1 is src, p0 is tgt
+//     to_def=...
+//     ------ //removed
+//     ...=to
+void DUMgr::coalesceDUChain(IR * from, IR * to)
+{
+    ASSERT0(from && to);
+    ASSERT0(from->is_stmt() && to->is_exp());
+    if (from->getDUSet() == NULL || to->getDUSet() == NULL) {
+        return removeIROutFromDUMgr(from);
+    }
+
+    //Use exp set of 'from'.
+    DUSet * uses = from->getDUSet();
+    //Def stmt set of 'to'.
+    DUSet * defs = to->getDUSet();
+
+    //Iterate USE of 'from', change each USE's definition to to_def.
+    DUIter it1 = NULL;
+    for (INT i = uses->get_first(&it1); i >= 0; i = uses->get_next(i, &it1)) {
+        IR const* use = m_rg->getIR((UINT)i);
+        ASSERT0(use && use->isMemoryRef());
+        DUSet * defs_of_use = use->getDUSet();
+        ASSERT0(defs_of_use);
+        defs_of_use->removeDef(from, *m_misc_bs_mgr);
+
+        DUIter it2 = NULL;
+        for (INT j = defs->get_first(&it2);
+             j >= 0; j = defs->get_next(j, &it2)) {
+            IR const* def = m_rg->getIR(j);
+            ASSERT0(def && def->is_stmt());
+            if (def == from) { continue; }
+
+            DUSet * uses_of_def = def->getDUSet();
+            ASSERT0(uses_of_def);
+            uses_of_def->removeUse(to, *m_misc_bs_mgr);
+            if (use != to) {
+                uses_of_def->addUse(use, *m_misc_bs_mgr);
+            }
+            defs_of_use->addDef(def, *m_misc_bs_mgr);
+        }
+    }
+    defs->clean(*m_misc_bs_mgr);
+    uses->clean(*m_misc_bs_mgr);
+}
+
+
 //Collect MustUse MDSet for both PR operation and Non-PR operation.
 //e.g: = a + b + *p;
 //    assume p->w,u, the MustUse is {a,b,p}, not include w,u.

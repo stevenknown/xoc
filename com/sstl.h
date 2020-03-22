@@ -389,7 +389,7 @@ inline void insertbefore(T ** head, T * marker, T * t)
 
 //Insert t into list immediately that following 'marker'.
 //e.g: a->maker->b->c
-//    output is: a->maker->t->b->c
+//     output is: a->maker->t->b->c
 //Return header in 'marker' if list is empty.
 template <class T>
 inline void insertafter_one(T ** marker, T * t)
@@ -412,7 +412,7 @@ inline void insertafter_one(T ** marker, T * t)
 
 //Append t into head of list.
 //e.g: given head->a->b->c, and t1->t2.
-//    output is: t1->t2->a->b->c
+//     output is: t1->t2->a->b->c
 //This function will update the head of list.
 template <class T>
 inline void append_head(T ** head, T * t)
@@ -597,13 +597,13 @@ public:
 //NOTICE:
 //    The following operations are the key points which you should
 //    pay attention to:
-//    1.    If you REMOVE one element, its container will be collect by FREE-List.
-//        So if you need a new container, please check the FREE-List first,
-//        accordingly, you should first invoke 'get_free_list' which get free
-//        containers out from 'm_free_list'.
-//      2.    If you want to invoke APPEND, please call 'newc' first to
-//        allocate a new container memory space, record your elements in
-//        container, then APPEND it at list.
+//    1. If you REMOVE one element, its container will be collect by FREE-List.
+//    So if you need a new container, please check the FREE-List first,
+//    accordingly, you should first invoke 'get_free_list' which get free
+//    containers out from 'm_free_list'.
+//    2. If you want to invoke APPEND, please call 'newc' first to
+//    allocate a new container memory space, record your elements in
+//    container, then APPEND it at list.
 template <class T, class Allocator = allocator<T> > class List {
 protected:
     UINT m_elem_count;
@@ -2907,15 +2907,15 @@ public:
 
 
 //Simply Vector.
-//
+//This is a small and lightweith vector object.
 //T: refer to element type.
 //NOTE: Zero is treated as the default NULL when we
 //determine the element existence.
-#define SVEC_elem_num(s)        ((s)->s1.m_elem_num)
+#define SVEC_elem_num(s) ((s)->s1.m_elem_num)
 template <class T, UINT GrowSize> class SimpleVec {
 protected:
     struct {
-        UINT m_elem_num:31;    //The number of element in vector.
+        UINT m_elem_num:31; //The number of element in vector.
         UINT m_is_init:1;
     } s1;
 public:
@@ -3330,9 +3330,7 @@ public:
     //If 't' already exists, return the element immediately.
     //'find': set to true if 't' already exist.
     //
-    //NOTE:
-    //    Do NOT append 0 to table.
-    //    Maximum size of T equals sizeof(void*).
+    //NOTE: Do NOT append 0 to table. Maximum size of T equals sizeof(void*).
     T append(T t, OUT HC<T> ** hct = NULL, bool * find = NULL)
     {
         ASSERTN(m_bucket != NULL, ("Hash not yet initialized."));
@@ -3933,11 +3931,7 @@ protected:
         m_root->color = RBBLACK;
     }
 public:
-    RBT()
-    {
-        m_pool = NULL;
-        init();
-    }
+    RBT() { m_pool = NULL; init(); }
     COPY_CONSTRUCTOR(RBT);
     ~RBT() { destroy(); }
 

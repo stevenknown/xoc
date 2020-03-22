@@ -95,7 +95,7 @@ class INTMat : public Matrix<INT> {
     friend class RMat;
     friend class BIRMat;
     bool m_is_init;
-    void _verify_hnf(INTMat &h);
+    void _verify_hnf(INTMat &h) const;
     friend INTMat operator * (INTMat const& a, INTMat const& b);
     friend INTMat operator + (INTMat const& a, INTMat const& b);
     friend INTMat operator - (INTMat const& a, INTMat const& b);
@@ -129,7 +129,7 @@ public:
     void genElimMat(UINT row, UINT col, OUT INTMat &elim);
 
     //Hermite Normal Form decomposition.
-    void hnf(OUT INTMat &h, OUT INTMat &u);
+    void hnf(OUT INTMat &h, OUT INTMat &u) const;
 
     //Reduce matrix by GCD operation.
     void gcd();

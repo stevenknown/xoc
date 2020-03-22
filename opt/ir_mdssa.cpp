@@ -1661,7 +1661,7 @@ void MDSSAMgr::changeUse(IR * olduse, IR * newuse)
 
 
 //Coalesce version of MD from 'src' to 'tgt'.
-//This function replace definitiond of USE of src to tgt's defintion.//
+//This function replace definition of USE of src to tgt's defintion.
 //e.g: p0=...
 //     p1=p0
 //     ...=p1
@@ -1982,5 +1982,16 @@ bool MDSSAMgr::construction(DomTree & domtree)
     return true;
 }
 //END MDSSAMgr
+
+bool verifyMDSSAInfo(Region * rg)
+{
+    MDSSAMgr * ssamgr = (MDSSAMgr*)(rg->getPassMgr()->
+        queryPass(PASS_MD_SSA_MGR));
+    if (ssamgr != NULL && ssamgr->isMDSSAConstructed()) {
+        ASSERT0(ssamgr->verify());
+        ASSERT0(ssamgr->verifyPhi(false));
+    }
+    return true;
+}
 
 } //namespace xoc

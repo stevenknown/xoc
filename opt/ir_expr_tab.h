@@ -32,15 +32,15 @@ IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 author: Su Zhenyu
 @*/
 #ifndef _IR_EXPR_TAB_
-#define    _IR_EXPR_TAB_
+#define _IR_EXPR_TAB_
 
 namespace xoc {
 
-#define EXPR_id(i)                  (i)->id
-#define EXPR_ir(i)                  (i)->ir
-#define EXPR_next(i)                (i)->next
-#define EXPR_prev(i)                (i)->prev
-#define EXPR_occ_list(i)            (i)->occ_list
+#define EXPR_id(i) (i)->id
+#define EXPR_ir(i) (i)->ir
+#define EXPR_next(i) (i)->next
+#define EXPR_prev(i) (i)->prev
+#define EXPR_occ_list(i) (i)->occ_list
 class ExpRep {
 public:
     UINT id;
@@ -63,8 +63,8 @@ public:
 //IR Expression Table, scanning statement to
 //evaluate the hash value of expression.
 //Compute LIVE IN and LIVE OUT IR expressions for each BB.
-#define IR_EXPR_TAB_LEVEL1_HASH_BUCKET    256
-#define IR_EXPR_TAB_LEVEL2_HASH_BUCKET    128
+#define IR_EXPR_TAB_LEVEL1_HASH_BUCKET 256
+#define IR_EXPR_TAB_LEVEL2_HASH_BUCKET 128
 class ExprTab : public Pass {
     UINT m_expr_count; //the encode-number expression.
     Region * m_rg;
@@ -124,7 +124,7 @@ public:
 
     PASS_TYPE getPassType() const { return PASS_EXPR_TAB; }
 
-    virtual CHAR const* getPassName() const { return "IR Expr Tabel"; }
+    virtual CHAR const* getPassName() const { return "Expr Table"; }
 
     virtual bool perform(IN OUT OptCtx & oc);
 };
