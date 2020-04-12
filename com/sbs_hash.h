@@ -56,6 +56,7 @@ class Bit2NodeT {
 public:
     SBitSetCore<BitsPerSeg> * set; //will be freed by sbs_mgr.
     TMap<UINT, Bit2NodeT*> next;
+    typedef RBTNode<UINT, Bit2NodeT*> B2NRBTNType;
 
     Bit2NodeT(SMemPool * pool = NULL) : next(pool) { set = NULL; }
     ~Bit2NodeT() {}
@@ -87,7 +88,7 @@ template <class Allocator, UINT BitsPerSeg = BITS_PER_SEG>
 class SBitSetCoreHash {
     COPY_CONSTRUCTOR(SBitSetCoreHash);
 protected:
-    SMemPool * m_pool;
+    SMemPool * m_pool;    
     Allocator * m_allocator;
     List<SBitSetCore<BitsPerSeg>*> m_bit2node_set_list;
 
@@ -99,6 +100,7 @@ protected:
     typedef Bit2NodeH<BitsPerSeg> B2NType;
     #else
     typedef Bit2NodeT<BitsPerSeg> B2NType;
+    SMemPool * m_rbtn_pool; //pool to store RBTNType.
     #endif
 
     B2NType * m_bit2node;
@@ -111,7 +113,7 @@ protected:
         #else
         B2NType * mn = (B2NType*)smpoolMallocConstSize(sizeof(B2NType), m_pool);
         ::memset(mn, 0, sizeof(B2NType));
-        mn->init(m_pool);
+        mn->init(m_rbtn_pool);
         #endif
 
         #ifdef _DEBUG_
@@ -128,13 +130,10 @@ protected:
                          UINT id) const
     {
         fprintf(h, "\n");
-
         UINT i = 0;
         while (i < indent) { fprintf(h, " "); i++; }
         fprintf(h, "%d", id);
-
         if (set == NULL) { return; }
-
         fprintf(h, " {");
         SEGIter * iter;
         for (INT j = set->get_first(&iter); j >= 0;) {
@@ -207,6 +206,8 @@ public:
         #ifdef _BIT2NODE_IN_HASH_
         m_bit2node = new B2NType(MD2NODE2_INIT_SZ);
         #else
+        m_rbtn_pool = smpoolCreate(sizeof(B2NType::B2NRBTNType) * 4,
+            MEM_CONST_SIZE);
         m_bit2node = new B2NType();
         #endif
     }
@@ -215,12 +216,14 @@ public:
         destroy();
 
         #ifdef _BIT2NODE_IN_HASH_
+        //Nothing to do.
         //Do not detete m_bit2node, it has already been deleted in destroy().        
         #else
+        smpoolDelete(m_rbtn_pool);
         delete m_bit2node;
         #endif
-        m_bit2node = NULL;
 
+        m_bit2node = NULL;
         smpoolDelete(m_pool);
     }
 
@@ -314,7 +317,7 @@ public:
             mn->next.grow();
         }
         #else
-        //Do nothing.
+        //Nothing to do.
         #endif
     }
 
@@ -357,6 +360,11 @@ public:
     size_t count_mem() const
     {
         size_t count = smpoolGetPoolSize(m_pool);
+        #ifdef _BIT2NODE_IN_HASH_
+        //Nothing to do.
+        #else
+        count += smpoolGetPoolSize(m_rbtn_pool);
+        #endif
         count += get_root()->count_mem();
         return count;
     }
@@ -365,7 +373,6 @@ public:
     void dump(FILE * h) const
     {
         if (h == NULL) { return; }
-
         fprintf(h, "\n==---- DUMP SBitSetCoreHashHash ----==");
 
         #ifdef _DEBUG_
@@ -374,7 +381,6 @@ public:
         #endif
 
         dump_helper(h, get_root(), 1);
-
         fflush(h);
     }
 
