@@ -41,7 +41,7 @@ class Bit2NodeH {
 public:
     SBitSetCore<BitsPerSeg> * set; //will be freed by sbs_mgr.
     HMap<UINT, Bit2NodeH*, HashFuncBase2<UINT> > next;
-
+public:
     Bit2NodeH(UINT hash_tab_size = 16) : next(hash_tab_size) { set = NULL; }
     ~Bit2NodeH() {}
     //Count memory usage for current object.
@@ -56,17 +56,14 @@ class Bit2NodeT {
 public:
     SBitSetCore<BitsPerSeg> * set; //will be freed by sbs_mgr.
     TMap<UINT, Bit2NodeT*> next;
-    typedef RBTNode<UINT, Bit2NodeT*> B2NRBTNType;
-
+public:
     Bit2NodeT(SMemPool * pool = NULL) : next(pool) { set = NULL; }
     ~Bit2NodeT() {}
-
     void init(SMemPool * pool = NULL)
     {
         set = NULL;
         next.init(pool);
     }
-
     void destroy()
     {
         set = NULL;
@@ -206,7 +203,8 @@ public:
         #ifdef _BIT2NODE_IN_HASH_
         m_bit2node = new B2NType(MD2NODE2_INIT_SZ);
         #else
-        m_rbtn_pool = smpoolCreate(sizeof(B2NType::B2NRBTNType) * 4,
+        m_rbtn_pool = smpoolCreate(
+            sizeof(RBTNode<UINT, Bit2NodeT<BitsPerSeg>*>) * 4,
             MEM_CONST_SIZE);
         m_bit2node = new B2NType();
         #endif
