@@ -51,6 +51,7 @@ class MDSSAMgr;
 //Record Data structure for IR analysis and transformation.
 #define ANA_INS_pass_mgr(a) ((a)->m_pass_mgr)
 class AnalysisInstrument {
+    COPY_CONSTRUCTOR(AnalysisInstrument);
 public:
     Region * m_rg;
     UINT m_pr_count; //counter of IR_PR.
@@ -79,8 +80,8 @@ public:
 
 public:
     explicit AnalysisInstrument(Region * rg);
-    COPY_CONSTRUCTOR(AnalysisInstrument);
     ~AnalysisInstrument();
+    //Count memory usage for current object.
     size_t count_mem();
 };
 
@@ -89,11 +90,12 @@ public:
 #define REF_INFO_maydef(ri) ((ri)->may_def_mds)
 #define REF_INFO_mayuse(ri) ((ri)->may_use_mds)
 class RefInfo {
+    COPY_CONSTRUCTOR(RefInfo);
 public:
     MDSet may_def_mds; //Record the MD set for Region usage
     MDSet may_use_mds; //Record the MD set for Region usage
 public:
-    COPY_CONSTRUCTOR(RefInfo);
+    //Count memory usage for current object.
     size_t count_mem()
     {
         size_t c = sizeof(RefInfo);
@@ -137,7 +139,57 @@ public:
 //And readonly region will alleviate the burden of optimizor.
 #define REGION_is_readonly(r) ((r)->m_u2.s1.is_readonly)
 
+//This class is base class to describe Region.
+//A program organized in a set of region, each region has it own IR stmt
+//list, local VAR table, and many kinds of analysis and transformation
+//modules.
+//
+//The kind of region can be blackbox, subregion, exception handling,
+//function unit, and program unit.
+//* blackbox
+//  The region is a black box that attached customized data.
+//  Black box is a single entry, single exit region.
+//
+//* subregion
+//  This kind of region serves as a unit of compilation. Subregion
+//  can be nested one inside another, which contains a list of IR.
+//  Subregion is single entry, multiple exits region. The different
+//  between subregion and function unit is subregion has neither
+//  epilog and prolog part of function, nor the landing part of
+//  exception handling. In general, subregions should be compiled
+//  inside-out. An additional use of this node is to specify a region
+//  to be parallelized.
+//
+//* exception handling
+//  It is region that represent exception handler and try block.
+//
+//* function unit
+//  The region represent normal function unit.
+//  Function unit may be multiple entries, and multiple exits.
+//  Most of optimizations apply on function unit. In general, the
+//  compilation of region unit include following phases:
+//    * Prescan IR list to specify which variable is taken address.
+//    * High level process to perform miscellaneous high
+//      level IR transformations accroding to syntactics analysis.
+//      This process is also responsible to simpify high level IR
+//      down to low level, and construct basic blocks.
+//    * Both high level and middle level will perform these passes,
+//      * Build control flow graph.
+//      * Flow sensitive or insensitive alias analysis.
+//      * Def-Use analysis.
+//      * Control dependence analysis.
+//    * Middle level optimizations are all based on low level IR,
+//      such as copy propagation, dead code elimination, global value
+//      numbering, and global common subexpression elimination.
+//
+//* program unit
+//  The region represent all program unit. A program unit contains a
+//  number of function units.
+//  Program unit is single entry and multiple exits region.
+//  XOC apply interprocedural analysis and optimization and inlining
+//  on program unit.
 class Region {
+    COPY_CONSTRUCTOR(Region);
 friend class RegionMgr;
 protected:
     union {
@@ -188,7 +240,6 @@ public:
 
 public:
     explicit Region(REGION_TYPE rt, RegionMgr * rm) { init(rt, rm); }
-    COPY_CONSTRUCTOR(Region);
     virtual ~Region() { destroy(); }
 
     void * xmalloc(UINT size)
@@ -282,9 +333,11 @@ public:
     MD const* allocCallResultPRMD(IR * ir);
     MD const* allocSetelemMD(IR * ir);
     MD const* allocGetelemMD(IR * ir);
-    void assignPRMD();
+    //Assign MD for ST/LD/ReadPR/WritePR operations.
+    //is_only_assign_pr: true if assign MD for each ReadPR/WritePR operations.
+    void assignMD(bool is_only_assign_pr);
     //Note the returned ByteBuf does not need to free by user.
-    ByteBuf * allocByteBuf(UINT bytesize)
+    ByteBuf * allocByteBuf(UINT bytesize)    
     {
         ByteBuf * buf = (ByteBuf*)xmalloc(sizeof(ByteBuf));
         BYTEBUF_size(buf) = bytesize;
@@ -388,6 +441,7 @@ public:
     HOST_INT calcLSRIntVal(Type const* type, HOST_INT v0, HOST_INT v1);
     HOST_INT calcIntVal(IR_TYPE ty, HOST_INT v0, HOST_INT v1);
     double calcFloatVal(IR_TYPE ty, double v0, double v1);
+    //Count memory usage for current object.
     size_t count_mem();
     void checkValidAndRecompute(OptCtx * oc, ...);
     void copyAI(IR const* src, IR * tgt);

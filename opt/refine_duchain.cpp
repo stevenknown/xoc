@@ -107,6 +107,10 @@ void RefineDUChain::processExpressionViaMDSSA(IR const* exp)
             ASSERTN(t->version() == 0, ("Only zero version MD has no DEF"));
             continue;
         }
+        if (t->getDef()->is_phi()) {
+            //TODO: Do PHI transferring to handle more cases.
+            continue;
+        }
         IR const* defstmt = t->getDef()->getOcc();
         ASSERT0(defstmt);
         if (exp->isNotOverLap(defstmt, m_rg)) {

@@ -40,11 +40,10 @@ class Region;
 
 //Control Dependence xcom::Graph
 class CDG : public xcom::Graph {
+    COPY_CONSTRUCTOR(CDG);
     Region * m_rg;
-
 public:
     CDG(Region * rg) { m_rg = rg; }
-    COPY_CONSTRUCTOR(CDG);
     void get_cd_preds(UINT id, OUT List<xcom::Vertex*> & lst);
     void get_cd_succs(UINT id, OUT List<xcom::Vertex*> & lst);
     bool is_only_cd_self(UINT id);

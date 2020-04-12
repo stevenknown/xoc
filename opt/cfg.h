@@ -66,6 +66,7 @@ public:
 //   compute dominator, please try best to add vertex with
 //   topological order.
 template <class BB, class XR> class CFG : public xcom::DGraph {
+    COPY_CONSTRUCTOR(CFG);
 protected:
     LI<BB> * m_loop_info; //Loop information
     List<BB*> * m_bb_list;
@@ -125,7 +126,6 @@ public:
         m_pool = smpoolCreate(sizeof(CFGEdgeInfo) * 4, MEM_COMM);
         set_dense(true); //We think CFG is always dense graph.
     }
-    COPY_CONSTRUCTOR(CFG);
     virtual ~CFG() { smpoolDelete(m_pool); }
 
     virtual void addBreakOutLoop(BB * loop_head, xcom::BitSet & body_set);
@@ -248,9 +248,10 @@ public:
 
     void chainPredAndSucc(UINT vid, bool is_single_pred_succ = false);
     void computeRPO(OptCtx & oc);
-    UINT count_mem() const
+    //Count memory usage for current object.
+    size_t count_mem() const
     {
-        UINT count = sizeof(*this);
+        size_t count = sizeof(*this);
         //count += m_bb_list.count_mem(); //do NOT count up BBs in bb_list.
         count += m_map_bb2li.count_mem();
         count += m_exit_list.count_mem();
@@ -259,7 +260,7 @@ public:
 
     virtual void dumpLoop(FILE * h)
     {
-        if (h == NULL) return;
+        if (h == NULL) { return; }
         fprintf(h, "\n==---- DUMP Natural Loop Tree ----==");
         dumpLoopTree(m_loop_info, 0, h);
         fflush(h);
@@ -403,14 +404,14 @@ public:
     void removeLoopInfo(LI<BB>* loop);
     bool reinsertLoopTree(LI<BB> ** lilist, LI<BB>* loop);
 
-    //Insert unconditional branch to revise fall through bb.
-    //e.g: Given bblist is bb1-bb2-bb3-bb4, bb4 is exit-BB,
-    //and flow edges are: bb1->bb2->bb3->bb4, bb1->bb3,
+    //Insert unconditional branch to revise fall through BB.
+    //e.g: Given bblist is bb1=>bb2=>bb3=>bb4, where bb4 is exit-BB,
+    //and control flow edges are: bb1->bb2->bb3->bb4, bb1->bb3,
     //where bb1->bb2, bb2->bb3, bb3->bb4 are fallthrough edge.
     //
-    //Assuming the reordered bblist is bb1-bb3-bb4-bb2, the
-    //associated flow edges are
-    //bb1->bb3->bb4, bb2->bb3.
+    //Assuming the reordered bblist is bb1=>bb3=>bb4=>bb2, the
+    //associated control flow edges are: bb1->bb3->bb4, bb2->bb3.
+    //
     //It is obviously that converting bb1->bb3 to be fallthrough,
     //and converting bb1->bb2 to be conditional branch, converting
     //bb2->bb3 to be unconditional branch.
@@ -985,50 +986,25 @@ void CFG<BB, XR>::sortByBFS()
 }
 
 
-//Sort BBs in order of topology.
-//NOTICE:
-//    Be careful use this function.
+//Sort BB in order of topology.
+//NOTE:Be careful use this function.
 //    Because we will emit IR in terms of
-//    the order which 'm_bbl' holds.
+//    the order which 'm_bb_list' holds.
 template <class BB, class XR>
 void CFG<BB, XR>::sortByTopological()
 {
-    xcom::Graph g;
-    g.clone(*this);
-    List<BB*> new_bbl;
-    List<xcom::Vertex*> succ;
-    INT c;
-    List<xcom::Vertex*> header;
-    while (g.getVertexNum() > 0) {
-        header.clean();
-        for (xcom::Vertex * vex = g.get_first_vertex(c);
-             vex != NULL; vex = g.get_next_vertex(c)) {
-            if (g.getInDegree(vex) == 0) {
-                header.append_tail(vex);
-            }
-        }
-
-        if (header.get_elem_count() == 0) {
-            header.append_tail(succ.get_head());
-        }
-
-        succ.clean();
-        ASSERTN(header.get_elem_count() > 0, ("No entry BB"));
-        xcom::C<xcom::Vertex*> * ct;
-        for (header.get_head(&ct);
-             ct != header.end(); ct = header.get_next(ct)) {
-            xcom::Vertex * v = ct->val();
-            xcom::EdgeC * el = VERTEX_out_list(v);
-            if (el != NULL) {
-                //record the first succ.
-                succ.append_tail(EDGE_to(EC_edge(el)));
-            }
-            g.removeVertex(v);
-            new_bbl.append_tail(getBB(VERTEX_id(v)));
-        }
+    Vector<Vertex*> vex_vec;
+    if (!sortInTopologOrder(vex_vec)) {
+        //Graph is cyclic.
+        return;
     }
-    revise_fallthrough(new_bbl);
-    m_bb_list->copy(new_bbl);
+    m_bb_list->clean();
+    for (INT i = 0; i <= vex_vec.get_last_idx(); i++) {
+        Vertex * v = vex_vec.get(i);
+        ASSERT0(v);
+        m_bb_list->append_tail(getBB(VERTEX_id(v)));
+    }
+    revise_fallthrough(*m_bb_list);
     m_bb_sort_type = SEQ_TOPOL;
 }
 

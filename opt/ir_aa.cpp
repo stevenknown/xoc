@@ -47,7 +47,7 @@ namespace xoc {
 //
 size_t PPSetMgr::count_mem()
 {
-    UINT count = 0;
+    size_t count = 0;
     for (xcom::SC<PtPairSet*> * sc = m_pp_set_list.get_head();
          sc != m_pp_set_list.end(); sc = m_pp_set_list.get_next(sc)) {
         PtPairSet * pps = sc->val();
@@ -1213,13 +1213,12 @@ MD const* AliasAnalysis::assignPRMD(IR * ir,
     ASSERT0(mds && ic);
     MD const* tmp = NULL;
     if (!m_is_visit.is_contain(ir->id())) {
-        m_is_visit.bunion(ir->id());
-        tmp = m_rg->allocPRMD(ir);
+        m_is_visit.bunion(ir->id());        
         AC_is_mds_mod(ic) = true;
-    } else {
-        tmp = m_rg->getMustRef(ir);
+    } else {    
         AC_is_mds_mod(ic) = false;
     }
+    tmp = m_rg->getMustRef(ir);
     ASSERT0(tmp);
     mds->clean(*m_misc_bs_mgr);
     AC_returned_pts(ic) = NULL;
@@ -1282,12 +1281,11 @@ MD const* AliasAnalysis::assignLoadMD(IR * ir,
     MD const* t = NULL;
     if (!m_is_visit.is_contain(ir->id())) {
         m_is_visit.bunion(ir->id());
-        t = m_rg->allocLoadMD(ir);
         AC_is_mds_mod(ic) = true;
     } else {
-        t = m_rg->getMustRef(ir);
         AC_is_mds_mod(ic) = false;
     }
+    t = m_rg->getMustRef(ir);
     ASSERT0(t);
     AC_returned_pts(ic) = NULL;
     mds->clean(*m_misc_bs_mgr);
@@ -1300,6 +1298,7 @@ MD const* AliasAnalysis::assignLoadMD(IR * ir,
     ASSERT0(mx);
     AC_is_mds_mod(ic) = true;
     MDSet const* pts = getPointTo(MD_id(t), *mx);
+    
     MD const* typed_md = NULL;
     if (pts != NULL && !pts->is_empty()) {
         if (pts->is_contain_global() &&
@@ -1338,19 +1337,12 @@ MD const* AliasAnalysis::assignIdMD(IR * ir,
     MD const* t = NULL;
     AC_returned_pts(ic) = NULL;
     if (!m_is_visit.is_contain(ir->id())) {
-        m_is_visit.bunion(ir->id());
-        if (ID_info(ir)->is_string()) {
-            t = m_rg->allocStringMD(ID_info(ir)->get_name());
-            m_rg->setMustRef(ir, t);
-            ir->cleanRefMDSet();
-        } else {
-            t = m_rg->allocIdMD(ir);
-        }
+        m_is_visit.bunion(ir->id());        
         AC_is_mds_mod(ic) = true;
     } else {
-        t = m_rg->getMustRef(ir);
         AC_is_mds_mod(ic) = false;
     }
+    t = m_rg->getMustRef(ir);
     ASSERT0(t);
     mds->clean(*m_misc_bs_mgr);
     //IR_ID does not generate or transit POINT-TO set.
@@ -1698,13 +1690,8 @@ void AliasAnalysis::inferStoreValue(IR const* ir,
 void AliasAnalysis::processStore(IN IR * ir, IN MD2MDSet * mx)
 {
     ASSERT0(ir->is_st());
-    MD const* t;
-    if (!m_is_visit.is_contain(ir->id())) {
-        m_is_visit.bunion(ir->id());
-        t = m_rg->allocStoreMD(ir);
-    } else {
-        t = m_rg->getMustRef(ir);
-    }
+    MD const* t = m_rg->getMustRef(ir);
+    ASSERT0(t);
     AACtx ic;
     inferStoreValue(ir, ST_rhs(ir), t, &ic, mx);
 }
@@ -1721,14 +1708,8 @@ void AliasAnalysis::processStore(IN IR * ir, IN MD2MDSet * mx)
 void AliasAnalysis::processStorePR(IN IR * ir, IN MD2MDSet * mx)
 {
     ASSERT0(ir->is_stpr());
-    MD const* t;
-    if (!m_is_visit.is_contain(ir->id())) {
-        m_is_visit.bunion(ir->id());
-        t = m_rg->allocStorePRMD(ir);
-    } else {
-        t = m_rg->getMustRef(ir);
-    }
-
+    MD const* t = m_rg->getMustRef(ir);
+    ASSERT0(t);
     AACtx ic;
     inferStoreValue(ir, STPR_rhs(ir), t, &ic, mx);
 }
@@ -1738,13 +1719,8 @@ void AliasAnalysis::processStorePR(IN IR * ir, IN MD2MDSet * mx)
 void AliasAnalysis::processSetelem(IR * ir, IN MD2MDSet * mx)
 {
     ASSERT0(ir->is_setelem());
-    MD const* t;
-    if (!m_is_visit.is_contain(ir->id())) {
-        m_is_visit.bunion(ir->id());
-        t = m_rg->allocSetelemMD(ir);
-    } else {
-        t = m_rg->getMustRef(ir);
-    }
+    MD const* t = m_rg->getMustRef(ir);
+    ASSERT0(t);
     AACtx ic;
     inferStoreValue(ir, SETELEM_val(ir), t, &ic, mx);
 
@@ -1764,13 +1740,6 @@ void AliasAnalysis::processSetelem(IR * ir, IN MD2MDSet * mx)
 void AliasAnalysis::processGetelem(IR * ir, IN MD2MDSet * mx)
 {
     ASSERT0(ir->is_getelem() && GETELEM_ofst(ir));
-    if (!m_is_visit.is_contain(ir->id())) {
-        m_is_visit.bunion(ir->id());
-        m_rg->allocGetelemMD(ir);
-    } else {
-        m_rg->getMustRef(ir);
-    }
-
     //Process base field, it must refer to memory object.
     AACtx ic;
     MDSet tmp;
@@ -1786,14 +1755,8 @@ void AliasAnalysis::processGetelem(IR * ir, IN MD2MDSet * mx)
 void AliasAnalysis::processPhi(IN IR * ir, IN MD2MDSet * mx)
 {
     ASSERT0(ir->is_phi());
-    MD const* phi_md;
-    if (!m_is_visit.is_contain(ir->id())) {
-        m_is_visit.bunion(ir->id());
-        phi_md = m_rg->allocPhiMD(ir);
-    } else {
-        phi_md = m_rg->getMustRef(ir);
-    }
-
+    MD const* phi_md = m_rg->getMustRef(ir);
+    ASSERT0(phi_md);
     AACtx ic;
     if (ir->is_ptr() || ir->is_any()) {
         AC_comp_pt(&ic) = true;
@@ -3541,7 +3504,7 @@ bool AliasAnalysis::computeFlowSensitive(List<IRBB*> const& bbl)
 
             #ifdef _DEBUG_
             //MD2MDSet x;
-            //convertPT2MD2MDSet(tmp, m_pt_pair_mgr, &x);
+            //convertPT2MD2MDSet(tmp, m_pt_pair_mgr, &x);            
             //dumpMD2MDSet(&x, false);
             #endif
             pps = getOutPtPairSet(bb);
@@ -3550,11 +3513,8 @@ bool AliasAnalysis::computeFlowSensitive(List<IRBB*> const& bbl)
                 change = true;
             }
         }
-
-        //dumpMD2MDSetForRegion(false);
-        //dumpIRPointToForRegion(true);
-    }
-    ASSERTN(!change, ("Iterated too many times"));
+     }
+    ASSERTN(!change, ("Iterate too many times"));
     return true;
 }
 

@@ -473,6 +473,7 @@ inline T * reverse_list(T * t)
 #define C_next(c) ((c)->next)
 #define C_prev(c) ((c)->prev)
 template <class T> class C {
+    COPY_CONSTRUCTOR(C<T>);
 public:
     C<T> * prev;
     C<T> * next;
@@ -480,8 +481,6 @@ public:
 
 public:
     C() { init(); }
-    COPY_CONSTRUCTOR(C<T>);
-
     void init()
     {
         prev = next = NULL;
@@ -498,14 +497,13 @@ public:
 #define SC_val(c) ((c)->value)
 #define SC_next(c) ((c)->next)
 template <class T> class SC {
+    COPY_CONSTRUCTOR(SC<T>);
 public:
     SC<T> * next;
     T value;
 
 public:
     SC() { init(); }
-    COPY_CONSTRUCTOR(SC<T>);
-
     void init()
     {
         next = NULL;
@@ -531,6 +529,7 @@ public:
 //    }
 template <class T>
 class FreeList {
+    COPY_CONSTRUCTOR(FreeList);
 public:
     BOOL m_is_clean;
     T * m_tail;
@@ -541,19 +540,16 @@ public:
         m_is_clean = true;
         m_tail = NULL;
     }
-    COPY_CONSTRUCTOR(FreeList);
     ~FreeList()
     { m_tail = NULL; }
 
-    UINT count_mem() const { return sizeof(FreeList<T>); }
-
+    //Count memory usage for current object.
+    size_t count_mem() const { return sizeof(FreeList<T>); }
     //Note the element in list should be freed by user.
-    void clean()
-    { m_tail = NULL; }
+    void clean() { m_tail = NULL; }
 
     //True if invoke ::memset when user query free element.
-    void set_clean(bool is_clean)
-    { m_is_clean = (BYTE)is_clean; }
+    void set_clean(bool is_clean) { m_is_clean = (BYTE)is_clean; }
 
     //Add t to tail of the list.
     //Do not clean t's content.
@@ -605,6 +601,7 @@ public:
 //    allocate a new container memory space, record your elements in
 //    container, then APPEND it at list.
 template <class T, class Allocator = allocator<T> > class List {
+    COPY_CONSTRUCTOR(List);
 protected:
     UINT m_elem_count;
     C<T> * m_head;
@@ -619,7 +616,6 @@ protected:
     FreeList<C<T> > m_free_list;
 public:
     List() { init(); }
-    COPY_CONSTRUCTOR(List);
     ~List() { destroy(); }
 
     void init()
@@ -691,11 +687,10 @@ public:
             t = src.get_next();
         }
     }
-
-    UINT count_mem() const
+    //Count memory usage for current object.
+    size_t count_mem() const
     {
-        UINT count = 0;
-        count += sizeof(m_elem_count);
+        size_t count = sizeof(m_elem_count);
         count += sizeof(m_head);
         count += sizeof(m_tail);
         count += sizeof(m_cur);
@@ -1554,6 +1549,7 @@ public:
 //     been allocated in memory pool, you should invoke clean() to free
 //     all of them back to a free list to reuse them.
 template <class T> class SListCore {
+    COPY_CONSTRUCTOR(SListCore);
 protected:
     UINT m_elem_count; //list elements counter.
     SC<T> m_head; //list head.
@@ -1622,7 +1618,6 @@ protected:
     }
 public:
     SListCore() { init(); }
-    COPY_CONSTRUCTOR(SListCore);
     ~SListCore()
     {
         //Note: Before invoked the destructor, even if the containers have
@@ -1685,10 +1680,10 @@ public:
 
         ASSERT0(m_elem_count == 0);
     }
-
-    UINT count_mem() const
+    //Count memory usage for current object.
+    size_t count_mem() const
     {
-        UINT count = sizeof(m_elem_count);
+        size_t count = sizeof(m_elem_count);
         count += sizeof(m_head);
         //Do not count SC, they belong to input pool.
         return count;
@@ -1866,6 +1861,7 @@ public:
 //          ...
 //          smpoolDelete(pool);
 template <class T> class SList : public SListCore<T> {
+    COPY_CONSTRUCTOR(SList);
 protected:
     SMemPool * m_free_list_pool;
     SC<T> * m_free_list; //Hold for available containers
@@ -1876,7 +1872,6 @@ public:
         //Invoke init() explicitly if SList is allocated from mempool.
         set_pool(pool);
     }
-    COPY_CONSTRUCTOR(SList);
     ~SList()
     {
         //destroy() do the same things as the parent class's destructor.
@@ -1912,8 +1907,8 @@ public:
     { SListCore<T>::copy(src, &m_free_list, m_free_list_pool); }
 
     void clean() { SListCore<T>::clean(&m_free_list); }
-
-    UINT count_mem() const
+    //Count memory usage for current object.
+    size_t count_mem() const
     {
         //Do not count SC containers, they belong to input pool.
         return SListCore<T>::count_mem();
@@ -1967,6 +1962,7 @@ public:
 //Compared to dual linked list, single linked list allocate containers
 //in a const size pool.
 template <class T> class SListEx {
+    COPY_CONSTRUCTOR(SListEx);
 protected:
     UINT m_elem_count;
     SC<T> * m_head;
@@ -2021,7 +2017,6 @@ protected:
     }
 public:
     SListEx() { init(); }
-    COPY_CONSTRUCTOR(SListEx);
     ~SListEx()
     {
         //Note: Before going to the destructor, even if the containers have
@@ -2112,10 +2107,10 @@ public:
         }
         ASSERT0(m_head == m_tail && m_head == NULL && m_elem_count == 0);
     }
-
-    UINT count_mem() const
+    //Count memory usage for current object.
+    size_t count_mem() const
     {
-        UINT count = sizeof(m_elem_count);
+        size_t count = sizeof(m_elem_count);
         count += sizeof(m_head);
         count += sizeof(m_tail);
         //Do not count SC, they has been involved in pool.
@@ -2297,11 +2292,11 @@ public:
 //
 //NOTICE: User must define a mapping class bewteen.
 template <class T, class MapTypename2Holder> class EList : public List<T> {
+    COPY_CONSTRUCTOR(EList);
 protected:
     MapTypename2Holder m_typename2holder; //map typename 'T' to its list holder.
 public:
     EList() {}
-    COPY_CONSTRUCTOR(EList);
     virtual ~EList() {} //MapTypename2Holder has virtual function.
 
     void copy(IN List<T> & src)
@@ -2319,7 +2314,7 @@ public:
         List<T>::clean();
         m_typename2holder.clean();
     }
-
+    //Count memory usage for current object.
     size_t count_mem() const
     {
         size_t count = m_typename2holder.count_mem();
@@ -2538,9 +2533,9 @@ public:
 
 //STACK
 template <class T> class Stack : public List<T> {
+    COPY_CONSTRUCTOR(Stack);
 public:
     Stack() {}
-    COPY_CONSTRUCTOR(Stack);
 
     void push(T t) { List<T>::append_tail(t); }
     T pop() { return List<T>::remove_tail(); }
@@ -2713,8 +2708,9 @@ public:
         ::memset(m_vec, 0, sizeof(T) * (m_last_idx + 1));
         m_last_idx = -1; //No any elements
     }
-
-    UINT count_mem() const { return m_elem_num * sizeof(T) + sizeof(Vector<T>); }
+    //Count memory usage for current object.
+    size_t count_mem() const
+    { return m_elem_num * sizeof(T) + sizeof(Vector<T>); }
 
     //Place elem to vector according to index.
     //Growing vector if 'index' is greater than m_elem_num.
@@ -2805,6 +2801,7 @@ public:
 //third is 5.
 template <class T, UINT GrowSize = 8>
 class VectorWithFreeIndex : public Vector<T, GrowSize> {
+    COPY_CONSTRUCTOR(VectorWithFreeIndex);
 protected:
     //Always refers to free space to Vector,
     //and the first free space position is '0'
@@ -2816,7 +2813,6 @@ public:
         Vector<T, GrowSize>::m_is_init = false;
         init();
     }
-    COPY_CONSTRUCTOR(VectorWithFreeIndex);
     inline void init()
     {
         Vector<T, GrowSize>::init();
@@ -3005,8 +3001,9 @@ public:
         ASSERTN(s1.m_is_init, ("SimpleVec not yet initialized."));
         ::memset(m_vec, 0, sizeof(T) * SVEC_elem_num(this));
     }
-
-    UINT count_mem() const { return SVEC_elem_num(this) + sizeof(Vector<T>); }
+    //Count memory usage for current object.
+    size_t count_mem() const
+    { return SVEC_elem_num(this) + sizeof(Vector<T>); }
 
     //Return NULL if 'i' is illegal, otherwise return 'elem'.
     void set(UINT i, T elem)
@@ -3222,6 +3219,7 @@ public:
 //'T': the element type.
 //'HF': Hash function type.
 template <class T, class HF = HashFuncBase<T> > class Hash {
+    COPY_CONSTRUCTOR(Hash);
 protected:
     HF m_hf;
     SMemPool * m_free_list_pool;
@@ -3322,7 +3320,6 @@ public:
         m_elem_count = 0;
         init(bsize);
     }
-    COPY_CONSTRUCTOR(Hash);
     virtual ~Hash() { destroy(); }
 
     //Append 't' into hash table and record its reference into
@@ -3798,8 +3795,10 @@ public:
 
 template <class T, class Ttgt, class CompareKey = CompareKeyBase<T> >
 class RBT {
+    COPY_CONSTRUCTOR(RBT);
 protected:
     typedef RBTNode<T, Ttgt> RBTNType;
+    bool m_use_outside_pool;
     UINT m_num_of_tn;
     RBTNType * m_root;
     SMemPool * m_pool;
@@ -3808,7 +3807,8 @@ protected:
 
     RBTNType * new_tn()
     {
-        RBTNType * p = (RBTNType*)smpoolMallocConstSize(sizeof(RBTNType), m_pool);
+        RBTNType * p = (RBTNType*)smpoolMallocConstSize(
+            sizeof(RBTNType), m_pool);
         ASSERT0(p);
         ::memset(p, 0, sizeof(RBTNType));
         return p;
@@ -3931,14 +3931,24 @@ protected:
         m_root->color = RBBLACK;
     }
 public:
-    RBT() { m_pool = NULL; init(); }
-    COPY_CONSTRUCTOR(RBT);
+    RBT(SMemPool * pool = NULL) : m_use_outside_pool(false)
+    { m_pool = NULL; init(pool); }
     ~RBT() { destroy(); }
 
-    void init()
+    void init(SMemPool * pool = NULL)
     {
-        if (m_pool != NULL) { return; }
-        m_pool = smpoolCreate(sizeof(RBTNType) * 4, MEM_CONST_SIZE);
+        if (m_pool != NULL) {
+            //RBT has been initialized.
+            return;
+        }
+        if (pool != NULL) {
+            //Regard outside pool as current pool.
+            m_pool = pool;
+            m_use_outside_pool = true;
+        } else {
+            ASSERT0(!m_use_outside_pool);
+            m_pool = smpoolCreate(sizeof(RBTNType) * 4, MEM_CONST_SIZE);
+        }
         m_root = NULL;
         m_num_of_tn = 0;
         m_free_list = NULL;
@@ -3946,21 +3956,29 @@ public:
 
     void destroy()
     {
-        if (m_pool == NULL) { return; }
-        smpoolDelete(m_pool);
+        if (m_pool == NULL) {
+            //RBT has been destroied.
+            return;
+        }
+        if (!m_use_outside_pool) {
+            smpoolDelete(m_pool);
+        }
+        m_use_outside_pool = false;
         m_pool = NULL;
         m_num_of_tn = 0;
         m_root = NULL;
         m_free_list = NULL;
     }
-
+    //Count memory usage for current object.
     size_t count_mem() const
     {
         size_t c = sizeof(m_num_of_tn);
         c += sizeof(m_root);
         c += sizeof(m_pool);
         c += sizeof(m_free_list);
-        c += smpoolGetPoolSize(m_pool);
+        if (!m_use_outside_pool) {
+            c += smpoolGetPoolSize(m_pool);
+        }
         return c;
     }
 
@@ -4281,9 +4299,9 @@ public:
 //You should call clean() to initialize the iterator.
 template <class Tsrc, class Ttgt>
 class TMapIter : public List<RBTNode<Tsrc, Ttgt>*> {
+    COPY_CONSTRUCTOR(TMapIter);
 public:
     TMapIter() {}
-    COPY_CONSTRUCTOR(TMapIter);
 };
 
 
@@ -4292,13 +4310,13 @@ public:
 //You should call clean() to initialize the iterator.
 template <class Tsrc, class Ttgt>
 class TMapIter2 : public SList<RBTNode<Tsrc, Ttgt>*> {
+    COPY_CONSTRUCTOR(TMapIter2);
 public:
     typedef RBTNode<Tsrc, Ttgt>* Container;
 
 public:
     TMapIter2(SMemPool * pool) : SList<RBTNode<Tsrc, Ttgt>*>(pool)
     { ASSERT0(pool); }
-    COPY_CONSTRUCTOR(TMapIter2);
 };
 
 
@@ -4321,15 +4339,16 @@ public:
 //       nor pointer type.
 template <class Tsrc, class Ttgt, class CompareKey = CompareKeyBase<Tsrc> >
 class TMap : public RBT<Tsrc, Ttgt, CompareKey> {
+    COPY_CONSTRUCTOR(TMap);
 public:
     typedef RBT<Tsrc, Ttgt, CompareKey> BaseType;
     typedef RBTNode<Tsrc, Ttgt> RBTNType;
-    TMap() {}
-    COPY_CONSTRUCTOR(TMap);
+    TMap(SMemPool * pool = NULL) : RBT<Tsrc, Ttgt, CompareKey>(pool) {}
     ~TMap() {}
 
     //This function should be invoked if TMap is initialized manually.
-    void init() { RBT<Tsrc, Ttgt, CompareKey>::init(); }
+    void init(SMemPool * pool = NULL)
+    { RBT<Tsrc, Ttgt, CompareKey>::init(pool); }
 
     //This function should be invoked if TMap is destroied manually.
     void destroy() { RBT<Tsrc, Ttgt, CompareKey>::destroy(); }
@@ -4410,16 +4429,16 @@ public:
 //You should call clean() to initialize the iterator.
 template <class T>
 class TabIter : public List<RBTNode<T, T>*> {
+    COPY_CONSTRUCTOR(TabIter);
 public:
     TabIter() {}
-    COPY_CONSTRUCTOR(TabIter);
 };
 
 template <class T, class CompareKey = CompareKeyBase<T> >
 class TTab : public TMap<T, T, CompareKey> {
+    COPY_CONSTRUCTOR(TTab);
 public:
     TTab() {}
-    COPY_CONSTRUCTOR(TTab);
 
     typedef RBT<T, T, CompareKey> BaseTypeofTMap;
     typedef TMap<T, T, CompareKey> BaseTMap;
@@ -4491,6 +4510,7 @@ public:
 //       virtual-function-pointers-table is needed.
 template <class Tsrc, class Ttgt, class HF = HashFuncBase<Tsrc> >
 class HMap : public Hash<Tsrc, HF> {
+    COPY_CONSTRUCTOR(HMap);
 protected:
     Vector<Ttgt> m_mapped_elem_table;
 
@@ -4519,7 +4539,6 @@ protected:
 public:
     HMap(UINT bsize = MAX_SHASH_BUCKET) : Hash<Tsrc, HF>(bsize)
     { m_mapped_elem_table.init(); }
-    COPY_CONSTRUCTOR(HMap);
     virtual ~HMap() { destroy(); }
 
     //Alway set new mapping even if it has done.
@@ -4556,10 +4575,10 @@ public:
         Hash<Tsrc, HF>::clean();
         m_mapped_elem_table.clean();
     }
-
-    UINT count_mem() const
+    //Count memory usage for current object.
+    size_t count_mem() const
     {
-        UINT count = m_mapped_elem_table.count_mem();
+        size_t count = m_mapped_elem_table.count_mem();
         count += ((Hash<Tsrc, HF>*)this)->count_mem();
         return count;
     }
@@ -4666,12 +4685,12 @@ public:
 //    2. DMap Object's memory can be allocated by malloc() dynamically.
 template <class Tsrc, class Ttgt, class MAP_Tsrc2Ttgt, class MAP_Ttgt2Tsrc>
 class DMap {
+    COPY_CONSTRUCTOR(DMap);
 protected:
     MAP_Tsrc2Ttgt m_src2tgt_map;
     MAP_Ttgt2Tsrc m_tgt2src_map;
 public:
     DMap() {}
-    COPY_CONSTRUCTOR(DMap);
     ~DMap() {}
 
     //Alway overlap the old value by new 'mapped' value.
@@ -4681,10 +4700,10 @@ public:
         m_src2tgt_map.setAlways(t, mapped);
         m_tgt2src_map.setAlways(mapped, t);
     }
-
-    UINT count_mem() const
+    //Count memory usage for current object.
+    size_t count_mem() const
     {
-        UINT count = m_src2tgt_map.count_mem();
+        size_t count = m_src2tgt_map.count_mem();
         count += m_tgt2src_map.count_mem();
         return count;
     }
@@ -4755,6 +4774,7 @@ public:
 template <class Tsrc, class Ttgt, class TAB_Ttgt,
           class HF = HashFuncBase<Tsrc> >
 class MMap : public HMap<Tsrc, TAB_Ttgt*, HF> {
+    COPY_CONSTRUCTOR(MMap);
 protected:
     bool m_is_init;
 public:
@@ -4763,10 +4783,9 @@ public:
         m_is_init = false;
         init();
     }
-    COPY_CONSTRUCTOR(MMap);
     virtual ~MMap() { destroy(); }
-
-    UINT count_mem() const
+    //Count memory usage for current object.
+    size_t count_mem() const
     {
         return ((HMap<Tsrc, TAB_Ttgt*, HF>*)this)->count_mem() +
                sizeof(m_is_init);

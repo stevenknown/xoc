@@ -37,9 +37,9 @@ author: Su Zhenyu
 namespace xoc {
 
 class IRSet : public DefSBitSet {
+    COPY_CONSTRUCTOR(IRSet);
 public:
     IRSet(DefSegMgr * sm) : DefSBitSet(sm) {}
-    COPY_CONSTRUCTOR(IRSet);
 
     void append(IR const* v) { DefSBitSet::bunion(IR_id(v)); }
 
@@ -61,10 +61,11 @@ public:
 //For each version of each prno, VP is unique.
 typedef SEGIter * SSAUseIter;
 
-#define SSA_id(ssainfo)         ((ssainfo)->id)
-#define SSA_def(ssainfo)        ((ssainfo)->def_stmt)
-#define SSA_uses(ssainfo)       ((ssainfo)->use_exp_set)
+#define SSA_id(ssainfo) ((ssainfo)->id)
+#define SSA_def(ssainfo) ((ssainfo)->def_stmt)
+#define SSA_uses(ssainfo) ((ssainfo)->use_exp_set)
 class SSAInfo {
+    COPY_CONSTRUCTOR(SSAInfo);
 protected:
     void cleanMember()
     {
@@ -78,7 +79,6 @@ public:
 
 public:
     SSAInfo(DefSegMgr * sm) : use_exp_set(sm) { cleanMember(); }
-    COPY_CONSTRUCTOR(SSAInfo);
 
     inline void cleanDU()
     {
@@ -111,13 +111,11 @@ public:
 #define VP_prno(v)           ((v)->prno)
 #define VP_ver(v)            ((v)->version)
 class VP : public SSAInfo {
+    COPY_CONSTRUCTOR(VP);
 public:
     UINT version;
     UINT prno;
-
     VP(DefSegMgr * sm) : SSAInfo(sm) { cleanMember(); }
-    COPY_CONSTRUCTOR(VP);
-
     inline void cleanMember()
     {
         SSAInfo::cleanMember();

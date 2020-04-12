@@ -39,9 +39,9 @@ namespace xoc {
 #define INLINFO_need_el(i)        ((i)->need_el)
 #define INLINFO_has_ret(i)        ((i)->has_ret)
 class InlineInfo {
+    COPY_CONSTRUCTOR(InlineInfo);
 public:
     InlineInfo() {}
-    COPY_CONSTRUCTOR(InlineInfo);
 
     BYTE need_el:1;
     BYTE has_ret:1;
@@ -49,6 +49,7 @@ public:
 
 
 class Inliner : public Pass {
+    COPY_CONSTRUCTOR(Inliner);
 protected:
     RegionMgr * m_rumgr;
     SMemPool * m_pool;
@@ -95,7 +96,6 @@ public:
         ASSERT0(m_call_graph);
         m_pool = smpoolCreate(16, MEM_COMM);
     }
-    COPY_CONSTRUCTOR(Inliner);
     virtual ~Inliner() { smpoolDelete(m_pool); }
 
     bool can_be_cand(Region * rg);

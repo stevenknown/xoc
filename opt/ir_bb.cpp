@@ -103,14 +103,15 @@ bool IRBB::isDownBoundary(IR * ir)
 }
 
 
-void IRBB::dump(Region * rg, bool dump_inner_region)
+void IRBB::dump(Region const* rg, bool dump_inner_region) const
 {
     if (g_tfile == NULL) { return; }
 
     note("\n----- BB%d ------", BB_id(this));
-    if (getLabelList().get_elem_count() > 0) {
+    IRBB * pthis = const_cast<IRBB*>(this);
+    if (pthis->getLabelList().get_elem_count() > 0) {
         note("\nLABEL:");
-        dumpBBLabel(getLabelList(), g_tfile);
+        dumpBBLabel(pthis->getLabelList(), g_tfile);
     }
 
     //Attributes
@@ -134,8 +135,8 @@ void IRBB::dump(Region * rg, bool dump_inner_region)
     //IR list
     note("\nSTMT NUM:%d", getNumOfIR());
     g_indent += 3;
-    for (IR * ir = BB_first_ir(this);
-         ir != NULL; ir = BB_irlist(this).get_next()) {
+    for (IR * ir = BB_first_ir(pthis);
+         ir != NULL; ir = BB_irlist(pthis).get_next()) {
         ASSERT0(ir->is_single() && ir->getBB() == this);
         dumpIR(ir, rg, NULL, IR_DUMP_KID | IR_DUMP_SRC_LINE |
             (dump_inner_region ? IR_DUMP_INNER_REGION : 0));
@@ -317,8 +318,8 @@ void dumpBBLabel(List<LabelInfo const*> & lablist, FILE * h)
 }
 
 
-void dumpBBList(BBList * bbl,
-                Region * rg,
+void dumpBBList(BBList const* bbl,
+                Region const* rg,
                 CHAR const* name,
                 bool dump_inner_region)
 {
@@ -340,8 +341,9 @@ void dumpBBList(BBList * bbl,
         } else {
             fprintf(h, "\n==---- DUMP IRBBList region '%s' ----==", rg->getRegionName());
         }
-
-        for (IRBB * bb = bbl->get_head(); bb != NULL; bb = bbl->get_next()) {
+        C<IRBB*> * ct = NULL;
+        for (IRBB * bb = bbl->get_head(&ct);
+             bb != NULL; bb = bbl->get_next(&ct)) {
             bb->dump(rg, dump_inner_region);
         }
         fflush(h);

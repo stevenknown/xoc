@@ -1,6 +1,9 @@
 #ifndef __XCOMINC_H__
 #define __XCOMINC_H__
 
+//Use OS dependent implementation
+//#define VARIADIC_PARAMETER_ACCESS
+
 //libxcom
 #include "ltype.h"
 #include "comf.h"
@@ -21,7 +24,6 @@
 #include "linsys.h"
 #include "lpsol.h"
 #include "sort.h"
-
 using namespace xcom;
 #endif
 

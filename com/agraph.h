@@ -79,9 +79,10 @@ public:
         }
     }
 
-    UINT count_mem() const
+    //Count memory usage for current object.
+    size_t count_mem() const
     {
-        UINT count = (UINT)Graph::count_mem();
+        size_t count = Graph::count_mem();
         if (m_spath_mat != NULL) {
             count += m_spath_mat->count_mem();
         }

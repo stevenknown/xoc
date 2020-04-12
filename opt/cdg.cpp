@@ -139,14 +139,14 @@ void CDG::build(IN OUT OptCtx & oc, xcom::DGraph & cfg)
     cfg.get_pdom_tree(pdom_tree);
     if (pdom_tree.getVertexNum() == 0) { return; }
 
-    Vector<UINT> top_order;
-    pdom_tree.sortInToplogOrder(top_order, false);
+    Vector<Vertex*> top_order;
+    pdom_tree.sortInTopologOrder(top_order);
     //dumpIntVector(top_order);
 
     xcom::BitSetMgr bs_mgr;
     Vector<xcom::BitSet*> cd_set;
     for (INT j = 0; j <= top_order.get_last_idx(); j++) {
-        UINT ii = top_order.get(j);
+        UINT ii = VERTEX_id(top_order.get(j));
         xcom::Vertex * v = cfg.getVertex(ii);
         ASSERT0(v != NULL);
         addVertex(VERTEX_id(v));

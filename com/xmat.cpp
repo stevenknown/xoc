@@ -28,8 +28,6 @@ USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include "math.h"
 #include "xcominc.h"
 
-//#define VARIADIC_PARAMETER_ACCESS
-
 namespace xcom {
 
 Matrix<Rational> operator * (Matrix<Rational> const& a,
@@ -762,19 +760,19 @@ void INTMat::sete(UINT num, ...)
     //says the code work well on Linux with gcc4.8, but
     //it does not work on Windows with VS2015. Therefore
     //a better advise is to use va_arg().
-    //INT * ptr = (INT*) (((BYTE*)(&num)) + sizeof(UINT));
-    //UINT i = 0;
-    //UINT row = 0, col = 0;
-    //while (i < num) {
-    //    INT numer = *ptr;
-    //    set(row, col++, numer);
-    //    if (col >= m_col_size) {
-    //        row++;
-    //        col = 0;
-    //    }
-    //    i++;
-    //    ptr++; //stack growing down
-    //}
+    INT * ptr = (INT*) (((BYTE*)(&num)) + sizeof(UINT));
+    UINT i = 0;
+    UINT row = 0, col = 0;
+    while (i < num) {
+        INT numer = *ptr;
+        set(row, col++, numer);
+        if (col >= m_col_size) {
+            row++;
+            col = 0;
+        }
+        i++;
+        ptr++; //stack growing down
+    }
 #else
     va_list ptr;
     va_start(ptr, num);

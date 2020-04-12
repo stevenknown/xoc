@@ -41,12 +41,12 @@ class DUMgr;
 typedef SEGIter * DUIter;
 
 class DUSet : public DefSBitSetCore {
+    COPY_CONSTRUCTOR(DUSet);
 protected:
     friend class DUMgr;
 
 public:
     DUSet() {}
-    COPY_CONSTRUCTOR(DUSet);
     ~DUSet()
     {
         //Do not free ref here. They are allocated in mempool,
@@ -63,10 +63,11 @@ public:
 };
 
 //Record DU info for ir.
-#define DU_md(du)           ((du)->md)
-#define DU_mds(du)          ((du)->mds)
-#define DU_duset(du)        ((du)->duset)
+#define DU_md(du) ((du)->md)
+#define DU_mds(du) ((du)->mds)
+#define DU_duset(du) ((du)->duset)
 class DU {
+    COPY_CONSTRUCTOR(DU);
 public:
     MD const* md; //indicate the Must MD reference.
     MDSet const* mds; //indicate May MDSet reference.
@@ -74,7 +75,6 @@ public:
 
 public:
     DU() {}
-    COPY_CONSTRUCTOR(DU);
 
     void clean()
     {

@@ -50,6 +50,7 @@ typedef TMapIter<UINT, MDPhiList*> BB2MDPhiListIter;
 //USE set in paticular virtual MD, and remove the virtual MD from current
 //IR's MDSSAInfo.
 class MDSSAMgr : public Pass {
+    COPY_CONSTRUCTOR(MDSSAMgr);
 protected:
     Region * m_rg;
     MDSystem * m_md_sys;
@@ -111,6 +112,9 @@ protected:
                         IN DefSBitSet & defed_prs,
                         IN OUT BB2VMDMap & bb2vmdmap);
 
+    void initVMD(IN IR * ir, OUT DefSBitSet & maydef_md);
+    void insertPhi(UINT mdid, IN IRBB * bb);
+
     Stack<VMD*> * mapMD2VMDStack(UINT mdid);
 
     void renamePhiResult(IN IRBB * bb);
@@ -158,7 +162,6 @@ public:
         ASSERTN(m_cfg, ("cfg is not available."));
         m_md_sys = rg->getMDSystem();
     }
-    COPY_CONSTRUCTOR(MDSSAMgr);
     ~MDSSAMgr()
     {
         //CAUTION: If you do not finish out-of-SSA prior to destory(),
@@ -212,7 +215,6 @@ public:
     //     ...=p0
     void coalesceVersion(IR const* src, IR const* tgt);
 
-
     void destroy();
     void destruction(DomTree & domtree);
     void destruction(OptCtx * oc);
@@ -229,8 +231,7 @@ public:
 
     Region * getRegion() const { return m_rg; }
     UseDefMgr * getUseDefMgr() { return &m_usedef_mgr; }
-    virtual CHAR const* getPassName() const
-    { return "MD SSA Manager"; }
+    virtual CHAR const* getPassName() const { return "MD SSA Manager"; }
     PASS_TYPE getPassType() const { return PASS_MD_SSA_MGR; }
     MDSSAInfo * getMDSSAInfoIfAny(IR const* ir)
     { return hasMDSSAInfo(ir) ? getUseDefMgr()->getMDSSAInfo(ir) : NULL; }
@@ -238,12 +239,9 @@ public:
     bool hasMDSSAInfo(IR const* ir) const
     { return ir->isMemoryRefNotOperatePR() || ir->isCallStmt(); }
 
-    void initVMD(IN IR * ir, OUT DefSBitSet & maydef_md);
-    void insertPhi(UINT mdid, IN IRBB * bb);
-
-    //Return true if PR ssa is constructed.
+    //Return true if MDSSA is constructed.
     //This flag will direct the behavior of optimizations.
-    //If SSA constructed, DU mananger will not compute any information for PR.
+    //If MDSSA constructed, DU mananger should not compute any information.
     bool isMDSSAConstructed() const { return m_is_ssa_constructed; }
 
     //Return true if phi is redundant, otherwise return false.
@@ -253,7 +251,7 @@ public:
     //  of all opnd is the same.
     bool isRedundantPHI(MDPhi const* phi, OUT VMD ** common_def) const;
 
-    //Reinitialize MD SSA manager.
+    //Reinitialize MDSSA manager.
     //This function will clean all informations and recreate them.
     void reinit();
 
@@ -275,8 +273,7 @@ public:
     bool verifyVMD();
     bool verify();
 
-    virtual bool perform(OptCtx & oc)
-    { construction(oc); return true; }
+    virtual bool perform(OptCtx & oc) { construction(oc); return true; }
 };
 
 bool verifyMDSSAInfo(Region * rg);

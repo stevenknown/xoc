@@ -41,40 +41,37 @@ namespace xoc {
 //    START_TIMER(t, "My Pass");
 //    Run mypass();
 //    END_TIMER(t, "My Pass");
-#define START_TIMER(_timer_, s)                      \
-    LONG _timer_ = 0;                                \
-    if (g_show_time) {                          \
-        _timer_ = getclockstart();                   \
-        prt2C("\n==-- START %s", (s));               \
+#define START_TIMER(_timer_, s) \
+    LONG _timer_ = 0; \
+    if (g_show_time) { \
+        _timer_ = getclockstart(); \
+        prt2C("\n==-- START %s", (s)); \
     }
-#define END_TIMER(_timer_, s)                        \
-    if (g_show_time) {                          \
-        prt2C("\n==-- END %s", s);                   \
-        prt2C(" Time:%fsec", getclockend(_timer_));  \
-    }
-
-
-//Timer, show format string before timer start and end.
-//e.g:
-//    START_TIMER(t, ("My Pass Name:%s", getPassName()));
-//    Run mypass();
-//    END_TIMER(t, ("My Pass Name:%s", getPassName()));
-#define START_TIMER_FMT(_timer_, s)                  \
-    LONG _timer_ = 0;                                \
-    if (g_show_time) {                          \
-        _timer_ = getclockstart();                   \
-        prt2C("\n==-- START ");                      \
-        prt2C s;                                     \
-    }
-#define END_TIMER_FMT(_timer_, s)                    \
-    if (g_show_time) {                          \
-        prt2C("\n==-- END ");                        \
-        prt2C s;                                     \
+#define END_TIMER(_timer_, s) \
+    if (g_show_time) { \
+        prt2C("\n==-- END %s", s); \
         prt2C(" Time:%fsec", getclockend(_timer_)); \
     }
 
 
-#define NIL_START  100000
+//Timer, show format string before timer start and end.
+//e.g:START_TIMER(t, ("My Pass Name:%s", getPassName()));
+//    Run mypass();
+//    END_TIMER(t, ("My Pass Name:%s", getPassName()));
+#define START_TIMER_FMT(_timer_, s) \
+    LONG _timer_ = 0; \
+    if (g_show_time) { \
+        _timer_ = getclockstart(); \
+        prt2C("\n==-- START "); \
+        prt2C s; \
+    }
+#define END_TIMER_FMT(_timer_, s) \
+    if (g_show_time) { \
+        prt2C("\n==-- END "); \
+        prt2C s; \
+        prt2C(" Time:%fsec", getclockend(_timer_)); \
+    }
+#define NIL_START 100000
 #define DUMP_INDENT_NUM 4
 
 //e.g:

@@ -1203,7 +1203,7 @@ void Region::dumpFreeTab()
 }
 
 
-static void assignPRMDImpl(IR * x, Region * rg)
+static void assignMDImpl(IR * x, Region * rg, bool is_only_assign_pr)
 {
     ASSERT0(x && rg);
     switch (x->getCode()) {
@@ -1228,20 +1228,37 @@ static void assignPRMDImpl(IR * x, Region * rg)
             rg->allocCallResultPRMD(x);
         }
         break;
+    case IR_ST:
+        if (is_only_assign_pr) { return; }
+        rg->allocStoreMD(x);
+        break;
+    case IR_LD:
+        if (is_only_assign_pr) { return; }
+        rg->allocLoadMD(x);
+        break;
+    case IR_ID:
+        if (is_only_assign_pr) { return; }
+        if (ID_info(x)->is_string()) {
+            rg->allocStringMD(ID_info(x)->get_name());
+        } else {
+            rg->allocIdMD(x);
+        }
+        break;
     default:
         ASSERT0(!x->isReadPR() && !x->isWritePR());
     }
 }
 
 
-//Assign MD for each ReadPR/WritePR operations.
-void Region::assignPRMD()
+//Assign MD for ST/LD/ReadPR/WritePR operations.
+//is_only_assign_pr: true if assign MD for each ReadPR/WritePR operations.
+void Region::assignMD(bool is_only_assign_pr)
 {
     IRIter ii;
     if (getIRList() != NULL) {
         for (IR * x = iterInit(getIRList(), ii);
              x != NULL; x = iterNext(ii)) {
-            assignPRMDImpl(x, this);
+            assignMDImpl(x, this, is_only_assign_pr);
         }
         return;
     }
@@ -1253,7 +1270,7 @@ void Region::assignPRMD()
              ir = BB_irlist(bb).get_next(&ct)) {
             for (IR * x = iterInit(ir, ii);
                 x != NULL; x = iterNext(ii)) {
-                assignPRMDImpl(x, this);
+                assignMDImpl(x, this, is_only_assign_pr);
             }
         }
     }
@@ -2427,9 +2444,6 @@ void Region::checkValidAndRecompute(OptCtx * oc, ...)
             if (opts.is_contain(PASS_LIVE_EXPR) && !OC_is_live_expr_valid(*oc)) {
                 f |= SOL_AVAIL_EXPR;
             }
-            if (opts.is_contain(PASS_EXPR_TAB) && !OC_is_live_expr_valid(*oc)) {
-                f |= SOL_AVAIL_EXPR;
-            }
             if (opts.is_contain(PASS_AVAIL_REACH_DEF) &&
                 !OC_is_avail_reach_def_valid(*oc)) {
                 f |= SOL_AVAIL_REACH_DEF;
@@ -2462,6 +2476,7 @@ void Region::checkValidAndRecompute(OptCtx * oc, ...)
                     max_numir_in_bb > g_thres_opt_ir_num_in_bb) {
                     aa->set_flow_sensitive(false);
                 }
+                //NOTE: assignMD(false) must be called before AA.
                 aa->perform(*oc);
             }
             if (f != 0 &&

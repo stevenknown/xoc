@@ -123,12 +123,12 @@ void UINT2VMDVec::set(UINT mdid, Vector<VMD*> * vmdvec)
 }
 
 
-UINT UINT2VMDVec::count_mem() const
+size_t UINT2VMDVec::count_mem() const
 {
     size_t count = sizeof(UINT2VMDVec);
     count += m_mdid2vmdvec_vec.count_mem();
     count += m_mdid2vmdvec_map.count_mem();
-    return (UINT)count;
+    return count;
 }
 //END UINT2VMDVec
 
@@ -573,10 +573,10 @@ VConst * UseDefMgr::allocVConst(IR const* ir)
 }
 
 
-VMD * UseDefMgr::getVMD(UINT mdid, UINT version)
+VMD * UseDefMgr::getVMD(UINT mdid, UINT version) const
 {
     ASSERT0(mdid > 0);
-    Vector<VMD*> * vec = m_map_md2vmd.get(mdid);
+    Vector<VMD*> * vec = const_cast<UseDefMgr*>(this)->m_map_md2vmd.get(mdid);
     if (vec == NULL) {
         return NULL;
     }
@@ -617,8 +617,7 @@ VMD * UseDefMgr::allocVMD(UINT mdid, UINT version)
 
 size_t UseDefMgr::count_mem()
 {
-    size_t count = 0;
-    count += smpoolGetPoolSize(m_mdssainfo_pool);
+    size_t count = smpoolGetPoolSize(m_mdssainfo_pool);
     count += smpoolGetPoolSize(m_phi_pool);
     count += smpoolGetPoolSize(m_def_pool);
     count += smpoolGetPoolSize(m_defset_pool);

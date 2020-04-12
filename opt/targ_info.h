@@ -35,9 +35,9 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 namespace xoc {
 
 class TargInfo {
+    COPY_CONSTRUCTOR(TargInfo);
 public:
     TargInfo() {}
-    COPY_CONSTRUCTOR(TargInfo);
     virtual ~TargInfo() {}
 
     // Return the number of allocable integer register.

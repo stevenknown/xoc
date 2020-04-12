@@ -809,7 +809,7 @@ bool GCSE::perform(OptCtx & oc)
     if (m_cfg->hasEHEdge()) {
         //Initialize Temp CFG and pick out exception-edge.
         m_tg = new TG(m_rg);
-        m_tg->clone(*m_cfg);
+        m_tg->clone(*m_cfg, false, false);
         m_tg->pick_eh();
         m_tg->removeUnreachNode(BB_id(entry));
         m_tg->computeDomAndIdom();

@@ -40,11 +40,9 @@ namespace xoc {
 //compiler internal variables, LABEL, ID, TYPE_NAME etc.
 #define SYM_name(sym)            ((sym)->s)
 class SYM {
+    COPY_CONSTRUCTOR(SYM);
 public:
     CHAR * s;
-
-public:
-    COPY_CONSTRUCTOR(SYM);
 };
 
 
@@ -148,12 +146,11 @@ public:
 //START SymTab based on Hash
 //
 class SymTabHash : public Hash<SYM*, SymbolHashFunc> {
+    COPY_CONSTRUCTOR(SymTabHash);
     SMemPool * m_pool;
-
 public:
     explicit SymTabHash(UINT bsize) : Hash<SYM*, SymbolHashFunc>(bsize)
     { m_pool = smpoolCreate(64, MEM_COMM); }
-    COPY_CONSTRUCTOR(SymTabHash);
     virtual ~SymTabHash()
     { smpoolDelete(m_pool); }
 
@@ -197,6 +194,7 @@ public:
 //START SymTab based on Map
 //
 class CompareSymTab {
+    COPY_CONSTRUCTOR(CompareSymTab);
     CHAR * xstrdup(CHAR const* s)
     {
         if (s == NULL) {
@@ -214,7 +212,6 @@ public:
 
 public:
     CompareSymTab() {}
-    COPY_CONSTRUCTOR(CompareSymTab);
 
     bool is_less(SYM * t1, SYM * t2) const
     { return ::strcmp(SYM_name(t1), SYM_name(t2)) < 0; }
@@ -231,6 +228,7 @@ public:
 
 
 class SymTab : public TTab<SYM*, CompareSymTab> {
+    COPY_CONSTRUCTOR(SymTab);
     SYM * m_free_one;
     SMemPool * m_pool;
 
@@ -242,7 +240,6 @@ public:
         TTab<SYM*, CompareSymTab>::m_ck.m_pool = m_pool;
         ASSERT0(m_pool);
     }
-    COPY_CONSTRUCTOR(SymTab);
     virtual ~SymTab() { smpoolDelete(m_pool); }
 
     //Add const string into symbol table.

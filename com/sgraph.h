@@ -43,11 +43,11 @@ class Edge;
 class Graph;
 class BMat;
 
-#define EDGE_next(e) (e)->next
-#define EDGE_prev(e) (e)->prev
-#define EDGE_from(e) (e)->from
-#define EDGE_to(e)   (e)->to
-#define EDGE_info(e) (e)->info
+#define EDGE_next(e) ((e)->next)
+#define EDGE_prev(e) ((e)->prev)
+#define EDGE_from(e) ((e)->from)
+#define EDGE_to(e) ((e)->to)
+#define EDGE_info(e) ((e)->info)
 class Edge {
 public:
     Edge()
@@ -67,9 +67,9 @@ public:
 
 
 //The container of EDEG.
-#define EC_next(el) (el)->next
-#define EC_prev(el) (el)->prev
-#define EC_edge(el) (el)->edge
+#define EC_next(el) ((el)->next)
+#define EC_prev(el) ((el)->prev)
+#define EC_edge(el) ((el)->edge)
 class EdgeC {
 public:
     EdgeC()
@@ -86,13 +86,13 @@ public:
 
 
 #define VERTEX_UNDEF 0
-#define VERTEX_next(v)     (v)->next
-#define VERTEX_prev(v)     (v)->prev
-#define VERTEX_id(v)       (v)->id
-#define VERTEX_rpo(v)      (v)->rpo
-#define VERTEX_in_list(v)  (v)->in_list
-#define VERTEX_out_list(v) (v)->out_list
-#define VERTEX_info(v)     (v)->info
+#define VERTEX_next(v) ((v)->next)
+#define VERTEX_prev(v) ((v)->prev)
+#define VERTEX_id(v) ((v)->id)
+#define VERTEX_rpo(v) ((v)->rpo)
+#define VERTEX_in_list(v) ((v)->in_list)
+#define VERTEX_out_list(v) ((v)->out_list)
+#define VERTEX_info(v) ((v)->info)
 class Vertex {
 public:
     Vertex()
@@ -190,12 +190,12 @@ public:
 
 
 class VertexHash : public Hash<Vertex*, VertexHashFunc> {
+    COPY_CONSTRUCTOR(VertexHash);
 protected:
     SMemPool * m_ec_pool;
 public:
     VertexHash(UINT bsize = 64) : Hash<Vertex*, VertexHashFunc>(bsize)
     { m_ec_pool = smpoolCreate(sizeof(Vertex) * 4, MEM_CONST_SIZE); }
-    COPY_CONSTRUCTOR(VertexHash);
     virtual ~VertexHash() { smpoolDelete(m_ec_pool); }
 
     virtual Vertex * create(OBJTY v)
@@ -351,7 +351,8 @@ public:
 
     void computeRpoNoRecursive(IN OUT Vertex * root,
                                OUT List<Vertex const*> & vlst);
-    bool clone(Graph const& src);
+    bool clone(Graph const& src, bool clone_edge_info, bool clone_vex_info);
+    //Count memory usage for current object.
     size_t count_mem() const;
 
     void dumpDOT(CHAR const* name = NULL) const;
@@ -410,6 +411,10 @@ public:
     //Return true if vertex is exit node of graph.
     bool is_graph_exit(Vertex const* v) const
     { return VERTEX_out_list(v) == NULL; }
+    //Return true if In-Degree of 'vex' equal to 'num'.
+    bool isInDegreeEqualTo(Vertex const* vex, UINT num) const;
+    //Return true if Out-Degree of 'vex' equal to 'num'.
+    bool isOutDegreeEqualTo(Vertex const* vex, UINT num) const;
 
     void erase();
 
@@ -481,7 +486,7 @@ public:
                                     BitSet & is_visited,
                                     DefMiscBitSetMgr & bs_mgr);
 
-    bool sortInToplogOrder(OUT Vector<UINT> & vex_vec, bool is_topdown);
+    bool sortInTopologOrder(OUT Vector<Vertex*> & vex_vec);
     void set_unique(bool is_unique)
     {
         ASSERTN(m_ec_pool != NULL, ("not yet initialized."));
@@ -531,10 +536,10 @@ public:
     DGraph(DGraph const& g);
     DGraph const& operator = (DGraph const&);
 
-    bool clone(DGraph const& g)
+    bool clone(DGraph const& g, bool clone_edge_info, bool clone_vex_info)
     {
         m_bs_mgr = g.m_bs_mgr;
-        return Graph::clone(g);
+        return Graph::clone(g, clone_edge_info, clone_vex_info);
     }
     bool cloneDomAndPdom(DGraph const& src);
     bool computeDom3(List<Vertex const*> const* vlst, BitSet const* uni);
@@ -547,6 +552,7 @@ public:
     bool computeIdom();
     bool computeIdom2(List<Vertex const*> const& vlst);
     bool computeIpdom();
+    //Count memory usage for current object.
     size_t count_mem() const;
 
     void dump_dom(FILE * h, bool dump_dom_tree = true);

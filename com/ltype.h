@@ -206,7 +206,7 @@ typedef unsigned long ULONG;
 #define OUT //indicate output argument
 
 //Misc Dumps/Dumpf of Vector<T>
-#define D_BOOL           1
-#define D_INT            2
+#define D_BOOL 1
+#define D_INT 2
 #endif
 

@@ -142,12 +142,11 @@ Type const* checkType(Type const* ty, DATA_TYPE dt);
 
 //Date Type Description.
 class Type {
+    COPY_CONSTRUCTOR(Type);
 public:
     DATA_TYPE data_type;
-
 public:
     Type() { data_type = D_UNDEF; }
-    COPY_CONSTRUCTOR(Type);
 
     void copy(Type const& src) { data_type = src.data_type; }
 
@@ -224,6 +223,7 @@ public:
 
 
 class PointerType : public Type {
+    COPY_CONSTRUCTOR(PointerType);
 public:
     //e.g  int * p, base size is 4,
     //long long * p, base size is 8
@@ -232,7 +232,6 @@ public:
 
 public:
     PointerType() { TY_dtype(this) = D_PTR; pointer_base_size = 0; }
-    COPY_CONSTRUCTOR(PointerType);
 
     void copy(PointerType const& src)
     {
@@ -243,13 +242,13 @@ public:
 
 
 class MCType : public Type {
+    COPY_CONSTRUCTOR(MCType);
 public:
     //Record the BYTE size if 'rtype' is D_MC.
     //NOTE: If ir is pointer, its 'rtype' should NOT be D_MC.
     UINT mc_size;
 public:
     MCType() { TY_dtype(this) = D_MC; mc_size = 0; }
-    COPY_CONSTRUCTOR(MCType);
 
     void copy(MCType const& src)
     {
@@ -260,6 +259,7 @@ public:
 
 
 class VectorType : public Type {
+    COPY_CONSTRUCTOR(VectorType);
 public:
     //Record the BYTE size of total vector.
     UINT total_vector_size;
@@ -273,7 +273,6 @@ public:
         total_vector_size = 0;
         vector_elem_type = D_UNDEF;
     }
-    COPY_CONSTRUCTOR(VectorType);
 
     void copy(VectorType const& src)
     {
@@ -285,6 +284,7 @@ public:
 
 
 class TensorType : public Type {
+    COPY_CONSTRUCTOR(TensorType);
 public:
     //Record the degree of each dimension.
     //e.g: <3x2x7x1>, the degree of dimension 0 is 3,
@@ -299,7 +299,6 @@ public:
         TY_dtype(this) = D_TENSOR;
         tensor_elem_type = D_UNDEF;
     }
-    COPY_CONSTRUCTOR(TensorType);
 
     void init() { degree_of_dimension.init(); }
     void destroy() { degree_of_dimension.destroy(); }
@@ -480,6 +479,7 @@ public:
 
 extern TypeDesc const g_type_desc[];
 class TypeMgr {
+    COPY_CONSTRUCTOR(TypeMgr);
     RegionMgr * m_rm;
     xcom::Vector<Type*> m_type_tab;
     SMemPool * m_pool;
@@ -564,7 +564,6 @@ public:
         m_str = getSimplexType(D_STR);
         m_any = getSimplexType(D_ANY);
     }
-    COPY_CONSTRUCTOR(TypeMgr);
     ~TypeMgr()
     {
         smpoolDelete(m_pool);

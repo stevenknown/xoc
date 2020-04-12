@@ -55,8 +55,10 @@ void MDId2MD::dump() const
 //
 //START MD
 //
-//Check if 'this' cover 'm'.
-bool MD::is_cover(MD const* m) const
+//Return true if current md may cover 'm', such as:
+//current md: |-...-----...---|
+//m:            |---...-|
+bool MD::is_may_cover(MD const* m) const
 {
     ASSERT0(m && this != m);
     if (get_base() != m->get_base()) {
@@ -78,7 +80,29 @@ bool MD::is_cover(MD const* m) const
 }
 
 
-//Check overlapping.
+//Return true if current md exactly cover 'm', such as:
+//CASE1:
+//  current md: |-------|
+//  m:            |----|
+//CASE2:
+//  current md: |---------|
+//  m:            |--..--|
+bool MD::is_exact_cover(MD const* m) const
+{
+    ASSERT0(m && this != m);
+    if (get_base() != m->get_base() ||
+        !is_exact() ||
+        (!m->is_exact() && !m->is_range())) {
+        return false;
+    }
+    return ((MD_ofst(this) <= MD_ofst(m)) &&
+           (MD_ofst(this) + MD_size(this) >= MD_ofst(m) + MD_size(m)));
+}
+
+
+//Return true if current md intersect but may be not cover 'm', such as:
+//current md: |-------|
+//m:            |-------| 
 bool MD::is_overlap(MD const* m) const
 {
     ASSERT0(m && this != m);
@@ -444,9 +468,9 @@ void MDSetMgr::free(MDSet * mds)
 }
 
 
-UINT MDSetMgr::count_mem()
+size_t MDSetMgr::count_mem()
 {
-    UINT count = 0;
+    size_t count = 0;
     for (xcom::SC<MDSet*> * sc = m_md_set_list.get_head();
          sc != m_md_set_list.end(); sc = m_md_set_list.get_next(sc)) {
         MDSet const* mds = sc->val();
@@ -462,7 +486,7 @@ void MDSetMgr::dump()
     if (g_tfile == NULL) { return; }
 
     FILE * h = g_tfile;
-    UINT count = 0;
+    size_t count = 0;
     for (xcom::SC<MDSet*> * sc = m_md_set_list.get_head();
          sc != m_md_set_list.end(); sc = m_md_set_list.get_next(sc)) {
         MDSet const* mds = sc->val();

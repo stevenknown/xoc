@@ -459,6 +459,7 @@ extern RoundDesc const g_round_desc[];
 #define IR_irt_size(ir) ((ir)->irt_size)
 #endif
 class IR {
+    COPY_CONSTRUCTOR(IR);
 public:
     UINT uid; //Each IR has unique id.
 
@@ -509,10 +510,24 @@ public:
     AIContainer * attach_info_container;
 
 public:
-    COPY_CONSTRUCTOR(IR);
-
+    //Note IR should not have virtual table because all operations are
+    //distinguished by IR_TYPE. An IR object might represent differet operation
+    //in specific scene when it is continually freed and allocated. Diverse
+    //description should be placed in attach-info.
+    
+    //Calculate the accumulated offset value from the base of array.
+    //e.g: For given array long long p[10][20],
+    //the offset of p[i][j] can be computed by i*20 + j, and
+    //the offset of p[i] can be computed by i*20.
+    //If all the indice are constant value, calcuate the value, storing
+    //in 'ofst_val' and return True, otherwise return False that means the
+    //Offset can not be predicated.
     bool calcArrayOffset(TMWORD * ofst, TypeMgr * tm) const;
+    //Set ir's DU to be NULL, return the DU pointer.
     inline DU * cleanDU();
+    //Set ir's PR SSA Info to be NULL.
+    //For convenient purpose, this function does not assert
+    //when current IR object is not operate on PR.
     inline void clearSSAInfo();
     void cleanRefMD()
     {
@@ -536,7 +551,8 @@ public:
         DU_md(du) = NULL;
     }
 
-    UINT count_mem() const;
+    //Count memory usage for current IR.
+    size_t count_mem() const;
 
     //Copy memory reference only for current ir node.
     //'src': copy MD reference from 'src', it may be different to current ir.
@@ -1129,6 +1145,7 @@ public:
 #define CONST_anony_val(ir) \
     (((CConst*)CK_IRT(ir, IR_CONST))->u1.anonymous_value)
 class CConst : public IR {
+    COPY_CONSTRUCTOR(CConst);
 public:
     union {
         //record string const.
@@ -1150,7 +1167,6 @@ public:
     } u1;
 
 public:
-    COPY_CONSTRUCTOR(CConst);
     HOST_FP getFP() const { return CONST_fp_val(this); }
     BYTE getMantissa() const { return CONST_fp_mant(this); }
     HOST_INT getINT() const { return CONST_int_val(this); }
@@ -1159,42 +1175,37 @@ public:
 
 //Record VAR property.
 class VarProp {
+    COPY_CONSTRUCTOR(VarProp);
 public:
     //Record VAR if ir is IR_LD|IR_ID.
     VAR * id_info;
-
-public:
-    COPY_CONSTRUCTOR(VarProp);
 };
 
 
 //Record DU property.
 #define DUPROP_du(ir) (((DuProp*)ir)->du)
 class DuProp : public IR {
+    COPY_CONSTRUCTOR(DuProp);
 public:
     DU * du;
-
-public:
-    COPY_CONSTRUCTOR(DuProp);
 };
 
 
+//ID need DU info, some Passes need it, e.g. GVN.
+//Note IR_ID should not participate in GVN analysis because it does not
+//represent a real operation.
 #define ID_info(ir) (((CId*)CK_IRT(ir, IR_ID))->id_info)
 #define ID_du(ir) (((CId*)CK_IRT(ir, IR_ID))->du)
 #define ID_phi(ir) (((CId*)CK_IRT(ir, IR_ID))->phi)
 class CId : public DuProp, public VarProp {
-//ID need DU info, some Passes need it, e.g. GVN.
-//Note IR_ID should not participate in GVN analysis because it does not
-//represent a real operation.
+    COPY_CONSTRUCTOR(CId);
 public:
     MDPhi * phi; //record the MD PHI dummy stmt if ID is operand of MD PHI.
-
-public:
-    COPY_CONSTRUCTOR(CId);
 };
 
 
 class OffsetProp {
+    COPY_CONSTRUCTOR(OffsetProp);
 public:
     //Record accessing field. result-type-idx should be D_MC.
     //ir is used by IR_LD|IR_ST|IR_ILD|IR_IST|IR_LDA|IR_ARRAY
@@ -1208,9 +1219,6 @@ public:
     //    ARRAY<ofst:3>(LDA('x'), OFST:5) => *(&x[5] + 3) = pr or
     //                                       pr = *(&x[5] + 3)
     UINT field_offset;
-
-public:
-    COPY_CONSTRUCTOR(OffsetProp);
 };
 
 
@@ -1224,7 +1232,6 @@ public:
 #define LD_idinfo(ir) (((CLd*)CK_IRT(ir, IR_LD))->id_info)
 #define LD_du(ir) (((CLd*)CK_IRT(ir, IR_LD))->du)
 class CLd : public DuProp, public VarProp, public OffsetProp {
-public:
     COPY_CONSTRUCTOR(CLd);
 };
 
@@ -1241,21 +1248,17 @@ public:
 #define ILD_base(ir) ILD_kid(ir, 0)
 #define ILD_kid(ir, idx) (((CILd*)ir)->opnd[CKID_TY(ir, IR_ILD, idx)])
 class CILd : public DuProp, public OffsetProp {
+    COPY_CONSTRUCTOR(CILd);
 public:
     IR * opnd[1];
-
-public:
-    COPY_CONSTRUCTOR(CILd);
 };
 
 
 //This class represent properties of stmt.
 class StmtProp {
+    COPY_CONSTRUCTOR(StmtProp);
 public:
     IRBB * bb;
-
-public:
-    COPY_CONSTRUCTOR(StmtProp);
 };
 
 
@@ -1274,11 +1277,9 @@ public:
 #define ST_rhs(ir) ST_kid(ir, 0)
 #define ST_kid(ir, idx) (((CSt*)ir)->opnd[CKID_TY(ir, IR_ST, idx)])
 class CSt: public CLd, public StmtProp {
+    COPY_CONSTRUCTOR(CSt);
 public:
     IR * opnd[1];
-
-public:
-    COPY_CONSTRUCTOR(CSt);
 };
 
 
@@ -1292,13 +1293,11 @@ public:
 #define STPR_rhs(ir) STPR_kid(ir, 0)
 #define STPR_kid(ir, idx) (((CStpr*)ir)->opnd[CKID_TY(ir, IR_STPR, idx)])
 class CStpr: public DuProp, public StmtProp {
+    COPY_CONSTRUCTOR(CStpr);
 public:
     UINT prno; //PR number.
     SSAInfo * ssainfo; //Present ssa def and use set.
     IR * opnd[1];
-
-public:
-    COPY_CONSTRUCTOR(CStpr);
 };
 
 
@@ -1326,13 +1325,11 @@ public:
 #define SETELEM_kid(ir, idx) \
     (((CSetElem*)ir)->opnd[CKID_TY(ir, IR_SETELEM, idx)])
 class CSetElem: public DuProp, public StmtProp {
+    COPY_CONSTRUCTOR(CSetElem);
 public:
     UINT prno; //PR number.
     SSAInfo * ssainfo; //Present ssa def and use set.
     IR * opnd[3];
-
-public:
-    COPY_CONSTRUCTOR(CSetElem);
 };
 
 
@@ -1354,17 +1351,14 @@ public:
 #define GETELEM_ofst(ir) GETELEM_kid(ir, 1)
 #define GETELEM_kid(ir, idx)(((CGetElem*)ir)->opnd[CKID_TY(ir, IR_GETELEM, idx)])
 class CGetElem : public DuProp, public StmtProp {
+    COPY_CONSTRUCTOR(CGetElem);
 public:
     UINT prno; //PR number.
 
     //versioned presentation or ssa def and use list in ssa mode.
     //Note this field only avaiable if SSA information is maintained.
     SSAInfo * ssainfo;
-
     IR * opnd[2];
-
-public:
-    COPY_CONSTRUCTOR(CGetElem);
 };
 
 
@@ -1384,11 +1378,9 @@ public:
 #define IST_rhs(ir) IST_kid(ir, 1)
 #define IST_kid(ir, idx) (((CISt*)ir)->opnd[CKID_TY(ir, IR_IST, idx)])
 class CISt : public DuProp, public OffsetProp, public StmtProp {
+    COPY_CONSTRUCTOR(CISt);
 public:
     IR * opnd[2];
-
-public:
-    COPY_CONSTRUCTOR(CISt);
 };
 
 
@@ -1402,7 +1394,6 @@ public:
 #define LDA_ofst(ir) (((CLda*)CK_IRT(ir, IR_LDA))->field_offset)
 #define LDA_idinfo(ir) (((CLda*)CK_IRT(ir, IR_LDA))->id_info)
 class CLda : public IR, public VarProp, public OffsetProp {
-public:
     COPY_CONSTRUCTOR(CLda);
 };
 
@@ -1446,6 +1437,7 @@ public:
 #define CALL_dummyuse(ir) CALL_kid(ir, 1)
 #define CALL_kid(ir, idx) (((CCall*)ir)->opnd[CKID_CALL(ir, idx)])
 class CCall : public DuProp, public VarProp, public StmtProp {
+    COPY_CONSTRUCTOR(CCall);
 public:
     //True if current call is intrinsic call.
     BYTE is_intrinsic:1;
@@ -1471,8 +1463,6 @@ public:
     IR * opnd[2];
 
 public:
-    COPY_CONSTRUCTOR(CCall);
-
     CHAR const* getCalleeNameString() const
     { return SYM_name(CALL_idinfo(this)->get_name()); }
 
@@ -1508,15 +1498,13 @@ public:
 #define ICALL_is_readonly(ir) (((CICall*)CK_IRT_ONLY_ICALL(ir))->is_readonly)
 #define ICALL_kid(ir, idx) (((CICall*)ir)->opnd[CKID_TY(ir, IR_ICALL, idx)])
 class CICall : public CCall {
+    COPY_CONSTRUCTOR(CICall);
 public:
     //NOTE: 'opnd_pad' must be the first member.
     IR * opnd_pad[1];
 
     //True if current call is readonly.
     BYTE is_readonly:1;
-
-public:
-    COPY_CONSTRUCTOR(CICall);
 };
 
 
@@ -1526,11 +1514,9 @@ public:
 #define BIN_opnd1(ir) BIN_kid(ir, 1)
 #define BIN_kid(ir, idx) (((CBin*)ir)->opnd[CKID_BIN(ir, idx)])
 class CBin : public IR {
+    COPY_CONSTRUCTOR(CBin);
 public:
     IR * opnd[2];
-
-public:
-    COPY_CONSTRUCTOR(CBin);
 };
 
 
@@ -1538,11 +1524,9 @@ public:
 #define UNA_opnd(ir) UNA_kid(ir, 0)
 #define UNA_kid(ir, idx) (((CUna*)ir)->opnd[CKID_UNA(ir, idx)])
 class CUna : public IR {
+    COPY_CONSTRUCTOR(CUna);
 public:
     IR * opnd[1];
-
-public:
-    COPY_CONSTRUCTOR(CUna);
 };
 
 
@@ -1550,11 +1534,9 @@ public:
 #define GOTO_bb(ir) (((CGoto*)CK_IRT(ir, IR_GOTO))->bb)
 #define GOTO_lab(ir) (((CGoto*)CK_IRT(ir, IR_GOTO))->jump_target_lab)
 class CGoto : public IR, public StmtProp {
+    COPY_CONSTRUCTOR(CGoto);
 public:
     LabelInfo const* jump_target_lab;
-
-public:
-    COPY_CONSTRUCTOR(CGoto);
 };
 
 
@@ -1572,11 +1554,9 @@ public:
 
 #define IGOTO_kid(ir, idx) (((CIGoto*)ir)->opnd[CKID_TY(ir, IR_IGOTO, idx)])
 class CIGoto : public IR, public StmtProp {
+    COPY_CONSTRUCTOR(CIGoto);
 public:
     IR * opnd[2];
-
-public:
-    COPY_CONSTRUCTOR(CIGoto);
 };
 
 
@@ -1595,12 +1575,10 @@ public:
 #define LOOP_body(ir) LOOP_kid(ir, 1)
 #define LOOP_kid(ir, idx) (((CWhileDo*)ir)->opnd[CKID_LOOP(ir, idx)])
 class CWhileDo : public IR {
+    COPY_CONSTRUCTOR(CWhileDo);
 public:
     //NOTE: 'opnd' must be the last member of CWhileDo.
     IR * opnd[2];
-
-public:
-    COPY_CONSTRUCTOR(CWhileDo);
 };
 
 
@@ -1610,7 +1588,6 @@ public:
 //      body
 //    } while (det)
 class CDoWhile : public CWhileDo {
-public:
     COPY_CONSTRUCTOR(CDoWhile);
 };
 
@@ -1650,12 +1627,10 @@ public:
 #define LOOP_step(ir) (*(((CDoLoop*)ir)->opnd + CKID_TY(ir, IR_DO_LOOP, 4)))
 #define DOLOOP_kid(ir, idx) (((CDoLoop*)ir)->opnd[CKID_TY(ir, IR_DO_LOOP, idx)])
 class CDoLoop : public CWhileDo {
+    COPY_CONSTRUCTOR(CDoLoop);
 public:
     //NOTE: 'opnd_pad' must be the first member of CDoLoop.
     IR * opnd_pad[3];
-
-public:
-    COPY_CONSTRUCTOR(CDoLoop);
 };
 
 
@@ -1670,22 +1645,18 @@ public:
 #define IF_falsebody(ir) IF_kid(ir, 2)
 #define IF_kid(ir, idx) (((CIf*)ir)->opnd[CKID_TY(ir, IR_IF, idx)])
 class CIf : public IR {
+    COPY_CONSTRUCTOR(CIf);
 public:
     IR * opnd[3];
-
-public:
-    COPY_CONSTRUCTOR(CIf);
 };
 
 
 //This class represent internal and customer defined label.
 #define LAB_lab(ir)        (((CLab*)CK_IRT(ir, IR_LABEL))->label_info)
 class CLab : public IR {
+    COPY_CONSTRUCTOR(CLab);
 public:
     LabelInfo const* label_info;
-
-public:
-    COPY_CONSTRUCTOR(CLab);
 };
 
 
@@ -1715,12 +1686,10 @@ public:
 
 #define SWITCH_kid(ir, idx)  (((CSwitch*)ir)->opnd[CKID_TY(ir, IR_SWITCH, idx)])
 class CSwitch : public IR, public StmtProp {
+    COPY_CONSTRUCTOR(CSwitch);
 public:
     IR * opnd[3];
     LabelInfo const* default_label;
-
-public:
-    COPY_CONSTRUCTOR(CSwitch);
 };
 
 
@@ -1732,12 +1701,10 @@ public:
 #define CASE_vexp(ir) CASE_kid(ir, 0)
 #define CASE_kid(ir, idx) (((CCase*)ir)->opnd[CKID_TY(ir, IR_CASE, idx)])
 class CCase : public IR {
+    COPY_CONSTRUCTOR(CCase);
 public:
     IR * opnd[1]; //case-value
     LabelInfo const* jump_target_label; //jump lable for case.
-
-public:
-    COPY_CONSTRUCTOR(CCase);
 };
 
 
@@ -1785,6 +1752,7 @@ public:
 #define ARR_sub_list(ir) ARR_kid(ir, 1)
 #define ARR_kid(ir, idx) (((CArray*)ir)->opnd[CKID_ARR(ir, idx)])
 class CArray : public DuProp, public OffsetProp {
+    COPY_CONSTRUCTOR(CArray);
 public:
     //Note that if ARR_ofst is not zero, the IR_dt may not equal to
     //ARR_elemtype. IR_dt describe the data-type of ARRAY operation + ARR_ofst.
@@ -1805,10 +1773,7 @@ public:
 
     //NOTE: 'opnd' must be the last member of CArray.
     IR * opnd[2];
-
 public:
-    COPY_CONSTRUCTOR(CArray);
-
     //Return the number of dimensions.
     UINT getDimNum() const
     {
@@ -1865,15 +1830,13 @@ public:
 #define STARR_rhs(ir) \
     (*(((CStArray*)ir)->opnd_pad + CKID_TY(ir, IR_STARRAY, 0)))
 class CStArray: public CArray {
+    COPY_CONSTRUCTOR(CStArray);
 public:
     //NOTE: 'opnd' must be the first member of CStArray.
     IR * opnd_pad[1];
 
     //DO NOT PLACE MEMBER BEFORE opnd_pad
     StmtProp stmtprop;
-
-public:
-    COPY_CONSTRUCTOR(CStArray);
 };
 
 
@@ -1883,12 +1846,10 @@ public:
 #define CVT_kid(ir, idx) (UNA_kid(ir, idx))
 #define CVT_round(ir) (((CCvt*)ir)->round)
 class CCvt : public CUna {
+    COPY_CONSTRUCTOR(CCvt);
 public:
    ROUND_TYPE round;
-
 public:
-    COPY_CONSTRUCTOR(CCvt);
-
     //Get the leaf expression.
     //e.g: cvt:i32(cvt:u8(x)), this function will return x;
     IR * getLeafExp()
@@ -1912,15 +1873,13 @@ public:
 #define PR_ssainfo(ir) (((CPr*)CK_IRT(ir, IR_PR))->ssainfo)
 #define PR_du(ir) (((CPr*)CK_IRT(ir, IR_PR))->du)
 class CPr : public DuProp {
+    COPY_CONSTRUCTOR(CPr);
 public:
     UINT prno; //PR number.
 
     //versioned presentation or ssa def and use list in ssa mode.
     //Note this field only avaiable if SSA information is maintained.
     SSAInfo * ssainfo;
-
-public:
-    COPY_CONSTRUCTOR(CPr);
 };
 
 
@@ -1935,12 +1894,10 @@ public:
 #define BR_det(ir) BR_kid(ir, 0)
 #define BR_kid(ir, idx) (((CTruebr*)ir)->opnd[CKID_BR(ir, idx)])
 class CTruebr : public IR, public StmtProp {
+    COPY_CONSTRUCTOR(CTruebr);
 public:
     IR * opnd[1];
     LabelInfo const* jump_target_lab; //jump target label.
-
-public:
-    COPY_CONSTRUCTOR(CTruebr);
 };
 
 
@@ -1949,7 +1906,6 @@ public:
 //Also use BR_det, BR_lab access.
 //NOTE: the lay out of truebr should same as falsebr.
 class CFalsebr : public CTruebr {
-public:
     COPY_CONSTRUCTOR(CFalsebr);
 };
 
@@ -1961,11 +1917,9 @@ public:
 #define RET_exp(ir) RET_kid(ir, 0)
 #define RET_kid(ir, idx) (((CRet*)ir)->opnd[CKID_TY(ir, IR_RETURN, idx)])
 class CRet : public IR, public StmtProp {
+    COPY_CONSTRUCTOR(CRet);
 public:
     IR * opnd[1];
-
-public:
-    COPY_CONSTRUCTOR(CRet);
 };
 
 
@@ -1989,11 +1943,9 @@ public:
 #define SELECT_falseexp(ir) SELECT_kid(ir, 2)
 #define SELECT_kid(ir, idx) (((CSelect*)ir)->opnd[CKID_TY(ir, IR_SELECT, idx)])
 class CSelect : public IR {
+    COPY_CONSTRUCTOR(CSelect);
 public:
     IR * opnd[3];
-
-public:
-    COPY_CONSTRUCTOR(CSelect);
 };
 
 
@@ -2002,7 +1954,6 @@ public:
 //other operations.
 //This operation is used by do-loop, do-while, while-do.
 class CBreak : public IR {
-public:
     COPY_CONSTRUCTOR(CBreak);
 };
 
@@ -2012,7 +1963,6 @@ public:
 //other operations.
 //This operation is used by do-loop, do-while, while-do.
 class CContinue : public IR {
-public:
     COPY_CONSTRUCTOR(CContinue);
 };
 
@@ -2024,14 +1974,12 @@ public:
 #define PHI_opnd_list(ir) PHI_kid(ir, 0)
 #define PHI_kid(ir, idx) (((CPhi*)ir)->opnd[CKID_TY(ir, IR_PHI, idx)])
 class CPhi : public DuProp, public StmtProp {
+    COPY_CONSTRUCTOR(CPhi);
 public:
     UINT prno; //PR number.
     SSAInfo * ssainfo; //Present ssa def and use set.
     IR * opnd[1];
-
 public:
-    COPY_CONSTRUCTOR(CPhi);
-
     void removeOpnd(IR * ir)
     {
         ASSERT0(xcom::in_list(PHI_opnd_list(this), ir));
@@ -2056,12 +2004,10 @@ public:
 #define REGION_bb(ir) (((CRegion*)CK_IRT(ir, IR_REGION))->bb)
 #define REGION_ru(ir) (((CRegion*)CK_IRT(ir, IR_REGION))->rg)
 class CRegion : public IR, public StmtProp {
+    COPY_CONSTRUCTOR(CRegion);
 public:
     Region * rg;
-
 public:
-    COPY_CONSTRUCTOR(CRegion);
-
     //True if region is readonly.
     //This property is very useful if region is a blackbox.
     //And readonly region will alleviate the burden of optimizor.
@@ -2378,6 +2324,9 @@ void IR::setOffset(UINT ofst)
 }
 
 
+//Set ir's PR SSA Info to be NULL.
+//For convenient purpose, this function does not assert
+//when current IR object is not operate on PR.
 void IR::clearSSAInfo()
 {
     switch (getCode()) {
@@ -2662,6 +2611,7 @@ IR * IR::getResultPR()
 //Return true if ir is call and does have a return value.
 bool IR::hasReturnValue() const
 {
+    ASSERT0(isCallStmt());
     return CALL_prno(this) != 0;
 }
 

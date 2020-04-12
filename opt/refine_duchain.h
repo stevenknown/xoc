@@ -32,6 +32,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 namespace xoc {
 
 class RefineDUChain : public Pass {
+    COPY_CONSTRUCTOR(RefineDUChain);
 protected:
     Region * m_rg;
     DUMgr * m_du;
@@ -60,7 +61,6 @@ public:
         m_du = rg->getDUMgr();
         m_sbs_mgr = rg->getMiscBitSetMgr();
     }
-    COPY_CONSTRUCTOR(RefineDUChain);
     virtual ~RefineDUChain() {}
 
     bool dump();

@@ -286,18 +286,17 @@ DUMgr::~DUMgr()
 //recompute: true to compute overlapping MDSet even if it has cached.
 void DUMgr::computeOverlapUseMDSet(IR * ir, bool recompute)
 {
-    bool has_init = false;
     MD const* md = ir->getRefMD();
     MDSet tmpmds;
     if (md != NULL) {
+        ASSERTN(!ir->isCallStmt(), ("Call should be processed specially"));
         if (MD_id(md) == MD_GLOBAL_VAR ||
             MD_id(md) == MD_IMPORT_VAR ||
             MD_id(md) == MD_FULL_MEM) {
             return;
         }
 
-        //Compute overlapped md set for must-ref.
-        has_init = true;
+        //Compute overlapped MDSet for must-ref.
         if (recompute || !m_is_cached_mdset.is_contain(MD_id(md))) {
             m_md_sys->computeOverlap(m_rg, md, tmpmds,
                 m_tab_iter, *m_misc_bs_mgr, true);
@@ -308,39 +307,27 @@ void DUMgr::computeOverlapUseMDSet(IR * ir, bool recompute)
             }
 
             m_is_cached_mdset.bunion(MD_id(md), *m_misc_bs_mgr);
-        } else {
-            MDSet const* hashed = m_cached_overlap_mdset.get(md);
-            if (hashed != NULL) {
-                tmpmds.copy(*hashed, *m_misc_bs_mgr);
-            } else {
-                tmpmds.clean(*m_misc_bs_mgr);
-            }
-        }
-    }
-
-    //Compute overlapped md set for may-ref, may-ref may contain several MDs.
-    MDSet const* mds = ir->getRefMDSet();
-    if (mds != NULL) {
-        if (!has_init) {
-            has_init = true;
-            tmpmds.copy(*mds, *m_misc_bs_mgr);
-        } else {
-            tmpmds.bunion_pure(*mds, *m_misc_bs_mgr);
+            tmpmds.clean(*m_misc_bs_mgr);
+            return;
         }
 
-        m_md_sys->computeOverlap(m_rg, *mds, tmpmds,
-            m_tab_iter, *m_misc_bs_mgr, true);
-    }
-
-    if (!has_init || tmpmds.is_empty()) {
-        ir->cleanRefMDSet();
-        tmpmds.clean(*m_misc_bs_mgr);
+        ASSERT0(tmpmds.is_empty());
+        ir->setRefMDSet(m_cached_overlap_mdset.get(md), m_rg);
         return;
     }
 
-    MDSet const* newmds = m_mds_hash->append(tmpmds);
-    ASSERT0(newmds);
-    ir->setRefMDSet(newmds, m_rg);
+    //Compute overlapped MDSet for may-ref, may-ref may contain several MDs.
+    MDSet const* mds = ir->getRefMDSet();
+    if (mds == NULL) {
+        ASSERT0(tmpmds.is_empty());
+        return;
+    }
+
+    ASSERTN(!mds->is_empty(), ("can not get a hashed MDSet that is empty")); 
+    tmpmds.copy(*mds, *m_misc_bs_mgr);
+    m_md_sys->computeOverlap(m_rg, *mds, tmpmds,
+        m_tab_iter, *m_misc_bs_mgr, true);
+    ir->setRefMDSet(m_mds_hash->append(tmpmds), m_rg);
     tmpmds.clean(*m_misc_bs_mgr);
 }
 
@@ -1660,8 +1647,7 @@ void DUMgr::dumpSet(bool is_bs)
 
         SEGIter * st = NULL;
         if (def_in != NULL) {
-            note("\nDEF IN STMT: %lu byte ",
-                 (ULONG)def_in->count_mem());
+            note("\nDEF IN STMT: %lu byte ", (ULONG)def_in->count_mem());
             for (i = def_in->get_first(&st);
                  i != -1; i = def_in->get_next(i, &st)) {
                 IR * ir = m_rg->getIR(i);
@@ -1720,7 +1706,7 @@ void DUMgr::dumpSet(bool is_bs)
 
         if (may_def_gen != NULL) {
             note("\nMAY GEN STMT: %lu byte ",
-                (ULONG)may_def_gen->count_mem());
+                 (ULONG)may_def_gen->count_mem());
             for (i = may_def_gen->get_first(&st);
                  i != -1; i = may_def_gen->get_next(i, &st)) {
                 IR * ir = m_rg->getIR(i);
@@ -1793,8 +1779,7 @@ void DUMgr::dumpSet(bool is_bs)
         }
 
         if (liveout_ir != NULL) {
-            note("\nLIVEOUT EXPR: %lu byte ",
-                    (ULONG)liveout_ir->count_mem());
+            note("\nLIVEOUT EXPR: %lu byte ", (ULONG)liveout_ir->count_mem());
             for (i = liveout_ir->get_first(&st);
                  i != -1; i = liveout_ir->get_next(i, &st)) {
                 IR * ir = m_rg->getIR(i);
@@ -1822,8 +1807,7 @@ void DUMgr::dumpSet(bool is_bs)
         }
 
         if (killed_exp != NULL) {
-            note("\nKILLED EXPR: %lu byte ",
-                    (ULONG)killed_exp->count_mem());
+            note("\nKILLED EXPR: %lu byte ", (ULONG)killed_exp->count_mem());
             for (i = killed_exp->get_first(&st);
                  i != -1; i = killed_exp->get_next(i, &st)) {
                 IR * ir = m_rg->getIR(i);
@@ -2530,7 +2514,7 @@ void DUMgr::inferIStore(IR * ir, UINT duflag)
 }
 
 
-//Inference call's MayDef MD set.
+//Inference call's MayDef MDSet.
 //Regard both USE and DEF as ir's RefMDSet.
 //NOTE: Call/ICall may modify addressable local
 //      variables and globals in any indefinite ways.
@@ -2591,7 +2575,7 @@ void DUMgr::inferCallAndICall(IR * ir, UINT duflag, IN MD2MDSet * mx)
     if (ir->isReadOnlyCall()) {
         modify_global = false;
     } else {
-        //Utilize calllee's MayDef MD Set if callee region has been processed.
+        //Utilize calllee's MayDef MDSet if callee region has been processed.
         CallGraph * callg = m_rg->getRegionMgr()->getCallGraph();
         if (callg != NULL) {
             Region * callee = callg->mapCall2Region(ir, m_rg);
@@ -2620,7 +2604,7 @@ void DUMgr::inferCallAndICall(IR * ir, UINT duflag, IN MD2MDSet * mx)
         tmpmds, m_tab_iter, *m_misc_bs_mgr, true);
     maydefuse.bunion_pure(tmpmds, *m_misc_bs_mgr);
 
-    //Register the MD set.
+    //Register the MDSet.
     //Regard both USE and DEF as ir's RefMDSet.
     //TODO: differetiate the USE set and DEF set of CALL stmt
     //      for better DefUse precision.
@@ -3195,7 +3179,7 @@ void DUMgr::computeMDRef(IN OUT OptCtx & oc, UINT duflag)
             default: UNREACHABLE();
             }
             if (ir->is_atomic()) {
-                computeAtomMDRef(ir, duflag);
+                computeAtomMDRef(ir);
             }
         }
     }
@@ -3207,7 +3191,7 @@ void DUMgr::computeMDRef(IN OUT OptCtx & oc, UINT duflag)
 
 //This function compute and update MDRef
 //according to operand in atom operation.
-void DUMgr::computeAtomMDRef(IR * ir, UINT duflag)
+void DUMgr::computeAtomMDRef(IR * ir)
 {
     ASSERT0(ir->is_atomic());
     //By default, RMW could be simulated by IR_CALL with 3 arguments, e.g:
@@ -3878,7 +3862,7 @@ void DUMgr::solve(DefDBitSetCore const& expr_univers,
 }
 
 
-//Check if stmt is killing-define to usemd.
+//Check if stmt is killing-def to usemd.
 //This function matchs the following patterns:
 //  CASE1:    st(mc<100>), x = ...
 //                      ...  = ld(mc<99>), x
@@ -3896,7 +3880,7 @@ bool DUMgr::checkIsLocalKillingDefForDirectAccess(
         return true;
     }
     if (defmd->is_exact()) {
-        if (defmd == usemd || defmd->is_cover(usemd)) {
+        if (defmd == usemd || defmd->is_exact_cover(usemd)) {
             return true;
         }
         *has_nonkilling_local_def = true;
@@ -4520,7 +4504,8 @@ void DUMgr::updateDefWithMustExactMD(IR * ir, MD const* mustexact)
             nk = dlst->get_next(k, &sc);
             ASSERT0(m_rg->getIR(k) && m_rg->getIR(k)->is_stmt());
             MD const* w = m_rg->getIR(k)->getExactRef();
-            if (mustexact == w || (w != NULL && mustexact->is_cover(w))) {
+            if (mustexact == w ||
+                (w != NULL && mustexact->is_exact_cover(w))) {
                 //Current ir stmt killed stmt k as well.
                 dlst->diff(k, *m_misc_bs_mgr);
             }

@@ -37,6 +37,7 @@ author: Su Zhenyu
 namespace xoc {
 
 class IR_CFS_OPT : public Pass {
+    COPY_CONSTRUCTOR(IR_CFS_OPT);
 protected:
     Region * m_rg;
     TypeMgr * m_tm;
@@ -53,7 +54,6 @@ protected:
 
 public:
     IR_CFS_OPT(Region * rg) { m_rg = rg; m_tm = rg->getTypeMgr(); }
-    COPY_CONSTRUCTOR(IR_CFS_OPT);
     ~IR_CFS_OPT() {}
 
     void dump();

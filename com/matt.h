@@ -246,7 +246,8 @@ public:
     void adjust();
 
     void copy(Matrix<T> const& m);
-    UINT count_mem() const;
+    //Count memory usage for current object.
+    size_t count_mem() const;
     bool cond(T & c, INT p = NORM_INF); //Calculate condition number.
     void cross(IN Matrix<T> & v, OUT Matrix<T> & u); //vector product.
 
@@ -323,7 +324,7 @@ public:
     //Simulating function like as 'v = m_mat[row][col]'
     //Because we allocated memory continuously, so we cannot access element
     //of 'm_mat'by 'm_mat[row][col]' directly.
-    T get(UINT row, UINT col) const
+    T & get(UINT row, UINT col) const
     {
         ASSERTN(m_is_init, ("not yet initialize."));
         ASSERTN(row < m_row_size && col < m_col_size,
@@ -541,9 +542,9 @@ public:
 
 
 template <class T>
-UINT Matrix<T>::count_mem() const
+size_t Matrix<T>::count_mem() const
 {
-    UINT count = sizeof(*this);
+    size_t count = sizeof(*this);
     count += size() * sizeof(T);
     return count;
 }
@@ -1122,7 +1123,7 @@ void Matrix<T>::interchCol(UINT col1, UINT col2)
 }
 
 
-//This function perform matrix transposing.
+//This function perform matrix transpose.
 template <class T>
 void Matrix<T>::trans()
 {
@@ -1598,8 +1599,7 @@ T Matrix<T>::FullPermutation(UINT n)
 {
     ASSERTN(n > 1, ("Invalid number"));
     INT * posbuf = new INT[n];
-    T det;
-    det = 0;
+    T det = T(0);
     ::memset(posbuf, 0, sizeof(INT) * n);
     for (UINT i = 0; i < n; i++) {
         posbuf[i] = 1;
@@ -2582,7 +2582,7 @@ T Matrix<T>::tr()
 {
     ASSERTN(m_is_init, ("not yet initialize."));
     ASSERTN(is_quad(), ("must be quad"));
-    T trv = 0;
+    T trv = T(0); //allocate on stack
     for (UINT i = 0; i < m_row_size; i++) {
         trv = trv + get(i,i);
     }
@@ -2740,6 +2740,8 @@ void Matrix<T>::insertRowBefore(UINT ridx)
 
 
 //Inserting empty rows before 'ridx'.
+//ridx: row index
+//rnum: number of rows
 template <class T>
 void Matrix<T>::insertRowsBefore(UINT ridx, UINT rnum)
 {
@@ -2765,6 +2767,7 @@ void Matrix<T>::insertRowsBefore(UINT ridx, UINT rnum)
 
 //Insert rows before 'ridx' which rows copy from matrix 'm'
 //from 'from' to 'to'.
+//ridx: row index
 template <class T>
 void Matrix<T>::insertRowsBefore(UINT ridx,
                                  Matrix<T> const& m,
@@ -2792,6 +2795,7 @@ void Matrix<T>::insertRowsBefore(UINT ridx,
 
 
 //Inserting one empty column before 'cidx'.
+//cidx: column index
 template <class T>
 void Matrix<T>::insertColumnBefore(UINT cidx)
 {
@@ -2812,6 +2816,8 @@ void Matrix<T>::insertColumnBefore(UINT cidx)
 
 
 //Insert the number 'cnum' of empty columns before 'cidx'.
+//cidx: column index
+//cnum: number of columns
 template <class T>
 void Matrix<T>::insertColumnsBefore(UINT cidx, UINT cnum)
 {
@@ -2837,6 +2843,7 @@ void Matrix<T>::insertColumnsBefore(UINT cidx, UINT cnum)
 
 //Inserting columns before 'cidx' which columns copy from matrix 'm'
 //from 'from' to 'to'.
+//cidx: column index
 template <class T>
 void Matrix<T>::insertColumnsBefore(UINT cidx,
                                     Matrix<T> const& m,
@@ -3580,7 +3587,7 @@ T Matrix<T>::mod()
 {
     ASSERTN(m_is_init, ("not yet initialize."));
     ASSERTN(is_vec(), ("not a vector, only one row or one col"));
-    T modv = 0;
+    T modv = T(0); //allocated on stack
 
     if (is_rowvec()) { //'this' is row vector
         for (UINT i = 0; i < m_col_size; i++) {
@@ -3606,9 +3613,9 @@ T Matrix<T>::modrow(UINT row)
 {
     ASSERTN(m_is_init, ("not yet initialize."));
     ASSERTN(row < m_row_size, ("out of boundary"));
-    T modv = 0;
+    T modv = T(0);
     for (UINT i = 0; i < m_col_size; i++) {
-        T v = get(row, i);
+        T & v = get(row, i);
         modv = modv + (v * v);
     }
     modv = _sqrt(modv);
@@ -3622,9 +3629,9 @@ T Matrix<T>::modcol(UINT col)
 {
     ASSERTN(m_is_init, ("not yet initialize."));
     ASSERTN(col < m_col_size, ("out of boundary"));
-    T modv = 0;
+    T modv = T(0);
     for (UINT i = 0; i < m_row_size; i++) {
-        T v = get(i, col);
+        T & v = get(i, col);
         modv = modv + (v * v);
     }
     modv = _sqrt(modv);
@@ -3895,25 +3902,25 @@ template <class T>
 T Matrix<T>::norm(INT p)
 {
     ASSERTN(m_is_init, ("not yet initialize."));
-    T n;
     if (p == NORM_F) {
-        n = 0;
+        T n = T(0);
         for (UINT i = 0; i < m_row_size; i++) {
             for (UINT j = 0; j < m_col_size; j++) {
                 n = n + (get(i, j) * get(i, j));
             }
         }
         return _sqrt(n);
-    } else if (p == NORM_1) {
+    }
+    
+    if (p == NORM_1) {
+        T n = T(0);
         if (is_vec()) { //vector norm
-            n = 0;
             for (UINT i = 0; i < m_row_size; i++) {
                 for (UINT j = 0; j < m_col_size; j++) {
                     n = n + abs(get(i, j));
                 }
             }
         } else { //matirx norm, row norm
-            n = 0;
             for (UINT i = 0; i < m_row_size; i++) {
                 T tmp = 0;
                 for (UINT j = 0; j < m_col_size; j++) {
@@ -3923,30 +3930,34 @@ T Matrix<T>::norm(INT p)
             }
         }
         return n;
-    } else if (p == NORM_2) {
+    }
+    
+    if (p == NORM_2) {
         if (is_vec()) { //vector norm
-            n = 0;
+            T n = T(0);
             for (UINT i = 0; i < m_row_size; i++) {
                 for (UINT j = 0; j < m_col_size; j++) {
                     n = n + (get(i, j) * get(i, j));
                 }
             }
             return _sqrt(n);
-        } else { //matrix norm
-            Matrix<T> tmp = *this;
-            tmp.trans();
-            return _sqrt((tmp * *this).sprad());
         }
-    } else if (p == NORM_INF) {
+        
+        //matrix norm
+        Matrix<T> tmp = *this;
+        tmp.trans();
+        return _sqrt((tmp * *this).sprad());
+    }
+    
+    if (p == NORM_INF) {
+        T n = T(0);
         if (is_vec()) { //vector norm
-            n = 0;
             for (UINT i = 0; i < m_row_size; i++) {
                 for (UINT j = 0; j < m_col_size; j++) {
                     n = MAX(n, abs(get(i, j)));
                 }
             }
         } else { //matrix norm, column norm
-            n = 0;
             for (UINT j = 0; j < m_col_size; j++) {
                 T tmp = 0;
                 for (UINT i = 0; i < m_row_size; i++) {
@@ -3981,9 +3992,7 @@ bool Matrix<T>::cond(T & c, INT p)
 
 
 //Spectral radius.
-//
 //Specrad = max|lamda(i)|, i=1~N-1
-//
 //NOTICE: matrix must be row-vector matrix.
 template <class T>
 T Matrix<T>::sprad()
@@ -3991,7 +4000,7 @@ T Matrix<T>::sprad()
     ASSERTN(m_is_init, ("not yet initialize."));
     Matrix<T> v;
     eig(v);
-    T maxeigv = 0;
+    T maxeigv = T(0); //allocated on stack
     for (UINT j = 0; j < m_col_size; j++) {
         if (j == 0) {
             maxeigv = abs(v.get(0, j));

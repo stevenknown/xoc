@@ -51,126 +51,125 @@ class RegionMgr;
 //you remove/add flag here.
 ///////////////////////////////////////////////////////
 #define DEDICATED_STRING_VAR_NAME "#DedicatedStringVar"
-#define VAR_UNDEF                0x0
-#define VAR_GLOBAL               0x1    //can be seen by all functions.
+#define VAR_UNDEF 0x0
+#define VAR_GLOBAL 0x1    //can be seen by all functions.
 
 //This kind of variable only can be seen by current function or thread.
 //It always be allocated in stack or thread local storage(TLS).
-#define VAR_LOCAL                0x2
+#define VAR_LOCAL 0x2
 
 //This kind of variable can be seen in same file.
-#define VAR_PRIVATE              0x4
-#define VAR_READONLY             0x8    //var is readonly
-#define VAR_VOLATILE             0x10   //var is volatile
-#define VAR_HAS_INIT_VAL         0x20   //var with initialied value.
-#define VAR_FAKE                 0x40   //var is fake
-#define VAR_IS_LABEL             0x80   //var is label.
-#define VAR_FUNC_DECL            0x100  //var is function region declaration.
-#define VAR_IS_ARRAY             0x200  //var is array.
-#define VAR_IS_FORMAL_PARAM      0x400  //var is formal parameter.
-#define VAR_IS_SPILL             0x800  //var is spill location.
-#define VAR_ADDR_TAKEN           0x1000 //var's address has been taken.
-#define VAR_IS_PR                0x2000 //var is pr.
-#define VAR_IS_RESTRICT          0x4000 //var is restrict.
-#define VAR_IS_UNALLOCABLE       0x8000 //var is unallocable in memory.
+#define VAR_PRIVATE 0x4
+#define VAR_READONLY 0x8 //var is readonly
+#define VAR_VOLATILE 0x10 //var is volatile
+#define VAR_HAS_INIT_VAL 0x20 //var with initialied value.
+#define VAR_FAKE 0x40 //var is fake
+#define VAR_IS_LABEL 0x80 //var is label.
+#define VAR_FUNC_DECL 0x100 //var is function region declaration.
+#define VAR_IS_ARRAY 0x200 //var is array.
+#define VAR_IS_FORMAL_PARAM 0x400 //var is formal parameter.
+#define VAR_IS_SPILL 0x800 //var is spill location.
+#define VAR_ADDR_TAKEN 0x1000 //var's address has been taken.
+#define VAR_IS_PR 0x2000 //var is pr.
+#define VAR_IS_RESTRICT 0x4000 //var is restrict.
+#define VAR_IS_UNALLOCABLE 0x8000 //var is unallocable in memory.
 
 ////////////////////////////////////////////////////////
-//NOTE: Do *NOT* forget modify the bit-field in VAR if//
+//NOTE: DO *NOT* forget modify the bit-field in VAR if//
 //you remove/add flag here.                           //
 ////////////////////////////////////////////////////////
-#define BYTEBUF_size(b)    ((b)->m_byte_size)
-#define BYTEBUF_buffer(b)  ((b)->m_byte_buffer)
+#define BYTEBUF_size(b) ((b)->m_byte_size)
+#define BYTEBUF_buffer(b) ((b)->m_byte_buffer)
 class ByteBuf {
+    COPY_CONSTRUCTOR(ByteBuf);
 public:
     UINT m_byte_size;
     BYTE * m_byte_buffer;
-
 public:
-    COPY_CONSTRUCTOR(ByteBuf);
-
     BYTE * getBuffer() const { return m_byte_buffer; }
     UINT getSize() const { return m_byte_size; }
 };
 
 //Variable unique id.
-#define VAR_id(v)                ((v)->uid)
+#define VAR_id(v) ((v)->uid)
 
 //Variable type.
-#define VAR_type(v)              ((v)->type)
+#define VAR_type(v) ((v)->type)
 
-#define VAR_name(v)              ((v)->name)
+#define VAR_name(v) ((v)->name)
 
 //Various flag.
-#define VAR_flag(v)              ((v)->u2.flag)
+#define VAR_flag(v) ((v)->u2.flag)
 
 //Record string content if variable is string.
-#define VAR_string(v)            ((v)->u1.string)
+#define VAR_string(v) ((v)->u1.string)
 
 //Record LabelInfo if variable is label.
-#define VAR_labinfo(v)           ((v)->u1.labinfo)
+#define VAR_labinfo(v) ((v)->u1.labinfo)
 
 //Variable is label.
-#define VAR_is_label(v)          ((v)->u2.s1.is_label)
+#define VAR_is_label(v) ((v)->u2.s1.is_label)
 
 //Variable is global.
-#define VAR_is_global(v)         ((v)->u2.s1.is_global)
+#define VAR_is_global(v) ((v)->u2.s1.is_global)
 
 //Variable is local.
-#define VAR_is_local(v)          ((v)->u2.s1.is_local)
+#define VAR_is_local(v) ((v)->u2.s1.is_local)
 
 //Global Variables which is private cannot be
 //referenced outside current file region.
-#define VAR_is_private(v)        ((v)->u2.s1.is_private)
+#define VAR_is_private(v) ((v)->u2.s1.is_private)
 
 //Variable is readonly.
-#define VAR_is_readonly(v)       ((v)->u2.s1.is_readonly)
+#define VAR_is_readonly(v) ((v)->u2.s1.is_readonly)
 
 //Record the initial valud index.
-#define VAR_byte_val(v)          ((v)->u1.byte_val)
+#define VAR_byte_val(v) ((v)->u1.byte_val)
 
 //Record prno.
-#define VAR_prno(v)              ((v)->u1.prno)
+#define VAR_prno(v) ((v)->u1.prno)
 
 //Variable has initial value.
-#define VAR_has_init_val(v)      ((v)->u2.s1.has_init_val)
+#define VAR_has_init_val(v) ((v)->u2.s1.has_init_val)
 
 //Variable is function region.
-#define VAR_is_func_decl(v)      ((v)->u2.s1.is_func_decl)
+#define VAR_is_func_decl(v) ((v)->u2.s1.is_func_decl)
 
 //Variable is aritifical or spurious that used to
 //faciliate optimizations and analysis.
-#define VAR_is_fake(v)           ((v)->u2.s1.is_fake)
+#define VAR_is_fake(v) ((v)->u2.s1.is_fake)
 
 //Variable is volatile.
-#define VAR_is_volatile(v)       ((v)->u2.s1.is_volatile)
+#define VAR_is_volatile(v) ((v)->u2.s1.is_volatile)
 
 //Variable is an array.
-#define VAR_is_array(v)          ((v)->u2.s1.is_array)
+#define VAR_is_array(v) ((v)->u2.s1.is_array)
 
 //Variable is parameter of this region.
-#define VAR_is_formal_param(v)   ((v)->u2.s1.is_formal_param)
+#define VAR_is_formal_param(v) ((v)->u2.s1.is_formal_param)
 
 //Record the parameter position.
-#define VAR_formal_param_pos(v)  ((v)->formal_parameter_pos)
+#define VAR_formal_param_pos(v) ((v)->formal_parameter_pos)
 
 //Variable is spill location.
-#define VAR_is_spill(v)          ((v)->u2.s1.is_spill)
+#define VAR_is_spill(v) ((v)->u2.s1.is_spill)
 
 //Variable has been taken address.
-#define VAR_is_addr_taken(v)     ((v)->u2.s1.is_addr_taken)
+#define VAR_is_addr_taken(v) ((v)->u2.s1.is_addr_taken)
 
 //Variable is PR.
-#define VAR_is_pr(v)             ((v)->u2.s1.is_pr)
+#define VAR_is_pr(v) ((v)->u2.s1.is_pr)
 
 //Variable is marked "restrict", and it always be parameter.
-#define VAR_is_restrict(v)       ((v)->u2.s1.is_restrict)
+#define VAR_is_restrict(v) ((v)->u2.s1.is_restrict)
 
 //Variable is concrete, and will be output to Code Generator.
-#define VAR_is_unallocable(v)    ((v)->u2.s1.is_unallocable)
+#define VAR_is_unallocable(v) ((v)->u2.s1.is_unallocable)
 
 //Record the alignment.
-#define VAR_align(v)             ((v)->align)
+#define VAR_align(v) ((v)->align)
 class VAR {
+    COPY_CONSTRUCTOR(VAR);
 public:
     UINT uid; //unique id;
     Type const* type; //Data type.
@@ -198,21 +197,21 @@ public:
     union {
         UINT flag; //Record variant properties of VAR.
         struct {
-            UINT is_global:1;       //VAR can be seen all program.
-            UINT is_local:1;        //VAR only can be seen in region.
-            UINT is_private:1;      //VAR only can be seen in file.
-            UINT is_readonly:1;     //VAR is readonly.
-            UINT is_volatile:1;     //VAR is volatile.
-            UINT has_init_val:1;    //VAR has initial value.
-            UINT is_fake:1;         //VAR is fake.
-            UINT is_label:1;        //VAR is label.
-            UINT is_func_decl:1;    //VAR is function unit declaration.
-            UINT is_array:1;        //VAR is array
+            UINT is_global:1; //VAR can be seen all program.
+            UINT is_local:1; //VAR only can be seen in region.
+            UINT is_private:1; //VAR only can be seen in file.
+            UINT is_readonly:1; //VAR is readonly.
+            UINT is_volatile:1; //VAR is volatile.
+            UINT has_init_val:1; //VAR has initial value.
+            UINT is_fake:1; //VAR is fake.
+            UINT is_label:1; //VAR is label.
+            UINT is_func_decl:1; //VAR is function unit declaration.
+            UINT is_array:1; //VAR is array
             UINT is_formal_param:1; //VAR is formal parameter.
-            UINT is_spill:1;        //VAR is spill location in function.
-            UINT is_addr_taken:1;   //VAR has been taken address.
-            UINT is_pr:1;           //VAR is pr.
-            UINT is_restrict:1;     //VAR is restrict.
+            UINT is_spill:1; //VAR is spill location in function.
+            UINT is_addr_taken:1; //VAR has been taken address.
+            UINT is_pr:1; //VAR is pr.
+            UINT is_restrict:1; //VAR is restrict.
 
             //True if variable should NOT be allocated in memory and
             //it is only being a placeholder in essence.
@@ -221,7 +220,6 @@ public:
     } u2;
 public:
     VAR();
-    COPY_CONSTRUCTOR(VAR);
     virtual ~VAR() {}
 
     UINT id() const { return VAR_id(this); }
@@ -348,10 +346,9 @@ public:
 
 
 class VarTab : public TTab<VAR*, CompareVar> {
+    COPY_CONSTRUCTOR(VarTab);
 public:
     VarTab() {}
-    COPY_CONSTRUCTOR(VarTab);
-
     void dump(TypeMgr * dm)
     {
         if (g_tfile == NULL) { return; }
@@ -388,7 +385,7 @@ typedef Vector<VAR*> VarVec;
 //This class is responsible for allocation and deallocation of VAR.
 //User can only create VAR via VarMgr, as well as delete it in the same way.
 class VarMgr {
-private:
+    COPY_CONSTRUCTOR(VarMgr);
     size_t m_var_count;
     VarVec m_var_vec;
     ConstSym2Var m_str_tab;
@@ -397,12 +394,9 @@ private:
     RegionMgr * m_ru_mgr;
     TypeMgr * m_tm;
 
-private:
-    inline void assignVarId(VAR * v);
-
+    void assignVarId(VAR * v);
 public:
     explicit VarMgr(RegionMgr * rm);
-    COPY_CONSTRUCTOR(VarMgr);
     virtual ~VarMgr() { destroy(); }
 
     void destroy();

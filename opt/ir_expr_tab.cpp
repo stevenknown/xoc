@@ -149,6 +149,9 @@ UINT ExprTab::compute_hash_key(IR const* ir)
 {
     ASSERT0(ir != NULL);
     UINT hval = ir->getCode() + (ir->getOffset() + 1) + (UINT)(size_t)IR_dt(ir);
+    if (ir->isReadPR()) {
+        hval += ir->getPrno();
+    }
     if (ir->is_id()) {
         VAR * var = ID_info(ir);
         hval += 5 * (UINT)(size_t)var;

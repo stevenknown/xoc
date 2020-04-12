@@ -37,12 +37,13 @@ author: Su Zhenyu
 namespace xoc {
 
 //CALL NODE
-#define CN_id(c)             ((c)->id)
-#define CN_sym(c)            ((c)->ru_name)
-#define CN_ru(c)             ((c)->rg)
-#define CN_is_used(c)        ((c)->u1.s1.is_used)
+#define CN_id(c) ((c)->id)
+#define CN_sym(c) ((c)->ru_name)
+#define CN_ru(c) ((c)->rg)
+#define CN_is_used(c) ((c)->u1.s1.is_used)
 #define CN_unknown_callee(c) ((c)->u1.s1.has_unknown_callee)
 class CallNode {
+    COPY_CONSTRUCTOR(CallNode);
 public:
     UINT id;
     SYM const* ru_name; //record the Region name.
@@ -62,7 +63,6 @@ public:
 
 public:
     CallNode() { ::memset(this, 0, sizeof(CallNode)); }
-    COPY_CONSTRUCTOR(CallNode);
 };
 
 
@@ -79,6 +79,7 @@ typedef TMapIter<Region*, SYM2CN*> Region2SYM2CNIter;
 #define CALLG_DUMP_SRC_LINE      2
 #define CALLG_DUMP_INNER_REGION  4
 class CallGraph : public xcom::DGraph {
+    COPY_CONSTRUCTOR(CallGraph);
 private:
     RegionMgr * m_ru_mgr;
     TypeMgr * m_tm;
@@ -128,7 +129,6 @@ public:
         m_cn_count = 1;
         m_cn_pool = smpoolCreate(sizeof(CallNode) * 2, MEM_CONST_SIZE);
     }
-    COPY_CONSTRUCTOR(CallGraph);
     virtual ~CallGraph()
     {
         SYM2CN * sym2cn = NULL;

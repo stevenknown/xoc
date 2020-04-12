@@ -227,18 +227,17 @@ AbsNode * CfsMgr::constructAbsBB(IN IRBB * bb, IN AbsNode * parent)
 }
 
 
-AbsNode * CfsMgr::constructAbsTree(
-        IN IRBB * entry,
-        IN AbsNode * parent,
-        IN xcom::BitSet * cur_region,
-        IN xcom::Graph & cur_graph,
-        IN OUT xcom::BitSet & visited)
+AbsNode * CfsMgr::constructAbsTree(IN IRBB * entry,
+                                   IN AbsNode * parent,
+                                   IN xcom::BitSet * cur_region,
+                                   IN xcom::Graph & cur_graph,
+                                   IN OUT xcom::BitSet & visited)
 {
     IRCFG * cfg = m_rg->getCFG();
     AbsNode * lst = NULL;
     IRBB * bb = entry;
     xcom::Graph g;
-    g.clone(cur_graph);
+    g.clone(cur_graph, false, false);
     xcom::Vertex * next = NULL;
     xcom::Vertex * v;
     if (cur_region != NULL) {

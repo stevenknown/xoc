@@ -35,7 +35,7 @@ namespace xcom {
 #define DEBUG_SEG
 #endif
 
-#define BITS_PER_SEG    512
+#define BITS_PER_SEG 512
 
 class BitSet;
 class BitSetMgr;
@@ -56,7 +56,7 @@ public:
     UINT id;
     #endif
     UINT start;
-    BitSet bs;
+    BitSet bs;    
 
     SEG()
     {
@@ -72,7 +72,7 @@ public:
         start = src.start;
         bs.copy(src.bs);
     }
-
+    //Count memory usage for current object.
     size_t count_mem() const { return sizeof(start) + bs.count_mem(); }
 
     inline void clean()
@@ -105,6 +105,7 @@ public:
 //Note this class only handle Default SEG.
 template <UINT BitsPerSeg = BITS_PER_SEG>
 class SegMgr {
+    COPY_CONSTRUCTOR(SegMgr);
 #ifdef _DEBUG_
 public:
     UINT seg_count;
@@ -127,7 +128,6 @@ public:
         SMemPool * p = smpoolCreate(sizeof(TSEGIter) * 4, MEM_CONST_SIZE);
         m_free_list.set_pool(p);
     }
-    COPY_CONSTRUCTOR(SegMgr);
     ~SegMgr()
     {
         #ifdef _DEBUG_
@@ -184,7 +184,7 @@ public:
 
         return s;
     }
-
+    //Count memory usage for current object.
     size_t count_mem() const
     {
         size_t count = 0;
@@ -224,13 +224,13 @@ public:
 //    x.clean(mbsm);  //Very Important!
 template <UINT BitsPerSeg = BITS_PER_SEG>
 class SBitSetCore {
+    COPY_CONSTRUCTOR(SBitSetCore);
 protected:
     SListEx<SEG<BitsPerSeg>*> segs;
 
     void * realloc(IN void * src, size_t orgsize, size_t newsize);
 public:
     SBitSetCore() {}
-    COPY_CONSTRUCTOR(SBitSetCore);
     ~SBitSetCore()
     {
         //should call clean() before destruction,
@@ -274,7 +274,7 @@ public:
 
     void copy(SBitSetCore<BitsPerSeg> const& src, MiscBitSetMgr<BitsPerSeg> & m)
     { copy(src, &m.sm, &m.scflst, m.ptr_pool); }
-
+    //Count memory usage for current object.
     size_t count_mem() const;
 
     void destroySEGandClean(SegMgr<BitsPerSeg> * sm, TSEGIter ** free_list);
@@ -325,6 +325,7 @@ public:
 //    x->clean(); //Very Important!
 template <UINT BitsPerSeg = BITS_PER_SEG>
 class SBitSet : public SBitSetCore<BitsPerSeg> {
+    COPY_CONSTRUCTOR(SBitSet);
 protected:
     SMemPool * m_pool;
     TSEGIter * m_flst; //free list
@@ -335,7 +336,6 @@ public:
         m_pool = NULL;
         init(sm, sz);
     }
-    COPY_CONSTRUCTOR(SBitSet);
     ~SBitSet() { destroy(); }
 
     void init(SegMgr<BitsPerSeg> * sm, UINT sz = sizeof(TSEGIter))
@@ -380,6 +380,7 @@ public:
         //Do NOT change current m_sm.
         SBitSetCore<BitsPerSeg>::copy(src, m_sm, &m_flst, m_pool);
     }
+    //Count memory usage for current object.
     size_t count_mem() const;
 
     void diff(UINT elem)
@@ -416,6 +417,7 @@ public:
 //    mbsm->freeDBitSet(x); //Very Important!
 template <UINT BitsPerSeg = BITS_PER_SEG>
 class DBitSetCore : public SBitSetCore<BitsPerSeg> {
+    COPY_CONSTRUCTOR(DBitSetCore);
 protected:
     BYTE m_is_sparse:1; //true if bitset is sparse.
 
@@ -462,7 +464,6 @@ protected:
 public:
     DBitSetCore() { m_is_sparse = true; }
     DBitSetCore(bool is_sparse) { set_sparse(is_sparse); }
-    COPY_CONSTRUCTOR(DBitSetCore);
     ~DBitSetCore() {}
 
     void bunion(DBitSetCore<BitsPerSeg> const& src,
@@ -530,7 +531,9 @@ public:
             tgtbs->copy(*srcbs);
         }
     }
-    size_t count_mem() const { return SBitSetCore<BitsPerSeg>::count_mem() + 1; }
+    //Count memory usage for current object.
+    size_t count_mem() const
+    { return SBitSetCore<BitsPerSeg>::count_mem() + 1; }
 
     void diff(UINT elem, SegMgr<BitsPerSeg> * sm, TSEGIter ** free_list)
     {
@@ -681,6 +684,7 @@ public:
 //    mbsm.freeDBitSet(x); //Very Important!
 template <UINT BitsPerSeg = BITS_PER_SEG>
 class DBitSet : public DBitSetCore<BitsPerSeg> {
+    COPY_CONSTRUCTOR(DBitSet);
 protected:
     SMemPool * m_pool;
     TSEGIter * m_flst;
@@ -695,7 +699,6 @@ public:
         m_sm = sm;
         m_flst = NULL;
     }
-    COPY_CONSTRUCTOR(DBitSet);
     ~DBitSet()
     {
         for (TSEGIter * st = SBitSetCore<BitsPerSeg>::segs.get_head();
@@ -721,7 +724,7 @@ public:
 
     void copy(DBitSet<BitsPerSeg> const& src)
     { DBitSetCore<BitsPerSeg>::copy(src, m_sm, &m_flst, m_pool); }
-
+    //Count memory usage for current object.
     size_t count_mem() const
     {
         size_t count = sizeof(m_pool);
@@ -749,6 +752,7 @@ public:
 
 template <UINT BitsPerSeg = BITS_PER_SEG>
 class MiscBitSetMgr {
+    COPY_CONSTRUCTOR(MiscBitSetMgr);
 protected:
     SList<SBitSet<BitsPerSeg>*> m_sbitset_list;
     SList<DBitSet<BitsPerSeg>*> m_dbitset_list;
@@ -793,7 +797,6 @@ public:
 
 public:
     MiscBitSetMgr() { ptr_pool = NULL; init(); }
-    COPY_CONSTRUCTOR(MiscBitSetMgr);
     ~MiscBitSetMgr() { destroy(); }
 
     void init()

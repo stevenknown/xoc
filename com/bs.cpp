@@ -1685,9 +1685,9 @@ void BitSet::dump(FILE * h, UINT flag, INT last_pos) const
 //START BitSetMgr
 //
 //'h': dump mem usage detail to file.
-UINT BitSetMgr::count_mem(FILE * h)
+size_t BitSetMgr::count_mem(FILE * h)
 {
-    UINT count = 0;
+    size_t count = 0;
     C<BitSet*> * ct;
     for (m_bs_list.get_head(&ct);
          ct != m_bs_list.end(); ct = m_bs_list.get_next(ct)) {
@@ -1699,14 +1699,14 @@ UINT BitSetMgr::count_mem(FILE * h)
     #ifdef _DEBUG_
     if (h != NULL) {
         //Dump mem usage into file.
-        List<UINT> lst;
+        List<size_t> lst;
         C<BitSet*> * ct2;
         for (m_bs_list.get_head(&ct2);
              ct2 != m_bs_list.end(); ct2 = m_bs_list.get_next(ct2)) {
             BitSet const* bs = ct2->val();
-            UINT c = bs->count_mem();
+            size_t c = bs->count_mem();
 
-            C<UINT> * ct3;
+            C<size_t> * ct3 = NULL;
             UINT n = lst.get_elem_count();
             lst.get_head(&ct3);
             UINT i;
@@ -1721,7 +1721,7 @@ UINT BitSetMgr::count_mem(FILE * h)
             }
         }
 
-        UINT v = lst.get_head();
+        size_t v = lst.get_head();
         fprintf(h, "\n== DUMP BitSetMgr: total %d bitsets, mem usage are:\n",
                    m_bs_list.get_elem_count());
 
@@ -1733,11 +1733,11 @@ UINT BitSetMgr::count_mem(FILE * h)
                 b = 0;
             }
             if (v < 1024) {
-                fprintf(h, "%dB,", v);
+                fprintf(h, "%zuB,", v);
             } else if (v < 1024 * 1024) {
-                fprintf(h, "%dKB,", v/1024);
+                fprintf(h, "%zuKB,", v/1024);
             } else {
-                fprintf(h, "%dMB,", v/1024/1024);
+                fprintf(h, "%zuMB,", v/1024/1024);
             }
         }
         fflush(h);

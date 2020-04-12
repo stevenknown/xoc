@@ -71,6 +71,7 @@ void Region::HighProcessImpl(OptCtx & oc)
 
     if (g_do_aa) {
         ASSERT0(g_cst_bb_list && OC_is_cfg_valid(oc));
+        assignMD(false);
         checkValidAndRecompute(&oc, PASS_AA, PASS_UNDEF);
     }
 

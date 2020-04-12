@@ -94,6 +94,7 @@ public:
         smpoolDelete(m_pool);
     }
 
+    //Count memory usage for current object.
     size_t count_mem();
 
     void free(PtPairSet * pps)
@@ -188,7 +189,7 @@ public:
     PtPair * get(UINT id) { return m_id2pt_pair.get(id); }
 
     PtPair * add(UINT from, UINT to);
-
+    //Count memory usage for current object.
     size_t count_mem() const;
 };
 
@@ -290,7 +291,7 @@ typedef TMap<IR const*, MD const*> IR2Heapobj;
 //2. Compute the POINT TO Set for individual memory address.
 //
 //NOTICE:
-//Heap is a unique object. That means the whole
+//Heap is an unique object. That means the whole
 //HEAP is modified/referrenced if a LOAD/STORE operates
 //MD that describes variable belongs to HEAP.
 class AliasAnalysis : public Pass {
@@ -491,6 +492,7 @@ public:
     void computeFlowInsensitive();
     void computeMayPointTo(IR * pointer, IN MD2MDSet * mx, OUT MDSet & mds);
     void computeMayPointTo(IR * pointer, OUT MDSet & mds);
+    //Count memory usage for current object.
     size_t count_mem();
     size_t countMD2MDSetMemory();
 

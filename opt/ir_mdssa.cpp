@@ -38,11 +38,10 @@ namespace xoc {
 //
 size_t MDSSAMgr::count_mem()
 {
-    size_t count = 0;
-    count += m_map_md2stack.count_mem();
+    size_t count = m_map_md2stack.count_mem();
     count += m_max_version.count_mem();
     count += m_usedef_mgr.count_mem();
-    count += sizeof(MDSSAMgr);
+    count += sizeof(*this);
     return count;
 }
 
@@ -66,7 +65,7 @@ void MDSSAMgr::freePhiList()
 {
     for (IRBB * bb = m_rg->getBBList()->get_head();
          bb != NULL; bb = m_rg->getBBList()->get_next()) {
-        MDPhiList * philist = m_usedef_mgr.genBBPhiList(BB_id(bb));
+        MDPhiList * philist = m_usedef_mgr.getBBPhiList(BB_id(bb));
         if (philist == NULL) { continue; }
 
         for (xcom::SC<MDPhi*> * sct = philist->get_head();
@@ -195,9 +194,7 @@ void MDSSAMgr::dumpAllVMD()
 void MDSSAMgr::dump()
 {
     if (g_tfile == NULL) { return; }
-    note("\n\n==---- DUMP MDSSAMgr '%s'----==\n",
-         m_rg->getRegionName());
-
+    note("\n\n==---- DUMP MDSSAMgr '%s'----==\n", m_rg->getRegionName());
     BBList * bbl = m_rg->getBBList();
     List<IR const*> lst;
     List<IR const*> opnd_lst;
@@ -206,14 +203,15 @@ void MDSSAMgr::dump()
     for (IRBB * bb = bbl->get_head(); bb != NULL; bb = bbl->get_next()) {
         note("\n--- BB%d ---", BB_id(bb));
 
-        MDPhiList * philist = m_usedef_mgr.genBBPhiList(BB_id(bb));
-        ASSERT0(philist);
-        for (xcom::SC<MDPhi*> * sct = philist->get_head();
-             sct != philist->end(); sct = philist->get_next(sct)) {
-            MDPhi * phi = sct->val();
-            ASSERT0(phi && phi->is_phi());
-            note("\n");
-            phi->dump(m_rg, &m_usedef_mgr);
+        MDPhiList * philist = m_usedef_mgr.getBBPhiList(BB_id(bb));
+        if (philist != NULL) {
+            for (xcom::SC<MDPhi*> * sct = philist->get_head();
+                 sct != philist->end(); sct = philist->get_next(sct)) {
+                MDPhi * phi = sct->val();
+                ASSERT0(phi && phi->is_phi());
+                note("\n");
+                phi->dump(m_rg, &m_usedef_mgr);
+            }
         }
 
         for (IR * ir = BB_first_ir(bb); ir != NULL; ir = BB_next_ir(bb)) {
@@ -382,7 +380,7 @@ MDDef * MDSSAMgr::findKillingDef(IR const* ir)
     MD const* defmd = def->getOcc()->getRefMD();
     if (defmd != NULL &&
         (defmd == opndmd ||
-         (defmd->is_exact() && defmd->is_cover(opndmd)))) {
+         (defmd->is_exact() && defmd->is_exact_cover(opndmd)))) {
         //def is killing must-def.
         return def;
     }
@@ -450,7 +448,7 @@ void MDSSAMgr::dumpDefChain(List<MDDef const*> & wl,
         if (defmd != NULL &&
             defmd->is_exact() &&
             vopndmd->is_exact() &&
-            (defmd == vopndmd || defmd->is_cover(vopndmd))) {
+            (defmd == vopndmd || defmd->is_exact_cover(vopndmd))) {
             ; //def is killing may-def.
         } else {
             if (def->getPrev() != NULL &&
@@ -527,18 +525,18 @@ void MDSSAMgr::dumpDUChain()
     g_indent = 0;
     for (IRBB * bb = bbl->get_head(); bb != NULL; bb = bbl->get_next()) {
         note("\n--- BB%d ---", BB_id(bb));
-        MDPhiList * philist = m_usedef_mgr.genBBPhiList(BB_id(bb));
-        ASSERT0(philist);
-        for (xcom::SC<MDPhi*> * sct = philist->get_head();
-             sct != philist->end(); sct = philist->get_next(sct)) {
-            MDPhi * phi = sct->val();
-            ASSERT0(phi && phi->is_phi());
-            note("\n");
-            phi->dump(m_rg, &m_usedef_mgr);
+        MDPhiList * philist = m_usedef_mgr.getBBPhiList(BB_id(bb));
+        if (philist != NULL) {
+            for (xcom::SC<MDPhi*> * sct = philist->get_head();
+                 sct != philist->end(); sct = philist->get_next(sct)) {
+                MDPhi * phi = sct->val();
+                ASSERT0(phi && phi->is_phi());
+                note("\n");
+                phi->dump(m_rg, &m_usedef_mgr);
+            }
         }
 
-        for (IR * ir = BB_first_ir(bb);
-             ir != NULL; ir = BB_next_ir(bb)) {
+        for (IR * ir = BB_first_ir(bb); ir != NULL; ir = BB_next_ir(bb)) {
             dumpIR(ir, m_rg);
 
             bool parting_line = false;
@@ -920,8 +918,9 @@ void MDSSAMgr::addDefChain(MDDef * def1, MDDef * def2)
 void MDSSAMgr::renamePhiResult(IN IRBB * bb)
 {
     ASSERT0(bb);
-    MDPhiList * philist = m_usedef_mgr.genBBPhiList(BB_id(bb));
-    ASSERT0(philist);
+    MDPhiList * philist = m_usedef_mgr.getBBPhiList(BB_id(bb));
+    if (philist == NULL) { return; }
+
     for (xcom::SC<MDPhi*> * sct = philist->get_head();
          sct != philist->end(); sct = philist->get_next(sct)) {
         MDPhi * phi = sct->val();
@@ -1045,8 +1044,9 @@ void MDSSAMgr::handleBBRename(IRBB * bb,
         ASSERT0(p);
 
         //Replace opnd of PHI of 'succ' with top SSA version.
-        MDPhiList * philist = m_usedef_mgr.genBBPhiList(BB_id(succ));
-        ASSERT0(philist);
+        MDPhiList * philist = m_usedef_mgr.getBBPhiList(BB_id(succ));
+        if (philist == NULL) { continue; }
+
         for (xcom::SC<MDPhi*> * sct = philist->get_head();
              sct != philist->end(); sct = philist->get_next(sct)) {
             MDPhi * phi = sct->val();
@@ -1181,8 +1181,8 @@ void MDSSAMgr::rename(xcom::DefSBitSet & effect_mds,
 
 void MDSSAMgr::destructBBSSAInfo(IRBB * bb)
 {
-    MDPhiList * philist = m_usedef_mgr.genBBPhiList(BB_id(bb));
-    ASSERT0(philist);
+    MDPhiList * philist = m_usedef_mgr.getBBPhiList(BB_id(bb));
+    if (philist == NULL) { return; }
     for (xcom::SC<MDPhi*> * sct = philist->get_head();
          sct != philist->end(); sct = philist->get_next(sct)) {
         MDPhi * phi = sct->val();
@@ -1353,8 +1353,7 @@ bool MDSSAMgr::verifyPhi(bool is_vpinfo_avail)
     List<IRBB*> preds;
     for (IRBB * bb = bblst->get_head(); bb != NULL; bb = bblst->get_next()) {
         m_cfg->get_preds(preds, bb);
-
-        MDPhiList * philist = m_usedef_mgr.genBBPhiList(BB_id(bb));
+        MDPhiList * philist = m_usedef_mgr.getBBPhiList(BB_id(bb));
         if (philist == NULL) { continue; }
 
         for (xcom::SC<MDPhi*> * sct = philist->get_head();
@@ -1387,8 +1386,8 @@ bool MDSSAMgr::verifyPhi(bool is_vpinfo_avail)
             }
 
             ASSERTN(num_opnd == preds.get_elem_count(),
-                   ("The number of phi operand must same with "
-                    "the number of BB predecessors."));
+                    ("The number of phi operand must same with "
+                     "the number of BB predecessors."));
         }
     }
     return true;
@@ -1572,14 +1571,9 @@ bool MDSSAMgr::verify()
     xcom::C<IRBB*> * ct = NULL;
     for (bbl->get_head(&ct); ct != bbl->end(); ct = bbl->get_next(ct)) {
         IRBB * bb = ct->val();
-        xcom::C<IR*> * ctir = NULL;
-        for (BB_irlist(bb).get_head(&ctir);
-             ctir != BB_irlist(bb).end();
-             ctir = BB_irlist(bb).get_next(ctir)) {
-
-            //Verify PHI list.
-            MDPhiList * philist = m_usedef_mgr.genBBPhiList(BB_id(bb));
-            ASSERT0(philist);
+        //Verify PHI list.
+        MDPhiList * philist = m_usedef_mgr.getBBPhiList(BB_id(bb));
+        if (philist != NULL) {
             for (xcom::SC<MDPhi*> * sct = philist->get_head();
                  sct != philist->end(); sct = philist->get_next(sct)) {
                 MDPhi * phi = sct->val();
@@ -1596,7 +1590,12 @@ bool MDSSAMgr::verify()
                     verifySSAInfo(opnd);
                 }
             }
-
+        }
+        
+        xcom::C<IR*> * ctir = NULL;
+        for (BB_irlist(bb).get_head(&ctir);
+             ctir != BB_irlist(bb).end();
+             ctir = BB_irlist(bb).get_next(ctir)) {
             IR * ir = ctir->val();
             m_iter.clean();
             for (IR * x = iterInit(ir, m_iter);
@@ -1812,9 +1811,10 @@ void MDSSAMgr::destruction(OptCtx * oc)
 void MDSSAMgr::prunePhiForBB(List<IRBB*> & wl, IRBB * bb)
 {
     ASSERT0(bb);
-    MDPhiList * philist = m_usedef_mgr.genBBPhiList(BB_id(bb));
-    ASSERT0(philist);
-    xcom::SC<MDPhi*> * next;
+    MDPhiList * philist = m_usedef_mgr.getBBPhiList(BB_id(bb));
+    if (philist == NULL) { return; }
+
+    xcom::SC<MDPhi*> * next = NULL;
     for (xcom::SC<MDPhi*> * sct = philist->get_head();
          sct != philist->end(); sct = next) {
         next = philist->get_next(sct);

@@ -39,6 +39,7 @@ class MDSSAMgr;
 
 //Mapping from MD id to vector of VMD.
 class UINT2VMDVec {
+    COPY_CONSTRUCTOR(UINT2VMDVec);
 protected:
     UINT m_threshold;
     Vector<Vector<VMD*>*> m_mdid2vmdvec_vec;
@@ -46,10 +47,9 @@ protected:
 
 public:
     UINT2VMDVec(UINT threshold = 1000) { init(threshold); }
-    COPY_CONSTRUCTOR(UINT2VMDVec);
     ~UINT2VMDVec() { destroy(); }
-
-    UINT count_mem() const;
+    //Count memory usage for current object.
+    size_t count_mem() const;
 
     void init(UINT threshold = 1000)
     {
@@ -103,13 +103,13 @@ typedef enum _VOPND_CODE {
 #define VOPND_id(v) ((v)->m_id)
 #define VOPND_code(v) ((v)->m_code)
 class VOpnd {
+    COPY_CONSTRUCTOR(VOpnd);
 public:
     VOPND_CODE m_code;
     UINT m_id;
 
 public:
     VOpnd();
-    COPY_CONSTRUCTOR(VOpnd);
     ~VOpnd();
 
     void clean()
@@ -132,12 +132,12 @@ public:
 //  Thus it's virtual operand code is VOPND_CONST.
 #define VCONST_val(v) (((VConst*)v)->m_const_val)
 class VConst : public VOpnd {
+    COPY_CONSTRUCTOR(VConst);
 public:
     IR const* m_const_val;
 
 public:
     VConst();
-    COPY_CONSTRUCTOR(VConst);
     ~VConst();
 
     void clean()
@@ -164,6 +164,7 @@ public:
 #define VMD_def(v) (((VMD*)v)->m_def_stmt)
 #define VMD_occs(v) (((VMD*)v)->m_occs)
 class VMD : public VOpnd {
+    COPY_CONSTRUCTOR(VMD);
 public:
     UINT m_version; //unique version of MD.
     UINT m_mdid; //id of current virtual MD.
@@ -173,7 +174,6 @@ public:
 public:
     VMD();
     VMD(xcom::DefSegMgr * sm);
-    COPY_CONSTRUCTOR(VMD);
     ~VMD();
 
     void clean()
@@ -214,9 +214,9 @@ public:
 
 //Set of Virtual Operand.
 class VOpndSet : public DefSBitSetCore {
+    COPY_CONSTRUCTOR(VOpndSet);
 public:
     VOpndSet() { xcom::DefSBitSetCore::init(); }
-    COPY_CONSTRUCTOR(VOpndSet);
     //Should call clean() before destruction,
     //otherwise it will incur SegMgr assertion.
     ~VOpndSet() {}
@@ -245,12 +245,12 @@ typedef xcom::SEGIter * VOpndSetIter;
 //could be represented by same MDSSAInfo. Nevertheless, the postulation
 //is quite experimentally, and in practical very rarelly.
 class MDSSAInfo : public MDSSAInfoAttachInfo {
+    COPY_CONSTRUCTOR(MDSSAInfo);
 protected:
     VOpndSet m_vopnd_set;
 
 public:
     MDSSAInfo() {}
-    COPY_CONSTRUCTOR(MDSSAInfo);
 
     void init() { BaseAttachInfo::init(AI_MD_SSA); }
     void destroy(xcom::DefMiscBitSetMgr & m) { m_vopnd_set.clean(m); }
@@ -282,6 +282,7 @@ public:
 #define MDDEF_nextset(m) (((MDDef*)m)->m_nextset)
 #define MDDEF_occ(m) (((MDDef*)m)->m_occ)
 class MDDef {
+    COPY_CONSTRUCTOR(MDDef);
 public:
     UINT m_id;
     VMD * m_result; //the MD defined.
@@ -293,7 +294,6 @@ public:
 
 public:
     MDDef();
-    COPY_CONSTRUCTOR(MDDef);
 
     //Before destruction, invoke clean() to free memory resource.
     ~MDDef();
@@ -320,9 +320,9 @@ public:
 
 //Set of MDDef.
 class MDDefSet : public DefSBitSetCore {
+    COPY_CONSTRUCTOR(MDDefSet);
 public:
     MDDefSet() { xcom::DefSBitSetCore::init(); }
-    COPY_CONSTRUCTOR(MDDefSet);
 
     //should call clean() before destruction,
     //otherwise it will incur SegMgr assertion.
@@ -348,11 +348,11 @@ public:
 //This class represent MD phi operation.
 #define MDPHI_opnd_list(p) (((MDPhi*)p)->m_opnd_list)
 class MDPhi : public MDDef {
+    COPY_CONSTRUCTOR(MDPhi);
 public:
     IR * m_opnd_list;
 public:
     MDPhi();
-    COPY_CONSTRUCTOR(MDPhi);
     ~MDPhi();
 
     void init()
@@ -371,14 +371,15 @@ public:
 
 
 class MDPhiList : public SList<MDPhi*> {
+    COPY_CONSTRUCTOR(MDPhiList);
 public:
     MDPhiList();
-    COPY_CONSTRUCTOR(MDPhiList);
     ~MDPhiList();
 };
 
 //This class manages MDSSAInfo object allocation and destroy.
 class UseDefMgr {
+    COPY_CONSTRUCTOR(UseDefMgr);
 friend class MDSSAMgr;
 protected:
     SMemPool * m_phi_pool;
@@ -409,7 +410,6 @@ protected:
 
 public:
     UseDefMgr(Region * rg, MDSSAMgr * mgr);
-    COPY_CONSTRUCTOR(UseDefMgr);
     ~UseDefMgr() { cleanOrDestroy(false); }
 
     void reinit() { cleanOrDestroy(true); }
@@ -421,6 +421,7 @@ public:
     xcom::SC<VOpnd*> * allocSCVOpnd(VOpnd * opnd);
     VConst * allocVConst(IR const* ir);
     VMD * allocVMD(UINT mdid, UINT version);
+    //Count memory usage for current object.
     size_t count_mem();
 
     //Get MDSSAInfo of ir.
@@ -430,11 +431,14 @@ public:
     xcom::Vector<VOpnd*> * getVOpndVec() { return &m_vopnd_vec; }
     //Get specific VOpnd.
     VOpnd * getVOpnd(UINT i) const { return m_vopnd_vec.get(i); }
-    //Get MDPhi list of specific BB.
+    //Get MDPhi list of specific BB, or generate the list if not exist.
     MDPhiList * genBBPhiList(UINT bbid);
+    //Get MDPhi list of specific BB.
+    MDPhiList * getBBPhiList(UINT bbid) const
+    { return m_philist_vec.get(bbid); }
     MDDef * getMDDef(UINT id) const { return m_def_vec.get(id); }
     //Get Versioned MD object by giving MD id and MD version.
-    VMD * getVMD(UINT mdid, UINT version);
+    VMD * getVMD(UINT mdid, UINT version) const;
     Region * getRegion() const { return m_rg; }
 
     //Set MDSSAInfo of ir.

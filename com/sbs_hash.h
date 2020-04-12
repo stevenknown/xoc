@@ -31,8 +31,9 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 namespace xcom {
 
-//#define _BIT2NODE_IN_HASH_
-#define MD2NODE2_INIT_SZ    8 //The size must be power of 2.
+//Consider the speed of TMap might be better than HMap on average.
+//#define _BIT2NODE_IN_HASH_ 
+#define MD2NODE2_INIT_SZ 8 //The size must be power of 2.
 
 //For given SBitSetCore, mapping MD to its subsequently MD elements via HMap.
 template <UINT BitsPerSeg = BITS_PER_SEG>
@@ -43,26 +44,26 @@ public:
 
     Bit2NodeH(UINT hash_tab_size = 16) : next(hash_tab_size) { set = NULL; }
     ~Bit2NodeH() {}
-
-    UINT count_mem() const { return next.count_mem() + sizeof(set); }
+    //Count memory usage for current object.
+    size_t count_mem() const { return next.count_mem() + sizeof(set); }
 };
 
 
 //For given SBitSetCore, mapping bit to its subsequently element via TMap.
 template <UINT BitsPerSeg = BITS_PER_SEG>
 class Bit2NodeT {
+    COPY_CONSTRUCTOR(Bit2NodeT);
 public:
     SBitSetCore<BitsPerSeg> * set; //will be freed by sbs_mgr.
     TMap<UINT, Bit2NodeT*> next;
 
-    Bit2NodeT() { set = NULL; }
-    COPY_CONSTRUCTOR(Bit2NodeT);
+    Bit2NodeT(SMemPool * pool = NULL) : next(pool) { set = NULL; }
     ~Bit2NodeT() {}
 
-    void init()
+    void init(SMemPool * pool = NULL)
     {
         set = NULL;
-        next.init();
+        next.init(pool);
     }
 
     void destroy()
@@ -70,7 +71,7 @@ public:
         set = NULL;
         next.destroy();
     }
-
+    //Count memory usage for current object.
     size_t count_mem() const { return next.count_mem() + (size_t)sizeof(set); }
 };
 
@@ -84,9 +85,11 @@ public:
 // }
 template <class Allocator, UINT BitsPerSeg = BITS_PER_SEG>
 class SBitSetCoreHash {
+    COPY_CONSTRUCTOR(SBitSetCoreHash);
 protected:
     SMemPool * m_pool;
     Allocator * m_allocator;
+    List<SBitSetCore<BitsPerSeg>*> m_bit2node_set_list;
 
     #ifdef _DEBUG_
     UINT m_num_node; //record the number of MD2Node in the tree.
@@ -108,7 +111,7 @@ protected:
         #else
         B2NType * mn = (B2NType*)smpoolMallocConstSize(sizeof(B2NType), m_pool);
         ::memset(mn, 0, sizeof(B2NType));
-        mn->init();
+        mn->init(m_pool);
         #endif
 
         #ifdef _DEBUG_
@@ -207,68 +210,94 @@ public:
         m_bit2node = new B2NType();
         #endif
     }
-    COPY_CONSTRUCTOR(SBitSetCoreHash);
     virtual ~SBitSetCoreHash()
     {
         destroy();
 
         #ifdef _BIT2NODE_IN_HASH_
-        //m_bit2node already deleted in destroyMN2Node().
+        //Do not detete m_bit2node, it has already been deleted in destroy().        
         #else
         delete m_bit2node;
         #endif
+        m_bit2node = NULL;
 
         smpoolDelete(m_pool);
     }
 
-    void destroy()
+    #ifdef _BIT2NODE_IN_HASH_
+    void destroyBit2NodeH()
     {
         //Destroy the Bit2Node structure, here you do
         //NOT need invoke SBitSetCore's destroy() because they were
         //allocated from set-allocator and will be destroied by
         //the allocator.
         List<B2NType*> wl;
-
-        #ifdef _BIT2NODE_IN_HASH_
-        //Do nothing.
-        #else
-        TMapIter<UINT, B2NType*> ti;
-        #endif
-
         wl.append_tail(get_root());
         while (wl.get_elem_count() != 0) {
             B2NType * mn = wl.remove_head();
             ASSERT0(mn);
-
             B2NType * nextmn = NULL;
-
-            #ifdef _BIT2NODE_IN_HASH_
             INT pos = 0;
             for (nextmn = mn->next.get_first_elem(pos);
                  nextmn != NULL; nextmn = mn->next.get_next_elem(pos)) {
                 wl.append_tail(nextmn);
             }
-            #else
+            if (mn->set != NULL) {
+                m_allocator->free(mn->set);
+            }
+            mn->next.destroy();
+            delete mn;
+        }
+    }
+    #else
+    void destroyBit2NodeT()
+    {
+
+        //Destroy the Bit2Node structure, here you do
+        //NOT need invoke SBitSetCore's destroy() because they were
+        //allocated from set-allocator and will be destroied by
+        //the allocator.
+
+        //The iteration is very slow if there are too many Bit2NodeTs.
+        //#define ITER_EACH_BIT2NODE_TO_FREE_SET
+        #ifdef ITER_EACH_BIT2NODE_TO_FREE_SET
+        List<B2NType*> wl;
+        TMapIter<UINT, B2NType*> ti;
+        wl.append_tail(get_root());
+        while (wl.get_elem_count() != 0) {
+            B2NType * mn = wl.remove_head();
+            ASSERT0(mn);
+            B2NType * nextmn = NULL;
             ti.clean();
             for (UINT id = mn->next.get_first(ti, &nextmn);
                  id != 0; id = mn->next.get_next(ti, &nextmn)) {
                 ASSERT0(nextmn);
                 wl.append_tail(nextmn);
             }
-            #endif
-
             if (mn->set != NULL) {
                 m_allocator->free(mn->set);
             }
-
             mn->next.destroy();
-
-            #ifdef _BIT2NODE_IN_HASH_
-            delete mn;
-            #else
-            //Do nothing.
-            #endif
         }
+        #else
+        C<SBitSetCore<BitsPerSeg>*> * ct = NULL;
+        for (SBitSetCore<BitsPerSeg>* set = m_bit2node_set_list.get_head(&ct);
+             ct != m_bit2node_set_list.end();
+             set = m_bit2node_set_list.get_next(&ct)) {
+            ASSERT0(set);
+            m_allocator->free(set);
+        }
+        #endif
+    }
+    #endif
+
+    void destroy()
+    {
+        #ifdef _BIT2NODE_IN_HASH_    
+        destroyBit2NodeH();
+        #else
+        destroyBit2NodeT();
+        #endif    
     }
 
     inline void checkAndGrow(B2NType * mn)
@@ -319,11 +348,12 @@ public:
             ASSERT0(s);
             s->copy(set, *m_allocator->getBsMgr());
             mn->set = s;
+            m_bit2node_set_list.append_tail(s);
         }
         ASSERT0(mn->set == &set || mn->set->is_equal(set));
         return mn->set;
     }
-
+    //Count memory usage for current object.
     size_t count_mem() const
     {
         size_t count = smpoolGetPoolSize(m_pool);

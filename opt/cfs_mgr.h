@@ -124,6 +124,7 @@ public:
 //CfsMgr, record and rebuild the control flow structure information.
 //
 class CfsMgr : public Pass {
+    COPY_CONSTRUCTOR(CfsMgr);
 protected:
     xcom::BitSetMgr m_bs_mgr; //xcom::BitSet manager.
     SMemPool * m_pool;
@@ -145,7 +146,6 @@ public:
         m_rg = rg;
         m_pool = smpoolCreate(64, MEM_COMM);
     }
-    COPY_CONSTRUCTOR(CfsMgr);
     ~CfsMgr() { smpoolDelete(m_pool); }
 
     AbsNode * constructAbsLoop(

@@ -42,18 +42,19 @@ class Region;
 //Note line number can not be 0.
 #define DBX_lineno(d)   ((d)->lineno)
 class Dbx {
+    COPY_CONSTRUCTOR(Dbx);
 public:
     UINT lineno; //Note line number can not be 0.
 
 public:
     Dbx() {}
-    COPY_CONSTRUCTOR(Dbx);
     void clean() { lineno = 0; }
     void copy(Dbx const& dbx) { lineno = dbx.lineno; }
 };
 
 
 class DbxMgr {
+    COPY_CONSTRUCTOR(DbxMgr);
 public:
     class PrtCtx {
     public:
@@ -69,7 +70,6 @@ public:
 
 public:
     DbxMgr() {}
-    COPY_CONSTRUCTOR(DbxMgr);
     virtual ~DbxMgr() {}
 
     //Do some prepare work before print source file.

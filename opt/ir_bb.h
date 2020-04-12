@@ -43,11 +43,11 @@ class IRBB;
 //
 //NOTE: Overload funtion when inserting or remving new IR.
 class BBIRList : public EList<IR*, IR2Holder> {
+    COPY_CONSTRUCTOR(BBIRList);
     IRBB * m_bb;
 
 public:
     BBIRList() { m_bb = NULL; }
-    COPY_CONSTRUCTOR(BBIRList);
 
     inline xcom::C<IR*> * append_head(IR * ir)
     {
@@ -158,6 +158,7 @@ public:
 #define BB_is_try_end(b)        ((b)->u1.s1.is_try_end)
 #define BB_is_terminate(b)      ((b)->u1.s1.is_terminate)
 class IRBB {
+    COPY_CONSTRUCTOR(IRBB);
 public:
     UINT m_id; //BB's id
     INT m_rpo; //reverse post order
@@ -185,7 +186,6 @@ public:
         u1.u1b1 = 0;
         m_rpo = -1;
     }
-    COPY_CONSTRUCTOR(IRBB);
     ~IRBB()
     {
         //BB will be destructed in ~IRBBMgr().
@@ -233,11 +233,12 @@ public:
     //Clean attached label.
     void cleanLabelInfoList() { getLabelList().clean(); }
 
-    void dump(Region * rg, bool dump_inner_region);
+    void dump(Region const* rg, bool dump_inner_region) const;
     void dupSuccessorPhiOpnd(CFG<IRBB, IR> * cfg, Region * rg, UINT opnd_pos);
 
     List<LabelInfo const*> & getLabelList() { return lab_list; }
-    List<LabelInfo const*> const& getLabelListConst() const { return lab_list; }
+    List<LabelInfo const*> const& getLabelListConst() const
+    { return lab_list; }
     UINT getNumOfIR() const { return BB_irlist(this).get_elem_count(); }
     UINT getNumOfPred(CFG<IRBB, IR> * cfg) const
     {
@@ -483,6 +484,7 @@ public:
 //START IRBBMgr
 //
 class IRBBMgr {
+    COPY_CONSTRUCTOR(IRBBMgr);
 protected:
     BBList m_bbs_list;
     BBList m_free_list;
@@ -490,7 +492,6 @@ protected:
 
 public:
     IRBBMgr() { m_bb_count = 1; }
-    COPY_CONSTRUCTOR(IRBBMgr);
     ~IRBBMgr()
     {
         for (IRBB * bb = m_bbs_list.get_head();
@@ -518,7 +519,7 @@ public:
         bb->clean();
         m_free_list.append_head(bb);
     }
-
+    //Count memory usage for current object.
     size_t count_mem()
     {
         size_t count = 0;
@@ -533,8 +534,8 @@ public:
 
 //Exported Functions
 void dumpBBLabel(List<LabelInfo const*> & lablist, FILE * h);
-void dumpBBList(BBList * bbl,
-                Region * rg,
+void dumpBBList(BBList const* bbl,
+                Region const* rg,
                 CHAR const* name = NULL,
                 bool dump_inner_region = true);
 

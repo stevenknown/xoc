@@ -77,7 +77,7 @@ Graph::Graph(Graph const& g) :
     m_vex_hash_size = g.m_vex_hash_size;
     m_ec_pool = NULL;
     init();
-    clone(g);
+    clone(g, true, true);
 }
 
 
@@ -131,8 +131,7 @@ void Graph::resize(UINT vertex_hash_sz, UINT edge_hash_sz)
 
 size_t Graph::count_mem() const
 {
-    size_t count = 0;
-    count += sizeof(BYTE);
+    size_t count = sizeof(BYTE);
     count += sizeof(m_edge_hash_size);
     count += sizeof(m_vex_hash_size);
     count += m_edges.count_mem();
@@ -240,7 +239,7 @@ void Graph::computeRpoNoRecursive(Vertex * root, OUT List<Vertex const*> & vlst)
 }
 
 
-bool Graph::clone(Graph const& src)
+bool Graph::clone(Graph const& src, bool clone_edge_info, bool clone_vex_info)
 {
     erase();
     m_is_unique = src.m_is_unique;
@@ -254,7 +253,7 @@ bool Graph::clone(Graph const& src)
 
         //Calls inherited class method.
         //Vertex info of memory should allocated by inherited class method
-        if (VERTEX_info(srcv) != NULL) {
+        if (VERTEX_info(srcv) != NULL && clone_vex_info) {
             VERTEX_info(v) = cloneVertexInfo(srcv);
         }
     }
@@ -263,11 +262,11 @@ bool Graph::clone(Graph const& src)
     for (Edge * srce = src.get_first_edge(c);
          srce != NULL; srce = src.get_next_edge(c)) {
         Edge * e = addEdge(VERTEX_id(EDGE_from(srce)),
-            VERTEX_id(EDGE_to(srce)));
+                           VERTEX_id(EDGE_to(srce)));
 
         //Calls inherited class method.
         //Edge info of memory should allocated by inherited class method
-        if (EDGE_info(srce) != NULL) {
+        if (EDGE_info(srce) != NULL && clone_edge_info) {
             EDGE_info(e) = cloneEdgeInfo(srce);
         }
     }
@@ -597,6 +596,32 @@ UINT Graph::getDegree(Vertex const* vex) const
 }
 
 
+bool Graph::isInDegreeEqualTo(Vertex const* vex, UINT num) const
+{
+    ASSERTN(m_ec_pool != NULL, ("not yet initialized."));
+    if (vex == NULL) { return 0; }
+    UINT degree = 0;
+    for (EdgeC * el = VERTEX_in_list(vex); el != NULL; el = EC_next(el)) {
+        degree++;
+        if (degree == num) { return true; }
+    }
+    return degree == num; //Both degree and num may be 0.
+}
+
+
+bool Graph::isOutDegreeEqualTo(Vertex const* vex, UINT num) const
+{
+    ASSERTN(m_ec_pool != NULL, ("not yet initialized."));
+    if (vex == NULL) { return 0; }
+    UINT degree = 0;
+    for (EdgeC * el = VERTEX_out_list(vex); el != NULL; el = EC_next(el)) {
+        degree++;
+        if (degree == num) { return true; }
+    }
+    return degree == num; //Both degree and num may be 0.
+}
+
+
 UINT Graph::getInDegree(Vertex const* vex) const
 {
     ASSERTN(m_ec_pool != NULL, ("not yet initialized."));
@@ -744,50 +769,52 @@ bool Graph::is_reachable(Vertex * from, Vertex * to) const
 
 
 //Sort graph vertices in topological order.
-//vex_vec: record nodes with topological sort.
-//is_topdown: true to sort vertex in topdown order, false to sort in
-//            bottomup order.
-//NOTE: current graph will be empty at function return.
-//    If one need to keep the graph unchanged, clone graph
-//    as a tmpgraph and operate on the tmpgraph.
-//    e.g: Graph org;
-//         And org must be unchanged,
-//         Graph tmp(org);
-//         tmp.sortInToplogOrder(...)
-bool Graph::sortInToplogOrder(OUT Vector<UINT> & vex_vec, bool is_topdown)
+//vex_vec: record vertics in topological order.
+//Return true if sorting success, otherwise there exist cycles in graph.
+bool Graph::sortInTopologOrder(OUT Vector<Vertex*> & vex_vec)
 {
     ASSERTN(m_ec_pool != NULL, ("Graph still not yet initialize."));
     if (getVertexNum() == 0) {
         return true;
     }
-    List<Vertex*> vlst;
-    UINT pos = 0;
-    vex_vec.clean();
-    vex_vec.grow(getVertexNum());
-    while (getVertexNum() != 0) {
-        vlst.clean();
-        INT c;
-        for (Vertex * v = get_first_vertex(c);
-             v != NULL; v = get_next_vertex(c)) {
-            if (is_topdown) {
-                if (VERTEX_in_list(v) == NULL) {
-                    vlst.append_tail(v);
-                }
-            } else if (VERTEX_out_list(v) == NULL) {
-                vlst.append_tail(v);
-            }
-        }
-        if (vlst.get_elem_count() == 0 && getVertexNum() != 0) {
-            ASSERTN(0, ("exist cycle in graph"));
-            return false;
-        }
-        for (Vertex * v = vlst.get_head(); v != NULL; v = vlst.get_next()) {
-            vex_vec.set(pos, VERTEX_id(v));
-            pos++;
-            removeVertex(v);
+    List<Vertex*> ready_list;
+    DefMiscBitSetMgr sm;
+    DefSBitSet is_removed(sm.getSegMgr());
+    INT c;
+    for (xcom::Vertex * vex = get_first_vertex(c);
+         vex != NULL; vex = get_next_vertex(c)) {
+        if (getInDegree(vex) == 0) {
+            ready_list.append_tail(vex);
         }
     }
-    return true;
+    vex_vec.set(getVertexNum() - 1, NULL);
+    UINT pos = 0;
+    for (; ready_list.get_elem_count() != 0;) {
+        Vertex * ready = ready_list.remove_head();
+        is_removed.bunion(VERTEX_id(ready));
+        vex_vec.set(pos, ready);
+        pos++;
+        UINT succ_num = 0;
+        for (xcom::EdgeC const* el = VERTEX_out_list(ready);
+             el != NULL; el = EC_next(el)) {
+            Vertex * ready_succ = EDGE_to(EC_edge(el));
+
+            //Determine if in-degree equal to 1.
+            UINT in_degree = 0;
+            for (xcom::EdgeC const* el2 = VERTEX_in_list(ready_succ);
+                 el2 != NULL; el2 = EC_next(el2)) {
+                Vertex const* ready_succ_pred = EDGE_from(EC_edge(el2));
+                if (is_removed.is_contain(VERTEX_id(ready_succ_pred))) {
+                    continue;
+                }
+                in_degree++;                
+            }
+            if (in_degree == 0) {
+                ready_list.append_tail(ready_succ);
+            }
+        }
+    }
+    return pos == getVertexNum() - 1;
 }
 
 
@@ -840,16 +867,15 @@ void Graph::removeEdgeBetween(Vertex * v1, Vertex * v2)
 //       and the same goes for the rest of edges.
 void Graph::removeTransitiveEdge()
 {
-    Vector<UINT> vex_vec;
-    Graph tmp(*this);
-    tmp.sortInToplogOrder(vex_vec, true);
+    Vector<Vertex*> vex_vec;
+    sortInTopologOrder(vex_vec);
     DefMiscBitSetMgr bs_mgr;
     Vector<DefSBitSetCore*> reachset_vec;
     TMap<UINT, DefSBitSetCore*> reachset_map;
     BitSet is_visited;
     //Scanning vertices in topological order.
     for (INT i = 0; i <= vex_vec.get_last_idx(); i++) {
-        Vertex const* fromvex = getVertex(vex_vec.get(i));
+        Vertex const* fromvex = vex_vec.get(i);
         ASSERT0(fromvex);
         if (is_dense()) {
             removeTransitiveEdgeHelper(fromvex,
@@ -1083,8 +1109,7 @@ bool DGraph::cloneDomAndPdom(DGraph const& src)
 
 size_t DGraph::count_mem() const
 {
-    UINT count = 0;
-    count += m_dom_set.count_mem();
+    size_t count = m_dom_set.count_mem();
     count += m_pdom_set.count_mem(); //record post-dominator-set of each vertex.
     count += m_idom_set.count_mem(); //immediate dominator.
     count += m_ipdom_set.count_mem(); //immediate post dominator.

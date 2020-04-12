@@ -37,6 +37,7 @@ author: Su Zhenyu
 namespace xoc {
 
 class IPA : public Pass {
+    COPY_CONSTRUCTOR(IPA);
 protected:
     RegionMgr * m_rumgr;
     Region * m_program;
@@ -76,7 +77,6 @@ public:
         m_is_keep_reachdef = false;
         m_is_recompute_du_ref = true;
     }
-    COPY_CONSTRUCTOR(IPA);
     virtual ~IPA() { smpoolDelete(m_pool); }
 
     void computeCallRefForAllRegion();

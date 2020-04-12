@@ -182,10 +182,19 @@ public:
     MD_TYPE getType() const { return (MD_TYPE)MD_ty(this); }
 
     UINT id() const { return MD_id(this); }
+    //Return true if current md may cover 'm', such as:
+    //current md: |-...-----...---|
+    //m:            |---...-|
+    bool is_may_cover(MD const* m) const;
+    
     //Return true if current md exactly cover 'm', such as:
-    //current md: |-------|
-    //m:            |----|
-    bool is_cover(MD const* m) const;
+    //CASE1:
+    //  current md: |-------|
+    //  m:            |----|
+    //CASE2:
+    //  current md: |----------|
+    //  m:            |--...--|
+    bool is_exact_cover(MD const* m) const;
 
     //Return true if current md intersect but may be not cover 'm', such as:
     //current md: |-------|
@@ -296,13 +305,13 @@ public:
 
 //Each VAR corresponds to an unqiue MDTab.
 class MDTab {
+    COPY_CONSTRUCTOR(MDTab);
 protected:
     OffsetTab m_ofst_tab;
     MD const* m_invalid_ofst_md; //record MD with invalid ofst
 
 public:
     MDTab() { m_invalid_ofst_md = NULL; }
-    COPY_CONSTRUCTOR(MDTab);
 
     void init(UINT hash_bucket_size);
     void clean()
@@ -310,7 +319,7 @@ public:
         m_invalid_ofst_md = NULL;
         m_ofst_tab.clean();
     }
-
+    //Count memory usage for current object.
     size_t count_mem() const
     { return m_ofst_tab.count_mem() + (size_t)sizeof(m_invalid_ofst_md); }
 
@@ -361,9 +370,9 @@ public:
 //Memory Descriptor Set.
 //Note: one must call clean() to reclamition before deletion or destruction.
 class MDSet : public DefSBitSetCore {
+    COPY_CONSTRUCTOR(MDSet);
 public:
     MDSet() {}
-    COPY_CONSTRUCTOR(MDSet);
     ~MDSet() {} //should call clean() before destruction.
 
     void bunion(MDSet const& pt, DefMiscBitSetMgr & mbsmgr);
@@ -503,6 +512,7 @@ public:
 
 //MDSetMgr
 class MDSetMgr {
+    COPY_CONSTRUCTOR(MDSetMgr);
 protected:
     SMemPool * m_mds_pool;
     SMemPool * m_sc_mds_pool;
@@ -513,7 +523,6 @@ protected:
 
 public:
     MDSetMgr(Region * rg, DefMiscBitSetMgr * mbsm);
-    COPY_CONSTRUCTOR(MDSetMgr);
     ~MDSetMgr() { destroy(); }
 
     //Clean and give it back to md set manager.
@@ -540,17 +549,17 @@ public:
     //Destroy MDSet manager.
     void destroy();
     void dump();
-
-    UINT count_mem();
+    //Count memory usage for current object.
+    size_t count_mem();
 };
 
 
 class MDId2MD : public Vector<MD*> {
+    COPY_CONSTRUCTOR(MDId2MD);
     UINT m_count;
 
 public:
     MDId2MD() { m_count = 0; }
-    COPY_CONSTRUCTOR(MDId2MD);
 
     void remove(UINT mdid)
     {
@@ -604,6 +613,7 @@ public:
 //the mapping between VAR and MDTab.
 //NOTE: each region manager has a single MDSystem.
 class MDSystem {
+    COPY_CONSTRUCTOR(MDSystem);
     SMemPool * m_pool;
     SMemPool * m_sc_mdptr_pool;
     TypeMgr * m_tm;
@@ -633,7 +643,6 @@ class MDSystem {
 
 public:
     MDSystem(VarMgr * vm) { init(vm); }
-    COPY_CONSTRUCTOR(MDSystem);
     ~MDSystem() { destroy(); }
 
     void init(VarMgr * vm);
@@ -740,9 +749,9 @@ typedef TMapIter<UINT, MDSet const*> MD2MDSetIter;
 //Record MD->MDS relations.
 //Note MD may mapped to NULL, means the MD does not point to anything.
 class MD2MDSet : public TMap<UINT, MDSet const*> {
+    COPY_CONSTRUCTOR(MD2MDSet);
 public:
     MD2MDSet() {}
-    COPY_CONSTRUCTOR(MD2MDSet);
     ~MD2MDSet()
     {
         //Note all elements should be in MD_HASH.

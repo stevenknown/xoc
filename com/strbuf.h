@@ -31,6 +31,7 @@ USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 namespace xcom {
 
 class StrBuf {
+    COPY_CONSTRUCTOR(StrBuf);
 public:
     CHAR * buf;
     UINT buflen;
@@ -43,7 +44,6 @@ public:
         buf = (CHAR*)::malloc(initsize);
         buf[0] = 0;
     }
-    COPY_CONSTRUCTOR(StrBuf);
     ~StrBuf()
     {
         if (buf != NULL) {

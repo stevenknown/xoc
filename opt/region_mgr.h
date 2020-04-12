@@ -70,6 +70,7 @@ class IPA;
 //Region Manager is the top level manager.
 #define RM_label_count(r)        ((r)->m_label_count)
 class RegionMgr {
+    COPY_CONSTRUCTOR(RegionMgr);
     friend class Region;
 protected:
 #ifdef _DEBUG_
@@ -102,7 +103,6 @@ protected:
 
 public:
     RegionMgr();
-    COPY_CONSTRUCTOR(RegionMgr);
     virtual ~RegionMgr();
 
     SYM * addToSymbolTab(CHAR const* s) { return m_sym_tab.add(s); }

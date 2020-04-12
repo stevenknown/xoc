@@ -1617,8 +1617,8 @@ bool IRParser::parseImmIR(ParseCtx * ctx)
     if (ty->is_int()) {
         imm = ctx->current_region->buildImmInt(v, ty);
     } else if (ty->is_fp()) {
-        HOST_FP v = ::atof(immstr.buf);
-        imm = ctx->current_region->buildImmFp(v, ty);
+        HOST_FP b = ::atof(immstr.buf);
+        imm = ctx->current_region->buildImmFp(b, ty);
     } else {
         StrBuf buf(64);
         error("'%s': illegal type for immediate",

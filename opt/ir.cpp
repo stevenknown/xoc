@@ -1475,9 +1475,9 @@ bool CRegion::is_readonly() const
 //
 //START IR
 //
-UINT IR::count_mem() const
+size_t IR::count_mem() const
 {
-    UINT size = 0;
+    size_t size = 0;
     ConstIRIter ii;
     for (IR const* k = iterInitC(this, ii);
          k != NULL; k = iterNextC(ii)) {
@@ -1515,7 +1515,7 @@ bool IR::verify(Region const* rg) const
         ASSERT0(TY_vec_ety(d) != D_UNDEF);
 
         ASSERTN(IS_SIMPLEX(TY_vec_ety(d)) || IS_PTR(TY_vec_ety(d)),
-               ("illegal vector elem type"));
+                ("illegal vector elem type"));
 
         ASSERT0(TY_vec_size(d) >= tm->getDTypeByteSize(TY_vec_ety(d)) &&
                 TY_vec_size(d) % tm->getDTypeByteSize(TY_vec_ety(d)) == 0);
