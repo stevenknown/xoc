@@ -32,9 +32,7 @@ IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 author: Su Zhenyu
 @*/
 #include "cominc.h"
-#include "liveness_mgr.h"
-#include "prssainfo.h"
-#include "ir_ssa.h"
+#include "comopt.h"
 
 namespace xoc {
 //
@@ -45,7 +43,7 @@ C<IR*> * BBIRList::append_tail_ex(IR * ir)
 {
     if (ir == NULL) { return NULL; }
 
-    xcom::C<IR*> * ct;
+    IRListIter ct;
     for (List<IR*>::get_tail(&ct);
          ct != List<IR*>::end(); ct = List<IR*>::get_prev(ct)) {
         if (!m_bb->isDownBoundary(ct->val())) {
@@ -151,7 +149,7 @@ void IRBB::dump(Region const* rg, bool dump_inner_region) const
 void IRBB::verify()
 {
     UINT c = 0;
-    xcom::C<IR*> * ct;
+    IRListIter ct;
     for (IR * ir = BB_irlist(this).get_head(&ct);
          ir != NULL; ir = BB_irlist(this).get_next(&ct)) {
         ASSERT0(ir->is_single());
@@ -171,10 +169,10 @@ bool IRBB::successorHasPhi(CFG<IRBB, IR> * cfg)
 {
     xcom::Vertex * vex = cfg->getVertex(BB_id(this));
     ASSERT0(vex);
-    for (xcom::EdgeC * out = VERTEX_out_list(vex);
-         out != NULL; out = EC_next(out)) {
-        xcom::Vertex * succ_vex = EDGE_to(EC_edge(out));
-        IRBB * succ = cfg->getBB(VERTEX_id(succ_vex));
+    for (xcom::EdgeC * out = vex->getOutList();
+         out != NULL; out = out->get_next()) {
+        xcom::Vertex * succ_vex = out->getTo();
+        IRBB * succ = cfg->getBB(succ_vex->id());
         ASSERT0(succ);
 
         for (IR * ir = BB_first_ir(succ);
@@ -195,15 +193,15 @@ void IRBB::dupSuccessorPhiOpnd(CFG<IRBB, IR> * cfg, Region * rg, UINT opnd_pos)
     ASSERT0(vex);
     for (xcom::EdgeC * out = VERTEX_out_list(vex);
          out != NULL; out = EC_next(out)) {
-        xcom::Vertex * succ_vex = EDGE_to(EC_edge(out));
-        IRBB * succ = ircfg->getBB(VERTEX_id(succ_vex));
+        xcom::Vertex * succ_vex = out->getTo();
+        IRBB * succ = ircfg->getBB(succ_vex->id());
         ASSERT0(succ);
 
         for (IR * ir = BB_first_ir(succ);
              ir != NULL; ir = BB_next_ir(succ)) {
             if (!ir->is_phi()) { break; }
 
-            ASSERT0(cnt_list(PHI_opnd_list(ir)) >= opnd_pos);
+            ASSERT0(xcom::cnt_list(PHI_opnd_list(ir)) >= opnd_pos);
 
             IR * opnd;
             UINT lpos = opnd_pos;
@@ -239,7 +237,7 @@ void IRBB::removeSuccessorDesignatePhiOpnd(CFG<IRBB, IR> * cfg, IRBB * succ)
     for (IR * ir = BB_first_ir(succ); ir != NULL; ir = BB_next_ir(succ)) {
         if (!ir->is_phi()) { break; }
 
-        ASSERT0(cnt_list(PHI_opnd_list(ir)) == succ->getNumOfPred(cfg));
+        ASSERT0(xcom::cnt_list(PHI_opnd_list(ir)) == succ->getNumOfPred(cfg));
 
         IR * opnd;
         UINT lpos = pos;
@@ -257,6 +255,12 @@ void IRBB::removeSuccessorDesignatePhiOpnd(CFG<IRBB, IR> * cfg, IRBB * succ)
         ((CPhi*)ir)->removeOpnd(opnd);
         rg->freeIRTree(opnd);
     }
+
+    MDSSAMgr * mdssamgr = (MDSSAMgr*)rg->getPassMgr()->queryPass(
+        PASS_MD_SSA_MGR);
+    if (mdssamgr != NULL) {
+        mdssamgr->removeSuccessorDesignatePhiOpnd(this, succ);
+    }
 }
 
 
@@ -266,8 +270,9 @@ void IRBB::removeSuccessorPhiOpnd(CFG<IRBB, IR> * cfg)
 {
     xcom::Vertex * vex = cfg->getVertex(BB_id(this));
     ASSERT0(vex);
-    for (xcom::EdgeC * out = VERTEX_out_list(vex); out != NULL; out = EC_next(out)) {
-        IRBB * succ = ((IRCFG*)cfg)->getBB(VERTEX_id(EDGE_to(EC_edge(out))));
+    for (xcom::EdgeC * out = vex->getOutList();
+         out != NULL; out = EC_next(out)) {
+        IRBB * succ = ((IRCFG*)cfg)->getBB(out->getToId());
         ASSERT0(succ);
         removeSuccessorDesignatePhiOpnd(cfg, succ);
     }

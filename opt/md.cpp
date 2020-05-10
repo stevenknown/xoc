@@ -174,7 +174,7 @@ MD * MDSet::get_effect_md(MDSystem * ms) const
     if (get_elem_count() != 1) {
         return NULL;
     }
-    SEGIter * iter;
+    MDSetIter iter;
     MD * md = ms->getMD(get_first(&iter));
     ASSERT0(md != NULL);
     if (md->get_base()->is_fake()) {
@@ -215,7 +215,7 @@ bool MDSet::is_exact_equal(MDSet const& mds, MDSystem * ms) const
     ASSERT0(ms);
     UINT count = 0;
     INT md1 = -1;
-    SEGIter * iter;
+    MDSetIter iter;
     for (INT i = get_first(&iter); i != -1; i = get_next(i, &iter)) {
         if (!ms->getMD(i)->is_exact()) {
             return false;
@@ -250,7 +250,7 @@ bool MDSet::is_exact_equal(MDSet const& mds, MDSystem * ms) const
 bool MDSet::is_contain_only_exact_and_str(MDSystem * ms) const
 {
     ASSERT0(ms);
-    SEGIter * iter;
+    MDSetIter iter;
     for (INT i = get_first(&iter); i != -1; i = get_next(i, &iter)) {
         MD * tmd = ms->getMD(i);
         ASSERT0(tmd != NULL);
@@ -265,7 +265,7 @@ bool MDSet::is_contain_only_exact_and_str(MDSystem * ms) const
 bool MDSet::is_contain_inexact(MDSystem * ms) const
 {
     ASSERT0(ms);
-    SEGIter * iter;
+    MDSetIter iter;
     for (INT i = get_first(&iter); i != -1; i = get_next(i, &iter)) {
         MD * tmd = ms->getMD(i);
         ASSERT0(tmd != NULL);
@@ -334,7 +334,7 @@ bool MDSet::is_overlap_ex(MD const* md,
     ASSERT0(md && mdsys && current_ru);
     if (MDSet::is_overlap(md, current_ru)) { return true; }
 
-    SEGIter * iter = NULL;
+    MDSetIter iter = NULL;
     for (INT i = get_first(&iter);
          i >= 0; i = get_next((UINT)i, &iter)) {
         MD const* t = const_cast<MDSystem*>(mdsys)->getMD((UINT)i);
@@ -377,7 +377,7 @@ void MDSet::dump(MDSystem * ms, bool detail) const
     if (g_tfile == NULL) { return; }
     ASSERT0(ms);
 
-    SEGIter * iter;
+    MDSetIter iter;
     for (INT i = get_first(&iter); i >= 0;) {
         prt("MD%d", i);
         i = get_next(i, &iter);
@@ -582,7 +582,7 @@ void MD2MDSet::dump(Region * rg)
 
         ASSERT0(pts);
         note("\n\t\tPOINT TO:\n");
-        SEGIter * iter_j;
+        MDSetIter iter_j;
         for (INT j = pts->get_first(&iter_j);
              j >= 0; j = pts->get_next(j, &iter_j)) {
             MD * mmd = ms->getMD(j);
@@ -816,7 +816,7 @@ void MDSystem::init(VarMgr * vm)
 
 void MDSystem::destroy()
 {
-    TMapIter<VAR const*, MDTab*> iter;
+    Var2MDTabIter iter;
     MDTab * mdtab;
     for (VAR const* var = m_var2mdtab.get_first(iter, &mdtab);
          var != NULL; var = m_var2mdtab.get_next(iter, &mdtab)) {
@@ -828,15 +828,16 @@ void MDSystem::destroy()
 }
 
 
-//Compute all other md which are overlapped with 'md', but the output
-//does not include md itself.
-//e.g: md is md1, and md1 overlapped with md2, md3,
-//then output set is {md2, md3}.
+//Compute all other md which are overlapped with 'md', the output
+//will include 'md' itself if there are overlapped MDs.
+//e.g: given md1, and md1 overlapped with md2, md3,
+//then output set is {md1, md2, md3}.
 //
 //'md': input to compute the overlapped md-set.
 //'tmpvec': for local use.
 //'tabiter': for local use.
-//'strictly': set to true to compute if md may be overlapped with global memory.
+//'strictly': set to true to compute if md may be overlapped
+//            with global variables or import variables.
 //
 //Note this function does NOT clean output, and will append result to output.
 void MDSystem::computeOverlap(Region * current_ru,
@@ -866,22 +867,21 @@ void MDSystem::computeOverlap(Region * current_ru,
 
     OffsetTab * ofsttab = mdt->get_ofst_tab();
     ASSERT0(ofsttab);
-    if (ofsttab->get_elem_count() > 0) {
-        tabiter.clean();
-        bool find_overlapped = false;
-        for (MD const* tmd = ofsttab->get_first(tabiter, NULL);
-             tmd != NULL; tmd = ofsttab->get_next(tabiter, NULL)) {
-            ASSERT0(MD_base(md) == MD_base(tmd));
-            if (tmd == md) { continue; }
-            if (md->is_overlap(tmd)) {
-                output.bunion(tmd, mbsmgr);
-                find_overlapped = true;
-            }
-        }
+    if (ofsttab->get_elem_count() == 0) { return; }
 
-        if (find_overlapped) {
-            output.bunion(md, mbsmgr);
+    tabiter.clean();
+    bool find_overlapped = false;
+    for (MD const* tmd = ofsttab->get_first(tabiter, NULL);
+         tmd != NULL; tmd = ofsttab->get_next(tabiter, NULL)) {
+        ASSERT0(MD_base(md) == MD_base(tmd));
+        if (tmd == md) { continue; }
+        if (md->is_overlap(tmd)) {
+            output.bunion(tmd, mbsmgr);
+            find_overlapped = true;
         }
+    }
+    if (find_overlapped) {
+        output.bunion(md, mbsmgr);
     }
 }
 
@@ -921,20 +921,19 @@ void MDSystem::computeOverlapExactMD(
 //'tmpvec': for local use.
 //'tabiter': for local use.
 //'strictly': set to true to compute if md may be overlapped with global memory.
-void MDSystem::computeOverlap(
-        Region * current_ru,
-        IN OUT MDSet & mds,
-        Vector<MD const*> & tmpvec,
-        ConstMDIter & tabiter,
-        DefMiscBitSetMgr & mbsmgr,
-        bool strictly)
+void MDSystem::computeOverlap(Region * current_ru,
+                              IN OUT MDSet & mds,
+                              Vector<MD const*> & tmpvec,
+                              ConstMDIter & tabiter,
+                              DefMiscBitSetMgr & mbsmgr,
+                              bool strictly)
 {
     ASSERT0(current_ru);
     UINT count = 0;
     tmpvec.clean();
     bool set_global = false;
     bool set_import_var = false;
-    SEGIter * iter;
+    MDSetIter iter;
     for (INT i = mds.get_first(&iter);
          i >= 0; i = mds.get_next(i, &iter)) {
         MD * md = getMD(i);
@@ -1010,7 +1009,7 @@ void MDSystem::computeOverlap(
 
     bool set_global = false;
     bool set_import_var = false;
-    SEGIter * iter;
+    MDSetIter iter;
     for (INT i = mds.get_first(&iter); i >= 0; i = mds.get_next(i, &iter)) {
         MD * md = getMD(i);
         ASSERT0(md);
@@ -1056,7 +1055,7 @@ void MDSystem::computeOverlap(
 
 void MDSystem::clean()
 {
-    TMapIter<VAR const*, MDTab*> iter;
+    Var2MDTabIter iter;
     MDTab * mdtab;
     for (VAR const* var = m_var2mdtab.get_first(iter, &mdtab);
          var != NULL; var = m_var2mdtab.get_next(iter, &mdtab)) {

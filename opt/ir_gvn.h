@@ -52,17 +52,18 @@ typedef enum _VN_TYPE {
 } VN_TYPE;
 
 
-#define VN_id(v)        ((v)->id)
-#define VN_type(v)      ((v)->vn_type)
-#define VN_int_val(v)   ((v)->u1.iv)
-#define VN_fp_val(v)    ((v)->u1.dv)
-#define VN_str_val(v)   ((v)->u1.str)
-#define VN_op(v)        ((v)->u1.op)
-#define VN_is_cst(v)    (VN_type(v) == VN_INT || \
-                         VN_type(v) == VN_MC_INT || \
-                         VN_type(v) == VN_FP || \
-                         VN_type(v) == VN_STR)
+#define VN_id(v) ((v)->id)
+#define VN_type(v) ((v)->vn_type)
+#define VN_int_val(v) ((v)->u1.iv)
+#define VN_fp_val(v) ((v)->u1.dv)
+#define VN_str_val(v) ((v)->u1.str)
+#define VN_op(v) ((v)->u1.op)
+#define VN_is_cst(v) (VN_type(v) == VN_INT || \
+                      VN_type(v) == VN_MC_INT || \
+                      VN_type(v) == VN_FP || \
+                      VN_type(v) == VN_STR)
 class VN {
+    COPY_CONSTRUCTOR(VN);
 public:
     UINT id;
     VN_TYPE vn_type; //value type
@@ -74,9 +75,7 @@ public:
     } u1;
 
 public:
-    VN() { clean();    }
-    COPY_CONSTRUCTOR(VN);
-
+    VN() { clean(); }
     void clean()
     {
         id = 0;
@@ -103,7 +102,6 @@ typedef HMap<LONGLONG, VN*> LONGLONG2VN_MAP;
 typedef HMap<LONGLONG, VN*> LONGLONGMC2VN_MAP;
 typedef HMap<MD const*, VN*> MD2VN_MAP;
 
-
 //Note: SymbolHashFunc request bucket size must be the power of 2.
 class SYM2VN_MAP : public HMap<SYM const*, VN*, SymbolHashFunc> {
 public:
@@ -122,6 +120,7 @@ public:
 
 //VN Expression of Scalar
 class VNE_SC {
+    //COPY_CONSTRUCTOR(VNE_SC);
 public:
     UINT mdid;
     UINT ofst;
@@ -134,7 +133,6 @@ public:
         ofst = o;
         sz = s;
     }
-    //COPY_CONSTRUCTOR(VNE_SC);
 
     bool is_equ(VNE_SC & ve)
     {
@@ -476,6 +474,8 @@ protected:
     DUMgr * m_du;
     TypeMgr * m_tm;
     MDSystem * m_md_sys;
+    PRSSAMgr * m_ssamgr;
+    MDSSAMgr * m_mdssamgr;
     IRCFG * m_cfg;
     VN * m_zero_vn;
     VN * m_mc_zero_vn;

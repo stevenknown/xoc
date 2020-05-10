@@ -96,7 +96,7 @@ void RefineDUChain::processExpressionViaMDSSA(IR const* exp)
     if (mdssainfo == NULL) { return; }
 
     //Iterate each VOpnd.
-    SEGIter * iter = NULL;
+    VOpndSetIter iter = NULL;
     INT next_i = -1;
     for (INT i = mdssainfo->readVOpndSet()->get_first(&iter);
          i >= 0; i = next_i) {
@@ -184,21 +184,42 @@ void RefineDUChain::process()
 
 bool RefineDUChain::perform(OptCtx & oc)
 {
+    BBList * bbl = m_rg->getBBList();
+    if (bbl == NULL || bbl->get_elem_count() == 0) { return false; }
+    if (!OC_is_ref_valid(oc)) { return false; }
+    if (!OC_is_cfg_valid(oc)) { return false; }
+    //Check PR DU chain.
+    PRSSAMgr * ssamgr = (PRSSAMgr*)(m_rg->getPassMgr()->queryPass(
+        PASS_PR_SSA_MGR));
+    if (ssamgr != NULL && ssamgr->isSSAConstructed()) {
+        m_ssamgr = ssamgr;
+    } else {
+        m_ssamgr = NULL;
+    }
+    if (!OC_is_pr_du_chain_valid(oc) && m_ssamgr == NULL) { 
+        //At least one kind of DU chain should be avaiable.
+        return false;
+    }
+    //Check NONPR DU chain.
+    MDSSAMgr * mdssamgr = (MDSSAMgr*)(m_rg->getPassMgr()->queryPass(
+        PASS_MD_SSA_MGR));
+    if (mdssamgr != NULL && mdssamgr->isMDSSAConstructed()) {
+        m_mdssamgr = mdssamgr;
+    } else {
+        m_mdssamgr = NULL;
+    }
+    if (!OC_is_nonpr_du_chain_valid(oc) && m_mdssamgr == NULL) {
+        //At least one kind of DU chain should be avaiable.
+        return false;
+    }
+
     if (m_is_use_gvn) {
-        if (!OC_is_du_chain_valid(oc)) {
-            return false;
-        }
         m_gvn = (GVN const*)m_rg->getPassMgr()->queryPass(PASS_GVN);
         if (m_gvn == NULL || !m_gvn->is_valid()) {
             return false;
         }
     } else {
         //Use MDSSA.
-        m_mdssamgr = (MDSSAMgr*)(m_rg->getPassMgr()->
-            queryPass(PASS_MD_SSA_MGR));
-        if (m_mdssamgr == NULL || !m_mdssamgr->isMDSSAConstructed()) {
-            return false;
-        }
     }
     START_TIMER(t, getPassName());
     process();

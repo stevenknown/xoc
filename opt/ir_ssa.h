@@ -158,7 +158,7 @@ protected:
         return p;
     }
 
-    void refinePhi(List<IRBB*> & wl);
+    bool refinePhi(List<IRBB*> & wl);
     void rename(DefSBitSet const& effect_prs,
                 Vector<DefSBitSet*> const& defined_prs_vec,
                 xcom::Graph const& domtree);
@@ -170,7 +170,7 @@ protected:
 
     void stripVersionForBBList();
     void stripVersionForAllVP();
-    void stripPhi(IR * phi, xcom::C<IR*> * phict);
+    void stripPhi(IR * phi, IRListIter phict);
     void stripSpecifiedVP(VP * vp);
     void stripStmtVersion(IR * stmt, xcom::BitSet & visited);
 
@@ -332,6 +332,9 @@ public:
         return (SSAInfo*)allocVP(prno, 0);
     }
 
+    //This function revise phi data type, and remove redundant phi.
+    //Return true if there is phi removed.
+    bool refinePhi();
     //Reinitialize SSA manager.
     //This function will clean all informations and recreate them.
     inline void reinit()
@@ -352,8 +355,7 @@ public:
 
     PASS_TYPE getPassType() const { return PASS_PR_SSA_MGR; }
 
-    virtual bool perform(OptCtx & oc)
-    { construction(oc); return true; }
+    virtual bool perform(OptCtx & oc) { construction(oc); return true; }
 };
 
 

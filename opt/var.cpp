@@ -352,7 +352,7 @@ bool VarMgr::isDedicatedStringVar(CHAR const* name) const
 
 void VarMgr::assignVarId(VAR * v)
 {
-    SEGIter * iter = NULL;
+    DefSBitSetIter iter = NULL;
     INT id = m_freelist_of_varid.get_first(&iter);
     ASSERT0(id != 0);
     if (id > 0) {

@@ -36,6 +36,9 @@ author: Su Zhenyu
 
 namespace xoc {
 
+class PRSSAMgr;
+class MDSSAMgr;
+
 #define IV_INIT_VAL_IS_CONST 1
 #define IV_INIT_VAL_IS_VAR 0
 
@@ -88,6 +91,7 @@ typedef TMap<UINT, IR*> UINT2IR;
 
 //Induction Variable Recognization.
 class IVR : public Pass {
+    COPY_CONSTRUCTOR(IVR);
 protected:
     Region * m_rg;
     MDSystem * m_md_sys;
@@ -98,6 +102,8 @@ protected:
     SMemPool * m_sc_pool;
     Vector<SList<IV*>*> m_li2bivlst;
     Vector<SList<IR const*>*> m_li2divlst;
+    PRSSAMgr * m_ssamgr;
+    MDSSAMgr * m_mdssamgr;
 
     //True if IVR pass only find BIV and DIV for exact MD IR.
     //Note if IR_ST, IR_LD, IR_PR, IR_STPR are VOID, the MD is inexact.
@@ -167,8 +173,9 @@ public:
         m_sc_pool = smpoolCreate(sizeof(xcom::SC<IV*>) * 4, MEM_CONST_SIZE);
         m_is_only_handle_exact_md = true;
         m_is_strictly_match_pattern = false;
+        m_ssamgr = NULL;
+        m_mdssamgr = NULL;
     }
-    COPY_CONSTRUCTOR(IVR);
     virtual ~IVR()
     {
         smpoolDelete(m_pool);

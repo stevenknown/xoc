@@ -36,14 +36,15 @@ author: Su Zhenyu
 
 namespace xcom {
 
-/*
+#define PRECISION_TYPE double
+
 //The precision of 'double' is too high to
 //some operation of those value that approaching infinitesimal.
 //e.g: when the value is 0.00000000000000066613381477509392,
-//it equals to 0 in actually.
-*/
-#define PRECISION_TYPE    double
-#define INFINITESIMAL     0.00000000000000001
+//it should approximately equals to 0 in actually.
+//#define INFINITESIMAL 0.00000000000000001
+#define INFINITESIMAL 0.000001
+
 class Float {
     friend Float zerolinz(Float const& a);
     friend bool operator == (Float const& a, Float const& b);
@@ -102,15 +103,41 @@ public:
 bool operator == (Float const& a, Float const& b);
 bool operator != (Float const& a, Float const& b);
 inline bool operator != (Float const& a, Float const& b) { return !(a == b); }
-bool operator < (Float const& a, Float const& b);
-bool operator <= (Float const& a, Float const& b);
-bool operator > (Float const& a, Float const& b);
-bool operator >= (Float const& a, Float const& b);
-Float operator * (Float const& a, Float const& b);
-Float operator / (Float const& a, Float const& b);
-Float operator + (Float const& a, Float const& b);
-Float operator - (Float const& a, Float const& b);
-Float operator - (Float a);
+inline bool operator < (Float const& a, Float const& b)
+{ return a.m_f < b.m_f; }
+inline bool operator <= (Float const& a, Float const& b)
+{ return (a.m_f < b.m_f) || (a == b); }
+inline bool operator > (Float const& a, Float const& b)
+{ return a.m_f > b.m_f; }
+inline bool operator >= (Float const& a, Float const& b)
+{ return (a.m_f > b.m_f) || (a == b); }
+inline Float operator * (Float const& a, Float const& b)
+{
+    //return Float(integralize(integralize(a.m_f) * integralize(b.m_f)));
+    return Float(a.m_f * b.m_f);
+}
+inline Float operator / (Float const& a, Float const& b)
+{
+    //return Float(integralize(integralize(a.m_f) / integralize(b.m_f)));
+    return Float(a.m_f / b.m_f);
+}
+inline Float operator + (Float const& a, Float const& b)
+{
+    //return Float(integralize(integralize(a.m_f) + integralize(b.m_f)));
+    return Float(a.m_f + b.m_f);
+}
+//Subtration operation
+inline Float operator - (Float const& a, Float const& b)
+{
+    //return Float(integralize(integralize(a.m_f) - integralize(b.m_f)));
+    return Float(a.m_f - b.m_f);
+}
+//Minus operation
+inline Float operator - (Float a)
+{
+    a.m_f = -(a.m_f);
+    return a;
+}
 PRECISION_TYPE integralize(PRECISION_TYPE const& a);
 Float zerolinz(Float const& a);
 

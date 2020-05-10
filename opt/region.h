@@ -128,7 +128,7 @@ public:
 #define REGION_is_inlinable(r) ((r)->m_u2.s1.is_inlinable)
 
 //True value means MustDef, MayDef, MayUse are available.
-#define REGION_is_mddu_valid(r) ((r)->m_u2.s1.is_du_valid)
+#define REGION_is_ref_valid(r) ((r)->m_u2.s1.is_ref_valid)
 
 //Record memory reference for region.
 #define REGION_refinfo(r) ((r)->m_ref_info)
@@ -225,7 +225,7 @@ public:
     union {
         struct {
             BYTE is_expect_inline:1; //see above macro declaration.
-            BYTE is_du_valid:1;  //see above macro declaration.
+            BYTE is_ref_valid:1;  //see above macro declaration.
 
             //True if region does not modify any live-in variables
             //which include VAR and PR. We say the region is readonly.
@@ -460,6 +460,8 @@ public:
     void dumpParameter();
     void dumpVarTab();
     void dumpGR(bool dump_inner_region);
+    void dumpRef(UINT indent = 4);
+    void dumpBBRef(IN IRBB * bb, UINT indent);
 
     bool evaluateConstInteger(IR const* ir, OUT ULONGLONG * const_value);
 
@@ -840,6 +842,7 @@ public:
     bool is_inner() const { return REGION_type(this) == REGION_INNER; }
     bool is_eh() const { return REGION_type(this) == REGION_EH; }
     bool is_readonly() const { return REGION_is_readonly(this); }
+    bool is_ref_valid() const { return REGION_is_ref_valid(this); }
 
     //Perform middle level IR optimizations which are implemented
     //accroding to control flow info and data flow info.
@@ -894,15 +897,15 @@ public:
     IR * refineIR(IR * ir, bool & change, RefineCtx & rc);
     IR * refineIRlist(IR * ir_list, bool & change, RefineCtx & rc);
     bool refineStmtList(IN OUT BBIRList & ir_list, RefineCtx & rc);
-    bool refineBBlist(IN OUT BBList * ir_bb_list, RefineCtx & rc);
+    bool refineBBlist(IN OUT BBList * ir_bb_list, RefineCtx & rc, OptCtx & oc);
     IR * reassociation(IR * ir, bool & change);
     bool reconstructBBList(OptCtx & oc);
     void registerGlobalVAR();
 
     IR * simpToPR(IR * ir, SimpCtx * ctx);
-    xcom::C<IRBB*> * splitIRlistIntoBB(IR * irs,
-                                       BBList * bbl,
-                                       xcom::C<IRBB*> * ctbb);
+    BBListIter splitIRlistIntoBB(IR * irs,
+                                 BBList * bbl,
+                                 BBListIter ctbb);
     IR * simplifyLoopIngredient(IR * ir, SimpCtx * ctx);
     IR * simplifyBranch(IR * ir, SimpCtx * ctx);
     IR * simplifyIfSelf(IR * ir, SimpCtx * ctx);

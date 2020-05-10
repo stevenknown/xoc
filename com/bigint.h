@@ -104,23 +104,23 @@ void biuDivRem(IN BigInt const& a, IN BigInt const& b,
 
 class BigInt : public xcom::Vector<BigIntElemType> {
     friend bool operator != (BigInt const& a, BigInt const& b);
-    friend bool operator == (BigInt const& a, BigInt const& b);
-    friend bool operator < (BigInt const& a, BigInt const& b);
-    friend bool operator <= (BigInt const& a, BigInt const& b);
-    friend bool operator > (BigInt const& a, BigInt const& b);
-    friend bool operator >= (BigInt const& a, BigInt const& b);
     friend bool operator != (BigInt const& a, BigIntElemType v);
-    friend bool operator == (BigInt const& a, BigIntElemType v);
-    friend bool operator < (BigInt const& a, BigIntElemType v);
-    friend bool operator <= (BigInt const& a, BigIntElemType v);
-    friend bool operator > (BigInt const& a, BigIntElemType v);
-    friend bool operator >= (BigInt const& a, BigIntElemType v);
     friend bool operator != (BigIntElemType v, BigInt const& a);
+    friend bool operator == (BigInt const& a, BigInt const& b);
+    friend bool operator == (BigInt const& a, BigIntElemType v);
     friend bool operator == (BigIntElemType v, BigInt const& a);
-    friend bool operator < (BigIntElemType v, BigInt const& a);
-    friend bool operator <= (BigIntElemType v, BigInt const& a);
-    friend bool operator > (BigIntElemType v, BigInt const& a);
+    friend bool operator >= (BigInt const& a, BigInt const& b);
+    friend bool operator >= (BigInt const& a, BigIntElemType v);
     friend bool operator >= (BigIntElemType v, BigInt const& a);
+    friend bool operator < (BigInt const& a, BigInt const& b);
+    friend bool operator < (BigInt const& a, BigIntElemType v);
+    friend bool operator < (BigIntElemType v, BigInt const& a);
+    friend bool operator <= (BigInt const& a, BigIntElemType v);
+    friend bool operator <= (BigIntElemType v, BigInt const& a);
+    friend bool operator <= (BigInt const& a, BigInt const& b);
+    friend bool operator > (BigInt const& a, BigIntElemType v);
+    friend bool operator > (BigIntElemType v, BigInt const& a);
+    friend bool operator > (BigInt const& a, BigInt const& b);
 
     friend BigInt& biuAdd(IN BigInt const& a,
                           IN BigInt const& b,
@@ -157,13 +157,20 @@ public:
     }
     void clean() { ((xcom::Vector<BigIntElemType>*)this)->clean(); }
 
+    //Compute negative value on current bigint.
     void neg();
-    void abs(); //Change value into absolute values.
+    //Compute absolute value on current bigint.
+    //Change value into absolute values.
+    void abs();
 
     //Dump big-integer to specific file with 'name'.
     //is_seg_hex: true if dump each segments in Hex format.
     void dump(CHAR const* name, bool is_seg_hex) const;
+    //Dump big-integer to specific file with 'name'.
+    //is_seg_hex: true if dump each segments in Hex format.
+    //with_newline: true to dump a '\n' before content.
     void dump(FILE * h, bool with_newline, bool is_seg_hex) const;
+    //Dump to stdout.
     void dump(bool is_seg_hex = true) const;
 
     //Return significant number position.

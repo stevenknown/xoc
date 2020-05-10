@@ -32,11 +32,7 @@ IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 author: Su Zhenyu
 @*/
 #include "cominc.h"
-#include "liveness_mgr.h"
-#include "prssainfo.h"
-#include "ir_ssa.h"
-#include "mdssainfo.h"
-#include "ir_mdssa.h"
+#include "comopt.h"
 
 namespace xoc {
 
@@ -505,7 +501,7 @@ IR * Region::refinePhi(IR * ir, bool & change, RefineCtx & rc)
     SSAInfo * ssainfo = PHI_ssainfo(ir);
     ASSERT0(ssainfo);
 
-    SEGIter * sc;
+    SSAUseIter sc;
     for (INT u = SSA_uses(ssainfo).get_first(&sc);
          u >= 0; u = SSA_uses(ssainfo).get_next(u, &sc)) {
         IR * use = getIR(u);
@@ -1709,9 +1705,9 @@ bool Region::refineStmtList(IN OUT BBIRList & ir_list, RefineCtx & rc)
 {
     if (!g_do_refine) return false;
     bool change = false;
-    xcom::C<IR*> * next_ct;
+    IRListIter next_ct;
     ir_list.get_head(&next_ct);
-    xcom::C<IR*> * ct = next_ct;
+    IRListIter ct = next_ct;
     for (; ct != NULL; ct = next_ct) {
         IR * ir = ct->val();
         next_ct = ir_list.get_next(next_ct);
@@ -1739,21 +1735,31 @@ bool Region::refineStmtList(IN OUT BBIRList & ir_list, RefineCtx & rc)
 }
 
 
-bool Region::refineBBlist(IN OUT BBList * ir_bb_list, RefineCtx & rc)
+bool Region::refineBBlist(IN OUT BBList * ir_bb_list,
+                          RefineCtx & rc,
+                          OptCtx & oc)
 {
     if (!g_do_refine) { return false; }
     START_TIMER(t, "Refine IRBB list");
     bool change = false;
-    xcom::C<IRBB*> * ct;
+    BBListIter ct;
     for (ir_bb_list->get_head(&ct);
          ct != ir_bb_list->end(); ct = ir_bb_list->get_next(ct)) {
-         IRBB * bb = ct->val();
-        change |= refineStmtList(BB_irlist(bb), rc);
+        change |= refineStmtList(BB_irlist(ct->val()), rc);
     }
     END_TIMER(t, "Refine IRBB list");
     if (change) {
-        ASSERT0(verifyMDRef());
-        ASSERT0(getDUMgr()->verifyMDDUChain(COMPUTE_PR_DU|COMPUTE_NONPR_DU));
+        if (OC_is_ref_valid(oc)) {
+            ASSERT0(verifyMDRef());
+            ASSERT0(getDUMgr() == NULL ||
+                getDUMgr()->verifyMDDUChain(DUOPT_COMPUTE_PR_DU |
+                    DUOPT_COMPUTE_NONPR_DU));
+            //DU chain is kept by refinement.
+            ASSERT0(verifyIRandBB(ir_bb_list, this));
+        }
+        OC_is_expr_tab_valid(oc) = false;
+        OC_is_live_expr_valid(oc) = false;
+        OC_is_reach_def_valid(oc) = false;        
     }
     return change;
 }

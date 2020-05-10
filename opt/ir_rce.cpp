@@ -32,11 +32,7 @@ IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 author: Su Zhenyu
 @*/
 #include "cominc.h"
-#include "liveness_mgr.h"
-#include "prssainfo.h"
-#include "ir_ssa.h"
-#include "ir_gvn.h"
-#include "ir_rce.h"
+#include "comopt.h"
 
 namespace xoc {
 
@@ -55,11 +51,10 @@ void RCE::dump()
 
 //If 'ir' is always true, set 'must_true', or if it is
 //always false, set 'must_false'.
-IR * RCE::calcCondMustVal(
-        IN IR * ir,
-        OUT bool & must_true,
-        OUT bool & must_false,
-        bool & changed)
+IR * RCE::calcCondMustVal(IN IR * ir,
+                          OUT bool & must_true,
+                          OUT bool & must_false,
+                          bool & changed)
 {
     must_true = false;
     must_false = false;
@@ -119,7 +114,6 @@ IR * RCE::calcCondMustVal(
 IR * RCE::processBranch(IR * ir, IN OUT bool & cfg_mod)
 {
     ASSERT0(ir->isConditionalBr());
-
     bool must_true, must_false, changed = false;
     IR * new_det = calcCondMustVal(BR_det(ir), must_true, must_false, changed);
     BR_det(ir) = NULL;
@@ -235,11 +229,12 @@ bool RCE::performSimplyRCE(IN OUT bool & cfg_mod)
 {
     BBList * bbl = m_rg->getBBList();
     bool change = false;
-    xcom::C<IRBB*> * ct_bb;
+    BBListIter ct_bb;
     for (IRBB * bb = bbl->get_head(&ct_bb);
          bb != NULL; bb = bbl->get_next(&ct_bb)) {
         BBIRList * ir_list = &BB_irlist(bb);
-        xcom::C<IR*> * ct, * next_ct;
+        IRListIter ct;
+        IRListIter next_ct;
         for (ir_list->get_head(&next_ct), ct = next_ct;
              ct != NULL; ct = next_ct) {
             IR * ir = ct->val();
@@ -260,18 +255,17 @@ bool RCE::performSimplyRCE(IN OUT bool & cfg_mod)
             default:;
             }
 
-            if (newIR != ir) {
-                ir_list->remove(ct);
-                m_rg->freeIRTree(ir);
-                if (newIR != NULL) {
-                    if (next_ct != NULL) {
-                        ir_list->insert_before(newIR, next_ct);
-                    } else {
-                        ir_list->append_tail(newIR);
-                    }
+            if (newIR == ir) { continue; }
+            ir_list->remove(ct);
+            m_rg->freeIRTree(ir);
+            if (newIR != NULL) {
+                if (next_ct != NULL) {
+                    ir_list->insert_before(newIR, next_ct);
+                } else {
+                    ir_list->append_tail(newIR);
                 }
-                change = true;
             }
+            change = true;
         }
     }
     return change;
@@ -280,15 +274,37 @@ bool RCE::performSimplyRCE(IN OUT bool & cfg_mod)
 
 bool RCE::perform(OptCtx & oc)
 {
-    START_TIMER(t, getPassName());
-    m_rg->checkValidAndRecompute(&oc, PASS_CFG,
-        PASS_DU_REF, PASS_DU_CHAIN, PASS_UNDEF);
-
-    if (!OC_is_du_chain_valid(oc)) {
-        END_TIMER(t, getPassName());
+    BBList * bbl = m_rg->getBBList();
+    if (bbl == NULL || bbl->get_elem_count() == 0) { return false; }
+    if (!OC_is_ref_valid(oc)) { return false; }
+    if (!OC_is_cfg_valid(oc)) { return false; }
+    //Check PR DU chain.
+    PRSSAMgr * ssamgr = (PRSSAMgr*)(m_rg->getPassMgr()->queryPass(
+        PASS_PR_SSA_MGR));
+    if (ssamgr != NULL && ssamgr->isSSAConstructed()) {
+        m_ssamgr = ssamgr;
+    } else {
+        m_ssamgr = NULL;
+    }
+    if (!OC_is_pr_du_chain_valid(oc) && m_ssamgr == NULL) { 
+        //At least one kind of DU chain should be avaiable.
+        return false;
+    }
+    //Check NONPR DU chain.
+    MDSSAMgr * mdssamgr = (MDSSAMgr*)(m_rg->getPassMgr()->queryPass(
+        PASS_MD_SSA_MGR));
+    if (mdssamgr != NULL && mdssamgr->isMDSSAConstructed()) {
+        m_mdssamgr = mdssamgr;
+    } else {
+        m_mdssamgr = NULL;
+    }
+    if (!OC_is_nonpr_du_chain_valid(oc) && m_mdssamgr == NULL) {
+        //At least one kind of DU chain should be avaiable.
         return false;
     }
 
+    START_TIMER(t, getPassName());
+    m_rg->checkValidAndRecompute(&oc, PASS_CFG, PASS_UNDEF);
     if (!m_gvn->is_valid() && is_use_gvn()) {
         m_gvn->reperform(oc);
     }
@@ -307,25 +323,23 @@ bool RCE::perform(OptCtx & oc)
         } while (lchange);
 
         m_cfg->computeExitList();
-
-        //TODO: May be the change of CFG does not influence the
-        //usage while we utilize du-chain and ir2mds.
+        //So far, a conservation policy applied if CFG changed. This
+        //lead to a lot of analysis info changed.
+        //TODO: have to check and may be the change of CFG does not
+        //influence the sanity of DU-chain and ir2mds.
         oc.set_flag_if_cfg_changed();
-        //CFG has been maintained.
-        OC_is_cfg_valid(oc) = true;
+        OC_is_cfg_valid(oc) = true; //CFG has been maintained.
         OC_is_expr_tab_valid(oc) = false;
-        OC_is_du_chain_valid(oc) = false;
+        OC_is_pr_du_chain_valid(oc) = false;
+        OC_is_nonpr_du_chain_valid(oc) = false;
         OC_is_ref_valid(oc) = false;
         OC_is_aa_valid(oc) = false;
-        OC_is_expr_tab_valid(oc) = false;
         OC_is_reach_def_valid(oc) = false;
         OC_is_avail_reach_def_valid(oc) = false;
     }
-
     if (change) {
         ASSERT0(verifySSAInfo(m_rg));
     }
-
     END_TIMER(t, getPassName());
     return change;
 }

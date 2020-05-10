@@ -48,13 +48,13 @@ void CDG::dump()
          v != NULL; v = get_next_vertex(c)) {
         xcom::EdgeC * in = VERTEX_in_list(v);
         if (in == NULL) {
-            note("\nBB%d has NO ctrl BB", VERTEX_id(v));
+            note("\nBB%d has NO ctrl BB", v->id());
             continue;
         }
-        note("\nBB%d ctrl BB is: ", VERTEX_id(v));
+        note("\nBB%d ctrl BB is: ", v->id());
         while (in != NULL) {
-            xcom::Vertex * pred = EDGE_from(EC_edge(in));
-            prt("%d,", VERTEX_id(pred));
+            xcom::Vertex * pred = in->getFrom();
+            prt("%d,", pred->id());
             in = EC_next(in);
         }
     }
@@ -69,7 +69,7 @@ void CDG::get_cd_preds(UINT id, OUT List<xcom::Vertex*> & lst)
     ASSERT0(v != NULL);
     xcom::EdgeC * in = VERTEX_in_list(v);
     while (in != NULL) {
-        xcom::Vertex * pred = EDGE_from(EC_edge(in));
+        xcom::Vertex * pred = in->getFrom();
         lst.append_tail(pred);
         in = EC_next(in);
     }
@@ -84,10 +84,10 @@ bool CDG::is_cd(UINT a, UINT b)
     ASSERT0(v != NULL);
     xcom::EdgeC * out = VERTEX_out_list(v);
     while (out != NULL) {
-        if (VERTEX_id(EDGE_to(EC_edge(out))) == b) {
+        if (out->getToId() == b) {
             return true;
         }
-        out = EC_next(out);
+        out = out->get_next();
     }
     return false;
 }
@@ -99,9 +99,9 @@ bool CDG::is_only_cd_self(UINT id)
     ASSERT0(v != NULL);
     xcom::EdgeC * out = VERTEX_out_list(v);
     while (out != NULL) {
-        xcom::Vertex * succ = EDGE_to(EC_edge(out));
-        if (succ != v) return false;
-        out = EC_next(out);
+        xcom::Vertex * succ = out->getTo();
+        if (succ != v) { return false; }
+        out = out->get_next();
     }
     return true;
 }
@@ -113,9 +113,9 @@ void CDG::get_cd_succs(UINT id, OUT List<xcom::Vertex*> & lst)
     ASSERT0(v != NULL);
     xcom::EdgeC * out = VERTEX_out_list(v);
     while (out != NULL) {
-        xcom::Vertex * succ = EDGE_to(EC_edge(out));
+        xcom::Vertex * succ = out->getTo();
         lst.append_tail(succ);
-        out = EC_next(out);
+        out = out->get_next();
     }
 }
 
@@ -146,43 +146,43 @@ void CDG::build(IN OUT OptCtx & oc, xcom::DGraph & cfg)
     xcom::BitSetMgr bs_mgr;
     Vector<xcom::BitSet*> cd_set;
     for (INT j = 0; j <= top_order.get_last_idx(); j++) {
-        UINT ii = VERTEX_id(top_order.get(j));
+        UINT ii = top_order.get(j)->id();
         xcom::Vertex * v = cfg.getVertex(ii);
         ASSERT0(v != NULL);
-        addVertex(VERTEX_id(v));
-        xcom::BitSet * cd_of_v = cd_set.get(VERTEX_id(v));
+        addVertex(v->id());
+        xcom::BitSet * cd_of_v = cd_set.get(v->id());
         if (cd_of_v == NULL) {
             cd_of_v = bs_mgr.create();
-            cd_set.set(VERTEX_id(v), cd_of_v);
+            cd_set.set(v->id(), cd_of_v);
         }
 
-        xcom::EdgeC * in = VERTEX_in_list(v);
+        xcom::EdgeC * in = v->getInList();
         while (in != NULL) {
-            xcom::Vertex * pred = EDGE_from(EC_edge(in));
-            if (VERTEX_id(v) != ((xcom::DGraph&)cfg).get_ipdom(VERTEX_id(pred))) {
-                cd_of_v->bunion(VERTEX_id(pred));
+            xcom::Vertex * pred = in->getFrom();
+            if (v->id() != ((xcom::DGraph&)cfg).get_ipdom(pred->id())) {
+                cd_of_v->bunion(pred->id());
                 //if (pred != v)
                 {
-                    addEdge(VERTEX_id(pred), VERTEX_id(v));
+                    addEdge(pred->id(), v->id());
                 }
             }
-            in = EC_next(in);
+            in = in->get_next();
         }
         INT c;
         for (xcom::Vertex * z = cfg.get_first_vertex(c);
              z != NULL; z = cfg.get_next_vertex(c)) {
-            if (((xcom::DGraph&)cfg).get_ipdom(VERTEX_id(z)) == VERTEX_id(v)) {
-                xcom::BitSet * cd = cd_set.get(VERTEX_id(z));
+            if (((xcom::DGraph&)cfg).get_ipdom(z->id()) == v->id()) {
+                xcom::BitSet * cd = cd_set.get(z->id());
                 if (cd == NULL) {
                     cd = bs_mgr.create();
-                    cd_set.set(VERTEX_id(z), cd);
+                    cd_set.set(z->id(), cd);
                 }
                 for (INT i = cd->get_first(); i != -1; i = cd->get_next(i)) {
-                    if (VERTEX_id(v) != ((xcom::DGraph&)cfg).get_ipdom(i)) {
+                    if (v->id() != ((xcom::DGraph&)cfg).get_ipdom(i)) {
                         cd_of_v->bunion(i);
-                        //if (i != (INT)VERTEX_id(v))
+                        //if (i != (INT)v->id())
                         {
-                            addEdge(i, VERTEX_id(v));
+                            addEdge(i, v->id());
                         }
                     }
                 }

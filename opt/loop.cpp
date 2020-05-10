@@ -41,11 +41,10 @@ namespace xoc {
 //  BB3: goto loop start bb
 //
 //BB2 is the loop header fallthrough bb.
-bool findTwoSuccessorBBOfLoopHeader(
-        LI<IRBB> const* li,
-        IRCFG * cfg,
-        UINT * succ1,
-        UINT * succ2)
+bool findTwoSuccessorBBOfLoopHeader(LI<IRBB> const* li,
+                                    IRCFG * cfg,
+                                    UINT * succ1,
+                                    UINT * succ2)
 {
     ASSERT0(li && cfg && succ1 && succ2);
     IRBB * head = LI_loop_head(li);
@@ -59,8 +58,8 @@ bool findTwoSuccessorBBOfLoopHeader(
     xcom::EdgeC const* ec = VERTEX_out_list(headvex);
     ASSERT0(ec && EC_next(ec));
 
-    *succ1 = VERTEX_id(EDGE_to(EC_edge(ec)));
-    *succ2 = VERTEX_id(EDGE_to(EC_edge(EC_next(ec))));
+    *succ1 = ec->getToId();
+    *succ2 = ec->get_next()->getToId();
     return true;
 }
 
@@ -81,7 +80,7 @@ IRBB * findSingleBackedgeStartBB(LI<IRBB> const* li, IRCFG * cfg)
     xcom::EdgeC const* ec = VERTEX_in_list(cfg->getVertex(BB_id(head)));
     while (ec != NULL) {
         backedgecount++;
-        UINT pred = VERTEX_id(EDGE_from(EC_edge(ec)));
+        UINT pred = ec->getFromId();
         if (li->isInsideLoop(pred)) {
             backedgebbid = pred;
         }
@@ -118,10 +117,10 @@ IRBB * findAndInsertPreheader(LI<IRBB> const* li,
     BBList * bblst = rg->getBBList();
     IRBB * head = LI_loop_head(li);
 
-    xcom::C<IRBB*> * bbholder = NULL;
+    BBListIter bbholder = NULL;
     bblst->find(head, &bbholder);
     ASSERT0(bbholder);
-    xcom::C<IRBB*> * tt = bbholder;
+    BBListIter tt = bbholder;
     IRBB * prev = bblst->get_prev(&tt);
 
     //Find appropriate BB to be prehead.
@@ -129,7 +128,7 @@ IRBB * findAndInsertPreheader(LI<IRBB> const* li,
 
     for (xcom::EdgeC const* ec = VERTEX_in_list(cfg->getVertex(BB_id(head)));
          ec != NULL; ec = EC_next(ec)) {
-        UINT pred = VERTEX_id(EDGE_from(EC_edge(ec)));
+        UINT pred = ec->getFromId();
         IRBB const* pred_bb = rg->getCFG()->getBB(pred);
         ASSERT0(pred_bb);
         if (pred == BB_id(prev) && !LI_bb_set(li)->is_contain(BB_id(prev))) {

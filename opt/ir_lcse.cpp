@@ -32,7 +32,7 @@ IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 author: Su Zhenyu
 @*/
 #include "cominc.h"
-#include "ir_lcse.h"
+#include "comopt.h"
 
 namespace xoc {
 
@@ -55,7 +55,7 @@ LCSE::LCSE(Region * rg)
 //Hoist CSE's computation, and replace its occurrence with the result pr.
 IR * LCSE::hoist_cse(IN IRBB * bb, IN IR * ir_pos, IN ExpRep * ie)
 {
-    xcom::C<IR*> * pos_holder = NULL;
+    IRListIter pos_holder = NULL;
     bool f = BB_irlist(bb).find(ir_pos, &pos_holder);
     CHECK_DUMMYUSE(f);
     switch (ir_pos->getCode()) {
@@ -613,11 +613,37 @@ bool LCSE::processDef(IN IRBB * bb,
 
 bool LCSE::perform(OptCtx & oc)
 {
-    START_TIMER(t, getPassName());
-    if (!OC_is_du_chain_valid(oc) || !OC_is_ref_valid(oc)) {
-        END_TIMER(t, getPassName());
+    BBList * bbl = m_rg->getBBList();
+    if (bbl->get_elem_count() == 0) { return false; }
+    if (!OC_is_ref_valid(oc)) { return false; }
+
+    //Check PR DU chain.
+    PRSSAMgr * ssamgr = (PRSSAMgr*)(m_rg->getPassMgr()->queryPass(
+        PASS_PR_SSA_MGR));
+    if (ssamgr != NULL && ssamgr->isSSAConstructed()) {
+        m_ssamgr = ssamgr;
+    } else {
+        m_ssamgr = NULL;
+    }
+    if (!OC_is_pr_du_chain_valid(oc) && m_ssamgr == NULL) { 
+        //At least one kind of DU chain should be avaiable.
         return false;
     }
+
+    //Check NONPR DU chain.
+    MDSSAMgr * mdssamgr = (MDSSAMgr*)(m_rg->getPassMgr()->queryPass(
+        PASS_MD_SSA_MGR));
+    if (mdssamgr != NULL && mdssamgr->isMDSSAConstructed()) {
+        m_mdssamgr = mdssamgr;
+    } else {
+        m_mdssamgr = NULL;
+    }
+    if (!OC_is_nonpr_du_chain_valid(oc) && m_mdssamgr == NULL) {
+        //At least one kind of DU chain should be avaiable.
+        return false;
+    }
+
+    START_TIMER(t, getPassName());
     m_rg->checkValidAndRecompute(&oc, PASS_EXPR_TAB, PASS_UNDEF);
     m_expr_tab = (ExprTab*)m_rg->getPassMgr()->registerPass(PASS_EXPR_TAB);
     ASSERT0(m_expr_tab);
@@ -625,7 +651,6 @@ bool LCSE::perform(OptCtx & oc)
     m_expr_vec = m_expr_tab->get_expr_vec();
     ASSERT0(m_expr_vec);
 
-    BBList * bbl = m_rg->getBBList();
     bool change = false;
 
     //Record lived expression during analysis.
@@ -636,15 +661,16 @@ bool LCSE::perform(OptCtx & oc)
 
     //Record pr that hold the value of expression.
     xcom::Vector<IR*> map_expr2avail_pr;
-    xcom::C<IRBB*> * ctbb = NULL;
+    BBListIter ctbb = NULL;
     MDSet tmp;
-    for (bbl->get_head(&ctbb); ctbb != bbl->end(); ctbb = bbl->get_next(ctbb)) {
+    for (bbl->get_head(&ctbb); ctbb != bbl->end();
+         ctbb = bbl->get_next(ctbb)) {
         IRBB * bb = ctbb->val();
         ASSERT0(bb);
         map_expr2avail_pos.clean();
         map_expr2avail_pr.clean();
         avail_ir_expr.clean();
-        xcom::C<IR*> * ct = NULL;
+        IRListIter ct = NULL;
         for (BB_irlist(bb).get_head(&ct);
              ct != BB_irlist(bb).end(); ct = BB_irlist(bb).get_next(ct)) {
             IR * ir = ct->val();
@@ -666,7 +692,8 @@ bool LCSE::perform(OptCtx & oc)
         //Found CSE and processed them.
         OC_is_expr_tab_valid(oc) = false;
         OC_is_aa_valid(oc) = false;
-        OC_is_du_chain_valid(oc) = false;
+        OC_is_pr_du_chain_valid(oc) = false;
+        OC_is_nonpr_du_chain_valid(oc) = false;
         OC_is_ref_valid(oc) = false;
     }
     END_TIMER(t, getPassName());

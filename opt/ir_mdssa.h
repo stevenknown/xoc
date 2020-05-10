@@ -31,9 +31,11 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 namespace xoc {
 
-typedef Vector<TMap<UINT, VMD*>*> BB2VMDMap;
-typedef TMap<UINT, MDPhiList*> BB2MDPhiList;
-typedef TMapIter<UINT, MDPhiList*> BB2MDPhiListIter;
+typedef xcom::Vector<xcom::TMap<UINT, VMD*>*> BB2VMDMap;
+typedef xcom::TMap<UINT, MDPhiList*> BB2MDPhiList;
+typedef xcom::TMapIter<UINT, MDPhiList*> BB2MDPhiListIter;
+typedef xcom::List<MDDef const*> ConstMDDefIter;
+typedef xcom::List<MDDef*> MDDefIter;
 
 //This class construct MDSSA form and manage the MDSSA information for
 //stmt and expression.
@@ -56,8 +58,8 @@ protected:
     MDSystem * m_md_sys;
     TypeMgr * m_tm;
     IRCFG * m_cfg;
-    DefSegMgr * m_seg_mgr;
-    DefMiscBitSetMgr * m_sbs_mgr;
+    xcom::DefSegMgr * m_seg_mgr;
+    xcom::DefMiscBitSetMgr * m_sbs_mgr;
     bool m_is_ssa_constructed;
 
     IRIter m_iter; //for tmp use.
@@ -66,10 +68,9 @@ protected:
     UINT2VMDStack m_map_md2stack;
 
     //record version number counter for pr.
-    Vector<UINT> m_max_version;
+    xcom::Vector<UINT> m_max_version;
 
     UseDefMgr m_usedef_mgr;
-
 protected:
     void init()
     {
@@ -94,7 +95,7 @@ protected:
     void cutoffDefChain(MDDef * def);
     void cleanMD2Stack();
     void collectDefinedMD(IN IRBB * bb, OUT DefSBitSet & mustdef_pr);
-
+    
     void destructBBSSAInfo(IRBB * bb);
     void destructionInDomTreeOrder(IRBB * root, xcom::Graph & domtree);
     void dumpDefChain(List<MDDef const*> & wl,
@@ -105,6 +106,8 @@ protected:
                             List<IR const*> & opnd_lst,
                             OUT bool * parting_line);
     void dumpBBRef(IN IRBB * bb, UINT indent);
+    bool doOpndHaveValidDef(MDPhi const* phi) const;
+    bool doOpndHaveSameDef(MDPhi const* phi, OUT VMD ** common_def) const;
 
     void freePhiList();
 
@@ -115,7 +118,7 @@ protected:
     void initVMD(IN IR * ir, OUT DefSBitSet & maydef_md);
     void insertPhi(UINT mdid, IN IRBB * bb);
 
-    Stack<VMD*> * mapMD2VMDStack(UINT mdid);
+    xcom::Stack<VMD*> * mapMD2VMDStack(UINT mdid);
 
     void renamePhiResult(IN IRBB * bb);
     void renameUse(IR * ir);
@@ -124,15 +127,21 @@ protected:
                 Vector<DefSBitSet*> & defed_prs_vec,
                 xcom::Graph & domtree);
     void renameBB(IRBB * bb);
-    void renameInDomTreeOrder(
-            IRBB * root,
-            xcom::Graph & dtree,
-            Vector<DefSBitSet*> & defed_prs_vec);
+    void renameInDomTreeOrder(IRBB * root,
+                              xcom::Graph & dtree,
+                              Vector<DefSBitSet*> & defed_prs_vec);
+    bool removePHIHasNoValidDef(List<IRBB*> & wl,
+                                MDPhi * phi,
+                                MDPhiList * philist);
+    bool removePHIHasCommonDef(List<IRBB*> & wl,
+                               MDPhi * phi,
+                               MDPhiList * philist);
+    void removeDefFromDDChainHelper(MDDef const* mddef, MDDef * prev);
 
     void stripPhi(MDPhi * phi);
 
-    void prunePhi(List<IRBB*> & wl);
-    void prunePhiForBB(List<IRBB*> & wl, IRBB * bb);
+    bool prunePhi(List<IRBB*> & wl);
+    bool prunePhiForBB(List<IRBB*> & wl, IRBB * bb);
     void placePhiForMD(UINT mdid,
                        IN List<IRBB*> * defbbs,
                        DfMgr const& dfm,
@@ -144,8 +153,8 @@ protected:
                   DefMiscBitSetMgr & bs_mgr,
                   Vector<DefSBitSet*> & defined_md_vec,
                   List<IRBB*> & wl);
-    void verifySSAInfo(IR const* ir);
 
+    void verifySSAInfo(IR const* ir);
 public:
     explicit MDSSAMgr(Region * rg) : m_usedef_mgr(rg, this)
     {
@@ -196,16 +205,32 @@ public:
         //SSA_uses(ssainfo).append(use);
     }
 
-    //Note: Non-SSA DU Chains of read/write PR will be clean and
-    //unusable after SSA construction.
+    //Construction of MDSSA form.
+    //Note: Non-SSA DU Chains will be maintained after construction.
     void construction(OptCtx & oc);
+    //Construction of MDSSA form.
     bool construction(DomTree & domtree);
     size_t count_mem();
+
+    //DU chain operation.
+    //Change Def stmt from 'olddef' to 'newdef'.
+    //'olddef': source stmt.
+    //'newdef': target stmt.
+    //e.g: oldef->USE change to newdef->USE.
     void changeDef(IR * olddef, IR * newdef);
+
+    //DU chain operation.
+    //Change Use expression from 'olduse' to 'newuse'.
+    //'olduse': source expression.
+    //'newuse': target expression.
+    //e.g: Change MDSSA DU chain DEF->olduse to DEF->newuse.
     void changeUse(IR * olduse, IR * newuse);
+
+    //Replace oldir with newir.
     void changeIR(IR * oldir, IR * newir);
+
     //Coalesce version of MD from 'src' to 'tgt'.
-    //This function replace definitiond of USE of src to tgt's defintion.//
+    //This function replace definitiond of USE of src to tgt's defintion.
     //e.g: p0=...
     //     p1=p0
     //     ...=p1
@@ -215,27 +240,42 @@ public:
     //     ...=p0
     void coalesceVersion(IR const* src, IR const* tgt);
 
+    //Destroy memory in MDSSAMgr.
     void destroy();
+    //Destruction of MDSSA.
     void destruction(DomTree & domtree);
+    //Destruction of MDSSA.
     void destruction(OptCtx * oc);
+    //Dump MDSSA reference info.
     void dump();
+    //Dump MDSSA DU chain.
     void dumpDUChain();
+    //This function dumps VMD structure and SSA DU info.
     void dumpAllVMD();
+    //Dump VMD info into given buffer.
+    //Note the buffer have to at least 128 bytes.
     CHAR * dumpVMD(IN VMD * v, OUT CHAR * buf);
+    //Dump MDSSA DU stmt graph.
     void dumpSSAGraph(CHAR * name = NULL);
+    //Dump IR tree's MD reference, where ir may be stmt or exp.
     void dumpRef(UINT indent);
 
     //Find killing must-def for expression ir.
     MDDef * findKillingDef(IR const* ir);
+    //Find nearest virtual DEF in VOpndSet of 'ir'.
     MDDef * findNearestDef(IR const* ir);
 
     Region * getRegion() const { return m_rg; }
     UseDefMgr * getUseDefMgr() { return &m_usedef_mgr; }
+    //Get specific virtual operand.
+    VOpnd * getVOpnd(UINT i) const { return m_usedef_mgr.getVOpnd(i); }
     virtual CHAR const* getPassName() const { return "MD SSA Manager"; }
     PASS_TYPE getPassType() const { return PASS_MD_SSA_MGR; }
+    //Get MDSSAInfo if exist.
     MDSSAInfo * getMDSSAInfoIfAny(IR const* ir)
     { return hasMDSSAInfo(ir) ? getUseDefMgr()->getMDSSAInfo(ir) : NULL; }
 
+    //Return true if ir might have MDSSAInfo.
     bool hasMDSSAInfo(IR const* ir) const
     { return ir->isMemoryRefNotOperatePR() || ir->isCallStmt(); }
 
@@ -244,12 +284,18 @@ public:
     //If MDSSA constructed, DU mananger should not compute any information.
     bool isMDSSAConstructed() const { return m_is_ssa_constructed; }
 
-    //Return true if phi is redundant, otherwise return false.
-    //If all opnds have same defintion or defined by current phi,
-    //the phi is redundant.
-    //common_def: record the common_def if the definition
-    //  of all opnd is the same.
-    bool isRedundantPHI(MDPhi const* phi, OUT VMD ** common_def) const;
+    //Iterative access MDDef chain.
+    //This funtion initialize the iterator.
+    //'def': the beginning MDDef of the chain.
+    //'ii': iterator. It should be clean already.
+    //Readonly function.
+    MDDef const* iterDefInitC(MDDef const* def,
+                              OUT ConstMDDefIter & ii);
+    //Iterative access MDDef chain.
+    //This function return the next MDDef node accroding to 'ii'.
+    //'ii': iterator.
+    //Readonly function.
+    MDDef const* iterDefNextC(IN OUT ConstMDDefIter & ii);
 
     //Reinitialize MDSSA manager.
     //This function will clean all informations and recreate them.
@@ -262,18 +308,49 @@ public:
     //NOTE: If ir is a IR tree, e.g: ild(x, ld(y)), remove ild(x) means
     //ld(y) will be removed as well. And ld(y)'s MDSSAInfo will be
     //updated as well.
-    void removeMDSSAUseRecur(IR * ir);
+    void removeMDSSAUse(IR * ir);
+
     //Remove DEF-USE chain if exist in between 'stmt' and 'exp'.
     //This function will remove 'exp' from occurence set.
     //stmt: IR stmt that is DEF of 'exp'.
     //exp: IR expression to be removed.
     void removeDUChain(IR const* stmt, IR const* exp);
 
+    //Remove all virtual USEs of 'stmt'.
+    void removeAllUse(IR const* stmt);
+
+    //Remove all MDSSAInfo of 'stmt' from MDSSAMgr.
+    void removeStmtFromMDSSAMgr(IR const* stmt);
+
+    //Remove MDDef from Def-Def chain.
+    //e.g:D1<->D2
+    //     |<->D3
+    //     |   |<->D5
+    //     |   |<->D6
+    //     |->D4
+    //  where predecessor of D3 is D1, successors of D3 are D5, D6
+    //  After remove D3:
+    //e.g:D1<->D2
+    //     |<->D5
+    //     |<->D6
+    //     |<->D4
+    //    D3<->NULL
+    //  where predecessor of D5, D6 is D1, successor of D1 includes D5, D6.
+    void removeDefFromDDChain(MDDef const* mddef);
+    void removePHIFromDDChain(MDPhi const* phi, MDDef * prev);
+
+    //Before removing bb or change bb successor,
+    //you need remove the related PHI operand if BB successor has PHI stmt.
+    void removeSuccessorDesignatePhiOpnd(IRBB * bb, IRBB * succ);
+            
     bool verifyPhi(bool is_vpinfo_avail);
     bool verifyVMD();
     bool verify();
 
     virtual bool perform(OptCtx & oc) { construction(oc); return true; }
+    //Remove redundant phi.
+    //Return true if there is phi removed.
+    bool prunePhi();
 };
 
 bool verifyMDSSAInfo(Region * rg);

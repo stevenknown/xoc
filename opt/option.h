@@ -51,7 +51,8 @@ class PassMgr;
 //Optimization Context
 //This class record and propagate auxiliary information to optimizations.
 #define OC_is_ref_valid(o) ((o).u1.s1.is_du_ref_valid)
-#define OC_is_du_chain_valid(o) ((o).u1.s1.is_du_chain_valid)
+#define OC_is_pr_du_chain_valid(o) ((o).u1.s1.is_pr_du_chain_valid)
+#define OC_is_nonpr_du_chain_valid(o) ((o).u1.s1.is_nonpr_du_chain_valid)
 #define OC_is_live_expr_valid(o) ((o).u1.s1.is_live_expr_valid)
 #define OC_is_reach_def_valid(o) ((o).u1.s1.is_reach_def_valid)
 #define OC_is_avail_reach_def_valid(o) ((o).u1.s1.is_avail_reach_def_valid)
@@ -73,7 +74,10 @@ public:
             //Record MUST-DEF, MAY-DEF, MAY-USE MDSet for each IR STMT/EXP.
             UINT is_du_ref_valid:1;
 
-            UINT is_du_chain_valid:1; //Record DEF, USE IR List for IR STMT.
+            //Record DEF/USE IR stmt/exp for PR operation.
+            UINT is_pr_du_chain_valid:1;
+            //Record DEF/USE IR stmt/exp for NON-PR operation.
+            UINT is_nonpr_du_chain_valid:1;
             UINT is_live_expr_valid:1;
             UINT is_reach_def_valid:1;
             UINT is_avail_reach_def_valid:1;
@@ -293,7 +297,7 @@ extern bool g_cst_bb_list; //Construct BB list.
 extern UINT g_thres_opt_ir_num;
 extern UINT g_thres_opt_bb_num;
 extern UINT g_thres_opt_ir_num_in_bb;
-extern UINT g_thres_flow_sensitive_aa;
+extern UINT g_thres_ptpair_num;
 extern bool g_do_loop_convert;
 extern bool g_do_poly_tran;
 extern bool g_do_refine_duchain;
@@ -331,5 +335,8 @@ extern bool g_is_search_and_copy_dbx;
 
 //Record dump options for each Pass.
 extern DumpOpt g_dump_opt;
+
+//Redirect output information to stdout to dump file if exist.
+extern bool g_redirect_stdout_to_dump_file;
 } //namespace xoc
 #endif

@@ -32,10 +32,7 @@ IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 author: Su Zhenyu
 @*/
 #include "cominc.h"
-#include "liveness_mgr.h"
-#include "prssainfo.h"
-#include "ir_ssa.h"
-#include "ir_gvn.h"
+#include "comopt.h"
 
 namespace xoc {
 
@@ -999,7 +996,7 @@ void GVN::processRegion(IR const* ir, bool & change)
 
 void GVN::processBB(IRBB * bb, bool & change)
 {
-    xcom::C<IR*> * ct;
+    IRListIter ct;
     for (BB_irlist(bb).get_head(&ct);
          ct != BB_irlist(bb).end(); ct = BB_irlist(bb).get_next(ct)) {
         IR * ir = ct->val();
@@ -1396,16 +1393,36 @@ bool GVN::perform(OptCtx & oc)
 {
     BBList * bbl = m_rg->getBBList();
     if (bbl->get_elem_count() == 0) { return false; }
+    if (!OC_is_ref_valid(oc)) { return false; }
 
-    START_TIMER(t, getPassName());
-    m_rg->checkValidAndRecompute(&oc, PASS_DU_CHAIN,
-        PASS_DU_REF, PASS_RPO, PASS_DOM, PASS_UNDEF);
-
-    if (!OC_is_du_chain_valid(oc)) {
-        END_TIMER(t, getPassName());
+    //Check PR DU chain.
+    PRSSAMgr * ssamgr = (PRSSAMgr*)(m_rg->getPassMgr()->queryPass(
+        PASS_PR_SSA_MGR));
+    if (ssamgr != NULL && ssamgr->isSSAConstructed()) {
+        m_ssamgr = ssamgr;
+    } else {
+        m_ssamgr = NULL;
+    }
+    if (!OC_is_pr_du_chain_valid(oc) && m_ssamgr == NULL) { 
+        //At least one kind of DU chain should be avaiable.
         return false;
     }
 
+    //Check NONPR DU chain.
+    MDSSAMgr * mdssamgr = (MDSSAMgr*)(m_rg->getPassMgr()->queryPass(
+        PASS_MD_SSA_MGR));
+    if (mdssamgr != NULL && mdssamgr->isMDSSAConstructed()) {
+        m_mdssamgr = mdssamgr;
+    } else {
+        m_mdssamgr = NULL;
+    }
+    if (!OC_is_nonpr_du_chain_valid(oc) && m_mdssamgr == NULL) {
+        //At least one kind of DU chain should be avaiable.
+        return false;
+    }
+
+    START_TIMER(t, getPassName());
+    m_rg->checkValidAndRecompute(&oc, PASS_RPO, PASS_DOM, PASS_UNDEF);
     List<IRBB*> * tbbl = m_cfg->getBBListInRPO();
     ASSERT0(tbbl->get_elem_count() == bbl->get_elem_count());
     UINT count = 0;

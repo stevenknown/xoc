@@ -32,10 +32,7 @@ IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 author: Su Zhenyu
 @*/
 #include "cominc.h"
-#include "liveness_mgr.h"
-#include "prssainfo.h"
-#include "ir_ssa.h"
-#include "ir_licm.h"
+#include "comopt.h"
 
 namespace xoc {
 
@@ -48,12 +45,11 @@ namespace xoc {
 //'isLegal': set to true if loop is legal to perform invariant motion.
 //  otherwise set to false to prohibit code motion.
 //Return true if find loop invariant expression.
-bool LICM::scanOpnd(
-        IN LI<IRBB> * li,
-        OUT TTab<IR*> & invariant_exp,
-        TTab<IR*> & invariant_stmt,
-        bool * isLegal,
-        bool first_scan)
+bool LICM::scanOpnd(IN LI<IRBB> * li,
+                    OUT TTab<IR*> & invariant_exp,
+                    TTab<IR*> & invariant_stmt,
+                    bool * isLegal,
+                    bool first_scan)
 {
     bool change = false;
     IRBB * head = LI_loop_head(li);
@@ -192,8 +188,7 @@ bool LICM::markExpAndStmt(IR * ir, TTab<IR*> & invariant_exp)
         m_analysable_stmt_list.append_tail(ir);
         break;
     case IR_CALL:
-    case IR_ICALL:
-        {
+    case IR_ICALL: {
             //Hoisting CALL out of loop may be unsafe if the loop
             //will never execute.
             for (IR * p = CALL_param_list(ir); p != NULL; p = p->get_next()) {
@@ -244,7 +239,6 @@ bool LICM::isUniqueDef(MD const* md)
 {
     UINT * n = m_md2num.get(md);
     ASSERT0(n);
-
     if (*n > 1) { return false; }
 
     MDTab * mdt = m_md_sys->getMDTab(MD_base(md));
@@ -258,7 +252,6 @@ bool LICM::isUniqueDef(MD const* md)
 
     OffsetTab * ofstab = mdt->get_ofst_tab();
     if (ofstab == NULL) { return true; }
-
     if (ofstab->get_elem_count() == 0) { return true; }
 
     m_mditer.clean();
@@ -318,8 +311,7 @@ void LICM::updateMD2Num(IR * ir)
 {
     switch (ir->getCode()) {
     case IR_ST:
-    case IR_STPR:
-        {
+    case IR_STPR: {
             MD const* md = ir->getRefMD();
             ASSERT0(md);
             UINT * n = m_md2num.get(const_cast<MD*>(md));
@@ -331,8 +323,7 @@ void LICM::updateMD2Num(IR * ir)
         }
         break;
     case IR_STARRAY:
-    case IR_IST:
-        {
+    case IR_IST: {
             MDSet const* mds = NULL;
             MD const* md = ir->getRefMD();
             if (md != NULL) {
@@ -343,7 +334,7 @@ void LICM::updateMD2Num(IR * ir)
                 }
                 (*n)++;
             } else if ((mds = ir->getRefMDSet()) != NULL) {
-                SEGIter * iter;
+                MDSetIter iter;
                 for (INT i = mds->get_first(&iter);
                      i >= 0; i = mds->get_next(i, &iter)) {
                     MD * md2 = m_md_sys->getMD(i);
@@ -375,9 +366,8 @@ void LICM::updateMD2Num(IR * ir)
 
 
 //Given loop info li, dump the invariant stmt and invariant expression.
-void LICM::dumpInvariantExpStmt(
-        TTab<IR*> const& invariant_stmt,
-        TTab<IR*> const& invariant_exp)
+void LICM::dumpInvariantExpStmt(TTab<IR*> const& invariant_stmt,
+                                TTab<IR*> const& invariant_exp)
 {
     if (g_tfile == NULL) { return; }
     note("\n==---- DUMP LICM Analysis Result '%s' ----==\n",
@@ -409,10 +399,9 @@ void LICM::dumpInvariantExpStmt(
 
 //Analysis loop invariant expression and stmt.
 //Return true if find them, otherwise return false.
-bool LICM::analysis(
-        IN LI<IRBB> * li,
-        OUT TTab<IR*> & invariant_stmt,
-        OUT TTab<IR*> & invariant_exp)
+bool LICM::analysis(IN LI<IRBB> * li,
+                    OUT TTab<IR*> & invariant_stmt,
+                    OUT TTab<IR*> & invariant_exp)
 {
     invariant_stmt.clean();
     invariant_exp.clean();
@@ -450,11 +439,10 @@ bool LICM::analysis(
 }
 
 
-bool LICM::is_stmt_dom_its_use(
-        IR const* stmt,
-        IR const* use,
-        LI<IRBB> const* li,
-        IRBB const* stmtbb) const
+bool LICM::is_stmt_dom_its_use(IR const* stmt,
+                               IR const* use,
+                               LI<IRBB> const* li,
+                               IRBB const* stmtbb) const
 {
     IR const* ustmt = use->getStmt();
     UINT ubbid = BB_id(ustmt->getBB());
@@ -474,9 +462,7 @@ bool LICM::is_stmt_dom_its_use(
 bool LICM::is_dom_all_use_in_loop(IR const* ir, LI<IRBB> * li)
 {
     ASSERT0(ir->is_stmt());
-
     IRBB * irbb = ir->getBB();
-
     if (ir->getSSAInfo() != NULL) {
         //Check if SSA def is loop invariant.
         ASSERT0(ir->getSSAInfo()->get_def() == ir);
@@ -539,12 +525,11 @@ bool LICM::isStmtCanBeHoisted(IR * stmt, IRBB * backedge_bb)
 
 
 bool LICM::hoistInvariantStmt(TTab<IR*> & invariant_stmt,
-                                 IR * stmt,
-                                 IRBB * prehead,
-                                 IN LI<IRBB> * li)
+                              IR * stmt,
+                              IRBB * prehead,
+                              IN LI<IRBB> * li)
 {
     ASSERT0(stmt->getBB());
-
     ConstIRIter iriter;
     for (IR const* x = iterRhsInitC(stmt, iriter);
          x != NULL; x = iterRhsNextC(iriter)) {
@@ -583,11 +568,10 @@ bool LICM::hoistInvariantStmt(TTab<IR*> & invariant_stmt,
 }
 
 
-bool LICM::checkDefStmt(
-        IR * def,
-        TTab<IR*> & invariant_stmt,
-        IN IRBB * prehead,
-        IN LI<IRBB> * li)
+bool LICM::checkDefStmt(IR * def,
+                        TTab<IR*> & invariant_stmt,
+                        IN IRBB * prehead,
+                        IN LI<IRBB> * li)
 {
     ASSERT0(def->is_stmt());
 
@@ -611,11 +595,10 @@ bool LICM::checkDefStmt(
 
 
 //Hoist candidate IRs to preheader BB.
-bool LICM::hoistCand(
-        TTab<IR*> & invariant_exp,
-        TTab<IR*> & invariant_stmt,
-        IN IRBB * prehead,
-        IN LI<IRBB> * li)
+bool LICM::hoistCand(TTab<IR*> & invariant_exp,
+                     TTab<IR*> & invariant_stmt,
+                     IN IRBB * prehead,
+                     IN LI<IRBB> * li)
 {
     bool du_set_info_changed = false;
     Vector<IR*> removed;
@@ -754,18 +737,17 @@ bool LICM::hoistCand(
 
 //Return true if do code motion successfully.
 //This funtion maintain LOOP INFO.
-bool LICM::doLoopTree(
-        LI<IRBB> * li,
-        OUT bool & du_set_info_changed,
-        OUT bool & insert_bb,
-        TTab<IR*> & invariant_stmt,
-        TTab<IR*> & invariant_exp)
+bool LICM::doLoopTree(LI<IRBB> * li,
+                      OUT bool & du_set_info_changed,
+                      OUT bool & insert_bb,
+                      TTab<IR*> & invariant_stmt,
+                      TTab<IR*> & invariant_exp)
 {
     if (li == NULL) { return false; }
     bool doit = false;
     for (LI<IRBB> * tli = li; tli != NULL; tli = LI_next(tli)) {
         doit |= doLoopTree(LI_inner_list(tli), du_set_info_changed,
-                   insert_bb, invariant_stmt, invariant_exp);
+            insert_bb, invariant_stmt, invariant_exp);
         analysis(tli, invariant_stmt, invariant_exp);
 
         if (g_is_dump_after_pass && g_dump_opt.isDumpLICM()) {
@@ -795,37 +777,49 @@ bool LICM::doLoopTree(
 
 bool LICM::perform(OptCtx & oc)
 {
-    START_TIMER(t, getPassName());
-    m_rg->checkValidAndRecompute(&oc, PASS_DOM,
-        PASS_DU_REF, PASS_LOOP_INFO, PASS_DU_CHAIN, PASS_UNDEF);
-
-    if (!OC_is_du_chain_valid(oc)) {
-        END_TIMER(t, getPassName());
+    BBList * bbl = m_rg->getBBList();
+    if (bbl == NULL || bbl->get_elem_count() == 0) { return false; }
+    if (!OC_is_ref_valid(oc)) { return false; }
+    //Check PR DU chain.
+    PRSSAMgr * ssamgr = (PRSSAMgr*)(m_rg->getPassMgr()->queryPass(
+        PASS_PR_SSA_MGR));
+    if (ssamgr != NULL && ssamgr->isSSAConstructed()) {
+        m_ssamgr = ssamgr;
+    } else {
+        m_ssamgr = NULL;
+    }
+    if (!OC_is_pr_du_chain_valid(oc) && m_ssamgr == NULL) { 
+        //At least one kind of DU chain should be avaiable.
+        return false;
+    }
+    //Check NONPR DU chain.
+    MDSSAMgr * mdssamgr = (MDSSAMgr*)(m_rg->getPassMgr()->queryPass(
+        PASS_MD_SSA_MGR));
+    if (mdssamgr != NULL && mdssamgr->isMDSSAConstructed()) {
+        m_mdssamgr = mdssamgr;
+    } else {
+        m_mdssamgr = NULL;
+    }
+    if (!OC_is_nonpr_du_chain_valid(oc) && m_mdssamgr == NULL) {
+        //At least one kind of DU chain should be avaiable.
         return false;
     }
 
+    START_TIMER(t, getPassName());
+    m_rg->checkValidAndRecompute(&oc, PASS_DOM, PASS_LOOP_INFO, PASS_UNDEF);
     bool du_set_info_changed = false;
     bool insert_bb = false;
     TTab<IR*> invariant_stmt;
     TTab<IR*> invariant_exp;
-
-    m_ssamgr = NULL;
-    PRSSAMgr * ssamgr = (PRSSAMgr*)m_rg->getPassMgr()->
-        queryPass(PASS_PR_SSA_MGR);
-    if (ssamgr != NULL && ssamgr->isSSAConstructed()) {
-        m_ssamgr = ssamgr;
-    }
-
     bool change = doLoopTree(m_cfg->getLoopInfo(), du_set_info_changed,
         insert_bb, invariant_stmt, invariant_exp);
     if (change) {
         m_cfg->performMiscOpt(oc);
-
         OC_is_expr_tab_valid(oc) = false;
 
         //DU chain and du ref is maintained.
         ASSERT0(m_rg->verifyMDRef());
-        ASSERT0(m_du->verifyMDDUChain(COMPUTE_PR_DU | COMPUTE_NONPR_DU));
+        ASSERT0(m_du->verifyMDDUChain(DUOPT_COMPUTE_PR_DU | DUOPT_COMPUTE_NONPR_DU));
 
         if (du_set_info_changed) {
             OC_is_live_expr_valid(oc) = false;

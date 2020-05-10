@@ -36,6 +36,8 @@ author: Su Zhenyu
 
 namespace xoc {
 
+typedef xcom::SEGIter * IRSetIter;
+
 class IRSet : public DefSBitSet {
     COPY_CONSTRUCTOR(IRSet);
 public:

@@ -37,6 +37,7 @@ protected:
     Region * m_rg;
     DUMgr * m_du;
     GVN const* m_gvn;
+    PRSSAMgr * m_ssamgr;
     MDSSAMgr * m_mdssamgr;
     bool m_is_use_gvn;
     DefMiscBitSetMgr * m_sbs_mgr;

@@ -91,7 +91,8 @@ class DUMgr;
 
 //Mapping from MD to IR list, and to be responsible for
 //allocating and destroy List<IR*> objects.
-class MDId2IRlist : public TMap<UINT, DefSBitSetCore*> {
+class MD2IRSet : public TMap<UINT, DefSBitSetCore*> {
+    COPY_CONSTRUCTOR(MD2IRSet);
     Region * m_rg;
     MDSystem * m_md_sys;
     TypeMgr * m_tm;
@@ -104,19 +105,15 @@ class MDId2IRlist : public TMap<UINT, DefSBitSetCore*> {
     bool m_are_stmts_defed_ineffect_md;
 
 public:
-    explicit MDId2IRlist(Region * rg);
-    COPY_CONSTRUCTOR(MDId2IRlist);
-    ~MDId2IRlist();
+    explicit MD2IRSet(Region * rg);
+    ~MD2IRSet();
 
     void append(MD const* md, IR const* ir)
     {
         ASSERT0(ir);
         append(MD_id(md), ir->id());
     }
-    void append(MD const* md, UINT irid)
-    {
-        append(MD_id(md), irid);
-    }
+    void append(MD const* md, UINT irid) { append(MD_id(md), irid); }
     void append(UINT mdid, IR * ir)
     {
         ASSERT0(ir);
@@ -149,12 +146,12 @@ public:
 //If ir is expression, this class indicates a set of DEF stmts.
 
 class DefDBitSetCoreHashAllocator {
+    COPY_CONSTRUCTOR(DefDBitSetCoreHashAllocator);
     DefMiscBitSetMgr * m_sbs_mgr;
 
 public:
     DefDBitSetCoreHashAllocator(DefMiscBitSetMgr * sbsmgr)
     { ASSERT0(sbsmgr); m_sbs_mgr = sbsmgr; }
-    COPY_CONSTRUCTOR(DefDBitSetCoreHashAllocator);
 
     DefSBitSetCore * alloc() { return m_sbs_mgr->allocDBitSetCore(); }
 
@@ -169,6 +166,7 @@ public:
 
 class DefDBitSetCoreReserveTab : public
     SBitSetCoreHash<DefDBitSetCoreHashAllocator> {
+    COPY_CONSTRUCTOR(DefDBitSetCoreReserveTab);
     #ifdef HASH_DBITSETCORE
     #else
     List<DefDBitSetCore*> m_allocated;
@@ -177,7 +175,6 @@ class DefDBitSetCoreReserveTab : public
 public:
     DefDBitSetCoreReserveTab(DefDBitSetCoreHashAllocator * allocator) :
         SBitSetCoreHash<DefDBitSetCoreHashAllocator>(allocator) {}
-    COPY_CONSTRUCTOR(DefDBitSetCoreReserveTab);
     virtual ~DefDBitSetCoreReserveTab()
     {
         #ifdef HASH_DBITSETCORE
@@ -231,22 +228,26 @@ public:
 typedef HMap<IR*, DUSet*> IR2DU;
 
 //Def|Use information manager.
-#define COMP_EXP_RECOMPUTE         1 //Recompute MD reference, completely
-                                     //needs POINT-TO info.
-#define COMP_EXP_UPDATE_DU         2
-#define COMP_EXP_COLLECT_MUST_USE  4
+#define COMP_EXP_RECOMPUTE 1 //Recompute MD reference, completely
+                             //needs POINT-TO info.
+#define COMP_EXP_UPDATE_DU 2
+#define COMP_EXP_COLLECT_MUST_USE 4
 
-#define SOL_UNDEF                  0
-#define SOL_AVAIL_REACH_DEF        0x1  //compute Must-Available Reach-definition.
-#define SOL_REACH_DEF              0x2  //compute May-Available Reach-definition.
-#define SOL_AVAIL_EXPR             0x4  //compute Must-Available expression.
-#define SOL_RU_REF                 0x8  //compute Region referenced MayDef/MayUse.
-#define SOL_REF                    0x10 //compute IR referenced MD/MDSet.
-#define COMPUTE_PR_DU              0x20 //compute PR du chain.
-#define COMPUTE_NONPR_DU           0x40 //compute Non-PR du chain.
+#define DUOPT_UNDEF 0
+#define DUOPT_SOL_AVAIL_REACH_DEF 0x1 //compute Must-Available Reach-definition.
+#define DUOPT_SOL_REACH_DEF 0x2 //compute May-Available Reach-definition.
+#define DUOPT_SOL_AVAIL_EXPR 0x4 //compute Must-Available expression.
+//compute Region referenced MayDef/MayUse MDSet.
+#define DUOPT_SOL_REGION_REF 0x8
+#define DUOPT_COMPUTE_PR_DU 0x10 //compute PR DU chain.
+#define DUOPT_COMPUTE_NONPR_DU 0x20 //compute Non-PR DU chain.
+#define DUOPT_COMPUTE_PR_REF 0x40 //compute PR stmt/exp referenced MD/MDSet.
+//compute Non-PR stmt/exp referenced MD/MDSet.
+#define DUOPT_COMPUTE_NONPR_REF 0x80
 
 class DUMgr : public Pass {
-    friend class MDId2IRlist;
+    COPY_CONSTRUCTOR(DUMgr);
+    friend class MD2IRSet;
     friend class DUSet;
 protected:
     Region * m_rg;
@@ -273,8 +274,7 @@ protected:
 
     //Used by DU chain.
     xcom::BitSet * m_is_init;
-    MDId2IRlist * m_md2irs;
-
+    MD2IRSet * m_md2irs;
     OptCtx * m_oc;
 
     //Available reach-def computes the definitions
@@ -325,7 +325,7 @@ protected:
     //must-killed def of STMT
     Vector<DefDBitSetCore const*> m_bb_must_killed_def;
     Vector<DefDBitSetCore const*> m_bb_may_killed_def; //may-killed def of STMT
-
+    Vector<DefSBitSetCore*> m_livein_bb; //live-in BB
     BSVec<DefDBitSetCore*> m_bb_gen_exp; //generate EXPR
     BSVec<DefDBitSetCore const*> m_bb_killed_exp; //killed EXPR
     BSVec<DefDBitSetCore*> m_bb_availin_exp; //available-in EXPR
@@ -336,7 +336,7 @@ protected:
                            IR const* exp,
                            MD const* expmd,
                            DUSet * expdu,
-                           xcom::C<IR*> * ct,
+                           IRListIter ct,
                            bool * has_local_nonkilling_def);
     void buildLocalDUChainForNonKillingDef(IRBB * bb,
                                            xcom::C<IR*> const* ct,
@@ -379,16 +379,17 @@ protected:
                          OUT MDSet * ret_mds,
                          UINT compflag,
                          UINT duflag);
-    void checkAndBuildChainForMemIR(IRBB * bb, IR * exp, xcom::C<IR*> * ct);
+    void computeLiveInBB(DefMiscBitSetMgr & bsmgr);
+    void checkAndBuildChainForMemIR(IRBB * bb, IR * exp, IRListIter ct);
     void checkAndBuildChainRecursiveIRList(IRBB * bb,
                                            IR * exp,
-                                           xcom::C<IR*> * ct,
+                                           IRListIter ct,
                                            UINT flag);
     void checkAndBuildChainRecursive(IRBB * bb,
                                      IR * exp,
-                                     xcom::C<IR*> * ct,
+                                     IRListIter ct,
                                      UINT flag);
-    void checkAndBuildChain(IR * stmt, xcom::C<IR*> * ct, UINT flag);
+    void checkAndBuildChain(IR * stmt, IRListIter ct, UINT flag);
     void computeMayDef(IR const* ir,
                        MDSet * bb_maydefmds,
                        DefDBitSetCore * maygen_stmt,
@@ -406,15 +407,15 @@ protected:
                                          UINT flag,
                                          DefMiscBitSetMgr & bsmgr);
 
-    DefDBitSetCore * getMayGenDef(UINT bbid, DefMiscBitSetMgr * mgr);
-    DefDBitSetCore * getMustGenDef(UINT bbid, DefMiscBitSetMgr * mgr);
-    DefDBitSetCore * getAvailOutReachDef(UINT bbid, DefMiscBitSetMgr * mgr);
-    DefDBitSetCore * getOutReachDef(UINT bbid, DefMiscBitSetMgr * mgr);
-    DefDBitSetCore * getGenIRExpr(UINT bbid, DefMiscBitSetMgr * mgr);
-    DefDBitSetCore * getAvailOutExpr(UINT bbid, DefMiscBitSetMgr * mgr);
-    DefDBitSetCore const* getMustKilledDef(UINT bbid);
-    DefDBitSetCore const* getMayKilledDef(UINT bbid);
-    DefDBitSetCore const* getKilledIRExpr(UINT bbid);
+    DefDBitSetCore * genMayGenDef(UINT bbid, DefMiscBitSetMgr * mgr);
+    DefDBitSetCore * genMustGenDef(UINT bbid, DefMiscBitSetMgr * mgr);
+    DefDBitSetCore * genAvailOutReachDef(UINT bbid, DefMiscBitSetMgr * mgr);
+    DefDBitSetCore * genOutReachDef(UINT bbid, DefMiscBitSetMgr * mgr);
+    DefDBitSetCore * genGenIRExpr(UINT bbid, DefMiscBitSetMgr * mgr);
+    DefDBitSetCore * genAvailOutExpr(UINT bbid, DefMiscBitSetMgr * mgr);
+    DefDBitSetCore const* getMustKilledDef(UINT bbid) const;
+    DefDBitSetCore const* getMayKilledDef(UINT bbid) const;
+    DefDBitSetCore const* getKilledIRExpr(UINT bbid) const;
 
     inline void * xmalloc(size_t size)
     {
@@ -429,7 +430,7 @@ protected:
     bool isOverlapDefUse(MD const* mustdef,
                          MDSet const* maydef,
                          IR const* use);
-    void initMD2IRList(IRBB * bb);
+    void initMD2IRSet(IRBB * bb);
     void inferRegion(IR * ir, bool ruinfo_avail, IN MDSet * tmp);
     void inferIStore(IR * ir, UINT duflag);
     void inferStore(IR * ir, UINT duflag);
@@ -444,6 +445,7 @@ protected:
                UINT const flag,
                DefMiscBitSetMgr & bsmgr);
     void resetLocalAuxSet(DefMiscBitSetMgr & bsmgr);
+    void resetLiveInBB(DefMiscBitSetMgr & bsmgr);
     void resetAvailReachDefInSet(bool cleanMember);
     void resetAvailExpInSet(bool cleanMember);
     void resetReachDefInSet(bool cleanMember);
@@ -454,7 +456,6 @@ protected:
 
 public:
     explicit DUMgr(Region * rg);
-    COPY_CONSTRUCTOR(DUMgr);
     ~DUMgr();
 
     //Build DU chain : def->use.
@@ -690,8 +691,6 @@ public:
     void dumpMemUsageForEachSet();
     void dumpMemUsageForMDRef();
     void dumpSet(bool is_bs = false);
-    void dumpBBRef(IN IRBB * bb, UINT indent);
-    void dumpRef(UINT indent = 4);
     void dumpDUChain();
     void dumpDUChainDetail();
     void dumpBBDUChainDetail(UINT bbid);
@@ -699,9 +698,10 @@ public:
     void dumpDUGraph(CHAR const* name = NULL, bool detail = true);
     void dump(CHAR const* name);
 
-    DefDBitSetCore * getAvailInExpr(UINT bbid, DefMiscBitSetMgr * mgr);
-    DefDBitSetCore * getInReachDef(UINT bbid, DefMiscBitSetMgr * mgr);
-    DefDBitSetCore * getAvailInReachDef(UINT bbid, DefMiscBitSetMgr * mgr);
+    DefSBitSetCore * genLiveInBB(UINT bbid, DefMiscBitSetMgr * mgr);
+    DefDBitSetCore * genAvailInExpr(UINT bbid, DefMiscBitSetMgr * mgr);
+    DefDBitSetCore * genInReachDef(UINT bbid, DefMiscBitSetMgr * mgr);
+    DefDBitSetCore * genAvailInReachDef(UINT bbid, DefMiscBitSetMgr * mgr);
     virtual CHAR const* getPassName() const { return "DU Manager"; }
     virtual PASS_TYPE getPassType() const { return PASS_DU_MGR; }
 
@@ -938,11 +938,9 @@ public:
         return false;
     }
     bool perform(IN OUT OptCtx & oc,
-                 UINT flag = SOL_AVAIL_REACH_DEF|
-                             SOL_AVAIL_EXPR|
-                             SOL_REACH_DEF|
-                             SOL_REF|
-                             SOL_RU_REF);
+                 UINT flag = DUOPT_SOL_AVAIL_REACH_DEF|DUOPT_SOL_AVAIL_EXPR|
+                             DUOPT_SOL_REACH_DEF|DUOPT_COMPUTE_PR_REF|
+                             DUOPT_COMPUTE_NONPR_REF|DUOPT_SOL_REGION_REF);
 };
 
 } //namespace xoc

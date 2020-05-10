@@ -206,6 +206,9 @@ public:
     //Return true if there is no element ONE in bitset.
     bool is_empty() const;
 
+    //Set each byte in BitSet to 'val'.
+    void set(BYTE val) { ::memset(m_ptr, val, m_size); }
+
     //Reverse each bit.
     //e.g: 1001 to 0110
     //'last_bit_pos': start at 0, e.g:given '101', last bit pos is 2.

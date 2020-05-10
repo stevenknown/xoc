@@ -37,6 +37,7 @@ author: Su Zhenyu
 namespace xoc {
 
 class IRBB;
+typedef xcom::C<IR*> * IRListIter;
 
 //
 //START BBIRList
@@ -49,7 +50,7 @@ class BBIRList : public EList<IR*, IR2Holder> {
 public:
     BBIRList() { m_bb = NULL; }
 
-    inline xcom::C<IR*> * append_head(IR * ir)
+    inline IRListIter append_head(IR * ir)
     {
         if (ir == NULL) { return NULL; }
         ASSERT0(m_bb != NULL);
@@ -57,7 +58,7 @@ public:
         return xcom::EList<IR*, IR2Holder>::append_head(ir);
     }
 
-    inline xcom::C<IR*> * append_tail(IR * ir)
+    inline IRListIter append_tail(IR * ir)
     {
         if (ir == NULL) { return NULL; }
         ASSERT0(m_bb != NULL);
@@ -66,7 +67,7 @@ public:
     }
 
     //Insert ir prior to cond_br, uncond_br, call, return.
-    xcom::C<IR*> * append_tail_ex(IR * ir);
+    IRListIter append_tail_ex(IR * ir);
 
     //Count up memory size of BBIRList
     size_t count_mem() const
@@ -76,7 +77,7 @@ public:
     }
 
     //Insert 'ir' before 'marker'.
-    inline xcom::C<IR*> * insert_before(IN IR * ir, IN IR * marker)
+    inline IRListIter insert_before(IN IR * ir, IN IR * marker)
     {
         if (ir == NULL) { return NULL; }
         ASSERT0(marker != NULL);
@@ -86,7 +87,7 @@ public:
     }
 
     //Insert 'ir' before 'marker'. marker will be modified.
-    inline xcom::C<IR*> * insert_before(IN IR * ir, IN xcom::C<IR*> * marker)
+    inline IRListIter insert_before(IN IR * ir, IN IRListIter marker)
     {
         if (ir == NULL) { return NULL; }
         ASSERT0(marker != NULL);
@@ -96,7 +97,7 @@ public:
     }
 
     //Insert 'ir' after 'marker'.
-    inline xcom::C<IR*> * insert_after(IR * ir, IR * marker)
+    inline IRListIter insert_after(IR * ir, IR * marker)
     {
         if (ir == NULL) { return NULL; }
         ASSERT0(marker != NULL);
@@ -106,7 +107,7 @@ public:
     }
 
     //Insert 'ir' after 'marker'.
-    inline xcom::C<IR*> * insert_after(IR * ir, IN xcom::C<IR*> * marker)
+    inline IRListIter insert_after(IR * ir, IN IRListIter marker)
     {
         if (ir == NULL) { return NULL; }
         ASSERT0(marker != NULL);
@@ -116,7 +117,7 @@ public:
     }
 
     //Remove ir that hold by 'holder'.
-    inline IR * remove(IN xcom::C<IR*> * holder)
+    inline IR * remove(IN IRListIter holder)
     {
         if (holder == NULL) { return NULL; }
         ASSERT0(holder->val());
@@ -142,21 +143,21 @@ public:
 //
 #define MAX_BB_KIDS_NUM     2
 
-#define BB_rpo(b)               ((b)->m_rpo)
-#define BB_id(b)                ((b)->m_id)
-#define BB_irlist(b)            ((b)->ir_list)
-#define BB_first_ir(b)          ((b)->ir_list.get_head())
-#define BB_next_ir(b)           ((b)->ir_list.get_next())
-#define BB_prev_ir(b)           ((b)->ir_list.get_prev())
-#define BB_last_ir(b)           ((b)->ir_list.get_tail())
-#define BB_is_entry(b)          ((b)->u1.s1.is_entry)
-#define BB_is_exit(b)           ((b)->u1.s1.is_exit)
-#define BB_is_fallthrough(b)    ((b)->u1.s1.is_fallthrough)
-#define BB_is_target(b)         ((b)->u1.s1.is_target)
-#define BB_is_catch_start(b)    ((b)->u1.s1.is_catch_start)
-#define BB_is_try_start(b)      ((b)->u1.s1.is_try_start)
-#define BB_is_try_end(b)        ((b)->u1.s1.is_try_end)
-#define BB_is_terminate(b)      ((b)->u1.s1.is_terminate)
+#define BB_rpo(b) ((b)->m_rpo)
+#define BB_id(b) ((b)->m_id)
+#define BB_irlist(b) ((b)->ir_list)
+#define BB_first_ir(b) ((b)->ir_list.get_head())
+#define BB_next_ir(b) ((b)->ir_list.get_next())
+#define BB_prev_ir(b) ((b)->ir_list.get_prev())
+#define BB_last_ir(b) ((b)->ir_list.get_tail())
+#define BB_is_entry(b) ((b)->u1.s1.is_entry)
+#define BB_is_exit(b) ((b)->u1.s1.is_exit)
+#define BB_is_fallthrough(b) ((b)->u1.s1.is_fallthrough)
+#define BB_is_target(b) ((b)->u1.s1.is_target)
+#define BB_is_catch_start(b) ((b)->u1.s1.is_catch_start)
+#define BB_is_try_start(b) ((b)->u1.s1.is_try_start)
+#define BB_is_try_end(b) ((b)->u1.s1.is_try_end)
+#define BB_is_terminate(b) ((b)->u1.s1.is_terminate)
 class IRBB {
     COPY_CONSTRUCTOR(IRBB);
 public:
@@ -427,7 +428,7 @@ public:
             return false;
         }
 
-        xcom::C<IR*> * ctir;
+        IRListIter ctir;
         for (BB_irlist(this).get_head(&ctir);
              ctir != BB_irlist(this).end();
              ctir = BB_irlist(this).get_next(ctir)) {
@@ -444,7 +445,7 @@ public:
 
     bool mayThrowException() const
     {
-        xcom::C<IR*> * ct;
+        IRListIter ct;
         IR * x = BB_irlist(const_cast<IRBB*>(this)).get_tail(&ct);
         if (x != NULL && x->isMayThrow()) {
             return true;
@@ -529,6 +530,8 @@ public:
         }
         return count;
     }
+
+    UINT getBBCount() const { return m_bb_count; }
 };
 //END IRBBMgr
 

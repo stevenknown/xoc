@@ -64,7 +64,8 @@ void Region::lowerIRTreeToLowestHeight(OptCtx & oc)
 
     if (SIMP_changed(&simp)) {
         OC_is_aa_valid(oc) = false;
-        OC_is_du_chain_valid(oc) = false;
+        OC_is_pr_du_chain_valid(oc) = false;
+        OC_is_nonpr_du_chain_valid(oc) = false;
         OC_is_reach_def_valid(oc) = false;
         OC_is_avail_reach_def_valid(oc) = false;
     }
@@ -122,9 +123,11 @@ bool Region::performSimplify(OptCtx & oc)
         ASSERT0((!g_do_md_du_analysis && !g_do_md_ssa) || verifyMDRef());
     }
 
-    if (g_verify_level >= VERIFY_LEVEL_3 && OC_is_du_chain_valid(oc)) {
+    if (g_verify_level >= VERIFY_LEVEL_3 &&
+        OC_is_pr_du_chain_valid(oc) &&
+        OC_is_nonpr_du_chain_valid(oc)) {
         ASSERT0(getDUMgr() == NULL ||
-            getDUMgr()->verifyMDDUChain(COMPUTE_PR_DU | COMPUTE_NONPR_DU));
+            getDUMgr()->verifyMDDUChain(DUOPT_COMPUTE_PR_DU | DUOPT_COMPUTE_NONPR_DU));
     }
 
     if (g_is_dump_after_pass && g_dump_opt.isDumpALL()) {
@@ -166,7 +169,7 @@ bool Region::MiddleProcess(OptCtx & oc)
 
     if (g_verify_level >= VERIFY_LEVEL_3) {
         ASSERT0(getDUMgr() == NULL ||
-            getDUMgr()->verifyMDDUChain(COMPUTE_PR_DU | COMPUTE_NONPR_DU));
+            getDUMgr()->verifyMDDUChain(DUOPT_COMPUTE_PR_DU | DUOPT_COMPUTE_NONPR_DU));
     }
 
     bool do_simplification = true;
@@ -190,19 +193,17 @@ bool Region::MiddleProcess(OptCtx & oc)
     ASSERT0(verifyRPO(oc));
     if (g_do_refine) {
         RefineCtx rf;
-        if (refineBBlist(bbl, rf)) {
-            OC_is_expr_tab_valid(oc) = false;
-            OC_is_live_expr_valid(oc) = false;
-            OC_is_reach_def_valid(oc) = false;
-            //DU chain is kept by refinement.
-            ASSERT0(verifyIRandBB(bbl, this));
-            if (g_verify_level >= VERIFY_LEVEL_3 && OC_is_du_chain_valid(oc)) {
+        if (refineBBlist(bbl, rf, oc)) {                        
+            if (g_verify_level >= VERIFY_LEVEL_3 &&
+                OC_is_pr_du_chain_valid(oc) &&
+                OC_is_nonpr_du_chain_valid(oc)) {
                 ASSERT0(getDUMgr() == NULL ||
-                        getDUMgr()->verifyMDDUChain(
-                            COMPUTE_PR_DU | COMPUTE_NONPR_DU));
+                        getDUMgr()->verifyMDDUChain(DUOPT_COMPUTE_PR_DU |
+                                                    DUOPT_COMPUTE_NONPR_DU));
             }
             return true;
-        }        
+        }
+        return false;
     }
     ASSERT0(verifyIRandBB(bbl, this));    
     return true;

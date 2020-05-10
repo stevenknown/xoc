@@ -98,7 +98,7 @@ void GCSE::elimCseAtStore(IR * use, IR * use_stmt, IR * gen)
     newrhs_pr->setRefMD(r_md, m_rg);
 
     if (m_mdssamgr != NULL) {
-        m_mdssamgr->removeMDSSAUseRecur(use);
+        m_mdssamgr->removeMDSSAUse(use);
     }
     m_rg->freeIRTree(use);
 }
@@ -147,7 +147,7 @@ void GCSE::elimCseAtBranch(IR * use, IR * use_stmt, IN IR * gen)
     IR_may_throw(use_stmt) = false;
 
     if (m_mdssamgr != NULL) {
-        m_mdssamgr->removeMDSSAUseRecur(use);
+        m_mdssamgr->removeMDSSAUse(use);
     }
     m_rg->freeIRTree(use);
 }
@@ -195,7 +195,7 @@ void GCSE::elimCseAtCall(IR * use, IR * use_stmt, IR * gen)
     bool f = use_stmt->replaceKid(use, use_pr, false);
     CHECK_DUMMYUSE(f);
     if (m_mdssamgr != NULL) {
-        m_mdssamgr->removeMDSSAUseRecur(use);
+        m_mdssamgr->removeMDSSAUse(use);
     }
     m_rg->freeIRTree(use);
 
@@ -266,7 +266,7 @@ void GCSE::processCseGen(IN IR * gen, IR * gen_stmt, bool & change)
     copyDbx(new_stpr, gen_stmt, m_rg);
 
     //The 'find()' is fast because it is implemented with hash.
-    xcom::C<IR*> * holder = NULL;
+    IRListIter holder = NULL;
     bool f = BB_irlist(bb).find(gen_stmt, &holder);
     CHECK_DUMMYUSE(f);
     CHECK_DUMMYUSE(holder);
@@ -388,7 +388,7 @@ bool GCSE::processCse(IN IR * exp, IN List<IR*> & livexp)
     IR * expstmt = exp->getStmt();
     ExpRep * irie = m_expr_tab->map_ir2ir_expr(exp);
     ASSERT0(irie && expstmt->getBB());
-    xcom::C<IR*> * ct;
+    IRListIter ct;
     bool change = false;
     for (IR * gen = livexp.get_head(&ct);
          gen != NULL; gen = livexp.get_next(&ct)) {
@@ -474,7 +474,7 @@ bool GCSE::doPropInDomTreeOrder(xcom::Graph const* domtree)
     bool changed = false;
     List<IR*> livexp;
     while ((v = stk.pop()) != NULL) {
-        UINT vid = VERTEX_id(v);
+        UINT vid = v->id();
         if (!is_visited.is_contain(vid)) {
             is_visited.bunion(vid);
             //May be push root more than once.
@@ -487,8 +487,8 @@ bool GCSE::doPropInDomTreeOrder(xcom::Graph const* domtree)
         EdgeC * el = VERTEX_out_list(v);
         Vertex * succ;
         while (el != NULL) {
-            succ = EDGE_to(EC_edge(el));
-            if (!is_visited.is_contain(VERTEX_id(succ))) {
+            succ = el->getTo();
+            if (!is_visited.is_contain(succ->id())) {
                 stk.push(v);
                 stk.push(succ);
                 break;
@@ -513,7 +513,7 @@ bool GCSE::doPropVNInDomTreeOrder(xcom::Graph const* domtree)
     stk.push(root);
     bool changed = false;
     while ((v = stk.pop()) != NULL) {
-        UINT vid = VERTEX_id(v);
+        UINT vid = v->id();
         if (!is_visited.is_contain(vid)) {
             is_visited.bunion(vid);
             //May be push root more than once.
@@ -526,8 +526,8 @@ bool GCSE::doPropVNInDomTreeOrder(xcom::Graph const* domtree)
         EdgeC * el = VERTEX_out_list(v);
         Vertex * succ;
         while (el != NULL) {
-            succ = EDGE_to(EC_edge(el));
-            if (!is_visited.is_contain(VERTEX_id(succ))) {
+            succ = el->getTo();
+            if (!is_visited.is_contain(succ->id())) {
                 stk.push(v);
                 stk.push(succ);
                 break;
@@ -543,7 +543,7 @@ bool GCSE::doPropVNInDomTreeOrder(xcom::Graph const* domtree)
 bool GCSE::doPropVN(IRBB * bb, UINT entry_id)
 {
     bool change = false;
-    xcom::C<IR*> * ct;
+    IRListIter ct;
     for (IR * ir = BB_irlist(bb).get_head(&ct);
          ir != NULL; ir = BB_irlist(bb).get_next(&ct)) {
         switch (ir->getCode()) {
@@ -597,8 +597,8 @@ bool GCSE::doPropVN(IRBB * bb, UINT entry_id)
 bool GCSE::doProp(IRBB * bb, List<IR*> & livexp)
 {
     livexp.clean();
-    DefDBitSetCore * x = m_du->getAvailInExpr(BB_id(bb), NULL);
-    SEGIter * st = NULL;
+    DefDBitSetCore * x = m_du->genAvailInExpr(BB_id(bb), NULL);
+    DefSBitSetIter st = NULL;
     for (INT i = x->get_first(&st); i != -1; i = x->get_next(i, &st)) {
         IR * y = m_rg->getIR(i);
         if (y->is_undef() || y->is_pr()) { continue; }
@@ -607,7 +607,7 @@ bool GCSE::doProp(IRBB * bb, List<IR*> & livexp)
     }
 
     bool change = false;
-    xcom::C<IR*> * ct;
+    IRListIter ct;
     MDSet tmp;
     for (IR * ir = BB_irlist(bb).get_head(&ct);
          ir != NULL; ir = BB_irlist(bb).get_next(&ct)) {
@@ -649,25 +649,24 @@ bool GCSE::doProp(IRBB * bb, List<IR*> & livexp)
             }
             break;
         case IR_CALL:
-        case IR_ICALL:
-            {
-                IR * param = CALL_param_list(ir);
-                IR * next = NULL;
-                while (param != NULL) {
-                    next = param->get_next();
-                    if (isCseCandidate(param)) {
-                        if (processCse(param, livexp)) {
-                            //Has found cse and replaced cse with pr.
-                            change = true;
-                        } else {
-                            //Generate new cse.
-                            livexp.append_tail(param);
-                        }
+        case IR_ICALL: {
+            IR * param = CALL_param_list(ir);
+            IR * next = NULL;
+            while (param != NULL) {
+                next = param->get_next();
+                if (isCseCandidate(param)) {
+                    if (processCse(param, livexp)) {
+                        //Has found cse and replaced cse with pr.
+                        change = true;
+                    } else {
+                        //Generate new cse.
+                        livexp.append_tail(param);
                     }
-                    param = next;
                 }
+                param = next;
             }
             break;
+        }
         case IR_TRUEBR:
         case IR_FALSEBR:
             if (isCseCandidate(BR_det(ir)) && shouldBeCse(BR_det(ir))) {
@@ -702,43 +701,44 @@ bool GCSE::doProp(IRBB * bb, List<IR*> & livexp)
         case IR_STPR:
         case IR_IST:
         case IR_CALL:
-        case IR_ICALL:
-            {
-                MDSet const* maydef = m_du->getMayDef(ir);
-                if (maydef != NULL && !maydef->is_empty()) {
-                    xcom::C<IR*> * ct2, * next;
-                    for (livexp.get_head(&ct2), next = ct2;
-                         ct2 != NULL; ct2 = next) {
-                        livexp.get_next(&next);
-                        IR * x2 = ct2->val();
-                        tmp.clean(m_misc_bs_mgr);
-                        m_du->collectMayUseRecursive(x2,
-                            tmp, true, m_misc_bs_mgr);
-                        if (maydef->is_intersect(tmp)) {
-                            livexp.remove(ct2);
-                        }
+        case IR_ICALL: {
+            MDSet const* maydef = m_du->getMayDef(ir);
+            if (maydef != NULL && !maydef->is_empty()) {
+                IRListIter ct2;
+                IRListIter next;
+                for (livexp.get_head(&ct2), next = ct2;
+                     ct2 != NULL; ct2 = next) {
+                    livexp.get_next(&next);
+                    IR * x2 = ct2->val();
+                    tmp.clean(m_misc_bs_mgr);
+                    m_du->collectMayUseRecursive(x2,
+                        tmp, true, m_misc_bs_mgr);
+                    if (maydef->is_intersect(tmp)) {
+                        livexp.remove(ct2);
                     }
                 }
+            }
 
-                MD const* mustdef = m_du->get_must_def(ir);
-                if (mustdef != NULL) {
-                    xcom::C<IR*> * ct2, * next;
-                    for (livexp.get_head(&ct2), next = ct2;
-                         ct2 != NULL; ct2 = next) {
-                        livexp.get_next(&next);
-                        IR * x2 = ct2->val();
-                        tmp.clean(m_misc_bs_mgr);
-                        m_du->collectMayUseRecursive(x2,
-                            tmp, true, m_misc_bs_mgr);
-                        if (tmp.is_overlap(mustdef, m_rg)) {
-                            livexp.remove(ct2);
-                        }
+            MD const* mustdef = m_du->get_must_def(ir);
+            if (mustdef != NULL) {
+                IRListIter ct2;
+                IRListIter next;
+                for (livexp.get_head(&ct2), next = ct2;
+                     ct2 != NULL; ct2 = next) {
+                    livexp.get_next(&next);
+                    IR * x2 = ct2->val();
+                    tmp.clean(m_misc_bs_mgr);
+                    m_du->collectMayUseRecursive(x2,
+                        tmp, true, m_misc_bs_mgr);
+                    if (tmp.is_overlap(mustdef, m_rg)) {
+                        livexp.remove(ct2);
                     }
                 }
             }
             break;
-        default: break;
         }
+        default: ;
+        } //end switch
     }
 
     tmp.clean(m_misc_bs_mgr);
@@ -762,16 +762,42 @@ void GCSE::dump()
 
 bool GCSE::perform(OptCtx & oc)
 {
-    START_TIMER(t, getPassName());
-    if (!OC_is_du_chain_valid(oc) || !OC_is_ref_valid(oc)) {
-        END_TIMER(t, getPassName());
+    BBList * bbl = m_rg->getBBList();
+    if (bbl == NULL || bbl->get_elem_count() == 0) { return false; }
+    if (!OC_is_ref_valid(oc)) { return false; }
+    //Check PR DU chain.
+    PRSSAMgr * ssamgr = (PRSSAMgr*)(m_rg->getPassMgr()->queryPass(
+        PASS_PR_SSA_MGR));
+    if (ssamgr != NULL && ssamgr->isSSAConstructed()) {
+        m_ssamgr = ssamgr;
+    } else {
+        m_ssamgr = NULL;
+    }
+    if (!OC_is_pr_du_chain_valid(oc) && m_ssamgr == NULL) { 
+        //At least one kind of DU chain should be avaiable.
         return false;
     }
+    //Check NONPR DU chain.
+    MDSSAMgr * mdssamgr = (MDSSAMgr*)(m_rg->getPassMgr()->queryPass(
+        PASS_MD_SSA_MGR));
+    if (mdssamgr != NULL && mdssamgr->isMDSSAConstructed()) {
+        m_mdssamgr = mdssamgr;
+    } else {
+        m_mdssamgr = NULL;
+    }
+    if (!OC_is_nonpr_du_chain_valid(oc) && m_mdssamgr == NULL) {
+        //At least one kind of DU chain should be avaiable.
+        return false;
+    }
+
+    START_TIMER(t, getPassName());
     if (m_gvn != NULL) {
         m_rg->checkValidAndRecompute(&oc, PASS_DOM, PASS_PDOM, PASS_UNDEF);
         if (!m_gvn->is_valid()) {
             m_gvn->reperform(oc);
         }
+        //GVN provide more accurate result of value flow analysis than
+        //expression analysis.
         m_expr_tab = NULL;
     } else {
         m_rg->checkValidAndRecompute(&oc, PASS_DOM, PASS_PDOM, PASS_EXPR_TAB,
@@ -783,22 +809,6 @@ bool GCSE::perform(OptCtx & oc)
     m_num_of_elim = 0;
     m_elimed.clean();
     #endif
-
-    PRSSAMgr * ssamgr = (PRSSAMgr*)(m_rg->getPassMgr()->
-        queryPass(PASS_PR_SSA_MGR));
-    if (ssamgr != NULL && ssamgr->isSSAConstructed()) {
-        m_ssamgr = ssamgr;
-    } else {
-        m_ssamgr = NULL;
-    }
-
-    MDSSAMgr * mdssamgr = (MDSSAMgr*)(m_rg->getPassMgr()->
-        queryPass(PASS_MD_SSA_MGR));
-    if (mdssamgr != NULL && mdssamgr->isMDSSAConstructed()) {
-        m_mdssamgr = mdssamgr;
-    } else {
-        m_mdssamgr = NULL;
-    }
 
     bool change = false;
     IRBB * entry = m_cfg->get_entry();
@@ -826,7 +836,7 @@ bool GCSE::perform(OptCtx & oc)
         //m_cfg->sortDomTreeInPreorder(root, lst);
         //for (xcom::Vertex * v = lst.get_head();
         //     v != NULL; v = lst.get_next()) {
-        //    IRBB * bb = m_cfg->getBB(VERTEX_id(v));
+        //    IRBB * bb = m_cfg->getBB(v->id());
         //    ASSERT0(bb);
         //    change |= doPropVN(bb, BB_id(entry));
         //}
@@ -839,8 +849,9 @@ bool GCSE::perform(OptCtx & oc)
         //List<IR*> livexp;
         //m_cfg->sortDomTreeInPreorder(root, lst);
         ////Access IRBB in preorder on domtree.
-        //for (xcom::Vertex * v = lst.get_head(); v != NULL; v = lst.get_next()) {
-        //    IRBB * bb = m_cfg->getBB(VERTEX_id(v));
+        //for (xcom::Vertex * v = lst.get_head();
+        //     v != NULL; v = lst.get_next()) {
+        //    IRBB * bb = m_cfg->getBB(v->id());
         //    ASSERT0(bb);
         //    change |= doProp(bb, livexp);
         //}
@@ -858,7 +869,7 @@ bool GCSE::perform(OptCtx & oc)
 
         //DU reference and du chain has maintained.
         ASSERT0(m_rg->verifyMDRef());
-        ASSERT0(m_du->verifyMDDUChain(COMPUTE_PR_DU | COMPUTE_NONPR_DU));
+        ASSERT0(m_du->verifyMDDUChain(DUOPT_COMPUTE_PR_DU | DUOPT_COMPUTE_NONPR_DU));
         if (m_ssamgr != NULL) {
             ASSERT0(verifySSAInfo(m_rg));
         }

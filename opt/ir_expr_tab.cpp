@@ -426,7 +426,7 @@ ExpRep * ExprTab::encode_expr(IN IR * ir)
 //the 'GEN-SET' and 'KILL-SET' of IR-EXPR for BB as well as.
 void ExprTab::encode_bb(IRBB * bb)
 {
-    xcom::C<IR*> * ct = NULL;
+    IRListIter ct = NULL;
     for (IR * ir = BB_irlist(bb).get_head(&ct);
          ir != NULL; ir = BB_irlist(bb).get_next(&ct)) {
         ASSERT0(ir->is_stmt());
@@ -566,7 +566,7 @@ bool ExprTab::perform(IN OUT OptCtx & oc)
     BBList * bbl = m_rg->getBBList();
     if (bbl->get_elem_count() == 0) { return false; }
 
-    xcom::C<IRBB*> * cb;
+    BBListIter cb;
     for (IRBB * bb = bbl->get_head(&cb);
          bb != NULL; bb = bbl->get_next(&cb)) {
         encode_bb(bb);

@@ -53,6 +53,7 @@ protected:
 
     //Indicate whether current IR is tranformed to ssa form.
     PRSSAMgr * m_ssamgr;
+    MDSSAMgr * m_mdssamgr;
 
 protected:
     bool doLoopTree(LI<IRBB> * li,

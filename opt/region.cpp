@@ -107,7 +107,7 @@ static void destroyVARandMD(Region * rg)
 
 AnalysisInstrument::~AnalysisInstrument()
 {
-    #if defined(_DEBUG_) && defined(DEBUG_SEG)
+    #ifdef DEBUG_SEG
     //Just dump the seg info if you really need to see.
     //DefSegMgr * segmgr = m_sbs_mgr.getSegMgr();
     //dumpSegMgr(segmgr, g_tfile);
@@ -198,11 +198,6 @@ size_t AnalysisInstrument::count_mem()
 //
 void Region::init(REGION_TYPE rt, RegionMgr * rm)
 {
-    //Reset
-    //REGION_is_expect_inline(r),
-    //REGION_is_inlinable(r),
-    //REGION_is_mddu_valid(r),
-    //REGION_is_readonly(r)
     m_u2.s1b1 = 0;
     REGION_type(this) = rt;
     REGION_blackbox_data(this) = NULL;
@@ -264,9 +259,9 @@ size_t Region::count_mem()
 //'irs': a list of ir.
 //'bbl': a list of bb.
 //'ctbb': marker current bb container.
-xcom::C<IRBB*> * Region::splitIRlistIntoBB(IR * irs,
-                                           BBList * bbl,
-                                           xcom::C<IRBB*> * ctbb)
+BBListIter Region::splitIRlistIntoBB(IR * irs,
+                                     BBList * bbl,
+                                     BBListIter ctbb)
 {
     IRCFG * cfg = getCFG();
     ASSERTN(cfg, ("CFG is not available"));
@@ -475,11 +470,11 @@ bool Region::reconstructBBList(OptCtx & oc)
     ASSERTN(getCFG(), ("CFG is not available"));
 
     bool change = false;
-    xcom::C<IRBB*> * ctbb;
+    BBListIter ctbb;
     BBList * bbl = getBBList();
     for (bbl->get_head(&ctbb); ctbb != NULL; bbl->get_next(&ctbb)) {
         IRBB * bb = ctbb->val();
-        xcom::C<IR*> * ctir;
+        IRListIter ctir;
         BBIRList * irlst = &BB_irlist(bb);
 
         IR * tail = irlst->get_tail();
@@ -541,7 +536,7 @@ IR * Region::constructIRlist(bool clean_ir_list)
     START_TIMER(t, "Construct IR list from BB");
     IR * ret_list = NULL;
     IR * last = NULL;
-    xcom::C<IRBB*> * ct;
+    BBListIter ct;
     for (getBBList()->get_head(&ct);
          ct != getBBList()->end();
          ct = getBBList()->get_next(ct)) {
@@ -836,15 +831,17 @@ void Region::freeIRBBList(BBList & bbl)
 
 
 //Free ir, and all its kids.
-//We can only utilizing the function to free the IR which allocated by 'allocIR'.
+//We can only utilizing the function to free
+//the IR which allocated by 'allocIR'.
 void Region::freeIRTreeList(IRList & irs)
 {
-    xcom::C<IR*> * next;
-    xcom::C<IR*> * ct;
+    IRListIter next;
+    IRListIter ct;
     for (irs.get_head(&ct); ct != irs.end(); ct = next) {
         IR * ir = ct->val();
         next = irs.get_next(ct);
-        ASSERTN(ir->is_single(), ("do not allow sibling node, need to simplify"));
+        ASSERTN(ir->is_single(),
+                ("do not allow sibling node, need to simplify"));
         irs.remove(ir);
         freeIRTree(ir);
     }
@@ -857,7 +854,6 @@ void Region::freeIRTreeList(IRList & irs)
 void Region::freeIRTree(IR * ir)
 {
     if (ir == NULL) { return; }
-
     ASSERTN(!ir->is_undef(), ("ir has been freed"));
     ASSERTN(ir->is_single(), ("chain list should be cut off"));
     for (INT i = 0; i < IR_MAX_KID_NUM(ir); i++) {
@@ -1540,7 +1536,8 @@ void Region::prescan(IR const* ir)
             //Array base must not be ID. It could be
             //LDA or computational expressions.
             //In C, array base address could be assgined to other variable.
-            //Its address should be marked as taken. And it's parent must be LDA.
+            //Its address should be marked as taken.
+            // And it's parent must be LDA.
             //e.g: Address of 'a' is taken.
             //    int a[10];
             //    int * p;
@@ -1722,9 +1719,8 @@ void Region::dumpVarTab()
         if (v->is_formal_param() || v->is_pr()) { continue; }
         set.bunion(v->id());
     }
-    SEGIter * cur = NULL;
-    for (INT id = set.get_first(&cur);
-         id >= 0; id = set.get_next(id, &cur)) {
+    DefSBitSetIter cur = NULL;
+    for (INT id = set.get_first(&cur); id >= 0; id = set.get_next(id, &cur)) {
         VAR * v = getVarMgr()->get_var(id);
         ASSERT0(v);
         buf.clean();
@@ -1886,6 +1882,49 @@ void Region::dumpAllocatedIR()
 }
 
 
+//Dump Region's IR BB list.
+//DUMP ALL BBList DEF/USE/OVERLAP_DEF/OVERLAP_USE.
+void Region::dumpRef(UINT indent)
+{
+    if (g_tfile == NULL) { return; }
+    note("\n\n==---- DUMP DUMgr: IR REFERENCE '%s' ----==\n",
+         getRegionName());
+    BBList * bbs = getBBList();
+    ASSERT0(bbs);
+    if (bbs->get_elem_count() != 0) {
+        getMDSystem()->dump(false);
+    }
+
+    //Dump imported variables referenced.
+    note("\n==----==");
+    MDSet * ru_maydef = getMayDef();
+    if (ru_maydef != NULL) {
+        note("\nRegionMayDef(OuterRegion):");
+        ru_maydef->dump(getMDSystem(), true);
+    }
+
+    MDSet * ru_mayuse = getMayUse();
+    if (ru_mayuse != NULL) {
+        note("\nRegionMayUse(OuterRegion):");
+        ru_mayuse->dump(getMDSystem(), true);
+    }
+
+    for (IRBB * bb = bbs->get_head(); bb != NULL; bb = bbs->get_next()) {
+        note("\n--- BB%d ---", BB_id(bb));
+        dumpBBRef(bb, indent);
+    }
+}
+
+
+void Region::dumpBBRef(IN IRBB * bb, UINT indent)
+{
+    if (g_tfile == NULL) { return; }
+    for (IR * ir = BB_first_ir(bb); ir != NULL; ir = BB_next_ir(bb)) {
+        ir->dumpRef(this, indent);
+    }
+}
+
+
 PassMgr * Region::initPassMgr()
 {
     if (REGION_analysis_instrument(this)->m_pass_mgr != NULL) {
@@ -1952,71 +1991,67 @@ bool Region::verifyMDRef()
                         ASSERTN(t->getExactRef()->is_pr(),
                             ("MD must present a PR."));
                     }
-
                     ASSERT0(t->getRefMDSet() == NULL);
                     break;
-                case IR_STARRAY:
-                    {
-                        MD const* must = t->getEffectRef();
-                        MDSet const* may = t->getRefMDSet();
-                        DUMMYUSE(must);
-                        DUMMYUSE(may);
-                        ASSERT0(must || (may && !may->is_empty()));
-                        if (must != NULL) {
-                            //PR can not be accessed by indirect operation.
-                            ASSERT0(!must->is_pr());
-                        }
+                case IR_STARRAY: {
+                    MD const* must = t->getEffectRef();
+                    MDSet const* may = t->getRefMDSet();
+                    DUMMYUSE(must);
+                    DUMMYUSE(may);
+                    ASSERT0(must || (may && !may->is_empty()));
+                    if (must != NULL) {
+                        //PR can not be accessed by indirect operation.
+                        ASSERT0(!must->is_pr());
+                    }
 
-                        if (may != NULL) {
-                            //PR can not be accessed by indirect operation.
-                            SEGIter * iter;
-                            for (INT i = may->get_first(&iter);
-                                 i >= 0; i = may->get_next(i, &iter)) {
-                                MD const* x = getMDSystem()->getMD(i);
-                                DUMMYUSE(x);
-                                ASSERT0(x && !x->is_pr());
-                            }
-                            ASSERT0(getMDSetHash()->find(*may));
+                    if (may != NULL) {
+                        //PR can not be accessed by indirect operation.
+                        MDSetIter iter;
+                        for (INT i = may->get_first(&iter);
+                             i >= 0; i = may->get_next(i, &iter)) {
+                            MD const* x = getMDSystem()->getMD(i);
+                            DUMMYUSE(x);
+                            ASSERT0(x && !x->is_pr());
                         }
+                        ASSERT0(getMDSetHash()->find(*may));
                     }
                     break;
+                }
                 case IR_ARRAY:
-                case IR_ILD:
-                    {
-                        MD const* mustuse = t->getEffectRef();
-                        MDSet const* mayuse = t->getRefMDSet();
-                        DUMMYUSE(mustuse);
-                        DUMMYUSE(mayuse);
+                case IR_ILD: {
+                    MD const* mustuse = t->getEffectRef();
+                    MDSet const* mayuse = t->getRefMDSet();
+                    DUMMYUSE(mustuse);
+                    DUMMYUSE(mayuse);
 
-                        ASSERT0(mustuse || (mayuse && !mayuse->is_empty()));
-                        if (mustuse != NULL) {
-                            //PR can not be accessed by indirect operation.
-                            ASSERT0(!mustuse->is_pr());
-                        }
+                    ASSERT0(mustuse || (mayuse && !mayuse->is_empty()));
+                    if (mustuse != NULL) {
+                        //PR can not be accessed by indirect operation.
+                        ASSERT0(!mustuse->is_pr());
+                    }
 
-                        if (mayuse != NULL) {
-                            //PR can not be accessed by indirect operation.
-                            SEGIter * iter;
-                            for (INT i = mayuse->get_first(&iter);
-                                 i >= 0; i = mayuse->get_next(i, &iter)) {
-                                MD const* x = getMDSystem()->getMD(i);
-                                DUMMYUSE(x);
-                                ASSERT0(x && !x->is_pr());
-                            }
-                            ASSERT0(getMDSetHash()->find(*mayuse));
+                    if (mayuse != NULL) {
+                        //PR can not be accessed by indirect operation.
+                        MDSetIter iter;
+                        for (INT i = mayuse->get_first(&iter);
+                             i >= 0; i = mayuse->get_next(i, &iter)) {
+                            MD const* x = getMDSystem()->getMD(i);
+                            DUMMYUSE(x);
+                            ASSERT0(x && !x->is_pr());
                         }
+                        ASSERT0(getMDSetHash()->find(*mayuse));
                     }
                     break;
+                }
                 case IR_ST:
                     if (g_is_support_dynamic_type) {
-                        ASSERTN(t->getEffectRef(),
-                               ("type is at least effect"));
+                        ASSERTN(t->getEffectRef(), ("type is at least effect"));
                         ASSERTN(!t->getEffectRef()->is_pr(),
-                               ("MD can not present a PR."));
+                                ("MD can not present a PR."));
                     } else {
                         ASSERTN(t->getExactRef(), ("type must be exact"));
                         ASSERTN(!t->getExactRef()->is_pr(),
-                               ("MD can not present a PR."));
+                                ("MD can not present a PR."));
                     }
                     //ST may modify overlapped memory object.
                     if (t->getRefMDSet() != NULL) {
@@ -2027,7 +2062,7 @@ bool Region::verifyMDRef()
                     if (g_is_support_dynamic_type) {
                         ASSERTN(t->getEffectRef(), ("type is at least effect"));
                         ASSERTN(t->getEffectRef()->is_pr(),
-                               ("MD must present a PR."));
+                                ("MD must present a PR."));
                     } else {
                         MD const* md = t->getEffectRef();
                         ASSERT0(md);
@@ -2043,17 +2078,15 @@ bool Region::verifyMDRef()
                     if (g_is_support_dynamic_type) {
                         ASSERTN(t->getEffectRef(), ("type is at least effect"));
                         ASSERTN(t->getEffectRef()->is_pr(),
-                               ("MD must present a PR."));
+                                ("MD must present a PR."));
                     } else {
                         ASSERTN(t->getExactRef(), ("type must be exact"));
                         ASSERTN(t->getExactRef()->is_pr(),
-                            ("MD must present a PR."));
+                                ("MD must present a PR."));
                     }
-
                     ASSERT0(t->getRefMDSet() == NULL);
                     break;
-                case IR_IST:
-                    {
+                case IR_IST: {
                         MD const* mustdef = t->getRefMD();
                         if (mustdef != NULL) {
                             //mustdef may be fake object, e.g: global memory.
@@ -2068,7 +2101,7 @@ bool Region::verifyMDRef()
                             (maydef != NULL && !maydef->is_empty()));
                         if (maydef != NULL) {
                             //PR can not be accessed by indirect operation.
-                            SEGIter * iter;
+                            MDSetIter iter;
                             for (INT i = maydef->get_first(&iter);
                                  i >= 0; i = maydef->get_next(i, &iter)) {
                                 MD const* x = getMDSystem()->getMD(i);
@@ -2165,12 +2198,11 @@ bool Region::verifyBBlist(BBList & bbl)
                     ("branch target cannot be NULL"));
         } else if (last->isMultiConditionalBr()) {
             ASSERT0(last->is_switch());
-
-            for (IR * c = SWITCH_case_list(last); c != NULL; c = c->get_next()) {
+            for (IR * c = SWITCH_case_list(last);
+                 c != NULL; c = c->get_next()) {
                 ASSERTN(lab2bb.get(CASE_lab(last)),
                         ("case branch target cannot be NULL"));
             }
-
             if (SWITCH_deflab(last) != NULL) {
                 ASSERTN(lab2bb.get(SWITCH_deflab(last)),
                         ("default target cannot be NULL"));
@@ -2348,7 +2380,8 @@ void Region::checkValidAndRecompute(OptCtx * oc, ...)
     va_start(ptr, oc);
     PASS_TYPE opty = (PASS_TYPE)va_arg(ptr, UINT);
     while (opty != PASS_UNDEF && num < 1000) {
-        ASSERTN(opty < PASS_NUM, ("You should append PASS_UNDEF to pass list."));
+        ASSERTN(opty < PASS_NUM,
+                ("You should append PASS_UNDEF to pass list."));
         opts.bunion(opty);
         optlist.append_tail(opty);
         num++;
@@ -2365,7 +2398,8 @@ void Region::checkValidAndRecompute(OptCtx * oc, ...)
     DUMgr * dumgr = NULL;
 
     C<PASS_TYPE> * it = NULL;
-    for (optlist.get_head(&it); it != optlist.end(); it = optlist.get_next(it)) {
+    for (optlist.get_head(&it); it != optlist.end();
+         it = optlist.get_next(it)) {
         PASS_TYPE pt = it->val();
         switch (pt) {
         case PASS_CFG:
@@ -2439,26 +2473,28 @@ void Region::checkValidAndRecompute(OptCtx * oc, ...)
         case PASS_AVAIL_REACH_DEF: {
             UINT f = 0;
             if (opts.is_contain(PASS_DU_REF) && !OC_is_ref_valid(*oc)) {
-                f |= SOL_REF;
+                f |= DUOPT_COMPUTE_PR_REF|DUOPT_COMPUTE_NONPR_REF;
             }
-            if (opts.is_contain(PASS_LIVE_EXPR) && !OC_is_live_expr_valid(*oc)) {
-                f |= SOL_AVAIL_EXPR;
+            if (opts.is_contain(PASS_LIVE_EXPR) &&
+                !OC_is_live_expr_valid(*oc)) {
+                f |= DUOPT_SOL_AVAIL_EXPR;
             }
             if (opts.is_contain(PASS_AVAIL_REACH_DEF) &&
                 !OC_is_avail_reach_def_valid(*oc)) {
-                f |= SOL_AVAIL_REACH_DEF;
+                f |= DUOPT_SOL_AVAIL_REACH_DEF;
             }
             if (opts.is_contain(PASS_DU_CHAIN) &&
-                !OC_is_du_chain_valid(*oc) &&
+                (!OC_is_pr_du_chain_valid(*oc) ||
+                 !OC_is_nonpr_du_chain_valid(*oc)) &&
                 !OC_is_reach_def_valid(*oc)) {
-                f |= SOL_REACH_DEF;
+                f |= DUOPT_SOL_REACH_DEF;
             }
-            if ((HAVE_FLAG(f, SOL_REF) || opts.is_contain(PASS_AA)) &&
+            if (opts.is_contain(PASS_AA) &&
                 !OC_is_aa_valid(*oc) &&
                 getBBList() != NULL &&
                 getBBList()->get_elem_count() != 0) {
                 ASSERTN(cfg && OC_is_cfg_valid(*oc),
-                    ("You should make CFG available first."));
+                        ("You should make CFG available first."));
                 if (aa == NULL) {
                     aa = (AliasAnalysis*)passmgr->registerPass(PASS_AA);
                     if (!aa->is_init()) {
@@ -2479,38 +2515,44 @@ void Region::checkValidAndRecompute(OptCtx * oc, ...)
                 //NOTE: assignMD(false) must be called before AA.
                 aa->perform(*oc);
             }
-            if (f != 0 &&
+            if (f != DUOPT_UNDEF &&
                 getBBList() != NULL &&
                 getBBList()->get_elem_count() != 0) {
                 if (dumgr == NULL) {
                     dumgr = (DUMgr*)passmgr->registerPass(PASS_DU_MGR);
                 }
-                f |= COMPUTE_NONPR_DU|COMPUTE_PR_DU;
+                if (opts.is_contain(PASS_DU_REF)) {
+                    f |= DUOPT_COMPUTE_NONPR_DU|DUOPT_COMPUTE_PR_DU;
+                }
                 dumgr->perform(*oc, f);
-                if (HAVE_FLAG(f, SOL_REF)) {
+                if (HAVE_FLAG(f, DUOPT_COMPUTE_PR_REF) ||
+                    HAVE_FLAG(f, DUOPT_COMPUTE_NONPR_REF)) {
                     ASSERT0(verifyMDRef());
                 }
-                if (HAVE_FLAG(f, SOL_AVAIL_EXPR)) {
+                if (HAVE_FLAG(f, DUOPT_SOL_AVAIL_EXPR)) {
                     ASSERT0(dumgr->verifyLiveinExp());
                 }
             }
             break;
         }
         case PASS_DU_CHAIN:
-            if (!OC_is_du_chain_valid(*oc) &&
-                getBBList() != NULL &&
-                getBBList()->get_elem_count() != 0) {
+            if (getBBList() != NULL && getBBList()->get_elem_count() != 0) {
                 if (dumgr == NULL) {
                     dumgr = (DUMgr*)passmgr->registerPass(PASS_DU_MGR);
                 }
 
-                UINT flag = COMPUTE_NONPR_DU;
+                UINT flag = DUOPT_UNDEF;
+                if (!OC_is_nonpr_du_chain_valid(*oc)) {
+                    flag |= DUOPT_COMPUTE_NONPR_DU;
+                }
 
                 //If PRs have already been in SSA form, compute
                 //DU chain doesn't make any sense.
-                PRSSAMgr * ssamgr = (PRSSAMgr*)passmgr->queryPass(PASS_PR_SSA_MGR);
-                if (ssamgr == NULL) {
-                    flag |= COMPUTE_PR_DU;
+                PRSSAMgr * ssamgr = (PRSSAMgr*)passmgr->queryPass(
+                    PASS_PR_SSA_MGR);
+                if ((ssamgr == NULL || !ssamgr->isSSAConstructed()) &&
+                    !OC_is_pr_du_chain_valid(*oc)) {
+                    flag |= DUOPT_COMPUTE_PR_DU;
                 }
 
                 if (opts.is_contain(PASS_REACH_DEF)) {
@@ -2526,8 +2568,8 @@ void Region::checkValidAndRecompute(OptCtx * oc, ...)
                 if (!pass->perform(*oc)) { break; }
             }
         }
-        }
-    }
+        } //end switch
+    } //end for
 }
 
 
@@ -2667,11 +2709,13 @@ bool Region::processIRList(OptCtx & oc)
     }
     if (!HighProcess(oc)) { return false; }
     ASSERT0(getDUMgr() == NULL ||
-        getDUMgr()->verifyMDDUChain(COMPUTE_PR_DU|COMPUTE_NONPR_DU));
+            getDUMgr()->verifyMDDUChain(DUOPT_COMPUTE_PR_DU|
+                                        DUOPT_COMPUTE_NONPR_DU));
     if (g_opt_level != OPT_LEVEL0) {
         //O0 does not build DU ref and DU chain.
         ASSERT0(verifyMDRef());
     }
+
     if (!MiddleProcess(oc)) { return false; }
 
     return true;

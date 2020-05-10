@@ -82,7 +82,7 @@ void LivenessMgr::processMay(
     if (mds != NULL) {
         MD const* prmd = pr->getExactRef();
         ASSERT0(prmd);
-        SEGIter * iter;
+        MDSetIter iter;
         for (INT i = mds->get_first(&iter);
              i >= 0; i = mds->get_next(i, &iter)) {
             MD const* md = m_md_sys->getMD(i);
@@ -106,11 +106,10 @@ void LivenessMgr::processMay(
 }
 
 
-void LivenessMgr::processOpnd(
-        IR const* ir,
-        List<IR const*> & lst,
-        DefSBitSetCore * use,
-        DefSBitSetCore * gen)
+void LivenessMgr::processOpnd(IR const* ir,
+                              List<IR const*> & lst,
+                              DefSBitSetCore * use,
+                              DefSBitSetCore * gen)
 {
     for (IR const* k = iterInitC(ir, lst);
          k != NULL; k = iterNextC(lst)) {
@@ -226,14 +225,13 @@ void LivenessMgr::computeLocal(IRBB * bb, List<IR const*> & lst)
 
 
 //Note this function does not consider PHI effect.
-//e.g:
-//BB1:             BB2:
-//st $4 = 0        st $3 = 1
-//     \               /
-//      \             /
-//      BB3:
-//      phi $5   =  $4, $4
-//      ...
+//e.g:  BB1:          BB2:
+//      st $4 = 0     st $3 = 1
+//           \        /
+//            \      /
+//    BB3:     |    |
+//    phi $5 = $4, $3
+//    ...
 //
 //In actually , $4 only lived out from BB1, and $3 only lived out
 //from BB2. For present, $4 both live out from BB1 and BB2, and $3
@@ -271,24 +269,14 @@ void LivenessMgr::computeGlobal()
             ASSERT0(bb);
             UINT bbid = BB_id(bb);
 
-            DefSBitSetCore * out = m_liveout.get(bbid);
-            news.copy(*out, m_sbs_mgr);
-
-            ASSERT0(m_def.get(bbid));
-            news.diff(*m_def.get(bbid), m_sbs_mgr);
-            news.bunion(*m_use.get(bbid), m_sbs_mgr);
-            m_livein.get(bbid)->copy(news, m_sbs_mgr);
-
-            xcom::EdgeC const* ec = VERTEX_out_list(
-                m_cfg->getVertex(BB_id(bb)));
+            xcom::DefSBitSetCore * out = m_liveout.get(bbid);
+            xcom::EdgeC const* ec = m_cfg->getVertex(BB_id(bb))->getOutList();
             if (ec != NULL) {
-                news.copy(*m_livein.get(
-                    VERTEX_id(EDGE_to(EC_edge(ec)))), m_sbs_mgr);
-                ec = EC_next(ec);
+                news.copy(*m_livein.get(ec->getToId()), m_sbs_mgr);
+                ec = ec->get_next();
 
-                for (; ec != NULL; ec = EC_next(ec)) {
-                    news.bunion(*m_livein.get(
-                        VERTEX_id(EDGE_to(EC_edge(ec)))), m_sbs_mgr);
+                for (; ec != NULL; ec = ec->get_next()) {
+                    news.bunion(*m_livein.get(ec->getToId()), m_sbs_mgr);
                 }
 
                 if (!out->is_equal(news)) {
@@ -296,6 +284,13 @@ void LivenessMgr::computeGlobal()
                     change = true;
                 }
             }
+
+            //Compute in by out.
+            news.copy(*out, m_sbs_mgr);
+            ASSERT0(m_def.get(bbid));
+            news.diff(*m_def.get(bbid), m_sbs_mgr);
+            news.bunion(*m_use.get(bbid), m_sbs_mgr);
+            m_livein.get(bbid)->copy(news, m_sbs_mgr);
         }
         count++;
     } while (change && count < thres);

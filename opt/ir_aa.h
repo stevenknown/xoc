@@ -52,7 +52,9 @@ public:
 
 //PtPairSet
 //Since PtPair's id is densely allocated, using xcom::BitSet is plausible.
-typedef xcom::BitSet PtPairSet;
+//CASE:some case introduce sparse PtPair, so we switch BitSet to SBitSet.
+typedef xcom::DefSBitSetCore PtPairSet;
+typedef xcom::DefSBitSetIter PtPairSetIter;
 
 
 //MD Addendum
@@ -70,48 +72,51 @@ public:
 
 //PPSetMgr
 class PPSetMgr {
-protected:
+    COPY_CONSTRUCTOR(PPSetMgr);
     SMemPool * m_pool;
-    SList<PtPairSet*> m_free_pp_set;
-    SList<PtPairSet*> m_pp_set_list;
+    SMemPool * m_ppset_pool;
+    SList<PtPairSet*> m_ppset_list;
+    DefMiscBitSetMgr m_misc_bs_mgr;
 
+    PtPairSet * xmalloc_ppset()
+    {
+        PtPairSet * p = (PtPairSet*)smpoolMallocConstSize(
+            sizeof(PtPairSet), m_ppset_pool);
+        ASSERT0(p);
+        ::memset(p, 0, sizeof(PtPairSet));
+        p->init();
+        return p;
+    }
 public:
     PPSetMgr()
     {
         m_pool = smpoolCreate(sizeof(xcom::SC<PtPairSet*>) * 4, MEM_CONST_SIZE);
-        m_free_pp_set.set_pool(m_pool);
-        m_pp_set_list.set_pool(m_pool);
+        m_ppset_pool = smpoolCreate(sizeof(PtPairSet) * 4, MEM_CONST_SIZE);
+        m_ppset_list.set_pool(m_pool);
     }
-    COPY_CONSTRUCTOR(PPSetMgr);
     ~PPSetMgr()
     {
-        for (xcom::SC<PtPairSet*> * sc = m_pp_set_list.get_head();
-             sc != m_pp_set_list.end(); sc = m_pp_set_list.get_next(sc)) {
+        for (xcom::SC<PtPairSet*> * sc = m_ppset_list.get_head();
+             sc != m_ppset_list.end(); sc = m_ppset_list.get_next(sc)) {
             PtPairSet * pps = sc->val();
             ASSERT0(pps);
-            delete pps;
+            pps->clean(*getSBSMgr());
         }
         smpoolDelete(m_pool);
+        smpoolDelete(m_ppset_pool);
+    }
+
+    PtPairSet * allocPtPairSet()
+    {
+        PtPairSet * pps = xmalloc_ppset();
+        m_ppset_list.append_head(pps);
+        return pps;
     }
 
     //Count memory usage for current object.
-    size_t count_mem();
+    size_t count_mem() const;
 
-    void free(PtPairSet * pps)
-    {
-        pps->clean();
-        m_free_pp_set.append_head(pps);
-    }
-
-    inline PtPairSet * newPtPairSet()
-    {
-        PtPairSet * pps = m_free_pp_set.remove_head();
-        if (pps == NULL) {
-            pps = new PtPairSet();
-            m_pp_set_list.append_head(pps);
-        }
-        return pps;
-    }
+    DefMiscBitSetMgr * getSBSMgr() { return &m_misc_bs_mgr; }    
 };
 
 
@@ -178,7 +183,7 @@ public:
         m_pool_tmap = NULL;
     }
 
-    inline void clobber()
+    void clean()
     {
         destroy();
         m_from_tmap.clean();
@@ -305,7 +310,7 @@ protected:
     SMemPool * m_pool;
     MDSetMgr * m_mds_mgr; //MDSet manager.
     MDSetHash * m_mds_hash; //MDSet hash table.
-    DefMiscBitSetMgr * m_misc_bs_mgr;
+    DefMiscBitSetMgr m_misc_bs_mgr;
 
     //This is a dummy global variable.
     //It is used used as a placeholder if there
@@ -316,7 +321,7 @@ protected:
     Vector<PtPairSet*> m_in_pp_set;
     Vector<PtPairSet*> m_out_pp_set;
     Var2MD m_var2md;
-    PtPairMgr m_pt_pair_mgr;
+    PtPairMgr m_ppmgr;
     xcom::BitSet m_is_visit;
 
     //This class contains those variables that can be referenced by
@@ -345,23 +350,54 @@ protected:
                          IN OUT MDSet * mds,
                          IN OUT AACtx * ic,
                          IN OUT MD2MDSet * mx);
+    //Function return the POINT-TO pair for each BB.
+    //Only used in flow-sensitive analysis.
+    inline MD2MDSet * genMD2MDSetForBB(UINT bbid)
+    {
+        MD2MDSet * mx = m_md2mds_vec.get(bbid);
+        if (mx == NULL) {
+            mx = (MD2MDSet*)xmalloc(sizeof(MD2MDSet));
+            mx->init();
+            m_md2mds_vec.set(bbid, mx);
+        }
+        return mx;
+    }
 
     void convertPT2MD2MDSet(PtPairSet const& pps,
-                            IN PtPairMgr & pt_pair_mgr,
+                            IN PtPairMgr & ppmgr,
                             IN OUT MD2MDSet * ctx);
-    bool convertMD2MDSet2PT(OUT PtPairSet & pps,
-                            IN PtPairMgr & pt_pair_mgr,
+    bool convertMD2MDSet2PT(OUT PtPairSet * pps,
+                            IN PtPairMgr & ppmgr,
+                            IN PPSetMgr & ppsetmgr,
                             IN MD2MDSet * mx);
-    void convertExact2Unbound(MDSet const* src, MDSet * tgt);
+    void convertExact2Unbound(MDSet const& src, MDSet * tgt);
+
+    //Do NOT public functions related to PtPair.
+    //They are inavailable after AA finished.
+    PtPairSet * getInPtPairSet(IRBB const* bb)
+    {
+        ASSERTN(m_in_pp_set.get(BB_id(bb)),
+                ("IN set is not yet initialized for BB%d", BB_id(bb)));
+        return m_in_pp_set.get(BB_id(bb));
+    }
+    //Do NOT public functions related to PtPair.
+    //They are inavailable after AA finished.
+    PtPairSet * getOutPtPairSet(IRBB const* bb)
+    {
+        ASSERTN(m_out_pp_set.get(BB_id(bb)),
+                ("OUT set is not yet initialized for BB%d", BB_id(bb)));
+        return m_out_pp_set.get(BB_id(bb));
+    }
 
     bool evaluateFromLda(IR const* ir);
 
     bool isInLoop(IR const* ir);
+    //Determine if flow sensitive analysis is properly.
     bool isFlowSensitiveProperly();
-    void initEntryPtset(PtPairSet ** ptset_arr);
-    void initGlobalAndParameterVarPtset(VAR * v,
-                                        MD2MDSet * mx,
-                                        ConstMDIter & iter);
+    void initBBPPSet(PPSetMgr & ppsetmgr);
+    void initFlowSensitiveEntryPtset(PPSetMgr & ppsetmgr);
+    void initEntryPtset(PPSetMgr & ppsetmgr);
+    void initGlobalAndParameterVarPtSet(VAR * v, MD2MDSet * mx);
     void inferPointerArith(IR const* ir,
                            IN OUT MDSet & mds,
                            IN OUT MDSet & opnd0_mds,
@@ -445,9 +481,10 @@ protected:
     //Return true if new MD generated, and new MD record in 'newmds'.
     bool tryReshapeMDSet(IR const* ir, MDSet const* mds, OUT MDSet * newmds);
     bool tryComputeConstOffset(IR const* ir,
+                               MDSet const& opnd0_mds,
                                IR const* opnd1,
-                               IN OUT MDSet & mds,
-                               IN OUT MDSet & opnd0_mds);
+                               IN OUT MDSet & mds);
+          
     void recomputeDataType(AACtx const& ic, IR const* ir, OUT MDSet & pts);
     void reviseMDSize(IN OUT MDSet & mds, UINT size);
 
@@ -478,6 +515,7 @@ public:
     virtual MD const* computePointToViaType(IR const*) { return NULL; }
 
     void clean();
+    void cleanSBSMgr();
     void cleanPointTo(UINT mdid, IN OUT MD2MDSet & ctx)
     { ctx.setAlways(mdid, NULL); }
 
@@ -487,15 +525,20 @@ public:
     //Return true if pointer pointed to MAY-POINT-TO set.
     MDSet const* computeMayPointToViaTBAA(IR const* pointer,
                                           MDSet const* point_to_set);
-    bool computeFlowSensitive(List<IRBB*> const& bbl);
+    bool computeFlowSensitive(List<IRBB*> const& bbl, PPSetMgr & ppsetmgr);
     void computeStmt(IRBB const* bb, IN OUT MD2MDSet * mx);
     void computeFlowInsensitive();
-    void computeMayPointTo(IR * pointer, IN MD2MDSet * mx, OUT MDSet & mds);
+    void computeMayPointTo(IR * pointer,
+                           IN MD2MDSet * mx,
+                           OUT MDSet & mds,
+                           DefMiscBitSetMgr & sbsmgr);
     void computeMayPointTo(IR * pointer, OUT MDSet & mds);
     //Count memory usage for current object.
     size_t count_mem();
     size_t countMD2MDSetMemory();
-
+    void cleanContext(OptCtx & oc);
+   
+    void destroyContext(OptCtx & oc);
     void dumpMD2MDSet(IN MD2MDSet * mx, bool dump_ptg);
     void dumpMD2MDSet(MD const* md, IN MD2MDSet * mx);
     void dumpIRPointTo(IN IR * ir, bool dump_kid, IN MD2MDSet * mx);
@@ -523,18 +566,7 @@ public:
 
     virtual CHAR const* getPassName() const { return "Alias Analysis"; }
     virtual PASS_TYPE getPassType() const { return PASS_AA; }
-    PtPairSet * getInPtPairSet(IRBB const* bb)
-    {
-        ASSERTN(m_in_pp_set.get(BB_id(bb)),
-                ("IN set is not yet initialized for BB%d", BB_id(bb)));
-        return m_in_pp_set.get(BB_id(bb));
-    }
-    PtPairSet * getOutPtPairSet(IRBB const* bb)
-    {
-        ASSERTN(m_out_pp_set.get(BB_id(bb)),
-                ("OUT set is not yet initialized for BB%d", BB_id(bb)));
-        return m_out_pp_set.get(BB_id(bb));
-    }
+    DefMiscBitSetMgr * getSBSMgr() { return &m_misc_bs_mgr; }
 
     //For given MD2MDSet, return the MDSet that 'md' pointed to.
     //ctx: context of point-to analysis.
@@ -558,9 +590,6 @@ public:
     //Return true if the MD of each PR corresponded is unique.
     void initMayPointToSet();
 
-    void cleanContext(OptCtx & oc);
-    void destroyContext(OptCtx & oc);
-
     //For given MD2MDSet, set the point-to set to 'md'.
     //ctx: context of point-to analysis.
     void setPointTo(UINT mdid, MD2MDSet & ctx, MDSet const* ptset)
@@ -577,10 +606,10 @@ public:
     {
         ASSERT0(target);
         MDSet tmp;
-        tmp.bunion(target, *m_misc_bs_mgr);
+        tmp.bunion(target, *getSBSMgr());
         MDSet const* hashed = m_mds_hash->append(tmp);
         setPointTo(pointer_mdid, ctx, hashed);
-        tmp.clean(*m_misc_bs_mgr);
+        tmp.clean(*getSBSMgr());
     }
 
     //Set pointer points to 'target_set' in the context.
@@ -608,13 +637,13 @@ public:
                 //setPointTo(pointer_mdid, ctx, pts);
                 return;
             }
-            tmp.bunion(*pts, *m_misc_bs_mgr);
+            tmp.bunion(*pts, *getSBSMgr());
         }
 
-        tmp.bunion(newmd, *m_misc_bs_mgr);
+        tmp.bunion(newmd, *getSBSMgr());
         MDSet const* hashed = m_mds_hash->append(tmp);
         setPointTo(pointer_mdid, ctx, hashed);
-        tmp.clean(*m_misc_bs_mgr);
+        tmp.clean(*getSBSMgr());
     }
 
     //Set pointer points to MD set by appending a MDSet.
@@ -634,12 +663,12 @@ public:
             return;
         }
         MDSet tmp;
-        tmp.copy(*pts, *m_misc_bs_mgr);
-        tmp.bunion(pt_set, *m_misc_bs_mgr);
+        tmp.copy(*pts, *getSBSMgr());
+        tmp.bunion(pt_set, *getSBSMgr());
 
         MDSet const* hashed = m_mds_hash->append(tmp);
         setPointTo(pointer_mdid, ctx, hashed);
-        tmp.clean(*m_misc_bs_mgr);
+        tmp.clean(*getSBSMgr());
     }
 
     //Set 'md' points to whole memory.
@@ -668,19 +697,6 @@ public:
     //Only used in flow-sensitive analysis.
     MD2MDSet * mapBBtoMD2MDSet(UINT bbid) const
     { return m_md2mds_vec.get(bbid); }
-
-    //Function return the POINT-TO pair for each BB.
-    //Only used in flow-sensitive analysis.
-    inline MD2MDSet * allocMD2MDSetForBB(UINT bbid)
-    {
-        MD2MDSet * mx = m_md2mds_vec.get(bbid);
-        if (mx == NULL) {
-            mx = (MD2MDSet*)xmalloc(sizeof(MD2MDSet));
-            mx->init();
-            m_md2mds_vec.set(bbid, mx);
-        }
-        return mx;
-    }
 
     //This function update LHS's POINT-TO set accroding to RHS.
     //is_lhs_pointer: true if transit rhs's POINT-TO set to lhs.

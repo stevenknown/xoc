@@ -37,7 +37,7 @@ author: Su Zhenyu
 namespace xoc {
 
 //CALL NODE
-#define CN_id(c) ((c)->id)
+#define CN_id(c) ((c)->nid)
 #define CN_sym(c) ((c)->ru_name)
 #define CN_ru(c) ((c)->rg)
 #define CN_is_used(c) ((c)->u1.s1.is_used)
@@ -45,7 +45,7 @@ namespace xoc {
 class CallNode {
     COPY_CONSTRUCTOR(CallNode);
 public:
-    UINT id;
+    UINT nid;
     SYM const* ru_name; //record the Region name.
     Region * rg; //record the Region that callnode corresponds to.
     union {
@@ -63,6 +63,15 @@ public:
 
 public:
     CallNode() { ::memset(this, 0, sizeof(CallNode)); }
+
+    bool hasUnknownCallee() const { return CN_unknown_callee(this); }
+
+    UINT id() const { return CN_id(this); }
+    bool is_used() const { return CN_is_used(this); }
+
+    Region * region() const { return CN_ru(this); }
+
+    SYM const* name() const { return CN_sym(this); }
 };
 
 
@@ -75,9 +84,9 @@ typedef TMapIter<Region*, SYM2CN*> Region2SYM2CNIter;
 //Call xcom::Graph
 //The call graph is not precise. That is, a callsite may indicate it can
 //call a function when in fact it does not do so in the running program.
-#define CALLG_DUMP_IR            1
-#define CALLG_DUMP_SRC_LINE      2
-#define CALLG_DUMP_INNER_REGION  4
+#define CALLG_DUMP_IR 1
+#define CALLG_DUMP_SRC_LINE 2
+#define CALLG_DUMP_INNER_REGION 4
 class CallGraph : public xcom::DGraph {
     COPY_CONSTRUCTOR(CallGraph);
 private:
@@ -94,7 +103,7 @@ private:
     {
         ASSERT0(m_cn_pool);
         CallNode * p = (CallNode*)smpoolMallocConstSize(
-                            sizeof(CallNode), m_cn_pool);
+            sizeof(CallNode), m_cn_pool);
         ASSERT0(p);
         ::memset(p, 0, sizeof(CallNode));
         return p;
@@ -140,7 +149,7 @@ public:
         smpoolDelete(m_cn_pool);
     }
 
-    void add_node(CallNode * cn)
+    void addNode(CallNode * cn)
     {
         m_cnid2cn.set(CN_id(cn), cn);
         addVertex(CN_id(cn));
@@ -156,7 +165,7 @@ public:
 
     CallNode * mapId2CallNode(UINT id) const { return m_cnid2cn.get(id); }
     CallNode * mapVertex2CallNode(xcom::Vertex const* v) const
-    { return m_cnid2cn.get(VERTEX_id(v)); }
+    { return m_cnid2cn.get(v->id()); }
 
     CallNode * mapRegion2CallNode(Region const* rg) const
     { return m_ruid2cn.get(REGION_id(rg)); }

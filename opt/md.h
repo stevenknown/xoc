@@ -367,6 +367,8 @@ public:
 };
 
 
+typedef xcom::SEGIter * MDSetIter;
+
 //Memory Descriptor Set.
 //Note: one must call clean() to reclamition before deletion or destruction.
 class MDSet : public DefSBitSetCore {
@@ -623,7 +625,9 @@ class MDSystem {
     MDId2MD m_id2md_map; //Map MD id to MD.
     SList<MD*> m_free_md_list; //MD allocated in pool.
     UINT m_md_count; //generate MD index, used by registerMD().
-    TMap<VAR const*, MDTab*, CompareConstVar> m_var2mdtab; //map VAR to MDTab.
+    typedef TMap<VAR const*, MDTab*, CompareConstVar> Var2MDTab;
+    typedef TMapIter<VAR const*, MDTab*> Var2MDTabIter;
+    Var2MDTab m_var2mdtab; //map VAR to MDTab.
 
     inline MD * allocMD()
     {
@@ -652,27 +656,24 @@ public:
             OUT MDSet * output,
             ConstMDIter & tabiter,
             DefMiscBitSetMgr & mbsmgr);
-    void computeOverlap(
-            Region * current_ru,
-            MD const* md,
-            MDSet & output,
-            ConstMDIter & tabiter,
-            DefMiscBitSetMgr & mbsmgr,
-            bool strictly);
-    void computeOverlap(
-            Region * current_ru,
-            IN OUT MDSet & mds,
-            Vector<MD const*> & tmpvec,
-            ConstMDIter & tabiter,
-            DefMiscBitSetMgr & mbsmgr,
-            bool strictly);
-    void computeOverlap(
-            Region * current_ru,
-            MDSet const& mds,
-            OUT MDSet & output,
-            ConstMDIter & tabiter,
-            DefMiscBitSetMgr & mbsmgr,
-            bool strictly);
+    void computeOverlap(Region * current_ru,
+                        MD const* md,
+                        MDSet & output,
+                        ConstMDIter & tabiter,
+                        DefMiscBitSetMgr & mbsmgr,
+                        bool strictly);
+    void computeOverlap(Region * current_ru,
+                        IN OUT MDSet & mds,
+                        Vector<MD const*> & tmpvec,
+                        ConstMDIter & tabiter,
+                        DefMiscBitSetMgr & mbsmgr,
+                        bool strictly);
+    void computeOverlap(Region * current_ru,
+                        MDSet const& mds,
+                        OUT MDSet & output,
+                        ConstMDIter & tabiter,
+                        DefMiscBitSetMgr & mbsmgr,
+                        bool strictly);
 
     //Dump all registered MDs.
     void dump(bool only_dump_nonpr_md);
@@ -732,7 +733,7 @@ public:
 //Return true if all MD in set are PR.
 bool MDSet::is_pr_set(MDSystem const* mdsys) const
 {
-    SEGIter * iter;
+    MDSetIter iter;
     for (INT i = get_first(&iter);
          i >= 0; i = get_next((UINT)i, &iter)) {
         MD const* md = mdsys->readMD((UINT)i);
@@ -760,6 +761,22 @@ public:
 
     //Clean each MD->MDSet, but do not free MDSet.
     void clean() { TMap<UINT, MDSet const*>::clean(); }
+    //Compute the number of PtPair that recorded in current MD2MDSet.
+    UINT computePtPairNum(MDSystem const& mdsys) const
+    {
+        UINT num_of_tgt_md = 0;
+        MD2MDSetIter mxiter;
+        MDSet const* from_md_pts = NULL;
+        for (UINT fromid = get_first(mxiter, &from_md_pts);        
+            fromid > 0; fromid = get_next(mxiter, &from_md_pts)) {
+            ASSERT0(const_cast<MDSystem&>(mdsys).getMD(fromid));
+            if (from_md_pts == NULL || from_md_pts->is_contain_all()) {
+                continue;
+            }
+            num_of_tgt_md += from_md_pts->get_elem_count();
+        }
+        return num_of_tgt_md;
+    }
 
     void dump(Region * rg);
 };

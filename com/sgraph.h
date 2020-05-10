@@ -40,29 +40,59 @@ namespace xcom {
 
 class Vertex;
 class Edge;
+class EdgeC;
 class Graph;
 class BMat;
 
 #define EDGE_next(e) ((e)->next)
 #define EDGE_prev(e) ((e)->prev)
-#define EDGE_from(e) ((e)->from)
-#define EDGE_to(e) ((e)->to)
-#define EDGE_info(e) ((e)->info)
+#define EDGE_from(e) ((e)->_from)
+#define EDGE_to(e) ((e)->_to)
+#define EDGE_info(e) ((e)->_info)
 class Edge {
-public:
-    Edge()
-    {
-        prev = next = NULL;
-        from = to = NULL;
-        info = NULL;
-    }
-
 public:
     Edge * prev; //used by FreeList and EdgeHash
     Edge * next; //used by FreeList and EdgeHash
-    Vertex * from;
-    Vertex * to;
-    void * info;
+    Vertex * _from;
+    Vertex * _to;
+    void * _info;
+public:
+    void init()
+    { prev = NULL, next = NULL, _from = NULL, _to = NULL, _info = NULL; }
+    void * info() const { return EDGE_info(this); }
+
+    Vertex * from() const { return EDGE_from(this); }
+    Vertex * to() const { return EDGE_to(this); }
+};
+
+
+#define VERTEX_UNDEF 0
+#define VERTEX_next(v) ((v)->next)
+#define VERTEX_prev(v) ((v)->prev)
+#define VERTEX_id(v) ((v)->_id)
+#define VERTEX_rpo(v) ((v)->_rpo)
+#define VERTEX_in_list(v) ((v)->in_list)
+#define VERTEX_out_list(v) ((v)->out_list)
+#define VERTEX_info(v) ((v)->_info)
+class Vertex {
+public:
+    Vertex * prev; //used by FreeList and HASH
+    Vertex * next; //used by FreeList and HASH
+    EdgeC * in_list; //incoming edge list
+    EdgeC * out_list;//outgoing edge list
+    UINT _id;
+    UINT _rpo;
+    void * _info;
+public:
+    void init()
+    { prev = NULL, next = NULL, in_list = NULL, out_list = NULL,
+      _id = VERTEX_UNDEF, _rpo = 0, _info = NULL; }
+    UINT id() const { return VERTEX_id(this); }    
+
+    EdgeC * getOutList() const { return VERTEX_out_list(this); }
+    EdgeC * getInList() const { return VERTEX_in_list(this); }
+
+    UINT rpo() const { return VERTEX_rpo(this); }
 };
 
 
@@ -72,45 +102,19 @@ public:
 #define EC_edge(el) ((el)->edge)
 class EdgeC {
 public:
-    EdgeC()
-    {
-        next = prev = NULL;
-        edge = NULL;
-    }
-
-public:
     EdgeC * next;
     EdgeC * prev;
     Edge * edge;
-};
-
-
-#define VERTEX_UNDEF 0
-#define VERTEX_next(v) ((v)->next)
-#define VERTEX_prev(v) ((v)->prev)
-#define VERTEX_id(v) ((v)->id)
-#define VERTEX_rpo(v) ((v)->rpo)
-#define VERTEX_in_list(v) ((v)->in_list)
-#define VERTEX_out_list(v) ((v)->out_list)
-#define VERTEX_info(v) ((v)->info)
-class Vertex {
 public:
-    Vertex()
-    {
-        prev = next = NULL;
-        in_list = out_list = NULL;
-        info = NULL;
-        id = VERTEX_UNDEF;
-    }
+    void init() { next = NULL, prev = NULL, edge = NULL; }
 
-public:
-    Vertex * prev; //used by FreeList and HASH
-    Vertex * next; //used by FreeList and HASH
-    EdgeC * in_list; //incoming edge list
-    EdgeC * out_list;//outgoing edge list
-    UINT id;
-    UINT rpo;
-    void * info;
+    Vertex * getTo() const { return EDGE_to(EC_edge(this)); }
+    UINT getToId() const { return VERTEX_id(EDGE_to(EC_edge(this))); }
+    Vertex * getFrom() const { return EDGE_from(EC_edge(this)); }
+    UINT getFromId() const { return VERTEX_id(EDGE_from(EC_edge(this))); }
+    EdgeC * get_next() const { return EC_next(this); }
+    EdgeC * get_prev() const { return EC_prev(this); }
+    Edge * getEdge() const { return EC_edge(this); }
 };
 
 
@@ -285,6 +289,7 @@ protected:
             sizeof(Vertex), m_vertex_pool);
         ASSERT0(vex);
         ::memset(vex, 0, sizeof(Vertex));
+        vex->init();
         return vex;
     }
 
@@ -305,6 +310,7 @@ protected:
             e = (Edge*)smpoolMallocConstSize(sizeof(Edge), m_edge_pool);
             ::memset(e, 0, sizeof(Edge));
         }
+        e->init();
         EDGE_from(e) = from;
         EDGE_to(e) = to;
         addInList(to, e);
@@ -322,6 +328,7 @@ protected:
             el = (EdgeC*)smpoolMallocConstSize(sizeof(EdgeC), m_ec_pool);
             ::memset(el, 0, sizeof(EdgeC));
         }
+        el->init();
         EC_edge(el) = e;
         return el;
     }
@@ -375,7 +382,7 @@ public:
     bool is_pred(Vertex * v, Vertex * pred) const
     {
         for (EdgeC * e = VERTEX_in_list(v); e != NULL; e = EC_next(e)) {
-            if (EDGE_from(EC_edge(e)) == pred) {
+            if (e->getFrom() == pred) {
                 return true;
             }
         }

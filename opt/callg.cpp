@@ -32,7 +32,7 @@ IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 author: Su Zhenyu
 @*/
 #include "cominc.h"
-#include "callg.h"
+#include "comopt.h"
 
 namespace xoc {
 
@@ -46,7 +46,7 @@ void CallGraph::computeEntryList(List<CallNode*> & elst)
     for (xcom::Vertex * v = get_first_vertex(c);
          v != NULL; v = get_next_vertex(c)) {
         if (VERTEX_in_list(v) == NULL) {
-            CallNode * cn = m_cnid2cn.get(VERTEX_id(v));
+            CallNode * cn = m_cnid2cn.get(v->id());
             ASSERT0(cn != NULL);
             elst.append_tail(cn);
         }
@@ -61,7 +61,7 @@ void CallGraph::computeExitList(List<CallNode*> & elst)
     for (xcom::Vertex * v = get_first_vertex(c);
          v != NULL; v = get_next_vertex(c)) {
         if (VERTEX_out_list(v) == NULL) {
-            CallNode * cn = m_cnid2cn.get(VERTEX_id(v));
+            CallNode * cn = m_cnid2cn.get(v->id());
             ASSERT0(cn != NULL);
             elst.append_tail(cn);
         }
@@ -136,7 +136,7 @@ void CallGraph::dumpVCG(CHAR const* name, INT flag)
     List<VAR const*> formalparamlst;
     for (xcom::Vertex * v = m_vertices.get_first(c);
          v != NULL; v = m_vertices.get_next(c)) {
-        INT id = VERTEX_id(v);
+        INT id = v->id();
         CallNode * cn = m_cnid2cn.get(id);
         ASSERT0(cn != NULL);
         fprintf(h, "\nnode: { title:\"%d\" shape:box color:gold "
@@ -185,7 +185,7 @@ void CallGraph::dumpVCG(CHAR const* name, INT flag)
         xcom::Vertex * from = EDGE_from(e);
         xcom::Vertex * to = EDGE_to(e);
         fprintf(h, "\nedge: { sourcename:\"%d\" targetname:\"%d\" %s}",
-                VERTEX_id(from), VERTEX_id(to),  "");
+                from->id(), to->id(),  "");
     }
     g_tfile = old;
     fprintf(h, "\n}\n");
@@ -286,7 +286,7 @@ bool CallGraph::build(RegionMgr * rumgr)
             }
         }
 
-        add_node(newCallNode(rg));
+        addNode(newCallNode(rg));
     }
 
     for (UINT i = 0; i < rumgr->getNumOfRegion(); i++) {
@@ -296,7 +296,7 @@ bool CallGraph::build(RegionMgr * rumgr)
         ASSERT0(rg->is_function() || rg->is_program());
         CallNode * caller = mapRegion2CallNode(rg);
         ASSERT0(caller);
-        add_node(caller);
+        addNode(caller);
         List<IR const*> * call_list = rg->getCallList();
         ASSERT0(call_list);
         if (call_list->get_elem_count() == 0) { continue; }
@@ -315,7 +315,7 @@ bool CallGraph::build(RegionMgr * rumgr)
                 //Indirect call.
                 CN_unknown_callee(callee) = true;
             }
-            add_node(callee);
+            addNode(callee);
             addEdge(CN_id(caller), CN_id(callee));
         }
     }

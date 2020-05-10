@@ -40,7 +40,7 @@ namespace xoc {
 bool MDSSAInfo::isUseReachable(IN UseDefMgr * usedefmgr, IR const* exp)
 {
     ASSERT0(usedefmgr && exp && exp->is_exp());
-    SEGIter * iter = NULL;
+    VOpndSetIter iter = NULL;
     for (INT i = getVOpndSet()->get_first(&iter);
          i >= 0; i = getVOpndSet()->get_next(i, &iter)) {
         VMD * vopnd = (VMD*)usedefmgr->getVOpnd(i);
@@ -59,14 +59,14 @@ void MDSSAInfo::collectUse(OUT DefSBitSetCore * set,
                            IN DefMiscBitSetMgr * bsmgr)
 {
     ASSERT0(set && usedefmgr && bsmgr);
-    SEGIter * iter = NULL;
+    VOpndSetIter iter = NULL;
     Region * rg = usedefmgr->getRegion();
     for (INT i = getVOpndSet()->get_first(&iter);
          i >= 0; i = getVOpndSet()->get_next(i, &iter)) {
         VMD * vopnd = (VMD*)usedefmgr->getVOpnd(i);
         ASSERT0(vopnd && vopnd->is_md());
 
-        SEGIter * vit = NULL;
+        IRSetIter vit = NULL;
         for (INT i2 = vopnd->getUseSet()->get_first(&vit);
             i2 >= 0; i2 = vopnd->getUseSet()->get_next(i2, &vit)) {
             IR * use = rg->getIR(i2);
@@ -82,7 +82,7 @@ void MDSSAInfo::collectUse(OUT DefSBitSetCore * set,
 void MDSSAInfo::removeUse(IR const* exp, IN UseDefMgr * usedefmgr)
 {
     ASSERT0(exp && exp->is_exp() && usedefmgr);
-    SEGIter * iter = NULL;
+    VOpndSetIter iter = NULL;
     for (INT i = getVOpndSet()->get_first(&iter);
          i >= 0; i = getVOpndSet()->get_next(i, &iter)) {
         VMD * vopnd = (VMD*)usedefmgr->getVOpnd(i);
@@ -95,7 +95,7 @@ void MDSSAInfo::removeUse(IR const* exp, IN UseDefMgr * usedefmgr)
 void MDSSAInfo::dump(MDSSAMgr const* mgr) const
 {
     if (g_tfile == NULL) { return; }
-    SEGIter * iter = NULL;
+    VOpndSetIter iter = NULL;
     MDSSAInfo * pthis = const_cast<MDSSAInfo*>(this);
     for (INT i = pthis->getVOpndSet()->get_first(&iter);
          i >= 0; i = pthis->getVOpndSet()->get_next(i, &iter)) {
@@ -103,8 +103,8 @@ void MDSSAInfo::dump(MDSSAMgr const* mgr) const
         VMD const* vopnd = (VMD*)const_cast<MDSSAMgr*>(mgr)->
             getUseDefMgr()->getVOpnd(i);
         ASSERT0(vopnd && vopnd->is_md());
-        vopnd->dump(mgr->getRegion(),
-            const_cast<MDSSAMgr*>(mgr)->getUseDefMgr());
+        vopnd->dump(mgr->getRegion(), const_cast<MDSSAMgr*>(mgr)->
+            getUseDefMgr());
     }
 }
 //END MDSSAInfo
@@ -162,7 +162,7 @@ void VMD::dump(Region const* rg, UseDefMgr const* mgr) const
         }
 
         if (getDef()->getNextSet() != NULL) {
-            SEGIter * nit = NULL;
+            MDDefSetIter nit = NULL;
             bool first = true;
             for (INT w = getDef()->getNextSet()->get_first(&nit);
                 w >= 0; w = getDef()->getNextSet()->get_next(w, &nit)) {
@@ -178,7 +178,7 @@ void VMD::dump(Region const* rg, UseDefMgr const* mgr) const
                 ASSERTN(use->getPrev() == getDef(), ("insanity relation"));
                 prt(",NextDEF:MD%dV%d",
                     use->getResult()->mdid(), use->getResult()->version());
-                }
+            }
         }
     } else {
         prt(",-");
@@ -187,7 +187,7 @@ void VMD::dump(Region const* rg, UseDefMgr const* mgr) const
 
     //Dump OccSet
     prt("|UsedBy:");
-    SEGIter * vit = NULL;
+    IRSetIter vit = NULL;
     bool first = true;
     VMD * pthis = const_cast<VMD*>(this);
     for (INT i2 = pthis->getUseSet()->get_first(&vit);
@@ -227,7 +227,7 @@ VMD * MDPhi::getOpndVMD(IR const* opnd, UseDefMgr const* mgr) const
     ASSERT0(mgr && mgr->getMDSSAInfo(opnd) &&
         mgr->getMDSSAInfo(opnd)->getVOpndSet()->get_elem_count() == 1);
 
-    SEGIter * iter;
+    VOpndSetIter iter = NULL;
     VMD * vopnd = (VMD*)mgr->getVOpnd(mgr->getMDSSAInfo(opnd)->
         getVOpndSet()->get_first(&iter));
     ASSERT0(vopnd->is_md());
@@ -250,7 +250,8 @@ void MDPhi::dump(Region * rg, UseDefMgr * mgr)
     ASSERT0(getResult());
     prt("Phi: MD%dV%d <- ",
         getResult()->mdid(), getResult()->version());
-    for (IR const* opnd = getOpndList(); opnd != NULL; opnd = opnd->get_next()) {
+    for (IR const* opnd = getOpndList();
+         opnd != NULL; opnd = opnd->get_next()) {
         if (opnd != getOpndList()) {
             prt(", ");
         }
@@ -279,7 +280,7 @@ void MDPhi::dump(Region * rg, UseDefMgr * mgr)
     VMD * res = getResult();
     ASSERT0(res);
     prt("|UsedBy:");
-    SEGIter * vit = NULL;
+    IRSetIter vit = NULL;
     bool first = true;
     for (INT i2 = res->getUseSet()->get_first(&vit);
         i2 >= 0; i2 = res->getUseSet()->get_next(i2, &vit)) {
@@ -310,14 +311,16 @@ UseDefMgr::UseDefMgr(Region * rg, MDSSAMgr * mgr) : m_rg(rg), m_mdssa_mgr(mgr)
     m_sbs_mgr = m_rg->getMiscBitSetMgr();
 
     //Single List Core need user declared a mempool.
-    m_vopnd_sc_pool = smpoolCreate(sizeof(xcom::SC<VOpnd*>) * 4, MEM_CONST_SIZE);
+    m_vopnd_sc_pool = smpoolCreate(sizeof(xcom::SC<VOpnd*>) * 4,
+        MEM_CONST_SIZE);
     m_phi_pool = smpoolCreate(sizeof(MDPhi) * 2, MEM_CONST_SIZE);
     m_def_pool = smpoolCreate(sizeof(MDDef) * 2, MEM_CONST_SIZE);
     m_defset_pool = smpoolCreate(sizeof(MDDefSet) * 2, MEM_CONST_SIZE);
     m_vconst_pool = smpoolCreate(sizeof(VConst)*2, MEM_CONST_SIZE);
     m_vmd_pool = smpoolCreate(sizeof(VMD)*2, MEM_CONST_SIZE);
     m_philist_pool = smpoolCreate(sizeof(MDPhiList)*2, MEM_CONST_SIZE);
-    m_philist_sc_pool = smpoolCreate(sizeof(xcom::SC<MDPhi*>) * 4, MEM_CONST_SIZE);
+    m_philist_sc_pool = smpoolCreate(sizeof(xcom::SC<MDPhi*>) * 4,
+        MEM_CONST_SIZE);
     m_mdssainfo_pool = smpoolCreate(sizeof(MDSSAInfo)*2, MEM_CONST_SIZE);
 
     m_free_sc_list = NULL;
@@ -416,14 +419,16 @@ void UseDefMgr::cleanOrDestroy(bool is_reinit)
     smpoolDelete(m_mdssainfo_pool);
 
     if (is_reinit) {
-        m_vopnd_sc_pool = smpoolCreate(sizeof(xcom::SC<VOpnd*>) * 4, MEM_CONST_SIZE);
+        m_vopnd_sc_pool = smpoolCreate(sizeof(xcom::SC<VOpnd*>) * 4,
+            MEM_CONST_SIZE);
         m_phi_pool = smpoolCreate(sizeof(MDPhi) * 2, MEM_CONST_SIZE);
         m_def_pool = smpoolCreate(sizeof(MDDef) * 2, MEM_CONST_SIZE);
         m_defset_pool = smpoolCreate(sizeof(MDDefSet) * 2, MEM_CONST_SIZE);
         m_vmd_pool = smpoolCreate(sizeof(VMD) * 2, MEM_CONST_SIZE);
         m_vconst_pool = smpoolCreate(sizeof(VConst)*2, MEM_CONST_SIZE);
         m_philist_pool = smpoolCreate(sizeof(MDPhiList)*2, MEM_CONST_SIZE);
-        m_philist_sc_pool = smpoolCreate(sizeof(xcom::SC<MDPhi*>) * 4, MEM_CONST_SIZE);
+        m_philist_sc_pool = smpoolCreate(sizeof(xcom::SC<MDPhi*>) * 4,
+            MEM_CONST_SIZE);
         m_mdssainfo_pool = smpoolCreate(sizeof(MDSSAInfo)*4, MEM_CONST_SIZE);
     }
 }

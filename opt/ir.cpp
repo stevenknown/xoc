@@ -411,8 +411,7 @@ bool verifyIRandBB(BBList * bblst, Region const* rg)
     for (IRBB * bb = bblst->get_head();
          bb != NULL; bb = bblst->get_next()) {
         bool should_not_phi = false;
-
-        xcom::C<IR*> * irct;
+        IRListIter irct;
         for (IR * ir = BB_irlist(bb).get_head(&irct);
              ir != NULL; ir = BB_irlist(bb).get_next(&irct)) {
             ASSERT0(ir->is_single());
@@ -2586,7 +2585,7 @@ void IR::invertLor(Region * rg)
 //This function only handle Call/ICall stmt, it find PR and remove
 //them out of UseSet.
 //Note this function does not maintain DU chain between call and its use.
-void IR::removePROutFromUseset(DefMiscBitSetMgr & sbs_mgr, Region * rg)
+void IR::removePRFromUseset(DefMiscBitSetMgr & sbs_mgr, Region * rg)
 {
     ASSERT0(isCallStmt() && rg);
     DUSet * useset = getDUSet();
@@ -2617,7 +2616,6 @@ static void removeSSAUseRecur(IR * ir)
             SSA_uses(ssainfo).remove(ir);
         }
     }
-
     for (UINT i = 0; i < IR_MAX_KID_NUM(ir); i++) {
         for (IR * x = ir->getKid(i); x != NULL; x = x->get_next()) {
             if (x->is_pr()) {
@@ -2637,10 +2635,10 @@ static void removeSSAUseRecur(IR * ir)
 }
 
 
-//Remove SSA use-def chain.
-//e.g: pr1=...
-//    =pr1 //S1
-//If S1 will be deleted, pr1 should be removed from its SSA_uses.
+//Remove PRSSA Use-Def chain.
+//e.g:pr1=...
+//    ...=pr1 //S1
+//If S1 deleted, pr1 should be removed from its SSA_uses.
 void IR::removeSSAUse()
 {
     removeSSAUseRecur(this);
@@ -2709,7 +2707,7 @@ void IR::dumpRef(Region * r, UINT indent)
         CallGraph * callg = r->getRegionMgr()->getCallGraph();
         if (callg != NULL) {
             Region * rg = callg->mapCall2Region(this, r);
-            if (rg != NULL && REGION_is_mddu_valid(rg)) {
+            if (rg != NULL && rg->is_ref_valid()) {
                 MDSet const* muse = rg->getMayUse();
                 //May use
                 prt(" <-- ");
@@ -3259,8 +3257,9 @@ void dumpGR(IR const* ir, TypeMgr * tm, DumpGRCtx * ctx)
         {
             List<IRBB*> preds;
             ctx->cfg->get_preds(preds, ir->getBB());
-            xcom::C<IRBB*> * bbct = NULL;
-            ASSERT0(preds.get_elem_count() == xcom::cnt_list(PHI_opnd_list(ir)));
+            BBListIter bbct = NULL;
+            ASSERT0(preds.get_elem_count() ==
+                    xcom::cnt_list(PHI_opnd_list(ir)));
             preds.get_head(&bbct);
             for (IR * opnd = PHI_opnd_list(ir);
                  opnd != NULL;
@@ -3423,7 +3422,7 @@ void dumpGRList(IR * irlist, TypeMgr * tm, DumpGRCtx * ctx)
 void dumpGRInBBList(List<IRBB*> * bblist, TypeMgr * tm, DumpGRCtx * ctx)
 {
     ASSERT0(bblist);
-    xcom::C<IRBB*> * bbct = NULL;
+    BBListIter bbct = NULL;
     for (bblist->get_head(&bbct);
          bbct != bblist->end(); bbct = bblist->get_next(bbct)) {
         IRBB * bb = bbct->val();
@@ -3438,7 +3437,7 @@ void dumpGRInBBList(List<IRBB*> * bblist, TypeMgr * tm, DumpGRCtx * ctx)
             prt(";");
         }
 
-        xcom::C<IR*> * irct = NULL;
+        IRListIter irct = NULL;
         for (BB_irlist(bb).get_head(&irct);
              irct != BB_irlist(bb).end(); irct = BB_irlist(bb).get_next(irct)) {
             IR * ir = irct->val();
@@ -3490,8 +3489,10 @@ bool IR::isNotOverLap(IR const* ir2, Region * rg) const
     ASSERT0(rg);
     IR const* ir1 = this;
     ASSERT0(ir1 && ir2);
-    ASSERT0(ir1->hasOffset() && ir2->hasOffset());
-    if (!ir1->getType()->is_scalar() || !ir2->getType()->is_scalar()) {
+    if (!ir1->getType()->is_scalar() ||
+        !ir2->getType()->is_scalar() ||
+        !ir1->hasOffset() ||
+        !ir2->hasOffset()) {
         return false;
     }
     UINT offset1 = ir1->getOffset();

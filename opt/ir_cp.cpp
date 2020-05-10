@@ -200,7 +200,7 @@ void CopyProp::replaceExp(IR * exp,
     } else if (exp_mdssainfo != NULL) {
         //Remove exp MD SSA use.
         ASSERT0(mdssamgr);
-        mdssamgr->removeMDSSAUseRecur(exp);
+        mdssamgr->removeMDSSAUse(exp);
         if (exp->is_id()) {
             ASSERT0(ID_phi(exp));
             ID_phi(exp)->replaceOpnd(exp, newir);
@@ -210,8 +210,7 @@ void CopyProp::replaceExp(IR * exp,
             DUMMYUSE(doit);
         }
 
-        MDSSAInfo * cand_exp_mdssainfo =
-            mdssamgr->getMDSSAInfoIfAny(cand_expr);
+        MDSSAInfo * cand_exp_mdssainfo = mdssamgr->getMDSSAInfoIfAny(cand_expr);
         if (cand_exp_mdssainfo != NULL) {
             //CASE:copy MDSSAInfo from cand_exp to newir.
             // .. = cand_exp
@@ -219,7 +218,7 @@ void CopyProp::replaceExp(IR * exp,
             mdssamgr->getUseDefMgr()->setMDSSAInfo(newir, cand_exp_mdssainfo);
             mdssamgr->addMDSSAOcc(newir, cand_exp_mdssainfo);
             //Remove 'exp' from OccSet of def_stmt of 'exp'.
-            mdssamgr->removeMDSSAUseRecur(exp);
+            mdssamgr->removeMDSSAUse(exp);
         }
 
         //To take care of classic DU info that used/maintained by
@@ -293,7 +292,7 @@ bool CopyProp::is_available(IR const* def_stmt,
     }
 
     //Both def_ir and use_ir are in same BB.
-    xcom::C<IR*> * ir_holder = NULL;
+    IRListIter ir_holder = NULL;
     bool f = BB_irlist(defbb).find(const_cast<IR*>(def_stmt), &ir_holder);
     CHECK_DUMMYUSE(f);
     IR * ir;
@@ -323,7 +322,7 @@ bool CopyProp::is_available(IR const* def_stmt,
         IRBB * t = wl.remove_head();
         if (t == defbb) { continue; }
 
-        xcom::C<IR*> * tir_holder = NULL;
+        IRListIter tir_holder = NULL;
         for (IR * tir = BB_irlist(t).get_head(&tir_holder);
              tir != NULL; tir = BB_irlist(t).get_next(&tir_holder)) {
             if (m_du->is_may_def(tir, prop_value, false)) {
@@ -334,7 +333,7 @@ bool CopyProp::is_available(IR const* def_stmt,
         visited.bunion(t->id());
         for (xcom::EdgeC * el = VERTEX_in_list(m_cfg->getVertex(t->id()));
              el != NULL; el = EC_next(el)) {
-            INT pred = VERTEX_id(EDGE_from(EC_edge(el)));
+            INT pred = el->getFromId();
             if (!visited.is_contain(pred)) {
                 wl.append_tail(m_cfg->getBB(pred));
             }
@@ -410,16 +409,16 @@ bool CopyProp::doPropToMDPhi(bool prssadu,
 
 
 //'usevec': for local used.
-bool CopyProp::doPropToNormalStmt(xcom::C<IR*> * cur_iter,
-                               xcom::C<IR*> ** next_iter,
-                               bool prssadu,
-                               bool mdssadu,
-                               IN IR const* prop_value,
-                               IN IR * use,
-                               IN IR * use_stmt,
-                               IN IRBB * def_bb,
-                               IN OUT IRBB * use_bb,
-                               MDSSAMgr * mdssamgr)
+bool CopyProp::doPropToNormalStmt(IRListIter cur_iter,
+                                  IRListIter* next_iter,
+                                  bool prssadu,
+                                  bool mdssadu,
+                                  IN IR const* prop_value,
+                                  IN IR * use,
+                                  IN IR * use_stmt,
+                                  IN IRBB * def_bb,
+                                  IN OUT IRBB * use_bb,
+                                  MDSSAMgr * mdssamgr)
 {
     bool change = false;
     CPCtx lchange;
@@ -446,7 +445,7 @@ bool CopyProp::doPropToNormalStmt(xcom::C<IR*> * cur_iter,
         //old_use_stmt has been removed and new stmt generated.
         ASSERTN(old_use_stmt->is_undef(), ("the old one should be freed"));
 
-        xcom::C<IR*> * irct = NULL;
+        IRListIter irct = NULL;
         BB_irlist(use_bb).find(old_use_stmt, &irct);
         ASSERTN(irct, ("old one should still left in BB"));
         BB_irlist(use_bb).insert_before(use_stmt, irct);
@@ -494,11 +493,11 @@ void CopyProp::dumpCopyPropagationAction(IR const* def_stmt,
 
 
 //bool CopyProp::isAllVMDReachAllUse(IR * ir,
-//                                MDSSAInfo * mdssainfo,
-//                                IN DefSBitSetCore & useset)
+//                                   MDSSAInfo * mdssainfo,
+//                                   IN DefSBitSetCore & useset)
 //{
 //    ASSERT0(ir && ir->isMemoryRef() && mdssainfo);
-//    SEGIter * segiter;
+//    DefSBitSetIter segiter;
 //    for (INT i = useset.get_first(&segiter);
 //         i != -1; i = useset.get_next(i, &segiter)) {
 //        IR * use = m_rg->getIR(i);
@@ -513,12 +512,12 @@ void CopyProp::dumpCopyPropagationAction(IR const* def_stmt,
 
 //'usevec': for local used.
 bool CopyProp::doProp(IN IRBB * bb,
-                   IN DefSBitSetCore * useset,
-                   MDSSAMgr * mdssamgr)
+                      IN DefSBitSetCore * useset,
+                      MDSSAMgr * mdssamgr)
 {
     bool change = false;
-    xcom::C<IR*> * cur_iter, * next_iter;
-
+    IRListIter cur_iter;
+    IRListIter next_iter;
     for (BB_irlist(bb).get_head(&cur_iter),
          next_iter = cur_iter; cur_iter != NULL; cur_iter = next_iter) {
         IR * def_stmt = cur_iter->val();
@@ -546,7 +545,7 @@ bool CopyProp::doProp(IN IRBB * bb,
         if (ssainfo != NULL && SSA_uses(ssainfo).get_elem_count() != 0) {
             //Record use_stmt in another vector to facilitate this function
             //if it is not in use-list any more after copy-propagation.
-            SEGIter * sc;
+            SSAUseIter sc;
             for (INT u = SSA_uses(ssainfo).get_first(&sc);
                  u >= 0; u = SSA_uses(ssainfo).get_next(u, &sc)) {
                 IR * use = m_rg->getIR(u);
@@ -578,7 +577,7 @@ bool CopyProp::doProp(IN IRBB * bb,
             continue;
         }
 
-        xcom::SEGIter * segiter;
+        DefSBitSetIter segiter;
         for (INT i = useset->get_first(&segiter);
              i != -1; i = useset->get_next(i, &segiter)) {
             IR * use = m_rg->getIR(i);
@@ -660,11 +659,11 @@ bool CopyProp::doProp(IN IRBB * bb,
 }
 
 
-void CopyProp::doFinalRefine()
+void CopyProp::doFinalRefine(OptCtx & oc)
 {
     RefineCtx rf;
     RC_insert_cvt(rf) = false;
-    m_rg->refineBBlist(m_rg->getBBList(), rf);
+    m_rg->refineBBlist(m_rg->getBBList(), rf, oc);
 }
 
 
@@ -672,17 +671,18 @@ bool CopyProp::perform(OptCtx & oc)
 {
     START_TIMER(t, getPassName());
     ASSERT0(OC_is_cfg_valid(oc));
-    bool is_org_du_chain_valid = OC_is_du_chain_valid(oc);
+    bool is_org_pr_du_chain_valid = OC_is_pr_du_chain_valid(oc);
+    bool is_org_nonpr_du_chain_valid = OC_is_nonpr_du_chain_valid(oc);
     m_rg->checkValidAndRecompute(&oc, PASS_DOM, PASS_DU_REF, PASS_UNDEF);
 
-    PRSSAMgr * prssamgr = (PRSSAMgr*)m_rg->getPassMgr()->
-        registerPass(PASS_PR_SSA_MGR);
+    PRSSAMgr * prssamgr = (PRSSAMgr*)m_rg->getPassMgr()->registerPass(
+        PASS_PR_SSA_MGR);
     if (!prssamgr->isSSAConstructed()) {
         prssamgr->construction(oc);
     }
 
-    MDSSAMgr * mdssamgr = (MDSSAMgr*)m_rg->getPassMgr()->
-        registerPass(PASS_MD_SSA_MGR);
+    MDSSAMgr * mdssamgr = (MDSSAMgr*)m_rg->getPassMgr()->registerPass(
+        PASS_MD_SSA_MGR);
     if (!mdssamgr->isMDSSAConstructed()) {
         mdssamgr->construction(oc);
     }
@@ -698,14 +698,14 @@ bool CopyProp::perform(OptCtx & oc)
     DefSBitSetCore useset;
 
     for (xcom::Vertex * v = lst.get_head(); v != NULL; v = lst.get_next()) {
-        IRBB * bb = m_cfg->getBB(VERTEX_id(v));
+        IRBB * bb = m_cfg->getBB(v->id());
         ASSERT0(bb);
         change |= doProp(bb, &useset, mdssamgr);
     }
     useset.clean(*m_rg->getMiscBitSetMgr());
     if (change) {
         ASSERT0(mdssamgr == NULL || mdssamgr->verify());
-        doFinalRefine();
+        doFinalRefine(oc);
     }
     END_TIMER(t, getPassName());
 
@@ -717,21 +717,23 @@ bool CopyProp::perform(OptCtx & oc)
     ASSERT0(m_rg->verifyMDRef());
     if (mdssamgr != NULL && mdssamgr->isMDSSAConstructed()) {
         ASSERT0(mdssamgr->verify());
-        OC_is_du_chain_valid(oc) = false; //not update.
+        OC_is_nonpr_du_chain_valid(oc) = false; //not update.
     } else {
         //Use classic DU chain.
-        m_du->verifyMDDUChain(COMPUTE_PR_DU | COMPUTE_NONPR_DU);
-        OC_is_du_chain_valid(oc) = true; //already update.
+        m_du->verifyMDDUChain(DUOPT_COMPUTE_PR_DU | DUOPT_COMPUTE_NONPR_DU);
+        OC_is_pr_du_chain_valid(oc) = true; //already update.
+        OC_is_nonpr_du_chain_valid(oc) = true; //already update.
     }
     
     if (prssamgr != NULL && prssamgr->isSSAConstructed()) {
         //Use PRSSA.
         ASSERT0(verifySSAInfo(m_rg));
-        OC_is_du_chain_valid(oc) = false; //not update.
+        OC_is_pr_du_chain_valid(oc) = false; //not update.
     } else {
         //Use classic DU chain.
         //Keep DU chain unchanged.
-        ASSERT0(OC_is_du_chain_valid(oc) == is_org_du_chain_valid);
+        ASSERT0(OC_is_pr_du_chain_valid(oc) == is_org_pr_du_chain_valid);
+        ASSERT0(OC_is_nonpr_du_chain_valid(oc) == is_org_nonpr_du_chain_valid);
     }    
     return true;
 }

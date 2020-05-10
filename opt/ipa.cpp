@@ -33,8 +33,6 @@ author: Su Zhenyu
 @*/
 #include "cominc.h"
 #include "comopt.h"
-#include "callg.h"
-#include "ipa.h"
 
 namespace xoc {
 
@@ -50,11 +48,9 @@ Region * IPA::findRegion(IR * call, Region * callru)
 
     //Iterate accessing successors.
     ASSERT0(cg->getVertex(CN_id(callercn)));
-    for (xcom::EdgeC const* ec =
-             VERTEX_out_list(cg->getVertex(CN_id(callercn)));
-         ec != NULL; ec = EC_next(ec)) {
-        CallNode * calleecn = cg->mapId2CallNode(
-            VERTEX_id(EDGE_to(EC_edge(ec))));
+    for (xcom::EdgeC const* ec = cg->getVertex(CN_id(callercn))->getOutList();
+         ec != NULL; ec = ec->get_next()) {
+        CallNode * calleecn = cg->mapId2CallNode(ec->getToId());
         ASSERT0(calleecn);
 
         Region * callee = CN_ru(calleecn);
@@ -88,7 +84,7 @@ void IPA::createCallDummyuse(IR * call, Region * callru)
     MDSet const* callermaydef = callru->getMayDef();
     if (callermaydef == NULL || callermaydef->is_empty()) { return; }
 
-    SEGIter * iter;
+    MDSetIter iter;
     IR * last = NULL;
     for (INT j = mayuse->get_first(&iter);
          j >= 0; j = mayuse->get_next(j, &iter)) {
@@ -149,7 +145,7 @@ void IPA::computeCallRefForAllRegion()
         DUMgr * dumgr = (DUMgr*)rg->getPassMgr()->
             registerPass(PASS_DU_MGR);
         ASSERT0(dumgr);
-        dumgr->computeCallRef(COMPUTE_PR_DU|COMPUTE_NONPR_DU);
+        dumgr->computeCallRef(DUOPT_COMPUTE_PR_DU|DUOPT_COMPUTE_NONPR_DU);
         rg->getPassMgr()->destroyPass(dumgr);
         rg->getPassMgr()->destroyPass(aa);
     }
@@ -163,7 +159,6 @@ void IPA::createCallDummyuse(OptCtx & oc)
         Region * rg = m_rumgr->getRegion(i);
         if (rg == NULL) { continue; }
         createCallDummyuse(rg);
-
         if (g_compute_classic_du_chain) {
             OptCtx * loc = m_rumgr->getAndGenOptCtx(rg->id());
             ASSERT0(loc);
@@ -173,9 +168,9 @@ void IPA::createCallDummyuse(OptCtx & oc)
             }
         }
     }
-
     if (g_compute_classic_du_chain) {
-        OC_is_du_chain_valid(oc) = true;
+        OC_is_pr_du_chain_valid(oc) = true;
+        OC_is_nonpr_du_chain_valid(oc) = true;
         if (m_is_keep_reachdef) {
             OC_is_reach_def_valid(oc) = true;
         }
@@ -187,8 +182,7 @@ void IPA::recomputeDUChain(Region * rg, OptCtx & oc)
 {
     ASSERT0(rg);
     if (rg->getIRList() == NULL &&
-        (rg->getBBList() == NULL ||
-         rg->getBBList()->get_elem_count() == 0)) {
+        (rg->getBBList() == NULL || rg->getBBList()->get_elem_count() == 0)) {
         return;
     }
     if (rg->getPassMgr() == NULL) {
@@ -201,21 +195,18 @@ void IPA::recomputeDUChain(Region * rg, OptCtx & oc)
     if (g_do_md_ssa) {
         //Build MD SSA du chain.
         if (m_is_recompute_du_ref) {
-            rg->checkValidAndRecompute(&oc,
-                PASS_DU_REF,
-                PASS_CFG,
-                PASS_UNDEF);
+            rg->checkValidAndRecompute(&oc, PASS_DU_REF, PASS_CFG, PASS_UNDEF);
         }
 
         //Compute typical PR du chain.
-        DUMgr * dumgr = (DUMgr*)rg->getPassMgr()->
-            registerPass(PASS_DU_MGR);
+        DUMgr * dumgr = (DUMgr*)rg->getPassMgr()->registerPass(
+            PASS_DU_MGR);
         ASSERT0(dumgr);
-        dumgr->perform(oc, SOL_REACH_DEF|COMPUTE_PR_DU);
-        dumgr->computeMDDUChain(oc, false, COMPUTE_PR_DU);
+        dumgr->perform(oc, DUOPT_SOL_REACH_DEF|DUOPT_COMPUTE_PR_DU);
+        dumgr->computeMDDUChain(oc, false, DUOPT_COMPUTE_PR_DU);
 
-        MDSSAMgr * mdssamgr = (MDSSAMgr*)rg->getPassMgr()->
-            registerPass(PASS_MD_SSA_MGR);
+        MDSSAMgr * mdssamgr = (MDSSAMgr*)rg->getPassMgr()->registerPass(
+            PASS_MD_SSA_MGR);
         ASSERT0(mdssamgr);
         if (!mdssamgr->isMDSSAConstructed()) {
             mdssamgr->construction(oc);
@@ -226,31 +217,19 @@ void IPA::recomputeDUChain(Region * rg, OptCtx & oc)
     //Build classic du chain.
     if (m_is_recompute_du_ref) {
         if (m_is_keep_reachdef) {
-            rg->checkValidAndRecompute(&oc,
-                    PASS_REACH_DEF,
-                    PASS_DU_REF,
-                    PASS_CFG,
-                    PASS_DU_CHAIN,
-                    PASS_UNDEF);
+            rg->checkValidAndRecompute(&oc, PASS_REACH_DEF, PASS_DU_REF,
+                PASS_CFG, PASS_DU_CHAIN, PASS_UNDEF);
         } else {
-            rg->checkValidAndRecompute(&oc,
-                    PASS_DU_REF,
-                    PASS_CFG,
-                    PASS_DU_CHAIN,
-                    PASS_UNDEF);
+            rg->checkValidAndRecompute(&oc, PASS_DU_REF, PASS_CFG,
+                PASS_DU_CHAIN, PASS_UNDEF);
         }
     } else {
         if (m_is_keep_reachdef) {
-            rg->checkValidAndRecompute(&oc,
-                    PASS_REACH_DEF,
-                    PASS_CFG,
-                    PASS_DU_CHAIN,
-                    PASS_UNDEF);
+            rg->checkValidAndRecompute(&oc, PASS_REACH_DEF, PASS_CFG,
+                PASS_DU_CHAIN, PASS_UNDEF);
         } else {
-            rg->checkValidAndRecompute(&oc,
-                    PASS_CFG,
-                    PASS_DU_CHAIN,
-                    PASS_UNDEF);
+            rg->checkValidAndRecompute(&oc, PASS_CFG, PASS_DU_CHAIN,
+                PASS_UNDEF);
         }
     }
 }

@@ -1890,7 +1890,7 @@ public:
     void set_pool(SMemPool * pool)
     {
         ASSERTN(pool == NULL || MEMPOOL_type(pool) == MEM_CONST_SIZE,
-               ("need const size pool"));
+                ("need const size pool"));
         m_free_list_pool = pool;
         m_free_list = NULL;
     }

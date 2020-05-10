@@ -116,7 +116,7 @@ public:
     virtual void computeExitList()
     {
         //Clean the Exit flag.
-        xcom::C<IRBB*> * ct = NULL;
+        BBListIter ct = NULL;
         for (m_exit_list.get_head(&ct);
              ct != m_exit_list.end();
              ct = m_exit_list.get_next(ct)) {
@@ -165,9 +165,9 @@ public:
     bool isRegionEntry(IRBB * bb) { return BB_is_entry(bb); }
     bool isRegionExit(IRBB * bb) { return BB_is_exit(bb); }
     void insertBBbetween(IN IRBB * from,
-                         IN xcom::C<IRBB*> * from_ct,
+                         IN BBListIter from_ct,
                          IN IRBB * to,
-                         IN xcom::C<IRBB*> * to_ct,
+                         IN BBListIter to_ct,
                          IN IRBB * newbb);
     bool inverseAndRemoveTrampolineBranch();
 
@@ -200,6 +200,7 @@ public:
     //Compute which predecessor is pred to bb.
     //e.g: If pred is the first predecessor, return 0.
     //pred: BB id of predecessor.
+    //Note 'pred' must be one of predecessors of 'bb'.
     UINT WhichPred(IRBB const* pred, IRBB const* bb) const
     {
         xcom::Vertex * bb_vex = getVertex(BB_id(bb));
@@ -209,8 +210,8 @@ public:
         bool find = false;
         for (xcom::EdgeC * in = VERTEX_in_list(bb_vex);
              in != NULL; in = EC_next(in)) {
-            xcom::Vertex * local_pred_vex = EDGE_from(EC_edge(in));
-            if (VERTEX_id(local_pred_vex) == BB_id(pred)) {
+            xcom::Vertex * local_pred_vex = in->getFrom();
+            if (local_pred_vex->id() == BB_id(pred)) {
                 find = true;
                 break;
             }

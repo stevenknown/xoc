@@ -211,13 +211,14 @@ UINT g_thres_opt_bb_num = 100000;
 
 //Record the maximum limit of the number of
 //PtPair to perform flow sensitive analysis.
-UINT g_thres_flow_sensitive_aa = 10000;
+UINT g_thres_ptpair_num = 10000;
 
 //Record the maximum limit of the number of IR to perform optimizations.
 //This is the threshold to do optimization.
 UINT g_thres_opt_ir_num = 30000;
 
-//Record the maximum limit of the number of IR in single to perform optimizations.
+//Record the maximum limit of the number of IR in single to
+//perform optimizations.
 //This is the threshold to do optimization.
 UINT g_thres_opt_ir_num_in_bb = 10000;
 
@@ -266,6 +267,9 @@ bool g_is_search_and_copy_dbx = true;
 
 //Record dump options for each Pass.
 DumpOpt g_dump_opt;
+
+//Redirect output information to stdout to dump file if exist.
+bool g_redirect_stdout_to_dump_file = false;
 
 DumpOpt::DumpOpt()
 {

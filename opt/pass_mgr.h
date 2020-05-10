@@ -48,6 +48,10 @@ public:
     COPY_CONSTRUCTOR(TimeInfo);
 };
 
+typedef TMap<PASS_TYPE, Pass*> PassTab;
+typedef TMapIter<PASS_TYPE, Pass*> PassTabIter;
+typedef TMap<PASS_TYPE, xcom::Graph*> GraphPassTab;
+typedef TMapIter<PASS_TYPE, xcom::Graph*> GraphPassTabIter;
 
 class PassMgr {
 protected:
@@ -57,8 +61,8 @@ protected:
     RegionMgr * m_rumgr;
     TypeMgr * m_tm;
     CDG * m_cdg;
-    TMap<PASS_TYPE, Pass*> m_registered_pass;
-    TMap<PASS_TYPE, xcom::Graph*> m_registered_graph_based_pass;
+    PassTab m_registered_pass;
+    GraphPassTab m_registered_graph_based_pass;
 
 protected:
     void * xmalloc(size_t size)

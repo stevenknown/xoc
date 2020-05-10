@@ -943,10 +943,10 @@ void GltMgr::localize(GLT * g)
         DefSBitSetCore * livein = m_liveness_mgr->get_livein(j);
         DefSBitSetCore * liveout = m_liveness_mgr->get_liveout(j);
         if (livein != NULL) {
-            livein->diff(prno, m_liveness_mgr->getMiscBitSetMgr());
+            livein->diff(prno, *m_liveness_mgr->getSBSMgr());
         }
         if (liveout != NULL) {
-            liveout->diff(prno, m_liveness_mgr->getMiscBitSetMgr());
+            liveout->diff(prno, *m_liveness_mgr->getSBSMgr());
         }
         LT * gl = ltm->map_pr2lt(prno);
         ASSERT0(gl); //glt miss local part.
@@ -996,10 +996,10 @@ GLT * GltMgr::buildGltLike(IR * pr, GLT * cand)
             DefSBitSetCore * livein = m_liveness_mgr->get_livein(j);
             DefSBitSetCore * liveout = m_liveness_mgr->get_liveout(j);
             if (livein != NULL && livein->is_contain(candprno)) {
-                livein->bunion(prno, m_liveness_mgr->getMiscBitSetMgr());
+                livein->bunion(prno, *m_liveness_mgr->getSBSMgr());
             }
             if (liveout != NULL && liveout->is_contain(candprno)) {
-                liveout->bunion(prno, m_liveness_mgr->getMiscBitSetMgr());
+                liveout->bunion(prno, *m_liveness_mgr->getSBSMgr());
             }
         }
     }
@@ -1377,19 +1377,18 @@ void GIG::dumpVCG(CHAR const* name)
     INT c;
     for (Vertex const* v = m_vertices.get_first(c);
          v != NULL; v = m_vertices.get_next(c)) {
-        GLT * glt = m_gltm->get_glt(VERTEX_id(v));
-        buf.sprint("GLT%d(pr%d):", VERTEX_id(v), GLT_prno(glt));
+        GLT * glt = m_gltm->get_glt(v->id());
+        buf.sprint("GLT%d(pr%d):", v->id(), GLT_prno(glt));
         fprintf(h, "\nnode: { title:\"%d\" label:\"%s\" "
                    "shape:circle fontname:\"courB\" color:gold}",
-                VERTEX_id(v), buf.buf);
+                v->id(), buf.buf);
     }
 
     //Print edge
     for (xcom::Edge const* e = m_edges.get_first(c);
          e != NULL;  e = m_edges.get_next(c)) {
         fprintf(h, "\nedge: { sourcename:\"%d\" targetname:\"%d\" %s}",
-                VERTEX_id(EDGE_from(e)),
-                VERTEX_id(EDGE_to(e)),
+                e->from()->id(), e->to()->id(),
                 m_is_direction ? "" : "arrowstyle:none" );
     }
 
@@ -1459,10 +1458,10 @@ bool GIG::is_interf(IN GLT * glt1, IN GLT * glt2)
 //Set glt interfered with a list of glt.
 void GIG::set_interf_with(UINT gltid, List<UINT> & lst)
 {
-    ASSERTN(m_vertices.find((OBJTY)gltid), ("not on graph"));
+    ASSERTN(m_vertices.find((OBJTY)(ULONGLONG)gltid), ("not on graph"));
     UINT n = lst.get_elem_count();
     for (UINT i = lst.get_head(); n > 0; i = lst.get_next(), n--) {
-        ASSERTN(m_vertices.find((OBJTY)i), ("not on graph"));
+        ASSERTN(m_vertices.find((OBJTY)(ULONGLONG)i), ("not on graph"));
         addEdge(gltid, i);
     }
 }
@@ -1530,12 +1529,12 @@ void IG::get_neighbor(OUT List<LT*> & nis, LT * lt) const
     nis.clean();
     //Ensure VertexHash::find is readonly.
     IG * pthis = const_cast<IG*>(this);
-    Vertex * vex  = pthis->m_vertices.find((OBJTY)LT_uid(lt));
+    Vertex * vex  = pthis->m_vertices.find((OBJTY)(ULONGLONG)LT_uid(lt));
     if (vex == NULL) return;
 
     xcom::EdgeC * el = VERTEX_in_list(vex);
     while (el != NULL) {
-        INT v = VERTEX_id(EDGE_from(EC_edge(el)));
+        INT v = el->getFromId();
         LT * ni = m_ltm->getLifeTime(v);
         ASSERT0(ni);
         if (!nis.find(ni)) {
@@ -1546,13 +1545,13 @@ void IG::get_neighbor(OUT List<LT*> & nis, LT * lt) const
 
     el = VERTEX_out_list(vex);
     while (el != NULL) {
-        INT v = VERTEX_id(EDGE_to(EC_edge(el)));
+        INT v = el->getToId();
         LT * ni = m_ltm->getLifeTime(v);
         ASSERT0(ni);
         if (!nis.find(ni)) {
             nis.append_tail(ni);
         }
-        el = EC_next(el);
+        el = el->get_next();
     }
 }
 
@@ -1607,17 +1606,18 @@ void IG::dumpVCG(CHAR const* name)
     INT c;
     for (Vertex const* v = m_vertices.get_first(c);
          v != NULL;  v = m_vertices.get_next(c)) {
-        LT * lt = m_ltm->getLifeTime(VERTEX_id(v));
-        buf.sprint("LT%d(pr%d):", VERTEX_id(v), LT_prno(lt));
-        fprintf(h, "\nnode: { title:\"%d\" label:\"%s\" shape:circle fontname:\"courB\" color:gold}",
-                VERTEX_id(v), buf.buf);
+        LT * lt = m_ltm->getLifeTime(v->id());
+        buf.sprint("LT%d(pr%d):", v->id(), LT_prno(lt));
+        fprintf(h, "\nnode: { title:\"%d\" label:\"%s\" shape:circle"
+                   " fontname:\"courB\" color:gold}",
+                v->id(), buf.buf);
     }
 
     //Print edge
     for (Edge const* e = m_edges.get_first(c);
          e != NULL;  e = m_edges.get_next(c)) {
         fprintf(h, "\nedge: { sourcename:\"%d\" targetname:\"%d\" %s}",
-                VERTEX_id(EDGE_from(e)), VERTEX_id(EDGE_to(e)),
+                e->from()->id(), e->to()->id(),
                 m_is_direction ? "" : "arrowstyle:none" );
     }
 
@@ -4598,7 +4598,7 @@ void RA::reviseRSC()
     }
 
     //Bind the new PR with the specified phy register.
-    TMapIter<IR*, INT> iter2;
+    IR2INTIter iter2;
     INT phy;
     for (IR * ir = pr2phy.get_first(iter2, &phy);
          ir != NULL; ir = pr2phy.get_next(iter2, &phy)) {

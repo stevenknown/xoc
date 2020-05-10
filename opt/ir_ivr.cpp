@@ -32,7 +32,7 @@ IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 author: Su Zhenyu
 @*/
 #include "cominc.h"
-#include "ir_ivr.h"
+#include "comopt.h"
 
 namespace xoc {
 
@@ -293,7 +293,7 @@ void IVR::findBIV(LI<IRBB> const* li,
         ASSERT0(def);
 
         //def stmt is reach-in of loop head.
-        if (m_du->getInReachDef(headi, NULL)->is_contain(def->id())) {
+        if (m_du->genInReachDef(headi, NULL)->is_contain(def->id())) {
             //It looks MD 'i' is biv.
             sdlst.append_head(m_md_sys->getMD(i));
             find = true;
@@ -608,16 +608,44 @@ bool IVR::perform(OptCtx & oc)
         PASS_DU_REF, PASS_DOM, PASS_LOOP_INFO,
         PASS_DU_CHAIN, PASS_RPO, PASS_UNDEF);
 
-    if (!OC_is_du_chain_valid(oc)) {
+    if (!OC_is_ref_valid(oc)) {
+        END_TIMER(t, getPassName());
+        return false;
+    }
+    //Check PR DU chain.
+    PRSSAMgr * ssamgr = (PRSSAMgr*)(m_rg->getPassMgr()->queryPass(
+        PASS_PR_SSA_MGR));
+    if (ssamgr != NULL && ssamgr->isSSAConstructed()) {
+        m_ssamgr = ssamgr;
+    } else {
+        m_ssamgr = NULL;
+    }
+    if (!OC_is_pr_du_chain_valid(oc) && m_ssamgr == NULL) { 
+        //At least one kind of DU chain should be avaiable.
+        END_TIMER(t, getPassName());
+        return false;
+    }
+    //Check NONPR DU chain.
+    MDSSAMgr * mdssamgr = (MDSSAMgr*)(m_rg->getPassMgr()->queryPass(
+        PASS_MD_SSA_MGR));
+    if (mdssamgr != NULL && mdssamgr->isMDSSAConstructed()) {
+        m_mdssamgr = mdssamgr;
+    } else {
+        m_mdssamgr = NULL;
+    }
+    if (!OC_is_nonpr_du_chain_valid(oc) && m_mdssamgr == NULL) {
+        //At least one kind of DU chain should be avaiable.
         END_TIMER(t, getPassName());
         return false;
     }
 
     m_du = (DUMgr*)m_rg->getPassMgr()->queryPass(PASS_DU_MGR);
-
     LI<IRBB> const* li = m_cfg->getLoopInfo();
     clean();
-    if (li == NULL) { return false; }
+    if (li == NULL) {
+        END_TIMER(t, getPassName());
+        return false;
+    }
 
     xcom::BitSet tmp;
     xcom::Vector<UINT> map_md2defcount;

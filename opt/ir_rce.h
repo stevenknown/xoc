@@ -43,6 +43,8 @@ protected:
     IRCFG * m_cfg;
     GVN * m_gvn;
     DUMgr * m_du;
+    PRSSAMgr * m_ssamgr;
+    MDSSAMgr * m_mdssamgr;
 
     //Use GVN info to determine if code is redundant.
     //Note that compute GVN is expensive.

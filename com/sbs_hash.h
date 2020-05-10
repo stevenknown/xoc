@@ -132,7 +132,7 @@ protected:
         fprintf(h, "%d", id);
         if (set == NULL) { return; }
         fprintf(h, " {");
-        SEGIter * iter;
+        SEGIter * iter = NULL;
         for (INT j = set->get_first(&iter); j >= 0;) {
             fprintf(h, "%d", j);
             j = set->get_next((UINT)j, &iter);
@@ -321,7 +321,7 @@ public:
 
     SBitSetCore<BitsPerSeg> const* append(SBitSetCore<BitsPerSeg> const& set)
     {
-        SEGIter * iter;
+        SEGIter * iter = NULL;
         INT id = set.get_first(&iter);
         if (id < 0) { return NULL; }
 
@@ -473,7 +473,7 @@ public:
     //Return true if SBitSetCore pointer has been record in the hash.
     bool find(SBitSetCore<BitsPerSeg> const& set) const
     {
-        SEGIter * iter;
+        SEGIter * iter = NULL;
         INT id = set.get_first(&iter);
         if (id < 0) { return false; }
 

@@ -265,6 +265,7 @@ public:
 
 //Map from IR to INT.
 typedef TMap<IR*, INT> IR2INT;
+typedef TMapIter<IR*, INT> IR2INTIter;
 
 
 //Lifetime Group Mgr

@@ -41,6 +41,8 @@ namespace xoc {
 class LCSE : public Pass {
 protected:
     bool m_enable_filter; //filter determines which expression can be CSE.
+    PRSSAMgr * m_ssamgr;
+    MDSSAMgr * m_mdssamgr;
     Region * m_rg;
     TypeMgr * m_tm;
     ExprTab * m_expr_tab;

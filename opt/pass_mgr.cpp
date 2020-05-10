@@ -70,7 +70,7 @@ void PassMgr::destroyPass(PASS_TYPE passtype)
 
 void PassMgr::destroyAllPass()
 {
-    TMapIter<PASS_TYPE, Pass*> tabiter;
+    PassTabIter tabiter;
     Pass * p;
     for (m_registered_pass.get_first(tabiter, &p);
          p != NULL; m_registered_pass.get_next(tabiter, &p)) {
@@ -78,7 +78,7 @@ void PassMgr::destroyAllPass()
     }
 
     xcom::Graph * opt2;
-    TMapIter<PASS_TYPE, xcom::Graph*> tabiter2;
+    GraphPassTabIter tabiter2;
     for (m_registered_graph_based_pass.get_first(tabiter2, &opt2);
          opt2 != NULL;
          m_registered_graph_based_pass.get_next(tabiter2, &opt2)) {
@@ -443,7 +443,7 @@ void PassMgr::performScalarOpt(OptCtx & oc)
                 ASSERT0(cfg->verify());
             }
             RefineCtx rc;
-            m_rg->refineBBlist(bbl, rc);
+            m_rg->refineBBlist(bbl, rc, oc);
             ASSERT0(m_rg->verifyRPO(oc));
         }
         count++;

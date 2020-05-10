@@ -46,89 +46,16 @@ bool operator == (Float const& a, Float const& b)
     if ((av > 0 && bv < 0) || (av < 0 && bv > 0)) {
         return false;
     }
-    if (av < 0) av = -av;
-    if (bv < 0) bv = -bv;
+    if (av < 0) { av = -av; }
+    if (bv < 0) { bv = -bv; }
     if((av == PRECISION_TYPE(0) && bv <= INFINITESIMAL) ||
-        (bv == PRECISION_TYPE(0) && av <= INFINITESIMAL)) {
+       (bv == PRECISION_TYPE(0) && av <= INFINITESIMAL)) {
         return true;
     }
     if (av > bv) {
         return (av - bv) <= INFINITESIMAL;
     }
     return (bv - av) <= INFINITESIMAL;
-}
-
-
-bool operator < (Float const& a, Float const& b)
-{
-    if (a.m_f < b.m_f) {
-        return true;
-    }
-    return false;
-}
-
-
-bool operator <= (Float const& a, Float const& b)
-{
-    if (a.m_f < b.m_f || a == b) {
-        return true;
-    }
-    return false;
-}
-
-
-bool operator > (Float const& a, Float const& b)
-{
-    if (a.m_f > b.m_f) {
-        return true;
-    }
-    return false;
-}
-
-
-bool operator >= (Float const& a, Float const& b)
-{
-    if (a.m_f > b.m_f || a == b) {
-        return true;
-    }
-    return false;
-}
-
-
-Float operator * (Float const& a, Float const& b)
-{
-    //return Float(integralize(integralize(a.m_f) * integralize(b.m_f)));
-    return Float(a.m_f * b.m_f);
-}
-
-
-Float operator / (Float const& a, Float const& b)
-{
-    //return Float(integralize(integralize(a.m_f) / integralize(b.m_f)));
-    return Float(a.m_f / b.m_f);
-}
-
-
-Float operator + (Float const& a, Float const& b)
-{
-    //return Float(integralize(integralize(a.m_f) + integralize(b.m_f)));
-    return Float(a.m_f + b.m_f);
-}
-
-
-//Subtration operation
-Float operator - (Float const& a, Float const& b)
-{
-    //return Float(integralize(integralize(a.m_f) - integralize(b.m_f)));
-    return Float(a.m_f - b.m_f);
-}
-
-
-//Minus operation
-Float operator - (Float a)
-{
-    a.m_f = -(a.m_f);
-    return a;
 }
 
 

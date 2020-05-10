@@ -36,12 +36,14 @@ author: Su Zhenyu
 
 namespace xoc {
 
+class GVN;
+
 //
 //START MD_LT
 //
-#define MDLT_id(g)            ((g)->id)
-#define MDLT_md(g)            ((g)->md)
-#define MDLT_livebbs(g)       ((g)->livebbs)
+#define MDLT_id(g) ((g)->id)
+#define MDLT_md(g) ((g)->md)
+#define MDLT_livebbs(g) ((g)->livebbs)
 
 class MD_LT {
 public:
@@ -51,15 +53,12 @@ public:
 };
 //END MD_LT
 
-class GVN;
-
 typedef HMap<MD*, MD_LT*> MD2MDLifeTime;
 
-
 class DontPromotTab : public MDSet {
+    COPY_CONSTRUCTOR(DontPromotTab);
     MDSystem * m_md_sys;
     Region * m_rg;
-
 public:
     explicit DontPromotTab(Region * rg)
     {
@@ -67,12 +66,10 @@ public:
         m_rg = rg;
         m_md_sys = rg->getMDSystem();
     }
-    COPY_CONSTRUCTOR(DontPromotTab);
-
     inline bool is_overlap(MD const* md)
     {
         if (MDSet::is_overlap(md, m_rg)) { return true; }
-        SEGIter * iter;
+        MDSetIter iter;
         for (INT i = get_first(&iter); i >= 0; i = get_next(i, &iter)) {
             MD const* t = m_md_sys->getMD(i);
             ASSERT0(t);
@@ -84,29 +81,28 @@ public:
     void dump()
     {
         if (g_tfile == NULL) { return; }
-
         note("\n==---- DUMP Dont Promot Tabel ----==\n");
-        SEGIter * iter;
+        MDSetIter iter;
         for (INT i = get_first(&iter); i >= 0; i = get_next(i, &iter)) {
             MD const* t = m_md_sys->getMD(i);
             ASSERT0(t);
             t->dump(m_md_sys->getTypeMgr());
         }
-
         fflush(g_tfile);
     }
 };
 
-#define RP_UNKNOWN              0
-#define RP_SAME_ARRAY           1
-#define RP_DIFFERENT_ARRAY      2
-#define RP_SAME_OBJ             3
-#define RP_DIFFERENT_OBJ        4
+#define RP_UNKNOWN 0
+#define RP_SAME_ARRAY 1
+#define RP_DIFFERENT_ARRAY 2
+#define RP_SAME_OBJ 3
+#define RP_DIFFERENT_OBJ 4
 
 //Perform Register Promotion.
 //Register Promotion combines multiple memory load of the
-//same memory location into one PR. */
+//same memory location into one PR.
 class RegPromot : public Pass {
+    COPY_CONSTRUCTOR(RegPromot);
 private:
     Vector<MDSet*> m_livein_mds_vec;
     Vector<MDSet*> m_liveout_mds_vec;
@@ -124,6 +120,7 @@ private:
     DUMgr * m_du;
     GVN * m_gvn;
     PRSSAMgr * m_ssamgr;
+    MDSSAMgr * m_mdssamgr;
     xcom::DefMiscBitSetMgr * m_misc_bs_mgr;
     DontPromotTab m_dont_promot;
     xcom::BitSetMgr m_bs_mgr;
@@ -132,83 +129,75 @@ private:
 private:
     UINT analyzeIndirectAccessStatus(IR const* ref1, IR const* ref2);
     UINT analyzeArrayStatus(IR const* ref1, IR const* ref2);
-    void addExactAccess(
-            OUT TMap<MD const*, IR*> & exact_access,
-            OUT List<IR*> & exact_occ_list,
-            MD const* exact_md,
-            IR * ir);
+    void addExactAccess(OUT TMap<MD const*, IR*> & exact_access,
+                        OUT List<IR*> & exact_occ_list,
+                        MD const* exact_md,
+                        IR * ir);
     void addInexactAccess(TTab<IR*> & inexact_access, IR * ir);
 
-    void buildDepGraph(
-            TMap<MD const*, IR*> & exact_access,
-            TTab<IR*> & inexact_access,
-            List<IR*> & exact_occ_list);
+    void buildDepGraph(TMap<MD const*, IR*> & exact_access,
+                       TTab<IR*> & inexact_access,
+                       List<IR*> & exact_occ_list);
 
     void checkAndRemoveInvalidExactOcc(List<IR*> & exact_occ_list);
-    void clobberAccessInList(
-            IR * ir,
-            OUT TMap<MD const*, IR*> & exact_access,
-            OUT List<IR*> & exact_occ_list,
-            OUT TTab<IR*> & inexact_access);
+    void clobberAccessInList(IR * ir,
+                             OUT TMap<MD const*, IR*> & exact_access,
+                             OUT List<IR*> & exact_occ_list,
+                             OUT TTab<IR*> & inexact_access);
     bool checkArrayIsLoopInvariant(IN IR * ir, LI<IRBB> const* li);
     bool checkExpressionIsLoopInvariant(IN IR * ir, LI<IRBB> const* li);
     bool checkIndirectAccessIsLoopInvariant(IN IR * ir, LI<IRBB> const* li);
     void createDelegateInfo(
-            IR * delegate,
-            TMap<IR*, IR*> & delegate2pr,
-            TMap<IR*, SList<IR*>*> & delegate2has_outside_uses_ir_list);
-    void computeOuterDefUse(
-            IR * ref,
-            IR * delegate,
-            TMap<IR*, DUSet*> & delegate2def,
-            TMap<IR*, DUSet*> & delegate2use,
-            DefMiscBitSetMgr * sbs_mgr,
-            LI<IRBB> const* li);
+        IR * delegate,
+        TMap<IR*, IR*> & delegate2pr,
+        TMap<IR*, SList<IR*>*> & delegate2has_outside_uses_ir_list);
+    void computeOuterDefUse(IR * ref,
+                            IR * delegate,
+                            TMap<IR*, DUSet*> & delegate2def,
+                            TMap<IR*, DUSet*> & delegate2use,
+                            DefMiscBitSetMgr * sbs_mgr,
+                            LI<IRBB> const* li);
 
     IRBB * findSingleExitBB(LI<IRBB> const* li);
-    void freeLocalStruct(
-            TMap<IR*, DUSet*> & delegate2use,
-            TMap<IR*, DUSet*> & delegate2def,
-            TMap<IR*, IR*> & delegate2pr,
-            DefMiscBitSetMgr * sbs_mgr);
+    void freeLocalStruct(TMap<IR*, DUSet*> & delegate2use,
+                         TMap<IR*, DUSet*> & delegate2def,
+                         TMap<IR*, IR*> & delegate2pr,
+                         DefMiscBitSetMgr * sbs_mgr);
 
     void handleAccessInBody(
-            IR * ref,
-            IR * delegate,
-            IR const* delegate_pr,
-            TMap<IR*, SList<IR*>*> const& delegate2has_outside_uses_ir_list,
-            OUT TTab<IR*> & restore2mem,
-            OUT List<IR*> & fixup_list,
-            TMap<IR*, IR*> const& delegate2stpr,
-            LI<IRBB> const* li,
-            IRIter & ii);
+        IR * ref,
+        IR * delegate,
+        IR const* delegate_pr,
+        TMap<IR*, SList<IR*>*> const& delegate2has_outside_uses_ir_list,
+        OUT TTab<IR*> & restore2mem,
+        OUT List<IR*> & fixup_list,
+        TMap<IR*, IR*> const& delegate2stpr,
+        LI<IRBB> const* li,
+        IRIter & ii);
     void handleRestore2Mem(
-            TTab<IR*> & restore2mem,
-            TMap<IR*, IR*> & delegate2stpr,
-            TMap<IR*, IR*> & delegate2pr,
-            TMap<IR*, DUSet*> & delegate2use,
-            TMap<IR*, SList<IR*>*> & delegate2has_outside_uses_ir_list,
-            TabIter<IR*> & ti,
-            IRBB * exit_bb);
-    void handlePrelog(
-            IR * delegate,
-            IR * pr,
-            TMap<IR*, IR*> & delegate2stpr,
-            TMap<IR*, DUSet*> & delegate2def,
-            IRBB * preheader);
+        TTab<IR*> & restore2mem,
+        TMap<IR*, IR*> & delegate2stpr,
+        TMap<IR*, IR*> & delegate2pr,
+        TMap<IR*, DUSet*> & delegate2use,
+        TMap<IR*, SList<IR*>*> & delegate2has_outside_uses_ir_list,
+        TabIter<IR*> & ti,
+        IRBB * exit_bb);
+    void handlePrelog(IR * delegate,
+                      IR * pr,
+                      TMap<IR*, IR*> & delegate2stpr,
+                      TMap<IR*, DUSet*> & delegate2def,
+                      IRBB * preheader);
     bool hasLoopOutsideUse(IR const* stmt, LI<IRBB> const* li);
-    bool handleArrayRef(
-            IN IR * ir,
-            LI<IRBB> const* li,
-            OUT TMap<MD const*, IR*> & exact_access,
-            OUT List<IR*> & exact_occ_list,
-            OUT TTab<IR*> & inexact_access);
-    bool handleGeneralRef(
-            IR * ir,
-            LI<IRBB> const* li,
-            OUT TMap<MD const*, IR*> & exact_access,
-            OUT List<IR*> & exact_occ_list,
-            OUT TTab<IR*> & inexact_access);
+    bool handleArrayRef(IN IR * ir,
+                        LI<IRBB> const* li,
+                        OUT TMap<MD const*, IR*> & exact_access,
+                        OUT List<IR*> & exact_occ_list,
+                        OUT TTab<IR*> & inexact_access);
+    bool handleGeneralRef(IR * ir,
+                          LI<IRBB> const* li,
+                          OUT TMap<MD const*, IR*> & exact_access,
+                          OUT List<IR*> & exact_occ_list,
+                          OUT TTab<IR*> & inexact_access);
 
     bool isMayThrow(IR * ir, IRIter & iter);
     bool mayBeGlobalRef(IR * ref)
@@ -219,7 +208,7 @@ private:
         MDSet const* mds = ref->getRefMDSet();
         if (mds == NULL) { return false; }
 
-        SEGIter * iter;
+        MDSetIter iter = NULL;
         for (INT i = mds->get_first(&iter);
              i >= 0; i = mds->get_next(i, &iter)) {
             MD const* md2 = m_md_sys->getMD(i);
@@ -248,20 +237,18 @@ private:
                 IRIter & ii);
     bool shouldBePromoted(IR const* occ, List<IR*> & exact_occ_list);
 
-    bool promoteInexactAccess(
-            LI<IRBB> const* li,
-            IRBB * preheader,
-            IRBB * exit_bb,
-            TTab<IR*> & inexact_access,
-            IRIter & ii, TabIter<IR*> & ti);
-    bool promoteExactAccess(
-            LI<IRBB> const* li,
-            IRIter & ii,
-            TabIter<IR*> & ti,
-            IRBB * preheader,
-            IRBB * exit_bb,
-            TMap<MD const*, IR*> & cand_list,
-            List<IR*> & occ_list);
+    bool promoteInexactAccess(LI<IRBB> const* li,
+                              IRBB * preheader,
+                              IRBB * exit_bb,
+                              TTab<IR*> & inexact_access,
+                              IRIter & ii, TabIter<IR*> & ti);
+    bool promoteExactAccess(LI<IRBB> const* li,
+                            IRIter & ii,
+                            TabIter<IR*> & ti,
+                            IRBB * preheader,
+                            IRBB * exit_bb,
+                            TMap<MD const*, IR*> & cand_list,
+                            List<IR*> & occ_list);
 
     void removeRedundantDUChain(List<IR*> & fixup_list);
     void replaceUseForTree(IR * oldir, IR * newir);
@@ -306,7 +293,6 @@ public:
         m_pool = smpoolCreate(2 * sizeof(MD_LT), MEM_COMM);
         m_ir_ptr_pool = smpoolCreate(4 * sizeof(xcom::SC<IR*>), MEM_CONST_SIZE);
     }
-    COPY_CONSTRUCTOR(RegPromot);
     virtual ~RegPromot()
     {
         for (INT i = 0; i <= m_livein_mds_vec.get_last_idx(); i++) {

@@ -32,10 +32,7 @@ IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 author: Su Zhenyu
 @*/
 #include "cominc.h"
-#include "liveness_mgr.h"
-#include "prssainfo.h"
-#include "ir_ssa.h"
-#include "ir_loop_cvt.h"
+#include "comopt.h"
 
 namespace xoc {
 
@@ -97,7 +94,7 @@ bool LoopCvt::try_convert(LI<IRBB> * li, IRBB * gobackbb,
         return false;
     }
 
-    xcom::C<IR*> * irct;
+    IRListIter irct;
     IR * lastir = BB_irlist(gobackbb).get_tail(&irct);
     ASSERT0(lastir->is_goto());
 
@@ -224,7 +221,7 @@ bool LoopCvt::perform(OptCtx & oc)
 
         //DU reference and du chain has maintained.
         ASSERT0(m_rg->verifyMDRef());
-        ASSERT0(m_du->verifyMDDUChain(COMPUTE_PR_DU | COMPUTE_NONPR_DU));
+        ASSERT0(m_du->verifyMDDUChain(DUOPT_COMPUTE_PR_DU | DUOPT_COMPUTE_NONPR_DU));
 
         //All these changed.
         OC_is_reach_def_valid(oc) = false;

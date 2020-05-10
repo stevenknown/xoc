@@ -170,8 +170,7 @@ public:
 
     virtual CHAR const* getPassName() const { return "LivenessMgr"; }
     PASS_TYPE getPassType() const { return PASS_LIVENESS_MGR; }
-
-    DefMiscBitSetMgr & getMiscBitSetMgr() { return m_sbs_mgr; }
+    DefMiscBitSetMgr * getSBSMgr() { return &m_sbs_mgr; }
 
     //Get livein PR. The return set is readonly.
     DefSBitSetCore const* read_livein(UINT bbid) const

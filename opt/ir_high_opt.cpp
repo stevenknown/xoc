@@ -81,22 +81,23 @@ void Region::HighProcessImpl(OptCtx & oc)
         DUMgr * dumgr = (DUMgr*)getPassMgr()->
             registerPass(PASS_DU_MGR);
         ASSERT0(dumgr);
-        UINT f = SOL_REF|COMPUTE_PR_DU|COMPUTE_NONPR_DU;
+        UINT f = DUOPT_COMPUTE_PR_REF|DUOPT_COMPUTE_NONPR_REF|
+                 DUOPT_COMPUTE_PR_DU|DUOPT_COMPUTE_NONPR_DU;
         if (g_compute_available_exp) {
-            f |= SOL_AVAIL_EXPR;
+            f |= DUOPT_SOL_AVAIL_EXPR;
         }
 
         if (g_compute_region_imported_defuse_md) {
-            f |= SOL_RU_REF;
+            f |= DUOPT_SOL_REGION_REF;
         }
 
         if (g_compute_classic_du_chain) {
-            f |= SOL_REACH_DEF;
+            f |= DUOPT_SOL_REACH_DEF;
         }
 
         if (dumgr->perform(oc, f) && OC_is_ref_valid(oc)) {
             if (g_compute_classic_du_chain) {
-                UINT flag = COMPUTE_NONPR_DU;
+                UINT flag = DUOPT_COMPUTE_NONPR_DU;
                 ASSERT0(getPassMgr());
 
                 //If PRs have already been in SSA form, compute
@@ -105,7 +106,7 @@ void Region::HighProcessImpl(OptCtx & oc)
                 if ((ssamgr = (PRSSAMgr*)getPassMgr()->
                      queryPass(PASS_PR_SSA_MGR)) == NULL ||
                     !ssamgr->isSSAConstructed()) {
-                    flag |= COMPUTE_PR_DU;
+                    flag |= DUOPT_COMPUTE_PR_DU;
                 }
 
                 dumgr->computeMDDUChain(oc, false, flag);

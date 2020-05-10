@@ -32,8 +32,7 @@ IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 author: Su Zhenyu
 @*/
 #include "cominc.h"
-#include "callg.h"
-#include "inliner.h"
+#include "comopt.h"
 
 namespace xoc {
 
@@ -252,8 +251,8 @@ void Inliner::do_inline(Region * cand)
     ASSERT0(v);
     for (xcom::EdgeC * el = VERTEX_in_list(v);
          el != NULL; el = EC_next(el)) {
-        Region * caller = CN_ru(m_call_graph->mapVertex2CallNode(
-            EDGE_from(EC_edge(el))));
+        Region * caller = m_call_graph->mapVertex2CallNode(
+            el->getFrom())->region();
         if (caller != NULL) {
             do_inline_c(caller, cand);
         }
@@ -265,7 +264,8 @@ void Inliner::do_inline(Region * cand)
 bool Inliner::can_be_cand(Region * rg)
 {
     IR * ru_irs = rg->getIRList();
-    if (REGION_is_expect_inline(rg) && cnt_list(ru_irs) < g_inline_threshold) {
+    if (REGION_is_expect_inline(rg) &&
+        xcom::cnt_list(ru_irs) < g_inline_threshold) {
         return true;
     }
     return false;

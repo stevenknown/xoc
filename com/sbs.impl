@@ -139,7 +139,7 @@ void SBitSetCore<BitsPerSeg>::bunion(SBitSetCore<BitsPerSeg> const& src,
             if (src_start < tgt_start) {
                 //s: |----|
                 //t:       |----|
-                SEG<BitsPerSeg> * x = sm->new_seg();
+                SEG<BitsPerSeg> * x = sm->allocSEG();
                 x->copy(*s);
                 if (prev_st == NULL) {
                     prev_st = segs.append_head(x, free_list, pool);
@@ -161,7 +161,7 @@ void SBitSetCore<BitsPerSeg>::bunion(SBitSetCore<BitsPerSeg> const& src,
 
         if (tgtst == NULL && !handled) {
             //Append rest of src segments to tail.
-            SEG<BitsPerSeg> * x = sm->new_seg();
+            SEG<BitsPerSeg> * x = sm->allocSEG();
             x->copy(*s);
             segs.append_tail(x, free_list, pool);
         }
@@ -194,7 +194,7 @@ void SBitSetCore<BitsPerSeg>::bunion(UINT elem,
         }
     }
 
-    SEG<BitsPerSeg> * x = sm->new_seg();
+    SEG<BitsPerSeg> * x = sm->allocSEG();
     if (sct != NULL) {
         if (prev_sct == NULL) {
             segs.append_head(x, free_list, pool);
@@ -208,7 +208,6 @@ void SBitSetCore<BitsPerSeg>::bunion(UINT elem,
     x->bs.bunion(elem - x->start);
 }
 
-
 template <UINT BitsPerSeg>
 void SBitSetCore<BitsPerSeg>::clean(SegMgr<BitsPerSeg> * sm,
                                     TSEGIter ** free_list)
@@ -216,8 +215,8 @@ void SBitSetCore<BitsPerSeg>::clean(SegMgr<BitsPerSeg> * sm,
     for (TSEGIter * st = segs.get_head();
          st != segs.end(); st = segs.get_next(st)) {
         SEG<BitsPerSeg> * s = st->val();
-        ASSERT0(s);
-        sm->free(s);
+        ASSERT0(s);        
+        sm->freeSEG(s);
     }
     //Free the list of container of SEG* back to SegMgr<BitsPerSeg>.
     segs.clean(free_list);
@@ -234,15 +233,11 @@ void SBitSetCore<BitsPerSeg>::destroySEGandClean(SegMgr<BitsPerSeg> * sm,
         //give it back to SegMgr<BitsPerSeg>.
         SEG<BitsPerSeg> * s = st->val();
         ASSERT0(s);
-
         DUMMYUSE(sm);
-        #ifdef _DEBUG_
-        sm->dec_seg_count();
 
         #ifdef DEBUG_SEG
+        sm->dec_seg_count();
         sm->allocated.diff(s->id);
-        #endif
-
         #endif
 
         delete s;
@@ -289,7 +284,7 @@ void SBitSetCore<BitsPerSeg>::diff(UINT elem,
             s->bs.diff(elem - start);
             if (s->bs.is_empty()) {
                 segs.remove(prev_sct, sct, free_list);
-                sm->free(s);
+                sm->freeSEG(s);
             }
             return;
         }
@@ -338,7 +333,7 @@ void SBitSetCore<BitsPerSeg>::diff(SBitSetCore const& src,
                 segs.remove(prev_st, tgtst, free_list);
                 //prev_st keep unchanged.
                 tgtst = next_st;
-                sm->free(t);
+                sm->freeSEG(t);
             } else {
                 prev_st = tgtst;
                 tgtst = next_st;
@@ -611,7 +606,7 @@ void SBitSetCore<BitsPerSeg>::intersect(SBitSetCore<BitsPerSeg> const& src,
                     segs.remove(prev_st, tgtst, free_list);
                     //prev_st keep unchanged.
                     tgtst = next_st;
-                    sm->free(t);
+                    sm->freeSEG(t);
                     continue;
                 }
                 break;
@@ -622,7 +617,7 @@ void SBitSetCore<BitsPerSeg>::intersect(SBitSetCore<BitsPerSeg> const& src,
                 segs.remove(prev_st, tgtst, free_list);
                 //prev_st keep unchanged.
                 tgtst = next_st;
-                sm->free(t);
+                sm->freeSEG(t);
                 continue;
             }
 
@@ -632,7 +627,7 @@ void SBitSetCore<BitsPerSeg>::intersect(SBitSetCore<BitsPerSeg> const& src,
                 segs.remove(prev_st, tgtst, free_list);
                 //prev_st keep unchanged.
                 tgtst = next_st;
-                sm->free(t);
+                sm->freeSEG(t);
             } else {
                 prev_st = tgtst;
                 tgtst = next_st;
@@ -650,7 +645,7 @@ void SBitSetCore<BitsPerSeg>::intersect(SBitSetCore<BitsPerSeg> const& src,
 
             //prev_st keep unchanged.
             tgtst = next_st;
-            sm->free(t);
+            sm->freeSEG(t);
         }
     }
 }
@@ -682,7 +677,7 @@ size_t SBitSet<BitsPerSeg>::count_mem() const
 //
 //START SegMgr
 //
-#if defined(_DEBUG_) && defined(DEBUG_SEG)
+#ifdef DEBUG_SEG
 
 //Dump SEGs that do not be freed in time.
 template <UINT BitsPerSeg>

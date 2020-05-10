@@ -32,9 +32,7 @@ IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 author: Su Zhenyu
 @*/
 #include "cominc.h"
-#include "ir_ssa.h"
-#include "ir_mdssa.h"
-#include "cfs_mgr.h"
+#include "comopt.h"
 
 namespace xoc {
 
@@ -2160,7 +2158,7 @@ IR * Region::simplifySwitch(IR * ir, SimpCtx * ctx)
     if (body == NULL) { return ir; }
 
     ASSERTN(!SIMP_break(ctx),
-           ("Must simplify Swich-stmt if you want to simply Break."));
+            ("Must simplify Swich-stmt if you want to simply Break."));
 
     SWITCH_body(ir) = NULL;
     body = simplifyStmtList(body, ctx);
@@ -2349,7 +2347,7 @@ IR * Region::simplifyStmtList(IR * ir_list, SimpCtx * ctx)
 void Region::simplifyBB(IRBB * bb, SimpCtx * ctx)
 {
     List<IR*> new_ir_list;
-    xcom::C<IR*> * ct;
+    IRListIter ct;
     for (BB_irlist(bb).get_head(&ct);
          ct != BB_irlist(bb).end();
          ct = BB_irlist(bb).get_next(ct)) {
@@ -2371,7 +2369,7 @@ void Region::simplifyBB(IRBB * bb, SimpCtx * ctx)
 void Region::simplifyBBlist(BBList * bbl, SimpCtx * ctx)
 {
     START_TIMER(t, "Simplify IRBB list");
-    xcom::C<IRBB*> * ct;
+    BBListIter ct;
     for (bbl->get_head(&ct); ct != bbl->end(); ct = bbl->get_next(ct)) {
         IRBB * bb = ct->val();
         simplifyBB(bb, ctx);

@@ -51,6 +51,7 @@ BigInt::BigInt(UINT elemnum, ...)
     va_start(ptr, elemnum);
     UINT i = 0;
     BigIntElemType last = 0;
+    set(elemnum - 1, 0); //pre-allocate buffer.
     for (; i < elemnum; i++) {
         last = va_arg(ptr, BigIntElemType);
         set(i, last);
@@ -80,6 +81,7 @@ void BigInt::initElem(UINT elemnum, ...)
     UINT i = 0;
     clean();
     BigIntElemType last = 0;
+    set(elemnum - 1, 0); //pre-allocate buffer.
     for (; i < elemnum; i++) {
         last = va_arg(ptr, BigIntElemType);
         set(i, last);
@@ -116,6 +118,7 @@ void BigInt::dump(CHAR const* name, bool is_seg_hex) const
 }
 
 
+//Dump to stdout.
 void BigInt::dump(bool is_seg_hex) const
 {
     dump(stdout, false, is_seg_hex);
@@ -123,6 +126,7 @@ void BigInt::dump(bool is_seg_hex) const
 
 
 //is_seg_hex: true if dump each segments in Hex format.
+//with_newline: true to dump a '\n' before content.
 void BigInt::dump(FILE * h, bool with_newline, bool is_seg_hex) const
 {
     ASSERTN(h, ("need file handler"));
@@ -554,7 +558,7 @@ BigInt& bisAdd(IN BigInt const& a, IN BigInt const& b, IN OUT BigInt & res)
 
 //BigInt Unsigned Addition.
 //e.g: res = a + b;
-//Note unsigned addition support in-suitate operation.
+//Note unsigned addition support in-situ operation.
 //e.g: res = res + b is legal.
 BigInt& biuAdd(IN BigInt const& a, IN BigInt const& b, IN OUT BigInt & res)
 {
@@ -614,7 +618,7 @@ BigInt& biuAdd(IN BigInt const& a, IN BigInt const& b, IN OUT BigInt & res)
 
 //BigInt substraction.
 //e.g: res = a - b;
-//Note substraction does not support in-suitate operation.
+//Note substraction does not support in-situ operation.
 //e.g: res = res - b is not legal.
 BigInt& biSub(IN BigInt const& a, IN BigInt const& b, IN OUT BigInt & res)
 {
@@ -810,6 +814,7 @@ void biuDivRem(IN BigInt const& a, IN BigInt const& b,
 }
 
 
+//Compute negative value on current bigint.
 void BigInt::neg()
 {
     ASSERT0(sizeof(SuperElemType) >= 2 * sizeof(BigIntElemType));
@@ -825,6 +830,7 @@ void BigInt::neg()
 }
 
 
+//Compute absolute value on current bigint.
 void BigInt::abs()
 {
     if (IS_NEG(getSig())) {

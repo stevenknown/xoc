@@ -88,8 +88,8 @@ private:
                        IN IR const* prop_value,
                        IN IR * use,
                        MDSSAMgr * mdssamgr);
-    bool doPropToNormalStmt(xcom::C<IR*> * cur_iter,
-                            xcom::C<IR*> ** next_iter,
+    bool doPropToNormalStmt(IRListIter cur_iter,
+                            IRListIter* next_iter,
                             bool prssadu,
                             bool mdssadu,
                             IN IR const* prop_value,
@@ -99,7 +99,7 @@ private:
                             IN OUT IRBB * use_bb,
                             MDSSAMgr * mdssamgr);
     bool doProp(IN IRBB * bb, IN DefSBitSetCore * useset, MDSSAMgr * mdssamgr);
-    void doFinalRefine();
+    void doFinalRefine(OptCtx & oc);
     void dumpCopyPropagationAction(IR const* def_stmt,
                                    IR const* prop_value,
                                    IR const* use,

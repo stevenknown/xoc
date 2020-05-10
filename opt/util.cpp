@@ -78,13 +78,18 @@ void prt2C(CHAR const* format, ...)
 {
     va_list args;
     va_start(args, format);
-    #ifdef FOR_ANDROID
+    #ifdef FOR_DEX
     __android_log_vprint(ANDROID_LOG_ERROR, LOG_TAG, format, args);
     #else
-    vfprintf(stdout, format, args);
+    if (g_redirect_stdout_to_dump_file && g_tfile != NULL) {
+        vfprintf(g_tfile, format, args);
+        fflush(g_tfile);
+    } else {
+        vfprintf(stdout, format, args);
+        fflush(stdout);
+    }
     #endif
     va_end(args);
-    fflush(stdout);
 }
 
 

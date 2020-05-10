@@ -37,6 +37,12 @@ class VMD;
 class MDDefSet;
 class MDSSAMgr;
 
+//Initial version is an abstract description to indicate the imported DEF of
+//each VMD. Especially for parameter, global variablers, imported variables.
+//Local variables should have explicitly definition which VMD version is not
+//initial version.
+#define INIT_VERSION 0
+
 //Mapping from MD id to vector of VMD.
 class UINT2VMDVec {
     COPY_CONSTRUCTOR(UINT2VMDVec);
@@ -181,7 +187,7 @@ public:
         VOpnd::clean();
         VMD_def(this) = NULL;
         VMD_mdid(this) = 0;
-        VMD_version(this) = 0;
+        VMD_version(this) = INIT_VERSION;
         VMD_occs(this).clean();
     }
 
@@ -211,6 +217,7 @@ public:
     }
 };
 
+typedef xcom::SEGIter * VOpndSetIter;
 
 //Set of Virtual Operand.
 class VOpndSet : public DefSBitSetCore {
@@ -318,6 +325,8 @@ public:
 };
 
 
+typedef xcom::DefSBitSetIter MDDefSetIter;
+
 //Set of MDDef.
 class MDDefSet : public DefSBitSetCore {
     COPY_CONSTRUCTOR(MDDefSet);
@@ -364,9 +373,17 @@ public:
     void dump(Region * rg, UseDefMgr * mgr);
 
     IR * getOpndList() const { return m_opnd_list; }
+    UINT getOpndNum() const { return xcom::cnt_list(getOpndList()); }
     VMD * getOpndVMD(IR const* opnd, UseDefMgr const* mgr) const;
 
     void replaceOpnd(IR * oldopnd, IR * newopnd);
+    void removeOpnd(IR * ir)
+    {
+        ASSERT0(xcom::in_list(getOpndList(), ir));
+        xcom::remove(&MDPHI_opnd_list(this), ir);
+    }
+
+    bool hasNoOpnd() const { return getOpndList() == NULL; }
 };
 
 
@@ -412,8 +429,6 @@ public:
     UseDefMgr(Region * rg, MDSSAMgr * mgr);
     ~UseDefMgr() { cleanOrDestroy(false); }
 
-    void reinit() { cleanOrDestroy(true); }
-
     MDSSAInfo * allocMDSSAInfo();
     MDPhi * allocMDPhi(UINT mdid, UINT num_operands);
     MDDef * allocMDDef();
@@ -440,6 +455,8 @@ public:
     //Get Versioned MD object by giving MD id and MD version.
     VMD * getVMD(UINT mdid, UINT version) const;
     Region * getRegion() const { return m_rg; }
+
+    void reinit() { cleanOrDestroy(true); }
 
     //Set MDSSAInfo of ir.
     void setMDSSAInfo(IR * ir, MDSSAInfo * mdssainfo);

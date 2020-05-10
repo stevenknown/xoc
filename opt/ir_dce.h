@@ -55,29 +55,32 @@ protected:
     IRCFG * m_cfg;
     CDG * m_cdg;
     DUMgr * m_du;
+    MDSSAMgr * m_mdssamgr;
+    PRSSAMgr * m_prssamgr;
     ConstIRIter m_citer;
     bool m_is_elim_cfs; //Eliminate control flow structure if necessary.
+    EffectStmt m_is_stmt_effect;
+    xcom::BitSet m_is_bb_effect;
 
     //Whether utilize MD du chain to find effect stmt.
     //If the value is false, all memory operations are considered used
     //except the operations which operate on PR.
     bool m_is_use_md_du;
+protected:
+    bool check_stmt(IR const* ir);
+    bool check_call(IR const* ir) const;
+    bool collectByPRSSA(IR const* x, IN OUT List<IR const*> * pwlst2);
+    bool collectAllDefThroughDefChain(MDDef const* tdef,
+                                      IN OUT List<IR const*> * pwlst2);
+    bool collectByMDSSA(IR const* x, IN OUT List<IR const*> * pwlst2);
+    bool collectByDU(IR const* x, IN OUT List<IR const*> * pwlst2);
 
     void fix_control_flow(List<IRBB*> & bblst, List<C<IRBB*>*> & ctlst);
-    bool find_effect_kid(IN IRBB * bb, IN IR * ir,
-                         IN EffectStmt & is_stmt_effect);
-    bool preserve_cd(IN OUT xcom::BitSet & is_bb_effect,
-                     IN OUT EffectStmt & is_stmt_effect,
-                     IN OUT List<IR const*> & act_ir_lst);
-    void mark_effect_ir(IN OUT EffectStmt & is_stmt_effect,
-                        IN OUT xcom::BitSet & is_bb_effect,
-                        IN OUT List<IR const*> & work_list);
+    bool find_effect_kid(IRBB const* bb, IR const* ir) const;
 
     bool is_effect_write(VAR * v) const
     { return VAR_is_global(v) || VAR_is_volatile(v); }
-
     bool is_effect_read(VAR * v) const { return VAR_is_volatile(v); }
-
     bool is_cfs(IR const* ir) const
     {
         switch (ir->getCode()) {
@@ -90,16 +93,23 @@ protected:
         }
         return false;
     }
+    void iter_collect(IN OUT List<IR const*> & work_list);
 
-    void iter_collect(IN OUT EffectStmt & is_stmt_effect,
-                      IN OUT xcom::BitSet & is_bb_effect,
-                      IN OUT List<IR const*> & work_list);
-    void record_all_ir(IN OUT Vector<Vector<IR*>*> & all_ir);
-    void revise_successor(IRBB * bb, xcom::C<IRBB*> * bbct, BBList * bbl);
+    void mark_effect_ir(IN OUT List<IR const*> & work_list);
 
-    bool check_stmt(IR const* ir);
-    bool check_call(IR const* ir);
+    bool preserve_cd(IN OUT List<IR const*> & act_ir_lst);
 
+    void reinit();
+    void revise_successor(IRBB * bb, 
+                          BBListIter bbct,
+                          BBList * bbl) const;
+    bool remove_ineffect_ir() const;
+    //Set control-dep bb to be effective.
+    bool setControlDepBBToBeEffect(IRBB const* bb,
+                                   IN OUT List<IR const*> & act_ir_lst);
+    void setEffectStmt(IR const* stmt,
+                       IN OUT xcom::BitSet * is_bb_effect,
+                       IN OUT List<IR const*> * act_ir_lst);
 public:
     explicit DeadCodeElim(Region * rg)
     {
@@ -108,6 +118,8 @@ public:
         m_tm = rg->getTypeMgr();
         m_cfg = rg->getCFG();
         m_du = rg->getDUMgr();
+        m_mdssamgr = NULL;
+        m_prssamgr = NULL;
         m_md_sys = rg->getMDSystem();
         ASSERT0(m_cfg && m_du && m_md_sys && m_tm);
         m_is_elim_cfs = false;
@@ -117,9 +129,7 @@ public:
     COPY_CONSTRUCTOR(DeadCodeElim);
     virtual ~DeadCodeElim() {}
 
-    void dump(EffectStmt const& is_stmt_effect,
-              xcom::BitSet const& is_bb_effect,
-              IN Vector<Vector<IR*>*> & all_ir);
+    void dump();
 
     virtual CHAR const* getPassName() const
     { return "Dead Code Eliminiation"; }

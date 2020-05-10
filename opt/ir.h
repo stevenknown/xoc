@@ -45,6 +45,7 @@ class MDPhi;
 class IRCFG;
 
 typedef List<IRBB*> BBList;
+typedef xcom::C<IRBB*> * BBListIter;
 typedef List<IR const*> ConstIRIter;
 typedef List<IR*> IRIter;
 
@@ -1121,7 +1122,7 @@ public:
     //This function only handle Call/ICall stmt, it find PR and remove
     //them out of UseSet.
     //Note this function does not maintain DU chain between call and its use.
-    void removePROutFromUseset(DefMiscBitSetMgr & sbs_mgr, Region * rg);
+    void removePRFromUseset(DefMiscBitSetMgr & sbs_mgr, Region * rg);
 
     bool verify(Region const* rg) const;
     bool verifyPhi(Region const* rg) const;

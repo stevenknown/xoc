@@ -32,7 +32,7 @@ IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 author: Su Zhenyu
 @*/
 #include "cominc.h"
-#include "cfs_mgr.h"
+#include "comopt.h"
 
 namespace xoc {
 
@@ -248,7 +248,7 @@ AbsNode * CfsMgr::constructAbsTree(IN IRBB * entry,
         INT c;
         for (v = g.get_first_vertex(c); v != NULL; v = next) {
             next = g.get_next_vertex(c);
-            if (cur_region->is_contain(VERTEX_id(v))) {
+            if (cur_region->is_contain(v->id())) {
                 continue;
             }
             g.removeVertex(v);
@@ -262,8 +262,7 @@ AbsNode * CfsMgr::constructAbsTree(IN IRBB * entry,
         loc_visited.clean();
         LI<IRBB> * li = cfg->mapBB2LabelInfo(bb);
         if (li != NULL) {
-            node = constructAbsLoop(bb, parent, LI_bb_set(li),
-                                    g, loc_visited);
+            node = constructAbsLoop(bb, parent, LI_bb_set(li), g, loc_visited);
         } else {
             IR * last_xr = cfg->get_last_xr(bb);
             if (last_xr != NULL && //'bb' is branching node of IF.
@@ -294,7 +293,7 @@ AbsNode * CfsMgr::constructAbsTree(IN IRBB * entry,
         INT c;
         for (v = g.get_first_vertex(c); v != NULL; v = next) {
             next = g.get_next_vertex(c);
-            if (!loc_visited.is_contain(VERTEX_id(v))) {
+            if (!loc_visited.is_contain(v->id())) {
                 continue;
             }
             g.removeVertex(v);
@@ -304,7 +303,7 @@ AbsNode * CfsMgr::constructAbsTree(IN IRBB * entry,
         for (v = g.get_first_vertex(c); v != NULL; v = g.get_next_vertex(c)) {
             if (g.getInDegree(v) == 0) {
                 ASSERTN(cand == NULL, ("multiple immediate-post-dominators"));
-                cand = cfg->getBB(VERTEX_id(v));
+                cand = cfg->getBB(v->id());
             }
         }
 

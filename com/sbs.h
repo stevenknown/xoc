@@ -52,7 +52,7 @@ template <UINT BitsPerSeg> class MiscBitSetMgr;
 template <UINT BitsPerSeg = BITS_PER_SEG>
 class SEG {
 public:
-    #if defined(_DEBUG_) && defined(DEBUG_SEG)
+    #ifdef DEBUG_SEG
     UINT id;
     #endif
     UINT start;
@@ -60,7 +60,7 @@ public:
 
     SEG()
     {
-        #if defined(_DEBUG_) && defined(DEBUG_SEG)
+        #ifdef DEBUG_SEG
         id = 0;
         #endif
         start = 0;
@@ -106,37 +106,71 @@ public:
 template <UINT BitsPerSeg = BITS_PER_SEG>
 class SegMgr {
     COPY_CONSTRUCTOR(SegMgr);
-#ifdef _DEBUG_
-public:
-    UINT seg_count;
-
-    #ifdef DEBUG_SEG
-    BitSet allocated;
-    #endif
-#endif
-
-protected:
     SList<SEG<BitsPerSeg>*> m_free_list;
 
-public:
-    SegMgr()
+#ifdef DEBUG_SEG
+    void debugSegMgr()
     {
-        #ifdef _DEBUG_
-        seg_count = 0;
-        #endif
+        //Dump Segs to help find leaks.
+        //DefSegMgr * segmgr = m_sbs_mgr.getSegMgr();
+        //dumpSegMgr(segmgr, g_tfile);
+        FILE * h = fopen("dump_seg.txt", "a+");
+        dumpSegMgr(this, h);
+        fclose(h);
+    }
+public:
+    UINT seg_count;
+    BitSet allocated;
+#endif
 
+public:
+    SegMgr() { init(); }
+    ~SegMgr() { destroy(); }
+
+    SEG<BitsPerSeg> * allocSEG()
+    {
+        SEG<BitsPerSeg> * s = m_free_list.remove_head();
+        if (s != NULL) {
+            #ifdef DEBUG_SEG
+            allocated.bunion(s->id);
+            #endif
+            return s;
+        }
+        s = new SEG<BitsPerSeg>();
+
+        #ifdef DEBUG_SEG
+        seg_count++;
+        s->id = seg_count;
+        allocated.bunion(s->id);
+        #endif
+        
+        return s;
+    }
+
+    void init()
+    {
+        if (m_free_list.get_pool() != NULL) { return; }
+        #ifdef DEBUG_SEG
+        seg_count = 0;
+        allocated.clean();
+        #endif
         SMemPool * p = smpoolCreate(sizeof(TSEGIter) * 4, MEM_CONST_SIZE);
         m_free_list.set_pool(p);
     }
-    ~SegMgr()
+
+    void destroy()
     {
-        #ifdef _DEBUG_
+        if (m_free_list.get_pool() == NULL) { return; }
+        #ifdef DEBUG_SEG
         UINT n = m_free_list.get_elem_count();
         ///////////////////////////////////////////////////////////////
         //NOTE: SBitSet or SBitSetCore's clean() should be invoked   //
         //before destruction, otherwise it will lead to SegMgr leaks.//
         ///////////////////////////////////////////////////////////////
-        ASSERTN(seg_count == n, ("MemLeak! There still are SEGs not freed"));
+        if (seg_count != n) {
+            debugSegMgr();
+        }
+        ASSERTN(seg_count == n, ("MemLeak! There still are SEGs not freed"));        
         #endif
 
         for (TSEGIter * sc = m_free_list.get_head();
@@ -146,44 +180,24 @@ public:
             delete s;
         }
 
+        //Note member of m_free_list is allocated in pool,
+        //thus delete pool at first.
+        m_free_list.clean();
         ASSERTN(m_free_list.get_pool(), ("miss pool"));
-
-        smpoolDelete(m_free_list.get_pool());
+        smpoolDelete(m_free_list.get_pool());        
+        m_free_list.set_pool(NULL);
     }
 
-    inline void free(SEG<BitsPerSeg> * s)
+    void freeSEG(SEG<BitsPerSeg> * s)
     {
-        #if defined(_DEBUG_) && defined(DEBUG_SEG)
+        #ifdef DEBUG_SEG
         allocated.diff(s->id);
         #endif
 
         s->clean();
         m_free_list.append_head(s);
     }
-
-    SEG<BitsPerSeg> * new_seg()
-    {
-        SEG<BitsPerSeg> * s = m_free_list.remove_head();
-        if (s != NULL) {
-            #if defined(_DEBUG_) && defined(DEBUG_SEG)
-            allocated.bunion(s->id);
-            #endif
-            return s;
-        }
-
-        #ifdef _DEBUG_
-        seg_count++;
-        #endif
-
-        s = new SEG<BitsPerSeg>();
-
-        #if defined(_DEBUG_) && defined(DEBUG_SEG)
-        s->id = seg_count;
-        allocated.bunion(s->id);
-        #endif
-
-        return s;
-    }
+    
     //Count memory usage for current object.
     size_t count_mem() const
     {
@@ -199,9 +213,8 @@ public:
         return count;
     }
 
-    #ifdef _DEBUG_
+    #ifdef DEBUG_SEG
     UINT get_seg_count() const { return seg_count; }
-
     //Decrease seg_count.
     void dec_seg_count() { seg_count--; }
     #endif
@@ -266,7 +279,7 @@ public:
             SEG<BitsPerSeg> * s = st->val();
             ASSERT0(s);
 
-            SEG<BitsPerSeg> * t = sm->new_seg();
+            SEG<BitsPerSeg> * t = sm->allocSEG();
             t->copy(*s);
             segs.append_tail(t, free_list, pool);
         }
@@ -341,8 +354,7 @@ public:
     void init(SegMgr<BitsPerSeg> * sm, UINT sz = sizeof(TSEGIter))
     {
         ASSERTN(sm, ("need SegMgr"));
-        ASSERTN(sz % sizeof(TSEGIter) == 0,
-                ("pool size must be mulitple."));
+        ASSERTN(sz % sizeof(TSEGIter) == 0, ("pool size must be mulitple."));
         ASSERTN(m_pool == NULL, ("already initialized"));
         m_pool = smpoolCreate(sz, MEM_CONST_SIZE);
         m_sm = sm;
@@ -358,7 +370,7 @@ public:
             SEG<BitsPerSeg> * s = st->val();
             ASSERT0(s);
 
-            m_sm->free(s);
+            m_sm->freeSEG(s);
         }
 
         //Unnecessary call clean(), since free pool will free all
@@ -442,7 +454,7 @@ protected:
         ASSERTN(!m_is_sparse, ("only used by dense bitset"));
         TSEGIter * sc = SBitSetCore<BitsPerSeg>::segs.get_head();
         if (sc == SBitSetCore<BitsPerSeg>::segs.end()) {
-            SEG<BitsPerSeg> * t = sm->new_seg();
+            SEG<BitsPerSeg> * t = sm->allocSEG();
             SBitSetCore<BitsPerSeg>::segs.append_head(t, flst, pool);
             return &t->bs;
         }
@@ -707,7 +719,7 @@ public:
             SEG<BitsPerSeg> * s = st->val();
             ASSERT0(s);
 
-            m_sm->free(s);
+            m_sm->freeSEG(s);
         }
 
         //Unnecessary call clean(), since free pool will free all
@@ -818,6 +830,7 @@ public:
         m_free_dbitsetcore_list.set_pool(ptr_pool);
 
         scflst = NULL;
+        sm.init();
     }
 
     void destroy()
@@ -843,6 +856,7 @@ public:
         smpoolDelete(m_sbitsetcore_pool);
         smpoolDelete(m_dbitsetcore_pool);
         smpoolDelete(ptr_pool);
+        sm.destroy();
 
         ptr_pool = NULL;
         m_sbitsetcore_pool = NULL;
@@ -955,6 +969,9 @@ typedef MiscBitSetMgr<> DefMiscBitSetMgr;
 //If you want to use different size SEG, then declare the new iter.
 typedef SC<DefSEG*> SEGIter; //Default SEG iter.
 
+//Note the iterator of DefSBitSetCore, DBitSet, DBitSetCore are
+//same with DefSBitSet.
+typedef SEGIter * DefSBitSetIter; //Default size SBitSet iter.
 } //namespace xcom
 
 #endif
