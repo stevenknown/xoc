@@ -689,10 +689,22 @@ void DeadCodeElim::reviseSuccForFallthroughBB(IRBB * bb,
         ec = next_ec;
     }
 
-    //TO BE CONFIRMED:Why need add edge here?
-    //if (next_bb != NULL) {
-    //    m_cfg->addEdge(BB_id(bb), BB_id(next_bb));
-    //}
+    //Add edge between bb and next_bb if bb is empty.
+    //e.g:BB2->BB3,BB2->BB5,BB3->BB2
+    //    Add edge BB3->BB5 if BB3 is empty.
+    //     ____
+    //     |   |
+    //     V   |
+    //  __BB2  |
+    //  |  |   |
+    //  |  V   |
+    //  | BB3  |
+    //  |  |___|
+    //  |  
+    //  |->BB5    
+    if (next_bb != NULL) {
+        m_cfg->addEdge(BB_id(bb), BB_id(next_bb));
+    }
 }
 
 
@@ -772,7 +784,6 @@ bool DeadCodeElim::perform(OptCtx & oc)
         if (m_mdssamgr != NULL && m_mdssamgr->isMDSSAConstructed()) {
             ASSERT0(verifyMDSSAInfo(m_rg));
         }
-
         if (m_cfg->performMiscOpt(oc)) {
             //CFG changed, remove empty BB.
             //TODO: DO not recompute SSA. Update SSA and MDSSA info especially
