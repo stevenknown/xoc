@@ -188,18 +188,59 @@ void note(CHAR const* format, ...)
         i++;
     }
 
-    //Append indent chars ahead of string.
-    ASSERT0(g_indent >= 0);
-    dumpIndent(g_tfile, g_indent);
-
     if (i == buf.strlen()) {
         fflush(g_tfile);
         va_end(arg);
         return;
     }
 
+    //Append indent chars ahead of string.
+    ASSERT0(g_indent >= 0);
+    dumpIndent(g_tfile, g_indent);
     fprintf(g_tfile, "%s", buf.buf + i);
     fflush(g_tfile);
+    va_end(arg);
+    return;
+}
+
+
+//Print string with indent chars.
+//h: file handler.
+void note(FILE * h, CHAR const* format, ...)
+{
+    if (h == NULL || format == NULL) { return; }
+
+    StrBuf buf(64);
+    va_list arg;
+    va_start(arg, format);
+    buf.vstrcat(format, arg);
+
+    //Print leading \n.
+    size_t i;
+    for (i = 0; i < buf.strlen(); i++) {
+        if (buf.buf[i] == '\n') {
+            if (g_prt_carriage_return_for_dot) {
+                //Print terminate lines that are left justified in DOT file.
+                fprintf(h, "\\l");
+            } else {
+                fprintf(h, "\n");
+            }
+            continue;
+        }
+        break;        
+    }
+
+    if (i == buf.strlen()) {
+        fflush(h);
+        va_end(arg);
+        return;
+    }
+
+    //Append indent chars ahead of string.
+    ASSERT0(g_indent >= 0);
+    dumpIndent(h, g_indent);
+    fprintf(h, "%s", buf.buf + i);
+    fflush(h);
     va_end(arg);
     return;
 }
@@ -233,149 +274,6 @@ void dumpIndent(FILE * h, UINT indent)
     for (; indent > 0; indent--) {
         fprintf(h, "%c", g_indent_chars);
     }
-}
-
-
-//Integer TAB.
-class IT : public RBT<int, int> {
-public:
-    //Add left child
-    void add_lc(int from, RBCOL f, int to, RBCOL t)
-    {
-        RBTNType * x = m_root;
-        if (x == NULL) {
-            m_root = new_tn(from, f);
-            x = new_tn(to, t);
-            m_root->lchild = x;
-            x->parent = m_root;
-            return;
-        }
-
-        List<RBTNType*> lst;
-        lst.append_tail(x);
-        while (lst.get_elem_count() != 0) {
-            x = lst.remove_head();
-            if (x->key == from) {
-                break;
-            }
-            if (x->rchild != NULL) {
-                lst.append_tail(x->rchild);
-            }
-            if (x->lchild != NULL) {
-                lst.append_tail(x->lchild);
-            }
-        }
-        ASSERT0(x);
-        ASSERT0(x->color == f);
-        RBTNType * y = new_tn(to, t);
-
-        ASSERT0(x->lchild == NULL);
-        x->lchild = y;
-        y->parent = x;
-    }
-
-    //Add left child
-    void add_rc(int from, RBCOL f, int to, RBCOL t)
-    {
-        RBTNType * x = m_root;
-        if (x == NULL) {
-            m_root = new_tn(from, f);
-            x = new_tn(to, t);
-            m_root->rchild = x;
-            x->parent = m_root;
-            return;
-        }
-
-        List<RBTNType*> lst;
-        lst.append_tail(x);
-        while (lst.get_elem_count() != 0) {
-            x = lst.remove_head();
-            if (x->key == from) {
-                break;
-            }
-            if (x->rchild != NULL) {
-                lst.append_tail(x->rchild);
-            }
-            if (x->lchild != NULL) {
-                lst.append_tail(x->lchild);
-            }
-        }
-        ASSERT0(x);
-        ASSERT0(x->color == f);
-        RBTNType * y = new_tn(to, t);
-
-        ASSERT0(x->rchild == NULL);
-        x->rchild = y;
-        y->parent = x;
-    }
-};
-
-
-static void test1()
-{
-    IT x;
-    x.add_lc(11, RBBLACK, 2, RBRED);
-    x.add_rc(11, RBBLACK, 14, RBBLACK);
-
-    x.add_lc(2, RBRED, 1, RBBLACK);
-    x.add_rc(2, RBRED, 7, RBBLACK);
-
-    x.add_lc(7, RBBLACK, 5, RBRED);
-    x.add_rc(7, RBBLACK, 8, RBRED);
-
-    x.add_rc(14, RBBLACK, 15, RBRED);
-
-    //x.add_lc(5, RBRED, 4, RBRED);
-    x.insert(4);
-    dump_rbt(x);
-}
-
-
-static void test2()
-{
-    IT x;
-    x.insert(1);
-    x.insert(2);
-    x.insert(11);
-    x.insert(14);
-    x.insert(15);
-    x.insert(7);
-    x.insert(5);
-    x.insert(8);
-    x.insert(4);
-    x.insert(4);
-    dump_rbt(x);
-
-    //Test remove
-    x.remove(7);
-    x.remove(8);
-    x.remove(4);
-    x.remove(11);
-    x.remove(14);
-    x.remove(2);
-    x.remove(5);
-    x.remove(15);
-    x.remove(1);
-
-    //Test insert
-    x.insert(1);
-    x.insert(2);
-    x.insert(11);
-    x.insert(14);
-    x.insert(15);
-    x.insert(7);
-    x.insert(5);
-    x.insert(8);
-    x.insert(4);
-    x.insert(4);
-    dump_rbt(x);
-}
-
-
-void test_rbt()
-{
-    test1();
-    test2();
 }
 
 } //namespace xoc

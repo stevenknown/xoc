@@ -203,11 +203,10 @@ IR * Region::buildString(SYM const* strtab)
 //The result depends on the predicator's value.
 //e.g: x = a > b ? 10 : 100
 //Note predicator may not be judgement expression.
-IR * Region::buildSelect(
-        IR * pred,
-        IR * true_exp,
-        IR * false_exp,
-        Type const* type)
+IR * Region::buildSelect(IR * pred,
+                         IR * true_exp,
+                         IR * false_exp,
+                         Type const* type)
 {
     ASSERT0(type);
     ASSERT0(pred && pred->is_single() && true_exp && false_exp);

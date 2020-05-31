@@ -291,9 +291,15 @@ public:
         OUT List<BB*> &) = 0;
 
     UINT getLoopNum() const { return m_li_count - 1; }
-    void get_preds(IN OUT List<BB*> & preds, BB const* v);
-    void get_succs(IN OUT List<BB*> & succs, BB const* v);
-    BB * get_entry() { return m_entry; }
+    void get_preds(IN OUT List<BB*> & preds, BB const* v) const;
+    void get_succs(IN OUT List<BB*> & succs, BB const* v) const;
+    //Get the number of successors of bb.
+    UINT getSuccsNum(BB const* bb) const
+    { return getOutDegree(getVertex(bb->id())); }
+    //Get the number of predecessors of bb.
+    UINT getPredsNum(BB const* bb) const
+    { return getInDegree(getVertex(bb->id())); }
+    BB * get_entry() const { return m_entry; }
     List<BB*> * getExitList() { return &m_exit_list; }
     List<BB*> * getBBListInRPO() { return &m_rpo_bblst; }
     virtual BB * getFallThroughBB(BB * bb)
@@ -612,7 +618,10 @@ bool CFG<BB, XR>::verifyIfBBRemoved(IN CDG * cdg, OptCtx & oc)
                     UNREACHABLE();
                 }
             }
-        } else if (last_xr != NULL && last_xr->isConditionalBr()) {
+            continue;
+        }
+        
+        if (last_xr != NULL && last_xr->isConditionalBr()) {
             //CASE:Check legalization of fallthrough edge and target edge.
             //     condbr L1
             //     FallThroughBB
@@ -636,7 +645,7 @@ bool CFG<BB, XR>::verifyIfBBRemoved(IN CDG * cdg, OptCtx & oc)
 }
 
 
-//Remove empty bb, and merger label info.
+//Remove empty bb, and merge label info.
 template <class BB, class XR>
 bool CFG<BB, XR>::removeEmptyBBHelper(BB * bb,
                                       BB * next_bb,
@@ -654,8 +663,9 @@ bool CFG<BB, XR>::removeEmptyBBHelper(BB * bb,
         ASSERT0(next_ct == NULL);
         if (bb->getLabelList().get_elem_count() == 0 &&
             !isRegionExit(bb)) {
-            bb->removeSuccessorPhiOpnd(this);
-            //resetMapBetweenLabelAndBB(bb); BB does not have Labels.
+            //BB does not have Label.
+            //resetMapBetweenLabelAndBB(bb);
+            bb->removeAllSuccessorsPhiOpnd(this);            
             remove_bb(ct);
             doit = true;
         }
@@ -666,7 +676,7 @@ bool CFG<BB, XR>::removeEmptyBBHelper(BB * bb,
     moveLabels(bb, next_bb);
 
     //Only apply restricted removing if CFG is invalid.
-    //Especially BB list is ready, but CFG is not.
+    //Especially BB list is ready, whereas CFG is not.
     if (!is_cfg_valid) { return doit; }
 
     //Revise edge.
@@ -691,7 +701,7 @@ bool CFG<BB, XR>::removeEmptyBBHelper(BB * bb,
         if (getEdge(pred->id(), next_bb->id()) != NULL) {
             //If bb removed, the number of its successors will decrease.
             //Then the number of PHI of bb's successors must be revised.
-            bb->removeSuccessorPhiOpnd(this);
+            bb->removeAllSuccessorsPhiOpnd(this);
         } else {
             addEdge(pred->id(), next_bb->id());
         }
@@ -714,53 +724,70 @@ bool CFG<BB, XR>::removeEmptyBBHelper(BB * bb,
         BB * prev_bb_of_succ = ct_prev_of_succ->val();
         ASSERT0(prev_bb_of_succ != NULL);
 
+        //TODO: confirm whether the following case should be handled.
         XR * last_xr = get_last_xr(prev_bb_of_succ);
         if (last_xr == NULL ||
             (!last_xr->isConditionalBr() &&
              !last_xr->isUnconditionalBr() &&
-             !last_xr->is_return())) {
-            //Add fall-through edge between prev_of_succ and succ.
-            //e.g:
+             !last_xr->is_terminate())) {
+            //Add fall-through edge between prev_bb_of_succ and succ.
+            //e.g:bb:
+            //    goto succ; --------
+            //                       |
+            //    ...                |
+            //                       |
+            //    prev_bb_of_succ:   |
+            //    a=1;               |
+            //                       |
+            //                       |
+            //    succ: <------------
+            //    b=1;
+            //After:
             //    bb:
             //    goto succ; --------
             //                       |
             //    ...                |
             //                       |
-            //    prev_of_succ:      |
+            //    prev_bb_of_succ:   |
             //    a=1;               |
-            //                       |
-            //                       |
-            //    succ: <-------------
+            //      |                |
+            //      V                |
+            //    succ: <------------
             //    b=1;
-            addEdge(prev_bb_of_succ->id(), succ->id());
+
+            ASSERTN(getEdge(prev_bb_of_succ->id(), succ->id()) != NULL,
+                    ("should already have edge"));
+            //addEdge(prev_bb_of_succ->id(), succ->id());
             continue;
         }
 
+        //TODO: confirm whether the following case should be handled.
         if (last_xr != NULL &&
             last_xr->isUnconditionalBr() &&
             !last_xr->isIndirectBr()) {
             if (last_xr->hasSideEffect()) {
                 continue;
             }
-            //Add fall-through edge between prev_of_succ and succ.
-            //e.g:
-            //prev_of_succ:
-            //    ...
-            //    goto L1  <--- redundant branch
+            //Add fall-through edge between prev_bb_of_succ and succ.
+            //e.g:prev_bb_of_succ:
+            //    goto succ <--- redundant branch
             //
-            //succ:
-            //    L1:
+            //    succ:
+            //    a=1;
             BB * tgt_bb = findBBbyLabel(last_xr->getLabel());
             ASSERT0(tgt_bb != NULL);
-            if (tgt_bb == succ) {
-                addEdge(prev_bb_of_succ->id(), succ->id());
-            }
+
+            ASSERTN(getEdge(prev_bb_of_succ->id(), succ->id()) != NULL,
+                    ("should already have edge"));
+            //if (tgt_bb == succ) {
+            //    addEdge(prev_bb_of_succ->id(), succ->id());
+            //}
         }
     } //end for each succ
 
-    //The map between 'bb' and its Labels has changed.
+    //The map between 'bb' and Labels has been maintained.
     //resetMapBetweenLabelAndBB(bb);
-    remove_bb(bb);
+    remove_bb(ct);
     doit = true;
     return doit;
 } 
@@ -1102,11 +1129,11 @@ bool CFG<BB, XR>::removeUnreachBB()
         if (!visited.is_contain(bb->id())) {
             //EH may be redundant and can be removed.
             //ASSERTN(!bb->isExceptionHandler(),
-            // ("For conservative purpose, "
-            //  "exception handler should be reserved."));
+            //        ("For conservative purpose, "
+            //         "exception handler should be reserved."));
 
-            bb->removeSuccessorPhiOpnd(this);
             resetMapBetweenLabelAndBB(bb);
+            bb->removeAllSuccessorsPhiOpnd(this);            
             remove_bb(ct);
             removed = true;
         }
@@ -1126,8 +1153,7 @@ void CFG<BB, XR>::chainPredAndSucc(UINT vid, bool is_single_pred_succ)
     xcom::EdgeC * pred_lst = VERTEX_in_list(v);
     xcom::EdgeC * succ_lst = VERTEX_out_list(v);
     if (is_single_pred_succ) {
-        ASSERTN(getInDegree(v) <= 1 &&
-                getOutDegree(v) <= 1,
+        ASSERTN(getInDegree(v) <= 1 && getOutDegree(v) <= 1,
                 ("BB only has solely pred and succ."));
     }
     while (pred_lst != NULL) {
@@ -1145,32 +1171,27 @@ void CFG<BB, XR>::chainPredAndSucc(UINT vid, bool is_single_pred_succ)
 
 //Return all successors.
 template <class BB, class XR>
-void CFG<BB, XR>::get_succs(IN OUT List<BB*> & succs, BB const* v)
+void CFG<BB, XR>::get_succs(IN OUT List<BB*> & succs, BB const* v) const
 {
     ASSERT0(v);
-    xcom::Vertex * vex = getVertex(v->id());
-    xcom::EdgeC * el = VERTEX_out_list(vex);
+    xcom::Vertex const* vex = getVertex(v->id());
     succs.clean();
-    while (el != NULL) {
-        INT succ = el->getToId();
-        succs.append_tail(getBB(succ));
-        el = EC_next(el);
+    for (xcom::EdgeC const* el = vex->getOutList();
+         el != NULL; el = el->get_next()) {
+        succs.append_tail(getBB(el->getToId()));
     }
 }
 
 
 //Return all predecessors.
 template <class BB, class XR>
-void CFG<BB, XR>::get_preds(IN OUT List<BB*> & preds, BB const* v)
+void CFG<BB, XR>::get_preds(IN OUT List<BB*> & preds, BB const* v) const
 {
     ASSERT0(v);
     xcom::Vertex * vex = getVertex(v->id());
-    xcom::EdgeC * el = VERTEX_in_list(vex);
     preds.clean();
-    while (el != NULL) {
-        INT pred = el->getFromId();
-        preds.append_tail(getBB(pred));
-        el = EC_next(el);
+    for (xcom::EdgeC * el = vex->getInList(); el != NULL; el = el->get_next()) {
+        preds.append_tail(getBB(el->getFromId()));
     }
 }
 

@@ -442,6 +442,8 @@ public:
         }
         return false;
     }
+    //Return true if BB has no IR stmt.
+    bool is_empty() const { return BB_irlist(this).get_elem_count() == 0; }
 
     bool mayThrowException() const
     {
@@ -469,7 +471,7 @@ public:
 
     //Before removing bb or change bb successor,
     //you need remove the related PHI operand if BB successor has PHI stmt.
-    void removeSuccessorPhiOpnd(CFG<IRBB, IR> * cfg);
+    void removeAllSuccessorsPhiOpnd(CFG<IRBB, IR> * cfg);
 
     //Before removing bb or change bb successor,
     //you need remove the related PHI operand if BB successor has PHI stmt.

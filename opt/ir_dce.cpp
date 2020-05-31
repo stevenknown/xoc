@@ -146,7 +146,7 @@ bool DeadCodeElim::check_stmt(IR const* ir)
 
 //Return true if ir is effect.
 bool DeadCodeElim::check_call(IR const* ir) const
-{
+{    
     ASSERT0(ir->isCallStmt());
     return !ir->isReadOnlyCall() || IR_has_sideeffect(ir) || IR_no_move(ir);
 }
@@ -202,8 +202,8 @@ bool DeadCodeElim::find_effect_kid(IRBB const* bb, IR const* ir) const
     ASSERT0(m_cfg && m_cdg);
     ASSERT0(ir->getBB() == bb);
     if (ir->isConditionalBr() || ir->isMultiConditionalBr()) {
-        xcom::EdgeC const* ec = VERTEX_out_list(m_cdg->getVertex(BB_id(bb)));
-        while (ec != NULL) {
+        for (xcom::EdgeC const* ec = m_cdg->getVertex(bb->id())->getOutList();
+             ec != NULL; ec = ec->get_next()) {
             IRBB * succ = m_cfg->getBB(ec->getToId());
             ASSERT0(succ != NULL);
             for (IR * r = BB_irlist(succ).get_head();
@@ -212,38 +212,35 @@ bool DeadCodeElim::find_effect_kid(IRBB const* bb, IR const* ir) const
                     return true;
                 }
             }
-            ec = EC_next(ec);
         }
-    } else if (ir->isUnconditionalBr()) {
-        xcom::EdgeC const* ecp = VERTEX_in_list(m_cdg->getVertex(BB_id(bb)));
-        while (ecp != NULL) {
-            INT cd_pred = ecp->getFromId();
-            xcom::EdgeC const* ecs = VERTEX_out_list(m_cdg->getVertex(cd_pred));
-            while (ecs != NULL) {
-                INT cd_succ = ecs->getToId();
-                IRBB * succ = m_cfg->getBB(cd_succ);
-                ASSERTN(succ, ("BB%d does not on CFG", cd_succ));
+        return false;
+    }
+    if (ir->isUnconditionalBr()) {
+        for (xcom::EdgeC const* ecp = m_cdg->getVertex(bb->id())->getInList();
+             ecp != NULL; ecp = ecp->get_next()) {
+            for (xcom::EdgeC const* ecs = m_cdg->getVertex(ecp->getFromId())->
+                    getOutList();
+                 ecs != NULL; ecs = ecs->get_next()) {
+                IRBB * succ = m_cfg->getBB(ecs->getToId());
+                ASSERTN(succ, ("BB%d does not belong to CFG", ecs->getToId()));
                 for (IR * r = BB_irlist(succ).get_head();
                      r != NULL; r = BB_irlist(succ).get_next()) {
                     if (m_is_stmt_effect.is_contain(IR_id(r))) {
                         return true;
                     }
                 }
-                ecs = EC_next(ecs);
             }
-            ecp = EC_next(ecp);
         }
-    } else {
-        UNREACHABLE();
+        return false;
     }
+    UNREACHABLE();
     return false;
 }
 
 
 //Set control-dep bb to be effective.
-bool DeadCodeElim::setControlDepBBToBeEffect(
-    IRBB const* bb,
-    IN OUT List<IR const*> & act_ir_lst)
+bool DeadCodeElim::setControlDepBBToBeEffect(IRBB const* bb,
+                                             OUT List<IR const*> & act_ir_lst)
 {
     bool change = false;
     UINT bbid = BB_id(bb);
@@ -279,12 +276,11 @@ bool DeadCodeElim::setControlDepBBToBeEffect(
     IR * ir = BB_last_ir(const_cast<IRBB*>(bb)); //last IR of BB.
     ASSERT0(ir != NULL);
     if ((ir->isConditionalBr() || ir->isMultiConditionalBr()) &&
-        !m_is_stmt_effect.is_contain(ir->id())) {
+        !m_is_stmt_effect.is_contain(ir->id()) &&
+        find_effect_kid(bb, ir)) {
         //IR_SWTICH might have multiple succ-BB.
-        if (find_effect_kid(bb, ir)) {
-            setEffectStmt(ir, NULL, &act_ir_lst);
-            change = true;
-        }
+        setEffectStmt(ir, NULL, &act_ir_lst);
+        change = true;        
     }
     return change;
 }
@@ -300,24 +296,23 @@ bool DeadCodeElim::preserve_cd(IN OUT List<IR const*> & act_ir_lst)
     for (bbl->get_head(&ct); ct != bbl->end(); ct = bbl->get_next(ct)) {
         IRBB * bb = ct->val();
         ASSERT0(bb);
-        if (m_is_bb_effect.is_contain(BB_id(bb))) {
+        if (m_is_bb_effect.is_contain(bb->id())) {
             change |= setControlDepBBToBeEffect(bb, act_ir_lst);
         }
 
-        //CASE: test_pre1()
-        //    GOTO 0xa4f634 id:23
-        //        CLABEL (name:L1) 0xa4f5e4 id:22 branch-target
-        //    in BB3
-        //    BB3 is ineffective, but GOTO can not be removed!
+        //CASE:test_pre1()
+        //  goto CLABEL:L1 id:22
+        //  BB3:L1 ...
+        //  BB3 is ineffective, but 'goto' can not be removed!
         if (BB_irlist(bb).get_elem_count() == 0) { continue; }
 
         IR * ir = BB_last_ir(bb); //last IR of BB.
         ASSERT0(ir);
-        if (ir->isUnconditionalBr() && !m_is_stmt_effect.is_contain(ir->id())) {
-            if (find_effect_kid(bb, ir)) {
-                setEffectStmt(ir, &m_is_bb_effect, &act_ir_lst);
-                change = true;
-            }
+        if (ir->isUnconditionalBr() &&
+            !m_is_stmt_effect.is_contain(ir->id()) &&
+            find_effect_kid(bb, ir)) {
+            setEffectStmt(ir, &m_is_bb_effect, &act_ir_lst);
+            change = true;
         }
     }
     return change;
@@ -343,9 +338,9 @@ bool DeadCodeElim::collectAllDefThroughDefChain(
 {
     bool change = false;
     ASSERT0(tdef);
-    ConstMDDefIter ii;    
+    ConstMDDefIter ii;
     for (MDDef const* def = m_mdssamgr->iterDefInitC(tdef, ii);
-         def != NULL; def = m_mdssamgr->iterDefNextC(ii)) {
+         def != NULL; def = m_mdssamgr->iterDefNextC(ii)) {        
         if (def->is_phi()) {
             //Merged DEF will be iterated.
             continue;
@@ -497,14 +492,18 @@ bool DeadCodeElim::remove_ineffect_ir() const
                 if (stmt->isConditionalBr() ||
                     stmt->isUnconditionalBr() ||
                     stmt->isMultiConditionalBr()) {
-                    revise_successor(bb, ctbb, bbl);
+                    reviseSuccForFallthroughBB(bb, ctbb, bbl);
+                    ASSERT0(m_mdssamgr->verifyPhi(true));
                 }
 
-                if (m_mdssamgr != NULL) {                    
+                //Remove stmt from BB, but do not free it right now.
+                BB_irlist(bb).remove(ctir);
+
+                if (m_mdssamgr != NULL) {
                     m_mdssamgr->removeMDSSAUse(stmt);
                 }
-
-                BB_irlist(bb).remove(ctir);
+                
+                //Now, stmt is safe to free.
                 m_rg->freeIRTree(stmt);
                 change = true;
                 tobecheck = true;
@@ -576,8 +575,8 @@ void DeadCodeElim::fix_control_flow(List<IRBB*> & bblst,
         ASSERT0(ct && bb);
         if (BB_irlist(bb).get_elem_count() != 0) { continue; }
 
-        xcom::EdgeC * vout = VERTEX_out_list(m_cfg->getVertex(BB_id(bb)));
-        if (vout == NULL || cnt_list(vout) <= 1) { continue; }
+        xcom::EdgeC * vout = m_cfg->getVertex(BB_id(bb))->getOutList();
+        if (vout == NULL || xcom::cnt_list(vout) <= 1) { continue; }
 
         BBListIter next_ct = ct;
         bbl->get_next(&next_ct);
@@ -588,7 +587,8 @@ void DeadCodeElim::fix_control_flow(List<IRBB*> & bblst,
 
         while (vout != NULL) {
             xcom::Edge * e = EC_edge(vout);
-            if (EDGE_info(e) != NULL && CFGEI_is_eh((CFGEdgeInfo*)EDGE_info(e))) {
+            if (EDGE_info(e) != NULL &&
+                CFGEI_is_eh((CFGEdgeInfo*)EDGE_info(e))) {
                 vout = EC_next(vout);
                 continue;
             }
@@ -649,16 +649,18 @@ void DeadCodeElim::fix_control_flow(List<IRBB*> & bblst,
 }
 
 
-//Fix control flow if BB is empty.
+//Fix control flow edge if BB will become fallthrough BB.
+//Remove edges after bb except the fallthrough edge.
 //It is illegal if empty BB has non-taken branch.
-void DeadCodeElim::revise_successor(IRBB * bb,
-                                    BBListIter bbct,
-                                    BBList * bbl) const
+void DeadCodeElim::reviseSuccForFallthroughBB(IRBB * bb,
+                                              BBListIter bbct,
+                                              BBList * bbl) const
 {
     ASSERT0(bb && bbct);
     xcom::EdgeC * ec = VERTEX_out_list(m_cfg->getVertex(BB_id(bb)));
     if (ec == NULL) { return; }
 
+    ASSERT0(!bb->is_empty());
     BBListIter next_ct = bbct;
     bbl->get_next(&next_ct);
     IRBB * next_bb = NULL;
@@ -667,27 +669,30 @@ void DeadCodeElim::revise_successor(IRBB * bb,
     }
 
     while (ec != NULL) {
-        xcom::Edge * e = EC_edge(ec);
-        if (EDGE_info(e) != NULL && CFGEI_is_eh((CFGEdgeInfo*)EDGE_info(e))) {
-            ec = EC_next(ec);
+        xcom::Edge * e = ec->getEdge();
+        if (e->info() != NULL && CFGEI_is_eh((CFGEdgeInfo*)e->info())) {
+            ec = ec->get_next();
             continue;
         }
 
-        IRBB * succ_bb = m_cfg->getBB(e->to()->id());
-        ASSERT0(succ_bb);
-
-        if (succ_bb != next_bb) {
-            bb->removeSuccessorPhiOpnd(m_cfg);
+        IRBB * succ = m_cfg->getBB(e->to()->id());
+        ASSERT0(succ);
+        if (succ == next_bb) {
+            ec = ec->get_next();
+            continue;
         }
-
-        xcom::EdgeC * next_ec = EC_next(ec);
+        
+        //bb->removeAllSuccessorsPhiOpnd(m_cfg);
+        bb->removeSuccessorDesignatePhiOpnd(m_cfg, succ);
+        xcom::EdgeC * next_ec = ec->get_next();
         ((xcom::Graph*)m_cfg)->removeEdge(e);
         ec = next_ec;
     }
 
-    if (next_bb != NULL) {
-        m_cfg->addEdge(BB_id(bb), BB_id(next_bb));
-    }
+    //TO BE CONFIRMED:Why need add edge here?
+    //if (next_bb != NULL) {
+    //    m_cfg->addEdge(BB_id(bb), BB_id(next_bb));
+    //}
 }
 
 
@@ -730,52 +735,58 @@ bool DeadCodeElim::perform(OptCtx & oc)
 
     START_TIMER(t, getPassName());
     if (m_is_elim_cfs) {
-        m_rg->checkValidAndRecompute(&oc, PASS_CDG, PASS_PDOM,
-            PASS_CDG, PASS_UNDEF);
+        m_rg->checkValidAndRecompute(&oc, PASS_CDG, PASS_UNDEF);
         m_cdg = (CDG*)m_rg->getPassMgr()->registerPass(PASS_CDG);
     } else {
         m_rg->checkValidAndRecompute(&oc, PASS_PDOM, PASS_UNDEF);
         m_cdg = NULL;
     }
-   
+
+    reinit();
+
     bool change = false;
-    bool removed = false;
-    reinit(); 
-    do {
+    bool removed = true;
+    UINT count = 0;
+    List<IR const*> work_list;
+    while (removed && count < 0xFFFF) {
         removed = false;
+        count++;
         //Mark effect IRs.
-        List<IR const*> work_list;
-        mark_effect_ir(work_list);
+        work_list.clean();
+        mark_effect_ir(work_list);        
         iter_collect(work_list);
         removed = remove_ineffect_ir();
-        if (removed) {
-            change = true;
-            m_is_stmt_effect.clean();
-            m_is_bb_effect.clean();
+        if (!removed) { break; }
 
-            //AA, DU chain and DU reference are maintained.
-            ASSERT0(m_rg->verifyMDRef() &&
-                m_du->verifyMDDUChain(DUOPT_COMPUTE_PR_DU | DUOPT_COMPUTE_NONPR_DU));
-            if (m_prssamgr != NULL && m_prssamgr->isSSAConstructed()) {
-                ASSERT0(verifySSAInfo(m_rg));
-            }
-            if (m_mdssamgr != NULL && m_mdssamgr->isMDSSAConstructed()) {
-                ASSERT0(verifyMDSSAInfo(m_rg));
-            }
-            //Remove empty BB.
-            if (m_cfg->performMiscOpt(oc)) {
-                if (m_mdssamgr != NULL && m_mdssamgr->isMDSSAConstructed()) {
-                    m_mdssamgr->prunePhi();
-                }
-                if (m_prssamgr != NULL && m_prssamgr->isSSAConstructed()) {
-                    m_prssamgr->refinePhi();
-                }
-            }
+        change = true;
+        m_is_stmt_effect.clean();
+        m_is_bb_effect.clean();
+
+        //DU chain and DU reference are maintained.
+        ASSERT0(m_rg->verifyMDRef() &&
+                m_du->verifyMDDUChain(DUOPT_COMPUTE_PR_DU|
+                                      DUOPT_COMPUTE_NONPR_DU));
+        if (m_prssamgr != NULL && m_prssamgr->isSSAConstructed()) {
+            ASSERT0(verifySSAInfo(m_rg));
+        }
+        if (m_mdssamgr != NULL && m_mdssamgr->isMDSSAConstructed()) {
             ASSERT0(verifyMDSSAInfo(m_rg));
         }
-        //fix_control_flow(bblst, ctlst);
-    } while (removed);
 
+        if (m_cfg->performMiscOpt(oc)) {
+            //CFG changed, remove empty BB.
+            //TODO: DO not recompute SSA. Update SSA and MDSSA info especially
+            //PHI operands incrementally.
+            if (m_mdssamgr != NULL && m_mdssamgr->isMDSSAConstructed()) {
+                m_mdssamgr->perform(oc);
+            }
+            if (m_prssamgr != NULL && m_prssamgr->isSSAConstructed()) {
+                m_prssamgr->perform(oc);
+            }
+        }
+        //fix_control_flow(bblst, ctlst);
+    }
+    ASSERT0(!removed);
     if (g_is_dump_after_pass && g_dump_opt.isDumpDCE()) {
         dump();
     }
@@ -787,7 +798,7 @@ bool DeadCodeElim::perform(OptCtx & oc)
 
     //AA, DU chain and DU reference are maintained.
     ASSERT0(m_rg->verifyMDRef() &&
-            m_du->verifyMDDUChain(DUOPT_COMPUTE_PR_DU | DUOPT_COMPUTE_NONPR_DU));
+            m_du->verifyMDDUChain(DUOPT_COMPUTE_PR_DU|DUOPT_COMPUTE_NONPR_DU));
     OC_is_expr_tab_valid(oc) = false;
     OC_is_live_expr_valid(oc) = false;
     OC_is_reach_def_valid(oc) = false;

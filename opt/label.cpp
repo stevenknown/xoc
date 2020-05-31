@@ -38,6 +38,15 @@ author: Su Zhenyu
 
 namespace xoc {
 
+LabelInfo * allocPragmaLabel(SYM const* st, SMemPool * pool)
+{
+    LabelInfo * li = allocLabel(pool);
+    LABEL_INFO_name(li) = st;
+    LABEL_INFO_type(li) = L_PRAGMA;
+    return li;
+}
+
+
 LabelInfo * allocCustomerLabel(SYM const* st, SMemPool * pool)
 {
     LabelInfo * li = allocLabel(pool);

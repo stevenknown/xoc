@@ -55,19 +55,20 @@ protected:
     void dump_head(FILE * h);
     void dump_edge(FILE * h, bool dump_eh);
 
-    void remove_bb_impl(IRBB * bb)
-    {
-        ASSERT0(bb);
-        m_bb_vec.set(BB_id(bb), NULL);
-
-        //C<LabelInfo const*> * ct;
-        //for (lablst.get_head(&ct);
-        //     ct != lablst.end(); ct = lablst.get_next(ct)) {
-        //    m_lab2bb.remove(ct->val());
-        //}
-
-        removeVertex(BB_id(bb));
-    }
+    void remove_bb_impl(IRBB * bb);
+    //CASE: Given pred1->bb, fallthrough edge,
+    //  and pred2->bb, jumping edge.
+    //  bb:
+    //      goto L1
+    //  next of bb:
+    //      L1:
+    //      ...
+    //      ...
+    //Remove bb and revise CFG.
+    //ct: container in m_bb_list of CFG.
+    //    It will be updated if related BB removed.
+    bool removeTrampolinBBCase1(BBListIter * ct);
+    bool removeTrampolinEdgeForCase2(BBListIter ct);
 
 public:
     IRCFG(CFG_SHAPE cs, BBList * bbl, Region * rg,
@@ -137,8 +138,6 @@ public:
         }
     }
 
-    virtual void dumpVCG(CHAR const* name) { CFG<IRBB, IR>::dumpVCG(name); }
-
     void dumpVCG(CHAR const* name = NULL,
                  bool detail = true,
                  bool dump_eh = true);
@@ -164,11 +163,12 @@ public:
     virtual bool if_opt(IRBB * bb);
     bool isRegionEntry(IRBB * bb) { return BB_is_entry(bb); }
     bool isRegionExit(IRBB * bb) { return BB_is_exit(bb); }
-    void insertBBbetween(IN IRBB * from,
-                         IN BBListIter from_ct,
-                         IN IRBB * to,
-                         IN BBListIter to_ct,
-                         IN IRBB * newbb);
+    //Return the inserted trampolining BB if exist.
+    IRBB * insertBBbetween(IN IRBB * from,
+                           IN BBListIter from_ct,
+                           IN IRBB * to,
+                           IN BBListIter to_ct,
+                           IN IRBB * newbb);
     bool inverseAndRemoveTrampolineBranch();
 
     //Return the first operation of 'bb'.

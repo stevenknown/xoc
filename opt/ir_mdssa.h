@@ -34,8 +34,17 @@ namespace xoc {
 typedef xcom::Vector<xcom::TMap<UINT, VMD*>*> BB2VMDMap;
 typedef xcom::TMap<UINT, MDPhiList*> BB2MDPhiList;
 typedef xcom::TMapIter<UINT, MDPhiList*> BB2MDPhiListIter;
-typedef xcom::List<MDDef const*> ConstMDDefIter;
 typedef xcom::List<MDDef*> MDDefIter;
+
+class ConstMDDefIter : public xcom::List<MDDef const*> {
+    COPY_CONSTRUCTOR(ConstMDDefIter);    
+    TTab<UINT> m_is_visited;
+public:
+    ConstMDDefIter() {}
+    bool is_visited(MDDef const* def) const
+    { return m_is_visited.find(def->id()); }
+    void set_visited(MDDef const* def) { m_is_visited.append(def->id()); }
+};
 
 //This class construct MDSSA form and manage the MDSSA information for
 //stmt and expression.
@@ -154,6 +163,9 @@ protected:
                   Vector<DefSBitSet*> & defined_md_vec,
                   List<IRBB*> & wl);
 
+    //Union successors in NextSet from 'from' to 'to'.
+    void unionSuccessors(MDDef const* from, MDDef const* to);
+
     void verifySSAInfo(IR const* ir);
 public:
     explicit MDSSAMgr(Region * rg) : m_usedef_mgr(rg, this)
@@ -246,6 +258,8 @@ public:
     void destruction(DomTree & domtree);
     //Destruction of MDSSA.
     void destruction(OptCtx * oc);
+    //Dump Phi List.
+    void dumpPhiList(MDPhiList const* philist) const;
     //Dump MDSSA reference info.
     void dump();
     //Dump MDSSA DU chain.
@@ -274,6 +288,8 @@ public:
     //Get MDSSAInfo if exist.
     MDSSAInfo * getMDSSAInfoIfAny(IR const* ir)
     { return hasMDSSAInfo(ir) ? getUseDefMgr()->getMDSSAInfo(ir) : NULL; }
+    MDPhiList const* getPhiList(IRBB const* bb) const
+    { return m_usedef_mgr.getBBPhiList(bb->id()); }
 
     //Return true if ir might have MDSSAInfo.
     bool hasMDSSAInfo(IR const* ir) const
@@ -342,7 +358,8 @@ public:
     //Before removing bb or change bb successor,
     //you need remove the related PHI operand if BB successor has PHI stmt.
     void removeSuccessorDesignatePhiOpnd(IRBB * bb, IRBB * succ);
-            
+
+    bool verifyDDChain();
     bool verifyPhi(bool is_vpinfo_avail);
     bool verifyVMD();
     bool verify();

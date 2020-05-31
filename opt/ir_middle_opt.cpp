@@ -133,7 +133,7 @@ bool Region::performSimplify(OptCtx & oc)
     if (g_is_dump_after_pass && g_dump_opt.isDumpALL()) {
         g_indent = 0;
         note("\n==---- DUMP AFTER SIMPLIFY IRBB LIST ----==");
-        dumpBBList(getBBList(), this);
+        dumpBBList();
     }
     return true;
 }
@@ -193,7 +193,7 @@ bool Region::MiddleProcess(OptCtx & oc)
     ASSERT0(verifyRPO(oc));
     if (g_do_refine) {
         RefineCtx rf;
-        if (refineBBlist(bbl, rf, oc)) {                        
+        if (refineBBlist(bbl, rf, oc)) {
             if (g_verify_level >= VERIFY_LEVEL_3 &&
                 OC_is_pr_du_chain_valid(oc) &&
                 OC_is_nonpr_du_chain_valid(oc)) {

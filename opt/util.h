@@ -282,6 +282,10 @@ void tfree();
 //This function indents blank space indicated by g_indent.
 void note(CHAR const* format, ...);
 
+//Print string with indent chars.
+//h: file handler.
+void note(FILE * h, CHAR const* format, ...);
+
 //Helper function to dump formatted string to g_tfile without indent.
 bool prt(CHAR const* format, ...);
 

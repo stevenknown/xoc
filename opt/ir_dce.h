@@ -100,9 +100,9 @@ protected:
     bool preserve_cd(IN OUT List<IR const*> & act_ir_lst);
 
     void reinit();
-    void revise_successor(IRBB * bb, 
-                          BBListIter bbct,
-                          BBList * bbl) const;
+    void reviseSuccForFallthroughBB(IRBB * bb, 
+                                    BBListIter bbct,
+                                    BBList * bbl) const;
     bool remove_ineffect_ir() const;
     //Set control-dep bb to be effective.
     bool setControlDepBBToBeEffect(IRBB const* bb,
@@ -122,7 +122,7 @@ public:
         m_prssamgr = NULL;
         m_md_sys = rg->getMDSystem();
         ASSERT0(m_cfg && m_du && m_md_sys && m_tm);
-        m_is_elim_cfs = false;
+        m_is_elim_cfs = true;
         m_is_use_md_du = true;
         m_cdg = NULL;
     }

@@ -219,6 +219,8 @@ public:
     //pointer's addend. e.g:The pointer arith, int * p; p = p + (type)value.
     bool is_ptr_addend() const
     { return !is_fp() && !is_mc() && !is_bool() && !is_pointer(); }
+
+    bool verify(TypeMgr const* tm) const;
 };
 
 

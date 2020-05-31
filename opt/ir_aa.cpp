@@ -981,7 +981,10 @@ END:
 //Compute the constant offset for pointer arithmetic.
 //Return true if the offset can be confirmed via
 //simply calculation, and has been determined by this function.
-//Return false if caller need to keep evaluating the offset.
+//Return false if caller need to keep reevaluating the offset of 'opnd0_mds'.
+//Return true if this function guarantee applying 'opnd1' on mds successful,
+//then caller can use the returned result directly. If the mds in 'opnd0_mds'
+//changed, then set 'changed' to true.
 //Note this function should not be invoked if 'ir' is placed in
 //loop, because each call of this function will generate a set
 //of new MD which MD_offset updated according to 'opnd1' constant
@@ -996,11 +999,13 @@ END:
 bool AliasAnalysis::tryComputeConstOffset(IR const* ir,
                                           MDSet const& opnd0_mds,
                                           IR const* opnd1,
-                                          IN OUT MDSet & mds)
+                                          IN OUT MDSet & mds,
+                                          bool * changed)
 {
+    ASSERT0(changed);
+    *changed = false;
     //Compute the offset for pointer arithmetic.
     if (opnd1->is_const() && opnd1->is_int() && CONST_int_val(opnd1) == 0) {
-        mds.copy(opnd0_mds, *getSBSMgr());
         return true;
     }
 
@@ -1015,14 +1020,13 @@ bool AliasAnalysis::tryComputeConstOffset(IR const* ir,
         return false;
     }
     if (const_offset == 0) {
-        mds.copy(opnd0_mds, *getSBSMgr());
         return true;
     }
-    mds.clean(*getSBSMgr());
 
     //In the case: LDA(x) + ofst, we can determine
     //the value of LDA(x) is constant.
     //Keep offset validation unchanged.
+    mds.clean(*getSBSMgr());
     MDSetIter iter;
     if (ir->is_add()) {
         for (INT i = opnd0_mds.get_first(&iter);
@@ -1042,6 +1046,7 @@ bool AliasAnalysis::tryComputeConstOffset(IR const* ir,
             ASSERT0(entry->id() > MD_UNDEF);
             mds.bunion(entry, *getSBSMgr());
         }
+        *changed = true;
         return true;
     }
 
@@ -1068,6 +1073,7 @@ bool AliasAnalysis::tryComputeConstOffset(IR const* ir,
         ASSERT0(entry->id() > MD_UNDEF);
         mds.bunion(entry, *getSBSMgr());
     }
+    *changed = true;
     return true;
 }
 
@@ -1079,15 +1085,26 @@ bool AliasAnalysis::tryComputeConstOffset(IR const* ir,
 //we could not determine the exact MD where p pointed to.
 //'mds' : record memory descriptor of 'ir'.
 void AliasAnalysis::inferPointerArith(IR const* ir,
-                                      IN OUT MDSet & mds,
-                                      IN OUT MDSet & opnd0_mds,
+                                      OUT MDSet & mds,
+                                      MDSet const& opnd0_mds,
                                       IN OUT AACtx * opnd0_ic,
                                       IN OUT MD2MDSet * mx)
 {
     ASSERT0(ir->is_add() || ir->is_sub());
     IR * opnd1 = BIN_opnd1(ir);
+    bool changed = false;
     if ((BIN_opnd0(ir)->is_lda() || evaluateFromLda(BIN_opnd0(ir))) &&
-        tryComputeConstOffset(ir, opnd0_mds, opnd1, mds)) {
+        tryComputeConstOffset(ir, opnd0_mds, opnd1, mds, &changed)) {
+        if (changed) {
+            //mds record the expected info.
+            AC_returned_pts(opnd0_ic) = NULL;
+            ASSERT0(!mds.is_empty());
+        } else {
+            //opnd0_mds record the expected info.
+            ASSERT0(mds.is_empty() && !opnd0_mds.is_empty());
+            ASSERT0(AC_returned_pts(opnd0_ic) == NULL);
+            mds.copy(opnd0_mds, *getSBSMgr());
+        }
         return;
     }
 
@@ -1115,27 +1132,65 @@ void AliasAnalysis::inferPointerArith(IR const* ir,
             //Compute constant offset does not make sense to the worst case.
             return;
         }
-        if (isInLoop(ir->getStmt()) ||
-            !tryComputeConstOffset(ir, *AC_returned_pts(opnd0_ic),
-                                   opnd1, mds)) {
+
+        if (isInLoop(ir->getStmt())) {
             //Pointer arithmetic causes ambiguous memory access.
             //e.g: while (...) { p = p+1 }
             //Where is p pointing to at all?
             //Set each MD of opnd0 to be UNBOUND even if it is exact
             //to keep the conservation.
             convertExact2Unbound(*AC_returned_pts(opnd0_ic), &mds);
+            AC_returned_pts(opnd0_ic) = NULL;
+            ASSERT0(!mds.is_empty()); //mds record the expected info.
+            return;
+        }
+
+        bool changed = false;
+        if (!tryComputeConstOffset(ir, *AC_returned_pts(opnd0_ic),
+                                   opnd1, mds, &changed)) {
+            convertExact2Unbound(*AC_returned_pts(opnd0_ic), &mds);
+            AC_returned_pts(opnd0_ic) = NULL;
+            ASSERT0(!mds.is_empty()); //mds record the expected info.
+            return;
+        }
+        if (changed) {
+            //mds record the expected info.
+            AC_returned_pts(opnd0_ic) = NULL;
+            ASSERT0(!mds.is_empty());
+        } else {
+            //AC_returned_pts record the expected info.
+            ASSERT0(mds.is_empty());
+            ASSERT0(AC_returned_pts(opnd0_ic) &&
+                    !AC_returned_pts(opnd0_ic)->is_empty());
         }
         return;
     }
 
-    if (isInLoop(ir->getStmt()) ||
-        !tryComputeConstOffset(ir, opnd0_mds, opnd1, mds)) {
+    ASSERT0(AC_returned_pts(opnd0_ic) == NULL);
+    
+    if (isInLoop(ir->getStmt())) {
         //Pointer arithmetic causes ambiguous memory access.
         //e.g: while (...) { p = p+1 }
         //Where is p pointing to at all?
         //Set each MD of opnd0 to be UNBOUND even if it is exact
         //to keep the conservation.
         convertExact2Unbound(opnd0_mds, &mds);
+        ASSERT0(!mds.is_empty()); //mds record the expected info.
+        return;
+    }
+
+    changed = false;
+    if (!tryComputeConstOffset(ir, opnd0_mds, opnd1, mds, &changed)) {
+        convertExact2Unbound(opnd0_mds, &mds);
+        ASSERT0(!mds.is_empty());
+        return;
+    }
+    if (changed) {
+        ASSERT0(!mds.is_empty()); //mds record the expected info.
+    } else {
+        //opnd0_mds record the expected info.
+        ASSERT0(mds.is_empty() && !opnd0_mds.is_empty());
+        mds.copy(opnd0_mds, *getSBSMgr());
     }
 }
 
@@ -1709,7 +1764,7 @@ void AliasAnalysis::inferStoreValue(IR const* ir,
         //of 'rhs' expression.
         AC_comp_pt(&rhsic) = true;
     }
-
+    
     MDSet rhsrefmds;
     inferExpression(rhs, rhsrefmds, &rhsic, mx);
     recomputeDataType(rhsic, ir, rhsrefmds);
@@ -2133,21 +2188,22 @@ void AliasAnalysis::processIStore(IN IR * ir, IN MD2MDSet * mx)
     ASSERT0(g_is_support_dynamic_type || IST_base(ir)->is_ptr());
 
     //mem location that base-expression may pointed to.
-    MDSet maypts;
+    MDSet base_maypts;
     AACtx ic;
     //Compute where IST_base may point to.
     AC_comp_pt(&ic) = true;
 
     //Compute where IST_base may point to.
-    inferExpression(IST_base(ir), maypts, &ic, mx);
-    if (maypts.is_empty()) {
+    inferExpression(IST_base(ir), base_maypts, &ic, mx);
+    //The POINT-TO set of base-expression indicates what IST stands for.
+    if (base_maypts.is_empty()) {
         //Compute IST ref MDSet and POINT-TO set.
-        //If mds is empty, the inaccurate POINT-TO set
-        //of ILD_base(ir) recorded in AC_returned_pts.
+        //If base_maypts is empty, the inaccurate POINT-TO set
+        //of IST_base(ir) recorded in AC_returned_pts.
         ASSERTN(AC_returned_pts(&ic) && !AC_returned_pts(&ic)->is_empty(),
                 ("mds and returne_pts are alternative"));
 
-        //The POINT-TO set of base-expression indicates what ILD stand for.
+        //The POINT-TO set of base-expression indicates what IST stands for.
         MDSet const* istrefmds = AC_returned_pts(&ic);
 
         //If ir has exact type, try to reshape MD to make ir's
@@ -2181,17 +2237,17 @@ void AliasAnalysis::processIStore(IN IR * ir, IN MD2MDSet * mx)
     //    ir->getTypeSize(m_tm) != IST_base(ir)->getTypeSize(m_tm)) {
     if (!ir->is_any()) {
         MDSet tmp;
-        bool change = tryReshapeMDSet(ir, &maypts, &tmp);
+        bool change = tryReshapeMDSet(ir, &base_maypts, &tmp);
         if (change) {
-            maypts.copy(tmp, *getSBSMgr());
+            base_maypts.copy(tmp, *getSBSMgr());
         }
         tmp.clean(*getSBSMgr());
     }
 
     MD const* x = NULL;
     MDSetIter iter = NULL;
-    if (maypts.get_elem_count() == 1 &&
-        !MD_is_may(x = m_md_sys->getMD((UINT)maypts.get_first(&iter)))) {
+    if (base_maypts.get_elem_count() == 1 &&
+        !MD_is_may(x = m_md_sys->getMD((UINT)base_maypts.get_first(&iter)))) {
         if (x->is_exact() &&
             !ir->is_any() &&
             ir->getTypeSize(m_tm) != MD_size(x)) {
@@ -2210,9 +2266,9 @@ void AliasAnalysis::processIStore(IN IR * ir, IN MD2MDSet * mx)
     } else {
         //Set ir has no exact mem-addr for convervative.
         ir->cleanRefMD();
-        m_rg->setMayRef(ir, m_mds_hash->append(maypts));
+        m_rg->setMayRef(ir, m_mds_hash->append(base_maypts));
     }
-    maypts.clean(*getSBSMgr());
+    base_maypts.clean(*getSBSMgr());
 
     AACtx ic2;
     inferIStoreValue(ir, &ic2, mx);
@@ -2381,20 +2437,17 @@ void AliasAnalysis::processCall(IN IR * ir, IN MD2MDSet * mx)
         if (p->is_ptr() || p->is_any()) {
             AC_comp_pt(&tic) = true;
         }
-
         inferExpression(p, tmp, &tic, mx);
 
-        if (!ir->isReadOnlyCall() &&
-            (AC_comp_pt(&tic) || AC_has_comp_lda(&tic))) {
-            if (!tmp.is_empty()) {
-                by_addr_mds.bunion(tmp, *getSBSMgr());
-            } else if (AC_returned_pts(&tic) != NULL) {
-                if (!by_addr_mds.is_equal(*AC_returned_pts(&tic))) {
-                    by_addr_mds.bunion(*AC_returned_pts(&tic), *getSBSMgr());
-                }
-            } else {
-                by_addr_mds.bunion(tmp, *getSBSMgr());
-            }
+        if (ir->isReadOnlyCall()) { continue; }
+        if (!AC_comp_pt(&tic) && !AC_has_comp_lda(&tic)) { continue; }
+        if (!tmp.is_empty()) {
+            by_addr_mds.bunion(tmp, *getSBSMgr());
+            continue;
+        }
+        if (AC_returned_pts(&tic) != NULL &&
+            !by_addr_mds.is_equal(*AC_returned_pts(&tic))) {
+            by_addr_mds.bunion(*AC_returned_pts(&tic), *getSBSMgr());
         }
     }
 
@@ -3933,6 +3986,8 @@ bool AliasAnalysis::perform(IN OUT OptCtx & oc)
     OC_is_aa_valid(oc) = true;
 
     if (g_is_dump_after_pass && g_dump_opt.isDumpAA()) {
+        note("\n\n==---- DUMP AliasAnalysis '%s' ----==\n",
+             m_rg->getRegionName());
         m_md_sys->dump(false);
         dumpMD2MDSetForRegion(false);
         //dumpInOutPointToSetForBB();

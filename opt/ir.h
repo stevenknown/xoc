@@ -658,8 +658,7 @@ public:
     //Return the SSAInfo if exist.
     inline SSAInfo * getSSAInfo() const;
 
-    //Return stmt if it writes PR as result.
-    //Otherwise return NULL.
+    //Return stmt if it writes PR as result. Otherwise return NULL.
     inline IR * getResultPR();
 
     //Get the stmt accroding to given prno if the stmt writes PR as a result.
@@ -2234,7 +2233,10 @@ bool IR::isReadOnlyCall() const
     switch (getCode()) {
     case IR_CALL: return CALL_is_readonly(this);
     case IR_ICALL: return ICALL_is_readonly(this);
-    default: ASSERTN(0, ("not a call"));
+    default:
+        //For convenient purpose, close down assertion.
+        //ASSERTN(0, ("not a call"));
+        return false;
     }
     return false;
 }

@@ -370,7 +370,7 @@ public:
         m_opnd_list = NULL;
     }
 
-    void dump(Region * rg, UseDefMgr * mgr);
+    void dump(Region const* rg, UseDefMgr const* mgr) const;
 
     IR * getOpndList() const { return m_opnd_list; }
     UINT getOpndNum() const { return xcom::cnt_list(getOpndList()); }
@@ -452,6 +452,7 @@ public:
     MDPhiList * getBBPhiList(UINT bbid) const
     { return m_philist_vec.get(bbid); }
     MDDef * getMDDef(UINT id) const { return m_def_vec.get(id); }
+    xcom::Vector<MDDef*> const* getMDDefVec() const { return &m_def_vec; }
     //Get Versioned MD object by giving MD id and MD version.
     VMD * getVMD(UINT mdid, UINT version) const;
     Region * getRegion() const { return m_rg; }

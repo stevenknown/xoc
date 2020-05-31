@@ -399,8 +399,8 @@ protected:
     void initEntryPtset(PPSetMgr & ppsetmgr);
     void initGlobalAndParameterVarPtSet(VAR * v, MD2MDSet * mx);
     void inferPointerArith(IR const* ir,
-                           IN OUT MDSet & mds,
-                           IN OUT MDSet & opnd0_mds,
+                           OUT MDSet & mds,
+                           MDSet const& opnd0_mds,
                            IN OUT AACtx * opnd0_ic,
                            IN OUT MD2MDSet * mx);
     void inferStoreValue(IR const* ir,
@@ -483,7 +483,8 @@ protected:
     bool tryComputeConstOffset(IR const* ir,
                                MDSet const& opnd0_mds,
                                IR const* opnd1,
-                               IN OUT MDSet & mds);
+                               IN OUT MDSet & mds,
+                               bool * changed);
           
     void recomputeDataType(AACtx const& ic, IR const* ir, OUT MDSet & pts);
     void reviseMDSize(IN OUT MDSet & mds, UINT size);

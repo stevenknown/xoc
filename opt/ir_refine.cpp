@@ -1213,13 +1213,15 @@ IR * Region::refineBinaryOp(IR * ir, bool & change, RefineCtx & rc)
     case IR_BAND:
     case IR_BOR:
     case IR_EQ:
-    case IR_NE: {
+    case IR_NE:
         //Operation commutative: ADD(CONST, ...) => ADD(..., CONST)
-        if (BIN_opnd0(ir)->is_const() && !BIN_opnd1(ir)->is_const()) {
+        if ((BIN_opnd0(ir)->is_const() && !BIN_opnd1(ir)->is_const()) ||
+            BIN_opnd1(ir)->is_ptr()) {
             IR * tmp = BIN_opnd0(ir);
             BIN_opnd0(ir) = BIN_opnd1(ir);
             BIN_opnd1(ir) = tmp;
         }
+
         if (BIN_opnd1(ir)->is_const()) {
             ir = reassociation(ir, lchange);
             change |= lchange;
@@ -1234,7 +1236,6 @@ IR * Region::refineBinaryOp(IR * ir, bool & change, RefineCtx & rc)
         else if (ir->is_eq()) { ir = refineEq(ir, change, rc); }
         else if (ir->is_ne()) { ir = refineNe(ir, change, rc); }
         break;
-    }
     case IR_SUB:
         if (BIN_opnd1(ir)->is_const()) {
             ir = reassociation(ir, lchange);
@@ -1263,7 +1264,9 @@ IR * Region::refineBinaryOp(IR * ir, bool & change, RefineCtx & rc)
     case IR_LSL:
         break;
     case IR_LT:
-        if (BIN_opnd0(ir)->is_const() && !BIN_opnd1(ir)->is_const()) {
+        if ((BIN_opnd0(ir)->is_const() && !BIN_opnd1(ir)->is_const()) ||
+            BIN_opnd1(ir)->is_ptr()) {
+            //Invert code: 0 < a ==> a > 0
             IR * tmp = BIN_opnd0(ir);
             BIN_opnd0(ir) = BIN_opnd1(ir);
             BIN_opnd1(ir) = tmp;
@@ -1271,7 +1274,9 @@ IR * Region::refineBinaryOp(IR * ir, bool & change, RefineCtx & rc)
         }
         break;
     case IR_LE:
-        if (BIN_opnd0(ir)->is_const() && !BIN_opnd1(ir)->is_const()) {
+        if ((BIN_opnd0(ir)->is_const() && !BIN_opnd1(ir)->is_const()) ||
+            BIN_opnd1(ir)->is_ptr()) {
+            //Invert code: 0 <= a ==> a >= 0
             IR * tmp = BIN_opnd0(ir);
             BIN_opnd0(ir) = BIN_opnd1(ir);
             BIN_opnd1(ir) = tmp;
@@ -1279,7 +1284,9 @@ IR * Region::refineBinaryOp(IR * ir, bool & change, RefineCtx & rc)
         }
         break;
     case IR_GT:
-        if (BIN_opnd0(ir)->is_const() && !BIN_opnd1(ir)->is_const()) {
+        if ((BIN_opnd0(ir)->is_const() && !BIN_opnd1(ir)->is_const()) ||
+            BIN_opnd1(ir)->is_ptr()) {
+            //Invert code: 0 > a ==> a < 0
             IR * tmp = BIN_opnd0(ir);
             BIN_opnd0(ir) = BIN_opnd1(ir);
             BIN_opnd1(ir) = tmp;
@@ -1287,7 +1294,9 @@ IR * Region::refineBinaryOp(IR * ir, bool & change, RefineCtx & rc)
         }
         break;
     case IR_GE:
-        if (BIN_opnd0(ir)->is_const() && !BIN_opnd1(ir)->is_const()) {
+        if ((BIN_opnd0(ir)->is_const() && !BIN_opnd1(ir)->is_const()) ||
+            BIN_opnd1(ir)->is_ptr()) {
+            //Invert code: 0 >= a ==> a <= 0
             IR * tmp = BIN_opnd0(ir);
             BIN_opnd0(ir) = BIN_opnd1(ir);
             BIN_opnd1(ir) = tmp;
@@ -1568,19 +1577,18 @@ IR * Region::refineIR(IR * ir, bool & change, RefineCtx & rc)
     case IR_GT:
     case IR_GE:
     case IR_EQ:
-    case IR_NE:
+    case IR_NE: {
         //Do NOT do foldConst for conditional expr.
         //e.g: If NE(1, 0) => 1, one should generate NE(1, 0) again,
         //because of TRUEBR/FALSEBR do not accept IR_CONST.
-        {
-            RefineCtx t(rc);
-            RC_do_fold_const(t) = false;
-            ir = refineBinaryOp(ir, tmpc, t);
-            if (!ir->is_const()) {
-                ir = refineDetViaSSAdu(ir, tmpc);
-            }
+        RefineCtx t(rc);
+        RC_do_fold_const(t) = false;
+        ir = refineBinaryOp(ir, tmpc, t);
+        if (!ir->is_const()) {
+            ir = refineDetViaSSAdu(ir, tmpc);
         }
         break;
+    }
     case IR_GOTO:
         break;
     case IR_DO_WHILE:
@@ -1771,11 +1779,9 @@ void Region::insertCvtForBinaryOp(IR * ir, bool & change)
     IR * op0 = BIN_opnd0(ir);
     IR * op1 = BIN_opnd1(ir);
     if (op0->is_any() || op1->is_any()) { return; }
-
     if (op0->getType() == op1->getType()) {
         if (op0->is_mc()) {
-            ASSERTN(TY_mc_size(op0->getType()) ==
-                    TY_mc_size(op1->getType()),
+            ASSERTN(TY_mc_size(op0->getType()) == TY_mc_size(op1->getType()),
                     ("invalid binop for two D_MC operands"));
         }
         return;
@@ -1784,7 +1790,7 @@ void Region::insertCvtForBinaryOp(IR * ir, bool & change)
     if (op0->is_ptr()) {
         if (op1->getTypeSize(getTypeMgr()) > op0->getTypeSize(getTypeMgr())) {
             ASSERTN(op1->getType()->is_ptr_addend() && !op1->is_ptr(),
-                   ("illegal pointer arith"));
+                    ("illegal pointer arith"));
             DATA_TYPE t = getTypeMgr()->getPointerSizeDtype();
             BIN_opnd1(ir) = buildCvt(op1, getTypeMgr()->getSimplexTypeEx(t));
             copyDbx(BIN_opnd1(ir), op1, this);
@@ -1795,7 +1801,10 @@ void Region::insertCvtForBinaryOp(IR * ir, bool & change)
         return;
     }
 
-    ASSERTN(!op1->is_ptr(), ("illegal binop for Non-pointer and Pointer"));
+    if (ir->is_logical()) {
+        //Type of operand of logical operation does not need to be consistent.
+        return;
+    }
 
     //Both op0 and op1 are NOT pointer.
     if (op0->is_vec() || op1->is_vec()) {
@@ -1803,6 +1812,10 @@ void Region::insertCvtForBinaryOp(IR * ir, bool & change)
         //op0 may be vector and op1 may be MC.
         return;
     }
+
+    //If ir is relation operation, op1 should have been swapped to first
+    //operand if it is a pointer.
+    ASSERTN(!op1->is_ptr(), ("illegal binop for Non-pointer and Pointer"));
 
     //Both op0 and op1 are NOT vector type.
     TypeMgr * dm = getTypeMgr();
@@ -1899,70 +1912,68 @@ IR * Region::insertCvt(IR * parent, IR * kid, bool & change)
     case IR_TRUEBR:
     case IR_FALSEBR:
     case IR_RETURN:
-    case IR_SELECT:
-        {
-            TypeMgr * dm = getTypeMgr();
-            Type const* tgt_ty = parent->getType();
-            if (tgt_ty->is_any()) { return kid; }
+    case IR_SELECT: {
+        TypeMgr * dm = getTypeMgr();
+        Type const* tgt_ty = parent->getType();
+        if (tgt_ty->is_any()) { return kid; }
 
-            UINT tgt_size = parent->getTypeSize(dm);
-            UINT src_size = kid->getTypeSize(dm);
+        UINT tgt_size = parent->getTypeSize(dm);
+        UINT src_size = kid->getTypeSize(dm);
 
-            if (parent->is_vec() || kid->is_vec()) {
-                //Do not do hoisting for vector type.
-                ASSERTN(tgt_size == src_size, ("different size vector"));
-                return kid;
-            }
-
-            if (parent->is_fp() || kid->is_fp()) {
-                return insertCvtForFloat(parent, kid, change);
-            }
-
-            if (tgt_size <= src_size) {
-                //Do not hoist type.
-                return kid;
-            }
-
-            if (parent->is_ptr() &&
-                parent->is_add() &&
-                BIN_opnd0(parent)->is_ptr()) {
-                //Skip pointer arithmetics.
-                return kid;
-            }
-
-            if ((parent->is_asr() || parent->is_lsl() || parent->is_lsr()) &&
-                kid == BIN_opnd1(parent)) {
-                //CASE: Second operand of Shift operantion need NOT to be converted.
-                //      Second operand indicates the bit that expected to be shifted.
-                //e.g: $2(u64) = $8(u64) >> j(u32);
-                //  stpr $2 : u64 id : 37 attachinfo : Dbx
-                //      lsr : u64 id : 31 attachinfo : Dbx
-                //          $8 : u64 id : 59
-                //          ld : u32 'j' decl : unsigned int j  id : 30 attachinfo : Dbx, MDSSA
-                return kid;
-            }
-
-            if (kid->is_const() && kid->is_int()) {
-                //kid is integer literal.
-                if (tgt_ty->is_pointer()) {
-                    IR_dt(kid) = dm->getSimplexTypeEx(dm->getPointerSizeDtype());
-                } else if (tgt_ty->is_string()) {
-                    IR * new_kid = buildCvt(kid, tgt_ty);
-                    copyDbx(new_kid, kid, this);
-                    kid = new_kid;
-                } else {
-                    IR_dt(kid) = tgt_ty;
-                }
-                change = true;
-                return kid;
-            }
-
-            IR * new_kid = buildCvt(kid, parent->getType());
-            copyDbx(new_kid, kid, this);
-            change = true;
-            return new_kid;
+        if (parent->is_vec() || kid->is_vec()) {
+            //Do not do hoisting for vector type.
+            ASSERTN(tgt_size == src_size, ("different size vector"));
+            return kid;
         }
-        break;
+
+        if (parent->is_fp() || kid->is_fp()) {
+            return insertCvtForFloat(parent, kid, change);
+        }
+
+        if (tgt_size <= src_size) {
+            //Do not hoist type.
+            return kid;
+        }
+
+        if (parent->is_ptr() &&
+            parent->is_add() &&
+            BIN_opnd0(parent)->is_ptr()) {
+            //Skip pointer arithmetics.
+            return kid;
+        }
+
+        if ((parent->is_asr() || parent->is_lsl() || parent->is_lsr()) &&
+            kid == BIN_opnd1(parent)) {
+            //CASE: Second operand of Shift operantion need NOT to be converted.
+            //      Second operand indicates the bit that expected to be shifted.
+            //e.g: $2(u64) = $8(u64) >> j(u32);
+            //  stpr $2 : u64 id : 37 attachinfo : Dbx
+            //      lsr : u64 id : 31 attachinfo : Dbx
+            //          $8 : u64 id : 59
+            //          ld : u32 'j' decl : unsigned int j  id : 30 attachinfo : Dbx, MDSSA
+            return kid;
+        }
+
+        if (kid->is_const() && kid->is_int()) {
+            //kid is integer literal.
+            if (tgt_ty->is_pointer()) {
+                IR_dt(kid) = dm->getSimplexTypeEx(dm->getPointerSizeDtype());
+            } else if (tgt_ty->is_string()) {
+                IR * new_kid = buildCvt(kid, tgt_ty);
+                copyDbx(new_kid, kid, this);
+                kid = new_kid;
+            } else {
+                IR_dt(kid) = tgt_ty;
+            }
+            change = true;
+            return kid;
+        }
+
+        IR * new_kid = buildCvt(kid, parent->getType());
+        copyDbx(new_kid, kid, this);
+        change = true;
+        return new_kid;
+    }
     default:;
     }
 

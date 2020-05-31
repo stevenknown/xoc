@@ -65,8 +65,7 @@ bool LICM::scanOpnd(IN LI<IRBB> * li,
 
         IRBB * bb = m_cfg->getBB(i);
         ASSERT0(bb && m_cfg->getVertex(i));
-        for (IR * ir = BB_first_ir(bb);
-             ir != NULL; ir = BB_next_ir(bb)) {
+        for (IR * ir = BB_first_ir(bb); ir != NULL; ir = BB_next_ir(bb)) {
             if (!ir->isContainMemRef() || ir->isNoMove()) { continue; }
             if ((ir->isCallStmt() && !ir->isReadOnlyCall()) ||
                 ir->is_region() || ir->is_phi()) {

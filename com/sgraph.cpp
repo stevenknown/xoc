@@ -793,7 +793,6 @@ bool Graph::sortInTopologOrder(OUT Vector<Vertex*> & vex_vec)
         is_removed.bunion(ready->id());
         vex_vec.set(pos, ready);
         pos++;
-        UINT succ_num = 0;
         for (xcom::EdgeC const* el = VERTEX_out_list(ready);
              el != NULL; el = EC_next(el)) {
             Vertex * ready_succ = el->getTo();

@@ -118,9 +118,9 @@ Type const* TypeMgr::hoistDtypeForBinop(IR const* opnd0, IR const* opnd1)
     Type const* d1 = opnd1->getType();
     ASSERT0(!d0->is_any() && !d1->is_any());
     ASSERTN(!d0->is_vector() && !d1->is_vector(),
-           ("Can not hoist vector type."));
+            ("Can not hoist vector type."));
     ASSERTN(!d0->is_pointer() && !d1->is_pointer(),
-           ("Can not hoist pointer type."));
+            ("Can not hoist pointer type."));
 
     DATA_TYPE t0 = TY_dtype(d0);
     DATA_TYPE t1 = TY_dtype(d1);
@@ -579,5 +579,34 @@ void TypeMgr::dump_type_tab()
     }
     fflush(g_tfile);
 }
+
+
+//
+//START Type
+//
+bool Type::verify(TypeMgr const* tm) const
+{
+    if (is_pointer()) {
+        ASSERT0(TY_ptr_base_size(this) != 0);
+    } else if (is_mc()) {
+        ASSERT0(TY_mc_size(this) != 0);
+    } else {
+        //IR_mc_size may be not zero.
+        //e.g: struct {int x;}s;
+        //    int w = s.x;
+        //    Here we get w IR_LD(s, offset=0, mc_size=4)
+        //ASSERT0(IR_mc_size(this) == 0);
+    }
+
+    if (is_vector()) {
+        ASSERT0(TY_vec_ety(this) != D_UNDEF);
+        ASSERTN(IS_SIMPLEX(TY_vec_ety(this)) || IS_PTR(TY_vec_ety(this)),
+                ("illegal vector elem type"));
+        ASSERT0((TY_vec_size(this) >= tm->getDTypeByteSize(TY_vec_ety(this))) &&
+            (TY_vec_size(this) % tm->getDTypeByteSize(TY_vec_ety(this)) == 0));        
+    }
+    return true;
+}
+//END Type
 
 } //namespace xoc

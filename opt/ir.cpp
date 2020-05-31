@@ -1496,29 +1496,8 @@ bool IR::verify(Region const* rg) const
     DUMMYUSE(tm);
 
     Type const* d = getType();
-    ASSERT0(d);
-
-    if (d->is_pointer()) {
-        ASSERT0(TY_ptr_base_size(d) != 0);
-    } else if (d->is_mc()) {
-        ASSERT0(TY_mc_size(d) != 0);
-    } else {
-        //IR_mc_size may be not zero.
-        //e.g: struct {int x;}s;
-        //    int w = s.x;
-        //    Here we get w IR_LD(s, offset=0, mc_size=4)
-        //ASSERT0(IR_mc_size(this) == 0);
-    }
-
+    ASSERT0(d && d->verify(tm));
     if (d->is_vector()) {
-        ASSERT0(TY_vec_ety(d) != D_UNDEF);
-
-        ASSERTN(IS_SIMPLEX(TY_vec_ety(d)) || IS_PTR(TY_vec_ety(d)),
-                ("illegal vector elem type"));
-
-        ASSERT0(TY_vec_size(d) >= tm->getDTypeByteSize(TY_vec_ety(d)) &&
-                TY_vec_size(d) % tm->getDTypeByteSize(TY_vec_ety(d)) == 0);
-
         UINT ofst = getOffset();
         if (ofst != 0) {
             ASSERT0((ofst % tm->getDTypeByteSize(TY_vec_ety(d))) == 0);
@@ -2697,8 +2676,10 @@ void IR::dumpRef(Region * r, UINT indent)
             note("\n"); //dump indent blank.
         }
         prt(" : ");
-        if (mds != NULL && !mds->is_empty()) {
-            mds->dump(r->getMDSystem());
+        if (!isReadOnlyCall()) {
+            if (mds != NULL && !mds->is_empty()) {
+                mds->dump(r->getMDSystem());
+            }
         }
     }
 

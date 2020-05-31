@@ -1510,12 +1510,14 @@ bool PRSSAMgr::refinePhi(List<IRBB*> & wl)
             nextirct = BB_irlist(bb).get_next(nextirct);
             IR * ir = irct->val();
             if (!ir->is_phi()) { break; }
-
+            
             IR * common_def = NULL;
             if (!isRedundantPHI(ir, &common_def)) {
                 revisePhiDataType(ir, m_rg);
                 continue;
             }
+
+            //PHI is redundant, revise SSAInfo before remove the PHI.
             for (IR const* opnd = PHI_opnd_list(ir);
                  opnd != NULL; opnd = opnd->get_next()) {
                 ASSERT0(opnd->is_phi_opnd());
@@ -1548,11 +1550,13 @@ bool PRSSAMgr::refinePhi(List<IRBB*> & wl)
                 //just call it common_def. Replace the SSA_def of
                 //current SSAInfo to the common_def.
 
-                ASSERT0(common_def->getResultPR(PHI_prno(ir)));
-                ASSERTN(common_def->getResultPR(PHI_prno(ir))->getPrno()
-                        == PHI_prno(ir), ("not same PR"));
+                //TO BE CONFIRMED:Why should the result PR of common-def
+                //be same with PHI?
+                //ASSERT0(common_def->getResultPR(PHI_prno(ir)));
+                //ASSERTN(common_def->getResultPR(PHI_prno(ir))->getPrno()
+                //        == PHI_prno(ir), ("not same PR"));
 
-                IR * respr = common_def->getResultPR(PHI_prno(ir));
+                IR * respr = common_def->getResultPR();
                 ASSERT0(respr);
 
                 SSAInfo * commdef_ssainfo = respr->getSSAInfo();

@@ -99,7 +99,7 @@ void MDSSAMgr::dumpRef(UINT indent)
     BBList * bbs = m_rg->getBBList();
     ASSERT0(bbs);
     if (bbs->get_elem_count() != 0) {
-        m_md_sys->dump(false);
+        m_md_sys->dump(true);
     }
 
     //Dump imported variables referenced.
@@ -196,7 +196,7 @@ void MDSSAMgr::dumpAllVMD()
 }
 
 
-//Before removing bb or change bb successor,
+//Before removing BB or change BB successor,
 //you need remove the related PHI operand if BB successor has PHI.
 void MDSSAMgr::removeSuccessorDesignatePhiOpnd(IRBB * bb, IRBB * succ)
 {
@@ -209,6 +209,7 @@ void MDSSAMgr::removeSuccessorDesignatePhiOpnd(IRBB * bb, IRBB * succ)
         MDPhi * phi = sct->val();
         ASSERT0(phi && phi->is_phi());
         IR * opnd_head = phi->getOpndList();
+
         ASSERT0(xcom::cnt_list(opnd_head) == succ->getNumOfPred(m_cfg));
         if (opnd_head == NULL) {
             //MDPHI does not contain any operand.
@@ -228,6 +229,19 @@ void MDSSAMgr::removeSuccessorDesignatePhiOpnd(IRBB * bb, IRBB * succ)
 }
 
 
+void MDSSAMgr::dumpPhiList(MDPhiList const* philist) const
+{
+    ASSERT0(philist);
+    for (xcom::SC<MDPhi*> * sct = philist->get_head();
+         sct != philist->end(); sct = philist->get_next(sct)) {
+        MDPhi const* phi = sct->val();
+        ASSERT0(phi && phi->is_phi());
+        note("\n");
+        phi->dump(m_rg, &m_usedef_mgr);
+    }
+}
+
+
 void MDSSAMgr::dump()
 {
     if (g_tfile == NULL) { return; }
@@ -242,13 +256,7 @@ void MDSSAMgr::dump()
 
         MDPhiList * philist = m_usedef_mgr.getBBPhiList(BB_id(bb));
         if (philist != NULL) {
-            for (xcom::SC<MDPhi*> * sct = philist->get_head();
-                 sct != philist->end(); sct = philist->get_next(sct)) {
-                MDPhi * phi = sct->val();
-                ASSERT0(phi && phi->is_phi());
-                note("\n");
-                phi->dump(m_rg, &m_usedef_mgr);
-            }
+            dumpPhiList(philist);
         }
 
         for (IR * ir = BB_first_ir(bb); ir != NULL; ir = BB_next_ir(bb)) {
@@ -627,8 +635,37 @@ void MDSSAMgr::dumpDUChain()
 void MDSSAMgr::initVMD(IN IR * ir, OUT DefSBitSet & maydef_md)
 {
     m_iter.clean();
-    for (IR * t = iterInit(ir, m_iter); t != NULL; t = iterNext(m_iter)) {
-        if (!t->isMemoryRefNotOperatePR() && !t->isCallStmt()) {
+    ASSERT0(ir->is_stmt());
+    if (ir->isMemoryRefNotOperatePR() ||
+        (ir->isCallStmt() && !ir->isReadOnlyCall())) {
+        MDSSAInfo * mdssainfo = m_usedef_mgr.genMDSSAInfo(ir);
+        MD const* ref = ir->getRefMD();
+        if (ref != NULL && !ref->is_pr()) {
+            VMD const* vmd = m_usedef_mgr.allocVMD(MD_id(ref), 0);
+            ASSERT0(m_sbs_mgr);
+            mdssainfo->getVOpndSet()->append(vmd, *m_sbs_mgr);
+            maydef_md.bunion(MD_id(ref));            
+        }
+
+        MDSet const* refset = ir->getRefMDSet();
+        if (refset != NULL) {
+            MDSetIter iter;
+            for (INT i = refset->get_first(&iter);
+                 i >= 0; i = refset->get_next((UINT)i, &iter)) {
+                MD * md = m_md_sys->getMD(i);
+                ASSERTN(md && !md->is_pr(), ("PR should not in MayBeSet"));
+                VMD const* vmd2 = m_usedef_mgr.allocVMD(MD_id(md), 0);
+                ASSERT0(m_sbs_mgr);
+                mdssainfo->getVOpndSet()->append(vmd2, *m_sbs_mgr);
+                maydef_md.bunion(MD_id(md));                
+            }
+        }
+    }
+
+    for (IR * t = iterRhsInit(ir, m_iter);
+         t != NULL; t = iterRhsNext(m_iter)) {
+        ASSERT0(t->is_exp());
+        if (!t->isMemoryRefNotOperatePR()) {
             continue;
         }
         MDSSAInfo * mdssainfo = m_usedef_mgr.genMDSSAInfo(t);
@@ -636,10 +673,7 @@ void MDSSAMgr::initVMD(IN IR * ir, OUT DefSBitSet & maydef_md)
         if (ref != NULL && !ref->is_pr()) {
             VMD const* vmd = m_usedef_mgr.allocVMD(MD_id(ref), 0);
             ASSERT0(m_sbs_mgr);
-            mdssainfo->getVOpndSet()->append(vmd, *m_sbs_mgr);
-            if (t->is_stmt()) {
-                maydef_md.bunion(MD_id(ref));
-            }
+            mdssainfo->getVOpndSet()->append(vmd, *m_sbs_mgr);            
         }
 
         MDSet const* refset = t->getRefMDSet();
@@ -652,9 +686,6 @@ void MDSSAMgr::initVMD(IN IR * ir, OUT DefSBitSet & maydef_md)
                 VMD const* vmd2 = m_usedef_mgr.allocVMD(MD_id(md), 0);
                 ASSERT0(m_sbs_mgr);
                 mdssainfo->getVOpndSet()->append(vmd2, *m_sbs_mgr);
-                if (t->is_stmt()) {
-                    maydef_md.bunion(MD_id(md));
-                }
             }
         }
     }
@@ -792,7 +823,6 @@ bool MDSSAMgr::doOpndHaveSameDef(MDPhi const* phi, OUT VMD ** common_def) const
 bool MDSSAMgr::doOpndHaveValidDef(MDPhi const* phi) const
 {
     if (phi->hasNoOpnd()) { return false; }
-    VMD * def = NULL;
     //Indicate all DEFs of operands are the invalid VMD.
     bool has_valid_def = false;
     for (IR const* opnd = phi->getOpndList();
@@ -1416,6 +1446,30 @@ void MDSSAMgr::stripPhi(MDPhi * phi)
 }
 
 
+bool MDSSAMgr::verifyDDChain()
+{
+    START_TIMER(tverify, "MDSSA: Verify DefDef Chain");
+    xcom::Vector<MDDef*> const*  mddefvec = getUseDefMgr()->getMDDefVec();
+    for (INT i = 0; i <= mddefvec->get_last_idx(); i++) {
+        MDDef const* mddef = mddefvec->get(i);
+        if (mddef == NULL) { continue; }
+
+        MDDef const* prev = mddef->getPrev();
+        if (prev != NULL) {
+            ASSERT0(prev->getNextSet());
+            ASSERT0(prev->getNextSet()->find(mddef));            
+        }        
+        if (mddef->is_phi()) {
+            //Note if MDDef indicates PHI, it does not have Previous DEF,
+            //because PHI has multiple Previous DEFs rather than single DEF.
+            ASSERT0(prev == NULL);
+        }
+    }
+    END_TIMER(tverify, "MDSSA: Verify After Pass");
+    return true;
+}
+
+
 //This function verify def/use information of PHI stmt.
 //If vpinfo is available, the function also check VOPND_mdid of phi operands.
 //is_vpinfo_avail: set true if VMD information is available.
@@ -1455,7 +1509,8 @@ bool MDSSAMgr::verifyPhi(bool is_vpinfo_avail)
                 //Ver0 is input parameter, and it has no MDSSA_def.
                 //ASSERT0(VOPND_ver(MD_ssainfo(opnd)) > 0);
 
-                ASSERTN(ID_phi(opnd) == phi, ("opnd is not an operand of phi"));
+                ASSERTN(ID_phi(opnd) == phi,
+                        ("opnd is not an operand of phi"));
             }
 
             ASSERTN(num_opnd == preds.get_elem_count(),
@@ -1640,6 +1695,7 @@ void MDSSAMgr::verifySSAInfo(IR const* ir)
 bool MDSSAMgr::verify()
 {
     START_TIMER(tverify, "MDSSA: Verify After Pass");
+    ASSERT0(verifyDDChain());
 
     //Check version for each vp.
     BBList * bbl = m_rg->getBBList();
@@ -1920,6 +1976,31 @@ void MDSSAMgr::removeStmtFromMDSSAMgr(IR const* stmt)
 }
 
 
+//Union successors in NextSet from 'from' to 'to'.
+void MDSSAMgr::unionSuccessors(MDDef const* from, MDDef const* to)
+{
+    if (from->is_phi()) {
+        if (to->getNextSet() == NULL) {
+            if (from->getNextSet() != NULL) {
+                //Note if MDDef indicates PHI, it does not have Previous DEF,
+                //because PHI has multiple Previous DEFs rather than single DEF.
+                MDDEF_nextset(to) = m_usedef_mgr.allocMDDefSet();
+                to->getNextSet()->bunion(*from->getNextSet(), *m_sbs_mgr);
+            }
+            return;
+        }
+        if (from->getNextSet() != NULL) {
+            //Note if MDDef indicates PHI, it does not have Previous DEF,
+            //because PHI has multiple Previous DEFs rather than single DEF.
+            to->getNextSet()->bunion(*from->getNextSet(), *m_sbs_mgr);
+        }
+        return;
+    }
+    if (to->getNextSet() == NULL || from->getNextSet() == NULL) { return; }
+    to->getNextSet()->bunion(*from->getNextSet(), *m_sbs_mgr);
+}
+
+
 //Remove MDDef from Def-Def chain.
 //e.g:D1<->D2
 //     |<->D3
@@ -1939,19 +2020,27 @@ void MDSSAMgr::removeDefFromDDChainHelper(MDDef const* mddef, MDDef * prev)
     ASSERT0(mddef);
     if (mddef->getNextSet() == NULL) {
         if (prev != NULL) {
-            //Cutoff def-def chain between 'mddef' to its predecessor.
-            ASSERT0(prev->getNextSet());
-            prev->getNextSet()->remove(mddef, *m_sbs_mgr);
+            if (prev->getNextSet() != NULL) {
+                //Cutoff def-def chain between 'mddef' to its predecessor.                
+                prev->getNextSet()->remove(mddef, *m_sbs_mgr);
+            } else {
+                //Note if mddef indicates PHI, it does not have Previous DEF,
+                //because PHI has multiple Previous DEFs rather than single DEF.
+                ASSERT0(mddef->is_phi());
+            }
         }
         MDDEF_prev(mddef) = NULL;
         return;
     }
+
     if (prev != NULL) {
         //Union successors of 'mddef' to its predecessor's next-set.
-        ASSERT0(prev->getNextSet());
-        prev->getNextSet()->remove(mddef, *m_sbs_mgr);
-        prev->getNextSet()->bunion(*mddef->getNextSet(), *m_sbs_mgr);        
+        unionSuccessors(mddef, prev);
+        if (prev->getNextSet() != NULL) {
+            prev->getNextSet()->remove(mddef, *m_sbs_mgr);
+        }        
     }
+
     //Update successor's predecesor.
     MDDefSetIter nit = NULL;
     for (INT w = mddef->getNextSet()->get_first(&nit);
@@ -1973,7 +2062,7 @@ void MDSSAMgr::removeDefFromDDChainHelper(MDDef const* mddef, MDDef * prev)
 //     |->D4
 //  where predecessor of D3 is D1, successors of D3 are D5, D6
 //  After remove D3:
-//e.g:D1<->D2
+//    D1<->D2
 //     |<->D5
 //     |<->D6
 //     |<->D4
@@ -1996,7 +2085,7 @@ void MDSSAMgr::removeDefFromDDChain(MDDef const* mddef)
 //     |->D4
 //  where predecessor of D3 is D1, successors of D3 are D5, D6
 //  After remove D3:
-//e.g:D1<->D2
+//    D1<->D2
 //     |<->D5
 //     |<->D6
 //     |<->D4
@@ -2040,7 +2129,6 @@ bool MDSSAMgr::removePHIHasCommonDef(List<IRBB*> & wl,
     if (!doOpndHaveSameDef(phi, &common_def)) {
         return false;
     }
-
     ASSERT0(common_def);
     for (IR * opnd = phi->getOpndList();
          opnd != NULL; opnd = opnd->get_next()) {
@@ -2199,7 +2287,7 @@ static void iterDefCHelper(MDDef const* def,
                            MDSSAMgr * mgr,
                            OUT ConstMDDefIter & ii)
 {
-    if (def == NULL) { return; }
+    ASSERT0(def);    
     if (def->is_phi()) {
         //Iter phi's opnd
         for (IR const* opnd = MDPHI_opnd_list(def);
@@ -2208,12 +2296,21 @@ static void iterDefCHelper(MDDef const* def,
                 opnd, mgr->getUseDefMgr());
             ASSERT0(vmd);
             MDDef * vmd_tdef = vmd->getDef();
-            if (vmd_tdef == NULL) { continue; }
+            if (vmd_tdef == NULL ||
+                vmd_tdef == def ||
+                ii.is_visited(vmd_tdef)) {
+                continue;
+            }
+            ii.set_visited(vmd_tdef);
             ii.append_tail(vmd_tdef);
         }
-    } else {
-        ii.append_tail(def->getPrev());
+        return;
     }
+
+    MDDef const* prev = def->getPrev();
+    if (prev == NULL || ii.is_visited(prev)) { return; }
+    ii.set_visited(prev);
+    ii.append_tail(prev);
 }
 
 
@@ -2225,7 +2322,9 @@ static void iterDefCHelper(MDDef const* def,
 MDDef const* MDSSAMgr::iterDefInitC(MDDef const* def,
                                     OUT ConstMDDefIter & ii)
 {
-    iterDefCHelper(def, this, ii);
+    ASSERT0(def);
+    ii.set_visited(def);
+    iterDefCHelper(def, this, ii);    
     return def;
 }
 
@@ -2237,6 +2336,7 @@ MDDef const* MDSSAMgr::iterDefInitC(MDDef const* def,
 MDDef const* MDSSAMgr::iterDefNextC(IN OUT ConstMDDefIter & ii)
 {
     MDDef const* def = ii.remove_head();
+    if (def == NULL) { return NULL; }
     iterDefCHelper(def, this, ii);
     return def;
 }
@@ -2318,12 +2418,12 @@ bool MDSSAMgr::construction(DomTree & domtree)
     if (g_is_dump_after_pass && g_dump_opt.isDumpMDSSAMgr()) {
         START_TIMER(tdump, "MDSSA: Dump After Pass");
         g_indent = 0;
-        m_md_sys->dump(false);
+        m_md_sys->dump(true);
         dump();
         dumpDUChain();
         END_TIMER(tdump, "MDSSA: Dump After Pass");
     }
-
+    
     ASSERT0(verify());
     ASSERT0(verifyIRandBB(m_rg->getBBList(), m_rg));
     ASSERT0(verifyPhi(false) && verifyVMD());

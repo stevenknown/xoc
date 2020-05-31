@@ -3289,8 +3289,6 @@ void DUMgr::computeKillSet(DefDBitSetCoreReserveTab & dbitsetchash,
     for (bbl->get_head(&ct); ct != bbl->end(); ct = bbl->get_next(ct)) {
         IRBB * bb = ct->val();
         UINT bbid = bb->id();
-        DefDBitSetCore const* maygendef = genMayGenDef(bbid, &bsmgr);
-
         bool comp_must = false;
         MDSet const* bb_mustdef_mds = NULL;
         if (mustexactdefmds != NULL) {
@@ -3321,7 +3319,7 @@ void DUMgr::computeKillSet(DefDBitSetCoreReserveTab & dbitsetchash,
         DefSBitSetIter st = NULL;
         for (INT b = livein_bbs->get_first(&st);
              b != -1; b = livein_bbs->get_next(b, &st)) {
-            if (b == bbid) { continue; }
+            if (b == (INT)bbid) { continue; }
             DefDBitSetCore const* livein_maygendef = genMayGenDef(
                 m_cfg->getBB(b)->id(), NULL);
             ASSERT0(livein_maygendef);
@@ -5383,7 +5381,8 @@ void DUMgr::computeMDDUChain(IN OUT OptCtx & oc,
         OC_is_nonpr_du_chain_valid(oc) = true;
     }
     if (g_is_dump_after_pass && g_dump_opt.isDumpDUMgr()) {
-        m_md_sys->dump(false);
+        note("\n\n==---- DUMP DUMgr '%s' ----==\n", m_rg->getRegionName());
+        m_md_sys->dump(true);
         dumpDUChainDetail();
     }
     ASSERTN(verifyMDDUChain(duflag), ("verifyMDDUChain failed"));

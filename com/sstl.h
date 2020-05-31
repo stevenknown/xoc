@@ -1396,21 +1396,34 @@ public:
 
     bool find(IN T t, OUT C<T> ** holder = NULL) const
     {
-        C<T> * c = m_head;
-        while (c != NULL) {
-            if (c->val() == t) {
-                if (holder != NULL) {
-                    *holder = c;
-                }
+        C<T> * tholder;
+        if (holder == NULL) {
+            holder = &tholder;
+        }
+        if (m_head == NULL) {
+            *holder = NULL;
+            return false;
+        }
+        C<T> * b = m_head;
+        C<T> * e = m_tail;
+        while (b != e && b != C_next(e)) {
+            if (b->val() == t) {                
+                *holder = b;
                 return true;
             }
-            c = C_next(c);
+            if (e->val() == t) {
+                *holder = e;
+                return true;
+            }
+            b = C_next(b);
+            e = C_prev(e);
         }
-
-        if (holder != NULL) {
-            *holder = NULL;
+        if (b->val() == t) {
+            *holder = b;
+            return true;
         }
-        return false;
+        *holder = NULL;
+        return false;        
     }
 
     //Reverse list.
@@ -1461,16 +1474,20 @@ public:
         if (m_head == NULL) { return T(0); }
         if (m_head->val() == t) { return remove_head(); }
         if (m_tail->val() == t) { return remove_tail(); }
-
-        C<T> * c = m_head;
-        while (c != NULL) {
-            if (c->val() == t) { break; }
-            c = C_next(c);
+        C<T> * b = m_head;
+        C<T> * e = m_tail;
+        while (b != e && b != C_next(e)) {
+            if (b->val() == t) {
+                return remove(b);
+            }
+            if (e->val() == t) {
+                return remove(e);
+            }
+            b = C_next(b);
+            e = C_prev(e);
         }
-
-        if (c == NULL) { return T(0); }
-
-        return remove(c);
+        if (b->val() == t) { return remove(b); }
+        return T(0);
     }
 
     //Remove from tail.

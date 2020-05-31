@@ -1,3 +1,4 @@
+
 /*@
 XOC Release License
 
@@ -336,6 +337,9 @@ public:
     //Assign MD for ST/LD/ReadPR/WritePR operations.
     //is_only_assign_pr: true if assign MD for each ReadPR/WritePR operations.
     void assignMD(bool is_only_assign_pr);
+    void assignMDForBBList(BBList * lst, bool is_only_assign_pr);
+    void assignMDForBB(IRBB * bb, IRIter & ii, bool is_only_assign_pr);
+    void assignMDForIRList(IR * lst, bool is_only_assign_pr);    
     //Note the returned ByteBuf does not need to free by user.
     ByteBuf * allocByteBuf(UINT bytesize)    
     {
@@ -451,6 +455,7 @@ public:
     IR * dupIR(IR const* ir);
     IR * dupIRTree(IR const* ir);
     IR * dupIRTreeList(IR const* ir);
+    void dumpBBList(bool dump_inner_region = true);
     void dumpAllocatedIR();
     void dumpVARInRegion();
     void dumpVarMD(VAR * v, UINT indent);
@@ -632,6 +637,16 @@ public:
         return li;
     }
 
+    LabelInfo * genPragmaLabel(CHAR const* lab)
+    { return genPragmaLabel(getRegionMgr()->addToSymbolTab(lab));}
+    LabelInfo * genPragmaLabel(SYM const* labsym)
+    {
+        ASSERT0(labsym);
+        return allocCustomerLabel(labsym, get_pool());
+    }
+
+    LabelInfo * genCustomLabel(CHAR const* lab)
+    { return genCustomLabel(getRegionMgr()->addToSymbolTab(lab));}
     LabelInfo * genCustomLabel(SYM const* labsym)
     {
         ASSERT0(labsym);

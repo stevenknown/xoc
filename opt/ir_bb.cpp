@@ -264,9 +264,9 @@ void IRBB::removeSuccessorDesignatePhiOpnd(CFG<IRBB, IR> * cfg, IRBB * succ)
 }
 
 
-//Before removing bb or change bb successor,
-//you need remove the related PHI operand if BB successor has PHI stmt.
-void IRBB::removeSuccessorPhiOpnd(CFG<IRBB, IR> * cfg)
+//Before removing current BB or change BB's successor,
+//you need remove the related PHI operand if BB successor has PHI.
+void IRBB::removeAllSuccessorsPhiOpnd(CFG<IRBB, IR> * cfg)
 {
     xcom::Vertex * vex = cfg->getVertex(BB_id(this));
     ASSERT0(vex);
@@ -278,6 +278,7 @@ void IRBB::removeSuccessorPhiOpnd(CFG<IRBB, IR> * cfg)
     }
 }
 //END IRBB
+
 
 void dumpBBLabel(List<LabelInfo const*> & lablist, FILE * h)
 {

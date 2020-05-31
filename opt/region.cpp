@@ -618,8 +618,10 @@ void Region::constructBBList()
             //Generate new BB.
             getBBList()->append_tail(cur_bb);
             cur_bb = allocBB();
+            continue;
         }
-        else if (cur_ir->is_label()) {
+        
+        if (cur_ir->is_label()) {
             BB_is_fallthrough(cur_bb) = true;
             getBBList()->append_tail(cur_bb);
 
@@ -639,25 +641,28 @@ void Region::constructBBList()
                     cur_ir = pointer;
                     pointer = IR_next(pointer);
                     IR_next(cur_ir) = IR_prev(cur_ir) = NULL;
-                }
-                else {
+                } else {
                     break;
                 }
             }
 
             BB_is_target(cur_bb) = true;
-        } else if (cur_ir->isMayThrow()) {
+            continue;
+        }
+
+        if (cur_ir->isMayThrow()) {
             BB_irlist(cur_bb).append_tail(cur_ir);
             BB_is_fallthrough(cur_bb) = true;
 
             //Generate new BB.
             getBBList()->append_tail(cur_bb);
             cur_bb = allocBB();
-        } else {
-            //Note that PHI should be placed followed after a LABEL immediately.
-            //That is a invalid phi if it has only one operand.
-            BB_irlist(cur_bb).append_tail(cur_ir);
+            continue;
         }
+
+        //Note that PHI should be placed followed after a LABEL immediately.
+        //That is a invalid phi if it has only one operand.
+        BB_irlist(cur_bb).append_tail(cur_ir);        
     } //end while
 
     ASSERT0(cur_bb != NULL);
@@ -1173,6 +1178,13 @@ PassMgr * Region::allocPassMgr()
 }
 
 
+void Region::dumpBBList(bool dump_inner_region)
+{
+    if (getBBList() == NULL) { return; }
+    xoc::dumpBBList(getBBList(), this, NULL, dump_inner_region);
+}
+
+
 void Region::dumpFreeTab()
 {
     if (g_tfile == NULL) { return; }
@@ -1249,26 +1261,46 @@ static void assignMDImpl(IR * x, Region * rg, bool is_only_assign_pr)
 //Assign MD for ST/LD/ReadPR/WritePR operations.
 //is_only_assign_pr: true if assign MD for each ReadPR/WritePR operations.
 void Region::assignMD(bool is_only_assign_pr)
-{
-    IRIter ii;
+{    
     if (getIRList() != NULL) {
-        for (IR * x = iterInit(getIRList(), ii);
-             x != NULL; x = iterNext(ii)) {
-            assignMDImpl(x, this, is_only_assign_pr);
-        }
+        assignMDForIRList(getIRList(), is_only_assign_pr);
         return;
     }
-    if (getBBList() == NULL) { return; }
-    for (IRBB * bb = getBBList()->get_head();
-         bb != NULL; bb = getBBList()->get_next()) {
-        xcom::C<xoc::IR*> * ct;
-        for (xoc::IR * ir = BB_irlist(bb).get_head(&ct); ir != NULL;
-             ir = BB_irlist(bb).get_next(&ct)) {
-            for (IR * x = iterInit(ir, ii);
-                x != NULL; x = iterNext(ii)) {
-                assignMDImpl(x, this, is_only_assign_pr);
-            }
+    if (getBBList() != NULL) {
+        assignMDForBBList(getBBList(), is_only_assign_pr);
+    }
+}
+
+
+void Region::assignMDForBBList(BBList * lst, bool is_only_assign_pr)
+{
+    ASSERT0(lst);
+    IRIter ii;
+    for (IRBB * bb = lst->get_head(); bb != NULL; bb = lst->get_next()) {
+        assignMDForBB(bb, ii, is_only_assign_pr);
+    }
+}
+
+
+void Region::assignMDForBB(IRBB * bb, IRIter & ii, bool is_only_assign_pr)
+{
+    xcom::C<xoc::IR*> * ct;
+    for (xoc::IR * ir = BB_irlist(bb).get_head(&ct); ir != NULL;
+         ir = BB_irlist(bb).get_next(&ct)) {
+        for (IR * x = iterInit(ir, ii);
+           x != NULL; x = iterNext(ii)) {
+           assignMDImpl(x, this, is_only_assign_pr);
         }
+    }
+}
+
+
+void Region::assignMDForIRList(IR * lst, bool is_only_assign_pr)
+{
+    IRIter ii;
+    for (IR * x = iterInit(lst, ii);
+         x != NULL; x = iterNext(ii)) {
+        assignMDImpl(x, this, is_only_assign_pr);
     }
 }
 
@@ -1791,11 +1823,7 @@ void Region::dump(bool dump_inner_region)
             (dump_inner_region ? IR_DUMP_INNER_REGION : 0));
         return;
     }
-
-    BBList * bblst = getBBList();
-    if (bblst != NULL) {
-        dumpBBList(bblst, this, NULL, dump_inner_region);
-    }
+    dumpBBList(dump_inner_region);
 }
 
 

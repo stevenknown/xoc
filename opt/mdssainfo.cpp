@@ -235,7 +235,7 @@ VMD * MDPhi::getOpndVMD(IR const* opnd, UseDefMgr const* mgr) const
 }
 
 
-void MDPhi::dump(Region * rg, UseDefMgr * mgr)
+void MDPhi::dump(Region const* rg, UseDefMgr const* mgr) const
 {
     ASSERT0(rg);
     ASSERT0(is_phi());
@@ -248,8 +248,7 @@ void MDPhi::dump(Region * rg, UseDefMgr * mgr)
     IRBB * pred = preds.get_head();
 
     ASSERT0(getResult());
-    prt("Phi: MD%dV%d <- ",
-        getResult()->mdid(), getResult()->version());
+    prt("Phi: MD%dV%d <- ", getResult()->mdid(), getResult()->version());
     for (IR const* opnd = getOpndList();
          opnd != NULL; opnd = opnd->get_next()) {
         if (opnd != getOpndList()) {
@@ -265,8 +264,7 @@ void MDPhi::dump(Region * rg, UseDefMgr * mgr)
             break;
         case IR_ID: {
             VMD * vopnd = getOpndVMD(opnd, mgr);
-            prt("MD%dV%d(id:%d)",
-                vopnd->mdid(), vopnd->version(), opnd->id());
+            prt("MD%dV%d(id:%d)", vopnd->mdid(), vopnd->version(), opnd->id());
             break;
         }
         default: UNREACHABLE();
