@@ -38,6 +38,7 @@ namespace xoc {
 
 class IRBB;
 typedef xcom::C<IR*> * IRListIter;
+#define BBID_UNDEF VERTEX_UNDEF
 
 //
 //START BBIRList
@@ -219,6 +220,10 @@ public:
             getLabelList().append_tail(li);
         }
     }
+    
+    //After adding new bb or change bb successor,
+    //you need add the related PHI operand if BB successor has PHI stmt.
+    void addSuccessorDesignatePhiOpnd(CFG<IRBB, IR> * cfg, IRBB * succ);
 
     size_t count_mem() const;
     void clean()
@@ -494,7 +499,7 @@ protected:
     UINT m_bb_count; //counter of IRBB.
 
 public:
-    IRBBMgr() { m_bb_count = 1; }
+    IRBBMgr() { m_bb_count = BBID_UNDEF + 1; }
     ~IRBBMgr()
     {
         for (IRBB * bb = m_bbs_list.get_head();

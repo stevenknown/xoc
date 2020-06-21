@@ -102,7 +102,7 @@ protected:
     //Remove empty bb, and merger label info.
     bool removeEmptyBBHelper(BB * bb,
                              BB * next_bb,
-                             C<BB*> * ct,
+                             C<BB*> * bbct,
                              C<BB*> * next_ct,
                              List<BB*> & preds,
                              List<BB*> & succs,
@@ -137,17 +137,8 @@ public:
     virtual ~CFG() { smpoolDelete(m_pool); }
 
     virtual void addBreakOutLoop(BB * loop_head, xcom::BitSet & body_set);
-    void rebuild(OptCtx & oc)
-    {
-        erase();
-        UINT newsz = MAX(16, getNearestPowerOf2(m_bb_list->get_elem_count()));
-        resize(newsz, newsz);
-        build(oc);
-
-        //One should call removeEmptyBB() immediately after this function,
-        //because rebuilding cfg may generate redundant empty bb, it
-        //disturb the computation of entry and exit.
-    }
+    virtual xcom::Edge * addEdge(BB * from, BB * to)
+    { return xcom::DGraph::addEdge(from->id(), to->id()); }
 
     //Build the CFG accroding to BB list.
     void build(OptCtx & oc);
@@ -292,14 +283,16 @@ public:
 
     UINT getLoopNum() const { return m_li_count - 1; }
     void get_preds(IN OUT List<BB*> & preds, BB const* v) const;
+    void get_preds(IN OUT List<BB const*> & preds, BB const* v) const;
     void get_succs(IN OUT List<BB*> & succs, BB const* v) const;
+    void get_succs(IN OUT List<BB const*> & succs, BB const* v) const;
     //Get the number of successors of bb.
     UINT getSuccsNum(BB const* bb) const
     { return getOutDegree(getVertex(bb->id())); }
     //Get the number of predecessors of bb.
     UINT getPredsNum(BB const* bb) const
     { return getInDegree(getVertex(bb->id())); }
-    BB * get_entry() const { return m_entry; }
+    BB * getEntry() const { return m_entry; }
     List<BB*> * getExitList() { return &m_exit_list; }
     List<BB*> * getBBListInRPO() { return &m_rpo_bblst; }
     virtual BB * getFallThroughBB(BB * bb)
@@ -397,22 +390,13 @@ public:
 
     //Move all Labels which attached on src BB to tgt BB.
     virtual void moveLabels(BB * src, BB * tgt) = 0;
-    virtual void resetMapBetweenLabelAndBB(BB * bb) = 0;
 
-    //Remove xr that in bb.
-    virtual void remove_xr(BB *, XR *) = 0;
-
-    //You should clean the relation between Label and BB before remove BB.
-    virtual void remove_bb(BB * bb) = 0;
-    virtual void remove_bb(xcom::C<BB*> * bbcontainer) = 0;
-
-    void removeEdge(BB * from, BB * to)
+    virtual void removeEdge(BB * from, BB * to)
     {
         xcom::Edge * e = xcom::Graph::getEdge(from->id(), to->id());
         ASSERT0(e != NULL);
         xcom::Graph::removeEdge(e);
     }
-
     bool removeEmptyBB(OptCtx & oc);
     bool removeUnreachBB();
     bool removeRedundantBranch();
@@ -433,18 +417,37 @@ public:
     void revise_fallthrough(List<BB*> & new_bbl)
     { ASSERTN(0, ("Target Dependent Code")); }
 
+    //Remove xr that in bb.
+    virtual void remove_xr(BB *, XR *) = 0;
+
+    //You should clean the relation between Label and BB before remove BB.
+    virtual void remove_bb(BB * bb) = 0;
+    virtual void remove_bb(xcom::C<BB*> * bbcontainer) = 0;
+    virtual void resetMapBetweenLabelAndBB(BB * bb) = 0;
+
+    //Rebuild CFG.
+    void rebuild(OptCtx & oc)
+    {
+        erase();
+        UINT newsz = MAX(16, getNearestPowerOf2(m_bb_list->get_elem_count()));
+        resize(newsz, newsz);
+        build(oc);
+
+        //One should call removeEmptyBB() immediately after this function,
+        //because rebuilding cfg may generate redundant empty bb, it
+        //disturb the computation of entry and exit.
+    }
+
+    //Set RPO for BB.
+    virtual void setRPO(BB * bb, INT order) = 0;
     void sortByDFS();
     void sortByBFS();
     void sortByTopological();
-
     void setBitSetMgr(xcom::BitSetMgr * bs_mgr)
     {
         m_bs_mgr = bs_mgr;
         xcom::DGraph::setBitSetMgr(bs_mgr);
     }
-
-    //Set RPO for BB.
-    virtual void setRPO(BB * bb, INT order) = 0;
 
     bool verifyIfBBRemoved(IN CDG * cdg, OptCtx & oc);
     bool verify()
@@ -649,7 +652,7 @@ bool CFG<BB, XR>::verifyIfBBRemoved(IN CDG * cdg, OptCtx & oc)
 template <class BB, class XR>
 bool CFG<BB, XR>::removeEmptyBBHelper(BB * bb,
                                       BB * next_bb,
-                                      C<BB*> * ct,
+                                      C<BB*> * bbct,
                                       C<BB*> * next_ct,
                                       List<BB*> & preds,
                                       List<BB*> & succs,
@@ -665,8 +668,7 @@ bool CFG<BB, XR>::removeEmptyBBHelper(BB * bb,
             !isRegionExit(bb)) {
             //BB does not have Label.
             //resetMapBetweenLabelAndBB(bb);
-            bb->removeAllSuccessorsPhiOpnd(this);            
-            remove_bb(ct);
+            remove_bb(bbct);
             doit = true;
         }
         return doit;
@@ -701,9 +703,17 @@ bool CFG<BB, XR>::removeEmptyBBHelper(BB * bb,
         if (getEdge(pred->id(), next_bb->id()) != NULL) {
             //If bb removed, the number of its successors will decrease.
             //Then the number of PHI of bb's successors must be revised.
-            bb->removeAllSuccessorsPhiOpnd(this);
+            //CASE:BB7->BB8->BB9
+            //      |         ^
+            //      |_________|
+            //There are phi at BB9, BB8 will be removed.
+            //bb->removeAllSuccessorsPhiOpnd(this);
         } else {
-            addEdge(pred->id(), next_bb->id());
+            //CASE:BB7->BB8->BB9
+            //There are phi at BB9, BB8 will be removed.
+            //Do not need to add operand to PHI because the number of edge
+            //of BB9 is unchanged.
+            addEdge(pred, next_bb);
         }
     }
 
@@ -757,7 +767,7 @@ bool CFG<BB, XR>::removeEmptyBBHelper(BB * bb,
 
             ASSERTN(getEdge(prev_bb_of_succ->id(), succ->id()) != NULL,
                     ("should already have edge"));
-            //addEdge(prev_bb_of_succ->id(), succ->id());
+            //addEdge(prev_bb_of_succ, succ);
             continue;
         }
 
@@ -780,20 +790,22 @@ bool CFG<BB, XR>::removeEmptyBBHelper(BB * bb,
             ASSERTN(getEdge(prev_bb_of_succ->id(), succ->id()) != NULL,
                     ("should already have edge"));
             //if (tgt_bb == succ) {
-            //    addEdge(prev_bb_of_succ->id(), succ->id());
+            //    addEdge(prev_bb_of_succ, succ);
             //}
         }
     } //end for each succ
 
+    //BB and Vertex removed.
     //The map between 'bb' and Labels has been maintained.
     //resetMapBetweenLabelAndBB(bb);
-    remove_bb(ct);
+    remove_bb(bbct);
     doit = true;
     return doit;
 } 
 
 
 //Remove empty bb, and merger label info.
+//Note remove BB will not affect the usage of RPO.
 template <class BB, class XR>
 bool CFG<BB, XR>::removeEmptyBB(OptCtx & oc)
 {
@@ -1102,6 +1114,7 @@ void CFG<BB, XR>::removeUnreachableBB(UINT id, xcom::BitSet & visited)
 
 //Perform DFS to seek for unreachable BB, removing the 'dead-BB', and
 //free its ir-list. Return true if some dead-BB removed.
+//Note remove BB will not affect the usage of RPO.
 template <class BB, class XR>
 bool CFG<BB, XR>::removeUnreachBB()
 {
@@ -1133,7 +1146,6 @@ bool CFG<BB, XR>::removeUnreachBB()
             //         "exception handler should be reserved."));
 
             resetMapBetweenLabelAndBB(bb);
-            bb->removeAllSuccessorsPhiOpnd(this);            
             remove_bb(ct);
             removed = true;
         }
@@ -1150,8 +1162,8 @@ void CFG<BB, XR>::chainPredAndSucc(UINT vid, bool is_single_pred_succ)
 {
     xcom::Vertex * v = getVertex(vid);
     ASSERT0(v);
-    xcom::EdgeC * pred_lst = VERTEX_in_list(v);
-    xcom::EdgeC * succ_lst = VERTEX_out_list(v);
+    xcom::EdgeC * pred_lst = v->getInList();
+    xcom::EdgeC * succ_lst = v->getOutList();
     if (is_single_pred_succ) {
         ASSERTN(getInDegree(v) <= 1 && getOutDegree(v) <= 1,
                 ("BB only has solely pred and succ."));
@@ -1161,10 +1173,10 @@ void CFG<BB, XR>::chainPredAndSucc(UINT vid, bool is_single_pred_succ)
         xcom::EdgeC * tmp_succ_lst = succ_lst;
         while (tmp_succ_lst != NULL) {
             UINT to = tmp_succ_lst->getToId();
-            addEdge(from, to);
-            tmp_succ_lst = EC_next(tmp_succ_lst);
+            addEdge(getBB(from), getBB(to));
+            tmp_succ_lst = tmp_succ_lst->get_next();
         }
-        pred_lst = EC_next(pred_lst);
+        pred_lst = pred_lst->get_next();
     }
 }
 
@@ -1183,6 +1195,20 @@ void CFG<BB, XR>::get_succs(IN OUT List<BB*> & succs, BB const* v) const
 }
 
 
+//Return all successors.
+template <class BB, class XR>
+void CFG<BB, XR>::get_succs(IN OUT List<BB const*> & succs, BB const* v) const
+{
+    ASSERT0(v);
+    xcom::Vertex const* vex = getVertex(v->id());
+    succs.clean();
+    for (xcom::EdgeC const* el = vex->getOutList();
+        el != NULL; el = el->get_next()) {
+        succs.append_tail(getBB(el->getToId()));
+    }
+}
+
+
 //Return all predecessors.
 template <class BB, class XR>
 void CFG<BB, XR>::get_preds(IN OUT List<BB*> & preds, BB const* v) const
@@ -1190,7 +1216,22 @@ void CFG<BB, XR>::get_preds(IN OUT List<BB*> & preds, BB const* v) const
     ASSERT0(v);
     xcom::Vertex * vex = getVertex(v->id());
     preds.clean();
-    for (xcom::EdgeC * el = vex->getInList(); el != NULL; el = el->get_next()) {
+    for (xcom::EdgeC * el = vex->getInList();
+         el != NULL; el = el->get_next()) {
+        preds.append_tail(getBB(el->getFromId()));
+    }
+}
+
+
+//Return all predecessors.
+template <class BB, class XR>
+void CFG<BB, XR>::get_preds(IN OUT List<BB const*> & preds, BB const* v) const
+{
+    ASSERT0(v);
+    xcom::Vertex * vex = getVertex(v->id());
+    preds.clean();
+    for (xcom::EdgeC * el = vex->getInList();
+         el != NULL; el = el->get_next()) {
         preds.append_tail(getBB(el->getFromId()));
     }
 }
@@ -1220,7 +1261,7 @@ void CFG<BB, XR>::build(OptCtx & oc)
             //Add fall-through edge.
             //The last bb may not terminated by 'return' stmt.
             if (next != NULL && !next->is_terminate()) {
-                addEdge(bb->id(), next->id());
+                DGraph::addEdge(bb->id(), next->id());
             } else {
                 addVertex(bb->id());
             }
@@ -1234,23 +1275,23 @@ void CFG<BB, XR>::build(OptCtx & oc)
             //Add fall-through edge
             //The last bb may not be terminated by 'return' stmt.
             if (next != NULL && !next->is_terminate()) {
-                addEdge(bb->id(), next->id());
+                DGraph::addEdge(bb->id(), next->id());
             }
         } else if (last->isConditionalBr()) {
             //Add fall-through edge
             //The last bb may not be terminated by 'return' stmt.
             if (next != NULL && !next->is_terminate()) {
-                addEdge(bb->id(), next->id());
+                DGraph::addEdge(bb->id(), next->id());
             }
             //Add edge between source BB and target BB.
             BB * target_bb = findBBbyLabel(last->getLabel());
             ASSERTN(target_bb != NULL, ("target cannot be NULL"));
-            addEdge(bb->id(), target_bb->id());
+            DGraph::addEdge(bb->id(), target_bb->id());
         } else if (last->isMultiConditionalBr()) {
             //Add fall-through edge
             //The last bb may not be terminated by 'return' stmt.
             if (next != NULL && !next->is_terminate()) {
-                addEdge(bb->id(), next->id());
+                DGraph::addEdge(bb->id(), next->id());
             }
 
             //Add edge between source BB and multi-target BBs.
@@ -1261,7 +1302,7 @@ void CFG<BB, XR>::build(OptCtx & oc)
             for (tgt_bbs.get_head(&ct2);
                  ct2 != tgt_bbs.end(); ct2 = tgt_bbs.get_next(ct2)) {
                 BB * tbb = ct2->val();
-                addEdge(bb->id(), tbb->id());
+                DGraph::addEdge(bb->id(), tbb->id());
             }
         } else if (last->isUnconditionalBr()) {
             if (last->isIndirectBr()) {
@@ -1271,19 +1312,19 @@ void CFG<BB, XR>::build(OptCtx & oc)
                 for (tgt_bbs.get_head(&ct2);
                      ct2 != tgt_bbs.end(); ct2 = tgt_bbs.get_next(ct2)) {
                     BB * t = ct2->val();
-                    addEdge(bb->id(), t->id());
+                    DGraph::addEdge(bb->id(), t->id());
                 }
             } else {
                 //Add edge between source BB and target BB.
                 BB * target_bb = findBBbyLabel(last->getLabel());
                 ASSERTN(target_bb != NULL, ("target cannot be NULL"));
-                addEdge(bb->id(), target_bb->id());
+                DGraph::addEdge(bb->id(), target_bb->id());
             }
         } else if (!last->is_return()) {
             //Add fall-through edge.
             //The last bb may not end by 'return' stmt.
             if (next != NULL && !next->is_terminate()) {
-                addEdge(bb->id(), next->id());
+                DGraph::addEdge(bb->id(), next->id());
             }
         } else {
             addVertex(bb->id());

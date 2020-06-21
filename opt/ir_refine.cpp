@@ -1470,8 +1470,8 @@ IR * Region::refineDetViaSSAdu(IR * ir, bool & change)
 
     if (op0_ssainfo == NULL || op1_ssainfo == NULL) { return ir; }
 
-    IR const* def0 = op0_ssainfo->get_def();
-    IR const* def1 = op1_ssainfo->get_def();
+    IR const* def0 = op0_ssainfo->getDef();
+    IR const* def1 = op1_ssainfo->getDef();
 
     if (def0 == NULL || def1 == NULL) { return ir; }
 
@@ -1496,9 +1496,9 @@ IR * Region::refineDetViaSSAdu(IR * ir, bool & change)
 
     Type const* ty = ir->getType();
 
-    //Reset SSA du for op0, op1.
-    SSA_uses(op0_ssainfo).remove(op0);
-    SSA_uses(op1_ssainfo).remove(op1);
+    //Remove SSA DU for op0, op1.
+    op0_ssainfo->removeUse(op0);
+    op1_ssainfo->removeUse(op1);
 
     freeIRTree(ir);
     change = true;

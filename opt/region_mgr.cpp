@@ -223,14 +223,14 @@ Region * RegionMgr::newRegion(REGION_TYPE rt)
 //Record new region and delete it when RegionMgr destroy.
 void RegionMgr::addToRegionTab(Region * rg)
 {
-    ASSERTN(REGION_id(rg) > 0, ("should generate new region via newRegion()"));
-    ASSERT0(getRegion(REGION_id(rg)) == NULL);
-    ASSERT0(REGION_id(rg) < m_ru_count);
-    INT pad = xcom::getNearestPowerOf2(REGION_id(rg));
+    ASSERTN(rg->id() > 0, ("should generate new region via newRegion()"));
+    ASSERT0(getRegion(rg->id()) == NULL);
+    ASSERT0(rg->id() < m_ru_count);
+    INT pad = xcom::getNearestPowerOf2(rg->id());
     if (m_id2ru.get_last_idx() + 1 < pad) {
         m_id2ru.set(pad, NULL);
     }
-    m_id2ru.set(REGION_id(rg), rg);
+    m_id2ru.set(rg->id(), rg);
 }
 
 
@@ -240,9 +240,8 @@ bool RegionMgr::verifyPreDefinedInfo()
     checkIRDesc();
     checkRoundDesc();
     ASSERT0_DUMMYUSE(WORD_LENGTH_OF_TARGET_MACHINE <=
-            sizeof(TMWORD) * HOST_BIT_PER_BYTE);
+                     sizeof(TMWORD) * HOST_BIT_PER_BYTE);
     ASSERT0_DUMMYUSE(BIT_PER_BYTE == HOST_BIT_PER_BYTE);
-
     ASSERT0_DUMMYUSE(sizeof(INT8) * HOST_BIT_PER_BYTE == 8);
     ASSERT0_DUMMYUSE(sizeof(UINT8) * HOST_BIT_PER_BYTE == 8);
     ASSERT0_DUMMYUSE(sizeof(INT16) * HOST_BIT_PER_BYTE == 16);
@@ -251,10 +250,10 @@ bool RegionMgr::verifyPreDefinedInfo()
     ASSERT0_DUMMYUSE(sizeof(UINT32) * HOST_BIT_PER_BYTE == 32);
     ASSERT0_DUMMYUSE(sizeof(INT64) * HOST_BIT_PER_BYTE == 64);
     ASSERT0_DUMMYUSE(sizeof(UINT64) * HOST_BIT_PER_BYTE == 64);
-    #ifdef INT128
+    #ifdef INT128 //Host type support 128bit signed integer.
     ASSERT0_DUMMYUSE(sizeof(INT128) * HOST_BIT_PER_BYTE == 128);
     #endif
-    #ifdef UINT128
+    #ifdef UINT128 //Host type support 128bit unsigned integer.
     ASSERT0_DUMMYUSE(sizeof(UINT128) * HOST_BIT_PER_BYTE == 128);
     #endif
 
@@ -266,10 +265,10 @@ bool RegionMgr::verifyPreDefinedInfo()
     ASSERT0_DUMMYUSE(IS_UNSIGN_TY(UINT32));
     ASSERT0_DUMMYUSE(!IS_UNSIGN_TY(INT64));
     ASSERT0_DUMMYUSE(IS_UNSIGN_TY(UINT64));
-    #ifdef INT128
+    #ifdef INT128 //Host type support 128bit signed integer.
     ASSERT0_DUMMYUSE(!IS_UNSIGN_TY(INT128));
     #endif
-    #ifdef UINT128
+    #ifdef UINT128 //Host type support 128bit unsigned integer.
     ASSERT0_DUMMYUSE(IS_UNSIGN_TY(UINT128));
     #endif
 
@@ -280,47 +279,46 @@ bool RegionMgr::verifyPreDefinedInfo()
     ASSERT0_DUMMYUSE(sizeof(HOST_UINT) >= sizeof(UINT32));
 
     ASSERT0_DUMMYUSE(WORD_LENGTH_OF_HOST_MACHINE ==
-        (sizeof(HOST_UINT) * HOST_BIT_PER_BYTE));
+                     (sizeof(HOST_UINT) * HOST_BIT_PER_BYTE));
 
     ASSERT0_DUMMYUSE(sizeof(CHAR) == sizeof(UCHAR) &&
-        sizeof(SHORT) == sizeof(USHORT) &&
-        sizeof(INT) == sizeof(UINT) &&
-        sizeof(LONG) == sizeof(ULONG) &&
-        sizeof(LONGLONG) == sizeof(ULONGLONG));
+                     sizeof(SHORT) == sizeof(USHORT) &&
+                     sizeof(INT) == sizeof(UINT) &&
+                     sizeof(LONG) == sizeof(ULONG) &&
+                     sizeof(LONGLONG) == sizeof(ULONGLONG));
 
     ASSERT0_DUMMYUSE(sizeof(CHAR) <= sizeof(SHORT) &&
-        sizeof(SHORT) <= sizeof(INT) &&
-        sizeof(INT) <= sizeof(LONG) &&
-        sizeof(LONG) <= sizeof(LONGLONG));
+                     sizeof(SHORT) <= sizeof(INT) &&
+                     sizeof(INT) <= sizeof(LONG) &&
+                     sizeof(LONG) <= sizeof(LONGLONG));
 
     ASSERT0_DUMMYUSE(BYTE_PER_CHAR < BYTE_PER_SHORT &&
-        BYTE_PER_SHORT < BYTE_PER_INT &&
-        BYTE_PER_INT <= BYTE_PER_LONG &&
-        BYTE_PER_LONG <= BYTE_PER_LONGLONG &&
-        BYTE_PER_FLOAT < BYTE_PER_DOUBLE &&
-        BYTE_PER_INT <= BYTE_PER_POINTER);
+                     BYTE_PER_SHORT < BYTE_PER_INT &&
+                     BYTE_PER_INT <= BYTE_PER_LONG &&
+                     BYTE_PER_LONG <= BYTE_PER_LONGLONG &&
+                     BYTE_PER_FLOAT < BYTE_PER_DOUBLE &&
+                     BYTE_PER_INT <= BYTE_PER_POINTER);
 
     ASSERT0_DUMMYUSE(BYTE_PER_CHAR < sizeof(ULONGLONG) &&
-        BYTE_PER_SHORT < sizeof(ULONGLONG) &&
-        BYTE_PER_INT <= sizeof(ULONGLONG) &&
-        BYTE_PER_LONG <= sizeof(ULONGLONG) &&
-        BYTE_PER_FLOAT <= sizeof(ULONGLONG) &&
-        BYTE_PER_DOUBLE <= sizeof(ULONGLONG) &&
-        BYTE_PER_POINTER <= sizeof(ULONGLONG) &&
-        GENERAL_REGISTER_SIZE <= sizeof(ULONGLONG));
+                     BYTE_PER_SHORT < sizeof(ULONGLONG) &&
+                     BYTE_PER_INT <= sizeof(ULONGLONG) &&
+                     BYTE_PER_LONG <= sizeof(ULONGLONG) &&
+                     BYTE_PER_FLOAT <= sizeof(ULONGLONG) &&
+                     BYTE_PER_DOUBLE <= sizeof(ULONGLONG) &&
+                     BYTE_PER_POINTER <= sizeof(ULONGLONG) &&
+                     GENERAL_REGISTER_SIZE <= sizeof(ULONGLONG));
 
     ASSERT0_DUMMYUSE(BYTE_PER_CHAR <= sizeof(HOST_INT) &&
-        BYTE_PER_CHAR <= sizeof(HOST_UINT) &&
-        BYTE_PER_CHAR <= sizeof(HOST_FP));
+                     BYTE_PER_CHAR <= sizeof(HOST_UINT) &&
+                     BYTE_PER_CHAR <= sizeof(HOST_FP));
 
     ASSERT0_DUMMYUSE(BYTE_PER_SHORT <= sizeof(HOST_INT) &&
-        BYTE_PER_SHORT <= sizeof(HOST_UINT) &&
-        BYTE_PER_SHORT <= sizeof(HOST_FP));
+                     BYTE_PER_SHORT <= sizeof(HOST_UINT) &&
+                     BYTE_PER_SHORT <= sizeof(HOST_FP));
 
     ASSERT0_DUMMYUSE(BYTE_PER_INT <= sizeof(HOST_INT) &&
-        BYTE_PER_INT <= sizeof(HOST_UINT) &&
-        BYTE_PER_INT <= sizeof(HOST_FP));
-
+                     BYTE_PER_INT <= sizeof(HOST_UINT) &&
+                     BYTE_PER_INT <= sizeof(HOST_FP));
     return true;
 }
 
@@ -364,7 +362,7 @@ void RegionMgr::deleteRegion(Region * rg, bool collect_id)
 {
     START_TIMER_FMT(t, ("Delete Region%d", rg->id()));
     ASSERT0(rg);
-    UINT id = REGION_id(rg);
+    UINT id = rg->id();
     ASSERTN(getRegion(id), ("not registered region"));
     delete rg;
 

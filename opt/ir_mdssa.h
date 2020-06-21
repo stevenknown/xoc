@@ -81,11 +81,7 @@ protected:
 
     UseDefMgr m_usedef_mgr;
 protected:
-    void init()
-    {
-        if (m_usedef_mgr.m_mdssainfo_pool != NULL) { return; }
-        m_is_ssa_constructed = false;
-    }
+    void addDefChain(MDDef * def1, MDDef * def2);
 
     //NOTE this function only be called at constructor.
     void cleanInConstructor()
@@ -97,14 +93,15 @@ protected:
         m_cfg = NULL;
         m_is_ssa_constructed = false;
     }
+    void cleanIRSSAInfo(IRBB * bb);
     void cleanMDSSAInfoAI();
-
-    void addDefChain(MDDef * def1, MDDef * def2);
-
     void cutoffDefChain(MDDef * def);
     void cleanMD2Stack();
     void collectDefinedMD(IN IRBB * bb, OUT DefSBitSet & mustdef_pr);
-    
+
+    void freeBBPhiList(IRBB * bb);
+    void freePhiList();
+   
     void destructBBSSAInfo(IRBB * bb);
     void destructionInDomTreeOrder(IRBB * root, xcom::Graph & domtree);
     void dumpDefChain(List<MDDef const*> & wl,
@@ -118,12 +115,15 @@ protected:
     bool doOpndHaveValidDef(MDPhi const* phi) const;
     bool doOpndHaveSameDef(MDPhi const* phi, OUT VMD ** common_def) const;
 
-    void freePhiList();
-
     void handleBBRename(IRBB * bb,
                         IN DefSBitSet & defed_prs,
                         IN OUT BB2VMDMap & bb2vmdmap);
 
+    void init()
+    {
+        if (m_usedef_mgr.m_mdssainfo_pool != NULL) { return; }
+        m_is_ssa_constructed = false;
+    }
     void initVMD(IN IR * ir, OUT DefSBitSet & maydef_md);
     void insertPhi(UINT mdid, IN IRBB * bb);
 
@@ -146,8 +146,6 @@ protected:
                                MDPhi * phi,
                                MDPhiList * philist);
     void removeDefFromDDChainHelper(MDDef const* mddef, MDDef * prev);
-
-    void stripPhi(MDPhi * phi);
 
     bool prunePhi(List<IRBB*> & wl);
     bool prunePhiForBB(List<IRBB*> & wl, IRBB * bb);
@@ -192,30 +190,11 @@ public:
         destroy();
     }
 
-    //Add occurence to each vopnd in mdssainfo.
+    //Add occurence to each VOpnd in mdssainfo.
     void addMDSSAOcc(IR * ir, MDSSAInfo * mdssainfo);
-
-    void buildDUChain(IR * def, IR * use)
-    {
-        DUMMYUSE(def);
-        DUMMYUSE(use);
-        UNREACHABLE();
-        //ASSERT0(def->isWritePR() || def->isCallHasRetVal());
-        //ASSERT0(use->isReadPR());
-        //MDSSAInfo * ssainfo = def->getMDSSAInfo();
-        //if (ssainfo == NULL) {
-        //    ssainfo = allocMDSSAInfo(def->getPrno());
-        //    def->setSSAInfo(ssainfo);
-        //    SSA_def(ssainfo) = def;
-        //
-        ///// You may be try to set multiple DEFs for USE.
-        //    ASSERTN(use->getSSAInfo() == NULL, ("use already has SSA info."));
-        //
-        //    use->setSSAInfo(ssainfo);
-        //}
-        //
-        //SSA_uses(ssainfo).append(use);
-    }
+    //After adding BB or change BB successor,
+    //you need add the related PHI operand if BB successor has PHI stmt.
+    void addSuccessorDesignatePhiOpnd(IRBB * bb, IRBB * succ);
 
     //Construction of MDSSA form.
     //Note: Non-SSA DU Chains will be maintained after construction.
@@ -251,6 +230,7 @@ public:
     //     ------ //removed
     //     ...=p0
     void coalesceVersion(IR const* src, IR const* tgt);
+    void cleanMDSSAInfo(IR * ir) { getUseDefMgr()->cleanMDSSAInfo(ir); }
 
     //Destroy memory in MDSSAMgr.
     void destroy();
@@ -290,6 +270,8 @@ public:
     { return hasMDSSAInfo(ir) ? getUseDefMgr()->getMDSSAInfo(ir) : NULL; }
     MDPhiList const* getPhiList(IRBB const* bb) const
     { return m_usedef_mgr.getBBPhiList(bb->id()); }
+    //Generate MDSSAInfo and generate VOpnd for related MD.
+    MDSSAInfo * genMDSSAInfoAndVOpnd(IR * ir, UINT version);
 
     //Return true if ir might have MDSSAInfo.
     bool hasMDSSAInfo(IR const* ir) const
@@ -347,9 +329,9 @@ public:
     //  where predecessor of D3 is D1, successors of D3 are D5, D6
     //  After remove D3:
     //e.g:D1<->D2
-    //     |<->D5
-    //     |<->D6
-    //     |<->D4
+    //    D1<->D5
+    //    D1<->D6
+    //    D1<->D4
     //    D3<->NULL
     //  where predecessor of D5, D6 is D1, successor of D1 includes D5, D6.
     void removeDefFromDDChain(MDDef const* mddef);

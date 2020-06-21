@@ -322,7 +322,7 @@ bool DeadCodeElim::preserve_cd(IN OUT List<IR const*> & act_ir_lst)
 bool DeadCodeElim::collectByPRSSA(IR const* x, IN OUT List<IR const*> * pwlst2)
 {
     ASSERT0(x->isReadPR() && PR_ssainfo(x));
-    IR const* d = PR_ssainfo(x)->get_def();
+    IR const* d = PR_ssainfo(x)->getDef();
     if (d == NULL) { return false; }
     ASSERT0(d->is_stmt());
     ASSERT0(d->isWritePR() || d->isCallHasRetVal());
@@ -491,20 +491,25 @@ bool DeadCodeElim::remove_ineffect_ir() const
 
                 if (stmt->isConditionalBr() ||
                     stmt->isUnconditionalBr() ||
-                    stmt->isMultiConditionalBr()) {
+                    stmt->isMultiConditionalBr()) {                    
                     reviseSuccForFallthroughBB(bb, ctbb, bbl);
-                    ASSERT0(m_mdssamgr->verifyPhi(true));
+                    //No need verify PHI here, because SSA will rebuild
+                    //after this function.
+                    //ASSERT0(m_mdssamgr->verifyPhi(true));
                 }
-
-                //Remove stmt from BB, but do not free it right now.
-                BB_irlist(bb).remove(ctir);
 
                 if (m_mdssamgr != NULL) {
                     m_mdssamgr->removeMDSSAUse(stmt);
                 }
+
+                PRSSAMgr::removePRSSAUse(stmt);
                 
                 //Now, stmt is safe to free.
                 m_rg->freeIRTree(stmt);
+
+                //Remove stmt from BB.
+                BB_irlist(bb).remove(ctir);
+
                 change = true;
                 tobecheck = true;
             }
@@ -657,7 +662,7 @@ void DeadCodeElim::reviseSuccForFallthroughBB(IRBB * bb,
                                               BBList * bbl) const
 {
     ASSERT0(bb && bbct);
-    xcom::EdgeC * ec = VERTEX_out_list(m_cfg->getVertex(BB_id(bb)));
+    xcom::EdgeC * ec = m_cfg->getVertex(bb->id())->getOutList();
     if (ec == NULL) { return; }
 
     ASSERT0(!bb->is_empty());
@@ -668,25 +673,29 @@ void DeadCodeElim::reviseSuccForFallthroughBB(IRBB * bb,
         next_bb = next_ct->val();
     }
 
-    while (ec != NULL) {
+    bool has_fallthrough = false;
+    xcom::EdgeC * next_ec = NULL;
+    for (; ec != NULL; ec = next_ec) {
+        next_ec = ec->get_next();
+
         xcom::Edge * e = ec->getEdge();
         if (e->info() != NULL && CFGEI_is_eh((CFGEdgeInfo*)e->info())) {
-            ec = ec->get_next();
             continue;
         }
 
         IRBB * succ = m_cfg->getBB(e->to()->id());
         ASSERT0(succ);
         if (succ == next_bb) {
+            //Do not remove the fall-throught edge.
+            has_fallthrough = true;
             ec = ec->get_next();
             continue;
         }
-        
-        //bb->removeAllSuccessorsPhiOpnd(m_cfg);
-        bb->removeSuccessorDesignatePhiOpnd(m_cfg, succ);
-        xcom::EdgeC * next_ec = ec->get_next();
-        ((xcom::Graph*)m_cfg)->removeEdge(e);
-        ec = next_ec;
+
+        //TODO: We have invoke removeSuccessorDesignatePhiOpnd() here to
+        //update PHI, but in-edge of succ has changed, and operands of phi
+        //did not maintained.        
+        m_cfg->removeEdge(bb, succ);
     }
 
     //Add edge between bb and next_bb if bb is empty.
@@ -702,8 +711,9 @@ void DeadCodeElim::reviseSuccForFallthroughBB(IRBB * bb,
     //  |  |___|
     //  |  
     //  |->BB5    
-    if (next_bb != NULL) {
-        m_cfg->addEdge(BB_id(bb), BB_id(next_bb));
+    if (next_bb != NULL && !has_fallthrough) {
+        //TODO: Add operands of PHI if 'next_bb' has PHI.
+        m_cfg->addEdge(bb, next_bb);
     }
 }
 
@@ -730,8 +740,7 @@ bool DeadCodeElim::perform(OptCtx & oc)
     if (!OC_is_ref_valid(oc)) { return false; }
     //Update object pointer every time.
     m_mdssamgr = (MDSSAMgr*)m_rg->getPassMgr()->queryPass(PASS_MD_SSA_MGR);
-    PRSSAMgr * m_prssamgr = (PRSSAMgr*)m_rg->getPassMgr()->queryPass(
-        PASS_PR_SSA_MGR);
+    m_prssamgr = (PRSSAMgr*)m_rg->getPassMgr()->queryPass(PASS_PR_SSA_MGR);
     if ((!OC_is_pr_du_chain_valid(oc) &&
          (m_prssamgr == NULL || !m_prssamgr->isSSAConstructed()))) {
         //DCE use either classic PR DU chain or PRSSA.
@@ -765,7 +774,7 @@ bool DeadCodeElim::perform(OptCtx & oc)
         count++;
         //Mark effect IRs.
         work_list.clean();
-        mark_effect_ir(work_list);        
+        mark_effect_ir(work_list);
         iter_collect(work_list);
         removed = remove_ineffect_ir();
         if (!removed) { break; }
@@ -774,26 +783,15 @@ bool DeadCodeElim::perform(OptCtx & oc)
         m_is_stmt_effect.clean();
         m_is_bb_effect.clean();
 
-        //DU chain and DU reference are maintained.
-        ASSERT0(m_rg->verifyMDRef() &&
-                m_du->verifyMDDUChain(DUOPT_COMPUTE_PR_DU|
-                                      DUOPT_COMPUTE_NONPR_DU));
-        if (m_prssamgr != NULL && m_prssamgr->isSSAConstructed()) {
-            ASSERT0(verifySSAInfo(m_rg));
-        }
-        if (m_mdssamgr != NULL && m_mdssamgr->isMDSSAConstructed()) {
-            ASSERT0(verifyMDSSAInfo(m_rg));
-        }
+        ASSERT0(verifyMDSSAInfo(m_rg));
+        ASSERT0(verifyPRSSAInfo(m_rg));
+        
         if (m_cfg->performMiscOpt(oc)) {
             //CFG changed, remove empty BB.
-            //TODO: DO not recompute SSA. Update SSA and MDSSA info especially
-            //PHI operands incrementally.
-            if (m_mdssamgr != NULL && m_mdssamgr->isMDSSAConstructed()) {
-                m_mdssamgr->perform(oc);
-            }
-            if (m_prssamgr != NULL && m_prssamgr->isSSAConstructed()) {
-                m_prssamgr->perform(oc);
-            }
+            //TODO: DO not recompute whole SSA/MDSSA. Instead, update
+            //SSA/MDSSA info especially PHI operands incrementally.
+            ASSERT0(verifyPRSSAInfo(m_rg));
+            ASSERT0(verifyMDSSAInfo(m_rg));
         }
         //fix_control_flow(bblst, ctlst);
     }
@@ -807,19 +805,15 @@ bool DeadCodeElim::perform(OptCtx & oc)
         return false;
     }
 
-    //AA, DU chain and DU reference are maintained.
+    //DU chain and DU reference should be maintained.
     ASSERT0(m_rg->verifyMDRef() &&
             m_du->verifyMDDUChain(DUOPT_COMPUTE_PR_DU|DUOPT_COMPUTE_NONPR_DU));
     OC_is_expr_tab_valid(oc) = false;
     OC_is_live_expr_valid(oc) = false;
     OC_is_reach_def_valid(oc) = false;
     OC_is_avail_reach_def_valid(oc) = false;
-    if (m_prssamgr != NULL && m_prssamgr->isSSAConstructed()) {
-        ASSERT0(verifySSAInfo(m_rg));
-    }
-    if (m_mdssamgr != NULL && m_mdssamgr->isMDSSAConstructed()) {
-        ASSERT0(verifyMDSSAInfo(m_rg));
-    }
+    ASSERT0(verifyPRSSAInfo(m_rg));
+    ASSERT0(verifyMDSSAInfo(m_rg));
     END_TIMER(t, getPassName());
     return true;
 }

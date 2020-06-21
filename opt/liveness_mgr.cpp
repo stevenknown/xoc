@@ -241,7 +241,7 @@ static UINT g_max_times = 0;
 #endif
 void LivenessMgr::computeGlobal()
 {
-    ASSERT0(m_cfg->get_entry() && BB_is_entry(m_cfg->get_entry()));
+    ASSERT0(m_cfg->getEntry() && BB_is_entry(m_cfg->getEntry()));
 
     //Rpo should be available.
     List<IRBB*> * vlst = m_cfg->getBBListInRPO();
@@ -300,7 +300,7 @@ void LivenessMgr::computeGlobal()
 
     #ifdef STATISTIC_LIVENESS
     g_max_times = MAX(g_max_times, count);
-    FILE * h = fopen("prdf.sat.dump", "a+");
+    FILE * h = fopen("liveness.sat.dump", "a+");
     fprintf(h, "\n%s run %u times, maxtimes %u",
             m_rg->getRegionName(), count, g_max_times);
     fclose(h);

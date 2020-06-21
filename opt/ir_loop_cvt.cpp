@@ -160,7 +160,7 @@ bool LoopCvt::try_convert(LI<IRBB> * li, IRBB * gobackbb,
     m_cfg->removeEdge(gobackbb, head); //revise cfg.
 
     LabelInfo const* loopbody_start_lab =
-            loopbody_start_bb->getLabelList().get_head();
+        loopbody_start_bb->getLabelList().get_head();
     if (loopbody_start_lab == NULL) {
         loopbody_start_lab = ::allocInternalLabel(m_rg->get_pool());
         m_cfg->addLabel(loopbody_start_bb, loopbody_start_lab);

@@ -144,36 +144,36 @@ void CallGraph::dumpVCG(CHAR const* name, INT flag)
 
         CHAR const* cnname = CN_sym(cn) != NULL ?
                 SYM_name(CN_sym(cn)) : "IndirectCall";
-        if (CN_ru(cn) != NULL) {
+        if (cn->region() != NULL) {
             fprintf(h, "CN(%d):Region(%d):%s\n",
-                    CN_id(cn), REGION_id(CN_ru(cn)), cnname);
+                    cn->id(), cn->region()->id(), cnname);
         } else {
-            fprintf(h, "CN(%d):%s\n", CN_id(cn), cnname);
+            fprintf(h, "CN(%d):%s\n", cn->id(), cnname);
         }
 
         fprintf(h, "\n");
-        if (dump_ir_detail && CN_ru(cn) != NULL) {
+        if (dump_ir_detail && cn->region() != NULL) {
             //Dump formal paramters.
             formalparamlst.clean();
-            CN_ru(cn)->findFormalParam(formalparamlst, true);
+            cn->region()->findFormalParam(formalparamlst, true);
             for (VAR const* param = formalparamlst.get_head(); param != NULL;
                  param = formalparamlst.get_next()) {
                 param->dump(g_tfile, m_tm);
             }
 
             g_indent = 0;
-            IR * irs = CN_ru(cn)->getIRList();
+            IR * irs = cn->region()->getIRList();
             if (irs != NULL) {
                 for (; irs != NULL; irs = irs->get_next()) {
                     //fprintf(h, "%s\n", dump_ir_buf(ir, buf));
                     //TODO: implement dump_ir_buf();
-                    dumpIR(irs, CN_ru(cn), NULL, IR_DUMP_KID|
+                    dumpIR(irs, cn->region(), NULL, IR_DUMP_KID|
                         (dump_src_line ? IR_DUMP_SRC_LINE : 0)|
                         (dump_inner_region ? IR_DUMP_INNER_REGION : 0));
                 }
             } else {
-                dumpBBList(CN_ru(cn)->getBBList(),
-                           CN_ru(cn), NULL, dump_inner_region);
+                dumpBBList(cn->region()->getBBList(),
+                           cn->region(), NULL, dump_inner_region);
             }
         }
         fprintf(h, "\"}");
@@ -229,7 +229,7 @@ CallNode * CallGraph::newCallNode(Region * rg)
     if (rg->is_program()) {
         CallNode * cn = mapRegion2CallNode(rg);
         if (cn != NULL) {
-            ASSERTN(CN_ru(cn) == rg, ("more than 2 rg with same id"));
+            ASSERTN(cn->region() == rg, ("more than 2 rg with same id"));
             return cn;
         }
 
@@ -237,7 +237,7 @@ CallNode * CallGraph::newCallNode(Region * rg)
         CN_sym(cn) = name;
         CN_id(cn) = m_cn_count++;
         CN_ru(cn) = rg;
-        m_ruid2cn.set(REGION_id(rg), cn);
+        m_ruid2cn.set(rg->id(), cn);
         return cn;
     }
 
@@ -248,8 +248,8 @@ CallNode * CallGraph::newCallNode(Region * rg)
     CN_id(cn) = m_cn_count++;
     CN_ru(cn) = rg;
     genSYM2CN(rg->getParent())->set(name, cn);
-    ASSERT0(m_ruid2cn.get(REGION_id(rg)) == NULL);
-    m_ruid2cn.set(REGION_id(rg), cn);
+    ASSERT0(m_ruid2cn.get(rg->id()) == NULL);
+    m_ruid2cn.set(rg->id(), cn);
     return cn;
 }
 
@@ -271,12 +271,12 @@ bool CallGraph::build(RegionMgr * rumgr)
 
             CallNode * cn = sym2cn->get(name);
             if (cn != NULL) {
-                if (CN_ru(cn) == NULL) {
+                if (cn->region() == NULL) {
                     CN_ru(cn) = rg;
-                    m_ruid2cn.set(REGION_id(rg), cn);
+                    m_ruid2cn.set(rg->id(), cn);
                 }
 
-                if (CN_ru(cn) != rg) {
+                if (cn->region() != rg) {
                     //more than one regions has the same id.
                     //UNREACHABLE();
                     return false;

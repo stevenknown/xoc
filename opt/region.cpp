@@ -36,6 +36,29 @@ author: Su Zhenyu
 
 namespace xoc {
 
+//Record memory reference for region.
+#define REGION_refinfo(r) ((r)->m_ref_info)
+
+static void set_irt_size(IR * ir, UINT)
+{
+    #ifdef CONST_IRT_SZ
+    IR_irt_size(ir) = irt_sz;
+    #else
+    DUMMYUSE(ir);
+    #endif
+}
+
+
+static UINT getIRTypeSize(IR const* ir)
+{
+    #ifdef CONST_IRT_SZ
+    return IR_irt_size(ir);
+    #else
+    return IRTSIZE(ir->getCode());
+    #endif
+}
+
+
 //
 //START AnalysisInstrument
 //
@@ -64,7 +87,7 @@ static bool verifyVar(Region * rg, VarMgr * vm, VAR * v)
     CHECK_DUMMYUSE(v);
     CHECK_DUMMYUSE(vm);
     if (rg->is_function() || rg->is_eh() ||
-        REGION_type(rg) == REGION_INNER) {
+        rg->getRegionType() == REGION_INNER) {
         //If var is global but unallocable, it often be
         //used as placeholder or auxilary var.
 
@@ -220,7 +243,7 @@ void Region::destroy()
 {
     destroyPassMgr();
     if ((is_inner() || is_function() || is_eh() || is_program()) &&
-        REGION_analysis_instrument(this) != NULL) {
+        getAnalysisInstrument() != NULL) {
         delete REGION_analysis_instrument(this);
     }
     REGION_analysis_instrument(this) = NULL;
@@ -242,8 +265,8 @@ size_t Region::count_mem()
     //not contain its class size.
     size_t count = sizeof(Region);
     if ((is_inner() || is_function() || is_eh() || is_program()) &&
-        REGION_analysis_instrument(this) != NULL) {
-        count += REGION_analysis_instrument(this)->count_mem();
+        getAnalysisInstrument() != NULL) {
+        count += getAnalysisInstrument()->count_mem();
     }
     count += m_ru_var_tab.count_mem();
     if (m_ref_info != NULL) {
@@ -784,7 +807,7 @@ MD const* Region::genMDforPR(UINT prno, Type const* type)
 Region * Region::getFuncRegion()
 {
     Region * rg = this;
-    while (!rg->is_function()) { rg = REGION_parent(rg); }
+    while (!rg->is_function()) { rg = rg->getParent(); }
     ASSERTN(rg != NULL, ("Not in func unit"));
     return rg;
 }
@@ -799,6 +822,90 @@ CHAR const* Region::getRegionName() const
 
     //Miss region variable.
     return NULL;
+}
+
+
+//Use HOST_INT type describes the value.
+//The value can not exceed ir type's value range.
+HOST_INT Region::getIntegerInDataTypeValueRange(IR * ir) const
+{
+    ASSERT0(ir->is_const() && ir->is_int());
+    UINT bitsz = getTypeMgr()->getDTypeBitSize(
+        TY_dtype(ir->getType()));
+    ASSERTN(sizeof(HOST_INT) * BIT_PER_BYTE >= bitsz,
+        ("integer might be truncated"));
+    switch (bitsz) {
+    case 8: return (HOST_INT)(((UINT8)(INT8)CONST_int_val(ir)));
+    case 16: return (HOST_INT)(((UINT16)(INT16)CONST_int_val(ir)));
+    case 32: return (HOST_INT)(((UINT32)(INT32)CONST_int_val(ir)));
+    case 64: return (HOST_INT)(((UINT64)(INT64)CONST_int_val(ir)));
+    case 128:
+        #ifdef INT128
+        return (HOST_INT)(((UINT128)(INT128)CONST_int_val(ir)));
+        #endif
+    default: ASSERTN(0, ("TODO:need to support"));
+    }
+    return 0;
+}
+
+
+HOST_INT Region::getMaxInteger(UINT bitsize, bool is_signed) const
+{
+    ASSERTN(sizeof(HOST_INT) * BIT_PER_BYTE >= bitsize,
+        ("integer might be truncated"));
+    if (is_signed) {
+        switch (bitsize) {
+        case 8: return (HOST_INT)(((UINT8)(INT8)-1) >> 1);
+        case 16: return (HOST_INT)(((UINT16)(INT16)-1) >> 1);
+        case 32: return (HOST_INT)(((UINT32)(INT32)-1) >> 1);
+        case 64: return (HOST_INT)(((UINT64)(INT64)-1) >> 1);
+        case 128:
+            #ifdef INT128
+            return (HOST_INT)(((UINT128)(INT128)-1) >> 1);
+            #endif
+        default: ASSERTN(0, ("TODO:need to support"));
+        }
+        return 0;
+    }
+
+    switch (bitsize) {
+    case 8: return (HOST_INT)(((UINT8)(INT8)-1));
+    case 16: return (HOST_INT)(((UINT16)(INT16)-1));
+    case 32: return (HOST_INT)(((UINT32)(INT32)-1));
+    case 64: return (HOST_INT)(((UINT64)(INT64)-1));
+    case 128:
+        #ifdef INT128
+        return (HOST_INT)(((UINT128)(INT128)-1));
+        #endif
+    default: ASSERTN(0, ("TODO:need to support"));
+    }
+    return 0;
+}
+
+
+HOST_INT Region::getMinInteger(UINT bitsize, bool is_signed) const
+{
+    switch (bitsize) {
+    case 8:
+        return (HOST_INT)
+            ((UINT8)(~(UINT8)getMaxInteger(bitsize, is_signed)));
+    case 16:
+        return (HOST_INT)
+            ((UINT16)(~(UINT16)getMaxInteger(bitsize, is_signed)));
+    case 32:
+        return (HOST_INT)
+            ((UINT32)(~(UINT32)getMaxInteger(bitsize, is_signed)));
+    case 64:
+        return (HOST_INT)
+            ((UINT64)(~(UINT64)getMaxInteger(bitsize, is_signed)));
+    case 128:
+        #ifdef INT128
+        return (HOST_INT)
+            ((UINT128)(~(UINT128)getMaxInteger(bitsize, is_signed)));
+        #endif
+    default: ASSERTN(0, ("TODO:need to support"));
+    }
+    return 0;
 }
 
 
@@ -882,9 +989,9 @@ void Region::freeIR(IR * ir)
     ASSERT0(ir);
     ASSERTN(ir->is_single(), ("chain list should be cut off"));
     #ifdef _DEBUG_
-    ASSERT0(!REGION_analysis_instrument(this)->
+    ASSERT0(!getAnalysisInstrument()->
             m_has_been_freed_irs.is_contain(ir->id()));
-    REGION_analysis_instrument(this)->m_has_been_freed_irs.bunion(ir->id());
+    getAnalysisInstrument()->m_has_been_freed_irs.bunion(ir->id());
     #endif
 
     ASSERT0(getMiscBitSetMgr());
@@ -892,7 +999,7 @@ void Region::freeIR(IR * ir)
 
     AIContainer * res_ai = IR_ai(ir);
     if (res_ai != NULL) {
-        //AICont will be reinitialized while setting.
+        //AICont will be reinitialized till next setting.
         res_ai->destroy();
     }
 
@@ -901,7 +1008,7 @@ void Region::freeIR(IR * ir)
         DU_md(du) = NULL;
         DU_mds(du) = NULL;
         ASSERT0(du->has_clean());
-        REGION_analysis_instrument(this)->m_free_du_list.append_head(du);
+        getAnalysisInstrument()->m_free_du_list.append_head(du);
     }
 
     //Zero clearing all data fields.
@@ -913,12 +1020,12 @@ void Region::freeIR(IR * ir)
     set_irt_size(ir, res_irt_sz);
 
     UINT idx = res_irt_sz - sizeof(IR);
-    IR * head = REGION_analysis_instrument(this)->m_free_tab[idx];
+    IR * head = getAnalysisInstrument()->m_free_tab[idx];
     if (head != NULL) {
         IR_next(ir) = head;
         IR_prev(head) = ir;
     }
-    REGION_analysis_instrument(this)->m_free_tab[idx] = ir;
+    getAnalysisInstrument()->m_free_tab[idx] = ir;
 }
 
 
@@ -1185,12 +1292,18 @@ void Region::dumpBBList(bool dump_inner_region)
 }
 
 
+AnalysisInstrument * Region::getAnalysisInstrument() const
+{
+    return REGION_analysis_instrument(this);
+}
+
+
 void Region::dumpFreeTab()
 {
     if (g_tfile == NULL) { return; }
     note("\n==-- DUMP Region Free Table --==");
     for (UINT i = 0; i <= MAX_OFFSET_AT_FREE_TABLE; i++) {
-        IR * lst = REGION_analysis_instrument(this)->m_free_tab[i];
+        IR * lst = getAnalysisInstrument()->m_free_tab[i];
         if (lst == NULL) { continue; }
 
         UINT sz = i + sizeof(IR);
@@ -1211,96 +1324,111 @@ void Region::dumpFreeTab()
 }
 
 
-static void assignMDImpl(IR * x, Region * rg, bool is_only_assign_pr)
+static void assignMDImpl(IR * x, Region * rg, bool assign_pr, bool assign_nonpr)
 {
     ASSERT0(x && rg);
     switch (x->getCode()) {
     case IR_PR:
-        rg->allocPRMD(x);
+        if (assign_pr) {
+            rg->allocPRMD(x);
+        }
         break;
     case IR_STPR:
-        rg->allocStorePRMD(x);
+        if (assign_pr) {
+            rg->allocStorePRMD(x);
+        }
         break;
     case IR_GETELEM:
-        rg->allocGetelemMD(x);
+        if (assign_pr) {
+            rg->allocGetelemMD(x);
+        }
         break;
     case IR_SETELEM:
-        rg->allocSetelemMD(x);
+        if (assign_pr) {
+            rg->allocSetelemMD(x);
+        }
         break;
     case IR_PHI:
-        rg->allocPhiMD(x);
+        if (assign_pr) {
+            rg->allocPhiMD(x);
+        }
         break;
     case IR_CALL:
     case IR_ICALL:
-        if (x->hasReturnValue()) {
+        if (assign_pr && x->hasReturnValue()) {
             rg->allocCallResultPRMD(x);
-        }
+        }        
         break;
     case IR_ST:
-        if (is_only_assign_pr) { return; }
-        rg->allocStoreMD(x);
-        break;
-    case IR_LD:
-        if (is_only_assign_pr) { return; }
-        rg->allocLoadMD(x);
-        break;
-    case IR_ID:
-        if (is_only_assign_pr) { return; }
-        if (ID_info(x)->is_string()) {
-            rg->allocStringMD(ID_info(x)->get_name());
-        } else {
-            rg->allocIdMD(x);
+        if (assign_nonpr) {
+            rg->allocStoreMD(x);
         }
         break;
-    default:
-        ASSERT0(!x->isReadPR() && !x->isWritePR());
+    case IR_LD:
+        if (assign_nonpr) {
+            rg->allocLoadMD(x);
+        }
+        break;
+    case IR_ID:
+        if (assign_nonpr) {
+            if (ID_info(x)->is_string()) {
+                rg->allocStringMD(ID_info(x)->get_name());
+            } else {
+                rg->allocIdMD(x);
+            }
+        }
+        break;
+    default: ASSERT0(!x->isReadPR() && !x->isWritePR());
     }
 }
 
 
 //Assign MD for ST/LD/ReadPR/WritePR operations.
 //is_only_assign_pr: true if assign MD for each ReadPR/WritePR operations.
-void Region::assignMD(bool is_only_assign_pr)
+void Region::assignMD(bool assign_pr, bool assign_nonpr)
 {    
     if (getIRList() != NULL) {
-        assignMDForIRList(getIRList(), is_only_assign_pr);
+        assignMDForIRList(getIRList(), assign_pr, assign_nonpr);
         return;
     }
     if (getBBList() != NULL) {
-        assignMDForBBList(getBBList(), is_only_assign_pr);
+        assignMDForBBList(getBBList(), assign_pr, assign_nonpr);
     }
 }
 
 
-void Region::assignMDForBBList(BBList * lst, bool is_only_assign_pr)
+void Region::assignMDForBBList(BBList * lst, bool assign_pr, bool assign_nonpr)
 {
     ASSERT0(lst);
     IRIter ii;
     for (IRBB * bb = lst->get_head(); bb != NULL; bb = lst->get_next()) {
-        assignMDForBB(bb, ii, is_only_assign_pr);
+        assignMDForBB(bb, ii, assign_pr, assign_nonpr);
     }
 }
 
 
-void Region::assignMDForBB(IRBB * bb, IRIter & ii, bool is_only_assign_pr)
+void Region::assignMDForBB(IRBB * bb,
+                           IRIter & ii,
+                           bool assign_pr,
+                           bool assign_nonpr)
 {
     xcom::C<xoc::IR*> * ct;
-    for (xoc::IR * ir = BB_irlist(bb).get_head(&ct); ir != NULL;
-         ir = BB_irlist(bb).get_next(&ct)) {
+    for (xoc::IR * ir = BB_irlist(bb).get_head(&ct);
+         ir != NULL; ir = BB_irlist(bb).get_next(&ct)) {
         for (IR * x = iterInit(ir, ii);
            x != NULL; x = iterNext(ii)) {
-           assignMDImpl(x, this, is_only_assign_pr);
+           assignMDImpl(x, this, assign_pr, assign_nonpr);
         }
     }
 }
 
 
-void Region::assignMDForIRList(IR * lst, bool is_only_assign_pr)
+void Region::assignMDForIRList(IR * lst, bool assign_pr, bool assign_nonpr)
 {
     IRIter ii;
     for (IR * x = iterInit(lst, ii);
          x != NULL; x = iterNext(ii)) {
-        assignMDImpl(x, this, is_only_assign_pr);
+        assignMDImpl(x, this, assign_pr, assign_nonpr);
     }
 }
 
@@ -1322,19 +1450,19 @@ IR * Region::allocIR(IR_TYPE irt)
 
     if (lookup) {
         for (; idx <= MAX_OFFSET_AT_FREE_TABLE; idx++) {
-            ir = REGION_analysis_instrument(this)->m_free_tab[idx];
+            ir = getAnalysisInstrument()->m_free_tab[idx];
             if (ir == NULL) { continue; }
 
-            REGION_analysis_instrument(this)->m_free_tab[idx] = ir->get_next();
+            getAnalysisInstrument()->m_free_tab[idx] = ir->get_next();
             if (ir->get_next() != NULL) {
                 IR_prev(ir->get_next()) = NULL;
             }
             break;
         }
     } else {
-        ir = REGION_analysis_instrument(this)->m_free_tab[idx];
+        ir = getAnalysisInstrument()->m_free_tab[idx];
         if (ir != NULL) {
-            REGION_analysis_instrument(this)->m_free_tab[idx] = ir->get_next();
+            getAnalysisInstrument()->m_free_tab[idx] = ir->get_next();
             if (ir->get_next() != NULL) {
                 IR_prev(ir->get_next()) = NULL;
             }
@@ -1351,7 +1479,7 @@ IR * Region::allocIR(IR_TYPE irt)
         ASSERT0(ir->get_prev() == NULL);
         IR_next(ir) = NULL;
         #ifdef _DEBUG_
-        REGION_analysis_instrument(this)->m_has_been_freed_irs.diff(ir->id());
+        getAnalysisInstrument()->m_has_been_freed_irs.diff(ir->id());
         #endif
     }
     IR_code(ir) = irt;
@@ -1692,7 +1820,7 @@ void Region::dumpGR(bool dump_inner_region)
 {
     note("\n//====---- Dump region '%s' ----====", getRegionName());
     note("\nregion ");
-    switch (REGION_type(this)) {
+    switch (getRegionType()) {
     case REGION_PROGRAM: prt("program "); break;
     case REGION_BLACKBOX: prt("blackbox "); break;
     case REGION_FUNC: prt("func "); break;
@@ -1856,7 +1984,7 @@ void Region::dumpAllocatedIR()
     //Dump IR dispers in free tab.
     note("\n==---- Dump IR dispersed in free tab ----==");
     for (UINT w = 0; w < MAX_OFFSET_AT_FREE_TABLE + 1; w++) {
-        IR * lst = REGION_analysis_instrument(this)->m_free_tab[w];
+        IR * lst = getAnalysisInstrument()->m_free_tab[w];
         note("\nbyte(%d)", (INT)(w + sizeof(IR)));
         if (lst == NULL) { continue; }
 
@@ -1955,22 +2083,22 @@ void Region::dumpBBRef(IN IRBB * bb, UINT indent)
 
 PassMgr * Region::initPassMgr()
 {
-    if (REGION_analysis_instrument(this)->m_pass_mgr != NULL) {
-        return REGION_analysis_instrument(this)->m_pass_mgr;
+    if (getAnalysisInstrument()->m_pass_mgr != NULL) {
+        return getAnalysisInstrument()->m_pass_mgr;
     }
-    REGION_analysis_instrument(this)->m_pass_mgr = allocPassMgr();
-    return REGION_analysis_instrument(this)->m_pass_mgr;
+    getAnalysisInstrument()->m_pass_mgr = allocPassMgr();
+    return getAnalysisInstrument()->m_pass_mgr;
 }
 
 
 void Region::destroyPassMgr()
 {
-    if (REGION_analysis_instrument(this) == NULL ||
-        ANA_INS_pass_mgr(REGION_analysis_instrument(this)) == NULL) {
+    if (getAnalysisInstrument() == NULL ||
+        ANA_INS_pass_mgr(getAnalysisInstrument()) == NULL) {
         return;
     }
-    delete ANA_INS_pass_mgr(REGION_analysis_instrument(this));
-    ANA_INS_pass_mgr(REGION_analysis_instrument(this)) = NULL;
+    delete ANA_INS_pass_mgr(getAnalysisInstrument());
+    ANA_INS_pass_mgr(getAnalysisInstrument()) = NULL;
 }
 
 
@@ -2291,11 +2419,11 @@ void Region::dumpVARInRegion()
 
     //Dump Region name.
     if (getRegionVar() != NULL) {
-        note("\n==---- REGION(%d):%s:", REGION_id(this), getRegionName());
+        note("\n==---- REGION(%d):%s:", id(), getRegionName());
         getRegionVar()->dumpVARDecl(buf);
         prt("%s ----==", buf.buf);
     } else {
-        note("\n==---- REGION(%d): ----==", REGION_id(this));
+        note("\n==---- REGION(%d): ----==", id());
     }
 
     //Dump formal parameter list.
@@ -2652,7 +2780,7 @@ bool Region::partitionRegion()
     while (ir != end_pos) {
         IR * t = ir;
         ir = ir->get_next();
-        xcom::remove(&REGION_analysis_instrument(this)->m_ir_list, t);
+        xcom::remove(&getAnalysisInstrument()->m_ir_list, t);
         IR * inner_ir = inner_ru->dupIRTree(t);
         freeIRTree(t);
         inner_ru->addToIRList(inner_ir);
@@ -2669,7 +2797,7 @@ bool Region::partitionRegion()
     dumpIRList(getIRList(), this);
 
     //Merger IR list in inner-region to outer region.
-    //xcom::remove(&REGION_analysis_instrument(this)->m_ir_list, ir_ru);
+    //xcom::remove(&getAnalysisInstrument()->m_ir_list, ir_ru);
     //IR * head = inner_ru->constructIRlist();
     //insertafter(&split_pos, dupIRTreeList(head));
     //dumpIRList(getIRList(), this);
@@ -2801,15 +2929,17 @@ bool Region::process(OptCtx * oc)
     ssamgr = (PRSSAMgr*)getPassMgr()->queryPass(PASS_PR_SSA_MGR);
     if (ssamgr != NULL && ssamgr->isSSAConstructed()) {
         ssamgr->destruction(oc);
+        getPassMgr()->destroyPass(ssamgr);
     }
 
     mdssamgr = (MDSSAMgr*)getPassMgr()->queryPass(PASS_MD_SSA_MGR);
     if (mdssamgr != NULL && mdssamgr->isMDSSAConstructed()) {
         mdssamgr->destruction(oc);
+        getPassMgr()->destroyPass(mdssamgr);
     }
 
     if (!g_retain_pass_mgr_for_region) {
-        destroyPassMgr();
+        destroyPassMgr();        
     }
 
     updateCallAndReturnList(true);
@@ -2822,6 +2952,12 @@ ERR_RET:
     ssamgr = (PRSSAMgr*)getPassMgr()->queryPass(PASS_PR_SSA_MGR);
     if (ssamgr != NULL && ssamgr->isSSAConstructed()) {
         ssamgr->destruction(oc);
+        getPassMgr()->destroyPass(ssamgr);
+    }
+    mdssamgr = (MDSSAMgr*)getPassMgr()->queryPass(PASS_MD_SSA_MGR);
+    if (mdssamgr != NULL && mdssamgr->isMDSSAConstructed()) {
+        mdssamgr->destruction(oc);
+        getPassMgr()->destroyPass(mdssamgr);
     }
     if (!g_retain_pass_mgr_for_region) {
         destroyPassMgr();

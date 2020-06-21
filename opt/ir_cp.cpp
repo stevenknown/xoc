@@ -79,8 +79,8 @@ bool CopyProp::checkTypeConsistency(IR const* ir, IR const* cand_expr) const
 //
 //NOTE: Do NOT handle stmt.
 void CopyProp::replaceExpViaSSADu(IR * exp,
-                               IR const* cand_expr,
-                               IN OUT CPCtx & ctx)
+                                  IR const* cand_expr,
+                                  IN OUT CPCtx & ctx)
 {
     ASSERT0(exp && exp->is_exp() && cand_expr && cand_expr->is_exp());
     ASSERT0(exp->getExactRef());
@@ -105,7 +105,7 @@ void CopyProp::replaceExpViaSSADu(IR * exp,
 
     if (cand_expr->isReadPR() && PR_ssainfo(cand_expr) != NULL) {
         PR_ssainfo(newir) = PR_ssainfo(cand_expr);
-        SSA_uses(PR_ssainfo(newir)).append(newir);
+        PR_ssainfo(newir)->addUse(newir);
     } else {
         m_du->copyIRTreeDU(newir, cand_expr, true);
     }
@@ -116,14 +116,13 @@ void CopyProp::replaceExpViaSSADu(IR * exp,
     //Add SSA use for new exp.
     SSAInfo * cand_ssainfo = NULL;
     if ((cand_ssainfo = cand_expr->getSSAInfo()) != NULL) {
-        SSA_uses(cand_ssainfo).append(newir);
+        cand_ssainfo->addUse(newir);
     }
 
     //Remove old exp SSA use.
     SSAInfo * exp_ssainfo = exp->getSSAInfo();
-    ASSERT0(exp_ssainfo);
-    ASSERT0(SSA_uses(exp_ssainfo).find(exp));
-    SSA_uses(exp_ssainfo).remove(exp);
+    ASSERT0(exp_ssainfo && exp_ssainfo->findUse(exp));
+    exp_ssainfo->removeUse(exp);
 
     CPC_change(ctx) = true;
 
@@ -191,7 +190,7 @@ void CopyProp::replaceExp(IR * exp,
     if (exp_ssainfo != NULL) {
         //Remove exp SSA use.
         ASSERT0(exp->getSSAInfo());
-        ASSERT0(exp->getSSAInfo()->get_uses().find(exp));
+        ASSERT0(exp->getSSAInfo()->getUses().find(exp));
         exp->removeSSAUse();
         ASSERT0(exp->getStmt());
         bool doit = exp->getParent()->replaceKid(exp, newir, false);
@@ -255,17 +254,51 @@ bool CopyProp::isCopyOR(IR * ir) const
 }
 
 
-//Return true if 'occ' does not be modified till meeting 'use_ir'.
-//e.g:
-//    xx = occ  //def_ir
+bool CopyProp::existMayDefTillBB(IR const* exp,
+                                 IRBB const* start,
+                                 IRBB const* meetup) const
+{
+    xcom::List<IRBB const*> wl;
+    m_cfg->get_preds(wl, start);
+    xcom::TTab<UINT> visited;
+    while (wl.get_elem_count() != 0) {
+        IRBB const* t = wl.remove_head();
+        if (t == meetup) { continue; }
+
+        IRListIter tir_holder = NULL;
+        for (IR const* tir = BB_irlist(t).get_head(&tir_holder);
+             tir != NULL; tir = BB_irlist(t).get_next(&tir_holder)) {
+            if (m_du->is_may_def(tir, exp, false)) {
+                return true;
+            }
+        }
+
+        visited.append(t->id());
+        for (xcom::EdgeC * el = m_cfg->getVertex(t->id())->getInList();
+             el != NULL; el = el->get_next()) {
+            UINT pred = (UINT)el->getFromId();
+            if (!visited.find(pred)) {
+                wl.append_tail(m_cfg->getBB(pred));
+            }
+        }
+    }
+    return false;
+}
+
+
+//Return true if 'prop_value' does not be modified till meeting 'use_stmt'.
+//e.g:xx = prop_value //def_stmt
 //    ..
 //    ..
-//    yy = xx  //use_ir
+//    use_bb:
+//    yy = xx  //use_stmt|use_phi
 //
 //'def_stmt': ir stmt.
-//'prop_value': exp that will be propagated.
-//'use_stmt': stmt in use-list of 'def_ir'.
-//'use_bb': IRBB that use_stmt be placed in.
+//'prop_value': expression that will be propagated.
+//'use_stmt': stmt in use-list of 'def_stmt'.
+//'use_phi': stmt in use-list of 'def_stmt'.
+//'use_bb': IRBB that use_stm or use_phi be placed in.
+//Note either use_phi or use_stmt is NULL.
 bool CopyProp::is_available(IR const* def_stmt,
                             IR const* prop_value,
                             IR * use_stmt,
@@ -315,29 +348,8 @@ bool CopyProp::is_available(IR const* def_stmt,
         //Nothing to do.
     }
 
-    List<IRBB*> wl;
-    m_cfg->get_preds(wl, usebb);
-    xcom::BitSet visited;
-    while (wl.get_elem_count() != 0) {
-        IRBB * t = wl.remove_head();
-        if (t == defbb) { continue; }
-
-        IRListIter tir_holder = NULL;
-        for (IR * tir = BB_irlist(t).get_head(&tir_holder);
-             tir != NULL; tir = BB_irlist(t).get_next(&tir_holder)) {
-            if (m_du->is_may_def(tir, prop_value, false)) {
-                return false;
-            }
-        }
-
-        visited.bunion(t->id());
-        for (xcom::EdgeC * el = VERTEX_in_list(m_cfg->getVertex(t->id()));
-             el != NULL; el = EC_next(el)) {
-            INT pred = el->getFromId();
-            if (!visited.is_contain(pred)) {
-                wl.append_tail(m_cfg->getBB(pred));
-            }
-        }
+    if (existMayDefTillBB(prop_value, usebb, defbb)) {
+        return false;
     }
 
     return true;
@@ -688,7 +700,7 @@ bool CopyProp::perform(OptCtx & oc)
     }
 
     bool change = false;
-    IRBB * entry = m_rg->getCFG()->get_entry();
+    IRBB * entry = m_rg->getCFG()->getEntry();
     ASSERTN(entry, ("Not unique entry, invalid Region"));
     xcom::Graph domtree;
     m_cfg->get_dom_tree(domtree);
@@ -727,7 +739,7 @@ bool CopyProp::perform(OptCtx & oc)
     
     if (prssamgr != NULL && prssamgr->isSSAConstructed()) {
         //Use PRSSA.
-        ASSERT0(verifySSAInfo(m_rg));
+        ASSERT0(verifyPRSSAInfo(m_rg));
         OC_is_pr_du_chain_valid(oc) = false; //not update.
     } else {
         //Use classic DU chain.

@@ -37,6 +37,7 @@ author: Su Zhenyu
 namespace xcom {
 
 #define MAGIC_METHOD
+#define VERTEX_UNDEF 0
 
 class Vertex;
 class Edge;
@@ -66,7 +67,6 @@ public:
 };
 
 
-#define VERTEX_UNDEF 0
 #define VERTEX_next(v) ((v)->next)
 #define VERTEX_prev(v) ((v)->prev)
 #define VERTEX_id(v) ((v)->_id)

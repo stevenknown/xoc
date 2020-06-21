@@ -191,8 +191,8 @@ void IRBB::dupSuccessorPhiOpnd(CFG<IRBB, IR> * cfg, Region * rg, UINT opnd_pos)
     IRCFG * ircfg = (IRCFG*)cfg;
     xcom::Vertex * vex = ircfg->getVertex(BB_id(this));
     ASSERT0(vex);
-    for (xcom::EdgeC * out = VERTEX_out_list(vex);
-         out != NULL; out = EC_next(out)) {
+    for (xcom::EdgeC * out = vex->getOutList();
+         out != NULL; out = out->get_next()) {
         xcom::Vertex * succ_vex = out->getTo();
         IRBB * succ = ircfg->getBB(succ_vex->id());
         ASSERT0(succ);
@@ -226,40 +226,40 @@ void IRBB::dupSuccessorPhiOpnd(CFG<IRBB, IR> * cfg, Region * rg, UINT opnd_pos)
 //END IRBB
 
 
-//Before removing bb or change bb successor,
+//Before removing BB or change BB successor,
 //you need remove the related PHI operand if BB successor has PHI stmt.
 void IRBB::removeSuccessorDesignatePhiOpnd(CFG<IRBB, IR> * cfg, IRBB * succ)
 {
-    ASSERT0(cfg && succ);
     IRCFG * ircfg = (IRCFG*)cfg;
-    Region * rg = ircfg->getRegion();
-    UINT const pos = ircfg->WhichPred(this, succ);
-    for (IR * ir = BB_first_ir(succ); ir != NULL; ir = BB_next_ir(succ)) {
-        if (!ir->is_phi()) { break; }
-
-        ASSERT0(xcom::cnt_list(PHI_opnd_list(ir)) == succ->getNumOfPred(cfg));
-
-        IR * opnd;
-        UINT lpos = pos;
-        for (opnd = PHI_opnd_list(ir); lpos != 0; opnd = opnd->get_next()) {
-            ASSERT0(opnd);
-            lpos--;
-        }
-
-        if (opnd == NULL) {
-            //PHI does not contain any operand.
-            continue;
-        }
-
-        opnd->removeSSAUse();
-        ((CPhi*)ir)->removeOpnd(opnd);
-        rg->freeIRTree(opnd);
+    PRSSAMgr * prssamgr = (PRSSAMgr*)ircfg->getRegion()->getPassMgr()->
+        queryPass(PASS_PR_SSA_MGR);
+    if (prssamgr != NULL && prssamgr->isSSAConstructed()) {
+        prssamgr->removeSuccessorDesignatePhiOpnd(this, succ);
     }
 
-    MDSSAMgr * mdssamgr = (MDSSAMgr*)rg->getPassMgr()->queryPass(
-        PASS_MD_SSA_MGR);
-    if (mdssamgr != NULL) {
+    MDSSAMgr * mdssamgr = (MDSSAMgr*)ircfg->getRegion()->getPassMgr()->
+        queryPass(PASS_MD_SSA_MGR);
+    if (mdssamgr != NULL && mdssamgr->isMDSSAConstructed()) {
         mdssamgr->removeSuccessorDesignatePhiOpnd(this, succ);
+    }
+}
+
+
+//After adding BB or change bb successor,
+//you need add the related PHI operand if BB successor has PHI stmt.
+void IRBB::addSuccessorDesignatePhiOpnd(CFG<IRBB, IR> * cfg, IRBB * succ)
+{
+    IRCFG * ircfg = (IRCFG*)cfg;
+    PRSSAMgr * prssamgr = (PRSSAMgr*)ircfg->getRegion()->getPassMgr()->
+        queryPass(PASS_PR_SSA_MGR);
+    if (prssamgr != NULL && prssamgr->isSSAConstructed()) {
+        prssamgr->addSuccessorDesignatePhiOpnd(this, succ);        
+    }
+
+    MDSSAMgr * mdssamgr = (MDSSAMgr*)ircfg->getRegion()->getPassMgr()->
+        queryPass(PASS_MD_SSA_MGR);
+    if (mdssamgr != NULL && mdssamgr->isMDSSAConstructed()) {
+        mdssamgr->addSuccessorDesignatePhiOpnd(this, succ);
     }
 }
 

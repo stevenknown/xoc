@@ -128,8 +128,6 @@ IR * RCE::processBranch(IR * ir, IN OUT bool & cfg_mod)
             ir->removeSSAUse();
 
             //Revise the PHI operand to fallthrough successor.
-            ir->getBB()->removeSuccessorDesignatePhiOpnd(m_cfg, to);
-
             //Revise cfg. remove fallthrough edge.
             m_cfg->removeEdge(from, to);
             cfg_mod = true;
@@ -144,7 +142,6 @@ IR * RCE::processBranch(IR * ir, IN OUT bool & cfg_mod)
             ir->removeSSAUse();
 
             //Revise the PHI operand to target successor.
-            ir->getBB()->removeSuccessorDesignatePhiOpnd(m_cfg, to);
             m_cfg->removeEdge(from, to);
             cfg_mod = true;
             return NULL;
@@ -160,7 +157,6 @@ IR * RCE::processBranch(IR * ir, IN OUT bool & cfg_mod)
             ir->removeSSAUse();
 
             //Revise the PHI operand to target successor.
-            ir->getBB()->removeSuccessorDesignatePhiOpnd(m_cfg, to);
             m_cfg->removeEdge(from, to);
             cfg_mod = true;
             return NULL;
@@ -175,8 +171,6 @@ IR * RCE::processBranch(IR * ir, IN OUT bool & cfg_mod)
             ir->removeSSAUse();
 
             //Revise the PHI operand to fallthrough successor.
-            ir->getBB()->removeSuccessorDesignatePhiOpnd(m_cfg, to);
-
             //Revise m_cfg. remove fallthrough edge.
             m_cfg->removeEdge(from, to);
             cfg_mod = true;
@@ -338,7 +332,7 @@ bool RCE::perform(OptCtx & oc)
         OC_is_avail_reach_def_valid(oc) = false;
     }
     if (change) {
-        ASSERT0(verifySSAInfo(m_rg));
+        ASSERT0(verifyPRSSAInfo(m_rg));
     }
     END_TIMER(t, getPassName());
     return change;

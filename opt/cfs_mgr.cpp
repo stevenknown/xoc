@@ -328,9 +328,9 @@ AbsNode * CfsMgr::constructAbsTree(IN IRBB * entry,
 AbsNode * CfsMgr::constructAbstractControlFlowStruct()
 {
     IRCFG * cfg = m_rg->getCFG();
-    ASSERTN(cfg->get_entry(), ("CFG should be single-entry"));
+    ASSERTN(cfg->getEntry(), ("CFG should be single-entry"));
     xcom::BitSet visited;
-    AbsNode * a = constructAbsTree(cfg->get_entry(), NULL,
+    AbsNode * a = constructAbsTree(cfg->getEntry(), NULL,
         NULL, *(xcom::Graph*)cfg, visited);
     //dump_abs_tree(a);
     return a;

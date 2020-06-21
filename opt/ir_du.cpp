@@ -1840,7 +1840,7 @@ void DUMgr::copyIRTreeDU(IR * to, IR const* from, bool copyDUChain)
 
             ASSERT0(to_ir->isReadPR());
             PR_ssainfo(to_ir) = ssainfo;
-            SSA_uses(ssainfo).append(to_ir);
+            ssainfo->addUse(to_ir);
         } else {
             DUSet const* from_du = from_ir->readDUSet();
             if (from_du == NULL || from_du->is_empty()) { continue; }
@@ -1942,7 +1942,7 @@ bool DUMgr::removeExpiredDUForStmt(IR * stmt)
 
             if (use->is_pr() && PR_no(use) == prno) { continue; }
 
-            SSA_uses(ssainfo).remove(use);
+            ssainfo->removeUse(use);
 
             change = true;
         }
@@ -1989,8 +1989,8 @@ bool DUMgr::removeExpiredDUForOperand(IR * stmt)
         if (k->isReadPR() && (ssainfo = PR_ssainfo(k)) != NULL) {
             SSAUseIter si;
             UINT prno = 0;
-            if (SSA_def(ssainfo) != NULL) {
-                prno = SSA_def(ssainfo)->getPrno();
+            if (ssainfo->getDef() != NULL) {
+                prno = ssainfo->getDef()->getPrno();
             } else {
                 continue;
             }
@@ -2003,7 +2003,7 @@ bool DUMgr::removeExpiredDUForOperand(IR * stmt)
 
                 if (use->is_pr() && PR_no(use) == prno) { continue; }
 
-                SSA_uses(ssainfo).remove(use);
+                ssainfo->removeUse(use);
             }
 
             continue;
@@ -2078,7 +2078,7 @@ void DUMgr::removeUseOutFromDefset(IR * ir)
         SSAInfo * ssainfo;
         if ((ssainfo = k->getSSAInfo()) != NULL) {
             ASSERT0(k->is_pr());
-            SSA_uses(ssainfo).remove(k);
+            ssainfo->removeUse(k);
             continue;
         }
 
@@ -3806,7 +3806,7 @@ void DUMgr::solve(DefDBitSetCore const& expr_univers,
 {
     START_TIMER(t7, "Solve DU set");
     BBList * bbl = m_rg->getBBList();
-    IRBB const* entry = m_cfg->get_entry();
+    IRBB const* entry = m_cfg->getEntry();
     ASSERT0(entry && BB_is_entry(entry));
     for (IRBB * bb = bbl->get_tail(); bb != NULL; bb = bbl->get_prev()) {
         UINT bbid = BB_id(bb);
@@ -5186,8 +5186,7 @@ bool DUMgr::perform(IN OUT OptCtx & oc, UINT flag)
     if (bbl->get_elem_count() == 0) { return true; }
     if (bbl->get_elem_count() > g_thres_opt_bb_num) {
         //Adjust g_thres_opt_bb_num to make sure you want to do DU analysis.
-        interwarn("DUMgr::perform() of Region(%d) is not applied.",
-                  REGION_id(m_rg));
+        interwarn("DUMgr::perform() of Region(%d) is not applied.", m_rg->id());
         return false;
     }
 

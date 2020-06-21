@@ -31,38 +31,13 @@ IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 author: Su Zhenyu
 @*/
-#ifndef __COMINC_H__
-#define __COMINC_H__
+#ifndef __CONST_H__
+#define __CONST_H__
 
-#include "commoninc.h"
-#include "data_type.h"
-#include "const.h"
-//Middle level included files
-#include "dbg.h"
-#include "var.h"
-#include "md.h"
-#include "pass.h"
-#include "ai.h"
-#include "du.h"
-#include "ir.h"
-#include "loop.h"
-#include "cfg.h"
-#include "prssainfo.h"
-#include "mdssainfo.h"
-#include "ir_bb.h"
-#include "ir_refine.h"
-#include "ir_simp.h"
-#include "pass_mgr.h"
-#include "ir_cfg.h"
-#include "ir_high_opt.h"
-#include "ir_middle_opt.h"
-#include "targ_info.h"
-#include "region_mgr.h"
-#include "region.h"
-#include "ir_du.h"
-#include "ir_aa.h"
-#include "ir_expr_tab.h"
-#include "callg.h"
+namespace xoc {
 
-using namespace xoc;
+#define PRNO_UNDEF 0
+
+} //namespace xoc
+
 #endif

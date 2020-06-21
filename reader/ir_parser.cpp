@@ -635,7 +635,7 @@ bool IRParser::declareRegion(ParseCtx * ctx)
                 ASSERT0(prssamgr);
                 prssamgr->computeSSAInfo();
                 prssamgr->verifySSAInfo();
-                prssamgr->verifyPhi(false);
+                prssamgr->verifyPhi(false, false);
             }
         }
     }

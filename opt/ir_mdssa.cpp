@@ -61,19 +61,26 @@ void MDSSAMgr::destroy()
 }
 
 
+void MDSSAMgr::freeBBPhiList(IRBB * bb)
+{
+    MDPhiList * philist = m_usedef_mgr.getBBPhiList(BB_id(bb));
+    if (philist == NULL) { return; }
+
+    for (xcom::SC<MDPhi*> * sct = philist->get_head();
+         sct != philist->end(); sct = philist->get_next(sct)) {
+        MDPhi * phi = sct->val();
+        ASSERT0(phi && phi->is_phi());
+        m_rg->freeIRTreeList(phi->getOpndList());
+        MDPHI_opnd_list(phi) = NULL;
+    }
+}
+
+
 void MDSSAMgr::freePhiList()
 {
     for (IRBB * bb = m_rg->getBBList()->get_head();
          bb != NULL; bb = m_rg->getBBList()->get_next()) {
-        MDPhiList * philist = m_usedef_mgr.getBBPhiList(BB_id(bb));
-        if (philist == NULL) { continue; }
-
-        for (xcom::SC<MDPhi*> * sct = philist->get_head();
-             sct != philist->end(); sct = philist->get_next(sct)) {
-            MDPhi * phi = sct->val();
-            ASSERT0(phi && phi->is_phi());
-            m_rg->freeIRTreeList(phi->getOpndList());
-        }
+        freeBBPhiList(bb);
     }
 }
 
@@ -160,7 +167,7 @@ void MDSSAMgr::dumpAllVMD()
         note("\nVMD%d:MD%dV%d: ", v->id(), v->mdid(), v->version());
         MDDef * mddef = v->getDef();        
         //Print DEF.
-        if (v->version() != INIT_VERSION) {
+        if (v->version() != MDSSA_INIT_VERSION) {
             //After renaming, MD must have defstmt if its version is nonzero.
             ASSERT0(mddef);
         }
@@ -203,7 +210,7 @@ void MDSSAMgr::removeSuccessorDesignatePhiOpnd(IRBB * bb, IRBB * succ)
     MDPhiList * philist = m_usedef_mgr.getBBPhiList(BB_id(succ));
     if (philist == NULL) { return; }
 
-    UINT const pos = m_cfg->WhichPred(bb, succ);
+    UINT pos = m_cfg->WhichPred(bb, succ);
     for (xcom::SC<MDPhi*> * sct = philist->get_head();
          sct != philist->end(); sct = philist->get_next(sct)) {
         MDPhi * phi = sct->val();
@@ -226,6 +233,148 @@ void MDSSAMgr::removeSuccessorDesignatePhiOpnd(IRBB * bb, IRBB * succ)
         phi->removeOpnd(opnd);
         m_rg->freeIRTree(opnd);
     }
+}
+
+
+//Find livein def-stmt through given 'start' BB.
+//start: the BB that begin to do searching.
+static bool findLiveInDef(IRCFG * cfg,
+                          VMDVec const* vmdvec,
+                          IRBB const* start,
+                          VMD ** livein_def)
+{
+    ASSERT0(livein_def && start);
+    IRBB const* meetup = cfg->getEntry();
+    ASSERT0(meetup);
+    xcom::List<IRBB const*> wl;
+    cfg->get_preds(wl, start);
+    xcom::TTab<UINT> visited;
+    while (wl.get_elem_count() != 0) {
+        IRBB const* t = wl.remove_head();
+        if (t == meetup) { continue; }
+
+        VMD * vmd = vmdvec->findVMD(t->id());
+        if (vmd != NULL) {
+            *livein_def = vmd;
+            return true;
+        }
+
+        visited.append(t->id());
+        for (xcom::EdgeC * el = cfg->getVertex(t->id())->getInList();
+             el != NULL; el = el->get_next()) {
+            UINT pred = (UINT)el->getFromId();
+            if (!visited.find(pred)) {
+                wl.append_tail(cfg->getBB(pred));
+            }
+        }
+    }
+    return false;
+}
+
+
+//Find livein def-stmt through given 'start' BB.
+//This function will iterate dom tree bottom up from 'start' until the
+//anticipated BB found.
+//start: the BB that begin to do searching.
+static void findLiveInDefInDomSet(IRCFG * cfg,
+                                  VMDVec const* vmdvec,
+                                  IRBB const* start,
+                                  VMD ** livein_def)
+{
+    //Find the latest live-in version of PHI's operand MD.
+    for (UINT bbid = start->id(); bbid != BBID_UNDEF;
+         bbid = ((DGraph*)cfg)->get_idom(bbid)) {
+        VMD * v = vmdvec->findVMD(bbid);
+        if (v != NULL) {
+            *livein_def = v;
+            return;
+        }
+    }
+}
+
+
+//Insert operand at given position.
+//pos: position of operand, start at 0.
+//     Each operand correspond to in-edge on CFG.
+IR * MDPhi::insertOpndAt(MDSSAMgr * mgr, UINT pos, IRBB const* pred)
+{
+    Region * rg = mgr->getRegion();
+    UINT i = 0;
+    IR * marker = MDPHI_opnd_list(this);
+    IR * last = NULL;
+    for (; marker != NULL && i <= pos; marker = marker->get_next(), i++) {
+        last = marker;
+    }
+
+    //Generate a new ID as operand of PHI.
+    MD const* res = rg->getMDSystem()->getMD(getResult()->mdid());
+    ASSERT0(res);
+    IR * opnd = rg->buildId(res->get_base());
+    opnd->setRefMD(res, rg);
+    ASSERT0(opnd->getRefMDSet() == NULL);    
+    ID_phi(opnd) = this; //Record ID's host PHI.
+
+    VMDVec * vmdvec = mgr->getUseDefMgr()->getVMDVec(res->id());
+    IRCFG * cfg = rg->getCFG();
+
+    //Find the latest live-in version of PHI's operand MD.
+    VMD * livein_def = NULL;
+    //findLiveInDefInDomSet(m_cfg, vmdvec, pred, &livein_def);
+    findLiveInDef(cfg, vmdvec, pred, &livein_def);
+
+    MDSSAInfo * mdssainfo = NULL;
+    if (livein_def != NULL) {
+        //Generate MDSSAInfo for new operand.
+        mdssainfo = mgr->genMDSSAInfoAndVOpnd(opnd, livein_def->version());
+    } else {
+        //Generate MDSSAInfo for new operand.
+        mdssainfo = mgr->genMDSSAInfoAndVOpnd(opnd, MDSSA_INIT_VERSION);
+    }
+    
+    //MDSSAInfo * mdssainfo = mgr->getUseDefMgr()->genMDSSAInfo(opnd);
+
+    //Add current ID into occurrence set of each VOpnd.
+    mgr->addMDSSAOcc(opnd, mdssainfo);
+
+    if (marker != NULL) {
+        //Insert operand into list.
+        xcom::insertbefore(&MDPHI_opnd_list(this), marker, opnd);
+        return opnd;
+    }
+
+    //Append a new operand to list.
+    ASSERT0(pos >= 0 && i == pos);
+    //'last' may be NULL, because the operand list may be empty before
+    //insertion. During several CFG edge removing and building,
+    //there may appear single operand PHI.
+    //If CFG optimization perform removing single edge then
+    //adding a new edge, the PHI operand is empty when adding the new edge.
+    //e.g:Before adding a new edge.
+    //  BB13:
+    //  Phi: MD13V4 <-| UsedBy :
+    xcom::add_next(&MDPHI_opnd_list(this), &last, opnd);
+    return opnd;
+}
+
+
+//After adding BB or change BB successor,
+//you need add the related PHI operand if BB successor has PHI stmt.
+void MDSSAMgr::addSuccessorDesignatePhiOpnd(IRBB * bb, IRBB * succ)
+{
+    MDPhiList * philist = m_usedef_mgr.getBBPhiList(BB_id(succ));
+    if (philist == NULL) { return; }   
+
+    UINT const pos = m_cfg->WhichPred(bb, succ);
+    for (xcom::SC<MDPhi*> * sct = philist->get_head();
+         sct != philist->end(); sct = philist->get_next(sct)) {
+        MDPhi * phi = sct->val();
+        ASSERT0(phi && phi->is_phi());
+        phi->insertOpndAt(this, pos, bb);
+        ASSERT0(xcom::cnt_list(phi->getOpndList()) ==
+                succ->getNumOfPred(m_cfg));
+        //addMDSSAOcc(opnd);
+    }
+
 }
 
 
@@ -349,7 +498,7 @@ MDDef * MDSSAMgr::findNearestDef(IR const* ir)
                 lastrpo = BB_rpo(last->getBB());
                 ASSERT0(lastrpo >= 0);
             } else {
-                ASSERT0(t->version() == INIT_VERSION);
+                ASSERT0(t->version() == MDSSA_INIT_VERSION);
                 //Regard the virtual def at the entry of region,
                 //it is the farest def.
             }
@@ -631,6 +780,36 @@ void MDSSAMgr::dumpDUChain()
     fflush(g_tfile);
 }
 
+
+//Generate MDSSAInfo and generate VOpnd for related MD.
+MDSSAInfo * MDSSAMgr::genMDSSAInfoAndVOpnd(IR * ir, UINT version)
+{
+    ASSERT0(ir);
+    MDSSAInfo * mdssainfo = m_usedef_mgr.genMDSSAInfo(ir);
+    MD const* ref = ir->getRefMD();
+    if (ref != NULL &&
+        !ref->is_pr()) { //ir may be Call stmt, its result is PR.
+        VMD const* vmd = m_usedef_mgr.allocVMD(MD_id(ref), version);
+        ASSERT0(m_sbs_mgr);
+        mdssainfo->getVOpndSet()->append(vmd, *m_sbs_mgr);
+    }
+
+    MDSet const* refset = ir->getRefMDSet();
+    if (refset != NULL) {
+        MDSetIter iter;
+        for (INT i = refset->get_first(&iter);
+             i >= 0; i = refset->get_next((UINT)i, &iter)) {
+            MD * md = m_md_sys->getMD(i);
+            ASSERTN(md && !md->is_pr(), ("PR should not in MayBeSet"));
+            VMD const* vmd2 = m_usedef_mgr.allocVMD(MD_id(md), version);
+            ASSERT0(m_sbs_mgr);
+            mdssainfo->getVOpndSet()->append(vmd2, *m_sbs_mgr);
+        }
+    }
+    return mdssainfo;
+}
+
+
 //Generate VMD for stmt and exp which reference memory.
 void MDSSAMgr::initVMD(IN IR * ir, OUT DefSBitSet & maydef_md)
 {
@@ -638,56 +817,23 @@ void MDSSAMgr::initVMD(IN IR * ir, OUT DefSBitSet & maydef_md)
     ASSERT0(ir->is_stmt());
     if (ir->isMemoryRefNotOperatePR() ||
         (ir->isCallStmt() && !ir->isReadOnlyCall())) {
-        MDSSAInfo * mdssainfo = m_usedef_mgr.genMDSSAInfo(ir);
         MD const* ref = ir->getRefMD();
-        if (ref != NULL && !ref->is_pr()) {
-            VMD const* vmd = m_usedef_mgr.allocVMD(MD_id(ref), 0);
-            ASSERT0(m_sbs_mgr);
-            mdssainfo->getVOpndSet()->append(vmd, *m_sbs_mgr);
-            maydef_md.bunion(MD_id(ref));            
+        if (ref != NULL && !ref->is_pr()) {            
+            maydef_md.bunion(MD_id(ref));
         }
-
         MDSet const* refset = ir->getRefMDSet();
         if (refset != NULL) {
-            MDSetIter iter;
-            for (INT i = refset->get_first(&iter);
-                 i >= 0; i = refset->get_next((UINT)i, &iter)) {
-                MD * md = m_md_sys->getMD(i);
-                ASSERTN(md && !md->is_pr(), ("PR should not in MayBeSet"));
-                VMD const* vmd2 = m_usedef_mgr.allocVMD(MD_id(md), 0);
-                ASSERT0(m_sbs_mgr);
-                mdssainfo->getVOpndSet()->append(vmd2, *m_sbs_mgr);
-                maydef_md.bunion(MD_id(md));                
-            }
+            maydef_md.bunion((DefSBitSet&)*refset);
         }
+        genMDSSAInfoAndVOpnd(ir, MDSSA_INIT_VERSION);
     }
 
     for (IR * t = iterRhsInit(ir, m_iter);
          t != NULL; t = iterRhsNext(m_iter)) {
         ASSERT0(t->is_exp());
-        if (!t->isMemoryRefNotOperatePR()) {
-            continue;
-        }
-        MDSSAInfo * mdssainfo = m_usedef_mgr.genMDSSAInfo(t);
-        MD const* ref = t->getRefMD();
-        if (ref != NULL && !ref->is_pr()) {
-            VMD const* vmd = m_usedef_mgr.allocVMD(MD_id(ref), 0);
-            ASSERT0(m_sbs_mgr);
-            mdssainfo->getVOpndSet()->append(vmd, *m_sbs_mgr);            
-        }
-
-        MDSet const* refset = t->getRefMDSet();
-        if (refset != NULL) {
-            MDSetIter iter;
-            for (INT i = refset->get_first(&iter);
-                 i >= 0; i = refset->get_next((UINT)i, &iter)) {
-                MD * md = m_md_sys->getMD(i);
-                ASSERTN(md && !md->is_pr(), ("PR should not in MayBeSet"));
-                VMD const* vmd2 = m_usedef_mgr.allocVMD(MD_id(md), 0);
-                ASSERT0(m_sbs_mgr);
-                mdssainfo->getVOpndSet()->append(vmd2, *m_sbs_mgr);
-            }
-        }
+        if (t->isMemoryRefNotOperatePR()) {
+            genMDSSAInfoAndVOpnd(t, MDSSA_INIT_VERSION);
+        }        
     }
 }
 
@@ -709,7 +855,7 @@ void MDSSAMgr::insertPhi(UINT mdid, IN IRBB * bb)
     //They will be revised to correct type during renaming.
     MDPhi * phi = m_usedef_mgr.allocMDPhi(mdid, num_opnd);
     MDDEF_bb(phi) = bb;
-    MDDEF_result(phi) = m_usedef_mgr.allocVMD(mdid, 0);
+    MDDEF_result(phi) = m_usedef_mgr.allocVMD(mdid, MDSSA_INIT_VERSION);
     ASSERT0(phi);
 
     m_usedef_mgr.genBBPhiList(bb->id())->append_head(phi);
@@ -923,15 +1069,15 @@ void MDSSAMgr::renameUse(IR * ir)
         //    be there in current IR any more.
 
         //Set latest version of VMD be the USE of current opnd.
-        if (topv->version() == INIT_VERSION) {
+        if (topv->version() == MDSSA_INIT_VERSION) {
             //Do nothing.
             ASSERT0(vopnd == topv);
         } else if (vopnd != topv) {
             //vopnd may be ver0.
             //Current ir does not refer the old version VMD any more.
-            ASSERT0(vopnd->version() == INIT_VERSION ||
+            ASSERT0(vopnd->version() == MDSSA_INIT_VERSION ||
                     vopnd->getUseSet()->find(ir));
-            ASSERT0(vopnd->version() == INIT_VERSION || vopnd->getDef());
+            ASSERT0(vopnd->version() == MDSSA_INIT_VERSION || vopnd->getDef());
             ASSERT0(!topv->getUseSet()->find(ir));
 
             set->remove(vopnd, *m_sbs_mgr);
@@ -961,7 +1107,8 @@ void MDSSAMgr::renameDef(IR * ir, IRBB * bb)
         next = set->get_next(i, &iter);
         VMD * vopnd = (VMD*)m_usedef_mgr.getVOpnd(i);
         ASSERT0(vopnd && vopnd->is_md() && vopnd->id() == (UINT)i);
-        ASSERTN(vopnd->version() == INIT_VERSION, ("should be first meet"));
+        ASSERTN(vopnd->version() == MDSSA_INIT_VERSION,
+                ("should be first meet"));
 
         UINT maxv = m_max_version.get(vopnd->mdid());
         VMD * newv = m_usedef_mgr.allocVMD(vopnd->mdid(), maxv + 1);
@@ -1272,26 +1419,36 @@ void MDSSAMgr::rename(xcom::DefSBitSet & effect_mds,
     DefSBitSetIter cur = NULL;
     for (INT mdid = effect_mds.get_first(&cur);
          mdid >= 0; mdid = effect_mds.get_next(mdid, &cur)) {
-        VMD * v = m_usedef_mgr.allocVMD(mdid, 0);
+        VMD * v = m_usedef_mgr.allocVMD(mdid, MDSSA_INIT_VERSION);
         mapMD2VMDStack(mdid)->push(v);
     }
 
-    ASSERT0(m_cfg->get_entry());
-    renameInDomTreeOrder(m_cfg->get_entry(), domtree, defed_mds_vec);
+    ASSERT0(m_cfg->getEntry());
+    renameInDomTreeOrder(m_cfg->getEntry(), domtree, defed_mds_vec);
     END_TIMER(t, "MDSSA: Rename");
+}
+
+
+void MDSSAMgr::cleanIRSSAInfo(IRBB * bb)
+{
+    IRListIter it;
+    IRIter ii;
+    for (IR * ir = BB_irlist(bb).get_head(&it);
+         ir != NULL; ir = BB_irlist(bb).get_next(&it)) {
+        ii.clean();
+        for (IR * k = iterInit(ir, ii); k != NULL; k = iterNext(ii)) {
+            if (hasMDSSAInfo(k)) {
+                cleanMDSSAInfo(k);
+            }
+        }
+    }
 }
 
 
 void MDSSAMgr::destructBBSSAInfo(IRBB * bb)
 {
-    MDPhiList * philist = m_usedef_mgr.getBBPhiList(BB_id(bb));
-    if (philist == NULL) { return; }
-    for (xcom::SC<MDPhi*> * sct = philist->get_head();
-         sct != philist->end(); sct = philist->get_next(sct)) {
-        MDPhi * phi = sct->val();
-        ASSERT0(phi && phi->is_phi());
-        stripPhi(phi);
-    }
+    cleanIRSSAInfo(bb);
+    freeBBPhiList(bb);
 }
 
 
@@ -1344,112 +1501,18 @@ void MDSSAMgr::destruction(DomTree & domtree)
 
     BBList * bblst = m_rg->getBBList();
     if (bblst->get_elem_count() == 0) { return; }
-    ASSERT0(m_cfg->get_entry());
-    destructionInDomTreeOrder(m_cfg->get_entry(), domtree);
+    ASSERT0(m_cfg->getEntry());
+    destructionInDomTreeOrder(m_cfg->getEntry(), domtree);
     m_is_ssa_constructed = false;
 
     END_TIMER(t, "MDSSA: destruction in dom tree order");
 }
 
 
-//Return true if inserting copy at the head of fallthrough BB
-//of current BB's predessor.
-//Note that do not free phi at this function, it will be freed
-//by user.
-void MDSSAMgr::stripPhi(MDPhi * phi)
-{
-    CHECK_DUMMYUSE(phi);
-    //IRBB * bb = phi->getBB();
-    //ASSERT0(bb);
-    //
-    //xcom::Vertex const* vex = m_cfg->getVertex(BB_id(bb));
-    //ASSERT0(vex);
-    //
-    ////Temprarory RP to hold the result of PHI.
-    //IR * phicopy = m_rg->buildPR(phi->getType());
-    //phicopy->setRefMD(m_rg->genMDforPR(
-    //    PR_no(phicopy), phicopy->getType()), m_rg);
-    //phicopy->cleanRefMDSet();
-    //IR * opnd = PHI_opnd_list(phi);
-    //
-    ////opnd may be CONST, LDA, PR.
-    ////ASSERT0(opnd->is_pr());
-    //ASSERT0(PHI_ssainfo(phi));
-    //
-    //UINT pos = 0;
-    //for (xcom::EdgeC * el = VERTEX_in_list(vex), * nextel = NULL;
-    //     el != NULL; el = nextel, opnd = opnd->get_next(), pos++) {
-    //    ASSERT0(find_position(VERTEX_in_list(vex), el) == pos);
-    //
-    //    nextel = EC_next(el);
-    //    INT pred = el->getFromId();
-    //
-    //    ASSERT0(opnd);
-    //    IR * opndcopy = m_rg->dupIRTree(opnd);
-    //    if (opndcopy->is_pr()) {
-    //        opndcopy->copyRef(opnd, m_rg);
-    //    }
-    //
-    //    //The copy will be inserted into related predecessor.
-    //    IR * store_to_phicopy = m_rg->buildStorePR(
-    //        PR_no(phicopy), phicopy->getType(), opndcopy);
-    //    store_to_phicopy->copyRef(phicopy, m_rg);
-    //
-    //    IRBB * p = m_cfg->getBB(pred);
-    //    ASSERT0(p);
-    //    IR * plast = BB_last_ir(p);
-    //
-    //    //In PHI node elimination to insert the copy in the predecessor block,
-    //    //there is a check if last IR of BB is not a call then
-    //    //place the copy there only.
-    //    //However for call BB terminator, the copy will be placed at the start
-    //    //of fallthrough BB.
-    //    if (plast != NULL && plast->isCallStmt()) {
-    //        IRBB * fallthrough = m_cfg->getFallThroughBB(p);
-    //        if (!plast->is_terminate()) {
-    //            //Fallthrough BB does not exist if the last ir is terminate.
-    //            ASSERTN(fallthrough, ("invalid control flow graph."));
-    //            if (BB_irlist(fallthrough).get_head() == NULL ||
-    //                !BB_irlist(fallthrough).get_head()->is_phi()) {
-    //                BB_irlist(fallthrough).append_head(store_to_phicopy);
-    //            } else {
-    //                //Insert block to hold the copy.
-    //                IRBB * newbb = m_rg->allocBB();
-    //                m_rg->getBBList()->insert_after(newbb, p);
-    //                m_cfg->addBB(newbb);
-    //                m_cfg->insertVertexBetween(
-    //                    BB_id(p), BB_id(fallthrough), BB_id(newbb));
-    //                BB_is_fallthrough(newbb) = true;
-    //
-    //                //Then append the copy.
-    //                BB_irlist(newbb).append_head(store_to_phicopy);
-    //            }
-    //        }
-    //    } else {
-    //        BB_irlist(p).append_tail_ex(store_to_phicopy);
-    //    }
-    //
-    //    //Remove the SSA DU chain between opnd and its DEF stmt.
-    //    if (opnd->is_pr()) {
-    //        ASSERT0(MD_ssainfo(opnd));
-    //        MDSSA_uses(MD_ssainfo(opnd)).remove(opnd);
-    //    }
-    //}
-    //
-    //IR * substitue_phi = m_rg->buildStorePR(
-    //    PHI_prno(phi), phi->getType(), phicopy);
-    //substitue_phi->copyRef(phi, m_rg);
-    //
-    //BB_irlist(bb).insert_before(substitue_phi, phict);
-    //
-    //PHI_ssainfo(phi) = NULL;
-}
-
-
 bool MDSSAMgr::verifyDDChain()
 {
     START_TIMER(tverify, "MDSSA: Verify DefDef Chain");
-    xcom::Vector<MDDef*> const*  mddefvec = getUseDefMgr()->getMDDefVec();
+    MDDefVec const*  mddefvec = getUseDefMgr()->getMDDefVec();
     for (INT i = 0; i <= mddefvec->get_last_idx(); i++) {
         MDDef const* mddef = mddefvec->get(i);
         if (mddef == NULL) { continue; }
@@ -1539,11 +1602,11 @@ bool MDSSAMgr::verifyVMD()
         if (def == NULL) {
             //ver0 used to indicate the Region live-in PR.
             //It may be a parameter.
-            ASSERTN(v->version() == INIT_VERSION,
-                    ("Nondef vp's version must be INIT_VERSION"));
+            ASSERTN(v->version() == MDSSA_INIT_VERSION,
+                    ("Nondef vp's version must be MDSSA_INIT_VERSION"));
         } else {
-            ASSERTN(v->version() != INIT_VERSION,
-                    ("version can not be INIT_VERSION"));
+            ASSERTN(v->version() != MDSSA_INIT_VERSION,
+                    ("version can not be MDSSA_INIT_VERSION"));
             ASSERTN(!defset.is_contain(def->id()),
                     ("DEF for each md+version must be unique."));
             defset.bunion(def->id());
@@ -1608,7 +1671,7 @@ void MDSSAMgr::verifySSAInfo(IR const* ir)
         MDDef * def = vopnd->getDef();
 
         if (ir->is_stmt()) {
-            ASSERTN(vopnd->version() != INIT_VERSION,
+            ASSERTN(vopnd->version() != MDSSA_INIT_VERSION,
                     ("not yet perform renaming"));
             ASSERTN(def && def->getOcc() == ir, ("IR stmt should have MDDef"));
         }
@@ -1850,14 +1913,7 @@ void MDSSAMgr::coalesceVersion(IR const* src, IR const* tgt)
 //Add occurence to each vopnd in mdssainfo.
 void MDSSAMgr::addMDSSAOcc(IR * ir, MDSSAInfo * mdssainfo)
 {
-    ASSERT0(ir && mdssainfo);
-    VOpndSetIter iter = NULL;
-    for (INT i = mdssainfo->getVOpndSet()->get_first(&iter);
-         i >= 0; i = mdssainfo->getVOpndSet()->get_next(i, &iter)) {
-        VMD * vopnd = (VMD*)getUseDefMgr()->getVOpnd(i);
-        ASSERT0(vopnd && vopnd->is_md());
-        vopnd->getUseSet()->bunion(ir->id());
-    }
+    mdssainfo->addUse(ir, getUseDefMgr());
 }
 
 
@@ -1910,7 +1966,7 @@ void MDSSAMgr::removeDUChain(IR const* stmt, IR const* exp)
         VMD * vopnd = (VMD*)getUseDefMgr()->getVOpnd(i);
         ASSERT0(vopnd && vopnd->is_md());
         if (vopnd->getDef() == NULL) {
-            ASSERTN(vopnd->version() == INIT_VERSION,
+            ASSERTN(vopnd->version() == MDSSA_INIT_VERSION,
                     ("Only zero version MD has no DEF"));
             continue;
         }
@@ -1935,7 +1991,7 @@ void MDSSAMgr::removeAllUse(IR const* stmt)
         VMD * vopnd = (VMD*)getUseDefMgr()->getVOpnd(i);
         ASSERT0(vopnd && vopnd->is_md());
         if (vopnd->getDef() == NULL) {
-            ASSERTN(vopnd->version() == INIT_VERSION,
+            ASSERTN(vopnd->version() == MDSSA_INIT_VERSION,
                     ("Only zero version MD has no DEF"));
             continue;
         }
@@ -1961,7 +2017,7 @@ void MDSSAMgr::removeStmtFromMDSSAMgr(IR const* stmt)
         VMD * vopnd = (VMD*)getUseDefMgr()->getVOpnd(i);
         ASSERT0(vopnd && vopnd->is_md());
         if (vopnd->getDef() == NULL) {
-            ASSERTN(vopnd->version() == INIT_VERSION,
+            ASSERTN(vopnd->version() == MDSSA_INIT_VERSION,
                     ("Only zero version MD has no DEF"));
             continue;
         }
@@ -2107,9 +2163,8 @@ void MDSSAMgr::destruction(OptCtx * oc)
     BBListIter bbct;
     for (bblst->get_head(&bbct);
          bbct != bblst->end(); bbct = bblst->get_next(bbct)) {
-        IRBB * bb = bbct->val();
-        ASSERT0(bb);
-        destructBBSSAInfo(bb);
+        ASSERT0(bbct->val());
+        destructBBSSAInfo(bbct->val());
     }
     if (bbnum != bblst->get_elem_count()) {
         oc->set_flag_if_cfg_changed();

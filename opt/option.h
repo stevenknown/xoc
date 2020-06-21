@@ -50,6 +50,10 @@ class PassMgr;
 
 //Optimization Context
 //This class record and propagate auxiliary information to optimizations.
+//These options brief describe state of Passes following an optimization
+//perform. When an optimization pass is run, it can change results of other
+//pass. Set the valid/invalid option to inform that results were preserved by
+//that optimization pass.es must be done explicitly.
 #define OC_is_ref_valid(o) ((o).u1.s1.is_du_ref_valid)
 #define OC_is_pr_du_chain_valid(o) ((o).u1.s1.is_pr_du_chain_valid)
 #define OC_is_nonpr_du_chain_valid(o) ((o).u1.s1.is_nonpr_du_chain_valid)

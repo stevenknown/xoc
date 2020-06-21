@@ -1350,8 +1350,7 @@ void dumpIR(IR const* ir, Region const* rg, IN CHAR * attr, UINT dumpflag)
 
             //Dump variable info.
             xstrcat(tt, 40, "%s", SYM_name(ruvar->get_name()));
-            prt(" \'%s\',id:%d", tt,
-                    REGION_id(REGION_ru(ir)));
+            prt(" \'%s\',id:%d", tt, REGION_ru(ir)->id());
         }
 
         PADDR(ir); //Dump IR address.
@@ -1823,54 +1822,12 @@ bool IR::verify(Region const* rg) const
 
         //PHI must have at least one opnd.
         ASSERT0(PHI_opnd_list(this) != NULL);
-        ASSERT0(verifyPhi(rg));
+        //To convenient for cfg optimization, do not verify PHI here, and
+        //more verification of PHI should be done at PRSSAMgr.
+        //ASSERT0(verifyPhi(rg));
         break;
     case IR_REGION: break;
     default: UNREACHABLE();
-    }
-    return true;
-}
-
-
-//This function verify def/use information of PHI stmt.
-//If vpinfo is available, the function also check VP_prno of phi operands.
-//is_vpinfo_avail: set true if VP information is available.
-bool IR::verifyPhi(Region const* rg) const
-{
-    ASSERT0(is_phi());
-    List<IRBB*> preds;
-    IRCFG * cfg = rg->getCFG();
-    IRBB * bb = getBB();
-    ASSERT0(bb);
-    cfg->get_preds(preds, bb);
-
-    UINT num_pred = preds.get_elem_count();
-    DUMMYUSE(num_pred);
-
-    //Check the number of phi opnds.
-    UINT num_opnd = 0;
-    for (IR const* opnd = PHI_opnd_list(this);
-         opnd != NULL; opnd = opnd->get_next()) {
-        num_opnd++;
-    }
-    ASSERTN(num_opnd == num_pred, ("the num of opnd unmatch"));
-
-    SSAInfo * ssainfo = getSSAInfo();
-    ASSERT0(ssainfo);
-
-    SSAUseIter vit = NULL;
-    for (INT i = SSA_uses(ssainfo).get_first(&vit);
-         vit != NULL; i = SSA_uses(ssainfo).get_next(i, &vit)) {
-        IR const* use = const_cast<Region*>(rg)->getIR(i);
-
-        if (!use->is_pr()) { continue; }
-
-        ASSERTN(PR_no(use) == PHI_prno(this), ("prno is unmatch"));
-
-        SSAInfo * use_ssainfo = PR_ssainfo(use);
-        CHECK_DUMMYUSE(use_ssainfo);
-
-        ASSERT0(SSA_def(use_ssainfo) == this);
     }
     return true;
 }
@@ -3367,7 +3324,7 @@ void dumpGR(IR const* ir, TypeMgr * tm, DumpGRCtx * ctx)
             //g_indent -= dn;
         } else {
             note("\nregion ");
-            switch (REGION_type(REGION_ru(ir))) {
+            switch (REGION_ru(ir)->getRegionType()) {
             case REGION_PROGRAM: prt("program "); break;
             case REGION_BLACKBOX: prt("blackbox "); break;
             case REGION_FUNC: prt("func "); break;
@@ -3485,5 +3442,81 @@ bool IR::isNotOverLap(IR const* ir2, Region * rg) const
     }
     return false;
 }
+
+
+//
+//START CIf
+//
+void CIf::addToTrueBody(UINT num, ...)
+{
+    va_list ptr;
+    va_start(ptr, num);
+    IR * ir = (IR*)va_arg(ptr, IR*);
+    IR * last = NULL;
+    while (num > 0) {
+        xcom::add_next(&IF_truebody(this), &last, ir);
+        ir = (IR*)va_arg(ptr, IR*);
+        ASSERT0(!ir->is_undef());
+        num--;
+    }
+    va_end(ptr);
+}
+
+
+void CIf::addToFalseBody(UINT num, ...)
+{
+    va_list ptr;
+    va_start(ptr, num);
+    IR * ir = (IR*)va_arg(ptr, IR*);
+    IR * last = NULL;
+    while (num > 0) {
+        xcom::add_next(&IF_falsebody(this), &last, ir);
+        ir = (IR*)va_arg(ptr, IR*);
+        ASSERT0(!ir->is_undef());
+        num--;
+    }
+    va_end(ptr);
+}
+//END CIf
+
+
+//
+//START CWhileDo
+//
+void CWhileDo::addToBody(UINT num, ...)
+{
+    va_list ptr;
+    va_start(ptr, num);
+    IR * ir = (IR*)va_arg(ptr, IR*);
+    IR * last = NULL;
+    while (num > 0) {
+        xcom::add_next(&LOOP_body(this), &last, ir);
+        ir = (IR*)va_arg(ptr, IR*);
+        ASSERT0(!ir->is_undef());
+        num--;
+    }
+    va_end(ptr);
+}
+//END CWhileDo
+
+
+//
+//START CSwitch
+//
+void CSwitch::addToBody(UINT num, ...)
+{
+    va_list ptr;
+    va_start(ptr, num);
+    IR * ir = (IR*)va_arg(ptr, IR*);
+    IR * last = NULL;
+    while (num > 0) {
+        xcom::add_next(&SWITCH_body(this), &last, ir);
+        ir = (IR*)va_arg(ptr, IR*);
+        ASSERT0(!ir->is_undef());
+        num--;
+    }
+    va_end(ptr);
+}
+//END CSwitch
 
 } //namespace xoc

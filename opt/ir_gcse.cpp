@@ -462,7 +462,7 @@ bool GCSE::shouldBeCse(IR * det)
 
 bool GCSE::doPropInDomTreeOrder(xcom::Graph const* domtree)
 {
-    IRBB * entry = m_cfg->get_entry();
+    IRBB * entry = m_cfg->getEntry();
     ASSERTN(entry && BB_is_entry(entry), ("Not find CFG entry"));
     ASSERT0(domtree);
     xcom::Vertex * root = domtree->getVertex(BB_id(entry));
@@ -502,7 +502,7 @@ bool GCSE::doPropInDomTreeOrder(xcom::Graph const* domtree)
 
 bool GCSE::doPropVNInDomTreeOrder(xcom::Graph const* domtree)
 {
-    IRBB * entry = m_cfg->get_entry();
+    IRBB * entry = m_cfg->getEntry();
     ASSERTN(entry && BB_is_entry(entry), ("Not find CFG entry"));
     ASSERT0(domtree);
     xcom::Vertex * root = domtree->getVertex(BB_id(entry));
@@ -811,7 +811,7 @@ bool GCSE::perform(OptCtx & oc)
     #endif
 
     bool change = false;
-    IRBB * entry = m_cfg->get_entry();
+    IRBB * entry = m_cfg->getEntry();
     ASSERTN(entry && BB_is_entry(entry), ("Not find CFG entry"));
     xcom::Graph domtree;
     m_cfg->get_dom_tree(domtree);
@@ -871,7 +871,7 @@ bool GCSE::perform(OptCtx & oc)
         ASSERT0(m_rg->verifyMDRef());
         ASSERT0(m_du->verifyMDDUChain(DUOPT_COMPUTE_PR_DU | DUOPT_COMPUTE_NONPR_DU));
         if (m_ssamgr != NULL) {
-            ASSERT0(verifySSAInfo(m_rg));
+            ASSERT0(verifyPRSSAInfo(m_rg));
         }
         //For now, gvn has updated correctly.
     }

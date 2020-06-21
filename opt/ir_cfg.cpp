@@ -88,7 +88,7 @@ void IRCFG::buildEHEdge()
                 ASSERT0(sc);
                 IRBB * tgt = findBBbyLabel(sc->val());
                 ASSERT0(tgt);
-                xcom::Edge * e = addEdge(BB_id(bb), BB_id(tgt));
+                xcom::Edge * e = DGraph::addEdge(BB_id(bb), BB_id(tgt));
                 EDGE_info(e) = xmalloc(sizeof(CFGEdgeInfo));
                 CFGEI_is_eh((CFGEdgeInfo*)EDGE_info(e)) = true;
                 m_has_eh_edge = true;
@@ -151,7 +151,7 @@ void IRCFG::buildEHEdgeNaive()
              IRBB * a = ct2->val();
              if (ehbbs.is_contain(BB_id(a))) { continue; }
 
-             xcom::Edge * e = addEdge(a->id(), b->id());
+             xcom::Edge * e = DGraph::addEdge(a->id(), b->id());
              EDGE_info(e) = xmalloc(sizeof(CFGEdgeInfo));
              CFGEI_is_eh((CFGEdgeInfo*)EDGE_info(e)) = true;
              m_has_eh_edge = true;
@@ -334,6 +334,7 @@ void IRCFG::build(OptCtx & oc)
 }
 
 
+//Note if cfg rebuild, SSAInfo and MDSSAInfo should be recomputed.
 void IRCFG::rebuild(OptCtx & oc)
 {
     ASSERT0(m_cs != C_UNDEF);
@@ -342,12 +343,12 @@ void IRCFG::rebuild(OptCtx & oc)
     buildEHEdge();
 
     //After CFG building.
-    //Remove empty bb when cfg rebuilted because
-    //Rebuild cfg may generate redundant empty bb, it
+    //Remove empty BB after cfg rebuilding because
+    //rebuilding cfg may generate empty BB, it
     //disturb the computation of entry and exit.
     removeEmptyBB(oc);
 
-    //Compute exit bb while cfg rebuilt.
+    //Compute exit BB while CFG rebuilt.
     computeExitList();
 
     bool change = true;
@@ -356,7 +357,7 @@ void IRCFG::rebuild(OptCtx & oc)
         change = false;
         if (g_do_cfg_remove_empty_bb &&
             removeEmptyBB(oc)) {
-            computeExitList();
+            computeExitList(); 
             change = true;
         }
 
@@ -832,20 +833,25 @@ bool IRCFG::inverseAndRemoveTrampolineBranch()
             ASSERT0(br->is_falsebr());
             IR_code(br) = IR_TRUEBR;
         }
-        BR_lab(br) = GOTO_lab(jmp);
+        br->setLabel(GOTO_lab(jmp));
 
         //Change 'next' to be empty BB.
         remove_xr(next, jmp);
 
-        //Remove jmp->jmp_tgt, add jmp->next_next
+        //Remove jmp->jmp_tgt.
         removeEdge(next, jmp_tgt);
-        xcom::Edge * newe = addEdge(next->id(), next_next->id());
+
+        //Add jmp->next_next.
+        xcom::Edge * newe = addEdge(next, next_next);
         EDGE_info(newe) = ei;
 
-        //Remove bb->next_next, add bb->jmp_tgt
+        //Remove bb->next_next.
         removeEdge(bb, next_next);
-        xcom::Edge * newe2 = addEdge(bb->id(), jmp_tgt->id());
+
+        //Add bb->jmp_tgt.
+        xcom::Edge * newe2 = addEdge(bb, jmp_tgt);
         EDGE_info(newe2) = ei2;
+
         changed = true;
     }
     return changed;
@@ -909,7 +915,7 @@ bool IRCFG::removeTrampolinBBCase1(BBListIter * ct)
             removeEdge(pred, bb);
 
             //Add normal control flow edge.
-            xcom::Edge * e = addEdge(BB_id(pred), BB_id(next));
+            xcom::Edge * e = addEdge(pred, next);
             CFGEdgeInfo * ei = (CFGEdgeInfo*)EDGE_info(e);
             if (ei != NULL && CFGEI_is_eh(ei)) {
                 //If there is already an edge, check if it is an
@@ -941,7 +947,9 @@ bool IRCFG::removeTrampolinBBCase1(BBListIter * ct)
         }
         removeEdge(pred, bb);
 
-        xcom::Edge * e = addEdge(BB_id(pred), BB_id(next));
+        xcom::Edge * e = addEdge(pred, next);
+        //TODO: Add operands of PHI if 'next_bb' has PHI.
+
         CFGEdgeInfo * ei = (CFGEdgeInfo*)EDGE_info(e);
         if (ei != NULL && CFGEI_is_eh(ei)) {
             //If there is already an edge, check if it is an
@@ -953,7 +961,6 @@ bool IRCFG::removeTrampolinBBCase1(BBListIter * ct)
     
     //The map between Labels and BB has been maintained.
     //resetMapBetweenLabelAndBB(bb);
-    bb->removeAllSuccessorsPhiOpnd(this);
     remove_bb(bb);
     removed = true;
 
@@ -1064,8 +1071,9 @@ bool IRCFG::removeTrampolinEdgeForCase2(BBListIter ct)
             BB_is_fallthrough(pred) = false;
             removeEdge(pred, bb);
 
-            addEdge(BB_id(pred), BB_id(succ));
-            bb->dupSuccessorPhiOpnd(this, m_rg, WhichPred(bb, succ));
+            addEdge(pred, succ);
+            //bb->dupSuccessorPhiOpnd(this, m_rg, WhichPred(bb, succ));
+            
             removed = true;
             continue;
         }
@@ -1102,7 +1110,9 @@ bool IRCFG::removeTrampolinEdgeForCase2(BBListIter ct)
 
             GOTO_lab(last_xr_of_pred) = tgt_li;
             removeEdge(pred, bb);
-            addEdge(BB_id(pred), BB_id(succ));
+            
+            addEdge(pred, succ);
+
             removed = true;
             continue;
         } //end if
@@ -1147,7 +1157,7 @@ bool IRCFG::removeTrampolinEdgeForCase2(BBListIter ct)
 
                 //Link up bb's pred and succ.
                 removeEdge(pred, bb);
-                addEdge(BB_id(pred), BB_id(succ));
+                addEdge(pred, succ);
                 removed = true;
             }
             continue;
@@ -1263,7 +1273,7 @@ bool IRCFG::removeRedundantBranch()
                  s != NULL; s = succs.get_next()) {
                 if (s == tmp_ct->val()) {
                     //Remove branch edge, leave fallthrough edge.
-                    removeEdge(bb, s);
+                    removeEdge(bb, s);                    
                 }
             }
             removed = true;
@@ -1862,15 +1872,17 @@ bool IRCFG::performMiscOpt(OptCtx & oc)
     if (change) {
         computeExitList();
 
-        //SSAInfo is invalid by adding new-edge to BB.
-        //This will confuse phi insertion.
-        //ASSERT0(verifySSAInfo(m_rg));        
-
         if (OC_is_cdg_valid(org_oc)) {
             m_rg->checkValidAndRecompute(&oc, PASS_CDG, PASS_UNDEF);
             ASSERT0(verifyIfBBRemoved((CDG*)m_rg->getPassMgr()->queryPass(
                     PASS_CDG), oc));
         }
+
+        //SSAInfo is invalid by adding new-edge to BB.
+        //This will confuse phi insertion.
+        ASSERT0(verifyPRSSAInfo(m_rg));
+        ASSERT0(verifyMDSSAInfo(m_rg));
+
     }
 
     ASSERT0(verifyIRandBB(getBBList(), m_rg));

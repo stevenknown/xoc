@@ -1124,7 +1124,6 @@ public:
     void removePRFromUseset(DefMiscBitSetMgr & sbs_mgr, Region * rg);
 
     bool verify(Region const* rg) const;
-    bool verifyPhi(Region const* rg) const;
     bool verifyKids() const;
 };
 
@@ -1192,7 +1191,7 @@ public:
 
 
 //ID need DU info, some Passes need it, e.g. GVN.
-//Note IR_ID should not participate in GVN analysis because it does not
+//Note IR_ID should NOT participate in GVN analysis because it does not
 //represent a real operation.
 #define ID_info(ir) (((CId*)CK_IRT(ir, IR_ID))->id_info)
 #define ID_du(ir) (((CId*)CK_IRT(ir, IR_ID))->du)
@@ -1579,6 +1578,9 @@ class CWhileDo : public IR {
 public:
     //NOTE: 'opnd' must be the last member of CWhileDo.
     IR * opnd[2];
+
+    //num: the number of IR added.
+    void addToBody(UINT num, ...);
 };
 
 
@@ -1648,11 +1650,15 @@ class CIf : public IR {
     COPY_CONSTRUCTOR(CIf);
 public:
     IR * opnd[3];
+    //num: the number of IR added.
+    void addToTrueBody(UINT num, ...);
+    //num: the number of IR added.
+    void addToFalseBody(UINT num, ...);
 };
 
 
 //This class represent internal and customer defined label.
-#define LAB_lab(ir)        (((CLab*)CK_IRT(ir, IR_LABEL))->label_info)
+#define LAB_lab(ir) (((CLab*)CK_IRT(ir, IR_LABEL))->label_info)
 class CLab : public IR {
     COPY_CONSTRUCTOR(CLab);
 public:
@@ -1690,6 +1696,9 @@ class CSwitch : public IR, public StmtProp {
 public:
     IR * opnd[3];
     LabelInfo const* default_label;
+
+    //num: the number of IR added.
+    void addToBody(UINT num, ...);
 };
 
 
@@ -1995,6 +2004,13 @@ public:
         xcom::add_next(&PHI_opnd_list(this), ir);
         IR_parent(ir) = this;
     }
+
+    void insertOpndBefore(IR * marker, IR * opnd)
+    {
+        ASSERT0(xcom::in_list(PHI_opnd_list(this), marker));
+        ASSERT0(!xcom::in_list(PHI_opnd_list(this), opnd));
+        xcom::insertbefore(&PHI_opnd_list(this), marker, opnd);
+    }
 };
 
 
@@ -2061,7 +2077,7 @@ SSAInfo * IR::getSSAInfo() const
     case IR_ICALL: return CALL_ssainfo(this);
     default:
         ASSERTN(!isReadPR() && !isWritePR() && !isWriteWholePR(),
-            ("miss switch entry"));
+                ("miss switch entry"));
         break;
     }
     return NULL;

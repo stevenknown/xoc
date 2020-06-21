@@ -112,7 +112,7 @@ IR * Region::buildPR(Type const* type)
 {
     ASSERT0(type);
     IR * ir = allocIR(IR_PR);
-    PR_no(ir) = REGION_analysis_instrument(this)->m_pr_count++;
+    PR_no(ir) = buildPrno(type);
     IR_dt(ir) = type;
     return ir;
 }
@@ -124,7 +124,9 @@ UINT Region::buildPrno(Type const* type)
 {
     ASSERT0(type);
     DUMMYUSE(type);
-    return REGION_analysis_instrument(this)->m_pr_count++;
+    UINT prno = getAnalysisInstrument()->m_pr_count;
+    getAnalysisInstrument()->m_pr_count++;
+    return prno;
 }
 
 
@@ -505,9 +507,9 @@ IR * Region::buildGetElem(UINT prno, Type const* type, IR * base, IR * offset)
 IR * Region::buildGetElem(Type const* type, IR * base, IR * offset)
 {
     ASSERT0(type && base && base->is_exp());
-    IR * ir = buildGetElem(REGION_analysis_instrument(this)->m_pr_count,
+    IR * ir = buildGetElem(getAnalysisInstrument()->m_pr_count,
         type, base, offset);
-    REGION_analysis_instrument(this)->m_pr_count++;
+    getAnalysisInstrument()->m_pr_count++;
     return ir;
 }
 
@@ -552,9 +554,9 @@ IR * Region::buildSetElem(Type const* type,
 {
     ASSERT0(type && base && val && val->is_exp() &&
         offset && offset->is_exp());
-    IR * ir = buildSetElem(REGION_analysis_instrument(this)->m_pr_count,
+    IR * ir = buildSetElem(getAnalysisInstrument()->m_pr_count,
         type, base, val, offset);
-    REGION_analysis_instrument(this)->m_pr_count++;
+    getAnalysisInstrument()->m_pr_count++;
     return ir;
 }
 
@@ -581,9 +583,9 @@ IR * Region::buildStorePR(UINT prno, Type const* type, IR * rhs)
 IR * Region::buildStorePR(Type const* type, IR * rhs)
 {
     ASSERT0(type && rhs && rhs->is_exp());
-    IR * ir = buildStorePR(REGION_analysis_instrument(this)->m_pr_count,
+    IR * ir = buildStorePR(getAnalysisInstrument()->m_pr_count,
         type, rhs);
-    REGION_analysis_instrument(this)->m_pr_count++;
+    getAnalysisInstrument()->m_pr_count++;
     return ir;
 }
 
@@ -1336,6 +1338,15 @@ IR * Region::buildBinaryOpSimp(IR_TYPE irt,
     IR_parent(rchild) = ir;
     IR_dt(ir) = type;
     return ir;
+}
+
+
+IR * Region::buildBinaryOp(IR_TYPE irt,
+                           DATA_TYPE dt,
+                           IN IR * lchild,
+                           IN IR * rchild)
+{
+    return buildBinaryOp(irt, getTypeMgr()->getSimplexType(dt), lchild, rchild);    
 }
 
 

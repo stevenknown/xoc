@@ -424,7 +424,7 @@ VN * GVN::computePR(IR const* exp, bool & change)
     SSAInfo * ssainfo = PR_ssainfo(exp);
     ASSERT0(exp->isReadPR() && ssainfo);
 
-    IR const* def = ssainfo->get_def();
+    IR const* def = ssainfo->getDef();
     if (def == NULL) {
         ASSERT0(exp->getRefMD());
         return allocLiveinVN(exp, exp->getRefMD(), change);

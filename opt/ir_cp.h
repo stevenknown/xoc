@@ -105,6 +105,10 @@ private:
                                    IR const* use,
                                    MDSSAMgr * mdssamgr);
 
+    bool existMayDefTillBB(IR const* exp,
+                           IRBB const* start,
+                           IRBB const* meetup) const;
+
     bool isSimpCVT(IR const* ir) const;
     bool isConstCVT(IR const* ir) const;
     bool is_available(IR const* def_stmt,

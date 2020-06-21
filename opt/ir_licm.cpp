@@ -88,7 +88,7 @@ bool LICM::scanOpnd(IN LI<IRBB> * li,
 
                 if (x->is_pr() && x->getSSAInfo() != NULL) {
                     //Check if SSA def is loop invariant.
-                    IR const* def = x->getSSAInfo()->get_def();
+                    IR const* def = x->getSSAInfo()->getDef();
 
                     if (def == NULL) { continue; }
 
@@ -464,7 +464,7 @@ bool LICM::is_dom_all_use_in_loop(IR const* ir, LI<IRBB> * li)
     IRBB * irbb = ir->getBB();
     if (ir->getSSAInfo() != NULL) {
         //Check if SSA def is loop invariant.
-        ASSERT0(ir->getSSAInfo()->get_def() == ir);
+        ASSERT0(ir->getSSAInfo()->getDef() == ir);
 
         SSAInfo * ssainfo = ir->getSSAInfo();
         SSAUseIter iter;

@@ -71,7 +71,7 @@ void Region::HighProcessImpl(OptCtx & oc)
 
     if (g_do_aa) {
         ASSERT0(g_cst_bb_list && OC_is_cfg_valid(oc));
-        assignMD(false);
+        assignMD(true, true);
         checkValidAndRecompute(&oc, PASS_AA, PASS_UNDEF);
     }
 
@@ -145,8 +145,8 @@ void Region::HighProcessImpl(OptCtx & oc)
     //Solution: We can scan IF stmt first, in order to mark
     //start stmt and end stmt of IF.
     //
-    ////AbsNode * an =
-    //    REGION_analysis_instrument(this)->m_cfs_mgr->construct_abstract_cfs();
+    ////AbsNode * an = getAnalysisInstrument()->getCfsMgr()->
+    ////    construct_abstract_cfs();
     ////Polyhedra optimization.
     ////IR_POLY * poly = newPoly();
     ////if (poly->construct_poly(an)) {

@@ -31,25 +31,34 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 namespace xoc {
 
+//Initial version is an abstract description to indicate the imported DEF of
+//each VMD. Especially for parameter, global variablers, imported variables.
+//Local variables should have explicitly definition that VMD version must not
+//be initial version.
+#define MDSSA_INIT_VERSION 0
+
 class MDDef;
 class UseDefMgr;
 class VMD;
 class MDDefSet;
 class MDSSAMgr;
 
-//Initial version is an abstract description to indicate the imported DEF of
-//each VMD. Especially for parameter, global variablers, imported variables.
-//Local variables should have explicitly definition which VMD version is not
-//initial version.
-#define INIT_VERSION 0
+class VMDVec : public Vector<VMD*> {
+    COPY_CONSTRUCTOR(VMDVec);
+public:
+    VMDVec() {}
+    //Find the VMD that have MD defined at given BB.
+    VMD * findVMD(UINT bbid) const;
+};
+
 
 //Mapping from MD id to vector of VMD.
 class UINT2VMDVec {
     COPY_CONSTRUCTOR(UINT2VMDVec);
 protected:
     UINT m_threshold;
-    Vector<Vector<VMD*>*> m_mdid2vmdvec_vec;
-    TMap<UINT, Vector<VMD*>*> m_mdid2vmdvec_map;
+    Vector<VMDVec*> m_mdid2vmdvec_vec;
+    TMap<UINT, VMDVec*> m_mdid2vmdvec_map;
 
 public:
     UINT2VMDVec(UINT threshold = 1000) { init(threshold); }
@@ -70,17 +79,17 @@ public:
         m_mdid2vmdvec_map.destroy();
     }
 
-    Vector<VMD*> * get(UINT mdid)
+    VMDVec * get(UINT mdid)
     {
         if (mdid < m_threshold) {
             return m_mdid2vmdvec_vec.get(mdid);
         }
         return m_mdid2vmdvec_map.get(mdid);
     }
-    Vector<Vector<VMD*>*> * getVec() { return &m_mdid2vmdvec_vec; }
-    TMap<UINT, Vector<VMD*>*> * getMap() { return &m_mdid2vmdvec_map; }
+    Vector<VMDVec*> * getVec() { return &m_mdid2vmdvec_vec; }
+    TMap<UINT, VMDVec*> * getMap() { return &m_mdid2vmdvec_map; }
 
-    void set(UINT mdid, Vector<VMD*> * vmdvec);
+    void set(UINT mdid, VMDVec * vmdvec);
 };
 
 
@@ -182,14 +191,7 @@ public:
     VMD(xcom::DefSegMgr * sm);
     ~VMD();
 
-    void clean()
-    {
-        VOpnd::clean();
-        VMD_def(this) = NULL;
-        VMD_mdid(this) = 0;
-        VMD_version(this) = INIT_VERSION;
-        VMD_occs(this).clean();
-    }
+    void clean();
 
     void init(xcom::DefSegMgr * sm)
     {
@@ -259,21 +261,27 @@ protected:
 public:
     MDSSAInfo() {}
 
-    void init() { BaseAttachInfo::init(AI_MD_SSA); }
-    void destroy(xcom::DefMiscBitSetMgr & m) { m_vopnd_set.clean(m); }
-    void dump(MDSSAMgr const* mgr) const;
-
-    VOpndSet * getVOpndSet() { return &m_vopnd_set; }
-
-    bool isUseReachable(IN UseDefMgr * usedefmgr, IR const* exp);
-
-    VOpndSet const* readVOpndSet() const { return &m_vopnd_set; }
+    //Add given IR expression to occurence set.
+    //exp: IR expression to be added.
+    void addUse(IR const* exp, IN UseDefMgr * usedefmgr);
 
     //Collect all USE, where USE is IR expression.
     void collectUse(OUT xcom::DefSBitSetCore * set,
                     IN UseDefMgr * usedefmgr,
                     IN xcom::DefMiscBitSetMgr * bsmgr);
 
+    void init() { BaseAttachInfo::init(AI_MD_SSA); }
+    bool isUseReachable(IN UseDefMgr * usedefmgr, IR const* exp);
+
+    void destroy(xcom::DefMiscBitSetMgr & m) { m_vopnd_set.clean(m); }
+    void dump(MDSSAMgr const* mgr) const;
+
+    VOpndSet * getVOpndSet() { return &m_vopnd_set; }
+
+    VOpndSet const* readVOpndSet() const { return &m_vopnd_set; }
+
+    //Remove given IR expression from occurence set.
+    //exp: IR expression to be removed.
     void removeUse(IR const* exp, IN UseDefMgr * usedefmgr);
 };
 
@@ -376,6 +384,9 @@ public:
     UINT getOpndNum() const { return xcom::cnt_list(getOpndList()); }
     VMD * getOpndVMD(IR const* opnd, UseDefMgr const* mgr) const;
 
+    //Insert operand at given position.
+    IR * insertOpndAt(MDSSAMgr * mgr, UINT pos, IRBB const* pred);
+
     void replaceOpnd(IR * oldopnd, IR * newopnd);
     void removeOpnd(IR * ir)
     {
@@ -393,6 +404,9 @@ public:
     MDPhiList();
     ~MDPhiList();
 };
+
+
+typedef xcom::Vector<MDDef*> MDDefVec;
 
 //This class manages MDSSAInfo object allocation and destroy.
 class UseDefMgr {
@@ -415,7 +429,7 @@ protected:
     UINT m_def_count;
     UINT m_vopnd_count;
     xcom::Vector<MDSSAInfo*> m_mdssainfo_vec;
-    xcom::Vector<MDDef*> m_def_vec;
+    MDDefVec m_def_vec;
     xcom::Vector<VOpnd*> m_vopnd_vec;
     xcom::Vector<MDPhiList*> m_philist_vec; //record the Phi list of BB.
     UINT2VMDVec m_map_md2vmd; //record version for each MD.
@@ -436,26 +450,37 @@ public:
     xcom::SC<VOpnd*> * allocSCVOpnd(VOpnd * opnd);
     VConst * allocVConst(IR const* ir);
     VMD * allocVMD(UINT mdid, UINT version);
+
     //Count memory usage for current object.
     size_t count_mem();
+    void cleanMDSSAInfo(IR * ir);
 
     //Get MDSSAInfo of ir.
     MDSSAInfo * genMDSSAInfo(IR * ir);
     MDSSAInfo * getMDSSAInfo(IR const* ir) const;
+    Region * getRegion() const { return m_rg; }
     xcom::SC<VOpnd*> ** getFreeSCListAddress() { return &m_free_sc_list; }
     xcom::Vector<VOpnd*> * getVOpndVec() { return &m_vopnd_vec; }
+
     //Get specific VOpnd.
     VOpnd * getVOpnd(UINT i) const { return m_vopnd_vec.get(i); }
+
     //Get MDPhi list of specific BB, or generate the list if not exist.
     MDPhiList * genBBPhiList(UINT bbid);
+
     //Get MDPhi list of specific BB.
     MDPhiList * getBBPhiList(UINT bbid) const
     { return m_philist_vec.get(bbid); }
+
     MDDef * getMDDef(UINT id) const { return m_def_vec.get(id); }
-    xcom::Vector<MDDef*> const* getMDDefVec() const { return &m_def_vec; }
+    MDDefVec const* getMDDefVec() const { return &m_def_vec; }
+
+    //Return VMD vector according to given mdid.
+    VMDVec * getVMDVec(UINT mdid) const
+    { return const_cast<UseDefMgr*>(this)->m_map_md2vmd.get(mdid); }
+
     //Get Versioned MD object by giving MD id and MD version.
     VMD * getVMD(UINT mdid, UINT version) const;
-    Region * getRegion() const { return m_rg; }
 
     void reinit() { cleanOrDestroy(true); }
 

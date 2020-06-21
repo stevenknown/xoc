@@ -84,6 +84,14 @@ public:
         //Set label->bb map.
         m_lab2bb.setAlways(li, src);
     }
+    virtual xcom::Edge * addEdge(IRBB * from, IRBB * to)
+    {
+        xcom::Edge * e = DGraph::addEdge(from->id(), to->id());
+        from->addSuccessorDesignatePhiOpnd(this, to);
+        return e;
+    }
+    xcom::Edge * addEdge(UINT from, UINT to)
+    { return DGraph::addEdge(from, to); }
 
     //Add new IRBB into CFG, but the BB list should be modified
     //out of this function.
@@ -228,7 +236,9 @@ public:
     {
         ASSERT0(bbct);
         ASSERT0(m_bb_list->in_list(bbct));
-        remove_bb_impl(bbct->val());
+        IRBB * bb = bbct->val();
+        bb->removeAllSuccessorsPhiOpnd(this);
+        remove_bb_impl(bb);
         m_bb_list->remove(bbct);
     }
 
@@ -241,6 +251,11 @@ public:
         m_bb_list->remove(bb);
     }
     void remove_xr(IRBB * bb, IR * ir);
+    virtual void removeEdge(IRBB * from, IRBB * to)
+    {
+        from->removeSuccessorDesignatePhiOpnd(this, to);
+        CFG<IRBB, IR>::removeEdge(from, to);
+    }
     bool removeTrampolinEdge();
     bool removeTrampolinBB();
     bool removeRedundantBranch();

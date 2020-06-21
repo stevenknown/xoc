@@ -575,8 +575,8 @@ bool RegPromot::checkExpressionIsLoopInvariant(IN IR * ir, LI<IRBB> const* li)
     if (ir->isMemoryOpnd()) {
         if (ir->isReadPR() && PR_ssainfo(ir) != NULL) {
             SSAInfo * ssainfo = PR_ssainfo(ir);
-            if (ssainfo->get_def() != NULL) {
-                IRBB * defbb = ssainfo->get_def()->getBB();
+            if (ssainfo->getDef() != NULL) {
+                IRBB * defbb = ssainfo->getDef()->getBB();
                 ASSERT0(defbb);
 
                 if (li->isInsideLoop(BB_id(defbb))) {
@@ -1451,9 +1451,9 @@ void RegPromot::removeRedundantDUChain(List<IR*> & fixup_list)
             UINT prno = PR_no(ref);
 
             if (PR_ssainfo(ref) != NULL) {
-                if (PR_ssainfo(ref)->get_def() != NULL) {
+                if (PR_ssainfo(ref)->getDef() != NULL) {
                     //SSA def must be same PR_no with the SSA use.
-                    ASSERT0(PR_ssainfo(ref)->get_def()->getPrno() == prno);
+                    ASSERT0(PR_ssainfo(ref)->getDef()->getPrno() == prno);
                 }
             } else {
                 for (INT i = duset->get_first(&di);

@@ -102,12 +102,35 @@ bool Region::performSimplify(OptCtx & oc)
             ASSERT0(verifyMDRef());
         }
 
+        bool need_rebuild_mdssa = false;
+        bool need_rebuild_prssa = false;
+        MDSSAMgr * mdssamgr = (MDSSAMgr*)getPassMgr()->queryPass(
+            PASS_MD_SSA_MGR);
+        if (mdssamgr != NULL && mdssamgr->isMDSSAConstructed()) {
+            need_rebuild_mdssa = true;
+            mdssamgr->destruction(&oc);
+        }
+
+        PRSSAMgr * prssamgr = (PRSSAMgr*)getPassMgr()->queryPass(
+            PASS_PR_SSA_MGR);
+        if (prssamgr != NULL && prssamgr->isSSAConstructed()) {
+            need_rebuild_prssa = true;
+            prssamgr->destruction(&oc);
+        }
+
         //Before CFG building.
         getCFG()->removeEmptyBB(oc);
 
         getCFG()->rebuild(oc);
 
         ASSERT0(getCFG()->verify());
+
+        if (need_rebuild_mdssa) {
+            mdssamgr->construction(oc);
+        }
+        if (need_rebuild_prssa) {
+            prssamgr->construction(oc);
+        }
 
         getCFG()->performMiscOpt(oc);
 

@@ -34,6 +34,26 @@ author: Su Zhenyu
 namespace xoc {
 
 //
+//START VMDVec
+//
+//Find the VMD that have MD defined at given BB.
+VMD * VMDVec::findVMD(UINT bbid) const
+{
+    
+    for (INT i = 0; i <= get_last_idx(); i++) {
+        VMD * p = get(i);
+        if (p == NULL || p->getDef() == NULL) { continue; }
+        ASSERT0(p->getDef() && p->getDef()->getBB());
+        if (p->getDef()->getBB()->id() == bbid) {
+            return p;
+        }
+    }
+    return NULL;
+}
+//END VMDVec
+
+
+//
 //START MDSSAInfo
 //
 //Return true if all definition of vopnd can reach 'exp'.
@@ -92,6 +112,21 @@ void MDSSAInfo::removeUse(IR const* exp, IN UseDefMgr * usedefmgr)
 }
 
 
+//Add given IR expression to occurence set.
+//exp: IR expression to be added.
+void MDSSAInfo::addUse(IR const* exp, IN UseDefMgr * usedefmgr)
+{
+    ASSERT0(exp && exp->is_exp() && usedefmgr);
+    VOpndSetIter iter = NULL;
+    for (INT i = getVOpndSet()->get_first(&iter);
+         i >= 0; i = getVOpndSet()->get_next(i, &iter)) {
+        VMD * vopnd = (VMD*)usedefmgr->getVOpnd(i);
+        ASSERT0(vopnd && vopnd->is_md());
+        vopnd->getUseSet()->bunion(exp->id());
+    }
+}
+
+
 void MDSSAInfo::dump(MDSSAMgr const* mgr) const
 {
     if (g_tfile == NULL) { return; }
@@ -113,7 +148,7 @@ void MDSSAInfo::dump(MDSSAMgr const* mgr) const
 //
 //START UINT2VMDVec
 //
-void UINT2VMDVec::set(UINT mdid, Vector<VMD*> * vmdvec)
+void UINT2VMDVec::set(UINT mdid, VMDVec * vmdvec)
 {
     if (mdid < m_threshold) {
         m_mdid2vmdvec_vec.set(mdid, vmdvec);
@@ -140,6 +175,16 @@ size_t UINT2VMDVec::count_mem() const
 void VMD::dump() const
 {
     prt("MD%dV%d", mdid(), version());
+}
+
+
+void VMD::clean()
+{
+    VOpnd::clean();
+    VMD_def(this) = NULL;
+    VMD_mdid(this) = MD_UNDEF;
+    VMD_version(this) = MDSSA_INIT_VERSION;
+    VMD_occs(this).clean();
 }
 
 
@@ -225,7 +270,7 @@ VMD * MDPhi::getOpndVMD(IR const* opnd, UseDefMgr const* mgr) const
     if (!opnd->is_id() && opnd->isMemoryOpnd()) { return NULL; }
 
     ASSERT0(mgr && mgr->getMDSSAInfo(opnd) &&
-        mgr->getMDSSAInfo(opnd)->getVOpndSet()->get_elem_count() == 1);
+            mgr->getMDSSAInfo(opnd)->getVOpndSet()->get_elem_count() == 1);
 
     VOpndSetIter iter = NULL;
     VMD * vopnd = (VMD*)mgr->getVOpnd(mgr->getMDSSAInfo(opnd)->
@@ -270,8 +315,11 @@ void MDPhi::dump(Region const* rg, UseDefMgr const* mgr) const
         default: UNREACHABLE();
         }
 
-        ASSERT0(pred);
-        prt("(BB%d)", pred->id());
+        if (pred == NULL) {
+            prt("(BB??)"); //Predecessor is not match with PHI, error occurred.
+        } else {
+            prt("(BB%d)", pred->id());            
+        }
         pred = preds.get_next();
     }
 
@@ -324,12 +372,13 @@ UseDefMgr::UseDefMgr(Region * rg, MDSSAMgr * mgr) : m_rg(rg), m_mdssa_mgr(mgr)
     m_free_sc_list = NULL;
     m_def_count = 1;
     m_vopnd_count = 1;
+    m_philist_vec.set(rg->getBBList()->get_elem_count(), 0);
 }
 
 
 void UseDefMgr::destroyMD2VMDVec()
 {
-    Vector<Vector<VMD*>*> * vec = m_map_md2vmd.getVec();
+    Vector<VMDVec*> * vec = m_map_md2vmd.getVec();
     if (vec != NULL) {
         for (INT i = 0; i <= vec->get_last_idx(); i++) {
             Vector<VMD*> * vpv = m_map_md2vmd.get((UINT)i);
@@ -339,10 +388,10 @@ void UseDefMgr::destroyMD2VMDVec()
         }
     }
 
-    TMap<UINT, Vector<VMD*>*> * map = m_map_md2vmd.getMap();
+    TMap<UINT, VMDVec*> * map = m_map_md2vmd.getMap();
     if (map != NULL) {
-        TMapIter<UINT, Vector<VMD*>*> iter;
-        Vector<VMD*> * vmdvec;
+        TMapIter<UINT, VMDVec*> iter;
+        VMDVec * vmdvec;
         for (map->get_first(iter, &vmdvec);
              vmdvec != NULL; map->get_next(iter, &vmdvec)) {
             delete vmdvec;
@@ -442,6 +491,16 @@ void UseDefMgr::setMDSSAInfo(IR * ir, MDSSAInfo * mdssainfo)
 }
 
 
+void UseDefMgr::cleanMDSSAInfo(IR * ir)
+{
+    ASSERT0(ir);
+    ASSERTN(m_mdssa_mgr->hasMDSSAInfo(ir), ("make decision early"));
+    if (ir->getAI() == NULL) { return; }    
+    IR_ai(ir)->clean(AI_MD_SSA);
+}
+
+
+
 //Generate MDSSAInfo for individual memory-ref IR stmt/exp since each IR
 //has its own specific MDSSA Memory Reference information.
 //It sounds there might be some waste to memory if many IRs mdssa-reference
@@ -498,30 +557,34 @@ MDSSAInfo * UseDefMgr::allocMDSSAInfo()
 //Each operands has zero version to mdid.
 MDPhi * UseDefMgr::allocMDPhi(UINT mdid, UINT num_operands)
 {
-    ASSERT0(mdid > 0 && num_operands > 0);
+    ASSERT0(mdid > MD_UNDEF && num_operands > 0);
 
     MDPhi * phi = (MDPhi*)smpoolMallocConstSize(sizeof(MDPhi), m_phi_pool);
     phi->init();
     MDDEF_id(phi) = m_def_count++;
     m_def_vec.set(MDDEF_id(phi), phi);
-    VMD const* vmd = allocVMD(mdid, 0);
+    VMD const* vmd = allocVMD(mdid, MDSSA_INIT_VERSION);
     ASSERT0(vmd);
 
     MD const* md = m_md_sys->getMD(mdid);
     ASSERT0(md);
     IR * last = NULL;
+    ASSERT0(m_sbs_mgr);
+
+    //Generate operand of PHI.
     for (UINT i = 0; i < num_operands; i++) {
-        IR * opnd = m_rg->buildId(md->get_base());
+        IR * opnd = m_rg->buildId(md->get_base());        
         opnd->setRefMD(md, m_rg);
 
+        //Generate MDSSAInfo to ID.
         MDSSAInfo * mdssainfo = genMDSSAInfo(opnd);
 
-        ASSERT0(m_sbs_mgr);
+        //Add VOpnd that ID indicated.
         mdssainfo->getVOpndSet()->append(vmd, *m_sbs_mgr);
 
         xcom::add_next(&MDPHI_opnd_list(phi), &last, opnd);
 
-        ID_phi(opnd) = phi;
+        ID_phi(opnd) = phi; //Record ID's host PHI.
     }
     return phi;
 }
@@ -578,7 +641,7 @@ VConst * UseDefMgr::allocVConst(IR const* ir)
 
 VMD * UseDefMgr::getVMD(UINT mdid, UINT version) const
 {
-    ASSERT0(mdid > 0);
+    ASSERT0(mdid > MD_UNDEF);
     Vector<VMD*> * vec = const_cast<UseDefMgr*>(this)->m_map_md2vmd.get(mdid);
     if (vec == NULL) {
         return NULL;
@@ -590,10 +653,10 @@ VMD * UseDefMgr::getVMD(UINT mdid, UINT version) const
 //Allocate VMD and ensure it is unique according to 'version' and 'mdid'.
 VMD * UseDefMgr::allocVMD(UINT mdid, UINT version)
 {
-    ASSERT0(mdid > 0);
-    Vector<VMD*> * vec = m_map_md2vmd.get(mdid);
+    ASSERT0(mdid > MD_UNDEF);
+    VMDVec * vec = m_map_md2vmd.get(mdid);
     if (vec == NULL) {
-        vec = new Vector<VMD*>();
+        vec = new VMDVec();
         m_map_md2vmd.set(mdid, vec);
     }
 

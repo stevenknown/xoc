@@ -2281,9 +2281,6 @@ void AliasAnalysis::processRegion(IR const* ir, IN MD2MDSet * mx)
 {
     Region * rg = REGION_ru(ir);
     ASSERT0(rg);
-    //ASSERT0(REGION_type(rg) == REGION_BLACKBOX ||
-    //        REGION_type(rg) == REGION_INNER);
-
     if (rg->is_readonly()) { return; }
 
     bool has_maydef_info = false;
@@ -2471,7 +2468,7 @@ void AliasAnalysis::processCall(IN IR * ir, IN MD2MDSet * mx)
         //The function such as malloc or new function should not modify
         //the memory in XOC scope.
         tmp.clean(*getSBSMgr());
-        by_addr_mds.clean(*getSBSMgr());;
+        by_addr_mds.clean(*getSBSMgr());
         return;
     }
 
@@ -3742,8 +3739,8 @@ void AliasAnalysis::initGlobalAndParameterVarPtSet(VAR * param, MD2MDSet * mx)
 //Determine if flow sensitive analysis is properly.
 bool AliasAnalysis::isFlowSensitiveProperly()
 {
-    ASSERT0(m_cfg->get_entry());
-    MD2MDSet * mx = genMD2MDSetForBB(m_cfg->get_entry()->id());
+    ASSERT0(m_cfg->getEntry());
+    MD2MDSet * mx = genMD2MDSetForBB(m_cfg->getEntry()->id());
     ASSERTN(mx, ("invoke initEntryPtset before here"));
     UINT num_of_tgt_md = mx->computePtPairNum(*m_md_sys);
     num_of_tgt_md = (num_of_tgt_md * mx->get_elem_count() /
@@ -3780,7 +3777,7 @@ void AliasAnalysis::initFlowSensitiveEntryPtset(PPSetMgr & ppsetmgr)
     VarTab * vt = m_rg->getVarTab();
     initBBPPSet(ppsetmgr);
 
-    IRBB * entry = m_cfg->get_entry();
+    IRBB * entry = m_cfg->getEntry();
     ASSERT0(entry);
     MD2MDSet * mx = genMD2MDSetForBB(BB_id(entry));
     setPointToAllMem(MD_FULL_MEM, *mx);
@@ -3899,7 +3896,7 @@ void AliasAnalysis::initMayPointToSet()
             }
         }
 
-        rg = REGION_parent(rg);
+        rg = rg->getParent();
         if (rg->is_program() || rg == NULL) {
             break;
         }

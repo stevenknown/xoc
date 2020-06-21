@@ -168,7 +168,7 @@ public:
     { return m_cnid2cn.get(v->id()); }
 
     CallNode * mapRegion2CallNode(Region const* rg) const
-    { return m_ruid2cn.get(REGION_id(rg)); }
+    { return m_ruid2cn.get(rg->id()); }
 
     CallNode * mapSym2CallNode(SYM const* sym, Region * start) const
     {
