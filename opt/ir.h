@@ -679,15 +679,18 @@ public:
     //Otherwise return NULL.
     IR * getOpndPR(UINT prno);
 
-    //Get the MD DefUse Set. This function is readonly.
-    DUSet const* readDUSet() const { return getDUSet(); }
-
     //Get the MD DefUse Set.
     DUSet * getDUSet() const
     {
         DU * const du = getDU();
         return du == NULL ? NULL : DU_duset(du);
     }
+
+    //Return the Memory Descriptor Set for given ir may describe.
+    MDSet const* getMayRef() { return getRefMDSet(); }
+
+    //Return the MemoryAddr for 'ir' must be.
+    MD const* getMustRef() { return getRefMD(); }
 
     //Get the MD that IR referrenced.
     MD const* getRefMD() const
@@ -1111,6 +1114,9 @@ public:
         }
         return false;
     }
+
+    //Get the MD DefUse Set. This function is readonly.
+    DUSet const* readDUSet() const { return getDUSet(); }
 
     //Iterate IR tree to remove SSA du.
     //    e.g: pr1 = ...

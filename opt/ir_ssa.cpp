@@ -924,7 +924,9 @@ void PRSSAMgr::placePhi(DfMgr const& dfm,
 
     //Record BBs which modified each PR.
     BBList * bblst = m_rg->getBBList();
-    Vector<List<IRBB*>*> pr2defbb(bblst->get_elem_count()); //for local used.
+    //All objects allocated and recorded in pr2defbb are used for local purpose,
+    //and will be destoied before leaving this function.
+    Vector<List<IRBB*>*> pr2defbb(bblst->get_elem_count());
 
     for (IRBB * bb = bblst->get_head(); bb != NULL; bb = bblst->get_next()) {
         DefSBitSet * bs = bs_mgr.allocSBitSet();
@@ -1873,8 +1875,8 @@ bool PRSSAMgr::refinePhi(List<IRBB*> & wl)
                 //just call it common_def. Replace the SSA_def of
                 //current SSAInfo to the common_def.
 
-                //TO BE CONFIRMED:Why should the result PR of common-def
-                //be same with PHI?
+                //TO BE CONFIRMED:Why did you say the result PR of common-def
+                //have to be same with PHI?
                 //ASSERT0(common_def->getResultPR(PHI_prno(ir)));
                 //ASSERTN(common_def->getResultPR(PHI_prno(ir))->getPrno()
                 //        == PHI_prno(ir), ("not same PR"));
@@ -1898,6 +1900,7 @@ bool PRSSAMgr::refinePhi(List<IRBB*> & wl)
                             PR_ssainfo(use) == curphi_ssainfo);
 
                     PR_ssainfo(use) = commdef_ssainfo;
+                    PR_no(use) = respr->getPrno();
                 }
             }
 
@@ -1918,7 +1921,6 @@ bool PRSSAMgr::refinePhi(List<IRBB*> & wl)
 void PRSSAMgr::removeSuccessorDesignatePhiOpnd(IRBB * bb, IRBB * succ)
 {
     ASSERT0(bb && succ);
-    Region * rg = m_cfg->getRegion();
     UINT pos = m_cfg->WhichPred(bb, succ);
     for (IR * ir = BB_first_ir(succ); ir != NULL; ir = BB_next_ir(succ)) {
         if (!ir->is_phi()) { break; }
@@ -2181,11 +2183,9 @@ void PRSSAMgr::construction(OptCtx & oc)
 bool PRSSAMgr::construction(DomTree & domtree)
 {
     ASSERT0(m_rg);
-
     START_TIMER(t, "PRSSA: Build dominance frontier");
     DfMgr dfm;
     dfm.build((xcom::DGraph&)*m_cfg);
-
     END_TIMER(t, "PRSSA: Build dominance frontier");
     if (dfm.hasHighDFDensityVertex((xcom::DGraph&)*m_cfg)) {
         return false;

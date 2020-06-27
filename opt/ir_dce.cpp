@@ -732,6 +732,15 @@ void DeadCodeElim::reinit()
 }
 
 
+bool DeadCodeElim::removeRedundantPhi()
+{    
+    if (m_prssamgr != NULL && m_prssamgr->isSSAConstructed()) {
+        return m_prssamgr->refinePhi();
+    }
+    return false; 
+}
+
+
 //An aggressive algo will be used if cdg is avaliable.
 bool DeadCodeElim::perform(OptCtx & oc)
 {
@@ -793,6 +802,8 @@ bool DeadCodeElim::perform(OptCtx & oc)
             ASSERT0(verifyPRSSAInfo(m_rg));
             ASSERT0(verifyMDSSAInfo(m_rg));
         }
+        removed |= removeRedundantPhi();
+        ASSERT0(verifyPRSSAInfo(m_rg));
         //fix_control_flow(bblst, ctlst);
     }
     ASSERT0(!removed);

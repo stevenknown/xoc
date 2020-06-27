@@ -2905,10 +2905,24 @@ bool Region::process(OptCtx * oc)
 
     PRSSAMgr * ssamgr = NULL;
     MDSSAMgr * mdssamgr = NULL;
-
     if (getIRList() != NULL) {
+        //Do primitive refinement.
+        START_TIMER(t, "Do Primitive Refinement");
+        RefineCtx rc;
+        bool change = false;
+        IR * irs = refineIRlist(getIRList(), change, rc);
+        ASSERT0(xoc::verifyIRList(irs, NULL, this));
+        setIRList(irs);
+        END_TIMER(t, "Do Primitive Refinement");
+
         if (!processIRList(*oc)) { goto ERR_RET; }
     } else {
+        //Do primitive refinement.
+        START_TIMER(t, "Do Primitive Refinement");
+        RefineCtx rf;
+        refineBBlist(getBBList(), rf, *oc);
+        END_TIMER(t, "Do Primitive Refinement");
+
         if (!processBBList(*oc)) { goto ERR_RET; }
     }
 

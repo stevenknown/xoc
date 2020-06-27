@@ -810,7 +810,7 @@ MDSSAInfo * MDSSAMgr::genMDSSAInfoAndVOpnd(IR * ir, UINT version)
 }
 
 
-//Generate VMD for stmt and exp which reference memory.
+//Generate VMD for stmt and exp that reference memory.
 void MDSSAMgr::initVMD(IN IR * ir, OUT DefSBitSet & maydef_md)
 {
     m_iter.clean();
@@ -818,8 +818,8 @@ void MDSSAMgr::initVMD(IN IR * ir, OUT DefSBitSet & maydef_md)
     if (ir->isMemoryRefNotOperatePR() ||
         (ir->isCallStmt() && !ir->isReadOnlyCall())) {
         MD const* ref = ir->getRefMD();
-        if (ref != NULL && !ref->is_pr()) {            
-            maydef_md.bunion(MD_id(ref));
+        if (ref != NULL && !ref->is_pr()) {
+            maydef_md.bunion(MD_id(ref));            
         }
         MDSet const* refset = ir->getRefMDSet();
         if (refset != NULL) {
@@ -833,13 +833,73 @@ void MDSSAMgr::initVMD(IN IR * ir, OUT DefSBitSet & maydef_md)
         ASSERT0(t->is_exp());
         if (t->isMemoryRefNotOperatePR()) {
             genMDSSAInfoAndVOpnd(t, MDSSA_INIT_VERSION);
-        }        
+        }
+    }
+}
+
+
+void MDSSAMgr::collectUseMD(IR const* ir, OUT LiveInMDTab & livein_md)
+{
+    ASSERT0(ir);
+    MD const* ref = ir->getRefMD();
+    if (ref != NULL &&
+        !ref->is_pr()) { //ir may be Call stmt, its result is PR.
+        livein_md.append(ref->id());
+    }
+
+    MDSet const* refset = ir->getRefMDSet();
+    if (refset == NULL) { return; }
+
+    MDSetIter iter;
+    for (INT i = refset->get_first(&iter);
+         i >= 0; i = refset->get_next((UINT)i, &iter)) {
+        MD * md = m_md_sys->getMD(i);
+        ASSERTN(md && !md->is_pr(), ("PR should not in MayBeSet"));
+        livein_md.append(md->id());
     }
 }
 
 
 //'maydef_md': record MDs that defined in 'bb'.
-void MDSSAMgr::collectDefinedMD(IN IRBB * bb, OUT DefSBitSet & maydef_md)
+void MDSSAMgr::computeLiveInMD(IRBB const* bb, OUT LiveInMDTab & livein_md)
+{
+    livein_md.clean();
+    ConstIRIter iter; //for tmp use.
+    IRBB * pbb = const_cast<IRBB*>(bb);
+    for (IR const* ir = BB_last_ir(pbb); ir != NULL; ir = BB_prev_ir(pbb)) {
+        iter.clean();
+        ASSERT0(ir->is_stmt());
+        for (IR const* t = iterRhsInitC(ir, iter);
+             t != NULL; t = iterRhsNextC(iter)) {
+            ASSERT0(t->is_exp());
+            if (t->isMemoryRefNotOperatePR()) {
+                collectUseMD(t, livein_md);
+            }
+        }
+
+        if (!ir->isMemoryRefNotOperatePR()) { continue; }
+
+        MD const* ref = ir->getRefMD();
+        if (ref == NULL || !ref->is_exact()) { continue; }
+
+        ASSERT0(!ref->is_pr());
+        LiveInMDTabIter iter;
+        for (UINT mdid = livein_md.get_first(iter);
+             mdid != MD_UNDEF; mdid = livein_md.get_next(iter)) {        
+            MD const* md = m_md_sys->getMD(mdid);
+            ASSERT0(md);
+            if (ref->is_exact_cover(md)) {
+                //ir kills the value of md.
+                livein_md.remove(ref->id());
+            }
+        }
+    }
+}
+
+
+//'maydef_md': record MDs that defined in 'bb'.
+void MDSSAMgr::collectDefinedMDAndInitVMD(IN IRBB * bb,
+                                          OUT DefSBitSet & maydef_md)
 {
     for (IR * ir = BB_first_ir(bb); ir != NULL; ir = BB_next_ir(bb)) {
         initVMD(ir, maydef_md);
@@ -865,16 +925,18 @@ void MDSSAMgr::insertPhi(UINT mdid, IN IRBB * bb)
 //Insert phi for VMD.
 //defbbs: record BBs which defined the VMD identified by 'mdid'.
 void MDSSAMgr::placePhiForMD(UINT mdid,
-                             IN List<IRBB*> * defbbs,
+                             List<IRBB*> const* defbbs,
                              DfMgr const& dfm,
                              xcom::BitSet & visited,
                              List<IRBB*> & wl,
                              Vector<DefSBitSet*> & defmds_vec)
 {
+    ASSERT0(defbbs && mdid != MD_UNDEF);
     visited.clean();
     wl.clean();
-    for (IRBB * defbb = defbbs->get_head();
-         defbb != NULL; defbb = defbbs->get_next()) {
+    C<IRBB*> * bbit;
+    for (IRBB * defbb = defbbs->get_head(&bbit);
+         defbb != NULL; defbb = defbbs->get_next(&bbit)) {
         wl.append_tail(defbb);
         //visited.bunion(BB_id(defbb));
     }
@@ -948,7 +1010,7 @@ bool MDSSAMgr::doOpndHaveSameDef(MDPhi const* phi, OUT VMD ** common_def) const
 }
 
 
-//Return true if phi is redundant, otherwise return false.
+//Return true if one of phi's operand have valid DEF, otherwise return false.
 //CASE1: if all opnds's DEF are invalid, then phi is redundant.
 //If opnd of phi do not have any valid DEF, then phi is redundant,
 //otherwise phi can NOT be removed even if there are only one
@@ -969,7 +1031,7 @@ bool MDSSAMgr::doOpndHaveSameDef(MDPhi const* phi, OUT VMD ** common_def) const
 bool MDSSAMgr::doOpndHaveValidDef(MDPhi const* phi) const
 {
     if (phi->hasNoOpnd()) { return false; }
-    //Indicate all DEFs of operands are the invalid VMD.
+    //Indicate if there exist a valid DEF for operands
     bool has_valid_def = false;
     for (IR const* opnd = phi->getOpndList();
          opnd != NULL; opnd = opnd->get_next()) {
@@ -985,6 +1047,19 @@ bool MDSSAMgr::doOpndHaveValidDef(MDPhi const* phi) const
 }
 
 
+//Record all modified MDs which will be versioned later.
+void MDSSAMgr::recordEffectMD(IRBB const* bb, OUT DefSBitSet & effect_md)
+{
+    LiveInMDTab livein_md;
+    computeLiveInMD(bb, livein_md);
+    LiveInMDTabIter iter;
+    for (UINT mdid = livein_md.get_first(iter);
+         mdid != MD_UNDEF; mdid = livein_md.get_next(iter)) {        
+        effect_md.bunion(mdid);
+    }
+}
+
+
 //Place phi and assign the v0 for each PR.
 //'effect_prs': record the MD which need to versioning.
 void MDSSAMgr::placePhi(DfMgr const& dfm,
@@ -997,15 +1072,19 @@ void MDSSAMgr::placePhi(DfMgr const& dfm,
 
     //Record BBs which modified each MD.
     BBList * bblst = m_rg->getBBList();
-    Vector<List<IRBB*>*> md2defbb(bblst->get_elem_count()); //for local used.
-
+    //All objects allocated and recorded in md2defbb are used for local purpose,
+    //and will be destoied before leaving this function.
+    Vector<List<IRBB*>*> md2defbb(bblst->get_elem_count());    
     for (IRBB * bb = bblst->get_head(); bb != NULL; bb = bblst->get_next()) {
         DefSBitSet * bs = bs_mgr.allocSBitSet();
         defined_md_vec.set(BB_id(bb), bs);
-        collectDefinedMD(bb, *bs);
-
-        //Record all modified MDs which will be versioned later.
-        effect_md.bunion(*bs);
+        collectDefinedMDAndInitVMD(bb, *bs);
+        if (m_is_semi_pruned) {
+            recordEffectMD(bb, effect_md);
+        } else {
+            //Record all modified MDs which will be versioned later.
+            effect_md.bunion(*bs);
+        }
 
         //Record which BB defined these effect mds.
         DefSBitSetIter cur = NULL;
@@ -1020,11 +1099,16 @@ void MDSSAMgr::placePhi(DfMgr const& dfm,
     }
 
     //Place phi for lived MD.
-    xcom::BitSet visited((bblst->get_elem_count()/8)+1);
+    xcom::BitSet visited((bblst->get_elem_count() / BITS_PER_BYTE) + 1);
     DefSBitSetIter cur = NULL;
     for (INT i = effect_md.get_first(&cur);
          i >= 0; i = effect_md.get_next(i, &cur)) {
-        placePhiForMD(i, md2defbb.get(i), dfm, visited, wl, defined_md_vec);
+        //effect_md includes MDs that have not been defined. These MDs's
+        //defbbs is empty.
+        List<IRBB*> const* defbbs = md2defbb.get(i);
+        if (defbbs != NULL) {
+            placePhiForMD(i, defbbs, dfm, visited, wl, defined_md_vec);
+        }
     }
     END_TIMER(t, "MDSSA: Place phi");
 
@@ -1255,6 +1339,7 @@ Stack<VMD*> * MDSSAMgr::mapMD2VMDStack(UINT mdid)
 
 
 void MDSSAMgr::handleBBRename(IRBB * bb,
+                              xcom::DefSBitSet const& effect_mds,
                               DefSBitSet & defed_mds,
                               IN OUT BB2VMDMap & bb2vmdmap)
 {
@@ -1265,9 +1350,12 @@ void MDSSAMgr::handleBBRename(IRBB * bb,
     DefSBitSetIter cur = NULL;
     for (INT mdid = defed_mds.get_first(&cur);
          mdid >= 0; mdid = defed_mds.get_next(mdid, &cur)) {
-        VMD * vmd = mapMD2VMDStack(mdid)->get_top();
-        ASSERT0(vmd);
-        mdid2vmd->set(VMD_mdid(vmd), vmd);
+        VMD * vmd = mapMD2VMDStack(mdid)->get_top();        
+        //ASSERT0(vmd);
+        ASSERT0(vmd || !effect_mds.is_contain(mdid));
+        if (vmd != NULL) {            
+            mdid2vmd->set(VMD_mdid(vmd), vmd);
+        }
     }
 
     renameBB(bb);
@@ -1323,7 +1411,8 @@ void MDSSAMgr::handleBBRename(IRBB * bb,
 
 
 //defed_prs_vec: for each BB, indicate PRs which has been defined.
-void MDSSAMgr::renameInDomTreeOrder(IRBB * root,
+void MDSSAMgr::renameInDomTreeOrder(xcom::DefSBitSet const& effect_mds,
+                                    IRBB * root,
                                     xcom::Graph & domtree,
                                     Vector<DefSBitSet*> & defed_mds_vec)
 {
@@ -1339,7 +1428,7 @@ void MDSSAMgr::renameInDomTreeOrder(IRBB * root,
             visited.bunion(BB_id(v));
             xcom::DefSBitSet * defed_mds = defed_mds_vec.get(BB_id(v));
             ASSERT0(defed_mds);
-            handleBBRename(v, *defed_mds, bb2vmdmap);
+            handleBBRename(v, effect_mds, *defed_mds, bb2vmdmap);
         }
 
         xcom::Vertex const* bbv = domtree.getVertex(BB_id(v));
@@ -1408,7 +1497,7 @@ void MDSSAMgr::changeIR(IR * oldir, IR * newir)
 
 
 //Rename variables.
-void MDSSAMgr::rename(xcom::DefSBitSet & effect_mds,
+void MDSSAMgr::rename(xcom::DefSBitSet const& effect_mds,
                       Vector<DefSBitSet*> & defed_mds_vec,
                       xcom::Graph & domtree)
 {
@@ -1424,7 +1513,7 @@ void MDSSAMgr::rename(xcom::DefSBitSet & effect_mds,
     }
 
     ASSERT0(m_cfg->getEntry());
-    renameInDomTreeOrder(m_cfg->getEntry(), domtree, defed_mds_vec);
+    renameInDomTreeOrder(effect_mds, m_cfg->getEntry(), domtree, defed_mds_vec);
     END_TIMER(t, "MDSSA: Rename");
 }
 
@@ -1669,11 +1758,11 @@ void MDSSAMgr::verifySSAInfo(IR const* ir)
         VMD * vopnd = (VMD*)m_usedef_mgr.getVOpnd(i);
         ASSERT0(vopnd && vopnd->is_md());
         MDDef * def = vopnd->getDef();
-
         if (ir->is_stmt()) {
             ASSERTN(vopnd->version() != MDSSA_INIT_VERSION,
                     ("not yet perform renaming"));
             ASSERTN(def && def->getOcc() == ir, ("IR stmt should have MDDef"));
+            ASSERT0(def->is_valid());
         }
 
         if (def != NULL) {
@@ -1734,7 +1823,7 @@ void MDSSAMgr::verifySSAInfo(IR const* ir)
             //Some transformation, such as IR Refinement, may change
             //the occ's MDSet. This might lead to the inaccurate and
             //redundant MDSSA DU Chain. So the MDSSA DU Chain is conservative,
-            //and the correctness of MDSSA dependence is garanteed.
+            //but the correctness of MDSSA dependence is garanteed.
             //e.g:
             //  ist:*<4> id:18 //:MD11, MD12, MD14, MD15
             //    lda: *<4> 'r'
@@ -1744,7 +1833,7 @@ void MDSSAMgr::verifySSAInfo(IR const* ir)
             //  st:*<4> 'r' //MMD12
             //    ild : i32 //MMD13 : MD16
             //      ld : *<4> 'q'    //MMD18
-            //ist combined to st. This reduce referenced MDSet to a single MD
+            //ist transformed to st. This reduce referenced MDSet to a single MD
             //as well.
             //ASSERT0(findref);
             DUMMYUSE(findref);
@@ -2058,6 +2147,8 @@ void MDSSAMgr::unionSuccessors(MDDef const* from, MDDef const* to)
 
 
 //Remove MDDef from Def-Def chain.
+//mddef: will be removed from Def-Def chain, and be modified as well.
+//prev: previous Def to mddef, and will be modified.
 //e.g:D1<->D2
 //     |<->D3
 //     |   |<->D5
@@ -2071,7 +2162,7 @@ void MDSSAMgr::unionSuccessors(MDDef const* from, MDDef const* to)
 //     |<->D4
 //    D3<->NULL
 //  where predecessor of D5, D6 is D1, successor of D1 includes D5, D6.
-void MDSSAMgr::removeDefFromDDChainHelper(MDDef const* mddef, MDDef * prev)
+void MDSSAMgr::removeDefFromDDChainHelper(MDDef * mddef, MDDef * prev)
 {   
     ASSERT0(mddef);
     if (mddef->getNextSet() == NULL) {
@@ -2086,6 +2177,7 @@ void MDSSAMgr::removeDefFromDDChainHelper(MDDef const* mddef, MDDef * prev)
             }
         }
         MDDEF_prev(mddef) = NULL;
+        mddef->clean();
         return;
     }
 
@@ -2107,10 +2199,12 @@ void MDSSAMgr::removeDefFromDDChainHelper(MDDef const* mddef, MDDef * prev)
     }
     MDDEF_prev(mddef) = NULL;
     mddef->getNextSet()->clean(*m_sbs_mgr);
+    mddef->clean();
 }
 
 
 //Remove MDDef from Def-Def chain.
+//mddef: will be removed from Def-Def chain, and be modified as well.
 //e.g:D1<->D2
 //     |<->D3
 //     |   |<->D5
@@ -2124,7 +2218,7 @@ void MDSSAMgr::removeDefFromDDChainHelper(MDDef const* mddef, MDDef * prev)
 //     |<->D4
 //    D3<->NULL
 //  where predecessor of D5, D6 is D1, successor of D1 includes D5, D6.
-void MDSSAMgr::removeDefFromDDChain(MDDef const* mddef)
+void MDSSAMgr::removeDefFromDDChain(MDDef * mddef)
 {
     ASSERT0(mddef);
     MDDef * prev = mddef->getPrev();
@@ -2133,6 +2227,7 @@ void MDSSAMgr::removeDefFromDDChain(MDDef const* mddef)
 
 
 //Remove MDDef from Def-Def chain.
+//phi: will be removed from Def-Def chain, and be modified as well.
 //prev: designated previous DEF.
 //e.g:D1<->D2
 //     |<->D3
@@ -2147,7 +2242,7 @@ void MDSSAMgr::removeDefFromDDChain(MDDef const* mddef)
 //     |<->D4
 //    D3<->NULL
 //  where predecessor of D5, D6 is D1, successor of D1 includes D5, D6.
-void MDSSAMgr::removePHIFromDDChain(MDPhi const* phi, MDDef * prev)
+void MDSSAMgr::removePHIFromDDChain(MDPhi * phi, MDDef * prev)
 {
     ASSERT0(phi && phi->is_phi());
     removeDefFromDDChainHelper(phi, prev);
@@ -2445,7 +2540,6 @@ void MDSSAMgr::construction(OptCtx & oc)
 bool MDSSAMgr::construction(DomTree & domtree)
 {
     ASSERT0(m_rg);
-
     START_TIMER(t1, "MDSSA: Build dominance frontier");
     DfMgr dfm;
     dfm.build((xcom::DGraph&)*m_cfg); //Build dominance frontier.
@@ -2458,13 +2552,9 @@ bool MDSSAMgr::construction(DomTree & domtree)
     DefMiscBitSetMgr bs_mgr;
     DefSBitSet effect_mds(bs_mgr.getSegMgr());
     Vector<DefSBitSet*> defed_mds_vec;
-
     placePhi(dfm, effect_mds, bs_mgr, defed_mds_vec, wl);
-
     rename(effect_mds, defed_mds_vec, domtree);
-
-    ASSERT0(verifyPhi(true));
-
+    ASSERT0(verifyPhi(true));    
     prunePhi(wl);
 
     //Clean version stack after renaming.
@@ -2478,13 +2568,11 @@ bool MDSSAMgr::construction(DomTree & domtree)
         dumpDUChain();
         END_TIMER(tdump, "MDSSA: Dump After Pass");
     }
-    
+
     ASSERT0(verify());
     ASSERT0(verifyIRandBB(m_rg->getBBList(), m_rg));
     ASSERT0(verifyPhi(false) && verifyVMD());
-
     m_is_ssa_constructed = true;
-
     return true;
 }
 //END MDSSAMgr

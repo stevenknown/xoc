@@ -60,6 +60,7 @@ opt/callg.o\
 opt/loop.o\
 opt/ir_loop_cvt.o\
 opt/symtab.o\
+opt/prssainfo.o\
 opt/liveness_mgr.o
 
 GRREADER_OBJS += \

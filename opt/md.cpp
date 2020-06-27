@@ -89,7 +89,9 @@ bool MD::is_may_cover(MD const* m) const
 //  m:            |--..--|
 bool MD::is_exact_cover(MD const* m) const
 {
-    ASSERT0(m && this != m);
+    ASSERT0(m);
+    //Avoid extra judgement of is_exact() for given non-exact MD.
+    //ASSERT0(this != m);
     if (get_base() != m->get_base() ||
         !is_exact() ||
         (!m->is_exact() && !m->is_range())) {
@@ -996,13 +998,12 @@ void MDSystem::computeOverlap(Region * current_ru,
 //'strictly': set to true to compute if md may be overlapped with global memory.
 //
 //Note output do not need to clean before invoke this function.
-void MDSystem::computeOverlap(
-        Region * current_ru,
-        MDSet const& mds,
-        OUT MDSet & output,
-        ConstMDIter & tabiter,
-        DefMiscBitSetMgr & mbsmgr,
-        bool strictly)
+void MDSystem::computeOverlap(Region * current_ru,
+                              MDSet const& mds,
+                              OUT MDSet & output,
+                              ConstMDIter & tabiter,
+                              DefMiscBitSetMgr & mbsmgr,
+                              bool strictly)
 {
     ASSERT0(&mds != &output);
     ASSERT0(current_ru);

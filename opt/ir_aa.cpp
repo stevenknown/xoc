@@ -767,8 +767,8 @@ MD const* AliasAnalysis::inferArrayLdabase(IR * ir,
     //Thus we should not stop recompute MustAddr even if AC_is_mds_mod
     //unchanged.
     //if (!AC_is_mds_mod(&tic)) {
-    //    ASSERTN(m_rg->getMayRef(ir) == NULL, ("have no mayaddr"));
-    //    MD const* x = m_rg->getMustRef(ir);
+    //    ASSERTN(ir->getMayRef() == NULL, ("have no mayaddr"));
+    //    MD const* x = ir->getMustRef();
     //    ASSERT0(x && x->is_effect());
     //    return x;
     //}
@@ -900,8 +900,8 @@ void AliasAnalysis::processArray(IR * ir,
         }
     }
     tmp.clean(*getSBSMgr());
-    ASSERTN(m_rg->getMustRef(ir) ||
-            (m_rg->getMayRef(ir) && !m_rg->getMayRef(ir)->is_empty()),
+    ASSERTN(ir->getMustRef() ||
+            (ir->getMayRef() && !ir->getMayRef()->is_empty()),
             ("ir should be assigned DU reference"));
 
     if (!AC_comp_pt(ic)) { return; }
@@ -1316,7 +1316,7 @@ MD const* AliasAnalysis::assignPRMD(IR * ir,
     } else {    
         AC_is_mds_mod(ic) = false;
     }
-    tmp = m_rg->getMustRef(ir);
+    tmp = ir->getMustRef();
     ASSERT0(tmp);
     mds->clean(*getSBSMgr());
     AC_returned_pts(ic) = NULL;
@@ -1383,7 +1383,7 @@ MD const* AliasAnalysis::assignLoadMD(IR * ir,
     } else {
         AC_is_mds_mod(ic) = false;
     }
-    t = m_rg->getMustRef(ir);
+    t = ir->getMustRef();
     ASSERT0(t);
     AC_returned_pts(ic) = NULL;
     mds->clean(*getSBSMgr());
@@ -1440,7 +1440,7 @@ MD const* AliasAnalysis::assignIdMD(IR * ir,
     } else {
         AC_is_mds_mod(ic) = false;
     }
-    t = m_rg->getMustRef(ir);
+    t = ir->getMustRef();
     ASSERT0(t);
     mds->clean(*getSBSMgr());
     //IR_ID does not generate or transit POINT-TO set.
@@ -1791,7 +1791,7 @@ void AliasAnalysis::inferStoreValue(IR const* ir,
 void AliasAnalysis::processStore(IN IR * ir, IN MD2MDSet * mx)
 {
     ASSERT0(ir->is_st());
-    MD const* t = m_rg->getMustRef(ir);
+    MD const* t = ir->getMustRef();
     ASSERT0(t);
     AACtx ic;
     inferStoreValue(ir, ST_rhs(ir), t, &ic, mx);
@@ -1809,7 +1809,7 @@ void AliasAnalysis::processStore(IN IR * ir, IN MD2MDSet * mx)
 void AliasAnalysis::processStorePR(IN IR * ir, IN MD2MDSet * mx)
 {
     ASSERT0(ir->is_stpr());
-    MD const* t = m_rg->getMustRef(ir);
+    MD const* t = ir->getMustRef();
     ASSERT0(t);
     AACtx ic;
     inferStoreValue(ir, STPR_rhs(ir), t, &ic, mx);
@@ -1820,7 +1820,7 @@ void AliasAnalysis::processStorePR(IN IR * ir, IN MD2MDSet * mx)
 void AliasAnalysis::processSetelem(IR * ir, IN MD2MDSet * mx)
 {
     ASSERT0(ir->is_setelem());
-    MD const* t = m_rg->getMustRef(ir);
+    MD const* t = ir->getMustRef();
     ASSERT0(t);
     AACtx ic;
     inferStoreValue(ir, SETELEM_val(ir), t, &ic, mx);
@@ -1856,7 +1856,7 @@ void AliasAnalysis::processGetelem(IR * ir, IN MD2MDSet * mx)
 void AliasAnalysis::processPhi(IN IR * ir, IN MD2MDSet * mx)
 {
     ASSERT0(ir->is_phi());
-    MD const* phi_md = m_rg->getMustRef(ir);
+    MD const* phi_md = ir->getMustRef();
     ASSERT0(phi_md);
     AACtx ic;
     if (ir->is_ptr() || ir->is_any()) {
@@ -2008,8 +2008,8 @@ void AliasAnalysis::inferIStoreValue(IR const* ir,
                                      IN MD2MDSet * mx)
 {
     ASSERT0(ir->is_ist());
-    MDSet const* ist_mayaddr = m_rg->getMayRef(ir);
-    MD const* ist_mustaddr = m_rg->getMustRef(ir);
+    MDSet const* ist_mayaddr = const_cast<IR*>(ir)->getMayRef();
+    MD const* ist_mustaddr = const_cast<IR*>(ir)->getMustRef();
     ASSERTN(ist_mustaddr || (ist_mayaddr && !ist_mayaddr->is_empty()),
             ("Have no idea about what ir is."));
 
@@ -2077,8 +2077,8 @@ void AliasAnalysis::inferStoreArrayValue(IR const* ir,
                                          IN MD2MDSet * mx)
 {
     ASSERT0(ir->is_starray());
-    MDSet const* lhs_mayaddr = m_rg->getMayRef(ir);
-    MD const* lhs_mustaddr = m_rg->getMustRef(ir);
+    MDSet const* lhs_mayaddr = const_cast<IR*>(ir)->getMayRef();
+    MD const* lhs_mustaddr = const_cast<IR*>(ir)->getMustRef();
     ASSERTN(lhs_mustaddr != NULL ||
             (lhs_mayaddr != NULL && !lhs_mayaddr->is_empty()),
             ("You need infer the may memory address of array operation"));
@@ -2460,7 +2460,7 @@ void AliasAnalysis::processCall(IN IR * ir, IN MD2MDSet * mx)
                 m_is_visit.bunion(ir->id());
                 t = m_rg->allocCallResultPRMD(ir);
             } else {
-                t = m_rg->getMustRef(ir);
+                t = ir->getMustRef();
             }
             setPointToUniqueMD(MD_id(t), *mx, allocHeapobj(ir));
         }
@@ -2479,7 +2479,7 @@ void AliasAnalysis::processCall(IN IR * ir, IN MD2MDSet * mx)
             m_is_visit.bunion(ir->id());
             t = m_rg->allocCallResultPRMD(ir);
         } else {
-            t = m_rg->getMustRef(ir);
+            t = ir->getMustRef();
         }
 
         ASSERTN(t, ("result of call miss exact MD."));
@@ -2859,8 +2859,8 @@ void AliasAnalysis::dumpPtPairSet(PtPairSet & pps)
 void AliasAnalysis::dumpIRPointTo(IN IR * ir, bool dump_kid, IN MD2MDSet * mx)
 {
     if (ir == NULL || g_tfile == NULL) { return; }
-    MD const* must = m_rg->getMustRef(ir);
-    MDSet const* may = m_rg->getMayRef(ir);
+    MD const* must = ir->getMustRef();
+    MDSet const* may = ir->getMayRef();
     if (must != NULL ||
         (may != NULL && may->get_elem_count() > 0)) {
         dumpIR(ir, m_rg, NULL, 0);
@@ -3431,22 +3431,22 @@ bool AliasAnalysis::verifyIR(IR * ir)
     case IR_ID:
     case IR_LD:
     case IR_PR:
-        ASSERT0(m_rg->getMustRef(ir));
-        ASSERT0(m_rg->getMayRef(ir) == NULL);
+        ASSERT0(ir->getMustRef());
+        ASSERT0(ir->getMayRef() == NULL);
         break;
     case IR_ST:
-        ASSERT0(m_rg->getMustRef(ir));
-        ASSERT0(m_rg->getMayRef(ir) == NULL);
+        ASSERT0(ir->getMustRef());
+        ASSERT0(ir->getMayRef() == NULL);
         break;
     case IR_STPR:
     case IR_SETELEM:
     case IR_GETELEM:
-        ASSERT0(m_rg->getMustRef(ir));
-        ASSERT0(m_rg->getMayRef(ir) == NULL);
+        ASSERT0(ir->getMustRef());
+        ASSERT0(ir->getMayRef() == NULL);
         break;
     case IR_STARRAY: {
-        MD const* mustaddr = m_rg->getMustRef(ir);
-        MDSet const* mayaddr = m_rg->getMayRef(ir);
+        MD const* mustaddr = ir->getMustRef();
+        MDSet const* mayaddr = ir->getMayRef();
         ASSERT0(mustaddr ||
                 (mayaddr && !mayaddr->is_empty()));
         ASSERT0((mustaddr != NULL) ^
@@ -3477,8 +3477,8 @@ bool AliasAnalysis::verifyIR(IR * ir)
         //fallthrough
     case IR_ILD:
     case IR_IST: {
-        MD const* mustaddr = m_rg->getMustRef(ir);
-        MDSet const* mayaddr = m_rg->getMayRef(ir);
+        MD const* mustaddr = ir->getMustRef();
+        MDSet const* mayaddr = ir->getMayRef();
         ASSERT0(mustaddr ||
                 (mayaddr && !mayaddr->is_empty()));
         ASSERT0((mustaddr != NULL) ^
@@ -3502,7 +3502,7 @@ bool AliasAnalysis::verifyIR(IR * ir)
     case IR_CALL:
     case IR_ICALL:
         if (ir->hasReturnValue()) {
-            ASSERT0(m_rg->getMustRef(ir));
+            ASSERT0(ir->getMustRef());
         }
         for (IR * p = CALL_param_list(ir); p != NULL; p = p->get_next()) {
             verifyIR(p);
@@ -3512,12 +3512,12 @@ bool AliasAnalysis::verifyIR(IR * ir)
         }
         break;
     case IR_PHI:
-        ASSERT0(m_rg->getMustRef(ir));
-        ASSERT0(m_rg->getMayRef(ir) == NULL);
+        ASSERT0(ir->getMustRef());
+        ASSERT0(ir->getMayRef() == NULL);
         break;
     default:
-        ASSERT0(m_rg->getMustRef(ir) == NULL);
-        ASSERT0(m_rg->getMayRef(ir) == NULL);
+        ASSERT0(ir->getMustRef() == NULL);
+        ASSERT0(ir->getMayRef() == NULL);
     }
     for (UINT i = 0; i < IR_MAX_KID_NUM(ir); i++) {
         IR * kid = ir->getKid(i);

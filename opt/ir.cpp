@@ -2945,11 +2945,17 @@ void dumpGR(IR const* ir, TypeMgr * tm, DumpGRCtx * ctx)
     case IR_CONST:
         if (ir->is_sint()) {
             #if WORD_LENGTH_OF_HOST_MACHINE==32
-            //CHAR const* intfmt = "%d:%s";
-            CHAR const* intfmt = "%x:%s";
+            //Prefer print imm according to its type.
+            CHAR const* intfmt = "%d:%s";
+
+            //WORKAROUND:GR parser has bug in parsing large negative number.
+            //CHAR const* intfmt = "%x:%s";
             #elif WORD_LENGTH_OF_HOST_MACHINE==64
-            //CHAR const* intfmt = "%lld:%s";
-            CHAR const* intfmt = "0x%llx:%s";
+            //Prefer print imm according to its type.
+            CHAR const* intfmt = "%lld:%s";
+
+            //WORKAROUND:GR parser has bug in parsing large negative number.
+            //CHAR const* intfmt = "0x%llx:%s";
             #else
             #error "Need to support";
             #endif

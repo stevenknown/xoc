@@ -35,6 +35,8 @@ typedef xcom::Vector<xcom::TMap<UINT, VMD*>*> BB2VMDMap;
 typedef xcom::TMap<UINT, MDPhiList*> BB2MDPhiList;
 typedef xcom::TMapIter<UINT, MDPhiList*> BB2MDPhiListIter;
 typedef xcom::List<MDDef*> MDDefIter;
+typedef TTab<UINT> LiveInMDTab;
+typedef TabIter<UINT> LiveInMDTabIter;
 
 class ConstMDDefIter : public xcom::List<MDDef const*> {
     COPY_CONSTRUCTOR(ConstMDDefIter);    
@@ -70,7 +72,7 @@ protected:
     xcom::DefSegMgr * m_seg_mgr;
     xcom::DefMiscBitSetMgr * m_sbs_mgr;
     bool m_is_ssa_constructed;
-
+    bool m_is_semi_pruned;
     IRIter m_iter; //for tmp use.
 
     //Record version stack during renaming.
@@ -92,12 +94,16 @@ protected:
         m_sbs_mgr = NULL;
         m_cfg = NULL;
         m_is_ssa_constructed = false;
+        m_is_semi_pruned = true;
     }
     void cleanIRSSAInfo(IRBB * bb);
     void cleanMDSSAInfoAI();
     void cutoffDefChain(MDDef * def);
     void cleanMD2Stack();
-    void collectDefinedMD(IN IRBB * bb, OUT DefSBitSet & mustdef_pr);
+    void collectDefinedMDAndInitVMD(IN IRBB * bb, OUT DefSBitSet & mustdef_pr);
+    void collectUseMD(IR const* ir, OUT LiveInMDTab & livein_md);
+    //'maydef_md': record MDs that defined in 'bb'.
+    void computeLiveInMD(IRBB const* bb, OUT LiveInMDTab & livein_md);
 
     void freeBBPhiList(IRBB * bb);
     void freePhiList();
@@ -116,7 +122,8 @@ protected:
     bool doOpndHaveSameDef(MDPhi const* phi, OUT VMD ** common_def) const;
 
     void handleBBRename(IRBB * bb,
-                        IN DefSBitSet & defed_prs,
+                        xcom::DefSBitSet const& effect_mds,
+                        IN DefSBitSet & defed_mds,
                         IN OUT BB2VMDMap & bb2vmdmap);
 
     void init()
@@ -132,25 +139,28 @@ protected:
     void renamePhiResult(IN IRBB * bb);
     void renameUse(IR * ir);
     void renameDef(IR * ir, IRBB * bb);
-    void rename(DefSBitSet & effect_prs,
-                Vector<DefSBitSet*> & defed_prs_vec,
+    void rename(DefSBitSet const& effect_mds,
+                Vector<DefSBitSet*> & defed_mds_vec,
                 xcom::Graph & domtree);
     void renameBB(IRBB * bb);
-    void renameInDomTreeOrder(IRBB * root,
+    void renameInDomTreeOrder(xcom::DefSBitSet const& effect_mds,
+                              IRBB * root,
                               xcom::Graph & dtree,
-                              Vector<DefSBitSet*> & defed_prs_vec);
+                              Vector<DefSBitSet*> & defed_mds_vec);
     bool removePHIHasNoValidDef(List<IRBB*> & wl,
                                 MDPhi * phi,
                                 MDPhiList * philist);
     bool removePHIHasCommonDef(List<IRBB*> & wl,
                                MDPhi * phi,
                                MDPhiList * philist);
-    void removeDefFromDDChainHelper(MDDef const* mddef, MDDef * prev);
+    void removeDefFromDDChainHelper(MDDef * mddef, MDDef * prev);
+    //Record all modified MDs which will be versioned later.
+    void recordEffectMD(IRBB const* bb, OUT DefSBitSet & effect_md);
 
     bool prunePhi(List<IRBB*> & wl);
     bool prunePhiForBB(List<IRBB*> & wl, IRBB * bb);
     void placePhiForMD(UINT mdid,
-                       IN List<IRBB*> * defbbs,
+                       List<IRBB*> const* defbbs,
                        DfMgr const& dfm,
                        xcom::BitSet & visited,
                        List<IRBB*> & wl,
@@ -334,8 +344,8 @@ public:
     //    D1<->D4
     //    D3<->NULL
     //  where predecessor of D5, D6 is D1, successor of D1 includes D5, D6.
-    void removeDefFromDDChain(MDDef const* mddef);
-    void removePHIFromDDChain(MDPhi const* phi, MDDef * prev);
+    void removeDefFromDDChain(MDDef * mddef);
+    void removePHIFromDDChain(MDPhi * phi, MDDef * prev);
 
     //Before removing bb or change bb successor,
     //you need remove the related PHI operand if BB successor has PHI stmt.

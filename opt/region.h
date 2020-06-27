@@ -871,10 +871,8 @@ public:
     //Get the MayUse MDSet of Region.
     MDSet * getMayUse() const
     { return m_ref_info != NULL ? &REF_INFO_mayuse(m_ref_info) : NULL; }
-    //Return the Memory Descriptor Set for given ir may describe.
-    MDSet const* getMayRef(IR const* ir) { return ir->getRefMDSet(); }
-    //Return the MemoryAddr for 'ir' must be.
-    MD const* getMustRef(IR const* ir) { return ir->getRefMD(); }
+
+    //Get the top parent level region.
     Region * getTopRegion()
     {
         Region * rg = this;

@@ -104,6 +104,8 @@ protected:
                                     BBListIter bbct,
                                     BBList * bbl) const;
     bool remove_ineffect_ir() const;
+    bool removeRedundantPhi();
+
     //Set control-dep bb to be effective.
     bool setControlDepBBToBeEffect(IRBB const* bb,
                                    IN OUT List<IR const*> & act_ir_lst);

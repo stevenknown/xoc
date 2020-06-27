@@ -370,8 +370,8 @@ UseDefMgr::UseDefMgr(Region * rg, MDSSAMgr * mgr) : m_rg(rg), m_mdssa_mgr(mgr)
     m_mdssainfo_pool = smpoolCreate(sizeof(MDSSAInfo)*2, MEM_CONST_SIZE);
 
     m_free_sc_list = NULL;
-    m_def_count = 1;
-    m_vopnd_count = 1;
+    m_def_count = MDDEF_UNDEF + 1;
+    m_vopnd_count = VOPND_UNDEF + 1;
     m_philist_vec.set(rg->getBBList()->get_elem_count(), 0);
 }
 

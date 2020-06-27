@@ -36,6 +36,7 @@ namespace xoc {
 //Local variables should have explicitly definition that VMD version must not
 //be initial version.
 #define MDSSA_INIT_VERSION 0
+#define MDDEF_UNDEF 0
 
 class MDDef;
 class UseDefMgr;
@@ -310,8 +311,11 @@ public:
 public:
     MDDef();
 
-    //Before destruction, invoke clean() to free memory resource.
+    //Before destruction, invoke clean() of m_nextset
+    //to free memory resource.
     ~MDDef();
+
+    void clean() { init(false); MDDEF_id(this) = MDDEF_UNDEF; }
 
     IRBB * getBB() const { return MDDEF_bb(this); }
     VMD * getResult() const { return MDDEF_result(this); }
@@ -330,6 +334,7 @@ public:
         MDDEF_occ(this) = NULL;
     }
     bool is_phi() const { return MDDEF_is_phi(this); }
+    bool is_valid() const { return id() != MDDEF_UNDEF; }
 };
 
 
@@ -371,6 +376,8 @@ public:
 public:
     MDPhi();
     ~MDPhi();
+
+    void clean() { init(); MDDEF_id(this) = MDDEF_UNDEF; }
 
     void init()
     {
