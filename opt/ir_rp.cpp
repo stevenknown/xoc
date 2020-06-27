@@ -2113,25 +2113,13 @@ bool RegPromot::perform(OptCtx & oc)
     if (!OC_is_ref_valid(oc)) { return false; }
     if (!OC_is_cfg_valid(oc)) { return false; }
     //Check PR DU chain.
-    PRSSAMgr * ssamgr = (PRSSAMgr*)(m_rg->getPassMgr()->queryPass(
-        PASS_PR_SSA_MGR));
-    if (ssamgr != NULL && ssamgr->isSSAConstructed()) {
-        m_ssamgr = ssamgr;
-    } else {
-        m_ssamgr = NULL;
-    }
+    m_ssamgr = (PRSSAMgr*)(m_rg->getPassMgr()->queryPass(PASS_PR_SSA_MGR));
     if (!OC_is_pr_du_chain_valid(oc) && m_ssamgr == NULL) { 
         //At least one kind of DU chain should be avaiable.
         return false;
     }
     //Check NONPR DU chain.
-    MDSSAMgr * mdssamgr = (MDSSAMgr*)(m_rg->getPassMgr()->queryPass(
-        PASS_MD_SSA_MGR));
-    if (mdssamgr != NULL && mdssamgr->isMDSSAConstructed()) {
-        m_mdssamgr = mdssamgr;
-    } else {
-        m_mdssamgr = NULL;
-    }
+    m_mdssamgr = (MDSSAMgr*)(m_rg->getPassMgr()->queryPass(PASS_MD_SSA_MGR));
     if (!OC_is_nonpr_du_chain_valid(oc) && m_mdssamgr == NULL) {
         //At least one kind of DU chain should be avaiable.
         return false;

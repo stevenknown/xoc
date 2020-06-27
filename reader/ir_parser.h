@@ -30,6 +30,8 @@ USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 namespace xoc {
 
+#define MAX_PRNO 0xffffFF
+
 class Lexer;
 class Region;
 class RegionMgr;
@@ -268,6 +270,7 @@ protected:
     Lexer * m_lexer;
     RegionMgr * m_rumgr;
     List<ParseErrorMsg*> m_err_list;
+    TMap<SYM const*, UINT> m_id2prno;
 protected:
     bool declareType(ParseCtx * ctx);
     bool declareVarProperty(VAR * var, ParseCtx * ctx);
@@ -300,6 +303,8 @@ protected:
     bool isExp(X_CODE code);
     bool isExp();
     bool isTerminator(TOKEN tok);
+
+    UINT mapID2Prno(CHAR const* prid, ParseCtx * ctx);
 
     bool parseDimProperty(PropertySet & cont, ParseCtx * ctx);
     bool parseElemTypeProperty(PropertySet & cont, ParseCtx * ctx);

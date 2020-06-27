@@ -428,7 +428,7 @@ void IRParser::error(TOKEN tok, CHAR const* format, ...)
 
 void IRParser::error(X_CODE xcode, CHAR const* format, ...)
 {
-    CHECK_DUMMYUSE(xcode);
+    DUMMYUSE(xcode);
     StrBuf buf(64);
     va_list arg;
     va_start(arg, format);
@@ -704,6 +704,7 @@ bool IRParser::parseRegionBody(ParseCtx * ctx)
 }
 
 
+//Return true if stmt list is correct.
 bool IRParser::parseStmtList(ParseCtx * ctx)
 {
     TOKEN tok = m_lexer->getCurrentToken();
@@ -791,7 +792,7 @@ bool IRParser::parseStmtList(ParseCtx * ctx)
             if (isEndOfScope() || isEndOfAll()) {
                 ctx->has_phi |= has_phi;
                 ctx->has_high_level_ir |= has_high_level_ir;
-                return true;
+                return !ctx->has_error;
             }
             error(tok, "not stmt operation");
             res = false;
@@ -820,7 +821,7 @@ bool IRParser::parseStmtList(ParseCtx * ctx)
         //dumpIRList(ctx->stmt_list, m_rg);
     }
     UNREACHABLE();
-    return true;
+    return !ctx->has_error;
 }
 
 
@@ -930,6 +931,7 @@ bool IRParser::parseCase(ParseCtx * ctx)
         if (tok == T_COLON) {
             tok = m_lexer->getNextToken();
             if (!parseType(ctx, &ty) || ty == NULL) {
+                error(tok, "illegal data type");
                 return false;
             }
             IR_dt(case_det) = ty;
@@ -946,6 +948,7 @@ bool IRParser::parseCase(ParseCtx * ctx)
         if (tok == T_COLON) {
             tok = m_lexer->getNextToken();
             if (!parseType(ctx, &ty) || ty == NULL) {
+                error(tok, "illegal data type");
                 return false;
             }
         } else {
@@ -993,6 +996,7 @@ bool IRParser::parseSelect(ParseCtx * ctx)
     if (tok == T_COLON) {
         tok = m_lexer->getNextToken();
         if (!parseType(ctx, &ty)) {
+            error(tok, "illegal data type");
             return false;
         }
     }
@@ -1015,7 +1019,11 @@ bool IRParser::parseSelect(ParseCtx * ctx)
         return false;
     }
     IR * truepart = ctx->returned_exp;
-    ASSERT0(truepart);
+    if (truepart == NULL) {
+        error(tok, "select miss true part");
+        return false;
+    }
+
     tok = m_lexer->getCurrentToken();
     if (tok != T_COMMA) {
         error(tok, "miss ','");
@@ -1028,12 +1036,29 @@ bool IRParser::parseSelect(ParseCtx * ctx)
         return false;
     }
     IR * falsepart = ctx->returned_exp;
-    ASSERT0(falsepart && ctx->current_region);
+    ASSERT0(ctx->current_region);
+    if (falsepart == NULL) {
+        error(tok, "select miss false part");
+        return false;
+    }
 
     IR * exp = ctx->current_region->buildSelect(det,
         truepart, falsepart, ty == NULL ? m_tm->getAny() : ty);
     ctx->returned_exp = exp;
     return true;
+}
+
+
+UINT IRParser::mapID2Prno(CHAR const* prid, ParseCtx * ctx)
+{
+    SYM const* sym = m_rumgr->addToSymbolTab(prid);
+    UINT prno = m_id2prno.get(sym);
+    if (prno == PRNO_UNDEF) {
+        prno = ctx->current_region->getPRCount() + 1;
+        ctx->current_region->setPRCount(prno);
+        m_id2prno.set(sym, prno);
+    }
+    return prno;
 }
 
 
@@ -1045,10 +1070,20 @@ bool IRParser::parsePR(ParseCtx * ctx)
     UINT prno = 0;
     if (tok == T_IMM) {
         prno = (UINT)xcom::xatoll(m_lexer->getCurrentTokenString(), false);
+        if (prno > MAX_PRNO) {
+            error("too large PR number %u", prno);
+            return false;
+        }
         ctx->current_region->setPRCount(
             MAX(ctx->current_region->getPRCount(), prno + 1));
         if (prno == PRNO_UNDEF) {
-            error("use invalid PR number %d", prno);
+            error("use invalid PR number %u", prno);
+            return false;
+        }
+    } else if (tok == T_IDENTIFIER) {
+        prno = mapID2Prno(m_lexer->getCurrentTokenString(), ctx);
+        if (prno == PRNO_UNDEF) {
+            error("use invalid PR number %u", prno);
             return false;
         }
     } else {
@@ -1200,6 +1235,7 @@ bool IRParser::parseStoreArray(ParseCtx * ctx)
         //Type
         tok = m_lexer->getNextToken();
         if (!parseType(ctx, &ty)) {
+            error(tok, "illegal data type");
             return false;
         }
     }
@@ -1338,6 +1374,7 @@ bool IRParser::parseArray(ParseCtx * ctx)
     if (tok == T_COLON) {
         tok = m_lexer->getNextToken();
         if (!parseType(ctx, &ty) || ty == NULL) {
+            error(tok, "illegal data type");
             return false;
         }
     }
@@ -1451,6 +1488,7 @@ bool IRParser::parseILd(ParseCtx * ctx)
         //Type
         tok = m_lexer->getNextToken();
         if (!parseType(ctx, &ty)) {
+            error(tok, "illegal data type");
             return false;
         }
     }
@@ -1607,6 +1645,7 @@ bool IRParser::parseImmIR(ParseCtx * ctx)
     if (tok == T_COLON) {
         tok = m_lexer->getNextToken();
         if (!parseType(ctx, &ty) || ty == NULL) {
+            error(tok, "illegal data type");
             return false;
         }
     } else {
@@ -1644,6 +1683,7 @@ bool IRParser::parseImmVal(ParseCtx * ctx)
     if (tok == T_COLON) {
         tok = m_lexer->getNextToken();
         if (!parseType(ctx, &ty) || ty == NULL) {
+            error(tok, "illegal data type");
             return false;
         }
     } else {
@@ -1674,6 +1714,7 @@ bool IRParser::parseBool(ParseCtx * ctx)
     if (tok == T_COLON) {
         tok = m_lexer->getNextToken();
         if (!parseType(ctx, &ty) || ty == NULL) {
+            error(tok, "illegal data type");
             return false;
         }
     } else {
@@ -1699,6 +1740,7 @@ bool IRParser::parseString(ParseCtx * ctx)
     if (tok == T_COLON) {
         tok = m_lexer->getNextToken();
         if (!parseType(ctx, &ty) || ty == NULL) {
+            error(tok, "illegal data type");
             return false;
         }
     } else {
@@ -1723,6 +1765,7 @@ bool IRParser::parseFp(ParseCtx * ctx)
     if (tok == T_COLON) {
         tok = m_lexer->getNextToken();
         if (!parseType(ctx, &ty) || ty == NULL) {
+            error(tok, "illegal data type");
             return false;
         }
     } else {
@@ -1912,6 +1955,7 @@ bool IRParser::parseBinaryOp(IR_TYPE code, ParseCtx * ctx)
     if (tok == T_COLON) {
         tok = m_lexer->getNextToken();
         if (!parseType(ctx, &ty)) {
+            error(tok, "illegal data type");
             return false;
         }
     }
@@ -1934,7 +1978,11 @@ bool IRParser::parseBinaryOp(IR_TYPE code, ParseCtx * ctx)
     }
 
     IR * opnd0 = ctx->returned_exp;
-    ASSERT0(opnd0);
+    if (opnd0 == NULL) {
+        error(tok, "miss opnd0 for binary operation");
+        return false;
+    }
+
     tok = m_lexer->getCurrentToken();
     if (tok != T_COMMA) {
         error(tok, "miss ','");
@@ -1947,8 +1995,12 @@ bool IRParser::parseBinaryOp(IR_TYPE code, ParseCtx * ctx)
         return false;
     }
     IR * opnd1 = ctx->returned_exp;
-    ASSERT0(opnd1 && ctx->current_region);
+    if (opnd1 == NULL) {
+        error(tok, "miss opnd1 for binary operation");
+        return false;
+    }
 
+    ASSERT0(ctx->current_region);
     if (ty == NULL) {
         switch (code) {
         case IR_LT:
@@ -2017,6 +2069,7 @@ bool IRParser::parseUnaryOp(IR_TYPE code, ParseCtx * ctx)
     if (tok == T_COLON) {
         tok = m_lexer->getNextToken();
         if (!parseType(ctx, &ty) || ty == NULL) {
+            error(tok, "illegal data type");
             return false;
         }
     }
@@ -2165,6 +2218,7 @@ bool IRParser::parseStore(ParseCtx * ctx)
     if (tok == T_COLON) {
         tok = m_lexer->getNextToken();
         if (!parseType(ctx, &ty)) {
+            error(tok, "illegal data type");
             return false;
         }
     }
@@ -2257,11 +2311,17 @@ bool IRParser::parseStorePR(ParseCtx * ctx)
     if (tok == T_IMM) {
         prno = (UINT)xcom::xatoll(m_lexer->getCurrentTokenString(), false);
         if (prno == PRNO_UNDEF) {
-            error("use invalid PR number %d", prno);
+            error("use invalid PR number %u", prno);
             return false;
         }
         ctx->current_region->setPRCount(
             MAX(ctx->current_region->getPRCount(), prno + 1));
+    } else if (tok == T_IDENTIFIER) {
+        prno = mapID2Prno(m_lexer->getCurrentTokenString(), ctx);
+        if (prno == PRNO_UNDEF) {
+            error("use invalid PR number %u", prno);
+            return false;
+        }
     } else {
         error(tok, "not PR number");
         return false;
@@ -2273,6 +2333,7 @@ bool IRParser::parseStorePR(ParseCtx * ctx)
     if (tok == T_COLON) {
         tok = m_lexer->getNextToken();
         if (!parseType(ctx, &ty) || ty == NULL) {
+            error(tok, "illegal data type");
             return false;
         }
     } else {
@@ -2330,6 +2391,12 @@ bool IRParser::parseModifyPR(X_CODE code, ParseCtx * ctx)
         prno = (UINT)xcom::xatoll(m_lexer->getCurrentTokenString(), false);
         ctx->current_region->setPRCount(
             MAX(ctx->current_region->getPRCount(), prno + 1));
+    } else if (tok == T_IDENTIFIER) {
+        prno = mapID2Prno(m_lexer->getCurrentTokenString(), ctx);
+        if (prno == PRNO_UNDEF) {
+            error("use invalid PR number %u", prno);
+            return false;
+        }
     } else {
         error(tok, "miss PR number");
         return false;
@@ -2340,6 +2407,7 @@ bool IRParser::parseModifyPR(X_CODE code, ParseCtx * ctx)
     if (tok == T_COLON) {
         tok = m_lexer->getNextToken();
         if (!parseType(ctx, &ty)) {
+            error(tok, "illegal data type");
             return false;
         }
     }
@@ -2447,6 +2515,7 @@ bool IRParser::parseIStore(ParseCtx * ctx)
     if (tok == T_COLON) {
         tok = m_lexer->getNextToken();
         if (!parseType(ctx, &ty) || ty == NULL) {
+            error(tok, "illegal data type");
             return false;
         }
     } else {
@@ -2554,6 +2623,7 @@ bool IRParser::parseCallAndICall(bool is_call, ParseCtx * ctx)
         if (tok == T_COLON) {
             tok = m_lexer->getNextToken();
             if (!parseType(ctx, &return_ty) || return_ty == NULL) {
+                error(tok, "illegal data type");
                 return false;
             }
         } else {
@@ -3215,6 +3285,7 @@ bool IRParser::parsePhi(ParseCtx * ctx)
     if (tok == T_COLON) {
         tok = m_lexer->getNextToken();
         if (!parseType(ctx, &ty) || ty == NULL) {
+            error(tok, "illegal data type");
             return false;
         }
     } else {
@@ -3699,7 +3770,8 @@ bool IRParser::parseType(ParseCtx * ctx, Type const** ty)
         *ty = m_tm->getAny();
         m_lexer->getNextToken();
         break;
-    default:;
+    default:
+        return false;
     }
     return true;
 }
@@ -4295,7 +4367,7 @@ bool IRParser::parse()
     ASSERT0(m_lexer);
     TOKEN tok = T_NUL;
     //Get first token.
-    //CASE: There are T_NUL token return.
+    //CASE: There are T_NUL token return.    
     while ((tok = m_lexer->getNextToken()) == T_NUL) {;}
     for (;; tok = m_lexer->getNextToken()) {
         switch (tok) {
@@ -4310,7 +4382,9 @@ bool IRParser::parse()
             switch (code) {
             case X_REGION: {
                 ParseCtx ctx;
-                declareRegion(&ctx);
+                bool succ = declareRegion(&ctx);
+                ASSERT0(succ || getErrorMsgList().get_elem_count() > 0);
+                DUMMYUSE(succ);
                 break;
             }
             default:
