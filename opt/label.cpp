@@ -38,7 +38,7 @@ author: Su Zhenyu
 
 namespace xoc {
 
-LabelInfo * allocPragmaLabel(SYM const* st, SMemPool * pool)
+LabelInfo * allocPragmaLabel(Sym const* st, SMemPool * pool)
 {
     LabelInfo * li = allocLabel(pool);
     LABEL_INFO_name(li) = st;
@@ -47,7 +47,7 @@ LabelInfo * allocPragmaLabel(SYM const* st, SMemPool * pool)
 }
 
 
-LabelInfo * allocCustomerLabel(SYM const* st, SMemPool * pool)
+LabelInfo * allocCustomerLabel(Sym const* st, SMemPool * pool)
 {
     LabelInfo * li = allocLabel(pool);
     LABEL_INFO_name(li) = st;

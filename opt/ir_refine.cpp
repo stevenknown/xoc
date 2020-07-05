@@ -1400,7 +1400,7 @@ IR * Region::refineBranch(IR * ir)
 IR * Region::refineLoad(IR * ir)
 {
     ASSERT0(LD_idinfo(ir));
-    VAR * var = LD_idinfo(ir);
+    Var * var = LD_idinfo(ir);
     if (VAR_is_array(var)) {
         //Convert LD(v) to LDA(ID(v)) if ID is array.
         //I think the convert is incorrect. If var a is array,
@@ -2432,7 +2432,7 @@ IR * Region::foldConst(IR * ir, bool & change)
     case IR_NE:
         {
             //address of string always not be 0x0.
-            //NE(LDA(SYM), 0) -> 1
+            //NE(LDA(Sym), 0) -> 1
             IR * opnd0 = BIN_opnd0(ir);
             IR * opnd1 = BIN_opnd1(ir);
             if ((opnd0->is_lda() &&
@@ -2459,7 +2459,7 @@ IR * Region::foldConst(IR * ir, bool & change)
     case IR_EQ:
         {
             //address of string always not be 0x0.
-            //EQ(LDA(SYM), 0) -> 0
+            //EQ(LDA(Sym), 0) -> 0
             IR * opnd0 = BIN_opnd0(ir);
             IR * opnd1 = BIN_opnd1(ir);
             if ((opnd0->is_lda() &&

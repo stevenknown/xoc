@@ -61,7 +61,7 @@ public:
 
         CHAR buf[64];
         sprintf(buf, "dummy%d", (UINT)(size_t)ty->type);
-        VAR * dummy = m_var_mgr->registerVar(
+        Var * dummy = m_var_mgr->registerVar(
                         buf, ty->type, 1, VAR_GLOBAL);
         VAR_is_addr_taken(dummy) = true;
         VAR_is_unallocable(dummy) = true;
@@ -94,7 +94,7 @@ public:
 
         CHAR buf[64];
         sprintf(buf, "dummy%d", (UINT)(size_t)ty->type);
-        VAR * dummy = m_var_mgr->registerVar(
+        Var * dummy = m_var_mgr->registerVar(
                     buf, m_tm->getMCType(0), 1, VAR_GLOBAL);
         VAR_is_addr_taken(dummy) = true;
         VAR_is_unallocable(dummy) = true;

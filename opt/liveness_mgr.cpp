@@ -70,11 +70,10 @@ void LivenessMgr::dump()
 }
 
 
-void LivenessMgr::processMay(
-            IR const* pr,
-            DefSBitSetCore * gen,
-            DefSBitSetCore * use,
-            bool is_lhs)
+void LivenessMgr::processMay(IR const* pr,
+                             DefSBitSetCore * gen,
+                             DefSBitSetCore * use,
+                             bool is_lhs)
 {
     if (!m_handle_may) { return; }
 

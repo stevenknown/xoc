@@ -601,8 +601,9 @@ public:
     IR_TYPE getCode() const { return (IR_TYPE)IR_code(this); }
     IR * get_next() const { return IR_next(this); }
     IR * get_prev() const { return IR_prev(this); }
+    inline IR * getBase() const; //Get base expression if exist.
     inline UINT getOffset() const; //Get byte offset if any.
-    inline VAR * getIdinfo() const; //Get idinfo if any.
+    inline Var * getIdinfo() const; //Get idinfo if any.
     IR * getParent() const { return IR_parent(this); }
     inline IR * getKid(UINT idx) const;
     inline IRBB * getBB() const;
@@ -746,7 +747,8 @@ public:
     //Note this function does not need RefMD information.
     //It just determine overlapping of given two IR according to
     //their data-type and offset.
-    bool isNotOverLap(IR const* ir2, Region * rg) const;
+    bool isNotOverlap(IR const* ir2, Region * rg) const;
+    bool isNotOverlapViaMDRef(IR const* ir2) const;
     bool isNoMove() const { return IR_no_move(this); }
     //Return true if current IR may contain memory reference.
     bool isContainMemRef() const
@@ -844,6 +846,9 @@ public:
 
     //Return true if ir is volatile.
     inline bool is_volatile() const;
+
+    //Return true if given array has same dimension structure with current ir.
+    bool isSameArrayStruct(IR const* ir) const;
 
     //Record if ir might throw exception.
     bool isMayThrow() const { return IR_may_throw(this); }
@@ -952,6 +957,9 @@ public:
     //Return true if ir is indirect jump to multiple target.
     bool isIndirectBr() const { return is_igoto(); }
 
+    //Return true if ir is indirect memory operation.
+    bool isIndirectMemOp() const { return is_ist() || is_ild(); }
+
     bool isCallStmt() const { return is_call() || is_icall(); }
 
     //Return true if ir is a call and has a return value.
@@ -989,6 +997,12 @@ public:
     //the PR memory.
     bool isMemoryRefNotOperatePR() const
     { return IRDES_is_non_pr_memref(g_ir_desc[getCode()]); }
+
+    //Return true if current ir and ir2 represent different memory location,
+    //otherwise return false to tell caller we do not know more about these
+    //object. Note this function will consider data type that current ir or ir2
+    //referrenced.
+    bool isDiffMemLoc(IR const* ir2) const;
 
     //True if ir is atomic operation.
     bool is_atomic() const { return IR_is_atomic(this); }
@@ -1053,7 +1067,7 @@ public:
 
     inline void setPrno(UINT prno);
     inline void setOffset(UINT ofst);
-    inline void setIdinfo(VAR * idinfo);
+    inline void setIdinfo(Var * idinfo);
     inline void setLabel(LabelInfo const* li);
     inline void setBB(IRBB * bb);
     inline void setRHS(IR * rhs);
@@ -1154,7 +1168,7 @@ class CConst : public IR {
 public:
     union {
         //record string const.
-        SYM const* str_value;
+        Sym const* str_value;
 
         //record integer value using a length of HOST_INT memory.
         HOST_INT int_const_value;
@@ -1175,15 +1189,15 @@ public:
     HOST_FP getFP() const { return CONST_fp_val(this); }
     BYTE getMantissa() const { return CONST_fp_mant(this); }
     HOST_INT getINT() const { return CONST_int_val(this); }
-    SYM const* getSTR() const { return CONST_str_val(this); }
+    Sym const* getSTR() const { return CONST_str_val(this); }
 };
 
-//Record VAR property.
+//Record Var property.
 class VarProp {
     COPY_CONSTRUCTOR(VarProp);
 public:
-    //Record VAR if ir is IR_LD|IR_ID.
-    VAR * id_info;
+    //Record Var if ir is IR_LD|IR_ID.
+    Var * id_info;
 };
 
 
@@ -2011,11 +2025,11 @@ public:
         IR_parent(ir) = this;
     }
 
-    void insertOpndBefore(IR * marker, IR * opnd)
+    void insertOpndBefore(IR * marker, IR * exp)
     {
         ASSERT0(xcom::in_list(PHI_opnd_list(this), marker));
-        ASSERT0(!xcom::in_list(PHI_opnd_list(this), opnd));
-        xcom::insertbefore(&PHI_opnd_list(this), marker, opnd);
+        ASSERT0(!xcom::in_list(PHI_opnd_list(this), exp));
+        xcom::insertbefore(&PHI_opnd_list(this), marker, exp);
     }
 };
 
@@ -2151,7 +2165,7 @@ IRBB * IR::getBB() const
 }
 
 
-VAR * IR::getIdinfo() const
+Var * IR::getIdinfo() const
 {
     ASSERT0(hasIdinfo());
     //DO NOT ASSERT even if current IR has no offset.
@@ -2167,7 +2181,7 @@ VAR * IR::getIdinfo() const
 }
 
 
-void IR::setIdinfo(VAR * idinfo)
+void IR::setIdinfo(Var * idinfo)
 {
     ASSERT0(hasIdinfo());
     //DO NOT ASSERT even if current IR has no offset.
@@ -2196,6 +2210,20 @@ UINT IR::getOffset() const
     default: break;
     }
     return 0;
+}
+
+
+IR * IR::getBase() const
+{
+    //DO NOT ASSERT even if current IR has no offset.
+    switch (getCode()) {
+    case IR_ILD: return ILD_base(this);
+    case IR_ARRAY: return ARR_base(this);
+    case IR_STARRAY: return ARR_base(this);
+    case IR_IST: return IST_base(this);
+    default: break;
+    }
+    return NULL;
 }
 
 
@@ -2268,7 +2296,7 @@ bool IR::is_volatile() const
 {
     //Describing if IR's address has been taken.
     if (is_id()) {
-        VAR * id_info = ID_info(this);
+        Var * id_info = ID_info(this);
         ASSERT0(id_info != NULL);
         return VAR_is_volatile(id_info);
     }
@@ -2314,19 +2342,27 @@ void IR::setRHS(IR * rhs)
     switch (getCode()) {
     case IR_ST:
         ST_rhs(this) = rhs;
-        IR_parent(rhs) = this;
+        if (rhs != NULL) {
+            IR_parent(rhs) = this;
+        }
         return;
     case IR_STPR:
         STPR_rhs(this) = rhs;
-        IR_parent(rhs) = this;
+        if (rhs != NULL) {
+            IR_parent(rhs) = this;
+        }
         return;
     case IR_STARRAY:
         STARR_rhs(this) = rhs;
-        IR_parent(rhs) = this;
+        if (rhs != NULL) {
+            IR_parent(rhs) = this;
+        }
         return;
     case IR_IST:
         IST_rhs(this) = rhs;
-        IR_parent(rhs) = this;
+        if (rhs != NULL) {
+            IR_parent(rhs) = this;
+        }
         return;
     default: ASSERTN(0, ("not store operation."));
     }
@@ -2671,7 +2707,7 @@ void IR::setDU(DU * du)
 
 
 //Exported Functions.
-CHAR const* compositeName(SYM const* n, xcom::StrBuf & buf);
+CHAR const* compositeName(Sym const* n, xcom::StrBuf & buf);
 void dumpIR(IR const* ir,
             Region const* rg,
             CHAR * attr = NULL,

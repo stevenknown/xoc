@@ -82,7 +82,7 @@ AnalysisInstrument::AnalysisInstrument(Region * rg) :
 }
 
 
-static bool verifyVar(Region * rg, VarMgr * vm, VAR * v)
+static bool verifyVar(Region * rg, VarMgr * vm, Var * v)
 {
     CHECK_DUMMYUSE(v);
     CHECK_DUMMYUSE(vm);
@@ -109,7 +109,7 @@ static bool verifyVar(Region * rg, VarMgr * vm, VAR * v)
 
 
 //Free md's id and local-var's id back to MDSystem and VarMgr.
-//The index of MD and VAR is important resource if there
+//The index of MD and Var is important resource if there
 //are a lot of REGIONs in RegionMgr.
 //Note this function does NOT process GLOBAL variable.
 static void destroyVARandMD(Region * rg)
@@ -120,7 +120,7 @@ static void destroyVARandMD(Region * rg)
     ConstMDIter iter;
     VarTab * vartab = rg->getVarTab();
     ASSERT0(vartab);
-    for (VAR * v = vartab->get_first(c); v != NULL; v = vartab->get_next(c)) {
+    for (Var * v = vartab->get_first(c); v != NULL; v = vartab->get_next(c)) {
         ASSERT0(verifyVar(rg, varmgr, v));
         mdsys->removeMDforVAR(v, iter);
         varmgr->destroyVar(v);
@@ -159,7 +159,7 @@ AnalysisInstrument::~AnalysisInstrument()
         ir->freeDUset(m_sbs_mgr);
     }
 
-    //Free local VAR id and related MD id, and destroy the memory.
+    //Free local Var id and related MD id, and destroy the memory.
     destroyVARandMD(m_rg);
 
     //Destroy reference info.
@@ -734,10 +734,10 @@ bool Region::isSafeToOptimize(IR const* ir)
 }
 
 
-//Return true if VAR belongs to current region.
-bool Region::isRegionVAR(VAR const* var)
+//Return true if Var belongs to current region.
+bool Region::isRegionVAR(Var const* var)
 {
-    return getVarTab()->find(const_cast<VAR*>(var));
+    return getVarTab()->find(const_cast<Var*>(var));
 }
 
 
@@ -751,14 +751,14 @@ bool Region::isRegionIR(IR const* ir)
 }
 
 
-//Generate VAR corresponding to PR load or write.
-VAR * Region::genVARforPR(UINT prno, Type const* type)
+//Generate Var corresponding to PR load or write.
+Var * Region::genVARforPR(UINT prno, Type const* type)
 {
     ASSERT0(type);
-    VAR * pr_var = mapPR2Var(prno);
+    Var * pr_var = mapPR2Var(prno);
     if (pr_var != NULL) { return pr_var; }
 
-    //Create a new PR VAR.
+    //Create a new PR Var.
     CHAR name[128];
     sprintf(name, "pr%d", prno);
     ASSERT0(strlen(name) < 128);
@@ -783,13 +783,13 @@ VAR * Region::genVARforPR(UINT prno, Type const* type)
 MD const* Region::genMDforPR(UINT prno, Type const* type)
 {
     ASSERT0(type);
-    VAR * pr_var = mapPR2Var(prno);
+    Var * pr_var = mapPR2Var(prno);
     if (pr_var == NULL) {
         pr_var = genVARforPR(prno, type);
     }
 
     MD md;
-    MD_base(&md) = pr_var; //correspond to VAR
+    MD_base(&md) = pr_var; //correspond to Var
     MD_ofst(&md) = 0;
     if (pr_var->getType()->is_any()) {
         MD_ty(&md) = MD_UNBOUND;
@@ -1029,13 +1029,13 @@ void Region::freeIR(IR * ir)
 }
 
 
-//This function find VAR via iterating VAR table of current region.
-VAR * Region::findVarViaSymbol(SYM const* sym)
+//This function find Var via iterating Var table of current region.
+Var * Region::findVarViaSymbol(Sym const* sym)
 {
     ASSERT0(sym);
     VarTab * vtab = getVarTab();
     VarTabIter c;
-    for (VAR * v = vtab->get_first(c); v != NULL; v = vtab->get_next(c)) {
+    for (Var * v = vtab->get_first(c); v != NULL; v = vtab->get_next(c)) {
         if (v->get_name() == sym) {
             return v;
         }
@@ -1044,24 +1044,24 @@ VAR * Region::findVarViaSymbol(SYM const* sym)
 }
 
 
-//This function iterate VAR table of current region to
-//find all VAR which are formal parameter.
+//This function iterate Var table of current region to
+//find all Var which are formal parameter.
 //in_decl_order: if it is true, this function will sort the formal
 //parameters in the Left to Right order according to their declaration.
 //e.g: foo(a, b, c), varlst will be {a, b, c}.
-void Region::findFormalParam(OUT List<VAR const*> & varlst, bool in_decl_order)
+void Region::findFormalParam(OUT List<Var const*> & varlst, bool in_decl_order)
 {
     VarTabIter c;
     VarTab * vt = getVarTab();
     ASSERT0(vt);
 
     if (in_decl_order)  {
-        for (VAR const* v = vt->get_first(c); v != NULL; v = vt->get_next(c)) {
+        for (Var const* v = vt->get_first(c); v != NULL; v = vt->get_next(c)) {
             if (!VAR_is_formal_param(v)) { continue; }
 
-            xcom::C<VAR const*> * ctp;
+            xcom::C<Var const*> * ctp;
             bool find = false;
-            for (VAR const* p = varlst.get_head(&ctp);
+            for (Var const* p = varlst.get_head(&ctp);
                  p != NULL; p = varlst.get_next(&ctp)) {
                 if (v->getFormalParamPos() < p->getFormalParamPos()) {
                     varlst.insert_before(v, ctp);
@@ -1078,7 +1078,7 @@ void Region::findFormalParam(OUT List<VAR const*> & varlst, bool in_decl_order)
     }
 
     //Unordered
-    for (VAR const* v = vt->get_first(c); v != NULL; v = vt->get_next(c)) {
+    for (Var const* v = vt->get_first(c); v != NULL; v = vt->get_next(c)) {
         if (VAR_is_formal_param(v)) {
             varlst.append_tail(v);
         }
@@ -1087,12 +1087,12 @@ void Region::findFormalParam(OUT List<VAR const*> & varlst, bool in_decl_order)
 
 
 //This function find the formal parameter variable by given position.
-VAR const* Region::findFormalParam(UINT position)
+Var const* Region::findFormalParam(UINT position)
 {
     VarTabIter c;
     VarTab * vt = getVarTab();
     ASSERT0(vt);
-    for (VAR const* v = vt->get_first(c); v != NULL; v = vt->get_next(c)) {
+    for (Var const* v = vt->get_first(c); v != NULL; v = vt->get_next(c)) {
         if (VAR_is_formal_param(v) && VAR_formal_param_pos(v) == position) {
             return v;
         }
@@ -1255,13 +1255,13 @@ MD const* Region::allocStoreMD(IR * ir)
 
 
 //Alloc MD for const string.
-MD const* Region::allocStringMD(SYM const* string)
+MD const* Region::allocStringMD(Sym const* string)
 {
     ASSERT0(string);
     MD const* strmd = getRegionMgr()->genDedicateStrMD();
     if (strmd != NULL) { return strmd; }
 
-    VAR * v = getVarMgr()->registerStringVar(NULL,
+    Var * v = getVarMgr()->registerStringVar(NULL,
         string, MEMORY_ALIGNMENT);
     //Set string address to be taken only if it is base of LDA.
     //VAR_is_addr_taken(v) = true;
@@ -1489,6 +1489,7 @@ IR * Region::allocIR(IR_TYPE irt)
 
 //Duplication 'ir' and kids, and its sibling, return list of new ir.
 //Duplicate irs start from 'ir' to the end of list.
+//The duplication includes AI, except DU info, SSA info.
 IR * Region::dupIRTreeList(IR const* ir)
 {
     IR * new_list = NULL;
@@ -1501,6 +1502,7 @@ IR * Region::dupIRTreeList(IR const* ir)
 }
 
 //Duplicate 'ir' and its kids, but without ir's sibiling node.
+//The duplication includes AI, except DU info, SSA info.
 IR * Region::dupIRTree(IR const* ir)
 {
     if (ir == NULL) { return NULL; }
@@ -1661,14 +1663,14 @@ void Region::prescan(IR const* ir)
         case IR_LDA:
             {
                 ASSERT0(LDA_idinfo(ir));
-                VAR * v = LDA_idinfo(ir);
+                Var * v = LDA_idinfo(ir);
                 if (v->is_string()) {
                     if (getRegionMgr()->genDedicateStrMD() != NULL) {
                         //Treat all string variable as the same one.
                         break;
                     }
 
-                    VAR * sv = getVarMgr()->registerStringVar(
+                    Var * sv = getVarMgr()->registerStringVar(
                         NULL, VAR_string(v), MEMORY_ALIGNMENT);
                     ASSERT0(sv);
                     VAR_is_addr_taken(sv) = true;
@@ -1684,7 +1686,7 @@ void Region::prescan(IR const* ir)
 
                     // ...=&x.a, address of 'x.a' is taken.
                     MD md;
-                    MD_base(&md) = LDA_idinfo(ir); //correspond to VAR
+                    MD_base(&md) = LDA_idinfo(ir); //correspond to Var
                     MD_ofst(&md) = LDA_ofst(ir);
                     MD_size(&md) = ir->getTypeSize(getTypeMgr());
                     MD_ty(&md) = MD_EXACT;
@@ -1865,7 +1867,7 @@ void Region::dumpVarTab()
         sort = false;
     }
     if (!sort) {
-        for (VAR * v = vt->get_first(c); v != NULL; v = vt->get_next(c)) {
+        for (Var * v = vt->get_first(c); v != NULL; v = vt->get_next(c)) {
             if (v->is_formal_param() || v->is_pr()) { continue; }
             buf.clean();
             note("\n%s;", v->dumpGR(buf, getTypeMgr()));
@@ -1875,13 +1877,13 @@ void Region::dumpVarTab()
 
     //Sort var in id order.
     DefSBitSet set(getMiscBitSetMgr()->getSegMgr());
-    for (VAR * v = vt->get_first(c); v != NULL; v = vt->get_next(c)) {
+    for (Var * v = vt->get_first(c); v != NULL; v = vt->get_next(c)) {
         if (v->is_formal_param() || v->is_pr()) { continue; }
         set.bunion(v->id());
     }
     DefSBitSetIter cur = NULL;
     for (INT id = set.get_first(&cur); id >= 0; id = set.get_next(id, &cur)) {
-        VAR * v = getVarMgr()->get_var(id);
+        Var * v = getVarMgr()->get_var(id);
         ASSERT0(v);
         buf.clean();
         note("\n%s;", v->dumpGR(buf, getTypeMgr()));
@@ -1895,8 +1897,8 @@ void Region::dumpParameter()
 {
     if (!is_function()) { return; }
     VarTabIter c;
-    Vector<VAR*> fpvec;
-    for (VAR * v = getVarTab()->get_first(c);
+    Vector<Var*> fpvec;
+    for (Var * v = getVarTab()->get_first(c);
          v != NULL; v = getVarTab()->get_next(c)) {
         if (VAR_is_formal_param(v)) {
             ASSERT0(!v->is_pr());
@@ -1906,7 +1908,7 @@ void Region::dumpParameter()
     if (fpvec.get_last_idx() < 0) { return; }
     StrBuf buf(32);
     for (INT i = 0; i <= fpvec.get_last_idx(); i++) {
-        VAR * v = fpvec.get(i);
+        Var * v = fpvec.get(i);
         if (i != 0) {
             prt(",");
         }
@@ -2379,8 +2381,8 @@ bool Region::verifyBBlist(BBList & bbl)
 }
 
 
-//Dump all MD that related to VAR.
-void Region::dumpVarMD(VAR * v, UINT indent)
+//Dump all MD that related to Var.
+void Region::dumpVarMD(Var * v, UINT indent)
 {
     StrBuf buf(64);
     ConstMDIter iter;
@@ -2411,7 +2413,7 @@ void Region::dumpVarMD(VAR * v, UINT indent)
 }
 
 
-//Dump each VAR in current region's VAR table.
+//Dump each Var in current region's Var table.
 void Region::dumpVARInRegion()
 {
     if (g_tfile == NULL) { return; }
@@ -2430,7 +2432,7 @@ void Region::dumpVARInRegion()
     if (is_function()) {
         bool has_param = false;
         VarTabIter c;
-        for (VAR * v = getVarTab()->get_first(c);
+        for (Var * v = getVarTab()->get_first(c);
              v != NULL; v = getVarTab()->get_next(c)) {
             if (VAR_is_formal_param(v)) {
                 has_param = true;
@@ -2441,15 +2443,15 @@ void Region::dumpVARInRegion()
         if (has_param) {
             note("\nFORMAL PARAMETERS:");
             c.clean();
-            Vector<VAR*> fpvec;
-            for (VAR * v = getVarTab()->get_first(c);
+            Vector<Var*> fpvec;
+            for (Var * v = getVarTab()->get_first(c);
                  v != NULL; v = getVarTab()->get_next(c)) {
                 if (VAR_is_formal_param(v)) {
                     fpvec.set(v->getFormalParamPos(), v);
                 }
             }
             for (INT i = 0; i <= fpvec.get_last_idx(); i++) {
-                VAR * v = fpvec.get(i);
+                Var * v = fpvec.get(i);
                 if (v == NULL) {
                     //This position may be reserved for other use.
                     //ASSERT0(v);
@@ -2480,14 +2482,14 @@ void Region::dumpVARInRegion()
         g_indent += 2;
         VarTabIter c;
 
-        //Sort VAR in ascending order because test tools will compare
-        //VAR dump information and require all variable have to be ordered.
-        xcom::List<VAR*> varlst;
-        for (VAR * v = vt->get_first(c); v != NULL; v = vt->get_next(c)) {
-            C<VAR*> * ct = NULL;
+        //Sort Var in ascending order because test tools will compare
+        //Var dump information and require all variable have to be ordered.
+        xcom::List<Var*> varlst;
+        for (Var * v = vt->get_first(c); v != NULL; v = vt->get_next(c)) {
+            C<Var*> * ct = NULL;
             bool find = false;
             for (varlst.get_head(&ct); ct != NULL; ct = varlst.get_next(ct)) {
-                VAR * v_in_lst = C_val(ct);
+                Var * v_in_lst = C_val(ct);
                 if (v_in_lst->id() > v->id()) {
                     varlst.insert_before(v, ct);
                     find = true;
@@ -2498,9 +2500,9 @@ void Region::dumpVARInRegion()
                 varlst.append_tail(v);
             }
         }
-        C<VAR*> * ct = NULL;
+        C<Var*> * ct = NULL;
         for (varlst.get_head(&ct); ct != NULL; ct = varlst.get_next(ct)) {
-            VAR * v = C_val(ct);
+            Var * v = C_val(ct);
             buf.clean();
             v->dump(buf, getTypeMgr());
             note("\n%s", buf.buf);
@@ -2765,7 +2767,7 @@ bool Region::partitionRegion()
 
     //Generate IR region.
     Type const* type = getTypeMgr()->getMCType(0);
-    VAR * ruv = getVarMgr()->registerVar("inner_ru",
+    Var * ruv = getVarMgr()->registerVar("inner_ru",
         type, 1, VAR_LOCAL|VAR_FAKE);
     VAR_is_unallocable(ruv) = true;
     addToVarTab(ruv);

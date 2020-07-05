@@ -44,7 +44,7 @@ Region * IPA::findRegion(IR * call, Region * callru)
     CallNode * callercn = cg->mapRegion2CallNode(callru);
     ASSERTN(callercn, ("caller is not on graph"));
 
-    SYM const* callname = CALL_idinfo(call)->get_name();
+    Sym const* callname = CALL_idinfo(call)->get_name();
 
     //Iterate accessing successors.
     ASSERT0(cg->getVertex(CN_id(callercn)));

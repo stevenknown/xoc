@@ -399,7 +399,6 @@ void MDSSAMgr::dump()
     List<IR const*> lst;
     List<IR const*> opnd_lst;
     UINT const indent = 2;
-    g_indent = 0;
     for (IRBB * bb = bbl->get_head(); bb != NULL; bb = bbl->get_next()) {
         note("\n--- BB%d ---", BB_id(bb));
 
@@ -446,7 +445,6 @@ void MDSSAMgr::dump()
                 if (!opnd->isMemoryRefNotOperatePR() || opnd->is_stmt()) {
                     continue;
                 }
-
                 MDSSAInfo * mdssainfo = m_usedef_mgr.getMDSSAInfo(opnd);
                 ASSERT0(mdssainfo);
                 VOpndSetIter iter = NULL;
@@ -658,6 +656,29 @@ void MDSSAMgr::dumpDefChain(List<MDDef const*> & wl,
 }
 
 
+//Return true if exist USE to 'ir'.
+//This is a helper function to provid simple query, an example to
+//show how to retrieval VOpnd and USE occurences as well.
+//ir: stmt
+bool MDSSAMgr::hasUse(IR const* ir) const
+{
+    ASSERT0(ir && ir->is_stmt());
+    MDSSAInfo const* info = const_cast<MDSSAMgr*>(this)->getMDSSAInfoIfAny(ir);
+    if (info == NULL) { return false; }
+
+    VOpndSetIter iter = NULL;
+    for (INT i = info->readVOpndSet()->get_first(&iter);
+        i >= 0; i = info->readVOpndSet()->get_next(i, &iter)) {
+        VOpnd const* vopnd = getVOpnd(i);
+        ASSERT0(vopnd && vopnd->is_md());
+        if (((VMD*)vopnd)->getUseSet()->get_elem_count() != 0) {
+            return true;
+        }
+    }
+    return false;
+}
+
+
 void MDSSAMgr::dumpExpDUChainIter(IR const* ir,
                                   List<IR const*> & lst,
                                   List<IR const*> & opnd_lst,
@@ -819,7 +840,7 @@ void MDSSAMgr::initVMD(IN IR * ir, OUT DefSBitSet & maydef_md)
         (ir->isCallStmt() && !ir->isReadOnlyCall())) {
         MD const* ref = ir->getRefMD();
         if (ref != NULL && !ref->is_pr()) {
-            maydef_md.bunion(MD_id(ref));            
+            maydef_md.bunion(MD_id(ref));
         }
         MDSet const* refset = ir->getRefMDSet();
         if (refset != NULL) {

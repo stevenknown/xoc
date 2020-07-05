@@ -38,18 +38,18 @@ class DexCallGraph : public CallGraph {
 protected:
     //Record very unimportant functions that do not
     //need to add an edge on call graph.
-    TTab<SYM const*> m_unimportant_symtab;
+    TTab<Sym const*> m_unimportant_symtab;
 
 public:
     DexCallGraph(UINT edge_hash, UINT vex_hash, RegionMgr * rumgr);
     virtual ~DexCallGraph() {}
 
-    bool is_unimportant(SYM const* sym) const;
+    bool is_unimportant(Sym const* sym) const;
 
     virtual bool shouldAddEdge(IR const* ir) const
     {
         ASSERT0(ir->isCallStmt());
-        SYM const* name = VAR_name(CALL_idinfo(ir));
+        Sym const* name = VAR_name(CALL_idinfo(ir));
         if (is_unimportant(name)) { return false; }
 
         CHAR const* q = "Ljava/lang/";

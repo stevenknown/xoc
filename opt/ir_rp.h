@@ -39,21 +39,22 @@ namespace xoc {
 class GVN;
 
 //
-//START MD_LT
+//START MDLT
 //
 #define MDLT_id(g) ((g)->id)
 #define MDLT_md(g) ((g)->md)
 #define MDLT_livebbs(g) ((g)->livebbs)
 
-class MD_LT {
+//This class represents life time of MD.
+class MDLT {
 public:
     UINT id;
-    MD * md;
+    MD const* md;
     xcom::BitSet * livebbs;
 };
-//END MD_LT
+//END MDLT
 
-typedef HMap<MD*, MD_LT*> MD2MDLifeTime;
+typedef HMap<MD*, MDLT*> MD2MDLifeTime;
 
 class DontPromotTab : public MDSet {
     COPY_CONSTRUCTOR(DontPromotTab);
@@ -81,7 +82,7 @@ public:
     void dump()
     {
         if (g_tfile == NULL) { return; }
-        note("\n==---- DUMP Dont Promot Tabel ----==\n");
+        note("\n==---- DUMP Dont Promot Table ----==\n");
         MDSetIter iter;
         for (INT i = get_first(&iter); i >= 0; i = get_next(i, &iter)) {
             MD const* t = m_md_sys->getMD(i);
@@ -91,6 +92,7 @@ public:
         fflush(g_tfile);
     }
 };
+
 
 #define RP_UNKNOWN 0
 #define RP_SAME_ARRAY 1
@@ -104,10 +106,6 @@ public:
 class RegPromot : public Pass {
     COPY_CONSTRUCTOR(RegPromot);
 private:
-    Vector<MDSet*> m_livein_mds_vec;
-    Vector<MDSet*> m_liveout_mds_vec;
-    Vector<MDSet*> m_def_mds_vec;
-    Vector<MDSet*> m_use_mds_vec;
     MD2MDLifeTime * m_md2lt_map;
     Region * m_rg;
     UINT m_mdlt_count;
@@ -115,35 +113,37 @@ private:
     SMemPool * m_ir_ptr_pool;
     MDSystem * m_md_sys;
     MDSetMgr * m_mds_mgr;
+    xcom::DefMiscBitSetMgr * m_misc_bs_mgr;
     IRCFG * m_cfg;
     TypeMgr * m_tm;
     DUMgr * m_du;
     GVN * m_gvn;
     PRSSAMgr * m_ssamgr;
     MDSSAMgr * m_mdssamgr;
-    xcom::DefMiscBitSetMgr * m_misc_bs_mgr;
     DontPromotTab m_dont_promot;
     xcom::BitSetMgr m_bs_mgr;
+    MDLivenessMgr * m_liveness_mgr;
     bool m_is_insert_bb; //indicate if new bb inserted and cfg changed.
+    //WORKAROUND|FIXME:For now, we do not support incremental update PRSSA.
+    //rebuild PRSSA if DU changed.
+    bool m_need_rebuild_prssa;
 
 private:
     UINT analyzeIndirectAccessStatus(IR const* ref1, IR const* ref2);
     UINT analyzeArrayStatus(IR const* ref1, IR const* ref2);
     void addExactAccess(OUT TMap<MD const*, IR*> & exact_access,
-                        OUT List<IR*> & exact_occ_list,
+                        OUT List<IR*> & exact_occs,
                         MD const* exact_md,
                         IR * ir);
     void addInexactAccess(TTab<IR*> & inexact_access, IR * ir);
 
-    void buildDepGraph(TMap<MD const*, IR*> & exact_access,
-                       TTab<IR*> & inexact_access,
-                       List<IR*> & exact_occ_list);
+    void buildPRDUChain(IR * def, IR * use);
 
-    void checkAndRemoveInvalidExactOcc(List<IR*> & exact_occ_list);
-    void clobberAccessInList(IR * ir,
-                             OUT TMap<MD const*, IR*> & exact_access,
-                             OUT List<IR*> & exact_occ_list,
-                             OUT TTab<IR*> & inexact_access);
+    void checkAndRemoveInvalidExactOcc(List<IR*> & exact_occs);
+    void clobberAccess(IR * ir,
+                       OUT TMap<MD const*, IR*> & exact_access,
+                       OUT List<IR*> & exact_occs,
+                       OUT TTab<IR*> & inexact_access);
     bool checkArrayIsLoopInvariant(IN IR * ir, LI<IRBB> const* li);
     bool checkExpressionIsLoopInvariant(IN IR * ir, LI<IRBB> const* li);
     bool checkIndirectAccessIsLoopInvariant(IN IR * ir, LI<IRBB> const* li);
@@ -158,11 +158,21 @@ private:
                             DefMiscBitSetMgr * sbs_mgr,
                             LI<IRBB> const* li);
 
+    void dump_mdlt();
+    void dumpInexact(TTab<IR*> & access);
+    void dumpExact(TMap<MD const*, IR*> & access, List<IR*> & occs);
+
+    bool EvaluableScalarReplacement(List<LI<IRBB> const*> & worklst);
+
     IRBB * findSingleExitBB(LI<IRBB> const* li);
     void freeLocalStruct(TMap<IR*, DUSet*> & delegate2use,
                          TMap<IR*, DUSet*> & delegate2def,
                          TMap<IR*, IR*> & delegate2pr,
                          DefMiscBitSetMgr * sbs_mgr);
+
+    xcom::DefMiscBitSetMgr * getSBSMgr() const { return m_misc_bs_mgr; }
+    MDLivenessMgr * getMDLivenessMgr() const { return m_liveness_mgr; }
+    MDLT * getMDLifeTime(MD * md);
 
     void handleAccessInBody(
         IR * ref,
@@ -191,15 +201,16 @@ private:
     bool handleArrayRef(IN IR * ir,
                         LI<IRBB> const* li,
                         OUT TMap<MD const*, IR*> & exact_access,
-                        OUT List<IR*> & exact_occ_list,
+                        OUT List<IR*> & exact_occs,
                         OUT TTab<IR*> & inexact_access);
     bool handleGeneralRef(IR * ir,
                           LI<IRBB> const* li,
                           OUT TMap<MD const*, IR*> & exact_access,
-                          OUT List<IR*> & exact_occ_list,
+                          OUT List<IR*> & exact_occs,
                           OUT TTab<IR*> & inexact_access);
 
     bool isMayThrow(IR * ir, IRIter & iter);
+
     bool mayBeGlobalRef(IR * ref)
     {
         MD const* md = ref->getRefMD();
@@ -221,21 +232,21 @@ private:
     bool scanOpnd(IR * ir,
                   LI<IRBB> const* li,
                   OUT TMap<MD const*, IR*> & exact_access,
-                  OUT List<IR*> & exact_occ_list,
+                  OUT List<IR*> & exact_occs,
                   OUT TTab<IR*> & inexact_access,
                   IRIter & ii);
     bool scanResult(IN IR * ir,
                     LI<IRBB> const* li,
                     OUT TMap<MD const*, IR*> & exact_access,
-                    OUT List<IR*> & exact_occ_list,
+                    OUT List<IR*> & exact_occs,
                     OUT TTab<IR*> & inexact_access);
     bool scanBB(IN IRBB * bb,
                 LI<IRBB> const* li,
                 OUT TMap<MD const*, IR*> & exact_access,
                 OUT TTab<IR*> & inexact_access,
-                OUT List<IR*> & exact_occ_list,
+                OUT List<IR*> & exact_occs,
                 IRIter & ii);
-    bool shouldBePromoted(IR const* occ, List<IR*> & exact_occ_list);
+    bool shouldBePromoted(IR const* occ, List<IR*> & exact_occs);
 
     bool promoteInexactAccess(LI<IRBB> const* li,
                               IRBB * preheader,
@@ -249,11 +260,17 @@ private:
                             IRBB * exit_bb,
                             TMap<MD const*, IR*> & cand_list,
                             List<IR*> & occ_list);
+    //Return true if there are memory locations have been promoted.
+    bool promote(LI<IRBB> const* li,
+                 IRBB * exit_bb,
+                 IRIter & ii,
+                 TabIter<IR*> & ti,
+                 TMap<MD const*, IR*> & exact_access,
+                 TTab<IR*> & inexact_access,
+                 List<IR*> & exact_occs);
 
     void removeRedundantDUChain(List<IR*> & fixup_list);
     void replaceUseForTree(IR * oldir, IR * newir);
-
-    bool EvaluableScalarReplacement(List<LI<IRBB> const*> & worklst);
 
     bool tryPromote(LI<IRBB> const* li,
                     IRBB * exit_bb,
@@ -261,7 +278,10 @@ private:
                     TabIter<IR*> & ti,
                     TMap<MD const*, IR*> & exact_access,
                     TTab<IR*> & inexact_access,
-                    List<IR*> & exact_occ_list);
+                    List<IR*> & exact_occs);
+
+    bool useMDSSADU() const;
+    bool usePRSSADU() const;
 
     void * xmalloc(UINT size)
     {
@@ -273,7 +293,7 @@ private:
     }
 
 public:
-    RegPromot(Region * rg, GVN * gvn) : m_dont_promot(rg)
+    RegPromot(Region * rg) : m_dont_promot(rg)
     {
         ASSERT0(rg != NULL);
         m_rg = rg;
@@ -283,42 +303,22 @@ public:
         m_du = rg->getDUMgr();
         m_mds_mgr = rg->getMDSetMgr();
         m_misc_bs_mgr = rg->getMiscBitSetMgr();
-        m_gvn = gvn;
-        m_is_insert_bb = false;
+        m_gvn = NULL;
         m_ssamgr = NULL;
+        m_mdssamgr = NULL;
+        m_is_insert_bb = false;
+        m_need_rebuild_prssa = false;
+        m_liveness_mgr = (MDLivenessMgr*)m_rg->getPassMgr()->registerPass(
+            PASS_MDLIVENESS_MGR);
 
         UINT c = MAX(11, m_rg->getMDSystem()->getNumOfMD());
         m_md2lt_map = new MD2MDLifeTime(c);
         m_mdlt_count = 0;
-        m_pool = smpoolCreate(2 * sizeof(MD_LT), MEM_COMM);
+        m_pool = smpoolCreate(2 * sizeof(MDLT), MEM_COMM);
         m_ir_ptr_pool = smpoolCreate(4 * sizeof(xcom::SC<IR*>), MEM_CONST_SIZE);
     }
     virtual ~RegPromot()
     {
-        for (INT i = 0; i <= m_livein_mds_vec.get_last_idx(); i++) {
-            MDSet * mds = m_livein_mds_vec.get(i);
-            if (mds == NULL) { continue; }
-            m_mds_mgr->free(mds);
-        }
-
-        for (INT i = 0; i <= m_liveout_mds_vec.get_last_idx(); i++) {
-            MDSet * mds = m_liveout_mds_vec.get(i);
-            if (mds == NULL) { continue; }
-            m_mds_mgr->free(mds);
-        }
-
-        for (INT i = 0; i <= m_def_mds_vec.get_last_idx(); i++) {
-            MDSet * mds = m_def_mds_vec.get(i);
-            if (mds == NULL) { continue; }
-            m_mds_mgr->free(mds);
-        }
-
-        for (INT i = 0; i <= m_use_mds_vec.get_last_idx(); i++) {
-            MDSet * mds = m_use_mds_vec.get(i);
-            if (mds == NULL) { continue; }
-            m_mds_mgr->free(mds);
-        }
-
         m_dont_promot.clean(*m_misc_bs_mgr);
 
         delete m_md2lt_map;
@@ -330,22 +330,11 @@ public:
     void buildLifeTime();
 
     void cleanLiveBBSet();
-    void computeLocalLiveness(IRBB * bb, DUMgr & du_mgr);
-    void computeGlobalLiveness();
-    void computeLiveness();
 
-    MDSet * getLiveInMDSet(IRBB * bb);
-    MDSet * getLiveOutMDSet(IRBB * bb);
-    MDSet * getDefMDSet(IRBB * bb);
-    MDSet * getUseMDSet(IRBB * bb);
-    MD_LT * getMDLifeTime(MD * md);
+    void dump();   
 
-    void dump();
-    void dump_mdlt();
-    void dump_occ_list(List<IR*> & occs);
-    void dump_access2(TTab<IR*> & access);
-    void dump_access(TMap<MD const*, IR*> & access);
-
+    //Prepare context before doing reg promotion.
+    void init();
     //Return true if 'ir' can be promoted.
     //Note ir must be memory reference.
     virtual bool isPromotable(IR const* ir) const

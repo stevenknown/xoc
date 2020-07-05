@@ -49,7 +49,7 @@ public:
 #define PARSECTX_returned_imm_fpval(p) ((p)->s1.u1.returned_imm_fpval)
 #define PARSECTX_returned_imm_ty(p) ((p)->s1.returned_imm_ty)
 class ParseCtx {
-    xcom::TMap<SYM const*, LabelInfo*> m_sym2label;
+    xcom::TMap<Sym const*, LabelInfo*> m_sym2label;
     xcom::TMap<IR*, LabelInfo*> m_ir2label;
 public:
     Region * current_region;
@@ -87,12 +87,12 @@ public:
 
     xcom::TMap<IR*, LabelInfo*> & getIR2Label() { return m_ir2label; }
 
-    LabelInfo * mapSym2Label(SYM const* sym) const
+    LabelInfo * mapSym2Label(Sym const* sym) const
     { return m_sym2label.get(sym); }
     LabelInfo * mapIR2Label(IR * ir) const
     { return m_ir2label.get(ir); }
 
-    void setMapSym2Label(SYM const* sym, LabelInfo * label)
+    void setMapSym2Label(Sym const* sym, LabelInfo * label)
     { m_sym2label.set(sym, label); }
     void setMapIR2Label(IR * ir, LabelInfo * label)
     { m_ir2label.set(ir, label); }
@@ -270,11 +270,11 @@ protected:
     Lexer * m_lexer;
     RegionMgr * m_rumgr;
     List<ParseErrorMsg*> m_err_list;
-    TMap<SYM const*, UINT> m_id2prno;
+    TMap<Sym const*, UINT> m_id2prno;
 protected:
     bool declareType(ParseCtx * ctx);
-    bool declareVarProperty(VAR * var, ParseCtx * ctx);
-    bool declareVar(ParseCtx * ctx, VAR ** var);
+    bool declareVarProperty(Var * var, ParseCtx * ctx);
+    bool declareVar(ParseCtx * ctx, Var ** var);
     bool declareRegion(ParseCtx * ctx);
 
     void enterRegion(ParseCtx *) {}
@@ -283,7 +283,7 @@ protected:
     void error(X_CODE xcode, CHAR const* format, ...);
     void error(CHAR const* format, ...);
 
-    VAR * findVar(ParseCtx * ctx, SYM const* name);
+    Var * findVar(ParseCtx * ctx, Sym const* name);
 
     X_CODE getCurrentPropertyCode();
     X_CODE getCurrentStmtCode();
@@ -308,9 +308,9 @@ protected:
 
     bool parseDimProperty(PropertySet & cont, ParseCtx * ctx);
     bool parseElemTypeProperty(PropertySet & cont, ParseCtx * ctx);
-    bool parseAlign(VAR * var, ParseCtx * ctx);
-    bool parseByteValue(VAR * var, ParseCtx * ctx);
-    bool parseStringValue(VAR * var, ParseCtx * ctx);
+    bool parseAlign(Var * var, ParseCtx * ctx);
+    bool parseByteValue(Var * var, ParseCtx * ctx);
+    bool parseStringValue(Var * var, ParseCtx * ctx);
     bool parseThrowTarget(PropertySet & cont, ParseCtx * ctx);
     bool parseDefProperty(PropertySet & cont, ParseCtx * ctx);
     bool parseUseProperty(PropertySet & cont, ParseCtx * ctx);

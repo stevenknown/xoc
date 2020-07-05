@@ -33,6 +33,7 @@ author: Su Zhenyu
 @*/
 //Optimizations
 #include "liveness_mgr.h"
+#include "mdliveness_mgr.h"
 #include "ir_ssa.h"
 #include "ir_mdssa.h"
 #include "cfs_mgr.h"
@@ -57,3 +58,4 @@ author: Su Zhenyu
 #include "ipa.h"
 #include "inliner.h"
 #include "refine_duchain.h"
+#include "scalar_opt.h"

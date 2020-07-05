@@ -126,8 +126,8 @@ MD const* RegionMgr::genDedicateStrMD()
 
     //Regard all string variables as same unbound MD.
     if (m_str_md == NULL) {
-        SYM * s = addToSymbolTab("DedicatedVarBeRegardedAsString");
-        VAR * sv = getVarMgr()->registerStringVar(
+        Sym * s = addToSymbolTab("DedicatedVarBeRegardedAsString");
+        Var * sv = getVarMgr()->registerStringVar(
             DEDICATED_STRING_VAR_NAME, s, MEMORY_ALIGNMENT);
         VAR_is_unallocable(sv) = true;
         VAR_is_addr_taken(sv) = true;
@@ -152,7 +152,7 @@ void RegionMgr::registerGlobalMD()
     ASSERT0(m_var_mgr);
     VarVec * varvec = m_var_mgr->get_var_vec();
     for (INT i = 0; i <= varvec->get_last_idx(); i++) {
-        VAR * v = varvec->get(i);
+        Var * v = varvec->get(i);
         if (v == NULL || VAR_is_local(v)) { continue; }
 
         //User sometime intentionally declare non-allocable
@@ -163,8 +163,8 @@ void RegionMgr::registerGlobalMD()
             continue;
         }
 
-        //We allocate MDTab for VAR which is func-decl or fake as well.
-        //Since some Passes such as AA may need fake VAR to do analysis.
+        //We allocate MDTab for Var which is func-decl or fake as well.
+        //Since some Passes such as AA may need fake Var to do analysis.
         MD md;
         MD_base(&md) = v;
         MD_ofst(&md) = 0;

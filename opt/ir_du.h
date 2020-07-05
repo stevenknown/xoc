@@ -97,9 +97,9 @@ class MD2IRSet : public TMap<UINT, DefSBitSetCore*> {
     MDSystem * m_md_sys;
     TypeMgr * m_tm;
     DUMgr * m_du;
-    DefMiscBitSetMgr * m_misc_bs_mgr;
-    TMapIter<UINT, DefSBitSetCore*> m_iter;
-    DefSBitSetCore m_global_md;
+    xcom::DefMiscBitSetMgr * m_misc_bs_mgr;
+    xcom::TMapIter<UINT, DefSBitSetCore*> m_iter;
+    xcom::DefSBitSetCore m_global_md;
 
     //Indicate if there exist stmt which only have MayDef.
     bool m_are_stmts_defed_ineffect_md;
@@ -258,7 +258,7 @@ protected:
     SMemPool * m_pool;
     MDSetMgr * m_mds_mgr;
     MDSetHash * m_mds_hash;
-    DefMiscBitSetMgr * m_misc_bs_mgr;
+    xcom::DefMiscBitSetMgr * m_misc_bs_mgr;
 
     ConstIRIter m_citer; //for tmp use.
     ConstIRIter m_citer2; //for tmp use.
@@ -707,11 +707,7 @@ public:
 
     //DU chain operation.
     DUSet * getAndAllocDUSet(IR * ir);
-
-    //Get information set to BB.
-
-    //DefMiscBitSetMgr * getMiscBitSetMgr() { return m_misc_bs_mgr; }
-
+    xcom::DefMiscBitSetMgr * getSBSMgr() const { return m_misc_bs_mgr; }
     //Return the MustDef MD.
     MD const* get_must_def(IR const* ir)
     {

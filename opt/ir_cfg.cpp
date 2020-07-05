@@ -1619,9 +1619,9 @@ void IRCFG::dump_edge(FILE * h, bool dump_eh)
     for (xcom::Vertex * v = m_vertices.get_first(c2);
          v != NULL; v = m_vertices.get_next(c2), pos++) {
         //Print in-edge list.
-        UINT pos = 0;
+        UINT pos2 = 0;
         for (xcom::EdgeC const* ec = v->getInList();
-             ec != NULL; ec = ec->get_next(), pos++) {
+             ec != NULL; ec = ec->get_next(), pos2++) {
             if (visited.find(ec->getEdge())) { continue; }
             visited.append(ec->getEdge());
             xcom::Edge const* e = ec->getEdge();
@@ -1631,7 +1631,7 @@ void IRCFG::dump_edge(FILE * h, bool dump_eh)
                 fprintf(h,
                         "\nedge: { sourcename:\"%d\" targetname:\"%d\" "
                         " thickness:4 color:darkred label:\"p%d\" }",
-                        e->from()->id(), e->to()->id(), pos);
+                        e->from()->id(), e->to()->id(), pos2);
                 continue;
             }
             

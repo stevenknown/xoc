@@ -113,7 +113,7 @@ void RefineDUChain::processExpressionViaMDSSA(IR const* exp)
         }
         IR const* defstmt = t->getDef()->getOcc();
         ASSERT0(defstmt);
-        if (exp->isNotOverLap(defstmt, m_rg)) {
+        if (exp->isNotOverlap(defstmt, m_rg)) {
             //Remove DU chain if we can guarantee ILD and its DEF stmt
             //are independent.
             //mdssainfo->getVOpndSet()->remove(t, *m_sbs_mgr);

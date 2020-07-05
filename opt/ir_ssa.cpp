@@ -562,6 +562,7 @@ void PRSSAMgr::dump()
     BBList * bbl = m_rg->getBBList();
     List<IR const*> lst;
     List<IR const*> opnd_lst;
+    INT orgindent = g_indent;
     for (IRBB * bb = bbl->get_head();
          bb != NULL; bb = bbl->get_next()) {
         note("\n--- BB%d ---", BB_id(bb));
@@ -605,6 +606,7 @@ void PRSSAMgr::dump()
             }
         }
     }
+    g_indent = orgindent;
     fflush(g_tfile);
 }
 

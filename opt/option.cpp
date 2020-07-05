@@ -194,7 +194,7 @@ bool g_do_gvn = true;
 //Perform partial redundant elimination.
 bool g_do_pre = false;
 
-//Perform redundant code elimination.
+//Perform light weith redundant code elimination.
 bool g_do_rce = false;
 
 //Perform register promotion.
@@ -230,6 +230,9 @@ bool g_do_poly_tran = false;
 
 //Refine DefUse Chain.
 bool g_do_refine_duchain = true;
+
+//Perform versatile scalar optimizations.
+bool g_do_scalar_opt = true;
 
 //Set to true to retain the PassMgr even if Region processing finished.
 bool g_retain_pass_mgr_for_region = false;

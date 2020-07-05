@@ -46,9 +46,9 @@ VarMgr::VarMgr(RegionMgr * rm)
 
 
 //
-//START VAR
+//START Var
 //
-VAR::VAR()
+Var::Var()
 {
     VAR_id(this) = 0; //unique id;
     VAR_type(this) = UNDEF_TYID;
@@ -59,7 +59,7 @@ VAR::VAR()
 }
 
 
-void VAR::dump(FILE * h, TypeMgr const* dm) const
+void Var::dump(FILE * h, TypeMgr const* dm) const
 {
     if (h == NULL) { h = g_tfile; }
     if (h == NULL) { return; }
@@ -72,7 +72,7 @@ void VAR::dump(FILE * h, TypeMgr const* dm) const
 }
 
 
-void VAR::dumpProp(xcom::StrBuf & buf, bool grmode) const
+void Var::dumpProp(xcom::StrBuf & buf, bool grmode) const
 {
     bool first = true;
     if (!grmode) {
@@ -245,7 +245,7 @@ void VAR::dumpProp(xcom::StrBuf & buf, bool grmode) const
 }
 
 
-CHAR const* VAR::dumpGR(StrBuf & buf, TypeMgr * dm) const
+CHAR const* Var::dumpGR(StrBuf & buf, TypeMgr * dm) const
 {
     xcom::StrBuf buf2(32);
     xcom::StrBuf buf3(32);
@@ -260,8 +260,8 @@ CHAR const* VAR::dumpGR(StrBuf & buf, TypeMgr * dm) const
 }
 
 
-//You must make sure this function will not change any field of VAR.
-CHAR const* VAR::dump(StrBuf & buf, TypeMgr const* dm) const
+//You must make sure this function will not change any field of Var.
+CHAR const* Var::dump(StrBuf & buf, TypeMgr const* dm) const
 {
     CHAR * lname = SYM_name(VAR_name(this));
     CHAR tt[43];
@@ -273,7 +273,7 @@ CHAR const* VAR::dump(StrBuf & buf, TypeMgr const* dm) const
         tt[42] = 0;
         lname = tt;
     }
-    buf.strcat("VAR%d(%s):", VAR_id(this), lname);
+    buf.strcat("Var%d(%s):", VAR_id(this), lname);
     dumpProp(buf, false);
 
     Type const* ltype = VAR_type(this);
@@ -316,14 +316,14 @@ CHAR const* VAR::dump(StrBuf & buf, TypeMgr const* dm) const
     #endif
     return buf.buf;
 }
-//END VAR
+//END Var
 
 
 //
 //START VarMgr
 //
-//Free VAR memory.
-void VarMgr::destroyVar(VAR * v)
+//Free Var memory.
+void VarMgr::destroyVar(Var * v)
 {
     ASSERT0(VAR_id(v) != 0);
     m_freelist_of_varid.bunion(VAR_id(v), *m_ru_mgr->get_sbs_mgr());
@@ -335,7 +335,7 @@ void VarMgr::destroyVar(VAR * v)
 void VarMgr::destroy()
 {
     for (INT i = 0; i <= m_var_vec.get_last_idx(); i++) {
-        VAR * v = m_var_vec.get((UINT)i);
+        Var * v = m_var_vec.get((UINT)i);
         if (v == NULL) { continue; }
         delete v;
     }
@@ -350,7 +350,7 @@ bool VarMgr::isDedicatedStringVar(CHAR const* name) const
 }
 
 
-void VarMgr::assignVarId(VAR * v)
+void VarMgr::assignVarId(Var * v)
 {
     DefSBitSetIter iter = NULL;
     INT id = m_freelist_of_varid.get_first(&iter);
@@ -367,10 +367,10 @@ void VarMgr::assignVarId(VAR * v)
 }
 
 
-VAR * VarMgr::findVarByName(SYM const* name)
+Var * VarMgr::findVarByName(Sym const* name)
 {
     for (INT i = 0; i <= m_var_vec.get_last_idx(); i++) {
-        VAR * v = m_var_vec.get(i);
+        Var * v = m_var_vec.get(i);
         if (v == NULL) { continue; }
         if (v->get_name() == name) {
             return v;
@@ -380,28 +380,28 @@ VAR * VarMgr::findVarByName(SYM const* name)
 }
 
 
-//Add VAR into VarTab.
+//Add Var into VarTab.
 //Note you should call this function cafefully, and make sure
-//the VAR is unique. This function does not keep the uniqueness
+//the Var is unique. This function does not keep the uniqueness
 //related to properties.
 //'var_name': name of the variable, it is optional.
-VAR * VarMgr::registerVar(CHAR const* varname,
+Var * VarMgr::registerVar(CHAR const* varname,
                           Type const* type,
                           UINT align,
                           UINT flag)
 {
     ASSERT0(varname);
-    SYM * sym = m_ru_mgr->addToSymbolTab(varname);
+    Sym * sym = m_ru_mgr->addToSymbolTab(varname);
     return registerVar(sym, type, align, flag);
 }
 
 
-//Add VAR into VarTab.
+//Add Var into VarTab.
 //Note you should call this function cafefully, and make sure
-//the VAR is unique. This function does not keep the uniqueness
+//the Var is unique. This function does not keep the uniqueness
 //related to properties.
 //'var_name': name of the variable, it is optional.
-VAR * VarMgr::registerVar(SYM const* var_name,
+Var * VarMgr::registerVar(Sym const* var_name,
                           Type const* type,
                           UINT align,
                           UINT flag)
@@ -409,10 +409,10 @@ VAR * VarMgr::registerVar(SYM const* var_name,
     ASSERT0(type);
     ASSERTN(var_name, ("variable need a name"));
 
-    //VAR is string type, but not const string.
+    //Var is string type, but not const string.
     //ASSERTN(!type->is_string(), ("use registerStringVar instead of"));
 
-    VAR * v = allocVAR();
+    Var * v = allocVAR();
     VAR_type(v) = type;
     VAR_name(v) = var_name;
     VAR_align(v) = align;
@@ -422,15 +422,15 @@ VAR * VarMgr::registerVar(SYM const* var_name,
 }
 
 
-//Register VAR for const string.
-//Return VAR if there is already related to 's',
-//otherwise create a new VAR.
+//Register Var for const string.
+//Return Var if there is already related to 's',
+//otherwise create a new Var.
 //'var_name': name of the variable, it is optional.
 //'s': string's content.
-VAR * VarMgr::registerStringVar(CHAR const* var_name, SYM const* s, UINT align)
+Var * VarMgr::registerStringVar(CHAR const* var_name, Sym const* s, UINT align)
 {
     ASSERT0(s);
-    VAR * v;
+    Var * v;
     if ((v = m_str_tab.get(s)) != NULL) {
         return v;
     }
@@ -466,7 +466,7 @@ void VarMgr::dump(CHAR * name)
 
     StrBuf buf(64);
     for (INT i = 0; i <= m_var_vec.get_last_idx(); i++) {
-        VAR * v = m_var_vec.get(i);
+        Var * v = m_var_vec.get(i);
         if (v == NULL) { continue; }
 
         buf.clean();

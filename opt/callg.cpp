@@ -133,7 +133,7 @@ void CallGraph::dumpVCG(CHAR const* name, INT flag)
     old = g_tfile;
     g_tfile = h;
     INT c;
-    List<VAR const*> formalparamlst;
+    List<Var const*> formalparamlst;
     for (xcom::Vertex * v = m_vertices.get_first(c);
          v != NULL; v = m_vertices.get_next(c)) {
         INT id = v->id();
@@ -156,7 +156,7 @@ void CallGraph::dumpVCG(CHAR const* name, INT flag)
             //Dump formal paramters.
             formalparamlst.clean();
             cn->region()->findFormalParam(formalparamlst, true);
-            for (VAR const* param = formalparamlst.get_head(); param != NULL;
+            for (Var const* param = formalparamlst.get_head(); param != NULL;
                  param = formalparamlst.get_next()) {
                 param->dump(g_tfile, m_tm);
             }
@@ -201,7 +201,7 @@ CallNode * CallGraph::newCallNode(IR const* ir, Region * rg)
 {
     ASSERT0(ir->isCallStmt() && rg);
     if (ir->is_call()) {
-        SYM const* name = CALL_idinfo(ir)->get_name();
+        Sym const* name = CALL_idinfo(ir)->get_name();
         CallNode * cn  = mapSym2CallNode(name, rg);
         if (cn != NULL) { return cn; }
 
@@ -225,7 +225,7 @@ CallNode * CallGraph::newCallNode(Region * rg)
 {
     ASSERT0(rg);
     ASSERT0(rg->getRegionVar() && rg->getRegionVar()->get_name());
-    SYM const* name = rg->getRegionVar()->get_name();
+    Sym const* name = rg->getRegionVar()->get_name();
     if (rg->is_program()) {
         CallNode * cn = mapRegion2CallNode(rg);
         if (cn != NULL) {
@@ -266,7 +266,7 @@ bool CallGraph::build(RegionMgr * rumgr)
             SYM2CN * sym2cn = genSYM2CN(rg->getParent());
             ASSERT0(sym2cn);
 
-            SYM const* name = rg->getRegionVar()->get_name();
+            Sym const* name = rg->getRegionVar()->get_name();
             ASSERT0(name);
 
             CallNode * cn = sym2cn->get(name);

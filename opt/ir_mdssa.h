@@ -286,6 +286,11 @@ public:
     //Return true if ir might have MDSSAInfo.
     bool hasMDSSAInfo(IR const* ir) const
     { return ir->isMemoryRefNotOperatePR() || ir->isCallStmt(); }
+    //Return true if exist USE to 'ir'.
+    //This is a helper function to provid simple query, an example to
+    //show how to retrieval VOpnd and USE occurences as well.
+    //ir: stmt
+    bool hasUse(IR const* ir) const;
 
     //Return true if MDSSA is constructed.
     //This flag will direct the behavior of optimizations.

@@ -115,12 +115,12 @@ UINT extractSeparateParamterType(
 //Note this function check the length of buffer needed.
 UINT printType2Buffer(CHAR const* type_string, OUT CHAR * buf);
 
-//Return the VAR related to given builtin.
-inline VAR * getBuiltinVar(BLTIN_TYPE blt, DexRegionMgr const* rumgr)
+//Return the Var related to given builtin.
+inline Var * getBuiltinVar(BLTIN_TYPE blt, DexRegionMgr const* rumgr)
 {
     ASSERT0(rumgr);
     bool find = false;
-    VAR * v = rumgr->getBuiltin2VarC().get((UINT)blt, &find);
+    Var * v = rumgr->getBuiltin2VarC().get((UINT)blt, &find);
     ASSERT0(find);
     return v;
 }

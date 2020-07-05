@@ -153,7 +153,7 @@ UINT ExprTab::compute_hash_key(IR const* ir)
         hval += ir->getPrno();
     }
     if (ir->is_id()) {
-        VAR * var = ID_info(ir);
+        Var * var = ID_info(ir);
         hval += 5 * (UINT)(size_t)var;
     }
     return hval;

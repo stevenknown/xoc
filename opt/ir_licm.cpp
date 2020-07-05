@@ -602,7 +602,7 @@ bool LICM::hoistCand(TTab<IR*> & invariant_exp,
     bool du_set_info_changed = false;
     Vector<IR*> removed;
     TabIter<IR*> ti;
-    IRBB * backedge_bb = ::findSingleBackedgeStartBB(li, m_cfg);
+    IRBB * backedge_bb = findSingleBackedgeStartBB(li, m_cfg);
 
     while (invariant_exp.get_elem_count() > 0) {
         UINT removednum = 0;
@@ -759,7 +759,7 @@ bool LICM::doLoopTree(LI<IRBB> * li,
 
         doit = true;
         bool flag;
-        IRBB * prehead = ::findAndInsertPreheader(tli, m_rg, flag, true);
+        IRBB * prehead = findAndInsertPreheader(tli, m_rg, flag, true);
         ASSERT0(prehead);
         insert_bb |= flag;
         if (flag && LI_outer(tli) != NULL) {
@@ -767,8 +767,8 @@ bool LICM::doLoopTree(LI<IRBB> * li,
             LI_bb_set(LI_outer(tli))->bunion(BB_id(prehead));
         }
 
-        du_set_info_changed |=
-            hoistCand(invariant_exp, invariant_stmt, prehead, li);
+        du_set_info_changed |= hoistCand(invariant_exp,
+            invariant_stmt, prehead, li);
     }
     return doit;
 }

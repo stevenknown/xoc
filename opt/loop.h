@@ -62,18 +62,19 @@ namespace xoc {
 //   |-Loop5
 
 //CFG Loop Info.
-#define LI_id(li)                   ((li)->id)
-#define LI_next(li)                 ((li)->next)
-#define LI_prev(li)                 ((li)->prev)
-#define LI_has_early_exit(li)       ((li)->has_early_exit)
-#define LI_has_call(li)             ((li)->has_call)
-#define LI_inner_list(li)           ((li)->inner_list)
-#define LI_outer(li)                ((li)->outer)
-#define LI_bb_set(li)               ((li)->bb_set)
-#define LI_loop_head(li)            ((li)->loop_head)
+#define LI_id(li) ((li)->_id)
+#define LI_next(li) ((li)->next)
+#define LI_prev(li) ((li)->prev)
+#define LI_has_early_exit(li) ((li)->has_early_exit)
+#define LI_has_call(li) ((li)->has_call)
+#define LI_inner_list(li) ((li)->inner_list)
+#define LI_outer(li) ((li)->outer)
+#define LI_bb_set(li) ((li)->bb_set)
+#define LI_loop_head(li) ((li)->loop_head)
 template <class BB> class LI {
+    COPY_CONSTRUCTOR(LI);
 public:
-    UINT id;
+    UINT _id;
     LI * next;
     LI * prev;
     LI * inner_list; //inner loop list
@@ -86,8 +87,17 @@ public:
 
 public:
     LI() {}
-    COPY_CONSTRUCTOR(LI);
+    LI<BB> * getOuter() const { return outer; }
+    LI<BB> * getInnerList() const { return inner_list; }
+    BB * getLoopHead() const { return loop_head; }
+    BitSet * getBodyBBSet() const { return bb_set; }
+    LI<BB> * get_next() const { return next; }
+    LI<BB> * get_prev() const { return prev; }
 
+    bool hasEarlyExit() const { return has_early_exit; }
+    bool hasCall() const { return has_call; }
+
+    UINT id() const { return _id; }
     bool isLoopReduction() { return !has_early_exit; }
 
     //Return true if bb is belong to current loop.
@@ -105,13 +115,14 @@ class IRBB;
 class Region;
 class IRCFG;
 
-IRBB * findAndInsertPreheader(
-            LI<IRBB> const* li, Region * rg,
-            OUT bool & insert_bb, bool force);
+IRBB * findAndInsertPreheader(LI<IRBB> const* li,
+                              Region * rg,
+                              OUT bool & insert_bb,
+                              bool force);
 IRBB * findSingleBackedgeStartBB(LI<IRBB> const* li, IRCFG * cfg);
-bool findTwoSuccessorBBOfLoopHeader(
-            LI<IRBB> const* li, IRCFG * cfg,
-            UINT * succ1, UINT * succ2);
-
+bool findTwoSuccessorBBOfLoopHeader(LI<IRBB> const* li,
+                                    IRCFG * cfg,
+                                    UINT * succ1,
+                                    UINT * succ2);
 } //namespace xoc
 #endif

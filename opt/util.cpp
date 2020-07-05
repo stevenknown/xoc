@@ -188,15 +188,16 @@ void note(CHAR const* format, ...)
         i++;
     }
 
+    //Append indent chars ahead of string.
+    ASSERT0(g_indent >= 0);
+    dumpIndent(g_tfile, g_indent);
+
     if (i == buf.strlen()) {
         fflush(g_tfile);
         va_end(arg);
         return;
-    }
+    }    
 
-    //Append indent chars ahead of string.
-    ASSERT0(g_indent >= 0);
-    dumpIndent(g_tfile, g_indent);
     fprintf(g_tfile, "%s", buf.buf + i);
     fflush(g_tfile);
     va_end(arg);
@@ -230,15 +231,16 @@ void note(FILE * h, CHAR const* format, ...)
         break;        
     }
 
+    //Append indent chars ahead of string.
+    ASSERT0(g_indent >= 0);
+    dumpIndent(h, g_indent);
+
     if (i == buf.strlen()) {
         fflush(h);
         va_end(arg);
         return;
     }
 
-    //Append indent chars ahead of string.
-    ASSERT0(g_indent >= 0);
-    dumpIndent(h, g_indent);
     fprintf(h, "%s", buf.buf + i);
     fflush(h);
     va_end(arg);

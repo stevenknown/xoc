@@ -87,31 +87,31 @@ extern UINT g_builtin_num;
 extern BuiltInInfo g_builtin_info[];
 
 
-class Var2UINT : public TMap<VAR const*, UINT> {
+class Var2UINT : public TMap<Var const*, UINT> {
 public:
     Var2UINT() {}
     virtual ~Var2UINT() {}
 
-    UINT get_mapped(VAR const* v) const
+    UINT get_mapped(Var const* v) const
     {
         bool find;
-        UINT i = TMap<VAR const*, UINT>::get(v, &find);
+        UINT i = TMap<Var const*, UINT>::get(v, &find);
         ASSERT0(find);
         return i;
     }
 };
 
 
-class UINT2Var : public TMap<UINT, VAR*> {
+class UINT2Var : public TMap<UINT, Var*> {
 public:
     UINT2Var() {}
     virtual ~UINT2Var() {}
 
-    VAR * get_mapped(UINT u)
+    Var * get_mapped(UINT u)
     {
         ASSERT0(u != 0);
         bool find;
-        VAR * v = TMap<UINT, VAR*>::get(u, &find);
+        Var * v = TMap<UINT, Var*>::get(u, &find);
         ASSERT0(find);
         return v;
     }

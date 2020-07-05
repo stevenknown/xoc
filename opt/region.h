@@ -62,7 +62,7 @@ public:
     List<IR const*> * m_return_list; //record RETURN in region.
     PassMgr * m_pass_mgr; //PASS manager.
     IR * m_free_tab[MAX_OFFSET_AT_FREE_TABLE + 1];
-    Vector<VAR*> m_prno2var; //map prno to related VAR.
+    Vector<Var*> m_prno2var; //map prno to related Var.
     Vector<IR*> m_ir_vector; //record IR which have allocated.
     xcom::BitSetMgr m_bs_mgr;
     xcom::DefMiscBitSetMgr m_sbs_mgr;
@@ -124,14 +124,14 @@ public:
 #define REGION_is_ref_valid(r) ((r)->m_u2.s1.is_ref_valid)
 
 //True if region does not modify any memory and live-in variables which
-//include VAR and PR.
+//include Var and PR.
 //This property is very useful if region is a blackbox.
 //And readonly region will alleviate the burden of optimizor.
 #define REGION_is_readonly(r) ((r)->m_u2.s1.is_readonly)
 
 //This class is base class to describe Region.
 //A program organized in a set of region, each region has it own IR stmt
-//list, local VAR table, and many kinds of analysis and transformation
+//list, local Var table, and many kinds of analysis and transformation
 //modules.
 //
 //The kind of region can be blackbox, subregion, exception handling,
@@ -220,7 +220,7 @@ public:
     RefInfo * m_ref_info; //record use/def info if Region has.
     REGION_TYPE m_ru_type; //region type.
     UINT m_id; //region unique id.
-    VAR * m_var; //record VAR if RU has.
+    Var * m_var; //record Var if RU has.
     Region * m_parent; //record parent region.
     RegionMgr * m_region_mgr; //Region manager.
     union {
@@ -229,7 +229,7 @@ public:
             BYTE is_ref_valid:1;  //see above macro declaration.
 
             //True if region does not modify any live-in variables
-            //which include VAR and PR. We say the region is readonly.
+            //which include Var and PR. We say the region is readonly.
             BYTE is_readonly:1;
 
             //True if region can be inlined. Default is false for
@@ -254,7 +254,7 @@ public:
 
     //Add var which used inside current or inner Region.
     //Once the region destructing, all local vars are deleted.
-    void addToVarTab(VAR * v) { m_ru_var_tab.append(v); }
+    void addToVarTab(Var * v) { m_ru_var_tab.append(v); }
 
     //Add irs into IR list of current region.
     void addToIRList(IR * irs)
@@ -327,7 +327,7 @@ public:
     MD const* allocStoreMD(IR * ir);
     MD const* allocIdMD(IR * ir);
     MD const* allocLoadMD(IR * ir);
-    MD const* allocStringMD(SYM const* string);
+    MD const* allocStringMD(Sym const* string);
     MD const* allocPRMD(IR * ir);
     MD const* allocPhiMD(IR * phi);
     MD const* allocStorePRMD(IR * ir);
@@ -457,7 +457,7 @@ public:
     IR * buildBranch(bool is_true_br, IR * det, LabelInfo const* lab);
 
     //Build Identifier.
-    IR * buildId(VAR * var_info);
+    IR * buildId(Var * var_info);
 
     //Build internal label operation.
     IR * buildIlabel();
@@ -547,21 +547,21 @@ public:
 
     //Build IR_LDA operation.
     //var: variable that will be taken address.
-    IR * buildLda(VAR * var);
-    IR * buildLdaString(CHAR const* varname, SYM * string);
+    IR * buildLda(Var * var);
+    IR * buildLdaString(CHAR const* varname, Sym * string);
     IR * buildLdaString(CHAR const* varname, CHAR const * string);
 
     //Build IR_LD operation.
     //Load value from variable with type 'type'.
     //'var': indicates the variable which value will be loaded.
     //'type': result type of value.
-    IR * buildLoad(VAR * var, Type const* type);
+    IR * buildLoad(Var * var, Type const* type);
 
     //Build IR_LD operation.
     //Load value from variable with type 'type'.
     //'var': indicates the variable which value will be loaded.
     //Result type of value is the type of variable carried.
-    IR * buildLoad(VAR * var);
+    IR * buildLoad(Var * var);
 
     //Build IR_ILD operation.
     //Result is either register or memory chunk, and the size of ILD
@@ -577,20 +577,20 @@ public:
     //Build IR_ST operation.
     //'lhs': memory variable, described target memory location.
     //'rhs: value expected to store.
-    IR * buildStore(VAR * lhs, IR * rhs);
+    IR * buildStore(Var * lhs, IR * rhs);
 
     //Build IR_ST operation.
     //'lhs': target memory location.
     //'type: result data type.
     //'rhs: value expected to store.
-    IR * buildStore(VAR * lhs, Type const* type, IR * rhs);
+    IR * buildStore(Var * lhs, Type const* type, IR * rhs);
 
     //Build IR_ST operation.
     //'lhs': target memory location.
     //'type: result data type.
     //'ofst': memory byte offset relative to lhs.
     //'rhs: value expected to store.
-    IR * buildStore(VAR * lhs, Type const* type, UINT ofst, IR * rhs);
+    IR * buildStore(Var * lhs, Type const* type, UINT ofst, IR * rhs);
 
     //Build store operation to store 'rhs' to new pr with type and prno.
     //'prno': target prno.
@@ -627,7 +627,7 @@ public:
 
     //Build IR_CONST operation.
     //The result IR indicates a string.
-    IR * buildString(SYM const* strtab);
+    IR * buildString(Sym const* strtab);
     IR * buildStoreArray(IR * base,
                          IR * sublist,
                          Type const* type,
@@ -715,11 +715,11 @@ public:
     //'result_prno': indicate the result PR which hold the return value.
     //    0 means the call does not have a return value.
     //'type': result PR data type.
-    IR * buildCall(VAR * callee,
+    IR * buildCall(Var * callee,
                    IR * param_list,
                    UINT result_prno,
                    Type const* type);
-    IR * buildCall(VAR * callee,  IR * param_list)
+    IR * buildCall(Var * callee,  IR * param_list)
     { return buildCall(callee, param_list, 0, getTypeMgr()->getAny()); }
 
     IR * constructIRlist(bool clean_ir_list);
@@ -740,7 +740,7 @@ public:
     void dumpBBList(bool dump_inner_region = true);
     void dumpAllocatedIR();
     void dumpVARInRegion();
-    void dumpVarMD(VAR * v, UINT indent);
+    void dumpVarMD(Var * v, UINT indent);
     void dumpFreeTab();
     void dumpMemUsage();
     void dump(bool dump_inner_region);
@@ -757,9 +757,9 @@ public:
     void freeIRTreeList(IR * ir);
     void freeIRTreeList(IRList & irs);
     void freeIRBBList(BBList & bbl);
-    void findFormalParam(OUT List<VAR const*> & varlst, bool in_decl_order);
-    VAR const* findFormalParam(UINT position);
-    VAR * findVarViaSymbol(SYM const* sym);
+    void findFormalParam(OUT List<Var const*> & varlst, bool in_decl_order);
+    Var const* findFormalParam(UINT position);
+    Var * findVarViaSymbol(Sym const* sym);
     IR * foldConst(IR * ir, bool & change);
 
     REGION_TYPE getRegionType() const { return REGION_type(this); }
@@ -774,7 +774,7 @@ public:
     { return getAnalysisInstrument()->m_sc_labelinfo_pool; }
     UINT getPRCount() const
     { return getAnalysisInstrument()->m_pr_count; }
-    VAR * getRegionVar() const { return m_var; }
+    Var * getRegionVar() const { return m_var; }
     RegionMgr * getRegionMgr() const { return REGION_region_mgr(this); }
     IR * getIRList() const
     { return getAnalysisInstrument()->m_ir_list; }
@@ -901,7 +901,7 @@ public:
 
     LabelInfo * genPragmaLabel(CHAR const* lab)
     { return genPragmaLabel(getRegionMgr()->addToSymbolTab(lab));}
-    LabelInfo * genPragmaLabel(SYM const* labsym)
+    LabelInfo * genPragmaLabel(Sym const* labsym)
     {
         ASSERT0(labsym);
         return allocCustomerLabel(labsym, get_pool());
@@ -909,14 +909,14 @@ public:
 
     LabelInfo * genCustomLabel(CHAR const* lab)
     { return genCustomLabel(getRegionMgr()->addToSymbolTab(lab));}
-    LabelInfo * genCustomLabel(SYM const* labsym)
+    LabelInfo * genCustomLabel(Sym const* labsym)
     {
         ASSERT0(labsym);
         return allocCustomerLabel(labsym, get_pool());
     }
 
-    //Allocate VAR for PR.
-    VAR * genVARforPR(UINT prno, Type const* type);
+    //Allocate Var for PR.
+    Var * genVARforPR(UINT prno, Type const* type);
 
     //Allocate MD for PR.
     MD const* genMDforPR(UINT prno, Type const* type);
@@ -928,13 +928,13 @@ public:
         return genMDforPR(ir->getPrno(), ir->getType());
     }
 
-    //Generate MD for VAR.
-    MD const* genMDforVAR(VAR * var)
+    //Generate MD for Var.
+    MD const* genMDforVAR(Var * var)
     { return genMDforVAR(var, var->getType()); }
 
 
-    //Generate MD for VAR.
-    MD const* genMDforVAR(VAR * var, Type const* type)
+    //Generate MD for Var.
+    MD const* genMDforVAR(Var * var, Type const* type)
     {
         ASSERT0(var && type);
         MD md;
@@ -1014,8 +1014,8 @@ public:
     //Return true if ir belongs to current region.
     bool isRegionIR(IR const* ir);
 
-    //Return true if VAR belongs to current region.
-    bool isRegionVAR(VAR const* var);
+    //Return true if Var belongs to current region.
+    bool isRegionVAR(Var const* var);
 
     //Check and insert data type CVT if it is necessary.
     IR * insertCvt(IR * parent, IR * kid, bool & change);
@@ -1069,8 +1069,8 @@ public:
     //accroding to control flow info and data flow info.
     virtual bool MiddleProcess(OptCtx & oc);
 
-    //Map from prno to related VAR.
-    VAR * mapPR2Var(UINT prno)
+    //Map from prno to related Var.
+    Var * mapPR2Var(UINT prno)
     { return getAnalysisInstrument()->m_prno2var.get(prno); }
 
     //Return the Call list of current region.
@@ -1178,7 +1178,7 @@ public:
     IR * simplifyLogicalDet(IR * ir, SimpCtx * cont);
 
     //Assign variable to given PR.
-    void setMapPR2Var(UINT prno, VAR * pr_var)
+    void setMapPR2Var(UINT prno, Var * pr_var)
     { getAnalysisInstrument()->m_prno2var.set(prno, pr_var); }
 
     //Set the counter of PR.
@@ -1196,7 +1196,7 @@ public:
         ASSERT0(ir && mds && !mds->is_empty());
         ir->setRefMDSet(mds, this);
     }
-    void setRegionVar(VAR * v) { m_var = v; }
+    void setRegionVar(Var * v) { m_var = v; }
     void setIRList(IR * irs) { getAnalysisInstrument()->m_ir_list = irs; }
     void setBlackBoxData(void * d) { REGION_blackbox_data(this) = d; }
     IR * StrengthReduce(IN OUT IR * ir, IN OUT bool & change);

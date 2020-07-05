@@ -842,10 +842,12 @@ void DUMgr::computeArrayRef(IR * ir,
 }
 
 
-//Walk through IR tree to collect referrenced MD.
+//Walk through IR tree to compute or collect referrenced MD.
 //'ret_mds': In COMP_EXP_RECOMPUTE mode, it is used as tmp;
 //  and in COMP_EXP_COLLECT_MUST_USE mode, it is
 //  used to collect MUST-USE MD.
+//Note this function will update ir's RefMD and RefMDSet if duflag contain
+//COMP_EXP_RECOMPUTE
 void DUMgr::computeExpression(IR * ir,
                               OUT MDSet * ret_mds,
                               UINT compflag,
@@ -857,26 +859,25 @@ void DUMgr::computeExpression(IR * ir,
     case IR_CONST: break;
     case IR_ID:
         if (HAVE_FLAG(compflag, COMP_EXP_COLLECT_MUST_USE)) {
-            UNREACHABLE();
+            ; //It does not use MD.
         }
         break;
     case IR_LD:
         if (HAVE_FLAG(compflag, COMP_EXP_RECOMPUTE)) {
-            //if (HAVE_FLAG(duflag, DUOPT_COMPUTE_NONPR_DU)) {
-                //The result of ref info should be avaiable.
-                ASSERT0(ir->getRefMD());
+            //The reference MD should be assigned first.
+            ASSERT0(ir->getRefMD());
 
-                //e.g: struct {int a;} s;
-                //s = ...
-                //s.a = ...
-                //Where s and s.a is overlapped.
+            //e.g: struct {int a;} s;
+            //s = ...
+            //s.a = ...
+            //Where s and s.a is overlapped.
 
-                //Always compute overlapping MDSet for both PR and NON-PR MD
-                //because DURef also have to compute NON-PR MD even if
-                //only ReachDef of PR is required by user.
-                computeOverlapUseMDSet(ir, false);
-            //}
+            //Always compute overlapping MDSet for both PR and NON-PR MD
+            //because DURef also have to compute NON-PR MD even if
+            //only ReachDef of PR is required by user.
+            computeOverlapUseMDSet(ir, false);
         } else if (HAVE_FLAG(compflag, COMP_EXP_COLLECT_MUST_USE)) {
+            //Collect the exact MD that current ir 'must' reference.
             MD const* t = ir->getRefMD();
             ASSERT0(t);
             if (t->is_exact()) {
@@ -898,12 +899,19 @@ void DUMgr::computeExpression(IR * ir,
             //because DURef also have to compute NON-PR MD even if
             //only ReachDef of PR is required by user.
             computeOverlapUseMDSet(ir, false);
-
         } else if (HAVE_FLAG(compflag, COMP_EXP_COLLECT_MUST_USE)) {
+            //Collect the exact MD that current ir 'must' reference.
+            MD const* t = ir->getRefMD();
+            if (t != NULL && t->is_exact()) {
+                ret_mds->bunion_pure(MD_id(t), *m_misc_bs_mgr);
+            }
+
             MD * use;
             MDSet const* use_mds = ir->getRefMDSet();
             if (use_mds != NULL &&
                 (use = use_mds->get_exact_md(m_md_sys)) != NULL) {
+                //If may-use MDSet only contain one element, there is a
+                //'must' reference actually.
                 ret_mds->bunion(use, *m_misc_bs_mgr);
             }
             computeExpression(ILD_base(ir), ret_mds, compflag, duflag);
@@ -922,7 +930,7 @@ void DUMgr::computeExpression(IR * ir,
             ASSERT0(ir->getRefMD() == NULL);
             ASSERT0(ir->getRefMDSet() == NULL);
         } else if (HAVE_FLAG(compflag, COMP_EXP_COLLECT_MUST_USE)) {
-            UNREACHABLE();
+            ; //LDA does not use MD.
         }
         break;
     SWITCH_CASE_BIN:
@@ -2345,64 +2353,15 @@ void DUMgr::coalesceDUChain(IR * from, IR * to)
 //    assume p->w,u, the MustUse is {a,b,p}, not include w,u.
 void DUMgr::collectMustUsedMDs(IR const* ir, OUT MDSet & mustuse)
 {
-    switch (ir->getCode()) {
-    case IR_ST:
-        computeExpression(ST_rhs(ir), &mustuse,
-            COMP_EXP_COLLECT_MUST_USE, DUOPT_COMPUTE_PR_DU|DUOPT_COMPUTE_NONPR_DU);
-        return;
-    case IR_STPR:
-        computeExpression(STPR_rhs(ir), &mustuse,
-            COMP_EXP_COLLECT_MUST_USE, DUOPT_COMPUTE_PR_DU | DUOPT_COMPUTE_NONPR_DU);
-        return;
-    case IR_IST:
-        computeExpression(IST_rhs(ir), &mustuse,
-            COMP_EXP_COLLECT_MUST_USE, DUOPT_COMPUTE_PR_DU | DUOPT_COMPUTE_NONPR_DU);
-        computeExpression(IST_base(ir), &mustuse,
-            COMP_EXP_COLLECT_MUST_USE, DUOPT_COMPUTE_PR_DU | DUOPT_COMPUTE_NONPR_DU);
-        return;
-    case IR_ICALL:
-        computeExpression(ICALL_callee(ir), &mustuse,
-            COMP_EXP_COLLECT_MUST_USE, DUOPT_COMPUTE_PR_DU | DUOPT_COMPUTE_NONPR_DU);
-    case IR_CALL:
-        for (IR * p = CALL_param_list(ir); p != NULL; p = p->get_next()) {
-            computeExpression(p, &mustuse,
-                COMP_EXP_COLLECT_MUST_USE, DUOPT_COMPUTE_PR_DU | DUOPT_COMPUTE_NONPR_DU);
-        }
-        for (IR * p = CALL_dummyuse(ir); p != NULL; p = p->get_next()) {
-            computeExpression(p, &mustuse,
-                COMP_EXP_COLLECT_MUST_USE, DUOPT_COMPUTE_PR_DU | DUOPT_COMPUTE_NONPR_DU);
-        }
-        return;
-    case IR_GOTO:
-    case IR_REGION:
-        break;
-    case IR_IGOTO:
-        computeExpression(IGOTO_vexp(ir), &mustuse,
-            COMP_EXP_COLLECT_MUST_USE, DUOPT_COMPUTE_PR_DU | DUOPT_COMPUTE_NONPR_DU);
-        return;
-    case IR_DO_WHILE:
-    case IR_WHILE_DO:
-    case IR_DO_LOOP:
-    case IR_IF:
-    case IR_LABEL:
-    case IR_CASE:
-        ASSERTN(0, ("TODO"));
-        break;
-    case IR_TRUEBR:
-    case IR_FALSEBR:
-        computeExpression(BR_det(ir), &mustuse,
-            COMP_EXP_COLLECT_MUST_USE, DUOPT_COMPUTE_PR_DU | DUOPT_COMPUTE_NONPR_DU);
-        return;
-    case IR_SWITCH:
-        computeExpression(SWITCH_vexp(ir), &mustuse,
-            COMP_EXP_COLLECT_MUST_USE, DUOPT_COMPUTE_PR_DU | DUOPT_COMPUTE_NONPR_DU);
-        return;
-    case IR_RETURN:
-        computeExpression(RET_exp(ir), &mustuse,
-            COMP_EXP_COLLECT_MUST_USE, DUOPT_COMPUTE_PR_DU | DUOPT_COMPUTE_NONPR_DU);
-        return;
-    default: UNREACHABLE();
-    } //end switch
+    ASSERT0(ir->is_stmt());
+    m_citer.clean();
+    for (IR const* x = iterRhsInitC(ir, m_citer);
+        x != NULL; x = iterRhsNextC(m_citer)) {
+        if (!x->isMemoryOpnd()) { continue; }        
+        computeExpression(const_cast<IR*>(x), &mustuse,
+            COMP_EXP_COLLECT_MUST_USE,
+            DUOPT_COMPUTE_PR_DU | DUOPT_COMPUTE_NONPR_DU);        
+    }    
 }
 
 
@@ -5106,7 +5065,7 @@ void DUMgr::computeRegionMDDU(Vector<MDSet*> const* mustexactdef_mds,
             MD const* md = m_md_sys->getMD(i);
             ASSERT0(md->get_base());
             if (!md->is_pr() && !vtab->find(md->get_base())) {
-                //Only record the VAR defined in outter region.
+                //Only record the Var defined in outter region.
                 ru_maydef->bunion(md, *m_misc_bs_mgr);
             }
         }
@@ -5118,7 +5077,7 @@ void DUMgr::computeRegionMDDU(Vector<MDSet*> const* mustexactdef_mds,
             MD const* md = m_md_sys->getMD(i);
             ASSERT0(md->get_base());
             if (!md->is_pr() && !vtab->find(md->get_base())) {
-                //Only record the VAR defined in outter region.
+                //Only record the Var defined in outter region.
                 ru_maydef->bunion(md, *m_misc_bs_mgr);
             }
         }
@@ -5130,7 +5089,7 @@ void DUMgr::computeRegionMDDU(Vector<MDSet*> const* mustexactdef_mds,
         MD const* md = m_md_sys->getMD(i);
         ASSERT0(md->get_base());
         if (!md->is_pr() && !vtab->find(md->get_base())) {
-            //Only record the VAR defined in outter region.
+            //Only record the Var defined in outter region.
             ru_mayuse->bunion(md, *m_misc_bs_mgr);
         }
     }

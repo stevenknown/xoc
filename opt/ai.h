@@ -221,7 +221,7 @@ public:
 class ProfileAttachInfo : public BaseAttachInfo {
     COPY_CONSTRUCTOR(ProfileAttachInfo);
 public:
-    SYM const* tag;
+    Sym const* tag;
     INT * data; //truebr freq, falsebr freq.
 
 public:

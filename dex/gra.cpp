@@ -430,7 +430,7 @@ void RSC::comp_call_fmt(IR const* ir)
     }
 
     if (ir->is_call() && CALL_is_intrinsic(ir)) {
-        VAR const* v = CALL_idinfo(ir);
+        Var const* v = CALL_idinfo(ir);
         ASSERT0(v);
         BLTIN_TYPE blt = m_str2builtin.get(SYM_name(v->get_name()));
         ASSERT0(blt != BLTIN_UNDEF);

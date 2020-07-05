@@ -106,7 +106,7 @@ PtPair * PtPairMgr::add(UINT from, UINT to)
 //END PtPairMgr
 
 
-//Return true if all element in mds are effect and derived from the same VAR.
+//Return true if all element in mds are effect and derived from the same Var.
 //mustref: record the Unbound MD if the function return true, or meaningless.
 static bool isAllElementDerivedFromSameEffectVar(MDSet const& mds,
                                                  MDSystem * mdsys,
@@ -121,7 +121,7 @@ static bool isAllElementDerivedFromSameEffectVar(MDSet const& mds,
         return false;
     }
 
-    VAR * base = md->get_base();
+    Var * base = md->get_base();
     i = mds.get_next((UINT)i, &iter);
     for (; i >= 0; i = mds.get_next((UINT)i, &iter)) {
         MD const* md2 = mdsys->getMD((UINT)i);
@@ -359,7 +359,7 @@ MD const* AliasAnalysis::processLda(IR * ir, IN OUT AACtx * ic)
     ASSERT0(ic);
 
     MD const* t = NULL;
-    VAR * v = LDA_idinfo(ir);
+    Var * v = LDA_idinfo(ir);
     if (v->is_string()) {
         t = m_rg->allocStringMD(v->get_name());
     } else {
@@ -1671,7 +1671,7 @@ void AliasAnalysis::processConst(IR * ir,
     mds.clean(*getSBSMgr());
     if (ir->is_str()) {
         //'ir' describes memory address of string const.
-        //Add a new VAR to describe the string.
+        //Add a new Var to describe the string.
         //'mds' : record memory descriptor of 'ir'.
         MD const* t = m_rg->allocStringMD(CONST_str_val(ir));
         ASSERT0(t);
@@ -1781,7 +1781,7 @@ void AliasAnalysis::inferStoreValue(IR const* ir,
 
 
 //Caculate pointer info accroding to rules for individiual ir, and
-//constructing the mapping table that maps MD to an unique VAR.
+//constructing the mapping table that maps MD to an unique Var.
 //e.g For given four point-to pairs {p->a,p->b,q->c,q->d}.
 //    store can be shown as
 //        p = q;
@@ -1799,7 +1799,7 @@ void AliasAnalysis::processStore(IN IR * ir, IN MD2MDSet * mx)
 
 
 //Caculate pointer info accroding to rules for individiual ir, and
-//constructing the mapping table that maps MD to an unique VAR.
+//constructing the mapping table that maps MD to an unique Var.
 //e.g For given four point-to pairs {p->a,p->b,q->c,q->d}.
 //    store can be shown as
 //        p = q;
@@ -2181,7 +2181,7 @@ bool AliasAnalysis::tryReshapeMDSet(IR const* ir,
 
 //Indirect store.
 //Analyse pointers according to rules for individiual ir to
-//constructe the map-table that maps MD to an unique VAR.
+//constructe the map-table that maps MD to an unique Var.
 void AliasAnalysis::processIStore(IN IR * ir, IN MD2MDSet * mx)
 {
     ASSERT0(ir->is_ist());
@@ -2312,7 +2312,7 @@ void AliasAnalysis::processRegionSideeffect(IN OUT MD2MDSet & mx)
             continue;
         }
 
-        VAR const* v = t->get_base();
+        Var const* v = t->get_base();
         if (v->is_pointer() ||
             v->is_any()) { //v may be pointer if its type is VOID
             setPointTo((UINT)j, mx, m_maypts);
@@ -2348,7 +2348,7 @@ void AliasAnalysis::processCallSideeffect(IN OUT MD2MDSet & mx,
         MD const* t = id2md->get((UINT)j);
         if (t == NULL) { continue; }
 
-        VAR const* v = t->get_base();
+        Var const* v = t->get_base();
         if (VAR_is_global(v) &&
             (v->is_pointer() ||
              v->is_any())) { //v may be pointer if its type is VOID
@@ -2368,7 +2368,7 @@ void AliasAnalysis::processCallSideeffect(IN OUT MD2MDSet & mx,
          j >= 0; j = by_addr_mds.get_next((UINT)j, &iter)) {
         MD const* t = m_md_sys->getMD((UINT)j);
         ASSERT0(t != NULL);
-        VAR const* v = t->get_base();
+        Var const* v = t->get_base();
         if (VAR_is_addr_taken(v) &&
             (v->is_pointer() ||
              v->is_any())) { //v may be pointer if its type is VOID
@@ -2393,7 +2393,7 @@ MD const* AliasAnalysis::allocHeapobj(IR * ir)
     CHAR name[128];
     sprintf(name, "heap_obj%d", m_ir2heapobj.get_elem_count());
     ASSERT0(strlen(name) < 128);
-    VAR * tv = m_rg->getVarMgr()->registerVar(
+    Var * tv = m_rg->getVarMgr()->registerVar(
         name, m_tm->getMCType(0), 0, VAR_GLOBAL);
 
     //Set the var to be unallocable, means do NOT add
@@ -3313,7 +3313,7 @@ bool AliasAnalysis::convertMD2MDSet2PT(OUT PtPairSet * pps,
          fromid > 0; fromid = mx->get_next(mxiter, &from_md_pts)) {
         ASSERT0(m_md_sys->getMD(fromid));
         if (from_md_pts == NULL) { continue; }
-        if (from_md_pts->is_contain_all()) {
+        if (from_md_pts->is_contain_fullmem()) {
             PtPair const* pp = ppmgr.add(fromid, MD_FULL_MEM);
             ASSERT0(pp);
             pps->bunion(PP_id(pp), *ppsetmgr.getSBSMgr());
@@ -3653,7 +3653,7 @@ bool AliasAnalysis::computeFlowSensitive(List<IRBB*> const& bbl,
 //The pointer includes global pointer and formal parameter pointer.
 //'param': formal parameter.
 //Note May-POINT-TO set must be available before call this function.
-void AliasAnalysis::initGlobalAndParameterVarPtSet(VAR * param, MD2MDSet * mx)
+void AliasAnalysis::initGlobalAndParameterVarPtSet(Var * param, MD2MDSet * mx)
 {
     MD const* dmd = NULL; //record dedicated MD which parameter pointed to.
     if (VAR_is_restrict(param)) {
@@ -3664,7 +3664,7 @@ void AliasAnalysis::initGlobalAndParameterVarPtSet(VAR * param, MD2MDSet * mx)
             CHAR name[64];
             SNPRINTF(name, 63, "DummyGlobalVarPointedByVAR%u", param->id());
             ASSERT0(::strlen(name) < 64);
-            VAR * tv = m_rg->getVarMgr()->registerVar(name,
+            Var * tv = m_rg->getVarMgr()->registerVar(name,
                 m_tm->getMCType(0), 0, VAR_GLOBAL|VAR_ADDR_TAKEN);
 
             //Set the var to be unallocable, means do NOT add
@@ -3786,9 +3786,9 @@ void AliasAnalysis::initFlowSensitiveEntryPtset(PPSetMgr & ppsetmgr)
     setPointToGlobalMem(MD_IMPORT_VAR, *mx);
     setPointToImportVar(MD_IMPORT_VAR, *mx);
 
-    //Initialize POINT-TO set for global VAR and parameter VAR.
+    //Initialize POINT-TO set for global Var and parameter Var.
     VarTabIter c;
-    for (VAR * v = vt->get_first(c); v != NULL; v = vt->get_next(c)) {
+    for (Var * v = vt->get_first(c); v != NULL; v = vt->get_next(c)) {
         if (!VAR_is_global(v) && !VAR_is_formal_param(v)) { continue; }
         if (!v->is_pointer()) { continue; }
 
@@ -3826,9 +3826,9 @@ void AliasAnalysis::initEntryPtset(PPSetMgr & ppsetmgr)
     setPointToGlobalMem(MD_IMPORT_VAR, m_unique_md2mds);
     setPointToImportVar(MD_IMPORT_VAR, m_unique_md2mds);
 
-    //Initialize POINT-TO set for global VAR and parameter VAR.
+    //Initialize POINT-TO set for global Var and parameter Var.
     VarTabIter c;
-    for (VAR * v = vt->get_first(c); v != NULL; v = vt->get_next(c)) {
+    for (Var * v = vt->get_first(c); v != NULL; v = vt->get_next(c)) {
         if (!VAR_is_global(v) && !VAR_is_formal_param(v)) { continue; }
         if (!v->is_pointer()) { continue; }
 
@@ -3855,7 +3855,7 @@ void AliasAnalysis::initMayPointToSet()
     for (; !rg->is_program();) {
         VarTab * vtab = rg->getVarTab();
         c.clean();
-        for (VAR * v = vtab->get_first(c); v != NULL; v = vtab->get_next(c)) {
+        for (Var * v = vtab->get_first(c); v != NULL; v = vtab->get_next(c)) {
             if (!VAR_is_addr_taken(v)) { continue; }
             ASSERT0(!v->is_global());
 

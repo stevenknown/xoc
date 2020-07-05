@@ -192,7 +192,8 @@ bool Region::MiddleProcess(OptCtx & oc)
 
     if (g_verify_level >= VERIFY_LEVEL_3) {
         ASSERT0(getDUMgr() == NULL ||
-            getDUMgr()->verifyMDDUChain(DUOPT_COMPUTE_PR_DU | DUOPT_COMPUTE_NONPR_DU));
+            getDUMgr()->verifyMDDUChain(DUOPT_COMPUTE_PR_DU |
+                                        DUOPT_COMPUTE_NONPR_DU));
     }
 
     bool do_simplification = true;
@@ -208,9 +209,7 @@ bool Region::MiddleProcess(OptCtx & oc)
     }
 
     if (g_opt_level > OPT_LEVEL0) {
-        PassMgr * passmgr = getPassMgr();
-        ASSERT0(passmgr);
-        passmgr->performScalarOpt(oc);
+        getPassMgr()->registerPass(PASS_SCALAR_OPT)->perform(oc);
     }
 
     ASSERT0(verifyRPO(oc));

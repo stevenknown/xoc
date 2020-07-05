@@ -343,13 +343,13 @@ void IRParser::dump()
 }
 
 
-//Find VAR in nested region from the inside out.
-VAR * IRParser::findVar(ParseCtx * ctx, SYM const* name)
+//Find Var in nested region from the inside out.
+Var * IRParser::findVar(ParseCtx * ctx, Sym const* name)
 {
     ASSERT0(ctx && ctx->current_region && name);
     for (Region * region = ctx->current_region;
          region != NULL; region = region->getParent()) {
-        VAR * var = region->findVarViaSymbol(name);
+        Var * var = region->findVarViaSymbol(name);
         if (var != NULL) {
             return var;
         }
@@ -561,8 +561,8 @@ bool IRParser::declareRegion(ParseCtx * ctx)
         error(tok, "miss region name");
         return false;
     }
-    SYM const* sym = m_rumgr->addToSymbolTab(m_lexer->getCurrentTokenString());
-    VAR * regionvar = NULL;
+    Sym const* sym = m_rumgr->addToSymbolTab(m_lexer->getCurrentTokenString());
+    Var * regionvar = NULL;
     if (ctx->current_region != NULL) {
         regionvar = findVar(ctx, sym);
         REGION_parent(region) = ctx->current_region;
@@ -665,7 +665,7 @@ bool IRParser::parseRegionBody(ParseCtx * ctx)
     for (; tok == T_IDENTIFIER;) {
         X_CODE code = getCurrentXCode();
         if (code == X_VAR) {
-            VAR * v;
+            Var * v;
             if (!declareVar(ctx, &v)) {
                 return false;
             }
@@ -971,7 +971,7 @@ bool IRParser::parseCase(ParseCtx * ctx)
         error(tok, "illegal target label of case");
         return false;
     }
-    SYM const* sym = m_rumgr->addToSymbolTab(m_lexer->getCurrentTokenString());
+    Sym const* sym = m_rumgr->addToSymbolTab(m_lexer->getCurrentTokenString());
     LabelInfo * caselab = ctx->mapSym2Label(sym);
     if (caselab == NULL) {
         caselab = ctx->current_region->genCustomLabel(sym);
@@ -1051,7 +1051,7 @@ bool IRParser::parseSelect(ParseCtx * ctx)
 
 UINT IRParser::mapID2Prno(CHAR const* prid, ParseCtx * ctx)
 {
-    SYM const* sym = m_rumgr->addToSymbolTab(prid);
+    Sym const* sym = m_rumgr->addToSymbolTab(prid);
     UINT prno = m_id2prno.get(sym);
     if (prno == PRNO_UNDEF) {
         prno = ctx->current_region->getPRCount() + 1;
@@ -1164,9 +1164,9 @@ bool IRParser::parseId(ParseCtx * ctx)
         error(tok, "miss variable name");
         return false;
     }
-    SYM const* sym = m_rumgr->addToSymbolTab(m_lexer->getCurrentTokenString());
+    Sym const* sym = m_rumgr->addToSymbolTab(m_lexer->getCurrentTokenString());
     ASSERT0(sym);
-    VAR * var = findVar(ctx, sym);
+    Var * var = findVar(ctx, sym);
     if (var == NULL) {
         error(tok, "%s is not declared", m_lexer->getCurrentTokenString());
         return false;
@@ -1209,7 +1209,7 @@ bool IRParser::parseLda(ParseCtx * ctx)
         error(tok, "miss variable name");
         return false;
     }
-    VAR * var = findVar(ctx, m_rumgr->addToSymbolTab(
+    Var * var = findVar(ctx, m_rumgr->addToSymbolTab(
         m_lexer->getCurrentTokenString()));
     if (var == NULL) {
         error(tok, "%s is not declared", m_lexer->getCurrentTokenString());
@@ -1590,7 +1590,7 @@ bool IRParser::parseLd(ParseCtx * ctx)
         return false;
     }
 
-    VAR * var = findVar(ctx, m_rumgr->addToSymbolTab(
+    Var * var = findVar(ctx, m_rumgr->addToSymbolTab(
         m_lexer->getCurrentTokenString()));
     if (var == NULL) {
         error(tok, "%s is not declared", m_lexer->getCurrentTokenString());
@@ -2263,7 +2263,7 @@ bool IRParser::parseStore(ParseCtx * ctx)
         return false;
     }
 
-    VAR * var = findVar(ctx, m_rumgr->addToSymbolTab(
+    Var * var = findVar(ctx, m_rumgr->addToSymbolTab(
         m_lexer->getCurrentTokenString()));
     if (var == NULL) {
         error(tok, "%s is not declared", m_lexer->getCurrentTokenString());
@@ -2638,7 +2638,7 @@ bool IRParser::parseCallAndICall(bool is_call, ParseCtx * ctx)
         tok = m_lexer->getNextToken();
     }
 
-    VAR * callee_var = NULL;
+    Var * callee_var = NULL;
     IR * callee_exp = NULL;
     if (is_call) {
         if (tok == T_AT) {
@@ -2654,7 +2654,7 @@ bool IRParser::parseCallAndICall(bool is_call, ParseCtx * ctx)
             return false;
         }
 
-        SYM const* name = m_rumgr->addToSymbolTab(
+        Sym const* name = m_rumgr->addToSymbolTab(
             m_lexer->getCurrentTokenString());
         callee_var = findVar(ctx, name);
         if (callee_var == NULL) {
@@ -2763,7 +2763,7 @@ bool IRParser::parseGoto(ParseCtx * ctx)
         error(tok, "miss label after goto");
         return false;
     }
-    SYM const* sym = m_rumgr->addToSymbolTab(
+    Sym const* sym = m_rumgr->addToSymbolTab(
         m_lexer->getCurrentTokenString());
     LabelInfo * label = ctx->mapSym2Label(sym);
     if (label == NULL) {
@@ -3177,7 +3177,7 @@ bool IRParser::parseLabel(ParseCtx * ctx)
         error(tok, "illegal label");
         return false;
     }
-    SYM const* sym = m_rumgr->addToSymbolTab(m_lexer->getCurrentTokenString());
+    Sym const* sym = m_rumgr->addToSymbolTab(m_lexer->getCurrentTokenString());
     LabelInfo * label = ctx->mapSym2Label(sym);
     if (label == NULL) {
         label = ctx->current_region->genCustomLabel(sym);
@@ -3241,7 +3241,7 @@ bool IRParser::parseBranch(bool is_truebr, ParseCtx * ctx)
         error(tok, "miss label after determinate-expression");
         return false;
     }
-    SYM const* sym = m_rumgr->addToSymbolTab(
+    Sym const* sym = m_rumgr->addToSymbolTab(
         m_lexer->getCurrentTokenString());
     LabelInfo * label = ctx->mapSym2Label(sym);
     if (label == NULL) {
@@ -3333,7 +3333,7 @@ bool IRParser::parsePhi(ParseCtx * ctx)
             error(tok, "miss label after phi operand");
             return false;
         }
-        SYM const* sym = m_rumgr->addToSymbolTab(
+        Sym const* sym = m_rumgr->addToSymbolTab(
             m_lexer->getCurrentTokenString());
         LabelInfo * label = ctx->mapSym2Label(sym);
         if (label == NULL) {
@@ -3522,7 +3522,7 @@ bool IRParser::parseSwitch(ParseCtx * ctx)
                 error(tok, "illegal default label");
                 return false;
             }
-            SYM const* sym = m_rumgr->addToSymbolTab(
+            Sym const* sym = m_rumgr->addToSymbolTab(
                 m_lexer->getCurrentTokenString());
             deflab = ctx->mapSym2Label(sym);
             if (deflab == NULL) {
@@ -3601,7 +3601,7 @@ bool IRParser::parseParameterList(ParseCtx * ctx)
 
     UINT i = 0;
     for (; tok != T_RPAREN && tok != T_END && tok != T_NUL; i++) {
-        VAR * v = NULL;
+        Var * v = NULL;
         if (getCurrentXCode() == X_UNDEFINED) {
             //The parameter is reserved.
             tok = m_lexer->getNextToken();
@@ -3833,7 +3833,7 @@ bool IRParser::parseSize(TOKEN tok, UINT * size)
 
 
 //List of type and property declaration.
-bool IRParser::declareVarProperty(VAR * var, ParseCtx * ctx)
+bool IRParser::declareVarProperty(Var * var, ParseCtx * ctx)
 {
     if (m_lexer->getCurrentToken() != T_LPAREN) {
         error(m_lexer->getCurrentToken(),
@@ -3935,7 +3935,7 @@ bool IRParser::declareVarProperty(VAR * var, ParseCtx * ctx)
 }
 
 
-bool IRParser::parseAlign(VAR * var, ParseCtx *)
+bool IRParser::parseAlign(Var * var, ParseCtx *)
 {
     ASSERT0(getCurrentXCode() == X_ALIGN);
     TOKEN tok = m_lexer->getNextToken();
@@ -3959,7 +3959,7 @@ bool IRParser::parseAlign(VAR * var, ParseCtx *)
 }
 
 
-bool IRParser::parseByteValue(VAR * var, ParseCtx * ctx)
+bool IRParser::parseByteValue(Var * var, ParseCtx * ctx)
 {
     ASSERT0(getCurrentXCode() == X_BYTE);
     TOKEN tok = m_lexer->getNextToken();
@@ -4002,7 +4002,7 @@ bool IRParser::parseByteValue(VAR * var, ParseCtx * ctx)
 }
 
 
-bool IRParser::parseStringValue(VAR * var, ParseCtx *)
+bool IRParser::parseStringValue(Var * var, ParseCtx *)
 {
     ASSERT0(getCurrentXCode() == X_STRING);
     if (!var->is_string()) {
@@ -4133,7 +4133,7 @@ bool IRParser::parseThrowTarget(PropertySet & cont, ParseCtx * ctx)
             error(tok, "illegal label");
             return false;
         }
-        SYM const* sym = m_rumgr->addToSymbolTab(
+        Sym const* sym = m_rumgr->addToSymbolTab(
             m_lexer->getCurrentTokenString());
         LabelInfo * label = ctx->mapSym2Label(sym);
         if (label == NULL) {
@@ -4291,7 +4291,7 @@ bool IRParser::parseProperty(PropertySet & cont, ParseCtx * ctx)
 }
 
 
-bool IRParser::declareVar(ParseCtx * ctx, VAR ** var)
+bool IRParser::declareVar(ParseCtx * ctx, Var ** var)
 {
     if (getCurrentXCode() != X_VAR) {
         error(m_lexer->getCurrentToken(), "miss 'var'");
@@ -4310,7 +4310,7 @@ bool IRParser::declareVar(ParseCtx * ctx, VAR ** var)
         error(tok, "miss identifier name");
         return false;
     }
-    SYM const* sym = m_rumgr->addToSymbolTab(m_lexer->getCurrentTokenString());
+    Sym const* sym = m_rumgr->addToSymbolTab(m_lexer->getCurrentTokenString());
 
     //Type
     tok = m_lexer->getNextToken();
@@ -4327,7 +4327,7 @@ bool IRParser::declareVar(ParseCtx * ctx, VAR ** var)
     }
 
     ASSERT0(ctx->current_region);
-    VAR * v = NULL;
+    Var * v = NULL;
     if (m_rumgr->getVarMgr()->isDedicatedStringVar(SYM_name(sym))) {
         MD const* md = m_rumgr->genDedicateStrMD();
         v = md->get_base();

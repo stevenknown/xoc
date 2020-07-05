@@ -204,11 +204,11 @@ void IVR::recordIV(MD * biv,
     m_ir2iv.set(occ, x);
     m_ir2iv.set(def, x);
 
-    SList<IV*> * ivlst = m_li2bivlst.get(LI_id(li));
+    SList<IV*> * ivlst = m_li2bivlst.get(li->id());
     if (ivlst == NULL) {
         ivlst = (SList<IV*>*)xmalloc(sizeof(SList<IV*>));
         ivlst->init(m_sc_pool);
-        m_li2bivlst.set(LI_id(li), ivlst);
+        m_li2bivlst.set(li->id(), ivlst);
     }
     ivlst->append_head(x);
 }
@@ -410,11 +410,11 @@ bool IVR::scanExp(IR const* ir,
 //Try to add IV expresion into div list if 'e' do not exist in the list.
 void IVR::addDIVList(LI<IRBB> const* li, IR const* e)
 {
-    SList<IR const*> * divlst = m_li2divlst.get(LI_id(li));
+    SList<IR const*> * divlst = m_li2divlst.get(li->id());
     if (divlst == NULL) {
         divlst = (SList<IR const*>*)xmalloc(sizeof(SList<IR const*>));
         divlst->init(m_sc_pool);
-        m_li2divlst.set(LI_id(li), divlst);
+        m_li2divlst.set(li->id(), divlst);
     }
 
     bool find = false;
@@ -489,14 +489,14 @@ void IVR::_dump(LI<IRBB> * li, UINT indent)
     while (li != NULL) {
         note("\n");
         for (UINT i = 0; i < indent; i++) { prt(" "); }
-        prt("LI%d:BB%d", LI_id(li), BB_id(LI_loop_head(li)));
+        prt("LI%d:BB%d", li->id(), li->getLoopHead()->id());
         prt(",BODY:");
         for (INT i = LI_bb_set(li)->get_first();
              i != -1; i = LI_bb_set(li)->get_next(i)) {
             prt("%d,", i);
         }
 
-        xcom::SList<IV*> * bivlst = m_li2bivlst.get(LI_id(li));
+        xcom::SList<IV*> * bivlst = m_li2bivlst.get(li->id());
         if (bivlst != NULL) {
             for (xcom::SC<IV*> * sc = bivlst->get_head();
                  sc != bivlst->end(); sc = bivlst->get_next(sc)) {
@@ -548,7 +548,7 @@ void IVR::_dump(LI<IRBB> * li, UINT indent)
             }
         } else { prt("(NO BIV)"); }
 
-        xcom::SList<IR const*> * divlst = m_li2divlst.get(LI_id(li));
+        xcom::SList<IR const*> * divlst = m_li2divlst.get(li->id());
         if (divlst != NULL) {
             if (divlst->get_elem_count() > 0) {
                 note("\n");

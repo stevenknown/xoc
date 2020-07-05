@@ -78,9 +78,9 @@ protected:
     void fix_control_flow(List<IRBB*> & bblst, List<C<IRBB*>*> & ctlst);
     bool find_effect_kid(IRBB const* bb, IR const* ir) const;
 
-    bool is_effect_write(VAR * v) const
+    bool is_effect_write(Var * v) const
     { return VAR_is_global(v) || VAR_is_volatile(v); }
-    bool is_effect_read(VAR * v) const { return VAR_is_volatile(v); }
+    bool is_effect_read(Var * v) const { return VAR_is_volatile(v); }
     bool is_cfs(IR const* ir) const
     {
         switch (ir->getCode()) {

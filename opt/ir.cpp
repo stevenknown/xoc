@@ -1344,7 +1344,7 @@ void dumpIR(IR const* ir, Region const* rg, IN CHAR * attr, UINT dumpflag)
     case IR_REGION:
         note("\nregion");
         if (REGION_ru(ir)->getRegionVar() != NULL) {
-            VAR * ruvar = REGION_ru(ir)->getRegionVar();
+            Var * ruvar = REGION_ru(ir)->getRegionVar();
             CHAR tt[40];
             tt[0] = 0;
 
@@ -1604,8 +1604,8 @@ bool IR::verify(Region const* rg) const
         ASSERT0(d);
         ASSERTN(TY_dtype(d) != D_UNDEF, ("size of load value cannot be zero"));
         ASSERT0(d->is_pointer());
-        //Lda base can be general VAR, label, const string.
-        ASSERTN(!VAR_is_fake(LDA_idinfo(this)), ("LDA's base must be effect VAR"));
+        //Lda base can be general Var, label, const string.
+        ASSERTN(!VAR_is_fake(LDA_idinfo(this)), ("LDA's base must be effect Var"));
         break;
     case IR_CALL:
         ASSERT0(CALL_idinfo(this));
@@ -1938,6 +1938,31 @@ bool IR::isIRListEqual(IR const* irs, bool is_cmp_kid) const
     }
     if ((irs != NULL) ^ (pthis != NULL)) {
         return false;
+    }
+    return true;
+}
+
+
+//Return true if given array has same dimension structure with current ir.
+bool IR::isSameArrayStruct(IR const* ir) const
+{
+    ASSERT0(isArrayOp() && ir->isArrayOp());
+    if (ARR_elemtype(this) != ARR_elemtype(ir) ||
+        ARR_ofst(this) != ARR_ofst(ir) ||
+        ((CArray*)this)->getDimNum() != ((CArray*)ir)->getDimNum()) {
+        return false;
+    }
+    if ((ARR_elem_num_buf(this) == NULL) || (ARR_elem_num_buf(ir) == NULL)) {
+        //Array is any dimension.
+        return false;
+    }
+    UINT dim = 0;
+    for (IR const* s = ARR_sub_list(this); s != NULL; s = s->get_next()) {
+        dim++;
+        if (((CArray*)this)->getElementNumOfDim(dim) !=
+            ((CArray*)ir)->getElementNumOfDim(dim)) {
+            return false;
+        }
     }
     return true;
 }
@@ -2793,7 +2818,7 @@ static void dumpProp(IR const* ir, TypeMgr * tm, DumpGRCtx * ctx)
 }
 
 
-CHAR const* compositeName(SYM const* n, xcom::StrBuf & buf)
+CHAR const* compositeName(Sym const* n, xcom::StrBuf & buf)
 {
     for (CHAR const* p = SYM_name(n); *p != 0; p++) {
         if (p == SYM_name(n)) {
@@ -3390,6 +3415,44 @@ void dumpGRInBBList(List<IRBB*> * bblist, TypeMgr * tm, DumpGRCtx * ctx)
         }
     }
 }
+
+
+//Return true if current ir and ir2 represent different memory location,
+//otherwise return false to tell caller we do not know more about these object.
+//Note this function will consider data type that current ir or ir2
+//referrenced.
+bool IR::isDiffMemLoc(IR const* ir2) const
+{
+    IR const* ir1 = this;
+    ASSERT0(ir1 && ir2);
+    if (ir1 == ir2) { return false; }
+    if ((ir1->is_st() || ir1->is_ld()) && (ir2->is_st() || ir2->is_ld())) {
+        return ir1->isNotOverlapViaMDRef(ir2);
+
+        //UINT tysz1 = ir1->getTypeSize(m_tm);
+        //UINT tysz2 = ir2->getTypeSize(m_tm);
+        //UINT ofst1 = ir1->getOffset();
+        //UINT ofst2 = ir2->getOffset();
+        //if ((((ofst1 + tysz1) <= ofst2) || ((ofst2 + tysz2) <= ofst1))) {
+        //    return true;
+        //}
+        //return false;
+    }
+    if (ir1->isIndirectMemOp() && ir2->isIndirectMemOp()) {
+        return ir1->isNotOverlapViaMDRef(ir2);
+    }
+    if (ir1->isArrayOp() && ir2->isArrayOp()) {
+        IR const* base1 = ARR_base(ir1);
+        IR const* base2 = ARR_base(ir2);
+        if (base1->is_lda() &&
+            base2->is_lda() &&
+            base1->getIdinfo() != base2->getIdinfo()) {
+            return true;
+        }
+        return ir1->isNotOverlapViaMDRef(ir2);
+    }
+    return ir1->isNotOverlapViaMDRef(ir2);
+}
 //END IR
 
 
@@ -3428,7 +3491,37 @@ bool checkRoundDesc()
 }
 
 
-bool IR::isNotOverLap(IR const* ir2, Region * rg) const
+//Return true if current ir does not overlap to ir2.
+//ir2: stmt or expression to be compared.
+//Note this function is different to isNotOverlap(), it determines overlapping
+//through MD and MDSet references.
+bool IR::isNotOverlapViaMDRef(IR const* ir2) const
+{
+    MD const* must1 = getRefMD();
+    MD const* must2 = ir2->getRefMD();
+    MDSet const* may1 = getRefMDSet();
+    MDSet const* may2 = ir2->getRefMDSet();
+    if (must1 != NULL && must2 != NULL && must1->is_overlap(must2)) {
+        return false;        
+    }
+    if (must1 != NULL &&
+        may2 != NULL &&
+        may2->is_contain_only_taken_addr(must1)) {
+        return false;
+    }
+    if (must2 != NULL &&
+        may1 != NULL &&
+        may1->is_contain_only_taken_addr(must2)) {
+        return false;
+    }
+    if (may1 != NULL && may2 != NULL && may1->is_intersect(*may2)) {
+        return false;
+    }
+    return true;
+}
+
+
+bool IR::isNotOverlap(IR const* ir2, Region * rg) const
 {
     ASSERT0(rg);
     IR const* ir1 = this;

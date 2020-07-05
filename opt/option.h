@@ -148,6 +148,7 @@ public:
     bool is_dump_dom; //Dump Dom/Pdom/Idom/Pidom.
     bool is_dump_cp; //Dump copy-propagation.
     bool is_dump_rp; //Dump register-promotion.
+    bool is_dump_rce; //Dump light weight redundant-code-elimination.
     bool is_dump_dce; //Dump dead-code-elimination.
     bool is_dump_gvn; //Dump global-value-numbering.
     bool is_dump_gcse; //Dump global-common-subscript-expression.
@@ -176,6 +177,7 @@ public:
     bool isDumpDOM() const;
     bool isDumpCP() const;
     bool isDumpRP() const;
+    bool isDumpRCE() const;
     bool isDumpDCE() const;
     bool isDumpGVN() const;
     bool isDumpGCSE() const;
@@ -235,6 +237,8 @@ typedef enum _PASS_TYPE {
     PASS_IPA,
     PASS_INLINER,
     PASS_REFINE_DUCHAIN,
+    PASS_SCALAR_OPT,
+    PASS_MDLIVENESS_MGR,
     PASS_NUM,
 } PASS_TYPE;
 
@@ -290,7 +294,7 @@ extern bool g_do_rp;
 extern bool g_do_gcse;
 extern bool g_do_lcse;
 extern bool g_do_pre;
-extern bool g_do_rce;
+extern bool g_do_rce; //light weight redundant code elimination
 extern bool g_do_dse;
 extern bool g_do_licm;
 extern bool g_do_ivr;
@@ -305,6 +309,7 @@ extern UINT g_thres_ptpair_num;
 extern bool g_do_loop_convert;
 extern bool g_do_poly_tran;
 extern bool g_do_refine_duchain;
+extern bool g_do_scalar_opt;
 extern bool g_retain_pass_mgr_for_region;
 extern UINT g_verify_level;
 

@@ -63,10 +63,7 @@ Pass * DexPassMgr::allocDCE()
 
 Pass * DexPassMgr::allocCopyProp()
 {
-    Pass * pass = new DEX_CP(m_rg);
-    SimpCtx simp;
-    pass->set_simp_cont(&simp);
-    return pass;
+    return new DEX_CP(m_rg);
 }
 
 

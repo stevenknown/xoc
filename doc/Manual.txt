@@ -79,7 +79,7 @@ Programming Guides
   ¡ñ Region
     Defined in region.h
     The program code organized in region, each region has it own IR stmt
-    list, local VAR table, and many kinds of analysis and transformation
+    list, local Var table, and many kinds of analysis and transformation
     modules.
 
     The kind of region can be blackbox, subregion, exception handling,
@@ -127,7 +127,7 @@ Programming Guides
       XOC apply interprocedural analysis and optimization and inlining
       on program unit.
 
-  ¡ñ SYM, SymTab
+  ¡ñ Sym, SymTab
     Symbol represent identifier name, pseudo register name and string.
     Each region manager has one unique symbol table. In general,
     any symbol with a name occupies an entry in symbol table.
@@ -137,7 +137,7 @@ Programming Guides
   ¡ñ TypeMgr
     Type manager represent all kind of distinct type in the region manager.
 
-  ¡ñ VAR
+  ¡ñ Var
     Defined in var.h
     Variable, is used to represent each memory object.
     The attributes of variable include:
@@ -166,7 +166,7 @@ Programming Guides
       Unique id of abstract memory object.
 
     ¡ð  Base Variable
-      Since MD is the abstract version of VAR, it is closely related to
+      Since MD is the abstract version of Var, it is closely related to
       individual variable. This variable may be the base of several MD.
 
     ¡ð Type
@@ -309,11 +309,11 @@ Programming Guides
   aggressively optimized.
 
   ¡ñ IR_ID
-      Identifier, represents a memory variable, namely, VAR.
+      Identifier, represents a memory variable, namely, Var.
 
       Operands:
       * IR_dt indicate the result type.
-      * ID_info indicate the VAR.
+      * ID_info indicate the Var.
 
   ¡ñ IR_LDA
       This operation computes the pointer value of the memory address of a
@@ -747,7 +747,7 @@ Programming Guides
 
       NOTE: The base of array can be IR_LDA, or other computational
       expression. If array base is LDA, it denotes that the base of
-      array is an array type VAR,
+      array is an array type Var,
       e.g: char p[N]; (&p)[i] = ...
 
       If array base is computational expression, it denotes that the
@@ -781,7 +781,7 @@ Programming Guides
 
       NOTE: The base of array can be IR_LDA, or other computational
       expression. If array base is LDA, it denotes that the base of
-      array is an array type VAR,
+      array is an array type Var,
       e.g: char p[N]; (&p)[i] = ...
 
       If array base is computational expression, it denotes that the
@@ -1069,7 +1069,7 @@ Programming Guides
     we perform alias analysis and compute the exact and inexact MD.
     These MDs describe the shape of the store and load and every function
     uses them to specify the store and load that it expects.
-    When alias analysis is finished, we define an unique VAR for each alias
+    When alias analysis is finished, we define an unique Var for each alias
     group, which are sets of MD that share the same aliases.
 
   ¡ñ DU Manager
@@ -1158,7 +1158,7 @@ Programming Guides
     time a PR is assigned in the code, a new version of the PR is created.
     Different versions of the same PR are distinguished by subscripting
     the variable name with its version number, we call this structure
-    Versioned PR(VP).
+    Versioned PR(VPR).
 
   ¡ñ AttachInfo
     The attached information of IR is used to represent additional
@@ -1199,7 +1199,7 @@ Programming Guides
         REGION_MGR rm;
         rm.init_var_mgr();
 
-        //Generate IR list, VAR and REGION accroding to user input.
+        //Generate IR list, Var and REGION accroding to user input.
         generate_ir_list(&rm);
         generate_var_tab(&rm);
 

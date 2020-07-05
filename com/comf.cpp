@@ -210,14 +210,14 @@ INT xceiling(INT a, INT b)
     ASSERTN(b != 0, ("div zero"));
     if (a % b == 0) {
         //(a+b-1)/b will be errorneous
-        //CASE:ceil(-4, 2)
+        //CASE:ceiling(-4, 2)
         return a / b;
     } else if ((a < 0 && b < 0) || (a > 0 && b > 0)) {
-        return ((a + b) / b);
+        return (a + b) / b;
     } else {
         //(a+b-1)/b will be errorneous
-        //CASE:ceil(5,-2)
-        return (a / b);
+        //CASE:ceiling(5,-2)
+        return a / b;
     }
 }
 

@@ -36,8 +36,8 @@ author: Su Zhenyu
 
 namespace xoc {
 
-//Map between VAR and PRno.
-class VAR2PR : public TMap<VAR const*, UINT, CompareConstVar> {
+//Map between Var and PRno.
+class VAR2PR : public TMap<Var const*, UINT, CompareConstVar> {
 };
 
 class LivenessMgr : public Pass {

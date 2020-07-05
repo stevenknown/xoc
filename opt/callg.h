@@ -46,7 +46,7 @@ class CallNode {
     COPY_CONSTRUCTOR(CallNode);
 public:
     UINT nid;
-    SYM const* ru_name; //record the Region name.
+    Sym const* ru_name; //record the Region name.
     Region * rg; //record the Region that callnode corresponds to.
     union {
         struct {
@@ -71,12 +71,12 @@ public:
 
     Region * region() const { return CN_ru(this); }
 
-    SYM const* name() const { return CN_sym(this); }
+    Sym const* name() const { return CN_sym(this); }
 };
 
 
-//Mapping from SYM to CallNode.
-typedef TMap<SYM const*, CallNode*> SYM2CN;
+//Mapping from Sym to CallNode.
+typedef TMap<Sym const*, CallNode*> SYM2CN;
 typedef TMap<Region*, SYM2CN*> Region2SYM2CN;
 typedef TMapIter<Region*, SYM2CN*> Region2SYM2CNIter;
 
@@ -170,7 +170,7 @@ public:
     CallNode * mapRegion2CallNode(Region const* rg) const
     { return m_ruid2cn.get(rg->id()); }
 
-    CallNode * mapSym2CallNode(SYM const* sym, Region * start) const
+    CallNode * mapSym2CallNode(Sym const* sym, Region * start) const
     {
         for (; start != NULL; start = start->getParent()) {
             SYM2CN * sym2cn = getSYM2CN(start);

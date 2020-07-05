@@ -519,7 +519,7 @@ public:
 //FREE-List
 //
 //T refer to basis element type.
-//    e.g: Suppose variable type is 'VAR*', then T is 'VAR'.
+//    e.g: Suppose variable type is 'Var*', then T is 'Var'.
 //
 //For easing implementation, there are 2 fields should be declared in T,
 //    struct T {

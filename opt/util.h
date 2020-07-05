@@ -75,8 +75,8 @@ namespace xoc {
 #define DUMP_INDENT_NUM 4
 
 //e.g:
-//CHAR * dumpTN(SYM* key, SYM* mapped) { return SYM_name(key); }
-//dump_rbt((RBT<SYM*, SYM*, xoc::CompareSymTab>&)map, NULL, 1000, dumpTN);
+//CHAR * dumpTN(Sym* key, Sym* mapped) { return SYM_name(key); }
+//dump_rbt((RBT<Sym*, Sym*, xoc::CompareSymTab>&)map, NULL, 1000, dumpTN);
 template <class T, class Ttgt, class CompareKey>
 void dump_rbt(RBT<T, Ttgt, CompareKey> & rbt,
               CHAR const* name = NULL,

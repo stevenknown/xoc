@@ -224,7 +224,7 @@ VN * GVN::registerVNviaMC(LONGLONG v)
 }
 
 
-VN * GVN::registerVNviaSTR(SYM const* v)
+VN * GVN::registerVNviaSTR(Sym const* v)
 {
     if (m_str2vn.get_bucket_size() == 0) {
         m_str2vn.init(16/*TO reevaluate*/);
@@ -873,7 +873,7 @@ VN * GVN::computeVN(IR const* exp, bool & change)
         return x;
     }
     case IR_LDA: {
-        VAR * v = LDA_idinfo(exp);
+        Var * v = LDA_idinfo(exp);
         VN * basevn = NULL;
         if (v->is_string()) {
             if (m_is_comp_lda_string) {
@@ -994,6 +994,54 @@ void GVN::processRegion(IR const* ir, bool & change)
 }
 
 
+//Return true if ir1 and ir2 represent identical memory location, otherwise
+//return false to tell caller we do not know more about these object.
+//Note this function does NOT consider data type that ir1 or ir2 referrenced.
+bool GVN::isSameMemLoc(IR const* ir1, IR const* ir2) const
+{
+    ASSERT0(ir1 && ir2);
+    if (ir1 == ir2) { return true; }
+    if (ir1->getOffset() != ir2->getOffset()) { return false; }
+    if ((ir1->is_st() || ir1->is_ld()) && (ir2->is_st() || ir2->is_ld())) {
+        return ir1->getIdinfo() == ir2->getIdinfo();
+    }
+    if (ir1->isIndirectMemOp() && ir2->isIndirectMemOp()) {
+        IR const* irbase1 = const_cast<IR*>(ir1)->getBase();
+        IR const* irbase2 = const_cast<IR*>(ir2)->getBase();
+        ASSERT0(irbase1 && irbase2);
+        VN const* base1 = mapIR2VN(irbase1);
+        VN const* base2 = mapIR2VN(irbase2);
+        return base1 == base2;
+    }
+    if (ir1->isArrayOp() && ir2->isArrayOp() && ir1->isSameArrayStruct(ir2)) {
+        IR const* irbase1 = const_cast<IR*>(ir1)->getBase();
+        IR const* irbase2 = const_cast<IR*>(ir2)->getBase();
+        ASSERT0(irbase1 && irbase2);
+        VN const* base1 = mapIR2VN(irbase1);
+        VN const* base2 = mapIR2VN(irbase2);
+        if (base1 != base2) {
+            return false;
+        }
+
+        IR const* s2 = ARR_sub_list(ir2);
+        for (IR const* s1 = ARR_sub_list(ir1); s1 != NULL;
+             s1 = s1->get_next(), s2 = s2->get_next()) {
+            ASSERT0(s2);    
+            VN const* vs1 = mapIR2VN(s1);
+            VN const* vs2 = mapIR2VN(s2);
+            if (vs1 != vs2) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    MD const* must1 = ir1->getRefMD();
+    MD const* must2 = ir2->getRefMD();
+    return must1 == must2 && must1 != NULL;
+}
+
+
 void GVN::processBB(IRBB * bb, bool & change)
 {
     IRListIter ct;
@@ -1093,13 +1141,14 @@ void GVN::dumpIR2VN()
 }
 
 
-void GVN::dump_h1(IR const* k, VN * x)
+void GVN::dump_h1(IR const* k, VN const* x)
 {
+    ASSERT0(k);
     note("\n\t%s", IRTNAME(k->getCode()));
     if (k->is_pr()) {
         prt("%d", PR_no(k));
     }
-    prt(" id:%d ", IR_id(k));
+    prt(" id:%d ", k->id());
     if (x != NULL) {
         prt("vn%d", VN_id(x));
     } else {
@@ -1118,8 +1167,7 @@ void GVN::dumpBB(UINT bbid)
     note("\n-- BB%d ", BB_id(bb));
     dumpBBLabel(bb->getLabelList(), g_tfile);
     note("\n");
-    for (IR * ir = BB_first_ir(bb);
-         ir != NULL; ir = BB_next_ir(bb)) {
+    for (IR * ir = BB_first_ir(bb); ir != NULL; ir = BB_next_ir(bb)) {
         dumpIR(ir, m_rg);
         note("\n");
         VN * x = m_ir2vn.get(ir->id());
@@ -1128,92 +1176,16 @@ void GVN::dumpBB(UINT bbid)
         }
 
         prt(" <- {");
-
-        switch (ir->getCode()) {
-        case IR_ST:
-            ii.clean();
-            for (IR const* k = iterInitC(ST_rhs(ir), ii);
-                 k != NULL; k = iterNextC(ii)) {
-                VN * x2 = m_ir2vn.get(IR_id(k));
-                dump_h1(k, x2);
-            }
-            break;
-        case IR_STPR:
-            ii.clean();
-            for (IR const* k = iterInitC(STPR_rhs(ir), ii);
-                 k != NULL; k = iterNextC(ii)) {
-                VN * x2 = m_ir2vn.get(IR_id(k));
-                dump_h1(k, x2);
-            }
-            break;
-        case IR_PHI:
-            ii.clean();
-            for (IR const* k = iterInitC(PHI_opnd_list(ir), ii);
-                k != NULL; k = iterNextC(ii)) {
-                VN * x2 = m_ir2vn.get(IR_id(k));
-                dump_h1(k, x2);
-            }
-            break;
-        case IR_IST:
-            ii.clean();
-            for (IR const* k = iterInitC(IST_rhs(ir), ii);
-                 k != NULL; k = iterNextC(ii)) {
-                VN * x2 = m_ir2vn.get(IR_id(k));
-                dump_h1(k, x2);
-            }
-
-            ii.clean();
-            for (IR const* k = iterInitC(IST_base(ir), ii);
-                 k != NULL; k = iterNextC(ii)) {
-                VN * x2 = m_ir2vn.get(IR_id(k));
-                dump_h1(k, x2);
-            }
-            break;
-        case IR_CALL:
-        case IR_ICALL:
-            ii.clean();
-            for (IR const* k = iterInitC(CALL_param_list(ir), ii);
-                 k != NULL; k = iterNextC(ii)) {
-                VN * x2 = m_ir2vn.get(IR_id(k));
-                dump_h1(k, x2);
-            }
-            break;
-        case IR_TRUEBR:
-        case IR_FALSEBR:
-            ii.clean();
-            for (IR const* k = iterInitC(BR_det(ir), ii);
-                 k != NULL; k = iterNextC(ii)) {
-                VN * x2 = m_ir2vn.get(IR_id(k));
-                dump_h1(k, x2);
-            }
-            break;
-        case IR_SWITCH:
-            ii.clean();
-            for (IR const* k = iterInitC(SWITCH_vexp(ir), ii);
-                 k != NULL; k = iterNextC(ii)) {
-                VN * x2 = m_ir2vn.get(IR_id(k));
-                dump_h1(k, x2);
-            }
-            break;
-        case IR_IGOTO:
-            ii.clean();
-            for (IR const* k = iterInitC(IGOTO_vexp(ir), ii);
-                 k != NULL; k = iterNextC(ii)) {
-                VN * x2 = m_ir2vn.get(IR_id(k));
-                dump_h1(k, x2);
-            }
-            break;
-        case IR_RETURN:
-            ii.clean();
-            for (IR const* k = iterInitC(RET_exp(ir), ii);
-                 k != NULL; k = iterNextC(ii)) {
-                VN * x2 = m_ir2vn.get(IR_id(k));
-                dump_h1(k, x2);
-            }
-            break;
-        case IR_GOTO: break;
-        case IR_REGION: break;
-        default: UNREACHABLE();
+        ii.clean();
+        bool dumped = false;
+        for (IR const* k = iterRhsInitC(ir, ii);
+             k != NULL; k = iterNextC(ii)) {
+            dumped = true;
+            VN const* vn = m_ir2vn.get(k->id());
+            dump_h1(k, vn);
+        }
+        if (dumped) {
+            note("\n");
         }
         prt(" }");
     }

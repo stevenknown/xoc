@@ -44,5 +44,8 @@ OPT_OBJS +=\
 ../opt/ir_loop_cvt.o\
 ../opt/refine_duchain.o\
 ../opt/prssainfo.o\
+../opt/scalar_opt.o\
+../opt/liveness_mgr.o\
+../opt/mdliveness_mgr.o\
 ../opt/symtab.o
 

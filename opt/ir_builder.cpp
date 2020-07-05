@@ -153,7 +153,7 @@ IR * Region::buildLogicalOp(IR_TYPE irt, IR * opnd0, IR * opnd1)
 
 
 //Build IR_ID operation.
-IR * Region::buildId(VAR * var)
+IR * Region::buildId(Var * var)
 {
     ASSERT0(var);
     IR * ir = allocIR(IR_ID);
@@ -170,16 +170,16 @@ IR * Region::buildLdaString(CHAR const* varname, CHAR const * string)
 }
 
 
-IR * Region::buildLdaString(CHAR const* varname, SYM * string)
+IR * Region::buildLdaString(CHAR const* varname, Sym * string)
 {
     ASSERT0(string);
-    VAR * v = getVarMgr()->registerStringVar(varname, string, MEMORY_ALIGNMENT);
+    Var * v = getVarMgr()->registerStringVar(varname, string, MEMORY_ALIGNMENT);
     return buildLda(v);
 }
 
 
 //Build IR_LDA operation.
-IR * Region::buildLda(VAR * var)
+IR * Region::buildLda(Var * var)
 {
     ASSERT0(var);
     IR * ir = allocIR(IR_LDA);
@@ -191,7 +191,7 @@ IR * Region::buildLda(VAR * var)
 
 //Build IR_CONST operation.
 //The result IR indicates a string.
-IR * Region::buildString(SYM const* strtab)
+IR * Region::buildString(Sym const* strtab)
 {
     ASSERT0(strtab);
     IR * str = allocIR(IR_CONST);
@@ -313,7 +313,7 @@ IR * Region::buildPhi(UINT prno, Type const* type, IR * opnd_list)
 //'result_prno': indicate the result PR which hold the return value.
 //    0 means the call does not have a return value.
 //'type': result PR data type.
-IR * Region::buildCall(VAR * callee,
+IR * Region::buildCall(Var * callee,
                        IR * param_list,
                        UINT result_prno,
                        Type const* type)
@@ -421,7 +421,7 @@ IR * Region::buildGoto(LabelInfo const* li)
 
 
 //Build IR_LD operation.
-IR * Region::buildLoad(IN VAR * var)
+IR * Region::buildLoad(IN Var * var)
 {
     ASSERT0(var);
     return buildLoad(var, VAR_type(var));
@@ -431,7 +431,7 @@ IR * Region::buildLoad(IN VAR * var)
 //Build IR_LD operation.
 //Load value from variable with type 'type'.
 //'type': result value type.
-IR * Region::buildLoad(VAR * var, Type const* type)
+IR * Region::buildLoad(Var * var, Type const* type)
 {
     ASSERT0(type);
     ASSERT0(var);
@@ -593,7 +593,7 @@ IR * Region::buildStorePR(Type const* type, IR * rhs)
 //Build IR_ST operation.
 //'lhs': memory variable, described target memory location.
 //'rhs: value expected to store.
-IR * Region::buildStore(VAR * lhs, IR * rhs)
+IR * Region::buildStore(Var * lhs, IR * rhs)
 {
     ASSERT0(lhs && rhs);
     return buildStore(lhs, VAR_type(lhs), rhs);
@@ -604,7 +604,7 @@ IR * Region::buildStore(VAR * lhs, IR * rhs)
 //'lhs': target memory location.
 //'type: result data type.
 //'rhs: value expected to store.
-IR * Region::buildStore(VAR * lhs, Type const* type, IR * rhs)
+IR * Region::buildStore(Var * lhs, Type const* type, IR * rhs)
 {
     ASSERT0(type);
     ASSERT0(lhs && rhs && rhs->is_exp());
@@ -622,7 +622,7 @@ IR * Region::buildStore(VAR * lhs, Type const* type, IR * rhs)
 //'type: result data type.
 //'ofst': memory byte offset relative to lhs.
 //'rhs: value expected to store.
-IR * Region::buildStore(VAR * lhs, Type const* type, UINT ofst, IR * rhs)
+IR * Region::buildStore(Var * lhs, Type const* type, UINT ofst, IR * rhs)
 {
     ASSERT0(type);
     IR * ir = buildStore(lhs, type, rhs);

@@ -46,9 +46,9 @@ author: Su Zhenyu
 #include "dex_util.h"
 
 //Add a variable of CLASS.
-VAR * DexRegionMgr::addVarForBuiltin(CHAR const* name)
+Var * DexRegionMgr::addVarForBuiltin(CHAR const* name)
 {
-    SYM * sym = addToSymbolTab(name);
+    Sym * sym = addToSymbolTab(name);
     return getVarMgr()->registerVar(sym, getTypeMgr()->getAny(),
         0, VAR_FUNC_DECL|VAR_GLOBAL);
 }
@@ -57,7 +57,7 @@ VAR * DexRegionMgr::addVarForBuiltin(CHAR const* name)
 void DexRegionMgr::initBuiltin()
 {
     for (UINT i = BLTIN_UNDEF + 1; i < BLTIN_LAST; i++) {
-        VAR * v = addVarForBuiltin(BLTIN_name((BLTIN_TYPE)i));
+        Var * v = addVarForBuiltin(BLTIN_name((BLTIN_TYPE)i));
         m_var2blt.set(v, i);
         m_blt2var.set(i, v);
         getSym2Var().set(addToSymbolTab(BLTIN_name((BLTIN_TYPE)i)), v);
@@ -69,7 +69,7 @@ void DexRegionMgr::addBuiltinVarToTab()
 {
     ASSERT0(getProgramRegion());
     for (UINT i = BLTIN_UNDEF + 1; i < BLTIN_LAST; i++) {
-        VAR * v = getSym2Var().get(addToSymbolTab(BLTIN_name((BLTIN_TYPE)i)));
+        Var * v = getSym2Var().get(addToSymbolTab(BLTIN_name((BLTIN_TYPE)i)));
         ASSERT0(v);
         getProgramRegion()->addToVarTab(v);
     }

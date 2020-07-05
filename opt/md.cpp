@@ -86,7 +86,7 @@ bool MD::is_may_cover(MD const* m) const
 //  m:            |----|
 //CASE2:
 //  current md: |---------|
-//  m:            |--..--|
+//  m(range):     |--..--|
 bool MD::is_exact_cover(MD const* m) const
 {
     ASSERT0(m);
@@ -170,6 +170,8 @@ void MD::dump(TypeMgr * dm) const
 //
 //Get unique MD that is not fake memory object,
 //but its offset might be invalid.
+//Note the MDSet can only contain one element.
+//Return the effect MD if found, otherwise return NULL.
 MD * MDSet::get_effect_md(MDSystem * ms) const
 {
     ASSERT0(ms);
@@ -292,6 +294,57 @@ bool MDSet::is_contain_inexact(MDSystem * ms) const
 }
 
 
+//Return true if set contained md.
+bool MDSet::is_contain(MD const* md) const
+{
+    if (md->is_global() &&
+        DefSBitSetCore::is_contain(MD_GLOBAL_VAR) &&
+        MD_id(md) != MD_IMPORT_VAR) {
+        return true;
+    }
+
+    //TO BE CONFIRMED: Does it necessary to judge if either current
+    //MD or input MD is FULL_MEM?
+    //As we observed, passes that utilize MD relationship add
+    //MD2 to accroding IR's MDSet, which can keep global variables
+    //and MD2 dependence.
+    //e.g: g=10, #mustdef=MD10, maydef={MD2, MD10}, g is global variable that
+    //           #represented in Program Region.
+    //     foo(); #maydef={MD2, MD10}
+    //if (DefSBitSetCore::is_contain(MD_FULL_MEM)) {
+    //    return true;
+    //}
+
+    return DefSBitSetCore::is_contain(MD_id(md));
+}
+
+
+//Return true if set only contained the md that has been taken address.
+bool MDSet::is_contain_only_taken_addr(MD const* md) const
+{
+    if (md->is_global() &&
+        md->get_base()->is_addr_taken() &&
+        DefSBitSetCore::is_contain(MD_GLOBAL_VAR) &&        
+        MD_id(md) != MD_IMPORT_VAR) {
+        return true;
+    }
+
+    //TO BE CONFIRMED: Does it necessary to judge if either current
+    //MD or input MD is FULL_MEM?
+    //As we observed, passes that utilize MD relationship add
+    //MD2 to accroding IR's MDSet, which can keep global variables
+    //and MD2 dependence.
+    //e.g: g=10, #mustdef=MD10, maydef={MD2, MD10}, g is global variable that
+    //           #represented in Program Region.
+    //     foo(); #maydef={MD2, MD10}
+    //if (DefSBitSetCore::is_contain(MD_FULL_MEM)) {
+    //    return true;
+    //}
+
+    return DefSBitSetCore::is_contain(MD_id(md));
+}
+
+
 //Return true if md is overlap with the elements in set.
 bool MDSet::is_overlap(MD const* md, Region * current_ru) const
 {
@@ -317,6 +370,44 @@ bool MDSet::is_overlap(MD const* md, Region * current_ru) const
     //}
 
     if (DefSBitSetCore::is_contain(MD_IMPORT_VAR) &&
+        !current_ru->isRegionVAR(md->get_base())) {
+        //If current MDSet contains imported variable, it
+        //overlaps with IMPORT_VAR.
+        return true;
+    }
+    return DefSBitSetCore::is_contain(MD_id(md));
+}
+
+
+//Return true if md is overlap with the elements in set.
+bool MDSet::is_overlap_only_taken_addr(MD const* md, Region * current_ru) const
+{
+    ASSERT0(current_ru);
+    Var const* base = md->get_base();
+    ASSERT0(base);
+
+    if (md->is_global() &&
+        base->is_addr_taken() &&
+        DefSBitSetCore::is_contain(MD_GLOBAL_VAR) &&        
+        MD_id(md) != MD_IMPORT_VAR) {
+        return true;
+    }
+
+    //TO BE CONFIRMED: Does it necessary to judge if either current
+    //MD or input MD is FULL_MEM?
+    //As we observed, passes that utilize MD relationship add
+    //MD2 to accroding IR's MDSet, which can keep global variables
+    //and MD2 dependence.
+    //e.g: g=10, #mustdef=MD10, maydef={MD2, MD10}, g is global variable that
+    //           #represented in Program Region.
+    //     foo(); #maydef={MD2, MD10}
+    //if ((DefSBitSetCore::is_contain(MD_FULL_MEM)) ||
+    //    (MD_id(md) == MD_FULL_MEM && !DefSBitSetCore::is_empty())) {
+    //    return true;
+    //}
+
+    if (DefSBitSetCore::is_contain(MD_IMPORT_VAR) &&
+        base->is_addr_taken() &&
         !current_ru->isRegionVAR(md->get_base())) {
         //If current MDSet contains imported variable, it
         //overlaps with IMPORT_VAR.
@@ -371,6 +462,27 @@ void MDSet::bunion(MDSet const& mds, DefMiscBitSetMgr & mbsmgr)
     //}
 
     DefSBitSetCore::bunion((DefSBitSetCore&)mds, mbsmgr);
+}
+
+
+//This function will walk through whole current MDSet and differenciate
+//overlapped elements.
+//Note this function is very costly.
+void MDSet::diffAllOverlapped(UINT id,
+                              DefMiscBitSetMgr & m,
+                              MDSystem const* sys)
+{
+    MDSetIter iter;
+    MD const* srcmd = const_cast<MDSystem*>(sys)->getMD(id);
+    INT next_i;
+    for (INT i = get_first(&iter); i >= 0; i = next_i) {
+        next_i = get_next(i, &iter);
+        MD const* tgtmd = const_cast<MDSystem*>(sys)->getMD(i);
+        ASSERT0(tgtmd);
+        if (srcmd->is_exact_cover(tgtmd)) {
+            diff(i, m);
+        }
+    }
 }
 
 
@@ -595,13 +707,13 @@ void MD2MDSet::dump(Region * rg)
         }
     }
 
-    //Dump set of MD that corresponding to an individual VAR.
-    note("\n==-- DUMP the mapping from VAR to MDSet --==");
+    //Dump set of MD that corresponding to an individual Var.
+    note("\n==-- DUMP the mapping from Var to MDSet --==");
     VarVec * var_tab = rg->getVarMgr()->get_var_vec();
     Vector<MD const*> mdv;
     ConstMDIter iter;
     for (INT i = 0; i <= var_tab->get_last_idx(); i++) {
-        VAR * v = var_tab->get(i);
+        Var * v = var_tab->get(i);
         if (v == NULL) { continue; }
 
         MDTab * mdtab = ms->getMDTab(v);
@@ -632,7 +744,7 @@ void MD2MDSet::dump(Region * rg)
 //START MDSystem
 //
 //Register MD and generating unique id for it, with the followed method:
-//1. Generating MD hash table for any unique VAR.
+//1. Generating MD hash table for any unique Var.
 //2. Entering 'md' into MD hash table, the hash-value comes
 //    from an evaluating binary-Tree that the branch of
 //    tree-node indicate determination data related with MD fields.
@@ -658,7 +770,7 @@ MD const* MDSystem::registerMD(MD const& m)
     //Check if MD has been registerd.
     MDTab * mdtab = getMDTab(MD_base(&m));
     if (mdtab != NULL) {
-        //VAR-base has been registered, then check md by
+        //Var-base has been registered, then check md by
         //offset in md-table.
         MD const* hash_entry = mdtab->find(&m);
         if (hash_entry != NULL) {
@@ -700,7 +812,7 @@ MD const* MDSystem::registerMD(MD const& m)
         m_var2mdtab.set(MD_base(entry), mdtab);
     }
 
-    //Insert entry into MDTab of VAR.
+    //Insert entry into MDTab of Var.
     mdtab->append(entry);
     m_id2md_map.set(MD_id(entry), entry);
     return entry;
@@ -708,7 +820,7 @@ MD const* MDSystem::registerMD(MD const& m)
 
 
 //Register an effectively unbound MD that base is 'var'.
-MD const* MDSystem::registerUnboundMD(VAR * var, UINT size)
+MD const* MDSystem::registerUnboundMD(Var * var, UINT size)
 {
     MD md;
     MD_base(&md) = var;
@@ -754,11 +866,11 @@ void MDSystem::initImportVar(VarMgr * vm)
     //region.
     //e.g:
     //  Program Region {
-    //    VAR a; # global variable
+    //    Var a; # global variable
     //    Func Region {
-    //      VAR b; # local
+    //      Var b; # local
     //      Func Region {
-    //        VAR c; # local
+    //        Var c; # local
     //        c = b # b is regarded as the variable that located in
     //              # IMPORT variable set.
     //      }
@@ -820,7 +932,7 @@ void MDSystem::destroy()
 {
     Var2MDTabIter iter;
     MDTab * mdtab;
-    for (VAR const* var = m_var2mdtab.get_first(iter, &mdtab);
+    for (Var const* var = m_var2mdtab.get_first(iter, &mdtab);
          var != NULL; var = m_var2mdtab.get_next(iter, &mdtab)) {
         delete mdtab;
     }
@@ -1058,7 +1170,7 @@ void MDSystem::clean()
 {
     Var2MDTabIter iter;
     MDTab * mdtab;
-    for (VAR const* var = m_var2mdtab.get_first(iter, &mdtab);
+    for (Var const* var = m_var2mdtab.get_first(iter, &mdtab);
          var != NULL; var = m_var2mdtab.get_next(iter, &mdtab)) {
         mdtab->clean();
     }
@@ -1095,7 +1207,7 @@ void MDSystem::dump(bool only_dump_nonpr_md)
 
 
 //Remove all MDs related to specific variable 'v'.
-void MDSystem::removeMDforVAR(VAR const* v, ConstMDIter & iter)
+void MDSystem::removeMDforVAR(Var const* v, ConstMDIter & iter)
 {
     ASSERT0(v);
     MDTab * mdtab = getMDTab(v);

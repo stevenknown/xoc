@@ -287,7 +287,7 @@ public:
 };
 
 
-typedef TMap<VAR*, MD const*, CompareVar> Var2MD;
+typedef TMap<Var*, MD const*, CompareVar> Var2MD;
 typedef TMap<IR const*, MD const*> IR2Heapobj;
 
 
@@ -397,7 +397,7 @@ protected:
     void initBBPPSet(PPSetMgr & ppsetmgr);
     void initFlowSensitiveEntryPtset(PPSetMgr & ppsetmgr);
     void initEntryPtset(PPSetMgr & ppsetmgr);
-    void initGlobalAndParameterVarPtSet(VAR * v, MD2MDSet * mx);
+    void initGlobalAndParameterVarPtSet(Var * v, MD2MDSet * mx);
     void inferPointerArith(IR const* ir,
                            OUT MDSet & mds,
                            MDSet const& opnd0_mds,

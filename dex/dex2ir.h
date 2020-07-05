@@ -138,12 +138,12 @@ public:
         smpoolDelete(m_pool);
     }
 
-    VAR * addVarByName(CHAR const* name, Type const* ty);
-    VAR * addClassVar(UINT class_id, LIR * lir);
-    VAR * addStringVar(CHAR const* string);
-    VAR * addFieldVar(UINT field_id, Type const* ty);
-    VAR * addStaticVar(UINT field_id, Type const* ty);
-    VAR * addFuncVar(UINT method_id, Type const* ty);
+    Var * addVarByName(CHAR const* name, Type const* ty);
+    Var * addClassVar(UINT class_id, LIR * lir);
+    Var * addStringVar(CHAR const* string);
+    Var * addFieldVar(UINT field_id, Type const* ty);
+    Var * addStaticVar(UINT field_id, Type const* ty);
+    Var * addFuncVar(UINT method_id, Type const* ty);
 
     UINT computeClassPosid(UINT cls_id_in_tytab);
     UINT computeFieldOffset(UINT field_id);
@@ -213,7 +213,7 @@ public:
     Type const* mapDexType2XocType(CHAR charty);
     Type const* mapFieldType2Type(UINT field_id);
 
-    void set_map_v2ofst(VAR * v, UINT ofst);
+    void set_map_v2ofst(Var * v, UINT ofst);
 };
 
 #endif
