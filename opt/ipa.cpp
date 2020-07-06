@@ -159,7 +159,7 @@ void IPA::createCallDummyuse(OptCtx & oc)
         Region * rg = m_rumgr->getRegion(i);
         if (rg == NULL) { continue; }
         createCallDummyuse(rg);
-        if (g_compute_classic_du_chain) {
+        if (g_compute_pr_du_chain && g_compute_nonpr_du_chain) {
             OptCtx * loc = m_rumgr->getAndGenOptCtx(rg->id());
             ASSERT0(loc);
             recomputeDUChain(rg, *loc);
@@ -168,7 +168,7 @@ void IPA::createCallDummyuse(OptCtx & oc)
             }
         }
     }
-    if (g_compute_classic_du_chain) {
+    if (g_compute_pr_du_chain && g_compute_nonpr_du_chain) {
         OC_is_pr_du_chain_valid(oc) = true;
         OC_is_nonpr_du_chain_valid(oc) = true;
         if (m_is_keep_reachdef) {

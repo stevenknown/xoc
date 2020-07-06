@@ -91,27 +91,21 @@ void Region::HighProcessImpl(OptCtx & oc)
             f |= DUOPT_SOL_REGION_REF;
         }
 
-        if (g_compute_classic_du_chain) {
+        if (g_compute_pr_du_chain || g_compute_nonpr_du_chain) {
+            //Compute classic du chain.
             f |= DUOPT_SOL_REACH_DEF;
         }
 
         if (dumgr->perform(oc, f) && OC_is_ref_valid(oc)) {
-            if (g_compute_classic_du_chain) {
-                UINT flag = DUOPT_COMPUTE_NONPR_DU;
-                ASSERT0(getPassMgr());
-
-                //If PRs have already been in SSA form, compute
-                //PR DU chain doesn't make any sense.
-                PRSSAMgr * ssamgr = NULL;
-                if ((ssamgr = (PRSSAMgr*)getPassMgr()->
-                     queryPass(PASS_PR_SSA_MGR)) == NULL ||
-                    !ssamgr->isSSAConstructed()) {
-                    flag |= DUOPT_COMPUTE_PR_DU;
-                }
-
-                dumgr->computeMDDUChain(oc, false, flag);
+            UINT flag = 0;
+            if (g_compute_pr_du_chain) {
+                flag |= DUOPT_COMPUTE_PR_DU;
             }
-        }
+            if (g_compute_nonpr_du_chain) {
+                flag |= DUOPT_COMPUTE_NONPR_DU;
+            }
+            dumgr->computeMDDUChain(oc, false, flag);
+         }
     }
 
     if (g_do_expr_tab) {

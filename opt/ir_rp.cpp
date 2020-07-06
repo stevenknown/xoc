@@ -1047,7 +1047,7 @@ void RegPromot::buildPRDUChain(IR * def, IR * use)
     if (usePRSSADU()) {
         //WORKAROUND|FIXME:For now, we do not support incremental update PRSSA.
         //rebuild PRSSA if DU changed.
-        //m_ssamgr->buildDUChain(def, use);
+        //m_prssamgr->buildDUChain(def, use);
         m_need_rebuild_prssa = true;
     } else {
         m_du->buildDUChain(def, use);
@@ -1500,8 +1500,8 @@ void RegPromot::handleAccessInBody(
             //Add du chain between new PR and the generated STPR.
             IR * stpr = delegate2stpr.get(delegate);
             ASSERT0(stpr);
-            if (m_ssamgr != NULL) {
-                m_ssamgr->buildDUChain(stpr, pr);
+            if (m_prssamgr != NULL) {
+                m_prssamgr->buildDUChain(stpr, pr);
             } else {
                 m_du->buildDUChain(stpr, pr);
             }
@@ -1967,18 +1967,6 @@ bool RegPromot::EvaluableScalarReplacement(List<LI<IRBB> const*> & worklst)
 }
 
 
-bool RegPromot::useMDSSADU() const
-{
-    return m_mdssamgr != NULL && m_mdssamgr->isMDSSAConstructed();
-}
-
-
-bool RegPromot::usePRSSADU() const
-{
-    return m_ssamgr != NULL && m_ssamgr->isSSAConstructed();
-}
-
-
 void RegPromot::init()
 {
     m_is_insert_bb = false;
@@ -1992,8 +1980,8 @@ void RegPromot::dump()
     note("\n==---- DUMP RegPromotion ----==");
     //dump_mdlt();
     dumpBBList(m_rg->getBBList(), m_rg);
-    if (m_ssamgr != NULL && m_ssamgr->isSSAConstructed()) {
-        m_ssamgr->dump();
+    if (m_prssamgr != NULL && m_prssamgr->isSSAConstructed()) {
+        m_prssamgr->dump();
     }
     if (m_mdssamgr != NULL && m_mdssamgr->isMDSSAConstructed()) {
         m_mdssamgr->dump();
@@ -2010,18 +1998,18 @@ bool RegPromot::perform(OptCtx & oc)
     if (!OC_is_ref_valid(oc)) { return false; }
     if (!OC_is_cfg_valid(oc)) { return false; }
     //Check PR DU chain.
-    m_ssamgr = (PRSSAMgr*)(m_rg->getPassMgr()->queryPass(PASS_PR_SSA_MGR));
-    if (!OC_is_pr_du_chain_valid(oc) && m_ssamgr == NULL) { 
+    m_prssamgr = (PRSSAMgr*)(m_rg->getPassMgr()->queryPass(PASS_PR_SSA_MGR));
+    if (!OC_is_pr_du_chain_valid(oc) && usePRSSADU()) { 
         //At least one kind of DU chain should be avaiable.
         return false;
     }
     //Check NONPR DU chain.
     m_mdssamgr = (MDSSAMgr*)(m_rg->getPassMgr()->queryPass(PASS_MD_SSA_MGR));
-    if (!OC_is_nonpr_du_chain_valid(oc) && m_mdssamgr == NULL) {
+    if (!OC_is_nonpr_du_chain_valid(oc) && useMDSSADU()) {
         //At least one kind of DU chain should be avaiable.
         return false;
     }
- 
+
     START_TIMER(t, getPassName());
     LI<IRBB> const* li = m_cfg->getLoopInfo();
     if (li == NULL) { return false; }
@@ -2059,8 +2047,8 @@ bool RegPromot::perform(OptCtx & oc)
     if (m_need_rebuild_prssa) {
         //WORKAROUND|FIXME:For now, we do not support incremental update PRSSA.
         //rebuild PRSSA if DU changed.
-        ASSERT0(m_ssamgr);
-        m_ssamgr->construction(oc);
+        ASSERT0(m_prssamgr);
+        m_prssamgr->construction(oc);
         ASSERT0(m_mdssamgr);
         m_mdssamgr->construction(oc);
     }

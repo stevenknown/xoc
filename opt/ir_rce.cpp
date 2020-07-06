@@ -111,7 +111,7 @@ IR * RCE::calcCondMustVal(IN IR * ir,
 }
 
 
-IR * RCE::processBranch(IR * ir, IN OUT bool & cfg_mod)
+IR * RCE::processBranch(IR * ir, IN OUT bool * cfg_mod)
 {
     ASSERT0(ir->isConditionalBr());
     bool must_true, must_false, changed = false;
@@ -130,7 +130,7 @@ IR * RCE::processBranch(IR * ir, IN OUT bool & cfg_mod)
             //Revise the PHI operand to fallthrough successor.
             //Revise cfg. remove fallthrough edge.
             m_cfg->removeEdge(from, to);
-            cfg_mod = true;
+            *cfg_mod = true;
             return newbr;
         } else if (must_false) {
             //TRUEBR(0x0), never jump.
@@ -143,7 +143,7 @@ IR * RCE::processBranch(IR * ir, IN OUT bool & cfg_mod)
 
             //Revise the PHI operand to target successor.
             m_cfg->removeEdge(from, to);
-            cfg_mod = true;
+            *cfg_mod = true;
             return NULL;
         }
     } else {
@@ -158,7 +158,7 @@ IR * RCE::processBranch(IR * ir, IN OUT bool & cfg_mod)
 
             //Revise the PHI operand to target successor.
             m_cfg->removeEdge(from, to);
-            cfg_mod = true;
+            *cfg_mod = true;
             return NULL;
         } else if (must_false) {
             //FALSEBR(0x0), always jump.
@@ -173,7 +173,7 @@ IR * RCE::processBranch(IR * ir, IN OUT bool & cfg_mod)
             //Revise the PHI operand to fallthrough successor.
             //Revise m_cfg. remove fallthrough edge.
             m_cfg->removeEdge(from, to);
-            cfg_mod = true;
+            *cfg_mod = true;
             return newbr;
         }
     }
@@ -219,7 +219,7 @@ IR * RCE::processStorePR(IR * ir)
 //e.g:
 //1. if (a == a) { ... } , remove redundant comparation.
 //2. b = b; remove redundant store.
-bool RCE::performSimplyRCE(IN OUT bool & cfg_mod)
+bool RCE::performSimplyRCE(IN OUT bool * cfg_mod)
 {
     BBList * bbl = m_rg->getBBList();
     bool change = false;
@@ -270,69 +270,39 @@ bool RCE::perform(OptCtx & oc)
 {
     BBList * bbl = m_rg->getBBList();
     if (bbl == NULL || bbl->get_elem_count() == 0) { return false; }
-    if (!OC_is_ref_valid(oc)) { return false; }
+
     if (!OC_is_cfg_valid(oc)) { return false; }
-    //Check PR DU chain.
-    PRSSAMgr * ssamgr = (PRSSAMgr*)(m_rg->getPassMgr()->queryPass(
-        PASS_PR_SSA_MGR));
-    if (ssamgr != NULL && ssamgr->isSSAConstructed()) {
-        m_ssamgr = ssamgr;
-    } else {
-        m_ssamgr = NULL;
-    }
-    if (!OC_is_pr_du_chain_valid(oc) && m_ssamgr == NULL) { 
+    if (!OC_is_ref_valid(oc)) { return false; }
+    m_mdssamgr = (MDSSAMgr*)m_rg->getPassMgr()->queryPass(PASS_MD_SSA_MGR);
+    m_prssamgr = (PRSSAMgr*)m_rg->getPassMgr()->queryPass(PASS_PR_SSA_MGR);
+    if (!OC_is_pr_du_chain_valid(oc) && !usePRSSADU()) {
+        //DCE use either classic PR DU chain or PRSSA.
         //At least one kind of DU chain should be avaiable.
         return false;
     }
-    //Check NONPR DU chain.
-    MDSSAMgr * mdssamgr = (MDSSAMgr*)(m_rg->getPassMgr()->queryPass(
-        PASS_MD_SSA_MGR));
-    if (mdssamgr != NULL && mdssamgr->isMDSSAConstructed()) {
-        m_mdssamgr = mdssamgr;
-    } else {
-        m_mdssamgr = NULL;
-    }
-    if (!OC_is_nonpr_du_chain_valid(oc) && m_mdssamgr == NULL) {
+    if (!OC_is_nonpr_du_chain_valid(oc) && !useMDSSADU()) {
+        //DCE use either classic MD DU chain or MDSSA.
         //At least one kind of DU chain should be avaiable.
         return false;
     }
 
     START_TIMER(t, getPassName());
-    m_rg->checkValidAndRecompute(&oc, PASS_CFG, PASS_UNDEF);
     if (!m_gvn->is_valid() && is_use_gvn()) {
         m_gvn->reperform(oc);
     }
 
     bool cfg_mod = false;
-    bool change = performSimplyRCE(cfg_mod);
+    bool change = performSimplyRCE(&cfg_mod);
     if (cfg_mod) {
-        //m_gvn->set_valid(false); //rce do not violate gvn for now.
-        bool lchange;
-        do {
-            lchange = false;
-            lchange |= m_cfg->removeUnreachBB();
-            lchange |= m_cfg->removeEmptyBB(oc);
-            lchange |= m_cfg->removeRedundantBranch();
-            lchange |= m_cfg->removeTrampolinEdge();
-        } while (lchange);
-
-        m_cfg->computeExitList();
-        //So far, a conservation policy applied if CFG changed. This
-        //lead to a lot of analysis info changed.
-        //TODO: have to check and may be the change of CFG does not
-        //influence the sanity of DU-chain and ir2mds.
-        oc.set_flag_if_cfg_changed();
-        OC_is_cfg_valid(oc) = true; //CFG has been maintained.
-        OC_is_expr_tab_valid(oc) = false;
-        OC_is_pr_du_chain_valid(oc) = false;
-        OC_is_nonpr_du_chain_valid(oc) = false;
-        OC_is_ref_valid(oc) = false;
-        OC_is_aa_valid(oc) = false;
-        OC_is_reach_def_valid(oc) = false;
-        OC_is_avail_reach_def_valid(oc) = false;
+        ASSERT0(change);
+        m_cfg->performMiscOpt(oc);
     }
     if (change) {
+        //CFG changed, remove empty BB.
+        //TODO: DO not recompute whole SSA/MDSSA. Instead, update
+        //SSA/MDSSA info especially PHI operands incrementally.
         ASSERT0(verifyPRSSAInfo(m_rg));
+        ASSERT0(verifyMDSSAInfo(m_rg));
     }
     END_TIMER(t, getPassName());
     return change;

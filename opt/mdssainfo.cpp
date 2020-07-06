@@ -316,7 +316,7 @@ void MDPhi::dump(Region const* rg, UseDefMgr const* mgr) const
         }
 
         if (pred == NULL) {
-            prt("(BB??)"); //Predecessor is not match with PHI, error occurred.
+            prt("(BB?)"); //Predecessor is not match with PHI, error occurred.
         } else {
             prt("(BB%d)", pred->id());            
         }

@@ -118,7 +118,7 @@ private:
     TypeMgr * m_tm;
     DUMgr * m_du;
     GVN * m_gvn;
-    PRSSAMgr * m_ssamgr;
+    PRSSAMgr * m_prssamgr;
     MDSSAMgr * m_mdssamgr;
     DontPromotTab m_dont_promot;
     xcom::BitSetMgr m_bs_mgr;
@@ -280,8 +280,10 @@ private:
                     TTab<IR*> & inexact_access,
                     List<IR*> & exact_occs);
 
-    bool useMDSSADU() const;
-    bool usePRSSADU() const;
+    bool useMDSSADU() const
+    { return m_mdssamgr != NULL && m_mdssamgr->isMDSSAConstructed(); }
+    bool usePRSSADU() const
+    { return m_prssamgr != NULL && m_prssamgr->isSSAConstructed(); }
 
     void * xmalloc(UINT size)
     {
@@ -304,7 +306,7 @@ public:
         m_mds_mgr = rg->getMDSetMgr();
         m_misc_bs_mgr = rg->getMiscBitSetMgr();
         m_gvn = NULL;
-        m_ssamgr = NULL;
+        m_prssamgr = NULL;
         m_mdssamgr = NULL;
         m_is_insert_bb = false;
         m_need_rebuild_prssa = false;

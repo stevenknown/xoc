@@ -243,15 +243,16 @@ typedef enum _PASS_TYPE {
 } PASS_TYPE;
 
 extern CHAR * g_func_or_bb_option;
-extern INT g_opt_level;
-extern bool g_do_refine;
+extern INT g_opt_level; //Represent optimization level.
+extern bool g_do_refine; //Perform peephole optimizations.
+//If true to insert IR_CVT by ir refinement.
 extern bool g_do_refine_auto_insert_cvt;
 extern bool g_is_hoist_type; //Hoist data type from less than INT to INT.
-extern bool g_do_ipa;
+extern bool g_do_ipa; //Perform interprocedual analysis and optimization.
 extern bool g_do_call_graph; //Build call graph.
-extern bool g_show_time;
-extern bool g_do_inline;
-extern UINT g_inline_threshold;
+extern bool g_show_time; //If true to show compilation time.
+extern bool g_do_inline; //Perform function inline.
+extern UINT g_inline_threshold; //Record the limit to inline.
 extern bool g_is_opt_float; //Optimize float point operation.
 extern bool g_is_lower_to_pr_mode; //Lower IR to PR mode.
 
@@ -260,23 +261,62 @@ extern bool g_is_lower_to_pr_mode; //Lower IR to PR mode.
 extern bool g_is_support_dynamic_type;
 extern bool g_do_pr_ssa; //Do optimization in SSA.
 extern bool g_do_md_ssa; //Do optimization in Memory SSA.
-extern bool g_do_cfg;
-extern bool g_do_rpo;
+extern bool g_do_cfg; //Build control flow graph.
+extern bool g_do_rpo; //Compute reverse-post-order.
 extern bool g_do_loop_ana; //loop analysis.
+//Perform cfg optimization: remove empty bb.
 extern bool g_do_cfg_remove_empty_bb;
+//Perform cfg optimization: remove unreachable bb from entry.
 extern bool g_do_cfg_remove_unreach_bb;
+
+//Perform cfg optimization: remove redundant trampoline bb.
+//e.g:
+//    BB1: goto L1
+//    BB2, L1: goto L2
+//should be optimized and generate:
+//    BB1: goto L2
 extern bool g_do_cfg_remove_trampolin_bb;
+
+//Perform cfg optimization: remove redundant branch.
+//e.g:
+//    BB1:
+//    falsebr L0 //S1
+//
+//    BB2:
+//    L0  //S2
+//    ... //S3
+//
+//S1 is redundant branch.
 extern bool g_do_cfg_remove_redundant_branch;
+
+//Perform cfg optimization: invert branch condition and
+//remove redundant trampoline bb.
+//e.g:
+//    truebr L4 | false L4
+//    goto L3
+//    L4
+//    ...
+//    L3:
+//    ...
 extern bool g_do_cfg_invert_condition_and_remove_trampolin_bb;
-extern bool g_do_cfg_dom;
-extern bool g_do_cfg_pdom;
-extern bool g_do_cdg;
-extern bool g_do_aa;
+extern bool g_do_cfg_dom; //Build dominator tree.
+extern bool g_do_cfg_pdom; //Build post dominator tree.
+extern bool g_do_cdg; //Build post dominator tree.
+extern bool g_do_aa; //Perform default alias analysis.
+//Perform DU analysis for MD to build du chain.
 extern bool g_do_md_du_analysis;
-extern bool g_compute_classic_du_chain;
+//Compute PR DU chain in classic method. 
+extern bool g_compute_pr_du_chain;
+//Compute NONPR DU chain in classic method.
+extern bool g_compute_nonpr_du_chain;
+//Computem available expression during du analysis to
+//build more precise du chain.
 extern bool g_compute_available_exp;
+//Computem imported MD which are defined and used in region.
 extern bool g_compute_region_imported_defuse_md;
+//Build expression table to record lexicographic equally IR expression.
 extern bool g_do_expr_tab;
+//Perform dead code elimination.
 extern bool g_do_dce;
 
 //Set true to eliminate control-flow-structures.
@@ -289,28 +329,52 @@ extern bool g_do_dce;
 //Aggressive DCE will remove the above dead cycle.
 extern bool g_do_dce_aggressive;
 extern bool g_do_cp_aggressive; //It may cost much compile time.
-extern bool g_do_cp;
-extern bool g_do_rp;
-extern bool g_do_gcse;
-extern bool g_do_lcse;
-extern bool g_do_pre;
+extern bool g_do_cp; //Perform copy propagation.
+extern bool g_do_rp; //Perform register promotion.
+extern bool g_do_gcse; //Perform global common subexpression elimination.
+extern bool g_do_lcse; //Perform local common subexpression elimination.
+extern bool g_do_pre; //Perform partial redundant elimination.
 extern bool g_do_rce; //light weight redundant code elimination
-extern bool g_do_dse;
-extern bool g_do_licm;
-extern bool g_do_ivr;
-extern bool g_do_gvn;
-extern bool g_do_cfs_opt;
+extern bool g_do_dse; //Perform dead store elimination.
+extern bool g_do_licm; //Perform loop invariant code motion.
+extern bool g_do_ivr; //Perform induction variable recognization.
+extern bool g_do_gvn; //Perform global value numbering.
+extern bool g_do_cfs_opt; //Perform control flow structure optimizations.
+
+//Build manager to reconstruct high level control flow structure IR.
+//This option is always useful if you want to perform optimization on
+//high level IR, such as IF, DO_LOOP, etc.
+//Note that if the CFS auxiliary information established, the
+//optimizations performed should not violate that.
 extern bool g_build_cfs;
 extern bool g_cst_bb_list; //Construct BB list.
+
+//Record the maximum limit of the number of IR to perform optimizations.
+//This is the threshold to do optimization.
 extern UINT g_thres_opt_ir_num;
+
+//Record the maximum limit of the number of BB to perform optimizations.
 extern UINT g_thres_opt_bb_num;
+
+//Record the maximum limit of the number of IR in single to
+//perform optimizations.
+//This is the threshold to do optimization.
 extern UINT g_thres_opt_ir_num_in_bb;
+
+//Record the maximum limit of the number of
+//PtPair to perform flow sensitive analysis.
 extern UINT g_thres_ptpair_num;
-extern bool g_do_loop_convert;
-extern bool g_do_poly_tran;
-extern bool g_do_refine_duchain;
-extern bool g_do_scalar_opt;
+
+extern bool g_do_loop_convert; //Convert while-do to do-while loop.
+extern bool g_do_poly_tran; //Polyhedral Transformations.
+extern bool g_do_refine_duchain; //Refine DefUse Chain.
+extern bool g_do_scalar_opt; //Perform versatile scalar optimizations.
+
+//Set to true to retain the PassMgr even if Region processing finished.
 extern bool g_retain_pass_mgr_for_region;
+
+//This variable show the verification level that compiler will perform.
+//More higher the level is, more verifications will be performed.
 extern UINT g_verify_level;
 
 //We always simplify parameters to lowest height to

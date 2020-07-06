@@ -67,10 +67,10 @@ void DeadCodeElim::dump()
     }
     note("\n");
     dumpBBList(m_rg->getBBList(), m_rg);
-    if (m_prssamgr != NULL && m_prssamgr->isSSAConstructed()) {
+    if (usePRSSADU()) {
         m_prssamgr->dump();
     }
-    if (m_mdssamgr != NULL && m_mdssamgr->isMDSSAConstructed()) {
+    if (useMDSSADU()) {
         m_mdssamgr->dump();
     }
     fflush(g_tfile);
@@ -321,7 +321,7 @@ bool DeadCodeElim::preserve_cd(IN OUT List<IR const*> & act_ir_lst)
 
 bool DeadCodeElim::collectByPRSSA(IR const* x, IN OUT List<IR const*> * pwlst2)
 {
-    ASSERT0(x->isReadPR() && PR_ssainfo(x));
+    ASSERT0(x->isReadPR() && PR_ssainfo(x) && usePRSSADU());
     IR const* d = PR_ssainfo(x)->getDef();
     if (d == NULL) { return false; }
     ASSERT0(d->is_stmt());
@@ -365,7 +365,7 @@ bool DeadCodeElim::collectAllDefThroughDefChain(
 
 bool DeadCodeElim::collectByMDSSA(IR const* x, IN OUT List<IR const*> * pwlst2)
 {
-    ASSERT0(x->isMemoryRefNotOperatePR() && m_mdssamgr);
+    ASSERT0(x->isMemoryRefNotOperatePR() && useMDSSADU());
     ASSERT0(x->is_exp()); 
     MDSSAInfo * mdssainfo = m_mdssamgr->getMDSSAInfoIfAny(x);
     if (mdssainfo == NULL ||
@@ -544,7 +544,8 @@ void DeadCodeElim::iter_collect(IN OUT List<IR const*> & work_list)
                     change |= collectByPRSSA(x, pwlst2);
                     continue;
                 }
-                if (m_mdssamgr->getMDSSAInfoIfAny(x) != NULL) {
+                if (m_mdssamgr != NULL &&
+                    m_mdssamgr->getMDSSAInfoIfAny(x) != NULL) {
                     change |= collectByMDSSA(x, pwlst2);
                     continue;
                 }
@@ -562,7 +563,7 @@ void DeadCodeElim::iter_collect(IN OUT List<IR const*> & work_list)
         List<IR const*> * tmp = pwlst1;
         pwlst1 = pwlst2;
         pwlst2 = tmp;
-    } //end while
+    }
 }
 
 
@@ -746,18 +747,16 @@ bool DeadCodeElim::perform(OptCtx & oc)
 {
     BBList * bbl = m_rg->getBBList();
     if (bbl == NULL || bbl->get_elem_count() == 0) { return false; }
+
     if (!OC_is_ref_valid(oc)) { return false; }
-    //Update object pointer every time.
     m_mdssamgr = (MDSSAMgr*)m_rg->getPassMgr()->queryPass(PASS_MD_SSA_MGR);
     m_prssamgr = (PRSSAMgr*)m_rg->getPassMgr()->queryPass(PASS_PR_SSA_MGR);
-    if ((!OC_is_pr_du_chain_valid(oc) &&
-         (m_prssamgr == NULL || !m_prssamgr->isSSAConstructed()))) {
+    if (!OC_is_pr_du_chain_valid(oc) && !usePRSSADU()) {
         //DCE use either classic PR DU chain or PRSSA.
         //At least one kind of DU chain should be avaiable.
         return false;
     }
-    if ((!OC_is_nonpr_du_chain_valid(oc) &&
-         (m_mdssamgr == NULL || !m_mdssamgr->isMDSSAConstructed()))) {
+    if (!OC_is_nonpr_du_chain_valid(oc) && !useMDSSADU()) {
         //DCE use either classic MD DU chain or MDSSA.
         //At least one kind of DU chain should be avaiable.
         return false;

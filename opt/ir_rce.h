@@ -38,18 +38,22 @@ namespace xoc {
 
 //Perform Redundant Code Elimination.
 class RCE : public Pass {
+    COPY_CONSTRUCTOR(RCE);
 protected:
     Region * m_rg;
     IRCFG * m_cfg;
     GVN * m_gvn;
     DUMgr * m_du;
-    PRSSAMgr * m_ssamgr;
+    PRSSAMgr * m_prssamgr;
     MDSSAMgr * m_mdssamgr;
-
     //Use GVN info to determine if code is redundant.
     //Note that compute GVN is expensive.
     bool m_use_gvn;
 
+    bool useMDSSADU() const
+    { return m_mdssamgr != NULL && m_mdssamgr->isMDSSAConstructed(); }
+    bool usePRSSADU() const
+    { return m_prssamgr != NULL && m_prssamgr->isSSAConstructed(); }
 public:
     RCE(Region * rg, GVN * gvn)
     {
@@ -61,19 +65,17 @@ public:
         ASSERT0(m_cfg && m_du);
         m_use_gvn = false;
     }
-    COPY_CONSTRUCTOR(RCE);
     virtual ~RCE() {}
 
-    IR * calcCondMustVal(
-            IN IR * ir,
-            OUT bool & must_true,
-            OUT bool & must_false,
-            bool & changed);
+    IR * calcCondMustVal(IN IR * ir,
+                         OUT bool & must_true,
+                         OUT bool & must_false,
+                         bool & changed);
 
     void dump();
+
     virtual CHAR const* getPassName() const
     { return "Redundant Code Elimination"; }
-
     PASS_TYPE getPassType() const { return PASS_RCE; }
 
     bool is_use_gvn() const { return m_use_gvn; }
@@ -82,8 +84,8 @@ public:
 
     IR * processStore(IR * ir);
     IR * processStorePR(IR * ir);
-    IR * processBranch(IR * ir, IN OUT bool & cfg_mod);
-    bool performSimplyRCE(IN OUT bool & cfg_mod);
+    IR * processBranch(IR * ir, IN OUT bool * cfg_mod);
+    bool performSimplyRCE(IN OUT bool * cfg_mod);
     virtual bool perform(OptCtx & oc);
 };
 

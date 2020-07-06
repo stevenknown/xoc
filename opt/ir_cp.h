@@ -71,6 +71,7 @@ public:
 
 //Perform Copy Propagation
 class CopyProp : public Pass {
+    COPY_CONSTRUCTOR(CopyProp);
 private:
     Region * m_rg;
     MDSystem * m_md_sys;
@@ -78,6 +79,8 @@ private:
     IRCFG * m_cfg;
     MDSetMgr * m_md_set_mgr;
     TypeMgr * m_tm;
+    PRSSAMgr * m_prssamgr;
+    MDSSAMgr * m_mdssamgr;
     UINT m_prop_kind;
 
 private:
@@ -130,6 +133,11 @@ private:
                             IR const* cand_expr,
                             IN OUT CPCtx & ctx);
 
+    bool useMDSSADU() const
+    { return m_mdssamgr != NULL && m_mdssamgr->isMDSSAConstructed(); }
+    bool usePRSSADU() const
+    { return m_prssamgr != NULL && m_prssamgr->isSSAConstructed(); }
+
 public:
     CopyProp(Region * rg)
     {
@@ -143,7 +151,6 @@ public:
         ASSERT0(m_cfg && m_du && m_md_sys && m_tm && m_md_set_mgr);
         m_prop_kind = CP_PROP_UNARY_AND_SIMPLEX;
     }
-    COPY_CONSTRUCTOR(CopyProp);
     virtual ~CopyProp() {}
 
     //Check if ir is appropriate for propagation.

@@ -56,7 +56,7 @@ INT g_opt_level = OPT_LEVEL0;
 //Construct bb list.
 bool g_cst_bb_list = true;
 
-//Build control flow structure.
+//Build control flow graph.
 bool g_do_cfg = true;
 
 //Compute reverse-post-order.
@@ -133,8 +133,11 @@ bool g_do_aa = true;
 //Perform DU analysis for MD to build du chain.
 bool g_do_md_du_analysis = true;
 
-//Compute DU chain.
-bool g_compute_classic_du_chain = false;
+//Compute PR DU chain.
+bool g_compute_pr_du_chain = false;
+
+//Compute NONPR DU chain.
+bool g_compute_nonpr_du_chain = false;
 
 //Computem available expression during du analysis to
 //build more precise du chain.
@@ -204,7 +207,7 @@ bool g_do_rp = false;
 bool g_do_pr_ssa = false;
 
 //Build Memory SSA and perform optimization based on Memory SSA.
-bool g_do_md_ssa = true;
+bool g_do_md_ssa = false;
 
 //Record the maximum limit of the number of BB to perform optimizations.
 UINT g_thres_opt_bb_num = 100000;

@@ -112,6 +112,11 @@ protected:
     void setEffectStmt(IR const* stmt,
                        IN OUT xcom::BitSet * is_bb_effect,
                        IN OUT List<IR const*> * act_ir_lst);
+
+    bool useMDSSADU() const
+    { return m_mdssamgr != NULL && m_mdssamgr->isMDSSAConstructed(); }
+    bool usePRSSADU() const
+    { return m_prssamgr != NULL && m_prssamgr->isSSAConstructed(); }
 public:
     explicit DeadCodeElim(Region * rg)
     {

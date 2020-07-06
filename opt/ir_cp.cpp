@@ -186,7 +186,8 @@ void CopyProp::replaceExp(IR * exp,
 
     ASSERT0(cand_expr->getStmt());
     SSAInfo * exp_ssainfo = exp->getSSAInfo();
-    MDSSAInfo * exp_mdssainfo = mdssamgr->getMDSSAInfoIfAny(exp);
+    MDSSAInfo * exp_mdssainfo = useMDSSADU() ?
+        mdssamgr->getMDSSAInfoIfAny(exp) : NULL;
     if (exp_ssainfo != NULL) {
         //Remove exp SSA use.
         ASSERT0(exp->getSSAInfo());
@@ -549,7 +550,8 @@ bool CopyProp::doProp(IN IRBB * bb,
         }
 
         SSAInfo * ssainfo = def_stmt->getSSAInfo();
-        MDSSAInfo * mdssainfo = mdssamgr->getMDSSAInfoIfAny(def_stmt);
+        MDSSAInfo * mdssainfo = useMDSSADU() ?
+            mdssamgr->getMDSSAInfoIfAny(def_stmt) : NULL;
         DUSet const* duset = NULL;
         bool prssadu = false;
         bool mdssadu = false;
@@ -685,20 +687,22 @@ bool CopyProp::perform(OptCtx & oc)
     ASSERT0(OC_is_cfg_valid(oc));
     bool is_org_pr_du_chain_valid = OC_is_pr_du_chain_valid(oc);
     bool is_org_nonpr_du_chain_valid = OC_is_nonpr_du_chain_valid(oc);
-    m_rg->checkValidAndRecompute(&oc, PASS_DOM, PASS_DU_REF, PASS_UNDEF);
 
-    PRSSAMgr * prssamgr = (PRSSAMgr*)m_rg->getPassMgr()->registerPass(
-        PASS_PR_SSA_MGR);
-    if (!prssamgr->isSSAConstructed()) {
-        prssamgr->construction(oc);
+    if (!OC_is_ref_valid(oc)) { return false; }
+    m_mdssamgr = (MDSSAMgr*)m_rg->getPassMgr()->queryPass(PASS_MD_SSA_MGR);
+    m_prssamgr = (PRSSAMgr*)m_rg->getPassMgr()->queryPass(PASS_PR_SSA_MGR);
+    if (!OC_is_pr_du_chain_valid(oc) && !usePRSSADU()) {
+        //DCE use either classic PR DU chain or PRSSA.
+        //At least one kind of DU chain should be avaiable.
+        return false;
+    }
+    if (!OC_is_nonpr_du_chain_valid(oc) && !useMDSSADU()) {
+        //DCE use either classic MD DU chain or MDSSA.
+        //At least one kind of DU chain should be avaiable.
+        return false;
     }
 
-    MDSSAMgr * mdssamgr = (MDSSAMgr*)m_rg->getPassMgr()->registerPass(
-        PASS_MD_SSA_MGR);
-    if (!mdssamgr->isMDSSAConstructed()) {
-        mdssamgr->construction(oc);
-    }
-
+    m_rg->checkValidAndRecompute(&oc, PASS_DOM, PASS_UNDEF);
     bool change = false;
     IRBB * entry = m_rg->getCFG()->getEntry();
     ASSERTN(entry, ("Not unique entry, invalid Region"));
@@ -712,11 +716,11 @@ bool CopyProp::perform(OptCtx & oc)
     for (xcom::Vertex * v = lst.get_head(); v != NULL; v = lst.get_next()) {
         IRBB * bb = m_cfg->getBB(v->id());
         ASSERT0(bb);
-        change |= doProp(bb, &useset, mdssamgr);
+        change |= doProp(bb, &useset, m_mdssamgr);
     }
     useset.clean(*m_rg->getMiscBitSetMgr());
     if (change) {
-        ASSERT0(mdssamgr == NULL || mdssamgr->verify());
+        ASSERT0(m_mdssamgr == NULL || m_mdssamgr->verify());
         doFinalRefine(oc);
     }
     END_TIMER(t, getPassName());
@@ -727,8 +731,8 @@ bool CopyProp::perform(OptCtx & oc)
     OC_is_aa_valid(oc) = false;
     OC_is_ref_valid(oc) = true; //already update.
     ASSERT0(m_rg->verifyMDRef());
-    if (mdssamgr != NULL && mdssamgr->isMDSSAConstructed()) {
-        ASSERT0(mdssamgr->verify());
+    if (useMDSSADU()) {
+        ASSERT0(m_mdssamgr->verify());
         OC_is_nonpr_du_chain_valid(oc) = false; //not update.
     } else {
         //Use classic DU chain.
@@ -737,7 +741,7 @@ bool CopyProp::perform(OptCtx & oc)
         OC_is_nonpr_du_chain_valid(oc) = true; //already update.
     }
     
-    if (prssamgr != NULL && prssamgr->isSSAConstructed()) {
+    if (usePRSSADU()) {
         //Use PRSSA.
         ASSERT0(verifyPRSSAInfo(m_rg));
         OC_is_pr_du_chain_valid(oc) = false; //not update.

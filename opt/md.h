@@ -405,7 +405,7 @@ public:
     }
 
     //Return true if set contained md.
-    inline bool is_contain(MD const* md) const;    
+    bool is_contain(MD const* md) const;    
 
     //Return true if set only contained the md that has been taken address.
     bool is_contain_only_taken_addr(MD const* md) const;
