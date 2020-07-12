@@ -47,5 +47,6 @@ OPT_OBJS +=\
 ../opt/scalar_opt.o\
 ../opt/liveness_mgr.o\
 ../opt/mdliveness_mgr.o\
+../opt/du_helper.o\
 ../opt/symtab.o
 

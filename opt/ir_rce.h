@@ -46,14 +46,15 @@ protected:
     DUMgr * m_du;
     PRSSAMgr * m_prssamgr;
     MDSSAMgr * m_mdssamgr;
+    Refine * m_refine;
     //Use GVN info to determine if code is redundant.
     //Note that compute GVN is expensive.
     bool m_use_gvn;
 
     bool useMDSSADU() const
-    { return m_mdssamgr != NULL && m_mdssamgr->isMDSSAConstructed(); }
+    { return m_mdssamgr != NULL && m_mdssamgr->is_valid(); }
     bool usePRSSADU() const
-    { return m_prssamgr != NULL && m_prssamgr->isSSAConstructed(); }
+    { return m_prssamgr != NULL && m_prssamgr->is_valid(); }
 public:
     RCE(Region * rg, GVN * gvn)
     {
@@ -64,6 +65,9 @@ public:
         m_du = m_rg->getDUMgr();
         ASSERT0(m_cfg && m_du);
         m_use_gvn = false;
+        m_prssamgr = NULL;
+        m_mdssamgr = NULL;
+        m_refine = NULL;
     }
     virtual ~RCE() {}
 

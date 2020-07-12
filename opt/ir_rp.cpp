@@ -575,6 +575,10 @@ bool RegPromot::handleGeneralRef(IR * ir,
     }
 
     if (mustref != NULL && m_dont_promot.is_overlap(mustref)) {
+        //If ir should not be promoted, then all the others mem-ref
+        //that overlapped with it should not be promoted too.
+        clobberAccess(ir, exact_access, exact_occs, inexact_access);
+
         //Need to analyze may-ref as well.
         //return true;
     }
@@ -929,11 +933,11 @@ void RegPromot::replaceUseForTree(IR * oldir, IR * newir)
     if (oldir->is_ld()) {
         m_du->changeUse(newir, oldir, m_rg->getMiscBitSetMgr());
     } else if (oldir->is_ild()) {
-        m_du->removeUseOutFromDefset(ILD_base(oldir));
+        m_du->removeUseFromDefset(ILD_base(oldir));
         m_du->changeUse(newir, oldir, m_rg->getMiscBitSetMgr());
     } else if (oldir->is_array()) {
-        m_du->removeUseOutFromDefset(ARR_base(oldir));
-        m_du->removeUseOutFromDefset(ARR_sub_list(oldir));
+        m_du->removeUseFromDefset(ARR_base(oldir));
+        m_du->removeUseFromDefset(ARR_sub_list(oldir));
         m_du->changeUse(newir, oldir, m_rg->getMiscBitSetMgr());
     } else {
         UNREACHABLE(); //TODO
@@ -971,8 +975,8 @@ void RegPromot::handleRestore2Mem(
             IR * sublist = m_rg->dupIRTree(ARR_sub_list(delegate));
 
             //Copy DU chain and MD reference.
-            m_du->copyIRTreeDU(base, ARR_base(delegate), true);
-            m_du->copyIRTreeDU(sublist, ARR_sub_list(delegate), true);
+            m_du->copyRefAndAddDUChain(base, ARR_base(delegate), true);
+            m_du->copyRefAndAddDUChain(sublist, ARR_sub_list(delegate), true);
 
             //Build Store Array operation.
             stmt = m_rg->buildStoreArray(
@@ -988,7 +992,7 @@ void RegPromot::handleRestore2Mem(
         }
         case IR_IST: {
             IR * lhs = m_rg->dupIRTree(IST_base(delegate));
-            m_du->copyIRTreeDU(lhs, IST_base(delegate), true);
+            m_du->copyRefAndAddDUChain(lhs, IST_base(delegate), true);
 
             stmt = m_rg->buildIStore(lhs, pr,
                 IST_ofst(delegate), IR_dt(delegate));
@@ -1002,7 +1006,7 @@ void RegPromot::handleRestore2Mem(
             IR * base = m_rg->dupIRTree(ILD_base(delegate));
             stmt = m_rg->buildIStore(base, pr,
                 ILD_ofst(delegate), IR_dt(delegate));
-            m_du->copyIRTreeDU(base, ILD_base(delegate), true);
+            m_du->copyRefAndAddDUChain(base, ILD_base(delegate), true);
             break;
         }
         case IR_LD:
@@ -1407,7 +1411,7 @@ void RegPromot::handleAccessInBody(
                 irlst->append_head(stpr);
             }
 
-            m_du->removeUseOutFromDefset(ref);
+            m_du->removeUseFromDefset(ref);
 
             //Change DU chain.
             m_du->changeDef(stpr, ref, m_rg->getMiscBitSetMgr());
@@ -1463,7 +1467,7 @@ void RegPromot::handleAccessInBody(
             }
 
             if (ref->is_ist()) {
-                m_du->removeUseOutFromDefset(IST_base(ref));
+                m_du->removeUseFromDefset(IST_base(ref));
             }
 
             //Change DU chain.
@@ -1529,8 +1533,8 @@ void RegPromot::handlePrelog(IR * delegate, IR * pr,
     if (delegate->is_array()) {
         //Load array value into PR.
         rhs = m_rg->dupIRTree(delegate);
-        m_du->copyIRTreeDU(ARR_base(rhs), ARR_base(delegate), true);
-        m_du->copyIRTreeDU(ARR_sub_list(rhs),
+        m_du->copyRefAndAddDUChain(ARR_base(rhs), ARR_base(delegate), true);
+        m_du->copyRefAndAddDUChain(ARR_sub_list(rhs),
                                 ARR_sub_list(delegate), true);
         stpr = m_rg->buildStorePR(PR_no(pr), IR_dt(pr), rhs);
     } else if (delegate->is_starray()) {
@@ -1541,24 +1545,24 @@ void RegPromot::handlePrelog(IR * delegate, IR * pr,
             ARR_elemtype(delegate),
             ((CArray*)delegate)->getDimNum(),
             ARR_elem_num_buf(delegate));
-        m_du->copyIRTreeDU(ARR_base(rhs), ARR_base(delegate), true);
-        m_du->copyIRTreeDU(ARR_sub_list(rhs), ARR_sub_list(delegate), true);
+        m_du->copyRefAndAddDUChain(ARR_base(rhs), ARR_base(delegate), true);
+        m_du->copyRefAndAddDUChain(ARR_sub_list(rhs), ARR_sub_list(delegate), true);
         stpr = m_rg->buildStorePR(PR_no(pr), IR_dt(pr), rhs);
     } else if (delegate->is_ist()) {
         //Load indirect value into PR.
         rhs = m_rg->buildILoad(m_rg->dupIRTree(IST_base(delegate)),
             IST_ofst(delegate), IR_dt(delegate));
-        m_du->copyIRTreeDU(ILD_base(rhs), IST_base(delegate), true);
+        m_du->copyRefAndAddDUChain(ILD_base(rhs), IST_base(delegate), true);
         stpr = m_rg->buildStorePR(PR_no(pr), IR_dt(pr), rhs);
     } else if (delegate->is_ild()) {
         //Load indirect value into PR.
         rhs = m_rg->dupIRTree(delegate);
-        m_du->copyIRTreeDU(ILD_base(rhs), ILD_base(delegate), true);
+        m_du->copyRefAndAddDUChain(ILD_base(rhs), ILD_base(delegate), true);
         stpr = m_rg->buildStorePR(PR_no(pr), IR_dt(pr), rhs);
     } else if (delegate->is_ld()) {
         //Load scalar into PR.
         rhs = m_rg->dupIRTree(delegate);
-        m_du->copyIRTreeDU(rhs, delegate, false);
+        m_du->copyRefAndAddDUChain(rhs, delegate, false);
         stpr = m_rg->buildStorePR(PR_no(pr), IR_dt(pr), rhs);
     } else if (delegate->is_st()) {
         //Load scalar into PR.
@@ -1980,10 +1984,10 @@ void RegPromot::dump()
     note("\n==---- DUMP RegPromotion ----==");
     //dump_mdlt();
     dumpBBList(m_rg->getBBList(), m_rg);
-    if (m_prssamgr != NULL && m_prssamgr->isSSAConstructed()) {
+    if (m_prssamgr != NULL && m_prssamgr->is_valid()) {
         m_prssamgr->dump();
     }
-    if (m_mdssamgr != NULL && m_mdssamgr->isMDSSAConstructed()) {
+    if (m_mdssamgr != NULL && m_mdssamgr->is_valid()) {
         m_mdssamgr->dump();
     }
     fflush(g_tfile);
@@ -1999,7 +2003,7 @@ bool RegPromot::perform(OptCtx & oc)
     if (!OC_is_cfg_valid(oc)) { return false; }
     //Check PR DU chain.
     m_prssamgr = (PRSSAMgr*)(m_rg->getPassMgr()->queryPass(PASS_PR_SSA_MGR));
-    if (!OC_is_pr_du_chain_valid(oc) && usePRSSADU()) { 
+    if (!OC_is_pr_du_chain_valid(oc) && usePRSSADU()) {
         //At least one kind of DU chain should be avaiable.
         return false;
     }
@@ -2010,10 +2014,10 @@ bool RegPromot::perform(OptCtx & oc)
         return false;
     }
 
-    START_TIMER(t, getPassName());
+    START_TIMER(t, getPassName());    
+    m_rg->checkValidAndRecompute(&oc, PASS_LOOP_INFO, PASS_UNDEF);
     LI<IRBB> const* li = m_cfg->getLoopInfo();
     if (li == NULL) { return false; }
-    m_rg->checkValidAndRecompute(&oc, PASS_LOOP_INFO, PASS_UNDEF);
     m_gvn = (GVN*)(m_rg->getPassMgr()->queryPass(PASS_GVN));
     if (m_gvn == NULL) {
         //We dependent on gvn to do critical judgement.
@@ -2021,7 +2025,7 @@ bool RegPromot::perform(OptCtx & oc)
     }
     if (!m_gvn->is_valid()) {
         m_gvn->reperform(oc);
-    }    
+    }
 
     init();    
     List<LI<IRBB> const*> worklst;
@@ -2041,7 +2045,7 @@ bool RegPromot::perform(OptCtx & oc)
         OC_is_avail_reach_def_valid(oc) = false;
         OC_is_live_expr_valid(oc) = false;
 
-        //Enforce followed pass to recompute gvn.
+        //Enforce following pass to recompute gvn.
         m_gvn->set_valid(false);
     }
     if (m_need_rebuild_prssa) {
@@ -2060,7 +2064,7 @@ bool RegPromot::perform(OptCtx & oc)
         //Loop info is unchanged.
     }
     if (g_is_dump_after_pass && g_dump_opt.isDumpRP()) {
-        dump();        
+        dump();
     }
     END_TIMER(t, getPassName());
     return change;

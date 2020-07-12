@@ -64,6 +64,8 @@ class CfsMgr;
 #define SIMP_changed(s)            (s)->prop_bottom_up.s1.something_has_changed
 #define SIMP_need_recon_bblist(s) \
     (s)->prop_bottom_up.s1.need_to_reconstruct_bb_list
+#define SIMP_need_rebuild_du_chain(s) \
+    (s)->prop_bottom_up.s1.need_to_rebuild_du_chain
 #define SIMP_cfs_mgr(s)            (s)->cfs_mgr
 class SimpCtx {
 public:
@@ -149,6 +151,12 @@ public:
             //If this flag is true, DU info and
             //DU chain also need to be rebuilt.
             BYTE need_to_reconstruct_bb_list:1;
+
+            //Propagate info bottom up.
+            //To inform Region to rebuild DU chain.
+            //If this flag is true, DU info and
+            //DU chain also need to be rebuilt.
+            BYTE need_to_rebuild_du_chain : 1;
         } s1;
     } prop_bottom_up;
 
@@ -222,6 +230,7 @@ public:
     {
         SIMP_changed(this) |= SIMP_changed(&c);
         SIMP_need_recon_bblist(this) |= SIMP_need_recon_bblist(&c);
+        SIMP_need_rebuild_du_chain(this) |= SIMP_need_rebuild_du_chain(&c);
     }
 
     //Set action flags to simplify control flow structure.

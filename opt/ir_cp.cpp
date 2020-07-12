@@ -107,7 +107,7 @@ void CopyProp::replaceExpViaSSADu(IR * exp,
         PR_ssainfo(newir) = PR_ssainfo(cand_expr);
         PR_ssainfo(newir)->addUse(newir);
     } else {
-        m_du->copyIRTreeDU(newir, cand_expr, true);
+        m_du->copyRefAndAddDUChain(newir, cand_expr, true);
     }
 
     //cand_expr may be IR tree. And there might be PR or LD on the tree.
@@ -182,7 +182,7 @@ void CopyProp::replaceExp(IR * exp,
 
     //Build DU chain between propagated exp 'newir' and its DEF.
     //TODO: build MDSSA DU chain.
-    m_du->copyIRTreeDU(newir, cand_expr, true);
+    m_du->copyRefAndAddDUChain(newir, cand_expr, true);
 
     ASSERT0(cand_expr->getStmt());
     SSAInfo * exp_ssainfo = exp->getSSAInfo();
@@ -225,9 +225,9 @@ void CopyProp::replaceExp(IR * exp,
         //other pass/phase even if MDSSA enabled, update classic
         //DU chain as well. Nevertheless, some verification
         //might complain.
-        m_du->removeUseOutFromDefset(exp);
+        m_du->removeUseFromDefset(exp);
     } else {
-        m_du->removeUseOutFromDefset(exp);
+        m_du->removeUseFromDefset(exp);
         ASSERT0(exp->getStmt());
         bool doit = exp->getParent()->replaceKid(exp, newir, false);
         ASSERT0(doit);
@@ -447,7 +447,7 @@ bool CopyProp::doPropToNormalStmt(IRListIter cur_iter,
     }
 
     RefineCtx rf;
-    use_stmt = m_rg->refineIR(use_stmt, change, rf);
+    use_stmt = m_refine->refineIR(use_stmt, change, rf);
     if (use_stmt == NULL && is_next) {
         //old_use_stmt has been optimized and removed by refineIR().
         *next_iter = cur_iter;
@@ -677,7 +677,7 @@ void CopyProp::doFinalRefine(OptCtx & oc)
 {
     RefineCtx rf;
     RC_insert_cvt(rf) = false;
-    m_rg->refineBBlist(m_rg->getBBList(), rf, oc);
+    m_refine->refineBBlist(m_rg->getBBList(), rf, oc);
 }
 
 
@@ -689,6 +689,7 @@ bool CopyProp::perform(OptCtx & oc)
     bool is_org_nonpr_du_chain_valid = OC_is_nonpr_du_chain_valid(oc);
 
     if (!OC_is_ref_valid(oc)) { return false; }
+    m_refine = (Refine*)m_rg->getPassMgr()->registerPass(PASS_REFINE);
     m_mdssamgr = (MDSSAMgr*)m_rg->getPassMgr()->queryPass(PASS_MD_SSA_MGR);
     m_prssamgr = (PRSSAMgr*)m_rg->getPassMgr()->queryPass(PASS_PR_SSA_MGR);
     if (!OC_is_pr_du_chain_valid(oc) && !usePRSSADU()) {
@@ -743,7 +744,7 @@ bool CopyProp::perform(OptCtx & oc)
     
     if (usePRSSADU()) {
         //Use PRSSA.
-        ASSERT0(verifyPRSSAInfo(m_rg));
+        ASSERT0(PRSSAMgr::verifyPRSSAInfo(m_rg));
         OC_is_pr_du_chain_valid(oc) = false; //not update.
     } else {
         //Use classic DU chain.

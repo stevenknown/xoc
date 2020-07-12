@@ -208,7 +208,7 @@ void IPA::recomputeDUChain(Region * rg, OptCtx & oc)
         MDSSAMgr * mdssamgr = (MDSSAMgr*)rg->getPassMgr()->registerPass(
             PASS_MD_SSA_MGR);
         ASSERT0(mdssamgr);
-        if (!mdssamgr->isMDSSAConstructed()) {
+        if (!mdssamgr->is_valid()) {
             mdssamgr->construction(oc);
         }
         return;

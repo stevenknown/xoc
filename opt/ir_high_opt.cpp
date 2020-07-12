@@ -64,7 +64,7 @@ void Region::HighProcessImpl(OptCtx & oc)
         PRSSAMgr * ssamgr =
             (PRSSAMgr*)getPassMgr()->registerPass(PASS_PR_SSA_MGR);
         ASSERT0(ssamgr);
-        if (!ssamgr->isSSAConstructed()) {
+        if (!ssamgr->is_valid()) {
             ssamgr->construction(oc);
         }
     }

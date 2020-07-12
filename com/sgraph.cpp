@@ -211,7 +211,7 @@ void Graph::computeRpoNoRecursive(Vertex * root, OUT List<Vertex const*> & vlst)
     Stack<Vertex*> stk;
     stk.push(root);
     Vertex * v;
-    UINT order = getVertexNum();
+    UINT order = getVertexNum() * RPO_INTERVAL;
     while ((v = stk.get_top()) != NULL) {
         is_visited.bunion(VERTEX_id(v));
         EdgeC * el = VERTEX_out_list(v);
@@ -228,14 +228,13 @@ void Graph::computeRpoNoRecursive(Vertex * root, OUT List<Vertex const*> & vlst)
         if (!find) {
             stk.pop();
             vlst.append_head(v);
-            VERTEX_rpo(v) = order--;
+            VERTEX_rpo(v) = order -= RPO_INTERVAL;
         }
     }
 
     //If order of BB is not zero, there must have some BBs should be
     //eliminated by CFG optimizations.
-    ASSERTN(order == 0,
-            ("still have some BBs that are not assigned an order"));
+    ASSERTN(order == 0, ("even having BB with no order assigned"));
 }
 
 

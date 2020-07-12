@@ -1007,7 +1007,6 @@ void Region::freeIR(IR * ir)
     if (du != NULL) {
         DU_md(du) = NULL;
         DU_mds(du) = NULL;
-        ASSERT0(du->has_clean());
         getAnalysisInstrument()->m_free_du_list.append_head(du);
     }
 
@@ -1261,8 +1260,7 @@ MD const* Region::allocStringMD(Sym const* string)
     MD const* strmd = getRegionMgr()->genDedicateStrMD();
     if (strmd != NULL) { return strmd; }
 
-    Var * v = getVarMgr()->registerStringVar(NULL,
-        string, MEMORY_ALIGNMENT);
+    Var * v = getVarMgr()->registerStringVar(NULL, string, MEMORY_ALIGNMENT);
     //Set string address to be taken only if it is base of LDA.
     //VAR_is_addr_taken(v) = true;
     MD md;
@@ -1324,57 +1322,57 @@ void Region::dumpFreeTab()
 }
 
 
-static void assignMDImpl(IR * x, Region * rg, bool assign_pr, bool assign_nonpr)
+void Region::assignMDImpl(IR * x, bool assign_pr, bool assign_nonpr)
 {
-    ASSERT0(x && rg);
+    ASSERT0(x);
     switch (x->getCode()) {
     case IR_PR:
         if (assign_pr) {
-            rg->allocPRMD(x);
+            allocPRMD(x);
         }
         break;
     case IR_STPR:
         if (assign_pr) {
-            rg->allocStorePRMD(x);
+            allocStorePRMD(x);
         }
         break;
     case IR_GETELEM:
         if (assign_pr) {
-            rg->allocGetelemMD(x);
+            allocGetelemMD(x);
         }
         break;
     case IR_SETELEM:
         if (assign_pr) {
-            rg->allocSetelemMD(x);
+            allocSetelemMD(x);
         }
         break;
     case IR_PHI:
         if (assign_pr) {
-            rg->allocPhiMD(x);
+            allocPhiMD(x);
         }
         break;
     case IR_CALL:
     case IR_ICALL:
         if (assign_pr && x->hasReturnValue()) {
-            rg->allocCallResultPRMD(x);
+            allocCallResultPRMD(x);
         }        
         break;
     case IR_ST:
         if (assign_nonpr) {
-            rg->allocStoreMD(x);
+            allocStoreMD(x);
         }
         break;
     case IR_LD:
         if (assign_nonpr) {
-            rg->allocLoadMD(x);
+            allocLoadMD(x);
         }
         break;
     case IR_ID:
         if (assign_nonpr) {
             if (ID_info(x)->is_string()) {
-                rg->allocStringMD(ID_info(x)->get_name());
+                allocStringMD(ID_info(x)->get_name());
             } else {
-                rg->allocIdMD(x);
+                allocIdMD(x);
             }
         }
         break;
@@ -1417,7 +1415,7 @@ void Region::assignMDForBB(IRBB * bb,
          ir != NULL; ir = BB_irlist(bb).get_next(&ct)) {
         for (IR * x = iterInit(ir, ii);
            x != NULL; x = iterNext(ii)) {
-           assignMDImpl(x, this, assign_pr, assign_nonpr);
+           assignMDImpl(x, assign_pr, assign_nonpr);
         }
     }
 }
@@ -1428,7 +1426,7 @@ void Region::assignMDForIRList(IR * lst, bool assign_pr, bool assign_nonpr)
     IRIter ii;
     for (IR * x = iterInit(lst, ii);
          x != NULL; x = iterNext(ii)) {
-        assignMDImpl(x, this, assign_pr, assign_nonpr);
+        assignMDImpl(x, assign_pr, assign_nonpr);
     }
 }
 
@@ -1604,11 +1602,10 @@ void Region::scanCallListImpl(
 
 
 //num_inner_region: count the number of inner regions.
-void Region::scanCallAndReturnList(
-        OUT UINT & num_inner_region,
-        OUT List<IR const*> * call_list,
-        OUT List<IR const*> * ret_list,
-        bool scan_inner_region)
+void Region::scanCallAndReturnList(OUT UINT & num_inner_region,
+                                   OUT List<IR const*> * call_list,
+                                   OUT List<IR const*> * ret_list,
+                                   bool scan_inner_region)
 {
     if (getIRList() != NULL) {
         scanCallListImpl(num_inner_region, getIRList(),
@@ -2518,17 +2515,9 @@ void Region::dumpVARInRegion()
 }
 
 
-//Copy src's AI to tgt.
-void Region::copyAI(IR const* src, IR * tgt)
-{
-    if (src->getAI() == NULL) { return; }
-    if (IR_ai(tgt) == NULL) {
-        IR_ai(tgt) = allocAIContainer();
-    }
-    IR_ai(tgt)->copy(src->getAI());
-}
-
-
+//This function check validation of options in oc, perform
+//recomputation if it is invalid.
+//...: the options/passes that anticipated to recompute.
 void Region::checkValidAndRecompute(OptCtx * oc, ...)
 {
     BitSet opts;
@@ -2708,7 +2697,7 @@ void Region::checkValidAndRecompute(OptCtx * oc, ...)
                 //DU chain doesn't make any sense.
                 PRSSAMgr * ssamgr = (PRSSAMgr*)passmgr->queryPass(
                     PASS_PR_SSA_MGR);
-                if ((ssamgr == NULL || !ssamgr->isSSAConstructed()) &&
+                if ((ssamgr == NULL || !ssamgr->is_valid()) &&
                     !OC_is_pr_du_chain_valid(*oc)) {
                     flag |= DUOPT_COMPUTE_PR_DU;
                 }
@@ -2907,24 +2896,10 @@ bool Region::process(OptCtx * oc)
 
     PRSSAMgr * ssamgr = NULL;
     MDSSAMgr * mdssamgr = NULL;
+    getPassMgr()->registerPass(PASS_REFINE)->perform(*oc);
     if (getIRList() != NULL) {
-        //Do primitive refinement.
-        START_TIMER(t, "Do Primitive Refinement");
-        RefineCtx rc;
-        bool change = false;
-        IR * irs = refineIRlist(getIRList(), change, rc);
-        ASSERT0(xoc::verifyIRList(irs, NULL, this));
-        setIRList(irs);
-        END_TIMER(t, "Do Primitive Refinement");
-
         if (!processIRList(*oc)) { goto ERR_RET; }
     } else {
-        //Do primitive refinement.
-        START_TIMER(t, "Do Primitive Refinement");
-        RefineCtx rf;
-        refineBBlist(getBBList(), rf, *oc);
-        END_TIMER(t, "Do Primitive Refinement");
-
         if (!processBBList(*oc)) { goto ERR_RET; }
     }
 
@@ -2943,13 +2918,13 @@ bool Region::process(OptCtx * oc)
     }
 
     ssamgr = (PRSSAMgr*)getPassMgr()->queryPass(PASS_PR_SSA_MGR);
-    if (ssamgr != NULL && ssamgr->isSSAConstructed()) {
+    if (ssamgr != NULL && ssamgr->is_valid()) {
         ssamgr->destruction(oc);
         getPassMgr()->destroyPass(ssamgr);
     }
 
     mdssamgr = (MDSSAMgr*)getPassMgr()->queryPass(PASS_MD_SSA_MGR);
-    if (mdssamgr != NULL && mdssamgr->isMDSSAConstructed()) {
+    if (mdssamgr != NULL && mdssamgr->is_valid()) {
         mdssamgr->destruction(oc);
         getPassMgr()->destroyPass(mdssamgr);
     }
@@ -2966,12 +2941,12 @@ bool Region::process(OptCtx * oc)
 ERR_RET:
     ASSERT0(getPassMgr());
     ssamgr = (PRSSAMgr*)getPassMgr()->queryPass(PASS_PR_SSA_MGR);
-    if (ssamgr != NULL && ssamgr->isSSAConstructed()) {
+    if (ssamgr != NULL && ssamgr->is_valid()) {
         ssamgr->destruction(oc);
         getPassMgr()->destroyPass(ssamgr);
     }
     mdssamgr = (MDSSAMgr*)getPassMgr()->queryPass(PASS_MD_SSA_MGR);
-    if (mdssamgr != NULL && mdssamgr->isMDSSAConstructed()) {
+    if (mdssamgr != NULL && mdssamgr->is_valid()) {
         mdssamgr->destruction(oc);
         getPassMgr()->destroyPass(mdssamgr);
     }

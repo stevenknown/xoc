@@ -48,7 +48,7 @@ public:
 
 //Perform dead code and redundant control flow elimination.
 class DeadCodeElim : public Pass {
-protected:
+    COPY_CONSTRUCTOR(DeadCodeElim);
     MDSystem * m_md_sys;
     TypeMgr * m_tm;
     Region * m_rg;
@@ -66,7 +66,7 @@ protected:
     //If the value is false, all memory operations are considered used
     //except the operations which operate on PR.
     bool m_is_use_md_du;
-protected:
+
     bool check_stmt(IR const* ir);
     bool check_call(IR const* ir) const;
     bool collectByPRSSA(IR const* x, IN OUT List<IR const*> * pwlst2);
@@ -114,9 +114,9 @@ protected:
                        IN OUT List<IR const*> * act_ir_lst);
 
     bool useMDSSADU() const
-    { return m_mdssamgr != NULL && m_mdssamgr->isMDSSAConstructed(); }
+    { return m_mdssamgr != NULL && m_mdssamgr->is_valid(); }
     bool usePRSSADU() const
-    { return m_prssamgr != NULL && m_prssamgr->isSSAConstructed(); }
+    { return m_prssamgr != NULL && m_prssamgr->is_valid(); }
 public:
     explicit DeadCodeElim(Region * rg)
     {
@@ -133,7 +133,6 @@ public:
         m_is_use_md_du = true;
         m_cdg = NULL;
     }
-    COPY_CONSTRUCTOR(DeadCodeElim);
     virtual ~DeadCodeElim() {}
 
     void dump();

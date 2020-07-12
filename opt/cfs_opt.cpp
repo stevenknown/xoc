@@ -116,9 +116,8 @@ bool IR_CFS_OPT::transformToDoWhile(IR ** head, IR * ir)
             isSameLabel(LAB_lab(ir), GOTO_lab(IF_truebody(t)))) {
 
             //Start transform.
-            IR * dowhile = m_rg->allocIR(IR_DO_WHILE);
-            LOOP_det(dowhile) = m_rg->dupIRTree(LOOP_det(t));
-
+            IR * dowhile = m_rg->buildDoWhile(m_rg->dupIRTree(LOOP_det(t)),
+                                              NULL);
             IR * if_stmt = t;
             t = ir->get_next();
             while (t != NULL && t != if_stmt) {
@@ -207,7 +206,7 @@ bool IR_CFS_OPT::transformIf1(IR ** head, IR * ir)
                             LAB_lab(IR_next(second_goto)))) {
 
                 //Start transforming.
-                m_rg->invertCondition(&IF_det(ir));
+                getRefiner()->invertCondition(&IF_det(ir));
                 IR * new_list1 = NULL;
                 IR * new_list2 = NULL;
 
@@ -288,7 +287,7 @@ bool IR_CFS_OPT::transformIf2(IR ** head, IR * ir)
             m_rg->freeIRTree(ir);
             return true;
         }
-        m_rg->invertCondition(&IF_det(ir));
+        getRefiner()->invertCondition(&IF_det(ir));
         IF_truebody(ir) = IF_falsebody(ir);
         IF_falsebody(ir) = NULL;
         return true;
@@ -325,15 +324,15 @@ bool IR_CFS_OPT::transformIf3(IR ** head, IR * ir)
             //e.g:
             //x is unsigned, if(x>0xFFFFFFFF) {a=1} else {b=1} => b=1
             //x is signed, if(x>0x7FFFFFFF) {a=1} else {b=1} =>  b=1
-            IR * allocIR = NULL;
+            IR * allocir = NULL;
             if (IF_falsebody(ir) != NULL) {
-                allocIR = m_rg->dupIRTree(IF_falsebody(ir));
+                allocir = m_rg->dupIRTree(IF_falsebody(ir));
             }
 
-            xcom::replace(head, ir, allocIR);
+            xcom::replace(head, ir, allocir);
 
-            if (allocIR != NULL) {
-                IR_parent(allocIR) = IR_parent(ir);
+            if (allocir != NULL) {
+                IR_parent(allocir) = IR_parent(ir);
             }
 
             m_rg->freeIRTree(ir);
@@ -350,15 +349,15 @@ bool IR_CFS_OPT::transformIf3(IR ** head, IR * ir)
               m_rg->getMinInteger(m_tm->getDTypeBitSize(
                 TY_dtype(opnd1->getType())), opnd1->is_signed())) {
             //x is signed, IF(x < 0x80000000) {a=1} ELSE {b=1}  =>  b=1
-            IR * allocIR = NULL;
+            IR * allocir = NULL;
             if (IF_falsebody(ir) != NULL) {
-                allocIR = m_rg->dupIRTree(IF_falsebody(ir));
+                allocir = m_rg->dupIRTree(IF_falsebody(ir));
             }
 
-            xcom::replace(head, ir, allocIR);
+            xcom::replace(head, ir, allocir);
 
-            if (allocIR != NULL) {
-                IR_parent(allocIR) = IR_parent(ir);
+            if (allocir != NULL) {
+                IR_parent(allocir) = IR_parent(ir);
             }
 
             m_rg->freeIRTree(ir);
@@ -368,15 +367,15 @@ bool IR_CFS_OPT::transformIf3(IR ** head, IR * ir)
                    opnd0->is_uint() &&
                    CONST_int_val(opnd1) == 0) {
             //x is unsigned, if(x<0) {a=1} else {b=1}  =>  b=1
-            IR * allocIR = NULL;
+            IR * allocir = NULL;
             if (IF_falsebody(ir) != NULL) {
-                allocIR = m_rg->dupIRTree(IF_falsebody(ir));
+                allocir = m_rg->dupIRTree(IF_falsebody(ir));
             }
 
-            xcom::replace(head, ir, allocIR);
+            xcom::replace(head, ir, allocir);
 
-            if (allocIR != NULL) {
-                IR_parent(allocIR) = IR_parent(ir);
+            if (allocir != NULL) {
+                IR_parent(allocir) = IR_parent(ir);
             }
 
             m_rg->freeIRTree(ir);

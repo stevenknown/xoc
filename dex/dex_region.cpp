@@ -228,7 +228,7 @@ bool DexRegion::process(OptCtx * oc)
 
     ASSERT0(getPassMgr());
     PRSSAMgr * ssamgr = (PRSSAMgr*)passmgr->queryPass(PASS_PR_SSA_MGR);
-    if (ssamgr != NULL && ssamgr->isSSAConstructed()) {
+    if (ssamgr != NULL && ssamgr->is_valid()) {
         ssamgr->destruction();
     }
 

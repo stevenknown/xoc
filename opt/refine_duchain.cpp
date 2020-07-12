@@ -191,7 +191,7 @@ bool RefineDUChain::perform(OptCtx & oc)
     //Check PR DU chain.
     PRSSAMgr * ssamgr = (PRSSAMgr*)(m_rg->getPassMgr()->queryPass(
         PASS_PR_SSA_MGR));
-    if (ssamgr != NULL && ssamgr->isSSAConstructed()) {
+    if (ssamgr != NULL && ssamgr->is_valid()) {
         m_ssamgr = ssamgr;
     } else {
         m_ssamgr = NULL;
@@ -203,7 +203,7 @@ bool RefineDUChain::perform(OptCtx & oc)
     //Check NONPR DU chain.
     MDSSAMgr * mdssamgr = (MDSSAMgr*)(m_rg->getPassMgr()->queryPass(
         PASS_MD_SSA_MGR));
-    if (mdssamgr != NULL && mdssamgr->isMDSSAConstructed()) {
+    if (mdssamgr != NULL && mdssamgr->is_valid()) {
         m_mdssamgr = mdssamgr;
     } else {
         m_mdssamgr = NULL;

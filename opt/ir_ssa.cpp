@@ -520,7 +520,7 @@ void PRSSAMgr::destroy(bool is_reinit)
 
     //Caution: if you do not destruct SSA prior to destory().
     //The reference to IR's SSA info will lead to undefined behaviors.
-    //ASSERTN(!m_is_ssa_constructed,
+    //ASSERTN(!m_is_valid,
     //   ("Still in ssa mode, you should out of "
     //    "SSA before the destruction."));
 
@@ -1055,6 +1055,38 @@ void PRSSAMgr::removePRSSAUse(IR * ir)
 }
 
 
+//Check each USE of stmt, remove the expired one which is not reference
+//the memory any more that stmt defined.
+bool PRSSAMgr::removeExpiredDUForStmt(IR * stmt, Region * rg)
+{
+    ASSERT0(stmt->is_stmt());
+    SSAInfo * ssainfo = stmt->getSSAInfo();
+    if (ssainfo == NULL) { return false; }
+
+    SSAUseIter si;
+    UINT prno = 0;
+    if (SSA_def(ssainfo) != NULL) {
+        prno = SSA_def(ssainfo)->getPrno();
+    } else {
+        //Without DEF.
+        return false;
+    }
+
+    //Check if use referenced the number of PR which defined by SSA_def.
+    INT ni = -1;
+    bool change = false;
+    for (INT i = SSA_uses(ssainfo).get_first(&si); si != NULL; i = ni) {
+        ni = SSA_uses(ssainfo).get_next(i, &si);
+        IR const* use = rg->getIR(i);
+        if (use->is_pr() && PR_no(use) == prno) { continue; }
+    
+        ssainfo->removeUse(use);
+        change = true;
+    }
+    return change;
+}
+
+
 //Rename vp from current version to the top-version on stack if it exist.
 void PRSSAMgr::renameBB(IN IRBB * bb)
 {
@@ -1357,7 +1389,7 @@ void PRSSAMgr::destruction(DomTree & domtree)
     ASSERT0(m_cfg->getEntry());
     destructionInDomTreeOrder(m_cfg->getEntry(), domtree);
     cleanPRSSAInfo();
-    m_is_ssa_constructed = false;
+    m_is_valid = false;
 
     END_TIMER(t, "PRSSA: destruction in dom tree order");
 }
@@ -1741,7 +1773,7 @@ void PRSSAMgr::destruction(OptCtx * oc)
 
     //Clean SSA info to avoid unnecessary abort or assert.
     cleanPRSSAInfo();
-    m_is_ssa_constructed = false;
+    m_is_valid = false;
 }
 
 
@@ -2159,7 +2191,7 @@ void PRSSAMgr::computeSSAInfo()
             }
         }
     }
-    m_is_ssa_constructed = true;
+    m_is_valid = true;
 }
 
 
@@ -2177,7 +2209,7 @@ void PRSSAMgr::construction(OptCtx & oc)
     if (!construction(domtree)) {
         return;
     }
-    m_is_ssa_constructed = true;
+    m_is_valid = true;
 }
 
 
@@ -2219,17 +2251,17 @@ bool PRSSAMgr::construction(DomTree & domtree)
 
     ASSERT0(verifyIRandBB(m_rg->getBBList(), m_rg));
     ASSERT0(verifyPhi(false, false) && verifyVPR());
-    m_is_ssa_constructed = true;
+    m_is_valid = true;
     return true;
 }
 //END PRSSAMgr
 
 
-bool verifyPRSSAInfo(Region * rg)
+bool PRSSAMgr::verifyPRSSAInfo(Region * rg)
 {
     PRSSAMgr * ssamgr = (PRSSAMgr*)(rg->getPassMgr()->
         queryPass(PASS_PR_SSA_MGR));
-    if (ssamgr != NULL && ssamgr->isSSAConstructed()) {
+    if (ssamgr != NULL && ssamgr->is_valid()) {
         ASSERT0(ssamgr->verifySSAInfo());
         ASSERT0(ssamgr->verifyPhi(false, false));
     }

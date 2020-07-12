@@ -2622,6 +2622,17 @@ void IR::copyRef(IR const* src, Region * rg)
 }
 
 
+//Copy AttachInfo from 'src' to current ir, not include kid and sibling.
+void IR::copyAI(IR const* src, Region * rg)
+{
+    if (src->getAI() == NULL) { return; }
+    if (IR_ai(this) == NULL) {
+        IR_ai(this) = rg->allocAIContainer();
+    }
+    IR_ai(this)->copy(src->getAI());
+}
+
+
 static bool hasProp(IR const* ir)
 {
     return ir->isMayThrow() ||

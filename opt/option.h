@@ -163,6 +163,7 @@ public:
     bool is_dump_memusage; //Dump memory usage.
     bool is_dump_livenessmgr; //Dump LivenessMgr.
     bool is_dump_refine_duchain; //Dump RefineDUChain.
+    bool is_dump_refine; //Dump Refinement.
 
 public:
     DumpOpt();
@@ -192,6 +193,7 @@ public:
     bool isDumpMemUsage() const;
     bool isDumpLivenessMgr() const;
     bool isDumpRefineDUChain() const;
+    bool isDumpRefine() const;
 };
 
 
@@ -239,6 +241,7 @@ typedef enum _PASS_TYPE {
     PASS_REFINE_DUCHAIN,
     PASS_SCALAR_OPT,
     PASS_MDLIVENESS_MGR,
+    PASS_REFINE,
     PASS_NUM,
 } PASS_TYPE;
 

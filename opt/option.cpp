@@ -443,4 +443,9 @@ bool DumpOpt::isDumpRefineDUChain() const
     return is_dump_all || (!is_dump_nothing && is_dump_refine_duchain);
 }
 
+bool DumpOpt::isDumpRefine() const
+{
+    return is_dump_all || (!is_dump_nothing && is_dump_refine);
+}
+
 } //namespace xoc

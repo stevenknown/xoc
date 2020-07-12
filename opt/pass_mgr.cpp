@@ -248,6 +248,12 @@ Pass * PassMgr::allocMDLivenessMgr()
 }
 
 
+Pass * PassMgr::allocRefine()
+{
+    return new Refine(m_rg);
+}
+
+
 xcom::Graph * PassMgr::registerGraphBasedPass(PASS_TYPE opty)
 {
     xcom::Graph * pass = NULL;
@@ -346,6 +352,9 @@ Pass * PassMgr::registerPass(PASS_TYPE opty)
         break;
     case PASS_MDLIVENESS_MGR:
         pass = allocMDLivenessMgr();
+        break;
+    case PASS_REFINE:
+        pass = allocRefine();
         break;
     default: ASSERTN(0, ("Unsupport Optimization."));
     }

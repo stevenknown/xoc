@@ -94,13 +94,12 @@ public:
 //Perform SSA based optimizations.
 class PRSSAMgr : public Pass {
     COPY_CONSTRUCTOR(PRSSAMgr);
-protected:
     Region * m_rg;
     SMemPool * m_vp_pool;
     TypeMgr * m_tm;
     IRCFG * m_cfg;
     DefSegMgr * m_seg_mgr;
-    bool m_is_ssa_constructed;
+    bool m_is_valid;
     UINT m_vp_count;
     IRIter m_iter; //for tmp use.
     //Record virtual PR for each PR.
@@ -115,12 +114,11 @@ protected:
     //Be used to generate phi for each prno.
     Vector<IR*> m_prno2ir;
 
-protected:
     inline void init()
     {
         if (m_vp_pool != NULL) { return; }
         m_vp_count = 1;
-        m_is_ssa_constructed = false;
+        m_is_valid = false;
         m_map_prno2vpr_vec.set(m_rg->getPRCount(), NULL);
         m_max_version.set(m_rg->getPRCount(), 0);
         m_vp_pool = smpoolCreate(sizeof(VPR)*2, MEM_CONST_SIZE);
@@ -133,7 +131,7 @@ protected:
         m_seg_mgr = NULL;
         m_cfg = NULL;
         m_vp_count = 1;
-        m_is_ssa_constructed = false;
+        m_is_valid = false;
         m_vp_pool = NULL;
     }
     void cleanPRSSAInfo();
@@ -213,7 +211,7 @@ public:
     }
     ~PRSSAMgr()
     {
-        ASSERTN(!isSSAConstructed(), ("should be destructed"));
+        ASSERTN(!is_valid(), ("should be destructed"));
         destroy(false);
     }
 
@@ -270,7 +268,7 @@ public:
     //Return true if PR ssa is constructed.
     //This flag will direct the behavior of optimizations.
     //If SSA constructed, DU mananger will not compute any information for PR.
-    bool isSSAConstructed() const { return m_is_ssa_constructed; }
+    bool is_valid() const { return m_is_valid; }
 
     //Return true if phi is redundant, otherwise return false.
     //If all opnds have same defintion or defined by current phi,
@@ -302,14 +300,17 @@ public:
     //updated as well.
     static void removePRSSAUse(IR * ir);
 
+    //Check each USE of stmt, remove the expired one which is not reference
+    //the memory any more that stmt defined.
+    //Return true if DU changed.
+    static bool removeExpiredDUForStmt(IR * stmt, Region * rg);
+
     bool verifyPhi(bool is_vpinfo_avail, bool before_strip_version);
     bool verifySSAInfo(); //Can be used in any module.
+    static bool verifyPRSSAInfo(Region * rg);
 
     virtual bool perform(OptCtx & oc) { construction(oc); return true; }
 };
-
-
-bool verifyPRSSAInfo(Region * rg);
 
 } //namespace xoc
 #endif

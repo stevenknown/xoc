@@ -52,7 +52,7 @@ void MDSSAMgr::destroy()
 
     //CAUTION: If you do not finish out-of-SSA prior to destory(),
     //the reference to IR's MDSSA info will lead to undefined behaviors.
-    //ASSERTN(!m_is_ssa_constructed,
+    //ASSERTN(!m_is_valid,
     //   ("Still in ssa mode, you should do out of "
     //    "SSA before destroy"));
 
@@ -1613,7 +1613,7 @@ void MDSSAMgr::destruction(DomTree & domtree)
     if (bblst->get_elem_count() == 0) { return; }
     ASSERT0(m_cfg->getEntry());
     destructionInDomTreeOrder(m_cfg->getEntry(), domtree);
-    m_is_ssa_constructed = false;
+    m_is_valid = false;
 
     END_TIMER(t, "MDSSA: destruction in dom tree order");
 }
@@ -1963,17 +1963,19 @@ void MDSSAMgr::changeUse(IR * olduse, IR * newuse)
 }
 
 
-//Coalesce version of MD from 'src' to 'tgt'.
+//Coalesce DU chain, actually the version of MD, from 'src' to 'tgt'.
 //This function replace definition of USE of src to tgt's defintion.
-//e.g: p0=...
-//     p1=p0
-//     ...=p1
+//e.g: p0 =...
+//     p1 = p0
+//     ...= p1
 //=> after coalescing, p1 is src, p0 is tgt
-//     p0=...
+//     p0 = ...
 //     ------ //removed
-//     ...=p0
-void MDSSAMgr::coalesceVersion(IR const* src, IR const* tgt)
+//     ... = p0
+void MDSSAMgr::coalesceDUChain(IR const* src, IR const* tgt)
 {
+    ASSERT0(src && tgt);
+    ASSERT0(src->is_stmt() && tgt->is_exp() && tgt->getStmt() == src);
     MDSSAInfo * src_mdssainfo = getUseDefMgr()->getMDSSAInfo(src);
     MDSSAInfo * tgt_mdssainfo = getUseDefMgr()->getMDSSAInfo(tgt);
     ASSERT0(src_mdssainfo && tgt_mdssainfo);
@@ -2021,15 +2023,17 @@ void MDSSAMgr::coalesceVersion(IR const* src, IR const* tgt)
 
 
 //Add occurence to each vopnd in mdssainfo.
+//ir: occurence to be added.
+//mdssainfo: add ir to it.
 void MDSSAMgr::addMDSSAOcc(IR * ir, MDSSAInfo * mdssainfo)
 {
     mdssainfo->addUse(ir, getUseDefMgr());
 }
 
 
-//Remove MD-SSA Use-Def chain.
-//e.g:ir=...
-//    ...=ir //S1
+//Remove MDSSA Use-Def chain.
+//e.g:ir = ...
+//    ... = ir //S1
 //If S1 deleted, ir should be removed from its useset in MDSSAInfo.
 //NOTE: If ir is an IR tree, e.g: ild(x, ld(y)), removing ild(x) means
 //ld(y) will be removed as well. Therefore ld(y)'s MDSSAInfo will be
@@ -2247,6 +2251,16 @@ void MDSSAMgr::removeDefFromDDChain(MDDef * mddef)
 }
 
 
+//Check each USE of stmt, remove the expired one which is not reference
+//the memory any more that stmt defined.
+//Return true if DU changed.
+bool MDSSAMgr::removeExpiredDUForStmt(IR * stmt)
+{
+    ASSERT0(0); //TODO
+    return false;
+}
+
+
 //Remove MDDef from Def-Def chain.
 //phi: will be removed from Def-Def chain, and be modified as well.
 //prev: designated previous DEF.
@@ -2287,7 +2301,7 @@ void MDSSAMgr::destruction(OptCtx * oc)
         //Each pass maintain CFG by default.
         OC_is_cfg_valid(*oc) = true;
     }
-    m_is_ssa_constructed = false;
+    m_is_valid = false;
 }
 
 
@@ -2553,7 +2567,7 @@ void MDSSAMgr::construction(OptCtx & oc)
     if (!construction(domtree)) {
         return;
     }
-    m_is_ssa_constructed = true;
+    m_is_valid = true;
     END_TIMER(t0, "MDSSA: Construction");
 }
 
@@ -2593,20 +2607,21 @@ bool MDSSAMgr::construction(DomTree & domtree)
     ASSERT0(verify());
     ASSERT0(verifyIRandBB(m_rg->getBBList(), m_rg));
     ASSERT0(verifyPhi(false) && verifyVMD());
-    m_is_ssa_constructed = true;
+    m_is_valid = true;
     return true;
 }
-//END MDSSAMgr
 
-bool verifyMDSSAInfo(Region * rg)
+
+bool MDSSAMgr::MDSSAMgr::verifyMDSSAInfo(Region * rg)
 {
     MDSSAMgr * ssamgr = (MDSSAMgr*)(rg->getPassMgr()->
         queryPass(PASS_MD_SSA_MGR));
-    if (ssamgr != NULL && ssamgr->isMDSSAConstructed()) {
+    if (ssamgr != NULL && ssamgr->is_valid()) {
         ASSERT0(ssamgr->verify());
         ASSERT0(ssamgr->verifyPhi(false));
     }
     return true;
 }
+//END MDSSAMgr
 
 } //namespace xoc

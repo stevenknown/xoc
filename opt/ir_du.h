@@ -44,7 +44,7 @@ namespace xoc {
 //    computeOverlapUseMDSet
 //    collectMayUse
 //    collectMayUseRecursive
-//    copyIRTreeDU
+//    copyRefAndAddDUChain
 //    changeUse
 //    changeDef
 //    getMayDef
@@ -80,14 +80,15 @@ namespace xoc {
 //    removeDUChain
 //    removeExpiredDU
 //    removeDef
-//    removeUseOutFromDefset
-//    removeDefOutFromUseset
-//    removeIROutFromDUMgr
+//    removeUseFromDefset
+//    removeDefFromUseset
+//    removeIRFromDUMgr
 
 //Mapping from IR to index.
 typedef HMap<IR const*, UINT, HashFuncBase2<IR const*> > IR2UINT;
 
 class DUMgr;
+class AliasAnalysis;
 
 //Mapping from MD to IR list, and to be responsible for
 //allocating and destroy List<IR*> objects.
@@ -505,7 +506,16 @@ public:
                            MDSet const* mayusemds);
 
     //DU chain and Memory Object reference operation.
-    void copyIRTreeDU(IR * to, IR const* from, bool copy_du_info);
+    //This function copy MustUse and MayUse mds from tree 'from' to tree 'to'
+    //and build new DU chain for 'to'.
+    //add_duchain: if true to add DU chain from tree 'from' to tree 'to'.
+    //  this operation will establish new DU chain between the DEF of 'from'
+    //  and 'to'.
+    //'to': root expression of target tree.
+    //'from': root expression of source tree.
+    //NOTE: IR tree 'to' and 'from' must be identical structure.
+    //'to' and 'from' must be expression.
+    void copyRefAndAddDUChain(IR * to, IR const* from, bool add_duchain);
 
     //Count the memory usage to DUMgr.
     size_t count_mem();
@@ -604,14 +614,15 @@ public:
         ASSERT0(m_rg->getIR(from)->is_stmt() &&
                 m_rg->getIR(to)->is_stmt() &&
                 useset_of_to && useset_of_from && m);
+        if (to == from) { return; }
         DUIter di = NULL;
         for (INT i = useset_of_from->get_first(&di);
              di != NULL; i = useset_of_from->get_next((UINT)i, &di)) {
             IR const* exp = m_rg->getIR((UINT)i);
-            ASSERT0(exp->isMemoryRef());
-
+            ASSERT0(exp->is_exp() && exp->isMemoryRef());
             DUSet * defset = exp->getDUSet();
             if (defset == NULL) { continue; }
+
             defset->diff(from, *m_misc_bs_mgr);
             defset->bunion(to, *m_misc_bs_mgr);
         }
@@ -648,6 +659,7 @@ public:
     {
         ASSERT0(m_rg->getIR(from)->is_exp() && m_rg->getIR(to)->is_exp() &&
                 defset_of_from && defset_of_to && m);
+        if (to == from) { return; }
         DUIter di = NULL;
         for (INT i = defset_of_from->get_first(&di);
              di != NULL; i = defset_of_from->get_next((UINT)i, &di)) {
@@ -655,6 +667,7 @@ public:
             ASSERT0(stmt->is_stmt());
             DUSet * useset = stmt->getDUSet();
             if (useset == NULL) { continue; }
+
             useset->diff(from, *m_misc_bs_mgr);
             useset->bunion(to, *m_misc_bs_mgr);
         }
@@ -666,7 +679,7 @@ public:
     //Change Use expression from 'from' to 'to'.
     //'to': indicate the exp which copy to.
     //'from': indicate the expression which copy from.
-    //e.g: DEF->from change to DEF->to
+    //e.g: change DEF->from to be DEF->to.
     inline void changeUse(IR * to, IR const* from, DefMiscBitSetMgr * m)
     {
         ASSERT0(to && from && to->is_exp() && from->is_exp());
@@ -686,6 +699,8 @@ public:
     //     to_def=...
     //     ------ //removed
     //     ...=to
+    //from: stmt
+    //to: expression
     void coalesceDUChain(IR * from, IR * to);
 
     void dumpMemUsageForEachSet();
@@ -707,6 +722,7 @@ public:
 
     //DU chain operation.
     DUSet * getAndAllocDUSet(IR * ir);
+    //Get sparse bitset mgr.
     xcom::DefMiscBitSetMgr * getSBSMgr() const { return m_misc_bs_mgr; }
     //Return the MustDef MD.
     MD const* get_must_def(IR const* ir)
@@ -914,15 +930,17 @@ public:
         DUSet * defset= use->getDUSet();
         if (defset != NULL) { defset->remove(def->id(), *m_misc_bs_mgr); }
     }
-    //DU chain operations.
-    //See function definition.
+
+    //Check each USE of stmt, remove the expired one which is not reference
+    //the memory any more that stmt defined.
+    //Return true if DU changed.
     bool removeExpiredDUForStmt(IR * stmt);
     bool removeExpiredDUForOperand(IR * stmt);
     bool removeExpiredDU(IR * stmt);
     void removeDef(IR const* ir, IR const* def);
-    void removeUseOutFromDefset(IR * ir);
-    void removeDefOutFromUseset(IR * def);
-    void removeIROutFromDUMgr(IR * ir);
+    void removeUseFromDefset(IR * ir);
+    void removeDefFromUseset(IR * def);
+    void removeIRFromDUMgr(IR * ir);
 
     bool verifyMDDUChain(UINT duflag);
     bool verifyMDDUChainForIR(IR const* ir, UINT duflag);

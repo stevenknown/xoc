@@ -85,14 +85,13 @@ protected:
 
     //Do clean before recompute loop info.
     void cleanLoopInfo(bool access_li_by_scan_bb = false);
-    void computeRPOImpl(xcom::BitSet & is_visited, IN xcom::Vertex * v,
-        OUT INT & order);
+    void computeRPOImpl(xcom::BitSet & is_visited,
+                        IN xcom::Vertex * v,
+                        OUT INT & order);
     inline void collectLoopInfoRecur(LI<BB> * li);
 
     inline bool isLoopHeadRecur(LI<BB> * li, BB * bb);
     bool insertLoopTree(LI<BB> ** lilist, LI<BB> * loop);
-
-    void dumpLoopTree(LI<BB> * looplist, UINT indent, FILE * h);
 
     bool removeRedundantBranchCase1(BB *RESTRICT bb,
                                     BB const*RESTRICT next_bb,
@@ -257,12 +256,13 @@ public:
         return count;
     }
 
-    virtual void dumpLoop(FILE * h)
+    void dumpLoopTree(LI<BB> const* looplist, UINT indent, FILE * h) const;
+    virtual void dumpLoopInfo()
     {
-        if (h == NULL) { return; }
-        fprintf(h, "\n==---- DUMP Natural Loop Tree ----==");
-        dumpLoopTree(m_loop_info, 0, h);
-        fflush(h);
+        if (g_tfile == NULL) { return; }
+        fprintf(g_tfile, "\n==---- DUMP Natural Loop Info ----==");
+        dumpLoopTree(m_loop_info, 0, g_tfile);
+        fflush(g_tfile);
     }
     virtual void dumpVCG(CHAR const* name = NULL);
 
@@ -270,8 +270,7 @@ public:
 
     //Find the target bb list.
     //2th parameter indicates a list of bb have found.
-    virtual void findTargetBBOfMulticondBranch(XR const*,
-        OUT List<BB*> &) = 0;
+    virtual void findTargetBBOfMulticondBranch(XR const*, OUT List<BB*> &) = 0;
 
     //Find the bb that referred given label.
     virtual BB * findBBbyLabel(LabelInfo const*) = 0;
@@ -557,20 +556,26 @@ void CFG<BB, XR>::getKidOfIF(BB * bb,
 
 
 template <class BB, class XR>
-void CFG<BB, XR>::dumpLoopTree(LI<BB> * looplist, UINT indent, FILE * h)
+void CFG<BB, XR>::dumpLoopTree(LI<BB> const* looplist,
+                               UINT indent,
+                               FILE * h) const
 {
+    if (h == NULL) { return; }
     while (looplist != NULL) {
         fprintf(h, "\n");
         for (UINT i = 0; i < indent; i++) { fprintf(h, " "); }
-        fprintf(h, "LOOP HEAD:BB%d, BODY:",
-            LI_loop_head(looplist)->id());
-        for (INT i = LI_bb_set(looplist)->get_first();
-             i != -1; i = LI_bb_set(looplist)->get_next((UINT)i)) {
-            fprintf(h, "%d,", i);
+        ASSERT0(LI_loop_head(looplist));
+        fprintf(h, "LOOP HEAD:BB%d, BODY:", LI_loop_head(looplist)->id());
+        if (LI_bb_set(looplist) != NULL) {
+            for (INT i = LI_bb_set(looplist)->get_first();
+                 i != -1; i = LI_bb_set(looplist)->get_next((UINT)i)) {
+                fprintf(h, "%d,", i);
+            }
         }
         dumpLoopTree(LI_inner_list(looplist), indent + 2, h);
         looplist = LI_next(looplist);
     }
+    fflush(h);
 }
 
 
@@ -1748,7 +1753,7 @@ void CFG<BB, XR>::computeRPOImpl(IN OUT xcom::BitSet & is_visited,
         el = el->get_next();
     }
     setRPO(getBB(v->id()), order);
-    order--;
+    order -= RPO_INTERVAL;
 }
 
 
@@ -1772,7 +1777,7 @@ void CFG<BB, XR>::computeRPO(OptCtx & oc)
     ASSERTN(m_entry, ("Not find entry"));
 
     #ifdef RECURSIVE_ALGO
-    INT order = m_bb_list->get_elem_count();
+    INT order = m_bb_list->get_elem_count() * RPO_INTERVAL;
     computeRPOImpl(is_visited, getVertex(m_entry->id()), order);
     #else
     List<xcom::Vertex const*> vlst;

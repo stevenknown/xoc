@@ -1808,28 +1808,27 @@ void DUMgr::dumpSet(bool is_bs)
 }
 
 
-//This function copy MustUse and MayUse mds from tree 'to' to tree 'from'
-//for memory reference and building new DU chain for 'to'.
-//
-//This function will process SSA du info if it exist.
-//
-//copyDUChain: if true to copy DU chain from tree 'from' to tree 'to'.
+//DU chain and Memory Object reference operation.
+//This function copy MustUse and MayUse mds from tree 'from' to tree 'to'
+//and build new DU chain for 'to'.
+//add_duchain: if true to add DU chain from tree 'from' to tree 'to'.
 //    this operation will establish new DU chain between the DEF of 'from' and
 //    'to'.
-//'to': root node of target tree.
-//'from': root node of source tree.
-//NOTICE: IR tree 'to' and 'from' must be identical. to and from may be stmt.
-void DUMgr::copyIRTreeDU(IR * to, IR const* from, bool copyDUChain)
+//'to': root expression of target tree.
+//'from': root expression of source tree.
+//NOTE: IR tree 'to' and 'from' must be identical structure.
+//'to' and 'from' must be expression.
+void DUMgr::copyRefAndAddDUChain(IR * to, IR const* from, bool add_duchain)
 {
     if (to == from) { return; }
+    ASSERT0(to->is_exp() && from->is_exp());
     ASSERT0(to->isIREqual(from, true));
     m_citer.clean();
     m_iter2.clean();
     IR const* from_ir = iterInitC(from, m_citer);
     for (IR * to_ir = iterInit(to, m_iter2);
          to_ir != NULL;
-         to_ir = iterNext(m_iter2),
-         from_ir = iterNextC(m_citer)) {
+         to_ir = iterNext(m_iter2), from_ir = iterNextC(m_citer)) {
         ASSERT0(to_ir->isIREqual(from_ir, true));
         if (!to_ir->isMemoryRef() && !to_ir->is_id()) {
             //Copy MD for IR_ID, some Passes need it, e.g. GVN.
@@ -1838,7 +1837,7 @@ void DUMgr::copyIRTreeDU(IR * to, IR const* from, bool copyDUChain)
 
         to_ir->copyRef(from_ir, m_rg);
 
-        if (!copyDUChain) { continue; }
+        if (!add_duchain) { continue; }
 
         SSAInfo * ssainfo;
         if ((ssainfo = from_ir->getSSAInfo()) != NULL) {
@@ -1849,25 +1848,24 @@ void DUMgr::copyIRTreeDU(IR * to, IR const* from, bool copyDUChain)
             ASSERT0(to_ir->isReadPR());
             PR_ssainfo(to_ir) = ssainfo;
             ssainfo->addUse(to_ir);
-        } else {
-            DUSet const* from_du = from_ir->readDUSet();
-            if (from_du == NULL || from_du->is_empty()) { continue; }
+        }
 
-            DUSet * to_du = getAndAllocDUSet(to_ir);
-            to_du->copy(*from_du, *m_misc_bs_mgr);
+        DUSet const* from_du = from_ir->readDUSet();
+        if (from_du == NULL || from_du->is_empty()) { continue; }
 
-            //Add new du chain between DEF and USE.
-            DUIter di = NULL;
-            for (UINT i = from_du->get_first(&di);
-                 di != NULL; i = from_du->get_next(i, &di)) {
+        DUSet * to_du = getAndAllocDUSet(to_ir);
+        to_du->copy(*from_du, *m_misc_bs_mgr);
 
-                //x is stmt if from_ir is expression.
-                //x is expression if from_ir is stmt.
-                IR const* x = m_rg->getIR(i);
-                DUSet * x_du_set = x->getDUSet();
-                if (x_du_set == NULL) { continue; }
-                x_du_set->add(IR_id(to_ir), *m_misc_bs_mgr);
-            }
+        //Add DU chain between DEF and USE.
+        DUIter di = NULL;
+        for (UINT i = from_du->get_first(&di);
+             di != NULL; i = from_du->get_next(i, &di)) {
+            //x is stmt if from_ir is expression.
+            //x is expression if from_ir is stmt.
+            IR const* x = m_rg->getIR(i);
+            DUSet * x_duset = x->getDUSet();
+            if (x_duset == NULL) { continue; }
+            x_duset->add(IR_id(to_ir), *m_misc_bs_mgr);
         }
     }
     ASSERT0(m_iter2.get_elem_count() == 0 && m_iter.get_elem_count() == 0);
@@ -1929,62 +1927,40 @@ bool DUMgr::removeExpiredDUForStmt(IR * stmt)
 {
     bool change = false;
     ASSERT0(stmt->is_stmt());
-    SSAInfo * ssainfo = stmt->getSSAInfo();
-    if (ssainfo != NULL) {
-        SSAUseIter si;
-        UINT prno = 0;
-        if (SSA_def(ssainfo) != NULL) {
-            prno = SSA_def(ssainfo)->getPrno();
-        } else {
-            //Without DEF.
-            return change;
-        }
-
-        //Check if use referenced the number of PR which defined by SSA_def.
-        INT ni = -1;
-        for (INT i = SSA_uses(ssainfo).get_first(&si);
-             si != NULL; i = ni) {
-            ni = SSA_uses(ssainfo).get_next(i, &si);
-
-            IR const* use = m_rg->getIR(i);
-
-            if (use->is_pr() && PR_no(use) == prno) { continue; }
-
-            ssainfo->removeUse(use);
-
-            change = true;
-        }
-
-        return change;
-    }
-
     DUSet const* useset = stmt->readDUSet();
     if (useset == NULL) { return false; }
 
     ASSERT0(stmt->isMemoryRef());
-
     MDSet const* maydef = getMayDef(stmt);
     MD const* mustdef = get_must_def(stmt);
-
     DUIter di = NULL;
     UINT next_u;
     for (UINT u = useset->get_first(&di); di != NULL; u = next_u) {
         next_u = useset->get_next(u, &di);
-
         IR const* use = m_rg->getIR(u);
         ASSERT0(use->is_exp());
-
         if (isOverlapDefUse(mustdef, maydef, use)) { continue; }
 
         //There is no du-chain bewteen stmt and use. Cut the MD du.
         removeDUChain(stmt, use);
         change = true;
     }
-
     return change;
 }
 
 
+//Check if the DEF of stmt's operands still modify the same memory object.
+//e.g: Revise DU chain if stmt's rhs has been changed.
+//    x=10 //S1
+//    ...
+//    c=x*0 //S2
+//after changed =>
+//    x=10 //S1
+//    ...
+//    c=0 //S2
+//where S1 is DEF, S2 is USE, after ir refinement, x in S2
+//is removed, remove the data dependence between S1
+//and S2's operand.
 bool DUMgr::removeExpiredDUForOperand(IR * stmt)
 {
     bool change = false;
@@ -2042,18 +2018,17 @@ bool DUMgr::removeExpiredDUForOperand(IR * stmt)
 
 
 //Check if the DEF of stmt's operands still modify the same memory object.
-//This function will process SSA info if it exists.
-//e.g: Revise DU chain if stmt's rhs has changed.
+//e.g: Revise DU chain if stmt's rhs has been changed.
 //    x=10 //S1
 //    ...
 //    c=x*0 //S2
-//  =>
+//after changed =>
 //    x=10 //S1
 //    ...
 //    c=0 //S2
-//Given S1 is def, S2 is use, after ir refinement, x in S2
+//where S1 is DEF, S2 is USE, after ir refinement, x in S2
 //is removed, remove the data dependence between S1
-//and S2 operand.
+//and S2's operand.
 bool DUMgr::removeExpiredDU(IR * stmt)
 {
     ASSERT0(stmt->is_stmt());
@@ -2070,7 +2045,7 @@ bool DUMgr::removeExpiredDU(IR * stmt)
 //'ir': indicate the root of IR tree.
 //e.g: d1, d2 are def-stmt of stmt's operands.
 //this functin cut off du-chain between d1, d2 and their use.
-void DUMgr::removeUseOutFromDefset(IR * ir)
+void DUMgr::removeUseFromDefset(IR * ir)
 {
     m_citer.clean();
     IR const* k;
@@ -2118,7 +2093,7 @@ void DUMgr::removeUseOutFromDefset(IR * ir)
 //Remove 'def' from its use's def-list.
 //e.g:u1, u2 are its use expressions.
 //cut off the du chain between def->u1 and def->u2.
-void DUMgr::removeDefOutFromUseset(IR * def)
+void DUMgr::removeDefFromUseset(IR * def)
 {
     ASSERT0(def->is_stmt());
 
@@ -2152,13 +2127,13 @@ void DUMgr::removeDefOutFromUseset(IR * def)
 
 
 //Remove all DU info of 'ir' from DU mgr.
-void DUMgr::removeIROutFromDUMgr(IR * ir)
+void DUMgr::removeIRFromDUMgr(IR * ir)
 {
     ASSERT0(ir->is_stmt());
-    removeUseOutFromDefset(ir);
+    removeUseFromDefset(ir);
 
     //If stmt has SSA info, it should be maintained by SSA related api.
-    removeDefOutFromUseset(ir);
+    removeDefFromUseset(ir);
 }
 
 
@@ -2298,25 +2273,28 @@ size_t DUMgr::count_mem_duset()
 
 //Coalesce DU chain of 'from' to 'to'.
 //This function replace definition of USE of 'from' to defintion of 'to'.
-//e.g: to_def=...
-//     from=to
-//     ...=from_use
-//=> after coalescing, p1 is src, p0 is tgt
-//     to_def=...
+//Just like copy-propagation.
+//e.g: to_def =...
+//     from = to
+//     ...= from_use
+//=> after coalescing
+//     to_def = ...
 //     ------ //removed
-//     ...=to
+//     ... = to
 void DUMgr::coalesceDUChain(IR * from, IR * to)
 {
     ASSERT0(from && to);
-    ASSERT0(from->is_stmt() && to->is_exp());
+    ASSERT0(from->is_stmt() && to->is_exp() && to->getStmt() == from);
     if (from->getDUSet() == NULL || to->getDUSet() == NULL) {
-        return removeIROutFromDUMgr(from);
+        //Neight from nor to has DU chain.
+        return removeIRFromDUMgr(from);
     }
 
     //Use exp set of 'from'.
     DUSet * uses = from->getDUSet();
     //Def stmt set of 'to'.
     DUSet * defs = to->getDUSet();
+    defs->remove(from->id(), *m_misc_bs_mgr);
 
     //Iterate USE of 'from', change each USE's definition to to_def.
     DUIter it1 = NULL;
@@ -2332,7 +2310,6 @@ void DUMgr::coalesceDUChain(IR * from, IR * to)
              j >= 0; j = defs->get_next(j, &it2)) {
             IR const* def = m_rg->getIR(j);
             ASSERT0(def && def->is_stmt());
-            if (def == from) { continue; }
 
             DUSet * uses_of_def = def->getDUSet();
             ASSERT0(uses_of_def);
@@ -2340,8 +2317,8 @@ void DUMgr::coalesceDUChain(IR * from, IR * to)
             if (use != to) {
                 uses_of_def->addUse(use, *m_misc_bs_mgr);
             }
-            defs_of_use->addDef(def, *m_misc_bs_mgr);
         }
+        defs_of_use->bunion(*defs, *m_misc_bs_mgr);
     }
     defs->clean(*m_misc_bs_mgr);
     uses->clean(*m_misc_bs_mgr);

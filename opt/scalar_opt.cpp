@@ -56,7 +56,7 @@ bool ScalarOpt::perform(OptCtx & oc)
 
     bool in_ssa_form = false;
     PRSSAMgr * ssamgr = (PRSSAMgr*)m_pass_mgr->queryPass(PASS_PR_SSA_MGR);
-    if (ssamgr != NULL && ssamgr->isSSAConstructed()) {
+    if (ssamgr != NULL && ssamgr->is_valid()) {
         in_ssa_form = true;
     }
 
@@ -116,11 +116,11 @@ bool ScalarOpt::perform(OptCtx & oc)
     BBList * bbl = m_rg->getBBList();
     IRCFG * cfg = m_rg->getCFG();
     DUMMYUSE(cfg);
+    Refine * refine = (Refine*)m_rg->getPassMgr()->registerPass(PASS_REFINE);
     do {
         change = false;
         for (Pass * pass = passlist.get_head();
              pass != NULL; pass = passlist.get_next()) {
-            CHAR const* passname = pass->getPassName();
             ASSERT0(verifyIRandBB(bbl, m_rg));
             bool doit = pass->perform(oc);
             if (doit) {
@@ -129,7 +129,7 @@ bool ScalarOpt::perform(OptCtx & oc)
                 ASSERT0(cfg->verify());
             }
             RefineCtx rc;
-            m_rg->refineBBlist(bbl, rc, oc);
+            refine->refineBBlist(bbl, rc, oc);
             ASSERT0(m_rg->verifyRPO(oc));
         }
         count++;

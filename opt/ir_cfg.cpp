@@ -1257,7 +1257,7 @@ bool IRCFG::removeRedundantBranch()
             BB_irlist(bb).remove_tail();
 
             if (dumgr != NULL) {
-                dumgr->removeIROutFromDUMgr(last_xr);
+                dumgr->removeIRFromDUMgr(last_xr);
             }
 
             m_rg->freeIRTree(last_xr);
@@ -1284,7 +1284,7 @@ bool IRCFG::removeRedundantBranch()
             (last_xr->is_falsebr() && always_true)) {
             IR * r = BB_irlist(bb).remove_tail();
             if (dumgr != NULL) {
-                dumgr->removeIROutFromDUMgr(r);
+                dumgr->removeIRFromDUMgr(r);
             }
             m_rg->freeIRTree(r);
 
@@ -1389,7 +1389,7 @@ void IRCFG::dumpDOT(FILE * h, bool detail, bool dump_eh)
             }
 
             //Dump MDSSA Phi List.
-            if (mdssamgr != NULL && mdssamgr->isMDSSAConstructed()) {
+            if (mdssamgr != NULL && mdssamgr->is_valid()) {
                 MDPhiList const* philist = mdssamgr->getPhiList(bb);
                 if (philist != NULL) {
                     FILE * org = g_tfile;
@@ -1531,7 +1531,7 @@ void IRCFG::dump_node(FILE * h, bool detail)
             fprintf(h, "\n");
 
             //Dump MDSSA Phi List.
-            if (mdssamgr != NULL && mdssamgr->isMDSSAConstructed()) {
+            if (mdssamgr != NULL && mdssamgr->is_valid()) {
                 MDPhiList const* philist = mdssamgr->getPhiList(bb);
                 if (philist != NULL) {
                     FILE * org = g_tfile;
@@ -1805,7 +1805,7 @@ void IRCFG::remove_xr(IRBB * bb, IR * ir)
         //Revise DU chains.
         //TODO: If ssa form is available, it doesn't need to maintain
         //DU chain of PR in DU manager counterpart.
-        dumgr->removeIROutFromDUMgr(ir);
+        dumgr->removeIRFromDUMgr(ir);
     }
 
     //Revise PRSSA info if PR is in SSA form.
@@ -1880,8 +1880,8 @@ bool IRCFG::performMiscOpt(OptCtx & oc)
 
         //SSAInfo is invalid by adding new-edge to BB.
         //This will confuse phi insertion.
-        ASSERT0(verifyPRSSAInfo(m_rg));
-        ASSERT0(verifyMDSSAInfo(m_rg));
+        ASSERT0(PRSSAMgr::verifyPRSSAInfo(m_rg));
+        ASSERT0(MDSSAMgr::verifyMDSSAInfo(m_rg));
 
     }
 

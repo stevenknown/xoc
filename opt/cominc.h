@@ -58,11 +58,13 @@ author: Su Zhenyu
 #include "ir_middle_opt.h"
 #include "targ_info.h"
 #include "region_mgr.h"
+#include "analysis_instr.h"
 #include "region.h"
 #include "ir_du.h"
 #include "ir_aa.h"
 #include "ir_expr_tab.h"
 #include "callg.h"
+#include "du_helper.h"
 
 using namespace xoc;
 #endif

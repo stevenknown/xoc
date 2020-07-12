@@ -487,7 +487,7 @@ bool DeadCodeElim::remove_ineffect_ir() const
                 //Revise DU chains.
                 //TODO: If ssa form is available, it doesn't need to maintain
                 //DU chain of PR in DU manager counterpart.
-                m_du->removeIROutFromDUMgr(stmt);
+                m_du->removeIRFromDUMgr(stmt);
 
                 if (stmt->isConditionalBr() ||
                     stmt->isUnconditionalBr() ||
@@ -735,7 +735,7 @@ void DeadCodeElim::reinit()
 
 bool DeadCodeElim::removeRedundantPhi()
 {    
-    if (m_prssamgr != NULL && m_prssamgr->isSSAConstructed()) {
+    if (m_prssamgr != NULL && m_prssamgr->is_valid()) {
         return m_prssamgr->refinePhi();
     }
     return false; 
@@ -772,7 +772,6 @@ bool DeadCodeElim::perform(OptCtx & oc)
     }
 
     reinit();
-
     bool change = false;
     bool removed = true;
     UINT count = 0;
@@ -791,18 +790,18 @@ bool DeadCodeElim::perform(OptCtx & oc)
         m_is_stmt_effect.clean();
         m_is_bb_effect.clean();
 
-        ASSERT0(verifyMDSSAInfo(m_rg));
-        ASSERT0(verifyPRSSAInfo(m_rg));
+        ASSERT0(MDSSAMgr::verifyMDSSAInfo(m_rg));
+        ASSERT0(PRSSAMgr::verifyPRSSAInfo(m_rg));
         
         if (m_cfg->performMiscOpt(oc)) {
             //CFG changed, remove empty BB.
             //TODO: DO not recompute whole SSA/MDSSA. Instead, update
             //SSA/MDSSA info especially PHI operands incrementally.
-            ASSERT0(verifyPRSSAInfo(m_rg));
-            ASSERT0(verifyMDSSAInfo(m_rg));
+            ASSERT0(PRSSAMgr::verifyPRSSAInfo(m_rg));
+            ASSERT0(MDSSAMgr::verifyMDSSAInfo(m_rg));
         }
         removed |= removeRedundantPhi();
-        ASSERT0(verifyPRSSAInfo(m_rg));
+        ASSERT0(PRSSAMgr::verifyPRSSAInfo(m_rg));
         //fix_control_flow(bblst, ctlst);
     }
     ASSERT0(!removed);
@@ -822,8 +821,8 @@ bool DeadCodeElim::perform(OptCtx & oc)
     OC_is_live_expr_valid(oc) = false;
     OC_is_reach_def_valid(oc) = false;
     OC_is_avail_reach_def_valid(oc) = false;
-    ASSERT0(verifyPRSSAInfo(m_rg));
-    ASSERT0(verifyMDSSAInfo(m_rg));
+    ASSERT0(PRSSAMgr::verifyPRSSAInfo(m_rg));
+    ASSERT0(MDSSAMgr::verifyMDSSAInfo(m_rg));
     END_TIMER(t, getPassName());
     return true;
 }

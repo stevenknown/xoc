@@ -106,14 +106,14 @@ bool Region::performSimplify(OptCtx & oc)
         bool need_rebuild_prssa = false;
         MDSSAMgr * mdssamgr = (MDSSAMgr*)getPassMgr()->queryPass(
             PASS_MD_SSA_MGR);
-        if (mdssamgr != NULL && mdssamgr->isMDSSAConstructed()) {
+        if (mdssamgr != NULL && mdssamgr->is_valid()) {
             need_rebuild_mdssa = true;
             mdssamgr->destruction(&oc);
         }
 
         PRSSAMgr * prssamgr = (PRSSAMgr*)getPassMgr()->queryPass(
             PASS_PR_SSA_MGR);
-        if (prssamgr != NULL && prssamgr->isSSAConstructed()) {
+        if (prssamgr != NULL && prssamgr->is_valid()) {
             need_rebuild_prssa = true;
             prssamgr->destruction(&oc);
         }
@@ -200,7 +200,7 @@ bool Region::MiddleProcess(OptCtx & oc)
     if (getPassMgr() != NULL &&
         (getPassMgr()->queryPass(PASS_PR_SSA_MGR) != NULL &&
          ((PRSSAMgr*)getPassMgr()->queryPass(PASS_PR_SSA_MGR))->
-              isSSAConstructed())) {
+              is_valid())) {
         do_simplification = false;
     }
 
@@ -215,7 +215,8 @@ bool Region::MiddleProcess(OptCtx & oc)
     ASSERT0(verifyRPO(oc));
     if (g_do_refine) {
         RefineCtx rf;
-        if (refineBBlist(bbl, rf, oc)) {
+        Refine * refine = (Refine*)getPassMgr()->registerPass(PASS_REFINE);
+        if (refine->refineBBlist(bbl, rf, oc)) {
             if (g_verify_level >= VERIFY_LEVEL_3 &&
                 OC_is_pr_du_chain_valid(oc) &&
                 OC_is_nonpr_du_chain_valid(oc)) {

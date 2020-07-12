@@ -1370,11 +1370,12 @@ IR * Region::simpToPR(IR * ir, SimpCtx * ctx)
     allocRefForPR(pr);
     copyDbx(pr, ir, this); //keep dbg info for new EXP.
 
-    IR * st = buildStorePR(PR_no(pr), pr->getType(), ir);
-    allocRefForPR(st);
+    IR * stpr = buildStorePR(PR_no(pr), pr->getType(), ir);
+    allocRefForPR(stpr);
+    addDUChain(stpr, pr, this);
 
-    copyDbx(st, ir, this); //keep dbg info for new STMT.
-    ctx->appendStmt(st);
+    copyDbx(stpr, ir, this); //keep dbg info for new STMT.
+    ctx->appendStmt(stpr);
     SIMP_changed(ctx) = true;
 
     //Do NOT free ir here, caller will do that.
@@ -1633,13 +1634,8 @@ IR * Region::simplifyStoreArray(IR * ir, SimpCtx * ctx)
     ret = buildIStore(array_addr, rhsval, type);
     ret->copyRef(ir, this);
     copyDbx(ret, ir, this);
-    if (getMDSSAMgr() != NULL) {
-        getMDSSAMgr()->changeDef(ir, ret);
-    }
-    if (getDUMgr() != NULL) {
-        getDUMgr()->changeDef(ret, ir, getMiscBitSetMgr());
-    }
-    copyAI(ir, ret);
+    ret->copyAI(ir, this);
+    changeDef(ir, ret, this);
     freeIRTree(ir);
 FIN:
     xcom::add_next(&ret_list, &last, ret);
@@ -1673,15 +1669,10 @@ IR * Region::simplifyArray(IR * ir, SimpCtx * ctx)
         IR * ld = buildLoad(ID_info(array_addr), array_addr->getType());
         //Load variable which is an array.
         ld->copyRef(ir, this);
-        if (getMDSSAMgr() != NULL) {
-            getMDSSAMgr()->changeUse(ir, ld);
-        }
-        copyAI(ir, ld);
+        ld->copyAI(ir, this);
+        changeUse(ir, ld, this);
         freeIRTree(ir);
         freeIRTree(array_addr);
-        if (getDUMgr() != NULL) {
-            getDUMgr()->changeUse(ld, ir, getMiscBitSetMgr());
-        }
         return ld;
     }
 
@@ -1693,13 +1684,8 @@ IR * Region::simplifyArray(IR * ir, SimpCtx * ctx)
         //Load array element value.
         IR * elem_val = buildILoad(array_addr, ir->getType());
         elem_val->copyRef(ir, this);
-        if (getMDSSAMgr() != NULL) {
-            getMDSSAMgr()->changeUse(ir, elem_val);
-        }
-        if (getDUMgr() != NULL) {
-            getDUMgr()->changeUse(elem_val, ir, getMiscBitSetMgr());
-        }
-        copyAI(ir, elem_val);
+        elem_val->copyAI(ir, this);
+        changeUse(ir, elem_val, this);
         freeIRTree(ir);
 
         IR * pr = buildPR(elem_val->getType());
@@ -1722,37 +1708,28 @@ IR * Region::simplifyArray(IR * ir, SimpCtx * ctx)
         //Load array element's value.
         IR * elem_val = buildILoad(array_addr, ir->getType());
         elem_val->copyRef(ir, this);
-        if (getMDSSAMgr() != NULL) {
-            getMDSSAMgr()->changeUse(ir, elem_val);
-        }
-        if (getDUMgr() != NULL) {
-            getDUMgr()->changeUse(elem_val, ir, getMiscBitSetMgr());
-        }
-        copyAI(ir, elem_val);
+        elem_val->copyAI(ir, this);
+        changeUse(ir, elem_val, this);
         freeIRTree(ir);
 
         IR * pr = buildPR(elem_val->getType());
         allocRefForPR(pr);
 
-        IR * st = buildStorePR(PR_no(pr), pr->getType(), elem_val);
-        allocRefForPR(st);
+        IR * stpr = buildStorePR(PR_no(pr), pr->getType(), elem_val);
+        allocRefForPR(stpr);
 
         //keep dbg info for new STMT.
-        copyDbx(st, array_addr, this);
-        ctx->appendStmt(st);
+        copyDbx(stpr, array_addr, this);
+        ctx->appendStmt(stpr);
+        addDUChain(stpr, pr, this);
         return pr;
     }
 
     //Load array element value.
     IR * elem_val = buildILoad(array_addr, ir->getType());
     elem_val->copyRef(ir, this);
-    if (getMDSSAMgr() != NULL) {
-        getMDSSAMgr()->changeUse(ir, elem_val);
-    }
-    if (getDUMgr() != NULL) {
-        getDUMgr()->changeUse(elem_val, ir, getMiscBitSetMgr());
-    }
-    copyAI(ir, elem_val);
+    changeUse(ir, elem_val, this);
+    elem_val->copyAI(ir, this);
     freeIRTree(ir);
     return elem_val;
 }

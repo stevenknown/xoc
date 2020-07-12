@@ -36,6 +36,8 @@ author: Su Zhenyu
 
 namespace xoc {
 
+class Region;
+
 //Refining context variable.
 //Set the following options true or false to enable or disable the refinement.
 #define RC_refine_div_const(r) ((r).u1.s1.refine_div_const)
@@ -119,6 +121,98 @@ public:
         RC_stmt_removed(*this) = false;
         RC_hoist_to_lnot(*this) = false;
     }
+};
+
+
+//This class perform peephole optimizations.
+class Refine : public Pass {
+    COPY_CONSTRUCTOR(Refine);
+    HOST_INT calcLSRIntVal(Type const* type, HOST_INT v0, HOST_INT v1);
+    HOST_INT calcIntVal(IR_TYPE ty, HOST_INT v0, HOST_INT v1);
+    double calcFloatVal(IR_TYPE ty, double v0, double v1);
+
+    IR * foldConstFloatUnary(IR * ir, bool & change);
+    IR * foldConstFloatBinary(IR * ir, bool & change);
+    IR * foldConstIntUnary(IR * ir, bool & change);
+    IR * foldConstIntBinary(IR * ir, bool & change);    
+ 
+    //Check and insert data type CVT if it is necessary.
+    IR * insertCvt(IR * parent, IR * kid, bool & change);
+    void insertCvtForBinaryOp(IR * ir, bool & change);
+    //Insert CVT for float if necessary.
+    virtual IR * insertCvtForFloat(IR * parent, IR * kid, bool & change);
+
+    //Peephole optimizations.
+    IR * refineSetelem(IR * ir, bool & change, RefineCtx & rc);
+    IR * refineGetelem(IR * ir, bool & change, RefineCtx & rc);
+    IR * refineBand(IR * ir, bool & change);
+    IR * refineBor(IR * ir, bool & change);
+    IR * refineCvt(IR * ir, bool & change, RefineCtx & rc);
+    IR * refineLand(IR * ir, bool & change);
+    IR * refineLor(IR * ir, bool & change);
+    IR * refineXor(IR * ir, bool & change);
+    IR * refineAdd(IR * ir, bool & change);
+    IR * refineSub(IR * ir, bool & change);
+    IR * refineMul(IR * ir, bool & change, RefineCtx & rc);
+    IR * refineRem(IR * ir, bool & change);
+    IR * refineDiv(IR * ir, bool & change, RefineCtx & rc);
+    IR * refineNe(IR * ir, bool & change, RefineCtx & rc);
+    IR * refineEq(IR * ir, bool & change, RefineCtx & rc);
+    IR * refineMod(IR * ir, bool & change);
+    IR * refineCall(IR * ir, bool & change, RefineCtx & rc);
+    IR * refineICall(IR * ir, bool & change, RefineCtx & rc);
+    IR * refineSwitch(IR * ir, bool & change, RefineCtx & rc);
+    IR * refineReturn(IR * ir, bool & change, RefineCtx & rc);
+    IR * refinePhi(IR * ir, bool & change, RefineCtx & rc);
+    IR * refineBr(IR * ir, bool & change, RefineCtx & rc);
+    IR * refineSelect(IR * ir, bool & change, RefineCtx & rc);
+    IR * refineBranch(IR * ir);
+    IR * refineArray(IR * ir, bool & change, RefineCtx & rc);
+    IR * refineNeg(IR * ir, bool & change);
+    IR * refineNot(IR * ir, bool & change, RefineCtx & rc);
+    IR * refineBinaryOp(IR * ir, bool & change, RefineCtx & rc);
+    IR * refineLoad(IR * ir);
+    IR * refineILoad1(IR * ir, bool & change);
+    IR * refineILoad2(IR * ir, bool & change);
+    IR * refineILoad(IR * ir, bool & change, RefineCtx & rc);
+    IR * refineDetViaSSAdu(IR * ir, bool & change);
+    IR * refineDet(IR * ir_list, bool & change, RefineCtx & rc);
+    IR * refineStore(IR * ir, bool & change, RefineCtx & rc);
+    IR * refineStoreArray(IR * ir, bool & change, RefineCtx & rc);
+    IR * refineIStore(IR * ir, bool & change, RefineCtx & rc);
+    bool refineStmtList(IN OUT BBIRList & ir_list, RefineCtx & rc);
+    IR * reassociation(IR * ir, bool & change);
+
+    IR * StrengthReduce(IN OUT IR * ir, IN OUT bool & change);
+protected:
+    Region * m_rg;
+    TypeMgr * m_tm;
+
+public:
+    explicit Refine(Region * rg);
+    virtual ~Refine() {}
+
+    //Perform const-folding.
+    //Return updated ir if optimization performed.
+    IR * foldConst(IR * ir, bool & change);
+
+    virtual CHAR const* getPassName() const { return "IR Refining"; }
+    virtual PASS_TYPE getPassType() const { return PASS_REFINE; }
+
+    //Invert condition for relation operation.
+    virtual void invertCondition(IR ** cond);
+
+    //Perform peephole optimization to ir_list.
+    //Return updated ir_list if optimization performed.
+    IR * refineIRlist(IR * ir_list, bool & change, RefineCtx & rc);
+    //Perform peephole optimization to ir.
+    //Return updated ir if optimization performed.
+    IR * refineIR(IR * ir, bool & change, RefineCtx & rc);
+    //Perform peephole optimization to BB list.
+    //Return updated BB list if optimization performed.
+    bool refineBBlist(IN OUT BBList * ir_bb_list, RefineCtx & rc, OptCtx & oc);
+
+    virtual bool perform(OptCtx & oc);
 };
 
 } //namespace xoc

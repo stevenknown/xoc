@@ -556,8 +556,11 @@ public:
     size_t count_mem() const;
 
     //Copy memory reference only for current ir node.
-    //'src': copy MD reference from 'src', it may be different to current ir.
+    //src: copy MD reference from 'src', it may be different to current ir.
     void copyRef(IR const* src, Region * rg);
+
+    //Copy AttachInfo from 'src' to current ir, not include kid and sibling.
+    void copyAI(IR const* src, Region * rg);
 
     //Copy each memory reference for whole ir tree.
     //'src': copy MD reference from 'src', it must be equal to current ir tree.

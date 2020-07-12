@@ -81,6 +81,7 @@ private:
     TypeMgr * m_tm;
     PRSSAMgr * m_prssamgr;
     MDSSAMgr * m_mdssamgr;
+    Refine * m_refine;
     UINT m_prop_kind;
 
 private:
@@ -134,9 +135,9 @@ private:
                             IN OUT CPCtx & ctx);
 
     bool useMDSSADU() const
-    { return m_mdssamgr != NULL && m_mdssamgr->isMDSSAConstructed(); }
+    { return m_mdssamgr != NULL && m_mdssamgr->is_valid(); }
     bool usePRSSADU() const
-    { return m_prssamgr != NULL && m_prssamgr->isSSAConstructed(); }
+    { return m_prssamgr != NULL && m_prssamgr->is_valid(); }
 
 public:
     CopyProp(Region * rg)
@@ -148,6 +149,9 @@ public:
         m_cfg = rg->getCFG();
         m_md_set_mgr = rg->getMDSetMgr();
         m_tm = rg->getTypeMgr();
+        m_refine = NULL;
+        m_mdssamgr = NULL;
+        m_prssamgr = NULL;
         ASSERT0(m_cfg && m_du && m_md_sys && m_tm && m_md_set_mgr);
         m_prop_kind = CP_PROP_UNARY_AND_SIMPLEX;
     }

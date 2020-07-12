@@ -61,7 +61,7 @@ void GCSE::elimCseAtStore(IR * use, IR * use_stmt, IR * gen)
     ASSERT0(use_stmt->getRHS() == use);
 
     //Cut off du chain for use and its definitions.
-    m_du->removeUseOutFromDefset(use);
+    m_du->removeUseFromDefset(use);
 
     //gen_pr hold the CSE value come from gen-stmt.
     //We eliminate the redundant computation via replace use by gen_pr.
@@ -112,7 +112,7 @@ void GCSE::elimCseAtBranch(IR * use, IR * use_stmt, IN IR * gen)
     ASSERT0(use->is_exp() && gen->is_exp());
 
     //Cut off du chain for use and its definitions.
-    m_du->removeUseOutFromDefset(use);
+    m_du->removeUseFromDefset(use);
 
     IR * gen_pr = m_exp2pr.get(gen);
     ASSERT0(gen_pr);
@@ -173,7 +173,7 @@ void GCSE::elimCseAtCall(IR * use, IR * use_stmt, IR * gen)
     ASSERT0(use->is_exp() && gen->is_exp() && use_stmt->is_stmt());
 
     //Cut off du chain for use and its definitions.
-    m_du->removeUseOutFromDefset(use);
+    m_du->removeUseFromDefset(use);
 
     IR * gen_pr = m_exp2pr.get(gen);
     ASSERT0(gen_pr && gen_pr->is_pr());
@@ -768,7 +768,7 @@ bool GCSE::perform(OptCtx & oc)
     //Check PR DU chain.
     PRSSAMgr * ssamgr = (PRSSAMgr*)(m_rg->getPassMgr()->queryPass(
         PASS_PR_SSA_MGR));
-    if (ssamgr != NULL && ssamgr->isSSAConstructed()) {
+    if (ssamgr != NULL && ssamgr->is_valid()) {
         m_ssamgr = ssamgr;
     } else {
         m_ssamgr = NULL;
@@ -780,7 +780,7 @@ bool GCSE::perform(OptCtx & oc)
     //Check NONPR DU chain.
     MDSSAMgr * mdssamgr = (MDSSAMgr*)(m_rg->getPassMgr()->queryPass(
         PASS_MD_SSA_MGR));
-    if (mdssamgr != NULL && mdssamgr->isMDSSAConstructed()) {
+    if (mdssamgr != NULL && mdssamgr->is_valid()) {
         m_mdssamgr = mdssamgr;
     } else {
         m_mdssamgr = NULL;
@@ -871,7 +871,7 @@ bool GCSE::perform(OptCtx & oc)
         ASSERT0(m_rg->verifyMDRef());
         ASSERT0(m_du->verifyMDDUChain(DUOPT_COMPUTE_PR_DU | DUOPT_COMPUTE_NONPR_DU));
         if (m_ssamgr != NULL) {
-            ASSERT0(verifyPRSSAInfo(m_rg));
+            ASSERT0(PRSSAMgr::verifyPRSSAInfo(m_rg));
         }
         //For now, gvn has updated correctly.
     }

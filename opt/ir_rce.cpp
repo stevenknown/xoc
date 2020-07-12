@@ -69,7 +69,7 @@ IR * RCE::calcCondMustVal(IN IR * ir,
     case IR_LAND:
     case IR_LOR:
     case IR_LNOT: {
-        ir = m_rg->foldConst(ir, changed);
+        ir = m_refine->foldConst(ir, changed);
         if (changed) {
             ASSERT0(ir->is_const() &&
                     (CONST_int_val(ir) == 0 || CONST_int_val(ir) == 1));
@@ -273,6 +273,7 @@ bool RCE::perform(OptCtx & oc)
 
     if (!OC_is_cfg_valid(oc)) { return false; }
     if (!OC_is_ref_valid(oc)) { return false; }
+    m_refine = (Refine*)m_rg->getPassMgr()->queryPass(PASS_REFINE);
     m_mdssamgr = (MDSSAMgr*)m_rg->getPassMgr()->queryPass(PASS_MD_SSA_MGR);
     m_prssamgr = (PRSSAMgr*)m_rg->getPassMgr()->queryPass(PASS_PR_SSA_MGR);
     if (!OC_is_pr_du_chain_valid(oc) && !usePRSSADU()) {
@@ -301,8 +302,8 @@ bool RCE::perform(OptCtx & oc)
         //CFG changed, remove empty BB.
         //TODO: DO not recompute whole SSA/MDSSA. Instead, update
         //SSA/MDSSA info especially PHI operands incrementally.
-        ASSERT0(verifyPRSSAInfo(m_rg));
-        ASSERT0(verifyMDSSAInfo(m_rg));
+        ASSERT0(PRSSAMgr::verifyPRSSAInfo(m_rg));
+        ASSERT0(MDSSAMgr::verifyMDSSAInfo(m_rg));
     }
     END_TIMER(t, getPassName());
     return change;

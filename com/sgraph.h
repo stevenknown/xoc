@@ -38,6 +38,7 @@ namespace xcom {
 
 #define MAGIC_METHOD
 #define VERTEX_UNDEF 0
+#define RPO_INTERVAL 5
 
 class Vertex;
 class Edge;

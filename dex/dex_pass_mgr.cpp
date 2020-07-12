@@ -81,7 +81,7 @@ void DexPassMgr::performScalarOpt(OptCtx & oc)
     PRSSAMgr * ssamgr = (PRSSAMgr*)registerPass(PASS_PR_SSA_MGR);
     bool is_ssa_avail = false;
     if (ssamgr != NULL) {
-        is_ssa_avail = ssamgr->isSSAConstructed();
+        is_ssa_avail = ssamgr->is_valid();
     }
 
     passlist.append_tail(registerPass(PASS_CP));

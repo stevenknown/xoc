@@ -281,9 +281,9 @@ private:
                     List<IR*> & exact_occs);
 
     bool useMDSSADU() const
-    { return m_mdssamgr != NULL && m_mdssamgr->isMDSSAConstructed(); }
+    { return m_mdssamgr != NULL && m_mdssamgr->is_valid(); }
     bool usePRSSADU() const
-    { return m_prssamgr != NULL && m_prssamgr->isSSAConstructed(); }
+    { return m_prssamgr != NULL && m_prssamgr->is_valid(); }
 
     void * xmalloc(UINT size)
     {

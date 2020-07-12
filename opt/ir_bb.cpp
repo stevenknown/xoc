@@ -233,13 +233,13 @@ void IRBB::removeSuccessorDesignatePhiOpnd(CFG<IRBB, IR> * cfg, IRBB * succ)
     IRCFG * ircfg = (IRCFG*)cfg;
     PRSSAMgr * prssamgr = (PRSSAMgr*)ircfg->getRegion()->getPassMgr()->
         queryPass(PASS_PR_SSA_MGR);
-    if (prssamgr != NULL && prssamgr->isSSAConstructed()) {
+    if (prssamgr != NULL && prssamgr->is_valid()) {
         prssamgr->removeSuccessorDesignatePhiOpnd(this, succ);
     }
 
     MDSSAMgr * mdssamgr = (MDSSAMgr*)ircfg->getRegion()->getPassMgr()->
         queryPass(PASS_MD_SSA_MGR);
-    if (mdssamgr != NULL && mdssamgr->isMDSSAConstructed()) {
+    if (mdssamgr != NULL && mdssamgr->is_valid()) {
         mdssamgr->removeSuccessorDesignatePhiOpnd(this, succ);
     }
 }
@@ -252,13 +252,13 @@ void IRBB::addSuccessorDesignatePhiOpnd(CFG<IRBB, IR> * cfg, IRBB * succ)
     IRCFG * ircfg = (IRCFG*)cfg;
     PRSSAMgr * prssamgr = (PRSSAMgr*)ircfg->getRegion()->getPassMgr()->
         queryPass(PASS_PR_SSA_MGR);
-    if (prssamgr != NULL && prssamgr->isSSAConstructed()) {
+    if (prssamgr != NULL && prssamgr->is_valid()) {
         prssamgr->addSuccessorDesignatePhiOpnd(this, succ);        
     }
 
     MDSSAMgr * mdssamgr = (MDSSAMgr*)ircfg->getRegion()->getPassMgr()->
         queryPass(PASS_MD_SSA_MGR);
-    if (mdssamgr != NULL && mdssamgr->isMDSSAConstructed()) {
+    if (mdssamgr != NULL && mdssamgr->is_valid()) {
         mdssamgr->addSuccessorDesignatePhiOpnd(this, succ);
     }
 }

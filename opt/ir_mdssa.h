@@ -71,7 +71,7 @@ protected:
     IRCFG * m_cfg;
     xcom::DefSegMgr * m_seg_mgr;
     xcom::DefMiscBitSetMgr * m_sbs_mgr;
-    bool m_is_ssa_constructed;
+    bool m_is_valid;
     bool m_is_semi_pruned;
     IRIter m_iter; //for tmp use.
 
@@ -93,7 +93,7 @@ protected:
         m_seg_mgr = NULL;
         m_sbs_mgr = NULL;
         m_cfg = NULL;
-        m_is_ssa_constructed = false;
+        m_is_valid = false;
         m_is_semi_pruned = true;
     }
     void cleanIRSSAInfo(IRBB * bb);
@@ -129,7 +129,7 @@ protected:
     void init()
     {
         if (m_usedef_mgr.m_mdssainfo_pool != NULL) { return; }
-        m_is_ssa_constructed = false;
+        m_is_valid = false;
     }
     void initVMD(IN IR * ir, OUT DefSBitSet & maydef_md);
     void insertPhi(UINT mdid, IN IRBB * bb);
@@ -195,7 +195,7 @@ public:
     {
         //CAUTION: If you do not finish out-of-SSA prior to destory(),
         //the reference to IR's MDSSA info will lead to undefined behaviors.
-        //ASSERTN(!isMDSSAConstructed(), ("should be destructed"));
+        //ASSERTN(!is_valid(), ("should be destructed"));
 
         destroy();
     }
@@ -217,7 +217,7 @@ public:
     //Change Def stmt from 'olddef' to 'newdef'.
     //'olddef': source stmt.
     //'newdef': target stmt.
-    //e.g: oldef->USE change to newdef->USE.
+    //e.g: given oldef->USE, change to newdef->USE.
     void changeDef(IR * olddef, IR * newdef);
 
     //DU chain operation.
@@ -239,7 +239,7 @@ public:
     //     p0=...
     //     ------ //removed
     //     ...=p0
-    void coalesceVersion(IR const* src, IR const* tgt);
+    void coalesceDUChain(IR const* src, IR const* tgt);
     void cleanMDSSAInfo(IR * ir) { getUseDefMgr()->cleanMDSSAInfo(ir); }
 
     //Destroy memory in MDSSAMgr.
@@ -295,7 +295,7 @@ public:
     //Return true if MDSSA is constructed.
     //This flag will direct the behavior of optimizations.
     //If MDSSA constructed, DU mananger should not compute any information.
-    bool isMDSSAConstructed() const { return m_is_ssa_constructed; }
+    bool is_valid() const { return m_is_valid; }
 
     //Iterative access MDDef chain.
     //This funtion initialize the iterator.
@@ -314,9 +314,9 @@ public:
     //This function will clean all informations and recreate them.
     void reinit();
 
-    //Remove MD-SSA and PR-SSA use-def chain.
-    //e.g: ir=...
-    //    =ir //S1
+    //Remove MDSSA Use-Def chain.
+    //e.g: ir = ...
+    //    = ir //S1
     //If S1 will be deleted, ir should be removed from its useset in MDSSAInfo.
     //NOTE: If ir is a IR tree, e.g: ild(x, ld(y)), remove ild(x) means
     //ld(y) will be removed as well. And ld(y)'s MDSSAInfo will be
@@ -356,18 +356,22 @@ public:
     //you need remove the related PHI operand if BB successor has PHI stmt.
     void removeSuccessorDesignatePhiOpnd(IRBB * bb, IRBB * succ);
 
+    //Check each USE of stmt, remove the expired one which is not reference
+    //the memory any more that stmt defined.
+    //Return true if DU changed.
+    bool removeExpiredDUForStmt(IR * stmt);
+
     bool verifyDDChain();
     bool verifyPhi(bool is_vpinfo_avail);
     bool verifyVMD();
     bool verify();
+    static bool verifyMDSSAInfo(Region * rg);
 
     virtual bool perform(OptCtx & oc) { construction(oc); return true; }
     //Remove redundant phi.
     //Return true if there is phi removed.
     bool prunePhi();
 };
-
-bool verifyMDSSAInfo(Region * rg);
 
 } //namespace xoc
 #endif

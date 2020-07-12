@@ -109,7 +109,7 @@ bool LoopCvt::try_convert(LI<IRBB> * li, IRBB * gobackbb,
          ir != NULL; ir = BB_next_ir(head)) {
         IR * newir = m_rg->dupIRTree(ir);
 
-        m_du->copyIRTreeDU(newir, ir, true);
+        m_du->copyRefAndAddDUChain(newir, ir, true);
 
         m_ii.clean();
         for (IR * x = iterRhsInit(ir, m_ii);

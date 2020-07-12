@@ -84,6 +84,7 @@ public:
     virtual Pass * allocRefineDUChain();
     virtual Pass * allocScalarOpt();
     virtual Pass * allocMDLivenessMgr();
+    virtual Pass * allocRefine();
 
     void destroyAllPass();
     void destroyPass(Pass * pass);
