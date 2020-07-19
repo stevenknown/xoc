@@ -67,7 +67,7 @@ bool LICM::scanOpnd(IN LI<IRBB> * li,
         ASSERT0(bb && m_cfg->getVertex(i));
         for (IR * ir = BB_first_ir(bb); ir != NULL; ir = BB_next_ir(bb)) {
             if (!ir->isContainMemRef() || ir->isNoMove()) { continue; }
-            if ((ir->isCallStmt() && !ir->isReadOnlyCall()) ||
+            if ((ir->isCallStmt() && !ir->isReadOnly()) ||
                 ir->is_region() || ir->is_phi()) {
                 //TODO: support call.
                 *isLegal = false;
@@ -81,7 +81,7 @@ bool LICM::scanOpnd(IN LI<IRBB> * li,
             for (IR const* x = iterRhsInitC(ir, m_iriter);
                  x != NULL; x = iterRhsNextC(m_iriter)) {
                 if (!x->isMemoryOpnd() ||
-                    x->isReadOnlyExp() ||
+                    x->isReadOnly() ||
                     invariant_exp.find(const_cast<IR*>(x))) {
                     continue;
                 }
@@ -188,7 +188,8 @@ bool LICM::markExpAndStmt(IR * ir, TTab<IR*> & invariant_exp)
         break;
     case IR_CALL:
     case IR_ICALL: {
-            //Hoisting CALL out of loop may be unsafe if the loop
+            //Hoisting CALL out of loop should generate a guard as well to
+            //guarantee CALL will not be exectued if the loop
             //will never execute.
             for (IR * p = CALL_param_list(ir); p != NULL; p = p->get_next()) {
                 if (!p->isConstExp() && !p->is_pr()) {
@@ -200,7 +201,7 @@ bool LICM::markExpAndStmt(IR * ir, TTab<IR*> & invariant_exp)
             }
 
             //The result of call may not be loop invariant.
-            if (ir->isReadOnlyCall()) {
+            if (ir->isReadOnly()) {
                 ASSERT0(!m_analysable_stmt_list.find(ir));
                 m_analysable_stmt_list.append_tail(ir);
             }
@@ -234,10 +235,11 @@ bool LICM::markExpAndStmt(IR * ir, TTab<IR*> & invariant_exp)
 
 
 //Return true if md is modified in loop only once.
-bool LICM::isUniqueDef(MD const* md)
+bool LICM::isUniqueDef(MD const* md) const
 {
+    ASSERT0(md);
     UINT * n = m_md2num.get(md);
-    ASSERT0(n);
+    ASSERTN(n, ("should call updateMD2Num() first"));
     if (*n > 1) { return false; }
 
     MDTab * mdt = m_md_sys->getMDTab(MD_base(md));
@@ -246,16 +248,16 @@ bool LICM::isUniqueDef(MD const* md)
     MD const* x = mdt->get_effect_md();
     if (x != NULL && x != md && x->is_overlap(md)) {
         UINT * n2 = m_md2num.get(x);
-        if (*n2 > 1) { return false; }
+        if (n2 != NULL && *n2 > 1) { return false; }
     }
 
     OffsetTab * ofstab = mdt->get_ofst_tab();
     if (ofstab == NULL) { return true; }
     if (ofstab->get_elem_count() == 0) { return true; }
 
-    m_mditer.clean();
-    for (MD const* x2 = ofstab->get_first(m_mditer, NULL);
-         x2 != NULL; x2 = ofstab->get_next(m_mditer, NULL)) {
+    ConstMDIter mditer;
+    for (MD const* x2 = ofstab->get_first(mditer, NULL);
+         x2 != NULL; x2 = ofstab->get_next(mditer, NULL)) {
         if (x2 != md && x2->is_overlap(md)) {
             UINT * n2 = m_md2num.get(x2);
             if (n2 != NULL && *n2 > 1) { return false; }
@@ -287,7 +289,8 @@ bool LICM::scanResult(OUT TTab<IR*> & invariant_stmt)
         }
         case IR_IST: {
             MD const* must = stmt->getRefMD();
-            if (must != NULL && must->is_effect() &&
+            if (must != NULL &&
+                must->is_effect() &&
                 isUniqueDef(must) &&
                 !invariant_stmt.find(stmt)) {
                 invariant_stmt.append(stmt);
@@ -296,9 +299,16 @@ bool LICM::scanResult(OUT TTab<IR*> & invariant_stmt)
             break;
         }
         case IR_CALL:
-        case IR_ICALL:
-            //TODO: hoist readonly call.
+        case IR_ICALL: {            
+            MD const* must = stmt->getRefMD();
+            if ((!stmt->hasReturnValue() || isUniqueDef(must)) &&
+                stmt->isReadOnly() &&
+                !invariant_stmt.find(stmt)) {
+                invariant_stmt.append(stmt);
+                change = true;
+            }
             break;
+        }
         default: UNREACHABLE(); //TODO: support more operations.
         }
     }
@@ -311,47 +321,55 @@ void LICM::updateMD2Num(IR * ir)
     switch (ir->getCode()) {
     case IR_ST:
     case IR_STPR: {
-            MD const* md = ir->getRefMD();
-            ASSERT0(md);
+        MD const* md = ir->getRefMD();
+        ASSERT0(md);
+        UINT * n = m_md2num.get(const_cast<MD*>(md));
+        if (n == NULL) {
+            n = (UINT*)xmalloc(sizeof(UINT));
+            m_md2num.set(md, n);
+        }
+        (*n)++;
+        break;
+    }    
+    case IR_STARRAY:
+    case IR_IST: {
+        MDSet const* mds = NULL;
+        MD const* md = ir->getRefMD();
+        if (md != NULL) {
             UINT * n = m_md2num.get(const_cast<MD*>(md));
             if (n == NULL) {
                 n = (UINT*)xmalloc(sizeof(UINT));
                 m_md2num.set(md, n);
             }
             (*n)++;
-        }
-        break;
-    case IR_STARRAY:
-    case IR_IST: {
-            MDSet const* mds = NULL;
-            MD const* md = ir->getRefMD();
-            if (md != NULL) {
-                UINT * n = m_md2num.get(const_cast<MD*>(md));
+        } else if ((mds = ir->getRefMDSet()) != NULL) {
+            MDSetIter iter;
+            for (INT i = mds->get_first(&iter);
+                 i >= 0; i = mds->get_next(i, &iter)) {
+                MD * md2 = m_md_sys->getMD(i);
+                UINT * n = m_md2num.get(md2);
                 if (n == NULL) {
                     n = (UINT*)xmalloc(sizeof(UINT));
-                    m_md2num.set(md, n);
+                    m_md2num.set(md2, n);
                 }
                 (*n)++;
-            } else if ((mds = ir->getRefMDSet()) != NULL) {
-                MDSetIter iter;
-                for (INT i = mds->get_first(&iter);
-                     i >= 0; i = mds->get_next(i, &iter)) {
-                    MD * md2 = m_md_sys->getMD(i);
-                    UINT * n = m_md2num.get(md2);
-                    if (n == NULL) {
-                        n = (UINT*)xmalloc(sizeof(UINT));
-                        m_md2num.set(md2, n);
-                    }
-                    (*n)++;
-                }
             }
         }
         break;
+    }    
     case IR_CALL:
-    case IR_ICALL:
-        ASSERT0(ir->isReadOnlyCall());
-        //TODO: support not readonly call.
+    case IR_ICALL: {
+        ASSERT0(ir->isReadOnly());
+        MD const* md = ir->getRefMD();
+        ASSERT0(md);
+        UINT * n = m_md2num.get(const_cast<MD*>(md));
+        if (n == NULL) {
+            n = (UINT*)xmalloc(sizeof(UINT));
+            m_md2num.set(md, n);
+        }
+        (*n)++;
         break;
+    }
     case IR_GOTO:
     case IR_IGOTO:
     case IR_SWITCH:
@@ -366,7 +384,7 @@ void LICM::updateMD2Num(IR * ir)
 
 //Given loop info li, dump the invariant stmt and invariant expression.
 void LICM::dumpInvariantExpStmt(TTab<IR*> const& invariant_stmt,
-                                TTab<IR*> const& invariant_exp)
+                                TTab<IR*> const& invariant_exp) const
 {
     if (g_tfile == NULL) { return; }
     note("\n==---- DUMP LICM Analysis Result '%s' ----==\n",
@@ -560,7 +578,7 @@ bool LICM::hoistInvariantStmt(TTab<IR*> & invariant_stmt,
         }
     }
 
-    //OK, stmt can be moved to prehead.
+    //OK, stmt can be moved to preheader.
     BB_irlist(stmt->getBB()).remove(stmt);
     BB_irlist(prehead).append_tail(stmt);
     return true;
@@ -703,9 +721,9 @@ bool LICM::hoistCand(TTab<IR*> & invariant_exp,
 
                 IR * stpr = m_rg->buildStorePR(PR_no(t), IR_dt(t), c);
 
-                if (m_ssamgr != NULL) {
+                if (m_prssamgr != NULL) {
                     //Generate SSA DU chain bewteen 'st' and 't'.
-                    m_ssamgr->buildDUChain(stpr, t);
+                    m_prssamgr->buildDUChain(stpr, t);
                 } else {
                     //Generate MD DU chain bewteen 'st' and 't'.
                     m_du->buildDUChain(stpr, t);
@@ -734,6 +752,22 @@ bool LICM::hoistCand(TTab<IR*> & invariant_exp,
 }
 
 
+bool LICM::splitBBIfNeeded(IRBB * bb)
+{
+    IR * next = NULL;
+    IRListIter it;
+    for (bb->getIRList()->get_head(&it); it != NULL;) {
+        IRListIter cur = it;
+        bb->getIRList()->get_next(&it);
+        if (IRBB::isDownBoundary(cur->val()) && it != NULL) {
+            m_cfg->splitBB(bb, cur);
+            return true;
+        }
+    }
+    return false;
+}
+
+
 //Return true if do code motion successfully.
 //This funtion maintain LOOP INFO.
 bool LICM::doLoopTree(LI<IRBB> * li,
@@ -750,6 +784,7 @@ bool LICM::doLoopTree(LI<IRBB> * li,
         analysis(tli, invariant_stmt, invariant_exp);
 
         if (g_is_dump_after_pass && g_dump_opt.isDumpLICM()) {
+            //Dump invariant info here because they will be replaced soon.
             dumpInvariantExpStmt(invariant_stmt, invariant_exp);
         }
 
@@ -769,37 +804,36 @@ bool LICM::doLoopTree(LI<IRBB> * li,
 
         du_set_info_changed |= hoistCand(invariant_exp,
             invariant_stmt, prehead, li);
+
+        insert_bb |= splitBBIfNeeded(prehead);
     }
     return doit;
 }
 
 
+void LICM::dump() const
+{
+    m_rg->dumpBBList();
+}
+
+
 bool LICM::perform(OptCtx & oc)
 {
-    BBList * bbl = m_rg->getBBList();
-    if (bbl == NULL || bbl->get_elem_count() == 0) { return false; }
-    if (!OC_is_ref_valid(oc)) { return false; }
-    //Check PR DU chain.
-    PRSSAMgr * ssamgr = (PRSSAMgr*)(m_rg->getPassMgr()->queryPass(
-        PASS_PR_SSA_MGR));
-    if (ssamgr != NULL && ssamgr->is_valid()) {
-        m_ssamgr = ssamgr;
-    } else {
-        m_ssamgr = NULL;
+    if (m_rg->getBBList() == NULL ||
+        m_rg->getBBList()->get_elem_count() == 0) {
+        return false;
     }
-    if (!OC_is_pr_du_chain_valid(oc) && m_ssamgr == NULL) { 
+
+    if (!OC_is_ref_valid(oc)) { return false; }
+    m_mdssamgr = (MDSSAMgr*)m_rg->getPassMgr()->queryPass(PASS_MD_SSA_MGR);
+    m_prssamgr = (PRSSAMgr*)m_rg->getPassMgr()->queryPass(PASS_PR_SSA_MGR);
+    if (!OC_is_pr_du_chain_valid(oc) && !usePRSSADU()) {
+        //DCE use either classic PR DU chain or PRSSA.
         //At least one kind of DU chain should be avaiable.
         return false;
     }
-    //Check NONPR DU chain.
-    MDSSAMgr * mdssamgr = (MDSSAMgr*)(m_rg->getPassMgr()->queryPass(
-        PASS_MD_SSA_MGR));
-    if (mdssamgr != NULL && mdssamgr->is_valid()) {
-        m_mdssamgr = mdssamgr;
-    } else {
-        m_mdssamgr = NULL;
-    }
-    if (!OC_is_nonpr_du_chain_valid(oc) && m_mdssamgr == NULL) {
+    if (!OC_is_nonpr_du_chain_valid(oc) && !useMDSSADU()) {
+        //DCE use either classic MD DU chain or MDSSA.
         //At least one kind of DU chain should be avaiable.
         return false;
     }
@@ -811,28 +845,30 @@ bool LICM::perform(OptCtx & oc)
     TTab<IR*> invariant_stmt;
     TTab<IR*> invariant_exp;
     bool change = doLoopTree(m_cfg->getLoopInfo(), du_set_info_changed,
-        insert_bb, invariant_stmt, invariant_exp);
+                             insert_bb, invariant_stmt, invariant_exp);
     if (change) {
-        m_cfg->performMiscOpt(oc);
+        if (insert_bb) {
+            OC_is_rpo_valid(oc) = m_cfg->isRPOValid();
+            m_cfg->cleanRPOBBList();
+            //Loop info is maintained, but dom pdom and cdg is changed.
+            OC_is_dom_valid(oc) = false;
+            OC_is_pdom_valid(oc) = false;
+            OC_is_cdg_valid(oc) = false;
+        }
         OC_is_expr_tab_valid(oc) = false;
-
-        //DU chain and du ref is maintained.
-        ASSERT0(m_rg->verifyMDRef());
-        ASSERT0(m_du->verifyMDDUChain(DUOPT_COMPUTE_PR_DU | DUOPT_COMPUTE_NONPR_DU));
-
         if (du_set_info_changed) {
             OC_is_live_expr_valid(oc) = false;
             OC_is_avail_reach_def_valid(oc) = false;
             OC_is_reach_def_valid(oc) = false;
         }
+        m_cfg->performMiscOpt(oc);
 
-        if (insert_bb) {
-            //Loop info is maintained, but dom pdom and cdg is changed.
-            OC_is_rpo_valid(oc) = false;
-            OC_is_dom_valid(oc) = false;
-            OC_is_pdom_valid(oc) = false;
-            OC_is_cdg_valid(oc) = false;
-            //oc->set_flag_if_cfg_changed();
+        //DU chain and du ref is maintained.
+        ASSERT0(m_rg->verifyMDRef());
+        ASSERT0(m_du->verifyMDDUChain(DUOPT_COMPUTE_PR_DU|
+                                      DUOPT_COMPUTE_NONPR_DU));
+        if (g_is_dump_after_pass && g_dump_opt.isDumpLICM()) {
+            dump();
         }
     }
 

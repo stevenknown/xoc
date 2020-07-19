@@ -276,15 +276,15 @@ public:
     virtual CHAR const* getPassName() const { return "MD SSA Manager"; }
     PASS_TYPE getPassType() const { return PASS_MD_SSA_MGR; }
     //Get MDSSAInfo if exist.
-    MDSSAInfo * getMDSSAInfoIfAny(IR const* ir)
-    { return hasMDSSAInfo(ir) ? getUseDefMgr()->getMDSSAInfo(ir) : NULL; }
+    static MDSSAInfo * getMDSSAInfoIfAny(IR const* ir)
+    { return hasMDSSAInfo(ir) ? UseDefMgr::getMDSSAInfo(ir) : NULL; }
     MDPhiList const* getPhiList(IRBB const* bb) const
     { return m_usedef_mgr.getBBPhiList(bb->id()); }
     //Generate MDSSAInfo and generate VOpnd for related MD.
     MDSSAInfo * genMDSSAInfoAndVOpnd(IR * ir, UINT version);
 
     //Return true if ir might have MDSSAInfo.
-    bool hasMDSSAInfo(IR const* ir) const
+    static bool hasMDSSAInfo(IR const* ir)
     { return ir->isMemoryRefNotOperatePR() || ir->isCallStmt(); }
     //Return true if exist USE to 'ir'.
     //This is a helper function to provid simple query, an example to

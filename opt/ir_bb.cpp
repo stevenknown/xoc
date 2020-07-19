@@ -75,7 +75,7 @@ size_t IRBB::count_mem() const
 
 
 //Could ir be looked as a last stmt in basic block?
-bool IRBB::isDownBoundary(IR * ir)
+bool IRBB::isDownBoundary(IR const* ir)
 {
     ASSERTN(ir->isStmtInBB() || ir->is_lab(), ("illegal stmt in bb"));
     switch (ir->getCode()) {
@@ -87,7 +87,7 @@ bool IRBB::isDownBoundary(IR * ir)
         return true;
     case IR_SWITCH:
         ASSERTN(SWITCH_body(ir) == NULL,
-               ("Peel switch-body to enable switch in bb-list construction"));
+                ("Peel switch-body to enable switch in bb-list construction"));
         return true;
     case IR_TRUEBR:
     case IR_FALSEBR:
@@ -105,7 +105,7 @@ void IRBB::dump(Region const* rg, bool dump_inner_region) const
 {
     if (g_tfile == NULL) { return; }
 
-    note("\n----- BB%d ------", BB_id(this));
+    note("\n----- BB%d --- rpo:%d -----", id(), rpo());
     IRBB * pthis = const_cast<IRBB*>(this);
     if (pthis->getLabelList().get_elem_count() > 0) {
         note("\nLABEL:");

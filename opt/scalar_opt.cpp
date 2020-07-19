@@ -130,7 +130,7 @@ bool ScalarOpt::perform(OptCtx & oc)
             }
             RefineCtx rc;
             refine->refineBBlist(bbl, rc, oc);
-            ASSERT0(m_rg->verifyRPO(oc));
+            ASSERT0(m_cfg->verifyRPO(oc));
         }
         count++;
         res |= change;

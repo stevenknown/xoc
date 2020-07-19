@@ -464,7 +464,7 @@ public:
 
     //Get MDSSAInfo of ir.
     MDSSAInfo * genMDSSAInfo(IR * ir);
-    MDSSAInfo * getMDSSAInfo(IR const* ir) const;
+    static MDSSAInfo * getMDSSAInfo(IR const* ir);
     Region * getRegion() const { return m_rg; }
     xcom::SC<VOpnd*> ** getFreeSCListAddress() { return &m_free_sc_list; }
     xcom::Vector<VOpnd*> * getVOpndVec() { return &m_vopnd_vec; }

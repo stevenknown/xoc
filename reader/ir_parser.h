@@ -351,6 +351,7 @@ protected:
     bool parseFp(ParseCtx * ctx);
     bool parseString(ParseCtx * ctx);
     bool parseBool(ParseCtx * ctx);
+    bool parsePrno(UINT * prno, ParseCtx * ctx);
     bool parsePR(ParseCtx * ctx);
     bool parseIf(ParseCtx * ctx);
     bool parseParameterList(ParseCtx * ctx);

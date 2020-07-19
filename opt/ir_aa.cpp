@@ -2436,7 +2436,7 @@ void AliasAnalysis::processCall(IN IR * ir, IN MD2MDSet * mx)
         }
         inferExpression(p, tmp, &tic, mx);
 
-        if (ir->isReadOnlyCall()) { continue; }
+        if (ir->isReadOnly()) { continue; }
         if (!AC_comp_pt(&tic) && !AC_has_comp_lda(&tic)) { continue; }
         if (!tmp.is_empty()) {
             by_addr_mds.bunion(tmp, *getSBSMgr());
@@ -2501,7 +2501,7 @@ void AliasAnalysis::processCall(IN IR * ir, IN MD2MDSet * mx)
         }
     }
 
-    if (ir->isReadOnlyCall()) {
+    if (ir->isReadOnly()) {
         //Readonly call does not modify any point-to informations.
         tmp.clean(*getSBSMgr());
         by_addr_mds.clean(*getSBSMgr());
@@ -3957,7 +3957,8 @@ bool AliasAnalysis::perform(IN OUT OptCtx & oc)
                 ("infer pointer arith need loop info"));
         initEntryPtset(ppsetmgr);
         m_rg->checkValidAndRecompute(&oc, PASS_RPO, PASS_UNDEF);
-        List<IRBB*> * tbbl = m_cfg->getBBListInRPO();
+        List<IRBB*> * tbbl = m_cfg->getRPOBBList();
+        ASSERT0(tbbl);
         ASSERT0(tbbl->get_elem_count() == m_rg->getBBList()->get_elem_count());
 
         START_TIMER_FMT(t2, ("%s:flow sensitive analysis", getPassName()));

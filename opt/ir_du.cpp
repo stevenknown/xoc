@@ -2492,7 +2492,7 @@ void DUMgr::inferCallAndICall(IR * ir, UINT duflag, IN MD2MDSet * mx)
     }
 
     bool modify_global = true;
-    if (ir->isReadOnlyCall()) {
+    if (ir->isReadOnly()) {
         modify_global = false;
     } else {
         //Utilize calllee's MayDef MDSet if callee region has been processed.
@@ -3176,7 +3176,8 @@ void DUMgr::computeLiveInBB(DefMiscBitSetMgr & bsmgr)
 {
     START_TIMER(t4, "Compute LiveInBB");
     bool change = true;
-    BBList const* bbl = m_cfg->getBBListInRPO();
+    BBList const* bbl = m_cfg->getRPOBBList();
+    ASSERT0(bbl);
     DefSBitSetCore tmp;
     UINT count = 0;
     while (change && count < 20) {
@@ -3777,7 +3778,8 @@ void DUMgr::solve(DefDBitSetCore const& expr_univers,
     }
 
     //Rpo already checked to be available. Here double check again.
-    List<IRBB*> * tbbl = m_cfg->getBBListInRPO();
+    List<IRBB*> * tbbl = m_cfg->getRPOBBList();
+    ASSERT0(tbbl);
     ASSERT0(tbbl->get_elem_count() == bbl->get_elem_count());
     List<IRBB*> preds;
     List<IRBB*> lst;

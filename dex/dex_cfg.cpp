@@ -118,7 +118,7 @@ void DEX_CFG::dump_node(FILE * h, bool detail, BitSet const& markbbs)
         }
 
         dump_bb(h, detail, id,
-                VERTEX_rpo(v), shape, color, font,
+                bb->rpo(), shape, color, font,
                 scale, vertical_order);
     }
 }
@@ -159,7 +159,7 @@ void DEX_CFG::dump_node2(
             color = "lightgreen";
         }
 
-        dump_bb(h, detail, id, VERTEX_rpo(v),
+        dump_bb(h, detail, id, bb->rpo(),
                 shape, color, font,
                 scale, vertical_order);
     }

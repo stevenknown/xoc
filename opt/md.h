@@ -41,8 +41,8 @@ class Region;
 
 typedef enum _MD_TYPE {
     MD_UNBOUND = 0,
-    MD_EXACT,
-    MD_RANGE,
+    MD_EXACT = 1,
+    MD_RANGE = 2,
 } MD_TYPE;
 
 #define MD_UNDEF 0 //Undefined.

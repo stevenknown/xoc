@@ -521,9 +521,9 @@ MDSSAInfo * UseDefMgr::genMDSSAInfo(IR * ir)
 }
 
 
-MDSSAInfo * UseDefMgr::getMDSSAInfo(IR const* ir) const
+MDSSAInfo * UseDefMgr::getMDSSAInfo(IR const* ir)
 {
-    ASSERT0(ir && m_mdssa_mgr->hasMDSSAInfo(ir));
+    ASSERT0(ir && MDSSAMgr::hasMDSSAInfo(ir));
     if (ir->getAI() == NULL) {
         return NULL;
     }

@@ -142,7 +142,7 @@ public:
 //
 //START IRBB
 //
-#define MAX_BB_KIDS_NUM     2
+#define MAX_BB_KIDS_NUM 2
 
 #define BB_rpo(b) ((b)->m_rpo)
 #define BB_id(b) ((b)->m_id)
@@ -186,7 +186,7 @@ public:
         ir_list.setBB(this);
         m_id = 0;
         u1.u1b1 = 0;
-        m_rpo = -1;
+        m_rpo = RPO_UNDEF;
     }
     ~IRBB()
     {
@@ -233,7 +233,7 @@ public:
         ir_list.clean();
         lab_list.clean();
         u1.u1b1 = 0;
-        m_rpo = -1;
+        m_rpo = RPO_UNDEF;
     }
 
     //Clean attached label.
@@ -256,7 +256,6 @@ public:
              in != NULL; in = EC_next(in), n++);
         return n;
     }
-
     UINT getNumOfSucc(CFG<IRBB, IR> * cfg) const
     {
         ASSERT0(cfg);
@@ -267,6 +266,7 @@ public:
              out != NULL; out = EC_next(out), n++);
         return n;
     }
+    BBIRList * getIRList() { return &BB_irlist(this); }
 
     //Is bb containing such label carried by 'lir'.
     inline bool hasLabel(LabelInfo const* lab)
@@ -386,16 +386,16 @@ public:
     }
 
     //Could ir be looked as a boundary stmt of basic block?
-    inline bool is_boundary(IR * ir)
-    { return (isUpperBoundary(ir) || isDownBoundary(ir)); }
+    static bool is_boundary(IR * ir)
+    { return isUpperBoundary(ir) || isDownBoundary(ir); }
 
     //Could ir be looked as a first stmt in basic block?
-    inline bool isUpperBoundary(IR const* ir) const
+    static bool isUpperBoundary(IR const* ir)
     {
         ASSERTN(ir->isStmtInBB() || ir->is_lab(), ("illegal stmt in bb"));
         return ir->is_lab();
     }
-    bool isDownBoundary(IR * ir);
+    static bool isDownBoundary(IR const* ir);
 
     inline bool isAttachDedicatedLabel()
     {

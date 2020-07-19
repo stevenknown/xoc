@@ -1187,8 +1187,7 @@ public:
     void updateCallAndReturnList(bool scan_inner_region);
 
     bool verifyBBlist(BBList & bbl);
-    bool verifyIRinRegion();
-    bool verifyRPO(OptCtx & oc);
+    bool verifyIROwnership();
     bool verifyMDRef();
 };
 //END Region

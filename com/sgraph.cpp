@@ -211,7 +211,7 @@ void Graph::computeRpoNoRecursive(Vertex * root, OUT List<Vertex const*> & vlst)
     Stack<Vertex*> stk;
     stk.push(root);
     Vertex * v;
-    UINT order = getVertexNum() * RPO_INTERVAL;
+    UINT order = RPO_INIT_VAL + getVertexNum() * RPO_INTERVAL;
     while ((v = stk.get_top()) != NULL) {
         is_visited.bunion(VERTEX_id(v));
         EdgeC * el = VERTEX_out_list(v);
@@ -234,7 +234,7 @@ void Graph::computeRpoNoRecursive(Vertex * root, OUT List<Vertex const*> & vlst)
 
     //If order of BB is not zero, there must have some BBs should be
     //eliminated by CFG optimizations.
-    ASSERTN(order == 0, ("even having BB with no order assigned"));
+    ASSERTN(order == RPO_INIT_VAL, ("even having BB with no order assigned"));
 }
 
 
@@ -1057,6 +1057,21 @@ void Graph::dumpVCG(CHAR const* name) const
     fprintf(h, "\n}\n");
     fclose(h);
 }
+
+
+//Return true if find an order of RPO for 'v' that less than order of 'ref'.
+bool Graph::tryFindLessRpo(Vertex * v, Vertex const* ref)
+{
+    ASSERT0(v && ref);
+    INT rpo = ref->rpo() - 1;
+    ASSERT0(rpo >= RPO_INIT_VAL);
+    if (isValidRPO(rpo)) {
+        VERTEX_rpo(v) = rpo;
+        return true;        
+    }
+    return false;
+}
+//END Graph
 
 
 //

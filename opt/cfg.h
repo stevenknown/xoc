@@ -65,6 +65,7 @@ public:
 //1. For accelerating perform operation of each vertex, e.g
 //   compute dominator, please try best to add vertex with
 //   topological order.
+//NOTE: BB should define and implement method 'id()' and member field 'm_rpo'.
 template <class BB, class XR> class CFG : public xcom::DGraph {
     COPY_CONSTRUCTOR(CFG);
 protected:
@@ -73,7 +74,7 @@ protected:
     Vector<LI<BB>*> m_map_bb2li; //map bb to LI if bb is loop header.
     BB * m_entry; //CFG Graph entry.
     List<BB*> m_exit_list; //CFG Graph ENTRY list
-    List<BB*> m_rpo_bblst; //record BB in reverse-post-order.
+    List<BB*> * m_rpo_bblst; //record BB in reverse-post-order.
     SEQ_TYPE m_bb_sort_type;
     xcom::BitSetMgr * m_bs_mgr;
     SMemPool * m_pool;
@@ -129,11 +130,16 @@ public:
         m_bs_mgr = NULL;
         m_li_count = 1;
         m_has_eh_edge = false;
+        m_rpo_bblst = NULL;
         m_entry = NULL; //entry will be computed during CFG::build().
         m_pool = smpoolCreate(sizeof(CFGEdgeInfo) * 4, MEM_COMM);
         set_dense(true); //We think CFG is always dense graph.
     }
-    virtual ~CFG() { smpoolDelete(m_pool); }
+    virtual ~CFG()
+    {
+        smpoolDelete(m_pool);
+        cleanRPOBBList();
+    }
 
     virtual void addBreakOutLoop(BB * loop_head, xcom::BitSet & body_set);
     virtual xcom::Edge * addEdge(BB * from, BB * to)
@@ -243,9 +249,15 @@ public:
             }
         }
     }
-
+    void cleanRPOBBList()
+    {
+        if (m_rpo_bblst != NULL) {
+            delete m_rpo_bblst;
+            m_rpo_bblst = NULL;
+        }
+    }
     void chainPredAndSucc(UINT vid, bool is_single_pred_succ = false);
-    void computeRPO(OptCtx & oc);
+    void computeRPO(OptCtx & oc);    
     //Count memory usage for current object.
     size_t count_mem() const
     {
@@ -273,7 +285,7 @@ public:
     virtual void findTargetBBOfMulticondBranch(XR const*, OUT List<BB*> &) = 0;
 
     //Find the bb that referred given label.
-    virtual BB * findBBbyLabel(LabelInfo const*) = 0;
+    virtual BB * findBBbyLabel(LabelInfo const*) const = 0;
 
     //Find a list bb that referred labels which is the target of xr.
     //2th parameter indicates a list of bb have found.
@@ -293,7 +305,7 @@ public:
     { return getInDegree(getVertex(bb->id())); }
     BB * getEntry() const { return m_entry; }
     List<BB*> * getExitList() { return &m_exit_list; }
-    List<BB*> * getBBListInRPO() { return &m_rpo_bblst; }
+    List<BB*> * getRPOBBList() { return m_rpo_bblst; }
     virtual BB * getFallThroughBB(BB * bb)
     {
         ASSERT0(bb);
@@ -446,6 +458,19 @@ public:
     {
         m_bs_mgr = bs_mgr;
         xcom::DGraph::setBitSetMgr(bs_mgr);
+    }
+
+    //Return true if find an order of RPO for 'bb' that
+    //less than order of 'ref'.
+    bool tryFindLessRpo(BB * bb, BB const* ref) const
+    {
+        Vertex * bb_vex = getVertex(bb->id());
+        ASSERT0(bb_vex);
+        Vertex const* ref_vex = getVertex(ref->id());
+        ASSERT0(ref_vex);
+        bool succ = Graph::tryFindLessRpo(bb_vex, ref_vex);
+        bb->m_rpo = bb_vex->rpo();
+        return succ;
     }
 
     bool verifyIfBBRemoved(IN CDG * cdg, OptCtx & oc);
@@ -1769,7 +1794,7 @@ void CFG<BB, XR>::computeRPO(OptCtx & oc)
     //Only for verify.
     for (BB * bb = m_bb_list->get_head();
          bb != NULL; bb = m_bb_list->get_next()) {
-        setRPO(bb, -1);
+        setRPO(bb, RPO_UNDEF);
     }
     #endif
 
@@ -1777,21 +1802,22 @@ void CFG<BB, XR>::computeRPO(OptCtx & oc)
     ASSERTN(m_entry, ("Not find entry"));
 
     #ifdef RECURSIVE_ALGO
-    INT order = m_bb_list->get_elem_count() * RPO_INTERVAL;
+    INT order = RPO_INIT_VAL + m_bb_list->get_elem_count() * RPO_INTERVAL;
     computeRPOImpl(is_visited, getVertex(m_entry->id()), order);
     #else
     List<xcom::Vertex const*> vlst;
     computeRpoNoRecursive(getVertex(m_entry->id()), vlst);
     #endif
 
-    m_rpo_bblst.clean();
+    if (m_rpo_bblst == NULL) { m_rpo_bblst = new List<IRBB*>(); }
+    m_rpo_bblst->clean();
     xcom::C<xcom::Vertex const*> * ct;
     for (vlst.get_head(&ct); ct != vlst.end(); ct = vlst.get_next(ct)) {
         xcom::Vertex const* v = ct->val();
         BB * bb = getBB(v->id());
         ASSERT0(bb);
         setRPO(bb, v->rpo());
-        m_rpo_bblst.append_tail(bb);
+        m_rpo_bblst->append_tail(bb);
     }
     OC_is_rpo_valid(oc) = true;
     END_TIMER(t, "Compute Rpo");

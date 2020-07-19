@@ -212,7 +212,7 @@ bool Region::MiddleProcess(OptCtx & oc)
         getPassMgr()->registerPass(PASS_SCALAR_OPT)->perform(oc);
     }
 
-    ASSERT0(verifyRPO(oc));
+    ASSERT0(getCFG() && getCFG()->verifyRPO(oc));
     if (g_do_refine) {
         RefineCtx rf;
         Refine * refine = (Refine*)getPassMgr()->registerPass(PASS_REFINE);

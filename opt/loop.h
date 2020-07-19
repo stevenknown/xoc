@@ -124,5 +124,11 @@ bool findTwoSuccessorBBOfLoopHeader(LI<IRBB> const* li,
                                     IRCFG * cfg,
                                     UINT * succ1,
                                     UINT * succ2);
+//Return true if all the expression on 'ir' tree is loop invariant.
+//ir: root node of IR
+//li: loop structure
+//Note this function does not check the sibling node of 'ir'.
+bool isLoopInvariant(IR const* ir, LI<IRBB> const* li, Region * rg);
+
 } //namespace xoc
 #endif

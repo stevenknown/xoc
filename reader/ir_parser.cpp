@@ -1066,32 +1066,12 @@ bool IRParser::parsePR(ParseCtx * ctx)
 {
     ASSERTN(m_lexer->getCurrentToken() == T_DOLLAR,
             ("miss $ before PR expression"));
-    TOKEN tok = m_lexer->getNextToken();
     UINT prno = 0;
-    if (tok == T_IMM) {
-        prno = (UINT)xcom::xatoll(m_lexer->getCurrentTokenString(), false);
-        if (prno > MAX_PRNO) {
-            error("too large PR number %u", prno);
-            return false;
-        }
-        ctx->current_region->setPRCount(
-            MAX(ctx->current_region->getPRCount(), prno + 1));
-        if (prno == PRNO_UNDEF) {
-            error("use invalid PR number %u", prno);
-            return false;
-        }
-    } else if (tok == T_IDENTIFIER) {
-        prno = mapID2Prno(m_lexer->getCurrentTokenString(), ctx);
-        if (prno == PRNO_UNDEF) {
-            error("use invalid PR number %u", prno);
-            return false;
-        }
-    } else {
-        error(tok, "not PR number");
+    if (!parsePrno(&prno, ctx)) {
         return false;
     }
 
-    tok = m_lexer->getNextToken();
+    TOKEN tok = m_lexer->getNextToken();
     Type const* ty = NULL;
     if (tok == T_COLON) {
         tok = m_lexer->getNextToken();
@@ -2299,31 +2279,14 @@ bool IRParser::parseStorePR(ParseCtx * ctx)
 {
     ASSERT0(getCurrentXCode() == X_STRP);
     TOKEN tok = m_lexer->getNextToken();
-
     if (tok != T_DOLLAR) {
         error(tok, "miss $ specifier");
         return false;
     }
 
     //PR no
-    tok = m_lexer->getNextToken();
     UINT prno = 0;
-    if (tok == T_IMM) {
-        prno = (UINT)xcom::xatoll(m_lexer->getCurrentTokenString(), false);
-        if (prno == PRNO_UNDEF) {
-            error("use invalid PR number %u", prno);
-            return false;
-        }
-        ctx->current_region->setPRCount(
-            MAX(ctx->current_region->getPRCount(), prno + 1));
-    } else if (tok == T_IDENTIFIER) {
-        prno = mapID2Prno(m_lexer->getCurrentTokenString(), ctx);
-        if (prno == PRNO_UNDEF) {
-            error("use invalid PR number %u", prno);
-            return false;
-        }
-    } else {
-        error(tok, "not PR number");
+    if (!parsePrno(&prno, ctx)) {
         return false;
     }
 
@@ -2379,26 +2342,12 @@ bool IRParser::parseModifyPR(X_CODE code, ParseCtx * ctx)
 {
     ASSERT0(code == X_SETELEM || code == X_GETELEM);
     TOKEN tok = m_lexer->getNextToken();
-
     if (tok != T_DOLLAR) {
         error(tok, "miss '$' specifier after %s", getKeywordName(code));
         return false;
     }
-
-    tok = m_lexer->getNextToken();
     UINT prno = 0;
-    if (tok == T_IMM) {
-        prno = (UINT)xcom::xatoll(m_lexer->getCurrentTokenString(), false);
-        ctx->current_region->setPRCount(
-            MAX(ctx->current_region->getPRCount(), prno + 1));
-    } else if (tok == T_IDENTIFIER) {
-        prno = mapID2Prno(m_lexer->getCurrentTokenString(), ctx);
-        if (prno == PRNO_UNDEF) {
-            error("use invalid PR number %u", prno);
-            return false;
-        }
-    } else {
-        error(tok, "miss PR number");
+    if (!parsePrno(&prno, ctx)) {
         return false;
     }
 
@@ -2584,6 +2533,38 @@ bool IRParser::parseIStore(ParseCtx * ctx)
 }
 
 
+bool IRParser::parsePrno(UINT * prno, ParseCtx * ctx)
+{
+    ASSERTN(m_lexer->getCurrentToken() == T_DOLLAR,
+            ("miss $ before PR expression"));
+    TOKEN tok = m_lexer->getNextToken();
+    *prno = 0;
+    if (tok == T_IMM) {
+        *prno = (UINT)xcom::xatoll(m_lexer->getCurrentTokenString(), false);
+        if (*prno > MAX_PRNO) {
+            error("too large PR number %u", *prno);
+            return false;
+        }
+        ctx->current_region->setPRCount(
+            MAX(ctx->current_region->getPRCount(), *prno + 1));
+        if (*prno == PRNO_UNDEF) {
+            error("use invalid PR number %u", *prno);
+            return false;
+        }
+    } else if (tok == T_IDENTIFIER) {
+        *prno = mapID2Prno(m_lexer->getCurrentTokenString(), ctx);
+        if (*prno == PRNO_UNDEF) {
+            error("use invalid PR number %u", *prno);
+            return false;
+        }
+    } else {
+        error(tok, "not PR number");
+        return false;
+    }
+    return true;
+}
+
+
 bool IRParser::parseCallAndICall(bool is_call, ParseCtx * ctx)
 {
     ASSERT0(is_call ? getCurrentXCode() == X_CALL :
@@ -2607,15 +2588,7 @@ bool IRParser::parseCallAndICall(bool is_call, ParseCtx * ctx)
     Type const* return_ty = m_tm->getAny();
     if (tok == T_DOLLAR) {
         //Expect return value.
-        tok = m_lexer->getNextToken();
-        if (tok == T_IMM) {
-            return_prno = (UINT)xcom::xatoll(
-                m_lexer->getCurrentTokenString(), false);
-            ctx->current_region->setPRCount(
-                MAX(ctx->current_region->getPRCount(), return_prno + 1));
-        }
-        else {
-            error(tok, "miss PR number");
+        if (!parsePrno(&return_prno, ctx)) {
             return false;
         }
 
@@ -2665,6 +2638,12 @@ bool IRParser::parseCallAndICall(bool is_call, ParseCtx * ctx)
             error(tok, "%s is not function type region", SYM_name(name));
             return false;
         }
+        if (cont.readonly != callee_var->is_readonly()) {
+            error(tok, "unmatch property, %s is %s",
+                  SYM_name(name),
+                  callee_var->is_readonly() ? "readonly" : "not readonly");
+            return false;
+        }
     } else {
         if (!parseExp(ctx)) {
             error(tok, "illegal callee expression");
@@ -2682,7 +2661,7 @@ bool IRParser::parseCallAndICall(bool is_call, ParseCtx * ctx)
             error(tok, "miss ',' after callee expression");
             return false;
         }
-    }
+    }    
 
     tok = m_lexer->getNextToken();
     if (tok != T_LPAREN) {
@@ -3269,14 +3248,8 @@ bool IRParser::parsePhi(ParseCtx * ctx)
         return false;
     }
 
-    tok = m_lexer->getNextToken();
     UINT prno = 0;
-    if (tok == T_IMM) {
-        prno = (UINT)xcom::xatoll(m_lexer->getCurrentTokenString(), false);
-        ctx->current_region->setPRCount(
-            MAX(ctx->current_region->getPRCount(), prno + 1));
-    } else {
-        error(tok, "miss PR number");
+    if (!parsePrno(&prno, ctx)) {
         return false;
     }
 
@@ -4180,9 +4153,10 @@ bool IRParser::parseProperty(PropertySet & cont, ParseCtx * ctx)
             case X_READONLY:
                 ASSERT0(ctx);
                 if (ctx->ircode != IR_ICALL &&
+                    ctx->ircode != IR_CALL &&
                     ctx->ircode != IR_REGION) {
-                    error(tok, "%s does have READONLY property",
-                        IRTNAME(ctx->ircode));
+                    error(tok, "%s does not have READONLY property",
+                          IRTNAME(ctx->ircode));
                     return false;
                 }
                 cont.readonly = true;

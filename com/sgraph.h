@@ -39,6 +39,8 @@ namespace xcom {
 #define MAGIC_METHOD
 #define VERTEX_UNDEF 0
 #define RPO_INTERVAL 5
+#define RPO_INIT_VAL 0
+#define RPO_UNDEF -1
 
 class Vertex;
 class Edge;
@@ -59,6 +61,8 @@ public:
     Vertex * _to;
     void * _info;
 public:
+    void copyEdgeInfo(Edge const* src) { EDGE_info(this) = src->info(); }
+
     void init()
     { prev = NULL, next = NULL, _from = NULL, _to = NULL, _info = NULL; }
     void * info() const { return EDGE_info(this); }
@@ -82,18 +86,18 @@ public:
     EdgeC * in_list; //incoming edge list
     EdgeC * out_list;//outgoing edge list
     UINT _id;
-    UINT _rpo;
+    INT _rpo;
     void * _info;
 public:
     void init()
     { prev = NULL, next = NULL, in_list = NULL, out_list = NULL,
-      _id = VERTEX_UNDEF, _rpo = 0, _info = NULL; }
+      _id = VERTEX_UNDEF, _rpo = RPO_UNDEF, _info = NULL; }
     UINT id() const { return VERTEX_id(this); }    
 
     EdgeC * getOutList() const { return VERTEX_out_list(this); }
     EdgeC * getInList() const { return VERTEX_in_list(this); }
 
-    UINT rpo() const { return VERTEX_rpo(this); }
+    INT rpo() const { return VERTEX_rpo(this); }
 };
 
 
@@ -423,6 +427,10 @@ public:
     bool isInDegreeEqualTo(Vertex const* vex, UINT num) const;
     //Return true if Out-Degree of 'vex' equal to 'num'.
     bool isOutDegreeEqualTo(Vertex const* vex, UINT num) const;
+    //Return true if rpo is available to assign to a new vertex.
+    //And the rpo is not repeated with other vertex.
+    static bool isValidRPO(INT rpo)
+    { return rpo >= 0 && (rpo % RPO_INTERVAL) != 0; }
 
     void erase();
 
@@ -518,6 +526,10 @@ public:
             m_dense_vertex = NULL;
         }
     }
+
+    //Return true if find an order of RPO for 'v'
+    //that less than order of 'ref'.
+    static bool tryFindLessRpo(Vertex * v, Vertex const* ref);
 };
 
 

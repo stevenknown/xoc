@@ -1858,12 +1858,13 @@ IR * Refine::insertCvt(IR * parent, IR * kid, bool & change)
         if ((parent->is_asr() || parent->is_lsl() || parent->is_lsr()) &&
             kid == BIN_opnd1(parent)) {
             //CASE: Second operand of Shift operantion need NOT to be converted.
-            //      Second operand indicates the bit that expected to be shifted.
+            //      Second operand indicates the bit that expected to be
+            //      shifted.
             //e.g: $2(u64) = $8(u64) >> j(u32);
-            //  stpr $2 : u64 id : 37 attachinfo : Dbx
-            //      lsr : u64 id : 31 attachinfo : Dbx
-            //          $8 : u64 id : 59
-            //          ld : u32 'j' decl : unsigned int j  id : 30 attachinfo : Dbx, MDSSA
+            //  stpr $2 : u64 id:37
+            //      lsr : u64 id:31
+            //          $8 : u64 id:59
+            //          ld : u32 'j' id:30
             return kid;
         }
 

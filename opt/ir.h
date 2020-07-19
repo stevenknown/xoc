@@ -865,17 +865,13 @@ public:
     //Return true if ir is constant expression.
     inline bool isConstExp() const;
 
-    //Return true if ir is readonly expression.
-    //This attribute indicate that the expression does not modify any
-    //memory. Note it can only refer to expression.
-    inline bool isReadOnlyExp() const;
-
-    //Return true if ir is readonly function call.
-    //This function is a shortcut to access properties of call stmt.
-    //This attribute indicate that if function does not modify any
-    //global memory or any memory object that pass through pointer
+    //Return true if ir is readonly expression or readonly call stmt.
+    //If ir is expression, this function indicates that the expression does
+    //not modify any memory.
+    //If ir is call, this function indicates that function does not modify any
+    //global memory or any memory object that passed through pointer
     //arguments.
-    inline bool isReadOnlyCall() const;
+    inline bool isReadOnly() const;
 
     //True if store to specified element of pseduo register.
     //The pseduo register must be D_MC or vector type.
@@ -2262,34 +2258,19 @@ bool IR::isConstExp() const
 }
 
 
-bool IR::isReadOnlyExp() const
+bool IR::isReadOnly() const
 {
-    ASSERT0(is_exp());
     switch (getCode()) {
-    case IR_CONST: return true;
-    case IR_CVT: return CVT_exp(this)->isReadOnlyExp();
+    case IR_CALL: return CALL_is_readonly(this);
+    case IR_ICALL: return ICALL_is_readonly(this);        
+    case IR_CVT: return CVT_exp(this)->isReadOnly();
     case IR_LD:
         if (VAR_is_readonly(LD_idinfo(this)) &&
             !VAR_is_volatile(LD_idinfo(this))) {
             return true;
         }
         return false;
-    case IR_LDA: return true;
     default:;
-    }
-    return false;
-}
-
-
-bool IR::isReadOnlyCall() const
-{
-    switch (getCode()) {
-    case IR_CALL: return CALL_is_readonly(this);
-    case IR_ICALL: return ICALL_is_readonly(this);
-    default:
-        //For convenient purpose, close down assertion.
-        //ASSERTN(0, ("not a call"));
-        return false;
     }
     return false;
 }

@@ -71,14 +71,14 @@ void addDUChain(IR * def, IR * use, Region * rg)
     }
 
     MDSSAMgr * mdssamgr = rg->getMDSSAMgr(); 
-    if (mdssamgr != NULL) {
+    if (mdssamgr != NULL && mdssamgr->is_valid()) {
         MDSSAInfo * info = mdssamgr->getMDSSAInfoIfAny(def);
         ASSERTN(info, ("def stmt even not in MDSSA system"));
         mdssamgr->addMDSSAOcc(use, info);
     }
 
     PRSSAMgr * prssamgr = rg->getPRSSAMgr();
-    if (prssamgr != NULL) {
+    if (prssamgr != NULL && prssamgr->is_valid()) {
         prssamgr->buildDUChain(def, use);
     }
 }

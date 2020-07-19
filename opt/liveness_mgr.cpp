@@ -243,7 +243,8 @@ void LivenessMgr::computeGlobal()
     ASSERT0(m_cfg->getEntry() && BB_is_entry(m_cfg->getEntry()));
 
     //Rpo should be available.
-    List<IRBB*> * vlst = m_cfg->getBBListInRPO();
+    List<IRBB*> * vlst = m_cfg->getRPOBBList();
+    ASSERT0(vlst);
     ASSERT0(vlst->get_elem_count() == m_rg->getBBList()->get_elem_count());
 
     C<IRBB*> * ct;

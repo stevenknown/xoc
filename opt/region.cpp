@@ -2306,28 +2306,15 @@ bool Region::verifyMDRef()
 }
 
 
-bool Region::verifyRPO(OptCtx & oc)
-{
-    if (getCFG() == NULL) { return true; }
-    ASSERT0(getBBList());
-    if (OC_is_rpo_valid(oc)) {
-        ASSERTN(getCFG()->getBBListInRPO()->get_elem_count() ==
-                getBBList()->get_elem_count(),
-                ("Previous pass has changed RPO, "
-                 "and you should set it to be invalid"));
-    }
-    return true;
-}
-
-
-//Ensure that each IR in ir_list must be allocated in current region.
-bool Region::verifyIRinRegion()
+//Ensure that each IR in ir_list must be allocated in
+//current region.
+bool Region::verifyIROwnership()
 {
     IR const* ir = getIRList();
     if (ir == NULL) { return true; }
     for (; ir != NULL; ir = ir->get_next()) {
         ASSERTN(getIR(ir->id()) == ir,
-               ("ir id:%d is not allocated in region %s", getRegionName()));
+                ("ir id:%d is not allocated in region %s", getRegionName()));
     }
     return true;
 }
@@ -2605,13 +2592,10 @@ void Region::checkValidAndRecompute(OptCtx * oc, ...)
         case PASS_RPO:
             ASSERTN(cfg && OC_is_cfg_valid(*oc),
                 ("You should make CFG available first."));
-            if (!OC_is_rpo_valid(*oc)) {
+            if (!OC_is_rpo_valid(*oc) || cfg->getRPOBBList() == NULL) {
                 cfg->computeRPO(*oc);
             } else {
-                ASSERTN(cfg->getBBListInRPO()->get_elem_count() ==
-                        getBBList()->get_elem_count(),
-                        ("Previous pass has changed RPO, "
-                         "and you should set it to be invalid"));
+                ASSERT0(cfg->verifyRPO(*oc));
             }
             break;
         case PASS_AA:
@@ -2873,7 +2857,7 @@ bool Region::processIRList(OptCtx & oc)
 bool Region::process(OptCtx * oc)
 {
     ASSERTN(oc, ("Need OptCtx"));
-    ASSERT0(verifyIRinRegion());
+    ASSERT0(verifyIROwnership());
 
     if (getIRList() == NULL &&
         getBBList()->get_elem_count() == 0) {

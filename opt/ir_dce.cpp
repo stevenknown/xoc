@@ -148,7 +148,7 @@ bool DeadCodeElim::check_stmt(IR const* ir)
 bool DeadCodeElim::check_call(IR const* ir) const
 {    
     ASSERT0(ir->isCallStmt());
-    return !ir->isReadOnlyCall() || IR_has_sideeffect(ir) || IR_no_move(ir);
+    return !ir->isReadOnly() || IR_has_sideeffect(ir) || IR_no_move(ir);
 }
 
 

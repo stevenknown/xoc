@@ -157,7 +157,7 @@ public:
     void erase();
 
     virtual void findTargetBBOfMulticondBranch(IR const*, OUT List<IRBB*>&);
-    virtual IRBB * findBBbyLabel(LabelInfo const* lab);
+    virtual IRBB * findBBbyLabel(LabelInfo const* lab) const;
     virtual void findTargetBBOfIndirectBranch(IR const*, OUT List<IRBB*>&);
     void findEHRegion(IRBB const* catch_start,
                       xcom::BitSet const& mainstreambbs,
@@ -178,6 +178,7 @@ public:
                            IN BBListIter to_ct,
                            IN IRBB * newbb);
     bool inverseAndRemoveTrampolineBranch();
+    bool isRPOValid() const;
 
     //Return the first operation of 'bb'.
     IR * get_first_xr(IRBB * bb)
@@ -265,6 +266,21 @@ public:
     void revisePhiEdge(TMap<IR*, LabelInfo*> & ir2label);
 
     virtual void setRPO(IRBB * bb, INT order) { BB_rpo(bb) = order; }
+    //Split BB into two BBs.
+    //bb: BB to be splited.
+    //split_point: the ir in 'bb' used to mark the split point that followed IRs
+    //             will be moved to fallthrough newbb.
+    //e.g:bb:
+    //    ...
+    //    split_point;
+    //    ...
+    //  =>
+    //    bb:
+    //    ...
+    //    split_point; //the last ir in bb.
+    //    newbb:
+    //    ...
+    IRBB * splitBB(IRBB * bb, IRListIter split_point);
 
     virtual void moveLabels(IRBB * src, IRBB * tgt);
 
@@ -277,7 +293,8 @@ public:
     bool performMiscOpt(OptCtx & oc);
 
     //Verification at building SSA mode by ir parser.
-    bool verifyPhiEdge(IR * phi, TMap<IR*, LabelInfo*> & ir2label);
+    bool verifyPhiEdge(IR * phi, TMap<IR*, LabelInfo*> & ir2label) const;
+    bool verifyRPO(OptCtx const& oc) const;
 };
 
 } //namespace xoc

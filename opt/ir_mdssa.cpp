@@ -837,7 +837,7 @@ void MDSSAMgr::initVMD(IN IR * ir, OUT DefSBitSet & maydef_md)
     m_iter.clean();
     ASSERT0(ir->is_stmt());
     if (ir->isMemoryRefNotOperatePR() ||
-        (ir->isCallStmt() && !ir->isReadOnlyCall())) {
+        (ir->isCallStmt() && !ir->isReadOnly())) {
         MD const* ref = ir->getRefMD();
         if (ref != NULL && !ref->is_pr()) {
             maydef_md.bunion(MD_id(ref));

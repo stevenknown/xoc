@@ -56,12 +56,12 @@ public:
 
 typedef HMap<MD*, MDLT*> MD2MDLifeTime;
 
-class DontPromotTab : public MDSet {
-    COPY_CONSTRUCTOR(DontPromotTab);
+class DontPromoteTab : public MDSet {
+    COPY_CONSTRUCTOR(DontPromoteTab);
     MDSystem * m_md_sys;
     Region * m_rg;
 public:
-    explicit DontPromotTab(Region * rg)
+    explicit DontPromoteTab(Region * rg)
     {
         ASSERT0(rg);
         m_rg = rg;
@@ -82,7 +82,7 @@ public:
     void dump()
     {
         if (g_tfile == NULL) { return; }
-        note("\n==---- DUMP Dont Promot Table ----==\n");
+        note("\n==---- DUMP Dont Promotion Table ----==\n");
         MDSetIter iter;
         for (INT i = get_first(&iter); i >= 0; i = get_next(i, &iter)) {
             MD const* t = m_md_sys->getMD(i);
@@ -120,7 +120,7 @@ private:
     GVN * m_gvn;
     PRSSAMgr * m_prssamgr;
     MDSSAMgr * m_mdssamgr;
-    DontPromotTab m_dont_promot;
+    DontPromoteTab m_dont_promote;
     xcom::BitSetMgr m_bs_mgr;
     MDLivenessMgr * m_liveness_mgr;
     bool m_is_insert_bb; //indicate if new bb inserted and cfg changed.
@@ -136,6 +136,8 @@ private:
                         MD const* exact_md,
                         IR * ir);
     void addInexactAccess(TTab<IR*> & inexact_access, IR * ir);
+    void addDontPromote(MD const* md);
+    void addDontPromote(MDSet const& mds);
 
     void buildPRDUChain(IR * def, IR * use);
 
@@ -145,7 +147,6 @@ private:
                        OUT List<IR*> & exact_occs,
                        OUT TTab<IR*> & inexact_access);
     bool checkArrayIsLoopInvariant(IN IR * ir, LI<IRBB> const* li);
-    bool checkExpressionIsLoopInvariant(IN IR * ir, LI<IRBB> const* li);
     bool checkIndirectAccessIsLoopInvariant(IN IR * ir, LI<IRBB> const* li);
     void createDelegateInfo(
         IR * delegate,
@@ -295,7 +296,7 @@ private:
     }
 
 public:
-    RegPromot(Region * rg) : m_dont_promot(rg)
+    RegPromot(Region * rg) : m_dont_promote(rg)
     {
         ASSERT0(rg != NULL);
         m_rg = rg;
@@ -321,7 +322,7 @@ public:
     }
     virtual ~RegPromot()
     {
-        m_dont_promot.clean(*m_misc_bs_mgr);
+        m_dont_promote.clean(*m_misc_bs_mgr);
 
         delete m_md2lt_map;
         m_md2lt_map = NULL;
@@ -339,12 +340,7 @@ public:
     void init();
     //Return true if 'ir' can be promoted.
     //Note ir must be memory reference.
-    virtual bool isPromotable(IR const* ir) const
-    {
-        ASSERT0(ir->isMemoryRef());
-        //I think the reference that may throw is promotable.
-        return !IR_has_sideeffect(ir) && !IR_no_move(ir);
-    }
+    virtual bool isPromotable(IR const* ir) const;   
 
     virtual CHAR const* getPassName() const { return "Register Promotion"; }
     PASS_TYPE getPassType() const { return PASS_RP; }

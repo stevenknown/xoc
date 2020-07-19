@@ -393,6 +393,7 @@ void RegPromot::addExactAccess(OUT TMap<MD const*, IR*> & exact_access,
     if (!exact_access.find(exact_md)) {
         exact_access.set(exact_md, ir);
     }
+    ASSERT0(!exact_occs.find(ir));
     exact_occs.append_tail(ir);
 }
 
@@ -403,61 +404,15 @@ void RegPromot::addInexactAccess(TTab<IR*> & inexact_access, IR * ir)
 }
 
 
-bool RegPromot::checkExpressionIsLoopInvariant(IN IR * ir, LI<IRBB> const* li)
-{
-    ASSERT0(ir->is_exp());
-    if (ir->isMemoryOpnd()) {
-        if (ir->isReadPR() && usePRSSADU()) {
-            SSAInfo * ssainfo = PR_ssainfo(ir);
-            ASSERT0(ssainfo);
-            if (ssainfo->getDef() != NULL) {
-                IRBB * defbb = ssainfo->getDef()->getBB();
-                ASSERT0(defbb);
-
-                if (li->isInsideLoop(BB_id(defbb))) {
-                    return false;
-                }
-            }
-            return true;
-        }
-
-        DUSet const* duset = ir->readDUSet();
-        if (duset == NULL) { return true; }
-
-        DUIter dui = NULL;
-        for (INT i = duset->get_first(&dui);
-             i >= 0; i = duset->get_next(i, &dui)) {
-            IR const* defstmt = m_rg->getIR(i);
-            ASSERT0(defstmt->is_stmt());
-            IRBB * bb = defstmt->getBB();
-
-            if (li->isInsideLoop(BB_id(bb))) { return false; }
-        }
-
-        return true;
-    }
-
-    for (UINT i = 0; i < IR_MAX_KID_NUM(ir); i++) {
-        IR * kid = ir->getKid(i);
-        if (kid == NULL) { continue; }
-        if (!checkExpressionIsLoopInvariant(kid, li)) {
-            return false;
-        }
-    }
-
-    return true;
-}
-
-
 bool RegPromot::checkArrayIsLoopInvariant(IN IR * ir, LI<IRBB> const* li)
 {
     ASSERT0(ir->is_array() && li);
     for (IR * s = ARR_sub_list(ir); s != NULL; s = s->get_next()) {
-        if (!checkExpressionIsLoopInvariant(s, li)) {
+        if (!isLoopInvariant(s, li, m_rg)) {
             return false;
         }
     }
-    if (!checkExpressionIsLoopInvariant(ARR_base(ir), li)) {
+    if (!isLoopInvariant(ARR_base(ir), li, m_rg)) {
         return false;
     }
     return true;
@@ -494,14 +449,14 @@ bool RegPromot::handleArrayRef(IN IR * ir,
     }
 
     if (mustuse->is_exact()) {
-        if (!m_dont_promot.is_overlap(mustuse)) {
+        if (!m_dont_promote.is_overlap(mustuse)) {
             //Exact memory access.
             addExactAccess(exact_access, exact_occs, mustuse, ir);
         }
         return true;
     }
 
-    if (m_dont_promot.is_overlap(mustuse)) {
+    if (m_dont_promote.is_overlap(mustuse)) {
         return true;
     }
 
@@ -551,50 +506,56 @@ bool RegPromot::handleGeneralRef(IR * ir,
         //return true;
     }
     MD const* mustref = ir->getRefMD();
-    if ((mustref == NULL || !mustref->is_effect()) && ir->is_stmt()) {
-        //It is dispensable to clobber access if entire loop is not analysable.
+    //if ((mustref == NULL || !mustref->is_effect()) && ir->is_stmt()) {
+    //    //It is dispensable to clobber access if entire loop is not analysable.
+    //    clobberAccess(ir, exact_access, exact_occs, inexact_access);
+    //
+    //    //TO BE CONFIRMED:ineffect MD should not lead entire loop unanalyzable.
+    //    //return false;
+    //}
+    if (mustref != NULL && mustref->is_volatile()) {
         clobberAccess(ir, exact_access, exact_occs, inexact_access);
-
-        //TO BE CONFIRMED:ineffect MD should not lead entire loop unanalyzable.
-        //return false;
-    } else if ((mustref != NULL && mustref->is_volatile()) && ir->is_stmt()) {
-        clobberAccess(ir, exact_access, exact_occs, inexact_access);
-
-        //Need to analyze may-ref as well.
-        //return true;
+        return true;
     }
-
-    if (mustref != NULL && mustref->is_exact()) {
-        if (!m_dont_promot.is_overlap(mustref)) {
-            //Mark exact memory access to be promotable.
-            addExactAccess(exact_access, exact_occs, mustref, ir);
-        }
-
-        //mustref already be in the dont_promot table.
-        //return true;
+    if (ir->id()==12) {
+        int a = 0;
     }
+    //if (mustref != NULL && mustref->is_exact()) {
+    //        if (ir != NULL) {
+    //            if (ir->is_stmt()) {
+    //                //Mark exact memory access to be promotable.
+    //                addExactAccess(exact_access, exact_occs, mustref, ir);
+    //            } else if (isLoopInvariant(ir, li, m_rg)) {
+    //                //Mark exact memory access to be promotable.
+    //                addExactAccess(exact_access, exact_occs, mustref, ir);
+    //            }
+    //        }
+    //    } else {
+    //        addDontPromote(mustref);
+    //    }
+    //    //Need to analyze MayRef.
+      
+    //    //mustref already be in the dont_promot table.
+    //    //return true;
+    //}
 
-    if (mustref != NULL && m_dont_promot.is_overlap(mustref)) {
+    if (mustref != NULL && m_dont_promote.is_overlap(mustref)) {
         //If ir should not be promoted, then all the others mem-ref
         //that overlapped with it should not be promoted too.
         clobberAccess(ir, exact_access, exact_occs, inexact_access);
-
-        //Need to analyze may-ref as well.
-        //return true;
+        return true;
     }
 
     if (ir->is_ild() || ir->is_ist()) {
         //MD is inexact. Check if it is loop invariant.
         if (!checkIndirectAccessIsLoopInvariant(ir, li)) {
             clobberAccess(ir, exact_access, exact_occs, inexact_access);
-            //Need to analyze may-ref as well.
-            //return true;
+            return true;
         }
     } else if (ir->is_ld()) {
-        if (!checkExpressionIsLoopInvariant(ir, li)) {
+        if (!isLoopInvariant(ir, li, m_rg)) {
             clobberAccess(ir, exact_access, exact_occs, inexact_access);
-            //Need to analyze may-ref as well.
-            //return true;
+            return true;
         }
     } else if (ir->is_st()) {
         ; //nothing to do
@@ -603,20 +564,36 @@ bool RegPromot::handleGeneralRef(IR * ir,
     }
 
     if (ir->is_stmt()) {
-        //Determine wherther current ir may clobber elements in access list.
+        //Determine wherther current ir clobber elements in access list.
         TabIter<IR*> ti;
         for (IR * ref = inexact_access.get_first(ti);
-            ref != NULL; ref = inexact_access.get_next(ti)) {
+             ref != NULL; ref = inexact_access.get_next(ti)) {
             if (m_gvn->isSameMemLoc(ir, ref)) { continue; }
             if (m_gvn->isDiffMemLoc(ir, ref)) { continue; }
 
             //Current ir can not be promoted. Check the promotable candidates
             //if current ir overrided related MDs.
             clobberAccess(ir, exact_access, exact_occs, inexact_access);
-            break;
+            return true;
         }
         if (mustref == NULL || !mustref->is_exact()) {
             addInexactAccess(inexact_access, ir);
+        } else if (mustref != NULL && mustref->is_exact()) {
+            if (!m_dont_promote.is_overlap(mustref)) {
+                if (ir->is_stmt()) {
+                    //Mark exact memory access to be promotable.
+                    addExactAccess(exact_access, exact_occs, mustref, ir);
+                } else if (isLoopInvariant(ir, li, m_rg)) {
+                    //Mark exact memory access to be promotable.
+                    addExactAccess(exact_access, exact_occs, mustref, ir);
+                }
+            } else {
+                addDontPromote(mustref);
+            }
+            //Need to analyze MayRef.
+        
+            //mustref already be in the dont_promot table.
+            //return true;
         }
         return true;
     }
@@ -624,13 +601,46 @@ bool RegPromot::handleGeneralRef(IR * ir,
     ASSERT0(ir->is_exp());
     if (mustref == NULL || !mustref->is_exact()) {
         addInexactAccess(inexact_access, ir);
+    } else if (mustref != NULL && mustref->is_exact()) {
+        if (!m_dont_promote.is_overlap(mustref)) {
+            if (ir != NULL) {
+                if (ir->is_stmt()) {
+                    //Mark exact memory access to be promotable.
+                    addExactAccess(exact_access, exact_occs, mustref, ir);
+                } else if (isLoopInvariant(ir, li, m_rg)) {
+                    //Mark exact memory access to be promotable.
+                    addExactAccess(exact_access, exact_occs, mustref, ir);
+                }
+            }
+        } else {
+            addDontPromote(mustref);
+        }
+        //Need to analyze MayRef.
+    
+        //mustref already be in the dont_promot table.
+        //return true;
     }
     return true;
 }
 
 
+void RegPromot::addDontPromote(MD const* md)
+{
+    ASSERT0(md);
+    m_dont_promote.bunion(md, *getSBSMgr());
+}
+
+
+void RegPromot::addDontPromote(MDSet const& mds)
+{
+    m_dont_promote.bunion(mds, *getSBSMgr());
+}
+
+
 //'ir' can not be promoted.
-//Check the promotable candidates if ir overlapped with the related MD.
+//Check the promotable candidates if ir overlapped with the related
+//MD and MDSet.
+//This function consider both MustRef MD and MayRef MDSet.
 void RegPromot::clobberAccess(IR * ir,
                               OUT TMap<MD const*, IR*> & exact_access,
                               OUT List<IR*> & exact_occs,
@@ -640,8 +650,8 @@ void RegPromot::clobberAccess(IR * ir,
     MD const* mustref = ir->getRefMD();
     MDSet const* mayref = ir->getRefMDSet();
 
-    if (mustref != NULL) { m_dont_promot.bunion(mustref, *getSBSMgr()); }
-    if (mayref != NULL) { m_dont_promot.bunion(*mayref, *getSBSMgr()); }
+    if (mustref != NULL) { addDontPromote(mustref); }
+    if (mayref != NULL) { addDontPromote(*mayref); }
 
     TMapIter<MD const*, IR*> iter;
     Vector<MD const*> need_to_be_removed;
@@ -727,11 +737,11 @@ bool RegPromot::checkIndirectAccessIsLoopInvariant(IN IR * ir, LI<IRBB> const* l
 {
     ASSERT0(li);
     if (ir->is_ild()) {
-        if (!checkExpressionIsLoopInvariant(ILD_base(ir), li)) {
+        if (!isLoopInvariant(ILD_base(ir), li, m_rg)) {
             return false;
         }
     } else if (ir->is_ist()) {
-        if (!checkExpressionIsLoopInvariant(IST_base(ir), li)) {
+        if (!isLoopInvariant(IST_base(ir), li, m_rg)) {
             return false;
         }
     }
@@ -856,7 +866,7 @@ bool RegPromot::scanBB(IN IRBB * bb,
 {
     for (IR * ir = BB_last_ir(bb);
          ir != NULL; ir = BB_prev_ir(bb)) {
-        if (ir->isCallStmt() && !ir->isReadOnlyCall()) {
+        if (ir->isCallStmt() && !ir->isReadOnly()) {
             return false;
         }
     }
@@ -1056,6 +1066,17 @@ void RegPromot::buildPRDUChain(IR * def, IR * use)
     } else {
         m_du->buildDUChain(def, use);
     }
+}
+
+
+//Return true if 'ir' can be promoted.
+//Note ir must be memory reference.
+bool RegPromot::isPromotable(IR const* ir) const
+{
+    ASSERT0(ir->isMemoryRef());
+    //I think the reference that may throw is promotable.
+    if (IR_has_sideeffect(ir) && IR_no_move(ir)) { return false; }
+    return true;
 }
 
 
@@ -1856,7 +1877,7 @@ void RegPromot::checkAndRemoveInvalidExactOcc(List<IR*> & exact_occs)
         //We record all MD that are not suit for promotion, and perform
         //the rest job here that remove all related OCC in exact_list.
         //The MD of promotable candidate must not overlapped each other.
-        if (m_dont_promot.is_overlap(md)) {
+        if (m_dont_promote.is_overlap(md)) {
             exact_occs.remove(ct);
         }
     }
@@ -1923,7 +1944,7 @@ bool RegPromot::tryPromote(LI<IRBB> const* li,
     exact_access.clean();
     inexact_access.clean();
     exact_occs.clean();
-    m_dont_promot.clean(*getSBSMgr());    
+    m_dont_promote.clean(*getSBSMgr());    
     for (INT i = li->getBodyBBSet()->get_first();
          i != -1; i = li->getBodyBBSet()->get_next(i)) {
         IRBB * bb = m_cfg->getBB(i);

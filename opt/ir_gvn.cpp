@@ -1395,7 +1395,8 @@ bool GVN::perform(OptCtx & oc)
 
     START_TIMER(t, getPassName());
     m_rg->checkValidAndRecompute(&oc, PASS_RPO, PASS_DOM, PASS_UNDEF);
-    List<IRBB*> * tbbl = m_cfg->getBBListInRPO();
+    List<IRBB*> * tbbl = m_cfg->getRPOBBList();
+    ASSERT0(tbbl);
     ASSERT0(tbbl->get_elem_count() == bbl->get_elem_count());
     UINT count = 0;
     bool change = true;

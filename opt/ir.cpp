@@ -634,6 +634,12 @@ void dumpIR(IR const* ir, Region const* rg, IN CHAR * attr, UINT dumpflag)
     if (ir->isNoMove()) {
         strcat(p, " nomove");
     }
+    if (ir->isReadOnly()) {
+        strcat(p, " readonly");
+    }
+    if (ir->is_volatile()) {
+        strcat(p, " volatile");
+    }
 
     dumpAttachInfo(p, ir);
 
@@ -2669,7 +2675,7 @@ void IR::dumpRef(Region * r, UINT indent)
             note("\n"); //dump indent blank.
         }
         prt(" : ");
-        if (!isReadOnlyCall()) {
+        if (!isReadOnly()) {
             if (mds != NULL && !mds->is_empty()) {
                 mds->dump(r->getMDSystem());
             }

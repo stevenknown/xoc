@@ -38,48 +38,42 @@ namespace xoc {
 
 //Loop Invariant code Motion.
 class LICM : public Pass {
-protected:
+    COPY_CONSTRUCTOR(LICM);
     Region * m_rg;
-    AliasAnalysis * m_aa;
     DUMgr * m_du;
     IRCFG * m_cfg;
+    MDSSAMgr * m_mdssamgr;
+    PRSSAMgr * m_prssamgr;
     ConstIRIter m_iriter;
-    ConstMDIter m_mditer;
     TypeMgr * m_tm;
     MDSystem * m_md_sys;
     SMemPool * m_pool;
     List<IR*> m_analysable_stmt_list;
     TMap<MD const*, UINT*> m_md2num;
 
-    //Indicate whether current IR is tranformed to ssa form.
-    PRSSAMgr * m_ssamgr;
-    MDSSAMgr * m_mdssamgr;
-
-protected:
     bool doLoopTree(LI<IRBB> * li,
                     OUT bool & du_set_info_changed,
                     OUT bool & insert_bb,
                     TTab<IR*> & invariant_stmt,
                     TTab<IR*> & invariant_exp);
 
-    bool checkDefStmt(
-            IR * def,
-            TTab<IR*> & invariant_stmt,
-            IN IRBB * prehead,
-            IN LI<IRBB> * li);
+    bool checkDefStmt(IR * def,
+                      TTab<IR*> & invariant_stmt,
+                      IN IRBB * prehead,
+                      IN LI<IRBB> * li);
 
-    inline bool is_stmt_dom_its_use(
-                    IR const* stmt,
-                    IR const* use,
-                    LI<IRBB> const* li,
-                    IRBB const* stmtbb) const;
+    inline bool is_stmt_dom_its_use(IR const* stmt,
+                                    IR const* use,
+                                    LI<IRBB> const* li,
+                                    IRBB const* stmtbb) const;
     bool is_dom_all_use_in_loop(IR const* ir, LI<IRBB> * li);
+    bool isStmtCanBeHoisted(IR * stmt, IRBB * backedge_bb);
+    bool isUniqueDef(MD const* md) const;
 
-    bool hoistInvariantStmt(
-            TTab<IR*> & invariant_stmt,
-            IR * stmt,
-            IRBB * prehead,
-            IN LI<IRBB> * li);
+    bool hoistInvariantStmt(TTab<IR*> & invariant_stmt,
+                            IR * stmt,
+                            IRBB * prehead,
+                            IN LI<IRBB> * li);
     bool hoistCand(TTab<IR*> & invariant_exp,
                    TTab<IR*> & invariant_stmt,
                    IN IRBB * prehead,
@@ -92,9 +86,13 @@ protected:
                   TTab<IR*> & invariant_stmt,
                   bool * isLegal, bool first_scan);
     bool scanResult(OUT TTab<IR*> & invariant_stmt);
-    bool isStmtCanBeHoisted(IR * stmt, IRBB * backedge_bb);
-    bool isUniqueDef(MD const* md);
+    bool splitBBIfNeeded(IRBB * bb);
+
     void updateMD2Num(IR * ir);
+    bool useMDSSADU() const
+    { return m_mdssamgr != NULL && m_mdssamgr->is_valid(); }
+    bool usePRSSADU() const
+    { return m_prssamgr != NULL && m_prssamgr->is_valid(); }
 
     void * xmalloc(UINT size)
     {
@@ -104,22 +102,20 @@ protected:
         ::memset(p, 0, size);
         return p;
     }
-
 public:
     explicit LICM(Region * rg)
     {
         ASSERT0(rg != NULL);
         m_rg = rg;
-        m_aa = rg->getAA();
         m_du = rg->getDUMgr();
         m_cfg = rg->getCFG();
         m_tm = rg->getTypeMgr();
         m_md_sys = rg->getMDSystem();
         ASSERT0(m_cfg && m_du && m_md_sys && m_tm);
         m_pool = smpoolCreate(4 * sizeof(UINT), MEM_CONST_SIZE);
-        m_ssamgr = NULL;
+        m_mdssamgr = NULL;
+        m_prssamgr = NULL;
     }
-    COPY_CONSTRUCTOR(LICM);
     virtual ~LICM() { smpoolDelete(m_pool); }
 
     bool analysis(IN LI<IRBB> * li,
@@ -127,9 +123,9 @@ public:
                   OUT TTab<IR*> & invariant_exp);
 
     //Given loop info li, dump the invariant stmt and invariant expression.
-    void dumpInvariantExpStmt(
-            TTab<IR*> const& invariant_stmt,
-            TTab<IR*> const& invariant_exp);
+    void dumpInvariantExpStmt(TTab<IR*> const& invariant_stmt,
+                              TTab<IR*> const& invariant_exp) const;
+    void dump() const;
 
     //Consider whether exp is worth hoisting.
     bool isWorthHoist(IR * exp)
@@ -143,7 +139,6 @@ public:
 
     virtual CHAR const* getPassName() const
     { return "Loop Invariant Code Motion"; }
-
     PASS_TYPE getPassType() const { return PASS_LICM; }
 
     virtual bool perform(OptCtx & oc);

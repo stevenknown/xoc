@@ -161,7 +161,8 @@ void IRCFG::buildEHEdgeNaive()
 
 
 //Verification at building SSA mode by ir parser.
-bool IRCFG::verifyPhiEdge(IR * phi, xcom::TMap<IR*, LabelInfo*> & ir2label)
+bool IRCFG::verifyPhiEdge(IR * phi,
+                          xcom::TMap<IR*, LabelInfo*> & ir2label) const
 {
     xcom::Vertex * bbvex = getVertex(phi->getBB()->id());
     xcom::EdgeC * opnd_pred = VERTEX_in_list(bbvex);
@@ -623,7 +624,7 @@ void IRCFG::LoopAnalysis(OptCtx & oc)
 
 
 //Find bb that 'lab' attouchemented.
-IRBB * IRCFG::findBBbyLabel(LabelInfo const* lab)
+IRBB * IRCFG::findBBbyLabel(LabelInfo const* lab) const
 {
     IRBB * bb = m_lab2bb.get(lab);
     if (bb == NULL) { return NULL; }
@@ -641,6 +642,78 @@ IRBB * IRCFG::findBBbyLabel(LabelInfo const* lab)
     #endif
 
     return bb;
+}
+
+
+//Split BB into two BBs.
+//bb: BB to be splited.
+//split_point: the ir in 'bb' used to mark the split point that followed IRs
+//             will be moved to fallthrough newbb.
+//e.g:bb:
+//    ...
+//    split_point;
+//    ...
+//  =>
+//    bb:
+//    ...
+//    split_point; //the last ir in bb.
+//    newbb:
+//    ...
+IRBB * IRCFG::splitBB(IRBB * bb, IRListIter split_point)
+{
+    IRBB * newbb = m_rg->allocBB();
+
+    //Move rest IRs from bb to newbb.
+    for (bb->getIRList()->get_next(&split_point); split_point != NULL;) {
+        IRListIter rm = split_point;
+        bb->getIRList()->get_next(&split_point);
+        bb->getIRList()->remove(rm);
+        ASSERT0(rm->val());
+        newbb->getIRList()->append_tail(rm->val());
+    }
+
+    //Update CFG info.
+    addBB(newbb);
+
+    //Update BB List.
+    getBBList()->insert_after(newbb, bb);
+
+    //Move EdgeInfo from old edges to new edges.
+    xcom::Vertex const* v = getVertex(bb->id());
+    ASSERT0(v);
+    INT minsuccrpo = MAX_HOST_INT_VALUE;
+    xcom::EdgeC * next_el;
+    for (xcom::EdgeC * el = v->getOutList(); el != NULL; el = next_el) {
+        next_el = el->get_next();
+        xcom::Edge * e = el->getEdge();
+        UINT succ = e->to()->id();
+        xcom::Edge * newe = addEdge(newbb->id(), succ);
+        newe->copyEdgeInfo(e);
+        xcom::Graph::removeEdge(e);        
+
+        //Collect the minimal RPO.
+        if (succ != bb->id()) {
+            IRBB const* succbb = getBB(succ);
+            ASSERT0(succbb);
+            minsuccrpo = MIN(succbb->rpo(), minsuccrpo);
+        }
+    }
+
+    BB_is_fallthrough(bb) = true;
+    addEdge(bb->id(), newbb->id());
+
+    //Update RPO
+    INT rpo = bb->rpo() + 1;
+    if (rpo < minsuccrpo && xcom::Graph::isValidRPO(rpo)) {
+        BB_rpo(newbb) = rpo;
+        xcom::Vertex * v = getVertex(newbb->id());
+        VERTEX_rpo(v) = rpo;
+    } else {
+        BB_rpo(newbb) = RPO_UNDEF;
+        xcom::Vertex * v = getVertex(newbb->id());
+        VERTEX_rpo(v) = RPO_UNDEF;
+    }    
+    return newbb;
 }
 
 
@@ -855,6 +928,19 @@ bool IRCFG::inverseAndRemoveTrampolineBranch()
         changed = true;
     }
     return changed;
+}
+
+
+bool IRCFG::isRPOValid() const
+{
+    BBListIter ct;    
+    for (IRBB * bb = m_bb_list->get_head(&ct);
+         bb != NULL; bb = m_bb_list->get_next(&ct)) {
+        if (bb->rpo() == RPO_UNDEF) {
+            return false;
+        }
+    }
+    return true;
 }
 
 
@@ -1305,6 +1391,21 @@ bool IRCFG::removeRedundantBranch()
 }
 
 
+bool IRCFG::verifyRPO(OptCtx const& oc) const
+{
+    if (!OC_is_rpo_valid(oc)) { return true; }
+    IRCFG * pthis = const_cast<IRCFG*>(this);
+    ASSERT0(pthis->getBBList());
+    ASSERTN(isRPOValid(), ("Miss RPO info or set rpo invalid in OptCtx"));
+    if (pthis->getRPOBBList() != NULL) {
+        ASSERTN(pthis->getRPOBBList()->get_elem_count() ==
+                pthis->getBBList()->get_elem_count(),
+                ("RPO info need to be fixed or set rpo invalid in OptCtx"));
+    }
+    return true;
+}
+
+
 void IRCFG::dumpDOT(CHAR const* name, bool detail, bool dump_eh)
 {
     //Do not dump if default dump file is not initialized.
@@ -1383,10 +1484,7 @@ void IRCFG::dumpDOT(FILE * h, bool detail, bool dump_eh)
 
             dumpBBLabel(bb->getLabelList(), h);
             fprintf(h, " ");
-
-            if (VERTEX_rpo(v) != 0) {
-                fprintf(h, "rpo:%d ", VERTEX_rpo(v));
-            }
+            fprintf(h, "rpo:%d ", bb->rpo());
 
             //Dump MDSSA Phi List.
             if (mdssamgr != NULL && mdssamgr->is_valid()) {
@@ -1522,11 +1620,8 @@ void IRCFG::dump_node(FILE * h, bool detail)
                 "\nnode: {title:\"%d\" vertical_order:%d shape:%s color:%s "
                 "fontname:\"%s\" scaling:%d label:\"",
                 v->id(), vertical_order++, shape, color, font, scale);
-            fprintf(h, "   BB%d ", v->id());
-            
-            if (VERTEX_rpo(v) != 0) {
-                fprintf(h, " rpo:%d ", VERTEX_rpo(v));
-            }
+            fprintf(h, "   BB%d ", bb->rpo());            
+            fprintf(h, " rpo:%d ", VERTEX_rpo(v));
             dumpBBLabel(bb->getLabelList(), h);
             fprintf(h, "\n");
 
@@ -1561,9 +1656,7 @@ void IRCFG::dump_node(FILE * h, bool detail)
                 "fontname:\"%s\" scaling:%d label:\"%d",
                 v->id(), vertical_order++, shape, color, font,
                 scale, v->id());
-        if (VERTEX_rpo(v) != 0) {
-            fprintf(h, " rpo:%d", VERTEX_rpo(v));
-        }
+        fprintf(h, " rpo:%d", bb->rpo());
         fprintf(h, "\" }");
     }
 }
@@ -1736,7 +1829,8 @@ void IRCFG::computeDomAndIdom(IN OUT OptCtx & oc, xcom::BitSet const* uni)
     ASSERTN(m_entry, ("ONLY support SESE or SEME"));
 
     m_rg->checkValidAndRecompute(&oc, PASS_RPO, PASS_UNDEF);
-    List<IRBB*> * bblst = getBBListInRPO();
+    List<IRBB*> * bblst = getRPOBBList();
+    ASSERT0(bblst);
     ASSERT0(bblst->get_elem_count() == m_rg->getBBList()->get_elem_count());
 
     List<xcom::Vertex const*> vlst;
@@ -1772,7 +1866,8 @@ void IRCFG::computePdomAndIpdom(IN OUT OptCtx & oc, xcom::BitSet const* uni)
     ASSERT0(OC_is_cfg_valid(oc));
 
     m_rg->checkValidAndRecompute(&oc, PASS_RPO, PASS_UNDEF);
-    List<IRBB*> * bblst = getBBListInRPO();
+    List<IRBB*> * bblst = getRPOBBList();
+    ASSERT0(bblst);
     ASSERT0(bblst->get_elem_count() == m_rg->getBBList()->get_elem_count());
 
     List<xcom::Vertex const*> vlst;
@@ -1884,10 +1979,8 @@ bool IRCFG::performMiscOpt(OptCtx & oc)
         ASSERT0(MDSSAMgr::verifyMDSSAInfo(m_rg));
 
     }
-
     ASSERT0(verifyIRandBB(getBBList(), m_rg));
-    ASSERT0(m_rg->verifyRPO(oc));
-
+    ASSERT0(verifyRPO(oc));
     END_TIMER(t, "CFG Optimizations");
     return change;
 }

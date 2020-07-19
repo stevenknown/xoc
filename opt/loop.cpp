@@ -32,6 +32,7 @@ IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 author: Su Zhenyu
 @*/
 #include "cominc.h"
+#include "comopt.h"
 
 namespace xoc {
 
@@ -134,11 +135,11 @@ IRBB * findAndInsertPreheader(LI<IRBB> const* li,
         if (pred == BB_id(prev) && !LI_bb_set(li)->is_contain(BB_id(prev))) {
             //Try to find fallthrough prev BB.
             //CASE:prev is not preheader of head.
-            //      BB_prehead----
+            //      BB_preheader--
             //                   |
             //  ............     |
             //                   |
-            //  ---->BB_prev     |
+            //  --->BB_prev      |
             //  |      |         |
             //  |      v         |
             //  |   BB_head<------
@@ -167,7 +168,7 @@ IRBB * findAndInsertPreheader(LI<IRBB> const* li,
     List<IRBB*> preds;
     cfg->get_preds(preds, head);
     IRBB * preheader = rg->allocBB();
-    bblst->insert_before(preheader, bbholder);
+    bblst->insert_before(preheader, bbholder);    
     LabelInfo const* preheader_lab = rg->genIlabel();
     xcom::BitSet * loop_body = LI_bb_set(li);
     for (IRBB * p = preds.get_head(); p != NULL; p = preds.get_next()) {
@@ -179,7 +180,8 @@ IRBB * findAndInsertPreheader(LI<IRBB> const* li,
             //Insert preheader in front of head.
             //Note preheader must fallthrough to head.
             cfg->addBB(preheader);
-            cfg->insertVertexBetween(BB_id(p), BB_id(head), BB_id(preheader));
+            cfg->insertVertexBetween(p->id(), head->id(), preheader->id());
+            cfg->tryFindLessRpo(preheader, head);
             BB_is_fallthrough(preheader) = true;
             insert_bb = true;
         }
@@ -210,7 +212,7 @@ IRBB * findAndInsertPreheader(LI<IRBB> const* li,
         //   v
         //  BB_header(lab2)
         IR * last_ir = BB_last_ir(p);
-        ASSERT0(last_ir);
+        if (last_ir == NULL) { continue; }
         if ((last_ir->isConditionalBr() || last_ir->isUnconditionalBr()) &&
             head == cfg->findBBbyLabel(last_ir->getLabel())) {
             //Add newlabel to preheader if not exist.
@@ -278,6 +280,105 @@ IRBB * findAndInsertPreheader(LI<IRBB> const* li,
     }
 
     return preheader;
+}
+
+
+static bool isLoopInvariantInPRSSA(IR const* ir, LI<IRBB> const* li)
+{
+    ASSERT0(ir->is_pr());
+    SSAInfo * ssainfo = PR_ssainfo(ir);
+    ASSERT0(ssainfo);
+    if (ssainfo->getDef() != NULL) {
+        IRBB * defbb = ssainfo->getDef()->getBB();
+        ASSERT0(defbb);    
+        if (li->isInsideLoop(BB_id(defbb))) {
+            return false;
+        }
+    }
+    return true;
+}
+
+
+static bool isLoopInvariantInMDSSA(IR const* ir,
+                                   LI<IRBB> const* li,
+                                   MDSSAMgr const* mdssamgr)
+{
+    ASSERT0(ir->isMemoryRefNotOperatePR());
+    MDSSAInfo * mdssainfo = UseDefMgr::getMDSSAInfo(ir);
+    ASSERT0(mdssainfo);
+    VOpndSetIter iter = NULL;
+    for (INT i = mdssainfo->getVOpndSet()->get_first(&iter);
+         i >= 0; i = mdssainfo->getVOpndSet()->get_next(i, &iter)) {
+        VMD const* vopnd = (VMD const*)mdssamgr->getVOpnd(i);
+        ASSERT0(vopnd && vopnd->is_md());
+        IRBB const* defbb = vopnd->getDef()->getBB();
+        ASSERT0(defbb);
+        if (li->isInsideLoop(defbb->id())) {
+            return false;
+        }
+    }
+    return true;
+}
+
+
+static bool isLoopInvariantInDUMgr(IR const* ir,
+                                   LI<IRBB> const* li,
+                                   Region const* rg)
+{
+    DUSet const* duset = ir->readDUSet();
+    if (duset == NULL) { return true; }
+
+    DUIter dui = NULL;
+    for (INT i = duset->get_first(&dui);
+         i >= 0; i = duset->get_next(i, &dui)) {
+        IR const* defstmt = const_cast<Region*>(rg)->getIR(i);
+        ASSERT0(defstmt->is_stmt());
+        IRBB const* bb = defstmt->getBB();
+
+        if (li->isInsideLoop(bb->id())) {
+            return false;
+        }
+    }
+    return true;
+}
+
+
+//Return true if all the expression on 'ir' tree is loop invariant.
+//ir: root node of IR tree
+//li: loop info structure
+//Note this function does not check the sibling node of 'ir'.
+bool isLoopInvariant(IR const* ir, LI<IRBB> const* li, Region * rg)
+{
+    ASSERT0(ir && ir->is_exp());
+    if (ir->isReadPR()) {
+        PRSSAMgr * prssamgr = rg->getPRSSAMgr();
+        if (prssamgr != NULL && prssamgr->is_valid()) {
+            if (!isLoopInvariantInPRSSA(ir, li)) {
+                return false;
+            }
+        } else if (!isLoopInvariantInDUMgr(ir, li, rg)) {
+            return false;
+        }
+    } else if (ir->isMemoryRefNotOperatePR()) {
+        MDSSAMgr * mdssamgr = rg->getMDSSAMgr();
+        if (mdssamgr != NULL && mdssamgr->is_valid()) {
+            if (!isLoopInvariantInMDSSA(ir, li, mdssamgr)) {
+                return false;
+            }
+        } else if (!isLoopInvariantInDUMgr(ir, li, rg)) {
+            return false;
+        }
+    }
+
+    for (UINT i = 0; i < IR_MAX_KID_NUM(ir); i++) {
+        IR * kid = ir->getKid(i);
+        if (kid == NULL) { continue; }
+        if (!isLoopInvariant(kid, li, rg)) {
+            return false;
+        }
+    }
+
+    return true;
 }
 
 } //namespace xoc

@@ -36,10 +36,11 @@ class ScalarOpt : public Pass {
 protected:
     PassMgr * m_pass_mgr;
     Region * m_rg;
+    IRCFG * m_cfg;
 
 public:
     explicit ScalarOpt(Region * rg) : m_rg(rg)
-    { m_pass_mgr = rg->getPassMgr(); }
+    { m_pass_mgr = rg->getPassMgr(); m_cfg = rg->getCFG(); }
     virtual ~ScalarOpt() {}
 
     virtual CHAR const* getPassName() const
