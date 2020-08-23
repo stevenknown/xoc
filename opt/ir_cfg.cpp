@@ -801,7 +801,6 @@ void IRCFG::insertBBbefore(IN IRBB * bb, IN IRBB * newbb)
     ASSERT0(bbv);
     xcom::Vertex * newbbv = getVertex(newbb->id());
     ASSERT0(newbbv);
-    xcom::EdgeC * last = NULL;
     for (xcom::EdgeC * predlist = bbv->getInList();
          predlist != NULL; predlist = predlist->get_next()) {
         xcom::Edge * prededge = predlist->getEdge();

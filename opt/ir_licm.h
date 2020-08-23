@@ -110,16 +110,16 @@ class LICM : public Pass {
     //e.g:given BB_prehead, insert BB_guard
     //  BB_prehead
     //  |
-    //  V
+    //  v
     //  BB_loophead
     //after insertion:
     //  BB_guard
-    //  | \
-    //  |  V
+    //  |  |
+    //  |  v
     //  |  BB_prehead
     //  | / 
     //  |/
-    //  V
+    //  v
     //  BB_loophead
     IRBB * insertGuardBB(IRBB * prehead, IRBB * loophead);
 

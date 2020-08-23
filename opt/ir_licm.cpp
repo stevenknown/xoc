@@ -63,7 +63,7 @@ bool LICM::scanOpnd(IN LI<IRBB> * li, bool * isLegal, bool first_scan)
     UINT headid = head->id();
     for (INT i = li->getBodyBBSet()->get_first();
          i != -1; i = li->getBodyBBSet()->get_next(i)) {
-        if (i != headid && !m_cfg->is_dom(headid, i)) {
+        if (i != (INT)headid && !m_cfg->is_dom(headid, i)) {
             //Loop head should anticipate into analysis as well.
             //The candidate BB must dominate all other loop body BBs.
             continue;
@@ -181,7 +181,6 @@ bool LICM::chooseExpAndStmt(IR * ir)
     case IR_CALL:
     case IR_ICALL: {
         bool add_param_invariant = false;
-        bool has_variant = false;
         //Hoisting CALL out of loop should generate a guard as well to
         //guarantee CALL will not be exectued if the loop
         //will never execute.
@@ -686,16 +685,16 @@ bool LICM::tryHoistDefStmt(IR * def, OUT IRBB * prehead, OUT LI<IRBB> * li)
 //e.g:given BB_prehead, insert BB_guard
 //  BB_prehead
 //  |
-//  V
+//  v
 //  BB_loophead
 //after insertion:
 //  BB_guard
-//  | \
-//  |  V
+//  |  |
+//  |  v
 //  |  BB_prehead
 //  | / 
 //  |/
-//  V
+//  v
 //  BB_loophead
 IRBB * LICM::insertGuardBB(IRBB * prehead, IRBB * loophead)
 {
@@ -721,19 +720,19 @@ IRBB * LICM::insertGuardBB(IRBB * prehead, IRBB * loophead)
 
     //2.BB_guard
     //  |
-    //  V
+    //  v
     //  BB_prehead
     //  |
-    //  V
+    //  v
     //  BB_loophead <--
     //after insertion edge:
     //  BB_guard
-    //  | \
-    //  |  V
+    //  |   |
+    //  |   v
     //  |  BB_prehead
     //  |   /
     //  |  /
-    //  V V
+    //  v v
     //  BB_loophead <--
     m_cfg->addEdge(guard, loophead); 
 
