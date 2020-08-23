@@ -38,6 +38,31 @@ typedef xcom::List<MDDef*> MDDefIter;
 typedef TTab<UINT> LiveInMDTab;
 typedef TabIter<UINT> LiveInMDTabIter;
 
+//This class define the iterator that used to iterate IR occurrence for
+//each VOpnd in MDSSA mode.
+class ConstMDSSAUSEIRIter {
+    COPY_CONSTRUCTOR(ConstMDSSAUSEIRIter);
+public:
+    ConstMDSSAUSEIRIter() : vopndset_iter(NULL), current_pos_in_vopndset(-1),
+        useset_iter(NULL), current_pos_in_useset(-1), current_useset(NULL) {}
+
+    VOpndSet * vopndset;
+    VOpndSetIter vopndset_iter;
+    INT current_pos_in_vopndset;
+    IRSetIter useset_iter;
+    INT current_pos_in_useset;
+    IRSet const* current_useset;
+
+    void clean()
+    {
+        vopndset_iter = NULL;
+        current_pos_in_vopndset = -1;
+        useset_iter = NULL;
+        current_pos_in_useset = -1;
+        current_useset = NULL;
+    }
+};
+
 class ConstMDDefIter : public xcom::List<MDDef const*> {
     COPY_CONSTRUCTOR(ConstMDDefIter);    
     TTab<UINT> m_is_visited;
@@ -251,7 +276,7 @@ public:
     //Dump Phi List.
     void dumpPhiList(MDPhiList const* philist) const;
     //Dump MDSSA reference info.
-    void dump();
+    virtual bool dump() const;
     //Dump MDSSA DU chain.
     void dumpDUChain();
     //This function dumps VMD structure and SSA DU info.
@@ -273,14 +298,14 @@ public:
     UseDefMgr * getUseDefMgr() { return &m_usedef_mgr; }
     //Get specific virtual operand.
     VOpnd * getVOpnd(UINT i) const { return m_usedef_mgr.getVOpnd(i); }
-    virtual CHAR const* getPassName() const { return "MD SSA Manager"; }
+    virtual CHAR const* getPassName() const { return "MDSSA Manager"; }
     PASS_TYPE getPassType() const { return PASS_MD_SSA_MGR; }
     //Get MDSSAInfo if exist.
     static MDSSAInfo * getMDSSAInfoIfAny(IR const* ir)
     { return hasMDSSAInfo(ir) ? UseDefMgr::getMDSSAInfo(ir) : NULL; }
     MDPhiList const* getPhiList(IRBB const* bb) const
     { return m_usedef_mgr.getBBPhiList(bb->id()); }
-    //Generate MDSSAInfo and generate VOpnd for related MD.
+    //Generate both MDSSAInfo and VOpnd for related MD.
     MDSSAInfo * genMDSSAInfoAndVOpnd(IR * ir, UINT version);
 
     //Return true if ir might have MDSSAInfo.
@@ -302,13 +327,46 @@ public:
     //'def': the beginning MDDef of the chain.
     //'ii': iterator. It should be clean already.
     //Readonly function.
-    MDDef const* iterDefInitC(MDDef const* def,
-                              OUT ConstMDDefIter & ii);
+    MDDef const* iterDefInitC(MDDef const* def, OUT ConstMDDefIter & ii) const;
+
     //Iterative access MDDef chain.
     //This function return the next MDDef node accroding to 'ii'.
     //'ii': iterator.
     //Readonly function.
-    MDDef const* iterDefNextC(IN OUT ConstMDDefIter & ii);
+    MDDef const* iterDefNextC(IN OUT ConstMDDefIter & ii) const;
+
+    //Iterative access USE in MDSSAInfo. The USE always an IR occurrence that
+    //describes a memory expression.
+    //This funtion initialize the iterator.
+    //'def': the MDDef of the chain.
+    //'ii': iterator. It should be clean already.
+    //Readonly function.
+    IR const* iterUseInitC(IR const* def, OUT ConstMDSSAUSEIRIter & ii) const;
+
+    //Iterative access USE in MDSSAInfo. The USE always an IR occurrence that
+    //describes a memory expression.
+    //This function return the next USE accroding to 'ii'.
+    //'ii': iterator.
+    //Readonly function.
+    IR const* iterUseNextC(IN OUT ConstMDSSAUSEIRIter & ii) const;
+
+    //Iterative access MDDef chain.
+    //This funtion initialize the iterator.
+    //'def': the beginning MDDef of the chain.
+    //'use': indicate the USE expression of the 'def'.
+    //'ii': iterator. It should be clean already.
+    //Readonly function.
+    MDDef const* iterDefInitCTillKillingDef(MDDef const* def,
+                                            IR const* use,
+                                            OUT ConstMDDefIter & ii) const;
+
+    //Iterative access MDDef chain.
+    //This function return the next MDDef node accroding to 'ii'.
+    //'ii': iterator.
+    //'use': indicate the USE expression of the 'def'.
+    //Readonly function.
+    MDDef const* iterDefNextCTillKillingDef(IR const* use,
+                                            IN OUT ConstMDDefIter & ii) const;
 
     //Reinitialize MDSSA manager.
     //This function will clean all informations and recreate them.
@@ -356,8 +414,8 @@ public:
     //you need remove the related PHI operand if BB successor has PHI stmt.
     void removeSuccessorDesignatePhiOpnd(IRBB * bb, IRBB * succ);
 
-    //Check each USE of stmt, remove the expired one which is not reference
-    //the memory any more that stmt defined.
+    //Check each USE of stmt, remove the expired expression which is not
+    //reference the memory any more that stmt defined.
     //Return true if DU changed.
     bool removeExpiredDUForStmt(IR * stmt);
 

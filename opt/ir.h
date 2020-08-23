@@ -724,6 +724,7 @@ public:
         return md;
     }
 
+    //Return true if ir carried sideeffect property.
     bool hasSideEffect() const { return IR_has_sideeffect(this); }
 
     //Return true if ir compute produce a result.
@@ -947,6 +948,9 @@ public:
     //Return true if ir is operation that read or write to an array element.
     bool isArrayOp() const { return is_array() || is_starray(); }
 
+    //Return true if ir is base expression of array operation.
+    inline bool isArrayBase(IR const* ir) const;
+
     //Return true if ir may jump to multiple target.
     bool isMultiConditionalBr() const { return is_switch(); }
 
@@ -1008,8 +1012,11 @@ public:
 
     //True if ir is read-modify-write.
     bool is_rmw() const { return IR_is_read_mod_write(this); }
+    //True if ir is judgement operation.
     bool is_judge() const { return is_relation() || is_logical(); }
+    //True if ir is logical operation.
     bool is_logical() const { return IRDES_is_logical(g_ir_desc[getCode()]); }
+    //True if ir is relation operation.
     bool is_relation() const { return IRDES_is_relation(g_ir_desc[getCode()]); }
 
     //IR meet commutative, e.g: a+b = b+a
@@ -1166,13 +1173,13 @@ class CConst : public IR {
     COPY_CONSTRUCTOR(CConst);
 public:
     union {
-        //record string const.
+        //record string-const if current ir is string type.
         Sym const* str_value;
 
         //record integer value using a length of HOST_INT memory.
         HOST_INT int_const_value;
 
-        //record float point value.
+        //record float point value if current ir is float type.
         struct {
             HOST_FP fp_const_value;
 
@@ -1189,6 +1196,7 @@ public:
     BYTE getMantissa() const { return CONST_fp_mant(this); }
     HOST_INT getINT() const { return CONST_int_val(this); }
     Sym const* getSTR() const { return CONST_str_val(this); }
+    void * getAnonymousVal() const { return CONST_anony_val(this); }
 };
 
 //Record Var property.
@@ -1586,10 +1594,10 @@ public:
 //NOTE:
 //    * The member layout should be same as do_while.
 //    * 'opnd' must be the last member of CWhileDo.
-//Determinate expression.
+//Determinate expression. It can NOT be NULL.
 #define LOOP_det(ir) LOOP_kid(ir, 0)
 
-//Loop body.
+//Record stmt list in loop body of IF. It can be NULL.
 #define LOOP_body(ir) LOOP_kid(ir, 1)
 #define LOOP_kid(ir, idx) (((CWhileDo*)ir)->opnd[CKID_LOOP(ir, idx)])
 class CWhileDo : public IR {
@@ -1661,8 +1669,13 @@ public:
 //      truebody
 //      falsebody
 //    endif
+//Determinate expression. It can NOT be NULL.
 #define IF_det(ir) IF_kid(ir, 0)
+
+//Record stmt list in true body of IF. It can be NULL.
 #define IF_truebody(ir) IF_kid(ir, 1)
+
+//Record stmt list in false body of IF. It can be NULL.
 #define IF_falsebody(ir) IF_kid(ir, 2)
 #define IF_kid(ir, idx) (((CIf*)ir)->opnd[CKID_TY(ir, IR_IF, idx)])
 class CIf : public IR {
@@ -1753,7 +1766,6 @@ public:
 //
 //'elem_num' represent the number of array element in current dimension.
 //
-//If 'elem_tyid' is vector, ARR_ofst refers the referrenced element byte offset.
 #define ARR_ofst(ir) (((CArray*)CK_IRT_ARR(ir))->field_offset)
 #define ARR_du(ir) (((CArray*)CK_IRT_ARR(ir))->du)
 #define ARR_elemtype(ir) (((CArray*)CK_IRT_ARR(ir))->elemtype)
@@ -1773,7 +1785,7 @@ public:
     (((CArray*)CK_IRT_ARR(ir))->elem_num[CK_ARRAY_DIM(ir, dim)])
 #define ARR_elem_num_buf(ir) (((CArray*)CK_IRT_ARR(ir))->elem_num)
 
-//Array base.
+//Array base expression.
 #define ARR_base(ir) ARR_kid(ir, 0)
 
 //Array subscript expression.
@@ -1853,14 +1865,13 @@ public:
 //
 //'elem_num' represent the number of array element in given dimension.
 //
-//If 'elem_tyid' is vector, ARR_ofst refers the referrenced element byte offset.
 #define STARR_bb(ir) (((CStArray*)CK_IRT(ir, IR_STARRAY))->stmtprop.bb)
 #define STARR_rhs(ir) \
     (*(((CStArray*)ir)->opnd_pad + CKID_TY(ir, IR_STARRAY, 0)))
 class CStArray: public CArray {
     COPY_CONSTRUCTOR(CStArray);
 public:
-    //NOTE: 'opnd' must be the first member of CStArray.
+    //NOTE: 'opnd_pad' must be the first member of CStArray.
     IR * opnd_pad[1];
 
     //DO NOT PLACE MEMBER BEFORE opnd_pad
@@ -1918,7 +1929,7 @@ public:
 #define BR_bb(ir) (((CTruebr*)CK_IRT_BR(ir))->bb)
 #define BR_lab(ir) (((CTruebr*)CK_IRT_BR(ir))->jump_target_lab)
 
-//Determinant expression.
+//Determinate expression. It can NOT be NULL.
 #define BR_det(ir) BR_kid(ir, 0)
 #define BR_kid(ir, idx) (((CTruebr*)ir)->opnd[CKID_BR(ir, idx)])
 class CTruebr : public IR, public StmtProp {
@@ -2065,6 +2076,14 @@ IR * IR::getRHS() const
     default: ASSERTN(0, ("not store operation."));
     }
     return NULL;
+}
+
+
+//Return true if ir is base expression of array operation.
+bool IR::isArrayBase(IR const* ir) const
+{
+    ASSERT0(isArrayOp());
+    return ((CArray*)this)->is_base(ir);
 }
 
 

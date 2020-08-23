@@ -345,7 +345,6 @@ void RegionMgr::dump(bool dump_inner_region)
 {
     if (g_tfile == NULL || getNumOfRegion() == 0) { return; }
 
-    g_indent = 0;
     note("\n==---- DUMP ALL Registered Region ----==");
     for (UINT id = 0; id < getNumOfRegion(); id++) {
         Region * rg = getRegion(id);
@@ -431,7 +430,6 @@ bool RegionMgr::processFuncRegion(Region * func, OptCtx * oc)
 {
     ASSERTN(!func->is_blackbox(),
             ("can not generate code for blackbox region"));
-    g_indent = 0;
     bool s = func->process(oc);
     tfree();
     return s;
@@ -443,7 +441,6 @@ bool RegionMgr::processFuncRegion(Region * func, OptCtx * oc)
 bool RegionMgr::processProgramRegion(Region * program, OptCtx * oc)
 {
     ASSERT0(program && program->is_program());
-    g_indent = 0;
     bool s = program->process(oc);
     tfree();
     return s;

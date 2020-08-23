@@ -37,10 +37,10 @@ author: Su Zhenyu
 namespace xoc {
 
 bool LoopCvt::is_while_do(LI<IRBB> const* li, OUT IRBB ** gobackbb,
-                              UINT * succ1, UINT * succ2)
+                          UINT * succ1, UINT * succ2)
 {
     ASSERT0(gobackbb);
-    IRBB * head = LI_loop_head(li);
+    IRBB * head = li->getLoopHead();
     ASSERT0(head);
 
     *gobackbb = findSingleBackedgeStartBB(li, m_cfg);
@@ -98,7 +98,7 @@ bool LoopCvt::try_convert(LI<IRBB> * li, IRBB * gobackbb,
     IR * lastir = BB_irlist(gobackbb).get_tail(&irct);
     ASSERT0(lastir->is_goto());
 
-    IRBB * head = LI_loop_head(li);
+    IRBB * head = li->getLoopHead();
     ASSERT0(head);
 
     //Copy ir in header to gobackbb.
@@ -120,7 +120,7 @@ bool LoopCvt::try_convert(LI<IRBB> * li, IRBB * gobackbb,
             if (x->isReadPR() && PR_ssainfo(x) != NULL) {
                 IR * def = SSA_def(PR_ssainfo(x));
                 if (def != NULL &&
-                    li->isInsideLoop(BB_id(def->getBB()))) {
+                    li->isInsideLoop(def->getBB()->id())) {
                     rmvec.set(cnt++, def);
                 }
             } else {
@@ -132,7 +132,7 @@ bool LoopCvt::try_convert(LI<IRBB> * li, IRBB * gobackbb,
                     IR * def = m_rg->getIR(d);
 
                     ASSERT0(def->getBB());
-                    if (li->isInsideLoop(BB_id(def->getBB()))) {
+                    if (li->isInsideLoop(def->getBB()->id())) {
                         rmvec.set(cnt++, def);
                     }
                 }
@@ -168,11 +168,10 @@ bool LoopCvt::try_convert(LI<IRBB> * li, IRBB * gobackbb,
     last_cond_br->setLabel(loopbody_start_lab);
 
     //Add back edge.
-    m_cfg->addEdge(BB_id(gobackbb), BB_id(loopbody_start_bb));
+    m_cfg->addEdge(gobackbb->id(), loopbody_start_bb->id());
 
     //Add fallthrough edge.
-    m_cfg->addEdge(BB_id(gobackbb), BB_id(next));
-    BB_is_fallthrough(next) = true;
+    m_cfg->addEdge(gobackbb->id(), next->id());
     return true;
 }
 
@@ -216,12 +215,15 @@ bool LoopCvt::perform(OptCtx & oc)
     bool change = find_and_convert(worklst);
     if (change) {
         if (g_is_dump_after_pass && g_dump_opt.isDumpLoopCVT()) {
+            note("\n==---- DUMP %s '%s' ----==",
+                 getPassName(), m_rg->getRegionName());
             dumpBBList(m_rg->getBBList(), m_rg);
         }
 
         //DU reference and du chain has maintained.
         ASSERT0(m_rg->verifyMDRef());
-        ASSERT0(m_du->verifyMDDUChain(DUOPT_COMPUTE_PR_DU | DUOPT_COMPUTE_NONPR_DU));
+        ASSERT0(m_du->verifyMDDUChain(DUOPT_COMPUTE_PR_DU|
+                                      DUOPT_COMPUTE_NONPR_DU));
 
         //All these changed.
         OC_is_reach_def_valid(oc) = false;

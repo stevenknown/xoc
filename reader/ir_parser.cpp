@@ -283,8 +283,8 @@ static void copyProp(IR * ir, PropertySet & cont, ParseCtx * ctx)
             EHLabelAttachInfo * ehai = (EHLabelAttachInfo*)ai->get(AI_EH_LABEL);
             if (ehai == NULL) {
                 ehai = (EHLabelAttachInfo*)ctx->current_region->
-                    xmalloc(sizeof(EHLabelAttachInfo));
-                ehai->init(ctx->current_region->getSCLabelInfoPool());
+                           xmalloc(sizeof(EHLabelAttachInfo));
+                ehai->init(ctx->current_region->getSCPool());
                 ai->set(ehai);
             }
             ehai->get_labels().append_head(l);
@@ -622,8 +622,8 @@ bool IRParser::declareRegion(ParseCtx * ctx)
             //cfg->rebuild(oc);
             //cfg->removeEmptyBB(oc);
             //cfg->computeExitList();
-            newctx.current_region->checkValidAndRecompute(oc,
-                PASS_CFG, PASS_UNDEF);
+            newctx.current_region->checkValidAndRecompute(oc, PASS_CFG,
+                                                          PASS_UNDEF);
             newctx.current_region->getCFG()->dumpVCG();
             dumpBBList(newctx.current_region->getBBList(),
                 newctx.current_region);
@@ -639,8 +639,10 @@ bool IRParser::declareRegion(ParseCtx * ctx)
             }
         }
     }
-    ASSERT0(verifyIRList(newctx.current_region->getIRList(),
-            NULL, newctx.current_region));
+    if (!newctx.current_region->is_blackbox()) {
+        ASSERT0(verifyIRList(newctx.current_region->getIRList(),
+                NULL, newctx.current_region));
+    }
     exitRegion(&newctx);
     if (ctx->current_region != NULL) {
         IR * ir = ctx->current_region->buildRegion(region);
@@ -1273,6 +1275,11 @@ bool IRParser::parseStoreArray(ParseCtx * ctx)
     IR * base = ctx->returned_exp;
     ctx->returned_exp = NULL;
 
+    if (!base->is_ptr()) {
+        error("base expression of starray should be pointer");
+        return false;
+    }
+
     tok = m_lexer->getCurrentToken();
     if (tok != T_COMMA) {
         error(tok, "miss ','");
@@ -1316,7 +1323,7 @@ bool IRParser::parseStoreArray(ParseCtx * ctx)
     if (dim_list.get_elem_count() != 0 &&
         xcom::cnt_list(subscript_list) != dim_list.get_elem_count()) {
         error("declare %d dimension array, but %d subscript given",
-            dim_list.get_elem_count(), xcom::cnt_list(subscript_list));
+              dim_list.get_elem_count(), xcom::cnt_list(subscript_list));
         return false;
     }
 
@@ -1401,6 +1408,11 @@ bool IRParser::parseArray(ParseCtx * ctx)
     IR * base = ctx->returned_exp;
     ctx->returned_exp = NULL;
 
+    if (!base->is_ptr()) {
+        error("base expression of array should be pointer");
+        return false;
+    }
+
     tok = m_lexer->getCurrentToken();
     if (tok != T_COMMA) {
         error(tok, "miss ','");
@@ -1444,7 +1456,7 @@ bool IRParser::parseArray(ParseCtx * ctx)
     if (dim_list.get_elem_count() != 0 &&
         xcom::cnt_list(subscript_list) != dim_list.get_elem_count()) {
         error("declare %d dimension array, but %d subscript given",
-            dim_list.get_elem_count(), xcom::cnt_list(subscript_list));
+              dim_list.get_elem_count(), xcom::cnt_list(subscript_list));
         return false;
     }
 
@@ -1500,6 +1512,7 @@ bool IRParser::parseILd(ParseCtx * ctx)
         ctx->ircode = IR_UNDEF;
     }
 
+    //Parse base expression.
     if (!parseExp(ctx)) {
         return false;
     }
@@ -1509,6 +1522,11 @@ bool IRParser::parseILd(ParseCtx * ctx)
     }
     IR * base = ctx->returned_exp;
     ctx->returned_exp = NULL;
+
+    if (!base->is_ptr()) {
+        error("base expression of ild should be pointer");
+        return false;
+    }
 
     IR * ild = ctx->current_region->buildILoad(base, ty);
     ILD_ofst(ild) = offset;
@@ -2503,6 +2521,7 @@ bool IRParser::parseIStore(ParseCtx * ctx)
         return false;
     }
 
+    //Parse base expression.
     tok = m_lexer->getNextToken();
     if (!parseExp(ctx)) {
         return false;
@@ -2510,6 +2529,11 @@ bool IRParser::parseIStore(ParseCtx * ctx)
     ASSERT0(ctx->returned_exp);
     IR * base = ctx->returned_exp;
     ctx->returned_exp = NULL;
+
+    if (!base->is_ptr()) {
+        error("base expression of ist should be pointer");
+        return false;
+    }
 
     tok = m_lexer->getCurrentToken();
     if (tok != T_COMMA) {
@@ -3097,19 +3121,19 @@ bool IRParser::parseLabelProperty(LabelInfo * label)
     for (;;) {
         switch (getCurrentXCode()) {
         case X_TRY_START:
-            LABEL_INFO_is_try_start(label) = true;
+            LABELINFO_is_try_start(label) = true;
             m_lexer->getNextToken();
             break;
         case X_TRY_END:
-            LABEL_INFO_is_try_end(label) = true;
+            LABELINFO_is_try_end(label) = true;
             m_lexer->getNextToken();
             break;
         case X_TERMINATE:
-            LABEL_INFO_is_terminate(label) = true;
+            LABELINFO_is_terminate(label) = true;
             m_lexer->getNextToken();
             break;
         case X_CATCH_START:
-            LABEL_INFO_is_catch_start(label) = true;
+            LABELINFO_is_catch_start(label) = true;
             m_lexer->getNextToken();
             break;
         default:

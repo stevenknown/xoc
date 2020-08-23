@@ -52,9 +52,9 @@ template <typename T> int dummy_use(T const&) { return 0; }
 
 //Do both assert and dummyuse at debug mode, do dummyuse at release mode.
 #define ASSERTN_DUMMYUSE(a, b)  \
-    ((a) ? DUMMYUSE(a) : (m022138(__FILE__, __LINE__), m518087 b))
+    ((a) ? DUMMYUSE(a) : (m522138(__FILE__, __LINE__), m518087 b))
 #define ASSERT0_DUMMYUSE(a)  \
-    ((a) ? DUMMYUSE(a) : (m022138(__FILE__, __LINE__), m518087 ("")))
+    ((a) ? DUMMYUSE(a) : (m522138(__FILE__, __LINE__), m518087 ("")))
 #else
 //Do assert at debug mode, and do dummyuse at release mode.
 #define CHECK_DUMMYUSE(a) DUMMYUSE(a)

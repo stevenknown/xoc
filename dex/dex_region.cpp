@@ -64,7 +64,6 @@ bool DexRegion::MiddleProcess(OptCtx & oc)
 bool DexRegion::HighProcess(OptCtx & oc)
 {
     CHAR const* ru_name = getRegionName();
-    g_indent = 0;
     SimpCtx simp;
     SIMP_if(&simp) = true;
     SIMP_doloop(&simp) = true;
@@ -212,8 +211,6 @@ bool DexRegion::process(OptCtx * oc)
 {
     if (getIRList() == NULL) { return true; }
     OC_show_comp_time(*oc) = g_show_comp_time;
-
-    g_indent = 0;
     if (!g_silence) {
         LOG("DexRegion process %s", getRegionName());
     }

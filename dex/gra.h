@@ -402,7 +402,7 @@ public:
     { return m_tm->getByteSize(IR_dt(ir))== 8; }
 
     inline bool is_livein(UINT prno) const
-    { return m_liveness_mgr->get_livein(BB_id(m_bb))->is_contain(prno); }
+    { return m_liveness_mgr->get_livein(m_bb->id())->is_contain(prno); }
     inline bool is_livein(LT const* l) const
     {
         ASSERT0(LT_range(l));
@@ -410,7 +410,7 @@ public:
     }
 
     inline bool is_liveout(UINT prno) const
-    { return m_liveness_mgr->get_liveout(BB_id(m_bb))->is_contain(prno); }
+    { return m_liveness_mgr->get_liveout(m_bb->id())->is_contain(prno); }
     inline bool is_liveout(LT const* l) const
     {
         ASSERT0(LT_range(l));
@@ -435,18 +435,18 @@ public:
 };
 
 
-#define GLT_id(g)            ((g)->id)
-#define GLT_prno(g)            ((g)->prno)
-#define GLT_phy(g)            ((g)->phy)
-#define GLT_prefer_reg(g)    ((g)->prefer_reg)
-#define GLT_bbs(g)            ((g)->livebbs)
-#define GLT_prio(g)            ((g)->prio)
-#define GLT_freq(g)            ((g)->freq)
-#define GLT_usable(g)        ((g)->usable)
-#define GLT_rg(g)            ((g)->reg_group)
-#define GLT_rg_sz(g)        ((g)->reg_group_size)
-#define GLT_is_param(g)        ((g)->is_param)
-#define GLT_param_pos(g)    ((g)->param_pos)
+#define GLT_id(g) ((g)->id)
+#define GLT_prno(g) ((g)->prno)
+#define GLT_phy(g) ((g)->phy)
+#define GLT_prefer_reg(g) ((g)->prefer_reg)
+#define GLT_bbs(g) ((g)->livebbs)
+#define GLT_prio(g) ((g)->prio)
+#define GLT_freq(g) ((g)->freq)
+#define GLT_usable(g) ((g)->usable)
+#define GLT_rg(g) ((g)->reg_group)
+#define GLT_rg_sz(g) ((g)->reg_group_size)
+#define GLT_is_param(g) ((g)->is_param)
+#define GLT_param_pos(g) ((g)->param_pos)
 class GLT {
 public:
     UINT id;

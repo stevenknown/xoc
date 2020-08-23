@@ -92,7 +92,7 @@ public:
     void init()
     { prev = NULL, next = NULL, in_list = NULL, out_list = NULL,
       _id = VERTEX_UNDEF, _rpo = RPO_UNDEF, _info = NULL; }
-    UINT id() const { return VERTEX_id(this); }    
+    UINT id() const { return VERTEX_id(this); }
 
     EdgeC * getOutList() const { return VERTEX_out_list(this); }
     EdgeC * getInList() const { return VERTEX_in_list(this); }
@@ -369,6 +369,7 @@ public:
 
     void dumpDOT(CHAR const* name = NULL) const;
     void dumpVCG(CHAR const* name = NULL) const;
+    void dumpVexVector(Vector<Vertex*> const& vec, FILE * h);
 
     //Return true if graph vertex id is dense.
     bool is_dense() const { return m_dense_vertex != NULL; }
@@ -639,14 +640,14 @@ public:
     //Return true if 'v1' dominate 'v2'.
     bool is_dom(UINT v1, UINT v2) const
     {
-        ASSERT0(read_dom_set(v2));
+        ASSERTN(read_dom_set(v2), ("no DOM info about vertex%d", v2));
         return read_dom_set(v2)->is_contain(v1);
     }
 
     //Return true if 'v1' post dominate 'v2'.
     bool is_pdom(UINT v1, UINT v2) const
     {
-        ASSERT0(read_pdom_set(v2));
+        ASSERTN(read_dom_set(v2), ("no PDOM info about vertex%d", v2));
         return read_pdom_set(v2)->is_contain(v1);
     }
 

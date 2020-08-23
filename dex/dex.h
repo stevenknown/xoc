@@ -172,7 +172,7 @@ public:
     {
         if (g_tfile == NULL) { return; }
         note("\n==---- DUMP Prno2Vreg ----==");
-        g_indent = 4;
+        g_indent += 4;
 
         if (maxreg < 0) {
             note("\n==------ PR to Vreg is unordered ------==");
@@ -199,6 +199,7 @@ public:
                 }
             }
         }
+        g_indent -= 4;
         fflush(g_tfile);
     }
 };

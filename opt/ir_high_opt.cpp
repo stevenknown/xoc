@@ -166,12 +166,11 @@ void Region::HighProcessImpl(OptCtx & oc)
 //    6. Loop unrolling
 bool Region::HighProcess(OptCtx & oc)
 {
-    g_indent = 0;
     note("\n\n==== Region:%s HIGHEST LEVEL FARMAT ====\n\n", getRegionName());
 
     SimpCtx simp;
     if (g_do_cfs_opt) {
-        IR_CFS_OPT co(this);
+        CfsOpt co(this);
         co.perform(simp);
         ASSERT0(verifyIRList(getIRList(), NULL, this));
     }

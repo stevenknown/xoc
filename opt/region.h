@@ -752,6 +752,7 @@ public:
     IR * dupIRTree(IR const* ir);
     IR * dupIRTreeList(IR const* ir);
     void dumpBBList(bool dump_inner_region = true);
+    void dumpIRList();
     void dumpAllocatedIR();
     void dumpVARInRegion();
     void dumpVarMD(Var * v, UINT indent);
@@ -776,33 +777,65 @@ public:
     Var * findVarViaSymbol(Sym const* sym);
 
     REGION_TYPE getRegionType() const { return REGION_type(this); }
+
+    //Get the data in which blackbox region contained.
     void * getBlackBoxData() const
     { ASSERT0(is_blackbox()); return REGION_blackbox_data(this); }
+
     MDSystem * getMDSystem() const { return getRegionMgr()->getMDSystem(); }
     TypeMgr * getTypeMgr() const { return getRegionMgr()->getTypeMgr(); }
+
+    //Get TargInfo that describes current target machine.
     TargInfo * getTargInfo() const
     { ASSERT0(getRegionMgr()); return getRegionMgr()->getTargInfo(); }
+
+    //Get general memory pool of current region.
     SMemPool * get_pool() const { return m_pool; }
-    SMemPool * getSCLabelInfoPool() const
+
+    //Get memory pool to allocate Single-List-Container.
+    SMemPool * getSCPool() const
     { return getAnalysisInstrument()->m_sc_labelinfo_pool; }
+
+    //Get the maximum PR no.
     UINT getPRCount() const
     { return getAnalysisInstrument()->m_pr_count; }
+
+    //Get the variable which represent current region.
     Var * getRegionVar() const { return m_var; }
+
+    //Get the RegionMgr that current region belongs to.
     RegionMgr * getRegionMgr() const { return REGION_region_mgr(this); }
-    IR * getIRList() const
-    { return getAnalysisInstrument()->m_ir_list; }
+
+    //Get IR list if any.
+    IR * getIRList() const { return getAnalysisInstrument()->m_ir_list; }
+
+    //Get the VarMgr related to current RegionMgr.
     VarMgr * getVarMgr() const
     { ASSERT0(getRegionMgr()); return getRegionMgr()->getVarMgr(); }
+
+    //Get a variable table that includes all variables
+    //declared in current region.
     VarTab * getVarTab() { return &m_ru_var_tab; }
+
+    //Get BitSetMgr of current region.
     xcom::BitSetMgr * getBitSetMgr() const
     { return &getAnalysisInstrument()->m_bs_mgr; }
+
+    //Get Sparse|Dense BitSetMgr of current region.
     xcom::DefMiscBitSetMgr * getMiscBitSetMgr() const
     { return &getAnalysisInstrument()->m_sbs_mgr; }
+
+    //Get MDSetMgr of current region.
     MDSetMgr * getMDSetMgr() const
     { return &getAnalysisInstrument()->m_mds_mgr; }
+
+    //Get IRBB list if any.
     BBList * getBBList() const
     { return &getAnalysisInstrument()->m_ir_bb_list; }
+
+    //Get IRBBMgr of current region.
     IRBBMgr * getBBMgr() const { return &getAnalysisInstrument()->m_ir_bb_mgr; }
+
     //Get MDSetHash.
     MDSetHash * getMDSetHash() const
     { return &getAnalysisInstrument()->m_mds_hash; }
@@ -823,42 +856,42 @@ public:
     IRCFG * getCFG() const
     {
         return getPassMgr() != NULL ?
-            (IRCFG*)getPassMgr()->queryPass(PASS_CFG) : NULL;
+               (IRCFG*)getPassMgr()->queryPass(PASS_CFG) : NULL;
     }
 
     //Get Alias Analysis.
     AliasAnalysis * getAA() const
     {
         return getPassMgr() != NULL ?
-            (AliasAnalysis*)getPassMgr()->queryPass(PASS_AA) : NULL;
+               (AliasAnalysis*)getPassMgr()->queryPass(PASS_AA) : NULL;
     }
 
     //Return DU info manager.
     DUMgr * getDUMgr() const
     {
         return getPassMgr() != NULL ?
-            (DUMgr*)getPassMgr()->queryPass(PASS_DU_MGR) : NULL;
+               (DUMgr*)getPassMgr()->queryPass(PASS_DU_MGR) : NULL;
     }
 
     //Return MDSSA manager.
     MDSSAMgr * getMDSSAMgr() const
     {
         return getPassMgr() != NULL ?
-            (MDSSAMgr*)getPassMgr()->queryPass(PASS_MD_SSA_MGR) : NULL;
+               (MDSSAMgr*)getPassMgr()->queryPass(PASS_MD_SSA_MGR) : NULL;
     }
 
     //Return PRSSA manager.
     PRSSAMgr * getPRSSAMgr() const
     {
         return getPassMgr() != NULL ?
-            (PRSSAMgr*)getPassMgr()->queryPass(PASS_PR_SSA_MGR) : NULL;
+               (PRSSAMgr*)getPassMgr()->queryPass(PASS_PR_SSA_MGR) : NULL;
     }
 
     Region * getParent() const { return REGION_parent(this); }
     CHAR const* getRegionName() const;
     Region * getFuncRegion();
 
-    //Allocate and return all CALL in the region.
+    //Allocate and return all CALLs in the region.
     inline List<IR const*> * getCallList()
     {
         if (getAnalysisInstrument()->m_call_list == NULL) {
@@ -903,19 +936,19 @@ public:
     }
 
     //Allocate a internal LabelInfo that is not declared by compiler user.
-    LabelInfo * genIlabel()
+    LabelInfo * genILabel()
     {
-        LabelInfo * li = genIlabel(RM_label_count(getRegionMgr()));
+        LabelInfo * li = genILabel(RM_label_count(getRegionMgr()));
         RM_label_count(getRegionMgr())++;
         return li;
     }
 
     //Allocate a LabelInfo accroding to given 'labid'.
-    LabelInfo * genIlabel(UINT labid)
+    LabelInfo * genILabel(UINT labid)
     {
         ASSERT0(labid <= RM_label_count(getRegionMgr()));
         LabelInfo * li = allocInternalLabel(get_pool());
-        LABEL_INFO_num(li) = labid;
+        LABELINFO_num(li) = labid;
         return li;
     }
 
@@ -996,8 +1029,8 @@ public:
     //Return the tyid for array index, the default is unsigned 32bit.
     inline Type const* getTargetMachineArrayIndexType()
     {
-        return getTypeMgr()->getSimplexTypeEx(getTypeMgr()->
-            getDType(WORD_LENGTH_OF_TARGET_MACHINE, false));
+        return getTypeMgr()->getSimplexTypeEx(
+            getTypeMgr()->getDType(WORD_LENGTH_OF_TARGET_MACHINE, false));
     }
 
     //Use HOST_INT type describes the value.
@@ -1165,29 +1198,37 @@ public:
     void setIRList(IR * irs) { getAnalysisInstrument()->m_ir_list = irs; }
     void setBlackBoxData(void * d) { REGION_blackbox_data(this) = d; }
 
+    //Collect information of CALL and RETURN in current region.
     //num_inner_region: count the number of inner regions.
     void scanCallAndReturnList(OUT UINT & num_inner_region,
                                OUT List<IR const*> * call_list,
                                OUT List<IR const*> * ret_list,
                                bool scan_inner_region);
+    //Collect information of CALL and RETURN in current region.
     void scanCallAndReturnList(OUT UINT & num_inner_region,
                                bool scan_inner_region)
     {
         getCallList()->clean();
         getReturnList()->clean(); //Scan RETURN as well.
         scanCallAndReturnList(num_inner_region, getCallList(),
-            getReturnList(), scan_inner_region);
+                              getReturnList(), scan_inner_region);
     }
 
+    //Do simplification that lowering IR tree to lowest tree height.
+    //The lowering should conform to the restriction declared in 'oc'.
     void lowerIRTreeToLowestHeight(OptCtx & oc);
 
-    virtual bool process(OptCtx * oc); //Entry to process region.
+    //This function is main entry to process current region.
+    virtual bool process(OptCtx * oc);
 
     //Check and rescan call list of region if one of elements in list changed.
     void updateCallAndReturnList(bool scan_inner_region);
 
+    //Verify cond|uncond target label.
     bool verifyBBlist(BBList & bbl);
+    //Ensure that each IR in ir_list must be allocated in crrent region.
     bool verifyIROwnership();
+    //Verify MD reference to stmts and expressions.
     bool verifyMDRef();
 };
 //END Region

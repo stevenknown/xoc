@@ -153,7 +153,6 @@ public:
 #define BB_last_ir(b) ((b)->ir_list.get_tail())
 #define BB_is_entry(b) ((b)->u1.s1.is_entry)
 #define BB_is_exit(b) ((b)->u1.s1.is_exit)
-#define BB_is_fallthrough(b) ((b)->u1.s1.is_fallthrough)
 #define BB_is_target(b) ((b)->u1.s1.is_target)
 #define BB_is_catch_start(b) ((b)->u1.s1.is_catch_start)
 #define BB_is_try_start(b) ((b)->u1.s1.is_try_start)
@@ -170,7 +169,6 @@ public:
         struct {
             BYTE is_entry:1; //bb is entry of the region.
             BYTE is_exit:1; //bb is exit of the region.
-            BYTE is_fallthrough:1; //bb has a fall through successor.
             BYTE is_target:1; //bb is branch target.
             BYTE is_catch_start:1; //bb is entry of catch block.
             BYTE is_terminate:1; //bb terminate the control flow.
@@ -202,16 +200,16 @@ public:
     {
         ASSERT0(li);
         if (getLabelList().find(li)) { return; }
-        if (LABEL_INFO_is_catch_start(li)) {
+        if (LABELINFO_is_catch_start(li)) {
             BB_is_catch_start(this) = true;
         }
-        if (LABEL_INFO_is_try_start(li)) {
+        if (LABELINFO_is_try_start(li)) {
             BB_is_try_start(this) = true;
         }
-        if (LABEL_INFO_is_try_end(li)) {
+        if (LABELINFO_is_try_end(li)) {
             BB_is_try_end(this) = true;
         }
-        if (LABEL_INFO_is_terminate(li)) {
+        if (LABELINFO_is_terminate(li)) {
             BB_is_terminate(this) = true;
         }
         if (at_head) {
@@ -259,7 +257,7 @@ public:
     UINT getNumOfSucc(CFG<IRBB, IR> * cfg) const
     {
         ASSERT0(cfg);
-        xcom::Vertex const* vex = cfg->getVertex(BB_id(this));
+        xcom::Vertex const* vex = cfg->getVertex(id());
         ASSERT0(vex);
         UINT n = 0;
         for (xcom::EdgeC const* out = VERTEX_out_list(vex);
@@ -267,6 +265,8 @@ public:
         return n;
     }
     BBIRList * getIRList() { return &BB_irlist(this); }
+    IR * getFirstIR() { return BB_first_ir(this); }
+    IR * getLastIR() { return BB_last_ir(this); }
 
     //Is bb containing such label carried by 'lir'.
     inline bool hasLabel(LabelInfo const* lab)
@@ -308,6 +308,15 @@ public:
     }
 
     UINT id() const { return BB_id(this); }
+    bool is_entry() const { return BB_is_entry(this); }
+    bool is_exit() const { return BB_is_exit(this); }
+    //Return true if BB has a fall through successor.
+    //Note conditional branch always has fallthrough successor.
+    bool is_fallthrough() const;
+    bool is_target() const { return BB_is_target(this); }
+    bool is_catch_start() const { return BB_is_catch_start(this); }
+    bool is_try_start() const { return BB_is_try_start(this); }
+    bool is_try_end() const { return BB_is_try_end(this); }
 
     //Return true if BB is an entry BB of TRY block.
     inline bool isTryStart() const
@@ -318,7 +327,7 @@ public:
         IRBB * pthis = const_cast<IRBB*>(this);
         for (LabelInfo const* li = pthis->getLabelList().get_head();
              li != NULL; li = pthis->getLabelList().get_next()) {
-            if (LABEL_INFO_is_try_start(li)) {
+            if (LABELINFO_is_try_start(li)) {
                 find = true;
                 break;
             }
@@ -337,7 +346,7 @@ public:
         IRBB * pthis = const_cast<IRBB*>(this);
         for (LabelInfo const* li = pthis->getLabelList().get_head();
              li != NULL; li = pthis->getLabelList().get_next()) {
-            if (LABEL_INFO_is_try_end(li)) {
+            if (LABELINFO_is_try_end(li)) {
                 find = true;
                 break;
             }
@@ -356,7 +365,7 @@ public:
         IRBB * pthis = const_cast<IRBB*>(this);
         for (LabelInfo const* li = pthis->getLabelList().get_head();
              li != NULL; li = pthis->getLabelList().get_next()) {
-            if (LABEL_INFO_is_catch_start(li)) {
+            if (LABELINFO_is_catch_start(li)) {
                 find = true;
                 break;
             }
@@ -375,7 +384,7 @@ public:
         IRBB * pthis = const_cast<IRBB*>(this);
         for (LabelInfo const* li = pthis->getLabelList().get_head();
              li != NULL; li = pthis->getLabelList().get_next()) {
-            if (LABEL_INFO_is_terminate(li)) {
+            if (LABELINFO_is_terminate(li)) {
                 find = true;
                 break;
             }
@@ -386,7 +395,7 @@ public:
     }
 
     //Could ir be looked as a boundary stmt of basic block?
-    static bool is_boundary(IR * ir)
+    static bool isBoundary(IR * ir)
     { return isUpperBoundary(ir) || isDownBoundary(ir); }
 
     //Could ir be looked as a first stmt in basic block?
@@ -401,10 +410,10 @@ public:
     {
         for (LabelInfo const* li = getLabelList().get_head();
              li != NULL; li = getLabelList().get_next()) {
-            if (LABEL_INFO_is_catch_start(li) ||
-                LABEL_INFO_is_try_start(li) ||
-                LABEL_INFO_is_try_end(li) ||
-                LABEL_INFO_is_pragma(li)) {
+            if (LABELINFO_is_catch_start(li) ||
+                LABELINFO_is_try_start(li) ||
+                LABELINFO_is_try_end(li) ||
+                LABELINFO_is_pragma(li)) {
                 return true;
             }
         }

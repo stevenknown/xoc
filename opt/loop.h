@@ -62,7 +62,7 @@ namespace xoc {
 //   |-Loop5
 
 //CFG Loop Info.
-#define LI_id(li) ((li)->_id)
+#define LI_id(li) ((li)->uid)
 #define LI_next(li) ((li)->next)
 #define LI_prev(li) ((li)->prev)
 #define LI_has_early_exit(li) ((li)->has_early_exit)
@@ -74,7 +74,7 @@ namespace xoc {
 template <class BB> class LI {
     COPY_CONSTRUCTOR(LI);
 public:
-    UINT _id;
+    UINT uid;
     LI * next;
     LI * prev;
     LI * inner_list; //inner loop list
@@ -86,7 +86,7 @@ public:
     xcom::BitSet * bb_set; //loop body elements
 
 public:
-    LI() {}
+    LI() {}      
     LI<BB> * getOuter() const { return outer; }
     LI<BB> * getInnerList() const { return inner_list; }
     BB * getLoopHead() const { return loop_head; }
@@ -97,8 +97,9 @@ public:
     bool hasEarlyExit() const { return has_early_exit; }
     bool hasCall() const { return has_call; }
 
-    UINT id() const { return _id; }
-    bool isLoopReduction() { return !has_early_exit; }
+    UINT id() const { return uid; }
+    bool isLoopReduction() const { return !has_early_exit; }
+    bool isOuterMost() const { return getOuter() == NULL; }
 
     //Return true if bb is belong to current loop.
     //'bbid': id of BB.
@@ -124,11 +125,24 @@ bool findTwoSuccessorBBOfLoopHeader(LI<IRBB> const* li,
                                     IRCFG * cfg,
                                     UINT * succ1,
                                     UINT * succ2);
+
+//List of invariant stmt.
+typedef xcom::EList<IR*, IR2Holder> InvStmtList;
+
 //Return true if all the expression on 'ir' tree is loop invariant.
 //ir: root node of IR
 //li: loop structure
+//check_tree: true to perform check recusively for entire IR tree.
+//invariant_stmt: a table that record the stmt that is invariant in loop.
+//    e.g:loop() {
+//          a = b; //S1
+//       }
+//    stmt S1 is invariant because b is invariant.
 //Note this function does not check the sibling node of 'ir'.
-bool isLoopInvariant(IR const* ir, LI<IRBB> const* li, Region * rg);
-
+bool isLoopInvariant(IR const* ir,
+                     LI<IRBB> const* li,
+                     Region * rg,
+                     InvStmtList const* invariant_stmt,
+                     bool check_tree);
 } //namespace xoc
 #endif

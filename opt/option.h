@@ -146,25 +146,25 @@ public:
     bool is_dump_mdset_hash; //Dump MD Set Hash Table.
     bool is_dump_cfg; //Dump CFG.
     bool is_dump_dom; //Dump Dom/Pdom/Idom/Pidom.
-    bool is_dump_cp; //Dump copy-propagation.
-    bool is_dump_rp; //Dump register-promotion.
-    bool is_dump_rce; //Dump light weight redundant-code-elimination.
-    bool is_dump_dce; //Dump dead-code-elimination.
-    bool is_dump_gvn; //Dump global-value-numbering.
-    bool is_dump_gcse; //Dump global-common-subscript-expression.
-    bool is_dump_ivr; //Dump induction variable recognization.
-    bool is_dump_licm; //Dump loop-invariant-code-motion.
-    bool is_dump_loopcvt; //Dump loop-convertion.
+    bool is_dump_cp; //Dump Copy Propagation.
+    bool is_dump_rp; //Dump Register Promotion.
+    bool is_dump_rce; //Dump light weight Redundant Code Elimination.
+    bool is_dump_dce; //Dump Dead Code Elimination.
+    bool is_dump_gvn; //Dump Global Value Numbering.
+    bool is_dump_gcse; //Dump Global Common Subscript Expression.
+    bool is_dump_ivr; //Dump Induction Variable Recognization.
+    bool is_dump_licm; //Dump Loop Invariant Code Motion.
+    bool is_dump_loopcvt; //Dump Loop Convertion.
     bool is_dump_simplification; //Dump IR simplification.
     bool is_dump_prssamgr; //Dump PRSSAMgr.
     bool is_dump_mdssamgr; //Dump MDSSAMgr.
     bool is_dump_cg; //Dump CodeGeneration.
-    bool is_dump_ra; //Dump register allocation.
+    bool is_dump_ra; //Dump Register Allocation.
     bool is_dump_memusage; //Dump memory usage.
     bool is_dump_livenessmgr; //Dump LivenessMgr.
     bool is_dump_refine_duchain; //Dump RefineDUChain.
     bool is_dump_refine; //Dump Refinement.
-
+    bool is_dump_cdg; //Dump Control Dependence Graph.
 public:
     DumpOpt();
     DumpOpt const& operator = (DumpOpt const&); //Disable operator =.
@@ -194,6 +194,7 @@ public:
     bool isDumpLivenessMgr() const;
     bool isDumpRefineDUChain() const;
     bool isDumpRefine() const;
+    bool isDumpCDG() const;
 };
 
 

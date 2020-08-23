@@ -47,7 +47,7 @@ public:
         if (ir->is_array()) {
             IR * sub = ARR_sub_list(ir);
             ASSERT0(sub);
-            if (cnt_list(sub) == 1) {
+            if (xcom::cnt_list(sub) == 1) {
                 if (sub->is_pr() && PR_no(sub) == 2) {
                     return false;
                 }

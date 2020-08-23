@@ -58,11 +58,11 @@ namespace xoc {
 //    get_exact_use_md
 //    getExactAndUniqueDef
 //    freeDUSetAndCleanMDRefs
-//    is_may_def
-//    is_may_kill
-//    is_must_kill
+//    isMayDef
+//    isMayKill
+//    isMustKill
 //    isExactAndUniqueDef
-//    is_call_may_def
+//    isCallMayDef
 //
 //* These functions manipulate the DU chain.
 //
@@ -71,7 +71,6 @@ namespace xoc {
 //    copyDUSet
 //    get_du_c
 //    getAndAllocDUSet
-//    freeDU
 //    is_du_exist
 //    unionUse
 //    unionUseSet
@@ -124,7 +123,7 @@ public:
 
     void clean();
 
-    void dump();
+    void dump() const;
 
     bool hasIneffectDef() const { return m_are_stmts_defed_ineffect_md; }
 
@@ -204,7 +203,7 @@ public:
         #endif
     }
 
-    void dump(FILE * h)
+    void dump(FILE * h) const
     {
         #ifdef HASH_DBITSETCORE
         dump_hashed_set(h);
@@ -703,15 +702,15 @@ public:
     //to: expression
     void coalesceDUChain(IR * from, IR * to);
 
-    void dumpMemUsageForEachSet();
-    void dumpMemUsageForMDRef();
-    void dumpSet(bool is_bs = false);
-    void dumpDUChain();
-    void dumpDUChainDetail();
-    void dumpBBDUChainDetail(UINT bbid);
-    void dumpBBDUChainDetail(IRBB * bb);
-    void dumpDUGraph(CHAR const* name = NULL, bool detail = true);
-    void dump(CHAR const* name);
+    void dumpMemUsageForEachSet() const;
+    void dumpMemUsageForMDRef() const;
+    void dumpSet(bool is_bs = false) const;
+    void dumpDUChain() const;
+    void dumpDUChainDetail() const;
+    void dumpBBDUChainDetail(UINT bbid) const;
+    void dumpBBDUChainDetail(IRBB * bb) const;
+    void dump(CHAR const* name) const;
+    virtual bool dump() const { dump(NULL); return true; }
 
     DefSBitSetCore * genLiveInBB(UINT bbid, DefMiscBitSetMgr * mgr);
     DefDBitSetCore * genAvailInExpr(UINT bbid, DefMiscBitSetMgr * mgr);
@@ -790,13 +789,45 @@ public:
         if (du == NULL) { return false; }
         return du->is_contain(IR_id(use));
     }
-    bool is_stpr_may_def(IR const* def, IR const* use, bool is_recur);
-    bool is_call_may_def(IR const* def, IR const* use, bool is_recur);
-    bool is_may_def(IR const* def, IR const* use, bool is_recur);
-    bool is_may_kill(IR const* def1, IR const* def2);
-    bool is_must_kill(IR const* def1, IR const* def2);
+
+    //Return true if 'def' may or must modify MDSet that 'use' referenced.
+    //'def': STPR stmt.
+    //'use': must be expression.
+    //'is_recur': true if one intend to compute the mayuse MDSet to walk
+    //            through IR tree recusively.    
+    bool isStprMayDef(IR const* def, IR const* use, bool is_recur);
+
+    //Return true if 'call' may or must modify MDSet that 'use' referenced.
+    //'call': CALL/ICALL stmt.
+    //'use': must be expression.
+    //'is_recur': true if one intend to compute the mayuse MDSet to walk
+    //            through IR tree recusively.    
+    bool isCallMayDef(IR const* def, IR const* use, bool is_recur);
+    //Return true if 'def' may or must modify MDSet that 'use' referenced.
+    //'def': must be stmt.
+    //'use': must be expression.
+    //'is_recur': true if one intend to compute the mayuse MDSet to walk
+    //            through IR tree recusively.
+    bool isMayDef(IR const* def, IR const* use, bool is_recur);
+
+    //Return true if 'def1' may modify md-set that 'def2' generated.
+    //'def1': should be stmt.
+    //'def2': should be stmt.
+    bool isMayKill(IR const* def1, IR const* def2);
+
+    //Return true if 'def1' exactly modified md that 'def2' generated.
+    //'def1': should be stmt.
+    //'def2': should be stmt.
+    bool isMustKill(IR const* def1, IR const* def2);
+
+    //Return true if 'def_stmt' is the exact and unique reach-definition
+    //to the operands of 'use_stmt', otherwise return false.
+    //
+    //'def_stmt': should be stmt.
+    //'use_stmt': should be stmt.
     bool isExactAndUniqueDef(IR const* def, IR const* exp);
 
+    //This equation needs May Kill Def and Must Gen Def.
     bool ForAvailReachDef(UINT bbid,
                           List<IRBB*> & preds,
                           List<IRBB*> * lst,
@@ -809,16 +840,38 @@ public:
                             List<IRBB*> & preds,
                             List<IRBB*> * lst,
                             DefMiscBitSetMgr & bsmgr);
-    void freeDU();
+
+    //Find the nearest dominated DEF stmt of 'exp'.
+    //NOTE: RPO of bb of stmt must be available.
+    //
+    //'exp': expression
+    //'exp_stmt': stmt that exp is belong to.
+    //'expdu': def set of exp.
+    //'omit_self': true if we do not consider the 'exp_stmt' itself.
     IR * findDomDef(IR const* exp,
                     IR const* exp_stmt,
                     DUSet const* expdefset,
                     bool omit_self);
+
+    //Find nearest killing def to expmd in its bb.
+    //Here we search exactly killing DEF from current stmt to previous
+    //for expmd even if it is exact,
+    //has_overlapped_def: record if find local non-killing def(overlapped).
+    //
+    //e.g: g is global variable, it is exact.
+    //x is a pointer that we do not know where it pointed to.
+    //    1. *x += 1;
+    //    2. g = 0;
+    //    3. *x += 2; # *x may overlapped with global variable g.
+    //    4. return g;
+    //In the case, the last reference of g in stmt 4 may be defined by
+    //stmt 2 or 3.
     IR const* findKillingLocalDef(IRBB * bb,
                                   xcom::C<IR*> const* ct,
                                   IR const* exp,
                                   MD const* md,
                                   bool * has_local_nonkilling_def);
+
     //Clean all DU-Chain and Defined/Used-MD reference info.
     //Return the DU structure if has to facilitate other
     //free or destroy process.
@@ -935,14 +988,62 @@ public:
     //the memory any more that stmt defined.
     //Return true if DU changed.
     bool removeExpiredDUForStmt(IR * stmt);
+
+    //Check if the DEF of stmt's operands still modify the same memory object.
+    //e.g: Revise DU chain if stmt's rhs has been changed.
+    //    x=10 //S1
+    //    ...
+    //    c=x*0 //S2
+    //after changed =>
+    //    x=10 //S1
+    //    ...
+    //    c=0 //S2
+    //where S1 is DEF, S2 is USE, after ir refinement, x in S2
+    //is removed, remove the data dependence between S1
+    //and S2's operand.
     bool removeExpiredDUForOperand(IR * stmt);
+
+    //Check if the DEF of stmt's operands still modify the same memory object.
+    //e.g: Revise DU chain if stmt's rhs has been changed.
+    //    x=10 //S1
+    //    ...
+    //    c=x*0 //S2
+    //after changed =>
+    //    x=10 //S1
+    //    ...
+    //    c=0 //S2
+    //where S1 is DEF, S2 is USE, after ir refinement, x in S2
+    //is removed, remove the data dependence between S1
+    //and S2's operand.
     bool removeExpiredDU(IR * stmt);
+
+    //Remove 'def' out of ir's DEF set. ir is exp.
     void removeDef(IR const* ir, IR const* def);
+
+    //This function check all USE of memory references of ir tree and
+    //cut its du-chain. 'ir' may be stmt or expression, if ir is stmt,
+    //check its right-hand-side.
+    //This function will process SSA info if it exists.
+    //'ir': indicate the root of IR tree.
+    //e.g: d1, d2 are def-stmt of stmt's operands.
+    //this functin cut off du-chain between d1, d2 and their use.
     void removeUseFromDefset(IR * ir);
+
+    //Note that do NOT use this function to remove SSA def.
+    //This function handle the MD DU chain and cut
+    //off the DU chain between MD def and its MD use expression.
+    //Remove 'def' from its use's def-list.
+    //e.g:u1, u2 are its use expressions.
+    //cut off the du chain between def->u1 and def->u2.
     void removeDefFromUseset(IR * def);
+
+    //Remove all DU info of 'ir' from DU mgr.
     void removeIRFromDUMgr(IR * ir);
 
+    //Verify DU chain's sanity.
     bool verifyMDDUChain(UINT duflag);
+
+    //Verify if DU chain is correct between each Def and Use of MD.
     bool verifyMDDUChainForIR(IR const* ir, UINT duflag);
     bool verifyLiveinExp();
 

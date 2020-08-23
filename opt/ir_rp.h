@@ -79,9 +79,9 @@ public:
         return false;
     }
 
-    void dump()
+    bool dump() const
     {
-        if (g_tfile == NULL) { return; }
+        if (g_tfile == NULL) { return false; }
         note("\n==---- DUMP Dont Promotion Table ----==\n");
         MDSetIter iter;
         for (INT i = get_first(&iter); i >= 0; i = get_next(i, &iter)) {
@@ -90,6 +90,7 @@ public:
             t->dump(m_md_sys->getTypeMgr());
         }
         fflush(g_tfile);
+        return true;
     }
 };
 
@@ -334,7 +335,7 @@ public:
 
     void cleanLiveBBSet();
 
-    void dump();   
+    virtual bool dump() const;   
 
     //Prepare context before doing reg promotion.
     void init();

@@ -457,7 +457,7 @@ VN * GVN::computeExactMemory(IR const* exp, bool & change)
         IRBB * b1 = ed->getBB();
         IRBB * b2 = exp_stmt->getBB();
         ASSERT0(b1 && b2);
-        if ((b1 != b2 && m_cfg->is_dom(BB_id(b1), BB_id(b2))) ||
+        if ((b1 != b2 && m_cfg->is_dom(b1->id(), b2->id())) ||
             (b1 == b2 && b1->is_dom(ed, exp_stmt, true))) {
             defvn = m_ir2vn.get(IR_id(ed));
         }
@@ -517,7 +517,7 @@ VN * GVN::computeILoadByAnonDomDef(IR const* ild,
                                       IR const* domdef,
                                       bool & change)
 {
-    ASSERT0(ild->is_ild() && m_du->is_may_def(domdef, ild, false));
+    ASSERT0(ild->is_ild() && m_du->isMayDef(domdef, ild, false));
     ILD_VNE2VN * vnexp_map = m_def2ildtab.get(domdef);
     UINT dtsz = ild->getTypeSize(m_tm);
     VNE_ILD vexp(VN_id(mlvn), ILD_ofst(ild), dtsz);
@@ -629,7 +629,7 @@ VN * GVN::computeArrayByAnonDomDef(IR const* arr,
                                       IR const* domdef,
                                       bool & change)
 {
-    ASSERT0(arr->is_array() && m_du->is_may_def(domdef, arr, false));
+    ASSERT0(arr->is_array() && m_du->isMayDef(domdef, arr, false));
     ARR_VNE2VN * vnexp_map = m_def2arrtab.get(domdef);
     UINT dtsz = arr->getTypeSize(m_tm);
     VNE_ARR vexp(VN_id(basevn), VN_id(ofstvn), ARR_ofst(arr), dtsz);
@@ -746,7 +746,7 @@ VN * GVN::computeScalarByAnonDomDef(IR const* exp,
                                        bool & change)
 {
     ASSERT0((exp->is_ld() || exp->is_pr()) &&
-            m_du->is_may_def(domdef, exp, false));
+            m_du->isMayDef(domdef, exp, false));
     SCVNE2VN * vnexp_map = m_def2sctab.get(domdef);
     UINT dtsz = exp->getTypeSize(m_tm);
     MD const* md = exp->getExactRef();
@@ -1128,7 +1128,7 @@ void GVN::processBB(IRBB * bb, bool & change)
 }
 
 
-void GVN::dumpIR2VN()
+void GVN::dumpIR2VN() const
 {
     if (g_tfile == NULL) { return; }
     for (INT k = 0; k <= m_ir2vn.get_last_idx(); k++) {
@@ -1141,12 +1141,13 @@ void GVN::dumpIR2VN()
 }
 
 
-void GVN::dump_h1(IR const* k, VN const* x)
+void GVN::dump_h1(IR const* k, VN const* x) const
 {
-    ASSERT0(k);
-    note("\n\t%s", IRTNAME(k->getCode()));
+    ASSERT0(k);    
     if (k->is_pr()) {
-        prt("%d", PR_no(k));
+        note("\n\t$%d", PR_no(k));
+    } else {
+        note("\n\t%s", IRTNAME(k->getCode()));
     }
     prt(" id:%d ", k->id());
     if (x != NULL) {
@@ -1157,14 +1158,14 @@ void GVN::dump_h1(IR const* k, VN const* x)
 }
 
 
-void GVN::dumpBB(UINT bbid)
+void GVN::dumpBB(UINT bbid) const
 {
     if (g_tfile == NULL) { return; }
     IRBB * bb = m_cfg->getBB(bbid);
     ASSERT0(bb);
 
     ConstIRIter ii;
-    note("\n-- BB%d ", BB_id(bb));
+    note("\n-- BB%d ", bb->id());
     dumpBBLabel(bb->getLabelList(), g_tfile);
     note("\n");
     for (IR * ir = BB_first_ir(bb); ir != NULL; ir = BB_next_ir(bb)) {
@@ -1193,20 +1194,24 @@ void GVN::dumpBB(UINT bbid)
 }
 
 
-void GVN::dump()
+bool GVN::dump() const
 {
-    if (g_tfile == NULL) { return; }
-    note("\n==---- DUMP GVN -- rg:'%s' ----==", m_rg->getRegionName());
+    if (g_tfile == NULL) { return false; }
+    note("\n==---- DUMP %s '%s' ----==", getPassName(), m_rg->getRegionName());
     BBList * bbl = m_rg->getBBList();
     for (IRBB * bb = bbl->get_head(); bb != NULL; bb = bbl->get_next()) {
-        dumpBB(BB_id(bb));
+        dumpBB(bb->id());
     }
     fflush(g_tfile);
+    return true;
 }
 
 
-//Return true if gvn is able to determine the result of 'ir'.
-bool GVN::calcCondMustVal(IR const* ir, bool & must_true, bool & must_false)
+//Return true if GVN is able to determine the result of 'ir', otherwise
+//return false that GVN know nothing about ir.
+bool GVN::calcCondMustVal(IR const* ir,
+                          bool & must_true,
+                          bool & must_false) const
 {
     must_true = false;
     must_false = false;

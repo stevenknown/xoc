@@ -46,7 +46,7 @@ C<IR*> * BBIRList::append_tail_ex(IR * ir)
     IRListIter ct;
     for (List<IR*>::get_tail(&ct);
          ct != List<IR*>::end(); ct = List<IR*>::get_prev(ct)) {
-        if (!m_bb->isDownBoundary(ct->val())) {
+        if (!IRBB::isDownBoundary(ct->val())) {
             break;
         }
     }
@@ -101,6 +101,38 @@ bool IRBB::isDownBoundary(IR const* ir)
 }
 
 
+//Return true if BB has a fall through successor.
+//Note conditional branch always has fallthrough successor.
+bool IRBB::is_fallthrough() const
+{
+    IR * last = const_cast<IRBB*>(this)->getLastIR();
+    if (last == NULL) { return true; }
+    switch (last->getCode()) {
+    case IR_CALL:
+    case IR_ICALL:
+    case IR_TRUEBR:
+    case IR_FALSEBR:
+    case IR_SWITCH:
+        return true;
+    case IR_IGOTO:
+    case IR_GOTO:
+        //We have no knowledge about whether target BB of GOTO/IGOTO
+        //will be followed subsequently on current BB.
+        //Leave this problem to CFG builder, and the related
+        //attribute should be set at that time.
+        return false;
+    case IR_RETURN:
+        //Succeed stmt of 'ir' may be DEAD code
+        //IR_BB_is_func_exit(cur_bb) = true;
+        return true;
+    case IR_REGION:
+        return true;
+    default: ;
+    }
+    return false;
+}
+
+
 void IRBB::dump(Region const* rg, bool dump_inner_region) const
 {
     if (g_tfile == NULL) { return; }
@@ -114,7 +146,7 @@ void IRBB::dump(Region const* rg, bool dump_inner_region) const
 
     //Attributes
     note("\nATTR:");
-    if (BB_is_entry(this)) {
+    if (is_entry()) {
         prt("entry_bb ");
     }
 
@@ -122,11 +154,11 @@ void IRBB::dump(Region const* rg, bool dump_inner_region) const
     //    prt("exit_bb ");
     //}
 
-    if (BB_is_fallthrough(this)) {
+    if (is_fallthrough()) {
         prt("fall_through ");
     }
 
-    if (BB_is_target(this)) {
+    if (is_target()) {
         prt("branch_target ");
     }
 
@@ -155,7 +187,7 @@ void IRBB::verify()
         ASSERT0(ir->is_single());
         ASSERT0(ir->getBB() == this);
         ASSERT0(ir->isStmtInBB());
-        if (isDownBoundary(ir)) {
+        if (IRBB::isDownBoundary(ir)) {
             ASSERTN(ir == BB_last_ir(this), ("invalid BB down boundary."));
         }
         c++;
@@ -167,14 +199,13 @@ void IRBB::verify()
 //Return true if one of bb's successor has a phi.
 bool IRBB::successorHasPhi(CFG<IRBB, IR> * cfg)
 {
-    xcom::Vertex * vex = cfg->getVertex(BB_id(this));
+    xcom::Vertex * vex = cfg->getVertex(id());
     ASSERT0(vex);
     for (xcom::EdgeC * out = vex->getOutList();
          out != NULL; out = out->get_next()) {
         xcom::Vertex * succ_vex = out->getTo();
         IRBB * succ = cfg->getBB(succ_vex->id());
         ASSERT0(succ);
-
         for (IR * ir = BB_first_ir(succ);
              ir != NULL; ir = BB_next_ir(succ)) {
             if (ir->is_phi()) { return true; }
@@ -189,7 +220,7 @@ bool IRBB::successorHasPhi(CFG<IRBB, IR> * cfg)
 void IRBB::dupSuccessorPhiOpnd(CFG<IRBB, IR> * cfg, Region * rg, UINT opnd_pos)
 {
     IRCFG * ircfg = (IRCFG*)cfg;
-    xcom::Vertex * vex = ircfg->getVertex(BB_id(this));
+    xcom::Vertex * vex = ircfg->getVertex(id());
     ASSERT0(vex);
     for (xcom::EdgeC * out = vex->getOutList();
          out != NULL; out = out->get_next()) {
@@ -268,7 +299,7 @@ void IRBB::addSuccessorDesignatePhiOpnd(CFG<IRBB, IR> * cfg, IRBB * succ)
 //you need remove the related PHI operand if BB successor has PHI.
 void IRBB::removeAllSuccessorsPhiOpnd(CFG<IRBB, IR> * cfg)
 {
-    xcom::Vertex * vex = cfg->getVertex(BB_id(this));
+    xcom::Vertex * vex = cfg->getVertex(id());
     ASSERT0(vex);
     for (xcom::EdgeC * out = vex->getOutList();
          out != NULL; out = EC_next(out)) {
@@ -286,7 +317,7 @@ void dumpBBLabel(List<LabelInfo const*> & lablist, FILE * h)
     xcom::C<LabelInfo const*> * ct;
     for (lablist.get_head(&ct); ct != lablist.end(); ct = lablist.get_next(ct)) {
         LabelInfo const* li = ct->val();
-        switch (LABEL_INFO_type(li)) {
+        switch (LABELINFO_type(li)) {
         case L_CLABEL:
             fprintf(h, CLABEL_STR_FORMAT, CLABEL_CONT(li));
             break;
@@ -294,27 +325,27 @@ void dumpBBLabel(List<LabelInfo const*> & lablist, FILE * h)
             fprintf(h, ILABEL_STR_FORMAT, ILABEL_CONT(li));
             break;
         case L_PRAGMA:
-            ASSERT0(LABEL_INFO_pragma(li));
-            fprintf(h, "%s", SYM_name(LABEL_INFO_pragma(li)));
+            ASSERT0(LABELINFO_pragma(li));
+            fprintf(h, "%s", SYM_name(LABELINFO_pragma(li)));
             break;
         default: UNREACHABLE();
         }
 
-        if (LABEL_INFO_is_try_start(li) ||
-            LABEL_INFO_is_try_end(li) ||
-            LABEL_INFO_is_catch_start(li) ||
-            LABEL_INFO_is_terminate(li)) {
+        if (LABELINFO_is_try_start(li) ||
+            LABELINFO_is_try_end(li) ||
+            LABELINFO_is_catch_start(li) ||
+            LABELINFO_is_terminate(li)) {
             prt("(");
-            if (LABEL_INFO_is_try_start(li)) {
+            if (LABELINFO_is_try_start(li)) {
                 prt("try_start,");
             }
-            if (LABEL_INFO_is_try_end(li)) {
+            if (LABELINFO_is_try_end(li)) {
                 prt("try_end,");
             }
-            if (LABEL_INFO_is_catch_start(li)) {
+            if (LABELINFO_is_catch_start(li)) {
                 prt("catch_start,");
             }
-            if (LABEL_INFO_is_terminate(li)) {
+            if (LABELINFO_is_terminate(li)) {
                 prt("terminate");
             }
             prt(")");
@@ -343,9 +374,10 @@ void dumpBBList(BBList const* bbl,
     if (h == NULL) { return; }
     if (bbl->get_elem_count() != 0) {
         if (h == g_tfile) {
-            note("\n==---- DUMP IRBBList region '%s' ----==", rg->getRegionName());
+            note("\n==---- DUMP IRBBList '%s' ----==", rg->getRegionName());
         } else {
-            fprintf(h, "\n==---- DUMP IRBBList region '%s' ----==", rg->getRegionName());
+            fprintf(h, "\n==---- DUMP IRBBList '%s' ----==",
+                    rg->getRegionName());
         }
         C<IRBB*> * ct = NULL;
         for (IRBB * bb = bbl->get_head(&ct);

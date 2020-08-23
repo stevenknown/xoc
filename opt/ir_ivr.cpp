@@ -99,7 +99,7 @@ bool IVR::findInitVal(IV * iv)
     LI<IRBB> const* li = IV_li(iv);
     ASSERT0(li);
     IRBB * dbb = domdef->getBB();
-    if (dbb == LI_loop_head(li) || !li->isInsideLoop(BB_id(dbb))) {
+    if (dbb == li->getLoopHead() || !li->isInsideLoop(dbb->id())) {
         return computeInitVal(domdef, iv);
     }
     return false;
@@ -222,16 +222,16 @@ void IVR::findBIV(LI<IRBB> const* li,
                   Vector<UINT> & map_md2defcount,
                   UINT2IR & map_md2defir)
 {
-    IRBB * head = LI_loop_head(li);
-    UINT headi = BB_id(head);
+    IRBB * head = li->getLoopHead();
+    UINT headi = head->id();
     tmp.clean(); //tmp is used to record exact/effect MD which be modified.
     map_md2defir.clean();
     map_md2defcount.clean();
-    for (INT i = LI_bb_set(li)->get_first();
-         i != -1; i = LI_bb_set(li)->get_next(i)) {
+    for (INT i = li->getBodyBBSet()->get_first();
+         i != -1; i = li->getBodyBBSet()->get_next(i)) {
         //if ((UINT)i == headi) { continue; }
         IRBB * bb = m_cfg->getBB(i);
-        ASSERT0(bb && m_cfg->getVertex(BB_id(bb)));
+        ASSERT0(bb && m_cfg->getVertex(bb->id()));
         for (IR * ir = BB_first_ir(bb); ir != NULL; ir = BB_next_ir(bb)) {
             if (!ir->is_st() &&
                 !ir->is_ist() &&
@@ -354,7 +354,7 @@ bool IVR::is_loop_invariant(LI<IRBB> const* li, IR const* ir)
     for (INT i = defs->get_first(&di); i >= 0; i = defs->get_next(i, &di)) {
         IR const* d = m_rg->getIR(i);
         ASSERT0(d->is_stmt() && d->getBB());
-        if (li->isInsideLoop(BB_id(d->getBB()))) {
+        if (li->isInsideLoop(d->getBB()->id())) {
             return false;
         }
     }
@@ -446,10 +446,10 @@ void IVR::findDIV(LI<IRBB> const* li,
         tmp.bunion(MD_id(IV_iv(iv)));
     }
 
-    for (INT i = LI_bb_set(li)->get_first();
-         i != -1; i = LI_bb_set(li)->get_next(i)) {
+    for (INT i = li->getBodyBBSet()->get_first();
+         i != -1; i = li->getBodyBBSet()->get_next(i)) {
         IRBB * bb = m_cfg->getBB(i);
-        ASSERT0(bb && m_cfg->getVertex(BB_id(bb)));
+        ASSERT0(bb && m_cfg->getVertex(bb->id()));
         for (IR * ir = BB_first_ir(bb); ir != NULL; ir = BB_next_ir(bb)) {
             switch (ir->getCode()) {
             case IR_ST:
@@ -491,8 +491,8 @@ void IVR::_dump(LI<IRBB> * li, UINT indent)
         for (UINT i = 0; i < indent; i++) { prt(" "); }
         prt("LI%d:BB%d", li->id(), li->getLoopHead()->id());
         prt(",BODY:");
-        for (INT i = LI_bb_set(li)->get_first();
-             i != -1; i = LI_bb_set(li)->get_next(i)) {
+        for (INT i = li->getBodyBBSet()->get_first();
+             i != -1; i = li->getBodyBBSet()->get_next(i)) {
             prt("%d,", i);
         }
 
@@ -575,7 +575,7 @@ void IVR::_dump(LI<IRBB> * li, UINT indent)
 void IVR::dump()
 {
     if (g_tfile == NULL) { return; }
-    note("\n==---- DUMP IVR -- rg:'%s' ----==", m_rg->getRegionName());
+    note("\n==---- DUMP %s '%s' ----==", getPassName(), m_rg->getRegionName());
     _dump(m_cfg->getLoopInfo(), 0);
     fflush(g_tfile);
 }
@@ -605,8 +605,8 @@ bool IVR::perform(OptCtx & oc)
     ASSERT0(m_cfg && m_du && m_md_sys && m_tm);
 
     m_rg->checkValidAndRecompute(&oc, PASS_REACH_DEF,
-        PASS_DU_REF, PASS_DOM, PASS_LOOP_INFO,
-        PASS_DU_CHAIN, PASS_RPO, PASS_UNDEF);
+                                 PASS_DU_REF, PASS_DOM, PASS_LOOP_INFO,
+                                 PASS_DU_CHAIN, PASS_RPO, PASS_UNDEF);
 
     if (!OC_is_ref_valid(oc)) {
         END_TIMER(t, getPassName());
@@ -626,8 +626,8 @@ bool IVR::perform(OptCtx & oc)
         return false;
     }
     //Check NONPR DU chain.
-    MDSSAMgr * mdssamgr = (MDSSAMgr*)(m_rg->getPassMgr()->queryPass(
-        PASS_MD_SSA_MGR));
+    MDSSAMgr * mdssamgr = (MDSSAMgr*)(m_rg->getPassMgr()->
+        queryPass(PASS_MD_SSA_MGR));
     if (mdssamgr != NULL && mdssamgr->is_valid()) {
         m_mdssamgr = mdssamgr;
     } else {

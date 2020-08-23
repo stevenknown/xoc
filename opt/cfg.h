@@ -289,8 +289,7 @@ public:
 
     //Find a list bb that referred labels which is the target of xr.
     //2th parameter indicates a list of bb have found.
-    virtual void findTargetBBOfIndirectBranch(XR const*,
-        OUT List<BB*> &) = 0;
+    virtual void findTargetBBOfIndirectBranch(XR const*, OUT List<BB*> &) = 0;
 
     UINT getLoopNum() const { return m_li_count - 1; }
     void get_preds(IN OUT List<BB*> & preds, BB const* v) const;
@@ -502,7 +501,7 @@ template <class BB, class XR>
 void CFG<BB, XR>::getKidOfLoop(BB * bb, OUT BB ** sibling, OUT BB ** body_root)
 {
     LI<BB> * li = mapBB2LabelInfo(bb);
-    ASSERT0(li != NULL && LI_loop_head(li) == bb);
+    ASSERT0(li != NULL && li->getLoopHead() == bb);
     List<BB*> succs;
     get_succs(succs, bb);
     ASSERT0(succs.get_elem_count() == 2);
@@ -590,7 +589,8 @@ void CFG<BB, XR>::dumpLoopTree(LI<BB> const* looplist,
         fprintf(h, "\n");
         for (UINT i = 0; i < indent; i++) { fprintf(h, " "); }
         ASSERT0(LI_loop_head(looplist));
-        fprintf(h, "LOOP HEAD:BB%d, BODY:", LI_loop_head(looplist)->id());
+        fprintf(h, "LOOP%d HEAD:BB%d, BODY:", looplist->id(),
+                LI_loop_head(looplist)->id());
         if (LI_bb_set(looplist) != NULL) {
             for (INT i = LI_bb_set(looplist)->get_first();
                  i != -1; i = LI_bb_set(looplist)->get_next((UINT)i)) {
@@ -870,8 +870,8 @@ bool CFG<BB, XR>::removeEmptyBB(OptCtx & oc)
         if (get_last_xr(bb) == NULL &&
             !isRegionEntry(bb) &&
             !bb->isExceptionHandler()) {
-            doit |= removeEmptyBBHelper(bb, next_bb,
-                ct, next_ct, preds, succs, is_cfg_valid);
+            doit |= removeEmptyBBHelper(bb, next_bb, ct, next_ct, preds,
+                                        succs, is_cfg_valid);
         }
     }
     END_TIMER(t, "Remove Empty BB");
@@ -1379,7 +1379,7 @@ void CFG<BB, XR>::collectLoopInfoRecur(LI<BB> * li)
     //A BB list is used in the CFG to describing sparse node layout.
     //In actually, such situation is rarely happen.
     //So we just use 'bb_set' for now. (see loop.h)
-    xcom::BitSet * bbset = LI_bb_set(li);
+    xcom::BitSet * bbset = li->getBodyBBSet();
     ASSERT0(bbset != NULL);
     for (INT id = bbset->get_first(); id != -1; id = bbset->get_next(id)) {
         BB * bb = getBB(id);
@@ -1525,7 +1525,7 @@ void CFG<BB, XR>::cleanLoopInfo(bool access_li_by_scan_bb)
             BB * bb = ct->val();
             LI<BB> * li = m_map_bb2li.get(bb->id());
             if (li != NULL) {
-                m_bs_mgr->free(LI_bb_set(li));
+                m_bs_mgr->free(li->getBodyBBSet());
                 m_map_bb2li.set(bb->id(), NULL);
             }
         }
@@ -1601,7 +1601,7 @@ bool CFG<BB, XR>::findLoop()
             LI<BB> * li = head2li.get(succ);
             if (li != NULL) {
                 //Multiple natural loops have the same loop header.
-                LI_bb_set(li)->bunion(*loop);
+                li->getBodyBBSet()->bunion(*loop);
                 reinsertLoopTree(&m_loop_info, li);
                 continue;
             }

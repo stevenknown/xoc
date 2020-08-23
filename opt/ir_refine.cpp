@@ -45,7 +45,7 @@ Refine::Refine(Region * rg)
 
 
 //Algebraic identities.
-IR * Refine::refineILoad1(IR * ir, bool & change)
+IR * Refine::refineILoad1(IR * ir, bool & change, RefineCtx & rc)
 {
     ASSERT0(ir->is_ild());
     //Convert
@@ -70,7 +70,7 @@ IR * Refine::refineILoad1(IR * ir, bool & change)
     //Note: do not recompute MD and overlap set to ld because that
     //might generate new MD that not versioned by MDSSAMgr.
     //ir's MD ref must be equivalent to ld.
-    if (ld->getEffectRef() == NULL) {
+    if (ld->getEffectRef() == NULL && rc.doUpdateMDRef()) {
         MD const* t = m_rg->allocRefForLoad(ld);
         CHECK_DUMMYUSE(ld->getRefMDSet() && ld->getRefMDSet()->is_contain(t));
     }
@@ -85,7 +85,7 @@ IR * Refine::refineILoad1(IR * ir, bool & change)
 }
 
 
-IR * Refine::refineILoad2(IR * ir, bool & change)
+IR * Refine::refineILoad2(IR * ir, bool & change, RefineCtx & rc)
 {
     ASSERT0(ir->is_ild() &&
             ILD_base(ir)->is_lda() &&
@@ -100,7 +100,7 @@ IR * Refine::refineILoad2(IR * ir, bool & change)
     LD_ofst(ld) = LDA_ofst(base) + ILD_ofst(ir);
     copyDbx(ld, ir, m_rg);
     ld->copyRef(ir, m_rg);
-    if (ld->getEffectRef() == NULL) {
+    if (ld->getEffectRef() == NULL && rc.doUpdateMDRef()) {
         MD const* t = m_rg->allocRefForLoad(ld);
         CHECK_DUMMYUSE(ld->getRefMDSet() &&
                        ld->getRefMDSet()->is_contain(t));
@@ -126,14 +126,14 @@ IR * Refine::refineILoad(IR * ir, bool & change, RefineCtx & rc)
         //     LDA
         //=>
         //    LD,ofst
-        return refineILoad1(ir, change);
+        return refineILoad1(ir, change, rc);
     } else if (base->is_lda() && LDA_ofst(base) != 0) {
         //Convert
         //    ILD,ofst1
         //     LDA,ofst2
         //=>
         //    LD,ofst1+ofst2
-        return refineILoad2(ir, change);
+        return refineILoad2(ir, change, rc);
     } else {
         ILD_base(ir) = refineIR(base, change, rc);
         if (change) {
@@ -153,26 +153,26 @@ IR * Refine::refineIStore(IR * ir, bool & change, RefineCtx & rc)
     if (t) { ir->setParent(IST_base(ir)); }
     lchange |= t;
 
-    t = false;
-    IST_rhs(ir) = refineIR(IST_rhs(ir), t, rc);
-    if (t) { ir->setParent(IST_rhs(ir)); }
-    lchange |= t;
+    bool t2 = false;
+    IST_rhs(ir) = refineIR(IST_rhs(ir), t2, rc);
+    if (t2) { ir->setParent(IST_rhs(ir)); }
+    lchange |= t2;
 
-    IR * lhs = IST_base(ir);
+    IR * base = IST_base(ir);
     IR * rhs = IST_rhs(ir);
-    if (lhs->is_lda()) {
+    if (base->is_lda()) {
         //Convert :
         //1. IST(LDA(var))=X to ST(var)=X
         //2. IST(LDA(var), ofst)=X to ST(var, ofst)=X
         //3. IST(LDA(var,ofst))=X to ST(var, ofst)=X
         //4. IST(LDA(var,ofst1), ofst2)=X to ST(var, ofst1+ofst2)=X
-        IR * newir = m_rg->buildStore(LDA_idinfo(lhs), ir->getType(),
-            LDA_ofst(lhs) + IST_ofst(ir), IST_rhs(ir));
+        IR * newir = m_rg->buildStore(LDA_idinfo(base), ir->getType(),
+            LDA_ofst(base) + IST_ofst(ir), IST_rhs(ir));
         newir->copyRef(ir, m_rg);
-        if (newir->getEffectRef() == NULL) {
+        if (newir->getEffectRef() == NULL && rc.doUpdateMDRef()) {
             MD const* t2 = m_rg->allocRefForStore(newir);
             CHECK_DUMMYUSE(newir->getRefMDSet() &&
-                newir->getRefMDSet()->is_contain(t2));
+                           newir->getRefMDSet()->is_contain(t2));
         }
         bool maybe_exist_expired_du = false;
         if (newir->getRefMD() == NULL) {
@@ -209,7 +209,7 @@ IR * Refine::refineIStore(IR * ir, bool & change, RefineCtx & rc)
         ir->setRHS(newrhs);
         copyDbx(newrhs, rhs, m_rg);
         newrhs->copyRef(rhs, m_rg);
-        if (newrhs->getEffectRef() == NULL) {
+        if (newrhs->getEffectRef() == NULL && rc.doUpdateMDRef()) {
             MD const* t2 = m_rg->allocRefForLoad(newrhs);
             CHECK_DUMMYUSE(newrhs->getRefMDSet() &&
                 newrhs->getRefMDSet()->is_contain(t2));
@@ -2445,14 +2445,14 @@ IR * Refine::StrengthReduce(IN OUT IR * ir, IN OUT bool & change)
 
 
 //User must invoke 'setParentPointer' to maintain the validation of IR tree.
-void Refine::invertCondition(IR ** cond)
+void Refine::invertCondition(IR ** cond, Region * rg)
 {
     switch ((*cond)->getCode()) {
     case IR_LAND:
     case IR_LOR: {
         IR * parent = IR_parent(*cond);
-        IR * newir = m_rg->buildLogicalNot(*cond);
-        copyDbx(newir, *cond, m_rg);
+        IR * newir = rg->buildLogicalNot(*cond);
+        copyDbx(newir, *cond, rg);
         IR_parent(newir) = parent;
         *cond = newir;
         newir->setParentPointer(true);

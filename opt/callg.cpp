@@ -80,6 +80,8 @@ void CallGraph::dumpVCG(CHAR const* name, INT flag)
     UNLINK(name);
     FILE * h = fopen(name, "a+");
     ASSERTN(h != NULL, ("%s create failed!!!",name));
+    INT org = g_indent;
+    g_indent = 0;
 
     bool dump_src_line = HAVE_FLAG(flag, CALLG_DUMP_SRC_LINE);
     bool dump_ir_detail = HAVE_FLAG(flag, CALLG_DUMP_IR);
@@ -161,15 +163,14 @@ void CallGraph::dumpVCG(CHAR const* name, INT flag)
                 param->dump(g_tfile, m_tm);
             }
 
-            g_indent = 0;
             IR * irs = cn->region()->getIRList();
             if (irs != NULL) {
                 for (; irs != NULL; irs = irs->get_next()) {
                     //fprintf(h, "%s\n", dump_ir_buf(ir, buf));
                     //TODO: implement dump_ir_buf();
                     dumpIR(irs, cn->region(), NULL, IR_DUMP_KID|
-                        (dump_src_line ? IR_DUMP_SRC_LINE : 0)|
-                        (dump_inner_region ? IR_DUMP_INNER_REGION : 0));
+                           (dump_src_line ? IR_DUMP_SRC_LINE : 0)|
+                           (dump_inner_region ? IR_DUMP_INNER_REGION : 0));
                 }
             } else {
                 dumpBBList(cn->region()->getBBList(),
@@ -188,6 +189,7 @@ void CallGraph::dumpVCG(CHAR const* name, INT flag)
                 from->id(), to->id(),  "");
     }
     g_tfile = old;
+    g_indent = org;
     fprintf(h, "\n}\n");
     fclose(h);
 }

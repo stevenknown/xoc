@@ -49,29 +49,35 @@ void changeUse(IR * olduse, IR * newuse, Region * rg);
 //e.g: given 'olddef'->USE, change to 'newdef'->USE.
 void changeDef(IR * olddef, IR * newdef, Region * rg);
 
-//Check each USE of stmt, remove the expired one which is not reference
-//the memory any more that stmt defined.
+//Check each USE occurrence of stmt, remove the expired expression which
+//is not reference the memory any more that stmt defined.
 //Return true if DU changed.
+//Note this function does not modify stmt.
 bool removeExpiredDUForStmt(IR * stmt, Region * rg);
 
 //Remove Use-Def chain.
 //e.g: ir = ...
-//    = ir //S1
-//If S1 will be deleted, ir should be removed from its useset in MDSSAInfo.
-//NOTE: If ir is a IR tree, e.g: ild(x, ld(y)), remove ild(x) means
+//        = exp //S1
+//If S1 will be deleted, exp should be removed from its UseSet in MDSSAInfo.
+//NOTE: If exp is an IR tree, e.g: ild(x, ld(y)), remove ild(x) means
 //ld(y) will be removed as well. And ld(y)'s MDSSAInfo will be
 //updated as well.
-void removeUse(IR * ir, Region * rg);
+void removeUse(IR * exp, Region * rg);
+
+//Remove all DU info of 'stmt'.
+void removeStmt(IR * stmt, Region * rg);
 
 //Coalesce DU chain of 'from' to 'to'.
 //This function replace definition of USE of 'from' to defintion of 'to'.
 //Just like copy-propagation.
+//from: indicates stmt operation, see example for detail.
+//to: indicates expression operation, see example for detail.
 //e.g: to_def =...
-//     from = to
-//     ...= from_use
+//     from = to //S1
+//     ... = from_use
 //=> after coalescing
 //     to_def = ...
-//     ------ //removed
+//     ------ //S1 removed
 //     ... = to
 void coalesceDUChain(IR * from, IR * to, Region * rg);
 
@@ -89,6 +95,19 @@ void copyRefAndAddDUChain(IR * to,
                           IR const* from,
                           Region * rg,
                           bool add_duchain);
+
+
+//Return true if def is killing-def of use.
+//Note this functin does not check if there is DU chain between def and use.
+bool isKillingDef(IR const* def, IR const* use);
+
+//Return true if def is killing-def of usemd.
+//Note this functin does not check if there is DU chain between def and usemd.
+bool isKillingDef(IR const* def, MD const* usemd);
+
+//Return true if defmd is killing-def MD of usemd.
+//Note this functin does not check if there is DU chain between defmd and usemd.
+bool isKillingDef(MD const* defmd, MD const* usemd);
 
 } //namespace xoc
 #endif

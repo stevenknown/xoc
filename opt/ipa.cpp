@@ -218,7 +218,7 @@ void IPA::recomputeDUChain(Region * rg, OptCtx & oc)
     if (m_is_recompute_du_ref) {
         if (m_is_keep_reachdef) {
             rg->checkValidAndRecompute(&oc, PASS_REACH_DEF, PASS_DU_REF,
-                PASS_CFG, PASS_DU_CHAIN, PASS_UNDEF);
+                                       PASS_CFG, PASS_DU_CHAIN, PASS_UNDEF);
         } else {
             rg->checkValidAndRecompute(&oc, PASS_DU_REF, PASS_CFG,
                 PASS_DU_CHAIN, PASS_UNDEF);
@@ -226,10 +226,10 @@ void IPA::recomputeDUChain(Region * rg, OptCtx & oc)
     } else {
         if (m_is_keep_reachdef) {
             rg->checkValidAndRecompute(&oc, PASS_REACH_DEF, PASS_CFG,
-                PASS_DU_CHAIN, PASS_UNDEF);
+                                       PASS_DU_CHAIN, PASS_UNDEF);
         } else {
             rg->checkValidAndRecompute(&oc, PASS_CFG, PASS_DU_CHAIN,
-                PASS_UNDEF);
+                                       PASS_UNDEF);
         }
     }
 }

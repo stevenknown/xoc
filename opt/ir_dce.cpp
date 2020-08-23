@@ -53,15 +53,15 @@ void DeadCodeElim::setEffectStmt(IR const* stmt,
 }
 
 
-void DeadCodeElim::dump()
+bool DeadCodeElim::dump() const
 {
-    if (g_tfile == NULL) { return; }
-    note("\n==---- DUMP DeadCodeElim ----==");
+    if (g_tfile == NULL) { return false; }
+    note("\n==---- DUMP %s '%s' ----==", getPassName(), m_rg->getRegionName());
     note("\n==-- Ineffect BB --==");
     BBList * bbl = m_rg->getBBList();
     for (IRBB * bb = bbl->get_head(); bb != NULL; bb = bbl->get_next()) {
-        note("\n--0- BB%d", BB_id(bb));
-        if (!m_is_bb_effect.is_contain(BB_id(bb))) {
+        note("\n--0- BB%d", bb->id());
+        if (!m_is_bb_effect.is_contain(bb->id())) {
             prt("\t\tineffect BB!");
         }
     }
@@ -74,6 +74,7 @@ void DeadCodeElim::dump()
         m_mdssamgr->dump();
     }
     fflush(g_tfile);
+    return true;
 }
 
 
@@ -243,7 +244,7 @@ bool DeadCodeElim::setControlDepBBToBeEffect(IRBB const* bb,
                                              OUT List<IR const*> & act_ir_lst)
 {
     bool change = false;
-    UINT bbid = BB_id(bb);
+    UINT bbid = bb->id();
     ASSERT0(m_cdg->getVertex(bbid));
     for (xcom::EdgeC const* ec = VERTEX_in_list(m_cdg->getVertex(bbid));
          ec != NULL; ec = EC_next(ec)) {
@@ -263,8 +264,8 @@ bool DeadCodeElim::setControlDepBBToBeEffect(IRBB const* bb,
             IRBB * pred = m_cfg->getBB(ec->getFromId());
             ASSERT0(pred);
             if (BB_rpo(pred) > (INT)bbto &&
-                !m_is_bb_effect.is_contain(BB_id(pred))) {
-                m_is_bb_effect.bunion(BB_id(pred));
+                !m_is_bb_effect.is_contain(pred->id())) {
+                m_is_bb_effect.bunion(pred->id());
                 change = true;
             }
             ec = EC_next(ec);
@@ -474,7 +475,7 @@ bool DeadCodeElim::remove_ineffect_ir() const
              ctir != NULL; ctir = next) {
             IR * stmt = ctir->val();
             BB_irlist(bb).get_next(&next);
-            if (!m_is_stmt_effect.is_contain(IR_id(stmt))) {
+            if (!m_is_stmt_effect.is_contain(stmt->id())) {                
                 //Revise PRSSA info if PR is in SSA form.
                 stmt->removeSSAUse();
 
@@ -581,7 +582,7 @@ void DeadCodeElim::fix_control_flow(List<IRBB*> & bblst,
         ASSERT0(ct && bb);
         if (BB_irlist(bb).get_elem_count() != 0) { continue; }
 
-        xcom::EdgeC * vout = m_cfg->getVertex(BB_id(bb))->getOutList();
+        xcom::EdgeC * vout = m_cfg->getVertex(bb->id())->getOutList();
         if (vout == NULL || xcom::cnt_list(vout) <= 1) { continue; }
 
         BBListIter next_ct = ct;
@@ -600,13 +601,13 @@ void DeadCodeElim::fix_control_flow(List<IRBB*> & bblst,
             }
 
             xcom::Vertex * s = EDGE_to(e);
-            if (s->id() == BB_id(bb) ||
-                (next_bb != NULL && s->id() == BB_id(next_bb))) {
+            if (s->id() == bb->id() ||
+                (next_bb != NULL && s->id() == next_bb->id())) {
                 vout = EC_next(vout);
                 continue;
             }
 
-            if (!m_cdg->is_cd(BB_id(bb), s->id())) {
+            if (!m_cdg->is_cd(bb->id(), s->id())) {
                 //See dce.c:lexrun(), bb5 control bb6, but not control bb8.
                 //if bb5 is empty, insert goto to bb8.
                 IRBB * tgt = m_cfg->getBB(s->id());
@@ -616,10 +617,10 @@ void DeadCodeElim::fix_control_flow(List<IRBB*> & bblst,
                 LabelInfo const* li;
                 for (li = tgt->getLabelList().get_head();
                      li != NULL; li = tgt->getLabelList().get_next()) {
-                    if (LABEL_INFO_is_catch_start(li) ||
-                        LABEL_INFO_is_try_start(li) ||
-                        LABEL_INFO_is_try_end(li) ||
-                        LABEL_INFO_is_pragma(li)) {
+                    if (LABELINFO_is_catch_start(li) ||
+                        LABELINFO_is_try_start(li) ||
+                        LABELINFO_is_try_end(li) ||
+                        LABELINFO_is_pragma(li)) {
                         continue;
                     }
                     break;
@@ -629,7 +630,7 @@ void DeadCodeElim::fix_control_flow(List<IRBB*> & bblst,
                 IR * g = m_rg->buildGoto(li);
                 BB_irlist(bb).append_tail(g);
                 bool change = true;
-                xcom::Vertex * bbv = m_cfg->getVertex(BB_id(bb));
+                xcom::Vertex * bbv = m_cfg->getVertex(bb->id());
                 while (change) {
                     xcom::EdgeC * ec = VERTEX_out_list(bbv);
                     change = false;
@@ -724,12 +725,14 @@ void DeadCodeElim::reinit()
     UINT irnum = m_rg->getIRVec()->get_elem_count() / BITS_PER_BYTE + 1;
     if (m_is_stmt_effect.get_byte_size() <= irnum) {
         m_is_stmt_effect.alloc(irnum + 1);
-    }
+    }    
+    m_is_stmt_effect.clean();
 
     UINT bbnum = m_rg->getBBList()->get_elem_count() / BITS_PER_BYTE + 1;
     if (m_is_bb_effect.get_byte_size() <= bbnum) {
         m_is_bb_effect.alloc(bbnum + 1);
     }
+    m_is_bb_effect.clean();
 }
 
 
@@ -765,7 +768,7 @@ bool DeadCodeElim::perform(OptCtx & oc)
     START_TIMER(t, getPassName());
     if (m_is_elim_cfs) {
         m_rg->checkValidAndRecompute(&oc, PASS_CDG, PASS_UNDEF);
-        m_cdg = (CDG*)m_rg->getPassMgr()->registerPass(PASS_CDG);
+        m_cdg = (CDG*)m_rg->getPassMgr()->queryPass(PASS_CDG);
     } else {
         m_rg->checkValidAndRecompute(&oc, PASS_PDOM, PASS_UNDEF);
         m_cdg = NULL;
@@ -776,13 +779,15 @@ bool DeadCodeElim::perform(OptCtx & oc)
     bool removed = true;
     UINT count = 0;
     List<IR const*> work_list;
-    while (removed && count < 0xFFFF) {
+    UINT const max_iter = 0xFFFF;
+    while (removed && count < max_iter) {
         removed = false;
         count++;
         //Mark effect IRs.
         work_list.clean();
         mark_effect_ir(work_list);
         iter_collect(work_list);
+
         removed = remove_ineffect_ir();
         if (!removed) { break; }
 
@@ -792,7 +797,7 @@ bool DeadCodeElim::perform(OptCtx & oc)
 
         ASSERT0(MDSSAMgr::verifyMDSSAInfo(m_rg));
         ASSERT0(PRSSAMgr::verifyPRSSAInfo(m_rg));
-        
+
         if (m_cfg->performMiscOpt(oc)) {
             //CFG changed, remove empty BB.
             //TODO: DO not recompute whole SSA/MDSSA. Instead, update

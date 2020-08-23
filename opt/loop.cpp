@@ -48,9 +48,9 @@ bool findTwoSuccessorBBOfLoopHeader(LI<IRBB> const* li,
                                     UINT * succ2)
 {
     ASSERT0(li && cfg && succ1 && succ2);
-    IRBB * head = LI_loop_head(li);
+    IRBB * head = li->getLoopHead();
 
-    xcom::Vertex * headvex = cfg->getVertex(BB_id(head));
+    xcom::Vertex * headvex = cfg->getVertex(head->id());
     if (cfg->getOutDegree(headvex) != 2) {
         //Not natural loop.
         return false;
@@ -74,11 +74,11 @@ bool findTwoSuccessorBBOfLoopHeader(LI<IRBB> const* li,
 IRBB * findSingleBackedgeStartBB(LI<IRBB> const* li, IRCFG * cfg)
 {
     ASSERT0(li && cfg);
-    IRBB * head = LI_loop_head(li);
+    IRBB * head = li->getLoopHead();
 
     UINT backedgebbid = 0;
     UINT backedgecount = 0;
-    xcom::EdgeC const* ec = VERTEX_in_list(cfg->getVertex(BB_id(head)));
+    xcom::EdgeC const* ec = VERTEX_in_list(cfg->getVertex(head->id()));
     while (ec != NULL) {
         backedgecount++;
         UINT pred = ec->getFromId();
@@ -96,93 +96,101 @@ IRBB * findSingleBackedgeStartBB(LI<IRBB> const* li, IRCFG * cfg)
 }
 
 
-//Find preheader BB. If it does not exist, insert one before loop 'li'.
-//
-//'insert_bb': return true if this function insert a new bb before loop,
-//    otherwise return false.
-//
-//'force': force to insert preheader BB whatever it has exist.
-//    Return the new BB if insertion is successful.
-//
-//Note if we find the preheader, the last IR of it may be call.
-//So if you are going to insert IR at the tail of preheader, the best is
-//force to insert a new bb.
-IRBB * findAndInsertPreheader(LI<IRBB> const* li,
-                              Region * rg,
-                              OUT bool & insert_bb,
-                              bool force)
+//Append GOTO stmt to 'from' BB, in order to it can jump to 'to' BB.
+static IR * tryAppendGotoToJumpToBB(IRBB * from, IRBB * to, Region * rg)
 {
-    ASSERT0(li && rg);
-    insert_bb = false;
-    IRCFG * cfg = rg->getCFG();
-    BBList * bblst = rg->getBBList();
-    IRBB * head = LI_loop_head(li);
-
-    BBListIter bbholder = NULL;
-    bblst->find(head, &bbholder);
-    ASSERT0(bbholder);
-    BBListIter tt = bbholder;
-    IRBB * prev = bblst->get_prev(&tt);
-
-    //Find appropriate BB to be prehead.
-    bool find_appropriate_prev_bb = false;
-
-    for (xcom::EdgeC const* ec = VERTEX_in_list(cfg->getVertex(BB_id(head)));
-         ec != NULL; ec = EC_next(ec)) {
-        UINT pred = ec->getFromId();
-        IRBB const* pred_bb = rg->getCFG()->getBB(pred);
-        ASSERT0(pred_bb);
-        if (pred == BB_id(prev) && !LI_bb_set(li)->is_contain(BB_id(prev))) {
-            //Try to find fallthrough prev BB.
-            //CASE:prev is not preheader of head.
-            //      BB_preheader--
-            //                   |
-            //  ............     |
-            //                   |
-            //  --->BB_prev      |
-            //  |      |         |
-            //  |      v         |
-            //  |   BB_head<------
-            //  |      |
-            //  |      v
-            //  ----BB_end
-            find_appropriate_prev_bb = true;
-            break;
+    ASSERT0(from && to && rg);
+    IR const* last = from->getLastIR();
+    if (!IRBB::isDownBoundary(last)) {
+        //Pick any label on 'to' BB to be the jump target.
+        LabelInfo const* lab = to->getLabelList().get_head();
+        if (lab == NULL) {
+            lab = rg->genILabel();
+            rg->getCFG()->addLabel(to, lab);
         }
+        IR * gotoir = rg->buildGoto(lab);
+        from->getIRList()->append_tail(gotoir);
+        return gotoir;
     }
-
-    if (BB_last_ir(prev) != NULL &&
-        prev->isDownBoundary(BB_last_ir(prev))) {
-        //prev should fallthrough to current BB.
-        //Can not append IR to prev BB.
-        find_appropriate_prev_bb = false;
-    }
-
-    if (!force) {
-        if (find_appropriate_prev_bb) {
-            return prev;
-        }
+    if (last->isUnconditionalBr() || last->isConditionalBr()) {
+        LabelInfo const* lab = last->getLabel();
+        ASSERT0(lab);
+        ASSERTN(to->hasLabel(lab), ("No valid label can be used as target"));
         return NULL;
     }
+    UNREACHABLE();
+    return NULL;
+}
 
+
+//Return true if inserting a new BB.
+static bool updateEdgeBetweenHeadAndPreheader(LI<IRBB> const* li,
+                                              Region * rg,
+                                              IRBB * head,
+                                              IRBB * preheader)
+{
+    bool insert_bb = false;
+    IRCFG * cfg = rg->getCFG();
     List<IRBB*> preds;
     cfg->get_preds(preds, head);
-    IRBB * preheader = rg->allocBB();
-    bblst->insert_before(preheader, bbholder);    
-    LabelInfo const* preheader_lab = rg->genIlabel();
-    xcom::BitSet * loop_body = LI_bb_set(li);
+    LabelInfo const* preheader_lab = NULL;
     for (IRBB * p = preds.get_head(); p != NULL; p = preds.get_next()) {
-        if (loop_body->is_contain(BB_id(p))) {
-            //p is inside loop.
+        if (li->isInsideLoop(p->id())) {
+            //BB_p is predecessor of loop-head that outside from loop;
+            //BB_1 is also predecessor of loop-head, but it belongs to loop.
+            //CASE:
+            //   BB_p
+            //   |
+            // ---
+            // |  BB_1<--...
+            // |  |      
+            // |  | //fallthrough
+            // v  v
+            // BB_header
+            //
+            //After inserting phreader BB_preheader:
+            //
+            //   BB_p
+            //   |
+            // ---
+            // |  BB_1<--...
+            // |  |      
+            // |  | //can not be fallthrough, have to be fixed.
+            // v  v
+            // BB_preheader
+            //    |
+            //    v
+            // BB_header
+            //
+            //Appending GOTO to fix:
+            //
+            //   BB_p
+            //   |
+            // ---
+            // |  BB_1<--...
+            // |  | //Jump
+            // |  |_________
+            // v            |
+            // BB_preheader |
+            //    |         |
+            //    v         |
+            // BB_header <--            
+            LabelInfo const* lab = head->getLabelList().get_head();
+            if (lab == NULL) {
+                lab = rg->genILabel();
+                cfg->addLabel(head, lab);
+            }
+
+            tryAppendGotoToJumpToBB(p, head, rg);
             continue;
         }
+
         if (!insert_bb) {
             //Insert preheader in front of head.
             //Note preheader must fallthrough to head.
             cfg->addBB(preheader);
             cfg->insertVertexBetween(p->id(), head->id(), preheader->id());
             cfg->tryFindLessRpo(preheader, head);
-            BB_is_fallthrough(preheader) = true;
             insert_bb = true;
         }
 
@@ -201,48 +209,63 @@ IRBB * findAndInsertPreheader(LI<IRBB> const* li,
         //CASE2:
         //  BB_p(goto lab1)
         //   |
+        //   ... //a lot of BB
+        //   |
         //   v
         //  BB_header(lab1)
         //=>
         //  BB_p(goto lab2)
         //   |
+        //   ... //a lot of BB
+        //   |
         //   v
         //  BB_preheader(lab2)
-        //   |
+        //   |  //fallthrough
         //   v
         //  BB_header(lab2)
         IR * last_ir = BB_last_ir(p);
         if (last_ir == NULL) { continue; }
         if ((last_ir->isConditionalBr() || last_ir->isUnconditionalBr()) &&
             head == cfg->findBBbyLabel(last_ir->getLabel())) {
+            if (preheader_lab == NULL) {
+                preheader_lab = rg->genILabel();
+            }
+
             //Add newlabel to preheader if not exist.
-            preheader->addLabel(preheader_lab);
+            cfg->addLabel(preheader, preheader_lab);
 
             //Update branch-target of IR that located in predecessor of head.
             last_ir->setLabel(preheader_lab);
         }
     }
+    return insert_bb;
+}
 
-    //Move LabelInfos from head to preheader except LabelInfos that
-    //are the target of IR that belongs to loop body.
+
+//Move LabelInfos from head to preheader except LabelInfos that
+//are the target of IR that belongs to loop body.
+static void tryMoveLabelFromHeadToPreheader(LI<IRBB> const* li,
+                                            IRCFG * cfg, 
+                                            IRBB * head,
+                                            IRBB * preheader)
+{
     List<LabelInfo const*> & lablst = head->getLabelList();
     if (lablst.get_elem_count() <= 1) {
         //The only label is the target of loop back-edge.
-        return preheader;
+        return;
     }
 
-    //Record if Labels which attached on head are
-    //branch target of IR which inside loop.
-    //Other Labels can be moved to preheader.
+    //Record if labels which attached on head BB are branch target of
+    //IR which inside loop. The rest of labels can be moved to preheader BB.
     TMap<LabelInfo const*, bool> lab_canbe_move_to_preheader;
     for (LabelInfo const* lab = lablst.get_head();
          lab != NULL; lab = lablst.get_next()) {
         lab_canbe_move_to_preheader.set(lab, false);
     }
 
-    //Mark labels that can not move to preheader.
-    for (INT i = LI_bb_set(li)->get_first();
-         i >= 0; i = LI_bb_set(li)->get_next(i)) {
+    //Mark labels that can not be moved to preheader BB.
+    for (INT i = li->getBodyBBSet()->get_first();
+         i >= 0; i = li->getBodyBBSet()->get_next(i)) {
         IRBB * bb = cfg->getBB(i);
         ASSERT0(bb);
         for (IR const* ir = BB_first_ir(bb); ir != NULL; ir = BB_next_ir(bb)) {
@@ -267,40 +290,187 @@ IRBB * findAndInsertPreheader(LI<IRBB> const* li,
         }
     }
 
-    //Move labels to preheader.
+    //Move labels to preheader BB.
     xcom::C<LabelInfo const*> * ct;
     xcom::C<LabelInfo const*> * next_ct;
     for (lablst.get_head(&ct); ct != lablst.end(); ct = next_ct) {
         next_ct = lablst.get_next(ct);
         LabelInfo const* lab = ct->val();
         if (lab_canbe_move_to_preheader.get(lab)) { continue; }
+
         lablst.remove(ct);
-        preheader->addLabel(lab);
+        cfg->addLabel(preheader, lab);
         cfg->getLabel2BBMap()->setAlways(lab, preheader);
     }
+}
 
+
+//Find appropriate BB to be prehead.
+static bool findAppropriatePrevBB(LI<IRBB> const* li,
+                                  IRCFG * cfg,
+                                  IRBB const* head,
+                                  IRBB const* prev)
+{
+    bool find = false;
+    for (xcom::EdgeC const* ec = cfg->getVertex(head->id())->getInList();
+         ec != NULL; ec = ec->get_next()) {
+        UINT pred = ec->getFromId();
+        if (li->isInsideLoop(pred)) { continue; }
+
+        if (pred == prev->id()) {
+            //Try to find fallthrough prev BB.
+            //CASE:BB_prev is suitable  for preheader of head.
+            //      BB_prev
+            //        | //fallthrough
+            //        v
+            // ...-->BB_head
+            find = true;
+            break;
+        }
+
+        if (pred != prev->id()) {
+            ASSERT0(cfg->getBB(pred));
+            IR const* last_ir_of_pred = cfg->getBB(pred)->getLastIR();
+            ASSERT0(last_ir_of_pred);
+            if (last_ir_of_pred->isUnconditionalBr()) {
+                //CASE:pred is not fallthrough to head,
+                //     but it is an unconditional branch.
+                //      BB_pred---  //Jump to head.
+                //                |
+                //  ............  |
+                //                |
+                //   -->BB_prev   |
+                //  |      |      |
+                //  |      v      |
+                //  |   BB_head<--
+                //  |      |
+                //  |      v
+                //   ---BB_end
+                find = true;
+                break;
+            }
+        }
+    }
+
+    if (const_cast<IRBB*>(prev)->getLastIR() != NULL &&
+        IRBB::isDownBoundary(const_cast<IRBB*>(prev)->getLastIR())) {
+        //prev should fallthrough to current BB.
+        //Can not append IR to prev BB.
+        find = false;
+    }
+
+    return find;
+}
+
+
+//Find preheader BB. If it does not exist, insert one before loop 'li'.
+//'insert_bb': return true if this function insert a new bb before loop,
+//             otherwise return false.
+//'force': force to insert preheader BB whatever it has exist.
+//         Return the new BB if insertion is successful.
+//Note if we find the preheader, the last IR of it may be call.
+//So if you are going to insert IR at the tail of preheader, the best is
+//force to insert a new bb.
+IRBB * findAndInsertPreheader(LI<IRBB> const* li,
+                              Region * rg,
+                              OUT bool & insert_bb,
+                              bool force)
+{
+    ASSERT0(li && rg);
+    insert_bb = false;
+    IRCFG * cfg = rg->getCFG();
+    BBList * bblst = rg->getBBList();
+    IRBB * head = li->getLoopHead();
+
+    BBListIter bbholder = NULL;
+    bblst->find(head, &bbholder);
+    ASSERT0(bbholder);
+    BBListIter tt = bbholder;
+    IRBB * prev = bblst->get_prev(&tt);
+    bool find_appropriate_prev_bb = findAppropriatePrevBB(li, cfg, head, prev);
+    if (!force) {
+        if (find_appropriate_prev_bb) {
+            return prev;
+        }
+        return NULL;
+    }
+
+    IRBB * preheader = rg->allocBB();
+    bblst->insert_before(preheader, bbholder);    
+    insert_bb |= updateEdgeBetweenHeadAndPreheader(li, rg, head, preheader);
+    tryMoveLabelFromHeadToPreheader(li, cfg,head, preheader);
     return preheader;
 }
 
 
-static bool isLoopInvariantInPRSSA(IR const* ir, LI<IRBB> const* li)
+static bool isLoopInvariantInPRSSA(IR const* ir,
+                                   LI<IRBB> const* li,
+                                   InvStmtList const* invariant_stmt)
 {
     ASSERT0(ir->is_pr());
     SSAInfo * ssainfo = PR_ssainfo(ir);
     ASSERT0(ssainfo);
-    if (ssainfo->getDef() != NULL) {
-        IRBB * defbb = ssainfo->getDef()->getBB();
-        ASSERT0(defbb);    
-        if (li->isInsideLoop(BB_id(defbb))) {
-            return false;
-        }
+    IR const* def = ssainfo->getDef();
+    if (def == NULL) { return true; }
+
+    //Note IR_PHI should have been analyzed and inserted into invariant_stmt
+    //if it's operand is invariant.
+    IRBB * defbb = def->getBB();
+    ASSERT0(defbb);    
+    if (!li->isInsideLoop(defbb->id()) ||
+        (invariant_stmt != NULL && 
+         invariant_stmt->find(const_cast<IR*>(def)))) {
+        return true;
     }
+    return false;
+}
+
+
+static bool isRealMDDefInvariant(MDDef const* mddef,
+                                 LI<IRBB> const* li,
+                                 InvStmtList const* invariant_stmt,
+                                 MDSSAMgr const* mdssamgr)
+{
+    ASSERT0(mddef && !mddef->is_phi());
+    IR const* def = mddef->getOcc();
+    ASSERT0(def);
+    IRBB const* defbb = def->getBB();
+    ASSERT0(defbb);
+    if (!li->isInsideLoop(defbb->id())) { return true; }
+    if (invariant_stmt == NULL ||
+        (invariant_stmt != NULL && 
+         !invariant_stmt->find(const_cast<IR*>(def)))) {
+        return false;
+    }
+    return true; 
+}
+
+
+static bool isMDPhiInvariant(MDDef const* start, 
+                             IR const* use,
+                             LI<IRBB> const* li,
+                             InvStmtList const* invariant_stmt,
+                             MDSSAMgr const* mdssamgr)
+{
+    ASSERT0(start && start->is_phi() && mdssamgr);
+    ConstMDDefIter ii;
+    for (MDDef const* def =
+            mdssamgr->iterDefInitCTillKillingDef(start, use, ii);
+         def != NULL; def = mdssamgr->iterDefNextCTillKillingDef(use, ii)) {        
+        if (def->is_phi() || def == start) {
+            continue;
+        }
+        if (!isRealMDDefInvariant(def, li, invariant_stmt, mdssamgr)) {
+            return false;     
+        }
+    }    
     return true;
 }
 
 
 static bool isLoopInvariantInMDSSA(IR const* ir,
                                    LI<IRBB> const* li,
+                                   InvStmtList const* invariant_stmt,
                                    MDSSAMgr const* mdssamgr)
 {
     ASSERT0(ir->isMemoryRefNotOperatePR());
@@ -311,9 +481,16 @@ static bool isLoopInvariantInMDSSA(IR const* ir,
          i >= 0; i = mdssainfo->getVOpndSet()->get_next(i, &iter)) {
         VMD const* vopnd = (VMD const*)mdssamgr->getVOpnd(i);
         ASSERT0(vopnd && vopnd->is_md());
-        IRBB const* defbb = vopnd->getDef()->getBB();
-        ASSERT0(defbb);
-        if (li->isInsideLoop(defbb->id())) {
+        MDDef const* mddef = vopnd->getDef();
+        if (mddef->is_phi()) {
+            if (!isMDPhiInvariant(mddef, ir, li, invariant_stmt, mdssamgr)) {
+                return false;
+            }
+            //PHI just indicates the JOIN point of other definitions, we do
+            //not regard PHI as real definition.
+            continue;
+        }
+        if (!isRealMDDefInvariant(mddef, li, invariant_stmt, mdssamgr)) {
             return false;
         }
     }
@@ -323,6 +500,7 @@ static bool isLoopInvariantInMDSSA(IR const* ir,
 
 static bool isLoopInvariantInDUMgr(IR const* ir,
                                    LI<IRBB> const* li,
+                                   InvStmtList const* invariant_stmt,
                                    Region const* rg)
 {
     DUSet const* duset = ir->readDUSet();
@@ -331,11 +509,14 @@ static bool isLoopInvariantInDUMgr(IR const* ir,
     DUIter dui = NULL;
     for (INT i = duset->get_first(&dui);
          i >= 0; i = duset->get_next(i, &dui)) {
-        IR const* defstmt = const_cast<Region*>(rg)->getIR(i);
-        ASSERT0(defstmt->is_stmt());
-        IRBB const* bb = defstmt->getBB();
+        IR const* def = const_cast<Region*>(rg)->getIR(i);
+        ASSERT0(def->is_stmt());
+        IRBB const* defbb = def->getBB();
 
-        if (li->isInsideLoop(bb->id())) {
+        if (!li->isInsideLoop(defbb->id())) { continue; }
+        if (invariant_stmt == NULL ||
+            (invariant_stmt != NULL && 
+             !invariant_stmt->find(const_cast<IR*>(def)))) {
             return false;
         }
     }
@@ -346,34 +527,40 @@ static bool isLoopInvariantInDUMgr(IR const* ir,
 //Return true if all the expression on 'ir' tree is loop invariant.
 //ir: root node of IR tree
 //li: loop info structure
+//check_tree: true to perform check recusively for entire IR tree.
 //Note this function does not check the sibling node of 'ir'.
-bool isLoopInvariant(IR const* ir, LI<IRBB> const* li, Region * rg)
+bool isLoopInvariant(IR const* ir,
+                     LI<IRBB> const* li,
+                     Region * rg,
+                     InvStmtList const* invariant_stmt,
+                     bool check_tree)
 {
     ASSERT0(ir && ir->is_exp());
-    if (ir->isReadPR()) {
+    if (ir->isReadPR() && !ir->isReadOnly()) {
         PRSSAMgr * prssamgr = rg->getPRSSAMgr();
         if (prssamgr != NULL && prssamgr->is_valid()) {
-            if (!isLoopInvariantInPRSSA(ir, li)) {
+            if (!isLoopInvariantInPRSSA(ir, li, invariant_stmt)) {
                 return false;
             }
-        } else if (!isLoopInvariantInDUMgr(ir, li, rg)) {
+        } else if (!isLoopInvariantInDUMgr(ir, li, invariant_stmt, rg)) {
             return false;
         }
-    } else if (ir->isMemoryRefNotOperatePR()) {
+    } else if (ir->isMemoryRefNotOperatePR() && !ir->isReadOnly()) {
         MDSSAMgr * mdssamgr = rg->getMDSSAMgr();
         if (mdssamgr != NULL && mdssamgr->is_valid()) {
-            if (!isLoopInvariantInMDSSA(ir, li, mdssamgr)) {
+            if (!isLoopInvariantInMDSSA(ir, li, invariant_stmt, mdssamgr)) {
                 return false;
             }
-        } else if (!isLoopInvariantInDUMgr(ir, li, rg)) {
+        } else if (!isLoopInvariantInDUMgr(ir, li, invariant_stmt, rg)) {
             return false;
         }
     }
 
+    if (!check_tree) { return true; }
     for (UINT i = 0; i < IR_MAX_KID_NUM(ir); i++) {
         IR * kid = ir->getKid(i);
         if (kid == NULL) { continue; }
-        if (!isLoopInvariant(kid, li, rg)) {
+        if (!isLoopInvariant(kid, li, rg, invariant_stmt, check_tree)) {
             return false;
         }
     }

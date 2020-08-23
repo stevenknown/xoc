@@ -142,20 +142,40 @@ void coalesceDUChain(IR * from, IR * to, Region * rg)
 //NOTE: If ir is a IR tree, e.g: ild(x, ld(y)), remove ild(x) means
 //ld(y) will be removed as well. And ld(y)'s MDSSAInfo will be
 //updated as well.
-void removeUse(IR * ir, Region * rg)
+void removeUse(IR * exp, Region * rg)
 {
-    ASSERT0(ir && ir->is_exp());
-    PRSSAMgr::removePRSSAUse(ir);
+    ASSERT0(exp && exp->is_exp());
+    PRSSAMgr::removePRSSAUse(exp);
 
     DUMgr * dumgr = rg->getDUMgr();
     if (dumgr != NULL) {
-        dumgr->removeUseFromDefset(ir);
+        dumgr->removeUseFromDefset(exp);
     }
 
-    if (ir->isMemoryRefNotOperatePR()) {
+    if (exp->isMemoryRefNotOperatePR()) {
         MDSSAMgr * mdssamgr = rg->getMDSSAMgr(); 
         if (mdssamgr != NULL) {
-            mdssamgr->removeMDSSAUse(ir);
+            mdssamgr->removeMDSSAUse(exp);
+        }
+    }
+}
+
+
+//Remove all DU info of 'stmt'.
+void removeStmt(IR * stmt, Region * rg)
+{
+    ASSERT0(stmt->is_stmt());
+    DUMgr * dumgr = rg->getDUMgr();
+    if (dumgr != NULL) {
+        dumgr->removeIRFromDUMgr(stmt);
+    }
+
+    PRSSAMgr::removePRSSAUse(stmt);
+
+    if (stmt->isMemoryRefNotOperatePR()) {
+        MDSSAMgr * mdssamgr = rg->getMDSSAMgr(); 
+        if (mdssamgr != NULL) {
+            mdssamgr->removeStmtFromMDSSAMgr(stmt);
         }
     }
 }
@@ -258,6 +278,42 @@ void copyRefAndAddDUChain(IR * to,
         }
     }
     ASSERT0(cit.get_elem_count() == 0 && it.get_elem_count() == 0);
+}
+
+
+//Return true if def is killing-def of use.
+//Note this functin does not check if there is DU chain between def and use.
+bool isKillingDef(IR const* def, IR const* use)
+{
+    ASSERT0(def && use);
+    MD const* usemd = use->getRefMD();
+    return isKillingDef(def, usemd);
+}
+
+
+//Return true if def is killing-def of usemd.
+//Note this functin does not check if there is DU chain between def and usemd.
+bool isKillingDef(IR const* def, MD const* usemd)
+{
+    ASSERT0(def && usemd);
+    MD const* defmd = def->getRefMD();
+    return isKillingDef(defmd, usemd);
+}
+
+
+//Return true if defmd is killing-def MD of usemd.
+//Note this functin does not check if there is DU chain between defmd and usemd.
+bool isKillingDef(MD const* defmd, MD const* usemd)
+{
+    ASSERT0(defmd && usemd);
+    if (defmd != NULL &&
+        usemd != NULL &&
+        defmd->is_exact() &&
+        (defmd == usemd || defmd->is_exact_cover(usemd))) {
+        //def is killing must-def.
+        return true;
+    }
+    return false;
 }
 
 } //namespace xoc

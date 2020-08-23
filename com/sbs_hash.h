@@ -383,7 +383,7 @@ public:
     }
 
     //Dump bitset that hashed.
-    void dump_hashed_set(FILE * h)
+    void dump_hashed_set(FILE * h) const
     {
         if (h == NULL) { return; }
         fprintf(h, "\n==---- DUMP SBitSetCoreHashHash ----==");

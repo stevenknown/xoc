@@ -58,7 +58,7 @@ public:
         List<IRBB*> * bbs = m_rg->getBBList();
         for (IRBB * bb = bbs->get_head(); bb != NULL; bb = bbs->get_next()) {
             if (bb->isExceptionHandler()) {
-                removeVertex(BB_id(bb));
+                removeVertex(bb->id());
             }
         }
     }
@@ -138,7 +138,7 @@ public:
     COPY_CONSTRUCTOR(GCSE);
     virtual ~GCSE() {}
 
-    void dump();
+    virtual bool dump() const;
 
     virtual CHAR const* getPassName() const
     { return "Global Command Subscript Elimination"; }

@@ -1122,9 +1122,9 @@ Programming Guides
       map_call2mayuse
       set_map_call2mayuse
       has_no_du
-      is_may_def
-      is_may_kill
-      is_must_kill
+      isMayDef
+      isMayKill
+      isMustKill
       is_must_def
       is_exact_unique_def
 

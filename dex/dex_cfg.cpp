@@ -94,7 +94,7 @@ void DEX_CFG::dump_node(FILE * h, bool detail, BitSet const& markbbs)
     UINT vertical_order = 1;
     for (IRBB * bb = m_bb_list->get_head(&bbct);
          bb != NULL; bb = m_bb_list->get_next(&bbct)) {
-        UINT id = BB_id(bb);
+        UINT id = bb->id();
         UINT scale = 1;
 
         Vertex * v = getVertex(id);
@@ -113,7 +113,7 @@ void DEX_CFG::dump_node(FILE * h, bool detail, BitSet const& markbbs)
             color = "cyan";
         }
 
-        if (markbbs.is_contain(BB_id(bb))) {
+        if (markbbs.is_contain(bb->id())) {
             color = "magenta";
         }
 
@@ -134,7 +134,7 @@ void DEX_CFG::dump_node2(
     UINT vertical_order = 1;
     for (IRBB * bb = m_bb_list->get_head(&bbct);
          bb != NULL; bb = m_bb_list->get_next(&bbct)) {
-        UINT id = BB_id(bb);
+        UINT id = bb->id();
         UINT scale = 1;
 
         Vertex * v = getVertex(id);
@@ -153,9 +153,9 @@ void DEX_CFG::dump_node2(
             color = "cyan";
         }
 
-        if (trybbs.is_contain(BB_id(bb))) {
+        if (trybbs.is_contain(bb->id())) {
             color = "magenta";
-        } else if (catchbbs.is_contain(BB_id(bb))) {
+        } else if (catchbbs.is_contain(bb->id())) {
             color = "lightgreen";
         }
 

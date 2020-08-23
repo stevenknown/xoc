@@ -47,20 +47,24 @@ class Region;
 #define RC_insert_cvt(r) ((r).u1.s1.insertCvt)
 #define RC_refine_stmt(r) ((r).u1.s1.refine_stmt)
 #define RC_stmt_removed(r) ((r).u1.s1.stmt_has_been_removed)
+#define RC_update_mdref(r) ((r).u1.s1.update_mdref)
 class RefineCtx {
 public:
     union {
         struct {
-            //Pass info topdown. e.g: int a; a/2 => a>>1
+            //Pass info topdown. True to do this type of refinement.
+            //e.g: int a; a/2 => a>>1
             UINT refine_div_const:1;
 
-            //Pass info topdown. e.g: int a; a*2 => a<<1
+            //Pass info topdown. True to do this type of refinement.
+            //e.g: int a; a*2 => a<<1
             UINT refine_mul_const:1;
 
-            //Pass info topdown. True to do refinement to stmt.
+            //Pass info topdown. True to do this type of refinement.
             UINT refine_stmt:1;
 
-            //Pass info topdown. e.g: int a; a=2+3 => a=5
+            //Pass info topdown. True to do this type of refinement.
+            //e.g: int a; a=2+3 => a=5
             UINT do_fold_const:1;
 
             //Pass info topdown.
@@ -74,6 +78,10 @@ public:
             //e.g: transform $1!=0?0:1 to lnot($1),
             //where lnot indicates logical-not.
             UINT hoist_to_lnot:1;
+
+            //Pass info topdown. True to compute and update MD reference
+            //when memory operation generated or modified.
+            UINT update_mdref:1;
 
             //Collect information bottom up to inform caller function
             //that current stmt has been removed from the BB.
@@ -92,6 +100,7 @@ public:
         RC_refine_mul_const(*this) = true;
         RC_refine_stmt(*this) = true;
         RC_do_fold_const(*this) = true;
+        RC_update_mdref(*this) = true;
 
         if (g_do_refine_auto_insert_cvt) {
             RC_insert_cvt(*this) = true;
@@ -103,6 +112,14 @@ public:
         RC_hoist_to_lnot(*this) = true;
     }
     RefineCtx const& operator = (RefineCtx const&);
+
+    bool doUpdateMDRef() const { return RC_update_mdref(*this); }
+    bool doInsertCVT() const { return RC_insert_cvt(*this); }
+    bool doFoldConst() const { return RC_do_fold_const(*this); }
+    bool doRefineStmt() const { return RC_refine_stmt(*this); }
+    bool doHoistLnot() const { return RC_hoist_to_lnot(*this); }
+    bool doRefineDivConst() const { return RC_refine_div_const(*this); }
+    bool doRefineMulConst() const { return RC_refine_mul_const(*this); }
 
     //Set flag to disable following optimizations.
     void setUnOptFlag()
@@ -172,8 +189,8 @@ class Refine : public Pass {
     IR * refineNot(IR * ir, bool & change, RefineCtx & rc);
     IR * refineBinaryOp(IR * ir, bool & change, RefineCtx & rc);
     IR * refineLoad(IR * ir);
-    IR * refineILoad1(IR * ir, bool & change);
-    IR * refineILoad2(IR * ir, bool & change);
+    IR * refineILoad1(IR * ir, bool & change, RefineCtx & rc);
+    IR * refineILoad2(IR * ir, bool & change, RefineCtx & rc);
     IR * refineILoad(IR * ir, bool & change, RefineCtx & rc);
     IR * refineDetViaSSAdu(IR * ir, bool & change);
     IR * refineDet(IR * ir_list, bool & change, RefineCtx & rc);
@@ -200,7 +217,7 @@ public:
     virtual PASS_TYPE getPassType() const { return PASS_REFINE; }
 
     //Invert condition for relation operation.
-    virtual void invertCondition(IR ** cond);
+    static void invertCondition(IR ** cond, Region * rg);
 
     //Perform peephole optimization to ir_list.
     //Return updated ir_list if optimization performed.

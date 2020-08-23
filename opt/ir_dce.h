@@ -135,7 +135,7 @@ public:
     }
     virtual ~DeadCodeElim() {}
 
-    void dump();
+    virtual bool dump() const;
 
     virtual CHAR const* getPassName() const
     { return "Dead Code Eliminiation"; }

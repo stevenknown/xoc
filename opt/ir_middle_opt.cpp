@@ -150,11 +150,11 @@ bool Region::performSimplify(OptCtx & oc)
         OC_is_pr_du_chain_valid(oc) &&
         OC_is_nonpr_du_chain_valid(oc)) {
         ASSERT0(getDUMgr() == NULL ||
-            getDUMgr()->verifyMDDUChain(DUOPT_COMPUTE_PR_DU | DUOPT_COMPUTE_NONPR_DU));
+                getDUMgr()->verifyMDDUChain(DUOPT_COMPUTE_PR_DU|
+                                            DUOPT_COMPUTE_NONPR_DU));
     }
 
     if (g_is_dump_after_pass && g_dump_opt.isDumpALL()) {
-        g_indent = 0;
         note("\n==---- DUMP AFTER SIMPLIFY IRBB LIST ----==");
         dumpBBList();
     }

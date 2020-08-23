@@ -64,7 +64,7 @@ public:
     void build(xcom::DGraph const& g);
     void build(xcom::DGraph const& g, DomTree const& domtree);
     void clean();
-    void dump(xcom::DGraph & g);
+    void dump(xcom::DGraph const& g) const;
 
     //Count Dominator Frontier Density for each xcom::Vertex.
     //Return true if there exist vertex that might inserting
@@ -87,7 +87,7 @@ class SSAGraph : xcom::Graph {
     VertexID2VP m_vdefs;
 public:
     SSAGraph(Region * rg, PRSSAMgr * ssamgr);
-    void dump(CHAR const* name = NULL, bool detail = true);
+    void dump(CHAR const* name = NULL, bool detail = true) const;
 };
 
 
@@ -244,17 +244,17 @@ public:
     void destroy(bool is_reinit);
     void destruction(DomTree & domtree);
     void destruction(OptCtx * oc);
-    void dump();
-    void dumpAllVPR();
-    CHAR * dumpVP(IN VPR * v, OUT CHAR * buf);
-    void dumpSSAGraph(CHAR * name = NULL);
+    virtual bool dump() const;
+    void dumpAllVPR() const;
+    CHAR * dumpVP(IN VPR * v, OUT CHAR * buf) const;
+    void dumpSSAGraph(CHAR * name = NULL) const;
 
     VPRVec const* getVPRVec() const { return &m_vpr_vec; }
     VPR * getVPR(UINT id) const { return m_vpr_vec.get(id); }
     //Map PRNO to VPRVec that recorded all VPR during SSA.
     VPRVec const* getVPRVecByPRNO(UINT prno) const
     { return m_map_prno2vpr_vec.get(prno); }
-    virtual CHAR const* getPassName() const { return "PR SSA Manager"; }
+    virtual CHAR const* getPassName() const { return "PRSSA Manager"; }
     PASS_TYPE getPassType() const { return PASS_PR_SSA_MGR; }
 
     IR * initVP(IN IR * ir);

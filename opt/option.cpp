@@ -368,6 +368,12 @@ bool DumpOpt::isDumpDCE() const
 }
 
 
+bool DumpOpt::isDumpCDG() const
+{
+    return is_dump_all || (!is_dump_nothing && is_dump_cdg);
+}
+
+
 bool DumpOpt::isDumpGVN() const
 {
     return is_dump_all || (!is_dump_nothing && is_dump_gvn);

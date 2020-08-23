@@ -37,7 +37,7 @@ protected:
     Region * m_rg;
     DUMgr * m_du;
     GVN const* m_gvn;
-    PRSSAMgr * m_ssamgr;
+    PRSSAMgr * m_prssamgr;
     MDSSAMgr * m_mdssamgr;
     bool m_is_use_gvn;
     DefMiscBitSetMgr * m_sbs_mgr;
@@ -48,23 +48,27 @@ protected:
     //e.g2: given IST(ILD(q)), return q and ist_star_level is 2.
     VN const* getVNOfIndirectOp(IR const* ir, UINT * indirect_level);
 
-    void processExpressionViaMDSSA(IR const* exp);
-    void processExpressionViaGVN(IR const* exp);
-    void processBB(IRBB const* bb);
-    void process();
+    bool processExpressionViaMDSSA(IR const* exp);
+    bool processExpressionViaGVN(IR const* exp);
+    bool processBB(IRBB const* bb);
+    bool process();
 
+    bool useMDSSADU() const
+    { return m_mdssamgr != NULL && m_mdssamgr->is_valid(); }
+    bool usePRSSADU() const
+    { return m_prssamgr != NULL && m_prssamgr->is_valid(); }
 public:
     explicit RefineDUChain(Region * rg) :
-        m_rg(rg), m_gvn(NULL), m_mdssamgr(NULL), m_is_use_gvn(false)
+        m_rg(rg), m_gvn(NULL), m_prssamgr(NULL), m_mdssamgr(NULL),
+        m_is_use_gvn(false)
     {
         ASSERT0(rg != NULL);
-        m_rg = rg;
         m_du = rg->getDUMgr();
         m_sbs_mgr = rg->getMiscBitSetMgr();
     }
     virtual ~RefineDUChain() {}
 
-    bool dump();
+    virtual bool dump() const;
 
     //True to use GVN and classic DU chain to perform optimization.
     void setUseGvn(bool use_gvn) { m_is_use_gvn = use_gvn; }

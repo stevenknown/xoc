@@ -241,10 +241,11 @@ void Region::init(REGION_TYPE rt, RegionMgr * rm)
 
 void Region::destroy()
 {
-    destroyPassMgr();
-    if ((is_inner() || is_function() || is_eh() || is_program()) &&
-        getAnalysisInstrument() != NULL) {
-        delete REGION_analysis_instrument(this);
+    if (!is_blackbox()) {
+        destroyPassMgr();
+        if (getAnalysisInstrument() != NULL) {
+            delete REGION_analysis_instrument(this);
+        }
     }
     REGION_analysis_instrument(this) = NULL;
     //MDSET destroied by MDSetMgr.
@@ -292,16 +293,14 @@ BBListIter Region::splitIRlistIntoBB(IR * irs,
     IRBB * newbb = allocBB();
     cfg->addBB(newbb);
     ctbb = bbl->insert_after(newbb, ctbb);
-    LAB2BB * lab2bb = cfg->getLabel2BBMap();
-
     while (irs != NULL) {
         IR * ir = xcom::removehead(&irs);
-        if (newbb->isDownBoundary(ir)) {
+        if (IRBB::isDownBoundary(ir)) {
             BB_irlist(newbb).append_tail(ir);
             newbb = allocBB();
             cfg->addBB(newbb);
             ctbb = bbl->insert_after(newbb, ctbb);
-        } else if (newbb->isUpperBoundary(ir)) {
+        } else if (IRBB::isUpperBoundary(ir)) {
             ASSERT0(ir->is_label());
 
             newbb = allocBB();
@@ -311,9 +310,8 @@ BBListIter Region::splitIRlistIntoBB(IR * irs,
             //Regard label-info as add-on info that attached on newbb, and
             //'ir' will be dropped off.
             LabelInfo const* li = ir->getLabel();
-            newbb->addLabel(li);
-            lab2bb->set(li, newbb);
-            if (!LABEL_INFO_is_try_start(li) && !LABEL_INFO_is_pragma(li)) {
+            cfg->addLabel(newbb, li);
+            if (!LABELINFO_is_try_start(li) && !LABELINFO_is_pragma(li)) {
                 BB_is_target(newbb) = true;
             }
             freeIRTree(ir); //free label ir.
@@ -503,7 +501,7 @@ bool Region::reconstructBBList(OptCtx & oc)
         IR * tail = irlst->get_tail();
         for (irlst->get_head(&ctir); ctir != NULL; irlst->get_next(&ctir)) {
             IR * ir = ctir->val();
-            if (bb->isDownBoundary(ir) && ir != tail) {
+            if (IRBB::isDownBoundary(ir) && ir != tail) {
                 change = true;
 
                 IR * restirs = NULL; //record rest part in bb list after 'ir'.
@@ -519,15 +517,11 @@ bool Region::reconstructBBList(OptCtx & oc)
 
                 ctbb = splitIRlistIntoBB(restirs, bbl, ctbb);
                 break;
-            } else if (bb->isUpperBoundary(ir)) {
+            } else if (IRBB::isUpperBoundary(ir)) {
                 ASSERT0(ir->is_label());
-
                 change = true;
-                BB_is_fallthrough(bb) = true;
-
                 IR * restirs = NULL; //record rest part in bb list after 'ir'.
                 IR * last = NULL;
-
                 for (C<IR*> * next_ctir = ctir;
                      ctir != NULL; ctir = next_ctir) {
                     irlst->get_next(&next_ctir);
@@ -610,34 +604,8 @@ void Region::constructBBList()
         pointer = IR_next(pointer);
         IR_next(cur_ir) = IR_prev(cur_ir) = NULL;
 
-        if (cur_bb->isDownBoundary(cur_ir)) {
+        if (IRBB::isDownBoundary(cur_ir)) {
             BB_irlist(cur_bb).append_tail(cur_ir);
-            switch (cur_ir->getCode()) {
-            case IR_CALL:
-            case IR_ICALL: //indirective call
-            case IR_TRUEBR:
-            case IR_FALSEBR:
-            case IR_SWITCH:
-                BB_is_fallthrough(cur_bb) = true;
-                break;
-            case IR_IGOTO:
-            case IR_GOTO:
-                //We have no knowledge about whether target BB of GOTO/IGOTO
-                //will be followed subsequently on current BB.
-                //Leave this problem to CFG builder, and the related
-                //attribute should be set at that time.
-                break;
-            case IR_RETURN:
-                //Succeed stmt of 'ir' may be DEAD code
-                //IR_BB_is_func_exit(cur_bb) = true;
-                BB_is_fallthrough(cur_bb) = true;
-                break;
-            case IR_REGION:
-                BB_is_fallthrough(cur_bb) = true;
-                break;
-            default: ASSERTN(0, ("invalid bb down-boundary IR"));
-            } //end switch
-
             //Generate new BB.
             getBBList()->append_tail(cur_bb);
             cur_bb = allocBB();
@@ -645,7 +613,6 @@ void Region::constructBBList()
         }
         
         if (cur_ir->is_label()) {
-            BB_is_fallthrough(cur_bb) = true;
             getBBList()->append_tail(cur_bb);
 
             //Generate new BB.
@@ -675,7 +642,6 @@ void Region::constructBBList()
 
         if (cur_ir->isMayThrow()) {
             BB_irlist(cur_bb).append_tail(cur_ir);
-            BB_is_fallthrough(cur_bb) = true;
 
             //Generate new BB.
             getBBList()->append_tail(cur_bb);
@@ -1283,6 +1249,13 @@ PassMgr * Region::allocPassMgr()
 }
 
 
+void Region::dumpIRList()
+{
+    if (getIRList() == NULL) { return; }
+    xoc::dumpIRList(getIRList(), this);
+}
+
+
 void Region::dumpBBList(bool dump_inner_region)
 {
     if (getBBList() == NULL) { return; }
@@ -1292,6 +1265,7 @@ void Region::dumpBBList(bool dump_inner_region)
 
 AnalysisInstrument * Region::getAnalysisInstrument() const
 {
+    ASSERT0(is_function() || is_program() || is_inner() || is_eh());
     return REGION_analysis_instrument(this);
 }
 
@@ -1423,11 +1397,24 @@ void Region::assignMDForBB(IRBB * bb,
 
 void Region::assignMDForIRList(IR * lst, bool assign_pr, bool assign_nonpr)
 {
-    IRIter ii;
-    for (IR * x = iterInit(lst, ii);
-         x != NULL; x = iterNext(ii)) {
-        assignMDImpl(x, assign_pr, assign_nonpr);
-    }
+    for (IR * ir = lst; ir != NULL; ir = ir->get_next()) {
+        switch (ir->getCode()) {
+        case IR_PR:
+        case IR_LD:
+        case IR_ID:
+            assignMDImpl(ir, assign_pr, assign_nonpr);
+            break;
+        default: {
+            //Iterate rest of ir in lst.
+            IRIter ii;
+            for (IR * x = iterInit(lst, ii);
+                 x != NULL; x = iterNext(ii)) {
+                assignMDImpl(x, assign_pr, assign_nonpr);
+            }
+            return;
+        }
+        }
+    }    
 }
 
 
@@ -1657,40 +1644,42 @@ void Region::prescan(IR const* ir)
                 }
             }
             break;
-        case IR_LDA:
-            {
-                ASSERT0(LDA_idinfo(ir));
-                Var * v = LDA_idinfo(ir);
-                if (v->is_string()) {
-                    if (getRegionMgr()->genDedicateStrMD() != NULL) {
-                        //Treat all string variable as the same one.
-                        break;
-                    }
-
-                    Var * sv = getVarMgr()->registerStringVar(
-                        NULL, VAR_string(v), MEMORY_ALIGNMENT);
-                    ASSERT0(sv);
-                    VAR_is_addr_taken(sv) = true;
-                } else if (v->is_label()) {
-                    ; //do nothing.
-                } else {
-                    //general variable.
-                    if (!ir->getParent()->is_array()) {
-                        //If LDA is the base of ARRAY, say (&a)[..], its
-                        //address does not need to mark as address taken.
-                        VAR_is_addr_taken(LDA_idinfo(ir)) = true;
-                    }
-
-                    // ...=&x.a, address of 'x.a' is taken.
-                    MD md;
-                    MD_base(&md) = LDA_idinfo(ir); //correspond to Var
-                    MD_ofst(&md) = LDA_ofst(ir);
-                    MD_size(&md) = ir->getTypeSize(getTypeMgr());
-                    MD_ty(&md) = MD_EXACT;
-                    getMDSystem()->registerMD(md);
+        case IR_LDA: {
+            ASSERT0(LDA_idinfo(ir));
+            Var * v = LDA_idinfo(ir);
+            if (v->is_string()) {
+                if (getRegionMgr()->genDedicateStrMD() != NULL) {
+                    //Treat all string variable as the same one.
+                    break;
                 }
-            }
+                Var * sv = getVarMgr()->registerStringVar(NULL, VAR_string(v),
+                                                          MEMORY_ALIGNMENT);
+                ASSERT0(sv);
+                VAR_is_addr_taken(sv) = true;
+            } else if (v->is_label()) {
+                ; //do nothing.
+            } else {
+                //General variable.
+                IR const* parent = ir->getParent();
+                ASSERT0(parent);
+                if (parent->isArrayOp() && parent->isArrayBase(ir)) {
+                    ; //nothing to do.
+                } else {
+                    //If LDA is the base of ARRAY, say (&a)[..], its
+                    //address does not need to mark as address taken.
+                    VAR_is_addr_taken(LDA_idinfo(ir)) = true;
+                }
+
+                // ...=&x.a, address of 'x.a' is taken.
+                MD md;
+                MD_base(&md) = LDA_idinfo(ir); //correspond to Var
+                MD_ofst(&md) = LDA_ofst(ir);
+                MD_size(&md) = ir->getTypeSize(getTypeMgr());
+                MD_ty(&md) = MD_EXACT;
+                getMDSystem()->registerMD(md);
+            }        
             break;
+        }
         case IR_ID:
             //Array base must not be ID. It could be
             //LDA or computational expressions.
@@ -1945,7 +1934,7 @@ void Region::dump(bool dump_inner_region)
     IR * irlst = getIRList();
     if (irlst != NULL) {
         note("\n==---- IR List ----==");
-        dumpIRList(irlst, this, NULL,
+        xoc::dumpIRList(irlst, this, NULL,
             IR_DUMP_KID | IR_DUMP_SRC_LINE |
             (dump_inner_region ? IR_DUMP_INNER_REGION : 0));
         return;
@@ -1961,7 +1950,7 @@ void Region::dumpAllocatedIR()
     note("\n==---- DUMP ALL IR INFO ----==");
     INT n = getIRVec()->get_last_idx();
     INT i = 1;
-    g_indent = 2;
+    g_indent += 2;
     UINT num_has_du = 0;
 
     //Dump which IR has allocate DU structure.
@@ -2034,6 +2023,7 @@ void Region::dumpAllocatedIR()
         }
     }
     fflush(g_tfile);
+    g_indent -= 2;
 }
 
 
@@ -2065,7 +2055,7 @@ void Region::dumpRef(UINT indent)
     }
 
     for (IRBB * bb = bbs->get_head(); bb != NULL; bb = bbs->get_next()) {
-        note("\n--- BB%d ---", BB_id(bb));
+        note("\n--- BB%d ---", bb->id());
         dumpBBRef(bb, indent);
     }
 }
@@ -2121,11 +2111,11 @@ bool Region::verifyMDRef()
                     if (g_is_support_dynamic_type) {
                         ASSERTN(t->getEffectRef(), ("type is at least effect"));
                         ASSERTN(!t->getEffectRef()->is_pr(),
-                            ("MD can not present a PR."));
+                                ("MD can not present a PR."));
                     } else {
                         ASSERTN(t->getExactRef(), ("type must be exact"));
                         ASSERTN(!t->getExactRef()->is_pr(),
-                            ("MD can not present a PR."));
+                                ("MD can not present a PR."));
                     }
 
                     //MayUse of ld may not empty.
@@ -2140,11 +2130,11 @@ bool Region::verifyMDRef()
                     if (g_is_support_dynamic_type) {
                         ASSERTN(t->getEffectRef(), ("type is at least effect"));
                         ASSERTN(t->getEffectRef()->is_pr(),
-                            ("MD must present a PR."));
+                                ("MD must present a PR."));
                     } else {
                         ASSERTN(t->getExactRef(), ("type must be exact"));
                         ASSERTN(t->getExactRef()->is_pr(),
-                            ("MD must present a PR."));
+                                ("MD must present a PR."));
                     }
                     ASSERT0(t->getRefMDSet() == NULL);
                     break;
@@ -2167,6 +2157,7 @@ bool Region::verifyMDRef()
                             MD const* x = getMDSystem()->getMD(i);
                             DUMMYUSE(x);
                             ASSERT0(x && !x->is_pr());
+                            ASSERT0(!x->get_base()->is_readonly());
                         }
                         ASSERT0(getMDSetHash()->find(*may));
                     }
@@ -2198,9 +2189,12 @@ bool Region::verifyMDRef()
                     }
                     break;
                 }
-                case IR_ST:
+                case IR_ST: {
+                    MD const* x = t->getRefMD();
+                    ASSERT0(!x->get_base()->is_readonly());
                     if (g_is_support_dynamic_type) {
-                        ASSERTN(t->getEffectRef(), ("type is at least effect"));
+                        ASSERTN(t->getEffectRef(),
+                                ("type is at least effect"));
                         ASSERTN(!t->getEffectRef()->is_pr(),
                                 ("MD can not present a PR."));
                     } else {
@@ -2213,6 +2207,7 @@ bool Region::verifyMDRef()
                         ASSERT0(getMDSetHash()->find(*t->getRefMDSet()));
                     }
                     break;
+                }
                 case IR_SETELEM:
                     if (g_is_support_dynamic_type) {
                         ASSERTN(t->getEffectRef(), ("type is at least effect"));
@@ -2713,8 +2708,8 @@ bool Region::partitionRegion()
     while (ir != NULL) {
         if (ir->is_label()) {
             LabelInfo const* li = LAB_lab(ir);
-            if (LABEL_INFO_type(li) == L_CLABEL &&
-                strcmp(SYM_name(LABEL_INFO_name(li)), "REGION_START") == 0) {
+            if (LABELINFO_type(li) == L_CLABEL &&
+                strcmp(SYM_name(LABELINFO_name(li)), "REGION_START") == 0) {
                 start_pos = ir;
                 break;
             }
@@ -2726,8 +2721,8 @@ bool Region::partitionRegion()
     while (ir != NULL) {
         if (ir->is_label()) {
             LabelInfo const* li = LAB_lab(ir);
-            if (LABEL_INFO_type(li) == L_CLABEL &&
-                strcmp(SYM_name(LABEL_INFO_name(li)), "REGION_END") == 0) {
+            if (LABELINFO_type(li) == L_CLABEL &&
+                strcmp(SYM_name(LABELINFO_name(li)), "REGION_END") == 0) {
                 end_pos = ir;
                 break;
             }
@@ -2760,16 +2755,16 @@ bool Region::partitionRegion()
         freeIRTree(t);
         inner_ru->addToIRList(inner_ir);
     }
-    dumpIRList(inner_ru->getIRList(), this);
+    xoc::dumpIRList(inner_ru->getIRList(), this);
     insertafter_one(&start_pos, ir_ru);
-    dumpIRList(getIRList(), this);
+    xoc::dumpIRList(getIRList(), this);
     //-------------
     OptCtx oc;
     bool succ = REGION_ru(ir_ru)->process(&oc);
     ASSERT0(succ);
     DUMMYUSE(succ);
 
-    dumpIRList(getIRList(), this);
+    xoc::dumpIRList(getIRList(), this);
 
     //Merger IR list in inner-region to outer region.
     //xcom::remove(&getAnalysisInstrument()->m_ir_list, ir_ru);
@@ -2834,9 +2829,8 @@ bool Region::processIRList(OptCtx & oc)
     prescan(getIRList());
     END_TIMER(t, "PreScan");
     if (g_is_dump_after_pass && g_dump_opt.isDumpALL()) {
-        g_indent = 0;
         note("\n==--- DUMP PRIMITIVE IR LIST ----==");
-        dumpIRList(getIRList(), this);
+        dumpIRList();
     }
     if (!HighProcess(oc)) { return false; }
     ASSERT0(getDUMgr() == NULL ||
@@ -2848,7 +2842,6 @@ bool Region::processIRList(OptCtx & oc)
     }
 
     if (!MiddleProcess(oc)) { return false; }
-
     return true;
 }
 

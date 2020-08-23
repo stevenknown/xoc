@@ -63,7 +63,7 @@ void MDSSAMgr::destroy()
 
 void MDSSAMgr::freeBBPhiList(IRBB * bb)
 {
-    MDPhiList * philist = m_usedef_mgr.getBBPhiList(BB_id(bb));
+    MDPhiList * philist = m_usedef_mgr.getBBPhiList(bb->id());
     if (philist == NULL) { return; }
 
     for (xcom::SC<MDPhi*> * sct = philist->get_head();
@@ -124,7 +124,7 @@ void MDSSAMgr::dumpRef(UINT indent)
     }
 
     for (IRBB * bb = bbs->get_head(); bb != NULL; bb = bbs->get_next()) {
-        note("\n--- BB%d ---", BB_id(bb));
+        note("\n--- BB%d ---", bb->id());
         dumpBBRef(bb, indent);
     }
 }
@@ -207,7 +207,7 @@ void MDSSAMgr::dumpAllVMD()
 //you need remove the related PHI operand if BB successor has PHI.
 void MDSSAMgr::removeSuccessorDesignatePhiOpnd(IRBB * bb, IRBB * succ)
 {
-    MDPhiList * philist = m_usedef_mgr.getBBPhiList(BB_id(succ));
+    MDPhiList * philist = m_usedef_mgr.getBBPhiList(succ->id());
     if (philist == NULL) { return; }
 
     UINT pos = m_cfg->WhichPred(bb, succ);
@@ -361,7 +361,7 @@ IR * MDPhi::insertOpndAt(MDSSAMgr * mgr, UINT pos, IRBB const* pred)
 //you need add the related PHI operand if BB successor has PHI stmt.
 void MDSSAMgr::addSuccessorDesignatePhiOpnd(IRBB * bb, IRBB * succ)
 {
-    MDPhiList * philist = m_usedef_mgr.getBBPhiList(BB_id(succ));
+    MDPhiList * philist = m_usedef_mgr.getBBPhiList(succ->id());
     if (philist == NULL) { return; }   
 
     UINT const pos = m_cfg->WhichPred(bb, succ);
@@ -391,18 +391,18 @@ void MDSSAMgr::dumpPhiList(MDPhiList const* philist) const
 }
 
 
-void MDSSAMgr::dump()
+bool MDSSAMgr::dump() const
 {
-    if (g_tfile == NULL) { return; }
-    note("\n\n==---- DUMP MDSSAMgr '%s'----==\n", m_rg->getRegionName());
+    if (g_tfile == NULL) { return false; }
+    note("\n==---- DUMP %s '%s' ----==", getPassName(), m_rg->getRegionName());
     BBList * bbl = m_rg->getBBList();
     List<IR const*> lst;
     List<IR const*> opnd_lst;
     UINT const indent = 2;
     for (IRBB * bb = bbl->get_head(); bb != NULL; bb = bbl->get_next()) {
-        note("\n--- BB%d ---", BB_id(bb));
+        note("\n--- BB%d ---", bb->id());
 
-        MDPhiList * philist = m_usedef_mgr.getBBPhiList(BB_id(bb));
+        MDPhiList * philist = m_usedef_mgr.getBBPhiList(bb->id());
         if (philist != NULL) {
             dumpPhiList(philist);
         }
@@ -472,6 +472,7 @@ void MDSSAMgr::dump()
     }
 
     fflush(g_tfile);
+    return true;
 }
 
 
@@ -569,15 +570,8 @@ MDDef * MDSSAMgr::findKillingDef(IR const* ir)
     if (def == NULL || def->is_phi()) { return NULL; }
 
     ASSERT0(def->getOcc());
-
     MD const* defmd = def->getOcc()->getRefMD();
-    if (defmd != NULL &&
-        (defmd == opndmd ||
-         (defmd->is_exact() && defmd->is_exact_cover(opndmd)))) {
-        //def is killing must-def.
-        return def;
-    }
-
+    if (defmd != NULL && isKillingDef(defmd, opndmd)) { return def; }
     return NULL;
 }
 
@@ -737,11 +731,10 @@ void MDSSAMgr::dumpDUChain()
     BBList * bbl = m_rg->getBBList();
     xcom::List<IR const*> lst;
     xcom::List<IR const*> opnd_lst;
-
-    g_indent = 0;
+    
     for (IRBB * bb = bbl->get_head(); bb != NULL; bb = bbl->get_next()) {
-        note("\n--- BB%d ---", BB_id(bb));
-        MDPhiList * philist = m_usedef_mgr.getBBPhiList(BB_id(bb));
+        note("\n--- BB%d ---", bb->id());
+        MDPhiList * philist = m_usedef_mgr.getBBPhiList(bb->id());
         if (philist != NULL) {
             for (xcom::SC<MDPhi*> * sct = philist->get_head();
                  sct != philist->end(); sct = philist->get_next(sct)) {
@@ -930,7 +923,7 @@ void MDSSAMgr::collectDefinedMDAndInitVMD(IN IRBB * bb,
 
 void MDSSAMgr::insertPhi(UINT mdid, IN IRBB * bb)
 {
-    UINT num_opnd = m_cfg->getInDegree(m_cfg->getVertex(BB_id(bb)));
+    UINT num_opnd = m_cfg->getInDegree(m_cfg->getVertex(bb->id()));
 
     //Here each operand and result of phi set to same type.
     //They will be revised to correct type during renaming.
@@ -959,14 +952,14 @@ void MDSSAMgr::placePhiForMD(UINT mdid,
     for (IRBB * defbb = defbbs->get_head(&bbit);
          defbb != NULL; defbb = defbbs->get_next(&bbit)) {
         wl.append_tail(defbb);
-        //visited.bunion(BB_id(defbb));
+        //visited.bunion(defbb->id());
     }
 
     while (wl.get_elem_count() != 0) {
         IRBB * bb = wl.remove_head();
 
         //Each basic block in dfcs is in dominance frontier of 'bb'.
-        xcom::BitSet const* dfcs = dfm.getDFControlSet(BB_id(bb));
+        xcom::BitSet const* dfcs = dfm.getDFControlSet(bb->id());
         if (dfcs == NULL) { continue; }
 
         for (INT i = dfcs->get_first(); i >= 0; i = dfcs->get_next(i)) {
@@ -1098,7 +1091,7 @@ void MDSSAMgr::placePhi(DfMgr const& dfm,
     Vector<List<IRBB*>*> md2defbb(bblst->get_elem_count());    
     for (IRBB * bb = bblst->get_head(); bb != NULL; bb = bblst->get_next()) {
         DefSBitSet * bs = bs_mgr.allocSBitSet();
-        defined_md_vec.set(BB_id(bb), bs);
+        defined_md_vec.set(bb->id(), bs);
         collectDefinedMDAndInitVMD(bb, *bs);
         if (m_is_semi_pruned) {
             recordEffectMD(bb, effect_md);
@@ -1272,7 +1265,7 @@ void MDSSAMgr::addDefChain(MDDef * def1, MDDef * def2)
 void MDSSAMgr::renamePhiResult(IN IRBB * bb)
 {
     ASSERT0(bb);
-    MDPhiList * philist = m_usedef_mgr.getBBPhiList(BB_id(bb));
+    MDPhiList * philist = m_usedef_mgr.getBBPhiList(bb->id());
     if (philist == NULL) { return; }
 
     for (xcom::SC<MDPhi*> * sct = philist->get_head();
@@ -1364,9 +1357,9 @@ void MDSSAMgr::handleBBRename(IRBB * bb,
                               DefSBitSet & defed_mds,
                               IN OUT BB2VMDMap & bb2vmdmap)
 {
-    ASSERT0(bb2vmdmap.get(BB_id(bb)) == NULL);
+    ASSERT0(bb2vmdmap.get(bb->id()) == NULL);
     xcom::TMap<UINT, VMD*> * mdid2vmd = new xcom::TMap<UINT, VMD*>();
-    bb2vmdmap.set(BB_id(bb), mdid2vmd);
+    bb2vmdmap.set(bb->id(), mdid2vmd);
 
     DefSBitSetIter cur = NULL;
     for (INT mdid = defed_mds.get_first(&cur);
@@ -1402,7 +1395,7 @@ void MDSSAMgr::handleBBRename(IRBB * bb,
         ASSERT0(p);
 
         //Replace opnd of PHI of 'succ' with top SSA version.
-        MDPhiList * philist = m_usedef_mgr.getBBPhiList(BB_id(succ));
+        MDPhiList * philist = m_usedef_mgr.getBBPhiList(succ->id());
         if (philist == NULL) { continue; }
 
         for (xcom::SC<MDPhi*> * sct = philist->get_head();
@@ -1445,14 +1438,14 @@ void MDSSAMgr::renameInDomTreeOrder(xcom::DefSBitSet const& effect_mds,
     stk.push(root);
     List<IR*> lst; //for tmp use.
     while ((v = stk.get_top()) != NULL) {
-        if (!visited.is_contain(BB_id(v))) {
-            visited.bunion(BB_id(v));
-            xcom::DefSBitSet * defed_mds = defed_mds_vec.get(BB_id(v));
+        if (!visited.is_contain(v->id())) {
+            visited.bunion(v->id());
+            xcom::DefSBitSet * defed_mds = defed_mds_vec.get(v->id());
             ASSERT0(defed_mds);
             handleBBRename(v, effect_mds, *defed_mds, bb2vmdmap);
         }
 
-        xcom::Vertex const* bbv = domtree.getVertex(BB_id(v));
+        xcom::Vertex const* bbv = domtree.getVertex(v->id());
         bool all_visited = true;
         for (xcom::EdgeC const* c = VERTEX_out_list(bbv);
              c != NULL; c = EC_next(c)) {
@@ -1470,9 +1463,9 @@ void MDSSAMgr::renameInDomTreeOrder(xcom::DefSBitSet const& effect_mds,
             stk.pop();
 
             //Do post-processing while all kids of BB has been processed.
-            xcom::TMap<UINT, VMD*> * mdid2vmd = bb2vmdmap.get(BB_id(v));
+            xcom::TMap<UINT, VMD*> * mdid2vmd = bb2vmdmap.get(v->id());
             ASSERT0(mdid2vmd);
-            xcom::DefSBitSet * defed_mds = defed_mds_vec.get(BB_id(v));
+            xcom::DefSBitSet * defed_mds = defed_mds_vec.get(v->id());
             ASSERT0(defed_mds);
 
             DefSBitSetIter cur = NULL;
@@ -1487,7 +1480,7 @@ void MDSSAMgr::renameInDomTreeOrder(xcom::DefSBitSet const& effect_mds,
             }
 
             //vmdmap is useless from now on.
-            bb2vmdmap.set(BB_id(v), NULL);
+            bb2vmdmap.set(v->id(), NULL);
             delete mdid2vmd;
         }
     }
@@ -1571,12 +1564,12 @@ void MDSSAMgr::destructionInDomTreeOrder(IRBB * root, xcom::Graph & domtree)
     IRBB * v = NULL;
     stk.push(root);
     while ((v = stk.get_top()) != NULL) {
-        if (!visited.is_contain(BB_id(v))) {
-            visited.bunion(BB_id(v));
+        if (!visited.is_contain(v->id())) {
+            visited.bunion(v->id());
             destructBBSSAInfo(v);
         }
 
-        xcom::Vertex * bbv = domtree.getVertex(BB_id(v));
+        xcom::Vertex * bbv = domtree.getVertex(v->id());
         ASSERTN(bbv, ("dom tree is invalid."));
 
         xcom::EdgeC * c = VERTEX_out_list(bbv);
@@ -1653,7 +1646,7 @@ bool MDSSAMgr::verifyPhi(bool is_vpinfo_avail)
     List<IRBB*> preds;
     for (IRBB * bb = bblst->get_head(); bb != NULL; bb = bblst->get_next()) {
         m_cfg->get_preds(preds, bb);
-        MDPhiList * philist = m_usedef_mgr.getBBPhiList(BB_id(bb));
+        MDPhiList * philist = m_usedef_mgr.getBBPhiList(bb->id());
         if (philist == NULL) { continue; }
 
         for (xcom::SC<MDPhi*> * sct = philist->get_head();
@@ -1876,7 +1869,7 @@ bool MDSSAMgr::verify()
     for (bbl->get_head(&ct); ct != bbl->end(); ct = bbl->get_next(ct)) {
         IRBB * bb = ct->val();
         //Verify PHI list.
-        MDPhiList * philist = m_usedef_mgr.getBBPhiList(BB_id(bb));
+        MDPhiList * philist = m_usedef_mgr.getBBPhiList(bb->id());
         if (philist != NULL) {
             for (xcom::SC<MDPhi*> * sct = philist->get_head();
                  sct != philist->end(); sct = philist->get_next(sct)) {
@@ -2410,7 +2403,7 @@ bool MDSSAMgr::removePHIHasNoValidDef(List<IRBB*> & wl,
 bool MDSSAMgr::prunePhiForBB(List<IRBB*> & wl, IRBB * bb)
 {
     ASSERT0(bb);
-    MDPhiList * philist = m_usedef_mgr.getBBPhiList(BB_id(bb));
+    MDPhiList * philist = m_usedef_mgr.getBBPhiList(bb->id());
     if (philist == NULL) { return false; }
 
     bool remove = false;
@@ -2469,7 +2462,8 @@ bool MDSSAMgr::prunePhi(List<IRBB*> & wl)
 
 
 static void iterDefCHelper(MDDef const* def,
-                           MDSSAMgr * mgr,
+                           IR const* use,
+                           MDSSAMgr const* mgr,
                            OUT ConstMDDefIter & ii)
 {
     ASSERT0(def);    
@@ -2478,7 +2472,7 @@ static void iterDefCHelper(MDDef const* def,
         for (IR const* opnd = MDPHI_opnd_list(def);
              opnd != NULL; opnd = opnd->get_next()) {
             VMD const* vmd = ((MDPhi const*)def)->getOpndVMD(
-                opnd, mgr->getUseDefMgr());
+                opnd, const_cast<MDSSAMgr*>(mgr)->getUseDefMgr());
             ASSERT0(vmd);
             MDDef * vmd_tdef = vmd->getDef();
             if (vmd_tdef == NULL ||
@@ -2491,11 +2485,97 @@ static void iterDefCHelper(MDDef const* def,
         }
         return;
     }
-
+   
+    ASSERT0(def->getOcc()); 
+    if (use != NULL && isKillingDef(def->getOcc(), use)) {
+        //Stop the iteration until meeting the killing DEF real stmt.
+        return;
+    }
     MDDef const* prev = def->getPrev();
     if (prev == NULL || ii.is_visited(prev)) { return; }
     ii.set_visited(prev);
     ii.append_tail(prev);
+}
+
+
+//Iterative access USE in MDSSAInfo. The USE always an IR occurrence that
+//describes a memory expression.
+//This funtion initialize the iterator.
+//'def': the MDDef of the chain.
+//'ii': iterator. It should be clean already.
+//Readonly function.
+IR const* MDSSAMgr::iterUseInitC(IR const* def,
+                                 OUT ConstMDSSAUSEIRIter & ii) const
+{
+    MDSSAMgr * pthis = const_cast<MDSSAMgr*>(this);
+    MDSSAInfo * info = pthis->getUseDefMgr()->getMDSSAInfo(def);
+    ASSERT0(info);
+    ii.vopndset_iter = NULL;
+    ii.vopndset = info->getVOpndSet();
+    //Find the first iter and position in VOpndSet.
+    for (ii.current_pos_in_vopndset = ii.vopndset->get_first(
+            &ii.vopndset_iter);
+         ii.current_pos_in_vopndset >= 0;
+         ii.current_pos_in_vopndset = ii.vopndset->get_next(
+            ii.current_pos_in_vopndset, &ii.vopndset_iter)) {
+        VMD * vopnd = (VMD*)pthis->getUseDefMgr()->getVOpnd(
+            ii.current_pos_in_vopndset);
+        ASSERT0(vopnd && vopnd->is_md());
+        ii.current_useset = vopnd->getUseSet();
+        ii.useset_iter = NULL;
+        //Find the first iter and position in UseSet.
+        for (ii.current_pos_in_useset = ii.current_useset->get_first(
+                 &ii.useset_iter);
+             ii.useset_iter != NULL;
+             ii.current_pos_in_useset = ii.current_useset->get_next(
+                 ii.current_pos_in_useset, &ii.useset_iter)) {            
+            IR * use = m_rg->getIR(ii.current_pos_in_useset);
+            ASSERT0(use && !use->isReadPR());
+            return use;
+        }
+    }
+    return NULL;
+}
+
+
+//Iterative access USE in MDSSAInfo. The USE always an IR occurrence that
+//describes a memory expression.
+//This function return the next USE accroding to 'ii'.
+//'ii': iterator.
+//Readonly function.
+IR const* MDSSAMgr::iterUseNextC(OUT ConstMDSSAUSEIRIter & ii) const
+{
+    MDSSAMgr * pthis = const_cast<MDSSAMgr*>(this);
+    //Update iter and position in UseSet.
+    for (; ii.useset_iter != NULL;
+         ii.current_pos_in_useset = ii.current_useset->get_next(
+             ii.current_pos_in_useset, &ii.useset_iter)) {            
+        IR * use = m_rg->getIR(ii.current_pos_in_useset);
+        ASSERT0(use && !use->isReadPR());
+        return use;
+    }
+
+    //Update iter and position in VOpndSet.
+    for (; ii.current_pos_in_vopndset >= 0;
+         ii.current_pos_in_vopndset = ii.vopndset->get_next(
+             ii.current_pos_in_vopndset, &ii.vopndset_iter)) {
+        VMD * vopnd = (VMD*)pthis->getUseDefMgr()->getVOpnd(
+            ii.current_pos_in_vopndset);
+        ASSERT0(vopnd && vopnd->is_md());
+        ii.current_useset = vopnd->getUseSet();
+        ii.useset_iter = NULL;
+        //Find the first iter and position in UseSet.
+        for (ii.current_pos_in_useset = ii.current_useset->get_first(
+                 &ii.useset_iter);
+             ii.useset_iter != NULL;
+             ii.current_pos_in_useset = ii.current_useset->get_next(
+                 ii.current_pos_in_useset, &ii.useset_iter)) {            
+            IR * use = m_rg->getIR(ii.current_pos_in_useset);
+            ASSERT0(use && !use->isReadPR());
+            return use;
+        }
+    }    
+    return NULL;
 }
 
 
@@ -2505,11 +2585,11 @@ static void iterDefCHelper(MDDef const* def,
 //'ii': iterator. It should be clean already.
 //Readonly function.
 MDDef const* MDSSAMgr::iterDefInitC(MDDef const* def,
-                                    OUT ConstMDDefIter & ii)
+                                    OUT ConstMDDefIter & ii) const
 {
     ASSERT0(def);
     ii.set_visited(def);
-    iterDefCHelper(def, this, ii);    
+    iterDefCHelper(def, NULL, this, ii);    
     return def;
 }
 
@@ -2518,11 +2598,45 @@ MDDef const* MDSSAMgr::iterDefInitC(MDDef const* def,
 //This function return the next MDDef node accroding to 'ii'.
 //'ii': iterator.
 //Readonly function.
-MDDef const* MDSSAMgr::iterDefNextC(IN OUT ConstMDDefIter & ii)
+MDDef const* MDSSAMgr::iterDefNextC(IN OUT ConstMDDefIter & ii) const
 {
     MDDef const* def = ii.remove_head();
     if (def == NULL) { return NULL; }
-    iterDefCHelper(def, this, ii);
+    iterDefCHelper(def, NULL, this, ii);
+    return def;
+}
+
+
+//Iterative access MDDef chain.
+//This funtion initialize the iterator.
+//'def': the beginning MDDef of the chain.
+//'use': indicate the USE expression of the 'def'.
+//'ii': iterator. It should be clean already.
+//Readonly function.
+MDDef const* MDSSAMgr::iterDefInitCTillKillingDef(MDDef const* def,
+                                                  IR const* use,
+                                                  OUT ConstMDDefIter & ii) const
+{
+    ASSERT0(def && use && use->is_exp());
+    ii.set_visited(def);
+    iterDefCHelper(def, use, this, ii);
+    return def;
+}
+
+
+//Iterative access MDDef chain.
+//This function return the next MDDef node accroding to 'ii'.
+//'ii': iterator.
+//'use': indicate the USE expression of the 'def'.
+//Readonly function.
+MDDef const* MDSSAMgr::iterDefNextCTillKillingDef(
+    IR const* use,
+    IN OUT ConstMDDefIter & ii) const
+{
+    ASSERT0(use && use->is_exp());
+    MDDef const* def = ii.remove_head();
+    if (def == NULL) { return NULL; }
+    iterDefCHelper(def, use, this, ii);
     return def;
 }
 
@@ -2597,7 +2711,6 @@ bool MDSSAMgr::construction(DomTree & domtree)
 
     if (g_is_dump_after_pass && g_dump_opt.isDumpMDSSAMgr()) {
         START_TIMER(tdump, "MDSSA: Dump After Pass");
-        g_indent = 0;
         m_md_sys->dump(true);
         dump();
         dumpDUChain();

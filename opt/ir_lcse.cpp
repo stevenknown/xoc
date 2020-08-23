@@ -120,7 +120,7 @@ IR * LCSE::hoist_cse(IN IRBB * bb, IN IR * ir_pos, IN ExpRep * ie)
                     insert_st = true;
                 } else {
                     xcom::replace(&CALL_param_list(ir_pos), p,
-                        m_rg->dupIRTree(ret));
+                                  m_rg->dupIRTree(ret));
                     insert_st = false;
                 }
                 ASSERT0(IR_prev(p) == NULL && p->get_next() == NULL);
@@ -128,7 +128,7 @@ IR * LCSE::hoist_cse(IN IRBB * bb, IN IR * ir_pos, IN ExpRep * ie)
                 if (insert_st) {
                     ASSERT0(ret->getRefMD());
                     IR * new_st = m_rg->buildStorePR(PR_no(ret),
-                        ret->getType(), p);
+                                                     ret->getType(), p);
                     new_st->setRefMD(ret->getRefMD(), m_rg);
                     BB_irlist(bb).insert_before(new_st, pos_holder);
                 }
@@ -423,7 +423,8 @@ bool LCSE::processParamList(IN IRBB * bb,
             if (canBeCandidate(p)) {
                 ExpRep * ie = m_expr_tab->map_ir2ir_expr(p);
                 IR * newparam = processExp(bb, ie, ir,
-                    avail_ir_expr, map_expr2avail_pos, map_expr2avail_pr);
+                                           avail_ir_expr, map_expr2avail_pos,
+                                           map_expr2avail_pr);
                 if (newparam != NULL) {
                     change = true;
                     lchange = true;
@@ -532,7 +533,7 @@ bool LCSE::processUse(IN IRBB * bb,
         ExpRep * ie = m_expr_tab->map_ir2ir_expr(RET_exp(ir));
         ASSERT0(ie);
         IR * cse_val = processExp(bb, ie, ir, avail_ir_expr,
-            map_expr2avail_pos, map_expr2avail_pr);
+                                  map_expr2avail_pos, map_expr2avail_pr);
         if (RET_exp(ir) != cse_val) {
             RET_exp(ir) = m_rg->dupIRTree(cse_val);
             ir->setParentPointer();
@@ -663,8 +664,7 @@ bool LCSE::perform(OptCtx & oc)
     xcom::Vector<IR*> map_expr2avail_pr;
     BBListIter ctbb = NULL;
     MDSet tmp;
-    for (bbl->get_head(&ctbb); ctbb != bbl->end();
-         ctbb = bbl->get_next(ctbb)) {
+    for (bbl->get_head(&ctbb); ctbb != bbl->end(); ctbb = bbl->get_next(ctbb)) {
         IRBB * bb = ctbb->val();
         ASSERT0(bb);
         map_expr2avail_pos.clean();
@@ -676,13 +676,13 @@ bool LCSE::perform(OptCtx & oc)
             IR * ir = ct->val();
             if (ir->hasSideEffect()) { continue; }
             change |= processUse(bb, ir, avail_ir_expr,
-                map_expr2avail_pos, map_expr2avail_pr);
+                                 map_expr2avail_pos, map_expr2avail_pr);
             if (!ir->hasResult()) { continue; }
 
             //There may have expressions be killed.
             //Remove them out the avail_ir_expr.
             change |= processDef(bb, ir, avail_ir_expr,
-                map_expr2avail_pos, map_expr2avail_pr, tmp);
+                                 map_expr2avail_pos, map_expr2avail_pr, tmp);
         }
     }
     tmp.clean(m_misc_bs_mgr);

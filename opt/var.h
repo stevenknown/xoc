@@ -52,14 +52,23 @@ class RegionMgr;
 ///////////////////////////////////////////////////////
 #define DEDICATED_STRING_VAR_NAME "#DedicatedStringVar"
 #define VAR_UNDEF 0x0
-#define VAR_GLOBAL 0x1    //can be seen by all functions.
 
-//This kind of variable only can be seen by current function or thread.
+//This attribute describe the scope of variable.
+//A variable can be seen by all regions if it is GLOBAL.
+#define VAR_GLOBAL 0x1
+
+//This attribute defined the scope of variable.
+//A variable can ONLY be seen by current and inner region.
 //It always be allocated in stack or thread local storage(TLS).
 #define VAR_LOCAL 0x2
 
-//This kind of variable can be seen in same file.
+//This attribute describe the scope of variable.
+//A private variable which is GLOBAL can ONLY be seen in
+//current and inner region.
 #define VAR_PRIVATE 0x4
+
+//This attribute describe the access authority of variable.
+//A readonly variable guarantees that no operation can modify the memory.
 #define VAR_READONLY 0x8 //var is readonly
 #define VAR_VOLATILE 0x10 //var is volatile
 #define VAR_HAS_INIT_VAL 0x20 //var with initialied value.
@@ -111,22 +120,30 @@ public:
 #define VAR_is_label(v) ((v)->u2.s1.is_label)
 
 //Variable is global.
+//This attribute describe the scope of variable.
+//A variable can be seen by all regions if it is GLOBAL.
 #define VAR_is_global(v) ((v)->u2.s1.is_global)
 
 //Variable is local.
+//This attribute defined the scope of variable.
+//A variable can ONLY be seen by current and inner region.
+//It always be allocated in stack or thread local storage(TLS).
 #define VAR_is_local(v) ((v)->u2.s1.is_local)
 
-//Global Variables which is private cannot be
-//referenced outside current file region.
+//This attribute describe the scope of variable.
+//A private variable which is GLOBAL can ONLY be seen in
+//current and inner region.
 #define VAR_is_private(v) ((v)->u2.s1.is_private)
 
 //Variable is readonly.
+//This attribute describe the access authority of variable.
+//A readonly variable guarantees that no operation can modify the memory.
 #define VAR_is_readonly(v) ((v)->u2.s1.is_readonly)
 
 //Record the initial valud index.
 #define VAR_byte_val(v) ((v)->u1.byte_val)
 
-//Record prno.
+//Record prno if variable represent a PR.
 #define VAR_prno(v) ((v)->u1.prno)
 
 //Variable has initial value.
@@ -142,7 +159,7 @@ public:
 //Variable is volatile.
 #define VAR_is_volatile(v) ((v)->u2.s1.is_volatile)
 
-//Variable is an array.
+//Variable describes a memory that arranged in the manner of array.
 #define VAR_is_array(v) ((v)->u2.s1.is_array)
 
 //Variable is parameter of this region.

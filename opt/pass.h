@@ -45,6 +45,14 @@ public:
     Pass() {}
     virtual ~Pass() {}
 
+    virtual bool dump() const
+    {
+        ASSERTN(0, ("Optimization Dependent Code"));
+        //The recommended dump format is:
+        //\n==---- DUMP PassName 'RegionName' ----==
+        return true;
+    }
+
     virtual CHAR const* getPassName() const
     {
         ASSERTN(0, ("Optimization Dependent Code"));

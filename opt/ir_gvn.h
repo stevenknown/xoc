@@ -574,7 +574,7 @@ protected:
         return vn;
     }
 
-    void dump_h1(IR const* k, VN const* x);
+    void dump_h1(IR const* k, VN const* x) const;
 
     void processBB(IRBB * bb, bool & change);
     void processCall(IR const* ir, bool & change);
@@ -586,13 +586,17 @@ public:
     COPY_CONSTRUCTOR(GVN);
     virtual ~GVN();
 
-    bool calcCondMustVal(IR const* ir, bool & must_true, bool & must_false);
-    void dump();
-    void dumpBB(UINT bbid);
-    void dumpIR2VN();
+    //Return true if GVN is able to determine the result of 'ir', otherwise
+    //return false that GVN know nothing about ir.
+    bool calcCondMustVal(IR const* ir,
+                         bool & must_true,
+                         bool & must_false) const;
 
-    virtual CHAR const* getPassName() const
-    { return "Global Value Numbering"; }
+    bool dump() const;
+    void dumpBB(UINT bbid) const;
+    void dumpIR2VN() const;
+
+    virtual CHAR const* getPassName() const { return "Global Value Numbering"; }
 
     PASS_TYPE getPassType() const { return PASS_GVN; }
 

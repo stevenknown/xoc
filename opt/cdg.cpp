@@ -38,11 +38,10 @@ namespace xoc {
 //
 //START CDG
 //
-void CDG::dump()
+void CDG::dump() const
 {
-    dumpVCG("graph_cd_tree.vcg");
     if (g_tfile == NULL) { return; }
-    note("\n==---- DUMP Control Dependence ----==");
+    note("\n==---- DUMP Control Dependence '%s' ----==", m_rg->getRegionName());
     INT c;
     for (xcom::Vertex * v = get_first_vertex(c);
          v != NULL; v = get_next_vertex(c)) {
@@ -77,7 +76,7 @@ void CDG::get_cd_preds(UINT id, OUT List<xcom::Vertex*> & lst)
 
 
 //Return true if b is control dependent on a.
-bool CDG::is_cd(UINT a, UINT b)
+bool CDG::is_cd(UINT a, UINT b) const
 {
     ASSERT0(getVertex(b));
     xcom::Vertex * v = getVertex(a);
@@ -93,7 +92,7 @@ bool CDG::is_cd(UINT a, UINT b)
 }
 
 
-bool CDG::is_only_cd_self(UINT id)
+bool CDG::is_only_cd_self(UINT id) const
 {
     xcom::Vertex * v = getVertex(id);
     ASSERT0(v != NULL);
@@ -131,23 +130,25 @@ void CDG::build(IN OUT OptCtx & oc, xcom::DGraph & cfg)
 {
     if (cfg.getVertexNum() == 0) { return; }
 
-    START_TIMER(t, "CDG");
+    START_TIMER(t, "Build CDG");
     ASSERT0(OC_is_cfg_valid(oc));
     m_rg->checkValidAndRecompute(&oc, PASS_PDOM, PASS_UNDEF);
 
     xcom::Graph pdom_tree;
     cfg.get_pdom_tree(pdom_tree);
+    pdom_tree.reverseEdges();
     if (pdom_tree.getVertexNum() == 0) { return; }
 
     Vector<Vertex*> top_order;
-    pdom_tree.sortInTopologOrder(top_order);
-    //dumpIntVector(top_order);
+    bool has_cyc = pdom_tree.sortInTopologOrder(top_order);
+    CHECK_DUMMYUSE(!has_cyc);
 
     xcom::BitSetMgr bs_mgr;
+    //Record vex set that current vex controlled by.
     Vector<xcom::BitSet*> cd_set;
     for (INT j = 0; j <= top_order.get_last_idx(); j++) {
         UINT ii = top_order.get(j)->id();
-        xcom::Vertex * v = cfg.getVertex(ii);
+        xcom::Vertex const* v = cfg.getVertex(ii);
         ASSERT0(v != NULL);
         addVertex(v->id());
         xcom::BitSet * cd_of_v = cd_set.get(v->id());
@@ -156,42 +157,46 @@ void CDG::build(IN OUT OptCtx & oc, xcom::DGraph & cfg)
             cd_set.set(v->id(), cd_of_v);
         }
 
-        xcom::EdgeC * in = v->getInList();
-        while (in != NULL) {
-            xcom::Vertex * pred = in->getFrom();
-            if (v->id() != ((xcom::DGraph&)cfg).get_ipdom(pred->id())) {
+        //Predecessor control current vex if vex is not ipdom of predecessor.
+        for (xcom::EdgeC const* in = v->getInList();
+             in != NULL; in = in->get_next()) {
+            xcom::Vertex const* pred = in->getFrom();
+            if (v->id() != cfg.get_ipdom(pred->id())) {
                 cd_of_v->bunion(pred->id());
-                //if (pred != v)
-                {
+                if (m_consider_cycle || pred != v) {
                     addEdge(pred->id(), v->id());
                 }
             }
-            in = in->get_next();
+            
         }
+
+        //For each vex that ipdom is current vex.
         INT c;
-        for (xcom::Vertex * z = cfg.get_first_vertex(c);
+        for (xcom::Vertex const* z = cfg.get_first_vertex(c);
              z != NULL; z = cfg.get_next_vertex(c)) {
-            if (((xcom::DGraph&)cfg).get_ipdom(z->id()) == v->id()) {
-                xcom::BitSet * cd = cd_set.get(z->id());
-                if (cd == NULL) {
-                    cd = bs_mgr.create();
-                    cd_set.set(z->id(), cd);
-                }
-                for (INT i = cd->get_first(); i != -1; i = cd->get_next(i)) {
-                    if (v->id() != ((xcom::DGraph&)cfg).get_ipdom(i)) {
-                        cd_of_v->bunion(i);
-                        //if (i != (INT)v->id())
-                        {
-                            addEdge(i, v->id());
-                        }
+            if (cfg.get_ipdom(z->id()) != v->id()) {
+                continue;
+            }
+            xcom::BitSet * cd = cd_set.get(z->id());
+            if (cd == NULL) {
+                cd = bs_mgr.create();
+                cd_set.set(z->id(), cd);
+            }
+            for (INT i = cd->get_first(); i != -1; i = cd->get_next(i)) {
+                if (v->id() != cfg.get_ipdom(i)) {
+                    cd_of_v->bunion(i);
+                    if (m_consider_cycle || i != (INT)v->id()) {
+                        addEdge(i, v->id());
                     }
                 }
             }
         }
-    } //end for
-
+    }
     OC_is_cdg_valid(oc) = true;
-    END_TIMER(t, "CDG");
+    if (g_is_dump_after_pass && g_dump_opt.isDumpCDG()) {
+        dump();
+    }
+    END_TIMER(t, "Build CDG");
 }
 //END CDG
 

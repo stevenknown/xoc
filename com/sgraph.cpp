@@ -792,14 +792,14 @@ bool Graph::sortInTopologOrder(OUT Vector<Vertex*> & vex_vec)
         is_removed.bunion(ready->id());
         vex_vec.set(pos, ready);
         pos++;
-        for (xcom::EdgeC const* el = VERTEX_out_list(ready);
-             el != NULL; el = EC_next(el)) {
+        for (xcom::EdgeC const* el = ready->getOutList();
+             el != NULL; el = el->get_next()) {
             Vertex * ready_succ = el->getTo();
 
             //Determine if in-degree equal to 1.
             UINT in_degree = 0;
-            for (xcom::EdgeC const* el2 = VERTEX_in_list(ready_succ);
-                 el2 != NULL; el2 = EC_next(el2)) {
+            for (xcom::EdgeC const* el2 = ready_succ->getInList();
+                 el2 != NULL; el2 = el2->get_next()) {
                 Vertex const* ready_succ_pred = EDGE_from(EC_edge(el2));
                 if (is_removed.is_contain(ready_succ_pred->id())) {
                     continue;
@@ -959,6 +959,21 @@ void Graph::removeTransitiveEdgeHelper(Vertex const* fromvex,
             removeEdge(EC_edge(ec2));
         }
     }
+}
+
+
+void Graph::dumpVexVector(Vector<Vertex*> const& vec, FILE * h)
+{
+    if (h == NULL) { return; }
+    fprintf(h, "\n");
+    for (INT i = 0; i <= vec.get_last_idx(); i++) {
+        Vertex const* x = vec.get(i);
+        if (x != NULL) {
+            if (i != 0) { fprintf(h, ","); }
+            fprintf(h, "V%d", x->id());
+        }
+    }
+    fflush(h);
 }
 
 
@@ -1781,10 +1796,9 @@ void DGraph::sortDomTreeInPreorder(IN Vertex * root, OUT List<Vertex*> & lst)
 //'order_buf': record the bfs-order for each vertex.
 //NOTE: BFS does NOT keep the sequence if you are going to
 //access vertex in lexicographic order.
-void DGraph::sortInBfsOrder(
-        Vector<UINT> & order_buf,
-        Vertex * root,
-        BitSet & visit)
+void DGraph::sortInBfsOrder(Vector<UINT> & order_buf,
+                            Vertex * root,
+                            BitSet & visit)
 {
     List<Vertex*> worklst;
     worklst.append_tail(root);

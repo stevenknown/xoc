@@ -46,13 +46,13 @@ void LivenessMgr::dump()
     if (g_tfile == NULL) { return; }
     note("\n==---- DUMP LivenessMgr : liveness of PR ----==\n");
     List<IRBB*> * bbl = m_rg->getBBList();
-    g_indent = 2;
+    g_indent += 2;
     for (IRBB * bb = bbl->get_head(); bb != NULL; bb = bbl->get_next()) {
-        note("\n\n\n-- BB%d --", BB_id(bb));
-        DefSBitSetCore * live_in = get_livein(BB_id(bb));
-        DefSBitSetCore * live_out = get_liveout(BB_id(bb));
-        DefSBitSetCore * def = get_def(BB_id(bb));
-        DefSBitSetCore * use = get_use(BB_id(bb));
+        note("\n\n\n-- BB%d --", bb->id());
+        DefSBitSetCore * live_in = get_livein(bb->id());
+        DefSBitSetCore * live_out = get_liveout(bb->id());
+        DefSBitSetCore * def = get_def(bb->id());
+        DefSBitSetCore * use = get_use(bb->id());
 
         note("\nLIVE-IN: ");
         live_in->dump(g_tfile);
@@ -66,6 +66,7 @@ void LivenessMgr::dump()
         note("\nUSE: ");
         use->dump(g_tfile);
     }
+    g_indent -= 2;
     fflush(g_tfile);
 }
 
@@ -122,8 +123,8 @@ void LivenessMgr::processOpnd(IR const* ir,
 
 void LivenessMgr::computeLocal(IRBB * bb, List<IR const*> & lst)
 {
-    DefSBitSetCore * gen = get_def(BB_id(bb));
-    DefSBitSetCore * use = get_use(BB_id(bb));
+    DefSBitSetCore * gen = get_def(bb->id());
+    DefSBitSetCore * use = get_use(bb->id());
     gen->clean(m_sbs_mgr);
     use->clean(m_sbs_mgr);
     for (IR * x = BB_last_ir(bb); x != NULL; x = BB_prev_ir(bb)) {
@@ -251,7 +252,7 @@ void LivenessMgr::computeGlobal()
     for (vlst->get_head(&ct); ct != vlst->end(); ct = vlst->get_next(ct)) {
         IRBB * bb = ct->val();
         ASSERT0(bb);
-        UINT bbid = BB_id(bb);
+        UINT bbid = bb->id();
         get_livein(bbid)->clean(m_sbs_mgr);
         get_liveout(bbid)->clean(m_sbs_mgr);
     }
@@ -267,10 +268,10 @@ void LivenessMgr::computeGlobal()
              ct2 != vlst->end(); ct2 = vlst->get_prev(ct2)) {
             IRBB * bb = ct2->val();
             ASSERT0(bb);
-            UINT bbid = BB_id(bb);
+            UINT bbid = bb->id();
 
             xcom::DefSBitSetCore * out = m_liveout.get(bbid);
-            xcom::EdgeC const* ec = m_cfg->getVertex(BB_id(bb))->getOutList();
+            xcom::EdgeC const* ec = m_cfg->getVertex(bb->id())->getOutList();
             if (ec != NULL) {
                 news.copy(*m_livein.get(ec->getToId()), m_sbs_mgr);
                 ec = ec->get_next();

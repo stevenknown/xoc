@@ -210,7 +210,7 @@ public:
     void setVAR2PR(VAR2PR * v2p) { m_var2pr = v2p; }
 
     void setPRToBeLiveout(IRBB * bb, UINT prno)
-    { get_liveout(BB_id(bb))->bunion(prno, m_sbs_mgr); }
+    { get_liveout(bb->id())->bunion(prno, m_sbs_mgr); }
 
     virtual bool perform(OptCtx & oc);
 };

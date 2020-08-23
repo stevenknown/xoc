@@ -517,7 +517,7 @@ void RSC::comp_call_fmt(IR const* ir)
     case INVOKE_STATIC:
     case INVOKE_INTERFACE:
         {
-            ASSERT0(cnt_list(p) <= 5);
+            ASSERT0(xcom::cnt_list(p) <= 5);
             m_ir2fmt.set(ir->id(), FACDEFGBBBBv);
         }
         break;
@@ -609,7 +609,7 @@ void RSC::comp_ir_fmt(IR const* ir)
         }
         return;
     case IR_RETURN:
-        ASSERT0(cnt_list(RET_exp(ir)) <= 1);
+        ASSERT0(xcom::cnt_list(RET_exp(ir)) <= 1);
         if (RET_exp(ir) == NULL) {
             m_ir2fmt.set(ir->id(), F0);
         } else {
@@ -647,7 +647,7 @@ void RSC::dump_ir_fmt()
     note("\n==------- DUMP IR FMT --------==");
     List<IRBB*> * bbl = m_rg->getBBList();
     for (IRBB * bb = bbl->get_head(); bb != NULL; bb = bbl->get_next()) {
-        note("\n-- BB%d --", BB_id(bb));
+        note("\n-- BB%d --", bb->id());
         for (IR const* ir = BB_first_ir(bb);
              ir != NULL; ir = BB_next_ir(bb)) {
             FMT f = m_ir2fmt.get(ir->id());
@@ -736,7 +736,7 @@ void RSC::dump()
     dump_glt_usable();
     BBList * bbl = m_rg->getBBList();
     for (IRBB * bb = bbl->get_head(); bb != NULL; bb = bbl->get_next()) {
-        dump_bb(BB_id(bb));
+        dump_bb(bb->id());
     }
     fflush(g_tfile);
 }
@@ -1171,11 +1171,11 @@ void GltMgr::dumpl(UINT bbid)
 
 LTMgr * GltMgr::map_bb2ltm(IRBB * bb)
 {
-    LTMgr * l = m_bb2ltmgr.get(BB_id(bb));
+    LTMgr * l = m_bb2ltmgr.get(bb->id());
     if (l == NULL) {
         //Allocated object managed by RaMgr, and do not delete it youself.
         l = new LTMgr(bb, m_liveness_mgr, this, m_pool);
-        m_bb2ltmgr.set(BB_id(bb), l);
+        m_bb2ltmgr.set(bb->id(), l);
     }
     return l;
 }
@@ -1228,7 +1228,7 @@ void GltMgr::renameLocal()
     BitSet met;
     List<IRBB*> * bbl = m_rg->getBBList();
     for (IRBB * bb = bbl->get_head(); bb != NULL; bb = bbl->get_next()) {
-        LTMgr * ltm = m_bb2ltmgr.get(BB_id(bb));
+        LTMgr * ltm = m_bb2ltmgr.get(bb->id());
         if (ltm == NULL) { continue; }
         ltm->rename(prno2lt, met);
     }
@@ -1274,8 +1274,8 @@ void GltMgr::build(bool build_group_part)
         m_params.set(i, prno);
     }
     for (IRBB * bb = bbl->get_head(); bb != NULL; bb = bbl->get_next()) {
-        DefSBitSetCore * livein = m_liveness_mgr->get_livein(BB_id(bb));
-        DefSBitSetCore * liveout = m_liveness_mgr->get_liveout(BB_id(bb));
+        DefSBitSetCore * livein = m_liveness_mgr->get_livein(bb->id());
+        DefSBitSetCore * liveout = m_liveness_mgr->get_liveout(bb->id());
         if (livein != NULL) {
             SEGIter * cur = NULL;
             for (INT i = livein->get_first(&cur);
@@ -1287,7 +1287,7 @@ void GltMgr::build(bool build_group_part)
                 if (GLT_bbs(glt) == NULL) {
                     GLT_bbs(glt) = m_sbs_mgr.allocDBitSetCore();
                 }
-                GLT_bbs(glt)->bunion(BB_id(bb), m_sbs_mgr);
+                GLT_bbs(glt)->bunion(bb->id(), m_sbs_mgr);
             }
         }
 
@@ -1302,7 +1302,7 @@ void GltMgr::build(bool build_group_part)
                 if (GLT_bbs(glt) == NULL) {
                     GLT_bbs(glt) = m_sbs_mgr.allocDBitSetCore();
                 }
-                GLT_bbs(glt)->bunion(BB_id(bb), m_sbs_mgr);
+                GLT_bbs(glt)->bunion(bb->id(), m_sbs_mgr);
             }
         }
 
@@ -2310,7 +2310,7 @@ void LTMgr::processLivein(
         UINT pos,
         bool always_consider_glt)
 {
-    DefSBitSetCore * livein = m_liveness_mgr->get_livein(BB_id(m_bb));
+    DefSBitSetCore * livein = m_liveness_mgr->get_livein(m_bb->id());
     SEGIter * cur = NULL;
     for (INT i = livein->get_first(&cur);
          i != -1; i = livein->get_next(i, &cur)) {
@@ -2347,7 +2347,7 @@ void LTMgr::processLiveout(
         UINT pos,
         bool always_consider_glt)
 {
-    DefSBitSetCore * liveout = m_liveness_mgr->get_liveout(BB_id(m_bb));
+    DefSBitSetCore * liveout = m_liveness_mgr->get_liveout(m_bb->id());
 
     SEGIter * cur = NULL;
     for (INT i = liveout->get_first(&cur);
@@ -2597,7 +2597,7 @@ void LTMgr::renameUse(IR * ir, LT * l, IR ** newpr)
         break;
     case IR_RETURN:
         {
-            ASSERT0(cnt_list(RET_exp(ir)) <= 1);
+            ASSERT0(xcom::cnt_list(RET_exp(ir)) <= 1);
             IR * rv = RET_exp(ir);
             if (rv != NULL && rv->is_pr()) {
                 if (PR_no(rv) == LT_prno(l)) {
@@ -3055,7 +3055,7 @@ void LTMgr::dump()
 
     //Print live-in PR.
     note("\nlivein:");
-    DefSBitSetCore * livein = m_liveness_mgr->get_livein(BB_id(m_bb));
+    DefSBitSetCore * livein = m_liveness_mgr->get_livein(m_bb->id());
     SEGIter * cur = NULL;
     for (INT i = livein->get_first(&cur);
          i != -1; i = livein->get_next(i, &cur)) {
@@ -3064,7 +3064,7 @@ void LTMgr::dump()
 
     //Print live-out PR.
     note("\nliveout:");
-    DefSBitSetCore * liveout = m_liveness_mgr->get_liveout(BB_id(m_bb));
+    DefSBitSetCore * liveout = m_liveness_mgr->get_liveout(m_bb->id());
     for (INT i = liveout->get_first(&cur);
          i != -1; i = liveout->get_next(i, &cur)) {
         prt("pr%d, ", i);
@@ -4113,7 +4113,7 @@ void RA::allocLocalSpec(List<UINT> & nis)
         }
 
         m_ii.clean();
-        LTMgr * ltm = m_gltm.get_ltm(BB_id(bb));
+        LTMgr * ltm = m_gltm.get_ltm(bb->id());
         need_to_alloc.clean();
         UINT idx = 0;
         bool need_rebuild = false;
@@ -4434,7 +4434,7 @@ UINT RA::computeReserveRegister(IRIter & ii, List<IR*> & resolve_list)
     resolve_list.clean();
     List<IRBB*> * bbl = m_rg->getBBList();
     for (IRBB * bb = bbl->get_head(); bb != NULL; bb = bbl->get_next()) {
-        LTMgr * ltm = m_gltm.get_ltm(BB_id(bb));
+        LTMgr * ltm = m_gltm.get_ltm(bb->id());
         if (ltm == NULL) { continue; }
         for (IR * ir = BB_first_ir(bb);
              ir != NULL; ir = BB_next_ir(bb)) {
@@ -4531,8 +4531,8 @@ void RA::reviseRSC()
     for (IR * ir = resolve_list.get_head();
          ir != NULL; ir = resolve_list.get_next()) {
         IRBB * irbb = ir->getBB();
-        LTMgr * ltm = m_gltm.get_ltm(BB_id(irbb));
-        visitbb.bunion(BB_id(irbb));
+        LTMgr * ltm = m_gltm.get_ltm(irbb->id());
+        visitbb.bunion(irbb->id());
         FMT fmt = m_rsc.get_fmt(ir);
         ASSERT0(fmt != FUNDEF);
         m_ii.clean();
@@ -4604,7 +4604,7 @@ void RA::reviseRSC()
          ir != NULL; ir = pr2phy.get_next(iter2, &phy)) {
         IR * stmt = ir->getStmt();
         ASSERT0(stmt && stmt->getBB());
-        LTMgr * ltm = m_gltm.get_ltm(BB_id(stmt->getBB()));
+        LTMgr * ltm = m_gltm.get_ltm(stmt->getBB()->id());
         ASSERT0(ltm);
         LT * l = ltm->map_pr2lt(PR_no(ir));
         ASSERT0(l && LT_prno(l) == PR_no(ir) && !l->has_allocated());
@@ -5176,7 +5176,7 @@ void RA::remedyLTG(
     IR * param = CALL_param_list(ir);
     ASSERT0(param);
     while (param != NULL && !param->is_pr()) { param = IR_next(param); }
-    ASSERT0(param && cnt_list(param) == ((UINT)ltg->get_last_idx()) + 1);
+    ASSERT0(param && xcom::cnt_list(param) == ((UINT)ltg->get_last_idx()) + 1);
 
     TMap<UINT, UINT> prno2phy;
     bool insert = false;
@@ -5207,7 +5207,7 @@ void RA::remedyLTG(
     rangestart = org_rangestart;
     param = CALL_param_list(ir);
     while (param != NULL && !param->is_pr()) { param = IR_next(param); }
-    ASSERT0(param && cnt_list(param) == ((UINT)ltg->get_last_idx()) + 1);
+    ASSERT0(param && xcom::cnt_list(param) == ((UINT)ltg->get_last_idx()) + 1);
 
     for (INT i = 0; i <= ltg->get_last_idx(); i++, param = next) {
         next = IR_next(param);
@@ -5651,7 +5651,7 @@ bool RA::verify_lt_occ()
 
     BBList * bbl = m_rg->getBBList();
     for (IRBB * bb = bbl->get_head(); bb != NULL; bb = bbl->get_next()) {
-        LTMgr * ltm = m_gltm.get_ltm(BB_id(bb));
+        LTMgr * ltm = m_gltm.get_ltm(bb->id());
         if (ltm == NULL) { continue; }
         Vector<LT*> * ltvec = ltm->get_lt_vec();
         for (INT i = 1; i <= ltvec->get_last_idx(); i++) {
@@ -5678,7 +5678,7 @@ bool RA::verify_lt_occ()
 
     ConstIRIter ii;
     for (IRBB * bb = bbl->get_head(); bb != NULL; bb = bbl->get_next()) {
-        LTMgr * ltm = m_gltm.get_ltm(BB_id(bb));
+        LTMgr * ltm = m_gltm.get_ltm(bb->id());
         if (ltm == NULL) { continue; }
 
         for (IR const* ir = BB_first_ir(bb);

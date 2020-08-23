@@ -99,10 +99,10 @@ public:
     //And you must consider the right insertion.
     void addBB(IRBB * bb)
     {
-        ASSERT0(bb && m_bb_vec.get(BB_id(bb)) == NULL);
-        ASSERTN(BB_id(bb) != 0, ("bb id should start at 1"));
-        m_bb_vec.set(BB_id(bb), bb);
-        addVertex(BB_id(bb));
+        ASSERT0(bb && m_bb_vec.get(bb->id()) == NULL);
+        ASSERTN(bb->id() != 0, ("bb id should start at 1"));
+        m_bb_vec.set(bb->id(), bb);
+        addVertex(bb->id());
     }
 
     //Construct EH edge after cfg built.
@@ -171,6 +171,19 @@ public:
     virtual bool if_opt(IRBB * bb);
     bool isRegionEntry(IRBB * bb) { return BB_is_entry(bb); }
     bool isRegionExit(IRBB * bb) { return BB_is_exit(bb); }
+
+    //Insert BB before bb.
+    //e.g:BB1 BB2 BB3
+    //      \  |  /
+    //        BB4
+    //  after inserting newbb,
+    //    BB1 BB2 BB3
+    //      \  |  /
+    //        newbb
+    //         |
+    //        BB4
+    void insertBBbefore(IN IRBB * bb, IN IRBB * newbb);
+
     //Return the inserted trampolining BB if exist.
     IRBB * insertBBbetween(IN IRBB * from,
                            IN BBListIter from_ct,
@@ -183,14 +196,14 @@ public:
     //Return the first operation of 'bb'.
     IR * get_first_xr(IRBB * bb)
     {
-        ASSERT0(bb && m_bb_vec.get(BB_id(bb)));
+        ASSERT0(bb && m_bb_vec.get(bb->id()));
         return BB_first_ir(bb);
     }
 
     //Return the last operation of 'bb'.
     IR * get_last_xr(IRBB * bb)
     {
-        ASSERT0(bb && m_bb_vec.get(BB_id(bb)));
+        ASSERT0(bb && m_bb_vec.get(bb->id()));
         return BB_last_ir(bb);
     }
 
@@ -212,7 +225,7 @@ public:
     //Note 'pred' must be one of predecessors of 'bb'.
     UINT WhichPred(IRBB const* pred, IRBB const* bb) const
     {
-        xcom::Vertex * bb_vex = getVertex(BB_id(bb));
+        xcom::Vertex * bb_vex = getVertex(bb->id());
         ASSERT0(bb_vex);
 
         UINT n = 0;
@@ -220,7 +233,7 @@ public:
         for (xcom::EdgeC * in = VERTEX_in_list(bb_vex);
              in != NULL; in = EC_next(in)) {
             xcom::Vertex * local_pred_vex = in->getFrom();
-            if (local_pred_vex->id() == BB_id(pred)) {
+            if (local_pred_vex->id() == pred->id()) {
                 find = true;
                 break;
             }
@@ -281,6 +294,15 @@ public:
     //    newbb:
     //    ...
     IRBB * splitBB(IRBB * bb, IRListIter split_point);
+
+    //Try to update RPO of newbb accroding to RPO of marker.
+    //newbb_prior_marker: true if newbb's lexicographical order is prior to
+    //marker.
+    //Return true if this function find a properly RPO for 'newbb', otherwise
+    //return false.
+    bool tryUpdateRPO(IRBB * newbb,
+                      IRBB const* marker,
+                      bool newbb_prior_marker);
 
     virtual void moveLabels(IRBB * src, IRBB * tgt);
 

@@ -192,7 +192,7 @@ IR * Inliner::replaceReturn(
 {
     LabelInfo * el = NULL;
     if (INLINFO_need_el(ii)) {
-        el = caller->genIlabel();
+        el = caller->genILabel();
     }
 
     if (INLINFO_has_ret(ii)) {

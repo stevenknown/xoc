@@ -365,7 +365,7 @@ bool GCSE::findAndElim(IR * exp, IR * gen)
             if (!gen_bb->is_dom(gen_stmt, exp_stmt, true)) {
                 return false;
             }
-        } else if (!m_tg->is_dom(BB_id(gen_bb), BB_id(exp_bb))) {
+        } else if (!m_tg->is_dom(gen_bb->id(), exp_bb->id())) {
             return false;
         }
     } else {
@@ -373,7 +373,7 @@ bool GCSE::findAndElim(IR * exp, IR * gen)
             if (!gen_bb->is_dom(gen_stmt, exp_stmt, true)) {
                 return false;
             }
-        } else if (!m_cfg->is_dom(BB_id(gen_bb), BB_id(exp_bb))) {
+        } else if (!m_cfg->is_dom(gen_bb->id(), exp_bb->id())) {
             return false;
         }
     }
@@ -397,8 +397,8 @@ bool GCSE::processCse(IN IR * exp, IN List<IR*> & livexp)
         if (irie != xie) { continue; }
         IR * gen_stmt = gen->getStmt();
         ASSERT0(gen_stmt->getBB());
-        UINT iid = BB_id(expstmt->getBB());
-        UINT xid = BB_id(gen_stmt->getBB());
+        UINT iid = expstmt->getBB()->id();
+        UINT xid = gen_stmt->getBB()->id();
         if (!m_cfg->get_dom_set(iid)->is_contain(xid)) {
             continue;
         }
@@ -409,7 +409,7 @@ bool GCSE::processCse(IN IR * exp, IN List<IR*> & livexp)
 
 
 void GCSE::handleCandidate(IR * exp, IRBB * bb,
-                              UINT entry_id, bool & change)
+                           UINT entry_id, bool & change)
 {
     VN const* vn = NULL;
     IR * gen = NULL;
@@ -421,10 +421,10 @@ void GCSE::handleCandidate(IR * exp, IRBB * bb,
     } else if (vn != NULL && gen == NULL) {
         if (m_cfg->hasEHEdge()) {
             ASSERT0(m_tg);
-            if (m_tg->is_pdom(BB_id(bb), entry_id)) {
+            if (m_tg->is_pdom(bb->id(), entry_id)) {
                 m_vn2exp.set(vn, exp);
             }
-        } else if (m_cfg->is_pdom(BB_id(bb), entry_id)) {
+        } else if (m_cfg->is_pdom(bb->id(), entry_id)) {
             m_vn2exp.set(vn, exp);
         }
     }
@@ -465,7 +465,7 @@ bool GCSE::doPropInDomTreeOrder(xcom::Graph const* domtree)
     IRBB * entry = m_cfg->getEntry();
     ASSERTN(entry && BB_is_entry(entry), ("Not find CFG entry"));
     ASSERT0(domtree);
-    xcom::Vertex * root = domtree->getVertex(BB_id(entry));
+    xcom::Vertex * root = domtree->getVertex(entry->id());
     ASSERT0(root);
     BitSet is_visited;
     Vertex * v;
@@ -505,7 +505,7 @@ bool GCSE::doPropVNInDomTreeOrder(xcom::Graph const* domtree)
     IRBB * entry = m_cfg->getEntry();
     ASSERTN(entry && BB_is_entry(entry), ("Not find CFG entry"));
     ASSERT0(domtree);
-    xcom::Vertex * root = domtree->getVertex(BB_id(entry));
+    xcom::Vertex * root = domtree->getVertex(entry->id());
     ASSERT0(root);
     BitSet is_visited;
     Vertex * v;
@@ -597,7 +597,7 @@ bool GCSE::doPropVN(IRBB * bb, UINT entry_id)
 bool GCSE::doProp(IRBB * bb, List<IR*> & livexp)
 {
     livexp.clean();
-    DefDBitSetCore * x = m_du->genAvailInExpr(BB_id(bb), NULL);
+    DefDBitSetCore * x = m_du->genAvailInExpr(bb->id(), NULL);
     DefSBitSetIter st = NULL;
     for (INT i = x->get_first(&st); i != -1; i = x->get_next(i, &st)) {
         IR * y = m_rg->getIR(i);
@@ -746,9 +746,9 @@ bool GCSE::doProp(IRBB * bb, List<IR*> & livexp)
 }
 
 
-void GCSE::dump()
+bool GCSE::dump() const
 {
-    note("\n==---- DUMP GCSE '%s' ----==\n", m_rg->getRegionName());
+    note("\n==---- DUMP %s '%s' ----==", getPassName(), m_rg->getRegionName());
     note("\nNumOfEliminatedCSE:%d", m_elimed.get_elem_count());
     note("\nEliminated IR: ");
     for (INT i = 0; i <= m_elimed.get_last_idx(); i++) {
@@ -757,6 +757,7 @@ void GCSE::dump()
         }
         note("id:%d", m_elimed.get(i));
     }
+    return true;
 }
 
 
@@ -800,8 +801,8 @@ bool GCSE::perform(OptCtx & oc)
         //expression analysis.
         m_expr_tab = NULL;
     } else {
-        m_rg->checkValidAndRecompute(&oc, PASS_DOM, PASS_PDOM, PASS_EXPR_TAB,
-            PASS_UNDEF);
+        m_rg->checkValidAndRecompute(&oc, PASS_DOM, PASS_PDOM,
+                                     PASS_EXPR_TAB, PASS_UNDEF);
         m_expr_tab = (ExprTab*)m_rg->getPassMgr()->registerPass(PASS_EXPR_TAB);
     }
 
@@ -815,13 +816,13 @@ bool GCSE::perform(OptCtx & oc)
     ASSERTN(entry && BB_is_entry(entry), ("Not find CFG entry"));
     xcom::Graph domtree;
     m_cfg->get_dom_tree(domtree);
-    xcom::Vertex * root = domtree.getVertex(BB_id(entry));
+    xcom::Vertex * root = domtree.getVertex(entry->id());
     if (m_cfg->hasEHEdge()) {
         //Initialize Temp CFG and pick out exception-edge.
         m_tg = new TG(m_rg);
         m_tg->clone(*m_cfg, false, false);
         m_tg->pick_eh();
-        m_tg->removeUnreachNode(BB_id(entry));
+        m_tg->removeUnreachNode(entry->id());
         m_tg->computeDomAndIdom();
         m_tg->computePdomAndIpdom(root);
     }
@@ -838,7 +839,7 @@ bool GCSE::perform(OptCtx & oc)
         //     v != NULL; v = lst.get_next()) {
         //    IRBB * bb = m_cfg->getBB(v->id());
         //    ASSERT0(bb);
-        //    change |= doPropVN(bb, BB_id(entry));
+        //    change |= doPropVN(bb, entry->id());
         //}
     } else {
         m_vn2exp.clean();
@@ -869,7 +870,8 @@ bool GCSE::perform(OptCtx & oc)
 
         //DU reference and du chain has maintained.
         ASSERT0(m_rg->verifyMDRef());
-        ASSERT0(m_du->verifyMDDUChain(DUOPT_COMPUTE_PR_DU | DUOPT_COMPUTE_NONPR_DU));
+        ASSERT0(m_du->verifyMDDUChain(DUOPT_COMPUTE_PR_DU|
+                                      DUOPT_COMPUTE_NONPR_DU));
         if (m_ssamgr != NULL) {
             ASSERT0(PRSSAMgr::verifyPRSSAInfo(m_rg));
         }

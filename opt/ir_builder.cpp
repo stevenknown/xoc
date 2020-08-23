@@ -235,7 +235,7 @@ IR * Region::buildIlabel()
 {
     IR * ir = allocIR(IR_LABEL);
     IR_dt(ir) = getTypeMgr()->getAny();
-    LAB_lab(ir) = genIlabel();
+    LAB_lab(ir) = genILabel();
     return ir;
 }
 
@@ -243,7 +243,7 @@ IR * Region::buildIlabel()
 //Build IR_LABEL operation.
 IR * Region::buildLabel(LabelInfo const* li)
 {
-    ASSERT0(li && LABEL_INFO_type(li) != L_UNDEF);
+    ASSERT0(li && LABELINFO_type(li) != L_UNDEF);
     IR * ir = allocIR(IR_LABEL);
     IR_dt(ir) = getTypeMgr()->getAny();
     LAB_lab(ir) = li;
@@ -608,6 +608,7 @@ IR * Region::buildStore(Var * lhs, Type const* type, IR * rhs)
 {
     ASSERT0(type);
     ASSERT0(lhs && rhs && rhs->is_exp());
+    ASSERTN(!lhs->is_readonly(), ("can not write readonly variable"));
     IR * ir = allocIR(IR_ST);
     ST_idinfo(ir) = lhs;
     ST_rhs(ir) = rhs;
@@ -781,6 +782,10 @@ IR * Region::buildStoreArray(IR * base,
     CStArray * ir = (CStArray*)allocIR(IR_STARRAY);
     IR_dt(ir) = type;
     ARR_base(ir) = base;
+    if (base->is_lda()) {
+        ASSERTN(!LDA_idinfo(base)->is_readonly(),
+                ("can not write readonly variable"));
+    }
     IR_parent(base) = ir;
     ARR_sub_list(ir) = sublist;
     UINT n = 0;

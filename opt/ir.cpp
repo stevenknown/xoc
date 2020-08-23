@@ -489,21 +489,21 @@ void dumpIRList(IRList & ir_list, Region const* rg)
 
 static void dump_lab_decl(LabelInfo const* li)
 {
-    if (LABEL_INFO_type(li) == L_ILABEL) {
+    if (LABELINFO_type(li) == L_ILABEL) {
         prt("label " ILABEL_STR_FORMAT "", ILABEL_CONT(li));
-    } else if (LABEL_INFO_type(li) == L_CLABEL) {
+    } else if (LABELINFO_type(li) == L_CLABEL) {
         prt("label " CLABEL_STR_FORMAT "", CLABEL_CONT(li));
-    } else if (LABEL_INFO_type(li) == L_PRAGMA) {
-        ASSERT0(LABEL_INFO_pragma(li));
-        prt("pragma %s", SYM_name(LABEL_INFO_pragma(li)));
+    } else if (LABELINFO_type(li) == L_PRAGMA) {
+        ASSERT0(LABELINFO_pragma(li));
+        prt("pragma %s", SYM_name(LABELINFO_pragma(li)));
     } else { ASSERTN(0, ("unknown label type")); }
 
     bool first = true;
-    if (LABEL_INFO_b1(li) != 0) {
+    if (LABELINFO_b1(li) != 0) {
         prt("(");
     }
 
-    if (LABEL_INFO_is_try_start(li)) {
+    if (LABELINFO_is_try_start(li)) {
         if (!first) {
             prt(",");
         }
@@ -511,7 +511,7 @@ static void dump_lab_decl(LabelInfo const* li)
         prt("try_start ");
     }
 
-    if (LABEL_INFO_is_try_end(li)) {
+    if (LABELINFO_is_try_end(li)) {
         if (!first) {
             prt(",");
         }
@@ -519,7 +519,7 @@ static void dump_lab_decl(LabelInfo const* li)
         prt("try_end ");
     }
 
-    if (LABEL_INFO_is_catch_start(li)) {
+    if (LABELINFO_is_catch_start(li)) {
         if (!first) {
             prt(",");
         }
@@ -527,7 +527,7 @@ static void dump_lab_decl(LabelInfo const* li)
         prt("catch_start ");
     }
 
-    if (LABEL_INFO_is_terminate(li)) {
+    if (LABELINFO_is_terminate(li)) {
         if (!first) {
             prt(",");
         }
@@ -535,7 +535,7 @@ static void dump_lab_decl(LabelInfo const* li)
         prt("terminate ");
     }
 
-    if (LABEL_INFO_b1(li) != 0) {
+    if (LABELINFO_b1(li) != 0) {
         prt(")");
     }
 }
@@ -543,9 +543,9 @@ static void dump_lab_decl(LabelInfo const* li)
 
 static void dump_label_ref(LabelInfo const* li)
 {
-    if (LABEL_INFO_type(li) == L_ILABEL) {
+    if (LABELINFO_type(li) == L_ILABEL) {
         prt(ILABEL_STR_FORMAT "", ILABEL_CONT(li));
-    } else if (LABEL_INFO_type(li) == L_CLABEL) {
+    } else if (LABELINFO_type(li) == L_CLABEL) {
         prt(CLABEL_STR_FORMAT "", CLABEL_CONT(li));
     } else {
         ASSERTN(0, ("unknown label type"));
@@ -1077,40 +1077,40 @@ void dumpIR(IR const* ir, Region const* rg, IN CHAR * attr, UINT dumpflag)
         break;
     case IR_LABEL: {
         LabelInfo const* li = LAB_lab(ir);
-        if (LABEL_INFO_type(li) == L_ILABEL) {
+        if (LABELINFO_type(li) == L_ILABEL) {
             note("\nlabel " ILABEL_STR_FORMAT "",
                  ILABEL_CONT(LAB_lab(ir)));
-        } else if (LABEL_INFO_type(li) == L_CLABEL) {
+        } else if (LABELINFO_type(li) == L_CLABEL) {
             note("\nlabel " CLABEL_STR_FORMAT "",
                  CLABEL_CONT(LAB_lab(ir)));
-        } else if (LABEL_INFO_type(li) == L_PRAGMA) {
-            ASSERT0(LABEL_INFO_pragma(LAB_lab(ir)));
-            note("\npragma %s", SYM_name(LABEL_INFO_pragma(LAB_lab(ir))));
+        } else if (LABELINFO_type(li) == L_PRAGMA) {
+            ASSERT0(LABELINFO_pragma(LAB_lab(ir)));
+            note("\npragma %s", SYM_name(LABELINFO_pragma(LAB_lab(ir))));
         } else { UNREACHABLE(); }
 
         PADDR(ir);
 
-        if (LABEL_INFO_b1(li) != 0) {
+        if (LABELINFO_b1(li) != 0) {
             prt("(");
         }
 
-        if (LABEL_INFO_is_try_start(li)) {
+        if (LABELINFO_is_try_start(li)) {
             prt("try_start ");
         }
 
-        if (LABEL_INFO_is_try_end(li)) {
+        if (LABELINFO_is_try_end(li)) {
             prt("try_end ");
         }
 
-        if (LABEL_INFO_is_catch_start(li)) {
+        if (LABELINFO_is_catch_start(li)) {
             prt("catch_start ");
         }
 
-        if (LABEL_INFO_is_terminate(li)) {
+        if (LABELINFO_is_terminate(li)) {
             prt("terminate ");
         }
 
-        if (LABEL_INFO_b1(li) != 0) {
+        if (LABELINFO_b1(li) != 0) {
             prt(")");
         }
 
@@ -3257,8 +3257,10 @@ void dumpGR(IR const* ir, TypeMgr * tm, DumpGRCtx * ctx)
                 LabelInfo const* lab = bbct->val()->
                     getLabelListConst().get_head(&lct);
                 if (lab == NULL) {
-                    lab = ctx->cfg->getRegion()->genIlabel();
-                    bbct->val()->addLabel(lab);
+                    //Add label because each opnd of PHI has to correspond to
+                    //an unique label.
+                    lab = ctx->cfg->getRegion()->genILabel();
+                    ctx->cfg->addLabel(bbct->val(), lab);
                 }
                 prt("(");
                 dumpGR(opnd, tm, ctx);

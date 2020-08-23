@@ -36,8 +36,8 @@ author: Su Zhenyu
 
 namespace xoc {
 
-class IR_CFS_OPT : public Pass {
-    COPY_CONSTRUCTOR(IR_CFS_OPT);
+class CfsOpt : public Pass {
+    COPY_CONSTRUCTOR(CfsOpt);
     Region * m_rg;
     TypeMgr * m_tm;
     Refine * m_rf;
@@ -60,19 +60,19 @@ class IR_CFS_OPT : public Pass {
     bool hoistIf(IR ** head, IR * ir);
 
 public:
-    IR_CFS_OPT(Region * rg)
+    CfsOpt(Region * rg)
     {
         m_rg = rg;
         m_tm = rg->getTypeMgr();
         m_rf = NULL;
     }
-    ~IR_CFS_OPT() {}
+    ~CfsOpt() {}
 
-    void dump();
-    
-    virtual CHAR const* getPassName() const { return "IR_CFS_OPT"; }
+    bool dump() const { return true; }
+    bool doCfsOpt(IN OUT IR ** ir_list, SimpCtx const& sc);
 
-    bool CfsOpt(IN OUT IR ** ir_list, SimpCtx const& sc);
+    virtual CHAR const* getPassName() const { return "CfsOpt"; }
+
     virtual bool perform(OptCtx &)
     {
         UNREACHABLE();

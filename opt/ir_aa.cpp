@@ -204,7 +204,7 @@ size_t AliasAnalysis::countMD2MDSetMemory()
     BBList * bbl = m_rg->getBBList();
     MD2MDSetIter iter;
     for (IRBB * bb = bbl->get_head(); bb != NULL; bb = bbl->get_next()) {
-        MD2MDSet * mx = m_md2mds_vec.get(BB_id(bb));
+        MD2MDSet * mx = m_md2mds_vec.get(bb->id());
         if (mx == NULL) { continue; }
         iter.clean();
         MDSet const* mds = NULL;
@@ -321,7 +321,7 @@ void AliasAnalysis::reviseMDSize(IN OUT MDSet & mds, UINT size)
 
 //Return true if IR is a valid statement that could be handled by AA.
 //NOTICE: High level control flow or similar statements are unacceptable here.
-bool AliasAnalysis::isValidStmtToAA(IR * ir)
+bool AliasAnalysis::isValidStmtToAA(IR const* ir) const
 {
     switch(ir->getCode()) {
     case IR_ST: //store
@@ -547,7 +547,7 @@ void AliasAnalysis::computeMayPointTo(IR * pointer, OUT MDSet & mds)
     MD2MDSet * mx = NULL;
     if (m_flow_sensitive) {
         ASSERT0(pointer->getStmt() && pointer->getStmt()->getBB());
-        mx = mapBBtoMD2MDSet(BB_id(pointer->getStmt()->getBB()));
+        mx = mapBBtoMD2MDSet(pointer->getStmt()->getBB()->id());
     } else  {
         mx = &m_unique_md2mds;
     }
@@ -705,8 +705,8 @@ void AliasAnalysis::inferArrayExpBase(IR * ir,
                     mds.clean(*getSBSMgr());
                     mds.bunion(typed_md, *getSBSMgr());
                 } else {
-                    inferArrayInfinite((INT)ofst,
-                        is_ofst_predicable, mdsz, *pts, mds);
+                    inferArrayInfinite((INT)ofst, is_ofst_predicable,
+                                       mdsz, *pts, mds);
                 }
 
             } else if (array_base->getAI() != NULL &&
@@ -890,8 +890,7 @@ void AliasAnalysis::processArray(IR * ir,
         MD const* x = NULL;
         MDSetIter iter2 = NULL;
         if (tmp.get_elem_count() == 1 &&
-            !MD_is_may(x = m_md_sys->getMD(
-                (UINT)tmp.get_first(&iter2)))) {
+            !MD_is_may(x = m_md_sys->getMD((UINT)tmp.get_first(&iter2)))) {
             m_rg->setMustRef(ir, x);
             ir->cleanRefMDSet();
         } else {
@@ -2564,116 +2563,111 @@ void AliasAnalysis::inferExpression(IR * expr,
     case IR_REM:
     case IR_MOD:
     case IR_LAND:
-    case IR_LOR:
-        {
-            //CASE: if (p && q)
-            //GR: land (ld p:*<2>, ld q:*<2>)
-            //ASSERTN(!BIN_opnd0(expr)->is_ptr(),
-            //    ("illegal, left operand can not be pointer type"));
+    case IR_LOR: {
+        //CASE: if (p && q)
+        //GR: land (ld p:*<2>, ld q:*<2>)
+        //ASSERTN(!BIN_opnd0(expr)->is_ptr(),
+        //    ("illegal, left operand can not be pointer type"));
 
-            AACtx tic(*ic);
-            AC_comp_pt(&tic) = false;
-            inferExpression(BIN_opnd1(expr), mds, &tic, mx);
+        AACtx tic(*ic);
+        AC_comp_pt(&tic) = false;
+        inferExpression(BIN_opnd1(expr), mds, &tic, mx);
 
-            tic.cleanBottomUpFlag();
-            inferExpression(BIN_opnd0(expr), mds, &tic, mx);
+        tic.cleanBottomUpFlag();
+        inferExpression(BIN_opnd0(expr), mds, &tic, mx);
 
-            //These expressions does not descripte
-            //an accurate memory-address. So, for the
-            //conservative purpose, we claim that can
-            //not find any MD.
-            if (AC_comp_pt(ic)) {
-                mds.copy(*m_maypts, *getSBSMgr());
-            } else {
-                mds.clean(*getSBSMgr());
-            }
+        //These expressions does not descripte
+        //an accurate memory-address. So, for the
+        //conservative purpose, we claim that can
+        //not find any MD.
+        if (AC_comp_pt(ic)) {
+            mds.copy(*m_maypts, *getSBSMgr());
+        } else {
+            mds.clean(*getSBSMgr());
         }
         return;
+    }
     case IR_BAND:
     case IR_BOR:
-    case IR_XOR:
-        {
-            //opnd0 may be pointer.
-            AACtx tic(*ic);
-            AC_comp_pt(&tic) = false;
-            inferExpression(BIN_opnd1(expr), mds, &tic, mx);
+    case IR_XOR: {
+        //opnd0 may be pointer.
+        AACtx tic(*ic);
+        AC_comp_pt(&tic) = false;
+        inferExpression(BIN_opnd1(expr), mds, &tic, mx);
 
-            tic.cleanBottomUpFlag();
-            inferExpression(BIN_opnd0(expr), mds, &tic, mx);
+        tic.cleanBottomUpFlag();
+        inferExpression(BIN_opnd0(expr), mds, &tic, mx);
 
-            //These expressions does not descripte
-            //an accurate memory-address. So, for the
-            //conservative purpose, we claim that can
-            //not find any MD.
-            if (AC_comp_pt(ic)) {
-                mds.copy(*m_maypts, *getSBSMgr());
-            } else {
-                mds.clean(*getSBSMgr());
-            }
+        //These expressions does not descripte
+        //an accurate memory-address. So, for the
+        //conservative purpose, we claim that can
+        //not find any MD.
+        if (AC_comp_pt(ic)) {
+            mds.copy(*m_maypts, *getSBSMgr());
+        } else {
+            mds.clean(*getSBSMgr());
         }
         return;
+    }
     case IR_BNOT:
     case IR_NEG:
-    case IR_LNOT:
-        {
-            //opnd0 may be pointer.
-            AACtx tic(*ic);
-            AC_comp_pt(&tic) = false;
-            inferExpression(UNA_opnd(expr), mds, &tic, mx);
+    case IR_LNOT: {
+        //opnd0 may be pointer.
+        AACtx tic(*ic);
+        AC_comp_pt(&tic) = false;
+        inferExpression(UNA_opnd(expr), mds, &tic, mx);
 
-            //These expressions does not descripte
-            //an accurate memory-address. So, for the
-            //conservative purpose, we claim that can
-            //not find any MD.
-            if (AC_comp_pt(ic)) {
-                mds.copy(*m_maypts, *getSBSMgr());
-            } else {
-                mds.clean(*getSBSMgr());
-            }
+        //These expressions does not descripte
+        //an accurate memory-address. So, for the
+        //conservative purpose, we claim that can
+        //not find any MD.
+        if (AC_comp_pt(ic)) {
+            mds.copy(*m_maypts, *getSBSMgr());
+        } else {
+            mds.clean(*getSBSMgr());
         }
         return;
+    }
     case IR_LT:
     case IR_LE:
     case IR_GT:
     case IR_GE:
     case IR_EQ:
-    case IR_NE:
-        {
-            AACtx tic(*ic);
-            AC_comp_pt(&tic) = false;
-            inferExpression(BIN_opnd0(expr), mds, &tic, mx);
+    case IR_NE: {
+        AACtx tic(*ic);
+        AC_comp_pt(&tic) = false;
+        inferExpression(BIN_opnd0(expr), mds, &tic, mx);
 
-            tic.cleanBottomUpFlag();
-            inferExpression(BIN_opnd1(expr), mds, &tic, mx);
-            if (AC_comp_pt(ic)) {
-                mds.copy(*m_maypts, *getSBSMgr());
-            } else {
-                mds.clean(*getSBSMgr());
-            }
+        tic.cleanBottomUpFlag();
+        inferExpression(BIN_opnd1(expr), mds, &tic, mx);
+        if (AC_comp_pt(ic)) {
+            mds.copy(*m_maypts, *getSBSMgr());
+        } else {
+            mds.clean(*getSBSMgr());
         }
         return;
+    }
     case IR_LABEL:
         return;
-    case IR_SELECT:
-        {
-            AACtx tic(*ic);
-            AC_comp_pt(&tic) = false;
+    case IR_SELECT: {
+        AACtx tic(*ic);
+        AC_comp_pt(&tic) = false;
 
-            inferExpression(SELECT_pred(expr), mds, &tic, mx);
+        inferExpression(SELECT_pred(expr), mds, &tic, mx);
 
-            tic.cleanBottomUpFlag();
-            inferExpression(SELECT_trueexp(expr), mds, &tic, mx);
+        tic.cleanBottomUpFlag();
+        inferExpression(SELECT_trueexp(expr), mds, &tic, mx);
 
-            tic.cleanBottomUpFlag();
-            inferExpression(SELECT_falseexp(expr), mds, &tic, mx);
-            if (AC_comp_pt(ic)) {
-                //We do not know if condition is true or false.
-                mds.copy(*m_maypts, *getSBSMgr());
-            } else {
-                mds.clean(*getSBSMgr());
-            }
+        tic.cleanBottomUpFlag();
+        inferExpression(SELECT_falseexp(expr), mds, &tic, mx);
+        if (AC_comp_pt(ic)) {
+            //We do not know if condition is true or false.
+            mds.copy(*m_maypts, *getSBSMgr());
+        } else {
+            mds.clean(*getSBSMgr());
         }
         return;
+    }
     default: UNREACHABLE();
     }
 }
@@ -2791,15 +2785,16 @@ void AliasAnalysis::ElemCleanPointTo(MDSet const& mds, IN MD2MDSet * mx)
 
 
 //Dump IR's point-to of each BB.
-void AliasAnalysis::dumpInOutPointToSetForBB()
+void AliasAnalysis::dumpInOutPointToSetForBB() const
 {
     if (g_tfile == NULL) { return; }
     note("\n==---- DUMP POINT TO INFO ----==");
     BBList * bbl = m_cfg->getBBList();
+    AliasAnalysis * pthis = const_cast<AliasAnalysis*>(this);
     for (IRBB * bb = bbl->get_head(); bb != NULL; bb = bbl->get_next()) {
-        PtPairSet * in_set = getInPtPairSet(bb);
-        PtPairSet * out_set = getOutPtPairSet(bb);
-        note("\n--- BB%d ---", BB_id(bb));
+        PtPairSet * in_set = pthis->getInPtPairSet(bb);
+        PtPairSet * out_set = pthis->getOutPtPairSet(bb);
+        note("\n--- BB%d ---", bb->id());
         note("\nIN-SET::");
         dumpPtPairSet(*in_set);
         note("\n\nOUT-SET::");
@@ -2810,16 +2805,17 @@ void AliasAnalysis::dumpInOutPointToSetForBB()
 
 
 //Dump POINT-TO pair record in 'pps'.
-void AliasAnalysis::dumpPtPairSet(PtPairSet & pps)
+void AliasAnalysis::dumpPtPairSet(PtPairSet const& pps) const
 {
     if (g_tfile == NULL) { return; }
     StrBuf buf(256);
     UINT k = 0;
     bool detail = true;
     PtPairSetIter iter;
+    PtPairMgr & pptmgr = const_cast<PtPairMgr&>(m_ppmgr);
     for (INT i = pps.get_first(&iter);
          i >= 0; i = pps.get_next((UINT)i, &iter), k++) {
-        PtPair * pp = m_ppmgr.get((UINT)i);
+        PtPair * pp = pptmgr.get((UINT)i);
         ASSERT0(pp);
         note("\nMD%u->MD%u,  ", PP_from(pp), PP_to(pp));
 
@@ -2830,8 +2826,7 @@ void AliasAnalysis::dumpPtPairSet(PtPairSet & pps)
 
         prt("%s", from->get_base()->dump(buf, m_tm));
         if (from->is_exact()) {
-            prt(":ofst(%u):size(%u)",
-                MD_ofst(from), MD_size(from));
+            prt(":ofst(%u):size(%u)", MD_ofst(from), MD_size(from));
         } else {
             prt(":ofst(--):size(%u)", MD_size(from));
         }
@@ -2856,11 +2851,13 @@ void AliasAnalysis::dumpPtPairSet(PtPairSet & pps)
 
 //Dump 'ir' point-to according to 'mx'.
 //'dump_kid': dump kid's memory object if it exist.
-void AliasAnalysis::dumpIRPointTo(IN IR * ir, bool dump_kid, IN MD2MDSet * mx)
+void AliasAnalysis::dumpIRPointTo(IR const* ir,
+                                  bool dump_kid,
+                                  MD2MDSet const* mx) const
 {
     if (ir == NULL || g_tfile == NULL) { return; }
-    MD const* must = ir->getMustRef();
-    MDSet const* may = ir->getMayRef();
+    MD const* must = const_cast<IR*>(ir)->getMustRef();
+    MDSet const* may = const_cast<IR*>(ir)->getMayRef();
     if (must != NULL ||
         (may != NULL && may->get_elem_count() > 0)) {
         dumpIR(ir, m_rg, NULL, 0);
@@ -2904,16 +2901,16 @@ void AliasAnalysis::dumpIRPointTo(IN IR * ir, bool dump_kid, IN MD2MDSet * mx)
 
 //Dump all relations between IR, MD, and MDSet.
 //'md2mds': mapping from 'md' to an md-set it pointed to.
-void AliasAnalysis::dumpIRPointToForBB(IRBB * bb, bool dump_kid)
+void AliasAnalysis::dumpIRPointToForBB(IRBB const* bb, bool dump_kid) const
 {
     if (g_tfile == NULL) { return; }
     g_indent += 1;
-    note("\n\n-- BB%u --", BB_id(bb));
+    note("\n\n-- BB%u --", bb->id());
     g_indent += 1;
     IRListIter ct;
-    MD2MDSet * mx;
+    MD2MDSet const* mx;
     if (m_flow_sensitive) {
-        mx = mapBBtoMD2MDSet(BB_id(bb));
+        mx = mapBBtoMD2MDSet(bb->id());
     } else {
         mx = &m_unique_md2mds;
     }
@@ -2924,16 +2921,16 @@ void AliasAnalysis::dumpIRPointToForBB(IRBB * bb, bool dump_kid)
 
         //interwarn("In IRAA, MD2MDSet of BB%u is NULL, may be new "
         //          "bb was generated. One should recall IRAA::perform()",
-        //          BB_id(bb));
-        note("\n-- BB%u's MD2MDSet is NULL", BB_id(bb));
+        //          bb->id());
+        note("\n-- BB%u's MD2MDSet is NULL", bb->id());
         g_indent -= 2;
         return;
     }
 
-    note("\n-- MD2MDSet: --", BB_id(bb));
+    note("\n-- MD2MDSet: --", bb->id());
     dumpMD2MDSet(mx, true);
 
-    if (BB_first_ir(bb) != NULL) {
+    if (BB_irlist(bb).get_head(&ct) != NULL) {
         note("\n\n-- IR POINT-TO: --");
     }
     for (IR * ir = BB_irlist(bb).get_head(&ct);
@@ -3019,60 +3016,60 @@ void AliasAnalysis::dumpIRPointToForBB(IRBB * bb, bool dump_kid)
             }
             break;
         case IR_CALL: {
-                if (ir->hasReturnValue()) {
-                    prt("LHS:");
-                    dumpIRPointTo(ir, false, mx);
+            if (ir->hasReturnValue()) {
+                prt("LHS:");
+                dumpIRPointTo(ir, false, mx);
+            }
+
+            UINT i = 0;
+            for (IR * p = CALL_param_list(ir);
+                 p != NULL; p = p->get_next()) {
+                note("\nPARAM%u:", i++);
+                dumpIRPointTo(p, false, mx);
+            }
+
+            i = 0;
+            for (IR * p = CALL_dummyuse(ir); p != NULL; p = p->get_next()) {
+                note("\nDUMMY%u:", i++);
+                dumpIRPointTo(p, false, mx);
+            }
+
+            if (dump_kid) {
+                if (CALL_param_list(ir) != NULL ||
+                    CALL_dummyuse(ir) != NULL) {
+                    note("\n>> MDSet DETAIL:\n");
                 }
 
-                UINT i = 0;
                 for (IR * p = CALL_param_list(ir);
                      p != NULL; p = p->get_next()) {
-                    note("\nPARAM%u:", i++);
-                    dumpIRPointTo(p, false, mx);
+                    dumpIRPointTo(p, true, mx);
                 }
 
-                i = 0;
-                for (IR * p = CALL_dummyuse(ir); p != NULL; p = p->get_next()) {
-                    note("\nDUMMY%u:", i++);
-                    dumpIRPointTo(p, false, mx);
-                }
-
-                if (dump_kid) {
-                    if (CALL_param_list(ir) != NULL ||
-                        CALL_dummyuse(ir) != NULL) {
-                        note("\n>> MDSet DETAIL:\n");
-                    }
-
-                    for (IR * p = CALL_param_list(ir);
-                         p != NULL; p = p->get_next()) {
-                        dumpIRPointTo(p, true, mx);
-                    }
-
-                    for (IR * p = CALL_dummyuse(ir);
-                         p != NULL; p = p->get_next()) {
-                        dumpIRPointTo(p, true, mx);
-                    }
+                for (IR * p = CALL_dummyuse(ir);
+                     p != NULL; p = p->get_next()) {
+                    dumpIRPointTo(p, true, mx);
                 }
             }
             break;
+        }
         case IR_ICALL: { //indirective call
-                if (ir->hasReturnValue()) {
-                    prt("LHS:");
-                    dumpIRPointTo(ir, false, mx);
-                }
+            if (ir->hasReturnValue()) {
+                prt("LHS:");
+                dumpIRPointTo(ir, false, mx);
+            }
 
-                ASSERT0(ICALL_callee(ir) != NULL);
-                prt("CALLEE:");
-                dumpIRPointTo(ICALL_callee(ir), false, mx);
+            ASSERT0(ICALL_callee(ir) != NULL);
+            prt("CALLEE:");
+            dumpIRPointTo(ICALL_callee(ir), false, mx);
 
-                if (dump_kid && CALL_param_list(ir) != NULL) {
-                    note("\n>> MDSet DETAIL:\n");
-                    for (IR * p = CALL_param_list(ir); p ; p = p->get_next()) {
-                        dumpIRPointTo(p, true, mx);
-                    }
+            if (dump_kid && CALL_param_list(ir) != NULL) {
+                note("\n>> MDSet DETAIL:\n");
+                for (IR * p = CALL_param_list(ir); p ; p = p->get_next()) {
+                    dumpIRPointTo(p, true, mx);
                 }
             }
             break;
+        }
         case IR_GOTO:
             break;
         case IR_IGOTO:
@@ -3113,33 +3110,33 @@ void AliasAnalysis::dumpIRPointToForBB(IRBB * bb, bool dump_kid)
             }
             break;
         case IR_RETURN: {
-                if (RET_exp(ir) != NULL) {
-                    dumpIRPointTo(RET_exp(ir), false, mx);
-                }
+            if (RET_exp(ir) != NULL) {
+                dumpIRPointTo(RET_exp(ir), false, mx);
+            }
 
-                if (dump_kid && RET_exp(ir) != NULL) {
-                    note("\n>> MDSet DETAIL:");
-                    dumpIRPointTo(RET_exp(ir), true, mx);
-                }
+            if (dump_kid && RET_exp(ir) != NULL) {
+                note("\n>> MDSet DETAIL:");
+                dumpIRPointTo(RET_exp(ir), true, mx);
             }
             break;
+        }
         case IR_PHI: {
-                prt("LHS:");
-                dumpIRPointTo(ir, false, mx);
+            prt("LHS:");
+            dumpIRPointTo(ir, false, mx);
 
+            for (IR * p = PHI_opnd_list(ir); p; p = p->get_next()) {
+                dumpIRPointTo(p, false, mx);
+            }
+
+            ASSERT0(PHI_opnd_list(ir));
+            if (dump_kid) {
+                note("\n>> MDSet DETAIL:\n");
                 for (IR * p = PHI_opnd_list(ir); p; p = p->get_next()) {
-                    dumpIRPointTo(p, false, mx);
-                }
-
-                ASSERT0(PHI_opnd_list(ir));
-                if (dump_kid) {
-                    note("\n>> MDSet DETAIL:\n");
-                    for (IR * p = PHI_opnd_list(ir); p; p = p->get_next()) {
-                        dumpIRPointTo(p, true, mx);
-                    }
+                    dumpIRPointTo(p, true, mx);
                 }
             }
             break;
+        }
         case IR_REGION: break;
         default: UNREACHABLE();
         }
@@ -3150,7 +3147,7 @@ void AliasAnalysis::dumpIRPointToForBB(IRBB * bb, bool dump_kid)
 
 //Dump all relations between IR, MD, and MDSet.
 //'md2mds': mapping from 'md' to an md-set it pointed to.
-void AliasAnalysis::dumpIRPointToForRegion(bool dump_kid)
+void AliasAnalysis::dumpIRPointToForRegion(bool dump_kid) const
 {
     if (g_tfile == NULL) { return; }
     note("\n==---- DUMP AliasAnalysis '%s' ----==", m_rg->getRegionName());
@@ -3172,7 +3169,7 @@ void AliasAnalysis::dumpIRPointToForRegion(bool dump_kid)
 }
 
 
-void AliasAnalysis::dumpMayPointTo()
+void AliasAnalysis::dumpMayPointTo() const
 {
     if (g_tfile == NULL || m_maypts == NULL) { return; }
 
@@ -3187,7 +3184,7 @@ void AliasAnalysis::dumpMayPointTo()
 }
 
 
-void AliasAnalysis::dump(CHAR const* name)
+void AliasAnalysis::dump(CHAR const* name) const
 {
     FILE * old = NULL;
     if (name != NULL) {
@@ -3208,7 +3205,7 @@ void AliasAnalysis::dump(CHAR const* name)
 
 
 //Dump MD's point-to for each BB.
-void AliasAnalysis::dumpMD2MDSetForRegion(bool dump_pt_graph)
+void AliasAnalysis::dumpMD2MDSetForRegion(bool dump_pt_graph) const
 {
     if (g_tfile == NULL) { return; }
     if (m_flow_sensitive) {
@@ -3216,9 +3213,9 @@ void AliasAnalysis::dumpMD2MDSetForRegion(bool dump_pt_graph)
              m_rg->getRegionName());
         BBList * bbl = m_cfg->getBBList();
         for (IRBB * bb = bbl->get_head(); bb != NULL; bb = bbl->get_next()) {
-            note("\n--- BB%u ---", BB_id(bb));
-            dumpMD2MDSet(mapBBtoMD2MDSet(BB_id(bb)),
-                false); //each BB has its own graph.
+            note("\n--- BB%u ---", bb->id());
+            dumpMD2MDSet(mapBBtoMD2MDSet(bb->id()),
+                        false); //each BB has its own graph.
         }
     } else {
         note("\n==---- DUMP POINT-TO OUT-SET (FLOW-INSENSITIVE) '%s' ----==",
@@ -3231,7 +3228,7 @@ void AliasAnalysis::dumpMD2MDSetForRegion(bool dump_pt_graph)
 
 //Dump MD's point-to according to individual 'mx'.
 //'dump_ptg': dump POINT-TO graph.
-void AliasAnalysis::dumpMD2MDSet(IN MD2MDSet * mx, bool dump_ptg)
+void AliasAnalysis::dumpMD2MDSet(MD2MDSet const* mx, bool dump_ptg) const
 {
     if (g_tfile == NULL || mx == NULL) { return; }
     xcom::Graph g;
@@ -3266,7 +3263,7 @@ void AliasAnalysis::dumpMD2MDSet(IN MD2MDSet * mx, bool dump_ptg)
 //Dump relations between MD, MDSet.
 //'md': candidate to dump.
 //'md2mds': mapping from 'md' to an md-set it pointed to.
-void AliasAnalysis::dumpMD2MDSet(MD const* md, IN MD2MDSet * mx)
+void AliasAnalysis::dumpMD2MDSet(MD const* md, MD2MDSet const* mx) const
 {
     if (g_tfile == NULL) { return; }
     StrBuf buf(64);
@@ -3385,13 +3382,13 @@ void AliasAnalysis::computeStmt(IRBB const* bb, IN OUT MD2MDSet * mx)
             ASSERT0(ir == BB_last_ir(readonly_bb));
             break;
         case IR_IGOTO: {
-                ASSERT0(ir == BB_last_ir(readonly_bb));
-                MDSet tmp;
-                AACtx ic;
-                inferExpression(IGOTO_vexp(ir), tmp, &ic, mx);
-                tmp.clean(*getSBSMgr());
-            }
+            ASSERT0(ir == BB_last_ir(readonly_bb));
+            MDSet tmp;
+            AACtx ic;
+            inferExpression(IGOTO_vexp(ir), tmp, &ic, mx);
+            tmp.clean(*getSBSMgr());
             break;
+        }
         case IR_PHI:
             processPhi(ir, mx);
             break;
@@ -3400,25 +3397,25 @@ void AliasAnalysis::computeStmt(IRBB const* bb, IN OUT MD2MDSet * mx)
             break;
         case IR_TRUEBR:
         case IR_FALSEBR: {
-                ASSERT0(ir == BB_last_ir(readonly_bb));
-                MDSet tmp;
-                AACtx ic;
-                inferExpression(BR_det(ir), tmp, &ic, mx);
-                tmp.clean(*getSBSMgr());;
-            }
+            ASSERT0(ir == BB_last_ir(readonly_bb));
+            MDSet tmp;
+            AACtx ic;
+            inferExpression(BR_det(ir), tmp, &ic, mx);
+            tmp.clean(*getSBSMgr());;
             break;
+        }
         case IR_RETURN:
             ASSERT0(ir == BB_last_ir(readonly_bb));
             processReturn(ir, mx);
             break;
         case IR_SWITCH: {
-                ASSERT0(ir == BB_last_ir(readonly_bb));
-                MDSet tmp;
-                AACtx ic;
-                inferExpression(SWITCH_vexp(ir), tmp, &ic, mx);
-                tmp.clean(*getSBSMgr());
-            }
+            ASSERT0(ir == BB_last_ir(readonly_bb));
+            MDSet tmp;
+            AACtx ic;
+            inferExpression(SWITCH_vexp(ir), tmp, &ic, mx);
+            tmp.clean(*getSBSMgr());
             break;
+        }
         default: ASSERTN(0, ("unsupported IR type"));
         }
     }
@@ -3571,9 +3568,9 @@ bool AliasAnalysis::computeFlowSensitive(List<IRBB*> const& bbl,
             #endif
 
             PtPairSet * pps = getInPtPairSet(bb);
-            MD2MDSet * md2mds = genMD2MDSetForBB(BB_id(bb));
+            MD2MDSet * md2mds = genMD2MDSetForBB(bb->id());
             tmp->clean(*sbsmgr);
-            xcom::EdgeC * el = m_cfg->getVertex(BB_id(bb))->getInList();
+            xcom::EdgeC * el = m_cfg->getVertex(bb->id())->getInList();
             bool compute = true;
             if (el != NULL) {
                 for (; el != NULL; el = el->get_next()) {
@@ -3744,8 +3741,8 @@ bool AliasAnalysis::isFlowSensitiveProperly()
     ASSERTN(mx, ("invoke initEntryPtset before here"));
     UINT num_of_tgt_md = mx->computePtPairNum(*m_md_sys);
     num_of_tgt_md = (num_of_tgt_md * mx->get_elem_count() /
-        HOST_BIT_PER_BYTE + 1) *
-        HOST_BIT_PER_BYTE / HOST_BIT_PER_BYTE;
+                    HOST_BIT_PER_BYTE + 1) *
+                    HOST_BIT_PER_BYTE / HOST_BIT_PER_BYTE;
     return num_of_tgt_md < g_thres_ptpair_num;
 }
 
@@ -3764,8 +3761,8 @@ void AliasAnalysis::initBBPPSet(PPSetMgr & ppsetmgr)
     BBListIter ct;
     for (IRBB * bb = bblst->get_head(&ct);
          bb != NULL; bb = bblst->get_next(&ct)) {
-        m_in_pp_set.set(BB_id(bb), ppsetmgr.allocPtPairSet());
-        m_out_pp_set.set(BB_id(bb), ppsetmgr.allocPtPairSet());
+        m_in_pp_set.set(bb->id(), ppsetmgr.allocPtPairSet());
+        m_out_pp_set.set(bb->id(), ppsetmgr.allocPtPairSet());
     }
 }
 
@@ -3779,7 +3776,7 @@ void AliasAnalysis::initFlowSensitiveEntryPtset(PPSetMgr & ppsetmgr)
 
     IRBB * entry = m_cfg->getEntry();
     ASSERT0(entry);
-    MD2MDSet * mx = genMD2MDSetForBB(BB_id(entry));
+    MD2MDSet * mx = genMD2MDSetForBB(entry->id());
     setPointToAllMem(MD_FULL_MEM, *mx);
     setPointToGlobalMem(MD_GLOBAL_VAR, *mx);
     setPointToImportVar(MD_GLOBAL_VAR, *mx);
@@ -3984,7 +3981,7 @@ bool AliasAnalysis::perform(IN OUT OptCtx & oc)
     OC_is_aa_valid(oc) = true;
 
     if (g_is_dump_after_pass && g_dump_opt.isDumpAA()) {
-        note("\n\n==---- DUMP AliasAnalysis '%s' ----==\n",
+        note("\n==---- DUMP %s '%s' ----==", getPassName(),
              m_rg->getRegionName());
         m_md_sys->dump(false);
         dumpMD2MDSetForRegion(false);

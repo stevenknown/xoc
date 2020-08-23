@@ -186,7 +186,7 @@ void CopyProp::replaceExp(IR * exp,
 
     ASSERT0(cand_expr->getStmt());
     SSAInfo * exp_ssainfo = exp->getSSAInfo();
-    MDSSAInfo * exp_mdssainfo = useMDSSADU() ?
+    MDSSAInfo * exp_mdssainfo = useMDSSADU() ? 
         mdssamgr->getMDSSAInfoIfAny(exp) : NULL;
     if (exp_ssainfo != NULL) {
         //Remove exp SSA use.
@@ -269,7 +269,7 @@ bool CopyProp::existMayDefTillBB(IR const* exp,
         IRListIter tir_holder = NULL;
         for (IR const* tir = BB_irlist(t).get_head(&tir_holder);
              tir != NULL; tir = BB_irlist(t).get_next(&tir_holder)) {
-            if (m_du->is_may_def(tir, exp, false)) {
+            if (m_du->isMayDef(tir, exp, false)) {
                 return true;
             }
         }
@@ -333,7 +333,7 @@ bool CopyProp::is_available(IR const* def_stmt,
     for (ir = BB_irlist(defbb).get_next(&ir_holder);
          ir != NULL && ir != use_stmt;
          ir = BB_irlist(defbb).get_next(&ir_holder)) {
-        if (m_du->is_may_def(ir, prop_value, false)) {
+        if (m_du->isMayDef(ir, prop_value, false)) {
             return false;
         }
     }
@@ -479,14 +479,14 @@ bool CopyProp::doPropToNormalStmt(IRListIter cur_iter,
 
 
 void CopyProp::dumpCopyPropagationAction(IR const* def_stmt,
-                                      IR const* prop_value,
-                                      IR const* use,
-                                      MDSSAMgr * mdssamgr)
+                                         IR const* prop_value,
+                                         IR const* use,
+                                         MDSSAMgr * mdssamgr)
 {
     if (g_tfile == NULL) { return; }
-    note("\n==---- DUMP CopyPropagation ----==");
+    note("\n==---- DUMP %s '%s' ----==", getPassName(), m_rg->getRegionName());
     note("\nPropagating Candidate is %s(id:%d), that located in Stmt:",
-        IRNAME(prop_value), prop_value->id());
+         IRNAME(prop_value), prop_value->id());
     dumpIR(def_stmt, m_rg);
     note("\nWill replace %s(id:%d), that located in Stmt:",
          IRNAME(use), use->id());

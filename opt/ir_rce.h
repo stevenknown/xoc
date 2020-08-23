@@ -64,23 +64,35 @@ public:
         m_cfg = rg->getCFG();
         m_du = m_rg->getDUMgr();
         ASSERT0(m_cfg && m_du);
-        m_use_gvn = false;
+        m_use_gvn = true;
         m_prssamgr = NULL;
         m_mdssamgr = NULL;
         m_refine = NULL;
     }
     virtual ~RCE() {}
 
+    //If 'ir' is always true, set 'must_true', or if it is
+    //always false, set 'must_false'.
+    //Return true if this function is able to determine the result of 'ir',
+    //otherwise return false that it does know nothing about ir.
+    bool calcCondMustVal(IR const* ir,
+                         OUT bool & must_true,
+                         OUT bool & must_false) const;
+
+    //If 'ir' is always true, set 'must_true', or if it is
+    //always false, set 'must_false'.
+    //Return the changed ir.
     IR * calcCondMustVal(IN IR * ir,
                          OUT bool & must_true,
                          OUT bool & must_false,
                          bool & changed);
 
-    void dump();
+    virtual bool dump() const;
 
     virtual CHAR const* getPassName() const
     { return "Redundant Code Elimination"; }
     PASS_TYPE getPassType() const { return PASS_RCE; }
+    GVN * getGVN() const { return m_gvn; }
 
     bool is_use_gvn() const { return m_use_gvn; }
 

@@ -394,7 +394,7 @@ IR * Dex2IR::convertSget(IN LIR * lir)
     IR * c = m_rg->buildStorePR(PR_no(res), res->getType(), rhs);
     IR_may_throw(c) = true;
     if (m_has_catch) {
-        IR * lab = m_rg->buildLabel(m_rg->genIlabel());
+        IR * lab = m_rg->buildLabel(m_rg->genILabel());
         add_next(&c, lab);
         attachCatchInfo(c);
     }
@@ -457,7 +457,7 @@ IR * Dex2IR::convertSput(IN LIR * lir)
     IR * c = m_rg->buildStore(v, res);
     IR_may_throw(c) = true;
     if (m_has_catch) {
-        IR * lab = m_rg->buildLabel(m_rg->genIlabel());
+        IR * lab = m_rg->buildLabel(m_rg->genILabel());
         add_next(&c, lab);
         attachCatchInfo(c);
     }
@@ -491,7 +491,7 @@ IR * Dex2IR::convertAput(IN LIR * lir)
     IR * c = m_rg->buildStoreArray(base, ofst, ty, ty, 1, &enbuf, src);
     IR_may_throw(c) = true;
     if (m_has_catch) {
-        IR * lab = m_rg->buildLabel(m_rg->genIlabel());
+        IR * lab = m_rg->buildLabel(m_rg->genILabel());
         add_next(&c, lab);
         attachCatchInfo(c);
     }
@@ -531,7 +531,7 @@ IR * Dex2IR::convertAget(IN LIR * lir)
     IR * c = m_rg->buildStorePR(PR_no(res), res->getType(), array);
     IR_may_throw(c) = true;
     if (m_has_catch) {
-        IR * lab = m_rg->buildLabel(m_rg->genIlabel());
+        IR * lab = m_rg->buildLabel(m_rg->genILabel());
         add_next(&c, lab);
         attachCatchInfo(c);
     }
@@ -580,7 +580,7 @@ IR * Dex2IR::convertIput(IN LIR * lir)
 
     IR_may_throw(c) = true;
     if (m_has_catch) {
-        IR * lab = m_rg->buildLabel(m_rg->genIlabel());
+        IR * lab = m_rg->buildLabel(m_rg->genILabel());
         add_next(&c, lab);
         attachCatchInfo(c);
     }
@@ -779,7 +779,7 @@ IR * Dex2IR::convertIget(IN LIR * lir)
     IR_ai(obj) = ai;
 
     if (m_has_catch) {
-        IR * lab = m_rg->buildLabel(m_rg->genIlabel());
+        IR * lab = m_rg->buildLabel(m_rg->genILabel());
         add_next(&c, lab);
         attachCatchInfo(c);
     }
@@ -846,7 +846,7 @@ IR * Dex2IR::convertBinaryOpAssign(IN LIR * lir)
         IR_may_throw(c) = true;
         #endif
         if (m_has_catch) {
-            IR * lab = m_rg->buildLabel(m_rg->genIlabel());
+            IR * lab = m_rg->buildLabel(m_rg->genILabel());
             add_next(&c, lab);
             attachCatchInfo(c);
         }
@@ -885,7 +885,7 @@ IR * Dex2IR::convertBinaryOp(IN LIR * lir)
         IR_may_throw(c) = true;
         #endif
         if (m_has_catch) {
-            IR * lab = m_rg->buildLabel(m_rg->genIlabel());
+            IR * lab = m_rg->buildLabel(m_rg->genILabel());
             add_next(&c, lab);
             attachCatchInfo(c);
         }
@@ -928,7 +928,7 @@ IR * Dex2IR::convertBinaryOpLit(IN LIR * lir)
         IR_may_throw(x) = true;
         IR_may_throw(c) = true;
         if (m_has_catch) {
-            IR * lab = m_rg->buildLabel(m_rg->genIlabel());
+            IR * lab = m_rg->buildLabel(m_rg->genILabel());
             add_next(&c, lab);
             attachCatchInfo(c);
         }
@@ -1257,7 +1257,7 @@ IR * Dex2IR::convertPackedSwitch(IN LIR * lir)
         }
     }
 
-    LabelInfo * defaultlab = m_rg->genIlabel();
+    LabelInfo * defaultlab = m_rg->genILabel();
     IR * vexp = genMappedPR(p->value, m_tr->i32);
     IR * ret_list = m_rg->buildSwitch(vexp, case_list, NULL, defaultlab);
     add_next(&ret_list, m_rg->buildLabel(defaultlab));
@@ -1333,7 +1333,7 @@ IR * Dex2IR::convertSparseSwitch(IN LIR * lir)
         }
     }
 
-    LabelInfo * defaultlab = m_rg->genIlabel();
+    LabelInfo * defaultlab = m_rg->genILabel();
     IR * vexp = genMappedPR(p->value, m_tr->i32);
     IR * ret_list = m_rg->buildSwitch(vexp, case_list, NULL, defaultlab);
     add_next(&ret_list, m_rg->buildLabel(defaultlab));
@@ -1833,7 +1833,7 @@ void Dex2IR::markLIRLabel()
             if (lst == NULL) {
                 lst = new List<LabelInfo*>();
                 m_lir2labs.set(tgt, lst);
-                lst->append_tail(m_rg->genIlabel());
+                lst->append_tail(m_rg->genILabel());
             }
         } else if (LIR_opcode(lir) == LOP_IFZ) {
             LIR * tgt = LIRC_op(m_lircode, LIR_op0(lir));
@@ -1842,7 +1842,7 @@ void Dex2IR::markLIRLabel()
             if (lst == NULL) {
                 lst = new List<LabelInfo*>();
                 m_lir2labs.set(tgt, lst);
-                lst->append_tail(m_rg->genIlabel());
+                lst->append_tail(m_rg->genILabel());
             }
         } else if (LIR_opcode(lir) == LOP_GOTO) {
             LIR * tgt = LIRC_op(m_lircode, ((LIRGOTOOp*)lir)->target);
@@ -1851,7 +1851,7 @@ void Dex2IR::markLIRLabel()
             if (lst == NULL) {
                 lst = new List<LabelInfo*>();
                 m_lir2labs.set(tgt, lst);
-                lst->append_tail(m_rg->genIlabel());
+                lst->append_tail(m_rg->genILabel());
             }
         } else if (LIR_opcode(lir) == LOP_TABLE_SWITCH) {
             LIRSwitchOp * p = (LIRSwitchOp*)lir;
@@ -1868,7 +1868,7 @@ void Dex2IR::markLIRLabel()
                     if (lst == NULL) {
                         lst = new List<LabelInfo*>();
                         m_lir2labs.set(tgt, lst);
-                        lst->append_tail(m_rg->genIlabel());
+                        lst->append_tail(m_rg->genILabel());
                     }
                 }
             }
@@ -1888,7 +1888,7 @@ void Dex2IR::markLIRLabel()
                     if (lst == NULL) {
                         lst = new List<LabelInfo*>();
                         m_lir2labs.set(tgt, lst);
-                        lst->append_tail(m_rg->genIlabel());
+                        lst->append_tail(m_rg->genILabel());
                     }
                 }
             }
@@ -1899,8 +1899,8 @@ void Dex2IR::markLIRLabel()
             if (lst == NULL) {
                 lst = new List<LabelInfo*>();
                 m_lir2labs.set(lir, lst);
-                LabelInfo * lab = m_rg->genIlabel();
-                LABEL_INFO_is_catch_start(lab) = true;
+                LabelInfo * lab = m_rg->genILabel();
+                LABELINFO_is_catch_start(lab) = true;
                 lst->append_tail(lab);
             }
             */
@@ -1926,16 +1926,16 @@ void Dex2IR::markTryLabel()
                 lst = new List<LabelInfo*>();
                 m_lir2labs.set(lir, lst);
             }
-            LabelInfo * lab = m_rg->genIlabel();
-            LABEL_INFO_is_try_start(lab) = true;
+            LabelInfo * lab = m_rg->genILabel();
+            LABELINFO_is_try_start(lab) = true;
             lst->append_tail(lab);
             ti->try_start = lab;
             ti->try_start_pos = pos;
 
             pos = each_try->end_pc;
             ASSERT0(pos >= 0 && pos <= LIRC_num_of_op(m_lircode));
-            lab = m_rg->genIlabel();
-            LABEL_INFO_is_try_end(lab) = true;
+            lab = m_rg->genILabel();
+            LABELINFO_is_try_end(lab) = true;
             if (pos < LIRC_num_of_op(m_lircode)) {
                 lir = LIRC_op(m_lircode, pos);
                 if (LIR_opcode(lir) == LOP_NOP &&
@@ -1995,7 +1995,7 @@ void Dex2IR::markTryLabel()
                 } else {
                     for (lab = lst->get_head();
                          lab != NULL; lab = lst->get_next()) {
-                        if (LABEL_INFO_is_catch_start(lab)) { break; }
+                        if (LABELINFO_is_catch_start(lab)) { break; }
                     }
 
                     //Multiple label may correspond to same LIR.
@@ -2003,8 +2003,8 @@ void Dex2IR::markTryLabel()
                 }
 
                 if (lab == NULL) {
-                    lab = m_rg->genIlabel();
-                    LABEL_INFO_is_catch_start(lab) = true;
+                    lab = m_rg->genILabel();
+                    LABELINFO_is_catch_start(lab) = true;
                     lst->append_tail(lab);
                 }
 

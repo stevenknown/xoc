@@ -70,11 +70,11 @@ static IF_TYPE get_simple_if_node_type(IRCFG * cfg, IRBB * bb)
 
     IRBB * truebd = NULL;
     IRBB * falsebd = NULL;
-    if (BB_is_fallthrough(succs.get_head()) &&
+    if (succs.get_head()->is_fallthrough() &&
         BB_is_target(succs.get_next())) {
         truebd = succs.get_head();
         falsebd = succs.get_next();
-    } else if (BB_is_fallthrough(succs.get_head_nth(1)) &&
+    } else if (succs.get_head_nth(1)->is_fallthrough() &&
                 BB_is_target(succs.get_head())) {
         falsebd = succs.get_head();
         truebd = succs.get_next();
