@@ -472,7 +472,6 @@ bool LICM::isInvariantStmt(IR const* stmt) const
 bool LICM::is_dom_all_use_in_loop(IR const* ir, LI<IRBB> * li)
 {
     ASSERT0(ir->is_stmt());
-    IRBB * irbb = ir->getBB();
     PRSSAMgr * prssamgr = m_rg->getPRSSAMgr();
     if (prssamgr != NULL && prssamgr->is_valid() &&
         (ir->isWritePR() || ir->isCallHasRetVal())) {

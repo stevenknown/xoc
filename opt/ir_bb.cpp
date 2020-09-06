@@ -253,6 +253,30 @@ void IRBB::dupSuccessorPhiOpnd(CFG<IRBB, IR> * cfg, Region * rg, UINT opnd_pos)
         }
     }
 }
+
+
+UINT IRBB::getNumOfPred(CFG<IRBB, IR> * cfg) const
+{
+    ASSERT0(cfg);
+    xcom::Vertex const* vex = cfg->getVertex(id());
+    ASSERT0(vex);
+    UINT n = 0;
+    for (xcom::EdgeC const* in = VERTEX_in_list(vex);
+         in != NULL; in = EC_next(in), n++);
+    return n;
+}
+
+
+UINT IRBB::getNumOfSucc(CFG<IRBB, IR> * cfg) const
+{
+    ASSERT0(cfg);
+    xcom::Vertex const* vex = cfg->getVertex(id());
+    ASSERT0(vex);
+    UINT n = 0;
+    for (xcom::EdgeC const* out = VERTEX_out_list(vex);
+         out != NULL; out = EC_next(out), n++);
+    return n;
+}
 //END IRBB
 
 

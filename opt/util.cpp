@@ -33,7 +33,6 @@ author: Su Zhenyu
 @*/
 #include "../com/xcominc.h"
 #include "commoninc.h"
-#include "errno.h"
 
 namespace xoc {
 
@@ -42,7 +41,6 @@ namespace xoc {
 //Print \l as the Carriage Return.
 //bool g_prt_carriage_return_for_dot = false;
 static SMemPool * g_pool_tmp_used = NULL;
-static CHAR g_indent_chars = ' ';
 
 //Return true if val is 32bit integer.
 bool isInteger32bit(HOST_UINT val)

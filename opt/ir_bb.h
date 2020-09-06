@@ -37,6 +37,7 @@ author: Su Zhenyu
 namespace xoc {
 
 class IRBB;
+template <class IRBB, class IR> class CFG;
 typedef xcom::C<IR*> * IRListIter;
 #define BBID_UNDEF VERTEX_UNDEF
 
@@ -244,26 +245,8 @@ public:
     List<LabelInfo const*> const& getLabelListConst() const
     { return lab_list; }
     UINT getNumOfIR() const { return BB_irlist(this).get_elem_count(); }
-    UINT getNumOfPred(CFG<IRBB, IR> * cfg) const
-    {
-        ASSERT0(cfg);
-        xcom::Vertex const* vex = cfg->getVertex(id());
-        ASSERT0(vex);
-        UINT n = 0;
-        for (xcom::EdgeC const* in = VERTEX_in_list(vex);
-             in != NULL; in = EC_next(in), n++);
-        return n;
-    }
-    UINT getNumOfSucc(CFG<IRBB, IR> * cfg) const
-    {
-        ASSERT0(cfg);
-        xcom::Vertex const* vex = cfg->getVertex(id());
-        ASSERT0(vex);
-        UINT n = 0;
-        for (xcom::EdgeC const* out = VERTEX_out_list(vex);
-             out != NULL; out = EC_next(out), n++);
-        return n;
-    }
+    UINT getNumOfPred(CFG<IRBB, IR> * cfg) const;
+    UINT getNumOfSucc(CFG<IRBB, IR> * cfg) const;
     BBIRList * getIRList() { return &BB_irlist(this); }
     IR * getFirstIR() { return BB_first_ir(this); }
     IR * getLastIR() { return BB_last_ir(this); }
