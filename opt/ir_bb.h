@@ -420,16 +420,22 @@ public:
         return false;
     }
 
-    inline bool isContainLabel(LabelInfo const* lab)
+    inline bool isContainLabel(LabelInfo const* lab) const
     {
-        for (LabelInfo const* li = getLabelList().get_head();
-             li != NULL; li = getLabelList().get_next()) {
+        for (LabelInfo const* li = const_cast<IRBB*>(this)->
+                 getLabelList().get_head();
+             li != NULL;
+             li = const_cast<IRBB*>(this)->getLabelList().get_next()) {
             if (li == lab) {
                 return true;
             }
         }
         return false;
     }
+
+    //Return true if current BB is the target of 'ir'.
+    bool isTarget(IR const* ir) const
+    { ASSERT0(ir->getLabel()); return isContainLabel(ir->getLabel()); }
 
     //Return true if ir1 dominates ir2 in current bb.
     //Function will modify the IR container of bb.
@@ -552,10 +558,9 @@ public:
 //END IRBBMgr
 
 //Exported Functions
-void dumpBBLabel(List<LabelInfo const*> & lablist, FILE * h);
+void dumpBBLabel(List<LabelInfo const*> & lablist, Region const* rg);
 void dumpBBList(BBList const* bbl,
                 Region const* rg,
-                CHAR const* name = NULL,
                 bool dump_inner_region = true);
 
 } //namespace xoc

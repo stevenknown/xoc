@@ -191,6 +191,7 @@ public:
         }
         return false;
     }
+    Region * getRegion() const { return m_rg; }
     virtual CHAR const* getPassName() const { return "Copy Propagation"; }
     virtual PASS_TYPE getPassType() const { return PASS_CP; }
     IR const* getSimpCVTValue(IR const* ir) const;

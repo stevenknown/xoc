@@ -122,8 +122,8 @@ public:
 
     void set_map_ir2ir_expr(IR const* ir, ExpRep * ie);
 
+    Region * getRegion() const { return m_rg; }
     PASS_TYPE getPassType() const { return PASS_EXPR_TAB; }
-
     virtual CHAR const* getPassName() const { return "Expr Table"; }
 
     virtual bool perform(IN OUT OptCtx & oc);

@@ -1039,6 +1039,10 @@ public:
     HOST_INT getMaxInteger(UINT bitsize, bool is_signed) const;
     HOST_INT getMinInteger(UINT bitsize, bool is_signed) const;
 
+    //Get the VarMgr related to current RegionMgr.
+    LogMgr * getLogMgr() const
+    { ASSERT0(getRegionMgr()); return getRegionMgr()->getLogMgr(); }
+
     //Perform high level optmizations.
     virtual bool HighProcess(OptCtx & oc);
 
@@ -1058,10 +1062,10 @@ public:
     bool isSafeToOptimize(IR const* ir);
 
     //Return true if ir belongs to current region.
-    bool isRegionIR(IR const* ir);
+    bool isRegionIR(IR const* ir) const;
 
     //Return true if Var belongs to current region.
-    bool isRegionVAR(Var const* var);
+    bool isRegionVAR(Var const* var) const;
 
     //Return true if the tree height is not great than 2.
     //e.g: tree a + b is lowest height , but a + b + c is not.
@@ -1106,6 +1110,8 @@ public:
 
     //Return true if Region's MD reference has been computed and is avaiable.
     bool is_ref_valid() const { return REGION_is_ref_valid(this); }
+
+    bool isLogMgrInit() const { return getRegionMgr()->isLogMgrInit(); }
 
     //Perform middle level IR optimizations which are implemented
     //accroding to control flow info and data flow info.

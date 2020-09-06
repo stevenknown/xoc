@@ -45,6 +45,7 @@ author: Su Zhenyu
 INT g_source_file_handler = 0;
 CHAR const* g_dex_file_path = NULL;
 INT g_output_file_handler = 0;
+CHAR const* g_logfile_name = NULL;
 
 //Set true to disable all auxiliary informations which will output to stdout.
 bool g_silence = false;
@@ -88,7 +89,7 @@ static bool create_dump_file(UINT argc, CHAR const* argv[], IN OUT UINT & i)
     i += 2;
     if (dumpfile == NULL) { return false; }
 
-    xoc::initdump(dumpfile, false);
+    g_logfile_name = dumpfile;
     return true;
 }
 

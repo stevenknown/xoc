@@ -83,6 +83,7 @@ public:
     COPY_CONSTRUCTOR(LoopCvt);
     virtual ~LoopCvt() {}
 
+    Region * getRegion() const { return m_rg; }
     virtual CHAR const* getPassName() const { return "Loop Convertion"; }
     PASS_TYPE getPassType() const { return PASS_LOOP_CVT; }
 

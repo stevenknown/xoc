@@ -166,7 +166,8 @@ void Region::HighProcessImpl(OptCtx & oc)
 //    6. Loop unrolling
 bool Region::HighProcess(OptCtx & oc)
 {
-    note("\n\n==== Region:%s HIGHEST LEVEL FARMAT ====\n\n", getRegionName());
+    note(this, "\n\n==== Region:%s HIGHEST LEVEL FARMAT ====\n\n",
+         getRegionName());
 
     SimpCtx simp;
     if (g_do_cfs_opt) {

@@ -201,11 +201,14 @@ public:
     }
 
     void destroy() { VMD_occs(this).destroy(); }
-    void dump() const; //Concisely dump
+    void dump(Region const* rg) const; //Concisely dump
     void dump(Region const* rg, UseDefMgr const* usedefmgr) const;
 
     MDDef * getDef() const { return VMD_def(this); }
     IRSet * getUseSet() { return &VMD_occs(this); }
+
+    //Return true if current VOpnd should have DEF stmt.
+    bool hasDef() const { return version() != MDSSA_INIT_VERSION; }
 
     UINT mdid() const
     {

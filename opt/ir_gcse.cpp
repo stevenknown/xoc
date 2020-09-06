@@ -748,14 +748,15 @@ bool GCSE::doProp(IRBB * bb, List<IR*> & livexp)
 
 bool GCSE::dump() const
 {
-    note("\n==---- DUMP %s '%s' ----==", getPassName(), m_rg->getRegionName());
-    note("\nNumOfEliminatedCSE:%d", m_elimed.get_elem_count());
-    note("\nEliminated IR: ");
+    note(getRegion(), "\n==---- DUMP %s '%s' ----==",
+         getPassName(), m_rg->getRegionName());
+    note(getRegion(), "\nNumOfEliminatedCSE:%d", m_elimed.get_elem_count());
+    note(getRegion(), "\nEliminated IR: ");
     for (INT i = 0; i <= m_elimed.get_last_idx(); i++) {
         if (i != 0) {
-            note(",");
+            note(getRegion(), ",");
         }
-        note("id:%d", m_elimed.get(i));
+        note(getRegion(), "id:%d", m_elimed.get(i));
     }
     return true;
 }
@@ -870,8 +871,7 @@ bool GCSE::perform(OptCtx & oc)
 
         //DU reference and du chain has maintained.
         ASSERT0(m_rg->verifyMDRef());
-        ASSERT0(m_du->verifyMDDUChain(DUOPT_COMPUTE_PR_DU|
-                                      DUOPT_COMPUTE_NONPR_DU));
+        ASSERT0(verifyMDDUChain(m_rg));
         if (m_ssamgr != NULL) {
             ASSERT0(PRSSAMgr::verifyPRSSAInfo(m_rg));
         }

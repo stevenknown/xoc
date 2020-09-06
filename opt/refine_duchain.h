@@ -73,6 +73,7 @@ public:
     //True to use GVN and classic DU chain to perform optimization.
     void setUseGvn(bool use_gvn) { m_is_use_gvn = use_gvn; }
 
+    Region * getRegion() const { return m_rg; }
     virtual CHAR const* getPassName() const
     { return "Refine DefUse Chain"; }
     PASS_TYPE getPassType() const { return PASS_PRE; }

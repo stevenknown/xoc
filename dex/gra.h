@@ -378,7 +378,7 @@ public:
 
     void clean();
 
-
+    Region * getRegion() const { return m_rg; }
     IRBB * getBB() { return m_bb; }
     LT * getLifeTime(UINT ltid) { return m_lt_vec.get(ltid); }
     Vector<LT*> * get_lt_vec() { return &m_lt_vec; }
@@ -706,7 +706,8 @@ public:
         ASSERT0(FUNDEF < fmt && fmt < FNUM);
         return m_usable[fmt][is_def];
     }
-
+    
+    Region * getRegion() const { return m_rg; }
     BitSet * get_4();
     BitSet * get_8();
     BitSet * get_16();
@@ -792,6 +793,8 @@ public:
     bool assignRegister(LT * l, List<UINT> & nis);
     void allocPrioList(OUT List<LT*> & prios, List<UINT> & nis);
 
+    Region * getRegion() const { return m_rg; }
+
     void set_omit_constrain(bool omit) { m_omit_constrain = omit; }
     void set_tmp_lts(List<LT*> * tmp) { ASSERT0(tmp); m_tmp_lts = tmp; }
     void set_tmp_lts2(List<LT*> * tmp) { ASSERT0(tmp); m_tmp_lts2 = tmp; }
@@ -824,7 +827,8 @@ protected:
     UINT m_param_num; //record the number of param.
     UINT m_param_reg_start;
     UINT m_vregnum; //record the number of original vreg.
-    UINT m_maxreg; //record the max vreg used. note it is not the number of vreg.
+    UINT m_maxreg; //record the max vreg used.
+                   //note it is not the number of vreg.
     IRIter m_ii; //for tmp used.
     ConstIRIter m_cii; //for tmp used.
 
@@ -833,8 +837,10 @@ protected:
     bool assignRegister(GLT * g, List<UINT> & nis, List<UINT> & nis2);
     void allocParameter();
     void allocGroup();
-    void allocPrioList(OUT List<GLT*> & prios, OUT List<GLT*> & unalloc,
-                          List<UINT> & nis, List<UINT> & nis2);
+    void allocPrioList(OUT List<GLT*> & prios,
+                       OUT List<GLT*> & unalloc,
+                       List<UINT> & nis,
+                       List<UINT> & nis2);
     void allocGlobal(List<UINT> & nis, List<UINT> & nis2);
     void allocLocal(List<UINT> & nis, bool omit_constrain);
     void allocLocalSpec(List<UINT> & nis);
@@ -844,20 +850,18 @@ protected:
 
     inline bool checkIfNeedSpill(UINT prno, FMT fmt, LTMgr const* ltm);
     UINT computeReserveRegister(IRIter & ii, List<IR*> & resolve_list);
-    UINT computeNumRegister(
-            UINT rangestart,
-            UINT rangeend,
-            LTG const* ltg,
-            BitSet const& occupied,
-            BitSet const& assigned,
-            BitSet const& liveout_phy);
-    UINT computeSatisfiedNumRegister(
-            UINT rangestart,
-            LTG const* ltg,
-            UINT rgsz,
-            BitSet const& occupied,
-            BitSet const& assigned,
-            BitSet const& liveout_phy);
+    UINT computeNumRegister(UINT rangestart,
+                            UINT rangeend,
+                            LTG const* ltg,
+                            BitSet const& occupied,
+                            BitSet const& assigned,
+                            BitSet const& liveout_phy);
+    UINT computeSatisfiedNumRegister(UINT rangestart,
+                                     LTG const* ltg,
+                                     UINT rgsz,
+                                     BitSet const& occupied,
+                                     BitSet const& assigned,
+                                     BitSet const& liveout_phy);
     float computePrio(GLT * g);
 
     void dump_ltg();
@@ -868,7 +872,8 @@ protected:
     bool is_cross_param(UINT reg_start, UINT rg_sz) const
     { return reg_start < m_param_num && (reg_start + rg_sz) > m_param_num; }
 
-    bool is_cross_liveout_phy(UINT reg_start, UINT rgsz,
+    bool is_cross_liveout_phy(UINT reg_start,
+                              UINT rgsz,
                               BitSet const& liveout_phy);
 
     void shiftReg(UINT ofst);
@@ -876,15 +881,14 @@ protected:
     void solveConflict(OUT List<GLT*> & unalloc, List<UINT> & nis);
     RA * self() { return this; }
 
-    INT tryReuseAppeared(
-            LTG const* ltg,
-            BitSet const& occupied,
-            BitSet const& assigned,
-            BitSet const& liveout_phy);
+    INT tryReuseAppeared(LTG const* ltg,
+                         BitSet const& occupied,
+                         BitSet const& assigned,
+                         BitSet const& liveout_phy);
     INT tryExtend(LTG const* ltg,
-            BitSet const& occupied,
-            BitSet const& liveout_phy,
-            BitSet const& assigned);
+                  BitSet const& occupied,
+                  BitSet const& liveout_phy,
+                  BitSet const& assigned);
 
     void remedyLTG(
             LTG * ltg,
@@ -905,8 +909,8 @@ public:
        Vreg2PR * v2pr,
        Prno2Vreg * pr2v,
        VAR2PR * var2pr) :
-        m_liveness_mgr(rg), m_gltm(rg, &m_liveness_mgr, self()), m_ig(rg, &m_gltm),
-        m_rsc(&m_gltm)
+           m_liveness_mgr(rg), m_gltm(rg, &m_liveness_mgr, self()),
+           m_ig(rg, &m_gltm), m_rsc(&m_gltm)
     {
         ASSERT0(rg && tr);
         m_rg = rg;
@@ -929,6 +933,7 @@ public:
         if (ltm == NULL) { return NULL; }
         return ltm->map_pr2lt(prno);
     }
+    Region * getRegion() const { return m_rg; }
     GLT * get_glt(UINT prno) { return m_gltm.map_pr2glt(prno); }
     GltMgr * get_gltm() { return &m_gltm; }
     RSC * get_rsc() { return &m_rsc; }

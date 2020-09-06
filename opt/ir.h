@@ -459,44 +459,72 @@ extern RoundDesc const g_round_desc[];
 #ifdef CONST_IRT_SZ
 #define IR_irt_size(ir) ((ir)->irt_size)
 #endif
+
+//IR, the intermediate language for the XOC compiler, serves as the common
+//interface among almost all the components. IR is defined to be capable of
+//representing any level of semantics except the level that corresponds to
+//the machine instructions. Two different levels of IR are defined, and each
+//optimization phase is defined to work at a specific level of IR. The
+//front-ends may generate the highest level of IR. Optimization proceeds
+//together with the process of continuous simplification, in which a
+//simplification of IR is called to translate IR from the current level to
+//the next lower level.
+//
+//High level IR preserve the high level control flow constructs, such as
+//DO_LOOP, DO_WHILE, WHILE_DO, SWITCH, IF, BREAK and CONTINUE.
+//Operations can be divided into two categories: statements, and expressions.
+//Statement implies which variable is defined, or control flow transfering.
+//Expression implies which variable is used, or operation without sideeffect,
+//and expression does not transfer control flow. Both statement and expression
+//node have NEXT and PREV pointers which link them together.
+//Statment can not be kid of other statement except control flow structure IR,
+//and expression can be kid of both expression and statement.
+//In a simple word, statements have side effects, and can be reordered only
+//if dependencies preserved. Expressions do not have side effect, expression
+//trees hung from statement, and they contain only uses and can be
+//aggressively optimized.
+//
+//Note IR should not have virtual table because all operations are
+//distinguished by IR_TYPE. An IR object might represent differet operation
+//in specific scene when it is continually freed and allocated. Diverse
+//description should be placed in attach-info.
 class IR {
     COPY_CONSTRUCTOR(IR);
 public:
-    UINT uid; //Each IR has unique id.
-
-    //The type of IR can be void, and depend on
-    //the dynamic behavior of program.
-    Type const* result_data_type;
-
     #ifdef _DEBUG_
     IR_TYPE code;
     #else
-    UINT code:IR_TYPE_BIT_SIZE;
+    USHORT code:IR_TYPE_BIT_SIZE;
     #endif
 
     //True if IR may throw excetion.
-    UINT may_throw_exception:1;
+    USHORT may_throw_exception:1;
 
     //True if IR is atomic operation.
-    UINT is_atomic_op:1;
+    USHORT is_atomic_op:1;
 
     //True if IR behaved as if it is an atomic operation consist of
     //sequential read, modify, and write.
-    UINT is_read_mod_write:1;
+    USHORT is_read_mod_write:1;
 
     //True if IR may terminate the control flow, such as throwing an excetion.
-    UINT is_terminate_control_flow:1;
+    USHORT is_terminate_control_flow:1;
 
     //True if IR may have side effect.
-    UINT has_sideeffect:1;
+    USHORT has_sideeffect:1;
 
     //True if IR can not be moved.
-    UINT no_move:1;
+    USHORT no_move:1;
 
     #ifdef CONST_IRT_SZ
     //Record the specific IR byte size.
     UINT irt_size:6;
     #endif
+
+    UINT uid; //Each IR has unique id.
+    //The type of IR can be void, and depend on
+    //the dynamic behavior of program.
+    Type const* result_data_type;
 
     //Both of 'next' and 'prev' used by the process of
     //complicated tree level IR construction.
@@ -509,13 +537,7 @@ public:
 
     //IR may have an unique attach info container.
     AIContainer * attach_info_container;
-
 public:
-    //Note IR should not have virtual table because all operations are
-    //distinguished by IR_TYPE. An IR object might represent differet operation
-    //in specific scene when it is continually freed and allocated. Diverse
-    //description should be placed in attach-info.
-    
     //Calculate the accumulated offset value from the base of array.
     //e.g: For given array long long p[10][20],
     //the offset of p[i][j] can be computed by i*20 + j, and
@@ -524,8 +546,10 @@ public:
     //in 'ofst_val' and return True, otherwise return False that means the
     //Offset can not be predicated.
     bool calcArrayOffset(TMWORD * ofst, TypeMgr * tm) const;
+
     //Set ir's DU to be NULL, return the DU pointer.
     inline DU * cleanDU();
+
     //Set ir's PR SSA Info to be NULL.
     //For convenient purpose, this function does not assert
     //when current IR object is not operate on PR.
@@ -1887,7 +1911,7 @@ public:
 class CCvt : public CUna {
     COPY_CONSTRUCTOR(CCvt);
 public:
-   ROUND_TYPE round;
+    ROUND_TYPE round;
 public:
     //Get the leaf expression.
     //e.g: cvt:i32(cvt:u8(x)), this function will return x;
@@ -1950,8 +1974,8 @@ class CFalsebr : public CTruebr {
 
 
 //This class represent function return operation.
-//Return value expressions list.
-//usage: return a, b, c;  a, b, c are return value expressions.
+//Return value expressions.
+//usage: return a;  a is return-value expression.
 #define RET_bb(ir) (((CRet*)CK_IRT(ir, IR_RETURN))->bb)
 #define RET_exp(ir) RET_kid(ir, 0)
 #define RET_kid(ir, idx) (((CRet*)ir)->opnd[CKID_TY(ir, IR_RETURN, idx)])

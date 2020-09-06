@@ -402,7 +402,7 @@ void IRCFG::initCfg(OptCtx & oc)
     build(oc);
     buildEHEdge();
     if (g_is_dump_after_pass && g_dump_opt.isDumpCFG()) {
-        dumpDOT(g_tfile, true, true);
+        dumpDOT(getRegion()->getLogMgr()->getFileHandler(), true, true);
     }
 
     //Rebuild cfg may generate redundant empty bb, it
@@ -1509,11 +1509,11 @@ bool IRCFG::verifyRPO(OptCtx const& oc) const
 
 void IRCFG::dumpDOT(CHAR const* name, bool detail, bool dump_eh)
 {
-    //Do not dump if default dump file is not initialized.
-    if (g_tfile == NULL) { return; }
+    //Do not dump if LogMr is not initialized.
+    if (!getRegion()->isLogMgrInit()) { return; }
 
-    //Note this function does not use g_tfile as output.
-    //So it is dispensable to check g_tfile.
+    //Note this function does not use LogMgr as output.
+    //So it is dispensable to check LogMgr.
     if (name == NULL) {
         name = "graph_cfg.dot";
     }
@@ -1527,9 +1527,8 @@ void IRCFG::dumpDOT(CHAR const* name, bool detail, bool dump_eh)
 
 void IRCFG::dumpDOT(FILE * h, bool detail, bool dump_eh)
 {
-    if (g_tfile == NULL || h == NULL) { return; }
-    FILE * org_tfile = g_tfile;
-    g_tfile = h;
+    if (!getRegion()->isLogMgrInit() || h == NULL) { return; }
+    getRegion()->getLogMgr()->push(h, "");
     if (detail) {
         //Print comment
         fprintf(h, "\n/*");
@@ -1543,8 +1542,8 @@ void IRCFG::dumpDOT(FILE * h, bool detail, bool dump_eh)
     //fprintf(h, "rankdir=BT;\n");
 
     //Print carriage return for dot file.
-    bool org_prt_cr = g_prt_carriage_return_for_dot;
-    g_prt_carriage_return_for_dot = true;
+    bool org_replace = getRegion()->getLogMgr()->isReplaceNewline();
+    getRegion()->getLogMgr()->setReplaceNewline(true);
 
     //Print Region name.
     fprintf(h,
@@ -1553,8 +1552,7 @@ void IRCFG::dumpDOT(FILE * h, bool detail, bool dump_eh)
             m_rg->getRegionName());
 
     MDSSAMgr const* mdssamgr = (MDSSAMgr const*)m_rg->getPassMgr()->queryPass(
-        PASS_MD_SSA_MGR);    
-
+                               PASS_MD_SSA_MGR);    
     //Print node
     INT c;
     for (xcom::Vertex * v = m_vertices.get_first(c);
@@ -1585,7 +1583,7 @@ void IRCFG::dumpDOT(FILE * h, bool detail, bool dump_eh)
                     "shape=%s,style=%s,label=\"BB%d ",
                     v->id(), font, fontsize, color, shape, style, v->id());
 
-            dumpBBLabel(bb->getLabelList(), h);
+            dumpBBLabel(bb->getLabelList(), getRegion());
             fprintf(h, " ");
             fprintf(h, "rpo:%d ", bb->rpo());
 
@@ -1593,10 +1591,7 @@ void IRCFG::dumpDOT(FILE * h, bool detail, bool dump_eh)
             if (mdssamgr != NULL && mdssamgr->is_valid()) {
                 MDPhiList const* philist = mdssamgr->getPhiList(bb);
                 if (philist != NULL) {
-                    FILE * org = g_tfile;
-                    g_tfile = h;
                     mdssamgr->dumpPhiList(philist);
-                    g_tfile = org;
                 }
             }
             
@@ -1684,27 +1679,26 @@ void IRCFG::dumpDOT(FILE * h, bool detail, bool dump_eh)
         }
         ASSERTN(0, ("unsupport CFGEdgeInfo"));
     }
-
-    g_tfile = org_tfile;
-    g_prt_carriage_return_for_dot = org_prt_cr;
+    getRegion()->getLogMgr()->pop();
+    getRegion()->getLogMgr()->setReplaceNewline(org_replace);
     fprintf(h,"\n}\n");
     fflush(h);
 }
 
 
-void IRCFG::dump_node(FILE * h, bool detail)
+void IRCFG::dump_node(bool detail)
 {
+    FILE * h = getRegion()->getLogMgr()->getFileHandler();
     ASSERT0(h);
     ASSERT0(m_bb_list);
     MDSSAMgr const* mdssamgr = (MDSSAMgr const*)m_rg->getPassMgr()->queryPass(
-        PASS_MD_SSA_MGR);    
+                               PASS_MD_SSA_MGR);    
     UINT vertical_order = 1;
     INT c;
     for (xcom::Vertex const* v = get_first_vertex(c);
         v != NULL; v = get_next_vertex(c)) {
         IRBB * bb = getBB(v->id());
         ASSERTN(bb, ("Not find BB%d", v->id()));
-
         CHAR const* shape = "box";
         CHAR const* font = "courB";
         CHAR const* color = "gold";
@@ -1721,22 +1715,19 @@ void IRCFG::dump_node(FILE * h, bool detail)
 
         if (detail) {
             fprintf(h,
-                "\nnode: {title:\"%d\" vertical_order:%d shape:%s color:%s "
-                "fontname:\"%s\" scaling:%d label:\"",
-                v->id(), vertical_order++, shape, color, font, scale);
+                    "\nnode: {title:\"%d\" vertical_order:%d shape:%s color:%s "
+                    "fontname:\"%s\" scaling:%d label:\"",
+                    v->id(), vertical_order++, shape, color, font, scale);
             fprintf(h, "   BB%d ", bb->rpo());            
             fprintf(h, " rpo:%d ", VERTEX_rpo(v));
-            dumpBBLabel(bb->getLabelList(), h);
+            dumpBBLabel(bb->getLabelList(), getRegion());
             fprintf(h, "\n");
 
             //Dump MDSSA Phi List.
             if (mdssamgr != NULL && mdssamgr->is_valid()) {
                 MDPhiList const* philist = mdssamgr->getPhiList(bb);
                 if (philist != NULL) {
-                    FILE * org = g_tfile;
-                    g_tfile = h;
                     mdssamgr->dumpPhiList(philist);
-                    g_tfile = org;
                 }
             }
 
@@ -1807,8 +1798,9 @@ void IRCFG::dump_head(FILE * h)
 }
 
 
-void IRCFG::dump_edge(FILE * h, bool dump_eh)
+void IRCFG::dump_edge(bool dump_eh)
 {
+    FILE * h = getRegion()->getLogMgr()->getFileHandler();
     ASSERT0(h);
     INT c2;
     TTab<xcom::Edge const*> visited;
@@ -1886,25 +1878,16 @@ void IRCFG::dump_edge(FILE * h, bool dump_eh)
 
 void IRCFG::dumpVCG(CHAR const* name, bool detail, bool dump_eh)
 {
-    if (g_tfile == NULL) { return; }
+    if (!getRegion()->isLogMgrInit()) { return; }
     ASSERT0(m_rg);
 
     if (name == NULL) { name = "graph_cfg.vcg"; }
 
-    //Note this function does not use g_tfile as output.
-    //So it is dispensable to check g_tfile.
+    //Note this function does not use LogMgr as output.
+    //So it is dispensable to check LogMgr.
     UNLINK(name);
     FILE * h = fopen(name, "a+");
     ASSERTN(h != NULL, ("%s create failed!!!",name));
-    FILE * old = NULL;
-
-    //Print comment
-    //fprintf(h, "\n/*");
-    //old = g_tfile;
-    //g_tfile = h;
-    //dumpBBList(m_bb_list, m_rg);
-    //g_tfile = old;
-    //fprintf(h, "\n*/\n");
     dump_head(h);
 
     //Print Region name.
@@ -1913,12 +1896,10 @@ void IRCFG::dumpVCG(CHAR const* name, bool detail, bool dump_eh)
             "borderwidth:0 fontname:\"Courier Bold\" "
             "scaling:2 label:\"RegionName:%s\" }",
             m_rg->getRegionName());
-    old = g_tfile;
-    g_tfile = h;
-    dump_node(h, detail);
-    dump_edge(h, dump_eh);
-
-    g_tfile = old;
+    getRegion()->getLogMgr()->push(h, "");
+    dump_node(detail);
+    dump_edge(dump_eh);
+    getRegion()->getLogMgr()->pop();
     fprintf(h, "\n}\n");
     fclose(h);
 }
@@ -1958,7 +1939,7 @@ void IRCFG::computeDomAndIdom(IN OUT OptCtx & oc, xcom::BitSet const* uni)
     OC_is_dom_valid(oc) = true;
     END_TIMER(t, "Compute Dom, IDom");
     if (g_is_dump_after_pass && g_dump_opt.isDumpDOM()) {
-        dump_dom(g_tfile, false);
+        dump_dom(getRegion()->getLogMgr()->getFileHandler(), false);
     }
 }
 
@@ -2071,7 +2052,6 @@ bool IRCFG::performMiscOpt(OptCtx & oc)
         //This will confuse phi insertion.
         ASSERT0(PRSSAMgr::verifyPRSSAInfo(m_rg));
         ASSERT0(MDSSAMgr::verifyMDSSAInfo(m_rg));
-
     }
     ASSERT0(verifyIRandBB(getBBList(), m_rg));
     ASSERT0(verifyRPO(oc));

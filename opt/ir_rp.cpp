@@ -222,7 +222,7 @@ public:
 #ifdef _DEUBG_
 static void dump_delegate_tab(RefTab & dele_tab, TypeMgr * dm)
 {
-    if (g_tfile == NULL) { return; }
+    if (!m_rg->isLogMgrInit()) { return; }
     ASSERT0(dm);
 
     note("\n==---- DUMP Delegate Table ----==");
@@ -231,7 +231,6 @@ static void dump_delegate_tab(RefTab & dele_tab, TypeMgr * dm)
          cur >= 0; dele = dele_tab.get_next(cur)) {
         dumpIR(dele, dm);
     }
-    fflush(g_tfile);
 }
 #endif
 
@@ -241,40 +240,37 @@ static void dump_delegate_tab(RefTab & dele_tab, TypeMgr * dm)
 //
 void RegPromot::dumpInexact(TTab<IR*> & access)
 {
-    if (g_tfile == NULL) { return; }
-    note("\n---- DUMP inexact access ----");
+    if (!m_rg->isLogMgrInit()) { return; }
+    note(getRegion(), "\n---- DUMP inexact access ----");
     TabIter<IR*> iter;
     for (IR * ir = access.get_first(iter);
         ir != NULL; ir = access.get_next(iter)) {
         dumpIR(ir, m_rg, NULL, IR_DUMP_SRC_LINE | IR_DUMP_INNER_REGION);
-        note("\n");
+        note(getRegion(), "\n");
     }
-    note("\n");
-    fflush(g_tfile);
+    note(getRegion(), "\n");
 }
 
 
 void RegPromot::dumpExact(TMap<MD const*, IR*> & access, List<IR*> & occs)
 {
-    if (g_tfile == NULL) { return; }
-    note("\n---- DUMP exact access ----");
+    if (!m_rg->isLogMgrInit()) { return; }
+    note(getRegion(), "\n---- DUMP exact access ----");
     TMapIter<MD const*, IR*> iter;
     IR * ref;
     for (MD const* md = access.get_first(iter, &ref);
          ref != NULL; md = access.get_next(iter, &ref)) {
         md->dump(m_rg->getTypeMgr());
         dumpIR(ref, m_rg, NULL, IR_DUMP_SRC_LINE | IR_DUMP_INNER_REGION);
-        note("\n");
+        note(getRegion(), "\n");
     }
 
-    note("\n---- DUMP exact occ list ----");
+    note(getRegion(), "\n---- DUMP exact occ list ----");
     for (IR * x = occs.get_head(); x != NULL; x = occs.get_next()) {
         dumpIR(x, m_rg, NULL, IR_DUMP_SRC_LINE | IR_DUMP_INNER_REGION);
-        note("\n");
+        note(getRegion(), "\n");
     }
-    note("\n");
-
-    fflush(g_tfile);
+    note(getRegion(), "\n");
 }
 
 
@@ -309,7 +305,7 @@ void RegPromot::cleanLiveBBSet()
 
 void RegPromot::dump_mdlt()
 {
-    if (g_tfile == NULL) { return; }
+    if (!m_rg->isLogMgrInit()) { return; }
     MDSet mdbs;
     xcom::DefMiscBitSetMgr * sbsmgr = getSBSMgr();
     MDLivenessMgr * livemgr = getMDLivenessMgr();
@@ -324,7 +320,7 @@ void RegPromot::dump_mdlt()
     mdbs.dump(m_md_sys);
 
     StrBuf buf(32);
-    note("\n==---- DUMP MD LIFE TIME ----==");
+    note(getRegion(), "\n==---- DUMP MD LIFE TIME ----==");
     MDSetIter iter;
     for (INT i = mdbs.get_first(&iter); i >= 0; i = mdbs.get_next(i, &iter)) {
         MD * md = m_md_sys->getMD(i);
@@ -335,8 +331,8 @@ void RegPromot::dump_mdlt()
         ASSERT0(livebbs != NULL);
 
         //Print MD name.
-        note("\nMD%d", MD_id(md));
-        prt(":");
+        note(getRegion(), "\nMD%d", MD_id(md));
+        prt(getRegion(), ":");
 
         //Print live BB.
         if (livebbs == NULL || livebbs->is_empty()) { continue; }
@@ -345,14 +341,13 @@ void RegPromot::dump_mdlt()
             for (INT j = start; j < u; j++) {
                 buf.sprint("%d,", j);
                 for (UINT k = 0; k < buf.strlen(); k++) {
-                    prt(" ");
+                    prt(getRegion(), " ");
                 }
             }
-            prt("%d,", u);
+            prt(getRegion(), "%d,", u);
             start = u + 1;
         }
     }
-    fflush(g_tfile);
     mdbs.clean(*sbsmgr);
 }
 
@@ -1996,8 +1991,9 @@ void RegPromot::init()
 
 bool RegPromot::dump() const
 {
-    if (g_tfile == NULL) { return false; }
-    note("\n==---- DUMP %s '%s' ----==", getPassName(), m_rg->getRegionName());
+    if (!m_rg->isLogMgrInit()) { return false; }
+    note(getRegion(), "\n==---- DUMP %s '%s' ----==",
+         getPassName(), m_rg->getRegionName());
     //dump_mdlt();
     dumpBBList(m_rg->getBBList(), m_rg);
     if (m_prssamgr != NULL && m_prssamgr->is_valid()) {
@@ -2006,7 +2002,6 @@ bool RegPromot::dump() const
     if (m_mdssamgr != NULL && m_mdssamgr->is_valid()) {
         m_mdssamgr->dump();
     }
-    fflush(g_tfile);
     return true;
 }
 
@@ -2055,8 +2050,7 @@ bool RegPromot::perform(OptCtx & oc)
     if (change) {
         //DU reference and du chain has maintained.
         ASSERT0(m_rg->verifyMDRef());
-        ASSERT0(m_du->verifyMDDUChain(DUOPT_COMPUTE_PR_DU|
-                                      DUOPT_COMPUTE_NONPR_DU));
+        ASSERT0(verifyMDDUChain(m_rg));
         OC_is_reach_def_valid(oc) = false;
         OC_is_avail_reach_def_valid(oc) = false;
         OC_is_live_expr_valid(oc) = false;

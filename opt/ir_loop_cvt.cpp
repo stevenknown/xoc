@@ -215,15 +215,14 @@ bool LoopCvt::perform(OptCtx & oc)
     bool change = find_and_convert(worklst);
     if (change) {
         if (g_is_dump_after_pass && g_dump_opt.isDumpLoopCVT()) {
-            note("\n==---- DUMP %s '%s' ----==",
+            note(getRegion(), "\n==---- DUMP %s '%s' ----==",
                  getPassName(), m_rg->getRegionName());
             dumpBBList(m_rg->getBBList(), m_rg);
         }
 
         //DU reference and du chain has maintained.
         ASSERT0(m_rg->verifyMDRef());
-        ASSERT0(m_du->verifyMDDUChain(DUOPT_COMPUTE_PR_DU|
-                                      DUOPT_COMPUTE_NONPR_DU));
+        ASSERT0(verifyMDDUChain(m_rg));
 
         //All these changed.
         OC_is_reach_def_valid(oc) = false;

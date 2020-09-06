@@ -36,6 +36,17 @@ author: Su Zhenyu
 
 namespace xoc {
 
+static bool checkMDSetContain(IR const* ir1, MD const* md)
+{
+    if (ir1->getRefMDSet() != NULL) {
+        //RefMDSet may be NULL under OPT_LEVEL0.
+        CHECK_DUMMYUSE(ir1->getRefMDSet() &&
+                       ir1->getRefMDSet()->is_contain(md));
+    }
+    return true;
+}
+
+
 Refine::Refine(Region * rg)
 {
     ASSERT0(rg != NULL);
@@ -72,7 +83,7 @@ IR * Refine::refineILoad1(IR * ir, bool & change, RefineCtx & rc)
     //ir's MD ref must be equivalent to ld.
     if (ld->getEffectRef() == NULL && rc.doUpdateMDRef()) {
         MD const* t = m_rg->allocRefForLoad(ld);
-        CHECK_DUMMYUSE(ld->getRefMDSet() && ld->getRefMDSet()->is_contain(t));
+        CHECK_DUMMYUSE(checkMDSetContain(ld, t));
     }
 
     changeUse(ir, ld, m_rg);
@@ -102,8 +113,7 @@ IR * Refine::refineILoad2(IR * ir, bool & change, RefineCtx & rc)
     ld->copyRef(ir, m_rg);
     if (ld->getEffectRef() == NULL && rc.doUpdateMDRef()) {
         MD const* t = m_rg->allocRefForLoad(ld);
-        CHECK_DUMMYUSE(ld->getRefMDSet() &&
-                       ld->getRefMDSet()->is_contain(t));
+        CHECK_DUMMYUSE(checkMDSetContain(ld, t));
     }
     changeUse(ir, ld, m_rg);
     ld->copyAI(ir, m_rg);
@@ -171,8 +181,7 @@ IR * Refine::refineIStore(IR * ir, bool & change, RefineCtx & rc)
         newir->copyRef(ir, m_rg);
         if (newir->getEffectRef() == NULL && rc.doUpdateMDRef()) {
             MD const* t2 = m_rg->allocRefForStore(newir);
-            CHECK_DUMMYUSE(newir->getRefMDSet() &&
-                           newir->getRefMDSet()->is_contain(t2));
+            CHECK_DUMMYUSE(checkMDSetContain(newir, t2));
         }
         bool maybe_exist_expired_du = false;
         if (newir->getRefMD() == NULL) {
@@ -211,8 +220,7 @@ IR * Refine::refineIStore(IR * ir, bool & change, RefineCtx & rc)
         newrhs->copyRef(rhs, m_rg);
         if (newrhs->getEffectRef() == NULL && rc.doUpdateMDRef()) {
             MD const* t2 = m_rg->allocRefForLoad(newrhs);
-            CHECK_DUMMYUSE(newrhs->getRefMDSet() &&
-                newrhs->getRefMDSet()->is_contain(t2));
+            CHECK_DUMMYUSE(checkMDSetContain(newrhs, t2));
         }
         changeUse(rhs, newrhs, m_rg);
         newrhs->copyAI(rhs, m_rg);
@@ -1671,12 +1679,12 @@ bool Refine::refineBBlist(IN OUT BBList * ir_bb_list,
         change |= refineStmtList(BB_irlist(ct->val()), rc);
     }
     END_TIMER(t, "Refine IRBB list");
+
     if (change) {
         if (OC_is_ref_valid(oc)) {
             ASSERT0(m_rg->verifyMDRef());
-            ASSERT0(m_rg->getDUMgr() == NULL ||
-                    m_rg->getDUMgr()->verifyMDDUChain(DUOPT_COMPUTE_PR_DU |
-                                                      DUOPT_COMPUTE_NONPR_DU));
+            ASSERT0(verifyMDDUChain(m_rg));
+
             //DU chain is kept by refinement.
             ASSERT0(verifyIRandBB(ir_bb_list, m_rg));
         }

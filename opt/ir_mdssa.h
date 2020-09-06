@@ -341,6 +341,15 @@ public:
     //'def': the MDDef of the chain.
     //'ii': iterator. It should be clean already.
     //Readonly function.
+    //Note this function may iterate same IR multiple times because it may
+    //belong different VOpnd.
+    //e.g: global int g; local int b;
+    //     g = b;
+    //The MDSSA info of ST is:
+    // st:i32 'g'
+    //  --DEFREF:(MD2V2, PrevDEF:MD2V1, NextDEF : MD2V3) | UsedBy : ld b(id:15)
+    //  --DEFREF : (MD5V2, PrevDEF:MD5V1) | UsedBy : ld b(id:15), id(id:23)
+    //  ld b is both USE of VOpnd(MD2V2) and VOpnd(MD5V2).
     IR const* iterUseInitC(IR const* def, OUT ConstMDSSAUSEIRIter & ii) const;
 
     //Iterative access USE in MDSSAInfo. The USE always an IR occurrence that
@@ -348,6 +357,15 @@ public:
     //This function return the next USE accroding to 'ii'.
     //'ii': iterator.
     //Readonly function.
+    //Note this function may iterate same IR multiple times because it may
+    //belong different VOpnd.
+    //e.g: global int g; local int b;
+    //     g = b;
+    //The MDSSA info of ST is:
+    // st:i32 'g'
+    //  --DEFREF:(MD2V2, PrevDEF:MD2V1, NextDEF : MD2V3) | UsedBy : ld b(id:15)
+    //  --DEFREF : (MD5V2, PrevDEF:MD5V1) | UsedBy : ld b(id:15), id(id:23)
+    //  ld b is both USE of VOpnd(MD2V2) and VOpnd(MD5V2).
     IR const* iterUseNextC(IN OUT ConstMDSSAUSEIRIter & ii) const;
 
     //Iterative access MDDef chain.
@@ -367,6 +385,15 @@ public:
     //Readonly function.
     MDDef const* iterDefNextCTillKillingDef(IR const* use,
                                             IN OUT ConstMDDefIter & ii) const;
+
+    //Return true if stmt dominate use's stmt, otherwise return false.
+    bool isStmtDomUseInsideLoop(IR const* stmt,
+                                IR const* use,
+                                LI<IRBB> const* li) const;
+
+    //Return true if ir dominates all its USE expressions which inside loop.
+    //In ssa mode, stmt's USE may be placed in operand list of PHI.
+    bool isStmtDomAllUseInsideLoop(IR const* ir, LI<IRBB> const* li) const;
 
     //Reinitialize MDSSA manager.
     //This function will clean all informations and recreate them.

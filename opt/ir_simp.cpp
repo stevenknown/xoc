@@ -2312,7 +2312,7 @@ IR * Region::simplifyStmtList(IR * ir_list, SimpCtx * ctx)
         }
     }
     if (g_is_dump_after_pass && g_dump_opt.isDumpSimp()) {
-        note("\n==---- DUMP AFTER SIMPLIFY STMT LIST ----==");
+        note(this, "\n==---- DUMP AFTER SIMPLIFY STMT LIST ----==");
         xoc::dumpIRList(ret_list, this);
     }
     return ret_list;

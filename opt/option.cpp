@@ -277,6 +277,12 @@ DumpOpt g_dump_opt;
 //Redirect output information to stdout to dump file if exist.
 bool g_redirect_stdout_to_dump_file = false;
 
+//Record the unique file handler for dump file.
+//Note the order of access to this file will not be guaranteed
+//in serial execution when there are multiple RegionMgrs doing compilation
+//simultaneously.
+FILE * g_unique_dumpfile = NULL;
+
 DumpOpt::DumpOpt()
 {
     is_dump_all = false;

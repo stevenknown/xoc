@@ -136,8 +136,8 @@ static bool updateEdgeBetweenHeadAndPreheader(LI<IRBB> const* li,
     LabelInfo const* preheader_lab = NULL;
     for (IRBB * p = preds.get_head(); p != NULL; p = preds.get_next()) {
         if (li->isInsideLoop(p->id())) {
-            //BB_p is predecessor of loop-head that outside from loop;
-            //BB_1 is also predecessor of loop-head, but it belongs to loop.
+            //BB_p is predecessor of loop-header that outside from loop;
+            //BB_1 is also predecessor of loop-header, but it belongs to loop.
             //CASE:
             //   BB_p
             //   |
@@ -162,19 +162,19 @@ static bool updateEdgeBetweenHeadAndPreheader(LI<IRBB> const* li,
             //    v
             // BB_header
             //
-            //Appending GOTO to fix:
+            //Append GOTO to fix it:
             //
             //   BB_p
             //   |
             // ---
             // |  BB_1<--...
-            // |  | //Jump
+            // |  | //Jump to loop-header
             // |  |_________
             // v            |
             // BB_preheader |
             //    |         |
             //    v         |
-            // BB_header <--            
+            // BB_header <--
             LabelInfo const* lab = head->getLabelList().get_head();
             if (lab == NULL) {
                 lab = rg->genILabel();
@@ -306,12 +306,13 @@ static void tryMoveLabelFromHeadToPreheader(LI<IRBB> const* li,
 
 
 //Find appropriate BB to be prehead.
-static bool findAppropriatePrevBB(LI<IRBB> const* li,
-                                  IRCFG * cfg,
-                                  IRBB const* head,
-                                  IRBB const* prev)
+//Return the appropriate BB if find.
+static IRBB * findAppropriatePreheader(LI<IRBB> const* li,
+                                       IRCFG * cfg,
+                                       IRBB const* head,
+                                       IRBB * prev)
 {
-    bool find = false;
+    IRBB * appropriate_bb = NULL;
     for (xcom::EdgeC const* ec = cfg->getVertex(head->id())->getInList();
          ec != NULL; ec = ec->get_next()) {
         UINT pred = ec->getFromId();
@@ -319,13 +320,24 @@ static bool findAppropriatePrevBB(LI<IRBB> const* li,
 
         if (pred == prev->id()) {
             //Try to find fallthrough prev BB.
-            //CASE:BB_prev is suitable  for preheader of head.
+            //CASE:BB_prev is suitable for preheader of head.
             //      BB_prev
             //        | //fallthrough
             //        v
             // ...-->BB_head
-            find = true;
-            break;
+            IR const* last = const_cast<IRBB*>(prev)->getLastIR();
+            if (last == NULL ||
+                (last->isUnconditionalBr() && head->isTarget(last))) {
+                //prev fallthrough to head BB.
+                appropriate_bb = prev;
+                break;
+            } else if (!IRBB::isDownBoundary(const_cast<IRBB*>(prev)->
+                                             getLastIR())) {
+                //prev should fallthrough to head BB.
+                //Otherwise can not append IR to prev BB.
+                appropriate_bb = prev;
+                break;
+            }
         }
 
         if (pred != prev->id()) {
@@ -346,20 +358,13 @@ static bool findAppropriatePrevBB(LI<IRBB> const* li,
                 //  |      |
                 //  |      v
                 //   ---BB_end
-                find = true;
+                ASSERT0(head->isTarget(last_ir_of_pred));
+                appropriate_bb = cfg->getBB(pred);
                 break;
             }
         }
     }
-
-    if (const_cast<IRBB*>(prev)->getLastIR() != NULL &&
-        IRBB::isDownBoundary(const_cast<IRBB*>(prev)->getLastIR())) {
-        //prev should fallthrough to current BB.
-        //Can not append IR to prev BB.
-        find = false;
-    }
-
-    return find;
+    return appropriate_bb;
 }
 
 
@@ -387,10 +392,10 @@ IRBB * findAndInsertPreheader(LI<IRBB> const* li,
     ASSERT0(bbholder);
     BBListIter tt = bbholder;
     IRBB * prev = bblst->get_prev(&tt);
-    bool find_appropriate_prev_bb = findAppropriatePrevBB(li, cfg, head, prev);
+    IRBB * appropriate_prev_bb = findAppropriatePreheader(li, cfg, head, prev);
     if (!force) {
-        if (find_appropriate_prev_bb) {
-            return prev;
+        if (appropriate_prev_bb != NULL) {
+            return appropriate_prev_bb;
         }
         return NULL;
     }
@@ -481,7 +486,10 @@ static bool isLoopInvariantInMDSSA(IR const* ir,
          i >= 0; i = mdssainfo->getVOpndSet()->get_next(i, &iter)) {
         VMD const* vopnd = (VMD const*)mdssamgr->getVOpnd(i);
         ASSERT0(vopnd && vopnd->is_md());
+        if (!vopnd->hasDef()) { continue; }
+
         MDDef const* mddef = vopnd->getDef();
+        ASSERT0(mddef);
         if (mddef->is_phi()) {
             if (!isMDPhiInvariant(mddef, ir, li, invariant_stmt, mdssamgr)) {
                 return false;

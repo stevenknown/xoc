@@ -84,6 +84,7 @@ public:
     void dump(bool with_name = false) const;
 
     MDSetMgr * getMdsMgr() { return &m_mds_mgr; }
+    Region * getRegion() const { return m_rg; }
     xcom::DefMiscBitSetMgr * getSBSMgr() { return &m_sbs_mgr; }
     MDSet * getLiveInMDSet(IRBB * bb);
     MDSet * getLiveOutMDSet(IRBB * bb);    

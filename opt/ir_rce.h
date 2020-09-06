@@ -89,6 +89,7 @@ public:
 
     virtual bool dump() const;
 
+    Region * getRegion() const { return m_rg; }
     virtual CHAR const* getPassName() const
     { return "Redundant Code Elimination"; }
     PASS_TYPE getPassType() const { return PASS_RCE; }

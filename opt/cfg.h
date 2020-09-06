@@ -268,13 +268,12 @@ public:
         return count;
     }
 
-    void dumpLoopTree(LI<BB> const* looplist, UINT indent, FILE * h) const;
-    virtual void dumpLoopInfo()
+    void dumpLoopTree(LI<BB> const* looplist, UINT indent, Region * rg) const;
+    virtual void dumpLoopInfo(Region * rg)
     {
-        if (g_tfile == NULL) { return; }
-        fprintf(g_tfile, "\n==---- DUMP Natural Loop Info ----==");
-        dumpLoopTree(m_loop_info, 0, g_tfile);
-        fflush(g_tfile);
+        if (!rg->isLogMgrInit()) { return; }
+        prt(rg, "\n==---- DUMP Natural Loop Info ----==");
+        dumpLoopTree(m_loop_info, 0, rg);
     }
     virtual void dumpVCG(CHAR const* name = NULL);
 
@@ -582,25 +581,24 @@ void CFG<BB, XR>::getKidOfIF(BB * bb,
 template <class BB, class XR>
 void CFG<BB, XR>::dumpLoopTree(LI<BB> const* looplist,
                                UINT indent,
-                               FILE * h) const
+                               Region * rg) const
 {
-    if (h == NULL) { return; }
+    if (!rg->isLogMgrInit()) { return; }
     while (looplist != NULL) {
-        fprintf(h, "\n");
-        for (UINT i = 0; i < indent; i++) { fprintf(h, " "); }
+        prt(rg, "\n");
+        for (UINT i = 0; i < indent; i++) { prt(rg, " "); }
         ASSERT0(LI_loop_head(looplist));
-        fprintf(h, "LOOP%d HEAD:BB%d, BODY:", looplist->id(),
-                LI_loop_head(looplist)->id());
+        prt(rg, "LOOP%d HEAD:BB%d, BODY:", looplist->id(),
+            LI_loop_head(looplist)->id());
         if (LI_bb_set(looplist) != NULL) {
             for (INT i = LI_bb_set(looplist)->get_first();
                  i != -1; i = LI_bb_set(looplist)->get_next((UINT)i)) {
-                fprintf(h, "%d,", i);
+                prt(rg, "%d,", i);
             }
         }
-        dumpLoopTree(LI_inner_list(looplist), indent + 2, h);
+        dumpLoopTree(LI_inner_list(looplist), indent + 2, rg);
         looplist = LI_next(looplist);
     }
-    fflush(h);
 }
 
 
@@ -1673,7 +1671,6 @@ bool CFG<BB, XR>::isLoopHeadRecur(LI<BB> * li, BB * bb)
 template <class BB, class XR>
 void CFG<BB, XR>::dumpVCG(CHAR const* name)
 {
-    ASSERTN(g_tfile, ("usr do not intend to dump internal info."));
     if (!name) {
         name = "graph_cfg.vcg";
     }
@@ -1681,39 +1678,39 @@ void CFG<BB, XR>::dumpVCG(CHAR const* name)
     FILE * hvcg = fopen(name, "a+");
     ASSERTN(hvcg, ("%s create failed!!!", name));
     fprintf(hvcg, "graph: {"
-              "title: \"Graph\"\n"
-              "shrink:  15\n"
-              "stretch: 27\n"
-              "layout_downfactor: 1\n"
-              "layout_upfactor: 1\n"
-              "layout_nearfactor: 1\n"
-              "layout_splinefactor: 70\n"
-              "spreadlevel: 1\n"
-              "treefactor: 0.500000\n"
-              "node_alignment: center\n"
-              "orientation: top_to_bottom\n"
-              "late_edge_labels: no\n"
-              "display_edge_labels: yes\n"
-              "dirty_edge_labels: no\n"
-              "finetuning: no\n"
-              "nearedges: no\n"
-              "splines: yes\n"
-              "ignoresingles: no\n"
-              "straight_phase: no\n"
-              "priority_phase: no\n"
-              "manhatten_edges: no\n"
-              "smanhatten_edges: no\n"
-              "port_sharing: no\n"
-              "crossingphase2: yes\n"
-              "crossingoptimization: yes\n"
-              "crossingweight: bary\n"
-              "arrow_mode: free\n"
-              "layoutalgorithm: mindepthslow\n"
-              "node.borderwidth: 2\n"
-              "node.color: lightcyan\n"
-              "node.textcolor: darkred\n"
-              "node.bordercolor: blue\n"
-              "edge.color: darkgreen\n");
+            "title: \"Graph\"\n"
+            "shrink:  15\n"
+            "stretch: 27\n"
+            "layout_downfactor: 1\n"
+            "layout_upfactor: 1\n"
+            "layout_nearfactor: 1\n"
+            "layout_splinefactor: 70\n"
+            "spreadlevel: 1\n"
+            "treefactor: 0.500000\n"
+            "node_alignment: center\n"
+            "orientation: top_to_bottom\n"
+            "late_edge_labels: no\n"
+            "display_edge_labels: yes\n"
+            "dirty_edge_labels: no\n"
+            "finetuning: no\n"
+            "nearedges: no\n"
+            "splines: yes\n"
+            "ignoresingles: no\n"
+            "straight_phase: no\n"
+            "priority_phase: no\n"
+            "manhatten_edges: no\n"
+            "smanhatten_edges: no\n"
+            "port_sharing: no\n"
+            "crossingphase2: yes\n"
+            "crossingoptimization: yes\n"
+            "crossingweight: bary\n"
+            "arrow_mode: free\n"
+            "layoutalgorithm: mindepthslow\n"
+            "node.borderwidth: 2\n"
+            "node.color: lightcyan\n"
+            "node.textcolor: darkred\n"
+            "node.bordercolor: blue\n"
+            "edge.color: darkgreen\n");
 
     //Print node
     UINT vertical_order = 1;
@@ -1729,9 +1726,9 @@ void CFG<BB, XR>::dumpVCG(CHAR const* name)
             color = "cyan";
         }
         fprintf(hvcg,
-            "\nnode: {title:\"%d\" vertical_order:%d shape:%s color:%s "
-            "fontname:\"%s\" scaling:%d label:\"",
-            bb->id(), vertical_order++, shape, color, font, scale);
+                "\nnode: {title:\"%d\" vertical_order:%d shape:%s color:%s "
+                "fontname:\"%s\" scaling:%d label:\"",
+                bb->id(), vertical_order++, shape, color, font, scale);
         xcom::Vertex * v = getVertex(bb->id());
         fprintf(hvcg, "   BB%d ", bb->id());
         if (VERTEX_rpo(v) != 0) {
@@ -1747,11 +1744,12 @@ void CFG<BB, XR>::dumpVCG(CHAR const* name)
         CFGEdgeInfo * ei = (CFGEdgeInfo*)EDGE_info(e);
         if (ei == NULL) {
             fprintf(hvcg,
-                "\nedge: { sourcename:\"%d\" targetname:\"%d\" }",
-                e->from()->id(), e->to()->id());
+                    "\nedge: { sourcename:\"%d\" targetname:\"%d\" }",
+                    e->from()->id(), e->to()->id());
         } else if (CFGEI_is_eh(ei)) {
             fprintf(hvcg,
-              "\nedge: { sourcename:\"%d\" targetname:\"%d\" linestyle:dotted }",
+              "\nedge: { sourcename:\"%d\" "
+              "targetname:\"%d\" linestyle:dotted }",
               e->from()->id(), e->to()->id());
         } else {
             UNREACHABLE();

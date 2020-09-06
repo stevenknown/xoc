@@ -549,8 +549,7 @@ public:
     void dumpInOutPointToSetForBB() const;
     void dumpMD2MDSetForRegion(bool dump_pt_graph) const;
     void dumpMayPointTo() const;
-    void dump(CHAR const* name) const;
-    virtual bool dump() const { dump(NULL); return true; }
+    virtual bool dump() const;
 
     void ElemUnionPointTo(MDSet const& mds,
                           MDSet const& in_set,
@@ -566,6 +565,7 @@ public:
     void ElemCleanPointTo(MDSet const& mds, IN MD2MDSet * mx);
     void ElemCleanExactPointTo(MDSet const& mds, IN MD2MDSet * mx);
 
+    Region * getRegion() const { return m_rg; }
     virtual CHAR const* getPassName() const { return "Alias Analysis"; }
     virtual PASS_TYPE getPassType() const { return PASS_AA; }
     DefMiscBitSetMgr * getSBSMgr() { return &m_misc_bs_mgr; }

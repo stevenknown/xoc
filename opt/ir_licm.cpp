@@ -390,34 +390,34 @@ void LICM::updateMD2Num(IR * ir)
 
 
 //Given loop info li, dump the invariant stmt and invariant expression.
-void LICM::dumpInvariantExpStmt() const
+void LICM::dumpInvariantExpStmt(LI<IRBB> const* li) const
 {
-    if (g_tfile == NULL) { return; }
-    note("\n==---- DUMP LICM Analysis Result '%s' ----==\n",
-         m_rg->getRegionName());
+    if (!m_rg->isLogMgrInit()) { return; }
+    note(getRegion(),
+         "\n==---- DUMP LICM Analysis Result : LoopInfo%d : '%s' ----==\n",
+         li->id(), m_rg->getRegionName());
     if (m_invariant_exp.get_elem_count() > 0) {
-        TabIter<IR*> ti;
-        prt("-- Invariant Expression (num=%d) -- :",
+        xcom::TabIter<IR*> ti;
+        prt(getRegion(), "-- Invariant Expression (num=%d) -- :",
             m_invariant_exp.get_elem_count());
-        g_indent += 3;
+        getRegion()->getLogMgr()->incIndent(3);
         for (IR * c = m_invariant_exp.get_first(ti);
              c != NULL; c = m_invariant_exp.get_next(ti)) {
-             dumpIR(c, m_rg);
+             dumpIR(c, m_rg, NULL, IR_DUMP_KID);
         }
-        g_indent -= 3;
-
+        getRegion()->getLogMgr()->decIndent(3);
     }
-    note("\n");
+    note(getRegion(), "\n");
     if (m_invariant_stmt.get_elem_count() > 0) {
-        prt("-- Invariant Statement (num=%d) -- :",
+        prt(getRegion(), "-- Invariant Statement (num=%d) -- :",
             m_invariant_stmt.get_elem_count());
-        g_indent += 3;
-        C<IR*> * it;
+        getRegion()->getLogMgr()->incIndent(3);
+        xcom::C<IR*> * it;
         for (IR * c = m_invariant_stmt.get_head(&it);
              c != NULL; c = m_invariant_stmt.get_next(&it)) {
              dumpIR(c, m_rg);
         }
-        g_indent -= 3;
+        getRegion()->getLogMgr()->decIndent(3);
     }
 }
 
@@ -461,69 +461,6 @@ bool LICM::analysis(IN LI<IRBB> * li)
 }
 
 
-static bool is_stmt_dom_its_use(IR const* stmt,
-                                IR const* use,
-                                LI<IRBB> const* li,
-                                IRBB const* stmtbb,
-                                IRCFG * cfg)
-{
-    IR const* ustmt = use->getStmt();
-    UINT ubbid = ustmt->getBB()->id();
-    if (!li->isInsideLoop(ubbid)) { return true; }
-
-    UINT stmtbbid = stmtbb->id();
-    if ((stmtbbid != ubbid && cfg->is_dom(stmtbbid, ubbid)) ||
-        (stmtbbid == ubbid && stmtbb->is_dom(stmt, ustmt, true))) {
-        return true;
-    }
-
-    return false;
-}
-
-
-static bool verifyPRSSADomUse(IR const* ir,
-                              LI<IRBB> const* li,
-                              SSAInfo const* info,
-                              Region const* rg,
-                              IRCFG * cfg)
-{
-    ASSERT0(info->getDef() == ir);
-    IRBB const* irbb = ir->getBB();
-    ASSERT0(irbb);
-    SSAUseIter iter;
-    for (INT i = info->getUses().get_first(&iter);
-         iter != NULL; i = info->getUses().get_next(i, &iter)) {
-        IR const* use = const_cast<Region*>(rg)->getIR(i);
-        if (!use->is_pr()) {
-            ASSERT0(!use->isReadPR());
-            continue;
-        }
-        ASSERTN(PR_no(use) == ir->getPrno(), ("prno is unmatch"));
-        ASSERT0(PR_ssainfo(use) == info);
-        ASSERT0(is_stmt_dom_its_use(ir, use, li, irbb, cfg));
-    }
-    return true;
-}
-
-
-static bool verifyMDSSADomUse(IR const* ir,
-                              LI<IRBB> const* li,
-                              MDSSAInfo const* info,
-                              Region const* rg,
-                              IRCFG * cfg,
-                              MDSSAMgr * mgr)
-{
-    IRBB const* irbb = ir->getBB();
-    ASSERT0(irbb);
-    ConstMDSSAUSEIRIter ii;
-    for (IR const* use = mgr->iterUseInitC(ir, ii);
-         use != NULL; use = mgr->iterUseNextC(ii)) {
-        ASSERT0(is_stmt_dom_its_use(ir, use, li, irbb, cfg));
-    }
-    return true;
-}
-
-
 bool LICM::isInvariantStmt(IR const* stmt) const
 {
     ASSERT0(stmt->is_stmt());
@@ -539,33 +476,20 @@ bool LICM::is_dom_all_use_in_loop(IR const* ir, LI<IRBB> * li)
     PRSSAMgr * prssamgr = m_rg->getPRSSAMgr();
     if (prssamgr != NULL && prssamgr->is_valid() &&
         (ir->isWritePR() || ir->isCallHasRetVal())) {
-        SSAInfo * info = ir->getSSAInfo();
-        ASSERTN(info, ("miss PRSSAInfo"));
-        ASSERT0(verifyPRSSADomUse(ir, li, info, m_rg, m_cfg));
-        return true;
+        return prssamgr->isStmtDomAllUseInsideLoop(ir, li);
     }
 
     MDSSAMgr * mdssamgr = m_rg->getMDSSAMgr();
     if (mdssamgr != NULL &&
         mdssamgr->is_valid() &&
         ir->isMemoryRefNotOperatePR()) {
-        MDSSAInfo * info = mdssamgr->getMDSSAInfoIfAny(ir);
-        ASSERTN(info, ("miss MDSSAInfo"));
-        ASSERT0(verifyMDSSADomUse(ir, li, info, m_rg, m_cfg, mdssamgr));
-        return true;
+        return mdssamgr->isStmtDomAllUseInsideLoop(ir, li);
     }
 
     DUSet const* useset = ir->readDUSet();
     if (useset != NULL) {
-        DUIter di = NULL;
-        for (INT i = useset->get_first(&di);
-             i >= 0; i = useset->get_next(i, &di)) {
-            IR const* u = m_rg->getIR(i);
-            ASSERT0(u->is_exp() && u->getStmt());
-            if (!is_stmt_dom_its_use(ir, u, li, irbb, m_cfg)) {
-                return false;
-            }
-        }
+        ASSERT0(m_du);
+        return m_du->isStmtDomAllUseInsideLoop(ir, li);
     }
     return true;
 }
@@ -650,7 +574,7 @@ bool LICM::hoistInvariantStmt(IR * stmt, OUT IRBB * prehead, OUT LI<IRBB> * li)
 
     //OK, stmt can be hoisted to preheader.
     BB_irlist(stmt->getBB()).remove(stmt);
-    BB_irlist(prehead).append_tail(stmt);
+    BB_irlist(prehead).append_tail_ex(stmt);
     return true;
 }
 
@@ -754,7 +678,7 @@ IRBB * LICM::insertGuardBB(IRBB * prehead, IRBB * loophead)
     //Assign MD for generated new IR.
     m_rg->assignMDForIRList(guard_br, true, true);
     ASSERT0(guard->getNumOfIR() == 0);
-    guard->getIRList()->append_tail(guard_br);
+    guard->getIRList()->append_tail_ex(guard_br);
     return guard;
 }
 
@@ -798,6 +722,7 @@ bool LICM::hasInsertedGuardBB(LI<IRBB> const* li) const
 //This function will maintain RPO of generated guard BB.
 //Return true if BB or STMT changed.
 bool LICM::hoistCandHelper(IRBB const* backedge_bb,
+                           OUT bool & insert_guard_bb,
                            OUT IR * cand_exp,
                            OUT IRBB * prehead,
                            OUT LI<IRBB> * li)
@@ -839,6 +764,7 @@ bool LICM::hoistCandHelper(IRBB const* backedge_bb,
             } else {
                 insertGuardBB(prehead, li->getLoopHead());
                 m_insert_guard_bb.append(li);
+                insert_guard_bb = true;
             }
         }
         cand_stmt->getBB()->getIRList()->remove(cand_stmt);        
@@ -877,7 +803,25 @@ bool LICM::hoistCandHelper(IRBB const* backedge_bb,
     stpr->setRefMD(tmd, m_rg);
 
     addDUChain(stpr, t, m_rg);
-    prehead->getIRList()->append_tail(stpr);
+    prehead->getIRList()->append_tail_ex(stpr);
+    return true;
+}
+
+
+//Try to move and check that each definitions of candidate has been
+//already hoisted from loop.
+bool LICM::tryMoveAllDefStmtOutFromLoop(IR const* c,
+                                        IRBB * prehead,
+                                        OUT LI<IRBB> * li)
+{
+    m_iriter.clean();
+    for (IR const* x = iterInitC(c, m_iriter);
+         x != NULL; x = iterNextC(m_iriter)) {
+        if (!handleDefByDUChain(x, prehead, li)) {
+            //x's DEF can not be hoisted.
+            return false;
+        }
+    }
     return true;
 }
 
@@ -885,36 +829,39 @@ bool LICM::hoistCandHelper(IRBB const* backedge_bb,
 //Hoist candidate IRs to preheader BB.
 //This function will maintain RPO if new BB inserted.
 //Return true if BB or STMT changed.
-bool LICM::hoistCand(OUT IRBB * prehead, OUT LI<IRBB> * li)
+bool LICM::hoistCand(OUT IRBB * prehead,
+                     OUT LI<IRBB> * li,
+                     OUT bool & insert_bb)
 {
     bool du_set_info_changed = false;
     Vector<IR*> removed;
     TabIter<IR*> ti;
     IRBB * backedge_bb = findSingleBackedgeStartBB(li, m_cfg);
+    ASSERT0(backedge_bb);
     while (m_invariant_exp.get_elem_count() > 0) {
         UINT removednum = 0;
         for (IR * c = m_invariant_exp.get_first(ti);
              c != NULL; c = m_invariant_exp.get_next(ti)) {
             ASSERT0(c->is_exp());
             if (!isWorthHoist(c)) { continue; }
-
-            //Check that each definitions of candidate have been
-            //already hoisted from loop.
-            bool do_hoist_now = true;
-            m_iriter.clean();
-            for (IR const* x = iterInitC(c, m_iriter);
-                 x != NULL; x = iterNextC(m_iriter)) {
-                if (!handleDefByDUChain(x, prehead, li)) {
-                    //x's DEF can not be hoisted.
-                    do_hoist_now = false;
-                    break;
-                }
-            }
-            if (!do_hoist_now) { continue; }
+            if (!tryMoveAllDefStmtOutFromLoop(c, prehead, li)) { continue; }
 
             removed.set(removednum, c);
             removednum++;
-            if (hoistCandHelper(backedge_bb, c, prehead, li)) {
+            if (!li->isInsideLoop(c->getStmt()->getBB()->id())) {
+                //Candidate expression has been moved to preheader.
+                //e.g:stpr $1 = add (ld gp, 0x1);  //S1
+                //    st m = ild $1;  //S2
+                //Both 'add' and 'ild' are cand-expression.
+                //First, we choose moving S2 to preheader first.
+                //Whereas according to the dependence
+                //relation of $1, the DEF stmt of $1 will be moved to
+                //preheader, namely, S1.
+                //Next, we are going to moving cand-exp 'add', but we find it
+                //has been moved to preheader.
+                continue;
+            }
+            if (hoistCandHelper(backedge_bb, insert_bb, c, prehead, li)) {
                 du_set_info_changed = true;
             }
         }
@@ -963,7 +910,7 @@ bool LICM::doLoopTree(LI<IRBB> * li,
 
         if (g_is_dump_after_pass && g_dump_opt.isDumpLICM()) {
             //Dump invariant info here because they will be replaced soon.
-            dumpInvariantExpStmt();
+            dumpInvariantExpStmt(tli);
         }
 
         if (m_invariant_exp.get_elem_count() == 0) {
@@ -990,10 +937,13 @@ bool LICM::doLoopTree(LI<IRBB> * li,
             m_cfg->computeDomAndIdom(oc);
         }
 
-        du_set_info_changed |= hoistCand(prehead, tli);
+        bool inserted3 = false;
+        du_set_info_changed |= hoistCand(prehead, tli, inserted3);
         changed |= du_set_info_changed;
+        insert_bb |= inserted3;
 
         bool inserted2 = splitBBIfNeeded(prehead);
+        ASSERTN(!inserted2, ("Does this happen?"));
         insert_bb |= inserted2;
         if (inserted2) {
             //Recompute DOM related info.
@@ -1008,7 +958,8 @@ bool LICM::doLoopTree(LI<IRBB> * li,
 
 bool LICM::dump() const
 {
-    note("\n==---- DUMP %s '%s' ----==", getPassName(), m_rg->getRegionName());
+    note(getRegion(), "\n==---- DUMP %s '%s' ----==",
+         getPassName(), m_rg->getRegionName());
     m_rg->dumpBBList();
     return true;
 }
@@ -1019,7 +970,7 @@ bool LICM::perform(OptCtx & oc)
     if (m_rg->getBBList() == NULL || m_rg->getBBList()->get_elem_count() == 0) {
         return false;
     }
-
+    
     if (!OC_is_ref_valid(oc)) { return false; }
     m_mdssamgr = (MDSSAMgr*)m_rg->getPassMgr()->queryPass(PASS_MD_SSA_MGR);
     m_prssamgr = (PRSSAMgr*)m_rg->getPassMgr()->queryPass(PASS_PR_SSA_MGR);
@@ -1058,6 +1009,7 @@ bool LICM::perform(OptCtx & oc)
             OC_is_pdom_valid(oc) = false;
             OC_is_cdg_valid(oc) = false;
         }
+        ASSERT0(m_cfg->verifyRPO(oc));
         OC_is_expr_tab_valid(oc) = false;
         if (du_set_info_changed) {
             OC_is_live_expr_valid(oc) = false;
@@ -1067,12 +1019,12 @@ bool LICM::perform(OptCtx & oc)
                 m_rce->getGVN()->set_valid(false);
             }
         }
+
         m_cfg->performMiscOpt(oc);
 
         //DU chain and du ref is maintained.
         ASSERT0(m_rg->verifyMDRef());
-        ASSERT0(m_du->verifyMDDUChain(DUOPT_COMPUTE_PR_DU|
-                                      DUOPT_COMPUTE_NONPR_DU));
+        ASSERT0(verifyMDDUChain(m_rg));
         if (g_is_dump_after_pass && g_dump_opt.isDumpLICM()) {
             dump();
         }

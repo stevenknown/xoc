@@ -1499,7 +1499,7 @@ public:
         if (C_prev(m_tail) == NULL) {
             //tail is the only one
             ASSERTN(m_tail == m_head && m_elem_count == 1,
-                   ("illegal list-remove"));
+                    ("illegal list-remove"));
             c = m_tail;
             m_head = m_tail = m_cur = NULL;
         } else {
@@ -1525,7 +1525,7 @@ public:
         if (C_next(m_head) == NULL) {
             //list_head is the only one
             ASSERTN(m_tail == m_head && m_elem_count == 1,
-                   ("illegal list-remove"));
+                    ("illegal list-remove"));
             c = m_head;
             m_head = m_tail = m_cur = NULL;
         } else {

@@ -33,8 +33,9 @@ namespace xoc {
 
 bool RefineDUChain::dump() const
 {
-    if (g_tfile == NULL) { return true; }
-    note("\n==---- DUMP %s '%s' ----==", getPassName(), m_rg->getRegionName());
+    if (!getRegion()->isLogMgrInit()) { return true; }
+    note(getRegion(), "\n==---- DUMP %s '%s' ----==", getPassName(),
+         m_rg->getRegionName());
     if (m_is_use_gvn) {
         ASSERT0(m_du);
         m_du->dumpDUChainDetail();

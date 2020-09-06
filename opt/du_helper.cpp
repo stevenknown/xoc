@@ -70,16 +70,20 @@ void addDUChain(IR * def, IR * use, Region * rg)
         dumgr->buildDUChain(def, use);
     }
 
-    MDSSAMgr * mdssamgr = rg->getMDSSAMgr(); 
-    if (mdssamgr != NULL && mdssamgr->is_valid()) {
-        MDSSAInfo * info = mdssamgr->getMDSSAInfoIfAny(def);
-        ASSERTN(info, ("def stmt even not in MDSSA system"));
-        mdssamgr->addMDSSAOcc(use, info);
+    if  (def->isMemoryRefNotOperatePR()) {
+        MDSSAMgr * mdssamgr = rg->getMDSSAMgr(); 
+        if (mdssamgr != NULL && mdssamgr->is_valid()) {
+            MDSSAInfo * info = mdssamgr->getMDSSAInfoIfAny(def);
+            ASSERTN(info, ("def stmt even not in MDSSA system"));
+            mdssamgr->addMDSSAOcc(use, info);
+        }
     }
 
-    PRSSAMgr * prssamgr = rg->getPRSSAMgr();
-    if (prssamgr != NULL && prssamgr->is_valid()) {
-        prssamgr->buildDUChain(def, use);
+    if (def->isWritePR() || def->isCallStmt()) {
+        PRSSAMgr * prssamgr = rg->getPRSSAMgr();
+        if (prssamgr != NULL && prssamgr->is_valid()) {
+            prssamgr->buildDUChain(def, use);
+        }
     }
 }
 
@@ -286,8 +290,9 @@ void copyRefAndAddDUChain(IR * to,
 bool isKillingDef(IR const* def, IR const* use)
 {
     ASSERT0(def && use);
-    MD const* usemd = use->getRefMD();
-    return isKillingDef(def, usemd);
+    MD const* mustusemd = use->getRefMD();
+    if (mustusemd == NULL) { return false; }
+    return isKillingDef(def, mustusemd);
 }
 
 
@@ -296,8 +301,9 @@ bool isKillingDef(IR const* def, IR const* use)
 bool isKillingDef(IR const* def, MD const* usemd)
 {
     ASSERT0(def && usemd);
-    MD const* defmd = def->getRefMD();
-    return isKillingDef(defmd, usemd);
+    MD const* mustdefmd = def->getRefMD();
+    if (mustdefmd == NULL) { return false; }
+    return isKillingDef(mustdefmd, usemd);
 }
 
 

@@ -80,8 +80,8 @@ void CallGraph::dumpVCG(CHAR const* name, INT flag)
     UNLINK(name);
     FILE * h = fopen(name, "a+");
     ASSERTN(h != NULL, ("%s create failed!!!",name));
-    INT org = g_indent;
-    g_indent = 0;
+    UINT org = getRegionMgr()->getLogMgr()->getIndent();
+    getRegionMgr()->getLogMgr()->decIndent(org);
 
     bool dump_src_line = HAVE_FLAG(flag, CALLG_DUMP_SRC_LINE);
     bool dump_ir_detail = HAVE_FLAG(flag, CALLG_DUMP_IR);
@@ -89,51 +89,47 @@ void CallGraph::dumpVCG(CHAR const* name, INT flag)
 
     //Print comment
     fprintf(h, "\n/*");
-    FILE * old = g_tfile;
-    g_tfile = h;
-    //....
-    g_tfile = old;
     fprintf(h, "\n*/\n");
 
     //Print graph structure description.
-    fprintf(h, "graph: {"
-              "title: \"Graph\"\n"
-              "shrink:  15\n"
-              "stretch: 27\n"
-              "layout_downfactor: 1\n"
-              "layout_upfactor: 1\n"
-              "layout_nearfactor: 1\n"
-              "layout_splinefactor: 70\n"
-              "spreadlevel: 1\n"
-              "treefactor: 0.500000\n"
-              "node_alignment: center\n"
-              "orientation: top_to_bottom\n"
-              "late_edge_labels: no\n"
-              "display_edge_labels: yes\n"
-              "dirty_edge_labels: no\n"
-              "finetuning: no\n"
-              "nearedges: no\n"
-              "splines: yes\n"
-              "ignoresingles: no\n"
-              "straight_phase: no\n"
-              "priority_phase: no\n"
-              "manhatten_edges: no\n"
-              "smanhatten_edges: no\n"
-              "port_sharing: no\n"
-              "crossingphase2: yes\n"
-              "crossingoptimization: yes\n"
-              "crossingweight: bary\n"
-              "arrow_mode: free\n"
-              "layoutalgorithm: mindepthslow\n"
-              "node.borderwidth: 2\n"
-              "node.color: lightcyan\n"
-              "node.textcolor: black\n"
-              "node.bordercolor: blue\n"
-              "edge.color: darkgreen\n");
+    fprintf(h,
+            "graph: {"
+            "title: \"Graph\"\n"
+            "shrink:  15\n"
+            "stretch: 27\n"
+            "layout_downfactor: 1\n"
+            "layout_upfactor: 1\n"
+            "layout_nearfactor: 1\n"
+            "layout_splinefactor: 70\n"
+            "spreadlevel: 1\n"
+            "treefactor: 0.500000\n"
+            "node_alignment: center\n"
+            "orientation: top_to_bottom\n"
+            "late_edge_labels: no\n"
+            "display_edge_labels: yes\n"
+            "dirty_edge_labels: no\n"
+            "finetuning: no\n"
+            "nearedges: no\n"
+            "splines: yes\n"
+            "ignoresingles: no\n"
+            "straight_phase: no\n"
+            "priority_phase: no\n"
+            "manhatten_edges: no\n"
+            "smanhatten_edges: no\n"
+            "port_sharing: no\n"
+            "crossingphase2: yes\n"
+            "crossingoptimization: yes\n"
+            "crossingweight: bary\n"
+            "arrow_mode: free\n"
+            "layoutalgorithm: mindepthslow\n"
+            "node.borderwidth: 2\n"
+            "node.color: lightcyan\n"
+            "node.textcolor: black\n"
+            "node.bordercolor: blue\n"
+            "edge.color: darkgreen\n");
 
     //Dump graph vertex.
-    old = g_tfile;
-    g_tfile = h;
+    getRegionMgr()->getLogMgr()->push(h, name); 
     INT c;
     List<Var const*> formalparamlst;
     for (xcom::Vertex * v = m_vertices.get_first(c);
@@ -145,7 +141,7 @@ void CallGraph::dumpVCG(CHAR const* name, INT flag)
                    "fontname:\"courB\" label:\"", id);
 
         CHAR const* cnname = CN_sym(cn) != NULL ?
-                SYM_name(CN_sym(cn)) : "IndirectCall";
+                             SYM_name(CN_sym(cn)) : "IndirectCall";
         if (cn->region() != NULL) {
             fprintf(h, "CN(%d):Region(%d):%s\n",
                     cn->id(), cn->region()->id(), cnname);
@@ -160,7 +156,7 @@ void CallGraph::dumpVCG(CHAR const* name, INT flag)
             cn->region()->findFormalParam(formalparamlst, true);
             for (Var const* param = formalparamlst.get_head(); param != NULL;
                  param = formalparamlst.get_next()) {
-                param->dump(g_tfile, m_tm);
+                param->dump(m_tm);
             }
 
             IR * irs = cn->region()->getIRList();
@@ -174,7 +170,7 @@ void CallGraph::dumpVCG(CHAR const* name, INT flag)
                 }
             } else {
                 dumpBBList(cn->region()->getBBList(),
-                           cn->region(), NULL, dump_inner_region);
+                           cn->region(), dump_inner_region);
             }
         }
         fprintf(h, "\"}");
@@ -188,8 +184,8 @@ void CallGraph::dumpVCG(CHAR const* name, INT flag)
         fprintf(h, "\nedge: { sourcename:\"%d\" targetname:\"%d\" %s}",
                 from->id(), to->id(),  "");
     }
-    g_tfile = old;
-    g_indent = org;
+    getRegionMgr()->getLogMgr()->pop(); 
+    getRegionMgr()->getLogMgr()->incIndent(org);
     fprintf(h, "\n}\n");
     fclose(h);
 }

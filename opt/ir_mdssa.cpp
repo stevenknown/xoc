@@ -100,8 +100,8 @@ void MDSSAMgr::cleanMD2Stack()
 //DUMP ALL BBList DEF/USE/OVERLAP_DEF/OVERLAP_USE.
 void MDSSAMgr::dumpRef(UINT indent)
 {
-    if (g_tfile == NULL) { return; }
-    note("\n\n==---- DUMP MDSSAMgr: IR REFERENCE '%s' ----==\n",
+    if (!m_rg->isLogMgrInit()) { return; }
+    note(getRegion(), "\n\n==---- DUMP MDSSAMgr: IR REFERENCE '%s' ----==\n",
          m_rg->getRegionName());
     BBList * bbs = m_rg->getBBList();
     ASSERT0(bbs);
@@ -110,21 +110,21 @@ void MDSSAMgr::dumpRef(UINT indent)
     }
 
     //Dump imported variables referenced.
-    note("\n==----==");
+    note(getRegion(), "\n==----==");
     MDSet * ru_maydef = m_rg->getMayDef();
     if (ru_maydef != NULL) {
-        note("\nRegionMayDef(OuterRegion):");
+        note(getRegion(), "\nRegionMayDef(OuterRegion):");
         ru_maydef->dump(m_md_sys, true);
     }
 
     MDSet * ru_mayuse = m_rg->getMayUse();
     if (ru_mayuse != NULL) {
-        note("\nRegionMayUse(OuterRegion):");
+        note(getRegion(), "\nRegionMayUse(OuterRegion):");
         ru_mayuse->dump(m_md_sys, true);
     }
 
     for (IRBB * bb = bbs->get_head(); bb != NULL; bb = bbs->get_next()) {
-        note("\n--- BB%d ---", bb->id());
+        note(getRegion(), "\n--- BB%d ---", bb->id());
         dumpBBRef(bb, indent);
     }
 }
@@ -132,7 +132,7 @@ void MDSSAMgr::dumpRef(UINT indent)
 
 void MDSSAMgr::dumpBBRef(IN IRBB * bb, UINT indent)
 {
-    if (g_tfile == NULL) { return; }
+    if (!m_rg->isLogMgrInit()) { return; }
     for (IR * ir = BB_first_ir(bb); ir != NULL; ir = BB_next_ir(bb)) {
         ir->dumpRef(m_rg, indent);
     }
@@ -157,14 +157,15 @@ CHAR * MDSSAMgr::dumpVMD(IN VMD * v, OUT CHAR * buf)
 //This function dumps VMD structure and SSA DU info.
 void MDSSAMgr::dumpAllVMD()
 {
-    if (g_tfile == NULL) { return; }
-    note("\n\n==---- DUMP MDSSAMgr: ALL VMD '%s'----==",
+    if (!m_rg->isLogMgrInit()) { return; }
+    note(getRegion(), "\n\n==---- DUMP MDSSAMgr: ALL VMD '%s'----==",
          m_rg->getRegionName());
     xcom::Vector<VOpnd*> * vec = getUseDefMgr()->getVOpndVec();
     for (INT i = 1; i <= vec->get_last_idx(); i++) {
         VMD * v = (VMD*)vec->get(i);
         ASSERT0(v);
-        note("\nVMD%d:MD%dV%d: ", v->id(), v->mdid(), v->version());
+        note(getRegion(), "\nVMD%d:MD%dV%d: ",
+             v->id(), v->mdid(), v->version());
         MDDef * mddef = v->getDef();        
         //Print DEF.
         if (v->version() != MDSSA_INIT_VERSION) {
@@ -175,31 +176,30 @@ void MDSSAMgr::dumpAllVMD()
             IR const* stmt = mddef->getOcc();
             if (stmt == NULL) {
                 ASSERT0(mddef->is_phi() && mddef->getBB());
-                prt("DEF:(phi,BB%d)", mddef->getBB()->id());
+                prt(getRegion(), "DEF:(phi,BB%d)", mddef->getBB()->id());
             } else {
                 ASSERT0(stmt->is_stmt() && !stmt->isWritePR());
-                prt("DEF:(%s,id:%d)", IRNAME(stmt), stmt->id());
+                prt(getRegion(), "DEF:(%s,id:%d)", IRNAME(stmt), stmt->id());
             }
         } else {
-            prt("DEF:---");
+            prt(getRegion(), "DEF:---");
         }
 
         //Print USEs.
-        prt("\tUSE:");
+        prt(getRegion(), "\tUSE:");
         IRSetIter it = NULL;
         INT nexti = 0;
         for (INT j = v->getUseSet()->get_first(&it); it != NULL; j = nexti) {
             nexti = v->getUseSet()->get_next(j, &it);
             IR * use = m_rg->getIR(j);
             ASSERT0(use && !use->isReadPR());
-            prt("(%s,id:%d)", IRNAME(use), use->id());
+            prt(getRegion(), "(%s,id:%d)", IRNAME(use), use->id());
             if (nexti >= 0) {
-                prt(",");
+                prt(getRegion(), ",");
             }
         }
     }
-    note("\n");
-    fflush(g_tfile);
+    note(getRegion(), "\n");
 }
 
 
@@ -385,7 +385,7 @@ void MDSSAMgr::dumpPhiList(MDPhiList const* philist) const
          sct != philist->end(); sct = philist->get_next(sct)) {
         MDPhi const* phi = sct->val();
         ASSERT0(phi && phi->is_phi());
-        note("\n");
+        note(getRegion(), "\n");
         phi->dump(m_rg, &m_usedef_mgr);
     }
 }
@@ -393,14 +393,15 @@ void MDSSAMgr::dumpPhiList(MDPhiList const* philist) const
 
 bool MDSSAMgr::dump() const
 {
-    if (g_tfile == NULL) { return false; }
-    note("\n==---- DUMP %s '%s' ----==", getPassName(), m_rg->getRegionName());
+    if (!m_rg->isLogMgrInit()) { return false; }
+    note(getRegion(), "\n==---- DUMP %s '%s' ----==",
+         getPassName(), m_rg->getRegionName());
     BBList * bbl = m_rg->getBBList();
     List<IR const*> lst;
     List<IR const*> opnd_lst;
     UINT const indent = 2;
     for (IRBB * bb = bbl->get_head(); bb != NULL; bb = bbl->get_next()) {
-        note("\n--- BB%d ---", bb->id());
+        note(getRegion(), "\n--- BB%d ---", bb->id());
 
         MDPhiList * philist = m_usedef_mgr.getBBPhiList(bb->id());
         if (philist != NULL) {
@@ -408,10 +409,10 @@ bool MDSSAMgr::dump() const
         }
 
         for (IR * ir = BB_first_ir(bb); ir != NULL; ir = BB_next_ir(bb)) {
-            note("\n");
+            note(getRegion(), "\n");
             dumpIR(ir, m_rg);
-            g_indent += indent;
-            ir->dumpRef(m_rg, g_indent);
+            m_rg->getLogMgr()->incIndent(indent);
+            ir->dumpRef(m_rg, m_rg->getLogMgr()->getIndent());
 
             bool parting_line = false;
             //Result
@@ -420,14 +421,14 @@ bool MDSSAMgr::dump() const
                 ASSERT0(mdssainfo);
                 VOpndSetIter iter = NULL;
                 if (!parting_line) {
-                    note("\n----");
+                    note(getRegion(), "\n----");
                     parting_line = true;
                 }
                 dumpIR(ir, m_rg, NULL, false);
 
                 for (INT i = mdssainfo->getVOpndSet()->get_first(&iter);
                      i >= 0; i = mdssainfo->getVOpndSet()->get_next(i, &iter)) {
-                    note("\n--DEFREF:");
+                    note(getRegion(), "\n--DEFREF:");
                     VMD * vopnd = (VMD*)m_usedef_mgr.getVOpnd(i);
                     ASSERT0(vopnd && vopnd->is_md());
                     if (vopnd->getDef() != NULL) {
@@ -449,11 +450,11 @@ bool MDSSAMgr::dump() const
                 ASSERT0(mdssainfo);
                 VOpndSetIter iter = NULL;
                 if (!parting_line) {
-                    note("\n----");
+                    note(getRegion(), "\n----");
                     parting_line = true;
                 }
                 dumpIR(opnd, m_rg, NULL, false);
-                note("\n--USEREF:");
+                note(getRegion(), "\n--USEREF:");
                 bool first = true;
                 for (INT i = mdssainfo->getVOpndSet()->get_first(&iter);
                      i >= 0; i = mdssainfo->getVOpndSet()->get_next(i, &iter)) {
@@ -462,16 +463,14 @@ bool MDSSAMgr::dump() const
                     if (first) {
                         first = false;
                     } else {
-                        prt(",");
+                        prt(getRegion(), ",");
                     }
-                    prt("MD%dV%d", vopnd->mdid(), vopnd->version());
+                    prt(getRegion(), "MD%dV%d", vopnd->mdid(), vopnd->version());
                 }
             }
-            g_indent -= indent;
+            m_rg->getLogMgr()->decIndent(indent);
         }
     }
-
-    fflush(g_tfile);
     return true;
 }
 
@@ -593,16 +592,16 @@ void MDSSAMgr::dumpDefChain(List<MDDef const*> & wl,
         visited_def.bunion(def->id());
         if (need_comma) {
             need_comma = false;
-            prt(",");
+            prt(getRegion(), ",");
         }
 
         if (def->is_phi()) {
             ASSERT0(def->getResult()->mdid() == vopnd->mdid());
             if (!prt_left_parenthesis) {
-                prt("(");
+                prt(getRegion(), "(");
                 prt_left_parenthesis = true;
             }
-            prt("phi");
+            prt(getRegion(), "phi");
             need_comma = true;
             //Collect opnd of PHI to forward to
             //retrieve corresponding DEFs.
@@ -623,10 +622,10 @@ void MDSSAMgr::dumpDefChain(List<MDDef const*> & wl,
         if (!visited.find(def->getOcc())) {
             visited.append(def->getOcc());
             if (!prt_left_parenthesis) {
-                prt("(");
+                prt(getRegion(), "(");
                 prt_left_parenthesis = true;
             }
-            prt("%s(id:%d)",
+            prt(getRegion(), "%s(id:%d)",
                 IRNAME(def->getOcc()), def->getOcc()->id());
             need_comma = true;
         }
@@ -645,7 +644,7 @@ void MDSSAMgr::dumpDefChain(List<MDDef const*> & wl,
         }
     }
     if (prt_left_parenthesis) {
-        prt(")");
+        prt(getRegion(), ")");
     }
 }
 
@@ -693,16 +692,16 @@ void MDSSAMgr::dumpExpDUChainIter(IR const* ir,
         ASSERT0(mdssainfo);
         VOpndSetIter iter = NULL;
         if (!(*parting_line)) {
-            note("\n----------------");
+            note(getRegion(), "\n----------------");
             (*parting_line) = true;
         }
 
-        note("\n");
-        prt("%s(id:%d) --DEF LIST:", IRNAME(opnd), opnd->id());
+        note(getRegion(), "\n");
+        prt(getRegion(), "%s(id:%d) --DEF LIST:", IRNAME(opnd), opnd->id());
 
         MDDef * kdef = findKillingDef(opnd);
         if (kdef != NULL) {
-            prt("%s(id:%d)",
+            prt(getRegion(), "%s(id:%d)",
                 IRNAME(kdef->getOcc()), kdef->getOcc()->id());
             continue;
         }
@@ -714,8 +713,8 @@ void MDSSAMgr::dumpExpDUChainIter(IR const* ir,
             VMD * vopnd = (VMD*)m_usedef_mgr.getVOpnd(i);
             ASSERT0(vopnd && vopnd->is_md());
             if (first) { first = false; }
-            else { prt(","); }
-            prt("MD%dV%d", vopnd->mdid(), vopnd->version());
+            else { prt(getRegion(), ","); }
+            prt(getRegion(), "MD%dV%d", vopnd->mdid(), vopnd->version());
             dumpDefChain(wl, visited, vopnd);
         }
     }
@@ -724,8 +723,8 @@ void MDSSAMgr::dumpExpDUChainIter(IR const* ir,
 
 void MDSSAMgr::dumpDUChain()
 {
-    if (g_tfile == NULL) { return; }
-    note("\n==---- DUMP MDSSAMgr DU CHAIN '%s' ----==\n",
+    if (!m_rg->isLogMgrInit()) { return; }
+    note(getRegion(), "\n==---- DUMP MDSSAMgr DU CHAIN '%s' ----==\n",
          m_rg->getRegionName());
 
     BBList * bbl = m_rg->getBBList();
@@ -733,14 +732,14 @@ void MDSSAMgr::dumpDUChain()
     xcom::List<IR const*> opnd_lst;
     
     for (IRBB * bb = bbl->get_head(); bb != NULL; bb = bbl->get_next()) {
-        note("\n--- BB%d ---", bb->id());
+        note(getRegion(), "\n--- BB%d ---", bb->id());
         MDPhiList * philist = m_usedef_mgr.getBBPhiList(bb->id());
         if (philist != NULL) {
             for (xcom::SC<MDPhi*> * sct = philist->get_head();
                  sct != philist->end(); sct = philist->get_next(sct)) {
                 MDPhi * phi = sct->val();
                 ASSERT0(phi && phi->is_phi());
-                note("\n");
+                note(getRegion(), "\n");
                 phi->dump(m_rg, &m_usedef_mgr);
             }
         }
@@ -755,11 +754,11 @@ void MDSSAMgr::dumpDUChain()
                 ASSERT0(mdssainfo);
                 VOpndSetIter iter = NULL;
                 if (!parting_line) {
-                    note("\n----------------");
+                    note(getRegion(), "\n----------------");
                     parting_line = true;
                 }
-                note("\n");
-                prt("%s(id:%d) --USE LIST:", IRNAME(ir), ir->id());
+                note(getRegion(), "\n");
+                prt(getRegion(), "%s(id:%d) --USE LIST:", IRNAME(ir), ir->id());
                 bool first = true;
                 for (INT i = mdssainfo->getVOpndSet()->get_first(&iter);
                      i >= 0; i = mdssainfo->getVOpndSet()->get_next(i, &iter)) {
@@ -775,13 +774,13 @@ void MDSSAMgr::dumpDUChain()
                         if (first) {
                             first = false;
                         } else {
-                            prt(",");
+                            prt(getRegion(), ",");
                         }
                         IR * use = m_rg->getIR(i2);
                         ASSERT0(use && (use->isMemoryRef() || use->is_id()));
-                        prt("%s(id:%d(", IRNAME(use), use->id());
-                        vopnd->dump();
-                        prt("))");
+                        prt(getRegion(), "%s(id:%d(", IRNAME(use), use->id());
+                        vopnd->dump(getRegion());
+                        prt(getRegion(), "))");
                     }
                 }
             }
@@ -790,8 +789,6 @@ void MDSSAMgr::dumpDUChain()
             dumpExpDUChainIter(ir, lst, opnd_lst, &parting_line);
         }
     }
-
-    fflush(g_tfile);
 }
 
 
@@ -2498,12 +2495,21 @@ static void iterDefCHelper(MDDef const* def,
 }
 
 
-//Iterative access USE in MDSSAInfo. The USE always an IR occurrence that
-//describes a memory expression.
+//Iterative access USE in MDSSAInfo.
+//The USE always an IR occurrence that describes a memory expression.
 //This funtion initialize the iterator.
 //'def': the MDDef of the chain.
 //'ii': iterator. It should be clean already.
 //Readonly function.
+//Note this function may iterate same IR multiple times because it may
+//belong different VOpnd.
+//e.g: global int g; local int b;
+//     g = b;
+//The MDSSA info of ST is:
+//  st:i32 'g'
+//    --DEFREF:(MD2V2, PrevDEF:MD2V1, NextDEF : MD2V3) | UsedBy : ld b(id:15)
+//    --DEFREF : (MD5V2, PrevDEF:MD5V1) | UsedBy : ld b(id:15), id(id:23)
+//  ld b is both USE of VOpnd(MD2V2) and VOpnd(MD5V2).
 IR const* MDSSAMgr::iterUseInitC(IR const* def,
                                  OUT ConstMDSSAUSEIRIter & ii) const
 {
@@ -2543,15 +2549,33 @@ IR const* MDSSAMgr::iterUseInitC(IR const* def,
 //This function return the next USE accroding to 'ii'.
 //'ii': iterator.
 //Readonly function.
+//Note this function may iterate same IR multiple times because it may
+//belong different VOpnd.
+//e.g: global int g; local int b;
+//     g = b;
+//The MDSSA info of ST is:
+//  st:i32 'g'
+//    --DEFREF:(MD2V2, PrevDEF:MD2V1, NextDEF : MD2V3) | UsedBy : ld b(id:15)
+//    --DEFREF : (MD5V2, PrevDEF:MD5V1) | UsedBy : ld b(id:15), id(id:23)
+//  ld b is both USE of VOpnd(MD2V2) and VOpnd(MD5V2).
 IR const* MDSSAMgr::iterUseNextC(OUT ConstMDSSAUSEIRIter & ii) const
 {
     MDSSAMgr * pthis = const_cast<MDSSAMgr*>(this);
     //Update iter and position in UseSet.
-    for (; ii.useset_iter != NULL;
-         ii.current_pos_in_useset = ii.current_useset->get_next(
-             ii.current_pos_in_useset, &ii.useset_iter)) {            
+    for (; ii.useset_iter != NULL; UNREACHABLE()) {
         IR * use = m_rg->getIR(ii.current_pos_in_useset);
         ASSERT0(use && !use->isReadPR());
+
+        //Prepare next USE.
+        ii.current_pos_in_useset = ii.current_useset->get_next(
+            ii.current_pos_in_useset, &ii.useset_iter);
+
+        if (ii.useset_iter == NULL) {
+            //Prepare next VOpnd.
+            ii.current_pos_in_vopndset = ii.vopndset->get_next(
+                ii.current_pos_in_vopndset, &ii.vopndset_iter);
+        }
+
         return use;
     }
 
@@ -2567,11 +2591,20 @@ IR const* MDSSAMgr::iterUseNextC(OUT ConstMDSSAUSEIRIter & ii) const
         //Find the first iter and position in UseSet.
         for (ii.current_pos_in_useset = ii.current_useset->get_first(
                  &ii.useset_iter);
-             ii.useset_iter != NULL;
-             ii.current_pos_in_useset = ii.current_useset->get_next(
-                 ii.current_pos_in_useset, &ii.useset_iter)) {            
+             ii.useset_iter != NULL; UNREACHABLE()) {            
             IR * use = m_rg->getIR(ii.current_pos_in_useset);
             ASSERT0(use && !use->isReadPR());
+
+            //Prepare next USE.
+            ii.current_pos_in_useset = ii.current_useset->get_next(
+                ii.current_pos_in_useset, &ii.useset_iter);
+
+            if (ii.useset_iter == NULL) {
+                //Prepare next VOpnd.
+                ii.current_pos_in_vopndset = ii.vopndset->get_next(
+                    ii.current_pos_in_vopndset, &ii.vopndset_iter);
+            }
+
             return use;
         }
     }    
@@ -2732,6 +2765,66 @@ bool MDSSAMgr::MDSSAMgr::verifyMDSSAInfo(Region * rg)
     if (ssamgr != NULL && ssamgr->is_valid()) {
         ASSERT0(ssamgr->verify());
         ASSERT0(ssamgr->verifyPhi(false));
+    }
+    return true;
+}
+
+
+//Return true if stmt dominates use's stmt, otherwise return false.
+bool MDSSAMgr::isStmtDomUseInsideLoop(IR const* stmt,
+                                      IR const* use,
+                                      LI<IRBB> const* li) const
+{
+    IRBB const* usestmtbb = NULL;
+    if (use->is_id()) {
+        MDPhi const* phi = ID_phi(use);
+        ASSERT0(phi && phi->is_phi());
+        usestmtbb = phi->getBB(); 
+    } else {
+        ASSERT0(use->getStmt());
+        usestmtbb = use->getStmt()->getBB();
+    }
+    ASSERT0(usestmtbb);
+
+    if (!li->isInsideLoop(usestmtbb->id())) {
+        //Only check dominiation info inside loop.
+        return true;
+    }
+
+    IRBB const* defstmtbb = stmt->getBB();
+    ASSERT0(defstmtbb);
+    if (defstmtbb != usestmtbb &&
+        m_cfg->is_dom(defstmtbb->id(), usestmtbb->id())) {
+        return true;
+    }
+    if (defstmtbb == usestmtbb) {
+        if (use->is_id()) { //use's stmt is MDPhi
+            //stmt can not dominate PHI because PHI is always
+            //in the front of BB.
+            return false;
+        }
+        IR const* ustmt = use->getStmt();
+        ASSERT0(ustmt);
+        return defstmtbb->is_dom(stmt, ustmt, true);
+    }
+
+    return false;
+}
+
+
+//Return true if ir dominates all its USE expressions which inside loop.
+//In ssa mode, stmt's USE may be placed in operand list of PHI.
+bool MDSSAMgr::isStmtDomAllUseInsideLoop(IR const* ir, LI<IRBB> const* li) const
+{
+    ASSERT0(ir);
+    IRBB const* irbb = ir->getBB();
+    ASSERT0(irbb);
+    ConstMDSSAUSEIRIter ii;
+    for (IR const* use = iterUseInitC(ir, ii);
+        use != NULL; use = iterUseNextC(ii)) {
+        if (!isStmtDomUseInsideLoop(ir, use, li)) {
+            return false;
+        }
     }
     return true;
 }

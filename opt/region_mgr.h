@@ -68,7 +68,7 @@ class IPA;
 //START RegionMgr
 //
 //Region Manager is the top level manager.
-#define RM_label_count(r)        ((r)->m_label_count)
+#define RM_label_count(r) ((r)->m_label_count)
 class RegionMgr {
     COPY_CONSTRUCTOR(RegionMgr);
     friend class Region;
@@ -92,12 +92,13 @@ protected:
     bool m_is_regard_str_as_same_md;
     TargInfo * m_targinfo;
     SMemPool * m_pool;
+    LogMgr * m_logmgr;
 
 protected:
     void estimateEV(OUT UINT & num_call,
-        OUT UINT & num_ru,
-        bool scan_call,
-        bool scan_inner_region);
+                    OUT UINT & num_ru,
+                    bool scan_call,
+                    bool scan_inner_region);
 
     void * xmalloc(UINT size);
 
@@ -145,6 +146,7 @@ public:
     CallGraph * getCallGraph() const { return m_call_graph; }
     VarMgr * getVarMgr() const { return m_var_mgr; }
     TargInfo * getTargInfo() const { return m_targinfo; }
+    LogMgr * getLogMgr() const { return m_logmgr; }
     OptCtx * getAndGenOptCtx(UINT id);
 
     //Register exact MD for each global variable.
@@ -173,6 +175,8 @@ public:
         m_targinfo = allocTargInfo();
         ASSERT0(m_targinfo);
     }
+    bool isLogMgrInit() const
+    { return const_cast<RegionMgr*>(this)->getLogMgr()->is_init(); }
 
     //Scan call site and build call graph.
     void buildCallGraph(OptCtx & oc, bool scan_call, bool scan_inner_region);

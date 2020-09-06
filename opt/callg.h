@@ -163,6 +163,7 @@ public:
     //        with completely information.
     void dumpVCG(CHAR const* name = NULL, INT flag = -1);
 
+    RegionMgr * getRegionMgr() const { return m_ru_mgr; }
     CallNode * mapId2CallNode(UINT id) const { return m_cnid2cn.get(id); }
     CallNode * mapVertex2CallNode(xcom::Vertex const* v) const
     { return m_cnid2cn.get(v->id()); }

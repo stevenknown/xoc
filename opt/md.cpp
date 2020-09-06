@@ -38,16 +38,15 @@ namespace xoc {
 //
 //START MDID
 //
-void MDId2MD::dump() const
+void MDId2MD::dump(Region const* rg) const
 {
-    if (g_tfile == NULL) { return; }
+    if (!rg->isLogMgrInit()) { return; }
     for (INT i = 0; i <= get_last_idx(); i++) {
         MD * md = Vector<MD*>::get(i);
         if (md == NULL) { continue; }
         ASSERT0(MD_id(md) == (UINT)i);
-        prt("%d,", i);
+        prt(rg, "%d,", i);
     }
-    fflush(g_tfile);
 }
 //END MDID
 
@@ -156,11 +155,9 @@ CHAR * MD::dump(StrBuf & buf, TypeMgr * dm) const
 
 void MD::dump(TypeMgr * dm) const
 {
-    if (g_tfile == NULL) { return; }
-
+    if (!dm->getRegionMgr()->getLogMgr()->is_init()) { return; }
     StrBuf buf(64);
-    note("\n%s", dump(buf, dm));
-    fflush(g_tfile);
+    note(dm->getRegionMgr(), "\n%s", dump(buf, dm));
 }
 //END MD
 
@@ -214,14 +211,15 @@ void MDSet::bunion(UINT mdid, DefMiscBitSetMgr & mbsmgr)
 
 //Return true current set is equivalent to mds, and every element
 //in set is exact.
-bool MDSet::is_exact_equal(MDSet const& mds, MDSystem * ms) const
+bool MDSet::is_exact_equal(MDSet const& mds, MDSystem const* ms) const
 {
     ASSERT0(ms);
     UINT count = 0;
     INT md1 = -1;
     MDSetIter iter;
+    MDSystem * pms = const_cast<MDSystem*>(ms);
     for (INT i = get_first(&iter); i != -1; i = get_next(i, &iter)) {
-        if (!ms->getMD(i)->is_exact()) {
+        if (!pms->getMD(i)->is_exact()) {
             return false;
         }
         md1 = i;
@@ -236,7 +234,7 @@ bool MDSet::is_exact_equal(MDSet const& mds, MDSystem * ms) const
     count = 0;
     INT md2 = -1;
     for (INT i = mds.get_first(&iter); i != -1; i = get_next(i, &iter)) {
-        if (!ms->getMD(i)->is_exact()) {
+        if (!pms->getMD(i)->is_exact()) {
             return false;
         }
         md2 = i;
@@ -251,12 +249,13 @@ bool MDSet::is_exact_equal(MDSet const& mds, MDSystem * ms) const
 }
 
 
-bool MDSet::is_contain_only_exact_and_str(MDSystem * ms) const
+bool MDSet::is_contain_only_exact_and_str(MDSystem const* ms) const
 {
     ASSERT0(ms);
     MDSetIter iter;
+    MDSystem * pms = const_cast<MDSystem*>(ms);
     for (INT i = get_first(&iter); i != -1; i = get_next(i, &iter)) {
-        MD * tmd = ms->getMD(i);
+        MD * tmd = pms->getMD(i);
         ASSERT0(tmd != NULL);
         if (!tmd->is_exact() && !MD_base(tmd)->is_string()) {
             return false;
@@ -266,12 +265,13 @@ bool MDSet::is_contain_only_exact_and_str(MDSystem * ms) const
 }
 
 
-bool MDSet::is_contain_inexact(MDSystem * ms) const
+bool MDSet::is_contain_inexact(MDSystem const* ms) const
 {
     ASSERT0(ms);
     MDSetIter iter;
+    MDSystem * pms = const_cast<MDSystem*>(ms);
     for (INT i = get_first(&iter); i != -1; i = get_next(i, &iter)) {
-        MD * tmd = ms->getMD(i);
+        MD * tmd = pms->getMD(i);
         ASSERT0(tmd != NULL);
 
         //TO BE CONFIRMED: Does it necessary to judge if either current
@@ -346,7 +346,7 @@ bool MDSet::is_contain_only_taken_addr(MD const* md) const
 
 
 //Return true if md is overlap with the elements in set.
-bool MDSet::is_overlap(MD const* md, Region * current_ru) const
+bool MDSet::is_overlap(MD const* md, Region const* current_ru) const
 {
     ASSERT0(current_ru);
 
@@ -380,7 +380,8 @@ bool MDSet::is_overlap(MD const* md, Region * current_ru) const
 
 
 //Return true if md is overlap with the elements in set.
-bool MDSet::is_overlap_only_taken_addr(MD const* md, Region * current_ru) const
+bool MDSet::is_overlap_only_taken_addr(MD const* md, 
+                                       Region const* current_ru) const
 {
     ASSERT0(current_ru);
     Var const* base = md->get_base();
@@ -421,7 +422,7 @@ bool MDSet::is_overlap_only_taken_addr(MD const* md, Region * current_ru) const
 //Note this function will iterate elements in current MDSet which is costly.
 //Use it carefully.
 bool MDSet::is_overlap_ex(MD const* md,
-                          Region * current_ru,
+                          Region const* current_ru,
                           MDSystem const* mdsys) const
 {
     ASSERT0(md && mdsys && current_ru);
@@ -488,15 +489,15 @@ void MDSet::diffAllOverlapped(UINT id,
 
 void MDSet::dump(MDSystem * ms, bool detail) const
 {
-    if (g_tfile == NULL) { return; }
+    if (!ms->getRegionMgr()->isLogMgrInit()) { return; }
     ASSERT0(ms);
 
     MDSetIter iter;
     for (INT i = get_first(&iter); i >= 0;) {
-        prt("MD%d", i);
+        prt(ms->getRegionMgr(), "MD%d", i);
         i = get_next(i, &iter);
         if (i >= 0) {
-            prt(",");
+            prt(ms->getRegionMgr(), ",");
         }
     }
     if (detail) {
@@ -506,7 +507,6 @@ void MDSet::dump(MDSystem * ms, bool detail) const
             md->dump(ms->getTypeMgr());
         }
     }
-    fflush(g_tfile);
 }
 //END MDSet
 
@@ -514,13 +514,14 @@ void MDSet::dump(MDSystem * ms, bool detail) const
 //
 //START MDSetHash
 //
-void MDSetHash::dump()
+void MDSetHash::dump(Region * rg)
 {
-    if (g_tfile == NULL) { return; }
-    note("\n==---- DUMP MDSet Hash ----==\n");
-    SBitSetCoreHash<MDSetHashAllocator>::dump_hashed_set(g_tfile);
-    SBitSetCoreHash<MDSetHashAllocator>::dump(g_tfile);
-    fflush(g_tfile);
+    if (!rg->isLogMgrInit()) { return; }
+    note(rg, "\n==---- DUMP MDSet Hash ----==\n");
+    SBitSetCoreHash<MDSetHashAllocator>::dump_hashed_set(
+        rg->getLogMgr()->getFileHandler());
+    SBitSetCoreHash<MDSetHashAllocator>::dump(
+        rg->getLogMgr()->getFileHandler());
 }
 //END MDSetHash
 
@@ -597,9 +598,7 @@ size_t MDSetMgr::count_mem()
 
 void MDSetMgr::dump()
 {
-    if (g_tfile == NULL) { return; }
-
-    FILE * h = g_tfile;
+    if (!m_rg->isLogMgrInit()) { return; }
     size_t count = 0;
     for (xcom::SC<MDSet*> * sc = m_md_set_list.get_head();
          sc != m_md_set_list.end(); sc = m_md_set_list.get_next(sc)) {
@@ -638,28 +637,27 @@ void MDSetMgr::dump()
 
     size_t v = lst.get_head();
 
-    fprintf(h,
-        "\n==---- DUMP MDSetMgr: total %d MD_SETs, "
-        "%d MDSet are in free-list, mem usage are:\n",
-        m_md_set_list.get_elem_count(), m_free_md_set.get_elem_count());
+    note(getRegion(),
+         "\n==---- DUMP MDSetMgr: total %d MD_SETs, "
+         "%d MDSet are in free-list, mem usage are:\n",
+         m_md_set_list.get_elem_count(), m_free_md_set.get_elem_count());
 
     UINT b = 0;
     UINT n = lst.get_elem_count();
     for (UINT i = 0; i < n; i++, v = lst.get_next(), b++) {
         if (b == 20) {
-            fprintf(h, "\n");
+            note(getRegion(), "\n");
             b = 0;
         }
 
         if (v < 1024) {
-            fprintf(h, "%luB,", (ULONG)v);
+            prt(getRegion(), "%luB,", (ULONG)v);
         } else if (v < 1024 * 1024) {
-            fprintf(h, "%luKB,", (ULONG)v/1024);
+            prt(getRegion(), "%luKB,", (ULONG)v/1024);
         } else {
-            fprintf(h, "%luMB,", (ULONG)v/1024/1024);
+            prt(getRegion(), "%luMB,", (ULONG)v/1024/1024);
         }
     }
-    fflush(h);
 }
 //END MDSetMgr
 
@@ -673,14 +671,14 @@ void MD2MDSet::dump(Region * rg)
 {
     StrBuf buf(64);
 
-    if (g_tfile == NULL) { return; }
+    if (!rg->isLogMgrInit()) { return; }
 
-    note("\n==---- DUMP MD2MDSet ----==");
+    note(rg, "\n==---- DUMP MD2MDSet ----==");
 
     //Dump all MDs.
     MDSystem * ms = rg->getMDSystem();
-    note("\n==-- DUMP MD Index --==");
-    ms->getID2MDMap()->dump();
+    note(rg, "\n==-- DUMP MD Index --==");
+    ms->getID2MDMap()->dump(rg);
 
     MD2MDSetIter mxiter;
     MDSet const* pts = NULL;
@@ -690,25 +688,25 @@ void MD2MDSet::dump(Region * rg)
         ASSERT0(md);
 
         buf.clean();
-        note("\n\t%s", md->dump(buf, rg->getTypeMgr()));
+        note(rg, "\n\t%s", md->dump(buf, rg->getTypeMgr()));
 
         //Dumps MDSet related to 'md'.
 
         ASSERT0(pts);
-        note("\n\t\tPOINT TO:\n");
+        note(rg, "\n\t\tPOINT TO:\n");
         MDSetIter iter_j;
         for (INT j = pts->get_first(&iter_j);
              j >= 0; j = pts->get_next(j, &iter_j)) {
             MD * mmd = ms->getMD(j);
             ASSERT0(mmd);
             buf.clean();
-            prt("\t\t\t%s\n",
-                    mmd->dump(buf, rg->getTypeMgr()));
+            prt(rg, "\t\t\t%s\n",
+                mmd->dump(buf, rg->getTypeMgr()));
         }
     }
 
     //Dump set of MD that corresponding to an individual Var.
-    note("\n==-- DUMP the mapping from Var to MDSet --==");
+    note(rg, "\n==-- DUMP the mapping from Var to MDSet --==");
     VarVec * var_tab = rg->getVarMgr()->get_var_vec();
     Vector<MD const*> mdv;
     ConstMDIter iter;
@@ -719,7 +717,7 @@ void MD2MDSet::dump(Region * rg)
         MDTab * mdtab = ms->getMDTab(v);
 
         buf.clean();
-        note("\n\t%s", v->dump(buf, rg->getTypeMgr()));
+        note(rg, "\n\t%s", v->dump(buf, rg->getTypeMgr()));
 
         if (mdtab == NULL || mdtab->get_elem_count() == 0) { continue; }
 
@@ -730,12 +728,11 @@ void MD2MDSet::dump(Region * rg)
         for (INT i2 = 0; i2 <= mdv.get_last_idx(); i2++) {
             MD const* md = mdv.get(i2);
             buf.clean();
-            note("\n\t\t%s", md->dump(buf, rg->getTypeMgr()));
+            note(rg, "\n\t\t%s", md->dump(buf, rg->getTypeMgr()));
         }
     }
 
-    note("\n");
-    fflush(g_tfile);
+    note(rg, "\n");
 }
 //END MD2MD_SET_MAP
 
@@ -1187,11 +1184,11 @@ void MDSystem::clean()
 
 void MDSystem::dump(bool only_dump_nonpr_md)
 {
-    if (g_tfile == NULL) { return; }
+    if (!getRegionMgr()->isLogMgrInit()) { return; }
     if (only_dump_nonpr_md) {
-        note("\n==---- DUMP NON-PR MD ----==");
+        note(getTypeMgr()->getRegionMgr(), "\n==---- DUMP NON-PR MD ----==");
     } else {
-        note("\n==---- DUMP ALL MD ----==");
+        note(getTypeMgr()->getRegionMgr(), "\n==---- DUMP ALL MD ----==");
     }
     for (INT i = 0; i <= m_id2md_map.get_last_idx(); i++) {
         MD * md = m_id2md_map.get(i);
@@ -1201,7 +1198,6 @@ void MDSystem::dump(bool only_dump_nonpr_md)
         }
         ASSERT0(MD_id(md) == (UINT)i);
         md->dump(getTypeMgr());
-        fflush(g_tfile);
     }
 }
 

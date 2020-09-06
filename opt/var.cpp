@@ -35,6 +35,29 @@ author: Su Zhenyu
 
 namespace xoc {
 
+
+void VarTab::dump(TypeMgr const* tm) const
+{
+    if (!tm->getRegionMgr()->isLogMgrInit()) { return; }
+    ASSERT0(tm);
+    VarTabIter iter;
+    for (Var * v = get_first(iter); v != NULL; v = get_next(iter)) {
+        v->dump(tm);
+    }
+}
+
+
+void ConstVarTab::dump(TypeMgr * tm)
+{
+    if (!tm->getRegionMgr()->isLogMgrInit()) { return; }
+    ASSERT0(tm);
+    ConstVarTabIter iter;
+    for (Var const* v = get_first(iter); v != NULL; v = get_next(iter)) {
+        v->dump(tm);
+    }
+}
+
+
 VarMgr::VarMgr(RegionMgr * rm)
 {
     ASSERT0(rm);
@@ -59,16 +82,23 @@ Var::Var()
 }
 
 
-void Var::dump(FILE * h, TypeMgr const* dm) const
+static void dumpIndent(LogMgr * lm)
 {
-    if (h == NULL) { h = g_tfile; }
-    if (h == NULL) { return; }
-    fprintf(h, "\n");
-    dumpIndent(h, g_indent);
+    UINT indent = lm->getIndent();
+    for (; indent > 0; indent--) {
+        prt(lm, "%c", lm->getIndentChar());
+    }
+}
+
+
+void Var::dump(TypeMgr const* tm) const
+{
+    if (!tm->getRegionMgr()->isLogMgrInit()) { return; }
+    note(tm->getRegionMgr(), "\n");
+    dumpIndent(tm->getRegionMgr()->getLogMgr());
 
     StrBuf buf(64);
-    fprintf(h, "%s", dump(buf, dm));
-    fflush(h);
+    prt(tm->getRegionMgr(), "%s", dump(buf, tm));
 }
 
 
@@ -453,16 +483,10 @@ Var * VarMgr::registerStringVar(CHAR const* var_name, Sym const* s, UINT align)
 
 
 //Dump all variables registered.
-void VarMgr::dump(CHAR * name)
+void VarMgr::dump()
 {
-    FILE * h = g_tfile;
-    if (name != NULL) {
-        h = fopen(name, "a+");
-        ASSERT0(h);
-    }
-    if (h == NULL) { return; }
-
-    fprintf(h, "\n\nVAR to Decl Mapping:");
+    RegionMgr * rm = m_tm->getRegionMgr();
+    prt(rm, "\n\nVAR to Decl Mapping:");
 
     StrBuf buf(64);
     for (INT i = 0; i <= m_var_vec.get_last_idx(); i++) {
@@ -470,15 +494,9 @@ void VarMgr::dump(CHAR * name)
         if (v == NULL) { continue; }
 
         buf.clean();
-        fprintf(h, "\n%s", v->dump(buf, m_tm));
-        fflush(h);
+        prt(rm, "\n%s", v->dump(buf, m_tm));
     }
-
-    fprintf(h, "\n");
-    fflush(h);
-    if (h != g_tfile) {
-        fclose(h);
-    }
+    prt(rm, "\n");
 }
 //END VarMgr
 

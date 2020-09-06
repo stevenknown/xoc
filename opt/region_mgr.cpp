@@ -54,6 +54,7 @@ RegionMgr::RegionMgr() : m_type_mgr(this)
     m_call_graph = NULL;
     m_targinfo = NULL;
     m_pool = smpoolCreate(64, MEM_COMM);
+    m_logmgr = new LogMgr();
 }
 
 
@@ -89,6 +90,9 @@ RegionMgr::~RegionMgr()
 
     smpoolDelete(m_pool);
     m_pool = NULL;
+
+    delete m_logmgr;
+    m_logmgr = NULL;
 }
 
 
@@ -343,15 +347,14 @@ void RegionMgr::dumpRelationGraph(CHAR const* name)
 //Dump regions recorded via addToRegionTab().
 void RegionMgr::dump(bool dump_inner_region)
 {
-    if (g_tfile == NULL || getNumOfRegion() == 0) { return; }
+    if (!isLogMgrInit() || getNumOfRegion() == 0) { return; }
 
-    note("\n==---- DUMP ALL Registered Region ----==");
+    note(this, "\n==---- DUMP ALL Registered Region ----==");
     for (UINT id = 0; id < getNumOfRegion(); id++) {
         Region * rg = getRegion(id);
         if (rg == NULL) { continue; }
         rg->dump(dump_inner_region);
     }
-    fflush(g_tfile);
 }
 
 

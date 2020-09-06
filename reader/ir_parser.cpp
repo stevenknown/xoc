@@ -310,22 +310,22 @@ void IRParser::initKeyWordMap()
     for (UINT i = 0; i < (sizeof(g_property_code) /
          sizeof(g_property_code[0])); i++) {
         m_prop2xcode.set(g_keyword_info[g_property_code[i]].name,
-            g_property_code[i]);
+                         g_property_code[i]);
     }
     for (UINT i = 0; i < (sizeof(g_stmt_code) /
          sizeof(g_stmt_code[0])); i++) {
         m_stmt2xcode.set(g_keyword_info[g_stmt_code[i]].name,
-            g_stmt_code[i]);
+                         g_stmt_code[i]);
     }
     for (UINT i = 0; i < (sizeof(g_exp_code) /
          sizeof(g_exp_code[0])); i++) {
         m_exp2xcode.set(g_keyword_info[g_exp_code[i]].name,
-            g_exp_code[i]);
+                        g_exp_code[i]);
     }
     for (UINT i = 0; i < (sizeof(g_type_code) /
          sizeof(g_type_code[0])); i++) {
         m_type2xcode.set(g_keyword_info[g_type_code[i]].name,
-            g_type_code[i]);
+                         g_type_code[i]);
     }
 }
 
@@ -392,7 +392,7 @@ X_CODE IRParser::getCurrentTypeCode()
 X_CODE IRParser::getCurrentXCode()
 {
     return getXCode(m_lexer->getCurrentToken(),
-        m_lexer->getCurrentTokenString());
+                    m_lexer->getCurrentTokenString());
 }
 
 
@@ -418,7 +418,7 @@ void IRParser::error(TOKEN tok, CHAR const* format, ...)
     va_start(arg, format);
     buf.vsprint(format, arg);
     prt2C("\nerror(%d):'%s', %s", m_lexer->getCurrentLineNum(),
-        m_lexer->getCurrentTokenString(), buf.buf);
+          m_lexer->getCurrentTokenString(), buf.buf);
     va_end(arg);
 
     ParseErrorMsg * msg = new ParseErrorMsg(10);
@@ -568,8 +568,8 @@ bool IRParser::declareRegion(ParseCtx * ctx)
         REGION_parent(region) = ctx->current_region;
     }
     if (regionvar == NULL) {
-        regionvar = m_rumgr->getVarMgr()->registerVar(
-            sym, m_rumgr->getTypeMgr()->getAny(), 1, flag);
+        regionvar = m_rumgr->getVarMgr()->registerVar(sym,
+            m_rumgr->getTypeMgr()->getAny(), 1, flag);
         if (region->is_function() || region->is_program()) {
             ASSERT0(regionvar);
             VAR_is_func_decl(regionvar) = true;
@@ -596,7 +596,7 @@ bool IRParser::declareRegion(ParseCtx * ctx)
 
     //Region body
     START_TIMER_FMT(w, ("Parse Region(%d):%s",
-        region->id(), region->getRegionName()));
+                        region->id(), region->getRegionName()));
     if (!parseRegionBody(&newctx)) {
         return false;
     }
@@ -612,8 +612,8 @@ bool IRParser::declareRegion(ParseCtx * ctx)
         if (newctx.has_phi) {
             newctx.current_region->constructBBList();
             newctx.current_region->setIRList(NULL);
-            OptCtx * oc = getRegionMgr()->
-                getAndGenOptCtx(newctx.current_region->id());
+            OptCtx * oc = getRegionMgr()->getAndGenOptCtx(
+                              newctx.current_region->id());
             ASSERT0(oc);
             newctx.current_region->initPassMgr();
             //IRCFG * cfg = newctx.current_region->
@@ -626,10 +626,10 @@ bool IRParser::declareRegion(ParseCtx * ctx)
                                                           PASS_UNDEF);
             newctx.current_region->getCFG()->dumpVCG();
             dumpBBList(newctx.current_region->getBBList(),
-                newctx.current_region);
+                       newctx.current_region);
             if (newctx.has_phi) {
-                newctx.current_region->getCFG()->
-                    revisePhiEdge(newctx.getIR2Label());
+                newctx.current_region->getCFG()->revisePhiEdge(
+                    newctx.getIR2Label());
                 PRSSAMgr * prssamgr = (PRSSAMgr*)newctx.current_region->
                     getPassMgr()->registerPass(PASS_PR_SSA_MGR);
                 ASSERT0(prssamgr);
@@ -924,9 +924,8 @@ bool IRParser::parseCase(ParseCtx * ctx)
     if (tok == T_IMM) {
         case_det = ctx->current_region->buildImmInt(
             (HOST_INT)xcom::xatoll(m_lexer->getCurrentTokenString(), false),
-            m_tm->getSimplexType(
-                m_tm->get_int_dtype(
-                    sizeof(HOST_INT)*BIT_PER_BYTE, true)));
+            m_tm->getSimplexType(m_tm->get_int_dtype(
+                                 sizeof(HOST_INT)*BIT_PER_BYTE, true)));
         tok = m_lexer->getNextToken();
 
         Type const* ty = NULL;

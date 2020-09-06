@@ -411,23 +411,24 @@ public:
     bool is_contain_only_taken_addr(MD const* md) const;
 
     //Return true if md is overlap with the elements in set.
-    bool is_overlap(MD const* md, Region * current_ru) const;
+    bool is_overlap(MD const* md, Region const* current_ru) const;
 
     //Return true if md is overlap with the elements.
     //Note this function only consider the MD that have been taken address.
-    bool is_overlap_only_taken_addr(MD const* md, Region * current_ru) const;
+    bool is_overlap_only_taken_addr(MD const* md, 
+                                    Region const* current_ru) const;
 
     //Return true if md overlaps with element in current MDSet.
     //Note this function will iterate all elements which is costly.
     //Use it carefully.
     bool is_overlap_ex(MD const* md,
-                       Region * current_ru,
+                       Region const* current_ru,
                        MDSystem const* mdsys) const;
-    bool is_contain_inexact(MDSystem * ms) const;
-    bool is_contain_only_exact_and_str(MDSystem * ms) const;
+    bool is_contain_inexact(MDSystem const* ms) const;
+    bool is_contain_only_exact_and_str(MDSystem const* ms) const;
     //Return true current set is equivalent to mds, whereas every element
     //in set is exact.
-    bool is_exact_equal(MDSet const& mds, MDSystem * ms) const;
+    bool is_exact_equal(MDSet const& mds, MDSystem const* ms) const;
 
     //Return true if set intersect with 'mds'.
     bool is_intersect(MDSet const& mds) const
@@ -525,6 +526,7 @@ public:
     //Do not destroy mds.
     void free(MDSet * mds);
 
+    Region * getRegion() const { return m_rg; }
     inline MDSet * get_free() { return m_free_md_set.remove_head(); }
     UINT get_mdset_count() const { return m_md_set_list.get_elem_count(); }
     UINT get_free_mdset_count() const { return m_free_md_set.get_elem_count(); }
@@ -573,7 +575,7 @@ public:
     }
 
     UINT get_elem_count() const { return m_count; }
-    void dump() const;
+    void dump(Region const* rg) const;
 };
 
 
@@ -598,7 +600,7 @@ public:
     MDSet const* append(SBitSetCore<> const& set)
     { return (MDSet const*)SBitSetCoreHash<MDSetHashAllocator>::append(set); }
 
-    void dump();
+    void dump(Region * rg);
 };
 
 
@@ -645,11 +647,10 @@ public:
 
     void init(VarMgr * vm);
     void clean();
-    void computeOverlapExactMD(
-            MD const* md,
-            OUT MDSet * output,
-            ConstMDIter & tabiter,
-            DefMiscBitSetMgr & mbsmgr);
+    void computeOverlapExactMD(MD const* md,
+                               OUT MDSet * output,
+                               ConstMDIter & tabiter,
+                               DefMiscBitSetMgr & mbsmgr);
     void computeOverlap(Region * current_ru,
                         MD const* md,
                         MDSet & output,
@@ -699,6 +700,7 @@ public:
         ASSERT0(v);
         return m_var2mdtab.get(v);
     }
+    RegionMgr * getRegionMgr() const { return m_tm->getRegionMgr(); }
 
     UINT getNumOfMD() const { return m_id2md_map.get_elem_count(); }
     MDId2MD const* getID2MDMap() const { return &m_id2md_map; }

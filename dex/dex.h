@@ -168,18 +168,18 @@ public:
         paramnum = src.paramnum;
     }
 
-    void dump()
+    void dump(Region const* rg)
     {
-        if (g_tfile == NULL) { return; }
-        note("\n==---- DUMP Prno2Vreg ----==");
-        g_indent += 4;
+        if (!rg->isLogMgrInit()) { return; }
+        note(rg, "\n==---- DUMP Prno2Vreg ----==");
+        rg->getLogMgr()->incIndent(4);
 
         if (maxreg < 0) {
-            note("\n==------ PR to Vreg is unordered ------==");
+            note(rg, "\n==------ PR to Vreg is unordered ------==");
             INT cur;
             for (UINT prno = get_first(cur); cur >= 0; prno = get_next(cur)) {
                 UINT v = get(prno);
-                note("\nPR%d->v%d", prno, v);
+                note(rg, "\nPR%d->v%d", prno, v);
             }
         } else {
             INT cur;
@@ -188,39 +188,37 @@ public:
                 for (UINT prno = get_first(cur); cur >= 0; prno = get_next(cur)) {
                     UINT v = get(prno);
                     if (v == (UINT)i) {
-                        note("\nPR%d -> v%d", prno, v);
+                        note(rg, "\nPR%d -> v%d", prno, v);
                         find = true;
                         break;
                     }
                 }
 
                 if (!find) {
-                    note("\n-- -> v%d", i);
+                    note(rg, "\n-- -> v%d", i);
                 }
             }
         }
-        g_indent -= 4;
-        fflush(g_tfile);
+        rg->getLogMgr()->decIndent(4);
     }
 };
 
 
 class Vreg2PR : public Vector<IR*> {
 public:
-    void dump()
+    void dump(Region const* rg)
     {
-        if (g_tfile == NULL) { return; }
+        if (!rg->isLogMgrInit()) { return; }
 
-        note("\n==---- DUMP Prno2Vreg ----==");
+        note(rg, "\n==---- DUMP Prno2Vreg ----==");
 
         for (INT i = 0; i <= get_last_idx(); i++) {
             IR * pr = get(i);
             if (pr == NULL) {
-                note("\nv%d -> --", i);
+                note(rg, "\nv%d -> --", i);
             }
-            note("\nv%d -> PR%u", i, pr->getPrno());
+            note(rg, "\nv%d -> PR%u", i, pr->getPrno());
         }
-        fflush(g_tfile);
     }
 };
 

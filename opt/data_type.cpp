@@ -557,27 +557,24 @@ void TypeMgr::dump_type(UINT tyid)
 
 void TypeMgr::dump_type(Type const* type)
 {
-    if (g_tfile == NULL) { return; }
+    if (!getRegionMgr()->isLogMgrInit()) { return; }
     StrBuf buf(64);
-    prt("%s", dump_type(type, buf));
-    fflush(g_tfile);
+    prt(getRegionMgr(), "%s", dump_type(type, buf));
 }
 
 
 void TypeMgr::dump_type_tab()
 {
     StrBuf buf(64);
-    if (g_tfile == NULL) { return; }
-    note("\n==---- DUMP Type Table ----==\n");
+    if (!getRegionMgr()->isLogMgrInit()) { return; }
+    note(getRegionMgr(), "\n==---- DUMP Type Table ----==\n");
     for (INT i = 1; i <= m_type_tab.get_last_idx(); i++) {
         buf.clean();
         Type * d = m_type_tab.get(i);
         ASSERT0(d);
-        prt("%s tyid:%d", dump_type(d, buf), i);
-        note("\n");
-        fflush(g_tfile);
+        prt(getRegionMgr(), "%s tyid:%d", dump_type(d, buf), i);
+        note(getRegionMgr(), "\n");
     }
-    fflush(g_tfile);
 }
 
 

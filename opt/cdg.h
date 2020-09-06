@@ -48,9 +48,13 @@ class CDG : public xcom::Graph {
 public:
     CDG(Region * rg) : m_consider_cycle(false) { m_rg = rg; }
     void build(IN OUT OptCtx & oc, xcom::DGraph & cfg);
+
     void dump() const;
+
+    Region * getRegion() const { return m_rg; }
     void get_cd_preds(UINT id, OUT List<xcom::Vertex*> & lst);
     void get_cd_succs(UINT id, OUT List<xcom::Vertex*> & lst);
+
     bool is_only_cd_self(UINT id) const;
     bool is_cd(UINT a, UINT b) const;
     void rebuild(IN OUT OptCtx & oc, xcom::DGraph & cfg);

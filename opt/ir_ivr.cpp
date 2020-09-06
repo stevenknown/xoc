@@ -487,13 +487,13 @@ void IVR::findDIV(LI<IRBB> const* li,
 void IVR::_dump(LI<IRBB> * li, UINT indent)
 {
     while (li != NULL) {
-        note("\n");
-        for (UINT i = 0; i < indent; i++) { prt(" "); }
-        prt("LI%d:BB%d", li->id(), li->getLoopHead()->id());
-        prt(",BODY:");
+        note(getRegion(), "\n");
+        for (UINT i = 0; i < indent; i++) { prt(getRegion(), " "); }
+        prt(getRegion(), "LI%d:BB%d", li->id(), li->getLoopHead()->id());
+        prt(getRegion(), ",BODY:");
         for (INT i = li->getBodyBBSet()->get_first();
              i != -1; i = li->getBodyBBSet()->get_next(i)) {
-            prt("%d,", i);
+            prt(getRegion(), "%d,", i);
         }
 
         xcom::SList<IV*> * bivlst = m_li2bivlst.get(li->id());
@@ -502,71 +502,70 @@ void IVR::_dump(LI<IRBB> * li, UINT indent)
                  sc != bivlst->end(); sc = bivlst->get_next(sc)) {
                 IV * iv = sc->val();
                 ASSERT0(iv);
-                note("\n");
-                for (UINT i = 0; i < indent; i++) { prt(" "); }
-                prt("BIV(md%d", MD_id(IV_iv(iv)));
+                note(getRegion(), "\n");
+                for (UINT i = 0; i < indent; i++) { prt(getRegion(), " "); }
+                prt(getRegion(), "BIV(md%d", MD_id(IV_iv(iv)));
 
                 if (IV_is_inc(iv)) {
-                    prt(",step=%lld", (LONGLONG)IV_step(iv));
+                    prt(getRegion(), ",step=%lld", (LONGLONG)IV_step(iv));
                 } else {
-                    prt(",step=-%lld", (LONGLONG)IV_step(iv));
+                    prt(getRegion(), ",step=-%lld", (LONGLONG)IV_step(iv));
                 }
 
                 if (iv->has_init_val()) {
                     if (iv->isInitConst()) {
-                        prt(",init=%lld", (LONGLONG)*IV_initv_i(iv));
+                        prt(getRegion(), ",init=%lld", (LONGLONG)*IV_initv_i(iv));
                     } else {
-                        prt(",init=md%d", (INT)MD_id(IV_initv_md(iv)));
+                        prt(getRegion(), ",init=md%d", (INT)MD_id(IV_initv_md(iv)));
                     }
                 }
-                prt(")");
+                prt(getRegion(), ")");
 
                 //Dump IV's def-stmt.
-                note("\n");
-                for (UINT i = 0; i < indent; i++) { prt(" "); }
-                prt("Def-Stmt:");
+                note(getRegion(), "\n");
+                for (UINT i = 0; i < indent; i++) { prt(getRegion(), " "); }
+                prt(getRegion(), "Def-Stmt:");
                 ASSERT0(IV_iv_def(iv));
-                g_indent = indent + 2;
+                getRegion()->getLogMgr()->setIndent(indent + 2);
                 dumpIR(IV_iv_def(iv), m_rg, NULL, IR_DUMP_KID);
 
                 //Dump IV's occ-exp.
-                note("\n");
-                for (UINT i = 0; i < indent; i++) { prt(" "); }
-                prt("Occ-Exp:");
+                note(getRegion(), "\n");
+                for (UINT i = 0; i < indent; i++) { prt(getRegion(), " "); }
+                prt(getRegion(), "Occ-Exp:");
                 ASSERT0(IV_iv_occ(iv));
-                g_indent = indent + 2;
+                getRegion()->getLogMgr()->setIndent(indent + 2);
                 dumpIR(IV_iv_occ(iv), m_rg, NULL, IR_DUMP_KID);
 
                 //Dump IV's init-stmt.
                 if (iv->getInitValStmt() != NULL) {
-                    note("\n");
-                    for (UINT i = 0; i < indent; i++) { prt(" "); }
-                    prt("Init-Stmt:");
-                    g_indent = indent + 2;
+                    note(getRegion(), "\n");
+                    for (UINT i = 0; i < indent; i++) { prt(getRegion(), " "); }
+                    prt(getRegion(), "Init-Stmt:");
+                    getRegion()->getLogMgr()->setIndent(indent + 2);
                     dumpIR(iv->getInitValStmt(), m_rg, NULL, IR_DUMP_KID);
                 }
             }
-        } else { prt("(NO BIV)"); }
+        } else { prt(getRegion(), "(NO BIV)"); }
 
         xcom::SList<IR const*> * divlst = m_li2divlst.get(li->id());
         if (divlst != NULL) {
             if (divlst->get_elem_count() > 0) {
-                note("\n");
-                for (UINT i = 0; i < indent; i++) { prt(" "); }
-                prt("DIV:");
+                note(getRegion(), "\n");
+                for (UINT i = 0; i < indent; i++) { prt(getRegion(), " "); }
+                prt(getRegion(), "DIV:");
             }
             for (xcom::SC<IR const*> * sc = divlst->get_head();
                  sc != divlst->end(); sc = divlst->get_next(sc)) {
                 IR const* iv = sc->val();
                 ASSERT0(iv);
-                g_indent = indent + 2;
+                getRegion()->getLogMgr()->setIndent(indent + 2);
                 dumpIR(iv, m_rg, NULL, IR_DUMP_KID);
             }
-        } else { prt("(NO DIV)"); }
+        } else { prt(getRegion(), "(NO DIV)"); }
 
         _dump(LI_inner_list(li), indent + 2);
         li = LI_next(li);
-        fflush(g_tfile);
     }
 }
 
@@ -574,10 +573,10 @@ void IVR::_dump(LI<IRBB> * li, UINT indent)
 //Dump IVR info for loop.
 void IVR::dump()
 {
-    if (g_tfile == NULL) { return; }
-    note("\n==---- DUMP %s '%s' ----==", getPassName(), m_rg->getRegionName());
+    if (!m_rg->isLogMgrInit()) { return; }
+    note(getRegion(), "\n==---- DUMP %s '%s' ----==",
+         getPassName(), m_rg->getRegionName());
     _dump(m_cfg->getLoopInfo(), 0);
-    fflush(g_tfile);
 }
 
 

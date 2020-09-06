@@ -40,25 +40,25 @@ namespace xoc {
 //
 void CDG::dump() const
 {
-    if (g_tfile == NULL) { return; }
-    note("\n==---- DUMP Control Dependence '%s' ----==", m_rg->getRegionName());
+    if (!getRegion()->isLogMgrInit()) { return; }
+    note(getRegion(), "\n==---- DUMP Control Dependence '%s' ----==",
+         m_rg->getRegionName());
     INT c;
     for (xcom::Vertex * v = get_first_vertex(c);
          v != NULL; v = get_next_vertex(c)) {
         xcom::EdgeC * in = VERTEX_in_list(v);
         if (in == NULL) {
-            note("\nBB%d has NO ctrl BB", v->id());
+            note(getRegion(), "\nBB%d has NO ctrl BB", v->id());
             continue;
         }
-        note("\nBB%d ctrl BB is: ", v->id());
+        note(getRegion(), "\nBB%d ctrl BB is: ", v->id());
         while (in != NULL) {
             xcom::Vertex * pred = in->getFrom();
-            prt("%d,", pred->id());
+            prt(getRegion(), "%d,", pred->id());
             in = EC_next(in);
         }
     }
-    note("\n");
-    fflush(g_tfile);
+    note(getRegion(), "\n");
 }
 
 

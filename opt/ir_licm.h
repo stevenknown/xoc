@@ -65,7 +65,8 @@ class LICM : public Pass {
     //and add it into invariant expression list.
     //Record the stmt in work list to next round analysis.
     //Return true if we add new invariant expression into list.
-    //Note caller has to guarantee that whole RHS expressions of ir are invariant.
+    //Note caller has to guarantee that whole RHS expressions of ir
+    //are invariant.
     bool chooseExpAndStmt(IR * ir);
 
     bool doLoopTree(LI<IRBB> * li,
@@ -87,10 +88,11 @@ class LICM : public Pass {
                             OUT IRBB * prehead,
                             OUT LI<IRBB> * li);
     //Hoist candidate IR to preheader BB.
-    bool hoistCand(OUT IRBB * prehead, OUT LI<IRBB> * li);
+    bool hoistCand(OUT IRBB * prehead, OUT LI<IRBB> * li, OUT bool & insert_bb);
     //This function will maintain RPO of generated guard BB.
     //Return true if BB or STMT changed.
     bool hoistCandHelper(IRBB const* backedge_bb,
+                         OUT bool & insert_guard_bb,
                          OUT IR * cand_exp,
                          OUT IRBB * prehead,
                          OUT LI<IRBB> * li);
@@ -127,6 +129,12 @@ class LICM : public Pass {
     //the judgement stmt in loophead BB.
     //e.g:Return true for while-do loop, and false for do-while loop.
     bool isLoopExecConditional(LI<IRBB> const* li) const;
+
+    //Try to move and check that each definitions of candidate has been
+    //already hoisted from loop.
+    bool tryMoveAllDefStmtOutFromLoop(IR const* c,
+                                     IRBB * prehead,
+                                     OUT LI<IRBB> * li);
 
     //Return true if any stmt is moved outside from loop.
     bool tryHoistDefStmt(IR * def,
@@ -191,7 +199,7 @@ public:
     bool analysis(IN LI<IRBB> * li);
 
     //Given loop info li, dump the invariant stmt and invariant expression.
-    void dumpInvariantExpStmt() const;
+    void dumpInvariantExpStmt(LI<IRBB> const* li) const;
     virtual bool dump() const;
 
     //Consider whether exp is worth hoisting.
@@ -204,6 +212,7 @@ public:
         return !exp->isNoMove();
     }
 
+    Region * getRegion() const { return m_rg; }
     virtual CHAR const* getPassName() const
     { return "Loop Invariant Code Motion"; }
     PASS_TYPE getPassType() const { return PASS_LICM; }

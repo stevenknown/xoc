@@ -164,58 +164,58 @@ void MDLivenessMgr::computeGlobalLiveness()
 
 void MDLivenessMgr::dump(bool with_name) const
 {
-    if (g_tfile == NULL) { return; }
-    note("\n==---- DUMP MDLivenessMgr '%s' ----==\n", m_rg->getRegionName());    
-    g_indent += 2;
+    if (!m_rg->isLogMgrInit()) { return; }
+    note(getRegion(), "\n==---- DUMP MDLivenessMgr '%s' ----==\n",
+         m_rg->getRegionName());
+    m_rg->getLogMgr()->incIndent(2);
     MDLivenessMgr * pthis = const_cast<MDLivenessMgr*>(this);
     BBList * bbl = m_rg->getBBList();
     MDSystem const* sys = m_rg->getMDSystem();
     CHAR const* fmt = with_name ? "MD%d(%s) " : "MD%d ";    
     for (IRBB * bb = bbl->get_head(); bb != NULL; bb = bbl->get_next()) {
-        note("\n---- BB%d -----", BB_id(bb));
+        note(getRegion(), "\n---- BB%d -----", BB_id(bb));
         MDSet * live_in = pthis->getLiveInMDSet(bb);
         MDSet * live_out = pthis->getLiveOutMDSet(bb);
         MDSet * def = pthis->getDefMDSet(bb);
         MDSet * use = pthis->getUseMDSet(bb);
-        note("\nLIVE-IN: ");
+        note(getRegion(), "\nLIVE-IN: ");
         MDSetIter iter;
         for (INT i = live_in->get_first(&iter);
              i != -1; i = live_in->get_next(i, &iter)) {
             MD const* md = const_cast<MDSystem*>(sys)->getMD(i);
             ASSERT0(md);
-            prt(fmt, i, with_name ?
+            prt(getRegion(), fmt, i, with_name ?
                 md->get_base()->get_name()->getStr() : NULL);
         }
 
-        note("\nLIVE-OUT: ");
+        note(getRegion(), "\nLIVE-OUT: ");
         for (INT i = live_out->get_first(&iter);
              i != -1; i = live_out->get_next(i, &iter)) {
             MD const* md = const_cast<MDSystem*>(sys)->getMD(i);
             ASSERT0(md);
-            prt(fmt, i, with_name ?
+            prt(getRegion(), fmt, i, with_name ?
                 md->get_base()->get_name()->getStr() : NULL);
         }
 
-        note("\nDEF: ");
+        note(getRegion(), "\nDEF: ");
         for (INT i = def->get_first(&iter);
              i != -1; i = def->get_next(i, &iter)) {
             MD const* md = const_cast<MDSystem*>(sys)->getMD(i);
             ASSERT0(md);
-            prt(fmt, i, with_name ?
+            prt(getRegion(), fmt, i, with_name ?
                 md->get_base()->get_name()->getStr() : NULL);
         }
 
-        note("\nUSE: ");
+        note(getRegion(), "\nUSE: ");
         for (INT i = use->get_first(&iter);
              i != -1; i = use->get_next(i, &iter)) {
             MD const* md = const_cast<MDSystem*>(sys)->getMD(i);
             ASSERT0(md);
-            prt(fmt, i, with_name ?
+            prt(getRegion(), fmt, i, with_name ?
                 md->get_base()->get_name()->getStr() : NULL);
         }
     }
-    g_indent -= 2;
-    fflush(g_tfile);
+    m_rg->getLogMgr()->decIndent(2);
 }
 
 

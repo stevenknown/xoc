@@ -135,45 +135,44 @@ bool IRBB::is_fallthrough() const
 
 void IRBB::dump(Region const* rg, bool dump_inner_region) const
 {
-    if (g_tfile == NULL) { return; }
+    if (!rg->isLogMgrInit()) { return; }
 
-    note("\n----- BB%d --- rpo:%d -----", id(), rpo());
+    note(rg, "\n----- BB%d --- rpo:%d -----", id(), rpo());
     IRBB * pthis = const_cast<IRBB*>(this);
     if (pthis->getLabelList().get_elem_count() > 0) {
-        note("\nLABEL:");
-        dumpBBLabel(pthis->getLabelList(), g_tfile);
+        note(rg, "\nLABEL:");
+        dumpBBLabel(pthis->getLabelList(), rg);
     }
 
     //Attributes
-    note("\nATTR:");
+    note(rg, "\nATTR:");
     if (is_entry()) {
-        prt("entry_bb ");
+        prt(rg, "entry_bb ");
     }
 
     //if (BB_is_exit(this)) {
-    //    prt("exit_bb ");
+    //    prt(rg, "exit_bb ");
     //}
 
     if (is_fallthrough()) {
-        prt("fall_through ");
+        prt(rg, "fall_through ");
     }
 
     if (is_target()) {
-        prt("branch_target ");
+        prt(rg, "branch_target ");
     }
 
     //IR list
-    note("\nSTMT NUM:%d", getNumOfIR());
-    g_indent += 3;
+    note(rg, "\nSTMT NUM:%d", getNumOfIR());
+    rg->getLogMgr()->incIndent(3);
     for (IR * ir = BB_first_ir(pthis);
          ir != NULL; ir = BB_irlist(pthis).get_next()) {
         ASSERT0(ir->is_single() && ir->getBB() == this);
         dumpIR(ir, rg, NULL, IR_DUMP_KID | IR_DUMP_SRC_LINE |
             (dump_inner_region ? IR_DUMP_INNER_REGION : 0));
     }
-    g_indent -= 3;
-    note("\n");
-    fflush(g_tfile);
+    rg->getLogMgr()->decIndent(3);
+    note(rg, "\n");
 }
 
 
@@ -311,11 +310,13 @@ void IRBB::removeAllSuccessorsPhiOpnd(CFG<IRBB, IR> * cfg)
 //END IRBB
 
 
-void dumpBBLabel(List<LabelInfo const*> & lablist, FILE * h)
+void dumpBBLabel(List<LabelInfo const*> & lablist, Region const* rg)
 {
+    FILE * h = rg->getLogMgr()->getFileHandler();
     ASSERT0(h);
     xcom::C<LabelInfo const*> * ct;
-    for (lablist.get_head(&ct); ct != lablist.end(); ct = lablist.get_next(ct)) {
+    for (lablist.get_head(&ct); ct != lablist.end();
+         ct = lablist.get_next(ct)) {
         LabelInfo const* li = ct->val();
         switch (LABELINFO_type(li)) {
         case L_CLABEL:
@@ -335,61 +336,39 @@ void dumpBBLabel(List<LabelInfo const*> & lablist, FILE * h)
             LABELINFO_is_try_end(li) ||
             LABELINFO_is_catch_start(li) ||
             LABELINFO_is_terminate(li)) {
-            prt("(");
+            prt(rg, "(");
             if (LABELINFO_is_try_start(li)) {
-                prt("try_start,");
+                prt(rg, "try_start,");
             }
             if (LABELINFO_is_try_end(li)) {
-                prt("try_end,");
+                prt(rg, "try_end,");
             }
             if (LABELINFO_is_catch_start(li)) {
-                prt("catch_start,");
+                prt(rg, "catch_start,");
             }
             if (LABELINFO_is_terminate(li)) {
-                prt("terminate");
+                prt(rg, "terminate");
             }
-            prt(")");
+            prt(rg, ")");
         }
-        prt(" ");
+        prt(rg, " ");
     }
 }
 
 
 void dumpBBList(BBList const* bbl,
                 Region const* rg,
-                CHAR const* name,
                 bool dump_inner_region)
 {
     ASSERT0(rg && bbl);
-    FILE * h = NULL;
-    FILE * org_g_tfile = g_tfile;
-    if (name == NULL) {
-        h = g_tfile;
-    } else {
-        UNLINK(name);
-        h = fopen(name, "a+");
-        ASSERTN(h != NULL, ("can not dump."));
-        g_tfile = h;
-    }
-    if (h == NULL) { return; }
     if (bbl->get_elem_count() != 0) {
-        if (h == g_tfile) {
-            note("\n==---- DUMP IRBBList '%s' ----==", rg->getRegionName());
-        } else {
-            fprintf(h, "\n==---- DUMP IRBBList '%s' ----==",
-                    rg->getRegionName());
-        }
+        note(rg, "\n==---- DUMP IRBBList '%s' ----==", rg->getRegionName());
         C<IRBB*> * ct = NULL;
         for (IRBB * bb = bbl->get_head(&ct);
              bb != NULL; bb = bbl->get_next(&ct)) {
             bb->dump(rg, dump_inner_region);
         }
-        fflush(h);
     }
-    if (h != org_g_tfile) {
-        fclose(h);
-    }
-    g_tfile = org_g_tfile;
 }
 
 } //namespace xoc

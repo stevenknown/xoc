@@ -48,5 +48,6 @@ OPT_OBJS +=\
 ../opt/liveness_mgr.o\
 ../opt/mdliveness_mgr.o\
 ../opt/du_helper.o\
-../opt/symtab.o
+../opt/symtab.o\
+../opt/logmgr.o
 

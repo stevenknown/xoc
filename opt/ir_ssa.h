@@ -64,7 +64,7 @@ public:
     void build(xcom::DGraph const& g);
     void build(xcom::DGraph const& g, DomTree const& domtree);
     void clean();
-    void dump(xcom::DGraph const& g) const;
+    void dump(xcom::DGraph const& g, Region * rg) const;
 
     //Count Dominator Frontier Density for each xcom::Vertex.
     //Return true if there exist vertex that might inserting
@@ -249,6 +249,7 @@ public:
     CHAR * dumpVP(IN VPR * v, OUT CHAR * buf) const;
     void dumpSSAGraph(CHAR * name = NULL) const;
 
+    Region * getRegion() const { return m_rg; }
     VPRVec const* getVPRVec() const { return &m_vpr_vec; }
     VPR * getVPR(UINT id) const { return m_vpr_vec.get(id); }
     //Map PRNO to VPRVec that recorded all VPR during SSA.
@@ -276,6 +277,15 @@ public:
     //common_def: record the common_def if the definition
     //  of all opnd is the same.
     bool isRedundantPHI(IR const* phi, OUT IR ** common_def) const;
+
+    //Return true if stmt dominate use's stmt, otherwise return false.
+    bool isStmtDomUseInsideLoop(IR const* stmt,
+                                IR const* use,
+                                LI<IRBB> const* li) const;
+
+    //Return true if ir dominates all its USE expressions which inside loop.
+    //In ssa mode, stmt's USE may be placed in operand list of PHI.
+    bool isStmtDomAllUseInsideLoop(IR const* ir, LI<IRBB> const* li) const;
 
     //This function revise phi data type, and remove redundant phi.
     //Return true if there is phi removed.

@@ -93,7 +93,7 @@ AbsNode * CfsMgr::new_abs_node(ABS_TYPE ty)
 void CfsMgr::dump_indent(UINT indent)
 {
     while (indent != 0) {
-        prt(" ");
+        prt(getRegion(), " ");
         indent--;
     }
 }
@@ -101,7 +101,7 @@ void CfsMgr::dump_indent(UINT indent)
 
 void CfsMgr::dump_abs_tree(AbsNode * an)
 {
-    note("\n==---- DUMP AbsNode Tree ----==\n");
+    note(getRegion(), "\n==---- DUMP AbsNode Tree ----==\n");
     dump_abs_tree(an, 0);
 }
 
@@ -111,25 +111,25 @@ void CfsMgr::dump_abs_tree(AbsNode * an, UINT indent)
     while (an != NULL) {
         switch (ABS_NODE_type(an)) {
         case ABS_BB:
-            note("\n"); dump_indent(indent);
-            prt("BB%d", ABS_NODE_bb(an)->id());
+            note(getRegion(), "\n"); dump_indent(indent);
+            prt(getRegion(), "BB%d", ABS_NODE_bb(an)->id());
             break;
         case ABS_LOOP:
-            note("\n"); dump_indent(indent);
-            prt("LOOP: HEAD=BB%d", ABS_NODE_loop_head(an)->id());
+            note(getRegion(), "\n"); dump_indent(indent);
+            prt(getRegion(), "LOOP: HEAD=BB%d", ABS_NODE_loop_head(an)->id());
             dump_abs_tree(ABS_NODE_loop_body(an), indent + 4);
             break;
         case ABS_IF:
-            note("\n"); dump_indent(indent);
-            prt("IF: HEAD=BB%d", ABS_NODE_if_head(an)->id());
+            note(getRegion(), "\n"); dump_indent(indent);
+            prt(getRegion(), "IF: HEAD=BB%d", ABS_NODE_if_head(an)->id());
             if (ABS_NODE_true_body(an) != NULL) {
-                note("\n"); dump_indent(indent);
-                prt("TRUE_BODY:");
+                note(getRegion(), "\n"); dump_indent(indent);
+                prt(getRegion(), "TRUE_BODY:");
                 dump_abs_tree(ABS_NODE_true_body(an), indent + 4);
             }
             if (ABS_NODE_false_body(an) != NULL) {
-                note("\n"); dump_indent(indent);
-                prt("FALSE_BODY:");
+                note(getRegion(), "\n"); dump_indent(indent);
+                prt(getRegion(), "FALSE_BODY:");
                 dump_abs_tree(ABS_NODE_false_body(an), indent + 4);
             }
             break;

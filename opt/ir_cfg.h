@@ -51,9 +51,9 @@ protected:
     CFG_SHAPE m_cs;
 
 protected:
-    void dump_node(FILE * h, bool detail);
+    void dump_node(bool detail);
     void dump_head(FILE * h);
-    void dump_edge(FILE * h, bool dump_eh);
+    void dump_edge(bool dump_eh);
 
     void remove_bb_impl(IRBB * bb);
     //CASE: Given pred1->bb, fallthrough edge,

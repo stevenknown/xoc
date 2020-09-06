@@ -137,6 +137,7 @@ public:
 
     virtual bool dump() const;
 
+    Region * getRegion() const { return m_rg; }
     virtual CHAR const* getPassName() const
     { return "Dead Code Eliminiation"; }
     virtual PASS_TYPE getPassType() const { return PASS_DCE; }

@@ -55,17 +55,18 @@ void DeadCodeElim::setEffectStmt(IR const* stmt,
 
 bool DeadCodeElim::dump() const
 {
-    if (g_tfile == NULL) { return false; }
-    note("\n==---- DUMP %s '%s' ----==", getPassName(), m_rg->getRegionName());
-    note("\n==-- Ineffect BB --==");
+    if (!getRegion()->isLogMgrInit()) { return false; }
+    note(getRegion(), "\n==---- DUMP %s '%s' ----==",
+         getPassName(), m_rg->getRegionName());
+    note(getRegion(), "\n==-- Ineffect BB --==");
     BBList * bbl = m_rg->getBBList();
     for (IRBB * bb = bbl->get_head(); bb != NULL; bb = bbl->get_next()) {
-        note("\n--0- BB%d", bb->id());
+        note(getRegion(), "\n--0- BB%d", bb->id());
         if (!m_is_bb_effect.is_contain(bb->id())) {
-            prt("\t\tineffect BB!");
+            prt(getRegion(), "\t\tineffect BB!");
         }
     }
-    note("\n");
+    note(getRegion(), "\n");
     dumpBBList(m_rg->getBBList(), m_rg);
     if (usePRSSADU()) {
         m_prssamgr->dump();
@@ -73,7 +74,6 @@ bool DeadCodeElim::dump() const
     if (useMDSSADU()) {
         m_mdssamgr->dump();
     }
-    fflush(g_tfile);
     return true;
 }
 
@@ -820,8 +820,7 @@ bool DeadCodeElim::perform(OptCtx & oc)
     }
 
     //DU chain and DU reference should be maintained.
-    ASSERT0(m_rg->verifyMDRef() &&
-            m_du->verifyMDDUChain(DUOPT_COMPUTE_PR_DU|DUOPT_COMPUTE_NONPR_DU));
+    ASSERT0(m_rg->verifyMDRef() && verifyMDDUChain(m_rg));
     OC_is_expr_tab_valid(oc) = false;
     OC_is_live_expr_valid(oc) = false;
     OC_is_reach_def_valid(oc) = false;

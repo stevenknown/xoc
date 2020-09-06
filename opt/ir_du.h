@@ -125,6 +125,8 @@ public:
 
     void dump() const;
 
+    Region * getRegion() const { return m_rg; }
+
     bool hasIneffectDef() const { return m_are_stmts_defed_ineffect_md; }
 
     void set(UINT mdid, IR * ir);
@@ -360,8 +362,7 @@ protected:
                                    DUSet * expdu);
     void checkMustMDAndBuildDUChainForPotentialDefList(IR const* exp,
                                                        MD const* expmd,
-                                                       DUSet * expdu);
-    bool checkIsTruelyDep(IR const* def, IR const* use);
+                                                       DUSet * expdu);    
     bool checkIsLocalKillingDefForDirectAccess(MD const* defmd,
                                                MD const* usemd,
                                                IR const* stmt);
@@ -452,8 +453,7 @@ protected:
     void resetGlobalSet(bool cleanMember);
     void updateDefWithMustEffectMD(IR * ir, MD const* musteffect);
     void updateDefWithMustExactMD(IR * ir, MD const* mustexact);
-    void updateDef(IR * ir, UINT flag);
-
+    void updateDef(IR * ir, UINT flag);    
 public:
     explicit DUMgr(Region * rg);
     ~DUMgr();
@@ -709,8 +709,7 @@ public:
     void dumpDUChainDetail() const;
     void dumpBBDUChainDetail(UINT bbid) const;
     void dumpBBDUChainDetail(IRBB * bb) const;
-    void dump(CHAR const* name) const;
-    virtual bool dump() const { dump(NULL); return true; }
+    virtual bool dump() const;
 
     DefSBitSetCore * genLiveInBB(UINT bbid, DefMiscBitSetMgr * mgr);
     DefDBitSetCore * genAvailInExpr(UINT bbid, DefMiscBitSetMgr * mgr);
@@ -780,7 +779,7 @@ public:
         return ir->getEffectRef();
     }
     IR const* getExactAndUniqueDef(IR const* exp);
-
+    Region * getRegion() const { return m_rg; }
 
     inline bool is_du_exist(IR const* def, IR const* use) const
     {
@@ -826,6 +825,14 @@ public:
     //'def_stmt': should be stmt.
     //'use_stmt': should be stmt.
     bool isExactAndUniqueDef(IR const* def, IR const* exp);
+
+    //Return true if stmt dominate use's stmt, otherwise return false.
+    bool isStmtDomUseInsideLoop(IR const* stmt,
+                                IR const* use,
+                                LI<IRBB> const* li) const;
+
+    //Return true if ir dominates all its USE expressions which inside loop.
+    bool isStmtDomAllUseInsideLoop(IR const* ir, LI<IRBB> const* li) const;
 
     //This equation needs May Kill Def and Must Gen Def.
     bool ForAvailReachDef(UINT bbid,
@@ -1040,12 +1047,10 @@ public:
     //Remove all DU info of 'ir' from DU mgr.
     void removeIRFromDUMgr(IR * ir);
 
-    //Verify DU chain's sanity.
-    bool verifyMDDUChain(UINT duflag);
+    bool verifyLiveinExp();
 
     //Verify if DU chain is correct between each Def and Use of MD.
     bool verifyMDDUChainForIR(IR const* ir, UINT duflag);
-    bool verifyLiveinExp();
 
     virtual bool perform(OptCtx &)
     {
@@ -1057,6 +1062,11 @@ public:
                              DUOPT_SOL_REACH_DEF|DUOPT_COMPUTE_PR_REF|
                              DUOPT_COMPUTE_NONPR_REF|DUOPT_SOL_REGION_REF);
 };
+
+//Verify DU chain's sanity.
+//Verify if DU chain is correct between each Def and Use of MD.    
+bool verifyMDDUChain(Region * rg, UINT duflag = DUOPT_COMPUTE_PR_DU |
+                                                DUOPT_COMPUTE_NONPR_DU);
 
 } //namespace xoc
 #endif

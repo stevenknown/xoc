@@ -483,25 +483,26 @@ void CopyProp::dumpCopyPropagationAction(IR const* def_stmt,
                                          IR const* use,
                                          MDSSAMgr * mdssamgr)
 {
-    if (g_tfile == NULL) { return; }
-    note("\n==---- DUMP %s '%s' ----==", getPassName(), m_rg->getRegionName());
-    note("\nPropagating Candidate is %s(id:%d), that located in Stmt:",
+    if (!getRegion()->isLogMgrInit()) { return; }
+    note(getRegion(), "\n==---- DUMP %s '%s' ----==",
+         getPassName(), m_rg->getRegionName());
+    note(getRegion(),
+         "\nPropagating Candidate is %s(id:%d), that located in Stmt:",
          IRNAME(prop_value), prop_value->id());
     dumpIR(def_stmt, m_rg);
-    note("\nWill replace %s(id:%d), that located in Stmt:",
+    note(getRegion(), "\nWill replace %s(id:%d), that located in Stmt:",
          IRNAME(use), use->id());
     if (use->is_id()) {
         ASSERT0(mdssamgr);
         MDSSAInfo * mdssainfo = mdssamgr->getUseDefMgr()->getMDSSAInfo(use);
         CHECK_DUMMYUSE(mdssainfo);
         ASSERT0(ID_phi(use));
-        note("\n");
+        note(getRegion(), "\n");
         ID_phi(use)->dump(m_rg, mdssamgr->getUseDefMgr());
     } else {
         ASSERT0(use->getStmt());
         dumpIR(use->getStmt(), m_rg);
     }
-    fflush(g_tfile);
 }
 
 
@@ -737,7 +738,7 @@ bool CopyProp::perform(OptCtx & oc)
         OC_is_nonpr_du_chain_valid(oc) = false; //not update.
     } else {
         //Use classic DU chain.
-        m_du->verifyMDDUChain(DUOPT_COMPUTE_PR_DU | DUOPT_COMPUTE_NONPR_DU);
+        ASSERT0(verifyMDDUChain(m_rg));
         OC_is_pr_du_chain_valid(oc) = true; //already update.
         OC_is_nonpr_du_chain_valid(oc) = true; //already update.
     }

@@ -862,6 +862,20 @@ void Graph::removeEdgeBetween(Vertex * v1, Vertex * v2)
 //       e.g: There are dependence edges: v0->v1, v0->v2.
 //       If v1->v2 has been marked, we said v0->v2 is removable,
 //       and the same goes for the rest of edges.
+//e.g: E->D, A->D are transitive edges.
+//           E   A
+//         __|   |\
+//        |   \ /  |
+//        |    V   |
+//        |    B   |
+//        |    |   |
+//        |    |   |
+//        |    V   |
+//        |    C   |
+//        |___ | __|
+//            \|/
+//             V
+//             D
 void Graph::removeTransitiveEdge()
 {
     Vector<Vertex*> vex_vec;
@@ -875,8 +889,8 @@ void Graph::removeTransitiveEdge()
         Vertex const* fromvex = vex_vec.get(i);
         ASSERT0(fromvex);
         if (is_dense()) {
-            removeTransitiveEdgeHelper(fromvex,
-                &reachset_vec, is_visited, bs_mgr);
+            removeTransitiveEdgeHelper(fromvex, &reachset_vec,
+                                       is_visited, bs_mgr);
         } else {
             removeTransitiveEdgeHelper(fromvex,
                 (Vector<DefSBitSetCore*>*)&reachset_map, is_visited, bs_mgr);
@@ -906,57 +920,58 @@ void Graph::removeTransitiveEdgeHelper(Vertex const* fromvex,
                                        DefMiscBitSetMgr & bs_mgr)
 {
     ASSERT0(reachset);
-    if (is_visited.is_contain(VERTEX_id(fromvex))) { return; }
-    is_visited.bunion(VERTEX_id(fromvex));
+    if (is_visited.is_contain(fromvex->id())) { return; }
+    is_visited.bunion(fromvex->id());
 
     ASSERT0(fromvex);
-    if (VERTEX_out_list(fromvex) == NULL) { return; }
+    if (fromvex->getOutList() == NULL) { return; }
+
+    //Reachset defines the set of vertex that fromvex is able to reach.
     DefSBitSetCore * from_reachset = is_dense() ?
-        reachset->get(VERTEX_id(fromvex)) :
-        ((TMap<UINT, DefSBitSetCore*>*)reachset)->get(VERTEX_id(fromvex));
+        reachset->get(fromvex->id()) :
+        ((TMap<UINT, DefSBitSetCore*>*)reachset)->get(fromvex->id());
     if (from_reachset == NULL) {
         from_reachset = bs_mgr.allocSBitSetCore();
         if (is_dense()) {
-            reachset->set(VERTEX_id(fromvex), from_reachset);
+            reachset->set(fromvex->id(), from_reachset);
         } else {
-            ((TMap<UINT, DefSBitSetCore*>*)reachset)->set(
-                VERTEX_id(fromvex), from_reachset);
+            ((TMap<UINT, DefSBitSetCore*>*)reachset)->set(fromvex->id(),
+                                                      from_reachset);
         }
     }
 
     //Position in bitset has been sorted in topological order.
     EdgeC const* next_ec = NULL;
-    for (EdgeC const* ec = VERTEX_out_list(fromvex);
-         ec != NULL; ec = next_ec) {
-        next_ec = EC_next(ec);
+    for (EdgeC const* ec = fromvex->getOutList(); ec != NULL; ec = next_ec) {
+        next_ec = ec->get_next();
         Vertex const* tovex = ec->getTo();
 
-        from_reachset->bunion(VERTEX_id(tovex), bs_mgr);
+        from_reachset->bunion(tovex->id(), bs_mgr);
         removeTransitiveEdgeHelper(tovex, reachset, is_visited, bs_mgr);
 
+        //Reachset defines the set of vertex that tovex is able to reach.
         DefSBitSetCore * to_reachset = is_dense() ?
-            reachset->get(VERTEX_id(tovex)) :
-            ((TMap<UINT, DefSBitSetCore*>*)reachset)->get(VERTEX_id(tovex));
+            reachset->get(tovex->id()) :
+            ((TMap<UINT, DefSBitSetCore*>*)reachset)->get(tovex->id());
         if (to_reachset == NULL) { continue; }
         from_reachset->bunion(*to_reachset, bs_mgr);
 
         //Get successor set correspond to to_dense.
-        if (VERTEX_out_list(tovex) == NULL) { continue; }
+        if (tovex->getOutList() == NULL) { continue; }
 
         //Iterate other successors except 'to'.
         EdgeC const* next_ec2 = NULL;
-        for (EdgeC const* ec2 = VERTEX_out_list(fromvex);
+        for (EdgeC const* ec2 = fromvex->getOutList();
              ec2 != NULL; ec2 = next_ec2) {
-            next_ec2 = EC_next(ec2);
+            next_ec2 = ec2->get_next();
             Vertex const* othervex = ec2->getTo();
-            if (othervex == tovex ||
-                !to_reachset->is_contain(VERTEX_id(othervex))) {
+            if (othervex == tovex || !to_reachset->is_contain(othervex->id())) {
                 continue;
             }
             if (next_ec == ec2) {
-                next_ec = EC_next(ec);
+                next_ec = ec->get_next();
             }
-            removeEdge(EC_edge(ec2));
+            removeEdge(ec2->getEdge());
         }
     }
 }

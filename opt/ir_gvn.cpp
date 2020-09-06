@@ -1130,14 +1130,14 @@ void GVN::processBB(IRBB * bb, bool & change)
 
 void GVN::dumpIR2VN() const
 {
-    if (g_tfile == NULL) { return; }
+    if (!m_rg->isLogMgrInit()) { return; }
     for (INT k = 0; k <= m_ir2vn.get_last_idx(); k++) {
         VN * x = m_ir2vn.get(k);
         if (x != NULL) {
-            note("\nIR%d : vn%d, %d", k, VN_id(x), (INT)VN_type(x));
+            note(getRegion(), "\nIR%d : vn%d, %d",
+                 k, VN_id(x), (INT)VN_type(x));
         }
     }
-    fflush(g_tfile);
 }
 
 
@@ -1145,38 +1145,38 @@ void GVN::dump_h1(IR const* k, VN const* x) const
 {
     ASSERT0(k);    
     if (k->is_pr()) {
-        note("\n\t$%d", PR_no(k));
+        note(getRegion(), "\n\t$%d", PR_no(k));
     } else {
-        note("\n\t%s", IRTNAME(k->getCode()));
+        note(getRegion(), "\n\t%s", IRTNAME(k->getCode()));
     }
-    prt(" id:%d ", k->id());
+    prt(getRegion(), " id:%d ", k->id());
     if (x != NULL) {
-        prt("vn%d", VN_id(x));
+        prt(getRegion(), "vn%d", VN_id(x));
     } else {
-        prt("--");
+        prt(getRegion(), "--");
     }
 }
 
 
 void GVN::dumpBB(UINT bbid) const
 {
-    if (g_tfile == NULL) { return; }
+    if (!m_rg->isLogMgrInit()) { return; }
     IRBB * bb = m_cfg->getBB(bbid);
     ASSERT0(bb);
 
     ConstIRIter ii;
-    note("\n-- BB%d ", bb->id());
-    dumpBBLabel(bb->getLabelList(), g_tfile);
-    note("\n");
+    note(getRegion(), "\n-- BB%d ", bb->id());
+    dumpBBLabel(bb->getLabelList(), getRegion());
+    note(getRegion(), "\n");
     for (IR * ir = BB_first_ir(bb); ir != NULL; ir = BB_next_ir(bb)) {
         dumpIR(ir, m_rg);
-        note("\n");
+        note(getRegion(), "\n");
         VN * x = m_ir2vn.get(ir->id());
         if (x != NULL) {
-            prt("vn%d", VN_id(x));
+            prt(getRegion(), "vn%d", VN_id(x));
         }
 
-        prt(" <- {");
+        prt(getRegion(), " <- {");
         ii.clean();
         bool dumped = false;
         for (IR const* k = iterRhsInitC(ir, ii);
@@ -1186,23 +1186,22 @@ void GVN::dumpBB(UINT bbid) const
             dump_h1(k, vn);
         }
         if (dumped) {
-            note("\n");
+            note(getRegion(), "\n");
         }
-        prt(" }");
+        prt(getRegion(), " }");
     }
-    fflush(g_tfile);
 }
 
 
 bool GVN::dump() const
 {
-    if (g_tfile == NULL) { return false; }
-    note("\n==---- DUMP %s '%s' ----==", getPassName(), m_rg->getRegionName());
+    if (!m_rg->isLogMgrInit()) { return false; }
+    note(getRegion(), "\n==---- DUMP %s '%s' ----==",
+         getPassName(), m_rg->getRegionName());
     BBList * bbl = m_rg->getBBList();
     for (IRBB * bb = bbl->get_head(); bb != NULL; bb = bbl->get_next()) {
         dumpBB(bb->id());
     }
-    fflush(g_tfile);
     return true;
 }
 
@@ -1370,30 +1369,17 @@ bool GVN::perform(OptCtx & oc)
 {
     BBList * bbl = m_rg->getBBList();
     if (bbl->get_elem_count() == 0) { return false; }
-    if (!OC_is_ref_valid(oc)) { return false; }
 
-    //Check PR DU chain.
-    PRSSAMgr * ssamgr = (PRSSAMgr*)(m_rg->getPassMgr()->queryPass(
-        PASS_PR_SSA_MGR));
-    if (ssamgr != NULL && ssamgr->is_valid()) {
-        m_ssamgr = ssamgr;
-    } else {
-        m_ssamgr = NULL;
-    }
-    if (!OC_is_pr_du_chain_valid(oc) && m_ssamgr == NULL) { 
+    if (!OC_is_ref_valid(oc)) { return false; }
+    m_mdssamgr = (MDSSAMgr*)m_rg->getPassMgr()->queryPass(PASS_MD_SSA_MGR);
+    m_prssamgr = (PRSSAMgr*)m_rg->getPassMgr()->queryPass(PASS_PR_SSA_MGR);
+    if (!OC_is_pr_du_chain_valid(oc) && !usePRSSADU()) {
+        //DCE use either classic PR DU chain or PRSSA.
         //At least one kind of DU chain should be avaiable.
         return false;
     }
-
-    //Check NONPR DU chain.
-    MDSSAMgr * mdssamgr = (MDSSAMgr*)(m_rg->getPassMgr()->queryPass(
-        PASS_MD_SSA_MGR));
-    if (mdssamgr != NULL && mdssamgr->is_valid()) {
-        m_mdssamgr = mdssamgr;
-    } else {
-        m_mdssamgr = NULL;
-    }
-    if (!OC_is_nonpr_du_chain_valid(oc) && m_mdssamgr == NULL) {
+    if (!OC_is_nonpr_du_chain_valid(oc) && !useMDSSADU()) {
+        //DCE use either classic MD DU chain or MDSSA.
         //At least one kind of DU chain should be avaiable.
         return false;
     }
@@ -1405,7 +1391,7 @@ bool GVN::perform(OptCtx & oc)
     ASSERT0(tbbl->get_elem_count() == bbl->get_elem_count());
     UINT count = 0;
     bool change = true;
-    while (change && count < 10) {
+    while (change && count < 100) {
         change = false;
         for (IRBB * bb = tbbl->get_head();
              bb != NULL; bb = tbbl->get_next()) {
@@ -1414,6 +1400,7 @@ bool GVN::perform(OptCtx & oc)
         count++;
     }
     ASSERT0(!change);
+
     if (g_is_dump_after_pass && g_dump_opt.isDumpGVN()) {
         dump();
     }

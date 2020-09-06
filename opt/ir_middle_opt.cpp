@@ -149,13 +149,11 @@ bool Region::performSimplify(OptCtx & oc)
     if (g_verify_level >= VERIFY_LEVEL_3 &&
         OC_is_pr_du_chain_valid(oc) &&
         OC_is_nonpr_du_chain_valid(oc)) {
-        ASSERT0(getDUMgr() == NULL ||
-                getDUMgr()->verifyMDDUChain(DUOPT_COMPUTE_PR_DU|
-                                            DUOPT_COMPUTE_NONPR_DU));
+        ASSERT0(verifyMDDUChain(this));
     }
 
     if (g_is_dump_after_pass && g_dump_opt.isDumpALL()) {
-        note("\n==---- DUMP AFTER SIMPLIFY IRBB LIST ----==");
+        note(this, "\n==---- DUMP AFTER SIMPLIFY IRBB LIST ----==");
         dumpBBList();
     }
     return true;
@@ -191,9 +189,7 @@ bool Region::MiddleProcess(OptCtx & oc)
     if (bbl->get_elem_count() == 0) { return true; }
 
     if (g_verify_level >= VERIFY_LEVEL_3) {
-        ASSERT0(getDUMgr() == NULL ||
-            getDUMgr()->verifyMDDUChain(DUOPT_COMPUTE_PR_DU |
-                                        DUOPT_COMPUTE_NONPR_DU));
+        ASSERT0(verifyMDDUChain(this));
     }
 
     bool do_simplification = true;
@@ -220,9 +216,7 @@ bool Region::MiddleProcess(OptCtx & oc)
             if (g_verify_level >= VERIFY_LEVEL_3 &&
                 OC_is_pr_du_chain_valid(oc) &&
                 OC_is_nonpr_du_chain_valid(oc)) {
-                ASSERT0(getDUMgr() == NULL ||
-                        getDUMgr()->verifyMDDUChain(DUOPT_COMPUTE_PR_DU |
-                                                    DUOPT_COMPUTE_NONPR_DU));
+                ASSERT0(verifyMDDUChain(this));
             }
             return true;
         }

@@ -43,31 +43,31 @@ namespace xoc {
 //
 void LivenessMgr::dump()
 {
-    if (g_tfile == NULL) { return; }
-    note("\n==---- DUMP LivenessMgr : liveness of PR ----==\n");
+    if (!getRegion()->isLogMgrInit()) { return; }
+    note(getRegion(), "\n==---- DUMP LivenessMgr : liveness of PR ----==\n");
     List<IRBB*> * bbl = m_rg->getBBList();
-    g_indent += 2;
+    FILE * file = getRegion()->getLogMgr()->getFileHandler();
+    getRegion()->getLogMgr()->incIndent(2);
     for (IRBB * bb = bbl->get_head(); bb != NULL; bb = bbl->get_next()) {
-        note("\n\n\n-- BB%d --", bb->id());
+        note(getRegion(), "\n\n\n-- BB%d --", bb->id());
         DefSBitSetCore * live_in = get_livein(bb->id());
         DefSBitSetCore * live_out = get_liveout(bb->id());
         DefSBitSetCore * def = get_def(bb->id());
         DefSBitSetCore * use = get_use(bb->id());
 
-        note("\nLIVE-IN: ");
-        live_in->dump(g_tfile);
+        note(getRegion(), "\nLIVE-IN: ");
+        live_in->dump(file);
 
-        note("\nLIVE-OUT: ");
-        live_out->dump(g_tfile);
+        note(getRegion(), "\nLIVE-OUT: ");
+        live_out->dump(file);
 
-        note("\nDEF: ");
-        def->dump(g_tfile);
+        note(getRegion(), "\nDEF: ");
+        def->dump(file);
 
-        note("\nUSE: ");
-        use->dump(g_tfile);
+        note(getRegion(), "\nUSE: ");
+        use->dump(file);
     }
-    g_indent -= 2;
-    fflush(g_tfile);
+    getRegion()->getLogMgr()->decIndent(2);
 }
 
 
@@ -79,28 +79,27 @@ void LivenessMgr::processMay(IR const* pr,
     if (!m_handle_may) { return; }
 
     MDSet const* mds = pr->getRefMDSet();
-    if (mds != NULL) {
-        MD const* prmd = pr->getExactRef();
-        ASSERT0(prmd);
-        MDSetIter iter;
-        for (INT i = mds->get_first(&iter);
-             i >= 0; i = mds->get_next(i, &iter)) {
-            MD const* md = m_md_sys->getMD(i);
-            ASSERT0(md);
-            if (MD_base(md) != MD_base(prmd)) {
-                bool find;
-                ASSERT0(m_var2pr); //One should initialize m_var2pr.
-                UINT prno = m_var2pr->get(MD_base(md), &find);
-                ASSERT0(find);
-                if (is_lhs) {
-                    ASSERT0(gen && use);
-                    gen->bunion(prno, m_sbs_mgr);
-                    use->diff(prno, m_sbs_mgr);
-                } else {
-                    ASSERT0(use);
-                    use->bunion(prno, m_sbs_mgr);
-                }
-            }
+    if (mds == NULL) { return; }
+
+    MD const* prmd = pr->getExactRef();
+    ASSERT0(prmd);
+    MDSetIter iter;
+    for (INT i = mds->get_first(&iter); i >= 0; i = mds->get_next(i, &iter)) {
+        MD const* md = m_md_sys->getMD(i);
+        ASSERT0(md);
+        if (MD_base(md) == MD_base(prmd)) { continue; }
+
+        bool find;
+        ASSERT0(m_var2pr); //One should initialize m_var2pr.
+        UINT prno = m_var2pr->get(MD_base(md), &find);
+        ASSERT0(find);
+        if (is_lhs) {
+            ASSERT0(gen && use);
+            gen->bunion(prno, m_sbs_mgr);
+            use->diff(prno, m_sbs_mgr);
+        } else {
+            ASSERT0(use);
+            use->bunion(prno, m_sbs_mgr);
         }
     }
 }

@@ -140,9 +140,9 @@ public:
 
     virtual bool dump() const;
 
+    Region * getRegion() const { return m_rg; }
     virtual CHAR const* getPassName() const
     { return "Global Command Subscript Elimination"; }
-
     PASS_TYPE getPassType() const { return PASS_GCSE; }
 
     bool perform(OptCtx & oc);

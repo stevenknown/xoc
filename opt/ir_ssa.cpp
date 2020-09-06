@@ -63,23 +63,22 @@ void DfMgr::clean()
 
 
 //g: dump dominance frontier to graph.
-void DfMgr::dump(xcom::DGraph const& g) const
+void DfMgr::dump(xcom::DGraph const& g, Region * rg) const
 {
-    if (g_tfile == NULL) { return; }
-    note("\n==---- DUMP Dominator Frontier Control Set ----==\n");
+    if (!rg->isLogMgrInit()) { return; }
+    note(rg, "\n==---- DUMP Dominator Frontier Control Set ----==\n");
     INT c;
     for (xcom::Vertex const* v = g.get_first_vertex(c);
          v != NULL; v = g.get_next_vertex(c)) {
         UINT vid = v->id();
-        note("\nBB%d DF set:", vid);
+        note(rg, "\nBB%d DF set:", vid);
         xcom::BitSet const* df = m_df_vec.get(vid);
         if (df != NULL) {
             for (INT i = df->get_first(); i >= 0; i = df->get_next(i)) {
-                prt("%d,", i);
+                prt(rg, "%d,", i);
             }
         }
     }
-    fflush(g_tfile);
 }
 
 
@@ -251,47 +250,46 @@ void SSAGraph::dump(CHAR const* name, bool detail) const
 
     //Print comment
     fprintf(h, "\n/*");
-    FILE * old = g_tfile;
-    g_tfile = h;
+    m_rg->getLogMgr()->push(h, name);
     dumpBBList(m_rg->getBBList(), m_rg);
-    g_tfile = old;
     fprintf(h, "\n*/\n");
 
     //Print graph structure description.
-    fprintf(h, "graph: {"
-              "title: \"Graph\"\n"
-              "shrink:  15\n"
-              "stretch: 27\n"
-              "layout_downfactor: 1\n"
-              "layout_upfactor: 1\n"
-              "layout_nearfactor: 1\n"
-              "layout_splinefactor: 70\n"
-              "spreadlevel: 1\n"
-              "treefactor: 0.500000\n"
-              "node_alignment: center\n"
-              "orientation: top_to_bottom\n"
-              "late_edge_labels: no\n"
-              "display_edge_labels: yes\n"
-              "dirty_edge_labels: no\n"
-              "finetuning: no\n"
-              "nearedges: no\n"
-              "splines: yes\n"
-              "ignoresingles: no\n"
-              "straight_phase: no\n"
-              "priority_phase: no\n"
-              "manhatten_edges: no\n"
-              "smanhatten_edges: no\n"
-              "port_sharing: no\n"
-              "crossingphase2: yes\n"
-              "crossingoptimization: yes\n"
-              "crossingweight: bary\n"
-              "arrow_mode: free\n"
-              "layoutalgorithm: mindepthslow\n"
-              "node.borderwidth: 2\n"
-              "node.color: lightcyan\n"
-              "node.textcolor: black\n"
-              "node.bordercolor: blue\n"
-              "edge.color: darkgreen\n");
+    fprintf(h,
+            "graph: {"
+            "title: \"Graph\"\n"
+            "shrink:  15\n"
+            "stretch: 27\n"
+            "layout_downfactor: 1\n"
+            "layout_upfactor: 1\n"
+            "layout_nearfactor: 1\n"
+            "layout_splinefactor: 70\n"
+            "spreadlevel: 1\n"
+            "treefactor: 0.500000\n"
+            "node_alignment: center\n"
+            "orientation: top_to_bottom\n"
+            "late_edge_labels: no\n"
+            "display_edge_labels: yes\n"
+            "dirty_edge_labels: no\n"
+            "finetuning: no\n"
+            "nearedges: no\n"
+            "splines: yes\n"
+            "ignoresingles: no\n"
+            "straight_phase: no\n"
+            "priority_phase: no\n"
+            "manhatten_edges: no\n"
+            "smanhatten_edges: no\n"
+            "port_sharing: no\n"
+            "crossingphase2: yes\n"
+            "crossingoptimization: yes\n"
+            "crossingweight: bary\n"
+            "arrow_mode: free\n"
+            "layoutalgorithm: mindepthslow\n"
+            "node.borderwidth: 2\n"
+            "node.color: lightcyan\n"
+            "node.textcolor: black\n"
+            "node.bordercolor: blue\n"
+            "edge.color: darkgreen\n");
 
     //Print Region name.
     fprintf(h,
@@ -300,8 +298,6 @@ void SSAGraph::dump(CHAR const* name, bool detail) const
             "scaling:2 label:\"Region:%s\" }", m_rg->getRegionName());
 
     //Print node
-    old = g_tfile;
-    g_tfile = h;
     List<IR const*> lst;
     INT c;
     for (xcom::Vertex * v = m_vertices.get_first(c);
@@ -359,8 +355,9 @@ void SSAGraph::dump(CHAR const* name, bool detail) const
         fprintf(h, "\nedge: { sourcename:\"%u\" targetname:\"%u\" %s}",
                 from->id(), to->id(),  "");
     }
-    g_tfile = old;
     fprintf(h, "\n}\n");
+    m_rg->getLogMgr()->pop();
+
     fclose(h);
 }
 //END SSAGraph
@@ -415,14 +412,15 @@ CHAR * PRSSAMgr::dumpVP(IN VPR * v, OUT CHAR * buf) const
 //have_renamed: set true if PRs have been renamed in construction.
 void PRSSAMgr::dumpAllVPR() const
 {
-    if (g_tfile == NULL) { return; }
-    note("\n==---- DUMP PRSSAMgr:VPR '%s' ----==\n", m_rg->getRegionName());
+    if (!m_rg->isLogMgrInit()) { return; }
+    note(getRegion(), "\n==---- DUMP PRSSAMgr:VPR '%s' ----==\n",
+         m_rg->getRegionName());
 
     VPRVec const* vpr_vec = getVPRVec();
     for (INT i = PRNO_UNDEF + 1; i <= vpr_vec->get_last_idx(); i++) {
         VPR * v = vpr_vec->get(i);
         ASSERT0(v != NULL);
-        note("\nid%d:$%dv%d$%d: ", v->id(), v->orgprno(),
+        note(getRegion(), "\nid%d:$%dv%d$%d: ", v->id(), v->orgprno(),
              v->version(), v->newprno());
         IR * def = SSA_def(v);
         if (v->version() != PRSSA_INIT_VERSION) {
@@ -433,36 +431,35 @@ void PRSSAMgr::dumpAllVPR() const
         if (def != NULL) {
             ASSERT0(def->is_stmt());            
             if (def->isWritePR()) {
-                prt("DEF:%s ($%d,id:%d)", IRNAME(def),
+                prt(getRegion(), "DEF:%s ($%d,id:%d)", IRNAME(def),
                     def->getPrno(), def->id());
             } else if (def->isCallStmt()) {
-                prt("DEF:%s", IRNAME(def));
+                prt(getRegion(), "DEF:%s", IRNAME(def));
                 if (def->hasReturnValue()) {
-                    prt(" ($%d,id:%d)", def->getPrno(), def->id());
+                    prt(getRegion(), " ($%d,id:%d)", def->getPrno(), def->id());
                 } else {
-                    prt(" NoRetVal??");
+                    prt(getRegion(), " NoRetVal??");
                 }
             } else {
                 ASSERTN(0, ("not def stmt of PR"));
             }
         } else {
-            prt("DEF:---");
+            prt(getRegion(), "DEF:---");
         }
 
-        prt("\tUSE:");
+        prt(getRegion(), "\tUSE:");
         SSAUseIter vit = NULL;
         INT nexti = 0;
         for (INT i2 = SSA_uses(v).get_first(&vit); vit != NULL; i2 = nexti) {
             nexti = SSA_uses(v).get_next(i2, &vit);
             IR * use = m_rg->getIR(i2);
             ASSERT0(use->is_pr());
-            prt("($%d,id:%d)", use->getPrno(), IR_id(use));
+            prt(getRegion(), "($%d,id:%d)", use->getPrno(), IR_id(use));
             if (nexti >= 0) {
-                prt(",");
+                prt(getRegion(), ",");
             }
         }
     }
-    fflush(g_tfile);
 }
 
 
@@ -555,21 +552,21 @@ void PRSSAMgr::destroy(bool is_reinit)
 
 bool PRSSAMgr::dump() const
 {
-    if (g_tfile == NULL) { return false; }
-    note("\n==---- DUMP %s '%s' ----==", getPassName(), m_rg->getRegionName());
+    if (!m_rg->isLogMgrInit()) { return false; }
+    note(getRegion(), "\n==---- DUMP %s '%s' ----==",
+         getPassName(), m_rg->getRegionName());
     dumpAllVPR();
 
     BBList * bbl = m_rg->getBBList();
     List<IR const*> lst;
     List<IR const*> opnd_lst;
-    INT orgindent = g_indent;
     for (IRBB * bb = bbl->get_head();
          bb != NULL; bb = bbl->get_next()) {
-        note("\n--- BB%d ---", bb->id());
+        note(getRegion(), "\n--- BB%d ---", bb->id());
         for (IR * ir = BB_first_ir(bb);
              ir != NULL; ir = BB_next_ir(bb)) {
-            g_indent += 4;
-            note("\n------------------");
+            m_rg->getLogMgr()->incIndent(4);
+            note(getRegion(), "\n------------------");
             dumpIR(ir, m_rg);
             lst.clean();
             opnd_lst.clean();
@@ -582,33 +579,31 @@ bool PRSSAMgr::dump() const
             }
 
             IR * res = ir->getResultPR();
-            note("\nVP:");
+            note(getRegion(), "\nVP:");
             if (res != NULL) {
                 VPR * vp = (VPR*)res->getSSAInfo();
                 ASSERT0(vp);
-                prt("$%dv%d$%d ", vp->orgprno(), vp->version(), vp->newprno());
+                prt(getRegion(), "$%dv%d$%d ", vp->orgprno(), vp->version(), vp->newprno());
             } else {
-                prt("--");
+                prt(getRegion(), "--");
             }
-            prt(" <= ");
+            prt(getRegion(), " <= ");
             if (opnd_lst.get_elem_count() != 0) {
                 UINT i = 0, n = opnd_lst.get_elem_count() - 1;
                 for (IR const* opnd = opnd_lst.get_head(); opnd != NULL;
                      opnd = opnd_lst.get_next(), i++) {
                     VPR * vp = (VPR*)PR_ssainfo(opnd);
                     ASSERT0(vp);
-                    prt("$%dv%d$%d", vp->orgprno(),
+                    prt(getRegion(), "$%dv%d$%d", vp->orgprno(),
                         vp->version(), vp->newprno());
-                    if (i < n) { prt(","); }
+                    if (i < n) { prt(getRegion(), ","); }
                 }
             } else {
-                prt("--");
+                prt(getRegion(), "--");
             }
-            g_indent -= 4;            
+            m_rg->getLogMgr()->decIndent(4);
         }
     }
-    g_indent = orgindent;
-    fflush(g_tfile);
     return true;
 }
 
@@ -1752,6 +1747,10 @@ bool PRSSAMgr::verifySSAInfo()
 
 
 //This function perform SSA destruction via scanning BB in sequential order.
+//Note PRSSA will change PR no during PRSSA destruction. If classic DU chain
+//is valid meanwhile, it might be disrupted as well. A better way is user
+//maintain the classic DU chain, alternatively a conservative way to
+//avoid subsequent verification complaining is set the prdu invalid.
 void PRSSAMgr::destruction(OptCtx * oc)
 {
     BBList * bblst = m_rg->getBBList();
@@ -2245,13 +2244,69 @@ bool PRSSAMgr::construction(DomTree & domtree)
     if (g_is_dump_after_pass && g_dump_opt.isDumpPRSSAMgr()) {
         START_TIMER(tdump, "PRSSA: Dump After Pass");
         dump();
-        dfm.dump((xcom::DGraph&)*m_cfg);
+        dfm.dump((xcom::DGraph&)*m_cfg, getRegion());
         END_TIMER(tdump, "PRSSA: Dump After Pass");
     }
 
     ASSERT0(verifyIRandBB(m_rg->getBBList(), m_rg));
     ASSERT0(verifyPhi(false, false) && verifyVPR());
     m_is_valid = true;
+    return true;
+}
+
+
+//Return true if stmt dominates use's stmt, otherwise return false.
+bool PRSSAMgr::isStmtDomUseInsideLoop(IR const* stmt,
+                                      IR const* use,
+                                      LI<IRBB> const* li) const
+{
+    IRBB const* usestmtbb = NULL;
+    ASSERT0(use->getStmt());
+    usestmtbb = use->getStmt()->getBB();
+    ASSERT0(usestmtbb);
+
+    if (!li->isInsideLoop(usestmtbb->id())) {
+        //Only check dominiation info inside loop.
+        return true;
+    }
+
+    IRBB const* defstmtbb = stmt->getBB();
+    ASSERT0(defstmtbb);
+    if (defstmtbb != usestmtbb &&
+        m_cfg->is_dom(defstmtbb->id(), usestmtbb->id())) {
+        return true;
+    }
+    if (defstmtbb == usestmtbb) {
+        return defstmtbb->is_dom(stmt, use->getStmt(), true);
+    }
+    return false;
+}
+
+
+//Return true if ir dominates all its USE expressions which inside loop.
+//In ssa mode, stmt's USE may be placed in operand list of PHI.
+bool PRSSAMgr::isStmtDomAllUseInsideLoop(IR const* ir, LI<IRBB> const* li) const
+{
+    ASSERT0(ir);
+    SSAInfo * info = ir->getSSAInfo();
+    ASSERTN(info, ("miss PRSSAInfo"));
+    ASSERT0(info->getDef() == ir);
+    IRBB const* irbb = ir->getBB();
+    ASSERT0(irbb);
+    SSAUseIter iter;
+    for (INT i = info->getUses().get_first(&iter);
+         iter != NULL; i = info->getUses().get_next(i, &iter)) {
+        IR const* use = const_cast<Region*>(m_rg)->getIR(i);
+        if (!use->is_pr()) {
+            ASSERT0(!use->isReadPR());
+            continue;
+        }
+        ASSERTN(PR_no(use) == ir->getPrno(), ("prno is unmatch"));
+        ASSERT0(PR_ssainfo(use) == info);
+        if (!isStmtDomUseInsideLoop(ir, use, li)) {
+            return false;
+        }
+    }
     return true;
 }
 //END PRSSAMgr

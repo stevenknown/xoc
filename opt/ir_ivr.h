@@ -189,11 +189,10 @@ public:
     SList<IV*> const* getBIVList(UINT loopid) const
     { return m_li2bivlst.get(loopid); }
 
+    Region * getRegion() const { return m_rg; }
     IV const* getIV(IR const* ir) { return m_ir2iv.get(ir); }
-
     virtual CHAR const* getPassName() const
     { return "Induction Variable Recogization"; }
-
     PASS_TYPE getPassType() const { return PASS_IVR; }
 
     bool is_loop_invariant(LI<IRBB> const* li, IR const* ir);

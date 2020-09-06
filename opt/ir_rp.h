@@ -81,15 +81,14 @@ public:
 
     bool dump() const
     {
-        if (g_tfile == NULL) { return false; }
-        note("\n==---- DUMP Dont Promotion Table ----==\n");
+        if (!m_rg->isLogMgrInit()) { return false; }
+        note(m_rg, "\n==---- DUMP Dont Promotion Table ----==\n");
         MDSetIter iter;
         for (INT i = get_first(&iter); i >= 0; i = get_next(i, &iter)) {
             MD const* t = m_md_sys->getMD(i);
             ASSERT0(t);
             t->dump(m_md_sys->getTypeMgr());
         }
-        fflush(g_tfile);
         return true;
     }
 };
@@ -313,7 +312,7 @@ public:
         m_is_insert_bb = false;
         m_need_rebuild_prssa = false;
         m_liveness_mgr = (MDLivenessMgr*)m_rg->getPassMgr()->registerPass(
-            PASS_MDLIVENESS_MGR);
+                             PASS_MDLIVENESS_MGR);
 
         UINT c = MAX(11, m_rg->getMDSystem()->getNumOfMD());
         m_md2lt_map = new MD2MDLifeTime(c);
@@ -343,6 +342,7 @@ public:
     //Note ir must be memory reference.
     virtual bool isPromotable(IR const* ir) const;   
 
+    Region * getRegion() const { return m_rg; }
     virtual CHAR const* getPassName() const { return "Register Promotion"; }
     PASS_TYPE getPassType() const { return PASS_RP; }
 

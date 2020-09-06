@@ -70,7 +70,6 @@ class LabelInfo {
     COPY_CONSTRUCTOR(LabelInfo);
 public:
     LABEL_TYPE ltype;
-
     union {
         Sym const* lab_name;
         Sym const* pragma_str;
@@ -107,8 +106,8 @@ public:
     }
     void copy_flag(LabelInfo const& li) { u2.b1 = li.u2.b1; }
 
-    void dump() const;
-    void dumpName() const;
+    void dump(Region const* rg) const;
+    void dumpName(Region const* rg) const;
 
     char const* getName(IN OUT StrBuf * buf) const;
     UINT getNum() const { return LABELINFO_num(this); }

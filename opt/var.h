@@ -311,7 +311,7 @@ public:
     {
         ASSERT0(VAR_type(this)->is_string());
         return VAR_string(this) == NULL ?
-            0 : xstrlen(SYM_name(VAR_string(this)));
+               0 : xstrlen(SYM_name(VAR_string(this)));
     }
     Sym const* getString() const { return VAR_string(this); }
     ByteBuf const* getByteValue() const { return VAR_byte_val(this); }
@@ -326,7 +326,7 @@ public:
     }
 
     virtual CHAR const* dumpVARDecl(StrBuf &) const { return NULL; }
-    virtual void dump(FILE * h, TypeMgr const* dm) const;
+    virtual void dump(TypeMgr const* tm) const;
 
     //You must make sure this function will not change any field of Var.
     virtual CHAR const* dump(StrBuf & buf, TypeMgr const* dm) const;
@@ -366,30 +366,13 @@ class VarTab : public TTab<Var*, CompareVar> {
     COPY_CONSTRUCTOR(VarTab);
 public:
     VarTab() {}
-    void dump(TypeMgr * dm)
-    {
-        if (g_tfile == NULL) { return; }
-        ASSERT0(dm);
-        VarTabIter iter;
-        for (Var * v = get_first(iter); v != NULL; v = get_next(iter)) {
-            v->dump(g_tfile, dm);
-        }
-    }
+    void dump(TypeMgr const* tm) const;
 };
 
 
 class ConstVarTab : public TTab<Var const*, CompareConstVar> {
 public:
-    void dump(TypeMgr * dm)
-    {
-        if (g_tfile == NULL) { return; }
-
-        ASSERT0(dm);
-        ConstVarTabIter iter;
-        for (Var const* v = get_first(iter); v != NULL; v = get_next(iter)) {
-            v->dump(g_tfile, dm);
-        }
-    }
+    void dump(TypeMgr * tm);
 };
 
 
@@ -418,7 +401,7 @@ public:
 
     void destroy();
     void destroyVar(Var * v); //Free Var memory.
-    void dump(IN OUT CHAR * name = NULL);
+    void dump();
 
     TypeMgr * getTypeMgr() const { return m_tm; }
     VarVec * get_var_vec() { return &m_var_vec; }

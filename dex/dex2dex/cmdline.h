@@ -39,6 +39,7 @@ bool processCommandLine(UINT argc, CHAR const* argv[]);
 extern CHAR const* g_dex_file_path;
 extern INT g_output_file_handler;
 extern INT g_source_file_handler;
+extern CHAR const* g_logfile_name;
 
 //Set true to disable all auxiliary informations which will output to stdout.
 extern bool g_silence;

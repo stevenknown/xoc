@@ -474,7 +474,7 @@ protected:
     DUMgr * m_du;
     TypeMgr * m_tm;
     MDSystem * m_md_sys;
-    PRSSAMgr * m_ssamgr;
+    PRSSAMgr * m_prssamgr;
     MDSSAMgr * m_mdssamgr;
     IRCFG * m_cfg;
     VN * m_zero_vn;
@@ -581,6 +581,11 @@ protected:
     void processRegion(IR const* ir, bool & change);
     void processPhi(IR const* ir, bool & change);
 
+    bool useMDSSADU() const
+    { return m_mdssamgr != NULL && m_mdssamgr->is_valid(); }
+    bool usePRSSADU() const
+    { return m_prssamgr != NULL && m_prssamgr->is_valid(); }
+
 public:
     explicit GVN(Region * rg);
     COPY_CONSTRUCTOR(GVN);
@@ -596,8 +601,8 @@ public:
     void dumpBB(UINT bbid) const;
     void dumpIR2VN() const;
 
+    Region * getRegion() const { return m_rg; }
     virtual CHAR const* getPassName() const { return "Global Value Numbering"; }
-
     PASS_TYPE getPassType() const { return PASS_GVN; }
 
     bool is_triple(IR_TYPE i) const { return i == IR_ILD; }

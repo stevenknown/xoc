@@ -129,17 +129,17 @@ void MDSSAInfo::addUse(IR const* exp, IN UseDefMgr * usedefmgr)
 
 void MDSSAInfo::dump(MDSSAMgr const* mgr) const
 {
-    if (g_tfile == NULL) { return; }
+    if (!mgr->getRegion()->isLogMgrInit()) { return; }
     VOpndSetIter iter = NULL;
     MDSSAInfo * pthis = const_cast<MDSSAInfo*>(this);
     for (INT i = pthis->getVOpndSet()->get_first(&iter);
          i >= 0; i = pthis->getVOpndSet()->get_next(i, &iter)) {
-        note("\nREF:");
+        note(mgr->getRegion(), "\nREF:");
         VMD const* vopnd = (VMD*)const_cast<MDSSAMgr*>(mgr)->
-            getUseDefMgr()->getVOpnd(i);
+                           getUseDefMgr()->getVOpnd(i);
         ASSERT0(vopnd && vopnd->is_md());
         vopnd->dump(mgr->getRegion(), const_cast<MDSSAMgr*>(mgr)->
-            getUseDefMgr());
+                    getUseDefMgr());
     }
 }
 //END MDSSAInfo
@@ -172,9 +172,9 @@ size_t UINT2VMDVec::count_mem() const
 //START VMD
 //
 //Concisely dump.
-void VMD::dump() const
+void VMD::dump(Region const* rg) const
 {
-    prt("MD%dV%d", mdid(), version());
+    prt(rg, "MD%dV%d", mdid(), version());
 }
 
 
@@ -190,20 +190,20 @@ void VMD::clean()
 
 void VMD::dump(Region const* rg, UseDefMgr const* mgr) const
 {
-    if (g_tfile == NULL) { return; }
+    if (!rg->isLogMgrInit()) { return; }
     ASSERT0(is_md() && rg);
-    prt("(MD%dV%d", mdid(), version());
+    prt(rg, "(MD%dV%d", mdid(), version());
 
     //Dump Def
     if (getDef() != NULL) {
         ASSERT0(!getDef()->is_phi());
 
         if (getDef()->getPrev() != NULL) {
-            prt(",PrevDEF:MD%dV%d",
+            prt(rg, ",PrevDEF:MD%dV%d",
                 getDef()->getPrev()->getResult()->mdid(),
                 getDef()->getPrev()->getResult()->version());
         } else {
-            prt(",-");
+            prt(rg, ",-");
         }
 
         if (getDef()->getNextSet() != NULL) {
@@ -214,24 +214,24 @@ void VMD::dump(Region const* rg, UseDefMgr const* mgr) const
                 if (first) {
                     first = false;
                 } else {
-                    prt(",");
+                    prt(rg, ",");
                 }
 
                 MDDef const* use = mgr->getMDDef(w);
                 ASSERTN(use, ("not such MDDef"));
                 ASSERT0(use->getResult());
                 ASSERTN(use->getPrev() == getDef(), ("insanity relation"));
-                prt(",NextDEF:MD%dV%d",
+                prt(rg, ",NextDEF:MD%dV%d",
                     use->getResult()->mdid(), use->getResult()->version());
             }
         }
     } else {
-        prt(",-");
+        prt(rg, ",-");
     }
-    prt(")");
+    prt(rg, ")");
 
     //Dump OccSet
-    prt("|UsedBy:");
+    prt(rg, "|UsedBy:");
     IRSetIter vit = NULL;
     bool first = true;
     VMD * pthis = const_cast<VMD*>(this);
@@ -240,15 +240,13 @@ void VMD::dump(Region const* rg, UseDefMgr const* mgr) const
         if (first) {
             first = false;
         } else {
-            prt(",");
+            prt(rg, ",");
         }
 
         IR * use = rg->getIR(i2);
         ASSERT0(use && (use->isMemoryRef() || use->is_id()));
-        prt("%s(id:%d)", IRNAME(use), use->id());
+        prt(rg, "%s(id:%d)", IRNAME(use), use->id());
     }
-
-    fflush(g_tfile);
 }
 //END VMD
 
@@ -284,7 +282,7 @@ void MDPhi::dump(Region const* rg, UseDefMgr const* mgr) const
 {
     ASSERT0(rg);
     ASSERT0(is_phi());
-    if (g_tfile == NULL) { return; }
+    if (!rg->isLogMgrInit()) { return; }
 
     List<IRBB*> preds;
     IRCFG * cfg = rg->getCFG();
@@ -293,39 +291,39 @@ void MDPhi::dump(Region const* rg, UseDefMgr const* mgr) const
     IRBB * pred = preds.get_head();
 
     ASSERT0(getResult());
-    prt("Phi: MD%dV%d <- ", getResult()->mdid(), getResult()->version());
+    prt(rg, "Phi: MD%dV%d <- ", getResult()->mdid(), getResult()->version());
     for (IR const* opnd = getOpndList();
          opnd != NULL; opnd = opnd->get_next()) {
         if (opnd != getOpndList()) {
-            prt(", ");
+            prt(rg, ", ");
         }
 
         switch (opnd->getCode()) {
         case IR_CONST:
-            prt("Const");
+            prt(rg, "Const");
             break;
         case IR_LDA:
-            prt("Lda");
+            prt(rg, "Lda");
             break;
         case IR_ID: {
             VMD * vopnd = getOpndVMD(opnd, mgr);
-            prt("MD%dV%d(id:%d)", vopnd->mdid(), vopnd->version(), opnd->id());
+            prt(rg, "MD%dV%d(id:%d)", vopnd->mdid(), vopnd->version(), opnd->id());
             break;
         }
         default: UNREACHABLE();
         }
 
         if (pred == NULL) {
-            prt("(BB?)"); //Predecessor is not match with PHI, error occurred.
+            prt(rg, "(BB?)"); //Predecessor is not match with PHI, error occurred.
         } else {
-            prt("(BB%d)", pred->id());            
+            prt(rg, "(BB%d)", pred->id());            
         }
         pred = preds.get_next();
     }
 
     VMD * res = getResult();
     ASSERT0(res);
-    prt("|UsedBy:");
+    prt(rg, "|UsedBy:");
     IRSetIter vit = NULL;
     bool first = true;
     for (INT i2 = res->getUseSet()->get_first(&vit);
@@ -333,15 +331,13 @@ void MDPhi::dump(Region const* rg, UseDefMgr const* mgr) const
         if (first) {
             first = false;
         } else {
-            prt(",");
+            prt(rg, ",");
         }
 
         IR const* use = rg->getIR(i2);
         ASSERT0(use && (use->isMemoryRef() || use->is_id()));
-        prt("%s(id:%d)", IRNAME(use), use->id());
+        prt(rg, "%s(id:%d)", IRNAME(use), use->id());
     }
-
-    fflush(g_tfile);
 }
 //END MDPhi
 

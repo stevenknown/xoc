@@ -38,14 +38,13 @@ namespace xoc {
 
 bool RCE::dump() const
 {
-    if (g_tfile == NULL) { return false; }
-    note("\n\n==---- DUMP RCE ----==\n");
+    if (!m_rg->isLogMgrInit()) { return false; }
+    note(getRegion(), "\n\n==---- DUMP RCE ----==\n");
 
     BBList * bbl = m_rg->getBBList();
     for (IRBB * bb = bbl->get_head(); bb != NULL; bb = bbl->get_next()) {
         //TODO:
     }
-    fflush(g_tfile);
     return true;
 }
 

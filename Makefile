@@ -63,7 +63,9 @@ opt/symtab.o\
 opt/prssainfo.o\
 opt/scalar_opt.o\
 opt/mdliveness_mgr.o\
-opt/liveness_mgr.o
+opt/liveness_mgr.o\
+opt/du_helper.o\
+opt/logmgr.o
 
 GRREADER_OBJS += \
 reader/ir_parser.o\

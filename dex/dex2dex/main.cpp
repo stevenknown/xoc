@@ -70,7 +70,7 @@ int main(int argc, char const* argv[])
         goto FIN;
     }
 
-    if (g_tfile != NULL && g_dump_dex_file_path) {
+    if (g_logfile_name != NULL && g_dump_dex_file_path) {
         note("\n==---- %s ----==\n", g_dex_file_path);
     }
 
@@ -88,9 +88,6 @@ FIN:
     if (g_output_file_handler >= 0) {
         close(g_output_file_handler);
     }
-
-    xoc::finidump();
-
     return locerrno; //success.
 }
 

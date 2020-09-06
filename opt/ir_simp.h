@@ -313,7 +313,7 @@ public:
 
     void dump(Region * rg) {
         ASSERT0(rg);
-        note("\n==---- DUMP SimpCtx IR List ----==");
+        note(rg, "\n==---- DUMP SimpCtx IR List ----==");
         dumpIRList(ir_stmt_list, rg);
     }
 };
