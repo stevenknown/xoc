@@ -204,11 +204,22 @@ bool LICM::chooseExpAndStmt(IR * ir)
     case IR_TRUEBR:
     case IR_FALSEBR: {
         IR * e = BR_det(ir);
-        if (!BIN_opnd0(e)->is_leaf() || !BIN_opnd1(e)->is_leaf()) {
-            if (!m_invariant_exp.find(e)) {
-                addInvariantExp(e);
-                return true;
+        if (e->isBinaryOp()) {
+            if (!BIN_opnd0(e)->is_leaf() || !BIN_opnd1(e)->is_leaf()) {
+                if (!m_invariant_exp.find(e)) {
+                    addInvariantExp(e);
+                    return true;
+                }
             }
+        } else if (e->isUnaryOp()) {
+            if (!UNA_opnd(e)->is_leaf()) {
+                if (!m_invariant_exp.find(e)) {
+                    addInvariantExp(e);
+                    return true;
+                }
+            }
+        } else {
+            ASSERT0(0); //TODO
         }
         return false;
     }
@@ -461,6 +472,7 @@ bool LICM::analysis(IN LI<IRBB> * li)
 }
 
 
+//Return true if stmt is collected into invariant-stmt set.
 bool LICM::isInvariantStmt(IR const* stmt) const
 {
     ASSERT0(stmt->is_stmt());
@@ -489,24 +501,6 @@ bool LICM::is_dom_all_use_in_loop(IR const* ir, LI<IRBB> * li)
     if (useset != NULL) {
         ASSERT0(m_du);
         return m_du->isStmtDomAllUseInsideLoop(ir, li);
-    }
-    return true;
-}
-
-
-bool LICM::isStmtCanBeHoisted(IR * stmt, IRBB * backedge_bb)
-{
-    if (backedge_bb == NULL) {
-        //Loop has multiple exits.
-        return false;
-    }
-    if (stmt->isNoMove()) {
-        return false;
-    }
-    if (stmt->getBB() != backedge_bb &&
-        !m_cfg->is_dom(stmt->getBB()->id(), backedge_bb->id())) {
-        //Stmt is at the dominate path in loop.
-        return false;
     }
     return true;
 }
@@ -605,6 +599,7 @@ bool LICM::tryHoistDefStmt(IR * def, OUT IRBB * prehead, OUT LI<IRBB> * li)
 //This function will maintain RPO of generated guard BB.
 //prehead: preheader BB of loop.
 //loophead: loopheader BB of loop.
+//Return the new guard controlling BB.
 //e.g:given BB_prehead, insert BB_guard
 //  BB_prehead
 //  |
@@ -720,8 +715,8 @@ bool LICM::hasInsertedGuardBB(LI<IRBB> const* li) const
 
 //This function will maintain RPO of generated guard BB.
 //Return true if BB or STMT changed.
-bool LICM::hoistCandHelper(IRBB const* backedge_bb,
-                           OUT bool & insert_guard_bb,
+//Note this function may insert guard BB if loop-det is conditional.
+bool LICM::hoistCandHelper(OUT bool & insert_guard_bb,
                            OUT IR * cand_exp,
                            OUT IRBB * prehead,
                            OUT LI<IRBB> * li)
@@ -731,10 +726,7 @@ bool LICM::hoistCandHelper(IRBB const* backedge_bb,
     if ((cand_stmt->is_st() || cand_stmt->is_stpr()) &&
         cand_exp == cand_stmt->getRHS() &&
         isInvariantStmt(cand_stmt) &&
-        backedge_bb != NULL && //loop only have one exit.
         is_dom_all_use_in_loop(cand_stmt, li)) {
-        //isStmtCanBeHoisted(cand_stmt, backedge_bb)
-
         //cand is store-value and the result memory object is ID|PR.
 
         //NOTE: If we hoist entire stmt out from loop,
@@ -761,7 +753,8 @@ bool LICM::hoistCandHelper(IRBB const* backedge_bb,
                 must_true) {
                 ; //guard BB is unnecessary
             } else {
-                insertGuardBB(prehead, li->getLoopHead());
+                IRBB * guard = insertGuardBB(prehead, li->getLoopHead());
+                movePhi(prehead, guard, m_rg);
                 m_insert_guard_bb.append(li);
                 insert_guard_bb = true;
             }
@@ -790,9 +783,14 @@ bool LICM::hoistCandHelper(IRBB const* backedge_bb,
     //    p1 = cand_exp; //S2
     //    n = p1; //S3
     //move S2 into prehead BB.
-    IR * t = m_rg->buildPR(cand_exp->getType());
-    bool f = cand_stmt->replaceKid(cand_exp, t, false);
-    CHECK_DUMMYUSE(f);
+    IR * t = m_rg->buildPR(cand_exp->getType());    
+    if (cand_stmt->hasJudgeDet() && cand_exp == cand_stmt->getJudgeDet()) {
+        bool f = cand_stmt->replaceKid(cand_exp, m_rg->buildJudge(t), false);
+        CHECK_DUMMYUSE(f);
+    } else {
+        bool f = cand_stmt->replaceKid(cand_exp, t, false);
+        CHECK_DUMMYUSE(f);
+    }
 
     IR * stpr = m_rg->buildStorePR(PR_no(t), t->getType(), cand_exp);
 
@@ -835,8 +833,8 @@ bool LICM::hoistCand(OUT IRBB * prehead,
     bool du_set_info_changed = false;
     Vector<IR*> removed;
     TabIter<IR*> ti;
-    IRBB * backedge_bb = findSingleBackedgeStartBB(li, m_cfg);
-    ASSERT0(backedge_bb);
+
+    //IRBB * backedge_bb = findSingleBackedgeStartBB(li, m_cfg);
     while (m_invariant_exp.get_elem_count() > 0) {
         UINT removednum = 0;
         for (IR * c = m_invariant_exp.get_first(ti);
@@ -860,7 +858,7 @@ bool LICM::hoistCand(OUT IRBB * prehead,
                 //has been moved to preheader.
                 continue;
             }
-            if (hoistCandHelper(backedge_bb, insert_bb, c, prehead, li)) {
+            if (hoistCandHelper(insert_bb, c, prehead, li)) {
                 du_set_info_changed = true;
             }
         }
@@ -920,7 +918,9 @@ bool LICM::doLoopTree(LI<IRBB> * li,
         IRBB * prehead = findAndInsertPreheader(tli, m_rg, inserted, false);
         if (prehead == NULL || m_cfg->isRegionEntry(prehead)) {
             prehead = findAndInsertPreheader(tli, m_rg, inserted, true);
-            changed = true;
+            //Do not mark LICM changed if just inserted some BBs rather than
+            //code motion, because post CFG optimization will removed the
+            //redundant BB.
         }
         ASSERT0(prehead);
         insert_bb |= inserted;
@@ -1018,7 +1018,7 @@ bool LICM::perform(OptCtx & oc)
                 m_rce->getGVN()->set_valid(false);
             }
         }
-
+        
         m_cfg->performMiscOpt(oc);
 
         //DU chain and du ref is maintained.

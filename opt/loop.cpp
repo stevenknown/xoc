@@ -123,7 +123,136 @@ static IR * tryAppendGotoToJumpToBB(IRBB * from, IRBB * to, Region * rg)
 }
 
 
-//Return true if inserting a new BB.
+//Fix up edge relation when preheader inserted.
+//pred: predecessor of head which is inside loop body.
+static void fixupInnerLoopEdgeBetweenHeadAndPreheader(LI<IRBB> const* li,
+                                                      Region * rg,
+                                                      IRBB * head,
+                                                      IRBB * pred)
+{
+    IRCFG * cfg = rg->getCFG();
+    //BB_p is predecessor of loop-header that outside from loop;
+    //BB_1 is also predecessor of loop-header, but it belongs to loop.
+    //CASE:
+    //   BB_p
+    //   |
+    // ---
+    // |  BB_1<--...
+    // |  |      
+    // |  | //fallthrough
+    // v  v
+    // BB_header
+    //
+    //After inserting phreader BB_preheader:
+    //
+    //   BB_p
+    //   |
+    // ---
+    // |  BB_1<--...
+    // |  |      
+    // |  | //can not be fallthrough, have to be fixed.
+    // v  v
+    // BB_preheader
+    //    |
+    //    v
+    // BB_header
+    //
+    //Append GOTO to fix it:
+    //
+    //   BB_p
+    //   |
+    // ---
+    // |  BB_1<--...
+    // |  | //Jump to loop-header
+    // |  |_________
+    // v            |
+    // BB_preheader |
+    //    |         |
+    //    v         |
+    // BB_header <--
+    LabelInfo const* lab = head->getLabelList().get_head();
+    if (lab == NULL) {
+        lab = rg->genILabel();
+        cfg->addLabel(head, lab);
+    }
+    tryAppendGotoToJumpToBB(pred, head, rg);
+}
+
+
+//Return true if inserted a new BB.
+static bool updateOutterLoopEdgeBetweenHeadAndPreheader(
+    LI<IRBB> const* li,
+    Region * rg,
+    IRBB * head,
+    IRBB * pred,
+    IRBB * preheader,
+    IN OUT LabelInfo const** preheader_lab,
+    bool insert_bb)
+{
+    IRCFG * cfg = rg->getCFG();
+    if (!insert_bb) {
+        //Insert preheader in front of head.
+        //Note preheader must fallthrough to head.
+        cfg->insertVertexBetween(pred->id(), head->id(), preheader->id());
+        cfg->tryFindLessRpo(preheader, head);
+        insert_bb = true;
+    }
+
+    //CASE1:
+    //  BB_p
+    //   |
+    //   v
+    //  BB_header
+    //Have to get the last IR of
+    //BB and judge if it is conditional branch.
+    //if (BB_is_fallthrough(p)) {
+    //    //Nothing to do.
+    //    continue;
+    //}
+
+    //CASE2:
+    //  BB_p(goto lab1)
+    //   |
+    //   ... //a lot of BB
+    //   |
+    //   v
+    //  BB_header(lab1)
+    //=>
+    //  BB_p(goto lab2)
+    //   |
+    //   ... //a lot of BB
+    //   |
+    //   v
+    //  BB_preheader(lab2)
+    //   |  //fallthrough
+    //   v
+    //  BB_header(lab2)
+    //Try to update the target label of the last IR of predecessor.
+    IR * last_ir = BB_last_ir(pred);
+    if (last_ir == NULL) {
+        //Nothing to update.
+        return insert_bb;
+    }
+
+    //Update the last IR.
+    if ((last_ir->isConditionalBr() || last_ir->isUnconditionalBr()) &&
+        head == cfg->findBBbyLabel(last_ir->getLabel())) {
+        if (*preheader_lab == NULL) {
+            //There is no label on preheader, make it.
+            *preheader_lab = rg->genILabel();
+        }
+
+        //Add the new label to preheader if not exist.
+        cfg->addLabel(preheader, *preheader_lab);
+
+        //Update branch-target of last IR of predecessor.
+        last_ir->setLabel(*preheader_lab);
+    }
+    return insert_bb;
+}
+
+
+//Return true if inserted a new BB.
 static bool updateEdgeBetweenHeadAndPreheader(LI<IRBB> const* li,
                                               Region * rg,
                                               IRBB * head,
@@ -136,107 +265,13 @@ static bool updateEdgeBetweenHeadAndPreheader(LI<IRBB> const* li,
     LabelInfo const* preheader_lab = NULL;
     for (IRBB * p = preds.get_head(); p != NULL; p = preds.get_next()) {
         if (li->isInsideLoop(p->id())) {
-            //BB_p is predecessor of loop-header that outside from loop;
-            //BB_1 is also predecessor of loop-header, but it belongs to loop.
-            //CASE:
-            //   BB_p
-            //   |
-            // ---
-            // |  BB_1<--...
-            // |  |      
-            // |  | //fallthrough
-            // v  v
-            // BB_header
-            //
-            //After inserting phreader BB_preheader:
-            //
-            //   BB_p
-            //   |
-            // ---
-            // |  BB_1<--...
-            // |  |      
-            // |  | //can not be fallthrough, have to be fixed.
-            // v  v
-            // BB_preheader
-            //    |
-            //    v
-            // BB_header
-            //
-            //Append GOTO to fix it:
-            //
-            //   BB_p
-            //   |
-            // ---
-            // |  BB_1<--...
-            // |  | //Jump to loop-header
-            // |  |_________
-            // v            |
-            // BB_preheader |
-            //    |         |
-            //    v         |
-            // BB_header <--
-            LabelInfo const* lab = head->getLabelList().get_head();
-            if (lab == NULL) {
-                lab = rg->genILabel();
-                cfg->addLabel(head, lab);
-            }
-
-            tryAppendGotoToJumpToBB(p, head, rg);
+            ASSERTN(cfg->getVertex(preheader->id()),
+                    ("vex should have been added before current function"));
+            fixupInnerLoopEdgeBetweenHeadAndPreheader(li, rg, head, p);
             continue;
         }
-
-        if (!insert_bb) {
-            //Insert preheader in front of head.
-            //Note preheader must fallthrough to head.
-            cfg->addBB(preheader);
-            cfg->insertVertexBetween(p->id(), head->id(), preheader->id());
-            cfg->tryFindLessRpo(preheader, head);
-            insert_bb = true;
-        }
-
-        //CASE1:
-        //  BB_p
-        //   |
-        //   v
-        //  BB_header
-        //Have to get the last IR of
-        //BB and judge if it is conditional branch.
-        //if (BB_is_fallthrough(p)) {
-        //    //Nothing to do.
-        //    continue;
-        //}
-
-        //CASE2:
-        //  BB_p(goto lab1)
-        //   |
-        //   ... //a lot of BB
-        //   |
-        //   v
-        //  BB_header(lab1)
-        //=>
-        //  BB_p(goto lab2)
-        //   |
-        //   ... //a lot of BB
-        //   |
-        //   v
-        //  BB_preheader(lab2)
-        //   |  //fallthrough
-        //   v
-        //  BB_header(lab2)
-        IR * last_ir = BB_last_ir(p);
-        if (last_ir == NULL) { continue; }
-        if ((last_ir->isConditionalBr() || last_ir->isUnconditionalBr()) &&
-            head == cfg->findBBbyLabel(last_ir->getLabel())) {
-            if (preheader_lab == NULL) {
-                preheader_lab = rg->genILabel();
-            }
-
-            //Add newlabel to preheader if not exist.
-            cfg->addLabel(preheader, preheader_lab);
-
-            //Update branch-target of IR that located in predecessor of head.
-            last_ir->setLabel(preheader_lab);
-        }
+        insert_bb |= updateOutterLoopEdgeBetweenHeadAndPreheader(li,
+            rg, head, p, preheader, &preheader_lab, insert_bb);
     }
     return insert_bb;
 }
@@ -395,12 +430,14 @@ IRBB * findAndInsertPreheader(LI<IRBB> const* li,
     IRBB * appropriate_prev_bb = findAppropriatePreheader(li, cfg, head, prev);
     if (!force) {
         if (appropriate_prev_bb != NULL) {
+            ASSERT0(appropriate_prev_bb->rpo() != RPO_UNDEF);
             return appropriate_prev_bb;
         }
         return NULL;
     }
 
     IRBB * preheader = rg->allocBB();
+    cfg->addBB(preheader);
     bblst->insert_before(preheader, bbholder);    
     insert_bb |= updateEdgeBetweenHeadAndPreheader(li, rg, head, preheader);
     tryMoveLabelFromHeadToPreheader(li, cfg,head, preheader);

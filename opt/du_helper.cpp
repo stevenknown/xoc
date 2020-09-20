@@ -322,4 +322,18 @@ bool isKillingDef(MD const* defmd, MD const* usemd)
     return false;
 }
 
+
+//Move IR_PHI and MDPhi from 'from' to 'to'.
+//This function often used in updating PHI when adding new dominater BB to 'to'.
+void movePhi(IRBB * from, IRBB * to, Region * rg)
+{
+    ASSERT0(from && to);
+    PRSSAMgr::movePhi(from, to);
+
+    MDSSAMgr * mdssamgr = rg->getMDSSAMgr();
+    if (mdssamgr != NULL) {
+        mdssamgr->movePhi(from, to);
+    }
+}
+
 } //namespace xoc

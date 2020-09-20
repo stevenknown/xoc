@@ -703,6 +703,7 @@ void af2i(IN CHAR * f, OUT BYTE * buf, UINT buflen, bool is_double)
 
 //Compute the power of 2, return the result.
 //Note v must be power of 2.
+//e.g: given v is 64, return 16.
 UINT getPowerOf2(ULONGLONG v)
 {
     ASSERT0(v > 0);

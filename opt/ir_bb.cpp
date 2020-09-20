@@ -169,7 +169,7 @@ void IRBB::dump(Region const* rg, bool dump_inner_region) const
          ir != NULL; ir = BB_irlist(pthis).get_next()) {
         ASSERT0(ir->is_single() && ir->getBB() == this);
         dumpIR(ir, rg, NULL, IR_DUMP_KID | IR_DUMP_SRC_LINE |
-            (dump_inner_region ? IR_DUMP_INNER_REGION : 0));
+               (dump_inner_region ? IR_DUMP_INNER_REGION : 0));
     }
     rg->getLogMgr()->decIndent(3);
     note(rg, "\n");

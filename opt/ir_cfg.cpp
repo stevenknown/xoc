@@ -402,7 +402,7 @@ void IRCFG::initCfg(OptCtx & oc)
     build(oc);
     buildEHEdge();
     if (g_is_dump_after_pass && g_dump_opt.isDumpCFG()) {
-        dumpDOT(getRegion()->getLogMgr()->getFileHandler(), true, true);
+        dumpDOT(getRegion()->getLogMgr()->getFileHandler());
     }
 
     //Rebuild cfg may generate redundant empty bb, it
@@ -1507,7 +1507,7 @@ bool IRCFG::verifyRPO(OptCtx const& oc) const
 }
 
 
-void IRCFG::dumpDOT(CHAR const* name, bool detail, bool dump_eh)
+void IRCFG::dumpDOT(CHAR const* name, UINT flag)
 {
     //Do not dump if LogMr is not initialized.
     if (!getRegion()->isLogMgrInit()) { return; }
@@ -1520,15 +1520,19 @@ void IRCFG::dumpDOT(CHAR const* name, bool detail, bool dump_eh)
     UNLINK(name);
     FILE * h = fopen(name, "a+");
     ASSERTN(h, ("%s create failed!!!", name));
-    dumpDOT(h, detail, dump_eh);
+    dumpDOT(h, flag);
     fclose(h);
 }
 
 
-void IRCFG::dumpDOT(FILE * h, bool detail, bool dump_eh)
+void IRCFG::dumpDOT(FILE * h, UINT flag)
 {
     if (!getRegion()->isLogMgrInit() || h == NULL) { return; }
     getRegion()->getLogMgr()->push(h, "");
+
+    bool detail = HAVE_FLAG(flag, DUMP_DETAIL);
+    bool dump_eh = HAVE_FLAG(flag, DUMP_EH);
+    bool dump_mdssa = HAVE_FLAG(flag, DUMP_MDSSA);
     if (detail) {
         //Print comment
         fprintf(h, "\n/*");
@@ -1553,6 +1557,10 @@ void IRCFG::dumpDOT(FILE * h, bool detail, bool dump_eh)
 
     MDSSAMgr const* mdssamgr = (MDSSAMgr const*)m_rg->getPassMgr()->queryPass(
                                PASS_MD_SSA_MGR);    
+    if (mdssamgr == NULL || !mdssamgr->is_valid()) {
+        dump_mdssa = false;
+    }
+
     //Print node
     INT c;
     for (xcom::Vertex * v = m_vertices.get_first(c);
@@ -1588,7 +1596,7 @@ void IRCFG::dumpDOT(FILE * h, bool detail, bool dump_eh)
             fprintf(h, "rpo:%d ", bb->rpo());
 
             //Dump MDSSA Phi List.
-            if (mdssamgr != NULL && mdssamgr->is_valid()) {
+            if (dump_mdssa) {
                 MDPhiList const* philist = mdssamgr->getPhiList(bb);
                 if (philist != NULL) {
                     mdssamgr->dumpPhiList(philist);
@@ -1602,7 +1610,11 @@ void IRCFG::dumpDOT(FILE * h, bool detail, bool dump_eh)
                 fprintf(h, "\\l");
 
                 //TODO: implement dump_ir_buf();
-                dumpIR(ir, m_rg, NULL, IR_DUMP_KID);
+                if (dump_mdssa) {
+                    mdssamgr->dumpIRWithMDSSA(ir, IR_DUMP_KID);
+                } else {
+                    dumpIR(ir, m_rg, NULL, IR_DUMP_KID);
+                }
             }
 
             //The last \l is very important to display DOT in a fine manner.
@@ -1686,13 +1698,17 @@ void IRCFG::dumpDOT(FILE * h, bool detail, bool dump_eh)
 }
 
 
-void IRCFG::dump_node(bool detail)
+void IRCFG::dump_node(bool detail, bool dump_mdssa)
 {
     FILE * h = getRegion()->getLogMgr()->getFileHandler();
     ASSERT0(h);
     ASSERT0(m_bb_list);
     MDSSAMgr const* mdssamgr = (MDSSAMgr const*)m_rg->getPassMgr()->queryPass(
-                               PASS_MD_SSA_MGR);    
+                               PASS_MD_SSA_MGR);
+    if (mdssamgr == NULL && !mdssamgr->is_valid()) {
+        dump_mdssa = false;
+    }
+
     UINT vertical_order = 1;
     INT c;
     for (xcom::Vertex const* v = get_first_vertex(c);
@@ -1724,7 +1740,7 @@ void IRCFG::dump_node(bool detail)
             fprintf(h, "\n");
 
             //Dump MDSSA Phi List.
-            if (mdssamgr != NULL && mdssamgr->is_valid()) {
+            if (dump_mdssa) {
                 MDPhiList const* philist = mdssamgr->getPhiList(bb);
                 if (philist != NULL) {
                     mdssamgr->dumpPhiList(philist);
@@ -1737,7 +1753,11 @@ void IRCFG::dump_node(bool detail)
                 //fprintf(h, "%s\n", dump_ir_buf(ir, buf));
 
                 //TODO: implement dump_ir_buf();
-                dumpIR(ir, m_rg, NULL, IR_DUMP_KID);
+                if (dump_mdssa) {
+                    mdssamgr->dumpIRWithMDSSA(ir, IR_DUMP_KID);
+                } else {
+                    dumpIR(ir, m_rg, NULL, IR_DUMP_KID);
+                }
             }
 
             fprintf(h, "\"}");
@@ -1876,10 +1896,14 @@ void IRCFG::dump_edge(bool dump_eh)
 }
 
 
-void IRCFG::dumpVCG(CHAR const* name, bool detail, bool dump_eh)
+void IRCFG::dumpVCG(CHAR const* name, UINT flag)
 {
     if (!getRegion()->isLogMgrInit()) { return; }
     ASSERT0(m_rg);
+
+    bool detail = HAVE_FLAG(flag, DUMP_DETAIL);
+    bool dump_eh = HAVE_FLAG(flag, DUMP_EH);
+    bool dump_mdssa = HAVE_FLAG(flag, DUMP_MDSSA);
 
     if (name == NULL) { name = "graph_cfg.vcg"; }
 
@@ -1897,7 +1921,7 @@ void IRCFG::dumpVCG(CHAR const* name, bool detail, bool dump_eh)
             "scaling:2 label:\"RegionName:%s\" }",
             m_rg->getRegionName());
     getRegion()->getLogMgr()->push(h, "");
-    dump_node(detail);
+    dump_node(detail, dump_mdssa);
     dump_edge(dump_eh);
     getRegion()->getLogMgr()->pop();
     fprintf(h, "\n}\n");
@@ -2053,6 +2077,7 @@ bool IRCFG::performMiscOpt(OptCtx & oc)
         ASSERT0(PRSSAMgr::verifyPRSSAInfo(m_rg));
         ASSERT0(MDSSAMgr::verifyMDSSAInfo(m_rg));
     }
+
     ASSERT0(verifyIRandBB(getBBList(), m_rg));
     ASSERT0(verifyRPO(oc));
     END_TIMER(t, "CFG Optimizations");

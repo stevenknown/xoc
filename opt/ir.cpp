@@ -592,6 +592,7 @@ void dumpIR(IR const* ir, Region const* rg, IN CHAR * attr, UINT dumpflag)
     bool dump_src_line = HAVE_FLAG(dumpflag, IR_DUMP_SRC_LINE);
     bool dump_kid = HAVE_FLAG(dumpflag, IR_DUMP_KID);
     bool dump_inner_region = HAVE_FLAG(dumpflag, IR_DUMP_INNER_REGION);
+    bool dump_var_decl = HAVE_FLAG(dumpflag, IR_DUMP_VAR_DECL);
     DUMMYUSE(dump_src_line);
     DUMMYUSE(dump_kid);
     DUMMYUSE(dump_addr);
@@ -678,7 +679,7 @@ void dumpIR(IR const* ir, Region const* rg, IN CHAR * attr, UINT dumpflag)
 
         //Dump declaration info if the frontend supplied.
         buf.clean();
-        if (ST_idinfo(ir)->dumpVARDecl(buf) != NULL) {
+        if (dump_var_decl && ST_idinfo(ir)->dumpVARDecl(buf) != NULL) {
             prt(rg, " decl:%s", buf.buf);
         }
 
@@ -811,7 +812,7 @@ void dumpIR(IR const* ir, Region const* rg, IN CHAR * attr, UINT dumpflag)
 
         //Dump declaration if frontend supplied.
         buf.clean();
-        if (LD_idinfo(ir)->dumpVARDecl(buf) != NULL) {
+        if (dump_var_decl && LD_idinfo(ir)->dumpVARDecl(buf) != NULL) {
             prt(rg, " decl:%s", buf.buf);
         }
 
@@ -851,7 +852,7 @@ void dumpIR(IR const* ir, Region const* rg, IN CHAR * attr, UINT dumpflag)
         note(rg, "\nid:%s '%s'", xtm->dump_type(d, buf), name);
 
         buf.clean();
-        if (ID_info(ir)->dumpVARDecl(buf) != NULL) {
+        if (dump_var_decl && ID_info(ir)->dumpVARDecl(buf) != NULL) {
             prt(rg, " decl:%s", buf.buf);
         }
 
@@ -1159,7 +1160,7 @@ void dumpIR(IR const* ir, Region const* rg, IN CHAR * attr, UINT dumpflag)
 
         //Dump declaration if frontend supplied.
         buf.clean();
-        if (LDA_idinfo(ir)->dumpVARDecl(buf) != NULL) {
+        if (dump_var_decl && LDA_idinfo(ir)->dumpVARDecl(buf) != NULL) {
             prt(rg, " decl:%s", buf.buf);
         }
 
@@ -1290,7 +1291,7 @@ void dumpIR(IR const* ir, Region const* rg, IN CHAR * attr, UINT dumpflag)
             }
             prt(rg, "call '%s' ", name);
             buf.clean();
-            if (CALL_idinfo(ir)->dumpVARDecl(buf) != NULL) {
+            if (dump_var_decl && CALL_idinfo(ir)->dumpVARDecl(buf) != NULL) {
                 prt(rg, "decl:%s", buf.buf);
             }
         } else {
@@ -2658,6 +2659,7 @@ static bool hasProp(IR const* ir)
 
 
 //Dump IR tree's MD reference, where ir may be stmt or exp.
+//indent: the addend to current indent of LogMgr.
 void IR::dumpRef(Region * rg, UINT indent)
 {
     if (this == NULL || !rg->isLogMgrInit() || is_const()) { return; }

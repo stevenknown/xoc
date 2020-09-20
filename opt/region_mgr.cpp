@@ -323,6 +323,8 @@ bool RegionMgr::verifyPreDefinedInfo()
     ASSERT0_DUMMYUSE(BYTE_PER_INT <= sizeof(HOST_INT) &&
                      BYTE_PER_INT <= sizeof(HOST_UINT) &&
                      BYTE_PER_INT <= sizeof(HOST_FP));
+
+    ASSERT0_DUMMYUSE(IR_TYPE_NUM <= ((1<<IR_TYPE_BIT_SIZE) - 1));
     return true;
 }
 

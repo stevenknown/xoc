@@ -135,6 +135,7 @@ inline UINT getNearestPowerOf2(UINT v)
 }
 
 //Compute the nearest power of 2 that not less than v.
+//e.g: given v is 60, return 64.
 inline ULONGLONG getNearestPowerOf2(ULONGLONG v)
 {
     v--;
@@ -156,6 +157,7 @@ UINT getSparsePopCount(ULONGLONG v);
 
 //Compute the power of 2, return the result.
 //Note v must be power of 2.
+//e.g: given v is 64, return 16.
 UINT getPowerOf2(ULONGLONG v);
 
 //Extract file suffix.

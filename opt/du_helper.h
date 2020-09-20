@@ -109,5 +109,9 @@ bool isKillingDef(IR const* def, MD const* usemd);
 //Note this functin does not check if there is DU chain between defmd and usemd.
 bool isKillingDef(MD const* defmd, MD const* usemd);
 
+//Move IR_PHI and MDPhi from 'from' to 'to'.
+//This function often used in updating PHI when adding new dominater BB to 'to'.
+void movePhi(IRBB * from, IRBB * to, Region * rg);
+
 } //namespace xoc
 #endif

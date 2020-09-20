@@ -376,7 +376,10 @@ extern RoundDesc const g_round_desc[];
 #define IR_DUMP_SRC_LINE 0x2
 #define IR_DUMP_ADDR 0x4
 #define IR_DUMP_INNER_REGION 0x8
+#define IR_DUMP_VAR_DECL 0x10
 
+//The maximum integer value that can described by bits of IR_TYPE_BIT_SIZE
+//should larger than IR_TYPE_NUM.
 #define IR_TYPE_BIT_SIZE 6
 #define IRNAME(ir) (IRDES_name(g_ir_desc[IR_code(ir)]))
 #define IRTNAME(irt) (IRDES_name(g_ir_desc[irt]))
@@ -748,6 +751,9 @@ public:
         return md;
     }
 
+    //Return determinate expression if any.
+    inline IR * getJudgeDet() const;
+
     //Return true if ir carried sideeffect property.
     bool hasSideEffect() const { return IR_has_sideeffect(this); }
 
@@ -762,6 +768,9 @@ public:
 
     //Return true if ir has DU Info.
     bool hasDU() const { return IRDES_has_du(g_ir_desc[getCode()]); }
+
+    //Return true if stmt has judge determinate expression.
+    inline bool hasJudgeDet() const;
 
     //Return true if ir is call and does have a return value.
     inline bool hasReturnValue() const;
@@ -983,6 +992,11 @@ public:
 
     //Return true if ir is indirect jump to multiple target.
     bool isIndirectBr() const { return is_igoto(); }
+
+    //Return true if ir is branch stmt.
+    bool isBranch() const
+    { return isConditionalBr() || isMultiConditionalBr() ||
+             isUnconditionalBr() || isIndirectBr(); }
 
     //Return true if ir is indirect memory operation.
     bool isIndirectMemOp() const { return is_ist() || is_ild(); }
@@ -2730,6 +2744,48 @@ void IR::setDU(DU * du)
 {
     hasDU() ? DUPROP_du(this) = du : 0;
 }
+
+
+//Return true if stmt has judge determinate expression.
+bool IR::hasJudgeDet() const
+{
+    //Both stmt and exp.
+    switch (getCode()) {
+    case IR_DO_WHILE:
+    case IR_WHILE_DO:
+    case IR_DO_LOOP:
+    case IR_IF:
+    case IR_TRUEBR:
+    case IR_FALSEBR:
+    case IR_SELECT:
+        return true;
+    default: return false;
+    }
+    return false;
+}
+
+
+//Return determinate expression if any.
+IR * IR::getJudgeDet() const
+{
+    //Both stmt and exp.
+    switch (getCode()) {
+    case IR_DO_WHILE:
+    case IR_WHILE_DO:
+    case IR_DO_LOOP:
+        return LOOP_det(this);
+    case IR_IF:
+        return IF_det(this);
+    case IR_TRUEBR:
+    case IR_FALSEBR:
+        return BR_det(this);
+    case IR_SELECT:
+        return SELECT_pred(this);
+    default: UNREACHABLE();
+    }
+    return NULL;
+}
+
 //END IR
 
 
@@ -2738,18 +2794,21 @@ CHAR const* compositeName(Sym const* n, xcom::StrBuf & buf);
 void dumpIR(IR const* ir,
             Region const* rg,
             CHAR * attr = NULL,
-            UINT dumpflag = IR_DUMP_KID|IR_DUMP_SRC_LINE|IR_DUMP_INNER_REGION);
+            UINT dumpflag = IR_DUMP_KID|IR_DUMP_SRC_LINE|IR_DUMP_INNER_REGION|
+                            IR_DUMP_VAR_DECL);
 void dumpIRListH(IR * ir_list, Region const* rg,
                  CHAR * attr = NULL,
                  UINT dumpflag = IR_DUMP_KID|
                                  IR_DUMP_SRC_LINE|
-                                 IR_DUMP_INNER_REGION);
+                                 IR_DUMP_INNER_REGION|
+                                 IR_DUMP_VAR_DECL);
 void dumpIRList(IR * ir_list,
                 Region const* rg,
                 CHAR * attr = NULL,
                 UINT dumpflag = IR_DUMP_KID|
                                 IR_DUMP_SRC_LINE|
-                                IR_DUMP_INNER_REGION);
+                                IR_DUMP_INNER_REGION|
+                                IR_DUMP_VAR_DECL);
 void dumpIRList(IRList & ir_list, Region const* rg);
 void dumpIRList(List<IR*> & ir_list, Region const* rg);
 

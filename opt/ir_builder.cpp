@@ -1271,7 +1271,7 @@ IR * Region::buildJudge(IR * exp)
     }
 
     return buildCmp(IR_NE, exp, type->is_fp() ?
-        buildImmFp(HOST_FP(0), type) : buildImmInt(0, type));
+           buildImmFp(HOST_FP(0), type) : buildImmInt(0, type));
 }
 
 

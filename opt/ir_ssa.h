@@ -287,6 +287,11 @@ public:
     //In ssa mode, stmt's USE may be placed in operand list of PHI.
     bool isStmtDomAllUseInsideLoop(IR const* ir, LI<IRBB> const* li) const;
 
+    //Move IR_PHI from 'from' to 'to'.
+    //This function often used in updating PHI when adding new dominater
+    //BB to 'to'.
+    static void movePhi(IRBB * from, IRBB * to);
+
     //This function revise phi data type, and remove redundant phi.
     //Return true if there is phi removed.
     bool refinePhi();

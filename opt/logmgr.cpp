@@ -274,7 +274,7 @@ void LogMgr::push(FILE * h, CHAR const* filename)
 //and filename as current.
 void LogMgr::push(LogCtx const& ctx)
 {
-    m_ctx_stack.push(ctx);
+    m_ctx_stack.push(m_ctx);
     m_ctx = ctx;
 }
 

@@ -1243,6 +1243,7 @@ void CFG<BB, XR>::get_preds(IN OUT List<BB*> & preds, BB const* v) const
 {
     ASSERT0(v);
     xcom::Vertex * vex = getVertex(v->id());
+    ASSERT0(vex);
     preds.clean();
     for (xcom::EdgeC * el = vex->getInList();
          el != NULL; el = el->get_next()) {

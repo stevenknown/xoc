@@ -288,6 +288,11 @@ public:
     void dumpSSAGraph(CHAR * name = NULL);
     //Dump IR tree's MD reference, where ir may be stmt or exp.
     void dumpRef(UINT indent);
+    //Dump IR tree and MDSSAInfo if any.
+    void dumpIRWithMDSSA(IR const* ir,
+                         UINT flag = IR_DUMP_KID|IR_DUMP_SRC_LINE|
+                                     IR_DUMP_INNER_REGION|
+                                     IR_DUMP_VAR_DECL) const;
 
     //Find killing must-def for expression ir.
     MDDef * findKillingDef(IR const* ir);
@@ -394,6 +399,11 @@ public:
     //Return true if ir dominates all its USE expressions which inside loop.
     //In ssa mode, stmt's USE may be placed in operand list of PHI.
     bool isStmtDomAllUseInsideLoop(IR const* ir, LI<IRBB> const* li) const;
+
+    //Move MDPhi from 'from' to 'to'.
+    //This function often used in updating PHI when adding new dominater
+    //BB to 'to'.
+    void movePhi(IRBB * from, IRBB * to);
 
     //Reinitialize MDSSA manager.
     //This function will clean all informations and recreate them.

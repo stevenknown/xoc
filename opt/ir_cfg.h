@@ -51,7 +51,7 @@ protected:
     CFG_SHAPE m_cs;
 
 protected:
-    void dump_node(bool detail);
+    void dump_node(bool detail, bool dump_mdssa);
     void dump_head(FILE * h);
     void dump_edge(bool dump_eh);
 
@@ -71,6 +71,8 @@ protected:
     bool removeTrampolinEdgeForCase2(BBListIter ct);
 
 public:
+    enum { DUMP_DETAIL = 0x1, DUMP_EH = 0x2, DUMP_MDSSA = 0x4 };
+
     IRCFG(CFG_SHAPE cs, BBList * bbl, Region * rg,
           UINT edge_hash_size = 16, UINT vertex_hash_size = 16);
     COPY_CONSTRUCTOR(IRCFG);
@@ -147,12 +149,10 @@ public:
     }
 
     void dumpVCG(CHAR const* name = NULL,
-                 bool detail = true,
-                 bool dump_eh = true);
+                 UINT flag = DUMP_DETAIL|DUMP_EH|DUMP_MDSSA);
     void dumpDOT(CHAR const* name = NULL,
-                 bool detail = true,
-                 bool dump_eh = true);
-    void dumpDOT(FILE * h, bool detail, bool dump_eh);
+                 UINT flag = DUMP_DETAIL|DUMP_EH|DUMP_MDSSA);
+    void dumpDOT(FILE * h, UINT flag = DUMP_DETAIL|DUMP_EH|DUMP_MDSSA);
 
     void erase();
 

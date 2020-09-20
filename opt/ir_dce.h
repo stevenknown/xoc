@@ -76,7 +76,7 @@ class DeadCodeElim : public Pass {
     bool collectByDU(IR const* x, IN OUT List<IR const*> * pwlst2);
 
     void fix_control_flow(List<IRBB*> & bblst, List<C<IRBB*>*> & ctlst);
-    bool find_effect_kid(IRBB const* bb, IR const* ir) const;
+    bool find_effect_kid(IR const* ir) const;
 
     bool is_effect_write(Var * v) const
     { return VAR_is_global(v) || VAR_is_volatile(v); }

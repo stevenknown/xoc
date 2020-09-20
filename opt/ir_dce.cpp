@@ -198,10 +198,11 @@ void DeadCodeElim::mark_effect_ir(IN OUT List<IR const*> & work_list)
 }
 
 
-bool DeadCodeElim::find_effect_kid(IRBB const* bb, IR const* ir) const
+bool DeadCodeElim::find_effect_kid(IR const* ir) const
 {
     ASSERT0(m_cfg && m_cdg);
-    ASSERT0(ir->getBB() == bb);
+    IRBB const* bb = ir->getBB();
+    ASSERT0(bb);
     if (ir->isConditionalBr() || ir->isMultiConditionalBr()) {
         for (xcom::EdgeC const* ec = m_cdg->getVertex(bb->id())->getOutList();
              ec != NULL; ec = ec->get_next()) {
@@ -209,7 +210,7 @@ bool DeadCodeElim::find_effect_kid(IRBB const* bb, IR const* ir) const
             ASSERT0(succ != NULL);
             for (IR * r = BB_irlist(succ).get_head();
                  r != NULL; r = BB_irlist(succ).get_next()) {
-                if (m_is_stmt_effect.is_contain(IR_id(r))) {
+                if (m_is_stmt_effect.is_contain(r->id())) {
                     return true;
                 }
             }
@@ -217,6 +218,14 @@ bool DeadCodeElim::find_effect_kid(IRBB const* bb, IR const* ir) const
         return false;
     }
     if (ir->isUnconditionalBr()) {
+        //Check if unconditional branch is effect.
+        //Note you can not mark unconditional branch directly. It is effect
+        //only if some effect path go through the branch.
+        //CASE: If S1 or S2 is effect, bb is effect.
+        //       p1    p2
+        //     /   |  /  |
+        //    v    v v   v
+        //   S1    bb    S2
         for (xcom::EdgeC const* ecp = m_cdg->getVertex(bb->id())->getInList();
              ecp != NULL; ecp = ecp->get_next()) {
             for (xcom::EdgeC const* ecs = m_cdg->getVertex(ecp->getFromId())->
@@ -226,7 +235,7 @@ bool DeadCodeElim::find_effect_kid(IRBB const* bb, IR const* ir) const
                 ASSERTN(succ, ("BB%d does not belong to CFG", ecs->getToId()));
                 for (IR * r = BB_irlist(succ).get_head();
                      r != NULL; r = BB_irlist(succ).get_next()) {
-                    if (m_is_stmt_effect.is_contain(IR_id(r))) {
+                    if (m_is_stmt_effect.is_contain(r->id())) {
                         return true;
                     }
                 }
@@ -239,15 +248,15 @@ bool DeadCodeElim::find_effect_kid(IRBB const* bb, IR const* ir) const
 }
 
 
-//Set control-dep bb to be effective.
+//Set controlling BB of 'bb' to be effective.
 bool DeadCodeElim::setControlDepBBToBeEffect(IRBB const* bb,
                                              OUT List<IR const*> & act_ir_lst)
 {
     bool change = false;
     UINT bbid = bb->id();
     ASSERT0(m_cdg->getVertex(bbid));
-    for (xcom::EdgeC const* ec = VERTEX_in_list(m_cdg->getVertex(bbid));
-         ec != NULL; ec = EC_next(ec)) {
+    for (xcom::EdgeC const* ec = m_cdg->getVertex(bbid)->getInList();
+         ec != NULL; ec = ec->get_next()) {
         INT cd_pred = ec->getFromId();
         if (!m_is_bb_effect.is_contain(cd_pred)) {
             m_is_bb_effect.bunion(cd_pred);
@@ -256,29 +265,28 @@ bool DeadCodeElim::setControlDepBBToBeEffect(IRBB const* bb,
     }
 
     ASSERT0(m_cfg->getVertex(bbid));
-    xcom::EdgeC const* ec = VERTEX_in_list(m_cfg->getVertex(bbid));
+    xcom::EdgeC const* ec = m_cfg->getVertex(bbid)->getInList();
     if (xcom::cnt_list(ec) >= 2) {
-        ASSERT0(BB_rpo(bb) >= 0);
-        UINT bbto = BB_rpo(bb);
+        ASSERT0(bb->rpo() >= 0);
+        UINT bbto = bb->rpo();
         while (ec != NULL) {
             IRBB * pred = m_cfg->getBB(ec->getFromId());
             ASSERT0(pred);
-            if (BB_rpo(pred) > (INT)bbto &&
+            if (pred->rpo() > (INT)bbto &&
                 !m_is_bb_effect.is_contain(pred->id())) {
                 m_is_bb_effect.bunion(pred->id());
                 change = true;
             }
-            ec = EC_next(ec);
+            ec = ec->get_next();
         }
     }
 
-    if (BB_irlist(bb).get_elem_count() == 0) { return change; }
+    IR * ir = const_cast<IRBB*>(bb)->getLastIR(); //last IR of BB.
+    if (ir == NULL) { return change; }
 
-    IR * ir = BB_last_ir(const_cast<IRBB*>(bb)); //last IR of BB.
-    ASSERT0(ir != NULL);
-    if ((ir->isConditionalBr() || ir->isMultiConditionalBr()) &&
+    if (ir->isBranch() &&
         !m_is_stmt_effect.is_contain(ir->id()) &&
-        find_effect_kid(bb, ir)) {
+        find_effect_kid(ir)) {
         //IR_SWTICH might have multiple succ-BB.
         setEffectStmt(ir, NULL, &act_ir_lst);
         change = true;        
@@ -302,17 +310,17 @@ bool DeadCodeElim::preserve_cd(IN OUT List<IR const*> & act_ir_lst)
         }
 
         //CASE:test_pre1()
-        //  goto CLABEL:L1 id:22
-        //  BB3:L1 ...
-        //  BB3 is ineffective, but 'goto' can not be removed!
-        if (BB_irlist(bb).get_elem_count() == 0) { continue; }
+        //  BB1:goto L1
+        //  BB3:L1: ...
+        //Note BB3 is ineffective, but 'goto' can not be removed!
+        IR * last_ir = bb->getLastIR(); //last IR of BB.
+        if (last_ir == NULL) { continue; }
 
-        IR * ir = BB_last_ir(bb); //last IR of BB.
-        ASSERT0(ir);
-        if (ir->isUnconditionalBr() &&
-            !m_is_stmt_effect.is_contain(ir->id()) &&
-            find_effect_kid(bb, ir)) {
-            setEffectStmt(ir, &m_is_bb_effect, &act_ir_lst);
+        if (last_ir->isUnconditionalBr() &&
+            !m_is_stmt_effect.is_contain(last_ir->id())) {
+            //TO BE COMFIRED: Does last_ir need to be judged via effect cd kid?
+            //find_effect_kid(ir)) 
+            setEffectStmt(last_ir, &m_is_bb_effect, &act_ir_lst);
             change = true;
         }
     }

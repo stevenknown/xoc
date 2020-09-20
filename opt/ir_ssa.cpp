@@ -2312,6 +2312,35 @@ bool PRSSAMgr::isStmtDomAllUseInsideLoop(IR const* ir, LI<IRBB> const* li) const
 //END PRSSAMgr
 
 
+//Move IR_PHI from 'from' to 'to'.
+//This function often used in updating PHI when adding new dominater
+//BB to 'to'.
+void PRSSAMgr::movePhi(IRBB * from, IRBB * to)
+{
+    IRListIter irct_to = NULL;
+    IRListIter irct_from = NULL;
+    IRListIter irct_from_next = NULL;
+    to->getIRList()->get_head(&irct_to);
+    for (from->getIRList()->get_head(&irct_from);
+         irct_from != from->getIRList()->end();
+         irct_from = irct_from_next) {
+        IR * ir = irct_from->val();
+        if (!ir->is_phi()) { break; }
+
+        irct_from_next = from->getIRList()->get_next(irct_from);
+        //Move ir from 'from' to 'to'.
+        from->getIRList()->remove(irct_from);
+        if (irct_to == NULL) {
+            //to is empty BB.
+            irct_to = to->getIRList()->append_head(ir);
+        } else {
+            //Make sure phi's order in 'to' is same with 'from'.
+            irct_to = to->getIRList()->insert_before(ir, irct_to);
+        }
+    }
+}
+
+
 bool PRSSAMgr::verifyPRSSAInfo(Region * rg)
 {
     PRSSAMgr * ssamgr = (PRSSAMgr*)(rg->getPassMgr()->

@@ -91,16 +91,15 @@ class LICM : public Pass {
     bool hoistCand(OUT IRBB * prehead, OUT LI<IRBB> * li, OUT bool & insert_bb);
     //This function will maintain RPO of generated guard BB.
     //Return true if BB or STMT changed.
-    bool hoistCandHelper(IRBB const* backedge_bb,
-                         OUT bool & insert_guard_bb,
+    bool hoistCandHelper(OUT bool & insert_guard_bb,
                          OUT IR * cand_exp,
                          OUT IRBB * prehead,
                          OUT LI<IRBB> * li);
 
     //Return true if ir dominate all USE which in loop.
     bool is_dom_all_use_in_loop(IR const* ir, LI<IRBB> * li);
+    //Return true if stmt is collected into invariant-stmt set.
     bool isInvariantStmt(IR const* ir) const;
-    bool isStmtCanBeHoisted(IR * stmt, IRBB * backedge_bb);
     
     //Return true if md modified in loop only once.
     bool isUniqueDef(MD const* md) const;
