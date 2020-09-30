@@ -42,6 +42,7 @@ author: Su Zhenyu
 #include "../com/xcominc.h" //libxcom
 #include "option.h"
 #include "targ_const_info.h"
+#include "logmgr.h"
 #include "util.h"
 #include "symtab.h"
 #include "label.h"

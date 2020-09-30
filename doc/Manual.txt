@@ -79,7 +79,7 @@ Programming Guides
   ¡ñ Region
     Defined in region.h
     The program code organized in region, each region has it own IR stmt
-    list, local VAR table, and many kinds of analysis and transformation
+    list, local Var table, and many kinds of analysis and transformation
     modules.
 
     The kind of region can be blackbox, subregion, exception handling,
@@ -127,7 +127,7 @@ Programming Guides
       XOC apply interprocedural analysis and optimization and inlining
       on program unit.
 
-  ¡ñ SYM, SymTab
+  ¡ñ Sym, SymTab
     Symbol represent identifier name, pseudo register name and string.
     Each region manager has one unique symbol table. In general,
     any symbol with a name occupies an entry in symbol table.
@@ -137,7 +137,7 @@ Programming Guides
   ¡ñ TypeMgr
     Type manager represent all kind of distinct type in the region manager.
 
-  ¡ñ VAR
+  ¡ñ Var
     Defined in var.h
     Variable, is used to represent each memory object.
     The attributes of variable include:
@@ -166,7 +166,7 @@ Programming Guides
       Unique id of abstract memory object.
 
     ¡ð  Base Variable
-      Since MD is the abstract version of VAR, it is closely related to
+      Since MD is the abstract version of Var, it is closely related to
       individual variable. This variable may be the base of several MD.
 
     ¡ð Type
@@ -301,19 +301,19 @@ Programming Guides
   Expression implies which variable is used, or operation without sideeffect,
   and expression does not transfer control flow. Both statement and expression
   node have NEXT and PREV pointers which link them together.
-  Statment can not be kid of other statement, and expression can be kid of
-  both expression and statement.
+  Statment can not be kid of other statement, except control flow structure IR,
+  and expression can be kid of both expression and statement.
   In a simple word, statements have side effects, and can be reordered only
   if dependencies preserved. Expressions do not have side effect, expression
   trees hung from statement, and they contain only uses and can be
   aggressively optimized.
 
   ¡ñ IR_ID
-      Identifier, represents a memory variable, namely, VAR.
+      Identifier, represents a memory variable, namely, Var.
 
       Operands:
       * IR_dt indicate the result type.
-      * ID_info indicate the VAR.
+      * ID_info indicate the Var.
 
   ¡ñ IR_LDA
       This operation computes the pointer value of the memory address of a
@@ -371,9 +371,10 @@ Programming Guides
       The result type of IR_LD indicates the size and type of the memory from
       which to load, as well as the interpretation of the value.
       e.g:
-          semantics: a = b
+          Semantics: a = b
           IR tree is:
-            st:i32 a = ld:i32 b
+            st:i32 a
+              ld:i32 b
 
       There is a difference in usage if LD_ofst is not 0.
           1. lhs = [LD_idinfo + 0], if LD_ofst is 0.
@@ -388,13 +389,13 @@ Programming Guides
       This operation stores value to a memory address specified by ST_idinfo.
       The result type of IR_ST indicates the size and type of the memory from
       which to store, as well as the interpretation of the value.
-      e.g:
-          semantics: a = a + 1
+      e.g: 
+          Semantics: a = a + 1
           IR tree is:
             st:i32 a =
-                add:i32
-                    ld:i32 a
-                    intconst:i32 1
+              add:i32
+                ld:i32 a
+                intconst:i32 1
 
       There is a difference in usage if ST_ofst is not 0.
           1. [p] = rhs, if ST_ofst is 0.
@@ -418,15 +419,25 @@ Programming Guides
       * PR_no indicate the number of PR.
       * PR_ssainfo indicate the SSA information if exist.
 
+      NOTE:
+          1. PR can not be taken address.
+          2. PR is always allocate on stack.
+ 
   ¡ñ IR_STPR
       This operation stores value to a PR specified by PR_no.
       The result type of IR_STPR indicates the size and type of the value
       to which to store.
-      e.g: semantics: store value of a to b.
-          IR tree is:
+      e.g:
+          Semantics: store value of a to b.
             i32 a, b;
             stpr:i32 $pr1 = ld a:i32
             st:i32 b = $pr1:i32
+
+          IR tree is:
+            stpr:i32 $pr1
+              ld a:i32
+            st:i32 b
+              $pr1:i32
 
       Operands:
       * IR_dt indicate the result type.
@@ -434,20 +445,35 @@ Programming Guides
       * STPR_ssainfo indicate the SSA information if exist.
       * STPR_rhs indicate the right-hand-side expression.
 
+      NOTE:
+          1. PR can not be taken address.
+          2. PR is always allocate on stack.
+ 
   ¡ñ IR_SETELEM
       This operation stores value to one of element of a temporary
       location named pseudo register.
 
-      SETEPR_ofst descibe the byte offset that is the addend to address.
+      SETELEM_ofst descibe the byte offset that is the addend to address.
 
-      If SETEPR_ofst is not 0, the base memory address must add the offset.
-      The the number of byte of SETEPR_base must be an integer multiple of
-      the number of byte of SETEPR_rhs.
+      If SETELEM_ofst is not 0, the base memory address must add the offset.
+      The the number of byte of SETELEM_base must be an integer multiple of
+      the number of byte of SETELEM_rhs.
 
-      usage: setepr(prno:1, val, ofst), where PR1 must be memory chunk or
-      vector. This operation will store value to the memory which offset to
+      usage: setelem:i32 $pr1, val, ofst;
+             where $pr1 must be memory chunk or vector.
+
+          IR tree is:
+            setelem:i32 $pr1
+              ld val
+              ld ofst
+
+      This operation will store value to the memory which offset to
       the memory chunk or vector's base address.
 
+      NOTE:
+          1. PR can not be taken address.
+          2. PR is always allocate on stack.
+ 
       Operands:
       * SETELEM_prno      indicate the result PR number.
       * SETELEM_ssainfo   indicate the SSA information if exist.
@@ -483,13 +509,14 @@ Programming Guides
       This operation represent indirect memory store operation.
       IST_ofst descibe the byte offset that is the addend to address.
 
-      e.g: semantics: given p is pointer, store value of a to the memory
-           that p pointed to.
-           In C syntax: *p = a;
-           And the corresponding IR tree is:
-              ist:i32
-                  ld:ptr p
-                  ld:i32 a
+      e.g: 
+          Semantics: given p is pointer, store value of a to the memory
+          that p pointed to.
+          In C syntax: *p = a;
+          And the corresponding IR tree is:
+             ist:i32
+               ld:ptr p
+               ld:i32 a
 
       If IST_ofst is not 0, the base memory address must add the offset.
       There is a difference in usage if IST_ofst is not 0.
@@ -507,13 +534,14 @@ Programming Guides
       This operation represent indirect memory load operation.
       ILD_ofst descibe the byte offset that is the addend to address.
 
-      e.g: semantics: given p is pointer, load the value that p pointed to,
-      and store it to a.
-           In C syntax: int a = *p;
-           And the corresponding IR tree is:
-              st:i32, a
-                  ild:i32
-                      ld:ptr p
+      e.g:
+          Semantics: given p is pointer, load the value that p pointed to,
+          and store it to a.
+          In C syntax: int a = *p;
+          And the corresponding IR tree is:
+             st:i32, a
+               ild:i32
+                 ld:ptr p
 
       There is a difference in usage if ILD_ofst is not 0.
       If ILD_ofst is not 0, the base memory address must add the offset.
@@ -574,13 +602,13 @@ Programming Guides
           control flow will jump to the default label if it is given.
 
       e.g: demostrate how to use IR_SWITCH.
-          pr1 = ...   //compute the target address, store it to pr1.
-          switch(pr1) //unconditional jump to pr1.
+          $pr1 = ...   //compute the target address, store it to pr1.
+          switch ($pr1) //unconditional jump to pr1.
 
       e.g: demostrate how to use IR_SWITCH.
           In this example, switch operation jump to label accroding to the
           value of a.
-          switch (ld(i32, a)) (deflab, L3) (0, L1), (1, L2)
+          switch (ld:i32 a) (deflab, L3) (0, L1), (1, L2)
           ...
           L1:
           ...
@@ -622,10 +650,18 @@ Programming Guides
           $pr1:i32 = call foo, ld:i32 a, ld:i32 b
           st:i32 a = $pr1:i32
 
+        IR tree is:
+          $pr1:i32 = call foo
+            ld:i32 a
+            ld:i32 b
+          st:i32 a
+            $pr1:i32
+
       Operands:
       * CALL_idinfo        record the function identifier.
       * CALL_is_intrinsic  indicate whether function is intrinsic.
-      * CALL_is_readonly   indicate whether this call would not modify any memory.
+      * CALL_is_readonly   indicate whether this call would not modify any
+                           memory.
       * CALL_ssainfo       indicate the SSA information of return value
                            PR if exist.
       * CALL_is_alloc_heap indicate whether this call is memory allocation
@@ -639,14 +675,24 @@ Programming Guides
 
       Usage:
       $pr1:ptr = lda:ptr foo
-      $pr2:i32 = icall, $pr1:ptr, parameter-list,  where pr1 is a pointer pointed to
-      function, and pr2 is the return value.
+      $pr2:i32 = icall, $pr1:ptr, parameter-list,  where $pr1 is a pointer
+      pointed to function, and $pr2 is the return value.
 
       e.g: Invoke function foo with 2 parameter a, b, and then store
           result value to them.
-          st:ptr $pr3 = lda:ptr foo
-          $pr1:i32 = icall, pr3:ptr, ld:i32 a, ld:i32 b
+          stpr $pr3:ptr = lda:ptr foo
+          $pr1:i32 = icall, $pr3:ptr, ld:i32 a, ld:i32 b
           st:i32 a = $pr1:i32
+
+        IR tree is:
+          stpr $pr3:ptr
+            lda:ptr foo
+          $pr1:i32 = icall
+            $pr3:ptr
+            ld:i32 a
+            ld:i32 b
+          st:i32 a
+            $pr1:i32
 
       Operands:
       * CALL_callee        record the function address.
@@ -747,7 +793,7 @@ Programming Guides
 
       NOTE: The base of array can be IR_LDA, or other computational
       expression. If array base is LDA, it denotes that the base of
-      array is an array type VAR,
+      array is an array type Var,
       e.g: char p[N]; (&p)[i] = ...
 
       If array base is computational expression, it denotes that the
@@ -781,7 +827,7 @@ Programming Guides
 
       NOTE: The base of array can be IR_LDA, or other computational
       expression. If array base is LDA, it denotes that the base of
-      array is an array type VAR,
+      array is an array type Var,
       e.g: char p[N]; (&p)[i] = ...
 
       If array base is computational expression, it denotes that the
@@ -817,14 +863,15 @@ Programming Guides
       determinant expression return true, otherwise the control flow does
       not change.
 
-      e.g: comparison and jump if condition is true.
-          truebr ilabel(L24)
-              ne (bool)
-                  pr1 (i32)
-                  intconst 1
-          st(i32 'a')
-              pr1 (i32)
-      Semantics is: if pr1 != 1, then jump to L24, otherwise go
+      e.g:
+          Semantics: comparison and jump if condition is true.
+          truebr ilabel L24
+            ne:bool
+              $pr1:i32
+              intconst 1
+          st:i32 a
+            $pr1:i32
+      Semantics is: if $pr1 != 1, then jump to label L24, otherwise go
       fallthrough to the following statement.
 
       Operands:
@@ -836,14 +883,15 @@ Programming Guides
       determinant expression return false, otherwise the control flow does
       not change.
 
-      e.g: comparison and jump if condition is false.
-          falsebr ilabel(L24)
-              ne (bool)
-                  pr1 (i32)
-                  intconst 1
-          st(i32 'a')
-              pr1 (i32)
-      Semantics is: if !(pr1 != 1), then jump to L24, otherwise go
+      e.g:
+          Semantics: comparison and jump if condition is false.
+          falsebr ilabel L24
+            ne:bool
+              $pr1:i32
+              intconst 1
+          st:i32 a
+            $pr1:i32
+      Semantics is: if !($pr1 != 1), then jump to label L24, otherwise go
       fallthrough to the following statement.
 
       Operands:
@@ -852,19 +900,30 @@ Programming Guides
 
   ¡ñ IR_RETURN
       This operation represents function unit return operation.
-      The operation has a list of return value list, so it may return multiple
-      value at a time.
 
-      e.g: return two computed value store in pr1, pr2
-          stpr1 (i32)
-              ld(i32 a)
-          stpr2 (i32)
-              ld(i32 b)
+      e.g: return-value store in $pr1
+          stpr $1:i32
+            ld:i32 a
           return
-              pr1(i32), pr2(i32)
+            $pr1:i32
 
       Operands:
-      * RET_exp_list  indicate return value expressions list.
+      * RET_exp  indicate return-value expression.
+
+      Combine with IR_SETELEM, the operation can return multiple values at
+      a time.
+
+      e.g: return two computed value store in $pr1, $pr2
+          stpr $1:i32
+            ld:i32 a
+          stpr $2:i32
+            ld:i32 b
+          setelem $pr3
+            $pr1, 0
+          setelem $pr3
+            $pr2, 4
+          return
+            $pr3:i64
 
   ¡ñ IR_SELECT
       This operation represents conditional execute operation. It computes
@@ -872,8 +931,8 @@ Programming Guides
       result value is true, return CONDEXE_trueexp, otherwise return
       CONDEXE_falseexp.
 
-      e.g: res = select(a > b), (10), (20)
-      Semantics:
+      e.g:
+          Semantics: res = select(a > b), (10), (20)
           if (a > b) res = 10;
           else res = 20;
       where a > b is the predicator.
@@ -912,8 +971,8 @@ Programming Guides
       Semantics: induction variable is i.
           init: i = 0
           do (det: i<=10)
-              body
-              step: i = i+1
+            body
+            step: i = i+1
           enddo
 
   ¡ñ IR_DO_WHILE
@@ -956,8 +1015,8 @@ Programming Guides
       the field should be NULL.
 
       Operands:
-      * IF_det  is a boolean expression, that indicate the
-          determinant expression.
+      * IF_det       is a boolean expression, that indicate the
+                     determinant expression.
       * IF_truebody  specify a list of statements that is executed
                      if IF_det return true.
       * IF_falsebody specify a list of statements that is executed
@@ -965,27 +1024,27 @@ Programming Guides
 
       Semantics:
           if (det)
-              truebody
+            truebody
           else
-              falsebody
+            falsebody
           endif
 
   ¡ñ IR_BREAK
-      This operation represents high level control structure, that terminate
-      current loop execution immediately without any other operations. It is
-      used to specify an unconditional branch from a loop body to the end
+      This operation represents high level control flow structure, that
+      terminate current loop execution immediately without any other operations.
+      It is used to specify an unconditional branch from a loop body to the end
       label of loop.
 
       Semantics: Jump out of loop.
           while (i < 10)
-              if (i ==3)
-                  break
-              endif
-              i = i+1
+            if (i ==3)
+              break
+            endif
+            i = i+1
           endwhile
 
   ¡ñ IR_CONTINUE
-      This operation represents high level control structure, that stop the
+      This operation represents high level control flow structure, that stop the
       current loop iteration, immediately continue with the next one.
       This operation is often used inside in loop body of IR_DO_LOOP,
       IR_DO_WHILE, and IR_WHILE_DO.
@@ -997,10 +1056,10 @@ Programming Guides
       Note in the example, followed stmts of IR_CONTINUE can not be
       executed, thus loop statement will not be terminated.
           while (i < 10)
-              if (i ==3)
-                  continue
-              endif
-              i = i+1
+            if (i ==3)
+              continue
+            endif
+            i = i+1
           endwhile
 
   ¡ñ IR_PHI
@@ -1069,7 +1128,7 @@ Programming Guides
     we perform alias analysis and compute the exact and inexact MD.
     These MDs describe the shape of the store and load and every function
     uses them to specify the store and load that it expects.
-    When alias analysis is finished, we define an unique VAR for each alias
+    When alias analysis is finished, we define an unique Var for each alias
     group, which are sets of MD that share the same aliases.
 
   ¡ñ DU Manager
@@ -1122,9 +1181,9 @@ Programming Guides
       map_call2mayuse
       set_map_call2mayuse
       has_no_du
-      is_may_def
-      is_may_kill
-      is_must_kill
+      isMayDef
+      isMayKill
+      isMustKill
       is_must_def
       is_exact_unique_def
 
@@ -1158,7 +1217,7 @@ Programming Guides
     time a PR is assigned in the code, a new version of the PR is created.
     Different versions of the same PR are distinguished by subscripting
     the variable name with its version number, we call this structure
-    Versioned PR(VP).
+    Versioned PR(VPR).
 
   ¡ñ AttachInfo
     The attached information of IR is used to represent additional
@@ -1199,7 +1258,7 @@ Programming Guides
         REGION_MGR rm;
         rm.init_var_mgr();
 
-        //Generate IR list, VAR and REGION accroding to user input.
+        //Generate IR list, Var and REGION accroding to user input.
         generate_ir_list(&rm);
         generate_var_tab(&rm);
 

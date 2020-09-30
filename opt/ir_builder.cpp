@@ -112,7 +112,7 @@ IR * Region::buildPR(Type const* type)
 {
     ASSERT0(type);
     IR * ir = allocIR(IR_PR);
-    PR_no(ir) = REGION_analysis_instrument(this)->m_pr_count++;
+    PR_no(ir) = buildPrno(type);
     IR_dt(ir) = type;
     return ir;
 }
@@ -124,7 +124,9 @@ UINT Region::buildPrno(Type const* type)
 {
     ASSERT0(type);
     DUMMYUSE(type);
-    return REGION_analysis_instrument(this)->m_pr_count++;
+    UINT prno = getAnalysisInstrument()->m_pr_count;
+    getAnalysisInstrument()->m_pr_count++;
+    return prno;
 }
 
 
@@ -151,7 +153,7 @@ IR * Region::buildLogicalOp(IR_TYPE irt, IR * opnd0, IR * opnd1)
 
 
 //Build IR_ID operation.
-IR * Region::buildId(VAR * var)
+IR * Region::buildId(Var * var)
 {
     ASSERT0(var);
     IR * ir = allocIR(IR_ID);
@@ -168,16 +170,16 @@ IR * Region::buildLdaString(CHAR const* varname, CHAR const * string)
 }
 
 
-IR * Region::buildLdaString(CHAR const* varname, SYM * string)
+IR * Region::buildLdaString(CHAR const* varname, Sym * string)
 {
     ASSERT0(string);
-    VAR * v = getVarMgr()->registerStringVar(varname, string, MEMORY_ALIGNMENT);
+    Var * v = getVarMgr()->registerStringVar(varname, string, MEMORY_ALIGNMENT);
     return buildLda(v);
 }
 
 
 //Build IR_LDA operation.
-IR * Region::buildLda(VAR * var)
+IR * Region::buildLda(Var * var)
 {
     ASSERT0(var);
     IR * ir = allocIR(IR_LDA);
@@ -189,7 +191,7 @@ IR * Region::buildLda(VAR * var)
 
 //Build IR_CONST operation.
 //The result IR indicates a string.
-IR * Region::buildString(SYM const* strtab)
+IR * Region::buildString(Sym const* strtab)
 {
     ASSERT0(strtab);
     IR * str = allocIR(IR_CONST);
@@ -233,7 +235,7 @@ IR * Region::buildIlabel()
 {
     IR * ir = allocIR(IR_LABEL);
     IR_dt(ir) = getTypeMgr()->getAny();
-    LAB_lab(ir) = genIlabel();
+    LAB_lab(ir) = genILabel();
     return ir;
 }
 
@@ -241,7 +243,7 @@ IR * Region::buildIlabel()
 //Build IR_LABEL operation.
 IR * Region::buildLabel(LabelInfo const* li)
 {
-    ASSERT0(li && LABEL_INFO_type(li) != L_UNDEF);
+    ASSERT0(li && LABELINFO_type(li) != L_UNDEF);
     IR * ir = allocIR(IR_LABEL);
     IR_dt(ir) = getTypeMgr()->getAny();
     LAB_lab(ir) = li;
@@ -311,7 +313,7 @@ IR * Region::buildPhi(UINT prno, Type const* type, IR * opnd_list)
 //'result_prno': indicate the result PR which hold the return value.
 //    0 means the call does not have a return value.
 //'type': result PR data type.
-IR * Region::buildCall(VAR * callee,
+IR * Region::buildCall(Var * callee,
                        IR * param_list,
                        UINT result_prno,
                        Type const* type)
@@ -419,7 +421,7 @@ IR * Region::buildGoto(LabelInfo const* li)
 
 
 //Build IR_LD operation.
-IR * Region::buildLoad(IN VAR * var)
+IR * Region::buildLoad(IN Var * var)
 {
     ASSERT0(var);
     return buildLoad(var, VAR_type(var));
@@ -429,7 +431,7 @@ IR * Region::buildLoad(IN VAR * var)
 //Build IR_LD operation.
 //Load value from variable with type 'type'.
 //'type': result value type.
-IR * Region::buildLoad(VAR * var, Type const* type)
+IR * Region::buildLoad(Var * var, Type const* type)
 {
     ASSERT0(type);
     ASSERT0(var);
@@ -505,9 +507,9 @@ IR * Region::buildGetElem(UINT prno, Type const* type, IR * base, IR * offset)
 IR * Region::buildGetElem(Type const* type, IR * base, IR * offset)
 {
     ASSERT0(type && base && base->is_exp());
-    IR * ir = buildGetElem(REGION_analysis_instrument(this)->m_pr_count,
+    IR * ir = buildGetElem(getAnalysisInstrument()->m_pr_count,
         type, base, offset);
-    REGION_analysis_instrument(this)->m_pr_count++;
+    getAnalysisInstrument()->m_pr_count++;
     return ir;
 }
 
@@ -552,9 +554,9 @@ IR * Region::buildSetElem(Type const* type,
 {
     ASSERT0(type && base && val && val->is_exp() &&
         offset && offset->is_exp());
-    IR * ir = buildSetElem(REGION_analysis_instrument(this)->m_pr_count,
+    IR * ir = buildSetElem(getAnalysisInstrument()->m_pr_count,
         type, base, val, offset);
-    REGION_analysis_instrument(this)->m_pr_count++;
+    getAnalysisInstrument()->m_pr_count++;
     return ir;
 }
 
@@ -581,9 +583,9 @@ IR * Region::buildStorePR(UINT prno, Type const* type, IR * rhs)
 IR * Region::buildStorePR(Type const* type, IR * rhs)
 {
     ASSERT0(type && rhs && rhs->is_exp());
-    IR * ir = buildStorePR(REGION_analysis_instrument(this)->m_pr_count,
+    IR * ir = buildStorePR(getAnalysisInstrument()->m_pr_count,
         type, rhs);
-    REGION_analysis_instrument(this)->m_pr_count++;
+    getAnalysisInstrument()->m_pr_count++;
     return ir;
 }
 
@@ -591,7 +593,7 @@ IR * Region::buildStorePR(Type const* type, IR * rhs)
 //Build IR_ST operation.
 //'lhs': memory variable, described target memory location.
 //'rhs: value expected to store.
-IR * Region::buildStore(VAR * lhs, IR * rhs)
+IR * Region::buildStore(Var * lhs, IR * rhs)
 {
     ASSERT0(lhs && rhs);
     return buildStore(lhs, VAR_type(lhs), rhs);
@@ -602,10 +604,11 @@ IR * Region::buildStore(VAR * lhs, IR * rhs)
 //'lhs': target memory location.
 //'type: result data type.
 //'rhs: value expected to store.
-IR * Region::buildStore(VAR * lhs, Type const* type, IR * rhs)
+IR * Region::buildStore(Var * lhs, Type const* type, IR * rhs)
 {
     ASSERT0(type);
     ASSERT0(lhs && rhs && rhs->is_exp());
+    ASSERTN(!lhs->is_readonly(), ("can not write readonly variable"));
     IR * ir = allocIR(IR_ST);
     ST_idinfo(ir) = lhs;
     ST_rhs(ir) = rhs;
@@ -620,7 +623,7 @@ IR * Region::buildStore(VAR * lhs, Type const* type, IR * rhs)
 //'type: result data type.
 //'ofst': memory byte offset relative to lhs.
 //'rhs: value expected to store.
-IR * Region::buildStore(VAR * lhs, Type const* type, UINT ofst, IR * rhs)
+IR * Region::buildStore(Var * lhs, Type const* type, UINT ofst, IR * rhs)
 {
     ASSERT0(type);
     IR * ir = buildStore(lhs, type, rhs);
@@ -779,6 +782,10 @@ IR * Region::buildStoreArray(IR * base,
     CStArray * ir = (CStArray*)allocIR(IR_STARRAY);
     IR_dt(ir) = type;
     ARR_base(ir) = base;
+    if (base->is_lda()) {
+        ASSERTN(!LDA_idinfo(base)->is_readonly(),
+                ("can not write readonly variable"));
+    }
     IR_parent(base) = ir;
     ARR_sub_list(ir) = sublist;
     UINT n = 0;
@@ -1264,7 +1271,7 @@ IR * Region::buildJudge(IR * exp)
     }
 
     return buildCmp(IR_NE, exp, type->is_fp() ?
-        buildImmFp(HOST_FP(0), type) : buildImmInt(0, type));
+           buildImmFp(HOST_FP(0), type) : buildImmInt(0, type));
 }
 
 
@@ -1336,6 +1343,15 @@ IR * Region::buildBinaryOpSimp(IR_TYPE irt,
     IR_parent(rchild) = ir;
     IR_dt(ir) = type;
     return ir;
+}
+
+
+IR * Region::buildBinaryOp(IR_TYPE irt,
+                           DATA_TYPE dt,
+                           IN IR * lchild,
+                           IN IR * rchild)
+{
+    return buildBinaryOp(irt, getTypeMgr()->getSimplexType(dt), lchild, rchild);    
 }
 
 

@@ -210,14 +210,14 @@ INT xceiling(INT a, INT b)
     ASSERTN(b != 0, ("div zero"));
     if (a % b == 0) {
         //(a+b-1)/b will be errorneous
-        //CASE:ceil(-4, 2)
+        //CASE:ceiling(-4, 2)
         return a / b;
     } else if ((a < 0 && b < 0) || (a > 0 && b > 0)) {
-        return ((a + b) / b);
+        return (a + b) / b;
     } else {
         //(a+b-1)/b will be errorneous
-        //CASE:ceil(5,-2)
-        return (a / b);
+        //CASE:ceiling(5,-2)
+        return a / b;
     }
 }
 
@@ -703,6 +703,7 @@ void af2i(IN CHAR * f, OUT BYTE * buf, UINT buflen, bool is_double)
 
 //Compute the power of 2, return the result.
 //Note v must be power of 2.
+//e.g: given v is 64, return 16.
 UINT getPowerOf2(ULONGLONG v)
 {
     ASSERT0(v > 0);

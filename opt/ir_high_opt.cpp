@@ -64,14 +64,14 @@ void Region::HighProcessImpl(OptCtx & oc)
         PRSSAMgr * ssamgr =
             (PRSSAMgr*)getPassMgr()->registerPass(PASS_PR_SSA_MGR);
         ASSERT0(ssamgr);
-        if (!ssamgr->isSSAConstructed()) {
+        if (!ssamgr->is_valid()) {
             ssamgr->construction(oc);
         }
     }
 
     if (g_do_aa) {
         ASSERT0(g_cst_bb_list && OC_is_cfg_valid(oc));
-        assignMD(false);
+        assignMD(true, true);
         checkValidAndRecompute(&oc, PASS_AA, PASS_UNDEF);
     }
 
@@ -91,27 +91,21 @@ void Region::HighProcessImpl(OptCtx & oc)
             f |= DUOPT_SOL_REGION_REF;
         }
 
-        if (g_compute_classic_du_chain) {
+        if (g_compute_pr_du_chain || g_compute_nonpr_du_chain) {
+            //Compute classic du chain.
             f |= DUOPT_SOL_REACH_DEF;
         }
 
         if (dumgr->perform(oc, f) && OC_is_ref_valid(oc)) {
-            if (g_compute_classic_du_chain) {
-                UINT flag = DUOPT_COMPUTE_NONPR_DU;
-                ASSERT0(getPassMgr());
-
-                //If PRs have already been in SSA form, compute
-                //PR DU chain doesn't make any sense.
-                PRSSAMgr * ssamgr = NULL;
-                if ((ssamgr = (PRSSAMgr*)getPassMgr()->
-                     queryPass(PASS_PR_SSA_MGR)) == NULL ||
-                    !ssamgr->isSSAConstructed()) {
-                    flag |= DUOPT_COMPUTE_PR_DU;
-                }
-
-                dumgr->computeMDDUChain(oc, false, flag);
+            UINT flag = 0;
+            if (g_compute_pr_du_chain) {
+                flag |= DUOPT_COMPUTE_PR_DU;
             }
-        }
+            if (g_compute_nonpr_du_chain) {
+                flag |= DUOPT_COMPUTE_NONPR_DU;
+            }
+            dumgr->computeMDDUChain(oc, false, flag);
+         }
     }
 
     if (g_do_expr_tab) {
@@ -145,8 +139,8 @@ void Region::HighProcessImpl(OptCtx & oc)
     //Solution: We can scan IF stmt first, in order to mark
     //start stmt and end stmt of IF.
     //
-    ////AbsNode * an =
-    //    REGION_analysis_instrument(this)->m_cfs_mgr->construct_abstract_cfs();
+    ////AbsNode * an = getAnalysisInstrument()->getCfsMgr()->
+    ////    construct_abstract_cfs();
     ////Polyhedra optimization.
     ////IR_POLY * poly = newPoly();
     ////if (poly->construct_poly(an)) {
@@ -172,12 +166,12 @@ void Region::HighProcessImpl(OptCtx & oc)
 //    6. Loop unrolling
 bool Region::HighProcess(OptCtx & oc)
 {
-    g_indent = 0;
-    note("\n\n==== Region:%s HIGHEST LEVEL FARMAT ====\n\n", getRegionName());
+    note(this, "\n\n==== Region:%s HIGHEST LEVEL FARMAT ====\n\n",
+         getRegionName());
 
     SimpCtx simp;
     if (g_do_cfs_opt) {
-        IR_CFS_OPT co(this);
+        CfsOpt co(this);
         co.perform(simp);
         ASSERT0(verifyIRList(getIRList(), NULL, this));
     }

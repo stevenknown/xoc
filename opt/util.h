@@ -36,6 +36,8 @@ author: Su Zhenyu
 
 namespace xoc {
 
+class Region;
+
 //Timer, show const string before timer start and end.
 //e.g:
 //    START_TIMER(t, "My Pass");
@@ -75,8 +77,8 @@ namespace xoc {
 #define DUMP_INDENT_NUM 4
 
 //e.g:
-//CHAR * dumpTN(SYM* key, SYM* mapped) { return SYM_name(key); }
-//dump_rbt((RBT<SYM*, SYM*, xoc::CompareSymTab>&)map, NULL, 1000, dumpTN);
+//CHAR * dumpTN(Sym* key, Sym* mapped) { return SYM_name(key); }
+//dump_rbt((RBT<Sym*, Sym*, xoc::CompareSymTab>&)map, NULL, 1000, dumpTN);
 template <class T, class Ttgt, class CompareKey>
 void dump_rbt(RBT<T, Ttgt, CompareKey> & rbt,
               CHAR const* name = NULL,
@@ -235,12 +237,7 @@ void dump_rbt(RBT<T, Ttgt, CompareKey> & rbt,
     fclose(hvcg);
 }
 
-//Exported Variables
-extern FILE * g_tfile; //Only for dump.
-extern INT g_indent; //Only for dump.
-extern bool g_prt_carriage_return_for_dot; //Only for dump.
 
-void dumpIndent(FILE * h, UINT indent);
 template <class T>
 void dumpVector(xcom::Vector<T> const& v, FILE * h)
 {
@@ -260,12 +257,6 @@ void dumpVector(xcom::Vector<T> const& v, FILE * h)
 //Get temporary memory pool handler.
 SMemPool * get_tmp_pool();
 
-//Initialze dump file.
-void initdump(CHAR const* f, bool is_del);
-
-//Finalize dump file.
-void finidump();
-
 //Report internal warning.
 void interwarn(CHAR const* format, ...);
 
@@ -277,17 +268,6 @@ void * tlloc(LONG size);
 
 //Free whole temporary memory pool.
 void tfree();
-
-//Helper function to dump formatted string to g_tfile.
-//This function indents blank space indicated by g_indent.
-void note(CHAR const* format, ...);
-
-//Print string with indent chars.
-//h: file handler.
-void note(FILE * h, CHAR const* format, ...);
-
-//Helper function to dump formatted string to g_tfile without indent.
-bool prt(CHAR const* format, ...);
 
 //Return true if val is 32bit integer more than 16bit.
 bool isInteger32bit(HOST_UINT val);

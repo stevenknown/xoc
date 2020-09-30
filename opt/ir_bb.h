@@ -37,7 +37,9 @@ author: Su Zhenyu
 namespace xoc {
 
 class IRBB;
+template <class IRBB, class IR> class CFG;
 typedef xcom::C<IR*> * IRListIter;
+#define BBID_UNDEF VERTEX_UNDEF
 
 //
 //START BBIRList
@@ -141,7 +143,7 @@ public:
 //
 //START IRBB
 //
-#define MAX_BB_KIDS_NUM     2
+#define MAX_BB_KIDS_NUM 2
 
 #define BB_rpo(b) ((b)->m_rpo)
 #define BB_id(b) ((b)->m_id)
@@ -152,7 +154,6 @@ public:
 #define BB_last_ir(b) ((b)->ir_list.get_tail())
 #define BB_is_entry(b) ((b)->u1.s1.is_entry)
 #define BB_is_exit(b) ((b)->u1.s1.is_exit)
-#define BB_is_fallthrough(b) ((b)->u1.s1.is_fallthrough)
 #define BB_is_target(b) ((b)->u1.s1.is_target)
 #define BB_is_catch_start(b) ((b)->u1.s1.is_catch_start)
 #define BB_is_try_start(b) ((b)->u1.s1.is_try_start)
@@ -169,7 +170,6 @@ public:
         struct {
             BYTE is_entry:1; //bb is entry of the region.
             BYTE is_exit:1; //bb is exit of the region.
-            BYTE is_fallthrough:1; //bb has a fall through successor.
             BYTE is_target:1; //bb is branch target.
             BYTE is_catch_start:1; //bb is entry of catch block.
             BYTE is_terminate:1; //bb terminate the control flow.
@@ -185,7 +185,7 @@ public:
         ir_list.setBB(this);
         m_id = 0;
         u1.u1b1 = 0;
-        m_rpo = -1;
+        m_rpo = RPO_UNDEF;
     }
     ~IRBB()
     {
@@ -201,16 +201,16 @@ public:
     {
         ASSERT0(li);
         if (getLabelList().find(li)) { return; }
-        if (LABEL_INFO_is_catch_start(li)) {
+        if (LABELINFO_is_catch_start(li)) {
             BB_is_catch_start(this) = true;
         }
-        if (LABEL_INFO_is_try_start(li)) {
+        if (LABELINFO_is_try_start(li)) {
             BB_is_try_start(this) = true;
         }
-        if (LABEL_INFO_is_try_end(li)) {
+        if (LABELINFO_is_try_end(li)) {
             BB_is_try_end(this) = true;
         }
-        if (LABEL_INFO_is_terminate(li)) {
+        if (LABELINFO_is_terminate(li)) {
             BB_is_terminate(this) = true;
         }
         if (at_head) {
@@ -219,6 +219,10 @@ public:
             getLabelList().append_tail(li);
         }
     }
+    
+    //After adding new bb or change bb successor,
+    //you need add the related PHI operand if BB successor has PHI stmt.
+    void addSuccessorDesignatePhiOpnd(CFG<IRBB, IR> * cfg, IRBB * succ);
 
     size_t count_mem() const;
     void clean()
@@ -228,7 +232,7 @@ public:
         ir_list.clean();
         lab_list.clean();
         u1.u1b1 = 0;
-        m_rpo = -1;
+        m_rpo = RPO_UNDEF;
     }
 
     //Clean attached label.
@@ -241,27 +245,11 @@ public:
     List<LabelInfo const*> const& getLabelListConst() const
     { return lab_list; }
     UINT getNumOfIR() const { return BB_irlist(this).get_elem_count(); }
-    UINT getNumOfPred(CFG<IRBB, IR> * cfg) const
-    {
-        ASSERT0(cfg);
-        xcom::Vertex const* vex = cfg->getVertex(id());
-        ASSERT0(vex);
-        UINT n = 0;
-        for (xcom::EdgeC const* in = VERTEX_in_list(vex);
-             in != NULL; in = EC_next(in), n++);
-        return n;
-    }
-
-    UINT getNumOfSucc(CFG<IRBB, IR> * cfg) const
-    {
-        ASSERT0(cfg);
-        xcom::Vertex const* vex = cfg->getVertex(BB_id(this));
-        ASSERT0(vex);
-        UINT n = 0;
-        for (xcom::EdgeC const* out = VERTEX_out_list(vex);
-             out != NULL; out = EC_next(out), n++);
-        return n;
-    }
+    UINT getNumOfPred(CFG<IRBB, IR> * cfg) const;
+    UINT getNumOfSucc(CFG<IRBB, IR> * cfg) const;
+    BBIRList * getIRList() { return &BB_irlist(this); }
+    IR * getFirstIR() { return BB_first_ir(this); }
+    IR * getLastIR() { return BB_last_ir(this); }
 
     //Is bb containing such label carried by 'lir'.
     inline bool hasLabel(LabelInfo const* lab)
@@ -303,6 +291,15 @@ public:
     }
 
     UINT id() const { return BB_id(this); }
+    bool is_entry() const { return BB_is_entry(this); }
+    bool is_exit() const { return BB_is_exit(this); }
+    //Return true if BB has a fall through successor.
+    //Note conditional branch always has fallthrough successor.
+    bool is_fallthrough() const;
+    bool is_target() const { return BB_is_target(this); }
+    bool is_catch_start() const { return BB_is_catch_start(this); }
+    bool is_try_start() const { return BB_is_try_start(this); }
+    bool is_try_end() const { return BB_is_try_end(this); }
 
     //Return true if BB is an entry BB of TRY block.
     inline bool isTryStart() const
@@ -313,7 +310,7 @@ public:
         IRBB * pthis = const_cast<IRBB*>(this);
         for (LabelInfo const* li = pthis->getLabelList().get_head();
              li != NULL; li = pthis->getLabelList().get_next()) {
-            if (LABEL_INFO_is_try_start(li)) {
+            if (LABELINFO_is_try_start(li)) {
                 find = true;
                 break;
             }
@@ -332,7 +329,7 @@ public:
         IRBB * pthis = const_cast<IRBB*>(this);
         for (LabelInfo const* li = pthis->getLabelList().get_head();
              li != NULL; li = pthis->getLabelList().get_next()) {
-            if (LABEL_INFO_is_try_end(li)) {
+            if (LABELINFO_is_try_end(li)) {
                 find = true;
                 break;
             }
@@ -351,7 +348,7 @@ public:
         IRBB * pthis = const_cast<IRBB*>(this);
         for (LabelInfo const* li = pthis->getLabelList().get_head();
              li != NULL; li = pthis->getLabelList().get_next()) {
-            if (LABEL_INFO_is_catch_start(li)) {
+            if (LABELINFO_is_catch_start(li)) {
                 find = true;
                 break;
             }
@@ -370,7 +367,7 @@ public:
         IRBB * pthis = const_cast<IRBB*>(this);
         for (LabelInfo const* li = pthis->getLabelList().get_head();
              li != NULL; li = pthis->getLabelList().get_next()) {
-            if (LABEL_INFO_is_terminate(li)) {
+            if (LABELINFO_is_terminate(li)) {
                 find = true;
                 break;
             }
@@ -381,41 +378,47 @@ public:
     }
 
     //Could ir be looked as a boundary stmt of basic block?
-    inline bool is_boundary(IR * ir)
-    { return (isUpperBoundary(ir) || isDownBoundary(ir)); }
+    static bool isBoundary(IR * ir)
+    { return isUpperBoundary(ir) || isDownBoundary(ir); }
 
     //Could ir be looked as a first stmt in basic block?
-    inline bool isUpperBoundary(IR const* ir) const
+    static bool isUpperBoundary(IR const* ir)
     {
         ASSERTN(ir->isStmtInBB() || ir->is_lab(), ("illegal stmt in bb"));
         return ir->is_lab();
     }
-    bool isDownBoundary(IR * ir);
+    static bool isDownBoundary(IR const* ir);
 
     inline bool isAttachDedicatedLabel()
     {
         for (LabelInfo const* li = getLabelList().get_head();
              li != NULL; li = getLabelList().get_next()) {
-            if (LABEL_INFO_is_catch_start(li) ||
-                LABEL_INFO_is_try_start(li) ||
-                LABEL_INFO_is_try_end(li) ||
-                LABEL_INFO_is_pragma(li)) {
+            if (LABELINFO_is_catch_start(li) ||
+                LABELINFO_is_try_start(li) ||
+                LABELINFO_is_try_end(li) ||
+                LABELINFO_is_pragma(li)) {
                 return true;
             }
         }
         return false;
     }
 
-    inline bool isContainLabel(LabelInfo const* lab)
+    inline bool isContainLabel(LabelInfo const* lab) const
     {
-        for (LabelInfo const* li = getLabelList().get_head();
-             li != NULL; li = getLabelList().get_next()) {
+        for (LabelInfo const* li = const_cast<IRBB*>(this)->
+                 getLabelList().get_head();
+             li != NULL;
+             li = const_cast<IRBB*>(this)->getLabelList().get_next()) {
             if (li == lab) {
                 return true;
             }
         }
         return false;
     }
+
+    //Return true if current BB is the target of 'ir'.
+    bool isTarget(IR const* ir) const
+    { ASSERT0(ir->getLabel()); return isContainLabel(ir->getLabel()); }
 
     //Return true if ir1 dominates ir2 in current bb.
     //Function will modify the IR container of bb.
@@ -494,7 +497,7 @@ protected:
     UINT m_bb_count; //counter of IRBB.
 
 public:
-    IRBBMgr() { m_bb_count = 1; }
+    IRBBMgr() { m_bb_count = BBID_UNDEF + 1; }
     ~IRBBMgr()
     {
         for (IRBB * bb = m_bbs_list.get_head();
@@ -538,10 +541,9 @@ public:
 //END IRBBMgr
 
 //Exported Functions
-void dumpBBLabel(List<LabelInfo const*> & lablist, FILE * h);
+void dumpBBLabel(List<LabelInfo const*> & lablist, Region const* rg);
 void dumpBBList(BBList const* bbl,
                 Region const* rg,
-                CHAR const* name = NULL,
                 bool dump_inner_region = true);
 
 } //namespace xoc

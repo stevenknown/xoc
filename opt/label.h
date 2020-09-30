@@ -43,37 +43,36 @@ typedef enum {
     L_PRAGMA, //pragma
 } LABEL_TYPE;
 
-#define PREFIX_OF_LABEL()     "_L"
-#define POSTFIX_OF_LABEL()    ""
-#define PREFIX_OF_CLABEL()    ""
-#define POSTFIX_OF_CLABEL()   ""
+#define PREFIX_OF_LABEL() "_L"
+#define POSTFIX_OF_LABEL() ""
+#define PREFIX_OF_CLABEL() ""
+#define POSTFIX_OF_CLABEL() ""
 
 #define ILABEL_STR_FORMAT  "%s%d%s" //prefix label-num postfix
 #define ILABEL_CONT(li) \
-    PREFIX_OF_LABEL(),LABEL_INFO_num(li),POSTFIX_OF_LABEL()
+    PREFIX_OF_LABEL(),LABELINFO_num(li),POSTFIX_OF_LABEL()
 
 #define CLABEL_STR_FORMAT  "%s%s%s" //prefix label-name postfix
 #define CLABEL_CONT(li) \
-    PREFIX_OF_CLABEL(), SYM_name(LABEL_INFO_name(li)), POSTFIX_OF_CLABEL()
+    PREFIX_OF_CLABEL(), SYM_name(LABELINFO_name(li)), POSTFIX_OF_CLABEL()
 
-
-#define LABEL_INFO_type(l)              ((l)->ltype)
-#define LABEL_INFO_name(l)              ((l)->u1.lab_name)
-#define LABEL_INFO_num(l)               ((l)->u1.lab_num)
-#define LABEL_INFO_pragma(l)            ((l)->u1.pragma_str)
-#define LABEL_INFO_is_catch_start(l)    ((l)->u2.s1.is_catch_start)
-#define LABEL_INFO_is_try_start(l)      ((l)->u2.s1.is_try_start)
-#define LABEL_INFO_is_try_end(l)        ((l)->u2.s1.is_try_end)
-#define LABEL_INFO_is_terminate(l)      ((l)->u2.s1.is_terminate)
-#define LABEL_INFO_is_pragma(l)         (LABEL_INFO_type(l) == L_PRAGMA)
-#define LABEL_INFO_b1(l)                ((l)->u2.b1)
+#define LABELINFO_type(l) ((l)->ltype)
+#define LABELINFO_name(l) ((l)->u1.lab_name)
+#define LABELINFO_num(l) ((l)->u1.lab_num)
+#define LABELINFO_pragma(l) ((l)->u1.pragma_str)
+#define LABELINFO_is_catch_start(l) ((l)->u2.s1.is_catch_start)
+#define LABELINFO_is_try_start(l) ((l)->u2.s1.is_try_start)
+#define LABELINFO_is_try_end(l) ((l)->u2.s1.is_try_end)
+#define LABELINFO_is_terminate(l) ((l)->u2.s1.is_terminate)
+#define LABELINFO_is_pragma(l) (LABELINFO_type(l) == L_PRAGMA)
+#define LABELINFO_b1(l) ((l)->u2.b1)
 class LabelInfo {
+    COPY_CONSTRUCTOR(LabelInfo);
 public:
     LABEL_TYPE ltype;
-
     union {
-        SYM const* lab_name;
-        SYM const* pragma_str;
+        Sym const* lab_name;
+        Sym const* pragma_str;
         UINT lab_num;
     } u1;
 
@@ -97,10 +96,8 @@ public:
         } s1;
         BYTE b1;
     } u2;
-
 public:
-    COPY_CONSTRUCTOR(LabelInfo);
-
+    LabelInfo() {}
     void copy(LabelInfo const& li)
     {
         ltype = li.ltype;
@@ -109,10 +106,18 @@ public:
     }
     void copy_flag(LabelInfo const& li) { u2.b1 = li.u2.b1; }
 
-    void dump() const;
-    void dumpName() const;
+    void dump(Region const* rg) const;
+    void dumpName(Region const* rg) const;
 
     char const* getName(IN OUT StrBuf * buf) const;
+    UINT getNum() const { return LABELINFO_num(this); }
+    LABEL_TYPE getType() const { return LABELINFO_type(this); }
+    Sym const* getPragma() const { return LABELINFO_pragma(this); }
+
+    bool is_catch_start() const { return LABELINFO_is_catch_start(this); }
+    bool is_try_start() const { return LABELINFO_is_try_start(this); }
+    bool is_try_end() const { return LABELINFO_is_try_end(this); }
+    bool is_terminate() const { return LABELINFO_is_terminate(this); }
 };
 
 
@@ -121,15 +126,15 @@ public:
 inline UINT computeLabelHashValue(LabelInfo const* li)
 {
     INT v = 0;
-    if (LABEL_INFO_type(li) == L_CLABEL) {
-        CHAR const* p = SYM_name(LABEL_INFO_name(li));
+    if (LABELINFO_type(li) == L_CLABEL) {
+        CHAR const* p = SYM_name(LABELINFO_name(li));
         while (*p != 0) {
             v += *p;
             p++;
         }
     } else {
-        ASSERT0(LABEL_INFO_type(li) == L_ILABEL);
-        v = (INT)LABEL_INFO_num(li);
+        ASSERT0(LABELINFO_type(li) == L_ILABEL);
+        v = (INT)LABELINFO_num(li);
         v = (INT)((((UINT)(-v)) >> 7) ^ 0xAC5AAC5A);
     }
     return (UINT)v;
@@ -138,14 +143,14 @@ inline UINT computeLabelHashValue(LabelInfo const* li)
 
 LabelInfo * allocLabel(SMemPool * pool);
 LabelInfo * allocInternalLabel(SMemPool * pool);
-LabelInfo * allocCustomerLabel(SYM const* st, SMemPool * pool);
-LabelInfo * allocPragmaLabel(SYM const* st, SMemPool * pool);
+LabelInfo * allocCustomerLabel(Sym const* st, SMemPool * pool);
+LabelInfo * allocPragmaLabel(Sym const* st, SMemPool * pool);
 inline bool isSameLabel(LabelInfo const* li1, LabelInfo const* li2)
 {
     ASSERT0(li1 && li2);
     if (li1 == li2) { return true; }
-    if (LABEL_INFO_type(li1) == LABEL_INFO_type(li2) &&
-        LABEL_INFO_num(li1) == LABEL_INFO_num(li2)) {
+    if (LABELINFO_type(li1) == LABELINFO_type(li2) &&
+        LABELINFO_num(li1) == LABELINFO_num(li2)) {
         return true;
     }
     return false;

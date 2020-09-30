@@ -82,9 +82,6 @@ public:
         mds = NULL;
         duset = NULL;
     }
-
-    bool has_clean() const
-    { return md == NULL && mds == NULL && duset == NULL; }
 };
 
 } //namespace xoc

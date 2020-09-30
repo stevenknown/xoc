@@ -55,7 +55,7 @@ namespace xoc {
 //Since this is done bottom up, multiple occurrences of the identical THEN
 //stmts can be transformed. If tranformed, the new IF statement is returned;
 //otherwise, the original IF.
-bool IR_CFS_OPT::transformIf4(IR ** head, IR * ir)
+bool CfsOpt::transformIf4(IR ** head, IR * ir)
 {
     //TODO.
     DUMMYUSE(ir);
@@ -76,7 +76,7 @@ bool IR_CFS_OPT::transformIf4(IR ** head, IR * ir)
 //Since this is done bottom up, multiple occurrences of the identical ELSE
 //stmts can be commonized.  If tranformed, the new IF statement is returned;
 //otherwise, the original IF.
-bool IR_CFS_OPT::transformIf5(IR ** head, IR * ir)
+bool CfsOpt::transformIf5(IR ** head, IR * ir)
 {
     //TODO.
     DUMMYUSE(ir);
@@ -103,7 +103,7 @@ bool IR_CFS_OPT::transformIf5(IR ** head, IR * ir)
 //        IR-List
 //    } WHILE DET
 //    FALSE-PART
-bool IR_CFS_OPT::transformToDoWhile(IR ** head, IR * ir)
+bool CfsOpt::transformToDoWhile(IR ** head, IR * ir)
 {
     ASSERTN(head != NULL && *head != NULL, ("invalid parameter"));
     if (!ir->is_lab()) { return false; }
@@ -116,9 +116,8 @@ bool IR_CFS_OPT::transformToDoWhile(IR ** head, IR * ir)
             isSameLabel(LAB_lab(ir), GOTO_lab(IF_truebody(t)))) {
 
             //Start transform.
-            IR * dowhile = m_rg->allocIR(IR_DO_WHILE);
-            LOOP_det(dowhile) = m_rg->dupIRTree(LOOP_det(t));
-
+            IR * dowhile = m_rg->buildDoWhile(m_rg->dupIRTree(IF_det(t)),
+                                              NULL);
             IR * if_stmt = t;
             t = ir->get_next();
             while (t != NULL && t != if_stmt) {
@@ -127,6 +126,7 @@ bool IR_CFS_OPT::transformToDoWhile(IR ** head, IR * ir)
                 xcom::remove(head, c);
                 xcom::add_next(&LOOP_body(dowhile), c);
             }
+            dowhile->setParentPointer(true);
 
             ASSERTN(t == if_stmt, ("illegal IR layout"));
 
@@ -150,7 +150,9 @@ bool IR_CFS_OPT::transformToDoWhile(IR ** head, IR * ir)
 //ONLY used in this file
 static inline bool is_non_branch_ir(IR * ir)
 {
-    return !ir->isConditionalBr() && !ir->isUnconditionalBr() && !ir->isMultiConditionalBr();
+    return !ir->isConditionalBr() &&
+           !ir->isUnconditionalBr() &&
+           !ir->isMultiConditionalBr();
 }
 
 
@@ -176,7 +178,7 @@ static inline bool is_non_branch_ir(IR * ir)
 //
 //'goto L1' is removed and free, and L1 is removed if it is not a target
 //of some other instruction.
-bool IR_CFS_OPT::transformIf1(IR ** head, IR * ir)
+bool CfsOpt::transformIf1(IR ** head, IR * ir)
 {
     ASSERTN(head && *head, ("invalid parameter"));
 
@@ -207,7 +209,7 @@ bool IR_CFS_OPT::transformIf1(IR ** head, IR * ir)
                             LAB_lab(IR_next(second_goto)))) {
 
                 //Start transforming.
-                m_rg->invertCondition(&IF_det(ir));
+                Refine::invertCondition(&IF_det(ir), m_rg);
                 IR * new_list1 = NULL;
                 IR * new_list2 = NULL;
 
@@ -239,14 +241,13 @@ bool IR_CFS_OPT::transformIf1(IR ** head, IR * ir)
                 xcom::add_next(&new_list2, second_goto);
 
                 //Swap new_list1 and new_list2
-                xcom::insertbefore(&IF_truebody(ir), IF_truebody(ir), new_list2);
+                xcom::insertbefore(&IF_truebody(ir), IF_truebody(ir),
+                                   new_list2);
 
                 //Update the IR_parent for new_list2.
-                for (IR * tmp = new_list2; tmp != NULL; tmp = IR_next(tmp)) {
-                    IR_parent(tmp) = ir;
-                }
-
-                ASSERTN(IF_truebody(ir) == new_list2, ("illegal insertbefore<T>"));
+                ir->setParentPointer(true);
+                ASSERTN(IF_truebody(ir) == new_list2,
+                        ("illegal insertbefore<T>"));
 
                 xcom::insertafter(&ir, new_list1);
 
@@ -276,7 +277,7 @@ bool IR_CFS_OPT::transformIf1(IR ** head, IR * ir)
 //   if (!cond) {
 //       IR-list
 //   }
-bool IR_CFS_OPT::transformIf2(IR ** head, IR * ir)
+bool CfsOpt::transformIf2(IR ** head, IR * ir)
 {
     ASSERTN(head && *head, ("invalid parameter"));
     if (ir == NULL || !ir->is_if()) { return false; }
@@ -288,7 +289,8 @@ bool IR_CFS_OPT::transformIf2(IR ** head, IR * ir)
             m_rg->freeIRTree(ir);
             return true;
         }
-        m_rg->invertCondition(&IF_det(ir));
+        Refine::invertCondition(&IF_det(ir), m_rg);
+        //Swap true and false body.
         IF_truebody(ir) = IF_falsebody(ir);
         IF_falsebody(ir) = NULL;
         return true;
@@ -300,13 +302,13 @@ bool IR_CFS_OPT::transformIf2(IR ** head, IR * ir)
 
 //The followed forms
 // x is signed
-//     IF(x > 0x7FFFFFFF) {a=1} ELSE {b=1}   =>  b=1
-//     IF(x < 0x80000000) {a=1} ELSE {b=1}   =>  b=1
+//     IF(x > 0x7FFFFFFF) {a=1} ELSE {b=1}  =>  b=1
+//     IF(x < 0x80000000) {a=1} ELSE {b=1}  =>  b=1
 //
 // x is unsigned
-//     IF(x > 0xFFFFFFFF){a=1} ELSE {b=1}   =>  b=1
-//     IF(x < 0x0) {a=1} ELSE {b=1}         =>  b=1
-bool IR_CFS_OPT::transformIf3(IR ** head, IR * ir)
+//     IF(x > 0xFFFFFFFF){a=1} ELSE {b=1}  =>  b=1
+//     IF(x < 0x0) {a=1} ELSE {b=1}        =>  b=1
+bool CfsOpt::transformIf3(IR ** head, IR * ir)
 {
     ASSERTN(head && *head, ("invalid parameter"));
     if (ir == NULL || !ir->is_if()) { return false; }
@@ -325,15 +327,14 @@ bool IR_CFS_OPT::transformIf3(IR ** head, IR * ir)
             //e.g:
             //x is unsigned, if(x>0xFFFFFFFF) {a=1} else {b=1} => b=1
             //x is signed, if(x>0x7FFFFFFF) {a=1} else {b=1} =>  b=1
-            IR * allocIR = NULL;
+            IR * allocir = NULL;
             if (IF_falsebody(ir) != NULL) {
-                allocIR = m_rg->dupIRTree(IF_falsebody(ir));
+                allocir = m_rg->dupIRTree(IF_falsebody(ir));
             }
+            xcom::replace(head, ir, allocir);
 
-            xcom::replace(head, ir, allocIR);
-
-            if (allocIR != NULL) {
-                IR_parent(allocIR) = IR_parent(ir);
+            if (allocir != NULL) {
+                IR_parent(allocir) = IR_parent(ir);
             }
 
             m_rg->freeIRTree(ir);
@@ -350,15 +351,14 @@ bool IR_CFS_OPT::transformIf3(IR ** head, IR * ir)
               m_rg->getMinInteger(m_tm->getDTypeBitSize(
                 TY_dtype(opnd1->getType())), opnd1->is_signed())) {
             //x is signed, IF(x < 0x80000000) {a=1} ELSE {b=1}  =>  b=1
-            IR * allocIR = NULL;
+            IR * allocir = NULL;
             if (IF_falsebody(ir) != NULL) {
-                allocIR = m_rg->dupIRTree(IF_falsebody(ir));
+                allocir = m_rg->dupIRTree(IF_falsebody(ir));
             }
+            xcom::replace(head, ir, allocir);
 
-            xcom::replace(head, ir, allocIR);
-
-            if (allocIR != NULL) {
-                IR_parent(allocIR) = IR_parent(ir);
+            if (allocir != NULL) {
+                IR_parent(allocir) = IR_parent(ir);
             }
 
             m_rg->freeIRTree(ir);
@@ -368,15 +368,14 @@ bool IR_CFS_OPT::transformIf3(IR ** head, IR * ir)
                    opnd0->is_uint() &&
                    CONST_int_val(opnd1) == 0) {
             //x is unsigned, if(x<0) {a=1} else {b=1}  =>  b=1
-            IR * allocIR = NULL;
+            IR * allocir = NULL;
             if (IF_falsebody(ir) != NULL) {
-                allocIR = m_rg->dupIRTree(IF_falsebody(ir));
+                allocir = m_rg->dupIRTree(IF_falsebody(ir));
             }
+            xcom::replace(head, ir, allocir);
 
-            xcom::replace(head, ir, allocIR);
-
-            if (allocIR != NULL) {
-                IR_parent(allocIR) = IR_parent(ir);
+            if (allocir != NULL) {
+                IR_parent(allocir) = IR_parent(ir);
             }
 
             m_rg->freeIRTree(ir);
@@ -402,7 +401,7 @@ bool IR_CFS_OPT::transformIf3(IR ** head, IR * ir)
 //        a = 10;
 //        b += 3;
 //     }
-bool IR_CFS_OPT::hoistLoop(IR ** head, IR * ir)
+bool CfsOpt::hoistLoop(IR ** head, IR * ir)
 {
     ASSERT0(ir->is_dowhile() || ir->is_whiledo() || ir->is_doloop());
     ASSERTN(LOOP_det(ir), ("DET is NULL"));
@@ -429,6 +428,7 @@ bool IR_CFS_OPT::hoistLoop(IR ** head, IR * ir)
         new_body_list = m_rg->dupIRTreeList(new_list);
         xcom::insertbefore(head, ir, new_list);
         xcom::add_next(&LOOP_body(ir), new_body_list);
+        ir->setParentPointer(false);
         return true;
     }
     return false;
@@ -436,12 +436,12 @@ bool IR_CFS_OPT::hoistLoop(IR ** head, IR * ir)
 
 
 //Canonicalize det of IF.
-//e.g: if (a=10,b+=3,c<a) {...}
-//be replaced by
-//     a = 10;
-//     b += 3;
-//     if (c<a) {...}
-bool IR_CFS_OPT::hoistIf(IR ** head, IR * ir)
+//e.g: if (a=10, b+=3, c<a) {...}
+//  will be replaced by
+//    a = 10;
+//    b += 3;
+//    if (c<a) {...}
+bool CfsOpt::hoistIf(IR ** head, IR * ir)
 {
     ASSERTN(ir->is_if(), ("need IF"));
     ASSERTN(IF_det(ir), ("DET is NULL"));
@@ -458,8 +458,8 @@ bool IR_CFS_OPT::hoistIf(IR ** head, IR * ir)
         det = IF_det(ir);
         while (i > 1) {
             IR * c = det;
-            ASSERTN(c->is_stmt(),
-                ("Non-stmt ir should be remove during reshape_ir_tree()"));
+            ASSERTN(c->is_stmt(), ("Non-stmt ir should be remove"
+                                   " during reshape_ir_tree()"));
             det = det->get_next();
             xcom::remove(&IF_det(ir), c);
             xcom::add_next(&new_list, c);
@@ -472,12 +472,9 @@ bool IR_CFS_OPT::hoistIf(IR ** head, IR * ir)
 }
 
 
-bool IR_CFS_OPT::CfsOpt(
-        IN OUT IR ** ir_list,
-        SimpCtx const& sc)
+bool CfsOpt::doCfsOpt(IN OUT IR ** ir_list, SimpCtx const& sc)
 {
     bool change = false;
-
     for (IR * ir = *ir_list; ir != NULL;) {
         if (transformToDoWhile(ir_list, ir)) {
             change = true;
@@ -510,12 +507,12 @@ bool IR_CFS_OPT::CfsOpt(
                 ir = *ir_list;
                 continue;
             }
-            if (CfsOpt(&IF_truebody(ir), sc)) {
+            if (doCfsOpt(&IF_truebody(ir), sc)) {
                 change = true;
                 ir = *ir_list;
                 continue;
             }
-            if (CfsOpt(&IF_falsebody(ir), sc)) {
+            if (doCfsOpt(&IF_falsebody(ir), sc)) {
                 change = true;
                 ir = *ir_list;
                 continue;
@@ -529,14 +526,14 @@ bool IR_CFS_OPT::CfsOpt(
                 ir = *ir_list;
                 continue;
             }
-            if (CfsOpt(&LOOP_body(ir), sc)) {
+            if (doCfsOpt(&LOOP_body(ir), sc)) {
                 change = true;
                 ir = *ir_list;
                 continue;
             }
             break;
         case IR_SWITCH:
-            if (CfsOpt(&SWITCH_body(ir), sc)) {
+            if (doCfsOpt(&SWITCH_body(ir), sc)) {
                 change = true;
                 ir = *ir_list;
                 continue;
@@ -545,7 +542,7 @@ bool IR_CFS_OPT::CfsOpt(
         default:;
         } //end switch
 
-         ir = ir->get_next();
+        ir = ir->get_next();
     }
     return change;
 }
@@ -557,8 +554,9 @@ bool IR_CFS_OPT::CfsOpt(
 //  1. goto reduction
 //  2. if restructure
 //  3. loop restructure
-bool IR_CFS_OPT::perform(SimpCtx const& sc)
+bool CfsOpt::perform(SimpCtx const& sc)
 {
+    START_TIMER(t, getPassName());
     ASSERT0(!SIMP_if(&sc) &&
             !SIMP_doloop(&sc) &&
             !SIMP_dowhile(&sc) &&
@@ -566,13 +564,12 @@ bool IR_CFS_OPT::perform(SimpCtx const& sc)
             !SIMP_switch(&sc) &&
             !SIMP_break(&sc) &&
             !SIMP_continue(&sc));
-    if (!g_do_cfs_opt) { return false; }
-
     IR * irs = m_rg->getIRList();
-    bool change = CfsOpt(&irs, sc);
+    bool change = doCfsOpt(&irs, sc);
     if (change) {
         m_rg->setIRList(irs);
     }
+    END_TIMER(t, getPassName());    
     return change;
 }
 

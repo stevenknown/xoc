@@ -187,7 +187,7 @@ public:
 class EHLabelAttachInfo : public BaseAttachInfo {
     COPY_CONSTRUCTOR(EHLabelAttachInfo);
 public:
-    SList<LabelInfo*> labels; //record a list of Labels.
+    xcom::SList<LabelInfo*> labels; //record a list of Labels.
 
 public:
     EHLabelAttachInfo(SMemPool * pool = NULL) : BaseAttachInfo(AI_EH_LABEL)
@@ -221,7 +221,7 @@ public:
 class ProfileAttachInfo : public BaseAttachInfo {
     COPY_CONSTRUCTOR(ProfileAttachInfo);
 public:
-    SYM const* tag;
+    Sym const* tag;
     INT * data; //truebr freq, falsebr freq.
 
 public:

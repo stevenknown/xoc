@@ -71,6 +71,7 @@ public:
 
 //Perform Copy Propagation
 class CopyProp : public Pass {
+    COPY_CONSTRUCTOR(CopyProp);
 private:
     Region * m_rg;
     MDSystem * m_md_sys;
@@ -78,6 +79,9 @@ private:
     IRCFG * m_cfg;
     MDSetMgr * m_md_set_mgr;
     TypeMgr * m_tm;
+    PRSSAMgr * m_prssamgr;
+    MDSSAMgr * m_mdssamgr;
+    Refine * m_refine;
     UINT m_prop_kind;
 
 private:
@@ -105,6 +109,10 @@ private:
                                    IR const* use,
                                    MDSSAMgr * mdssamgr);
 
+    bool existMayDefTillBB(IR const* exp,
+                           IRBB const* start,
+                           IRBB const* meetup) const;
+
     bool isSimpCVT(IR const* ir) const;
     bool isConstCVT(IR const* ir) const;
     bool is_available(IR const* def_stmt,
@@ -126,6 +134,11 @@ private:
                             IR const* cand_expr,
                             IN OUT CPCtx & ctx);
 
+    bool useMDSSADU() const
+    { return m_mdssamgr != NULL && m_mdssamgr->is_valid(); }
+    bool usePRSSADU() const
+    { return m_prssamgr != NULL && m_prssamgr->is_valid(); }
+
 public:
     CopyProp(Region * rg)
     {
@@ -136,10 +149,12 @@ public:
         m_cfg = rg->getCFG();
         m_md_set_mgr = rg->getMDSetMgr();
         m_tm = rg->getTypeMgr();
+        m_refine = NULL;
+        m_mdssamgr = NULL;
+        m_prssamgr = NULL;
         ASSERT0(m_cfg && m_du && m_md_sys && m_tm && m_md_set_mgr);
         m_prop_kind = CP_PROP_UNARY_AND_SIMPLEX;
     }
-    COPY_CONSTRUCTOR(CopyProp);
     virtual ~CopyProp() {}
 
     //Check if ir is appropriate for propagation.
@@ -176,6 +191,7 @@ public:
         }
         return false;
     }
+    Region * getRegion() const { return m_rg; }
     virtual CHAR const* getPassName() const { return "Copy Propagation"; }
     virtual PASS_TYPE getPassType() const { return PASS_CP; }
     IR const* getSimpCVTValue(IR const* ir) const;

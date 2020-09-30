@@ -52,9 +52,9 @@ template <typename T> int dummy_use(T const&) { return 0; }
 
 //Do both assert and dummyuse at debug mode, do dummyuse at release mode.
 #define ASSERTN_DUMMYUSE(a, b)  \
-    ((a) ? DUMMYUSE(a) : (m022138(__FILE__, __LINE__), m518087 b))
+    ((a) ? DUMMYUSE(a) : (m522138(__FILE__, __LINE__), m518087 b))
 #define ASSERT0_DUMMYUSE(a)  \
-    ((a) ? DUMMYUSE(a) : (m022138(__FILE__, __LINE__), m518087 ("")))
+    ((a) ? DUMMYUSE(a) : (m522138(__FILE__, __LINE__), m518087 ("")))
 #else
 //Do assert at debug mode, and do dummyuse at release mode.
 #define CHECK_DUMMYUSE(a) DUMMYUSE(a)
@@ -135,6 +135,7 @@ inline UINT getNearestPowerOf2(UINT v)
 }
 
 //Compute the nearest power of 2 that not less than v.
+//e.g: given v is 60, return 64.
 inline ULONGLONG getNearestPowerOf2(ULONGLONG v)
 {
     v--;
@@ -156,6 +157,7 @@ UINT getSparsePopCount(ULONGLONG v);
 
 //Compute the power of 2, return the result.
 //Note v must be power of 2.
+//e.g: given v is 64, return 16.
 UINT getPowerOf2(ULONGLONG v);
 
 //Extract file suffix.

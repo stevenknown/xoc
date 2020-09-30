@@ -287,7 +287,7 @@ public:
 };
 
 
-typedef TMap<VAR*, MD const*, CompareVar> Var2MD;
+typedef TMap<Var*, MD const*, CompareVar> Var2MD;
 typedef TMap<IR const*, MD const*> IR2Heapobj;
 
 
@@ -376,17 +376,17 @@ protected:
     //They are inavailable after AA finished.
     PtPairSet * getInPtPairSet(IRBB const* bb)
     {
-        ASSERTN(m_in_pp_set.get(BB_id(bb)),
-                ("IN set is not yet initialized for BB%d", BB_id(bb)));
-        return m_in_pp_set.get(BB_id(bb));
+        ASSERTN(m_in_pp_set.get(bb->id()),
+                ("IN set is not yet initialized for BB%d", bb->id()));
+        return m_in_pp_set.get(bb->id());
     }
     //Do NOT public functions related to PtPair.
     //They are inavailable after AA finished.
     PtPairSet * getOutPtPairSet(IRBB const* bb)
     {
-        ASSERTN(m_out_pp_set.get(BB_id(bb)),
-                ("OUT set is not yet initialized for BB%d", BB_id(bb)));
-        return m_out_pp_set.get(BB_id(bb));
+        ASSERTN(m_out_pp_set.get(bb->id()),
+                ("OUT set is not yet initialized for BB%d", bb->id()));
+        return m_out_pp_set.get(bb->id());
     }
 
     bool evaluateFromLda(IR const* ir);
@@ -397,7 +397,7 @@ protected:
     void initBBPPSet(PPSetMgr & ppsetmgr);
     void initFlowSensitiveEntryPtset(PPSetMgr & ppsetmgr);
     void initEntryPtset(PPSetMgr & ppsetmgr);
-    void initGlobalAndParameterVarPtSet(VAR * v, MD2MDSet * mx);
+    void initGlobalAndParameterVarPtSet(Var * v, MD2MDSet * mx);
     void inferPointerArith(IR const* ir,
                            OUT MDSet & mds,
                            MDSet const& opnd0_mds,
@@ -540,16 +540,16 @@ public:
     void cleanContext(OptCtx & oc);
    
     void destroyContext(OptCtx & oc);
-    void dumpMD2MDSet(IN MD2MDSet * mx, bool dump_ptg);
-    void dumpMD2MDSet(MD const* md, IN MD2MDSet * mx);
-    void dumpIRPointTo(IN IR * ir, bool dump_kid, IN MD2MDSet * mx);
-    void dumpIRPointToForBB(IRBB * bb, bool dump_kid);
-    void dumpIRPointToForRegion(bool dump_kid);
-    void dumpPtPairSet(PtPairSet & pps);
-    void dumpInOutPointToSetForBB();
-    void dumpMD2MDSetForRegion(bool dump_pt_graph);
-    void dumpMayPointTo();
-    void dump(CHAR const* name);
+    void dumpMD2MDSet(MD2MDSet const* mx, bool dump_ptg) const;
+    void dumpMD2MDSet(MD const* md, MD2MDSet const* mx) const;
+    void dumpIRPointTo(IR const* ir, bool dump_kid, MD2MDSet const* mx) const;
+    void dumpIRPointToForBB(IRBB const* bb, bool dump_kid) const;
+    void dumpIRPointToForRegion(bool dump_kid) const;
+    void dumpPtPairSet(PtPairSet const& pps) const;
+    void dumpInOutPointToSetForBB() const;
+    void dumpMD2MDSetForRegion(bool dump_pt_graph) const;
+    void dumpMayPointTo() const;
+    virtual bool dump() const;
 
     void ElemUnionPointTo(MDSet const& mds,
                           MDSet const& in_set,
@@ -565,13 +565,14 @@ public:
     void ElemCleanPointTo(MDSet const& mds, IN MD2MDSet * mx);
     void ElemCleanExactPointTo(MDSet const& mds, IN MD2MDSet * mx);
 
+    Region * getRegion() const { return m_rg; }
     virtual CHAR const* getPassName() const { return "Alias Analysis"; }
     virtual PASS_TYPE getPassType() const { return PASS_AA; }
     DefMiscBitSetMgr * getSBSMgr() { return &m_misc_bs_mgr; }
 
     //For given MD2MDSet, return the MDSet that 'md' pointed to.
     //ctx: context of point-to analysis.
-    MDSet const* getPointTo(UINT mdid, MD2MDSet & ctx) const
+    MDSet const* getPointTo(UINT mdid, MD2MDSet const& ctx) const
     { return ctx.get(mdid); }
 
     //Return the may-point-to Memory Descriptor Set.
@@ -582,7 +583,7 @@ public:
     //Return true if Alias Analysis has initialized.
     bool is_init() const { return m_maypts != NULL; }
     bool isFlowSensitive() const { return m_flow_sensitive; }
-    bool isValidStmtToAA(IR * ir);
+    bool isValidStmtToAA(IR const* ir) const;
     bool isHeapMem(UINT mdid) const
     { //return mdid == MD_HEAP_MEM ? true : false;
       DUMMYUSE(mdid);

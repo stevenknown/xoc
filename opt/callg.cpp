@@ -80,6 +80,8 @@ void CallGraph::dumpVCG(CHAR const* name, INT flag)
     UNLINK(name);
     FILE * h = fopen(name, "a+");
     ASSERTN(h != NULL, ("%s create failed!!!",name));
+    UINT org = getRegionMgr()->getLogMgr()->getIndent();
+    getRegionMgr()->getLogMgr()->decIndent(org);
 
     bool dump_src_line = HAVE_FLAG(flag, CALLG_DUMP_SRC_LINE);
     bool dump_ir_detail = HAVE_FLAG(flag, CALLG_DUMP_IR);
@@ -87,53 +89,49 @@ void CallGraph::dumpVCG(CHAR const* name, INT flag)
 
     //Print comment
     fprintf(h, "\n/*");
-    FILE * old = g_tfile;
-    g_tfile = h;
-    //....
-    g_tfile = old;
     fprintf(h, "\n*/\n");
 
     //Print graph structure description.
-    fprintf(h, "graph: {"
-              "title: \"Graph\"\n"
-              "shrink:  15\n"
-              "stretch: 27\n"
-              "layout_downfactor: 1\n"
-              "layout_upfactor: 1\n"
-              "layout_nearfactor: 1\n"
-              "layout_splinefactor: 70\n"
-              "spreadlevel: 1\n"
-              "treefactor: 0.500000\n"
-              "node_alignment: center\n"
-              "orientation: top_to_bottom\n"
-              "late_edge_labels: no\n"
-              "display_edge_labels: yes\n"
-              "dirty_edge_labels: no\n"
-              "finetuning: no\n"
-              "nearedges: no\n"
-              "splines: yes\n"
-              "ignoresingles: no\n"
-              "straight_phase: no\n"
-              "priority_phase: no\n"
-              "manhatten_edges: no\n"
-              "smanhatten_edges: no\n"
-              "port_sharing: no\n"
-              "crossingphase2: yes\n"
-              "crossingoptimization: yes\n"
-              "crossingweight: bary\n"
-              "arrow_mode: free\n"
-              "layoutalgorithm: mindepthslow\n"
-              "node.borderwidth: 2\n"
-              "node.color: lightcyan\n"
-              "node.textcolor: black\n"
-              "node.bordercolor: blue\n"
-              "edge.color: darkgreen\n");
+    fprintf(h,
+            "graph: {"
+            "title: \"Graph\"\n"
+            "shrink:  15\n"
+            "stretch: 27\n"
+            "layout_downfactor: 1\n"
+            "layout_upfactor: 1\n"
+            "layout_nearfactor: 1\n"
+            "layout_splinefactor: 70\n"
+            "spreadlevel: 1\n"
+            "treefactor: 0.500000\n"
+            "node_alignment: center\n"
+            "orientation: top_to_bottom\n"
+            "late_edge_labels: no\n"
+            "display_edge_labels: yes\n"
+            "dirty_edge_labels: no\n"
+            "finetuning: no\n"
+            "nearedges: no\n"
+            "splines: yes\n"
+            "ignoresingles: no\n"
+            "straight_phase: no\n"
+            "priority_phase: no\n"
+            "manhatten_edges: no\n"
+            "smanhatten_edges: no\n"
+            "port_sharing: no\n"
+            "crossingphase2: yes\n"
+            "crossingoptimization: yes\n"
+            "crossingweight: bary\n"
+            "arrow_mode: free\n"
+            "layoutalgorithm: mindepthslow\n"
+            "node.borderwidth: 2\n"
+            "node.color: lightcyan\n"
+            "node.textcolor: black\n"
+            "node.bordercolor: blue\n"
+            "edge.color: darkgreen\n");
 
     //Dump graph vertex.
-    old = g_tfile;
-    g_tfile = h;
+    getRegionMgr()->getLogMgr()->push(h, name); 
     INT c;
-    List<VAR const*> formalparamlst;
+    List<Var const*> formalparamlst;
     for (xcom::Vertex * v = m_vertices.get_first(c);
          v != NULL; v = m_vertices.get_next(c)) {
         INT id = v->id();
@@ -143,37 +141,36 @@ void CallGraph::dumpVCG(CHAR const* name, INT flag)
                    "fontname:\"courB\" label:\"", id);
 
         CHAR const* cnname = CN_sym(cn) != NULL ?
-                SYM_name(CN_sym(cn)) : "IndirectCall";
-        if (CN_ru(cn) != NULL) {
+                             SYM_name(CN_sym(cn)) : "IndirectCall";
+        if (cn->region() != NULL) {
             fprintf(h, "CN(%d):Region(%d):%s\n",
-                    CN_id(cn), REGION_id(CN_ru(cn)), cnname);
+                    cn->id(), cn->region()->id(), cnname);
         } else {
-            fprintf(h, "CN(%d):%s\n", CN_id(cn), cnname);
+            fprintf(h, "CN(%d):%s\n", cn->id(), cnname);
         }
 
         fprintf(h, "\n");
-        if (dump_ir_detail && CN_ru(cn) != NULL) {
+        if (dump_ir_detail && cn->region() != NULL) {
             //Dump formal paramters.
             formalparamlst.clean();
-            CN_ru(cn)->findFormalParam(formalparamlst, true);
-            for (VAR const* param = formalparamlst.get_head(); param != NULL;
+            cn->region()->findFormalParam(formalparamlst, true);
+            for (Var const* param = formalparamlst.get_head(); param != NULL;
                  param = formalparamlst.get_next()) {
-                param->dump(g_tfile, m_tm);
+                param->dump(m_tm);
             }
 
-            g_indent = 0;
-            IR * irs = CN_ru(cn)->getIRList();
+            IR * irs = cn->region()->getIRList();
             if (irs != NULL) {
                 for (; irs != NULL; irs = irs->get_next()) {
                     //fprintf(h, "%s\n", dump_ir_buf(ir, buf));
                     //TODO: implement dump_ir_buf();
-                    dumpIR(irs, CN_ru(cn), NULL, IR_DUMP_KID|
-                        (dump_src_line ? IR_DUMP_SRC_LINE : 0)|
-                        (dump_inner_region ? IR_DUMP_INNER_REGION : 0));
+                    dumpIR(irs, cn->region(), NULL, IR_DUMP_KID|
+                           (dump_src_line ? IR_DUMP_SRC_LINE : 0)|
+                           (dump_inner_region ? IR_DUMP_INNER_REGION : 0));
                 }
             } else {
-                dumpBBList(CN_ru(cn)->getBBList(),
-                           CN_ru(cn), NULL, dump_inner_region);
+                dumpBBList(cn->region()->getBBList(),
+                           cn->region(), dump_inner_region);
             }
         }
         fprintf(h, "\"}");
@@ -187,7 +184,8 @@ void CallGraph::dumpVCG(CHAR const* name, INT flag)
         fprintf(h, "\nedge: { sourcename:\"%d\" targetname:\"%d\" %s}",
                 from->id(), to->id(),  "");
     }
-    g_tfile = old;
+    getRegionMgr()->getLogMgr()->pop(); 
+    getRegionMgr()->getLogMgr()->incIndent(org);
     fprintf(h, "\n}\n");
     fclose(h);
 }
@@ -201,7 +199,7 @@ CallNode * CallGraph::newCallNode(IR const* ir, Region * rg)
 {
     ASSERT0(ir->isCallStmt() && rg);
     if (ir->is_call()) {
-        SYM const* name = CALL_idinfo(ir)->get_name();
+        Sym const* name = CALL_idinfo(ir)->get_name();
         CallNode * cn  = mapSym2CallNode(name, rg);
         if (cn != NULL) { return cn; }
 
@@ -225,11 +223,11 @@ CallNode * CallGraph::newCallNode(Region * rg)
 {
     ASSERT0(rg);
     ASSERT0(rg->getRegionVar() && rg->getRegionVar()->get_name());
-    SYM const* name = rg->getRegionVar()->get_name();
+    Sym const* name = rg->getRegionVar()->get_name();
     if (rg->is_program()) {
         CallNode * cn = mapRegion2CallNode(rg);
         if (cn != NULL) {
-            ASSERTN(CN_ru(cn) == rg, ("more than 2 rg with same id"));
+            ASSERTN(cn->region() == rg, ("more than 2 rg with same id"));
             return cn;
         }
 
@@ -237,7 +235,7 @@ CallNode * CallGraph::newCallNode(Region * rg)
         CN_sym(cn) = name;
         CN_id(cn) = m_cn_count++;
         CN_ru(cn) = rg;
-        m_ruid2cn.set(REGION_id(rg), cn);
+        m_ruid2cn.set(rg->id(), cn);
         return cn;
     }
 
@@ -248,8 +246,8 @@ CallNode * CallGraph::newCallNode(Region * rg)
     CN_id(cn) = m_cn_count++;
     CN_ru(cn) = rg;
     genSYM2CN(rg->getParent())->set(name, cn);
-    ASSERT0(m_ruid2cn.get(REGION_id(rg)) == NULL);
-    m_ruid2cn.set(REGION_id(rg), cn);
+    ASSERT0(m_ruid2cn.get(rg->id()) == NULL);
+    m_ruid2cn.set(rg->id(), cn);
     return cn;
 }
 
@@ -266,17 +264,17 @@ bool CallGraph::build(RegionMgr * rumgr)
             SYM2CN * sym2cn = genSYM2CN(rg->getParent());
             ASSERT0(sym2cn);
 
-            SYM const* name = rg->getRegionVar()->get_name();
+            Sym const* name = rg->getRegionVar()->get_name();
             ASSERT0(name);
 
             CallNode * cn = sym2cn->get(name);
             if (cn != NULL) {
-                if (CN_ru(cn) == NULL) {
+                if (cn->region() == NULL) {
                     CN_ru(cn) = rg;
-                    m_ruid2cn.set(REGION_id(rg), cn);
+                    m_ruid2cn.set(rg->id(), cn);
                 }
 
-                if (CN_ru(cn) != rg) {
+                if (cn->region() != rg) {
                     //more than one regions has the same id.
                     //UNREACHABLE();
                     return false;

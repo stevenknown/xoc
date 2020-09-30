@@ -36,6 +36,12 @@ author: Su Zhenyu
 
 namespace xoc {
 
+//Initial version is an abstract description to indicate the imported DEF of
+//each PR. Especially for dedicated PR, parameter.
+//PR should have explicitly definition that version must not
+//be initial version.
+#define PRSSA_INIT_VERSION 0
+
 typedef xcom::SEGIter * IRSetIter;
 
 class IRSet : public DefSBitSet {
@@ -60,10 +66,10 @@ public:
 
 
 //Verisoned Presentation.
-//For each version of each prno, VP is unique.
+//For each version of each prno, VPR is unique.
 typedef SEGIter * SSAUseIter;
 
-#define SSA_id(ssainfo) ((ssainfo)->id)
+#define SSA_id(ssainfo) ((ssainfo)->uid)
 #define SSA_def(ssainfo) ((ssainfo)->def_stmt)
 #define SSA_uses(ssainfo) ((ssainfo)->use_exp_set)
 class SSAInfo {
@@ -71,58 +77,87 @@ class SSAInfo {
 protected:
     void cleanMember()
     {
-        id = 0;
+        uid = 0;
         def_stmt = NULL;
     }
 public:
-    UINT id;
+    UINT uid;
     IR * def_stmt;
     IRSet use_exp_set;
 
 public:
     SSAInfo(DefSegMgr * sm) : use_exp_set(sm) { cleanMember(); }
 
-    inline void cleanDU()
+    //Add an USE reference.
+    //This function build DU chain between DEF and 'ir'.
+    void addUse(IR const* ir)
+    {
+        ASSERT0(ir && ir->isReadPR());
+        ASSERT0(ir->getSSAInfo() == this);
+        SSA_uses(this).append(ir);
+    }
+
+    //This function guarantee all memory resource recycled.
+    void cleanDU()
     {
         SSA_def(this) = NULL;
         SSA_uses(this).clean();
     }
 
-    inline void init(DefSegMgr * sm)
+    //Get SSAInfo id.
+    UINT id() const { return uid; }
+    void init(DefSegMgr * sm)
     {
         cleanMember();
-        use_exp_set.init(sm);
+        SSA_uses(this).init(sm);
+    }
+    void initNoClean(DefSegMgr * sm) { SSA_uses(this).init(sm); }
+
+    void destroy() { SSA_uses(this).destroy(); }
+
+    //Return true if 'ir' is an USE reference.
+    bool findUse(IR const* ir) const
+    {
+        ASSERT0(ir && ir->isReadPR());
+        return SSA_uses(this).find(ir);
     }
 
-    void initNoClean(DefSegMgr * sm) { use_exp_set.init(sm); }
+    //Get the DEF stmt.
+    IR * getDef() const { return SSA_def(this); }
+    //Get the USE set of expressions.
+    IRSet const& getUses() const { return SSA_uses(this); }
 
-    void destroy() { use_exp_set.destroy(); }
-
-    IR const* get_def() const { return def_stmt; }
-    IRSet const& get_uses() const { return use_exp_set; }
-
+    //Remove 'ir' from USE set.
+    //This function cut off DU chain between DEF and 'ir'.
     void removeUse(IR const* ir)
     {
         ASSERT0(ir && ir->isReadPR());
         SSA_uses(this).remove(ir);
-    }
+    }    
 };
 
 
 //Version PR.
-#define VP_prno(v)           ((v)->prno)
-#define VP_ver(v)            ((v)->version)
-class VP : public SSAInfo {
-    COPY_CONSTRUCTOR(VP);
+//Record original PRNO before SSA construction.
+#define VPR_orgprno(v) (((VPR*)v)->m_orgprno)
+//Record renamed PRNO after SSA construction.
+#define VPR_newprno(v) (((VPR*)v)->m_newprno)
+//Record Version related to original PRNO.
+#define VPR_version(v) (((VPR*)v)->m_version)
+class VPR : public SSAInfo {
+    COPY_CONSTRUCTOR(VPR);
 public:
-    UINT version;
-    UINT prno;
-    VP(DefSegMgr * sm) : SSAInfo(sm) { cleanMember(); }
+    UINT m_version; //record Version related to original PRNO.
+    UINT m_newprno; //record renamed PRNO after SSA construction.
+    UINT m_orgprno; //record original PRNO before SSA construction.
+    VPR(DefSegMgr * sm) : SSAInfo(sm) { cleanMember(); }
+
     inline void cleanMember()
     {
         SSAInfo::cleanMember();
-        prno = 0;
-        version = 0;
+        m_newprno = PRNO_UNDEF;
+        m_orgprno = PRNO_UNDEF;
+        m_version = PRSSA_INIT_VERSION;
     }
 
     void init(DefSegMgr * sm)
@@ -130,13 +165,30 @@ public:
         cleanMember();
         SSAInfo::init(sm);
     }
+
+    UINT newprno() const { return VPR_newprno(this); }
+    UINT orgprno() const { return VPR_orgprno(this); }
+
+    UINT version() const { return VPR_version(this); }
 };
 
-//Mapping from PRNO to vector of VP.
-typedef Vector<Vector<VP*>*> UINT2VPVec;
 
-//Mapping from PRNO id to Stack of VP.
-typedef Vector<Stack<VP*>*> UINT2VPStack;
+class VPRVec : public Vector<VPR*> {
+    COPY_CONSTRUCTOR(VPRVec);
+public:
+    VPRVec() {}
+    //Find the VPR that have PR defined at given BB.
+    VPR * findVPR(UINT bbid) const;
+    //Find the initial version VPR.
+    VPR * findInitVersion() const;
+};
+
+
+//Mapping from PRNO to vector of VPR.
+typedef Vector<VPRVec*> UINT2VPVec;
+
+//Mapping from PRNO id to Stack of VPR.
+typedef Vector<Stack<VPR*>*> UINT2VPRStack;
 
 } //namespace xoc
 #endif

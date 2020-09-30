@@ -36,8 +36,8 @@ author: Su Zhenyu
 
 namespace xoc {
 
-//Map between VAR and PRno.
-class VAR2PR : public TMap<VAR const*, UINT, CompareConstVar> {
+//Map between Var and PRno.
+class VAR2PR : public TMap<Var const*, UINT, CompareConstVar> {
 };
 
 class LivenessMgr : public Pass {
@@ -171,6 +171,7 @@ public:
     virtual CHAR const* getPassName() const { return "LivenessMgr"; }
     PASS_TYPE getPassType() const { return PASS_LIVENESS_MGR; }
     DefMiscBitSetMgr * getSBSMgr() { return &m_sbs_mgr; }
+    Region * getRegion() const { return m_rg; }
 
     //Get livein PR. The return set is readonly.
     DefSBitSetCore const* read_livein(UINT bbid) const
@@ -210,7 +211,7 @@ public:
     void setVAR2PR(VAR2PR * v2p) { m_var2pr = v2p; }
 
     void setPRToBeLiveout(IRBB * bb, UINT prno)
-    { get_liveout(BB_id(bb))->bunion(prno, m_sbs_mgr); }
+    { get_liveout(bb->id())->bunion(prno, m_sbs_mgr); }
 
     virtual bool perform(OptCtx & oc);
 };

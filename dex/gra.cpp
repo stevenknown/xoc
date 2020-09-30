@@ -430,7 +430,7 @@ void RSC::comp_call_fmt(IR const* ir)
     }
 
     if (ir->is_call() && CALL_is_intrinsic(ir)) {
-        VAR const* v = CALL_idinfo(ir);
+        Var const* v = CALL_idinfo(ir);
         ASSERT0(v);
         BLTIN_TYPE blt = m_str2builtin.get(SYM_name(v->get_name()));
         ASSERT0(blt != BLTIN_UNDEF);
@@ -517,7 +517,7 @@ void RSC::comp_call_fmt(IR const* ir)
     case INVOKE_STATIC:
     case INVOKE_INTERFACE:
         {
-            ASSERT0(cnt_list(p) <= 5);
+            ASSERT0(xcom::cnt_list(p) <= 5);
             m_ir2fmt.set(ir->id(), FACDEFGBBBBv);
         }
         break;
@@ -609,7 +609,7 @@ void RSC::comp_ir_fmt(IR const* ir)
         }
         return;
     case IR_RETURN:
-        ASSERT0(cnt_list(RET_exp(ir)) <= 1);
+        ASSERT0(xcom::cnt_list(RET_exp(ir)) <= 1);
         if (RET_exp(ir) == NULL) {
             m_ir2fmt.set(ir->id(), F0);
         } else {
@@ -643,62 +643,60 @@ void RSC::comp_ir_constrain()
 
 void RSC::dump_ir_fmt()
 {
-    if (g_tfile == NULL) { return; }
-    note("\n==------- DUMP IR FMT --------==");
+    if (!getRegion()->isLogMgrInit()) { return; }
+    note(getRegion(), "\n==------- DUMP IR FMT --------==");
     List<IRBB*> * bbl = m_rg->getBBList();
     for (IRBB * bb = bbl->get_head(); bb != NULL; bb = bbl->get_next()) {
-        note("\n-- BB%d --", BB_id(bb));
+        note(getRegion(), "\n-- BB%d --", bb->id());
         for (IR const* ir = BB_first_ir(bb);
              ir != NULL; ir = BB_next_ir(bb)) {
             FMT f = m_ir2fmt.get(ir->id());
-            note("\nFMT:%s", g_fmt_name[f]);
+            note(getRegion(), "\nFMT:%s", g_fmt_name[f]);
             dumpIR(ir, m_rg);
         }
     }
-    note("\n");
-    fflush(g_tfile);
+    note(getRegion(), "\n");
 }
 
 
 void RSC::dump_glt_usable()
 {
-    if (g_tfile == NULL) { return; }
-    note("\n=== DUMP GLT Usable Regs: ===");
+    if (!getRegion()->isLogMgrInit()) { return; }
+    note(getRegion(), "\n=== DUMP GLT Usable Regs: ===");
     Vector<GLT*> * gltv = m_gltm->get_gltvec();
     bool dump_bit = false;
     for (INT i = 0; i <= gltv->get_last_idx(); i++) {
         GLT * g = gltv->get(i);
         if (g == NULL) { continue; }
-        note("\nGLT%d(pr%d):", GLT_id(g), GLT_prno(g));
+        note(getRegion(), "\nGLT%d(pr%d):", GLT_id(g), GLT_prno(g));
         if (GLT_prefer_reg(g) != REG_UNDEF) {
-            prt("prefer_reg=%d", LT_prefer_reg(g));
+            prt(getRegion(), "prefer_reg=%d", LT_prefer_reg(g));
         } else {
             BitSet const* usable = GLT_usable(g);
             if (usable == NULL || usable->is_empty()) {
-                prt("--");
+                prt(getRegion(), "--");
                 continue;
             }
 
             if (dump_bit) {
                 for (INT i2 = usable->get_first();
                      i2 >= 0; i2 = usable->get_next(i2)) {
-                    prt("%d,", i2);
+                    prt(getRegion(), "%d,", i2);
                 }
             } else {
-                prt("%d~%d",
+                prt(getRegion(), "%d~%d",
                         usable->get_first(), usable->get_last());
             }
         }
     }
-    note("\n");
-    fflush(g_tfile);
+    note(getRegion(), "\n");
 }
 
 
 void RSC::dump_bb(UINT bbid)
 {
-    if (g_tfile == NULL) { return; }
-    note("\n-- BB%d Usable Regs --", bbid);
+    if (!getRegion()->isLogMgrInit()) { return; }
+    note(getRegion(), "\n-- BB%d Usable Regs --", bbid);
     LTMgr * ltm = m_gltm->get_ltm(bbid);
     ASSERT0(ltm);
     Vector<LT*> * ltvec = ltm->get_lt_vec();
@@ -706,39 +704,37 @@ void RSC::dump_bb(UINT bbid)
     for (INT i = 0; i <= ltvec->get_last_idx(); i++) {
         LT const* lt = ltvec->get(i);
         if (lt == NULL) { continue; }
-        note("\nLT%d(pr%d):", LT_uid(lt), LT_prno(lt));
+        note(getRegion(), "\nLT%d(pr%d):", LT_uid(lt), LT_prno(lt));
         if (LT_prefer_reg(lt) != REG_UNDEF) {
-            prt("prefer_reg=%d", LT_prefer_reg(lt));
+            prt(getRegion(), "prefer_reg=%d", LT_prefer_reg(lt));
         } else {
             BitSet const* usable = LT_usable(lt);
             if (usable == NULL || usable->is_empty()) {
-                prt("--");
+                prt(getRegion(), "--");
                 continue;
             }
             if (dump_bit) {
                 for (INT i2 = usable->get_first();
                      i2 >= 0; i2 = usable->get_next(i2)) {
-                    prt("%d,", i2);
+                    prt(getRegion(), "%d,", i2);
                 }
             } else {
-                prt("%d~%d", usable->get_first(), usable->get_last());
+                prt(getRegion(), "%d~%d", usable->get_first(), usable->get_last());
             }
         }
     }
-    fflush(g_tfile);
 }
 
 
 void RSC::dump()
 {
-    if (g_tfile == NULL) { return; }
+    if (!getRegion()->isLogMgrInit()) { return; }
     dump_ir_fmt();
     dump_glt_usable();
     BBList * bbl = m_rg->getBBList();
     for (IRBB * bb = bbl->get_head(); bb != NULL; bb = bbl->get_next()) {
-        dump_bb(BB_id(bb));
+        dump_bb(bb->id());
     }
-    fflush(g_tfile);
 }
 
 
@@ -1034,7 +1030,7 @@ bool GltMgr::verify()
 //Dump global lt info.
 void GltMgr::dumpg()
 {
-    if (g_tfile == NULL) { return; }
+    if (!getRegion()->isLogMgrInit()) { return; }
     BitSet prs;
     List<IRBB*> * bbl = m_rg->getBBList();
     for (IRBB * bb = bbl->get_head(); bb != NULL; bb = bbl->get_next()) {
@@ -1075,27 +1071,27 @@ void GltMgr::dumpg()
     }
     litbuf2.sprint("pr%%-%dd", num2);
 
-    note("\n=== DUMP Global Life Time = maxreg:%d = paramnum:%d ===",
+    note(getRegion(), "\n=== DUMP Global Life Time = maxreg:%d = paramnum:%d ===",
          m_ra->m_maxreg, m_ra->m_param_num);
     if (m_ra->m_param_num > 0) {
-        prt("{");
+        prt(getRegion(), "{");
         for (INT i = 0; i <= m_params.get_last_idx(); i++) {
             INT pr = m_params.get(i);
             if (pr != 0) {
-                prt("pr%d", pr);
+                prt(getRegion(), "pr%d", pr);
                 GLT * g = map_pr2glt(pr);
                 ASSERT0(g); //may be pr is local.
                 if (g->has_allocated()) {
-                    prt("(v%d)", GLT_phy(g));
+                    prt(getRegion(), "(v%d)", GLT_phy(g));
                 }
-                prt(",");
+                prt(getRegion(), ",");
             } else {
-                prt("--,");
+                prt(getRegion(), "--,");
             }
         }
-        prt("}");
+        prt(getRegion(), "}");
     }
-    note("\n");
+    note(getRegion(), "\n");
 
     StrBuf buf(32);
     for (INT i = prs.get_first(); i >= 0; i = prs.get_next(i)) {
@@ -1103,23 +1099,23 @@ void GltMgr::dumpg()
         if (g == NULL) { continue; }
 
         //Print prno.
-        note("\n");
-        prt(litbuf2.buf, GLT_prno(g));
-        prt(" ");
+        note(getRegion(), "\n");
+        prt(getRegion(), litbuf2.buf, GLT_prno(g));
+        prt(getRegion(), " ");
 
         //Print phy.
         if (g != NULL) {
-            prt("[");
+            prt(getRegion(), "[");
             if (GLT_phy(g) == REG_UNDEF) {
                 UINT h = 0;
                 while (h <= num) {
-                    prt("-");
+                    prt(getRegion(), "-");
                     h++;
                 }
             } else {
-                prt(litbuf.buf, GLT_phy(g));
+                prt(getRegion(), litbuf.buf, GLT_phy(g));
             }
-            prt("]");
+            prt(getRegion(), "]");
         }
 
         //Print live BB.
@@ -1132,15 +1128,14 @@ void GltMgr::dumpg()
             for (INT j = start; j < u; j++) {
                 buf.sprint("%d,", j);
                 for (UINT k = 0; k < buf.strlen(); k++) {
-                    prt(" ");
+                    prt(getRegion(), " ");
                 }
             }
-            prt("%d,", u);
+            prt(getRegion(), "%d,", u);
             start = u + 1;
         }
     }
-    note("\n");
-    fflush(g_tfile);
+    note(getRegion(), "\n");
 }
 
 
@@ -1148,15 +1143,14 @@ void GltMgr::dumpg()
 void GltMgr::dump()
 {
     dumpg();
-    if (g_tfile == NULL) { return; }
-    note("\n=== DUMP Local Life Time ===");
+    if (!getRegion()->isLogMgrInit()) { return; }
+    note(getRegion(), "\n=== DUMP Local Life Time ===");
     BBList * bbl = m_rg->getBBList();
     for (IRBB * bb = bbl->get_head(); bb != NULL; bb = bbl->get_next()) {
         LTMgr * lltmgr = map_bb2ltm(bb);
         lltmgr->dump();
     }
-    note("\n");
-    fflush(g_tfile);
+    note(getRegion(), "\n");
 }
 
 
@@ -1171,11 +1165,11 @@ void GltMgr::dumpl(UINT bbid)
 
 LTMgr * GltMgr::map_bb2ltm(IRBB * bb)
 {
-    LTMgr * l = m_bb2ltmgr.get(BB_id(bb));
+    LTMgr * l = m_bb2ltmgr.get(bb->id());
     if (l == NULL) {
         //Allocated object managed by RaMgr, and do not delete it youself.
         l = new LTMgr(bb, m_liveness_mgr, this, m_pool);
-        m_bb2ltmgr.set(BB_id(bb), l);
+        m_bb2ltmgr.set(bb->id(), l);
     }
     return l;
 }
@@ -1228,7 +1222,7 @@ void GltMgr::renameLocal()
     BitSet met;
     List<IRBB*> * bbl = m_rg->getBBList();
     for (IRBB * bb = bbl->get_head(); bb != NULL; bb = bbl->get_next()) {
-        LTMgr * ltm = m_bb2ltmgr.get(BB_id(bb));
+        LTMgr * ltm = m_bb2ltmgr.get(bb->id());
         if (ltm == NULL) { continue; }
         ltm->rename(prno2lt, met);
     }
@@ -1274,8 +1268,8 @@ void GltMgr::build(bool build_group_part)
         m_params.set(i, prno);
     }
     for (IRBB * bb = bbl->get_head(); bb != NULL; bb = bbl->get_next()) {
-        DefSBitSetCore * livein = m_liveness_mgr->get_livein(BB_id(bb));
-        DefSBitSetCore * liveout = m_liveness_mgr->get_liveout(BB_id(bb));
+        DefSBitSetCore * livein = m_liveness_mgr->get_livein(bb->id());
+        DefSBitSetCore * liveout = m_liveness_mgr->get_liveout(bb->id());
         if (livein != NULL) {
             SEGIter * cur = NULL;
             for (INT i = livein->get_first(&cur);
@@ -1287,7 +1281,7 @@ void GltMgr::build(bool build_group_part)
                 if (GLT_bbs(glt) == NULL) {
                     GLT_bbs(glt) = m_sbs_mgr.allocDBitSetCore();
                 }
-                GLT_bbs(glt)->bunion(BB_id(bb), m_sbs_mgr);
+                GLT_bbs(glt)->bunion(bb->id(), m_sbs_mgr);
             }
         }
 
@@ -1302,7 +1296,7 @@ void GltMgr::build(bool build_group_part)
                 if (GLT_bbs(glt) == NULL) {
                     GLT_bbs(glt) = m_sbs_mgr.allocDBitSetCore();
                 }
-                GLT_bbs(glt)->bunion(BB_id(bb), m_sbs_mgr);
+                GLT_bbs(glt)->bunion(bb->id(), m_sbs_mgr);
             }
         }
 
@@ -2310,7 +2304,7 @@ void LTMgr::processLivein(
         UINT pos,
         bool always_consider_glt)
 {
-    DefSBitSetCore * livein = m_liveness_mgr->get_livein(BB_id(m_bb));
+    DefSBitSetCore * livein = m_liveness_mgr->get_livein(m_bb->id());
     SEGIter * cur = NULL;
     for (INT i = livein->get_first(&cur);
          i != -1; i = livein->get_next(i, &cur)) {
@@ -2347,7 +2341,7 @@ void LTMgr::processLiveout(
         UINT pos,
         bool always_consider_glt)
 {
-    DefSBitSetCore * liveout = m_liveness_mgr->get_liveout(BB_id(m_bb));
+    DefSBitSetCore * liveout = m_liveness_mgr->get_liveout(m_bb->id());
 
     SEGIter * cur = NULL;
     for (INT i = liveout->get_first(&cur);
@@ -2597,7 +2591,7 @@ void LTMgr::renameUse(IR * ir, LT * l, IR ** newpr)
         break;
     case IR_RETURN:
         {
-            ASSERT0(cnt_list(RET_exp(ir)) <= 1);
+            ASSERT0(xcom::cnt_list(RET_exp(ir)) <= 1);
             IR * rv = RET_exp(ir);
             if (rv != NULL && rv->is_pr()) {
                 if (PR_no(rv) == LT_prno(l)) {
@@ -3050,24 +3044,24 @@ void LTMgr::dump_unallocated(FILE * h, BitSet & visited)
 
 void LTMgr::dump()
 {
-    if (g_tfile == NULL) { return; }
-    note("\n--- BB%d Local Life Time ---", m_bb->id());
+    if (!getRegion()->isLogMgrInit()) { return; }
+    note(getRegion(), "\n--- BB%d Local Life Time ---", m_bb->id());
 
     //Print live-in PR.
-    note("\nlivein:");
-    DefSBitSetCore * livein = m_liveness_mgr->get_livein(BB_id(m_bb));
+    note(getRegion(), "\nlivein:");
+    DefSBitSetCore * livein = m_liveness_mgr->get_livein(m_bb->id());
     SEGIter * cur = NULL;
     for (INT i = livein->get_first(&cur);
          i != -1; i = livein->get_next(i, &cur)) {
-        prt("pr%d, ", i);
+        prt(getRegion(), "pr%d, ", i);
     }
 
     //Print live-out PR.
-    note("\nliveout:");
-    DefSBitSetCore * liveout = m_liveness_mgr->get_liveout(BB_id(m_bb));
+    note(getRegion(), "\nliveout:");
+    DefSBitSetCore * liveout = m_liveness_mgr->get_liveout(m_bb->id());
     for (INT i = liveout->get_first(&cur);
          i != -1; i = liveout->get_next(i, &cur)) {
-        prt("pr%d, ", i);
+        prt(getRegion(), "pr%d, ", i);
     }
 
     //Print local life times base info.
@@ -3076,14 +3070,13 @@ void LTMgr::dump()
         LT * lt = m_lt_vec.get(i);
         if (lt == NULL) { continue; }
         c = MAX(c, LT_uid(lt));
-        //note("\n\tLT(%d):", LT_uid(lt));
-        //prt("[pr%d]:", LT_prno(lt));
+        //note(getRegion(), "\n\tLT(%d):", LT_uid(lt));
+        //prt(getRegion(), "[pr%d]:", LT_prno(lt));
     }
 
     BitSet visited(c + 1);
-    dump_allocated(g_tfile, visited);
-    //dump_unallocated(g_tfile, visited);
-    fflush(g_tfile);
+    dump_allocated(getRegion()->getLogMgr()->getFileHandler(), visited);
+    //dump_unallocated(getRegion()->getLogMgr()->getFileHandler(), visited);
 }
 //END LTMgr
 
@@ -3992,21 +3985,20 @@ bool BBRA::split(LT * lt)
 
 void BBRA::dump_prio(List<LT*> & prios)
 {
-    if (g_tfile == NULL) { return; }
+    if (!getRegion()->isLogMgrInit()) { return; }
     for (LT * l = prios.get_head(); l != NULL; l = prios.get_next()) {
-        note("\nLT%d(pr%d)(prio=%f)",
+        note(getRegion(), "\nLT%d(pr%d)(prio=%f)",
                 LT_uid(l), LT_prno(l), LT_priority(l));
         if (LT_is_global(l)) {
-            prt("(global)");
+            prt(getRegion(), "(global)");
         }
         if (l->has_allocated()) {
-            prt("(phy=v%d)", LT_phy(l));
+            prt(getRegion(), "(phy=v%d)", LT_phy(l));
         }
         if (LT_prefer_reg(l) != REG_UNDEF) {
-            prt("(prefer=v%d)", LT_prefer_reg(l));
+            prt(getRegion(), "(prefer=v%d)", LT_prefer_reg(l));
         }
     }
-    fflush(g_tfile);
 }
 
 
@@ -4113,7 +4105,7 @@ void RA::allocLocalSpec(List<UINT> & nis)
         }
 
         m_ii.clean();
-        LTMgr * ltm = m_gltm.get_ltm(BB_id(bb));
+        LTMgr * ltm = m_gltm.get_ltm(bb->id());
         need_to_alloc.clean();
         UINT idx = 0;
         bool need_rebuild = false;
@@ -4434,7 +4426,7 @@ UINT RA::computeReserveRegister(IRIter & ii, List<IR*> & resolve_list)
     resolve_list.clean();
     List<IRBB*> * bbl = m_rg->getBBList();
     for (IRBB * bb = bbl->get_head(); bb != NULL; bb = bbl->get_next()) {
-        LTMgr * ltm = m_gltm.get_ltm(BB_id(bb));
+        LTMgr * ltm = m_gltm.get_ltm(bb->id());
         if (ltm == NULL) { continue; }
         for (IR * ir = BB_first_ir(bb);
              ir != NULL; ir = BB_next_ir(bb)) {
@@ -4531,8 +4523,8 @@ void RA::reviseRSC()
     for (IR * ir = resolve_list.get_head();
          ir != NULL; ir = resolve_list.get_next()) {
         IRBB * irbb = ir->getBB();
-        LTMgr * ltm = m_gltm.get_ltm(BB_id(irbb));
-        visitbb.bunion(BB_id(irbb));
+        LTMgr * ltm = m_gltm.get_ltm(irbb->id());
+        visitbb.bunion(irbb->id());
         FMT fmt = m_rsc.get_fmt(ir);
         ASSERT0(fmt != FUNDEF);
         m_ii.clean();
@@ -4604,7 +4596,7 @@ void RA::reviseRSC()
          ir != NULL; ir = pr2phy.get_next(iter2, &phy)) {
         IR * stmt = ir->getStmt();
         ASSERT0(stmt && stmt->getBB());
-        LTMgr * ltm = m_gltm.get_ltm(BB_id(stmt->getBB()));
+        LTMgr * ltm = m_gltm.get_ltm(stmt->getBB()->id());
         ASSERT0(ltm);
         LT * l = ltm->map_pr2lt(PR_no(ir));
         ASSERT0(l && LT_prno(l) == PR_no(ir) && !l->has_allocated());
@@ -5176,7 +5168,7 @@ void RA::remedyLTG(
     IR * param = CALL_param_list(ir);
     ASSERT0(param);
     while (param != NULL && !param->is_pr()) { param = IR_next(param); }
-    ASSERT0(param && cnt_list(param) == ((UINT)ltg->get_last_idx()) + 1);
+    ASSERT0(param && xcom::cnt_list(param) == ((UINT)ltg->get_last_idx()) + 1);
 
     TMap<UINT, UINT> prno2phy;
     bool insert = false;
@@ -5207,7 +5199,7 @@ void RA::remedyLTG(
     rangestart = org_rangestart;
     param = CALL_param_list(ir);
     while (param != NULL && !param->is_pr()) { param = IR_next(param); }
-    ASSERT0(param && cnt_list(param) == ((UINT)ltg->get_last_idx()) + 1);
+    ASSERT0(param && xcom::cnt_list(param) == ((UINT)ltg->get_last_idx()) + 1);
 
     for (INT i = 0; i <= ltg->get_last_idx(); i++, param = next) {
         next = IR_next(param);
@@ -5300,10 +5292,10 @@ void RA::remedyLTG(
 
 void RA::dump_ltg()
 {
-    if (g_tfile == NULL) { return; }
+    if (!getRegion()->isLogMgrInit()) { return; }
     TMapIter<UINT, LTG*> iter;
     LTG * ltg;
-    note("\n=== DUMP LTG === %s ===\n", m_rg->getRegionName());
+    note(getRegion(), "\n=== DUMP LTG === %s ===\n", m_rg->getRegionName());
     for (UINT id = m_gltm.m_ltgmgr.get_first(iter, &ltg);
          id != 0; id = m_gltm.m_ltgmgr.get_next(iter, &ltg)) {
         IR * ir = m_rg->getIR(id);
@@ -5314,7 +5306,6 @@ void RA::dump_ltg()
         ASSERT0(ltm);
         ltm->dump();
     }
-    fflush(g_tfile);
 }
 
 
@@ -5651,7 +5642,7 @@ bool RA::verify_lt_occ()
 
     BBList * bbl = m_rg->getBBList();
     for (IRBB * bb = bbl->get_head(); bb != NULL; bb = bbl->get_next()) {
-        LTMgr * ltm = m_gltm.get_ltm(BB_id(bb));
+        LTMgr * ltm = m_gltm.get_ltm(bb->id());
         if (ltm == NULL) { continue; }
         Vector<LT*> * ltvec = ltm->get_lt_vec();
         for (INT i = 1; i <= ltvec->get_last_idx(); i++) {
@@ -5678,7 +5669,7 @@ bool RA::verify_lt_occ()
 
     ConstIRIter ii;
     for (IRBB * bb = bbl->get_head(); bb != NULL; bb = bbl->get_next()) {
-        LTMgr * ltm = m_gltm.get_ltm(BB_id(bb));
+        LTMgr * ltm = m_gltm.get_ltm(bb->id());
         if (ltm == NULL) { continue; }
 
         for (IR const* ir = BB_first_ir(bb);

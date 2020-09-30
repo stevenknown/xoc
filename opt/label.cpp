@@ -33,25 +33,26 @@ author: Su Zhenyu
 @*/
 #include "../com/xcominc.h"
 #include "commoninc.h"
+#include "cominc.h"
 #include "symtab.h"
 #include "label.h"
 
 namespace xoc {
 
-LabelInfo * allocPragmaLabel(SYM const* st, SMemPool * pool)
+LabelInfo * allocPragmaLabel(Sym const* st, SMemPool * pool)
 {
     LabelInfo * li = allocLabel(pool);
-    LABEL_INFO_name(li) = st;
-    LABEL_INFO_type(li) = L_PRAGMA;
+    LABELINFO_name(li) = st;
+    LABELINFO_type(li) = L_PRAGMA;
     return li;
 }
 
 
-LabelInfo * allocCustomerLabel(SYM const* st, SMemPool * pool)
+LabelInfo * allocCustomerLabel(Sym const* st, SMemPool * pool)
 {
     LabelInfo * li = allocLabel(pool);
-    LABEL_INFO_name(li) = st;
-    LABEL_INFO_type(li) = L_CLABEL;
+    LABELINFO_name(li) = st;
+    LABELINFO_type(li) = L_CLABEL;
     return li;
 }
 
@@ -59,7 +60,7 @@ LabelInfo * allocCustomerLabel(SYM const* st, SMemPool * pool)
 LabelInfo * allocInternalLabel(SMemPool * pool)
 {
     LabelInfo * n = allocLabel(pool);
-    LABEL_INFO_type(n) = L_ILABEL;
+    LABELINFO_type(n) = L_ILABEL;
     return n;
 }
 
@@ -72,65 +73,60 @@ LabelInfo * allocLabel(SMemPool * pool)
     return p;
 }
 
-void LabelInfo::dumpName() const
+void LabelInfo::dumpName(Region const* rg) const
 {
-    if (g_tfile == NULL) { return; }
-    if (LABEL_INFO_type(this) == L_ILABEL) {
-        prt(ILABEL_STR_FORMAT, ILABEL_CONT(this));
-    } else if (LABEL_INFO_type(this) == L_CLABEL) {
-        prt("%s", SYM_name(LABEL_INFO_name(this)));
-    } else if (LABEL_INFO_type(this) == L_PRAGMA) {
-        ASSERT0(LABEL_INFO_pragma(this));
-        prt("%s", SYM_name(LABEL_INFO_pragma(this)));
+    if (!rg->isLogMgrInit()) { return; }
+    if (LABELINFO_type(this) == L_ILABEL) {
+        prt(rg, ILABEL_STR_FORMAT, ILABEL_CONT(this));
+    } else if (LABELINFO_type(this) == L_CLABEL) {
+        prt(rg, "%s", SYM_name(LABELINFO_name(this)));
+    } else if (LABELINFO_type(this) == L_PRAGMA) {
+        ASSERT0(LABELINFO_pragma(this));
+        prt(rg, "%s", SYM_name(LABELINFO_pragma(this)));
     } else { UNREACHABLE(); }
 }
 
 char const* LabelInfo::getName(IN OUT StrBuf * buf) const
 {
-    if (g_tfile == NULL) { return NULL; }
-    if (LABEL_INFO_type(this) == L_ILABEL) {
+    if (LABELINFO_type(this) == L_ILABEL) {
         buf->sprint(ILABEL_STR_FORMAT, ILABEL_CONT(this));
-    } else if (LABEL_INFO_type(this) == L_CLABEL) {
-        buf->strcat("%s", SYM_name(LABEL_INFO_name(this)));
-    } else if (LABEL_INFO_type(this) == L_PRAGMA) {
-        ASSERT0(LABEL_INFO_pragma(this));
-        buf->strcat("%s", SYM_name(LABEL_INFO_pragma(this)));
+    } else if (LABELINFO_type(this) == L_CLABEL) {
+        buf->strcat("%s", SYM_name(LABELINFO_name(this)));
+    } else if (LABELINFO_type(this) == L_PRAGMA) {
+        ASSERT0(LABELINFO_pragma(this));
+        buf->strcat("%s", SYM_name(LABELINFO_pragma(this)));
     }
     else { UNREACHABLE(); }
     return buf->buf;
 }
 
-void LabelInfo::dump() const
+void LabelInfo::dump(Region const* rg) const
 {
-    if (g_tfile == NULL) { return; }
-    if (LABEL_INFO_type(this) == L_ILABEL) {
-        note("\nilabel(" ILABEL_STR_FORMAT ")",
-                ILABEL_CONT(this));
-    } else if (LABEL_INFO_type(this) == L_CLABEL) {
-        note("\nclabel(" CLABEL_STR_FORMAT ")",
-                CLABEL_CONT(this));
-    } else if (LABEL_INFO_type(this) == L_PRAGMA) {
-        ASSERT0(LABEL_INFO_pragma(this));
-        note("\npragms(%s)",
-                SYM_name(LABEL_INFO_pragma(this)));
+    if (!rg->isLogMgrInit()) { return; }
+    if (LABELINFO_type(this) == L_ILABEL) {
+        note(rg, "\nilabel(" ILABEL_STR_FORMAT ")", ILABEL_CONT(this));
+    } else if (LABELINFO_type(this) == L_CLABEL) {
+        note(rg, "\nclabel(" CLABEL_STR_FORMAT ")", CLABEL_CONT(this));
+    } else if (LABELINFO_type(this) == L_PRAGMA) {
+        ASSERT0(LABELINFO_pragma(this));
+        note(rg, "\npragms(%s)", SYM_name(LABELINFO_pragma(this)));
     } else { UNREACHABLE(); }
 
-    if (LABEL_INFO_b1(this) != 0) {
-        prt("(");
+    if (LABELINFO_b1(this) != 0) {
+        prt(rg, "(");
     }
-    if (LABEL_INFO_is_try_start(this)) {
-        prt("try_start ");
+    if (LABELINFO_is_try_start(this)) {
+        prt(rg, "try_start ");
     }
-    if (LABEL_INFO_is_try_end(this)) {
-        prt("try_end ");
+    if (LABELINFO_is_try_end(this)) {
+        prt(rg, "try_end ");
     }
-    if (LABEL_INFO_is_catch_start(this)) {
-        prt("catch_start ");
+    if (LABELINFO_is_catch_start(this)) {
+        prt(rg, "catch_start ");
     }
-    if (LABEL_INFO_b1(this) != 0) {
-        prt(")");
+    if (LABELINFO_b1(this) != 0) {
+        prt(rg, ")");
     }
-    fflush(g_tfile);
 }
 
 } //namespace xoc

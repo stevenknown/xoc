@@ -99,7 +99,7 @@ bool IVR::findInitVal(IV * iv)
     LI<IRBB> const* li = IV_li(iv);
     ASSERT0(li);
     IRBB * dbb = domdef->getBB();
-    if (dbb == LI_loop_head(li) || !li->isInsideLoop(BB_id(dbb))) {
+    if (dbb == li->getLoopHead() || !li->isInsideLoop(dbb->id())) {
         return computeInitVal(domdef, iv);
     }
     return false;
@@ -204,11 +204,11 @@ void IVR::recordIV(MD * biv,
     m_ir2iv.set(occ, x);
     m_ir2iv.set(def, x);
 
-    SList<IV*> * ivlst = m_li2bivlst.get(LI_id(li));
+    SList<IV*> * ivlst = m_li2bivlst.get(li->id());
     if (ivlst == NULL) {
         ivlst = (SList<IV*>*)xmalloc(sizeof(SList<IV*>));
         ivlst->init(m_sc_pool);
-        m_li2bivlst.set(LI_id(li), ivlst);
+        m_li2bivlst.set(li->id(), ivlst);
     }
     ivlst->append_head(x);
 }
@@ -222,16 +222,16 @@ void IVR::findBIV(LI<IRBB> const* li,
                   Vector<UINT> & map_md2defcount,
                   UINT2IR & map_md2defir)
 {
-    IRBB * head = LI_loop_head(li);
-    UINT headi = BB_id(head);
+    IRBB * head = li->getLoopHead();
+    UINT headi = head->id();
     tmp.clean(); //tmp is used to record exact/effect MD which be modified.
     map_md2defir.clean();
     map_md2defcount.clean();
-    for (INT i = LI_bb_set(li)->get_first();
-         i != -1; i = LI_bb_set(li)->get_next(i)) {
+    for (INT i = li->getBodyBBSet()->get_first();
+         i != -1; i = li->getBodyBBSet()->get_next(i)) {
         //if ((UINT)i == headi) { continue; }
         IRBB * bb = m_cfg->getBB(i);
-        ASSERT0(bb && m_cfg->getVertex(BB_id(bb)));
+        ASSERT0(bb && m_cfg->getVertex(bb->id()));
         for (IR * ir = BB_first_ir(bb); ir != NULL; ir = BB_next_ir(bb)) {
             if (!ir->is_st() &&
                 !ir->is_ist() &&
@@ -354,7 +354,7 @@ bool IVR::is_loop_invariant(LI<IRBB> const* li, IR const* ir)
     for (INT i = defs->get_first(&di); i >= 0; i = defs->get_next(i, &di)) {
         IR const* d = m_rg->getIR(i);
         ASSERT0(d->is_stmt() && d->getBB());
-        if (li->isInsideLoop(BB_id(d->getBB()))) {
+        if (li->isInsideLoop(d->getBB()->id())) {
             return false;
         }
     }
@@ -410,11 +410,11 @@ bool IVR::scanExp(IR const* ir,
 //Try to add IV expresion into div list if 'e' do not exist in the list.
 void IVR::addDIVList(LI<IRBB> const* li, IR const* e)
 {
-    SList<IR const*> * divlst = m_li2divlst.get(LI_id(li));
+    SList<IR const*> * divlst = m_li2divlst.get(li->id());
     if (divlst == NULL) {
         divlst = (SList<IR const*>*)xmalloc(sizeof(SList<IR const*>));
         divlst->init(m_sc_pool);
-        m_li2divlst.set(LI_id(li), divlst);
+        m_li2divlst.set(li->id(), divlst);
     }
 
     bool find = false;
@@ -446,10 +446,10 @@ void IVR::findDIV(LI<IRBB> const* li,
         tmp.bunion(MD_id(IV_iv(iv)));
     }
 
-    for (INT i = LI_bb_set(li)->get_first();
-         i != -1; i = LI_bb_set(li)->get_next(i)) {
+    for (INT i = li->getBodyBBSet()->get_first();
+         i != -1; i = li->getBodyBBSet()->get_next(i)) {
         IRBB * bb = m_cfg->getBB(i);
-        ASSERT0(bb && m_cfg->getVertex(BB_id(bb)));
+        ASSERT0(bb && m_cfg->getVertex(bb->id()));
         for (IR * ir = BB_first_ir(bb); ir != NULL; ir = BB_next_ir(bb)) {
             switch (ir->getCode()) {
             case IR_ST:
@@ -487,86 +487,85 @@ void IVR::findDIV(LI<IRBB> const* li,
 void IVR::_dump(LI<IRBB> * li, UINT indent)
 {
     while (li != NULL) {
-        note("\n");
-        for (UINT i = 0; i < indent; i++) { prt(" "); }
-        prt("LI%d:BB%d", LI_id(li), BB_id(LI_loop_head(li)));
-        prt(",BODY:");
-        for (INT i = LI_bb_set(li)->get_first();
-             i != -1; i = LI_bb_set(li)->get_next(i)) {
-            prt("%d,", i);
+        note(getRegion(), "\n");
+        for (UINT i = 0; i < indent; i++) { prt(getRegion(), " "); }
+        prt(getRegion(), "LI%d:BB%d", li->id(), li->getLoopHead()->id());
+        prt(getRegion(), ",BODY:");
+        for (INT i = li->getBodyBBSet()->get_first();
+             i != -1; i = li->getBodyBBSet()->get_next(i)) {
+            prt(getRegion(), "%d,", i);
         }
 
-        xcom::SList<IV*> * bivlst = m_li2bivlst.get(LI_id(li));
+        xcom::SList<IV*> * bivlst = m_li2bivlst.get(li->id());
         if (bivlst != NULL) {
             for (xcom::SC<IV*> * sc = bivlst->get_head();
                  sc != bivlst->end(); sc = bivlst->get_next(sc)) {
                 IV * iv = sc->val();
                 ASSERT0(iv);
-                note("\n");
-                for (UINT i = 0; i < indent; i++) { prt(" "); }
-                prt("BIV(md%d", MD_id(IV_iv(iv)));
+                note(getRegion(), "\n");
+                for (UINT i = 0; i < indent; i++) { prt(getRegion(), " "); }
+                prt(getRegion(), "BIV(md%d", MD_id(IV_iv(iv)));
 
                 if (IV_is_inc(iv)) {
-                    prt(",step=%lld", (LONGLONG)IV_step(iv));
+                    prt(getRegion(), ",step=%lld", (LONGLONG)IV_step(iv));
                 } else {
-                    prt(",step=-%lld", (LONGLONG)IV_step(iv));
+                    prt(getRegion(), ",step=-%lld", (LONGLONG)IV_step(iv));
                 }
 
                 if (iv->has_init_val()) {
                     if (iv->isInitConst()) {
-                        prt(",init=%lld", (LONGLONG)*IV_initv_i(iv));
+                        prt(getRegion(), ",init=%lld", (LONGLONG)*IV_initv_i(iv));
                     } else {
-                        prt(",init=md%d", (INT)MD_id(IV_initv_md(iv)));
+                        prt(getRegion(), ",init=md%d", (INT)MD_id(IV_initv_md(iv)));
                     }
                 }
-                prt(")");
+                prt(getRegion(), ")");
 
                 //Dump IV's def-stmt.
-                note("\n");
-                for (UINT i = 0; i < indent; i++) { prt(" "); }
-                prt("Def-Stmt:");
+                note(getRegion(), "\n");
+                for (UINT i = 0; i < indent; i++) { prt(getRegion(), " "); }
+                prt(getRegion(), "Def-Stmt:");
                 ASSERT0(IV_iv_def(iv));
-                g_indent = indent + 2;
+                getRegion()->getLogMgr()->setIndent(indent + 2);
                 dumpIR(IV_iv_def(iv), m_rg, NULL, IR_DUMP_KID);
 
                 //Dump IV's occ-exp.
-                note("\n");
-                for (UINT i = 0; i < indent; i++) { prt(" "); }
-                prt("Occ-Exp:");
+                note(getRegion(), "\n");
+                for (UINT i = 0; i < indent; i++) { prt(getRegion(), " "); }
+                prt(getRegion(), "Occ-Exp:");
                 ASSERT0(IV_iv_occ(iv));
-                g_indent = indent + 2;
+                getRegion()->getLogMgr()->setIndent(indent + 2);
                 dumpIR(IV_iv_occ(iv), m_rg, NULL, IR_DUMP_KID);
 
                 //Dump IV's init-stmt.
                 if (iv->getInitValStmt() != NULL) {
-                    note("\n");
-                    for (UINT i = 0; i < indent; i++) { prt(" "); }
-                    prt("Init-Stmt:");
-                    g_indent = indent + 2;
+                    note(getRegion(), "\n");
+                    for (UINT i = 0; i < indent; i++) { prt(getRegion(), " "); }
+                    prt(getRegion(), "Init-Stmt:");
+                    getRegion()->getLogMgr()->setIndent(indent + 2);
                     dumpIR(iv->getInitValStmt(), m_rg, NULL, IR_DUMP_KID);
                 }
             }
-        } else { prt("(NO BIV)"); }
+        } else { prt(getRegion(), "(NO BIV)"); }
 
-        xcom::SList<IR const*> * divlst = m_li2divlst.get(LI_id(li));
+        xcom::SList<IR const*> * divlst = m_li2divlst.get(li->id());
         if (divlst != NULL) {
             if (divlst->get_elem_count() > 0) {
-                note("\n");
-                for (UINT i = 0; i < indent; i++) { prt(" "); }
-                prt("DIV:");
+                note(getRegion(), "\n");
+                for (UINT i = 0; i < indent; i++) { prt(getRegion(), " "); }
+                prt(getRegion(), "DIV:");
             }
             for (xcom::SC<IR const*> * sc = divlst->get_head();
                  sc != divlst->end(); sc = divlst->get_next(sc)) {
                 IR const* iv = sc->val();
                 ASSERT0(iv);
-                g_indent = indent + 2;
+                getRegion()->getLogMgr()->setIndent(indent + 2);
                 dumpIR(iv, m_rg, NULL, IR_DUMP_KID);
             }
-        } else { prt("(NO DIV)"); }
+        } else { prt(getRegion(), "(NO DIV)"); }
 
         _dump(LI_inner_list(li), indent + 2);
         li = LI_next(li);
-        fflush(g_tfile);
     }
 }
 
@@ -574,10 +573,10 @@ void IVR::_dump(LI<IRBB> * li, UINT indent)
 //Dump IVR info for loop.
 void IVR::dump()
 {
-    if (g_tfile == NULL) { return; }
-    note("\n==---- DUMP IVR -- rg:'%s' ----==", m_rg->getRegionName());
+    if (!m_rg->isLogMgrInit()) { return; }
+    note(getRegion(), "\n==---- DUMP %s '%s' ----==",
+         getPassName(), m_rg->getRegionName());
     _dump(m_cfg->getLoopInfo(), 0);
-    fflush(g_tfile);
 }
 
 
@@ -605,8 +604,8 @@ bool IVR::perform(OptCtx & oc)
     ASSERT0(m_cfg && m_du && m_md_sys && m_tm);
 
     m_rg->checkValidAndRecompute(&oc, PASS_REACH_DEF,
-        PASS_DU_REF, PASS_DOM, PASS_LOOP_INFO,
-        PASS_DU_CHAIN, PASS_RPO, PASS_UNDEF);
+                                 PASS_DU_REF, PASS_DOM, PASS_LOOP_INFO,
+                                 PASS_DU_CHAIN, PASS_RPO, PASS_UNDEF);
 
     if (!OC_is_ref_valid(oc)) {
         END_TIMER(t, getPassName());
@@ -615,7 +614,7 @@ bool IVR::perform(OptCtx & oc)
     //Check PR DU chain.
     PRSSAMgr * ssamgr = (PRSSAMgr*)(m_rg->getPassMgr()->queryPass(
         PASS_PR_SSA_MGR));
-    if (ssamgr != NULL && ssamgr->isSSAConstructed()) {
+    if (ssamgr != NULL && ssamgr->is_valid()) {
         m_ssamgr = ssamgr;
     } else {
         m_ssamgr = NULL;
@@ -626,9 +625,9 @@ bool IVR::perform(OptCtx & oc)
         return false;
     }
     //Check NONPR DU chain.
-    MDSSAMgr * mdssamgr = (MDSSAMgr*)(m_rg->getPassMgr()->queryPass(
-        PASS_MD_SSA_MGR));
-    if (mdssamgr != NULL && mdssamgr->isMDSSAConstructed()) {
+    MDSSAMgr * mdssamgr = (MDSSAMgr*)(m_rg->getPassMgr()->
+        queryPass(PASS_MD_SSA_MGR));
+    if (mdssamgr != NULL && mdssamgr->is_valid()) {
         m_mdssamgr = mdssamgr;
     } else {
         m_mdssamgr = NULL;

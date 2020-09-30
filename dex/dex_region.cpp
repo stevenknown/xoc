@@ -64,7 +64,6 @@ bool DexRegion::MiddleProcess(OptCtx & oc)
 bool DexRegion::HighProcess(OptCtx & oc)
 {
     CHAR const* ru_name = getRegionName();
-    g_indent = 0;
     SimpCtx simp;
     SIMP_if(&simp) = true;
     SIMP_doloop(&simp) = true;
@@ -212,8 +211,6 @@ bool DexRegion::process(OptCtx * oc)
 {
     if (getIRList() == NULL) { return true; }
     OC_show_comp_time(*oc) = g_show_comp_time;
-
-    g_indent = 0;
     if (!g_silence) {
         LOG("DexRegion process %s", getRegionName());
     }
@@ -228,7 +225,7 @@ bool DexRegion::process(OptCtx * oc)
 
     ASSERT0(getPassMgr());
     PRSSAMgr * ssamgr = (PRSSAMgr*)passmgr->queryPass(PASS_PR_SSA_MGR);
-    if (ssamgr != NULL && ssamgr->isSSAConstructed()) {
+    if (ssamgr != NULL && ssamgr->is_valid()) {
         ssamgr->destruction();
     }
 

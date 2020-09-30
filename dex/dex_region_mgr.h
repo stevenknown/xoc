@@ -42,7 +42,7 @@ protected:
     ConstSym2Var m_sym2var;
 
 protected:
-    VAR * addVarForBuiltin(CHAR const* name);
+    Var * addVarForBuiltin(CHAR const* name);
     void initBuiltin();
 
 public:

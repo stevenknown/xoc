@@ -39,7 +39,6 @@ namespace xoc {
 PassMgr::PassMgr(Region * rg)
 {
     ASSERT0(rg);
-    m_pool = smpoolCreate(sizeof(TimeInfo) * 4, MEM_COMM);
     m_rg = rg;
     m_rumgr = rg->getRegionMgr();
     m_tm = rg->getTypeMgr();
@@ -89,11 +88,7 @@ void PassMgr::destroyAllPass()
 
 Pass * PassMgr::allocCopyProp()
 {
-    Pass * pass = new CopyProp(m_rg);
-    SimpCtx * simp = (SimpCtx*)xmalloc(sizeof(SimpCtx));
-    simp->init();
-    pass->set_simp_cont(simp);
-    return pass;
+    return new CopyProp(m_rg);
 }
 
 
@@ -111,7 +106,7 @@ Pass * PassMgr::allocLCSE()
 
 Pass * PassMgr::allocRP()
 {
-    return new RegPromot(m_rg, (GVN*)registerPass(PASS_GVN));
+    return new RegPromot(m_rg);
 }
 
 
@@ -241,6 +236,24 @@ Pass * PassMgr::allocRefineDUChain()
 }
 
 
+Pass * PassMgr::allocScalarOpt()
+{
+    return new ScalarOpt(m_rg);
+}
+
+
+Pass * PassMgr::allocMDLivenessMgr()
+{
+    return new MDLivenessMgr(m_rg);
+}
+
+
+Pass * PassMgr::allocRefine()
+{
+    return new Refine(m_rg);
+}
+
+
 xcom::Graph * PassMgr::registerGraphBasedPass(PASS_TYPE opty)
 {
     xcom::Graph * pass = NULL;
@@ -334,137 +347,21 @@ Pass * PassMgr::registerPass(PASS_TYPE opty)
     case PASS_REFINE_DUCHAIN:
         pass = allocRefineDUChain();
         break;
+    case PASS_SCALAR_OPT:
+        pass = allocScalarOpt();
+        break;
+    case PASS_MDLIVENESS_MGR:
+        pass = allocMDLivenessMgr();
+        break;
+    case PASS_REFINE:
+        pass = allocRefine();
+        break;
     default: ASSERTN(0, ("Unsupport Optimization."));
     }
 
     ASSERT0(opty != PASS_UNDEF && pass);
     m_registered_pass.set(opty, pass);
     return pass;
-}
-
-
-void PassMgr::performScalarOpt(OptCtx & oc)
-{
-    TTab<Pass*> opt_tab;
-    List<Pass*> passlist;
-    SimpCtx simp;
-    if (g_do_gvn) { registerPass(PASS_GVN); }
-
-    if (g_do_pre) {
-        //Do PRE individually.
-        //Since it will incur the opposite effect with Copy-Propagation.
-        Pass * pre = registerPass(PASS_PRE);
-        pre->perform(oc);
-        ASSERT0(verifyIRandBB(m_rg->getBBList(), m_rg));
-    }
-
-    if (g_do_dce) {
-        DeadCodeElim * dce = (DeadCodeElim*)registerPass(PASS_DCE);
-        passlist.append_tail(dce);
-        if (g_do_dce_aggressive) {
-            dce->set_elim_cfs(true);
-        }
-    }
-
-    bool in_ssa_form = false;
-    PRSSAMgr * ssamgr = (PRSSAMgr*)(m_rg->getPassMgr()->
-        queryPass(PASS_PR_SSA_MGR));
-    if (ssamgr != NULL && ssamgr->isSSAConstructed()) {
-        in_ssa_form = true;
-    }
-
-    if (!in_ssa_form) {
-        //RP can reduce the memory operations and
-        //improve the effect of PR SSA, so perform
-        //RP before SSA construction.
-        //TODO: Do SSA renaming when after register promotion done.
-        if (g_do_rp) {
-            //First RP.
-            passlist.append_tail(registerPass(PASS_RP));
-        }
-    }
-
-    if (g_do_cp) {
-        CopyProp * pass = (CopyProp*)registerPass(PASS_CP);
-        pass->setPropagationKind(CP_PROP_SIMPLEX);
-        passlist.append_tail(pass);
-    }
-
-    if (g_do_rp) {
-        //Second RP.
-        passlist.append_tail(registerPass(PASS_RP));
-    }
-
-    if (g_do_gcse) {
-        passlist.append_tail(registerPass(PASS_GCSE));
-    }
-
-    if (g_do_lcse) {
-        passlist.append_tail(registerPass(PASS_LCSE));
-    }
-
-    if (g_do_rce) {
-        passlist.append_tail(registerPass(PASS_RCE));
-    }
-
-    if (g_do_dse) {
-        passlist.append_tail(registerPass(PASS_DSE));
-    }
-
-    if (g_do_licm) {
-        passlist.append_tail(registerPass(PASS_LICM));
-    }
-
-    if (g_do_ivr) {
-        passlist.append_tail(registerPass(PASS_IVR));
-    }
-
-    if (g_do_loop_convert) {
-        passlist.append_tail(registerPass(PASS_LOOP_CVT));
-    }
-
-    bool change;
-    UINT count = 0;
-    BBList * bbl = m_rg->getBBList();
-    IRCFG * cfg = m_rg->getCFG();
-    DUMMYUSE(cfg);
-    do {
-        change = false;
-        for (Pass * pass = passlist.get_head();
-             pass != NULL; pass = passlist.get_next()) {
-            CHAR const* passname = pass->getPassName();
-            ASSERT0(verifyIRandBB(bbl, m_rg));
-            ULONGLONG t = xcom::getusec();
-            bool doit = pass->perform(oc);
-            appendTimeInfo(passname, xcom::getusec() - t);
-            if (doit) {
-                change = true;
-                ASSERT0(verifyIRandBB(bbl, m_rg));
-                ASSERT0(cfg->verify());
-            }
-            RefineCtx rc;
-            m_rg->refineBBlist(bbl, rc, oc);
-            ASSERT0(m_rg->verifyRPO(oc));
-        }
-        count++;
-    } while (change && count < 20);
-    ASSERT0(!change);
-
-    if (g_do_lcse) {
-        LCSE * lcse = (LCSE*)registerPass(PASS_LCSE);
-        lcse->set_enable_filter(false);
-        ULONGLONG t = xcom::getusec();
-        lcse->perform(oc);
-        t = xcom::getusec() - t;
-        appendTimeInfo(lcse->getPassName(), t);
-    }
-
-    if (g_do_rp) {
-        RegPromot * r = (RegPromot*)registerPass(PASS_RP);
-        ULONGLONG t = xcom::getusec();
-        r->perform(oc);
-        appendTimeInfo(r->getPassName(), xcom::getusec() - t);
-    }
 }
 
 } //namespace xoc

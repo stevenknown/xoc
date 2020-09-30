@@ -183,6 +183,7 @@ public:
 
     void recordStmt(IR * ir, xcom::BitSet & irset);
 
+    Region * getRegion() const { return m_rg; }
     virtual CHAR const* getPassName() const
     { return "Control Flow Structure MGR"; }
 

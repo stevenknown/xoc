@@ -36,13 +36,20 @@ author: Su Zhenyu
 
 namespace xoc {
 
-class IR_CFS_OPT : public Pass {
-    COPY_CONSTRUCTOR(IR_CFS_OPT);
-protected:
+class CfsOpt : public Pass {
+    COPY_CONSTRUCTOR(CfsOpt);
     Region * m_rg;
     TypeMgr * m_tm;
+    Refine * m_rf;
 
-protected:
+    Refine * getRefiner()
+    {
+        if (m_rf == NULL) {
+            m_rf = (Refine*)m_rg->getPassMgr()->registerPass(PASS_REFINE);
+        }
+        return m_rf;
+    }
+
     bool transformToDoWhile(IR ** head, IR * ir);
     bool transformIf1(IR ** head, IR * ir);
     bool transformIf2(IR ** head, IR * ir);
@@ -53,14 +60,19 @@ protected:
     bool hoistIf(IR ** head, IR * ir);
 
 public:
-    IR_CFS_OPT(Region * rg) { m_rg = rg; m_tm = rg->getTypeMgr(); }
-    ~IR_CFS_OPT() {}
+    CfsOpt(Region * rg)
+    {
+        m_rg = rg;
+        m_tm = rg->getTypeMgr();
+        m_rf = NULL;
+    }
+    ~CfsOpt() {}
 
-    void dump();
+    bool dump() const { return true; }
+    bool doCfsOpt(IN OUT IR ** ir_list, SimpCtx const& sc);
 
-    virtual CHAR const* getPassName() const { return "IR_CFS_OPT"; }
+    virtual CHAR const* getPassName() const { return "CfsOpt"; }
 
-    bool CfsOpt(IN OUT IR ** ir_list, SimpCtx const& sc);
     virtual bool perform(OptCtx &)
     {
         UNREACHABLE();

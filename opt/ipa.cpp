@@ -44,7 +44,7 @@ Region * IPA::findRegion(IR * call, Region * callru)
     CallNode * callercn = cg->mapRegion2CallNode(callru);
     ASSERTN(callercn, ("caller is not on graph"));
 
-    SYM const* callname = CALL_idinfo(call)->get_name();
+    Sym const* callname = CALL_idinfo(call)->get_name();
 
     //Iterate accessing successors.
     ASSERT0(cg->getVertex(CN_id(callercn)));
@@ -159,7 +159,7 @@ void IPA::createCallDummyuse(OptCtx & oc)
         Region * rg = m_rumgr->getRegion(i);
         if (rg == NULL) { continue; }
         createCallDummyuse(rg);
-        if (g_compute_classic_du_chain) {
+        if (g_compute_pr_du_chain && g_compute_nonpr_du_chain) {
             OptCtx * loc = m_rumgr->getAndGenOptCtx(rg->id());
             ASSERT0(loc);
             recomputeDUChain(rg, *loc);
@@ -168,7 +168,7 @@ void IPA::createCallDummyuse(OptCtx & oc)
             }
         }
     }
-    if (g_compute_classic_du_chain) {
+    if (g_compute_pr_du_chain && g_compute_nonpr_du_chain) {
         OC_is_pr_du_chain_valid(oc) = true;
         OC_is_nonpr_du_chain_valid(oc) = true;
         if (m_is_keep_reachdef) {
@@ -208,7 +208,7 @@ void IPA::recomputeDUChain(Region * rg, OptCtx & oc)
         MDSSAMgr * mdssamgr = (MDSSAMgr*)rg->getPassMgr()->registerPass(
             PASS_MD_SSA_MGR);
         ASSERT0(mdssamgr);
-        if (!mdssamgr->isMDSSAConstructed()) {
+        if (!mdssamgr->is_valid()) {
             mdssamgr->construction(oc);
         }
         return;
@@ -218,7 +218,7 @@ void IPA::recomputeDUChain(Region * rg, OptCtx & oc)
     if (m_is_recompute_du_ref) {
         if (m_is_keep_reachdef) {
             rg->checkValidAndRecompute(&oc, PASS_REACH_DEF, PASS_DU_REF,
-                PASS_CFG, PASS_DU_CHAIN, PASS_UNDEF);
+                                       PASS_CFG, PASS_DU_CHAIN, PASS_UNDEF);
         } else {
             rg->checkValidAndRecompute(&oc, PASS_DU_REF, PASS_CFG,
                 PASS_DU_CHAIN, PASS_UNDEF);
@@ -226,10 +226,10 @@ void IPA::recomputeDUChain(Region * rg, OptCtx & oc)
     } else {
         if (m_is_keep_reachdef) {
             rg->checkValidAndRecompute(&oc, PASS_REACH_DEF, PASS_CFG,
-                PASS_DU_CHAIN, PASS_UNDEF);
+                                       PASS_DU_CHAIN, PASS_UNDEF);
         } else {
             rg->checkValidAndRecompute(&oc, PASS_CFG, PASS_DU_CHAIN,
-                PASS_UNDEF);
+                                       PASS_UNDEF);
         }
     }
 }

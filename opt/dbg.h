@@ -40,7 +40,7 @@ class Region;
 
 //Describe debug information.
 //Note line number can not be 0.
-#define DBX_lineno(d)   ((d)->lineno)
+#define DBX_lineno(d) ((d)->lineno)
 class Dbx {
     COPY_CONSTRUCTOR(Dbx);
 public:
@@ -62,10 +62,12 @@ public:
         char const* prefix;
 
         //Record the IO handler.
-        FILE * handler;
+        LogMgr * logmgr;
 
     public:
-        PrtCtx() { prefix = NULL; handler = NULL; }
+        PrtCtx() { prefix = NULL; logmgr = NULL; }
+
+        LogMgr * getLogMgr() const { return logmgr; }
     };
 
 public:

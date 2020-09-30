@@ -87,31 +87,31 @@ extern UINT g_builtin_num;
 extern BuiltInInfo g_builtin_info[];
 
 
-class Var2UINT : public TMap<VAR const*, UINT> {
+class Var2UINT : public TMap<Var const*, UINT> {
 public:
     Var2UINT() {}
     virtual ~Var2UINT() {}
 
-    UINT get_mapped(VAR const* v) const
+    UINT get_mapped(Var const* v) const
     {
         bool find;
-        UINT i = TMap<VAR const*, UINT>::get(v, &find);
+        UINT i = TMap<Var const*, UINT>::get(v, &find);
         ASSERT0(find);
         return i;
     }
 };
 
 
-class UINT2Var : public TMap<UINT, VAR*> {
+class UINT2Var : public TMap<UINT, Var*> {
 public:
     UINT2Var() {}
     virtual ~UINT2Var() {}
 
-    VAR * get_mapped(UINT u)
+    Var * get_mapped(UINT u)
     {
         ASSERT0(u != 0);
         bool find;
-        VAR * v = TMap<UINT, VAR*>::get(u, &find);
+        Var * v = TMap<UINT, Var*>::get(u, &find);
         ASSERT0(find);
         return v;
     }
@@ -168,18 +168,18 @@ public:
         paramnum = src.paramnum;
     }
 
-    void dump()
+    void dump(Region const* rg)
     {
-        if (g_tfile == NULL) { return; }
-        note("\n==---- DUMP Prno2Vreg ----==");
-        g_indent = 4;
+        if (!rg->isLogMgrInit()) { return; }
+        note(rg, "\n==---- DUMP Prno2Vreg ----==");
+        rg->getLogMgr()->incIndent(4);
 
         if (maxreg < 0) {
-            note("\n==------ PR to Vreg is unordered ------==");
+            note(rg, "\n==------ PR to Vreg is unordered ------==");
             INT cur;
             for (UINT prno = get_first(cur); cur >= 0; prno = get_next(cur)) {
                 UINT v = get(prno);
-                note("\nPR%d->v%d", prno, v);
+                note(rg, "\nPR%d->v%d", prno, v);
             }
         } else {
             INT cur;
@@ -188,38 +188,37 @@ public:
                 for (UINT prno = get_first(cur); cur >= 0; prno = get_next(cur)) {
                     UINT v = get(prno);
                     if (v == (UINT)i) {
-                        note("\nPR%d -> v%d", prno, v);
+                        note(rg, "\nPR%d -> v%d", prno, v);
                         find = true;
                         break;
                     }
                 }
 
                 if (!find) {
-                    note("\n-- -> v%d", i);
+                    note(rg, "\n-- -> v%d", i);
                 }
             }
         }
-        fflush(g_tfile);
+        rg->getLogMgr()->decIndent(4);
     }
 };
 
 
 class Vreg2PR : public Vector<IR*> {
 public:
-    void dump()
+    void dump(Region const* rg)
     {
-        if (g_tfile == NULL) { return; }
+        if (!rg->isLogMgrInit()) { return; }
 
-        note("\n==---- DUMP Prno2Vreg ----==");
+        note(rg, "\n==---- DUMP Prno2Vreg ----==");
 
         for (INT i = 0; i <= get_last_idx(); i++) {
             IR * pr = get(i);
             if (pr == NULL) {
-                note("\nv%d -> --", i);
+                note(rg, "\nv%d -> --", i);
             }
-            note("\nv%d -> PR%u", i, pr->getPrno());
+            note(rg, "\nv%d -> PR%u", i, pr->getPrno());
         }
-        fflush(g_tfile);
     }
 };
 

@@ -102,12 +102,35 @@ bool Region::performSimplify(OptCtx & oc)
             ASSERT0(verifyMDRef());
         }
 
+        bool need_rebuild_mdssa = false;
+        bool need_rebuild_prssa = false;
+        MDSSAMgr * mdssamgr = (MDSSAMgr*)getPassMgr()->queryPass(
+            PASS_MD_SSA_MGR);
+        if (mdssamgr != NULL && mdssamgr->is_valid()) {
+            need_rebuild_mdssa = true;
+            mdssamgr->destruction(&oc);
+        }
+
+        PRSSAMgr * prssamgr = (PRSSAMgr*)getPassMgr()->queryPass(
+            PASS_PR_SSA_MGR);
+        if (prssamgr != NULL && prssamgr->is_valid()) {
+            need_rebuild_prssa = true;
+            prssamgr->destruction(&oc);
+        }
+
         //Before CFG building.
         getCFG()->removeEmptyBB(oc);
 
         getCFG()->rebuild(oc);
 
         ASSERT0(getCFG()->verify());
+
+        if (need_rebuild_mdssa) {
+            mdssamgr->construction(oc);
+        }
+        if (need_rebuild_prssa) {
+            prssamgr->construction(oc);
+        }
 
         getCFG()->performMiscOpt(oc);
 
@@ -126,13 +149,11 @@ bool Region::performSimplify(OptCtx & oc)
     if (g_verify_level >= VERIFY_LEVEL_3 &&
         OC_is_pr_du_chain_valid(oc) &&
         OC_is_nonpr_du_chain_valid(oc)) {
-        ASSERT0(getDUMgr() == NULL ||
-            getDUMgr()->verifyMDDUChain(DUOPT_COMPUTE_PR_DU | DUOPT_COMPUTE_NONPR_DU));
+        ASSERT0(verifyMDDUChain(this));
     }
 
     if (g_is_dump_after_pass && g_dump_opt.isDumpALL()) {
-        g_indent = 0;
-        note("\n==---- DUMP AFTER SIMPLIFY IRBB LIST ----==");
+        note(this, "\n==---- DUMP AFTER SIMPLIFY IRBB LIST ----==");
         dumpBBList();
     }
     return true;
@@ -168,15 +189,14 @@ bool Region::MiddleProcess(OptCtx & oc)
     if (bbl->get_elem_count() == 0) { return true; }
 
     if (g_verify_level >= VERIFY_LEVEL_3) {
-        ASSERT0(getDUMgr() == NULL ||
-            getDUMgr()->verifyMDDUChain(DUOPT_COMPUTE_PR_DU | DUOPT_COMPUTE_NONPR_DU));
+        ASSERT0(verifyMDDUChain(this));
     }
 
     bool do_simplification = true;
     if (getPassMgr() != NULL &&
         (getPassMgr()->queryPass(PASS_PR_SSA_MGR) != NULL &&
          ((PRSSAMgr*)getPassMgr()->queryPass(PASS_PR_SSA_MGR))->
-              isSSAConstructed())) {
+              is_valid())) {
         do_simplification = false;
     }
 
@@ -185,21 +205,18 @@ bool Region::MiddleProcess(OptCtx & oc)
     }
 
     if (g_opt_level > OPT_LEVEL0) {
-        PassMgr * passmgr = getPassMgr();
-        ASSERT0(passmgr);
-        passmgr->performScalarOpt(oc);
+        getPassMgr()->registerPass(PASS_SCALAR_OPT)->perform(oc);
     }
 
-    ASSERT0(verifyRPO(oc));
+    ASSERT0(getCFG() && getCFG()->verifyRPO(oc));
     if (g_do_refine) {
         RefineCtx rf;
-        if (refineBBlist(bbl, rf, oc)) {
+        Refine * refine = (Refine*)getPassMgr()->registerPass(PASS_REFINE);
+        if (refine->refineBBlist(bbl, rf, oc)) {
             if (g_verify_level >= VERIFY_LEVEL_3 &&
                 OC_is_pr_du_chain_valid(oc) &&
                 OC_is_nonpr_du_chain_valid(oc)) {
-                ASSERT0(getDUMgr() == NULL ||
-                        getDUMgr()->verifyMDDUChain(DUOPT_COMPUTE_PR_DU |
-                                                    DUOPT_COMPUTE_NONPR_DU));
+                ASSERT0(verifyMDDUChain(this));
             }
             return true;
         }

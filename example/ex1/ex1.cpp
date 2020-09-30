@@ -143,8 +143,6 @@ int main(int argc, char * argv[])
 
     printf("\nGenerate region");
 
-    initdump("tmp.log", true);
-
     //Generate region.
     generate_region(rm);
 
@@ -165,8 +163,6 @@ int main(int argc, char * argv[])
     delete g_dbx_mgr;
     g_dbx_mgr = NULL;
     printf("\nFinish\n");
-
-    finidump();
 
     return 0;
 }

@@ -43,5 +43,11 @@ OPT_OBJS +=\
 ../opt/callg.o\
 ../opt/ir_loop_cvt.o\
 ../opt/refine_duchain.o\
-../opt/symtab.o
+../opt/prssainfo.o\
+../opt/scalar_opt.o\
+../opt/liveness_mgr.o\
+../opt/mdliveness_mgr.o\
+../opt/du_helper.o\
+../opt/symtab.o\
+../opt/logmgr.o
 

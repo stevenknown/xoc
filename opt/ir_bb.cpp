@@ -46,7 +46,7 @@ C<IR*> * BBIRList::append_tail_ex(IR * ir)
     IRListIter ct;
     for (List<IR*>::get_tail(&ct);
          ct != List<IR*>::end(); ct = List<IR*>::get_prev(ct)) {
-        if (!m_bb->isDownBoundary(ct->val())) {
+        if (!IRBB::isDownBoundary(ct->val())) {
             break;
         }
     }
@@ -75,7 +75,7 @@ size_t IRBB::count_mem() const
 
 
 //Could ir be looked as a last stmt in basic block?
-bool IRBB::isDownBoundary(IR * ir)
+bool IRBB::isDownBoundary(IR const* ir)
 {
     ASSERTN(ir->isStmtInBB() || ir->is_lab(), ("illegal stmt in bb"));
     switch (ir->getCode()) {
@@ -87,7 +87,7 @@ bool IRBB::isDownBoundary(IR * ir)
         return true;
     case IR_SWITCH:
         ASSERTN(SWITCH_body(ir) == NULL,
-               ("Peel switch-body to enable switch in bb-list construction"));
+                ("Peel switch-body to enable switch in bb-list construction"));
         return true;
     case IR_TRUEBR:
     case IR_FALSEBR:
@@ -101,47 +101,78 @@ bool IRBB::isDownBoundary(IR * ir)
 }
 
 
+//Return true if BB has a fall through successor.
+//Note conditional branch always has fallthrough successor.
+bool IRBB::is_fallthrough() const
+{
+    IR * last = const_cast<IRBB*>(this)->getLastIR();
+    if (last == NULL) { return true; }
+    switch (last->getCode()) {
+    case IR_CALL:
+    case IR_ICALL:
+    case IR_TRUEBR:
+    case IR_FALSEBR:
+    case IR_SWITCH:
+        return true;
+    case IR_IGOTO:
+    case IR_GOTO:
+        //We have no knowledge about whether target BB of GOTO/IGOTO
+        //will be followed subsequently on current BB.
+        //Leave this problem to CFG builder, and the related
+        //attribute should be set at that time.
+        return false;
+    case IR_RETURN:
+        //Succeed stmt of 'ir' may be DEAD code
+        //IR_BB_is_func_exit(cur_bb) = true;
+        return true;
+    case IR_REGION:
+        return true;
+    default: ;
+    }
+    return false;
+}
+
+
 void IRBB::dump(Region const* rg, bool dump_inner_region) const
 {
-    if (g_tfile == NULL) { return; }
+    if (!rg->isLogMgrInit()) { return; }
 
-    note("\n----- BB%d ------", BB_id(this));
+    note(rg, "\n----- BB%d --- rpo:%d -----", id(), rpo());
     IRBB * pthis = const_cast<IRBB*>(this);
     if (pthis->getLabelList().get_elem_count() > 0) {
-        note("\nLABEL:");
-        dumpBBLabel(pthis->getLabelList(), g_tfile);
+        note(rg, "\nLABEL:");
+        dumpBBLabel(pthis->getLabelList(), rg);
     }
 
     //Attributes
-    note("\nATTR:");
-    if (BB_is_entry(this)) {
-        prt("entry_bb ");
+    note(rg, "\nATTR:");
+    if (is_entry()) {
+        prt(rg, "entry_bb ");
     }
 
     //if (BB_is_exit(this)) {
-    //    prt("exit_bb ");
+    //    prt(rg, "exit_bb ");
     //}
 
-    if (BB_is_fallthrough(this)) {
-        prt("fall_through ");
+    if (is_fallthrough()) {
+        prt(rg, "fall_through ");
     }
 
-    if (BB_is_target(this)) {
-        prt("branch_target ");
+    if (is_target()) {
+        prt(rg, "branch_target ");
     }
 
     //IR list
-    note("\nSTMT NUM:%d", getNumOfIR());
-    g_indent += 3;
+    note(rg, "\nSTMT NUM:%d", getNumOfIR());
+    rg->getLogMgr()->incIndent(3);
     for (IR * ir = BB_first_ir(pthis);
          ir != NULL; ir = BB_irlist(pthis).get_next()) {
         ASSERT0(ir->is_single() && ir->getBB() == this);
         dumpIR(ir, rg, NULL, IR_DUMP_KID | IR_DUMP_SRC_LINE |
-            (dump_inner_region ? IR_DUMP_INNER_REGION : 0));
+               (dump_inner_region ? IR_DUMP_INNER_REGION : 0));
     }
-    g_indent -= 3;
-    note("\n");
-    fflush(g_tfile);
+    rg->getLogMgr()->decIndent(3);
+    note(rg, "\n");
 }
 
 
@@ -155,7 +186,7 @@ void IRBB::verify()
         ASSERT0(ir->is_single());
         ASSERT0(ir->getBB() == this);
         ASSERT0(ir->isStmtInBB());
-        if (isDownBoundary(ir)) {
+        if (IRBB::isDownBoundary(ir)) {
             ASSERTN(ir == BB_last_ir(this), ("invalid BB down boundary."));
         }
         c++;
@@ -167,14 +198,13 @@ void IRBB::verify()
 //Return true if one of bb's successor has a phi.
 bool IRBB::successorHasPhi(CFG<IRBB, IR> * cfg)
 {
-    xcom::Vertex * vex = cfg->getVertex(BB_id(this));
+    xcom::Vertex * vex = cfg->getVertex(id());
     ASSERT0(vex);
     for (xcom::EdgeC * out = vex->getOutList();
          out != NULL; out = out->get_next()) {
         xcom::Vertex * succ_vex = out->getTo();
         IRBB * succ = cfg->getBB(succ_vex->id());
         ASSERT0(succ);
-
         for (IR * ir = BB_first_ir(succ);
              ir != NULL; ir = BB_next_ir(succ)) {
             if (ir->is_phi()) { return true; }
@@ -189,10 +219,10 @@ bool IRBB::successorHasPhi(CFG<IRBB, IR> * cfg)
 void IRBB::dupSuccessorPhiOpnd(CFG<IRBB, IR> * cfg, Region * rg, UINT opnd_pos)
 {
     IRCFG * ircfg = (IRCFG*)cfg;
-    xcom::Vertex * vex = ircfg->getVertex(BB_id(this));
+    xcom::Vertex * vex = ircfg->getVertex(id());
     ASSERT0(vex);
-    for (xcom::EdgeC * out = VERTEX_out_list(vex);
-         out != NULL; out = EC_next(out)) {
+    for (xcom::EdgeC * out = vex->getOutList();
+         out != NULL; out = out->get_next()) {
         xcom::Vertex * succ_vex = out->getTo();
         IRBB * succ = ircfg->getBB(succ_vex->id());
         ASSERT0(succ);
@@ -223,43 +253,67 @@ void IRBB::dupSuccessorPhiOpnd(CFG<IRBB, IR> * cfg, Region * rg, UINT opnd_pos)
         }
     }
 }
+
+
+UINT IRBB::getNumOfPred(CFG<IRBB, IR> * cfg) const
+{
+    ASSERT0(cfg);
+    xcom::Vertex const* vex = cfg->getVertex(id());
+    ASSERT0(vex);
+    UINT n = 0;
+    for (xcom::EdgeC const* in = VERTEX_in_list(vex);
+         in != NULL; in = EC_next(in), n++);
+    return n;
+}
+
+
+UINT IRBB::getNumOfSucc(CFG<IRBB, IR> * cfg) const
+{
+    ASSERT0(cfg);
+    xcom::Vertex const* vex = cfg->getVertex(id());
+    ASSERT0(vex);
+    UINT n = 0;
+    for (xcom::EdgeC const* out = VERTEX_out_list(vex);
+         out != NULL; out = EC_next(out), n++);
+    return n;
+}
 //END IRBB
 
 
-//Before removing bb or change bb successor,
+//Before removing BB or change BB successor,
 //you need remove the related PHI operand if BB successor has PHI stmt.
 void IRBB::removeSuccessorDesignatePhiOpnd(CFG<IRBB, IR> * cfg, IRBB * succ)
 {
-    ASSERT0(cfg && succ);
     IRCFG * ircfg = (IRCFG*)cfg;
-    Region * rg = ircfg->getRegion();
-    UINT const pos = ircfg->WhichPred(this, succ);
-    for (IR * ir = BB_first_ir(succ); ir != NULL; ir = BB_next_ir(succ)) {
-        if (!ir->is_phi()) { break; }
-
-        ASSERT0(xcom::cnt_list(PHI_opnd_list(ir)) == succ->getNumOfPred(cfg));
-
-        IR * opnd;
-        UINT lpos = pos;
-        for (opnd = PHI_opnd_list(ir); lpos != 0; opnd = opnd->get_next()) {
-            ASSERT0(opnd);
-            lpos--;
-        }
-
-        if (opnd == NULL) {
-            //PHI does not contain any operand.
-            continue;
-        }
-
-        opnd->removeSSAUse();
-        ((CPhi*)ir)->removeOpnd(opnd);
-        rg->freeIRTree(opnd);
+    PRSSAMgr * prssamgr = (PRSSAMgr*)ircfg->getRegion()->getPassMgr()->
+        queryPass(PASS_PR_SSA_MGR);
+    if (prssamgr != NULL && prssamgr->is_valid()) {
+        prssamgr->removeSuccessorDesignatePhiOpnd(this, succ);
     }
 
-    MDSSAMgr * mdssamgr = (MDSSAMgr*)rg->getPassMgr()->queryPass(
-        PASS_MD_SSA_MGR);
-    if (mdssamgr != NULL) {
+    MDSSAMgr * mdssamgr = (MDSSAMgr*)ircfg->getRegion()->getPassMgr()->
+        queryPass(PASS_MD_SSA_MGR);
+    if (mdssamgr != NULL && mdssamgr->is_valid()) {
         mdssamgr->removeSuccessorDesignatePhiOpnd(this, succ);
+    }
+}
+
+
+//After adding BB or change bb successor,
+//you need add the related PHI operand if BB successor has PHI stmt.
+void IRBB::addSuccessorDesignatePhiOpnd(CFG<IRBB, IR> * cfg, IRBB * succ)
+{
+    IRCFG * ircfg = (IRCFG*)cfg;
+    PRSSAMgr * prssamgr = (PRSSAMgr*)ircfg->getRegion()->getPassMgr()->
+        queryPass(PASS_PR_SSA_MGR);
+    if (prssamgr != NULL && prssamgr->is_valid()) {
+        prssamgr->addSuccessorDesignatePhiOpnd(this, succ);        
+    }
+
+    MDSSAMgr * mdssamgr = (MDSSAMgr*)ircfg->getRegion()->getPassMgr()->
+        queryPass(PASS_MD_SSA_MGR);
+    if (mdssamgr != NULL && mdssamgr->is_valid()) {
+        mdssamgr->addSuccessorDesignatePhiOpnd(this, succ);
     }
 }
 
@@ -268,7 +322,7 @@ void IRBB::removeSuccessorDesignatePhiOpnd(CFG<IRBB, IR> * cfg, IRBB * succ)
 //you need remove the related PHI operand if BB successor has PHI.
 void IRBB::removeAllSuccessorsPhiOpnd(CFG<IRBB, IR> * cfg)
 {
-    xcom::Vertex * vex = cfg->getVertex(BB_id(this));
+    xcom::Vertex * vex = cfg->getVertex(id());
     ASSERT0(vex);
     for (xcom::EdgeC * out = vex->getOutList();
          out != NULL; out = EC_next(out)) {
@@ -280,13 +334,15 @@ void IRBB::removeAllSuccessorsPhiOpnd(CFG<IRBB, IR> * cfg)
 //END IRBB
 
 
-void dumpBBLabel(List<LabelInfo const*> & lablist, FILE * h)
+void dumpBBLabel(List<LabelInfo const*> & lablist, Region const* rg)
 {
+    FILE * h = rg->getLogMgr()->getFileHandler();
     ASSERT0(h);
     xcom::C<LabelInfo const*> * ct;
-    for (lablist.get_head(&ct); ct != lablist.end(); ct = lablist.get_next(ct)) {
+    for (lablist.get_head(&ct); ct != lablist.end();
+         ct = lablist.get_next(ct)) {
         LabelInfo const* li = ct->val();
-        switch (LABEL_INFO_type(li)) {
+        switch (LABELINFO_type(li)) {
         case L_CLABEL:
             fprintf(h, CLABEL_STR_FORMAT, CLABEL_CONT(li));
             break;
@@ -294,70 +350,49 @@ void dumpBBLabel(List<LabelInfo const*> & lablist, FILE * h)
             fprintf(h, ILABEL_STR_FORMAT, ILABEL_CONT(li));
             break;
         case L_PRAGMA:
-            ASSERT0(LABEL_INFO_pragma(li));
-            fprintf(h, "%s", SYM_name(LABEL_INFO_pragma(li)));
+            ASSERT0(LABELINFO_pragma(li));
+            fprintf(h, "%s", SYM_name(LABELINFO_pragma(li)));
             break;
         default: UNREACHABLE();
         }
 
-        if (LABEL_INFO_is_try_start(li) ||
-            LABEL_INFO_is_try_end(li) ||
-            LABEL_INFO_is_catch_start(li) ||
-            LABEL_INFO_is_terminate(li)) {
-            prt("(");
-            if (LABEL_INFO_is_try_start(li)) {
-                prt("try_start,");
+        if (LABELINFO_is_try_start(li) ||
+            LABELINFO_is_try_end(li) ||
+            LABELINFO_is_catch_start(li) ||
+            LABELINFO_is_terminate(li)) {
+            prt(rg, "(");
+            if (LABELINFO_is_try_start(li)) {
+                prt(rg, "try_start,");
             }
-            if (LABEL_INFO_is_try_end(li)) {
-                prt("try_end,");
+            if (LABELINFO_is_try_end(li)) {
+                prt(rg, "try_end,");
             }
-            if (LABEL_INFO_is_catch_start(li)) {
-                prt("catch_start,");
+            if (LABELINFO_is_catch_start(li)) {
+                prt(rg, "catch_start,");
             }
-            if (LABEL_INFO_is_terminate(li)) {
-                prt("terminate");
+            if (LABELINFO_is_terminate(li)) {
+                prt(rg, "terminate");
             }
-            prt(")");
+            prt(rg, ")");
         }
-        prt(" ");
+        prt(rg, " ");
     }
 }
 
 
 void dumpBBList(BBList const* bbl,
                 Region const* rg,
-                CHAR const* name,
                 bool dump_inner_region)
 {
     ASSERT0(rg && bbl);
-    FILE * h = NULL;
-    FILE * org_g_tfile = g_tfile;
-    if (name == NULL) {
-        h = g_tfile;
-    } else {
-        UNLINK(name);
-        h = fopen(name, "a+");
-        ASSERTN(h != NULL, ("can not dump."));
-        g_tfile = h;
-    }
-    if (h == NULL) { return; }
     if (bbl->get_elem_count() != 0) {
-        if (h == g_tfile) {
-            note("\n==---- DUMP IRBBList region '%s' ----==", rg->getRegionName());
-        } else {
-            fprintf(h, "\n==---- DUMP IRBBList region '%s' ----==", rg->getRegionName());
-        }
+        note(rg, "\n==---- DUMP IRBBList '%s' ----==", rg->getRegionName());
         C<IRBB*> * ct = NULL;
         for (IRBB * bb = bbl->get_head(&ct);
              bb != NULL; bb = bbl->get_next(&ct)) {
             bb->dump(rg, dump_inner_region);
         }
-        fflush(h);
     }
-    if (h != org_g_tfile) {
-        fclose(h);
-    }
-    g_tfile = org_g_tfile;
 }
 
 } //namespace xoc

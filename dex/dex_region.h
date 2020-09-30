@@ -52,7 +52,7 @@ protected:
     DexFile const* m_dexfile;
     DexMethod const* m_dexmethod;
     SMemPool * m_sc_pool; //a pool to hold the SC<LabelInfo*>
-    Var2UINT m_var2fieldid; //map VAR to field-id.
+    Var2UINT m_var2fieldid; //map Var to field-id.
 
 protected:
     bool is_64bit(IR const* ir)

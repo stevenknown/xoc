@@ -31,10 +31,11 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 namespace xoc {
 
-bool RefineDUChain::dump()
+bool RefineDUChain::dump() const
 {
-    if (g_tfile == NULL) { return true; }
-    note("\n==---- DUMP REFINE_DUCHAIN ----==\n");
+    if (!getRegion()->isLogMgrInit()) { return true; }
+    note(getRegion(), "\n==---- DUMP %s '%s' ----==", getPassName(),
+         m_rg->getRegionName());
     if (m_is_use_gvn) {
         ASSERT0(m_du);
         m_du->dumpDUChainDetail();
@@ -67,11 +68,13 @@ VN const* RefineDUChain::getVNOfIndirectOp(IR const* ir, UINT * indirect_level)
 }
 
 
-void RefineDUChain::processBB(IRBB const* bb)
+//Return true if DU chain changed.
+bool RefineDUChain::processBB(IRBB const* bb)
 {
     ASSERT0(bb);
     C<IR*> * ct = NULL;
     ConstIRIter ii;
+    bool change = false;
     for (IR * ir = BB_irlist(bb).get_head(&ct);
          ir != NULL; ir = BB_irlist(bb).get_next(&ct)) {
         ii.clean();
@@ -79,25 +82,28 @@ void RefineDUChain::processBB(IRBB const* bb)
              exp != NULL; exp = iterRhsNextC(ii)) {
             if (!exp->is_ild()) { continue; }
             if (m_is_use_gvn) {
-                processExpressionViaGVN(exp);
+                change |= processExpressionViaGVN(exp);
                 continue;
             }
             //Use MDSSA.
-            processExpressionViaMDSSA(exp);
+            change |= processExpressionViaMDSSA(exp);
         }
     }
+    return change;
 }
 
 
-void RefineDUChain::processExpressionViaMDSSA(IR const* exp)
+//Return true if DU chain changed.
+bool RefineDUChain::processExpressionViaMDSSA(IR const* exp)
 {
     ASSERT0(exp && exp->is_ild());
     MDSSAInfo * mdssainfo = m_mdssamgr->getMDSSAInfoIfAny(exp);
-    if (mdssainfo == NULL) { return; }
+    if (mdssainfo == NULL) { return false; }
 
     //Iterate each VOpnd.
     VOpndSetIter iter = NULL;
     INT next_i = -1;
+    bool change = false;
     for (INT i = mdssainfo->readVOpndSet()->get_first(&iter);
          i >= 0; i = next_i) {
         next_i = mdssainfo->readVOpndSet()->get_next(i, &iter);
@@ -113,7 +119,7 @@ void RefineDUChain::processExpressionViaMDSSA(IR const* exp)
         }
         IR const* defstmt = t->getDef()->getOcc();
         ASSERT0(defstmt);
-        if (exp->isNotOverLap(defstmt, m_rg)) {
+        if (exp->isNotOverlap(defstmt, m_rg)) {
             //Remove DU chain if we can guarantee ILD and its DEF stmt
             //are independent.
             //mdssainfo->getVOpndSet()->remove(t, *m_sbs_mgr);
@@ -122,12 +128,15 @@ void RefineDUChain::processExpressionViaMDSSA(IR const* exp)
             //removeDUChain may remove VOpnd that indicated by 'next_i'.
             //We have to recompute next_i to avoid redundnant iteration.
             next_i = mdssainfo->readVOpndSet()->get_first(&iter);
+            change = true;
         }
     }
+    return change;
 }
 
 
-void RefineDUChain::processExpressionViaGVN(IR const* exp)
+//Return true if DU chain changed.
+bool RefineDUChain::processExpressionViaGVN(IR const* exp)
 {
     ASSERT0(exp->is_exp());
     //Find the base expression that is not ILD.
@@ -137,13 +146,14 @@ void RefineDUChain::processExpressionViaGVN(IR const* exp)
     VN const* vn_of_ild_base = getVNOfIndirectOp(exp, &ild_star_level);
     if (vn_of_ild_base == NULL) {
         //It is no need to analyze DEF set with have no VN.
-        return;
+        return false;
     }
 
     DUSet const* defset = exp->getDUSet();
-    if (defset == NULL) { return; }
+    if (defset == NULL) { return false; }
 
     //Iterate each DEF stmt of 'exp'.
+    bool change = false;
     DUIter di = NULL;
     INT next_i = -1;
     for (INT i = defset->get_first(&di); i >= 0; i = next_i) {
@@ -167,18 +177,23 @@ void RefineDUChain::processExpressionViaGVN(IR const* exp)
             continue;
         }
         m_du->removeDUChain(stmt, exp);
+        change = true;
     }
+    return change;
 }
 
 
-void RefineDUChain::process()
+//Return true if DU chain changed.
+bool RefineDUChain::process()
 {
     BBList * bbl = m_rg->getBBList();
     C<IRBB*> * ctbb = NULL;
+    bool change = false;
     for (IRBB * bb = bbl->get_head(&ctbb);
          bb != NULL; bb = bbl->get_next(&ctbb)) {
-        processBB(bb);
+        change |= processBB(bb);
     }
+    return change;
 }
 
 
@@ -186,33 +201,20 @@ bool RefineDUChain::perform(OptCtx & oc)
 {
     BBList * bbl = m_rg->getBBList();
     if (bbl == NULL || bbl->get_elem_count() == 0) { return false; }
-    if (!OC_is_ref_valid(oc)) { return false; }
     if (!OC_is_cfg_valid(oc)) { return false; }
-    //Check PR DU chain.
-    PRSSAMgr * ssamgr = (PRSSAMgr*)(m_rg->getPassMgr()->queryPass(
-        PASS_PR_SSA_MGR));
-    if (ssamgr != NULL && ssamgr->isSSAConstructed()) {
-        m_ssamgr = ssamgr;
-    } else {
-        m_ssamgr = NULL;
-    }
-    if (!OC_is_pr_du_chain_valid(oc) && m_ssamgr == NULL) { 
+    if (!OC_is_ref_valid(oc)) { return false; }
+    m_mdssamgr = (MDSSAMgr*)m_rg->getPassMgr()->queryPass(PASS_MD_SSA_MGR);
+    m_prssamgr = (PRSSAMgr*)m_rg->getPassMgr()->queryPass(PASS_PR_SSA_MGR);
+    if (!OC_is_pr_du_chain_valid(oc) && !usePRSSADU()) {
+        //DCE use either classic PR DU chain or PRSSA.
         //At least one kind of DU chain should be avaiable.
         return false;
     }
-    //Check NONPR DU chain.
-    MDSSAMgr * mdssamgr = (MDSSAMgr*)(m_rg->getPassMgr()->queryPass(
-        PASS_MD_SSA_MGR));
-    if (mdssamgr != NULL && mdssamgr->isMDSSAConstructed()) {
-        m_mdssamgr = mdssamgr;
-    } else {
-        m_mdssamgr = NULL;
-    }
-    if (!OC_is_nonpr_du_chain_valid(oc) && m_mdssamgr == NULL) {
+    if (!OC_is_nonpr_du_chain_valid(oc) && !useMDSSADU()) {
+        //DCE use either classic MD DU chain or MDSSA.
         //At least one kind of DU chain should be avaiable.
         return false;
     }
-
     if (m_is_use_gvn) {
         m_gvn = (GVN const*)m_rg->getPassMgr()->queryPass(PASS_GVN);
         if (m_gvn == NULL || !m_gvn->is_valid()) {
@@ -222,13 +224,13 @@ bool RefineDUChain::perform(OptCtx & oc)
         //Use MDSSA.
     }
     START_TIMER(t, getPassName());
-    process();
+    bool change = process();
     END_TIMER(t, getPassName());
     if (g_is_dump_after_pass && g_dump_opt.isDumpRefineDUChain()) {
         dump();
     }
-    //This pass does not affect IR stmt/exp.
-    return false;
+    //This pass does not affect IR stmt/exp, but DU chain may be changed.
+    return change;
 }
 //END PRE
 

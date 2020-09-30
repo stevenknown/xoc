@@ -41,8 +41,8 @@ class Region;
 
 typedef enum _MD_TYPE {
     MD_UNBOUND = 0,
-    MD_EXACT,
-    MD_RANGE,
+    MD_EXACT = 1,
+    MD_RANGE = 2,
 } MD_TYPE;
 
 #define MD_UNDEF 0 //Undefined.
@@ -70,7 +70,7 @@ typedef enum _MD_TYPE {
 //    Unique id of abstract memory object.
 //
 //¡ð Base Variable
-//    Since MD is the abstract version of VAR, it is closely related to
+//    Since MD is the abstract version of Var, it is closely related to
 //    individual variable. This variable may be the base of several MD.
 //
 //¡ð Type
@@ -148,7 +148,7 @@ public:
     UINT uid; //unique id.
     UINT ofst; //byte offsets relative to 'base'
     UINT size; //byte size of the memory block
-    VAR * base;
+    Var * base;
     union {
         struct {
             BYTE type:2;
@@ -176,7 +176,7 @@ public:
         u2.s1v = md->u2.s1v;
     }
 
-    VAR * get_base() const { return MD_base(this); }
+    Var * get_base() const { return MD_base(this); }
     UINT get_ofst() const { return MD_ofst(this); }
     UINT get_size() const { return MD_size(this); }
     MD_TYPE getType() const { return (MD_TYPE)MD_ty(this); }
@@ -303,7 +303,7 @@ public:
 };
 
 
-//Each VAR corresponds to an unqiue MDTab.
+//Each Var corresponds to an unqiue MDTab.
 class MDTab {
     COPY_CONSTRUCTOR(MDTab);
 protected:
@@ -389,7 +389,7 @@ public:
     bool is_contain_pure(UINT mdid) const
     { return DefSBitSetCore::is_contain(mdid); }
 
-    //Return true if set contain global variable.
+    //Return true if set contained global variable.
     bool is_contain_global() const
     {
         return DefSBitSetCore::is_contain(MD_GLOBAL_VAR) ||
@@ -397,49 +397,38 @@ public:
                //|| DefSBitSetCore::is_contain(MD_FULL_MEM);
     }
 
-    //Return true if set contain all memory variable.
-    bool is_contain_all() const
+    //Return true if set contained full memory variable.
+    bool is_contain_fullmem() const
     {
         //return DefSBitSetCore::is_contain(MD_FULL_MEM);
         return false;
     }
 
-    //Return true if set contain md.
-    inline bool is_contain(MD const* md) const
-    {
-        if (md->is_global() &&
-            DefSBitSetCore::is_contain(MD_GLOBAL_VAR) &&
-            MD_id(md) != MD_IMPORT_VAR) {
-            return true;
-        }
+    //Return true if set contained md.
+    bool is_contain(MD const* md) const;    
 
-        //TO BE CONFIRMED: Does it necessary to judge if either current
-        //MD or input MD is FULL_MEM?
-        //As we observed, passes that utilize MD relationship add
-        //MD2 to accroding IR's MDSet, which can keep global variables
-        //and MD2 dependence.
-        //e.g: g=10, #mustdef=MD10, maydef={MD2, MD10}, g is global variable that
-        //           #represented in Program Region.
-        //     foo(); #maydef={MD2, MD10}
-        //if (DefSBitSetCore::is_contain(MD_FULL_MEM)) {
-        //    return true;
-        //}
-
-        return DefSBitSetCore::is_contain(MD_id(md));
-    }
+    //Return true if set only contained the md that has been taken address.
+    bool is_contain_only_taken_addr(MD const* md) const;
 
     //Return true if md is overlap with the elements in set.
-    bool is_overlap(MD const* md, Region * current_ru) const;
+    bool is_overlap(MD const* md, Region const* current_ru) const;
+
+    //Return true if md is overlap with the elements.
+    //Note this function only consider the MD that have been taken address.
+    bool is_overlap_only_taken_addr(MD const* md, 
+                                    Region const* current_ru) const;
 
     //Return true if md overlaps with element in current MDSet.
-    //Note this function will iterate elements in set which is costly.
+    //Note this function will iterate all elements which is costly.
     //Use it carefully.
     bool is_overlap_ex(MD const* md,
-                       Region * current_ru,
+                       Region const* current_ru,
                        MDSystem const* mdsys) const;
-    bool is_contain_inexact(MDSystem * ms) const;
-    bool is_contain_only_exact_and_str(MDSystem * ms) const;
-    bool is_exact_equal(MDSet const& mds, MDSystem * ms) const;
+    bool is_contain_inexact(MDSystem const* ms) const;
+    bool is_contain_only_exact_and_str(MDSystem const* ms) const;
+    //Return true current set is equivalent to mds, whereas every element
+    //in set is exact.
+    bool is_exact_equal(MDSet const& mds, MDSystem const* ms) const;
 
     //Return true if set intersect with 'mds'.
     bool is_intersect(MDSet const& mds) const
@@ -468,15 +457,11 @@ public:
         return DefSBitSetCore::is_intersect(mds);
     }
 
-    //Return true if all MD in set are PR.
-    inline bool is_pr_set(MDSystem const* mdsys) const;
-
     void diff(MD const* md, DefMiscBitSetMgr & m)
     {
         ASSERT0(md);
         DefSBitSetCore::diff(MD_id(md), m);
     }
-
     void diff(UINT id, DefMiscBitSetMgr & m) { DefSBitSetCore::diff(id, m); }
     void diff(MDSet const& mds, DefMiscBitSetMgr & m)
     {
@@ -497,9 +482,15 @@ public:
         //}
         DefSBitSetCore::diff(mds, m);
     }
+    //This function will walk through whole current MDSet and differenciate
+    //overlapped elements.
+    //Note this function is very costly.
+    void diffAllOverlapped(UINT id, DefMiscBitSetMgr & m, MDSystem const* sys);
     void dump(MDSystem * ms, bool detail = false) const;
 
     //Get unique MD that is effective, and offset must be valid.
+    //Note the MDSet can only contain one element.
+    //Return the effect MD if found, otherwise return NULL.
     inline MD * get_exact_md(MDSystem * ms) const
     {
         MD * md = get_effect_md(ms);
@@ -508,6 +499,10 @@ public:
         }
         return NULL;
     }
+    //Get unique MD that is not fake memory object,
+    //but its offset might be invalid.
+    //Note the MDSet can only contain one element.
+    //Return the effect MD if found, otherwise return NULL.
     MD * get_effect_md(MDSystem * ms) const;
 };
 
@@ -531,6 +526,7 @@ public:
     //Do not destroy mds.
     void free(MDSet * mds);
 
+    Region * getRegion() const { return m_rg; }
     inline MDSet * get_free() { return m_free_md_set.remove_head(); }
     UINT get_mdset_count() const { return m_md_set_list.get_elem_count(); }
     UINT get_free_mdset_count() const { return m_free_md_set.get_elem_count(); }
@@ -579,7 +575,7 @@ public:
     }
 
     UINT get_elem_count() const { return m_count; }
-    void dump() const;
+    void dump(Region const* rg) const;
 };
 
 
@@ -604,7 +600,7 @@ public:
     MDSet const* append(SBitSetCore<> const& set)
     { return (MDSet const*)SBitSetCoreHash<MDSetHashAllocator>::append(set); }
 
-    void dump();
+    void dump(Region * rg);
 };
 
 
@@ -612,22 +608,22 @@ public:
 //Manage the memory allocation and free of MD, and
 //the mapping between MD_id and MD.
 //Manage the memory allocation and free of MDTab, and
-//the mapping between VAR and MDTab.
+//the mapping between Var and MDTab.
 //NOTE: each region manager has a single MDSystem.
 class MDSystem {
     COPY_CONSTRUCTOR(MDSystem);
     SMemPool * m_pool;
     SMemPool * m_sc_mdptr_pool;
     TypeMgr * m_tm;
-    VAR * m_all_mem;
-    VAR * m_global_mem;
-    VAR * m_import_var;
+    Var * m_all_mem;
+    Var * m_global_mem;
+    Var * m_import_var;
     MDId2MD m_id2md_map; //Map MD id to MD.
     SList<MD*> m_free_md_list; //MD allocated in pool.
     UINT m_md_count; //generate MD index, used by registerMD().
-    typedef TMap<VAR const*, MDTab*, CompareConstVar> Var2MDTab;
-    typedef TMapIter<VAR const*, MDTab*> Var2MDTabIter;
-    Var2MDTab m_var2mdtab; //map VAR to MDTab.
+    typedef TMap<Var const*, MDTab*, CompareConstVar> Var2MDTab;
+    typedef TMapIter<Var const*, MDTab*> Var2MDTabIter;
+    Var2MDTab m_var2mdtab; //map Var to MDTab.
 
     inline MD * allocMD()
     {
@@ -651,11 +647,10 @@ public:
 
     void init(VarMgr * vm);
     void clean();
-    void computeOverlapExactMD(
-            MD const* md,
-            OUT MDSet * output,
-            ConstMDIter & tabiter,
-            DefMiscBitSetMgr & mbsmgr);
+    void computeOverlapExactMD(MD const* md,
+                               OUT MDSet * output,
+                               ConstMDIter & tabiter,
+                               DefMiscBitSetMgr & mbsmgr);
     void computeOverlap(Region * current_ru,
                         MD const* md,
                         MDSet & output,
@@ -699,12 +694,13 @@ public:
         return md;
     }
 
-    //Get MD TAB that described mds which under same base VAR.
-    MDTab * getMDTab(VAR const* v)
+    //Get MD TAB that described mds which under same base Var.
+    MDTab * getMDTab(Var const* v)
     {
         ASSERT0(v);
         return m_var2mdtab.get(v);
     }
+    RegionMgr * getRegionMgr() const { return m_tm->getRegionMgr(); }
 
     UINT getNumOfMD() const { return m_id2md_map.get_elem_count(); }
     MDId2MD const* getID2MDMap() const { return &m_id2md_map; }
@@ -723,26 +719,11 @@ public:
     MD const* registerMD(MD const& m);
 
     //Register an effectively unbound MD that base is 'var'.
-    MD const* registerUnboundMD(VAR * var, UINT size);
+    MD const* registerUnboundMD(Var * var, UINT size);
 
     //Remove all MDs related to specific variable 'v'.
-    void removeMDforVAR(VAR const* v, IN ConstMDIter & iter);
+    void removeMDforVAR(Var const* v, IN ConstMDIter & iter);
 };
-
-
-//Return true if all MD in set are PR.
-bool MDSet::is_pr_set(MDSystem const* mdsys) const
-{
-    MDSetIter iter;
-    for (INT i = get_first(&iter);
-         i >= 0; i = get_next((UINT)i, &iter)) {
-        MD const* md = mdsys->readMD((UINT)i);
-        ASSERT0(md);
-        if (!md->is_pr()) { return false; }
-    }
-    return true;
-}
-
 
 typedef TMapIter<UINT, MDSet const*> MD2MDSetIter;
 
@@ -770,7 +751,7 @@ public:
         for (UINT fromid = get_first(mxiter, &from_md_pts);        
             fromid > 0; fromid = get_next(mxiter, &from_md_pts)) {
             ASSERT0(const_cast<MDSystem&>(mdsys).getMD(fromid));
-            if (from_md_pts == NULL || from_md_pts->is_contain_all()) {
+            if (from_md_pts == NULL || from_md_pts->is_contain_fullmem()) {
                 continue;
             }
             num_of_tgt_md += from_md_pts->get_elem_count();

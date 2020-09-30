@@ -31,14 +31,14 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 namespace xoc {
 
 //Add const string into symbol table.
-SYM * SymTab::add(CHAR const* s)
+Sym * SymTab::add(CHAR const* s)
 {
-    SYM * sym = m_free_one;
+    Sym * sym = m_free_one;
     if (sym == NULL) {
-        sym = (SYM*)smpoolMalloc(sizeof(SYM), m_pool);
+        sym = (Sym*)smpoolMalloc(sizeof(Sym), m_pool);
     }
     SYM_name(sym) = const_cast<CHAR*>(s);
-    SYM * appended_one = TTab<SYM*, CompareSymTab>::append(sym);
+    Sym * appended_one = TTab<Sym*, CompareSymTab>::append(sym);
     ASSERT0(m_free_one == NULL || m_free_one == sym);
     if (appended_one != sym) {
         //'s' has already been appended.

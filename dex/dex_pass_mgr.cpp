@@ -63,10 +63,7 @@ Pass * DexPassMgr::allocDCE()
 
 Pass * DexPassMgr::allocCopyProp()
 {
-    Pass * pass = new DEX_CP(m_rg);
-    SimpCtx simp;
-    pass->set_simp_cont(&simp);
-    return pass;
+    return new DEX_CP(m_rg);
 }
 
 
@@ -84,7 +81,7 @@ void DexPassMgr::performScalarOpt(OptCtx & oc)
     PRSSAMgr * ssamgr = (PRSSAMgr*)registerPass(PASS_PR_SSA_MGR);
     bool is_ssa_avail = false;
     if (ssamgr != NULL) {
-        is_ssa_avail = ssamgr->isSSAConstructed();
+        is_ssa_avail = ssamgr->is_valid();
     }
 
     passlist.append_tail(registerPass(PASS_CP));

@@ -38,19 +38,27 @@ namespace xoc {
 
 class Region;
 
-//Control Dependence xcom::Graph
+//Control Dependence Graph
 class CDG : public xcom::Graph {
     COPY_CONSTRUCTOR(CDG);
+    //Set to true if CDG presents control-edge to cyclic control flow.
+    //e.g: given loop, the control BB of loop-header includes itself.
+    bool m_consider_cycle;
     Region * m_rg;
 public:
-    CDG(Region * rg) { m_rg = rg; }
+    CDG(Region * rg) : m_consider_cycle(false) { m_rg = rg; }
+    void build(IN OUT OptCtx & oc, xcom::DGraph & cfg);
+
+    void dump() const;
+
+    Region * getRegion() const { return m_rg; }
     void get_cd_preds(UINT id, OUT List<xcom::Vertex*> & lst);
     void get_cd_succs(UINT id, OUT List<xcom::Vertex*> & lst);
-    bool is_only_cd_self(UINT id);
-    bool is_cd(UINT a, UINT b);
-    void dump();
-    void build(IN OUT OptCtx & oc, xcom::DGraph & cfg);
+
+    bool is_only_cd_self(UINT id) const;
+    bool is_cd(UINT a, UINT b) const;
     void rebuild(IN OUT OptCtx & oc, xcom::DGraph & cfg);
+    void set_consider_cycle(bool doit) { m_consider_cycle = doit; }
 };
 
 } //namespace xoc

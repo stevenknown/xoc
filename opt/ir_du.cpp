@@ -200,11 +200,11 @@ void MD2IRSet::append(UINT mdid, UINT irid)
 }
 
 
-void MD2IRSet::dump()
+void MD2IRSet::dump() const
 {
-    if (g_tfile == NULL) { return; }
+    if (!m_rg->isLogMgrInit()) { return; }
     m_md_sys->dump(false);
-    note("\n==-- DUMP MDID2IRLIST --==");
+    note(getRegion(), "\n==-- DUMP MDID2IRLIST --==");
     TMapIter<UINT, DefSBitSetCore*> c;
     for (UINT mdid = get_first(c); mdid != MD_UNDEF; mdid = get_next(c)) {
         MD const * md = m_md_sys->getMD(mdid);
@@ -213,18 +213,18 @@ void MD2IRSet::dump()
         DefSBitSetCore * irs = get(mdid);
         if (irs == NULL || irs->get_elem_count() == 0) { continue; }
         DefSBitSetIter sc = NULL;
-        g_indent += 2;
+        getRegion()->getLogMgr()->incIndent(2);
         for (INT i = irs->get_first(&sc); i >= 0; i = irs->get_next(i, &sc)) {
             IR * d = m_rg->getIR(i);
-            note("\n------------------");
+            note(getRegion(), "\n------------------");
             dumpIR(d, m_rg, NULL, 0);
-            note("\nDEF-REF:");
+            note(getRegion(), "\nDEF-REF:");
             MDSet const* ms = m_du->getMayDef(d);
             MD const* m = m_du->get_must_def(d);
 
             if (m != NULL) {
                 //Dump Must-Def ref.
-                prt("MMD%d", MD_id(m));
+                prt(getRegion(), "MMD%d", MD_id(m));
             }
 
             if (ms != NULL) {
@@ -232,13 +232,12 @@ void MD2IRSet::dump()
                 MDSetIter iter;
                 for (INT j = ms->get_first(&iter);
                      j >= 0; j = ms->get_next(j, &iter)) {
-                    prt(" MD%d", j);
+                    prt(getRegion(), " MD%d", j);
                 }
             }
         }
-        g_indent -= 2;
+        getRegion()->getLogMgr()->decIndent(2);
     }
-    fflush(g_tfile);
 }
 //END MD2IRSet
 
@@ -334,7 +333,7 @@ void DUMgr::computeOverlapUseMDSet(IR * ir, bool recompute)
     ASSERTN(!mds->is_empty(), ("can not get a hashed MDSet that is empty")); 
     tmpmds.copy(*mds, *m_misc_bs_mgr);
     m_md_sys->computeOverlap(m_rg, *mds, tmpmds,
-        m_tab_iter, *m_misc_bs_mgr, true);
+                             m_tab_iter, *m_misc_bs_mgr, true);
     ir->setRefMDSet(m_mds_hash->append(tmpmds), m_rg);
     tmpmds.clean(*m_misc_bs_mgr);
 }
@@ -611,7 +610,7 @@ bool DUMgr::hasSingleDefToMD(DUSet const& defset, MD const* md) const
 //Return true if 'def1' exactly modified md that 'def2' generated.
 //'def1': should be stmt.
 //'def2': should be stmt.
-bool DUMgr::is_must_kill(IR const* def1, IR const* def2)
+bool DUMgr::isMustKill(IR const* def1, IR const* def2)
 {
     ASSERT0(def1->is_stmt() && def2->is_stmt());
     if ((def1->isWritePR() || def1->isCallStmt()) &&
@@ -632,7 +631,7 @@ bool DUMgr::is_must_kill(IR const* def1, IR const* def2)
 }
 
 
-bool DUMgr::is_stpr_may_def(IR const* def, IR const* use, bool is_recur)
+bool DUMgr::isStprMayDef(IR const* def, IR const* use, bool is_recur)
 {
     ASSERT0(def->is_stpr());
     UINT prno = STPR_no(def);
@@ -650,9 +649,9 @@ bool DUMgr::is_stpr_may_def(IR const* def, IR const* use, bool is_recur)
 }
 
 
-static bool is_call_may_def_core(IR const* call,
-                                 IR const* use,
-                                 MDSet const* call_maydef)
+static bool is_call_may_def_helper(IR const* call,
+                                   IR const* use,
+                                   MDSet const* call_maydef)
 {
     //MD of use may be exact or inexact.
     MD const* use_md = use->getEffectRef();
@@ -675,7 +674,12 @@ static bool is_call_may_def_core(IR const* call,
 }
 
 
-bool DUMgr::is_call_may_def(IR const* call, IR const* use, bool is_recur)
+//Return true if 'call' may or must modify MDSet that 'use' referenced.
+//'call': CALL/ICALL stmt.
+//'use': must be expression.
+//'is_recur': true if one intend to compute the mayuse MDSet to walk
+//            through IR tree recusively.
+bool DUMgr::isCallMayDef(IR const* call, IR const* use, bool is_recur)
 {
     ASSERT0(call->isCallStmt());
 
@@ -688,7 +692,7 @@ bool DUMgr::is_call_may_def(IR const* call, IR const* use, bool is_recur)
              x != NULL; x = iterNextC(m_citer)) {
             if (!x->isMemoryOpnd()) { continue; }
 
-            if (is_call_may_def_core(call, x, call_maydef)) {
+            if (is_call_may_def_helper(call, x, call_maydef)) {
                 return true;
             }
         }
@@ -696,23 +700,23 @@ bool DUMgr::is_call_may_def(IR const* call, IR const* use, bool is_recur)
     }
 
     ASSERT0(use->isMemoryOpnd());
-    return is_call_may_def_core(call, use, call_maydef);
+    return is_call_may_def_helper(call, use, call_maydef);
 }
 
 
-//Return true if 'def' may or must modify md-set that 'use' referenced.
+//Return true if 'def' may or must modify MDSet that 'use' referenced.
 //'def': must be stmt.
 //'use': must be expression.
 //'is_recur': true if one intend to compute the mayuse MDSet to walk
-//    through IR tree recusively.
-bool DUMgr::is_may_def(IR const* def, IR const* use, bool is_recur)
+//            through IR tree recusively.
+bool DUMgr::isMayDef(IR const* def, IR const* use, bool is_recur)
 {
     ASSERT0(def->is_stmt() && use->is_exp());
     if (def->is_stpr()) {
-        return is_stpr_may_def(def, use, is_recur);
+        return isStprMayDef(def, use, is_recur);
     }
     if (def->isCallStmt()) {
-        return is_call_may_def(def, use, is_recur);
+        return isCallMayDef(def, use, is_recur);
     }
 
     MD const* mustdef = get_must_def(def);
@@ -754,7 +758,8 @@ bool DUMgr::is_may_def(IR const* def, IR const* use, bool is_recur)
     MDSet const* mayuse = getMayUse(use);
     if (mayuse != NULL) {
         if ((mustdef != NULL && mayuse->is_contain(mustdef)) ||
-            (maydef != NULL && mayuse->is_intersect(*maydef))) {
+            (maydef != NULL &&
+             (maydef == mayuse || mayuse->is_intersect(*maydef)))) {
             return true;
         }
     }
@@ -765,7 +770,7 @@ bool DUMgr::is_may_def(IR const* def, IR const* use, bool is_recur)
 //Return true if 'def1' may modify md-set that 'def2' generated.
 //'def1': should be stmt.
 //'def2': should be stmt.
-bool DUMgr::is_may_kill(IR const* def1, IR const* def2)
+bool DUMgr::isMayKill(IR const* def1, IR const* def2)
 {
     ASSERT0(def1->is_stmt() && def2->is_stmt());
     if (def1->is_stpr() && def2->is_stpr() && STPR_no(def1) == STPR_no(def2)) {
@@ -842,10 +847,12 @@ void DUMgr::computeArrayRef(IR * ir,
 }
 
 
-//Walk through IR tree to collect referrenced MD.
+//Walk through IR tree to compute or collect referrenced MD.
 //'ret_mds': In COMP_EXP_RECOMPUTE mode, it is used as tmp;
 //  and in COMP_EXP_COLLECT_MUST_USE mode, it is
 //  used to collect MUST-USE MD.
+//Note this function will update ir's RefMD and RefMDSet if duflag contain
+//COMP_EXP_RECOMPUTE
 void DUMgr::computeExpression(IR * ir,
                               OUT MDSet * ret_mds,
                               UINT compflag,
@@ -857,26 +864,25 @@ void DUMgr::computeExpression(IR * ir,
     case IR_CONST: break;
     case IR_ID:
         if (HAVE_FLAG(compflag, COMP_EXP_COLLECT_MUST_USE)) {
-            UNREACHABLE();
+            ; //It does not use MD.
         }
         break;
     case IR_LD:
         if (HAVE_FLAG(compflag, COMP_EXP_RECOMPUTE)) {
-            //if (HAVE_FLAG(duflag, DUOPT_COMPUTE_NONPR_DU)) {
-                //The result of ref info should be avaiable.
-                ASSERT0(ir->getRefMD());
+            //The reference MD should be assigned first.
+            ASSERT0(ir->getRefMD());
 
-                //e.g: struct {int a;} s;
-                //s = ...
-                //s.a = ...
-                //Where s and s.a is overlapped.
+            //e.g: struct {int a;} s;
+            //s = ...
+            //s.a = ...
+            //Where s and s.a is overlapped.
 
-                //Always compute overlapping MDSet for both PR and NON-PR MD
-                //because DURef also have to compute NON-PR MD even if
-                //only ReachDef of PR is required by user.
-                computeOverlapUseMDSet(ir, false);
-            //}
+            //Always compute overlapping MDSet for both PR and NON-PR MD
+            //because DURef also have to compute NON-PR MD even if
+            //only ReachDef of PR is required by user.
+            computeOverlapUseMDSet(ir, false);
         } else if (HAVE_FLAG(compflag, COMP_EXP_COLLECT_MUST_USE)) {
+            //Collect the exact MD that current ir 'must' reference.
             MD const* t = ir->getRefMD();
             ASSERT0(t);
             if (t->is_exact()) {
@@ -898,12 +904,19 @@ void DUMgr::computeExpression(IR * ir,
             //because DURef also have to compute NON-PR MD even if
             //only ReachDef of PR is required by user.
             computeOverlapUseMDSet(ir, false);
-
         } else if (HAVE_FLAG(compflag, COMP_EXP_COLLECT_MUST_USE)) {
+            //Collect the exact MD that current ir 'must' reference.
+            MD const* t = ir->getRefMD();
+            if (t != NULL && t->is_exact()) {
+                ret_mds->bunion_pure(MD_id(t), *m_misc_bs_mgr);
+            }
+
             MD * use;
             MDSet const* use_mds = ir->getRefMDSet();
             if (use_mds != NULL &&
                 (use = use_mds->get_exact_md(m_md_sys)) != NULL) {
+                //If may-use MDSet only contain one element, there is a
+                //'must' reference actually.
                 ret_mds->bunion(use, *m_misc_bs_mgr);
             }
             computeExpression(ILD_base(ir), ret_mds, compflag, duflag);
@@ -922,7 +935,7 @@ void DUMgr::computeExpression(IR * ir,
             ASSERT0(ir->getRefMD() == NULL);
             ASSERT0(ir->getRefMDSet() == NULL);
         } else if (HAVE_FLAG(compflag, COMP_EXP_COLLECT_MUST_USE)) {
-            UNREACHABLE();
+            ; //LDA does not use MD.
         }
         break;
     SWITCH_CASE_BIN:
@@ -958,166 +971,45 @@ void DUMgr::computeExpression(IR * ir,
 }
 
 
-void DUMgr::dumpDUGraph(CHAR const* name, bool detail)
-{
-    if (g_tfile == NULL) { return; }
-    xcom::Graph dug;
-    dug.set_unique(false);
-
-    class _EDGEINFO {
-    public:
-        int id;
-    };
-
-    BBList * bbl = m_rg->getBBList();
-    for (IRBB * bb = bbl->get_head(); bb != NULL; bb = bbl->get_next()) {
-        for (IR * ir = BB_first_ir(bb);
-             ir != NULL; ir = BB_next_ir(bb)) {
-
-            dug.addVertex(ir->id());
-            DUSet const* useset = ir->readDUSet();
-            if (useset == NULL) { continue; }
-
-            DUIter di = NULL;
-            for (INT i = useset->get_first(&di);
-                 i >= 0; i = useset->get_next(i, &di)) {
-                IR * u = m_rg->getIR(i);
-                ASSERT0(u->is_exp());
-                IR const* ustmt = u->getStmt();
-                xcom::Edge * e = dug.addEdge(ir->id(), IR_id(ustmt));
-                _EDGEINFO * ei = (_EDGEINFO*)xmalloc(sizeof(_EDGEINFO));
-                ei->id = i;
-                EDGE_info(e) = ei;
-            }
-        }
-    }
-
-    if (name == NULL) {
-        name = "graph_du.vcg";
-    }
-    UNLINK(name);
-    FILE * h = fopen(name, "a+");
-    ASSERTN(h != NULL, ("%s create failed!!!",name));
-
-    FILE * old;
-    //Print comment
-    //fprintf(h, "\n/*");
-    //old = g_tfile;
-    //g_tfile = h;
-    //dumpBBList(m_rg->getBBList(), m_rg);
-    //g_tfile = old;
-    //fprintf(h, "\n*/\n");
-
-    fprintf(h, "graph: {"
-              "title: \"Graph\"\n"
-              "shrink:  15\n"
-              "stretch: 27\n"
-              "layout_downfactor: 1\n"
-              "layout_upfactor: 1\n"
-              "layout_nearfactor: 1\n"
-              "layout_splinefactor: 70\n"
-              "spreadlevel: 1\n"
-              "treefactor: 0.500000\n"
-              "node_alignment: center\n"
-              "orientation: top_to_bottom\n"
-              "late_edge_labels: no\n"
-              "display_edge_labels: yes\n"
-              "dirty_edge_labels: no\n"
-              "finetuning: no\n"
-              "nearedges: no\n"
-              "splines: yes\n"
-              "ignoresingles: no\n"
-              "straight_phase: no\n"
-              "priority_phase: no\n"
-              "manhatten_edges: no\n"
-              "smanhatten_edges: no\n"
-              "port_sharing: no\n"
-              "crossingphase2: yes\n"
-              "crossingoptimization: yes\n"
-              "crossingweight: bary\n"
-              "arrow_mode: free\n"
-              "layoutalgorithm: mindepthslow\n"
-              "node.borderwidth: 2\n"
-              "node.color: lightcyan\n"
-              "node.textcolor: black\n"
-              "node.bordercolor: blue\n"
-              "edge.color: darkgreen\n");
-
-    //Print node
-    old = g_tfile;
-    g_tfile = h;
-    g_indent = 0;
-    INT c;
-    for (xcom::Vertex * v = dug.get_first_vertex(c);
-         v != NULL; v = dug.get_next_vertex(c)) {
-        INT id = v->id();
-        if (detail) {
-            fprintf(h, "\nnode: { title:\"%d\" shape:box color:gold "
-                        "fontname:\"courB\" label:\"", id);
-            IR * ir = m_rg->getIR(id);
-            ASSERT0(ir != NULL);
-            dumpIR(ir, m_rg);
-            fprintf(h, "\"}");
-        } else {
-            fprintf(h, "\nnode: { title:\"%d\" shape:box color:gold "
-                        "fontname:\"courB\" label:\"%d\" }", id, id);
-        }
-    }
-    g_tfile = old;
-
-    //Print edge
-    for (xcom::Edge * e = dug.get_first_edge(c);
-         e != NULL; e = dug.get_next_edge(c)) {
-        xcom::Vertex * from = EDGE_from(e);
-        xcom::Vertex * to = EDGE_to(e);
-        _EDGEINFO * ei = (_EDGEINFO*)EDGE_info(e);
-        ASSERT0(ei);
-        fprintf(h,
-            "\nedge: { sourcename:\"%d\" targetname:\"%d\" label:\"id%d\"}",
-            from->id(), to->id(),  ei->id);
-    }
-    fprintf(h, "\n}\n");
-    fclose(h);
-}
-
-
 //Dump mem usage for each ir DU reference.
-void DUMgr::dumpMemUsageForMDRef()
+void DUMgr::dumpMemUsageForMDRef() const
 {
-    if (g_tfile == NULL) { return; }
-    note("\n==---- DUMP DUMgr : Memory Usage for DU Reference '%s' ----==",
+    if (!m_rg->isLogMgrInit()) { return; }
+    note(getRegion(),
+         "\n==---- DUMP DUMgr : Memory Usage for DU Reference '%s' ----==",
          m_rg->getRegionName());
 
-    note("\nMustD: must defined MD");
-    note("\nMayDs: overlapped and may defined MDSet");
+    note(getRegion(), "\nMustD: must defined MD");
+    note(getRegion(), "\nMayDs: overlapped and may defined MDSet");
 
-    note("\nMustU: must used MD");
+    note(getRegion(), "\nMustU: must used MD");
 
-    note("\nMayUs: overlapped and may used MDSet");
+    note(getRegion(), "\nMayUs: overlapped and may used MDSet");
     BBList * bbs = m_rg->getBBList();
     size_t count = 0;
     CHAR const* str = NULL;
-    g_indent = 0;
+    ConstIRIter citer;
+    DUMgr * pthis = const_cast<DUMgr*>(this);
     for (IRBB * bb = bbs->get_head(); bb != NULL; bb = bbs->get_next()) {
-        note("\n--- BB%d ---", BB_id(bb));
+        note(getRegion(), "\n--- BB%d ---", bb->id());
         for (IR * ir = BB_first_ir(bb);
              ir != NULL; ir = BB_next_ir(bb)) {
             dumpIR(ir, m_rg);
-            note("\n");
-            m_citer.clean();
-            for (IR const* x = iterInitC(ir, m_citer);
-                 x != NULL; x = iterNextC(m_citer)) {
-                note("\n\t%s(%d)::", IRNAME(x), IR_id(x));
+            note(getRegion(), "\n");
+            citer.clean();
+            for (IR const* x = iterInitC(ir, citer);
+                 x != NULL; x = iterNextC(citer)) {
+                note(getRegion(), "\n\t%s(%d)::", IRNAME(x), IR_id(x));
                 if (x->is_stmt()) {
                     //MustDef
-                    MD const* md = get_must_def(x);
+                    MD const* md = pthis->get_must_def(x);
                     if (md != NULL) {
-                        prt("MustD%uB, ", (UINT)sizeof(MD));
+                        prt(getRegion(), "MustD%uB, ", (UINT)sizeof(MD));
                         count += sizeof(MD);
                     }
 
                     //MayDef
-                    MDSet const* mds = getMayDef(x);
+                    MDSet const* mds = pthis->getMayDef(x);
                     if (mds != NULL) {
                         size_t n = mds->count_mem();
                         if (n < 1024) { str = "B"; }
@@ -1125,21 +1017,21 @@ void DUMgr::dumpMemUsageForMDRef()
                         else  { n /= 1024*1024; str = "MB"; }
 
                         MDSetIter iter;
-                        prt("MayDs(%lu%s, %d elems, last %d), ",
+                        prt(getRegion(), "MayDs(%lu%s, %d elems, last %d), ",
                             (ULONG)n, str, mds->get_elem_count(),
                             mds->get_last(&iter));
                         count += n;
                     }
                 } else {
                     //MustUse
-                    MD const* md = get_effect_use_md(x);
+                    MD const* md = pthis->get_effect_use_md(x);
                     if (md != NULL) {
-                        prt("MustU%dB, ", (INT)sizeof(MD));
+                        prt(getRegion(), "MustU%dB, ", (INT)sizeof(MD));
                         count += sizeof(MD);
                     }
 
                     //MayUse
-                    MDSet const* mds = getMayUse(x);
+                    MDSet const* mds = pthis->getMayUse(x);
                     if (mds != NULL) {
                         size_t n = mds->count_mem();
                         if (n < 1024) { str = "B"; }
@@ -1147,7 +1039,7 @@ void DUMgr::dumpMemUsageForMDRef()
                         else { n /= 1024*1024; str = "MB"; }
 
                         MDSetIter iter;
-                        prt("MayUs(%lu%s, %d elems, last %d), ",
+                        prt(getRegion(), "MayUs(%lu%s, %d elems, last %d), ",
                             (ULONG)n, str, mds->get_elem_count(),
                             mds->get_last(&iter));
                         count += n;
@@ -1159,224 +1051,220 @@ void DUMgr::dumpMemUsageForMDRef()
 
     if (count < 1024) { str = "B"; }
     else if (count < 1024 * 1024) { count /= 1024; str = "KB"; }
-    else  { count /= 1024*1024; str = "MB"; }
-    note("\nTotal %u%s", (UINT)count, str);
-    fflush(g_tfile);
+    else { count /= 1024*1024; str = "MB"; }
+    note(getRegion(), "\nTotal %u%s", (UINT)count, str);
 }
 
 
 //Dump mem usage for each internal set of bb.
-void DUMgr::dumpMemUsageForEachSet()
+void DUMgr::dumpMemUsageForEachSet() const
 {
-    if (g_tfile == NULL) { return; }
-    note("\n==---- DUMP '%s' DUMgr : Memory Usage for Value Set ----==",
+    if (!m_rg->isLogMgrInit()) { return; }
+    note(getRegion(),
+         "\n==---- DUMP '%s' DUMgr : Memory Usage for Value Set ----==",
          m_rg->getRegionName());
 
     BBList * bbs = m_rg->getBBList();
     size_t count = 0;
     CHAR const* str = NULL;
     for (IRBB * bb = bbs->get_head(); bb != NULL; bb = bbs->get_next()) {
-        note("\n--- BB%d ---", BB_id(bb));
+        note(getRegion(), "\n--- BB%d ---", bb->id());
         size_t n;
         DefSBitSetIter st = NULL;
-        DefDBitSetCore * irs = m_bb_avail_in_reach_def.get(BB_id(bb));
+        DefDBitSetCore * irs = m_bb_avail_in_reach_def.get(bb->id());
         if (irs != NULL) {
             n = irs->count_mem();
             count += n;
             if (n < 1024) { str = "B"; }
             else if (n < 1024 * 1024) { n /= 1024; str = "KB"; }
             else  { n /= 1024*1024; str = "MB"; }
-            note("\n\tAvaInReachDef:%lu%s, %d elems, last %d",
-                    (ULONG)n, str, irs->get_elem_count(), irs->get_last(&st));
+            note(getRegion(), "\n\tAvaInReachDef:%lu%s, %d elems, last %d",
+                 (ULONG)n, str, irs->get_elem_count(), irs->get_last(&st));
         }
 
-        irs = m_bb_avail_out_reach_def.get(BB_id(bb));
+        irs = m_bb_avail_out_reach_def.get(bb->id());
         if (irs != NULL) {
             n = irs->count_mem();
             count += n;
             if (n < 1024) { str = "B"; }
             else if (n < 1024 * 1024) { n /= 1024; str = "KB"; }
             else  { n /= 1024*1024; str = "MB"; }
-            note("\n\tAvaOutReachDef:%lu%s, %d elems, last %d",
-                    (ULONG)n, str, irs->get_elem_count(), irs->get_last(&st));
+            note(getRegion(), "\n\tAvaOutReachDef:%lu%s, %d elems, last %d",
+                 (ULONG)n, str, irs->get_elem_count(), irs->get_last(&st));
         }
 
-        irs = m_bb_in_reach_def.get(BB_id(bb));
+        irs = m_bb_in_reach_def.get(bb->id());
         if (irs != NULL) {
             n = irs->count_mem();
             count += n;
             if (n < 1024) { str = "B"; }
             else if (n < 1024 * 1024) { n /= 1024; str = "KB"; }
             else  { n /= 1024*1024; str = "MB"; }
-            note("\n\tInReachDef:%lu%s, %d elems, last %d",
-                    (ULONG)n, str, irs->get_elem_count(), irs->get_last(&st));
+            note(getRegion(), "\n\tInReachDef:%lu%s, %d elems, last %d",
+                 (ULONG)n, str, irs->get_elem_count(), irs->get_last(&st));
         }
 
-        irs = m_bb_out_reach_def.get(BB_id(bb));
+        irs = m_bb_out_reach_def.get(bb->id());
         if (irs != NULL) {
             n = irs->count_mem();
             count += n;
             if (n < 1024) { str = "B"; }
             else if (n < 1024 * 1024) { n /= 1024; str = "KB"; }
             else  { n /= 1024*1024; str = "MB"; }
-            note("\n\tOutReachDef:%lu%s, %d elems, last %d",
-                    (ULONG)n, str, irs->get_elem_count(), irs->get_last(&st));
+            note(getRegion(), "\n\tOutReachDef:%lu%s, %d elems, last %d",
+                 (ULONG)n, str, irs->get_elem_count(), irs->get_last(&st));
         }
 
-        irs = m_bb_may_gen_def.get(BB_id(bb));
+        irs = m_bb_may_gen_def.get(bb->id());
         if (irs != NULL) {
             n = irs->count_mem();
             count += n;
             if (n < 1024) { str = "B"; }
             else if (n < 1024 * 1024) { n /= 1024; str = "KB"; }
             else  { n /= 1024*1024; str = "MB"; }
-            note("\n\tMayGenDef:%lu%s, %d elems, last %d",
-                    (ULONG)n, str, irs->get_elem_count(), irs->get_last(&st));
+            note(getRegion(), "\n\tMayGenDef:%lu%s, %d elems, last %d",
+                 (ULONG)n, str, irs->get_elem_count(), irs->get_last(&st));
         }
 
-        irs = m_bb_must_gen_def.get(BB_id(bb));
+        irs = m_bb_must_gen_def.get(bb->id());
         if (irs != NULL) {
             n = irs->count_mem();
             count += n;
             if (n < 1024) { str = "B"; }
             else if (n < 1024 * 1024) { n /= 1024; str = "KB"; }
             else  { n /= 1024*1024; str = "MB"; }
-            note("\n\tMustGenDef:%lu%s, %d elems, last %d",
-                    (ULONG)n, str, irs->get_elem_count(), irs->get_last(&st));
+            note(getRegion(), "\n\tMustGenDef:%lu%s, %d elems, last %d",
+                 (ULONG)n, str, irs->get_elem_count(), irs->get_last(&st));
         }
 
-        DefDBitSetCore const* dbs = m_bb_may_killed_def.get(BB_id(bb));
+        DefDBitSetCore const* dbs = m_bb_may_killed_def.get(bb->id());
         if (dbs != NULL) {
             n = dbs->count_mem();
             count += n;
             if (n < 1024) { str = "B"; }
             else if (n < 1024 * 1024) { n /= 1024; str = "KB"; }
             else  { n /= 1024*1024; str = "MB"; }
-            note("\n\tMayKilledDef:%lu%s, %d elems, last %d",
-                    (ULONG)n, str, dbs->get_elem_count(), dbs->get_last(&st));
+            note(getRegion(), "\n\tMayKilledDef:%lu%s, %d elems, last %d",
+                 (ULONG)n, str, dbs->get_elem_count(), dbs->get_last(&st));
         }
 
-        dbs = m_bb_must_killed_def.get(BB_id(bb));
+        dbs = m_bb_must_killed_def.get(bb->id());
         if (dbs != NULL) {
             n = dbs->count_mem();
             count += n;
             if (n < 1024) { str = "B"; }
             else if (n < 1024 * 1024) { n /= 1024; str = "KB"; }
             else  { n /= 1024*1024; str = "MB"; }
-            note("\n\tMustKilledDef:%lu%s, %d elems, last %d",
-                    (ULONG)n, str, dbs->get_elem_count(), dbs->get_last(&st));
+            note(getRegion(), "\n\tMustKilledDef:%lu%s, %d elems, last %d",
+                 (ULONG)n, str, dbs->get_elem_count(), dbs->get_last(&st));
         }
 
-        //
-        DefDBitSetCore * bs = m_bb_gen_exp.get(BB_id(bb));
+        DefDBitSetCore * bs = m_bb_gen_exp.get(bb->id());
         if (bs != NULL) {
             n = bs->count_mem();
             count += n;
             if (n < 1024) { str = "B"; }
             else if (n < 1024 * 1024) { n /= 1024; str = "KB"; }
             else  { n /= 1024*1024; str = "MB"; }
-            note("\n\tMayKilledDef:%lu%s, %d elems, last %d",
-                    (ULONG)n, str, bs->get_elem_count(), bs->get_last(&st));
+            note(getRegion(), "\n\tMayKilledDef:%lu%s, %d elems, last %d",
+                 (ULONG)n, str, bs->get_elem_count(), bs->get_last(&st));
         }
 
-        dbs = m_bb_killed_exp.get(BB_id(bb));
+        dbs = m_bb_killed_exp.get(bb->id());
         if (dbs != NULL) {
             n = dbs->count_mem();
             count += n;
             if (n < 1024) { str = "B"; }
             else if (n < 1024 * 1024) { n /= 1024; str = "KB"; }
             else  { n /= 1024*1024; str = "MB"; }
-            note("\n\tKilledIrExp:%lu%s, %d elems, last %d",
-                    (ULONG)n, str, dbs->get_elem_count(), dbs->get_last(&st));
+            note(getRegion(), "\n\tKilledIrExp:%lu%s, %d elems, last %d",
+                 (ULONG)n, str, dbs->get_elem_count(), dbs->get_last(&st));
         }
 
-        bs = m_bb_availin_exp.get(BB_id(bb));
+        bs = m_bb_availin_exp.get(bb->id());
         if (bs != NULL) {
             n = bs->count_mem();
             count += n;
             if (n < 1024) { str = "B"; }
             else if (n < 1024 * 1024) { n /= 1024; str = "KB"; }
             else  { n /= 1024*1024; str = "MB"; }
-            note("\n\tLiveInIrExp:%lu%s, %d elems, last %d",
-                    (ULONG)n, str, bs->get_elem_count(), bs->get_last(&st));
+            note(getRegion(), "\n\tLiveInIrExp:%lu%s, %d elems, last %d",
+                 (ULONG)n, str, bs->get_elem_count(), bs->get_last(&st));
         }
 
-        bs = m_bb_availout_ir_expr.get(BB_id(bb));
+        bs = m_bb_availout_ir_expr.get(bb->id());
         if (bs != NULL) {
             n = bs->count_mem();
             count += n;
             if (n < 1024) { str = "B"; }
             else if (n < 1024 * 1024) { n /= 1024; str = "KB"; }
             else  { n /= 1024*1024; str = "MB"; }
-            note("\n\tLiveOutIrExp:%lu%s, %d elems, last %d",
-                    (ULONG)n, str, bs->get_elem_count(), bs->get_last(&st));
+            note(getRegion(), "\n\tLiveOutIrExp:%lu%s, %d elems, last %d",
+                 (ULONG)n, str, bs->get_elem_count(), bs->get_last(&st));
         }
     }
 
     if (count < 1024) { str = "B"; }
     else if (count < 1024 * 1024) { count /= 1024; str = "KB"; }
-    else  { count /= 1024*1024; str = "MB"; }
-    note("\nTotal %u%s", (UINT)count, str);
-    fflush(g_tfile);
+    else { count /= 1024*1024; str = "MB"; }
+    note(getRegion(), "\nTotal %u%s", (UINT)count, str);
 }
 
 
-void DUMgr::dumpBBDUChainDetail(UINT bbid)
+void DUMgr::dumpBBDUChainDetail(UINT bbid) const
 {
-    ASSERT0(g_tfile);
     dumpBBDUChainDetail(m_cfg->getBB(bbid));
 }
 
 
-void DUMgr::dumpBBDUChainDetail(IRBB * bb)
+void DUMgr::dumpBBDUChainDetail(IRBB * bb) const
 {
-    ASSERT0(g_tfile);
     ASSERT0(bb);
-    note("\n--- BB%d ---", BB_id(bb));
+    note(getRegion(), "\n--- BB%d ---", bb->id());
 
     //Label Info list.
     LabelInfo const* li = bb->getLabelList().get_head();
     if (li != NULL) {
-        note("\nLABEL:");
+        note(getRegion(), "\nLABEL:");
     }
     for (; li != NULL; li = bb->getLabelList().get_next()) {
-        switch (LABEL_INFO_type(li)) {
+        switch (LABELINFO_type(li)) {
         case L_CLABEL:
-            note(CLABEL_STR_FORMAT, CLABEL_CONT(li));
+            note(getRegion(), CLABEL_STR_FORMAT, CLABEL_CONT(li));
             break;
         case L_ILABEL:
-            note(ILABEL_STR_FORMAT, ILABEL_CONT(li));
+            note(getRegion(), ILABEL_STR_FORMAT, ILABEL_CONT(li));
             break;
         case L_PRAGMA:
-            ASSERT0(LABEL_INFO_pragma(li));
-            note("%s", SYM_name(LABEL_INFO_pragma(li)));
+            ASSERT0(LABELINFO_pragma(li));
+            note(getRegion(), "%s", SYM_name(LABELINFO_pragma(li)));
             break;
         default: UNREACHABLE();
         }
 
-        if (LABEL_INFO_is_try_start(li) ||
-            LABEL_INFO_is_try_end(li) ||
-            LABEL_INFO_is_catch_start(li)) {
-            prt("(");
-            if (LABEL_INFO_is_try_start(li)) {
-                prt("try_start,");
+        if (LABELINFO_is_try_start(li) ||
+            LABELINFO_is_try_end(li) ||
+            LABELINFO_is_catch_start(li)) {
+            prt(getRegion(), "(");
+            if (LABELINFO_is_try_start(li)) {
+                prt(getRegion(), "try_start,");
             }
-            if (LABEL_INFO_is_try_end(li)) {
-                prt("try_end,");
+            if (LABELINFO_is_try_end(li)) {
+                prt(getRegion(), "try_end,");
             }
-            if (LABEL_INFO_is_catch_start(li)) {
-                prt("catch_start");
+            if (LABELINFO_is_catch_start(li)) {
+                prt(getRegion(), "catch_start");
             }
-            prt(")");
+            prt(getRegion(), ")");
         }
 
-        prt(" ");
+        prt(getRegion(), " ");
     }
 
     for (IR * ir = BB_irlist(bb).get_head();
          ir != NULL; ir = BB_irlist(bb).get_next()) {
         dumpIR(ir, m_rg);
-        note("\n");
+        note(getRegion(), "\n");
 
         IRIter ii;
         for (IR * k = iterInit(ir, ii);
@@ -1385,43 +1273,43 @@ void DUMgr::dumpBBDUChainDetail(IRBB * bb)
                 continue;
             }
 
-            note("\n\t>>%s", IRNAME(k));
+            note(getRegion(), "\n\t>>%s", IRNAME(k));
             if (k->is_stpr() || k->is_pr()) {
-                prt("%d", k->getPrno());
+                prt(getRegion(), "%d", k->getPrno());
             }
-            prt("(id:%d) ", IR_id(k));
+            prt(getRegion(), "(id:%d) ", IR_id(k));
 
             if (k->is_stmt()) {
-                prt("DEFREF:");
+                prt(getRegion(), "DEFREF:");
             } else {
-                prt("USEREF:");
+                prt(getRegion(), "USEREF:");
             }
 
             //Dump must ref.
             MD const* md = k->getRefMD();
             if (md != NULL) {
-                prt("MMD%d", MD_id(md));
+                prt(getRegion(), "MMD%d", MD_id(md));
             }
 
             //Dump may ref.
             MDSet const* mds = k->getRefMDSet();
             if (mds != NULL && !mds->is_empty()) {
                 if (md != NULL) {
-                    prt(",");
+                    prt(getRegion(), ",");
                 }
                 MDSetIter iter;
                 for (INT i = mds->get_first(&iter); i >= 0; ) {
-                    prt("MD%d", i);
+                    prt(getRegion(), "MD%d", i);
                     i = mds->get_next(i, &iter);
-                    if (i >= 0) { prt(","); }
+                    if (i >= 0) { prt(getRegion(), ","); }
                 }
             }
 
             //Dump def/use list.
             if (k->is_stmt() || ir->is_lhs(k)) {
-                note("\n\t  USE-EXP LIST:");
+                note(getRegion(), "\n\t  USE-EXP LIST:");
             } else {
-                note("\n\t  DEF-STMT LIST:");
+                note(getRegion(), "\n\t  DEF-STMT LIST:");
             }
 
             DUSet const* set = k->readDUSet();
@@ -1430,56 +1318,41 @@ void DUMgr::dumpBBDUChainDetail(IRBB * bb)
                 for (INT i = set->get_first(&di);
                      i >= 0; ) {
                     IR const* ref = m_rg->getIR(i);
-                    prt("%s", IRNAME(ref));
+                    prt(getRegion(), "%s", IRNAME(ref));
                     if (ref->is_stpr() || ref->is_pr()) {
-                        prt("%d", ref->getPrno());
+                        prt(getRegion(), "%d", ref->getPrno());
                     }
-                    prt("(id:%d)", IR_id(ref));
+                    prt(getRegion(), "(id:%d)", IR_id(ref));
 
                     i = set->get_next(i, &di);
 
-                    if (i >= 0) { prt(","); }
+                    if (i >= 0) { prt(getRegion(), ","); }
                 }
             }
         }
-        note("\n");
+        note(getRegion(), "\n");
     } //end for each IR
 }
 
 
-void DUMgr::dump(CHAR const* name)
+bool DUMgr::dump() const
 {
-    if (g_tfile == NULL) { return; }
-    FILE * old = NULL;
-    if (name != NULL) {
-        old = g_tfile;
-        //UNLINK(name);
-        g_tfile = fopen(name, "a+");
-        ASSERTN(g_tfile, ("%s create failed!!!", name));
-    }
-
     dumpDUChainDetail();
-
-    fflush(g_tfile);
-    if (name != NULL) {
-        fclose(g_tfile);
-        g_tfile = old;
-    }
+    return true;
 }
 
 
 //The difference between this function and dumpDUChain is this function
 //will dump du chain for each memory reference.
-void DUMgr::dumpDUChainDetail()
+void DUMgr::dumpDUChainDetail() const
 {
-    if (g_tfile == NULL) { return; }
-    note("\n\n==---- DUMP DUMgr DU CHAIN of '%s' ----==\n",
+    if (!m_rg->isLogMgrInit()) { return; }
+    note(getRegion(), "\n\n==---- DUMP DUMgr DU CHAIN of '%s' ----==\n",
          m_rg->getRegionName());
     BBList * bbl = m_rg->getBBList();
     for (IRBB * bb = bbl->get_head(); bb != NULL; bb = bbl->get_next()) {
         dumpBBDUChainDetail(bb);
     }
-    fflush(g_tfile);
 }
 
 
@@ -1487,74 +1360,75 @@ void DUMgr::dumpDUChainDetail()
 //This function collects must and may USE of MD and regard stmt as a whole.
 //So this function does not distingwish individual memory operand inside the
 //stmt, but if you want, please invoke dumpDUChainDetail().
-void DUMgr::dumpDUChain()
+void DUMgr::dumpDUChain() const
 {
-    if (g_tfile == NULL) { return; }
-    note("\n\n==---- DUMP '%s' DU chain ----==\n",
-            m_rg->getRegionName());
-    g_indent = 2;
+    if (!m_rg->isLogMgrInit()) { return; }
+    note(getRegion(), "\n\n==---- DUMP '%s' DU chain ----==\n",
+         m_rg->getRegionName());
     MDSet mds;
     DefMiscBitSetMgr bsmgr;
     BBList * bbl = m_rg->getBBList();
+    DUMgr * pthis = const_cast<DUMgr*>(this);
+    ConstIRIter citer;
     for (IRBB * bb = bbl->get_head(); bb != NULL; bb = bbl->get_next()) {
-        note("\n--- BB%d ---", BB_id(bb));
+        note(getRegion(), "\n--- BB%d ---", bb->id());
         for (IR * ir = BB_irlist(bb).get_head();
              ir != NULL; ir = BB_irlist(bb).get_next()) {
             dumpIR(ir, m_rg);
-            note("\n>>");
+            note(getRegion(), "\n>>");
 
             //MustDef
-            prt("Dref(");
+            prt(getRegion(), "Dref(");
             bool has_prt_something = false;
-            MD const* md = get_must_def(ir);
+            MD const* md = pthis->get_must_def(ir);
             if (md != NULL) {
-                prt("MMD%d", MD_id(md));
+                prt(getRegion(), "MMD%d", MD_id(md));
                 has_prt_something = true;
             }
 
             //MayDef
-            if (getMayDef(ir) != NULL) {
+            if (pthis->getMayDef(ir) != NULL) {
                 mds.clean(bsmgr);
-                MDSet const* x = getMayDef(ir);
+                MDSet const* x = pthis->getMayDef(ir);
                 if (x != NULL) {
                     if (has_prt_something) {
-                        prt(",");
+                        prt(getRegion(), ",");
                     }
 
                     MDSetIter iter;
                     for (INT i = x->get_first(&iter); i >= 0;) {
-                        prt("MD%d", i);
+                        prt(getRegion(), "MD%d", i);
                         i = x->get_next(i, &iter);
                         if (i >= 0) {
-                            prt(",");
+                            prt(getRegion(), ",");
                         }
                     }
                     has_prt_something = true;
                 }
             }
             if (!has_prt_something) {
-                prt("--");
+                prt(getRegion(), "--");
             }
-            prt(")");
+            prt(getRegion(), ")");
 
             //MayUse
-            prt(" <= ");
+            prt(getRegion(), " <= ");
             mds.clean(bsmgr);
 
-            prt("Uref(");
-            collectMayUseRecursive(ir, mds, true, bsmgr);
+            prt(getRegion(), "Uref(");
+            pthis->collectMayUseRecursive(ir, mds, true, bsmgr);
             if (!mds.is_empty()) {
                 mds.dump(m_md_sys);
             } else {
-                prt("--");
+                prt(getRegion(), "--");
             }
-            prt(")");
+            prt(getRegion(), ")");
 
             //Dump def chain.
-            m_citer.clean();
+            citer.clean();
             bool first = true;
-            for (IR const* x = iterRhsInitC(ir, m_citer);
-                 x != NULL; x = iterRhsNextC(m_citer)) {
+            for (IR const* x = iterRhsInitC(ir, citer);
+                 x != NULL; x = iterRhsNextC(citer)) {
                  if (!x->isMemoryOpnd()) { continue; }
 
                 DUSet const* defset = x->readDUSet();
@@ -1563,7 +1437,7 @@ void DUMgr::dumpDUChain()
                 }
 
                 if (first) {
-                    note("\n>>DEF List:");
+                    note(getRegion(), "\n>>DEF List:");
                     first = false;
                 }
 
@@ -1571,7 +1445,7 @@ void DUMgr::dumpDUChain()
                 for (INT i = defset->get_first(&di);
                      i >= 0; i = defset->get_next(i, &di)) {
                     IR const* def = m_rg->getIR(i);
-                    prt("%s(id:%d), ", IRNAME(def), def->id());
+                    prt(getRegion(), "%s(id:%d), ", IRNAME(def), def->id());
                 }
             }
 
@@ -1579,249 +1453,257 @@ void DUMgr::dumpDUChain()
             DUSet const* useset = ir->readDUSet();
             if (useset == NULL || useset->get_elem_count() == 0) { continue; }
 
-            note("\n>>USE List:");
+            note(getRegion(), "\n>>USE List:");
             DUIter di = NULL;
             for (INT i = useset->get_first(&di);
                  i >= 0; i = useset->get_next(i, &di)) {
                 IR const* u = m_rg->getIR(i);
-                prt("%s(id:%d), ", IRNAME(u), IR_id(u));
+                prt(getRegion(), "%s(id:%d), ", IRNAME(u), IR_id(u));
             }
         } //end for each IR
     } //end for each BB
     mds.clean(bsmgr);
-    fflush(g_tfile);
 }
 
 
 //'is_bs': true to dump bitset info.
-void DUMgr::dumpSet(bool is_bs)
+void DUMgr::dumpSet(bool is_bs) const
 {
-    if (g_tfile == NULL) { return; }
-    note("\n\n==---- DUMP DUMgr SET '%s' ----==\n", m_rg->getRegionName());
+    if (!m_rg->isLogMgrInit()) { return; }
+    note(getRegion(), "\n\n==---- DUMP DUMgr SET '%s' ----==\n",
+         m_rg->getRegionName());
     BBList * bbl = m_rg->getBBList();
     BBListIter cb;
+    DUMgr * pthis = const_cast<DUMgr*>(this);
+    FILE * file = m_rg->getLogMgr()->getFileHandler();
+    ASSERT0(file);
     for (IRBB * bb = bbl->get_head(&cb); bb != NULL; bb = bbl->get_next(&cb)) {
-        UINT bbid = BB_id(bb);
-        note("\n---- BB%d ----", bbid);
-        DefDBitSetCore * def_in = genInReachDef(bbid, NULL);
-        DefDBitSetCore * def_out = genOutReachDef(bbid, NULL);
-        DefDBitSetCore * avail_def_in = genAvailInReachDef(bbid, NULL);
-        DefDBitSetCore * avail_def_out = genAvailOutReachDef(bbid, NULL);
-        DefDBitSetCore * may_def_gen = genMayGenDef(bbid, NULL);
-        DefDBitSetCore * must_def_gen = genMustGenDef(bbid, NULL);
-        DefDBitSetCore * gen_ir = genGenIRExpr(bbid, NULL);
-        DefDBitSetCore * livein_ir = genAvailInExpr(bbid, NULL);
-        DefDBitSetCore * liveout_ir = genAvailOutExpr(bbid, NULL);
-        DefDBitSetCore const* must_def_kill = getMustKilledDef(bbid);
-        DefDBitSetCore const* may_def_kill = getMayKilledDef(bbid);
-        DefDBitSetCore const* killed_exp = getKilledIRExpr(bbid);
-        DefSBitSetCore * livein_bb = genLiveInBB(bbid, NULL);
+        UINT bbid = bb->id();
+        note(getRegion(), "\n---- BB%d ----", bbid);
+        DefDBitSetCore * def_in = pthis->genInReachDef(bbid, NULL);
+        DefDBitSetCore * def_out = pthis->genOutReachDef(bbid, NULL);
+        DefDBitSetCore * avail_def_in = pthis->genAvailInReachDef(bbid, NULL);
+        DefDBitSetCore * avail_def_out = pthis->genAvailOutReachDef(bbid, NULL);
+        DefDBitSetCore * may_def_gen = pthis->genMayGenDef(bbid, NULL);
+        DefDBitSetCore * must_def_gen = pthis->genMustGenDef(bbid, NULL);
+        DefDBitSetCore * gen_ir = pthis->genGenIRExpr(bbid, NULL);
+        DefDBitSetCore * livein_ir = pthis->genAvailInExpr(bbid, NULL);
+        DefDBitSetCore * liveout_ir = pthis->genAvailOutExpr(bbid, NULL);
+        DefDBitSetCore const* must_def_kill = pthis->getMustKilledDef(bbid);
+        DefDBitSetCore const* may_def_kill = pthis->getMayKilledDef(bbid);
+        DefDBitSetCore const* killed_exp = pthis->getKilledIRExpr(bbid);
+        DefSBitSetCore * livein_bb = pthis->genLiveInBB(bbid, NULL);
         DefSBitSetIter st = NULL;
         if (def_in != NULL) {
-            note("\nDEF IN STMT: %lu byte ", (ULONG)def_in->count_mem());
+            note(getRegion(), "\nDEF IN STMT: %lu byte ",
+                 (ULONG)def_in->count_mem());
             for (INT i = def_in->get_first(&st);
                  i != -1; i = def_in->get_next(i, &st)) {
                 IR * ir = m_rg->getIR(i);
                 ASSERT0(ir != NULL);
-                prt("%s(%d), ", IRNAME(ir), ir->id());
+                prt(getRegion(), "%s(%d), ", IRNAME(ir), ir->id());
             }
             if (is_bs) {
-                note("\n             ");
-                def_in->dump(g_tfile);
+                note(getRegion(), "\n             ");
+                def_in->dump(file);
             }
         }
 
         if (def_out != NULL) {
-            note("\nDEF OUT STMT: %lu byte ", (ULONG)def_out->count_mem());
+            note(getRegion(), "\nDEF OUT STMT: %lu byte ",
+                 (ULONG)def_out->count_mem());
             for (INT i = def_out->get_first(&st);
                  i != -1; i = def_out->get_next(i, &st)) {
                 IR * ir = m_rg->getIR(i);
                 ASSERT0(ir != NULL);
-                prt("%s(%d), ", IRNAME(ir), ir->id());
+                prt(getRegion(), "%s(%d), ", IRNAME(ir), ir->id());
             }
             if (is_bs) {
-                note("\n             ");
-                def_out->dump(g_tfile);
+                note(getRegion(), "\n             ");
+                def_out->dump(file);
             }
         }
 
         if (avail_def_in != NULL) {
-            note("\nDEF AVAIL_IN STMT: %lu byte ",
+            note(getRegion(), "\nDEF AVAIL_IN STMT: %lu byte ",
                  (ULONG)avail_def_in->count_mem());
             for (INT i = avail_def_in->get_first(&st);
                  i != -1; i = avail_def_in->get_next(i, &st)) {
                 IR * ir = m_rg->getIR(i);
                 ASSERT0(ir != NULL);
-                prt("%s(%d), ", IRNAME(ir), ir->id());
+                prt(getRegion(), "%s(%d), ", IRNAME(ir), ir->id());
             }
             if (is_bs) {
-                note("\n             ");
-                avail_def_in->dump(g_tfile);
+                note(getRegion(), "\n             ");
+                avail_def_in->dump(file);
             }
         }
 
         if (avail_def_out != NULL) {
-            note("\nDEF AVAIL_OUT STMT: %lu byte ",
+            note(getRegion(), "\nDEF AVAIL_OUT STMT: %lu byte ",
                  (ULONG)avail_def_out->count_mem());
             for (INT i = avail_def_out->get_first(&st);
                  i != -1; i = avail_def_out->get_next(i, &st)) {
                 IR * ir = m_rg->getIR(i);
                 ASSERT0(ir != NULL);
-                prt("%s(%d), ", IRNAME(ir), ir->id());
+                prt(getRegion(), "%s(%d), ", IRNAME(ir), ir->id());
             }
             if (is_bs) {
-                note("\n             ");
-                avail_def_out->dump(g_tfile);
+                note(getRegion(), "\n             ");
+                avail_def_out->dump(file);
             }
         }
 
         if (may_def_gen != NULL) {
-            note("\nMAY GEN STMT: %lu byte ",
+            note(getRegion(), "\nMAY GEN STMT: %lu byte ",
                  (ULONG)may_def_gen->count_mem());
             for (INT i = may_def_gen->get_first(&st);
                  i != -1; i = may_def_gen->get_next(i, &st)) {
                 IR * ir = m_rg->getIR(i);
                 ASSERT0(ir != NULL);
-                prt("%s(%d), ", IRNAME(ir), ir->id());
+                prt(getRegion(), "%s(%d), ", IRNAME(ir), ir->id());
             }
             if (is_bs) {
-                note("\n             ");
-                may_def_gen->dump(g_tfile);
+                note(getRegion(), "\n             ");
+                may_def_gen->dump(file);
             }
         }
 
         if (must_def_gen != NULL) {
-            note("\nMUST GEN STMT: %lu byte ",
+            note(getRegion(), "\nMUST GEN STMT: %lu byte ",
                  (ULONG)must_def_gen->count_mem());
             for (INT i = must_def_gen->get_first(&st);
                  i != -1; i = must_def_gen->get_next(i, &st)) {
                 IR * ir = m_rg->getIR(i);
                 ASSERT0(ir != NULL);
-                prt("%s(%d), ", IRNAME(ir), ir->id());
+                prt(getRegion(), "%s(%d), ", IRNAME(ir), ir->id());
             }
             if (is_bs) {
-                note("\n             ");
-                must_def_gen->dump(g_tfile);
+                note(getRegion(), "\n             ");
+                must_def_gen->dump(file);
             }
         }
 
         if (must_def_kill != NULL) {
-            note("\nMUST KILLED STMT: %lu byte ",
+            note(getRegion(), "\nMUST KILLED STMT: %lu byte ",
                  (ULONG)must_def_kill->count_mem());
             for (INT i = must_def_kill->get_first(&st);
                  i != -1; i = must_def_kill->get_next(i, &st)) {
                 IR * ir = m_rg->getIR(i);
                 ASSERT0(ir != NULL);
-                prt("%s(%d), ", IRNAME(ir), ir->id());
+                prt(getRegion(), "%s(%d), ", IRNAME(ir), ir->id());
             }
             if (is_bs) {
-                note("\n             ");
-                must_def_kill->dump(g_tfile);
+                note(getRegion(), "\n             ");
+                must_def_kill->dump(file);
             }
         }
 
         if (may_def_kill != NULL) {
-            note("\nMAY KILLED STMT: %lu byte ",
+            note(getRegion(), "\nMAY KILLED STMT: %lu byte ",
                  (ULONG)may_def_kill->count_mem());
             for (INT i = may_def_kill->get_first(&st);
                  i != -1; i = may_def_kill->get_next(i, &st)) {
                 IR * ir = m_rg->getIR(i);
                 ASSERT0(ir != NULL);
-                prt("%s(%d), ", IRNAME(ir), ir->id());
+                prt(getRegion(), "%s(%d), ", IRNAME(ir), ir->id());
             }
             if (is_bs) {
-                note("\n             ");
-                may_def_kill->dump(g_tfile);
+                note(getRegion(), "\n             ");
+                may_def_kill->dump(file);
             }
         }
 
         if (livein_ir != NULL) {
-            note("\nLIVEIN EXPR: %lu byte ", (ULONG)livein_ir->count_mem());
+            note(getRegion(), "\nLIVEIN EXPR: %lu byte ",
+                 (ULONG)livein_ir->count_mem());
             for (INT i = livein_ir->get_first(&st);
                  i != -1; i = livein_ir->get_next(i, &st)) {
                 IR * ir = m_rg->getIR(i);
                 ASSERT0(ir != NULL);
-                prt("%s(%d), ", IRNAME(ir), ir->id());
+                prt(getRegion(), "%s(%d), ", IRNAME(ir), ir->id());
             }
             if (is_bs) {
-                note("\n             ");
-                livein_ir->dump(g_tfile);
+                note(getRegion(), "\n             ");
+                livein_ir->dump(file);
             }
         }
 
         if (liveout_ir != NULL) {
-            note("\nLIVEOUT EXPR: %lu byte ", (ULONG)liveout_ir->count_mem());
+            note(getRegion(), "\nLIVEOUT EXPR: %lu byte ",
+                 (ULONG)liveout_ir->count_mem());
             for (INT i = liveout_ir->get_first(&st);
                  i != -1; i = liveout_ir->get_next(i, &st)) {
                 IR * ir = m_rg->getIR(i);
                 ASSERT0(ir != NULL);
-                prt("%s(%d), ", IRNAME(ir), ir->id());
+                prt(getRegion(), "%s(%d), ", IRNAME(ir), ir->id());
             }
             if (is_bs) {
-                note("\n             ");
-                liveout_ir->dump(g_tfile);
+                note(getRegion(), "\n             ");
+                liveout_ir->dump(file);
             }
         }
 
         if (gen_ir != NULL) {
-            note("\nGEN EXPR: %lu byte ", (ULONG)gen_ir->count_mem());
+            note(getRegion(), "\nGEN EXPR: %lu byte ",
+                 (ULONG)gen_ir->count_mem());
             for (INT i = gen_ir->get_first(&st);
                  i != -1; i = gen_ir->get_next(i, &st)) {
                 IR * ir = m_rg->getIR(i);
                 ASSERT0(ir != NULL);
-                prt("%s(%d), ", IRNAME(ir), ir->id());
+                prt(getRegion(), "%s(%d), ", IRNAME(ir), ir->id());
             }
             if (is_bs) {
-                note("\n             ");
-                gen_ir->dump(g_tfile);
+                note(getRegion(), "\n             ");
+                gen_ir->dump(file);
             }
         }
 
         if (killed_exp != NULL) {
-            note("\nKILLED EXPR: %lu byte ", (ULONG)killed_exp->count_mem());
+            note(getRegion(), "\nKILLED EXPR: %lu byte ",
+                 (ULONG)killed_exp->count_mem());
             for (INT i = killed_exp->get_first(&st);
                  i != -1; i = killed_exp->get_next(i, &st)) {
                 IR * ir = m_rg->getIR(i);
                 ASSERT0(ir != NULL);
-                prt("%s(%d), ", IRNAME(ir), ir->id());
+                prt(getRegion(), "%s(%d), ", IRNAME(ir), ir->id());
             }
             if (is_bs) {
-                note("\n             ");
-                killed_exp->dump(g_tfile);
+                note(getRegion(), "\n             ");
+                killed_exp->dump(file);
             }
         }
 
         if (livein_bb != NULL) {
-            note("\nLIVEIN BB: %lu byte ", (ULONG)livein_bb->count_mem());
-            livein_bb->dump(g_tfile);
+            note(getRegion(), "\nLIVEIN BB: %lu byte ",
+                 (ULONG)livein_bb->count_mem());
+            livein_bb->dump(file);
         }
     }
-    fflush(g_tfile);
 }
 
 
-//This function copy MustUse and MayUse mds from tree 'to' to tree 'from'
-//for memory reference and building new DU chain for 'to'.
-//
-//This function will process SSA du info if it exist.
-//
-//copyDUChain: if true to copy DU chain from tree 'from' to tree 'to'.
+//DU chain and Memory Object reference operation.
+//This function copy MustUse and MayUse mds from tree 'from' to tree 'to'
+//and build new DU chain for 'to'.
+//add_duchain: if true to add DU chain from tree 'from' to tree 'to'.
 //    this operation will establish new DU chain between the DEF of 'from' and
 //    'to'.
-//'to': root node of target tree.
-//'from': root node of source tree.
-//NOTICE: IR tree 'to' and 'from' must be identical. to and from may be stmt.
-void DUMgr::copyIRTreeDU(IR * to, IR const* from, bool copyDUChain)
+//'to': root expression of target tree.
+//'from': root expression of source tree.
+//NOTE: IR tree 'to' and 'from' must be identical structure.
+//'to' and 'from' must be expression.
+void DUMgr::copyRefAndAddDUChain(IR * to, IR const* from, bool add_duchain)
 {
     if (to == from) { return; }
+    ASSERT0(to->is_exp() && from->is_exp());
     ASSERT0(to->isIREqual(from, true));
     m_citer.clean();
     m_iter2.clean();
     IR const* from_ir = iterInitC(from, m_citer);
     for (IR * to_ir = iterInit(to, m_iter2);
          to_ir != NULL;
-         to_ir = iterNext(m_iter2),
-         from_ir = iterNextC(m_citer)) {
+         to_ir = iterNext(m_iter2), from_ir = iterNextC(m_citer)) {
         ASSERT0(to_ir->isIREqual(from_ir, true));
         if (!to_ir->isMemoryRef() && !to_ir->is_id()) {
             //Copy MD for IR_ID, some Passes need it, e.g. GVN.
@@ -1830,7 +1712,7 @@ void DUMgr::copyIRTreeDU(IR * to, IR const* from, bool copyDUChain)
 
         to_ir->copyRef(from_ir, m_rg);
 
-        if (!copyDUChain) { continue; }
+        if (!add_duchain) { continue; }
 
         SSAInfo * ssainfo;
         if ((ssainfo = from_ir->getSSAInfo()) != NULL) {
@@ -1840,26 +1722,25 @@ void DUMgr::copyIRTreeDU(IR * to, IR const* from, bool copyDUChain)
 
             ASSERT0(to_ir->isReadPR());
             PR_ssainfo(to_ir) = ssainfo;
-            SSA_uses(ssainfo).append(to_ir);
-        } else {
-            DUSet const* from_du = from_ir->readDUSet();
-            if (from_du == NULL || from_du->is_empty()) { continue; }
+            ssainfo->addUse(to_ir);
+        }
 
-            DUSet * to_du = getAndAllocDUSet(to_ir);
-            to_du->copy(*from_du, *m_misc_bs_mgr);
+        DUSet const* from_du = from_ir->readDUSet();
+        if (from_du == NULL || from_du->is_empty()) { continue; }
 
-            //Add new du chain between DEF and USE.
-            DUIter di = NULL;
-            for (UINT i = from_du->get_first(&di);
-                 di != NULL; i = from_du->get_next(i, &di)) {
+        DUSet * to_du = getAndAllocDUSet(to_ir);
+        to_du->copy(*from_du, *m_misc_bs_mgr);
 
-                //x is stmt if from_ir is expression.
-                //x is expression if from_ir is stmt.
-                IR const* x = m_rg->getIR(i);
-                DUSet * x_du_set = x->getDUSet();
-                if (x_du_set == NULL) { continue; }
-                x_du_set->add(IR_id(to_ir), *m_misc_bs_mgr);
-            }
+        //Add DU chain between DEF and USE.
+        DUIter di = NULL;
+        for (UINT i = from_du->get_first(&di);
+             di != NULL; i = from_du->get_next(i, &di)) {
+            //x is stmt if from_ir is expression.
+            //x is expression if from_ir is stmt.
+            IR const* x = m_rg->getIR(i);
+            DUSet * x_duset = x->getDUSet();
+            if (x_duset == NULL) { continue; }
+            x_duset->add(IR_id(to_ir), *m_misc_bs_mgr);
         }
     }
     ASSERT0(m_iter2.get_elem_count() == 0 && m_iter.get_elem_count() == 0);
@@ -1915,68 +1796,46 @@ bool DUMgr::isOverlapDefUse(MD const* mustdef,
 }
 
 
-//Check each USE of stmt, remove the expired one which is not reference
+//Check each USE of stmt, remove the expired expression which is not reference
 //the memory any more that stmt defined.
 bool DUMgr::removeExpiredDUForStmt(IR * stmt)
 {
     bool change = false;
     ASSERT0(stmt->is_stmt());
-    SSAInfo * ssainfo = stmt->getSSAInfo();
-    if (ssainfo != NULL) {
-        SSAUseIter si;
-        UINT prno = 0;
-        if (SSA_def(ssainfo) != NULL) {
-            prno = SSA_def(ssainfo)->getPrno();
-        } else {
-            //Without DEF.
-            return change;
-        }
-
-        //Check if use referenced the number of PR which defined by SSA_def.
-        INT ni = -1;
-        for (INT i = SSA_uses(ssainfo).get_first(&si);
-             si != NULL; i = ni) {
-            ni = SSA_uses(ssainfo).get_next(i, &si);
-
-            IR const* use = m_rg->getIR(i);
-
-            if (use->is_pr() && PR_no(use) == prno) { continue; }
-
-            SSA_uses(ssainfo).remove(use);
-
-            change = true;
-        }
-
-        return change;
-    }
-
     DUSet const* useset = stmt->readDUSet();
     if (useset == NULL) { return false; }
 
     ASSERT0(stmt->isMemoryRef());
-
     MDSet const* maydef = getMayDef(stmt);
     MD const* mustdef = get_must_def(stmt);
-
     DUIter di = NULL;
     UINT next_u;
     for (UINT u = useset->get_first(&di); di != NULL; u = next_u) {
         next_u = useset->get_next(u, &di);
-
         IR const* use = m_rg->getIR(u);
         ASSERT0(use->is_exp());
-
         if (isOverlapDefUse(mustdef, maydef, use)) { continue; }
 
         //There is no du-chain bewteen stmt and use. Cut the MD du.
         removeDUChain(stmt, use);
         change = true;
     }
-
     return change;
 }
 
 
+//Check if the DEF of stmt's operands still modify the same memory object.
+//e.g: Revise DU chain if stmt's rhs has been changed.
+//    x=10 //S1
+//    ...
+//    c=x*0 //S2
+//after changed =>
+//    x=10 //S1
+//    ...
+//    c=0 //S2
+//where S1 is DEF, S2 is USE, after ir refinement, x in S2
+//is removed, remove the data dependence between S1
+//and S2's operand.
 bool DUMgr::removeExpiredDUForOperand(IR * stmt)
 {
     bool change = false;
@@ -1989,8 +1848,8 @@ bool DUMgr::removeExpiredDUForOperand(IR * stmt)
         if (k->isReadPR() && (ssainfo = PR_ssainfo(k)) != NULL) {
             SSAUseIter si;
             UINT prno = 0;
-            if (SSA_def(ssainfo) != NULL) {
-                prno = SSA_def(ssainfo)->getPrno();
+            if (ssainfo->getDef() != NULL) {
+                prno = ssainfo->getDef()->getPrno();
             } else {
                 continue;
             }
@@ -2003,7 +1862,7 @@ bool DUMgr::removeExpiredDUForOperand(IR * stmt)
 
                 if (use->is_pr() && PR_no(use) == prno) { continue; }
 
-                SSA_uses(ssainfo).remove(use);
+                ssainfo->removeUse(use);
             }
 
             continue;
@@ -2034,18 +1893,17 @@ bool DUMgr::removeExpiredDUForOperand(IR * stmt)
 
 
 //Check if the DEF of stmt's operands still modify the same memory object.
-//This function will process SSA info if it exists.
-//e.g: Revise DU chain if stmt's rhs has changed.
+//e.g: Revise DU chain if stmt's rhs has been changed.
 //    x=10 //S1
 //    ...
 //    c=x*0 //S2
-//  =>
+//after changed =>
 //    x=10 //S1
 //    ...
 //    c=0 //S2
-//Given S1 is def, S2 is use, after ir refinement, x in S2
+//where S1 is DEF, S2 is USE, after ir refinement, x in S2
 //is removed, remove the data dependence between S1
-//and S2 operand.
+//and S2's operand.
 bool DUMgr::removeExpiredDU(IR * stmt)
 {
     ASSERT0(stmt->is_stmt());
@@ -2062,7 +1920,7 @@ bool DUMgr::removeExpiredDU(IR * stmt)
 //'ir': indicate the root of IR tree.
 //e.g: d1, d2 are def-stmt of stmt's operands.
 //this functin cut off du-chain between d1, d2 and their use.
-void DUMgr::removeUseOutFromDefset(IR * ir)
+void DUMgr::removeUseFromDefset(IR * ir)
 {
     m_citer.clean();
     IR const* k;
@@ -2075,12 +1933,13 @@ void DUMgr::removeUseOutFromDefset(IR * ir)
     for (; k != NULL; k = iterRhsNextC(m_citer)) {
         if (!k->isMemoryOpnd()) { continue; }
 
-        SSAInfo * ssainfo;
-        if ((ssainfo = k->getSSAInfo()) != NULL) {
-            ASSERT0(k->is_pr());
-            SSA_uses(ssainfo).remove(k);
-            continue;
-        }
+        //SSAInfo has been processed in PRSSAMgr::removeUse().
+        //SSAInfo * ssainfo;
+        //if ((ssainfo = k->getSSAInfo()) != NULL) {
+        //    ASSERT0(k->is_pr());
+        //    ssainfo->removeUse(k);
+        //    continue;
+        //}
 
         DUSet * defset = k->getDUSet();
         if (defset == NULL) { continue; }
@@ -2110,7 +1969,7 @@ void DUMgr::removeUseOutFromDefset(IR * ir)
 //Remove 'def' from its use's def-list.
 //e.g:u1, u2 are its use expressions.
 //cut off the du chain between def->u1 and def->u2.
-void DUMgr::removeDefOutFromUseset(IR * def)
+void DUMgr::removeDefFromUseset(IR * def)
 {
     ASSERT0(def->is_stmt());
 
@@ -2144,13 +2003,13 @@ void DUMgr::removeDefOutFromUseset(IR * def)
 
 
 //Remove all DU info of 'ir' from DU mgr.
-void DUMgr::removeIROutFromDUMgr(IR * ir)
+void DUMgr::removeIRFromDUMgr(IR * ir)
 {
     ASSERT0(ir->is_stmt());
-    removeUseOutFromDefset(ir);
+    removeUseFromDefset(ir);
 
     //If stmt has SSA info, it should be maintained by SSA related api.
-    removeDefOutFromUseset(ir);
+    removeDefFromUseset(ir);
 }
 
 
@@ -2290,25 +2149,28 @@ size_t DUMgr::count_mem_duset()
 
 //Coalesce DU chain of 'from' to 'to'.
 //This function replace definition of USE of 'from' to defintion of 'to'.
-//e.g: to_def=...
-//     from=to
-//     ...=from_use
-//=> after coalescing, p1 is src, p0 is tgt
-//     to_def=...
+//Just like copy-propagation.
+//e.g: to_def =...
+//     from = to
+//     ...= from_use
+//=> after coalescing
+//     to_def = ...
 //     ------ //removed
-//     ...=to
+//     ... = to
 void DUMgr::coalesceDUChain(IR * from, IR * to)
 {
     ASSERT0(from && to);
-    ASSERT0(from->is_stmt() && to->is_exp());
+    ASSERT0(from->is_stmt() && to->is_exp() && to->getStmt() == from);
     if (from->getDUSet() == NULL || to->getDUSet() == NULL) {
-        return removeIROutFromDUMgr(from);
+        //Neight from nor to has DU chain.
+        return removeIRFromDUMgr(from);
     }
 
     //Use exp set of 'from'.
     DUSet * uses = from->getDUSet();
     //Def stmt set of 'to'.
     DUSet * defs = to->getDUSet();
+    defs->remove(from->id(), *m_misc_bs_mgr);
 
     //Iterate USE of 'from', change each USE's definition to to_def.
     DUIter it1 = NULL;
@@ -2324,7 +2186,6 @@ void DUMgr::coalesceDUChain(IR * from, IR * to)
              j >= 0; j = defs->get_next(j, &it2)) {
             IR const* def = m_rg->getIR(j);
             ASSERT0(def && def->is_stmt());
-            if (def == from) { continue; }
 
             DUSet * uses_of_def = def->getDUSet();
             ASSERT0(uses_of_def);
@@ -2332,8 +2193,8 @@ void DUMgr::coalesceDUChain(IR * from, IR * to)
             if (use != to) {
                 uses_of_def->addUse(use, *m_misc_bs_mgr);
             }
-            defs_of_use->addDef(def, *m_misc_bs_mgr);
         }
+        defs_of_use->bunion(*defs, *m_misc_bs_mgr);
     }
     defs->clean(*m_misc_bs_mgr);
     uses->clean(*m_misc_bs_mgr);
@@ -2345,64 +2206,15 @@ void DUMgr::coalesceDUChain(IR * from, IR * to)
 //    assume p->w,u, the MustUse is {a,b,p}, not include w,u.
 void DUMgr::collectMustUsedMDs(IR const* ir, OUT MDSet & mustuse)
 {
-    switch (ir->getCode()) {
-    case IR_ST:
-        computeExpression(ST_rhs(ir), &mustuse,
-            COMP_EXP_COLLECT_MUST_USE, DUOPT_COMPUTE_PR_DU|DUOPT_COMPUTE_NONPR_DU);
-        return;
-    case IR_STPR:
-        computeExpression(STPR_rhs(ir), &mustuse,
-            COMP_EXP_COLLECT_MUST_USE, DUOPT_COMPUTE_PR_DU | DUOPT_COMPUTE_NONPR_DU);
-        return;
-    case IR_IST:
-        computeExpression(IST_rhs(ir), &mustuse,
-            COMP_EXP_COLLECT_MUST_USE, DUOPT_COMPUTE_PR_DU | DUOPT_COMPUTE_NONPR_DU);
-        computeExpression(IST_base(ir), &mustuse,
-            COMP_EXP_COLLECT_MUST_USE, DUOPT_COMPUTE_PR_DU | DUOPT_COMPUTE_NONPR_DU);
-        return;
-    case IR_ICALL:
-        computeExpression(ICALL_callee(ir), &mustuse,
-            COMP_EXP_COLLECT_MUST_USE, DUOPT_COMPUTE_PR_DU | DUOPT_COMPUTE_NONPR_DU);
-    case IR_CALL:
-        for (IR * p = CALL_param_list(ir); p != NULL; p = p->get_next()) {
-            computeExpression(p, &mustuse,
-                COMP_EXP_COLLECT_MUST_USE, DUOPT_COMPUTE_PR_DU | DUOPT_COMPUTE_NONPR_DU);
-        }
-        for (IR * p = CALL_dummyuse(ir); p != NULL; p = p->get_next()) {
-            computeExpression(p, &mustuse,
-                COMP_EXP_COLLECT_MUST_USE, DUOPT_COMPUTE_PR_DU | DUOPT_COMPUTE_NONPR_DU);
-        }
-        return;
-    case IR_GOTO:
-    case IR_REGION:
-        break;
-    case IR_IGOTO:
-        computeExpression(IGOTO_vexp(ir), &mustuse,
-            COMP_EXP_COLLECT_MUST_USE, DUOPT_COMPUTE_PR_DU | DUOPT_COMPUTE_NONPR_DU);
-        return;
-    case IR_DO_WHILE:
-    case IR_WHILE_DO:
-    case IR_DO_LOOP:
-    case IR_IF:
-    case IR_LABEL:
-    case IR_CASE:
-        ASSERTN(0, ("TODO"));
-        break;
-    case IR_TRUEBR:
-    case IR_FALSEBR:
-        computeExpression(BR_det(ir), &mustuse,
-            COMP_EXP_COLLECT_MUST_USE, DUOPT_COMPUTE_PR_DU | DUOPT_COMPUTE_NONPR_DU);
-        return;
-    case IR_SWITCH:
-        computeExpression(SWITCH_vexp(ir), &mustuse,
-            COMP_EXP_COLLECT_MUST_USE, DUOPT_COMPUTE_PR_DU | DUOPT_COMPUTE_NONPR_DU);
-        return;
-    case IR_RETURN:
-        computeExpression(RET_exp(ir), &mustuse,
-            COMP_EXP_COLLECT_MUST_USE, DUOPT_COMPUTE_PR_DU | DUOPT_COMPUTE_NONPR_DU);
-        return;
-    default: UNREACHABLE();
-    } //end switch
+    ASSERT0(ir->is_stmt());
+    m_citer.clean();
+    for (IR const* x = iterRhsInitC(ir, m_citer);
+        x != NULL; x = iterRhsNextC(m_citer)) {
+        if (!x->isMemoryOpnd()) { continue; }        
+        computeExpression(const_cast<IR*>(x), &mustuse,
+            COMP_EXP_COLLECT_MUST_USE,
+            DUOPT_COMPUTE_PR_DU | DUOPT_COMPUTE_NONPR_DU);        
+    }    
 }
 
 
@@ -2556,7 +2368,7 @@ void DUMgr::inferCallAndICall(IR * ir, UINT duflag, IN MD2MDSet * mx)
     }
 
     bool modify_global = true;
-    if (ir->isReadOnlyCall()) {
+    if (ir->isReadOnly()) {
         modify_global = false;
     } else {
         //Utilize calllee's MayDef MDSet if callee region has been processed.
@@ -2890,7 +2702,7 @@ void DUMgr::computeMayDef(IR const* ir,
         ni = maygen_stmt->get_next(i, &st);
         IR * gened_ir = m_rg->getIR(i);
         ASSERT0(gened_ir != NULL && gened_ir->is_stmt());
-        if (is_must_kill(ir, gened_ir)) {
+        if (isMustKill(ir, gened_ir)) {
             maygen_stmt->diff(i, bsmgr);
         }
     }
@@ -2946,7 +2758,7 @@ void DUMgr::computeMustExactDef(IR const* ir,
         ni = mustgen_stmt->get_next(i, &st);
         IR * gened_ir = m_rg->getIR(i);
         ASSERT0(gened_ir != NULL && gened_ir->is_stmt());
-        if (is_may_kill(ir, gened_ir)) {
+        if (isMayKill(ir, gened_ir)) {
             mustgen_stmt->diff(i, bsmgr);
         }
     }
@@ -2991,7 +2803,7 @@ void DUMgr::computeMustExactDefMayDefMayUse(OUT Vector<MDSet*> * mustdefmds,
         DefDBitSetCore * mustgen_stmt = NULL;
         MDSet * bb_mustdefmds = NULL;
         MDSet * bb_maydefmds = NULL;
-        UINT bbid = BB_id(bb);
+        UINT bbid = bb->id();
         if (mustdefmds != NULL) {
             //if (mustdefmds != NULL &&
             //    HAVE_FLAG(flag, DUOPT_SOL_AVAIL_REACH_DEF)) {
@@ -3096,7 +2908,7 @@ void DUMgr::computeCallRef(UINT duflag)
                 //querying process is only executed once per BB.
                 MD2MDSet * mx = NULL;
                 if (m_aa->isFlowSensitive()) {
-                    mx = m_aa->mapBBtoMD2MDSet(BB_id(bb));
+                    mx = m_aa->mapBBtoMD2MDSet(bb->id());
                 } else {
                     mx = m_aa->getUniqueMD2MDSet();
                 }
@@ -3154,7 +2966,7 @@ void DUMgr::computeMDRef(IN OUT OptCtx & oc, UINT duflag)
                 //querying process is only executed once per BB.
                 MD2MDSet * mx = NULL;
                 if (m_aa->isFlowSensitive()) {
-                    mx = m_aa->mapBBtoMD2MDSet(BB_id(bb));
+                    mx = m_aa->mapBBtoMD2MDSet(bb->id());
                 } else {
                     mx = m_aa->getUniqueMD2MDSet();
                 }
@@ -3162,25 +2974,26 @@ void DUMgr::computeMDRef(IN OUT OptCtx & oc, UINT duflag)
                 break;
             }
             case IR_RETURN:
+                ASSERT0(RET_exp(ir) == NULL || RET_exp(ir)->is_single());
                 computeExpression(RET_exp(ir), NULL,
-                    COMP_EXP_RECOMPUTE, duflag);
+                                  COMP_EXP_RECOMPUTE, duflag);
                 break;
             case IR_TRUEBR:
             case IR_FALSEBR:
                 //Compute USE mdset.
                 ASSERT0(BR_lab(ir));
                 computeExpression(BR_det(ir), NULL,
-                    COMP_EXP_RECOMPUTE, duflag);
+                                  COMP_EXP_RECOMPUTE, duflag);
                 break;
             case IR_SWITCH:
                 //Compute USE mdset.
                 computeExpression(SWITCH_vexp(ir), NULL,
-                    COMP_EXP_RECOMPUTE, duflag);
+                                  COMP_EXP_RECOMPUTE, duflag);
                 break;
             case IR_IGOTO:
                 //Compute USE mdset.
                 computeExpression(IGOTO_vexp(ir), NULL,
-                    COMP_EXP_RECOMPUTE, duflag);
+                                  COMP_EXP_RECOMPUTE, duflag);
                 break;
             case IR_GOTO:
                 break;
@@ -3240,7 +3053,8 @@ void DUMgr::computeLiveInBB(DefMiscBitSetMgr & bsmgr)
 {
     START_TIMER(t4, "Compute LiveInBB");
     bool change = true;
-    BBList const* bbl = m_cfg->getBBListInRPO();
+    BBList const* bbl = m_cfg->getRPOBBList();
+    ASSERT0(bbl);
     DefSBitSetCore tmp;
     UINT count = 0;
     while (change && count < 20) {
@@ -3353,9 +3167,11 @@ void DUMgr::computeKillSet(DefDBitSetCoreReserveTab & dbitsetchash,
             } //end for livein_maygendef
         } //end for each livein
 
-        setMustKilledDef(bbid,
+        setMustKilledDef(
+            bbid,
             comp_must ? dbitsetchash.append(must_killed_set) : NULL);
-        setMayKilledDef(bbid,
+        setMayKilledDef(
+            bbid,
             comp_may ? dbitsetchash.append(may_killed_set) : NULL);
         must_killed_set.clean(bsmgr);
         may_killed_set.clean(bsmgr);
@@ -3390,7 +3206,7 @@ void DUMgr::computeGenForBB(IRBB * bb,
                             DefMiscBitSetMgr & bsmgr)
 {
     MDSet tmp;
-    DefDBitSetCore * gen_ir_exprs = genGenIRExpr(BB_id(bb), &bsmgr);
+    DefDBitSetCore * gen_ir_exprs = genGenIRExpr(bb->id(), &bsmgr);
     gen_ir_exprs->clean(bsmgr);
 
     IRListIter ct;
@@ -3605,7 +3421,7 @@ void DUMgr::computeAuxSetForExpression(DefDBitSetCoreReserveTab & dbitsetchash,
     MDSet tmp;
     for (bbl->get_head(&ct); ct != bbl->end(); ct = bbl->get_next(ct)) {
         IRBB * bb = ct->val();
-        MDSet const* bb_maydef = maydefmds->get(BB_id(bb));
+        MDSet const* bb_maydef = maydefmds->get(bb->id());
         ASSERT0(bb_maydef != NULL);
 
         DefSBitSetIter st = NULL;
@@ -3624,7 +3440,7 @@ void DUMgr::computeAuxSetForExpression(DefDBitSetCoreReserveTab & dbitsetchash,
             }
         }
 
-        setKilledIRExpr(BB_id(bb), dbitsetchash.append(killed_set));
+        setKilledIRExpr(bb->id(), dbitsetchash.append(killed_set));
         killed_set.clean(bsmgr);
     }
 
@@ -3650,11 +3466,11 @@ bool DUMgr::ForAvailReachDef(UINT bbid,
         //Intersect
         if (first) {
             first = false;
-            in->copy(*genAvailOutReachDef(BB_id(p), &bsmgr), *m_misc_bs_mgr);
+            in->copy(*genAvailOutReachDef(p->id(), &bsmgr), *m_misc_bs_mgr);
         } else {
-            in->intersect(*genAvailOutReachDef(BB_id(p), &bsmgr),
-                *m_misc_bs_mgr);
-            //in->bunion(*getAvailOutReachDef(BB_id(p)), *m_misc_bs_mgr);
+            in->intersect(*genAvailOutReachDef(p->id(), &bsmgr),
+                          *m_misc_bs_mgr);
+            //in->bunion(*getAvailOutReachDef(p)->id(), *m_misc_bs_mgr);
         }
     }
 
@@ -3702,12 +3518,12 @@ bool DUMgr::ForReachDef(UINT bbid,
     for (preds.get_head(&ct); ct != preds.end(); ct = preds.get_next(ct)) {
         IRBB const* p = ct->val();
         if (first) {
-            in_reach_def->copy(*genOutReachDef(BB_id(p), &bsmgr),
-                *m_misc_bs_mgr);
+            in_reach_def->copy(*genOutReachDef(p->id(), &bsmgr),
+                               *m_misc_bs_mgr);
             first = false;
         } else {
-            in_reach_def->bunion(*genOutReachDef(BB_id(p), &bsmgr),
-                *m_misc_bs_mgr);
+            in_reach_def->bunion(*genOutReachDef(p->id(), &bsmgr),
+                                 *m_misc_bs_mgr);
         }
     }
 
@@ -3760,7 +3576,7 @@ bool DUMgr::ForAvailExpression(UINT bbid,
     BBListIter ct;
     for (preds.get_head(&ct); ct != preds.end(); ct = preds.get_next(ct)) {
         IRBB * p = ct->val();
-        DefDBitSetCore * liveout = genAvailOutExpr(BB_id(p), &bsmgr);
+        DefDBitSetCore * liveout = genAvailOutExpr(p->id(), &bsmgr);
         if (first) {
             first = false;
             in->copy(*liveout, *m_misc_bs_mgr);
@@ -3806,10 +3622,10 @@ void DUMgr::solve(DefDBitSetCore const& expr_univers,
 {
     START_TIMER(t7, "Solve DU set");
     BBList * bbl = m_rg->getBBList();
-    IRBB const* entry = m_cfg->get_entry();
+    IRBB const* entry = m_cfg->getEntry();
     ASSERT0(entry && BB_is_entry(entry));
     for (IRBB * bb = bbl->get_tail(); bb != NULL; bb = bbl->get_prev()) {
-        UINT bbid = BB_id(bb);
+        UINT bbid = bb->id();
         if (HAVE_FLAG(flag, DUOPT_SOL_REACH_DEF)) {
             //Initialize reach-def IN, reach-def OUT.
             genInReachDef(bbid, m_misc_bs_mgr)->clean(*m_misc_bs_mgr);
@@ -3841,7 +3657,8 @@ void DUMgr::solve(DefDBitSetCore const& expr_univers,
     }
 
     //Rpo already checked to be available. Here double check again.
-    List<IRBB*> * tbbl = m_cfg->getBBListInRPO();
+    List<IRBB*> * tbbl = m_cfg->getRPOBBList();
+    ASSERT0(tbbl);
     ASSERT0(tbbl->get_elem_count() == bbl->get_elem_count());
     List<IRBB*> preds;
     List<IRBB*> lst;
@@ -3856,7 +3673,7 @@ void DUMgr::solve(DefDBitSetCore const& expr_univers,
     UINT i = 0; //time of bb accessed.
     do {
         IRBB * bb = lst.remove_head();
-        UINT bbid = BB_id(bb);
+        UINT bbid = bb->id();
         preds.clean();
         m_cfg->get_preds(preds, bb);
         if (HAVE_FLAG(flag, DUOPT_SOL_AVAIL_REACH_DEF)) {
@@ -3880,7 +3697,7 @@ void DUMgr::solve(DefDBitSetCore const& expr_univers,
         BBListIter ct;
         for (tbbl->get_head(&ct); ct != tbbl->end(); ct = tbbl->get_next(ct)) {
             IRBB * bb = ct->val();
-            UINT bbid = BB_id(bb);
+            UINT bbid = bb->id();
             preds.clean();
             m_cfg->get_preds(preds, bb);
             if (HAVE_FLAG(flag, DUOPT_SOL_AVAIL_REACH_DEF)) {
@@ -4045,8 +3862,8 @@ IR const* DUMgr::findKillingLocalDef(IRBB * bb,
                     return NULL;
                 }
 
-                UINT result = checkIsLocalKillingDefForIndirectAccess(ir,
-                    exp, ct);
+                UINT result = checkIsLocalKillingDefForIndirectAccess(
+                    ir, exp, ct);
                 if (result == CK_OVERLAP) {
                     return ir;
                 } else if (result == CK_NOT_OVERLAP) {
@@ -4233,7 +4050,7 @@ void DUMgr::checkAndBuildChainForMemIR(IRBB * bb,
     if ((expmd != NULL && expmd->is_exact()) || exp->isReadPR()) {
         //Only must-exact USE-ref has qualification to compute killing-def.
         has_local_killing_def = buildLocalDUChain(bb, exp, expmd, expdu, ct,
-            &has_local_nonkilling_def);
+                                                  &has_local_nonkilling_def);
     }
 
     if (has_local_killing_def) {
@@ -4357,7 +4174,7 @@ UINT DUMgr::checkIsNonLocalKillingDef(IR const* stmt, IR const* exp)
     //  ... //t can not be defined.
     //  = *t
     DefDBitSetCore const* lived_in_expr =
-        genAvailInExpr(BB_id(exp->getStmt()->getBB()), m_misc_bs_mgr);
+        genAvailInExpr(exp->getStmt()->getBB()->id(), m_misc_bs_mgr);
     if (!lived_in_expr->is_contain(IR_id(t2))) { return CK_UNKNOWN; }
 
     UINT exptysz = exp->getTypeSize(m_tm);
@@ -4651,7 +4468,7 @@ void DUMgr::updateDef(IR * ir, UINT flag)
 //NOTE this function is used for classic data-flow analysis.
 void DUMgr::initMD2IRSet(IRBB * bb)
 {
-    DefDBitSetCore * reachdef_in = genInReachDef(BB_id(bb), m_misc_bs_mgr);
+    DefDBitSetCore * reachdef_in = genInReachDef(bb->id(), m_misc_bs_mgr);
     ASSERT0(reachdef_in);
     m_md2irs->clean();
 
@@ -4731,7 +4548,7 @@ bool DUMgr::verifyLiveinExp()
         IRBB * bb = ct->val();
         ASSERT0(bb);
         DefSBitSetIter st = NULL;
-        DefDBitSetCore * x = genAvailInExpr(BB_id(bb), m_misc_bs_mgr);
+        DefDBitSetCore * x = genAvailInExpr(bb->id(), m_misc_bs_mgr);
         for (INT i = x->get_first(&st); i >= 0; i = x->get_next(i, &st)) {
             ASSERT0(m_rg->getIR(i) && m_rg->getIR(i)->is_exp());
         }
@@ -4740,7 +4557,10 @@ bool DUMgr::verifyLiveinExp()
 }
 
 
-bool DUMgr::checkIsTruelyDep(IR const* def, IR const* use)
+static bool checkIsTruelyDep(IR const* def,
+                             IR const* use,
+                             Region const* rg,
+                             MDSystem const* ms)
 {
     MD const* mustdef = def->getRefMD();
     MDSet const* maydef = def->getRefMDSet();
@@ -4749,46 +4569,61 @@ bool DUMgr::checkIsTruelyDep(IR const* def, IR const* use)
     if (mustdef != NULL) {
         if (mustuse != NULL) {
             if (def->isCallStmt()) {
-                //CALL, ICALL have sideeffect, so process
+                //CALL, ICALL may have sideeffect, thus processing
                 //them individually.
                 if (mustdef == mustuse || mustdef->is_overlap(mustuse)) {
-                    ; //Do nothing.
-                } else if (maydef != NULL &&
-                           maydef->is_overlap(mustuse, m_rg)) {
-                    ; //Do nothing.
-                } else if (maydef != NULL &&
-                           mayuse != NULL &&
-                           mayuse->is_intersect(*maydef)) {
-                    ; //Do nothing.
-                } else {
-                    UNREACHABLE();
+                    return true;
                 }
-            } else {
-                ASSERT0(mustdef == mustuse || mustdef->is_overlap(mustuse));
+                
+                if (maydef != NULL && maydef->is_overlap(mustuse, rg)) {
+                    return true;
+                }
+                
+                if (maydef != NULL &&
+                    mayuse != NULL &&
+                    mayuse->is_intersect(*maydef)) {
+                    return true;
+                }
+                
+                UNREACHABLE();
+                return false;
             }
-        } else if (mayuse != NULL) {
+
+            ASSERT0(mustdef == mustuse || mustdef->is_overlap(mustuse));
+            return true;
+        }
+        
+        if (mayuse != NULL) {
             if (def->isCallStmt()) {
-                ASSERT0(mayuse->is_overlap_ex(mustdef, m_rg, m_md_sys) ||
+                ASSERT0(mayuse->is_overlap_ex(mustdef, rg, ms) ||
                         maydef == mayuse ||
                         (maydef != NULL && mayuse->is_intersect(*maydef)));
-            } else {
-                ASSERT0(mayuse->is_overlap_ex(mustdef, m_rg, m_md_sys));
+                return true;
             }
-        } else {
-            ASSERTN(0, ("Not a truely dependence"));
+            
+            ASSERT0(mayuse->is_overlap_ex(mustdef, rg, ms));
+            return true;
         }
-    } else if (maydef != NULL) {
-        if (mustuse != NULL) {
-            ASSERT0(maydef->is_overlap_ex(mustuse, m_rg, m_md_sys));
-        } else if (mayuse != NULL) {
-            ASSERT0(mayuse == maydef || mayuse->is_intersect(*maydef));
-        } else {
-            ASSERTN(0, ("Not a truely dependence"));
-        }
-    } else {
+
         ASSERTN(0, ("Not a truely dependence"));
+        return false;
     }
-    return true;
+    
+    if (maydef != NULL) {
+        if (mustuse != NULL) {
+            ASSERT0(maydef->is_overlap_ex(mustuse, rg, ms));
+            return true;
+        }
+        if (mayuse != NULL) {
+            ASSERT0(mayuse == maydef || mayuse->is_intersect(*maydef));
+            return true;
+        }
+        ASSERTN(0, ("Not a truely dependence"));
+        return false;
+    }
+    
+    ASSERTN(0, ("Not a truely dependence"));
+    return false;
 }
 
 
@@ -4797,39 +4632,39 @@ bool DUMgr::verifyMDDUChainForIR(IR const* ir, UINT duflag)
 {
     bool precision_check = g_verify_level >= VERIFY_LEVEL_2;
     ASSERT0(ir->is_stmt());
+    //Check stmt's UseSet.
+    if ((HAVE_FLAG(duflag, DUOPT_COMPUTE_PR_DU) &&
+         (ir->isWritePR() || ir->isCallStmt())) ||
+        (HAVE_FLAG(duflag, DUOPT_COMPUTE_NONPR_DU) &&
+         ir->isMemoryRef())) {
+        //Also check memory DU for call stmt.
+        //The DUSet of call-stmt is a speical case because the DUSet of call
+        //not only record the DefSet but also the UseSet.
+        DUSet const* useset = ir->readDUSet();
+        if (useset != NULL) {
+            DUIter di = NULL;
+            for (INT i = useset->get_first(&di);
+                 i >= 0; i = useset->get_next(i, &di)) {
+                IR const* use = m_rg->getIR(i);
+                DUMMYUSE(use);
+                ASSERT0(use->is_exp());
 
-    if (ir->getSSAInfo() == NULL ||
-        ir->isCallStmt()) { //Need to check memory DU for call
-        //ir is in MD DU form.
-        if ((HAVE_FLAG(duflag, DUOPT_COMPUTE_PR_DU) && ir->isWritePR()) ||
-            (HAVE_FLAG(duflag, DUOPT_COMPUTE_NONPR_DU) && ir->isMemoryRef())) {
-            DUSet const* useset = ir->readDUSet();
-            if (useset != NULL) {
-                DUIter di = NULL;
-                for (INT i = useset->get_first(&di);
-                     i >= 0; i = useset->get_next(i, &di)) {
-                    IR const* use = m_rg->getIR(i);
-                    DUMMYUSE(use);
+                //Check the existence of 'use'.
+                ASSERT0(use->getStmt() && use->getStmt()->getBB());
+                ASSERT0(BB_irlist(use->getStmt()->getBB()).find(
+                                  use->getStmt()));
 
-                    ASSERT0(use->is_exp());
+                //use must be a memory operation.
+                ASSERT0(use->isMemoryOpnd());
 
-                    //Check the existence of 'use'.
-                    ASSERT0(use->getStmt() && use->getStmt()->getBB());
-                    ASSERT0(BB_irlist(
-                        use->getStmt()->getBB()).find(use->getStmt()));
+                //ir must be DEF of 'use'.
+                ASSERT0(use->readDUSet());
 
-                    //use must be a memory operation.
-                    ASSERT0(use->isMemoryOpnd());
+                //Check consistence between ir and use duchain.
+                ASSERT0(use->readDUSet()->is_contain(ir->id()));
 
-                    //ir must be DEF of 'use'.
-                    ASSERT0(use->readDUSet());
-
-                    //Check consistence between ir and use duchain.
-                    ASSERT0(use->readDUSet()->is_contain(ir->id()));
-
-                    if (precision_check) {
-                        ASSERT0(checkIsTruelyDep(ir, use));
-                    }
+                if (precision_check) {
+                    ASSERT0(checkIsTruelyDep(ir, use, m_rg, m_md_sys));
                 }
             }
         }
@@ -4839,12 +4674,7 @@ bool DUMgr::verifyMDDUChainForIR(IR const* ir, UINT duflag)
     for (IR const* u = iterRhsInitC(ir, m_citer);
          u != NULL; u = iterRhsNextC(m_citer)) {
         ASSERT0(!ir->is_lhs(u) && u->is_exp());
-
-        if (u->getSSAInfo() != NULL) {
-            //u is in SSA form, so check it MD du is meaningless.
-            continue;
-        }
-
+        if (!u->isReadPR() && !u->isMemoryRef()) { continue; }
         if ((!HAVE_FLAG(duflag, DUOPT_COMPUTE_PR_DU) && u->isReadPR()) ||
             (!HAVE_FLAG(duflag, DUOPT_COMPUTE_NONPR_DU) && u->isMemoryRef())) {
             continue;
@@ -4873,7 +4703,7 @@ bool DUMgr::verifyMDDUChainForIR(IR const* ir, UINT duflag)
             ASSERT0(def->readDUSet()->is_contain(IR_id(u)));
 
             if (precision_check) {
-                ASSERT0(checkIsTruelyDep(def, u));
+                ASSERT0(checkIsTruelyDep(def, u, m_rg, m_md_sys));
             }
         }
     }
@@ -4882,15 +4712,20 @@ bool DUMgr::verifyMDDUChainForIR(IR const* ir, UINT duflag)
 
 
 //Verify DU chain's sanity.
-bool DUMgr::verifyMDDUChain(UINT duflag)
+bool verifyMDDUChain(Region * rg, UINT duflag)
 {
-    BBList * bbl = m_rg->getBBList();
+    DUMgr * dumgr = rg->getDUMgr();
+    if (dumgr == NULL) { return true; }
+    if (!HAVE_FLAG(duflag, DUOPT_COMPUTE_PR_REF) &&
+        !HAVE_FLAG(duflag, DUOPT_COMPUTE_NONPR_REF)) {
+        return true;
+    }
+    BBList * bbl = rg->getBBList();
     for (IRBB * bb = bbl->get_head();
          bb != NULL; bb = bbl->get_next()) {
-        for (IR * ir = BB_first_ir(bb);
-             ir != NULL; ir = BB_next_ir(bb)) {
-            verifyMDDUChainForIR(ir, duflag);
-         }
+        for (IR * ir = BB_first_ir(bb); ir != NULL; ir = BB_next_ir(bb)) {
+            dumgr->verifyMDDUChainForIR(ir, duflag);
+        }
     }
     return true;
 }
@@ -5031,7 +4866,7 @@ IR * DUMgr::findDomDef(IR const* exp,
          i >= 0; i = expdefset->get_next(i, &di)) {
         IR * d = m_rg->getIR(i);
         ASSERT0(d->is_stmt());
-        if (!is_may_def(d, exp, false)) {
+        if (!isMayDef(d, exp, false)) {
             continue;
         }
 
@@ -5061,7 +4896,7 @@ IR * DUMgr::findDomDef(IR const* exp,
     if (last == NULL) { return NULL; }
     IRBB * last_bb = last->getBB();
     IRBB * exp_bb = exp_stmt->getBB();
-    if (!m_cfg->is_dom(BB_id(last_bb), BB_id(exp_bb))) {
+    if (!m_cfg->is_dom(last_bb->id(), exp_bb->id())) {
         return NULL;
     }
 
@@ -5098,7 +4933,7 @@ void DUMgr::computeRegionMDDU(Vector<MDSet*> const* mustexactdef_mds,
     VarTab const* vtab = m_rg->getVarTab();
     for (bbl->get_head(&ct); ct != bbl->end(); ct = bbl->get_next(ct)) {
         IRBB * bb = ct->val();
-        MDSet const* mds = mustexactdef_mds->get(BB_id(bb));
+        MDSet const* mds = mustexactdef_mds->get(bb->id());
         ASSERT0(mds != NULL);
         MDSetIter iter;
         for (INT i = mds->get_first(&iter);
@@ -5106,19 +4941,19 @@ void DUMgr::computeRegionMDDU(Vector<MDSet*> const* mustexactdef_mds,
             MD const* md = m_md_sys->getMD(i);
             ASSERT0(md->get_base());
             if (!md->is_pr() && !vtab->find(md->get_base())) {
-                //Only record the VAR defined in outter region.
+                //Only record the Var defined in outter region.
                 ru_maydef->bunion(md, *m_misc_bs_mgr);
             }
         }
 
-        mds = maydef_mds->get(BB_id(bb));
+        mds = maydef_mds->get(bb->id());
         ASSERT0(mds != NULL);
         for (INT i = mds->get_first(&iter);
              i >= 0; i = mds->get_next(i, &iter)) {
             MD const* md = m_md_sys->getMD(i);
             ASSERT0(md->get_base());
             if (!md->is_pr() && !vtab->find(md->get_base())) {
-                //Only record the VAR defined in outter region.
+                //Only record the Var defined in outter region.
                 ru_maydef->bunion(md, *m_misc_bs_mgr);
             }
         }
@@ -5130,7 +4965,7 @@ void DUMgr::computeRegionMDDU(Vector<MDSet*> const* mustexactdef_mds,
         MD const* md = m_md_sys->getMD(i);
         ASSERT0(md->get_base());
         if (!md->is_pr() && !vtab->find(md->get_base())) {
-            //Only record the VAR defined in outter region.
+            //Only record the Var defined in outter region.
             ru_mayuse->bunion(md, *m_misc_bs_mgr);
         }
     }
@@ -5186,8 +5021,7 @@ bool DUMgr::perform(IN OUT OptCtx & oc, UINT flag)
     if (bbl->get_elem_count() == 0) { return true; }
     if (bbl->get_elem_count() > g_thres_opt_bb_num) {
         //Adjust g_thres_opt_bb_num to make sure you want to do DU analysis.
-        interwarn("DUMgr::perform() of Region(%d) is not applied.",
-                  REGION_id(m_rg));
+        interwarn("DUMgr::perform() of Region(%d) is not applied.", m_rg->id());
         return false;
     }
 
@@ -5242,17 +5076,17 @@ bool DUMgr::perform(IN OUT OptCtx & oc, UINT flag)
         for (IRBB * bb = bbl->get_tail();
              bb != NULL; bb = bbl->get_prev(), i++) {
             if (mustexactdef_mds != NULL) {
-                mustexactdef_mds->set(BB_id(bb), &mds_arr_for_must[i]);
+                mustexactdef_mds->set(bb->id(), &mds_arr_for_must[i]);
             }
             if (maydef_mds != NULL) {
-                maydef_mds->set(BB_id(bb), &mds_arr_for_may[i]);
+                maydef_mds->set(bb->id(), &mds_arr_for_may[i]);
             }
         }
         END_TIMER(t2, "Allocate May/Must MDS table");
 
         DefMiscBitSetMgr bsmgr;
-        computeMustExactDefMayDefMayUse(mustexactdef_mds,
-            maydef_mds, mayuse_mds, flag, bsmgr);
+        computeMustExactDefMayDefMayUse(mustexactdef_mds, maydef_mds,
+                                        mayuse_mds, flag, bsmgr);
 
         DefDBitSetCoreHashAllocator dbitsetchashallocator(&bsmgr);
         DefDBitSetCoreReserveTab dbitsetchash(&dbitsetchashallocator);
@@ -5320,7 +5154,7 @@ bool DUMgr::perform(IN OUT OptCtx & oc, UINT flag)
 
     if (g_is_dump_after_pass && g_dump_opt.isDumpDUMgr()) {
         if (g_dump_opt.isDumpMDSetHash()) {
-            m_mds_hash->dump();
+            m_mds_hash->dump(getRegion());
         }
         m_rg->dumpRef();
     }
@@ -5381,12 +5215,60 @@ void DUMgr::computeMDDUChain(IN OUT OptCtx & oc,
         OC_is_nonpr_du_chain_valid(oc) = true;
     }
     if (g_is_dump_after_pass && g_dump_opt.isDumpDUMgr()) {
-        note("\n\n==---- DUMP DUMgr '%s' ----==\n", m_rg->getRegionName());
+        note(getRegion(), "\n==---- DUMP %s '%s' ----==", getPassName(),
+             m_rg->getRegionName());
         m_md_sys->dump(true);
         dumpDUChainDetail();
     }
-    ASSERTN(verifyMDDUChain(duflag), ("verifyMDDUChain failed"));
+    ASSERTN(verifyMDDUChain(m_rg, duflag), ("verifyMDDUChain failed"));
     END_TIMER(t, "Build DU-CHAIN");
+}
+
+
+//Return true if stmt dominate use's stmt, otherwise return false.
+bool DUMgr::isStmtDomUseInsideLoop(IR const* stmt,
+                                   IR const* use,
+                                   LI<IRBB> const* li) const
+{
+    IRBB const* usestmtbb = NULL;
+    ASSERT0(use->getStmt());
+    usestmtbb = use->getStmt()->getBB();
+    ASSERT0(usestmtbb);
+
+    if (!li->isInsideLoop(usestmtbb->id())) {
+        //Only check dominiation info inside loop.
+        return true;
+    }
+
+    IRBB const* defstmtbb = stmt->getBB();
+    ASSERT0(defstmtbb);
+    if (defstmtbb != usestmtbb &&
+        m_cfg->is_dom(defstmtbb->id(), usestmtbb->id())) {
+        return true;
+    }
+    if (defstmtbb == usestmtbb) {
+        return defstmtbb->is_dom(stmt, use->getStmt(), true);
+    }
+    return false;
+}
+
+
+//Return true if ir dominates all its USE expressions which inside loop.
+bool DUMgr::isStmtDomAllUseInsideLoop(IR const* ir, LI<IRBB> const* li) const
+{
+    DUSet const* useset = ir->readDUSet();
+    if (useset != NULL) {
+        DUIter di = NULL;
+        for (INT i = useset->get_first(&di);
+             i >= 0; i = useset->get_next(i, &di)) {
+            IR const* u = m_rg->getIR(i);
+            ASSERT0(u->is_exp() && u->getStmt());
+            if (!isStmtDomUseInsideLoop(ir, u, li)) {
+                return false;
+            }
+        }
+    }
+    return true;
 }
 //END DUMgr
 

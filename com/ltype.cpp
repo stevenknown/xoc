@@ -55,8 +55,8 @@ INT m518087(CHAR const* info, ...)
 }
 
 
-INT m022138(CHAR const* filename, INT line)
+INT m522138(CHAR const* filename, INT line)
 {
-    fprintf(stderr, "\nASSERTION in %s(%d): ", filename, line);
-    return 0;
+     fprintf(stderr, "\nASSERTION in %s(%d): ", filename, line);
+     return 0;
 }

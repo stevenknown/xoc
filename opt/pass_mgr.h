@@ -36,27 +36,14 @@ author: Su Zhenyu
 
 namespace xoc {
 
-//Time Info.
-#define TI_pn(ti)        (ti)->pass_name
-#define TI_pt(ti)        (ti)->pass_time
-class TimeInfo {
-public:
-    CHAR const* pass_name;
-    ULONGLONG pass_time;
-
-public:
-    COPY_CONSTRUCTOR(TimeInfo);
-};
-
 typedef TMap<PASS_TYPE, Pass*> PassTab;
 typedef TMapIter<PASS_TYPE, Pass*> PassTabIter;
 typedef TMap<PASS_TYPE, xcom::Graph*> GraphPassTab;
 typedef TMapIter<PASS_TYPE, xcom::Graph*> GraphPassTabIter;
 
 class PassMgr {
-protected:
-    List<TimeInfo*> m_ti_list;
-    SMemPool * m_pool;
+    COPY_CONSTRUCTOR(PassMgr);
+protected:    
     Region * m_rg;
     RegionMgr * m_rumgr;
     TypeMgr * m_tm;
@@ -65,31 +52,11 @@ protected:
     GraphPassTab m_registered_graph_based_pass;
 
 protected:
-    void * xmalloc(size_t size)
-    {
-        void * p = smpoolMalloc(size, m_pool);
-        if (p == NULL) return NULL;
-        ::memset(p, 0, size);
-        return p;
-    }
     xcom::Graph * registerGraphBasedPass(PASS_TYPE opty);
 
 public:
     PassMgr(Region * rg);
-    COPY_CONSTRUCTOR(PassMgr);
-    virtual ~PassMgr()
-    {
-        destroyAllPass();
-        smpoolDelete(m_pool);
-    }
-
-    void appendTimeInfo(CHAR const* pass_name, ULONGLONG t)
-    {
-        TimeInfo * ti = (TimeInfo*)xmalloc(sizeof(TimeInfo));
-        TI_pn(ti) = pass_name;
-        TI_pt(ti) = t;
-        m_ti_list.append_tail(ti);
-    }
+    virtual ~PassMgr() { destroyAllPass(); }
 
     virtual xcom::Graph * allocCDG();
     virtual Pass * allocCFG();
@@ -115,23 +82,13 @@ public:
     virtual Pass * allocIPA();
     virtual Pass * allocInliner();
     virtual Pass * allocRefineDUChain();
+    virtual Pass * allocScalarOpt();
+    virtual Pass * allocMDLivenessMgr();
+    virtual Pass * allocRefine();
 
     void destroyAllPass();
     void destroyPass(Pass * pass);
     void destroyPass(PASS_TYPE passtype);
-
-    void dump_pass_time_info()
-    {
-        if (g_tfile == NULL) { return; }
-        note("\n==---- PASS TIME INFO ----==");
-        for (TimeInfo * ti = m_ti_list.get_head(); ti != NULL;
-             ti = m_ti_list.get_next()) {
-            note("\n * %s --- use %llu ms ---",
-                    TI_pn(ti), TI_pt(ti));
-        }
-        note("\n===----------------------------------------===");
-        fflush(g_tfile);
-    }
 
     Pass * registerPass(PASS_TYPE opty);
 
@@ -142,8 +99,6 @@ public:
         }
         return m_registered_pass.get(opty);
     }
-
-    virtual void performScalarOpt(OptCtx & oc);
 };
 
 } //namespace xoc

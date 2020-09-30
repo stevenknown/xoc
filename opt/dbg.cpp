@@ -43,8 +43,8 @@ void setLineNum(IR * ir, UINT lineno, Region * rg)
     ASSERT0(rg);
     if (IR_ai(ir) == NULL) {
         IR_ai(ir) = rg->allocAIContainer();
-        da = (DbxAttachInfo*)smpoolMalloc(
-            sizeof(DbxAttachInfo), rg->get_pool());
+        da = (DbxAttachInfo*)smpoolMalloc(sizeof(DbxAttachInfo),
+                                          rg->get_pool());
         ASSERT0(da);
         da->init();
         IR_ai(ir)->set((BaseAttachInfo*)da);
@@ -119,8 +119,8 @@ void copyDbx(IR * tgt, IR const* src, Region * rg)
 
     DbxAttachInfo * tgt_da = (DbxAttachInfo*)IR_ai(tgt)->get(AI_DBX);
     if (tgt_da == NULL) {
-        tgt_da = (DbxAttachInfo*)smpoolMalloc(
-                    sizeof(DbxAttachInfo), rg->get_pool());
+        tgt_da = (DbxAttachInfo*)smpoolMalloc(sizeof(DbxAttachInfo),
+                                              rg->get_pool());
         ASSERT0(tgt_da);
         tgt_da->init();
         IR_ai(tgt)->set((BaseAttachInfo*)tgt_da);
@@ -144,7 +144,7 @@ Dbx * getDbx(IR const* ir)
 void DbxMgr::printSrcLine(IR const* ir, PrtCtx * ctx)
 {
     ASSERT0(ir);
-    if (g_tfile == NULL) { return; }
+    if (ctx->getLogMgr() == NULL || !ctx->getLogMgr()->is_init()) { return; }
     if (!ir->is_stmt()) { return; }
     Dbx * dbx = ::getDbx(ir);
     if (dbx != NULL) {

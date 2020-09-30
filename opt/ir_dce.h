@@ -48,7 +48,7 @@ public:
 
 //Perform dead code and redundant control flow elimination.
 class DeadCodeElim : public Pass {
-protected:
+    COPY_CONSTRUCTOR(DeadCodeElim);
     MDSystem * m_md_sys;
     TypeMgr * m_tm;
     Region * m_rg;
@@ -66,7 +66,7 @@ protected:
     //If the value is false, all memory operations are considered used
     //except the operations which operate on PR.
     bool m_is_use_md_du;
-protected:
+
     bool check_stmt(IR const* ir);
     bool check_call(IR const* ir) const;
     bool collectByPRSSA(IR const* x, IN OUT List<IR const*> * pwlst2);
@@ -76,11 +76,11 @@ protected:
     bool collectByDU(IR const* x, IN OUT List<IR const*> * pwlst2);
 
     void fix_control_flow(List<IRBB*> & bblst, List<C<IRBB*>*> & ctlst);
-    bool find_effect_kid(IRBB const* bb, IR const* ir) const;
+    bool find_effect_kid(IR const* ir) const;
 
-    bool is_effect_write(VAR * v) const
+    bool is_effect_write(Var * v) const
     { return VAR_is_global(v) || VAR_is_volatile(v); }
-    bool is_effect_read(VAR * v) const { return VAR_is_volatile(v); }
+    bool is_effect_read(Var * v) const { return VAR_is_volatile(v); }
     bool is_cfs(IR const* ir) const
     {
         switch (ir->getCode()) {
@@ -104,12 +104,19 @@ protected:
                                     BBListIter bbct,
                                     BBList * bbl) const;
     bool remove_ineffect_ir() const;
+    bool removeRedundantPhi();
+
     //Set control-dep bb to be effective.
     bool setControlDepBBToBeEffect(IRBB const* bb,
                                    IN OUT List<IR const*> & act_ir_lst);
     void setEffectStmt(IR const* stmt,
                        IN OUT xcom::BitSet * is_bb_effect,
                        IN OUT List<IR const*> * act_ir_lst);
+
+    bool useMDSSADU() const
+    { return m_mdssamgr != NULL && m_mdssamgr->is_valid(); }
+    bool usePRSSADU() const
+    { return m_prssamgr != NULL && m_prssamgr->is_valid(); }
 public:
     explicit DeadCodeElim(Region * rg)
     {
@@ -126,11 +133,11 @@ public:
         m_is_use_md_du = true;
         m_cdg = NULL;
     }
-    COPY_CONSTRUCTOR(DeadCodeElim);
     virtual ~DeadCodeElim() {}
 
-    void dump();
+    virtual bool dump() const;
 
+    Region * getRegion() const { return m_rg; }
     virtual CHAR const* getPassName() const
     { return "Dead Code Eliminiation"; }
     virtual PASS_TYPE getPassType() const { return PASS_DCE; }

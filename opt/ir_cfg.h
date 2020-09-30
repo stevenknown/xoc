@@ -51,9 +51,9 @@ protected:
     CFG_SHAPE m_cs;
 
 protected:
-    void dump_node(FILE * h, bool detail);
+    void dump_node(bool detail, bool dump_mdssa);
     void dump_head(FILE * h);
-    void dump_edge(FILE * h, bool dump_eh);
+    void dump_edge(bool dump_eh);
 
     void remove_bb_impl(IRBB * bb);
     //CASE: Given pred1->bb, fallthrough edge,
@@ -71,6 +71,8 @@ protected:
     bool removeTrampolinEdgeForCase2(BBListIter ct);
 
 public:
+    enum { DUMP_DETAIL = 0x1, DUMP_EH = 0x2, DUMP_MDSSA = 0x4 };
+
     IRCFG(CFG_SHAPE cs, BBList * bbl, Region * rg,
           UINT edge_hash_size = 16, UINT vertex_hash_size = 16);
     COPY_CONSTRUCTOR(IRCFG);
@@ -84,6 +86,14 @@ public:
         //Set label->bb map.
         m_lab2bb.setAlways(li, src);
     }
+    virtual xcom::Edge * addEdge(IRBB * from, IRBB * to)
+    {
+        xcom::Edge * e = DGraph::addEdge(from->id(), to->id());
+        from->addSuccessorDesignatePhiOpnd(this, to);
+        return e;
+    }
+    xcom::Edge * addEdge(UINT from, UINT to)
+    { return DGraph::addEdge(from, to); }
 
     //Add new IRBB into CFG, but the BB list should be modified
     //out of this function.
@@ -91,10 +101,10 @@ public:
     //And you must consider the right insertion.
     void addBB(IRBB * bb)
     {
-        ASSERT0(bb && m_bb_vec.get(BB_id(bb)) == NULL);
-        ASSERTN(BB_id(bb) != 0, ("bb id should start at 1"));
-        m_bb_vec.set(BB_id(bb), bb);
-        addVertex(BB_id(bb));
+        ASSERT0(bb && m_bb_vec.get(bb->id()) == NULL);
+        ASSERTN(bb->id() != 0, ("bb id should start at 1"));
+        m_bb_vec.set(bb->id(), bb);
+        addVertex(bb->id());
     }
 
     //Construct EH edge after cfg built.
@@ -139,17 +149,15 @@ public:
     }
 
     void dumpVCG(CHAR const* name = NULL,
-                 bool detail = true,
-                 bool dump_eh = true);
+                 UINT flag = DUMP_DETAIL|DUMP_EH|DUMP_MDSSA);
     void dumpDOT(CHAR const* name = NULL,
-                 bool detail = true,
-                 bool dump_eh = true);
-    void dumpDOT(FILE * h, bool detail, bool dump_eh);
+                 UINT flag = DUMP_DETAIL|DUMP_EH|DUMP_MDSSA);
+    void dumpDOT(FILE * h, UINT flag = DUMP_DETAIL|DUMP_EH|DUMP_MDSSA);
 
     void erase();
 
     virtual void findTargetBBOfMulticondBranch(IR const*, OUT List<IRBB*>&);
-    virtual IRBB * findBBbyLabel(LabelInfo const* lab);
+    virtual IRBB * findBBbyLabel(LabelInfo const* lab) const;
     virtual void findTargetBBOfIndirectBranch(IR const*, OUT List<IRBB*>&);
     void findEHRegion(IRBB const* catch_start,
                       xcom::BitSet const& mainstreambbs,
@@ -163,6 +171,19 @@ public:
     virtual bool if_opt(IRBB * bb);
     bool isRegionEntry(IRBB * bb) { return BB_is_entry(bb); }
     bool isRegionExit(IRBB * bb) { return BB_is_exit(bb); }
+
+    //Insert BB before bb.
+    //e.g:BB1 BB2 BB3
+    //      \  |  /
+    //        BB4
+    //  after inserting newbb,
+    //    BB1 BB2 BB3
+    //      \  |  /
+    //        newbb
+    //         |
+    //        BB4
+    void insertBBbefore(IN IRBB * bb, IN IRBB * newbb);
+
     //Return the inserted trampolining BB if exist.
     IRBB * insertBBbetween(IN IRBB * from,
                            IN BBListIter from_ct,
@@ -170,18 +191,19 @@ public:
                            IN BBListIter to_ct,
                            IN IRBB * newbb);
     bool inverseAndRemoveTrampolineBranch();
+    bool isRPOValid() const;
 
     //Return the first operation of 'bb'.
     IR * get_first_xr(IRBB * bb)
     {
-        ASSERT0(bb && m_bb_vec.get(BB_id(bb)));
+        ASSERT0(bb && m_bb_vec.get(bb->id()));
         return BB_first_ir(bb);
     }
 
     //Return the last operation of 'bb'.
     IR * get_last_xr(IRBB * bb)
     {
-        ASSERT0(bb && m_bb_vec.get(BB_id(bb)));
+        ASSERT0(bb && m_bb_vec.get(bb->id()));
         return BB_last_ir(bb);
     }
 
@@ -203,7 +225,7 @@ public:
     //Note 'pred' must be one of predecessors of 'bb'.
     UINT WhichPred(IRBB const* pred, IRBB const* bb) const
     {
-        xcom::Vertex * bb_vex = getVertex(BB_id(bb));
+        xcom::Vertex * bb_vex = getVertex(bb->id());
         ASSERT0(bb_vex);
 
         UINT n = 0;
@@ -211,7 +233,7 @@ public:
         for (xcom::EdgeC * in = VERTEX_in_list(bb_vex);
              in != NULL; in = EC_next(in)) {
             xcom::Vertex * local_pred_vex = in->getFrom();
-            if (local_pred_vex->id() == BB_id(pred)) {
+            if (local_pred_vex->id() == pred->id()) {
                 find = true;
                 break;
             }
@@ -228,7 +250,9 @@ public:
     {
         ASSERT0(bbct);
         ASSERT0(m_bb_list->in_list(bbct));
-        remove_bb_impl(bbct->val());
+        IRBB * bb = bbct->val();
+        bb->removeAllSuccessorsPhiOpnd(this);
+        remove_bb_impl(bb);
         m_bb_list->remove(bbct);
     }
 
@@ -241,6 +265,11 @@ public:
         m_bb_list->remove(bb);
     }
     void remove_xr(IRBB * bb, IR * ir);
+    virtual void removeEdge(IRBB * from, IRBB * to)
+    {
+        from->removeSuccessorDesignatePhiOpnd(this, to);
+        CFG<IRBB, IR>::removeEdge(from, to);
+    }
     bool removeTrampolinEdge();
     bool removeTrampolinBB();
     bool removeRedundantBranch();
@@ -250,6 +279,30 @@ public:
     void revisePhiEdge(TMap<IR*, LabelInfo*> & ir2label);
 
     virtual void setRPO(IRBB * bb, INT order) { BB_rpo(bb) = order; }
+    //Split BB into two BBs.
+    //bb: BB to be splited.
+    //split_point: the ir in 'bb' used to mark the split point that followed IRs
+    //             will be moved to fallthrough newbb.
+    //e.g:bb:
+    //    ...
+    //    split_point;
+    //    ...
+    //  =>
+    //    bb:
+    //    ...
+    //    split_point; //the last ir in bb.
+    //    newbb:
+    //    ...
+    IRBB * splitBB(IRBB * bb, IRListIter split_point);
+
+    //Try to update RPO of newbb accroding to RPO of marker.
+    //newbb_prior_marker: true if newbb's lexicographical order is prior to
+    //marker.
+    //Return true if this function find a properly RPO for 'newbb', otherwise
+    //return false.
+    bool tryUpdateRPO(IRBB * newbb,
+                      IRBB const* marker,
+                      bool newbb_prior_marker);
 
     virtual void moveLabels(IRBB * src, IRBB * tgt);
 
@@ -262,7 +315,8 @@ public:
     bool performMiscOpt(OptCtx & oc);
 
     //Verification at building SSA mode by ir parser.
-    bool verifyPhiEdge(IR * phi, TMap<IR*, LabelInfo*> & ir2label);
+    bool verifyPhiEdge(IR * phi, TMap<IR*, LabelInfo*> & ir2label) const;
+    bool verifyRPO(OptCtx const& oc) const;
 };
 
 } //namespace xoc

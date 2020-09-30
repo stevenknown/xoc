@@ -58,13 +58,13 @@ DexCallGraph::DexCallGraph(UINT edge_hash, UINT vex_hash, RegionMgr * rumgr) :
     ASSERT0(rumgr);
     SymTab * symtab = rumgr->getSymTab();
     for (UINT i = 0; i < g_unimportant_func_num; i++) {
-        SYM const* sym = symtab->add(g_unimportant_func[i]);
+        Sym const* sym = symtab->add(g_unimportant_func[i]);
         m_unimportant_symtab.append(sym);
     }
 }
 
 
-bool DexCallGraph::is_unimportant(SYM const* sym) const
+bool DexCallGraph::is_unimportant(Sym const* sym) const
 {
     return m_unimportant_symtab.find(sym);
 }

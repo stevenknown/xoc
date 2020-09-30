@@ -36,21 +36,62 @@ author: Su Zhenyu
 
 namespace xoc {
 
-void RCE::dump()
+bool RCE::dump() const
 {
-    if (g_tfile == NULL) { return; }
-    note("\n\n==---- DUMP RCE ----==\n");
+    if (!m_rg->isLogMgrInit()) { return false; }
+    note(getRegion(), "\n\n==---- DUMP RCE ----==\n");
 
     BBList * bbl = m_rg->getBBList();
     for (IRBB * bb = bbl->get_head(); bb != NULL; bb = bbl->get_next()) {
         //TODO:
     }
-    fflush(g_tfile);
+    return true;
 }
 
 
 //If 'ir' is always true, set 'must_true', or if it is
 //always false, set 'must_false'.
+//Return true if this function is able to determine the result of 'ir',
+//otherwise return false that it does know nothing about ir.
+bool RCE::calcCondMustVal(IR const* ir,
+                          OUT bool & must_true,
+                          OUT bool & must_false) const
+{
+    must_true = false;
+    must_false = false;
+    ASSERT0(ir->is_judge());
+    switch (ir->getCode()) {
+    case IR_LT:
+    case IR_LE:
+    case IR_GT:
+    case IR_GE:
+    case IR_NE:
+    case IR_EQ:
+    case IR_LAND:
+    case IR_LOR:
+    case IR_LNOT: {
+        if (ir->is_const()) {            
+            if (CONST_int_val(ir) == 1) {
+                must_true = true;
+            } else if (CONST_int_val(ir) == 0) {
+                must_false = true;
+            }
+            return true;
+        }
+        if (m_gvn != NULL && m_gvn->is_valid()) {
+            return m_gvn->calcCondMustVal(ir, must_true, must_false);
+        }
+        break;
+    }
+    default: UNREACHABLE();
+    }
+    return false;
+}
+
+
+//If 'ir' is always true, set 'must_true', or if it is
+//always false, set 'must_false'.
+//Return the changed ir.
 IR * RCE::calcCondMustVal(IN IR * ir,
                           OUT bool & must_true,
                           OUT bool & must_false,
@@ -69,7 +110,7 @@ IR * RCE::calcCondMustVal(IN IR * ir,
     case IR_LAND:
     case IR_LOR:
     case IR_LNOT: {
-        ir = m_rg->foldConst(ir, changed);
+        ir = m_refine->foldConst(ir, changed);
         if (changed) {
             ASSERT0(ir->is_const() &&
                     (CONST_int_val(ir) == 0 || CONST_int_val(ir) == 1));
@@ -82,23 +123,21 @@ IR * RCE::calcCondMustVal(IN IR * ir,
         }
 
         if (m_gvn != NULL && m_gvn->is_valid()) {
-            bool change = m_gvn->calcCondMustVal(ir, must_true, must_false);
-            if (change) {
+            bool succ = m_gvn->calcCondMustVal(ir, must_true, must_false);
+            if (succ) {
                 changed = true;
                 if (must_true) {
                     ASSERT0(!must_false);
                     Type const* type = ir->getType();
-                    ir->removeSSAUse();
+                    removeUse(ir, m_rg);
                     m_rg->freeIRTree(ir);
-                    ir = m_rg->buildImmInt(1, type);
-                    return ir;
+                    return m_rg->buildImmInt(1, type);
                 } else {
                     ASSERT0(must_false);
                     Type const* type = ir->getType();
-                    ir->removeSSAUse();
+                    removeUse(ir, m_rg);
                     m_rg->freeIRTree(ir);
-                    ir = m_rg->buildImmInt(0, type);
-                    return ir;
+                    return m_rg->buildImmInt(0, type);
                 }
             }
         }
@@ -106,12 +145,11 @@ IR * RCE::calcCondMustVal(IN IR * ir,
     }
     default: UNREACHABLE();
     }
-
     return ir;
 }
 
 
-IR * RCE::processBranch(IR * ir, IN OUT bool & cfg_mod)
+IR * RCE::processBranch(IR * ir, IN OUT bool * cfg_mod)
 {
     ASSERT0(ir->isConditionalBr());
     bool must_true, must_false, changed = false;
@@ -124,15 +162,12 @@ IR * RCE::processBranch(IR * ir, IN OUT bool & cfg_mod)
             IRBB * to = m_cfg->getFallThroughBB(from);
             ASSERT0(from != NULL && to != NULL);
             IR * newbr = m_rg->buildGoto(BR_lab(ir));
-
-            ir->removeSSAUse();
+            removeStmt(ir, m_rg);
 
             //Revise the PHI operand to fallthrough successor.
-            ir->getBB()->removeSuccessorDesignatePhiOpnd(m_cfg, to);
-
             //Revise cfg. remove fallthrough edge.
             m_cfg->removeEdge(from, to);
-            cfg_mod = true;
+            *cfg_mod = true;
             return newbr;
         } else if (must_false) {
             //TRUEBR(0x0), never jump.
@@ -140,13 +175,11 @@ IR * RCE::processBranch(IR * ir, IN OUT bool & cfg_mod)
             IRBB * from = ir->getBB();
             IRBB * to = m_cfg->findBBbyLabel(BR_lab(ir));
             ASSERT0(from && to);
-
-            ir->removeSSAUse();
+            removeStmt(ir, m_rg);
 
             //Revise the PHI operand to target successor.
-            ir->getBB()->removeSuccessorDesignatePhiOpnd(m_cfg, to);
             m_cfg->removeEdge(from, to);
-            cfg_mod = true;
+            *cfg_mod = true;
             return NULL;
         }
     } else {
@@ -156,13 +189,11 @@ IR * RCE::processBranch(IR * ir, IN OUT bool & cfg_mod)
             IRBB * from = ir->getBB();
             IRBB * to = m_cfg->getTargetBB(from);
             ASSERT0(from != NULL && to != NULL);
-
-            ir->removeSSAUse();
+            removeStmt(ir, m_rg);
 
             //Revise the PHI operand to target successor.
-            ir->getBB()->removeSuccessorDesignatePhiOpnd(m_cfg, to);
             m_cfg->removeEdge(from, to);
-            cfg_mod = true;
+            *cfg_mod = true;
             return NULL;
         } else if (must_false) {
             //FALSEBR(0x0), always jump.
@@ -171,19 +202,17 @@ IR * RCE::processBranch(IR * ir, IN OUT bool & cfg_mod)
             ASSERT0(from != NULL && to != NULL);
 
             IR * newbr = m_rg->buildGoto(BR_lab(ir));
-
-            ir->removeSSAUse();
+            removeStmt(ir, m_rg);
 
             //Revise the PHI operand to fallthrough successor.
-            ir->getBB()->removeSuccessorDesignatePhiOpnd(m_cfg, to);
-
             //Revise m_cfg. remove fallthrough edge.
             m_cfg->removeEdge(from, to);
-            cfg_mod = true;
+            *cfg_mod = true;
             return newbr;
         }
     }
 
+    ASSERT0(!BR_det(ir));
     if (changed) {
         if (!new_det->is_judge()) {
             new_det = m_rg->buildJudge(new_det);
@@ -191,9 +220,9 @@ IR * RCE::processBranch(IR * ir, IN OUT bool & cfg_mod)
         BR_det(ir) = new_det;
         ir->setParent(new_det);
     } else {
+        //Resume original det.
         BR_det(ir) = new_det;
     }
-
     return ir;
 }
 
@@ -203,7 +232,7 @@ IR * RCE::processStore(IR * ir)
 {
     ASSERT0(ir->is_st());
     if (ST_rhs(ir)->getExactRef() == ir->getExactRef()) {
-        ir->removeSSAUse();
+        removeUse(ir, m_rg);
         return NULL;
     }
     return ir;
@@ -215,7 +244,7 @@ IR * RCE::processStorePR(IR * ir)
 {
     ASSERT0(ir->is_stpr());
     if (STPR_rhs(ir)->getExactRef() == ir->getExactRef()) {
-        ir->removeSSAUse();
+        removeUse(ir, m_rg);
         return NULL;
     }
     return ir;
@@ -225,7 +254,7 @@ IR * RCE::processStorePR(IR * ir)
 //e.g:
 //1. if (a == a) { ... } , remove redundant comparation.
 //2. b = b; remove redundant store.
-bool RCE::performSimplyRCE(IN OUT bool & cfg_mod)
+bool RCE::performSimplyRCE(IN OUT bool * cfg_mod)
 {
     BBList * bbl = m_rg->getBBList();
     bool change = false;
@@ -276,69 +305,40 @@ bool RCE::perform(OptCtx & oc)
 {
     BBList * bbl = m_rg->getBBList();
     if (bbl == NULL || bbl->get_elem_count() == 0) { return false; }
-    if (!OC_is_ref_valid(oc)) { return false; }
+
     if (!OC_is_cfg_valid(oc)) { return false; }
-    //Check PR DU chain.
-    PRSSAMgr * ssamgr = (PRSSAMgr*)(m_rg->getPassMgr()->queryPass(
-        PASS_PR_SSA_MGR));
-    if (ssamgr != NULL && ssamgr->isSSAConstructed()) {
-        m_ssamgr = ssamgr;
-    } else {
-        m_ssamgr = NULL;
-    }
-    if (!OC_is_pr_du_chain_valid(oc) && m_ssamgr == NULL) { 
+    if (!OC_is_ref_valid(oc)) { return false; }
+    m_refine = (Refine*)m_rg->getPassMgr()->queryPass(PASS_REFINE);
+    m_mdssamgr = (MDSSAMgr*)m_rg->getPassMgr()->queryPass(PASS_MD_SSA_MGR);
+    m_prssamgr = (PRSSAMgr*)m_rg->getPassMgr()->queryPass(PASS_PR_SSA_MGR);
+    if (!OC_is_pr_du_chain_valid(oc) && !usePRSSADU()) {
+        //DCE use either classic PR DU chain or PRSSA.
         //At least one kind of DU chain should be avaiable.
         return false;
     }
-    //Check NONPR DU chain.
-    MDSSAMgr * mdssamgr = (MDSSAMgr*)(m_rg->getPassMgr()->queryPass(
-        PASS_MD_SSA_MGR));
-    if (mdssamgr != NULL && mdssamgr->isMDSSAConstructed()) {
-        m_mdssamgr = mdssamgr;
-    } else {
-        m_mdssamgr = NULL;
-    }
-    if (!OC_is_nonpr_du_chain_valid(oc) && m_mdssamgr == NULL) {
+    if (!OC_is_nonpr_du_chain_valid(oc) && !useMDSSADU()) {
+        //DCE use either classic MD DU chain or MDSSA.
         //At least one kind of DU chain should be avaiable.
         return false;
     }
 
     START_TIMER(t, getPassName());
-    m_rg->checkValidAndRecompute(&oc, PASS_CFG, PASS_UNDEF);
     if (!m_gvn->is_valid() && is_use_gvn()) {
         m_gvn->reperform(oc);
     }
 
     bool cfg_mod = false;
-    bool change = performSimplyRCE(cfg_mod);
+    bool change = performSimplyRCE(&cfg_mod);
     if (cfg_mod) {
-        //m_gvn->set_valid(false); //rce do not violate gvn for now.
-        bool lchange;
-        do {
-            lchange = false;
-            lchange |= m_cfg->removeUnreachBB();
-            lchange |= m_cfg->removeEmptyBB(oc);
-            lchange |= m_cfg->removeRedundantBranch();
-            lchange |= m_cfg->removeTrampolinEdge();
-        } while (lchange);
-
-        m_cfg->computeExitList();
-        //So far, a conservation policy applied if CFG changed. This
-        //lead to a lot of analysis info changed.
-        //TODO: have to check and may be the change of CFG does not
-        //influence the sanity of DU-chain and ir2mds.
-        oc.set_flag_if_cfg_changed();
-        OC_is_cfg_valid(oc) = true; //CFG has been maintained.
-        OC_is_expr_tab_valid(oc) = false;
-        OC_is_pr_du_chain_valid(oc) = false;
-        OC_is_nonpr_du_chain_valid(oc) = false;
-        OC_is_ref_valid(oc) = false;
-        OC_is_aa_valid(oc) = false;
-        OC_is_reach_def_valid(oc) = false;
-        OC_is_avail_reach_def_valid(oc) = false;
+        ASSERT0(change);
+        m_cfg->performMiscOpt(oc);
     }
     if (change) {
-        ASSERT0(verifySSAInfo(m_rg));
+        //CFG changed, remove empty BB.
+        //TODO: DO not recompute whole SSA/MDSSA. Instead, update
+        //SSA/MDSSA info especially PHI operands incrementally.
+        ASSERT0(PRSSAMgr::verifyPRSSAInfo(m_rg));
+        ASSERT0(MDSSAMgr::verifyMDSSAInfo(m_rg));
     }
     END_TIMER(t, getPassName());
     return change;

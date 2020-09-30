@@ -376,7 +376,10 @@ extern RoundDesc const g_round_desc[];
 #define IR_DUMP_SRC_LINE 0x2
 #define IR_DUMP_ADDR 0x4
 #define IR_DUMP_INNER_REGION 0x8
+#define IR_DUMP_VAR_DECL 0x10
 
+//The maximum integer value that can described by bits of IR_TYPE_BIT_SIZE
+//should larger than IR_TYPE_NUM.
 #define IR_TYPE_BIT_SIZE 6
 #define IRNAME(ir) (IRDES_name(g_ir_desc[IR_code(ir)]))
 #define IRTNAME(irt) (IRDES_name(g_ir_desc[irt]))
@@ -459,44 +462,72 @@ extern RoundDesc const g_round_desc[];
 #ifdef CONST_IRT_SZ
 #define IR_irt_size(ir) ((ir)->irt_size)
 #endif
+
+//IR, the intermediate language for the XOC compiler, serves as the common
+//interface among almost all the components. IR is defined to be capable of
+//representing any level of semantics except the level that corresponds to
+//the machine instructions. Two different levels of IR are defined, and each
+//optimization phase is defined to work at a specific level of IR. The
+//front-ends may generate the highest level of IR. Optimization proceeds
+//together with the process of continuous simplification, in which a
+//simplification of IR is called to translate IR from the current level to
+//the next lower level.
+//
+//High level IR preserve the high level control flow constructs, such as
+//DO_LOOP, DO_WHILE, WHILE_DO, SWITCH, IF, BREAK and CONTINUE.
+//Operations can be divided into two categories: statements, and expressions.
+//Statement implies which variable is defined, or control flow transfering.
+//Expression implies which variable is used, or operation without sideeffect,
+//and expression does not transfer control flow. Both statement and expression
+//node have NEXT and PREV pointers which link them together.
+//Statment can not be kid of other statement except control flow structure IR,
+//and expression can be kid of both expression and statement.
+//In a simple word, statements have side effects, and can be reordered only
+//if dependencies preserved. Expressions do not have side effect, expression
+//trees hung from statement, and they contain only uses and can be
+//aggressively optimized.
+//
+//Note IR should not have virtual table because all operations are
+//distinguished by IR_TYPE. An IR object might represent differet operation
+//in specific scene when it is continually freed and allocated. Diverse
+//description should be placed in attach-info.
 class IR {
     COPY_CONSTRUCTOR(IR);
 public:
-    UINT uid; //Each IR has unique id.
-
-    //The type of IR can be void, and depend on
-    //the dynamic behavior of program.
-    Type const* result_data_type;
-
     #ifdef _DEBUG_
     IR_TYPE code;
     #else
-    UINT code:IR_TYPE_BIT_SIZE;
+    USHORT code:IR_TYPE_BIT_SIZE;
     #endif
 
     //True if IR may throw excetion.
-    UINT may_throw_exception:1;
+    USHORT may_throw_exception:1;
 
     //True if IR is atomic operation.
-    UINT is_atomic_op:1;
+    USHORT is_atomic_op:1;
 
     //True if IR behaved as if it is an atomic operation consist of
     //sequential read, modify, and write.
-    UINT is_read_mod_write:1;
+    USHORT is_read_mod_write:1;
 
     //True if IR may terminate the control flow, such as throwing an excetion.
-    UINT is_terminate_control_flow:1;
+    USHORT is_terminate_control_flow:1;
 
     //True if IR may have side effect.
-    UINT has_sideeffect:1;
+    USHORT has_sideeffect:1;
 
     //True if IR can not be moved.
-    UINT no_move:1;
+    USHORT no_move:1;
 
     #ifdef CONST_IRT_SZ
     //Record the specific IR byte size.
     UINT irt_size:6;
     #endif
+
+    UINT uid; //Each IR has unique id.
+    //The type of IR can be void, and depend on
+    //the dynamic behavior of program.
+    Type const* result_data_type;
 
     //Both of 'next' and 'prev' used by the process of
     //complicated tree level IR construction.
@@ -509,13 +540,7 @@ public:
 
     //IR may have an unique attach info container.
     AIContainer * attach_info_container;
-
 public:
-    //Note IR should not have virtual table because all operations are
-    //distinguished by IR_TYPE. An IR object might represent differet operation
-    //in specific scene when it is continually freed and allocated. Diverse
-    //description should be placed in attach-info.
-    
     //Calculate the accumulated offset value from the base of array.
     //e.g: For given array long long p[10][20],
     //the offset of p[i][j] can be computed by i*20 + j, and
@@ -524,8 +549,10 @@ public:
     //in 'ofst_val' and return True, otherwise return False that means the
     //Offset can not be predicated.
     bool calcArrayOffset(TMWORD * ofst, TypeMgr * tm) const;
+
     //Set ir's DU to be NULL, return the DU pointer.
     inline DU * cleanDU();
+
     //Set ir's PR SSA Info to be NULL.
     //For convenient purpose, this function does not assert
     //when current IR object is not operate on PR.
@@ -556,8 +583,11 @@ public:
     size_t count_mem() const;
 
     //Copy memory reference only for current ir node.
-    //'src': copy MD reference from 'src', it may be different to current ir.
+    //src: copy MD reference from 'src', it may be different to current ir.
     void copyRef(IR const* src, Region * rg);
+
+    //Copy AttachInfo from 'src' to current ir, not include kid and sibling.
+    void copyAI(IR const* src, Region * rg);
 
     //Copy each memory reference for whole ir tree.
     //'src': copy MD reference from 'src', it must be equal to current ir tree.
@@ -601,8 +631,9 @@ public:
     IR_TYPE getCode() const { return (IR_TYPE)IR_code(this); }
     IR * get_next() const { return IR_next(this); }
     IR * get_prev() const { return IR_prev(this); }
+    inline IR * getBase() const; //Get base expression if exist.
     inline UINT getOffset() const; //Get byte offset if any.
-    inline VAR * getIdinfo() const; //Get idinfo if any.
+    inline Var * getIdinfo() const; //Get idinfo if any.
     IR * getParent() const { return IR_parent(this); }
     inline IR * getKid(UINT idx) const;
     inline IRBB * getBB() const;
@@ -679,15 +710,18 @@ public:
     //Otherwise return NULL.
     IR * getOpndPR(UINT prno);
 
-    //Get the MD DefUse Set. This function is readonly.
-    DUSet const* readDUSet() const { return getDUSet(); }
-
     //Get the MD DefUse Set.
     DUSet * getDUSet() const
     {
         DU * const du = getDU();
         return du == NULL ? NULL : DU_duset(du);
     }
+
+    //Return the Memory Descriptor Set for given ir may describe.
+    MDSet const* getMayRef() { return getRefMDSet(); }
+
+    //Return the MemoryAddr for 'ir' must be.
+    MD const* getMustRef() { return getRefMD(); }
 
     //Get the MD that IR referrenced.
     MD const* getRefMD() const
@@ -717,6 +751,10 @@ public:
         return md;
     }
 
+    //Return determinate expression if any.
+    inline IR * getJudgeDet() const;
+
+    //Return true if ir carried sideeffect property.
     bool hasSideEffect() const { return IR_has_sideeffect(this); }
 
     //Return true if ir compute produce a result.
@@ -731,6 +769,9 @@ public:
     //Return true if ir has DU Info.
     bool hasDU() const { return IRDES_has_du(g_ir_desc[getCode()]); }
 
+    //Return true if stmt has judge determinate expression.
+    inline bool hasJudgeDet() const;
+
     //Return true if ir is call and does have a return value.
     inline bool hasReturnValue() const;
 
@@ -743,7 +784,8 @@ public:
     //Note this function does not need RefMD information.
     //It just determine overlapping of given two IR according to
     //their data-type and offset.
-    bool isNotOverLap(IR const* ir2, Region * rg) const;
+    bool isNotOverlap(IR const* ir2, Region * rg) const;
+    bool isNotOverlapViaMDRef(IR const* ir2) const;
     bool isNoMove() const { return IR_no_move(this); }
     //Return true if current IR may contain memory reference.
     bool isContainMemRef() const
@@ -842,6 +884,9 @@ public:
     //Return true if ir is volatile.
     inline bool is_volatile() const;
 
+    //Return true if given array has same dimension structure with current ir.
+    bool isSameArrayStruct(IR const* ir) const;
+
     //Record if ir might throw exception.
     bool isMayThrow() const { return IR_may_throw(this); }
 
@@ -854,17 +899,13 @@ public:
     //Return true if ir is constant expression.
     inline bool isConstExp() const;
 
-    //Return true if ir is readonly expression.
-    //This attribute indicate that the expression does not modify any
-    //memory. Note it can only refer to expression.
-    inline bool isReadOnlyExp() const;
-
-    //Return true if ir is readonly function call.
-    //This function is a shortcut to access properties of call stmt.
-    //This attribute indicate that if function does not modify any
-    //global memory or any memory object that pass through pointer
+    //Return true if ir is readonly expression or readonly call stmt.
+    //If ir is expression, this function indicates that the expression does
+    //not modify any memory.
+    //If ir is call, this function indicates that function does not modify any
+    //global memory or any memory object that passed through pointer
     //arguments.
-    inline bool isReadOnlyCall() const;
+    inline bool isReadOnly() const;
 
     //True if store to specified element of pseduo register.
     //The pseduo register must be D_MC or vector type.
@@ -940,6 +981,9 @@ public:
     //Return true if ir is operation that read or write to an array element.
     bool isArrayOp() const { return is_array() || is_starray(); }
 
+    //Return true if ir is base expression of array operation.
+    inline bool isArrayBase(IR const* ir) const;
+
     //Return true if ir may jump to multiple target.
     bool isMultiConditionalBr() const { return is_switch(); }
 
@@ -948,6 +992,14 @@ public:
 
     //Return true if ir is indirect jump to multiple target.
     bool isIndirectBr() const { return is_igoto(); }
+
+    //Return true if ir is branch stmt.
+    bool isBranch() const
+    { return isConditionalBr() || isMultiConditionalBr() ||
+             isUnconditionalBr() || isIndirectBr(); }
+
+    //Return true if ir is indirect memory operation.
+    bool isIndirectMemOp() const { return is_ist() || is_ild(); }
 
     bool isCallStmt() const { return is_call() || is_icall(); }
 
@@ -987,13 +1039,22 @@ public:
     bool isMemoryRefNotOperatePR() const
     { return IRDES_is_non_pr_memref(g_ir_desc[getCode()]); }
 
+    //Return true if current ir and ir2 represent different memory location,
+    //otherwise return false to tell caller we do not know more about these
+    //object. Note this function will consider data type that current ir or ir2
+    //referrenced.
+    bool isDiffMemLoc(IR const* ir2) const;
+
     //True if ir is atomic operation.
     bool is_atomic() const { return IR_is_atomic(this); }
 
     //True if ir is read-modify-write.
     bool is_rmw() const { return IR_is_read_mod_write(this); }
+    //True if ir is judgement operation.
     bool is_judge() const { return is_relation() || is_logical(); }
+    //True if ir is logical operation.
     bool is_logical() const { return IRDES_is_logical(g_ir_desc[getCode()]); }
+    //True if ir is relation operation.
     bool is_relation() const { return IRDES_is_relation(g_ir_desc[getCode()]); }
 
     //IR meet commutative, e.g: a+b = b+a
@@ -1050,7 +1111,7 @@ public:
 
     inline void setPrno(UINT prno);
     inline void setOffset(UINT ofst);
-    inline void setIdinfo(VAR * idinfo);
+    inline void setIdinfo(Var * idinfo);
     inline void setLabel(LabelInfo const* li);
     inline void setBB(IRBB * bb);
     inline void setRHS(IR * rhs);
@@ -1112,6 +1173,9 @@ public:
         return false;
     }
 
+    //Get the MD DefUse Set. This function is readonly.
+    DUSet const* readDUSet() const { return getDUSet(); }
+
     //Iterate IR tree to remove SSA du.
     //    e.g: pr1 = ...
     //             = pr1 //S1
@@ -1124,7 +1188,6 @@ public:
     void removePRFromUseset(DefMiscBitSetMgr & sbs_mgr, Region * rg);
 
     bool verify(Region const* rg) const;
-    bool verifyPhi(Region const* rg) const;
     bool verifyKids() const;
 };
 
@@ -1148,13 +1211,13 @@ class CConst : public IR {
     COPY_CONSTRUCTOR(CConst);
 public:
     union {
-        //record string const.
-        SYM const* str_value;
+        //record string-const if current ir is string type.
+        Sym const* str_value;
 
         //record integer value using a length of HOST_INT memory.
         HOST_INT int_const_value;
 
-        //record float point value.
+        //record float point value if current ir is float type.
         struct {
             HOST_FP fp_const_value;
 
@@ -1170,15 +1233,16 @@ public:
     HOST_FP getFP() const { return CONST_fp_val(this); }
     BYTE getMantissa() const { return CONST_fp_mant(this); }
     HOST_INT getINT() const { return CONST_int_val(this); }
-    SYM const* getSTR() const { return CONST_str_val(this); }
+    Sym const* getSTR() const { return CONST_str_val(this); }
+    void * getAnonymousVal() const { return CONST_anony_val(this); }
 };
 
-//Record VAR property.
+//Record Var property.
 class VarProp {
     COPY_CONSTRUCTOR(VarProp);
 public:
-    //Record VAR if ir is IR_LD|IR_ID.
-    VAR * id_info;
+    //Record Var if ir is IR_LD|IR_ID.
+    Var * id_info;
 };
 
 
@@ -1192,7 +1256,7 @@ public:
 
 
 //ID need DU info, some Passes need it, e.g. GVN.
-//Note IR_ID should not participate in GVN analysis because it does not
+//Note IR_ID should NOT participate in GVN analysis because it does not
 //represent a real operation.
 #define ID_info(ir) (((CId*)CK_IRT(ir, IR_ID))->id_info)
 #define ID_du(ir) (((CId*)CK_IRT(ir, IR_ID))->du)
@@ -1568,10 +1632,10 @@ public:
 //NOTE:
 //    * The member layout should be same as do_while.
 //    * 'opnd' must be the last member of CWhileDo.
-//Determinate expression.
+//Determinate expression. It can NOT be NULL.
 #define LOOP_det(ir) LOOP_kid(ir, 0)
 
-//Loop body.
+//Record stmt list in loop body of IF. It can be NULL.
 #define LOOP_body(ir) LOOP_kid(ir, 1)
 #define LOOP_kid(ir, idx) (((CWhileDo*)ir)->opnd[CKID_LOOP(ir, idx)])
 class CWhileDo : public IR {
@@ -1579,6 +1643,9 @@ class CWhileDo : public IR {
 public:
     //NOTE: 'opnd' must be the last member of CWhileDo.
     IR * opnd[2];
+
+    //num: the number of IR added.
+    void addToBody(UINT num, ...);
 };
 
 
@@ -1640,19 +1707,28 @@ public:
 //      truebody
 //      falsebody
 //    endif
+//Determinate expression. It can NOT be NULL.
 #define IF_det(ir) IF_kid(ir, 0)
+
+//Record stmt list in true body of IF. It can be NULL.
 #define IF_truebody(ir) IF_kid(ir, 1)
+
+//Record stmt list in false body of IF. It can be NULL.
 #define IF_falsebody(ir) IF_kid(ir, 2)
 #define IF_kid(ir, idx) (((CIf*)ir)->opnd[CKID_TY(ir, IR_IF, idx)])
 class CIf : public IR {
     COPY_CONSTRUCTOR(CIf);
 public:
     IR * opnd[3];
+    //num: the number of IR added.
+    void addToTrueBody(UINT num, ...);
+    //num: the number of IR added.
+    void addToFalseBody(UINT num, ...);
 };
 
 
 //This class represent internal and customer defined label.
-#define LAB_lab(ir)        (((CLab*)CK_IRT(ir, IR_LABEL))->label_info)
+#define LAB_lab(ir) (((CLab*)CK_IRT(ir, IR_LABEL))->label_info)
 class CLab : public IR {
     COPY_CONSTRUCTOR(CLab);
 public:
@@ -1690,6 +1766,9 @@ class CSwitch : public IR, public StmtProp {
 public:
     IR * opnd[3];
     LabelInfo const* default_label;
+
+    //num: the number of IR added.
+    void addToBody(UINT num, ...);
 };
 
 
@@ -1725,7 +1804,6 @@ public:
 //
 //'elem_num' represent the number of array element in current dimension.
 //
-//If 'elem_tyid' is vector, ARR_ofst refers the referrenced element byte offset.
 #define ARR_ofst(ir) (((CArray*)CK_IRT_ARR(ir))->field_offset)
 #define ARR_du(ir) (((CArray*)CK_IRT_ARR(ir))->du)
 #define ARR_elemtype(ir) (((CArray*)CK_IRT_ARR(ir))->elemtype)
@@ -1745,7 +1823,7 @@ public:
     (((CArray*)CK_IRT_ARR(ir))->elem_num[CK_ARRAY_DIM(ir, dim)])
 #define ARR_elem_num_buf(ir) (((CArray*)CK_IRT_ARR(ir))->elem_num)
 
-//Array base.
+//Array base expression.
 #define ARR_base(ir) ARR_kid(ir, 0)
 
 //Array subscript expression.
@@ -1825,14 +1903,13 @@ public:
 //
 //'elem_num' represent the number of array element in given dimension.
 //
-//If 'elem_tyid' is vector, ARR_ofst refers the referrenced element byte offset.
 #define STARR_bb(ir) (((CStArray*)CK_IRT(ir, IR_STARRAY))->stmtprop.bb)
 #define STARR_rhs(ir) \
     (*(((CStArray*)ir)->opnd_pad + CKID_TY(ir, IR_STARRAY, 0)))
 class CStArray: public CArray {
     COPY_CONSTRUCTOR(CStArray);
 public:
-    //NOTE: 'opnd' must be the first member of CStArray.
+    //NOTE: 'opnd_pad' must be the first member of CStArray.
     IR * opnd_pad[1];
 
     //DO NOT PLACE MEMBER BEFORE opnd_pad
@@ -1848,7 +1925,7 @@ public:
 class CCvt : public CUna {
     COPY_CONSTRUCTOR(CCvt);
 public:
-   ROUND_TYPE round;
+    ROUND_TYPE round;
 public:
     //Get the leaf expression.
     //e.g: cvt:i32(cvt:u8(x)), this function will return x;
@@ -1890,7 +1967,7 @@ public:
 #define BR_bb(ir) (((CTruebr*)CK_IRT_BR(ir))->bb)
 #define BR_lab(ir) (((CTruebr*)CK_IRT_BR(ir))->jump_target_lab)
 
-//Determinant expression.
+//Determinate expression. It can NOT be NULL.
 #define BR_det(ir) BR_kid(ir, 0)
 #define BR_kid(ir, idx) (((CTruebr*)ir)->opnd[CKID_BR(ir, idx)])
 class CTruebr : public IR, public StmtProp {
@@ -1911,8 +1988,8 @@ class CFalsebr : public CTruebr {
 
 
 //This class represent function return operation.
-//Return value expressions list.
-//usage: return a, b, c;  a, b, c are return value expressions.
+//Return value expressions.
+//usage: return a;  a is return-value expression.
 #define RET_bb(ir) (((CRet*)CK_IRT(ir, IR_RETURN))->bb)
 #define RET_exp(ir) RET_kid(ir, 0)
 #define RET_kid(ir, idx) (((CRet*)ir)->opnd[CKID_TY(ir, IR_RETURN, idx)])
@@ -1995,6 +2072,13 @@ public:
         xcom::add_next(&PHI_opnd_list(this), ir);
         IR_parent(ir) = this;
     }
+
+    void insertOpndBefore(IR * marker, IR * exp)
+    {
+        ASSERT0(xcom::in_list(PHI_opnd_list(this), marker));
+        ASSERT0(!xcom::in_list(PHI_opnd_list(this), exp));
+        xcom::insertbefore(&PHI_opnd_list(this), marker, exp);
+    }
 };
 
 
@@ -2033,6 +2117,14 @@ IR * IR::getRHS() const
 }
 
 
+//Return true if ir is base expression of array operation.
+bool IR::isArrayBase(IR const* ir) const
+{
+    ASSERT0(isArrayOp());
+    return ((CArray*)this)->is_base(ir);
+}
+
+
 UINT IR::getPrno() const
 {
     switch (getCode()) {
@@ -2061,7 +2153,7 @@ SSAInfo * IR::getSSAInfo() const
     case IR_ICALL: return CALL_ssainfo(this);
     default:
         ASSERTN(!isReadPR() && !isWritePR() && !isWriteWholePR(),
-            ("miss switch entry"));
+                ("miss switch entry"));
         break;
     }
     return NULL;
@@ -2129,7 +2221,7 @@ IRBB * IR::getBB() const
 }
 
 
-VAR * IR::getIdinfo() const
+Var * IR::getIdinfo() const
 {
     ASSERT0(hasIdinfo());
     //DO NOT ASSERT even if current IR has no offset.
@@ -2145,7 +2237,7 @@ VAR * IR::getIdinfo() const
 }
 
 
-void IR::setIdinfo(VAR * idinfo)
+void IR::setIdinfo(Var * idinfo)
 {
     ASSERT0(hasIdinfo());
     //DO NOT ASSERT even if current IR has no offset.
@@ -2174,6 +2266,20 @@ UINT IR::getOffset() const
     default: break;
     }
     return 0;
+}
+
+
+IR * IR::getBase() const
+{
+    //DO NOT ASSERT even if current IR has no offset.
+    switch (getCode()) {
+    case IR_ILD: return ILD_base(this);
+    case IR_ARRAY: return ARR_base(this);
+    case IR_STARRAY: return ARR_base(this);
+    case IR_IST: return IST_base(this);
+    default: break;
+    }
+    return NULL;
 }
 
 
@@ -2209,34 +2315,19 @@ bool IR::isConstExp() const
 }
 
 
-bool IR::isReadOnlyExp() const
+bool IR::isReadOnly() const
 {
-    ASSERT0(is_exp());
     switch (getCode()) {
-    case IR_CONST: return true;
-    case IR_CVT: return CVT_exp(this)->isReadOnlyExp();
+    case IR_CALL: return CALL_is_readonly(this);
+    case IR_ICALL: return ICALL_is_readonly(this);        
+    case IR_CVT: return CVT_exp(this)->isReadOnly();
     case IR_LD:
         if (VAR_is_readonly(LD_idinfo(this)) &&
             !VAR_is_volatile(LD_idinfo(this))) {
             return true;
         }
         return false;
-    case IR_LDA: return true;
     default:;
-    }
-    return false;
-}
-
-
-bool IR::isReadOnlyCall() const
-{
-    switch (getCode()) {
-    case IR_CALL: return CALL_is_readonly(this);
-    case IR_ICALL: return ICALL_is_readonly(this);
-    default:
-        //For convenient purpose, close down assertion.
-        //ASSERTN(0, ("not a call"));
-        return false;
     }
     return false;
 }
@@ -2246,7 +2337,7 @@ bool IR::is_volatile() const
 {
     //Describing if IR's address has been taken.
     if (is_id()) {
-        VAR * id_info = ID_info(this);
+        Var * id_info = ID_info(this);
         ASSERT0(id_info != NULL);
         return VAR_is_volatile(id_info);
     }
@@ -2292,19 +2383,27 @@ void IR::setRHS(IR * rhs)
     switch (getCode()) {
     case IR_ST:
         ST_rhs(this) = rhs;
-        IR_parent(rhs) = this;
+        if (rhs != NULL) {
+            IR_parent(rhs) = this;
+        }
         return;
     case IR_STPR:
         STPR_rhs(this) = rhs;
-        IR_parent(rhs) = this;
+        if (rhs != NULL) {
+            IR_parent(rhs) = this;
+        }
         return;
     case IR_STARRAY:
         STARR_rhs(this) = rhs;
-        IR_parent(rhs) = this;
+        if (rhs != NULL) {
+            IR_parent(rhs) = this;
+        }
         return;
     case IR_IST:
         IST_rhs(this) = rhs;
-        IR_parent(rhs) = this;
+        if (rhs != NULL) {
+            IR_parent(rhs) = this;
+        }
         return;
     default: ASSERTN(0, ("not store operation."));
     }
@@ -2645,26 +2744,71 @@ void IR::setDU(DU * du)
 {
     hasDU() ? DUPROP_du(this) = du : 0;
 }
+
+
+//Return true if stmt has judge determinate expression.
+bool IR::hasJudgeDet() const
+{
+    //Both stmt and exp.
+    switch (getCode()) {
+    case IR_DO_WHILE:
+    case IR_WHILE_DO:
+    case IR_DO_LOOP:
+    case IR_IF:
+    case IR_TRUEBR:
+    case IR_FALSEBR:
+    case IR_SELECT:
+        return true;
+    default: return false;
+    }
+    return false;
+}
+
+
+//Return determinate expression if any.
+IR * IR::getJudgeDet() const
+{
+    //Both stmt and exp.
+    switch (getCode()) {
+    case IR_DO_WHILE:
+    case IR_WHILE_DO:
+    case IR_DO_LOOP:
+        return LOOP_det(this);
+    case IR_IF:
+        return IF_det(this);
+    case IR_TRUEBR:
+    case IR_FALSEBR:
+        return BR_det(this);
+    case IR_SELECT:
+        return SELECT_pred(this);
+    default: UNREACHABLE();
+    }
+    return NULL;
+}
+
 //END IR
 
 
 //Exported Functions.
-CHAR const* compositeName(SYM const* n, xcom::StrBuf & buf);
+CHAR const* compositeName(Sym const* n, xcom::StrBuf & buf);
 void dumpIR(IR const* ir,
             Region const* rg,
             CHAR * attr = NULL,
-            UINT dumpflag = IR_DUMP_KID|IR_DUMP_SRC_LINE|IR_DUMP_INNER_REGION);
+            UINT dumpflag = IR_DUMP_KID|IR_DUMP_SRC_LINE|IR_DUMP_INNER_REGION|
+                            IR_DUMP_VAR_DECL);
 void dumpIRListH(IR * ir_list, Region const* rg,
                  CHAR * attr = NULL,
                  UINT dumpflag = IR_DUMP_KID|
                                  IR_DUMP_SRC_LINE|
-                                 IR_DUMP_INNER_REGION);
+                                 IR_DUMP_INNER_REGION|
+                                 IR_DUMP_VAR_DECL);
 void dumpIRList(IR * ir_list,
                 Region const* rg,
                 CHAR * attr = NULL,
                 UINT dumpflag = IR_DUMP_KID|
                                 IR_DUMP_SRC_LINE|
-                                IR_DUMP_INNER_REGION);
+                                IR_DUMP_INNER_REGION|
+                                IR_DUMP_VAR_DECL);
 void dumpIRList(IRList & ir_list, Region const* rg);
 void dumpIRList(List<IR*> & ir_list, Region const* rg);
 

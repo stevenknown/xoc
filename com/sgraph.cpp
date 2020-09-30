@@ -211,7 +211,7 @@ void Graph::computeRpoNoRecursive(Vertex * root, OUT List<Vertex const*> & vlst)
     Stack<Vertex*> stk;
     stk.push(root);
     Vertex * v;
-    UINT order = getVertexNum();
+    UINT order = RPO_INIT_VAL + getVertexNum() * RPO_INTERVAL;
     while ((v = stk.get_top()) != NULL) {
         is_visited.bunion(VERTEX_id(v));
         EdgeC * el = VERTEX_out_list(v);
@@ -228,14 +228,13 @@ void Graph::computeRpoNoRecursive(Vertex * root, OUT List<Vertex const*> & vlst)
         if (!find) {
             stk.pop();
             vlst.append_head(v);
-            VERTEX_rpo(v) = order--;
+            VERTEX_rpo(v) = order -= RPO_INTERVAL;
         }
     }
 
     //If order of BB is not zero, there must have some BBs should be
     //eliminated by CFG optimizations.
-    ASSERTN(order == 0,
-            ("still have some BBs that are not assigned an order"));
+    ASSERTN(order == RPO_INIT_VAL, ("even having BB with no order assigned"));
 }
 
 
@@ -793,14 +792,14 @@ bool Graph::sortInTopologOrder(OUT Vector<Vertex*> & vex_vec)
         is_removed.bunion(ready->id());
         vex_vec.set(pos, ready);
         pos++;
-        for (xcom::EdgeC const* el = VERTEX_out_list(ready);
-             el != NULL; el = EC_next(el)) {
+        for (xcom::EdgeC const* el = ready->getOutList();
+             el != NULL; el = el->get_next()) {
             Vertex * ready_succ = el->getTo();
 
             //Determine if in-degree equal to 1.
             UINT in_degree = 0;
-            for (xcom::EdgeC const* el2 = VERTEX_in_list(ready_succ);
-                 el2 != NULL; el2 = EC_next(el2)) {
+            for (xcom::EdgeC const* el2 = ready_succ->getInList();
+                 el2 != NULL; el2 = el2->get_next()) {
                 Vertex const* ready_succ_pred = EDGE_from(EC_edge(el2));
                 if (is_removed.is_contain(ready_succ_pred->id())) {
                     continue;
@@ -863,6 +862,20 @@ void Graph::removeEdgeBetween(Vertex * v1, Vertex * v2)
 //       e.g: There are dependence edges: v0->v1, v0->v2.
 //       If v1->v2 has been marked, we said v0->v2 is removable,
 //       and the same goes for the rest of edges.
+//e.g: E->D, A->D are transitive edges.
+//           E   A
+//         __|   |\
+//        |   \ /  |
+//        |    V   |
+//        |    B   |
+//        |    |   |
+//        |    |   |
+//        |    V   |
+//        |    C   |
+//        |___ | __|
+//            \|/
+//             V
+//             D
 void Graph::removeTransitiveEdge()
 {
     Vector<Vertex*> vex_vec;
@@ -876,8 +889,8 @@ void Graph::removeTransitiveEdge()
         Vertex const* fromvex = vex_vec.get(i);
         ASSERT0(fromvex);
         if (is_dense()) {
-            removeTransitiveEdgeHelper(fromvex,
-                &reachset_vec, is_visited, bs_mgr);
+            removeTransitiveEdgeHelper(fromvex, &reachset_vec,
+                                       is_visited, bs_mgr);
         } else {
             removeTransitiveEdgeHelper(fromvex,
                 (Vector<DefSBitSetCore*>*)&reachset_map, is_visited, bs_mgr);
@@ -907,59 +920,75 @@ void Graph::removeTransitiveEdgeHelper(Vertex const* fromvex,
                                        DefMiscBitSetMgr & bs_mgr)
 {
     ASSERT0(reachset);
-    if (is_visited.is_contain(VERTEX_id(fromvex))) { return; }
-    is_visited.bunion(VERTEX_id(fromvex));
+    if (is_visited.is_contain(fromvex->id())) { return; }
+    is_visited.bunion(fromvex->id());
 
     ASSERT0(fromvex);
-    if (VERTEX_out_list(fromvex) == NULL) { return; }
+    if (fromvex->getOutList() == NULL) { return; }
+
+    //Reachset defines the set of vertex that fromvex is able to reach.
     DefSBitSetCore * from_reachset = is_dense() ?
-        reachset->get(VERTEX_id(fromvex)) :
-        ((TMap<UINT, DefSBitSetCore*>*)reachset)->get(VERTEX_id(fromvex));
+        reachset->get(fromvex->id()) :
+        ((TMap<UINT, DefSBitSetCore*>*)reachset)->get(fromvex->id());
     if (from_reachset == NULL) {
         from_reachset = bs_mgr.allocSBitSetCore();
         if (is_dense()) {
-            reachset->set(VERTEX_id(fromvex), from_reachset);
+            reachset->set(fromvex->id(), from_reachset);
         } else {
-            ((TMap<UINT, DefSBitSetCore*>*)reachset)->set(
-                VERTEX_id(fromvex), from_reachset);
+            ((TMap<UINT, DefSBitSetCore*>*)reachset)->set(fromvex->id(),
+                                                      from_reachset);
         }
     }
 
     //Position in bitset has been sorted in topological order.
     EdgeC const* next_ec = NULL;
-    for (EdgeC const* ec = VERTEX_out_list(fromvex);
-         ec != NULL; ec = next_ec) {
-        next_ec = EC_next(ec);
+    for (EdgeC const* ec = fromvex->getOutList(); ec != NULL; ec = next_ec) {
+        next_ec = ec->get_next();
         Vertex const* tovex = ec->getTo();
 
-        from_reachset->bunion(VERTEX_id(tovex), bs_mgr);
+        from_reachset->bunion(tovex->id(), bs_mgr);
         removeTransitiveEdgeHelper(tovex, reachset, is_visited, bs_mgr);
 
+        //Reachset defines the set of vertex that tovex is able to reach.
         DefSBitSetCore * to_reachset = is_dense() ?
-            reachset->get(VERTEX_id(tovex)) :
-            ((TMap<UINT, DefSBitSetCore*>*)reachset)->get(VERTEX_id(tovex));
+            reachset->get(tovex->id()) :
+            ((TMap<UINT, DefSBitSetCore*>*)reachset)->get(tovex->id());
         if (to_reachset == NULL) { continue; }
         from_reachset->bunion(*to_reachset, bs_mgr);
 
         //Get successor set correspond to to_dense.
-        if (VERTEX_out_list(tovex) == NULL) { continue; }
+        if (tovex->getOutList() == NULL) { continue; }
 
         //Iterate other successors except 'to'.
         EdgeC const* next_ec2 = NULL;
-        for (EdgeC const* ec2 = VERTEX_out_list(fromvex);
+        for (EdgeC const* ec2 = fromvex->getOutList();
              ec2 != NULL; ec2 = next_ec2) {
-            next_ec2 = EC_next(ec2);
+            next_ec2 = ec2->get_next();
             Vertex const* othervex = ec2->getTo();
-            if (othervex == tovex ||
-                !to_reachset->is_contain(VERTEX_id(othervex))) {
+            if (othervex == tovex || !to_reachset->is_contain(othervex->id())) {
                 continue;
             }
             if (next_ec == ec2) {
-                next_ec = EC_next(ec);
+                next_ec = ec->get_next();
             }
-            removeEdge(EC_edge(ec2));
+            removeEdge(ec2->getEdge());
         }
     }
+}
+
+
+void Graph::dumpVexVector(Vector<Vertex*> const& vec, FILE * h)
+{
+    if (h == NULL) { return; }
+    fprintf(h, "\n");
+    for (INT i = 0; i <= vec.get_last_idx(); i++) {
+        Vertex const* x = vec.get(i);
+        if (x != NULL) {
+            if (i != 0) { fprintf(h, ","); }
+            fprintf(h, "V%d", x->id());
+        }
+    }
+    fflush(h);
 }
 
 
@@ -1058,6 +1087,21 @@ void Graph::dumpVCG(CHAR const* name) const
     fprintf(h, "\n}\n");
     fclose(h);
 }
+
+
+//Return true if find an order of RPO for 'v' that less than order of 'ref'.
+bool Graph::tryFindLessRpo(Vertex * v, Vertex const* ref)
+{
+    ASSERT0(v && ref);
+    INT rpo = ref->rpo() - 1;
+    ASSERT0(rpo >= RPO_INIT_VAL);
+    if (isValidRPO(rpo)) {
+        VERTEX_rpo(v) = rpo;
+        return true;        
+    }
+    return false;
+}
+//END Graph
 
 
 //
@@ -1767,10 +1811,9 @@ void DGraph::sortDomTreeInPreorder(IN Vertex * root, OUT List<Vertex*> & lst)
 //'order_buf': record the bfs-order for each vertex.
 //NOTE: BFS does NOT keep the sequence if you are going to
 //access vertex in lexicographic order.
-void DGraph::sortInBfsOrder(
-        Vector<UINT> & order_buf,
-        Vertex * root,
-        BitSet & visit)
+void DGraph::sortInBfsOrder(Vector<UINT> & order_buf,
+                            Vertex * root,
+                            BitSet & visit)
 {
     List<Vertex*> worklst;
     worklst.append_tail(root);

@@ -808,6 +808,7 @@ static void copyClassData(D2Dpool* pool)
 
 static void dumpGR(Region * r, char const* dexfilename)
 {
+    INT org = g_indent;
     g_indent = 0;
     r->dump(true);
     ASSERT0(dexfilename);
@@ -821,6 +822,7 @@ static void dumpGR(Region * r, char const* dexfilename)
     r->dumpGR(true);
     fclose(gr);
     g_tfile = oldvalue;
+    g_indent = org;
 }
 
 
@@ -844,6 +846,9 @@ static void processClass(DexFile* pDexFile, D2Dpool* pool, char const* dexfilena
         rumgr = new DexRegionMgr();
         rumgr->initVarMgr();
         rumgr->init();
+        if (g_logfile_name != NULL) {
+            rumgr->getLogMgr()->init(g_logfile_name, true);
+        }
         topru = rumgr->newRegion(REGION_PROGRAM);
         rumgr->addToRegionTab(topru);
             topru->setRegionVar(rumgr->getVarMgr()->registerVar(

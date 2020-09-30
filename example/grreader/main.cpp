@@ -35,48 +35,49 @@ author: Su Zhenyu
 #include "../../opt/comopt.h"
 #include "../../reader/grreader.h"
 
-bool readGR(CHAR * gr_file_name)
+static bool readGR(CHAR * gr_file_name)
 {
     ASSERT0(gr_file_name);
     xoc::RegionMgr * rm = new xoc::RegionMgr();
     rm->initVarMgr();
     rm->initTargInfo();
-    xoc::initdump("tmp.log", true);
+    rm->getLogMgr()->init("tmp.log", true);
     bool succ = xoc::readGRAndConstructRegion(rm, gr_file_name);
     if (!succ) {
-        printf("\nread gr file %s failed\n", gr_file_name);
+        xoc::prt2C("\nread gr file %s failed\n", gr_file_name);
         return false;
     }
 
+    xoc::LogMgr * lm = rm->getLogMgr();
     //Normalizing and dump new GR file.
     for (UINT i = 0; i < rm->getNumOfRegion(); i++) {
-        Region * r = rm->getRegion(i);
-        if (r == NULL) { continue; }
-        if (r->is_program() && succ) {
-            //r->dump(true);
+        xoc::Region * rg = rm->getRegion(i);
+        if (rg == NULL) { continue; }
+        if (rg->is_program() && succ) {
+            //rg->dump(true);
             xcom::StrBuf b(64);
             b.strcat(gr_file_name);
             b.strcat(".gr");
             UNLINK(b.buf);
-            FILE * gr = fopen(b.buf, "w");
-            FILE * oldvalue = g_tfile;
-            g_tfile = gr;
-            r->dumpGR(true);
-            fclose(gr);
-            g_tfile = oldvalue;
-            printf("\noutput is %s\n", b.buf);
+            FILE * gr = ::fopen(b.buf, "w");
+            FILE * oldh = lm->getFileHandler();
+            CHAR const* oldname = lm->getFileName();
+            lm->changeFileHandler(gr, b.buf);
+            rg->dumpGR(true);
+            lm->changeFileHandler(oldh, oldname);
+            ::fclose(gr);            
+            xoc::prt2C("\noutput is %s\n", b.buf);
         }
-        if (r->getPassMgr() != NULL) {
-            xoc::PRSSAMgr * ssamgr = (PRSSAMgr*)r->
-                getPassMgr()->queryPass(PASS_PR_SSA_MGR);
-            if (ssamgr != NULL && ssamgr->isSSAConstructed()) {
+        if (rg->getPassMgr() != NULL) {
+            xoc::PRSSAMgr * ssamgr = (PRSSAMgr*)rg->getPassMgr()->queryPass(
+                                         PASS_PR_SSA_MGR);
+            if (ssamgr != NULL && ssamgr->is_valid()) {
                 ssamgr->destruction();
             }
         }
     }
 
     delete rm;
-    xoc::finidump();
     return true;
 }
 

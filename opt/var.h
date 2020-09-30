@@ -39,27 +39,36 @@ namespace xoc {
 class RegionMgr;
 
 //
-//START VAR
+//START Var
 //
 
-//The size of VAR does not be recorded, because the memory size processed is
+//The size of Var does not be recorded, because the memory size processed is
 //to be changed dynamically, so the size is related with the corresponding
-//IR's type that referred the VAR.
+//IR's type that referred the Var.
 
 ///////////////////////////////////////////////////////
-//NOTE: Do *NOT* forget modify the bit-field in VAR if
+//NOTE: Do *NOT* forget modify the bit-field in Var if
 //you remove/add flag here.
 ///////////////////////////////////////////////////////
 #define DEDICATED_STRING_VAR_NAME "#DedicatedStringVar"
 #define VAR_UNDEF 0x0
-#define VAR_GLOBAL 0x1    //can be seen by all functions.
 
-//This kind of variable only can be seen by current function or thread.
+//This attribute describe the scope of variable.
+//A variable can be seen by all regions if it is GLOBAL.
+#define VAR_GLOBAL 0x1
+
+//This attribute defined the scope of variable.
+//A variable can ONLY be seen by current and inner region.
 //It always be allocated in stack or thread local storage(TLS).
 #define VAR_LOCAL 0x2
 
-//This kind of variable can be seen in same file.
+//This attribute describe the scope of variable.
+//A private variable which is GLOBAL can ONLY be seen in
+//current and inner region.
 #define VAR_PRIVATE 0x4
+
+//This attribute describe the access authority of variable.
+//A readonly variable guarantees that no operation can modify the memory.
 #define VAR_READONLY 0x8 //var is readonly
 #define VAR_VOLATILE 0x10 //var is volatile
 #define VAR_HAS_INIT_VAL 0x20 //var with initialied value.
@@ -75,7 +84,7 @@ class RegionMgr;
 #define VAR_IS_UNALLOCABLE 0x8000 //var is unallocable in memory.
 
 ////////////////////////////////////////////////////////
-//NOTE: DO *NOT* forget modify the bit-field in VAR if//
+//NOTE: DO *NOT* forget modify the bit-field in Var if//
 //you remove/add flag here.                           //
 ////////////////////////////////////////////////////////
 #define BYTEBUF_size(b) ((b)->m_byte_size)
@@ -111,22 +120,30 @@ public:
 #define VAR_is_label(v) ((v)->u2.s1.is_label)
 
 //Variable is global.
+//This attribute describe the scope of variable.
+//A variable can be seen by all regions if it is GLOBAL.
 #define VAR_is_global(v) ((v)->u2.s1.is_global)
 
 //Variable is local.
+//This attribute defined the scope of variable.
+//A variable can ONLY be seen by current and inner region.
+//It always be allocated in stack or thread local storage(TLS).
 #define VAR_is_local(v) ((v)->u2.s1.is_local)
 
-//Global Variables which is private cannot be
-//referenced outside current file region.
+//This attribute describe the scope of variable.
+//A private variable which is GLOBAL can ONLY be seen in
+//current and inner region.
 #define VAR_is_private(v) ((v)->u2.s1.is_private)
 
 //Variable is readonly.
+//This attribute describe the access authority of variable.
+//A readonly variable guarantees that no operation can modify the memory.
 #define VAR_is_readonly(v) ((v)->u2.s1.is_readonly)
 
 //Record the initial valud index.
 #define VAR_byte_val(v) ((v)->u1.byte_val)
 
-//Record prno.
+//Record prno if variable represent a PR.
 #define VAR_prno(v) ((v)->u1.prno)
 
 //Variable has initial value.
@@ -142,7 +159,7 @@ public:
 //Variable is volatile.
 #define VAR_is_volatile(v) ((v)->u2.s1.is_volatile)
 
-//Variable is an array.
+//Variable describes a memory that arranged in the manner of array.
 #define VAR_is_array(v) ((v)->u2.s1.is_array)
 
 //Variable is parameter of this region.
@@ -168,50 +185,50 @@ public:
 
 //Record the alignment.
 #define VAR_align(v) ((v)->align)
-class VAR {
-    COPY_CONSTRUCTOR(VAR);
+class Var {
+    COPY_CONSTRUCTOR(Var);
 public:
     UINT uid; //unique id;
     Type const* type; //Data type.
     UINT align; //memory alignment of var.
-    SYM const* name;
+    Sym const* name;
 
-    //Record the formal parameter position if VAR is parameter.
+    //Record the formal parameter position if Var is parameter.
     //Start from 0.
     UINT formal_parameter_pos;
 
     union {
-        //Record string contents if VAR is const string.
-        SYM const* string;
+        //Record string contents if Var is const string.
+        Sym const* string;
 
-        //Record byte code if VAR has constant initial value.
+        //Record byte code if Var has constant initial value.
         ByteBuf * byte_val;
 
-        //Record labelinfo if VAR is label.
+        //Record labelinfo if Var is label.
         LabelInfo * labinfo;
 
-        //Record Prno if VAR is pr.
+        //Record Prno if Var is pr.
         UINT prno;
     } u1;
 
     union {
-        UINT flag; //Record variant properties of VAR.
+        UINT flag; //Record variant properties of Var.
         struct {
-            UINT is_global:1; //VAR can be seen all program.
-            UINT is_local:1; //VAR only can be seen in region.
-            UINT is_private:1; //VAR only can be seen in file.
-            UINT is_readonly:1; //VAR is readonly.
-            UINT is_volatile:1; //VAR is volatile.
-            UINT has_init_val:1; //VAR has initial value.
-            UINT is_fake:1; //VAR is fake.
-            UINT is_label:1; //VAR is label.
-            UINT is_func_decl:1; //VAR is function unit declaration.
-            UINT is_array:1; //VAR is array
-            UINT is_formal_param:1; //VAR is formal parameter.
-            UINT is_spill:1; //VAR is spill location in function.
-            UINT is_addr_taken:1; //VAR has been taken address.
-            UINT is_pr:1; //VAR is pr.
-            UINT is_restrict:1; //VAR is restrict.
+            UINT is_global:1; //Var can be seen all program.
+            UINT is_local:1; //Var only can be seen in region.
+            UINT is_private:1; //Var only can be seen in file.
+            UINT is_readonly:1; //Var is readonly.
+            UINT is_volatile:1; //Var is volatile.
+            UINT has_init_val:1; //Var has initial value.
+            UINT is_fake:1; //Var is fake.
+            UINT is_label:1; //Var is label.
+            UINT is_func_decl:1; //Var is function unit declaration.
+            UINT is_array:1; //Var is array
+            UINT is_formal_param:1; //Var is formal parameter.
+            UINT is_spill:1; //Var is spill location in function.
+            UINT is_addr_taken:1; //Var has been taken address.
+            UINT is_pr:1; //Var is pr.
+            UINT is_restrict:1; //Var is restrict.
 
             //True if variable should NOT be allocated in memory and
             //it is only being a placeholder in essence.
@@ -219,8 +236,8 @@ public:
         } s1;
     } u2;
 public:
-    VAR();
-    virtual ~VAR() {}
+    Var();
+    virtual ~Var() {}
 
     UINT id() const { return VAR_id(this); }
     bool is_local() const { return VAR_is_local(this); }
@@ -286,7 +303,7 @@ public:
     }
 
     UINT get_align() const { return VAR_align(this); }
-    SYM const* get_name() const { return VAR_name(this); }
+    Sym const* get_name() const { return VAR_name(this); }
     Type const* getType() const { return VAR_type(this); }
     DATA_TYPE getDType() const { return TY_dtype(getType()); }
     UINT getFormalParamPos() const { return VAR_formal_param_pos(this); }
@@ -294,9 +311,9 @@ public:
     {
         ASSERT0(VAR_type(this)->is_string());
         return VAR_string(this) == NULL ?
-            0 : xstrlen(SYM_name(VAR_string(this)));
+               0 : xstrlen(SYM_name(VAR_string(this)));
     }
-    SYM const* getString() const { return VAR_string(this); }
+    Sym const* getString() const { return VAR_string(this); }
     ByteBuf const* getByteValue() const { return VAR_byte_val(this); }
 
     //Return the byte size of variable accroding type.
@@ -309,9 +326,9 @@ public:
     }
 
     virtual CHAR const* dumpVARDecl(StrBuf &) const { return NULL; }
-    virtual void dump(FILE * h, TypeMgr const* dm) const;
+    virtual void dump(TypeMgr const* tm) const;
 
-    //You must make sure this function will not change any field of VAR.
+    //You must make sure this function will not change any field of Var.
     virtual CHAR const* dump(StrBuf & buf, TypeMgr const* dm) const;
     void dumpProp(xcom::StrBuf & buf, bool grmode) const;
     CHAR const* dumpGR(StrBuf & buf, TypeMgr * dm) const;
@@ -323,67 +340,50 @@ public:
     }
 };
 
-//END VAR
+//END Var
 
-typedef TabIter<VAR*> VarTabIter;
-typedef TabIter<VAR const*> ConstVarTabIter;
+typedef TabIter<Var*> VarTabIter;
+typedef TabIter<Var const*> ConstVarTabIter;
 
 class CompareVar {
 public:
-    bool is_less(VAR * t1, VAR * t2) const { return t1->id() < t2->id(); }
-    bool is_equ(VAR * t1, VAR * t2) const { return t1 == t2; }
-    VAR * createKey(VAR * t) { return t; }
+    bool is_less(Var * t1, Var * t2) const { return t1->id() < t2->id(); }
+    bool is_equ(Var * t1, Var * t2) const { return t1 == t2; }
+    Var * createKey(Var * t) { return t; }
 };
 
 
 class CompareConstVar {
 public:
-    bool is_less(VAR const* t1, VAR const* t2) const
+    bool is_less(Var const* t1, Var const* t2) const
     { return t1->id() < t2->id(); }
-    bool is_equ(VAR const* t1, VAR const* t2) const { return t1 == t2; }
-    VAR const* createKey(VAR const* t) { return t; }
+    bool is_equ(Var const* t1, Var const* t2) const { return t1 == t2; }
+    Var const* createKey(Var const* t) { return t; }
 };
 
 
-class VarTab : public TTab<VAR*, CompareVar> {
+class VarTab : public TTab<Var*, CompareVar> {
     COPY_CONSTRUCTOR(VarTab);
 public:
     VarTab() {}
-    void dump(TypeMgr * dm)
-    {
-        if (g_tfile == NULL) { return; }
-        ASSERT0(dm);
-        VarTabIter iter;
-        for (VAR * v = get_first(iter); v != NULL; v = get_next(iter)) {
-            v->dump(g_tfile, dm);
-        }
-    }
+    void dump(TypeMgr const* tm) const;
 };
 
 
-class ConstVarTab : public TTab<VAR const*, CompareConstVar> {
+class ConstVarTab : public TTab<Var const*, CompareConstVar> {
 public:
-    void dump(TypeMgr * dm)
-    {
-        if (g_tfile == NULL) { return; }
-
-        ASSERT0(dm);
-        ConstVarTabIter iter;
-        for (VAR const* v = get_first(iter); v != NULL; v = get_next(iter)) {
-            v->dump(g_tfile, dm);
-        }
-    }
+    void dump(TypeMgr * tm);
 };
 
 
-//Map from const SYM to VAR.
-typedef TMap<SYM const*, VAR*> ConstSym2Var;
+//Map from const Sym to Var.
+typedef TMap<Sym const*, Var*> ConstSym2Var;
 
-//Map from VAR id to VAR.
-typedef Vector<VAR*> VarVec;
+//Map from Var id to Var.
+typedef Vector<Var*> VarVec;
 
-//This class is responsible for allocation and deallocation of VAR.
-//User can only create VAR via VarMgr, as well as delete it in the same way.
+//This class is responsible for allocation and deallocation of Var.
+//User can only create Var via VarMgr, as well as delete it in the same way.
 class VarMgr {
     COPY_CONSTRUCTOR(VarMgr);
     size_t m_var_count;
@@ -394,40 +394,40 @@ class VarMgr {
     RegionMgr * m_ru_mgr;
     TypeMgr * m_tm;
 
-    void assignVarId(VAR * v);
+    void assignVarId(Var * v);
 public:
     explicit VarMgr(RegionMgr * rm);
     virtual ~VarMgr() { destroy(); }
 
     void destroy();
-    void destroyVar(VAR * v); //Free VAR memory.
-    void dump(IN OUT CHAR * name = NULL);
+    void destroyVar(Var * v); //Free Var memory.
+    void dump();
 
     TypeMgr * getTypeMgr() const { return m_tm; }
     VarVec * get_var_vec() { return &m_var_vec; }
-    VAR * get_var(size_t id) const { return m_var_vec.get((UINT)id); }
+    Var * get_var(size_t id) const { return m_var_vec.get((UINT)id); }
 
-    VAR * findStringVar(SYM const* str) { return m_str_tab.get(str); }
-    VAR * findVarByName(SYM const* name);
+    Var * findStringVar(Sym const* str) { return m_str_tab.get(str); }
+    Var * findVarByName(Sym const* name);
 
     bool isDedicatedStringVar(CHAR const* name) const;
 
     //Interface to target machine.
     //Customer could specify additional attributions for specific purpose.
-    virtual VAR * allocVAR() { return new VAR(); }
+    virtual Var * allocVAR() { return new Var(); }
 
-    //Create a VAR.
-    VAR * registerVar(CHAR const* varname,
+    //Create a Var.
+    Var * registerVar(CHAR const* varname,
                       Type const* type,
                       UINT align,
                       UINT flag);
-    VAR * registerVar(SYM const* var_name,
+    Var * registerVar(Sym const* var_name,
                       Type const* type,
                       UINT align,
                       UINT flag);
 
-    //Create a String VAR.
-    VAR * registerStringVar(CHAR const* var_name, SYM const* s, UINT align);
+    //Create a String Var.
+    Var * registerStringVar(CHAR const* var_name, Sym const* s, UINT align);
 };
 
 } //namespace xoc

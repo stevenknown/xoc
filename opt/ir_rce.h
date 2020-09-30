@@ -38,18 +38,23 @@ namespace xoc {
 
 //Perform Redundant Code Elimination.
 class RCE : public Pass {
+    COPY_CONSTRUCTOR(RCE);
 protected:
     Region * m_rg;
     IRCFG * m_cfg;
     GVN * m_gvn;
     DUMgr * m_du;
-    PRSSAMgr * m_ssamgr;
+    PRSSAMgr * m_prssamgr;
     MDSSAMgr * m_mdssamgr;
-
+    Refine * m_refine;
     //Use GVN info to determine if code is redundant.
     //Note that compute GVN is expensive.
     bool m_use_gvn;
 
+    bool useMDSSADU() const
+    { return m_mdssamgr != NULL && m_mdssamgr->is_valid(); }
+    bool usePRSSADU() const
+    { return m_prssamgr != NULL && m_prssamgr->is_valid(); }
 public:
     RCE(Region * rg, GVN * gvn)
     {
@@ -59,22 +64,36 @@ public:
         m_cfg = rg->getCFG();
         m_du = m_rg->getDUMgr();
         ASSERT0(m_cfg && m_du);
-        m_use_gvn = false;
+        m_use_gvn = true;
+        m_prssamgr = NULL;
+        m_mdssamgr = NULL;
+        m_refine = NULL;
     }
-    COPY_CONSTRUCTOR(RCE);
     virtual ~RCE() {}
 
-    IR * calcCondMustVal(
-            IN IR * ir,
-            OUT bool & must_true,
-            OUT bool & must_false,
-            bool & changed);
+    //If 'ir' is always true, set 'must_true', or if it is
+    //always false, set 'must_false'.
+    //Return true if this function is able to determine the result of 'ir',
+    //otherwise return false that it does know nothing about ir.
+    bool calcCondMustVal(IR const* ir,
+                         OUT bool & must_true,
+                         OUT bool & must_false) const;
 
-    void dump();
+    //If 'ir' is always true, set 'must_true', or if it is
+    //always false, set 'must_false'.
+    //Return the changed ir.
+    IR * calcCondMustVal(IN IR * ir,
+                         OUT bool & must_true,
+                         OUT bool & must_false,
+                         bool & changed);
+
+    virtual bool dump() const;
+
+    Region * getRegion() const { return m_rg; }
     virtual CHAR const* getPassName() const
     { return "Redundant Code Elimination"; }
-
     PASS_TYPE getPassType() const { return PASS_RCE; }
+    GVN * getGVN() const { return m_gvn; }
 
     bool is_use_gvn() const { return m_use_gvn; }
 
@@ -82,8 +101,8 @@ public:
 
     IR * processStore(IR * ir);
     IR * processStorePR(IR * ir);
-    IR * processBranch(IR * ir, IN OUT bool & cfg_mod);
-    bool performSimplyRCE(IN OUT bool & cfg_mod);
+    IR * processBranch(IR * ir, IN OUT bool * cfg_mod);
+    bool performSimplyRCE(IN OUT bool * cfg_mod);
     virtual bool perform(OptCtx & oc);
 };
 

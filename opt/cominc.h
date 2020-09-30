@@ -36,7 +36,7 @@ author: Su Zhenyu
 
 #include "commoninc.h"
 #include "data_type.h"
-
+#include "const.h"
 //Middle level included files
 #include "dbg.h"
 #include "var.h"
@@ -46,23 +46,25 @@ author: Su Zhenyu
 #include "du.h"
 #include "ir.h"
 #include "loop.h"
-#include "cfg.h"
 #include "prssainfo.h"
 #include "mdssainfo.h"
 #include "ir_bb.h"
 #include "ir_refine.h"
 #include "ir_simp.h"
 #include "pass_mgr.h"
-#include "ir_cfg.h"
 #include "ir_high_opt.h"
 #include "ir_middle_opt.h"
 #include "targ_info.h"
 #include "region_mgr.h"
+#include "analysis_instr.h"
 #include "region.h"
+#include "cfg.h"
+#include "ir_cfg.h"
 #include "ir_du.h"
 #include "ir_aa.h"
 #include "ir_expr_tab.h"
 #include "callg.h"
+#include "du_helper.h"
 
 using namespace xoc;
 #endif

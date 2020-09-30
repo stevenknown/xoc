@@ -38,11 +38,13 @@ namespace xoc {
 
 //Record a variety of symbols such as user defined variables,
 //compiler internal variables, LABEL, ID, TYPE_NAME etc.
-#define SYM_name(sym)            ((sym)->s)
-class SYM {
-    COPY_CONSTRUCTOR(SYM);
+#define SYM_name(sym) ((sym)->s)
+class Sym {
+    COPY_CONSTRUCTOR(Sym);
 public:
     CHAR * s;
+
+    CHAR const* getStr() const { return s; }
 };
 
 
@@ -71,7 +73,7 @@ public:
         return v;
     }
 
-    UINT get_hash_value(SYM const* s, UINT bs) const
+    UINT get_hash_value(Sym const* s, UINT bs) const
     {
         ASSERT0(isPowerOf2(bs));
         UINT v = computeCharSum(SYM_name(s));
@@ -88,10 +90,10 @@ public:
         return hash32bit(n) & (bs - 1);
     }
 
-    bool compare(SYM const* s1, SYM const* s2) const
+    bool compare(Sym const* s1, Sym const* s2) const
     { return strcmp(SYM_name(s1), SYM_name(s2)) == 0; }
 
-    bool compare(SYM const* s, OBJTY val) const
+    bool compare(Sym const* s, OBJTY val) const
     {
         ASSERTN_DUMMYUSE(sizeof(OBJTY) == sizeof(CHAR*),
             ("exception will taken place in type-cast"));
@@ -113,7 +115,7 @@ public:
         return v;
     }
 
-    UINT get_hash_value(SYM const* s, UINT bs) const
+    UINT get_hash_value(Sym const* s, UINT bs) const
     {
         ASSERT0(isPowerOf2(bs));
         UINT v = computeCharSum(SYM_name(s));
@@ -130,10 +132,10 @@ public:
         return hash32bit(n) & (bs - 1);
     }
 
-    bool compare(SYM const* s1, SYM const* s2) const
+    bool compare(Sym const* s1, Sym const* s2) const
     { return strcmp(SYM_name(s1),  SYM_name(s2)) == 0; }
 
-    bool compare(SYM const* s, OBJTY val) const
+    bool compare(Sym const* s, OBJTY val) const
     {
         ASSERTN_DUMMYUSE(sizeof(OBJTY) == sizeof(CHAR const*),
                 ("exception will taken place in type-cast"));
@@ -145,11 +147,11 @@ public:
 //
 //START SymTab based on Hash
 //
-class SymTabHash : public Hash<SYM*, SymbolHashFunc> {
+class SymTabHash : public Hash<Sym*, SymbolHashFunc> {
     COPY_CONSTRUCTOR(SymTabHash);
     SMemPool * m_pool;
 public:
-    explicit SymTabHash(UINT bsize) : Hash<SYM*, SymbolHashFunc>(bsize)
+    explicit SymTabHash(UINT bsize) : Hash<Sym*, SymbolHashFunc>(bsize)
     { m_pool = smpoolCreate(64, MEM_COMM); }
     virtual ~SymTabHash()
     { smpoolDelete(m_pool); }
@@ -166,26 +168,26 @@ public:
         return ns;
     }
 
-    SYM * create(OBJTY v)
+    Sym * create(OBJTY v)
     {
-        SYM * sym = (SYM*)smpoolMalloc(sizeof(SYM), m_pool);
+        Sym * sym = (Sym*)smpoolMalloc(sizeof(Sym), m_pool);
         SYM_name(sym) = strdup((CHAR const*)v);
         return sym;
     }
 
     //Add const string into symbol table.
     //If the string table is not big enough to hold strings, expand it.
-    inline SYM * add(CHAR const* s)
+    inline Sym * add(CHAR const* s)
     {
-        UINT sz = Hash<SYM*, SymbolHashFunc>::get_bucket_size() * 4;
-        if (sz < Hash<SYM*, SymbolHashFunc>::get_elem_count()) {
-            Hash<SYM*, SymbolHashFunc>::grow(sz);
+        UINT sz = Hash<Sym*, SymbolHashFunc>::get_bucket_size() * 4;
+        if (sz < Hash<Sym*, SymbolHashFunc>::get_elem_count()) {
+            Hash<Sym*, SymbolHashFunc>::grow(sz);
         }
-        return Hash<SYM*, SymbolHashFunc>::append((OBJTY)s);
+        return Hash<Sym*, SymbolHashFunc>::append((OBJTY)s);
     }
 
-    SYM * get(CHAR const* s)
-    { return Hash<SYM*, SymbolHashFunc>::find((OBJTY)s); }
+    Sym * get(CHAR const* s)
+    { return Hash<Sym*, SymbolHashFunc>::find((OBJTY)s); }
 };
 //END SymTabHash
 
@@ -213,13 +215,13 @@ public:
 public:
     CompareSymTab() {}
 
-    bool is_less(SYM * t1, SYM * t2) const
+    bool is_less(Sym * t1, Sym * t2) const
     { return ::strcmp(SYM_name(t1), SYM_name(t2)) < 0; }
 
-    bool is_equ(SYM * t1, SYM * t2) const
+    bool is_equ(Sym * t1, Sym * t2) const
     { return ::strcmp(SYM_name(t1), SYM_name(t2)) == 0; }
 
-    SYM * createKey(SYM * t)
+    Sym * createKey(Sym * t)
     {
         SYM_name(t) = xstrdup(SYM_name(t));
         return t;
@@ -227,9 +229,9 @@ public:
 };
 
 
-class SymTab : public TTab<SYM*, CompareSymTab> {
+class SymTab : public TTab<Sym*, CompareSymTab> {
     COPY_CONSTRUCTOR(SymTab);
-    SYM * m_free_one;
+    Sym * m_free_one;
     SMemPool * m_pool;
 
 public:
@@ -237,13 +239,13 @@ public:
     {
         m_pool = smpoolCreate(64, MEM_COMM);
         m_free_one = NULL;
-        TTab<SYM*, CompareSymTab>::m_ck.m_pool = m_pool;
+        TTab<Sym*, CompareSymTab>::m_ck.m_pool = m_pool;
         ASSERT0(m_pool);
     }
     virtual ~SymTab() { smpoolDelete(m_pool); }
 
     //Add const string into symbol table.
-    SYM * add(CHAR const* s);
+    Sym * add(CHAR const* s);
 };
 //END SymTab
 

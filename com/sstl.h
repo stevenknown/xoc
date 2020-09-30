@@ -519,7 +519,7 @@ public:
 //FREE-List
 //
 //T refer to basis element type.
-//    e.g: Suppose variable type is 'VAR*', then T is 'VAR'.
+//    e.g: Suppose variable type is 'Var*', then T is 'Var'.
 //
 //For easing implementation, there are 2 fields should be declared in T,
 //    struct T {
@@ -1499,7 +1499,7 @@ public:
         if (C_prev(m_tail) == NULL) {
             //tail is the only one
             ASSERTN(m_tail == m_head && m_elem_count == 1,
-                   ("illegal list-remove"));
+                    ("illegal list-remove"));
             c = m_tail;
             m_head = m_tail = m_cur = NULL;
         } else {
@@ -1525,7 +1525,7 @@ public:
         if (C_next(m_head) == NULL) {
             //list_head is the only one
             ASSERTN(m_tail == m_head && m_elem_count == 1,
-                   ("illegal list-remove"));
+                    ("illegal list-remove"));
             c = m_head;
             m_head = m_tail = m_cur = NULL;
         } else {
@@ -1935,8 +1935,8 @@ public:
     SC<T> * insert_after(T t, IN SC<T> * marker)
     {
         ASSERT0(m_free_list_pool);
-        return SListCore<T>::insert_after(t,
-            marker, &m_free_list, m_free_list_pool);
+        return SListCore<T>::insert_after(t, marker, &m_free_list,
+                                          m_free_list_pool);
     }
 
     //Remove 't' out of list, return true if find t, otherwise return false.
@@ -1947,8 +1947,10 @@ public:
         return SListCore<T>::remove(t, &m_free_list);
     }
 
+    //Remove elemlent that contained in 'holder' from current single list.
     //Return element removed.
-    //'prev': the previous one element of 'holder'.
+    //'prev': the holder of previous element of 'holder'.
+    //Note both holders must belong to current SList.
     T remove(SC<T> * prev, SC<T> * holder)
     {
         ASSERT0(m_free_list_pool);

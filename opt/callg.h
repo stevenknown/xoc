@@ -46,7 +46,7 @@ class CallNode {
     COPY_CONSTRUCTOR(CallNode);
 public:
     UINT nid;
-    SYM const* ru_name; //record the Region name.
+    Sym const* ru_name; //record the Region name.
     Region * rg; //record the Region that callnode corresponds to.
     union {
         struct {
@@ -71,12 +71,12 @@ public:
 
     Region * region() const { return CN_ru(this); }
 
-    SYM const* name() const { return CN_sym(this); }
+    Sym const* name() const { return CN_sym(this); }
 };
 
 
-//Mapping from SYM to CallNode.
-typedef TMap<SYM const*, CallNode*> SYM2CN;
+//Mapping from Sym to CallNode.
+typedef TMap<Sym const*, CallNode*> SYM2CN;
 typedef TMap<Region*, SYM2CN*> Region2SYM2CN;
 typedef TMapIter<Region*, SYM2CN*> Region2SYM2CNIter;
 
@@ -163,14 +163,15 @@ public:
     //        with completely information.
     void dumpVCG(CHAR const* name = NULL, INT flag = -1);
 
+    RegionMgr * getRegionMgr() const { return m_ru_mgr; }
     CallNode * mapId2CallNode(UINT id) const { return m_cnid2cn.get(id); }
     CallNode * mapVertex2CallNode(xcom::Vertex const* v) const
     { return m_cnid2cn.get(v->id()); }
 
     CallNode * mapRegion2CallNode(Region const* rg) const
-    { return m_ruid2cn.get(REGION_id(rg)); }
+    { return m_ruid2cn.get(rg->id()); }
 
-    CallNode * mapSym2CallNode(SYM const* sym, Region * start) const
+    CallNode * mapSym2CallNode(Sym const* sym, Region * start) const
     {
         for (; start != NULL; start = start->getParent()) {
             SYM2CN * sym2cn = getSYM2CN(start);

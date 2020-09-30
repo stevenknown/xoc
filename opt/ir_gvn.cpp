@@ -224,7 +224,7 @@ VN * GVN::registerVNviaMC(LONGLONG v)
 }
 
 
-VN * GVN::registerVNviaSTR(SYM const* v)
+VN * GVN::registerVNviaSTR(Sym const* v)
 {
     if (m_str2vn.get_bucket_size() == 0) {
         m_str2vn.init(16/*TO reevaluate*/);
@@ -424,7 +424,7 @@ VN * GVN::computePR(IR const* exp, bool & change)
     SSAInfo * ssainfo = PR_ssainfo(exp);
     ASSERT0(exp->isReadPR() && ssainfo);
 
-    IR const* def = ssainfo->get_def();
+    IR const* def = ssainfo->getDef();
     if (def == NULL) {
         ASSERT0(exp->getRefMD());
         return allocLiveinVN(exp, exp->getRefMD(), change);
@@ -457,7 +457,7 @@ VN * GVN::computeExactMemory(IR const* exp, bool & change)
         IRBB * b1 = ed->getBB();
         IRBB * b2 = exp_stmt->getBB();
         ASSERT0(b1 && b2);
-        if ((b1 != b2 && m_cfg->is_dom(BB_id(b1), BB_id(b2))) ||
+        if ((b1 != b2 && m_cfg->is_dom(b1->id(), b2->id())) ||
             (b1 == b2 && b1->is_dom(ed, exp_stmt, true))) {
             defvn = m_ir2vn.get(IR_id(ed));
         }
@@ -517,7 +517,7 @@ VN * GVN::computeILoadByAnonDomDef(IR const* ild,
                                       IR const* domdef,
                                       bool & change)
 {
-    ASSERT0(ild->is_ild() && m_du->is_may_def(domdef, ild, false));
+    ASSERT0(ild->is_ild() && m_du->isMayDef(domdef, ild, false));
     ILD_VNE2VN * vnexp_map = m_def2ildtab.get(domdef);
     UINT dtsz = ild->getTypeSize(m_tm);
     VNE_ILD vexp(VN_id(mlvn), ILD_ofst(ild), dtsz);
@@ -629,7 +629,7 @@ VN * GVN::computeArrayByAnonDomDef(IR const* arr,
                                       IR const* domdef,
                                       bool & change)
 {
-    ASSERT0(arr->is_array() && m_du->is_may_def(domdef, arr, false));
+    ASSERT0(arr->is_array() && m_du->isMayDef(domdef, arr, false));
     ARR_VNE2VN * vnexp_map = m_def2arrtab.get(domdef);
     UINT dtsz = arr->getTypeSize(m_tm);
     VNE_ARR vexp(VN_id(basevn), VN_id(ofstvn), ARR_ofst(arr), dtsz);
@@ -746,7 +746,7 @@ VN * GVN::computeScalarByAnonDomDef(IR const* exp,
                                        bool & change)
 {
     ASSERT0((exp->is_ld() || exp->is_pr()) &&
-            m_du->is_may_def(domdef, exp, false));
+            m_du->isMayDef(domdef, exp, false));
     SCVNE2VN * vnexp_map = m_def2sctab.get(domdef);
     UINT dtsz = exp->getTypeSize(m_tm);
     MD const* md = exp->getExactRef();
@@ -873,7 +873,7 @@ VN * GVN::computeVN(IR const* exp, bool & change)
         return x;
     }
     case IR_LDA: {
-        VAR * v = LDA_idinfo(exp);
+        Var * v = LDA_idinfo(exp);
         VN * basevn = NULL;
         if (v->is_string()) {
             if (m_is_comp_lda_string) {
@@ -994,6 +994,54 @@ void GVN::processRegion(IR const* ir, bool & change)
 }
 
 
+//Return true if ir1 and ir2 represent identical memory location, otherwise
+//return false to tell caller we do not know more about these object.
+//Note this function does NOT consider data type that ir1 or ir2 referrenced.
+bool GVN::isSameMemLoc(IR const* ir1, IR const* ir2) const
+{
+    ASSERT0(ir1 && ir2);
+    if (ir1 == ir2) { return true; }
+    if (ir1->getOffset() != ir2->getOffset()) { return false; }
+    if ((ir1->is_st() || ir1->is_ld()) && (ir2->is_st() || ir2->is_ld())) {
+        return ir1->getIdinfo() == ir2->getIdinfo();
+    }
+    if (ir1->isIndirectMemOp() && ir2->isIndirectMemOp()) {
+        IR const* irbase1 = const_cast<IR*>(ir1)->getBase();
+        IR const* irbase2 = const_cast<IR*>(ir2)->getBase();
+        ASSERT0(irbase1 && irbase2);
+        VN const* base1 = mapIR2VN(irbase1);
+        VN const* base2 = mapIR2VN(irbase2);
+        return base1 == base2;
+    }
+    if (ir1->isArrayOp() && ir2->isArrayOp() && ir1->isSameArrayStruct(ir2)) {
+        IR const* irbase1 = const_cast<IR*>(ir1)->getBase();
+        IR const* irbase2 = const_cast<IR*>(ir2)->getBase();
+        ASSERT0(irbase1 && irbase2);
+        VN const* base1 = mapIR2VN(irbase1);
+        VN const* base2 = mapIR2VN(irbase2);
+        if (base1 != base2) {
+            return false;
+        }
+
+        IR const* s2 = ARR_sub_list(ir2);
+        for (IR const* s1 = ARR_sub_list(ir1); s1 != NULL;
+             s1 = s1->get_next(), s2 = s2->get_next()) {
+            ASSERT0(s2);    
+            VN const* vs1 = mapIR2VN(s1);
+            VN const* vs2 = mapIR2VN(s2);
+            if (vs1 != vs2) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    MD const* must1 = ir1->getRefMD();
+    MD const* must2 = ir2->getRefMD();
+    return must1 == must2 && must1 != NULL;
+}
+
+
 void GVN::processBB(IRBB * bb, bool & change)
 {
     IRListIter ct;
@@ -1080,161 +1128,89 @@ void GVN::processBB(IRBB * bb, bool & change)
 }
 
 
-void GVN::dumpIR2VN()
+void GVN::dumpIR2VN() const
 {
-    if (g_tfile == NULL) { return; }
+    if (!m_rg->isLogMgrInit()) { return; }
     for (INT k = 0; k <= m_ir2vn.get_last_idx(); k++) {
         VN * x = m_ir2vn.get(k);
         if (x != NULL) {
-            note("\nIR%d : vn%d, %d", k, VN_id(x), (INT)VN_type(x));
+            note(getRegion(), "\nIR%d : vn%d, %d",
+                 k, VN_id(x), (INT)VN_type(x));
         }
     }
-    fflush(g_tfile);
 }
 
 
-void GVN::dump_h1(IR const* k, VN * x)
+void GVN::dump_h1(IR const* k, VN const* x) const
 {
-    note("\n\t%s", IRTNAME(k->getCode()));
+    ASSERT0(k);    
     if (k->is_pr()) {
-        prt("%d", PR_no(k));
-    }
-    prt(" id:%d ", IR_id(k));
-    if (x != NULL) {
-        prt("vn%d", VN_id(x));
+        note(getRegion(), "\n\t$%d", PR_no(k));
     } else {
-        prt("--");
+        note(getRegion(), "\n\t%s", IRTNAME(k->getCode()));
+    }
+    prt(getRegion(), " id:%d ", k->id());
+    if (x != NULL) {
+        prt(getRegion(), "vn%d", VN_id(x));
+    } else {
+        prt(getRegion(), "--");
     }
 }
 
 
-void GVN::dumpBB(UINT bbid)
+void GVN::dumpBB(UINT bbid) const
 {
-    if (g_tfile == NULL) { return; }
+    if (!m_rg->isLogMgrInit()) { return; }
     IRBB * bb = m_cfg->getBB(bbid);
     ASSERT0(bb);
 
     ConstIRIter ii;
-    note("\n-- BB%d ", BB_id(bb));
-    dumpBBLabel(bb->getLabelList(), g_tfile);
-    note("\n");
-    for (IR * ir = BB_first_ir(bb);
-         ir != NULL; ir = BB_next_ir(bb)) {
+    note(getRegion(), "\n-- BB%d ", bb->id());
+    dumpBBLabel(bb->getLabelList(), getRegion());
+    note(getRegion(), "\n");
+    for (IR * ir = BB_first_ir(bb); ir != NULL; ir = BB_next_ir(bb)) {
         dumpIR(ir, m_rg);
-        note("\n");
+        note(getRegion(), "\n");
         VN * x = m_ir2vn.get(ir->id());
         if (x != NULL) {
-            prt("vn%d", VN_id(x));
+            prt(getRegion(), "vn%d", VN_id(x));
         }
 
-        prt(" <- {");
-
-        switch (ir->getCode()) {
-        case IR_ST:
-            ii.clean();
-            for (IR const* k = iterInitC(ST_rhs(ir), ii);
-                 k != NULL; k = iterNextC(ii)) {
-                VN * x2 = m_ir2vn.get(IR_id(k));
-                dump_h1(k, x2);
-            }
-            break;
-        case IR_STPR:
-            ii.clean();
-            for (IR const* k = iterInitC(STPR_rhs(ir), ii);
-                 k != NULL; k = iterNextC(ii)) {
-                VN * x2 = m_ir2vn.get(IR_id(k));
-                dump_h1(k, x2);
-            }
-            break;
-        case IR_PHI:
-            ii.clean();
-            for (IR const* k = iterInitC(PHI_opnd_list(ir), ii);
-                k != NULL; k = iterNextC(ii)) {
-                VN * x2 = m_ir2vn.get(IR_id(k));
-                dump_h1(k, x2);
-            }
-            break;
-        case IR_IST:
-            ii.clean();
-            for (IR const* k = iterInitC(IST_rhs(ir), ii);
-                 k != NULL; k = iterNextC(ii)) {
-                VN * x2 = m_ir2vn.get(IR_id(k));
-                dump_h1(k, x2);
-            }
-
-            ii.clean();
-            for (IR const* k = iterInitC(IST_base(ir), ii);
-                 k != NULL; k = iterNextC(ii)) {
-                VN * x2 = m_ir2vn.get(IR_id(k));
-                dump_h1(k, x2);
-            }
-            break;
-        case IR_CALL:
-        case IR_ICALL:
-            ii.clean();
-            for (IR const* k = iterInitC(CALL_param_list(ir), ii);
-                 k != NULL; k = iterNextC(ii)) {
-                VN * x2 = m_ir2vn.get(IR_id(k));
-                dump_h1(k, x2);
-            }
-            break;
-        case IR_TRUEBR:
-        case IR_FALSEBR:
-            ii.clean();
-            for (IR const* k = iterInitC(BR_det(ir), ii);
-                 k != NULL; k = iterNextC(ii)) {
-                VN * x2 = m_ir2vn.get(IR_id(k));
-                dump_h1(k, x2);
-            }
-            break;
-        case IR_SWITCH:
-            ii.clean();
-            for (IR const* k = iterInitC(SWITCH_vexp(ir), ii);
-                 k != NULL; k = iterNextC(ii)) {
-                VN * x2 = m_ir2vn.get(IR_id(k));
-                dump_h1(k, x2);
-            }
-            break;
-        case IR_IGOTO:
-            ii.clean();
-            for (IR const* k = iterInitC(IGOTO_vexp(ir), ii);
-                 k != NULL; k = iterNextC(ii)) {
-                VN * x2 = m_ir2vn.get(IR_id(k));
-                dump_h1(k, x2);
-            }
-            break;
-        case IR_RETURN:
-            ii.clean();
-            for (IR const* k = iterInitC(RET_exp(ir), ii);
-                 k != NULL; k = iterNextC(ii)) {
-                VN * x2 = m_ir2vn.get(IR_id(k));
-                dump_h1(k, x2);
-            }
-            break;
-        case IR_GOTO: break;
-        case IR_REGION: break;
-        default: UNREACHABLE();
+        prt(getRegion(), " <- {");
+        ii.clean();
+        bool dumped = false;
+        for (IR const* k = iterRhsInitC(ir, ii);
+             k != NULL; k = iterNextC(ii)) {
+            dumped = true;
+            VN const* vn = m_ir2vn.get(k->id());
+            dump_h1(k, vn);
         }
-        prt(" }");
+        if (dumped) {
+            note(getRegion(), "\n");
+        }
+        prt(getRegion(), " }");
     }
-    fflush(g_tfile);
 }
 
 
-void GVN::dump()
+bool GVN::dump() const
 {
-    if (g_tfile == NULL) { return; }
-    note("\n==---- DUMP GVN -- rg:'%s' ----==", m_rg->getRegionName());
+    if (!m_rg->isLogMgrInit()) { return false; }
+    note(getRegion(), "\n==---- DUMP %s '%s' ----==",
+         getPassName(), m_rg->getRegionName());
     BBList * bbl = m_rg->getBBList();
     for (IRBB * bb = bbl->get_head(); bb != NULL; bb = bbl->get_next()) {
-        dumpBB(BB_id(bb));
+        dumpBB(bb->id());
     }
-    fflush(g_tfile);
+    return true;
 }
 
 
-//Return true if gvn is able to determine the result of 'ir'.
-bool GVN::calcCondMustVal(IR const* ir, bool & must_true, bool & must_false)
+//Return true if GVN is able to determine the result of 'ir', otherwise
+//return false that GVN know nothing about ir.
+bool GVN::calcCondMustVal(IR const* ir,
+                          bool & must_true,
+                          bool & must_false) const
 {
     must_true = false;
     must_false = false;
@@ -1393,41 +1369,29 @@ bool GVN::perform(OptCtx & oc)
 {
     BBList * bbl = m_rg->getBBList();
     if (bbl->get_elem_count() == 0) { return false; }
-    if (!OC_is_ref_valid(oc)) { return false; }
 
-    //Check PR DU chain.
-    PRSSAMgr * ssamgr = (PRSSAMgr*)(m_rg->getPassMgr()->queryPass(
-        PASS_PR_SSA_MGR));
-    if (ssamgr != NULL && ssamgr->isSSAConstructed()) {
-        m_ssamgr = ssamgr;
-    } else {
-        m_ssamgr = NULL;
-    }
-    if (!OC_is_pr_du_chain_valid(oc) && m_ssamgr == NULL) { 
+    if (!OC_is_ref_valid(oc)) { return false; }
+    m_mdssamgr = (MDSSAMgr*)m_rg->getPassMgr()->queryPass(PASS_MD_SSA_MGR);
+    m_prssamgr = (PRSSAMgr*)m_rg->getPassMgr()->queryPass(PASS_PR_SSA_MGR);
+    if (!OC_is_pr_du_chain_valid(oc) && !usePRSSADU()) {
+        //DCE use either classic PR DU chain or PRSSA.
         //At least one kind of DU chain should be avaiable.
         return false;
     }
-
-    //Check NONPR DU chain.
-    MDSSAMgr * mdssamgr = (MDSSAMgr*)(m_rg->getPassMgr()->queryPass(
-        PASS_MD_SSA_MGR));
-    if (mdssamgr != NULL && mdssamgr->isMDSSAConstructed()) {
-        m_mdssamgr = mdssamgr;
-    } else {
-        m_mdssamgr = NULL;
-    }
-    if (!OC_is_nonpr_du_chain_valid(oc) && m_mdssamgr == NULL) {
+    if (!OC_is_nonpr_du_chain_valid(oc) && !useMDSSADU()) {
+        //DCE use either classic MD DU chain or MDSSA.
         //At least one kind of DU chain should be avaiable.
         return false;
     }
 
     START_TIMER(t, getPassName());
     m_rg->checkValidAndRecompute(&oc, PASS_RPO, PASS_DOM, PASS_UNDEF);
-    List<IRBB*> * tbbl = m_cfg->getBBListInRPO();
+    List<IRBB*> * tbbl = m_cfg->getRPOBBList();
+    ASSERT0(tbbl);
     ASSERT0(tbbl->get_elem_count() == bbl->get_elem_count());
     UINT count = 0;
     bool change = true;
-    while (change && count < 10) {
+    while (change && count < 100) {
         change = false;
         for (IRBB * bb = tbbl->get_head();
              bb != NULL; bb = tbbl->get_next()) {
@@ -1436,6 +1400,7 @@ bool GVN::perform(OptCtx & oc)
         count++;
     }
     ASSERT0(!change);
+
     if (g_is_dump_after_pass && g_dump_opt.isDumpGVN()) {
         dump();
     }

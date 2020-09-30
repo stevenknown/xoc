@@ -104,30 +104,29 @@ void ExprTab::clean_occ_list()
 //Dump all IR expressions of region and its used MDs.
 void ExprTab::dump_ir_expr_tab()
 {
-    if (g_tfile == NULL) { return; }
-    note("\n==---- DUMP ExprTab ----==");
+    if (!m_rg->isLogMgrInit()) { return; }
+    note(getRegion(), "\n==---- DUMP ExprTab ----==");
     DUMgr * du_mgr = m_rg->getDUMgr();
     INT last = m_ir_expr_vec.get_last_idx();
     for (INT i = 0; i <= last; i++) {
         ExpRep * ie = m_ir_expr_vec.get(i);
         if (ie == NULL) { continue; }
         ASSERT0(EXPR_id(ie) == (UINT)i);
-        note("\n\n----------- ExpRep(%d)", i);
+        note(getRegion(), "\n\n----------- ExpRep(%d)", i);
         dumpIR(EXPR_ir(ie), m_rg);
-        note("\n\tOCC:");
+        note(getRegion(), "\n\tOCC:");
         for (IR * occ = EXPR_occ_list(ie).get_head();
              occ != NULL; occ = EXPR_occ_list(ie).get_next()) {
-            prt("IR%d", IR_id(occ));
+            prt(getRegion(), "IR%d", IR_id(occ));
             MDSet const* use_mds = du_mgr->getMayUse(occ);
             if (use_mds != NULL) {
-                prt("(use:");
+                prt(getRegion(), "(use:");
                 use_mds->dump(m_rg->getMDSystem());
-                prt(")");
+                prt(getRegion(), ")");
             }
-            prt(",");
+            prt(getRegion(), ",");
         }
     }
-    fflush(g_tfile);
 }
 
 
@@ -153,7 +152,7 @@ UINT ExprTab::compute_hash_key(IR const* ir)
         hval += ir->getPrno();
     }
     if (ir->is_id()) {
-        VAR * var = ID_info(ir);
+        Var * var = ID_info(ir);
         hval += 5 * (UINT)(size_t)var;
     }
     return hval;

@@ -40,12 +40,18 @@ class SimpCtx;
 
 //Basis Class of pass.
 class Pass {
-protected:
-    SimpCtx * m_simp;
-public:
-    Pass() { m_simp = NULL; }
-    virtual ~Pass() {}
     COPY_CONSTRUCTOR(Pass);
+public:
+    Pass() {}
+    virtual ~Pass() {}
+
+    virtual bool dump() const
+    {
+        ASSERTN(0, ("Optimization Dependent Code"));
+        //The recommended dump format is:
+        //\n==---- DUMP PassName 'RegionName' ----==
+        return true;
+    }
 
     virtual CHAR const* getPassName() const
     {
@@ -58,8 +64,6 @@ public:
         ASSERTN(0, ("Optimization Dependent Code"));
         return PASS_UNDEF;
     }
-
-    void set_simp_cont(SimpCtx * simp) { m_simp = simp; }
 
     virtual bool perform(OptCtx &)
     {

@@ -56,7 +56,7 @@ INT g_opt_level = OPT_LEVEL0;
 //Construct bb list.
 bool g_cst_bb_list = true;
 
-//Build control flow structure.
+//Build control flow graph.
 bool g_do_cfg = true;
 
 //Compute reverse-post-order.
@@ -133,8 +133,11 @@ bool g_do_aa = true;
 //Perform DU analysis for MD to build du chain.
 bool g_do_md_du_analysis = true;
 
-//Compute DU chain.
-bool g_compute_classic_du_chain = false;
+//Compute PR DU chain.
+bool g_compute_pr_du_chain = false;
+
+//Compute NONPR DU chain.
+bool g_compute_nonpr_du_chain = false;
 
 //Computem available expression during du analysis to
 //build more precise du chain.
@@ -194,7 +197,7 @@ bool g_do_gvn = true;
 //Perform partial redundant elimination.
 bool g_do_pre = false;
 
-//Perform redundant code elimination.
+//Perform light weith redundant code elimination.
 bool g_do_rce = false;
 
 //Perform register promotion.
@@ -204,7 +207,7 @@ bool g_do_rp = false;
 bool g_do_pr_ssa = false;
 
 //Build Memory SSA and perform optimization based on Memory SSA.
-bool g_do_md_ssa = true;
+bool g_do_md_ssa = false;
 
 //Record the maximum limit of the number of BB to perform optimizations.
 UINT g_thres_opt_bb_num = 100000;
@@ -230,6 +233,9 @@ bool g_do_poly_tran = false;
 
 //Refine DefUse Chain.
 bool g_do_refine_duchain = true;
+
+//Perform versatile scalar optimizations.
+bool g_do_scalar_opt = true;
 
 //Set to true to retain the PassMgr even if Region processing finished.
 bool g_retain_pass_mgr_for_region = false;
@@ -270,6 +276,12 @@ DumpOpt g_dump_opt;
 
 //Redirect output information to stdout to dump file if exist.
 bool g_redirect_stdout_to_dump_file = false;
+
+//Record the unique file handler for dump file.
+//Note the order of access to this file will not be guaranteed
+//in serial execution when there are multiple RegionMgrs doing compilation
+//simultaneously.
+FILE * g_unique_dumpfile = NULL;
 
 DumpOpt::DumpOpt()
 {
@@ -362,6 +374,12 @@ bool DumpOpt::isDumpDCE() const
 }
 
 
+bool DumpOpt::isDumpCDG() const
+{
+    return is_dump_all || (!is_dump_nothing && is_dump_cdg);
+}
+
+
 bool DumpOpt::isDumpGVN() const
 {
     return is_dump_all || (!is_dump_nothing && is_dump_gvn);
@@ -435,6 +453,11 @@ bool DumpOpt::isDumpLivenessMgr() const
 bool DumpOpt::isDumpRefineDUChain() const
 {
     return is_dump_all || (!is_dump_nothing && is_dump_refine_duchain);
+}
+
+bool DumpOpt::isDumpRefine() const
+{
+    return is_dump_all || (!is_dump_nothing && is_dump_refine);
 }
 
 } //namespace xoc

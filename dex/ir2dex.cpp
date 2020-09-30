@@ -65,7 +65,7 @@ LIR * IR2Dex::buildConstString(IN IR ** ir)
     IR * tir = *ir;
     ASSERT0(tir->is_stpr());
     UINT vx = get_vreg(STPR_no(tir));
-    VAR * v = LDA_idinfo(STPR_rhs(tir));
+    Var * v = LDA_idinfo(STPR_rhs(tir));
     CHAR const* n = SYM_name(VAR_name(v));
     LIRABOp * lir = (LIRABOp*)ymalloc(sizeof(LIRABOp));
     lir->opcode = LOP_CONST_STRING;
@@ -102,7 +102,7 @@ LIR * IR2Dex::buildSgetBasicTypeVar(IN IR ** ir)
     ASSERT0(tir->is_stpr());
     ASSERT0(STPR_rhs(tir)->is_ld());
     UINT vx = get_vreg(STPR_no(tir));
-    VAR * v = LD_idinfo(STPR_rhs(tir));
+    Var * v = LD_idinfo(STPR_rhs(tir));
     CHAR const* n = SYM_name(VAR_name(v));
     UINT field_id = m_var2fieldid->get_mapped(v);
     LIRABOp * lir = (LIRABOp*)ymalloc(sizeof(LIRABOp));
@@ -122,7 +122,7 @@ LIR * IR2Dex::buildSgetObj(IN IR ** ir)
     ASSERT0(tir->is_stpr());
     ASSERT0(STPR_rhs(tir)->is_lda());
     UINT vx = get_vreg(STPR_no(tir));
-    VAR * v = LDA_idinfo(STPR_rhs(tir));
+    Var * v = LDA_idinfo(STPR_rhs(tir));
     CHAR const* n = SYM_name(VAR_name(v));
     UINT field_id = m_var2fieldid->get_mapped(v);
     LIRABOp * lir = (LIRABOp*)ymalloc(sizeof(LIRABOp));

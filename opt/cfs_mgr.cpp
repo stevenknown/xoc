@@ -93,7 +93,7 @@ AbsNode * CfsMgr::new_abs_node(ABS_TYPE ty)
 void CfsMgr::dump_indent(UINT indent)
 {
     while (indent != 0) {
-        prt(" ");
+        prt(getRegion(), " ");
         indent--;
     }
 }
@@ -101,7 +101,7 @@ void CfsMgr::dump_indent(UINT indent)
 
 void CfsMgr::dump_abs_tree(AbsNode * an)
 {
-    note("\n==---- DUMP AbsNode Tree ----==\n");
+    note(getRegion(), "\n==---- DUMP AbsNode Tree ----==\n");
     dump_abs_tree(an, 0);
 }
 
@@ -111,25 +111,25 @@ void CfsMgr::dump_abs_tree(AbsNode * an, UINT indent)
     while (an != NULL) {
         switch (ABS_NODE_type(an)) {
         case ABS_BB:
-            note("\n"); dump_indent(indent);
-            prt("BB%d", BB_id(ABS_NODE_bb(an)));
+            note(getRegion(), "\n"); dump_indent(indent);
+            prt(getRegion(), "BB%d", ABS_NODE_bb(an)->id());
             break;
         case ABS_LOOP:
-            note("\n"); dump_indent(indent);
-            prt("LOOP: HEAD=BB%d", BB_id(ABS_NODE_loop_head(an)));
+            note(getRegion(), "\n"); dump_indent(indent);
+            prt(getRegion(), "LOOP: HEAD=BB%d", ABS_NODE_loop_head(an)->id());
             dump_abs_tree(ABS_NODE_loop_body(an), indent + 4);
             break;
         case ABS_IF:
-            note("\n"); dump_indent(indent);
-            prt("IF: HEAD=BB%d", BB_id(ABS_NODE_if_head(an)));
+            note(getRegion(), "\n"); dump_indent(indent);
+            prt(getRegion(), "IF: HEAD=BB%d", ABS_NODE_if_head(an)->id());
             if (ABS_NODE_true_body(an) != NULL) {
-                note("\n"); dump_indent(indent);
-                prt("TRUE_BODY:");
+                note(getRegion(), "\n"); dump_indent(indent);
+                prt(getRegion(), "TRUE_BODY:");
                 dump_abs_tree(ABS_NODE_true_body(an), indent + 4);
             }
             if (ABS_NODE_false_body(an) != NULL) {
-                note("\n"); dump_indent(indent);
-                prt("FALSE_BODY:");
+                note(getRegion(), "\n"); dump_indent(indent);
+                prt(getRegion(), "FALSE_BODY:");
                 dump_abs_tree(ABS_NODE_false_body(an), indent + 4);
             }
             break;
@@ -141,28 +141,27 @@ void CfsMgr::dump_abs_tree(AbsNode * an, UINT indent)
 
 AbsNode * CfsMgr::map_bb2abs(IRBB const* bb)
 {
-    return m_map_bb2abs.get(BB_id(bb));
+    return m_map_bb2abs.get(bb->id());
 }
 
 
 void CfsMgr::set_map_bb2abs(IRBB const* bb, AbsNode * abs)
 {
-    m_map_bb2abs.set(BB_id(bb), abs);
+    m_map_bb2abs.set(bb->id(), abs);
 }
 
 
-AbsNode * CfsMgr::constructAbsLoop(
-        IN IRBB * entry,
-        IN AbsNode * parent,
-        IN xcom::BitSet * cur_region,
-        IN xcom::Graph & cur_graph,
-        IN OUT xcom::BitSet & visited)
+AbsNode * CfsMgr::constructAbsLoop(IN IRBB * entry,
+                                   IN AbsNode * parent,
+                                   IN xcom::BitSet * cur_region,
+                                   IN xcom::Graph & cur_graph,
+                                   IN OUT xcom::BitSet & visited)
 {
     DUMMYUSE(cur_region);
-    ASSERT0(cur_region == NULL || cur_region->is_contain(BB_id(entry)));
+    ASSERT0(cur_region == NULL || cur_region->is_contain(entry->id()));
     IRCFG * cfg = m_rg->getCFG();
     LI<IRBB> * li = cfg->mapBB2LabelInfo(entry);
-    ASSERT0(li != NULL && LI_loop_head(li) == entry);
+    ASSERT0(li != NULL && li->getLoopHead() == entry);
 
     AbsNode * node = new_abs_node(ABS_LOOP);
     set_map_bb2abs(entry, node);
@@ -176,22 +175,22 @@ AbsNode * CfsMgr::constructAbsLoop(
     CHECK_DUMMYUSE(ci);
     ASSERT0(CFS_INFO_head(ci) == entry);
 
-    ASSERT0(CFS_INFO_loop_body(ci)->is_contain(*LI_bb_set(li)));
+    ASSERT0(CFS_INFO_loop_body(ci)->is_contain(*li->getBodyBBSet()));
     xcom::BitSet loc_visited;
     ABS_NODE_loop_body(node) = constructAbsTree(body_start, node,
-        LI_bb_set(li), cur_graph, loc_visited);
+                                                li->getBodyBBSet(), cur_graph,
+                                                loc_visited);
     visited.bunion(loc_visited);
-    visited.bunion(BB_id(entry));
+    visited.bunion(entry->id());
     return node;
 }
 
 
 //'cur_region' covered 'entry'.
-AbsNode * CfsMgr::constructAbsIf(
-        IN IRBB * entry,
-        IN AbsNode * parent,
-        IN xcom::Graph & cur_graph,
-        IN OUT xcom::BitSet & visited)
+AbsNode * CfsMgr::constructAbsIf(IN IRBB * entry,
+                                 IN AbsNode * parent,
+                                 IN xcom::Graph & cur_graph,
+                                 IN OUT xcom::BitSet & visited)
 {
     AbsNode * node = new_abs_node(ABS_IF);
     set_map_bb2abs(entry, node);
@@ -212,7 +211,7 @@ AbsNode * CfsMgr::constructAbsIf(
     ABS_NODE_false_body(node) = constructAbsTree(false_body, node,
         CFS_INFO_false_body(ci), cur_graph, loc_visited);
     visited.bunion(loc_visited);
-    visited.bunion(BB_id(entry));
+    visited.bunion(entry->id());
     return node;
 }
 
@@ -257,12 +256,13 @@ AbsNode * CfsMgr::constructAbsTree(IN IRBB * entry,
     xcom::BitSet loc_visited;
     while (bb != NULL &&
            (cur_region == NULL ||
-            cur_region->is_contain(BB_id(bb)))) {
+            cur_region->is_contain(bb->id()))) {
         AbsNode * node = NULL;
         loc_visited.clean();
         LI<IRBB> * li = cfg->mapBB2LabelInfo(bb);
         if (li != NULL) {
-            node = constructAbsLoop(bb, parent, LI_bb_set(li), g, loc_visited);
+            node = constructAbsLoop(bb, parent, li->getBodyBBSet(),
+                                    g, loc_visited);
         } else {
             IR * last_xr = cfg->get_last_xr(bb);
             if (last_xr != NULL && //'bb' is branching node of IF.
@@ -276,16 +276,16 @@ AbsNode * CfsMgr::constructAbsTree(IN IRBB * entry,
                 //  return 2;
                 //
                 //  BB1 does not have a ipdom.
-                UINT ipdom = ((xcom::DGraph*)cfg)->get_ipdom(BB_id(bb));
+                UINT ipdom = ((xcom::DGraph*)cfg)->get_ipdom(bb->id());
                 DUMMYUSE(ipdom);
                 ASSERTN(ipdom > 0, ("bb does not have ipdom"));
                 node = constructAbsIf(bb, parent, g, loc_visited);
             } else {
                 node = constructAbsBB(bb, parent);
-                loc_visited.bunion(BB_id(bb));
+                loc_visited.bunion(bb->id());
             }
         }
-        insertbefore_one(&lst, lst, node);
+        xcom::insertbefore_one(&lst, lst, node);
 
         visited.bunion(loc_visited);
         //Remove visited vertex.
@@ -319,7 +319,7 @@ AbsNode * CfsMgr::constructAbsTree(IN IRBB * entry,
             break;
         }
     }
-    lst = reverse_list(lst);
+    lst = xcom::reverse_list(lst);
     return lst;
 }
 
@@ -328,10 +328,10 @@ AbsNode * CfsMgr::constructAbsTree(IN IRBB * entry,
 AbsNode * CfsMgr::constructAbstractControlFlowStruct()
 {
     IRCFG * cfg = m_rg->getCFG();
-    ASSERTN(cfg->get_entry(), ("CFG should be single-entry"));
+    ASSERTN(cfg->getEntry(), ("CFG should be single-entry"));
     xcom::BitSet visited;
-    AbsNode * a = constructAbsTree(cfg->get_entry(), NULL,
-        NULL, *(xcom::Graph*)cfg, visited);
+    AbsNode * a = constructAbsTree(cfg->getEntry(), NULL, NULL,
+                                   *(xcom::Graph*)cfg, visited);
     //dump_abs_tree(a);
     return a;
 }
