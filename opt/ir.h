@@ -1124,7 +1124,7 @@ public:
     //Set the relationship between parent and its kid.
     void setParentPointer(bool recur = true);
 
-    //The current ir is set to be kid's parent.
+    //Set current ir to be parent of 'kid'.
     void setParent(IR * kid)
     {
         ASSERT0(kid && is_kids(kid));
@@ -1232,8 +1232,8 @@ public:
 public:
     HOST_FP getFP() const { return CONST_fp_val(this); }
     BYTE getMantissa() const { return CONST_fp_mant(this); }
-    HOST_INT getINT() const { return CONST_int_val(this); }
-    Sym const* getSTR() const { return CONST_str_val(this); }
+    HOST_INT getInt() const { return CONST_int_val(this); }
+    Sym const* getStr() const { return CONST_str_val(this); }
     void * getAnonymousVal() const { return CONST_anony_val(this); }
 };
 
@@ -2078,6 +2078,7 @@ public:
         ASSERT0(xcom::in_list(PHI_opnd_list(this), marker));
         ASSERT0(!xcom::in_list(PHI_opnd_list(this), exp));
         xcom::insertbefore(&PHI_opnd_list(this), marker, exp);
+        IR_parent(exp) = this;
     }
 };
 

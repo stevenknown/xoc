@@ -766,7 +766,7 @@ bool GCSE::perform(OptCtx & oc)
 {
     BBList * bbl = m_rg->getBBList();
     if (bbl == NULL || bbl->get_elem_count() == 0) { return false; }
-    if (!OC_is_ref_valid(oc)) { return false; }
+    if (!oc.is_ref_valid()) { return false; }
     //Check PR DU chain.
     PRSSAMgr * ssamgr = (PRSSAMgr*)(m_rg->getPassMgr()->queryPass(
         PASS_PR_SSA_MGR));
@@ -775,7 +775,7 @@ bool GCSE::perform(OptCtx & oc)
     } else {
         m_ssamgr = NULL;
     }
-    if (!OC_is_pr_du_chain_valid(oc) && m_ssamgr == NULL) { 
+    if (!oc.is_pr_du_chain_valid() && m_ssamgr == NULL) { 
         //At least one kind of DU chain should be avaiable.
         return false;
     }
@@ -787,7 +787,7 @@ bool GCSE::perform(OptCtx & oc)
     } else {
         m_mdssamgr = NULL;
     }
-    if (!OC_is_nonpr_du_chain_valid(oc) && m_mdssamgr == NULL) {
+    if (!oc.is_nonpr_du_chain_valid() && m_mdssamgr == NULL) {
         //At least one kind of DU chain should be avaiable.
         return false;
     }

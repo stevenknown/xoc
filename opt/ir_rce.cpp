@@ -129,13 +129,13 @@ IR * RCE::calcCondMustVal(IN IR * ir,
                 if (must_true) {
                     ASSERT0(!must_false);
                     Type const* type = ir->getType();
-                    removeUse(ir, m_rg);
+                    removeIRTreeUse(ir, m_rg);
                     m_rg->freeIRTree(ir);
                     return m_rg->buildImmInt(1, type);
                 } else {
                     ASSERT0(must_false);
                     Type const* type = ir->getType();
-                    removeUse(ir, m_rg);
+                    removeIRTreeUse(ir, m_rg);
                     m_rg->freeIRTree(ir);
                     return m_rg->buildImmInt(0, type);
                 }
@@ -232,7 +232,7 @@ IR * RCE::processStore(IR * ir)
 {
     ASSERT0(ir->is_st());
     if (ST_rhs(ir)->getExactRef() == ir->getExactRef()) {
-        removeUse(ir, m_rg);
+        removeIRTreeUse(ir, m_rg);
         return NULL;
     }
     return ir;
@@ -244,7 +244,7 @@ IR * RCE::processStorePR(IR * ir)
 {
     ASSERT0(ir->is_stpr());
     if (STPR_rhs(ir)->getExactRef() == ir->getExactRef()) {
-        removeUse(ir, m_rg);
+        removeIRTreeUse(ir, m_rg);
         return NULL;
     }
     return ir;
@@ -306,17 +306,17 @@ bool RCE::perform(OptCtx & oc)
     BBList * bbl = m_rg->getBBList();
     if (bbl == NULL || bbl->get_elem_count() == 0) { return false; }
 
-    if (!OC_is_cfg_valid(oc)) { return false; }
-    if (!OC_is_ref_valid(oc)) { return false; }
+    if (!oc.is_cfg_valid()) { return false; }
+    if (!oc.is_ref_valid()) { return false; }
     m_refine = (Refine*)m_rg->getPassMgr()->queryPass(PASS_REFINE);
     m_mdssamgr = (MDSSAMgr*)m_rg->getPassMgr()->queryPass(PASS_MD_SSA_MGR);
     m_prssamgr = (PRSSAMgr*)m_rg->getPassMgr()->queryPass(PASS_PR_SSA_MGR);
-    if (!OC_is_pr_du_chain_valid(oc) && !usePRSSADU()) {
+    if (!oc.is_pr_du_chain_valid() && !usePRSSADU()) {
         //DCE use either classic PR DU chain or PRSSA.
         //At least one kind of DU chain should be avaiable.
         return false;
     }
-    if (!OC_is_nonpr_du_chain_valid(oc) && !useMDSSADU()) {
+    if (!oc.is_nonpr_du_chain_valid() && !useMDSSADU()) {
         //DCE use either classic MD DU chain or MDSSA.
         //At least one kind of DU chain should be avaiable.
         return false;

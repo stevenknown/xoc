@@ -55,7 +55,7 @@ VPR * VPRVec::findInitVersion() const
 {
     for (INT i = 0; i <= get_last_idx(); i++) {
         VPR * vpr = get(i);
-        if (vpr != NULL && vpr->version() == 0) {
+        if (vpr != NULL && vpr->version() == PRSSA_INIT_VERSION) {
             return vpr;
         }
     }

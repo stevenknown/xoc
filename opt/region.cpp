@@ -1383,9 +1383,9 @@ void Region::assignMDForBB(IRBB * bb,
                            bool assign_pr,
                            bool assign_nonpr)
 {
-    xcom::C<xoc::IR*> * ct;
-    for (xoc::IR * ir = BB_irlist(bb).get_head(&ct);
-         ir != NULL; ir = BB_irlist(bb).get_next(&ct)) {
+    BBIRListIter ct;
+    for (xoc::IR * ir = bb->getIRList()->get_head(&ct);
+         ir != NULL; ir = bb->getIRList()->get_next(&ct)) {
         for (IR * x = iterInit(ir, ii);
            x != NULL; x = iterNext(ii)) {
            assignMDImpl(x, assign_pr, assign_nonpr);
@@ -1617,15 +1617,31 @@ void Region::scanCallAndReturnList(OUT UINT & num_inner_region,
 }
 
 
+void Region::prescanBBList(BBList const* bblst)
+{
+    BBListIter bbit;
+    for (IRBB const* bb = bblst->get_head(&bbit);
+         bb != NULL; bb = bblst->get_next(&bbit)) {
+        BBIRListIter irct;
+        for (IR const* ir = const_cast<IRBB*>(bb)->getIRList()->
+                 get_head(&irct);
+             ir != NULL;
+             ir = const_cast<IRBB*>(bb)->getIRList()->get_next(&irct)) {
+            prescanIRList(ir);
+        }
+    }
+}
+
+
 //Prepare informations for analysis phase, such as record
 //which variables have been taken address for both
 //global and local variable.
-void Region::prescan(IR const* ir)
+void Region::prescanIRList(IR const* ir)
 {
     for (; ir != NULL; ir = ir->get_next()) {
         switch (ir->getCode()) {
         case IR_ST:
-            prescan(ST_rhs(ir));
+            prescanIRList(ST_rhs(ir));
             break;
         case IR_CALL:
         case IR_ICALL:
@@ -1639,7 +1655,7 @@ void Region::prescan(IR const* ir)
                 IR * k = ir->getKid(i);
                 if (k != NULL) {
                     ASSERT0(IR_parent(k) == ir);
-                    prescan(k);
+                    prescanIRList(k);
                 }
             }
             break;
@@ -1712,7 +1728,7 @@ void Region::prescan(IR const* ir)
                 IR * k = ir->getKid(i);
                 if (k != NULL) {
                     ASSERT0(IR_parent(k) == ir);
-                    prescan(k);
+                    prescanIRList(k);
                 }
             }
              break;
@@ -1721,7 +1737,7 @@ void Region::prescan(IR const* ir)
                 IR * k = ir->getKid(i);
                 if (k != NULL) {
                     ASSERT0(IR_parent(k) == ir);
-                    prescan(k);
+                    prescanIRList(k);
                 }
             }
         }
@@ -2088,7 +2104,207 @@ void Region::destroyPassMgr()
 }
 
 
-//Verify MD reference to stmts and expressions.
+static bool verifyMDRefForIR(IR const* ir, ConstIRIter & cii, Region * rg)
+{
+    for (IR const* t = iterInitC(ir, cii); t != NULL; t = iterNextC(cii)) {
+        switch (t->getCode()) {
+        case IR_ID:
+            //We do not need MD or MDSET information of IR_ID.
+            //ASSERT0(t->getExactRef());
+            ASSERT0(t->getRefMDSet() == NULL);
+            break;
+        case IR_LD:
+            if (g_is_support_dynamic_type) {
+                ASSERTN(t->getEffectRef(), ("type is at least effect"));
+                ASSERTN(!t->getEffectRef()->is_pr(),
+                        ("MD can not present a PR."));
+            } else {
+                ASSERTN(t->getExactRef(), ("type must be exact"));
+                ASSERTN(!t->getExactRef()->is_pr(),
+                        ("MD can not present a PR."));
+            }
+
+            //MayUse of ld may not empty.
+            //e.g: cvt(ld(id(x,i8)), i32) x has exact md4(size=1), and
+            //an overlapped md5(size=4).
+
+            if (t->getRefMDSet() != NULL) {
+                ASSERT0(rg->getMDSetHash()->find(*t->getRefMDSet()));
+            }
+            break;
+        case IR_PR:
+            if (g_is_support_dynamic_type) {
+                ASSERTN(t->getEffectRef(), ("type is at least effect"));
+                ASSERTN(t->getEffectRef()->is_pr(),
+                        ("MD must present a PR."));
+            } else {
+                ASSERTN(t->getExactRef(), ("type must be exact"));
+                ASSERTN(t->getExactRef()->is_pr(),
+                        ("MD must present a PR."));
+            }
+            ASSERT0(t->getRefMDSet() == NULL);
+            break;
+        case IR_STARRAY: {
+            MD const* must = t->getEffectRef();
+            MDSet const* may = t->getRefMDSet();
+            DUMMYUSE(must);
+            DUMMYUSE(may);
+            ASSERT0(must || (may && !may->is_empty()));
+            if (must != NULL) {
+                //PR can not be accessed by indirect operation.
+                ASSERT0(!must->is_pr());
+            }
+
+            if (may != NULL) {
+                //PR can not be accessed by indirect operation.
+                MDSetIter iter;
+                for (INT i = may->get_first(&iter);
+                     i >= 0; i = may->get_next(i, &iter)) {
+                    MD const* x = rg->getMDSystem()->getMD(i);
+                    DUMMYUSE(x);
+                    ASSERT0(x && !x->is_pr());
+                    ASSERT0(!x->get_base()->is_readonly());
+                }
+                ASSERT0(rg->getMDSetHash()->find(*may));
+            }
+            break;
+        }
+        case IR_ARRAY:
+        case IR_ILD: {
+            MD const* mustuse = t->getEffectRef();
+            MDSet const* mayuse = t->getRefMDSet();
+            DUMMYUSE(mustuse);
+            DUMMYUSE(mayuse);
+            ASSERT0(mustuse || (mayuse && !mayuse->is_empty()));
+            if (mustuse != NULL) {
+                //PR can not be accessed by indirect operation.
+                ASSERT0(!mustuse->is_pr());
+            }
+
+            if (mayuse != NULL) {
+                //PR can not be accessed by indirect operation.
+                MDSetIter iter;
+                for (INT i = mayuse->get_first(&iter);
+                     i >= 0; i = mayuse->get_next(i, &iter)) {
+                    MD const* x = rg->getMDSystem()->getMD(i);
+                    DUMMYUSE(x);
+                    ASSERT0(x && !x->is_pr());
+                }
+                ASSERT0(rg->getMDSetHash()->find(*mayuse));
+            }
+            break;
+        }
+        case IR_ST: {
+            MD const* x = t->getRefMD();
+            ASSERT0(!x->get_base()->is_readonly());
+            if (g_is_support_dynamic_type) {
+                ASSERTN(t->getEffectRef(),
+                        ("type is at least effect"));
+                ASSERTN(!t->getEffectRef()->is_pr(),
+                        ("MD can not present a PR."));
+            } else {
+                ASSERTN(t->getExactRef(), ("type must be exact"));
+                ASSERTN(!t->getExactRef()->is_pr(),
+                        ("MD can not present a PR."));
+            }
+            //ST may modify overlapped memory object.
+            if (t->getRefMDSet() != NULL) {
+                ASSERT0(rg->getMDSetHash()->find(*t->getRefMDSet()));
+            }
+            break;
+        }
+        case IR_SETELEM:
+            if (g_is_support_dynamic_type) {
+                ASSERTN(t->getEffectRef(), ("type is at least effect"));
+                ASSERTN(t->getEffectRef()->is_pr(),
+                        ("MD must present a PR."));
+            } else {
+                MD const* md = t->getEffectRef();
+                ASSERT0(md);
+                if (!md->is_exact()) {
+                    ASSERTN(md->is_range(), ("type must be range"));
+                }
+                ASSERTN(md->is_pr(), ("MD must present a PR."));
+            }
+            ASSERT0(t->getRefMDSet() == NULL);
+            break;
+        case IR_STPR:
+        case IR_GETELEM:
+            if (g_is_support_dynamic_type) {
+                ASSERTN(t->getEffectRef(), ("type is at least effect"));
+                ASSERTN(t->getEffectRef()->is_pr(),
+                        ("MD must present a PR."));
+            } else {
+                ASSERTN(t->getExactRef(), ("type must be exact"));
+                ASSERTN(t->getExactRef()->is_pr(),
+                        ("MD must present a PR."));
+            }
+            ASSERT0(t->getRefMDSet() == NULL);
+            break;
+        case IR_IST: {
+            MD const* mustdef = t->getRefMD();
+            if (mustdef != NULL) {
+                //mustdef may be fake object, e.g: global memory.
+                //ASSERT0(mustdef->is_effect());
+
+                //PR can not be accessed by indirect operation.
+                ASSERT0(!mustdef->is_pr());
+            }
+
+            MDSet const* maydef = t->getRefMDSet();
+            ASSERT0(mustdef != NULL ||
+                    (maydef != NULL && !maydef->is_empty()));
+            if (maydef != NULL) {
+                //PR can not be accessed by indirect operation.
+                MDSetIter iter;
+                for (INT i = maydef->get_first(&iter);
+                     i >= 0; i = maydef->get_next(i, &iter)) {
+                    MD const* x = rg->getMDSystem()->getMD(i);
+                    DUMMYUSE(x);
+                    ASSERT0(x && !x->is_pr());
+                }
+                ASSERT0(rg->getMDSetHash()->find(*maydef));
+            }
+            break;
+        }
+        case IR_CALL:
+        case IR_ICALL:
+            if (t->getRefMDSet() != NULL) {
+                ASSERT0(rg->getMDSetHash()->find(*t->getRefMDSet()));
+            }
+            break;
+        case IR_PHI:
+            ASSERT0(t->getEffectRef() && t->getEffectRef()->is_pr());
+            ASSERT0(t->getRefMDSet() == NULL);
+            break;
+        SWITCH_CASE_BIN:
+        SWITCH_CASE_UNA:
+        //CVT should not have any reference. Even if the
+        //operation will genrerate different type memory
+        //accessing.
+        case IR_CONST:
+        case IR_LDA:
+        case IR_SELECT:
+        case IR_CASE:
+        case IR_BREAK:
+        case IR_CONTINUE:
+        case IR_TRUEBR:
+        case IR_FALSEBR:
+        case IR_GOTO:
+        case IR_IGOTO:
+        case IR_SWITCH:
+        case IR_RETURN:
+        case IR_REGION:
+            ASSERT0(t->getRefMD() == NULL && t->getRefMDSet() == NULL);
+            break;
+        default: ASSERTN(0, ("unsupport ir type"));
+        }
+    }
+    return true;
+}
+
+
+//Verify MD reference to each stmts and expressions which described memory.
 bool Region::verifyMDRef()
 {
     ConstIRIter cii;
@@ -2096,210 +2312,14 @@ bool Region::verifyMDRef()
     for (IRBB * bb = bbl->get_head(); bb != NULL; bb = bbl->get_next()) {
         for (IR * ir = BB_first_ir(bb); ir != NULL; ir = BB_next_ir(bb)) {
             cii.clean();
-            for (IR const* t = iterInitC(ir, cii);
-                 t != NULL; t = iterNextC(cii)) {
-                switch (t->getCode()) {
-                case IR_ID:
-                    //We do not need MD or MDSET information of IR_ID.
-                    //ASSERT0(t->getExactRef());
-                    ASSERT0(t->getRefMDSet() == NULL);
-                    break;
-                case IR_LD:
-                    if (g_is_support_dynamic_type) {
-                        ASSERTN(t->getEffectRef(), ("type is at least effect"));
-                        ASSERTN(!t->getEffectRef()->is_pr(),
-                                ("MD can not present a PR."));
-                    } else {
-                        ASSERTN(t->getExactRef(), ("type must be exact"));
-                        ASSERTN(!t->getExactRef()->is_pr(),
-                                ("MD can not present a PR."));
-                    }
-
-                    //MayUse of ld may not empty.
-                    //e.g: cvt(ld(id(x,i8)), i32) x has exact md4(size=1), and
-                    //an overlapped md5(size=4).
-
-                    if (t->getRefMDSet() != NULL) {
-                        ASSERT0(getMDSetHash()->find(*t->getRefMDSet()));
-                    }
-                    break;
-                case IR_PR:
-                    if (g_is_support_dynamic_type) {
-                        ASSERTN(t->getEffectRef(), ("type is at least effect"));
-                        ASSERTN(t->getEffectRef()->is_pr(),
-                                ("MD must present a PR."));
-                    } else {
-                        ASSERTN(t->getExactRef(), ("type must be exact"));
-                        ASSERTN(t->getExactRef()->is_pr(),
-                                ("MD must present a PR."));
-                    }
-                    ASSERT0(t->getRefMDSet() == NULL);
-                    break;
-                case IR_STARRAY: {
-                    MD const* must = t->getEffectRef();
-                    MDSet const* may = t->getRefMDSet();
-                    DUMMYUSE(must);
-                    DUMMYUSE(may);
-                    ASSERT0(must || (may && !may->is_empty()));
-                    if (must != NULL) {
-                        //PR can not be accessed by indirect operation.
-                        ASSERT0(!must->is_pr());
-                    }
-
-                    if (may != NULL) {
-                        //PR can not be accessed by indirect operation.
-                        MDSetIter iter;
-                        for (INT i = may->get_first(&iter);
-                             i >= 0; i = may->get_next(i, &iter)) {
-                            MD const* x = getMDSystem()->getMD(i);
-                            DUMMYUSE(x);
-                            ASSERT0(x && !x->is_pr());
-                            ASSERT0(!x->get_base()->is_readonly());
-                        }
-                        ASSERT0(getMDSetHash()->find(*may));
-                    }
-                    break;
-                }
-                case IR_ARRAY:
-                case IR_ILD: {
-                    MD const* mustuse = t->getEffectRef();
-                    MDSet const* mayuse = t->getRefMDSet();
-                    DUMMYUSE(mustuse);
-                    DUMMYUSE(mayuse);
-
-                    ASSERT0(mustuse || (mayuse && !mayuse->is_empty()));
-                    if (mustuse != NULL) {
-                        //PR can not be accessed by indirect operation.
-                        ASSERT0(!mustuse->is_pr());
-                    }
-
-                    if (mayuse != NULL) {
-                        //PR can not be accessed by indirect operation.
-                        MDSetIter iter;
-                        for (INT i = mayuse->get_first(&iter);
-                             i >= 0; i = mayuse->get_next(i, &iter)) {
-                            MD const* x = getMDSystem()->getMD(i);
-                            DUMMYUSE(x);
-                            ASSERT0(x && !x->is_pr());
-                        }
-                        ASSERT0(getMDSetHash()->find(*mayuse));
-                    }
-                    break;
-                }
-                case IR_ST: {
-                    MD const* x = t->getRefMD();
-                    ASSERT0(!x->get_base()->is_readonly());
-                    if (g_is_support_dynamic_type) {
-                        ASSERTN(t->getEffectRef(),
-                                ("type is at least effect"));
-                        ASSERTN(!t->getEffectRef()->is_pr(),
-                                ("MD can not present a PR."));
-                    } else {
-                        ASSERTN(t->getExactRef(), ("type must be exact"));
-                        ASSERTN(!t->getExactRef()->is_pr(),
-                                ("MD can not present a PR."));
-                    }
-                    //ST may modify overlapped memory object.
-                    if (t->getRefMDSet() != NULL) {
-                        ASSERT0(getMDSetHash()->find(*t->getRefMDSet()));
-                    }
-                    break;
-                }
-                case IR_SETELEM:
-                    if (g_is_support_dynamic_type) {
-                        ASSERTN(t->getEffectRef(), ("type is at least effect"));
-                        ASSERTN(t->getEffectRef()->is_pr(),
-                                ("MD must present a PR."));
-                    } else {
-                        MD const* md = t->getEffectRef();
-                        ASSERT0(md);
-                        if (!md->is_exact()) {
-                            ASSERTN(md->is_range(), ("type must be range"));
-                        }
-                        ASSERTN(md->is_pr(), ("MD must present a PR."));
-                    }
-                    ASSERT0(t->getRefMDSet() == NULL);
-                    break;
-                case IR_STPR:
-                case IR_GETELEM:
-                    if (g_is_support_dynamic_type) {
-                        ASSERTN(t->getEffectRef(), ("type is at least effect"));
-                        ASSERTN(t->getEffectRef()->is_pr(),
-                                ("MD must present a PR."));
-                    } else {
-                        ASSERTN(t->getExactRef(), ("type must be exact"));
-                        ASSERTN(t->getExactRef()->is_pr(),
-                                ("MD must present a PR."));
-                    }
-                    ASSERT0(t->getRefMDSet() == NULL);
-                    break;
-                case IR_IST: {
-                        MD const* mustdef = t->getRefMD();
-                        if (mustdef != NULL) {
-                            //mustdef may be fake object, e.g: global memory.
-                            //ASSERT0(mustdef->is_effect());
-
-                            //PR can not be accessed by indirect operation.
-                            ASSERT0(!mustdef->is_pr());
-                        }
-
-                        MDSet const* maydef = t->getRefMDSet();
-                        ASSERT0(mustdef != NULL ||
-                            (maydef != NULL && !maydef->is_empty()));
-                        if (maydef != NULL) {
-                            //PR can not be accessed by indirect operation.
-                            MDSetIter iter;
-                            for (INT i = maydef->get_first(&iter);
-                                 i >= 0; i = maydef->get_next(i, &iter)) {
-                                MD const* x = getMDSystem()->getMD(i);
-                                DUMMYUSE(x);
-                                ASSERT0(x && !x->is_pr());
-                            }
-                            ASSERT0(getMDSetHash()->find(*maydef));
-                        }
-                    }
-                    break;
-                case IR_CALL:
-                case IR_ICALL:
-                    if (t->getRefMDSet() != NULL) {
-                        ASSERT0(getMDSetHash()->find(*t->getRefMDSet()));
-                    }
-                    break;
-                case IR_PHI:
-                    ASSERT0(t->getEffectRef() && t->getEffectRef()->is_pr());
-                    ASSERT0(t->getRefMDSet() == NULL);
-                    break;
-                SWITCH_CASE_BIN:
-                SWITCH_CASE_UNA:
-                //CVT should not have any reference. Even if the
-                //operation will genrerate different type memory
-                //accessing.
-                case IR_CONST:
-                case IR_LDA:
-                case IR_SELECT:
-                case IR_CASE:
-                case IR_BREAK:
-                case IR_CONTINUE:
-                case IR_TRUEBR:
-                case IR_FALSEBR:
-                case IR_GOTO:
-                case IR_IGOTO:
-                case IR_SWITCH:
-                case IR_RETURN:
-                case IR_REGION:
-                    ASSERT0(t->getRefMD() == NULL && t->getRefMDSet() == NULL);
-                    break;
-                default: ASSERTN(0, ("unsupport ir type"));
-                }
-            }
+            verifyMDRefForIR(ir, cii, this);
         }
     }
     return true;
 }
 
 
-//Ensure that each IR in ir_list must be allocated in
-//current region.
+//Ensure that each IR in ir_list must be allocated in current region.
 bool Region::verifyIROwnership()
 {
     IR const* ir = getIRList();
@@ -2348,7 +2368,7 @@ bool Region::verifyBBlist(BBList & bbl)
                 for (IR * caseexp = IGOTO_case_list(last); caseexp != NULL;
                     caseexp = caseexp->get_next()) {
                     ASSERTN(lab2bb.get(CASE_lab(caseexp)),
-                        ("target cannot be NULL"));
+                            ("target cannot be NULL"));
                 }
             }
         }
@@ -2810,6 +2830,15 @@ bool Region::processBBList(OptCtx & oc)
     if (getBBList() == NULL || getBBList()->get_elem_count() == 0) {
         return true;
     }
+
+    START_TIMER(t, "PreScan");
+    prescanBBList(getBBList());
+    END_TIMER(t, "PreScan");
+    if (g_is_dump_after_pass && g_dump_opt.isDumpALL()) {
+        note(this, "\n==--- DUMP PRIMITIVE IRBB LIST ----==");
+        dumpBBList();
+    }
+
     return MiddleProcess(oc);
 }
 
@@ -2819,7 +2848,7 @@ bool Region::processIRList(OptCtx & oc)
     if (getIRList() == NULL) { return true; }
 
     START_TIMER(t, "PreScan");
-    prescan(getIRList());
+    prescanIRList(getIRList());
     END_TIMER(t, "PreScan");
     if (g_is_dump_after_pass && g_dump_opt.isDumpALL()) {
         note(this, "\n==--- DUMP PRIMITIVE IR LIST ----==");
@@ -2838,90 +2867,90 @@ bool Region::processIRList(OptCtx & oc)
 }
 
 
+static void post_process(Region * rg, OptCtx * oc)
+{
+    PRSSAMgr * ssamgr = (PRSSAMgr*)rg->getPassMgr()->queryPass(
+        PASS_PR_SSA_MGR);
+    if (ssamgr != NULL && ssamgr->is_valid()) {
+        ssamgr->destruction(oc);
+        rg->getPassMgr()->destroyPass(ssamgr);
+    }
+
+    MDSSAMgr * mdssamgr = (MDSSAMgr*)rg->getPassMgr()->queryPass(
+        PASS_MD_SSA_MGR);
+    if (mdssamgr != NULL && mdssamgr->is_valid()) {
+        mdssamgr->destruction(oc);
+        rg->getPassMgr()->destroyPass(mdssamgr);
+    }
+
+    if (!g_retain_pass_mgr_for_region) {
+        rg->destroyPassMgr();
+    }
+
+    rg->updateCallAndReturnList(true);
+    tfree();
+}
+
+
+static void do_ipa(Region * rg, OptCtx * oc)
+{
+    if (!oc->is_callg_valid()) {
+        //processFuncRegion has scanned and collected call-list.
+        //Thus it does not need to scan call-list here.
+        rg->getRegionMgr()->buildCallGraph(*oc, true, true);
+    }
+
+    if (oc->is_callg_valid()) {
+        IPA * ipa = (IPA*)rg->getPassMgr()->registerPass(PASS_IPA);
+        ipa->perform(*oc);
+        rg->getPassMgr()->destroyPass(ipa);
+    }
+}
+
+
+static void do_inline(Region * rg, OptCtx * oc)
+{
+    //Need to scan call-list.
+    rg->getRegionMgr()->buildCallGraph(*oc, true, true);
+    if (oc->is_callg_valid()) {
+        Inliner * inl = (Inliner*)rg->getPassMgr()->registerPass(PASS_INLINER);
+        inl->perform(*oc);
+        rg->getPassMgr()->destroyPass(inl);
+    }
+}
+
+
 //Return true if all passes finished normally, otherwise return false.
 bool Region::process(OptCtx * oc)
 {
     ASSERTN(oc, ("Need OptCtx"));
     ASSERT0(verifyIROwnership());
-
-    if (getIRList() == NULL &&
-        getBBList()->get_elem_count() == 0) {
+    if (getIRList() == NULL && getBBList()->get_elem_count() == 0) {
         return true;
     }
-
-    OC_show_comp_time(*oc) = g_show_time;
+    
     initPassMgr();
-
     if (g_do_inline && is_program()) {
-        //Need to scan call-list.
-        getRegionMgr()->buildCallGraph(*oc, true, true);
-        if (OC_is_callg_valid(*oc)) {
-            Inliner * inl = (Inliner*)getPassMgr()->
-                registerPass(PASS_INLINER);
-            inl->perform(*oc);
-            getPassMgr()->destroyPass(inl);
-        }
+        do_inline(this, oc);
     }
 
-    PRSSAMgr * ssamgr = NULL;
-    MDSSAMgr * mdssamgr = NULL;
     getPassMgr()->registerPass(PASS_REFINE)->perform(*oc);
     if (getIRList() != NULL) {
-        if (!processIRList(*oc)) { goto ERR_RET; }
+        if (!processIRList(*oc)) { goto ERR_RETURN; }
     } else {
-        if (!processBBList(*oc)) { goto ERR_RET; }
+        if (!processBBList(*oc)) { goto ERR_RETURN; }
     }
 
     if (g_do_ipa && is_program()) {
-        if (!OC_is_callg_valid(*oc)) {
-            //processFuncRegion has scanned and collected call-list.
-            //Thus it does not need to scan call-list here.
-            getRegionMgr()->buildCallGraph(*oc, true, true);
-        }
-
-        if (OC_is_callg_valid(*oc)) {
-            IPA * ipa = (IPA*)getPassMgr()->registerPass(PASS_IPA);
-            ipa->perform(*oc);
-            getPassMgr()->destroyPass(ipa);
-        }
+        do_ipa(this, oc);
     }
 
-    ssamgr = (PRSSAMgr*)getPassMgr()->queryPass(PASS_PR_SSA_MGR);
-    if (ssamgr != NULL && ssamgr->is_valid()) {
-        ssamgr->destruction(oc);
-        getPassMgr()->destroyPass(ssamgr);
-    }
-
-    mdssamgr = (MDSSAMgr*)getPassMgr()->queryPass(PASS_MD_SSA_MGR);
-    if (mdssamgr != NULL && mdssamgr->is_valid()) {
-        mdssamgr->destruction(oc);
-        getPassMgr()->destroyPass(mdssamgr);
-    }
-
-    if (!g_retain_pass_mgr_for_region) {
-        destroyPassMgr();        
-    }
-
-    updateCallAndReturnList(true);
-    tfree();
+    post_process(this, oc);
     //oc->set_all_invalid();
     return true;
 
-ERR_RET:
-    ASSERT0(getPassMgr());
-    ssamgr = (PRSSAMgr*)getPassMgr()->queryPass(PASS_PR_SSA_MGR);
-    if (ssamgr != NULL && ssamgr->is_valid()) {
-        ssamgr->destruction(oc);
-        getPassMgr()->destroyPass(ssamgr);
-    }
-    mdssamgr = (MDSSAMgr*)getPassMgr()->queryPass(PASS_MD_SSA_MGR);
-    if (mdssamgr != NULL && mdssamgr->is_valid()) {
-        mdssamgr->destruction(oc);
-        getPassMgr()->destroyPass(mdssamgr);
-    }
-    if (!g_retain_pass_mgr_for_region) {
-        destroyPassMgr();
-    }
+ERR_RETURN:
+    post_process(this, oc);
     oc->set_all_invalid();
     return false;
 }

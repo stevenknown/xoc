@@ -39,6 +39,7 @@ namespace xoc {
 class IRBB;
 template <class IRBB, class IR> class CFG;
 typedef xcom::C<IR*> * IRListIter;
+typedef IRListIter BBIRListIter;
 #define BBID_UNDEF VERTEX_UNDEF
 
 //
@@ -162,10 +163,6 @@ public:
 class IRBB {
     COPY_CONSTRUCTOR(IRBB);
 public:
-    UINT m_id; //BB's id
-    INT m_rpo; //reverse post order
-    BBIRList ir_list; //IR list
-    List<LabelInfo const*> lab_list; //Record labels attached on BB
     union {
         struct {
             BYTE is_entry:1; //bb is entry of the region.
@@ -178,6 +175,10 @@ public:
         } s1;
         BYTE u1b1;
     } u1;
+    UINT m_id; //BB's id
+    INT m_rpo; //reverse post order
+    BBIRList ir_list; //IR list
+    List<LabelInfo const*> lab_list; //Record labels attached on BB
 
 public:
     IRBB()

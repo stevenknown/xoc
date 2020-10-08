@@ -137,8 +137,22 @@ bool CfsOpt::transformToDoWhile(IR ** head, IR * ir)
             }
             xcom::insertafter(&ir, dowhile);
             m_rg->freeIRTree(if_stmt); //free IF
-            xcom::remove(head, ir);
-            m_rg->freeIRTree(ir); //free LABEL
+
+            //Do not remove label because it might be used as target of
+            //other branch stmt.
+            //e.g:
+            // int test()
+            // {
+            //  ENTRY:
+            //    goto BODY;
+            //  BODY:
+            //    if (a > 0) {
+            //        goto BODY;
+            //    }
+            //    return 0;
+            // }
+            //xcom::remove(head, ir);
+            //m_rg->freeIRTree(ir); //free LABEL
             return true;
         }
     }
@@ -181,7 +195,6 @@ static inline bool is_non_branch_ir(IR * ir)
 bool CfsOpt::transformIf1(IR ** head, IR * ir)
 {
     ASSERTN(head && *head, ("invalid parameter"));
-
     if (ir == NULL || !ir->is_if()) { return false; }
 
     //Check true part.

@@ -385,6 +385,7 @@ void dumpBBList(BBList const* bbl,
                 bool dump_inner_region)
 {
     ASSERT0(rg && bbl);
+    if (!rg->isLogMgrInit()) { return; }
     if (bbl->get_elem_count() != 0) {
         note(rg, "\n==---- DUMP IRBBList '%s' ----==", rg->getRegionName());
         C<IRBB*> * ct = NULL;

@@ -140,16 +140,24 @@ public:
 //Version PR.
 //Record original PRNO before SSA construction.
 #define VPR_orgprno(v) (((VPR*)v)->m_orgprno)
+
+//Record original PRNO data type.
+#define VPR_orgpr_type(v) (((VPR*)v)->m_orgpr_type)
+
 //Record renamed PRNO after SSA construction.
 #define VPR_newprno(v) (((VPR*)v)->m_newprno)
+
 //Record Version related to original PRNO.
 #define VPR_version(v) (((VPR*)v)->m_version)
+
 class VPR : public SSAInfo {
     COPY_CONSTRUCTOR(VPR);
 public:
     UINT m_version; //record Version related to original PRNO.
     UINT m_newprno; //record renamed PRNO after SSA construction.
     UINT m_orgprno; //record original PRNO before SSA construction.
+    Type const* m_orgpr_type; //record original PRNO data type.
+public:
     VPR(DefSegMgr * sm) : SSAInfo(sm) { cleanMember(); }
 
     inline void cleanMember()
@@ -158,6 +166,7 @@ public:
         m_newprno = PRNO_UNDEF;
         m_orgprno = PRNO_UNDEF;
         m_version = PRSSA_INIT_VERSION;
+        m_orgpr_type = NULL;
     }
 
     void init(DefSegMgr * sm)
@@ -165,9 +174,11 @@ public:
         cleanMember();
         SSAInfo::init(sm);
     }
+    bool is_init_version() const { return version() == PRSSA_INIT_VERSION; }
 
     UINT newprno() const { return VPR_newprno(this); }
     UINT orgprno() const { return VPR_orgprno(this); }
+    Type const* orgpr_type() const { return VPR_orgpr_type(this); }
 
     UINT version() const { return VPR_version(this); }
 };

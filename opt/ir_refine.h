@@ -187,6 +187,9 @@ class Refine : public Pass {
     IR * refineArray(IR * ir, bool & change, RefineCtx & rc);
     IR * refineNeg(IR * ir, bool & change);
     IR * refineNot(IR * ir, bool & change, RefineCtx & rc);
+    IR * refineAsr(IR * ir, bool & change);
+    IR * refineLsl(IR * ir, bool & change);
+    IR * refineLsr(IR * ir, bool & change);
     IR * refineBinaryOp(IR * ir, bool & change, RefineCtx & rc);
     IR * refineLoad(IR * ir);
     IR * refineILoad1(IR * ir, bool & change, RefineCtx & rc);

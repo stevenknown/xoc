@@ -188,7 +188,7 @@ void IPA::recomputeDUChain(Region * rg, OptCtx & oc)
     if (rg->getPassMgr() == NULL) {
         rg->initPassMgr();
     }
-    if (!OC_is_aa_valid(oc)) {
+    if (!oc.is_aa_valid()) {
         //DUMgr need AliasAnalysis
         rg->getPassMgr()->registerPass(PASS_AA);
     }

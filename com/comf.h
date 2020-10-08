@@ -65,6 +65,15 @@ template <typename T> int dummy_use(T const&) { return 0; }
 #endif
 
 
+//Compute the maximum unsigned integer value that type is ValueType.
+//e.g: given bitwidth is 3, return 7 as result.
+//Note ValueType should be unsigned integer type.
+template <class ValueType>
+inline ValueType computeUnsignedMaxValue(UINT bitwidth)
+{
+    return ((((ValueType)1) << bitwidth) - 1);
+}
+
 template <class T, UINT GrowSize> class Vector;
 
 //Arrangement
@@ -89,8 +98,11 @@ UINT combin(UINT n, UINT m); //Combination
 //e.g  v=17 , align=4 , the result is 20.
 LONGLONG ceil_align(LONGLONG v, LONGLONG align);
 
-//Caculate the number of bits which longer enough to represent given constant.
-UINT computeConstBitLen(ULONGLONG v);
+//Compute the number of bits which biger enough to represent given value.
+//value: the input value that to be check.
+//e.g: given 00101, it needs at least 3 bits to hold the binary value 101.
+//     and function return 3.
+UINT computeMaxBitSizeForValue(ULONGLONG v);
 
 //Dumpf() for Vector<TY>.
 void dumpf_svec(void * vec, UINT ty, CHAR const* name, bool is_del);

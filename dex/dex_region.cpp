@@ -162,8 +162,6 @@ void DexRegion::processSimply()
     if (getIRList() == NULL) { return ; }
 
     OptCtx oc;
-    OC_show_comp_time(oc) = g_show_comp_time;
-
     CHAR const* ru_name = getRegionName();
 
     constructBBList();
@@ -210,7 +208,6 @@ static void addCatchTypeName(DexRegion * rg)
 bool DexRegion::process(OptCtx * oc)
 {
     if (getIRList() == NULL) { return true; }
-    OC_show_comp_time(*oc) = g_show_comp_time;
     if (!g_silence) {
         LOG("DexRegion process %s", getRegionName());
     }

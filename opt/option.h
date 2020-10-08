@@ -69,7 +69,6 @@ class PassMgr;
 #define OC_is_rpo_valid(o) ((o).u1.s1.is_rpo_valid)
 #define OC_is_loopinfo_valid(o) ((o).u1.s1.is_loopinfo_valid)
 #define OC_is_callg_valid(o) ((o).u1.s1.is_callg_valid)
-#define OC_show_comp_time(o) ((o).u2.s1.show_compile_time)
 class OptCtx {
 public:
     union {
@@ -104,16 +103,28 @@ public:
         } s1;
     } u1;
 
-    union {
-        UINT int1;
-        struct {
-            UINT show_compile_time:1; //Show compilation time.
-        } s1;
-    } u2;
-
 public:
-    OptCtx() { set_all_invalid(); u2.int1 = 0; }
+    OptCtx() { set_all_invalid(); }
     OptCtx const& operator = (OptCtx const&);
+
+    bool is_ref_valid() const { return OC_is_ref_valid(*this); }
+    bool is_pr_du_chain_valid() const
+    { return OC_is_pr_du_chain_valid(*this); }
+    bool is_nonpr_du_chain_valid() const
+    { return OC_is_nonpr_du_chain_valid(*this); }
+    bool is_live_expr_valid() const { return OC_is_live_expr_valid(*this); }
+    bool is_reach_def_valid() const { return OC_is_reach_def_valid(*this); }
+    bool is_avail_reach_def_valid() const
+    { return OC_is_avail_reach_def_valid(*this); }
+    bool is_cfg_valid() const { return OC_is_cfg_valid(*this); }
+    bool is_aa_valid() const { return OC_is_aa_valid(*this); }
+    bool is_expr_tab_valid() const { return OC_is_expr_tab_valid(*this); }
+    bool is_cdg_valid() const { return OC_is_cdg_valid(*this); }
+    bool is_dom_valid() const { return OC_is_dom_valid(*this); }
+    bool is_pdom_valid() const { return OC_is_pdom_valid(*this); }
+    bool is_rpo_valid() const { return OC_is_rpo_valid(*this); }
+    bool is_loopinfo_valid() const { return OC_is_loopinfo_valid(*this); }
+    bool is_callg_valid() const { return OC_is_callg_valid(*this); }
 
     void set_all_valid() { u1.int1 = (UINT)-1; }
     void set_all_invalid() { u1.int1 = 0; }

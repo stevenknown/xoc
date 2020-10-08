@@ -607,7 +607,7 @@ bool IVR::perform(OptCtx & oc)
                                  PASS_DU_REF, PASS_DOM, PASS_LOOP_INFO,
                                  PASS_DU_CHAIN, PASS_RPO, PASS_UNDEF);
 
-    if (!OC_is_ref_valid(oc)) {
+    if (!oc.is_ref_valid()) {
         END_TIMER(t, getPassName());
         return false;
     }
@@ -619,7 +619,7 @@ bool IVR::perform(OptCtx & oc)
     } else {
         m_ssamgr = NULL;
     }
-    if (!OC_is_pr_du_chain_valid(oc) && m_ssamgr == NULL) { 
+    if (!oc.is_pr_du_chain_valid() && m_ssamgr == NULL) { 
         //At least one kind of DU chain should be avaiable.
         END_TIMER(t, getPassName());
         return false;
@@ -632,7 +632,7 @@ bool IVR::perform(OptCtx & oc)
     } else {
         m_mdssamgr = NULL;
     }
-    if (!OC_is_nonpr_du_chain_valid(oc) && m_mdssamgr == NULL) {
+    if (!oc.is_nonpr_du_chain_valid() && m_mdssamgr == NULL) {
         //At least one kind of DU chain should be avaiable.
         END_TIMER(t, getPassName());
         return false;

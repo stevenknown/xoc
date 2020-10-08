@@ -55,14 +55,15 @@ void changeDef(IR * olddef, IR * newdef, Region * rg);
 //Note this function does not modify stmt.
 bool removeExpiredDUForStmt(IR * stmt, Region * rg);
 
-//Remove Use-Def chain.
+//Remove Use-Def chain for all memory references in IR Tree
+//that rooted by 'exp'.
 //e.g: ir = ...
 //        = exp //S1
 //If S1 will be deleted, exp should be removed from its UseSet in MDSSAInfo.
 //NOTE: If exp is an IR tree, e.g: ild(x, ld(y)), remove ild(x) means
 //ld(y) will be removed as well. And ld(y)'s MDSSAInfo will be
 //updated as well.
-void removeUse(IR * exp, Region * rg);
+void removeIRTreeUse(IR * exp, Region * rg);
 
 //Remove all DU info of 'stmt'.
 void removeStmt(IR * stmt, Region * rg);

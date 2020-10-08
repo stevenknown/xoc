@@ -68,7 +68,8 @@ protected:
     //ct: container in m_bb_list of CFG.
     //    It will be updated if related BB removed.
     bool removeTrampolinBBCase1(BBListIter * ct);
-    bool removeTrampolinEdgeForCase2(BBListIter ct);
+    bool removeTrampolinEdgeCase1(BBListIter bbct);
+    bool removeTrampolinEdgeCase2(BBListIter bbct);
 
 public:
     enum { DUMP_DETAIL = 0x1, DUMP_EH = 0x2, DUMP_MDSSA = 0x4 };
@@ -185,6 +186,7 @@ public:
     void insertBBbefore(IN IRBB * bb, IN IRBB * newbb);
 
     //Return the inserted trampolining BB if exist.
+    //This function will break fallthrough edge of 'to' if necessary.
     IRBB * insertBBbetween(IN IRBB * from,
                            IN BBListIter from_ct,
                            IN IRBB * to,

@@ -131,7 +131,7 @@ void CDG::build(IN OUT OptCtx & oc, xcom::DGraph & cfg)
     if (cfg.getVertexNum() == 0) { return; }
 
     START_TIMER(t, "Build CDG");
-    ASSERT0(OC_is_cfg_valid(oc));
+    ASSERT0(oc.is_cfg_valid());
     m_rg->checkValidAndRecompute(&oc, PASS_PDOM, PASS_UNDEF);
 
     xcom::Graph pdom_tree;

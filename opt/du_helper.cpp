@@ -146,7 +146,7 @@ void coalesceDUChain(IR * from, IR * to, Region * rg)
 //NOTE: If ir is a IR tree, e.g: ild(x, ld(y)), remove ild(x) means
 //ld(y) will be removed as well. And ld(y)'s MDSSAInfo will be
 //updated as well.
-void removeUse(IR * exp, Region * rg)
+void removeIRTreeUse(IR * exp, Region * rg)
 {
     ASSERT0(exp && exp->is_exp());
     PRSSAMgr::removePRSSAUse(exp);

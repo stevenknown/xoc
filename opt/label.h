@@ -39,7 +39,7 @@ namespace xoc {
 typedef enum {
     L_UNDEF = 0,
     L_CLABEL, //customer defined label
-    L_ILABEL, //internal generated label
+    L_ILABEL, //internal generated label by compiler
     L_PRAGMA, //pragma
 } LABEL_TYPE;
 
@@ -117,6 +117,7 @@ public:
     bool is_catch_start() const { return LABELINFO_is_catch_start(this); }
     bool is_try_start() const { return LABELINFO_is_try_start(this); }
     bool is_try_end() const { return LABELINFO_is_try_end(this); }
+    bool is_pragma() const { return LABELINFO_is_pragma(this); }
     bool is_terminate() const { return LABELINFO_is_terminate(this); }
 };
 

@@ -607,6 +607,7 @@ bool IRParser::declareRegion(ParseCtx * ctx)
 
         //TODO: build cfg by given parameters.
         if (newctx.has_phi) {
+            //GR can not include CFS when PHI is in used.
             ASSERT0(!newctx.has_high_level_ir);
         }
         if (newctx.has_phi) {
@@ -616,17 +617,8 @@ bool IRParser::declareRegion(ParseCtx * ctx)
                               newctx.current_region->id());
             ASSERT0(oc);
             newctx.current_region->initPassMgr();
-            //IRCFG * cfg = newctx.current_region->
-            //    getPassMgr()->registerPass(PASS_CFG);
-            ////Caution: the validation of cfg should maintained by user.
-            //cfg->rebuild(oc);
-            //cfg->removeEmptyBB(oc);
-            //cfg->computeExitList();
             newctx.current_region->checkValidAndRecompute(oc, PASS_CFG,
                                                           PASS_UNDEF);
-            newctx.current_region->getCFG()->dumpVCG();
-            dumpBBList(newctx.current_region->getBBList(),
-                       newctx.current_region);
             if (newctx.has_phi) {
                 newctx.current_region->getCFG()->revisePhiEdge(
                     newctx.getIR2Label());
@@ -639,11 +631,14 @@ bool IRParser::declareRegion(ParseCtx * ctx)
             }
         }
     }
+
     if (!newctx.current_region->is_blackbox()) {
         ASSERT0(verifyIRList(newctx.current_region->getIRList(),
                 NULL, newctx.current_region));
     }
+
     exitRegion(&newctx);
+
     if (ctx->current_region != NULL) {
         IR * ir = ctx->current_region->buildRegion(region);
         copyProp(ir, cont, ctx);
@@ -3353,7 +3348,7 @@ bool IRParser::parsePhi(ParseCtx * ctx)
             break;
         } else {
             error(tok, "illegal %s in phi operation declaration",
-                m_lexer->getCurrentTokenString());
+                  m_lexer->getCurrentTokenString());
         }
     }
 

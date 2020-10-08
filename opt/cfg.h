@@ -609,7 +609,7 @@ bool CFG<BB, XR>::verifyIfBBRemoved(IN CDG * cdg, OptCtx & oc)
     ASSERTN(cdg, ("DEBUG: verification need cdg."));
     xcom::C<BB*> * ct, * next_ct;
     List<BB*> succs;
-    bool is_cfg_valid = OC_is_cfg_valid(oc);
+    bool is_cfg_valid = oc.is_cfg_valid();
     for (m_bb_list->get_head(&ct), next_ct = ct; ct != NULL; ct = next_ct) {
         next_ct = m_bb_list->get_next(next_ct);
         BB * bb = ct->val();
@@ -842,7 +842,7 @@ bool CFG<BB, XR>::removeEmptyBB(OptCtx & oc)
     bool doit = false;
     List<BB*> succs;
     List<BB*> preds;
-    bool is_cfg_valid = OC_is_cfg_valid(oc);
+    bool is_cfg_valid = oc.is_cfg_valid();
     for (m_bb_list->get_head(&ct), next_ct = ct; ct != NULL; ct = next_ct) {
         next_ct = m_bb_list->get_next(next_ct);
         BB * bb = ct->val();

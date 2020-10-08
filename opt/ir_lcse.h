@@ -84,7 +84,7 @@ public:
 
     bool canBeCandidate(IR * ir);
     virtual CHAR const* getPassName() const
-    { return "Local Command Subscript Elimination"; }
+    { return "Local Command Subexpression Elimination"; }
 
     PASS_TYPE getPassType() const { return PASS_LCSE; }
 

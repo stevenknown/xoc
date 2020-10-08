@@ -181,7 +181,8 @@ bool IRCFG::verifyPhiEdge(IR * phi,
 }
 
 
-//Construct CFG edge for BB has phi.
+//Revise CFG edge for BB has phi.
+//NOTE:CFG should have been built before revise Vertex order.
 void IRCFG::revisePhiEdge(xcom::TMap<IR*, LabelInfo*> & ir2label)
 {
     ASSERTN(m_bb_list, ("bb_list is emt"));
@@ -200,54 +201,45 @@ void IRCFG::revisePhiEdge(xcom::TMap<IR*, LabelInfo*> & ir2label)
             IR * x = ct2->val();
             ASSERT0(x);
             if (!x->is_phi()) { continue; }
-
-            //CFG should have been built before revise Vertex order.
-            //for (IR * opnd = PHI_opnd_list(x);
-            //     opnd != NULL; opnd = opnd->get_next()) {
-            //    LabelInfo * opnd_label = ir2label.get(opnd);
-            //    ASSERTN(opnd_label, ("no corresponding label to opnd"));
-            //    IRBB * incoming_bb = findBBbyLabel(opnd_label);
-            //    ASSERT0(incoming_bb);
-            //    addEdge(incoming_bb->id(), bb->id());
-            //}
-
             if (phi_opnd_num == -1) {
                 phi_opnd_num = xcom::cnt_list(PHI_opnd_list(x));
 
-                //Sort in-edge of bb to make sure the order of them are same
+                //Sort in-edge of bb to guarantee the order of them are same
                 //with the phi-operands.
                 xcom::Vertex * bbvex = getVertex(bb->id());
-                xcom::EdgeC * opnd_pred = VERTEX_in_list(bbvex);
+                xcom::EdgeC * opnd_pred = bbvex->getInList();
                 for (IR * opnd = PHI_opnd_list(x);
                      opnd != NULL; opnd = opnd->get_next()) {
                     LabelInfo * opnd_label = ir2label.get(opnd);
                     IRBB * incoming_bb = findBBbyLabel(opnd_label);
                     ASSERT0(incoming_bb);
                     if (opnd_pred->getFromId() == incoming_bb->id()) {
-                        opnd_pred = EC_next(opnd_pred);
+                        opnd_pred = opnd_pred->get_next();
                         continue;
                     }
 
                     xcom::EdgeC * q;
-                    for (q = EC_next(opnd_pred);
-                         q != NULL; q = EC_next(q)) {
+                    for (q = opnd_pred->get_next();
+                         q != NULL; q = q->get_next()) {
                         if (q->getFromId() == incoming_bb->id()) {
                             break;
                         }
                     }
                     ASSERTN(q, ("can not find needed xcom::EdgeC"));
                     xcom::swap(&VERTEX_in_list(bbvex), opnd_pred, q);
-                    opnd_pred = EC_next(q);
+                    opnd_pred = q->get_next();
                 }
 
                 ASSERT0(verifyPhiEdge(x, ir2label));
-            } else {
-                ASSERTN((UINT)phi_opnd_num == xcom::cnt_list(PHI_opnd_list(x)),
-                        ("the number of operand is inconsistent"));
-                ASSERT0((UINT)phi_opnd_num ==
-                        getInDegree(getVertex(bb->id())));
-                ASSERT0(verifyPhiEdge(x, ir2label));
+                continue;
             }
+
+            //Verify whether the others PHI's operands are in correct order.
+            ASSERTN((UINT)phi_opnd_num == xcom::cnt_list(PHI_opnd_list(x)),
+                    ("the number of operand is inconsistent"));
+            ASSERT0((UINT)phi_opnd_num ==
+                    getInDegree(getVertex(bb->id())));
+            ASSERT0(verifyPhiEdge(x, ir2label));
         }
     }
 }
@@ -394,7 +386,7 @@ void IRCFG::initCfg(OptCtx & oc)
 {
     if (getBBList()->get_elem_count() == 0) {
         //If bb is empty, set CFG is invalid.
-        //OC_is_cfg_valid(oc) = true;
+        //oc.is_cfg_valid() = true;
         return;
     }
 
@@ -821,6 +813,8 @@ void IRCFG::insertBBbefore(IN IRBB * bb, IN IRBB * newbb)
 }
 
 
+//Return the inserted trampolining BB if exist.
+//This function will break fallthrough edge of 'to' if necessary.
 IRBB * IRCFG::insertBBbetween(IN IRBB * from,
                               IN BBListIter from_ct,
                               IN IRBB * to,
@@ -845,23 +839,25 @@ IRBB * IRCFG::insertBBbetween(IN IRBB * from,
     get_preds(preds, to);
     ASSERTN(preds.find(from), ("'from' is not pred of 'to'"));
     BBListIter pred_ct = NULL;
+    //Third, find the fallthrough previous BB of 'to'. If find it, insert
+    //a trampolining BB between the previous BB of 'to' that contains a jump
+    //IR.
     IRBB * inserted_tramp_bb = NULL;
     for (IRBB * pred = preds.get_head(&pred_ct);
          pred != NULL; pred = preds.get_next(&pred_ct)) {
         BBListIter tmp_ct2 = to_ct;
         if (pred->is_fallthrough() && bblst->get_prev(&tmp_ct2) == pred) {
             //Given 'to' has a fallthrough in-edge. Insert a tmp BB
-            //e.g:
-            //    from->bb1->bb2->to, all edges are fallthrough
-            //    from->to, jump-edge
-            //    bb1->to, jump-edge
+            //e.g:Given following edges,
+            //    from->bb1->bb2->to, where all edges are fallthrough edges;
+            //    from->to is jump-edge
+            //    bb1->to is jump-edge
             //
-            //Here we need to revise the fallthrough-edge 'bb2->to',
-            //the result is from->bb1->bb2->inserted_tramp_bb, all
-            //edges are fallthrough inserted_tramp_bb->to, jump-edge
-            //    from->to, jump-edge
-            //    bb1->to, jump-edge
-            //
+            //We got it and have to revise the fallthrough edge 'bb2->to',
+            //the result is from->bb1->bb2->inserted_tramp_bb, where all
+            //edges are fallthrough, inserted_tramp_bb->to becomes jump-edge
+            //    from->to is jump-edge
+            //    bb1->to is jump-edge
             //    bb2->inserted_tramp_bb, tmp_tramp_bb->to, both are jump-edge.
             //    ir-list of inserted_tramp_bb is:
             //        goto L1:
@@ -878,9 +874,12 @@ IRBB * IRCFG::insertBBbetween(IN IRBB * from,
             addBB(inserted_tramp_bb);
             bblst->insert_after(inserted_tramp_bb, pred);
 
+            //Insert a trampolining BB between the previous BB of 'to'
+            //that contains a jump IR.
             insertVertexBetween(pred->id(), to->id(), inserted_tramp_bb->id());
 
-            //Fall through edge has been broken, insert 'newbb' before 'to'.
+            //Now, fallthrough edge bb2->to has been broken, we can insert
+            //'newbb' before 'to' correctly.
             break;
         }
     }
@@ -897,7 +896,7 @@ IRBB * IRCFG::insertBBbetween(IN IRBB * from,
 
     addLabel(newbb, li);
 
-    //When we get here, there are NOT any fallthrough in-edges of 'to' exist.
+    //When we get here, there are NOT any fallthrough in-edges of 'to'.
     bblst->insert_before(newbb, to_ct);
     insertVertexBetween(from->id(), to->id(), newbb->id());
     return inserted_tramp_bb;
@@ -1061,19 +1060,16 @@ void IRCFG::remove_bb_impl(IRBB * bb)
 //CASE: Given pred1->bb, fallthrough edge, and pred2->bb, jumping edge.
 //  pred2:
 //    goto bb;
-//  ...
 //  pred1:
 //    a=1;
 //  bb:
 //    goto next;
 //  next:
 //    ...
-//    ...
 //Remove bb and revise CFG.
 //ct: container in m_bb_list of CFG. It will be updated if related BB removed.
 bool IRCFG::removeTrampolinBBCase1(BBListIter * ct)
 {
-    bool removed = false;
     List<IRBB*> preds;
     IRBB * bb = (*ct)->val();
     ASSERT0(getSuccsNum(bb) == 1);
@@ -1083,9 +1079,17 @@ bool IRCFG::removeTrampolinBBCase1(BBListIter * ct)
     ASSERT0(uncond_br && uncond_br->isUnconditionalBr());
     BBListIter tmp_bb_ct = *ct;
     IRBB * next = m_bb_list->get_next(&tmp_bb_ct);
-    if (next == NULL || //bb may be the last BB in bb-list.
-        next != succ) { //next BB is not the successor.
-        return removed;
+    if (next == NULL || //bb can not be the last BB in bb-list.
+        next != succ) { //next lexical bb must also be the successor.
+        return false;
+    }
+
+    Vertex const* vex = getVertex(next->id());
+    ASSERT0(vex);
+    if (getInDegree(vex) > 1) {
+        //successor is not just the branch target of 'bb', thus it
+        //can not be removed.
+        return false;
     }
 
     tmp_bb_ct = *ct;
@@ -1108,7 +1112,7 @@ bool IRCFG::removeTrampolinBBCase1(BBListIter * ct)
                 //to be normal control flow edge.
                 CFGEI_is_eh(ei) = false;
             }
-            return removed;
+            return true;
         }
 
         //CASE:
@@ -1147,11 +1151,10 @@ bool IRCFG::removeTrampolinBBCase1(BBListIter * ct)
     //The map between Labels and BB has been maintained.
     //resetMapBetweenLabelAndBB(bb);
     remove_bb(bb);
-    removed = true;
 
     //Update ct to reprocess BB list from beginning.
     m_bb_list->get_head(ct);
-    return removed;
+    return true;
 }
 
 
@@ -1190,26 +1193,16 @@ bool IRCFG::removeTrampolinBB()
             bb->getNumOfIR() != 1) {
             continue;
         }
-
-        //CASE: Given pred1->bb, fallthrough edge,
-        //  and pred2->bb, jumping edge.
-        //  bb:
-        //      goto L1
-        //  next of bb:
-        //      L1:
-        //      ...
-        //      ...
-        //Remove bb and revise CFG.
         removed |= removeTrampolinBBCase1(&ct);
     }
     return removed;
 }
 
 
-bool IRCFG::removeTrampolinEdgeForCase2(BBListIter ct)
+bool IRCFG::removeTrampolinEdgeCase2(BBListIter bbct)
 {
-    ASSERT0(ct);
-    IRBB * bb = ct->val();
+    ASSERT0(bbct);
+    IRBB * bb = bbct->val();
     bool removed = false;
     List<IRBB*> preds; //record preds in list because CFG may be modified.
     get_preds(preds, bb);
@@ -1335,7 +1328,7 @@ bool IRCFG::removeTrampolinEdgeForCase2(BBListIter ct)
             //  bb is:
             //      L1:
             //      goto L2
-            BBListIter prev_of_bb = ct;
+            BBListIter prev_of_bb = bbct;
             if (m_bb_list->get_prev(&prev_of_bb) == pred) {
                 //Can not remove jumping-edge if 'bb' is
                 //fall-through successor of 'pred'.
@@ -1362,6 +1355,50 @@ bool IRCFG::removeTrampolinEdgeForCase2(BBListIter ct)
 }
 
 
+bool IRCFG::removeTrampolinEdgeCase1(BBListIter bbct)
+{
+    ASSERT0(bbct);
+    IRBB * bb = bbct->val();
+    bool removed = false;
+    BBListIter next_ct = m_bb_list->get_next(bbct);
+    if (next_ct == NULL) { return false; }
+
+    //BB is not the last one in BB list.
+    IR * last_xr = get_last_xr(bb);
+    ASSERT0(last_xr && last_xr->is_goto());
+
+    LabelInfo const* tgt_li = last_xr->getLabel();
+    ASSERT0(tgt_li != NULL);
+
+    IRBB * target = findBBbyLabel(tgt_li);
+    if (target == next_ct->val()) {
+        Vertex const* vex = getVertex(target->id());
+        ASSERT0(vex);
+        if (getInDegree(vex) > 1) {
+            //'target' is not just the branch target of 'bb', thus
+            //it can not be removed.
+            return false;    
+        }
+
+        //CASE1:Remove the redundant GOTO.
+        //  e.g: region func main () {
+        //    truebr (eq $1, $2), L2;
+        //    goto L1; //goto is actually fallthrough to label L1.
+        //             //So it can be removed.
+        //    label L1;
+        //    goto L1;
+        //    label L2;
+        //  };
+        ASSERT0(bb->getNumOfIR() == 1);
+        BB_irlist(bb).remove_tail();
+        m_rg->freeIRTree(last_xr);
+        return true;
+    }
+
+    return false;
+}
+
+
 //Remove trampoline edge.
 //e.g: bb1->bb2->bb3
 //stmt of bb2 is just 'goto bb3', then bb1->bb2 is tramp edge.
@@ -1378,7 +1415,6 @@ bool IRCFG::removeTrampolinEdge()
             //BB is almost not a trampoline BB if there are multiples IRs.
             continue;
         }
-
         IR * last_xr = get_last_xr(bb);
         ASSERT0(last_xr);
         if (last_xr->hasSideEffect() ||
@@ -1388,32 +1424,13 @@ bool IRCFG::removeTrampolinEdge()
             continue;
         }
 
-        LabelInfo const* tgt_li = last_xr->getLabel();
-        ASSERT0(tgt_li != NULL);
-        BBListIter next_ct = m_bb_list->get_next(ct);
-        if (next_ct != NULL) {
-            //BB is not the last one.
-            IRBB * target = findBBbyLabel(tgt_li);
-            if (target == next_ct->val()) {
-                //CASE1:Remove the redundant GOTO.
-                //  e.g: region func main () {
-                //    truebr (eq $1, $2), L2;
-                //    goto L1; //goto is actually fallthrough to label L1.
-                //             //So it can be removed.
-                //    label L1;
-                //    goto L1;
-                //    label L2;
-                //  };
-                ASSERT0(bb->getNumOfIR() == 1);
-                BB_irlist(bb).remove_tail();
-                m_rg->freeIRTree(last_xr);
-                removed = true;
-                continue;
-            }
+        bool res1 = removeTrampolinEdgeCase1(ct);
+        removed |= res1;
+        if (res1) {
+            continue;
         }
-
-        removed |= removeTrampolinEdgeForCase2(ct);
-    } //end for each BB
+        removed |= removeTrampolinEdgeCase2(ct);
+    }
     return removed;
 }
 
@@ -1935,7 +1952,7 @@ void IRCFG::computeDomAndIdom(IN OUT OptCtx & oc, xcom::BitSet const* uni)
 
     DUMMYUSE(uni);
     START_TIMER(t, "Compute Dom, IDom");
-    ASSERT0(OC_is_cfg_valid(oc));
+    ASSERT0(oc.is_cfg_valid());
     ASSERTN(m_entry, ("ONLY support SESE or SEME"));
 
     m_rg->checkValidAndRecompute(&oc, PASS_RPO, PASS_UNDEF);
@@ -1973,7 +1990,7 @@ void IRCFG::computePdomAndIpdom(IN OUT OptCtx & oc, xcom::BitSet const* uni)
     if (getBBList()->get_elem_count() == 0) { return; }
 
     START_TIMER(t, "Compute PDom,IPDom");
-    ASSERT0(OC_is_cfg_valid(oc));
+    ASSERT0(oc.is_cfg_valid());
 
     m_rg->checkValidAndRecompute(&oc, PASS_RPO, PASS_UNDEF);
     List<IRBB*> * bblst = getRPOBBList();

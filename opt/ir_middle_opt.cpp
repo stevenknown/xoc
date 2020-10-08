@@ -147,8 +147,8 @@ bool Region::performSimplify(OptCtx & oc)
     }
 
     if (g_verify_level >= VERIFY_LEVEL_3 &&
-        OC_is_pr_du_chain_valid(oc) &&
-        OC_is_nonpr_du_chain_valid(oc)) {
+        oc.is_pr_du_chain_valid() &&
+        oc.is_nonpr_du_chain_valid()) {
         ASSERT0(verifyMDDUChain(this));
     }
 
@@ -157,6 +157,70 @@ bool Region::performSimplify(OptCtx & oc)
         dumpBBList();
     }
     return true;
+}
+
+
+void Region::doBasicAnalysis(OptCtx & oc)
+{
+    if (g_do_aa) {
+        ASSERT0(g_cst_bb_list && oc.is_cfg_valid());
+        if (!oc.is_ref_valid()) {
+            assignMD(true, true);
+        }
+        if (!oc.is_aa_valid()) {
+            checkValidAndRecompute(&oc, PASS_DOM, PASS_LOOP_INFO,
+                                       PASS_AA, PASS_UNDEF);
+        }
+    }
+
+    if (g_do_md_du_analysis) {
+        ASSERT0(g_cst_bb_list && oc.is_cfg_valid() && oc.is_aa_valid());
+        ASSERT0(getPassMgr());
+        DUMgr * dumgr = (DUMgr*)getPassMgr()->registerPass(PASS_DU_MGR);
+        ASSERT0(dumgr);
+        UINT f = DUOPT_COMPUTE_PR_REF | DUOPT_COMPUTE_NONPR_REF;
+        if (g_compute_region_imported_defuse_md) {
+            f |= DUOPT_SOL_REGION_REF;
+        }
+        if (g_compute_pr_du_chain) {
+            f |= DUOPT_SOL_REACH_DEF | DUOPT_COMPUTE_PR_DU;
+        }
+        if (g_compute_nonpr_du_chain) {
+            f |= DUOPT_SOL_REACH_DEF | DUOPT_COMPUTE_NONPR_DU;
+        }
+        bool succ = dumgr->perform(oc, f);
+        ASSERT0(oc.is_ref_valid());
+        if (HAVE_FLAG(f, DUOPT_SOL_REACH_DEF) && succ) {
+            dumgr->computeMDDUChain(oc, false, f);
+        }
+
+        if (g_do_pr_ssa) {
+            PRSSAMgr * ssamgr = (PRSSAMgr*)getPassMgr()->registerPass(
+                PASS_PR_SSA_MGR);
+            ASSERT0(ssamgr);
+            if (!ssamgr->is_valid()) {
+                ssamgr->construction(oc);
+            }
+        }
+        if (g_do_md_ssa) {
+            MDSSAMgr * ssamgr = (MDSSAMgr*)getPassMgr()->registerPass(
+                PASS_MD_SSA_MGR);
+            ASSERT0(ssamgr);
+            if (!ssamgr->is_valid()) {
+                ssamgr->construction(oc);
+            }
+        }
+        if (g_do_refine_duchain) {
+            RefineDUChain * refdu = (RefineDUChain*)getPassMgr()->
+                registerPass(PASS_REFINE_DUCHAIN);
+            if (g_compute_pr_du_chain && g_compute_nonpr_du_chain) {
+                refdu->setUseGvn(true);
+                GVN * gvn = (GVN*)getPassMgr()->registerPass(PASS_GVN);
+                gvn->perform(oc);
+            }
+            refdu->perform(oc);
+        }
+    }
 }
 
 
@@ -176,8 +240,8 @@ bool Region::performSimplify(OptCtx & oc)
 //    7. SCCP (Sparse Conditional Constant Propagation).
 //    8. PRE (Partial Redundancy Elimination) with strength reduction.
 //    9. Dominator-based optimizations such as copy propagation,
-//        constant propagation and redundancy elimination using
-//        value numbering.
+//       constant propagation and redundancy elimination using
+//       value numbering.
 //    10. Must-alias analysis, to convert pointer de-references
 //        into regular variable references whenever possible.
 //    11. Scalar Replacement of Aggregates, to convert structure
@@ -192,15 +256,16 @@ bool Region::MiddleProcess(OptCtx & oc)
         ASSERT0(verifyMDDUChain(this));
     }
 
-    bool do_simplification = true;
-    if (getPassMgr() != NULL &&
-        (getPassMgr()->queryPass(PASS_PR_SSA_MGR) != NULL &&
-         ((PRSSAMgr*)getPassMgr()->queryPass(PASS_PR_SSA_MGR))->
-              is_valid())) {
-        do_simplification = false;
+    if (g_opt_level > OPT_LEVEL0) {
+        //Do analysis before simplification.
+        doBasicAnalysis(oc);
     }
 
-    if (do_simplification) {
+    if (getPassMgr() != NULL &&
+        (getPassMgr()->queryPass(PASS_PR_SSA_MGR) != NULL &&
+         ((PRSSAMgr*)getPassMgr()->queryPass(PASS_PR_SSA_MGR))->is_valid())) {
+        ;
+    } else {
         performSimplify(oc);
     }
 
@@ -214,8 +279,8 @@ bool Region::MiddleProcess(OptCtx & oc)
         Refine * refine = (Refine*)getPassMgr()->registerPass(PASS_REFINE);
         if (refine->refineBBlist(bbl, rf, oc)) {
             if (g_verify_level >= VERIFY_LEVEL_3 &&
-                OC_is_pr_du_chain_valid(oc) &&
-                OC_is_nonpr_du_chain_valid(oc)) {
+                oc.is_pr_du_chain_valid() &&
+                oc.is_nonpr_du_chain_valid()) {
                 ASSERT0(verifyMDDUChain(this));
             }
             return true;

@@ -2041,7 +2041,8 @@ void MDSSAMgr::addMDSSAOcc(IR * ir, MDSSAInfo * mdssainfo)
 }
 
 
-//Remove MDSSA Use-Def chain.
+//Remove MDSSA Use-Def chain for all memory references in IR Tree
+//that rooted by 'exp'.
 //e.g:ir = ...
 //    ... = ir //S1
 //If S1 deleted, ir should be removed from its useset in MDSSAInfo.
@@ -2725,7 +2726,7 @@ void MDSSAMgr::construction(OptCtx & oc)
 {
     START_TIMER(t0, "MDSSA: Construction");
     m_rg->checkValidAndRecompute(&oc, PASS_DOM, PASS_UNDEF);
-    ASSERT0(OC_is_ref_valid(oc));
+    ASSERT0(oc.is_ref_valid());
     ASSERT0(OC_is_dom_valid(oc));
     reinit();
 

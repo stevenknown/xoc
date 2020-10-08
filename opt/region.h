@@ -162,16 +162,19 @@ protected:
     //This is a helper function to assignMD.
     void assignMDImpl(IR * x, bool assign_pr, bool assign_nonpr);
 
+    void doBasicAnalysis(OptCtx & oc);
+
     AnalysisInstrument * getAnalysisInstrument() const;
 
-   void scanCallListImpl(OUT UINT & num_inner_region,
+    void scanCallListImpl(OUT UINT & num_inner_region,
                           IR * irlst,
                           OUT List<IR const*> * call_list,
                           OUT List<IR const*> * ret_list,
                           bool scan_inner_region);
     bool processIRList(OptCtx & oc);
     bool processBBList(OptCtx & oc);
-    void prescan(IR const* ir);
+    void prescanIRList(IR const* ir);
+    void prescanBBList(BBList const* bblst);
     bool partitionRegion();
     bool performSimplify(OptCtx & oc);
     void HighProcessImpl(OptCtx & oc);
@@ -957,7 +960,7 @@ public:
     LabelInfo * genPragmaLabel(Sym const* labsym)
     {
         ASSERT0(labsym);
-        return allocCustomerLabel(labsym, get_pool());
+        return allocPragmaLabel(labsym, get_pool());
     }
 
     LabelInfo * genCustomLabel(CHAR const* lab)
@@ -1234,7 +1237,7 @@ public:
     bool verifyBBlist(BBList & bbl);
     //Ensure that each IR in ir_list must be allocated in crrent region.
     bool verifyIROwnership();
-    //Verify MD reference to stmts and expressions.
+    //Verify MD reference to each stmts and expressions which described memory.
     bool verifyMDRef();
 };
 //END Region

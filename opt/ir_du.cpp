@@ -5025,11 +5025,11 @@ bool DUMgr::perform(IN OUT OptCtx & oc, UINT flag)
         return false;
     }
 
-    ASSERT0(OC_is_cfg_valid(oc)); //First, only cfg is needed.
+    ASSERT0(oc.is_cfg_valid()); //First, only cfg is needed.
 
     if (HAVE_FLAG(flag, DUOPT_COMPUTE_PR_REF) ||
         HAVE_FLAG(flag, DUOPT_COMPUTE_NONPR_REF)) {
-        ASSERT0(OC_is_aa_valid(oc));
+        ASSERT0(oc.is_aa_valid());
         computeMDRef(oc, flag);
     }
 
@@ -5037,7 +5037,7 @@ bool DUMgr::perform(IN OUT OptCtx & oc, UINT flag)
         HAVE_FLAG(flag, DUOPT_SOL_REACH_DEF) ||
         HAVE_FLAG(flag, DUOPT_SOL_REGION_REF) ||
         HAVE_FLAG(flag, DUOPT_SOL_AVAIL_EXPR)) {
-        ASSERT0(OC_is_ref_valid(oc));
+        ASSERT0(oc.is_ref_valid());
 
         Vector<MDSet*> * maydef_mds = NULL;
         Vector<MDSet*> * mustexactdef_mds = NULL;
@@ -5172,8 +5172,8 @@ void DUMgr::computeMDDUChain(IN OUT OptCtx & oc,
 {
     if (m_rg->getBBList()->get_elem_count() == 0) { return; }
     START_TIMER(t, "Build DU-CHAIN");
-    ASSERT0(OC_is_cfg_valid(oc));
-    ASSERT0(OC_is_ref_valid(oc) && OC_is_reach_def_valid(oc));
+    ASSERT0(oc.is_cfg_valid());
+    ASSERT0(oc.is_ref_valid() && OC_is_reach_def_valid(oc));
     m_oc = &oc;
     BBList * bbl = m_rg->getBBList();
     if (bbl->get_elem_count() > g_thres_opt_bb_num) {

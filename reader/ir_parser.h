@@ -57,7 +57,7 @@ public:
     IR * stmt_list;
     IR * last;
     bool has_phi;
-    bool has_high_level_ir;
+    bool has_high_level_ir; //Control Flow Struct are high level IR.
     bool has_error;
     IR_TYPE ircode; //for temporary used
     struct {

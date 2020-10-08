@@ -61,52 +61,15 @@ void Region::HighProcessImpl(OptCtx & oc)
 
     if (g_do_pr_ssa) {
         ASSERT0(getPassMgr());
-        PRSSAMgr * ssamgr =
-            (PRSSAMgr*)getPassMgr()->registerPass(PASS_PR_SSA_MGR);
+        PRSSAMgr * ssamgr = (PRSSAMgr*)getPassMgr()->registerPass(
+            PASS_PR_SSA_MGR);
         ASSERT0(ssamgr);
         if (!ssamgr->is_valid()) {
             ssamgr->construction(oc);
         }
     }
 
-    if (g_do_aa) {
-        ASSERT0(g_cst_bb_list && OC_is_cfg_valid(oc));
-        assignMD(true, true);
-        checkValidAndRecompute(&oc, PASS_AA, PASS_UNDEF);
-    }
-
-    if (g_do_md_du_analysis) {
-        ASSERT0(g_cst_bb_list && OC_is_cfg_valid(oc) && OC_is_aa_valid(oc));
-        ASSERT0(getPassMgr());
-        DUMgr * dumgr = (DUMgr*)getPassMgr()->
-            registerPass(PASS_DU_MGR);
-        ASSERT0(dumgr);
-        UINT f = DUOPT_COMPUTE_PR_REF|DUOPT_COMPUTE_NONPR_REF|
-                 DUOPT_COMPUTE_PR_DU|DUOPT_COMPUTE_NONPR_DU;
-        if (g_compute_available_exp) {
-            f |= DUOPT_SOL_AVAIL_EXPR;
-        }
-
-        if (g_compute_region_imported_defuse_md) {
-            f |= DUOPT_SOL_REGION_REF;
-        }
-
-        if (g_compute_pr_du_chain || g_compute_nonpr_du_chain) {
-            //Compute classic du chain.
-            f |= DUOPT_SOL_REACH_DEF;
-        }
-
-        if (dumgr->perform(oc, f) && OC_is_ref_valid(oc)) {
-            UINT flag = 0;
-            if (g_compute_pr_du_chain) {
-                flag |= DUOPT_COMPUTE_PR_DU;
-            }
-            if (g_compute_nonpr_du_chain) {
-                flag |= DUOPT_COMPUTE_NONPR_DU;
-            }
-            dumgr->computeMDDUChain(oc, false, flag);
-         }
-    }
+    doBasicAnalysis(oc);
 
     if (g_do_expr_tab) {
         ASSERT0(g_cst_bb_list);

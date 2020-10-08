@@ -216,7 +216,10 @@ public:
     }
 
     //Allocate VPR and ensure it is unique according to 'version' and 'prno'.
-    VPR * allocVPR(UINT prno, UINT version);
+    //prno: describ the Versioned PR
+    //version: current version of Versioned PR
+    //orgtype: data type of orginal prno
+    VPR * allocVPR(UINT prno, UINT version, Type const* orgtype);
 
     //After adding BB or change BB successor,
     //you need add the related PHI operand if BB successor has PHI stmt.
@@ -226,7 +229,7 @@ public:
     SSAInfo * allocSSAInfo(UINT prno)
     {
         ASSERT0(prno != PRNO_UNDEF);
-        return (SSAInfo*)allocVPR(prno, 0);
+        return (SSAInfo*)allocVPR(prno, 0, m_tm->getAny());
     }
 
     void buildDUChain(IR * def, IR * use);

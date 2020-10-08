@@ -150,19 +150,26 @@ ASCII g_asc1[] = {
 };
 
 
-//Caculate the number of bits which longer enough to represent given constant.
-UINT computeConstBitLen(ULONGLONG v)
+//Compute the number of bits which biger enough to represent given value.
+//value: the input value that to be check.
+//e.g: given 00101, it needs at least 3 bits to hold the binary value 101.
+//     and function return 3.
+UINT computeMaxBitSizeForValue(ULONGLONG value)
 {
-#ifdef _VC6_
-    if (!(v & 0xffffffffffffff00)) { return 8; }
-    if (!(v & 0xffffffffffff0000)) { return 16; }
-    if (!(v & 0xffffffff00000000)) { return 32; }
-#else
-    if (!(v & 0xffffffffffffff00ull)) { return 8; }
-    if (!(v & 0xffffffffffff0000ull)) { return 16; }
-    if (!(v & 0xffffffff00000000ull)) { return 32; }
-#endif
-    return 64;
+    if (value == 0) { return 1; }
+    UINT bitwidth = sizeof(value) * 8; //Assume BITS_PER_BYTE is 8
+    UINT half_bitwidth = bitwidth / 2;
+    for (; value < computeUnsignedMaxValue<ULONGLONG>(half_bitwidth); ) {
+        bitwidth /= 2;
+        half_bitwidth = bitwidth / 2;
+    }
+    for (INT i = bitwidth - 1; i >= 0; i--) {
+        if (HAVE_FLAG(value, (((ULONGLONG)1) << i))) {
+            return i + 1;
+        }
+    }
+    UNREACHABLE();
+    return 0;
 }
 
 

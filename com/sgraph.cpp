@@ -864,7 +864,7 @@ void Graph::removeEdgeBetween(Vertex * v1, Vertex * v2)
 //       and the same goes for the rest of edges.
 //e.g: E->D, A->D are transitive edges.
 //           E   A
-//         __|   |\
+//         __|   |_
 //        |   \ /  |
 //        |    V   |
 //        |    B   |
