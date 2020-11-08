@@ -49,12 +49,12 @@ Region * IPA::findRegion(IR * call, Region * callru)
     //Iterate accessing successors.
     ASSERT0(cg->getVertex(CN_id(callercn)));
     for (xcom::EdgeC const* ec = cg->getVertex(CN_id(callercn))->getOutList();
-         ec != NULL; ec = ec->get_next()) {
+         ec != nullptr; ec = ec->get_next()) {
         CallNode * calleecn = cg->mapId2CallNode(ec->getToId());
         ASSERT0(calleecn);
 
         Region * callee = CN_ru(calleecn);
-        if (callee == NULL || callercn == calleecn) {
+        if (callee == nullptr || callercn == calleecn) {
             //callee site does not have a region or the same region.
             continue;
         }
@@ -63,7 +63,7 @@ Region * IPA::findRegion(IR * call, Region * callru)
             return callee;
         }
     }
-    return NULL;
+    return nullptr;
 }
 
 
@@ -74,18 +74,18 @@ Region * IPA::findRegion(IR * call, Region * callru)
 void IPA::createCallDummyuse(IR * call, Region * callru)
 {
     Region * calleeru = findRegion(call, callru);
-    if (calleeru == NULL || CALL_dummyuse(call) != NULL) {
+    if (calleeru == nullptr || CALL_dummyuse(call) != nullptr) {
         return;
     }
 
     MDSet const* mayuse = calleeru->getMayUse();
-    if (mayuse == NULL || mayuse->is_empty()) { return; }
+    if (mayuse == nullptr || mayuse->is_empty()) { return; }
 
     MDSet const* callermaydef = callru->getMayDef();
-    if (callermaydef == NULL || callermaydef->is_empty()) { return; }
+    if (callermaydef == nullptr || callermaydef->is_empty()) { return; }
 
     MDSetIter iter;
-    IR * last = NULL;
+    IR * last = nullptr;
     for (INT j = mayuse->get_first(&iter);
          j >= 0; j = mayuse->get_next(j, &iter)) {
         MD const* md = m_mdsys->getMD(j);
@@ -106,12 +106,12 @@ void IPA::createCallDummyuse(Region * rg)
 {
     ASSERT0(rg);
     IR * ir = rg->getIRList();
-    if (ir == NULL) {
+    if (ir == nullptr) {
         BBList * bbl = rg->getBBList();
-        if (bbl == NULL) { return; }
-        for (IRBB * bb = bbl->get_head(); bb != NULL; bb = bbl->get_next()) {
+        if (bbl == nullptr) { return; }
+        for (IRBB * bb = bbl->get_head(); bb != nullptr; bb = bbl->get_next()) {
             for (IR * ir2 = BB_first_ir(bb);
-                 ir2 != NULL; ir2 = BB_next_ir(bb)) {
+                 ir2 != nullptr; ir2 = BB_next_ir(bb)) {
                 if (!ir2->is_call()) { continue; }
                 //TODO: handle icall.
                 createCallDummyuse(ir2, rg);
@@ -120,7 +120,7 @@ void IPA::createCallDummyuse(Region * rg)
         return;
     }
 
-    for (; ir != NULL; ir = ir->get_next()) {
+    for (; ir != nullptr; ir = ir->get_next()) {
         if (!ir->is_call()) { continue; }
         //TODO: handle icall.
         createCallDummyuse(ir, rg);
@@ -133,8 +133,8 @@ void IPA::computeCallRefForAllRegion()
     START_TIMER(t, "Compute CallRef for all regions");
     for (UINT i = 0; i < m_rumgr->getNumOfRegion(); i++) {
         Region * rg = m_rumgr->getRegion(i);
-        if (rg == NULL ||
-            (rg->getIRList() == NULL &&
+        if (rg == nullptr ||
+            (rg->getIRList() == nullptr &&
              rg->getBBList()->get_elem_count() == 0)) {
             continue;
         }
@@ -157,13 +157,13 @@ void IPA::createCallDummyuse(OptCtx & oc)
 {
     for (UINT i = 0; i < m_rumgr->getNumOfRegion(); i++) {
         Region * rg = m_rumgr->getRegion(i);
-        if (rg == NULL) { continue; }
+        if (rg == nullptr) { continue; }
         createCallDummyuse(rg);
         if (g_compute_pr_du_chain && g_compute_nonpr_du_chain) {
             OptCtx * loc = m_rumgr->getAndGenOptCtx(rg->id());
             ASSERT0(loc);
             recomputeDUChain(rg, *loc);
-            if (!m_is_keep_dumgr && rg->getPassMgr() != NULL) {
+            if (!m_is_keep_dumgr && rg->getPassMgr() != nullptr) {
                 rg->getPassMgr()->destroyPass(PASS_DU_MGR);
             }
         }
@@ -181,11 +181,11 @@ void IPA::createCallDummyuse(OptCtx & oc)
 void IPA::recomputeDUChain(Region * rg, OptCtx & oc)
 {
     ASSERT0(rg);
-    if (rg->getIRList() == NULL &&
-        (rg->getBBList() == NULL || rg->getBBList()->get_elem_count() == 0)) {
+    if (rg->getIRList() == nullptr &&
+        (rg->getBBList() == nullptr || rg->getBBList()->get_elem_count() == 0)) {
         return;
     }
-    if (rg->getPassMgr() == NULL) {
+    if (rg->getPassMgr() == nullptr) {
         rg->initPassMgr();
     }
     if (!oc.is_aa_valid()) {

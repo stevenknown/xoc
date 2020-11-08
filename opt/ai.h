@@ -77,8 +77,9 @@ public:
 };
 
 
+typedef xcom::SimpleVector<BaseAttachInfo*, 1, 64> AICont;
+
 //This class represents container of miscellaneous AttachInfo.
-typedef xcom::SimpleVec<BaseAttachInfo*, 1> AICont;
 class AIContainer {
     COPY_CONSTRUCTOR(AIContainer);
 protected:
@@ -88,98 +89,45 @@ public:
     AIContainer() { init(); }
     ~AIContainer() {}
 
-    void init()
-    {
-        if (cont.is_init()) { return; }
-        cont.init();
-    }
-
-    INT is_init() const { return cont.is_init(); }
-
-    void destroy() { cont.destroy(); }
-    void destroy_vec() { cont.destroy_vec(); }
-
-    void copy(AIContainer const* ai)
-    {
-        ASSERT0(ai);
-        if (!ai->is_init()) { return; }
-        cont.copy(ai->cont);
-    }
-
+    void copy(AIContainer const* ai, Region * rg);
     void clean(AI_TYPE type)
     {
         if (!cont.is_init()) { return; }
         ASSERT0(type > AI_UNDEF && type < AI_LAST);
         for (UINT i = 0; i < cont.get_capacity(); i++) {
             BaseAttachInfo * ac = cont.get(i);
-            if (ac != NULL && ac->type == type) {
-                cont.set(i, NULL);
+            if (ac != nullptr && ac->type == type) {
+                cont[i] = nullptr;
                 return;
             }
         }
     }
 
-    void set(BaseAttachInfo * c)
+    void destroy() { cont.destroy(); }
+
+    void init()
     {
-        ASSERTN(c, ("Can not set empty AI"));
-
-        INT emptyslot = -1;
-        if (!cont.is_init()) { cont.init(); }
-
-        AI_TYPE type = c->type;
-        ASSERT0(type > AI_UNDEF && type < AI_LAST);
-
-        UINT i;
-        for (i = 0; i < cont.get_capacity(); i++) {
-            BaseAttachInfo * ac = cont.get(i);
-            if (ac == NULL) {
-                emptyslot = (INT)i;
-            } else if (ac->type != type) {
-                continue;
-            }
-
-            //Note c will override the prior AIContainer that has same type.
-            cont.set(i, c);
-            return;
-        }
-
-        if (emptyslot != -1) {
-            cont.set((UINT)emptyslot, c);
-        } else {
-            //AIContainer buffer will grow bigger.
-            cont.set(i, c);
-        }
+        if (cont.is_init()) { return; }
+        cont.init();
     }
+    INT is_init() const { return cont.is_init(); }
 
+    CHAR const* getAIName(AI_TYPE type) const;
     BaseAttachInfo * get(AI_TYPE type) const
     {
-        if (!cont.is_init()) { return NULL; }
+        if (!cont.is_init()) { return nullptr; }
         for (UINT i = 0; i < cont.get_capacity(); i++) {
             BaseAttachInfo * ac = cont.get(i);
-            if (ac != NULL && ac->type == type) {
+            if (ac != nullptr && ac->type == type) {
                 return ac;
             }
         }
-        return NULL;
+        return nullptr;
     }
 
     AICont const& read_cont() const { return cont; }
 
-    CHAR const* get_ai_name(AI_TYPE type) const
-    {
-        switch (type) {
-        case AI_UNDEF: return "Undef";
-        case AI_DBX: return "Dbx";
-        case AI_PROF: return "Prof";
-        case AI_TBAA: return "Tbaa";
-        case AI_EH_LABEL: return "EH";
-        case AI_USER_DEF: return "UserDef";
-        case AI_MD_SSA: return "MDSSA";
-        case AI_LAST:;
-        default: UNREACHABLE();
-        }
-        return NULL;
-    }
+    void set(BaseAttachInfo * c, Region * rg);
 };
 
 
@@ -190,7 +138,7 @@ public:
     xcom::SList<LabelInfo*> labels; //record a list of Labels.
 
 public:
-    EHLabelAttachInfo(SMemPool * pool = NULL) : BaseAttachInfo(AI_EH_LABEL)
+    EHLabelAttachInfo(SMemPool * pool = nullptr) : BaseAttachInfo(AI_EH_LABEL)
     { init(pool); }
 
     //This function must be invoked during construction.
@@ -229,8 +177,8 @@ public:
     void init()
     {
         BaseAttachInfo::init(AI_PROF);
-        tag = NULL;
-        data = NULL;
+        tag = nullptr;
+        data = nullptr;
     }
 };
 
@@ -240,7 +188,7 @@ class TbaaAttachInfo : public BaseAttachInfo {
 public:
     Type const* type;
 public:
-    TbaaAttachInfo() : BaseAttachInfo(AI_TBAA) { type = NULL; }
+    TbaaAttachInfo() : BaseAttachInfo(AI_TBAA) { type = nullptr; }
 };
 
 

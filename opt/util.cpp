@@ -40,7 +40,7 @@ namespace xoc {
 
 //Print \l as the Carriage Return.
 //bool g_prt_carriage_return_for_dot = false;
-static SMemPool * g_pool_tmp_used = NULL;
+static SMemPool * g_pool_tmp_used = nullptr;
 
 //Return true if val is 32bit integer.
 bool isInteger32bit(HOST_UINT val)
@@ -76,7 +76,7 @@ void prt2C(CHAR const* format, ...)
     #ifdef FOR_DEX
     __android_log_vprint(ANDROID_LOG_ERROR, LOG_TAG, format, args);
     #else
-    if (g_redirect_stdout_to_dump_file && g_unique_dumpfile != NULL) {
+    if (g_redirect_stdout_to_dump_file && g_unique_dumpfile != nullptr) {
         vfprintf(g_unique_dumpfile, format, args);
         fflush(g_unique_dumpfile);
     } else {
@@ -97,12 +97,12 @@ SMemPool * get_tmp_pool()
 //Malloc memory for tmp used.
 void * tlloc(LONG size)
 {
-    if (size < 0 || size == 0) { return NULL; }
-    if (g_pool_tmp_used == NULL) {
+    if (size < 0 || size == 0) { return nullptr; }
+    if (g_pool_tmp_used == nullptr) {
         g_pool_tmp_used = smpoolCreate(8, MEM_COMM);
     }
     void * p = smpoolMalloc(size, g_pool_tmp_used);
-    if (p == NULL) { return NULL; }
+    if (p == nullptr) { return nullptr; }
     ::memset(p, 0, size);
     return p;
 }
@@ -110,9 +110,9 @@ void * tlloc(LONG size)
 
 void tfree()
 {
-    if (g_pool_tmp_used != NULL) {
+    if (g_pool_tmp_used != nullptr) {
         smpoolDelete(g_pool_tmp_used);
-        g_pool_tmp_used = NULL;
+        g_pool_tmp_used = nullptr;
     }
 }
 

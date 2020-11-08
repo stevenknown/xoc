@@ -41,7 +41,7 @@ namespace xoc {
 //Insert ir prior to cond_br, uncond_br, call, return.
 C<IR*> * BBIRList::append_tail_ex(IR * ir)
 {
-    if (ir == NULL) { return NULL; }
+    if (ir == nullptr) { return nullptr; }
 
     IRListIter ct;
     for (List<IR*>::get_tail(&ct);
@@ -53,7 +53,7 @@ C<IR*> * BBIRList::append_tail_ex(IR * ir)
 
     ASSERT0(m_bb);
     ir->setBB(m_bb);
-    if (ct == NULL) {
+    if (ct == nullptr) {
         //The only one stmt of BB is down boundary or bb is empty.
         return EList<IR*, IR2Holder>::append_head(ir);
     }
@@ -86,7 +86,7 @@ bool IRBB::isDownBoundary(IR const* ir)
     case IR_IGOTO:
         return true;
     case IR_SWITCH:
-        ASSERTN(SWITCH_body(ir) == NULL,
+        ASSERTN(SWITCH_body(ir) == nullptr,
                 ("Peel switch-body to enable switch in bb-list construction"));
         return true;
     case IR_TRUEBR:
@@ -106,7 +106,7 @@ bool IRBB::isDownBoundary(IR const* ir)
 bool IRBB::is_fallthrough() const
 {
     IR * last = const_cast<IRBB*>(this)->getLastIR();
-    if (last == NULL) { return true; }
+    if (last == nullptr) { return true; }
     switch (last->getCode()) {
     case IR_CALL:
     case IR_ICALL:
@@ -166,9 +166,9 @@ void IRBB::dump(Region const* rg, bool dump_inner_region) const
     note(rg, "\nSTMT NUM:%d", getNumOfIR());
     rg->getLogMgr()->incIndent(3);
     for (IR * ir = BB_first_ir(pthis);
-         ir != NULL; ir = BB_irlist(pthis).get_next()) {
+         ir != nullptr; ir = BB_irlist(pthis).get_next()) {
         ASSERT0(ir->is_single() && ir->getBB() == this);
-        dumpIR(ir, rg, NULL, IR_DUMP_KID | IR_DUMP_SRC_LINE |
+        dumpIR(ir, rg, nullptr, IR_DUMP_KID | IR_DUMP_SRC_LINE |
                (dump_inner_region ? IR_DUMP_INNER_REGION : 0));
     }
     rg->getLogMgr()->decIndent(3);
@@ -182,7 +182,7 @@ void IRBB::verify()
     UINT c = 0;
     IRListIter ct;
     for (IR * ir = BB_irlist(this).get_head(&ct);
-         ir != NULL; ir = BB_irlist(this).get_next(&ct)) {
+         ir != nullptr; ir = BB_irlist(this).get_next(&ct)) {
         ASSERT0(ir->is_single());
         ASSERT0(ir->getBB() == this);
         ASSERT0(ir->isStmtInBB());
@@ -201,12 +201,12 @@ bool IRBB::successorHasPhi(CFG<IRBB, IR> * cfg)
     xcom::Vertex * vex = cfg->getVertex(id());
     ASSERT0(vex);
     for (xcom::EdgeC * out = vex->getOutList();
-         out != NULL; out = out->get_next()) {
+         out != nullptr; out = out->get_next()) {
         xcom::Vertex * succ_vex = out->getTo();
         IRBB * succ = cfg->getBB(succ_vex->id());
         ASSERT0(succ);
         for (IR * ir = BB_first_ir(succ);
-             ir != NULL; ir = BB_next_ir(succ)) {
+             ir != nullptr; ir = BB_next_ir(succ)) {
             if (ir->is_phi()) { return true; }
         }
     }
@@ -222,13 +222,13 @@ void IRBB::dupSuccessorPhiOpnd(CFG<IRBB, IR> * cfg, Region * rg, UINT opnd_pos)
     xcom::Vertex * vex = ircfg->getVertex(id());
     ASSERT0(vex);
     for (xcom::EdgeC * out = vex->getOutList();
-         out != NULL; out = out->get_next()) {
+         out != nullptr; out = out->get_next()) {
         xcom::Vertex * succ_vex = out->getTo();
         IRBB * succ = ircfg->getBB(succ_vex->id());
         ASSERT0(succ);
 
         for (IR * ir = BB_first_ir(succ);
-             ir != NULL; ir = BB_next_ir(succ)) {
+             ir != nullptr; ir = BB_next_ir(succ)) {
             if (!ir->is_phi()) { break; }
 
             ASSERT0(xcom::cnt_list(PHI_opnd_list(ir)) >= opnd_pos);
@@ -262,7 +262,7 @@ UINT IRBB::getNumOfPred(CFG<IRBB, IR> * cfg) const
     ASSERT0(vex);
     UINT n = 0;
     for (xcom::EdgeC const* in = VERTEX_in_list(vex);
-         in != NULL; in = EC_next(in), n++);
+         in != nullptr; in = EC_next(in), n++);
     return n;
 }
 
@@ -274,7 +274,7 @@ UINT IRBB::getNumOfSucc(CFG<IRBB, IR> * cfg) const
     ASSERT0(vex);
     UINT n = 0;
     for (xcom::EdgeC const* out = VERTEX_out_list(vex);
-         out != NULL; out = EC_next(out), n++);
+         out != nullptr; out = EC_next(out), n++);
     return n;
 }
 //END IRBB
@@ -287,13 +287,13 @@ void IRBB::removeSuccessorDesignatePhiOpnd(CFG<IRBB, IR> * cfg, IRBB * succ)
     IRCFG * ircfg = (IRCFG*)cfg;
     PRSSAMgr * prssamgr = (PRSSAMgr*)ircfg->getRegion()->getPassMgr()->
         queryPass(PASS_PR_SSA_MGR);
-    if (prssamgr != NULL && prssamgr->is_valid()) {
+    if (prssamgr != nullptr && prssamgr->is_valid()) {
         prssamgr->removeSuccessorDesignatePhiOpnd(this, succ);
     }
 
     MDSSAMgr * mdssamgr = (MDSSAMgr*)ircfg->getRegion()->getPassMgr()->
         queryPass(PASS_MD_SSA_MGR);
-    if (mdssamgr != NULL && mdssamgr->is_valid()) {
+    if (mdssamgr != nullptr && mdssamgr->is_valid()) {
         mdssamgr->removeSuccessorDesignatePhiOpnd(this, succ);
     }
 }
@@ -306,13 +306,13 @@ void IRBB::addSuccessorDesignatePhiOpnd(CFG<IRBB, IR> * cfg, IRBB * succ)
     IRCFG * ircfg = (IRCFG*)cfg;
     PRSSAMgr * prssamgr = (PRSSAMgr*)ircfg->getRegion()->getPassMgr()->
         queryPass(PASS_PR_SSA_MGR);
-    if (prssamgr != NULL && prssamgr->is_valid()) {
+    if (prssamgr != nullptr && prssamgr->is_valid()) {
         prssamgr->addSuccessorDesignatePhiOpnd(this, succ);        
     }
 
     MDSSAMgr * mdssamgr = (MDSSAMgr*)ircfg->getRegion()->getPassMgr()->
         queryPass(PASS_MD_SSA_MGR);
-    if (mdssamgr != NULL && mdssamgr->is_valid()) {
+    if (mdssamgr != nullptr && mdssamgr->is_valid()) {
         mdssamgr->addSuccessorDesignatePhiOpnd(this, succ);
     }
 }
@@ -325,7 +325,7 @@ void IRBB::removeAllSuccessorsPhiOpnd(CFG<IRBB, IR> * cfg)
     xcom::Vertex * vex = cfg->getVertex(id());
     ASSERT0(vex);
     for (xcom::EdgeC * out = vex->getOutList();
-         out != NULL; out = EC_next(out)) {
+         out != nullptr; out = EC_next(out)) {
         IRBB * succ = ((IRCFG*)cfg)->getBB(out->getToId());
         ASSERT0(succ);
         removeSuccessorDesignatePhiOpnd(cfg, succ);
@@ -388,9 +388,9 @@ void dumpBBList(BBList const* bbl,
     if (!rg->isLogMgrInit()) { return; }
     if (bbl->get_elem_count() != 0) {
         note(rg, "\n==---- DUMP IRBBList '%s' ----==", rg->getRegionName());
-        C<IRBB*> * ct = NULL;
+        C<IRBB*> * ct = nullptr;
         for (IRBB * bb = bbl->get_head(&ct);
-             bb != NULL; bb = bbl->get_next(&ct)) {
+             bb != nullptr; bb = bbl->get_next(&ct)) {
             bb->dump(rg, dump_inner_region);
         }
     }

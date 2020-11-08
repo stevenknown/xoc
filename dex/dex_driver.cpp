@@ -54,9 +54,9 @@ author: Su Zhenyu
 static void add_ret(IR * irs, Region * rg)
 {
     IR * last = get_last(irs);
-    if (last != NULL && !last->is_return()) {
-        IR * ret = rg->buildReturn(NULL);
-        if (irs == NULL) {
+    if (last != nullptr && !last->is_return()) {
+        IR * ret = rg->buildReturn(nullptr);
+        if (irs == nullptr) {
             irs = ret;
         } else {
             insertafter_one(&last, ret);
@@ -70,11 +70,11 @@ static void updateLIRCodeOrg(LIRCode * lircode, Dex2IR & d2ir, IR2Dex & ir2d)
 {
     TryInfo * ti = d2ir.getTryInfo();
     Label2UINT * lab2idx = ir2d.get_lab2idx();
-    if (ti == NULL) { return; }
+    if (ti == nullptr) { return; }
 
     ASSERT0(lircode->trys);
     UINT i = 0;
-    for (; ti != NULL; ti = ti->next, i++) {
+    for (; ti != nullptr; ti = ti->next, i++) {
         bool find;
         UINT idx = lab2idx->get(ti->try_start, &find);
             ASSERT0(find);
@@ -101,7 +101,7 @@ static void updateLIRCodeOrg(LIRCode * lircode, Dex2IR & d2ir, IR2Dex & ir2d)
 
             UINT j = 0;
             for (CatchInfo * ci = ti->catch_list;
-                 ci != NULL; ci = ci->next, j++) {
+                 ci != nullptr; ci = ci->next, j++) {
                 ASSERT0(each_try->catches);
                 LIROpcodeCatch * each_catch = each_try->catches + j;
 
@@ -111,7 +111,7 @@ static void updateLIRCodeOrg(LIRCode * lircode, Dex2IR & d2ir, IR2Dex & ir2d)
                 each_catch->class_type = ci->kind;
             }
 
-        if (ti->catch_list != NULL) {
+        if (ti->catch_list != nullptr) {
             ASSERT0(j == each_try->catchSize);
         }
     }
@@ -123,14 +123,14 @@ static void updateLIRCodeOrg(LIRCode * lircode, Dex2IR & d2ir, IR2Dex & ir2d)
 static void updateTryInfo(LIRCode * lircode, Dex2IR & d2ir, IR2Dex & ir2d)
 {
     TryInfo * ti = d2ir.getTryInfo();
-    if (ti == NULL) { return; }
+    if (ti == nullptr) { return; }
 
     Label2UINT * lab2idx = ir2d.get_lab2idx();
     Vector<TryInfo*> tivec;
 
     //Check if catch blocks has removed, delete the tryinfo.
     UINT vecidx = 0;
-    for (UINT i = 0; ti != NULL; ti = ti->next, i++) {
+    for (UINT i = 0; ti != nullptr; ti = ti->next, i++) {
         //Check if try-block is not exist.
         bool find_start_lab = false;
         bool find_end_lab = false;
@@ -157,7 +157,7 @@ static void updateTryInfo(LIRCode * lircode, Dex2IR & d2ir, IR2Dex & ir2d)
 
         bool at_least_one_catch_block = false;
         for (CatchInfo * ci = ti->catch_list;
-             ci != NULL; ci = ci->next, j++) {
+             ci != nullptr; ci = ci->next, j++) {
             ASSERT0(each_try->catches);
             ASSERT0(j < each_try->catchSize);
             LIROpcodeCatch * each_catch = &each_try->catches[j];
@@ -214,7 +214,7 @@ static void updateTryInfo(LIRCode * lircode, Dex2IR & d2ir, IR2Dex & ir2d)
 
         //Generate catch-block info.
         UINT j = 0;
-        for (CatchInfo * ci = ti->catch_list; ci != NULL; ci = ci->next) {
+        for (CatchInfo * ci = ti->catch_list; ci != nullptr; ci = ci->next) {
             LIROpcodeCatch * each_catch = &each_try->catches[j];
 
             UINT idx = lab2idx->get(ci->catch_start, &find);
@@ -225,7 +225,7 @@ static void updateTryInfo(LIRCode * lircode, Dex2IR & d2ir, IR2Dex & ir2d)
             }
         }
 
-        if (ti->catch_list != NULL) {
+        if (ti->catch_list != nullptr) {
             ASSERT0(j > 0);
             each_try->catchSize = j;
         }
@@ -237,7 +237,7 @@ static void updateTryInfo(LIRCode * lircode, Dex2IR & d2ir, IR2Dex & ir2d)
 
 static void do_opt(IR * ir_list, DexRegion * func_ru)
 {
-    if (ir_list == NULL) { return; }
+    if (ir_list == nullptr) { return; }
 
     //dumpIRList(ir_list, func_ru->getTypeMgr());
 
@@ -250,7 +250,7 @@ static void do_opt(IR * ir_list, DexRegion * func_ru)
 
     //ir_list = func_ru->refineIRlist(ir_list, change, rf);
 
-    verifyIRList(ir_list, NULL, func_ru);
+    verifyIRList(ir_list, nullptr, func_ru);
 
     func_ru->addToIRList(ir_list);
 
@@ -302,7 +302,7 @@ static void convertLIR2Dex(
     adm.extract_dxinfo(dxinfo,
                        newone->insns,
                        newone->insnsSize,
-                       NULL, &dexm->methodIdx);
+                       nullptr, &dexm->methodIdx);
     adm.dump_method(dxinfo, g_tfile);
     #endif
 }
@@ -327,7 +327,7 @@ static void convertIR2LIR(
     ASSERT0(lircode->numArgs == func_ru->getPrno2Vreg()->paramnum);
     ::memset(lircode->lirList, 0, u * sizeof(LIR*));
     UINT i = 0;
-    for (LIR * l = newlirs.get_head(); l != NULL; l = newlirs.get_next()) {
+    for (LIR * l = newlirs.get_head(); l != nullptr; l = newlirs.get_next()) {
         ASSERT0(l);
         lircode->lirList[i++] = l;
     }
@@ -358,7 +358,7 @@ public:
         dbxvec(dv),
         pool(p),
         lircode_num(n),
-        last_debug_info(NULL)
+        last_debug_info(nullptr)
     { ASSERT0(rg); }
 
     DexDbx * newDexDbx()
@@ -472,7 +472,7 @@ static void handleRegion(
 {
     DbxVec dbxvec(LIRC_num_of_op(lircode));
 
-    SMemPool * dbxpool = NULL; //record the all DexDbx data.
+    SMemPool * dbxpool = nullptr; //record the all DexDbx data.
     if (g_collect_debuginfo) {
         if (g_do_ipa) {
             dbxpool = ((DexRegionMgr*)func_ru->getRegionMgr())->get_pool();
@@ -536,7 +536,7 @@ static void handleRegion(
         convertIR2LIR(func_ru, df, lircode);
     }
 FIN:
-    if (dbxpool != NULL && !g_do_ipa) {
+    if (dbxpool != nullptr && !g_do_ipa) {
         smpoolDelete(dbxpool); //delete the pool local used.
     }
     return;
@@ -612,7 +612,7 @@ bool compileFunc(
         List<DexRegion const*> * rulist)
 {
     CHAR tmp[256];
-    CHAR * runame = NULL;
+    CHAR * runame = nullptr;
     CHAR const* classname = get_class_name(df, dexm);
     CHAR const* funcname = get_func_name(df, dexm);
     CHAR const* functype = get_func_type(df, dexm);
@@ -645,12 +645,12 @@ bool compileFunc(
         dump_all_lir(lircode, df, dexm);
     }
 
-    DexRegionMgr * rm = NULL;
+    DexRegionMgr * rm = nullptr;
     if (g_do_ipa) {
         ASSERT0(rumgr);
         rm = (DexRegionMgr*)rumgr;
     } else {
-        ASSERT0(rumgr == NULL);
+        ASSERT0(rumgr == nullptr);
         rm = new DexRegionMgr();
         rm->initVarMgr();
         rm->init();
@@ -688,12 +688,12 @@ bool compileFunc(
         program->addToVarTab(func_ru->getRegionVar());
         program->addToIRList(program->buildRegion(func_ru));
         rm->addToRegionTab(func_ru);
-        if (rulist != NULL) {
+        if (rulist != nullptr) {
             //Caller must make sure func_ru will not be destroied before IPA.
             rulist->append_tail(func_ru);
         }
     } else {
-        ASSERT0(rumgr == NULL);
+        ASSERT0(rumgr == nullptr);
         rm->deleteRegion(func_ru);
         delete rm;
     }

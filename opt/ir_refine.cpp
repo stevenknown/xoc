@@ -38,8 +38,8 @@ namespace xoc {
 
 static bool checkMDSetContain(IR const* ir1, MD const* md)
 {
-    if (ir1->getRefMDSet() != NULL) {
-        //RefMDSet may be NULL under OPT_LEVEL0.
+    if (ir1->getRefMDSet() != nullptr) {
+        //RefMDSet may be nullptr under OPT_LEVEL0.
         CHECK_DUMMYUSE(ir1->getRefMDSet() &&
                        ir1->getRefMDSet()->is_contain(md));
     }
@@ -49,7 +49,7 @@ static bool checkMDSetContain(IR const* ir1, MD const* md)
 
 Refine::Refine(Region * rg)
 {
-    ASSERT0(rg != NULL);
+    ASSERT0(rg != nullptr);
     m_rg = rg;
     m_tm = rg->getTypeMgr();
 }
@@ -81,7 +81,7 @@ IR * Refine::refineILoad1(IR * ir, bool & change, RefineCtx & rc)
     //Note: do not recompute MD and overlap set to ld because that
     //might generate new MD that not versioned by MDSSAMgr.
     //ir's MD ref must be equivalent to ld.
-    if (ld->getEffectRef() == NULL && rc.doUpdateMDRef()) {
+    if (ld->getEffectRef() == nullptr && rc.doUpdateMDRef()) {
         MD const* t = m_rg->allocRefForLoad(ld);
         CHECK_DUMMYUSE(checkMDSetContain(ld, t));
     }
@@ -111,7 +111,7 @@ IR * Refine::refineILoad2(IR * ir, bool & change, RefineCtx & rc)
     LD_ofst(ld) = LDA_ofst(base) + ILD_ofst(ir);
     copyDbx(ld, ir, m_rg);
     ld->copyRef(ir, m_rg);
-    if (ld->getEffectRef() == NULL && rc.doUpdateMDRef()) {
+    if (ld->getEffectRef() == nullptr && rc.doUpdateMDRef()) {
         MD const* t = m_rg->allocRefForLoad(ld);
         CHECK_DUMMYUSE(checkMDSetContain(ld, t));
     }
@@ -179,12 +179,12 @@ IR * Refine::refineIStore(IR * ir, bool & change, RefineCtx & rc)
         IR * newir = m_rg->buildStore(LDA_idinfo(base), ir->getType(),
             LDA_ofst(base) + IST_ofst(ir), IST_rhs(ir));
         newir->copyRef(ir, m_rg);
-        if (newir->getEffectRef() == NULL && rc.doUpdateMDRef()) {
+        if (newir->getEffectRef() == nullptr && rc.doUpdateMDRef()) {
             MD const* t2 = m_rg->allocRefForStore(newir);
             CHECK_DUMMYUSE(checkMDSetContain(newir, t2));
         }
         bool maybe_exist_expired_du = false;
-        if (newir->getRefMD() == NULL) {
+        if (newir->getRefMD() == nullptr) {
             newir->setRefMD(m_rg->genMDforStore(newir), m_rg);
             newir->cleanRefMDSet();
 
@@ -203,7 +203,7 @@ IR * Refine::refineIStore(IR * ir, bool & change, RefineCtx & rc)
         }
         newir->copyAI(ir, m_rg);
 
-        IST_rhs(ir) = NULL;
+        IST_rhs(ir) = nullptr;
         m_rg->freeIR(ir);
         ir = newir;
         lchange = true; //Keep the result type of ST unchanged.
@@ -218,7 +218,7 @@ IR * Refine::refineIStore(IR * ir, bool & change, RefineCtx & rc)
         ir->setRHS(newrhs);
         copyDbx(newrhs, rhs, m_rg);
         newrhs->copyRef(rhs, m_rg);
-        if (newrhs->getEffectRef() == NULL && rc.doUpdateMDRef()) {
+        if (newrhs->getEffectRef() == nullptr && rc.doUpdateMDRef()) {
             MD const* t2 = m_rg->allocRefForLoad(newrhs);
             CHECK_DUMMYUSE(checkMDSetContain(newrhs, t2));
         }
@@ -272,14 +272,14 @@ IR * Refine::refineStore(IR * ir, bool & change, RefineCtx & rc)
         coalesceDUChain(ir, rhs, m_rg);
 
         IRBB * bb = ir->getBB();
-        if (bb != NULL) {
+        if (bb != nullptr) {
             BB_irlist(bb).remove(ir);
             RC_stmt_removed(rc) = true;
         }
 
         m_rg->freeIRTree(ir);
         change = true;
-        return NULL;
+        return nullptr;
     }
 
     rhs = refineIR(rhs, lchange, rc);
@@ -287,7 +287,7 @@ IR * Refine::refineStore(IR * ir, bool & change, RefineCtx & rc)
     ASSERT0(!::is_redundant_cvt(rhs));
     if (RC_refine_stmt(rc)) {
         MD const* umd = rhs->getExactRef();
-        if (umd != NULL && umd == ir->getExactRef()) {
+        if (umd != nullptr && umd == ir->getExactRef()) {
             //Result and operand referenced the same md.
             if (rhs->is_cvt()) {
                 //CASE: pr(i64) = cvt(i64, pr(i32))
@@ -297,13 +297,13 @@ IR * Refine::refineStore(IR * ir, bool & change, RefineCtx & rc)
                 change = true;
                 coalesceDUChain(ir, rhs, m_rg);
                 IRBB * bb = ir->getBB();
-                if (bb != NULL) {
+                if (bb != nullptr) {
                     BB_irlist(bb).remove(ir);
                     RC_stmt_removed(rc) = true;
                 }
 
                 m_rg->freeIRTree(ir);
-                return NULL;
+                return nullptr;
             }
         }
     }
@@ -361,11 +361,11 @@ IR * Refine::refineGetelem(IR * ir, bool & change, RefineCtx & rc)
 IR * Refine::refineCall(IR * ir, bool & change, RefineCtx & rc)
 {
     bool lchange = false;
-    if (CALL_param_list(ir) != NULL) {
+    if (CALL_param_list(ir) != nullptr) {
         IR * param = xcom::removehead(&CALL_param_list(ir));
-        IR * newparamlst = NULL;
-        IR * last = NULL;
-        while (param != NULL) {
+        IR * newparamlst = nullptr;
+        IR * last = nullptr;
+        while (param != nullptr) {
             IR * newp = refineIR(param, lchange, rc);
             xcom::add_next(&newparamlst, &last, newp);
             last = newp;
@@ -420,7 +420,7 @@ IR * Refine::refineBr(IR * ir, bool & change, RefineCtx & rc)
 
 IR * Refine::refineReturn(IR * ir, bool & change, RefineCtx & rc)
 {
-    if (RET_exp(ir) == NULL) { return ir; }
+    if (RET_exp(ir) == nullptr) { return ir; }
 
     bool lchange = false;
     RET_exp(ir) = refineIR(RET_exp(ir), lchange, rc);
@@ -442,7 +442,7 @@ IR * Refine::refinePhi(IR * ir, bool & change, RefineCtx & rc)
     HOST_INT val = 0;
     if (opnd->is_const() && opnd->is_int()) {
         val = CONST_int_val(opnd);
-        for (opnd = opnd->get_next(); opnd != NULL; opnd = opnd->get_next()) {
+        for (opnd = opnd->get_next(); opnd != nullptr; opnd = opnd->get_next()) {
             if (opnd->is_const() && opnd->is_int() &&
                 val == CONST_int_val(opnd)) {
                 continue;
@@ -482,7 +482,7 @@ IR * Refine::refinePhi(IR * ir, bool & change, RefineCtx & rc)
         RC_stmt_removed(rc) = true;
         m_rg->freeIRTree(ir);
     }
-    return NULL;
+    return nullptr;
 }
 
 
@@ -521,7 +521,7 @@ static inline IR * hoistSelectToLnot(IR * ir, Region * rg)
                            IR_LNOT,
                            rg->getTypeMgr()->getBool(),
                            BIN_opnd0(det));
-            BIN_opnd0(det) = NULL;
+            BIN_opnd0(det) = nullptr;
             return lnot;
         }
     }
@@ -533,7 +533,7 @@ static inline IR * hoistSelectToLnot(IR * ir, Region * rg)
             trueexp->isConstIntValueEqualTo(1) &&
             falseexp->isConstIntValueEqualTo(0)) {
             IR * lnot = rg->buildLogicalNot(BIN_opnd0(det));
-            BIN_opnd0(det) = NULL;
+            BIN_opnd0(det) = nullptr;
             return lnot;
         }
     }
@@ -549,7 +549,7 @@ IR * Refine::refineSelect(IR * ir, bool & change, RefineCtx & rc)
     SELECT_trueexp(ir) = refineIRlist(SELECT_trueexp(ir), change, rc);
     SELECT_falseexp(ir) = refineIRlist(SELECT_falseexp(ir), change, rc);
     IR * det = foldConst(SELECT_pred(ir), change);
-    IR * gen = NULL;
+    IR * gen = nullptr;
     if (det->is_const() && det->is_int()) {
         HOST_INT v = CONST_int_val(det);
         if (v == 0) {
@@ -629,7 +629,7 @@ IR * Refine::refineNeg(IR * ir, bool & change)
     if (!lchange && UNA_opnd(ir)->is_neg()) {
         //-(-x) => x
         IR * tmp = UNA_opnd(UNA_opnd(ir));
-        UNA_opnd(UNA_opnd(ir)) = NULL;
+        UNA_opnd(UNA_opnd(ir)) = nullptr;
         m_rg->freeIRTree(ir);
         change = true;
         return tmp;
@@ -664,7 +664,7 @@ IR * Refine::refineNot(IR * ir, bool & change, RefineCtx & rc)
         default: break;
         }
         if (lchange) {
-            UNA_opnd(ir) = NULL;
+            UNA_opnd(ir) = nullptr;
             m_rg->freeIRTree(ir);
             change = true;
             ir = op0;
@@ -688,7 +688,7 @@ IR * Refine::refineDiv(IR * ir, bool & change, RefineCtx & rc)
         if (fp_imm == 1.0) {
             //X/1.0 => X
             IR * newIR = op0;
-            BIN_opnd0(ir) = NULL;
+            BIN_opnd0(ir) = nullptr;
             m_rg->freeIRTree(ir);
             ir = newIR;
             change = true;
@@ -753,7 +753,7 @@ IR * Refine::refineDiv(IR * ir, bool & change, RefineCtx & rc)
         IR * op0_of_op0 = BIN_opnd0(op0);
         IR * op1_of_op0 = BIN_opnd1(op0);
         if (op1_of_op0->isIREqual(op1, true)) {
-            BIN_opnd0(op0) = NULL;
+            BIN_opnd0(op0) = nullptr;
             removeIRTreeUse(ir, m_rg);
             m_rg->freeIRTree(ir);
             ir = op0_of_op0;
@@ -823,10 +823,10 @@ IR * Refine::refineAdd(IR * ir, bool & change)
     ASSERT0(ir->is_add());
     IR * op0 = BIN_opnd0(ir);
     IR * op1 = BIN_opnd1(ir);
-    ASSERT0(op0 != NULL && op1 != NULL);
+    ASSERT0(op0 != nullptr && op1 != nullptr);
     if (op1->is_const() && op1->is_int() && CONST_int_val(op1) == 0) {
         //add X,0 => X
-        BIN_opnd0(ir) = NULL;
+        BIN_opnd0(ir) = nullptr;
         m_rg->freeIRTree(ir);
         ir = op0;
         change = true;
@@ -848,7 +848,7 @@ IR * Refine::refineAdd(IR * ir, bool & change)
         IR * op0_of_op0 = BIN_opnd0(op0);
         IR * op1_of_op0 = BIN_opnd1(op0);
         if (op1_of_op0->isIREqual(op1, true)) {
-            BIN_opnd0(op0) = NULL;
+            BIN_opnd0(op0) = nullptr;
             m_rg->freeIRTree(ir);
             ir = op0_of_op0;
             change = true; 
@@ -864,7 +864,7 @@ IR * Refine::refineMul(IR * ir, bool & change, RefineCtx & rc)
     ASSERT0(ir->is_mul());
     IR * op0 = BIN_opnd0(ir);
     IR * op1 = BIN_opnd1(ir);
-    ASSERT0(op0 != NULL && op1 != NULL);
+    ASSERT0(op0 != nullptr && op1 != nullptr);
     if (op1->is_const() && op1->is_fp()) {
         if (g_is_opt_float && CONST_fp_val(op1) == HOST_FP(2.0)) {
             //mul.fp X,2.0 => add.fp X,X
@@ -885,7 +885,7 @@ IR * Refine::refineMul(IR * ir, bool & change, RefineCtx & rc)
             //mantissa of NaN*1.0 are unchanged from NaN. The sign is also
             //identical to the input NaN.
             //mul X,1.0 => X
-            BIN_opnd0(ir) = NULL;
+            BIN_opnd0(ir) = nullptr;
             m_rg->freeIRTree(ir);
             ir = op0;
             change = true;
@@ -907,7 +907,7 @@ IR * Refine::refineMul(IR * ir, bool & change, RefineCtx & rc)
         if (CONST_int_val(op1) == 1) {
             //mul X,1 => X
             IR * newir = op0;
-            BIN_opnd0(ir) = NULL;
+            BIN_opnd0(ir) = nullptr;
             //Do NOT need revise DU, just keep X original DU info.
             m_rg->freeIRTree(ir);
             change = true;
@@ -917,7 +917,7 @@ IR * Refine::refineMul(IR * ir, bool & change, RefineCtx & rc)
             //mul X,0 => 0
             removeIRTreeUse(ir, m_rg);
             IR * newir = op1;
-            BIN_opnd1(ir) = NULL;
+            BIN_opnd1(ir) = nullptr;
             m_rg->freeIRTree(ir);
             change = true;
             return newir;
@@ -938,7 +938,7 @@ IR * Refine::refineMul(IR * ir, bool & change, RefineCtx & rc)
         IR * op0_of_op0 = BIN_opnd0(op0);
         IR * op1_of_op0 = BIN_opnd1(op0);
         if (op1_of_op0->isIREqual(op1, true)) {
-            BIN_opnd0(op0) = NULL;
+            BIN_opnd0(op0) = nullptr;
             removeIRTreeUse(ir, m_rg);
             m_rg->freeIRTree(ir);
             ir = op0_of_op0;
@@ -955,11 +955,11 @@ IR * Refine::refineBand(IR * ir, bool & change)
     ASSERT0(ir->is_band());
     IR * op0 = BIN_opnd0(ir);
     IR * op1 = BIN_opnd1(ir);
-    ASSERT0(op0 != NULL && op1 != NULL);
+    ASSERT0(op0 != nullptr && op1 != nullptr);
     if (op1->is_const() && op1->is_int() && CONST_int_val(op1) == -1) {
         //BAND X,-1 => X
         IR * tmp = ir;
-        BIN_opnd0(ir) = NULL;
+        BIN_opnd0(ir) = nullptr;
         ir = op0;
         m_rg->freeIRTree(tmp);
         change = true;
@@ -974,11 +974,11 @@ IR * Refine::refineBor(IR * ir, bool & change)
     ASSERT0(ir->is_bor());
     IR * op0 = BIN_opnd0(ir);
     IR * op1 = BIN_opnd1(ir);
-    ASSERT0(op0 != NULL && op1 != NULL);
+    ASSERT0(op0 != nullptr && op1 != nullptr);
     if (op1->is_const() && op1->is_int() && CONST_int_val(op1) == 0) {
         //BOR X,0 => X
         IR * tmp = ir;
-        BIN_opnd0(ir) = NULL;
+        BIN_opnd0(ir) = nullptr;
         ir = op0;
         m_rg->freeIRTree(tmp);
         change = true;
@@ -995,7 +995,7 @@ IR * Refine::refineLand(IR * ir, bool & change)
     if (op0->is_const() && op0->is_int() && CONST_int_val(op0) == 1) {
         //1 && x => x
         IR * tmp = BIN_opnd1(ir);
-        BIN_opnd1(ir) = NULL;
+        BIN_opnd1(ir) = nullptr;
         m_rg->freeIRTree(ir);
         change = true;
         return tmp;
@@ -1014,7 +1014,7 @@ IR * Refine::refineLand(IR * ir, bool & change)
             IR * c3 = BIN_opnd1(lor);
             IR * c33 = BIN_opnd1(ir);
             if (b2->isIREqual(b22) && c3->isIREqual(c33)) {
-                SELECT_falseexp(op0) = NULL;
+                SELECT_falseexp(op0) = nullptr;
                 removeIRTreeUse(ir, m_rg);
                 m_rg->freeIRTree(ir);
                 ir = lor;
@@ -1035,7 +1035,7 @@ IR * Refine::refineLor(IR * ir, bool & change)
         //1 || x => 1
         removeIRTreeUse(ir, m_rg);
         IR * tmp = BIN_opnd0(ir);
-        BIN_opnd0(ir) = NULL;
+        BIN_opnd0(ir) = nullptr;
         m_rg->freeIRTree(ir);
         change = true;
         return tmp;
@@ -1054,7 +1054,7 @@ IR * Refine::refineLor(IR * ir, bool & change)
             IR * c3 = BIN_opnd1(lor);
             IR * c33 = BIN_opnd1(ir);
             if (b2->isIREqual(b22) && c3->isIREqual(c33)) {
-                SELECT_falseexp(op0) = NULL;
+                SELECT_falseexp(op0) = nullptr;
                 removeIRTreeUse(ir, m_rg);
                 m_rg->freeIRTree(ir);
                 ir = lor;
@@ -1073,7 +1073,7 @@ IR * Refine::refineSub(IR * ir, bool & change)
 
     IR * op0 = BIN_opnd0(ir);
     IR * op1 = BIN_opnd1(ir);
-    ASSERT0(op0 != NULL && op1 != NULL);
+    ASSERT0(op0 != nullptr && op1 != nullptr);
     if (op0->isIRListEqual(op1)) {
         //sub X,X => 0
         removeIRTreeUse(ir, m_rg);
@@ -1100,7 +1100,7 @@ IR * Refine::refineSub(IR * ir, bool & change)
     if (op1->is_const() && op1->is_int() && CONST_int_val(op1) == 0) {
         // X - 0 => X
         IR * tmp = ir;
-        BIN_opnd0(ir) = NULL;
+        BIN_opnd0(ir) = nullptr;
         ir = op0;
         m_rg->freeIRTree(tmp);
         change = true;
@@ -1110,7 +1110,7 @@ IR * Refine::refineSub(IR * ir, bool & change)
     if (op1->is_const() && op1->is_fp() && CONST_fp_val(op1) == HOST_FP(0.0)) {
         // X - 0 => X
         IR * tmp = ir;
-        BIN_opnd0(ir) = NULL;
+        BIN_opnd0(ir) = nullptr;
         ir = op0;
         m_rg->freeIRTree(tmp);
         change = true;
@@ -1126,7 +1126,7 @@ IR * Refine::refineXor(IR * ir, bool & change)
 
     IR * op0 = BIN_opnd0(ir);
     IR * op1 = BIN_opnd1(ir);
-    ASSERT0(op0 != NULL && op1 != NULL);
+    ASSERT0(op0 != nullptr && op1 != nullptr);
     if (op0->isIRListEqual(op1)) {
         //xor X,X => 0
         removeIRTreeUse(ir, m_rg);
@@ -1154,7 +1154,7 @@ IR * Refine::refineEq(IR * ir, bool & change, RefineCtx & rc)
 
     IR * op0 = BIN_opnd0(ir);
     IR * op1 = BIN_opnd1(ir);
-    ASSERT0(op0 != NULL && op1 != NULL);
+    ASSERT0(op0 != nullptr && op1 != nullptr);
     if (op0->isIRListEqual(op1) && RC_do_fold_const(rc)) {
         //eq X,X => 1
         removeIRTreeUse(ir, m_rg);
@@ -1176,7 +1176,7 @@ IR * Refine::refineNe(IR * ir, bool & change, RefineCtx & rc)
     ASSERT0(ir->is_ne());
     IR * op0 = BIN_opnd0(ir);
     IR * op1 = BIN_opnd1(ir);
-    ASSERT0(op0 != NULL && op1 != NULL);
+    ASSERT0(op0 != nullptr && op1 != nullptr);
     if (op0->isIRListEqual(op1) && RC_do_fold_const(rc)) {
         //ne X,X => 0
         removeIRTreeUse(ir, m_rg);
@@ -1198,11 +1198,11 @@ IR * Refine::refineAsr(IR * ir, bool & change)
     ASSERT0(ir->is_asr());
     IR * op0 = BIN_opnd0(ir);
     IR * op1 = BIN_opnd1(ir);
-    ASSERT0(op0 != NULL && op1 != NULL);
+    ASSERT0(op0 != nullptr && op1 != nullptr);
     if (op1->is_const() && op1->is_int() && CONST_int_val(op1) == 0) {
         //asr X >> 0 => X
         IR * tmp = ir;
-        BIN_opnd0(ir) = NULL;
+        BIN_opnd0(ir) = nullptr;
         ir = op0;
         m_rg->freeIRTree(tmp);
         change = true;
@@ -1217,11 +1217,11 @@ IR * Refine::refineLsl(IR * ir, bool & change)
     ASSERT0(ir->is_lsl());
     IR * op0 = BIN_opnd0(ir);
     IR * op1 = BIN_opnd1(ir);
-    ASSERT0(op0 != NULL && op1 != NULL);
+    ASSERT0(op0 != nullptr && op1 != nullptr);
     if (op1->is_const() && op1->is_int() && CONST_int_val(op1) == 0) {
         //X << 0 => X
         IR * tmp = ir;
-        BIN_opnd0(ir) = NULL;
+        BIN_opnd0(ir) = nullptr;
         ir = op0;
         m_rg->freeIRTree(tmp);
         change = true;
@@ -1236,11 +1236,11 @@ IR * Refine::refineLsr(IR * ir, bool & change)
     ASSERT0(ir->is_lsr());
     IR * op0 = BIN_opnd0(ir);
     IR * op1 = BIN_opnd1(ir);
-    ASSERT0(op0 != NULL && op1 != NULL);
+    ASSERT0(op0 != nullptr && op1 != nullptr);
     if (op1->is_const() && op1->is_int() && CONST_int_val(op1) == 0) {
         //X >> 0 => X
         IR * tmp = ir;
-        BIN_opnd0(ir) = NULL;
+        BIN_opnd0(ir) = nullptr;
         ir = op0;
         m_rg->freeIRTree(tmp);
         change = true;
@@ -1274,8 +1274,8 @@ IR * Refine::reassociation(IR * ir, bool & change)
                                          op1->getDType();
         IR * new_const = m_rg->buildImmInt(v, m_tm->getSimplexTypeEx(dt));
         copyDbx(new_const, BIN_opnd0(ir), m_rg);
-        IR_parent(op0) = NULL;
-        BIN_opnd0(ir) = NULL;
+        IR_parent(op0) = nullptr;
+        BIN_opnd0(ir) = nullptr;
         m_rg->freeIRTree(ir);
         m_rg->freeIRTree(BIN_opnd1(op0));
         BIN_opnd1(op0) = new_const;
@@ -1290,7 +1290,7 @@ IR * Refine::reassociation(IR * ir, bool & change)
 //Refine binary operations.
 IR * Refine::refineBinaryOp(IR * ir, bool & change, RefineCtx & rc)
 {
-    ASSERT0(BIN_opnd0(ir) != NULL && BIN_opnd1(ir) != NULL);
+    ASSERT0(BIN_opnd0(ir) != nullptr && BIN_opnd1(ir) != nullptr);
     BIN_opnd0(ir) = refineIR(BIN_opnd0(ir), change, rc);
     BIN_opnd1(ir) = refineIR(BIN_opnd1(ir), change, rc);
     if (change) { ir->setParentPointer(false); }
@@ -1435,7 +1435,7 @@ IR * Refine::refineStoreArray(IR * ir, bool & change, RefineCtx & rc)
     ASSERT0(!::is_redundant_cvt(newrhs));
     if (RC_refine_stmt(rc)) {
         MD const* umd = newrhs->getExactRef();
-        if (umd != NULL && umd == ir->getExactRef()) {
+        if (umd != nullptr && umd == ir->getExactRef()) {
             //Result and operand refered the same md.
             if (newrhs->is_cvt()) {
                 //CASE: pr(i64) = cvt(i64, pr(i32))
@@ -1446,13 +1446,13 @@ IR * Refine::refineStoreArray(IR * ir, bool & change, RefineCtx & rc)
                 coalesceDUChain(ir, newrhs, m_rg);
 
                 IRBB * bb = ir->getBB();
-                if (bb != NULL) {
+                if (bb != nullptr) {
                     BB_irlist(bb).remove(ir);
                     RC_stmt_removed(rc) = true;
                 }
 
                 m_rg->freeIRTree(ir);
-                return NULL;
+                return nullptr;
             }
         }
     }
@@ -1468,11 +1468,11 @@ IR * Refine::refineArray(IR * ir, bool & change, RefineCtx & rc)
         IR_parent(newbase) = ir;
     }
 
-    IR * newsublist = NULL;
-    IR * last = NULL;
+    IR * newsublist = nullptr;
+    IR * last = nullptr;
     IR * s = xcom::removehead(&ARR_sub_list(ir));
 
-    for (; s != NULL;) {
+    for (; s != nullptr;) {
         IR * newsub = refineIR(s, change, rc);
         if (newsub != s) {
             IR_parent(newsub) = ir;
@@ -1524,7 +1524,7 @@ IR * Refine::refineCvt(IR * ir, bool & change, RefineCtx & rc)
         //cvt1(cvt2,xxx) => cvt1(xxx)
         IR * tmp = CVT_exp(ir);
         CVT_exp(ir) = CVT_exp(CVT_exp(ir));
-        CVT_exp(tmp) = NULL;
+        CVT_exp(tmp) = nullptr;
         m_rg->freeIRTree(tmp);
         IR_parent(CVT_exp(ir)) = ir;
         change = true;
@@ -1534,7 +1534,7 @@ IR * Refine::refineCvt(IR * ir, bool & change, RefineCtx & rc)
         //cvt(i64, ld(i64)) => ld(i64)
         IR * tmp = CVT_exp(ir);
         IR_parent(tmp) = IR_parent(ir);
-        CVT_exp(ir) = NULL;
+        CVT_exp(ir) = nullptr;
         m_rg->freeIRTree(ir);
         ir = tmp;
         change = true;
@@ -1547,7 +1547,7 @@ IR * Refine::refineCvt(IR * ir, bool & change, RefineCtx & rc)
         IR * tmp = CVT_exp(ir);
         IR_dt(tmp) = ir->getType();
         IR_parent(tmp) = IR_parent(ir);
-        CVT_exp(ir) = NULL;
+        CVT_exp(ir) = nullptr;
         m_rg->freeIRTree(ir);
         ir = tmp;
         change = true;
@@ -1566,19 +1566,19 @@ IR * Refine::refineDetViaSSAdu(IR * ir, bool & change)
     SSAInfo * op0_ssainfo = op0->getSSAInfo();
     SSAInfo * op1_ssainfo = op1->getSSAInfo();
 
-    if (op0_ssainfo == NULL || op1_ssainfo == NULL) { return ir; }
+    if (op0_ssainfo == nullptr || op1_ssainfo == nullptr) { return ir; }
 
     IR const* def0 = op0_ssainfo->getDef();
     IR const* def1 = op1_ssainfo->getDef();
 
-    if (def0 == NULL || def1 == NULL) { return ir; }
+    if (def0 == nullptr || def1 == nullptr) { return ir; }
 
     if (!def0->is_phi() || !def1->is_phi()) { return ir; }
 
     //Check if operand is the same const.
     IR const* phi_opnd0 = PHI_opnd_list(def0);
     IR const* phi_opnd1 = PHI_opnd_list(def1);
-    for (; phi_opnd1 != NULL && phi_opnd0 != NULL;
+    for (; phi_opnd1 != nullptr && phi_opnd0 != nullptr;
          phi_opnd1 = IR_next(phi_opnd1), phi_opnd0 = IR_next(phi_opnd0)) {
         if (!phi_opnd0->is_const() ||
             !phi_opnd1->is_const() ||
@@ -1587,7 +1587,7 @@ IR * Refine::refineDetViaSSAdu(IR * ir, bool & change)
         }
     }
 
-    if (phi_opnd0 != NULL || phi_opnd1 != NULL) {
+    if (phi_opnd0 != nullptr || phi_opnd1 != nullptr) {
         //These two PHIs does not have same number of operands.
         return ir;
     }
@@ -1610,7 +1610,7 @@ IR * Refine::refineDetViaSSAdu(IR * ir, bool & change)
 IR * Refine::refineIR(IR * ir, bool & change, RefineCtx & rc)
 {
     if (!g_do_refine) { return ir; }
-    if (ir == NULL) { return NULL; }
+    if (ir == nullptr) { return nullptr; }
     if (ir->hasSideEffect()) { return ir; }
     bool tmpc = false;
     switch (ir->getCode()) {
@@ -1744,7 +1744,7 @@ IR * Refine::refineIR(IR * ir, bool & change, RefineCtx & rc)
     default: UNREACHABLE();
     }
 
-    if (tmpc && ir != NULL && ir->is_stmt()) {
+    if (tmpc && ir != nullptr && ir->is_stmt()) {
         ir->setParentPointer(true);
     }
 
@@ -1793,9 +1793,9 @@ IR * Refine::refineIRlist(IR * ir_list, bool & change, RefineCtx & rc)
     bool lchange = true; //local flag
     while (lchange) {
         lchange = false;
-        IR * new_list = NULL;
-        IR * last = NULL;
-        while (ir_list != NULL) {
+        IR * new_list = nullptr;
+        IR * last = nullptr;
+        while (ir_list != nullptr) {
             IR * ir = xcom::removehead(&ir_list);
             IR * newIR = refineIR(ir, lchange, rc);
             xcom::add_next(&new_list, &last, newIR);
@@ -1814,7 +1814,7 @@ bool Refine::refineStmtList(IN OUT BBIRList & ir_list, RefineCtx & rc)
     IRListIter next_ct;
     ir_list.get_head(&next_ct);
     IRListIter ct = next_ct;
-    for (; ct != NULL; ct = next_ct) {
+    for (; ct != nullptr; ct = next_ct) {
         IR * ir = ct->val();
         next_ct = ir_list.get_next(next_ct);
 
@@ -1826,8 +1826,8 @@ bool Refine::refineStmtList(IN OUT BBIRList & ir_list, RefineCtx & rc)
                 ir_list.remove(ct);
             }
 
-            if (newir != NULL) {
-                if (next_ct != NULL) {
+            if (newir != nullptr) {
+                if (next_ct != nullptr) {
                     ir_list.insert_before(newir, next_ct);
                 } else {
                     ir_list.append_tail(newir);
@@ -2075,7 +2075,7 @@ IR * Refine::insertCvt(IR * parent, IR * kid, bool & change)
     }
 
     UNREACHABLE();
-    return NULL;
+    return nullptr;
 }
 
 
@@ -2265,7 +2265,7 @@ IR * Refine::foldConstIntBinary(IR * ir, bool & change)
     case IR_NE:
     case IR_ASR:
     case IR_LSL: {
-        IR * x = NULL;
+        IR * x = nullptr;
         if (ir->is_bool()) {
             x = m_rg->buildImmInt(calcIntVal(ir->getCode(), v0, v1),
                     m_tm->getSimplexTypeEx(D_U32));
@@ -2426,7 +2426,7 @@ IR * Refine::foldConst(IR * ir, bool & change)
     bool doit = false;
     for (INT i = 0; i < IR_MAX_KID_NUM(ir); i++) {
         IR * kid = ir->getKid(i);
-        if (kid != NULL) {
+        if (kid != nullptr) {
             IR * new_kid = foldConst(kid, change);
             if (new_kid != kid) {
                 doit = true;
@@ -2445,7 +2445,7 @@ IR * Refine::foldConst(IR * ir, bool & change)
         IR * t1 = BIN_opnd1(ir);
         ASSERT0(ir->isBinaryOp());
         ASSERTN(IR_MAX_KID_NUM(ir) == 2, ("binary op"));
-        ASSERTN(t0 != NULL && t1 != NULL, ("binary op"));
+        ASSERTN(t0 != nullptr && t1 != nullptr, ("binary op"));
         if ((t0->is_const() && t0->is_fp() &&
              t1->is_const() && t1->is_fp()) &&
              g_is_opt_float) {
@@ -2461,7 +2461,7 @@ IR * Refine::foldConst(IR * ir, bool & change)
     case IR_NEG: {
         //NEG(1.0) => INT(-1.0)
         ASSERTN(IR_MAX_KID_NUM(ir) == 1, ("unary op"));
-        ASSERT0(UNA_opnd(ir) != NULL);
+        ASSERT0(UNA_opnd(ir) != nullptr);
         if (UNA_opnd(ir)->is_const() &&
             UNA_opnd(ir)->is_fp() && g_is_opt_float) {
             ir = foldConstFloatUnary(ir, change);
@@ -2575,7 +2575,7 @@ IR * Refine::foldConst(IR * ir, bool & change)
                    CONST_int_val(opnd1) == 0) {
             removeIRTreeUse(ir, m_rg);
             IR * newir = opnd0;
-            BIN_opnd0(ir) = NULL;
+            BIN_opnd0(ir) = nullptr;
             m_rg->freeIRTree(ir);
             ir = newir;
             change = true;
@@ -2598,7 +2598,7 @@ IR * Refine::foldConst(IR * ir, bool & change)
                 //x<<0 => x
                 removeIRTreeUse(ir, m_rg);
                 IR * newir = opnd0;
-                BIN_opnd0(ir) = NULL;
+                BIN_opnd0(ir) = nullptr;
                 m_rg->freeIRTree(ir);
                 ir = newir;
                 change = true;
@@ -2671,12 +2671,12 @@ void Refine::invertCondition(IR ** cond, Region * rg)
 bool Refine::perform(OptCtx & oc)
 {
     bool change = false;
-    if (m_rg->getIRList() != NULL) {
+    if (m_rg->getIRList() != nullptr) {
         //Do primitive refinement.
         START_TIMER(t, "Do Primitive Refinement");
         RefineCtx rc;
         IR * irs = refineIRlist(m_rg->getIRList(), change, rc);
-        ASSERT0(xoc::verifyIRList(irs, NULL, m_rg));
+        ASSERT0(xoc::verifyIRList(irs, nullptr, m_rg));
         m_rg->setIRList(irs);
         END_TIMER(t, "Do Primitive Refinement");
         return change;

@@ -228,7 +228,7 @@ static Rational rat_sqrt(Rational)
 
 static void rmat_dumpf_by_handle(void const* pbasis, FILE * h)
 {
-    ASSERTN(h, ("dump file handle is NULL"));
+    ASSERTN(h, ("dump file handle is nullptr"));
     RMat * pthis = (RMat*)pbasis;
     fprintf(h, "\nMATRIX(%dx%d)\n", pthis->getRowSize(), pthis->getColSize());
     for (UINT i = 0; i < pthis->getRowSize(); i++) {
@@ -1253,7 +1253,7 @@ static Float val_sqrt(Float a)
 
 static void flt_dumpf_by_handle(void const* pbasis, FILE * h)
 {
-    ASSERTN(h, ("file handle is NULL"));
+    ASSERTN(h, ("file handle is nullptr"));
     FloatMat * pthis = (FloatMat*)pbasis;
     fprintf(h, "\nMATRIX(%dx%d)\n", pthis->getRowSize(), pthis->getColSize());
     for (UINT i = 0; i < pthis->getRowSize(); i++) {
@@ -1334,9 +1334,9 @@ static Float fast_sqrt(Float n)
 
 void FloatMat::setSigDigitDesc(UINT sd)
 {
-    if (HOOK_ADJUST == NULL) {
+    if (HOOK_ADJUST == nullptr) {
         INHR i;
-        i.he = NULL;
+        i.he = nullptr;
         i.ha = val_adjust;
         i.hs = val_sqrt;
         i.hds = flt_dumps;
@@ -1400,7 +1400,7 @@ void FloatMat::init()
     ((Matrix<PRECISION_TYPE>*)this)->init();
 
     INHR i;
-    i.he = NULL;
+    i.he = nullptr;
     i.ha = val_adjust;
 
     #ifdef USE_FAST_BUT_LOW_PRECISION_SQRT
@@ -1587,7 +1587,7 @@ FloatMat operator - (FloatMat const& a, FloatMat const& b)
 //
 static void bool_dumpf_by_handle(void const* pbasis, FILE * h)
 {
-    ASSERTN(h != NULL, ("file handle is NULL"));
+    ASSERTN(h != nullptr, ("file handle is nullptr"));
     BMat * pthis = (BMat*)pbasis;
     fprintf(h, "\nMATRIX(%dx%d)\n", pthis->getRowSize(), pthis->getColSize());
     for (UINT i = 0; i < pthis->getRowSize(); i++) {

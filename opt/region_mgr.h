@@ -158,11 +158,11 @@ public:
     //It is the first thing you should do after you declared a RegionMgr.
     inline void initVarMgr()
     {
-        ASSERTN(m_var_mgr == NULL, ("VarMgr already initialized"));
+        ASSERTN(m_var_mgr == nullptr, ("VarMgr already initialized"));
         m_var_mgr = allocVarMgr();
         ASSERT0(m_var_mgr);
 
-        ASSERTN(m_md_sys == NULL, ("MDSystem already initialized"));
+        ASSERTN(m_md_sys == nullptr, ("MDSystem already initialized"));
         m_md_sys = new MDSystem(m_var_mgr);
         ASSERT0(m_md_sys);
     }
@@ -171,7 +171,7 @@ public:
     //It is the first thing one should do after declaring RegionMgr.
     void initTargInfo()
     {
-        ASSERTN(m_targinfo == NULL, ("TargInfo already initialized"));
+        ASSERTN(m_targinfo == nullptr, ("TargInfo already initialized"));
         m_targinfo = allocTargInfo();
         ASSERT0(m_targinfo);
     }
@@ -184,11 +184,11 @@ public:
     Region * newRegion(REGION_TYPE rt);
 
     //Note m_targinfo will be destructed when RegionMgr is destructed.
-    //m_targinfo should be set to NULL if given TargInfo object is not
+    //m_targinfo should be set to nullptr if given TargInfo object is not
     //allocated by allocTargInfo() of current RegionMgr.
     void setTargInfo(TargInfo * ti)
     {
-        ASSERTN(m_targinfo == NULL, ("TargInfo has already been set"));
+        ASSERTN(m_targinfo == nullptr, ("TargInfo has already been set"));
         m_targinfo = ti;
     }
 

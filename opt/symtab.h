@@ -158,8 +158,8 @@ public:
 
     CHAR * strdup(CHAR const* s)
     {
-        if (s == NULL) {
-            return NULL;
+        if (s == nullptr) {
+            return nullptr;
         }
         size_t l = strlen(s);
         CHAR * ns = (CHAR*)smpoolMalloc(l + 1, m_pool);
@@ -199,8 +199,8 @@ class CompareSymTab {
     COPY_CONSTRUCTOR(CompareSymTab);
     CHAR * xstrdup(CHAR const* s)
     {
-        if (s == NULL) {
-            return NULL;
+        if (s == nullptr) {
+            return nullptr;
         }
         size_t l = ::strlen(s);
         CHAR * ns = (CHAR*)smpoolMalloc(l + 1, m_pool);
@@ -238,7 +238,7 @@ public:
     SymTab()
     {
         m_pool = smpoolCreate(64, MEM_COMM);
-        m_free_one = NULL;
+        m_free_one = nullptr;
         TTab<Sym*, CompareSymTab>::m_ck.m_pool = m_pool;
         ASSERT0(m_pool);
     }

@@ -535,7 +535,7 @@ public:
     IR * prev;
 
     //Used in all processs at all level IR.
-    //This field should be NULL if IR is the top level of stmt.
+    //This field should be nullptr if IR is the top level of stmt.
     IR * parent;
 
     //IR may have an unique attach info container.
@@ -550,33 +550,33 @@ public:
     //Offset can not be predicated.
     bool calcArrayOffset(TMWORD * ofst, TypeMgr * tm) const;
 
-    //Set ir's DU to be NULL, return the DU pointer.
+    //Set ir's DU to be nullptr, return the DU pointer.
     inline DU * cleanDU();
 
-    //Set ir's PR SSA Info to be NULL.
+    //Set ir's PR SSA Info to be nullptr.
     //For convenient purpose, this function does not assert
     //when current IR object is not operate on PR.
     inline void clearSSAInfo();
     void cleanRefMD()
     {
         DU * du = getDU();
-        if (du == NULL) { return; }
-        DU_md(du) = NULL;
+        if (du == nullptr) { return; }
+        DU_md(du) = nullptr;
     }
 
     void cleanRefMDSet()
     {
         DU * du = getDU();
-        if (du == NULL) { return; }
-        DU_mds(du) = NULL;
+        if (du == nullptr) { return; }
+        DU_mds(du) = nullptr;
     }
 
     void cleanRef()
     {
         DU * du = getDU();
-        if (du == NULL) { return; }
-        DU_mds(du) = NULL;
-        DU_md(du) = NULL;
+        if (du == nullptr) { return; }
+        DU_mds(du) = nullptr;
+        DU_md(du) = nullptr;
     }
 
     //Count memory usage for current IR.
@@ -603,11 +603,12 @@ public:
 
         for (UINT i = 0; i < IR_MAX_KID_NUM(this); i++) {
             IR * kid = getKid(i);
-            if (kid == NULL) { continue; }
+            if (kid == nullptr) { continue; }
 
             IR * srckid = src->getKid(i);
             ASSERT0(srckid);
-            for (; kid != NULL; kid = IR_next(kid), srckid = IR_next(srckid)) {
+            for (; kid != nullptr;
+                 kid = IR_next(kid), srckid = IR_next(srckid)) {
                 ASSERT0(srckid);
                 kid->copyRefForTree(srckid, rg);
             }
@@ -620,12 +621,12 @@ public:
     inline void freeDUset(DefMiscBitSetMgr & sbs_mgr)
     {
         DU * du = getDU();
-        if (du == NULL || DU_duset(du) == NULL) { return; }
+        if (du == nullptr || DU_duset(du) == nullptr) { return; }
 
         //Free DUSet back to DefSegMgr, or it will
         //complain and make an assertion.
         sbs_mgr.freeSBitSetCore(DU_duset(du));
-        DU_duset(du) = NULL;
+        DU_duset(du) = nullptr;
     }
 
     IR_TYPE getCode() const { return (IR_TYPE)IR_code(this); }
@@ -654,7 +655,7 @@ public:
         ASSERT0(!is_undef());
         ASSERTN(!is_stmt(), ("IR already be stmt, it is performance bug."));
         IR const* ir = this;
-        while (IR_parent(ir) != NULL) {
+        while (IR_parent(ir) != nullptr) {
             ir = IR_parent(ir);
             if (ir->is_stmt()) { break; }
         }
@@ -689,14 +690,14 @@ public:
     //Return the SSAInfo if exist.
     inline SSAInfo * getSSAInfo() const;
 
-    //Return stmt if it writes PR as result. Otherwise return NULL.
+    //Return stmt if it writes PR as result. Otherwise return nullptr.
     inline IR * getResultPR();
 
     //Get the stmt accroding to given prno if the stmt writes PR as a result.
-    //Otherwise return NULL.
+    //Otherwise return nullptr.
     IR * getResultPR(UINT prno);
 
-    //Find the first PR related to 'prno'. Otherwise return NULL.
+    //Find the first PR related to 'prno'. Otherwise return nullptr.
     //This function iterate IR tree nonrecursively.
     IR * getOpndPRList(UINT prno);
 
@@ -707,14 +708,14 @@ public:
 
     //This function recursively iterate the IR tree to
     //retrieve the PR whose PR_no is equal to given 'prno'.
-    //Otherwise return NULL.
+    //Otherwise return nullptr.
     IR * getOpndPR(UINT prno);
 
     //Get the MD DefUse Set.
     DUSet * getDUSet() const
     {
         DU * const du = getDU();
-        return du == NULL ? NULL : DU_duset(du);
+        return du == nullptr ? nullptr : DU_duset(du);
     }
 
     //Return the Memory Descriptor Set for given ir may describe.
@@ -727,27 +728,27 @@ public:
     MD const* getRefMD() const
     {
         DU * du = getDU();
-        return du == NULL ? NULL : DU_md(du);
+        return du == nullptr ? nullptr : DU_md(du);
     }
 
     //Get the MDSet that IR referrenced.
     MDSet const* getRefMDSet() const
     {
         DU * du = getDU();
-        return du == NULL ? NULL : DU_mds(du);
+        return du == nullptr ? nullptr : DU_mds(du);
     }
 
     //Return exact MD if ir defined.
     MD const* getExactRef() const
     {
         MD const* md = getRefMD();
-        return (md == NULL || !md->is_exact()) ? NULL : md;
+        return (md == nullptr || !md->is_exact()) ? nullptr : md;
     }
 
     MD const* getEffectRef() const
     {
         MD const* md = getRefMD();
-        ASSERT0(md == NULL || !MD_is_may(md));
+        ASSERT0(md == nullptr || !MD_is_may(md));
         return md;
     }
 
@@ -856,7 +857,7 @@ public:
     bool isMemRefEqual(IR const* src) const;
 
     //Return true if ir does not have any sibling.
-    bool is_single() const { return get_next() == NULL && get_prev() == NULL; }
+    bool is_single() const { return get_next() == nullptr && get_prev() == nullptr; }
 
     //Return true if current ir is memory store operation.
     bool is_store() const
@@ -1128,7 +1129,7 @@ public:
     void setParent(IR * kid)
     {
         ASSERT0(kid && is_kids(kid));
-        for (IR * k = kid; k != NULL; k = IR_next(k)) {
+        for (IR * k = kid; k != nullptr; k = IR_next(k)) {
             IR_parent(k) = this;
         }
     }
@@ -1153,11 +1154,11 @@ public:
     {
         for (UINT i = 0; i < IR_MAX_KID_NUM(this); i++) {
             IR * kid = getKid(i);
-            if (kid == NULL) { continue; }
-            for (IR * x = kid; x != NULL; x = x->get_next()) {
+            if (kid == nullptr) { continue; }
+            for (IR * x = kid; x != nullptr; x = x->get_next()) {
                 if (x == oldk) {
                     xcom::replace(&kid, oldk, newk);
-                    if (IR_prev(newk) == NULL) {
+                    if (IR_prev(newk) == nullptr) {
                         //oldk is the header, and update the kid i.
                         setKid(i, kid);
                     } else {
@@ -1632,10 +1633,10 @@ public:
 //NOTE:
 //    * The member layout should be same as do_while.
 //    * 'opnd' must be the last member of CWhileDo.
-//Determinate expression. It can NOT be NULL.
+//Determinate expression. It can NOT be nullptr.
 #define LOOP_det(ir) LOOP_kid(ir, 0)
 
-//Record stmt list in loop body of IF. It can be NULL.
+//Record stmt list in loop body of IF. It can be nullptr.
 #define LOOP_body(ir) LOOP_kid(ir, 1)
 #define LOOP_kid(ir, idx) (((CWhileDo*)ir)->opnd[CKID_LOOP(ir, idx)])
 class CWhileDo : public IR {
@@ -1707,13 +1708,13 @@ public:
 //      truebody
 //      falsebody
 //    endif
-//Determinate expression. It can NOT be NULL.
+//Determinate expression. It can NOT be nullptr.
 #define IF_det(ir) IF_kid(ir, 0)
 
-//Record stmt list in true body of IF. It can be NULL.
+//Record stmt list in true body of IF. It can be nullptr.
 #define IF_truebody(ir) IF_kid(ir, 1)
 
-//Record stmt list in false body of IF. It can be NULL.
+//Record stmt list in false body of IF. It can be nullptr.
 #define IF_falsebody(ir) IF_kid(ir, 2)
 #define IF_kid(ir, idx) (((CIf*)ir)->opnd[CKID_TY(ir, IR_IF, idx)])
 class CIf : public IR {
@@ -1857,7 +1858,7 @@ public:
     {
         ASSERT0(isArrayOp());
         UINT dim = 0;
-        for (IR const* s = ARR_sub_list(this); s != NULL; s = s->get_next()) {
+        for (IR const* s = ARR_sub_list(this); s != nullptr; s = s->get_next()) {
             dim++;
         }
         return dim;
@@ -1876,7 +1877,7 @@ public:
     //Return true if exp is array subscript expression list.
     bool isInSubList(IR const* exp) const
     {
-        for (IR const* s = ARR_sub_list(this); s != NULL; s = s->get_next()) {
+        for (IR const* s = ARR_sub_list(this); s != nullptr; s = s->get_next()) {
             if (s == exp || s->is_kids(exp)) { return true; }
         }
         return false;
@@ -1967,7 +1968,7 @@ public:
 #define BR_bb(ir) (((CTruebr*)CK_IRT_BR(ir))->bb)
 #define BR_lab(ir) (((CTruebr*)CK_IRT_BR(ir))->jump_target_lab)
 
-//Determinate expression. It can NOT be NULL.
+//Determinate expression. It can NOT be nullptr.
 #define BR_det(ir) BR_kid(ir, 0)
 #define BR_kid(ir, idx) (((CTruebr*)ir)->opnd[CKID_BR(ir, idx)])
 class CTruebr : public IR, public StmtProp {
@@ -2114,7 +2115,7 @@ IR * IR::getRHS() const
     case IR_IST: return IST_rhs(this);
     default: ASSERTN(0, ("not store operation."));
     }
-    return NULL;
+    return nullptr;
 }
 
 
@@ -2157,7 +2158,7 @@ SSAInfo * IR::getSSAInfo() const
                 ("miss switch entry"));
         break;
     }
-    return NULL;
+    return nullptr;
 }
 
 
@@ -2189,11 +2190,11 @@ IR * IR::getKid(UINT idx) const
     case IR_RETURN: return RET_kid(this, idx);
     case IR_SELECT: return SELECT_kid(this, idx);
     SWITCH_CASE_EXP_NO_KID:
-    SWITCH_CASE_STMT_NO_KID: return NULL;
+    SWITCH_CASE_STMT_NO_KID: return nullptr;
     case IR_PHI: return PHI_kid(this, idx);
     default: ASSERTN(0, ("Unknown IR type"));
     }
-    return NULL;
+    return nullptr;
 }
 
 
@@ -2218,7 +2219,7 @@ IRBB * IR::getBB() const
     case IR_REGION: return REGION_bb(this);
     default: ASSERTN(0, ("This stmt can not be placed in basic block."));
     }
-    return NULL;
+    return nullptr;
 }
 
 
@@ -2234,7 +2235,7 @@ Var * IR::getIdinfo() const
     case IR_CALL: return CALL_idinfo(this);
     default: UNREACHABLE();
     }
-    return NULL;
+    return nullptr;
 }
 
 
@@ -2280,7 +2281,7 @@ IR * IR::getBase() const
     case IR_IST: return IST_base(this);
     default: break;
     }
-    return NULL;
+    return nullptr;
 }
 
 
@@ -2291,13 +2292,13 @@ LabelInfo const* IR::getLabel() const
     case IR_TRUEBR:
     case IR_FALSEBR: return BR_lab(this);
     case IR_GOTO: return GOTO_lab(this);
-    case IR_IGOTO: return NULL;
+    case IR_IGOTO: return nullptr;
     case IR_LABEL: return LAB_lab(this);
     case IR_CASE: return CASE_lab(this);
     case IR_SWITCH: return SWITCH_deflab(this);
     default:;
     }
-    return NULL;
+    return nullptr;
 }
 
 
@@ -2339,7 +2340,7 @@ bool IR::is_volatile() const
     //Describing if IR's address has been taken.
     if (is_id()) {
         Var * id_info = ID_info(this);
-        ASSERT0(id_info != NULL);
+        ASSERT0(id_info != nullptr);
         return VAR_is_volatile(id_info);
     }
     return false;
@@ -2384,25 +2385,25 @@ void IR::setRHS(IR * rhs)
     switch (getCode()) {
     case IR_ST:
         ST_rhs(this) = rhs;
-        if (rhs != NULL) {
+        if (rhs != nullptr) {
             IR_parent(rhs) = this;
         }
         return;
     case IR_STPR:
         STPR_rhs(this) = rhs;
-        if (rhs != NULL) {
+        if (rhs != nullptr) {
             IR_parent(rhs) = this;
         }
         return;
     case IR_STARRAY:
         STARR_rhs(this) = rhs;
-        if (rhs != NULL) {
+        if (rhs != nullptr) {
             IR_parent(rhs) = this;
         }
         return;
     case IR_IST:
         IST_rhs(this) = rhs;
-        if (rhs != NULL) {
+        if (rhs != nullptr) {
             IR_parent(rhs) = this;
         }
         return;
@@ -2427,19 +2428,19 @@ void IR::setOffset(UINT ofst)
 }
 
 
-//Set ir's PR SSA Info to be NULL.
+//Set ir's PR SSA Info to be nullptr.
 //For convenient purpose, this function does not assert
 //when current IR object is not operate on PR.
 void IR::clearSSAInfo()
 {
     switch (getCode()) {
-    case IR_PR: PR_ssainfo(this) = NULL; return;
-    case IR_STPR: STPR_ssainfo(this) = NULL; return;
-    case IR_SETELEM: SETELEM_ssainfo(this) = NULL; return;
-    case IR_GETELEM: GETELEM_ssainfo(this) = NULL; return;
+    case IR_PR: PR_ssainfo(this) = nullptr; return;
+    case IR_STPR: STPR_ssainfo(this) = nullptr; return;
+    case IR_SETELEM: SETELEM_ssainfo(this) = nullptr; return;
+    case IR_GETELEM: GETELEM_ssainfo(this) = nullptr; return;
     case IR_CALL:
-    case IR_ICALL: CALL_ssainfo(this) = NULL; return;
-    case IR_PHI: PHI_ssainfo(this) = NULL; return;
+    case IR_ICALL: CALL_ssainfo(this) = nullptr; return;
+    case IR_PHI: PHI_ssainfo(this) = nullptr; return;
     default: break;
     }
 }
@@ -2478,7 +2479,7 @@ void IR::setPrno(UINT prno)
 }
 
 
-//Return label or NULL.
+//Return label or nullptr.
 void IR::setLabel(LabelInfo const* li)
 {
     switch (getCode()) {
@@ -2530,7 +2531,7 @@ void IR::setKid(UINT idx, IR * kid)
     default: ASSERTN(0, ("Unknown IR type"));
     }
 
-    for (IR * k = kid; k != NULL; k = IR_next(k)) {
+    for (IR * k = kid; k != nullptr; k = IR_next(k)) {
         IR_parent(k) = this;
     }
 }
@@ -2548,11 +2549,11 @@ bool IR::isPREqual(IR const* src) const
 //the DFS searching in tree.
 bool IR::is_kids(IR const* exp) const
 {
-    if (exp == NULL) { return false; }
+    if (exp == nullptr) { return false; }
     IR * tmp;
     for (UINT i = 0; i < IR_MAX_KID_NUM(this); i++) {
         tmp = getKid(i);
-        while (tmp != NULL) {
+        while (tmp != nullptr) {
             if (exp == tmp) {
                 return true;
             }
@@ -2613,13 +2614,13 @@ bool IR::isExactDef(MD const* md, MDSet const* mds) const
 
     MD const* cur_ir_defined_md = getRefMD();
 
-    if (cur_ir_defined_md != NULL && cur_ir_defined_md->is_exact()) {
-        if (md != NULL &&
+    if (cur_ir_defined_md != nullptr && cur_ir_defined_md->is_exact()) {
+        if (md != nullptr &&
             (cur_ir_defined_md == md || cur_ir_defined_md->is_overlap(md))) {
             return true;
         }
 
-        if (mds != NULL && mds->is_contain_pure(MD_id(cur_ir_defined_md))) {
+        if (mds != nullptr && mds->is_contain_pure(MD_id(cur_ir_defined_md))) {
             return true;
         }
     }
@@ -2636,7 +2637,7 @@ bool IR::isExactDef(MD const* md) const
     if (!md->is_exact()) { return false; }
 
     MD const* cur_ir_defined_md = getRefMD();
-    if (cur_ir_defined_md != NULL &&
+    if (cur_ir_defined_md != nullptr &&
         cur_ir_defined_md->is_exact() &&
         (cur_ir_defined_md == md || cur_ir_defined_md->is_overlap(md))) {
         return true;
@@ -2645,7 +2646,7 @@ bool IR::isExactDef(MD const* md) const
 }
 
 
-//Set ir DU to be NULL, return the DU pointer.
+//Set ir DU to be nullptr, return the DU pointer.
 DU * IR::cleanDU()
 {
     switch (getCode()) {
@@ -2663,12 +2664,12 @@ DU * IR::cleanDU()
     case IR_CALL:
     case IR_ICALL: {
         DU * du = DUPROP_du(this);
-        DUPROP_du(this) = NULL;
+        DUPROP_du(this) = nullptr;
         return du;
     }
     default:;
     }
-    return NULL;
+    return nullptr;
 }
 
 
@@ -2677,14 +2678,14 @@ IR * IR::getResultPR()
 {
     ASSERT0(is_stmt());
     switch (getCode()) {
-    case IR_ST: return NULL;
+    case IR_ST: return nullptr;
     case IR_STPR:
     case IR_SETELEM:
     case IR_GETELEM:
         return this;
     case IR_CALL:
     case IR_ICALL:
-        return hasReturnValue() ? this : NULL;
+        return hasReturnValue() ? this : nullptr;
     case IR_STARRAY:
     case IR_IST:
     case IR_GOTO:
@@ -2700,14 +2701,14 @@ IR * IR::getResultPR()
     case IR_RETURN:
     case IR_BREAK:
     case IR_CONTINUE:
-        return NULL;
+        return nullptr;
     case IR_PHI:
         return this;
     case IR_REGION:
-        return NULL;
+        return nullptr;
     default: UNREACHABLE();
     }
-    return NULL;
+    return nullptr;
 }
 
 
@@ -2737,7 +2738,7 @@ bool IR::isConstIntValueEqualTo(HOST_INT value) const
 
 DU * IR::getDU() const
 {
-    return hasDU() ? DUPROP_du(this) : NULL;
+    return hasDU() ? DUPROP_du(this) : nullptr;
 }
 
 
@@ -2784,7 +2785,7 @@ IR * IR::getJudgeDet() const
         return SELECT_pred(this);
     default: UNREACHABLE();
     }
-    return NULL;
+    return nullptr;
 }
 
 //END IR
@@ -2794,18 +2795,18 @@ IR * IR::getJudgeDet() const
 CHAR const* compositeName(Sym const* n, xcom::StrBuf & buf);
 void dumpIR(IR const* ir,
             Region const* rg,
-            CHAR * attr = NULL,
+            CHAR * attr = nullptr,
             UINT dumpflag = IR_DUMP_KID|IR_DUMP_SRC_LINE|IR_DUMP_INNER_REGION|
                             IR_DUMP_VAR_DECL);
 void dumpIRListH(IR * ir_list, Region const* rg,
-                 CHAR * attr = NULL,
+                 CHAR * attr = nullptr,
                  UINT dumpflag = IR_DUMP_KID|
                                  IR_DUMP_SRC_LINE|
                                  IR_DUMP_INNER_REGION|
                                  IR_DUMP_VAR_DECL);
 void dumpIRList(IR * ir_list,
                 Region const* rg,
-                CHAR * attr = NULL,
+                CHAR * attr = nullptr,
                 UINT dumpflag = IR_DUMP_KID|
                                 IR_DUMP_SRC_LINE|
                                 IR_DUMP_INNER_REGION|
@@ -2836,13 +2837,13 @@ bool verifySimp(IR * ir, SimpCtx & simp);
 //Readonly function.
 inline IR const* iterInitC(IR const* ir, OUT ConstIRIter & ii)
 {
-    if (ir == NULL) { return NULL; }
+    if (ir == nullptr) { return nullptr; }
     for (UINT i = 0; i < IR_MAX_KID_NUM(ir); i++) {
         IR * kid = ir->getKid(i);
-        if (kid == NULL) { continue; }
+        if (kid == nullptr) { continue; }
         ii.append_tail(kid);
     }
-    if (ir->get_next() != NULL) {
+    if (ir->get_next() != nullptr) {
         ii.append_tail(ir->get_next());
     }
     return ir;
@@ -2856,13 +2857,13 @@ inline IR const* iterInitC(IR const* ir, OUT ConstIRIter & ii)
 inline IR const* iterNextC(IN OUT ConstIRIter & ii)
 {
     IR const* ir = ii.remove_head();
-    if (ir == NULL) { return NULL; }
+    if (ir == nullptr) { return nullptr; }
     for (UINT i = 0; i < IR_MAX_KID_NUM(ir); i++) {
         IR * kid = ir->getKid(i);
-        if (kid == NULL) { continue; }
+        if (kid == nullptr) { continue; }
         ii.append_tail(kid);
     }
-    if (ir->get_next() != NULL) {
+    if (ir->get_next() != nullptr) {
         ii.append_tail(ir->get_next());
     }
     return ir;
@@ -2877,16 +2878,16 @@ inline IR const* iterNextC(IN OUT ConstIRIter & ii)
 //Use iterRhsNextC to iter next IR.
 inline IR const* iterRhsInitC(IR const* ir, OUT ConstIRIter & ii)
 {
-    if (ir == NULL) { return NULL; }
+    if (ir == nullptr) { return nullptr; }
 
     ASSERT0(ir->is_stmt());
 
     //Other stmt.
-    IR const* firstkid = NULL;
+    IR const* firstkid = nullptr;
     for (UINT i = 0; i < IR_MAX_KID_NUM(ir); i++) {
         IR const* kid = ir->getKid(i);
-        if (kid == NULL) { continue; }
-        if (firstkid == NULL) {
+        if (kid == nullptr) { continue; }
+        if (firstkid == nullptr) {
             firstkid = kid;
             continue;
         }
@@ -2894,17 +2895,17 @@ inline IR const* iterRhsInitC(IR const* ir, OUT ConstIRIter & ii)
     }
 
     //IR const* x = ii.remove_head();
-    //if (x == NULL) { return NULL; }
+    //if (x == nullptr) { return nullptr; }
 
-    if (firstkid == NULL) { return NULL; }
+    if (firstkid == nullptr) { return nullptr; }
 
     for (UINT i = 0; i < IR_MAX_KID_NUM(firstkid); i++) {
         IR const* kid = firstkid->getKid(i);
-        if (kid == NULL) { continue; }
+        if (kid == nullptr) { continue; }
         ii.append_tail(kid);
     }
 
-    if (IR_next(firstkid) != NULL) {
+    if (IR_next(firstkid) != nullptr) {
         ii.append_tail(IR_next(firstkid));
     }
     return firstkid;
@@ -2919,14 +2920,14 @@ inline IR const* iterRhsInitC(IR const* ir, OUT ConstIRIter & ii)
 //Use iterRhsNextC to iter next IR.
 inline IR const* iterExpInitC(IR const* ir, OUT ConstIRIter & ii)
 {
-    if (ir == NULL) { return NULL; }
+    if (ir == nullptr) { return nullptr; }
     ASSERT0(ir->is_exp());
     for (UINT i = 0; i < IR_MAX_KID_NUM(ir); i++) {
         IR * kid = ir->getKid(i);
-        if (kid == NULL) { continue; }
+        if (kid == nullptr) { continue; }
         ii.append_tail(kid);
     }
-    if (ir->get_next() != NULL) {
+    if (ir->get_next() != nullptr) {
         ASSERTN(!ir->get_next()->is_stmt(), ("ir can not be stmt list"));
         ii.append_tail(ir->get_next());
     }
@@ -2951,13 +2952,13 @@ inline IR const* iterRhsNextC(IN OUT ConstIRIter & ii)
 //Note this function is NOT readonly, the returnd IR may be modified.
 inline IR * iterInit(IN IR * ir, OUT IRIter & ii)
 {
-    if (ir == NULL) { return NULL; }
+    if (ir == nullptr) { return nullptr; }
     for (UINT i = 0; i < IR_MAX_KID_NUM(ir); i++) {
         IR * kid = ir->getKid(i);
-        if (kid == NULL) { continue; }
+        if (kid == nullptr) { continue; }
         ii.append_tail(kid);
     }
-    if (ir->get_next() != NULL) {
+    if (ir->get_next() != nullptr) {
         ii.append_tail(ir->get_next());
     }
     return ir;
@@ -2971,13 +2972,13 @@ inline IR * iterInit(IN IR * ir, OUT IRIter & ii)
 inline IR * iterNext(IN OUT IRIter & ii)
 {
     IR * ir = ii.remove_head();
-    if (ir == NULL) { return NULL; }
+    if (ir == nullptr) { return nullptr; }
     for (UINT i = 0; i < IR_MAX_KID_NUM(ir); i++) {
         IR * kid = ir->getKid(i);
-        if (kid == NULL) { continue; }
+        if (kid == nullptr) { continue; }
         ii.append_tail(kid);
     }
-    if (ir->get_next() != NULL) {
+    if (ir->get_next() != nullptr) {
         ii.append_tail(ir->get_next());
     }
     return ir;
@@ -2991,31 +2992,31 @@ inline IR * iterNext(IN OUT IRIter & ii)
 //Use iterRhsNextC to iter next IR.
 inline IR * iterRhsInit(IR * ir, OUT IRIter & ii)
 {
-    if (ir == NULL) { return NULL; }
+    if (ir == nullptr) { return nullptr; }
 
     ASSERT0(ir->is_stmt());
 
     //Other stmt.
-    IR * firstkid = NULL;
+    IR * firstkid = nullptr;
     for (UINT i = 0; i < IR_MAX_KID_NUM(ir); i++) {
         IR * kid = ir->getKid(i);
-        if (kid == NULL) { continue; }
-        if (firstkid == NULL) {
+        if (kid == nullptr) { continue; }
+        if (firstkid == nullptr) {
             firstkid = kid;
             continue;
         }
         ii.append_tail(kid);
     }
 
-    if (firstkid == NULL) { return NULL; }
+    if (firstkid == nullptr) { return nullptr; }
 
     for (UINT i = 0; i < IR_MAX_KID_NUM(firstkid); i++) {
         IR * kid = firstkid->getKid(i);
-        if (kid == NULL) { continue; }
+        if (kid == nullptr) { continue; }
         ii.append_tail(kid);
     }
 
-    if (IR_next(firstkid) != NULL) {
+    if (IR_next(firstkid) != nullptr) {
         ii.append_tail(IR_next(firstkid));
     }
 

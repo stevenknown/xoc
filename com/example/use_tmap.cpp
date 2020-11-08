@@ -15,7 +15,7 @@ int main()
     TMapIter<int, char const*> iter;
     char const* str;
     for (int v = map.get_first(iter, &str);
-         str != NULL; v = map.get_next(iter, &str)) {
+         str != nullptr; v = map.get_next(iter, &str)) {
         printf("%d->%s\n", v, str);
     }
 

@@ -66,13 +66,13 @@ void DEX_CFG::dump_bb(
         }
 
         IRBB * bb = getBB(id);
-        ASSERT0(bb != NULL);
+        ASSERT0(bb != nullptr);
         dumpBBLabel(bb->getLabelList(), h);
         fprintf(h, "\n");
-        for (IR * ir = BB_first_ir(bb); ir != NULL; ir = BB_next_ir(bb)) {
+        for (IR * ir = BB_first_ir(bb); ir != nullptr; ir = BB_next_ir(bb)) {
             //TODO: implement dump_ir_buf();
             //fprintf(h, "%s\n", dump_ir_buf(ir, buf));
-            dumpIR(ir, m_tm, NULL, true, false);
+            dumpIR(ir, m_tm, nullptr, true, false);
         }
         fprintf(h, "\"}");
     } else {
@@ -93,7 +93,7 @@ void DEX_CFG::dump_node(FILE * h, bool detail, BitSet const& markbbs)
     C<IRBB*> * bbct;
     UINT vertical_order = 1;
     for (IRBB * bb = m_bb_list->get_head(&bbct);
-         bb != NULL; bb = m_bb_list->get_next(&bbct)) {
+         bb != nullptr; bb = m_bb_list->get_next(&bbct)) {
         UINT id = bb->id();
         UINT scale = 1;
 
@@ -133,7 +133,7 @@ void DEX_CFG::dump_node2(
     C<IRBB*> * bbct;
     UINT vertical_order = 1;
     for (IRBB * bb = m_bb_list->get_head(&bbct);
-         bb != NULL; bb = m_bb_list->get_next(&bbct)) {
+         bb != nullptr; bb = m_bb_list->get_next(&bbct)) {
         UINT id = bb->id();
         UINT scale = 1;
 
@@ -173,8 +173,8 @@ void DEX_CFG::dump_vcg_ex(BitSet const& markbbs)
     //So it is dispensable to check g_tfile.
     UNLINK(name);
     FILE * h = fopen(name, "a+");
-    ASSERTN(h != NULL, ("%s create failed!!!",name));
-    FILE * old = NULL;
+    ASSERTN(h != nullptr, ("%s create failed!!!",name));
+    FILE * old = nullptr;
 
     //Print comment
     //fprintf(h, "\n/*");
@@ -208,8 +208,8 @@ void DEX_CFG::dump_vcg_ex2(BitSet const& trybbs, BitSet const& catchbbs)
     //So it is dispensable to check g_tfile.
     UNLINK(name);
     FILE * h = fopen(name, "a+");
-    ASSERTN(h != NULL, ("%s create failed!!!",name));
-    FILE * old = NULL;
+    ASSERTN(h != nullptr, ("%s create failed!!!",name));
+    FILE * old = nullptr;
 
     //Print comment
     //fprintf(h, "\n/*");

@@ -159,7 +159,7 @@ public:
     void clean()
     {
         VOpnd::clean();
-        VCONST_val(this) = NULL;
+        VCONST_val(this) = nullptr;
     }
 };
 
@@ -329,12 +329,12 @@ public:
     UINT id() const { return MDDEF_id(this); }
     void init(bool is_phi)
     {
-        MDDEF_bb(this) = NULL;
-        MDDEF_result(this) = NULL;
+        MDDEF_bb(this) = nullptr;
+        MDDEF_result(this) = nullptr;
         MDDEF_is_phi(this) = (BYTE)is_phi;
-        MDDEF_prev(this) = NULL;
-        MDDEF_nextset(this) = NULL;
-        MDDEF_occ(this) = NULL;
+        MDDEF_prev(this) = nullptr;
+        MDDEF_nextset(this) = nullptr;
+        MDDEF_occ(this) = nullptr;
     }
     bool is_phi() const { return MDDEF_is_phi(this); }
     bool is_valid() const { return id() != MDDEF_UNDEF; }
@@ -385,7 +385,7 @@ public:
     void init()
     {
         MDDef::init(true);
-        m_opnd_list = NULL;
+        m_opnd_list = nullptr;
     }
 
     void dump(Region const* rg, UseDefMgr const* mgr) const;
@@ -404,7 +404,7 @@ public:
         xcom::remove(&MDPHI_opnd_list(this), ir);
     }
 
-    bool hasNoOpnd() const { return getOpndList() == NULL; }
+    bool hasNoOpnd() const { return getOpndList() == nullptr; }
 };
 
 
@@ -462,7 +462,7 @@ public:
     VMD * allocVMD(UINT mdid, UINT version);
 
     //Count memory usage for current object.
-    size_t count_mem();
+    size_t count_mem() const;
     void cleanMDSSAInfo(IR * ir);
 
     //Get MDSSAInfo of ir.

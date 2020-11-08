@@ -160,7 +160,7 @@ static void copyAndTransformMethod(
 
         if (pDexMethod->codeOff != 0) {
             d2rMethod(pool, pDexFile, pDexMethod, pClassDef, rumgr,
-                      g_record_region_for_classs ? &rulist : NULL);
+                      g_record_region_for_classs ? &rulist : nullptr);
         } else {
             pool->codeOff = 0;
         }
@@ -186,7 +186,7 @@ static void copyAndTransformMethod(
 
         if (pDexMethod->codeOff != 0) {
             d2rMethod(pool, pDexFile, pDexMethod, pClassDef, rumgr,
-                      g_record_region_for_classs ? &rulist : NULL);
+                      g_record_region_for_classs ? &rulist : nullptr);
         } else {
             pool->codeOff = 0;
         }
@@ -212,12 +212,12 @@ static void convertClassData(
         const DexClassDef* pDexClassDef,
         RegionMgr* rumgr)
 {
-    const BYTE* pEncodedData = NULL;
-    const DexClassData* pClassData = NULL;
-    const DexMethod* pDexMethod = NULL;
+    const BYTE* pEncodedData = nullptr;
+    const DexClassData* pClassData = nullptr;
+    const DexMethod* pDexMethod = nullptr;
 
     pEncodedData = dexGetClassData(pDexFile, pDexClassDef);
-    pClassData = dexReadAndVerifyClassData(&pEncodedData, NULL);
+    pClassData = dexReadAndVerifyClassData(&pEncodedData, nullptr);
 
     //write to the static fields size
     writeUnSignedLeb128ToCbs(
@@ -838,15 +838,15 @@ static void processClass(DexFile* pDexFile, D2Dpool* pool, char const* dexfilena
     pool->codeItemOff = pool->currentSize;
     UInt32 size = 0;
 
-    DexRegionMgr * rumgr = NULL;
-    Region * topru = NULL;
+    DexRegionMgr * rumgr = nullptr;
+    Region * topru = nullptr;
     if (g_do_ipa) {
         g_do_call_graph = true;
         g_collect_debuginfo = true;
         rumgr = new DexRegionMgr();
         rumgr->initVarMgr();
         rumgr->init();
-        if (g_logfile_name != NULL) {
+        if (g_logfile_name != nullptr) {
             rumgr->getLogMgr()->init(g_logfile_name, true);
         }
         topru = rumgr->newRegion(REGION_PROGRAM);
@@ -953,7 +953,7 @@ static void fixAndCopyMapItemOffset(DexFile* pDexFile, D2Dpool* pool)
    UInt32 lastOffset = 0xffffffff;
    DexMapList* mapList;
    DexMapItem* item;
-   DexMapItem* lastItem = NULL;
+   DexMapItem* lastItem = nullptr;
 
    //List the map items and change the item's offset.
    mapList = (DexMapList*)cbsGetData(pool->mapLbs);

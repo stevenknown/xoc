@@ -130,7 +130,7 @@ public:
     SEG<BitsPerSeg> * allocSEG()
     {
         SEG<BitsPerSeg> * s = m_free_list.remove_head();
-        if (s != NULL) {
+        if (s != nullptr) {
             #ifdef DEBUG_SEG
             allocated.bunion(s->id);
             #endif
@@ -149,7 +149,7 @@ public:
 
     void init()
     {
-        if (m_free_list.get_pool() != NULL) { return; }
+        if (m_free_list.get_pool() != nullptr) { return; }
         #ifdef DEBUG_SEG
         seg_count = 0;
         allocated.clean();
@@ -160,7 +160,7 @@ public:
 
     void destroy()
     {
-        if (m_free_list.get_pool() == NULL) { return; }
+        if (m_free_list.get_pool() == nullptr) { return; }
         #ifdef DEBUG_SEG
         UINT n = m_free_list.get_elem_count();
         ///////////////////////////////////////////////////////////////
@@ -185,7 +185,7 @@ public:
         m_free_list.clean();
         ASSERTN(m_free_list.get_pool(), ("miss pool"));
         smpoolDelete(m_free_list.get_pool());        
-        m_free_list.set_pool(NULL);
+        m_free_list.set_pool(nullptr);
     }
 
     void freeSEG(SEG<BitsPerSeg> * s)
@@ -346,7 +346,7 @@ protected:
 public:
     SBitSet(SegMgr<BitsPerSeg> * sm, UINT sz = sizeof(TSEGIter))
     {
-        m_pool = NULL;
+        m_pool = nullptr;
         init(sm, sz);
     }
     ~SBitSet() { destroy(); }
@@ -355,10 +355,10 @@ public:
     {
         ASSERTN(sm, ("need SegMgr"));
         ASSERTN(sz % sizeof(TSEGIter) == 0, ("pool size must be mulitple."));
-        ASSERTN(m_pool == NULL, ("already initialized"));
+        ASSERTN(m_pool == nullptr, ("already initialized"));
         m_pool = smpoolCreate(sz, MEM_CONST_SIZE);
         m_sm = sm;
-        m_flst = NULL;
+        m_flst = nullptr;
     }
 
     void destroy()
@@ -377,7 +377,7 @@ public:
         //SEGIter object.
         //SBitSetCore::clean(m_sm, &m_flst);
         smpoolDelete(m_pool);
-        m_pool = NULL;
+        m_pool = nullptr;
     }
 
     void bunion(SBitSet<BitsPerSeg> const& src)
@@ -440,7 +440,7 @@ protected:
         ASSERTN(!m_is_sparse, ("only used by dense bitset"));
         TSEGIter * sc = SBitSetCore<BitsPerSeg>::segs.get_head();
         if (sc == SBitSetCore<BitsPerSeg>::segs.end()) {
-            return NULL;
+            return nullptr;
         }
         ASSERT0(sc->val());
         return &sc->val()->bs;
@@ -468,7 +468,7 @@ protected:
         ASSERTN(!m_is_sparse, ("only used by dense bitset"));
         TSEGIter * sc = SBitSetCore<BitsPerSeg>::segs.get_head();
         if (sc == SBitSetCore<BitsPerSeg>::segs.end()) {
-            return NULL;
+            return nullptr;
         }
         ASSERT0(sc->val());
         return &sc->val()->bs;
@@ -489,7 +489,7 @@ public:
             SBitSetCore<BitsPerSeg>::bunion(src, sm, free_list, pool);
         } else {
             BitSet const* srcbs = src.read_bs();
-            if (srcbs == NULL) { return; }
+            if (srcbs == nullptr) { return; }
             BitSet * tgtbs = alloc_bs(sm, free_list, pool);
             tgtbs->bunion(*srcbs);
         }
@@ -535,7 +535,7 @@ public:
             SBitSetCore<BitsPerSeg>::copy(src, sm, free_list, pool);
         } else {
             BitSet const* srcbs = src.read_bs();
-            if (srcbs == NULL) {
+            if (srcbs == nullptr) {
                 SBitSetCore<BitsPerSeg>::clean(sm, free_list);
                 return;
             }
@@ -553,7 +553,7 @@ public:
             SBitSetCore<BitsPerSeg>::diff(elem, sm, free_list);
         } else {
             BitSet * tgtbs = get_bs();
-            if (tgtbs == NULL) { return; }
+            if (tgtbs == nullptr) { return; }
             tgtbs->diff(elem);
         }
     }
@@ -567,9 +567,9 @@ public:
             SBitSetCore<BitsPerSeg>::diff(src, sm, free_list);
         } else {
             BitSet const* srcbs = src.read_bs();
-            if (srcbs == NULL) { return; }
+            if (srcbs == nullptr) { return; }
             BitSet * tgtbs = get_bs();
-            if (tgtbs == NULL) { return; }
+            if (tgtbs == nullptr) { return; }
             tgtbs->diff(*srcbs);
         }
     }
@@ -588,12 +588,12 @@ public:
             SBitSetCore<BitsPerSeg>::intersect(src, sm, free_list);
         } else {
             BitSet const* srcbs = src.read_bs();
-            if (srcbs == NULL) {
+            if (srcbs == nullptr) {
                 SBitSetCore<BitsPerSeg>::clean(sm, free_list);
                 return;
             }
             BitSet * tgtbs = get_bs();
-            if (tgtbs == NULL) { return; }
+            if (tgtbs == nullptr) { return; }
             tgtbs->intersect(*srcbs);
         }
     }
@@ -604,7 +604,7 @@ public:
             return SBitSetCore<BitsPerSeg>::is_contain(elem);
         }
         BitSet const* tgtbs = read_bs();
-        if (tgtbs == NULL) { return false; }
+        if (tgtbs == nullptr) { return false; }
         return tgtbs->is_contain(elem);
     }
 
@@ -617,19 +617,19 @@ public:
         }
         BitSet const* srcbs = src.read_bs();
         BitSet const* tgtbs = read_bs();
-        if (srcbs == NULL) {
-            if (tgtbs == NULL) { return true; }
+        if (srcbs == nullptr) {
+            if (tgtbs == nullptr) { return true; }
             if (tgtbs->is_empty()) { return true; }
             return false;
         }
-        if (tgtbs == NULL) {
+        if (tgtbs == nullptr) {
             if (srcbs->is_empty()) { return true; }
             return false;
         }
         return tgtbs->is_equal(*srcbs);
     }
 
-    //*cur will be set to NULL if set is empty.
+    //*cur will be set to nullptr if set is empty.
     INT get_first(TSEGIter ** cur) const
     {
         ASSERT0(cur);
@@ -637,7 +637,7 @@ public:
         TSEGIter * sc = SBitSetCore<BitsPerSeg>::segs.get_head();
         if (sc == SBitSetCore<BitsPerSeg>::segs.end()) {
             ASSERT0(SBitSetCore<BitsPerSeg>::segs.get_elem_count() == 0);
-            *cur = NULL;
+            *cur = nullptr;
             return -1;
         }
 
@@ -650,13 +650,13 @@ public:
         return s->get_start() + s->bs.get_first();
     }
 
-    //*cur will be set to NULL if set is empty.
+    //*cur will be set to nullptr if set is empty.
     INT get_last(TSEGIter ** cur) const
     {
         TSEGIter * sc = SBitSetCore<BitsPerSeg>::segs.get_tail();
         if (sc == SBitSetCore<BitsPerSeg>::segs.end()) {
             ASSERT0(SBitSetCore<BitsPerSeg>::segs.get_elem_count() == 0);
-            *cur = NULL;
+            *cur = nullptr;
             return -1;
         }
 
@@ -709,7 +709,7 @@ public:
         DBitSetCore<BitsPerSeg>::m_is_sparse = true;
         m_pool = smpoolCreate(sz, MEM_CONST_SIZE);
         m_sm = sm;
-        m_flst = NULL;
+        m_flst = nullptr;
     }
     ~DBitSet()
     {
@@ -808,12 +808,12 @@ public:
     SMemPool * ptr_pool;
 
 public:
-    MiscBitSetMgr() { ptr_pool = NULL; init(); }
+    MiscBitSetMgr() { ptr_pool = nullptr; init(); }
     ~MiscBitSetMgr() { destroy(); }
 
     void init()
     {
-        if (ptr_pool != NULL) { return; }
+        if (ptr_pool != nullptr) { return; }
 
         ptr_pool = smpoolCreate(sizeof(TSEGIter) * 10, MEM_CONST_SIZE);
         m_sbitsetcore_pool = smpoolCreate(
@@ -829,13 +829,13 @@ public:
         m_free_dbitset_list.set_pool(ptr_pool);
         m_free_dbitsetcore_list.set_pool(ptr_pool);
 
-        scflst = NULL;
+        scflst = nullptr;
         sm.init();
     }
 
     void destroy()
     {
-        if (ptr_pool == NULL) { return; }
+        if (ptr_pool == nullptr) { return; }
 
         for (SC<SBitSet<BitsPerSeg>*> * st = m_sbitset_list.get_head();
              st != m_sbitset_list.end();
@@ -858,16 +858,16 @@ public:
         smpoolDelete(ptr_pool);
         sm.destroy();
 
-        ptr_pool = NULL;
-        m_sbitsetcore_pool = NULL;
-        m_dbitsetcore_pool = NULL;
-        scflst = NULL;
+        ptr_pool = nullptr;
+        m_sbitsetcore_pool = nullptr;
+        m_dbitsetcore_pool = nullptr;
+        scflst = nullptr;
     }
 
     inline SBitSet<BitsPerSeg> * allocSBitSet()
     {
         SBitSet<BitsPerSeg> * p = m_free_sbitset_list.remove_head();
-        if (p == NULL) {
+        if (p == nullptr) {
             p = new SBitSet<BitsPerSeg>(&sm);
             m_sbitset_list.append_head(p);
         }
@@ -877,7 +877,7 @@ public:
     inline SBitSetCore<BitsPerSeg> * allocSBitSetCore()
     {
         SBitSetCore<BitsPerSeg> * p = m_free_sbitsetcore_list.remove_head();
-        if (p == NULL) {
+        if (p == nullptr) {
             p = xmalloc_sbitsetc();
         }
         return p;
@@ -886,7 +886,7 @@ public:
     inline DBitSet<BitsPerSeg> * allocDBitSet()
     {
         DBitSet<BitsPerSeg> * p = m_free_dbitset_list.remove_head();
-        if (p == NULL) {
+        if (p == nullptr) {
             p = new DBitSet<BitsPerSeg>(&sm);
             m_dbitset_list.append_head(p);
         }
@@ -896,7 +896,7 @@ public:
     inline DBitSetCore<BitsPerSeg> * allocDBitSetCore()
     {
         DBitSetCore<BitsPerSeg> * p = m_free_dbitsetcore_list.remove_head();
-        if (p == NULL) {
+        if (p == nullptr) {
             p = xmalloc_dbitsetc();
             p->set_sparse(true);
         }
@@ -906,12 +906,12 @@ public:
     //Note that this function does not add up the memory allocated by
     //allocSBitSetCore() and allocDBitSetCore(). You should count these
     //objects additionally.
-    size_t count_mem(FILE * h = NULL) const;
+    size_t count_mem(FILE * h = nullptr) const;
 
     //free bs for next use.
     inline void freeSBitSet(SBitSet<BitsPerSeg> * bs)
     {
-        if (bs == NULL) { return; }
+        if (bs == nullptr) { return; }
         bs->clean();
         m_free_sbitset_list.append_head(bs);
     }
@@ -919,7 +919,7 @@ public:
     //Free bs for next use.
     inline void freeSBitSetCore(SBitSetCore<BitsPerSeg> * bs)
     {
-        if (bs == NULL) { return; }
+        if (bs == nullptr) { return; }
         bs->clean(*this);
         m_free_sbitsetcore_list.append_head(bs);
     }
@@ -927,7 +927,7 @@ public:
     //Free bs for next use.
     inline void freeDBitSet(DBitSet<BitsPerSeg> * bs)
     {
-        if (bs == NULL) { return; }
+        if (bs == nullptr) { return; }
         bs->clean();
         m_free_dbitset_list.append_head(bs);
     }
@@ -935,7 +935,7 @@ public:
     //free bs for next use.
     inline void freeDBitSetCore(DBitSetCore<BitsPerSeg> * bs)
     {
-        if (bs == NULL) { return; }
+        if (bs == nullptr) { return; }
         bs->clean(&sm, &scflst);
         m_free_dbitsetcore_list.append_head(bs);
     }
@@ -944,7 +944,7 @@ public:
     //MiscBitSetMgr for next use.
     inline void destroySEGandFreeDBitSetCore(DBitSetCore<BitsPerSeg> * bs)
     {
-        if (bs == NULL) { return; }
+        if (bs == nullptr) { return; }
         bs->destroySEGandClean(&sm, &scflst);
 
         //Recycle bitset.

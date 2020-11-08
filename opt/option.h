@@ -176,6 +176,7 @@ public:
     bool is_dump_refine_duchain; //Dump RefineDUChain.
     bool is_dump_refine; //Dump Refinement.
     bool is_dump_cdg; //Dump Control Dependence Graph.
+    bool is_dump_lis; //Dump LIS.
 public:
     DumpOpt();
     DumpOpt const& operator = (DumpOpt const&); //Disable operator =.
@@ -206,6 +207,7 @@ public:
     bool isDumpRefineDUChain() const;
     bool isDumpRefine() const;
     bool isDumpCDG() const;
+    bool isDumpLIS() const;
 };
 
 

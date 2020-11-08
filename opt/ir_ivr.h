@@ -75,7 +75,7 @@ public:
 public:
     COPY_CONSTRUCTOR(IV);
 
-    bool has_init_val() const { return IV_initv_i(this) != NULL; }
+    bool has_init_val() const { return IV_initv_i(this) != nullptr; }
 
     //Return true if initial value is const.
     bool isInitConst() const
@@ -163,7 +163,7 @@ protected:
 public:
     explicit IVR(Region * rg)
     {
-        ASSERT0(rg != NULL);
+        ASSERT0(rg != nullptr);
         m_rg = rg;
         m_md_sys = rg->getMDSystem();
         m_du = rg->getDUMgr();
@@ -173,8 +173,8 @@ public:
         m_sc_pool = smpoolCreate(sizeof(xcom::SC<IV*>) * 4, MEM_CONST_SIZE);
         m_is_only_handle_exact_md = true;
         m_is_strictly_match_pattern = false;
-        m_ssamgr = NULL;
-        m_mdssamgr = NULL;
+        m_ssamgr = nullptr;
+        m_mdssamgr = nullptr;
     }
     virtual ~IVR()
     {

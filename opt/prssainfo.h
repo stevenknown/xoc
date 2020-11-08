@@ -78,7 +78,7 @@ protected:
     void cleanMember()
     {
         uid = 0;
-        def_stmt = NULL;
+        def_stmt = nullptr;
     }
 public:
     UINT uid;
@@ -100,7 +100,7 @@ public:
     //This function guarantee all memory resource recycled.
     void cleanDU()
     {
-        SSA_def(this) = NULL;
+        SSA_def(this) = nullptr;
         SSA_uses(this).clean();
     }
 
@@ -166,7 +166,7 @@ public:
         m_newprno = PRNO_UNDEF;
         m_orgprno = PRNO_UNDEF;
         m_version = PRSSA_INIT_VERSION;
-        m_orgpr_type = NULL;
+        m_orgpr_type = nullptr;
     }
 
     void init(DefSegMgr * sm)

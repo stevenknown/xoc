@@ -31,18 +31,22 @@ IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 author: Su Zhenyu
 @*/
-#include "ltype.h"
-#include "comf.h"
-#include "smempool.h"
-#include "sstl.h"
-#include "bs.h"
-#include "sbs.h"
-#include "sgraph.h"
+#include "xcominc.h"
 
 namespace xcom {
 
 //Expect for unique vertex in graphic depitction
 #define ALWAYS_VERTEX_UNIQUE
+//
+//START CompareEdgeFunc
+//
+Edge * CompareEdgeFunc::createKey(Edge const* ref)
+{
+    ASSERT0(m_g);
+    return m_g->newEdgeImpl(ref->from(), ref->to());
+}
+//END  CompareEdgeFunc
+
 
 //
 //START EdgeHash
@@ -60,22 +64,24 @@ Edge * EdgeHash::create(OBJTY v)
 
 
 //DONT CALL Constructor directly.
-Graph::Graph(UINT edge_hash_size, UINT vex_hash_size) :
-    m_edges(edge_hash_size), m_vertices(vex_hash_size)
+Graph::Graph(UINT edge_hash_size, UINT vex_hash_size) : m_edgetab(self())
 {
     m_edge_hash_size = edge_hash_size;
     m_vex_hash_size = vex_hash_size;
-    m_ec_pool = NULL;
+    m_ec_pool = nullptr;
+    m_dense_vertex = nullptr; //default vertex layout is sparse.
+    m_sparse_vertex = nullptr;
     init();
 }
 
 
-Graph::Graph(Graph const& g) :
-    m_edges(g.m_edge_hash_size), m_vertices(g.m_vex_hash_size)
+Graph::Graph(Graph const& g) : m_edgetab(self())
 {
     m_edge_hash_size = g.m_edge_hash_size;
     m_vex_hash_size = g.m_vex_hash_size;
-    m_ec_pool = NULL;
+    m_ec_pool = nullptr;
+    m_dense_vertex = nullptr; //default vertex layout is sparse.
+    m_sparse_vertex = nullptr;
     init();
     clone(g, true, true);
 }
@@ -83,7 +89,7 @@ Graph::Graph(Graph const& g) :
 
 void Graph::init()
 {
-    if (m_ec_pool != NULL) { return; }
+    if (m_ec_pool != nullptr) { return; }
 
     m_ec_pool = smpoolCreate(sizeof(EdgeC), MEM_CONST_SIZE);
     ASSERTN(m_ec_pool, ("create mem pool failed"));
@@ -95,13 +101,18 @@ void Graph::init()
     ASSERTN(m_edge_pool, ("create mem pool failed"));
 
     //If m_edges already initialized, this call will do nothing.
-    m_edges.init(this, m_edge_hash_size);
+    m_edgetab.init(this);
 
-    //If m_vertices already initialized, this call will do nothing.
-    m_vertices.init(m_vex_hash_size);
+    if (is_dense()) {
+        ASSERT0(m_dense_vertex == nullptr);
+        m_dense_vertex = new Vector<Vertex*>(m_vex_hash_size);
+    } else {
+        ASSERT0(m_sparse_vertex == nullptr);
+        m_sparse_vertex = new VertexHash(m_vex_hash_size);
+    }
     m_is_unique = true;
     m_is_direction = true;
-    m_dense_vertex = NULL;
+    m_dense_vex_num = 0;
 }
 
 
@@ -112,38 +123,36 @@ void Graph::init()
 void Graph::resize(UINT vertex_hash_sz, UINT edge_hash_sz)
 {
     ASSERT0(m_ec_pool);
-    ASSERTN(m_vertices.get_elem_count() == 0, ("graph is not empty"));
-    ASSERTN(m_edges.get_elem_count() == 0, ("graph is not empty"));
-
-    if (m_vex_hash_size != vertex_hash_sz) {
-        m_vertices.destroy();
-        m_vertices.init(vertex_hash_sz);
-        m_vex_hash_size = vertex_hash_sz;
-    }
-
-    if (m_edge_hash_size != edge_hash_sz) {
-        m_edges.destroy();
-        m_edges.init(this, edge_hash_sz);
-        m_edge_hash_size = edge_hash_sz;
+    if (!is_dense()) {
+        //Dense vertex vector does not need resize.
+        ASSERTN(getVertexNum() == 0, ("graph is not empty"));
+        if (m_vex_hash_size != vertex_hash_sz) {
+            m_sparse_vertex->destroy();
+            m_sparse_vertex->init(vertex_hash_sz);
+            m_vex_hash_size = vertex_hash_sz;
+        }
     }
 }
 
 
 size_t Graph::count_mem() const
 {
-    size_t count = sizeof(BYTE);
-    count += sizeof(m_edge_hash_size);
-    count += sizeof(m_vex_hash_size);
-    count += m_edges.count_mem();
-    count += m_vertices.count_mem();
+    size_t count = sizeof(Graph);
+    count -= sizeof(EdgeHash); //has been counted in Graph.
+    count -= sizeof(FreeList<Edge>); //has been counted in Graph.
+    count -= sizeof(FreeList<EdgeC>); //has been counted in Graph.
+    count -= sizeof(FreeList<Vertex>); //has been counted in Graph.
+    count += m_edgetab.count_mem();
     count += m_e_free_list.count_mem();
     count += m_el_free_list.count_mem();
     count += m_v_free_list.count_mem();
     count += smpoolGetPoolSize(m_ec_pool);
     count += smpoolGetPoolSize(m_vertex_pool);
     count += smpoolGetPoolSize(m_edge_pool);
-    if (m_dense_vertex != NULL) {
+    if (is_dense()) {
         count += m_dense_vertex->count_mem();
+    } else {
+        count += m_sparse_vertex->count_mem();
     }
     return count;
 }
@@ -151,9 +160,8 @@ size_t Graph::count_mem() const
 
 void Graph::destroy()
 {
-    if (m_ec_pool == NULL) return;
-    m_edges.destroy();
-    m_vertices.destroy();
+    if (m_ec_pool == nullptr) { return; }
+    m_edgetab.destroy();
 
     //Set if edge and vertex would not be redundantly.
     m_is_unique = false;
@@ -163,41 +171,56 @@ void Graph::destroy()
     m_v_free_list.clean(); //vertex free list
 
     smpoolDelete(m_ec_pool);
-    m_ec_pool = NULL;
+    m_ec_pool = nullptr;
 
     smpoolDelete(m_vertex_pool);
-    m_vertex_pool = NULL;
+    m_vertex_pool = nullptr;
 
     smpoolDelete(m_edge_pool);
-    m_edge_pool = NULL;
+    m_edge_pool = nullptr;
 
-    if (m_dense_vertex != NULL) {
+    if (is_dense()) {
         delete m_dense_vertex;
-        m_dense_vertex = NULL;
+        m_dense_vertex = nullptr;
+        m_dense_vex_num = 0;
+    } else {
+        delete m_sparse_vertex;
+        m_sparse_vertex = nullptr;
     }
 }
 
 
 //Erasing graph, include all nodes and edges,
-//except for mempool, freelist.
+//except for EdgeInfo and VertexInfo.
 void Graph::erase()
 {
-    ASSERTN(m_ec_pool != NULL, ("Graph must be initialized before clone."));
-    //Collect edge, vertex data structure into free-list
-    //for allocation on demand.
-    INT c;
-    for (Vertex * v = m_vertices.get_first(c);
-         v != NULL; v = m_vertices.get_next(c)) {
-         removeVertex(v);
+    ASSERTN(m_ec_pool != nullptr, ("Graph must be initialized before clone."));
+    if (is_dense()) {
+        m_dense_vertex->destroy();
+        m_dense_vertex->init();
+        m_dense_vex_num = 0;
+    } else {
+        m_sparse_vertex->destroy();
+        //If m_sparse_vertex already initialized, this call will do nothing.
+        m_sparse_vertex->init(m_vex_hash_size);
     }
-    #ifdef _DEBUG_
-    if (m_dense_vertex != NULL) {
-        for (INT i = 0; i <= m_dense_vertex->get_last_idx(); i++) {
-            //Should be removed in removeVertex().
-            ASSERT0(m_dense_vertex->get((UINT)i) == NULL);
-        }
-    }
-    #endif
+
+    m_e_free_list.clean(); //edge free list
+    m_el_free_list.clean(); //edge-list free list
+    m_v_free_list.clean(); //vertex free list
+
+    smpoolDelete(m_ec_pool);
+    smpoolDelete(m_vertex_pool);
+    smpoolDelete(m_edge_pool);
+    m_ec_pool = smpoolCreate(sizeof(EdgeC), MEM_CONST_SIZE);
+    ASSERTN(m_ec_pool, ("create mem pool failed"));
+    m_vertex_pool = smpoolCreate(sizeof(Vertex) * 4, MEM_CONST_SIZE);
+    ASSERTN(m_vertex_pool, ("create mem pool failed"));
+    m_edge_pool = smpoolCreate(sizeof(Edge) * 4, MEM_CONST_SIZE);
+    ASSERTN(m_edge_pool, ("create mem pool failed"));
+
+    m_edgetab.destroy();
+    m_edgetab.init(this);
 }
 
 
@@ -212,11 +235,11 @@ void Graph::computeRpoNoRecursive(Vertex * root, OUT List<Vertex const*> & vlst)
     stk.push(root);
     Vertex * v;
     UINT order = RPO_INIT_VAL + getVertexNum() * RPO_INTERVAL;
-    while ((v = stk.get_top()) != NULL) {
+    while ((v = stk.get_top()) != nullptr) {
         is_visited.bunion(VERTEX_id(v));
         EdgeC * el = VERTEX_out_list(v);
         bool find = false; //find unvisited kid.
-        while (el != NULL) {
+        while (el != nullptr) {
             Vertex * succ = el->getTo();
             if (!is_visited.is_contain(VERTEX_id(succ))) {
                 stk.push(succ);
@@ -245,27 +268,28 @@ bool Graph::clone(Graph const& src, bool clone_edge_info, bool clone_vex_info)
     m_is_direction = src.m_is_direction;
 
     //Clone vertices
-    INT c;
-    for (Vertex * srcv = src.get_first_vertex(c);
-         srcv != NULL; srcv = src.get_next_vertex(c)) {
+    VertexIter itv;
+    for (Vertex * srcv = src.get_first_vertex(itv);
+         srcv != nullptr; srcv = src.get_next_vertex(itv)) {
         Vertex * v = addVertex(VERTEX_id(srcv));
 
         //Calls inherited class method.
         //Vertex info of memory should allocated by inherited class method
-        if (VERTEX_info(srcv) != NULL && clone_vex_info) {
+        if (VERTEX_info(srcv) != nullptr && clone_vex_info) {
             VERTEX_info(v) = cloneVertexInfo(srcv);
         }
     }
 
     //Clone edges
-    for (Edge * srce = src.get_first_edge(c);
-         srce != NULL; srce = src.get_next_edge(c)) {
+    EdgeIter ite;
+    for (Edge * srce = src.get_first_edge(ite);
+         srce != nullptr; srce = src.get_next_edge(ite)) {
         Edge * e = addEdge(VERTEX_id(EDGE_from(srce)),
                            VERTEX_id(EDGE_to(srce)));
 
         //Calls inherited class method.
         //Edge info of memory should allocated by inherited class method
-        if (EDGE_info(srce) != NULL && clone_edge_info) {
+        if (EDGE_info(srce) != nullptr && clone_edge_info) {
             EDGE_info(e) = cloneEdgeInfo(srce);
         }
     }
@@ -277,68 +301,46 @@ bool Graph::clone(Graph const& src, bool clone_edge_info, bool clone_vex_info)
 Vertex * Graph::newVertex(UINT vid)
 {
     ASSERTN(m_vertex_pool, ("not yet initialized."));
-    ASSERTN(vid != 0, ("Do not use 0 as vertex id"));
-
-    Vertex * vex = NULL;
-
-    #ifndef ALWAYS_VERTEX_UNIQUE
-    if (m_is_unique)
-    #endif
-    {
-        Vertex * v = m_vertices.find((OBJTY)(size_t)vid);
-        if (v != NULL) {
-            return v;
-        }
-    }
-
-    vex = m_v_free_list.get_free_elem();
-    if (vex == NULL) {
+    ASSERTN(vid != VERTEX_UNDEF, ("Use undefined vertex id"));
+    Vertex * vex = m_v_free_list.get_free_elem();
+    if (vex == nullptr) {
         vex = newVertex();
     }
     VERTEX_id(vex) = vid;
-
-    if (m_dense_vertex != NULL) {
-        ASSERT0(m_dense_vertex->get(vid) == NULL);
-        m_dense_vertex->set(vid, vex);
-    }
     return vex;
 }
 
 
 Edge * Graph::newEdge(Vertex * from, Vertex * to)
 {
-    ASSERTN(m_ec_pool != NULL, ("not yet initialized."));
-    if (from == NULL || to == NULL) return NULL;
-    Edge teste;
-    Vertex testfrom, testto;
+    ASSERTN(m_ec_pool != nullptr, ("not yet initialized."));
+    if (from == nullptr || to == nullptr) return nullptr;
     if (m_is_unique) {
-        VERTEX_id(&testfrom) = VERTEX_id(from);
-        VERTEX_id(&testto) = VERTEX_id(to);
-        EDGE_from(&teste) = &testfrom;
-        EDGE_to(&teste) = &testto;
+        Edge placeholder;
+        EDGE_from(&placeholder) = from;
+        EDGE_to(&placeholder) = to;
         if (m_is_direction) {
-            return m_edges.append((OBJTY)&teste, NULL);
+            return m_edgetab.append(&placeholder);
         }
 
-        Edge * e = NULL;
-        if (m_edges.find(&teste, &e)) {
-            ASSERT0(e);
+        Edge * e = m_edgetab.get(&placeholder);
+        if (e != nullptr) {
             return e;
         }
 
         //Both check from->to and to->from
-        EDGE_from(&teste) = &testto;
-        EDGE_to(&teste) = &testfrom;
-        return m_edges.append((OBJTY)&teste, NULL);
+        EDGE_from(&placeholder) = to;
+        EDGE_to(&placeholder) = from;
+        return m_edgetab.append(&placeholder);
     }
-    return m_edges.append(newEdgeImpl(from, to));
+    return m_edgetab.append(newEdgeImpl(from, to));
 }
 
 
 //Reverse edge direction
 Edge * Graph::reverseEdge(Edge * e)
 {
-    ASSERTN(m_ec_pool != NULL, ("not yet initialized."));
+    ASSERTN(m_ec_pool != nullptr, ("not yet initialized."));
     ASSERTN(m_is_direction, ("graph is indirection"));
     void * einfo = EDGE_info(e);
     Vertex * from = EDGE_from(e);
@@ -353,15 +355,15 @@ Edge * Graph::reverseEdge(Edge * e)
 //Reverse all edge direction
 void Graph::reverseEdges()
 {
-    ASSERTN(m_ec_pool != NULL, ("not yet initialized."));
+    ASSERTN(m_ec_pool != nullptr, ("not yet initialized."));
     ASSERTN(m_is_direction, ("graph is indirection"));
     List<Edge*> list;
     Edge * e;
-    INT c;
-    for (e = get_first_edge(c); e != NULL; e = get_next_edge(c)) {
+    EdgeIter c;
+    for (e = get_first_edge(c); e != nullptr; e = get_next_edge(c)) {
         list.append_tail(e);
     }
-    for (e = list.get_head(); e != NULL; e = list.get_next()) {
+    for (e = list.get_head(); e != nullptr; e = list.get_next()) {
         reverseEdge(e);
     }
 }
@@ -379,17 +381,17 @@ void Graph::insertVertexBetween(IN Vertex * v1,
 {
     Edge * e = getEdge(v1, v2);
 
-    EdgeC * v2pos_in_list = NULL;
-    EdgeC * v1pos_in_list = NULL;
+    EdgeC * v2pos_in_list = nullptr;
+    EdgeC * v1pos_in_list = nullptr;
     if (sort) {
-        for (EdgeC * ec = VERTEX_out_list(v1); ec != NULL; ec = EC_next(ec)) {
+        for (EdgeC * ec = VERTEX_out_list(v1); ec != nullptr; ec = EC_next(ec)) {
             if (ec->getTo() == v2) {
                 break;
             }
             v2pos_in_list = ec;
         }
 
-        for (EdgeC * ec = VERTEX_in_list(v2); ec != NULL; ec = EC_next(ec)) {
+        for (EdgeC * ec = VERTEX_in_list(v2); ec != nullptr; ec = EC_next(ec)) {
             if (ec->getFrom() == v1) {
                 break;
             }
@@ -401,13 +403,13 @@ void Graph::insertVertexBetween(IN Vertex * v1,
     removeEdge(e);
     Edge * tmpe1 = addEdge(v1, newv);
     Edge * tmpe2 = addEdge(newv, v2);
-    if (e1 != NULL) { *e1 = tmpe1; }
-    if (e2 != NULL) { *e2 = tmpe2; }
+    if (e1 != nullptr) { *e1 = tmpe1; }
+    if (e2 != nullptr) { *e2 = tmpe2; }
 
     if (!sort) { return; }
 
-    EdgeC * tmpe1_ec = NULL;
-    for (EdgeC * ec = VERTEX_out_list(v1); ec != NULL; ec = EC_next(ec)) {
+    EdgeC * tmpe1_ec = nullptr;
+    for (EdgeC * ec = VERTEX_out_list(v1); ec != nullptr; ec = EC_next(ec)) {
         if (EC_edge(ec) == tmpe1) {
             tmpe1_ec = ec;
             break;
@@ -415,8 +417,8 @@ void Graph::insertVertexBetween(IN Vertex * v1,
     }
     ASSERT0(tmpe1_ec);
 
-    EdgeC * tmpe2_ec = NULL;
-    for (EdgeC * ec = VERTEX_in_list(v2); ec != NULL; ec = EC_next(ec)) {
+    EdgeC * tmpe2_ec = nullptr;
+    for (EdgeC * ec = VERTEX_in_list(v2); ec != nullptr; ec = EC_next(ec)) {
         if (EC_edge(ec) == tmpe2) {
             tmpe2_ec = ec;
             break;
@@ -425,14 +427,14 @@ void Graph::insertVertexBetween(IN Vertex * v1,
     ASSERT0(tmpe2_ec);
 
     xcom::remove(&VERTEX_out_list(v1), tmpe1_ec);
-    if (v2pos_in_list == NULL) {
+    if (v2pos_in_list == nullptr) {
         xcom::append_head(&VERTEX_out_list(v1), tmpe1_ec);
     } else {
         xcom::insertafter_one(&v2pos_in_list, tmpe1_ec);
     }
 
     xcom::remove(&VERTEX_in_list(v2), tmpe2_ec);
-    if (v1pos_in_list == NULL) {
+    if (v1pos_in_list == nullptr) {
         xcom::append_head(&VERTEX_in_list(v2), tmpe2_ec);
     } else {
         xcom::insertafter_one(&v1pos_in_list, tmpe2_ec);
@@ -462,33 +464,33 @@ void Graph::insertVertexBetween(UINT v1,
 
 Edge * Graph::removeEdge(Edge * e)
 {
-    ASSERTN(m_ec_pool != NULL, ("not yet initialized."));
-    if (e == NULL) { return NULL; }
+    ASSERTN(m_ec_pool != nullptr, ("not yet initialized."));
+    if (e == nullptr) { return nullptr; }
     Vertex * from = EDGE_from(e);
     Vertex * to = EDGE_to(e);
 
     //remove out of out-list of 'from'
     EdgeC * el = VERTEX_out_list(from);
-    while (el != NULL) {
+    while (el != nullptr) {
         if (EC_edge(el) == e) { break; }
         el = EC_next(el);
     }
-    ASSERTN(el != NULL, ("can not find out-edge, it is illegal graph"));
+    ASSERTN(el != nullptr, ("can not find out-edge, it is illegal graph"));
     xcom::remove(&VERTEX_out_list(from), el);
     m_el_free_list.add_free_elem(el);
 
     //remove out of in-list of 'to'
     el = VERTEX_in_list(to);
-    while (el != NULL) {
+    while (el != nullptr) {
         if (EC_edge(el) == e) { break; }
         el = EC_next(el);
     }
-    ASSERTN(el != NULL, ("can not find in-edge, it is illegal graph"));
+    ASSERTN(el != nullptr, ("can not find in-edge, it is illegal graph"));
     xcom::remove(&VERTEX_in_list(to), el);
     m_el_free_list.add_free_elem(el);
 
-    //remove edge out of edge-hash
-    e = m_edges.removed(e);
+    //remove edge out of edge-tab
+    m_edgetab.remove(e);
     m_e_free_list.add_free_elem(e);
     return e;
 }
@@ -496,11 +498,11 @@ Edge * Graph::removeEdge(Edge * e)
 
 Vertex * Graph::removeVertex(Vertex * vex)
 {
-    ASSERTN(m_ec_pool != NULL, ("not yet initialized."));
-    if (vex == NULL) return NULL;
+    ASSERTN(m_ec_pool != nullptr, ("not yet initialized."));
+    if (vex == nullptr) { return nullptr; }
     EdgeC * el = VERTEX_out_list(vex);
     //remove all out-edge
-    while (el != NULL) {
+    while (el != nullptr) {
         EdgeC * tmp = el;
         el = EC_next(el);
         removeEdge(EC_edge(tmp));
@@ -508,16 +510,18 @@ Vertex * Graph::removeVertex(Vertex * vex)
 
     //remove all in-edge
     el = VERTEX_in_list(vex);
-    while (el != NULL) {
+    while (el != nullptr) {
         EdgeC * tmp = el;
         el = EC_next(el);
         removeEdge(EC_edge(tmp));
     }
-    vex = m_vertices.removed(vex);
-    m_v_free_list.add_free_elem(vex);
-    if (m_dense_vertex != NULL) {
-        m_dense_vertex->set(VERTEX_id(vex), NULL);
+    if (is_dense()) {
+        m_dense_vertex->set(VERTEX_id(vex), nullptr);
+        m_dense_vex_num--;
+    } else {
+        vex = m_sparse_vertex->remove(vex);
     }
+    m_v_free_list.add_free_elem(vex);
     return vex;
 }
 
@@ -529,15 +533,15 @@ Vertex * Graph::removeVertex(Vertex * vex)
 //    Note that this function ensure each neighbours in ni_list is unique.
 bool Graph::getNeighborList(OUT List<UINT> & ni_list, UINT vid) const
 {
-    ASSERTN(m_ec_pool != NULL, ("not yet initialized."));
+    ASSERTN(m_ec_pool != nullptr, ("not yet initialized."));
 
     //Ensure VertexHash::find is readonly.
     Graph * pthis = const_cast<Graph*>(this);
     Vertex * vex  = pthis->getVertex(vid);
-    if (vex == NULL) { return false; }
+    if (vex == nullptr) { return false; }
 
     EdgeC * el = VERTEX_in_list(vex);
-    while (el != NULL) {
+    while (el != nullptr) {
         UINT v = el->getFromId();
         if (!ni_list.find(v)) {
             ni_list.append_tail(v);
@@ -546,7 +550,7 @@ bool Graph::getNeighborList(OUT List<UINT> & ni_list, UINT vid) const
     }
 
     el = VERTEX_out_list(vex);
-    while (el != NULL) {
+    while (el != nullptr) {
         UINT v = el->getToId();
         if (!ni_list.find(v)) {
             ni_list.append_tail(v);
@@ -564,21 +568,21 @@ bool Graph::getNeighborList(OUT List<UINT> & ni_list, UINT vid) const
 //       Using sparse bitset is faster than list in most cases.
 bool Graph::getNeighborSet(OUT DefSBitSet & niset, UINT vid) const
 {
-    ASSERTN(m_ec_pool != NULL, ("not yet initialized."));
+    ASSERTN(m_ec_pool != nullptr, ("not yet initialized."));
     //Ensure VertexHash::find is readonly.
     Graph * pthis = const_cast<Graph*>(this);
     Vertex * vex  = pthis->getVertex(vid);
-    if (vex == NULL) { return false; }
+    if (vex == nullptr) { return false; }
 
     EdgeC * el = VERTEX_in_list(vex);
-    while (el != NULL) {
+    while (el != nullptr) {
         UINT v = el->getFromId();
         niset.bunion(v);
         el = EC_next(el);
     }
 
     el = VERTEX_out_list(vex);
-    while (el != NULL) {
+    while (el != nullptr) {
         niset.bunion(el->getToId());
         el = EC_next(el);
     }
@@ -588,18 +592,18 @@ bool Graph::getNeighborSet(OUT DefSBitSet & niset, UINT vid) const
 
 UINT Graph::getDegree(Vertex const* vex) const
 {
-    ASSERTN(m_ec_pool != NULL, ("not yet initialized."));
-    if (vex == NULL) return 0;
+    ASSERTN(m_ec_pool != nullptr, ("not yet initialized."));
+    if (vex == nullptr) return 0;
     return getInDegree(vex) + getOutDegree(vex);
 }
 
 
 bool Graph::isInDegreeEqualTo(Vertex const* vex, UINT num) const
 {
-    ASSERTN(m_ec_pool != NULL, ("not yet initialized."));
-    if (vex == NULL) { return 0; }
+    ASSERTN(m_ec_pool != nullptr, ("not yet initialized."));
+    if (vex == nullptr) { return 0; }
     UINT degree = 0;
-    for (EdgeC * el = VERTEX_in_list(vex); el != NULL; el = EC_next(el)) {
+    for (EdgeC * el = VERTEX_in_list(vex); el != nullptr; el = EC_next(el)) {
         degree++;
         if (degree == num) { return true; }
     }
@@ -609,10 +613,10 @@ bool Graph::isInDegreeEqualTo(Vertex const* vex, UINT num) const
 
 bool Graph::isOutDegreeEqualTo(Vertex const* vex, UINT num) const
 {
-    ASSERTN(m_ec_pool != NULL, ("not yet initialized."));
-    if (vex == NULL) { return 0; }
+    ASSERTN(m_ec_pool != nullptr, ("not yet initialized."));
+    if (vex == nullptr) { return 0; }
     UINT degree = 0;
-    for (EdgeC * el = VERTEX_out_list(vex); el != NULL; el = EC_next(el)) {
+    for (EdgeC * el = VERTEX_out_list(vex); el != nullptr; el = EC_next(el)) {
         degree++;
         if (degree == num) { return true; }
     }
@@ -622,11 +626,11 @@ bool Graph::isOutDegreeEqualTo(Vertex const* vex, UINT num) const
 
 UINT Graph::getInDegree(Vertex const* vex) const
 {
-    ASSERTN(m_ec_pool != NULL, ("not yet initialized."));
-    if (vex == NULL) { return 0; }
+    ASSERTN(m_ec_pool != nullptr, ("not yet initialized."));
+    if (vex == nullptr) { return 0; }
     UINT degree = 0;
     EdgeC * el = VERTEX_in_list(vex);
-    while (el != NULL) {
+    while (el != nullptr) {
         degree++;
         el = EC_next(el);
     }
@@ -636,12 +640,12 @@ UINT Graph::getInDegree(Vertex const* vex) const
 
 UINT Graph::getOutDegree(Vertex const* vex) const
 {
-    ASSERTN(m_ec_pool != NULL, ("not yet initialized."));
-    if (vex == NULL) { return 0; }
+    ASSERTN(m_ec_pool != nullptr, ("not yet initialized."));
+    if (vex == nullptr) { return 0; }
 
     UINT degree = 0;
     EdgeC * el = VERTEX_out_list(vex);
-    while (el != NULL) {
+    while (el != nullptr) {
         degree++;
         el = EC_next(el);
     }
@@ -651,11 +655,11 @@ UINT Graph::getOutDegree(Vertex const* vex) const
 
 Edge * Graph::getEdge(Vertex const* from, Vertex const* to) const
 {
-    ASSERTN(m_ec_pool != NULL, ("not yet initialized."));
-    if (from == NULL || to == NULL) { return NULL; }
+    ASSERTN(m_ec_pool != nullptr, ("not yet initialized."));
+    if (from == nullptr || to == nullptr) { return nullptr; }
 
     EdgeC * el = VERTEX_out_list(from);
-    while (el != NULL) {
+    while (el != nullptr) {
         Edge * e = EC_edge(el);
         if (EDGE_from(e) == from && EDGE_to(e) == to) {
             return e;
@@ -669,7 +673,7 @@ Edge * Graph::getEdge(Vertex const* from, Vertex const* to) const
 
     if (!m_is_direction) {
         EdgeC * el2 = VERTEX_out_list(to);
-        while (el2 != NULL) {
+        while (el2 != nullptr) {
             Edge * e = EC_edge(el2);
             if (EDGE_from(e) == to && EDGE_to(e) == from) {
                 return e;
@@ -677,13 +681,13 @@ Edge * Graph::getEdge(Vertex const* from, Vertex const* to) const
             el2 = EC_next(el2);
         }
     }
-    return NULL;
+    return nullptr;
 }
 
 
 Edge * Graph::getEdge(UINT from, UINT to) const
 {
-    ASSERTN(m_ec_pool != NULL, ("not yet initialized."));
+    ASSERTN(m_ec_pool != nullptr, ("not yet initialized."));
     Vertex * fp = getVertex(from);
     Vertex * tp = getVertex(to);
     return getEdge(fp, tp);
@@ -700,33 +704,33 @@ bool Graph::is_equal(Graph & g) const
     BitSet vs;
     INT c;
     for (Vertex * v1 = get_first_vertex(c);
-         v1 != NULL; v1 = get_next_vertex(c)) {
+         v1 != nullptr; v1 = get_next_vertex(c)) {
         Vertex * v2 = g.getVertex(VERTEX_id(v1));
-        if (v2 == NULL) {
+        if (v2 == nullptr) {
             return false;
         }
 
         vs.clean();
         EdgeC * el = VERTEX_out_list(v1);
-        Edge * e = NULL;
+        Edge * e = nullptr;
         UINT v1_succ_n = 0;
-        if (el == NULL) {
-            if (VERTEX_out_list(v2) != NULL) {
+        if (el == nullptr) {
+            if (VERTEX_out_list(v2) != nullptr) {
                 return false;
             }
             continue;
         }
 
-        for (e = EC_edge(el); e != NULL; el = EC_next(el),
-             e = el ? EC_edge(el) : NULL) {
+        for (e = EC_edge(el); e != nullptr; el = EC_next(el),
+             e = el ? EC_edge(el) : nullptr) {
             vs.bunion(VERTEX_id(EDGE_to(e)));
             v1_succ_n++;
         }
 
         UINT v2_succ_n = 0;
         el = VERTEX_out_list(v2);
-        for (e = EC_edge(el); e != NULL; el = EC_next(el),
-             e = el ? EC_edge(el) : NULL) {
+        for (e = EC_edge(el); e != nullptr; el = EC_next(el),
+             e = el ? EC_edge(el) : nullptr) {
             v2_succ_n++;
             if (!vs.is_contain(VERTEX_id(EDGE_to(e)))) {
                 return false;
@@ -744,15 +748,15 @@ bool Graph::is_equal(Graph & g) const
 //Is there exist a path connect 'from' and 'to'.
 bool Graph::is_reachable(Vertex * from, Vertex * to) const
 {
-    ASSERTN(m_ec_pool != NULL, ("not yet initialized."));
-    ASSERTN(from != NULL && to != NULL, ("parameters cannot be NULL"));
+    ASSERTN(m_ec_pool != nullptr, ("not yet initialized."));
+    ASSERTN(from != nullptr && to != nullptr, ("parameters cannot be nullptr"));
     EdgeC * el = VERTEX_out_list(from);
-    Edge * e = NULL;
-    if (el == NULL) { return false; }
+    Edge * e = nullptr;
+    if (el == nullptr) { return false; }
 
     //Walk through each succ of 'from'
-    for (e = EC_edge(el); e != NULL; el = EC_next(el),
-         e = el ? EC_edge(el):NULL) {
+    for (e = EC_edge(el); e != nullptr; el = EC_next(el),
+         e = el ? EC_edge(el):nullptr) {
         Vertex * succ = EDGE_to(e);
         if (VERTEX_id(succ) == VERTEX_id(to)) {
             return true;
@@ -769,9 +773,11 @@ bool Graph::is_reachable(Vertex * from, Vertex * to) const
 //Sort graph vertices in topological order.
 //vex_vec: record vertics in topological order.
 //Return true if sorting success, otherwise there exist cycles in graph.
+//Note you should NOT retrieve vertex in 'vex_vec' via vertex's index because
+//they are stored in dense manner.
 bool Graph::sortInTopologOrder(OUT Vector<Vertex*> & vex_vec)
 {
-    ASSERTN(m_ec_pool != NULL, ("Graph still not yet initialize."));
+    ASSERTN(m_ec_pool != nullptr, ("Graph still not yet initialize."));
     if (getVertexNum() == 0) {
         return true;
     }
@@ -780,12 +786,12 @@ bool Graph::sortInTopologOrder(OUT Vector<Vertex*> & vex_vec)
     DefSBitSet is_removed(sm.getSegMgr());
     INT c;
     for (xcom::Vertex * vex = get_first_vertex(c);
-         vex != NULL; vex = get_next_vertex(c)) {
+         vex != nullptr; vex = get_next_vertex(c)) {
         if (getInDegree(vex) == 0) {
             ready_list.append_tail(vex);
         }
     }
-    vex_vec.set(getVertexNum() - 1, NULL);
+    vex_vec.set(getVertexNum() - 1, nullptr);
     UINT pos = 0;
     for (; ready_list.get_elem_count() != 0;) {
         Vertex * ready = ready_list.remove_head();
@@ -793,18 +799,18 @@ bool Graph::sortInTopologOrder(OUT Vector<Vertex*> & vex_vec)
         vex_vec.set(pos, ready);
         pos++;
         for (xcom::EdgeC const* el = ready->getOutList();
-             el != NULL; el = el->get_next()) {
+             el != nullptr; el = el->get_next()) {
             Vertex * ready_succ = el->getTo();
 
-            //Determine if in-degree equal to 1.
+            //Determine if in-degree is not equal to 0.
             UINT in_degree = 0;
             for (xcom::EdgeC const* el2 = ready_succ->getInList();
-                 el2 != NULL; el2 = el2->get_next()) {
-                Vertex const* ready_succ_pred = EDGE_from(EC_edge(el2));
+                 el2 != nullptr; el2 = el2->get_next()) {
+                Vertex const* ready_succ_pred = el2->getFrom();
                 if (is_removed.is_contain(ready_succ_pred->id())) {
                     continue;
                 }
-                in_degree++;                
+                in_degree++;
             }
             if (in_degree == 0) {
                 ready_list.append_tail(ready_succ);
@@ -819,7 +825,7 @@ bool Graph::sortInTopologOrder(OUT Vector<Vertex*> & vex_vec)
 void Graph::removeEdgeBetween(Vertex * v1, Vertex * v2)
 {
     EdgeC * ec = VERTEX_out_list(v1);
-    while (ec != NULL) {
+    while (ec != nullptr) {
         EdgeC * next = EC_next(ec);
         Edge * e = EC_edge(ec);
         if ((EDGE_from(e) == v1 && EDGE_to(e) == v2) ||
@@ -830,7 +836,7 @@ void Graph::removeEdgeBetween(Vertex * v1, Vertex * v2)
     }
 
     ec = VERTEX_in_list(v1);
-    while (ec != NULL) {
+    while (ec != nullptr) {
         EdgeC * next = EC_next(ec);
         Edge * e = EC_edge(ec);
         if ((EDGE_from(e) == v1 && EDGE_to(e) == v2) ||
@@ -899,15 +905,15 @@ void Graph::removeTransitiveEdge()
     if (is_dense()) {
         for (INT i = 0; i <= reachset_vec.get_last_idx(); i++) {
             DefSBitSetCore * bs = reachset_vec.get(i);
-            if (bs != NULL) {
+            if (bs != nullptr) {
                 bs->clean(bs_mgr);
             }
         }
     } else {
         TMapIter<UINT, DefSBitSetCore*> iter;
-        DefSBitSetCore * bs = NULL;
+        DefSBitSetCore * bs = nullptr;
         for (reachset_map.get_first(iter, &bs);
-             bs != NULL; reachset_map.get_next(iter, &bs)) {
+             bs != nullptr; reachset_map.get_next(iter, &bs)) {
             bs->clean(bs_mgr);
         }
     }
@@ -924,13 +930,13 @@ void Graph::removeTransitiveEdgeHelper(Vertex const* fromvex,
     is_visited.bunion(fromvex->id());
 
     ASSERT0(fromvex);
-    if (fromvex->getOutList() == NULL) { return; }
+    if (fromvex->getOutList() == nullptr) { return; }
 
     //Reachset defines the set of vertex that fromvex is able to reach.
     DefSBitSetCore * from_reachset = is_dense() ?
         reachset->get(fromvex->id()) :
         ((TMap<UINT, DefSBitSetCore*>*)reachset)->get(fromvex->id());
-    if (from_reachset == NULL) {
+    if (from_reachset == nullptr) {
         from_reachset = bs_mgr.allocSBitSetCore();
         if (is_dense()) {
             reachset->set(fromvex->id(), from_reachset);
@@ -941,8 +947,8 @@ void Graph::removeTransitiveEdgeHelper(Vertex const* fromvex,
     }
 
     //Position in bitset has been sorted in topological order.
-    EdgeC const* next_ec = NULL;
-    for (EdgeC const* ec = fromvex->getOutList(); ec != NULL; ec = next_ec) {
+    EdgeC const* next_ec = nullptr;
+    for (EdgeC const* ec = fromvex->getOutList(); ec != nullptr; ec = next_ec) {
         next_ec = ec->get_next();
         Vertex const* tovex = ec->getTo();
 
@@ -953,16 +959,16 @@ void Graph::removeTransitiveEdgeHelper(Vertex const* fromvex,
         DefSBitSetCore * to_reachset = is_dense() ?
             reachset->get(tovex->id()) :
             ((TMap<UINT, DefSBitSetCore*>*)reachset)->get(tovex->id());
-        if (to_reachset == NULL) { continue; }
+        if (to_reachset == nullptr) { continue; }
         from_reachset->bunion(*to_reachset, bs_mgr);
 
         //Get successor set correspond to to_dense.
-        if (tovex->getOutList() == NULL) { continue; }
+        if (tovex->getOutList() == nullptr) { continue; }
 
         //Iterate other successors except 'to'.
-        EdgeC const* next_ec2 = NULL;
+        EdgeC const* next_ec2 = nullptr;
         for (EdgeC const* ec2 = fromvex->getOutList();
-             ec2 != NULL; ec2 = next_ec2) {
+             ec2 != nullptr; ec2 = next_ec2) {
             next_ec2 = ec2->get_next();
             Vertex const* othervex = ec2->getTo();
             if (othervex == tovex || !to_reachset->is_contain(othervex->id())) {
@@ -979,11 +985,11 @@ void Graph::removeTransitiveEdgeHelper(Vertex const* fromvex,
 
 void Graph::dumpVexVector(Vector<Vertex*> const& vec, FILE * h)
 {
-    if (h == NULL) { return; }
+    if (h == nullptr) { return; }
     fprintf(h, "\n");
     for (INT i = 0; i <= vec.get_last_idx(); i++) {
         Vertex const* x = vec.get(i);
-        if (x != NULL) {
+        if (x != nullptr) {
             if (i != 0) { fprintf(h, ","); }
             fprintf(h, "V%d", x->id());
         }
@@ -994,7 +1000,7 @@ void Graph::dumpVexVector(Vector<Vertex*> const& vec, FILE * h)
 
 void Graph::dumpDOT(CHAR const* name) const
 {
-    if (name == NULL) {
+    if (name == nullptr) {
         name = "graph.dot";
     }
     UNLINK(name);
@@ -1003,20 +1009,32 @@ void Graph::dumpDOT(CHAR const* name) const
 
     fprintf(h, "digraph G {\n");
     //Print node
-    INT c;
-    for (Vertex const* v = m_vertices.get_first(c);
-         v != NULL; v = m_vertices.get_next(c)) {
+    VertexIter itv;
+    for (Vertex const* v = get_first_vertex(itv);
+         v != nullptr; v = get_next_vertex(itv)) {
         fprintf(h, "\nnode%d [shape = Mrecord, label=\"{V%d}\"];",
                 VERTEX_id(v), VERTEX_id(v));
     }
 
     //Print edge
-    for (Edge const* e = m_edges.get_first(c);
-         e != NULL; e = m_edges.get_next(c)) {
-        fprintf(h, "\nnode%d->node%d[label=\"%s\"]",
-                    VERTEX_id(EDGE_from(e)),
-                    VERTEX_id(EDGE_to(e)),
-                    "");
+    EdgeIter ite;
+    for (Edge const* e = get_first_edge(ite);
+         e != nullptr; e = get_next_edge(ite)) {
+        fprintf(h, "\nnode%d->node%d", e->from()->id(), e->to()->id());
+        fprintf(h, "[");
+        bool prt_comma = false;
+        if (!is_direction()) {
+            if (prt_comma) { fprintf(h, ","); }
+            fprintf(h, "dir=none");
+            prt_comma = true;
+        }
+        {
+            //Print label.
+            if (prt_comma) { fprintf(h, ","); }
+            fprintf(h, "label=\"%s\"", "");
+            prt_comma = true;
+        }
+        fprintf(h, "]");
     }
     fprintf(h, "\n}\n");
     fclose(h);
@@ -1025,8 +1043,8 @@ void Graph::dumpDOT(CHAR const* name) const
 
 void Graph::dumpVCG(CHAR const* name) const
 {
-    ASSERTN(m_ec_pool != NULL, ("not yet initialized."));
-    if (name == NULL) {
+    ASSERTN(m_ec_pool != nullptr, ("not yet initialized."));
+    if (name == nullptr) {
         name = "graph.vcg";
     }
     UNLINK(name);
@@ -1068,17 +1086,18 @@ void Graph::dumpVCG(CHAR const* name) const
               "edge.color: darkgreen\n");
 
     //Print node
-    INT c;
-    for (Vertex const* v = m_vertices.get_first(c);
-         v != NULL; v = m_vertices.get_next(c)) {
+    VertexIter itv;
+    for (Vertex const* v = get_first_vertex(itv);
+         v != nullptr; v = get_next_vertex(itv)) {
         fprintf(h, "\nnode: { title:\"%d\" label:\"%d\" "
                 "shape:circle fontname:\"courB\" color:gold}",
                 VERTEX_id(v), VERTEX_id(v));
     }
 
     //Print edge
-    for (Edge const* e = m_edges.get_first(c);
-         e != NULL; e = m_edges.get_next(c)) {
+    EdgeIter ite;
+    for (Edge const* e = get_first_edge(ite);
+         e != nullptr; e = get_next_edge(ite)) {
         fprintf(h, "\nedge: { sourcename:\"%d\" targetname:\"%d\" %s}",
                 VERTEX_id(EDGE_from(e)),
                 VERTEX_id(EDGE_to(e)),
@@ -1110,14 +1129,14 @@ bool Graph::tryFindLessRpo(Vertex * v, Vertex const* ref)
 DGraph::DGraph(UINT edge_hash_size, UINT vex_hash_size) :
     Graph(edge_hash_size, vex_hash_size)
 {
-    m_bs_mgr = NULL;
+    m_bs_mgr = nullptr;
 }
 
 
 DGraph::DGraph(DGraph const& g) : Graph(g)
 {
     m_bs_mgr = g.m_bs_mgr;
-    if (m_bs_mgr != NULL) {
+    if (m_bs_mgr != nullptr) {
         cloneDomAndPdom(g);
     }
 }
@@ -1125,24 +1144,24 @@ DGraph::DGraph(DGraph const& g) : Graph(g)
 
 bool DGraph::cloneDomAndPdom(DGraph const& src)
 {
-    ASSERT0(m_bs_mgr != NULL);
+    ASSERT0(m_bs_mgr != nullptr);
     INT c;
-    for (Vertex * srcv = src.m_vertices.get_first(c);
-         srcv != NULL; srcv = src.m_vertices.get_next(c)) {
+    for (Vertex * srcv = src.get_first_vertex(c);
+         srcv != nullptr; srcv = src.get_next_vertex(c)) {
         UINT src_vid = VERTEX_id(srcv);
         Vertex * tgtv = getVertex(src_vid);
-        ASSERT0(tgtv != NULL);
+        ASSERT0(tgtv != nullptr);
 
         BitSet const* set = src.read_dom_set(VERTEX_id(srcv));
-        if (set != NULL) {
+        if (set != nullptr) {
             get_dom_set(tgtv)->copy(*set);
         }
 
         set = src.read_pdom_set(VERTEX_id(srcv));
-        if (set != NULL) {
+        if (set != nullptr) {
             get_pdom_set(tgtv)->copy(*set);
         }
-    } //end for each vertices
+    }
     m_idom_set.copy(src.m_idom_set);
     m_ipdom_set.copy(src.m_ipdom_set);
     return true;
@@ -1169,23 +1188,23 @@ bool DGraph::computeDom(List<Vertex const*> const* vlst, BitSet const* uni)
 {
     List<Vertex const*> tmpvlst;
     List<Vertex const*> * pvlst = &tmpvlst;
-    if (vlst != NULL) {
+    if (vlst != nullptr) {
         //Here one must guarantee pvlst would not be modified.
         pvlst = const_cast<List<Vertex const*>*>(vlst);
     } else {
         INT c;
         for (Vertex const* u = get_first_vertex(c);
-             u != NULL; u = get_next_vertex(c)) {
+             u != nullptr; u = get_next_vertex(c)) {
             pvlst->append_tail(u);
         }
     }
 
-    BitSet const* luni = NULL;
-    if (uni != NULL) {
+    BitSet const* luni = nullptr;
+    if (uni != nullptr) {
         luni = uni;
     } else {
         BitSet * x = new BitSet();
-        C<Vertex const*> * ct = NULL;
+        C<Vertex const*> * ct = nullptr;
         for (pvlst->get_head(&ct);
              ct != pvlst->end(); ct = pvlst->get_next(ct)) {
             Vertex const* u = ct->val();
@@ -1228,7 +1247,7 @@ bool DGraph::computeDom(List<Vertex const*> const* vlst, BitSet const* uni)
             } else {
                 //Access each preds
                 EdgeC * ec = VERTEX_in_list(v);
-                while (ec != NULL) {
+                while (ec != nullptr) {
                     Vertex * pred = ec->getFrom();
                     if (ec == VERTEX_in_list(v)) {
                         tmp.copy(*m_dom_set.get(VERTEX_id(pred)));
@@ -1249,7 +1268,7 @@ bool DGraph::computeDom(List<Vertex const*> const* vlst, BitSet const* uni)
     }//end while
     ASSERT0(!change);
 
-    if (uni == NULL && luni != NULL) {
+    if (uni == nullptr && luni != nullptr) {
         delete luni;
     }
     return true;
@@ -1266,13 +1285,13 @@ bool DGraph::computeDom3(List<Vertex const*> const* vlst, BitSet const* uni)
     DUMMYUSE(uni);
     List<Vertex const*> tmpvlst;
     List<Vertex const*> * pvlst = &tmpvlst;
-    if (vlst != NULL) {
+    if (vlst != nullptr) {
         //Here one must guarantee pvlst would not be modified.
         pvlst = const_cast<List<Vertex const*>*>(vlst);
     } else {
         INT c;
         for (Vertex const* u = get_first_vertex(c);
-             u != NULL; u = get_next_vertex(c)) {
+             u != nullptr; u = get_next_vertex(c)) {
             pvlst->append_tail(u);
         }
     }
@@ -1311,7 +1330,7 @@ bool DGraph::computeDom3(List<Vertex const*> const* vlst, BitSet const* uni)
                 //Access each preds
                 EdgeC * ec = VERTEX_in_list(v);
                 UINT meet = 0;
-                while (ec != NULL) {
+                while (ec != nullptr) {
                     Vertex * pred = ec->getFrom();
                     BitSet * ds = m_dom_set.get(VERTEX_id(pred));
                     if (ds->is_empty()) {
@@ -1357,7 +1376,7 @@ bool DGraph::computePdomByRpo(Vertex * root, BitSet const* uni)
     vlst.reverse();
 
     bool res = false;
-    if (uni == NULL) {
+    if (uni == nullptr) {
         res = computePdom(&vlst);
     } else {
         res = computePdom(&vlst, uni);
@@ -1425,7 +1444,7 @@ bool DGraph::computePdom(List<Vertex const*> const* vlst, BitSet const* uni)
                 tmp.clean();
                 //Access each succs
                 EdgeC * ec = VERTEX_out_list(v);
-                while (ec != NULL) {
+                while (ec != nullptr) {
                     Vertex * succ = ec->getTo();
                     if (ec == VERTEX_out_list(v)) {
                         tmp.copy(*m_pdom_set.get(VERTEX_id(succ)));
@@ -1507,8 +1526,8 @@ bool DGraph::computeIdom2(List<Vertex const*> const& vlst)
 
             //Access each preds
             EdgeC const* ec = VERTEX_in_list(v);
-            Vertex const* idom = NULL;
-            while (ec != NULL) {
+            Vertex const* idom = nullptr;
+            while (ec != nullptr) {
                 Vertex const* pred = ec->getFrom();
                 UINT pid = VERTEX_id(pred);
 
@@ -1517,7 +1536,7 @@ bool DGraph::computeIdom2(List<Vertex const*> const& vlst)
                     continue;
                 }
 
-                if (idom == NULL) {
+                if (idom == nullptr) {
                     idom = pred;
                     ec = EC_next(ec);
                     continue;
@@ -1548,7 +1567,7 @@ bool DGraph::computeIdom2(List<Vertex const*> const& vlst)
                 if (j != k) {
                     //Multi entries.
                     ASSERT0(is_graph_entry(j) && is_graph_entry(k));
-                    idom = NULL;
+                    idom = nullptr;
                     break;
                 }
 
@@ -1556,7 +1575,7 @@ bool DGraph::computeIdom2(List<Vertex const*> const& vlst)
                 ec = EC_next(ec);
             }
 
-            if (idom == NULL) {
+            if (idom == nullptr) {
                 if (m_idom_set.get(v->id()) != 0) {
                     m_idom_set.set(v->id(), 0);
                     change = true;
@@ -1590,14 +1609,14 @@ bool DGraph::computeIdom()
 
     //Access with topological order.
     INT c;
-    for (Vertex * v = m_vertices.get_first(c);
-         v != NULL; v = m_vertices.get_next(c)) {
+    for (Vertex * v = get_first_vertex(c);
+         v != nullptr; v = get_next_vertex(c)) {
         UINT cur_id = VERTEX_id(v);
         if (is_graph_entry(v)) {
             continue;
         } else if (m_dom_set.get(cur_id)->get_elem_count() >= 2) {
             BitSet * p = m_dom_set.get(cur_id);
-            ASSERTN(p != NULL, ("should compute dom first"));
+            ASSERTN(p != nullptr, ("should compute dom first"));
             if (p->get_elem_count() == 1) {
                 //There is no idom if 'dom' set only contain itself.
                 ASSERT0(m_idom_set.get(cur_id) == 0);
@@ -1642,7 +1661,76 @@ bool DGraph::computeIdom()
 }
 
 
-//NOTE: Exit does not have idom.
+Vertex * Graph::get_last_vertex(INT & cur) const
+{
+    ASSERTN(m_ec_pool != nullptr, ("not yet initialized."));
+    if (is_dense()) {
+        for (INT i = m_dense_vertex->get_last_idx(); i >= 0; i--) {
+            Vertex * vex = m_dense_vertex->get(cur);
+            if (vex != nullptr) {
+                cur = i;
+                return vex;
+            }
+        }
+        return nullptr;
+    }
+    return m_sparse_vertex->get_last(cur);
+}
+
+
+Vertex * Graph::get_prev_vertex(INT & cur) const
+{
+    ASSERTN(m_ec_pool != nullptr, ("not yet initialized."));
+    if (is_dense()) {
+        for (INT i = cur - 1; i >= m_dense_vertex->get_last_idx(); i++) {
+            Vertex * vex = m_dense_vertex->get(cur);
+            if (vex != nullptr) {
+                cur = i;
+                return vex;
+            }
+        }
+        return nullptr;
+    }
+    return m_sparse_vertex->get_prev(cur);
+}
+
+
+Vertex * Graph::get_first_vertex(INT & cur) const
+{
+    ASSERTN(m_ec_pool != nullptr, ("not yet initialized."));
+    if (is_dense()) {
+        for (INT i = VERTEX_UNDEF + 1;
+             i <= m_dense_vertex->get_last_idx(); i++) {
+            Vertex * vex = m_dense_vertex->get(i);
+            if (vex != nullptr) {
+                cur = i;
+                return vex;
+            }
+        }
+        return nullptr;
+    }
+    return m_sparse_vertex->get_first(cur);
+}
+
+
+Vertex * Graph::get_next_vertex(INT & cur) const
+{
+    ASSERTN(m_ec_pool != nullptr, ("not yet initialized."));
+    if (is_dense()) {
+        for (INT i = cur + 1; i <= m_dense_vertex->get_last_idx(); i++) {
+            Vertex * vex = m_dense_vertex->get(i);
+            if (vex != nullptr) {
+                cur = i;
+                return vex;
+            }
+        }
+        return nullptr;
+    }
+    return m_sparse_vertex->get_next(cur);
+}
+
+
+//NOTE: graph exit vertex does not have idom.
 bool DGraph::computeIpdom()
 {
     //Initialize ipdom-set for each BB.
@@ -1650,33 +1738,34 @@ bool DGraph::computeIpdom()
 
     //Processing in reverse-topological order.
     INT c;
-    for (Vertex const* v = m_vertices.get_last(c);
-         v != NULL; v = m_vertices.get_prev(c)) {
+    for (Vertex const* v = get_last_vertex(c);
+         v != nullptr; v = get_prev_vertex(c)) {
         UINT cur_id = VERTEX_id(v);
-        if (is_graph_exit(v)) {
+        if (is_graph_exit(v) ||
+            m_pdom_set.get(cur_id)->get_elem_count() <= 1) {
             continue;
-        } else if (m_pdom_set.get(cur_id)->get_elem_count() > 1) {
-            BitSet * p = m_pdom_set.get(cur_id);
-            ASSERTN(p != NULL, ("should compute pdom first"));
-            if (p->get_elem_count() == 1) {
-                //There is no ipdom if 'pdom' set only contain itself.
-                ASSERT0(m_ipdom_set.get(cur_id) == 0);
-                continue;
-            }
+        }
 
-            p->diff(cur_id);
-            INT i;
-            for (i = p->get_first(); i != -1; i = p->get_next((UINT)i)) {
-                if (m_pdom_set.get((UINT)i)->is_equal(*p)) {
-                    ASSERT0(m_ipdom_set.get(cur_id) == 0);
-                    m_ipdom_set.set(cur_id, i);
-                    break;
-                }
+        BitSet * p = m_pdom_set.get(cur_id);
+        ASSERTN(p != nullptr, ("should compute pdom first"));
+        if (p->get_elem_count() == 1) {
+            //There is no ipdom if 'pdom' set only contain itself.
+            ASSERT0(m_ipdom_set.get(cur_id) == 0);
+            continue;
+        }
+
+        p->diff(cur_id);
+        INT i;
+        for (i = p->get_first(); i != -1; i = p->get_next((UINT)i)) {
+            if (m_pdom_set.get((UINT)i)->is_equal(*p)) {
+                ASSERT0(m_ipdom_set.get(cur_id) == 0);
+                m_ipdom_set.set(cur_id, i);
+                break;
             }
-            //ASSERTN(i != -1, ("not find ipdom")); //Not find.
-            p->bunion(cur_id);
-        } //end else if
-    } //end for
+        }
+        //ASSERTN(i != -1, ("not find ipdom")); //Not find.
+        p->bunion(cur_id);
+    }
     return true;
 }
 
@@ -1685,8 +1774,8 @@ bool DGraph::computeIpdom()
 void DGraph::get_dom_tree(OUT Graph & dom)
 {
     INT c;
-    for (Vertex * v = m_vertices.get_first(c);
-         v != NULL; v = m_vertices.get_next(c)) {
+    for (Vertex * v = get_first_vertex(c);
+         v != nullptr; v = get_next_vertex(c)) {
         UINT vid = VERTEX_id(v);
         dom.addVertex(vid);
         if (m_idom_set.get(vid) != 0) {
@@ -1700,8 +1789,8 @@ void DGraph::get_dom_tree(OUT Graph & dom)
 void DGraph::get_pdom_tree(OUT Graph & pdom)
 {
     INT c;
-    for (Vertex * v = m_vertices.get_first(c);
-         v != NULL; v = m_vertices.get_next(c)) {
+    for (Vertex * v = get_first_vertex(c);
+         v != nullptr; v = get_next_vertex(c)) {
         UINT vid = VERTEX_id(v);
         pdom.addVertex(vid);
         if (m_ipdom_set.get(vid) != 0) { //id of bb starting at 1.
@@ -1716,16 +1805,16 @@ void DGraph::get_pdom_tree(OUT Graph & pdom)
 //  tree, and post dominate Tree.
 void DGraph::dump_dom(FILE * h, bool dump_dom_tree)
 {
-    if (h == NULL) { return; }
+    if (h == nullptr) { return; }
     fprintf(h, "\n==---- DUMP DOM/PDOM/IDOM/IPDOM ----==");
     INT c;
-    for (Vertex * v = m_vertices.get_first(c);
-         v != NULL; v = m_vertices.get_next(c)) {
+    for (Vertex * v = get_first_vertex(c);
+         v != nullptr; v = get_next_vertex(c)) {
         UINT vid = VERTEX_id(v);
         fprintf(h, "\nVERTEX(%d) dom: ", vid);
 
         BitSet * bs;
-        if ((bs = m_dom_set.get(vid)) != NULL) {
+        if ((bs = m_dom_set.get(vid)) != nullptr) {
             for (INT id = bs->get_first();
                  id != -1 ; id = bs->get_next((UINT)id)) {
                 if ((UINT)id != vid) {
@@ -1736,7 +1825,7 @@ void DGraph::dump_dom(FILE * h, bool dump_dom_tree)
 
         fprintf(h, "\n     pdom: ");
 
-        if ((bs = m_pdom_set.get(vid)) != NULL) {
+        if ((bs = m_pdom_set.get(vid)) != nullptr) {
             for (INT id = bs->get_first();
                  id != -1; id = bs->get_next((UINT)id)) {
                 if ((UINT)id != vid) {
@@ -1783,7 +1872,7 @@ void DGraph::sortDomTreeInPreorder(IN Vertex * root, OUT List<Vertex*> & lst)
     Vertex * v;
     Stack<Vertex*> stk;
     stk.push(root);
-    while ((v = stk.pop()) != NULL) {
+    while ((v = stk.pop()) != nullptr) {
         if (!is_visited.is_contain(VERTEX_id(v))) {
             is_visited.bunion(VERTEX_id(v));
             stk.push(v);
@@ -1794,7 +1883,7 @@ void DGraph::sortDomTreeInPreorder(IN Vertex * root, OUT List<Vertex*> & lst)
         //Visit children.
         EdgeC * el = VERTEX_out_list(v);
         Vertex * succ;
-        while (el != NULL) {
+        while (el != nullptr) {
             succ = el->getTo();
             if (!is_visited.is_contain(VERTEX_id(succ))) {
                 stk.push(v);
@@ -1824,7 +1913,7 @@ void DGraph::sortInBfsOrder(Vector<UINT> & order_buf,
         order++;
         visit.bunion(VERTEX_id(sv));
         EdgeC * el = VERTEX_out_list(sv);
-        while (el != NULL) {
+        while (el != nullptr) {
             Vertex * to = el->getTo();
             if (visit.is_contain(VERTEX_id(to))) {
                 el = EC_next(el);
@@ -1846,12 +1935,12 @@ void DGraph::sortDomTreeInPostrder(IN Vertex * root, OUT List<Vertex*> & lst)
     Vertex * v;
     Stack<Vertex*> stk;
     stk.push(root);
-    while ((v = stk.pop()) != NULL) {
+    while ((v = stk.pop()) != nullptr) {
         //Visit children first.
         EdgeC * el = VERTEX_out_list(v);
         bool find = false; //find unvisited kid.
         Vertex * succ;
-        while (el != NULL) {
+        while (el != nullptr) {
             succ = el->getTo();
             if (!is_visited.is_contain(VERTEX_id(succ))) {
                 stk.push(v);
@@ -1875,7 +1964,7 @@ void DGraph::_removeUnreachNode(UINT id, BitSet & visited)
     visited.bunion(id);
     Vertex * vex = getVertex(id);
     EdgeC * el = VERTEX_out_list(vex);
-    while (el != NULL) {
+    while (el != nullptr) {
         UINT succ = el->getToId();
         if (!visited.is_contain(succ)) {
             _removeUnreachNode(succ, visited);
@@ -1895,7 +1984,7 @@ bool DGraph::removeUnreachNode(UINT entry_id)
     _removeUnreachNode(entry_id, visited);
     INT c;
     for (Vertex * v = get_first_vertex(c);
-         v != NULL; v = get_next_vertex(c)) {
+         v != nullptr; v = get_next_vertex(c)) {
         if (!visited.is_contain(VERTEX_id(v))) {
             removeVertex(v);
             removed = true;

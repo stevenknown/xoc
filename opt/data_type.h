@@ -288,10 +288,11 @@ public:
 class TensorType : public Type {
     COPY_CONSTRUCTOR(TensorType);
 public:
+    friend class TypeMgr;
     //Record the degree of each dimension.
     //e.g: <3x2x7x1>, the degree of dimension 0 is 3,
     //degree of dimension 1 is 2, degree of dimension 2 is 7, etc.
-    xcom::SimpleVec<UINT, 3> degree_of_dimension;
+    xcom::SimpleVector<UINT, 3, 64> degree_of_dimension;
 
     //Record data type of element in tensor.
     DATA_TYPE tensor_elem_type;
@@ -302,15 +303,10 @@ public:
         tensor_elem_type = D_UNDEF;
     }
 
+    void copy(TensorType const& src, TypeMgr * mgr);
+
     void init() { degree_of_dimension.init(); }
     void destroy() { degree_of_dimension.destroy(); }
-
-    void copy(TensorType const& src)
-    {
-        Type::copy(src);
-        tensor_elem_type = src.tensor_elem_type;
-        degree_of_dimension.copy(src.degree_of_dimension);
-    }
 
     //Get data type of element in tensor.
     DATA_TYPE getElemDataType() const { return tensor_elem_type; }
@@ -323,7 +319,7 @@ public:
     UINT getByteSize(TypeMgr const* mgr) const;
 
     //Set degree to given dimension.
-    void setDegreeOfDim(UINT dim, UINT degree);
+    void setDegreeOfDim(UINT dim, UINT degree, TypeMgr * mgr);
 };
 
 
@@ -482,6 +478,8 @@ public:
 extern TypeDesc const g_type_desc[];
 class TypeMgr {
     COPY_CONSTRUCTOR(TypeMgr);
+    friend class TensorType;
+
     RegionMgr * m_rm;
     xcom::Vector<Type*> m_type_tab;
     SMemPool * m_pool;
@@ -538,6 +536,9 @@ class TypeMgr {
     TypeContainer * newTC()
     { return (TypeContainer*)xmalloc(sizeof(TypeContainer)); }
 
+protected:
+    SMemPool * get_pool() const { return m_pool; }
+
 public:
     TypeMgr(RegionMgr * rm)
     {
@@ -569,12 +570,12 @@ public:
     ~TypeMgr()
     {
         smpoolDelete(m_pool);
-        m_pool = NULL;
+        m_pool = nullptr;
 
         VectorElemTypeTabIter iter;
         VectorElemTypeTab * tab;
         for (Type const* d = m_vector_type_tab.get_first(iter, &tab);
-             d != NULL; d = m_vector_type_tab.get_next(iter, &tab)) {
+             d != nullptr; d = m_vector_type_tab.get_next(iter, &tab)) {
             ASSERT0(tab);
             delete tab;
         }
@@ -582,7 +583,7 @@ public:
         TensorElemTypeTabIter iter2;
         TensorElemTypeTab * tab2;
         for (Type const* d = m_tensor_type_tab.get_first(iter2, &tab2);
-             d != NULL; d = m_tensor_type_tab.get_next(iter2, &tab2)) {
+             d != nullptr; d = m_tensor_type_tab.get_next(iter2, &tab2)) {
             ASSERT0(tab2);
             delete tab2;
         }

@@ -184,7 +184,7 @@ public:
     //Interior equality compare.
     bool _equal(T const& a, T const& b) const
     {
-        if (HOOK_EQUAL != NULL) {
+        if (HOOK_EQUAL != nullptr) {
             return (*HOOK_EQUAL)(a, b);
         }
         return a == b;
@@ -195,7 +195,7 @@ public:
     //If it is inappropriate, overloading it as your need.
     T _sqrt(T v)
     {
-        if (HOOK_SQRT != NULL) {
+        if (HOOK_SQRT != nullptr) {
             return (*HOOK_SQRT)(v);
         }
         ASSERTN(0, ("_sqrt() need to implement"));
@@ -203,7 +203,7 @@ public:
     }
 
 public:
-    Matrix(INHR const* i = NULL)
+    Matrix(INHR const* i = nullptr)
     {
         m_is_init = false;
         init(i);
@@ -217,7 +217,7 @@ public:
         copy(m);
     }
 
-    Matrix(UINT row, UINT col, INHR const* i = NULL)
+    Matrix(UINT row, UINT col, INHR const* i = nullptr)
     {
         m_is_init = false;
         init(row, col, i);
@@ -257,17 +257,17 @@ public:
         if (!m_is_init) { return; }
         m_row_size = 0;
         m_col_size = 0;
-        if (m_mat != NULL) {
+        if (m_mat != nullptr) {
             delT(m_mat);
         }
-        m_mat = NULL;
+        m_mat = nullptr;
     }
     //This function will destroy matrix object.
     void destroy()
     {
         if (!m_is_init) { return; }
         deleteAllElem();
-        set_hook(NULL);
+        set_hook(nullptr);
         m_is_init = false;
     }
     T det() const;
@@ -304,10 +304,10 @@ public:
     //Full rank decomposition
     void frd(OUT Matrix<T> & f, OUT Matrix<T> & g);
 
-    void reinit(UINT row, UINT col, INHR const* i = NULL)
+    void reinit(UINT row, UINT col, INHR const* i = nullptr)
     {
         INHR inhr;
-        if (i != NULL) {
+        if (i != nullptr) {
             inhr = *i;
         } else {
             inhr = m_inhr;
@@ -369,21 +369,21 @@ public:
     //Set 'v' to row vector by diagonal entry.
     void getdiag(OUT Matrix<T> & v);
 
-    void init(INHR const* i = NULL)
+    void init(INHR const* i = nullptr)
     {
         if (m_is_init) { return; }
         init(0, 0, i);
     }
-    void init(UINT row, UINT col, INHR const* i = NULL)
+    void init(UINT row, UINT col, INHR const* i = nullptr)
     {
         if (m_is_init) { return; }
         m_row_size = 0;
         m_col_size = 0;
-        m_mat = NULL;
+        m_mat = nullptr;
         m_is_init = true;
         set_hook(i);
         growRowAndCol(row, col);
-        if (HOOK_INIT != NULL) {
+        if (HOOK_INIT != nullptr) {
             (*HOOK_INIT)(this);
         }
     }
@@ -473,7 +473,7 @@ public:
     void eche(); //Reduce matrix to row-echelon normal form.
     void basis(OUT Matrix<T> & b); //Calculate basis
 
-    UINT rank(Matrix<T> * basis = NULL, bool is_unitarize = false) const;
+    UINT rank(Matrix<T> * basis = nullptr, bool is_unitarize = false) const;
     T tr(); //Computation of trace
     void trans(); //Transpose
 
@@ -555,7 +555,7 @@ template <class T>
 void Matrix<T>::adjust()
 {
     ASSERTN(m_is_init, ("not yet initialize."));
-    if (HOOK_ADJUST != NULL) {
+    if (HOOK_ADJUST != nullptr) {
         (*HOOK_ADJUST)(this);
     }
 }
@@ -573,7 +573,7 @@ void Matrix<T>::growRow(UINT size)
     UINT oldrows = 0;
     if (m_row_size == 0) {
         //If matrix is empty, growing 'size' rows, but only one column.
-        ASSERTN(!m_col_size && m_mat == NULL, ("matrix should be empty"));
+        ASSERTN(!m_col_size && m_mat == nullptr, ("matrix should be empty"));
         m_mat = newT(size);
         m_col_size = 1;
         m_row_size = size;
@@ -607,10 +607,10 @@ template <class T>
 void Matrix<T>::growRow(const T row[], UINT rowelemnum)
 {
     ASSERTN(m_is_init, ("not yet initialize."));
-    ASSERT0(row != NULL);
+    ASSERT0(row != nullptr);
     if (rowelemnum == 0) { return; }
     if (m_row_size == 0) {
-        ASSERTN(!m_col_size && m_mat == NULL, ("matrix should be empty"));
+        ASSERTN(!m_col_size && m_mat == nullptr, ("matrix should be empty"));
         m_mat = newT(rowelemnum);
         copyT(m_mat, row, rowelemnum);
         m_row_size = 1;
@@ -658,7 +658,7 @@ void Matrix<T>::growRow(Matrix<T> const& a, UINT from, UINT to)
             ("not yet initialize."));
     if (m_row_size == 0) {
         //If matrix is empty, growing 'size' rows, but only one column.
-        ASSERTN(!m_col_size && m_mat == NULL, ("matrix should be empty"));
+        ASSERTN(!m_col_size && m_mat == nullptr, ("matrix should be empty"));
         m_col_size = a.m_col_size;
         m_row_size = to - from + 1;
         m_mat = newT(m_row_size * m_col_size);
@@ -693,7 +693,7 @@ void Matrix<T>::growCol(UINT size)
     }
     if (m_col_size == 0) { //matrix is empty
         //If matrix is empty, growing 'size' columns, but only one row.
-        ASSERTN(!m_row_size && m_mat == NULL, ("exception occur in growCol()"));
+        ASSERTN(!m_row_size && m_mat == nullptr, ("exception occur in growCol()"));
         m_mat = newT(size);
         //cleanT(m_mat, size);
         m_col_size = size;
@@ -738,7 +738,7 @@ void Matrix<T>::growCol(Matrix<T> const& a, UINT from, UINT to)
     if (m_col_size == 0) { //matrix is empty
 
         //m_row_size also be 0
-        ASSERTN(!m_row_size && m_mat == NULL,
+        ASSERTN(!m_row_size && m_mat == nullptr,
                 ("exception occur in growRowAndCol()"));
         m_row_size = a.m_row_size;
         m_col_size = to - from + 1;
@@ -776,9 +776,9 @@ template <class T>
 void Matrix<T>::growCol(const T col[], UINT colelemnum)
 {
     ASSERTN(m_is_init, ("not yet initialize."));
-    ASSERT0(col != NULL);
+    ASSERT0(col != nullptr);
     if (m_col_size == 0) {
-        ASSERTN(!m_row_size && m_mat == NULL,
+        ASSERTN(!m_row_size && m_mat == nullptr,
                ("exception occur in growCol()"));
         m_mat = newT(colelemnum);
         copyT(m_mat, col, colelemnum);
@@ -823,7 +823,7 @@ void Matrix<T>::growRowAndCol(UINT row_size, UINT col_size)
     //The complexity of grow column is same as grow both.
     if (m_col_size == 0) { //matrix is empty
         //m_row_size also be 0
-        ASSERTN(!m_row_size && m_mat == NULL,
+        ASSERTN(!m_row_size && m_mat == nullptr,
                 ("exception occur in growRowAndCol()"));
         m_mat = newT(row_size * col_size);
         cleanT(m_mat, row_size * col_size);
@@ -1158,9 +1158,9 @@ void Matrix<T>::copy(IN Matrix<T> const& m)
     } else {
         //m(a,b), m(x,y): a*b == x*y
         if (size() != m.size()) {
-            if (m_mat != NULL) {
+            if (m_mat != nullptr) {
                 delT(m_mat);
-                m_mat = NULL;
+                m_mat = nullptr;
             }
             m_mat = newT(m.size());
         }
@@ -2010,7 +2010,7 @@ bool Matrix<T>::ginv(OUT Matrix<T> & x)
         Matrix<T> trans_m = *this;
         trans_m.trans();
 
-        Matrix<T> * A = NULL,* At = NULL;
+        Matrix<T> * A = nullptr,* At = nullptr;
         if (m_row_size < m_col_size) {
             At = this;
             A = &trans_m;
@@ -2260,7 +2260,7 @@ template <class T>
 void Matrix<T>::fzero()
 {
     ASSERTN(m_is_init, ("not yet initialize."));
-    if (m_mat != NULL) {
+    if (m_mat != nullptr) {
         cleanT(m_mat, m_row_size * m_col_size);
     }
 }
@@ -2609,9 +2609,9 @@ UINT Matrix<T>::rank(OUT Matrix<T> * basis, bool is_unitarize) const
     ASSERTN(m_is_init, ("not yet initialize."));
     ASSERTN(m_row_size > 0 && m_col_size > 0, ("strange matrix"));
     UINT rankv = 0;
-    Matrix<T> * ptr = NULL;
-    Matrix<INT> * rowpos = NULL; //record change process of rows.
-    if (basis != NULL) {
+    Matrix<T> * ptr = nullptr;
+    Matrix<INT> * rowpos = nullptr; //record change process of rows.
+    if (basis != nullptr) {
         ptr = basis;
     } else {
         ptr = new Matrix<T>(m_row_size, m_col_size, &m_inhr);
@@ -2664,7 +2664,7 @@ UINT Matrix<T>::rank(OUT Matrix<T> * basis, bool is_unitarize) const
             }
             if (swap_row != (INT)row) {
                 ptr->interchRow(swap_row, row);
-                if (rowpos != NULL)
+                if (rowpos != nullptr)
                     rowpos->interchRow(swap_row, row);
             }
             col = w;
@@ -2701,7 +2701,7 @@ UINT Matrix<T>::rank(OUT Matrix<T> * basis, bool is_unitarize) const
         ptr->adjust();
     } //end for (INT row = 0...
 FIN:
-    if (rowpos != NULL) {
+    if (rowpos != nullptr) {
         ASSERT0(ptr == basis);
         ASSERT0(rankv <= rowpos->getRowSize());
         if (rankv < this->getRowSize()) {
@@ -4088,7 +4088,7 @@ void Matrix<T>::dumpf(FILE * h) const
 {
     ASSERTN(m_is_init, ("not yet initialize."));
 #ifdef NO_BASIC_MAT_DUMP
-    if (HOOK_DUMPFH != NULL) {
+    if (HOOK_DUMPFH != nullptr) {
         (*HOOK_DUMPFH)((void*)this, h);
         return;
     }
@@ -4096,7 +4096,7 @@ void Matrix<T>::dumpf(FILE * h) const
 #else
 
     //Customization
-    if (HOOK_DUMPFH != NULL) {
+    if (HOOK_DUMPFH != nullptr) {
         (*HOOK_DUMPFH)((void*)this, h);
         return;
     }
@@ -4105,7 +4105,7 @@ void Matrix<T>::dumpf(FILE * h) const
 
     //Default version regards T as 'int'.
     static INT g_count = 0;
-    ASSERTN(h, ("In dumpf(), file handle is NULL!!!"));
+    ASSERTN(h, ("In dumpf(), file handle is nullptr!!!"));
     fprintf(h, "\nMATRIX dump id:%d\n", g_count++);
 
     for (UINT i = 0; i < m_row_size; i++) {
@@ -4126,7 +4126,7 @@ void Matrix<T>::dumpf(CHAR const* name, bool is_del) const
 {
     ASSERTN(m_is_init, ("not yet initialize."));
 #ifdef NO_BASIC_MAT_DUMP
-    if (HOOK_DUMPF != NULL) {
+    if (HOOK_DUMPF != nullptr) {
         (*HOOK_DUMPF)((void*)this, name, is_del);
         return;
     }
@@ -4134,7 +4134,7 @@ void Matrix<T>::dumpf(CHAR const* name, bool is_del) const
 #else
 
     //Customization
-    if (HOOK_DUMPF != NULL) {
+    if (HOOK_DUMPF != nullptr) {
         (*HOOK_DUMPF)((void*)this, name, is_del);
         return;
     }
@@ -4160,7 +4160,7 @@ void Matrix<T>::dumps() const
 {
     ASSERTN(m_is_init, ("not yet initialize."));
 #ifdef NO_BASIC_MAT_DUMP
-    if (HOOK_DUMPS != NULL) {
+    if (HOOK_DUMPS != nullptr) {
         (*HOOK_DUMPS)((void*)this);
         return;
     }
@@ -4168,7 +4168,7 @@ void Matrix<T>::dumps() const
 #else
 
     //Customization
-    if (HOOK_DUMPS != NULL) {
+    if (HOOK_DUMPS != nullptr) {
         (*HOOK_DUMPS)((void*)this);
         return;
     }

@@ -77,7 +77,7 @@ CHAR const* get_dt_name(LIR * ir)
     case LIR_JDT_double:
         return "DOUBLE";
     }
-    return NULL;
+    return nullptr;
 }
 
 
@@ -99,7 +99,7 @@ bool is_builtin(IR const* ir, BLTIN_TYPE bt, DexRegionMgr const* rumgr)
                     INTCONST r:U32:4 (1 0x1) id:2
                 PR, retv0 */
             ASSERT0(CALL_param_list(ir) && CALL_param_list(ir)->is_const());
-            ASSERT0(IR_next(CALL_param_list(ir)) == NULL);
+            ASSERT0(IR_next(CALL_param_list(ir)) == nullptr);
             ASSERT0(ir->hasReturnValue());
         }
         break;
@@ -123,7 +123,7 @@ bool is_builtin(IR const* ir, BLTIN_TYPE bt, DexRegionMgr const* rumgr)
             //The second is array element type id.
             ASSERT0(p && p->is_const());
             UINT elem_type_id = CONST_int_val(p);
-            ASSERT0(p->get_next() == NULL);
+            ASSERT0(p->get_next() == nullptr);
         }
         break;
     case BLTIN_MOVE_EXP         :
@@ -139,7 +139,7 @@ bool is_builtin(IR const* ir, BLTIN_TYPE bt, DexRegionMgr const* rumgr)
             //the exception object.
             IR * p = CALL_param_list(ir);
             ASSERT0(p->is_pr());
-            ASSERT0(p->get_next() == NULL);
+            ASSERT0(p->get_next() == nullptr);
         }
         break;
     case BLTIN_CHECK_CAST       :
@@ -160,7 +160,7 @@ bool is_builtin(IR const* ir, BLTIN_TYPE bt, DexRegionMgr const* rumgr)
             //The second is class type id.
             ASSERT0(p && p->is_const());
             UINT type_id = CONST_int_val(p);
-            ASSERT0(p->get_next() == NULL);
+            ASSERT0(p->get_next() == nullptr);
         }
         break;
     case BLTIN_FILLED_NEW_ARRAY    :
@@ -186,7 +186,7 @@ bool is_builtin(IR const* ir, BLTIN_TYPE bt, DexRegionMgr const* rumgr)
             //The second record class type id.
             ASSERT0(p && p->is_const());
             p = p->get_next();
-            while (p != NULL) {
+            while (p != nullptr) {
                 ASSERT0(p->is_pr());
                 p = p->get_next();
             }
@@ -210,7 +210,7 @@ bool is_builtin(IR const* ir, BLTIN_TYPE bt, DexRegionMgr const* rumgr)
 
             //The second record binary data.
             ASSERT0(p && p->is_const());
-            ASSERT0(p->get_next() == NULL);
+            ASSERT0(p->get_next() == nullptr);
         }
         break;
     case BLTIN_CONST_CLASS      :
@@ -225,24 +225,24 @@ bool is_builtin(IR const* ir, BLTIN_TYPE bt, DexRegionMgr const* rumgr)
             */
             ASSERT0(ir->hasReturnValue());
             ASSERT0(CALL_param_list(ir) && CALL_param_list(ir)->is_const());
-            ASSERT0(IR_next(CALL_param_list(ir)) == NULL);
+            ASSERT0(IR_next(CALL_param_list(ir)) == nullptr);
         }
         break;
     case BLTIN_ARRAY_LENGTH     :
         ASSERT0(ir->hasReturnValue());
         ASSERT0(CALL_param_list(ir) &&
                  CALL_param_list(ir)->is_pr());
-        ASSERT0(IR_next(CALL_param_list(ir)) == NULL);
+        ASSERT0(IR_next(CALL_param_list(ir)) == nullptr);
         break;
     case BLTIN_MONITOR_ENTER    :
         ASSERT0(CALL_param_list(ir) &&
                  CALL_param_list(ir)->is_pr());
-        ASSERT0(IR_next(CALL_param_list(ir)) == NULL);
+        ASSERT0(IR_next(CALL_param_list(ir)) == nullptr);
         break;
     case BLTIN_MONITOR_EXIT     :
         ASSERT0(CALL_param_list(ir) &&
                  CALL_param_list(ir)->is_pr());
-        ASSERT0(IR_next(CALL_param_list(ir)) == NULL);
+        ASSERT0(IR_next(CALL_param_list(ir)) == nullptr);
         break;
     case BLTIN_INSTANCE_OF      :
         {
@@ -263,7 +263,7 @@ bool is_builtin(IR const* ir, BLTIN_TYPE bt, DexRegionMgr const* rumgr)
 
             //The second is type-id.
             ASSERT0(p->is_const());
-            ASSERT0(p->get_next() == NULL);
+            ASSERT0(p->get_next() == nullptr);
 
             //The first is result reg..
             ASSERT0(ir->hasReturnValue());
@@ -292,7 +292,7 @@ bool is_builtin(IR const* ir, BLTIN_TYPE bt, DexRegionMgr const* rumgr)
             p = p->get_next();
 
             ASSERT0(p && p->is_pr());
-            ASSERT0(p->get_next() == NULL);
+            ASSERT0(p->get_next() == nullptr);
             ASSERT0(ir->hasReturnValue());
         }
         break;
@@ -334,11 +334,11 @@ void extractFunctionTypeFromFunctionTypeString(
 
     //The format of type string is: (Ljava/lang/String;)Ljava/lang/String;
     CHAR const* p = start;
-    CHAR const* start2 = NULL;
-    CHAR const* end2 = NULL;
+    CHAR const* start2 = nullptr;
+    CHAR const* end2 = nullptr;
     for (; l > 0; l--, p++) {
         if (*p == '(') {
-            ASSERTN(start2 == NULL, ("unsupport string pattern"));
+            ASSERTN(start2 == nullptr, ("unsupport string pattern"));
             start2 = p;
         } else if (*p == ')') {
             end2 = p;
@@ -372,13 +372,13 @@ void extractFunctionTypeFromRegionName(
     UINT num = xsplit(runame, ret, ":");
     ASSERTN(num == NUM_OF_PART, ("You may be input builtin function name"));
 
-    if (classpath != NULL) {
+    if (classpath != nullptr) {
         UINT l = strlen(ret[CLASSPATH_PART]);
         ::memcpy(classpath, ret[CLASSPATH_PART], l + 1);
         classpath[l] = 0;
     }
 
-    if (functionname != NULL) {
+    if (functionname != nullptr) {
         UINT l = strlen(ret[FUNCNAME_PART]);
         ::memcpy(functionname, ret[FUNCNAME_PART], l + 1);
         functionname[l] = 0;
@@ -386,19 +386,19 @@ void extractFunctionTypeFromRegionName(
 
     //The format of type string is: (Ljava/lang/String;)Ljava/lang/String;
     CHAR const* typestr = ret[TYPE_PART];
-    CHAR const* start = NULL;
-    CHAR const* end = NULL;
+    CHAR const* start = nullptr;
+    CHAR const* end = nullptr;
 
     //Parse parameter type string.
     UINT len = 0;
     for (CHAR const* p = typestr; *p != 0; p++, len++) {
         if (*p == '(') {
-            ASSERTN(start == NULL, ("unsupport string pattern"));
+            ASSERTN(start == nullptr, ("unsupport string pattern"));
             start = p;
         } else if (*p == ')') {
             end = p;
             UINT s = end - start - 1;
-            if (param_type != NULL) {
+            if (param_type != nullptr) {
                 ::memcpy(param_type, start + 1, s);
                 param_type[s] = 0;
             }
@@ -410,7 +410,7 @@ void extractFunctionTypeFromRegionName(
     ASSERTN(end, ("unsupport string pattern"));
 
     UINT s = ::strlen(typestr) - len;
-    if (return_type != NULL) {
+    if (return_type != nullptr) {
         ::memcpy(return_type, typestr + len, s);
         return_type[s] = 0;
     }
@@ -428,10 +428,10 @@ UINT printType2Buffer(CHAR const* type_string, OUT CHAR * buf)
 {
     ASSERT0(type_string);
 
-    //buf may be NULL. If it is the case, user want to compute the
+    //buf may be nullptr. If it is the case, user want to compute the
     //actual length of the buffer.
 
-    CHAR const* name = NULL;
+    CHAR const* name = nullptr;
     UINT len = 0;
     CHAR const* start = type_string;
     switch (*type_string) {
@@ -458,7 +458,7 @@ UINT printType2Buffer(CHAR const* type_string, OUT CHAR * buf)
     default: ASSERTN(0, ("unknown dex type"));
     }
 
-    if (buf != NULL) {
+    if (buf != nullptr) {
         for (UINT i = 0; i < len; i++) {
             buf[i] = name[i];
         }
@@ -467,13 +467,13 @@ UINT printType2Buffer(CHAR const* type_string, OUT CHAR * buf)
 
     for (; *start == '['; start++) {
         len += 2; // print [ ]
-        if (buf != NULL) {
+        if (buf != nullptr) {
             *buf++ = '[';
             *buf++ = ']';
         }
     }
 
-    if (buf != NULL) {
+    if (buf != nullptr) {
         *buf = 0;
     }
     return len; //the length does not include the ending '\0'.
@@ -495,8 +495,8 @@ UINT extractSeparateParamterType(
     CHAR const* end = param_type_string;
 
     //Note outputbuf should big enough to hold the string.
-    CHAR * outputbuf = NULL;
-    if (params != NULL) {
+    CHAR * outputbuf = nullptr;
+    if (params != nullptr) {
         outputbuf = params->get_head();
     }
 
@@ -513,7 +513,7 @@ UINT extractSeparateParamterType(
             }
 
             UINT s = end - start;
-            if (outputbuf != NULL) {
+            if (outputbuf != nullptr) {
                 ::memcpy(outputbuf, start, s);
                 outputbuf[s] = 0;
                 ASSERT0(params);
@@ -535,7 +535,7 @@ UINT extractSeparateParamterType(
             case 'D': //f64
                 if (start == end) {
                     //Parse primitive type.
-                    if (outputbuf != NULL) {
+                    if (outputbuf != nullptr) {
                         outputbuf[0] = *end;
                         outputbuf[1] = 0;
                         ASSERT0(outputbuf);
@@ -634,7 +634,7 @@ CHAR const* get_func_type(DexFile const* df, DexMethodId const* dmid)
 
 void dump_lir(LIR * lir, DexFile * df, INT pos)
 {
-    if (g_tfile == NULL || lir == NULL) return;
+    if (g_tfile == nullptr || lir == nullptr) return;
     note("\n");
     dump_lir2(lir, df, pos);
 }
@@ -643,7 +643,7 @@ void dump_lir(LIR * lir, DexFile * df, INT pos)
 //Dump LIR stmts stored in fu->lirList array.
 void dump_lir2(LIR * lir, DexFile * df, INT pos)
 {
-    if (g_tfile == NULL || lir == NULL) return;
+    if (g_tfile == nullptr || lir == nullptr) return;
     if (pos < 0) {
         prt("%s", LIR_name(lir));
     } else {
@@ -1381,7 +1381,7 @@ void dump_lir2(LIR * lir, DexFile * df, INT pos)
 //Dump LIR stmts stored in fu->lirList array.
 void dump_all_lir(LIRCode * fu, DexFile * df, DexMethod const* dm)
 {
-    if (g_tfile == NULL) { return; }
+    if (g_tfile == nullptr) { return; }
     ASSERT0(fu && df && dm);
     CHAR const* class_name = get_class_name(df, dm);
     CHAR const* func_name = get_func_name(df, dm);
@@ -1424,7 +1424,7 @@ void dump_all_lir(LIRCode * fu, DexFile * df, DexMethod const* dm)
 //'finfo': field info.
 static void dumpf_field(DexFile * df, DexField * finfo, INT indent)
 {
-    if (g_tfile == NULL) { return; }
+    if (g_tfile == nullptr) { return; }
     CHAR const* fname = get_field_name(df, finfo);
     CHAR const* tname = get_field_type_name(df, finfo);
     ASSERT0(fname && tname);
@@ -1492,7 +1492,7 @@ CHAR const* get_field_name(DexFile const* df, UINT field_id)
 //Dump all classes declared in DEX file 'df'.
 void dump_all_class_and_field(DexFile * df)
 {
-    if (g_tfile == NULL) { return; }
+    if (g_tfile == nullptr) { return; }
     note("\n==---- DUMP ALL CLASS and FIELD ----==");
     //Walk through each class declaration via class-index in file.
     ASSERT0(df && df->pHeader);
@@ -1511,10 +1511,10 @@ void dump_all_class_and_field(DexFile * df)
 
         //Dump class fields.
         BYTE const* encoded_data = dexGetClassData(df, class_info);
-        if (encoded_data != NULL) {
+        if (encoded_data != nullptr) {
             DexClassData * class_data =
-                dexReadAndVerifyClassData(&encoded_data, NULL);
-            if (class_data != NULL) {
+                dexReadAndVerifyClassData(&encoded_data, nullptr);
+            if (class_data != nullptr) {
                 for (UINT i = 0; i < class_data->header.instanceFieldsSize; i++) {
                     note("\n");
                     DexField * finfo = &class_data->instanceFields[i];

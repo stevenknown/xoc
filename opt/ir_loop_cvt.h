@@ -74,7 +74,7 @@ protected:
 public:
     explicit LoopCvt(Region * rg)
     {
-        ASSERT0(rg != NULL);
+        ASSERT0(rg != nullptr);
         m_rg = rg;
         m_du = rg->getDUMgr();
         m_cfg = m_rg->getCFG();

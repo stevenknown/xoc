@@ -29,7 +29,7 @@ USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 void bs_test(FILE * h)
 {
-    if (h == NULL) { return; }
+    if (h == nullptr) { return; }
     SegMgr<BITS_PER_SEG> sm;
     DBitSet<BITS_PER_SEG> a(&sm);
     DBitSet<BITS_PER_SEG> b(&sm);
@@ -59,7 +59,7 @@ void bs_test(FILE * h)
     x.dump(h);
 
     int n = x.get_elem_count();
-    SC<SEG<BITS_PER_SEG>*>  * ct = NULL;
+    SC<SEG<BITS_PER_SEG>*>  * ct = nullptr;
     n = x.get_first(&ct);
     n = x.get_next(n, &ct);
     n = x.get_next(n, &ct);
@@ -103,7 +103,7 @@ void bs_test(FILE * h)
 
 void bs_test2(FILE * h)
 {
-    if (h == NULL) { return; }
+    if (h == nullptr) { return; }
     SegMgr<BITS_PER_SEG> sm;
     SBitSet<BITS_PER_SEG> a(&sm),b(&sm);
     a.bunion(8);
@@ -137,7 +137,7 @@ void bs_test2(FILE * h)
 
 void bs_test3(FILE * h)
 {
-    if (h == NULL) { return; }
+    if (h == nullptr) { return; }
     fprintf(h, "\n===");
     MiscBitSetMgr<33> mbsm;
     SBitSet<33> x1(mbsm.getSegMgr());
@@ -161,8 +161,8 @@ void bs_test3(FILE * h)
 template <UINT BitsPerSeg>
 void dumpSegMgr(SegMgr<BitsPerSeg> & m, FILE * h)
 {
-    if (h == NULL) { return; }
-    SC<SEG<BitsPerSeg>*> * st = NULL;
+    if (h == nullptr) { return; }
+    SC<SEG<BitsPerSeg>*> * st = nullptr;
     fprintf(h, "\n====start %d:%d===\n",
             m.get_free_list()->get_elem_count(),
             m.get_seg_count());

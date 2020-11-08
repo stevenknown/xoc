@@ -25,20 +25,7 @@ CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
 OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE
 USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 @*/
-#include "ltype.h"
-#include "comf.h"
-#include "strbuf.h"
-#include "smempool.h"
-#include "rational.h"
-#include "flty.h"
-#include "sstl.h"
-#include "matt.h"
-#include "bs.h"
-#include "sbs.h"
-#include "sgraph.h"
-#include "xmat.h"
-#include "linsys.h"
-#include "lpsol.h"
+#include "xcominc.h"
 
 namespace xcom {
 
@@ -63,14 +50,14 @@ public:
         UINT start_offset = map_ptr->offset_vec.get(map_ptr->offset_in_vec);
 
         for (; v + start_offset < bucket_size &&
-             HB_member(map_ptr->m_bucket[v + start_offset]) != NULL;
+             HB_member(map_ptr->m_bucket[v + start_offset]) != nullptr;
              start_offset++) {
             //Entry has been occupied.
 
         }
 
         if (v + start_offset < bucket_size &&
-            HB_member(map_ptr->m_bucket[v + start_offset]) == NULL) {
+            HB_member(map_ptr->m_bucket[v + start_offset]) == nullptr) {
             //Find avaiable entry.
             map_ptr->offset_vec.set(map_ptr->offset_in_vec, start_offset);
         } else {

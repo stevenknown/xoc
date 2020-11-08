@@ -42,13 +42,13 @@ VMD * VMDVec::findVMD(UINT bbid) const
     
     for (INT i = 0; i <= get_last_idx(); i++) {
         VMD * p = get(i);
-        if (p == NULL || p->getDef() == NULL) { continue; }
+        if (p == nullptr || p->getDef() == nullptr) { continue; }
         ASSERT0(p->getDef() && p->getDef()->getBB());
         if (p->getDef()->getBB()->id() == bbid) {
             return p;
         }
     }
-    return NULL;
+    return nullptr;
 }
 //END VMDVec
 
@@ -60,7 +60,7 @@ VMD * VMDVec::findVMD(UINT bbid) const
 bool MDSSAInfo::isUseReachable(IN UseDefMgr * usedefmgr, IR const* exp)
 {
     ASSERT0(usedefmgr && exp && exp->is_exp());
-    VOpndSetIter iter = NULL;
+    VOpndSetIter iter = nullptr;
     for (INT i = getVOpndSet()->get_first(&iter);
          i >= 0; i = getVOpndSet()->get_next(i, &iter)) {
         VMD * vopnd = (VMD*)usedefmgr->getVOpnd(i);
@@ -79,14 +79,14 @@ void MDSSAInfo::collectUse(OUT DefSBitSetCore * set,
                            IN DefMiscBitSetMgr * bsmgr)
 {
     ASSERT0(set && usedefmgr && bsmgr);
-    VOpndSetIter iter = NULL;
+    VOpndSetIter iter = nullptr;
     Region * rg = usedefmgr->getRegion();
     for (INT i = getVOpndSet()->get_first(&iter);
          i >= 0; i = getVOpndSet()->get_next(i, &iter)) {
         VMD * vopnd = (VMD*)usedefmgr->getVOpnd(i);
         ASSERT0(vopnd && vopnd->is_md());
 
-        IRSetIter vit = NULL;
+        IRSetIter vit = nullptr;
         for (INT i2 = vopnd->getUseSet()->get_first(&vit);
             i2 >= 0; i2 = vopnd->getUseSet()->get_next(i2, &vit)) {
             IR * use = rg->getIR(i2);
@@ -102,7 +102,7 @@ void MDSSAInfo::collectUse(OUT DefSBitSetCore * set,
 void MDSSAInfo::removeUse(IR const* exp, IN UseDefMgr * usedefmgr)
 {
     ASSERT0(exp && exp->is_exp() && usedefmgr);
-    VOpndSetIter iter = NULL;
+    VOpndSetIter iter = nullptr;
     for (INT i = getVOpndSet()->get_first(&iter);
          i >= 0; i = getVOpndSet()->get_next(i, &iter)) {
         VMD * vopnd = (VMD*)usedefmgr->getVOpnd(i);
@@ -117,7 +117,7 @@ void MDSSAInfo::removeUse(IR const* exp, IN UseDefMgr * usedefmgr)
 void MDSSAInfo::addUse(IR const* exp, IN UseDefMgr * usedefmgr)
 {
     ASSERT0(exp && exp->is_exp() && usedefmgr);
-    VOpndSetIter iter = NULL;
+    VOpndSetIter iter = nullptr;
     for (INT i = getVOpndSet()->get_first(&iter);
          i >= 0; i = getVOpndSet()->get_next(i, &iter)) {
         VMD * vopnd = (VMD*)usedefmgr->getVOpnd(i);
@@ -130,7 +130,7 @@ void MDSSAInfo::addUse(IR const* exp, IN UseDefMgr * usedefmgr)
 void MDSSAInfo::dump(MDSSAMgr const* mgr) const
 {
     if (!mgr->getRegion()->isLogMgrInit()) { return; }
-    VOpndSetIter iter = NULL;
+    VOpndSetIter iter = nullptr;
     MDSSAInfo * pthis = const_cast<MDSSAInfo*>(this);
     for (INT i = pthis->getVOpndSet()->get_first(&iter);
          i >= 0; i = pthis->getVOpndSet()->get_next(i, &iter)) {
@@ -181,7 +181,7 @@ void VMD::dump(Region const* rg) const
 void VMD::clean()
 {
     VOpnd::clean();
-    VMD_def(this) = NULL;
+    VMD_def(this) = nullptr;
     VMD_mdid(this) = MD_UNDEF;
     VMD_version(this) = MDSSA_INIT_VERSION;
     VMD_occs(this).clean();
@@ -195,10 +195,10 @@ void VMD::dump(Region const* rg, UseDefMgr const* mgr) const
     prt(rg, "(MD%dV%d", mdid(), version());
 
     //Dump Def
-    if (getDef() != NULL) {
+    if (getDef() != nullptr) {
         ASSERT0(!getDef()->is_phi());
 
-        if (getDef()->getPrev() != NULL) {
+        if (getDef()->getPrev() != nullptr) {
             prt(rg, ",PrevDEF:MD%dV%d",
                 getDef()->getPrev()->getResult()->mdid(),
                 getDef()->getPrev()->getResult()->version());
@@ -206,8 +206,8 @@ void VMD::dump(Region const* rg, UseDefMgr const* mgr) const
             prt(rg, ",-");
         }
 
-        if (getDef()->getNextSet() != NULL) {
-            MDDefSetIter nit = NULL;
+        if (getDef()->getNextSet() != nullptr) {
+            MDDefSetIter nit = nullptr;
             bool first = true;
             for (INT w = getDef()->getNextSet()->get_first(&nit);
                 w >= 0; w = getDef()->getNextSet()->get_next(w, &nit)) {
@@ -232,7 +232,7 @@ void VMD::dump(Region const* rg, UseDefMgr const* mgr) const
 
     //Dump OccSet
     prt(rg, "|UsedBy:");
-    IRSetIter vit = NULL;
+    IRSetIter vit = nullptr;
     bool first = true;
     VMD * pthis = const_cast<VMD*>(this);
     for (INT i2 = pthis->getUseSet()->get_first(&vit);
@@ -265,12 +265,12 @@ void MDPhi::replaceOpnd(IR * oldopnd, IR * newopnd)
 VMD * MDPhi::getOpndVMD(IR const* opnd, UseDefMgr const* mgr) const
 {
     ASSERTN(xcom::in_list(getOpndList(), opnd), ("not operand of phi"));
-    if (!opnd->is_id() && opnd->isMemoryOpnd()) { return NULL; }
+    if (!opnd->is_id() && opnd->isMemoryOpnd()) { return nullptr; }
 
     ASSERT0(mgr && mgr->getMDSSAInfo(opnd) &&
             mgr->getMDSSAInfo(opnd)->getVOpndSet()->get_elem_count() == 1);
 
-    VOpndSetIter iter = NULL;
+    VOpndSetIter iter = nullptr;
     VMD * vopnd = (VMD*)mgr->getVOpnd(mgr->getMDSSAInfo(opnd)->
         getVOpndSet()->get_first(&iter));
     ASSERT0(vopnd->is_md());
@@ -293,7 +293,7 @@ void MDPhi::dump(Region const* rg, UseDefMgr const* mgr) const
     ASSERT0(getResult());
     prt(rg, "Phi: MD%dV%d <- ", getResult()->mdid(), getResult()->version());
     for (IR const* opnd = getOpndList();
-         opnd != NULL; opnd = opnd->get_next()) {
+         opnd != nullptr; opnd = opnd->get_next()) {
         if (opnd != getOpndList()) {
             prt(rg, ", ");
         }
@@ -313,7 +313,7 @@ void MDPhi::dump(Region const* rg, UseDefMgr const* mgr) const
         default: UNREACHABLE();
         }
 
-        if (pred == NULL) {
+        if (pred == nullptr) {
             prt(rg, "(BB?)"); //Predecessor is not match with PHI, error occurred.
         } else {
             prt(rg, "(BB%d)", pred->id());            
@@ -324,7 +324,7 @@ void MDPhi::dump(Region const* rg, UseDefMgr const* mgr) const
     VMD * res = getResult();
     ASSERT0(res);
     prt(rg, "|UsedBy:");
-    IRSetIter vit = NULL;
+    IRSetIter vit = nullptr;
     bool first = true;
     for (INT i2 = res->getUseSet()->get_first(&vit);
         i2 >= 0; i2 = res->getUseSet()->get_next(i2, &vit)) {
@@ -365,7 +365,7 @@ UseDefMgr::UseDefMgr(Region * rg, MDSSAMgr * mgr) : m_rg(rg), m_mdssa_mgr(mgr)
         MEM_CONST_SIZE);
     m_mdssainfo_pool = smpoolCreate(sizeof(MDSSAInfo)*2, MEM_CONST_SIZE);
 
-    m_free_sc_list = NULL;
+    m_free_sc_list = nullptr;
     m_def_count = MDDEF_UNDEF + 1;
     m_vopnd_count = VOPND_UNDEF + 1;
     m_philist_vec.set(rg->getBBList()->get_elem_count(), 0);
@@ -375,21 +375,21 @@ UseDefMgr::UseDefMgr(Region * rg, MDSSAMgr * mgr) : m_rg(rg), m_mdssa_mgr(mgr)
 void UseDefMgr::destroyMD2VMDVec()
 {
     Vector<VMDVec*> * vec = m_map_md2vmd.getVec();
-    if (vec != NULL) {
+    if (vec != nullptr) {
         for (INT i = 0; i <= vec->get_last_idx(); i++) {
             Vector<VMD*> * vpv = m_map_md2vmd.get((UINT)i);
-            if (vpv != NULL) {
+            if (vpv != nullptr) {
                 delete vpv;
             }
         }
     }
 
     TMap<UINT, VMDVec*> * map = m_map_md2vmd.getMap();
-    if (map != NULL) {
+    if (map != nullptr) {
         TMapIter<UINT, VMDVec*> iter;
         VMDVec * vmdvec;
         for (map->get_first(iter, &vmdvec);
-             vmdvec != NULL; map->get_next(iter, &vmdvec)) {
+             vmdvec != nullptr; map->get_next(iter, &vmdvec)) {
             delete vmdvec;
         }
     }
@@ -402,21 +402,21 @@ void UseDefMgr::cleanOrDestroy(bool is_reinit)
 
     for (INT i = 0; i <= m_vopnd_vec.get_last_idx(); i++) {
         VOpnd * v = m_vopnd_vec.get((UINT)i);
-        if (v != NULL && v->is_md()) {
+        if (v != nullptr && v->is_md()) {
             ((VMD*)v)->destroy();
         }
     }
 
     for (INT i = 0; i <= m_def_vec.get_last_idx(); i++) {
         MDDef * d = m_def_vec.get((UINT)i);
-        if (d != NULL && d->getNextSet() != NULL) {
+        if (d != nullptr && d->getNextSet() != nullptr) {
             d->getNextSet()->clean(*m_sbs_mgr);
         }
     }
 
     for (INT i = 0; i <= m_mdssainfo_vec.get_last_idx(); i++) {
         MDSSAInfo * info = m_mdssainfo_vec.get((UINT)i);
-        if (info != NULL) {
+        if (info != nullptr) {
             info->destroy(*m_sbs_mgr);
         }
     }
@@ -480,10 +480,10 @@ void UseDefMgr::cleanOrDestroy(bool is_reinit)
 void UseDefMgr::setMDSSAInfo(IR * ir, MDSSAInfo * mdssainfo)
 {
     ASSERT0(ir && mdssainfo && m_mdssa_mgr->hasMDSSAInfo(ir));
-    if (ir->getAI() == NULL) {
+    if (ir->getAI() == nullptr) {
         IR_ai(ir) = m_rg->allocAIContainer();
     }
-    IR_ai(ir)->set(mdssainfo);
+    IR_ai(ir)->set(mdssainfo, m_rg);
 }
 
 
@@ -491,7 +491,7 @@ void UseDefMgr::cleanMDSSAInfo(IR * ir)
 {
     ASSERT0(ir);
     ASSERTN(m_mdssa_mgr->hasMDSSAInfo(ir), ("make decision early"));
-    if (ir->getAI() == NULL) { return; }    
+    if (ir->getAI() == nullptr) { return; }    
     IR_ai(ir)->clean(AI_MD_SSA);
 }
 
@@ -505,13 +505,13 @@ void UseDefMgr::cleanMDSSAInfo(IR * ir)
 MDSSAInfo * UseDefMgr::genMDSSAInfo(IR * ir)
 {
     ASSERT0(ir && m_mdssa_mgr->hasMDSSAInfo(ir));
-    if (ir->getAI() == NULL) {
+    if (ir->getAI() == nullptr) {
         IR_ai(ir) = m_rg->allocAIContainer();
     }
     MDSSAInfo * mdssainfo = (MDSSAInfo*)ir->getAI()->get(AI_MD_SSA);
-    if (mdssainfo == NULL) {
+    if (mdssainfo == nullptr) {
         mdssainfo = allocMDSSAInfo();
-        IR_ai(ir)->set(mdssainfo);
+        IR_ai(ir)->set(mdssainfo, m_rg);
     }
     return mdssainfo;
 }
@@ -520,13 +520,13 @@ MDSSAInfo * UseDefMgr::genMDSSAInfo(IR * ir)
 MDSSAInfo * UseDefMgr::getMDSSAInfo(IR const* ir)
 {
     ASSERT0(ir && MDSSAMgr::hasMDSSAInfo(ir));
-    if (ir->getAI() == NULL) {
-        return NULL;
+    if (ir->getAI() == nullptr) {
+        return nullptr;
     }
 
     MDSSAInfo * mdssainfo = (MDSSAInfo*)ir->getAI()->get(AI_MD_SSA);
-    if (mdssainfo == NULL) {
-        return NULL;
+    if (mdssainfo == nullptr) {
+        return nullptr;
     }
 
     return mdssainfo;
@@ -564,7 +564,7 @@ MDPhi * UseDefMgr::allocMDPhi(UINT mdid, UINT num_operands)
 
     MD const* md = m_md_sys->getMD(mdid);
     ASSERT0(md);
-    IR * last = NULL;
+    IR * last = nullptr;
     ASSERT0(m_sbs_mgr);
 
     //Generate operand of PHI.
@@ -608,7 +608,7 @@ MDDefSet * UseDefMgr::allocMDDefSet()
 xcom::SC<VOpnd*> * UseDefMgr::allocSCVOpnd(VOpnd * opnd)
 {
     xcom::SC<VOpnd*> * sc = xcom::removehead_single_list(&m_free_sc_list);
-    if (sc != NULL) {
+    if (sc != nullptr) {
         sc->init();
         return sc;
     }
@@ -639,8 +639,8 @@ VMD * UseDefMgr::getVMD(UINT mdid, UINT version) const
 {
     ASSERT0(mdid > MD_UNDEF);
     Vector<VMD*> * vec = const_cast<UseDefMgr*>(this)->m_map_md2vmd.get(mdid);
-    if (vec == NULL) {
-        return NULL;
+    if (vec == nullptr) {
+        return nullptr;
     }
     return vec->get(version);
 }
@@ -651,13 +651,13 @@ VMD * UseDefMgr::allocVMD(UINT mdid, UINT version)
 {
     ASSERT0(mdid > MD_UNDEF);
     VMDVec * vec = m_map_md2vmd.get(mdid);
-    if (vec == NULL) {
+    if (vec == nullptr) {
         vec = new VMDVec();
         m_map_md2vmd.set(mdid, vec);
     }
 
     VMD * v = vec->get(version);
-    if (v != NULL) {
+    if (v != nullptr) {
         return v;
     }
 
@@ -670,14 +670,14 @@ VMD * UseDefMgr::allocVMD(UINT mdid, UINT version)
     VOPND_id(v) = m_vopnd_count++;
     VMD_mdid(v) = mdid;
     VMD_version(v) = version;
-    VMD_def(v) = NULL;
+    VMD_def(v) = nullptr;
     vec->set(version, v);
     m_vopnd_vec.set(v->id(), v);
     return v;
 }
 
 
-size_t UseDefMgr::count_mem()
+size_t UseDefMgr::count_mem() const
 {
     size_t count = smpoolGetPoolSize(m_mdssainfo_pool);
     count += smpoolGetPoolSize(m_phi_pool);
@@ -698,7 +698,7 @@ size_t UseDefMgr::count_mem()
 MDPhiList * UseDefMgr::genBBPhiList(UINT bbid)
 {
     MDPhiList * lst = m_philist_vec.get(bbid);
-    if (lst != NULL) { return lst; }
+    if (lst != nullptr) { return lst; }
 
     lst = (MDPhiList*)smpoolMallocConstSize(sizeof(MDPhiList), m_philist_pool);
     ASSERT0(lst);

@@ -135,23 +135,23 @@ private:
                             IN OUT CPCtx & ctx);
 
     bool useMDSSADU() const
-    { return m_mdssamgr != NULL && m_mdssamgr->is_valid(); }
+    { return m_mdssamgr != nullptr && m_mdssamgr->is_valid(); }
     bool usePRSSADU() const
-    { return m_prssamgr != NULL && m_prssamgr->is_valid(); }
+    { return m_prssamgr != nullptr && m_prssamgr->is_valid(); }
 
 public:
     CopyProp(Region * rg)
     {
-        ASSERT0(rg != NULL);
+        ASSERT0(rg != nullptr);
         m_rg = rg;
         m_md_sys = rg->getMDSystem();
         m_du = rg->getDUMgr();
         m_cfg = rg->getCFG();
         m_md_set_mgr = rg->getMDSetMgr();
         m_tm = rg->getTypeMgr();
-        m_refine = NULL;
-        m_mdssamgr = NULL;
-        m_prssamgr = NULL;
+        m_refine = nullptr;
+        m_mdssamgr = nullptr;
+        m_prssamgr = nullptr;
         ASSERT0(m_cfg && m_du && m_md_sys && m_tm && m_md_set_mgr);
         m_prop_kind = CP_PROP_UNARY_AND_SIMPLEX;
     }
@@ -181,7 +181,7 @@ public:
                 return true;
             case IR_LD:
             case IR_ILD:
-                if (ir->getRefMD() != NULL && ir->getRefMD()->is_exact()) {
+                if (ir->getRefMD() != nullptr && ir->getRefMD()->is_exact()) {
                     return true;
                 }
                 return false;

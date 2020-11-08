@@ -32,14 +32,7 @@ USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <sys/time.h>
 #endif
 
-#include "ltype.h"
-#include "comf.h"
-#include "strbuf.h"
-#include "stdio.h"
-#include "string.h"
-#include "smempool.h"
-#include "sstl.h"
-#include "bs.h"
+#include "xcominc.h"
 
 namespace xcom {
 
@@ -65,7 +58,7 @@ void StrBuf::strcat(CHAR const* format, ...)
     va_start(args, format);
     va_list org_args;
     va_copy(org_args, args);
-    UINT l = VSNPRINTF(NULL, 0, format, args);
+    UINT l = VSNPRINTF(nullptr, 0, format, args);
     strcat(l, format, org_args);
     va_end(args);
     va_end(org_args);
@@ -76,7 +69,7 @@ void StrBuf::vstrcat(CHAR const* format, va_list args)
 {
     va_list org_args;
     va_copy(org_args, args);
-    UINT l = VSNPRINTF(NULL, 0, format, args);
+    UINT l = VSNPRINTF(nullptr, 0, format, args);
     strcat(l, format, org_args);
     va_end(org_args);
 }
@@ -89,7 +82,7 @@ void StrBuf::sprint(CHAR const* format, ...)
     va_start(args, format);
     va_list org_args;
     va_copy(org_args, args);
-    UINT l = VSNPRINTF(NULL, 0, format, args);
+    UINT l = VSNPRINTF(nullptr, 0, format, args);
     strcat(l, format, org_args);
     va_end(args);
     va_end(org_args);
@@ -114,7 +107,7 @@ void StrBuf::nstrcat(UINT size, CHAR const* format, ...)
     va_start(args, format);
     va_list org_args;
     va_copy(org_args, args);
-    UINT l = VSNPRINTF(NULL, 0, format, args);
+    UINT l = VSNPRINTF(nullptr, 0, format, args);
     if (l > size) { l = size; }
     strcat(l, format, org_args);
     va_end(args);

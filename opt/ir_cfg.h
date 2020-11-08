@@ -102,7 +102,7 @@ public:
     //And you must consider the right insertion.
     void addBB(IRBB * bb)
     {
-        ASSERT0(bb && m_bb_vec.get(bb->id()) == NULL);
+        ASSERT0(bb && m_bb_vec.get(bb->id()) == nullptr);
         ASSERTN(bb->id() != 0, ("bb id should start at 1"));
         m_bb_vec.set(bb->id(), bb);
         addVertex(bb->id());
@@ -120,15 +120,15 @@ public:
     void build(OptCtx & oc);
 
     virtual void cf_opt();
-    void computeDomAndIdom(IN OUT OptCtx & oc, xcom::BitSet const* uni = NULL);
+    void computeDomAndIdom(IN OUT OptCtx & oc, xcom::BitSet const* uni = nullptr);
     void computePdomAndIpdom(IN OUT OptCtx & oc,
-                             xcom::BitSet const* uni = NULL);
+                             xcom::BitSet const* uni = nullptr);
 
     //Record the Exit BB here.
     virtual void computeExitList()
     {
         //Clean the Exit flag.
-        BBListIter ct = NULL;
+        BBListIter ct = nullptr;
         for (m_exit_list.get_head(&ct);
              ct != m_exit_list.end();
              ct = m_exit_list.get_next(ct)) {
@@ -149,9 +149,9 @@ public:
         }
     }
 
-    void dumpVCG(CHAR const* name = NULL,
+    void dumpVCG(CHAR const* name = nullptr,
                  UINT flag = DUMP_DETAIL|DUMP_EH|DUMP_MDSSA);
-    void dumpDOT(CHAR const* name = NULL,
+    void dumpDOT(CHAR const* name = nullptr,
                  UINT flag = DUMP_DETAIL|DUMP_EH|DUMP_MDSSA);
     void dumpDOT(FILE * h, UINT flag = DUMP_DETAIL|DUMP_EH|DUMP_MDSSA);
 
@@ -233,7 +233,7 @@ public:
         UINT n = 0;
         bool find = false;
         for (xcom::EdgeC * in = VERTEX_in_list(bb_vex);
-             in != NULL; in = EC_next(in)) {
+             in != nullptr; in = EC_next(in)) {
             xcom::Vertex * local_pred_vex = in->getFrom();
             if (local_pred_vex->id() == pred->id()) {
                 find = true;
@@ -248,7 +248,7 @@ public:
     }
 
     //You should clean the relation between Label and BB before remove BB.
-    virtual void remove_bb(C<IRBB*> * bbct)
+    virtual void removeBB(C<IRBB*> * bbct)
     {
         ASSERT0(bbct);
         ASSERT0(m_bb_list->in_list(bbct));
@@ -260,7 +260,7 @@ public:
 
     //We only remove 'bb' from CF graph, vector and bb-list.
     //You should clean the relation between Label and BB before remove BB.
-    virtual void remove_bb(IRBB * bb)
+    virtual void removeBB(IRBB * bb)
     {
         ASSERT0(bb);
         remove_bb_impl(bb);

@@ -31,12 +31,33 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 namespace xoc {
 
-//Print leading '\n'.
-static size_t prt_leading_newline(LogMgr const* lm, StrBuf const& buf)
+//Find newline '\n' and return the byte offset that corresponding
+//to start of 'buf'.
+//Return -1 if not find newline.
+//start: the byte offset to 'buf'.
+static INT find_newline_pos(StrBuf const& buf, UINT buflen, UINT start)
 {
-    size_t i = 0;
-    while (i < buf.strlen()) {
-        if (buf.buf[i] == '\n') {
+    ASSERT0(buflen <= (UINT)buf.strlen());
+    UINT i = start;
+    while (i < buflen) {
+        if (buf.buf[i] == LOGMGR_NEWLINE_CHAR) {
+            return (INT)i;
+        }
+        i++;
+    }
+    return -1;
+}
+
+
+//Print leading '\n'.
+//Return the byte offset of content that related to string buffer.
+static size_t prt_leading_newline(LogMgr const* lm, StrBuf const& buf,
+                                  UINT buflen, UINT start)
+{
+    size_t i = start;
+    ASSERT0(buf.strlen() <= buflen);
+    while (i < buflen) {
+        if (buf.buf[i] == LOGMGR_NEWLINE_CHAR) {
             if (lm->isReplaceNewline()) {
                 //Print terminate lines that are left
                 //justified in DOT file.
@@ -55,7 +76,7 @@ static size_t prt_leading_newline(LogMgr const* lm, StrBuf const& buf)
 
 static void prt_indent(LogMgr const* lm)
 {
-    if (lm->getFileHandler() == NULL) { return; }
+    if (lm->getFileHandler() == nullptr) { return; }
     UINT indent = lm->getIndent();
     for (; indent > 0; indent--) {
         fprintf(lm->getFileHandler(), "%c", lm->getIndentChar());
@@ -68,7 +89,7 @@ static void note_helper(LogMgr const* lm, CHAR const* format, va_list args)
 {
     ASSERT0(lm);
     FILE * h = lm->getFileHandler();
-    if (h == NULL || format == NULL) { return; }
+    if (h == nullptr || format == nullptr) { return; }
 
     va_list targs;
     va_copy(targs, args);
@@ -76,16 +97,40 @@ static void note_helper(LogMgr const* lm, CHAR const* format, va_list args)
     buf.vstrcat(format, targs);
     va_end(targs);
 
+    UINT const buflen = (UINT)buf.strlen();
     //Print leading \n.
-    size_t i = prt_leading_newline(lm, buf);
-
+    UINT cont_pos = (UINT)prt_leading_newline(lm, buf, buflen, 0);
     //Append indent chars ahead of string.
     ASSERT0(lm->getIndent() >= 0);
     prt_indent(lm);
 
-    if (i != buf.strlen()) {
-        fprintf(h, "%s", buf.buf + i);
-    }
+    INT newline_pos = -1; //record the begin of next newline.
+    do {
+        //Find next newline char.
+        newline_pos = find_newline_pos(buf, buflen, cont_pos);
+        if (newline_pos != -1) {
+            //The characters between cont_pos and newline_pos
+            //is the print content.
+            buf.buf[newline_pos] = 0;
+        }
+        if (cont_pos != buflen) {
+            ASSERT0(cont_pos < buflen);
+            fprintf(h, "%s", buf.buf + cont_pos);
+        } else {
+            break;
+        }
+        if (newline_pos != -1) {
+            //Recovery newline char.
+            buf.buf[newline_pos] = LOGMGR_NEWLINE_CHAR;
+
+            //Print leading \n.
+            cont_pos = (UINT)prt_leading_newline(lm, buf, buflen, newline_pos);
+            //Append indent chars ahead of string.
+            ASSERT0(lm->getIndent() >= 0);
+            prt_indent(lm);
+        }
+    } while (newline_pos != -1);
+
     fflush(h);
 }
 
@@ -95,7 +140,7 @@ static void prt_helper(LogMgr const* lm, CHAR const* format, va_list args)
 {
     ASSERT0(lm);
     FILE * h = lm->getFileHandler();
-    if (h == NULL || format == NULL) { return; }
+    if (h == nullptr || format == nullptr) { return; }
 
     va_list targs;
     va_copy(targs, args);
@@ -103,8 +148,9 @@ static void prt_helper(LogMgr const* lm, CHAR const* format, va_list args)
     buf.vstrcat(format, targs);
     va_end(targs);
 
-    size_t i = prt_leading_newline(lm, buf);
-    if (i != buf.strlen()) {
+    UINT buflen = (UINT)buf.strlen();
+    size_t i = prt_leading_newline(lm, buf, buflen, 0);
+    if (i != buflen) {
         fprintf(h, "%s", buf.buf + i);
     }
     fflush(h);
@@ -169,45 +215,10 @@ void note(RegionMgr const* rm, CHAR const* format, ...)
 void note(LogMgr const* lm, CHAR const* format, ...)
 {
     ASSERT0(lm);
-    FILE * h = lm->getFileHandler();
-    if (h == NULL || format == NULL) { return; }
-
-    StrBuf buf(64);
-    va_list arg;
-    va_start(arg, format);
-    buf.vstrcat(format, arg);
-
-    //Print leading \n.
-    size_t i = 0;
-    while (i < buf.strlen()) {
-        if (buf.buf[i] == '\n') {
-            if (lm->isReplaceNewline()) {
-                //Print terminate lines that are left
-                //justified in DOT file.
-                fprintf(lm->getFileHandler(), "\\l");
-            } else {
-                fprintf(lm->getFileHandler(), "\n");
-            }
-        } else {
-            break;
-        }
-        i++;
-    }
-
-    //Append indent chars ahead of string.
-    ASSERT0(lm->getIndent() >= 0);
-    prt_indent(lm);
-
-    if (i == buf.strlen()) {
-        fflush(h);
-        va_end(arg);
-        return;
-    }    
-
-    fprintf(h, "%s", buf.buf + i);
-    fflush(h);
-    va_end(arg);
-    return;
+    va_list args;
+    va_start(args, format);
+    note_helper(lm, format, args);
+    va_end(args);
 }
 
 
@@ -235,13 +246,13 @@ void prtIndent(Region const* rg, UINT indent)
 //START LogMgr
 void LogMgr::init(CHAR const* logfilename, bool is_del)
 {
-    if (m_ctx.logfile != NULL) { return; }
-    if (logfilename == NULL) { return; }
+    if (m_ctx.logfile != nullptr) { return; }
+    if (logfilename == nullptr) { return; }
     if (is_del) {
         UNLINK(logfilename);
     }
     m_ctx.logfile = fopen(logfilename, "a+");
-    if (m_ctx.logfile == NULL) {
+    if (m_ctx.logfile == nullptr) {
         fprintf(stderr,
                 "\ncan not open dump file %s, errno:%d, errstring:\'%s\'\n",
                 logfilename, errno, strerror(errno));
@@ -252,7 +263,7 @@ void LogMgr::init(CHAR const* logfilename, bool is_del)
 //Finalize log file.
 void LogMgr::fini()
 {
-    if (m_ctx.logfile != NULL) {
+    if (m_ctx.logfile != nullptr) {
         fclose(m_ctx.logfile);
         m_ctx.clean();
     }

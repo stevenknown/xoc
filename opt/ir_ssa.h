@@ -87,7 +87,7 @@ class SSAGraph : xcom::Graph {
     VertexID2VP m_vdefs;
 public:
     SSAGraph(Region * rg, PRSSAMgr * ssamgr);
-    void dump(CHAR const* name = NULL, bool detail = true) const;
+    void dump(CHAR const* name = nullptr, bool detail = true) const;
 };
 
 
@@ -116,23 +116,23 @@ class PRSSAMgr : public Pass {
 
     inline void init()
     {
-        if (m_vp_pool != NULL) { return; }
+        if (m_vp_pool != nullptr) { return; }
         m_vp_count = 1;
         m_is_valid = false;
-        m_map_prno2vpr_vec.set(m_rg->getPRCount(), NULL);
+        m_map_prno2vpr_vec.set(m_rg->getPRCount(), nullptr);
         m_max_version.set(m_rg->getPRCount(), 0);
         m_vp_pool = smpoolCreate(sizeof(VPR)*2, MEM_CONST_SIZE);
     }
 
     void clean()
     {
-        m_rg = NULL;
-        m_tm = NULL;
-        m_seg_mgr = NULL;
-        m_cfg = NULL;
+        m_rg = nullptr;
+        m_tm = nullptr;
+        m_seg_mgr = nullptr;
+        m_cfg = nullptr;
         m_vp_count = 1;
         m_is_valid = false;
-        m_vp_pool = NULL;
+        m_vp_pool = nullptr;
     }
     void cleanPRSSAInfo();
     void constructMDDUChainForPR();
@@ -151,7 +151,7 @@ class PRSSAMgr : public Pass {
 
     VPR * allocVPR()
     {
-        ASSERTN(m_vp_pool != NULL, ("not init"));
+        ASSERTN(m_vp_pool != nullptr, ("not init"));
         VPR * p = (VPR*)smpoolMallocConstSize(sizeof(VPR), m_vp_pool);
         ASSERT0(p);
         ::memset(p, 0, sizeof(VPR));
@@ -241,7 +241,7 @@ public:
 
     //Compute SSAInfo for IRs in region that are in SSA mode.
     void computeSSAInfo();
-    size_t count_mem();
+    size_t count_mem() const;
 
     //is_reinit: this function is invoked in reinit().
     void destroy(bool is_reinit);
@@ -250,7 +250,7 @@ public:
     virtual bool dump() const;
     void dumpAllVPR() const;
     CHAR * dumpVP(IN VPR * v, OUT CHAR * buf) const;
-    void dumpSSAGraph(CHAR * name = NULL) const;
+    void dumpSSAGraph(CHAR * name = nullptr) const;
 
     Region * getRegion() const { return m_rg; }
     VPRVec const* getVPRVec() const { return &m_vpr_vec; }

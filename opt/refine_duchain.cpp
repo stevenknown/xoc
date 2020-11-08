@@ -57,7 +57,7 @@ VN const* RefineDUChain::getVNOfIndirectOp(IR const* ir, UINT * indirect_level)
     ASSERT0(m_gvn);
     IR const* base = ir;
     *indirect_level = 1;
-    for (; base != NULL && !base->is_ild() && !base->is_ist();
+    for (; base != nullptr && !base->is_ild() && !base->is_ist();
          base = base->is_ild() ? ILD_base(base) : IST_base(base)) {
         *indirect_level++;
     }
@@ -72,14 +72,14 @@ VN const* RefineDUChain::getVNOfIndirectOp(IR const* ir, UINT * indirect_level)
 bool RefineDUChain::processBB(IRBB const* bb)
 {
     ASSERT0(bb);
-    C<IR*> * ct = NULL;
+    C<IR*> * ct = nullptr;
     ConstIRIter ii;
     bool change = false;
     for (IR * ir = BB_irlist(bb).get_head(&ct);
-         ir != NULL; ir = BB_irlist(bb).get_next(&ct)) {
+         ir != nullptr; ir = BB_irlist(bb).get_next(&ct)) {
         ii.clean();
         for (IR const* exp = iterRhsInitC(ir, ii);
-             exp != NULL; exp = iterRhsNextC(ii)) {
+             exp != nullptr; exp = iterRhsNextC(ii)) {
             if (!exp->is_ild()) { continue; }
             if (m_is_use_gvn) {
                 change |= processExpressionViaGVN(exp);
@@ -98,10 +98,10 @@ bool RefineDUChain::processExpressionViaMDSSA(IR const* exp)
 {
     ASSERT0(exp && exp->is_ild());
     MDSSAInfo * mdssainfo = m_mdssamgr->getMDSSAInfoIfAny(exp);
-    if (mdssainfo == NULL) { return false; }
+    if (mdssainfo == nullptr) { return false; }
 
     //Iterate each VOpnd.
-    VOpndSetIter iter = NULL;
+    VOpndSetIter iter = nullptr;
     INT next_i = -1;
     bool change = false;
     for (INT i = mdssainfo->readVOpndSet()->get_first(&iter);
@@ -109,7 +109,7 @@ bool RefineDUChain::processExpressionViaMDSSA(IR const* exp)
         next_i = mdssainfo->readVOpndSet()->get_next(i, &iter);
         VMD const* t = (VMD const*)m_mdssamgr->getUseDefMgr()->getVOpnd(i);
         ASSERT0(t && t->is_md());
-        if (t->getDef() == NULL) {
+        if (t->getDef() == nullptr) {
             ASSERTN(t->version() == 0, ("Only zero version MD has no DEF"));
             continue;
         }
@@ -144,17 +144,17 @@ bool RefineDUChain::processExpressionViaGVN(IR const* exp)
     //find out 'p'.
     UINT ild_star_level = 0;
     VN const* vn_of_ild_base = getVNOfIndirectOp(exp, &ild_star_level);
-    if (vn_of_ild_base == NULL) {
+    if (vn_of_ild_base == nullptr) {
         //It is no need to analyze DEF set with have no VN.
         return false;
     }
 
     DUSet const* defset = exp->getDUSet();
-    if (defset == NULL) { return false; }
+    if (defset == nullptr) { return false; }
 
     //Iterate each DEF stmt of 'exp'.
     bool change = false;
-    DUIter di = NULL;
+    DUIter di = nullptr;
     INT next_i = -1;
     for (INT i = defset->get_first(&di); i >= 0; i = next_i) {
         next_i = defset->get_next(i, &di);
@@ -166,7 +166,7 @@ bool RefineDUChain::processExpressionViaGVN(IR const* exp)
         //Get VN of IST's base expression.
         UINT ist_star_level = 0;
         VN const* vn_of_ist_base = getVNOfIndirectOp(stmt, &ist_star_level);
-        if (vn_of_ist_base == NULL) {
+        if (vn_of_ist_base == nullptr) {
             //It is no need to analyze DEF stmt with have no VN.
             continue;
         }
@@ -187,10 +187,10 @@ bool RefineDUChain::processExpressionViaGVN(IR const* exp)
 bool RefineDUChain::process()
 {
     BBList * bbl = m_rg->getBBList();
-    C<IRBB*> * ctbb = NULL;
+    C<IRBB*> * ctbb = nullptr;
     bool change = false;
     for (IRBB * bb = bbl->get_head(&ctbb);
-         bb != NULL; bb = bbl->get_next(&ctbb)) {
+         bb != nullptr; bb = bbl->get_next(&ctbb)) {
         change |= processBB(bb);
     }
     return change;
@@ -200,7 +200,7 @@ bool RefineDUChain::process()
 bool RefineDUChain::perform(OptCtx & oc)
 {
     BBList * bbl = m_rg->getBBList();
-    if (bbl == NULL || bbl->get_elem_count() == 0) { return false; }
+    if (bbl == nullptr || bbl->get_elem_count() == 0) { return false; }
     if (!oc.is_cfg_valid()) { return false; }
     if (!oc.is_ref_valid()) { return false; }
     m_mdssamgr = (MDSSAMgr*)m_rg->getPassMgr()->queryPass(PASS_MD_SSA_MGR);
@@ -217,7 +217,7 @@ bool RefineDUChain::perform(OptCtx & oc)
     }
     if (m_is_use_gvn) {
         m_gvn = (GVN const*)m_rg->getPassMgr()->queryPass(PASS_GVN);
-        if (m_gvn == NULL || !m_gvn->is_valid()) {
+        if (m_gvn == nullptr || !m_gvn->is_valid()) {
             return false;
         }
     } else {

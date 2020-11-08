@@ -40,13 +40,13 @@ VPR * VPRVec::findVPR(UINT bbid) const
     
     for (INT i = 0; i <= get_last_idx(); i++) {
         VPR * vpr = get(i);
-        if (vpr == NULL || vpr->getDef() == NULL) { continue; }
+        if (vpr == nullptr || vpr->getDef() == nullptr) { continue; }
         ASSERT0(vpr->getDef() && vpr->getDef()->getBB());
         if (vpr->getDef()->getBB()->id() == bbid) {
             return vpr;
         }
     }
-    return NULL;
+    return nullptr;
 }
 
 
@@ -55,11 +55,11 @@ VPR * VPRVec::findInitVersion() const
 {
     for (INT i = 0; i <= get_last_idx(); i++) {
         VPR * vpr = get(i);
-        if (vpr != NULL && vpr->version() == PRSSA_INIT_VERSION) {
+        if (vpr != nullptr && vpr->version() == PRSSA_INIT_VERSION) {
             return vpr;
         }
     }
-    return NULL;
+    return nullptr;
 }
 //END VPRVec
 

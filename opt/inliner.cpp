@@ -59,8 +59,8 @@ IR * Inliner::replaceReturnImpl(
         IR * new_irs,
         LabelInfo * el)
 {
-    IR * next = NULL;
-    for (IR * x = new_irs; x != NULL; x = next) {
+    IR * next = nullptr;
+    for (IR * x = new_irs; x != nullptr; x = next) {
         next = x->get_next();
         switch (x->getCode()) {
         case IR_DO_WHILE:
@@ -81,7 +81,7 @@ IR * Inliner::replaceReturnImpl(
             break;
         case IR_RETURN:
             if (!caller_call->hasReturnValue()) {
-                if (el != NULL) {
+                if (el != nullptr) {
                     IR * go = caller->buildGoto(el);
                     xcom::insertbefore_one(&new_irs, x, go);
                 }
@@ -90,22 +90,22 @@ IR * Inliner::replaceReturnImpl(
             } else {
                 IR * send = RET_exp(x);
                 UINT receive = CALL_prno(caller_call);
-                IR * mv_lst = NULL;
-                if (send != NULL) {
+                IR * mv_lst = nullptr;
+                if (send != nullptr) {
                     IR * mv = caller->buildStorePR(receive,
                         caller_call->getType(), send);
                     xcom::insertbefore_one(&mv_lst, mv_lst, mv);
                 }
-                RET_exp(x) = NULL;
+                RET_exp(x) = nullptr;
 
-                if (el != NULL) {
+                if (el != nullptr) {
                     IR * go = caller->buildGoto(el);
                     xcom::add_next(&mv_lst, go);
                 }
 
                 xcom::insertbefore(&new_irs, x, mv_lst);
                 xcom::remove(&new_irs, x);
-                ASSERT0(RET_exp(x) == NULL);
+                ASSERT0(RET_exp(x) == nullptr);
                 caller->freeIRTree(x);
             }
             break;
@@ -126,15 +126,15 @@ void Inliner::checkRegion(
     has_ret = false;
     List<IR const*> lst;
     IR const* irs = rg->getIRList();
-    if (irs == NULL) { return; }
-    for (IR const* x = irs; x != NULL; x = x->get_next()) {
+    if (irs == nullptr) { return; }
+    for (IR const* x = irs; x != nullptr; x = x->get_next()) {
         switch (x->getCode()) {
         case IR_DO_WHILE:
         case IR_WHILE_DO:
         case IR_DO_LOOP:
             lst.clean();
             for (IR const* k = iterInitC(LOOP_body(x), lst);
-                 k != NULL; k = iterNextC(lst)) {
+                 k != nullptr; k = iterNextC(lst)) {
                 if (k->is_return()) {
                     need_el = true;
                     has_ret = true;
@@ -145,7 +145,7 @@ void Inliner::checkRegion(
         case IR_IF:
             lst.clean();
             for (IR const* k = iterInitC(IF_truebody(x), lst);
-                 k != NULL; k = iterNextC(lst)) {
+                 k != nullptr; k = iterNextC(lst)) {
                 if (k->is_return()) {
                     need_el = true;
                     has_ret = true;
@@ -154,7 +154,7 @@ void Inliner::checkRegion(
             }
             lst.clean();
             for (IR const* k = iterInitC(IF_falsebody(x), lst);
-                 k != NULL; k = iterNextC(lst)) {
+                 k != nullptr; k = iterNextC(lst)) {
                 if (k->is_return()) {
                     need_el = true;
                     has_ret = true;
@@ -165,7 +165,7 @@ void Inliner::checkRegion(
         case IR_SWITCH:
             lst.clean();
             for (IR const* k = iterInitC(SWITCH_body(x), lst);
-                 k != NULL; k = iterNextC(lst)) {
+                 k != nullptr; k = iterNextC(lst)) {
                 if (k->is_return()) {
                     need_el = true;
                     has_ret = true;
@@ -190,7 +190,7 @@ IR * Inliner::replaceReturn(
         IR * new_irs,
         InlineInfo * ii)
 {
-    LabelInfo * el = NULL;
+    LabelInfo * el = nullptr;
     if (INLINFO_need_el(ii)) {
         el = caller->genILabel();
     }
@@ -199,7 +199,7 @@ IR * Inliner::replaceReturn(
         new_irs = replaceReturnImpl(caller, caller_call, new_irs, el);
     }
 
-    if (el != NULL) {
+    if (el != nullptr) {
         xcom::add_next(&new_irs, caller->buildLabel(el));
     }
     return new_irs;
@@ -210,18 +210,18 @@ bool Inliner::do_inline_c(Region * caller, Region * callee)
 {
     IR * caller_irs = caller->getIRList();
     IR * callee_irs = callee->getIRList();
-    if (caller_irs == NULL || callee_irs == NULL) { return false; }
-    IR * next = NULL;
+    if (caller_irs == nullptr || callee_irs == nullptr) { return false; }
+    IR * next = nullptr;
     bool change = false;
     IR * head = caller_irs;
-    for (; caller_irs != NULL; caller_irs = next) {
+    for (; caller_irs != nullptr; caller_irs = next) {
         next = caller_irs->get_next();
         if (caller_irs->is_call() &&
             is_call_site(caller_irs, callee)) {
             IR * new_irs_in_caller = caller->dupIRTreeList(callee_irs);
 
             InlineInfo * ii = mapRegion2InlineInfo(callee, false);
-            if (ii == NULL) {
+            if (ii == nullptr) {
                 bool need_el;
                 bool has_ret;
                 checkRegion(callee, need_el, has_ret);
@@ -250,10 +250,10 @@ void Inliner::do_inline(Region * cand)
     xcom::Vertex * v = m_call_graph->getVertex(CN_id(cn));
     ASSERT0(v);
     for (xcom::EdgeC * el = VERTEX_in_list(v);
-         el != NULL; el = EC_next(el)) {
+         el != nullptr; el = EC_next(el)) {
         Region * caller = m_call_graph->mapVertex2CallNode(
             el->getFrom())->region();
-        if (caller != NULL) {
+        if (caller != nullptr) {
             do_inline_c(caller, cand);
         }
     }
@@ -279,7 +279,7 @@ bool Inliner::perform(OptCtx & oc)
     ASSERT0(OC_is_callg_valid(oc));
     ASSERT0(m_program && m_program->is_program());
     IR * irs = m_program->getIRList();
-    while (irs != NULL) {
+    while (irs != nullptr) {
         if (irs->is_region()) {
             Region * rg = REGION_ru(irs);
             if (can_be_cand(rg)) {

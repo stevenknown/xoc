@@ -56,7 +56,7 @@ bool ScalarOpt::perform(OptCtx & oc)
 
     bool in_ssa_form = false;
     PRSSAMgr * ssamgr = (PRSSAMgr*)m_pass_mgr->queryPass(PASS_PR_SSA_MGR);
-    if (ssamgr != NULL && ssamgr->is_valid()) {
+    if (ssamgr != nullptr && ssamgr->is_valid()) {
         in_ssa_form = true;
     }
 
@@ -120,7 +120,7 @@ bool ScalarOpt::perform(OptCtx & oc)
     do {
         change = false;
         for (Pass * pass = passlist.get_head();
-             pass != NULL; pass = passlist.get_next()) {
+             pass != nullptr; pass = passlist.get_next()) {
             ASSERT0(verifyIRandBB(bbl, m_rg));
             bool doit = pass->perform(oc);
             if (doit) {

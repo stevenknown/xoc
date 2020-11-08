@@ -80,7 +80,7 @@ void DexPassMgr::performScalarOpt(OptCtx & oc)
     List<Pass*> passlist; //A list of optimization.
     PRSSAMgr * ssamgr = (PRSSAMgr*)registerPass(PASS_PR_SSA_MGR);
     bool is_ssa_avail = false;
-    if (ssamgr != NULL) {
+    if (ssamgr != nullptr) {
         is_ssa_avail = ssamgr->is_valid();
     }
 
@@ -107,7 +107,7 @@ void DexPassMgr::performScalarOpt(OptCtx & oc)
     //do {
         change = false;
         for (Pass * pass = passlist.get_head();
-             pass != NULL; pass = passlist.get_next()) {
+             pass != nullptr; pass = passlist.get_next()) {
             CHAR const* passname = pass->getPassName();
             LOG("\t\tpass %s", passname);
             ASSERT0(verifyIRandBB(m_rg->getBBList(), m_rg));

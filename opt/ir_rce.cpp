@@ -42,7 +42,7 @@ bool RCE::dump() const
     note(getRegion(), "\n\n==---- DUMP RCE ----==\n");
 
     BBList * bbl = m_rg->getBBList();
-    for (IRBB * bb = bbl->get_head(); bb != NULL; bb = bbl->get_next()) {
+    for (IRBB * bb = bbl->get_head(); bb != nullptr; bb = bbl->get_next()) {
         //TODO:
     }
     return true;
@@ -78,7 +78,7 @@ bool RCE::calcCondMustVal(IR const* ir,
             }
             return true;
         }
-        if (m_gvn != NULL && m_gvn->is_valid()) {
+        if (m_gvn != nullptr && m_gvn->is_valid()) {
             return m_gvn->calcCondMustVal(ir, must_true, must_false);
         }
         break;
@@ -122,7 +122,7 @@ IR * RCE::calcCondMustVal(IN IR * ir,
             return ir;
         }
 
-        if (m_gvn != NULL && m_gvn->is_valid()) {
+        if (m_gvn != nullptr && m_gvn->is_valid()) {
             bool succ = m_gvn->calcCondMustVal(ir, must_true, must_false);
             if (succ) {
                 changed = true;
@@ -154,13 +154,13 @@ IR * RCE::processBranch(IR * ir, IN OUT bool * cfg_mod)
     ASSERT0(ir->isConditionalBr());
     bool must_true, must_false, changed = false;
     IR * new_det = calcCondMustVal(BR_det(ir), must_true, must_false, changed);
-    BR_det(ir) = NULL;
+    BR_det(ir) = nullptr;
     if (ir->is_truebr()) {
         if (must_true) {
             //TRUEBR(0x1), always jump.
             IRBB * from = ir->getBB();
             IRBB * to = m_cfg->getFallThroughBB(from);
-            ASSERT0(from != NULL && to != NULL);
+            ASSERT0(from != nullptr && to != nullptr);
             IR * newbr = m_rg->buildGoto(BR_lab(ir));
             removeStmt(ir, m_rg);
 
@@ -180,7 +180,7 @@ IR * RCE::processBranch(IR * ir, IN OUT bool * cfg_mod)
             //Revise the PHI operand to target successor.
             m_cfg->removeEdge(from, to);
             *cfg_mod = true;
-            return NULL;
+            return nullptr;
         }
     } else {
         if (must_true) {
@@ -188,18 +188,18 @@ IR * RCE::processBranch(IR * ir, IN OUT bool * cfg_mod)
             //Revise m_cfg. remove branch edge.
             IRBB * from = ir->getBB();
             IRBB * to = m_cfg->getTargetBB(from);
-            ASSERT0(from != NULL && to != NULL);
+            ASSERT0(from != nullptr && to != nullptr);
             removeStmt(ir, m_rg);
 
             //Revise the PHI operand to target successor.
             m_cfg->removeEdge(from, to);
             *cfg_mod = true;
-            return NULL;
+            return nullptr;
         } else if (must_false) {
             //FALSEBR(0x0), always jump.
             IRBB * from = ir->getBB();
             IRBB * to = m_cfg->getFallThroughBB(from);
-            ASSERT0(from != NULL && to != NULL);
+            ASSERT0(from != nullptr && to != nullptr);
 
             IR * newbr = m_rg->buildGoto(BR_lab(ir));
             removeStmt(ir, m_rg);
@@ -233,7 +233,7 @@ IR * RCE::processStore(IR * ir)
     ASSERT0(ir->is_st());
     if (ST_rhs(ir)->getExactRef() == ir->getExactRef()) {
         removeIRTreeUse(ir, m_rg);
-        return NULL;
+        return nullptr;
     }
     return ir;
 }
@@ -245,7 +245,7 @@ IR * RCE::processStorePR(IR * ir)
     ASSERT0(ir->is_stpr());
     if (STPR_rhs(ir)->getExactRef() == ir->getExactRef()) {
         removeIRTreeUse(ir, m_rg);
-        return NULL;
+        return nullptr;
     }
     return ir;
 }
@@ -260,12 +260,12 @@ bool RCE::performSimplyRCE(IN OUT bool * cfg_mod)
     bool change = false;
     BBListIter ct_bb;
     for (IRBB * bb = bbl->get_head(&ct_bb);
-         bb != NULL; bb = bbl->get_next(&ct_bb)) {
+         bb != nullptr; bb = bbl->get_next(&ct_bb)) {
         BBIRList * ir_list = &BB_irlist(bb);
         IRListIter ct;
         IRListIter next_ct;
         for (ir_list->get_head(&next_ct), ct = next_ct;
-             ct != NULL; ct = next_ct) {
+             ct != nullptr; ct = next_ct) {
             IR * ir = ct->val();
             ir_list->get_next(&next_ct);
             if (ir->hasSideEffect()) { continue; }
@@ -287,8 +287,8 @@ bool RCE::performSimplyRCE(IN OUT bool * cfg_mod)
             if (newIR == ir) { continue; }
             ir_list->remove(ct);
             m_rg->freeIRTree(ir);
-            if (newIR != NULL) {
-                if (next_ct != NULL) {
+            if (newIR != nullptr) {
+                if (next_ct != nullptr) {
                     ir_list->insert_before(newIR, next_ct);
                 } else {
                     ir_list->append_tail(newIR);
@@ -304,7 +304,7 @@ bool RCE::performSimplyRCE(IN OUT bool * cfg_mod)
 bool RCE::perform(OptCtx & oc)
 {
     BBList * bbl = m_rg->getBBList();
-    if (bbl == NULL || bbl->get_elem_count() == 0) { return false; }
+    if (bbl == nullptr || bbl->get_elem_count() == 0) { return false; }
 
     if (!oc.is_cfg_valid()) { return false; }
     if (!oc.is_ref_valid()) { return false; }

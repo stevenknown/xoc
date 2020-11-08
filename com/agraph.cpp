@@ -31,15 +31,7 @@ IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 author: Su Zhenyu
 @*/
-#include "ltype.h"
-#include "comf.h"
-#include "smempool.h"
-#include "sstl.h"
-#include "matt.h"
-#include "bs.h"
-#include "sbs.h"
-#include "sgraph.h"
-#include "agraph.h"
+#include "xcominc.h"
 
 namespace xcom {
 
@@ -57,13 +49,13 @@ See <Shortest_Path-Dijkstra.txt>
 'infinite': the value indiates infinity. */
 void AGraph::ShortestPath(UINT infinite)
 {
-    ASSERTN(m_ec_pool != NULL, ("not yet initialized."));
+    ASSERTN(m_ec_pool != nullptr, ("not yet initialized."));
     Matrix<UINT> adj_mat;
     buildAdjacentMatrix(adj_mat);
     UINT row = adj_mat.getRowSize();
     UINT col = adj_mat.getColSize();
     UINT i,j,k,min,v1,v2;
-    if (m_spath_mat != NULL) { delete m_spath_mat; }
+    if (m_spath_mat != nullptr) { delete m_spath_mat; }
     m_spath_mat = new Matrix<UINT>(row, col);
     m_spath_mat->setAllElem(infinite);
 

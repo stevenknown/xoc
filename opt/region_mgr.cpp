@@ -47,12 +47,12 @@ RegionMgr::RegionMgr() : m_type_mgr(this)
     #endif
     m_ru_count = 1;
     m_label_count = 1;
-    m_var_mgr = NULL;
-    m_md_sys = NULL;
+    m_var_mgr = nullptr;
+    m_md_sys = nullptr;
     m_is_regard_str_as_same_md = true;
-    m_str_md = NULL;
-    m_call_graph = NULL;
-    m_targinfo = NULL;
+    m_str_md = nullptr;
+    m_call_graph = nullptr;
+    m_targinfo = nullptr;
     m_pool = smpoolCreate(64, MEM_COMM);
     m_logmgr = new LogMgr();
 }
@@ -62,7 +62,7 @@ RegionMgr::~RegionMgr()
 {
     for (INT id = 0; id <= m_id2ru.get_last_idx(); id++) {
         Region * rg = m_id2ru.get(id);
-        if (rg == NULL) { continue; }
+        if (rg == nullptr) { continue; }
         deleteRegion(rg, false);
     }
     m_id2ru.clean();
@@ -71,36 +71,36 @@ RegionMgr::~RegionMgr()
     ASSERTN(m_num_allocated == 0, ("there is still region leave out"));
     #endif
 
-    if (m_md_sys != NULL) {
+    if (m_md_sys != nullptr) {
         delete m_md_sys;
-        m_md_sys = NULL;
+        m_md_sys = nullptr;
     }
 
-    if (m_var_mgr != NULL) {
+    if (m_var_mgr != nullptr) {
         delete m_var_mgr;
-        m_var_mgr = NULL;
+        m_var_mgr = nullptr;
     }
 
-    if (m_call_graph != NULL) {
+    if (m_call_graph != nullptr) {
         delete m_call_graph;
-        m_call_graph = NULL;
+        m_call_graph = nullptr;
     }
 
     m_id2optctx.clean();
 
     smpoolDelete(m_pool);
-    m_pool = NULL;
+    m_pool = nullptr;
 
     delete m_logmgr;
-    m_logmgr = NULL;
+    m_logmgr = nullptr;
 }
 
 
 void * RegionMgr::xmalloc(UINT size)
 {
-    ASSERTN(m_pool != NULL, ("pool not initialized"));
+    ASSERTN(m_pool != nullptr, ("pool not initialized"));
     void * p = smpoolMalloc(size, m_pool);
-    ASSERT0(p != NULL);
+    ASSERT0(p != nullptr);
     ::memset(p, 0, size);
     return p;
 }
@@ -109,7 +109,7 @@ void * RegionMgr::xmalloc(UINT size)
 OptCtx * RegionMgr::getAndGenOptCtx(UINT id)
 {
     OptCtx * oc = m_id2optctx.get(id);
-    if (oc == NULL) {
+    if (oc == nullptr) {
         oc = (OptCtx*)xmalloc(sizeof(OptCtx));
         m_id2optctx.set(id, oc);
     }
@@ -126,10 +126,10 @@ OptCtx * RegionMgr::getAndGenOptCtx(UINT id)
 //as same unbounded MD.
 MD const* RegionMgr::genDedicateStrMD()
 {
-    if (!m_is_regard_str_as_same_md) { return NULL; }
+    if (!m_is_regard_str_as_same_md) { return nullptr; }
 
     //Regard all string variables as same unbound MD.
-    if (m_str_md == NULL) {
+    if (m_str_md == nullptr) {
         Sym * s = addToSymbolTab("DedicatedVarBeRegardedAsString");
         Var * sv = getVarMgr()->registerStringVar(
             DEDICATED_STRING_VAR_NAME, s, MEMORY_ALIGNMENT);
@@ -157,13 +157,13 @@ void RegionMgr::registerGlobalMD()
     VarVec * varvec = m_var_mgr->get_var_vec();
     for (INT i = 0; i <= varvec->get_last_idx(); i++) {
         Var * v = varvec->get(i);
-        if (v == NULL || VAR_is_local(v)) { continue; }
+        if (v == nullptr || VAR_is_local(v)) { continue; }
 
         //User sometime intentionally declare non-allocable
         //global variable to custmized usage.
         //ASSERT0(!VAR_is_unallocable(v));
 
-        if (v->is_string() && genDedicateStrMD() != NULL) {
+        if (v->is_string() && genDedicateStrMD() != nullptr) {
             continue;
         }
 
@@ -196,7 +196,7 @@ VarMgr * RegionMgr::allocVarMgr()
 
 TargInfo * RegionMgr::allocTargInfo()
 {
-    return NULL;
+    return nullptr;
 }
 
 
@@ -228,11 +228,11 @@ Region * RegionMgr::newRegion(REGION_TYPE rt)
 void RegionMgr::addToRegionTab(Region * rg)
 {
     ASSERTN(rg->id() > 0, ("should generate new region via newRegion()"));
-    ASSERT0(getRegion(rg->id()) == NULL);
+    ASSERT0(getRegion(rg->id()) == nullptr);
     ASSERT0(rg->id() < m_ru_count);
     INT pad = xcom::getNearestPowerOf2(rg->id());
     if (m_id2ru.get_last_idx() + 1 < pad) {
-        m_id2ru.set(pad, NULL);
+        m_id2ru.set(pad, nullptr);
     }
     m_id2ru.set(rg->id(), rg);
 }
@@ -332,14 +332,14 @@ bool RegionMgr::verifyPreDefinedInfo()
 void RegionMgr::dumpRelationGraph(CHAR const* name)
 {
     if (getNumOfRegion() == 0) { return; }
-    if (name == NULL) {
+    if (name == nullptr) {
         name = "graph_region_relation_graph.vcg";
     }
     UNLINK(name);
     xcom::Graph g;
     for (UINT id = 0; id < getNumOfRegion(); id++) {
         Region * rg = getRegion(id);
-        if (rg == NULL || rg->getParent() == NULL) { continue; }
+        if (rg == nullptr || rg->getParent() == nullptr) { continue; }
         g.addEdge(rg->getParent()->id(), rg->id());
     }
     g.dumpVCG(name);
@@ -354,7 +354,7 @@ void RegionMgr::dump(bool dump_inner_region)
     note(this, "\n==---- DUMP ALL Registered Region ----==");
     for (UINT id = 0; id < getNumOfRegion(); id++) {
         Region * rg = getRegion(id);
-        if (rg == NULL) { continue; }
+        if (rg == nullptr) { continue; }
         rg->dump(dump_inner_region);
     }
 }
@@ -371,7 +371,7 @@ void RegionMgr::deleteRegion(Region * rg, bool collect_id)
     delete rg;
 
     if (collect_id && id != 0) {
-        m_id2ru.set(id, NULL);
+        m_id2ru.set(id, nullptr);
         m_free_ru_id.append_head(id);
     }
 
@@ -391,7 +391,7 @@ void RegionMgr::estimateEV(OUT UINT & num_call,
 {
     for (UINT i = 0; i < getNumOfRegion(); i++) {
         Region * rg = getRegion(i);
-        if (rg == NULL) { continue; }
+        if (rg == nullptr) { continue; }
 
         num_ru++;
 
@@ -401,7 +401,7 @@ void RegionMgr::estimateEV(OUT UINT & num_call,
         }
 
         List<IR const*> * call_list = rg->getCallList();
-        if (call_list != NULL) {
+        if (call_list != nullptr) {
             num_call += call_list->get_elem_count();
         }
     }
@@ -420,7 +420,7 @@ void RegionMgr::buildCallGraph(OptCtx & oc,
     UINT vn = 0, en = 0;
     estimateEV(en, vn, scan_call, scan_inner_region);
 
-    if (m_call_graph == NULL) {
+    if (m_call_graph == nullptr) {
         //Construct call graph.
         m_call_graph = allocCallGraph(vn, en);
     }

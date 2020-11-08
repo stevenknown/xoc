@@ -91,10 +91,18 @@ UINT TensorType::getByteSize(TypeMgr const* mgr) const
 
 //Set degree to given dimension.
 //Note degree should not be 0.
-void TensorType::setDegreeOfDim(UINT dim, UINT degree)
+void TensorType::setDegreeOfDim(UINT dim, UINT degree, TypeMgr * mgr)
 {
     ASSERTN(degree != 0, ("Degree of dim%d is 0.", dim));
-    degree_of_dimension.set(dim, degree);
+    degree_of_dimension.set(dim, degree, mgr->get_pool());
+}
+
+
+void TensorType::copy(TensorType const& src, TypeMgr * mgr)
+{
+    Type::copy(src);
+    tensor_elem_type = src.tensor_elem_type;
+    degree_of_dimension.copy(src.degree_of_dimension, mgr->get_pool());
 }
 //END TensorType
 
@@ -233,7 +241,7 @@ TypeContainer const* TypeMgr::registerPointer(Type const* type)
     //    PTR, base_size=128
     //    ...
     TypeContainer const* entry = m_pointer_type_tab.get(type);
-    if (entry != NULL) {
+    if (entry != nullptr) {
         return entry;
     }
 
@@ -258,9 +266,9 @@ TypeContainer const* TypeMgr::registerVector(Type const* type)
             TY_vec_size(type) % getDTypeByteSize(TY_vec_ety(type)) == 0);
 
     VectorElemTypeTab * elemtab = m_vector_type_tab.get(type);
-    if (elemtab != NULL) {
+    if (elemtab != nullptr) {
         TypeContainer const* entry = elemtab->get(type);
-        if (entry != NULL) {
+        if (entry != nullptr) {
             return entry;
         }
     }
@@ -279,7 +287,7 @@ TypeContainer const* TypeMgr::registerVector(Type const* type)
     VectorType * ty = newVectorType();
     TC_type(x) = ty;
     ty->copy((VectorType const&)*type);
-    if (elemtab == NULL) {
+    if (elemtab == nullptr) {
         //Add new vector into table.
         elemtab = new VectorElemTypeTab();
         m_vector_type_tab.set(ty, elemtab);
@@ -301,9 +309,9 @@ TypeContainer const* TypeMgr::registerTensor(Type const* type)
             getDTypeByteSize(TY_tensor_ety(type)) == 0);
 
     TensorElemTypeTab * elemtab = m_tensor_type_tab.get(type);
-    if (elemtab != NULL) {
+    if (elemtab != nullptr) {
         TypeContainer const* entry = elemtab->get(type);
-        if (entry != NULL) {
+        if (entry != nullptr) {
             return entry;
         }
     }
@@ -321,8 +329,8 @@ TypeContainer const* TypeMgr::registerTensor(Type const* type)
     TypeContainer * x = newTC();
     TensorType * ty = newTensorType();
     TC_type(x) = ty;
-    ty->copy((TensorType const&)*type);
-    if (elemtab == NULL) {
+    ty->copy((TensorType const&)*type, this);
+    if (elemtab == nullptr) {
         //Add new tensor into table.
         elemtab = new TensorElemTypeTab();
         m_tensor_type_tab.set(ty, elemtab);
@@ -352,7 +360,7 @@ Type const* TypeMgr::getTensorType(DATA_TYPE elem_ty, UINT dim, ...)
     UINT i = 0;
     while (i < dim) {
         UINT degree = (UINT)va_arg(args, UINT);
-        d.setDegreeOfDim(i, degree);
+        d.setDegreeOfDim(i, degree, this);
         i++;
     }
     va_end(args);
@@ -374,7 +382,7 @@ TypeContainer const* TypeMgr::registerMC(Type const* type)
     }
 
     TypeContainer const* entry = m_memorychunk_type_tab.get(type);
-    if (entry != NULL) {
+    if (entry != nullptr) {
         return entry;
     }
 
@@ -395,7 +403,7 @@ TypeContainer const* TypeMgr::registerSimplex(Type const* type)
 {
     ASSERT0(type);
     TypeContainer ** head = &m_simplex_type[TY_dtype(type)];
-    if (*head == NULL) {
+    if (*head == nullptr) {
         *head = newTC();
         TypeContainer * x = *head;
         Type * ty = newType();
@@ -447,7 +455,7 @@ Type * TypeMgr::registerType(Type const* type)
 
     ASSERTN(0, ("unsupport data type"));
 
-    return NULL;
+    return nullptr;
 }
 
 

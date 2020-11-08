@@ -43,9 +43,9 @@ author: Su Zhenyu
 #include <errno.h>
 
 INT g_source_file_handler = 0;
-CHAR const* g_dex_file_path = NULL;
+CHAR const* g_dex_file_path = nullptr;
 INT g_output_file_handler = 0;
-CHAR const* g_logfile_name = NULL;
+CHAR const* g_logfile_name = nullptr;
 
 //Set true to disable all auxiliary informations which will output to stdout.
 bool g_silence = false;
@@ -70,7 +70,7 @@ static bool is_dex_source_file(CHAR const* fn)
     CHAR * buf = (CHAR*)ALLOCA(len);
     buf = xcom::getfilesuffix(fn, buf, len);
 
-    if (buf == NULL) { return false; }
+    if (buf == nullptr) { return false; }
 
     if (strcmp(xcom::upper(buf), "DEX") == 0 ||
         strcmp(xcom::upper(buf), "ODEX") == 0) {
@@ -82,12 +82,12 @@ static bool is_dex_source_file(CHAR const* fn)
 
 static bool create_dump_file(UINT argc, CHAR const* argv[], IN OUT UINT & i)
 {
-    CHAR const* dumpfile = NULL;
-    if (i + 1 < argc && argv[i + 1] != NULL) {
+    CHAR const* dumpfile = nullptr;
+    if (i + 1 < argc && argv[i + 1] != nullptr) {
         dumpfile = argv[i + 1];
     }
     i += 2;
-    if (dumpfile == NULL) { return false; }
+    if (dumpfile == nullptr) { return false; }
 
     g_logfile_name = dumpfile;
     return true;
@@ -120,8 +120,8 @@ static bool process_silence(UINT argc, CHAR const* argv[], IN OUT UINT & i)
 
 static bool process_o(UINT argc, CHAR const* argv[], IN OUT UINT & i)
 {
-    CHAR const* output = NULL;
-    if (i + 1 < argc && argv[i + 1] != NULL) {
+    CHAR const* output = nullptr;
+    if (i + 1 < argc && argv[i + 1] != nullptr) {
         output = argv[i + 1];
     }
     i += 2;

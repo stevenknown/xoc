@@ -54,15 +54,15 @@ protected:
     bool process();
 
     bool useMDSSADU() const
-    { return m_mdssamgr != NULL && m_mdssamgr->is_valid(); }
+    { return m_mdssamgr != nullptr && m_mdssamgr->is_valid(); }
     bool usePRSSADU() const
-    { return m_prssamgr != NULL && m_prssamgr->is_valid(); }
+    { return m_prssamgr != nullptr && m_prssamgr->is_valid(); }
 public:
     explicit RefineDUChain(Region * rg) :
-        m_rg(rg), m_gvn(NULL), m_prssamgr(NULL), m_mdssamgr(NULL),
+        m_rg(rg), m_gvn(nullptr), m_prssamgr(nullptr), m_mdssamgr(nullptr),
         m_is_use_gvn(false)
     {
-        ASSERT0(rg != NULL);
+        ASSERT0(rg != nullptr);
         m_du = rg->getDUMgr();
         m_sbs_mgr = rg->getMiscBitSetMgr();
     }

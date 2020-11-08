@@ -54,16 +54,16 @@ typedef enum {
 } MEMPOOLTYPE;
 
 
-#define MEMPOOL_type(p)                 ((p)->pool_type)
-#define MEMPOOL_next(p)                 ((p)->next)
-#define MEMPOOL_prev(p)                 ((p)->prev)
-#define MEMPOOL_id(p)                   ((p)->mpt_id)
-#define MEMPOOL_grow_size(p)            ((p)->grow_size)
-#define MEMPOOL_start_pos(p)            ((p)->start_pos)
-#define MEMPOOL_pool_size(p)            ((p)->mem_pool_size)
-#define MEMPOOL_pool_ptr(p)             ((p)->ppool)
+#define MEMPOOL_type(p) ((p)->pool_type)
+#define MEMPOOL_next(p) ((p)->next)
+#define MEMPOOL_prev(p) ((p)->prev)
+#define MEMPOOL_id(p) ((p)->mpt_id)
+#define MEMPOOL_grow_size(p) ((p)->grow_size)
+#define MEMPOOL_start_pos(p) ((p)->start_pos)
+#define MEMPOOL_pool_size(p) ((p)->mem_pool_size)
+#define MEMPOOL_pool_ptr(p) ((p)->ppool)
 #ifdef _DEBUG_
-#define MEMPOOL_chunk_id(p)             ((p)->chunk_id)
+#define MEMPOOL_chunk_id(p) ((p)->chunk_id)
 #endif
 
 typedef struct _MemPool {

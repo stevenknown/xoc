@@ -73,7 +73,7 @@ protected:
     InlineInfo * mapRegion2InlineInfo(Region * rg, bool alloc)
     {
         InlineInfo * ii = m_ru2inl.get(rg);
-        if (ii == NULL && alloc) {
+        if (ii == nullptr && alloc) {
             ii = (InlineInfo*)xmalloc(sizeof(InlineInfo));
             m_ru2inl.set(rg, ii);
         }

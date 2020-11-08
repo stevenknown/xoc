@@ -247,7 +247,7 @@ public:
     virtual VNE_SC * create(OBJTY v)
     {
         VNE_SC * ve = m_free_lst.remove_head();
-        if (ve == NULL) {
+        if (ve == nullptr) {
             ve = (VNE_SC*)smpoolMalloc(sizeof(VNE_SC), m_pool);
         }
         ve->copy(*(VNE_SC*)v);
@@ -257,7 +257,7 @@ public:
     virtual void clean()
     {
         INT c;
-        for (VNE_SC * ve = get_first(c); ve != NULL; ve = get_next(c)) {
+        for (VNE_SC * ve = get_first(c); ve != nullptr; ve = get_next(c)) {
             ve->clean();
             m_free_lst.append_head(ve);
         }
@@ -307,7 +307,7 @@ public:
     virtual VNE_ILD * create(OBJTY v)
     {
         VNE_ILD * ve = m_free_lst.remove_head();
-        if (ve == NULL) {
+        if (ve == nullptr) {
             ve = (VNE_ILD*)smpoolMalloc(sizeof(VNE_ILD), m_pool);
         }
         ve->copy(*(VNE_ILD*)v);
@@ -317,7 +317,7 @@ public:
     virtual void clean()
     {
         INT c;
-        for (VNE_ILD * ve = get_first(c); ve != NULL; ve = get_next(c)) {
+        for (VNE_ILD * ve = get_first(c); ve != nullptr; ve = get_next(c)) {
             ve->clean();
             m_free_lst.append_head(ve);
         }
@@ -334,7 +334,7 @@ public:
     {
         TMapIter<IR const*, SCVNE2VN*> ii;
         SCVNE2VN * v;
-        for (get_first(ii, &v); v != NULL; get_next(ii, &v)) {
+        for (get_first(ii, &v); v != nullptr; get_next(ii, &v)) {
             delete v;
         }
     }
@@ -343,7 +343,7 @@ public:
     {
         TMapIter<IR const*, SCVNE2VN*> ii;
         SCVNE2VN * v;
-        for (get_first(ii, &v); v != NULL; get_next(ii, &v)) {
+        for (get_first(ii, &v); v != nullptr; get_next(ii, &v)) {
             v->clean();
         }
     }
@@ -358,7 +358,7 @@ public:
     {
         TMapIter<IR const*, ILD_VNE2VN*> ii;
         ILD_VNE2VN * vne2vn;
-        for (get_first(ii, &vne2vn); vne2vn != NULL; get_next(ii, &vne2vn)) {
+        for (get_first(ii, &vne2vn); vne2vn != nullptr; get_next(ii, &vne2vn)) {
             delete vne2vn;
         }
     }
@@ -367,7 +367,7 @@ public:
     {
         TMapIter<IR const*, ILD_VNE2VN*> ii;
         ILD_VNE2VN * vne2vn;
-        for (get_first(ii, &vne2vn); vne2vn != NULL; get_next(ii, &vne2vn)) {
+        for (get_first(ii, &vne2vn); vne2vn != nullptr; get_next(ii, &vne2vn)) {
             vne2vn->clean();
         }
     }
@@ -416,7 +416,7 @@ public:
     VNE_ARR * create(OBJTY v)
     {
         VNE_ARR * ve = m_free_lst.remove_head();
-        if (ve == NULL) {
+        if (ve == nullptr) {
             ve = (VNE_ARR*)smpoolMalloc(sizeof(VNE_ARR), m_pool);
         }
         ve->copy(*(VNE_ARR*)v);
@@ -426,7 +426,7 @@ public:
     void clean()
     {
         INT c;
-        for (VNE_ARR * ve = get_first(c); ve != NULL; ve = get_next(c)) {
+        for (VNE_ARR * ve = get_first(c); ve != nullptr; ve = get_next(c)) {
             ve->clean();
             m_free_lst.append_head(ve);
         }
@@ -443,7 +443,7 @@ public:
     {
         TMapIter<IR const*, ARR_VNE2VN*> ii;
         ARR_VNE2VN * v;
-        for (get_first(ii, &v); v != NULL; get_next(ii, &v)) {
+        for (get_first(ii, &v); v != nullptr; get_next(ii, &v)) {
             delete v;
         }
     }
@@ -452,7 +452,7 @@ public:
     {
         TMapIter<IR const*, ARR_VNE2VN*> ii;
         ARR_VNE2VN * v;
-        for (get_first(ii, &v); v != NULL; get_next(ii, &v)) {
+        for (get_first(ii, &v); v != nullptr; get_next(ii, &v)) {
             delete v;
         }
     }
@@ -565,7 +565,7 @@ protected:
     inline VN * newVN()
     {
         VN * vn = m_free_lst.remove_head();
-        if (vn == NULL) {
+        if (vn == nullptr) {
             vn = (VN*)xmalloc(sizeof(VN));
         } else {
             vn->clean();
@@ -582,9 +582,9 @@ protected:
     void processPhi(IR const* ir, bool & change);
 
     bool useMDSSADU() const
-    { return m_mdssamgr != NULL && m_mdssamgr->is_valid(); }
+    { return m_mdssamgr != nullptr && m_mdssamgr->is_valid(); }
     bool usePRSSADU() const
-    { return m_prssamgr != NULL && m_prssamgr->is_valid(); }
+    { return m_prssamgr != nullptr && m_prssamgr->is_valid(); }
 
 public:
     explicit GVN(Region * rg);

@@ -36,15 +36,15 @@ typedef xcom::TMap<UINT, MDPhiList*> BB2MDPhiList;
 typedef xcom::TMapIter<UINT, MDPhiList*> BB2MDPhiListIter;
 typedef xcom::List<MDDef*> MDDefIter;
 typedef TTab<UINT> LiveInMDTab;
-typedef TabIter<UINT> LiveInMDTabIter;
+typedef TTabIter<UINT> LiveInMDTabIter;
 
 //This class define the iterator that used to iterate IR occurrence for
 //each VOpnd in MDSSA mode.
 class ConstMDSSAUSEIRIter {
     COPY_CONSTRUCTOR(ConstMDSSAUSEIRIter);
 public:
-    ConstMDSSAUSEIRIter() : vopndset_iter(NULL), current_pos_in_vopndset(-1),
-        useset_iter(NULL), current_pos_in_useset(-1), current_useset(NULL) {}
+    ConstMDSSAUSEIRIter() : vopndset_iter(nullptr), current_pos_in_vopndset(-1),
+        useset_iter(nullptr), current_pos_in_useset(-1), current_useset(nullptr) {}
 
     VOpndSet * vopndset;
     VOpndSetIter vopndset_iter;
@@ -55,11 +55,11 @@ public:
 
     void clean()
     {
-        vopndset_iter = NULL;
+        vopndset_iter = nullptr;
         current_pos_in_vopndset = -1;
-        useset_iter = NULL;
+        useset_iter = nullptr;
         current_pos_in_useset = -1;
-        current_useset = NULL;
+        current_useset = nullptr;
     }
 };
 
@@ -113,11 +113,11 @@ protected:
     //NOTE this function only be called at constructor.
     void cleanInConstructor()
     {
-        m_rg = NULL;
-        m_tm = NULL;
-        m_seg_mgr = NULL;
-        m_sbs_mgr = NULL;
-        m_cfg = NULL;
+        m_rg = nullptr;
+        m_tm = nullptr;
+        m_seg_mgr = nullptr;
+        m_sbs_mgr = nullptr;
+        m_cfg = nullptr;
         m_is_valid = false;
         m_is_semi_pruned = true;
     }
@@ -153,7 +153,7 @@ protected:
 
     void init()
     {
-        if (m_usedef_mgr.m_mdssainfo_pool != NULL) { return; }
+        if (m_usedef_mgr.m_mdssainfo_pool != nullptr) { return; }
         m_is_valid = false;
     }
     void initVMD(IN IR * ir, OUT DefSBitSet & maydef_md);
@@ -236,7 +236,7 @@ public:
     void construction(OptCtx & oc);
     //Construction of MDSSA form.
     bool construction(DomTree & domtree);
-    size_t count_mem();
+    size_t count_mem() const;
 
     //DU chain operation.
     //Change Def stmt from 'olddef' to 'newdef'.
@@ -285,7 +285,7 @@ public:
     //Note the buffer have to at least 128 bytes.
     CHAR * dumpVMD(IN VMD * v, OUT CHAR * buf);
     //Dump MDSSA DU stmt graph.
-    void dumpSSAGraph(CHAR * name = NULL);
+    void dumpSSAGraph(CHAR * name = nullptr);
     //Dump IR tree's MD reference, where ir may be stmt or exp.
     void dumpRef(UINT indent);
     //Dump IR tree and MDSSAInfo if any.
@@ -307,7 +307,7 @@ public:
     PASS_TYPE getPassType() const { return PASS_MD_SSA_MGR; }
     //Get MDSSAInfo if exist.
     static MDSSAInfo * getMDSSAInfoIfAny(IR const* ir)
-    { return hasMDSSAInfo(ir) ? UseDefMgr::getMDSSAInfo(ir) : NULL; }
+    { return hasMDSSAInfo(ir) ? UseDefMgr::getMDSSAInfo(ir) : nullptr; }
     MDPhiList const* getPhiList(IRBB const* bb) const
     { return m_usedef_mgr.getBBPhiList(bb->id()); }
     //Generate both MDSSAInfo and VOpnd for related MD.
@@ -442,7 +442,7 @@ public:
     //    D1<->D5
     //    D1<->D6
     //    D1<->D4
-    //    D3<->NULL
+    //    D3<->nullptr
     //  where predecessor of D5, D6 is D1, successor of D1 includes D5, D6.
     void removeDefFromDDChain(MDDef * mddef);
     void removePHIFromDDChain(MDPhi * phi, MDDef * prev);

@@ -73,14 +73,14 @@ Dex2IR::Dex2IR(IN Region * rg,
     m_var2fieldid = m_rg->getVAR2Fieldid();
     m_lircode = fu;
     m_tr = ((DexRegion*)rg)->getTypeIndexRep();
-    m_ti = NULL;
+    m_ti = nullptr;
     m_pool = smpoolCreate(16, MEM_COMM);
     m_pr2v.init(MAX(4, getNearestPowerOf2(fu->maxVars)));
     m_ptr_addend = m_tm->getSimplexType(D_U32);
     m_ofst_addend = m_tm->getDTypeByteSize(D_I64);
     m_pr2v.maxreg = fu->maxVars - 1;
     m_pr2v.paramnum = fu->numArgs;
-    m_current_catch_list = NULL;
+    m_current_catch_list = nullptr;
 }
 
 
@@ -89,7 +89,7 @@ Var * Dex2IR::addVarByName(CHAR const* name, Type const* ty)
 {
     Sym * sym = m_ru_mgr->addToSymbolTab(name);
     Var * v = m_str2var.get(sym);
-    if (v != NULL) { return v; }
+    if (v != nullptr) { return v; }
     UINT flag = 0;
     SET_FLAG(flag, VAR_GLOBAL);
     v = m_vm->registerVar(sym, ty, 0, flag);
@@ -97,7 +97,7 @@ Var * Dex2IR::addVarByName(CHAR const* name, Type const* ty)
     //Record global class,method symbol at RegionMgr.
     //Record global class,method variable at program region.
     ASSERT0(m_ru_mgr->getProgramRegion());
-    if (m_ru_mgr->getSym2Var().get(sym) == NULL) {
+    if (m_ru_mgr->getSym2Var().get(sym) == nullptr) {
         m_ru_mgr->getProgramRegion()->addToVarTab(v);
         m_ru_mgr->getSym2Var().set(sym, v);
     }
@@ -131,12 +131,12 @@ Var * Dex2IR::addStringVar(CHAR const* string)
     //}
     Sym * sym = m_ru_mgr->addToSymbolTab(local_string);
     Var * v = m_str2var.get(sym);
-    if (v != NULL) { return v; }
-    v = m_vm->registerStringVar(NULL, sym, 0);
+    if (v != nullptr) { return v; }
+    v = m_vm->registerStringVar(nullptr, sym, 0);
 
     //Record string at RegionMgr.
     ASSERT0(m_ru_mgr->getProgramRegion());
-    if (m_ru_mgr->getSym2Var().get(sym) == NULL) {
+    if (m_ru_mgr->getSym2Var().get(sym) == nullptr) {
         m_ru_mgr->getProgramRegion()->addToVarTab(v);
         m_ru_mgr->getSym2Var().set(sym, v);
     }
@@ -370,7 +370,7 @@ IR * Dex2IR::convertSget(IN LIR * lir)
     //Var * v = addStaticVar(LIR_op0(lir), m_tr->obj_lda_base_type);
     Var * v = addStaticVar(LIR_op0(lir), getType(lir));
     set_map_v2ofst(v, LIR_op0(lir));
-    IR * rhs = NULL;
+    IR * rhs = nullptr;
     /*
     if (LIR_dt(lir) == LIR_JDT_object) {
         IR * id = m_rg->buildId(v);
@@ -388,7 +388,7 @@ IR * Dex2IR::convertSget(IN LIR * lir)
     tbaa->type = mapFieldType2Type(LIR_op0(lir));
     ASSERT0(tbaa->type);
     ai->set(tbaa);
-    ASSERT0(rhs->getAI() == NULL);
+    ASSERT0(rhs->getAI() == nullptr);
     IR_ai(rhs) = ai;
 
     IR * c = m_rg->buildStorePR(PR_no(res), res->getType(), rhs);
@@ -404,7 +404,7 @@ IR * Dex2IR::convertSget(IN LIR * lir)
 
 Type const* Dex2IR::mapDexType2XocType(CHAR charty)
 {
-    Type const* ty = NULL;
+    Type const* ty = nullptr;
     switch (charty) {
     case 'V': ty = m_tm->getSimplexTypeEx(D_ANY); break;
     case 'Z': ty = m_tm->getSimplexTypeEx(D_B); break;
@@ -429,7 +429,7 @@ Type const* Dex2IR::mapFieldType2Type(UINT field_id)
     CHAR const* type_name = get_var_type_name(field_id);
     ASSERT0(type_name);
     Type const* ty = m_typename2type.get(type_name);
-    if (ty != NULL) { return ty; }
+    if (ty != nullptr) { return ty; }
     m_typename2type.set(type_name, ty = mapDexType2XocType(*type_name));
     ASSERT0(ty);
     return ty;
@@ -485,7 +485,7 @@ IR * Dex2IR::convertAput(IN LIR * lir)
     tbaa->type = m_tr->array;
     ASSERT0(tbaa->type);
     ai->set(tbaa);
-    ASSERT0(base->getAI() == NULL);
+    ASSERT0(base->getAI() == nullptr);
     IR_ai(base) = ai;
 
     IR * c = m_rg->buildStoreArray(base, ofst, ty, ty, 1, &enbuf, src);
@@ -525,7 +525,7 @@ IR * Dex2IR::convertAget(IN LIR * lir)
     tbaa->type = m_tr->array;
     ASSERT0(tbaa->type);
     ai->set(tbaa);
-    ASSERT0(base->getAI() == NULL);
+    ASSERT0(base->getAI() == nullptr);
     IR_ai(base) = ai;
 
     IR * c = m_rg->buildStorePR(PR_no(res), res->getType(), array);
@@ -639,8 +639,8 @@ IR * Dex2IR::convertCmp(IN LIR * lir)
     //Generate callee.
     Var * v = getBuiltinVar(BLTIN_CMP_BIAS, m_ru_mgr);
     ASSERT0(v);
-    IR * last = NULL;
-    IR * p = NULL;
+    IR * last = nullptr;
+    IR * p = nullptr;
 
     //The first parameter is used to record cmp-kind.
     IR * kind = m_rg->buildImmInt(ck, m_tr->u32);
@@ -722,7 +722,7 @@ UINT Dex2IR::computeFieldOffset(UINT field_id)
 
     //Get class-definition.
     BYTE const* encoded_data = dexGetClassData(m_df, class_info);
-    DexClassData * class_data = dexReadAndVerifyClassData(&encoded_data, NULL);
+    DexClassData * class_data = dexReadAndVerifyClassData(&encoded_data, nullptr);
     for (UINT i = 0; i < class_data->header.instanceFieldsSize; i++) {
         DexField * finfo = &class_data->instanceFields[i];
         if (finfo->fieldIdx == field_id) {
@@ -775,7 +775,7 @@ IR * Dex2IR::convertIget(IN LIR * lir)
     tbaa->type = m_tr->ptr;
     ASSERT0(tbaa->type);
     ai->set(tbaa);
-    ASSERT0(obj->getAI() == NULL);
+    ASSERT0(obj->getAI() == nullptr);
     IR_ai(obj) = ai;
 
     if (m_has_catch) {
@@ -794,7 +794,7 @@ IR * Dex2IR::convertIget(IN LIR * lir)
         tbaa->type = m_tr->array;
         ASSERT0(tbaa->type);
         ai->set(tbaa);
-        ASSERT0(ild->getAI() == NULL);
+        ASSERT0(ild->getAI() == nullptr);
         IR_ai(ild) = ai;
     } else if (is_obj_type(type_name)) {
         //The type of result value of ild is pointer to object type.
@@ -805,7 +805,7 @@ IR * Dex2IR::convertIget(IN LIR * lir)
         tbaa->type = m_tr->ptr;
         ASSERT0(tbaa->type);
         ai->set(tbaa);
-        ASSERT0(ild->getAI() == NULL);
+        ASSERT0(ild->getAI() == nullptr);
         IR_ai(ild) = ai;
     }
 
@@ -1016,8 +1016,8 @@ IR * Dex2IR::convertInvoke(IN LIR * lir)
     ASSERT0(method_name && paramty);
 
     //Construct param list.
-    IR * last = NULL;
-    IR * param_list = NULL;
+    IR * last = nullptr;
+    IR * param_list = nullptr;
 
     //The first parameter is used to record invoke-kind.
     UINT k = LIR_dt(lir);
@@ -1058,7 +1058,7 @@ IR * Dex2IR::convertInvoke(IN LIR * lir)
     //Record invoke-parameters.
     paramty++;
     for (USHORT i = 0; i < r->argc; i++) {
-        IR * param = NULL;
+        IR * param = nullptr;
         if (has_this && i == 0) {
             param = genMappedPR(r->args[i], m_tr->ptr);
         } else {
@@ -1160,14 +1160,14 @@ IR * Dex2IR::convertArrayLength(IN LIR * lir)
 
 void Dex2IR::attachCatchInfo(IR * ir, AIContainer * ai)
 {
-    if (m_current_catch_list != NULL) {
+    if (m_current_catch_list != nullptr) {
         ASSERT0(ai);
         EHLabelAttachInfo * ehai = (EHLabelAttachInfo*)xmalloc(
                     sizeof(EHLabelAttachInfo), m_rg->get_pool());
         ehai->init(m_rg->get_sc_pool());
         ai->set(ehai);
         for (CatchInfo * ci = m_current_catch_list;
-             ci != NULL; ci = ci->next) {
+             ci != nullptr; ci = ci->next) {
             ehai->get_labels().append_head(ci->catch_start);
         }
     }
@@ -1176,9 +1176,9 @@ void Dex2IR::attachCatchInfo(IR * ir, AIContainer * ai)
 
 void Dex2IR::attachCatchInfo(IR * ir)
 {
-    if (m_current_catch_list != NULL) {
+    if (m_current_catch_list != nullptr) {
         AIContainer * ai = m_rg->allocAIContainer();
-        ASSERT0(ir->getAI() == NULL);
+        ASSERT0(ir->getAI() == nullptr);
         IR_ai(ir) = ai;
 
         EHLabelAttachInfo * ehai = (EHLabelAttachInfo*)xmalloc(
@@ -1186,7 +1186,7 @@ void Dex2IR::attachCatchInfo(IR * ir)
         ehai->init(m_rg->get_sc_pool());
         ai->set(ehai);
         for (CatchInfo * ci = m_current_catch_list;
-             ci != NULL; ci = ci->next) {
+             ci != nullptr; ci = ci->next) {
             ehai->get_labels().append_head(ci->catch_start);
         }
     }
@@ -1237,8 +1237,8 @@ IR * Dex2IR::convertPackedSwitch(IN LIR * lir)
 
     INT base_val = LIR_packed_switch_base_value(p);
 
-    IR * case_list = NULL;
-    IR * last = NULL;
+    IR * case_list = nullptr;
+    IR * last = nullptr;
     if (num_of_case > 0) {
         Type const* ty = m_tr->i32;
         UINT * pcase_entry = LIR_packed_switch_case_entry(p);
@@ -1259,7 +1259,7 @@ IR * Dex2IR::convertPackedSwitch(IN LIR * lir)
 
     LabelInfo * defaultlab = m_rg->genILabel();
     IR * vexp = genMappedPR(p->value, m_tr->i32);
-    IR * ret_list = m_rg->buildSwitch(vexp, case_list, NULL, defaultlab);
+    IR * ret_list = m_rg->buildSwitch(vexp, case_list, nullptr, defaultlab);
     add_next(&ret_list, m_rg->buildLabel(defaultlab));
     return ret_list;
 }
@@ -1283,7 +1283,7 @@ IR * Dex2IR::convertFillArrayData(IN LIR * lir)
     #endif
 
     Var * v = getBuiltinVar(BLTIN_FILL_ARRAY_DATA, m_ru_mgr);
-    IR * call = m_rg->buildCall(v, NULL, 0, m_tm->getAny());
+    IR * call = m_rg->buildCall(v, nullptr, 0, m_tm->getAny());
 
     //The first parameter is array obj-ptr.
     IR * p = genMappedPR(l->value, m_tr->ptr);
@@ -1312,8 +1312,8 @@ IR * Dex2IR::convertSparseSwitch(IN LIR * lir)
     ASSERT0(f == 0x200);
 
     UINT num_of_case = LIR_case_num(p);
-    IR * case_list = NULL;
-    IR * last = NULL;
+    IR * case_list = nullptr;
+    IR * last = nullptr;
     if (num_of_case > 0) {
         Type const* ty = m_tr->i32;
         UINT * pcase_value =LIR_sparse_switch_case_value(p);
@@ -1335,7 +1335,7 @@ IR * Dex2IR::convertSparseSwitch(IN LIR * lir)
 
     LabelInfo * defaultlab = m_rg->genILabel();
     IR * vexp = genMappedPR(p->value, m_tr->i32);
-    IR * ret_list = m_rg->buildSwitch(vexp, case_list, NULL, defaultlab);
+    IR * ret_list = m_rg->buildSwitch(vexp, case_list, nullptr, defaultlab);
     add_next(&ret_list, m_rg->buildLabel(defaultlab));
     return ret_list;
 }
@@ -1450,7 +1450,7 @@ IR * Dex2IR::convertConstClass(IN LIR * lir)
 IR * Dex2IR::convertMoveException(IN LIR * lir)
 {
     Var * v = getBuiltinVar(BLTIN_MOVE_EXP, m_ru_mgr);
-    IR * ir = m_rg->buildCall(v, NULL,
+    IR * ir = m_rg->buildCall(v, nullptr,
                               genMappedPrno(LIR_res(lir), m_tr->i32),
                               m_tr->i32);
     CALL_is_readonly(ir) = true;
@@ -1463,7 +1463,7 @@ IR * Dex2IR::convertMoveException(IN LIR * lir)
 
 IR * Dex2IR::convertMoveResult(IN LIR * lir)
 {
-    Type const* resty = NULL;
+    Type const* resty = nullptr;
     switch (LIR_dt(lir)) {
     case LIR_JDT_unknown: resty = m_tr->i32; break;
     case LIR_JDT_object: resty = m_tr->ptr; break;
@@ -1473,7 +1473,7 @@ IR * Dex2IR::convertMoveResult(IN LIR * lir)
 
     Var * v = getBuiltinVar(BLTIN_MOVE_RES, m_ru_mgr);
     VAR_is_readonly(v) = true;
-    IR * x = m_rg->buildCall(v, NULL,
+    IR * x = m_rg->buildCall(v, nullptr,
                              genMappedPrno(LIR_res(lir), resty),
                              resty);
     CALL_is_readonly(x) = true;
@@ -1485,7 +1485,7 @@ IR * Dex2IR::convertMoveResult(IN LIR * lir)
 
 IR * Dex2IR::convertMove(IN LIR * lir)
 {
-    Type const* ty = NULL;
+    Type const* ty = nullptr;
     switch (LIR_dt(lir)) {
     case LIR_JDT_unknown: //return pr.
         ty = m_tr->i32;
@@ -1509,7 +1509,7 @@ IR * Dex2IR::convertMove(IN LIR * lir)
 IR * Dex2IR::genMappedPR(UINT vid, Type const* ty)
 {
     IR * vx = m_v2pr.get(vid);
-    if (vx == NULL) {
+    if (vx == nullptr) {
         vx = m_rg->buildPR(ty);
         m_v2pr.set(vid, vx);
         m_pr2v.set(PR_no(vx), vid);
@@ -1525,7 +1525,7 @@ IR * Dex2IR::genMappedPR(UINT vid, Type const* ty)
 UINT Dex2IR::genMappedPrno(UINT vid, Type const* ty)
 {
     IR * vx = m_v2pr.get(vid);
-    if (vx == NULL) {
+    if (vx == nullptr) {
         vx = m_rg->buildPR(ty);
         m_v2pr.set(vid, vx);
         m_pr2v.set(PR_no(vx), vid);
@@ -1536,13 +1536,13 @@ UINT Dex2IR::genMappedPrno(UINT vid, Type const* ty)
 
 IR * Dex2IR::convertRet(IN LIR * lir)
 {
-    IR * exp = NULL;
+    IR * exp = nullptr;
     switch (LIR_dt(lir)) {
     case LIR_JDT_unknown: //return pr. vAA
         exp = genMappedPR(LIR_res(lir), m_tr->i32);
         break;
     case LIR_JDT_void:
-        exp = NULL;
+        exp = nullptr;
         break;
     case LIR_JDT_object: //return object.
         exp = genMappedPR(LIR_res(lir), m_tr->ptr);
@@ -1642,8 +1642,8 @@ IR * Dex2IR::convertCondBr(IN LIR * lir)
 
     //Det
     Type const* ty = m_tr->i32;
-    IR * op0 = NULL;
-    IR * op1 = NULL;
+    IR * op0 = nullptr;
+    IR * op1 = nullptr;
     UINT liridx = 0;
     if (LIR_opcode(lir) == LOP_IF) {
         op0 = genMappedPR(LIR_res(lir), ty);
@@ -1668,8 +1668,8 @@ IR * Dex2IR::convertCondBr(IN LIR * lir)
 
 IR * Dex2IR::convertCvt(IN LIR * lir)
 {
-    Type const* tgt = NULL;
-    Type const* src = NULL;
+    Type const* tgt = nullptr;
+    Type const* src = nullptr;
     switch (LIR_dt(lir)) {
     case LIR_convert_i2l: tgt = m_tr->i64; src = m_tr->i32; break;
     case LIR_convert_i2f: tgt = m_tr->f32; src = m_tr->i32; break;
@@ -1814,10 +1814,10 @@ IR * Dex2IR::convert(IN LIR * lir)
     default: UNREACHABLE();
     } //end switch
 
-    if (g_tfile != NULL) {
+    if (g_tfile != nullptr) {
         fflush(g_tfile);
     }
-    return NULL;
+    return nullptr;
 }
 
 
@@ -1830,7 +1830,7 @@ void Dex2IR::markLIRLabel()
             LIR * tgt = LIRC_op(m_lircode, LIR_op1(lir));
             ASSERT0(tgt);
             List<LabelInfo*> * lst = m_lir2labs.get(tgt);
-            if (lst == NULL) {
+            if (lst == nullptr) {
                 lst = new List<LabelInfo*>();
                 m_lir2labs.set(tgt, lst);
                 lst->append_tail(m_rg->genILabel());
@@ -1839,7 +1839,7 @@ void Dex2IR::markLIRLabel()
             LIR * tgt = LIRC_op(m_lircode, LIR_op0(lir));
             ASSERT0(tgt);
             List<LabelInfo*> * lst = m_lir2labs.get(tgt);
-            if (lst == NULL) {
+            if (lst == nullptr) {
                 lst = new List<LabelInfo*>();
                 m_lir2labs.set(tgt, lst);
                 lst->append_tail(m_rg->genILabel());
@@ -1848,7 +1848,7 @@ void Dex2IR::markLIRLabel()
             LIR * tgt = LIRC_op(m_lircode, ((LIRGOTOOp*)lir)->target);
             ASSERT0(tgt);
             List<LabelInfo*> * lst = m_lir2labs.get(tgt);
-            if (lst == NULL) {
+            if (lst == nullptr) {
                 lst = new List<LabelInfo*>();
                 m_lir2labs.set(tgt, lst);
                 lst->append_tail(m_rg->genILabel());
@@ -1865,7 +1865,7 @@ void Dex2IR::markLIRLabel()
                     LIR * tgt = LIRC_op(m_lircode, pcase_entry[i]);
                     ASSERT0(tgt);
                     List<LabelInfo*> * lst = m_lir2labs.get(tgt);
-                    if (lst == NULL) {
+                    if (lst == nullptr) {
                         lst = new List<LabelInfo*>();
                         m_lir2labs.set(tgt, lst);
                         lst->append_tail(m_rg->genILabel());
@@ -1885,7 +1885,7 @@ void Dex2IR::markLIRLabel()
                     LIR * tgt = LIRC_op(m_lircode, pcase_entry[i]);
                     ASSERT0(tgt);
                     List<LabelInfo*> * lst = m_lir2labs.get(tgt);
-                    if (lst == NULL) {
+                    if (lst == nullptr) {
                         lst = new List<LabelInfo*>();
                         m_lir2labs.set(tgt, lst);
                         lst->append_tail(m_rg->genILabel());
@@ -1896,7 +1896,7 @@ void Dex2IR::markLIRLabel()
             /* Do not generate catch start label here, and it will
              be made up during handle try-block.
             List<LabelInfo*> * lst = m_lir2labs.get(lir);
-            if (lst == NULL) {
+            if (lst == nullptr) {
                 lst = new List<LabelInfo*>();
                 m_lir2labs.set(lir, lst);
                 LabelInfo * lab = m_rg->genILabel();
@@ -1912,7 +1912,7 @@ void Dex2IR::markLIRLabel()
 void Dex2IR::markTryLabel()
 {
     if (m_lircode->triesSize != 0) {
-        TryInfo * tihead = NULL, * lasti = NULL;
+        TryInfo * tihead = nullptr, * lasti = nullptr;
         for (UINT i = 0; i < m_lircode->triesSize; i++) {
             LIROpcodeTry * each_try = m_lircode->trys + i;
             TryInfo * ti = (TryInfo*)xmalloc(sizeof(TryInfo));
@@ -1922,7 +1922,7 @@ void Dex2IR::markTryLabel()
             ASSERT0(pos >= 0 && pos < LIRC_num_of_op(m_lircode));
             LIR * lir = LIRC_op(m_lircode, pos);
             List<LabelInfo*> * lst = m_lir2labs.get(lir);
-            if (lst == NULL) {
+            if (lst == nullptr) {
                 lst = new List<LabelInfo*>();
                 m_lir2labs.set(lir, lst);
             }
@@ -1949,7 +1949,7 @@ void Dex2IR::markTryLabel()
                     m_last_try_end_lab_list.append_tail(lab);
                 } else {
                     lst = m_lir2labs.get(lir);
-                    if (lst == NULL) {
+                    if (lst == nullptr) {
                         lst = new List<LabelInfo*>();
                         m_lir2labs.set(lir, lst);
                     }
@@ -1975,7 +1975,7 @@ void Dex2IR::markTryLabel()
             ti->try_end = lab;
             ti->try_end_pos = pos;
 
-            CatchInfo * last = NULL;
+            CatchInfo * last = nullptr;
             for (UINT j = 0; j < each_try->catchSize; j++) {
                 LIROpcodeCatch * each_catch = each_try->catches + j;
                 CatchInfo * ci = (CatchInfo*)xmalloc(sizeof(CatchInfo));
@@ -1987,14 +1987,14 @@ void Dex2IR::markTryLabel()
                 //ASSERTN(LIR_opcode(x) == LOP_MOVE_EXCEPTION,
                 //         ("LIR at catch start must be move_exception"));
 
-                LabelInfo * lab = NULL;
+                LabelInfo * lab = nullptr;
                 lst = m_lir2labs.get(x);
-                if (lst == NULL) {
+                if (lst == nullptr) {
                     lst = new List<LabelInfo*>();
                     m_lir2labs.set(x, lst);
                 } else {
                     for (lab = lst->get_head();
-                         lab != NULL; lab = lst->get_next()) {
+                         lab != nullptr; lab = lst->get_next()) {
                         if (LABELINFO_is_catch_start(lab)) { break; }
                     }
 
@@ -2002,7 +2002,7 @@ void Dex2IR::markTryLabel()
                     //ASSERT0(lst->get_elem_count() == 1);
                 }
 
-                if (lab == NULL) {
+                if (lab == nullptr) {
                     lab = m_rg->genILabel();
                     LABELINFO_is_catch_start(lab) = true;
                     lst->append_tail(lab);
@@ -2026,19 +2026,19 @@ void Dex2IR::markTryLabel()
 
 void Dex2IR::dump_lir2lab()
 {
-    if (g_tfile != NULL) {
+    if (g_tfile != nullptr) {
         INT c;
         note("\n==-- DUMP LIR->LABEL --== ");
 
         TMapIter<LIR*, List<LabelInfo*>*> iter;
         List<LabelInfo*> * lst;
         for (LIR * lir = m_lir2labs.get_first(iter, &lst);
-             lir != NULL; lir =    m_lir2labs.get_next(iter, &lst)) {
+             lir != nullptr; lir =    m_lir2labs.get_next(iter, &lst)) {
             ASSERT0(lst);
             note("\n");
             dump_lir2(lir, m_df, -1);
             for (LabelInfo * lab = lst->get_head();
-                 lab != NULL; lab = lst->get_next()) {
+                 lab != nullptr; lab = lst->get_next()) {
                 dumpLabel(lab);
             }
         }
@@ -2053,16 +2053,16 @@ IR * Dex2IR::convert(bool * succ)
     m_has_catch = false;
     markLIRLabel();
     markTryLabel();
-    IR * ir_list = NULL;
-    IR * last = NULL;
+    IR * ir_list = nullptr;
+    IR * last = nullptr;
 
-    bool dump = g_dump_dex2ir && g_tfile != NULL;
+    bool dump = g_dump_dex2ir && g_tfile != nullptr;
     if (dump) {
         note("\n\n==== DEX->IR CONVERT %s =====",
                 m_rg->getRegionName());
     }
 
-    FILE * log = NULL;
+    FILE * log = nullptr;
     if (g_dd) {
         log = fopen("dex2ir.log", "a+");
         fprintf(log, "\n== %s ==", m_rg->getRegionName());
@@ -2073,8 +2073,8 @@ IR * Dex2IR::convert(bool * succ)
     INT start = -1;
     INT end = -1;
     TryInfo * ti = m_ti;
-    m_current_catch_list  = NULL;
-    if (ti != NULL) {
+    m_current_catch_list  = nullptr;
+    if (ti != nullptr) {
         start = ti->try_start_pos;
         end = ti->try_end_pos - 1;
     }
@@ -2082,7 +2082,7 @@ IR * Dex2IR::convert(bool * succ)
     for (INT i = 0; i < LIRC_num_of_op(m_lircode); i++) {
         LIR * lir = LIRC_op(m_lircode, i);
 
-        FILE * t = NULL;
+        FILE * t = nullptr;
         if (g_dd) {
             t = g_tfile;
             g_tfile = log;
@@ -2097,16 +2097,16 @@ IR * Dex2IR::convert(bool * succ)
         }
 
         List<LabelInfo*> * labs = m_lir2labs.get(lir);
-        if (labs != NULL) {
+        if (labs != nullptr) {
             for (LabelInfo * l = labs->get_head();
-                 l != NULL; l = labs->get_next()) {
+                 l != nullptr; l = labs->get_next()) {
                 add_next(&ir_list, &last, m_rg->buildLabel(l));
             }
         }
 
-        if (i > end && ti != NULL) {
+        if (i > end && ti != nullptr) {
             ti = ti->next;
-            if (ti != NULL) {
+            if (ti != nullptr) {
                 start = ti->try_start_pos;
                 end = ti->try_end_pos - 1;
             }
@@ -2116,7 +2116,7 @@ IR * Dex2IR::convert(bool * succ)
             m_current_catch_list = ti->catch_list;
             ASSERT0(m_current_catch_list);
         } else {
-            m_current_catch_list = NULL;
+            m_current_catch_list = nullptr;
         }
 
         IR * newir = convert(lir);
@@ -2127,11 +2127,11 @@ IR * Dex2IR::convert(bool * succ)
         }
 
         DexDbx const* dbx = m_dbxvec.get(i);
-        if (dbx != NULL) {
+        if (dbx != nullptr) {
             //Record Debug info.
-            for (IR * tmp = newir; tmp != NULL; tmp = IR_next(tmp)) {
+            for (IR * tmp = newir; tmp != nullptr; tmp = IR_next(tmp)) {
                 AIContainer * ai = IR_ai(tmp);
-                if (ai == NULL) {
+                if (ai == nullptr) {
                     ai = m_rg->allocAIContainer();
                     IR_ai(tmp) = ai;
                 }
@@ -2143,7 +2143,7 @@ IR * Dex2IR::convert(bool * succ)
     }
 
     for (LabelInfo * li = m_last_try_end_lab_list.get_head();
-         li != NULL; li = m_last_try_end_lab_list.get_next()) {
+         li != nullptr; li = m_last_try_end_lab_list.get_next()) {
         add_next(&ir_list, &last, m_rg->buildLabel(li));
     }
 

@@ -41,7 +41,7 @@ static bool isLowest(IR const* ir)
     ASSERT0(ir->is_exp());
     if (ir->is_leaf()) { return true; }
     IR * parent = ir->getParent();
-    if (parent == NULL) { return true; }
+    if (parent == nullptr) { return true; }
     if (!parent->is_stmt()) {
         //tree height is more than 2.
         return false;
@@ -94,7 +94,7 @@ bool Region::isLowestHeightArrayOp(IR const* ir) const
 
     if (!ARR_base(ir)->is_leaf()) { return false; }
 
-    for (IR const* s = ARR_sub_list(ir); s != NULL; s = s->get_next()) {
+    for (IR const* s = ARR_sub_list(ir); s != nullptr; s = s->get_next()) {
         if (!s->is_leaf()) { return false; }
     }
     return true;
@@ -153,7 +153,7 @@ bool Region::isLowestHeight(IR const* ir, SimpCtx const* ctx) const
     switch (ir->getCode()) {
     case IR_CALL:
     case IR_ICALL:
-        for (IR * p = CALL_param_list(ir); p != NULL; p = p->get_next()) {
+        for (IR * p = CALL_param_list(ir); p != nullptr; p = p->get_next()) {
             if (!p->is_leaf()) {
                 return false;
             }
@@ -177,7 +177,7 @@ bool Region::isLowestHeight(IR const* ir, SimpCtx const* ctx) const
     case IR_CASE:
         return true;
     case IR_RETURN:
-        if (RET_exp(ir) != NULL) {
+        if (RET_exp(ir) != nullptr) {
             return isLowestHeightExp(RET_exp(ir), ctx);
         }
         return true;
@@ -213,7 +213,7 @@ bool Region::isLowestHeight(IR const* ir, SimpCtx const* ctx) const
 //  IF_END:
 IR * Region::simplifyIfSelf(IR * ir, SimpCtx * ctx)
 {
-    if (ir == NULL) { return NULL; }
+    if (ir == nullptr) { return nullptr; }
     ASSERTN(ir->is_if(), ("expect IR_IF node"));
     SimpCtx tcont(*ctx);
     SIMP_ret_array_val(&tcont) = true;
@@ -233,8 +233,8 @@ IR * Region::simplifyIfSelf(IR * ir, SimpCtx * ctx)
     xcom::add_next(&det, falsebr);
 
     IR * truebody = simplifyStmtList(IF_truebody(ir), ctx);
-    IR * elsebody = NULL;
-    if (IF_falsebody(ir) != NULL) { //Simplify ELSE body
+    IR * elsebody = nullptr;
+    if (IF_falsebody(ir) != nullptr) { //Simplify ELSE body
         //append GOTO following end of true body
         IR * go = buildGoto(genILabel());
         copyDbx(go, IF_det(ir), this);
@@ -255,7 +255,7 @@ IR * Region::simplifyIfSelf(IR * ir, SimpCtx * ctx)
 
     if (SIMP_is_record_cfs(ctx)) {
         //Record high level control flow structure.
-        CFS_INFO * ci = NULL;
+        CFS_INFO * ci = nullptr;
 
         ASSERT0(SIMP_cfs_mgr(ctx));
         ci = SIMP_cfs_mgr(ctx)->new_cfs_info(IR_IF);
@@ -266,12 +266,12 @@ IR * Region::simplifyIfSelf(IR * ir, SimpCtx * ctx)
         SIMP_cfs_mgr(ctx)->recordStmt(elsebody, *CFS_INFO_false_body(ci));
     }
 
-    IR * ret_list = NULL;
+    IR * ret_list = nullptr;
     xcom::add_next(&ret_list, det);
     xcom::add_next(&ret_list, truebody);
     xcom::add_next(&ret_list, elsebody);
-    for (IR * p = ret_list; p != NULL; p = p->get_next()) {
-        IR_parent(p) = NULL;
+    for (IR * p = ret_list; p != nullptr; p = p->get_next()) {
+        IR_parent(p) = nullptr;
     }
 
     SIMP_changed(ctx) = true;
@@ -289,10 +289,10 @@ IR * Region::simplifyIfSelf(IR * ir, SimpCtx * ctx)
 //  LABEL: L1
 IR * Region::simplifyWhileDoSelf(IR * ir, SimpCtx * ctx)
 {
-    if (ir == NULL) return NULL;
+    if (ir == nullptr) return nullptr;
     SimpCtx local;
     local.copyTopdownFlag(*ctx);
-    IR * ret_list = NULL;
+    IR * ret_list = nullptr;
     ASSERTN(ir->is_whiledo(), ("expect IR_WHILE_DO node"));
     LabelInfo * startl = genILabel();
 
@@ -323,7 +323,7 @@ IR * Region::simplifyWhileDoSelf(IR * ir, SimpCtx * ctx)
 
     if (SIMP_is_record_cfs(ctx)) {
         //Record high level control flow structure.
-        CFS_INFO * ci = NULL;
+        CFS_INFO * ci = nullptr;
         ASSERT0(SIMP_cfs_mgr(ctx));
         ci = SIMP_cfs_mgr(ctx)->new_cfs_info(IR_WHILE_DO);
         SIMP_cfs_mgr(ctx)->set_map_ir2cfsinfo(falsebr, ci);
@@ -338,8 +338,8 @@ IR * Region::simplifyWhileDoSelf(IR * ir, SimpCtx * ctx)
     xcom::add_next(&ret_list, det);
     xcom::add_next(&ret_list, body);
     xcom::add_next(&ret_list, buildLabel(BR_lab(falsebr)));
-    for (IR * p = ret_list; p != NULL; p = p->get_next()) {
-        IR_parent(p) = NULL;
+    for (IR * p = ret_list; p != nullptr; p = p->get_next()) {
+        IR_parent(p) = nullptr;
     }
     SIMP_changed(ctx) = true;
     SIMP_need_recon_bblist(ctx) = true;
@@ -355,10 +355,10 @@ IR * Region::simplifyWhileDoSelf(IR * ir, SimpCtx * ctx)
 //  TRUEBR start
 IR * Region::simplifyDoWhileSelf(IR * ir, SimpCtx * ctx)
 {
-    if (ir == NULL) return NULL;
+    if (ir == nullptr) return nullptr;
     SimpCtx local;
     local.copyTopdownFlag(*ctx);
-    IR * ret_list = NULL;
+    IR * ret_list = nullptr;
     ASSERTN(ir->is_dowhile(), ("expect IR_DO_WHILE node"));
 
     LabelInfo * startl = genILabel();
@@ -390,7 +390,7 @@ IR * Region::simplifyDoWhileSelf(IR * ir, SimpCtx * ctx)
 
     if (SIMP_is_record_cfs(ctx)) {
         //Record high level control flow structure.
-        CFS_INFO * ci = NULL;
+        CFS_INFO * ci = nullptr;
         ASSERT0(SIMP_cfs_mgr(ctx));
         ci = SIMP_cfs_mgr(ctx)->new_cfs_info(IR_DO_WHILE);
         SIMP_cfs_mgr(ctx)->set_map_ir2cfsinfo(truebr, ci);
@@ -406,8 +406,8 @@ IR * Region::simplifyDoWhileSelf(IR * ir, SimpCtx * ctx)
     xcom::add_next(&ret_list, &last, buildLabel(det_startl));
     xcom::add_next(&ret_list, &last, det);
     xcom::add_next(&ret_list, &last, buildLabel(endl));
-    for (IR * p = ret_list; p != NULL; p = p->get_next()) {
-        IR_parent(p) = NULL;
+    for (IR * p = ret_list; p != nullptr; p = p->get_next()) {
+        IR_parent(p) = nullptr;
     }
     SIMP_changed(ctx) = true;
     SIMP_need_recon_bblist(ctx) = true;
@@ -427,10 +427,10 @@ IR * Region::simplifyDoWhileSelf(IR * ir, SimpCtx * ctx)
 //  LABEL: L1
 IR * Region::simplifyDoLoopSelf(IR * ir, SimpCtx * ctx)
 {
-    if (ir == NULL) return NULL;
+    if (ir == nullptr) return nullptr;
     SimpCtx local;
     local.copyTopdownFlag(*ctx);
-    IR * ret_list = NULL;
+    IR * ret_list = nullptr;
     ASSERTN(ir->is_doloop(), ("expect IR_DO_LOOP node"));
 
     LabelInfo * startl = genILabel();
@@ -476,8 +476,8 @@ IR * Region::simplifyDoLoopSelf(IR * ir, SimpCtx * ctx)
 
     if (SIMP_is_record_cfs(ctx)) {
         //Record high level control flow structure.
-        CFS_INFO * ci = NULL;
-        ASSERT0(SIMP_cfs_mgr(ctx) != NULL);
+        CFS_INFO * ci = nullptr;
+        ASSERT0(SIMP_cfs_mgr(ctx) != nullptr);
         ci = SIMP_cfs_mgr(ctx)->new_cfs_info(IR_DO_LOOP);
         SIMP_cfs_mgr(ctx)->set_map_ir2cfsinfo(falsebr, ci);
         CFS_INFO_ir(ci) = falsebr;
@@ -492,9 +492,9 @@ IR * Region::simplifyDoLoopSelf(IR * ir, SimpCtx * ctx)
     xcom::add_next(&ret_list, falsebr);
     xcom::add_next(&ret_list, body);
     xcom::add_next(&ret_list, buildLabel(BR_lab(falsebr)));
-    for (IR * p = ret_list; p != NULL; p = p->get_next()) {
+    for (IR * p = ret_list; p != nullptr; p = p->get_next()) {
         ASSERT0(p->is_stmt());
-        IR_parent(p) = NULL;
+        IR_parent(p) = nullptr;
     }
     SIMP_changed(ctx) = true;
     SIMP_need_recon_bblist(ctx) = true;
@@ -505,12 +505,12 @@ IR * Region::simplifyDoLoopSelf(IR * ir, SimpCtx * ctx)
 //Simplify determination of Control Flow Structure.
 IR * Region::simplifyDet(IR * ir, SimpCtx * ctx)
 {
-    if (ir == NULL) return NULL;
-    IR * ret_exp_list = NULL;
+    if (ir == nullptr) return nullptr;
+    IR * ret_exp_list = nullptr;
     IR * next;
-    while (ir != NULL) {
+    while (ir != nullptr) {
         next = ir->get_next();
-        IR_next(ir) = IR_prev(ir) = NULL;
+        IR_next(ir) = IR_prev(ir) = nullptr;
         if (ir->is_stmt()) {
             SimpCtx tcont(*ctx);
             IR * new_stmt_list = simplifyStmt(ir, &tcont);
@@ -518,7 +518,7 @@ IR * Region::simplifyDet(IR * ir, SimpCtx * ctx)
 
             #ifdef _DEBUG_
             IR * x = new_stmt_list;
-            while (x != NULL) {
+            while (x != nullptr) {
                 ASSERT0(x->is_stmt());
                 x = x->get_next();
             }
@@ -536,8 +536,8 @@ IR * Region::simplifyDet(IR * ir, SimpCtx * ctx)
         }
         ir = next;
     }
-    for (IR * p = ret_exp_list; p != NULL; p = p->get_next()) {
-        IR_parent(p) = NULL;
+    for (IR * p = ret_exp_list; p != nullptr; p = p->get_next()) {
+        IR_parent(p) = nullptr;
     }
     return ret_exp_list;
 }
@@ -561,11 +561,11 @@ IR * Region::simplifyLogicalNot(IN IR * ir, SimpCtx * ctx)
     LabelInfo * label1 = genILabel();
     IR * pr = buildPR(ir->getType());
     allocRefForPR(pr);
-    IR * ret_list = NULL;
+    IR * ret_list = nullptr;
 
     //truebr(exp != 0), L1
     IR * opnd0 = UNA_opnd(ir);
-    UNA_opnd(ir) = NULL;
+    UNA_opnd(ir) = nullptr;
     if (!opnd0->is_judge()) {
         opnd0 = buildJudge(opnd0);
     }
@@ -669,12 +669,12 @@ IR * Region::simplifyLogicalAnd(IN IR * ir, SimpCtx * ctx)
 //NOTE: ir's parent can NOT be FALSEBR.
 IR * Region::simplifyLogicalAndAtTruebr(IR * ir, LabelInfo const* tgt_label)
 {
-    ASSERT0(ir->is_land() && tgt_label != NULL);
-    IR * ret_list = NULL;
+    ASSERT0(ir->is_land() && tgt_label != nullptr);
+    IR * ret_list = nullptr;
 
     //Process opnd0.
     IR * opnd0 = BIN_opnd0(ir);
-    BIN_opnd0(ir) = NULL;
+    BIN_opnd0(ir) = nullptr;
     if (!opnd0->is_judge()) {
         opnd0 = buildJudge(opnd0);
     }
@@ -687,7 +687,7 @@ IR * Region::simplifyLogicalAndAtTruebr(IR * ir, LabelInfo const* tgt_label)
 
     //Process opnd1.
     IR * opnd1 = BIN_opnd1(ir);
-    BIN_opnd1(ir) = NULL;
+    BIN_opnd1(ir) = nullptr;
     if (!opnd1->is_judge()) {
         opnd1 = buildJudge(opnd1);
     }
@@ -713,12 +713,12 @@ IR * Region::simplifyLogicalAndAtTruebr(IR * ir, LabelInfo const* tgt_label)
 //NOTE: ir's parent must be FALSEBR.
 IR * Region::simplifyLogicalAndAtFalsebr(IR * ir, LabelInfo const* tgt_label)
 {
-    ASSERT0(ir->is_land() && tgt_label != NULL);
-    IR * ret_list = NULL;
+    ASSERT0(ir->is_land() && tgt_label != nullptr);
+    IR * ret_list = nullptr;
 
     //Process opnd0.
     IR * opnd0 = BIN_opnd0(ir);
-    BIN_opnd0(ir) = NULL;
+    BIN_opnd0(ir) = nullptr;
     if (!opnd0->is_judge()) {
         opnd0 = buildJudge(opnd0);
     }
@@ -728,7 +728,7 @@ IR * Region::simplifyLogicalAndAtFalsebr(IR * ir, LabelInfo const* tgt_label)
 
     //Process opnd1
     IR * opnd1 = BIN_opnd1(ir);
-    BIN_opnd1(ir) = NULL;
+    BIN_opnd1(ir) = nullptr;
     if (!opnd1->is_judge()) {
         opnd1 = buildJudge(opnd1);
     }
@@ -754,12 +754,12 @@ IR * Region::simplifyLogicalAndAtFalsebr(IR * ir, LabelInfo const* tgt_label)
 //NOTE: ir's parent can NOT be FALSEBR.
 IR * Region::simplifyLogicalOrAtTruebr(IR * ir, LabelInfo const* tgt_label)
 {
-    ASSERT0(ir->is_lor() && tgt_label != NULL);
-    IR * ret_list = NULL;
+    ASSERT0(ir->is_lor() && tgt_label != nullptr);
+    IR * ret_list = nullptr;
 
     //Process opnd0.
     IR * opnd0 = BIN_opnd0(ir);
-    BIN_opnd0(ir) = NULL;
+    BIN_opnd0(ir) = nullptr;
     if (!opnd0->is_judge()) {
         opnd0 = buildJudge(opnd0);
     }
@@ -769,16 +769,16 @@ IR * Region::simplifyLogicalOrAtTruebr(IR * ir, LabelInfo const* tgt_label)
 
     //Process opnd1.
     IR * opnd1 = BIN_opnd1(ir);
-    BIN_opnd1(ir) = NULL;
+    BIN_opnd1(ir) = nullptr;
     if (!opnd1->is_judge()) {
         opnd1 = buildJudge(opnd1);
     }
-    IR * op = NULL;
+    IR * op = nullptr;
     //if (SIMP_lnot(ctx)) {
         op = buildBranch(true, opnd1, tgt_label);
     //} else {
     //    In the case ir's parent is if(a||b),L1, generate STORE is invalid.
-    //    ASSERT0(res_pr != NULL);
+    //    ASSERT0(res_pr != nullptr);
     //    op = buildStore(res_pr, opnd1);
     //}
     copyDbx(op, ir, this);
@@ -798,12 +798,12 @@ IR * Region::simplifyLogicalOrAtTruebr(IR * ir, LabelInfo const* tgt_label)
 //NOTE: ir's parent must be be FALSEBR.
 IR * Region::simplifyLogicalOrAtFalsebr(IR * ir, LabelInfo const* tgt_label)
 {
-    ASSERT0(ir->is_lor() && tgt_label != NULL);
-    IR * ret_list = NULL;
+    ASSERT0(ir->is_lor() && tgt_label != nullptr);
+    IR * ret_list = nullptr;
 
     //ir is FALSEBR
     IR * opnd0 = BIN_opnd0(ir);
-    BIN_opnd0(ir) = NULL;
+    BIN_opnd0(ir) = nullptr;
     if (!opnd0->is_judge()) {
         opnd0 = buildJudge(opnd0);
     }
@@ -813,7 +813,7 @@ IR * Region::simplifyLogicalOrAtFalsebr(IR * ir, LabelInfo const* tgt_label)
     xcom::add_next(&ret_list, true_br);
 
     IR * opnd1 = BIN_opnd1(ir);
-    BIN_opnd1(ir) = NULL;
+    BIN_opnd1(ir) = nullptr;
     if (!opnd1->is_judge()) {
         opnd1 = buildJudge(opnd1);
     }
@@ -888,14 +888,14 @@ IR * Region::simplifyLogicalOr(IN IR * ir, SimpCtx * ctx)
 //Return generate IR stmts.
 IR * Region::simplifyLogicalDet(IR * ir, SimpCtx * ctx)
 {
-    if (ir == NULL) { return NULL; }
+    if (ir == nullptr) { return nullptr; }
     ASSERT0(ir->isConditionalBr());
     ASSERT0(BR_det(ir)->is_logical());
-    IR * ret_list = NULL;
+    IR * ret_list = nullptr;
     if (BR_det(ir)->is_lor()) {
         if (ir->is_truebr()) {
             ret_list = simplifyLogicalOrAtTruebr(BR_det(ir), BR_lab(ir));
-            BR_det(ir) = NULL;
+            BR_det(ir) = nullptr;
             freeIRTree(ir);
             SIMP_changed(ctx) = true;
             SIMP_need_recon_bblist(ctx) = true;
@@ -904,7 +904,7 @@ IR * Region::simplifyLogicalDet(IR * ir, SimpCtx * ctx)
 
         //ir is FALSEBR
         ret_list = simplifyLogicalOrAtFalsebr(BR_det(ir), BR_lab(ir));
-        BR_det(ir) = NULL;
+        BR_det(ir) = nullptr;
         freeIRTree(ir);
         SIMP_changed(ctx) = true;
         SIMP_need_recon_bblist(ctx) = true;
@@ -912,7 +912,7 @@ IR * Region::simplifyLogicalDet(IR * ir, SimpCtx * ctx)
     } else if (BR_det(ir)->is_land()) {
         if (ir->is_truebr()) {
             ret_list = simplifyLogicalAndAtTruebr(BR_det(ir), BR_lab(ir));
-            BR_det(ir) = NULL;
+            BR_det(ir) = nullptr;
             freeIRTree(ir);
             SIMP_changed(ctx) = true;
             SIMP_need_recon_bblist(ctx) = true;
@@ -921,7 +921,7 @@ IR * Region::simplifyLogicalDet(IR * ir, SimpCtx * ctx)
 
         //ir is FALSEBR
         ret_list = simplifyLogicalAndAtFalsebr(BR_det(ir), BR_lab(ir));
-        BR_det(ir) = NULL;
+        BR_det(ir) = nullptr;
         freeIRTree(ir);
         SIMP_changed(ctx) = true;
         SIMP_need_recon_bblist(ctx) = true;
@@ -953,7 +953,7 @@ void Region::simplifySelectKids(IR * ir, SimpCtx * ctx)
     ASSERT0(ir && ir->is_select());
     for (UINT i = 0; i < IR_MAX_KID_NUM(ir); i++) {
         IR * kid = ir->getKid(i);
-        if (kid == NULL) { continue; }
+        if (kid == nullptr) { continue; }
         IR * new_kid = simplifyExpression(kid, ctx);
 
         if (SIMP_to_lowest_height(ctx)) {
@@ -972,7 +972,7 @@ void Region::simplifySelectKids(IR * ir, SimpCtx * ctx)
 //Generate comparision and branch.
 IR * Region::simplifySelect(IR * ir, SimpCtx * ctx)
 {
-    if (ir == NULL) { return NULL; }
+    if (ir == nullptr) { return nullptr; }
     ASSERTN(ir->is_select(), ("expect select node"));
     if (!SIMP_select(ctx)) {
         simplifySelectKids(ir, ctx);
@@ -1007,8 +1007,8 @@ IR * Region::simplifySelect(IR * ir, SimpCtx * ctx)
     IR * falsebr = buildBranch(false, newpred, genILabel());
     copyDbx(falsebr, SELECT_pred(ir), this);
 
-    IR * lst = NULL;
-    IR * last = NULL;
+    IR * lst = nullptr;
+    IR * last = nullptr;
     xcom::add_next(&lst, &last, falsebr);
 
     //Trueexp's type may be different to Falseexp.
@@ -1028,7 +1028,7 @@ IR * Region::simplifySelect(IR * ir, SimpCtx * ctx)
 
     //---
     //Simp false expression
-    ASSERT0(SELECT_falseexp(ir) != NULL);
+    ASSERT0(SELECT_falseexp(ir) != nullptr);
     //append GOTO following end of true body
     IR * gotoend = buildGoto(genILabel());
     copyDbx(gotoend, SELECT_pred(ir), this);
@@ -1052,8 +1052,8 @@ IR * Region::simplifySelect(IR * ir, SimpCtx * ctx)
     xcom::add_next(&lst, &last, buildLabel(GOTO_lab(gotoend)));
     //
 
-    for (IR * p = lst; p != NULL; p = p->get_next()) {
-        IR_parent(p) = NULL;
+    for (IR * p = lst; p != nullptr; p = p->get_next()) {
+        IR_parent(p) = nullptr;
     }
     ctx->appendStmt(lst);
 
@@ -1061,8 +1061,8 @@ IR * Region::simplifySelect(IR * ir, SimpCtx * ctx)
     SIMP_need_recon_bblist(ctx) = true;
     if (SIMP_is_record_cfs(ctx)) {
         //Record high level control flow structure.
-        CFS_INFO * ci = NULL;
-        ASSERT0(SIMP_cfs_mgr(ctx) != NULL);
+        CFS_INFO * ci = nullptr;
+        ASSERT0(SIMP_cfs_mgr(ctx) != nullptr);
         ci = SIMP_cfs_mgr(ctx)->new_cfs_info(IR_IF);
         SIMP_cfs_mgr(ctx)->set_map_ir2cfsinfo(falsebr, ci);
         CFS_INFO_ir(ci) = falsebr;
@@ -1075,7 +1075,7 @@ IR * Region::simplifySelect(IR * ir, SimpCtx * ctx)
 
 IR * Region::simplifyIgoto(IR * ir, SimpCtx * ctx)
 {
-    if (ir == NULL) { return NULL; }
+    if (ir == nullptr) { return nullptr; }
     ASSERTN(ir->is_igoto(), ("expect igoto"));
 
     IGOTO_vexp(ir) = simplifyExpression(IGOTO_vexp(ir), ctx);
@@ -1085,35 +1085,35 @@ IR * Region::simplifyIgoto(IR * ir, SimpCtx * ctx)
 
 IR * Region::simplifySwitchSelf(IR * ir, SimpCtx * ctx)
 {
-    if (ir == NULL) { return NULL; }
+    if (ir == nullptr) { return nullptr; }
     ASSERTN(ir->is_switch(), ("expect switch node"));
 
-    IR * vexp_stmt = NULL;
+    IR * vexp_stmt = nullptr;
     IR * swt_val = SWITCH_vexp(ir);
     if (!swt_val->is_pr()) {
         SimpCtx vexpctx;
         swt_val = simpToPR(swt_val, &vexpctx);
         vexp_stmt = SIMP_stmtlist(&vexpctx);
     }
-    SWITCH_vexp(ir) = NULL;
+    SWITCH_vexp(ir) = nullptr;
 
     IR * case_lst = xcom::get_last(SWITCH_case_list(ir));
-    IR * prev_ir_tree = NULL;
-    if (case_lst == NULL) {
+    IR * prev_ir_tree = nullptr;
+    if (case_lst == nullptr) {
         //Switch body is useless and neglected.
-        return NULL;
+        return nullptr;
     }
 
-    LabelInfo * switch_endlab = NULL;
+    LabelInfo * switch_endlab = nullptr;
 
     //Simplify CASE list into IF as default to enable
     //more advanced middle level optimizations.
-    if (SWITCH_deflab(ir) != NULL) {
+    if (SWITCH_deflab(ir) != nullptr) {
         prev_ir_tree = buildGoto(SWITCH_deflab(ir));
         copyDbx(prev_ir_tree, ir, this);
-        SWITCH_deflab(ir) = NULL;
+        SWITCH_deflab(ir) = nullptr;
     } else {
-        if (switch_endlab == NULL) {
+        if (switch_endlab == nullptr) {
             switch_endlab = genILabel();
         }
         IR * goto_switch_end = buildGoto(switch_endlab);
@@ -1121,20 +1121,20 @@ IR * Region::simplifySwitchSelf(IR * ir, SimpCtx * ctx)
         copyDbx(goto_switch_end, ir, this);
     }
 
-    for (; case_lst != NULL; case_lst = IR_prev(case_lst)) {
+    for (; case_lst != nullptr; case_lst = IR_prev(case_lst)) {
         IR * ifstmt = buildIf(
             buildCmp(IR_EQ, dupIRTree(swt_val), CASE_vexp(case_lst)),
             buildGoto(CASE_lab(case_lst)),
             prev_ir_tree);
         copyDbx(ifstmt, case_lst, this);
-        CASE_vexp(case_lst) = NULL;
+        CASE_vexp(case_lst) = nullptr;
         prev_ir_tree = ifstmt;
     }
 
     xcom::add_next(&prev_ir_tree, SWITCH_body(ir));
-    SWITCH_body(ir) = NULL;
+    SWITCH_body(ir) = nullptr;
 
-    if (switch_endlab != NULL) {
+    if (switch_endlab != nullptr) {
         xcom::add_next(&prev_ir_tree, buildLabel(switch_endlab));
     }
 
@@ -1142,7 +1142,7 @@ IR * Region::simplifySwitchSelf(IR * ir, SimpCtx * ctx)
         //Simpilify IF to TRUEBR/FALSEBR.
         //Generate the ending-label of SWITCH to serve as the target
         //branch label of TRUEBR/FALSEBR.
-        if (switch_endlab == NULL) {
+        if (switch_endlab == nullptr) {
             switch_endlab = genILabel();
             xcom::add_next(&prev_ir_tree, buildLabel(switch_endlab));
         }
@@ -1152,15 +1152,15 @@ IR * Region::simplifySwitchSelf(IR * ir, SimpCtx * ctx)
         prev_ir_tree = simplifyStmtList(prev_ir_tree, &tctx);
     }
 
-    for (IR * p = prev_ir_tree; p != NULL; p = p->get_next()) {
-        IR_parent(p) = NULL;
+    for (IR * p = prev_ir_tree; p != nullptr; p = p->get_next()) {
+        IR_parent(p) = nullptr;
     }
 
     SIMP_changed(ctx) = true;
     SIMP_need_recon_bblist(ctx) = true;
 
     IR * ret_list = prev_ir_tree;
-    if (vexp_stmt != NULL) {
+    if (vexp_stmt != nullptr) {
         xcom::add_next(&vexp_stmt, prev_ir_tree);
         ret_list = vexp_stmt;
     }
@@ -1202,11 +1202,11 @@ IR * Region::simplifyArrayAddrExp(IR * ir, SimpCtx * ctx)
 
     Type const* indextyid = getTargetMachineArrayIndexType();
     UINT dim = 0;
-    IR * ofst_exp = NULL;
+    IR * ofst_exp = nullptr;
     TMWORD const* elemnumbuf = ARR_elem_num_buf(ir);
 
     for (IR * s = xcom::removehead(&ARR_sub_list(ir));
-         s != NULL; dim++, s = xcom::removehead(&ARR_sub_list(ir))) {
+         s != nullptr; dim++, s = xcom::removehead(&ARR_sub_list(ir))) {
         SimpCtx tcont(*ctx);
         SIMP_ret_array_val(&tcont) = true;
         IR * newsub = simplifyExpression(s, &tcont);
@@ -1238,13 +1238,13 @@ IR * Region::simplifyArrayAddrExp(IR * ir, SimpCtx * ctx)
             }
         }
 
-        if (ofst_exp == NULL) {
+        if (ofst_exp == nullptr) {
             ofst_exp = newsub;
         } else {
             ofst_exp = buildBinaryOpSimp(IR_ADD, indextyid, ofst_exp, newsub);
         }
 
-        if (elemnumbuf != NULL) {
+        if (elemnumbuf != nullptr) {
             ASSERTN(elemnumbuf[dim] != 0,
                     ("Incomplete array dimension, we need to "
                      "know how many elements in dimension %d.", dim));
@@ -1283,7 +1283,7 @@ IR * Region::simplifyArrayAddrExp(IR * ir, SimpCtx * ctx)
     ctx->unionBottomupFlag(tcont);
 
     ASSERT0(newbase && (newbase->is_ptr() || newbase->is_any()));
-    ARR_base(ir) = NULL;
+    ARR_base(ir) = nullptr;
 
     //'array_addr' is address of an ARRAY, and it is pointer type.
     //Given 'array_addr + n', the result-type of '+' must
@@ -1304,7 +1304,7 @@ IR * Region::simplifyArrayAddrExp(IR * ir, SimpCtx * ctx)
     }
 
     if (SIMP_to_lowest_height(ctx)) {
-       //CASE: If IR_parent is NULL, the situation is
+       //CASE: If IR_parent is nullptr, the situation is
        //caller attempt to enforce simplification to array expression
        //whenever possible.
        SimpCtx ttcont(*ctx);
@@ -1334,7 +1334,7 @@ IR * Region::simplifyBinAndUniExpression(IR * ir, SimpCtx * ctx)
 
     for (UINT i = 0; i < IR_MAX_KID_NUM(ir); i++) {
         IR * kid = ir->getKid(i);
-        if (kid != NULL) {
+        if (kid != nullptr) {
             IR * x = simplifyExpression(kid, ctx);
             ir->setKid(i, x);
         }
@@ -1347,7 +1347,7 @@ IR * Region::simplifyBinAndUniExpression(IR * ir, SimpCtx * ctx)
     //Do lowering.
     for (UINT i = 0; i < IR_MAX_KID_NUM(ir); i++) {
         IR * k = ir->getKid(i);
-        if (k == NULL) { continue; }
+        if (k == nullptr) { continue; }
 
         //Lower ARRAY arith :
         //  a[i] + b[i]
@@ -1387,7 +1387,7 @@ IR * Region::simpToPR(IR * ir, SimpCtx * ctx)
 //'ir': ir may be in parameter list if its prev or next is not empty.
 IR * Region::simplifyExpression(IR * ir, SimpCtx * ctx)
 {
-    if (ir == NULL) { return NULL; }
+    if (ir == nullptr) { return nullptr; }
     ASSERTN(ir->is_exp(), ("expect non-statement node"));
 
     //ir can not in list, or it may incur illegal result.
@@ -1437,14 +1437,14 @@ IR * Region::simplifyExpression(IR * ir, SimpCtx * ctx)
     case IR_SELECT: return simplifySelect(ir, ctx);
     default: ASSERTN(0, ("cannot simplify '%s'", IRNAME(ir)));
     } //end switch
-    return NULL;
+    return nullptr;
 }
 
 
 //Return new generated expression's value.
 IR * Region::simplifyJudgeDet(IR * ir, SimpCtx * ctx)
 {
-    if (ir == NULL) return NULL;
+    if (ir == nullptr) return nullptr;
     ASSERT0(ir->is_judge());
     ASSERT0(ir->is_single());
     switch (ir->getCode()) {
@@ -1453,7 +1453,7 @@ IR * Region::simplifyJudgeDet(IR * ir, SimpCtx * ctx)
         if (SIMP_lor_land(ctx)) {
             SimpCtx tcont(*ctx);
             SIMP_ret_array_val(&tcont) = true;
-            IR * newir = NULL;
+            IR * newir = nullptr;
             if (ir->is_lor()) {
                 newir = simplifyLogicalOr(ir, &tcont);
             } else {
@@ -1471,7 +1471,7 @@ IR * Region::simplifyJudgeDet(IR * ir, SimpCtx * ctx)
         } else {
             for (UINT i = 0; i < IR_MAX_KID_NUM(ir); i++) {
                 IR * kid = ir->getKid(i);
-                if (kid != NULL) {
+                if (kid != nullptr) {
                     ir->setKid(i, simplifyExpression(kid, ctx));
                 }
             }
@@ -1500,7 +1500,7 @@ IR * Region::simplifyJudgeDet(IR * ir, SimpCtx * ctx)
         } else {
             for (UINT i = 0; i < IR_MAX_KID_NUM(ir); i++) {
                 IR * kid = ir->getKid(i);
-                if (kid != NULL) {
+                if (kid != nullptr) {
                     ir->setKid(i, simplifyExpression(kid, ctx));
                 }
             }
@@ -1519,7 +1519,7 @@ IR * Region::simplifyJudgeDet(IR * ir, SimpCtx * ctx)
         ASSERT0(IR_parent(ir));
         for (UINT i = 0; i < IR_MAX_KID_NUM(ir); i++) {
             IR * kid = ir->getKid(i);
-            if (kid != NULL) {
+            if (kid != nullptr) {
                 ir->setKid(i, simplifyExpression(kid, ctx));
             }
         }
@@ -1531,7 +1531,7 @@ IR * Region::simplifyJudgeDet(IR * ir, SimpCtx * ctx)
     }
     default: UNREACHABLE();
     } //end switch
-    return NULL;
+    return nullptr;
 }
 
 
@@ -1540,8 +1540,8 @@ IR * Region::simplifyArrayIngredient(IR * ir, SimpCtx * ctx)
 {
     ASSERT0(ir->is_array() || ir->is_starray());
 
-    IR * stmtlist = NULL;
-    IR * last = NULL;
+    IR * stmtlist = nullptr;
+    IR * last = nullptr;
 
     //Simplify base.
     SimpCtx basectx(*ctx);
@@ -1552,15 +1552,15 @@ IR * Region::simplifyArrayIngredient(IR * ir, SimpCtx * ctx)
         IR_parent(newbase) = ir;
     }
     ctx->unionBottomupFlag(basectx);
-    if (SIMP_stmtlist(&basectx) != NULL) {
+    if (SIMP_stmtlist(&basectx) != nullptr) {
         xcom::add_next(&stmtlist, &last, SIMP_stmtlist(&basectx));
     }
 
     //Simplify sublist.
-    IR * newsublist = NULL;
-    IR * newsublast = NULL;
+    IR * newsublist = nullptr;
+    IR * newsublast = nullptr;
     IR * s = xcom::removehead(&ARR_sub_list(ir));
-    for (; s != NULL; s = xcom::removehead(&ARR_sub_list(ir))) {
+    for (; s != nullptr; s = xcom::removehead(&ARR_sub_list(ir))) {
         SimpCtx subctx(*ctx);
         SIMP_ret_array_val(&subctx) = true;
         IR * news = simplifyExpression(s, &subctx);
@@ -1571,7 +1571,7 @@ IR * Region::simplifyArrayIngredient(IR * ir, SimpCtx * ctx)
 
         xcom::add_next(&newsublist, &newsublast, news);
 
-        if (SIMP_stmtlist(&subctx) != NULL) {
+        if (SIMP_stmtlist(&subctx) != nullptr) {
             xcom::add_next(&stmtlist, &last, SIMP_stmtlist(&subctx));
         }
         ctx->unionBottomupFlag(subctx);
@@ -1585,14 +1585,14 @@ IR * Region::simplifyArrayIngredient(IR * ir, SimpCtx * ctx)
 IR * Region::simplifyStoreArray(IR * ir, SimpCtx * ctx)
 {
     ASSERT0(ir->is_starray());
-    ASSERT0(SIMP_stmtlist(ctx) == NULL);
-    IR * ret_list = NULL;
-    IR * last = NULL;
+    ASSERT0(SIMP_stmtlist(ctx) == nullptr);
+    IR * ret_list = nullptr;
+    IR * last = nullptr;
     Type const* type = ir->getType();
 
     if (!SIMP_array(ctx)) {
         IR * stmtlst = simplifyArrayIngredient(ir, ctx);
-        if (stmtlst != NULL) {
+        if (stmtlst != nullptr) {
             xcom::add_next(&ret_list, &last, stmtlst);
         }
     }
@@ -1606,13 +1606,13 @@ IR * Region::simplifyStoreArray(IR * ir, SimpCtx * ctx)
         IR_parent(rhsval) = ir;
     }
     ctx->unionBottomupFlag(rhsctx);
-    if (SIMP_stmtlist(&rhsctx) != NULL) {
+    if (SIMP_stmtlist(&rhsctx) != nullptr) {
         xcom::add_next(&ret_list, &last, SIMP_stmtlist(&rhsctx));
     }
 
     SimpCtx tcont(*ctx);
-    IR * array_addr = NULL;
-    IR * ret = NULL;
+    IR * array_addr = nullptr;
+    IR * ret = nullptr;
 
     if (!SIMP_array(ctx)) { ret = ir; goto FIN; }
 
@@ -1620,14 +1620,14 @@ IR * Region::simplifyStoreArray(IR * ir, SimpCtx * ctx)
     SIMP_ret_array_val(&tcont) = false; //We need array address expression.
 
     //simplyArray will free ir. That will make rhs invalid.
-    STARR_rhs(ir) = NULL;
+    STARR_rhs(ir) = nullptr;
 
     //Need to free ir in current function.
     array_addr = simplifyArray(ir, &tcont);
 
     ctx->unionBottomupFlag(tcont);
 
-    if (SIMP_stmtlist(&tcont) != NULL) {
+    if (SIMP_stmtlist(&tcont) != nullptr) {
         xcom::add_next(&ret_list, &last, SIMP_stmtlist(&tcont));
     }
 
@@ -1649,7 +1649,7 @@ IR * Region::simplifyArray(IR * ir, SimpCtx * ctx)
 {
     if (!SIMP_array(ctx)) {
         IR * stmtlst = simplifyArrayIngredient(ir, ctx);
-        if (stmtlst != NULL) {
+        if (stmtlst != nullptr) {
             ctx->appendStmt(stmtlst);
         }
         return ir;
@@ -1739,15 +1739,15 @@ IR * Region::simplifyCall(IR * ir, SimpCtx * ctx)
 {
     ASSERT0(ir->isCallStmt());
     SimpCtx tcont(*ctx);
-    ASSERT0(SIMP_stmtlist(ctx) == NULL);
+    ASSERT0(SIMP_stmtlist(ctx) == nullptr);
     SIMP_ret_array_val(&tcont) = true;
 
     bool origin_to_lowest_height = SIMP_to_lowest_height(&tcont);
 
-    IR * newp = NULL;
-    IR * last = NULL;
+    IR * newp = nullptr;
+    IR * last = nullptr;
     bool lchange = false;
-    while (CALL_param_list(ir) != NULL) {
+    while (CALL_param_list(ir) != nullptr) {
         IR * p = xcom::removehead(&CALL_param_list(ir));
 
         if (g_is_simplify_parameter && !p->isMemoryOpnd() && !p->is_lda()) {
@@ -1789,7 +1789,7 @@ IR * Region::simplifyCall(IR * ir, SimpCtx * ctx)
     }
 
     CALL_param_list(ir) = newp;
-    if (newp != NULL) {
+    if (newp != nullptr) {
         ir->setParent(newp);
     }
 
@@ -1805,18 +1805,18 @@ IR * Region::simplifyStorePR(IR * ir, SimpCtx * ctx)
 {
     ASSERT0(ir->is_stpr());
 
-    ASSERT0(SIMP_stmtlist(ctx) == NULL);
+    ASSERT0(SIMP_stmtlist(ctx) == nullptr);
 
     SimpCtx tcont(*ctx);
-    ASSERT0(SIMP_stmtlist(ctx) == NULL);
+    ASSERT0(SIMP_stmtlist(ctx) == nullptr);
     SIMP_ret_array_val(&tcont) = true;
     STPR_rhs(ir) = simplifyExpression(STPR_rhs(ir), &tcont);
     IR_parent(STPR_rhs(ir)) = ir;
     ctx->unionBottomupFlag(tcont);
 
-    IR * ret_list = NULL;
-    IR * last = NULL;
-    if (SIMP_stmtlist(&tcont) != NULL) {
+    IR * ret_list = nullptr;
+    IR * last = nullptr;
+    if (SIMP_stmtlist(&tcont) != nullptr) {
         xcom::add_next(&ret_list, &last, SIMP_stmtlist(&tcont));
     }
     xcom::add_next(&ret_list, &last, ir);
@@ -1828,10 +1828,10 @@ IR * Region::simplifySetelem(IR * ir, SimpCtx * ctx)
 {
     ASSERT0(ir->is_setelem());
 
-    ASSERT0(SIMP_stmtlist(ctx) == NULL);
+    ASSERT0(SIMP_stmtlist(ctx) == nullptr);
 
     SimpCtx tcont(*ctx);
-    ASSERT0(SIMP_stmtlist(ctx) == NULL);
+    ASSERT0(SIMP_stmtlist(ctx) == nullptr);
     SIMP_ret_array_val(&tcont) = true;
     SETELEM_base(ir) = simplifyExpression(SETELEM_base(ir), &tcont);
     IR_parent(SETELEM_base(ir)) = ir;
@@ -1843,9 +1843,9 @@ IR * Region::simplifySetelem(IR * ir, SimpCtx * ctx)
     IR_parent(SETELEM_val(ir)) = ir;
     ctx->unionBottomupFlag(tcont);
 
-    IR * ret_list = NULL;
-    IR * last = NULL;
-    if (SIMP_stmtlist(&tcont) != NULL) {
+    IR * ret_list = nullptr;
+    IR * last = nullptr;
+    if (SIMP_stmtlist(&tcont) != nullptr) {
         xcom::add_next(&ret_list, &last, SIMP_stmtlist(&tcont));
     }
 
@@ -1855,8 +1855,8 @@ IR * Region::simplifySetelem(IR * ir, SimpCtx * ctx)
     SETELEM_ofst(ir) = simplifyExpression(SETELEM_ofst(ir), &tcont);
     IR_parent(SETELEM_ofst(ir)) = ir;
     ctx->unionBottomupFlag(tcont);
-    last = NULL;
-    if (SIMP_stmtlist(&tcont) != NULL) {
+    last = nullptr;
+    if (SIMP_stmtlist(&tcont) != nullptr) {
         xcom::add_next(&ret_list, &last, SIMP_stmtlist(&tcont));
     }
     xcom::add_next(&ret_list, &last, ir);
@@ -1868,19 +1868,19 @@ IR * Region::simplifyGetelem(IR * ir, SimpCtx * ctx)
 {
     ASSERT0(ir->is_getelem());
 
-    ASSERT0(SIMP_stmtlist(ctx) == NULL);
+    ASSERT0(SIMP_stmtlist(ctx) == nullptr);
 
     //Process base.
     SimpCtx tcont(*ctx);
-    ASSERT0(SIMP_stmtlist(ctx) == NULL);
+    ASSERT0(SIMP_stmtlist(ctx) == nullptr);
     SIMP_ret_array_val(&tcont) = true;
     GETELEM_base(ir) = simplifyExpression(GETELEM_base(ir), &tcont);
     IR_parent(GETELEM_base(ir)) = ir;
     ctx->unionBottomupFlag(tcont);
 
-    IR * ret_list = NULL;
-    IR * last = NULL;
-    if (SIMP_stmtlist(&tcont) != NULL) {
+    IR * ret_list = nullptr;
+    IR * last = nullptr;
+    if (SIMP_stmtlist(&tcont) != nullptr) {
         xcom::add_next(&ret_list, &last, SIMP_stmtlist(&tcont));
     }
 
@@ -1890,8 +1890,8 @@ IR * Region::simplifyGetelem(IR * ir, SimpCtx * ctx)
     GETELEM_ofst(ir) = simplifyExpression(GETELEM_ofst(ir), &tcont);
     IR_parent(GETELEM_ofst(ir)) = ir;
     ctx->unionBottomupFlag(tcont);
-    last = NULL;
-    if (SIMP_stmtlist(&tcont) != NULL) {
+    last = nullptr;
+    if (SIMP_stmtlist(&tcont) != nullptr) {
         xcom::add_next(&ret_list, &last, SIMP_stmtlist(&tcont));
     }
     xcom::add_next(&ret_list, &last, ir);
@@ -1902,9 +1902,9 @@ IR * Region::simplifyGetelem(IR * ir, SimpCtx * ctx)
 IR * Region::simplifyIStore(IR * ir, SimpCtx * ctx)
 {
     ASSERT0(ir->is_ist());
-    IR * ret_list = NULL;
-    IR * last = NULL;
-    ASSERT0(SIMP_stmtlist(ctx) == NULL);
+    IR * ret_list = nullptr;
+    IR * last = nullptr;
+    ASSERT0(SIMP_stmtlist(ctx) == nullptr);
 
     SimpCtx basectx(*ctx);
     SIMP_ret_array_val(&basectx) = true;
@@ -1916,7 +1916,7 @@ IR * Region::simplifyIStore(IR * ir, SimpCtx * ctx)
         ctx->unionBottomupFlag(basectx);
     }
 
-    if (SIMP_stmtlist(&basectx) != NULL) {
+    if (SIMP_stmtlist(&basectx) != nullptr) {
         xcom::add_next(&ret_list, &last, SIMP_stmtlist(&basectx));
     }
 
@@ -1938,13 +1938,13 @@ IR * Region::simplifyIStore(IR * ir, SimpCtx * ctx)
 
     //Simplify rhs.
     SimpCtx rhsctx(*ctx);
-    ASSERT0(SIMP_stmtlist(ctx) == NULL);
+    ASSERT0(SIMP_stmtlist(ctx) == nullptr);
     SIMP_ret_array_val(&rhsctx) = true;
     IST_rhs(ir) = simplifyExpression(IST_rhs(ir), &rhsctx);
     ir->setParent(IST_rhs(ir));
     ctx->unionBottomupFlag(rhsctx);
 
-    if (SIMP_stmtlist(&rhsctx) != NULL) {
+    if (SIMP_stmtlist(&rhsctx) != nullptr) {
         xcom::add_next(&ret_list, &last, SIMP_stmtlist(&rhsctx));
     }
     xcom::add_next(&ret_list, &last, ir);
@@ -1956,18 +1956,18 @@ IR * Region::simplifyStore(IR * ir, SimpCtx * ctx)
 {
     ASSERT0(ir->is_st());
 
-    ASSERT0(SIMP_stmtlist(ctx) == NULL);
+    ASSERT0(SIMP_stmtlist(ctx) == nullptr);
 
     SimpCtx tcont(*ctx);
-    ASSERT0(SIMP_stmtlist(ctx) == NULL);
+    ASSERT0(SIMP_stmtlist(ctx) == nullptr);
     SIMP_ret_array_val(&tcont) = true;
     ST_rhs(ir) = simplifyExpression(ST_rhs(ir), &tcont);
     IR_parent(ST_rhs(ir)) = ir;
 
     ctx->unionBottomupFlag(tcont);
-    IR * ret_list = NULL;
-    IR * last = NULL;
-    if (SIMP_stmtlist(&tcont) != NULL) {
+    IR * ret_list = nullptr;
+    IR * last = nullptr;
+    if (SIMP_stmtlist(&tcont) != nullptr) {
         xcom::add_next(&ret_list, &last, SIMP_stmtlist(&tcont));
     }
     xcom::add_next(&ret_list, &last, ir);
@@ -1977,9 +1977,9 @@ IR * Region::simplifyStore(IR * ir, SimpCtx * ctx)
 
 IR * Region::simplifyBranch(IR * ir, SimpCtx * ctx)
 {
-    IR * ret_list = NULL;
+    IR * ret_list = nullptr;
     SimpCtx tcont(*ctx);
-    ASSERT0(SIMP_stmtlist(ctx) == NULL);
+    ASSERT0(SIMP_stmtlist(ctx) == nullptr);
     SIMP_ret_array_val(&tcont) = true;
 
     if ((SIMP_lor_land(ctx) &&
@@ -1990,11 +1990,11 @@ IR * Region::simplifyBranch(IR * ir, SimpCtx * ctx)
     } else {
         for (INT i = 0; i < IR_MAX_KID_NUM(ir); i++) {
             IR * kid = ir->getKid(i);
-            if (kid != NULL) {
+            if (kid != nullptr) {
                 ir->setKid(i, simplifyExpression(kid, &tcont));
-                if (SIMP_stmtlist(&tcont) != NULL) {
+                if (SIMP_stmtlist(&tcont) != nullptr) {
                     xcom::add_next(&ret_list, SIMP_stmtlist(&tcont));
-                    SIMP_stmtlist(&tcont) = NULL;
+                    SIMP_stmtlist(&tcont) = nullptr;
                 }
             }
         }
@@ -2015,7 +2015,7 @@ IR * Region::simplifyIf(IR * ir, SimpCtx * ctx)
     SimpCtx detctx(*ctx);
     IF_det(ir) = simplifyExpression(IF_det(ir), &detctx);
     ir->setParent(IF_det(ir));
-    ASSERTN(SIMP_stmtlist(&detctx) == NULL, ("invalid determinator"));
+    ASSERTN(SIMP_stmtlist(&detctx) == nullptr, ("invalid determinator"));
 
     //Truebody
     SimpCtx truectx(*ctx);
@@ -2023,7 +2023,7 @@ IR * Region::simplifyIf(IR * ir, SimpCtx * ctx)
     if (SIMP_changed(&truectx)) {
         ir->setParent(IF_truebody(ir));
     }
-    ASSERTN(SIMP_stmtlist(&truectx) == NULL,
+    ASSERTN(SIMP_stmtlist(&truectx) == nullptr,
            ("should already be added to truebody"));
 
     //Falsebody
@@ -2032,7 +2032,7 @@ IR * Region::simplifyIf(IR * ir, SimpCtx * ctx)
     if (SIMP_changed(&falsectx)) {
         ir->setParent(IF_falsebody(ir));
     }
-    ASSERTN(SIMP_stmtlist(&falsectx) == NULL,
+    ASSERTN(SIMP_stmtlist(&falsectx) == nullptr,
            ("should already be added to falsebody"));
 
     return ir;
@@ -2045,7 +2045,7 @@ IR * Region::simplifyLoopIngredient(IR * ir, SimpCtx * ctx)
     SimpCtx detctx(*ctx);
     LOOP_det(ir) = simplifyExpression(LOOP_det(ir), &detctx);
     ir->setParent(LOOP_det(ir));
-    ASSERTN(SIMP_stmtlist(&detctx) == NULL, ("invalid determinator"));
+    ASSERTN(SIMP_stmtlist(&detctx) == nullptr, ("invalid determinator"));
 
     SimpCtx initctx(*ctx);
     if (ir->is_doloop()) {
@@ -2061,7 +2061,7 @@ IR * Region::simplifyLoopIngredient(IR * ir, SimpCtx * ctx)
         if (SIMP_changed(&stepctx)) {
             ir->setParent(LOOP_step(ir));
         }
-        ASSERTN(SIMP_stmtlist(&stepctx) == NULL,
+        ASSERTN(SIMP_stmtlist(&stepctx) == nullptr,
                ("step of DoLoop is too complex, the operation "
                 "should only be reduction"));
     }
@@ -2072,12 +2072,12 @@ IR * Region::simplifyLoopIngredient(IR * ir, SimpCtx * ctx)
     if (SIMP_changed(&bodyctx)) {
         ir->setParent(LOOP_body(ir));
     }
-    ASSERTN(SIMP_stmtlist(&bodyctx) == NULL,
+    ASSERTN(SIMP_stmtlist(&bodyctx) == nullptr,
            ("should already be added to truebody"));
 
-    IR * ret_list = NULL;
-    IR * last = NULL;
-    if (ir->is_doloop() && SIMP_stmtlist(&initctx) != NULL) {
+    IR * ret_list = nullptr;
+    IR * last = nullptr;
+    if (ir->is_doloop() && SIMP_stmtlist(&initctx) != nullptr) {
         xcom::add_next(&ret_list, &last, SIMP_stmtlist(&initctx));
     }
     xcom::add_next(&ret_list, &last, ir);
@@ -2132,16 +2132,16 @@ IR * Region::simplifySwitch(IR * ir, SimpCtx * ctx)
     }
 
     IR * body = SWITCH_body(ir);
-    if (body == NULL) { return ir; }
+    if (body == nullptr) { return ir; }
 
     ASSERTN(!SIMP_break(ctx),
             ("Must simplify Swich-stmt if you want to simply Break."));
 
-    SWITCH_body(ir) = NULL;
+    SWITCH_body(ir) = nullptr;
     body = simplifyStmtList(body, ctx);
-    if (ir->getParent() == NULL) {
-        for (IR * t = body; t != NULL; t = t->get_next()) {
-            IR_parent(t) = NULL;
+    if (ir->getParent() == nullptr) {
+        for (IR * t = body; t != nullptr; t = t->get_next()) {
+            IR_parent(t) = nullptr;
         }
     }
     xcom::add_next(&ir, body);
@@ -2157,14 +2157,14 @@ IR * Region::simplifySwitch(IR * ir, SimpCtx * ctx)
 //Return new ir stmt-list.
 IR * Region::simplifyStmt(IR * ir, SimpCtx * ctx)
 {
-    if (ir == NULL) { return NULL; }
+    if (ir == nullptr) { return nullptr; }
     ASSERTN(ir->is_stmt(), ("expect statement node"));
     ASSERTN(ir->is_single(), ("ir should be remove out of list"));
     if (ctx->isSimpCFSOnly() && ir->isStmtInBB()) { return ir; }
 
     bool has_side_effect = ir->hasSideEffect();
     bool is_no_move = ir->isNoMove();
-    IR * ret_list = NULL;
+    IR * ret_list = nullptr;
     switch (ir->getCode()) {
     case IR_CALL:
     case IR_ICALL: //indirective call
@@ -2189,7 +2189,7 @@ IR * Region::simplifyStmt(IR * ir, SimpCtx * ctx)
         ret_list = simplifyIStore(ir, ctx);
         break;
     case IR_IGOTO:
-        ASSERT0(SIMP_stmtlist(ctx) == NULL);
+        ASSERT0(SIMP_stmtlist(ctx) == nullptr);
         ret_list = simplifyIgoto(ir, ctx);
         break;
     case IR_GOTO:
@@ -2197,16 +2197,16 @@ IR * Region::simplifyStmt(IR * ir, SimpCtx * ctx)
     case IR_CASE:
     case IR_RETURN: {
         SimpCtx tcont(*ctx);
-        ASSERT0(SIMP_stmtlist(ctx) == NULL);
+        ASSERT0(SIMP_stmtlist(ctx) == nullptr);
         SIMP_ret_array_val(&tcont) = true;
         for (INT i = 0; i < IR_MAX_KID_NUM(ir); i++) {
             IR * kid = ir->getKid(i);
-            if (kid != NULL) {
+            if (kid != nullptr) {
                 ir->setKid(i, simplifyExpression(kid, &tcont));
                 ctx->unionBottomupFlag(tcont);
-                if (SIMP_stmtlist(&tcont) != NULL) {
+                if (SIMP_stmtlist(&tcont) != nullptr) {
                     xcom::add_next(&ret_list, SIMP_stmtlist(&tcont));
-                    SIMP_stmtlist(&tcont) = NULL;
+                    SIMP_stmtlist(&tcont) = nullptr;
                 }
             }
         }
@@ -2218,7 +2218,7 @@ IR * Region::simplifyStmt(IR * ir, SimpCtx * ctx)
         ret_list = simplifyBranch(ir, ctx);
         break;
     case IR_BREAK:
-        ASSERT0(SIMP_stmtlist(ctx) == NULL);
+        ASSERT0(SIMP_stmtlist(ctx) == nullptr);
         if (SIMP_break(ctx)) {
             ASSERT0(SIMP_break_label(ctx));
             IR * go = buildGoto(SIMP_break_label(ctx));
@@ -2229,7 +2229,7 @@ IR * Region::simplifyStmt(IR * ir, SimpCtx * ctx)
         xcom::add_next(&ret_list, ir);
         break;
     case IR_CONTINUE:
-        ASSERT0(SIMP_stmtlist(ctx) == NULL);
+        ASSERT0(SIMP_stmtlist(ctx) == nullptr);
         if (SIMP_continue(ctx)) {
             ASSERT0(SIMP_continue_label(ctx));
             IR * go = buildGoto(SIMP_continue_label(ctx));
@@ -2240,23 +2240,23 @@ IR * Region::simplifyStmt(IR * ir, SimpCtx * ctx)
         xcom::add_next(&ret_list, ir);
         break;
     case IR_IF:
-        ASSERT0(SIMP_stmtlist(ctx) == NULL);
+        ASSERT0(SIMP_stmtlist(ctx) == nullptr);
         ret_list = simplifyIf(ir, ctx);
         break;
     case IR_DO_WHILE:
-        ASSERT0(SIMP_stmtlist(ctx) == NULL);
+        ASSERT0(SIMP_stmtlist(ctx) == nullptr);
         ret_list = simplifyDoWhile(ir, ctx);
         break;
     case IR_WHILE_DO:
-        ASSERT0(SIMP_stmtlist(ctx) == NULL);
+        ASSERT0(SIMP_stmtlist(ctx) == nullptr);
         ret_list = simplifyWhileDo(ir, ctx);
         break;
     case IR_DO_LOOP:
-        ASSERT0(SIMP_stmtlist(ctx) == NULL);
+        ASSERT0(SIMP_stmtlist(ctx) == nullptr);
         ret_list = simplifyDoLoop(ir, ctx);
         break;
     case IR_SWITCH:
-        ASSERT0(SIMP_stmtlist(ctx) == NULL);
+        ASSERT0(SIMP_stmtlist(ctx) == nullptr);
         ret_list = simplifySwitch(ir, ctx);
         break;
     case IR_REGION:
@@ -2266,7 +2266,7 @@ IR * Region::simplifyStmt(IR * ir, SimpCtx * ctx)
     }
     setParentPointerForIRList(ret_list);
     if (has_side_effect || is_no_move) {
-        for (IR * t = ret_list; t != NULL; t = t->get_next()) {
+        for (IR * t = ret_list; t != nullptr; t = t->get_next()) {
             IR_has_sideeffect(t) = has_side_effect ? true : t->hasSideEffect();
             IR_no_move(t) = is_no_move ? true : t->isNoMove();
         }
@@ -2278,9 +2278,9 @@ IR * Region::simplifyStmt(IR * ir, SimpCtx * ctx)
 //Return new generated IR stmt.
 IR * Region::simplifyStmtList(IR * ir_list, SimpCtx * ctx)
 {
-    if (ir_list == NULL) { return NULL; }
-    IR * ret_list = NULL;
-    ASSERT0(SIMP_stmtlist(ctx) == NULL);
+    if (ir_list == nullptr) { return nullptr; }
+    IR * ret_list = nullptr;
+    ASSERT0(SIMP_stmtlist(ctx) == nullptr);
     bool redo_simp = true;
     UINT count = 0;
     while (redo_simp) {
@@ -2288,14 +2288,14 @@ IR * Region::simplifyStmtList(IR * ir_list, SimpCtx * ctx)
         ASSERTN(count < 50, ("dead lock"));
         redo_simp = false;
 
-        IR * last = NULL;
+        IR * last = nullptr;
         for (IR * stmt = xcom::removehead(&ir_list);
-             stmt != NULL; stmt = xcom::removehead(&ir_list)) {
+             stmt != nullptr; stmt = xcom::removehead(&ir_list)) {
             IR * new_stmt_list = simplifyStmt(stmt, ctx);
-            ASSERT0(SIMP_stmtlist(ctx) == NULL);
+            ASSERT0(SIMP_stmtlist(ctx) == nullptr);
             if (SIMP_to_lowest_height(ctx)) {
                 //Check if new generated stmts still need to resimplify.
-                for (IR * x = new_stmt_list; x != NULL; x = x->get_next()) {
+                for (IR * x = new_stmt_list; x != nullptr; x = x->get_next()) {
                     if (!isLowestHeight(x, ctx)) {
                         redo_simp = true;
                         break;
@@ -2308,7 +2308,7 @@ IR * Region::simplifyStmtList(IR * ir_list, SimpCtx * ctx)
 
         if (redo_simp) {
             ir_list = ret_list;
-            ret_list = NULL;
+            ret_list = nullptr;
         }
     }
     if (g_is_dump_after_pass && g_dump_opt.isDumpSimp()) {
@@ -2330,7 +2330,7 @@ void Region::simplifyBB(IRBB * bb, SimpCtx * ctx)
         IR * stmt = ct->val();
         ASSERT0(stmt && stmt->is_single());
         IR * newstmt_lst = simplifyStmt(stmt, ctx);
-        while (newstmt_lst != NULL) {
+        while (newstmt_lst != nullptr) {
             IR * newir = xcom::removehead(&newstmt_lst);
             newir->setBB(bb);
             ASSERT0(newir->verify(this));

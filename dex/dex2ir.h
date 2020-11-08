@@ -115,7 +115,7 @@ protected:
     void * xmalloc(INT size)
     {
         ASSERTN(size > 0, ("xmalloc: size less zero!"));
-        ASSERTN(m_pool != NULL, ("need pool!!"));
+        ASSERTN(m_pool != nullptr, ("need pool!!"));
         void * p = smpoolMalloc(size, m_pool);
         ASSERT0(p);
         ::memset(p, 0, size);
@@ -131,7 +131,7 @@ public:
         TMapIter<LIR*, List<LabelInfo*>*> iter;
         List<LabelInfo*> * l;
         for (m_lir2labs.get_first(iter, &l);
-             l != NULL; m_lir2labs.get_next(iter, &l)) {
+             l != nullptr; m_lir2labs.get_next(iter, &l)) {
             delete l;
         }
 

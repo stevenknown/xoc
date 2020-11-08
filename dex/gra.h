@@ -102,7 +102,7 @@ public:
         //for (INT i = range->get_next(pos);
         //     i >= 0; i = range->get_next(i)) {
         //    IR const* p = range->get(i);
-        //    if (p != NULL) {
+        //    if (p != nullptr) {
         //        *is_def = this->is_def(i);
         //        return i;
         //    }
@@ -134,7 +134,7 @@ public:
     inline INT getBackwardOcc(INT pos, OUT bool * is_d, INT firstpos)
     {
         ASSERTN(pos >= firstpos, ("Illegal position"));
-        if (pos == firstpos && (occ == NULL || occ->is_empty())) { return -1; }
+        if (pos == firstpos && (occ == nullptr || occ->is_empty())) { return -1; }
 
         INT backwpos = -1;
         INT start = LT_range(this)->get_first();
@@ -154,7 +154,7 @@ public:
     inline INT getBackwardOccForDEF(INT pos, INT firstpos)
     {
         ASSERTN(pos >= firstpos, ("Illegal position"));
-        if (pos == firstpos && (occ == NULL || occ->is_empty())) { return -1; }
+        if (pos == firstpos && (occ == nullptr || occ->is_empty())) { return -1; }
 
         INT start = LT_range(this)->get_first();
         for (INT i = pos - 1; i >= start; i--) {
@@ -275,7 +275,7 @@ public:
     virtual ~LTGMgr()
     {
         for (LTG * ltg = m_ltgs.get_head();
-             ltg != NULL; ltg = m_ltgs.get_next()) {
+             ltg != nullptr; ltg = m_ltgs.get_next()) {
             delete ltg;
         }
     }
@@ -302,7 +302,7 @@ public:
     void set_ltm(LTMgr * ltm) { ASSERT0(ltm); m_ltm = ltm; }
     bool is_interf(LT const* lt1, LT const* lt2) const;
     void build();
-    void dumpVCG(CHAR const* name = NULL);
+    void dumpVCG(CHAR const* name = nullptr);
     void get_neighbor(OUT List<LT*> & nis, LT * lt) const;
 };
 
@@ -337,7 +337,7 @@ protected:
     {
         ASSERT0(m_pool);
         void * p = smpoolMalloc(size, m_pool);
-        ASSERT0(p != NULL);
+        ASSERT0(p != nullptr);
         ::memset(p, 0, size);
         return p;
     }
@@ -420,7 +420,7 @@ public:
     inline LT * map_pr2lt(UINT prno) const
     {
         if (m_prno2lt.get_elem_count() == 0) {
-            return NULL;
+            return nullptr;
         }
         return m_prno2lt.get(prno);
     }
@@ -545,9 +545,9 @@ protected:
     void comp_ir_usage(IR const* ir);
     void * xmalloc(UINT size)
     {
-        ASSERTN(m_pool != NULL,("need graph pool!!"));
+        ASSERTN(m_pool != nullptr,("need graph pool!!"));
         void * p = smpoolMalloc(size, m_pool);
-        ASSERT0(p != NULL);
+        ASSERT0(p != nullptr);
         ::memset(p, 0, size);
         return p;
     }
@@ -559,7 +559,7 @@ public:
     {
         for (INT i = 0; i <= m_bb2ltmgr.get_last_idx(); i++) {
             LTMgr * l = m_bb2ltmgr.get(i);
-            if (l != NULL) {
+            if (l != nullptr) {
                 delete l;
             }
         }
@@ -582,7 +582,7 @@ public:
     BitSet * getUsableRegSet(GLT const* g, bool alloc)
     {
         BitSet * rs = m_glt2usable_regs.get(GLT_id(g));
-        if (rs == NULL && alloc) {
+        if (rs == nullptr && alloc) {
             rs = m_bs_mgr.create();
             m_glt2usable_regs.set(GLT_id(g), rs);
         }
@@ -596,7 +596,7 @@ public:
         Vector<GLT*> * gltv = get_gltvec();
         for (INT i = 0; i <= gltv->get_last_idx(); i++) {
             GLT * g = gltv->get(i);
-            if (g == NULL) { continue; }
+            if (g == nullptr) { continue; }
             m_sbs_mgr.freeDBitSetCore(GLT_bbs(g));
         }
     }
@@ -646,7 +646,7 @@ public:
     }
 
     void add_glt(GLT * g) { addVertex(GLT_id(g)); }
-    void dumpVCG(CHAR const* name = NULL);
+    void dumpVCG(CHAR const* name = nullptr);
     void remove_glt(GLT * g) { removeVertex(GLT_id(g)); }
     bool is_interf(IN GLT * glt1, IN GLT * glt2);
     bool is_interf_with_neighbour(GLT * g, DefSBitSet & nis, UINT phy);
@@ -688,9 +688,9 @@ public:
         m_rg = gltm->getRegion();
         m_tm = m_rg->getTypeMgr();
         m_bsm = gltm->getBitSetMgr();
-        m_4 = NULL;
-        m_8 = NULL;
-        m_16 = NULL;
+        m_4 = nullptr;
+        m_8 = nullptr;
+        m_16 = nullptr;
         init_usable();
     }
     ~RSC()
@@ -930,7 +930,7 @@ public:
     LT * getLifeTime(UINT bbid, UINT prno)
     {
         LTMgr * ltm = m_gltm.get_ltm(bbid);
-        if (ltm == NULL) { return NULL; }
+        if (ltm == nullptr) { return nullptr; }
         return ltm->map_pr2lt(prno);
     }
     Region * getRegion() const { return m_rg; }

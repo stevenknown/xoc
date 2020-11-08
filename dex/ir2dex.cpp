@@ -145,7 +145,7 @@ LIR * IR2Dex::buildMove(IN IR ** ir)
     if (tgt == src) {
         //Redundant move: vn=vn
         *ir = IR_next(*ir);
-        return NULL;
+        return nullptr;
     }
     LIRABOp * lir = (LIRABOp*)ymalloc(sizeof(LIRABOp));
     lir->opcode = LOP_MOVE;
@@ -269,7 +269,7 @@ LIR * IR2Dex::buildThrow(IN IR ** ir)
     IR * p = CALL_param_list(*ir);
     ASSERT0(p);
     lir->vA = get_vreg(p);
-    ASSERT0(p->get_next() == NULL);
+    ASSERT0(p->get_next() == nullptr);
     *ir = IR_next(*ir);
     return (LIR*)lir;
 }
@@ -286,7 +286,7 @@ LIR * IR2Dex::buildMonitorExit(IN IR ** ir)
     ASSERT0(p);
 
     lir->vA = get_vreg(p);
-    ASSERT0(p->get_next() == NULL);
+    ASSERT0(p->get_next() == nullptr);
     *ir = IR_next(*ir);
     return (LIR*)lir;
 }
@@ -303,7 +303,7 @@ LIR * IR2Dex::buildMonitorEnter(IN IR ** ir)
     ASSERT0(p);
 
     lir->vA = get_vreg(p);
-    ASSERT0(p->get_next() == NULL);
+    ASSERT0(p->get_next() == nullptr);
     *ir = IR_next(*ir);
     return (LIR*)lir;
 }
@@ -355,7 +355,7 @@ LIR * IR2Dex::buildArrayLength(IN IR ** ir)
     //vB
     ASSERT0(CALL_param_list(tir));
     lir->vB = get_vreg(CALL_param_list(tir));
-    ASSERT0(IR_next(CALL_param_list(tir)) == NULL);
+    ASSERT0(IR_next(CALL_param_list(tir)) == nullptr);
     *ir = IR_next(*ir);
     return (LIR*)lir;
 }
@@ -380,7 +380,7 @@ LIR * IR2Dex::buildCheckCast(IN IR ** ir)
     lir->vB = CONST_int_val(p);
     LIR_dt(lir) = LIR_JDT_unknown; //see genInstruction()
     p = p->get_next();
-    ASSERT0(p == NULL);
+    ASSERT0(p == nullptr);
     *ir = IR_next(*ir);
     return (LIR*)lir;
 
@@ -640,7 +640,7 @@ LIR * IR2Dex::buildBinOp(IN IR ** ir)
     } else {
         UNREACHABLE();
     }
-    return NULL;
+    return nullptr;
 }
 
 
@@ -679,7 +679,7 @@ LIR * IR2Dex::convertStoreVar(IN OUT IR ** ir, IN IR2DexCtx * cont)
         return buildSput(ir);
     default: UNREACHABLE();
     }
-    return NULL;
+    return nullptr;
 }
 
 
@@ -734,7 +734,7 @@ LIR * IR2Dex::convertStorePR(IN OUT IR ** ir, IN IR2DexCtx * cont)
     default: UNREACHABLE();
     }
     UNREACHABLE();
-    return NULL;
+    return nullptr;
 }
 
 
@@ -855,7 +855,7 @@ LIR * IR2Dex::buildInvoke(IN IR ** ir)
     //Real invoke paramenters.
     UINT i = 0;
     IR * t = p;
-    while (t != NULL) {
+    while (t != nullptr) {
         ASSERT0(t->is_pr());
         i++;
         if (is_pair(t)) { i++; }
@@ -866,7 +866,7 @@ LIR * IR2Dex::buildInvoke(IN IR ** ir)
     }
     lir->argc = i;
     INT j = 0;
-    while (p != NULL) {
+    while (p != nullptr) {
         ASSERT0(p->is_pr());
         UINT vx = get_vreg(p);
         lir->args[j] = vx;
@@ -974,7 +974,7 @@ LIR * IR2Dex::buildFilledNewArray(IN IR ** ir)
     //and else parameters.
     UINT i = 0;
     IR * t = p;
-    while (t != NULL) {
+    while (t != nullptr) {
         ASSERT0(t->is_pr());
         t = t->get_next();
         i++;
@@ -982,7 +982,7 @@ LIR * IR2Dex::buildFilledNewArray(IN IR ** ir)
     lir->argc = i;
     lir->args = (UInt16*)ymalloc(sizeof(UInt16) * i);
     i = 0;
-    while (p != NULL) {
+    while (p != nullptr) {
         lir->args[i] = get_vreg(p);
         p = p->get_next();
         i++;
@@ -1014,7 +1014,7 @@ LIR * IR2Dex::buildConstClass(IN IR ** ir)
     ASSERT0(CALL_param_list(tir) &&
             CALL_param_list(tir)->is_const());
     lir->vB = CONST_int_val(CALL_param_list(tir));
-    ASSERT0(IR_next(CALL_param_list(tir)) == NULL);
+    ASSERT0(IR_next(CALL_param_list(tir)) == nullptr);
 
     *ir = IR_next(*ir);
     return (LIR*)lir;
@@ -1042,7 +1042,7 @@ LIR * IR2Dex::buildNewArray(IN IR ** ir)
     //Type id of array element.
     ASSERT0(p->is_const());
     lir->vC = CONST_int_val(p);
-    ASSERT0(p->get_next() == NULL);
+    ASSERT0(p->get_next() == nullptr);
 
     ASSERT0(tir->hasReturnValue());
     lir->vA = get_vreg(CALL_prno(tir));
@@ -1079,7 +1079,7 @@ LIR * IR2Dex::buildInstanceOf(IN IR ** ir)
     //type-id
     ASSERT0(p->is_const());
     lir->vC = CONST_int_val(p);
-    ASSERT0(p->get_next() == NULL);
+    ASSERT0(p->get_next() == nullptr);
 
     *ir = IR_next(*ir);
     return (LIR*)lir;
@@ -1168,7 +1168,7 @@ LIR * IR2Dex::convertCall(IN OUT IR ** ir, IN IR2DexCtx * cont)
         case BLTIN_CMP_BIAS: return buildCmpBias(ir);
         default: UNREACHABLE();
         }
-        return NULL;
+        return nullptr;
     }
 
     return buildInvoke(ir);
@@ -1178,7 +1178,7 @@ LIR * IR2Dex::convertCall(IN OUT IR ** ir, IN IR2DexCtx * cont)
 LIR * IR2Dex::convertICall(IN OUT IR ** ir, IN IR2DexCtx * cont)
 {
     *ir = IR_next(*ir);
-    return NULL;
+    return nullptr;
 }
 
 
@@ -1189,8 +1189,8 @@ LIR * IR2Dex::convertReturn(IN OUT IR ** ir, IN IR2DexCtx * cont)
     lir->opcode = LOP_RETURN;
 
     IR * retval = RET_exp(*ir);
-    if (retval != NULL) {
-        ASSERT0(IR_next(retval) == NULL);
+    if (retval != nullptr) {
+        ASSERT0(IR_next(retval) == nullptr);
         ASSERT0(retval->is_pr());
         Type const* ty = IR_dt(retval);
         if (ty == m_tr->ptr) {
@@ -1232,7 +1232,7 @@ LIR * IR2Dex::convertGoto(IN OUT IR ** ir, IN IR2DexCtx * cont)
 //ABCCCC
 LIR * IR2Dex::convertBranch(bool is_truebr, IN OUT IR ** ir, IN IR2DexCtx * cont)
 {
-    LIR * lir = NULL;
+    LIR * lir = nullptr;
     IR * det = BR_det(*ir);
     if (BIN_opnd1(det)->is_const() &&
         CONST_int_val(BIN_opnd1(det)) == 0) {
@@ -1290,11 +1290,11 @@ LIR * IR2Dex::convertSwitch(IN OUT IR ** ir, IN IR2DexCtx * cont)
     ASSERT0(vexp->is_pr());
     lir->value = get_vreg(vexp);
     IR * case_list = SWITCH_case_list(*ir);
-    if (case_list != NULL) {
+    if (case_list != nullptr) {
         IR * c = case_list;
         bool is_packed = true; //case value is continuous.
         INT base_val = CONST_int_val(CASE_vexp(c));
-        while (c != NULL && c->get_next() != NULL) {
+        while (c != nullptr && c->get_next() != nullptr) {
             if ((CONST_int_val(CASE_vexp(c)) + 1) !=
                 CONST_int_val(CASE_vexp(c->get_next()))) {
                 is_packed = false;
@@ -1312,7 +1312,7 @@ LIR * IR2Dex::convertSwitch(IN OUT IR ** ir, IN IR2DexCtx * cont)
 
         c = case_list;
         UINT num_of_case = 0;
-        while (c != NULL) {
+        while (c != nullptr) {
             num_of_case++;
             c = c->get_next();
         }
@@ -1395,14 +1395,14 @@ LIR * IR2Dex::convert(IN OUT IR ** ir, IN IR2DexCtx * cont)
     default:
         UNREACHABLE();
     }
-    return NULL;
+    return nullptr;
 }
 
 
 void IR2Dex::reloc()
 {
     for (BackFillData * b = m_bf_list.get_head();
-         b != NULL; b = m_bf_list.get_next()) {
+         b != nullptr; b = m_bf_list.get_next()) {
         LIR * l =  b->lir;
         switch (LIR_opcode(l)) {
         case LOP_GOTO:
@@ -1465,15 +1465,15 @@ void IR2Dex::reloc()
 
 void IR2Dex::dump_output(List<LIR*> & newlirs, Prno2Vreg const& prno2v)
 {
-    if (g_tfile == NULL) { return; }
+    if (g_tfile == nullptr) { return; }
     if (m_lab2idx.get_elem_count() != 0) {
         INT c;
         note("\n==== RU:%s, IR2Dex DUMP lab2idx ====",
                 m_rg->getRegionName());
         for (LabelInfo const* li = m_lab2idx.get_first(c);
-             li != NULL; li = m_lab2idx.get_next(c)) {
+             li != nullptr; li = m_lab2idx.get_next(c)) {
             dumpLabel(li);
-            prt(" -->> %d", m_lab2idx.get(li, NULL));
+            prt(" -->> %d", m_lab2idx.get(li, nullptr));
         }
     }
     note("\n==== RU:%s, DUMP lir list after reloc === vregnum:%d ",
@@ -1505,14 +1505,14 @@ void IR2Dex::dump_output(List<LIR*> & newlirs, Prno2Vreg const& prno2v)
 extern bool g_dd;
 void IR2Dex::convert(IR * ir_list, List<LIR*> & newlirs)
 {
-    bool dump = g_dump_ir2dex && g_tfile != NULL;
+    bool dump = g_dump_ir2dex && g_tfile != nullptr;
     if (dump) {
         note("\n\n==== IR->DEX CONVERT %s =====",
                 m_rg->getRegionName());
     }
     IR2DexCtx cont;
     UINT idx = 0;
-    while (ir_list != NULL) {
+    while (ir_list != nullptr) {
         if (dump) {
             note("\n---");
             dumpIR(ir_list, m_tm);
@@ -1524,7 +1524,7 @@ void IR2Dex::convert(IR * ir_list, List<LIR*> & newlirs)
             continue;
         }
         LIR * lir = convert(&ir_list, &cont);
-        if (lir == NULL) { continue; }
+        if (lir == nullptr) { continue; }
         newlirs.append_tail(lir);
         idx++;
 

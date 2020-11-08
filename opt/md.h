@@ -254,7 +254,7 @@ public:
         MD_id(this) = 0;
         MD_ofst(this) = 0;
         MD_size(this) = 0;
-        MD_base(this) = NULL;
+        MD_base(this) = nullptr;
         u2.s1v = 0;
     }
 };
@@ -296,7 +296,7 @@ class OffsetTab : public TMap<MD const*, MD const*, CompareOffset> {
 public:
     //Return the entry.
     MD const* find(MD const* md)
-    { return TMap<MD const*, MD const*, CompareOffset>::get(md, NULL); }
+    { return TMap<MD const*, MD const*, CompareOffset>::get(md, nullptr); }
 
     void append(MD const* md)
     { TMap<MD const*, MD const*, CompareOffset>::set(md, md); }
@@ -311,12 +311,12 @@ protected:
     MD const* m_invalid_ofst_md; //record MD with invalid ofst
 
 public:
-    MDTab() { m_invalid_ofst_md = NULL; }
+    MDTab() { m_invalid_ofst_md = nullptr; }
 
     void init(UINT hash_bucket_size);
     void clean()
     {
-        m_invalid_ofst_md = NULL;
+        m_invalid_ofst_md = nullptr;
         m_ofst_tab.clean();
     }
     //Count memory usage for current object.
@@ -337,14 +337,14 @@ public:
             m_ofst_tab.append(md);
             return;
         }
-        ASSERT0(m_invalid_ofst_md == NULL);
+        ASSERT0(m_invalid_ofst_md == nullptr);
         m_invalid_ofst_md = md;
     }
 
     UINT get_elem_count()
     {
         UINT elems = 0;
-        if (m_invalid_ofst_md != NULL) {
+        if (m_invalid_ofst_md != nullptr) {
             elems++;
         }
         elems += m_ofst_tab.get_elem_count();
@@ -356,11 +356,11 @@ public:
     void get_elems(OUT Vector<MD const*> & mdv, ConstMDIter & iter)
     {
         UINT idx = 0;
-        if (m_invalid_ofst_md != NULL) {
+        if (m_invalid_ofst_md != nullptr) {
             mdv.set(idx++, m_invalid_ofst_md);
         }
-        for (MD const* md = m_ofst_tab.get_first(iter, NULL);
-             md != NULL; md = m_ofst_tab.get_next(iter, NULL)) {
+        for (MD const* md = m_ofst_tab.get_first(iter, nullptr);
+             md != nullptr; md = m_ofst_tab.get_next(iter, nullptr)) {
             mdv.set(idx++, md);
         }
     }
@@ -490,19 +490,19 @@ public:
 
     //Get unique MD that is effective, and offset must be valid.
     //Note the MDSet can only contain one element.
-    //Return the effect MD if found, otherwise return NULL.
+    //Return the effect MD if found, otherwise return nullptr.
     inline MD * get_exact_md(MDSystem * ms) const
     {
         MD * md = get_effect_md(ms);
-        if (md != NULL && md->is_exact()) {
+        if (md != nullptr && md->is_exact()) {
             return md;
         }
-        return NULL;
+        return nullptr;
     }
     //Get unique MD that is not fake memory object,
     //but its offset might be invalid.
     //Note the MDSet can only contain one element.
-    //Return the effect MD if found, otherwise return NULL.
+    //Return the effect MD if found, otherwise return nullptr.
     MD * get_effect_md(MDSystem * ms) const;
 };
 
@@ -535,7 +535,7 @@ public:
     MDSet * create()
     {
         MDSet * mds = get_free();
-        if (mds == NULL) {
+        if (mds == nullptr) {
             mds = (MDSet*)smpoolMallocConstSize(sizeof(MDSet), m_mds_pool);
             ASSERT0(mds);
             ::memset(mds, 0, sizeof(MDSet));
@@ -548,7 +548,7 @@ public:
     void destroy();
     void dump();
     //Count memory usage for current object.
-    size_t count_mem();
+    size_t count_mem() const;
 };
 
 
@@ -562,14 +562,14 @@ public:
     void remove(UINT mdid)
     {
         ASSERT0(mdid != 0); //0 is illegal mdid.
-        ASSERT0(get(mdid) != NULL);
-        Vector<MD*>::set(mdid, NULL);
+        ASSERT0(get(mdid) != nullptr);
+        Vector<MD*>::set(mdid, nullptr);
         m_count--;
     }
 
     void set(UINT mdid, MD * md)
     {
-        ASSERTN(Vector<MD*>::get(mdid) == NULL, ("already mapped"));
+        ASSERTN(Vector<MD*>::get(mdid) == nullptr, ("already mapped"));
         Vector<MD*>::set(mdid, md);
         m_count++;
     }
@@ -628,7 +628,7 @@ class MDSystem {
     inline MD * allocMD()
     {
         MD * md = m_free_md_list.remove_head();
-        if (md == NULL) {
+        if (md == nullptr) {
             md = (MD*)smpoolMallocConstSize(sizeof(MD), m_pool);
             md->clean();
         }
@@ -682,7 +682,7 @@ public:
     {
         ASSERT0(id != 0);
         MD * md = m_id2md_map.get(id);
-        ASSERT0(md == NULL || MD_id(md) == id);
+        ASSERT0(md == nullptr || MD_id(md) == id);
         return md;
     }
 
@@ -690,7 +690,7 @@ public:
     {
         ASSERT0(id != 0);
         MD * md = m_id2md_map.get(id);
-        ASSERT0(md == NULL || MD_id(md) == id);
+        ASSERT0(md == nullptr || MD_id(md) == id);
         return md;
     }
 
@@ -707,7 +707,7 @@ public:
 
     inline void freeMD(MD * md)
     {
-        if (md == NULL) { return; }
+        if (md == nullptr) { return; }
         m_id2md_map.remove(MD_id(md));
         UINT mdid = MD_id(md);
         ::memset(md, 0, sizeof(MD));
@@ -729,7 +729,7 @@ typedef TMapIter<UINT, MDSet const*> MD2MDSetIter;
 
 //MD2MD_SET_MAP
 //Record MD->MDS relations.
-//Note MD may mapped to NULL, means the MD does not point to anything.
+//Note MD may mapped to nullptr, means the MD does not point to anything.
 class MD2MDSet : public TMap<UINT, MDSet const*> {
     COPY_CONSTRUCTOR(MD2MDSet);
 public:
@@ -747,11 +747,11 @@ public:
     {
         UINT num_of_tgt_md = 0;
         MD2MDSetIter mxiter;
-        MDSet const* from_md_pts = NULL;
+        MDSet const* from_md_pts = nullptr;
         for (UINT fromid = get_first(mxiter, &from_md_pts);        
             fromid > 0; fromid = get_next(mxiter, &from_md_pts)) {
             ASSERT0(const_cast<MDSystem&>(mdsys).getMD(fromid));
-            if (from_md_pts == NULL || from_md_pts->is_contain_fullmem()) {
+            if (from_md_pts == nullptr || from_md_pts->is_contain_fullmem()) {
                 continue;
             }
             num_of_tgt_md += from_md_pts->get_elem_count();

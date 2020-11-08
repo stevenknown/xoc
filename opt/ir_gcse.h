@@ -44,10 +44,10 @@ protected:
 
 protected:
     virtual void * cloneEdgeInfo(xcom::Edge *)
-    { return NULL; }
+    { return nullptr; }
 
     virtual void * cloneVertexInfo(xcom::Vertex *)
-    { return NULL; }
+    { return nullptr; }
 
 public:
     explicit TG(Region * rg) { m_rg = rg; }
@@ -56,7 +56,7 @@ public:
     void pick_eh()
     {
         List<IRBB*> * bbs = m_rg->getBBList();
-        for (IRBB * bb = bbs->get_head(); bb != NULL; bb = bbs->get_next()) {
+        for (IRBB * bb = bbs->get_head(); bb != nullptr; bb = bbs->get_next()) {
             if (bb->isExceptionHandler()) {
                 removeVertex(bb->id());
             }
@@ -71,7 +71,7 @@ public:
 
     inline void computePdomAndIpdom(xcom::Vertex * root)
     {
-        if (!computePdomByRpo(root, NULL)) { UNREACHABLE(); }
+        if (!computePdomByRpo(root, nullptr)) { UNREACHABLE(); }
         if (!computeIpdom()) { UNREACHABLE(); }
     }
 };
@@ -126,13 +126,13 @@ public:
         m_du = rg->getDUMgr();
         m_aa = rg->getAA();
         ASSERT0(m_du && m_aa && m_cfg);
-        m_expr_tab = NULL;
+        m_expr_tab = nullptr;
         m_tm = rg->getTypeMgr();
         m_gvn = gvn;
-        m_tg = NULL;
+        m_tg = nullptr;
         m_is_in_ssa_form = false;
-        m_ssamgr = NULL;
-        m_mdssamgr = NULL;
+        m_ssamgr = nullptr;
+        m_mdssamgr = nullptr;
         m_num_of_elim = 0;
     }
     COPY_CONSTRUCTOR(GCSE);

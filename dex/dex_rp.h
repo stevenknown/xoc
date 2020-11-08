@@ -67,9 +67,9 @@ public:
 
         DUMgr * dumgr = rg->getDUMgr();
 
-        C<IR*> * ct = NULL;
+        C<IR*> * ct = nullptr;
         BB_irlist(stmt_bb).find(stmt, &ct);
-        ASSERT0(ct != NULL);
+        ASSERT0(ct != nullptr);
 
         //Insert stuff code as you need. It will slow down the benchmark.
         UINT num_want_to_insert = 30;

@@ -114,24 +114,24 @@ class DeadCodeElim : public Pass {
                        IN OUT List<IR const*> * act_ir_lst);
 
     bool useMDSSADU() const
-    { return m_mdssamgr != NULL && m_mdssamgr->is_valid(); }
+    { return m_mdssamgr != nullptr && m_mdssamgr->is_valid(); }
     bool usePRSSADU() const
-    { return m_prssamgr != NULL && m_prssamgr->is_valid(); }
+    { return m_prssamgr != nullptr && m_prssamgr->is_valid(); }
 public:
     explicit DeadCodeElim(Region * rg)
     {
-        ASSERT0(rg != NULL);
+        ASSERT0(rg != nullptr);
         m_rg = rg;
         m_tm = rg->getTypeMgr();
         m_cfg = rg->getCFG();
         m_du = rg->getDUMgr();
-        m_mdssamgr = NULL;
-        m_prssamgr = NULL;
+        m_mdssamgr = nullptr;
+        m_prssamgr = nullptr;
         m_md_sys = rg->getMDSystem();
         ASSERT0(m_cfg && m_du && m_md_sys && m_tm);
         m_is_elim_cfs = true;
         m_is_use_md_du = true;
-        m_cdg = NULL;
+        m_cdg = nullptr;
     }
     virtual ~DeadCodeElim() {}
 

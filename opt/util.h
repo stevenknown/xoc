@@ -38,6 +38,26 @@ namespace xoc {
 
 class Region;
 
+//Specific Timer, show const string before timer start and end.
+//User have to declare the 't' variable.
+//e.g:
+//    LONG t; //User declared
+//    START_STIMER(t, "My Pass");
+//    Run mypass();
+//    END_STIMER(t, "My Pass");
+#define START_STIMER(_timer_, s) \
+    _timer_ = 0; \
+    if (g_show_time) { \
+        _timer_ = getclockstart(); \
+        prt2C("\n==-- START %s", (s)); \
+    }
+#define END_STIMER(_timer_, s) \
+    if (g_show_time) { \
+        prt2C("\n==-- END %s", s); \
+        prt2C(" Time:%fsec", getclockend(_timer_)); \
+    }
+
+
 //Timer, show const string before timer start and end.
 //e.g:
 //    START_TIMER(t, "My Pass");
@@ -78,16 +98,16 @@ class Region;
 
 //e.g:
 //CHAR * dumpTN(Sym* key, Sym* mapped) { return SYM_name(key); }
-//dump_rbt((RBT<Sym*, Sym*, xoc::CompareSymTab>&)map, NULL, 1000, dumpTN);
+//dump_rbt((RBT<Sym*, Sym*, xoc::CompareSymTab>&)map, nullptr, 1000, dumpTN);
 template <class T, class Ttgt, class CompareKey>
 void dump_rbt(RBT<T, Ttgt, CompareKey> & rbt,
-              CHAR const* name = NULL,
+              CHAR const* name = nullptr,
               UINT nil_count = NIL_START,
-              CHAR const* (*dumpTN)(T, Ttgt) = NULL)
+              CHAR const* (*dumpTN)(T, Ttgt) = nullptr)
 {
     typedef RBTNode<T, Ttgt> TN;
     Vector<TN*> nilvec;
-    if (name == NULL) {
+    if (name == nullptr) {
         name = "graph_rbt.vcg";
     }
     UNLINK(name);
@@ -131,7 +151,7 @@ void dump_rbt(RBT<T, Ttgt, CompareKey> & rbt,
     //Print node
     List<TN*> lst;
     TN const* root = rbt.get_root();
-    if (root != NULL) {
+    if (root != nullptr) {
         lst.append_tail(const_cast<TN*>(root));
     }
 
@@ -142,7 +162,7 @@ void dump_rbt(RBT<T, Ttgt, CompareKey> & rbt,
         bool is_nil = false;
         for (INT i = 0; i <= nilvec.get_last_idx(); i++) {
             TN * z = nilvec.get(i);
-            if (z == NULL) { continue; }
+            if (z == nullptr) { continue; }
             if (x == z) {
                 key = z->key;
                 is_nil = true;
@@ -155,7 +175,7 @@ void dump_rbt(RBT<T, Ttgt, CompareKey> & rbt,
 
         if (x->color == RBRED) {
             //red
-            if (dumpTN != NULL) {
+            if (dumpTN != nullptr) {
                 fprintf(hvcg,
                     "\nnode: { title:\"%u\" label:\"%s\" shape:circle "
                     "color:red fontname:\"courB\" textcolor:white}",
@@ -176,7 +196,7 @@ void dump_rbt(RBT<T, Ttgt, CompareKey> & rbt,
                     (UINT)key, 0);
             } else {
                 //black
-                if (dumpTN != NULL) {
+                if (dumpTN != nullptr) {
                     fprintf(hvcg,
                         "\nnode: { title:\"%u\" label:\"%s\" shape:circle "
                         "color:black fontname:\"courB\" textcolor:white}",
@@ -190,7 +210,7 @@ void dump_rbt(RBT<T, Ttgt, CompareKey> & rbt,
             }
         }
 
-        if (x->rchild != NULL) {
+        if (x->rchild != nullptr) {
             lst.append_tail(x->rchild);
             fprintf(hvcg,
                 "\nedge: { sourcename:\"%u\" targetname:\"%u\" }",
@@ -209,7 +229,7 @@ void dump_rbt(RBT<T, Ttgt, CompareKey> & rbt,
                 (UINT)key, (UINT)nil->key);
         }
 
-        if (x->lchild != NULL) {
+        if (x->lchild != nullptr) {
             lst.append_tail(x->lchild);
             fprintf(hvcg,
                 "\nedge: { sourcename:\"%u\" targetname:\"%u\" }",
@@ -241,7 +261,7 @@ void dump_rbt(RBT<T, Ttgt, CompareKey> & rbt,
 template <class T>
 void dumpVector(xcom::Vector<T> const& v, FILE * h)
 {
-    if (h == NULL) { return; }
+    if (h == nullptr) { return; }
     fprintf(h, "\n");
     for (INT i = 0; i <= v.get_last_idx(); i++) {
         T x = v.get(i);

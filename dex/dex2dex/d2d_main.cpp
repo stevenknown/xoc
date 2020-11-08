@@ -75,7 +75,7 @@ bool d2dEntryBuf(
     DexFile * dexfile = dexFileParse((const u1*)*dxbuf,
                                       *dxbuflen,
                                       kDexParseDefault);
-    if (dexfile == NULL) {
+    if (dexfile == nullptr) {
         LOGE("LEMUR:dexfile is null: DEX parse failed for \n");
         goto END;
     }
@@ -92,7 +92,7 @@ bool d2dEntryBuf(
 
     LOGI("d2dEntry finished.\n");
 END:
-    if (dexfile != NULL) {
+    if (dexfile != nullptr) {
         dexFileFree(dexfile);
     }
     return result;
@@ -115,7 +115,7 @@ int d2dEntry(int dexfd,
 {
     ASSERT0(dexfd >= 0);
     Int32 error = 0;
-    DexFile* dexfile = NULL;
+    DexFile* dexfile = nullptr;
     MemMapping inputmap;
     MemMapping outputmap;
     bool inputmapped = false;
@@ -150,7 +150,7 @@ int d2dEntry(int dexfd,
     }
 
     dexfile = dexFileParse((const u1*)(inputmap.addr), inputmap.length, kDexParseDefault);
-    if (dexfile == NULL) {
+    if (dexfile == nullptr) {
         LOGE("error: parse dex file failed\n");
         error = -1;
         goto END;
@@ -174,7 +174,7 @@ END:
         sysReleaseShmem(&outputmap);
     }
 
-    if (dexfile != NULL) {
+    if (dexfile != nullptr) {
         dexFileFree(dexfile);
     }
 

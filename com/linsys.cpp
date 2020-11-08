@@ -25,20 +25,7 @@ CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
 OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE
 USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 @*/
-#include "ltype.h"
-#include "comf.h"
-#include "strbuf.h"
-#include "smempool.h"
-#include "rational.h"
-#include "flty.h"
-#include "sstl.h"
-#include "matt.h"
-#include "bs.h"
-#include "sbs.h"
-#include "sgraph.h"
-#include "xmat.h"
-#include "linsys.h"
-#include "lpsol.h"
+#include "xcominc.h"
 
 namespace xcom {
 
@@ -56,7 +43,7 @@ class X2V_MAP {
     {
         ASSERTN(m_is_init == true, ("List not yet initialized."));
         void * p = smpoolMalloc(size, m_pool);
-        if (!p) return NULL;
+        if (!p) return nullptr;
         ::memset(p,0,size);
         return p;
     }
@@ -110,7 +97,7 @@ public:
         if (coeff > 0) {
             //Get equatino index vec.
             Vector<INT> * vec = m_x2pos.get(idx_of_var);
-            if (vec == NULL) {
+            if (vec == nullptr) {
                 vec = (Vector<INT>*)xmalloc(sizeof(Vector<INT>));
                 vec->init();
                 m_x2pos.set(idx_of_var, vec);
@@ -118,7 +105,7 @@ public:
             vec->set(vec->get_last_idx() + 1, idx_of_equation);
         } else if (coeff < 0) {
             Vector<INT> * vec = m_x2neg.get(idx_of_var);
-            if (vec == NULL) {
+            if (vec == nullptr) {
                 vec = (Vector<INT>*)xmalloc(sizeof(Vector<INT>));
                 vec->init();
                 m_x2neg.set(idx_of_var, vec);
@@ -150,7 +137,7 @@ Lineq::Lineq(RMat * m, INT rhs_idx)
     m_is_init = false;
     m_is_dump = false;
     m_rhs_idx = -1;
-    m_coeff = NULL;
+    m_coeff = nullptr;
     init(m, rhs_idx);
 }
 
@@ -164,10 +151,10 @@ Lineq::~Lineq()
 void Lineq::init(RMat * m, INT rhs_idx)
 {
     if (m_is_init) return;
-    if (m != NULL) {
+    if (m != nullptr) {
         setParam(m, rhs_idx);
     } else {
-        m_coeff = NULL;
+        m_coeff = nullptr;
         m_rhs_idx = -1;
     }
     m_is_init = true;
@@ -177,7 +164,7 @@ void Lineq::init(RMat * m, INT rhs_idx)
 void Lineq::destroy()
 {
     if (!m_is_init) return;
-    m_coeff = NULL;
+    m_coeff = nullptr;
     m_rhs_idx = -1;
     m_is_init = false;
 }
@@ -186,7 +173,7 @@ void Lineq::destroy()
 //Set coeff matrix and index of start column of constant term.
 void Lineq::setParam(RMat * m, INT rhs_idx)
 {
-    ASSERTN(m != NULL && m->getColSize() > 0, ("coeff mat is empty"));
+    ASSERTN(m != nullptr && m->getColSize() > 0, ("coeff mat is empty"));
     m_coeff = m;
     if (rhs_idx == -1) {
         m_rhs_idx = m->getColSize() -1;
@@ -301,8 +288,8 @@ void Lineq::ConvexHullUnionAndIntersect(OUT RMat & res,
     }
 
     //Scanning each convex hull to compute boundary.
-    Lineq lin(NULL);
-    for (p = chlst.get_head(); p != NULL; p = chlst.get_next()) {
+    Lineq lin(nullptr);
+    for (p = chlst.get_head(); p != nullptr; p = chlst.get_next()) {
         ASSERTN(first_cols == p->getColSize(),
                 ("matrix is not in homotype"));
         //FM-elim
@@ -426,7 +413,7 @@ bool Lineq::reduce(IN OUT RMat & m, UINT rhs_idx, bool is_intersect)
     //Processing positive coefficent relationship, e.g: x <= N, x <= M.
     for (idx_of_var = 0; idx_of_var < (UINT)rhs_idx; idx_of_var++) {
         Vector<INT> * poscoeff_eqt = x2v.get_pos_of_var(idx_of_var);
-        if (poscoeff_eqt != NULL) {
+        if (poscoeff_eqt != nullptr) {
             //Reduction in terms of intersection/union operation on boundary.
             for (INT k1 = 0; k1 < poscoeff_eqt->get_last_idx(); k1++) {
                 UINT idx_of_ineqt1 = poscoeff_eqt->get(k1);
@@ -498,7 +485,7 @@ bool Lineq::reduce(IN OUT RMat & m, UINT rhs_idx, bool is_intersect)
         //which only involved single variable.
         //Processing negitive coefficent relationship, e.g: -x <= W, -x <= V.
         Vector<INT> * negcoeff_eqt = x2v.get_neg_of_var(idx_of_var);
-        if (negcoeff_eqt != NULL) {
+        if (negcoeff_eqt != nullptr) {
             for (INT k1 = 0; k1 < negcoeff_eqt->get_last_idx(); k1++) {
                 UINT idx_of_eqt1 = negcoeff_eqt->get(k1);
                 if (removed.get(idx_of_eqt1) == true) {
@@ -570,7 +557,7 @@ bool Lineq::reduce(IN OUT RMat & m, UINT rhs_idx, bool is_intersect)
 
         //Verification for legitimate intersection of lower and upper boundary.
         //e.g: x <= 9 , x >= 10 is inconsistency.
-        if (is_intersect && poscoeff_eqt != NULL && negcoeff_eqt != NULL) {
+        if (is_intersect && poscoeff_eqt != nullptr && negcoeff_eqt != nullptr) {
             for (INT i = 0; i <= poscoeff_eqt->get_last_idx(); i++) {
                 INT pi = poscoeff_eqt->get(i);
                 Rational coeff = m.get(pi, idx_of_var);
@@ -652,7 +639,7 @@ FIN:
 bool Lineq::fme(UINT const u, OUT RMat & res, bool const darkshadow)
 {
     ASSERTN(m_is_init == true, ("not yet initialize."));
-    ASSERTN(m_coeff != NULL && m_coeff != &res, ("illegal parameter of fme"));
+    ASSERTN(m_coeff != nullptr && m_coeff != &res, ("illegal parameter of fme"));
     ASSERTN(m_rhs_idx != -1, ("not yet initialize."));
     if (m_coeff->size() == 0) {
         res.deleteAllElem();
@@ -876,7 +863,7 @@ bool Lineq::has_solution(RMat const& leq,
     if (is_int_sol) {
         MIP<RMat, Rational> mip(m_is_dump);
         mip.reviseTargetFunc(tgtf, eq, leq, num_of_var);
-        UINT st = mip.maxm(v, res, tgtf, vc, eq, leq, false, NULL, rhs_idx);
+        UINT st = mip.maxm(v, res, tgtf, vc, eq, leq, false, nullptr, rhs_idx);
         if (st == IP_SUCC) {
             //max value is 'v', solution is 'res'.
             return true;
@@ -893,7 +880,7 @@ bool Lineq::has_solution(RMat const& leq,
             //
             //return true;
         }
-        st = mip.minm(v, res, tgtf, vc, eq, leq, false, NULL, rhs_idx);
+        st = mip.minm(v, res, tgtf, vc, eq, leq, false, nullptr, rhs_idx);
         if (st == IP_SUCC) {
             //min value is 'v', solution is 'res'.
             return true;
@@ -1094,14 +1081,14 @@ void Lineq::formatBound(UINT u, OUT RMat & ineqt_of_u)
 bool Lineq::calcBound(IN OUT List<RMat*> & limits)
 {
     ASSERTN(m_is_init == true, ("not yet initialized"));
-    ASSERTN(m_coeff != NULL && limits.get_elem_count() == (UINT)m_rhs_idx,
+    ASSERTN(m_coeff != nullptr && limits.get_elem_count() == (UINT)m_rhs_idx,
             ("unmatch coeff matrix info"));
 
     //Eliminating variable one by one, and inner to outer.
     INT i,j;
     RMat res;
     RMat work; //Recovery for next elimination.
-    Lineq lineq(NULL);
+    Lineq lineq(nullptr);
     for (j = 0; j < m_rhs_idx; j++) {
         work = *m_coeff; //Recovery for next elimination.
         lineq.setParam(&work, m_rhs_idx);

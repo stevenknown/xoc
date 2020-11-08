@@ -34,6 +34,9 @@ author: Su Zhenyu
 #ifndef _L_TYPE_
 #define _L_TYPE_
 
+//This file include system library header files and defined general macros
+//that used in project.
+
 #ifdef _ON_WINDOWS_
     #ifdef _VC6_
     #include "windows.h"
@@ -208,5 +211,11 @@ typedef unsigned long ULONG;
 //Misc Dumps/Dumpf of Vector<T>
 #define D_BOOL 1
 #define D_INT 2
+
+#ifdef _SUPPORT_C11_
+//Predefine C11 keyword if host compiler does not support C11.
+#define nullptr NULL
+#endif
+
 #endif
 

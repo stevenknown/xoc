@@ -157,7 +157,7 @@ IR * Region::buildId(Var * var)
 {
     ASSERT0(var);
     IR * ir = allocIR(IR_ID);
-    ASSERT0(var != NULL);
+    ASSERT0(var != nullptr);
     ID_info(ir) = var;
     IR_dt(ir) = VAR_type(var);
     return ir;
@@ -170,7 +170,7 @@ IR * Region::buildLdaString(CHAR const* varname, CHAR const * string)
 }
 
 
-IR * Region::buildLdaString(CHAR const* varname, Sym * string)
+IR * Region::buildLdaString(CHAR const* varname, Sym const* string)
 {
     ASSERT0(string);
     Var * v = getVarMgr()->registerStringVar(varname, string, MEMORY_ALIGNMENT);
@@ -276,10 +276,10 @@ IR * Region::buildPhi(UINT prno, Type const* type, UINT num_opnd)
     PHI_prno(ir) = prno;
     IR_dt(ir) = type;
 
-    IR * last = NULL;
+    IR * last = nullptr;
     for (UINT i = 0; i < num_opnd; i++) {
         IR * x = buildPRdedicated(prno, type);
-        PR_ssainfo(x) = NULL;
+        PR_ssainfo(x) = nullptr;
         xcom::add_next(&PHI_opnd_list(ir), &last, x);
         IR_parent(x) = ir;
     }
@@ -296,10 +296,10 @@ IR * Region::buildPhi(UINT prno, Type const* type, IR * opnd_list)
     IR * ir = allocIR(IR_PHI);
     PHI_prno(ir) = prno;
     IR_dt(ir) = type;
-    for (IR * opnd = opnd_list; opnd != NULL; opnd = opnd->get_next()) {
+    for (IR * opnd = opnd_list; opnd != nullptr; opnd = opnd->get_next()) {
         ASSERT0(opnd->is_pr() || opnd->is_const());
         if (opnd->is_pr()) {
-            PR_ssainfo(opnd) = NULL;
+            PR_ssainfo(opnd) = nullptr;
         }
         IR_parent(opnd) = ir;
     }
@@ -325,7 +325,7 @@ IR * Region::buildCall(Var * callee,
     CALL_prno(ir) = result_prno;
     CALL_idinfo(ir) = callee;
     IR_dt(ir) = type;
-    while (param_list != NULL) {
+    while (param_list != nullptr) {
         IR_parent(param_list) = ir;
         param_list = IR_next(param_list);
     }
@@ -354,7 +354,7 @@ IR * Region::buildICall(IR * callee,
     IR_dt(ir) = type;
 
     IR_parent(callee) = ir;
-    while (param_list != NULL) {
+    while (param_list != nullptr) {
         IR_parent(param_list) = ir;
         param_list = IR_next(param_list);
     }
@@ -399,7 +399,7 @@ IR * Region::buildIgoto(IR * vexp, IR * case_list)
     IR_parent(vexp) = ir;
 
     IR * c = case_list;
-    while (c != NULL) {
+    while (c != nullptr) {
         ASSERT0(c->is_case());
         IR_parent(c) = ir;
         c = c->get_next();
@@ -414,7 +414,7 @@ IR * Region::buildGoto(LabelInfo const* li)
     ASSERT0(li);
     IR * ir = allocIR(IR_GOTO);
     IR_dt(ir) = getTypeMgr()->getAny();
-    ASSERT0(li != NULL);
+    ASSERT0(li != nullptr);
     GOTO_lab(ir) = li;
     return ir;
 }
@@ -713,14 +713,14 @@ IR * Region::buildArray(IR * base,
     IR_parent(base) = ir;
     ARR_sub_list(ir) = sublist;
     UINT n = 0;
-    for (IR * p = sublist; p != NULL; p = p->get_next()) {
+    for (IR * p = sublist; p != nullptr; p = p->get_next()) {
         IR_parent(p) = ir;
         n++;
     }
     ASSERT0(n == dims);
     ARR_elemtype(ir) = elemtype;
 
-    if (elem_num_buf != NULL) {
+    if (elem_num_buf != nullptr) {
         UINT l = sizeof(TMWORD) * dims;
         TMWORD * ebuf = (TMWORD*)xmalloc(l);
         ::memcpy(ebuf, elem_num_buf, l);
@@ -765,7 +765,7 @@ IR * Region::buildArray(IR * base,
 //        elem_num points to an array with 2 value, [12, 24].
 //        the 1th dimension has 12 elements, and the 2th dimension has 24
 //        elements, which element type is D_I32.
-//    Note the parameter may be NULL.
+//    Note the parameter may be nullptr.
 //'rhs: value expected to store.
 IR * Region::buildStoreArray(IR * base,
                              IR * sublist,
@@ -789,14 +789,14 @@ IR * Region::buildStoreArray(IR * base,
     IR_parent(base) = ir;
     ARR_sub_list(ir) = sublist;
     UINT n = 0;
-    for (IR * p = sublist; p != NULL; p = p->get_next()) {
+    for (IR * p = sublist; p != nullptr; p = p->get_next()) {
         IR_parent(p) = ir;
         n++;
     }
     ASSERT0(n == dims);
     ARR_elemtype(ir) = elemtype;
 
-    if (elem_num_buf != NULL) {
+    if (elem_num_buf != nullptr) {
         UINT l = sizeof(TMWORD) * dims;
         TMWORD * ebuf = (TMWORD*)xmalloc(l);
         ::memcpy(ebuf, elem_num_buf, l);
@@ -815,10 +815,10 @@ IR * Region::buildReturn(IR * retexp)
     IR * ir = allocIR(IR_RETURN);
     IR_dt(ir) = getTypeMgr()->getAny();
     RET_exp(ir) = retexp;
-    if (retexp != NULL) {
+    if (retexp != nullptr) {
         ASSERT0(retexp->is_exp());
-        ASSERT0(IR_next(retexp) == NULL);
-        ASSERT0(IR_prev(retexp) == NULL);
+        ASSERT0(IR_next(retexp) == nullptr);
+        ASSERT0(IR_prev(retexp) == nullptr);
         IR_parent(retexp) = ir;
     }
     return ir;
@@ -895,7 +895,7 @@ IR * Region::buildDoLoop(IR * iv,
 
     LOOP_body(ir) = loop_body;
     IR * c = loop_body;
-    while (c != NULL) {
+    while (c != nullptr) {
         IR_parent(c) = ir;
         //Do not check if ir is stmt, it will be canonicalized later.
         c = c->get_next();
@@ -918,7 +918,7 @@ IR * Region::buildDoWhile(IR * det, IR * loop_body)
 
     LOOP_body(ir) = loop_body;
     IR * c = loop_body;
-    while (c != NULL) {
+    while (c != nullptr) {
         IR_parent(c) = ir;
         //Do not check if ir is stmt, it will be canonicalized later.
         c = c->get_next();
@@ -941,7 +941,7 @@ IR * Region::buildWhileDo(IR * det, IR * loop_body)
 
     LOOP_body(ir) = loop_body;
     IR * c = loop_body;
-    while (c != NULL) {
+    while (c != nullptr) {
         IR_parent(c) = ir;
         //Do not check if ir is stmt, it will be canonicalized later.
         c = c->get_next();
@@ -965,7 +965,7 @@ IR * Region::buildIf(IR * det, IR * true_body, IR * false_body)
 
     IF_truebody(ir) = true_body;
     IR * c = true_body;
-    while (c != NULL) {
+    while (c != nullptr) {
         IR_parent(c) = ir;
         //Do not check if ir is stmt, it will be canonicalized later.
         c = c->get_next();
@@ -973,7 +973,7 @@ IR * Region::buildIf(IR * det, IR * true_body, IR * false_body)
 
     IF_falsebody(ir) = false_body;
     c = false_body;
-    while (c != NULL) {
+    while (c != nullptr) {
         IR_parent(c) = ir;
         //Do not check if ir is stmt, it will be canonicalized later.
         c = c->get_next();
@@ -1005,14 +1005,14 @@ IR * Region::buildSwitch(IR * vexp,
     IR_parent(vexp) = ir;
 
     IR * c = case_list;
-    while (c != NULL) {
+    while (c != nullptr) {
         ASSERT0(c->is_case());
         IR_parent(c) = ir;
         c = c->get_next();
     }
 
     c = body;
-    while (c != NULL) {
+    while (c != nullptr) {
         IR_parent(c) = ir;
         //Do not check if ir is stmt, it will be canonicalized later.
         c = c->get_next();
@@ -1249,7 +1249,7 @@ IR * Region::buildPointerOp(IR_TYPE irt, IR * lchild, IR * rchild)
     }
 
     UNREACHABLE();
-    return NULL; //just ceases warning.
+    return nullptr; //just ceases warning.
 }
 
 

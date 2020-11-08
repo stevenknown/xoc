@@ -405,9 +405,9 @@ void genInstruction(
         case lirFmtINVOKE:
         {
             LIRInvokeOp* lir = (LIRInvokeOp*)LIRMALLOC(sizeof(LIRInvokeOp));
-            const DexMethodId* method = NULL;
-            const DexProtoId* proto = NULL;
-            const char* shorty = NULL;
+            const DexMethodId* method = nullptr;
+            const DexProtoId* proto = nullptr;
+            const char* shorty = nullptr;
             lir->flags = flags;
 
             /* TODO: to process the objectinit and excute inline
@@ -437,7 +437,7 @@ void genInstruction(
             if (dInsn.vA != 0) {
                 lir->args = (UInt16*)LIRMALLOC(dInsn.vA * sizeof(UInt32));
             } else {
-                lir->args = NULL;
+                lir->args = nullptr;
             }
 
            if ((flags & 0xf0) == LIR_Range) {
@@ -455,7 +455,7 @@ END:
             result = (LIRBaseOp*)lir;
             break;
         }default:{
-            result = NULL;
+            result = nullptr;
             UNREACHABLE();
         }
         }
@@ -508,7 +508,7 @@ static void genTryCatches(
     UInt32 triesSize = dexCode->triesSize;
 
     code->triesSize = triesSize;
-    code->trys = NULL;
+    code->trys = nullptr;
     if (triesSize == 0) {
         return;
     }
@@ -537,7 +537,7 @@ static void genTryCatches(
         handlerSize = 0;
         while (true) {
             DexCatchHandler* handler = dexCatchIteratorNext(&iterator);
-            if (handler == NULL) {
+            if (handler == nullptr) {
                 break;
             }
             handlerSize ++;
@@ -553,7 +553,7 @@ static void genTryCatches(
             DexCatchHandler* handler = dexCatchIteratorNext(&iterator);
             UInt32 newHandler;
 
-            if (handler == NULL) {
+            if (handler == nullptr) {
                 break;
             }
 
@@ -683,7 +683,7 @@ bool aotDrGenCode(
 CHAR const* debugAssemblyName(DexFile const* df, DexMethod const* dexm)
 {
     CHAR tmp[256];
-    CHAR * name = NULL;
+    CHAR * name = nullptr;
     CHAR const* classname = get_class_name(df, dexm);
     CHAR const* funcname = get_func_name(df, dexm);
     CHAR const* functype = get_func_type(df, dexm);
@@ -703,7 +703,7 @@ CHAR const* debugAssemblyName(DexFile const* df, DexMethod const* dexm)
 bool checkMethodName(DexFile const* df, DexMethod const* dexm)
 {
     CHAR tmp[256];
-    CHAR * runame = NULL;
+    CHAR * runame = nullptr;
     CHAR const* classname = get_class_name(df, dexm);
     CHAR const* funcname = get_func_name(df, dexm);
     CHAR const* functype = get_func_type(df, dexm);

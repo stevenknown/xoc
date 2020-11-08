@@ -298,8 +298,8 @@ public:
             is_fake() ||
             is_label() ||
             is_array() ||
-            (is_string() && getString() != NULL) ||
-            getByteValue() != NULL);
+            (is_string() && getString() != nullptr) ||
+            getByteValue() != nullptr);
     }
 
     UINT get_align() const { return VAR_align(this); }
@@ -310,7 +310,7 @@ public:
     UINT getStringLength() const
     {
         ASSERT0(VAR_type(this)->is_string());
-        return VAR_string(this) == NULL ?
+        return VAR_string(this) == nullptr ?
                0 : xstrlen(SYM_name(VAR_string(this)));
     }
     Sym const* getString() const { return VAR_string(this); }
@@ -325,7 +325,7 @@ public:
             dm->getByteSize(VAR_type(this));
     }
 
-    virtual CHAR const* dumpVARDecl(StrBuf &) const { return NULL; }
+    virtual CHAR const* dumpVARDecl(StrBuf &) const { return nullptr; }
     virtual void dump(TypeMgr const* tm) const;
 
     //You must make sure this function will not change any field of Var.
@@ -342,8 +342,8 @@ public:
 
 //END Var
 
-typedef TabIter<Var*> VarTabIter;
-typedef TabIter<Var const*> ConstVarTabIter;
+typedef TTabIter<Var*> VarTabIter;
+typedef TTabIter<Var const*> ConstVarTabIter;
 
 class CompareVar {
 public:
@@ -408,6 +408,9 @@ public:
     Var * get_var(size_t id) const { return m_var_vec.get((UINT)id); }
 
     Var * findStringVar(Sym const* str) { return m_str_tab.get(str); }
+    //Find variable by 'name'.
+    //Note there may be multiple variable with same name, this function return
+    //the first.
     Var * findVarByName(Sym const* name);
 
     bool isDedicatedStringVar(CHAR const* name) const;

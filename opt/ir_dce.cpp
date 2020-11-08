@@ -47,7 +47,7 @@ void DeadCodeElim::setEffectStmt(IR const* stmt,
     act_ir_lst->append_tail(stmt);
     m_is_stmt_effect.bunion(stmt->id());
     ASSERT0(stmt->getBB());
-    if (is_bb_effect != NULL) {
+    if (is_bb_effect != nullptr) {
         is_bb_effect->bunion(stmt->getBB()->id());
     }
 }
@@ -60,7 +60,7 @@ bool DeadCodeElim::dump() const
          getPassName(), m_rg->getRegionName());
     note(getRegion(), "\n==-- Ineffect BB --==");
     BBList * bbl = m_rg->getBBList();
-    for (IRBB * bb = bbl->get_head(); bb != NULL; bb = bbl->get_next()) {
+    for (IRBB * bb = bbl->get_head(); bb != nullptr; bb = bbl->get_next()) {
         note(getRegion(), "\n--0- BB%d", bb->id());
         if (!m_is_bb_effect.is_contain(bb->id())) {
             prt(getRegion(), "\t\tineffect BB!");
@@ -90,13 +90,13 @@ bool DeadCodeElim::check_stmt(IR const* ir)
     }
 
     MD const* mustdef = ir->getRefMD();
-    if (mustdef != NULL) {
+    if (mustdef != nullptr) {
         if (is_effect_write(mustdef->get_base())) {
             return true;
         }
     } else {
         MDSet const* maydefs = ir->getRefMDSet();
-        if (maydefs != NULL) {
+        if (maydefs != nullptr) {
             MDSetIter iter;
             for (INT i = maydefs->get_first(&iter);
                  i >= 0; i = maydefs->get_next(i, &iter)) {
@@ -111,7 +111,7 @@ bool DeadCodeElim::check_stmt(IR const* ir)
 
     m_citer.clean();
     for (IR const* x = iterRhsInitC(ir, m_citer);
-         x != NULL; x = iterRhsNextC(m_citer)) {
+         x != nullptr; x = iterRhsNextC(m_citer)) {
         if (!m_is_use_md_du && x->isMemoryRefNotOperatePR()) {
             return true;
         }
@@ -122,18 +122,18 @@ bool DeadCodeElim::check_stmt(IR const* ir)
         //e.g: volatile int g = 0;
         //    while(g); # The stmt has effect.
         MD const* md = x->getRefMD();
-        if (md != NULL) {
+        if (md != nullptr) {
             if (is_effect_read(md->get_base())) {
                 return true;
             }
         } else {
             MDSet const* mds = x->getRefMDSet();
-            if (mds != NULL) {
+            if (mds != nullptr) {
                 MDSetIter iter;
                 for (INT i = mds->get_first(&iter);
                      i != -1; i = mds->get_next(i, &iter)) {
                     MD * md2 = m_md_sys->getMD(i);
-                    ASSERT0(md2 != NULL);
+                    ASSERT0(md2 != nullptr);
                     if (is_effect_read(md2->get_base())) {
                         return true;
                     }
@@ -159,9 +159,9 @@ void DeadCodeElim::mark_effect_ir(IN OUT List<IR const*> & work_list)
     List<IRBB*> * bbl = m_rg->getBBList();
     BBListIter ct;
     for (IRBB * bb = bbl->get_head(&ct);
-         bb != NULL; bb = bbl->get_next(&ct)) {
+         bb != nullptr; bb = bbl->get_next(&ct)) {
         for (IR const* ir = BB_first_ir(bb);
-             ir != NULL; ir = BB_next_ir(bb)) {
+             ir != nullptr; ir = BB_next_ir(bb)) {
             switch (ir->getCode()) {
             case IR_RETURN:
                 //Do NOT set exit-bb to be effect.
@@ -205,11 +205,11 @@ bool DeadCodeElim::find_effect_kid(IR const* ir) const
     ASSERT0(bb);
     if (ir->isConditionalBr() || ir->isMultiConditionalBr()) {
         for (xcom::EdgeC const* ec = m_cdg->getVertex(bb->id())->getOutList();
-             ec != NULL; ec = ec->get_next()) {
+             ec != nullptr; ec = ec->get_next()) {
             IRBB * succ = m_cfg->getBB(ec->getToId());
-            ASSERT0(succ != NULL);
+            ASSERT0(succ != nullptr);
             for (IR * r = BB_irlist(succ).get_head();
-                 r != NULL; r = BB_irlist(succ).get_next()) {
+                 r != nullptr; r = BB_irlist(succ).get_next()) {
                 if (m_is_stmt_effect.is_contain(r->id())) {
                     return true;
                 }
@@ -227,14 +227,14 @@ bool DeadCodeElim::find_effect_kid(IR const* ir) const
         //    v    v v   v
         //   S1    bb    S2
         for (xcom::EdgeC const* ecp = m_cdg->getVertex(bb->id())->getInList();
-             ecp != NULL; ecp = ecp->get_next()) {
+             ecp != nullptr; ecp = ecp->get_next()) {
             for (xcom::EdgeC const* ecs = m_cdg->getVertex(ecp->getFromId())->
                     getOutList();
-                 ecs != NULL; ecs = ecs->get_next()) {
+                 ecs != nullptr; ecs = ecs->get_next()) {
                 IRBB * succ = m_cfg->getBB(ecs->getToId());
                 ASSERTN(succ, ("BB%d does not belong to CFG", ecs->getToId()));
                 for (IR * r = BB_irlist(succ).get_head();
-                     r != NULL; r = BB_irlist(succ).get_next()) {
+                     r != nullptr; r = BB_irlist(succ).get_next()) {
                     if (m_is_stmt_effect.is_contain(r->id())) {
                         return true;
                     }
@@ -256,7 +256,7 @@ bool DeadCodeElim::setControlDepBBToBeEffect(IRBB const* bb,
     UINT bbid = bb->id();
     ASSERT0(m_cdg->getVertex(bbid));
     for (xcom::EdgeC const* ec = m_cdg->getVertex(bbid)->getInList();
-         ec != NULL; ec = ec->get_next()) {
+         ec != nullptr; ec = ec->get_next()) {
         INT cd_pred = ec->getFromId();
         if (!m_is_bb_effect.is_contain(cd_pred)) {
             m_is_bb_effect.bunion(cd_pred);
@@ -269,7 +269,7 @@ bool DeadCodeElim::setControlDepBBToBeEffect(IRBB const* bb,
     if (xcom::cnt_list(ec) >= 2) {
         ASSERT0(bb->rpo() >= 0);
         UINT bbto = bb->rpo();
-        while (ec != NULL) {
+        while (ec != nullptr) {
             IRBB * pred = m_cfg->getBB(ec->getFromId());
             ASSERT0(pred);
             if (pred->rpo() > (INT)bbto &&
@@ -282,13 +282,13 @@ bool DeadCodeElim::setControlDepBBToBeEffect(IRBB const* bb,
     }
 
     IR * ir = const_cast<IRBB*>(bb)->getLastIR(); //last IR of BB.
-    if (ir == NULL) { return change; }
+    if (ir == nullptr) { return change; }
 
     if (ir->isBranch() &&
         !m_is_stmt_effect.is_contain(ir->id()) &&
         find_effect_kid(ir)) {
         //IR_SWTICH might have multiple succ-BB.
-        setEffectStmt(ir, NULL, &act_ir_lst);
+        setEffectStmt(ir, nullptr, &act_ir_lst);
         change = true;        
     }
     return change;
@@ -314,7 +314,7 @@ bool DeadCodeElim::preserve_cd(IN OUT List<IR const*> & act_ir_lst)
         //  BB3:L1: ...
         //Note BB3 is ineffective, but 'goto' can not be removed!
         IR * last_ir = bb->getLastIR(); //last IR of BB.
-        if (last_ir == NULL) { continue; }
+        if (last_ir == nullptr) { continue; }
 
         if (last_ir->isUnconditionalBr() &&
             !m_is_stmt_effect.is_contain(last_ir->id())) {
@@ -332,7 +332,7 @@ bool DeadCodeElim::collectByPRSSA(IR const* x, IN OUT List<IR const*> * pwlst2)
 {
     ASSERT0(x->isReadPR() && PR_ssainfo(x) && usePRSSADU());
     IR const* d = PR_ssainfo(x)->getDef();
-    if (d == NULL) { return false; }
+    if (d == nullptr) { return false; }
     ASSERT0(d->is_stmt());
     ASSERT0(d->isWritePR() || d->isCallHasRetVal());
     if (m_is_stmt_effect.is_contain(d->id())) { return false; }
@@ -349,7 +349,7 @@ bool DeadCodeElim::collectAllDefThroughDefChain(
     ASSERT0(tdef);
     ConstMDDefIter ii;
     for (MDDef const* def = m_mdssamgr->iterDefInitC(tdef, ii);
-         def != NULL; def = m_mdssamgr->iterDefNextC(ii)) {        
+         def != nullptr; def = m_mdssamgr->iterDefNextC(ii)) {        
         if (def->is_phi()) {
             //Merged DEF will be iterated.
             continue;
@@ -377,20 +377,20 @@ bool DeadCodeElim::collectByMDSSA(IR const* x, IN OUT List<IR const*> * pwlst2)
     ASSERT0(x->isMemoryRefNotOperatePR() && useMDSSADU());
     ASSERT0(x->is_exp()); 
     MDSSAInfo * mdssainfo = m_mdssamgr->getMDSSAInfoIfAny(x);
-    if (mdssainfo == NULL ||
-        mdssainfo->readVOpndSet() == NULL ||
+    if (mdssainfo == nullptr ||
+        mdssainfo->readVOpndSet() == nullptr ||
         mdssainfo->readVOpndSet()->is_empty()) {
         return false;
     }
     bool change = false;
-    VOpndSetIter iter = NULL;
+    VOpndSetIter iter = nullptr;
     MD const* mustuse = x->getRefMD();
     for (INT i = mdssainfo->readVOpndSet()->get_first(&iter);
          i >= 0; i = mdssainfo->readVOpndSet()->get_next(i, &iter)) {
         VOpnd const* t = m_mdssamgr->getVOpnd(i);
         ASSERT0(t && t->is_md());
         MDDef * tdef = ((VMD*)t)->getDef();
-        if (tdef == NULL) { continue; }
+        if (tdef == nullptr) { continue; }
         if (tdef->is_phi()) {
             //TODO: iter phi.
             change |= collectAllDefThroughDefChain(tdef, pwlst2);
@@ -409,8 +409,8 @@ bool DeadCodeElim::collectByMDSSA(IR const* x, IN OUT List<IR const*> * pwlst2)
         }
 
         MD const* mustdef = defstmt->getRefMD();
-        if (mustuse != NULL &&
-            mustdef != NULL &&
+        if (mustuse != nullptr &&
+            mustdef != nullptr &&
             mustuse->is_exact() &&
             mustdef->is_exact()) {
             if (mustdef == mustuse || mustdef->is_exact_cover(mustuse)) {
@@ -425,7 +425,7 @@ bool DeadCodeElim::collectByMDSSA(IR const* x, IN OUT List<IR const*> * pwlst2)
             continue;            
         }
 
-        if (mustuse != NULL) {
+        if (mustuse != nullptr) {
             //TODO:
             //CASE1:DEF=
             //         =USE            
@@ -452,8 +452,8 @@ bool DeadCodeElim::collectByDU(IR const* x, IN OUT List<IR const*> * pwlst2)
 {
     ASSERT0(x->is_exp());
     DUSet const* defs = x->readDUSet();
-    if (defs == NULL) { return false; }
-    DUIter di = NULL;
+    if (defs == nullptr) { return false; }
+    DUIter di = nullptr;
     bool change = false;
     for (INT i = defs->get_first(&di); i >= 0; i = defs->get_next(i, &di)) {
         IR const* d = m_rg->getIR(i);
@@ -469,18 +469,18 @@ bool DeadCodeElim::collectByDU(IR const* x, IN OUT List<IR const*> * pwlst2)
 
 bool DeadCodeElim::remove_ineffect_ir() const
 {
-    BBListIter ctbb = NULL;
+    BBListIter ctbb = nullptr;
     List<IRBB*> bblst;
     List<IRBB*> * bbl = m_rg->getBBList();
     List<C<IRBB*>*> ctlst;
     bool change = false;    
     for (IRBB * bb = bbl->get_head(&ctbb);
-         bb != NULL; bb = bbl->get_next(&ctbb)) {
-        IRListIter ctir = NULL;
-        IRListIter next = NULL;
+         bb != nullptr; bb = bbl->get_next(&ctbb)) {
+        IRListIter ctir = nullptr;
+        IRListIter next = nullptr;
         bool tobecheck = false;
         for (BB_irlist(bb).get_head(&ctir), next = ctir;
-             ctir != NULL; ctir = next) {
+             ctir != nullptr; ctir = next) {
             IR * stmt = ctir->val();
             BB_irlist(bb).get_next(&next);
             if (!m_is_stmt_effect.is_contain(stmt->id())) {                
@@ -491,7 +491,7 @@ bool DeadCodeElim::remove_ineffect_ir() const
                 //you should consider the SSA_uses
                 //and make sure they are all removable.
                 //Use SSA form related api.
-                //ASSERT0(stmt->getSSAInfo() == NULL);
+                //ASSERT0(stmt->getSSAInfo() == nullptr);
 
                 //Revise DU chains.
                 //TODO: If ssa form is available, it doesn't need to maintain
@@ -507,7 +507,7 @@ bool DeadCodeElim::remove_ineffect_ir() const
                     //ASSERT0(m_mdssamgr->verifyPhi(true));
                 }
 
-                if (m_mdssamgr != NULL) {
+                if (m_mdssamgr != nullptr) {
                     m_mdssamgr->removeMDSSAUse(stmt);
                 }
 
@@ -544,17 +544,17 @@ void DeadCodeElim::iter_collect(IN OUT List<IR const*> & work_list)
     while (change) {
         change = false;
         for (IR const* ir = pwlst1->get_head();
-             ir != NULL; ir = pwlst1->get_next()) {
+             ir != nullptr; ir = pwlst1->get_next()) {
             m_citer.clean();
             for (IR const* x = iterRhsInitC(ir, m_citer);
-                 x != NULL; x = iterRhsNextC(m_citer)) {
+                 x != nullptr; x = iterRhsNextC(m_citer)) {
                 if (!x->isMemoryOpnd()) { continue; }
-                if (x->isReadPR() && PR_ssainfo(x) != NULL) {
+                if (x->isReadPR() && PR_ssainfo(x) != nullptr) {
                     change |= collectByPRSSA(x, pwlst2);
                     continue;
                 }
-                if (m_mdssamgr != NULL &&
-                    m_mdssamgr->getMDSSAInfoIfAny(x) != NULL) {
+                if (m_mdssamgr != nullptr &&
+                    m_mdssamgr->getMDSSAInfoIfAny(x) != nullptr) {
                     change |= collectByMDSSA(x, pwlst2);
                     continue;
                 }
@@ -591,18 +591,18 @@ void DeadCodeElim::fix_control_flow(List<IRBB*> & bblst,
         if (BB_irlist(bb).get_elem_count() != 0) { continue; }
 
         xcom::EdgeC * vout = m_cfg->getVertex(bb->id())->getOutList();
-        if (vout == NULL || xcom::cnt_list(vout) <= 1) { continue; }
+        if (vout == nullptr || xcom::cnt_list(vout) <= 1) { continue; }
 
         BBListIter next_ct = ct;
         bbl->get_next(&next_ct);
-        IRBB * next_bb = NULL;
-        if (next_ct != NULL) {
+        IRBB * next_bb = nullptr;
+        if (next_ct != nullptr) {
             next_bb = next_ct->val();
         }
 
-        while (vout != NULL) {
+        while (vout != nullptr) {
             xcom::Edge * e = EC_edge(vout);
-            if (EDGE_info(e) != NULL &&
+            if (EDGE_info(e) != nullptr &&
                 CFGEI_is_eh((CFGEdgeInfo*)EDGE_info(e))) {
                 vout = EC_next(vout);
                 continue;
@@ -610,7 +610,7 @@ void DeadCodeElim::fix_control_flow(List<IRBB*> & bblst,
 
             xcom::Vertex * s = EDGE_to(e);
             if (s->id() == bb->id() ||
-                (next_bb != NULL && s->id() == next_bb->id())) {
+                (next_bb != nullptr && s->id() == next_bb->id())) {
                 vout = EC_next(vout);
                 continue;
             }
@@ -624,7 +624,7 @@ void DeadCodeElim::fix_control_flow(List<IRBB*> & bblst,
                 //Find a normal label as target.
                 LabelInfo const* li;
                 for (li = tgt->getLabelList().get_head();
-                     li != NULL; li = tgt->getLabelList().get_next()) {
+                     li != nullptr; li = tgt->getLabelList().get_next()) {
                     if (LABELINFO_is_catch_start(li) ||
                         LABELINFO_is_try_start(li) ||
                         LABELINFO_is_try_end(li) ||
@@ -642,7 +642,7 @@ void DeadCodeElim::fix_control_flow(List<IRBB*> & bblst,
                 while (change) {
                     xcom::EdgeC * ec = VERTEX_out_list(bbv);
                     change = false;
-                    while (ec != NULL) {
+                    while (ec != nullptr) {
                         if (EC_edge(ec) != e) {
                             //May be remove multi edges.
                             ((xcom::Graph*)m_cfg)->removeEdgeBetween(
@@ -673,23 +673,23 @@ void DeadCodeElim::reviseSuccForFallthroughBB(IRBB * bb,
 {
     ASSERT0(bb && bbct);
     xcom::EdgeC * ec = m_cfg->getVertex(bb->id())->getOutList();
-    if (ec == NULL) { return; }
+    if (ec == nullptr) { return; }
 
     ASSERT0(!bb->is_empty());
     BBListIter next_ct = bbct;
     bbl->get_next(&next_ct);
-    IRBB * next_bb = NULL;
-    if (next_ct != NULL) {
+    IRBB * next_bb = nullptr;
+    if (next_ct != nullptr) {
         next_bb = next_ct->val();
     }
 
     bool has_fallthrough = false;
-    xcom::EdgeC * next_ec = NULL;
-    for (; ec != NULL; ec = next_ec) {
+    xcom::EdgeC * next_ec = nullptr;
+    for (; ec != nullptr; ec = next_ec) {
         next_ec = ec->get_next();
 
         xcom::Edge * e = ec->getEdge();
-        if (e->info() != NULL && CFGEI_is_eh((CFGEdgeInfo*)e->info())) {
+        if (e->info() != nullptr && CFGEI_is_eh((CFGEdgeInfo*)e->info())) {
             continue;
         }
 
@@ -721,7 +721,7 @@ void DeadCodeElim::reviseSuccForFallthroughBB(IRBB * bb,
     //  |  |___|
     //  |  
     //  |->BB5    
-    if (next_bb != NULL && !has_fallthrough) {
+    if (next_bb != nullptr && !has_fallthrough) {
         //TODO: Add operands of PHI if 'next_bb' has PHI.
         m_cfg->addEdge(bb, next_bb);
     }
@@ -746,7 +746,7 @@ void DeadCodeElim::reinit()
 
 bool DeadCodeElim::removeRedundantPhi()
 {    
-    if (m_prssamgr != NULL && m_prssamgr->is_valid()) {
+    if (m_prssamgr != nullptr && m_prssamgr->is_valid()) {
         return m_prssamgr->refinePhi();
     }
     return false; 
@@ -757,7 +757,7 @@ bool DeadCodeElim::removeRedundantPhi()
 bool DeadCodeElim::perform(OptCtx & oc)
 {
     BBList * bbl = m_rg->getBBList();
-    if (bbl == NULL || bbl->get_elem_count() == 0) { return false; }
+    if (bbl == nullptr || bbl->get_elem_count() == 0) { return false; }
 
     if (!oc.is_ref_valid()) { return false; }
     m_mdssamgr = (MDSSAMgr*)m_rg->getPassMgr()->queryPass(PASS_MD_SSA_MGR);
@@ -779,7 +779,7 @@ bool DeadCodeElim::perform(OptCtx & oc)
         m_cdg = (CDG*)m_rg->getPassMgr()->queryPass(PASS_CDG);
     } else {
         m_rg->checkValidAndRecompute(&oc, PASS_PDOM, PASS_UNDEF);
-        m_cdg = NULL;
+        m_cdg = nullptr;
     }
 
     reinit();

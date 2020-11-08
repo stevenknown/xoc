@@ -6,9 +6,10 @@
 
 //libxcom
 #include "ltype.h"
-#include "comf.h"
+#include "comm_macro.h"
 #include "strbuf.h"
 #include "smempool.h"
+#include "comf.h" //used by sstl.h
 #include "sstl.h"
 #include "bs.h"
 #include "sbs.h"
@@ -21,6 +22,7 @@
 #include "matt_dump.h"
 #include "matt.h"
 #include "xmat.h"
+#include "agraph.h"
 #include "linsys.h"
 #include "lpsol.h"
 #include "sort.h"

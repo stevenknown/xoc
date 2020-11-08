@@ -48,7 +48,7 @@ bool g_is_support_dynamic_type = false;
 //If true to hoist short type to integer type.
 bool g_is_hoist_type = false;
 
-CHAR * g_func_or_bb_option = NULL;
+CHAR * g_func_or_bb_option = nullptr;
 
 //Represent optimization level.
 INT g_opt_level = OPT_LEVEL0;
@@ -281,7 +281,7 @@ bool g_redirect_stdout_to_dump_file = false;
 //Note the order of access to this file will not be guaranteed
 //in serial execution when there are multiple RegionMgrs doing compilation
 //simultaneously.
-FILE * g_unique_dumpfile = NULL;
+FILE * g_unique_dumpfile = nullptr;
 
 DumpOpt::DumpOpt()
 {
@@ -371,6 +371,12 @@ bool DumpOpt::isDumpRP() const
 bool DumpOpt::isDumpDCE() const
 {
     return is_dump_all || (!is_dump_nothing && is_dump_dce);
+}
+
+
+bool DumpOpt::isDumpLIS() const
+{
+    return is_dump_all || (!is_dump_nothing && is_dump_lis);
 }
 
 

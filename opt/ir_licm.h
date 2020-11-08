@@ -147,10 +147,10 @@ class LICM : public Pass {
                                   bool & must_false) const;
 
     //Scan operand to find invariant candidate.
-    //'isLegal': set to true if loop is legal to perform invariant motion.
-    //           otherwise set to false to prohibit code motion.
+    //islegal: set to true if loop is legal to perform invariant motion.
+    //         otherwise set to false to prohibit code motion.
     //Return true if find loop invariant expression.
-    bool scanOpnd(IN LI<IRBB> * li, bool * isLegal, bool first_scan);
+    bool scanOpnd(IN LI<IRBB> * li, bool * islegal, bool first_scan);
 
     //Propagate invariant property to result.
     //This operation will generate more invariant.
@@ -166,22 +166,22 @@ class LICM : public Pass {
 
     void updateMD2Num(IR * ir);
     bool useMDSSADU() const
-    { return m_mdssamgr != NULL && m_mdssamgr->is_valid(); }
+    { return m_mdssamgr != nullptr && m_mdssamgr->is_valid(); }
     bool usePRSSADU() const
-    { return m_prssamgr != NULL && m_prssamgr->is_valid(); }
+    { return m_prssamgr != nullptr && m_prssamgr->is_valid(); }
 
     void * xmalloc(UINT size)
     {
-        ASSERT0(m_pool != NULL);
+        ASSERT0(m_pool != nullptr);
         void * p = smpoolMallocConstSize(sizeof(UINT), m_pool);
-        ASSERT0(p != NULL);
+        ASSERT0(p != nullptr);
         ::memset(p, 0, size);
         return p;
     }
 public:
     explicit LICM(Region * rg)
     {
-        ASSERT0(rg != NULL);
+        ASSERT0(rg != nullptr);
         m_rg = rg;
         m_du = rg->getDUMgr();
         m_cfg = rg->getCFG();
@@ -189,9 +189,9 @@ public:
         m_md_sys = rg->getMDSystem();
         ASSERT0(m_cfg && m_du && m_md_sys && m_tm);
         m_pool = smpoolCreate(4 * sizeof(UINT), MEM_CONST_SIZE);
-        m_mdssamgr = NULL;
-        m_prssamgr = NULL;
-        m_rce = NULL;
+        m_mdssamgr = nullptr;
+        m_prssamgr = nullptr;
+        m_rce = nullptr;
     }
     virtual ~LICM() { smpoolDelete(m_pool); }
 

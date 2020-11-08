@@ -50,12 +50,12 @@ public:
         ASSERT0(ir && ai);
 
         TbaaAttachInfo * ty = (TbaaAttachInfo*)ai->get(AI_TBAA);
-        if (ty == NULL) { return NULL; }
+        if (ty == nullptr) { return nullptr; }
 
         ASSERTN(ty->type, ("Type should not be given if "
                           "you intend to annotate it as TBAA."));
         MD const* md = m_type2md.get(ty->type);
-        if (md != NULL) {
+        if (md != nullptr) {
             return md;
         }
 
@@ -80,13 +80,13 @@ public:
     {
         ASSERT0(ld->is_ld() && mx);
         AIContainer * ai = IR_ai(ld);
-        if (ai == NULL) { return; }
+        if (ai == nullptr) { return; }
 
         TbaaAttachInfo * ty = (TbaaAttachInfo*)ai->get(AI_TBAA);
-        if (ty == NULL) { return; }
+        if (ty == nullptr) { return; }
 
         MD const* md = m_type2md.get(ty->type);
-        if (md != NULL) {
+        if (md != nullptr) {
             MD const* t = allocLoadMD(ld);
             setPointToMDSetByAddMD(MD_id(t), *mx, md);
             return;

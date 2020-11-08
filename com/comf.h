@@ -31,39 +31,13 @@ IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 author: Su Zhenyu
 @*/
-#ifndef _COMF_H_
-#define _COMF_H_
+#ifndef _COMMON_FUNCTION_H_
+#define _COMMON_FUNCTION_H_
 
 namespace xcom {
 
-//This macro declare copy constructor for class.
-#define COPY_CONSTRUCTOR(class_name)   \
-    class_name(class_name const&);     \
-    class_name const& operator = (class_name const&)
-
-//Used to avoid warning: unreferenced variable if set
-//-Werror=unused-variable.
-template <typename T> int dummy_use(T const&) { return 0; }
-#define DUMMYUSE(v) xcom::dummy_use(v)
-
-#ifdef _DEBUG_
-//Do assert at debug mode, and do dummyuse at release mode.
-#define CHECK_DUMMYUSE(a) ASSERT0(a)
-
-//Do both assert and dummyuse at debug mode, do dummyuse at release mode.
-#define ASSERTN_DUMMYUSE(a, b)  \
-    ((a) ? DUMMYUSE(a) : (m522138(__FILE__, __LINE__), m518087 b))
-#define ASSERT0_DUMMYUSE(a)  \
-    ((a) ? DUMMYUSE(a) : (m522138(__FILE__, __LINE__), m518087 ("")))
-#else
-//Do assert at debug mode, and do dummyuse at release mode.
-#define CHECK_DUMMYUSE(a) DUMMYUSE(a)
-
-//Do both assert and dummyuse at debug mode, do dummyuse at release mode.
-#define ASSERTN_DUMMYUSE(a, b) DUMMYUSE(a)
-#define ASSERT0_DUMMYUSE(a) DUMMYUSE(a)
-#endif
-
+//Forward Declaration
+template <class T> class Vector;
 
 //Compute the maximum unsigned integer value that type is ValueType.
 //e.g: given bitwidth is 3, return 7 as result.
@@ -73,8 +47,6 @@ inline ValueType computeUnsignedMaxValue(UINT bitwidth)
 {
     return ((((ValueType)1) << bitwidth) - 1);
 }
-
-template <class T, UINT GrowSize> class Vector;
 
 //Arrangement
 //P(n,m)=n*(n-1)*...*(n-m+1)=n!/(n-m)!
@@ -131,7 +103,7 @@ void extractLeftMostSubString(CHAR * tgt, CHAR const* string, CHAR separator);
 INT gcdm(UINT num, ...);
 
 //Great common divisor for values stored in vector.
-INT gcdm(UINT num, Vector<INT, 8> const& a);
+INT gcdm(UINT num, Vector<INT> const& a);
 
 //Compute the nearest power of 2 that not less than v.
 inline UINT getNearestPowerOf2(UINT v)
@@ -268,7 +240,7 @@ LONG xstrstr(CHAR const* src, CHAR const* par, INT i);
 //ret: record each substring which separated by sep.
 //sep: separator.
 //Note caller is responsible for the free of each string memory in ret.
-UINT xsplit(CHAR const* str, OUT Vector<CHAR*, 8> & ret, CHAR const* sep);
+UINT xsplit(CHAR const* str, OUT Vector<CHAR*> & ret, CHAR const* sep);
 void xstrcpy(CHAR * tgt, CHAR const* src, size_t size);
 inline bool xisspace(CHAR c) { return c == ' ' || c == '\t'; }
 inline bool xisdigit(CHAR c) { return c >= '0' && c <= '9'; }
@@ -292,4 +264,5 @@ public:
 extern ASCII g_asc1[];
 
 } //namespace xcom
-#endif
+
+#endif  //_COMMON_FUNCTION_H_

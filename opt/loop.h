@@ -99,7 +99,7 @@ public:
 
     UINT id() const { return uid; }
     bool isLoopReduction() const { return !has_early_exit; }
-    bool isOuterMost() const { return getOuter() == NULL; }
+    bool isOuterMost() const { return getOuter() == nullptr; }
 
     //Return true if bb is belong to current loop.
     //'bbid': id of BB.
@@ -108,7 +108,7 @@ public:
 
     //Clean adjacent relation in loop-tree.
     void cleanAdjRelation()
-    { LI_outer(this) = NULL; LI_next(this) = NULL; LI_prev(this) = NULL; }
+    { LI_outer(this) = nullptr; LI_next(this) = nullptr; LI_prev(this) = nullptr; }
 };
 
 

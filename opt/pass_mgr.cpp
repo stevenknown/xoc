@@ -61,7 +61,7 @@ void PassMgr::destroyPass(Pass * pass)
 void PassMgr::destroyPass(PASS_TYPE passtype)
 {
     Pass * pass = queryPass(passtype);
-    if (pass == NULL) { return; }
+    if (pass == nullptr) { return; }
     destroyPass(pass);
 }
 
@@ -72,14 +72,14 @@ void PassMgr::destroyAllPass()
     PassTabIter tabiter;
     Pass * p;
     for (m_registered_pass.get_first(tabiter, &p);
-         p != NULL; m_registered_pass.get_next(tabiter, &p)) {
+         p != nullptr; m_registered_pass.get_next(tabiter, &p)) {
         delete p;
     }
 
     xcom::Graph * opt2;
     GraphPassTabIter tabiter2;
     for (m_registered_graph_based_pass.get_first(tabiter2, &opt2);
-         opt2 != NULL;
+         opt2 != nullptr;
          m_registered_graph_based_pass.get_next(tabiter2, &opt2)) {
         delete opt2;
     }
@@ -113,14 +113,14 @@ Pass * PassMgr::allocRP()
 Pass * PassMgr::allocPRE()
 {
     //return new PRE(m_rg);
-    return NULL;
+    return nullptr;
 }
 
 
 Pass * PassMgr::allocIVR()
 {
     //return new IVR(m_rg);
-    return NULL;
+    return nullptr;
 }
 
 
@@ -139,7 +139,7 @@ Pass * PassMgr::allocDCE()
 Pass * PassMgr::allocDSE()
 {
     //return new DSE(m_rg);
-    return NULL;
+    return nullptr;
 }
 
 
@@ -182,7 +182,7 @@ xcom::Graph * PassMgr::allocCDG()
 Pass * PassMgr::allocCCP()
 {
     //return new CondConstProp(m_rg, (PRSSAMgr*)registerPass(PASS_PR_SSA_MGR));
-    return NULL;
+    return nullptr;
 }
 
 
@@ -256,7 +256,7 @@ Pass * PassMgr::allocRefine()
 
 xcom::Graph * PassMgr::registerGraphBasedPass(PASS_TYPE opty)
 {
-    xcom::Graph * pass = NULL;
+    xcom::Graph * pass = nullptr;
     switch (opty) {
     case PASS_CDG:
         pass = allocCDG();
@@ -273,7 +273,7 @@ xcom::Graph * PassMgr::registerGraphBasedPass(PASS_TYPE opty)
 Pass * PassMgr::registerPass(PASS_TYPE opty)
 {
     Pass * pass = queryPass(opty);
-    if (pass != NULL) { return pass; }
+    if (pass != nullptr) { return pass; }
 
     switch (opty) {
     case PASS_CFG:

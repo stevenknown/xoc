@@ -58,7 +58,7 @@ size_t MiscBitSetMgr<BitsPerSeg>::count_mem(FILE * h) const
 
     DUMMYUSE(h);
     #ifdef _DEBUG_
-    if (h != NULL) {
+    if (h != nullptr) {
         //Dump mem usage into file.
         List<size_t> lst;
         for (SC<SBitSet<BitsPerSeg>*> * st = m_sbitset_list.get_head();
@@ -123,7 +123,7 @@ void SBitSetCore<BitsPerSeg>::bunion(SBitSetCore<BitsPerSeg> const& src,
 {
     ASSERTN(this != &src, ("operate on same set"));
     TSEGIter * tgtst = segs.get_head();
-    TSEGIter * prev_st = NULL;
+    TSEGIter * prev_st = nullptr;
     for (TSEGIter * srcst = src.segs.get_head();
          srcst != src.segs.end(); srcst = src.segs.get_next(srcst)) {
         SEG<BitsPerSeg> * s = srcst->val();
@@ -141,7 +141,7 @@ void SBitSetCore<BitsPerSeg>::bunion(SBitSetCore<BitsPerSeg> const& src,
                 //t:       |----|
                 SEG<BitsPerSeg> * x = sm->allocSEG();
                 x->copy(*s);
-                if (prev_st == NULL) {
+                if (prev_st == nullptr) {
                     prev_st = segs.append_head(x, free_list, pool);
                 } else {
                     prev_st = segs.insert_after(x, prev_st, free_list, pool);
@@ -159,7 +159,7 @@ void SBitSetCore<BitsPerSeg>::bunion(SBitSetCore<BitsPerSeg> const& src,
             }
         }
 
-        if (tgtst == NULL && !handled) {
+        if (tgtst == nullptr && !handled) {
             //Append rest of src segments to tail.
             SEG<BitsPerSeg> * x = sm->allocSEG();
             x->copy(*s);
@@ -177,7 +177,7 @@ void SBitSetCore<BitsPerSeg>::bunion(UINT elem,
                                      TSEGIter ** free_list,
                                      SMemPool * pool)
 {
-    TSEGIter * prev_sct = NULL;
+    TSEGIter * prev_sct = nullptr;
     TSEGIter * sct = segs.get_head();
     TSEGIter * next_sct = sct;
     for (; sct != segs.end(); prev_sct = sct, sct = next_sct) {
@@ -195,8 +195,8 @@ void SBitSetCore<BitsPerSeg>::bunion(UINT elem,
     }
 
     SEG<BitsPerSeg> * x = sm->allocSEG();
-    if (sct != NULL) {
-        if (prev_sct == NULL) {
+    if (sct != nullptr) {
+        if (prev_sct == nullptr) {
             segs.append_head(x, free_list, pool);
         } else {
             segs.insert_after(x, prev_sct, free_list, pool);
@@ -271,7 +271,7 @@ void SBitSetCore<BitsPerSeg>::diff(UINT elem,
 {
     TSEGIter * sct = segs.get_head();
     TSEGIter * next_sct = sct;
-    TSEGIter * prev_sct = NULL;
+    TSEGIter * prev_sct = nullptr;
     for (; sct != segs.end(); prev_sct = sct, sct = next_sct) {
         SEG<BitsPerSeg> * s = SC_val(sct);
         next_sct = segs.get_next(next_sct);
@@ -301,7 +301,7 @@ void SBitSetCore<BitsPerSeg>::diff(SBitSetCore const& src,
 {
     ASSERTN(this != &src, ("operate on same set"));
     TSEGIter * tgtst = segs.get_head();
-    TSEGIter * prev_st = NULL;
+    TSEGIter * prev_st = nullptr;
     TSEGIter * next_st = tgtst;
     TSEGIter * next_srcst = src.segs.get_head();
     TSEGIter * srcst = next_srcst;
@@ -394,7 +394,7 @@ UINT SBitSetCore<BitsPerSeg>::get_elem_count() const
 }
 
 
-//*cur will be set to NULL if set is empty.
+//*cur will be set to nullptr if set is empty.
 template <UINT BitsPerSeg>
 INT SBitSetCore<BitsPerSeg>::get_first(TSEGIter ** cur) const
 {
@@ -402,7 +402,7 @@ INT SBitSetCore<BitsPerSeg>::get_first(TSEGIter ** cur) const
     TSEGIter * sc = segs.get_head();
     if (sc == segs.end()) {
         ASSERT0(segs.get_elem_count() == 0);
-        *cur = NULL;
+        *cur = nullptr;
         return -1;
     }
     *cur = sc;
@@ -414,7 +414,7 @@ INT SBitSetCore<BitsPerSeg>::get_first(TSEGIter ** cur) const
 }
 
 
-//*cur will be set to NULL if set is empty.
+//*cur will be set to nullptr if set is empty.
 template <UINT BitsPerSeg>
 INT SBitSetCore<BitsPerSeg>::get_last(TSEGIter ** cur) const
 {
@@ -422,7 +422,7 @@ INT SBitSetCore<BitsPerSeg>::get_last(TSEGIter ** cur) const
     TSEGIter * sc = segs.get_tail();
     if (sc == segs.end()) {
         ASSERT0(segs.get_elem_count() == 0);
-        *cur = NULL;
+        *cur = nullptr;
         return -1;
     }
     *cur = sc;
@@ -438,7 +438,7 @@ INT SBitSetCore<BitsPerSeg>::get_last(TSEGIter ** cur) const
 template <UINT BitsPerSeg>
 INT SBitSetCore<BitsPerSeg>::get_next(UINT elem, TSEGIter ** cur) const
 {
-    if (cur == NULL) {
+    if (cur == nullptr) {
         for (TSEGIter * st = segs.get_head();
              st != segs.end(); st = segs.get_next(st)) {
             SEG<BitsPerSeg> * s = st->val();
@@ -452,7 +452,7 @@ INT SBitSetCore<BitsPerSeg>::get_next(UINT elem, TSEGIter ** cur) const
                 if (n >= 0) { return (INT)(start + (UINT)n); }
 
                 st = segs.get_next(st);
-                if (st == NULL) {
+                if (st == nullptr) {
                     return -1;
                 }
 
@@ -466,7 +466,7 @@ INT SBitSetCore<BitsPerSeg>::get_next(UINT elem, TSEGIter ** cur) const
     }
 
     TSEGIter * st = *cur;
-    if (st == NULL) { return -1; }
+    if (st == nullptr) { return -1; }
 
     UINT start = st->val()->get_start();
     INT n = st->val()->bs.get_next(elem - start);
@@ -476,7 +476,7 @@ INT SBitSetCore<BitsPerSeg>::get_next(UINT elem, TSEGIter ** cur) const
 
     st = segs.get_next(st);
     if (st == segs.end()) {
-        *cur = NULL;
+        *cur = nullptr;
         return -1;
     }
 
@@ -496,7 +496,7 @@ bool SBitSetCore<BitsPerSeg>::is_equal(SBitSetCore<BitsPerSeg> const& src) const
     TSEGIter * srcst = src.segs.get_head();
     TSEGIter * tgtst = segs.get_head();
     for (; srcst != src.segs.end() || tgtst != segs.end(); )  {
-        if ((srcst == NULL) ^ (tgtst == NULL)) {
+        if ((srcst == nullptr) ^ (tgtst == nullptr)) {
             return false;
         }
 
@@ -585,7 +585,7 @@ void SBitSetCore<BitsPerSeg>::intersect(SBitSetCore<BitsPerSeg> const& src,
 {
     ASSERTN(this != &src, ("operate on same set"));
     TSEGIter * tgtst = segs.get_head();
-    TSEGIter * prev_st = NULL;
+    TSEGIter * prev_st = nullptr;
     TSEGIter * next_st = tgtst;
     TSEGIter * next_srcst = src.segs.get_head();
     TSEGIter * srcst = next_srcst;
@@ -600,7 +600,7 @@ void SBitSetCore<BitsPerSeg>::intersect(SBitSetCore<BitsPerSeg> const& src,
             UINT tgt_start = t->start;
 
             if (src_start < tgt_start) {
-                if (next_srcst == NULL) {
+                if (next_srcst == nullptr) {
                     //the last segment of src.
                     next_st = segs.get_next(next_st);
                     segs.remove(prev_st, tgtst, free_list);
@@ -683,7 +683,7 @@ size_t SBitSet<BitsPerSeg>::count_mem() const
 template <UINT BitsPerSeg>
 void dumpSegMgr(SegMgr<BitsPerSeg> * segmgr, FILE * h)
 {
-    if (h == NULL) { return; }
+    if (h == nullptr) { return; }
     fprintf(h, "\nNot freed seg:");
     for (UINT i = 0; i < segmgr->seg_count; i++) {
         if (segmgr->allocated.is_contain(i)) {

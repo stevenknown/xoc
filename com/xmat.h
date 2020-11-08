@@ -63,7 +63,7 @@ public:
     void init(INTMat const& m);
     void destroy();
     bool is_init() const { return m_is_init; }
-    bool is_imat(UINT * row = NULL, UINT * col = NULL);
+    bool is_imat(UINT * row = nullptr, UINT * col = nullptr);
     void sete(UINT num,...);
     void setr(UINT row, UINT col, FRAC_TYPE numer, FRAC_TYPE denom = 1);
     void setr(UINT row, UINT col, Rational rat);

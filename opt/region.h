@@ -208,9 +208,9 @@ public:
 
     void * xmalloc(UINT size)
     {
-        ASSERTN(m_pool != NULL, ("pool does not initialized"));
+        ASSERTN(m_pool != nullptr, ("pool does not initialized"));
         void * p = smpoolMalloc(size, m_pool);
-        ASSERT0(p != NULL);
+        ASSERT0(p != nullptr);
         ::memset(p, 0, size);
         return p;
     }
@@ -273,7 +273,7 @@ public:
     inline DU * allocDU()
     {
         DU * du = getAnalysisInstrument()->m_free_du_list.remove_head();
-        if (du == NULL) {
+        if (du == nullptr) {
             du = (DU*)smpoolMallocConstSize(sizeof(DU),
                 getAnalysisInstrument()->m_du_pool);
             ::memset(du, 0, sizeof(DU));
@@ -520,7 +520,7 @@ public:
     //Build IR_LDA operation.
     //var: variable that will be taken address.
     IR * buildLda(Var * var);
-    IR * buildLdaString(CHAR const* varname, Sym * string);
+    IR * buildLdaString(CHAR const* varname, Sym const* string);
     IR * buildLdaString(CHAR const* varname, CHAR const * string);
 
     //Build IR_LD operation.
@@ -636,7 +636,7 @@ public:
     //        elem_num points to an array with 2 value, [12, 24].
     //        the 1th dimension has 12 elements, and the 2th dimension has 24
     //        elements, which element type is D_I32.
-    //    Note the parameter may be NULL.
+    //    Note the parameter may be nullptr.
     //'rhs: value expected to store.
     IR * buildStoreArray(IR * base,
                          IR * sublist,
@@ -682,7 +682,7 @@ public:
     //        elem_num points to an array with 2 value, [12, 24].
     //        the 1th dimension has 12 elements, and the 2th dimension has 24
     //        elements, which element type is D_I32.
-    //    Note the parameter may be NULL.
+    //    Note the parameter may be nullptr.
     IR * buildArray(IR * base,
                     IR * sublist,
                     Type const* type,
@@ -742,7 +742,7 @@ public:
     void constructBBList();
 
     //Count memory usage for current object.
-    size_t count_mem();
+    size_t count_mem() const;
     
     //This function check validation of options in oc, perform
     //recomputation if it is invalid.
@@ -858,36 +858,36 @@ public:
     //Return IRCFG.
     IRCFG * getCFG() const
     {
-        return getPassMgr() != NULL ?
-               (IRCFG*)getPassMgr()->queryPass(PASS_CFG) : NULL;
+        return getPassMgr() != nullptr ?
+               (IRCFG*)getPassMgr()->queryPass(PASS_CFG) : nullptr;
     }
 
     //Get Alias Analysis.
     AliasAnalysis * getAA() const
     {
-        return getPassMgr() != NULL ?
-               (AliasAnalysis*)getPassMgr()->queryPass(PASS_AA) : NULL;
+        return getPassMgr() != nullptr ?
+               (AliasAnalysis*)getPassMgr()->queryPass(PASS_AA) : nullptr;
     }
 
     //Return DU info manager.
     DUMgr * getDUMgr() const
     {
-        return getPassMgr() != NULL ?
-               (DUMgr*)getPassMgr()->queryPass(PASS_DU_MGR) : NULL;
+        return getPassMgr() != nullptr ?
+               (DUMgr*)getPassMgr()->queryPass(PASS_DU_MGR) : nullptr;
     }
 
     //Return MDSSA manager.
     MDSSAMgr * getMDSSAMgr() const
     {
-        return getPassMgr() != NULL ?
-               (MDSSAMgr*)getPassMgr()->queryPass(PASS_MD_SSA_MGR) : NULL;
+        return getPassMgr() != nullptr ?
+               (MDSSAMgr*)getPassMgr()->queryPass(PASS_MD_SSA_MGR) : nullptr;
     }
 
     //Return PRSSA manager.
     PRSSAMgr * getPRSSAMgr() const
     {
-        return getPassMgr() != NULL ?
-               (PRSSAMgr*)getPassMgr()->queryPass(PASS_PR_SSA_MGR) : NULL;
+        return getPassMgr() != nullptr ?
+               (PRSSAMgr*)getPassMgr()->queryPass(PASS_PR_SSA_MGR) : nullptr;
     }
 
     Region * getParent() const { return REGION_parent(this); }
@@ -897,7 +897,7 @@ public:
     //Allocate and return all CALLs in the region.
     inline List<IR const*> * getCallList()
     {
-        if (getAnalysisInstrument()->m_call_list == NULL) {
+        if (getAnalysisInstrument()->m_call_list == nullptr) {
             getAnalysisInstrument()->m_call_list = new List<IR const*>();
         }
         return getAnalysisInstrument()->m_call_list;
@@ -910,7 +910,7 @@ public:
     //Allocate and return a list of IR_RETURN in current Region.
     inline List<IR const*> * getReturnList()
     {
-        if (getAnalysisInstrument()->m_return_list == NULL) {
+        if (getAnalysisInstrument()->m_return_list == nullptr) {
             getAnalysisInstrument()->m_return_list = new List<IR const*>();
         }
         return getAnalysisInstrument()->m_return_list;
@@ -922,17 +922,17 @@ public:
 
     //Get the MayDef MDSet of Region.
     MDSet * getMayDef() const
-    { return m_ref_info != NULL ? &REF_INFO_maydef(m_ref_info) : NULL; }
+    { return m_ref_info != nullptr ? &REF_INFO_maydef(m_ref_info) : nullptr; }
 
     //Get the MayUse MDSet of Region.
     MDSet * getMayUse() const
-    { return m_ref_info != NULL ? &REF_INFO_mayuse(m_ref_info) : NULL; }
+    { return m_ref_info != nullptr ? &REF_INFO_mayuse(m_ref_info) : nullptr; }
 
     //Get the top parent level region.
     Region * getTopRegion()
     {
         Region * rg = this;
-        while (rg->getParent() != NULL) {
+        while (rg->getParent() != nullptr) {
             rg = rg->getParent();
         }
         return rg;
@@ -1056,7 +1056,7 @@ public:
 
     void initRefInfo()
     {
-        if (m_ref_info != NULL) { return; }
+        if (m_ref_info != nullptr) { return; }
         m_ref_info = (RefInfo*)xmalloc(sizeof(RefInfo));
     }
 
@@ -1136,9 +1136,12 @@ public:
     IR * simpToPR(IR * ir, SimpCtx * ctx);
 
     //Split IR list into list of basic blocks.
-    BBListIter splitIRlistIntoBB(IR * irs,
-                                 BBList * bbl,
-                                 BBListIter ctbb);
+    //'irs': a list of ir.
+    //'bbl': a list of bb.
+    //'ctbb': marker current bb container.
+    //Note if CFG is invalid, it will not be updated.
+    BBListIter splitIRlistIntoBB(IR * irs, BBList * bbl, BBListIter ctbb,
+                                 OptCtx const& oc);
 
     //Series of helper functions to simplify
     //ir according to given specification.
@@ -1194,7 +1197,7 @@ public:
     void setPRCount(UINT cnt) { getAnalysisInstrument()->m_pr_count = cnt; }
     void setMustRef(IR * ir, MD const* md)
     {
-        ASSERT0(ir != NULL && md);
+        ASSERT0(ir != nullptr && md);
         ir->setRefMD(md, this);
     }
     //mds: record MayMDSet that have to be hashed.

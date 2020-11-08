@@ -106,14 +106,14 @@ bool Region::performSimplify(OptCtx & oc)
         bool need_rebuild_prssa = false;
         MDSSAMgr * mdssamgr = (MDSSAMgr*)getPassMgr()->queryPass(
             PASS_MD_SSA_MGR);
-        if (mdssamgr != NULL && mdssamgr->is_valid()) {
+        if (mdssamgr != nullptr && mdssamgr->is_valid()) {
             need_rebuild_mdssa = true;
             mdssamgr->destruction(&oc);
         }
 
         PRSSAMgr * prssamgr = (PRSSAMgr*)getPassMgr()->queryPass(
             PASS_PR_SSA_MGR);
-        if (prssamgr != NULL && prssamgr->is_valid()) {
+        if (prssamgr != nullptr && prssamgr->is_valid()) {
             need_rebuild_prssa = true;
             prssamgr->destruction(&oc);
         }
@@ -261,8 +261,8 @@ bool Region::MiddleProcess(OptCtx & oc)
         doBasicAnalysis(oc);
     }
 
-    if (getPassMgr() != NULL &&
-        (getPassMgr()->queryPass(PASS_PR_SSA_MGR) != NULL &&
+    if (getPassMgr() != nullptr &&
+        (getPassMgr()->queryPass(PASS_PR_SSA_MGR) != nullptr &&
          ((PRSSAMgr*)getPassMgr()->queryPass(PASS_PR_SSA_MGR))->is_valid())) {
         ;
     } else {

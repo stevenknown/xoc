@@ -210,7 +210,7 @@ public:
         #ifdef HASH_DBITSETCORE
         dump_hashed_set(h);
         #else
-        if (h == NULL) { return; }
+        if (h == nullptr) { return; }
         fprintf(h, "\n==---- DUMP DefDBitSetCoreReserveTab ----==");
         xcom::C<DefDBitSetCore*> * ct;
         for (m_allocated.get_head(&ct);
@@ -517,7 +517,7 @@ public:
     void copyRefAndAddDUChain(IR * to, IR const* from, bool add_duchain);
 
     //Count the memory usage to DUMgr.
-    size_t count_mem();
+    size_t count_mem() const;
     size_t count_mem_duset();
     size_t count_mem_local_data(DefDBitSetCore * expr_univers,
                                 Vector<MDSet*> * maydef_mds,
@@ -548,9 +548,9 @@ public:
         //tgt and src should either both be stmt or both be exp.
         ASSERT0(!(tgt->is_stmt() ^ src->is_stmt()));
         DUSet const* srcduinfo = src->readDUSet();
-        if (srcduinfo == NULL) {
+        if (srcduinfo == nullptr) {
             DUSet * tgtduinfo = tgt->getDUSet();
-            if (tgtduinfo != NULL) {
+            if (tgtduinfo != nullptr) {
                 tgtduinfo->clean(*m_misc_bs_mgr);
             }
             return;
@@ -565,9 +565,9 @@ public:
     //If srcset is empty, then clean tgt's duset.
     inline void copyDUSet(IR * tgt, DUSet const* srcset)
     {
-        if (srcset == NULL) {
+        if (srcset == nullptr) {
             DUSet * tgtduinfo = tgt->getDUSet();
-            if (tgtduinfo != NULL) {
+            if (tgtduinfo != nullptr) {
                 tgtduinfo->clean(*m_misc_bs_mgr);
             }
             return;
@@ -586,14 +586,14 @@ public:
         copyDUSet(tgt, src);
         DUSet const* from_du = src->readDUSet();
 
-        DUIter di = NULL;
+        DUIter di = nullptr;
         for (UINT i = (UINT)from_du->get_first(&di);
-             di != NULL; i = (UINT)from_du->get_next(i, &di)) {
+             di != nullptr; i = (UINT)from_du->get_next(i, &di)) {
             IR const* ref = m_rg->getIR(i);
             //ref may be stmt or exp.
 
             DUSet * ref_defuse_set = ref->getDUSet();
-            if (ref_defuse_set == NULL) { continue; }
+            if (ref_defuse_set == nullptr) { continue; }
             ref_defuse_set->add(IR_id(tgt), *m_misc_bs_mgr);
         }
     }
@@ -614,13 +614,13 @@ public:
                 m_rg->getIR(to)->is_stmt() &&
                 useset_of_to && useset_of_from && m);
         if (to == from) { return; }
-        DUIter di = NULL;
+        DUIter di = nullptr;
         for (INT i = useset_of_from->get_first(&di);
-             di != NULL; i = useset_of_from->get_next((UINT)i, &di)) {
+             di != nullptr; i = useset_of_from->get_next((UINT)i, &di)) {
             IR const* exp = m_rg->getIR((UINT)i);
             ASSERT0(exp->is_exp() && exp->isMemoryRef());
             DUSet * defset = exp->getDUSet();
-            if (defset == NULL) { continue; }
+            if (defset == nullptr) { continue; }
 
             defset->diff(from, *m_misc_bs_mgr);
             defset->bunion(to, *m_misc_bs_mgr);
@@ -638,7 +638,7 @@ public:
     {
         ASSERT0(to && from && to->is_stmt() && from->is_stmt());
         DUSet * useset_of_from = from->getDUSet();
-        if (useset_of_from == NULL) { return; }
+        if (useset_of_from == nullptr) { return; }
 
         DUSet * useset_of_to = getAndAllocDUSet(to);
         changeDef(IR_id(to), IR_id(from), useset_of_to, useset_of_from, m);
@@ -659,13 +659,13 @@ public:
         ASSERT0(m_rg->getIR(from)->is_exp() && m_rg->getIR(to)->is_exp() &&
                 defset_of_from && defset_of_to && m);
         if (to == from) { return; }
-        DUIter di = NULL;
+        DUIter di = nullptr;
         for (INT i = defset_of_from->get_first(&di);
-             di != NULL; i = defset_of_from->get_next((UINT)i, &di)) {
+             di != nullptr; i = defset_of_from->get_next((UINT)i, &di)) {
             IR * stmt = m_rg->getIR((UINT)i);
             ASSERT0(stmt->is_stmt());
             DUSet * useset = stmt->getDUSet();
-            if (useset == NULL) { continue; }
+            if (useset == nullptr) { continue; }
 
             useset->diff(from, *m_misc_bs_mgr);
             useset->bunion(to, *m_misc_bs_mgr);
@@ -683,7 +683,7 @@ public:
     {
         ASSERT0(to && from && to->is_exp() && from->is_exp());
         DUSet * defset_of_from = from->getDUSet();
-        if (defset_of_from == NULL) { return; }
+        if (defset_of_from == nullptr) { return; }
 
         DUSet * defset_of_to = getAndAllocDUSet(to);
         changeUse(IR_id(to), IR_id(from), defset_of_to, defset_of_from, m);
@@ -740,7 +740,7 @@ public:
     {
         ASSERT0(ir && ir->is_stmt());
         MD const* md = get_effect_def_md(ir);
-        if (md == NULL || !md->is_exact()) { return NULL; }
+        if (md == nullptr || !md->is_exact()) { return nullptr; }
         return md;
     }
 
@@ -770,7 +770,7 @@ public:
     {
         ASSERT0(ir && ir->is_exp());
         MD const* md = get_effect_use_md(ir);
-        return md != NULL && md->is_exact() ? md : NULL;
+        return md != nullptr && md->is_exact() ? md : nullptr;
     }
 
     MD const* get_effect_use_md(IR const* ir)
@@ -785,7 +785,7 @@ public:
     {
         ASSERT0(def->is_stmt() && use->is_exp());
         DUSet const* du = def->readDUSet();
-        if (du == NULL) { return false; }
+        if (du == nullptr) { return false; }
         return du->is_contain(IR_id(use));
     }
 
@@ -885,19 +885,19 @@ public:
     inline DU * freeDUSetAndCleanMDRefs(IR * ir)
     {
         DU * du = ir->getDU();
-        if (du == NULL) { return NULL; }
+        if (du == nullptr) { return nullptr; }
 
-        if (DU_duset(du) != NULL) {
+        if (DU_duset(du) != nullptr) {
             //Free DUSet back to DefSegMgr, or it will
             //complain and make an assertion.
             ASSERT0(m_misc_bs_mgr);
             m_misc_bs_mgr->freeSBitSetCore(DU_duset(du));
-            DU_duset(du) = NULL;
+            DU_duset(du) = nullptr;
         }
 
         //Clean MD refs.
-        DU_mds(du) = NULL;
-        DU_md(du) = NULL;
+        DU_mds(du) = nullptr;
+        DU_md(du) = nullptr;
         return du;
     }
 
@@ -911,7 +911,7 @@ public:
     inline void unionUse(IR * stmt, IN IR * use)
     {
         ASSERT0(stmt && stmt->is_stmt());
-        if (use == NULL) { return; }
+        if (use == nullptr) { return; }
         ASSERT0(use->is_exp());
         getAndAllocDUSet(stmt)->addUse(use, *m_misc_bs_mgr);
     }
@@ -923,7 +923,7 @@ public:
     inline void unionUse(DUSet const* stmtset, IR * exp)
     {
         ASSERT0(stmtset && exp && exp->is_exp());
-        DUIter di = NULL;
+        DUIter di = nullptr;
         for (INT i = stmtset->get_first(&di);
              i >= 0; i = stmtset->get_next((UINT)i, &di)) {
             IR * d = m_rg->getIR((UINT)i);
@@ -938,7 +938,7 @@ public:
     inline void unionUseSet(IR * stmt, DefSBitSetCore const* set)
     {
         ASSERT0(stmt->is_stmt());
-        if (set == NULL) { return; }
+        if (set == nullptr) { return; }
         getAndAllocDUSet(stmt)->bunion(*set, *m_misc_bs_mgr);
     }
     //DU chain operation.
@@ -948,7 +948,7 @@ public:
     inline void unionDefSet(IR * ir, DefSBitSetCore const* set)
     {
         ASSERT0(ir->is_exp());
-        if (set == NULL) { return; }
+        if (set == nullptr) { return; }
         getAndAllocDUSet(ir)->bunion(*set, *m_misc_bs_mgr);
     }
     //DU chain operation.
@@ -958,7 +958,7 @@ public:
     inline void unionDef(IR * ir, IN IR * def)
     {
         ASSERT0(ir->is_exp());
-        if (def == NULL) return;
+        if (def == nullptr) return;
         ASSERT0(def->is_stmt());
         getAndAllocDUSet(ir)->addDef(def, *m_misc_bs_mgr);
     }
@@ -969,7 +969,7 @@ public:
     inline void unionDef(DUSet const* expset, IR * stmt)
     {
         ASSERT0(expset && stmt && stmt->is_stmt());
-        DUIter di = NULL;
+        DUIter di = nullptr;
         for (INT i = expset->get_first(&di);
              i >= 0; i = expset->get_next((UINT)i, &di)) {
             IR * u = m_rg->getIR((UINT)i);
@@ -985,10 +985,10 @@ public:
     {
         ASSERT0(def->is_stmt() && use->is_exp());
         DUSet * useset = def->getDUSet();
-        if (useset != NULL) { useset->remove(IR_id(use), *m_misc_bs_mgr); }
+        if (useset != nullptr) { useset->remove(IR_id(use), *m_misc_bs_mgr); }
 
         DUSet * defset= use->getDUSet();
-        if (defset != NULL) { defset->remove(def->id(), *m_misc_bs_mgr); }
+        if (defset != nullptr) { defset->remove(def->id(), *m_misc_bs_mgr); }
     }
 
     //Check each USE of stmt, remove the expired one which is not reference

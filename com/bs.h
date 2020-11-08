@@ -82,7 +82,7 @@ public:
     //Initialize bit buffer.
     void init(UINT init_pool_size = 1)
     {
-        if (m_ptr != NULL) { return; }
+        if (m_ptr != nullptr) { return; }
         m_size = init_pool_size;
         if (init_pool_size == 0) { return; }
         m_ptr = (BYTE*)::malloc(init_pool_size);
@@ -92,10 +92,10 @@ public:
     //Destroy bit buffer memory.
     void destroy()
     {
-        if (m_ptr == NULL) { return; }
+        if (m_ptr == nullptr) { return; }
         ASSERTN(m_size > 0, ("bitset is invalid"));
         ::free(m_ptr);
-        m_ptr = NULL;
+        m_ptr = nullptr;
         m_size = 0;
     }
 
@@ -134,7 +134,7 @@ public:
     void diff(BitSet const& bs);
 
     //Dump bit value and position.
-    void dump(CHAR const* name = NULL, bool is_del = false,
+    void dump(CHAR const* name = nullptr, bool is_del = false,
               UINT flag = BS_DUMP_BITSET | BS_DUMP_POS,
               INT last_pos = -1) const;
     //Dump bit value and position.
@@ -221,7 +221,7 @@ class ROBitSet : public BitSet {
     COPY_CONSTRUCTOR(ROBitSet);
 public:
     ROBitSet(BYTE const* vec, UINT veclen) : BitSet(0) { init(vec, veclen); }
-    ~ROBitSet() { m_ptr = NULL; m_size = 0; }
+    ~ROBitSet() { m_ptr = nullptr; m_size = 0; }
 
     void init(BYTE const* vec, UINT veclen)
     {
@@ -233,7 +233,7 @@ public:
     size_t count_mem() const { return get_byte_size(); }
 
     //Dump bit value and position.
-    void dump(CHAR const* name = NULL, bool is_del = false,
+    void dump(CHAR const* name = nullptr, bool is_del = false,
               UINT flag = BS_DUMP_BITSET | BS_DUMP_POS,
               INT last_pos = -1) const
     { BitSet::dump(name, is_del, flag, last_pos); }
@@ -280,7 +280,7 @@ protected:
 public:
     BitSetMgr()
     {
-        m_pool = NULL;
+        m_pool = nullptr;
         init();
     }
     ~BitSetMgr() { destroy(); }
@@ -288,7 +288,7 @@ public:
 
     inline void init()
     {
-        if (m_pool != NULL) { return; }
+        if (m_pool != nullptr) { return; }
         m_pool = smpoolCreate(sizeof(BitSet) * 4, MEM_CONST_SIZE);
         m_bs_list.init();
         m_free_list.init();
@@ -296,7 +296,7 @@ public:
 
     void destroy()
     {
-        if (m_pool == NULL) { return; }
+        if (m_pool == nullptr) { return; }
 
         C<BitSet*> * ct;
         for (m_bs_list.get_head(&ct);
@@ -309,14 +309,14 @@ public:
         m_bs_list.destroy();
         m_free_list.destroy();
         smpoolDelete(m_pool);
-        m_pool = NULL;
+        m_pool = nullptr;
     }
 
     BitSet * create(UINT init_sz = 0)
     {
         ASSERTN(m_pool, ("not yet init"));
         BitSet * p = m_free_list.remove_head();
-        if (p == NULL) {
+        if (p == nullptr) {
             p = (BitSet*)xmalloc(sizeof(BitSet));
             p->init(init_sz);
             m_bs_list.append_head(p);
@@ -340,11 +340,11 @@ public:
     }
 
     //Count memory usage for current object.    
-    size_t count_mem(FILE * h = NULL);
+    size_t count_mem(FILE * h = nullptr) const;
 
     inline void free(IN BitSet * bs) //free bs for next use.
     {
-        if (bs == NULL) { return; }
+        if (bs == nullptr) { return; }
 
         #ifdef _DEBUG_
         C<BitSet*> * ct;
@@ -487,14 +487,14 @@ public:
     }
 
     //Clear bit of position 'i', and set new value 't' for the position.
-    //Default placeholder of clear bit is NULL.
+    //Default placeholder of clear bit is nullptr.
     inline void remove(UINT i, T t = (T)0)
     {
         m_bs.diff(i);
         Vector<T>::set(i, t);
     }
 
-    void dump(CHAR const* name = NULL, bool is_del = false) const
+    void dump(CHAR const* name = nullptr, bool is_del = false) const
     { m_bs.dump(name, is_del); }
 
     void dump(FILE * h) const
@@ -516,14 +516,14 @@ protected:
 public:
     BSVecMgr()
     {
-        m_pool = NULL;
+        m_pool = nullptr;
         init();
     }
     ~BSVecMgr(){ destroy(); }
 
     inline void init()
     {
-        if (m_pool != NULL) { return; }
+        if (m_pool != nullptr) { return; }
         m_pool = smpoolCreate(sizeof(SC<BSVec<T>*>) * 2, MEM_CONST_SIZE);
         m_bs_list.set_pool(m_pool);
         m_free_list.set_pool(m_pool);
@@ -531,7 +531,7 @@ public:
 
     void destroy()
     {
-        if (m_pool == NULL) { return; }
+        if (m_pool == nullptr) { return; }
 
         for (SC<BSVec<T>*> * ct = m_bs_list.get_head();
              ct != m_bs_list.end(); ct = m_bs_list.get_next(ct)) {
@@ -542,12 +542,12 @@ public:
         }
 
         smpoolDelete(m_pool);
-        m_pool = NULL;
+        m_pool = nullptr;
     }
 
     void dump(FILE * h)
     {
-        if (h == NULL) { return; }
+        if (h == nullptr) { return; }
 
         //Dump mem usage into file.
         List<UINT> lst;
@@ -595,7 +595,7 @@ public:
         ASSERTN(m_pool, ("not yet init"));
 
         BSVec<T> * p = m_free_list.remove_head();
-        if (p == NULL) {
+        if (p == nullptr) {
             p = (BSVec<T>*)::malloc(sizeof(BSVec<T>));
             ::memset(p, 0, sizeof(BSVec<T>));
             p->init();
@@ -626,7 +626,7 @@ public:
 
     inline void free(IN BSVec<T> * bs) //free bs for next use.
     {
-        if (bs == NULL) { return; }
+        if (bs == nullptr) { return; }
         bs->clean();
         m_free_list.append_head(bs);
     }

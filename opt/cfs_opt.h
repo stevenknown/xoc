@@ -44,27 +44,27 @@ class CfsOpt : public Pass {
 
     Refine * getRefiner()
     {
-        if (m_rf == NULL) {
+        if (m_rf == nullptr) {
             m_rf = (Refine*)m_rg->getPassMgr()->registerPass(PASS_REFINE);
         }
         return m_rf;
     }
 
-    bool transformToDoWhile(IR ** head, IR * ir);
-    bool transformIf1(IR ** head, IR * ir);
-    bool transformIf2(IR ** head, IR * ir);
-    bool transformIf3(IR ** head, IR * ir);
-    bool transformIf4(IR ** head, IR * ir);
-    bool transformIf5(IR ** head, IR * ir);
-    bool hoistLoop(IR ** head, IR * ir);
-    bool hoistIf(IR ** head, IR * ir);
+    bool transformToDoWhile(IR ** head, IR ** ir);
+    bool transformIf1(IR ** head, IR ** ir);
+    bool transformIf2(IR ** head, IR ** ir);
+    bool transformIf3(IR ** head, IR ** ir);
+    bool transformIf4(IR ** head, IR ** ir);
+    bool transformIf5(IR ** head, IR ** ir);
+    bool hoistLoop(IR ** head, IR ** ir);
+    bool hoistIf(IR ** head, IR ** ir);
 
 public:
     CfsOpt(Region * rg)
     {
         m_rg = rg;
         m_tm = rg->getTypeMgr();
-        m_rf = NULL;
+        m_rf = nullptr;
     }
     ~CfsOpt() {}
 

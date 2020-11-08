@@ -71,11 +71,11 @@ bool readGRAndConstructRegion(RegionMgr * rumgr, CHAR const* grfile)
     GRReader reader(rumgr);
 
     //START_TIMER(t, "lexer dump");
-    //reader.getLexer()->dump(grfile, NULL);
+    //reader.getLexer()->dump(grfile, nullptr);
     //END_TIMER(t, "lexer dump");
 
     FILE * h = fopen(grfile, "r");
-    if (h == NULL) {
+    if (h == nullptr) {
         return false;
     }
     reader.setSrcFile(h);

@@ -35,6 +35,7 @@ class Region;
 class RegionMgr;
 
 #define LOGMGR_INDENT_CHAR ' '
+#define LOGMGR_NEWLINE_CHAR '\n'
 
 //This class permits copy-constructing operations.
 class LogCtx {
@@ -49,7 +50,7 @@ public:
 public:
     LogCtx() : replace_newline(false), prt_srcline(true),
                indent_char(LOGMGR_INDENT_CHAR), indent(0),
-               logfile(NULL), logfile_name(NULL) {}
+               logfile(nullptr), logfile_name(nullptr) {}
     LogCtx(UINT) { clean(); } //Used as UNDEFINED value in Stack<T>
     LogCtx(bool p_replace_newline,
            bool p_prt_srcline,
@@ -73,8 +74,8 @@ public:
         prt_srcline = true;
         indent_char = LOGMGR_INDENT_CHAR;
         indent = 0;
-        logfile = NULL;
-        logfile_name = NULL;
+        logfile = nullptr;
+        logfile_name = nullptr;
     }
 };
 
@@ -85,7 +86,7 @@ protected:
     LogCtx m_ctx;
     Stack<LogCtx> m_ctx_stack;
 public:
-    LogMgr() { init(NULL, false); }
+    LogMgr() { init(nullptr, false); }
     LogMgr(CHAR const* logfilename, bool is_del) { init(logfilename, is_del); }
     ~LogMgr() { fini(); }
 
@@ -116,7 +117,7 @@ public:
     void incIndent(UINT v) { m_ctx.indent += (INT)v; }
 
     //Return true if LogMgr has initialized.
-    bool is_init() const { return m_ctx.logfile != NULL; }
+    bool is_init() const { return m_ctx.logfile != nullptr; }
 
     //Save current log file handler and name into stack, and set given handler
     //and filename as current.

@@ -27,12 +27,12 @@ int main()
 
     printf("Iter list element by user declared iter:\n");
     C<int> * iter;
-    for (l.get_head(&iter); iter != NULL; l.get_next(&iter)) {
+    for (l.get_head(&iter); iter != nullptr; l.get_next(&iter)) {
         printf("%d\n", iter->val());
     }
 
     printf("\nReverse Iterator:\n");
-    for (l.get_tail(&iter); iter != NULL; l.get_prev(&iter)) {
+    for (l.get_tail(&iter); iter != nullptr; l.get_prev(&iter)) {
         printf("%d\n", iter->val());
     }
 

@@ -51,20 +51,20 @@ class BBIRList : public EList<IR*, IR2Holder> {
     IRBB * m_bb;
 
 public:
-    BBIRList() { m_bb = NULL; }
+    BBIRList() { m_bb = nullptr; }
 
     inline IRListIter append_head(IR * ir)
     {
-        if (ir == NULL) { return NULL; }
-        ASSERT0(m_bb != NULL);
+        if (ir == nullptr) { return nullptr; }
+        ASSERT0(m_bb != nullptr);
         ir->setBB(m_bb);
         return xcom::EList<IR*, IR2Holder>::append_head(ir);
     }
 
     inline IRListIter append_tail(IR * ir)
     {
-        if (ir == NULL) { return NULL; }
-        ASSERT0(m_bb != NULL);
+        if (ir == nullptr) { return nullptr; }
+        ASSERT0(m_bb != nullptr);
         ir->setBB(m_bb);
         return xcom::EList<IR*, IR2Holder>::append_tail(ir);
     }
@@ -82,9 +82,9 @@ public:
     //Insert 'ir' before 'marker'.
     inline IRListIter insert_before(IN IR * ir, IN IR * marker)
     {
-        if (ir == NULL) { return NULL; }
-        ASSERT0(marker != NULL);
-        ASSERT0(m_bb != NULL);
+        if (ir == nullptr) { return nullptr; }
+        ASSERT0(marker != nullptr);
+        ASSERT0(m_bb != nullptr);
         ir->setBB(m_bb);
         return xcom::EList<IR*, IR2Holder>::insert_before(ir, marker);
     }
@@ -92,9 +92,9 @@ public:
     //Insert 'ir' before 'marker'. marker will be modified.
     inline IRListIter insert_before(IN IR * ir, IN IRListIter marker)
     {
-        if (ir == NULL) { return NULL; }
-        ASSERT0(marker != NULL);
-        ASSERT0(m_bb != NULL);
+        if (ir == nullptr) { return nullptr; }
+        ASSERT0(marker != nullptr);
+        ASSERT0(m_bb != nullptr);
         ir->setBB(m_bb);
         return xcom::EList<IR*, IR2Holder>::insert_before(ir, marker);
     }
@@ -102,9 +102,9 @@ public:
     //Insert 'ir' after 'marker'.
     inline IRListIter insert_after(IR * ir, IR * marker)
     {
-        if (ir == NULL) { return NULL; }
-        ASSERT0(marker != NULL);
-        ASSERT0(m_bb != NULL);
+        if (ir == nullptr) { return nullptr; }
+        ASSERT0(marker != nullptr);
+        ASSERT0(m_bb != nullptr);
         ir->setBB(m_bb);
         return xcom::EList<IR*, IR2Holder>::insert_after(ir, marker);
     }
@@ -112,9 +112,9 @@ public:
     //Insert 'ir' after 'marker'.
     inline IRListIter insert_after(IR * ir, IN IRListIter marker)
     {
-        if (ir == NULL) { return NULL; }
-        ASSERT0(marker != NULL);
-        ASSERT0(m_bb != NULL);
+        if (ir == nullptr) { return nullptr; }
+        ASSERT0(marker != nullptr);
+        ASSERT0(m_bb != nullptr);
         ir->setBB(m_bb);
         return xcom::EList<IR*, IR2Holder>::insert_after(ir, marker);
     }
@@ -122,17 +122,17 @@ public:
     //Remove ir that hold by 'holder'.
     inline IR * remove(IN IRListIter holder)
     {
-        if (holder == NULL) { return NULL; }
+        if (holder == nullptr) { return nullptr; }
         ASSERT0(holder->val());
-        holder->val()->setBB(NULL);
+        holder->val()->setBB(nullptr);
         return xcom::EList<IR*, IR2Holder>::remove(holder);
     }
 
     //Remove ir out of list.
     inline IR * remove(IN IR * ir)
     {
-        if (ir == NULL) { return NULL; }
-        ir->setBB(NULL);
+        if (ir == nullptr) { return nullptr; }
+        ir->setBB(nullptr);
         return xcom::EList<IR*, IR2Holder>::remove(ir);
     }
 
@@ -193,7 +193,7 @@ public:
         //BB will be destructed in ~IRBBMgr().
         //No need to free it. Or the ir_list must be clean before
         //the deletion of BB.
-        //for (IR * ir = ir_list.get_head(); ir != NULL; ir = ir_list.get_next()) {
+        //for (IR * ir = ir_list.get_head(); ir != nullptr; ir = ir_list.get_next()) {
         //    m_rg->freeIRTree(ir);
         //}
     }
@@ -256,7 +256,7 @@ public:
     inline bool hasLabel(LabelInfo const* lab)
     {
         for (LabelInfo const* li = getLabelList().get_head();
-             li != NULL; li = getLabelList().get_next()) {
+             li != nullptr; li = getLabelList().get_next()) {
             if (isSameLabel(li, lab)) {
                 return true;
             }
@@ -271,7 +271,7 @@ public:
     {
         BBIRList * irlst = const_cast<BBIRList*>(&BB_irlist(this));
         for (IR * ir = irlst->get_tail();
-             ir != NULL; ir = irlst->get_prev()) {
+             ir != nullptr; ir = irlst->get_prev()) {
             if (ir->isCallStmt()) {
                 return true;
             }
@@ -283,7 +283,7 @@ public:
     {
         BBIRList * irlst = const_cast<BBIRList*>(&BB_irlist(this));
         for (IR * ir = irlst->get_tail();
-             ir != NULL; ir = irlst->get_prev()) {
+             ir != nullptr; ir = irlst->get_prev()) {
             if (ir->is_return()) {
                 return true;
             }
@@ -310,7 +310,7 @@ public:
         bool find = false;
         IRBB * pthis = const_cast<IRBB*>(this);
         for (LabelInfo const* li = pthis->getLabelList().get_head();
-             li != NULL; li = pthis->getLabelList().get_next()) {
+             li != nullptr; li = pthis->getLabelList().get_next()) {
             if (LABELINFO_is_try_start(li)) {
                 find = true;
                 break;
@@ -329,7 +329,7 @@ public:
         bool find = false;
         IRBB * pthis = const_cast<IRBB*>(this);
         for (LabelInfo const* li = pthis->getLabelList().get_head();
-             li != NULL; li = pthis->getLabelList().get_next()) {
+             li != nullptr; li = pthis->getLabelList().get_next()) {
             if (LABELINFO_is_try_end(li)) {
                 find = true;
                 break;
@@ -348,7 +348,7 @@ public:
         bool find = false;
         IRBB * pthis = const_cast<IRBB*>(this);
         for (LabelInfo const* li = pthis->getLabelList().get_head();
-             li != NULL; li = pthis->getLabelList().get_next()) {
+             li != nullptr; li = pthis->getLabelList().get_next()) {
             if (LABELINFO_is_catch_start(li)) {
                 find = true;
                 break;
@@ -367,7 +367,7 @@ public:
         bool find = false;
         IRBB * pthis = const_cast<IRBB*>(this);
         for (LabelInfo const* li = pthis->getLabelList().get_head();
-             li != NULL; li = pthis->getLabelList().get_next()) {
+             li != nullptr; li = pthis->getLabelList().get_next()) {
             if (LABELINFO_is_terminate(li)) {
                 find = true;
                 break;
@@ -393,7 +393,7 @@ public:
     inline bool isAttachDedicatedLabel()
     {
         for (LabelInfo const* li = getLabelList().get_head();
-             li != NULL; li = getLabelList().get_next()) {
+             li != nullptr; li = getLabelList().get_next()) {
             if (LABELINFO_is_catch_start(li) ||
                 LABELINFO_is_try_start(li) ||
                 LABELINFO_is_try_end(li) ||
@@ -408,7 +408,7 @@ public:
     {
         for (LabelInfo const* li = const_cast<IRBB*>(this)->
                  getLabelList().get_head();
-             li != NULL;
+             li != nullptr;
              li = const_cast<IRBB*>(this)->getLabelList().get_next()) {
             if (li == lab) {
                 return true;
@@ -453,7 +453,7 @@ public:
     {
         IRListIter ct;
         IR * x = BB_irlist(const_cast<IRBB*>(this)).get_tail(&ct);
-        if (x != NULL && x->isMayThrow()) {
+        if (x != nullptr && x->isMayThrow()) {
             return true;
         }
         return false;
@@ -463,7 +463,7 @@ public:
     inline void mergeLabeInfoList(IRBB * src)
     {
         for (LabelInfo const* li = src->getLabelList().get_tail();
-             li != NULL; li = src->getLabelList().get_prev()) {
+             li != nullptr; li = src->getLabelList().get_prev()) {
             addLabel(li, true);
         }
     }
@@ -502,7 +502,7 @@ public:
     ~IRBBMgr()
     {
         for (IRBB * bb = m_bbs_list.get_head();
-             bb != NULL; bb = m_bbs_list.get_next()) {
+             bb != nullptr; bb = m_bbs_list.get_next()) {
             delete bb;
         }
         //BB in free list will also be recorded in m_bbs_list.
@@ -511,7 +511,7 @@ public:
     inline IRBB * allocBB()
     {
         IRBB * bb = m_free_list.remove_head();
-        if (bb == NULL) {
+        if (bb == nullptr) {
             bb = new IRBB();
             BB_id(bb) = m_bb_count++;
             m_bbs_list.append_tail(bb);
@@ -527,11 +527,12 @@ public:
         m_free_list.append_head(bb);
     }
     //Count memory usage for current object.
-    size_t count_mem()
+    size_t count_mem() const
     {
         size_t count = 0;
-        for (IRBB * bb = m_bbs_list.get_head();
-             bb != NULL; bb = m_bbs_list.get_next()) {
+        BBListIter bbit;
+        for (IRBB * bb = m_bbs_list.get_head(&bbit);
+             bb != nullptr; bb = m_bbs_list.get_next(&bbit)) {
             count += bb->count_mem();
         }
         return count;

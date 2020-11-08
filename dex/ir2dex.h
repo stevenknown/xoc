@@ -94,7 +94,7 @@ protected:
 
     void * xmalloc(UINT size)
     {
-        ASSERTN(m_pool != NULL, ("need pool!!"));
+        ASSERTN(m_pool != nullptr, ("need pool!!"));
         void * p = smpoolMalloc(size, m_pool);
         ASSERT0(p);
         ::memset(p, 0, size);
@@ -177,7 +177,7 @@ public:
     Label2UINT * get_lab2idx() { return &m_lab2idx; }
     UINT get_vreg(UINT prno)
     {
-        if (m_prno2v != NULL) {
+        if (m_prno2v != nullptr) {
             bool find;
             return m_prno2v->get(prno, &find);
         }

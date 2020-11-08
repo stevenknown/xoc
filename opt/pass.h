@@ -56,7 +56,7 @@ public:
     virtual CHAR const* getPassName() const
     {
         ASSERTN(0, ("Optimization Dependent Code"));
-        return NULL;
+        return nullptr;
     }
 
     virtual PASS_TYPE getPassType() const

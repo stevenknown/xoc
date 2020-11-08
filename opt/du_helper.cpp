@@ -35,12 +35,12 @@ void changeDef(IR * olddef, IR * newdef, Region * rg)
 {
     ASSERT0(olddef->is_stmt() && newdef->is_stmt());
     MDSSAMgr * mdssamgr = rg->getMDSSAMgr();
-    if (mdssamgr != NULL) {
+    if (mdssamgr != nullptr) {
         mdssamgr->changeDef(olddef, newdef);
     }
 
     DUMgr * dumgr = rg->getDUMgr();
-    if (dumgr != NULL) {
+    if (dumgr != nullptr) {
         dumgr->changeDef(newdef, olddef, dumgr->getSBSMgr());
     }
 }
@@ -50,12 +50,12 @@ void changeUse(IR * olduse, IR * newuse, Region * rg)
 {
     ASSERT0(olduse->is_exp() && newuse->is_exp());
     MDSSAMgr * mdssamgr = rg->getMDSSAMgr();
-    if (mdssamgr != NULL) {
+    if (mdssamgr != nullptr) {
         mdssamgr->changeUse(olduse, newuse);
     }
 
     DUMgr * dumgr = rg->getDUMgr();
-    if (dumgr != NULL) {
+    if (dumgr != nullptr) {
         dumgr->changeUse(newuse, olduse, dumgr->getSBSMgr());
     }
 }
@@ -66,13 +66,13 @@ void addDUChain(IR * def, IR * use, Region * rg)
 {
     ASSERT0(def->is_stmt() && use->is_exp());
     DUMgr * dumgr = rg->getDUMgr();
-    if (dumgr != NULL) {
+    if (dumgr != nullptr) {
         dumgr->buildDUChain(def, use);
     }
 
     if  (def->isMemoryRefNotOperatePR()) {
         MDSSAMgr * mdssamgr = rg->getMDSSAMgr(); 
-        if (mdssamgr != NULL && mdssamgr->is_valid()) {
+        if (mdssamgr != nullptr && mdssamgr->is_valid()) {
             MDSSAInfo * info = mdssamgr->getMDSSAInfoIfAny(def);
             ASSERTN(info, ("def stmt even not in MDSSA system"));
             mdssamgr->addMDSSAOcc(use, info);
@@ -81,7 +81,7 @@ void addDUChain(IR * def, IR * use, Region * rg)
 
     if (def->isWritePR() || def->isCallStmt()) {
         PRSSAMgr * prssamgr = rg->getPRSSAMgr();
-        if (prssamgr != NULL && prssamgr->is_valid()) {
+        if (prssamgr != nullptr && prssamgr->is_valid()) {
             prssamgr->buildDUChain(def, use);
         }
     }
@@ -96,12 +96,12 @@ bool removeExpiredDUForStmt(IR * stmt, Region * rg)
     bool change = PRSSAMgr::removeExpiredDUForStmt(stmt, rg);
 
     DUMgr * dumgr = rg->getDUMgr();
-    if (dumgr != NULL) {
+    if (dumgr != nullptr) {
         change |= dumgr->removeExpiredDUForStmt(stmt);
     }
 
     MDSSAMgr * mdssamgr = rg->getMDSSAMgr(); 
-    if (mdssamgr != NULL) {
+    if (mdssamgr != nullptr) {
         MDSSAInfo * info = mdssamgr->getMDSSAInfoIfAny(stmt);
         ASSERTN(info, ("def stmt even not in MDSSA system"));
         change |= mdssamgr->removeExpiredDUForStmt(stmt);
@@ -125,14 +125,14 @@ void coalesceDUChain(IR * from, IR * to, Region * rg)
     ASSERT0(from && to);
     ASSERT0(from->is_stmt() && to->is_exp() && to->getStmt() == from);
     DUMgr * dumgr = rg->getDUMgr();
-    if (dumgr != NULL) {
+    if (dumgr != nullptr) {
         dumgr->coalesceDUChain(from, to);
     }
 
     if (from->isMemoryRefNotOperatePR()) {
         ASSERT0(to->isMemoryRefNotOperatePR());
         MDSSAMgr * mdssamgr = rg->getMDSSAMgr(); 
-        if (mdssamgr != NULL) {
+        if (mdssamgr != nullptr) {
             mdssamgr->coalesceDUChain(from, to);
         }
     }
@@ -152,13 +152,13 @@ void removeIRTreeUse(IR * exp, Region * rg)
     PRSSAMgr::removePRSSAUse(exp);
 
     DUMgr * dumgr = rg->getDUMgr();
-    if (dumgr != NULL) {
+    if (dumgr != nullptr) {
         dumgr->removeUseFromDefset(exp);
     }
 
     if (exp->isMemoryRefNotOperatePR()) {
         MDSSAMgr * mdssamgr = rg->getMDSSAMgr(); 
-        if (mdssamgr != NULL) {
+        if (mdssamgr != nullptr) {
             mdssamgr->removeMDSSAUse(exp);
         }
     }
@@ -170,7 +170,7 @@ void removeStmt(IR * stmt, Region * rg)
 {
     ASSERT0(stmt->is_stmt());
     DUMgr * dumgr = rg->getDUMgr();
-    if (dumgr != NULL) {
+    if (dumgr != nullptr) {
         dumgr->removeIRFromDUMgr(stmt);
     }
 
@@ -178,7 +178,7 @@ void removeStmt(IR * stmt, Region * rg)
 
     if (stmt->isMemoryRefNotOperatePR()) {
         MDSSAMgr * mdssamgr = rg->getMDSSAMgr(); 
-        if (mdssamgr != NULL) {
+        if (mdssamgr != nullptr) {
             mdssamgr->removeStmtFromMDSSAMgr(stmt);
         }
     }
@@ -188,7 +188,7 @@ void removeStmt(IR * stmt, Region * rg)
 static void addUseInPRSSAMode(IR * to_ir, IR const* from_ir)
 {
     SSAInfo * ssainfo = from_ir->getSSAInfo();
-    if (ssainfo != NULL) {
+    if (ssainfo != nullptr) {
         if (from_ir->isWritePR() || from_ir->isCallHasRetVal()) {
             ASSERTN(0, ("SSA only has one def"));
         }
@@ -206,20 +206,20 @@ static void addUseInDUMode(IR * to_ir,
                            Region * rg)
 {
     DUSet const* from_du = from_ir->readDUSet();
-    if (from_du == NULL || from_du->is_empty()) { return; }
+    if (from_du == nullptr || from_du->is_empty()) { return; }
 
     DUSet * to_du = dumgr->getAndAllocDUSet(to_ir);
     to_du->copy(*from_du, *dumgr->getSBSMgr());
 
     //Add DU chain between DEF and USE.
-    DUIter di = NULL;
+    DUIter di = nullptr;
     for (UINT i = from_du->get_first(&di);
-         di != NULL; i = from_du->get_next(i, &di)) {
+         di != nullptr; i = from_du->get_next(i, &di)) {
         //x is stmt if from_ir is expression.
         //x is expression if from_ir is stmt.
         IR const* x = rg->getIR(i);
         DUSet * x_duset = x->getDUSet();
-        if (x_duset == NULL) { continue; }
+        if (x_duset == nullptr) { continue; }
         x_duset->add(IR_id(to_ir), *dumgr->getSBSMgr());
     }
 }
@@ -254,15 +254,15 @@ void copyRefAndAddDUChain(IR * to,
     ASSERT0(to->isIREqual(from, true));
 
     MDSSAMgr * mdssamgr = rg->getMDSSAMgr();
-    bool use_mdssa = mdssamgr != NULL && mdssamgr->is_valid();
+    bool use_mdssa = mdssamgr != nullptr && mdssamgr->is_valid();
     PRSSAMgr * prssamgr = rg->getPRSSAMgr();
-    bool use_prssa = prssamgr != NULL && prssamgr->is_valid();
+    bool use_prssa = prssamgr != nullptr && prssamgr->is_valid();
     DUMgr * dumgr = rg->getDUMgr();
     ConstIRIter cit;
     IRIter it;
     IR const* from_ir = iterInitC(from, cit);
     for (IR * to_ir = iterInit(to, it);
-         to_ir != NULL; to_ir = iterNext(it), from_ir = iterNextC(cit)) {
+         to_ir != nullptr; to_ir = iterNext(it), from_ir = iterNextC(cit)) {
         ASSERT0(to_ir->isIREqual(from_ir, true));
         if (!to_ir->isMemoryRef() && !to_ir->is_id()) {
             //Copy MD for IR_ID, some Passes need it, e.g. GVN.
@@ -274,7 +274,7 @@ void copyRefAndAddDUChain(IR * to,
         if (use_prssa && from_ir->isReadPR()) {
             addUseInPRSSAMode(to_ir, from_ir);
         }
-        if (dumgr != NULL) {
+        if (dumgr != nullptr) {
             addUseInDUMode(to_ir, from_ir, dumgr, rg);
         }
         if (use_mdssa && from_ir->isMemoryRefNotOperatePR()) {
@@ -291,7 +291,7 @@ bool isKillingDef(IR const* def, IR const* use)
 {
     ASSERT0(def && use);
     MD const* mustusemd = use->getRefMD();
-    if (mustusemd == NULL) { return false; }
+    if (mustusemd == nullptr) { return false; }
     return isKillingDef(def, mustusemd);
 }
 
@@ -302,7 +302,7 @@ bool isKillingDef(IR const* def, MD const* usemd)
 {
     ASSERT0(def && usemd);
     MD const* mustdefmd = def->getRefMD();
-    if (mustdefmd == NULL) { return false; }
+    if (mustdefmd == nullptr) { return false; }
     return isKillingDef(mustdefmd, usemd);
 }
 
@@ -312,8 +312,8 @@ bool isKillingDef(IR const* def, MD const* usemd)
 bool isKillingDef(MD const* defmd, MD const* usemd)
 {
     ASSERT0(defmd && usemd);
-    if (defmd != NULL &&
-        usemd != NULL &&
+    if (defmd != nullptr &&
+        usemd != nullptr &&
         defmd->is_exact() &&
         (defmd == usemd || defmd->is_exact_cover(usemd))) {
         //def is killing must-def.
@@ -331,7 +331,7 @@ void movePhi(IRBB * from, IRBB * to, Region * rg)
     PRSSAMgr::movePhi(from, to);
 
     MDSSAMgr * mdssamgr = rg->getMDSSAMgr();
-    if (mdssamgr != NULL) {
+    if (mdssamgr != nullptr) {
         mdssamgr->movePhi(from, to);
     }
 }

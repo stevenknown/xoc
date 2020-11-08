@@ -41,7 +41,7 @@ void VarTab::dump(TypeMgr const* tm) const
     if (!tm->getRegionMgr()->isLogMgrInit()) { return; }
     ASSERT0(tm);
     VarTabIter iter;
-    for (Var * v = get_first(iter); v != NULL; v = get_next(iter)) {
+    for (Var * v = get_first(iter); v != nullptr; v = get_next(iter)) {
         v->dump(tm);
     }
 }
@@ -52,7 +52,7 @@ void ConstVarTab::dump(TypeMgr * tm)
     if (!tm->getRegionMgr()->isLogMgrInit()) { return; }
     ASSERT0(tm);
     ConstVarTabIter iter;
-    for (Var const* v = get_first(iter); v != NULL; v = get_next(iter)) {
+    for (Var const* v = get_first(iter); v != nullptr; v = get_next(iter)) {
         v->dump(tm);
     }
 }
@@ -75,8 +75,8 @@ Var::Var()
 {
     VAR_id(this) = 0; //unique id;
     VAR_type(this) = UNDEF_TYID;
-    VAR_name(this) = NULL;
-    VAR_string(this) = NULL;
+    VAR_name(this) = nullptr;
+    VAR_string(this) = nullptr;
     u2.flag = 0; //Record various properties of variable.
     align = 0;
 }
@@ -216,7 +216,7 @@ void Var::dumpProp(xcom::StrBuf & buf, bool grmode) const
         first = false;
         buf.strcat("align(%d)", get_align());
     }
-    if (is_string() && getString() != NULL) {
+    if (is_string() && getString() != nullptr) {
         if (!first) {
             buf.strcat(",");
         }
@@ -231,7 +231,7 @@ void Var::dumpProp(xcom::StrBuf & buf, bool grmode) const
                 quote_num++;
             }
         }
-        CHAR * local_buf = NULL;
+        CHAR * local_buf = nullptr;
         if (quote_num != 0) {
             UINT i = 0;
             len += quote_num;
@@ -251,12 +251,12 @@ void Var::dumpProp(xcom::StrBuf & buf, bool grmode) const
             local_string = local_buf;
         }
         buf.strcat("string(\"%s\")", local_string);
-        if (local_buf != NULL && len >= HOST_STACK_MAX_USABLE_MEMORY_BYTE_SIZE) {
+        if (local_buf != nullptr && len >= HOST_STACK_MAX_USABLE_MEMORY_BYTE_SIZE) {
             ::free(local_buf);
         }
     } else if (VAR_has_init_val(this)) {
         ASSERT0(getByteValue());
-        //Initial value can NOT be NULL.
+        //Initial value can NOT be nullptr.
         if (!first) {
             buf.strcat(",");
         }
@@ -357,7 +357,7 @@ void VarMgr::destroyVar(Var * v)
 {
     ASSERT0(VAR_id(v) != 0);
     m_freelist_of_varid.bunion(VAR_id(v), *m_ru_mgr->get_sbs_mgr());
-    m_var_vec.set(VAR_id(v), NULL);
+    m_var_vec.set(VAR_id(v), nullptr);
     delete v;
 }
 
@@ -366,7 +366,7 @@ void VarMgr::destroy()
 {
     for (INT i = 0; i <= m_var_vec.get_last_idx(); i++) {
         Var * v = m_var_vec.get((UINT)i);
-        if (v == NULL) { continue; }
+        if (v == nullptr) { continue; }
         delete v;
     }
 
@@ -382,7 +382,7 @@ bool VarMgr::isDedicatedStringVar(CHAR const* name) const
 
 void VarMgr::assignVarId(Var * v)
 {
-    DefSBitSetIter iter = NULL;
+    DefSBitSetIter iter = nullptr;
     INT id = m_freelist_of_varid.get_first(&iter);
     ASSERT0(id != 0);
     if (id > 0) {
@@ -392,21 +392,24 @@ void VarMgr::assignVarId(Var * v)
         VAR_id(v) = (UINT)m_var_count++;
     }
     ASSERTN(VAR_id(v) < 5000000, ("too many variables"));
-    ASSERT0(m_var_vec.get(VAR_id(v)) == NULL);
+    ASSERT0(m_var_vec.get(VAR_id(v)) == nullptr);
     m_var_vec.set(VAR_id(v), v);
 }
 
 
+//Find variable by 'name'.
+//Note there may be multiple variable with same name, this function return
+//the first.
 Var * VarMgr::findVarByName(Sym const* name)
 {
     for (INT i = 0; i <= m_var_vec.get_last_idx(); i++) {
         Var * v = m_var_vec.get(i);
-        if (v == NULL) { continue; }
+        if (v == nullptr) { continue; }
         if (v->get_name() == name) {
             return v;
         }
     }
-    return NULL;
+    return nullptr;
 }
 
 
@@ -461,11 +464,11 @@ Var * VarMgr::registerStringVar(CHAR const* var_name, Sym const* s, UINT align)
 {
     ASSERT0(s);
     Var * v;
-    if ((v = m_str_tab.get(s)) != NULL) {
+    if ((v = m_str_tab.get(s)) != nullptr) {
         return v;
     }
     v = allocVAR();
-    if (var_name == NULL) {
+    if (var_name == nullptr) {
         StrBuf buf(64);
         buf.sprint("_const_string_%lu", (ULONG)m_str_count++);
         VAR_name(v) = m_ru_mgr->addToSymbolTab(buf.buf);
@@ -491,7 +494,7 @@ void VarMgr::dump()
     StrBuf buf(64);
     for (INT i = 0; i <= m_var_vec.get_last_idx(); i++) {
         Var * v = m_var_vec.get(i);
-        if (v == NULL) { continue; }
+        if (v == nullptr) { continue; }
 
         buf.clean();
         prt(rm, "\n%s", v->dump(buf, m_tm));

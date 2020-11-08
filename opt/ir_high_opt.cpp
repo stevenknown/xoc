@@ -136,7 +136,7 @@ bool Region::HighProcess(OptCtx & oc)
     if (g_do_cfs_opt) {
         CfsOpt co(this);
         co.perform(simp);
-        ASSERT0(verifyIRList(getIRList(), NULL, this));
+        ASSERT0(verifyIRList(getIRList(), nullptr, this));
     }
 
     if (g_build_cfs) {
@@ -150,12 +150,12 @@ bool Region::HighProcess(OptCtx & oc)
     simp.setSimpCFS();
     setIRList(simplifyStmtList(getIRList(), &simp));
     ASSERT0(verifySimp(getIRList(), simp));
-    ASSERT0(verifyIRList(getIRList(), NULL, this));
+    ASSERT0(verifyIRList(getIRList(), nullptr, this));
 
     if (g_cst_bb_list) {
         constructBBList();
         ASSERT0(verifyIRandBB(getBBList(), this));
-        setIRList(NULL); //All IRs have been moved to each IRBB.
+        setIRList(nullptr); //All IRs have been moved to each IRBB.
     }
 
     HighProcessImpl(oc);

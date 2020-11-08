@@ -25,52 +25,73 @@ LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND
 ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
 SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+author: Su Zhenyu
 @*/
-#ifndef __ANALYSIS_INSTR_H__
-#define __ANALYSIS_INSTR_H__
+#include "cominc.h"
+#include "comopt.h"
 
 namespace xoc {
 
-//Make sure IR_ICALL is the largest ir.
-#define MAX_OFFSET_AT_FREE_TABLE (sizeof(CICall) - sizeof(IR))
+//
+//START AIContainer
+//
+void AIContainer::copy(AIContainer const* ai, Region * rg)
+{
+    ASSERT0(ai);
+    if (!ai->is_init()) { return; }
+    cont.copy(ai->cont, rg->get_pool());
+}
 
-//Analysis Instrument.
-//Record Data structure for IR analysis and transformation.
-#define ANA_INS_pass_mgr(a) ((a)->m_pass_mgr)
-class AnalysisInstrument {
-    COPY_CONSTRUCTOR(AnalysisInstrument);
-public:
-    Region * m_rg;
-    UINT m_pr_count; //counter of IR_PR.
-    SMemPool * m_du_pool;
-    SMemPool * m_sc_labelinfo_pool;
-    //Indicate a list of IR.
-    IR * m_ir_list;
-    List<IR const*> * m_call_list; //record CALL/ICALL in region.
-    List<IR const*> * m_return_list; //record RETURN in region.
-    PassMgr * m_pass_mgr; //PASS manager.
-    IR * m_free_tab[MAX_OFFSET_AT_FREE_TABLE + 1];
-    Vector<Var*> m_prno2var; //map prno to related Var.
-    Vector<IR*> m_ir_vector; //record IR which have allocated.
-    xcom::BitSetMgr m_bs_mgr;
-    xcom::DefMiscBitSetMgr m_sbs_mgr;
-    MDSetMgr m_mds_mgr;
-    MDSetHashAllocator m_mds_hash_allocator;
-    MDSetHash m_mds_hash;
-    List<DU*> m_free_du_list;
-    IRBBMgr m_ir_bb_mgr; //Allocate the basic block.
-    BBList m_ir_bb_list; //record a list of basic blocks.
 
-    #ifdef _DEBUG_
-    xcom::BitSet m_has_been_freed_irs;
-    #endif
+CHAR const* AIContainer::getAIName(AI_TYPE type) const
+{
+    switch (type) {
+    case AI_UNDEF: return "Undef";
+    case AI_DBX: return "Dbx";
+    case AI_PROF: return "Prof";
+    case AI_TBAA: return "Tbaa";
+    case AI_EH_LABEL: return "EH";
+    case AI_USER_DEF: return "UserDef";
+    case AI_MD_SSA: return "MDSSA";
+    case AI_LAST:;
+    default: UNREACHABLE();
+    }
+    return nullptr;
+}
 
-public:
-    explicit AnalysisInstrument(Region * rg);
-    ~AnalysisInstrument();
-    //Count memory usage for current object.
-    size_t count_mem() const;
-};
+
+void AIContainer::set(BaseAttachInfo * c, Region * rg)
+{
+    ASSERTN(c, ("Can not set empty AI"));
+
+    INT emptyslot = -1;
+    if (!cont.is_init()) { cont.init(); }
+
+    AI_TYPE type = c->type;
+    ASSERT0(type > AI_UNDEF && type < AI_LAST);
+
+    UINT i = 0;
+    for (; i < cont.get_capacity(); i++) {
+        BaseAttachInfo * ac = cont.get(i);
+        if (ac == nullptr) {
+            emptyslot = (INT)i;
+        } else if (ac->type != type) {
+            continue;
+        }
+
+        //Note c will override the prior AIContainer that has same type.
+        cont.set(i, c, rg->get_pool());
+        return;
+    }
+
+    if (emptyslot != -1) {
+        cont.set((UINT)emptyslot, c, rg->get_pool());
+    } else {
+        //AIContainer buffer will grow bigger.
+        cont.set(i, c, rg->get_pool());
+    }
+}
+//END
 
 } //namespace xoc
-#endif

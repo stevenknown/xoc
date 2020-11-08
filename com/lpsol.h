@@ -211,7 +211,7 @@ inline CHAR const* getStatusName(STATUS st)
     case SIX_TIME_OUT: return "time_out";
     default: UNREACHABLE();
     }
-    return NULL;
+    return nullptr;
 }
 
 
@@ -275,7 +275,7 @@ public:
     {
         m_is_init = false;
         m_rhs_idx = -1;
-        m_ppt = NULL;
+        m_ppt = nullptr;
         init();
         m_is_dump = is_dump;
         setParam(indent, max_iter);
@@ -293,7 +293,7 @@ public:
         if (!m_is_init) { return; }
         m_rhs_idx = -1;
         m_is_init = false;
-        if (m_ppt != NULL) {
+        if (m_ppt != nullptr) {
             delete m_ppt;
         }
     }
@@ -383,7 +383,7 @@ template <class Mat, class T>
 void SIX<Mat, T>::newPPT(INT var_num)
 {
     ASSERT0(var_num > 0);
-    if (m_ppt != NULL) {
+    if (m_ppt != nullptr) {
         m_ppt->destroy();
         m_ppt->init(var_num);
         return;
@@ -395,7 +395,7 @@ void SIX<Mat, T>::newPPT(INT var_num)
 template <class Mat, class T>
 FILE * SIX<Mat, T>::dump_open_file() const
 {
-    if (!m_is_dump) { return NULL; }
+    if (!m_is_dump) { return nullptr; }
     FILE * h = fopen(SIX_DUMP_NAME, "a+");
     ASSERTN(h, ("%s create failed!!!", SIX_DUMP_NAME));
     return h;
@@ -417,9 +417,9 @@ bool SIX<Mat, T>::dump_prt_indent(FILE * h) const
 template <class Mat, class T>
 bool SIX<Mat, T>::dump_str(CHAR const* format, ...) const
 {
-    if (format == NULL) { return true; }
+    if (format == nullptr) { return true; }
     FILE * h = dump_open_file();
-    if (h == NULL) { return true; }
+    if (h == nullptr) { return true; }
 
     StrBuf buf(64);
     va_list arg;
@@ -899,7 +899,7 @@ bool SIX<Mat, T>::constructBasicFeasibleSolution(IN OUT Mat & leq,
     }
 
     PVParam<Mat> pp(&leq, &tgtf, &nvset, &bvset,
-                    &bv2eqmap, &eq2bvmap, NULL, rhs_idx);
+                    &bv2eqmap, &eq2bvmap, nullptr, rhs_idx);
     pivot(xa, pivot_bv_idx, pp);
 
     Mat sol;
@@ -2127,7 +2127,7 @@ public:
         if (m_is_init) { return; }
         m_cur_best_sol.init();
         m_cur_best_v = 0;
-        m_allow_rational_indicator = NULL;
+        m_allow_rational_indicator = nullptr;
         m_indent = 0;
         m_times = 0;
         m_is_init = true;
@@ -2139,7 +2139,7 @@ public:
         m_rhs_idx = -1;
         m_cur_best_sol.destroy();
         m_cur_best_v = 0;
-        m_allow_rational_indicator = NULL;
+        m_allow_rational_indicator = nullptr;
         m_is_init = false;
     }
 
@@ -2159,7 +2159,7 @@ public:
                       Mat const& eq,
                       Mat const& leq,
                       bool is_bin = false,
-                      IN BMat * rational_indicator = NULL,
+                      IN BMat * rational_indicator = nullptr,
                       INT rhs_idx = -1); //Linear minmum solution
     virtual UINT maxm(OUT T & maxv,
                       OUT Mat & res,
@@ -2168,7 +2168,7 @@ public:
                       Mat const& eq,
                       Mat const& leq,
                       bool is_bin = false,
-                      IN BMat * rational_indicator = NULL,
+                      IN BMat * rational_indicator = nullptr,
                       INT rhs_idx = -1); //Linear maximum solution
     void reviseTargetFunc(IN OUT Mat & tgtf,
                           Mat const& eq,
@@ -2192,7 +2192,7 @@ public:
 template <class Mat, class T>
 FILE * MIP<Mat, T>::dump_open_file() const
 {
-    if (!m_is_dump) { return NULL; }
+    if (!m_is_dump) { return nullptr; }
     FILE * h = ::fopen(SIX_DUMP_NAME, "a+");
     ASSERTN(h, ("%s create failed!!!", SIX_DUMP_NAME));
     return h;
@@ -2216,7 +2216,7 @@ bool MIP<Mat, T>::dump_start_six(Mat const&, //target function
                                  Mat const&) const //inequalities.
 {
     FILE * h = dump_open_file();
-    if (h == NULL) { return true; }
+    if (h == nullptr) { return true; }
     if (m_times == 0) {
         fprintf(h, "\n");
     }
@@ -2233,7 +2233,7 @@ template <class Mat, class T>
 bool MIP<Mat, T>::dump_end_six(UINT status, T v, Mat & sol, bool is_maxm) const
 {
     FILE * h = dump_open_file();
-    if (h == NULL) { return true; }
+    if (h == nullptr) { return true; }
     StrBuf buf(32);
     dump_prt_indent(h);
     fprintf(h, "\nEND SIX,status=%s,%s_value=%s,solution={",
@@ -2253,7 +2253,7 @@ template <class Mat, class T>
 bool MIP<Mat, T>::dump_is_satisfying() const
 {
     FILE * h = dump_open_file();
-    if (h == NULL) { return true; }
+    if (h == nullptr) { return true; }
     dump_prt_indent(h);
     fprintf(h, "SOL Satisfying!!! return IP_SUCC.\n");
     fclose(h);
@@ -2265,7 +2265,7 @@ template <class Mat, class T>
 bool MIP<Mat, T>::dump_floor_branch(INT floor) const
 {
     FILE * h = dump_open_file();
-    if (h == NULL) { return true; }
+    if (h == nullptr) { return true; }
     fprintf(h, "\n");
     dump_prt_indent(h);
     fprintf(h, "ENTER floor(left) branch, floor_value=%d\n", floor);
@@ -2278,7 +2278,7 @@ template <class Mat, class T>
 bool MIP<Mat, T>::dump_ceiling_branch(INT ceil) const
 {
     FILE * h = dump_open_file();
-    if (h == NULL) { return true; }
+    if (h == nullptr) { return true; }
     fprintf(h, "\n");
     dump_prt_indent(h);
     fprintf(h, "ENTER ceiling(right) branch, ceiling_value=%d\n", ceil);
@@ -2336,7 +2336,7 @@ void MIP<Mat, T>::checkAndInitConst(Mat const& leq,
             vc.getColSize() == (UINT)max_cols,
             ("unmatch variables constraints"));
 
-    if (m_allow_rational_indicator != NULL) {
+    if (m_allow_rational_indicator != nullptr) {
         ASSERTN(m_allow_rational_indicator->getColSize() == (UINT)max_cols,
                 ("unmatch variable"));
     }
@@ -2365,7 +2365,7 @@ bool MIP<Mat, T>::is_satisfying(OUT UINT & row,
                                 IN Mat & sol,
                                 bool is_bin)
 {
-    if (m_allow_rational_indicator != NULL) {
+    if (m_allow_rational_indicator != nullptr) {
         ASSERT0(m_allow_rational_indicator->getRowSize() ==
                 sol.getRowSize() &&
                 m_allow_rational_indicator->getColSize() ==
@@ -2621,7 +2621,7 @@ UINT MIP<Mat, T>::RecusivePart(OUT T & v,
 //'leq': inequalites which the solution should subject to .
 //'is_bin': true refers to solve the binary(0-1) programming,
 //    else to solve integer programming.
-//'rational_indicator': if it is not NULL, TRUE element means
+//'rational_indicator': if it is not nullptr, TRUE element means
 //    the solution permits to be rational.
 //    e.g: If rational_indicator(0, j) is TRUE, the element j
 //    of solution could be rational.
@@ -2665,7 +2665,7 @@ UINT MIP<Mat, T>::maxm(OUT T & maxv,
 //'leq': inequalites which the solution should subject to .
 //'is_bin': true refers to solve the binary(0-1) programming,
 //        else to solve integer programming.
-//'rational_indicator': if it is not NULL, TRUE element means
+//'rational_indicator': if it is not nullptr, TRUE element means
 //        the solution permits to be rational.
 //    e.g: If rational_indicator(0, j) is TRUE, the element j
 //        of solution could be rational.

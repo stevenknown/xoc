@@ -381,7 +381,7 @@ static inline UINT fetch_uint32_impl(UINT offset, USHORT const* cptr)
 //Dump all insns of method.
 void DX_MGR::dump_method(IN DX_INFO const& dxinfo, IN FILE * h)
 {
-    if (h == NULL) return;
+    if (h == nullptr) return;
     fprintf(h, "\n=== DX_MGR DUMP : COMPILE %s::%s, has %d insn ===",
                      DXI_class_name(&dxinfo),
                      DXI_method_name(&dxinfo),
@@ -391,7 +391,7 @@ void DX_MGR::dump_method(IN DX_INFO const& dxinfo, IN FILE * h)
     ASSERT0(cptr && endptr);
     fprintf(h, "\n");
     INT ofst = 0; //offset to dexcode-insn-buffer.
-    if (cptr == NULL) return;
+    if (cptr == nullptr) return;
     UINT i = 0;
     while (cptr < endptr) {
         if (is_inline_data(cptr)) {
@@ -412,7 +412,7 @@ void DX_MGR::dump_method(IN DX_INFO const& dxinfo, IN FILE * h)
 
 void DX_MGR::dump_dx(DXC const& dc, FILE * h, INT ofst)
 {
-    if (h == NULL) { return; }
+    if (h == nullptr) { return; }
     ASSERT0(dc.opc <= 255);
     fprintf(h, "%s ", DX_name(dc.opc));
     fflush(h);
@@ -743,7 +743,7 @@ void DX_MGR::extract_dxinfo(OUT DX_INFO & dxinfo, USHORT const* cptr, UINT cs,
     DXI_num_of_op(&dxinfo) = i;
 
     //class definition.
-    if (class_def_idx == NULL) {
+    if (class_def_idx == nullptr) {
         DXI_class_name(&dxinfo) = "NO Class Declaration Name";
     } else {
         DXI_class_name(&dxinfo) =
@@ -751,11 +751,11 @@ void DX_MGR::extract_dxinfo(OUT DX_INFO & dxinfo, USHORT const* cptr, UINT cs,
     }
 
     //method definition.
-    if (method_idx == NULL) {
+    if (method_idx == nullptr) {
         DXI_method_name(&dxinfo) = "NO Method Name";
     } else {
         DXI_method_name(&dxinfo) = get_method_name(*method_idx);
-        if (class_def_idx == NULL) {
+        if (class_def_idx == nullptr) {
             DXI_class_name(&dxinfo) = get_class_name_by_method_id(*method_idx);
         }
     }

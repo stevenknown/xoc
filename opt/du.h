@@ -78,9 +78,9 @@ public:
 
     void clean()
     {
-        md = NULL;
-        mds = NULL;
-        duset = NULL;
+        md = nullptr;
+        mds = nullptr;
+        duset = nullptr;
     }
 };
 

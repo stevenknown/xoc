@@ -103,7 +103,7 @@ void CopyProp::replaceExpViaSSADu(IR * exp,
 
     IR * newir = m_rg->dupIRTree(cand_expr);
 
-    if (cand_expr->isReadPR() && PR_ssainfo(cand_expr) != NULL) {
+    if (cand_expr->isReadPR() && PR_ssainfo(cand_expr) != nullptr) {
         PR_ssainfo(newir) = PR_ssainfo(cand_expr);
         PR_ssainfo(newir)->addUse(newir);
     } else {
@@ -114,8 +114,8 @@ void CopyProp::replaceExpViaSSADu(IR * exp,
     newir->copyRefForTree(cand_expr, m_rg);
 
     //Add SSA use for new exp.
-    SSAInfo * cand_ssainfo = NULL;
-    if ((cand_ssainfo = cand_expr->getSSAInfo()) != NULL) {
+    SSAInfo * cand_ssainfo = nullptr;
+    if ((cand_ssainfo = cand_expr->getSSAInfo()) != nullptr) {
         cand_ssainfo->addUse(newir);
     }
 
@@ -187,8 +187,8 @@ void CopyProp::replaceExp(IR * exp,
     ASSERT0(cand_expr->getStmt());
     SSAInfo * exp_ssainfo = exp->getSSAInfo();
     MDSSAInfo * exp_mdssainfo = useMDSSADU() ? 
-        mdssamgr->getMDSSAInfoIfAny(exp) : NULL;
-    if (exp_ssainfo != NULL) {
+        mdssamgr->getMDSSAInfoIfAny(exp) : nullptr;
+    if (exp_ssainfo != nullptr) {
         //Remove exp SSA use.
         ASSERT0(exp->getSSAInfo());
         ASSERT0(exp->getSSAInfo()->getUses().find(exp));
@@ -197,7 +197,7 @@ void CopyProp::replaceExp(IR * exp,
         bool doit = exp->getParent()->replaceKid(exp, newir, false);
         ASSERT0(doit);
         DUMMYUSE(doit);
-    } else if (exp_mdssainfo != NULL) {
+    } else if (exp_mdssainfo != nullptr) {
         //Remove exp MD SSA use.
         ASSERT0(mdssamgr);
         mdssamgr->removeMDSSAUse(exp);
@@ -211,7 +211,7 @@ void CopyProp::replaceExp(IR * exp,
         }
 
         MDSSAInfo * cand_exp_mdssainfo = mdssamgr->getMDSSAInfoIfAny(cand_expr);
-        if (cand_exp_mdssainfo != NULL) {
+        if (cand_exp_mdssainfo != nullptr) {
             //CASE:copy MDSSAInfo from cand_exp to newir.
             // .. = cand_exp
             // .. = exp
@@ -266,9 +266,9 @@ bool CopyProp::existMayDefTillBB(IR const* exp,
         IRBB const* t = wl.remove_head();
         if (t == meetup) { continue; }
 
-        IRListIter tir_holder = NULL;
+        IRListIter tir_holder = nullptr;
         for (IR const* tir = BB_irlist(t).get_head(&tir_holder);
-             tir != NULL; tir = BB_irlist(t).get_next(&tir_holder)) {
+             tir != nullptr; tir = BB_irlist(t).get_next(&tir_holder)) {
             if (m_du->isMayDef(tir, exp, false)) {
                 return true;
             }
@@ -276,7 +276,7 @@ bool CopyProp::existMayDefTillBB(IR const* exp,
 
         visited.append(t->id());
         for (xcom::EdgeC * el = m_cfg->getVertex(t->id())->getInList();
-             el != NULL; el = el->get_next()) {
+             el != nullptr; el = el->get_next()) {
             UINT pred = (UINT)el->getFromId();
             if (!visited.find(pred)) {
                 wl.append_tail(m_cfg->getBB(pred));
@@ -299,7 +299,7 @@ bool CopyProp::existMayDefTillBB(IR const* exp,
 //'use_stmt': stmt in use-list of 'def_stmt'.
 //'use_phi': stmt in use-list of 'def_stmt'.
 //'use_bb': IRBB that use_stm or use_phi be placed in.
-//Note either use_phi or use_stmt is NULL.
+//Note either use_phi or use_stmt is nullptr.
 bool CopyProp::is_available(IR const* def_stmt,
                             IR const* prop_value,
                             IR * use_stmt,
@@ -326,12 +326,12 @@ bool CopyProp::is_available(IR const* def_stmt,
     }
 
     //Both def_ir and use_ir are in same BB.
-    IRListIter ir_holder = NULL;
+    IRListIter ir_holder = nullptr;
     bool f = BB_irlist(defbb).find(const_cast<IR*>(def_stmt), &ir_holder);
     CHECK_DUMMYUSE(f);
     IR * ir;
     for (ir = BB_irlist(defbb).get_next(&ir_holder);
-         ir != NULL && ir != use_stmt;
+         ir != nullptr && ir != use_stmt;
          ir = BB_irlist(defbb).get_next(&ir_holder)) {
         if (m_du->isMayDef(ir, prop_value, false)) {
             return false;
@@ -344,7 +344,7 @@ bool CopyProp::is_available(IR const* def_stmt,
         return true;
     }
 
-    if (use_phi != NULL || use_stmt->is_phi()) {
+    if (use_phi != nullptr || use_stmt->is_phi()) {
         //Propagate value to phi operand.
         //Nothing to do.
     }
@@ -378,7 +378,7 @@ bool CopyProp::isSimpCVT(IR const* ir) const
 //CVT with simply cvt-exp is copy-propagate candidate.
 IR const* CopyProp::getSimpCVTValue(IR const* ir) const
 {
-    if (!ir->is_cvt()) { return NULL; }
+    if (!ir->is_cvt()) { return nullptr; }
 
     for (;;) {
         if (ir->is_cvt()) {
@@ -389,7 +389,7 @@ IR const* CopyProp::getSimpCVTValue(IR const* ir) const
             break;
         }
     }
-    return NULL;
+    return nullptr;
 }
 
 
@@ -404,7 +404,7 @@ inline static IR * get_propagated_value(IR * stmt)
     default:;
     }
     UNREACHABLE();
-    return NULL;
+    return nullptr;
 }
 
 
@@ -442,23 +442,23 @@ bool CopyProp::doPropToNormalStmt(IRListIter cur_iter,
 
     //Indicate whether use_stmt is the next stmt of def_stmt.
     bool is_next = false;
-    if (*next_iter != NULL && use_stmt == (*next_iter)->val()) {
+    if (*next_iter != nullptr && use_stmt == (*next_iter)->val()) {
         is_next = true;
     }
 
     RefineCtx rf;
     use_stmt = m_refine->refineIR(use_stmt, change, rf);
-    if (use_stmt == NULL && is_next) {
+    if (use_stmt == nullptr && is_next) {
         //old_use_stmt has been optimized and removed by refineIR().
         *next_iter = cur_iter;
         BB_irlist(def_bb).get_next(next_iter);
     }
 
-    if (use_stmt != NULL && use_stmt != old_use_stmt) {
+    if (use_stmt != nullptr && use_stmt != old_use_stmt) {
         //old_use_stmt has been removed and new stmt generated.
         ASSERTN(old_use_stmt->is_undef(), ("the old one should be freed"));
 
-        IRListIter irct = NULL;
+        IRListIter irct = nullptr;
         BB_irlist(use_bb).find(old_use_stmt, &irct);
         ASSERTN(irct, ("old one should still left in BB"));
         BB_irlist(use_bb).insert_before(use_stmt, irct);
@@ -533,14 +533,14 @@ bool CopyProp::doProp(IN IRBB * bb,
     IRListIter cur_iter;
     IRListIter next_iter;
     for (BB_irlist(bb).get_head(&cur_iter),
-         next_iter = cur_iter; cur_iter != NULL; cur_iter = next_iter) {
+         next_iter = cur_iter; cur_iter != nullptr; cur_iter = next_iter) {
         IR * def_stmt = cur_iter->val();
         BB_irlist(bb).get_next(&next_iter);
         if (!isCopyOR(def_stmt)) {
             continue;
         }
 
-        if (def_stmt->getExactRef() == NULL && !def_stmt->isWritePR()) {
+        if (def_stmt->getExactRef() == nullptr && !def_stmt->isWritePR()) {
             //Do NOT progate value through inexact memory reference, except PR.
             continue;
         }
@@ -552,12 +552,12 @@ bool CopyProp::doProp(IN IRBB * bb,
 
         SSAInfo * ssainfo = def_stmt->getSSAInfo();
         MDSSAInfo * mdssainfo = useMDSSADU() ?
-            mdssamgr->getMDSSAInfoIfAny(def_stmt) : NULL;
-        DUSet const* duset = NULL;
+            mdssamgr->getMDSSAInfoIfAny(def_stmt) : nullptr;
+        DUSet const* duset = nullptr;
         bool prssadu = false;
         bool mdssadu = false;
         useset->clean(*m_rg->getMiscBitSetMgr());
-        if (ssainfo != NULL && SSA_uses(ssainfo).get_elem_count() != 0) {
+        if (ssainfo != nullptr && SSA_uses(ssainfo).get_elem_count() != 0) {
             //Record use_stmt in another vector to facilitate this function
             //if it is not in use-list any more after copy-propagation.
             SSAUseIter sc;
@@ -568,10 +568,10 @@ bool CopyProp::doProp(IN IRBB * bb,
                 useset->bunion(use->id(), *m_rg->getMiscBitSetMgr());
             }
             prssadu = true;
-        } else if (mdssainfo != NULL &&
-                   mdssainfo->readVOpndSet() != NULL &&
+        } else if (mdssainfo != nullptr &&
+                   mdssainfo->readVOpndSet() != nullptr &&
                    !mdssainfo->readVOpndSet()->is_empty()) {
-            if (def_stmt->getRefMD() == NULL ||
+            if (def_stmt->getRefMD() == nullptr ||
                 !def_stmt->getRefMD()->is_exact()) {
                 continue;
             }
@@ -579,9 +579,9 @@ bool CopyProp::doProp(IN IRBB * bb,
             mdssainfo->collectUse(useset, mdssamgr->getUseDefMgr(),
                 m_rg->getMiscBitSetMgr());
             mdssadu = true;
-        } else if ((duset = def_stmt->readDUSet()) != NULL &&
+        } else if ((duset = def_stmt->readDUSet()) != nullptr &&
                    duset->get_elem_count() != 0) {
-            if (def_stmt->getRefMD() == NULL ||
+            if (def_stmt->getRefMD() == nullptr ||
                 !def_stmt->getRefMD()->is_exact()) {
                 continue;
             }
@@ -602,19 +602,19 @@ bool CopyProp::doProp(IN IRBB * bb,
                 continue;
             }
 
-            if (use->getExactRef() == NULL && !use->isReadPR()) {
+            if (use->getExactRef() == nullptr && !use->isReadPR()) {
                 //Do NOT progate value to inexact memory reference, except PR.
                 continue;
             }
 
-            if (mdssainfo != NULL &&
+            if (mdssainfo != nullptr &&
                 !mdssainfo->isUseReachable(mdssamgr->getUseDefMgr(), use)) {
                 continue;
             }
 
-            IR * use_stmt = NULL;
-            MDPhi * use_phi = NULL;
-            IRBB * use_bb = NULL;
+            IR * use_stmt = nullptr;
+            MDPhi * use_phi = nullptr;
+            IRBB * use_bb = nullptr;
 
             if (use->is_id()) {
                 ASSERT0(ID_phi(use));
@@ -625,7 +625,7 @@ bool CopyProp::doProp(IN IRBB * bb,
                 use_stmt = use->getStmt();
                 ASSERT0(use_stmt->is_stmt() && use_stmt->getBB());
                 use_bb = use_stmt->getBB();
-                use_phi = NULL;
+                use_phi = nullptr;
             }
 
             if (!is_available(def_stmt, prop_value,
@@ -715,14 +715,14 @@ bool CopyProp::perform(OptCtx & oc)
     m_cfg->sortDomTreeInPreorder(root, lst);
     DefSBitSetCore useset;
 
-    for (xcom::Vertex * v = lst.get_head(); v != NULL; v = lst.get_next()) {
+    for (xcom::Vertex * v = lst.get_head(); v != nullptr; v = lst.get_next()) {
         IRBB * bb = m_cfg->getBB(v->id());
         ASSERT0(bb);
         change |= doProp(bb, &useset, m_mdssamgr);
     }
     useset.clean(*m_rg->getMiscBitSetMgr());
     if (change) {
-        ASSERT0(m_mdssamgr == NULL || m_mdssamgr->verify());
+        ASSERT0(m_mdssamgr == nullptr || m_mdssamgr->verify());
         doFinalRefine(oc);
     }
     END_TIMER(t, getPassName());
