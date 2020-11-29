@@ -36,26 +36,8 @@ author: Su Zhenyu
 
 namespace xoc {
 
-#define ERR_BUF_LEN 1024
-
 //Print \l as the Carriage Return.
 //bool g_prt_carriage_return_for_dot = false;
-static SMemPool * g_pool_tmp_used = nullptr;
-
-//Return true if val is 32bit integer.
-bool isInteger32bit(HOST_UINT val)
-{
-    ASSERT0_DUMMYUSE(sizeof(HOST_UINT) >= sizeof(UINT32));
-    return (((UINT32)val) & (UINT32)0x0000FFFF) != val;
-}
-
-
-//Return true if val is 64bit integer.
-bool isInteger64bit(UINT64 val)
-{
-    return (val & (UINT64)0xFFFFFFFF) != val;
-}
-
 
 void interwarn(CHAR const* format, ...)
 {
@@ -85,35 +67,6 @@ void prt2C(CHAR const* format, ...)
     }
     #endif
     va_end(args);
-}
-
-
-SMemPool * get_tmp_pool()
-{
-    return g_pool_tmp_used;
-}
-
-
-//Malloc memory for tmp used.
-void * tlloc(LONG size)
-{
-    if (size < 0 || size == 0) { return nullptr; }
-    if (g_pool_tmp_used == nullptr) {
-        g_pool_tmp_used = smpoolCreate(8, MEM_COMM);
-    }
-    void * p = smpoolMalloc(size, g_pool_tmp_used);
-    if (p == nullptr) { return nullptr; }
-    ::memset(p, 0, size);
-    return p;
-}
-
-
-void tfree()
-{
-    if (g_pool_tmp_used != nullptr) {
-        smpoolDelete(g_pool_tmp_used);
-        g_pool_tmp_used = nullptr;
-    }
 }
 
 } //namespace xoc

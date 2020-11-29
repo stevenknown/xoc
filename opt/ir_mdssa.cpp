@@ -375,7 +375,6 @@ void MDSSAMgr::addSuccessorDesignatePhiOpnd(IRBB * bb, IRBB * succ)
                 succ->getNumOfPred(m_cfg));
         //addMDSSAOcc(opnd);
     }
-
 }
 
 
@@ -2043,7 +2042,7 @@ void MDSSAMgr::addMDSSAOcc(IR * ir, MDSSAInfo * mdssainfo)
 
 
 //Remove MDSSA Use-Def chain for all memory references in IR Tree
-//that rooted by 'exp'.
+//that rooted by 'ir'. Note ir can be stmt or expression.
 //e.g:ir = ...
 //    ... = ir //S1
 //If S1 deleted, ir should be removed from its useset in MDSSAInfo.
@@ -2130,6 +2129,8 @@ void MDSSAMgr::removeAllUse(IR const* stmt)
 
 
 //Remove all MDSSAInfo of 'stmt' from MDSSAMgr.
+//Note this function only handle stmt's MDSSAInfo, thus it will not
+//process its RHS expression.
 void MDSSAMgr::removeStmtFromMDSSAMgr(IR const* stmt)
 {
     ASSERT0(stmt && stmt->is_stmt());

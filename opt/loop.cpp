@@ -101,7 +101,7 @@ static IR * tryAppendGotoToJumpToBB(IRBB * from, IRBB * to, Region * rg)
 {
     ASSERT0(from && to && rg);
     IR const* last = from->getLastIR();
-    if (!IRBB::isDownBoundary(last)) {
+    if (!IRBB::isLowerBoundary(last)) {
         //Pick any label on 'to' BB to be the jump target.
         LabelInfo const* lab = to->getLabelList().get_head();
         if (lab == nullptr) {
@@ -366,8 +366,8 @@ static IRBB * findAppropriatePreheader(LI<IRBB> const* li,
                 //prev fallthrough to head BB.
                 appropriate_bb = prev;
                 break;
-            } else if (!IRBB::isDownBoundary(const_cast<IRBB*>(prev)->
-                                             getLastIR())) {
+            } else if (!IRBB::isLowerBoundary(const_cast<IRBB*>(prev)->
+                                              getLastIR())) {
                 //prev should fallthrough to head BB.
                 //Otherwise can not append IR to prev BB.
                 appropriate_bb = prev;

@@ -47,6 +47,204 @@ static bool checkMDSetContain(IR const* ir1, MD const* md)
 }
 
 
+static HOST_INT calcIntVal(IR_TYPE ty, HOST_INT v0, HOST_INT v1)
+{
+    switch (ty) {
+    case IR_ADD:
+        v1 = v0 + v1;
+        break;
+    case IR_SUB:
+        v1 = v0 - v1;
+        break;
+    case IR_MUL:
+        v1 = v0 * v1;
+        break;
+    case IR_DIV:
+        v1 = v0 / v1;
+        break;
+    case IR_REM:
+        v1 = v0 % v1;
+        break;
+    case IR_MOD:
+        v1 = v0 % v1;
+        break;
+    case IR_LAND:
+        v1 = v0 && v1;
+        break;
+    case IR_LOR:
+        v1 = v0 || v1;
+        break;
+    case IR_BAND:
+        v1 = v0 & v1;
+        break;
+    case IR_BOR:
+        v1 = v0 | v1;
+        break;
+    case IR_XOR:
+        v1 = v0 ^ v1;
+        break;
+    case IR_BNOT:
+        v1 = ~v0;
+        break;
+    case IR_LNOT:
+        v1 = !v0;
+        break;
+    case IR_LT:
+        v1 = v0 < v1;
+        break;
+    case IR_LE:
+        v1 = v0 <= v1;
+        break;
+    case IR_GT:
+        v1 = v0 > v1;
+        break;
+    case IR_GE:
+        v1 = v0 >= v1;
+        break;
+    case IR_EQ:
+        v1 = v0 == v1;
+        break;
+    case IR_NE:
+        v1 = v0 != v1;
+        break;
+    case IR_ASR:
+        v1 = v0 >> v1;
+        break;
+    case IR_LSR:
+        ASSERTN(0, ("the case must be handled in calcLSRIntVal()"));
+        //v1 = ((HOST_UINT)v0) >> v1;
+        break;
+    case IR_LSL:
+        v1 = v0 << v1;
+        break;
+    default: UNREACHABLE();
+    }
+    return v1;
+}
+
+
+//Make sure v0 is sign-extended if its bits length less than HOST_INT.
+static HOST_INT calcLSRIntVal(Type const* type, HOST_INT v0, HOST_INT v1)
+{
+    HOST_INT res = 0;
+    switch (TY_dtype(type)) {
+    case D_B:
+    case D_I8:
+        res = (HOST_INT) (((INT8)(UINT8)v0) >> v1);
+        break;
+    case D_U8:
+        res = (HOST_INT) (HOST_UINT) (((UINT8)v0) >> v1);
+        break;
+    case D_I16:
+        res = (HOST_INT) (((INT16)(UINT16)v0) >> v1);
+        break;
+    case D_U16:
+        res = (HOST_INT) (HOST_UINT) (((UINT16)v0) >> v1);
+        break;
+    case D_I32:
+        res = (HOST_INT) (((INT32)(UINT32)v0) >> v1);
+        break;
+    case D_U32:
+        res = (HOST_INT) (HOST_UINT) (((UINT32)v0) >> v1);
+        break;
+    case D_I64:
+        res = (HOST_INT) (((INT64)(UINT64)v0) >> v1);
+        break;
+    case D_U64:
+        res = (HOST_INT) (HOST_UINT) (((UINT64)v0) >> v1);
+        break;
+    case D_I128:
+        #ifdef INT128
+        res = (HOST_INT) (((INT128)(UINT128)v0) >> v1);
+        break;
+        #endif
+    case D_U128:
+        #ifdef UINT128
+        res = (HOST_INT) (HOST_UINT) (((UINT128)v0) >> v1);
+        break;
+        #endif
+    default: ASSERTN(0, ("Need to support"));
+    }
+    return res;
+}
+
+
+template <class T>
+static bool calcBoolVal(IR_TYPE ty, T v0, T v1)
+{
+    bool res;
+    switch (ty) {
+    case IR_LT:
+        res = v0 < v1;
+        break;
+    case IR_LE:
+        res = v0 <= v1;
+        break;
+    case IR_GT:
+        res = v0 > v1;
+        break;
+    case IR_GE:
+        res = v0 >= v1;
+        break;
+    case IR_EQ:
+        res = v0 == v1;
+        break;
+    case IR_NE:
+        res = v0 != v1;
+        break;
+    default:
+        UNREACHABLE();
+    }
+    return res;
+}
+
+
+static double calcFloatVal(IR_TYPE ty, double v0, double v1)
+{
+    switch (ty) {
+    case IR_ADD:
+        v1 = v0 + v1;
+        break;
+    case IR_SUB:
+        v1 = v0 - v1;
+        break;
+    case IR_MUL:
+        v1 = v0 * v1;
+        break;
+    case IR_DIV:
+        v1 = v0 / v1;
+        break;
+    case IR_LNOT:
+        v1 = !v0;
+        break;
+    case IR_LT:
+        v1 = v0 < v1;
+        break;
+    case IR_LE:
+        v1 = v0 <= v1;
+        break;
+    case IR_GT:
+        v1 = v0 > v1;
+        break;
+    case IR_GE:
+        v1 = v0 >= v1;
+        break;
+    case IR_EQ:
+        v1 = v0 == v1;
+        break;
+    case IR_NE:
+        v1 = v0 != v1;
+        break;
+    default:
+        ;
+    }
+    return v1;
+}
+
+
+//
+//START Refine
+//
 Refine::Refine(Region * rg)
 {
     ASSERT0(rg != nullptr);
@@ -549,60 +747,66 @@ IR * Refine::refineSelect(IR * ir, bool & change, RefineCtx & rc)
     SELECT_trueexp(ir) = refineIRlist(SELECT_trueexp(ir), change, rc);
     SELECT_falseexp(ir) = refineIRlist(SELECT_falseexp(ir), change, rc);
     IR * det = foldConst(SELECT_pred(ir), change);
+    if (det != SELECT_pred(ir)) {
+        SELECT_pred(ir) = det;
+        ir->setParent(det);
+    }
+
     IR * gen = nullptr;
     if (det->is_const() && det->is_int()) {
         HOST_INT v = CONST_int_val(det);
         if (v == 0) {
-            // select(0) ? a:b => b
-            IR * rm = SELECT_trueexp(ir);
-            IR * rm2 = det;
-            ir = SELECT_falseexp(ir);
+            // select(0) ? a : b => b
+            IR * keep = SELECT_falseexp(ir);
+            SELECT_falseexp(ir) = nullptr;
+            removeIRTreeUse(ir, m_rg);
+            m_rg->freeIRTree(ir);
+            ir = keep;
             ASSERT0(ir->is_exp());
-            m_rg->freeIRTree(rm);
-            m_rg->freeIRTree(rm2);
             change = true;
         } else {
-            // select(1) ? a:b => a
-            IR * rm = SELECT_falseexp(ir);
-            IR * rm2 = det;
-            ir = SELECT_trueexp(ir);
+            // select(1) ? a : b => a
+            IR * keep = SELECT_trueexp(ir);
+            SELECT_trueexp(ir) = nullptr;
+            removeIRTreeUse(ir, m_rg);
+            m_rg->freeIRTree(ir);
+            ir = keep;
             ASSERT0(ir->is_exp());
-            m_rg->freeIRTree(rm);
-            m_rg->freeIRTree(rm2);
             change = true;
         }
     } else if (det->is_const() && det->is_fp()) {
         double v = CONST_fp_val(det);
         if (v < HOST_FP(EPSILON)) { //means v == 0.0
-            // select(0) ? a:b => b
-            IR * rm = SELECT_trueexp(ir);
-            IR * rm2 = det;
-            ir = SELECT_falseexp(ir);
+            // select(0) ? a : b => b
+            IR * keep = SELECT_falseexp(ir);
+            SELECT_falseexp(ir) = nullptr;
+            removeIRTreeUse(ir, m_rg);
+            m_rg->freeIRTree(ir);
+            ir = keep;
             ASSERT0(ir->is_exp());
-            m_rg->freeIRTree(rm);
-            m_rg->freeIRTree(rm2);
             change = true;
         } else {
-            // select(1) ? a:b => a
-            IR * rm = SELECT_falseexp(ir);
-            IR * rm2 = det;
-            ir = SELECT_trueexp(ir);
+            // select(1) ? a : b => a
+            IR * keep = SELECT_trueexp(ir);
+            SELECT_trueexp(ir) = nullptr;
+            removeIRTreeUse(ir, m_rg);
+            m_rg->freeIRTree(ir);
+            ir = keep;
             ASSERT0(ir->is_exp());
-            m_rg->freeIRTree(rm);
-            m_rg->freeIRTree(rm2);
             change = true;
         }
     } else if (det->is_str()) {
-        // select(1) ? a:b => a
-        IR * rm = SELECT_falseexp(ir);
-        IR * rm2 = det;
-        ir = SELECT_trueexp(ir);
+        // select(1) ? a : b => a
+        IR * keep = SELECT_trueexp(ir);
+        SELECT_trueexp(ir) = nullptr;
+        removeIRTreeUse(ir, m_rg);
+        m_rg->freeIRTree(ir);
+        ir = keep;
         ASSERT0(ir->is_exp());
-        m_rg->freeIRTree(rm);
-        m_rg->freeIRTree(rm2);
         change = true;
     } else if (RC_hoist_to_lnot(rc) &&
                (gen = hoistSelectToLnot(ir, m_rg)) != ir) {
+        removeIRTreeUse(ir, m_rg);
         m_rg->freeIRTree(ir);
         ir = gen;
         change = true;
@@ -2079,128 +2283,6 @@ IR * Refine::insertCvt(IR * parent, IR * kid, bool & change)
 }
 
 
-//Make sure v0 is sign-extended if its bits length less than HOST_INT.
-HOST_INT Refine::calcLSRIntVal(Type const* type, HOST_INT v0, HOST_INT v1)
-{
-    HOST_INT res = 0;
-    switch (TY_dtype(type)) {
-    case D_B:
-    case D_I8:
-        res = (HOST_INT) (((INT8)(UINT8)v0) >> v1);
-        break;
-    case D_U8:
-        res = (HOST_INT) (HOST_UINT) (((UINT8)v0) >> v1);
-        break;
-    case D_I16:
-        res = (HOST_INT) (((INT16)(UINT16)v0) >> v1);
-        break;
-    case D_U16:
-        res = (HOST_INT) (HOST_UINT) (((UINT16)v0) >> v1);
-        break;
-    case D_I32:
-        res = (HOST_INT) (((INT32)(UINT32)v0) >> v1);
-        break;
-    case D_U32:
-        res = (HOST_INT) (HOST_UINT) (((UINT32)v0) >> v1);
-        break;
-    case D_I64:
-        res = (HOST_INT) (((INT64)(UINT64)v0) >> v1);
-        break;
-    case D_U64:
-        res = (HOST_INT) (HOST_UINT) (((UINT64)v0) >> v1);
-        break;
-    case D_I128:
-        #ifdef INT128
-        res = (HOST_INT) (((INT128)(UINT128)v0) >> v1);
-        break;
-        #endif
-    case D_U128:
-        #ifdef UINT128
-        res = (HOST_INT) (HOST_UINT) (((UINT128)v0) >> v1);
-        break;
-        #endif
-    default: ASSERTN(0, ("Need to support"));
-    }
-    return res;
-}
-
-
-HOST_INT Refine::calcIntVal(IR_TYPE ty, HOST_INT v0, HOST_INT v1)
-{
-    switch (ty) {
-    case IR_ADD:
-        v1 = v0 + v1;
-        break;
-    case IR_SUB:
-        v1 = v0 - v1;
-        break;
-    case IR_MUL:
-        v1 = v0 * v1;
-        break;
-    case IR_DIV:
-        v1 = v0 / v1;
-        break;
-    case IR_REM:
-        v1 = v0 % v1;
-        break;
-    case IR_MOD:
-        v1 = v0 % v1;
-        break;
-    case IR_LAND:
-        v1 = v0 && v1;
-        break;
-    case IR_LOR:
-        v1 = v0 || v1;
-        break;
-    case IR_BAND:
-        v1 = v0 & v1;
-        break;
-    case IR_BOR:
-        v1 = v0 | v1;
-        break;
-    case IR_XOR:
-        v1 = v0 ^ v1;
-        break;
-    case IR_BNOT:
-        v1 = ~v0;
-        break;
-    case IR_LNOT:
-        v1 = !v0;
-        break;
-    case IR_LT:
-        v1 = v0 < v1;
-        break;
-    case IR_LE:
-        v1 = v0 <= v1;
-        break;
-    case IR_GT:
-        v1 = v0 > v1;
-        break;
-    case IR_GE:
-        v1 = v0 >= v1;
-        break;
-    case IR_EQ:
-        v1 = v0 == v1;
-        break;
-    case IR_NE:
-        v1 = v0 != v1;
-        break;
-    case IR_ASR:
-        v1 = v0 >> v1;
-        break;
-    case IR_LSR:
-        ASSERTN(0, ("the case must be handled in calcLSRIntVal()"));
-        //v1 = ((HOST_UINT)v0) >> v1;
-        break;
-    case IR_LSL:
-        v1 = v0 << v1;
-        break;
-    default: UNREACHABLE();
-    } //end switch
-    return v1;
-}
-
-
 IR * Refine::foldConstIntUnary(IR * ir, bool & change)
 {
     ASSERT0(ir->isUnaryOp());
@@ -2305,49 +2387,6 @@ IR * Refine::foldConstIntBinary(IR * ir, bool & change)
 }
 
 
-double Refine::calcFloatVal(IR_TYPE ty, double v0, double v1)
-{
-    switch (ty) {
-    case IR_ADD:
-        v1 = v0 + v1;
-        break;
-    case IR_SUB:
-        v1 = v0 - v1;
-        break;
-    case IR_MUL:
-        v1 = v0 * v1;
-        break;
-    case IR_DIV:
-        v1 = v0 / v1;
-        break;
-    case IR_LNOT:
-        v1 = !v0;
-        break;
-    case IR_LT:
-        v1 = v0 < v1;
-        break;
-    case IR_LE:
-        v1 = v0 <= v1;
-        break;
-    case IR_GT:
-        v1 = v0 > v1;
-        break;
-    case IR_GE:
-        v1 = v0 >= v1;
-        break;
-    case IR_EQ:
-        v1 = v0 == v1;
-        break;
-    case IR_NE:
-        v1 = v0 != v1;
-        break;
-    default:
-        ;
-    } //end switch
-    return v1;
-}
-
-
 IR * Refine::foldConstFloatUnary(IR * ir, bool & change)
 {
     ASSERT0(ir->isUnaryOp());
@@ -2398,14 +2437,19 @@ IR * Refine::foldConstFloatBinary(IR * ir, bool & change)
     case IR_SUB:
     case IR_MUL:
     case IR_DIV:
+        ir = m_rg->buildImmFp(calcFloatVal(ir->getCode(), v0, v1),
+                              ir->getType());
+        copyDbx(ir, oldir, m_rg);
+        lchange = true;
+        break;
     case IR_LT:
     case IR_LE:
     case IR_GT:
     case IR_GE:
     case IR_EQ:
     case IR_NE:
-        ir = m_rg->buildImmFp(calcFloatVal(ir->getCode(), v0, v1),
-                              ir->getType());
+        ir = m_rg->buildImmInt(calcBoolVal(ir->getCode(), v0, v1),
+                               ir->getType());
         copyDbx(ir, oldir, m_rg);
         lchange = true;
         break;
@@ -2689,5 +2733,6 @@ bool Refine::perform(OptCtx & oc)
     END_TIMER(t, "Do Primitive Refinement");
     return change;
 }
+//END Refine
 
 } //namespace xoc

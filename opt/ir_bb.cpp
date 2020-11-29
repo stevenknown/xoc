@@ -46,7 +46,7 @@ C<IR*> * BBIRList::append_tail_ex(IR * ir)
     IRListIter ct;
     for (List<IR*>::get_tail(&ct);
          ct != List<IR*>::end(); ct = List<IR*>::get_prev(ct)) {
-        if (!IRBB::isDownBoundary(ct->val())) {
+        if (!IRBB::isLowerBoundary(ct->val())) {
             break;
         }
     }
@@ -75,7 +75,7 @@ size_t IRBB::count_mem() const
 
 
 //Could ir be looked as a last stmt in basic block?
-bool IRBB::isDownBoundary(IR const* ir)
+bool IRBB::isLowerBoundary(IR const* ir)
 {
     ASSERTN(ir->isStmtInBB() || ir->is_lab(), ("illegal stmt in bb"));
     switch (ir->getCode()) {
@@ -186,7 +186,7 @@ void IRBB::verify()
         ASSERT0(ir->is_single());
         ASSERT0(ir->getBB() == this);
         ASSERT0(ir->isStmtInBB());
-        if (IRBB::isDownBoundary(ir)) {
+        if (IRBB::isLowerBoundary(ir)) {
             ASSERTN(ir == BB_last_ir(this), ("invalid BB down boundary."));
         }
         c++;

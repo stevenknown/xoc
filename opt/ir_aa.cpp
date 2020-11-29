@@ -2394,8 +2394,8 @@ MD const* AliasAnalysis::allocHeapobj(IR * ir)
     CHAR name[128];
     sprintf(name, "heap_obj%d", m_ir2heapobj.get_elem_count());
     ASSERT0(strlen(name) < 128);
-    Var * tv = m_rg->getVarMgr()->registerVar(
-        name, m_tm->getMCType(0), 0, VAR_GLOBAL);
+    Var * tv = m_rg->getVarMgr()->registerVar(name, m_tm->getMCType(0),
+                                              0, VAR_GLOBAL);
 
     //Set the var to be unallocable, means do NOT add
     //var immediately as a memory-variable.

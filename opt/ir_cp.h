@@ -87,11 +87,14 @@ private:
 private:
     bool checkTypeConsistency(IR const* ir, IR const* cand_expr) const;
 
+    bool doPropUseSet(IRSet * useset, IR * def_stmt,
+                      IR const* prop_value, MDSSAInfo * mdssainfo,
+                      IRListIter cur_iter, IRListIter * next_iter,
+                      IRBB * bb, bool prssadu, bool mdssadu);
     bool doPropToMDPhi(bool prssadu,
                        bool mdssadu,
                        IN IR const* prop_value,
-                       IN IR * use,
-                       MDSSAMgr * mdssamgr);
+                       IN IR * use);
     bool doPropToNormalStmt(IRListIter cur_iter,
                             IRListIter* next_iter,
                             bool prssadu,
@@ -100,18 +103,19 @@ private:
                             IN IR * use,
                             IN IR * use_stmt,
                             IN IRBB * def_bb,
-                            IN OUT IRBB * use_bb,
-                            MDSSAMgr * mdssamgr);
-    bool doProp(IN IRBB * bb, IN DefSBitSetCore * useset, MDSSAMgr * mdssamgr);
+                            IN OUT IRBB * use_bb);
+    bool doProp(IN IRBB * bb, IN IRSet * useset);
     void doFinalRefine(OptCtx & oc);
     void dumpCopyPropagationAction(IR const* def_stmt,
                                    IR const* prop_value,
-                                   IR const* use,
-                                   MDSSAMgr * mdssamgr);
+                                   IR const* use);
 
     bool existMayDefTillBB(IR const* exp,
                            IRBB const* start,
                            IRBB const* meetup) const;
+
+    DefSegMgr  * getSegMgr() const { return getSBSMgr()->getSegMgr(); }
+    DefMiscBitSetMgr  * getSBSMgr() const { return m_rg->getMiscBitSetMgr(); }
 
     bool isSimpCVT(IR const* ir) const;
     bool isConstCVT(IR const* ir) const;
@@ -128,8 +132,7 @@ private:
                     IR const* cand_expr,
                     IN OUT CPCtx & ctx,
                     bool stmt_use_ssadu,
-                    bool stmt_use_mdssadu,
-                    MDSSAMgr * mdssamgr);
+                    bool stmt_use_mdssadu);
     void replaceExpViaSSADu(IR * exp,
                             IR const* cand_expr,
                             IN OUT CPCtx & ctx);

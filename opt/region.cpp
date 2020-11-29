@@ -193,7 +193,7 @@ AnalysisInstrument::~AnalysisInstrument()
 
 size_t AnalysisInstrument::count_mem() const
 {
-    size_t count = 0;
+    size_t count = sizeof(*this);
     if (m_call_list != nullptr) {
         count += m_call_list->count_mem();
     }
@@ -207,6 +207,7 @@ size_t AnalysisInstrument::count_mem() const
     count += m_mds_hash.count_mem();
     count += m_ir_vector.count_mem();
     count += m_ir_bb_list.count_mem();
+    //m_free_du_list has been counted in m_du_pool.
     return count;
 }
 //END AnalysisInstrument
@@ -268,6 +269,7 @@ size_t Region::count_mem() const
         count += getAnalysisInstrument()->count_mem();
     }
     count += m_ru_var_tab.count_mem();
+    count -= sizeof(m_ru_var_tab);
     if (m_ref_info != nullptr) {
         count += m_ref_info->count_mem();
     }
@@ -282,10 +284,8 @@ size_t Region::count_mem() const
 //'bbl': a list of bb.
 //'ctbb': marker current bb container.
 //Note if CFG is invalid, it will not be updated.
-BBListIter Region::splitIRlistIntoBB(IR * irs,
-                                     BBList * bbl,
-                                     BBListIter ctbb,
-                                     OptCtx const& oc)
+BBListIter Region::splitIRlistIntoBB(IR * irs, BBList * bbl,
+                                     BBListIter ctbb, OptCtx const& oc)
 {
     bool cfg_is_valid = false;
     IRCFG * cfg = getCFG();
@@ -301,7 +301,7 @@ BBListIter Region::splitIRlistIntoBB(IR * irs,
     ctbb = bbl->insert_after(newbb, ctbb);
     while (irs != nullptr) {
         IR * ir = xcom::removehead(&irs);
-        if (IRBB::isDownBoundary(ir)) {
+        if (IRBB::isLowerBoundary(ir)) {
             BB_irlist(newbb).append_tail(ir);
             newbb = allocBB();
             if (cfg_is_valid) {
@@ -513,7 +513,7 @@ bool Region::reconstructBBList(OptCtx & oc)
         IR * tail = irlst->get_tail();
         for (irlst->get_head(&ctir); ctir != nullptr; irlst->get_next(&ctir)) {
             IR * ir = ctir->val();
-            if (IRBB::isDownBoundary(ir) && ir != tail) {
+            if (IRBB::isLowerBoundary(ir) && ir != tail) {
                 change = true;
 
                 IR * restirs = nullptr; //record rest part in bb list after 'ir'.
@@ -616,7 +616,7 @@ void Region::constructBBList()
         pointer = IR_next(pointer);
         IR_next(cur_ir) = IR_prev(cur_ir) = nullptr;
 
-        if (IRBB::isDownBoundary(cur_ir)) {
+        if (IRBB::isLowerBoundary(cur_ir)) {
             BB_irlist(cur_bb).append_tail(cur_ir);
             //Generate new BB.
             getBBList()->append_tail(cur_bb);
@@ -730,7 +730,7 @@ bool Region::isRegionIR(IR const* ir) const
 
 
 //Generate Var corresponding to PR load or write.
-Var * Region::genVARforPR(UINT prno, Type const* type)
+Var * Region::genVarForPR(UINT prno, Type const* type)
 {
     ASSERT0(type);
     Var * pr_var = mapPR2Var(prno);
@@ -740,9 +740,7 @@ Var * Region::genVARforPR(UINT prno, Type const* type)
     CHAR name[128];
     sprintf(name, "pr%d", prno);
     ASSERT0(strlen(name) < 128);
-    UINT flag = VAR_LOCAL;
-    SET_FLAG(flag, VAR_IS_PR);
-    pr_var = getVarMgr()->registerVar(name, type, 0, flag);
+    pr_var = getVarMgr()->registerVar(name, type, 0, VAR_LOCAL | VAR_IS_PR);
     setMapPR2Var(prno, pr_var);
     VAR_prno(pr_var) = prno;
 
@@ -763,7 +761,7 @@ MD const* Region::genMDforPR(UINT prno, Type const* type)
     ASSERT0(type);
     Var * pr_var = mapPR2Var(prno);
     if (pr_var == nullptr) {
-        pr_var = genVARforPR(prno, type);
+        pr_var = genVarForPR(prno, type);
     }
 
     MD md;
@@ -1007,10 +1005,10 @@ void Region::freeIR(IR * ir)
 
 
 //This function find Var via iterating Var table of current region.
-Var * Region::findVarViaSymbol(Sym const* sym)
+Var * Region::findVarViaSymbol(Sym const* sym) const
 {
     ASSERT0(sym);
-    VarTab * vtab = getVarTab();
+    VarTab * vtab = const_cast<Region*>(this)->getVarTab();
     VarTabIter c;
     for (Var * v = vtab->get_first(c); v != nullptr; v = vtab->get_next(c)) {
         if (v->get_name() == sym) {
@@ -1033,7 +1031,9 @@ void Region::findFormalParam(OUT List<Var const*> & varlst, bool in_decl_order)
     ASSERT0(vt);
 
     if (in_decl_order)  {
-        for (Var const* v = vt->get_first(c); v != nullptr; v = vt->get_next(c)) {
+        //Sort parameter in declaration order.
+        for (Var const* v = vt->get_first(c);
+             v != nullptr; v = vt->get_next(c)) {
             if (!VAR_is_formal_param(v)) { continue; }
 
             xcom::C<Var const*> * ctp;
@@ -1064,10 +1064,10 @@ void Region::findFormalParam(OUT List<Var const*> & varlst, bool in_decl_order)
 
 
 //This function find the formal parameter variable by given position.
-Var const* Region::findFormalParam(UINT position)
+Var const* Region::findFormalParam(UINT position) const
 {
     VarTabIter c;
-    VarTab * vt = getVarTab();
+    VarTab * vt = const_cast<Region*>(this)->getVarTab();
     ASSERT0(vt);
     for (Var const* v = vt->get_first(c); v != nullptr; v = vt->get_next(c)) {
         if (VAR_is_formal_param(v) && VAR_formal_param_pos(v) == position) {
@@ -1261,14 +1261,14 @@ PassMgr * Region::allocPassMgr()
 }
 
 
-void Region::dumpIRList()
+void Region::dumpIRList() const
 {
     if (getIRList() == nullptr) { return; }
     xoc::dumpIRList(getIRList(), this);
 }
 
 
-void Region::dumpBBList(bool dump_inner_region)
+void Region::dumpBBList(bool dump_inner_region) const
 {
     if (getBBList() == nullptr) { return; }
     xoc::dumpBBList(getBBList(), this, dump_inner_region);
@@ -1282,7 +1282,7 @@ AnalysisInstrument * Region::getAnalysisInstrument() const
 }
 
 
-void Region::dumpFreeTab()
+void Region::dumpFreeTab() const
 {
     if (!isLogMgrInit()) { return; }
     note(this, "\n==-- DUMP Region Free Table --==");
@@ -1757,7 +1757,7 @@ void Region::prescanIRList(IR const* ir)
 
 
 //Dump IR and memory usage.
-void Region::dumpMemUsage()
+void Region::dumpMemUsage() const
 {
     if (!isLogMgrInit()) { return; }
 
@@ -1786,7 +1786,11 @@ void Region::dumpMemUsage()
     UINT nist = 0;
     UINT nbin = 0;
     UINT nuna = 0;
-
+    UINT nstarr = 0;
+    UINT narr = 0;
+    UINT ncvt = 0;
+    UINT ncbr = 0;
+    UINT nncbr = 0;
     for (int i = 0; i <= v->get_last_idx(); i++) {
         IR * ir = v->get(i);
         if (ir == nullptr) { continue; }
@@ -1798,6 +1802,11 @@ void Region::dumpMemUsage()
         else if (ir->is_call()) ncall++;
         else if (ir->is_icall()) nicall++;
         else if (ir->is_stpr()) nstpr++;
+        else if (ir->is_starray()) nstarr++;
+        else if (ir->is_array()) narr++;
+        else if (ir->is_cvt()) ncvt++;
+        else if (ir->isConditionalBr()) ncbr++;
+        else if (ir->isUnconditionalBr()) nncbr++;
         else if (ir->is_pr()) npr++;
         else if (ir->is_ist()) nist++;
         else if (ir->isBinaryOp()) nbin++;
@@ -1811,10 +1820,21 @@ void Region::dumpMemUsage()
     }
 
     note(this, "\nThe number of IR Total:%u, id:%u(%.1f)%%, "
-         "ld:%u(%.1f)%%, st:%u(%.1f)%%, lda:%u(%.1f)%%,"
-         "call:%u(%.1f)%%, icall:%u(%.1f)%%, pr:%u(%.1f)%%, "
-         "stpr:%u(%.1f)%%, ist:%u(%.1f)%%,"
-         "bin:%u(%.1f)%%, una:%u(%.1f)%%",
+         "ld:%u(%.1f)%%, "
+         "st:%u(%.1f)%%, "
+         "lda:%u(%.1f)%%,"
+         "call:%u(%.1f)%%, "
+         "icall:%u(%.1f)%%, "
+         "pr:%u(%.1f)%%, "
+         "stpr:%u(%.1f)%%, "
+         "ist:%u(%.1f)%%,"
+         "bin:%u(%.1f)%%, "
+         "una:%u(%.1f)%%, "
+         "starray:%u(%.1f)%%, "
+         "array:%u(%.1f)%%, "
+         "cvt:%u(%.1f)%%, "
+         "condbr:%u(%.1f)%%, "
+         "uncondbr:%u(%.1f)%%, ",
          total,
          nid, ((double)nid) / ((double)total) * 100,
          nld, ((double)nld) / ((double)total) * 100,
@@ -1826,11 +1846,16 @@ void Region::dumpMemUsage()
          nstpr, ((double)nstpr) / ((double)total) * 100,
          nist, ((double)nist) / ((double)total) * 100,
          nbin, ((double)nbin) / ((double)total) * 100,
-         nuna, ((double)nuna) / ((double)total) * 100);
+         nuna, ((double)nuna) / ((double)total) * 100,
+         nstarr, ((double)nstarr) / ((double)total) * 100,
+         narr, ((double)narr) / ((double)total) * 100,
+         ncvt, ((double)ncvt) / ((double)total) * 100,
+         ncbr, ((double)ncbr) / ((double)total) * 100,
+         nncbr, ((double)ncbr) / ((double)total) * 100);
 }
 
 
-void Region::dumpGR(bool dump_inner_region)
+void Region::dumpGR(bool dump_inner_region) const
 {
     note(this, "\n//====---- Dump region '%s' ----====", getRegionName());
     note(this, "\nregion ");
@@ -1866,9 +1891,9 @@ void Region::dumpGR(bool dump_inner_region)
 }
 
 
-void Region::dumpVarTab()
+void Region::dumpVarTab() const
 {
-    VarTab * vt = getVarTab();
+    VarTab * vt = const_cast<Region*>(this)->getVarTab();
     if (vt->get_elem_count() == 0) { return; }
     VarTabIter c;
     StrBuf buf(64);
@@ -1905,13 +1930,14 @@ void Region::dumpVarTab()
 
 
 //Dump formal parameter list.
-void Region::dumpParameter()
+void Region::dumpParameter() const
 {
     if (!is_function()) { return; }
     VarTabIter c;
     Vector<Var*> fpvec;
-    for (Var * v = getVarTab()->get_first(c);
-         v != nullptr; v = getVarTab()->get_next(c)) {
+    for (Var * v = const_cast<Region*>(this)->getVarTab()->get_first(c);
+         v != nullptr;
+         v = const_cast<Region*>(this)->getVarTab()->get_next(c)) {
         if (VAR_is_formal_param(v)) {
             ASSERT0(!v->is_pr());
             fpvec.set(v->getFormalParamPos(), v);
@@ -1936,7 +1962,7 @@ void Region::dumpParameter()
 }
 
 
-void Region::dump(bool dump_inner_region)
+void Region::dump(bool dump_inner_region) const
 {
     if (!isLogMgrInit()) { return; }
     dumpVARInRegion();
@@ -1970,7 +1996,7 @@ void Region::dump(bool dump_inner_region)
 
 
 //Dump all irs and ordering by IR_id.
-void Region::dumpAllocatedIR()
+void Region::dumpAllocatedIR() const
 {
     if (!isLogMgrInit()) { return; }
     note(this, "\n==---- DUMP ALL IR INFO ----==");
@@ -2053,7 +2079,7 @@ void Region::dumpAllocatedIR()
 
 //Dump Region's IR BB list.
 //DUMP ALL BBList DEF/USE/OVERLAP_DEF/OVERLAP_USE.
-void Region::dumpRef(UINT indent)
+void Region::dumpRef(UINT indent) const
 {
     if (!isLogMgrInit()) { return; }
     note(this, "\n\n==---- DUMP DUMgr: IR REFERENCE '%s' ----==\n",
@@ -2085,11 +2111,11 @@ void Region::dumpRef(UINT indent)
 }
 
 
-void Region::dumpBBRef(IN IRBB * bb, UINT indent)
+void Region::dumpBBRef(IN IRBB * bb, UINT indent) const
 {
     if (!isLogMgrInit()) { return; }
     for (IR * ir = BB_first_ir(bb); ir != nullptr; ir = BB_next_ir(bb)) {
-        ir->dumpRef(this, indent);
+        ir->dumpRef(const_cast<Region*>(this), indent);
     }
 }
 
@@ -2389,7 +2415,7 @@ bool Region::verifyBBlist(BBList & bbl)
 
 
 //Dump all MD that related to Var.
-void Region::dumpVarMD(Var * v, UINT indent)
+void Region::dumpVarMD(Var * v, UINT indent) const
 {
     StrBuf buf(64);
     ConstMDIter iter;
@@ -2420,7 +2446,7 @@ void Region::dumpVarMD(Var * v, UINT indent)
 
 
 //Dump each Var in current region's Var table.
-void Region::dumpVARInRegion()
+void Region::dumpVARInRegion() const
 {
     if (!isLogMgrInit()) { return; }
     StrBuf buf(64);
@@ -2435,12 +2461,13 @@ void Region::dumpVARInRegion()
         note(this, "\n==---- REGION(%d): ----==", id());
     }
 
+    Region * pthis = const_cast<Region*>(this);
     //Dump formal parameter list.
     if (is_function()) {
         bool has_param = false;
         VarTabIter c;
-        for (Var * v = getVarTab()->get_first(c);
-             v != nullptr; v = getVarTab()->get_next(c)) {
+        for (Var * v = pthis->getVarTab()->get_first(c);
+             v != nullptr; v = pthis->getVarTab()->get_next(c)) {
             if (VAR_is_formal_param(v)) {
                 has_param = true;
                 break;
@@ -2451,8 +2478,8 @@ void Region::dumpVARInRegion()
             note(this, "\nFORMAL PARAMETERS:");
             c.clean();
             Vector<Var*> fpvec;
-            for (Var * v = getVarTab()->get_first(c);
-                 v != nullptr; v = getVarTab()->get_next(c)) {
+            for (Var * v = pthis->getVarTab()->get_first(c);
+                 v != nullptr; v = pthis->getVarTab()->get_next(c)) {
                 if (VAR_is_formal_param(v)) {
                     fpvec.set(v->getFormalParamPos(), v);
                 }
@@ -2482,7 +2509,7 @@ void Region::dumpVARInRegion()
     }
 
     //Dump local varibles.
-    VarTab * vt = getVarTab();
+    VarTab * vt = pthis->getVarTab();
     if (vt->get_elem_count() > 0) {
         note(this, "\nVARIABLES:%d", vt->get_elem_count());
         lm->incIndent(2);
@@ -2494,7 +2521,8 @@ void Region::dumpVARInRegion()
         for (Var * v = vt->get_first(c); v != nullptr; v = vt->get_next(c)) {
             C<Var*> * ct = nullptr;
             bool find = false;
-            for (varlst.get_head(&ct); ct != nullptr; ct = varlst.get_next(ct)) {
+            for (varlst.get_head(&ct); ct != nullptr;
+                 ct = varlst.get_next(ct)) {
                 Var * v_in_lst = C_val(ct);
                 if (v_in_lst->id() > v->id()) {
                     varlst.insert_before(v, ct);
@@ -2900,7 +2928,6 @@ static void post_process(Region * rg, OptCtx * oc)
 
     oc->set_all_invalid();
     rg->updateCallAndReturnList(true);
-    tfree();
 }
 
 

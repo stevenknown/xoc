@@ -1520,4 +1520,19 @@ OVER:
     return buf;
 }
 
+
+//Return true if val is 32bit integer.
+bool isInteger32bit(UINT64 val)
+{
+    ASSERT0_DUMMYUSE(sizeof(UINT64) >= sizeof(UINT32));
+    return (((UINT32)val) & (UINT32)0x0000FFFF) != val;
+}
+
+
+//Return true if val is 64bit integer.
+bool isInteger64bit(UINT64 val)
+{
+    return (val & (UINT64)0xFFFFFFFF) != val;
+}
+
 } //namespace xcom

@@ -36,6 +36,7 @@ class RegionMgr;
 
 #define LOGMGR_INDENT_CHAR ' '
 #define LOGMGR_NEWLINE_CHAR '\n'
+#define DUMP_INDENT_NUM 4
 
 //This class permits copy-constructing operations.
 class LogCtx {
@@ -66,7 +67,6 @@ public:
         logfile = p_logfile;
         logfile_name = p_logfile_name;
     }
-
 
     void clean()
     {

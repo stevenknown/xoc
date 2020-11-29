@@ -74,11 +74,9 @@ bool MDSSAInfo::isUseReachable(IN UseDefMgr * usedefmgr, IR const* exp)
 
 
 //Collect all USE, where USE is IR expression.
-void MDSSAInfo::collectUse(OUT DefSBitSetCore * set,
-                           IN UseDefMgr * usedefmgr,
-                           IN DefMiscBitSetMgr * bsmgr)
+void MDSSAInfo::collectUse(OUT IRSet * set, UseDefMgr const* usedefmgr)
 {
-    ASSERT0(set && usedefmgr && bsmgr);
+    ASSERT0(set && usedefmgr);
     VOpndSetIter iter = nullptr;
     Region * rg = usedefmgr->getRegion();
     for (INT i = getVOpndSet()->get_first(&iter);
@@ -86,13 +84,16 @@ void MDSSAInfo::collectUse(OUT DefSBitSetCore * set,
         VMD * vopnd = (VMD*)usedefmgr->getVOpnd(i);
         ASSERT0(vopnd && vopnd->is_md());
 
+        #ifdef _DEBUG_
         IRSetIter vit = nullptr;
         for (INT i2 = vopnd->getUseSet()->get_first(&vit);
             i2 >= 0; i2 = vopnd->getUseSet()->get_next(i2, &vit)) {
             IR * use = rg->getIR(i2);
             ASSERT0(use && (use->isMemoryRef() || use->is_id()));
-            set->bunion(use->id(), *bsmgr);
         }
+        #endif
+
+        set->bunion(*vopnd->getUseSet());
     }
 }
 

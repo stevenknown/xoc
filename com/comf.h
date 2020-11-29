@@ -186,6 +186,16 @@ bool isIntegerD(double d);
 inline bool isPowerOf2(ULONGLONG x) { return (x != 0 && (x & (x-1)) == 0); }
 bool isPowerOf5(double f);
 
+//Return true if val is 32bit integer more than 16bit.
+//e.g: 0xFFFF is not more than 16bit.
+//     0x1FFFF is more than 32bit.
+bool isInteger32bit(UINT64 val);
+
+//Return true if val is 64bit integer more than 32bit.
+//e.g: 0xffffFFFF is not more than 32bit.
+//     0x1ffffFFFF is more than 32bit.
+bool isInteger64bit(UINT64 val);
+
 //Prime Factorization.
 //e.g: 435234 = 251 * 17 * 17 * 3 * 2.
 void prim(INT m, OUT INT * buf);

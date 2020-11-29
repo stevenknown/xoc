@@ -754,19 +754,19 @@ public:
     IR * dupIR(IR const* ir);
     IR * dupIRTree(IR const* ir);
     IR * dupIRTreeList(IR const* ir);
-    void dumpBBList(bool dump_inner_region = true);
-    void dumpIRList();
-    void dumpAllocatedIR();
-    void dumpVARInRegion();
-    void dumpVarMD(Var * v, UINT indent);
-    void dumpFreeTab();
-    void dumpMemUsage();
-    void dump(bool dump_inner_region);
-    void dumpParameter();
-    void dumpVarTab();
-    void dumpGR(bool dump_inner_region);
-    void dumpRef(UINT indent = 4);
-    void dumpBBRef(IN IRBB * bb, UINT indent);
+    void dumpBBList(bool dump_inner_region = true) const;
+    void dumpIRList() const;
+    void dumpAllocatedIR() const;
+    void dumpVARInRegion() const;
+    void dumpVarMD(Var * v, UINT indent) const;
+    void dumpFreeTab() const;
+    void dumpMemUsage() const;
+    void dump(bool dump_inner_region) const;
+    void dumpParameter() const;
+    void dumpVarTab() const;
+    void dumpGR(bool dump_inner_region) const;
+    void dumpRef(UINT indent = 4) const;
+    void dumpBBRef(IN IRBB * bb, UINT indent) const;
 
     bool evaluateConstInteger(IR const* ir, OUT ULONGLONG * const_value);
 
@@ -776,8 +776,8 @@ public:
     void freeIRTreeList(IRList & irs);
     void freeIRBBList(BBList & bbl);
     void findFormalParam(OUT List<Var const*> & varlst, bool in_decl_order);
-    Var const* findFormalParam(UINT position);
-    Var * findVarViaSymbol(Sym const* sym);
+    Var const* findFormalParam(UINT position) const;
+    Var * findVarViaSymbol(Sym const* sym) const;
 
     REGION_TYPE getRegionType() const { return REGION_type(this); }
 
@@ -972,7 +972,7 @@ public:
     }
 
     //Allocate Var for PR.
-    Var * genVARforPR(UINT prno, Type const* type);
+    Var * genVarForPR(UINT prno, Type const* type);
 
     //Allocate MD for PR.
     MD const* genMDforPR(UINT prno, Type const* type);

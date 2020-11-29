@@ -96,6 +96,8 @@ author: Su Zhenyu
 #undef LONGLONG
 #undef ULONGLONG
 #undef BOOL
+#undef UINT64
+#undef UINT32
 
 typedef int STATUS;
 typedef unsigned char BYTE;
@@ -112,9 +114,13 @@ typedef unsigned long ULONG;
 #ifdef _ON_WINDOWS_
     typedef __int64 LONGLONG;
     typedef unsigned __int64 ULONGLONG;
+    typedef unsigned __int32 UINT32;
+    typedef unsigned __int64 UINT64;
 #else
     typedef long long LONGLONG;
     typedef unsigned long long ULONGLONG;
+    typedef uint32_t UINT32;
+    typedef uint64_t UINT64;
 #endif
 
 #ifndef va_copy

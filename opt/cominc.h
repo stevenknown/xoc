@@ -65,6 +65,7 @@ author: Su Zhenyu
 #include "ir_expr_tab.h"
 #include "callg.h"
 #include "du_helper.h"
+#include "debug_util.h" //only for compiler internal debugging.
 
 using namespace xoc;
 #endif

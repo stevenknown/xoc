@@ -44,7 +44,8 @@ class ConstMDSSAUSEIRIter {
     COPY_CONSTRUCTOR(ConstMDSSAUSEIRIter);
 public:
     ConstMDSSAUSEIRIter() : vopndset_iter(nullptr), current_pos_in_vopndset(-1),
-        useset_iter(nullptr), current_pos_in_useset(-1), current_useset(nullptr) {}
+        useset_iter(nullptr), current_pos_in_useset(-1),
+        current_useset(nullptr) {}
 
     VOpndSet * vopndset;
     VOpndSetIter vopndset_iter;
@@ -90,14 +91,14 @@ public:
 class MDSSAMgr : public Pass {
     COPY_CONSTRUCTOR(MDSSAMgr);
 protected:
+    BYTE m_is_valid:1;
+    BYTE m_is_semi_pruned:1;
     Region * m_rg;
     MDSystem * m_md_sys;
     TypeMgr * m_tm;
     IRCFG * m_cfg;
     xcom::DefSegMgr * m_seg_mgr;
     xcom::DefMiscBitSetMgr * m_sbs_mgr;
-    bool m_is_valid;
-    bool m_is_semi_pruned;
     IRIter m_iter; //for tmp use.
 
     //Record version stack during renaming.

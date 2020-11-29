@@ -154,7 +154,7 @@ void RegionMgr::registerGlobalMD()
 {
     //Only top region can do initialize MD for global variable.
     ASSERT0(m_var_mgr);
-    VarVec * varvec = m_var_mgr->get_var_vec();
+    VarVec * varvec = m_var_mgr->getVarVec();
     for (INT i = 0; i <= varvec->get_last_idx(); i++) {
         Var * v = varvec->get(i);
         if (v == nullptr || VAR_is_local(v)) { continue; }
@@ -435,9 +435,7 @@ bool RegionMgr::processFuncRegion(Region * func, OptCtx * oc)
 {
     ASSERTN(!func->is_blackbox(),
             ("can not generate code for blackbox region"));
-    bool s = func->process(oc);
-    tfree();
-    return s;
+    return func->process(oc);
 }
 
 
@@ -446,9 +444,7 @@ bool RegionMgr::processFuncRegion(Region * func, OptCtx * oc)
 bool RegionMgr::processProgramRegion(Region * program, OptCtx * oc)
 {
     ASSERT0(program && program->is_program());
-    bool s = program->process(oc);
-    tfree();
-    return s;
+    return program->process(oc);
 }
 //END RegionMgr
 

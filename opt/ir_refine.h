@@ -144,9 +144,6 @@ public:
 //This class perform peephole optimizations.
 class Refine : public Pass {
     COPY_CONSTRUCTOR(Refine);
-    HOST_INT calcLSRIntVal(Type const* type, HOST_INT v0, HOST_INT v1);
-    HOST_INT calcIntVal(IR_TYPE ty, HOST_INT v0, HOST_INT v1);
-    double calcFloatVal(IR_TYPE ty, double v0, double v1);
 
     IR * foldConstFloatUnary(IR * ir, bool & change);
     IR * foldConstFloatBinary(IR * ir, bool & change);

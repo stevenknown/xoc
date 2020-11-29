@@ -40,8 +40,8 @@ namespace xoc {
 class AnalysisInstrument {
     COPY_CONSTRUCTOR(AnalysisInstrument);
 public:
-    Region * m_rg;
     UINT m_pr_count; //counter of IR_PR.
+    Region * m_rg;
     SMemPool * m_du_pool;
     SMemPool * m_sc_labelinfo_pool;
     //Indicate a list of IR.
@@ -50,8 +50,8 @@ public:
     List<IR const*> * m_return_list; //record RETURN in region.
     PassMgr * m_pass_mgr; //PASS manager.
     IR * m_free_tab[MAX_OFFSET_AT_FREE_TABLE + 1];
-    Vector<Var*> m_prno2var; //map prno to related Var.
-    Vector<IR*> m_ir_vector; //record IR which have allocated.
+    Vector<Var*> m_prno2var; //map prno to related Var. prno is dense integer.
+    Vector<IR*> m_ir_vector; //record IR which have allocated. ir id is dense
     xcom::BitSetMgr m_bs_mgr;
     xcom::DefMiscBitSetMgr m_sbs_mgr;
     MDSetMgr m_mds_mgr;

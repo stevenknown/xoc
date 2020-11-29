@@ -454,7 +454,7 @@ void IRParser::error(X_CODE xcode, CHAR const* format, ...)
 //        return g_real_token == v;
 //    }
 //
-//    CELL * c = g_cell_list.get_head();
+//    Cell * c = g_cell_list.get_head();
 //    if (c != nullptr) {
 //        //append current real token to 'token-list'
 //        append_tok_head(g_real_token, g_real_token_string, g_real_line_num);

@@ -270,9 +270,7 @@ public:
     void addUse(IR const* exp, IN UseDefMgr * usedefmgr);
 
     //Collect all USE, where USE is IR expression.
-    void collectUse(OUT xcom::DefSBitSetCore * set,
-                    IN UseDefMgr * usedefmgr,
-                    IN xcom::DefMiscBitSetMgr * bsmgr);
+    void collectUse(OUT IRSet * set, UseDefMgr const* usedefmgr);
 
     void init() { BaseAttachInfo::init(AI_MD_SSA); }
     bool isUseReachable(IN UseDefMgr * usedefmgr, IR const* exp);

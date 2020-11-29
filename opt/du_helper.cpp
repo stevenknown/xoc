@@ -156,11 +156,9 @@ void removeIRTreeUse(IR * exp, Region * rg)
         dumgr->removeUseFromDefset(exp);
     }
 
-    if (exp->isMemoryRefNotOperatePR()) {
-        MDSSAMgr * mdssamgr = rg->getMDSSAMgr(); 
-        if (mdssamgr != nullptr) {
-            mdssamgr->removeMDSSAUse(exp);
-        }
+    MDSSAMgr * mdssamgr = rg->getMDSSAMgr(); 
+    if (mdssamgr != nullptr) {
+        mdssamgr->removeMDSSAUse(exp);
     }
 }
 
@@ -176,11 +174,10 @@ void removeStmt(IR * stmt, Region * rg)
 
     PRSSAMgr::removePRSSAUse(stmt);
 
-    if (stmt->isMemoryRefNotOperatePR()) {
-        MDSSAMgr * mdssamgr = rg->getMDSSAMgr(); 
-        if (mdssamgr != nullptr) {
-            mdssamgr->removeStmtFromMDSSAMgr(stmt);
-        }
+    MDSSAMgr * mdssamgr = rg->getMDSSAMgr(); 
+    if (mdssamgr != nullptr) {
+        //mdssamgr->removeStmtFromMDSSAMgr(stmt);
+        mdssamgr->removeMDSSAUse(stmt);
     }
 }
 
@@ -211,6 +208,7 @@ static void addUseInDUMode(IR * to_ir,
     DUSet * to_du = dumgr->getAndAllocDUSet(to_ir);
     to_du->copy(*from_du, *dumgr->getSBSMgr());
 
+    UINT to_ir_id = to_ir->id();
     //Add DU chain between DEF and USE.
     DUIter di = nullptr;
     for (UINT i = from_du->get_first(&di);
@@ -220,7 +218,7 @@ static void addUseInDUMode(IR * to_ir,
         IR const* x = rg->getIR(i);
         DUSet * x_duset = x->getDUSet();
         if (x_duset == nullptr) { continue; }
-        x_duset->add(IR_id(to_ir), *dumgr->getSBSMgr());
+        x_duset->add(to_ir_id, *dumgr->getSBSMgr());
     }
 }
 
@@ -230,7 +228,10 @@ static void addUseInMDSSAMode(IR * to_ir,
                               MDSSAMgr * mdssamgr,
                               Region * rg)
 {
-    ASSERT0(0);
+    ASSERT0(from_ir->isMemoryRefNotOperatePR());
+    MDSSAInfo * info = mdssamgr->getMDSSAInfoIfAny(from_ir);
+    if (info == nullptr) { return; }
+    mdssamgr->addMDSSAOcc(to_ir, info);
 }
 
 

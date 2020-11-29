@@ -1240,7 +1240,7 @@ bool IRCFG::removeTrampolinEdgeCase2(BBListIter bbct)
         }
 
         IR * last_xr_of_pred = get_last_xr(pred);
-        if (!IRBB::isDownBoundary(last_xr_of_pred)) {
+        if (!IRBB::isLowerBoundary(last_xr_of_pred)) {
             //CASE: pred->bb, pred is fallthrough-BB.
             //  pred is:
             //      a=b+1

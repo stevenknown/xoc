@@ -887,7 +887,7 @@ bool LICM::splitBBIfNeeded(IRBB * bb)
     for (bb->getIRList()->get_head(&it); it != nullptr;) {
         IRListIter cur = it;
         bb->getIRList()->get_next(&it);
-        if (IRBB::isDownBoundary(cur->val()) && it != nullptr) {
+        if (IRBB::isLowerBoundary(cur->val()) && it != nullptr) {
             m_cfg->splitBB(bb, cur);
             return true;
         }

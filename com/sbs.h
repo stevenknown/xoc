@@ -392,6 +392,11 @@ public:
         //Do NOT change current m_sm.
         SBitSetCore<BitsPerSeg>::copy(src, m_sm, &m_flst, m_pool);
     }
+    void copy(SBitSetCore<BitsPerSeg> const& src)
+    {
+        //Do NOT change current m_sm.
+        SBitSetCore<BitsPerSeg>::copy(src, m_sm, &m_flst, m_pool);
+    }
     //Count memory usage for current object.
     size_t count_mem() const;
 

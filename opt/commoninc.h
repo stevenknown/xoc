@@ -47,4 +47,5 @@ author: Su Zhenyu
 #include "symtab.h"
 #include "label.h"
 #include "cdg.h"
+#include "timer.h"
 #endif

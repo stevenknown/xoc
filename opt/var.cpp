@@ -358,6 +358,10 @@ void VarMgr::destroyVar(Var * v)
     ASSERT0(VAR_id(v) != 0);
     m_freelist_of_varid.bunion(VAR_id(v), *m_ru_mgr->get_sbs_mgr());
     m_var_vec.set(VAR_id(v), nullptr);
+    if (v->is_string()) {
+        ASSERT0(VAR_string(v));
+        m_str_tab.remove(VAR_string(v));
+    }
     delete v;
 }
 
@@ -485,8 +489,25 @@ Var * VarMgr::registerStringVar(CHAR const* var_name, Sym const* s, UINT align)
 }
 
 
+void VarMgr::dumpFreeIDList() const
+{
+    if (m_freelist_of_varid.is_empty()) { return; }
+
+    RegionMgr * rm = m_tm->getRegionMgr();
+    prt(rm, "\nVarMgr: FREE VAR ID:");
+    DefSBitSetIter iter = nullptr;
+    bool first = true;
+    for (INT id = m_freelist_of_varid.get_first(&iter);
+         id != -1; id = m_freelist_of_varid.get_next(id, &iter)) {
+        if (!first) { prt(rm, ","); }
+        prt(rm, "%d", id);
+        first = false;
+    }
+}
+
+
 //Dump all variables registered.
-void VarMgr::dump()
+void VarMgr::dump() const
 {
     RegionMgr * rm = m_tm->getRegionMgr();
     prt(rm, "\n\nVAR to Decl Mapping:");
@@ -500,6 +521,7 @@ void VarMgr::dump()
         prt(rm, "\n%s", v->dump(buf, m_tm));
     }
     prt(rm, "\n");
+    dumpFreeIDList();
 }
 //END VarMgr
 

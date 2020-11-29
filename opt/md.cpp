@@ -707,7 +707,7 @@ void MD2MDSet::dump(Region * rg)
 
     //Dump set of MD that corresponding to an individual Var.
     note(rg, "\n==-- DUMP the mapping from Var to MDSet --==");
-    VarVec * var_tab = rg->getVarMgr()->get_var_vec();
+    VarVec * var_tab = rg->getVarMgr()->getVarVec();
     Vector<MD const*> mdv;
     ConstMDIter iter;
     for (INT i = 0; i <= var_tab->get_last_idx(); i++) {
