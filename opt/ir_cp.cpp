@@ -329,7 +329,7 @@ bool CopyProp::is_available(IR const* def_stmt,
     //Both def_ir and use_ir are in same BB.
     IRListIter ir_holder = nullptr;
     bool f = BB_irlist(defbb).find(const_cast<IR*>(def_stmt), &ir_holder);
-    CHECK_DUMMYUSE(f);
+    CHECK0_DUMMYUSE(f);
     IR * ir;
     for (ir = BB_irlist(defbb).get_next(&ir_holder);
          ir != nullptr && ir != use_stmt;
@@ -493,7 +493,7 @@ void CopyProp::dumpCopyPropagationAction(IR const* def_stmt,
     if (use->is_id()) {
         ASSERT0(m_mdssamgr);
         MDSSAInfo * mdssainfo = m_mdssamgr->getUseDefMgr()->getMDSSAInfo(use);
-        CHECK_DUMMYUSE(mdssainfo);
+        CHECK0_DUMMYUSE(mdssainfo);
         ASSERT0(ID_phi(use));
         note(getRegion(), "\n");
         ID_phi(use)->dump(m_rg, m_mdssamgr->getUseDefMgr());
@@ -698,6 +698,8 @@ bool CopyProp::perform(OptCtx & oc)
     ASSERT0(oc.is_cfg_valid());
     bool is_org_pr_du_chain_valid = oc.is_pr_du_chain_valid();
     bool is_org_nonpr_du_chain_valid = oc.is_nonpr_du_chain_valid();
+    DUMMYUSE(is_org_pr_du_chain_valid);
+    DUMMYUSE(is_org_nonpr_du_chain_valid);
 
     if (!oc.is_ref_valid()) { return false; }
     m_refine = (Refine*)m_rg->getPassMgr()->registerPass(PASS_REFINE);

@@ -412,7 +412,7 @@ void IRParser::error(CHAR const* format, ...)
 
 void IRParser::error(TOKEN tok, CHAR const* format, ...)
 {
-    CHECK_DUMMYUSE(tok);
+    CHECK0_DUMMYUSE(tok);
     StrBuf buf(64);
     va_list arg;
     va_start(arg, format);

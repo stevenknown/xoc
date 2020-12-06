@@ -113,9 +113,8 @@ static IR * tryAppendGotoToJumpToBB(IRBB * from, IRBB * to, Region * rg)
         return gotoir;
     }
     if (last->isUnconditionalBr() || last->isConditionalBr()) {
-        LabelInfo const* lab = last->getLabel();
-        ASSERT0(lab);
-        ASSERTN(to->hasLabel(lab), ("No valid label can be used as target"));
+        ASSERTN(last->getLabel() && to->hasLabel(last->getLabel()),
+                ("No valid label can be used as target"));
         return nullptr;
     }
     UNREACHABLE();

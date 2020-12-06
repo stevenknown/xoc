@@ -38,6 +38,7 @@ namespace xoc {
 //                "graph_rbt.vcg", 1000, dumpTN);
 inline CHAR * dumpTN(Sym* key, Sym* mapped)
 {
+    DUMMYUSE(mapped);
     return SYM_name(key);
 }
 

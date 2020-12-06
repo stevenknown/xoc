@@ -102,8 +102,8 @@ bool removeExpiredDUForStmt(IR * stmt, Region * rg)
 
     MDSSAMgr * mdssamgr = rg->getMDSSAMgr(); 
     if (mdssamgr != nullptr) {
-        MDSSAInfo * info = mdssamgr->getMDSSAInfoIfAny(stmt);
-        ASSERTN(info, ("def stmt even not in MDSSA system"));
+        ASSERTN(mdssamgr->getMDSSAInfoIfAny(stmt),
+                ("def stmt even not in MDSSA system"));
         change |= mdssamgr->removeExpiredDUForStmt(stmt);
     }
     return change;

@@ -2712,7 +2712,7 @@ public:
         set(m_last_idx < 0 ? 0 : m_last_idx + 1, t);
     }
 
-    inline void init()
+    void init()
     {
         if (m_is_init) { return; }
         m_elem_num = 0;
@@ -2721,7 +2721,7 @@ public:
         m_is_init = true;
     }
 
-    inline void init(UINT size)
+    void init(UINT size)
     {
         if (m_is_init) { return; }
         ASSERT0(size != 0);
@@ -2735,7 +2735,7 @@ public:
 
     bool is_init() const { return m_is_init; }
 
-    inline void destroy()
+    void destroy()
     {
         if (!m_is_init) { return; }
         m_elem_num = 0;
@@ -3304,8 +3304,8 @@ public:
 
     UINT get_hash_value(OBJTY v, UINT bucket_size) const
     {
-        ASSERTN_DUMMYUSE(sizeof(OBJTY) == sizeof(CHAR*),
-                         ("exception will taken place in type-cast"));
+        ASSERTN(sizeof(OBJTY) == sizeof(CHAR*),
+                ("exception will taken place in type-cast"));
         return get_hash_value((CHAR const*)v, bucket_size);
     }
 
@@ -3314,8 +3314,8 @@ public:
 
     bool compare(CHAR const* s, OBJTY val) const
     {
-        ASSERTN_DUMMYUSE(sizeof(OBJTY) == sizeof(CHAR const*),
-            ("exception will taken place in type-cast"));
+        ASSERTN(sizeof(OBJTY) == sizeof(CHAR const*),
+                ("exception will taken place in type-cast"));
         return (strcmp(s,  (CHAR const*)val) == 0);
     }
 };

@@ -1672,8 +1672,7 @@ void AliasAnalysis::processConst(IR * ir,
         //'ir' describes memory address of string const.
         //Add a new Var to describe the string.
         //'mds' : record memory descriptor of 'ir'.
-        MD const* t = m_rg->allocStringMD(CONST_str_val(ir));
-        ASSERT0(t);
+        m_rg->allocStringMD(CONST_str_val(ir));        
         if (!m_is_visit.is_contain(ir->id())) {
             m_is_visit.bunion(ir->id());
             AC_is_mds_mod(ic) = true;
@@ -3438,7 +3437,7 @@ bool AliasAnalysis::verifyIR(IR * ir)
             for (INT i = mayaddr->get_first(&iter);
                  i >= 0; i = mayaddr->get_next((UINT)i, &iter)) {
                 MD const* x = m_md_sys->getMD((UINT)i);
-                CHECK_DUMMYUSE(x);
+                CHECK0_DUMMYUSE(x);
                 ASSERT0(!x->is_pr());
             }
         }
@@ -3470,7 +3469,7 @@ bool AliasAnalysis::verifyIR(IR * ir)
             for (INT i = mayaddr->get_first(&iter);
                  i >= 0; i = mayaddr->get_next((UINT)i, &iter)) {
                 MD const* x = m_md_sys->getMD((UINT)i);
-                CHECK_DUMMYUSE(x);
+                CHECK0_DUMMYUSE(x);
                 ASSERT0(!x->is_pr());
             }
         }

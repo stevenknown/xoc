@@ -605,4 +605,5 @@ void Sort<T>::shell_sort(IN OUT Vector<T> & data)
 }
 
 } //namespace xcom
+
 #endif

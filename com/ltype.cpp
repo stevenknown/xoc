@@ -31,32 +31,4 @@ IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 author: Su Zhenyu
 @*/
-#include "ltype.h"
-
-INT m518087(CHAR const* info, ...)
-{
-    //CHAR * ptr = (CHAR*)&info;
-    //ptr += sizeof(CHAR*); //being sizeof(info)
-    va_list ptr;
-    va_start(ptr, info);
-
-    //PROTOTYPE: int __cdecl vprintf(char const*, char *)
-    //vprintf(info, ptr);
-
-    //PROTOTYPE: int vfprintf (FILE * stream, const char * format, va_list ap)
-    vfprintf(stderr, info, ptr);
-    fflush(stderr);
-
-    //abort() has type 'void' and is not a throw-expression.
-    //And it is unable to be used in clause : a ? 1 : abort().
-    va_end(ptr);
-    abort();
-    return 0;
-}
-
-
-INT m522138(CHAR const* filename, INT line)
-{
-     fprintf(stderr, "\nASSERTION in %s(%d): ", filename, line);
-     return 0;
-}
+#include "xcominc.h"

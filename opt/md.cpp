@@ -842,7 +842,7 @@ void MDSystem::initGlobalMemMD(VarMgr * vm)
     MD_ty(&x) = MD_UNBOUND;
     MD_is_may(&x) = true; //MD_GLOBAL_VAR can only be May reference.
     MD const* e = registerMD(x);
-    CHECK_DUMMYUSE(e);
+    CHECK0_DUMMYUSE(e);
     ASSERT0(MD_id(e) == MD_GLOBAL_VAR);
 }
 
@@ -881,7 +881,7 @@ void MDSystem::initImportVar(VarMgr * vm)
     MD_ty(&x) = MD_UNBOUND;
     MD_is_may(&x) = true; //MD_IMPORT_VAR can only be May reference.
     MD const* e = registerMD(x);
-    CHECK_DUMMYUSE(e);
+    CHECK0_DUMMYUSE(e);
     ASSERT0(MD_id(e) == MD_IMPORT_VAR);
 }
 
@@ -905,7 +905,7 @@ void MDSystem::initAllMemMD(VarMgr * vm)
     MD_size(&x) = 0;
     MD_ty(&x) = MD_UNBOUND;
     MD const* e = registerMD(x);
-    CHECK_DUMMYUSE(e);
+    CHECK0_DUMMYUSE(e);
     ASSERT0(MD_id(e) == MD_FULL_MEM);
 }
 

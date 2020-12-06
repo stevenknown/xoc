@@ -4557,6 +4557,7 @@ bool DUMgr::verifyLiveinExp()
 }
 
 
+#ifdef _DEBUG_
 static bool checkIsTruelyDep(IR const* def,
                              IR const* use,
                              Region const* rg,
@@ -4625,6 +4626,7 @@ static bool checkIsTruelyDep(IR const* def,
     ASSERTN(0, ("Not a truely dependence"));
     return false;
 }
+#endif
 
 
 //Verify if DU chain is correct between each Def and Use of MD.
@@ -4689,7 +4691,7 @@ bool DUMgr::verifyMDDUChainForIR(IR const* ir, UINT duflag)
         for (INT i = defset->get_first(&di);
              i >= 0; i = defset->get_next(i, &di)) {
             IR const* def = m_rg->getIR(i);
-            CHECK_DUMMYUSE(def);
+            CHECK0_DUMMYUSE(def);
             ASSERT0(def->is_stmt());
 
             //Check the existence to 'def'.

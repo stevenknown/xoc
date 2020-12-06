@@ -1729,11 +1729,11 @@ size_t BitSetMgr::count_mem(FILE * h) const
                 b = 0;
             }
             if (v < 1024) {
-                fprintf(h, "%zuB,", v);
+                fprintf(h, "%uB,", (UINT)v);
             } else if (v < 1024 * 1024) {
-                fprintf(h, "%zuKB,", v/1024);
+                fprintf(h, "%uKB,", (UINT)v/1024);
             } else {
-                fprintf(h, "%zuMB,", v/1024/1024);
+                fprintf(h, "%uMB,", (UINT)v/1024/1024);
             }
         }
         fflush(h);

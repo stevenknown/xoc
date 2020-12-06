@@ -83,21 +83,21 @@ public:
     //Note v must be string pointer.
     UINT get_hash_value(OBJTY v, UINT bs) const
     {
-        ASSERTN_DUMMYUSE(sizeof(OBJTY) == sizeof(CHAR*),
-            ("exception will taken place in type-cast"));
+        ASSERTN(sizeof(OBJTY) == sizeof(CHAR*),
+                ("exception will taken place in type-cast"));
         ASSERT0(isPowerOf2(bs));
         UINT n = computeCharSum((CHAR*)v);
         return hash32bit(n) & (bs - 1);
     }
 
     bool compare(Sym const* s1, Sym const* s2) const
-    { return strcmp(SYM_name(s1), SYM_name(s2)) == 0; }
+    { return ::strcmp(SYM_name(s1), SYM_name(s2)) == 0; }
 
     bool compare(Sym const* s, OBJTY val) const
     {
-        ASSERTN_DUMMYUSE(sizeof(OBJTY) == sizeof(CHAR*),
-            ("exception will taken place in type-cast"));
-        return (strcmp(SYM_name(s), (CHAR*)val) == 0);
+        ASSERTN(sizeof(OBJTY) == sizeof(CHAR*),
+                ("exception will taken place in type-cast"));
+        return (::strcmp(SYM_name(s), (CHAR*)val) == 0);
     }
 };
 
@@ -125,7 +125,7 @@ public:
     //Note v must be const string pointer.
     UINT get_hash_value(OBJTY v, UINT bs) const
     {
-        ASSERTN_DUMMYUSE(sizeof(OBJTY) == sizeof(CHAR const*),
+        ASSERTN(sizeof(OBJTY) == sizeof(CHAR const*),
                 ("exception will taken place in type-cast"));
         ASSERT0(isPowerOf2(bs));
         UINT n = computeCharSum((CHAR const*)v);
@@ -133,13 +133,13 @@ public:
     }
 
     bool compare(Sym const* s1, Sym const* s2) const
-    { return strcmp(SYM_name(s1),  SYM_name(s2)) == 0; }
+    { return ::strcmp(SYM_name(s1),  SYM_name(s2)) == 0; }
 
     bool compare(Sym const* s, OBJTY val) const
     {
-        ASSERTN_DUMMYUSE(sizeof(OBJTY) == sizeof(CHAR const*),
+        ASSERTN(sizeof(OBJTY) == sizeof(CHAR const*),
                 ("exception will taken place in type-cast"));
-        return (strcmp(SYM_name(s),  (CHAR const*)val) == 0);
+        return (::strcmp(SYM_name(s),  (CHAR const*)val) == 0);
     }
 };
 

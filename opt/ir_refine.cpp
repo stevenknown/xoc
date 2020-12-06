@@ -40,7 +40,7 @@ static bool checkMDSetContain(IR const* ir1, MD const* md)
 {
     if (ir1->getRefMDSet() != nullptr) {
         //RefMDSet may be nullptr under OPT_LEVEL0.
-        CHECK_DUMMYUSE(ir1->getRefMDSet() &&
+        CHECK0_DUMMYUSE(ir1->getRefMDSet() &&
                        ir1->getRefMDSet()->is_contain(md));
     }
     return true;
@@ -281,7 +281,7 @@ IR * Refine::refineILoad1(IR * ir, bool & change, RefineCtx & rc)
     //ir's MD ref must be equivalent to ld.
     if (ld->getEffectRef() == nullptr && rc.doUpdateMDRef()) {
         MD const* t = m_rg->allocRefForLoad(ld);
-        CHECK_DUMMYUSE(checkMDSetContain(ld, t));
+        CHECK0_DUMMYUSE(checkMDSetContain(ld, t));
     }
 
     changeUse(ir, ld, m_rg);
@@ -311,7 +311,7 @@ IR * Refine::refineILoad2(IR * ir, bool & change, RefineCtx & rc)
     ld->copyRef(ir, m_rg);
     if (ld->getEffectRef() == nullptr && rc.doUpdateMDRef()) {
         MD const* t = m_rg->allocRefForLoad(ld);
-        CHECK_DUMMYUSE(checkMDSetContain(ld, t));
+        CHECK0_DUMMYUSE(checkMDSetContain(ld, t));
     }
     changeUse(ir, ld, m_rg);
     ld->copyAI(ir, m_rg);
@@ -379,7 +379,7 @@ IR * Refine::refineIStore(IR * ir, bool & change, RefineCtx & rc)
         newir->copyRef(ir, m_rg);
         if (newir->getEffectRef() == nullptr && rc.doUpdateMDRef()) {
             MD const* t2 = m_rg->allocRefForStore(newir);
-            CHECK_DUMMYUSE(checkMDSetContain(newir, t2));
+            CHECK0_DUMMYUSE(checkMDSetContain(newir, t2));
         }
         bool maybe_exist_expired_du = false;
         if (newir->getRefMD() == nullptr) {
@@ -418,7 +418,7 @@ IR * Refine::refineIStore(IR * ir, bool & change, RefineCtx & rc)
         newrhs->copyRef(rhs, m_rg);
         if (newrhs->getEffectRef() == nullptr && rc.doUpdateMDRef()) {
             MD const* t2 = m_rg->allocRefForLoad(newrhs);
-            CHECK_DUMMYUSE(checkMDSetContain(newrhs, t2));
+            CHECK0_DUMMYUSE(checkMDSetContain(newrhs, t2));
         }
         changeUse(rhs, newrhs, m_rg);
         newrhs->copyAI(rhs, m_rg);
@@ -975,8 +975,8 @@ IR * Refine::refineMod(IR * ir, bool & change)
     ASSERT0(ir->is_mod());
     IR * op0 = BIN_opnd0(ir);
     IR * op1 = BIN_opnd1(ir);
-    CHECK_DUMMYUSE(op0);
-    CHECK_DUMMYUSE(op1);
+    CHECK0_DUMMYUSE(op0);
+    CHECK0_DUMMYUSE(op1);
     if (op1->is_const() && op1->is_int() && CONST_int_val(op1) == 1) {
         //mod X,1 => 0
         IR * tmp = ir;
@@ -996,8 +996,8 @@ IR * Refine::refineRem(IR * ir, bool & change)
     ASSERT0(ir->is_rem());
     IR * op0 = BIN_opnd0(ir);
     IR * op1 = BIN_opnd1(ir);
-    CHECK_DUMMYUSE(op0);
-    CHECK_DUMMYUSE(op1);
+    CHECK0_DUMMYUSE(op0);
+    CHECK0_DUMMYUSE(op1);
     if (op1->is_const() && op1->is_int()) {
         if (CONST_int_val(op1) == 1) {
             //rem X,1 => 0
@@ -1626,7 +1626,7 @@ IR * Refine::refineBinaryOp(IR * ir, bool & change, RefineCtx & rc)
 IR * Refine::refineStoreArray(IR * ir, bool & change, RefineCtx & rc)
 {
     IR * newir = refineArray(ir, change, rc);
-    CHECK_DUMMYUSE(newir == ir);
+    CHECK0_DUMMYUSE(newir == ir);
 
     bool lchange = false;
     IR * newrhs = refineIR(STARR_rhs(ir), lchange, rc);
@@ -2151,7 +2151,7 @@ void Refine::insertCvtForBinaryOp(IR * ir, bool & change)
 //Insert CVT for float if necessary.
 IR * Refine::insertCvtForFloat(IR * parent, IR * kid, bool &)
 {
-    CHECK_DUMMYUSE(parent->is_fp() || kid->is_fp());
+    CHECK0_DUMMYUSE(parent->is_fp() || kid->is_fp());
     return kid;
 }
 

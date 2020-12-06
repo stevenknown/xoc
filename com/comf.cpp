@@ -223,7 +223,7 @@ INT xceiling(INT a, INT b)
 }
 
 
-//Great common divisor.
+//Calculate the Great Common Divisor of x and y.
 INT sgcd(INT x, INT y)
 {
     INT t;
@@ -245,7 +245,7 @@ INT sgcd(INT x, INT y)
 }
 
 
-//Least common multiple.
+//Calculate the Least Common Multiple of x and y.
 INT slcm(INT x, INT y)
 {
     return x * y / sgcd(x,y);
@@ -621,7 +621,7 @@ void dumpf_svec(void * vec, UINT ty, CHAR const* name, bool is_del)
 
     ///
     switch (ty) {
-    case D_BOOL: {
+    case DUMPVEC_BOOL: {
         Vector<bool> *p = (Vector<bool> *)vec;
         for (INT i = 0; i <= p->get_last_idx(); i++) {
             fprintf(h, "%d", (INT)p->get(i));
@@ -631,7 +631,7 @@ void dumpf_svec(void * vec, UINT ty, CHAR const* name, bool is_del)
         }
         break;
     }
-    case D_INT: {
+    case DUMPVEC_INT: {
         Vector<INT> * p = (Vector<INT> *)vec;
         for (INT i = 0; i <= p->get_last_idx(); i++) {
             fprintf(h, "%d", (INT)p->get(i));
@@ -653,7 +653,7 @@ void dumps_svec(void * vec, UINT ty)
 {
     printf("\n");
     switch (ty) {
-    case D_BOOL: {
+    case DUMPVEC_BOOL: {
         Vector<bool> *p = (Vector<bool> *)vec;
         for (INT i = 0; i <= p->get_last_idx(); i++) {
             printf("%d", (INT)p->get(i));
@@ -663,7 +663,7 @@ void dumps_svec(void * vec, UINT ty)
         }
         break;
     }
-    case D_INT: {
+    case DUMPVEC_INT: {
         Vector<INT> *p = (Vector<INT> *)vec;
         for (INT i = 0; i <= p->get_last_idx(); i++) {
             printf("%d", (INT)p->get(i));
@@ -934,7 +934,7 @@ void extractLeftMostSubString(CHAR * tgt, CHAR const* string, CHAR separator)
 UINT xstrlen(CHAR const* p)
 {
     UINT len = 0;
-    while (*p != 0) {
+    while (*p != '\0') {
         if (*p == '\\' && *(p+1) == 'n') {
             p += 2;
         } else {
@@ -1518,21 +1518,6 @@ OVER:
     buf[buflen - 1] = '\0';
     va_end(stack_start);
     return buf;
-}
-
-
-//Return true if val is 32bit integer.
-bool isInteger32bit(UINT64 val)
-{
-    ASSERT0_DUMMYUSE(sizeof(UINT64) >= sizeof(UINT32));
-    return (((UINT32)val) & (UINT32)0x0000FFFF) != val;
-}
-
-
-//Return true if val is 64bit integer.
-bool isInteger64bit(UINT64 val)
-{
-    return (val & (UINT64)0xFFFFFFFF) != val;
 }
 
 } //namespace xcom

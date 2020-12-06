@@ -1549,10 +1549,10 @@ bool PRSSAMgr::verifyPhi(bool is_vpinfo_avail, bool before_strip_version)
             //Check phi result.
             VPR * resvp = (VPR*)PHI_ssainfo(ir);
             if (is_vpinfo_avail) {
-                UINT prno = before_strip_version ?
-                    resvp->orgprno() : resvp->newprno();
-                ASSERTN(prno == PHI_prno(ir), ("prno of VPR is unmatched"));
-            }           
+                ASSERTN(before_strip_version ? resvp->orgprno() :
+                                               resvp->newprno() ==
+                        PHI_prno(ir), ("prno of VPR is unmatched"));
+            }
 
             //Check the number of phi opnds.
             UINT num_opnd = 0;
@@ -1560,6 +1560,8 @@ bool PRSSAMgr::verifyPhi(bool is_vpinfo_avail, bool before_strip_version)
             for (IR const* opnd = PHI_opnd_list(ir);
                  opnd != nullptr; opnd = opnd->get_next()) {
                 //Opnd may be PR, CONST or LDA.
+                #ifdef _DEBUG_
+                //Only for checking.
                 if (is_vpinfo_avail) {
                     UINT prno = before_strip_version ?
                         VPR_orgprno(PR_ssainfo(opnd)) :
@@ -1567,7 +1569,8 @@ bool PRSSAMgr::verifyPhi(bool is_vpinfo_avail, bool before_strip_version)
                     ASSERTN(prno == PR_no(opnd),
                             ("prno of VPR is unmatched"));
                 }
-                
+                #endif
+
                 //Ver0 is input parameter, and it has no SSA_def.
                 //ASSERT0(VPR_version(PR_ssainfo(opnd)) > 0);
 
@@ -1588,7 +1591,7 @@ bool PRSSAMgr::verifyPhi(bool is_vpinfo_avail, bool before_strip_version)
 
                 SSAInfo * use_ssainfo = PR_ssainfo(use);
 
-                CHECK_DUMMYUSE(use_ssainfo);
+                CHECK0_DUMMYUSE(use_ssainfo);
                 ASSERT0(SSA_def(use_ssainfo) == ir);
             }
         }
@@ -2314,8 +2317,7 @@ bool PRSSAMgr::isStmtDomAllUseInsideLoop(IR const* ir, LI<IRBB> const* li) const
     SSAInfo * info = ir->getSSAInfo();
     ASSERTN(info, ("miss PRSSAInfo"));
     ASSERT0(info->getDef() == ir);
-    IRBB const* irbb = ir->getBB();
-    ASSERT0(irbb);
+    ASSERT0(ir->getBB());
     SSAUseIter iter;
     for (INT i = info->getUses().get_first(&iter);
          iter != nullptr; i = info->getUses().get_next(i, &iter)) {

@@ -2658,7 +2658,7 @@ static bool hasProp(IR const* ir)
 //indent: the addend to current indent of LogMgr.
 void IR::dumpRef(Region * rg, UINT indent)
 {
-    if (this == nullptr || !rg->isLogMgrInit() || is_const()) { return; }
+    if (!rg->isLogMgrInit() || is_const()) { return; }
     rg->getLogMgr()->incIndent(indent);
     dumpIR(this, rg, nullptr, false);
 
@@ -3484,6 +3484,7 @@ bool IR::isDiffMemLoc(IR const* ir2) const
 //END IR
 
 
+//The function only invoked at debug mode.
 //Make sure IR_ICALL is the largest ir.
 bool checkMaxIRType()
 {
@@ -3495,6 +3496,7 @@ bool checkMaxIRType()
 }
 
 
+//The function only invoked at debug mode.
 bool checkIRDesc()
 {
     UINT sz = (UINT)(1 << IR_TYPE_BIT_SIZE);
@@ -3504,17 +3506,19 @@ bool checkIRDesc()
         ASSERT0(i == (UINT)IRDES_code(g_ir_desc[i]));
     }
     UINT descnum = sizeof(g_ir_desc) / sizeof(g_ir_desc[0]);
-    ASSERTN(descnum - 1 == IR_TYPE_NUM, ("miss IRDesc declaration"));
+    CHECKN_DUMMYUSE(descnum - 1 == IR_TYPE_NUM, ("miss IRDesc declaration"));
     return true;
 }
 
+
+//The function only invoked at debug mode.
 bool checkRoundDesc()
 {
     for (UINT i = ROUND_UNDEF; i < ROUND_TYPE_NUM; i++) {
         ASSERT0(i == (UINT)ROUNDDESC_type(g_round_desc[i]));
     }
     UINT descnum = sizeof(g_round_desc) / sizeof(g_round_desc[0]);
-    ASSERTN(descnum == ROUND_TYPE_NUM, ("miss RoundDesc declaration"));
+    CHECKN_DUMMYUSE(descnum == ROUND_TYPE_NUM, ("miss RoundDesc declaration"));
     return true;
 }
 

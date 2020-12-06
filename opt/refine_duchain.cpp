@@ -49,8 +49,8 @@ bool RefineDUChain::dump() const
 
 //This function try to require VN of base of ir.
 //Return the VN if found, and the indirect operation level.
-//e.g: given ILD(ILD(p)), return p and ist_star_level is 2.
-//e.g2: given IST(ILD(q)), return q and ist_star_level is 2.
+//e.g: given ILD(ILD(p)), return p and indirect_level is 2.
+//e.g2: given IST(ILD(q)), return q and indirect_level is 2.
 VN const* RefineDUChain::getVNOfIndirectOp(IR const* ir, UINT * indirect_level)
 {
     ASSERT0(ir && (ir->is_ild() || ir->is_ist()));
@@ -59,7 +59,7 @@ VN const* RefineDUChain::getVNOfIndirectOp(IR const* ir, UINT * indirect_level)
     *indirect_level = 1;
     for (; base != nullptr && !base->is_ild() && !base->is_ist();
          base = base->is_ild() ? ILD_base(base) : IST_base(base)) {
-        *indirect_level++;
+        (*indirect_level)++;
     }
     ASSERT0(base);
 

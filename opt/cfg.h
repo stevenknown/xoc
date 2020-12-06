@@ -483,13 +483,13 @@ public:
         //The entry node can not have any predecessors.
         ASSERT0(m_entry);
         xcom::Vertex * vex = getVertex(m_entry->id());
-        CHECK_DUMMYUSE(vex && getInDegree(vex) == 0);
+        CHECK0_DUMMYUSE(vex && getInDegree(vex) == 0);
 
         //The exit node can not have successors.
         for (BB * bb = m_exit_list.get_head();
              bb != nullptr; bb = m_exit_list.get_next()) {
             xcom::Vertex * vex2 = getVertex(bb->id());
-            CHECK_DUMMYUSE(vex2 && getOutDegree(vex2) == 0);
+            CHECK0_DUMMYUSE(vex2 && getOutDegree(vex2) == 0);
         }
         return true;
     }
@@ -818,11 +818,12 @@ bool CFG<BB, XR>::removeEmptyBBHelper(BB * bb,
             //
             //    succ:
             //    a=1;
-            BB * tgt_bb = findBBbyLabel(last_xr->getLabel());
-            ASSERT0(tgt_bb != nullptr);
-
             ASSERTN(getEdge(prev_bb_of_succ->id(), succ->id()) != nullptr,
                     ("should already have edge"));
+
+            //TBD:Do we need add edge between them?
+            //BB * tgt_bb = findBBbyLabel(last_xr->getLabel());
+            //ASSERT0(tgt_bb);
             //if (tgt_bb == succ) {
             //    addEdge(prev_bb_of_succ, succ);
             //}

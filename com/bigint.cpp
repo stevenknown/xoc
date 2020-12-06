@@ -191,7 +191,7 @@ bool BigInt::verify(UINT elemnum, ...)
     for (; i < elemnum; i++) {
         BigIntElemType expected_val = va_arg(ptr, BigIntElemType);
         BigIntElemType val = get(i);
-        ASSERT0(val == expected_val);
+        CHECK0_DUMMYUSE(val == expected_val);
     }
     va_end(ptr);
     return true;

@@ -82,6 +82,13 @@ author: Su Zhenyu
 #include "string.h"
 #include "memory.h"
 
+namespace xcom {
+
+#ifdef _SUPPORT_C11_
+//Predefine C11 keyword if host compiler does not support C11.
+#define nullptr NULL
+#endif
+
 //Primitive types may have been defined, override them.
 #undef STATUS
 #undef BYTE
@@ -114,114 +121,12 @@ typedef unsigned long ULONG;
 #ifdef _ON_WINDOWS_
     typedef __int64 LONGLONG;
     typedef unsigned __int64 ULONGLONG;
-    typedef unsigned __int32 UINT32;
-    typedef unsigned __int64 UINT64;
 #else
     typedef long long LONGLONG;
-    typedef unsigned long long ULONGLONG;
-    typedef uint32_t UINT32;
-    typedef uint64_t UINT64;
+    typedef unsigned long long ULONGLONG; 
 #endif
 
-#ifndef va_copy
-#define va_copy(d, s) ((d) = (s))
-#endif
-
-//Avoid using the predefined ASSERTN.
-#undef ASSERTN
-#undef ASSERTL
-#undef ASSERT0
-#undef ASSERTL0
-
-// This macro is needed to prevent the clang static analyzer from generating
-// false-positive reports in ASSERTN() macros.
-#ifdef __clang__
-#define CLANG_ANALYZER_NORETURN __attribute__((analyzer_noreturn))
-#else
-#define CLANG_ANALYZER_NORETURN
-#endif
-
-#ifdef _DEBUG_
-    #ifdef __cplusplus
-        #define EXTERN_C extern "C"
-    #else
-        #define EXTERN_C extern
-    #endif
-    #include "stdio.h"
-    EXTERN_C INT m518087(CHAR const* info, ...) CLANG_ANALYZER_NORETURN;
-    EXTERN_C INT m522138(CHAR const* filename, INT line) CLANG_ANALYZER_NORETURN;
-
-    #define ASSERTN(a, b)  \
-        ((a) ? 0 : (m522138(__FILE__, __LINE__), m518087 b))
-    #define ASSERTL(a, filename, line, b)  \
-        ((a) ? 0 : (m522138(filename, line), m518087 b))
-    #define ASSERT0(a)  ((a) ? 0 : (m522138(__FILE__, __LINE__), m518087 ("")))
-    #define ASSERTL0(a, filename, line)  \
-        ((a) ? 0 : (m522138(filename, line), m518087 ("")))
-#else
-    #define ASSERTN(a, b)
-    #define ASSERTL(a, filename, line, b)
-    #define ASSERT0(a)
-    #define ASSERTL0(a, filename, line)
-#endif
-
-#undef UNREACHABLE
-#define UNREACHABLE()  ASSERTN(0, ("Unreachable."))
-
-#undef MAX
-#define MAX(a,b) ((a)>(b)?(a):(b))
-
-#undef MIN
-#define MIN(a,b) ((a)<(b)?(a):(b))
-
-#undef DIFF
-#define DIFF(a,b) (xabs((a)-(b)))
-
-#undef ODD
-#define ODD(v) ((v)%2!=0?1:0)
-
-#undef EVEN
-#define EVEN(v) (!ODD(v))
-
-#undef SET_FLAG
-#define SET_FLAG(flag, v) ((flag) |= (v))
-
-#undef HAVE_FLAG
-#define HAVE_FLAG(flag, v) (((flag) & (v)) == (v))
-
-#undef ONLY_HAVE_FLAG
-#define ONLY_HAVE_FLAG(flag, v) (!((flag)&(~(v))))
-
-#undef REMOVE_FLAG
-#define REMOVE_FLAG(flag, v) ((flag) = ((flag) & (~(v))))
-
-#undef OFFSET_OF
-//Offset of field 'f' of struct type 'st'.
-#define OFFSET_OF(st, f) ((size_t)&((st*)0)->f)
-
-#undef GET_LOW_32BIT
-#define GET_LOW_32BIT(l) ((l)&0xffffFFFF)
-
-#undef GET_HIGH_32BIT
-#define GET_HIGH_32BIT(l) (((l)>>32)&0xffffFFFF)
-
-//True if type is unsigned.
-#define IS_UNSIGN_TY(type) ((type)(((type)0) - 1) > 0)
-
-#undef IN
-#define IN  //indicate input argument
-
-#undef OUT
-#define OUT //indicate output argument
-
-//Misc Dumps/Dumpf of Vector<T>
-#define D_BOOL 1
-#define D_INT 2
-
-#ifdef _SUPPORT_C11_
-//Predefine C11 keyword if host compiler does not support C11.
-#define nullptr NULL
-#endif
+} //namespace xcom
 
 #endif
 

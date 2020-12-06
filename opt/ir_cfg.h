@@ -242,7 +242,7 @@ public:
             n++;
         }
 
-        CHECK_DUMMYUSE(find); //pred should be a predecessor of bb.
+        CHECK0_DUMMYUSE(find); //pred should be a predecessor of bb.
 
         return n;
     }

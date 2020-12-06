@@ -25,68 +25,36 @@ CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
 OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE
 USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 @*/
-#ifndef __COMM_MACRO_H__
-#define __COMM_MACRO_H__
-
-//This file defined macros that used in xcom namespace.
+#include "xcominc.h"
 
 namespace xcom {
 
-#ifndef va_copy
-#define va_copy(d, s) ((d) = (s))
-#endif
+INT m518087(CHAR const* info, ...)
+{
+    //CHAR * ptr = (CHAR*)&info;
+    //ptr += sizeof(CHAR*); //being sizeof(info)
+    va_list ptr;
+    va_start(ptr, info);
 
-#undef MAX
-#define MAX(a,b) ((a)>(b)?(a):(b))
+    //PROTOTYPE: int __cdecl vprintf(char const*, char *)
+    //vprintf(info, ptr);
 
-#undef MIN
-#define MIN(a,b) ((a)<(b)?(a):(b))
+    //PROTOTYPE: int vfprintf (FILE * stream, const char * format, va_list ap)
+    vfprintf(stderr, info, ptr);
+    fflush(stderr);
 
-#undef DIFF
-#define DIFF(a,b) (xabs((a)-(b)))
+    //abort() has type 'void' and is not a throw-expression.
+    //And it is unable to be used in clause : a ? 1 : abort().
+    va_end(ptr);
+    abort();
+    return 0;
+}
 
-#undef ODD
-#define ODD(v) ((v)%2!=0?1:0)
 
-#undef EVEN
-#define EVEN(v) (!ODD(v))
-
-#undef SET_FLAG
-#define SET_FLAG(flag, v) ((flag) |= (v))
-
-#undef HAVE_FLAG
-#define HAVE_FLAG(flag, v) (((flag) & (v)) == (v))
-
-#undef ONLY_HAVE_FLAG
-#define ONLY_HAVE_FLAG(flag, v) (!((flag)&(~(v))))
-
-#undef REMOVE_FLAG
-#define REMOVE_FLAG(flag, v) ((flag) = ((flag) & (~(v))))
-
-#undef OFFSET_OF
-//Offset of field 'f' of struct type 'st'.
-#define OFFSET_OF(st, f) ((size_t)&((st*)0)->f)
-
-#undef GET_LOW_32BIT
-#define GET_LOW_32BIT(l) ((l)&0xffffFFFF)
-
-#undef GET_HIGH_32BIT
-#define GET_HIGH_32BIT(l) (((l)>>32)&0xffffFFFF)
-
-//True if type is unsigned.
-#define IS_UNSIGN_TY(type) ((type)(((type)0) - 1) > 0)
-
-#undef IN
-#define IN  //indicate input argument
-
-#undef OUT
-#define OUT //indicate output argument
-
-//This macro declare copy constructor for class.
-#define COPY_CONSTRUCTOR(class_name) \
-    class_name(class_name const&);   \
-    class_name const& operator = (class_name const&)
+INT m522138(CHAR const* filename, INT line)
+{
+     fprintf(stderr, "\nASSERTION in %s(%d): ", filename, line);
+     return 0;
+}
 
 } //namespace xcom
-
-#endif //END __COMM_MACRO_H__

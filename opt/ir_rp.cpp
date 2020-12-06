@@ -1101,7 +1101,7 @@ bool RegPromot::promoteExactAccess(LI<IRBB> const* li,
     List<IR*> fixup_list; //record the IR that need to fix up duset.
 
     xcom::BitSet * bbset = li->getBodyBBSet();
-    CHECK_DUMMYUSE(bbset);
+    CHECK0_DUMMYUSE(bbset);
     ASSERT0(!bbset->is_empty()); //loop is empty.
 
     DefMiscBitSetMgr * sbs_mgr = m_rg->getMiscBitSetMgr();
@@ -1524,7 +1524,7 @@ void RegPromot::handleAccessInBody(
 
             ASSERT0(IR_parent(ref));
             bool r = IR_parent(ref)->replaceKid(ref, pr, false);
-            CHECK_DUMMYUSE(r);
+            CHECK0_DUMMYUSE(r);
 
             if (stmt->isMayThrow() && !isMayThrow(stmt, ii)) {
                 IR_may_throw(stmt) = false;
@@ -1704,7 +1704,7 @@ bool RegPromot::promoteInexactAccess(LI<IRBB> const* li,
     List<IR*> fixup_list; //record the IR that need to fix up duset.
 
     xcom::BitSet * bbset = li->getBodyBBSet();
-    CHECK_DUMMYUSE(bbset);
+    CHECK0_DUMMYUSE(bbset);
     ASSERT0(!bbset->is_empty()); //loop is empty.
 
     DefMiscBitSetMgr * sbs_mgr = m_rg->getMiscBitSetMgr();

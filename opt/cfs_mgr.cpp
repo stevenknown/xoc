@@ -172,7 +172,7 @@ AbsNode * CfsMgr::constructAbsLoop(IN IRBB * entry,
     ASSERT0(body_start != nullptr);
 
     CFS_INFO * ci = map_ir2cfsinfo(cfg->get_last_xr(entry));
-    CHECK_DUMMYUSE(ci);
+    CHECK0_DUMMYUSE(ci);
     ASSERT0(CFS_INFO_head(ci) == entry);
 
     ASSERT0(CFS_INFO_loop_body(ci)->is_contain(*li->getBodyBBSet()));

@@ -76,6 +76,10 @@ LONGLONG ceil_align(LONGLONG v, LONGLONG align);
 //     and function return 3.
 UINT computeMaxBitSizeForValue(ULONGLONG v);
 
+//Misc Dumps/Dumpf of Vector<T>
+#define DUMPVEC_BOOL 1
+#define DUMPVEC_INT 2
+
 //Dumpf() for Vector<TY>.
 void dumpf_svec(void * vec, UINT ty, CHAR const* name, bool is_del);
 
@@ -165,6 +169,7 @@ float getclockend(LONG start);
 //e.g: given m=0x8, the first '1' index is 3.
 INT getFirstOneAtRightSide(INT m);
 
+//Calculate an integer hash value according to 'n'.
 inline UINT hash32bit(UINT n)
 {
     n = (n+0x7ed55d16) + (n<<12);
@@ -186,16 +191,6 @@ bool isIntegerD(double d);
 inline bool isPowerOf2(ULONGLONG x) { return (x != 0 && (x & (x-1)) == 0); }
 bool isPowerOf5(double f);
 
-//Return true if val is 32bit integer more than 16bit.
-//e.g: 0xFFFF is not more than 16bit.
-//     0x1FFFF is more than 32bit.
-bool isInteger32bit(UINT64 val);
-
-//Return true if val is 64bit integer more than 32bit.
-//e.g: 0xffffFFFF is not more than 32bit.
-//     0x1ffffFFFF is more than 32bit.
-bool isInteger64bit(UINT64 val);
-
 //Prime Factorization.
 //e.g: 435234 = 251 * 17 * 17 * 3 * 2.
 void prim(INT m, OUT INT * buf);
@@ -206,9 +201,17 @@ LONG revlong(LONG d);
 
 //Reverse the string.
 UCHAR * reverseString(UCHAR * v);
+
+//Replace letters in 'n' to capital letter.
 CHAR * upper(CHAR * n);
+
+//Replace letters in 'n' to lowercase letter.
 CHAR * lower(CHAR * n);
+
+//Calculate the Great Common Divisor of x and y.
 INT sgcd(INT x, INT y);
+
+//Calculate the Least Common Multiple of x and y.
 INT slcm(INT x, INT y);
 
 //Shift a string to right side or left side.
@@ -217,10 +220,18 @@ INT slcm(INT x, INT y);
 //   means shifting string to left.
 void strshift(CHAR * src, INT ofst);
 
+//The function produce output string according to 'info' as described below,
+//and appends the output the 'buf'.
+//Return a pointer to the resulting string 'buf'.
+//buf: output string buffer.
+//bufl: byte size of 'buf'.
+//info: formatting string.
 CHAR * xstrcat(CHAR * buf, size_t bufl, CHAR const* info, ...);
+
+//Calculates the byte size of string 'p', excluding the terminating byte '\0'.
 UINT xstrlen(CHAR const* p);
 
-//Compare the first 'n' char of two string.
+//Compare the first 'n' characters of two string.
 //Return true if equal.
 bool xstrcmp(CHAR const* p1, CHAR const* p2, INT n);
 
@@ -241,8 +252,24 @@ INT xctoi(CHAR const* cl);
 
 //Convert long to string.
 UCHAR * xltoa(LONG v, OUT UCHAR * buf);
+
+//Cacluates the smallest integral value that is not less than
+//the division of a, b.
+//e.g: xceiling(3,2) is 2.
 INT xceiling(INT a, INT b);
+
+//Cacluates the largest integral value that is not greater than
+//the division of a, b.
+//e.g: xceiling(3,2) is 1.
 INT xfloor(INT a, INT b);
+
+//Find partial string, return the subscript-index if substring found,
+//otherwise return -1.
+//
+//'src': input string.
+//'par': partial string.
+//'i': find the ith partial string. And 'i' get started with 0.
+//     If one only want to find the first partial string, i equals to 0.
 LONG xstrstr(CHAR const* src, CHAR const* par, INT i);
 
 //Split string by given separetor, and return the number of substring.
@@ -251,19 +278,31 @@ LONG xstrstr(CHAR const* src, CHAR const* par, INT i);
 //sep: separator.
 //Note caller is responsible for the free of each string memory in ret.
 UINT xsplit(CHAR const* str, OUT Vector<CHAR*> & ret, CHAR const* sep);
+
+//The function copies byte size of 'size' of the string pointed to by 'src'
+//to destination 'tgt', including the '\0'.
 void xstrcpy(CHAR * tgt, CHAR const* src, size_t size);
+
+//Return true if 'c' is blank space or TAB character.
 inline bool xisspace(CHAR c) { return c == ' ' || c == '\t'; }
+
+//Return true if 'c' is decimal.
 inline bool xisdigit(CHAR c) { return c >= '0' && c <= '9'; }
+
+//Return true if 'c' is hex decimal.
 inline bool xisdigithex(CHAR d)
 {
     if (xisdigit(d)) { return true; }
     else if ((d >= 'a' && d <= 'f') || (d >= 'A' && d <= 'F')) { return true; }
     return false;
 }
+
+//Return true if 'c' is letter.
 inline bool xisalpha(CHAR c)
 { return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z'); }
-LONGLONG xabs(LONGLONG a);
 
+//Return abs value of 'a'.
+LONGLONG xabs(LONGLONG a);
 
 //Exported Data Structures
 class ASCII {

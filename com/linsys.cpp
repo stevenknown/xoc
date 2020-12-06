@@ -479,7 +479,7 @@ bool Lineq::reduce(IN OUT RMat & m, UINT rhs_idx, bool is_intersect)
                 }
             }
         }
-        //dumps_svec((void*)&removed, D_BOOL);
+        //dumps_svec((void*)&removed, DUMPVEC_BOOL);
 
         //Compute the tightest/relaxed bound of inequalities
         //which only involved single variable.
@@ -553,7 +553,7 @@ bool Lineq::reduce(IN OUT RMat & m, UINT rhs_idx, bool is_intersect)
                 }
             }
         }
-        //dumps_svec((void*)&removed, D_BOOL);
+        //dumps_svec((void*)&removed, DUMPVEC_BOOL);
 
         //Verification for legitimate intersection of lower and upper boundary.
         //e.g: x <= 9 , x >= 10 is inconsistency.

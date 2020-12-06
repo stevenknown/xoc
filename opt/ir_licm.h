@@ -204,7 +204,7 @@ public:
     //Consider whether exp is worth hoisting.
     bool isWorthHoist(IR * exp)
     {
-        CHECK_DUMMYUSE(exp);
+        CHECK0_DUMMYUSE(exp);
         ASSERT0(exp->is_exp());
         //If IR_has_sideeffect(ir) is true, that means exp can not be removed,
         //but still can be moved.

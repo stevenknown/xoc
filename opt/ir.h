@@ -1551,7 +1551,7 @@ public:
 };
 
 
-//Represents a indirect function call.
+//Represents an indirect function call.
 //This class uses macro operations of CCall.
 //Expression to compute the target function address.
 //NOTE: 'opnd_pad' must be the first member.
@@ -1694,6 +1694,7 @@ class CDoWhile : public CWhileDo {
 //Record the expression that update induction variable.
 #define LOOP_step(ir) (*(((CDoLoop*)ir)->opnd + CKID_TY(ir, IR_DO_LOOP, 4)))
 #define DOLOOP_kid(ir, idx) (((CDoLoop*)ir)->opnd[CKID_TY(ir, IR_DO_LOOP, idx)])
+
 class CDoLoop : public CWhileDo {
     COPY_CONSTRUCTOR(CDoLoop);
 public:

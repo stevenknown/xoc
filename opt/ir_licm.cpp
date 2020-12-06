@@ -533,8 +533,9 @@ bool LICM::handleDefByDUChain(IR const* exp,
 
     MDSSAMgr * mdssamgr = m_rg->getMDSSAMgr();
     if (mdssamgr != nullptr && mdssamgr->is_valid() && exp->isMemoryOpnd()) {
-        MDSSAInfo * info = mdssamgr->getMDSSAInfoIfAny(exp);
-        ASSERTN(info, ("def stmt even not in MDSSA system"));
+        //TBD:Does this code useful?
+        //MDSSAInfo * info = mdssamgr->getMDSSAInfoIfAny(exp);
+        //ASSERTN(info, ("def stmt even not in MDSSA system"));
         //mdssamgr->addMDSSAOcc(use, info);
         return true;
     }
@@ -791,10 +792,10 @@ bool LICM::hoistCandHelper(OUT bool & insert_guard_bb,
     IR * t = m_rg->buildPR(cand_exp->getType());    
     if (cand_stmt->hasJudgeDet() && cand_exp == cand_stmt->getJudgeDet()) {
         bool f = cand_stmt->replaceKid(cand_exp, m_rg->buildJudge(t), false);
-        CHECK_DUMMYUSE(f);
+        CHECK0_DUMMYUSE(f);
     } else {
         bool f = cand_stmt->replaceKid(cand_exp, t, false);
-        CHECK_DUMMYUSE(f);
+        CHECK0_DUMMYUSE(f);
     }
 
     IR * stpr = m_rg->buildStorePR(PR_no(t), t->getType(), cand_exp);

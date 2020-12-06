@@ -147,7 +147,7 @@ void CDG::build(IN OUT OptCtx & oc, xcom::DGraph & cfg)
 
     Vector<Vertex*> top_order;
     bool has_cyc = pdom_tree.sortInTopologOrder(top_order);
-    CHECK_DUMMYUSE(!has_cyc);
+    CHECK0_DUMMYUSE(!has_cyc);
 
     xcom::BitSetMgr bs_mgr;
     //Record vertex set by which current vertex controlled.

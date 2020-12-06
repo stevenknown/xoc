@@ -1381,7 +1381,7 @@ bool DGraph::computePdomByRpo(Vertex * root, BitSet const* uni)
     } else {
         res = computePdom(&vlst, uni);
     }
-    CHECK_DUMMYUSE(res);
+    CHECK0_DUMMYUSE(res);
     return true;
 }
 
@@ -1737,7 +1737,7 @@ bool DGraph::computeIpdom()
     m_ipdom_set.clean();
 
     //Processing in reverse-topological order.
-    INT c;
+    INT c = 0;
     for (Vertex const* v = get_last_vertex(c);
          v != nullptr; v = get_prev_vertex(c)) {
         UINT cur_id = VERTEX_id(v);

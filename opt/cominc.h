@@ -34,6 +34,13 @@ author: Su Zhenyu
 #ifndef __COMINC_H__
 #define __COMINC_H__
 
+//_USE_GCC_ will be defined if host C++ compiler is gcc.
+#ifdef _USE_GCC_
+//Suppress gcc warning about array boundary checking. The accessing to
+//IR's padding operand violates the checking.
+#pragma GCC diagnostic ignored "-Warray-bounds"
+#endif
+
 #include "commoninc.h"
 #include "data_type.h"
 #include "const.h"

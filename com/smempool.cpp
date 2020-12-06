@@ -33,6 +33,8 @@ author: Su Zhenyu
 @*/
 #include "xcominc.h"
 
+namespace xcom {
+
 #define msg
 #define MAGIC_NUM 0xFC
 #define BOUNDARY_NUM 0xAA
@@ -550,3 +552,4 @@ size_t smpoolGetPoolSizeViaIndex(MEMPOOLIDX mpt_idx)
     return smpoolGetPoolSize(mp);
 }
 
+} //namespace xcom

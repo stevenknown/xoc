@@ -193,7 +193,7 @@ void GCSE::elimCseAtCall(IR * use, IR * use_stmt, IR * gen)
 
     //Add du chain from gen_pr's stmt to the use of pr.
     bool f = use_stmt->replaceKid(use, use_pr, false);
-    CHECK_DUMMYUSE(f);
+    CHECK0_DUMMYUSE(f);
     if (m_mdssamgr != nullptr) {
         m_mdssamgr->removeMDSSAUse(use);
     }
@@ -268,8 +268,8 @@ void GCSE::processCseGen(IN IR * gen, IR * gen_stmt, bool & change)
     //The 'find()' is fast because it is implemented with hash.
     IRListIter holder = nullptr;
     bool f = BB_irlist(bb).find(gen_stmt, &holder);
-    CHECK_DUMMYUSE(f);
-    CHECK_DUMMYUSE(holder);
+    CHECK0_DUMMYUSE(f);
+    CHECK0_DUMMYUSE(holder);
     BB_irlist(bb).insert_before(new_stpr, holder);
 
     IR * newkid = tmp_pr;
@@ -280,7 +280,7 @@ void GCSE::processCseGen(IN IR * gen, IR * gen_stmt, bool & change)
     }
 
     bool v = gen_stmt->replaceKid(gen, newkid, false);
-    CHECK_DUMMYUSE(v);
+    CHECK0_DUMMYUSE(v);
 
     //Keep original du unchange, add new du chain for new stmt.
     ASSERT0(tmp_pr->is_pr());

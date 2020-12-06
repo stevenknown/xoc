@@ -381,6 +381,7 @@ TypeContainer const* TypeMgr::registerMC(Type const* type)
         return registerVector(type);
     }
 
+    ASSERT0(type->is_mc());
     TypeContainer const* entry = m_memorychunk_type_tab.get(type);
     if (entry != nullptr) {
         return entry;
@@ -534,9 +535,9 @@ CHAR const* TypeMgr::dump_type(Type const* type, OUT StrBuf & buf)
         break;
     }
     case D_TENSOR: {
-        UINT elem_byte_size = getDTypeByteSize(TY_tensor_ety(type));
-        ASSERT0(elem_byte_size != 0);
-        ASSERT0(getByteSize(type) % elem_byte_size == 0);
+        //Check byte size of element.
+        ASSERT0(getDTypeByteSize(TY_tensor_ety(type)) != 0);
+        ASSERT0(getByteSize(type) % getDTypeByteSize(TY_tensor_ety(type)) == 0);
         buf.strcat("%s:%s<", DTNAME(dt), DTNAME(TY_tensor_ety(type)));
         UINT dim = ((TensorType const*)type)->getDim();
         for (UINT i = 0; i < dim; i++) {

@@ -82,10 +82,11 @@ AnalysisInstrument::AnalysisInstrument(Region * rg) :
 }
 
 
+#ifdef _DEBUG_
 static bool verifyVar(Region * rg, VarMgr * vm, Var * v)
 {
-    CHECK_DUMMYUSE(v);
-    CHECK_DUMMYUSE(vm);
+    CHECK0_DUMMYUSE(v);
+    CHECK0_DUMMYUSE(vm);
     if (rg->is_function() || rg->is_eh() ||
         rg->getRegionType() == REGION_INNER) {
         //If var is global but unallocable, it often be
@@ -94,18 +95,17 @@ static bool verifyVar(Region * rg, VarMgr * vm, Var * v)
         //For these kind of regions, there are only local variable or
         //unablable global variable is legal.
         ASSERT0(VAR_is_local(v) || VAR_is_unallocable(v));
-    }
-    else if (rg->is_program()) {
+    } else if (rg->is_program()) {
         //Theoretically, only global variable is legal in program region.
         //However even if the program region there may be local
         //variables, e.g: PR, a kind of local variable.
         //ASSERT0(VAR_is_global(v));
-    }
-    else {
+    } else {
         ASSERTN(0, ("unsupport variable type."));
     }
     return true;
 }
+#endif
 
 
 //Free md's id and local-var's id back to MDSystem and VarMgr.
@@ -2232,8 +2232,7 @@ static bool verifyMDRefForIR(IR const* ir, ConstIRIter & cii, Region * rg)
             break;
         }
         case IR_ST: {
-            MD const* x = t->getRefMD();
-            ASSERT0(!x->get_base()->is_readonly());
+            ASSERT0(!t->getRefMD()->get_base()->is_readonly());
             if (g_is_support_dynamic_type) {
                 ASSERTN(t->getEffectRef(),
                         ("type is at least effect"));

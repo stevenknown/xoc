@@ -77,14 +77,14 @@ bool MDSSAInfo::isUseReachable(IN UseDefMgr * usedefmgr, IR const* exp)
 void MDSSAInfo::collectUse(OUT IRSet * set, UseDefMgr const* usedefmgr)
 {
     ASSERT0(set && usedefmgr);
-    VOpndSetIter iter = nullptr;
-    Region * rg = usedefmgr->getRegion();
+    VOpndSetIter iter = nullptr;    
     for (INT i = getVOpndSet()->get_first(&iter);
          i >= 0; i = getVOpndSet()->get_next(i, &iter)) {
         VMD * vopnd = (VMD*)usedefmgr->getVOpnd(i);
         ASSERT0(vopnd && vopnd->is_md());
 
         #ifdef _DEBUG_
+        Region * rg = usedefmgr->getRegion();
         IRSetIter vit = nullptr;
         for (INT i2 = vopnd->getUseSet()->get_first(&vit);
             i2 >= 0; i2 = vopnd->getUseSet()->get_next(i2, &vit)) {

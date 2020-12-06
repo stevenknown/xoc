@@ -1333,7 +1333,7 @@ void MDSSAMgr::renameBB(IN IRBB * bb)
                 for (INT i = refset->get_first(&iter);
                      i >= 0; i = refset->get_next((UINT)i, &iter)) {
                     MD * md = m_md_sys->getMD(i);
-                    CHECK_DUMMYUSE(md);
+                    CHECK0_DUMMYUSE(md);
 
                     //In memory SSA, rename the MD even
                     //if it is ineffect to keep DU relation, e.g:
@@ -1673,7 +1673,7 @@ bool MDSSAMgr::verifyPhi(bool is_vpinfo_avail)
 
             //Check phi result.
             VMD * res = phi->getResult();
-            CHECK_DUMMYUSE(res->is_md());
+            CHECK0_DUMMYUSE(res->is_md());
 
             //Check the number of phi opnds.
             UINT num_opnd = 0;
@@ -1685,7 +1685,7 @@ bool MDSSAMgr::verifyPhi(bool is_vpinfo_avail)
 
                 //Opnd may be ID, CONST or LDA.
                 MD const* opnd_md = opnd->getRefMD();
-                CHECK_DUMMYUSE(opnd_md);
+                CHECK0_DUMMYUSE(opnd_md);
                 ASSERTN(MD_id(opnd_md) == res->mdid(),
                         ("mdid of VMD is unmatched"));
 
@@ -1749,7 +1749,7 @@ bool MDSSAMgr::verifyVMD()
                         res->mdid())) {
                     findref = true;
                 }
-                CHECK_DUMMYUSE(findref);
+                CHECK0_DUMMYUSE(findref);
             }
         }
 
@@ -1769,7 +1769,7 @@ bool MDSSAMgr::verifyVMD()
                     use->getRefMDSet()->is_contain_pure(res->mdid())) {
                     findref = true;
                 }
-                CHECK_DUMMYUSE(findref);
+                CHECK0_DUMMYUSE(findref);
             }
         }
     }
@@ -1898,7 +1898,7 @@ bool MDSSAMgr::verify()
                     if (!opnd->is_id()) { continue; }
 
                     MD const* opnd_md = opnd->getRefMD();
-                    CHECK_DUMMYUSE(opnd_md);
+                    CHECK0_DUMMYUSE(opnd_md);
                     ASSERTN(MD_id(opnd_md) == phi->getResult()->mdid(),
                             ("MD not matched"));
                     verifySSAInfo(opnd);
@@ -2843,9 +2843,7 @@ bool MDSSAMgr::isStmtDomUseInsideLoop(IR const* stmt,
 //In ssa mode, stmt's USE may be placed in operand list of PHI.
 bool MDSSAMgr::isStmtDomAllUseInsideLoop(IR const* ir, LI<IRBB> const* li) const
 {
-    ASSERT0(ir);
-    IRBB const* irbb = ir->getBB();
-    ASSERT0(irbb);
+    ASSERT0(ir && ir->getBB());
     ConstMDSSAUSEIRIter ii;
     for (IR const* use = iterUseInitC(ir, ii);
         use != nullptr; use = iterUseNextC(ii)) {
