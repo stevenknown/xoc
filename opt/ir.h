@@ -39,6 +39,7 @@ namespace xoc {
 class SimpCtx;
 class IRBB;
 class DU;
+class MD;
 class SSAInfo;
 class MDSSAInfo;
 class MDPhi;

@@ -33,38 +33,15 @@ author: Su Zhenyu
 @*/
 #ifndef __COMINC_H__
 #define __COMINC_H__
-
-//_USE_GCC_ will be defined if host C++ compiler is gcc.
-#ifdef _USE_GCC_
-//Suppress gcc warning about array boundary checking. The accessing to
-//IR's padding operand violates the checking.
-#pragma GCC diagnostic ignored "-Warray-bounds"
-#endif
-
 #include "commoninc.h"
-#include "data_type.h"
-#include "const.h"
-//Middle level included files
-#include "dbg.h"
-#include "var.h"
-#include "md.h"
-#include "pass.h"
-#include "ai.h"
-#include "du.h"
-#include "ir.h"
-#include "loop.h"
-#include "prssainfo.h"
-#include "mdssainfo.h"
-#include "ir_bb.h"
+#include "region_deps.h"
 #include "ir_refine.h"
 #include "ir_simp.h"
-#include "pass_mgr.h"
 #include "ir_high_opt.h"
 #include "ir_middle_opt.h"
 #include "targ_info.h"
-#include "region_mgr.h"
-#include "analysis_instr.h"
-#include "region.h"
+#include "prssainfo.h"
+#include "mdssainfo.h"
 #include "cfg.h"
 #include "ir_cfg.h"
 #include "ir_du.h"

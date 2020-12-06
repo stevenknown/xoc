@@ -42,6 +42,8 @@ class AliasAnalysis;
 class ExprTab;
 class MDSSAMgr;
 class PRSSAMgr;
+class Pass;
+class PassMgr;
 
 //Region MD referrence info.
 #define REF_INFO_maydef(ri) ((ri)->may_def_mds)

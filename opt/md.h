@@ -36,6 +36,7 @@ author: Su Zhenyu
 
 namespace xoc {
 
+class Var;
 class MDSystem;
 class Region;
 

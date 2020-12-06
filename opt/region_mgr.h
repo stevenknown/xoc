@@ -63,6 +63,7 @@ typedef enum {
 class Region;
 class CallGraph;
 class IPA;
+class TargInfo;
 
 //
 //START RegionMgr

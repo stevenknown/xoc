@@ -33,9 +33,7 @@ author: Su Zhenyu
 @*/
 #include "../com/xcominc.h"
 #include "commoninc.h"
-#include "cominc.h"
-#include "symtab.h"
-#include "label.h"
+#include "region_deps.h"
 
 namespace xoc {
 
@@ -73,6 +71,7 @@ LabelInfo * allocLabel(SMemPool * pool)
     return p;
 }
 
+
 void LabelInfo::dumpName(Region const* rg) const
 {
     if (!rg->isLogMgrInit()) { return; }
@@ -85,6 +84,7 @@ void LabelInfo::dumpName(Region const* rg) const
         prt(rg, "%s", SYM_name(LABELINFO_pragma(this)));
     } else { UNREACHABLE(); }
 }
+
 
 char const* LabelInfo::getName(IN OUT StrBuf * buf) const
 {
@@ -99,6 +99,7 @@ char const* LabelInfo::getName(IN OUT StrBuf * buf) const
     else { UNREACHABLE(); }
     return buf->buf;
 }
+
 
 void LabelInfo::dump(Region const* rg) const
 {
