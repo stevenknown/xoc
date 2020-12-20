@@ -153,8 +153,7 @@ class SymTabHash : public Hash<Sym*, SymbolHashFunc> {
 public:
     explicit SymTabHash(UINT bsize) : Hash<Sym*, SymbolHashFunc>(bsize)
     { m_pool = smpoolCreate(64, MEM_COMM); }
-    virtual ~SymTabHash()
-    { smpoolDelete(m_pool); }
+    virtual ~SymTabHash() { smpoolDelete(m_pool); }
 
     CHAR * strdup(CHAR const* s)
     {
