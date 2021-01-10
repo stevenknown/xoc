@@ -606,10 +606,10 @@ public:
     //Return data type that registered in m_type_tab.
     Type * registerType(Type const* dtd);
 
-    CHAR const* dump_type(Type const* dtd, OUT StrBuf & buf);
-    void dump_type(Type const* dtd);
-    void dump_type(UINT tyid);
-    void dump_type_tab();
+    CHAR const* dump_type(Type const* dtd, OUT StrBuf & buf) const;
+    void dump_type(Type const* dtd) const;
+    void dump_type(UINT tyid) const;
+    void dump_type_tab() const;
 
     DATA_TYPE hoistBSdtype(UINT bit_size, bool is_signed) const;
     DATA_TYPE hoistDtype(UINT bit_size, OUT UINT * hoisted_data_size);

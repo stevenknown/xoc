@@ -34,6 +34,7 @@ author: Su Zhenyu
 #include <windows.h>
 #include <string>
 #include <iostream>
+#include "../com/xcominc.h"
 
 static LARGE_INTEGER li = {0}, li2 = {0};
 
@@ -45,42 +46,30 @@ void tstart()
 }
 
 
-char * format_elapsed(double d)
+char * format_elapsed(double d, char * buf, UINT buflen)
 {
-    char buf[256] = {0};
-
-    if( d < 0.00000001 )
-    {
+    if( d < 0.00000001 ) {
         // show in ps with 4 digits
-        sprintf(buf, "%0.4f ps", d * 1000000000000.0);
-    }
-    else if( d < 0.00001 )
-    {
+        SNPRINTF(buf, buflen, "%0.4f ps", d * 1000000000000.0);
+    } else if( d < 0.00001 ) {
         // show in ns
-        sprintf(buf, "%0.0f ns", d * 1000000000.0);
-    }
-    else if( d < 0.001 )
-    {
+        SNPRINTF(buf, buflen, "%0.0f ns", d * 1000000000.0);
+    } else if( d < 0.001 ) {
         // show in us
-        sprintf(buf, "%0.0f us", d * 1000000.0);
-    }
-    else if( d < 0.1 )
-    {
+        SNPRINTF(buf, buflen, "%0.0f us", d * 1000000.0);
+    } else if( d < 0.1 ) {
         // show in ms
-        sprintf(buf, "%0.0f ms", d * 1000.0);
-    }
-    else if( d <= 60.0 )
-    {
+        SNPRINTF(buf, buflen, "%0.0f ms", d * 1000.0);
+    } else if( d <= 60.0 ) {
         // show in seconds
-        sprintf(buf, "%0.2f s", d);
-    }
-    else if( d < 3600.0 )
-    {
+        SNPRINTF(buf, buflen, "%0.2f s", d);
+    } else if( d < 3600.0 ) {
         // show in min:sec
-        sprintf(buf, "%01.0f:%02.2f", floor(d/60.0), fmod(d,60.0));
+        SNPRINTF(buf, buflen, "%01.0f:%02.2f", floor(d/60.0), fmod(d,60.0));
     } else {
         // show in h:min:sec
-        sprintf(buf, "%01.0f:%02.0f:%02.2f", floor(d/3600.0), floor(fmod(d,3600.0)/60.0), fmod(d,60.0));
+        SNPRINTF(buf, buflen, "%01.0f:%02.0f:%02.2f",
+                 floor(d/3600.0), floor(fmod(d,3600.0)/60.0), fmod(d,60.0));
     }
     return buf;
 }
@@ -89,16 +78,18 @@ char * format_elapsed(double d)
 
 #include <time.h>
 //Return time, in ps, ns, ms, or h:min:sec.
-char * tend()
+//buf: recommend to larger than 256 bytes at least.
+char * tend(char * buf, UINT buflen)
 {
     clock_t start = clock();
-    /*Do something*/
+    //Do something
     clock_t end = clock();
     float seconds = (float)(end - start) / CLOCKS_PER_SEC;
 
     long long freq = 4294967296;
     QueryPerformanceCounter(&li2);
-    __int64 ticks = li2.QuadPart-li.QuadPart;
-    char * s = format_elapsed((double)ticks/(double)freq);
-    return s;
+    __int64 ticks = li2.QuadPart-li.QuadPart;    
+    buf[0] = '\0';
+    format_elapsed((double)ticks/(double)freq, buf, buflen);
+    return buf;
 }

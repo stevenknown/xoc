@@ -241,6 +241,9 @@ public:
     BYTE kid_num;
     BYTE size;
     UINT attr;
+
+public:
+    static bool mustExist(IR_TYPE irtype, UINT kididx);
 };
 
 
@@ -2795,6 +2798,7 @@ IR * IR::getJudgeDet() const
 
 //Exported Functions.
 CHAR const* compositeName(Sym const* n, xcom::StrBuf & buf);
+void dumpConst(IR const* ir, Region const* rg);
 void dumpIR(IR const* ir,
             Region const* rg,
             CHAR * attr = nullptr,

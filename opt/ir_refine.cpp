@@ -2152,6 +2152,7 @@ void Refine::insertCvtForBinaryOp(IR * ir, bool & change)
 IR * Refine::insertCvtForFloat(IR * parent, IR * kid, bool &)
 {
     CHECK0_DUMMYUSE(parent->is_fp() || kid->is_fp());
+    //Target Dependent Code.
     return kid;
 }
 
@@ -2327,6 +2328,11 @@ IR * Refine::foldConstIntBinary(IR * ir, bool & change)
     ASSERT0(BIN_opnd1(ir)->is_const());
     HOST_INT v1 = CONST_int_val(BIN_opnd1(ir));
 
+    if (v1 == 0 && (ir->is_div() || ir->is_mod())) {
+        //Keep IR unchanged because it will trigger runtime exception.
+        return ir;
+    }
+    
     switch (ir->getCode()) {
     case IR_ADD:
     case IR_SUB:

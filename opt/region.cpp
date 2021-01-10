@@ -2985,6 +2985,7 @@ bool Region::process(OptCtx * oc)
 
     post_process(this, oc);
     //oc->set_all_invalid();
+
     return true;
 
 ERR_RETURN:

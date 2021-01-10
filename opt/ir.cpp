@@ -357,6 +357,15 @@ UINT checkStArrayDimension(IR const* ir, UINT n)
 }
 #endif
 
+//
+//START IRDesc
+//
+bool IRDesc::mustExist(IR_TYPE irtype, UINT kididx)
+{
+    return HAVE_FLAG(IRDES_kid_map(g_ir_desc[irtype]), 1 << kididx);
+}
+//END IRDesc
+
 
 //Dump IR, and both its kids and siblings.
 void dumpIRListH(IR * ir_list, Region const* rg, CHAR * attr, UINT dumpflag)
@@ -581,6 +590,94 @@ static void dumpAttachInfo(OUT CHAR * buf, IR const* ir)
         sprintf(p, "%s", ai->getAIName(ac->type));
         p = p + strlen(p);
     }
+}
+
+
+void dumpConst(IR const* ir, Region const* rg)
+{
+    StrBuf buf(64);
+    TypeMgr const* xtm = rg->getTypeMgr();
+    Type const* d = ir->getType();
+    if (ir->is_sint()) {
+        #if WORD_LENGTH_OF_HOST_MACHINE==32
+        CHAR const* intfmt = "intconst:%s %d|0x%x";
+        #elif WORD_LENGTH_OF_HOST_MACHINE==64
+        CHAR const* intfmt = "intconst:%s %lld|0x%llx";
+        #else
+        #error "Need to support";
+        #endif
+        prt(rg, intfmt, xtm->dump_type(d, buf),
+            CONST_int_val(ir), CONST_int_val(ir));
+        return;
+    }
+
+    if (ir->is_uint()) {
+        #if WORD_LENGTH_OF_HOST_MACHINE==32
+        CHAR const* intfmt = "intconst:%s %u|0x%x";
+        #elif WORD_LENGTH_OF_HOST_MACHINE==64
+        CHAR const* intfmt = "intconst:%s %llu|0x%llx";
+        #else
+        #error "Need to support";
+        #endif
+        prt(rg, intfmt, xtm->dump_type(d, buf),
+            CONST_int_val(ir), CONST_int_val(ir));
+        return;
+    }
+
+    if (ir->is_fp()) {
+        CHAR fpformat[128];
+        ::snprintf(fpformat, 127, "fpconst:%%s %%.%df",
+                   CONST_fp_mant(ir));
+        prt(rg, fpformat, xtm->dump_type(d, buf), CONST_fp_val(ir));
+        return;
+    }
+
+    if (ir->is_bool()) {
+        prt(rg, "boolconst:%s %d", xtm->dump_type(d, buf),
+            CONST_int_val(ir));
+        return;
+    }
+
+    if (ir->is_str()) {
+        UINT const tbuflen = 40;
+        CHAR tbuf[tbuflen];
+        tbuf[0] = 0;
+        xstrcat(tbuf, tbuflen, "%s", SYM_name(CONST_str_val(ir)));
+
+        //Remove \n to show string in one line.
+        for (UINT i = 0; i < tbuflen && tbuf[i] != 0; i++) {
+            if (tbuf[i] == '\n') { tbuf[i] = ' '; }
+        }
+
+        if (strlen(SYM_name(CONST_str_val(ir))) < tbuflen) {
+            prt(rg, "strconst:%s \\\"%s\\\"",
+                xtm->dump_type(d, buf), tbuf);
+        } else {
+            prt(rg, "strconst:%s \\\"%s...\\\"",
+                xtm->dump_type(d, buf), tbuf);
+        }
+        return;
+    }
+
+    if (ir->is_mc()) {
+        //Imm may be MC type.
+        #if WORD_LENGTH_OF_HOST_MACHINE==32
+        CHAR const* intfmt = "intconst:%s %u|0x%x";
+        #elif WORD_LENGTH_OF_HOST_MACHINE==64
+        CHAR const* intfmt = "intconst:%s %llu|0x%llx";
+        #else
+        #error "Need to support";
+        #endif
+        prt(rg, intfmt, xtm->dump_type(d, buf),
+            CONST_int_val(ir), CONST_int_val(ir));
+        return;
+    }
+
+    //Dump as HOST_INT type even if it is unrecognized,
+    //leave the sanity check to verify().
+    //Note the dump format may extend or truncate the real value.
+    prt(rg, "intconst:%s %d|0x%x", xtm->dump_type(d, buf),
+        CONST_int_val(ir),  CONST_int_val(ir));
 }
 
 
@@ -862,70 +959,8 @@ void dumpIR(IR const* ir, Region const* rg, IN CHAR * attr, UINT dumpflag)
         break;
     }
     case IR_CONST:
-        if (ir->is_sint()) {
-            #if WORD_LENGTH_OF_HOST_MACHINE==32
-            CHAR const* intfmt = "\nintconst:%s %d|0x%x";
-            #elif WORD_LENGTH_OF_HOST_MACHINE==64
-            CHAR const* intfmt = "\nintconst:%s %lld|0x%llx";
-            #else
-            #error "Need to support";
-            #endif
-            note(rg, intfmt, xtm->dump_type(d, buf),
-                 CONST_int_val(ir), CONST_int_val(ir));
-        } else if (ir->is_uint()) {
-            #if WORD_LENGTH_OF_HOST_MACHINE==32
-            CHAR const* intfmt = "\nintconst:%s %u|0x%x";
-            #elif WORD_LENGTH_OF_HOST_MACHINE==64
-            CHAR const* intfmt = "\nintconst:%s %llu|0x%llx";
-            #else
-            #error "Need to support";
-            #endif
-            note(rg, intfmt, xtm->dump_type(d, buf),
-                 CONST_int_val(ir), CONST_int_val(ir));
-        } else if (ir->is_fp()) {
-            CHAR fpformat[128];
-            ::snprintf(fpformat, 127, "\nfpconst:%%s %%.%df",
-                       CONST_fp_mant(ir));
-            note(rg, fpformat, xtm->dump_type(d, buf), CONST_fp_val(ir));
-        } else if (ir->is_bool()) {
-            note(rg, "\nboolconst:%s %d", xtm->dump_type(d, buf),
-                 CONST_int_val(ir));
-        } else if (ir->is_str()) {
-            UINT const tbuflen = 40;
-            CHAR tbuf[tbuflen];
-            tbuf[0] = 0;
-            xstrcat(tbuf, tbuflen, "%s", SYM_name(CONST_str_val(ir)));
-
-            //Remove \n to show string in one line.
-            for (UINT i = 0; i < tbuflen && tbuf[i] != 0; i++) {
-                if (tbuf[i] == '\n') { tbuf[i] = ' '; }
-            }
-
-            if (strlen(SYM_name(CONST_str_val(ir))) < tbuflen) {
-                note(rg, "\nstrconst:%s \\\"%s\\\"",
-                     xtm->dump_type(d, buf), tbuf);
-            } else {
-                note(rg, "\nstrconst:%s \\\"%s...\\\"",
-                     xtm->dump_type(d, buf), tbuf);
-            }
-        } else if (ir->is_mc()) {
-            //Imm may be MC type.
-            #if WORD_LENGTH_OF_HOST_MACHINE==32
-            CHAR const* intfmt = "\nintconst:%s %u|0x%x";
-            #elif WORD_LENGTH_OF_HOST_MACHINE==64
-            CHAR const* intfmt = "\nintconst:%s %llu|0x%llx";
-            #else
-            #error "Need to support";
-            #endif
-            note(rg, intfmt, xtm->dump_type(d, buf),
-                 CONST_int_val(ir), CONST_int_val(ir));
-        } else {
-            //Dump as HOST_INT type even if it is unrecognized,
-            //leave the sanity check to verify().
-            //Note the dump format may extend or truncate the real value.
-            note(rg, "\nintconst:%s %d|0x%x", xtm->dump_type(d, buf),
-                 CONST_int_val(ir),  CONST_int_val(ir));
-        }
+        note(rg, "\n");
+        dumpConst(ir, rg); 
         PADDR(ir);
         prt(rg, "%s", attr);
         break;
@@ -1849,15 +1884,14 @@ bool IR::verify(Region const* rg) const
 
 bool IR::verifyKids() const
 {
-    ULONG kidbit = 1;
-    for (UINT i = 0; i < IR_MAX_KID_NUM(this); i++, kidbit <<= 1) {
+    for (UINT i = 0; i < IR_MAX_KID_NUM(this); i++) {
         IR * k = getKid(i);
         if (k != nullptr) {
             ASSERT0(IR_parent(k) == this);
         }
-        if (!HAVE_FLAG(IRDES_kid_map(g_ir_desc[getCode()]), kidbit)) {
+        if (!IRDesc::mustExist(getCode(), i)) {
             ASSERTN(k == nullptr,
-                   ("IR_%s does not have No.%d kid", IRNAME(this), i));
+                    ("IR_%s does not have No.%d kid", IRNAME(this), i));
         } else {
             //Here, ith kid cannot be nullptr.
             //CASE: Kind of node permit some of their kid to be nullptr.
@@ -1884,7 +1918,8 @@ bool IR::verifyKids() const
                 case IR_CALL:
                     break;
                 default:
-                    ASSERTN(k != nullptr, ("IR_%s miss kid%d", IRNAME(this), i));
+                    ASSERTN(k != nullptr,
+                            ("IR_%s miss kid%d", IRNAME(this), i));
                 }
             }
         }
@@ -1907,7 +1942,8 @@ bool IR::calcArrayOffset(TMWORD * ofst_val, TypeMgr * tm) const
 
     TMWORD aggr = 0;
     UINT dim = 0;
-    for (IR const* s = ARR_sub_list(this); s != nullptr; s = s->get_next(), dim++) {
+    for (IR const* s = ARR_sub_list(this); s != nullptr;
+         s = s->get_next(), dim++) {
         if (!s->is_const()) { return false; }
 
         ASSERT0(!s->is_fp() && CONST_int_val(s) >= 0);
@@ -1919,7 +1955,7 @@ bool IR::calcArrayOffset(TMWORD * ofst_val, TypeMgr * tm) const
         #endif
         ASSERTN((((ULONGLONG)CONST_int_val(s)) &
                 (ULONGLONG)(LONGLONG)MASK_32BIT) == 0,
-               ("allow 32bit array offset."));
+                ("allow 32bit array offset."));
 
         ASSERT0(dim < ((CArray*)this)->getDimNum());
         ASSERT0(ARR_elem_num(this, dim) != 0);

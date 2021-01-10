@@ -197,7 +197,8 @@ void VMD::dump(Region const* rg, UseDefMgr const* mgr) const
 
     //Dump Def
     if (getDef() != nullptr) {
-        ASSERT0(!getDef()->is_phi());
+        //TBD: I think MDDef could be PHI.
+        //ASSERT0(!getDef()->is_phi());
 
         if (getDef()->getPrev() != nullptr) {
             prt(rg, ",PrevDEF:MD%dV%d",
@@ -301,21 +302,24 @@ void MDPhi::dump(Region const* rg, UseDefMgr const* mgr) const
 
         switch (opnd->getCode()) {
         case IR_CONST:
-            prt(rg, "Const");
+            //prt(rg, "Const");
+            dumpConst(opnd, rg);
             break;
         case IR_LDA:
             prt(rg, "Lda");
             break;
         case IR_ID: {
             VMD * vopnd = getOpndVMD(opnd, mgr);
-            prt(rg, "MD%dV%d(id:%d)", vopnd->mdid(), vopnd->version(), opnd->id());
+            prt(rg, "MD%dV%d(id:%d)", vopnd->mdid(), vopnd->version(),
+                opnd->id());
             break;
         }
         default: UNREACHABLE();
         }
 
         if (pred == nullptr) {
-            prt(rg, "(BB?)"); //Predecessor is not match with PHI, error occurred.
+            //Predecessor is not match with PHI, error occurred.
+            prt(rg, "(BB?)");
         } else {
             prt(rg, "(BB%d)", pred->id());            
         }

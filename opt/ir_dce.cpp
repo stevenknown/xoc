@@ -385,6 +385,7 @@ bool DeadCodeElim::collectByMDSSA(IR const* x, IN OUT List<IR const*> * pwlst2)
     bool change = false;
     VOpndSetIter iter = nullptr;
     MD const* mustuse = x->getRefMD();
+
     for (INT i = mdssainfo->readVOpndSet()->get_first(&iter);
          i >= 0; i = mdssainfo->readVOpndSet()->get_next(i, &iter)) {
         VOpnd const* t = m_mdssamgr->getVOpnd(i);

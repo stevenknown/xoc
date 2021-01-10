@@ -2689,20 +2689,24 @@ protected:
 public:
     T * m_vec;
 
+public:
     Vector()
     {
         m_is_init = false;
         init();
     }
-
     explicit Vector(INT size)
     {
         m_is_init = false;
         init();
         grow(size);
     }
-
-    Vector(Vector const& vec) { copy(vec); }
+    Vector(Vector const& vec)
+    {
+        m_is_init = false;
+        init();
+        copy(vec);
+    }
     Vector const& operator = (Vector const&); //DISALBE COPY-CONSTRUCTOR.
     ~Vector() { destroy(); }
 

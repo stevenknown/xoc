@@ -535,8 +535,34 @@ bool CopyProp::doPropUseSet(IRSet * useset, IR * def_stmt,
          i != -1; i = useset->get_next(i, &it)) {
         IR * use = m_rg->getIR(i);
         ASSERT0(use && use->is_exp());
-        if (use->is_id() && !prop_value->is_const()) {
-            //Do NOT propagate non-const value to operand of MD PHI.
+        if (use->is_id()) {
+            if (!prop_value->is_const()) {
+                //Do NOT propagate non-const value to operand of MD PHI.
+                continue;
+            }
+
+            //TODO: For now, we will not propagate CONST value to PHI for the
+            //time being. Because IR_DCE will remove the
+            //'def_stmt' if there is no USE of it. And we should insert an
+            //assignment of the CONST value during stripping-PHI of MDSSA.
+            //e.g:i1 = 1; //S1
+            //    LOOP:
+            //    i3 = phi(i1, i2); //S2
+            //    i2 = i3 + 1;
+            //    truebr LOOP;
+            //  After IR_CP, 1 has been propagated to S2:
+            //    i1 = 1;
+            //    LOOP:
+            //    i3 = phi(1, i2);
+            //    i2 = i3 + 1;
+            //    truebr LOOP;
+            //  And after IR_DCE, S1 is removed:
+            //    LOOP:
+            //    i3 = phi(1, i2);
+            //    i2 = i3 + 1;
+            //    truebr LOOP;
+            // phi stripping should deal with the situation.
+            ASSERT0(ID_phi(use) && ID_phi(use)->is_phi());
             continue;
         }
 
@@ -642,6 +668,7 @@ bool CopyProp::doProp(IN IRBB * bb, IN IRSet * useset)
         bool prssadu = false;
         bool mdssadu = false;
         useset->clean();
+
         if (ssainfo != nullptr && SSA_uses(ssainfo).get_elem_count() != 0) {
             //Record use_stmt in another vector to facilitate this function
             //if it is not in use-list any more after copy-propagation.

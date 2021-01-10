@@ -497,7 +497,7 @@ UINT TypeMgr::getByteSize(Type const* type) const
 }
 
 
-CHAR const* TypeMgr::dump_type(Type const* type, OUT StrBuf & buf)
+CHAR const* TypeMgr::dump_type(Type const* type, OUT StrBuf & buf) const
 {
     ASSERT0(type);
     DATA_TYPE dt = TY_dtype(type);
@@ -558,13 +558,13 @@ CHAR const* TypeMgr::dump_type(Type const* type, OUT StrBuf & buf)
 }
 
 
-void TypeMgr::dump_type(UINT tyid)
+void TypeMgr::dump_type(UINT tyid) const
 {
     dump_type(getType(tyid));
 }
 
 
-void TypeMgr::dump_type(Type const* type)
+void TypeMgr::dump_type(Type const* type) const
 {
     if (!getRegionMgr()->isLogMgrInit()) { return; }
     StrBuf buf(64);
@@ -572,7 +572,7 @@ void TypeMgr::dump_type(Type const* type)
 }
 
 
-void TypeMgr::dump_type_tab()
+void TypeMgr::dump_type_tab() const
 {
     StrBuf buf(64);
     if (!getRegionMgr()->isLogMgrInit()) { return; }

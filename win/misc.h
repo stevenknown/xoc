@@ -31,8 +31,15 @@ IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 author: Su Zhenyu
 @*/
-#ifndef _MISC_
-#define _MISC_
+#ifndef _MISC_H_
+#define _MISC_H_
+
+//This file only used on Windows.
+
 void tstart();
-char * tend();
+
+//Return time, in ps, ns, ms, or h:min:sec.
+//buf: recommend to larger than 256 bytes at least.
+char * tend(char * buf, UINT buflen)
+
 #endif

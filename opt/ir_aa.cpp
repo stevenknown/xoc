@@ -859,8 +859,7 @@ void AliasAnalysis::processArray(IR * ir,
 
     if (array_base->is_lda()) {
         //Array base is LDA operation.
-        MD const* md = inferArrayLdabase(ir, array_base,
-                                         is_ofst_predicable,
+        MD const* md = inferArrayLdabase(ir, array_base, is_ofst_predicable,
                                          (UINT)ofst_val, &tic);
         ASSERT0(md);
         mds.clean(*getSBSMgr());
