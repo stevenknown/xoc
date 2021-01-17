@@ -515,6 +515,10 @@ public:
     IR * buildImmFp(HOST_FP fp, Type const* type);
 
     //Build IR_CONST operation.
+    //The expression indicates value with dynamic type.
+    IR * buildImmAny(HOST_INT v);
+
+    //Build IR_CONST operation.
     //The expression indicates a float point number.
     IR * buildImmFp(HOST_FP fp, DATA_TYPE dt)
     { return buildImmFp(fp, getTypeMgr()->getSimplexType(dt)); }

@@ -462,7 +462,8 @@ IR * Region::buildLoad(Var * var, Type const* type)
 IR * Region::buildILoad(IR * base, Type const* type)
 {
     ASSERT0(type);
-    ASSERTN(base && base->is_ptr(), ("mem-address of ILD must be pointer"));
+    ASSERTN(base && (base->is_ptr() || base->is_any()),
+            ("mem-address of ILD must be pointer"));
     IR * ir = allocIR(IR_ILD);
     IR_dt(ir) = type;
     ILD_base(ir) = base;
@@ -1052,6 +1053,17 @@ IR * Region::buildImmFp(HOST_FP fp, Type const* type)
     CONST_fp_val(imm) = fp;
     CONST_fp_mant(imm) = DEFAULT_MANTISSA_NUM;
     IR_dt(imm) = type;
+    return imm;
+}
+
+
+//Build IR_CONST operation.
+//The expression indicates value with dynamic type.
+IR * Region::buildImmAny(HOST_INT v)
+{
+    IR * imm = allocIR(IR_CONST);
+    CONST_int_val(imm) = (HOST_INT)v;
+    IR_dt(imm) = getTypeMgr()->getAny();
     return imm;
 }
 

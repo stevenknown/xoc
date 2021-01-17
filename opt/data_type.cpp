@@ -37,30 +37,30 @@ namespace xoc {
 
 TypeDesc const g_type_desc[] = {
     {D_UNDEF, "none",  0},
-    {D_B,     "bool",  8}, //BOOL
-    {D_I8,    "i8",    8}, //signed integer 8 bits
-    {D_I16,   "i16",   16},
-    {D_I32,   "i32",   32},
-    {D_I64,   "i64",   64},
-    {D_I128,  "i128",  128},
+    {D_B, "bool", 8}, //BOOL
+    {D_I8, "i8", 8}, //signed integer 8 bits
+    {D_I16, "i16", 16},
+    {D_I32, "i32", 32},
+    {D_I64, "i64", 64},
+    {D_I128, "i128", 128},
 
-    {D_U8,    "u8",    8},//unsigned integer 8 bits
-    {D_U16,   "u16",   16},
-    {D_U32,   "u32",   32},
-    {D_U64,   "u64",   64},
-    {D_U128,  "u128",  128},
+    {D_U8, "u8", 8}, //unsigned integer 8 bits
+    {D_U16, "u16", 16},
+    {D_U32, "u32", 32},
+    {D_U64, "u64", 64},
+    {D_U128, "u128", 128},
 
-    {D_F32,   "f32",   32}, //float point 32 bits
-    {D_F64,   "f64",   64},
-    {D_F80,   "f80",   80},
-    {D_F128,  "f128",  128},
+    {D_F32, "f32", 32}, //float point 32 bits
+    {D_F64, "f64", 64},
+    {D_F80, "f80", 80},
+    {D_F128, "f128", 128},
 
-    {D_MC,    "mc",    0}, //memory chunk, for structures, default bitsize is 0
-    {D_STR,   "str",   BYTE_PER_POINTER * BIT_PER_BYTE}, //string is pointer
-    {D_PTR,   "*",     BYTE_PER_POINTER * BIT_PER_BYTE}, //pointer
-    {D_VEC,   "vec",   0}, //vector, default bitsize is 0
+    {D_MC, "mc", 0}, //memory chunk, for structures, default bitsize is 0
+    {D_STR, "str", BYTE_PER_POINTER * BIT_PER_BYTE}, //string is pointer
+    {D_PTR, "*", BYTE_PER_POINTER * BIT_PER_BYTE}, //pointer
+    {D_VEC, "vec", 0}, //vector, default bitsize is 0
 
-    {D_ANY,  "void",  0}, //void type, default bitsize is 0
+    {D_ANY, "any", 0}, //void type, default bitsize is 0
     {D_TENSOR, "tensor", 0}, //tensor type, default bitsize is 0
 };
 

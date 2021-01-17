@@ -2212,8 +2212,8 @@ void DUMgr::collectMustUsedMDs(IR const* ir, OUT MDSet & mustuse)
         x != nullptr; x = iterRhsNextC(m_citer)) {
         if (!x->isMemoryOpnd()) { continue; }        
         computeExpression(const_cast<IR*>(x), &mustuse,
-            COMP_EXP_COLLECT_MUST_USE,
-            DUOPT_COMPUTE_PR_DU | DUOPT_COMPUTE_NONPR_DU);        
+                          COMP_EXP_COLLECT_MUST_USE,
+                          DUOPT_COMPUTE_PR_DU | DUOPT_COMPUTE_NONPR_DU);        
     }    
 }
 
@@ -2311,7 +2311,8 @@ void DUMgr::inferCallAndICall(IR * ir, UINT duflag, IN MD2MDSet * mx)
     ASSERT0(ir->isCallStmt());
     if (ir->is_icall()) {
         //Analysis callee's RefMDSet of IR_ICALL.
-        computeExpression(ICALL_callee(ir), nullptr, COMP_EXP_RECOMPUTE, duflag);
+        computeExpression(ICALL_callee(ir), nullptr,
+                          COMP_EXP_RECOMPUTE, duflag);
     }
 
     if (!HAVE_FLAG(duflag, DUOPT_COMPUTE_NONPR_REF)) {
@@ -2371,7 +2372,7 @@ void DUMgr::inferCallAndICall(IR * ir, UINT duflag, IN MD2MDSet * mx)
     if (ir->isReadOnly()) {
         modify_global = false;
     } else {
-        //Utilize calllee's MayDef MDSet if callee region has been processed.
+        //Prefer to use calllee's MayDef if callee region has been processed.
         CallGraph * callg = m_rg->getRegionMgr()->getCallGraph();
         if (callg != nullptr) {
             Region * callee = callg->mapCall2Region(ir, m_rg);
@@ -2422,15 +2423,26 @@ void DUMgr::inferCallAndICall(IR * ir, UINT duflag, IN MD2MDSet * mx)
     }
 
     MDSet tmpmds;
-    m_md_sys->computeOverlap(m_rg, maydefuse,
-        tmpmds, m_tab_iter, *m_misc_bs_mgr, true);
+    m_md_sys->computeOverlap(m_rg, maydefuse, tmpmds,
+                             m_tab_iter, *m_misc_bs_mgr, true);
     maydefuse.bunion_pure(tmpmds, *m_misc_bs_mgr);
 
     //Register the MDSet.
     //Regard both USE and DEF as ir's RefMDSet.
     //TODO: differetiate the USE set and DEF set of CALL stmt
     //      for better DefUse precision.
-    ir->setRefMDSet(m_mds_hash->append(maydefuse), m_rg);
+    MDSet const* hashed = m_mds_hash->append(maydefuse);
+    ir->setRefMDSet(hashed, m_rg);
+
+    //Build dummyuse for call.
+    if (!((CCall*)ir)->hasDummyUse() || !CALL_dummyuse(ir)->is_ild()) {
+        //TODO:consider append DefUse info on existed dummyuse.
+        ((CCall*)ir)->addDummyUse(m_rg);
+    }
+    ASSERTN(CALL_dummyuse(ir)->is_ild(),
+            ("ild can better present MD that based on different VAR"));
+    CALL_dummyuse(ir)->setRefMDSet(hashed, m_rg);
+
     tmpmds.clean(*m_misc_bs_mgr);
     maydefuse.clean(*m_misc_bs_mgr);
 }

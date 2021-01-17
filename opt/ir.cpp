@@ -1562,6 +1562,7 @@ bool IR::verify(Region const* rg) const
             !is_fp() &&
             !is_bool() &&
             !is_mc() &&
+            !is_any() &&
             !is_str()) {
             ASSERTN(0, ("unsupport immediate value DATA_TYPE:%d", getDType()));
         }
@@ -3685,5 +3686,21 @@ void CSwitch::addToBody(UINT num, ...)
     va_end(ptr);
 }
 //END CSwitch
+
+
+//
+//START CCall
+//
+//Build dummyuse expression to represent potential memory objects that
+//the Call referrenced.
+//Note dummyuse may be a list of IR.
+void CCall::addDummyUse(Region * rg)
+{    
+    IR * newdummyuse = rg->buildILoad(rg->buildImmAny(0),
+                                      rg->getTypeMgr()->getAny());
+    IR_parent(newdummyuse) = this;
+    xcom::insertbefore(&CALL_dummyuse(this), CALL_dummyuse(this), newdummyuse);
+}
+//END CCall
 
 } //namespace xoc

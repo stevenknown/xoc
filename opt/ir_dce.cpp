@@ -414,7 +414,7 @@ bool DeadCodeElim::collectByMDSSA(IR const* x, IN OUT List<IR const*> * pwlst2)
             mustdef != nullptr &&
             mustuse->is_exact() &&
             mustdef->is_exact()) {
-            if (mustdef == mustuse || mustdef->is_exact_cover(mustuse)) {
+            if (mustdef == mustuse || mustdef->is_overlap(mustuse)) {
                 if (m_is_stmt_effect.is_contain(defstmt->id())) { continue; }
                 setEffectStmt(defstmt, &m_is_bb_effect, pwlst2);
                 change = true;
@@ -763,6 +763,7 @@ bool DeadCodeElim::perform(OptCtx & oc)
     if (!oc.is_ref_valid()) { return false; }
     m_mdssamgr = (MDSSAMgr*)m_rg->getPassMgr()->queryPass(PASS_MD_SSA_MGR);
     m_prssamgr = (PRSSAMgr*)m_rg->getPassMgr()->queryPass(PASS_PR_SSA_MGR);
+
     if (!oc.is_pr_du_chain_valid() && !usePRSSADU()) {
         //DCE use either classic PR DU chain or PRSSA.
         //At least one kind of DU chain should be avaiable.

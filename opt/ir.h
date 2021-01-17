@@ -1532,6 +1532,11 @@ public:
     IR * opnd[2];
 
 public:
+    //Build dummyuse expression to represent potential memory objects that
+    //the Call referrenced.
+    //Note dummyuse may be a list of IR.
+    void addDummyUse(Region * rg);    
+
     CHAR const* getCalleeNameString() const
     { return SYM_name(CALL_idinfo(this)->get_name()); }
 
@@ -1552,7 +1557,11 @@ public:
         ASSERT0(CALL_is_intrinsic(this));
         return CALL_intrinsic_op(this);
     }
+
+    //Return true if current stmt has dummyuse.
+    bool hasDummyUse() const { return CALL_dummyuse(this) != nullptr; }
 };
+
 
 
 //Represents an indirect function call.

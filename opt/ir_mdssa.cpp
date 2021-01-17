@@ -456,6 +456,7 @@ void MDSSAMgr::dumpIRWithMDSSA(IR const* ir, UINT flag) const
             prt(getRegion(), "MD%dV%d", vopnd->mdid(), vopnd->version());
         }
     }
+
     m_rg->getLogMgr()->decIndent(2);    
 }
 
@@ -812,7 +813,8 @@ void MDSSAMgr::dumpDUChain()
 }
 
 
-//Generate MDSSAInfo and generate VOpnd for related MD.
+//Generate MDSSAInfo and generate VOpnd for referrenced MD that both include
+//must-ref MD and may-ref MDs.
 MDSSAInfo * MDSSAMgr::genMDSSAInfoAndVOpnd(IR * ir, UINT version)
 {
     ASSERT0(ir);
@@ -841,7 +843,7 @@ MDSSAInfo * MDSSAMgr::genMDSSAInfoAndVOpnd(IR * ir, UINT version)
 }
 
 
-//Generate VMD for stmt and exp that reference memory.
+//Generate VMD for stmt and its kid expressions that reference memory.
 void MDSSAMgr::initVMD(IN IR * ir, OUT DefSBitSet & maydef_md)
 {
     m_iter.clean();
@@ -1152,9 +1154,12 @@ void MDSSAMgr::placePhi(DfMgr const& dfm,
 }
 
 
+//Note call stmt is a specical case in renaming because it regards MayDef
+//as MayUse.
 void MDSSAMgr::renameUse(IR * ir)
 {
-    ASSERT0(ir && ir->is_exp());
+    ASSERT0(ir);
+    ASSERT0(ir->is_exp());
 
     MDSSAInfo * mdssainfo = m_usedef_mgr.genMDSSAInfo(ir);
     ASSERT0(mdssainfo);
@@ -1222,7 +1227,7 @@ void MDSSAMgr::renameDef(IR * ir, IRBB * bb)
         next = set->get_next(i, &iter);
         VMD * vopnd = (VMD*)m_usedef_mgr.getVOpnd(i);
         ASSERT0(vopnd && vopnd->is_md() && vopnd->id() == (UINT)i);
-        ASSERTN(vopnd->version() == MDSSA_INIT_VERSION,
+        ASSERTN(vopnd->version() == MDSSA_INIT_VERSION, 
                 ("should be first meet"));
 
         UINT maxv = m_max_version.get(vopnd->mdid());
@@ -1314,42 +1319,25 @@ void MDSSAMgr::renameBB(IN IRBB * bb)
     renamePhiResult(bb);
     for (IR * ir = BB_first_ir(bb); ir != nullptr; ir = BB_next_ir(bb)) {
         //Rename opnd, not include phi.
-        //Walk through rhs expression IR tree to rename IR_PR's VMD.
+        //Walk through rhs expression IR tree to rename memory's VMD.
         m_iter.clean();
         for (IR * opnd = iterInit(ir, m_iter);
              opnd != nullptr; opnd = iterNext(m_iter)) {
-            if (!opnd->isMemoryOpnd() || opnd->isReadPR()) {
+            if (!opnd->isMemoryOpnd() || opnd->isReadPR()) {                
                 continue;
             }
 
-            MD const* ref = opnd->getRefMD();
-            if (ref != nullptr) {
-                renameUse(opnd);
-            }
-
-            MDSet const* refset = opnd->getRefMDSet();
-            if (refset != nullptr) {
-                MDSetIter iter;
-                for (INT i = refset->get_first(&iter);
-                     i >= 0; i = refset->get_next((UINT)i, &iter)) {
-                    MD * md = m_md_sys->getMD(i);
-                    CHECK0_DUMMYUSE(md);
-
-                    //In memory SSA, rename the MD even
-                    //if it is ineffect to keep DU relation, e.g:
-                    //  int bar(int * p, int * q, int * m, int * n)
-                    //  {
-                    //      *p = *q + 20; *p define MD2V1
-                    //      *m = *n - 64; *n use MD2V1
-                    //      return 0;
-                    //  }
-                    //if (!md->is_effect()) { continue; }
-
-                    renameUse(opnd);
-                }
-            }
+            //In memory SSA, rename the MD even if it is ineffect to
+            //keep sound DU chain, e.g:
+            //  int bar(int * p, int * q, int * m, int * n)
+            //  {
+            //    *p = *q + 20; *p define MD2V1
+            //    *m = *n - 64; *n use MD2V1
+            //    return 0;
+            //  }
+            renameUse(opnd);
         }
-
+        
         if (!ir->isMemoryRef() || ir->isWritePR()) { continue; }
 
         //Rename result.
