@@ -52,18 +52,19 @@ class RefineCtx {
 public:
     union {
         struct {
-            //Pass info topdown. True to do this type of refinement.
+            //Pass info topdown. True to do following refinement.
             //e.g: int a; a/2 => a>>1
             UINT refine_div_const:1;
 
-            //Pass info topdown. True to do this type of refinement.
+            //Pass info topdown. True to do following refinement.
             //e.g: int a; a*2 => a<<1
+            //     int b; b*2 => b+b
             UINT refine_mul_const:1;
 
-            //Pass info topdown. True to do this type of refinement.
+            //Pass info topdown. True to do following refinement.
             UINT refine_stmt:1;
 
-            //Pass info topdown. True to do this type of refinement.
+            //Pass info topdown. True to do following refinement.
             //e.g: int a; a=2+3 => a=5
             UINT do_fold_const:1;
 
@@ -97,7 +98,7 @@ public:
     RefineCtx()
     {
         RC_refine_div_const(*this) = true;
-        RC_refine_mul_const(*this) = true;
+        RC_refine_mul_const(*this) = false;
         RC_refine_stmt(*this) = true;
         RC_do_fold_const(*this) = true;
         RC_update_mdref(*this) = true;

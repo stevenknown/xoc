@@ -576,7 +576,7 @@ IR * Region::simplifyLogicalNot(IN IR * ir, SimpCtx * ctx)
     TypeMgr * dm = getTypeMgr();
     //pr = 1
     Type const* t = dm->getSimplexTypeEx(
-        dm->getDType(WORD_LENGTH_OF_HOST_MACHINE, true));
+        dm->getDType(WORD_LENGTH_OF_TARGET_MACHINE, true));
     IR * imm0 = buildImmInt(1, t);
     IR * x = buildStorePR(PR_no(pr), pr->getType(), imm0);
     allocRefForPR(x);
@@ -592,7 +592,7 @@ IR * Region::simplifyLogicalNot(IN IR * ir, SimpCtx * ctx)
 
     //pr = 0
     Type const* t2 = dm->getSimplexTypeEx(
-                    dm->getDType(WORD_LENGTH_OF_HOST_MACHINE, true));
+        dm->getDType(WORD_LENGTH_OF_TARGET_MACHINE, true));
     IR * imm1 = buildImmInt(0, t2);
 
     IR * x2 = buildStorePR(PR_no(pr), pr->getType(), imm1);
@@ -632,8 +632,8 @@ IR * Region::simplifyLogicalAnd(IN IR * ir, SimpCtx * ctx)
     allocRefForPR(pr);
     IR * ret_list = simplifyLogicalAndAtTruebr(ir, label1);
     TypeMgr * tm = getTypeMgr();
-    Type const* t = tm->getSimplexTypeEx(
-                tm->getDType(WORD_LENGTH_OF_HOST_MACHINE, true));
+    Type const* t = tm->getSimplexTypeEx(tm->getDType(
+        WORD_LENGTH_OF_TARGET_MACHINE, true));
     IR * imm0 = buildImmInt(0, t);
     IR * x = buildStorePR(PR_no(pr), pr->getType(), imm0);
     allocRefForPR(x);
@@ -643,8 +643,8 @@ IR * Region::simplifyLogicalAnd(IN IR * ir, SimpCtx * ctx)
     LabelInfo * label2 = genILabel();
     xcom::add_next(&ret_list, buildGoto(label2));
     xcom::add_next(&ret_list, buildLabel(label1));
-    Type const* t2 = tm->getSimplexTypeEx(
-                tm->getDType(WORD_LENGTH_OF_HOST_MACHINE, true));
+    Type const* t2 = tm->getSimplexTypeEx(tm->getDType(
+        WORD_LENGTH_OF_TARGET_MACHINE, true));
     IR * imm1 = buildImmInt(1, t2);
     IR * x2 = buildStorePR(PR_no(pr), pr->getType(), imm1);
     allocRefForPR(x2);
@@ -858,8 +858,8 @@ IR * Region::simplifyLogicalOr(IN IR * ir, SimpCtx * ctx)
     allocRefForPR(pr);
     IR * ret_list = simplifyLogicalOrAtTruebr(ir, label1);
     TypeMgr * dm = getTypeMgr();
-    Type const* type = dm->getSimplexTypeEx(
-                         dm->getDType(WORD_LENGTH_OF_HOST_MACHINE, true));
+    Type const* type = dm->getSimplexTypeEx(dm->getDType(
+        WORD_LENGTH_OF_TARGET_MACHINE, true));
     IR * imm0 = buildImmInt(0, type);
     IR * x = buildStorePR(PR_no(pr), pr->getType(), imm0);
     allocRefForPR(x);
@@ -870,7 +870,8 @@ IR * Region::simplifyLogicalOr(IN IR * ir, SimpCtx * ctx)
     xcom::add_next(&ret_list, buildGoto(label2));
     xcom::add_next(&ret_list, buildLabel(label1));
 
-    type = dm->getSimplexTypeEx(dm->getDType(WORD_LENGTH_OF_HOST_MACHINE, true));
+    type = dm->getSimplexTypeEx(dm->getDType(
+        WORD_LENGTH_OF_TARGET_MACHINE, true));
     IR * imm1 = buildImmInt(1, type);
     IR * x2 = buildStorePR(PR_no(pr), pr->getType(), imm1);
     allocRefForPR(x2);
@@ -1372,7 +1373,7 @@ IR * Region::simpToPR(IR * ir, SimpCtx * ctx)
 
     IR * stpr = buildStorePR(PR_no(pr), pr->getType(), ir);
     allocRefForPR(stpr);
-    addDUChain(stpr, pr, this);
+    xoc::buildDUChain(stpr, pr, this);
 
     copyDbx(stpr, ir, this); //keep dbg info for new STMT.
     ctx->appendStmt(stpr);
@@ -1721,7 +1722,7 @@ IR * Region::simplifyArray(IR * ir, SimpCtx * ctx)
         //keep dbg info for new STMT.
         copyDbx(stpr, array_addr, this);
         ctx->appendStmt(stpr);
-        addDUChain(stpr, pr, this);
+        xoc::buildDUChain(stpr, pr, this);
         return pr;
     }
 

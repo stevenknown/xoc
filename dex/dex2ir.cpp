@@ -1494,7 +1494,7 @@ IR * Dex2IR::convertMove(IN LIR * lir)
         ty = m_tr->ptr;
         break;
     case LIR_JDT_wide: //return 64bits result
-        ty = m_tr->i64; //TODO: need pair?
+        ty = m_tr->i64; //TODO: require pair?
         break;
     default: UNREACHABLE();
     }

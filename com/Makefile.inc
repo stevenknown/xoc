@@ -12,4 +12,5 @@ COM_OBJS +=\
 ../com/flty.o \
 ../com/linsys.o \
 ../com/diagnostic.o \
-../com/bs.o
+../com/bs.o\
+../com/scc.o

@@ -93,12 +93,12 @@ void GCSE::elimCseAtStore(IR * use, IR * use_stmt, IR * gen)
     }
 
     //Assign MD to newrhs.
-    MD const* r_md = m_rg->genMDforPR(newrhs_pr);
+    MD const* r_md = m_rg->genMDForPR(newrhs_pr);
     ASSERT0(r_md);
     newrhs_pr->setRefMD(r_md, m_rg);
 
     if (m_mdssamgr != nullptr) {
-        m_mdssamgr->removeMDSSAUse(use);
+        m_mdssamgr->removeMDSSAOcc(use);
     }
     m_rg->freeIRTree(use);
 }
@@ -136,7 +136,7 @@ void GCSE::elimCseAtBranch(IR * use, IR * use_stmt, IN IR * gen)
     m_gvn->setMapIR2VN(new_pr, vn);
 
     //Assign MD to PR.
-    MD const* r_md = m_rg->genMDforPR(new_pr);
+    MD const* r_md = m_rg->genMDForPR(new_pr);
     ASSERT0(r_md);
     new_pr->setRefMD(r_md, m_rg);
 
@@ -147,7 +147,7 @@ void GCSE::elimCseAtBranch(IR * use, IR * use_stmt, IN IR * gen)
     IR_may_throw(use_stmt) = false;
 
     if (m_mdssamgr != nullptr) {
-        m_mdssamgr->removeMDSSAUse(use);
+        m_mdssamgr->removeMDSSAOcc(use);
     }
     m_rg->freeIRTree(use);
 }
@@ -187,7 +187,7 @@ void GCSE::elimCseAtCall(IR * use, IR * use_stmt, IR * gen)
     m_gvn->setMapIR2VN(use_pr, vn);
 
     //Allocate MD to use_pr to make up DU manager request.
-    MD const* r_md = m_rg->genMDforPR(use_pr);
+    MD const* r_md = m_rg->genMDForPR(use_pr);
     ASSERT0(r_md);
     use_pr->setRefMD(r_md, m_rg);
 
@@ -195,7 +195,7 @@ void GCSE::elimCseAtCall(IR * use, IR * use_stmt, IR * gen)
     bool f = use_stmt->replaceKid(use, use_pr, false);
     CHECK0_DUMMYUSE(f);
     if (m_mdssamgr != nullptr) {
-        m_mdssamgr->removeMDSSAUse(use);
+        m_mdssamgr->removeMDSSAOcc(use);
     }
     m_rg->freeIRTree(use);
 
@@ -250,7 +250,7 @@ void GCSE::processCseGen(IN IR * gen, IR * gen_stmt, bool & change)
     m_exp2pr.set(gen, tmp_pr);
 
     //Assign MD to PR.
-    MD const* tmp_pr_md = m_rg->genMDforPR(tmp_pr);
+    MD const* tmp_pr_md = m_rg->genMDForPR(tmp_pr);
     ASSERT0(tmp_pr_md);
     tmp_pr->setRefMD(tmp_pr_md, m_rg);
 
@@ -794,16 +794,15 @@ bool GCSE::perform(OptCtx & oc)
 
     START_TIMER(t, getPassName());
     if (m_gvn != nullptr) {
-        m_rg->checkValidAndRecompute(&oc, PASS_DOM, PASS_PDOM, PASS_UNDEF);
-        if (!m_gvn->is_valid()) {
-            m_gvn->reperform(oc);
-        }
+        m_rg->getPassMgr()->checkValidAndRecompute(&oc, PASS_DOM, PASS_PDOM,
+                                                   PASS_GVN, PASS_UNDEF);
+        ASSERT0(m_gvn->is_valid());
         //GVN provide more accurate result of value flow analysis than
         //expression analysis.
         m_expr_tab = nullptr;
     } else {
-        m_rg->checkValidAndRecompute(&oc, PASS_DOM, PASS_PDOM,
-                                     PASS_EXPR_TAB, PASS_UNDEF);
+        m_rg->getPassMgr()->checkValidAndRecompute(&oc, PASS_DOM, PASS_PDOM,
+                                                   PASS_EXPR_TAB, PASS_UNDEF);
         m_expr_tab = (ExprTab*)m_rg->getPassMgr()->registerPass(PASS_EXPR_TAB);
     }
 
@@ -864,10 +863,8 @@ bool GCSE::perform(OptCtx & oc)
     }
     if (change) {
         //no new expr generated, only new pr.
-        OC_is_expr_tab_valid(oc) = false;
         OC_is_aa_valid(oc) = false;
-        OC_is_live_expr_valid(oc) = false;
-        OC_is_reach_def_valid(oc) = false;
+        oc.setInvalidIfDUMgrLiveChanged();
 
         //DU reference and du chain has maintained.
         ASSERT0(m_rg->verifyMDRef());

@@ -49,7 +49,7 @@ namespace xoc {
 //    endif
 static IF_TYPE get_simple_if_node_type(IRCFG * cfg, IRBB * bb)
 {
-    ASSERTN(cfg && bb, ("need cfg"));
+    ASSERTN(cfg && bb, ("requires cfg"));
     BBList succs;
     cfg->get_succs(succs, bb);
 

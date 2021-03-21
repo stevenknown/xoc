@@ -12,7 +12,8 @@ com/bigint.o \
 com/birational.o \
 com/example/testbs.o \
 com/flty.o \
-com/bs.o
+com/bs.o\
+com/scc.o
 
 OPT_OBJS +=\
 opt/cfs_opt.o\
@@ -65,7 +66,8 @@ opt/scalar_opt.o\
 opt/mdliveness_mgr.o\
 opt/liveness_mgr.o\
 opt/du_helper.o\
-opt/logmgr.o
+opt/logmgr.o\
+opt/gscc.o
 
 GRREADER_OBJS += \
 reader/ir_parser.o\

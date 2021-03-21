@@ -299,7 +299,7 @@ void SSAGraph::dump(CHAR const* name, bool detail) const
 
     //Print node
     List<IR const*> lst;
-    VertexIter itv;
+    VertexIter itv = VERTEX_UNDEF;
     for (xcom::Vertex * v = get_first_vertex(itv);
          v != nullptr; v = get_next_vertex(itv)) {
         VPR * vp = m_vdefs.get(v->id());
@@ -497,6 +497,10 @@ VPR * PRSSAMgr::allocVPR(UINT prno, UINT version, Type const* orgtype)
 }
 
 
+//Build Def-Use chain for 'def' and 'use'.
+//def: def stmt that writes PR.
+//use: use expression that reads PR.
+//Note caller should guarrentee 'use' does not belong to other Def-Use chain.
 void PRSSAMgr::buildDUChain(IR * def, IR * use)
 {
     ASSERT0(def->isWritePR() || def->isCallHasRetVal());
@@ -508,7 +512,9 @@ void PRSSAMgr::buildDUChain(IR * def, IR * use)
         SSA_def(ssainfo) = def;
     }
 
+    //Apply new SSAInfo directly, it will displace original ssainfo.
     //You may be set multiple defs for use.
+    //Or you should removeSSAUse for original 'use' first.
     ASSERTN(use->getSSAInfo() == nullptr, ("use already has SSA info."));
     use->setSSAInfo(ssainfo);
     ssainfo->addUse(use);
@@ -522,9 +528,8 @@ void PRSSAMgr::destroy(bool is_reinit)
 
     //Caution: if you do not destruct SSA prior to destory().
     //The reference to IR's SSA info will lead to undefined behaviors.
-    //ASSERTN(!m_is_valid,
-    //   ("Still in ssa mode, you should out of "
-    //    "SSA before the destruction."));
+    //ASSERTN(!is_valid(), ("Still in ssa mode, you should out of "
+    //                      "SSA before the destruction."));
 
     for (INT i = 0; i <= m_map_prno2vpr_vec.get_last_idx(); i++) {
         VPRVec * vpv = m_map_prno2vpr_vec.get((UINT)i);
@@ -1052,7 +1057,7 @@ void PRSSAMgr::renameRHS(IR * ir, IRBB * bb)
 //NOTE: If ir is an IR tree, e.g: add(pr1, pr2), removing 'add' means
 //pr1 and pr2 will be removed as well. Therefore pr1 pr2's SSAInfo will be
 //updated as well.
-void PRSSAMgr::removePRSSAUse(IR * ir)
+void PRSSAMgr::removePRSSAOcc(IR * ir)
 {
     if (ir->is_stmt()) {
         if (ir->isWritePR() || ir->isCallStmt()) {
@@ -1071,7 +1076,7 @@ void PRSSAMgr::removePRSSAUse(IR * ir)
     //Maintain the SSAInfo of read-pr/write-pr operation.
     for (UINT i = 0; i < IR_MAX_KID_NUM(ir); i++) {
         for (IR * x = ir->getKid(i); x != nullptr; x = x->get_next()) {
-            removePRSSAUse(x);
+            removePRSSAOcc(x);
         }
     }
 }
@@ -1411,7 +1416,7 @@ void PRSSAMgr::destruction(DomTree & domtree)
     ASSERT0(m_cfg->getEntry());
     destructionInDomTreeOrder(m_cfg->getEntry(), domtree);
     cleanPRSSAInfo();
-    m_is_valid = false;
+    set_valid(false);
 
     END_TIMER(t, "PRSSA: destruction in dom tree order");
 }
@@ -1431,7 +1436,7 @@ void PRSSAMgr::stripPhi(IR * phi, IRListIter phict)
 
     //Temprarory RP to hold the result of PHI.
     IR * phicopy = m_rg->buildPR(phi->getType());
-    phicopy->setRefMD(m_rg->genMDforPR(PR_no(phicopy),
+    phicopy->setRefMD(m_rg->genMDForPR(PR_no(phicopy),
                       phicopy->getType()), m_rg);
     phicopy->cleanRefMDSet();
     IR * opnd = PHI_opnd_list(phi);
@@ -1510,7 +1515,8 @@ void PRSSAMgr::removePhiFromBB()
 {
     BBList * bblst = m_rg->getBBList();
     BBListIter bbit = nullptr;
-    for (bblst->get_head(&bbit); bbit != nullptr; bbit = bblst->get_next(bbit)) {
+    for (bblst->get_head(&bbit); bbit != nullptr;
+         bbit = bblst->get_next(bbit)) {
         IRBB * bb = bbit->val();
         IRListIter irit = nullptr;
         IRListIter next_irit = nullptr;
@@ -1533,7 +1539,7 @@ void PRSSAMgr::removePhiFromBB()
 //If vpinfo is available, the function also check VPR_prno of phi operands.
 //is_vpinfo_avail: set true if VPR information is available.
 //before_strip_version: true if this function invoked before striping version.
-bool PRSSAMgr::verifyPhi(bool is_vpinfo_avail, bool before_strip_version)
+bool PRSSAMgr::verifyPhi(bool is_vpinfo_avail, bool before_strip_version) const
 {
     DUMMYUSE(is_vpinfo_avail);
     BBList * bblst = m_rg->getBBList();
@@ -1604,10 +1610,10 @@ bool PRSSAMgr::verifyPhi(bool is_vpinfo_avail, bool before_strip_version)
 //This function only can be invoked immediately
 //after rename() and before refinePhi(), because refinePhi() might
 //clobber VPR information, that leads VPR_orgprno() to be invalid.
-bool PRSSAMgr::verifyPRNOofVP()
+bool PRSSAMgr::verifyPRNOofVP() const
 {
     ConstIRIter ii;
-    BBList * bblst = m_rg->getBBList();
+    BBList const* bblst = m_rg->getBBList();
     BBListIter ct;
     for (IRBB * bb = bblst->get_head(&ct);
          bb != nullptr; bb = bblst->get_next(&ct)) {
@@ -1626,7 +1632,7 @@ bool PRSSAMgr::verifyPRNOofVP()
 
 
 //Verify VPR after striping version.
-bool PRSSAMgr::verifyVPR()
+bool PRSSAMgr::verifyVPR() const
 {
     //Check version for each vp.
     xcom::BitSet defset;
@@ -1744,8 +1750,9 @@ static void verify_ssainfo_helper(IR * ir, xcom::BitSet & defset, Region * rg)
 
 //The verification check the DU info in SSA form.
 //Current IR must be in SSA form.
-bool PRSSAMgr::verifySSAInfo()
+bool PRSSAMgr::verifySSAInfo() const
 {
+    PRSSAMgr * pthis = const_cast<PRSSAMgr*>(this);
     //Check version for each vp.
     xcom::BitSet defset;
     BBList * bbl = m_rg->getBBList();
@@ -1757,9 +1764,9 @@ bool PRSSAMgr::verifySSAInfo()
              ctir != BB_irlist(bb).end();
              ctir = BB_irlist(bb).get_next(ctir)) {
             IR * ir = ctir->val();
-            m_iter.clean();
-            for (IR * x = iterInit(ir, m_iter);
-                 x != nullptr; x = iterNext(m_iter)) {
+            pthis->m_iter.clean();
+            for (IR * x = iterInit(ir, pthis->m_iter);
+                 x != nullptr; x = iterNext(pthis->m_iter)) {
                 if (x->isReadPR() ||
                     x->isWritePR() ||
                     x->isCallHasRetVal()) {
@@ -1791,14 +1798,12 @@ void PRSSAMgr::destruction(OptCtx * oc)
     }
     if (bblst->get_elem_count() != bbcnt) {
         ASSERT0(oc);
-        oc->set_flag_if_cfg_changed();
-        //Each pass maintain CFG by default.
-        OC_is_cfg_valid(*oc) = true;
+        oc->setInvalidIfCFGChanged();
     }
 
     //Clean SSA info to avoid unnecessary abort or assert.
     cleanPRSSAInfo();
-    m_is_valid = false;
+    set_valid(false);
 }
 
 
@@ -2081,7 +2086,7 @@ void PRSSAMgr::stripSpecifiedVP(VPR * vp)
     IR * replaced_one = replace_res_pr(def, vp->orgprno(), newprno, newprty);
     ASSERT0(replaced_one);
 
-    MD const* md = m_rg->genMDforPR(newprno, newprty);
+    MD const* md = m_rg->genMDForPR(newprno, newprty);
     replaced_one->setRefMD(md, m_rg);
     if (replaced_one->isCallStmt()) {
         //Call stmts may have sideeffect modify MDSet.
@@ -2216,14 +2221,14 @@ void PRSSAMgr::computeSSAInfo()
             }
         }
     }
-    m_is_valid = true;
+    set_valid(true);
 }
 
 
 void PRSSAMgr::construction(OptCtx & oc)
 {
     reinit();
-    m_rg->checkValidAndRecompute(&oc, PASS_DOM, PASS_UNDEF);
+    m_rg->getPassMgr()->checkValidAndRecompute(&oc, PASS_DOM, PASS_UNDEF);
 
     //Extract dominate tree of CFG.
     START_TIMER(t, "PRSSA: Extract Dom Tree");
@@ -2234,7 +2239,7 @@ void PRSSAMgr::construction(OptCtx & oc)
     if (!construction(domtree)) {
         return;
     }
-    m_is_valid = true;
+    set_valid(true);
 }
 
 
@@ -2276,7 +2281,7 @@ bool PRSSAMgr::construction(DomTree & domtree)
 
     ASSERT0(verifyIRandBB(m_rg->getBBList(), m_rg));
     ASSERT0(verifyPhi(false, false) && verifyVPR());
-    m_is_valid = true;
+    set_valid(true);
     return true;
 }
 
@@ -2366,13 +2371,15 @@ void PRSSAMgr::movePhi(IRBB * from, IRBB * to)
 }
 
 
-bool PRSSAMgr::verifyPRSSAInfo(Region * rg)
+bool PRSSAMgr::verifyPRSSAInfo(Region const* rg)
 {
-    PRSSAMgr * ssamgr = (PRSSAMgr*)(rg->getPassMgr()->
+    PRSSAMgr const* ssamgr = (PRSSAMgr*)(rg->getPassMgr()->
         queryPass(PASS_PR_SSA_MGR));
     if (ssamgr != nullptr && ssamgr->is_valid()) {
         ASSERT0(ssamgr->verifySSAInfo());
         ASSERT0(ssamgr->verifyPhi(false, false));
+        //TBD:Do we have to verify VPR here?
+        //ASSERT0(ssamgr->verifyVPR());
     }
     return true;
 }

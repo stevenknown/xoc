@@ -45,14 +45,20 @@ class MDSSAInfo;
 class MDPhi;
 class IRCFG;
 
-typedef List<IRBB*> BBList;
+typedef xcom::List<IRBB*> BBList;
 typedef xcom::C<IRBB*> * BBListIter;
-typedef List<IR const*> ConstIRIter;
-typedef List<IR*> IRIter;
+typedef xcom::List<IR const*> ConstIRIter;
+typedef xcom::List<IR*> IRIter;
 
 //Map IR to its Holder during instrument operation.
 typedef xcom::TMap<IR*, xcom::C<IR*>*> IR2Holder;
-typedef xcom::EList<IR*, IR2Holder> IRList;
+typedef xcom::EList<IR*, IR2Holder> IREList;
+
+typedef xcom::List<IR*> IRList;
+typedef xcom::C<IR*> * IRListIter;
+
+typedef xcom::List<IR const*> CIRList;
+typedef xcom::C<IR const*> * CIRListIter;
 
 //IR type
 typedef enum {
@@ -699,21 +705,27 @@ public:
 
     //Get the stmt accroding to given prno if the stmt writes PR as a result.
     //Otherwise return nullptr.
+    //This function can not be const because it will return itself.
     IR * getResultPR(UINT prno);
 
     //Find the first PR related to 'prno'. Otherwise return nullptr.
     //This function iterate IR tree nonrecursively.
-    IR * getOpndPRList(UINT prno);
+    IR * getOpndPRList(UINT prno) const;
 
     //Find the first PR related to 'prno'.
     //This function iterate IR tree nonrecursively.
-    //'ii': iterator.
-    IR * getOpndPR(UINT prno, IRIter & ii); //Nonrecursively.
+    //'it': iterator.
+    IR * getOpndPR(UINT prno, IRIter & it) const; //Nonrecursively.
 
     //This function recursively iterate the IR tree to
     //retrieve the PR whose PR_no is equal to given 'prno'.
     //Otherwise return nullptr.
-    IR * getOpndPR(UINT prno);
+    IR * getOpndPR(UINT prno) const;
+
+    //This function recursively iterate the IR tree to
+    //retrieve the memory-ref IR whose MD is equal to given 'md'.
+    //Otherwise return nullptr.
+    IR * getOpndMem(MD const* md) const;
 
     //Get the MD DefUse Set.
     DUSet * getDUSet() const
@@ -786,7 +798,7 @@ public:
 
     //Return true if current ir does not overlap to ir2.
     //ir2: stmt or expression to be compared.
-    //Note this function does not need RefMD information.
+    //Note this function does not require RefMD information.
     //It just determine overlapping of given two IR according to
     //their data-type and offset.
     bool isNotOverlap(IR const* ir2, Region * rg) const;
@@ -847,7 +859,10 @@ public:
     //Return true if ir is label.
     bool is_lab() const { return getCode() == IR_LABEL; }
 
-    //Return true if current ir equal to src.
+    //Return true if current ir tree is equivalent to src.
+    //src: root of IR tree.
+    //is_cmp_kid: it is true if comparing kids as well.
+    //Note the function does not compare the siblings of 'src'.
     bool isIREqual(IR const* src, bool is_cmp_kid = true) const;
 
     //Return true if current ir is both PR and equal to src.
@@ -1022,8 +1037,12 @@ public:
     bool isWriteWholePR() const
     { return IRDES_is_write_whole_pr(g_ir_desc[getCode()]); }
 
-    //Return true if current stmt read value from PR.
+    //Return true if current expression read value from PR.
     bool isReadPR() const  { return is_pr(); }
+
+    //Return true if current stmt/expression operates PR.
+    bool isPROp() const
+    { return isReadPR() || isWritePR() || (isCallStmt() && hasResult()); }
 
     //Return true if current operation references memory.
     //These kinds of operation always define or use MD.
@@ -1114,6 +1133,8 @@ public:
     inline bool isExactDef(MD const* md) const;
     inline bool isExactDef(MD const* md, MDSet const* mds) const;
 
+    //Set prno, and update SSAInfo meanwhile.
+    void setPrnoConsiderSSAInfo(UINT prno);
     inline void setPrno(UINT prno);
     inline void setOffset(UINT ofst);
     inline void setIdinfo(Var * idinfo);
@@ -1260,7 +1281,7 @@ public:
 };
 
 
-//ID need DU info, some Passes need it, e.g. GVN.
+//ID need DU info, some Passes requires it, e.g. GVN.
 //Note IR_ID should NOT participate in GVN analysis because it does not
 //represent a real operation.
 #define ID_info(ir) (((CId*)CK_IRT(ir, IR_ID))->id_info)
@@ -1824,9 +1845,12 @@ public:
 #define ARR_elemtype(ir) (((CArray*)CK_IRT_ARR(ir))->elemtype)
 
 //Get the number of element in each dimension.
-//e.g: Given array D_I32 A[10][20], the 0th dimension has 20 elements,
-//each element has type D_I32, the 1th dimension has 10 elements,
-//each element has type [D_I32*20], and the ARR_elem_num_buf will be [20, 10],
+//Note the lowest dimension, which iterates most slowly, is at the most left
+//of 'ARR_elem_num_buf'.
+//e.g: Given array D_I32 A[10][20], the 0th dimension is the lowest dimension,
+//it has 20 elements, each element has type D_I32;
+//the 1th dimension has 10 elements, each element has type [D_I32*20], and
+//the ARR_elem_num_buf will be [20, 10],
 //that is the lowest dimension at the position 0 of the buffer.
 //If we have an array accessing, such as A[i][j], the sublist will be
 //ld(j)->ld(i), and elem_num list will be 20->10.
@@ -2688,6 +2712,7 @@ DU * IR::cleanDU()
 
 
 //Return stmt if it writes PR as result.
+//This function can not be const because it will return itself.
 IR * IR::getResultPR()
 {
     ASSERT0(is_stmt());
@@ -2813,21 +2838,20 @@ void dumpIR(IR const* ir,
             CHAR * attr = nullptr,
             UINT dumpflag = IR_DUMP_KID|IR_DUMP_SRC_LINE|IR_DUMP_INNER_REGION|
                             IR_DUMP_VAR_DECL);
-void dumpIRListH(IR * ir_list, Region const* rg,
+void dumpIRListH(IR const* ir_list, Region const* rg,
                  CHAR * attr = nullptr,
                  UINT dumpflag = IR_DUMP_KID|
                                  IR_DUMP_SRC_LINE|
                                  IR_DUMP_INNER_REGION|
                                  IR_DUMP_VAR_DECL);
-void dumpIRList(IR * ir_list,
+void dumpIRList(IR const* ir_list,
                 Region const* rg,
                 CHAR * attr = nullptr,
                 UINT dumpflag = IR_DUMP_KID|
                                 IR_DUMP_SRC_LINE|
                                 IR_DUMP_INNER_REGION|
                                 IR_DUMP_VAR_DECL);
-void dumpIRList(IRList & ir_list, Region const* rg);
-void dumpIRList(List<IR*> & ir_list, Region const* rg);
+void dumpIRList(IRList const& ir_list, Region const* rg);
 
 class DumpGRCtx {
 public:
@@ -2848,38 +2872,40 @@ bool verifySimp(IR * ir, SimpCtx & simp);
 
 //Iterative access ir tree. This funtion initialize the iterator.
 //'ir': the root ir of the tree.
-//'ii': iterator. It should be clean already.
+//'it': iterator. It should be clean already.
 //Readonly function.
-inline IR const* iterInitC(IR const* ir, OUT ConstIRIter & ii)
+inline IR const* iterInitC(IR const* ir, OUT ConstIRIter & it)
 {
     if (ir == nullptr) { return nullptr; }
     for (UINT i = 0; i < IR_MAX_KID_NUM(ir); i++) {
         IR * kid = ir->getKid(i);
-        if (kid == nullptr) { continue; }
-        ii.append_tail(kid);
+        if (kid != nullptr) {
+            it.append_tail(kid);
+        }
     }
     if (ir->get_next() != nullptr) {
-        ii.append_tail(ir->get_next());
+        it.append_tail(ir->get_next());
     }
     return ir;
 }
 
 
 //Iterative access ir tree.
-//This function return the next IR node accroding to 'ii'.
-//'ii': iterator.
+//This function return the next IR node accroding to 'it'.
+//'it': iterator.
 //Readonly function.
-inline IR const* iterNextC(IN OUT ConstIRIter & ii)
+inline IR const* iterNextC(IN OUT ConstIRIter & it)
 {
-    IR const* ir = ii.remove_head();
+    IR const* ir = it.remove_head();
     if (ir == nullptr) { return nullptr; }
     for (UINT i = 0; i < IR_MAX_KID_NUM(ir); i++) {
         IR * kid = ir->getKid(i);
-        if (kid == nullptr) { continue; }
-        ii.append_tail(kid);
+        if (kid != nullptr) {
+            it.append_tail(kid);
+        }
     }
     if (ir->get_next() != nullptr) {
-        ii.append_tail(ir->get_next());
+        it.append_tail(ir->get_next());
     }
     return ir;
 }
@@ -2888,10 +2914,10 @@ inline IR const* iterNextC(IN OUT ConstIRIter & ii)
 //Iterative access the right-hand-side expression of stmt.
 //This funtion initialize the iterator.
 //'ir': the root ir of the tree, it must be stmt.
-//'ii': iterator.
+//'it': iterator.
 //This function is a readonly function.
 //Use iterRhsNextC to iter next IR.
-inline IR const* iterRhsInitC(IR const* ir, OUT ConstIRIter & ii)
+inline IR const* iterRhsInitC(IR const* ir, OUT ConstIRIter & it)
 {
     if (ir == nullptr) { return nullptr; }
 
@@ -2906,22 +2932,22 @@ inline IR const* iterRhsInitC(IR const* ir, OUT ConstIRIter & ii)
             firstkid = kid;
             continue;
         }
-        ii.append_tail(kid);
+        it.append_tail(kid);
     }
 
-    //IR const* x = ii.remove_head();
+    //IR const* x = it.remove_head();
     //if (x == nullptr) { return nullptr; }
 
     if (firstkid == nullptr) { return nullptr; }
 
     for (UINT i = 0; i < IR_MAX_KID_NUM(firstkid); i++) {
         IR const* kid = firstkid->getKid(i);
-        if (kid == nullptr) { continue; }
-        ii.append_tail(kid);
+        if (kid != nullptr) {
+            it.append_tail(kid);
+        }
     }
-
     if (IR_next(firstkid) != nullptr) {
-        ii.append_tail(IR_next(firstkid));
+        it.append_tail(IR_next(firstkid));
     }
     return firstkid;
 }
@@ -2930,71 +2956,73 @@ inline IR const* iterRhsInitC(IR const* ir, OUT ConstIRIter & ii)
 //Iterative access the expression.
 //This funtion initialize the iterator.
 //'ir': the root ir of the tree, it must be expression.
-//'ii': iterator.
+//'it': iterator.
 //Readonly function.
 //Use iterRhsNextC to iter next IR.
-inline IR const* iterExpInitC(IR const* ir, OUT ConstIRIter & ii)
+inline IR const* iterExpInitC(IR const* ir, OUT ConstIRIter & it)
 {
     if (ir == nullptr) { return nullptr; }
     ASSERT0(ir->is_exp());
     for (UINT i = 0; i < IR_MAX_KID_NUM(ir); i++) {
         IR * kid = ir->getKid(i);
         if (kid == nullptr) { continue; }
-        ii.append_tail(kid);
+        it.append_tail(kid);
     }
     if (ir->get_next() != nullptr) {
         ASSERTN(!ir->get_next()->is_stmt(), ("ir can not be stmt list"));
-        ii.append_tail(ir->get_next());
+        it.append_tail(ir->get_next());
     }
     return ir;
 }
 
 
 //Iterative access the right-hand-side expression of stmt.
-//This function return the next IR node accroding to 'ii'.
-//'ii': iterator.
+//This function return the next IR node accroding to 'it'.
+//'it': iterator.
 //Readonly function.
-inline IR const* iterRhsNextC(IN OUT ConstIRIter & ii)
+inline IR const* iterRhsNextC(IN OUT ConstIRIter & it)
 {
-    return iterNextC(ii);
+    return iterNextC(it);
 }
 
 
 //Iterative access the ir tree that start with 'ir'.
 //This funtion initialize the iterator.
 //'ir': the root ir of the tree, it may be either stmt or expression.
-//'ii': iterator. It should be clean already.
+//'it': iterator. It should be clean already.
 //Note this function is NOT readonly, the returnd IR may be modified.
-inline IR * iterInit(IN IR * ir, OUT IRIter & ii)
+inline IR * iterInit(IN IR * ir, OUT IRIter & it)
 {
     if (ir == nullptr) { return nullptr; }
     for (UINT i = 0; i < IR_MAX_KID_NUM(ir); i++) {
         IR * kid = ir->getKid(i);
-        if (kid == nullptr) { continue; }
-        ii.append_tail(kid);
+        if (kid != nullptr) {
+            it.append_tail(kid);
+        }
     }
     if (ir->get_next() != nullptr) {
-        ii.append_tail(ir->get_next());
+        it.append_tail(ir->get_next());
     }
     return ir;
 }
 
 
 //Iterative access the ir tree.
-//This funtion return the next IR node accroding to 'ii'.
-//'ii': iterator.
+//This funtion return the next IR node accroding to 'it'.
+//'it': iterator.
 //Note this function is NOT readonly, the returnd IR may be modified.
-inline IR * iterNext(IN OUT IRIter & ii)
+inline IR * iterNext(IN OUT IRIter & it)
 {
-    IR * ir = ii.remove_head();
+    IR * ir = it.remove_head();
     if (ir == nullptr) { return nullptr; }
     for (UINT i = 0; i < IR_MAX_KID_NUM(ir); i++) {
         IR * kid = ir->getKid(i);
-        if (kid == nullptr) { continue; }
-        ii.append_tail(kid);
+        if (kid != nullptr) {
+            it.append_tail(kid);
+        }
     }
     if (ir->get_next() != nullptr) {
-        ii.append_tail(ir->get_next());
+        it.append_tail(ir->get_next());
     }
     return ir;
 }
@@ -3003,9 +3031,9 @@ inline IR * iterNext(IN OUT IRIter & ii)
 //Iterative access the right-hand-side expression of stmt.
 //This funtion initialize the iterator.
 //'ir': the root ir of the tree, it must be stmt.
-//'ii': iterator. It should be clean already.
+//'it': iterator. It should be clean already.
 //Use iterRhsNextC to iter next IR.
-inline IR * iterRhsInit(IR * ir, OUT IRIter & ii)
+inline IR * iterRhsInit(IR * ir, OUT IRIter & it)
 {
     if (ir == nullptr) { return nullptr; }
 
@@ -3020,19 +3048,19 @@ inline IR * iterRhsInit(IR * ir, OUT IRIter & ii)
             firstkid = kid;
             continue;
         }
-        ii.append_tail(kid);
+        it.append_tail(kid);
     }
 
     if (firstkid == nullptr) { return nullptr; }
 
     for (UINT i = 0; i < IR_MAX_KID_NUM(firstkid); i++) {
         IR * kid = firstkid->getKid(i);
-        if (kid == nullptr) { continue; }
-        ii.append_tail(kid);
+        if (kid != nullptr) {
+            it.append_tail(kid);
+        }
     }
-
     if (IR_next(firstkid) != nullptr) {
-        ii.append_tail(IR_next(firstkid));
+        it.append_tail(IR_next(firstkid));
     }
 
     return firstkid;
@@ -3040,12 +3068,12 @@ inline IR * iterRhsInit(IR * ir, OUT IRIter & ii)
 
 
 //Iterative access the right-hand-side expression of stmt.
-//This function return the next IR node accroding to 'ii'.
-//'ii': iterator.
+//This function return the next IR node accroding to 'it'.
+//'it': iterator.
 //This is a readonly function.
-inline IR * iterRhsNext(IN OUT IRIter & ii)
+inline IR * iterRhsNext(IN OUT IRIter & it)
 {
-    return iterNext(ii);
+    return iterNext(it);
 }
 
 

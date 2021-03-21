@@ -134,9 +134,7 @@ bool Region::performSimplify(OptCtx & oc)
 
         getCFG()->performMiscOpt(oc);
 
-        oc.set_flag_if_cfg_changed();
-        //Each pass maintain CFG by default.
-        OC_is_cfg_valid(oc) = true;
+        oc.setInvalidIfCFGChanged();
         if (g_do_cdg) {
             ASSERT0(getPassMgr());
             CDG * cdg = (CDG*)getPassMgr()->registerPass(PASS_CDG);
@@ -168,8 +166,8 @@ void Region::doBasicAnalysis(OptCtx & oc)
             assignMD(true, true);
         }
         if (!oc.is_aa_valid()) {
-            checkValidAndRecompute(&oc, PASS_DOM, PASS_LOOP_INFO,
-                                       PASS_AA, PASS_UNDEF);
+            getPassMgr()->checkValidAndRecompute(&oc, PASS_DOM, PASS_LOOP_INFO,
+                                                 PASS_AA, PASS_UNDEF);
         }
     }
 

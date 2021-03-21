@@ -552,7 +552,7 @@ bool Region::reconstructBBList(OptCtx & oc)
     if (change) {
         //Must rebuild CFG and all other structures which are
         //closely related to CFG.
-        oc.set_flag_if_cfg_changed();
+        oc.setInvalidIfCFGChanged();
     }
     return change;
 }
@@ -756,7 +756,7 @@ Var * Region::genVarForPR(UINT prno, Type const* type)
 
 
 //Generate MD corresponding to PR load or write.
-MD const* Region::genMDforPR(UINT prno, Type const* type)
+MD const* Region::genMDForPR(UINT prno, Type const* type)
 {
     ASSERT0(type);
     Var * pr_var = mapPR2Var(prno);
@@ -1083,7 +1083,7 @@ Var const* Region::findFormalParam(UINT position) const
 MD const* Region::allocPRMD(IR * pr)
 {
     ASSERT0(pr->is_pr());
-    MD const* md = genMDforPR(pr);
+    MD const* md = genMDForPR(pr);
     setMustRef(pr, md);
     pr->cleanRefMDSet();
     return md;
@@ -1095,7 +1095,7 @@ MD const* Region::allocPRMD(IR * pr)
 MD const* Region::allocPhiMD(IR * phi)
 {
     ASSERT0(phi->is_phi());
-    MD const* md = genMDforPR(phi);
+    MD const* md = genMDForPR(phi);
     setMustRef(phi, md);
     phi->cleanRefMDSet();
     return md;
@@ -1105,7 +1105,7 @@ MD const* Region::allocPhiMD(IR * phi)
 MD const* Region::allocIdMD(IR * ir)
 {
     ASSERT0(ir->is_id());
-    MD const* t = genMDforId(ir);
+    MD const* t = genMDForId(ir);
     setMustRef(ir, t);
     ir->cleanRefMDSet();
     return t;
@@ -1115,18 +1115,21 @@ MD const* Region::allocIdMD(IR * ir)
 MD const* Region::allocLoadMD(IR * ir)
 {
     ASSERT0(ir->is_ld());
-    MD const* t = genMDforLoad(ir);
+    MD const* t = genMDForLoad(ir);
     ASSERT0(t);
     ir->cleanRefMDSet();
-    if (LD_ofst(ir) != 0) {
-        MD t2(*t);
-        ASSERT0(t2.is_exact());
-        MD_ofst(&t2) += LD_ofst(ir);
-        MD_size(&t2) = ir->getTypeSize(getTypeMgr());
-        MD const* entry = getMDSystem()->registerMD(t2);
-        ASSERTN(MD_id(entry) > 0, ("Not yet registered"));
-        t = entry; //regard MD with offset as return result.
-    }
+
+    //TO BE REMOVED: genMDForLoad has consider the Offset of ir.
+    //if (LD_ofst(ir) != 0) {
+    //    MD t2(*t);
+    //    ASSERT0(t2.is_exact());
+    //    MD_ofst(&t2) += LD_ofst(ir);
+    //    MD_size(&t2) = ir->getTypeSize(getTypeMgr());
+    //    MD const* entry = getMDSystem()->registerMD(t2);
+    //    ASSERTN(MD_id(entry) > 0, ("Not yet registered"));
+    //    t = entry; //regard MD with offset as return result.
+    //}
+
     setMustRef(ir, t);
     return t;
 }
@@ -1135,7 +1138,7 @@ MD const* Region::allocLoadMD(IR * ir)
 MD const* Region::allocStorePRMD(IR * ir)
 {
     ASSERT0(ir->is_stpr());
-    MD const* md = genMDforPR(ir);
+    MD const* md = genMDForPR(ir);
     setMustRef(ir, md);
     ir->cleanRefMDSet();
     return md;
@@ -1145,7 +1148,7 @@ MD const* Region::allocStorePRMD(IR * ir)
 MD const* Region::allocCallResultPRMD(IR * ir)
 {
     ASSERT0(ir->isCallStmt());
-    MD const* md = genMDforPR(ir);
+    MD const* md = genMDForPR(ir);
     setMustRef(ir, md);
     ir->cleanRefMDSet();
     return md;
@@ -1155,7 +1158,7 @@ MD const* Region::allocCallResultPRMD(IR * ir)
 MD const* Region::allocSetelemMD(IR * ir)
 {
     ASSERT0(ir->is_setelem());
-    MD const* md = genMDforPR(ir);
+    MD const* md = genMDForPR(ir);
     IR const* ofst = SETELEM_ofst(ir);
     ASSERT0(ofst);
     if (md->is_exact()) {
@@ -1200,7 +1203,7 @@ MD const* Region::allocSetelemMD(IR * ir)
 MD const* Region::allocGetelemMD(IR * ir)
 {
     ASSERT0(ir->is_getelem());
-    MD const* md = genMDforPR(ir);
+    MD const* md = genMDForPR(ir);
     setMustRef(ir, md);
     ir->cleanRefMDSet();
     return md;
@@ -1210,22 +1213,25 @@ MD const* Region::allocGetelemMD(IR * ir)
 MD const* Region::allocStoreMD(IR * ir)
 {
     ASSERT0(ir->is_st());
-    MD const* md = genMDforStore(ir);
+    MD const* md = genMDForStore(ir);
     ASSERT0(md);
     ir->cleanRefMDSet();
-    if (ST_ofst(ir) != 0) {
-        //Accumulating offset of identifier.
-        //e.g: struct {int a,b; } s; s.a = 10
-        //generate: st('s', ofst:4) = 10
-        MD t(*md);
-        ASSERT0(t.is_exact());
-        ASSERT0(ir->getTypeSize(getTypeMgr()) > 0);
-        MD_ofst(&t) += ST_ofst(ir);
-        MD_size(&t) = ir->getTypeSize(getTypeMgr());
-        MD const* entry = getMDSystem()->registerMD(t);
-        ASSERTN(MD_id(entry) > 0, ("Not yet registered"));
-        md = entry; //regard MD with offset as return result.
-    }
+
+    //TO BE REMOVED: genMDForStore has considered the Offset of ir.
+    //if (ST_ofst(ir) != 0) {
+    //    //Accumulating offset of identifier.
+    //    //e.g: struct {int a,b; } s; s.a = 10
+    //    //generate: st('s', ofst:4) = 10
+    //    MD t(*md);
+    //    ASSERT0(t.is_exact());
+    //    ASSERT0(ir->getTypeSize(getTypeMgr()) > 0);
+    //    MD_ofst(&t) += ST_ofst(ir);
+    //    MD_size(&t) = ir->getTypeSize(getTypeMgr());
+    //    MD const* entry = getMDSystem()->registerMD(t);
+    //    ASSERTN(MD_id(entry) > 0, ("Not yet registered"));
+    //    md = entry; //regard MD with offset as return result.
+    //}
+
     setMustRef(ir, md);
     return md;
 }
@@ -1263,6 +1269,8 @@ PassMgr * Region::allocPassMgr()
 
 void Region::dumpIRList() const
 {
+    if (!isLogMgrInit()) { return; }
+    note(this, "\n==---- DUMP IR LIST '%s' ----==", getRegionName());
     if (getIRList() == nullptr) { return; }
     xoc::dumpIRList(getIRList(), this);
 }
@@ -1539,6 +1547,9 @@ IR * Region::dupIR(IR const* src)
         }
         IR_ai(res)->copy(IR_ai(src), this);
     }
+    if (res->isMemoryRef()) {
+        res->copyRef(src, this);
+    }
     return res;
 }
 
@@ -1657,7 +1668,7 @@ void Region::prescanIRList(IR const* ir)
         case IR_CALL:
         case IR_ICALL:
             if (g_do_call_graph && !CALL_is_intrinsic(ir)) {
-                List<IR const*> * cl = getCallList();
+                CIRList * cl = getCallList();
                 ASSERT0(cl);
                 cl->append_tail(ir);
             }
@@ -1730,7 +1741,7 @@ void Region::prescanIRList(IR const* ir)
             break;
         case IR_RETURN:
             if (g_do_call_graph) {
-                List<IR const*> * cl = getReturnList();
+                CIRList * cl = getReturnList();
                 ASSERT0(cl);
                 cl->append_tail(ir);
             }
@@ -2548,208 +2559,6 @@ void Region::dumpVARInRegion() const
 }
 
 
-//This function check validation of options in oc, perform
-//recomputation if it is invalid.
-//...: the options/passes that anticipated to recompute.
-void Region::checkValidAndRecompute(OptCtx * oc, ...)
-{
-    BitSet opts;
-    List<PASS_TYPE> optlist;
-    UINT num = 0;
-    va_list ptr;
-    va_start(ptr, oc);
-    PASS_TYPE opty = (PASS_TYPE)va_arg(ptr, UINT);
-    while (opty != PASS_UNDEF && num < 1000) {
-        ASSERTN(opty < PASS_NUM,
-                ("You should append PASS_UNDEF to pass list."));
-        opts.bunion(opty);
-        optlist.append_tail(opty);
-        num++;
-        opty = (PASS_TYPE)va_arg(ptr, UINT);
-    }
-    va_end(ptr);
-    ASSERTN(num < 1000, ("too many pass queried or miss ending placeholder"));
-    if (num == 0) { return; }
-
-    PassMgr * passmgr = getPassMgr();
-    ASSERTN(passmgr, ("PassMgr is not enable"));
-    IRCFG * cfg = (IRCFG*)passmgr->queryPass(PASS_CFG);
-    AliasAnalysis * aa = nullptr;
-    DUMgr * dumgr = nullptr;
-
-    C<PASS_TYPE> * it = nullptr;
-    for (optlist.get_head(&it); it != optlist.end();
-         it = optlist.get_next(it)) {
-        PASS_TYPE pt = it->val();
-        switch (pt) {
-        case PASS_CFG:
-            if (!OC_is_cfg_valid(*oc)) {
-                if (cfg == nullptr) {
-                    //CFG is not constructed.
-                    cfg = (IRCFG*)getPassMgr()->registerPass(PASS_CFG);
-                    cfg->initCfg(*oc);
-                } else {
-                    //CAUTION: validation of CFG should maintained by user.
-                    cfg->rebuild(*oc);
-                }
-            }
-            break;
-        case PASS_CDG:
-            if (!OC_is_cdg_valid(*oc)) {
-                ASSERT0(passmgr);
-                CDG * cdg = (CDG*)passmgr->registerPass(PASS_CDG);
-                ASSERT0(cdg); //cdg is not enable.
-                ASSERTN(cfg && OC_is_cfg_valid(*oc),
-                        ("You should make CFG available first."));
-                cdg->rebuild(*oc, *cfg);
-            }
-            break;
-        case PASS_DOM:
-            if (!OC_is_dom_valid(*oc)) {
-                ASSERTN(cfg && OC_is_cfg_valid(*oc),
-                        ("You should make CFG available first."));
-                cfg->computeDomAndIdom(*oc);
-            }
-            break;
-        case PASS_PDOM:
-            if (!OC_is_pdom_valid(*oc)) {
-                ASSERTN(cfg && OC_is_cfg_valid(*oc),
-                        ("You should make CFG available first."));
-                cfg->computePdomAndIpdom(*oc);
-            }
-            break;
-        case PASS_EXPR_TAB:
-            if (!OC_is_expr_tab_valid(*oc) &&
-                getBBList() != nullptr &&
-                getBBList()->get_elem_count() != 0) {
-                ExprTab * exprtab = (ExprTab*)passmgr->
-                    registerPass(PASS_EXPR_TAB);
-                ASSERT0(exprtab);
-                exprtab->reperform(*oc);
-            }
-            break;
-        case PASS_LOOP_INFO:
-            if (!OC_is_loopinfo_valid(*oc)) {
-                ASSERTN(cfg && OC_is_cfg_valid(*oc),
-                        ("You should make CFG available first."));
-                cfg->LoopAnalysis(*oc);
-            }
-            break;
-        case PASS_RPO:
-            ASSERTN(cfg && OC_is_cfg_valid(*oc),
-                ("You should make CFG available first."));
-            if (!OC_is_rpo_valid(*oc) || cfg->getRPOBBList() == nullptr) {
-                cfg->computeRPO(*oc);
-            } else {
-                ASSERT0(cfg->verifyRPO(*oc));
-            }
-            break;
-        case PASS_AA:
-        case PASS_DU_REF:
-        case PASS_LIVE_EXPR:
-        case PASS_AVAIL_REACH_DEF: {
-            UINT f = 0;
-            if (opts.is_contain(PASS_DU_REF) && !OC_is_ref_valid(*oc)) {
-                f |= DUOPT_COMPUTE_PR_REF|DUOPT_COMPUTE_NONPR_REF;
-            }
-            if (opts.is_contain(PASS_LIVE_EXPR) &&
-                !OC_is_live_expr_valid(*oc)) {
-                f |= DUOPT_SOL_AVAIL_EXPR;
-            }
-            if (opts.is_contain(PASS_AVAIL_REACH_DEF) &&
-                !OC_is_avail_reach_def_valid(*oc)) {
-                f |= DUOPT_SOL_AVAIL_REACH_DEF;
-            }
-            if (opts.is_contain(PASS_DU_CHAIN) &&
-                (!OC_is_pr_du_chain_valid(*oc) ||
-                 !OC_is_nonpr_du_chain_valid(*oc)) &&
-                !OC_is_reach_def_valid(*oc)) {
-                f |= DUOPT_SOL_REACH_DEF;
-            }
-            if (opts.is_contain(PASS_AA) &&
-                !OC_is_aa_valid(*oc) &&
-                getBBList() != nullptr &&
-                getBBList()->get_elem_count() != 0) {
-                ASSERTN(cfg && OC_is_cfg_valid(*oc),
-                        ("You should make CFG available first."));
-                if (aa == nullptr) {
-                    aa = (AliasAnalysis*)passmgr->registerPass(PASS_AA);
-                    if (!aa->is_init()) {
-                        aa->initAliasAnalysis();
-                    }
-                }
-                UINT numir = 0;
-                UINT max_numir_in_bb = 0;
-                for (IRBB * bb = getBBList()->get_head();
-                    bb != nullptr; bb = getBBList()->get_next()) {
-                    numir += bb->getNumOfIR();
-                    max_numir_in_bb = MAX(max_numir_in_bb, bb->getNumOfIR());
-                }
-                if (numir > g_thres_opt_ir_num ||
-                    max_numir_in_bb > g_thres_opt_ir_num_in_bb) {
-                    aa->set_flow_sensitive(false);
-                }
-                //NOTE: assignMD(false) must be called before AA.
-                aa->perform(*oc);
-            }
-            if (f != DUOPT_UNDEF &&
-                getBBList() != nullptr &&
-                getBBList()->get_elem_count() != 0) {
-                if (dumgr == nullptr) {
-                    dumgr = (DUMgr*)passmgr->registerPass(PASS_DU_MGR);
-                }
-                if (opts.is_contain(PASS_DU_REF)) {
-                    f |= DUOPT_COMPUTE_NONPR_DU|DUOPT_COMPUTE_PR_DU;
-                }
-                dumgr->perform(*oc, f);
-                if (HAVE_FLAG(f, DUOPT_COMPUTE_PR_REF) ||
-                    HAVE_FLAG(f, DUOPT_COMPUTE_NONPR_REF)) {
-                    ASSERT0(verifyMDRef());
-                }
-                if (HAVE_FLAG(f, DUOPT_SOL_AVAIL_EXPR)) {
-                    ASSERT0(dumgr->verifyLiveinExp());
-                }
-            }
-            break;
-        }
-        case PASS_DU_CHAIN:
-            if (getBBList() != nullptr && getBBList()->get_elem_count() != 0) {
-                if (dumgr == nullptr) {
-                    dumgr = (DUMgr*)passmgr->registerPass(PASS_DU_MGR);
-                }
-
-                UINT flag = DUOPT_UNDEF;
-                if (!OC_is_nonpr_du_chain_valid(*oc)) {
-                    flag |= DUOPT_COMPUTE_NONPR_DU;
-                }
-
-                //If PRs have already been in SSA form, compute
-                //DU chain doesn't make any sense.
-                PRSSAMgr * ssamgr = (PRSSAMgr*)passmgr->queryPass(
-                    PASS_PR_SSA_MGR);
-                if ((ssamgr == nullptr || !ssamgr->is_valid()) &&
-                    !OC_is_pr_du_chain_valid(*oc)) {
-                    flag |= DUOPT_COMPUTE_PR_DU;
-                }
-
-                if (opts.is_contain(PASS_REACH_DEF)) {
-                    dumgr->computeMDDUChain(*oc, true, flag);
-                } else {
-                    dumgr->computeMDDUChain(*oc, false, flag);
-                }
-            }
-            break;
-        default: {
-            Pass * pass = passmgr->queryPass(pt);
-            if (pass != nullptr) {
-                if (!pass->perform(*oc)) { break; }
-            }
-        }
-        } //end switch
-    } //end for
-}
-
-
 bool Region::partitionRegion()
 {
     //----- DEMO CODE ----------
@@ -2833,10 +2642,10 @@ void Region::updateCallAndReturnList(bool scan_inner_region)
 {
     if (readCallList() == nullptr) { return; }
     UINT num_inner_region = 0;
-    List<IR const*> * clst = getCallList();
-    if (clst == nullptr) { return; }
+    CIRList * clst = getCallList();
+    if (clst->get_elem_count() == 0) { return; }
 
-    xcom::C<IR const*> * ct;
+    CIRListIter ct;
     for (clst->get_head(&ct); ct != clst->end(); ct = clst->get_next(ct)) {
         IR const* c = ct->val();
         ASSERT0(c);
@@ -2847,8 +2656,8 @@ void Region::updateCallAndReturnList(bool scan_inner_region)
         }
     }
 
-    List<IR const*> * retlst = getReturnList();
-    if (retlst == nullptr) { return; }
+    CIRList * retlst = getReturnList();
+    if (retlst->get_elem_count() == 0) { return; }
 
     for (retlst->get_head(&ct);
          ct != retlst->end(); ct = retlst->get_next(ct)) {

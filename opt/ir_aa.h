@@ -37,6 +37,7 @@ author: Su Zhenyu
 namespace xoc {
 
 class IRCFG;
+class GSCC;
 
 //PtPair
 #define PP_id(pp) ((pp)->id)
@@ -302,6 +303,7 @@ typedef TMap<IR const*, MD const*> IR2Heapobj;
 class AliasAnalysis : public Pass {
 protected:
     IRCFG * m_cfg;
+    GSCC * m_scc;
     VarMgr * m_var_mgr;
     TypeMgr * m_tm;
     Region * m_rg;

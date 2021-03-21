@@ -50,5 +50,8 @@ OPT_OBJS +=\
 ../opt/du_helper.o\
 ../opt/symtab.o\
 ../opt/logmgr.o\
-../opt/ai.o
+../opt/ai.o\
+../opt/gscc.o\
+../opt/lftr.o\
+../opt/ir_ivr.o
 

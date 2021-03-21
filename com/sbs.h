@@ -335,7 +335,7 @@ public:
 //    MiscBitSetMgr<47> mbsm;
 //    SBitSet<47> * x = new SBitSet<47>(mbsm.getSegMgr());
 //    x->bunion(100);
-//    x->clean(); //Very Important!
+//    x->clean(); //Very Important! User should free resource to mbsm.
 template <UINT BitsPerSeg = BITS_PER_SEG>
 class SBitSet : public SBitSetCore<BitsPerSeg> {
     COPY_CONSTRUCTOR(SBitSet);
@@ -765,7 +765,7 @@ public:
 
 //This class represent a BitSet Manager that is response for creating
 //and destory dense bitset, sparse bitset and dual bitset.
-#define MiscBitSetMgr_sc_free_list(sbs)        ((sbs)->scflst)
+#define MiscBitSetMgr_sc_free_list(sbs) ((sbs)->scflst)
 
 template <UINT BitsPerSeg = BITS_PER_SEG>
 class MiscBitSetMgr {

@@ -50,6 +50,7 @@ author: Su Zhenyu
 #include "callg.h"
 #include "du_helper.h"
 #include "debug_util.h" //only for compiler internal debugging.
+#include "gscc.h"
 
 using namespace xoc;
 #endif

@@ -2048,6 +2048,12 @@ public:
     T remove(SC<T> * prev, SC<T> * holder)
     {
         ASSERT0(m_free_list_pool);
+        if (prev == nullptr) {
+            T t = remove_head();
+            ASSERTN(t == holder->val(),
+                    ("prev does not have relation to holder"));
+            return t;
+        }
         return SListCore<T>::remove(prev, holder, &m_free_list);
     }
 
@@ -4825,7 +4831,8 @@ public:
 //    DMap<OPND*, OPER*, MAP1, MAP2> opnd2oper_dmap;
 //
 //NOTICE:
-//    1. Tsrc(0) is defined as default nullptr in DMap, so do not use T(0) as element.
+//    1. Tsrc(0) is defined as default nullptr in DMap, so do not use T(0)
+//       as element.
 //    2. DMap Object's memory can be allocated by malloc() dynamically.
 template <class Tsrc, class Ttgt, class MAP_Tsrc2Ttgt, class MAP_Ttgt2Tsrc>
 class DMap {
@@ -4886,7 +4893,8 @@ public:
 //    or deriving from List, typedef List<Ttgt> TAB_Ttgt;
 //
 //NOTICE:
-//    1. Tsrc(0) is defined as default nullptr in MMap, do not use T(0) as element.
+//    1. Tsrc(0) is defined as default nullptr in MMap, do not use T(0)
+//       as element.
 //
 //    2. MMap allocate memory for 'TAB_Ttgt' and return 'TAB_Ttgt *'
 //       when get(Tsrc) be invoked. DO NOT free these objects yourself.

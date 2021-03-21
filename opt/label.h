@@ -47,6 +47,8 @@ typedef enum {
 #define POSTFIX_OF_LABEL() ""
 #define PREFIX_OF_CLABEL() ""
 #define POSTFIX_OF_CLABEL() ""
+#define PREFIX_OF_PRAGMA() "_PRAGMA"
+
 
 #define ILABEL_STR_FORMAT  "%s%d%s" //prefix label-num postfix
 #define ILABEL_CONT(li) \
@@ -55,6 +57,10 @@ typedef enum {
 #define CLABEL_STR_FORMAT  "%s%s%s" //prefix label-name postfix
 #define CLABEL_CONT(li) \
     PREFIX_OF_CLABEL(), SYM_name(LABELINFO_name(li)), POSTFIX_OF_CLABEL()
+
+#define PRAGMA_STR_FORMAT  "%s%s%s" //prefix label-name postfix
+#define PRAGMA_CONT(li) \
+    PREFIX_OF_PRAGMA(), SYM_name(LABELINFO_name(li)), POSTFIX_OF_CLABEL()
 
 #define LABELINFO_type(l) ((l)->ltype)
 #define LABELINFO_name(l) ((l)->u1.lab_name)

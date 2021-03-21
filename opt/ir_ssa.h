@@ -50,8 +50,7 @@ protected:
     Vector<xcom::BitSet*> m_df_vec;
     UINT m_thres;
 
-    void buildRecur(xcom::Vertex const* v,
-                    xcom::DGraph const& g,
+    void buildRecur(xcom::Vertex const* v, xcom::DGraph const& g,
                     DomTree const& domtree);
 
     //Generate the DF control set
@@ -99,7 +98,6 @@ class PRSSAMgr : public Pass {
     TypeMgr * m_tm;
     IRCFG * m_cfg;
     DefSegMgr * m_seg_mgr;
-    bool m_is_valid;
     UINT m_vp_count;
     IRIter m_iter; //for tmp use.
     //Record virtual PR for each PR.
@@ -131,6 +129,11 @@ class PRSSAMgr : public Pass {
         m_seg_mgr = nullptr;
         m_cfg = nullptr;
         m_vp_count = 1;
+
+        //Set to true if PR ssa is constructed.
+        //This flag will direct the behavior of optimizations.
+        //If SSA constructed, DU mananger should not compute information
+        //for PR any more.
         m_is_valid = false;
         m_vp_pool = nullptr;
     }
@@ -142,8 +145,7 @@ class PRSSAMgr : public Pass {
     void destructBBSSAInfo(IRBB * bb);
     void destructionInDomTreeOrder(IRBB * root, xcom::Graph & domtree);
 
-    void handleBBRename(IRBB * bb,
-                        IN DefSBitSet const& defined_prs,
+    void handleBBRename(IRBB * bb, DefSBitSet const& defined_prs,
                         IN OUT BB2VPMap & bb2vp);
 
     xcom::Stack<VPR*> * mapPRNO2VPStack(UINT prno);
@@ -168,8 +170,7 @@ class PRSSAMgr : public Pass {
                 xcom::Graph const& domtree);
     void renameBB(IRBB * bb);
     void renameInDomTreeOrder(
-        IRBB * root,
-        xcom::Graph const& dtree,
+        IRBB * root, xcom::Graph const& dtree,
         Vector<DefSBitSet*> const& defined_prs_vec);
     void removePhiFromBB();
 
@@ -178,20 +179,16 @@ class PRSSAMgr : public Pass {
     void stripSpecifiedVP(VPR * vp);
     void stripStmtVersion(IR * stmt, xcom::BitSet & visited);
 
-    void placePhiForPR(UINT prno,
-                       IN List<IRBB*> * defbbs,
-                       DfMgr const& dfm,
-                       xcom::BitSet & visited,
-                       List<IRBB*> & wl,
-                       Vector<DefSBitSet*> & defined_prs_vec);
-    void placePhi(DfMgr const& dfm,
-                  IN OUT DefSBitSet & effect_prs,
+    void placePhiForPR(UINT prno, IN List<IRBB*> * defbbs,
+                       DfMgr const& dfm, xcom::BitSet & visited,
+                       List<IRBB*> & wl, Vector<DefSBitSet*> & defined_prs_vec);
+    void placePhi(DfMgr const& dfm, IN OUT DefSBitSet & effect_prs,
                   DefMiscBitSetMgr & bs_mgr,
                   Vector<DefSBitSet*> & defined_prs_vec,
                   List<IRBB*> & wl);
 
-    bool verifyPRNOofVP(); //Only used in PRSSAMgr.
-    bool verifyVPR(); //Only used in PRSSAMgr.
+    bool verifyPRNOofVP() const; //Only used in PRSSAMgr.
+    bool verifyVPR() const; //Only used in PRSSAMgr.
 public:
     explicit PRSSAMgr(Region * rg)
     {
@@ -232,6 +229,11 @@ public:
         return (SSAInfo*)allocVPR(prno, 0, m_tm->getAny());
     }
 
+    //Build Def-Use chain for 'def' and 'use'.
+    //def: def stmt that writes PR.
+    //use: use expression that reads PR.
+    //Note caller should guarrentee 'use' does not belong to other Def-Use
+    //chain.
     void buildDUChain(IR * def, IR * use);
 
     //Note: Non-SSA DU Chains of read/write PR will be clean and
@@ -269,11 +271,6 @@ public:
     //     Each operand correspond to in-edge on CFG.
     IR * insertOpndAt(IR * phi, UINT pos, IRBB const* pred);
 
-    //Return true if PR ssa is constructed.
-    //This flag will direct the behavior of optimizations.
-    //If SSA constructed, DU mananger will not compute any information for PR.
-    bool is_valid() const { return m_is_valid; }
-
     //Return true if phi is redundant, otherwise return false.
     //If all opnds have same defintion or defined by current phi,
     //the phi is redundant.
@@ -282,8 +279,7 @@ public:
     bool isRedundantPHI(IR const* phi, OUT IR ** common_def) const;
 
     //Return true if stmt dominate use's stmt, otherwise return false.
-    bool isStmtDomUseInsideLoop(IR const* stmt,
-                                IR const* use,
+    bool isStmtDomUseInsideLoop(IR const* stmt, IR const* use,
                                 LI<IRBB> const* li) const;
 
     //Return true if ir dominates all its USE expressions which inside loop.
@@ -316,16 +312,16 @@ public:
     //NOTE: If ir is an IR tree, e.g: add(pr1, pr2), removing 'add' means
     //pr1 and pr2 will be removed as well. Therefore pr1 pr2's SSAInfo will be
     //updated as well.
-    static void removePRSSAUse(IR * ir);
+    static void removePRSSAOcc(IR * ir);
 
     //Check each USE of stmt, remove the expired one which is not reference
     //the memory any more that stmt defined.
     //Return true if DU changed.
     static bool removeExpiredDUForStmt(IR * stmt, Region * rg);
 
-    bool verifyPhi(bool is_vpinfo_avail, bool before_strip_version);
-    bool verifySSAInfo(); //Can be used in any module.
-    static bool verifyPRSSAInfo(Region * rg);
+    bool verifyPhi(bool is_vpinfo_avail, bool before_strip_version) const;
+    bool verifySSAInfo() const; //Can be used in any module.
+    static bool verifyPRSSAInfo(Region const* rg);
 
     virtual bool perform(OptCtx & oc) { construction(oc); return true; }
 };

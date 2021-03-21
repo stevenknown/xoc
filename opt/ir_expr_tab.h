@@ -47,7 +47,7 @@ public:
     IR * ir;
     ExpRep * next;
     ExpRep * prev;
-    IRList occ_list;
+    IREList occ_list;
 
 public:
     ExpRep()

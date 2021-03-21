@@ -324,7 +324,7 @@ bool RCE::perform(OptCtx & oc)
 
     START_TIMER(t, getPassName());
     if (!m_gvn->is_valid() && is_use_gvn()) {
-        m_gvn->reperform(oc);
+        m_gvn->perform(oc);
     }
 
     bool cfg_mod = false;

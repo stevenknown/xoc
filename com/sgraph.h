@@ -563,10 +563,10 @@ public:
         ASSERTN(m_ec_pool != nullptr, ("not yet initialized."));
         return m_edgetab.get_next(it);
     }
-    Vertex * get_first_vertex(INT & cur) const;
-    Vertex * get_next_vertex(INT & cur) const;
-    Vertex * get_last_vertex(INT & cur) const;
-    Vertex * get_prev_vertex(INT & cur) const;
+    Vertex * get_first_vertex(VertexIter & cur) const;
+    Vertex * get_next_vertex(VertexIter & cur) const;
+    Vertex * get_last_vertex(VertexIter & cur) const;
+    Vertex * get_prev_vertex(VertexIter & cur) const;
 
     void resize(UINT vertex_hash_sz, UINT edge_hash_sz);
     Edge * reverseEdge(Edge * e); //Reverse edge direction.(e.g: a->b => b->a)
@@ -749,7 +749,7 @@ public:
     //Return true if 'v1' post dominate 'v2'.
     bool is_pdom(UINT v1, UINT v2) const
     {
-        ASSERTN(read_dom_set(v2), ("no PDOM info about vertex%d", v2));
+        ASSERTN(read_pdom_set(v2), ("no PDOM info about vertex%d", v2));
         return read_pdom_set(v2)->is_contain(v1);
     }
 

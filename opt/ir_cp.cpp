@@ -107,7 +107,7 @@ void CopyProp::replaceExpViaSSADu(IR * exp,
         PR_ssainfo(newir) = PR_ssainfo(cand_expr);
         PR_ssainfo(newir)->addUse(newir);
     } else {
-        m_du->copyRefAndAddDUChain(newir, cand_expr, true);
+        m_du->addUse(newir, cand_expr);
     }
 
     //cand_expr may be IR tree. And there might be PR or LD on the tree.
@@ -134,12 +134,50 @@ void CopyProp::replaceExpViaSSADu(IR * exp,
 }
 
 
+//Update DU info for 'exp', it will be replaced by 'newir'.
+void CopyProp::removeExpDUInfo(IR * newir, IR * exp)
+{
+    SSAInfo * exp_prssainfo = usePRSSADU() ? exp->getSSAInfo() : nullptr;
+    MDSSAInfo * exp_mdssainfo = useMDSSADU() ? 
+        m_mdssamgr->getMDSSAInfoIfAny(exp) : nullptr;
+
+    if (exp_prssainfo != nullptr) {
+        //Remove exp SSA use.
+        ASSERT0(exp_prssainfo->getUses().find(exp));
+        exp->removeSSAUse();
+        ASSERT0(exp->getStmt());
+    }
+
+    if (exp_mdssainfo != nullptr) {
+        //Remove exp MD SSA use.
+        ASSERT0(m_mdssamgr);
+        m_mdssamgr->removeMDSSAOcc(exp);
+        if (exp->is_id()) {
+            ASSERT0(ID_phi(exp));
+            ID_phi(exp)->replaceOpnd(exp, newir);
+        }
+    }
+
+    //To take care of classic DU info that used/maintained by
+    //other pass/phase even if MDSSA enabled, update classic
+    //DU chain as well. Nevertheless, some verification
+    //might complain.
+    m_du->removeUseFromDefset(exp);
+    ASSERT0(exp->getStmt());
+}
+
+
+void CopyProp::addDUInfoForDupOfCandExp(IR * dup, IR const* cand_exp)
+{
+    xoc::addUse(dup, cand_exp, m_rg);
+}
+
+
 //Check and replace 'ir' with 'cand_expr' if they are
 //equal, and update DU info. If 'cand_expr' is NOT leaf,
 //that will create redundant computation, and
 //depends on later Redundancy Elimination to reverse back.
 //exp: expression which will be replaced.
-//
 //cand_expr: substitute cand_expr for exp.
 //    e.g: cand_expr is *p, cand_expr_md is MD3
 //        *p(MD3) = 10 //p point to MD3
@@ -176,65 +214,15 @@ void CopyProp::replaceExp(IR * exp,
     //    }
     //    CPC_need_recomp_aa(ctx) = true;
     //}
-
-    IR * newir = m_rg->dupIRTree(cand_expr);
-
-    //Build DU chain between propagated exp 'newir' and its DEF.
-    //TODO: build MDSSA DU chain.
-    m_du->copyRefAndAddDUChain(newir, cand_expr, true);
-
+    IR * dup = m_rg->dupIRTree(cand_expr);
     ASSERT0(cand_expr->getStmt());
-    SSAInfo * exp_ssainfo = exp->getSSAInfo();
-    MDSSAInfo * exp_mdssainfo = useMDSSADU() ? 
-        m_mdssamgr->getMDSSAInfoIfAny(exp) : nullptr;
-    if (exp_ssainfo != nullptr) {
-        //Remove exp SSA use.
-        ASSERT0(exp->getSSAInfo());
-        ASSERT0(exp->getSSAInfo()->getUses().find(exp));
-        exp->removeSSAUse();
-        ASSERT0(exp->getStmt());
-        bool doit = exp->getParent()->replaceKid(exp, newir, false);
-        ASSERT0(doit);
-        DUMMYUSE(doit);
-    } else if (exp_mdssainfo != nullptr) {
-        //Remove exp MD SSA use.
-        ASSERT0(m_mdssamgr);
-        m_mdssamgr->removeMDSSAUse(exp);
-        if (exp->is_id()) {
-            ASSERT0(ID_phi(exp));
-            ID_phi(exp)->replaceOpnd(exp, newir);
-        } else {
-            bool doit = exp->getParent()->replaceKid(exp, newir, false);
-            ASSERT0(doit);
-            DUMMYUSE(doit);
-        }
-
-        MDSSAInfo * cand_exp_mdssainfo = m_mdssamgr->getMDSSAInfoIfAny(
-            cand_expr);
-        if (cand_exp_mdssainfo != nullptr) {
-            //CASE:copy MDSSAInfo from cand_exp to newir.
-            // .. = cand_exp
-            // .. = exp
-            m_mdssamgr->getUseDefMgr()->setMDSSAInfo(newir,
-                                                     cand_exp_mdssainfo);
-            m_mdssamgr->addMDSSAOcc(newir, cand_exp_mdssainfo);
-            //Remove 'exp' from OccSet of def_stmt of 'exp'.
-            m_mdssamgr->removeMDSSAUse(exp);
-        }
-
-        //To take care of classic DU info that used/maintained by
-        //other pass/phase even if MDSSA enabled, update classic
-        //DU chain as well. Nevertheless, some verification
-        //might complain.
-        m_du->removeUseFromDefset(exp);
-    } else {
-        m_du->removeUseFromDefset(exp);
-        ASSERT0(exp->getStmt());
-        bool doit = exp->getParent()->replaceKid(exp, newir, false);
-        ASSERT0(doit);
-        DUMMYUSE(doit);
-    }
+    removeExpDUInfo(dup, exp);
+    addDUInfoForDupOfCandExp(dup, cand_expr);
     CPC_change(ctx) = true;
+
+    bool doit = exp->getParent()->replaceKid(exp, dup, false);
+    ASSERT0(doit);
+    DUMMYUSE(doit);
     m_rg->freeIRTree(exp);
 }
 
@@ -244,8 +232,23 @@ bool CopyProp::isCopyOR(IR * ir) const
     switch (ir->getCode()) {
     case IR_ST:
     case IR_STPR:
-    case IR_IST:
+    case IR_IST: {
+        if (ir->is_stpr() && !isLowCostExp(ir->getRHS())) {
+            //CASE:Propagate LD/ILD through PR may degrade performance, e.g:
+            //  pr1 = LD(x)
+            //  while (..) {
+            //     = pr1 
+            //  }
+            //====> after propagate LD(x)
+            //  pr1 = LD(x)
+            //  while (..) {
+            //     = LD(x)
+            //  }
+            //This might lead perform degradation.
+            return false;
+        }
         return canBeCandidate(ir->getRHS());
+       }
     case IR_PHI:
         if (xcom::cnt_list(PHI_opnd_list(ir)) == 1) {
             return true;
@@ -256,8 +259,7 @@ bool CopyProp::isCopyOR(IR * ir) const
 }
 
 
-bool CopyProp::existMayDefTillBB(IR const* exp,
-                                 IRBB const* start,
+bool CopyProp::existMayDefTillBB(IR const* exp, IRBB const* start,
                                  IRBB const* meetup) const
 {
     xcom::List<IRBB const*> wl;
@@ -301,16 +303,13 @@ bool CopyProp::existMayDefTillBB(IR const* exp,
 //'use_phi': stmt in use-list of 'def_stmt'.
 //'use_bb': IRBB that use_stm or use_phi be placed in.
 //Note either use_phi or use_stmt is nullptr.
-bool CopyProp::is_available(IR const* def_stmt,
-                            IR const* prop_value,
-                            IR * use_stmt,
-                            MDPhi * use_phi,
-                            IRBB * usebb)
+bool CopyProp::is_available(IR const* def_stmt, IR const* prop_value,
+                            IR * use_stmt, MDPhi * use_phi, IRBB * usebb)
 {
     ASSERT0(usebb);
     ASSERT0(use_stmt || use_phi);
-
     if (def_stmt == use_stmt) { return false; }
+
     if (isSimpCVT(prop_value)) {
         prop_value = getSimpCVTValue(prop_value);
         ASSERT0(prop_value);
@@ -358,20 +357,54 @@ bool CopyProp::is_available(IR const* def_stmt,
 }
 
 
-//CVT with simply cvt-exp is copy-propagate candidate.
-bool CopyProp::isSimpCVT(IR const* ir) const
+//Return true if ir is CVT with cvt-exp that always include low-cost
+//expression. These low-cost always profitable and may bring up new
+//optimization opportunity.
+bool CopyProp::isLowCostCVT(IR const* ir) const
 {
-    if (!ir->is_cvt()) return false;
+    if (!ir->is_cvt()) { return false; }
 
     for (;;) {
         if (ir->is_cvt()) {
             ir = CVT_exp(ir);
-        } else if (ir->is_ld() || ir->is_const() || ir->is_pr()) {
+            continue;
+        }
+        switch (ir->getCode()) {
+        case IR_CONST:
+        case IR_PR:
+        case IR_LDA:
             return true;
-        } else {
-            break;
+        default:
+            return false;
         }
     }
+    UNREACHABLE();
+    return false;
+}
+
+
+//Return true if CVT with simply cvt-exp that can be regard as
+//copy-propagate candidate.
+bool CopyProp::isSimpCVT(IR const* ir) const
+{
+    if (!ir->is_cvt()) { return false; }
+
+    for (;;) {
+        if (ir->is_cvt()) {
+            ir = CVT_exp(ir);
+            continue;
+        }
+        switch (ir->getCode()) {
+        case IR_LD:
+        case IR_CONST:
+        case IR_PR:
+        case IR_LDA:
+            return true;
+        default:
+            return false;
+        }
+    }
+    UNREACHABLE();
     return false;
 }
 
@@ -384,12 +417,20 @@ IR const* CopyProp::getSimpCVTValue(IR const* ir) const
     for (;;) {
         if (ir->is_cvt()) {
             ir = CVT_exp(ir);
-        } else if (ir->is_ld() || ir->is_const() || ir->is_pr()) {
+            continue;
+        }
+
+        switch (ir->getCode()) {
+        case IR_LD:
+        case IR_CONST:
+        case IR_PR:
+        case IR_LDA:
             return ir;
-        } else {
-            break;
+        default:
+            return nullptr;
         }
     }
+    UNREACHABLE();
     return nullptr;
 }
 
@@ -485,11 +526,18 @@ void CopyProp::dumpCopyPropagationAction(IR const* def_stmt,
     note(getRegion(), "\n==---- DUMP %s '%s' ----==",
          getPassName(), m_rg->getRegionName());
     note(getRegion(),
-         "\nPropagating Candidate is %s(id:%d), that located in Stmt:",
+         "\nPROPAGATING CANDIDATE: %s(id:%d) THAT LOCATED IN STMT:",
          IRNAME(prop_value), prop_value->id());
-    dumpIR(def_stmt, m_rg);
-    note(getRegion(), "\nWill replace %s(id:%d), that located in Stmt:",
+
+    m_rg->getLogMgr()->incIndent(4);
+    dumpIR(def_stmt, m_rg, nullptr,
+           IR_DUMP_KID|IR_DUMP_INNER_REGION|IR_DUMP_VAR_DECL);
+    m_rg->getLogMgr()->decIndent(4);
+
+    note(getRegion(), "\nWILL REPLACE %s(id:%d) THAT LOCATED IN STMT:",
          IRNAME(use), use->id());
+
+    m_rg->getLogMgr()->incIndent(4);
     if (use->is_id()) {
         ASSERT0(m_mdssamgr);
         MDSSAInfo * mdssainfo = m_mdssamgr->getUseDefMgr()->getMDSSAInfo(use);
@@ -499,8 +547,10 @@ void CopyProp::dumpCopyPropagationAction(IR const* def_stmt,
         ID_phi(use)->dump(m_rg, m_mdssamgr->getUseDefMgr());
     } else {
         ASSERT0(use->getStmt());
-        dumpIR(use->getStmt(), m_rg);
+        dumpIR(use->getStmt(), m_rg, nullptr,
+               IR_DUMP_KID|IR_DUMP_INNER_REGION|IR_DUMP_VAR_DECL);
     }
+    m_rg->getLogMgr()->decIndent(4);
 }
 
 
@@ -669,7 +719,7 @@ bool CopyProp::doProp(IN IRBB * bb, IN IRSet * useset)
         bool mdssadu = false;
         useset->clean();
 
-        if (ssainfo != nullptr && SSA_uses(ssainfo).get_elem_count() != 0) {
+        if (ssainfo != nullptr) {
             //Record use_stmt in another vector to facilitate this function
             //if it is not in use-list any more after copy-propagation.
             SSAUseIter sc;
@@ -688,10 +738,10 @@ bool CopyProp::doProp(IN IRBB * bb, IN IRSet * useset)
                 continue;
             }
 
-            mdssainfo->collectUse(useset, m_mdssamgr->getUseDefMgr());
+            mdssainfo->collectUse(m_mdssamgr->getUseDefMgr(), useset);
             mdssadu = true;
         } else if ((duset = def_stmt->readDUSet()) != nullptr &&
-                   duset->get_elem_count() != 0) {
+                   !duset->is_empty()) {
             if (def_stmt->getRefMD() == nullptr ||
                 !def_stmt->getRefMD()->is_exact()) {
                 continue;
@@ -742,8 +792,8 @@ bool CopyProp::perform(OptCtx & oc)
         //At least one kind of DU chain should be avaiable.
         return false;
     }
+    m_rg->getPassMgr()->checkValidAndRecompute(&oc, PASS_DOM, PASS_UNDEF);
 
-    m_rg->checkValidAndRecompute(&oc, PASS_DOM, PASS_UNDEF);
     bool change = false;
     IRBB * entry = m_rg->getCFG()->getEntry();
     ASSERTN(entry, ("Not unique entry, invalid Region"));

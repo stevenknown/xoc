@@ -85,6 +85,8 @@ private:
     UINT m_prop_kind;
 
 private:
+    void addDUInfoForDupOfCandExp(IR * dup, IR const* cand_exp);
+
     bool checkTypeConsistency(IR const* ir, IR const* cand_expr) const;
 
     bool doPropUseSet(IRSet * useset, IR * def_stmt,
@@ -117,8 +119,25 @@ private:
     DefSegMgr  * getSegMgr() const { return getSBSMgr()->getSegMgr(); }
     DefMiscBitSetMgr  * getSBSMgr() const { return m_rg->getMiscBitSetMgr(); }
 
+    bool isLowCostExp(IR const* ir) const
+    {
+        switch (ir->getCode()) {
+        case IR_LDA:
+        case IR_CONST:
+        case IR_PR:
+            return true;
+        default: return isLowCostCVT(ir);
+        }
+        UNREACHABLE();
+        return false;
+    }
+    //Return true if CVT with simply cvt-exp that can be regard as
+    //copy-propagate candidate.
     bool isSimpCVT(IR const* ir) const;
-    bool isConstCVT(IR const* ir) const;
+    //Return true if ir is CVT with cvt-exp that always include low-cost
+    //expression. These low-cost always profitable and may bring up new
+    //optimization opportunity.
+    bool isLowCostCVT(IR const* ir) const;
     bool is_available(IR const* def_stmt,
                       IR const* prop_value,
                       IR * use_stmt,
@@ -136,6 +155,7 @@ private:
     void replaceExpViaSSADu(IR * exp,
                             IR const* cand_expr,
                             IN OUT CPCtx & ctx);
+    void removeExpDUInfo(IR * dup, IR * exp);
 
     bool useMDSSADU() const
     { return m_mdssamgr != nullptr && m_mdssamgr->is_valid(); }
@@ -183,11 +203,20 @@ public:
             case IR_PR:
                 return true;
             case IR_LD:
+                ASSERT0(ir->getRefMD());
+                return true;
             case IR_ILD:
-                if (ir->getRefMD() != nullptr && ir->getRefMD()->is_exact()) {
-                    return true;
+                if (ir->getRefMD() == nullptr || !ir->getRefMD()->is_exact()) {
+                    //TBD:In aggressive mode, we anticipate propagating RHS
+                    //expression even if it is inexact.
+                    //e.g: s is MC type.
+                    //    s = *p
+                    //    *q = s 
+                    //  *p can be propagated.
+                    //return false;
                 }
-                return false;
+                ASSERT0(ir->getRefMD() || ir->getRefMDSet());
+                return true;
             default: return isSimpCVT(ir);
             }
         default: UNREACHABLE();

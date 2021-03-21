@@ -80,13 +80,14 @@ public:
     }
 
     //Insert 'ir' before 'marker'.
-    inline IRListIter insert_before(IN IR * ir, IN IR * marker)
+    inline IRListIter insert_before(IN IR * ir, IR const* marker)
     {
         if (ir == nullptr) { return nullptr; }
         ASSERT0(marker != nullptr);
         ASSERT0(m_bb != nullptr);
         ir->setBB(m_bb);
-        return xcom::EList<IR*, IR2Holder>::insert_before(ir, marker);
+        return xcom::EList<IR*, IR2Holder>::insert_before(
+            ir, const_cast<IR*>(marker));
     }
 
     //Insert 'ir' before 'marker'. marker will be modified.
@@ -100,13 +101,14 @@ public:
     }
 
     //Insert 'ir' after 'marker'.
-    inline IRListIter insert_after(IR * ir, IR * marker)
+    inline IRListIter insert_after(IR * ir, IR const* marker)
     {
         if (ir == nullptr) { return nullptr; }
         ASSERT0(marker != nullptr);
         ASSERT0(m_bb != nullptr);
         ir->setBB(m_bb);
-        return xcom::EList<IR*, IR2Holder>::insert_after(ir, marker);
+        return xcom::EList<IR*, IR2Holder>::insert_after(
+            ir, const_cast<IR*>(marker));
     }
 
     //Insert 'ir' after 'marker'.
@@ -250,6 +252,7 @@ public:
     UINT getNumOfSucc(CFG<IRBB, IR> * cfg) const;
     BBIRList * getIRList() { return &BB_irlist(this); }
     IR * getFirstIR() { return BB_first_ir(this); }
+    IR * getNextIR() { return BB_next_ir(this); }
     IR * getLastIR() { return BB_last_ir(this); }
 
     //Is bb containing such label carried by 'lir'.

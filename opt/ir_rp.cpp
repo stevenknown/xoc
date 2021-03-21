@@ -977,8 +977,8 @@ void RegPromot::handleRestore2Mem(
             IR * sublist = m_rg->dupIRTree(ARR_sub_list(delegate));
 
             //Copy DU chain and MD reference.
-            m_du->copyRefAndAddDUChain(base, ARR_base(delegate), true);
-            m_du->copyRefAndAddDUChain(sublist, ARR_sub_list(delegate), true);
+            m_du->addUse(base, ARR_base(delegate));
+            m_du->addUse(sublist, ARR_sub_list(delegate));
 
             //Build Store Array operation.
             stmt = m_rg->buildStoreArray(base, sublist, IR_dt(delegate),
@@ -993,7 +993,7 @@ void RegPromot::handleRestore2Mem(
         }
         case IR_IST: {
             IR * lhs = m_rg->dupIRTree(IST_base(delegate));
-            m_du->copyRefAndAddDUChain(lhs, IST_base(delegate), true);
+            m_du->addUse(lhs, IST_base(delegate));
 
             stmt = m_rg->buildIStore(lhs, pr,
                 IST_ofst(delegate), IR_dt(delegate));
@@ -1007,12 +1007,11 @@ void RegPromot::handleRestore2Mem(
             IR * base = m_rg->dupIRTree(ILD_base(delegate));
             stmt = m_rg->buildIStore(base, pr, ILD_ofst(delegate),
                                      IR_dt(delegate));
-            m_du->copyRefAndAddDUChain(base, ILD_base(delegate), true);
+            m_du->addUse(base, ILD_base(delegate));
             break;
         }
         case IR_LD:
-            stmt = m_rg->buildStore(LD_idinfo(delegate),
-                                    IR_dt(delegate),
+            stmt = m_rg->buildStore(LD_idinfo(delegate), IR_dt(delegate),
                                     LD_ofst(delegate), pr);
             break;
         default: UNREACHABLE(); //Unsupport.
@@ -1545,36 +1544,34 @@ void RegPromot::handlePrelog(IR * delegate, IR * pr,
     if (delegate->is_array()) {
         //Load array value into PR.
         rhs = m_rg->dupIRTree(delegate);
-        m_du->copyRefAndAddDUChain(ARR_base(rhs), ARR_base(delegate), true);
-        m_du->copyRefAndAddDUChain(ARR_sub_list(rhs),
-                                   ARR_sub_list(delegate), true);
+        m_du->addUse(ARR_base(rhs), ARR_base(delegate));
+        m_du->addUse(ARR_sub_list(rhs), ARR_sub_list(delegate));
         stpr = m_rg->buildStorePR(PR_no(pr), IR_dt(pr), rhs);
     } else if (delegate->is_starray()) {
         //Load array value into PR.
         rhs = m_rg->buildArray(m_rg->dupIRTree(ARR_base(delegate)),
                                m_rg->dupIRTree(ARR_sub_list(delegate)),
-                               IR_dt(delegate),
-                               ARR_elemtype(delegate),
+                               IR_dt(delegate), ARR_elemtype(delegate),
                                ((CArray*)delegate)->getDimNum(),
                                ARR_elem_num_buf(delegate));
-        m_du->copyRefAndAddDUChain(ARR_base(rhs), ARR_base(delegate), true);
-        m_du->copyRefAndAddDUChain(ARR_sub_list(rhs), ARR_sub_list(delegate), true);
+        m_du->addUse(ARR_base(rhs), ARR_base(delegate));
+        m_du->addUse(ARR_sub_list(rhs), ARR_sub_list(delegate));
         stpr = m_rg->buildStorePR(PR_no(pr), IR_dt(pr), rhs);
     } else if (delegate->is_ist()) {
         //Load indirect value into PR.
         rhs = m_rg->buildILoad(m_rg->dupIRTree(IST_base(delegate)),
                                IST_ofst(delegate), IR_dt(delegate));
-        m_du->copyRefAndAddDUChain(ILD_base(rhs), IST_base(delegate), true);
+        m_du->addUse(ILD_base(rhs), IST_base(delegate));
         stpr = m_rg->buildStorePR(PR_no(pr), IR_dt(pr), rhs);
     } else if (delegate->is_ild()) {
         //Load indirect value into PR.
         rhs = m_rg->dupIRTree(delegate);
-        m_du->copyRefAndAddDUChain(ILD_base(rhs), ILD_base(delegate), true);
+        m_du->addUse(ILD_base(rhs), ILD_base(delegate));
         stpr = m_rg->buildStorePR(PR_no(pr), IR_dt(pr), rhs);
     } else if (delegate->is_ld()) {
         //Load scalar into PR.
         rhs = m_rg->dupIRTree(delegate);
-        m_du->copyRefAndAddDUChain(rhs, delegate, false);
+        m_du->addUse(rhs, delegate);
         stpr = m_rg->buildStorePR(PR_no(pr), IR_dt(pr), rhs);
     } else if (delegate->is_st()) {
         //Load scalar into PR.
@@ -2027,17 +2024,20 @@ bool RegPromot::perform(OptCtx & oc)
     }
 
     START_TIMER(t, getPassName());    
-    m_rg->checkValidAndRecompute(&oc, PASS_LOOP_INFO, PASS_UNDEF);
+    m_rg->getPassMgr()->checkValidAndRecompute(&oc, PASS_LOOP_INFO,
+                                               PASS_UNDEF);
     LI<IRBB> const* li = m_cfg->getLoopInfo();
     if (li == nullptr) { return false; }
+
     m_gvn = (GVN*)(m_rg->getPassMgr()->queryPass(PASS_GVN));
     if (m_gvn == nullptr) {
         //We dependent on gvn to do critical judgement.
         return false;
     }
     if (!m_gvn->is_valid()) {
-        m_gvn->reperform(oc);
+        m_gvn->perform(oc);
     }
+
     init();    
     List<LI<IRBB> const*> worklst;
     while (li != nullptr) {

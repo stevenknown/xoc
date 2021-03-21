@@ -649,7 +649,7 @@ IRBB * LICM::insertGuardBB(IRBB * prehead, IRBB * loophead)
     //  |
     //  v
     //  BB_loophead <--
-    //after insertion edge:
+    //after insertion of edge:
     //  BB_guard
     //  |   |
     //  |   v
@@ -660,24 +660,31 @@ IRBB * LICM::insertGuardBB(IRBB * prehead, IRBB * loophead)
     //  BB_loophead <--
     m_cfg->addEdge(guard, loophead); 
 
+    //Build guard-branch, and insert it into guard-BB.
     IR * br = loophead->getLastIR();
     ASSERT0(br && br->isConditionalBr());
     IR * det = m_rg->dupIRTree(BR_det(br));
+
+    //Remember maintaining the DU chain of generated IR.
+    xoc::addUse(det, BR_det(br), m_rg);
+
     if (br->is_truebr()) {
-        //Make sure the guard BR is FALSEBR because FALSEBR uses
+        //Make sure the guard-branch is FALSEBR because FALSEBR uses
         //fewer instructions than TRUEBR.
         Refine::invertCondition(&det, m_rg);
     }
     ASSERT0(br->is_single());
     
-    //The taken target is loophead.
+    //Set the label of taken-BB, note the taken target-BB should be loophead.
     LabelInfo const* li = loophead->getLabelList().get_head();
     ASSERT0(li);
     IR * guard_br = m_rg->buildBranch(false, det, li);
 
-    //Assign MD for generated new IR.
+    //Assign MD for all generated new IRs.
     m_rg->assignMDForIRList(guard_br, true, true);
     ASSERT0(guard->getNumOfIR() == 0);
+
+    //Insert the guard-branch into guard-BB.
     guard->getIRList()->append_tail_ex(guard_br);
     return guard;
 }
@@ -760,7 +767,7 @@ bool LICM::hoistCandHelper(OUT bool & insert_guard_bb,
                 ; //guard BB is unnecessary
             } else {
                 IRBB * guard = insertGuardBB(prehead, li->getLoopHead());
-                movePhi(prehead, guard, m_rg);
+                xoc::movePhi(prehead, guard, m_rg);
                 m_insert_guard_bb.append(li);
                 insert_guard_bb = true;
             }
@@ -801,11 +808,11 @@ bool LICM::hoistCandHelper(OUT bool & insert_guard_bb,
     IR * stpr = m_rg->buildStorePR(PR_no(t), t->getType(), cand_exp);
 
     //Revise MD info.
-    MD const* tmd = m_rg->genMDforPR(t);
+    MD const* tmd = m_rg->genMDForPR(t);
     t->setRefMD(tmd, m_rg);
     stpr->setRefMD(tmd, m_rg);
 
-    addDUChain(stpr, t, m_rg);
+    xoc::buildDUChain(stpr, t, m_rg);
     prehead->getIRList()->append_tail_ex(stpr);
     return true;
 }
@@ -832,15 +839,14 @@ bool LICM::tryMoveAllDefStmtOutFromLoop(IR const* c,
 //Hoist candidate IRs to preheader BB.
 //This function will maintain RPO if new BB inserted.
 //Return true if BB or STMT changed.
-bool LICM::hoistCand(OUT IRBB * prehead,
-                     OUT LI<IRBB> * li,
+bool LICM::hoistCand(OUT IRBB * prehead, OUT LI<IRBB> * li,
                      OUT bool & insert_bb)
 {
     bool du_set_info_changed = false;
     Vector<IR*> removed;
     TTabIter<IR*> ti;
 
-    //IRBB * backedge_bb = findSingleBackedgeStartBB(li, m_cfg);
+    //IRBB * backedge_bb = li->findBackedgeStartBB(m_cfg);
     while (m_invariant_exp.get_elem_count() > 0) {
         UINT removednum = 0;
         for (IR * c = m_invariant_exp.get_first(ti);
@@ -920,34 +926,21 @@ bool LICM::doLoopTree(LI<IRBB> * li,
             continue;
         }
 
-        bool inserted = false;
-        IRBB * prehead = findAndInsertPreheader(tli, m_rg, inserted, false);
-        if (prehead == nullptr || m_cfg->isRegionEntry(prehead)) {
-            prehead = findAndInsertPreheader(tli, m_rg, inserted, true);
-            //Do not mark LICM changed if just inserted some BBs rather than
-            //code motion, because post CFG optimization will removed the
-            //redundant BB.
-        }
-        ASSERT0(prehead);
-        insert_bb |= inserted;
-        if (inserted && !tli->isOuterMost()) {
-            //Update loop body BB set, add preheader to outer loop body.
-            tli->getOuter()->getBodyBBSet()->bunion(prehead->id());
-        }
-
-        if (inserted) {
+        IRBB * preheader = nullptr;
+        if (insertPreheader(tli, m_rg, &preheader)) {
             //Recompute DOM related info.
             OC_is_dom_valid(oc) = false;
             OC_is_rpo_valid(oc) = false;
             m_cfg->computeDomAndIdom(oc);
+            insert_bb = true;
         }
 
         bool inserted3 = false;
-        du_set_info_changed |= hoistCand(prehead, tli, inserted3);
+        du_set_info_changed |= hoistCand(preheader, tli, inserted3);
         changed |= du_set_info_changed;
         insert_bb |= inserted3;
 
-        bool inserted2 = splitBBIfNeeded(prehead);
+        bool inserted2 = splitBBIfNeeded(preheader);
         ASSERTN(!inserted2, ("Does this happen?"));
         insert_bb |= inserted2;
         if (inserted2) {
@@ -991,11 +984,12 @@ bool LICM::perform(OptCtx & oc)
     }
  
     START_TIMER(t, getPassName());
-    m_rg->checkValidAndRecompute(&oc, PASS_DOM, PASS_LOOP_INFO, PASS_UNDEF);
+    m_rg->getPassMgr()->checkValidAndRecompute(&oc, PASS_DOM, PASS_LOOP_INFO,
+                                               PASS_UNDEF);
     m_rce = (RCE*)m_rg->getPassMgr()->registerPass(PASS_RCE);
     ASSERT0(m_rce);
     if (m_rce->is_use_gvn() && !m_rce->getGVN()->is_valid()) {
-        m_rce->getGVN()->reperform(oc);
+        m_rce->getGVN()->perform(oc);
     }
 
     bool du_set_info_changed = false;

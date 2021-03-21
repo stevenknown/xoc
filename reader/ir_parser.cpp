@@ -617,8 +617,8 @@ bool IRParser::declareRegion(ParseCtx * ctx)
                               newctx.current_region->id());
             ASSERT0(oc);
             newctx.current_region->initPassMgr();
-            newctx.current_region->checkValidAndRecompute(oc, PASS_CFG,
-                                                          PASS_UNDEF);
+            newctx.current_region->getPassMgr()->checkValidAndRecompute(oc,
+                PASS_CFG, PASS_UNDEF);
             if (newctx.has_phi) {
                 newctx.current_region->getCFG()->revisePhiEdge(
                     newctx.getIR2Label());

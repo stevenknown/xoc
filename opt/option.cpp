@@ -150,7 +150,7 @@ bool g_compute_region_imported_defuse_md = false;
 bool g_do_expr_tab = true;
 
 //Perform aggressive copy propagation.
-bool g_do_cp_aggressive = true; //It may cost much compile time.
+bool g_do_cp_aggressive = false; //It may cost much compile time.
 
 //Perform copy propagation.
 bool g_do_cp = false;
@@ -159,7 +159,10 @@ bool g_do_cp = false;
 bool g_do_dce = false;
 
 //Perform aggressive dead code elimination.
-bool g_do_dce_aggressive = true;
+bool g_do_dce_aggressive = false;
+
+//Perform linear function test replacement.
+bool g_do_lftr = false;
 
 //Perform dead store elimination.
 bool g_do_dse = false;
@@ -295,6 +298,7 @@ DumpOpt::DumpOpt()
     is_dump_cp = false;
     is_dump_rp = false;
     is_dump_dce = false;
+    is_dump_lftr = false;
     is_dump_gvn = false;
     is_dump_gcse = false;
     is_dump_ivr = false;
@@ -371,6 +375,12 @@ bool DumpOpt::isDumpRP() const
 bool DumpOpt::isDumpDCE() const
 {
     return is_dump_all || (!is_dump_nothing && is_dump_dce);
+}
+
+
+bool DumpOpt::isDumpLFTR() const
+{
+    return is_dump_all || (!is_dump_nothing && is_dump_lftr);
 }
 
 
@@ -464,6 +474,11 @@ bool DumpOpt::isDumpRefineDUChain() const
 bool DumpOpt::isDumpRefine() const
 {
     return is_dump_all || (!is_dump_nothing && is_dump_refine);
+}
+
+bool DumpOpt::isDumpGSCC() const
+{
+    return is_dump_all || (!is_dump_nothing && is_dump_gscc);
 }
 
 } //namespace xoc

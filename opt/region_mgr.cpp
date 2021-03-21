@@ -400,10 +400,7 @@ void RegionMgr::estimateEV(OUT UINT & num_call,
             rg->scanCallAndReturnList(num_ru, scan_inner_region);
         }
 
-        List<IR const*> * call_list = rg->getCallList();
-        if (call_list != nullptr) {
-            num_call += call_list->get_elem_count();
-        }
+        num_call += rg->getCallList()->get_elem_count();        
     }
     num_ru = MAX(4, xcom::getNearestPowerOf2(num_ru));
     num_call = MAX(4, xcom::getNearestPowerOf2(num_call));

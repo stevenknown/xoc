@@ -1368,7 +1368,7 @@ void GIG::dumpVCG(CHAR const* name)
     StrBuf buf(128);
 
     //Print node
-    VertexIter itv;
+    VertexIter itv = VERTEX_UNDEF;
     for (Vertex const* v = get_first_vertex(itv);
          v != nullptr; v = get_next_vertex(itv)) {
         GLT * glt = m_gltm->get_glt(v->id());
@@ -1599,7 +1599,7 @@ void IG::dumpVCG(CHAR const* name)
     ASSERT0(m_ltm);
 
     //Print node
-    VertexIter itv;
+    VertexIter itv = VERTEX_UNDEF;
     for (Vertex const* v = get_first_vertex(itv);
          v != nullptr;  v = get_next_vertex(itv)) {
         LT * lt = m_ltm->getLifeTime(v->id());

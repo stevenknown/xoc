@@ -239,7 +239,7 @@ public:
     //It should be called if new PR generated in optimzations.
     inline MD const* allocRefForPR(IR * pr)
     {
-        MD const* md = genMDforPR(pr);
+        MD const* md = genMDForPR(pr);
         pr->setRefMD(md, this);
         pr->cleanRefMDSet();
         return md;
@@ -249,7 +249,7 @@ public:
     //It should be called if LD generated in optimzations.
     inline MD const* allocRefForLoad(IR * ld)
     {
-        MD const* md = genMDforLoad(ld);
+        MD const* md = genMDForLoad(ld);
         ld->setRefMD(md, this);
 
         //Do NOT clean MDSet because transformation may combine ILD(LDA)
@@ -262,7 +262,7 @@ public:
     //It should be called if new PR generated in optimzations.
     inline MD const* allocRefForStore(IR * st)
     {
-        MD const* md = genMDforStore(st);
+        MD const* md = genMDForStore(st);
         st->setRefMD(md, this);
 
         //Do NOT clean MDSet because transformation may combine IST(LDA)
@@ -750,11 +750,6 @@ public:
     //Count memory usage for current object.
     size_t count_mem() const;
     
-    //This function check validation of options in oc, perform
-    //recomputation if it is invalid.
-    //...: the options/passes that anticipated to recompute.
-    void checkValidAndRecompute(OptCtx * oc, ...);
-
     virtual void destroy();
     void destroyPassMgr();
     IR * dupIR(IR const* ir);
@@ -901,30 +896,22 @@ public:
     Region * getFuncRegion();
 
     //Allocate and return all CALLs in the region.
-    inline List<IR const*> * getCallList()
+    inline CIRList * getCallList()
     {
         if (getAnalysisInstrument()->m_call_list == nullptr) {
-            getAnalysisInstrument()->m_call_list = new List<IR const*>();
+            getAnalysisInstrument()->m_call_list = new CIRList();
         }
         return getAnalysisInstrument()->m_call_list;
     }
 
-    //Read and return Call list in the Region.
-    List<IR const*> * getCallList() const
-    { return getAnalysisInstrument()->m_call_list; }
-
     //Allocate and return a list of IR_RETURN in current Region.
-    inline List<IR const*> * getReturnList()
+    inline CIRList * getReturnList()
     {
         if (getAnalysisInstrument()->m_return_list == nullptr) {
-            getAnalysisInstrument()->m_return_list = new List<IR const*>();
+            getAnalysisInstrument()->m_return_list = new CIRList();
         }
         return getAnalysisInstrument()->m_return_list;
     }
-
-    //Return a list of IR_RETURN in current Region.
-    List<IR const*> * getReturnList() const
-    { return getAnalysisInstrument()->m_return_list; }
 
     //Get the MayDef MDSet of Region.
     MDSet * getMayDef() const
@@ -981,22 +968,22 @@ public:
     Var * genVarForPR(UINT prno, Type const* type);
 
     //Allocate MD for PR.
-    MD const* genMDforPR(UINT prno, Type const* type);
+    MD const* genMDForPR(UINT prno, Type const* type);
 
     //Generate MD corresponding to PR load or write.
-    MD const* genMDforPR(IR const* ir)
+    MD const* genMDForPR(IR const* ir)
     {
         ASSERT0(ir->isWritePR() || ir->isReadPR() || ir->isCallStmt());
-        return genMDforPR(ir->getPrno(), ir->getType());
+        return genMDForPR(ir->getPrno(), ir->getType());
     }
 
     //Generate MD for Var.
-    MD const* genMDforVAR(Var * var)
-    { return genMDforVAR(var, var->getType()); }
+    MD const* genMDForVAR(Var * var, UINT offset)
+    { return genMDForVAR(var, var->getType(), offset); }
 
 
     //Generate MD for Var.
-    MD const* genMDforVAR(Var * var, Type const* type)
+    MD const* genMDForVAR(Var * var, Type const* type, UINT offset)
     {
         ASSERT0(var && type);
         MD md;
@@ -1007,6 +994,7 @@ public:
         } else {
             MD_size(&md) = getTypeMgr()->getByteSize(type);
             MD_ty(&md) = MD_EXACT;
+            MD_ofst(&md) = offset;
         }
 
         MD const* e = getMDSystem()->registerMD(md);
@@ -1015,24 +1003,24 @@ public:
     }
 
     //Generate MD for IR_ST.
-    MD const* genMDforStore(IR const* ir)
+    MD const* genMDForStore(IR const* ir)
     {
         ASSERT0(ir->is_st());
-        return genMDforVAR(ST_idinfo(ir), ir->getType());
+        return genMDForVAR(ST_idinfo(ir), ir->getType(), ST_ofst(ir));
     }
 
     //Generate MD for IR_LD.
-    MD const* genMDforLoad(IR const* ir)
+    MD const* genMDForLoad(IR const* ir)
     {
         ASSERT0(ir->is_ld());
-        return genMDforVAR(LD_idinfo(ir), ir->getType());
+        return genMDForVAR(LD_idinfo(ir), ir->getType(), LD_ofst(ir));
     }
 
     //Generate MD for IR_ID.
-    MD const* genMDforId(IR const* ir)
+    MD const* genMDForId(IR const* ir)
     {
         ASSERT0(ir->is_id());
-        return genMDforVAR(ID_info(ir), ir->getType());
+        return genMDForVAR(ID_info(ir), ir->getType(), 0);
     }
 
     //Return the tyid for array index, the default is unsigned 32bit.

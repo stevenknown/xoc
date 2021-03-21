@@ -189,18 +189,18 @@ void IPA::recomputeDUChain(Region * rg, OptCtx & oc)
         rg->initPassMgr();
     }
     if (!oc.is_aa_valid()) {
-        //DUMgr need AliasAnalysis
+        //DUMgr requires AliasAnalysis
         rg->getPassMgr()->registerPass(PASS_AA);
     }
     if (g_do_md_ssa) {
         //Build MD SSA du chain.
         if (m_is_recompute_du_ref) {
-            rg->checkValidAndRecompute(&oc, PASS_DU_REF, PASS_CFG, PASS_UNDEF);
+            rg->getPassMgr()->checkValidAndRecompute(&oc, PASS_DU_REF,
+                                                     PASS_CFG, PASS_UNDEF);
         }
 
         //Compute typical PR du chain.
-        DUMgr * dumgr = (DUMgr*)rg->getPassMgr()->registerPass(
-            PASS_DU_MGR);
+        DUMgr * dumgr = (DUMgr*)rg->getPassMgr()->registerPass(PASS_DU_MGR);
         ASSERT0(dumgr);
         dumgr->perform(oc, DUOPT_SOL_REACH_DEF|DUOPT_COMPUTE_PR_DU);
         dumgr->computeMDDUChain(oc, false, DUOPT_COMPUTE_PR_DU);
@@ -217,19 +217,24 @@ void IPA::recomputeDUChain(Region * rg, OptCtx & oc)
     //Build classic du chain.
     if (m_is_recompute_du_ref) {
         if (m_is_keep_reachdef) {
-            rg->checkValidAndRecompute(&oc, PASS_REACH_DEF, PASS_DU_REF,
-                                       PASS_CFG, PASS_DU_CHAIN, PASS_UNDEF);
+            rg->getPassMgr()->checkValidAndRecompute(&oc, PASS_REACH_DEF,
+                                                     PASS_DU_REF, PASS_CFG,
+                                                     PASS_DU_CHAIN,
+                                                     PASS_UNDEF);
         } else {
-            rg->checkValidAndRecompute(&oc, PASS_DU_REF, PASS_CFG,
-                PASS_DU_CHAIN, PASS_UNDEF);
+            rg->getPassMgr()->checkValidAndRecompute(&oc, PASS_DU_REF,
+                                                     PASS_CFG, PASS_DU_CHAIN,
+                                                     PASS_UNDEF);
         }
     } else {
         if (m_is_keep_reachdef) {
-            rg->checkValidAndRecompute(&oc, PASS_REACH_DEF, PASS_CFG,
-                                       PASS_DU_CHAIN, PASS_UNDEF);
+            rg->getPassMgr()->checkValidAndRecompute(&oc, PASS_REACH_DEF,
+                                                     PASS_CFG, PASS_DU_CHAIN,
+                                                     PASS_UNDEF);
         } else {
-            rg->checkValidAndRecompute(&oc, PASS_CFG, PASS_DU_CHAIN,
-                                       PASS_UNDEF);
+            rg->getPassMgr()->checkValidAndRecompute(&oc, PASS_CFG,
+                                                     PASS_DU_CHAIN,
+                                                     PASS_UNDEF);
         }
     }
 }
@@ -237,7 +242,7 @@ void IPA::recomputeDUChain(Region * rg, OptCtx & oc)
 
 //NOTE: IPA should be performed on program region.
 //IPA will create dummy use for each region, and recompute the
-//DU chain if need.
+//DU chain if any required.
 bool IPA::perform(OptCtx & oc)
 {
     START_TIMER(t, getPassName());

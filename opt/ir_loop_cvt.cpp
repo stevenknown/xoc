@@ -43,7 +43,7 @@ bool LoopCvt::is_while_do(LI<IRBB> const* li, OUT IRBB ** gobackbb,
     IRBB * head = li->getLoopHead();
     ASSERT0(head);
 
-    *gobackbb = findSingleBackedgeStartBB(li, m_cfg);
+    *gobackbb = findBackedgeStartBB(li, m_cfg);
     if (*gobackbb == nullptr) {
         //loop may be too messy.
         return false;
@@ -70,7 +70,7 @@ bool LoopCvt::is_while_do(LI<IRBB> const* li, OUT IRBB ** gobackbb,
 
 
 bool LoopCvt::try_convert(LI<IRBB> * li, IRBB * gobackbb,
-                              UINT succ1, UINT succ2)
+                          UINT succ1, UINT succ2)
 {
     ASSERT0(gobackbb);
 
@@ -108,8 +108,7 @@ bool LoopCvt::try_convert(LI<IRBB> * li, IRBB * gobackbb,
     for (IR * ir = BB_first_ir(head);
          ir != nullptr; ir = BB_next_ir(head)) {
         IR * newir = m_rg->dupIRTree(ir);
-
-        m_du->copyRefAndAddDUChain(newir, ir, true);
+        m_du->addUse(newir, ir);
 
         m_ii.clean();
         for (IR * x = iterRhsInit(ir, m_ii);
@@ -201,7 +200,8 @@ bool LoopCvt::find_and_convert(List<LI<IRBB>*> & worklst)
 bool LoopCvt::perform(OptCtx & oc)
 {
     START_TIMER(t, getPassName());
-    m_rg->checkValidAndRecompute(&oc, PASS_LOOP_INFO, PASS_RPO, PASS_UNDEF);
+    m_rg->getPassMgr()->checkValidAndRecompute(&oc, PASS_LOOP_INFO, PASS_RPO,
+                                               PASS_UNDEF);
 
     LI<IRBB> * li = m_cfg->getLoopInfo();
     if (li == nullptr) { return false; }
@@ -229,11 +229,7 @@ bool LoopCvt::perform(OptCtx & oc)
         OC_is_avail_reach_def_valid(oc) = false;
         OC_is_live_expr_valid(oc) = false;
 
-        oc.set_flag_if_cfg_changed();
-        //Only cfg is avaiable.
-        //Each pass maintain CFG by default.
-        OC_is_cfg_valid(oc) = true;
-
+        oc.setInvalidIfCFGChanged();
         //TODO: make rpo, dom valid.
     }
 

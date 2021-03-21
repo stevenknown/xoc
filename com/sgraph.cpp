@@ -268,7 +268,7 @@ bool Graph::clone(Graph const& src, bool clone_edge_info, bool clone_vex_info)
     m_is_direction = src.m_is_direction;
 
     //Clone vertices
-    VertexIter itv;
+    VertexIter itv = VERTEX_UNDEF;
     for (Vertex * srcv = src.get_first_vertex(itv);
          srcv != nullptr; srcv = src.get_next_vertex(itv)) {
         Vertex * v = addVertex(VERTEX_id(srcv));
@@ -702,7 +702,7 @@ bool Graph::is_equal(Graph & g) const
     }
 
     BitSet vs;
-    INT c;
+    VertexIter c = VERTEX_UNDEF;
     for (Vertex * v1 = get_first_vertex(c);
          v1 != nullptr; v1 = get_next_vertex(c)) {
         Vertex * v2 = g.getVertex(VERTEX_id(v1));
@@ -784,7 +784,7 @@ bool Graph::sortInTopologOrder(OUT Vector<Vertex*> & vex_vec)
     List<Vertex*> ready_list;
     DefMiscBitSetMgr sm;
     DefSBitSet is_removed(sm.getSegMgr());
-    INT c;
+    VertexIter c = VERTEX_UNDEF;
     for (xcom::Vertex * vex = get_first_vertex(c);
          vex != nullptr; vex = get_next_vertex(c)) {
         if (getInDegree(vex) == 0) {
@@ -1009,7 +1009,7 @@ void Graph::dumpDOT(CHAR const* name) const
 
     fprintf(h, "digraph G {\n");
     //Print node
-    VertexIter itv;
+    VertexIter itv = VERTEX_UNDEF;
     for (Vertex const* v = get_first_vertex(itv);
          v != nullptr; v = get_next_vertex(itv)) {
         fprintf(h, "\nnode%d [shape = Mrecord, label=\"{V%d}\"];",
@@ -1086,7 +1086,7 @@ void Graph::dumpVCG(CHAR const* name) const
               "edge.color: darkgreen\n");
 
     //Print node
-    VertexIter itv;
+    VertexIter itv = VERTEX_UNDEF;
     for (Vertex const* v = get_first_vertex(itv);
          v != nullptr; v = get_next_vertex(itv)) {
         fprintf(h, "\nnode: { title:\"%d\" label:\"%d\" "
@@ -1145,7 +1145,7 @@ DGraph::DGraph(DGraph const& g) : Graph(g)
 bool DGraph::cloneDomAndPdom(DGraph const& src)
 {
     ASSERT0(m_bs_mgr != nullptr);
-    INT c;
+    VertexIter c = VERTEX_UNDEF;
     for (Vertex * srcv = src.get_first_vertex(c);
          srcv != nullptr; srcv = src.get_next_vertex(c)) {
         UINT src_vid = VERTEX_id(srcv);
@@ -1192,7 +1192,7 @@ bool DGraph::computeDom(List<Vertex const*> const* vlst, BitSet const* uni)
         //Here one must guarantee pvlst would not be modified.
         pvlst = const_cast<List<Vertex const*>*>(vlst);
     } else {
-        INT c;
+        VertexIter c = VERTEX_UNDEF;
         for (Vertex const* u = get_first_vertex(c);
              u != nullptr; u = get_next_vertex(c)) {
             pvlst->append_tail(u);
@@ -1289,7 +1289,7 @@ bool DGraph::computeDom3(List<Vertex const*> const* vlst, BitSet const* uni)
         //Here one must guarantee pvlst would not be modified.
         pvlst = const_cast<List<Vertex const*>*>(vlst);
     } else {
-        INT c;
+        VertexIter c = VERTEX_UNDEF;
         for (Vertex const* u = get_first_vertex(c);
              u != nullptr; u = get_next_vertex(c)) {
             pvlst->append_tail(u);
@@ -1608,7 +1608,7 @@ bool DGraph::computeIdom()
     m_idom_set.clean();
 
     //Access with topological order.
-    INT c;
+    VertexIter c = VERTEX_UNDEF;
     for (Vertex * v = get_first_vertex(c);
          v != nullptr; v = get_next_vertex(c)) {
         UINT cur_id = VERTEX_id(v);
@@ -1661,12 +1661,12 @@ bool DGraph::computeIdom()
 }
 
 
-Vertex * Graph::get_last_vertex(INT & cur) const
+Vertex * Graph::get_last_vertex(VertexIter & cur) const
 {
     ASSERTN(m_ec_pool != nullptr, ("not yet initialized."));
     if (is_dense()) {
         for (INT i = m_dense_vertex->get_last_idx(); i >= 0; i--) {
-            Vertex * vex = m_dense_vertex->get(cur);
+            Vertex * vex = m_dense_vertex->get(i);
             if (vex != nullptr) {
                 cur = i;
                 return vex;
@@ -1678,12 +1678,12 @@ Vertex * Graph::get_last_vertex(INT & cur) const
 }
 
 
-Vertex * Graph::get_prev_vertex(INT & cur) const
+Vertex * Graph::get_prev_vertex(VertexIter & cur) const
 {
     ASSERTN(m_ec_pool != nullptr, ("not yet initialized."));
     if (is_dense()) {
-        for (INT i = cur - 1; i >= m_dense_vertex->get_last_idx(); i++) {
-            Vertex * vex = m_dense_vertex->get(cur);
+        for (INT i = cur - 1; i >= 0; i--) {
+            Vertex * vex = m_dense_vertex->get(i);
             if (vex != nullptr) {
                 cur = i;
                 return vex;
@@ -1695,7 +1695,7 @@ Vertex * Graph::get_prev_vertex(INT & cur) const
 }
 
 
-Vertex * Graph::get_first_vertex(INT & cur) const
+Vertex * Graph::get_first_vertex(VertexIter & cur) const
 {
     ASSERTN(m_ec_pool != nullptr, ("not yet initialized."));
     if (is_dense()) {
@@ -1713,7 +1713,7 @@ Vertex * Graph::get_first_vertex(INT & cur) const
 }
 
 
-Vertex * Graph::get_next_vertex(INT & cur) const
+Vertex * Graph::get_next_vertex(VertexIter & cur) const
 {
     ASSERTN(m_ec_pool != nullptr, ("not yet initialized."));
     if (is_dense()) {
@@ -1730,14 +1730,14 @@ Vertex * Graph::get_next_vertex(INT & cur) const
 }
 
 
-//NOTE: graph exit vertex does not have idom.
+//NOTE: graph exit vertex does not have ipdom.
 bool DGraph::computeIpdom()
 {
     //Initialize ipdom-set for each BB.
     m_ipdom_set.clean();
 
     //Processing in reverse-topological order.
-    INT c = 0;
+    VertexIter c = VERTEX_UNDEF;
     for (Vertex const* v = get_last_vertex(c);
          v != nullptr; v = get_prev_vertex(c)) {
         UINT cur_id = VERTEX_id(v);
@@ -1773,7 +1773,7 @@ bool DGraph::computeIpdom()
 //'dom': output dominator tree.
 void DGraph::get_dom_tree(OUT Graph & dom)
 {
-    INT c;
+    VertexIter c = VERTEX_UNDEF;
     for (Vertex * v = get_first_vertex(c);
          v != nullptr; v = get_next_vertex(c)) {
         UINT vid = VERTEX_id(v);
@@ -1788,7 +1788,7 @@ void DGraph::get_dom_tree(OUT Graph & dom)
 //'pdom': output post-dominator tree.
 void DGraph::get_pdom_tree(OUT Graph & pdom)
 {
-    INT c;
+    VertexIter c = VERTEX_UNDEF;
     for (Vertex * v = get_first_vertex(c);
          v != nullptr; v = get_next_vertex(c)) {
         UINT vid = VERTEX_id(v);
@@ -1807,7 +1807,7 @@ void DGraph::dump_dom(FILE * h, bool dump_dom_tree)
 {
     if (h == nullptr) { return; }
     fprintf(h, "\n==---- DUMP DOM/PDOM/IDOM/IPDOM ----==");
-    INT c;
+    VertexIter c = VERTEX_UNDEF;
     for (Vertex * v = get_first_vertex(c);
          v != nullptr; v = get_next_vertex(c)) {
         UINT vid = VERTEX_id(v);
@@ -1982,7 +1982,7 @@ bool DGraph::removeUnreachNode(UINT entry_id)
     bool removed = false;
     BitSet visited;
     _removeUnreachNode(entry_id, visited);
-    INT c;
+    VertexIter c = VERTEX_UNDEF;
     for (Vertex * v = get_first_vertex(c);
          v != nullptr; v = get_next_vertex(c)) {
         if (!visited.is_contain(VERTEX_id(v))) {

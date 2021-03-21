@@ -130,7 +130,7 @@ void CallGraph::dumpVCG(CHAR const* name, INT flag)
 
     //Dump graph vertex.
     getRegionMgr()->getLogMgr()->push(h, name); 
-    VertexIter itv;
+    VertexIter itv = VERTEX_UNDEF;
     List<Var const*> formalparamlst;
     for (xcom::Vertex * v = get_first_vertex(itv);
          v != nullptr; v = get_next_vertex(itv)) {
@@ -296,7 +296,7 @@ bool CallGraph::build(RegionMgr * rumgr)
         CallNode * caller = mapRegion2CallNode(rg);
         ASSERT0(caller);
         addNode(caller);
-        List<IR const*> * call_list = rg->getCallList();
+        CIRList * call_list = rg->getCallList();
         ASSERT0(call_list);
         if (call_list->get_elem_count() == 0) { continue; }
 

@@ -46,12 +46,10 @@ bool ScalarOpt::perform(OptCtx & oc)
         ASSERT0(verifyIRandBB(m_rg->getBBList(), m_rg));
     }
 
-    if (g_do_dce) {
+    if (g_do_dce || g_do_dce_aggressive) {
         DeadCodeElim * dce = (DeadCodeElim*)m_pass_mgr->registerPass(PASS_DCE);
+        dce->set_elim_cfs(g_do_dce_aggressive);
         passlist.append_tail(dce);
-        if (g_do_dce_aggressive) {
-            dce->set_elim_cfs(true);
-        }
     }
 
     bool in_ssa_form = false;
@@ -71,9 +69,10 @@ bool ScalarOpt::perform(OptCtx & oc)
         }
     }
 
-    if (g_do_cp) {
+    if (g_do_cp || g_do_cp_aggressive) {
         CopyProp * pass = (CopyProp*)m_pass_mgr->registerPass(PASS_CP);
-        pass->setPropagationKind(CP_PROP_SIMPLEX);
+        pass->setPropagationKind(g_do_cp_aggressive ?
+                                 CP_PROP_UNARY_AND_SIMPLEX : CP_PROP_SIMPLEX);
         passlist.append_tail(pass);
     }
 
@@ -108,6 +107,10 @@ bool ScalarOpt::perform(OptCtx & oc)
 
     if (g_do_loop_convert) {
         passlist.append_tail(m_pass_mgr->registerPass(PASS_LOOP_CVT));
+    }
+
+    if (g_do_lftr) {
+        passlist.append_tail(m_pass_mgr->registerPass(PASS_LFTR));
     }
 
     bool res = false;

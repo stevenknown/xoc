@@ -33,6 +33,7 @@ author: Su Zhenyu
 @*/
 #include "cominc.h"
 #include "prssainfo.h"
+#include "ir_ssa.h"
 
 namespace xoc {
 
@@ -368,7 +369,8 @@ bool IRDesc::mustExist(IR_TYPE irtype, UINT kididx)
 
 
 //Dump IR, and both its kids and siblings.
-void dumpIRListH(IR * ir_list, Region const* rg, CHAR * attr, UINT dumpflag)
+void dumpIRListH(IR const* ir_list, Region const* rg, CHAR * attr,
+                 UINT dumpflag)
 {
     if (!rg->isLogMgrInit()) { return; }
     note(rg, "\n==---- DUMP IR List ----==");
@@ -377,7 +379,8 @@ void dumpIRListH(IR * ir_list, Region const* rg, CHAR * attr, UINT dumpflag)
 
 
 //Dump IR, and both its kids and siblings.
-void dumpIRList(IR * ir_list, Region const* rg, CHAR * attr, UINT dumpflag)
+void dumpIRList(IR const* ir_list, Region const* rg, CHAR * attr,
+                UINT dumpflag)
 {
     if (!rg->isLogMgrInit()) { return; }
     note(rg, "");
@@ -478,22 +481,17 @@ bool verifyIRList(IR * ir, BitSet * irh, Region const* rg)
 }
 
 
-void dumpIRList(IN List<IR*> & ir_list, Region const* rg)
+void dumpIRList(IRList const& ir_list, Region const* rg)
 {
     if (!rg->isLogMgrInit()) { return; }
     note(rg, "\n==---- DUMP IR List ----==\n");
     ASSERT0(rg);
-    for (IR * ir = ir_list.get_head();
-         ir != nullptr; ir = ir_list.get_next()) {
+    IRListIter it;
+    for (IR const* ir = ir_list.get_head(&it);
+         ir != nullptr; ir = ir_list.get_next(&it)) {
         ASSERT0(ir->is_single());
         dumpIR(ir, rg);
     }
-}
-
-
-void dumpIRList(IRList & ir_list, Region const* rg)
-{
-    dumpIRList((List<IR*>&)ir_list, rg);
 }
 
 
@@ -1525,9 +1523,9 @@ bool CRegion::is_readonly() const
 size_t IR::count_mem() const
 {
     size_t size = 0;
-    ConstIRIter ii;
-    for (IR const* k = iterInitC(this, ii);
-         k != nullptr; k = iterNextC(ii)) {
+    ConstIRIter it;
+    for (IR const* k = iterInitC(this, it);
+         k != nullptr; k = iterNextC(it)) {
         size += IRTSIZE(k->getCode());
     }
     return size;
@@ -2139,17 +2137,19 @@ bool IR::isMemRefEqual(IR const* src) const
 
 
 //Return true if current ir tree is equivalent to src.
+//src: root of IR tree.
 //is_cmp_kid: it is true if comparing kids as well.
+//Note the function does not compare the siblings of 'src'.
 bool IR::isIREqual(IR const* src, bool is_cmp_kid) const
 {
     ASSERT0(src);
     if (getCode() != src->getCode()) { return false; }
     switch (src->getCode()) {
     case IR_CONST: //Constant value: include integer, float, string.
-        if (CONST_int_val(this) != CONST_int_val(src)) return false;
+        if (CONST_int_val(this) != CONST_int_val(src)) { return false; }
         break;
     case IR_ID:
-        if (ID_info(this) != ID_info(src)) return false;
+        if (ID_info(this) != ID_info(src)) { return false; }
         break;
     case IR_LD:
         if (LD_idinfo(this) != LD_idinfo(src) ||
@@ -2196,8 +2196,7 @@ bool IR::isIREqual(IR const* src, bool is_cmp_kid) const
         }
         break;
     case IR_IST:
-        if (IST_ofst(this) != IST_ofst(src) ||
-            getType() != src->getType()) {
+        if (IST_ofst(this) != IST_ofst(src) || getType() != src->getType()) {
             return false;
         }
         break;
@@ -2209,13 +2208,13 @@ bool IR::isIREqual(IR const* src, bool is_cmp_kid) const
         }
         break;
     case IR_CALL:
-        if (CALL_idinfo(this) != CALL_idinfo(src)) return false;
+        if (CALL_idinfo(this) != CALL_idinfo(src)) { return false; }
         break;
     case IR_ICALL:
         break;
     SWITCH_CASE_BIN:
     SWITCH_CASE_UNA:
-        if (getType() != src->getType()) return false;
+        if (getType() != src->getType()) { return false; }
         break;
     case IR_GOTO:
     case IR_IGOTO:
@@ -2225,7 +2224,7 @@ bool IR::isIREqual(IR const* src, bool is_cmp_kid) const
     case IR_IF:
         break;
     case IR_LABEL:
-        if (LAB_lab(this) != LAB_lab(src)) return false;
+        if (LAB_lab(this) != LAB_lab(src)) { return false; }
         break;
     case IR_SWITCH:
     case IR_CASE:
@@ -2277,6 +2276,8 @@ bool IR::isIREqual(IR const* src, bool is_cmp_kid) const
     default: UNREACHABLE();
     }
 
+    if (!is_cmp_kid) { return true; }
+
     //Compare kids.
     for (INT i = 0; i < IR_MAX_KID_NUM(this); i++) {
         IR * kid1 = getKid(i);
@@ -2321,10 +2322,10 @@ void IR::setParentPointer(bool recur)
 
 //Find the first PR related to 'prno'.
 //This function iterate IR tree nonrecursively.
-IR * IR::getOpndPRList(UINT prno)
+IR * IR::getOpndPRList(UINT prno) const
 {
     IR * pr = nullptr;
-    IR * p = this; //this is header of list.
+    IR * p = const_cast<IR*>(this); //this is header of list.
     while (p != nullptr) {
         if ((pr = p->getOpndPR(prno)) != nullptr) {
             return pr;
@@ -2337,13 +2338,13 @@ IR * IR::getOpndPRList(UINT prno)
 
 //Find the first PR related to 'prno'.
 //This function iterate IR tree nonrecursively.
-//'ii': iterator.
-IR * IR::getOpndPR(UINT prno, IRIter & ii)
+//'it': iterator.
+IR * IR::getOpndPR(UINT prno, IRIter & it) const
 {
     ASSERT0(is_stmt());
-    ii.clean();
-    for (IR * k = iterInit(this, ii);
-         k != nullptr; k = iterNext(ii)) {
+    it.clean();
+    for (IR * k = iterInit(const_cast<IR*>(this), it);
+         k != nullptr; k = iterNext(it)) {
         if (k->is_pr() && PR_no(k) == prno && is_rhs(k)) {
             return k;
         }
@@ -2355,136 +2356,39 @@ IR * IR::getOpndPR(UINT prno, IRIter & ii)
 //This function recursively iterate the IR tree to
 //retrieve the PR whose PR_no is equal to given 'prno'.
 //Otherwise return nullptr.
-IR * IR::getOpndPR(UINT prno)
+IR * IR::getOpndPR(UINT prno) const
 {
-    IR * pr = nullptr;
-    switch (getCode()) {
-    case IR_CONST:
-    case IR_ID:
-    case IR_LD:
-        return nullptr;
-    case IR_ST:
-        return ST_rhs(this)->getOpndPR(prno);
-    case IR_STPR:
-        return STPR_rhs(this)->getOpndPR(prno);
-    case IR_STARRAY:
-        if ((pr = ARR_base(this)->getOpndPR(prno)) != nullptr) {
-            return pr;
-        }
-        if ((pr = ARR_sub_list(this)->getOpndPRList(prno)) != nullptr) {
-            return pr;
-        }
-        return STARR_rhs(this)->getOpndPR(prno);
-    case IR_SETELEM:
-        if ((pr = SETELEM_base(this)->getOpndPR(prno)) != nullptr) {
-            return pr;
-        }
-        if ((pr = SETELEM_ofst(this)->getOpndPR(prno)) != nullptr) {
-            return pr;
-        }
-        return SETELEM_val(this)->getOpndPR(prno);
-    case IR_GETELEM:
-        if ((pr = GETELEM_base(this)->getOpndPR(prno)) != nullptr) {
-            return pr;
-        }
-        if ((pr = GETELEM_ofst(this)->getOpndPR(prno)) != nullptr) {
-            return pr;
-        }
-        return GETELEM_prno(this) == prno ? this : nullptr;
-    case IR_ILD:
-        return ILD_base(this)->getOpndPR(prno);
-    case IR_IST:
-        if ((pr = IST_base(this)->getOpndPR(prno)) != nullptr) {
-            return pr;
-        }
-        return IST_rhs(this)->getOpndPR(prno);
-    case IR_LDA: return nullptr;
-    case IR_CALL:
-    case IR_ICALL:
-        if ((pr = CALL_param_list(this)->getOpndPRList(prno)) != nullptr) {
-            return pr;
-        }
-        if (is_icall()) {
-            return ICALL_callee(this)->getOpndPR(prno);
-        }
-        return nullptr;
-    SWITCH_CASE_BIN:
-    SWITCH_CASE_UNA:
-       for (UINT i = 0; i < IR_MAX_KID_NUM(this); i++) {
-            IR * k = getKid(i);
-            if (k == nullptr) { continue; }
-            if ((pr = k->getOpndPR(prno)) != nullptr) {
-                return pr;
-            }
-       }
-       return nullptr;
-    case IR_GOTO: return nullptr;
-    case IR_IGOTO:
-        if ((pr = IGOTO_vexp(this)->getOpndPR(prno)) != nullptr) {
-            return pr;
-        }
-        return nullptr;
-    case IR_DO_WHILE:
-    case IR_WHILE_DO:
-        if ((pr = LOOP_det(this)->getOpndPR(prno)) != nullptr) {
-            return pr;
-        }
-        return LOOP_body(this)->getOpndPRList(prno);
-    case IR_DO_LOOP:
-        if ((pr = LOOP_det(this)->getOpndPR(prno)) != nullptr) {
-            return pr;
-        }
-        if ((pr = LOOP_init(this)->getOpndPR(prno)) != nullptr) {
-            return pr;
-        }
-        if ((pr = LOOP_step(this)->getOpndPR(prno)) != nullptr) {
-            return pr;
-        }
-        return LOOP_body(this)->getOpndPRList(prno);
-    case IR_IF:
-    case IR_LABEL: return nullptr;
-    case IR_SWITCH:
-        if ((pr = SWITCH_vexp(this)->getOpndPR(prno)) != nullptr) {
-            return pr;
-        }
-        return SWITCH_body(this)->getOpndPRList(prno);
-    case IR_CASE: return nullptr;
-    case IR_ARRAY:
-        if ((pr = ARR_base(this)->getOpndPR(prno)) != nullptr) {
-            return pr;
-        }
-        if ((pr = ARR_sub_list(this)->getOpndPRList(prno)) != nullptr) {
-            return pr;
-        }
-        return nullptr;
-    case IR_PR:
-        return PR_no(this) == prno ? this : nullptr;
-    case IR_TRUEBR:
-    case IR_FALSEBR:
-        return BR_det(this)->getOpndPR(prno);
-    case IR_SELECT:
-        if ((pr = SELECT_pred(this)->getOpndPR(prno)) != nullptr) {
-            return pr;
-        }
-        if ((pr = SELECT_trueexp(this)->getOpndPR(prno)) != nullptr) {
-            return pr;
-        }
-        return SELECT_falseexp(this)->getOpndPR(prno);
-    case IR_RETURN:
-        if ((pr = RET_exp(this)->getOpndPR(prno)) != nullptr) {
-            return pr;
-        }
-        return nullptr;
-    case IR_BREAK:
-    case IR_CONTINUE:
-        return nullptr;
-    case IR_PHI:
-        if ((pr = PHI_opnd_list(this)->getOpndPRList(prno)) != nullptr) {
-            return pr;
-        }
-        return nullptr;
-    case IR_REGION: return nullptr;
-    default: UNREACHABLE();
+    if (isReadPR() && getPrno() == prno) {
+        return const_cast<IR*>(this);
+    }
+    for (UINT i = 0; i < IR_MAX_KID_NUM(this); i++) {
+        IR * kid = getKid(i);
+        if (kid != nullptr && kid->isReadPR() && kid->getPrno() == prno) {
+            ASSERTN(!kid->isWritePR(), ("stmt should not be kid in IR tree"));
+            return kid;
+        } 
+        IR * f = kid->getOpndPR(prno);
+        if (f != nullptr) { return f; }
+    }
+    return nullptr;
+}
+
+
+//This function recursively iterate the IR tree to
+//retrieve the memory-ref IR whose MD is equal to given 'md'.
+//Otherwise return nullptr.
+IR * IR::getOpndMem(MD const* md) const
+{
+    if (isMemoryOpnd() && getRefMD() == md) {
+        return const_cast<IR*>(this);
+    }
+    for (UINT i = 0; i < IR_MAX_KID_NUM(this); i++) {
+        IR * kid = getKid(i);
+        if (kid != nullptr && kid->isMemoryRef() && kid->getRefMD() == md) {
+            return kid;
+        } 
+        IR * f = kid->getOpndMem(md);
+        if (f != nullptr) { return f; }
     }
     return nullptr;
 }
@@ -2492,6 +2396,7 @@ IR * IR::getOpndPR(UINT prno)
 
 //Get the Stmt accroding to given prno.
 //The stmt must write to PR as a result.
+//This function can not be const because it will return itself.
 IR * IR::getResultPR(UINT prno)
 {
     switch (getCode()) {
@@ -3518,46 +3423,6 @@ bool IR::isDiffMemLoc(IR const* ir2) const
     }
     return ir1->isNotOverlapViaMDRef(ir2);
 }
-//END IR
-
-
-//The function only invoked at debug mode.
-//Make sure IR_ICALL is the largest ir.
-bool checkMaxIRType()
-{
-    //Change MAX_OFFSET_AT_FREE_TABLE if IR_ICALL is not the largest.
-    for (UINT i = IR_UNDEF; i < IR_TYPE_NUM; i++) {
-        ASSERT0(IRTSIZE(i) <= IRTSIZE(IR_ICALL));
-    }
-    return true;
-}
-
-
-//The function only invoked at debug mode.
-bool checkIRDesc()
-{
-    UINT sz = (UINT)(1 << IR_TYPE_BIT_SIZE);
-    ASSERTN(IR_TYPE_NUM <= sz, ("code field is too small"));
-    DUMMYUSE(sz);
-    for (UINT i = IR_UNDEF; i < IR_TYPE_NUM; i++) {
-        ASSERT0(i == (UINT)IRDES_code(g_ir_desc[i]));
-    }
-    UINT descnum = sizeof(g_ir_desc) / sizeof(g_ir_desc[0]);
-    CHECKN_DUMMYUSE(descnum - 1 == IR_TYPE_NUM, ("miss IRDesc declaration"));
-    return true;
-}
-
-
-//The function only invoked at debug mode.
-bool checkRoundDesc()
-{
-    for (UINT i = ROUND_UNDEF; i < ROUND_TYPE_NUM; i++) {
-        ASSERT0(i == (UINT)ROUNDDESC_type(g_round_desc[i]));
-    }
-    UINT descnum = sizeof(g_round_desc) / sizeof(g_round_desc[0]);
-    CHECKN_DUMMYUSE(descnum == ROUND_TYPE_NUM, ("miss RoundDesc declaration"));
-    return true;
-}
 
 
 //Return true if current ir does not overlap to ir2.
@@ -3609,6 +3474,58 @@ bool IR::isNotOverlap(IR const* ir2, Region * rg) const
         return true;
     }
     return false;
+}
+
+
+//Set prno, and update SSAInfo meanwhile.
+void IR::setPrnoConsiderSSAInfo(UINT prno)
+{
+    ASSERT0(prno != getPrno());
+    if (getSSAInfo() != nullptr) {
+        PRSSAMgr::removePRSSAOcc(this);
+        setSSAInfo(nullptr);
+    }
+    setPrno(prno);
+}
+//END IR
+
+
+//The function only invoked at debug mode.
+//Make sure IR_ICALL is the largest ir.
+bool checkMaxIRType()
+{
+    //Change MAX_OFFSET_AT_FREE_TABLE if IR_ICALL is not the largest.
+    for (UINT i = IR_UNDEF; i < IR_TYPE_NUM; i++) {
+        ASSERT0(IRTSIZE(i) <= IRTSIZE(IR_ICALL));
+    }
+    return true;
+}
+
+
+//The function only invoked at debug mode.
+bool checkIRDesc()
+{
+    UINT sz = (UINT)(1 << IR_TYPE_BIT_SIZE);
+    ASSERTN(IR_TYPE_NUM <= sz, ("code field is too small"));
+    DUMMYUSE(sz);
+    for (UINT i = IR_UNDEF; i < IR_TYPE_NUM; i++) {
+        ASSERT0(i == (UINT)IRDES_code(g_ir_desc[i]));
+    }
+    UINT descnum = sizeof(g_ir_desc) / sizeof(g_ir_desc[0]);
+    CHECKN_DUMMYUSE(descnum - 1 == IR_TYPE_NUM, ("miss IRDesc declaration"));
+    return true;
+}
+
+
+//The function only invoked at debug mode.
+bool checkRoundDesc()
+{
+    for (UINT i = ROUND_UNDEF; i < ROUND_TYPE_NUM; i++) {
+        ASSERT0(i == (UINT)ROUNDDESC_type(g_round_desc[i]));
+    }
+    UINT descnum = sizeof(g_round_desc) / sizeof(g_round_desc[0]);
+    CHECKN_DUMMYUSE(descnum == ROUND_TYPE_NUM, ("miss RoundDesc declaration"));
+    return true;
 }
 
 

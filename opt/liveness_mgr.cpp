@@ -311,7 +311,7 @@ void LivenessMgr::computeGlobal()
 bool LivenessMgr::perform(OptCtx & oc)
 {
     START_TIMER(t, getPassName());
-    m_rg->checkValidAndRecompute(&oc, PASS_RPO, PASS_UNDEF);
+    m_rg->getPassMgr()->checkValidAndRecompute(&oc, PASS_RPO, PASS_UNDEF);
     List<IRBB*> * bbl = m_rg->getBBList();
     if (bbl->get_elem_count() == 0) { return false; }
     List<IR const*> lst;

@@ -29,5 +29,6 @@ using namespace xcom;
 #include "linsys.h"
 #include "lpsol.h"
 #include "sort.h"
+#include "scc.h"
 #endif
 

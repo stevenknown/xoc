@@ -516,7 +516,7 @@ bool CfsOpt::hoistLoop(IR ** head, IR ** ir)
 //    if (c<a) {...}
 bool CfsOpt::hoistIf(IR ** head, IR ** ir)
 {
-    ASSERTN((*ir)->is_if(), ("need IF"));
+    ASSERTN((*ir)->is_if(), ("requires IF"));
     ASSERTN(IF_det(*ir), ("DET is nullptr"));
 
     IR * det = IF_det(*ir);

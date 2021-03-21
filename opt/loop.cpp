@@ -65,37 +65,6 @@ bool findTwoSuccessorBBOfLoopHeader(LI<IRBB> const* li,
 }
 
 
-//Find the bb that is the start of the unqiue backedge of loop.
-//  BB1: loop start bb
-//  BB2: body
-//  BB3: goto loop start bb
-//
-//BB3 is the backedge start bb.
-IRBB * findSingleBackedgeStartBB(LI<IRBB> const* li, IRCFG * cfg)
-{
-    ASSERT0(li && cfg);
-    IRBB * head = li->getLoopHead();
-
-    UINT backedgebbid = 0;
-    UINT backedgecount = 0;
-    xcom::EdgeC const* ec = VERTEX_in_list(cfg->getVertex(head->id()));
-    while (ec != nullptr) {
-        backedgecount++;
-        UINT pred = ec->getFromId();
-        if (li->isInsideLoop(pred)) {
-            backedgebbid = pred;
-        }
-        ec = EC_next(ec);
-    }
-    ASSERT0(backedgebbid > 0 && cfg->getBB(backedgebbid));
-    if (backedgecount > 2) {
-        //There are multiple backedges.
-        return nullptr;
-    }
-    return cfg->getBB(backedgebbid);
-}
-
-
 //Append GOTO stmt to 'from' BB, in order to it can jump to 'to' BB.
 static IR * tryAppendGotoToJumpToBB(IRBB * from, IRBB * to, Region * rg)
 {
@@ -610,6 +579,91 @@ bool isLoopInvariant(IR const* ir,
     }
 
     return true;
+}
+
+
+//Try inserting preheader BB of loop 'li'.
+//preheader: record the preheader either inserted BB or existed BB.
+//Return true if inserting a new BB before loop, otherwise false.
+//
+//Note if we find the preheader, the last IR of it may be call.
+//So if you are going to insert IR at the tail of preheader, the best is
+//force to insert a new bb.
+bool insertPreheader(LI<IRBB> * li, Region * rg, OUT IRBB ** preheader)
+{
+    IRCFG * cfg = rg->getCFG();
+    bool inserted = false;
+    IRBB * p = findAndInsertPreheader(li, rg, inserted, false);
+    if (p == nullptr || cfg->isRegionEntry(p)) {
+        p = findAndInsertPreheader(li, rg, inserted, true);
+        //Do not mark PASS changed if just inserted some BBs rather than
+        //code motion, because post CFG optimization will removed the
+        //redundant BB.
+    }
+
+    ASSERT0(p);
+    if (inserted && !li->isOuterMost()) {
+        //Update loop body BB set, add preheader to outer loop body.
+        li->getOuter()->getBodyBBSet()->bunion(p->id());
+    }
+    
+    ASSERT0(preheader);
+    *preheader = p;
+    return inserted;
+}
+
+
+//Iterative access LoopInfo tree. This funtion initialize the iterator.
+//'li': the root of the LoopInfo tree.
+//'it': iterator. It should be clean already.
+//Readonly function.
+LI<IRBB> const* iterInitLoopInfoC(LI<IRBB> const* li, OUT CLoopInfoIter & it)
+{
+    if (li == nullptr) { return nullptr; }
+    for (LI<IRBB> const* x = li->getInnerList();
+         x != nullptr; x = x->get_next()) {
+        it.append_tail(x);
+    }
+    if (li->get_next() != nullptr) {
+        it.append_tail(li->get_next());
+    }
+    return li;
+}
+
+
+//Iterative access LoopInfo tree.
+//This function return the next LoopInfo accroding to 'it'.
+//'it': iterator.
+//Readonly function.
+LI<IRBB> const* iterNextLoopInfoC(IN OUT CLoopInfoIter & it)
+{
+    LI<IRBB> const* li = it.remove_head();
+    if (li == nullptr) { return nullptr; }
+    for (LI<IRBB> const* x = li->getInnerList();
+         x != nullptr; x = x->get_next()) {
+        it.append_tail(x);
+    }
+    if (li->get_next() != nullptr) {
+        it.append_tail(li->get_next());
+    }
+    return li;
+}
+
+
+//Find the bb that is the START of the unqiue backedge of loop.
+//  BB1: loop-start bb
+//  BB2: body
+//  BB3: goto loop-start bb
+//
+//BB3 is the backedge-start bb.
+//Return backedge BB id if found, otherwise return BBID_UNDEF.
+IRBB * findBackedgeStartBB(LI<IRBB> const* li, IRCFG * cfg)
+{
+    UINT bbid = li->findBackedgeStartBB(cfg);
+    if (bbid != BBID_UNDEF) {
+        return cfg->getBB(bbid);
+    }
+    return nullptr;
 }
 
 } //namespace xoc

@@ -869,7 +869,7 @@ void BitSet::bunion(BitSet const& bs)
 {
     ASSERT0(this != &bs);
     if (bs.m_ptr == nullptr) { return; }
-    UINT cp_sz = bs.m_size; //size need to union.
+    UINT cp_sz = bs.m_size; //size needs to unifiy
     if (m_size < bs.m_size) {
         //src's last byte pos.
         INT l = bs.get_last();
@@ -1572,7 +1572,7 @@ void BitSet::copy(BitSet const& src)
         return;
     }
 
-    UINT cp_sz = src.m_size; //size need to copy.
+    UINT cp_sz = src.m_size; //size needs to copy.
     if (m_size < src.m_size) {
         //src's last byte pos.
         INT l = src.get_last();

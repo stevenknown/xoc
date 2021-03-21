@@ -132,7 +132,7 @@ void CDG::build(IN OUT OptCtx & oc, xcom::DGraph & cfg)
 
     START_TIMER(t, "Build CDG");
     ASSERT0(oc.is_cfg_valid());
-    m_rg->checkValidAndRecompute(&oc, PASS_PDOM, PASS_UNDEF);
+    m_rg->getPassMgr()->checkValidAndRecompute(&oc, PASS_PDOM, PASS_UNDEF);
 
     START_TIMER(t2, "Build CDG: Get Dom Tree");
     xcom::Graph pdom_tree;

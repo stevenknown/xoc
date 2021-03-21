@@ -75,7 +75,7 @@ public:
         UINT num_want_to_insert = 30;
         for (UINT i = 0; i < num_want_to_insert; i++) {
             IR * newref = rg->dupIRTree(ref);
-            dumgr->copyRefAndAddDUChain(newref, ref, true);
+            dumgr->addUse(newref, ref);
             IR * stpr = rg->buildStorePR(rg->buildPrno(newref->getType()),
                                             newref->getType(), newref);
             rg->allocRefForPR(stpr);

@@ -50,7 +50,6 @@ GVN::GVN(Region * rg)
     ASSERT0(m_cfg && m_du && m_md_sys && m_tm);
     m_vn_count = 1;
     m_is_vn_fp = false;
-    m_is_valid = false;
     m_is_comp_ild_vn_by_du = true;
     m_is_comp_lda_string = false;
     m_zero_vn = nullptr;
@@ -574,7 +573,7 @@ VN * GVN::computeILoad(IR const* exp, bool & change)
     IR const* exp_stmt = const_cast<IR*>(exp)->getStmt();
     IR const* domdef = m_stmt2domdef.get(exp_stmt);
     if (domdef == nullptr) {
-        domdef = m_du->findDomDef(exp, exp_stmt, defset, false);
+        domdef = m_du->findNearestDomDef(exp, exp_stmt, defset, false);
         if (domdef != nullptr) {
             m_stmt2domdef.set(exp_stmt, domdef);
         }
@@ -701,7 +700,7 @@ VN * GVN::computeArray(IR const* exp, bool & change)
 
     IR const* exp_stmt = const_cast<IR*>(exp)->getStmt();
     ASSERT0(exp_stmt->is_stmt());
-    IR const* domdef = m_du->findDomDef(exp, exp_stmt, du, false);
+    IR const* domdef = m_du->findNearestDomDef(exp, exp_stmt, du, false);
     if (domdef == nullptr) {
         return nullptr;
     }
@@ -796,7 +795,7 @@ VN * GVN::computeScalar(IR const* exp, bool & change)
     ASSERT0(du->get_elem_count() > 0);
 
     IR const* exp_stmt = const_cast<IR*>(exp)->getStmt();
-    IR const* domdef = m_du->findDomDef(exp, exp_stmt, du, false);
+    IR const* domdef = m_du->findNearestDomDef(exp, exp_stmt, du, false);
 
     if (domdef == nullptr) { return nullptr; }
 
@@ -877,15 +876,15 @@ VN * GVN::computeVN(IR const* exp, bool & change)
         VN * basevn = nullptr;
         if (v->is_string()) {
             if (m_is_comp_lda_string) {
-                MD const* emd = m_rg->genMDforVAR(v);
+                MD const* emd = m_rg->genMDForVAR(v, LDA_ofst(exp));
                 ASSERTN(emd && emd->is_effect(),
-                       ("string should have effect MD"));
+                        ("string should have effect MD"));
                 basevn = registerVNviaMD(emd);
             } else {
                 basevn = nullptr;
             }
         } else {
-            MD const* emd = m_rg->genMDforVAR(v);
+            MD const* emd = m_rg->genMDForVAR(v, LDA_ofst(exp));
             ASSERTN(emd && emd->is_effect(), ("string should have effect MD"));
             basevn = registerVNviaMD(emd);
         }
@@ -1357,13 +1356,6 @@ bool GVN::calcCondMustVal(IR const* ir,
 }
 
 
-bool GVN::reperform(OptCtx & oc)
-{
-    clean();
-    return perform(oc);
-}
-
-
 //GVN try to assign a value numbers to expressions.
 bool GVN::perform(OptCtx & oc)
 {
@@ -1385,7 +1377,9 @@ bool GVN::perform(OptCtx & oc)
     }
 
     START_TIMER(t, getPassName());
-    m_rg->checkValidAndRecompute(&oc, PASS_RPO, PASS_DOM, PASS_UNDEF);
+    clean();
+    m_rg->getPassMgr()->checkValidAndRecompute(&oc, PASS_RPO, PASS_DOM,
+                                               PASS_UNDEF);
     List<IRBB*> * tbbl = m_cfg->getRPOBBList();
     ASSERT0(tbbl);
     ASSERT0(tbbl->get_elem_count() == bbl->get_elem_count());
@@ -1406,7 +1400,7 @@ bool GVN::perform(OptCtx & oc)
     }
     END_TIMER(t, getPassName());
     ASSERT0(verify());
-    m_is_valid = true;
+    set_valid(true);
     return true;
 }
 //END GVN

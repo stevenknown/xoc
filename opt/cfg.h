@@ -119,12 +119,11 @@ protected:
         return p;
     }
 public:
-    CFG(List<BB*> * bb_list,
-        UINT edge_hash_size = 16,
+    CFG(List<BB*> * bb_list, UINT edge_hash_size = 16,
         UINT vertex_hash_size = 16)
         : xcom::DGraph(edge_hash_size, vertex_hash_size)
     {
-        ASSERTN(bb_list, ("CFG need BB list"));
+        ASSERTN(bb_list, ("CFG requires BB list"));
         m_bb_list = bb_list;
         m_loop_info = nullptr;
         m_bs_mgr = nullptr;
@@ -168,7 +167,7 @@ public:
 
     //Compute all reachable BBs start from 'startbb'.
     //bbset: record the output result.
-    //Note caller should clean bbset.
+    //Note caller should clean bbset. This function is non-recursive.
     void computeReachableBBSet(BB * startbb, OUT xcom::BitSet & bbset)
     {
         ASSERT0(startbb);
@@ -199,6 +198,7 @@ public:
     //This function is different to computeReachableBBSet, it only
     //collect BBs in main stream control flow, BBs which in
     //exception handler region are omitted.
+    //This function is non-recursive.
     void computeMainStreamBBSet(BB * startbb, OUT xcom::BitSet & bbset)
     {
         ASSERT0(startbb);
@@ -229,8 +229,8 @@ public:
 
     //Compute and record exit BBs.
     //Only the function entry can be CFG entry.
-    //Connect or handle try and catch BB before perform
-    //removing unreachable BB.
+    //Connect or handle TRY and CATCH BB before performing removing
+    //unreachable BB.
     virtual void computeExitList()
     {
         m_exit_list.clean();
@@ -286,14 +286,14 @@ public:
     bool findLoop();
 
     //Find the target bb list.
-    //2th parameter indicates a list of bb have found.
+    //2th parameter records a list of bb have found.
     virtual void findTargetBBOfMulticondBranch(XR const*, OUT List<BB*> &) = 0;
 
     //Find the bb that referred given label.
     virtual BB * findBBbyLabel(LabelInfo const*) const = 0;
 
-    //Find a list bb that referred labels which is the target of xr.
-    //2th parameter indicates a list of bb have found.
+    //Find a list of bb that referrence labels which are target of xr.
+    //2th parameter records a list of bb have found.
     virtual void findTargetBBOfIndirectBranch(XR const*, OUT List<BB*> &) = 0;
 
     UINT getLoopNum() const { return m_li_count - 1; }
@@ -301,9 +301,11 @@ public:
     void get_preds(IN OUT List<BB const*> & preds, BB const* v) const;
     void get_succs(IN OUT List<BB*> & succs, BB const* v) const;
     void get_succs(IN OUT List<BB const*> & succs, BB const* v) const;
+
     //Get the number of successors of bb.
     UINT getSuccsNum(BB const* bb) const
     { return getOutDegree(getVertex(bb->id())); }
+
     //Get the number of predecessors of bb.
     UINT getPredsNum(BB const* bb) const
     { return getInDegree(getVertex(bb->id())); }
@@ -375,7 +377,7 @@ public:
     virtual XR * get_first_xr(BB *) = 0;
     virtual BB * getBB(UINT id) const = 0;
 
-    //True if has exception handler edge.
+    //True if current CFG has exception-handler edge.
     bool hasEHEdge() const { return m_has_eh_edge; }
 
     void identifyNaturalLoop(UINT x,
@@ -390,16 +392,24 @@ public:
     bool isCFGExit(UINT bbid)
     { return xcom::Graph::is_graph_exit(getVertex(bbid)); }
 
-    //Return true if bb is entry BB of function.
+    //Return true if bb is entry BB of function-region.
     //In some case, BB is not Region entry even if it is the CFG entry.
     virtual bool isRegionEntry(BB *) = 0;
 
     //Return true if bb is exit BB of function.
-    //In some case, BB is not Region exit even if it is the CFG exit.
+    //In some case, BB is not region-exit even if it is the CFG exit.
     virtual bool isRegionExit(BB *) = 0;
 
     virtual bool isLoopHead(BB * bb)
     { return isLoopHeadRecur(m_loop_info, bb); }
+
+    //Return true if BB 'pred' control the execution of 'bb'.
+    //Note 'pred' must be predecessor of 'bb'.
+    bool isControlPred(BB const* pred, BB const* bb) const
+    {
+        return const_cast<CFG<BB, XR>*>(this)->get_ipdom(const_cast<BB*>(pred))
+               != bb;
+    }
 
     LI<BB> * mapBB2LabelInfo(BB * bb) { return m_map_bb2li.get(bb->id()); }
 
@@ -497,8 +507,7 @@ public:
 
 
 //Find and Return LOOP_SIBLING and BODY_ROOT.
-//e.g:
-//    LOOP
+//e.g:LOOP
 //        BODY_ROOT
 //    END_LOOP
 //    LOOP_SIBLING
@@ -522,8 +531,7 @@ void CFG<BB, XR>::getKidOfLoop(BB * bb, OUT BB ** sibling, OUT BB ** body_root)
 
 
 //Find and Return TRUE_BODY, FALSE_BODY, IF_SIBLING.
-//e.g:
-//    IF
+//e.g:IF
 //        TRUE_BODY
 //    ELSE
 //        FALSE_BODY
@@ -585,8 +593,7 @@ void CFG<BB, XR>::getKidOfIF(BB * bb,
 
 
 template <class BB, class XR>
-void CFG<BB, XR>::dumpLoopTree(LI<BB> const* looplist,
-                               UINT indent,
+void CFG<BB, XR>::dumpLoopTree(LI<BB> const* looplist, UINT indent,
                                Region * rg) const
 {
     if (!rg->isLogMgrInit()) { return; }
@@ -612,7 +619,7 @@ void CFG<BB, XR>::dumpLoopTree(LI<BB> const* looplist,
 template <class BB, class XR>
 bool CFG<BB, XR>::verifyIfBBRemoved(IN CDG * cdg, OptCtx & oc)
 {
-    ASSERTN(cdg, ("DEBUG: verification need cdg."));
+    ASSERTN(cdg, ("DEBUG: verification requires cdg."));
     xcom::C<BB*> * ct, * next_ct;
     List<BB*> succs;
     bool is_cfg_valid = oc.is_cfg_valid();
@@ -651,7 +658,7 @@ bool CFG<BB, XR>::verifyIfBBRemoved(IN CDG * cdg, OptCtx & oc)
                 }
 
                 if (!cdg->is_cd(bb->id(), succ->id())) {
-                    //bb should not be empty, need goto.
+                    //bb should not be empty, requires GOTO at least.
                     UNREACHABLE();
                 }
             }
@@ -719,7 +726,7 @@ bool CFG<BB, XR>::removeEmptyBBHelper(BB * bb,
     //Connect all predecessors to each successors of bb.
     get_preds(preds, bb);
     if (preds.get_elem_count() > 1 && bb->successorHasPhi(this)) {
-        //TODO:If you remove current BB, then you need to add more
+        //TODO: If you remove current BB, then you have to add more
         //than one predecessors to bb's succ, that will add more than
         //one operand to phi at bb's succ. It complicates the optimization.
         return doit;
@@ -860,8 +867,8 @@ bool CFG<BB, XR>::removeEmptyBB(OptCtx & oc)
         }
 
         //TODO: confirm if this is correct:
-        //  isRegionExit() need to update if CFG
-        //  changed or ir_bb_list reconstructed.
+        //  isRegionExit() need to update if CFG changed or ir_bb_list
+        //  reconstructed.
         //  e.g:void m(bool r, bool y)
         //      {
         //          bool l;
@@ -869,8 +876,8 @@ bool CFG<BB, XR>::removeEmptyBB(OptCtx & oc)
         //          return 0;
         //      }
         //After initCfg(), there are 2 BBs, BB1 and BB3.
-        //While IR_LOR simpilified, new BB generated, then func-exit BB flag
-        //need to be updated as well.
+        //When IR_LOR simpilified, and new BB generated, func-exit BB flag
+        //has to be updated as well.
 
         if (get_last_xr(bb) == nullptr &&
             !isRegionEntry(bb) &&

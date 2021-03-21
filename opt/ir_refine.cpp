@@ -383,7 +383,7 @@ IR * Refine::refineIStore(IR * ir, bool & change, RefineCtx & rc)
         }
         bool maybe_exist_expired_du = false;
         if (newir->getRefMD() == nullptr) {
-            newir->setRefMD(m_rg->genMDforStore(newir), m_rg);
+            newir->setRefMD(m_rg->genMDForStore(newir), m_rg);
             newir->cleanRefMDSet();
 
             //Change IST to ST may result the DU chain invalid.
@@ -475,6 +475,7 @@ IR * Refine::refineStore(IR * ir, bool & change, RefineCtx & rc)
             RC_stmt_removed(rc) = true;
         }
 
+        xoc::removeStmt(ir, m_rg);
         m_rg->freeIRTree(ir);
         change = true;
         return nullptr;
@@ -487,6 +488,7 @@ IR * Refine::refineStore(IR * ir, bool & change, RefineCtx & rc)
         MD const* umd = rhs->getExactRef();
         if (umd != nullptr && umd == ir->getExactRef()) {
             //Result and operand referenced the same md.
+            //CASE: st(x) = ld(x);
             if (rhs->is_cvt()) {
                 //CASE: pr(i64) = cvt(i64, pr(i32))
                 //Do NOT remove 'cvt'.
@@ -499,7 +501,7 @@ IR * Refine::refineStore(IR * ir, bool & change, RefineCtx & rc)
                     BB_irlist(bb).remove(ir);
                     RC_stmt_removed(rc) = true;
                 }
-
+                xoc::removeStmt(ir, m_rg);
                 m_rg->freeIRTree(ir);
                 return nullptr;
             }
@@ -1075,7 +1077,7 @@ IR * Refine::refineMul(IR * ir, bool & change, RefineCtx & rc)
             IR_code(ir) = IR_ADD;
             m_rg->freeIRTree(BIN_opnd1(ir));
             BIN_opnd1(ir) = m_rg->dupIRTree(BIN_opnd0(ir));
-            copyRefAndAddDUChain(BIN_opnd1(ir), BIN_opnd0(ir), m_rg, true);
+            xoc::addUse(BIN_opnd1(ir), BIN_opnd0(ir), m_rg);
             ir->setParentPointer(false);
             change = true;
             return ir; //No need to update DU.
@@ -1097,12 +1099,13 @@ IR * Refine::refineMul(IR * ir, bool & change, RefineCtx & rc)
         }
         return ir;
     }
-    if (op1->is_const() && op1->is_int() && CONST_int_val(op1) == 2) {
+    if (op1->is_const() && op1->is_int() && CONST_int_val(op1) == 2 &&
+        RC_refine_mul_const(rc)) {
         //mul.int X,2 => add.int X,X
         IR_code(ir) = IR_ADD;
         m_rg->freeIRTree(BIN_opnd1(ir));
         BIN_opnd1(ir) = m_rg->dupIRTree(BIN_opnd0(ir));
-        copyRefAndAddDUChain(BIN_opnd1(ir), BIN_opnd0(ir), m_rg, true);
+        xoc::addUse(BIN_opnd1(ir), BIN_opnd0(ir), m_rg);
         ir->setParentPointer(false);
         change = true;
         return ir; //No need to update DU.
@@ -1654,7 +1657,8 @@ IR * Refine::refineStoreArray(IR * ir, bool & change, RefineCtx & rc)
                     BB_irlist(bb).remove(ir);
                     RC_stmt_removed(rc) = true;
                 }
-
+  
+                xoc::removeStmt(ir, m_rg);
                 m_rg->freeIRTree(ir);
                 return nullptr;
             }

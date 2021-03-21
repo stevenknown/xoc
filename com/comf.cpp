@@ -950,7 +950,7 @@ UINT xstrlen(CHAR const* p)
 //Return true if equal.
 bool xstrcmp(CHAR const* p1, CHAR const* p2, INT n)
 {
-    //Note it is no need to judge whether current char is terminate char.
+    //Note it does not have to judge whether current char is terminate char.
     while (n-- > 0 && *p1++ == *p2++) {}
     return n < 0;
 }

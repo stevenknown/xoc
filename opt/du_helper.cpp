@@ -61,15 +61,13 @@ void changeUse(IR * olduse, IR * newuse, Region * rg)
 }
 
 
-//Build DU chain : def->use.
-void addDUChain(IR * def, IR * use, Region * rg)
+//Build DU chain from stmt 'def' to expression 'use'.
+//The function establishs DU chain from 'def' to 'use'.
+//def: stmt
+//use: expression
+void buildDUChain(IR * def, IR * use, Region * rg)
 {
-    ASSERT0(def->is_stmt() && use->is_exp());
-    DUMgr * dumgr = rg->getDUMgr();
-    if (dumgr != nullptr) {
-        dumgr->buildDUChain(def, use);
-    }
-
+    ASSERT0(def && use && def->is_stmt() && use->is_exp());
     if  (def->isMemoryRefNotOperatePR()) {
         MDSSAMgr * mdssamgr = rg->getMDSSAMgr(); 
         if (mdssamgr != nullptr && mdssamgr->is_valid()) {
@@ -84,6 +82,11 @@ void addDUChain(IR * def, IR * use, Region * rg)
         if (prssamgr != nullptr && prssamgr->is_valid()) {
             prssamgr->buildDUChain(def, use);
         }
+    }
+
+    DUMgr * dumgr = rg->getDUMgr();
+    if (dumgr != nullptr) {
+        dumgr->buildDUChain(def, use);
     }
 }
 
@@ -149,7 +152,7 @@ void coalesceDUChain(IR * from, IR * to, Region * rg)
 void removeIRTreeUse(IR * exp, Region * rg)
 {
     ASSERT0(exp && exp->is_exp());
-    PRSSAMgr::removePRSSAUse(exp);
+    PRSSAMgr::removePRSSAOcc(exp);
 
     DUMgr * dumgr = rg->getDUMgr();
     if (dumgr != nullptr) {
@@ -158,7 +161,7 @@ void removeIRTreeUse(IR * exp, Region * rg)
 
     MDSSAMgr * mdssamgr = rg->getMDSSAMgr(); 
     if (mdssamgr != nullptr) {
-        mdssamgr->removeMDSSAUse(exp);
+        mdssamgr->removeMDSSAOcc(exp);
     }
 }
 
@@ -172,12 +175,12 @@ void removeStmt(IR * stmt, Region * rg)
         dumgr->removeIRFromDUMgr(stmt);
     }
 
-    PRSSAMgr::removePRSSAUse(stmt);
+    PRSSAMgr::removePRSSAOcc(stmt);
 
     MDSSAMgr * mdssamgr = rg->getMDSSAMgr(); 
     if (mdssamgr != nullptr) {
-        //mdssamgr->removeStmtFromMDSSAMgr(stmt);
-        mdssamgr->removeMDSSAUse(stmt);
+        //Remove stmt and its RHS.
+        mdssamgr->removeMDSSAOcc(stmt);
     }
 }
 
@@ -185,48 +188,19 @@ void removeStmt(IR * stmt, Region * rg)
 static void addUseInPRSSAMode(IR * to_ir, IR const* from_ir)
 {
     SSAInfo * ssainfo = from_ir->getSSAInfo();
-    if (ssainfo != nullptr) {
-        if (from_ir->isWritePR() || from_ir->isCallHasRetVal()) {
-            ASSERTN(0, ("SSA only has one def"));
-        }
+    if (ssainfo == nullptr) { return; }
 
-        ASSERT0(to_ir->isReadPR());
-        PR_ssainfo(to_ir) = ssainfo;
-        ssainfo->addUse(to_ir);
+    if (from_ir->isWritePR() || from_ir->isCallHasRetVal()) {
+        ASSERTN(0, ("SSA only has one def"));
     }
+    ASSERT0(to_ir->isReadPR());
+    PR_ssainfo(to_ir) = ssainfo;
+    ssainfo->addUse(to_ir);
 }
 
 
-static void addUseInDUMode(IR * to_ir,
-                           IR const* from_ir,
-                           DUMgr * dumgr,
-                           Region * rg)
-{
-    DUSet const* from_du = from_ir->readDUSet();
-    if (from_du == nullptr || from_du->is_empty()) { return; }
-
-    DUSet * to_du = dumgr->getAndAllocDUSet(to_ir);
-    to_du->copy(*from_du, *dumgr->getSBSMgr());
-
-    UINT to_ir_id = to_ir->id();
-    //Add DU chain between DEF and USE.
-    DUIter di = nullptr;
-    for (UINT i = from_du->get_first(&di);
-         di != nullptr; i = from_du->get_next(i, &di)) {
-        //x is stmt if from_ir is expression.
-        //x is expression if from_ir is stmt.
-        IR const* x = rg->getIR(i);
-        DUSet * x_duset = x->getDUSet();
-        if (x_duset == nullptr) { continue; }
-        x_duset->add(to_ir_id, *dumgr->getSBSMgr());
-    }
-}
-
-
-static void addUseInMDSSAMode(IR * to_ir,
-                              IR const* from_ir,
-                              MDSSAMgr * mdssamgr,
-                              Region * rg)
+static void addUseInMDSSAMode(IR * to_ir, IR const* from_ir,
+                              MDSSAMgr * mdssamgr, Region * rg)
 {
     ASSERT0(from_ir->isMemoryRefNotOperatePR());
     MDSSAInfo * info = mdssamgr->getMDSSAInfoIfAny(from_ir);
@@ -235,25 +209,14 @@ static void addUseInMDSSAMode(IR * to_ir,
 }
 
 
-//DU chain and Memory Object reference operation.
-//This function copy MustUse and MayUse mds from tree 'from' to tree 'to'
-//and build new DU chain for 'to'.
-//add_duchain: if true to add DU chain from tree 'from' to tree 'to'.
-//    this operation will establish new DU chain between the DEF of 'from' and
-//    'to'.
-//'to': root expression of target tree.
-//'from': root expression of source tree.
-//NOTE: IR tree 'to' and 'from' must be identical structure.
-//'to' and 'from' must be expression.
-void copyRefAndAddDUChain(IR * to,
-                          IR const* from,
-                          Region * rg,
-                          bool add_duchain)
+void addUse(IR * to, IR const* from, Region * rg)
 {
     if (to == from) { return; }
+
     ASSERT0(to->is_exp() && from->is_exp());
     ASSERT0(to->isIREqual(from, true));
 
+    //Priority of DU chain: PRSSA > MDSSA > Classic DU.
     MDSSAMgr * mdssamgr = rg->getMDSSAMgr();
     bool use_mdssa = mdssamgr != nullptr && mdssamgr->is_valid();
     PRSSAMgr * prssamgr = rg->getPRSSAMgr();
@@ -266,20 +229,17 @@ void copyRefAndAddDUChain(IR * to,
          to_ir != nullptr; to_ir = iterNext(it), from_ir = iterNextC(cit)) {
         ASSERT0(to_ir->isIREqual(from_ir, true));
         if (!to_ir->isMemoryRef() && !to_ir->is_id()) {
-            //Copy MD for IR_ID, some Passes need it, e.g. GVN.
+            //Copy MD for IR_ID, some Passes require it, e.g. GVN.
             continue;
         }
-        to_ir->copyRef(from_ir, rg);
-        if (!add_duchain) { continue; }
-
         if (use_prssa && from_ir->isReadPR()) {
             addUseInPRSSAMode(to_ir, from_ir);
         }
-        if (dumgr != nullptr) {
-            addUseInDUMode(to_ir, from_ir, dumgr, rg);
-        }
         if (use_mdssa && from_ir->isMemoryRefNotOperatePR()) {
             addUseInMDSSAMode(to_ir, from_ir, mdssamgr, rg);
+        }
+        if (dumgr != nullptr) {
+            dumgr->addUse(to_ir, from_ir);
         }
     }
     ASSERT0(cit.get_elem_count() == 0 && it.get_elem_count() == 0);
@@ -335,6 +295,130 @@ void movePhi(IRBB * from, IRBB * to, Region * rg)
     if (mdssamgr != nullptr) {
         mdssamgr->movePhi(from, to);
     }
+}
+
+
+//Collect all USE expressions of 'def' into 'useset'.
+//This function give priority to PRSSA and MDSSA DU chain and then classic
+//DU chain in doing collection.
+void collectUseSet(IR const* def, MDSSAMgr const* mdssamgr, OUT IRSet * useset)
+{
+    ASSERT0(def->is_stmt());
+    useset->clean();
+
+    SSAInfo const* prssainfo = def->getSSAInfo();
+    if (prssainfo != nullptr) {
+        SSAUseIter sc;
+        Region * rg = mdssamgr->getRegion();
+        for (INT u = SSA_uses(prssainfo).get_first(&sc);
+             u >= 0; u = SSA_uses(prssainfo).get_next(u, &sc)) {
+            ASSERT0(rg->getIR(u));
+            useset->bunion(u);
+        }
+        return;
+    }
+
+    MDSSAInfo const* mdssainfo = nullptr;
+    if (mdssamgr != nullptr && mdssamgr->is_valid()) {
+        mdssainfo = mdssamgr->getMDSSAInfoIfAny(def);
+    }
+    if (mdssainfo != nullptr) {
+        mdssainfo->collectUse(const_cast<MDSSAMgr*>(mdssamgr)->getUseDefMgr(),
+                              useset);
+        return;
+    }
+
+    if (def->readDUSet() != nullptr) {
+        useset->copy((DefSBitSetCore&)*def->readDUSet());
+    }
+}
+
+
+//Collect all DEF expressions of 'use' into 'defset'.
+//This function give priority to PRSSA and MDSSA DU chain and then classic
+//DU chain in doing collection.
+void collectDefSet(IR const* use, MDSSAMgr const* mdssamgr, OUT IRSet * defset)
+{
+    ASSERT0(defset && use->is_exp());
+    defset->clean();
+
+    SSAInfo const* prssainfo = use->getSSAInfo();
+    if (prssainfo != nullptr) {
+        defset->bunion(prssainfo->getDef()->id());
+        return;
+    }
+
+    MDSSAInfo const* mdssainfo = nullptr;
+    if (mdssamgr != nullptr && mdssamgr->is_valid()) {
+        mdssainfo = mdssamgr->getMDSSAInfoIfAny(use);
+    }
+    if (mdssainfo != nullptr) {
+        mdssainfo->collectDef(mdssamgr, use->getRefMD(), defset);
+        return;
+    }
+
+    if (use->readDUSet() != nullptr) {
+        defset->copy((DefSBitSetCore&)*use->readDUSet());
+    }
+}
+
+
+//Find the nearest dominated DEF stmt of 'exp'.
+//Note RPO of BB must be available.
+//exp: given expression.
+//defset: DEF stmt set of 'exp'.
+//omit_self: true if we do not consider the stmt of 'exp' itself.
+IR * findNearestDomDef(IR const* exp, IRSet const& defset, Region const* rg,
+                       bool omit_self)
+{
+    ASSERT0(exp->is_exp());
+    IR const* stmt_of_exp = exp->getStmt();
+    INT stmt_rpo = stmt_of_exp->getBB()->rpo();
+    ASSERT0(stmt_rpo != RPO_UNDEF);
+    IR * last = nullptr;
+    INT lastrpo = RPO_UNDEF;
+    IRSetIter it = nullptr;
+    for (INT i = defset.get_first(&it); i >= 0; i = defset.get_next(i, &it)) {
+        IR * d = rg->getIR(i);
+        ASSERT0(d->is_stmt());
+        if (omit_self && d == stmt_of_exp) {
+            continue;
+        }
+
+        if (last == nullptr) {
+            last = d;
+            lastrpo = d->getBB()->rpo();
+            ASSERT0(lastrpo >= 0);
+            continue;
+        }
+
+        IRBB * dbb = d->getBB();
+        ASSERT0(dbb);
+        ASSERT0(dbb->rpo() >= 0);
+        if (dbb->rpo() < stmt_rpo && dbb->rpo() > lastrpo) {
+            last = d;
+            lastrpo = dbb->rpo();
+        } else if (dbb == last->getBB() && dbb->is_dom(last, d, true)) {
+            last = d;
+            lastrpo = dbb->rpo();
+        }
+    }
+    if (last == nullptr) { return nullptr; }
+
+    IRBB const* last_bb = last->getBB();
+    IRBB const* exp_bb = stmt_of_exp->getBB();
+    if (!rg->getCFG()->is_dom(last_bb->id(), exp_bb->id())) {
+        return nullptr;
+    }
+
+    //e.g: *p = *p + 1
+    //Def and Use in same stmt, in this situation,
+    //the stmt can not be regarded as dom-def.
+    if (exp_bb == last_bb && !exp_bb->is_dom(last, stmt_of_exp, true)) {
+        return nullptr;
+    }
+    ASSERT0(last != stmt_of_exp);
+    return last;
 }
 
 } //namespace xoc

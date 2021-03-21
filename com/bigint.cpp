@@ -125,7 +125,7 @@ void BigInt::dump(bool is_seg_hex) const
 //with_newline: true to dump a '\n' before content.
 void BigInt::dump(FILE * h, bool with_newline, bool is_seg_hex) const
 {
-    ASSERTN(h, ("need file handler"));
+    ASSERTN(h, ("require file handler"));
     if (getSigPos() >= 0 && with_newline) {
         fprintf(h, "\n");
     }

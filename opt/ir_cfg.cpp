@@ -603,7 +603,7 @@ void IRCFG::LoopAnalysis(OptCtx & oc)
         //OC_is_loopinfo_valid(oc) = true;
         return;
     }
-    m_rg->checkValidAndRecompute(&oc, PASS_DOM, PASS_UNDEF);
+    m_rg->getPassMgr()->checkValidAndRecompute(&oc, PASS_DOM, PASS_UNDEF);
     findLoop();
     collectLoopInfo();
     OC_is_loopinfo_valid(oc) = true;
@@ -933,7 +933,7 @@ void IRCFG::resetMapBetweenLabelAndBB(IRBB * bb)
 //Combine trampoline branch.
 //e.g:L2:
 //    truebr L4 | false L4
-//    goto L3
+//    goto L3 //redundant jump
 //    L4
 //    ...
 //    L3:
@@ -997,7 +997,7 @@ bool IRCFG::inverseAndRemoveTrampolineBranch()
             continue;
         }
 
-        //Do replacement
+        //Displacement
         if (br->is_truebr()) {
             IR_code(br) = IR_FALSEBR;
         } else {
@@ -1012,7 +1012,7 @@ bool IRCFG::inverseAndRemoveTrampolineBranch()
         //Remove jmp->jmp_tgt.
         removeEdge(next, jmp_tgt);
 
-        //Add jmp->next_next.
+        //Add next->next_next, actually jmp->next_next because 'next' is empty.
         xcom::Edge * newe = addEdge(next, next_next);
         EDGE_info(newe) = ei;
 
@@ -1578,7 +1578,7 @@ void IRCFG::dumpDOT(FILE * h, UINT flag)
     }
 
     //Print node
-    VertexIter c;
+    VertexIter c = VERTEX_UNDEF;
     for (xcom::Vertex * v = get_first_vertex(c);
          v != nullptr; v = get_next_vertex(c)) {
         CHAR const* shape = "box";
@@ -1651,7 +1651,7 @@ void IRCFG::dumpDOT(FILE * h, UINT flag)
     }
 
     //Print edge
-    VertexIter c2;
+    VertexIter c2 = VERTEX_UNDEF;
     TTab<xcom::Edge const*> visited;
     for (xcom::Vertex * v = get_first_vertex(c2);
          v != nullptr; v = get_next_vertex(c2)) {
@@ -1955,7 +1955,7 @@ void IRCFG::computeDomAndIdom(IN OUT OptCtx & oc, xcom::BitSet const* uni)
     ASSERT0(oc.is_cfg_valid());
     ASSERTN(m_entry, ("ONLY support SESE or SEME"));
 
-    m_rg->checkValidAndRecompute(&oc, PASS_RPO, PASS_UNDEF);
+    m_rg->getPassMgr()->checkValidAndRecompute(&oc, PASS_RPO, PASS_UNDEF);
     List<IRBB*> * bblst = getRPOBBList();
     ASSERT0(bblst);
     ASSERT0(bblst->get_elem_count() == m_rg->getBBList()->get_elem_count());
@@ -1992,7 +1992,7 @@ void IRCFG::computePdomAndIpdom(IN OUT OptCtx & oc, xcom::BitSet const* uni)
     START_TIMER(t, "Compute PDom,IPDom");
     ASSERT0(oc.is_cfg_valid());
 
-    m_rg->checkValidAndRecompute(&oc, PASS_RPO, PASS_UNDEF);
+    m_rg->getPassMgr()->checkValidAndRecompute(&oc, PASS_RPO, PASS_UNDEF);
     List<IRBB*> * bblst = getRPOBBList();
     ASSERT0(bblst);
     ASSERT0(bblst->get_elem_count() == m_rg->getBBList()->get_elem_count());
@@ -2040,7 +2040,6 @@ bool IRCFG::performMiscOpt(OptCtx & oc)
     bool lchange;
     UINT count = 0;
     OptCtx org_oc(oc);
-
     do {
         lchange = false;
 
@@ -2070,10 +2069,7 @@ bool IRCFG::performMiscOpt(OptCtx & oc)
         }
 
         if (lchange) {
-            oc.set_flag_if_cfg_changed();
-
-            //Each pass maintain CFG by default.
-            OC_is_cfg_valid(oc) = true;
+            oc.setInvalidIfCFGChanged();
         }
         change |= lchange;
         count++;
@@ -2084,7 +2080,8 @@ bool IRCFG::performMiscOpt(OptCtx & oc)
         computeExitList();
 
         if (OC_is_cdg_valid(org_oc)) {
-            m_rg->checkValidAndRecompute(&oc, PASS_CDG, PASS_UNDEF);
+            m_rg->getPassMgr()->checkValidAndRecompute(&oc, PASS_CDG,
+                                                       PASS_UNDEF);
             ASSERT0(verifyIfBBRemoved((CDG*)m_rg->getPassMgr()->
                                       queryPass(PASS_CDG), oc));
         }

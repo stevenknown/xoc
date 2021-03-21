@@ -41,8 +41,10 @@ class SimpCtx;
 //Basis Class of pass.
 class Pass {
     COPY_CONSTRUCTOR(Pass);
+protected:
+    BYTE m_is_valid:1; //True if current pass information is available.
 public:
-    Pass() {}
+    Pass() { m_is_valid = false; }
     virtual ~Pass() {}
 
     virtual bool dump() const
@@ -65,6 +67,12 @@ public:
         return PASS_UNDEF;
     }
 
+    virtual bool is_valid() const { return m_is_valid; }
+
+    virtual void set_valid(bool valid) { m_is_valid = valid; }
+
+    //Return true means IR status changed, caller should consider whether
+    //other optimizations should be reperform again. Otherwise return false.
     virtual bool perform(OptCtx &)
     {
         ASSERTN(0, ("Optimization Dependent Code"));

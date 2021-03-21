@@ -40,7 +40,7 @@ void Region::HighProcessImpl(OptCtx & oc)
 {
     if (g_do_cfg) {
         ASSERT0(g_cst_bb_list);
-        checkValidAndRecompute(&oc, PASS_CFG, PASS_UNDEF);
+        getPassMgr()->checkValidAndRecompute(&oc, PASS_CFG, PASS_UNDEF);
         //Remove empty bb when cfg rebuilted because
         //rebuilding cfg may generate redundant empty bb.
         //It disturbs the computation of entry and exit.
@@ -53,10 +53,10 @@ void Region::HighProcessImpl(OptCtx & oc)
         getCFG()->performMiscOpt(oc);
 
         //Build DOM after CFG be optimized.
-        checkValidAndRecompute(&oc, PASS_DOM, PASS_UNDEF);
+        getPassMgr()->checkValidAndRecompute(&oc, PASS_DOM, PASS_UNDEF);
 
         //Infer pointer arith need loopinfo.
-        checkValidAndRecompute(&oc, PASS_LOOP_INFO, PASS_UNDEF);
+        getPassMgr()->checkValidAndRecompute(&oc, PASS_LOOP_INFO, PASS_UNDEF);
     }
 
     if (g_do_pr_ssa) {
@@ -73,12 +73,12 @@ void Region::HighProcessImpl(OptCtx & oc)
 
     if (g_do_expr_tab) {
         ASSERT0(g_cst_bb_list);
-        checkValidAndRecompute(&oc, PASS_EXPR_TAB, PASS_UNDEF);
+        getPassMgr()->checkValidAndRecompute(&oc, PASS_EXPR_TAB, PASS_UNDEF);
     }
 
     if (g_do_cdg) {
         ASSERT0(g_cst_bb_list);
-        checkValidAndRecompute(&oc, PASS_CDG, PASS_UNDEF);
+        getPassMgr()->checkValidAndRecompute(&oc, PASS_CDG, PASS_UNDEF);
     }
 
     if (g_opt_level == OPT_LEVEL0) {

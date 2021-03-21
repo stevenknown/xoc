@@ -39,12 +39,10 @@ namespace xoc {
 //Util Functions supplied by DUMgr
 // These functions manipulate the reference of IR.
 // IR may reference MD, or MDSet, or both MD and MDSet.
-//
 //    computeOverlapDefMDSet
 //    computeOverlapUseMDSet
 //    collectMayUse
 //    collectMayUseRecursive
-//    copyRefAndAddDUChain
 //    changeUse
 //    changeDef
 //    getMayDef
@@ -65,11 +63,10 @@ namespace xoc {
 //    isCallMayDef
 //
 //* These functions manipulate the DU chain.
-//
+//    addUse
 //    buildDUChain
 //    freeDUSetAndCleanMDRefs
 //    copyDUSet
-//    get_du_c
 //    getAndAllocDUSet
 //    is_du_exist
 //    unionUse
@@ -459,6 +456,7 @@ public:
     ~DUMgr();
 
     //Build DU chain : def->use.
+    //Build DU chain from stmt 'def' to expression 'use'.
     void buildDUChain(IR * def, IR * use)
     {
         ASSERT0(def && def->is_stmt() && use && use->is_exp());
@@ -504,17 +502,15 @@ public:
                            Vector<MDSet*> const* maydefmds,
                            MDSet const* mayusemds);
 
-    //DU chain and Memory Object reference operation.
     //This function copy MustUse and MayUse mds from tree 'from' to tree 'to'
     //and build new DU chain for 'to'.
-    //add_duchain: if true to add DU chain from tree 'from' to tree 'to'.
-    //  this operation will establish new DU chain between the DEF of 'from'
-    //  and 'to'.
-    //'to': root expression of target tree.
-    //'from': root expression of source tree.
-    //NOTE: IR tree 'to' and 'from' must be identical structure.
-    //'to' and 'from' must be expression.
-    void copyRefAndAddDUChain(IR * to, IR const* from, bool add_duchain);
+    //The function will establish new DU chain between the DEF of 'from'
+    //and 'to'.
+    //to: root expression of target tree.
+    //from: root expression of source tree.
+    //NOTE: IR tree 'to' and 'from' must be isomorphic structure.
+    //Both 'to' and 'from' must be expression.
+    void addUse(IR * to, IR const* from);
 
     //Count the memory usage to DUMgr.
     size_t count_mem() const;
@@ -528,14 +524,10 @@ public:
                                 UINT elemnum);
 
     //Collect must and may memory reference.
-    void collectMayUseRecursive(IR const* ir,
-                                MDSet & mayUse,
-                                bool computePR,
-                                DefMiscBitSetMgr & bsmgr);
-    void collectMayUseRecursiveIRList(IR const* ir,
-                                      OUT MDSet & mayUse,
-                                      bool computePR,
-                                      DefMiscBitSetMgr & bsmgr);
+    void collectMayUseRecursive(IR const* ir, MDSet & mayUse,
+                                bool computePR, DefMiscBitSetMgr & bsmgr);
+    void collectMayUseRecursiveIRList(IR const* ir, OUT MDSet & mayUse,
+                                      bool computePR, DefMiscBitSetMgr & bsmgr);
 
     //Collect may memory reference.
     void collectMayUse(IR const* ir, MDSet & mayUse, bool computePR);
@@ -577,38 +569,14 @@ public:
         tgtduinfo->copy(*srcset, *m_misc_bs_mgr);
     }
 
-    //Copy and maintain tgt DU chain.
-    //This function will establish tgt's DU chain accroding to src'
-    //DU chain information. e.g, The DEF stmt S will be the DEF of tgt.
-    //And tgt will be the USE of S.
-    void copyDUChain(IR * tgt, IR * src)
-    {
-        copyDUSet(tgt, src);
-        DUSet const* from_du = src->readDUSet();
-
-        DUIter di = nullptr;
-        for (UINT i = (UINT)from_du->get_first(&di);
-             di != nullptr; i = (UINT)from_du->get_next(i, &di)) {
-            IR const* ref = m_rg->getIR(i);
-            //ref may be stmt or exp.
-
-            DUSet * ref_defuse_set = ref->getDUSet();
-            if (ref_defuse_set == nullptr) { continue; }
-            ref_defuse_set->add(IR_id(tgt), *m_misc_bs_mgr);
-        }
-    }
-
     //DU chain operation.
     //Change Def stmt from 'from' to 'to'.
     //'to': copy to stmt's id.
     //'from': copy from stmt's id.
     //'useset': each element is USE, it is the USE expression set of 'from'.
     //e.g: from->USE change to to->USE.
-    void changeDef(UINT to,
-                   UINT from,
-                   DUSet * useset_of_to,
-                   DUSet * useset_of_from,
-                   DefMiscBitSetMgr * m)
+    void changeDef(UINT to, UINT from,  DUSet * useset_of_to,
+                   DUSet * useset_of_from, DefMiscBitSetMgr * m)
     {
         ASSERT0(m_rg->getIR(from)->is_stmt() &&
                 m_rg->getIR(to)->is_stmt() &&
@@ -650,11 +618,8 @@ public:
     //'from': indicate the source expression which copy from.
     //'defset': it is the DEF stmt set of 'from'.
     //e.g: DEF->from change to DEF->to.
-    void changeUse(UINT to,
-                   UINT from,
-                   DUSet * defset_of_to,
-                   DUSet * defset_of_from,
-                   DefMiscBitSetMgr * m)
+    void changeUse(UINT to, UINT from,  DUSet * defset_of_to,
+                   DUSet * defset_of_from, DefMiscBitSetMgr * m)
     {
         ASSERT0(m_rg->getIR(from)->is_exp() && m_rg->getIR(to)->is_exp() &&
                 defset_of_from && defset_of_to && m);
@@ -827,38 +792,28 @@ public:
     bool isExactAndUniqueDef(IR const* def, IR const* exp);
 
     //Return true if stmt dominate use's stmt, otherwise return false.
-    bool isStmtDomUseInsideLoop(IR const* stmt,
-                                IR const* use,
+    bool isStmtDomUseInsideLoop(IR const* stmt, IR const* use,
                                 LI<IRBB> const* li) const;
 
     //Return true if ir dominates all its USE expressions which inside loop.
     bool isStmtDomAllUseInsideLoop(IR const* ir, LI<IRBB> const* li) const;
 
     //This equation needs May Kill Def and Must Gen Def.
-    bool ForAvailReachDef(UINT bbid,
-                          List<IRBB*> & preds,
-                          List<IRBB*> * lst,
+    bool ForAvailReachDef(UINT bbid, List<IRBB*> & preds, List<IRBB*> * lst,
                           DefMiscBitSetMgr & bsmgr);
-    bool ForReachDef(UINT bbid,
-                     List<IRBB*> & preds,
-                     List<IRBB*> * lst,
+    bool ForReachDef(UINT bbid, List<IRBB*> & preds, List<IRBB*> * lst,
                      DefMiscBitSetMgr & bsmgr);
-    bool ForAvailExpression(UINT bbid,
-                            List<IRBB*> & preds,
-                            List<IRBB*> * lst,
+    bool ForAvailExpression(UINT bbid, List<IRBB*> & preds, List<IRBB*> * lst,
                             DefMiscBitSetMgr & bsmgr);
 
     //Find the nearest dominated DEF stmt of 'exp'.
     //NOTE: RPO of bb of stmt must be available.
-    //
     //'exp': expression
     //'exp_stmt': stmt that exp is belong to.
     //'expdu': def set of exp.
     //'omit_self': true if we do not consider the 'exp_stmt' itself.
-    IR * findDomDef(IR const* exp,
-                    IR const* exp_stmt,
-                    DUSet const* expdefset,
-                    bool omit_self);
+    IR * findNearestDomDef(IR const* exp, IR const* exp_stmt,
+                           DUSet const* expdefset, bool omit_self);
 
     //Find nearest killing def to expmd in its bb.
     //Here we search exactly killing DEF from current stmt to previous
@@ -873,10 +828,8 @@ public:
     //    4. return g;
     //In the case, the last reference of g in stmt 4 may be defined by
     //stmt 2 or 3.
-    IR const* findKillingLocalDef(IRBB * bb,
-                                  xcom::C<IR*> const* ct,
-                                  IR const* exp,
-                                  MD const* md,
+    IR const* findKillingLocalDef(IRBB * bb, xcom::C<IR*> const* ct,
+                                  IR const* exp, MD const* md,
                                   bool * has_local_nonkilling_def);
 
     //Clean all DU-Chain and Defined/Used-MD reference info.

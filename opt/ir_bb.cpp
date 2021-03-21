@@ -243,7 +243,8 @@ void IRBB::dupSuccessorPhiOpnd(CFG<IRBB, IR> * cfg, Region * rg, UINT opnd_pos)
 
             IR * newopnd = rg->dupIRTree(opnd);
             if (opnd->isReadPR()) {
-                newopnd->copyRef(opnd, rg);
+                //TO BE REMOVED, should have been copied in dupIR
+                //newopnd->copyRef(opnd, rg);
                 ASSERT0(PR_ssainfo(opnd));
                 PR_ssainfo(newopnd) = PR_ssainfo(opnd);
                 SSA_uses(PR_ssainfo(newopnd)).append(newopnd);

@@ -36,6 +36,10 @@ author: Su Zhenyu
 
 namespace xoc {
 
+class IRBB;
+class Region;
+class IRCFG;
+
 //This file represent loop tree structure and relate algorithms.
 //e.g:
 //for (i) { #Loop1
@@ -87,6 +91,14 @@ public:
 
 public:
     LI() {}      
+
+    //Find the bb that is the start of the unqiue backedge of loop.
+    //  BB1: loop start bb
+    //  BB2: body
+    //  BB3: goto loop start bb
+    //BB3 is the backedge start bb.
+    UINT findBackedgeStartBB(xcom::Graph * cfg) const;
+
     LI<BB> * getOuter() const { return outer; }
     LI<BB> * getInnerList() const { return inner_list; }
     BB * getLoopHead() const { return loop_head; }
@@ -108,19 +120,55 @@ public:
 
     //Clean adjacent relation in loop-tree.
     void cleanAdjRelation()
-    { LI_outer(this) = nullptr; LI_next(this) = nullptr; LI_prev(this) = nullptr; }
+    {
+        LI_outer(this) = nullptr;
+        LI_next(this) = nullptr;
+        LI_prev(this) = nullptr;
+    }
 };
 
 
-class IRBB;
-class Region;
-class IRCFG;
+//Find the bb that is the START of the unqiue backedge of loop.
+//  BB1: loop-start bb
+//  BB2: body
+//  BB3: goto loop-start bb
+//BB3 is the backedge-start bb.
+//Return backedge BB id if found, otherwise return BBID_UNDEF.
+template <class BB>
+UINT LI<BB>::findBackedgeStartBB(xcom::Graph * cfg) const
+{
+    ASSERT0(cfg);
+    BB * head = getLoopHead();
+    UINT backedgebbid = BBID_UNDEF;
+    UINT backedgecount = 0;
+    for (xcom::EdgeC const* ec = cfg->getVertex(head->id())->getInList();
+         ec != nullptr; ec = ec->get_next()) {
+        backedgecount++;
+        UINT pred = ec->getFromId();
+        if (isInsideLoop(pred)) {
+            backedgebbid = pred;
+        }
+    }
+    ASSERT0(backedgebbid != BBID_UNDEF);
+    if (backedgecount > 2) {
+        //There are multiple backedges.
+        return BBID_UNDEF;
+    }
+    return backedgebbid;
+}
 
+
+//Find the bb that is the START of the unqiue backedge of loop.
+//  BB1: loop-start bb
+//  BB2: body
+//  BB3: goto loop-start bb
+//
+//BB3 is the backedge-start bb.
+IRBB * findBackedgeStartBB(LI<IRBB> const* li, IRCFG * cfg);
 IRBB * findAndInsertPreheader(LI<IRBB> const* li,
                               Region * rg,
                               OUT bool & insert_bb,
                               bool force);
-IRBB * findSingleBackedgeStartBB(LI<IRBB> const* li, IRCFG * cfg);
 bool findTwoSuccessorBBOfLoopHeader(LI<IRBB> const* li,
                                     IRCFG * cfg,
                                     UINT * succ1,
@@ -128,6 +176,7 @@ bool findTwoSuccessorBBOfLoopHeader(LI<IRBB> const* li,
 
 //List of invariant stmt.
 typedef xcom::EList<IR*, IR2Holder> InvStmtList;
+typedef xcom::List<LI<IRBB> const*> CLoopInfoIter;
 
 //Return true if all the expression on 'ir' tree is loop invariant.
 //ir: root node of IR
@@ -139,10 +188,27 @@ typedef xcom::EList<IR*, IR2Holder> InvStmtList;
 //       }
 //    stmt S1 is invariant because b is invariant.
 //Note this function does not check the sibling node of 'ir'.
-bool isLoopInvariant(IR const* ir,
-                     LI<IRBB> const* li,
-                     Region * rg,
-                     InvStmtList const* invariant_stmt,
-                     bool check_tree);
+bool isLoopInvariant(IR const* ir, LI<IRBB> const* li, Region * rg,
+                     InvStmtList const* invariant_stmt, bool check_tree);
+
+//Try inserting preheader BB of loop 'li'.
+//insert_bb: set to true if inserting a new BB before loop, otherwise false.
+//Note if we find the preheader, the last IR of it may be call.
+//So if you are going to insert IR at the tail of preheader, the best is
+//force to insert a new bb.
+bool insertPreheader(LI<IRBB> * li, Region * rg, OUT IRBB ** preheader);
+
+//Iterative access LoopInfo tree. This funtion initialize the iterator.
+//'li': the root of the LoopInfo tree.
+//'it': iterator. It should be clean already.
+//Readonly function.
+LI<IRBB> const* iterInitLoopInfoC(LI<IRBB> const* li, OUT CLoopInfoIter & it);
+
+//Iterative access LoopInfo tree.
+//This function return the next LoopInfo accroding to 'it'.
+//'it': iterator.
+//Readonly function.
+LI<IRBB> const* iterNextLoopInfoC(IN OUT CLoopInfoIter & it);
+
 } //namespace xoc
 #endif

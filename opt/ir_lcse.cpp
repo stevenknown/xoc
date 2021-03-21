@@ -70,7 +70,7 @@ IR * LCSE::hoist_cse(IN IRBB * bb, IN IR * ir_pos, IN ExpRep * ie)
         if (tie != nullptr && tie == ie) {
             //e.g: a = 10, expression of store_val is nullptr.
             ret = m_rg->buildPR(IR_dt(rhs));
-            ret->setRefMD(m_rg->genMDforPR(ret), m_rg);
+            ret->setRefMD(m_rg->genMDForPR(ret), m_rg);
             IR * new_st = m_rg->buildStorePR(PR_no(ret), ret->getType(), rhs);
 
             //Insert into IR list of BB.
@@ -86,7 +86,7 @@ IR * LCSE::hoist_cse(IN IRBB * bb, IN IR * ir_pos, IN ExpRep * ie)
                 if (ret == nullptr) {
                     IR * x = IST_base(ir_pos);
                     ret = m_rg->buildPR(IR_dt(x));
-                    ret->setRefMD(m_rg->genMDforPR(ret), m_rg);
+                    ret->setRefMD(m_rg->genMDForPR(ret), m_rg);
                     IR * new_st = m_rg->buildStorePR(PR_no(ret),
                         ret->getType(), m_rg->dupIRTree(x));
                     new_st->setRefMD(ret->getRefMD(), m_rg);
@@ -115,7 +115,7 @@ IR * LCSE::hoist_cse(IN IRBB * bb, IN IR * ir_pos, IN ExpRep * ie)
                 bool insert_st;
                 if (ret == nullptr) {
                     ret = m_rg->buildPR(IR_dt(p));
-                    ret->setRefMD(m_rg->genMDforPR(ret), m_rg);
+                    ret->setRefMD(m_rg->genMDForPR(ret), m_rg);
                     xcom::replace(&CALL_param_list(ir_pos), p, ret);
                     insert_st = true;
                 } else {
@@ -154,7 +154,7 @@ IR * LCSE::hoist_cse(IN IRBB * bb, IN IR * ir_pos, IN ExpRep * ie)
         if (tie != nullptr && tie == ie) {
             IR * x = BR_det(ir_pos);
             IR * ret = m_rg->buildPR(IR_dt(x));
-            ret->setRefMD(m_rg->genMDforPR(ret), m_rg);
+            ret->setRefMD(m_rg->genMDForPR(ret), m_rg);
             IR * new_st = m_rg->buildStorePR(PR_no(ret), ret->getType(), x);
             new_st->setRefMD(ret->getRefMD(), m_rg);
             BB_irlist(bb).insert_before(new_st, pos_holder);
@@ -169,7 +169,7 @@ IR * LCSE::hoist_cse(IN IRBB * bb, IN IR * ir_pos, IN ExpRep * ie)
         if (tie != nullptr && tie == ie) {
             IR * x = IGOTO_vexp(ir_pos);
             IR * ret = m_rg->buildPR(IR_dt(x));
-            ret->setRefMD(m_rg->genMDforPR(ret), m_rg);
+            ret->setRefMD(m_rg->genMDForPR(ret), m_rg);
             IR * new_st = m_rg->buildStorePR(PR_no(ret), ret->getType(), x);
             new_st->setRefMD(ret->getRefMD(), m_rg);
             BB_irlist(bb).insert_before(new_st, pos_holder);
@@ -184,7 +184,7 @@ IR * LCSE::hoist_cse(IN IRBB * bb, IN IR * ir_pos, IN ExpRep * ie)
         if (tie != nullptr && tie == ie) {
             IR * x = SWITCH_vexp(ir_pos);
             IR * ret = m_rg->buildPR(IR_dt(x));
-            ret->setRefMD(m_rg->genMDforPR(ret), m_rg);
+            ret->setRefMD(m_rg->genMDForPR(ret), m_rg);
             IR * new_st = m_rg->buildStorePR(PR_no(ret), ret->getType(), x);
             new_st->setRefMD(ret->getRefMD(), m_rg);
             BB_irlist(bb).insert_before(new_st, pos_holder);
@@ -199,7 +199,7 @@ IR * LCSE::hoist_cse(IN IRBB * bb, IN IR * ir_pos, IN ExpRep * ie)
         if (tie != nullptr && tie == ie) {
             IR * x = RET_exp(ir_pos);
             IR * ret = m_rg->buildPR(IR_dt(x));
-            ret->setRefMD(m_rg->genMDforPR(ret), m_rg);
+            ret->setRefMD(m_rg->genMDForPR(ret), m_rg);
             IR * new_st = m_rg->buildStorePR(PR_no(ret), ret->getType(), x);
             new_st->setRefMD(ret->getRefMD(), m_rg);
             BB_irlist(bb).insert_before(new_st, pos_holder);
@@ -645,7 +645,7 @@ bool LCSE::perform(OptCtx & oc)
     }
 
     START_TIMER(t, getPassName());
-    m_rg->checkValidAndRecompute(&oc, PASS_EXPR_TAB, PASS_UNDEF);
+    m_rg->getPassMgr()->checkValidAndRecompute(&oc, PASS_EXPR_TAB, PASS_UNDEF);
     m_expr_tab = (ExprTab*)m_rg->getPassMgr()->registerPass(PASS_EXPR_TAB);
     ASSERT0(m_expr_tab);
 

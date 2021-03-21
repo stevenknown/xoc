@@ -178,8 +178,10 @@ public:
     }
 
     Var * get_base() const { return MD_base(this); }
-    UINT get_ofst() const { return MD_ofst(this); }
-    UINT get_size() const { return MD_size(this); }
+    UINT getBitOfst() const { return MD_ofst(this); }
+    UINT getByteOfst() const { return MD_ofst(this); }
+    UINT getBitSize() const { return MD_size(this); }
+    UINT getByteSize() const { return MD_size(this); }
     MD_TYPE getType() const { return (MD_TYPE)MD_ty(this); }
 
     UINT id() const { return MD_id(this); }

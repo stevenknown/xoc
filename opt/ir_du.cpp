@@ -1683,19 +1683,18 @@ void DUMgr::dumpSet(bool is_bs) const
 }
 
 
-//DU chain and Memory Object reference operation.
-//This function copy MustUse and MayUse mds from tree 'from' to tree 'to'
-//and build new DU chain for 'to'.
-//add_duchain: if true to add DU chain from tree 'from' to tree 'to'.
-//    this operation will establish new DU chain between the DEF of 'from' and
-//    'to'.
-//'to': root expression of target tree.
-//'from': root expression of source tree.
+//The function build copy DU chain for 'to' from 'from', which will append
+//'to' as USE of DEFs.
+//The function will build DU chain from all DEFs of 'from' to
+//expression 'to'.
+//to: root expression of target tree.
+//from: root expression of source tree.
 //NOTE: IR tree 'to' and 'from' must be identical structure.
-//'to' and 'from' must be expression.
-void DUMgr::copyRefAndAddDUChain(IR * to, IR const* from, bool add_duchain)
+//Both 'to' and 'from' must be expression.
+void DUMgr::addUse(IR * to, IR const* from)
 {
     if (to == from) { return; }
+
     ASSERT0(to->is_exp() && from->is_exp());
     ASSERT0(to->isIREqual(from, true));
     m_citer.clean();
@@ -1704,25 +1703,10 @@ void DUMgr::copyRefAndAddDUChain(IR * to, IR const* from, bool add_duchain)
     for (IR * to_ir = iterInit(to, m_iter2);
          to_ir != nullptr;
          to_ir = iterNext(m_iter2), from_ir = iterNextC(m_citer)) {
-        ASSERT0(to_ir->isIREqual(from_ir, true));
+        ASSERT0(to_ir->isIREqual(from_ir, false));
         if (!to_ir->isMemoryRef() && !to_ir->is_id()) {
             //Copy MD for IR_ID, some Passes need it, e.g. GVN.
             continue;
-        }
-
-        to_ir->copyRef(from_ir, m_rg);
-
-        if (!add_duchain) { continue; }
-
-        SSAInfo * ssainfo;
-        if ((ssainfo = from_ir->getSSAInfo()) != nullptr) {
-            if (from_ir->isWritePR() || from_ir->isCallHasRetVal()) {
-                ASSERTN(0, ("SSA only has one def"));
-            }
-
-            ASSERT0(to_ir->isReadPR());
-            PR_ssainfo(to_ir) = ssainfo;
-            ssainfo->addUse(to_ir);
         }
 
         DUSet const* from_du = from_ir->readDUSet();
@@ -1758,8 +1742,7 @@ void DUMgr::removeDef(IR const* ir, IR const* def)
 
 
 //Return true if mustdef or maydef overlaped with use's referrence.
-bool DUMgr::isOverlapDefUse(MD const* mustdef,
-                            MDSet const* maydef,
+bool DUMgr::isOverlapDefUse(MD const* mustdef, MDSet const* maydef,
                             IR const* use)
 {
     if (maydef != nullptr) {
@@ -4861,20 +4844,20 @@ void DUMgr::resetLocalAuxSet(DefMiscBitSetMgr & bsmgr)
 
 //Find the nearest dominated DEF stmt of 'exp'.
 //NOTE: RPO of bb of stmt must be available.
-//
 //'exp': expression
 //'exp_stmt': stmt that exp is belong to.
 //'expdu': def set of exp.
 //'omit_self': true if we do not consider the 'exp_stmt' itself.
-IR * DUMgr::findDomDef(IR const* exp,
-                       IR const* exp_stmt,
-                       DUSet const* expdefset,
-                       bool omit_self)
+IR * DUMgr::findNearestDomDef(IR const* exp, IR const* exp_stmt,
+                              DUSet const* expdefset, bool omit_self)
 {
+    ASSERT0(exp->is_exp() && exp_stmt->is_stmt());
     ASSERT0(const_cast<DUMgr*>(this)->getMayUse(exp) != nullptr ||
             const_cast<DUMgr*>(this)->getMustUse(exp) != nullptr);
     IR * last = nullptr;
-    INT lastrpo = -1;
+    INT stmt_rpo = exp_stmt->getBB()->rpo();
+    ASSERT0(stmt_rpo != RPO_UNDEF);
+    INT lastrpo = RPO_UNDEF;
     DUIter di = nullptr;
     for (INT i = expdefset->get_first(&di);
          i >= 0; i = expdefset->get_next(i, &di)) {
@@ -4890,26 +4873,26 @@ IR * DUMgr::findDomDef(IR const* exp,
 
         if (last == nullptr) {
             last = d;
-            lastrpo = BB_rpo(d->getBB());
+            lastrpo = d->getBB()->rpo();
             ASSERT0(lastrpo >= 0);
             continue;
         }
 
         IRBB * dbb = d->getBB();
         ASSERT0(dbb);
-        ASSERT0(BB_rpo(dbb) >= 0);
-        if (BB_rpo(dbb) > lastrpo) {
+        ASSERT0(dbb->rpo() >= 0);
+        if (dbb->rpo() < stmt_rpo && dbb->rpo() > lastrpo) {
             last = d;
-            lastrpo = BB_rpo(dbb);
+            lastrpo = dbb->rpo();
         } else if (dbb == last->getBB() && dbb->is_dom(last, d, true)) {
             last = d;
-            lastrpo = BB_rpo(dbb);
+            lastrpo = dbb->rpo();
         }
     }
 
     if (last == nullptr) { return nullptr; }
-    IRBB * last_bb = last->getBB();
-    IRBB * exp_bb = exp_stmt->getBB();
+    IRBB const* last_bb = last->getBB();
+    IRBB const* exp_bb = exp_stmt->getBB();
     if (!m_cfg->is_dom(last_bb->id(), exp_bb->id())) {
         return nullptr;
     }
@@ -5124,7 +5107,8 @@ bool DUMgr::perform(IN OUT OptCtx & oc, UINT flag)
         if (HAVE_FLAG(flag, DUOPT_SOL_REACH_DEF) ||
             HAVE_FLAG(flag, DUOPT_SOL_AVAIL_REACH_DEF) ||
             HAVE_FLAG(flag, DUOPT_SOL_AVAIL_EXPR)) {
-            m_rg->checkValidAndRecompute(&oc, PASS_RPO, PASS_UNDEF);
+            m_rg->getPassMgr()->checkValidAndRecompute(&oc, PASS_RPO,
+                                                       PASS_UNDEF);
             solve(expr_univers, flag, bsmgr);
         }
 
