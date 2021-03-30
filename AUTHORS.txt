@@ -6,3 +6,4 @@ Su Zhenyu,    steven.known@gmail.com,   primary architect of XOC
 GongKai,      gong_k@126.com,           dex2dex and LIR convertor
 JinYue,       fionaking930@gmail.com,   dex2dex and LIR convertor
 Guo XiaoXin,  guonic@gmail.com,
+
