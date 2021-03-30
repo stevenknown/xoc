@@ -76,6 +76,7 @@ author: Su Zhenyu
     #define UNLINK   unlink
 #endif
 
+#include "limits.h"
 #include "stdlib.h"
 #include "stdarg.h"
 #include "stdio.h"
@@ -123,10 +124,16 @@ typedef unsigned long ULONG;
     typedef unsigned __int64 ULONGLONG;
 #else
     typedef long long LONGLONG;
-    typedef unsigned long long ULONGLONG; 
+    typedef unsigned long long ULONGLONG;
+#endif
+
+#ifndef MAX_HOST_INT_VALUE
+#define MAX_HOST_INT_VALUE INT_MAX
+#endif
+#ifndef MIN_HOST_INT_VALUE
+#define MIN_HOST_INT_VALUE INT_MIN
 #endif
 
 } //namespace xcom
 
 #endif
-

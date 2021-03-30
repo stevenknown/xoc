@@ -2384,8 +2384,8 @@ public:
     void reverse_list()
     {
         SC<T> * head = nullptr;
-        SC<T> * cur = m_head.next;
-        while (cur != &m_head) {
+        SC<T> * cur = m_head->next;
+        while (cur != m_head) {
             SC<T> * temp = cur->next;
             if (head == nullptr) {
                 head = cur;
