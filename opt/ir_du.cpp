@@ -309,7 +309,7 @@ void DUMgr::computeOverlapUseMDSet(IR * ir, bool recompute)
 
             MDSet const* newmds = m_mds_hash->append(tmpmds);
             if (newmds != nullptr) {
-                m_cached_overlap_mdset.set(md, newmds);                
+                m_cached_overlap_mdset.set(md, newmds);
             }
             //If newmds is nullptr, clean may-ref of ir.
             ir->setRefMDSet(newmds, m_rg);
@@ -330,7 +330,7 @@ void DUMgr::computeOverlapUseMDSet(IR * ir, bool recompute)
         return;
     }
 
-    ASSERTN(!mds->is_empty(), ("can not get a hashed MDSet that is empty")); 
+    ASSERTN(!mds->is_empty(), ("can not get a hashed MDSet that is empty"));
     tmpmds.copy(*mds, *m_misc_bs_mgr);
     m_md_sys->computeOverlap(m_rg, *mds, tmpmds,
                              m_tab_iter, *m_misc_bs_mgr, true);
@@ -2193,11 +2193,11 @@ void DUMgr::collectMustUsedMDs(IR const* ir, OUT MDSet & mustuse)
     m_citer.clean();
     for (IR const* x = iterRhsInitC(ir, m_citer);
         x != nullptr; x = iterRhsNextC(m_citer)) {
-        if (!x->isMemoryOpnd()) { continue; }        
+        if (!x->isMemoryOpnd()) { continue; }
         computeExpression(const_cast<IR*>(x), &mustuse,
                           COMP_EXP_COLLECT_MUST_USE,
-                          DUOPT_COMPUTE_PR_DU | DUOPT_COMPUTE_NONPR_DU);        
-    }    
+                          DUOPT_COMPUTE_PR_DU | DUOPT_COMPUTE_NONPR_DU);
+    }
 }
 
 
@@ -3115,7 +3115,7 @@ void DUMgr::computeKillSet(DefDBitSetCoreReserveTab & dbitsetchash,
             if (bb_maydef_mds != nullptr && !bb_maydef_mds->is_empty()) {
                 comp_may = true;
             }
-        }        
+        }
 
         if (!comp_must && !comp_may) {
             setMustKilledDef(bbid, nullptr);
@@ -3143,7 +3143,7 @@ void DUMgr::computeKillSet(DefDBitSetCoreReserveTab & dbitsetchash,
                         must_killed_set.bunion(i, bsmgr);
                     }
                 }
-            
+
                 if (comp_may) {
                     //Compute may killed stmts, for avail-reach-def.
                     MD const* stmt_effectdef_md = stmt->getEffectRef();
@@ -3152,7 +3152,7 @@ void DUMgr::computeKillSet(DefDBitSetCoreReserveTab & dbitsetchash,
                         may_killed_set.bunion(i, bsmgr);
                         continue;
                     }
-            
+
                     MDSet const* maydef = getMayDef(stmt);
                     if (maydef == nullptr) { continue; }
                     if (bb_maydef_mds->is_intersect(*maydef)) {
@@ -4570,17 +4570,17 @@ static bool checkIsTruelyDep(IR const* def,
                 if (mustdef == mustuse || mustdef->is_overlap(mustuse)) {
                     return true;
                 }
-                
+
                 if (maydef != nullptr && maydef->is_overlap(mustuse, rg)) {
                     return true;
                 }
-                
+
                 if (maydef != nullptr &&
                     mayuse != nullptr &&
                     mayuse->is_intersect(*maydef)) {
                     return true;
                 }
-                
+
                 UNREACHABLE();
                 return false;
             }
@@ -4588,7 +4588,7 @@ static bool checkIsTruelyDep(IR const* def,
             ASSERT0(mustdef == mustuse || mustdef->is_overlap(mustuse));
             return true;
         }
-        
+
         if (mayuse != nullptr) {
             if (def->isCallStmt()) {
                 ASSERT0(mayuse->is_overlap_ex(mustdef, rg, ms) ||
@@ -4596,7 +4596,7 @@ static bool checkIsTruelyDep(IR const* def,
                         (maydef != nullptr && mayuse->is_intersect(*maydef)));
                 return true;
             }
-            
+
             ASSERT0(mayuse->is_overlap_ex(mustdef, rg, ms));
             return true;
         }
@@ -4604,7 +4604,7 @@ static bool checkIsTruelyDep(IR const* def,
         ASSERTN(0, ("Not a truely dependence"));
         return false;
     }
-    
+
     if (maydef != nullptr) {
         if (mustuse != nullptr) {
             ASSERT0(maydef->is_overlap_ex(mustuse, rg, ms));
@@ -4617,7 +4617,7 @@ static bool checkIsTruelyDep(IR const* def,
         ASSERTN(0, ("Not a truely dependence"));
         return false;
     }
-    
+
     ASSERTN(0, ("Not a truely dependence"));
     return false;
 }
@@ -5088,8 +5088,8 @@ bool DUMgr::perform(IN OUT OptCtx & oc, UINT flag)
         DefDBitSetCoreHashAllocator dbitsetchashallocator(&bsmgr);
         DefDBitSetCoreReserveTab dbitsetchash(&dbitsetchashallocator);
         if (HAVE_FLAG(flag, DUOPT_SOL_REACH_DEF) ||
-            HAVE_FLAG(flag, DUOPT_SOL_AVAIL_REACH_DEF)) {            
-            computeKillSet(dbitsetchash, mustexactdef_mds, maydef_mds, bsmgr);            
+            HAVE_FLAG(flag, DUOPT_SOL_AVAIL_REACH_DEF)) {
+            computeKillSet(dbitsetchash, mustexactdef_mds, maydef_mds, bsmgr);
         }
 
         DefDBitSetCore expr_univers(SOL_SET_IS_SPARSE);
@@ -5181,7 +5181,7 @@ void DUMgr::computeMDDUChain(IN OUT OptCtx & oc,
         OC_is_reach_def_valid(oc) = false;
         return;
     }
-    
+
 
     //Record IRs which may defined these referred MDs.
     ASSERT0(m_md2irs == nullptr && m_is_init == nullptr);

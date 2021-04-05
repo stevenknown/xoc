@@ -55,9 +55,9 @@ void prt2C(CHAR const* format, ...)
 {
     va_list args;
     va_start(args, format);
-    #ifdef FOR_DEX
-    __android_log_vprint(ANDROID_LOG_ERROR, LOG_TAG, format, args);
-    #else
+    //#ifdef FOR_DEX
+    //__android_log_vprint(ANDROID_LOG_ERROR, LOG_TAG, format, args);
+    //#else
     if (g_redirect_stdout_to_dump_file && g_unique_dumpfile != nullptr) {
         vfprintf(g_unique_dumpfile, format, args);
         fflush(g_unique_dumpfile);
@@ -65,7 +65,7 @@ void prt2C(CHAR const* format, ...)
         vfprintf(stdout, format, args);
         fflush(stdout);
     }
-    #endif
+    //#endif
     va_end(args);
 }
 

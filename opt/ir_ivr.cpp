@@ -93,7 +93,7 @@ void LinearRep::dump(Region const* rg) const
         rg->getLogMgr()->incIndent(ind);
         dumpIR(addend, rg, nullptr, IR_DUMP_KID);
         rg->getLogMgr()->decIndent(ind);
-    }    
+    }
 }
 
 
@@ -120,7 +120,7 @@ bool IVR::computeInitVal(IR const* ir, OUT BIV * iv)
                 BIV_initv_int(iv) = (BIVIntType*)xmalloc(sizeof(BIVIntType));
             }
             *BIV_initv_int(iv) = CONST_int_val(v);
-            BIV_initv_kind(iv) = IV_INIT_VAL_IS_INT;        
+            BIV_initv_kind(iv) = IV_INIT_VAL_IS_INT;
             return true;
         }
         if (v->is_fp()) {
@@ -198,7 +198,7 @@ bool IVR::extractBIV(IR const* def, LinearRep const& lr, IRSet const& defset,
         return false;
     }
 
-    MD const* bivref = def->getRefMD(); 
+    MD const* bivref = def->getRefMD();
     if (m_is_strictly_match_pattern) {
         //Make sure self modify stmt is monotonic.
         //Strictly match the pattern: i = i + CONST.
@@ -445,7 +445,7 @@ bool IVR::isReductionOp(IR const* ir, LI<IRBB> const* li,
                         OUT LinearRep * lr, OUT IRSet * set) const
 {
     MD const* mustref = ir->getRefMD();
-    if (mustref == nullptr || 
+    if (mustref == nullptr ||
         (m_is_only_handle_exact_md && !mustref->is_exact())) {
         return false;
     }
@@ -458,7 +458,7 @@ bool IVR::isReductionOp(IR const* ir, LI<IRBB> const* li,
     }
 
     //The coefficient and addend should be loop-invariant.
-    ASSERT0(linrep.is_valid());    
+    ASSERT0(linrep.is_valid());
     if (linrep.addend == nullptr ||
         linrep.addend->is_const() ||
         isLoopInvariant(linrep.addend, li, m_rg, nullptr, true)) {
@@ -470,7 +470,7 @@ bool IVR::isReductionOp(IR const* ir, LI<IRBB> const* li,
         isLoopInvariant(linrep.coeff, li, m_rg, nullptr, true)) {
         ; //nothing to do
     } else { return false; }
- 
+
     //The variable can be defined only once inside current loop.
     if (hasMultiDefInLoop(linrep.var, li, set)) {
         return false;
@@ -489,7 +489,7 @@ bool IVR::isSelfModByDUSet(IR const* ir) const
     DUSet const* useset = ir->readDUSet();
     if (useset == nullptr) { return false; }
 
-    //SelfMod pattern under SSA mode. 
+    //SelfMod pattern under SSA mode.
     // x<-SelfModOP(x, 1)
     //Iterate all USEs to check if the stmt of USE is identical to 'ir'.
     DUIter it = nullptr;
@@ -514,8 +514,8 @@ bool IVR::isSelfModByPRSSA(IR const* ir) const
     ASSERT0(ir->is_stmt());
     SSAInfo const* ssainfo = ir->getSSAInfo();
     if (ssainfo == nullptr) { return false; }
-   
-    //SelfMod pattern under SSA mode. 
+
+    //SelfMod pattern under SSA mode.
     // pr3<-...
     // pr4<-PHI(pr3, pr5)
     // pr5<-SelfModOP(pr4, 1)
@@ -539,8 +539,8 @@ bool IVR::isSelfModByMDSSA(IR const* ir) const
     ASSERT0(ir->is_stmt());
     MDSSAInfo const* ssainfo = m_mdssamgr->getMDSSAInfoIfAny(ir);
     if (ssainfo == nullptr) { return false; }
-   
-    //SelfMod pattern under SSA mode. 
+
+    //SelfMod pattern under SSA mode.
     // md3<-...
     // md4<-PHI(md3, md5)
     // md5<-SelfModOP(md4, 1)
@@ -557,8 +557,8 @@ bool IVR::isSelfModByMDSSA(IR const* ir) const
             i >= 0; i = vopnd->getUseSet()->get_next(i, &vit)) {
             IR * use = m_rg->getIR(i);
             ASSERT0(use && (use->isMemoryRef() || use->is_id()));
-       
-            //Only consider PHI. 
+
+            //Only consider PHI.
             if (!use->is_id()) { continue; }
 
             ASSERT0(ID_phi(use));
@@ -610,7 +610,7 @@ void IVR::findBIV(LI<IRBB> const* li, IDTab & tmp)
             //       V      V
             //   i=i+1      i=i+1
             //   |__         ___|
-            //      |        |   
+            //      |        |
             //      V        V
             //      goto LoopHeadBB //backedge start BB
             continue;
@@ -625,7 +625,7 @@ void IVR::findBIV(LI<IRBB> const* li, IDTab & tmp)
                 !ir->is_starray()) {
                 continue;
             }
-    
+
             //ir is the candidate.
             LinearRep lr;
             set.clean();
@@ -735,7 +735,7 @@ bool IVR::isLinearRepOfMD(LI<IRBB> const* li, IR const* ir, MD const* selfmd,
         }
         return false;
     }
- 
+
     if (ir->is_mul()) {
         //LinearRep of IV:a*i.
         if (isMDEqual(selfmd, BIN_opnd0(ir)) && isCoeff(li, BIN_opnd1(ir))) {
@@ -773,7 +773,7 @@ bool IVR::isLinearRepOfIV(LI<IRBB> const* li, IR const* ir,
 {
     ASSERT0(ir->is_exp());
     IV const* iv = nullptr;
-    if (ir->is_mul()) {        
+    if (ir->is_mul()) {
         if (isIV(li, BIN_opnd0(ir), &iv) && isCoeff(li, BIN_opnd1(ir))) {
             if (linrep != nullptr) {
                 linrep->coeff = BIN_opnd1(ir);
@@ -874,8 +874,8 @@ void IVR::findDIV(LI<IRBB> const* li, BIVList const& bivlst)
                     continue;
                 }
                 LinearRep linrep;
-                if (isLinearRep(li, ir->getRHS(), &linrep) && 
-                    !hasMultiDefInLoop(ir, li, &set)) {                
+                if (isLinearRep(li, ir->getRHS(), &linrep) &&
+                    !hasMultiDefInLoop(ir, li, &set)) {
                     //ir is DIV.
                     ASSERT0(linrep.is_valid());
                     linrep.dump(m_rg);
@@ -884,7 +884,7 @@ void IVR::findDIV(LI<IRBB> const* li, BIVList const& bivlst)
                     recordDIV(li, ir, r);
                 }
                 break;
-            }             
+            }
             default:;
             }
         }
@@ -935,7 +935,7 @@ void IVR::dump_recur(LI<IRBB> const* li, UINT indent) const
                 prt(getRegion(), ")");
                 getRegion()->getLogMgr()->incIndent(2);
 
-                //Dump BIV's def-stmt.                
+                //Dump BIV's def-stmt.
                 note(getRegion(), "\n");
                 for (UINT i = 0; i < indent; i++) { prt(getRegion(), " "); }
                 prt(getRegion(), "DEF-STMT:");
@@ -978,10 +978,10 @@ void IVR::dump_recur(LI<IRBB> const* li, UINT indent) const
                 //Dump div occurrence.
                 getRegion()->getLogMgr()->incIndent(2);
                 note(getRegion(), "\nOCC:");
-                
+
                 getRegion()->getLogMgr()->incIndent(2);
                 dumpIR(iv->getRedStmt(), m_rg, nullptr, IR_DUMP_KID);
-                getRegion()->getLogMgr()->decIndent(2);                
+                getRegion()->getLogMgr()->decIndent(2);
 
                 getRegion()->getLogMgr()->decIndent(2);
 

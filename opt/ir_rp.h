@@ -334,13 +334,13 @@ public:
 
     void cleanLiveBBSet();
 
-    virtual bool dump() const;   
+    virtual bool dump() const;
 
     //Prepare context before doing reg promotion.
     void init();
     //Return true if 'ir' can be promoted.
     //Note ir must be memory reference.
-    virtual bool isPromotable(IR const* ir) const;   
+    virtual bool isPromotable(IR const* ir) const;
 
     Region * getRegion() const { return m_rg; }
     virtual CHAR const* getPassName() const { return "Register Promotion"; }

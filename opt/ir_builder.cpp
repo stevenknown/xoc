@@ -877,7 +877,7 @@ IR * Region::buildDoLoop(IR * iv,
              det->is_ge()));
     ASSERT0(init && step && init->is_exp() && step->is_exp());
     ASSERT0(iv->is_id() || iv->is_pr());
-    //ASSERT0(isReduction(step));    
+    //ASSERT0(isReduction(step));
 
     IR * ir = allocIR(IR_DO_LOOP);
     IR_dt(ir) = getTypeMgr()->getAny();
@@ -1363,7 +1363,7 @@ IR * Region::buildBinaryOp(IR_TYPE irt,
                            IN IR * lchild,
                            IN IR * rchild)
 {
-    return buildBinaryOp(irt, getTypeMgr()->getSimplexType(dt), lchild, rchild);    
+    return buildBinaryOp(irt, getTypeMgr()->getSimplexType(dt), lchild, rchild);
 }
 
 

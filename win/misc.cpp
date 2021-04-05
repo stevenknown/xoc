@@ -88,7 +88,7 @@ char * tend(char * buf, UINT buflen)
 
     long long freq = 4294967296;
     QueryPerformanceCounter(&li2);
-    __int64 ticks = li2.QuadPart-li.QuadPart;    
+    __int64 ticks = li2.QuadPart-li.QuadPart;
     buf[0] = '\0';
     format_elapsed((double)ticks/(double)freq, buf, buflen);
     return buf;

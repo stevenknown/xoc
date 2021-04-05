@@ -1,3 +1,4 @@
+
 COM_OBJS +=\
 com/ltype.o \
 com/comf.o \
@@ -13,7 +14,9 @@ com/birational.o \
 com/example/testbs.o \
 com/flty.o \
 com/bs.o\
-com/scc.o
+com/scc.o\
+com/sort.o\
+com/diagnostic.o
 
 OPT_OBJS +=\
 opt/cfs_opt.o\
@@ -79,7 +82,7 @@ ifdef WIN
 CFLAGS += -D_ON_WINDOWS_
 endif
 
-CFLAGS += -DFOR_DEX -D_DEBUG_ -O2 -g2 -Wno-unknown-pragmas -Wno-write-strings -Wsign-promo \
+CFLAGS += -DFOR_DEX -D_DEBUG_ -D_SUPPORT_C11_ -O2 -g2 -Wno-unknown-pragmas -Wno-write-strings -Wsign-promo \
         -Wsign-compare -Wpointer-arith -Wno-multichar -Winit-self -Wswitch
 
 CC := $(shell which clang++ > /dev/null)
@@ -92,8 +95,8 @@ ifneq (,$(filter $(CC),g++ gcc))
 	CFLAGS += -Wstrict-aliasing=3 -finline-limit=10000000
 endif
 
-all: com_objs opt_objs grreader_objs
-	ar rcs libxoc.a $(COM_OBJS) $(OPT_OBJS) $(GRREADER_OBJS)
+all: com_objs opt_objs reader_objs
+	ar rcs libxoc.a $(COM_OBJS) $(OPT_OBJS) $(READER_OBJS)
 	@echo "success!!"
 
 INC=-I .
@@ -103,7 +106,7 @@ INC=-I .
 
 com_objs: $(COM_OBJS)
 opt_objs: $(OPT_OBJS)
-grreader_objs: $(GRREADER_OBJS)
+reader_objs: $(READER_OBJS)
 
 clean:
 	@find ./ -name "*.gcda" | xargs rm -f

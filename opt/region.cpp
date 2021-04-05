@@ -623,7 +623,7 @@ void Region::constructBBList()
             cur_bb = allocBB();
             continue;
         }
-        
+
         if (cur_ir->is_label()) {
             getBBList()->append_tail(cur_bb);
 
@@ -663,7 +663,7 @@ void Region::constructBBList()
 
         //Note that PHI should be placed followed after a LABEL immediately.
         //That is a invalid phi if it has only one operand.
-        BB_irlist(cur_bb).append_tail(cur_ir);        
+        BB_irlist(cur_bb).append_tail(cur_ir);
     } //end while
 
     ASSERT0(cur_bb != nullptr);
@@ -1348,7 +1348,7 @@ void Region::assignMDImpl(IR * x, bool assign_pr, bool assign_nonpr)
     case IR_ICALL:
         if (assign_pr && x->hasReturnValue()) {
             allocCallResultPRMD(x);
-        }        
+        }
         break;
     case IR_ST:
         if (assign_nonpr) {
@@ -1377,7 +1377,7 @@ void Region::assignMDImpl(IR * x, bool assign_pr, bool assign_nonpr)
 //Assign MD for ST/LD/ReadPR/WritePR operations.
 //is_only_assign_pr: true if assign MD for each ReadPR/WritePR operations.
 void Region::assignMD(bool assign_pr, bool assign_nonpr)
-{    
+{
     if (getIRList() != nullptr) {
         assignMDForIRList(getIRList(), assign_pr, assign_nonpr);
         return;
@@ -1433,7 +1433,7 @@ void Region::assignMDForIRList(IR * lst, bool assign_pr, bool assign_nonpr)
             return;
         }
         }
-    }    
+    }
 }
 
 
@@ -1714,7 +1714,7 @@ void Region::prescanIRList(IR const* ir)
                 MD_size(&md) = ir->getTypeSize(getTypeMgr());
                 MD_ty(&md) = MD_EXACT;
                 getMDSystem()->registerMD(md);
-            }        
+            }
             break;
         }
         case IR_ID:
@@ -2775,7 +2775,7 @@ bool Region::process(OptCtx * oc)
     if (getIRList() == nullptr && getBBList()->get_elem_count() == 0) {
         return true;
     }
-    
+
     initPassMgr();
     if (g_do_inline && is_program()) {
         do_inline(this, oc);

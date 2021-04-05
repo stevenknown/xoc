@@ -2679,7 +2679,7 @@ bool IRParser::parseCallAndICall(bool is_call, ParseCtx * ctx)
             error(tok, "miss ',' after callee expression");
             return false;
         }
-    }    
+    }
 
     tok = m_lexer->getNextToken();
     if (tok != T_LPAREN) {
@@ -4359,7 +4359,7 @@ bool IRParser::parse()
     ASSERT0(m_lexer);
     TOKEN tok = T_NUL;
     //Get first token.
-    //CASE: There are T_NUL token return.    
+    //CASE: There are T_NUL token return.
     while ((tok = m_lexer->getNextToken()) == T_NUL) {;}
     for (;; tok = m_lexer->getNextToken()) {
         switch (tok) {

@@ -126,7 +126,7 @@ class DeadCodeElim : public Pass {
     bool preserve_cd(IN OUT List<IR const*> & act_ir_lst);
 
     void reinit();
-    void reviseSuccForFallthroughBB(IRBB * bb, 
+    void reviseSuccForFallthroughBB(IRBB * bb,
                                     BBListIter bbct,
                                     BBList * bbl) const;
     bool removeIneffectIR(OUT bool & remove_branch_stmt);

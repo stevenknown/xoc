@@ -526,7 +526,7 @@ bool RegPromot::handleGeneralRef(IR * ir,
     //        addDontPromote(mustref);
     //    }
     //    //Need to analyze MayRef.
-      
+
     //    //mustref already be in the dont_promot table.
     //    //return true;
     //}
@@ -583,7 +583,7 @@ bool RegPromot::handleGeneralRef(IR * ir,
                 addDontPromote(mustref);
             }
             //Need to analyze MayRef.
-        
+
             //mustref already be in the dont_promot table.
             //return true;
         }
@@ -608,7 +608,7 @@ bool RegPromot::handleGeneralRef(IR * ir,
             addDontPromote(mustref);
         }
         //Need to analyze MayRef.
-    
+
         //mustref already be in the dont_promot table.
         //return true;
     }
@@ -1242,7 +1242,7 @@ bool RegPromot::hasLoopOutsideUse(IR const* stmt, LI<IRBB> const* li)
     if (useMDSSADU()) {
         return m_mdssamgr->hasUse(stmt);
     }
-    
+
     DUSet const* useset = stmt->readDUSet();
     if (useset == nullptr) { return false; }
 
@@ -1257,7 +1257,7 @@ bool RegPromot::hasLoopOutsideUse(IR const* stmt, LI<IRBB> const* li)
         if (!li->isInsideLoop(s->getBB()->id())) {
             return true;
         }
-    }    
+    }
     return false;
 }
 
@@ -1931,7 +1931,7 @@ bool RegPromot::tryPromote(LI<IRBB> const* li,
     exact_access.clean();
     inexact_access.clean();
     exact_occs.clean();
-    m_dont_promote.clean(*getSBSMgr());    
+    m_dont_promote.clean(*getSBSMgr());
     for (INT i = li->getBodyBBSet()->get_first();
          i != -1; i = li->getBodyBBSet()->get_next(i)) {
         IRBB * bb = m_cfg->getBB(i);
@@ -2023,7 +2023,7 @@ bool RegPromot::perform(OptCtx & oc)
         return false;
     }
 
-    START_TIMER(t, getPassName());    
+    START_TIMER(t, getPassName());
     m_rg->getPassMgr()->checkValidAndRecompute(&oc, PASS_LOOP_INFO,
                                                PASS_UNDEF);
     LI<IRBB> const* li = m_cfg->getLoopInfo();
@@ -2038,7 +2038,7 @@ bool RegPromot::perform(OptCtx & oc)
         m_gvn->perform(oc);
     }
 
-    init();    
+    init();
     List<LI<IRBB> const*> worklst;
     while (li != nullptr) {
         worklst.append_tail(li);

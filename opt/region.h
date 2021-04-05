@@ -234,7 +234,7 @@ public:
     MD const* allocCallResultPRMD(IR * ir);
     MD const* allocSetelemMD(IR * ir);
     MD const* allocGetelemMD(IR * ir);
- 
+
     //The function generates new MD for all operations to PR.
     //It should be called if new PR generated in optimzations.
     inline MD const* allocRefForPR(IR * pr)
@@ -315,10 +315,10 @@ public:
     //Assign MD for memory reference operations.
     //This function will iterate given ir list.
     //is_only_assign_pr: true if only assign MD for read|write PR operations.
-    void assignMDForIRList(IR * lst,bool assign_pr, bool assign_nonpr);    
+    void assignMDForIRList(IR * lst,bool assign_pr, bool assign_nonpr);
 
     //Note the returned ByteBuf does not need to free by user.
-    ByteBuf * allocByteBuf(UINT bytesize)    
+    ByteBuf * allocByteBuf(UINT bytesize)
     {
         ByteBuf * buf = (ByteBuf*)xmalloc(sizeof(ByteBuf));
         BYTEBUF_size(buf) = bytesize;
@@ -416,7 +416,7 @@ public:
 
     //Build PR that PRNO assiged by Region.
     IR * buildPR(DATA_TYPE dt)
-    { return buildPR(getTypeMgr()->getSimplexType(dt)); }    
+    { return buildPR(getTypeMgr()->getSimplexType(dt)); }
 
     //Generate a PR number by specified prno and type id.
     //This operation will allocate new PR number.
@@ -425,7 +425,7 @@ public:
     //Generate a PR number by specified prno and type id.
     //This operation will allocate new PR number.
     UINT buildPrno(DATA_TYPE dt)
-    { return buildPrno(getTypeMgr()->getSimplexType(dt)); }    
+    { return buildPrno(getTypeMgr()->getSimplexType(dt)); }
 
     //Build IR_TRUEBR or IR_FALSEBR operation.
     IR * buildBranch(bool is_true_br, IR * det, LabelInfo const* lab);
@@ -459,7 +459,7 @@ public:
 
     //Build compare operation.
     IR * buildCmp(IR_TYPE irt, IR * lchild, IR * rchild);
-    //Build judgement operation.    
+    //Build judgement operation.
     //This function build operation that comparing with 0 by NE node.
     //e.g: output is (exp != 0).
     //This function always used as helper function to convient to
@@ -482,7 +482,7 @@ public:
     IR * buildBinaryOp(IR_TYPE irt,
                        DATA_TYPE dt,
                        IN IR * lchild,
-                       IN IR * rchild);    
+                       IN IR * rchild);
 
     //Build unary operation.
     IR * buildUnaryOp(IR_TYPE irt, Type const* type, IN IR * opnd);
@@ -593,7 +593,7 @@ public:
     //'rhs: value expected to store.
     IR * buildStorePR(DATA_TYPE dt, IR * rhs)
     { return buildStorePR(getTypeMgr()->getSimplexType(dt), rhs); }
-    
+
     //Build IR_IST operation.
     //'lhs': target memory location pointer.
     //'rhs: value expected to store.
@@ -749,7 +749,7 @@ public:
 
     //Count memory usage for current object.
     size_t count_mem() const;
-    
+
     virtual void destroy();
     void destroyPassMgr();
     IR * dupIR(IR const* ir);

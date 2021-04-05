@@ -87,12 +87,12 @@ public:
     Region * getRegion() const { return m_rg; }
     xcom::DefMiscBitSetMgr * getSBSMgr() { return &m_sbs_mgr; }
     MDSet * getLiveInMDSet(IRBB * bb);
-    MDSet * getLiveOutMDSet(IRBB * bb);    
+    MDSet * getLiveOutMDSet(IRBB * bb);
     virtual CHAR const* getPassName() const { return "MDLivenessMgr"; }
     PASS_TYPE getPassType() const { return PASS_MDLIVENESS_MGR; }
 
     virtual bool perform(OptCtx & oc);
-};   
+};
 
 } //namespace xoc
 #endif

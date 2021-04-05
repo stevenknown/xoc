@@ -389,7 +389,7 @@ Programming Guides
       This operation stores value to a memory address specified by ST_idinfo.
       The result type of IR_ST indicates the size and type of the memory from
       which to store, as well as the interpretation of the value.
-      e.g: 
+      e.g:
           Semantics: a = a + 1
           IR tree is:
             st:i32 a =
@@ -422,7 +422,7 @@ Programming Guides
       NOTE:
           1. PR can not be taken address.
           2. PR is always allocate on stack.
- 
+
   ¡ñ IR_STPR
       This operation stores value to a PR specified by PR_no.
       The result type of IR_STPR indicates the size and type of the value
@@ -448,7 +448,7 @@ Programming Guides
       NOTE:
           1. PR can not be taken address.
           2. PR is always allocate on stack.
- 
+
   ¡ñ IR_SETELEM
       This operation stores value to one of element of a temporary
       location named pseudo register.
@@ -473,7 +473,7 @@ Programming Guides
       NOTE:
           1. PR can not be taken address.
           2. PR is always allocate on stack.
- 
+
       Operands:
       * SETELEM_prno      indicate the result PR number.
       * SETELEM_ssainfo   indicate the SSA information if exist.
@@ -509,7 +509,7 @@ Programming Guides
       This operation represent indirect memory store operation.
       IST_ofst descibe the byte offset that is the addend to address.
 
-      e.g: 
+      e.g:
           Semantics: given p is pointer, store value of a to the memory
           that p pointed to.
           In C syntax: *p = a;

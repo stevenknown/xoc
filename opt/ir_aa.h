@@ -117,7 +117,7 @@ public:
     //Count memory usage for current object.
     size_t count_mem() const;
 
-    DefMiscBitSetMgr * getSBSMgr() { return &m_misc_bs_mgr; }    
+    DefMiscBitSetMgr * getSBSMgr() { return &m_misc_bs_mgr; }
 };
 
 
@@ -487,7 +487,7 @@ protected:
                                IR const* opnd1,
                                IN OUT MDSet & mds,
                                bool * changed);
-          
+
     void recomputeDataType(AACtx const& ic, IR const* ir, OUT MDSet & pts);
     void reviseMDSize(IN OUT MDSet & mds, UINT size);
 
@@ -540,7 +540,7 @@ public:
     size_t count_mem() const;
     size_t countMD2MDSetMemory() const;
     void cleanContext(OptCtx & oc);
-   
+
     void destroyContext(OptCtx & oc);
     void dumpMD2MDSet(MD2MDSet const* mx, bool dump_ptg) const;
     void dumpMD2MDSet(MD const* md, MD2MDSet const* mx) const;

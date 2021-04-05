@@ -1116,7 +1116,7 @@ bool Graph::tryFindLessRpo(Vertex * v, Vertex const* ref)
     ASSERT0(rpo >= RPO_INIT_VAL);
     if (isValidRPO(rpo)) {
         VERTEX_rpo(v) = rpo;
-        return true;        
+        return true;
     }
     return false;
 }

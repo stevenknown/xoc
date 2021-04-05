@@ -285,7 +285,7 @@ bool Region::MiddleProcess(OptCtx & oc)
         }
         return false;
     }
-    ASSERT0(verifyIRandBB(bbl, this));    
+    ASSERT0(verifyIRandBB(bbl, this));
     return true;
 }
 

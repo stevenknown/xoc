@@ -34,7 +34,7 @@ namespace xoc {
 //doReplacement may append stmt into BB which has down-boundary stmt.
 //That makes BB invalid. Split such invalid BB into two or more BBs.
 bool LFTR::splitBBIfNeeded(IRBB * bb)
-{    
+{
     IRListIter it;
     for (bb->getIRList()->get_head(&it); it != nullptr;) {
         IRListIter cur = it;
@@ -243,13 +243,13 @@ void LFTR::pickupProperCandidate(OUT List<LFRInfo*> & lfrinfo_list)
              e != nullptr; e = init_val_list.get_next()) {
             if (cand->isIREqual(e, true)) {
                 equal_exp = e;
-                break; 
+                break;
             }
         }
         if (equal_exp != nullptr) {
-            LFRInfo * info = m_cand_occ2info.get(equal_exp); 
+            LFRInfo * info = m_cand_occ2info.get(equal_exp);
             ASSERT0(info);
-            m_cand_occ2info.set(cand, info); 
+            m_cand_occ2info.set(cand, info);
             continue;
         }
 
@@ -314,7 +314,7 @@ IR * LFTR::insertPhiForRed(LI<IRBB> const* li, IR * init, IR * red)
     IR * opndarr[2];
     ASSERTN(m_cfg->getPredsNum(head) == 2,
             ("TODO: support loop head with more preds"));
-    
+
     //Init-value BB do not have to be immeidate-predecessor of head, however
     //head BB should be reachable from init-value BB.
     UINT pos_of_redbb = m_cfg->WhichPred(red->getBB(), head);
@@ -367,7 +367,7 @@ IR * LFTR::insertPhiForRed(LI<IRBB> const* li, IR * init, IR * red)
     m_rg->allocRefForPR(red);
 
     IR * opnd = opndarr[m_cfg->WhichPred(red->getBB(), head)];
-    opnd->setPrnoConsiderSSAInfo(red->getPrno()); 
+    opnd->setPrnoConsiderSSAInfo(red->getPrno());
     m_rg->allocRefForPR(opnd);
     //PR_ssainfo(opnd) = STPR_ssainfo(red) =
     //    m_prssamgr->allocSSAInfo(red->getPrno());
@@ -402,7 +402,7 @@ bool LFTR::insertReductionCode(List<LFRInfo*> & lfrinfo_list)
             op = IR_ADD;
         }
 
-        //Build stmt to do reduction in loop body. 
+        //Build stmt to do reduction in loop body.
         Type const* ty = info->new_div->getType();
         IR * red = m_rg->buildStorePR(newiv->getPrno(), ty,
                                       m_rg->buildBinaryOp(op, ty,
@@ -410,7 +410,7 @@ bool LFTR::insertReductionCode(List<LFRInfo*> & lfrinfo_list)
                                           m_rg->buildImmInt(newiv_step, ty)));
         m_rg->allocRefForPR(red);
         IRBB * redbb = ivinfo->getRedStmt()->getBB();
-        ASSERT0(redbb); 
+        ASSERT0(redbb);
         redbb->getIRList()->insert_before(red, ivinfo->getRedStmt());
         if (usePRSSADU()) {
             IR * phi = insertPhiForRed(ivinfo->getLI(), info->init_stmt, red);
@@ -458,7 +458,7 @@ bool LFTR::doReplacement(OUT IRBB * preheader, OUT LI<IRBB> * li,
     bool changed = insertComputingInitValCode(preheader, lfrinfo_list);
     changed |= insertReductionCode(lfrinfo_list);
     changed |= replaceCandByIV();
-    return changed; 
+    return changed;
 }
 
 
@@ -469,7 +469,7 @@ bool LFTR::dump(LI<IRBB> const* li) const
          getPassName(), m_rg->getRegionName());
 
     note(getRegion(), "\n==-- LINEAR FUNC CAND LIST of LI%d --==", li->id());
-    IRListIter it; 
+    IRListIter it;
     for (IR const* x = m_cand_list.get_head(&it); x != nullptr;
          x = m_cand_list.get_next(&it)) {
         dumpIR(x, m_rg);
@@ -507,7 +507,7 @@ bool LFTR::perform(OptCtx & oc)
 
     bool du_set_info_changed = false;
     bool insert_bb = false;
-    
+
     clean();
     bool change = doLoopTree(m_cfg->getLoopInfo(), du_set_info_changed,
                              insert_bb, oc);

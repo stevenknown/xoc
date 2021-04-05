@@ -222,7 +222,7 @@ public:
             getLabelList().append_tail(li);
         }
     }
-    
+
     //After adding new bb or change bb successor,
     //you need add the related PHI operand if BB successor has PHI stmt.
     void addSuccessorDesignatePhiOpnd(CFG<IRBB, IR> * cfg, IRBB * succ);

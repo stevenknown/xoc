@@ -44,7 +44,7 @@ void changeDef(IR * olddef, IR * newdef, Region * rg)
         dumgr->changeDef(newdef, olddef, dumgr->getSBSMgr());
     }
 }
- 
+
 
 void changeUse(IR * olduse, IR * newuse, Region * rg)
 {
@@ -69,7 +69,7 @@ void buildDUChain(IR * def, IR * use, Region * rg)
 {
     ASSERT0(def && use && def->is_stmt() && use->is_exp());
     if  (def->isMemoryRefNotOperatePR()) {
-        MDSSAMgr * mdssamgr = rg->getMDSSAMgr(); 
+        MDSSAMgr * mdssamgr = rg->getMDSSAMgr();
         if (mdssamgr != nullptr && mdssamgr->is_valid()) {
             MDSSAInfo * info = mdssamgr->getMDSSAInfoIfAny(def);
             ASSERTN(info, ("def stmt even not in MDSSA system"));
@@ -103,7 +103,7 @@ bool removeExpiredDUForStmt(IR * stmt, Region * rg)
         change |= dumgr->removeExpiredDUForStmt(stmt);
     }
 
-    MDSSAMgr * mdssamgr = rg->getMDSSAMgr(); 
+    MDSSAMgr * mdssamgr = rg->getMDSSAMgr();
     if (mdssamgr != nullptr) {
         ASSERTN(mdssamgr->getMDSSAInfoIfAny(stmt),
                 ("def stmt even not in MDSSA system"));
@@ -134,7 +134,7 @@ void coalesceDUChain(IR * from, IR * to, Region * rg)
 
     if (from->isMemoryRefNotOperatePR()) {
         ASSERT0(to->isMemoryRefNotOperatePR());
-        MDSSAMgr * mdssamgr = rg->getMDSSAMgr(); 
+        MDSSAMgr * mdssamgr = rg->getMDSSAMgr();
         if (mdssamgr != nullptr) {
             mdssamgr->coalesceDUChain(from, to);
         }
@@ -159,7 +159,7 @@ void removeIRTreeUse(IR * exp, Region * rg)
         dumgr->removeUseFromDefset(exp);
     }
 
-    MDSSAMgr * mdssamgr = rg->getMDSSAMgr(); 
+    MDSSAMgr * mdssamgr = rg->getMDSSAMgr();
     if (mdssamgr != nullptr) {
         mdssamgr->removeMDSSAOcc(exp);
     }
@@ -177,7 +177,7 @@ void removeStmt(IR * stmt, Region * rg)
 
     PRSSAMgr::removePRSSAOcc(stmt);
 
-    MDSSAMgr * mdssamgr = rg->getMDSSAMgr(); 
+    MDSSAMgr * mdssamgr = rg->getMDSSAMgr();
     if (mdssamgr != nullptr) {
         //Remove stmt and its RHS.
         mdssamgr->removeMDSSAOcc(stmt);

@@ -159,7 +159,7 @@ bool DeadCodeElim::check_stmt(IR const* ir)
 
 //Return true if ir is effect.
 bool DeadCodeElim::check_call(IR const* ir) const
-{    
+{
     ASSERT0(ir->isCallStmt());
     return !ir->isReadOnly() || IR_has_sideeffect(ir) || IR_no_move(ir);
 }
@@ -294,7 +294,7 @@ bool DeadCodeElim::find_effect_kid_uncondbr(IR const* ir) const
     //CASE: If S1 is effect, bb is effect.
     //    bb
     //    |
-    //    V 
+    //    V
     //    S1
     for (xcom::EdgeC const* ec = m_cfg->getVertex(bb->id())->getOutList();
          ec != nullptr; ec = ec->get_next()) {
@@ -412,7 +412,7 @@ bool DeadCodeElim::collectByPRSSA(IR const* x, IN OUT List<IR const*> * pwlst2)
     ASSERT0(d->is_stmt());
     ASSERT0(d->isWritePR() || d->isCallHasRetVal());
     if (m_is_stmt_effect.is_contain(d->id())) { return false; }
-    setEffectStmt(d, &m_is_bb_effect, pwlst2); 
+    setEffectStmt(d, &m_is_bb_effect, pwlst2);
     return true;
 }
 
@@ -428,7 +428,7 @@ bool DeadCodeElim::collectAllDefThroughDefChain(
     for (MDDef const* def = m_mdssamgr->iterDefInitCTillKillingDef(
              tdef, use, ii);
          def != nullptr;
-         def = m_mdssamgr->iterDefNextCTillKillingDef(use, ii)) {        
+         def = m_mdssamgr->iterDefNextCTillKillingDef(use, ii)) {
         if (def->is_phi()) {
             //Merged DEF will be iterated.
             continue;
@@ -446,7 +446,7 @@ bool DeadCodeElim::collectAllDefThroughDefChain(
         }
         change = true;
         setEffectStmt(stmt, &m_is_bb_effect, pwlst2);
-    }    
+    }
     return change;
 }
 
@@ -454,7 +454,7 @@ bool DeadCodeElim::collectAllDefThroughDefChain(
 bool DeadCodeElim::collectByMDSSA(IR const* x, IN OUT List<IR const*> * pwlst2)
 {
     ASSERT0(x->isMemoryRefNotOperatePR() && useMDSSADU());
-    ASSERT0(x->is_exp()); 
+    ASSERT0(x->is_exp());
     MDSSAInfo * mdssainfo = m_mdssamgr->getMDSSAInfoIfAny(x);
     if (mdssainfo == nullptr ||
         mdssainfo->readVOpndSet() == nullptr ||
@@ -485,7 +485,7 @@ bool DeadCodeElim::collectByMDSSA(IR const* x, IN OUT List<IR const*> * pwlst2)
         ASSERT0(defstmt);
         if (defstmt->isCallStmt()) {
             //CASE:call()
-            //        =USE            
+            //        =USE
             //Call is the only stmt that need to process specially.
             //Because it always is not dominated killing-def.
             change |= collectAllDefThroughDefChain(tdef, x, pwlst2);
@@ -506,13 +506,13 @@ bool DeadCodeElim::collectByMDSSA(IR const* x, IN OUT List<IR const*> * pwlst2)
             //the Def and Use are independent.
             //e.g:arr[1]=10;
             //    return arr[2];
-            continue;            
+            continue;
         }
 
         if (mustuse != nullptr) {
             //TODO:
             //CASE1:DEF=
-            //         =USE            
+            //         =USE
             //CASE2:???=
             //         =USE
             //Both cases need to collect all DEFs until
@@ -526,7 +526,7 @@ bool DeadCodeElim::collectByMDSSA(IR const* x, IN OUT List<IR const*> * pwlst2)
         //CASE2:DEF=
         //         =???
         //Both cases need to collect all DEFs through def-chain.
-        change |= collectAllDefThroughDefChain(tdef, x, pwlst2);        
+        change |= collectAllDefThroughDefChain(tdef, x, pwlst2);
     }
     return change;
 }
@@ -544,10 +544,10 @@ bool DeadCodeElim::collectByDUSet(IR const* x, IN OUT List<IR const*> * pwlst2)
         ASSERT0(d->is_stmt());
         if (!m_is_stmt_effect.is_contain(d->id())) {
             change = true;
-            setEffectStmt(d, &m_is_bb_effect, pwlst2); 
+            setEffectStmt(d, &m_is_bb_effect, pwlst2);
         }
     }
-    return change; 
+    return change;
 }
 
 
@@ -557,7 +557,7 @@ bool DeadCodeElim::removeIneffectIR(OUT bool & remove_branch_stmt)
     List<IRBB*> bblst;
     List<IRBB*> * bbl = m_rg->getBBList();
     List<C<IRBB*>*> ctlst;
-    bool change = false;    
+    bool change = false;
     for (IRBB * bb = bbl->get_head(&ctbb);
          bb != nullptr; bb = bbl->get_next(&ctbb)) {
         IRListIter ctir = nullptr;
@@ -797,7 +797,7 @@ void DeadCodeElim::reviseSuccForFallthroughBB(IRBB * bb, BBListIter bbct,
 
         //TODO: We have invoke removeSuccessorDesignatePhiOpnd() here to
         //update PHI, but in-edge of succ has changed, and operands of phi
-        //did not maintained.        
+        //did not maintained.
         m_cfg->removeEdge(bb, succ);
     }
 
@@ -812,8 +812,8 @@ void DeadCodeElim::reviseSuccForFallthroughBB(IRBB * bb, BBListIter bbct,
     //  |  V   |
     //  | BB3  |
     //  |  |___|
-    //  |  
-    //  |->BB5    
+    //  |
+    //  |->BB5
     if (next_bb != nullptr && !has_fallthrough) {
         //TODO: Add operands of PHI if 'next_bb' has PHI.
         m_cfg->addEdge(bb, next_bb);
@@ -826,7 +826,7 @@ void DeadCodeElim::reinit()
     UINT irnum = m_rg->getIRVec()->get_elem_count() / BITS_PER_BYTE + 1;
     if (m_is_stmt_effect.get_byte_size() <= irnum) {
         m_is_stmt_effect.alloc(irnum + 1);
-    }    
+    }
     m_is_stmt_effect.clean();
     m_is_mddef_effect.clean();
 
@@ -839,11 +839,11 @@ void DeadCodeElim::reinit()
 
 
 bool DeadCodeElim::removeRedundantPhi()
-{    
+{
     if (m_prssamgr != nullptr && m_prssamgr->is_valid()) {
         return m_prssamgr->refinePhi();
     }
-    return false; 
+    return false;
 }
 
 

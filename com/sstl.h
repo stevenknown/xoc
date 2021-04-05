@@ -1410,7 +1410,7 @@ public:
         C<T> * b = m_head;
         C<T> * e = m_tail;
         while (b != e && b != C_next(e)) {
-            if (b->val() == t) {                
+            if (b->val() == t) {
                 *holder = b;
                 return true;
             }
@@ -1426,7 +1426,7 @@ public:
             return true;
         }
         *holder = nullptr;
-        return false;        
+        return false;
     }
 
     //Reverse list.
@@ -3098,7 +3098,7 @@ public:
     {
         if (!s1.m_is_init) { return; }
         SVEC_elem_num(this) = 0;
-        m_vec = nullptr;        
+        m_vec = nullptr;
         s1.m_is_init = false;
     }
 
@@ -3175,7 +3175,7 @@ public:
         ASSERT0(tmp);
         ::memcpy(tmp, m_vec, SVEC_elem_num(this) * sizeof(T));
         ::memset(((CHAR*)tmp) + SVEC_elem_num(this) * sizeof(T),
-                 0, (size - SVEC_elem_num(this))* sizeof(T));        
+                 0, (size - SVEC_elem_num(this))* sizeof(T));
         m_vec = tmp;
         SVEC_elem_num(this) = size;
     }
@@ -4513,7 +4513,7 @@ public:
     }
 
     //Establishing mapping in between 't' and 'mapped'.
-    //Note this function will check whether 't' has been mapped. 
+    //Note this function will check whether 't' has been mapped.
     Tsrc set(Tsrc t, Ttgt mapped)
     {
         bool find = false;

@@ -63,9 +63,9 @@ static void generate_region(RegionMgr * rm)
     //      q = 30;
     //  }
     //  return g:u32;
-    VAR * g = rm->getVarMgr()->registerVar("g",
+    Var * g = rm->getVarMgr()->registerVar("g",
         rm->getTypeMgr()->getI32(),0,VAR_GLOBAL);
-    VAR * q = rm->getVarMgr()->registerVar("q",
+    Var * q = rm->getVarMgr()->registerVar("q",
             rm->getTypeMgr()->getI32(),0,VAR_GLOBAL);
     Type const* i32ty = rm->getTypeMgr()->getI32();
     Type const* u32ty = rm->getTypeMgr()->getU32();
@@ -122,15 +122,13 @@ static void generate_region(RegionMgr * rm)
 
 static void dumpGR(Region * rg)
 {
-    g_indent = 0;
     xcom::StrBuf b(64);
     b.strcat("tmp.gr");
     FILE * gr = fopen(b.buf, "a");
-    FILE * oldvalue = g_tfile;
-    g_tfile = gr;
+    rg->getLogMgr()->push(gr, b.buf);
     rg->dumpGR(true);
+    rg->getLogMgr()->pop();
     fclose(gr);
-    g_tfile = oldvalue;
 }
 
 

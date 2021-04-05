@@ -90,7 +90,7 @@ public:
     xcom::BitSet * bb_set; //loop body elements
 
 public:
-    LI() {}      
+    LI() {}
 
     //Find the bb that is the start of the unqiue backedge of loop.
     //  BB1: loop start bb

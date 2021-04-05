@@ -775,7 +775,7 @@ bool GCSE::perform(OptCtx & oc)
     } else {
         m_ssamgr = nullptr;
     }
-    if (!oc.is_pr_du_chain_valid() && m_ssamgr == nullptr) { 
+    if (!oc.is_pr_du_chain_valid() && m_ssamgr == nullptr) {
         //At least one kind of DU chain should be avaiable.
         return false;
     }

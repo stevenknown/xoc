@@ -138,7 +138,7 @@ void CopyProp::replaceExpViaSSADu(IR * exp,
 void CopyProp::removeExpDUInfo(IR * newir, IR * exp)
 {
     SSAInfo * exp_prssainfo = usePRSSADU() ? exp->getSSAInfo() : nullptr;
-    MDSSAInfo * exp_mdssainfo = useMDSSADU() ? 
+    MDSSAInfo * exp_mdssainfo = useMDSSADU() ?
         m_mdssamgr->getMDSSAInfoIfAny(exp) : nullptr;
 
     if (exp_prssainfo != nullptr) {
@@ -237,7 +237,7 @@ bool CopyProp::isCopyOR(IR * ir) const
             //CASE:Propagate LD/ILD through PR may degrade performance, e.g:
             //  pr1 = LD(x)
             //  while (..) {
-            //     = pr1 
+            //     = pr1
             //  }
             //====> after propagate LD(x)
             //  pr1 = LD(x)
@@ -817,7 +817,7 @@ bool CopyProp::perform(OptCtx & oc)
     END_TIMER(t, getPassName());
 
     if (!change) { return false; }
-    
+
     OC_is_expr_tab_valid(oc) = false;
     OC_is_aa_valid(oc) = false;
     OC_is_ref_valid(oc) = true; //already update.
@@ -831,7 +831,7 @@ bool CopyProp::perform(OptCtx & oc)
         OC_is_pr_du_chain_valid(oc) = true; //already update.
         OC_is_nonpr_du_chain_valid(oc) = true; //already update.
     }
-    
+
     if (usePRSSADU()) {
         //Use PRSSA.
         ASSERT0(PRSSAMgr::verifyPRSSAInfo(m_rg));
@@ -841,7 +841,7 @@ bool CopyProp::perform(OptCtx & oc)
         //Keep DU chain unchanged.
         ASSERT0(oc.is_pr_du_chain_valid() == is_org_pr_du_chain_valid);
         ASSERT0(oc.is_nonpr_du_chain_valid() == is_org_nonpr_du_chain_valid);
-    }    
+    }
     return true;
 }
 //END CopyProp

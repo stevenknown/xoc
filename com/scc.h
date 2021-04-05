@@ -67,7 +67,7 @@ public:
     }
 
     void set_group(UINT idx, UINT group_val)
-    { 
+    {
         if (m_is_dense) {
             group.dense->set(idx, group_val);
         } else {
@@ -76,7 +76,7 @@ public:
     }
 
     UINT get_group(UINT idx) const
-    { 
+    {
         if (m_is_dense) {
             return group.dense->get(idx);
         }
@@ -84,7 +84,7 @@ public:
     }
 
     void set_index(UINT i, UINT idx)
-    { 
+    {
         if (m_is_dense) {
             index.dense->set(i, idx);
         } else {
@@ -93,7 +93,7 @@ public:
     }
 
     UINT get_index(UINT i) const
-    { 
+    {
         if (m_is_dense) {
             return index.dense->get(i);
         }
@@ -151,7 +151,7 @@ public:
 
     //Return true if 'v' is in SCC, and records the SCC in 'scc_vertex_set'.
     bool isInSCC(UINT vid, OUT VertexSet ** scc_vertex_set = nullptr) const;
-    
+
     void dump(FILE * h) const;
 };
 

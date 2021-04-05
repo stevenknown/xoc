@@ -347,7 +347,7 @@ extern bool g_do_cdg; //Build post dominator tree.
 extern bool g_do_aa; //Perform default alias analysis.
 //Perform DU analysis for MD to build du chain.
 extern bool g_do_md_du_analysis;
-//Compute PR DU chain in classic method. 
+//Compute PR DU chain in classic method.
 extern bool g_compute_pr_du_chain;
 //Compute NONPR DU chain in classic method.
 extern bool g_compute_nonpr_du_chain;

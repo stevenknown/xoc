@@ -1025,7 +1025,7 @@ bool GVN::isSameMemLoc(IR const* ir1, IR const* ir2) const
         IR const* s2 = ARR_sub_list(ir2);
         for (IR const* s1 = ARR_sub_list(ir1); s1 != nullptr;
              s1 = s1->get_next(), s2 = s2->get_next()) {
-            ASSERT0(s2);    
+            ASSERT0(s2);
             VN const* vs1 = mapIR2VN(s1);
             VN const* vs2 = mapIR2VN(s2);
             if (vs1 != vs2) {
@@ -1142,7 +1142,7 @@ void GVN::dumpIR2VN() const
 
 void GVN::dump_h1(IR const* k, VN const* x) const
 {
-    ASSERT0(k);    
+    ASSERT0(k);
     if (k->is_pr()) {
         note(getRegion(), "\n\t$%d", PR_no(k));
     } else {

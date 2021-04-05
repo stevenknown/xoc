@@ -274,7 +274,7 @@ public:
     void collectUse(UseDefMgr const* udmgr, OUT IRSet * set) const;
     //Collect all DEF that overlapped with 'ref', where DEF is IR expression.
     //Note the function will not clear 'set' because caller may perform unify
-    //operation. 
+    //operation.
     //ref: given MD, if it is NULL, the function will collect all DEFs.
     void collectDef(MDSSAMgr const* mdssamgr, MD const* ref,
                     OUT IRSet * set) const;
@@ -309,7 +309,7 @@ class MDDef {
     COPY_CONSTRUCTOR(MDDef);
 public:
     BYTE m_is_phi:1; //is MDPhi.
-    UINT m_id;    
+    UINT m_id;
     VMD * m_result; //the MD defined.
 
     //The nearest previous MDDef. Note MDPhi does not have prev-def.

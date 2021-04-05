@@ -65,7 +65,7 @@ public:
 };
 
 class ConstMDDefIter : public xcom::List<MDDef const*> {
-    COPY_CONSTRUCTOR(ConstMDDefIter);    
+    COPY_CONSTRUCTOR(ConstMDDefIter);
     TTab<UINT> m_is_visited;
 public:
     ConstMDDefIter() {}
@@ -133,7 +133,7 @@ protected:
 
     void freeBBPhiList(IRBB * bb);
     void freePhiList();
-   
+
     void destructBBSSAInfo(IRBB * bb);
     void destructionInDomTreeOrder(IRBB * root, xcom::Graph & domtree);
     void dumpDefChain(List<MDDef const*> & wl,

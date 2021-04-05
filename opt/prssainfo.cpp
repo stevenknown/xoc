@@ -37,7 +37,7 @@ namespace xoc {
 //Find the VPR that have PR defined at given BB.
 VPR * VPRVec::findVPR(UINT bbid) const
 {
-    
+
     for (INT i = 0; i <= get_last_idx(); i++) {
         VPR * vpr = get(i);
         if (vpr == nullptr || vpr->getDef() == nullptr) { continue; }

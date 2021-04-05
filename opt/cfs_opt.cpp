@@ -384,7 +384,7 @@ bool CfsOpt::transformIf3(IR ** head, IR ** ir)
             }
 
             m_rg->freeIRTree(*ir);
-            
+
             if (prev == nullptr) {
                 *ir = *head;
             } else {
@@ -557,7 +557,7 @@ bool CfsOpt::doCfsOpt(IN OUT IR ** ir_list, SimpCtx const& sc)
     bool change = false;
     for (IR * ir = *ir_list; ir != nullptr;) {
         if (transformToDoWhile(ir_list, &ir)) {
-            change = true;            
+            change = true;
             continue;
         }
 
@@ -644,7 +644,7 @@ bool CfsOpt::perform(SimpCtx const& sc)
     if (change) {
         m_rg->setIRList(irs);
     }
-    END_TIMER(t, getPassName());    
+    END_TIMER(t, getPassName());
     return change;
 }
 

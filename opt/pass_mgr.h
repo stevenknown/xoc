@@ -43,7 +43,7 @@ typedef TMapIter<PASS_TYPE, xcom::Graph*> GraphPassTabIter;
 
 class PassMgr {
     COPY_CONSTRUCTOR(PassMgr);
-protected:    
+protected:
     Region * m_rg;
     RegionMgr * m_rumgr;
     TypeMgr * m_tm;

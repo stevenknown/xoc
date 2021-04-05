@@ -3911,7 +3911,7 @@ T Matrix<T>::norm(INT p)
         }
         return _sqrt(n);
     }
-    
+
     if (p == NORM_1) {
         T n = T(0);
         if (is_vec()) { //vector norm
@@ -3931,7 +3931,7 @@ T Matrix<T>::norm(INT p)
         }
         return n;
     }
-    
+
     if (p == NORM_2) {
         if (is_vec()) { //vector norm
             T n = T(0);
@@ -3942,13 +3942,13 @@ T Matrix<T>::norm(INT p)
             }
             return _sqrt(n);
         }
-        
+
         //matrix norm
         Matrix<T> tmp = *this;
         tmp.trans();
         return _sqrt((tmp * *this).sprad());
     }
-    
+
     if (p == NORM_INF) {
         T n = T(0);
         if (is_vec()) { //vector norm

@@ -32,7 +32,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 namespace xcom {
 
 //Consider the speed of TMap might be better than HMap on average.
-//#define _BIT2NODE_IN_HASH_ 
+//#define _BIT2NODE_IN_HASH_
 #define MD2NODE2_INIT_SZ 8 //The size must be power of 2.
 
 //For given SBitSetCore, mapping MD to its subsequently MD elements via HMap.
@@ -85,7 +85,7 @@ template <class Allocator, UINT BitsPerSeg = BITS_PER_SEG>
 class SBitSetCoreHash {
     COPY_CONSTRUCTOR(SBitSetCoreHash);
 protected:
-    SMemPool * m_pool;    
+    SMemPool * m_pool;
     Allocator * m_allocator;
     List<SBitSetCore<BitsPerSeg>*> m_bit2node_set_list;
 
@@ -215,7 +215,7 @@ public:
 
         #ifdef _BIT2NODE_IN_HASH_
         //Nothing to do.
-        //Do not detete m_bit2node, it has already been deleted in destroy().        
+        //Do not detete m_bit2node, it has already been deleted in destroy().
         #else
         smpoolDelete(m_rbtn_pool);
         delete m_bit2node;
@@ -294,11 +294,11 @@ public:
 
     void destroy()
     {
-        #ifdef _BIT2NODE_IN_HASH_    
+        #ifdef _BIT2NODE_IN_HASH_
         destroyBit2NodeH();
         #else
         destroyBit2NodeT();
-        #endif    
+        #endif
     }
 
     inline void checkAndGrow(B2NType * mn)

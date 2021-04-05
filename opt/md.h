@@ -189,7 +189,7 @@ public:
     //current md: |-...-----...---|
     //m:            |---...-|
     bool is_may_cover(MD const* m) const;
-    
+
     //Return true if current md exactly cover 'm', such as:
     //CASE1:
     //  current md: |-------|
@@ -408,7 +408,7 @@ public:
     }
 
     //Return true if set contained md.
-    bool is_contain(MD const* md) const;    
+    bool is_contain(MD const* md) const;
 
     //Return true if set only contained the md that has been taken address.
     bool is_contain_only_taken_addr(MD const* md) const;
@@ -418,7 +418,7 @@ public:
 
     //Return true if md is overlap with the elements.
     //Note this function only consider the MD that have been taken address.
-    bool is_overlap_only_taken_addr(MD const* md, 
+    bool is_overlap_only_taken_addr(MD const* md,
                                     Region const* current_ru) const;
 
     //Return true if md overlaps with element in current MDSet.
@@ -751,7 +751,7 @@ public:
         UINT num_of_tgt_md = 0;
         MD2MDSetIter mxiter;
         MDSet const* from_md_pts = nullptr;
-        for (UINT fromid = get_first(mxiter, &from_md_pts);        
+        for (UINT fromid = get_first(mxiter, &from_md_pts);
             fromid > 0; fromid = get_next(mxiter, &from_md_pts)) {
             ASSERT0(const_cast<MDSystem&>(mdsys).getMD(fromid));
             if (from_md_pts == nullptr || from_md_pts->is_contain_fullmem()) {

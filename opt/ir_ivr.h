@@ -111,7 +111,7 @@ public:
     //Return true if initial value is const.
     bool isInitConst() const
     { return BIV_initv_kind(this) == IV_INIT_VAL_IS_INT; }
-    bool is_inc() const { return BIV_is_inc(this); } 
+    bool is_inc() const { return BIV_is_inc(this); }
 
     Type const* getInitValType() const { return BIV_initv_data_type(this); }
 
@@ -138,7 +138,7 @@ public:
 
     void copy(LinearRep const& src) { *this = src; }
     void dump(Region const* rg) const;
-    bool is_valid() const { return var != nullptr; }    
+    bool is_valid() const { return var != nullptr; }
 };
 
 
@@ -178,7 +178,7 @@ protected:
     SMemPool * m_sc_pool;
     PRSSAMgr * m_prssamgr;
     MDSSAMgr * m_mdssamgr;
-    
+
     typedef TTab<UINT> IDTab;
     typedef TTabIter<UINT> IDTabIter;
     typedef SList<BIV*> BIVList;
@@ -237,7 +237,7 @@ protected:
     bool isSelfModByPRSSA(IR const* ir) const;
     bool isSelfModByMDSSA(IR const* ir) const;
     //Return true if ir is addend of linear-representation.
-    bool isAddend(LI<IRBB> const* li, IR const* ir) const;    
+    bool isAddend(LI<IRBB> const* li, IR const* ir) const;
     //Return true if ir is coefficent of linear-representation.
     bool isCoeff(LI<IRBB> const* li, IR const* ir) const;
     //Return true if ir is linear-representation of BIV.

@@ -347,7 +347,7 @@ void IRCFG::rebuild(OptCtx & oc)
         change = false;
         if (g_do_cfg_remove_empty_bb &&
             removeEmptyBB(oc)) {
-            computeExitList(); 
+            computeExitList();
             change = true;
         }
 
@@ -676,7 +676,7 @@ IRBB * IRCFG::splitBB(IRBB * bb, IRListIter split_point)
         UINT succ = e->to()->id();
         xcom::Edge * newe = addEdge(newbb->id(), succ);
         newe->copyEdgeInfo(e);
-        xcom::Graph::removeEdge(e);        
+        xcom::Graph::removeEdge(e);
 
         //Collect the minimal RPO.
         if (succ != bb->id()) {
@@ -771,7 +771,7 @@ bool IRCFG::tryUpdateRPO(IRBB * newbb,
     BB_rpo(newbb) = RPO_UNDEF;
     xcom::Vertex * nv = getVertex(newbb->id());
     VERTEX_rpo(nv) = RPO_UNDEF;
-    return false;    
+    return false;
 }
 
 
@@ -799,7 +799,7 @@ void IRCFG::insertBBbefore(IN IRBB * bb, IN IRBB * newbb)
         //Make sure the order of new edge is in same order as original edge.
         //e.g:original edge order is: BB1->BB4, BB2->BB4, BB3->BB4. The order
         //of new edge is: BB1->newbb, BB2->newbb, BB3->newbb.
-        xcom::Edge * newedge = newEdge(prededge->from(), newbbv); 
+        xcom::Edge * newedge = newEdge(prededge->from(), newbbv);
         EDGE_info(newedge) = prededge->info();
     }
     xcom::EdgeC * next = nullptr;
@@ -809,7 +809,7 @@ void IRCFG::insertBBbefore(IN IRBB * bb, IN IRBB * newbb)
         DGraph::removeEdge(predlist->getEdge());
     }
     DGraph::addEdge(newbbv->id(), bbv->id());
-    moveLabels(bb, newbb);    
+    moveLabels(bb, newbb);
 }
 
 
@@ -1031,7 +1031,7 @@ bool IRCFG::inverseAndRemoveTrampolineBranch()
 
 bool IRCFG::isRPOValid() const
 {
-    BBListIter ct;    
+    BBListIter ct;
     for (IRBB * bb = m_bb_list->get_head(&ct);
          bb != nullptr; bb = m_bb_list->get_next(&ct)) {
         if (bb->rpo() == RPO_UNDEF) {
@@ -1043,8 +1043,8 @@ bool IRCFG::isRPOValid() const
 
 
 void IRCFG::remove_bb_impl(IRBB * bb)
-{        
-    ASSERT0(bb);    
+{
+    ASSERT0(bb);
     m_bb_vec.set(bb->id(), nullptr);
 
     //C<LabelInfo const*> * ct;
@@ -1147,7 +1147,7 @@ bool IRCFG::removeTrampolinBBCase1(BBListIter * ct)
             CFGEI_is_eh(ei) = false;
         }
     } //end for each pred of BB.
-    
+
     //The map between Labels and BB has been maintained.
     //resetMapBetweenLabelAndBB(bb);
     removeBB(bb);
@@ -1209,7 +1209,7 @@ bool IRCFG::removeTrampolinEdgeCase2(BBListIter bbct)
 
     IRBB * succ = get_first_succ(bb);
     ASSERT0(succ);
-    
+
     if (succ == bb) {
         //CASE: BB_pred
         //       |
@@ -1261,7 +1261,7 @@ bool IRCFG::removeTrampolinEdgeCase2(BBListIter bbct)
 
             addEdge(pred, succ);
             //bb->dupSuccessorPhiOpnd(this, m_rg, WhichPred(bb, succ));
-            
+
             removed = true;
             continue;
         }
@@ -1298,7 +1298,7 @@ bool IRCFG::removeTrampolinEdgeCase2(BBListIter bbct)
 
             GOTO_lab(last_xr_of_pred) = tgt_li;
             removeEdge(pred, bb);
-            
+
             addEdge(pred, succ);
 
             removed = true;
@@ -1376,7 +1376,7 @@ bool IRCFG::removeTrampolinEdgeCase1(BBListIter bbct)
         if (getInDegree(vex) > 1) {
             //'target' is not just the branch target of 'bb', thus
             //it can not be removed.
-            return false;    
+            return false;
         }
 
         //CASE1:Remove the redundant GOTO.
@@ -1478,7 +1478,7 @@ bool IRCFG::removeRedundantBranch()
                  s != nullptr; s = succs.get_next()) {
                 if (s == tmp_ct->val()) {
                     //Remove branch edge, leave fallthrough edge.
-                    removeEdge(bb, s);                    
+                    removeEdge(bb, s);
                 }
             }
             removed = true;
@@ -1572,7 +1572,7 @@ void IRCFG::dumpDOT(FILE * h, UINT flag)
             m_rg->getRegionName());
 
     MDSSAMgr const* mdssamgr = (MDSSAMgr const*)m_rg->getPassMgr()->queryPass(
-                               PASS_MD_SSA_MGR);    
+                               PASS_MD_SSA_MGR);
     if (mdssamgr == nullptr || !mdssamgr->is_valid()) {
         dump_mdssa = false;
     }
@@ -1587,7 +1587,7 @@ void IRCFG::dumpDOT(FILE * h, UINT flag)
         CHAR const* style = "bold";
         UINT fontsize = 12;
         IRBB * bb = getBB(v->id());
-        ASSERT0(bb);        
+        ASSERT0(bb);
         if (BB_is_catch_start(bb)) {
             font = "Times Bold";
             fontsize = 18;
@@ -1618,7 +1618,7 @@ void IRCFG::dumpDOT(FILE * h, UINT flag)
                     mdssamgr->dumpPhiList(philist);
                 }
             }
-            
+
             //Dump IR list.
             for (IR * ir = BB_first_ir(bb); ir != nullptr; ir = BB_next_ir(bb)) {
                 //The first \l is very important to display
@@ -1675,7 +1675,7 @@ void IRCFG::dumpDOT(FILE * h, UINT flag)
                 if (dump_eh) {
                     fprintf(h, "\nnode%d->node%d[style=dotted, "
                                "color=darkslategray, label=\"p%d %s\"]",
-                               e->from()->id(), e->to()->id(), pos, "");                        
+                               e->from()->id(), e->to()->id(), pos, "");
                 }
                 continue;
             }
@@ -1702,7 +1702,7 @@ void IRCFG::dumpDOT(FILE * h, UINT flag)
             if (dump_eh) {
                 fprintf(h, "\nnode%d->node%d[style=dotted, "
                            "color=darkslategray, label=\"%s\"]",
-                           e->from()->id(), e->to()->id(), "");                        
+                           e->from()->id(), e->to()->id(), "");
             }
             continue;
         }
@@ -1751,7 +1751,7 @@ void IRCFG::dump_node(bool detail, bool dump_mdssa)
                     "\nnode: {title:\"%d\" vertical_order:%d shape:%s color:%s "
                     "fontname:\"%s\" scaling:%d label:\"",
                     v->id(), vertical_order++, shape, color, font, scale);
-            fprintf(h, "   BB%d ", bb->rpo());            
+            fprintf(h, "   BB%d ", bb->rpo());
             fprintf(h, " rpo:%d ", VERTEX_rpo(v));
             dumpBBLabel(bb->getLabelList(), getRegion());
             fprintf(h, "\n");
@@ -1860,7 +1860,7 @@ void IRCFG::dump_edge(bool dump_eh)
                         e->from()->id(), e->to()->id(), pos2);
                 continue;
             }
-            
+
             if (CFGEI_is_eh(ei)) {
                 if (dump_eh) {
                     fprintf(h,

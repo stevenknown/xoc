@@ -149,8 +149,8 @@ class Refine : public Pass {
     IR * foldConstFloatUnary(IR * ir, bool & change);
     IR * foldConstFloatBinary(IR * ir, bool & change);
     IR * foldConstIntUnary(IR * ir, bool & change);
-    IR * foldConstIntBinary(IR * ir, bool & change);    
- 
+    IR * foldConstIntBinary(IR * ir, bool & change);
+
     //Check and insert data type CVT if it is necessary.
     IR * insertCvt(IR * parent, IR * kid, bool & change);
     void insertCvtForBinaryOp(IR * ir, bool & change);
@@ -192,6 +192,7 @@ class Refine : public Pass {
     IR * refineLoad(IR * ir);
     IR * refineILoad1(IR * ir, bool & change, RefineCtx & rc);
     IR * refineILoad2(IR * ir, bool & change, RefineCtx & rc);
+    IR * refineILoad3(IR * ir, bool & change, RefineCtx & rc);
     IR * refineILoad(IR * ir, bool & change, RefineCtx & rc);
     IR * refineDetViaSSAdu(IR * ir, bool & change);
     IR * refineDet(IR * ir_list, bool & change, RefineCtx & rc);

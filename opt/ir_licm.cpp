@@ -101,7 +101,7 @@ bool LICM::scanOpnd(IN LI<IRBB> * li, bool * islegal, bool first_scan)
             }
 
             if (!is_cand) { continue; }
-            
+
             //ir stmt is loop invariant.
             change |= chooseExpAndStmt(ir);
         }
@@ -229,7 +229,7 @@ bool LICM::chooseExpAndStmt(IR * ir)
         return false;
     }
     case IR_SWITCH: {
-        IR * e = SWITCH_vexp(ir);        
+        IR * e = SWITCH_vexp(ir);
         //CASE: assign const expression by ST/STPR
         //      a = 0x10;
         //Regard this stmt as loop invariant if a is not volatile.
@@ -317,7 +317,7 @@ bool LICM::scanResult()
             break;
         }
         case IR_CALL:
-        case IR_ICALL: {            
+        case IR_ICALL: {
             MD const* must = stmt->getRefMD();
             if ((!stmt->hasReturnValue() || isUniqueDef(must)) &&
                 stmt->isReadOnly() &&
@@ -365,7 +365,7 @@ void LICM::updateMD2Num(IR * ir)
             }
         }
         break;
-    }    
+    }
     case IR_CALL:
     case IR_ICALL: {
         ASSERT0(ir->isReadOnly());
@@ -616,7 +616,7 @@ bool LICM::tryHoistDefStmt(IR * def, OUT IRBB * prehead, OUT LI<IRBB> * li)
 //  |  |
 //  |  v
 //  |  BB_prehead
-//  | / 
+//  | /
 //  |/
 //  v
 //  BB_loophead
@@ -658,7 +658,7 @@ IRBB * LICM::insertGuardBB(IRBB * prehead, IRBB * loophead)
     //  |  /
     //  v v
     //  BB_loophead <--
-    m_cfg->addEdge(guard, loophead); 
+    m_cfg->addEdge(guard, loophead);
 
     //Build guard-branch, and insert it into guard-BB.
     IR * br = loophead->getLastIR();
@@ -674,7 +674,7 @@ IRBB * LICM::insertGuardBB(IRBB * prehead, IRBB * loophead)
         Refine::invertCondition(&det, m_rg);
     }
     ASSERT0(br->is_single());
-    
+
     //Set the label of taken-BB, note the taken target-BB should be loophead.
     LabelInfo const* li = loophead->getLabelList().get_head();
     ASSERT0(li);
@@ -692,7 +692,7 @@ IRBB * LICM::insertGuardBB(IRBB * prehead, IRBB * loophead)
 
 //Try to evaluate the value of loop execution condition.
 //Returnt true if this function evaluated successfully, otherwise return false.
-bool LICM::tryEvalLoopExecCondition(LI<IRBB> const* li,  
+bool LICM::tryEvalLoopExecCondition(LI<IRBB> const* li,
                                     bool & must_true,
                                     bool & must_false) const
 {
@@ -701,8 +701,8 @@ bool LICM::tryEvalLoopExecCondition(LI<IRBB> const* li,
     ASSERT0(head);
     IR const* last = const_cast<IRBB*>(head)->getLastIR();
     ASSERT0(last && last->isConditionalBr());
-  
-    //Try to evaluate the value of judgement operation. 
+
+    //Try to evaluate the value of judgement operation.
     return m_rce->calcCondMustVal(BR_det(last), must_true, must_false);
 }
 
@@ -772,7 +772,7 @@ bool LICM::hoistCandHelper(OUT bool & insert_guard_bb,
                 insert_guard_bb = true;
             }
         }
-        cand_stmt->getBB()->getIRList()->remove(cand_stmt);        
+        cand_stmt->getBB()->getIRList()->remove(cand_stmt);
         prehead->getIRList()->append_tail_ex(cand_stmt);
 
         //The code motion do not modify DU chain info of 'exp' and
@@ -796,7 +796,7 @@ bool LICM::hoistCandHelper(OUT bool & insert_guard_bb,
     //    p1 = cand_exp; //S2
     //    n = p1; //S3
     //move S2 into prehead BB.
-    IR * t = m_rg->buildPR(cand_exp->getType());    
+    IR * t = m_rg->buildPR(cand_exp->getType());
     if (cand_stmt->hasJudgeDet() && cand_exp == cand_stmt->getJudgeDet()) {
         bool f = cand_stmt->replaceKid(cand_exp, m_rg->buildJudge(t), false);
         CHECK0_DUMMYUSE(f);
@@ -889,7 +889,7 @@ bool LICM::hoistCand(OUT IRBB * prehead, OUT LI<IRBB> * li,
 //hoistCand may append stmt into BB which has down-boundary stmt.
 //That makes BB invalid. Split such invalid BB into two or more BBs.
 bool LICM::splitBBIfNeeded(IRBB * bb)
-{    
+{
     IRListIter it;
     for (bb->getIRList()->get_head(&it); it != nullptr;) {
         IRListIter cur = it;
@@ -968,7 +968,7 @@ bool LICM::perform(OptCtx & oc)
     if (m_rg->getBBList() == nullptr || m_rg->getBBList()->get_elem_count() == 0) {
         return false;
     }
-    
+
     if (!oc.is_ref_valid()) { return false; }
     m_mdssamgr = (MDSSAMgr*)m_rg->getPassMgr()->queryPass(PASS_MD_SSA_MGR);
     m_prssamgr = (PRSSAMgr*)m_rg->getPassMgr()->queryPass(PASS_PR_SSA_MGR);
@@ -982,7 +982,7 @@ bool LICM::perform(OptCtx & oc)
         //At least one kind of DU chain should be avaiable.
         return false;
     }
- 
+
     START_TIMER(t, getPassName());
     m_rg->getPassMgr()->checkValidAndRecompute(&oc, PASS_DOM, PASS_LOOP_INFO,
                                                PASS_UNDEF);
@@ -1018,7 +1018,7 @@ bool LICM::perform(OptCtx & oc)
                 m_rce->getGVN()->set_valid(false);
             }
         }
-        
+
         m_cfg->performMiscOpt(oc);
 
         //DU chain and du ref is maintained.

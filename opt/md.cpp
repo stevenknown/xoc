@@ -103,7 +103,7 @@ bool MD::is_exact_cover(MD const* m) const
 
 //Return true if current md intersect but may be not cover 'm', such as:
 //current md: |-------|
-//m:            |-------| 
+//m:            |-------|
 bool MD::is_overlap(MD const* m) const
 {
     ASSERT0(m && this != m);
@@ -324,7 +324,7 @@ bool MDSet::is_contain_only_taken_addr(MD const* md) const
 {
     if (md->is_global() &&
         md->get_base()->is_addr_taken() &&
-        DefSBitSetCore::is_contain(MD_GLOBAL_VAR) &&        
+        DefSBitSetCore::is_contain(MD_GLOBAL_VAR) &&
         MD_id(md) != MD_IMPORT_VAR) {
         return true;
     }
@@ -380,7 +380,7 @@ bool MDSet::is_overlap(MD const* md, Region const* current_ru) const
 
 
 //Return true if md is overlap with the elements in set.
-bool MDSet::is_overlap_only_taken_addr(MD const* md, 
+bool MDSet::is_overlap_only_taken_addr(MD const* md,
                                        Region const* current_ru) const
 {
     ASSERT0(current_ru);
@@ -389,7 +389,7 @@ bool MDSet::is_overlap_only_taken_addr(MD const* md,
 
     if (md->is_global() &&
         base->is_addr_taken() &&
-        DefSBitSetCore::is_contain(MD_GLOBAL_VAR) &&        
+        DefSBitSetCore::is_contain(MD_GLOBAL_VAR) &&
         MD_id(md) != MD_IMPORT_VAR) {
         return true;
     }

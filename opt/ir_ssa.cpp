@@ -430,7 +430,7 @@ void PRSSAMgr::dumpAllVPR() const
             //ASSERT0(def);
         }
         if (def != nullptr) {
-            ASSERT0(def->is_stmt());            
+            ASSERT0(def->is_stmt());
             if (def->isWritePR()) {
                 prt(getRegion(), "DEF:%s ($%d,id:%d)", IRNAME(def),
                     def->getPrno(), def->id());
@@ -470,7 +470,7 @@ void PRSSAMgr::dumpAllVPR() const
 //orgtype: data type of orginal prno
 VPR * PRSSAMgr::allocVPR(UINT prno, UINT version, Type const* orgtype)
 {
-    ASSERT0(prno != PRNO_UNDEF);    
+    ASSERT0(prno != PRNO_UNDEF);
     VPRVec * vec = m_map_prno2vpr_vec.get(prno);
     if (vec == nullptr) {
         vec = new VPRVec();
@@ -742,7 +742,7 @@ static void findLiveInDefInDomSet(IRCFG * cfg,
     *init_version = vprvec->findInitVersion();
 
     for (UINT bbid = start->id(); bbid != BBID_UNDEF;
-         bbid = ((DGraph*)cfg)->get_idom(bbid)) {         
+         bbid = ((DGraph*)cfg)->get_idom(bbid)) {
         VPR * vpr = vprvec->findVPR(bbid);
         if (vpr != nullptr) {
             *livein_def = vpr;
@@ -778,7 +778,7 @@ IR * PRSSAMgr::insertOpndAt(IR * phi, UINT pos, IRBB const* pred)
     VPR * livein_def = nullptr;
     VPR * init_version = nullptr;
     DUMMYUSE(findLiveInDefInDomSet);
-    //findLiveInDefInDomSet(cfg, vprvec, pred, &livein_def, &init_version);    
+    //findLiveInDefInDomSet(cfg, vprvec, pred, &livein_def, &init_version);
     findLiveInDef(cfg, vprvec, pred, &livein_def, &init_version);
 
     //Add current PR into USE set of lived-in VPR.
@@ -1006,7 +1006,7 @@ void PRSSAMgr::renameRHS(IR * ir, IRBB * bb)
         if (!ir->is_rhs(opnd) || !opnd->is_pr()) {
             continue;
         }
-    
+
         //Get the top-version on stack.
         Stack<VPR*> * vs = mapPRNO2VPStack(PR_no(opnd));
         ASSERT0(vs);
@@ -1018,13 +1018,13 @@ void PRSSAMgr::renameRHS(IR * ir, IRBB * bb)
                     ("parameter only has first version"));
             continue;
         }
-    
+
         //e.g: pr1 = pr2(vp1)
         //    vp1 will be renamed to vp2, so vp1 does not
         //    occur in current IR any more.
         VPR * curv = (VPR*)PR_ssainfo(opnd);
         ASSERT0(curv && curv->orgprno() == PR_no(opnd));
-    
+
         //Let latest version VPR regard current opnd as an USE.
         if (VPR_version(topv) == 0) {
             //Each opnd only meet once.
@@ -1040,7 +1040,7 @@ void PRSSAMgr::renameRHS(IR * ir, IRBB * bb)
             ASSERT0(VPR_version(curv) == 0 || curv->findUse(opnd));
             ASSERT0(VPR_version(curv) == 0 || SSA_def(curv) != nullptr);
             ASSERT0(!topv->findUse(opnd));
-    
+
             curv->removeUse(opnd);
             PR_ssainfo(opnd) = topv;
             topv->addUse(opnd);
@@ -1106,7 +1106,7 @@ bool PRSSAMgr::removeExpiredDUForStmt(IR * stmt, Region * rg)
         ni = SSA_uses(ssainfo).get_next(i, &si);
         IR const* use = rg->getIR(i);
         if (use->is_pr() && PR_no(use) == prno) { continue; }
-    
+
         ssainfo->removeUse(use);
         change = true;
     }
@@ -1122,7 +1122,7 @@ void PRSSAMgr::renameBB(IN IRBB * bb)
             renameRHS(ir, bb);
         }
         IR * res = ir->getResultPR();
-        if (res == nullptr) { continue; } 
+        if (res == nullptr) { continue; }
 
         //Rename result, include phi.
         ASSERT0(res->is_single());
@@ -1683,7 +1683,7 @@ bool PRSSAMgr::verifyVPR() const
             }
 
             //Each USE of current VPR must be defined by same stmt.
-            ASSERT0(use->getSSAInfo() == v);            
+            ASSERT0(use->getSSAInfo() == v);
         }
 
         if (opndprno != PRNO_UNDEF && defprno != PRNO_UNDEF) {
@@ -1899,7 +1899,7 @@ bool PRSSAMgr::refinePhi(List<IRBB*> & wl)
             nextirct = BB_irlist(bb).get_next(nextirct);
             IR * ir = irct->val();
             if (!ir->is_phi()) { break; }
-            
+
             IR * common_def = nullptr;
             if (!isRedundantPHI(ir, &common_def)) {
                 revisePhiDataType(ir, m_rg);
@@ -2103,7 +2103,7 @@ void PRSSAMgr::stripSpecifiedVP(VPR * vp)
          vit != nullptr; i = SSA_uses(vp).get_next(i, &vit)) {
         IR * use = m_rg->getIR(i);
         ASSERT0(use->is_pr());
-        
+
         //Rename PR.
         PR_no(use) = newprno;
 

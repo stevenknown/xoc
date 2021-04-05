@@ -175,7 +175,7 @@ void CDG::build(IN OUT OptCtx & oc, xcom::DGraph & cfg)
                 if (m_consider_cycle || pred != v) {
                     addEdge(pred->id(), v->id());
                 }
-            }            
+            }
         }
 
         //Transfer controlling to vertex in control-set of current vertex by

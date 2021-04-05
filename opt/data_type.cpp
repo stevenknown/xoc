@@ -609,7 +609,7 @@ bool Type::verify(TypeMgr const* tm) const
         ASSERTN(IS_SIMPLEX(TY_vec_ety(this)) || IS_PTR(TY_vec_ety(this)),
                 ("illegal vector elem type"));
         ASSERT0((TY_vec_size(this) >= tm->getDTypeByteSize(TY_vec_ety(this))) &&
-            (TY_vec_size(this) % tm->getDTypeByteSize(TY_vec_ety(this)) == 0));        
+            (TY_vec_size(this) % tm->getDTypeByteSize(TY_vec_ety(this)) == 0));
     }
     return true;
 }

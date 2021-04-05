@@ -706,7 +706,7 @@ public:
         ASSERT0(FUNDEF < fmt && fmt < FNUM);
         return m_usable[fmt][is_def];
     }
-    
+
     Region * getRegion() const { return m_rg; }
     BitSet * get_4();
     BitSet * get_8();

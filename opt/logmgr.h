@@ -103,9 +103,9 @@ public:
     CHAR const* getFileName() const { return m_ctx.logfile_name; }
     INT getIndent() const { return m_ctx.indent; }
     CHAR getIndentChar() const { return m_ctx.indent_char; }
-   
+
     //Return true if replace 'newline' charactor with '\l' when
-    //dumpping DOT file. 
+    //dumpping DOT file.
     bool isReplaceNewline() const { return m_ctx.replace_newline; }
 
     //Initialze log file.

@@ -257,7 +257,7 @@ public:
         }
     }
     void chainPredAndSucc(UINT vid, bool is_single_pred_succ = false);
-    void computeRPO(OptCtx & oc);    
+    void computeRPO(OptCtx & oc);
     //Count memory usage for current object.
     size_t count_mem() const
     {
@@ -664,7 +664,7 @@ bool CFG<BB, XR>::verifyIfBBRemoved(IN CDG * cdg, OptCtx & oc)
             }
             continue;
         }
-        
+
         if (last_xr != nullptr && last_xr->isConditionalBr()) {
             //CASE:Check legalization of fallthrough edge and target edge.
             //     condbr L1
@@ -843,7 +843,7 @@ bool CFG<BB, XR>::removeEmptyBBHelper(BB * bb,
     removeBB(bbct);
     doit = true;
     return doit;
-} 
+}
 
 
 //Remove empty bb, and merger label info.

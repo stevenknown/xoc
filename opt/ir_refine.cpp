@@ -323,6 +323,45 @@ IR * Refine::refineILoad2(IR * ir, bool & change, RefineCtx & rc)
 }
 
 
+IR * Refine::refineILoad3(IR * ir, bool & change, RefineCtx & rc)
+{
+    ASSERT0(ir->is_ild() && ILD_base(ir)->is_add());
+    ASSERT0(BIN_opnd1(ILD_base(ir))->is_int() &&
+            BIN_opnd1(ILD_base(ir))->is_const());
+    //Convert
+    //---------------------
+    //  ILD
+    //    ADD
+    //      AnyKid
+    //      IMM 4
+    //=>
+    //  ILD, 4
+    //    AnyKid
+    //---------------------
+    //  ILD, ofst2
+    //    ADD
+    //      AnyKid
+    //      IMM 4
+    //=>
+    //  ILD, ofst2 + 4
+    //    AnyKid
+    IR * add = ILD_base(ir);
+    HOST_INT imm = ((CConst*)BIN_opnd1(add))->getInt();
+    if (imm < 0) { return ir; }
+
+    ir->setOffset(ir->getOffset() + (UINT)imm);
+
+    IR * anykid = BIN_opnd0(add);
+    BIN_opnd0(add) = nullptr;
+    ILD_base(ir) = anykid;
+    ir->setParent(anykid);
+
+    m_rg->freeIRTree(add);
+    change = true;
+    return ir;
+}
+
+
 IR * Refine::refineILoad(IR * ir, bool & change, RefineCtx & rc)
 {
     ASSERT0(ir->is_ild());
@@ -342,6 +381,26 @@ IR * Refine::refineILoad(IR * ir, bool & change, RefineCtx & rc)
         //=>
         //    LD,ofst1+ofst2
         return refineILoad2(ir, change, rc);
+    } else if (base->is_add() && BIN_opnd1(base)->is_int() &&
+               BIN_opnd1(base)->is_const()) {
+        //Convert
+        //---------------------
+        //  ILD
+        //    ADD
+        //      AnyKid
+        //      IMM 4
+        //=>
+        //  ILD, 4
+        //    AnyKid
+        //---------------------
+        //  ILD, ofst2
+        //    ADD
+        //      AnyKid
+        //      IMM 4
+        //=>
+        //  ILD, ofst2 + 4
+        //    AnyKid
+        return refineILoad3(ir, change, rc);
     } else {
         ILD_base(ir) = refineIR(base, change, rc);
         if (change) {
@@ -963,11 +1022,11 @@ IR * Refine::refineDiv(IR * ir, bool & change, RefineCtx & rc)
             removeIRTreeUse(ir, m_rg);
             m_rg->freeIRTree(ir);
             ir = op0_of_op0;
-            change = true; 
+            change = true;
         }
         return ir;
     }
- 
+
     return ir;
 }
 
@@ -1057,10 +1116,31 @@ IR * Refine::refineAdd(IR * ir, bool & change)
             BIN_opnd0(op0) = nullptr;
             m_rg->freeIRTree(ir);
             ir = op0_of_op0;
-            change = true; 
+            change = true;
         }
         return ir;
     }
+
+    if (op0->is_lda() && op1->is_const() && op1->is_int()) {
+        //  add:*<80>
+        //    lda:*<1600> 's'
+        //    intconst:u32 200
+        //====>
+        //  lda:*<80>, offset=200 's'
+        HOST_INT imm = ((CConst*)op1)->getInt();
+        if (imm >= 0) {
+            IR_dt(op0) = ir->getType();
+            op0->setOffset(op0->getOffset() + (UINT)imm);
+            BIN_opnd0(ir) = nullptr;
+
+            IR * tmp = ir;
+            ir = op0;
+            m_rg->freeIRTree(tmp);
+            change = true;
+        }
+        return ir;
+    }
+
     return ir;
 }
 
@@ -1149,7 +1229,7 @@ IR * Refine::refineMul(IR * ir, bool & change, RefineCtx & rc)
             removeIRTreeUse(ir, m_rg);
             m_rg->freeIRTree(ir);
             ir = op0_of_op0;
-            change = true; 
+            change = true;
         }
         return ir;
     }
@@ -1237,7 +1317,7 @@ IR * Refine::refineLand(IR * ir, bool & change)
 IR * Refine::refineLor(IR * ir, bool & change)
 {
     ASSERT0(ir->is_lor());
-    IR * op0 = BIN_opnd0(ir);    
+    IR * op0 = BIN_opnd0(ir);
     if (op0->is_const() && op0->is_int() && CONST_int_val(op0) == 1) {
         //1 || x => 1
         removeIRTreeUse(ir, m_rg);
@@ -1657,7 +1737,7 @@ IR * Refine::refineStoreArray(IR * ir, bool & change, RefineCtx & rc)
                     BB_irlist(bb).remove(ir);
                     RC_stmt_removed(rc) = true;
                 }
-  
+
                 xoc::removeStmt(ir, m_rg);
                 m_rg->freeIRTree(ir);
                 return nullptr;
@@ -1884,6 +1964,13 @@ IR * Refine::refineIR(IR * ir, bool & change, RefineCtx & rc)
     case IR_GE:
     case IR_EQ:
     case IR_NE: {
+        //According input setting to do refinement.
+        bool lchange = false;
+        BIN_opnd0(ir) = refineIR(BIN_opnd0(ir), lchange, rc);
+        BIN_opnd1(ir) = refineIR(BIN_opnd1(ir), lchange, rc);
+        if (lchange) { ir->setParentPointer(false); }
+        change |= lchange;
+
         //Do NOT do foldConst for conditional expr.
         //e.g: If NE(1, 0) => 1, one should generate NE(1, 0) again,
         //because of TRUEBR/FALSEBR do not accept IR_CONST.
@@ -2073,7 +2160,7 @@ bool Refine::refineBBlist(IN OUT BBList * ir_bb_list,
         }
         OC_is_expr_tab_valid(oc) = false;
         OC_is_live_expr_valid(oc) = false;
-        OC_is_reach_def_valid(oc) = false;        
+        OC_is_reach_def_valid(oc) = false;
     }
     return change;
 }
@@ -2336,7 +2423,7 @@ IR * Refine::foldConstIntBinary(IR * ir, bool & change)
         //Keep IR unchanged because it will trigger runtime exception.
         return ir;
     }
-    
+
     switch (ir->getCode()) {
     case IR_ADD:
     case IR_SUB:

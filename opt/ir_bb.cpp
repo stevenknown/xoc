@@ -308,7 +308,7 @@ void IRBB::addSuccessorDesignatePhiOpnd(CFG<IRBB, IR> * cfg, IRBB * succ)
     PRSSAMgr * prssamgr = (PRSSAMgr*)ircfg->getRegion()->getPassMgr()->
         queryPass(PASS_PR_SSA_MGR);
     if (prssamgr != nullptr && prssamgr->is_valid()) {
-        prssamgr->addSuccessorDesignatePhiOpnd(this, succ);        
+        prssamgr->addSuccessorDesignatePhiOpnd(this, succ);
     }
 
     MDSSAMgr * mdssamgr = (MDSSAMgr*)ircfg->getRegion()->getPassMgr()->

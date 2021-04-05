@@ -339,7 +339,7 @@ public:
         init();
     }
 
-    //Count memory usage for current object.    
+    //Count memory usage for current object.
     size_t count_mem(FILE * h = nullptr) const;
 
     inline void free(IN BitSet * bs) //free bs for next use.

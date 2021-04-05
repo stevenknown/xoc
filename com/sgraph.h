@@ -616,7 +616,7 @@ public:
 
         //Set to sparse.
         if (m_sparse_vertex == nullptr) {
-            m_sparse_vertex = new VertexHash(m_vex_hash_size);    
+            m_sparse_vertex = new VertexHash(m_vex_hash_size);
         }
         if (m_dense_vertex != nullptr) {
             delete m_dense_vertex;

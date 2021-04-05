@@ -779,13 +779,14 @@ public:
         return TC_type(registerVector(&d));
     }
 
-    //Register and return pointer type tyid accroding to pointer-base-size.
+    //Register and return pointer type accroding to pt_base_size.
+    //pt_base_sz: byte size of pointer's base type.
     Type const* getPointerType(UINT pt_base_sz)
     {
         //Pointer base size can be zero.
         //Note if pointer base size is 0, that means the pointer can not
         //do any arthimetic, because pointer arithmetic may use pointer
-        //base size as addend.
+        //base size as an addend.
         //ASSERT0(pt_base_sz != 0);
         PointerType d;
         TY_dtype(&d) = D_PTR;

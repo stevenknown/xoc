@@ -34,7 +34,7 @@ author: Su Zhenyu
 #ifndef _EX1_H_
 #define _EX1_H_
 
-class CVAR : public VAR {
+class CVAR : public Var {
 public:
     virtual CHAR const* dumpVARDecl(OUT StrBuf & buf) const { return NULL; }
 };
@@ -44,7 +44,7 @@ class CVarMgr : public VarMgr {
 public:
     CVarMgr(RegionMgr * mgr) : VarMgr(mgr) {}
     virtual ~CVarMgr() {}
-    virtual VAR * allocVAR() { return new CVAR(); }
+    virtual Var * allocVAR() { return new CVAR(); }
 };
 
 

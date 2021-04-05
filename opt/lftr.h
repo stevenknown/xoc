@@ -96,10 +96,10 @@ protected:
     void getLinearRepOfIV(IR const* lf_exp, IV const** iv, IR const** coeff);
     LFRInfo * genLFRInfo(IR const* lf_exp)
     {
-        LFRInfo * info = m_cand_occ2info.get(lf_exp); 
+        LFRInfo * info = m_cand_occ2info.get(lf_exp);
         if (info == nullptr) {
             info = allocLFRInfo();
-            m_cand_occ2info.set(lf_exp, info); 
+            m_cand_occ2info.set(lf_exp, info);
         }
         return info;
     }

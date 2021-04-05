@@ -211,7 +211,7 @@ public:
                     //expression even if it is inexact.
                     //e.g: s is MC type.
                     //    s = *p
-                    //    *q = s 
+                    //    *q = s
                     //  *p can be propagated.
                     //return false;
                 }

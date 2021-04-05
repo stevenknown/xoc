@@ -70,7 +70,7 @@ bool RCE::calcCondMustVal(IR const* ir,
     case IR_LAND:
     case IR_LOR:
     case IR_LNOT: {
-        if (ir->is_const()) {            
+        if (ir->is_const()) {
             if (CONST_int_val(ir) == 1) {
                 must_true = true;
             } else if (CONST_int_val(ir) == 0) {

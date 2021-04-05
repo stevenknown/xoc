@@ -106,7 +106,7 @@ static void fixupInnerLoopEdgeBetweenHeadAndPreheader(LI<IRBB> const* li,
     //   |
     // ---
     // |  BB_1<--...
-    // |  |      
+    // |  |
     // |  | //fallthrough
     // v  v
     // BB_header
@@ -117,7 +117,7 @@ static void fixupInnerLoopEdgeBetweenHeadAndPreheader(LI<IRBB> const* li,
     //   |
     // ---
     // |  BB_1<--...
-    // |  |      
+    // |  |
     // |  | //can not be fallthrough, have to be fixed.
     // v  v
     // BB_preheader
@@ -248,7 +248,7 @@ static bool updateEdgeBetweenHeadAndPreheader(LI<IRBB> const* li,
 //Move LabelInfos from head to preheader except LabelInfos that
 //are the target of IR that belongs to loop body.
 static void tryMoveLabelFromHeadToPreheader(LI<IRBB> const* li,
-                                            IRCFG * cfg, 
+                                            IRCFG * cfg,
                                             IRBB * head,
                                             IRBB * preheader)
 {
@@ -406,7 +406,7 @@ IRBB * findAndInsertPreheader(LI<IRBB> const* li,
 
     IRBB * preheader = rg->allocBB();
     cfg->addBB(preheader);
-    bblst->insert_before(preheader, bbholder);    
+    bblst->insert_before(preheader, bbholder);
     insert_bb |= updateEdgeBetweenHeadAndPreheader(li, rg, head, preheader);
     tryMoveLabelFromHeadToPreheader(li, cfg,head, preheader);
     return preheader;
@@ -426,9 +426,9 @@ static bool isLoopInvariantInPRSSA(IR const* ir,
     //Note IR_PHI should have been analyzed and inserted into invariant_stmt
     //if it's operand is invariant.
     IRBB * defbb = def->getBB();
-    ASSERT0(defbb);    
+    ASSERT0(defbb);
     if (!li->isInsideLoop(defbb->id()) ||
-        (invariant_stmt != nullptr && 
+        (invariant_stmt != nullptr &&
          invariant_stmt->find(const_cast<IR*>(def)))) {
         return true;
     }
@@ -448,15 +448,15 @@ static bool isRealMDDefInvariant(MDDef const* mddef,
     ASSERT0(defbb);
     if (!li->isInsideLoop(defbb->id())) { return true; }
     if (invariant_stmt == nullptr ||
-        (invariant_stmt != nullptr && 
+        (invariant_stmt != nullptr &&
          !invariant_stmt->find(const_cast<IR*>(def)))) {
         return false;
     }
-    return true; 
+    return true;
 }
 
 
-static bool isMDPhiInvariant(MDDef const* start, 
+static bool isMDPhiInvariant(MDDef const* start,
                              IR const* use,
                              LI<IRBB> const* li,
                              InvStmtList const* invariant_stmt,
@@ -466,14 +466,14 @@ static bool isMDPhiInvariant(MDDef const* start,
     ConstMDDefIter ii;
     for (MDDef const* def =
             mdssamgr->iterDefInitCTillKillingDef(start, use, ii);
-         def != nullptr; def = mdssamgr->iterDefNextCTillKillingDef(use, ii)) {        
+         def != nullptr; def = mdssamgr->iterDefNextCTillKillingDef(use, ii)) {
         if (def->is_phi() || def == start) {
             continue;
         }
         if (!isRealMDDefInvariant(def, li, invariant_stmt, mdssamgr)) {
-            return false;     
+            return false;
         }
-    }    
+    }
     return true;
 }
 
@@ -528,7 +528,7 @@ static bool isLoopInvariantInDUMgr(IR const* ir,
 
         if (!li->isInsideLoop(defbb->id())) { continue; }
         if (invariant_stmt == nullptr ||
-            (invariant_stmt != nullptr && 
+            (invariant_stmt != nullptr &&
              !invariant_stmt->find(const_cast<IR*>(def)))) {
             return false;
         }
@@ -606,7 +606,7 @@ bool insertPreheader(LI<IRBB> * li, Region * rg, OUT IRBB ** preheader)
         //Update loop body BB set, add preheader to outer loop body.
         li->getOuter()->getBodyBBSet()->bunion(p->id());
     }
-    
+
     ASSERT0(preheader);
     *preheader = p;
     return inserted;

@@ -133,7 +133,7 @@ public:
     {
         ASSERT0(ir && ir->isReadPR());
         SSA_uses(this).remove(ir);
-    }    
+    }
 };
 
 

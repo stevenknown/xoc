@@ -359,7 +359,7 @@ protected:
                                    DUSet * expdu);
     void checkMustMDAndBuildDUChainForPotentialDefList(IR const* exp,
                                                        MD const* expmd,
-                                                       DUSet * expdu);    
+                                                       DUSet * expdu);
     bool checkIsLocalKillingDefForDirectAccess(MD const* defmd,
                                                MD const* usemd,
                                                IR const* stmt);
@@ -450,7 +450,7 @@ protected:
     void resetGlobalSet(bool cleanMember);
     void updateDefWithMustEffectMD(IR * ir, MD const* musteffect);
     void updateDefWithMustExactMD(IR * ir, MD const* mustexact);
-    void updateDef(IR * ir, UINT flag);    
+    void updateDef(IR * ir, UINT flag);
 public:
     explicit DUMgr(Region * rg);
     ~DUMgr();
@@ -758,14 +758,14 @@ public:
     //'def': STPR stmt.
     //'use': must be expression.
     //'is_recur': true if one intend to compute the mayuse MDSet to walk
-    //            through IR tree recusively.    
+    //            through IR tree recusively.
     bool isStprMayDef(IR const* def, IR const* use, bool is_recur);
 
     //Return true if 'call' may or must modify MDSet that 'use' referenced.
     //'call': CALL/ICALL stmt.
     //'use': must be expression.
     //'is_recur': true if one intend to compute the mayuse MDSet to walk
-    //            through IR tree recusively.    
+    //            through IR tree recusively.
     bool isCallMayDef(IR const* def, IR const* use, bool is_recur);
     //Return true if 'def' may or must modify MDSet that 'use' referenced.
     //'def': must be stmt.
@@ -1017,7 +1017,7 @@ public:
 };
 
 //Verify DU chain's sanity.
-//Verify if DU chain is correct between each Def and Use of MD.    
+//Verify if DU chain is correct between each Def and Use of MD.
 bool verifyMDDUChain(Region * rg, UINT duflag = DUOPT_COMPUTE_PR_DU |
                                                 DUOPT_COMPUTE_NONPR_DU);
 

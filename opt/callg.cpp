@@ -129,7 +129,7 @@ void CallGraph::dumpVCG(CHAR const* name, INT flag)
             "edge.color: darkgreen\n");
 
     //Dump graph vertex.
-    getRegionMgr()->getLogMgr()->push(h, name); 
+    getRegionMgr()->getLogMgr()->push(h, name);
     VertexIter itv = VERTEX_UNDEF;
     List<Var const*> formalparamlst;
     for (xcom::Vertex * v = get_first_vertex(itv);
@@ -185,7 +185,7 @@ void CallGraph::dumpVCG(CHAR const* name, INT flag)
         fprintf(h, "\nedge: { sourcename:\"%d\" targetname:\"%d\" %s}",
                 from->id(), to->id(),  "");
     }
-    getRegionMgr()->getLogMgr()->pop(); 
+    getRegionMgr()->getLogMgr()->pop();
     getRegionMgr()->getLogMgr()->incIndent(org);
     fprintf(h, "\n}\n");
     fclose(h);

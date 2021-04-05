@@ -368,7 +368,8 @@ bool IRDesc::mustExist(IR_TYPE irtype, UINT kididx)
 //END IRDesc
 
 
-//Dump IR, and both its kids and siblings.
+//Dump IR list with a logging header-notation.
+//Dump both its kids and siblings.
 void dumpIRListH(IR const* ir_list, Region const* rg, CHAR * attr,
                  UINT dumpflag)
 {
@@ -958,7 +959,7 @@ void dumpIR(IR const* ir, Region const* rg, IN CHAR * attr, UINT dumpflag)
     }
     case IR_CONST:
         note(rg, "\n");
-        dumpConst(ir, rg); 
+        dumpConst(ir, rg);
         PADDR(ir);
         prt(rg, "%s", attr);
         break;
@@ -2366,7 +2367,7 @@ IR * IR::getOpndPR(UINT prno) const
         if (kid != nullptr && kid->isReadPR() && kid->getPrno() == prno) {
             ASSERTN(!kid->isWritePR(), ("stmt should not be kid in IR tree"));
             return kid;
-        } 
+        }
         IR * f = kid->getOpndPR(prno);
         if (f != nullptr) { return f; }
     }
@@ -2386,7 +2387,7 @@ IR * IR::getOpndMem(MD const* md) const
         IR * kid = getKid(i);
         if (kid != nullptr && kid->isMemoryRef() && kid->getRefMD() == md) {
             return kid;
-        } 
+        }
         IR * f = kid->getOpndMem(md);
         if (f != nullptr) { return f; }
     }
@@ -3436,7 +3437,7 @@ bool IR::isNotOverlapViaMDRef(IR const* ir2) const
     MDSet const* may1 = getRefMDSet();
     MDSet const* may2 = ir2->getRefMDSet();
     if (must1 != nullptr && must2 != nullptr && must1->is_overlap(must2)) {
-        return false;        
+        return false;
     }
     if (must1 != nullptr &&
         may2 != nullptr &&
@@ -3612,7 +3613,7 @@ void CSwitch::addToBody(UINT num, ...)
 //the Call referrenced.
 //Note dummyuse may be a list of IR.
 void CCall::addDummyUse(Region * rg)
-{    
+{
     IR * newdummyuse = rg->buildILoad(rg->buildImmAny(0),
                                       rg->getTypeMgr()->getAny());
     IR_parent(newdummyuse) = this;

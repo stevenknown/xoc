@@ -191,7 +191,7 @@ ExpRep * ExprTab::append_expr(IR * ir)
         //Generate copy of 'ir'.
         ExpRep * ie = new_ir_expr();
         EXPR_id(ie) = ++m_expr_count;
-        EXPR_ir(ie) = m_rg->dupIRTree(ir);        
+        EXPR_ir(ie) = m_rg->dupIRTree(ir);
         m_ir_expr_vec.set(EXPR_id(ie), ie);
 
         //Enter into 'ir'

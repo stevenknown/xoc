@@ -298,7 +298,7 @@ public:
     //This function will clean all informations and recreate them.
     inline void reinit()
     {
-        destroy(true);        
+        destroy(true);
         init();
     }
     //Before removing BB or change BB successor,

@@ -56,7 +56,7 @@ public:
     UINT id;
     #endif
     UINT start;
-    BitSet bs;    
+    BitSet bs;
 
     SEG()
     {
@@ -143,7 +143,7 @@ public:
         s->id = seg_count;
         allocated.bunion(s->id);
         #endif
-        
+
         return s;
     }
 
@@ -170,7 +170,7 @@ public:
         if (seg_count != n) {
             debugSegMgr();
         }
-        ASSERTN(seg_count == n, ("MemLeak! There still are SEGs not freed"));        
+        ASSERTN(seg_count == n, ("MemLeak! There still are SEGs not freed"));
         #endif
 
         for (TSEGIter * sc = m_free_list.get_head();
@@ -184,7 +184,7 @@ public:
         //thus delete pool at first.
         m_free_list.clean();
         ASSERTN(m_free_list.get_pool(), ("miss pool"));
-        smpoolDelete(m_free_list.get_pool());        
+        smpoolDelete(m_free_list.get_pool());
         m_free_list.set_pool(nullptr);
     }
 
@@ -197,7 +197,7 @@ public:
         s->clean();
         m_free_list.append_head(s);
     }
-    
+
     //Count memory usage for current object.
     size_t count_mem() const
     {

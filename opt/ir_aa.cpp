@@ -1146,7 +1146,7 @@ void AliasAnalysis::inferPointerArith(IR const* ir,
     }
 
     ASSERT0(AC_returned_pts(opnd0_ic) == nullptr);
-    
+
     if (isInLoop(ir->getStmt())) {
         //Pointer arithmetic causes ambiguous memory access.
         //e.g: while (...) { p = p+1 }
@@ -1200,7 +1200,7 @@ bool AliasAnalysis::isInLoop(IR const* ir)
     IRBB * bb = ir->getBB();
     ASSERT0(bb);
     LI<IRBB> const* li = m_cfg->getLoopInfo();
-    
+
     //Only have to check the outermost loop body.
     for (; li != nullptr; li = LI_next(li)) {
         if (li->isInsideLoop(bb->id())) {
@@ -1209,7 +1209,7 @@ bool AliasAnalysis::isInLoop(IR const* ir)
     }
 
     ASSERT0(m_scc);
-    if (m_scc->isInSCC(bb)) { return true; } 
+    if (m_scc->isInSCC(bb)) { return true; }
 
     return false;
 }
@@ -1294,9 +1294,9 @@ MD const* AliasAnalysis::assignPRMD(IR * ir,
     ASSERT0(mds && ic);
     MD const* tmp = nullptr;
     if (!m_is_visit.is_contain(ir->id())) {
-        m_is_visit.bunion(ir->id());        
+        m_is_visit.bunion(ir->id());
         AC_is_mds_mod(ic) = true;
-    } else {    
+    } else {
         AC_is_mds_mod(ic) = false;
     }
     tmp = ir->getMustRef();
@@ -1379,7 +1379,7 @@ MD const* AliasAnalysis::assignLoadMD(IR * ir,
     ASSERT0(mx);
     AC_is_mds_mod(ic) = true;
     MDSet const* pts = getPointTo(MD_id(t), *mx);
-    
+
     MD const* typed_md = nullptr;
     if (pts != nullptr && !pts->is_empty()) {
         if (pts->is_contain_global() &&
@@ -1418,7 +1418,7 @@ MD const* AliasAnalysis::assignIdMD(IR * ir,
     MD const* t = nullptr;
     AC_returned_pts(ic) = nullptr;
     if (!m_is_visit.is_contain(ir->id())) {
-        m_is_visit.bunion(ir->id());        
+        m_is_visit.bunion(ir->id());
         AC_is_mds_mod(ic) = true;
     } else {
         AC_is_mds_mod(ic) = false;
@@ -1651,7 +1651,7 @@ void AliasAnalysis::processConst(IR * ir,
         //'ir' describes memory address of string const.
         //Add a new Var to describe the string.
         //'mds' : record memory descriptor of 'ir'.
-        m_rg->allocStringMD(CONST_str_val(ir));        
+        m_rg->allocStringMD(CONST_str_val(ir));
         if (!m_is_visit.is_contain(ir->id())) {
             m_is_visit.bunion(ir->id());
             AC_is_mds_mod(ic) = true;
@@ -1741,7 +1741,7 @@ void AliasAnalysis::inferStoreValue(IR const* ir,
         //of 'rhs' expression.
         AC_comp_pt(&rhsic) = true;
     }
-    
+
     MDSet rhsrefmds;
     inferExpression(rhs, rhsrefmds, &rhsic, mx);
     recomputeDataType(rhsic, ir, rhsrefmds);
@@ -3134,7 +3134,7 @@ void AliasAnalysis::dumpIRPointToForRegion(bool dump_kid) const
     ASSERT0(m_maypts);
     m_maypts->dump(m_md_sys, true);
 
-    note(getRegion(), "\n-- DUMP IR POINT-TO: --");    
+    note(getRegion(), "\n-- DUMP IR POINT-TO: --");
     BBList * bbl = m_cfg->getBBList();
     for (IRBB * bb = bbl->get_head(); bb != nullptr; bb = bbl->get_next()) {
         dumpIRPointToForBB(bb, dump_kid);
@@ -3314,7 +3314,7 @@ void AliasAnalysis::computeStmt(IRBB const* bb, IN OUT MD2MDSet * mx)
          ir != nullptr; ir = BB_irlist(readonly_bb).get_next(&ct)) {
         ASSERT0(isValidStmtToAA(ir));
         switch (ir->getCode()) {
-        case IR_ST:            
+        case IR_ST:
             processStore(ir, mx);
             break;
         case IR_STPR:
@@ -3510,12 +3510,12 @@ bool AliasAnalysis::computeFlowSensitive(List<IRBB*> const& bbl,
     bool change = true;
     UINT count = 0;
     xcom::BitSet is_bb_changed(m_rg->getBBMgr()->getBBCount() /
-                               BITS_PER_BYTE + 1);    
+                               BITS_PER_BYTE + 1);
     PtPairSet * tmp = ppsetmgr.allocPtPairSet();
     DefMiscBitSetMgr * sbsmgr = ppsetmgr.getSBSMgr();
     is_bb_changed.set(0xFF);
     for (; change && count < 20;) {
-        count++;        
+        count++;
         bool first = count == 1;
         change = false;
         BBListIter ct = nullptr;
@@ -3555,8 +3555,8 @@ bool AliasAnalysis::computeFlowSensitive(List<IRBB*> const& bbl,
                 } else {
                     is_bb_changed.diff(bb->id());
                 }
-                
-                #else                
+
+                #else
 
                 if (!pps->is_equal(*tmp)) {
                     pps->copy(*tmp, *sbsmgr);
@@ -3569,7 +3569,7 @@ bool AliasAnalysis::computeFlowSensitive(List<IRBB*> const& bbl,
                     //info and DU analysis.
                     md2mds->clean();
                     convertPT2MD2MDSet(*pps, m_ppmgr, md2mds);
-                }                
+                }
                 #endif
             }
 
@@ -3579,16 +3579,16 @@ bool AliasAnalysis::computeFlowSensitive(List<IRBB*> const& bbl,
             if (!convertMD2MDSet2PT(tmp, m_ppmgr, ppsetmgr, md2mds)) {
                 return false;
             }
-        
+
             #ifdef _DEBUG_
             //MD2MDSet x;
-            //convertPT2MD2MDSet(tmp, m_ppmgr, &x);            
+            //convertPT2MD2MDSet(tmp, m_ppmgr, &x);
             //dumpMD2MDSet(&x, false);
             #endif
             pps = getOutPtPairSet(bb);
             if (!pps->is_equal(*tmp)) {
                 pps->copy(*tmp, *sbsmgr);
-                change = true;                
+                change = true;
                 for (xcom::EdgeC * el = m_cfg->getVertex(bb->id())->
                         getOutList();
                      el != nullptr; el = el->get_next()) {
@@ -3596,7 +3596,7 @@ bool AliasAnalysis::computeFlowSensitive(List<IRBB*> const& bbl,
                     ASSERT0(s);
                     is_bb_changed.bunion(s->id());
                 }
-            }            
+            }
         } //for each BB
     } //each iter
     ASSERTN(!change, ("Iterate too many times"));
@@ -3715,7 +3715,7 @@ void AliasAnalysis::initBBPPSet(PPSetMgr & ppsetmgr)
         m_out_pp_set.grow(bbnum);
         m_md2mds_vec.grow(bbnum);
     }
-    
+
     BBListIter ct;
     for (IRBB * bb = bblst->get_head(&ct);
          bb != nullptr; bb = bblst->get_next(&ct)) {
@@ -3768,7 +3768,7 @@ void AliasAnalysis::initFlowSensitiveEntryPtset(PPSetMgr & ppsetmgr)
 //    where p and q are entry MD.
 //ptset_arr: used to record all the PtPair set. It will be deleted by caller.
 void AliasAnalysis::initEntryPtset(PPSetMgr & ppsetmgr)
-{    
+{
     if (m_flow_sensitive) {
         initFlowSensitiveEntryPtset(ppsetmgr);
         return;
@@ -3904,7 +3904,7 @@ bool AliasAnalysis::perform(IN OUT OptCtx & oc)
     clean();
 
     //We allocate PtPairSet at each call of AA,
-    //because AA would not be invoked frequently.    
+    //because AA would not be invoked frequently.
     if (m_flow_sensitive) {
         PPSetMgr ppsetmgr;
         m_rg->getPassMgr()->checkValidAndRecompute(&oc, PASS_LOOP_INFO,

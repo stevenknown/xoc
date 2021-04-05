@@ -1312,7 +1312,7 @@ public:
 };
 
 
-//This class represent memory load operation.
+//This class represents memory load operation.
 //LD_ofst descibe the byte offset that is the addend to variable base address.
 //
 //usage: ld(i32, ofst:10, s) with LD_ofst = 10 means:
@@ -1326,7 +1326,7 @@ class CLd : public DuProp, public VarProp, public OffsetProp {
 };
 
 
-//This class represent indirect memory load operation.
+//This class represents indirect memory load operation.
 //ILD_ofst descibe the byte offset that is the addend to address.
 //If ILD_ofst is not 0, the base memory address must add the offset.
 //
@@ -1344,7 +1344,7 @@ public:
 };
 
 
-//This class represent properties of stmt.
+//This class represents properties of stmt.
 class StmtProp {
     COPY_CONSTRUCTOR(StmtProp);
 public:
@@ -1352,7 +1352,7 @@ public:
 };
 
 
-//This class represent memory store operation.
+//This class represents memory store operation.
 //ST_ofst descibe the byte offset that is the addend to address.
 //ST_idinfo describe the memory variable.
 //If ST_ofst is not 0, the base memory address must add the offset.
@@ -1373,7 +1373,7 @@ public:
 };
 
 
-//This class represent temporary memory store operation.
+//This class represents temporary memory store operation.
 //The temporary memory named pseudo register.
 //usage: stpr(prno:1, val), will store val to PR1.
 #define STPR_bb(ir) (((CStpr*)CK_IRT(ir, IR_STPR))->bb)
@@ -1391,7 +1391,7 @@ public:
 };
 
 
-//This class represent an operation that store value to be part of the section
+//This class represents an operation that store value to be part of the section
 //of 'base'.
 //NOTE: Type of result PR should same with base.
 //SETELEM_ofst descibe the byte offset to the start address of result PR.
@@ -1423,7 +1423,7 @@ public:
 };
 
 
-//This class represent an operation that get an element from a base memory
+//This class represents an operation that get an element from a base memory
 //location and store the element to a PR.
 //
 //The the number of byte of GETELEM_base must be
@@ -1452,7 +1452,7 @@ public:
 };
 
 
-//This class represent indirect memory store operation.
+//This class represents indirect memory store operation.
 //IST_ofst descibe the byte offset that is the addend to address.
 //
 //If IST_ofst is not 0, the base memory address must add the offset.
@@ -1474,7 +1474,7 @@ public:
 };
 
 
-//This class represent the operation to load memory variable address.
+//This class represents the operation to load memory variable address.
 //The base of LDA may be ID variable, LABEL variable, STRING variable.
 //NOTE: LDA_ofst describe the byte offset that is the addend to the address.
 //usage: lda(s) with LDA_ofst = 10 means:
@@ -1556,7 +1556,7 @@ public:
     //Build dummyuse expression to represent potential memory objects that
     //the Call referrenced.
     //Note dummyuse may be a list of IR.
-    void addDummyUse(Region * rg);    
+    void addDummyUse(Region * rg);
 
     CHAR const* getCalleeNameString() const
     { return SYM_name(CALL_idinfo(this)->get_name()); }
@@ -1629,7 +1629,7 @@ public:
 };
 
 
-//This class represent goto operation, unconditional jump to target label.
+//This class represents goto operation, unconditional jump to target label.
 #define GOTO_bb(ir) (((CGoto*)CK_IRT(ir, IR_GOTO))->bb)
 #define GOTO_lab(ir) (((CGoto*)CK_IRT(ir, IR_GOTO))->jump_target_lab)
 class CGoto : public IR, public StmtProp {
@@ -1639,7 +1639,7 @@ public:
 };
 
 
-//This class represent indirect goto operation,
+//This class represents indirect goto operation,
 //the control flow will unconditional jump to one target label of a list of
 //label which determined by value-exp.
 //usage: igoto (value-exp) case_list.
@@ -1695,7 +1695,7 @@ class CDoWhile : public CWhileDo {
 
 
 //High level control loop operation.
-//This structure represent a kind of loop with
+//This structure represents a kind of loop with
 //plainly definition of INIT(low bound), DET(HIGH bound),
 //LOOP-BODY and STEP(Increment or Dcrement) of induction variable.
 //e.g1:
@@ -1737,7 +1737,7 @@ public:
 };
 
 
-//This class represent high level control IF operation.
+//This class represents high level control IF operation.
 //usage:
 //    if (det)
 //      truebody
@@ -1763,7 +1763,7 @@ public:
 };
 
 
-//This class represent internal and customer defined label.
+//This class represents internal and customer defined label.
 #define LAB_lab(ir) (((CLab*)CK_IRT(ir, IR_LABEL))->label_info)
 class CLab : public IR {
     COPY_CONSTRUCTOR(CLab);
@@ -1772,7 +1772,7 @@ public:
 };
 
 
-//This class represent high and middle level control flow switch operation.
+//This class represents high and middle level control flow switch operation.
 //usage:
 //    switch (value-exp)
 //    case_list
@@ -1808,7 +1808,7 @@ public:
 };
 
 
-//This class represent the case value expression and its jump target label.
+//This class represents the case value expression and its jump target label.
 //NOTE: this class is used only by SWITCH and IGOTO.
 #define CASE_lab(ir) (((CCase*)CK_IRT(ir, IR_CASE))->jump_target_label)
 
@@ -1823,7 +1823,7 @@ public:
 };
 
 
-//This class represent array operation.
+//This class represents array operation.
 //Base of array can be LDA, or other computational expression.
 //This operation do not perform any array bound diagnositc.
 //
@@ -1835,10 +1835,10 @@ public:
 //base is pointer, and the pointer point to an array.
 //    e.g: char * p; (p+1)[i] = ...
 //
-//'elem_ty' represent the type of array element.
+//'elem_ty' represents the type of array element.
 //Moreover, element may be array as well.
 //
-//'elem_num' represent the number of array element in current dimension.
+//'elem_num' represents the number of array element in current dimension.
 //
 #define ARR_ofst(ir) (((CArray*)CK_IRT_ARR(ir))->field_offset)
 #define ARR_du(ir) (((CArray*)CK_IRT_ARR(ir))->du)
@@ -1923,7 +1923,7 @@ public:
 };
 
 
-//This class represent the operation storing value to array.
+//This class represents the operation storing value to array.
 //The most operations and properties are same as CArray.
 //
 //Base of array can be LDA, or other computational expression.
@@ -1937,10 +1937,10 @@ public:
 //base is pointer, and the pointer point to an array.
 //    e.g: char * p; (p+1)[i] = ...
 //
-//'elem_ty' represent the type of array element.
+//'elem_ty' represents the type of array element.
 //Moreover, element may be also an array as well.
 //
-//'elem_num' represent the number of array element in given dimension.
+//'elem_num' represents the number of array element in given dimension.
 //
 #define STARR_bb(ir) (((CStArray*)CK_IRT(ir, IR_STARRAY))->stmtprop.bb)
 #define STARR_rhs(ir) \
@@ -1956,7 +1956,7 @@ public:
 };
 
 
-//This class represent data-type convertion.
+//This class represents data-type convertion.
 //Record the expression to be converted.
 #define CVT_exp(ir) (UNA_opnd(ir))
 #define CVT_kid(ir, idx) (UNA_kid(ir, idx))
@@ -1979,7 +1979,7 @@ public:
 };
 
 
-//This class represent temporary memory location which named pseudo register.
+//This class represents temporary memory location which named pseudo register.
 //It can be used to indicate the Region live-in register. In this case,
 //a PR may not have a definition.
 //NOTE:
@@ -1999,7 +1999,7 @@ public:
 };
 
 
-//This class represent true branch operation.
+//This class represents true branch operation.
 //Branch if determinant express is true, otherwise control flow does not change.
 
 //NOTE: the lay out of truebr should same as falsebr.
@@ -2017,7 +2017,7 @@ public:
 };
 
 
-//This class represent false branch operation.
+//This class represents false branch operation.
 //Branch if determinant express is false, otherwise control flow does not change.
 //Also use BR_det, BR_lab access.
 //NOTE: the lay out of truebr should same as falsebr.
@@ -2026,7 +2026,7 @@ class CFalsebr : public CTruebr {
 };
 
 
-//This class represent function return operation.
+//This class represents function return operation.
 //Return value expressions.
 //usage: return a;  a is return-value expression.
 #define RET_bb(ir) (((CRet*)CK_IRT(ir, IR_RETURN))->bb)
@@ -2039,7 +2039,7 @@ public:
 };
 
 
-//This class represent conditional select operation.
+//This class represents conditional select operation.
 //usage: res = select(a > b), (10), (20)
 //    means:
 //    if (a > b) res = 10;
@@ -2065,7 +2065,7 @@ public:
 };
 
 
-//This class represent high level control structure, that
+//This class represents high level control structure, that
 //terminate current loop execution immediately without any
 //other operations.
 //This operation is used by do-loop, do-while, while-do.
@@ -2074,7 +2074,7 @@ class CBreak : public IR {
 };
 
 
-//This class represent high level control structure, that
+//This class represents high level control structure, that
 //re-execute current loop immediately without any
 //other operations.
 //This operation is used by do-loop, do-while, while-do.
@@ -2083,7 +2083,7 @@ class CContinue : public IR {
 };
 
 
-//This class represent phi operation.
+//This class represents phi operation.
 #define PHI_bb(ir) (((CPhi*)CK_IRT(ir, IR_PHI))->bb)
 #define PHI_prno(ir) (((CPhi*)CK_IRT(ir, IR_PHI))->prno)
 #define PHI_ssainfo(ir) (((CPhi*)CK_IRT(ir, IR_PHI))->ssainfo)
@@ -2122,7 +2122,7 @@ public:
 };
 
 
-//This class represent region operation.
+//This class represents region operation.
 //NOTE: If region is in BB, it must be single entry, single exit, since
 //it might be reduced from reducible graph.
 #define REGION_bb(ir) (((CRegion*)CK_IRT(ir, IR_REGION))->bb)
@@ -2359,7 +2359,7 @@ bool IR::isReadOnly() const
 {
     switch (getCode()) {
     case IR_CALL: return CALL_is_readonly(this);
-    case IR_ICALL: return ICALL_is_readonly(this);        
+    case IR_ICALL: return ICALL_is_readonly(this);
     case IR_CVT: return CVT_exp(this)->isReadOnly();
     case IR_LD:
         if (VAR_is_readonly(LD_idinfo(this)) &&

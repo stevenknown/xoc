@@ -50,7 +50,7 @@ class LICM : public Pass {
     MDSystem * m_md_sys;
     SMemPool * m_pool;
     xcom::List<IR*> m_analysable_stmt_list;
-    xcom::TMap<MD const*, UINT*> m_md2num;    
+    xcom::TMap<MD const*, UINT*> m_md2num;
     //Record if the result of stmt is loop invariant
     //xcom::TTab<IR*> m_invariant_stmt;
     //Record if the result of stmt is loop invariant
@@ -100,7 +100,7 @@ class LICM : public Pass {
     bool is_dom_all_use_in_loop(IR const* ir, LI<IRBB> * li);
     //Return true if stmt is collected into invariant-stmt set.
     bool isInvariantStmt(IR const* ir) const;
-    
+
     //Return true if md modified in loop only once.
     bool isUniqueDef(MD const* md) const;
 
@@ -118,7 +118,7 @@ class LICM : public Pass {
     //  |  |
     //  |  v
     //  |  BB_prehead
-    //  | / 
+    //  | /
     //  |/
     //  v
     //  BB_loophead
@@ -142,7 +142,7 @@ class LICM : public Pass {
     //Try to evaluate the value of loop execution condition.
     //Returnt true if this function evaluated successfully,
     //otherwise return false.
-    bool tryEvalLoopExecCondition(LI<IRBB> const* li,  
+    bool tryEvalLoopExecCondition(LI<IRBB> const* li,
                                   bool & must_true,
                                   bool & must_false) const;
 

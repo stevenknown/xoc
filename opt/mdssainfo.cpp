@@ -86,12 +86,12 @@ bool MDSSAInfo::isUseReachable(UseDefMgr const* udmgr, IR const* exp) const
 
 //Collect all USE, where USE is IR expression.
 //Note the function will not clear 'set' because caller may perform unify
-//operation. 
+//operation.
 void MDSSAInfo::collectUse(UseDefMgr const* udmgr, OUT IRSet * set) const
 {
     //DO NOT CLEAN SET
     ASSERT0(set && udmgr);
-    VOpndSetIter iter = nullptr;    
+    VOpndSetIter iter = nullptr;
     MDSSAInfo * pthis = const_cast<MDSSAInfo*>(this);
     for (INT i = pthis->getVOpndSet()->get_first(&iter);
          i >= 0; i = pthis->getVOpndSet()->get_next(i, &iter)) {
@@ -121,7 +121,7 @@ static void collectDefThroughDefChain(MDSSAMgr const* mdssamgr,
     ASSERT0(def);
     ConstMDDefIter it;
     for (MDDef const* d = mdssamgr->iterDefInitC(def, it);
-         d != nullptr; d = mdssamgr->iterDefNextC(it)) {        
+         d != nullptr; d = mdssamgr->iterDefNextC(it)) {
         if (d->is_phi()) {
             //Merged DEF will be iterated at alter function.
             continue;
@@ -133,13 +133,13 @@ static void collectDefThroughDefChain(MDSSAMgr const* mdssamgr,
         //mark almost all DEF to be effect. This may lead to
         //traverse the same DEF many times. Apply DP like algo to reduce
         //the traversal time.
-    }    
+    }
 }
 
 
 //Collect all DEF that overlapped with 'ref', where DEF is IR expression.
 //Note the function will not clear 'set' because caller may perform unify
-//operation. 
+//operation.
 //ref: given MD, if it is NULL, the function will collect all DEFs.
 void MDSSAInfo::collectDef(MDSSAMgr const* mdssamgr, MD const* ref,
                            OUT IRSet * set) const
@@ -163,7 +163,7 @@ void MDSSAInfo::collectDef(MDSSAMgr const* mdssamgr, MD const* ref,
         ASSERT0(defstmt);
         if (defstmt->isCallStmt()) {
             //CASE:call()
-            //        =USE            
+            //        =USE
             //Call is the only stmt that need to process specially.
             //Because it always is not dominated killing-def.
             collectDefThroughDefChain(mdssamgr, tdef, set);
@@ -176,13 +176,13 @@ void MDSSAInfo::collectDef(MDSSAMgr const* mdssamgr, MD const* ref,
             (mustdef == ref || mustdef->is_exact_cover(ref))) {
             //defstmt is killing definition of 'ref'.
             set->bunion(defstmt->id());
-            continue;            
+            continue;
         }
 
         if (ref != nullptr) {
             //TODO:
             //CASE1:DEF=
-            //         =USE            
+            //         =USE
             //CASE2:...=
             //         =USE
             //Both cases need to collect all DEFs until
@@ -386,7 +386,7 @@ VMD * MDPhi::getOpndVMD(IR const* opnd, UseDefMgr const* mgr) const
         //The ID of PHI should not be removed, because it is be regarded
         //as a place-holder of PHI, and the place-holder indicates the position
         //of related predecessor of current BB of PHI in CFG.
-        return nullptr;      
+        return nullptr;
     }
 
     ASSERT0(mdssainfo->getVOpndSet()->get_elem_count() == 1);
@@ -445,7 +445,7 @@ void MDPhi::dump(Region const* rg, UseDefMgr const* mgr) const
             //Predecessor is not match with PHI, error occurred.
             prt(rg, "(BB?)");
         } else {
-            prt(rg, "(BB%d)", pred->id());            
+            prt(rg, "(BB%d)", pred->id());
         }
         pred = preds.get_next();
     }
@@ -620,7 +620,7 @@ void UseDefMgr::cleanMDSSAInfo(IR * ir)
 {
     ASSERT0(ir);
     ASSERTN(m_mdssa_mgr->hasMDSSAInfo(ir), ("make decision early"));
-    if (ir->getAI() == nullptr) { return; }    
+    if (ir->getAI() == nullptr) { return; }
     IR_ai(ir)->clean(AI_MD_SSA);
 }
 
@@ -699,7 +699,7 @@ MDPhi * UseDefMgr::allocMDPhi(UINT mdid, UINT num_operands)
 
     //Generate operand of PHI.
     for (UINT i = 0; i < num_operands; i++) {
-        IR * opnd = m_rg->buildId(md->get_base());        
+        IR * opnd = m_rg->buildId(md->get_base());
         opnd->setRefMD(md, m_rg);
 
         //Generate MDSSAInfo to ID.
