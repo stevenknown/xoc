@@ -87,7 +87,7 @@ Dex2IR::Dex2IR(IN Region * rg,
 //Add a variable of CLASS.
 Var * Dex2IR::addVarByName(CHAR const* name, Type const* ty)
 {
-    Sym * sym = m_ru_mgr->addToSymbolTab(name);
+    Sym const* sym = m_ru_mgr->addToSymbolTab(name);
     Var * v = m_str2var.get(sym);
     if (v != nullptr) { return v; }
     UINT flag = 0;
@@ -129,7 +129,7 @@ Var * Dex2IR::addStringVar(CHAR const* string)
     //    }
     //    local_string = buf;
     //}
-    Sym * sym = m_ru_mgr->addToSymbolTab(local_string);
+    Sym const* sym = m_ru_mgr->addToSymbolTab(local_string);
     Var * v = m_str2var.get(sym);
     if (v != nullptr) { return v; }
     v = m_vm->registerStringVar(nullptr, sym, 0);

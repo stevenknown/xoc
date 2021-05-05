@@ -422,13 +422,11 @@ Var * VarMgr::findVarByName(Sym const* name)
 //the Var is unique. This function does not keep the uniqueness
 //related to properties.
 //'var_name': name of the variable, it is optional.
-Var * VarMgr::registerVar(CHAR const* varname,
-                          Type const* type,
-                          UINT align,
+Var * VarMgr::registerVar(CHAR const* varname, Type const* type, UINT align,
                           UINT flag)
 {
     ASSERT0(varname);
-    Sym * sym = m_ru_mgr->addToSymbolTab(varname);
+    Sym const* sym = m_ru_mgr->addToSymbolTab(varname);
     return registerVar(sym, type, align, flag);
 }
 
@@ -438,9 +436,7 @@ Var * VarMgr::registerVar(CHAR const* varname,
 //the Var is unique. This function does not keep the uniqueness
 //related to properties.
 //'var_name': name of the variable, it is optional.
-Var * VarMgr::registerVar(Sym const* var_name,
-                          Type const* type,
-                          UINT align,
+Var * VarMgr::registerVar(Sym const* var_name, Type const* type, UINT align,
                           UINT flag)
 {
     ASSERT0(type);

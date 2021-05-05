@@ -38,6 +38,9 @@ class GSCC : public Pass {
     Region * m_rg;
     SCC m_scc;
 
+    //Verify that LoopInfo of CFG should be consistent with SCC info.
+    bool verify();
+
 public:
     explicit GSCC(Region * rg);
     virtual ~GSCC() {}

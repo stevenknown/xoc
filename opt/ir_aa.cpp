@@ -1199,6 +1199,11 @@ bool AliasAnalysis::isInLoop(IR const* ir)
     ASSERT0(ir && ir->is_stmt());
     IRBB * bb = ir->getBB();
     ASSERT0(bb);
+    ASSERT0(m_scc);
+    if (m_scc->isInSCC(bb)) { return true; }
+
+    #ifdef USE_LOOPINFO
+    //LoopInfo should be subset of SCC.
     LI<IRBB> const* li = m_cfg->getLoopInfo();
 
     //Only have to check the outermost loop body.
@@ -1207,9 +1212,7 @@ bool AliasAnalysis::isInLoop(IR const* ir)
             return true;
         }
     }
-
-    ASSERT0(m_scc);
-    if (m_scc->isInSCC(bb)) { return true; }
+    #endif
 
     return false;
 }
@@ -3903,18 +3906,20 @@ bool AliasAnalysis::perform(IN OUT OptCtx & oc)
     //Clean data structures used for analysis.
     clean();
 
+    //Both sensitive and insensitive analysis need loop and scc info to
+    //make point-to computation more accurately.
+    m_rg->getPassMgr()->checkValidAndRecompute(&oc, PASS_LOOP_INFO,
+                                               PASS_GSCC, PASS_UNDEF);
+    ASSERTN(oc.is_loopinfo_valid(),
+            ("infer pointer arith need loop info"));
+    ASSERT0(oc.is_scc_valid());
+    m_scc = (GSCC*)m_rg->getPassMgr()->queryPass(PASS_GSCC);
+    ASSERT0(m_scc);
+
     //We allocate PtPairSet at each call of AA,
     //because AA would not be invoked frequently.
     if (m_flow_sensitive) {
         PPSetMgr ppsetmgr;
-        m_rg->getPassMgr()->checkValidAndRecompute(&oc, PASS_LOOP_INFO,
-                                                   PASS_GSCC, PASS_UNDEF);
-        ASSERTN(oc.is_loopinfo_valid(),
-                ("infer pointer arith need loop info"));
-        ASSERT0(oc.is_scc_valid());
-        m_scc = (GSCC*)m_rg->getPassMgr()->queryPass(PASS_GSCC);
-        ASSERT0(m_scc);
-
         initEntryPtset(ppsetmgr);
         m_rg->getPassMgr()->checkValidAndRecompute(&oc, PASS_RPO, PASS_UNDEF);
         List<IRBB*> * tbbl = m_cfg->getRPOBBList();

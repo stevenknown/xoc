@@ -528,7 +528,9 @@ bool SBitSetCore<BitsPerSeg>::is_intersect(
         if (SC_val(srcst)->start < SC_val(tgtst)->start) {
             srcst = src.segs.get_next(srcst);
             continue;
-        } else if (SC_val(srcst)->start == SC_val(tgtst)->start) {
+        }
+
+        if (SC_val(srcst)->start == SC_val(tgtst)->start) {
             if (SC_val(srcst)->bs.is_intersect(SC_val(tgtst)->bs)) {
                 return true;
             }
@@ -536,11 +538,10 @@ bool SBitSetCore<BitsPerSeg>::is_intersect(
             srcst = src.segs.get_next(srcst);
             tgtst = segs.get_next(tgtst);
             continue;
-        } else {
-            //srcst's start > tgtst's start
-            tgtst = segs.get_next(tgtst);
-            continue;
         }
+
+        //srcst's start > tgtst's start
+        tgtst = segs.get_next(tgtst);        
     }
     return false;
 }
@@ -560,6 +561,37 @@ bool SBitSetCore<BitsPerSeg>::is_contain(UINT elem) const
         }
     }
     return false;
+}
+
+
+template <UINT BitsPerSeg>
+bool SBitSetCore<BitsPerSeg>::is_contain(
+    SBitSetCore<BitsPerSeg> const& src) const
+{
+    ASSERTN(this != &src, ("operate on same set"));
+    TSEGIter * srcst = src.segs.get_head();
+    TSEGIter * curst = segs.get_head(); //seg-iter of current SBitSet.
+    for (; srcst != src.segs.end() && curst != segs.end(); ) {
+        if (curst->val()->start < srcst->val()->start) {
+            curst = segs.get_next(curst);
+            continue;
+        }
+
+        if (curst->val()->start == srcst->val()->start) {
+            if (!curst->val()->bs.is_contain(srcst->val()->bs)) {
+                return false;
+            }
+
+            curst = segs.get_next(curst);
+            srcst = src.segs.get_next(srcst);
+            continue;
+        }
+
+        //curst's start > srcst's start
+        return false;
+    }
+    if (srcst != src.segs.end()) { return false; }
+    return true;
 }
 
 

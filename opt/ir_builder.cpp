@@ -33,6 +33,7 @@ namespace xoc {
 #ifdef _DEBUG_
 static bool isReduction(IR const* ir)
 {
+    DUMMYUSE(isReduction);
     ASSERT0(ir->is_stmt());
     if (!ir->is_st() && !ir->is_stpr()) { return false; }
     IR * rhs = ir->getRHS();
@@ -462,8 +463,7 @@ IR * Region::buildLoad(Var * var, Type const* type)
 IR * Region::buildILoad(IR * base, Type const* type)
 {
     ASSERT0(type);
-    ASSERTN(base && (base->is_ptr() || base->is_any()),
-            ("mem-address of ILD must be pointer"));
+    ASSERTN(base && base->isPtr(), ("mem-address of ILD must be pointer"));
     IR * ir = allocIR(IR_ILD);
     IR_dt(ir) = type;
     ILD_base(ir) = base;
@@ -652,7 +652,7 @@ IR * Region::buildIStore(IR * base, IR * rhs, Type const* type)
 {
     ASSERT0(type);
     ASSERT0(base && rhs && rhs->is_exp());
-    ASSERTN(base->is_ptr(), ("must be pointer"));
+    ASSERTN(base->isPtr(), ("must be pointer"));
     IR * ir = allocIR(IR_IST);
     IR_dt(ir) = type;
     IST_base(ir) = base;
@@ -707,7 +707,7 @@ IR * Region::buildArray(IR * base,
 {
     ASSERT0(type);
     ASSERT0(base && sublist && elemtype);
-    ASSERT0(base->is_exp() && base->is_ptr());
+    ASSERT0(base->is_exp() && base->isPtr());
     CArray * ir = (CArray*)allocIR(IR_ARRAY);
     IR_dt(ir) = type;
     ARR_base(ir) = base;
@@ -777,7 +777,7 @@ IR * Region::buildStoreArray(IR * base,
                              IR * rhs)
 {
     ASSERT0(base && sublist && type);
-    ASSERT0(base->is_exp() && (base->is_ptr() || base->is_any()));
+    ASSERT0(base->is_exp() && base->isPtr());
     ASSERT0(rhs && rhs->is_exp());
     ASSERT0(allBeExp(sublist));
     CStArray * ir = (CStArray*)allocIR(IR_STARRAY);

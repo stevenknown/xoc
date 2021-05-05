@@ -161,16 +161,17 @@ public:
     void destroy()
     {
         if (m_free_list.get_pool() == nullptr) { return; }
+
         #ifdef DEBUG_SEG
-        UINT n = m_free_list.get_elem_count();
         ///////////////////////////////////////////////////////////////
         //NOTE: SBitSet or SBitSetCore's clean() should be invoked   //
-        //before destruction, otherwise it will lead to SegMgr leaks.//
+        //before destruction, otherwise it will lead SegMgr          //
+        //to complain leaking.                                       //
         ///////////////////////////////////////////////////////////////
-        if (seg_count != n) {
+        if (seg_count != m_free_list.get_elem_count()) {
             debugSegMgr();
-        }
-        ASSERTN(seg_count == n, ("MemLeak! There still are SEGs not freed"));
+            ASSERTN(0, ("MemLeak! There still are SEGs not freed"));
+        }        
         #endif
 
         for (TSEGIter * sc = m_free_list.get_head();
@@ -319,6 +320,7 @@ public:
 
     bool is_equal(SBitSetCore<BitsPerSeg> const& src) const;
     bool is_contain(UINT elem) const;
+    bool is_contain(SBitSetCore<BitsPerSeg> const& src) const;
     bool is_intersect(SBitSetCore<BitsPerSeg> const& src) const;
     bool is_empty() const;
 };

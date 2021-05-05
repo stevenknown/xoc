@@ -30,7 +30,27 @@ USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 namespace xoc {
 
-GSCC::GSCC(Region * rg) : m_scc(rg->getCFG()) {}
+GSCC::GSCC(Region * rg) : m_rg(rg), m_scc(rg->getCFG()) {}
+
+//Verify that LoopInfo of CFG should be consistent with SCC info.
+bool GSCC::verify()
+{
+    IRCFG * cfg = (IRCFG*)m_rg->getPassMgr()->queryPass(PASS_CFG);
+    if (cfg == nullptr) { return true; }
+
+    LI<IRBB> const* li = cfg->getLoopInfo();
+
+    //Only have to check the outermost loop body.
+    for (; li != nullptr; li = li->get_next()) {
+        BitSet * bbs = li->getBodyBBSet();
+        ASSERT0(bbs);
+        for (INT i = bbs->get_first(); i != -1; i = bbs->get_next(i)) {
+            ASSERT0(m_scc.isInSCC((UINT)i));
+        }
+    }
+    return true;
+}
+
 
 bool GSCC::perform(OptCtx & oc)
 {
@@ -39,6 +59,7 @@ bool GSCC::perform(OptCtx & oc)
     m_scc.findSCC();
     END_TIMER(t, "Compute Graph SCC");
     OC_is_scc_valid(oc) = true;
+    ASSERT0(verify());
     return false;
 }
 

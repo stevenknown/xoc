@@ -2424,7 +2424,15 @@ void DUMgr::inferCallAndICall(IR * ir, UINT duflag, IN MD2MDSet * mx)
     }
     ASSERTN(CALL_dummyuse(ir)->is_ild(),
             ("ild can better present MD that based on different VAR"));
-    CALL_dummyuse(ir)->setRefMDSet(hashed, m_rg);
+    if (hashed != nullptr) {
+        CALL_dummyuse(ir)->setRefMDSet(hashed, m_rg);
+    } else {
+        AliasAnalysis * aa = m_rg->getAA();
+        ASSERT0(aa);
+        ASSERT0(aa->getMayPointToMDSet() &&
+                !aa->getMayPointToMDSet()->is_empty());
+        CALL_dummyuse(ir)->setRefMDSet(aa->getMayPointToMDSet(), m_rg);
+    }
 
     tmpmds.clean(*m_misc_bs_mgr);
     maydefuse.clean(*m_misc_bs_mgr);

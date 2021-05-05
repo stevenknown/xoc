@@ -25,7 +25,7 @@ CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
 OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE
 USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 @*/
-#include "../xcominc.h"
+#include "xcominc.h"
 
 void bs_test(FILE * h)
 {
@@ -162,17 +162,30 @@ template <UINT BitsPerSeg>
 void dumpSegMgr(SegMgr<BitsPerSeg> & m, FILE * h)
 {
     if (h == nullptr) { return; }
-    SC<SEG<BitsPerSeg>*> * st = nullptr;
     fprintf(h, "\n====start %d:%d===\n",
             m.get_free_list()->get_elem_count(),
             m.get_seg_count());
     BitSet x;
     SList<SEG<BitsPerSeg>*> const* flst = m.get_free_list();
-    for (flst->get_head(&st); st != flst->end(); st = flst->get_next(st)) {
+    for (SC<SEG<BitsPerSeg>*> * st =flst->get_head();
+         st != flst->end(); st = flst->get_next(st)) {
         SEG<BitsPerSeg> const* s = st->val();
-        prt("%d,", s->id);
+        fprintf(h, "%d,", s->id);
         x.bunion(s->id);
     }
     fflush(h);
     x.dump(h);
+}
+
+int main()
+{
+    FILE * h = fopen("bs.dump", "a+");
+    if (h == nullptr) { return 0; }
+    bs_test(h);
+    bs_test2(h);
+    bs_test3(h);
+    DefMiscBitSetMgr mgr;
+    dumpSegMgr(*mgr.getSegMgr(), h);
+    fclose(h);
+    return 0;
 }

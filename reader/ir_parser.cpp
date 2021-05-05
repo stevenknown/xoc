@@ -1269,7 +1269,7 @@ bool IRParser::parseStoreArray(ParseCtx * ctx)
     IR * base = ctx->returned_exp;
     ctx->returned_exp = nullptr;
 
-    if (!base->is_ptr()) {
+    if (!base->isPtr()) {
         error("base expression of starray should be pointer");
         return false;
     }
@@ -1402,7 +1402,7 @@ bool IRParser::parseArray(ParseCtx * ctx)
     IR * base = ctx->returned_exp;
     ctx->returned_exp = nullptr;
 
-    if (!base->is_ptr()) {
+    if (!base->isPtr()) {
         error("base expression of array should be pointer");
         return false;
     }
@@ -1517,7 +1517,7 @@ bool IRParser::parseILd(ParseCtx * ctx)
     IR * base = ctx->returned_exp;
     ctx->returned_exp = nullptr;
 
-    if (!base->is_ptr()) {
+    if (!base->isPtr()) {
         error("base expression of ild should be pointer");
         return false;
     }
@@ -2524,7 +2524,7 @@ bool IRParser::parseIStore(ParseCtx * ctx)
     IR * base = ctx->returned_exp;
     ctx->returned_exp = nullptr;
 
-    if (!base->is_ptr()) {
+    if (!base->isPtr()) {
         error("base expression of ist should be pointer");
         return false;
     }
@@ -3573,8 +3573,7 @@ bool IRParser::parseSwitch(ParseCtx * ctx)
     if (body != nullptr) {
         ctx->has_high_level_ir = true;
     }
-    IR * ir = ctx->current_region->buildSwitch(
-        det, case_list, body, deflab);
+    IR * ir = ctx->current_region->buildSwitch(det, case_list, body, deflab);
     copyProp(ir, cont, ctx);
     ctx->addIR(ir);
     return true;

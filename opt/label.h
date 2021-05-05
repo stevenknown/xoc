@@ -43,8 +43,8 @@ typedef enum {
     L_PRAGMA, //pragma
 } LABEL_TYPE;
 
-#define PREFIX_OF_LABEL() "_L"
-#define POSTFIX_OF_LABEL() ""
+#define PREFIX_OF_ILABEL() "_$L"
+#define POSTFIX_OF_ILABEL() ""
 #define PREFIX_OF_CLABEL() ""
 #define POSTFIX_OF_CLABEL() ""
 #define PREFIX_OF_PRAGMA() "_PRAGMA"
@@ -52,7 +52,7 @@ typedef enum {
 
 #define ILABEL_STR_FORMAT  "%s%d%s" //prefix label-num postfix
 #define ILABEL_CONT(li) \
-    PREFIX_OF_LABEL(),LABELINFO_num(li),POSTFIX_OF_LABEL()
+    PREFIX_OF_ILABEL(),LABELINFO_num(li),POSTFIX_OF_ILABEL()
 
 #define CLABEL_STR_FORMAT  "%s%s%s" //prefix label-name postfix
 #define CLABEL_CONT(li) \
@@ -115,7 +115,8 @@ public:
     void dump(Region const* rg) const;
     void dumpName(Region const* rg) const;
 
-    char const* getName(IN OUT StrBuf * buf) const;
+    CHAR const* getName(IN OUT StrBuf * buf) const;
+    Sym const* getOrgName() const { return LABELINFO_name(this); }
     UINT getNum() const { return LABELINFO_num(this); }
     LABEL_TYPE getType() const { return LABELINFO_type(this); }
     Sym const* getPragma() const { return LABELINFO_pragma(this); }
@@ -134,7 +135,7 @@ inline UINT computeLabelHashValue(LabelInfo const* li)
 {
     INT v = 0;
     if (LABELINFO_type(li) == L_CLABEL) {
-        CHAR const* p = SYM_name(LABELINFO_name(li));
+        CHAR const* p = li->getOrgName()->getStr();
         while (*p != 0) {
             v += *p;
             p++;

@@ -117,7 +117,6 @@ static void collectDefThroughDefChain(MDSSAMgr const* mdssamgr,
                                       MDDef const* def,
                                       OUT IRSet * set)
 {
-    bool change = false;
     ASSERT0(def);
     ConstMDDefIter it;
     for (MDDef const* d = mdssamgr->iterDefInitC(def, it);

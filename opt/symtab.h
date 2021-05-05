@@ -147,11 +147,11 @@ public:
 //
 //START SymTab based on Hash
 //
-class SymTabHash : public Hash<Sym*, SymbolHashFunc> {
+class SymTabHash : public Hash<Sym const*, SymbolHashFunc> {
     COPY_CONSTRUCTOR(SymTabHash);
     SMemPool * m_pool;
 public:
-    explicit SymTabHash(UINT bsize) : Hash<Sym*, SymbolHashFunc>(bsize)
+    explicit SymTabHash(UINT bsize) : Hash<Sym const*, SymbolHashFunc>(bsize)
     { m_pool = smpoolCreate(64, MEM_COMM); }
     virtual ~SymTabHash() { smpoolDelete(m_pool); }
 
@@ -167,7 +167,7 @@ public:
         return ns;
     }
 
-    Sym * create(OBJTY v)
+    Sym const* create(OBJTY v)
     {
         Sym * sym = (Sym*)smpoolMalloc(sizeof(Sym), m_pool);
         SYM_name(sym) = strdup((CHAR const*)v);
@@ -176,17 +176,17 @@ public:
 
     //Add const string into symbol table.
     //If the string table is not big enough to hold strings, expand it.
-    inline Sym * add(CHAR const* s)
+    inline Sym const* add(CHAR const* s)
     {
-        UINT sz = Hash<Sym*, SymbolHashFunc>::get_bucket_size() * 4;
-        if (sz < Hash<Sym*, SymbolHashFunc>::get_elem_count()) {
-            Hash<Sym*, SymbolHashFunc>::grow(sz);
+        UINT sz = Hash<Sym const*, SymbolHashFunc>::get_bucket_size() * 4;
+        if (sz < Hash<Sym const*, SymbolHashFunc>::get_elem_count()) {
+            Hash<Sym const*, SymbolHashFunc>::grow(sz);
         }
-        return Hash<Sym*, SymbolHashFunc>::append((OBJTY)s);
+        return Hash<Sym const*, SymbolHashFunc>::append((OBJTY)s);
     }
 
-    Sym * get(CHAR const* s)
-    { return Hash<Sym*, SymbolHashFunc>::find((OBJTY)s); }
+    Sym const* get(CHAR const* s)
+    { return Hash<Sym const*, SymbolHashFunc>::find((OBJTY)s); }
 };
 //END SymTabHash
 
@@ -214,12 +214,14 @@ public:
 public:
     CompareSymTab() {}
 
-    bool is_less(Sym * t1, Sym * t2) const
+    bool is_less(Sym const* t1, Sym const* t2) const
     { return ::strcmp(SYM_name(t1), SYM_name(t2)) < 0; }
 
-    bool is_equ(Sym * t1, Sym * t2) const
+    bool is_equ(Sym const* t1, Sym const* t2) const
     { return ::strcmp(SYM_name(t1), SYM_name(t2)) == 0; }
 
+    //Note the function createKey() will modify parameter's contents, thus the
+    //'const' qualifier is unusable.
     Sym * createKey(Sym * t)
     {
         SYM_name(t) = xstrdup(SYM_name(t));
@@ -228,6 +230,8 @@ public:
 };
 
 
+//Note the symbol might be modified by CompareSymTab::createKey(), thus the
+//'const' qualifier of 'Sym*' is unusable.
 class SymTab : public TTab<Sym*, CompareSymTab> {
     COPY_CONSTRUCTOR(SymTab);
     Sym * m_free_one;
@@ -244,7 +248,7 @@ public:
     virtual ~SymTab() { smpoolDelete(m_pool); }
 
     //Add const string into symbol table.
-    Sym * add(CHAR const* s);
+    Sym const* add(CHAR const* s);
 };
 //END SymTab
 

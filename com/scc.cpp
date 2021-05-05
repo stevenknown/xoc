@@ -29,6 +29,7 @@ USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 namespace xcom {
 
+#define USE_NONRECURSIVE_ALGO
 #define UNDEF_GROUP 0
 
 //
@@ -68,57 +69,136 @@ void SCC::destroy()
 }
 
 
+//Searchs for SCC starting from 'root'.
+//onpath: records vertices till in accessing stack.
+//visited: records vertices that have been visited.
+void SCC::scanNoRecur(Vertex const* root, VertexSet & onpath,
+                      VertexSet & visited, GAI & gai, UINT & count,
+                      Group2VertexSet & group2bs,
+                      Stack<Vertex const*> & path)
+{
+    ASSERTN(is_init(), ("not yet initialized."));
+    Stack<Vertex const*> stk_vex;
+    stk_vex.push(root);
+    Vertex const* v;
+    while ((v = stk_vex.get_top()) != nullptr) {
+        if (!visited.is_contain(v->id())) {
+            visited.bunion(v->id());
+            gai.set_index(v->id(), count);
+            gai.set_group(v->id(), count);
+            visited.bunion(v->id());
+            count++;
+            ASSERT0(!onpath.is_contain(v->id()));
+            onpath.bunion(v->id());
+            path.push(v);
+        }
+
+        //Walk through each successors of 'v'.
+        bool all_visited = true;
+        for (EdgeC * el = v->getOutList(); el != nullptr; el = el->get_next()) {
+            Vertex const* succ = el->getEdge()->to();
+            if (!visited.is_contain(succ->id())) {
+                all_visited = false;
+                stk_vex.push(succ);
+                break;
+            }
+        }
+        if (!all_visited) { continue; }
+
+        stk_vex.pop();
+        UINT v_group = gai.get_group(v->id());
+        bool find_scc = false;
+        for (EdgeC * el = v->getOutList(); el != nullptr; el = el->get_next()) {
+            Vertex const* succ = el->getEdge()->to();
+            if (onpath.is_contain(succ->id())) {
+                UINT succ_group = gai.get_group(succ->id());
+                v_group = MIN(v_group, succ_group);
+                if (v_group == succ_group) {
+                    find_scc = true;
+                }
+                continue;
+            }
+            UINT succ_group = UNDEF_GROUP;
+            //The successor has been visited by other path.
+            //The successor may be included in other scc.
+            ASSERT0(v_group != succ_group);
+        }
+        gai.set_group(v->id(), v_group);
+ 
+        if (find_scc) {
+            addToGroup(v, v_group, group2bs);
+        }
+
+        if (v_group == gai.get_index(v->id())) {
+            for (Vertex const* t = path.get_top(); t != v;) {
+                onpath.diff(t->id());
+                path.pop();
+                t = path.get_top();
+            }
+            ASSERT0(path.get_top() == v);
+            path.pop();
+            onpath.diff(v->id());
+        }
+    }
+    return;
+}
+
+
 //Searchs for SCC starting from 'v'.
 //onpath: records vertices till in accessing stack.
 //visited: records vertices that have been visited.
-void SCC::scan(Vertex const* v, VertexSet & onpath, VertexSet & visited,
-               GAI & gai, UINT & count, Group2VertexSet & group2bs)
+void SCC::scanRecur(Vertex const* v, VertexSet & onpath, VertexSet & visited,
+                    GAI & gai, UINT & count, Group2VertexSet & group2bs,
+                    Stack<Vertex const*> & path)
 {
     ASSERTN(is_init(), ("not yet initialized."));
+    visited.bunion(v->id());
     gai.set_index(v->id(), count);
     gai.set_group(v->id(), count);
-    visited.bunion(v->id());
     count++;
     ASSERT0(!onpath.is_contain(v->id()));
-    visited.bunion(v->id());
     onpath.bunion(v->id());
-
+    path.push(v);
     UINT v_group = gai.get_group(v->id());
+
     //Walk through each successors of 'v'
     bool find_scc = false;
     for (EdgeC * el = v->getOutList(); el != nullptr; el = el->get_next()) {
         Vertex const* succ = el->getEdge()->to();
-        UINT succ_group = UNDEF_GROUP;
         if (!visited.is_contain(succ->id())) {
-            scan(succ, onpath, visited, gai, count, group2bs);
-            succ_group = gai.get_group(succ->id());
-            v_group = gai.get_group(v->id());
-            v_group = MIN(v_group, succ_group);
-            gai.set_group(v->id(), MIN(v_group, succ_group));
+            scanRecur(succ, onpath, visited, gai, count, group2bs, path);
+        }
 
-            if (succ_group == gai.get_index(succ->id())) {
-                //succ is critical vertex.
-                //TODO:record and dump critical vertex info.
+        if (onpath.is_contain(succ->id())) {
+            UINT succ_group = gai.get_group(succ->id());
+            v_group = MIN(v_group, succ_group);
+            if (v_group == succ_group) {
+                find_scc = true;
             }
-        } else if (onpath.is_contain(succ->id())) {
-            succ_group = gai.get_group(succ->id());
-            v_group = gai.get_group(v->id());
-            v_group = MIN(v_group, succ_group);
-            gai.set_group(v->id(), v_group);
-        } else {
-            //The vertex may be included in other scc.
+            continue;
         }
 
-        if (v_group == succ_group) {
-            find_scc = true;
-        }
+        UINT succ_group = gai.get_group(succ->id());
+        //The successor has been visited by other path.
+        //The successor may be included in other scc.
+        ASSERT0(v_group != succ_group);
     }
+    gai.set_group(v->id(), v_group);
 
     if (find_scc) {
         addToGroup(v, v_group, group2bs);
     }
-    onpath.diff(v->id());
-    return;
+ 
+    if (v_group == gai.get_index(v->id())) {
+        for (Vertex const* t = path.get_top(); t != v;) {
+            onpath.diff(t->id());
+            path.pop();
+            t = path.get_top();
+        }
+        ASSERT0(path.get_top() == v);
+        path.pop();
+        onpath.diff(v->id());
+    }
 }
 
 
@@ -147,18 +227,26 @@ void SCC::findSCC()
     UINT count = UNDEF_GROUP + 1;
     Group2VertexSet group2bs;
     VertexIter cur = VERTEX_UNDEF;
+    Stack<Vertex const*> path;
+
     for (Vertex const* v = m_g->get_first_vertex(cur);
          v != nullptr; v = m_g->get_next_vertex(cur)) {
         if (visited.is_contain(v->id())) {
             continue;
         }
         onpath.clean();
-        scan(v, onpath, visited, gai, count, group2bs);
+        path.clean();
+        #ifdef USE_NONRECURSIVE_ALGO
+        scanNoRecur(v, onpath, visited, gai, count, group2bs, path);
+        #else
+        scanRecur(v, onpath, visited, gai, count, group2bs, path);
+        #endif
     }
-    return;
 }
 
 
+//Return true if 'v' is in SCC, and records the SCC in 'scc_vertex_set'.
+//scc_vertex_set: records the SCC if it is not NULL.
 bool SCC::isInSCC(UINT vid, OUT VertexSet ** scc_vertex_set) const
 {
     VertexSetIter it;

@@ -3,7 +3,7 @@ XOC is released under the BSD 3-Clause license.
 
 XOC Release License
 
-Copyright (c) 2013-2014, Su Zhenyu steven.known@gmail.com
+Copyright (c) 2016-2021, Su Zhenyu steven.known@gmail.com
 
 All rights reserved.
 

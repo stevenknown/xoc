@@ -1278,43 +1278,42 @@ void PRSSAMgr::renameInDomTreeOrder(IRBB * root,
         }
 
         xcom::Vertex const* bbv = domtree.getVertex(v->id());
-        xcom::EdgeC const* c = VERTEX_out_list(bbv);
         bool all_visited = true;
-        while (c != nullptr) {
+        for (xcom::EdgeC const* c = bbv->getOutList();
+             c != nullptr; c = c->get_next()) {
             xcom::Vertex * dom_succ = c->getTo();
-            if (dom_succ == bbv) { continue; }
-            if (!visited.is_contain(VERTEX_id(dom_succ))) {
-                ASSERT0(m_cfg->getBB(VERTEX_id(dom_succ)));
-                all_visited = false;
-                stk.push(m_cfg->getBB(VERTEX_id(dom_succ)));
-                break;
-            }
-            c = EC_next(c);
-        }
-
-        if (all_visited) {
-            stk.pop();
-
-            //Do post-processing while all kids of BB has been processed.
-            PRNO2VP * prno2vp = bb2vpmap.get(v->id());
-            ASSERT0(prno2vp);
-            DefSBitSet const* defined_prs = defined_prs_vec.get(v->id());
-            ASSERT0(defined_prs);
-
-            DefSBitSetIter cur = nullptr;
-            for (INT i = defined_prs->get_first(&cur);
-                 i >= 0; i = defined_prs->get_next(i, &cur)) {
-                Stack<VPR*> * vs = mapPRNO2VPStack(i);
-                ASSERT0(vs->get_bottom() != nullptr);
-                VPR * vp = prno2vp->get(vs->get_top()->orgprno());
-                while (vs->get_top() != vp) {
-                    vs->pop();
-                }
+            if (dom_succ == bbv || visited.is_contain(VERTEX_id(dom_succ))) {
+                continue;
             }
 
-            //vpmap is useless from now on.
-            destoryPRNO2VP(v->id(), prno2vp, bb2vpmap);
+            ASSERT0(m_cfg->getBB(VERTEX_id(dom_succ)));
+            all_visited = false;
+            stk.push(m_cfg->getBB(VERTEX_id(dom_succ)));
+            break;
         }
+        if (!all_visited) { continue; }
+
+        stk.pop();
+
+        //Do post-processing while all kids of BB has been processed.
+        PRNO2VP * prno2vp = bb2vpmap.get(v->id());
+        ASSERT0(prno2vp);
+        DefSBitSet const* defined_prs = defined_prs_vec.get(v->id());
+        ASSERT0(defined_prs);
+
+        DefSBitSetIter cur = nullptr;
+        for (INT i = defined_prs->get_first(&cur);
+             i >= 0; i = defined_prs->get_next(i, &cur)) {
+            Stack<VPR*> * vs = mapPRNO2VPStack(i);
+            ASSERT0(vs->get_bottom() != nullptr);
+            VPR * vp = prno2vp->get(vs->get_top()->orgprno());
+            while (vs->get_top() != vp) {
+                vs->pop();
+            }
+        }
+
+        //vpmap is useless from now on.
+        destoryPRNO2VP(v->id(), prno2vp, bb2vpmap);
     }
 
     #ifdef _DEBUG_

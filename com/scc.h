@@ -109,6 +109,7 @@ public:
 //  s.findSCC();
 //  s.dump(h); //Dump SCC.
 class SCC {
+public:
     //The map is used to loop up container rapidly.
     typedef DefSBitSet VertexSet;
     typedef List<VertexSet const*> ConstVertexSetList;
@@ -116,6 +117,7 @@ class SCC {
     typedef C<VertexSet*> * VertexSetIter;
     typedef TMap<UINT, VertexSet*> Group2VertexSet;
 
+protected:
     //BitSetMgr m_bsmgr;
     DefMiscBitSetMgr m_sbsmgr;
 
@@ -123,14 +125,22 @@ class SCC {
     VertexSetList m_scc;
 
     void addToGroup(Vertex const* v, UINT group, Group2VertexSet & group2bs);
-    DefMiscBitSetMgr * getSbsMgr() { return &m_sbsmgr; }
     bool is_init() const { return m_g != nullptr; }
 
     //Searchs for scc starting from 'v'.
     //onpath: records vertices still in accessing stack.
     //visited: records vertices have been found.
-    void scan(Vertex const* v, VertexSet & onpath, VertexSet & visited,
-              GAI & gai, UINT & count, Group2VertexSet & group2bs);
+    void scanRecur(Vertex const* v, VertexSet & onpath, VertexSet & visited,
+                   GAI & gai, UINT & count, Group2VertexSet & group2bs,
+                   Stack<Vertex const*> & stk);
+
+    //Searchs for SCC starting from 'root'.
+    //onpath: records vertices till in accessing stack.
+    //visited: records vertices that have been visited.
+    void scanNoRecur(Vertex const* root, VertexSet & onpath,
+                     VertexSet & visited, GAI & gai, UINT & count,
+                     Group2VertexSet & group2bs,
+                     Stack<Vertex const*> & stk);
 public:
     SCC(Graph * g);
     ~SCC();
@@ -142,9 +152,13 @@ public:
     //    Both of them can be found.
     void findSCC();
 
+    DefMiscBitSetMgr * getSbsMgr() { return &m_sbsmgr; }
+    VertexSetList & getSCCList() { return m_scc; }
+
     void init(Graph * g);
 
     //Return true if 'v' is in SCC, and records the SCC in 'scc_vertex_set'.
+    //scc_vertex_set: records the SCC if it is not NULL.
     bool isInSCC(Vertex const* v,
                  OUT VertexSet ** scc_vertex_set = nullptr) const
     { return isInSCC(v->id(), scc_vertex_set); }

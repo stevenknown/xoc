@@ -130,9 +130,9 @@ MD const* RegionMgr::genDedicateStrMD()
 
     //Regard all string variables as same unbound MD.
     if (m_str_md == nullptr) {
-        Sym * s = addToSymbolTab("DedicatedVarBeRegardedAsString");
-        Var * sv = getVarMgr()->registerStringVar(
-            DEDICATED_STRING_VAR_NAME, s, MEMORY_ALIGNMENT);
+        Sym const* s = addToSymbolTab("DedicatedVarBeRegardedAsString");
+        Var * sv = getVarMgr()->registerStringVar(DEDICATED_STRING_VAR_NAME, s,
+                                                  MEMORY_ALIGNMENT);
         VAR_is_unallocable(sv) = true;
         VAR_is_addr_taken(sv) = true;
         MD md;

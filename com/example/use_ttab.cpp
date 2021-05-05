@@ -1,9 +1,5 @@
 #include "stdio.h"
-#include "ltype.h"
-#include "comf.h"
-#include "smempool.h"
-#include "sstl.h"
-using namespace xcom;
+#include "xcominc.h"
 class CompareString {
 public:
     bool is_equ(char const* s1, char const* s2) const

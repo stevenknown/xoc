@@ -132,8 +132,8 @@ protected:
     { return m_prssamgr != nullptr && m_prssamgr->is_valid(); }
 public:
     explicit LFTR(Region * rg) :
-        m_rg(rg), m_ivr(nullptr), m_prssamgr(nullptr), m_mdssamgr(nullptr),
-        m_pool(nullptr)
+        m_pool(nullptr), m_rg(rg), m_ivr(nullptr), m_prssamgr(nullptr),
+        m_mdssamgr(nullptr)
     {
         ASSERT0(rg != nullptr);
         m_cfg = rg->getCFG();

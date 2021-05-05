@@ -139,9 +139,10 @@ typedef enum {
     //DO NOT ADD NEW IR Type AFTER THIS ONE.
     IR_TYPE_NUM =   57  //The last IR type, the number of IR type.
 
-    //////////////////////////////////////////////////////////////////
-    //NOTE: Extend IR::ir_type bit length if type value large than 63.
-    //////////////////////////////////////////////////////////////////
+    /////////////////////////////////////////////////////////////////////
+    //NOTE: Extends IR::ir_type bit length if the maximum type value is//
+    //larger than 63.                                                  //
+    /////////////////////////////////////////////////////////////////////
 } IR_TYPE;
 
 #define SWITCH_CASE_BIN \
@@ -260,19 +261,12 @@ INT checkKidNumValid(IR const* ir, UINT n, CHAR const* file, INT lineno);
 INT checkKidNumValidCall(IR const* ir, UINT n, CHAR const* filename, INT line);
 INT checkKidNumValidArray(IR const* ir, UINT n, CHAR const* filename, INT line);
 INT checkKidNumValidLoop(IR const* ir, UINT n, CHAR const* filename, INT line);
-INT checkKidNumValidBranch(IR const* ir,
-                           UINT n,
-                           CHAR const* filename,
+INT checkKidNumValidBranch(IR const* ir, UINT n, CHAR const* filename,
                            INT line);
-INT checkKidNumValidBinary(IR const* ir,
-                           UINT n,
-                           CHAR const* filename,
+INT checkKidNumValidBinary(IR const* ir, UINT n, CHAR const* filename,
                            INT line);
 INT checkKidNumValidUnary(IR const* ir, UINT n, CHAR const* filename, INT line);
-INT checkKidNumIRtype(IR const* ir,
-                      UINT n,
-                      IR_TYPE irty,
-                      CHAR const* filename,
+INT checkKidNumIRtype(IR const* ir, UINT n, IR_TYPE irty, CHAR const* filename,
                       INT line);
 IR const* checkIRT(IR const* ir, IR_TYPE irt);
 IR const* checkIRTBranch(IR const* ir);
@@ -825,6 +819,9 @@ public:
     //Return true if ir's data type is pointer.
     bool is_ptr() const { return IR_dt(this)->is_pointer(); }
 
+    //Return true if ir's data type can be regarded as pointer.
+    bool isPtr() const { return is_ptr() || is_any(); }
+
     //Return true if ir's data type is string.
     bool is_str() const { return IR_dt(this)->is_string(); }
 
@@ -876,7 +873,8 @@ public:
     bool isMemRefEqual(IR const* src) const;
 
     //Return true if ir does not have any sibling.
-    bool is_single() const { return get_next() == nullptr && get_prev() == nullptr; }
+    bool is_single() const
+    { return get_next() == nullptr && get_prev() == nullptr; }
 
     //Return true if current ir is memory store operation.
     bool is_store() const

@@ -107,7 +107,7 @@ public:
     RegionMgr();
     virtual ~RegionMgr();
 
-    Sym * addToSymbolTab(CHAR const* s) { return m_sym_tab.add(s); }
+    Sym const* addToSymbolTab(CHAR const* s) { return m_sym_tab.add(s); }
 
     //This function will establish a map between region and its id.
     void addToRegionTab(Region * rg);

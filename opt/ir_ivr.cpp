@@ -601,7 +601,7 @@ void IVR::findBIV(LI<IRBB> const* li, IDTab & tmp)
         IRBB * bb = m_cfg->getBB(i);
         ASSERT0(bb && m_cfg->getVertex(bb->id()));
 
-        if (i != back_start_bb->id() &&
+        if ((UINT)i != back_start_bb->id() &&
             !m_cfg->is_dom(i, back_start_bb->id())) {
             //bb should dominate backedge start BB.
             //TODO: consider the convergence of IV reduction.

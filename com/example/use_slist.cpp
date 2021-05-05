@@ -1,9 +1,5 @@
 #include "stdio.h"
-#include "ltype.h"
-#include "comf.h"
-#include "smempool.h"
-#include "sstl.h"
-using namespace xcom;
+#include "xcominc.h"
 void use_slist_core()
 {
     //Single List Core need user declared a mempool.

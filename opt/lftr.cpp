@@ -95,7 +95,6 @@ void LFTR::analyzeBB(LI<IRBB> * li, IRBB * bb)
 
 void LFTR::analysis(LI<IRBB> * li)
 {
-    bool change = false;
     IRBB * head = li->getLoopHead();
     UINT headid = head->id();
     for (INT i = li->getBodyBBSet()->get_first();
