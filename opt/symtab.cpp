@@ -34,6 +34,7 @@ namespace xoc {
 //Add const string into symbol table.
 Sym const* SymTab::add(CHAR const* s)
 {
+    ASSERT0(s);
     Sym * sym = m_free_one;
     if (sym == nullptr) {
         sym = (Sym*)smpoolMalloc(sizeof(Sym), m_pool);

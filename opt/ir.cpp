@@ -1601,6 +1601,7 @@ bool IR::verify(Region const* rg) const
         ASSERT0(ILD_base(this));
         if (!g_is_support_dynamic_type) {
             ASSERTN(ILD_base(this)->is_ptr(), ("base must be pointer"));
+            ASSERT0(tm->getPointerBaseByteSize(ILD_base(this)->getType()) > 0);
         }
         ASSERT0(ILD_base(this)->is_exp());
         ASSERT0(ILD_base(this)->is_single());
@@ -1609,6 +1610,7 @@ bool IR::verify(Region const* rg) const
         ASSERT0(d);
         if (!g_is_support_dynamic_type) {
             ASSERTN(IST_base(this)->is_ptr(), ("base must be pointer"));
+            ASSERT0(tm->getPointerBaseByteSize(IST_base(this)->getType()) > 0);
         }
         ASSERT0(IST_rhs(this));
         ASSERT0(IST_rhs(this)->is_exp());
@@ -1724,8 +1726,8 @@ bool IR::verify(Region const* rg) const
         ASSERT0(is_bool());
         ASSERT0(BIN_opnd0(this) && BIN_opnd0(this)->is_exp() &&
                 BIN_opnd1(this) && BIN_opnd1(this)->is_exp());
-        ASSERT0(BIN_opnd0(this)->is_single());
-        ASSERT0(BIN_opnd1(this)->is_single());
+        ASSERT0(((CBin*)this)->getOpnd0()->is_single());
+        ASSERT0(((CBin*)this)->getOpnd1()->is_single());
         break;
     case IR_SUB:
     case IR_MUL:
@@ -1946,7 +1948,8 @@ bool IR::calcArrayOffset(TMWORD * ofst_val, TypeMgr * tm) const
          s = s->get_next(), dim++) {
         if (!s->is_const()) { return false; }
 
-        ASSERT0(!s->is_fp() && CONST_int_val(s) >= 0);
+        ASSERT0(!s->is_fp());
+        if (CONST_int_val(s) < 0) { return false; }
 
         #ifdef _VC2010_
         #define MASK_32BIT 0xFFFFffff00000000lu
@@ -1958,11 +1961,13 @@ bool IR::calcArrayOffset(TMWORD * ofst_val, TypeMgr * tm) const
                 ("allow 32bit array offset."));
 
         ASSERT0(dim < ((CArray*)this)->getDimNum());
-        ASSERT0(ARR_elem_num(this, dim) != 0);
         //Array index start at 0.
         if (dim == 0) {
+            //The dimension of dim0 may be zero.
+            //e.g: struct { char di[]; } a; ... = a.di[0];
             aggr = (TMWORD)CONST_int_val(s);
         } else {
+            ASSERT0(ARR_elem_num(this, dim) != 0);
             aggr += ARR_elem_num(this, dim - 1) * (TMWORD)CONST_int_val(s);
         }
     }
@@ -2568,7 +2573,7 @@ void IR::removeSSAUse()
 void IR::copyRef(IR const* src, Region * rg)
 {
     ASSERT0(src && rg && this != src);
-    ASSERTN(isMemoryRef(), ("not memory reference"));
+    ASSERTN(isMemoryRef() && src->isMemoryRef(), ("not memory reference"));
     ASSERT0(!src->is_undef());
     setRefMD(src->getRefMD(), rg);
     if (isReadPR() || isWritePR()) {

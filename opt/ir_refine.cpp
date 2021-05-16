@@ -2182,6 +2182,9 @@ void Refine::insertCvtForBinaryOp(IR * ir, bool & change)
 
     if (op0->is_ptr()) {
         if (op1->getTypeSize(m_tm) > op0->getTypeSize(m_tm)) {
+            //If longer data type is compared with pointer, it always have to
+            //be truncated to the same size of pointer. Otherwise, the pointer
+            //comparison is meaningless.
             ASSERTN(op1->getType()->is_ptr_addend() && !op1->is_ptr(),
                     ("illegal pointer arith"));
             DATA_TYPE t = m_tm->getPointerSizeDtype();
@@ -2191,6 +2194,10 @@ void Refine::insertCvtForBinaryOp(IR * ir, bool & change)
             change = true;
             return;
         }
+
+        //Smaller data size no need to process.
+        //e.g: char * p; if (p:ptr < a:i8) { ... }
+        //     CVT of a:i8 is dispensable.
         return;
     }
 

@@ -1148,6 +1148,7 @@ public:
     IR * simplifySwitchSelf(IR * ir, SimpCtx * ctx);
     void simplifySelectKids(IR * ir, SimpCtx * cont);
     IR * simplifyStore(IR * ir, SimpCtx * cont);
+    void simplifyCalleeExp(IR * ir, SimpCtx * ctx);
     IR * simplifyStorePR(IR * ir, SimpCtx * cont);
     IR * simplifyArrayIngredient(IR * ir, SimpCtx * ctx);
     IR * simplifyStoreArray(IR * ir, SimpCtx * ctx);

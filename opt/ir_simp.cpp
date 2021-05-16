@@ -1246,12 +1246,18 @@ IR * Region::simplifyArrayAddrExp(IR * ir, SimpCtx * ctx)
         }
 
         if (elemnumbuf != nullptr) {
-            ASSERTN(elemnumbuf[dim] != 0,
-                    ("Incomplete array dimension, we need to "
-                     "know how many elements in dimension %d.", dim));
             if (dim == 0) {
+                //The element-size of dim0 may be zero.
+                //e.g: User can define an array with zero size.
+                //     In C-language: struct { int buf[]; };
                 enumb = (UINT)elemnumbuf[dim];
             } else {
+                //The higher dimesion size should not be zero, otherwise
+                //we could not generate the address computation expression to
+                //linearize the array.
+                ASSERTN(elemnumbuf[dim] != 0,
+                        ("Incomplete array dimension, we need to "
+                         "know how many elements in dimension %d.", dim));
                 enumb *= (UINT)elemnumbuf[dim];
             }
         }
@@ -1276,7 +1282,7 @@ IR * Region::simplifyArrayAddrExp(IR * ir, SimpCtx * ctx)
     }
 
     ASSERT0(ARR_base(ir) &&
-        (ARR_base(ir)->is_ptr() || ARR_base(ir)->is_any()));
+            (ARR_base(ir)->is_ptr() || ARR_base(ir)->is_any()));
     SimpCtx tcont(*ctx);
     SIMP_ret_array_val(&tcont) = false;
     IR * newbase = simplifyExpression(ARR_base(ir), &tcont);
@@ -1795,10 +1801,27 @@ IR * Region::simplifyCall(IR * ir, SimpCtx * ctx)
     }
 
     IR * ret_list = SIMP_stmtlist(&tcont);
+    ctx->unionBottomupFlag(tcont);
+
+    if (ir->is_icall()) {
+        //Simplify callee expression of ICALL
+        SimpCtx tctx2(*ctx);
+        simplifyCalleeExp(ir, &tctx2);
+        lchange |= SIMP_changed(&tctx2);
+        xcom::add_next(&ret_list, SIMP_stmtlist(&tctx2));
+        ctx->unionBottomupFlag(tctx2);
+    }
+
     xcom::add_next(&ret_list, ir);
     SIMP_changed(ctx) |= lchange;
-    ctx->unionBottomupFlag(tcont);
     return ret_list;
+}
+
+
+void Region::simplifyCalleeExp(IR * ir, SimpCtx * ctx)
+{
+    ASSERT0(ir->is_icall());
+    ICALL_callee(ir) = simplifyExpression(ICALL_callee(ir), ctx);
 }
 
 

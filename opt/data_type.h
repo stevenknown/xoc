@@ -173,6 +173,19 @@ public:
 
     //Return true if data type is boolean.
     bool is_bool() const { return TY_dtype(this) == D_B; }
+    bool is_i8() const { return TY_dtype(this) == D_I8; }
+    bool is_i16() const { return TY_dtype(this) == D_I16; }
+    bool is_i32() const { return TY_dtype(this) == D_I32; }
+    bool is_i64() const { return TY_dtype(this) == D_I64; }
+    bool is_i128() const { return TY_dtype(this) == D_I128; }
+    bool is_u8() const { return TY_dtype(this) == D_U8; }
+    bool is_u16() const { return TY_dtype(this) == D_U16; }
+    bool is_u32() const { return TY_dtype(this) == D_U32; }
+    bool is_u64() const { return TY_dtype(this) == D_U64; }
+    bool is_u128() const { return TY_dtype(this) == D_U128; }
+    bool is_f32() const { return TY_dtype(this) == D_F32; }
+    bool is_f64() const { return TY_dtype(this) == D_F64; }
+    bool is_f128() const { return TY_dtype(this) == D_F128; }
 
     //Return true if data type is primitive.
     bool is_scalar() const
@@ -681,7 +694,7 @@ public:
     { return get_int_dtype(BYTE_PER_POINTER * BIT_PER_BYTE, false); }
 
     //Return the byte size of pointer's base.
-    UINT getPointerBaseByteSize(Type const* type)
+    UINT getPointerBaseByteSize(Type const* type) const
     {
         ASSERT0(type->is_pointer());
         return TY_ptr_base_size(type);
@@ -783,7 +796,7 @@ public:
     //pt_base_sz: byte size of pointer's base type.
     Type const* getPointerType(UINT pt_base_sz)
     {
-        //Pointer base size can be zero.
+        //Pointer base size could be zero.
         //Note if pointer base size is 0, that means the pointer can not
         //do any arthimetic, because pointer arithmetic may use pointer
         //base size as an addend.

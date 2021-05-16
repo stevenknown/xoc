@@ -1289,6 +1289,9 @@ class CId : public DuProp, public VarProp {
     COPY_CONSTRUCTOR(CId);
 public:
     MDPhi * phi; //record the MD PHI dummy stmt if ID is operand of MD PHI.
+
+public:
+    MDPhi * getMDPhi() const { return ID_phi(this); }
 };
 
 
@@ -1339,6 +1342,10 @@ class CILd : public DuProp, public OffsetProp {
     COPY_CONSTRUCTOR(CILd);
 public:
     IR * opnd[1];
+
+public:
+    IR * getKid(UINT idx) const { return ILD_kid(this, idx); }
+    IR * getBase() const { return ILD_base(this); }
 };
 
 
@@ -1368,6 +1375,10 @@ class CSt: public CLd, public StmtProp {
     COPY_CONSTRUCTOR(CSt);
 public:
     IR * opnd[1];
+
+public:
+    IR * getKid(UINT idx) const { return ST_kid(this, idx); }
+    IR * getRHS() const { return ST_rhs(this); }
 };
 
 
@@ -1386,6 +1397,10 @@ public:
     UINT prno; //PR number.
     SSAInfo * ssainfo; //Present ssa def and use set.
     IR * opnd[1];
+
+public:
+    IR * getKid(UINT idx) const { return STPR_kid(this, idx); }
+    IR * getRHS() const { return STPR_rhs(this); }
 };
 
 
@@ -1418,6 +1433,11 @@ public:
     UINT prno; //PR number.
     SSAInfo * ssainfo; //Present ssa def and use set.
     IR * opnd[3];
+
+public:
+    IR * getKid(UINT idx) const { return SETELEM_kid(this, idx); }
+    IR * getBase() const { return SETELEM_base(this); }
+    IR * getVal() const { return SETELEM_val(this); }
 };
 
 
@@ -1447,6 +1467,10 @@ public:
     //Note this field only avaiable if SSA information is maintained.
     SSAInfo * ssainfo;
     IR * opnd[2];
+
+public:
+    IR * getKid(UINT idx) const { return GETELEM_kid(this, idx); }
+    IR * getBase() const { return GETELEM_base(this); }
 };
 
 
@@ -1469,6 +1493,11 @@ class CISt : public DuProp, public OffsetProp, public StmtProp {
     COPY_CONSTRUCTOR(CISt);
 public:
     IR * opnd[2];
+
+public:
+    IR * getKid(UINT idx) const { return IST_kid(this, idx); }
+    IR * getRHS() const { return IST_rhs(this); }
+    IR * getBase() const { return IST_base(this); }
 };
 
 
@@ -1500,13 +1529,13 @@ class CLda : public IR, public VarProp, public OffsetProp {
 #define CALL_ssainfo(ir) (((CCall*)CK_IRT_CALL(ir))->prssainfo)
 
 //True if this call is intrinsic operation.
-#define CALL_is_intrinsic(ir) (((CCall*)CK_IRT_CALL(ir))->is_intrinsic)
+#define CALL_is_intrinsic(ir) (((CCall*)CK_IRT_CALL(ir))->m_is_intrinsic)
 
 //Record intrinsic operator if CALL_is_intrinsic is true.
 #define CALL_intrinsic_op(ir) (((CCall*)CK_IRT_CALL(ir))->intrinsic_op)
 
 //Call does not necessarily to be BB boundary.
-#define CALL_is_not_bb_bound(ir) (((CCall*)CK_IRT_CALL(ir))->is_not_bb_bound)
+#define CALL_is_not_bb_bound(ir) (((CCall*)CK_IRT_CALL(ir))->m_is_not_bb_bound)
 
 //True if this call does not modify any memory.
 #define CALL_is_readonly(ir) \
@@ -1514,7 +1543,7 @@ class CLda : public IR, public VarProp, public OffsetProp {
 
 //True if call allocated memory from heap. It always describe functions
 //like malloc() or 'new' operator.
-#define CALL_is_alloc_heap(ir) (((CCall*)CK_IRT_CALL(ir))->is_alloc_heap)
+#define CALL_is_alloc_heap(ir) (((CCall*)CK_IRT_CALL(ir))->m_is_alloc_heap)
 
 //Record MD DU information.
 #define CALL_du(ir) (((CCall*)CK_IRT_CALL(ir))->du)
@@ -1528,17 +1557,17 @@ class CCall : public DuProp, public VarProp, public StmtProp {
     COPY_CONSTRUCTOR(CCall);
 public:
     //True if current call is intrinsic call.
-    BYTE is_intrinsic:1;
+    BYTE m_is_intrinsic:1;
 
     //True if this call do allocate memory from heap. It always the function
     //like malloc or new.
-    BYTE is_alloc_heap:1;
+    BYTE m_is_alloc_heap:1;
 
     //True if this call does not necessarily to be basic block boundary.
     //By default, call stmt must be down boundary of basic block, but if
     //the flag is true, the call is always be defined by customer for
     //special purpose, e.g, intrinsic call or customized operation.
-    BYTE is_not_bb_bound:1;
+    BYTE m_is_not_bb_bound:1;
 
     //Record the intrinsic operation.
     UINT intrinsic_op;
@@ -1556,9 +1585,23 @@ public:
     //Note dummyuse may be a list of IR.
     void addDummyUse(Region * rg);
 
+    IR * getKid(UINT idx) const { return CALL_kid(this, idx); }
+    IR * getParamList() const { return CALL_param_list(this); }
+    IR * getDummyUse() const { return CALL_dummyuse(this); }
     CHAR const* getCalleeNameString() const
     { return SYM_name(CALL_idinfo(this)->get_name()); }
+    //Get the intrinsic operation code.
+    UINT getIntrinsicOp()
+    {
+        ASSERT0(CALL_is_intrinsic(this));
+        return CALL_intrinsic_op(this);
+    }
 
+    //Return true if current stmt has dummyuse.
+    bool hasDummyUse() const { return CALL_dummyuse(this) != nullptr; }
+
+    bool is_intrinsic() const { return CALL_is_intrinsic(this); }
+    bool is_readonly() const { return CALL_is_readonly(this); }
     bool isMustBBbound()
     {
         #ifdef _DEBUG_
@@ -1569,16 +1612,6 @@ public:
         #endif
         return !CALL_is_not_bb_bound(this);
     }
-
-    //Get the intrinsic operation code.
-    UINT getIntrinsicOp()
-    {
-        ASSERT0(CALL_is_intrinsic(this));
-        return CALL_intrinsic_op(this);
-    }
-
-    //Return true if current stmt has dummyuse.
-    bool hasDummyUse() const { return CALL_dummyuse(this) != nullptr; }
 };
 
 
@@ -1592,7 +1625,7 @@ public:
 #define ICALL_callee(ir) (*(((CICall*)ir)->opnd + CKID_TY(ir, IR_ICALL, 2)))
 
 //True if current call is readonly.
-#define ICALL_is_readonly(ir) (((CICall*)CK_IRT_ONLY_ICALL(ir))->is_readonly)
+#define ICALL_is_readonly(ir) (((CICall*)CK_IRT_ONLY_ICALL(ir))->m_is_readonly)
 #define ICALL_kid(ir, idx) (((CICall*)ir)->opnd[CKID_TY(ir, IR_ICALL, idx)])
 class CICall : public CCall {
     COPY_CONSTRUCTOR(CICall);
@@ -1601,7 +1634,13 @@ public:
     IR * opnd_pad[1];
 
     //True if current call is readonly.
-    BYTE is_readonly:1;
+    BYTE m_is_readonly:1;
+
+public:
+    IR * getKid(UINT idx) const { return ICALL_kid(this, idx); }
+    IR * getCallee() const { return ICALL_callee(this); }
+
+    bool is_readonly() const { return ICALL_is_readonly(this); }
 };
 
 
@@ -1614,6 +1653,11 @@ class CBin : public IR {
     COPY_CONSTRUCTOR(CBin);
 public:
     IR * opnd[2];
+
+public:
+    IR * getKid(UINT idx) const { return BIN_kid(this, idx); }
+    IR * getOpnd0() const { return BIN_opnd0(this); }
+    IR * getOpnd1() const { return BIN_opnd1(this); }
 };
 
 
@@ -1624,6 +1668,10 @@ class CUna : public IR {
     COPY_CONSTRUCTOR(CUna);
 public:
     IR * opnd[1];
+
+public:
+    IR * getKid(UINT idx) const { return UNA_kid(this, idx); }
+    IR * getOpnd() const { return UNA_opnd(this); }
 };
 
 
@@ -1634,6 +1682,9 @@ class CGoto : public IR, public StmtProp {
     COPY_CONSTRUCTOR(CGoto);
 public:
     LabelInfo const* jump_target_lab;
+
+public:
+    LabelInfo const* getLab() const { return GOTO_lab(this); }
 };
 
 
@@ -1679,6 +1730,8 @@ public:
 
     //num: the number of IR added.
     void addToBody(UINT num, ...);
+
+    IR * getBody() const { return LOOP_body(this); }
 };
 
 
@@ -1732,6 +1785,11 @@ class CDoLoop : public CWhileDo {
 public:
     //NOTE: 'opnd_pad' must be the first member of CDoLoop.
     IR * opnd_pad[3];
+
+public:
+    IR * getIV() const { return LOOP_iv(this); }
+    IR * getInit() const { return LOOP_init(this); }
+    IR * getStep() const { return LOOP_step(this); }
 };
 
 
@@ -1754,10 +1812,17 @@ class CIf : public IR {
     COPY_CONSTRUCTOR(CIf);
 public:
     IR * opnd[3];
+
+public:
     //num: the number of IR added.
     void addToTrueBody(UINT num, ...);
     //num: the number of IR added.
     void addToFalseBody(UINT num, ...);
+
+    IR * getKid(UINT idx) const { return IF_kid(this, idx); }
+    IR * getDet() const { return IF_det(this); }
+    IR * getTrueBody() const { return IF_truebody(this); }
+    IR * getFalseBody() const { return IF_falsebody(this); }
 };
 
 
@@ -1767,6 +1832,9 @@ class CLab : public IR {
     COPY_CONSTRUCTOR(CLab);
 public:
     LabelInfo const* label_info;
+
+public:
+    LabelInfo const* getLab() const { return LAB_lab(this); }
 };
 
 
@@ -1801,8 +1869,15 @@ public:
     IR * opnd[3];
     LabelInfo const* default_label;
 
+public:
     //num: the number of IR added.
     void addToBody(UINT num, ...);
+
+    LabelInfo const* getDefLab() const { return SWITCH_deflab(this); }
+    IR * getKid(UINT idx) const { return SWITCH_kid(this, idx); }
+    IR * getValExp() const { return SWITCH_vexp(this); }
+    IR * getBody() const { return SWITCH_body(this); }
+    IR * getCaseList() const { return SWITCH_case_list(this); }
 };
 
 
@@ -1818,6 +1893,11 @@ class CCase : public IR {
 public:
     IR * opnd[1]; //case-value
     LabelInfo const* jump_target_label; //jump lable for case.
+
+public:
+    LabelInfo const* getLab() const { return CASE_lab(this); }
+    IR * getValExp() const { return CASE_vexp(this); }
+    IR * getKid(UINT idx) const { return CASE_kid(this, idx); }
 };
 
 
@@ -1906,6 +1986,11 @@ public:
         ASSERT0(ARR_elem_num_buf(this));
         return ARR_elem_num(this, dimension);
     }
+    TMWORD const* getElemNumBuf() const { return ARR_elem_num_buf(this); }
+    Type const* getElemType() const { return ARR_elemtype(this); }
+    IR * getKid(UINT idx) const { return ARR_kid(this, idx); }
+    IR * getBase() const { return ARR_base(this); } 
+    IR * getSubList() const { return ARR_sub_list(this); } 
 
     //Return true if exp is array base.
     bool is_base(IR const* exp) const { return exp == ARR_base(this); }
@@ -1974,6 +2059,9 @@ public:
         ASSERT0(v);
         return v;
     }
+    IR * getExp() const { return CVT_exp(this); }
+    IR * getKid(UINT idx) const { return CVT_kid(this, idx); }
+    ROUND_TYPE getRoundType() const { return CVT_round(this); }
 };
 
 
@@ -2012,6 +2100,11 @@ class CTruebr : public IR, public StmtProp {
 public:
     IR * opnd[1];
     LabelInfo const* jump_target_lab; //jump target label.
+
+public:
+    LabelInfo const* getLab() const { return BR_lab(this); }
+    IR * getKid(UINT idx) const { return BR_kid(this, idx); }
+    IR * getDet() const { return BR_det(this); }
 };
 
 
@@ -2034,6 +2127,10 @@ class CRet : public IR, public StmtProp {
     COPY_CONSTRUCTOR(CRet);
 public:
     IR * opnd[1];
+
+public:
+    IR * getKid(UINT idx) const { return RET_kid(this, idx); }
+    IR * getExp() const { return RET_exp(this); }
 };
 
 
@@ -2060,6 +2157,12 @@ class CSelect : public IR {
     COPY_CONSTRUCTOR(CSelect);
 public:
     IR * opnd[3];
+
+public:
+    IR * getKid(UINT idx) const { return SELECT_kid(this, idx); }
+    IR * getPred() const { return SELECT_pred(this); }
+    IR * getTrueExp() const { return SELECT_trueexp(this); }
+    IR * getFalseExp() const { return SELECT_falseexp(this); }
 };
 
 
@@ -2110,6 +2213,9 @@ public:
         IR_parent(ir) = this;
     }
 
+    IR * getKid(UINT idx) const { return PHI_kid(this, idx); }
+    IR * getOpndList() const { return PHI_opnd_list(this); }
+
     void insertOpndBefore(IR * marker, IR * exp)
     {
         ASSERT0(xcom::in_list(PHI_opnd_list(this), marker));
@@ -2134,6 +2240,8 @@ public:
     //This property is very useful if region is a blackbox.
     //And readonly region will alleviate the burden of optimizor.
     bool is_readonly() const;
+
+    Region * getRegion() const { return REGION_ru(this); } 
 };
 
 

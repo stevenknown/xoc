@@ -426,7 +426,12 @@ Type * TypeMgr::registerType(Type const* type)
 
     #ifdef _DEBUG_
     if (type->is_pointer()) {
-        ASSERT0(TY_ptr_base_size(type) != 0);
+        //Some pointer is never participate pointer-arithmetic, it may be
+        //used as just a representation of pointer. Moreover, the base-size of
+        //pointer is always useful when the pointer is regarded as base of
+        //ILD, IST, pointer-arith as well. Thus, we will allow the base-size
+        //is zero here for conveninence.
+        //ASSERT0(TY_ptr_base_size(type) != 0);
     }
 
     if (type->is_vector()) {
@@ -593,7 +598,12 @@ void TypeMgr::dump_type_tab() const
 bool Type::verify(TypeMgr const* tm) const
 {
     if (is_pointer()) {
-        ASSERT0(TY_ptr_base_size(this) != 0);
+        //Some pointer is never participate pointer-arithmetic, it may be
+        //used as just a representation of pointer. Moreover, the base-size of
+        //pointer is always useful when the pointer is regarded as base of
+        //ILD, IST, pointer-arith as well. Thus, we will allow the base-size
+        //is zero here for conveninence.
+        //ASSERT0(TY_ptr_base_size(this) != 0);
     } else if (is_mc()) {
         ASSERT0(TY_mc_size(this) != 0);
     } else {
