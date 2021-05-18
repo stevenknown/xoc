@@ -38,13 +38,7 @@ author: Su Zhenyu
 #include <sys/time.h>
 #endif
 
-#include "ltype.h"
-#include "comf.h"
-#include "stdio.h"
-#include "string.h"
-#include "smempool.h"
-#include "sstl.h"
-#include "bs.h"
+#include "xcominc.h"
 
 namespace xcom {
 
@@ -150,19 +144,26 @@ ASCII g_asc1[] = {
 };
 
 
-//Caculate the number of bits which longer enough to represent given constant.
-UINT computeConstBitLen(ULONGLONG v)
+//Compute the number of bits which biger enough to represent given value.
+//value: the input value that to be check.
+//e.g: given 00101, it needs at least 3 bits to hold the binary value 101.
+//     and function return 3.
+UINT computeMaxBitSizeForValue(ULONGLONG value)
 {
-#ifdef _VC6_
-    if (!(v & 0xffffffffffffff00)) { return 8; }
-    if (!(v & 0xffffffffffff0000)) { return 16; }
-    if (!(v & 0xffffffff00000000)) { return 32; }
-#else
-    if (!(v & 0xffffffffffffff00ull)) { return 8; }
-    if (!(v & 0xffffffffffff0000ull)) { return 16; }
-    if (!(v & 0xffffffff00000000ull)) { return 32; }
-#endif
-    return 64;
+    if (value == 0) { return 1; }
+    UINT bitwidth = sizeof(value) * 8; //Assume BITS_PER_BYTE is 8
+    UINT half_bitwidth = bitwidth / 2;
+    for (; value < computeUnsignedMaxValue<ULONGLONG>(half_bitwidth); ) {
+        bitwidth /= 2;
+        half_bitwidth = bitwidth / 2;
+    }
+    for (INT i = bitwidth - 1; i >= 0; i--) {
+        if (HAVE_FLAG(value, (((ULONGLONG)1) << i))) {
+            return i + 1;
+        }
+    }
+    UNREACHABLE();
+    return 0;
 }
 
 
@@ -222,7 +223,7 @@ INT xceiling(INT a, INT b)
 }
 
 
-//Great common divisor.
+//Calculate the Great Common Divisor of x and y.
 INT sgcd(INT x, INT y)
 {
     INT t;
@@ -244,7 +245,7 @@ INT sgcd(INT x, INT y)
 }
 
 
-//Least common multiple.
+//Calculate the Least Common Multiple of x and y.
 INT slcm(INT x, INT y)
 {
     return x * y / sgcd(x,y);
@@ -252,7 +253,7 @@ INT slcm(INT x, INT y)
 
 
 //Great common divisor for values stored in vector.
-INT gcdm(UINT num, Vector<INT, 8> const& values)
+INT gcdm(UINT num, Vector<INT> const& values)
 {
     if (num == 0) { return 0; }
     INT n1 = values[0];
@@ -379,7 +380,7 @@ INT xctoi(CHAR const* cl)
         #define BIT_PER_BYTE 8
     #endif
 
-    if (cl == NULL || strcmp(cl, "") == 0) { return 0; }
+    if (cl == nullptr || strcmp(cl, "") == 0) { return 0; }
     INT l = (INT)strlen(cl);
     if (l > BYTE_PER_INT) {
         ASSERTN(0, ("too many characters in integer"));
@@ -401,7 +402,7 @@ INT xctoi(CHAR const* cl)
 //'is_oct': if true, nptr is octal digits.
 LONGLONG xatoll(CHAR const* nptr, bool is_oct)
 {
-    if (nptr == NULL) { return 0; }
+    if (nptr == nullptr) { return 0; }
     while (*nptr == ' ' || *nptr == '\t') {
         nptr++;
     }
@@ -605,7 +606,7 @@ void prim(INT m, OUT INT * buf)
 //Dumpf() for Vector<TY>.
 void dumpf_svec(void * vec, UINT ty, CHAR const* name, bool is_del)
 {
-    if (name == NULL) {
+    if (name == nullptr) {
         name = "matrix.tmp";
     }
 
@@ -620,7 +621,7 @@ void dumpf_svec(void * vec, UINT ty, CHAR const* name, bool is_del)
 
     ///
     switch (ty) {
-    case D_BOOL: {
+    case DUMPVEC_BOOL: {
         Vector<bool> *p = (Vector<bool> *)vec;
         for (INT i = 0; i <= p->get_last_idx(); i++) {
             fprintf(h, "%d", (INT)p->get(i));
@@ -630,7 +631,7 @@ void dumpf_svec(void * vec, UINT ty, CHAR const* name, bool is_del)
         }
         break;
     }
-    case D_INT: {
+    case DUMPVEC_INT: {
         Vector<INT> * p = (Vector<INT> *)vec;
         for (INT i = 0; i <= p->get_last_idx(); i++) {
             fprintf(h, "%d", (INT)p->get(i));
@@ -652,7 +653,7 @@ void dumps_svec(void * vec, UINT ty)
 {
     printf("\n");
     switch (ty) {
-    case D_BOOL: {
+    case DUMPVEC_BOOL: {
         Vector<bool> *p = (Vector<bool> *)vec;
         for (INT i = 0; i <= p->get_last_idx(); i++) {
             printf("%d", (INT)p->get(i));
@@ -662,7 +663,7 @@ void dumps_svec(void * vec, UINT ty)
         }
         break;
     }
-    case D_INT: {
+    case DUMPVEC_INT: {
         Vector<INT> *p = (Vector<INT> *)vec;
         for (INT i = 0; i <= p->get_last_idx(); i++) {
             printf("%d", (INT)p->get(i));
@@ -743,9 +744,9 @@ UINT getLookupPopCount(ULONGLONG v)
 //Searchs for sub-string.
 INT findstr(CHAR * src, CHAR * s)
 {
-    if (src == NULL || s == NULL) { return 0; }
+    if (src == nullptr || s == nullptr) { return 0; }
 
-    // can't have empty or NULL 'old'
+    // can't have empty or nullptr 'old'
     INT srclen = -1;
     CHAR * startp = src, * p, * q;
     INT l = 0;
@@ -790,7 +791,7 @@ LONGLONG ceil_align(LONGLONG v, LONGLONG align)
 //e.g: Given /xx/yy/zz.file, return /xx/yy
 CHAR * getfilepath(CHAR const* n, OUT CHAR * buf, UINT bufl)
 {
-    if (n == NULL) { return NULL; }
+    if (n == nullptr) { return nullptr; }
 
     ASSERT0(buf);
     INT l = (INT)strlen(n);
@@ -800,7 +801,7 @@ CHAR * getfilepath(CHAR const* n, OUT CHAR * buf, UINT bufl)
     }
 
     if (i < 0) {
-        return NULL;
+        return nullptr;
     }
 
     DUMMYUSE(bufl);
@@ -818,7 +819,7 @@ CHAR * getfilepath(CHAR const* n, OUT CHAR * buf, UINT bufl)
 void strshift(IN OUT CHAR * string, INT ofst)
 {
     INT len = (INT)strlen(string), i;
-    if (string == NULL) { return; }
+    if (string == nullptr) { return; }
 
     if (ofst >= 0) { //shift to right
         if (ofst >= len) {
@@ -848,7 +849,7 @@ void strshift(IN OUT CHAR * string, INT ofst)
 CHAR * getfilename(CHAR const* path, OUT CHAR * buf, UINT bufl)
 {
     DUMMYUSE(bufl);
-    if (path == NULL) { return NULL; }
+    if (path == nullptr) { return nullptr; }
     INT l = (INT)strlen(path);
     INT i = l;
     INT dotpos = -1;
@@ -881,7 +882,7 @@ CHAR * getfilename(CHAR const* path, OUT CHAR * buf, UINT bufl)
 //e.g: Given a.foo, return foo.
 CHAR * getfilesuffix(CHAR const* n, OUT CHAR * buf, UINT bufl)
 {
-    if (n == NULL) { return NULL; }
+    if (n == nullptr) { return nullptr; }
 
     INT l = (INT)strlen(n);
     INT i = l;
@@ -889,7 +890,7 @@ CHAR * getfilesuffix(CHAR const* n, OUT CHAR * buf, UINT bufl)
         i--;
     }
     DUMMYUSE(bufl);
-    if (i < 0) { return NULL; }
+    if (i < 0) { return nullptr; }
     ASSERT0((UINT)(l - i -1) < bufl);
     ::memcpy(buf, n + i + 1, l - i -1);
     buf[l - i -1] = 0;
@@ -933,7 +934,7 @@ void extractLeftMostSubString(CHAR * tgt, CHAR const* string, CHAR separator)
 UINT xstrlen(CHAR const* p)
 {
     UINT len = 0;
-    while (*p != 0) {
+    while (*p != '\0') {
         if (*p == '\\' && *(p+1) == 'n') {
             p += 2;
         } else {
@@ -949,15 +950,15 @@ UINT xstrlen(CHAR const* p)
 //Return true if equal.
 bool xstrcmp(CHAR const* p1, CHAR const* p2, INT n)
 {
-    while (n-- > 0 && *p1++ == *p2++) { }
-    if (n >= 0) { return true; }
-    return false;
+    //Note it does not have to judge whether current char is terminate char.
+    while (n-- > 0 && *p1++ == *p2++) {}
+    return n < 0;
 }
 
 
 CHAR * upper(CHAR * n)
 {
-    if (n == NULL) { return NULL; }
+    if (n == nullptr) { return nullptr; }
     LONG l = (LONG)strlen(n);
     l--;
     while (l >= 0) {
@@ -972,7 +973,7 @@ CHAR * upper(CHAR * n)
 
 CHAR * lower(CHAR * n)
 {
-    if (n == NULL) { return NULL; }
+    if (n == nullptr) { return nullptr; }
     LONG l = (LONG)strlen(n);
     l--;
     while (l >= 0) {
@@ -1188,7 +1189,7 @@ static bool prt_ansi_str(CHAR * buf, UINT buflen, UINT * pbufpos,
 {
     CHAR ch;
     bool sized = (format_size > 0);
-    if (s == NULL) { return true; }
+    if (s == nullptr) { return true; }
     while ((ch = *s++) != 0) {
         if (!prtchar(buf, buflen, pbufpos, ch)) {
             return false;
@@ -1510,7 +1511,7 @@ CHAR * xsprintf(IN OUT CHAR * buf, UINT buflen, CHAR const* format, ...)
         ch = *format;
     }
 OVER:
-    // NULL terminate string
+    // nullptr terminate string
     prtchar(buf, buflen, &bufpos, '\0');
 
     // Ensure string terminated

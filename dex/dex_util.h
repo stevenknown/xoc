@@ -103,7 +103,7 @@ void extractFunctionTypeFromRegionName(
 
 //Seperate param_type_string into a set of individual type string.
 //Return the number of individual type strings.
-//If params is NULL, this function only compute the number of type string.
+//If params is nullptr, this function only compute the number of type string.
 //Note the outputbuf recorded in params should big enough to
 //hold each type string.
 UINT extractSeparateParamterType(

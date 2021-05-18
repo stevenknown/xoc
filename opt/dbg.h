@@ -65,7 +65,7 @@ public:
         LogMgr * logmgr;
 
     public:
-        PrtCtx() { prefix = NULL; logmgr = NULL; }
+        PrtCtx() { prefix = nullptr; logmgr = nullptr; }
 
         LogMgr * getLogMgr() const { return logmgr; }
     };

@@ -6,9 +6,13 @@
 
 //libxcom
 #include "ltype.h"
-#include "comf.h"
-#include "strbuf.h"
+#include "diagnostic.h"
+#include "comm_macro.h"
 #include "smempool.h"
+using namespace xcom;
+#include "allocator.h"
+#include "strbuf.h"
+#include "comf.h" //used by sstl.h
 #include "sstl.h"
 #include "bs.h"
 #include "sbs.h"
@@ -21,9 +25,10 @@
 #include "matt_dump.h"
 #include "matt.h"
 #include "xmat.h"
+#include "agraph.h"
 #include "linsys.h"
 #include "lpsol.h"
 #include "sort.h"
-using namespace xcom;
+#include "scc.h"
 #endif
 

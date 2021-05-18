@@ -70,7 +70,7 @@ int main(int argc, char const* argv[])
         goto FIN;
     }
 
-    if (g_logfile_name != NULL && g_dump_dex_file_path) {
+    if (g_logfile_name != nullptr && g_dump_dex_file_path) {
         note("\n==---- %s ----==\n", g_dex_file_path);
     }
 

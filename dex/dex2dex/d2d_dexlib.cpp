@@ -204,7 +204,7 @@ int readSignedLeb128(const Int8** pStream) {
  * value was syntactically valid. The only syntactically *invalid*
  * values are ones that are five bytes long where the final byte has
  * any but the low-order four bits set. Additionally, if the limit is
- * passed as non-NULL and bytes would need to be read past the limit,
+ * passed as non-nullptr and bytes would need to be read past the limit,
  * then the read is considered invalid.
  */
 int readAndVerifyUnsignedLeb128(const UInt8** pStream, const UInt8* limit,
@@ -212,7 +212,7 @@ int readAndVerifyUnsignedLeb128(const UInt8** pStream, const UInt8* limit,
     const UInt8* ptr = *pStream;
     int result = readUnsignedLeb128(pStream);
 
-    if (((limit != NULL) && (*pStream > limit))
+    if (((limit != nullptr) && (*pStream > limit))
             || (((*pStream - ptr) == 5) && (ptr[4] > 0x0f))) {
         *okay = false;
     }
@@ -226,7 +226,7 @@ int readAndVerifyUnsignedLeb128(const UInt8** pStream, const UInt8* limit,
  * value was syntactically valid. The only syntactically *invalid*
  * values are ones that are five bytes long where the final byte has
  * any but the low-order four bits set. Additionally, if the limit is
- * passed as non-NULL and bytes would need to be read past the limit,
+ * passed as non-nullptr and bytes would need to be read past the limit,
  * then the read is considered invalid.
  */
 int readAndVerifySignedLeb128(const UInt8** pStream, const UInt8* limit,
@@ -234,7 +234,7 @@ int readAndVerifySignedLeb128(const UInt8** pStream, const UInt8* limit,
     const UInt8* ptr = *pStream;
     int result = readSignedLeb128(pStream);
 
-    if (((limit != NULL) && (*pStream > limit))
+    if (((limit != nullptr) && (*pStream > limit))
             || (((*pStream - ptr) == 5) && (ptr[4] > 0x0f))) {
         *okay = false;
     }

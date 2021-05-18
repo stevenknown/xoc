@@ -61,6 +61,7 @@ class PassMgr;
 #define OC_is_reach_def_valid(o) ((o).u1.s1.is_reach_def_valid)
 #define OC_is_avail_reach_def_valid(o) ((o).u1.s1.is_avail_reach_def_valid)
 #define OC_is_cfg_valid(o) ((o).u1.s1.is_cfg_valid)
+#define OC_is_scc_valid(o) ((o).u1.s1.is_scc_valid)
 #define OC_is_aa_valid(o) ((o).u1.s1.is_aa_result_valid)
 #define OC_is_expr_tab_valid(o) ((o).u1.s1.is_ir_expr_tab)
 #define OC_is_cdg_valid(o) ((o).u1.s1.is_cdg_valid)
@@ -69,7 +70,6 @@ class PassMgr;
 #define OC_is_rpo_valid(o) ((o).u1.s1.is_rpo_valid)
 #define OC_is_loopinfo_valid(o) ((o).u1.s1.is_loopinfo_valid)
 #define OC_is_callg_valid(o) ((o).u1.s1.is_callg_valid)
-#define OC_show_comp_time(o) ((o).u2.s1.show_compile_time)
 class OptCtx {
 public:
     union {
@@ -88,6 +88,7 @@ public:
             UINT is_aa_result_valid:1; //POINT TO info is avaiable.
             UINT is_ir_expr_tab:1; //Liveness of ExpRep is avaliable.
             UINT is_cfg_valid:1; //CFG is avaliable.
+            UINT is_scc_valid:1; //SCC of CFG is avaliable.
             UINT is_cdg_valid:1; //CDG is avaliable.
 
             //Dominator Set, Immediate Dominator are avaliable.
@@ -104,29 +105,58 @@ public:
         } s1;
     } u1;
 
-    union {
-        UINT int1;
-        struct {
-            UINT show_compile_time:1; //Show compilation time.
-        } s1;
-    } u2;
-
 public:
-    OptCtx() { set_all_invalid(); u2.int1 = 0; }
+    OptCtx() { set_all_invalid(); }
     OptCtx const& operator = (OptCtx const&);
+
+    bool is_ref_valid() const { return OC_is_ref_valid(*this); }
+    bool is_pr_du_chain_valid() const
+    { return OC_is_pr_du_chain_valid(*this); }
+    bool is_nonpr_du_chain_valid() const
+    { return OC_is_nonpr_du_chain_valid(*this); }
+    bool is_live_expr_valid() const { return OC_is_live_expr_valid(*this); }
+    bool is_reach_def_valid() const { return OC_is_reach_def_valid(*this); }
+    bool is_avail_reach_def_valid() const
+    { return OC_is_avail_reach_def_valid(*this); }
+    bool is_cfg_valid() const { return OC_is_cfg_valid(*this); }
+    bool is_scc_valid() const { return OC_is_scc_valid(*this); }
+    bool is_aa_valid() const { return OC_is_aa_valid(*this); }
+    bool is_expr_tab_valid() const { return OC_is_expr_tab_valid(*this); }
+    bool is_cdg_valid() const { return OC_is_cdg_valid(*this); }
+    bool is_dom_valid() const { return OC_is_dom_valid(*this); }
+    bool is_pdom_valid() const { return OC_is_pdom_valid(*this); }
+    bool is_rpo_valid() const { return OC_is_rpo_valid(*this); }
+    bool is_loopinfo_valid() const { return OC_is_loopinfo_valid(*this); }
+    bool is_callg_valid() const { return OC_is_callg_valid(*this); }
 
     void set_all_valid() { u1.int1 = (UINT)-1; }
     void set_all_invalid() { u1.int1 = 0; }
 
     //This function reset the flag if control flow changed.
-    void set_flag_if_cfg_changed()
+    void setInvalidIfCFGChanged()
     {
-        OC_is_cfg_valid(*this) = false;
+        //OC_is_cfg_valid(*this) = false; CFG should always be maintained.
+        OC_is_scc_valid(*this) = false;
         OC_is_cdg_valid(*this) = false;
         OC_is_dom_valid(*this) = false;
         OC_is_pdom_valid(*this) = false;
         OC_is_rpo_valid(*this) = false;
         OC_is_loopinfo_valid(*this) = false;
+        OC_is_scc_valid(*this) = false;
+    }
+
+    void setDomValid(bool valid)
+    {
+        OC_is_dom_valid(*this) = valid;
+        OC_is_pdom_valid(*this) = valid;
+    }
+
+    void setInvalidIfDUMgrLiveChanged()
+    {
+        OC_is_expr_tab_valid(*this) = false;
+        OC_is_live_expr_valid(*this) = false;
+        OC_is_reach_def_valid(*this) = false;
+        OC_is_avail_reach_def_valid(*this) = false;
     }
 };
 
@@ -150,6 +180,7 @@ public:
     bool is_dump_rp; //Dump Register Promotion.
     bool is_dump_rce; //Dump light weight Redundant Code Elimination.
     bool is_dump_dce; //Dump Dead Code Elimination.
+    bool is_dump_lftr; //Dump Linear Function Test Replacement.
     bool is_dump_gvn; //Dump Global Value Numbering.
     bool is_dump_gcse; //Dump Global Common Subscript Expression.
     bool is_dump_ivr; //Dump Induction Variable Recognization.
@@ -164,7 +195,9 @@ public:
     bool is_dump_livenessmgr; //Dump LivenessMgr.
     bool is_dump_refine_duchain; //Dump RefineDUChain.
     bool is_dump_refine; //Dump Refinement.
+    bool is_dump_gscc; //Dump GSCC.
     bool is_dump_cdg; //Dump Control Dependence Graph.
+    bool is_dump_lis; //Dump LIS.
 public:
     DumpOpt();
     DumpOpt const& operator = (DumpOpt const&); //Disable operator =.
@@ -180,6 +213,7 @@ public:
     bool isDumpRP() const;
     bool isDumpRCE() const;
     bool isDumpDCE() const;
+    bool isDumpLFTR() const;
     bool isDumpGVN() const;
     bool isDumpGCSE() const;
     bool isDumpIVR() const;
@@ -194,7 +228,9 @@ public:
     bool isDumpLivenessMgr() const;
     bool isDumpRefineDUChain() const;
     bool isDumpRefine() const;
+    bool isDumpGSCC() const;
     bool isDumpCDG() const;
+    bool isDumpLIS() const;
 };
 
 
@@ -214,6 +250,7 @@ typedef enum _PASS_TYPE {
     PASS_SCEV,
     PASS_LICM,
     PASS_DCE,
+    PASS_LFTR,
     PASS_DSE,
     PASS_RCE,
     PASS_GVN,
@@ -243,6 +280,7 @@ typedef enum _PASS_TYPE {
     PASS_SCALAR_OPT,
     PASS_MDLIVENESS_MGR,
     PASS_REFINE,
+    PASS_GSCC,
     PASS_NUM,
 } PASS_TYPE;
 
@@ -309,7 +347,7 @@ extern bool g_do_cdg; //Build post dominator tree.
 extern bool g_do_aa; //Perform default alias analysis.
 //Perform DU analysis for MD to build du chain.
 extern bool g_do_md_du_analysis;
-//Compute PR DU chain in classic method. 
+//Compute PR DU chain in classic method.
 extern bool g_compute_pr_du_chain;
 //Compute NONPR DU chain in classic method.
 extern bool g_compute_nonpr_du_chain;
@@ -332,6 +370,8 @@ extern bool g_do_dce;
 //    }
 //Aggressive DCE will remove the above dead cycle.
 extern bool g_do_dce_aggressive;
+//Perform linear function test replacement.
+extern bool g_do_lftr;
 extern bool g_do_cp_aggressive; //It may cost much compile time.
 extern bool g_do_cp; //Perform copy propagation.
 extern bool g_do_rp; //Perform register promotion.

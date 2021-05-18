@@ -52,18 +52,19 @@ class RefineCtx {
 public:
     union {
         struct {
-            //Pass info topdown. True to do this type of refinement.
+            //Pass info topdown. True to do following refinement.
             //e.g: int a; a/2 => a>>1
             UINT refine_div_const:1;
 
-            //Pass info topdown. True to do this type of refinement.
+            //Pass info topdown. True to do following refinement.
             //e.g: int a; a*2 => a<<1
+            //     int b; b*2 => b+b
             UINT refine_mul_const:1;
 
-            //Pass info topdown. True to do this type of refinement.
+            //Pass info topdown. True to do following refinement.
             UINT refine_stmt:1;
 
-            //Pass info topdown. True to do this type of refinement.
+            //Pass info topdown. True to do following refinement.
             //e.g: int a; a=2+3 => a=5
             UINT do_fold_const:1;
 
@@ -97,7 +98,7 @@ public:
     RefineCtx()
     {
         RC_refine_div_const(*this) = true;
-        RC_refine_mul_const(*this) = true;
+        RC_refine_mul_const(*this) = false;
         RC_refine_stmt(*this) = true;
         RC_do_fold_const(*this) = true;
         RC_update_mdref(*this) = true;
@@ -144,15 +145,12 @@ public:
 //This class perform peephole optimizations.
 class Refine : public Pass {
     COPY_CONSTRUCTOR(Refine);
-    HOST_INT calcLSRIntVal(Type const* type, HOST_INT v0, HOST_INT v1);
-    HOST_INT calcIntVal(IR_TYPE ty, HOST_INT v0, HOST_INT v1);
-    double calcFloatVal(IR_TYPE ty, double v0, double v1);
 
     IR * foldConstFloatUnary(IR * ir, bool & change);
     IR * foldConstFloatBinary(IR * ir, bool & change);
     IR * foldConstIntUnary(IR * ir, bool & change);
-    IR * foldConstIntBinary(IR * ir, bool & change);    
- 
+    IR * foldConstIntBinary(IR * ir, bool & change);
+
     //Check and insert data type CVT if it is necessary.
     IR * insertCvt(IR * parent, IR * kid, bool & change);
     void insertCvtForBinaryOp(IR * ir, bool & change);
@@ -187,10 +185,14 @@ class Refine : public Pass {
     IR * refineArray(IR * ir, bool & change, RefineCtx & rc);
     IR * refineNeg(IR * ir, bool & change);
     IR * refineNot(IR * ir, bool & change, RefineCtx & rc);
+    IR * refineAsr(IR * ir, bool & change);
+    IR * refineLsl(IR * ir, bool & change);
+    IR * refineLsr(IR * ir, bool & change);
     IR * refineBinaryOp(IR * ir, bool & change, RefineCtx & rc);
     IR * refineLoad(IR * ir);
     IR * refineILoad1(IR * ir, bool & change, RefineCtx & rc);
     IR * refineILoad2(IR * ir, bool & change, RefineCtx & rc);
+    IR * refineILoad3(IR * ir, bool & change, RefineCtx & rc);
     IR * refineILoad(IR * ir, bool & change, RefineCtx & rc);
     IR * refineDetViaSSAdu(IR * ir, bool & change);
     IR * refineDet(IR * ir_list, bool & change, RefineCtx & rc);

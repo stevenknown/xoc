@@ -55,8 +55,8 @@ class BMat;
 #define EDGE_info(e) ((e)->_info)
 class Edge {
 public:
-    Edge * prev; //used by FreeList and EdgeHash
-    Edge * next; //used by FreeList and EdgeHash
+    Edge * prev; //used by FreeList
+    Edge * next; //used by FreeList
     Vertex * _from;
     Vertex * _to;
     void * _info;
@@ -64,7 +64,13 @@ public:
     void copyEdgeInfo(Edge const* src) { EDGE_info(this) = src->info(); }
 
     void init()
-    { prev = NULL, next = NULL, _from = NULL, _to = NULL, _info = NULL; }
+    {
+        prev = nullptr;
+        next = nullptr;
+        _from = nullptr;
+        _to = nullptr;
+        _info = nullptr;
+    }
     void * info() const { return EDGE_info(this); }
 
     Vertex * from() const { return EDGE_from(this); }
@@ -90,8 +96,8 @@ public:
     void * _info;
 public:
     void init()
-    { prev = NULL, next = NULL, in_list = NULL, out_list = NULL,
-      _id = VERTEX_UNDEF, _rpo = RPO_UNDEF, _info = NULL; }
+    { prev = nullptr, next = nullptr, in_list = nullptr, out_list = nullptr,
+      _id = VERTEX_UNDEF, _rpo = RPO_UNDEF, _info = nullptr; }
     UINT id() const { return VERTEX_id(this); }
 
     EdgeC * getOutList() const { return VERTEX_out_list(this); }
@@ -111,7 +117,7 @@ public:
     EdgeC * prev;
     Edge * edge;
 public:
-    void init() { next = NULL, prev = NULL, edge = NULL; }
+    void init() { next = nullptr, prev = nullptr, edge = nullptr; }
 
     Vertex * getTo() const { return EDGE_to(EC_edge(this)); }
     UINT getToId() const { return VERTEX_id(EDGE_to(EC_edge(this))); }
@@ -168,11 +174,59 @@ public:
 
     void destroy()
     {
-        m_g = NULL;
+        m_g = nullptr;
         Hash<Edge*, EdgeHashFunc>::destroy();
     }
 
     virtual Edge * create(OBJTY v);
+    size_t count_mem() const
+    { return sizeof(m_g) + Hash<Edge*, EdgeHashFunc>::count_mem(); }
+};
+
+
+class CompareEdgeFunc {
+public:
+    Graph * m_g;
+public:
+    bool is_less(Edge const* e1, Edge const* e2) const
+    {
+        return (e1->from()->id() < e2->from()->id()) ||
+               ((e1->from()->id() == e2->from()->id()) &&
+                (e1->to()->id() < e2->to()->id()));
+    }
+
+    bool is_equ(Edge const* e1, Edge const* e2) const
+    {
+        return e1->from()->id() == e2->from()->id() &&
+               e1->to()->id() == e2->to()->id();
+    }
+
+    Edge * createKey(Edge const* ref);
+};
+
+
+typedef TTabIter<Edge*> EdgeTabIter;
+
+class EdgeTab : public TTab<Edge*, CompareEdgeFunc> {
+    Graph * m_g;
+public:
+    EdgeTab(Graph * g) { init(g); }
+
+    void init(Graph * g)
+    {
+        m_g = g;
+        getCompareKeyObject()->m_g = g;
+        TTab<Edge*, CompareEdgeFunc>::init();
+    }
+
+    void destroy()
+    {
+        m_g = nullptr;
+        TTab<Edge*, CompareEdgeFunc>::destroy();
+    }
+
+    size_t count_mem() const
+    { return sizeof(m_g) + TTab<Edge*, CompareEdgeFunc>::count_mem(); }
 };
 
 
@@ -209,15 +263,22 @@ public:
 
     virtual Vertex * create(OBJTY v)
     {
-        Vertex * vex =
-            (Vertex*)smpoolMallocConstSize(sizeof(Vertex), m_ec_pool);
+        Vertex * vex = (Vertex*)smpoolMallocConstSize(sizeof(Vertex),
+                                                      m_ec_pool);
         ASSERT0(vex);
         ::memset(vex, 0, sizeof(Vertex));
         VERTEX_id(vex) = (UINT)(size_t)v;
         return vex;
     }
+    size_t count_mem() const
+    {
+        return sizeof(m_ec_pool) + Hash<Vertex*, VertexHashFunc>::count_mem() +
+               smpoolGetPoolSize(m_ec_pool);
+    }
 };
 
+typedef EdgeTabIter EdgeIter;
+typedef INT VertexIter;
 
 //A graph G = (V, E), consists of a set of vertices, V, and a set of edges, E.
 //Each edge is a pair (v,w), where v,w belong to V. Edges are sometimes
@@ -231,6 +292,7 @@ public:
 //compute dominator, please try best to add vertex with
 //topological order.
 class Graph {
+    friend class CompareEdgeFunc;
     friend class EdgeHash;
     friend class VertexHash;
 protected:
@@ -240,31 +302,31 @@ protected:
     BYTE m_is_direction:1; //true if graph is direction.
     UINT m_edge_hash_size;
     UINT m_vex_hash_size;
-    EdgeHash m_edges; //record all edges.
-    VertexHash m_vertices; //record all vertices.
-    FreeList<Edge> m_e_free_list; //record freed Edge for reuse.
-    FreeList<EdgeC> m_el_free_list; //record freed EdgeC for reuse.
-    FreeList<Vertex> m_v_free_list; //record freed Vertex for reuse.
-    SMemPool * m_vertex_pool;
-    SMemPool * m_edge_pool;
-    SMemPool * m_ec_pool;
-
+    UINT m_dense_vex_num; //record the number of vertex in dense mode.
     //record vertex if vertex id is densen distribution.
     //map vertex id to vertex.
     Vector<Vertex*> * m_dense_vertex;
+    VertexHash * m_sparse_vertex; //record all vertices.
+    SMemPool * m_vertex_pool;
+    SMemPool * m_edge_pool;
+    SMemPool * m_ec_pool;
+    EdgeTab m_edgetab; //record all edges.
+    FreeList<Edge> m_e_free_list; //record freed Edge for reuse.
+    FreeList<EdgeC> m_el_free_list; //record freed EdgeC for reuse.
+    FreeList<Vertex> m_v_free_list; //record freed Vertex for reuse.
 
 protected:
     //Add 'e' into out-edges of 'vex'
     inline void addOutList(Vertex * vex, Edge * e)
     {
-        ASSERTN(m_ec_pool != NULL, ("not yet initialized."));
+        ASSERTN(m_ec_pool != nullptr, ("not yet initialized."));
         ASSERT0(vex && e);
-        EdgeC * last = NULL;
-        for (EdgeC * el = VERTEX_out_list(vex); el != NULL; el = EC_next(el)) {
+        EdgeC * last = nullptr;
+        for (EdgeC * el = VERTEX_out_list(vex); el != nullptr; el = EC_next(el)) {
             last = el;
             if (EC_edge(el) == e) return;
         }
-        ASSERT0(last == NULL || EC_next(last) == NULL);
+        ASSERT0(last == nullptr || EC_next(last) == nullptr);
         xcom::add_next(&VERTEX_out_list(vex), &last, newEdgeC(e));
     }
 
@@ -273,25 +335,25 @@ protected:
     {
         ASSERTN(m_ec_pool, ("not yet initialized."));
         ASSERT0(vex && e);
-        EdgeC * last = NULL;
-        for (EdgeC * el = VERTEX_in_list(vex); el != NULL; el = EC_next(el)) {
+        EdgeC * last = nullptr;
+        for (EdgeC * el = VERTEX_in_list(vex); el != nullptr; el = EC_next(el)) {
             last = el;
             if (EC_edge(el) == e) { return; }
         }
-        ASSERT0(last == NULL || EC_next(last) == NULL);
+        ASSERT0(last == nullptr || EC_next(last) == nullptr);
         xcom::add_next(&VERTEX_in_list(vex), &last, newEdgeC(e));
     }
 
     virtual void * cloneEdgeInfo(Edge*)
-    { ASSERTN(0, ("Target Dependent Code")); return NULL; }
+    { ASSERTN(0, ("Target Dependent Code")); return nullptr; }
 
     virtual void * cloneVertexInfo(Vertex*)
-    { ASSERTN(0, ("Target Dependent Code")); return NULL; }
+    { ASSERTN(0, ("Target Dependent Code")); return nullptr; }
 
     inline Vertex * newVertex()
     {
-        Vertex * vex = (Vertex*)smpoolMallocConstSize(
-            sizeof(Vertex), m_vertex_pool);
+        Vertex * vex = (Vertex*)smpoolMallocConstSize(sizeof(Vertex),
+                                                      m_vertex_pool);
         ASSERT0(vex);
         ::memset(vex, 0, sizeof(Vertex));
         vex->init();
@@ -300,7 +362,7 @@ protected:
 
     inline Edge * newEdge(UINT from, UINT to)
     {
-        ASSERTN(m_ec_pool != NULL, ("not yet initialized."));
+        ASSERTN(m_ec_pool != nullptr, ("not yet initialized."));
         Vertex * fp = addVertex(from);
         Vertex * tp = addVertex(to);
         return newEdge(fp, tp);
@@ -311,7 +373,7 @@ protected:
     inline Edge * newEdgeImpl(Vertex * from, Vertex * to)
     {
         Edge * e = m_e_free_list.get_free_elem();
-        if (e == NULL) {
+        if (e == nullptr) {
             e = (Edge*)smpoolMallocConstSize(sizeof(Edge), m_edge_pool);
             ::memset(e, 0, sizeof(Edge));
         }
@@ -325,11 +387,11 @@ protected:
 
     inline EdgeC * newEdgeC(Edge * e)
     {
-        ASSERTN(m_ec_pool != NULL, ("not yet initialized."));
-        if (e == NULL) { return NULL; }
+        ASSERTN(m_ec_pool != nullptr, ("not yet initialized."));
+        if (e == nullptr) { return nullptr; }
 
         EdgeC * el = m_el_free_list.get_free_elem();
-        if (el == NULL) {
+        if (el == nullptr) {
             el = (EdgeC*)smpoolMallocConstSize(sizeof(EdgeC), m_ec_pool);
             ::memset(el, 0, sizeof(EdgeC));
         }
@@ -337,6 +399,12 @@ protected:
         EC_edge(el) = e;
         return el;
     }
+
+    void removeTransitiveEdgeHelper(Vertex const* fromvex,
+                                    Vector<DefSBitSetCore*> * reachset_vec,
+                                    BitSet & is_visited,
+                                    DefMiscBitSetMgr & bs_mgr);
+    Graph * self() { return this; }
 public:
     Graph(UINT edge_hash_size = 64, UINT vex_hash_size = 64);
     Graph(Graph const& g);
@@ -347,18 +415,33 @@ public:
     void destroy();
     inline Edge * addEdge(UINT from, UINT to)
     {
-        ASSERTN(m_ec_pool != NULL, ("not yet initialized."));
+        ASSERTN(m_ec_pool != nullptr, ("not yet initialized."));
         return newEdge(from, to);
     }
     inline Edge * addEdge(Vertex * from, Vertex * to)
     {
-        ASSERTN(m_ec_pool != NULL, ("not yet initialized."));
+        ASSERTN(m_ec_pool != nullptr, ("not yet initialized."));
         return newEdge(from, to);
     }
     inline Vertex * addVertex(UINT vid)
     {
-        ASSERTN(m_ec_pool != NULL, ("not yet initialized."));
-        return m_vertices.append(newVertex(vid));
+        ASSERTN(m_ec_pool != nullptr, ("not yet initialized."));
+        if (is_dense()) {
+            Vertex * vex = m_dense_vertex->get(vid);
+            if (vex != nullptr) {
+                return vex;
+            }
+            vex = newVertex(vid);
+            m_dense_vertex->set(vid, vex);
+            m_dense_vex_num++;
+            return vex;
+        }
+
+        Vertex * vex = m_sparse_vertex->find((OBJTY)(size_t)vid);
+        if (vex != nullptr) {
+            return vex;
+        }
+        return m_sparse_vertex->append(newVertex(vid));
     }
 
     void computeRpoNoRecursive(IN OUT Vertex * root,
@@ -367,16 +450,16 @@ public:
     //Count memory usage for current object.
     size_t count_mem() const;
 
-    void dumpDOT(CHAR const* name = NULL) const;
-    void dumpVCG(CHAR const* name = NULL) const;
+    void dumpDOT(CHAR const* name = nullptr) const;
+    void dumpVCG(CHAR const* name = nullptr) const;
     void dumpVexVector(Vector<Vertex*> const& vec, FILE * h);
 
     //Return true if graph vertex id is dense.
-    bool is_dense() const { return m_dense_vertex != NULL; }
+    bool is_dense() const { return m_dense_vertex != nullptr; }
     //Return true if 'succ' is successor of 'v'.
     bool is_succ(Vertex * v, Vertex * succ) const
     {
-        for (EdgeC * e = VERTEX_out_list(v); e != NULL; e = EC_next(e)) {
+        for (EdgeC * e = VERTEX_out_list(v); e != nullptr; e = EC_next(e)) {
             if (EDGE_to(EC_edge(e)) == succ) {
                 return true;
             }
@@ -387,7 +470,7 @@ public:
     //Return true if 'pred' is predecessor of 'v'.
     bool is_pred(Vertex * v, Vertex * pred) const
     {
-        for (EdgeC * e = VERTEX_in_list(v); e != NULL; e = EC_next(e)) {
+        for (EdgeC * e = VERTEX_in_list(v); e != nullptr; e = EC_next(e)) {
             if (e->getFrom() == pred) {
                 return true;
             }
@@ -402,28 +485,28 @@ public:
     //Is there exist a path connect 'from' and 'to'.
     bool is_reachable(UINT from, UINT to) const
     {
-        ASSERTN(m_ec_pool != NULL, ("not yet initialized."));
+        ASSERTN(m_ec_pool != nullptr, ("not yet initialized."));
         return is_reachable(getVertex(from), getVertex(to));
     }
     bool is_reachable(Vertex * from, Vertex * to) const;
     void insertVertexBetween(IN Vertex * v1,
                              IN Vertex * v2,
                              IN Vertex * newv,
-                             OUT Edge ** e1 = NULL,
-                             OUT Edge ** e2 = NULL,
+                             OUT Edge ** e1 = nullptr,
+                             OUT Edge ** e2 = nullptr,
                              bool sort = true);
     void insertVertexBetween(UINT v1,
                              UINT v2,
                              UINT newv,
-                             OUT Edge ** e1 = NULL,
-                             OUT Edge ** e2 = NULL,
+                             OUT Edge ** e1 = nullptr,
+                             OUT Edge ** e2 = nullptr,
                              bool sort = true);
     bool is_graph_entry(Vertex const* v) const
-    { return VERTEX_in_list(v) == NULL; }
+    { return VERTEX_in_list(v) == nullptr; }
 
     //Return true if vertex is exit node of graph.
     bool is_graph_exit(Vertex const* v) const
-    { return VERTEX_out_list(v) == NULL; }
+    { return VERTEX_out_list(v) == nullptr; }
     //Return true if In-Degree of 'vex' equal to 'num'.
     bool isInDegreeEqualTo(Vertex const* vex, UINT num) const;
     //Return true if Out-Degree of 'vex' equal to 'num'.
@@ -433,13 +516,15 @@ public:
     static bool isValidRPO(INT rpo)
     { return rpo >= 0 && (rpo % RPO_INTERVAL) != 0; }
 
+    //Erasing graph, include all nodes and edges,
+    //except for EdgeInfo and VertexInfo.
     void erase();
 
     bool getNeighborList(IN OUT List<UINT> & ni_list, UINT vid) const;
     bool getNeighborSet(OUT DefSBitSet & niset, UINT vid) const;
     UINT getDegree(UINT vid) const
     {
-        ASSERTN(m_ec_pool != NULL, ("not yet initialized."));
+        ASSERTN(m_ec_pool != nullptr, ("not yet initialized."));
         return getDegree(getVertex(vid));
     }
     UINT getDegree(Vertex const* vex) const;
@@ -447,44 +532,41 @@ public:
     UINT getOutDegree(Vertex const* vex) const;
     UINT getVertexNum() const
     {
-        ASSERTN(m_ec_pool != NULL, ("not yet initialized."));
-        return m_vertices.get_elem_count();
+        ASSERTN(m_ec_pool != nullptr, ("not yet initialized."));
+        if (is_dense()) {
+            return m_dense_vex_num;
+        }
+        return m_sparse_vertex->get_elem_count();
     }
     UINT getEdgeNum() const
     {
-        ASSERTN(m_ec_pool != NULL, ("not yet initialized."));
-        return m_edges.get_elem_count();
+        ASSERTN(m_ec_pool != nullptr, ("not yet initialized."));
+        return m_edgetab.get_elem_count();
     }
     inline Vertex * getVertex(UINT vid) const
     {
-        ASSERTN(m_ec_pool != NULL, ("not yet initialized."));
-        if (m_dense_vertex != NULL) {
+        ASSERTN(m_ec_pool != nullptr, ("not yet initialized."));
+        if (is_dense()) {
             return m_dense_vertex->get(vid);
         }
-        return (Vertex*)m_vertices.find((OBJTY)(size_t)vid);
+        return (Vertex*)m_sparse_vertex->find((OBJTY)(size_t)vid);
     }
     Edge * getEdge(UINT from, UINT to) const;
     Edge * getEdge(Vertex const* from, Vertex const* to) const;
-    Edge * get_first_edge(INT & cur) const
+    Edge * get_first_edge(EdgeIter & it) const
     {
-        ASSERTN(m_ec_pool != NULL, ("not yet initialized."));
-        return m_edges.get_first(cur);
+        ASSERTN(m_ec_pool != nullptr, ("not yet initialized."));
+        return m_edgetab.get_first(it);
     }
-    Edge * get_next_edge(INT & cur) const
+    Edge * get_next_edge(EdgeIter & it) const
     {
-        ASSERTN(m_ec_pool != NULL, ("not yet initialized."));
-        return m_edges.get_next(cur);
+        ASSERTN(m_ec_pool != nullptr, ("not yet initialized."));
+        return m_edgetab.get_next(it);
     }
-    Vertex * get_first_vertex(INT & cur) const
-    {
-        ASSERTN(m_ec_pool != NULL, ("not yet initialized."));
-        return m_vertices.get_first(cur);
-    }
-    Vertex * get_next_vertex(INT & cur) const
-    {
-        ASSERTN(m_ec_pool != NULL, ("not yet initialized."));
-        return m_vertices.get_next(cur);
-    }
+    Vertex * get_first_vertex(VertexIter & cur) const;
+    Vertex * get_next_vertex(VertexIter & cur) const;
+    Vertex * get_last_vertex(VertexIter & cur) const;
+    Vertex * get_prev_vertex(VertexIter & cur) const;
 
     void resize(UINT vertex_hash_sz, UINT edge_hash_sz);
     Edge * reverseEdge(Edge * e); //Reverse edge direction.(e.g: a->b => b->a)
@@ -494,37 +576,51 @@ public:
     Vertex * removeVertex(Vertex * vex);
     Vertex * removeVertex(UINT vid)
     {
-        ASSERTN(m_ec_pool != NULL, ("not yet initialized."));
+        ASSERTN(m_ec_pool != nullptr, ("not yet initialized."));
         return removeVertex(getVertex(vid));
     }
     void removeTransitiveEdge();
-    void removeTransitiveEdgeHelper(Vertex const* fromvex,
-                                    Vector<DefSBitSetCore*> * reachset_vec,
-                                    BitSet & is_visited,
-                                    DefMiscBitSetMgr & bs_mgr);
 
+    //Sort graph vertices in topological order.
+    //vex_vec: record vertics in topological order.
+    //Return true if sorting success, otherwise there exist cycles in graph.
+    //Note you should NOT retrieve vertex in 'vex_vec' via vertex's index because
+    //they are stored in dense manner.
     bool sortInTopologOrder(OUT Vector<Vertex*> & vex_vec);
     void set_unique(bool is_unique)
     {
-        ASSERTN(m_ec_pool != NULL, ("not yet initialized."));
+        ASSERTN(m_ec_pool != nullptr, ("not yet initialized."));
         m_is_unique = (BYTE)is_unique;
     }
     void set_direction(bool has_direction)
     {
-        ASSERTN(m_ec_pool != NULL, ("not yet initialized."));
+        ASSERTN(m_ec_pool != nullptr, ("not yet initialized."));
         m_is_direction = (BYTE)has_direction;
     }
-    void set_dense(bool is_dense)
+    void set_dense(bool dense)
     {
-        if (is_dense) {
-            if (m_dense_vertex == NULL) {
+        ASSERTN(m_ec_pool != nullptr, ("not yet initialized."));
+        ASSERT0(getVertexNum() == 0);
+        ASSERT0(m_dense_vertex || m_sparse_vertex);
+        if (dense) {
+            //Set to dense.
+            if (m_dense_vertex == nullptr) {
                 m_dense_vertex = new Vector<Vertex*>();
+            }
+            if (m_sparse_vertex != nullptr) {
+                delete m_sparse_vertex;
+                m_sparse_vertex = nullptr;
             }
             return;
         }
-        if (m_dense_vertex == NULL) {
+
+        //Set to sparse.
+        if (m_sparse_vertex == nullptr) {
+            m_sparse_vertex = new VertexHash(m_vex_hash_size);
+        }
+        if (m_dense_vertex != nullptr) {
             delete m_dense_vertex;
-            m_dense_vertex = NULL;
+            m_dense_vertex = nullptr;
         }
     }
 
@@ -565,13 +661,19 @@ public:
     bool cloneDomAndPdom(DGraph const& src);
     bool computeDom3(List<Vertex const*> const* vlst, BitSet const* uni);
     bool computeDom2(List<Vertex const*> const& vlst);
-    bool computeDom(List<Vertex const*> const* vlst = NULL,
-                    BitSet const* uni = NULL);
+    bool computeDom(List<Vertex const*> const* vlst = nullptr,
+                    BitSet const* uni = nullptr);
     bool computePdomByRpo(Vertex * root, BitSet const* uni);
+    //Compute dominate vertex.
     bool computePdom(List<Vertex const*> const* vlst);
+    //Compute dominate vertex.
     bool computePdom(List<Vertex const*> const* vlst, BitSet const* uni);
+    //Compute immediate dominate vertex.
     bool computeIdom();
+    //Compute immediate dominate vertex.
     bool computeIdom2(List<Vertex const*> const& vlst);
+    //Compute immediate post dominate vertex.
+    //NOTE: graph exit vertex does not have idom.
     bool computeIpdom();
     //Count memory usage for current object.
     size_t count_mem() const;
@@ -597,9 +699,9 @@ public:
     //NOTE: set does NOT include 'v' itself.
     inline BitSet * get_dom_set(UINT id)
     {
-        ASSERT0(m_bs_mgr != NULL);
+        ASSERT0(m_bs_mgr != nullptr);
         BitSet * set = m_dom_set.get(id);
-        if (set == NULL) {
+        if (set == nullptr) {
             set = m_bs_mgr->create();
             m_dom_set.set(id, set);
         }
@@ -610,7 +712,7 @@ public:
     //NOTE: set does NOT include 'v' itself.
     BitSet * get_dom_set(Vertex const* v)
     {
-        ASSERT0(v != NULL);
+        ASSERT0(v != nullptr);
         return get_dom_set(VERTEX_id(v));
     }
 
@@ -620,9 +722,9 @@ public:
     //NOTE: set does NOT include 'v' itself.
     inline BitSet * get_pdom_set(UINT id)
     {
-        ASSERT0(m_bs_mgr != NULL);
+        ASSERT0(m_bs_mgr != nullptr);
         BitSet * set = m_pdom_set.get(id);
-        if (set == NULL) {
+        if (set == nullptr) {
             set = m_bs_mgr->create();
             m_pdom_set.set(id, set);
         }
@@ -633,7 +735,7 @@ public:
     //NOTE: set does NOT include 'v' itself.
     BitSet * get_pdom_set(Vertex const* v)
     {
-        ASSERT0(v != NULL);
+        ASSERT0(v != nullptr);
         return get_pdom_set(VERTEX_id(v));
     }
 
@@ -647,7 +749,7 @@ public:
     //Return true if 'v1' post dominate 'v2'.
     bool is_pdom(UINT v1, UINT v2) const
     {
-        ASSERTN(read_dom_set(v2), ("no PDOM info about vertex%d", v2));
+        ASSERTN(read_pdom_set(v2), ("no PDOM info about vertex%d", v2));
         return read_pdom_set(v2)->is_contain(v1);
     }
 

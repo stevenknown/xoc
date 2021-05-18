@@ -47,12 +47,12 @@ RegionMgr::RegionMgr() : m_type_mgr(this)
     #endif
     m_ru_count = 1;
     m_label_count = 1;
-    m_var_mgr = NULL;
-    m_md_sys = NULL;
+    m_var_mgr = nullptr;
+    m_md_sys = nullptr;
     m_is_regard_str_as_same_md = true;
-    m_str_md = NULL;
-    m_call_graph = NULL;
-    m_targinfo = NULL;
+    m_str_md = nullptr;
+    m_call_graph = nullptr;
+    m_targinfo = nullptr;
     m_pool = smpoolCreate(64, MEM_COMM);
     m_logmgr = new LogMgr();
 }
@@ -62,7 +62,7 @@ RegionMgr::~RegionMgr()
 {
     for (INT id = 0; id <= m_id2ru.get_last_idx(); id++) {
         Region * rg = m_id2ru.get(id);
-        if (rg == NULL) { continue; }
+        if (rg == nullptr) { continue; }
         deleteRegion(rg, false);
     }
     m_id2ru.clean();
@@ -71,36 +71,36 @@ RegionMgr::~RegionMgr()
     ASSERTN(m_num_allocated == 0, ("there is still region leave out"));
     #endif
 
-    if (m_md_sys != NULL) {
+    if (m_md_sys != nullptr) {
         delete m_md_sys;
-        m_md_sys = NULL;
+        m_md_sys = nullptr;
     }
 
-    if (m_var_mgr != NULL) {
+    if (m_var_mgr != nullptr) {
         delete m_var_mgr;
-        m_var_mgr = NULL;
+        m_var_mgr = nullptr;
     }
 
-    if (m_call_graph != NULL) {
+    if (m_call_graph != nullptr) {
         delete m_call_graph;
-        m_call_graph = NULL;
+        m_call_graph = nullptr;
     }
 
     m_id2optctx.clean();
 
     smpoolDelete(m_pool);
-    m_pool = NULL;
+    m_pool = nullptr;
 
     delete m_logmgr;
-    m_logmgr = NULL;
+    m_logmgr = nullptr;
 }
 
 
 void * RegionMgr::xmalloc(UINT size)
 {
-    ASSERTN(m_pool != NULL, ("pool not initialized"));
+    ASSERTN(m_pool != nullptr, ("pool not initialized"));
     void * p = smpoolMalloc(size, m_pool);
-    ASSERT0(p != NULL);
+    ASSERT0(p != nullptr);
     ::memset(p, 0, size);
     return p;
 }
@@ -109,7 +109,7 @@ void * RegionMgr::xmalloc(UINT size)
 OptCtx * RegionMgr::getAndGenOptCtx(UINT id)
 {
     OptCtx * oc = m_id2optctx.get(id);
-    if (oc == NULL) {
+    if (oc == nullptr) {
         oc = (OptCtx*)xmalloc(sizeof(OptCtx));
         m_id2optctx.set(id, oc);
     }
@@ -126,13 +126,13 @@ OptCtx * RegionMgr::getAndGenOptCtx(UINT id)
 //as same unbounded MD.
 MD const* RegionMgr::genDedicateStrMD()
 {
-    if (!m_is_regard_str_as_same_md) { return NULL; }
+    if (!m_is_regard_str_as_same_md) { return nullptr; }
 
     //Regard all string variables as same unbound MD.
-    if (m_str_md == NULL) {
-        Sym * s = addToSymbolTab("DedicatedVarBeRegardedAsString");
-        Var * sv = getVarMgr()->registerStringVar(
-            DEDICATED_STRING_VAR_NAME, s, MEMORY_ALIGNMENT);
+    if (m_str_md == nullptr) {
+        Sym const* s = addToSymbolTab("DedicatedVarBeRegardedAsString");
+        Var * sv = getVarMgr()->registerStringVar(DEDICATED_STRING_VAR_NAME, s,
+                                                  MEMORY_ALIGNMENT);
         VAR_is_unallocable(sv) = true;
         VAR_is_addr_taken(sv) = true;
         MD md;
@@ -154,16 +154,16 @@ void RegionMgr::registerGlobalMD()
 {
     //Only top region can do initialize MD for global variable.
     ASSERT0(m_var_mgr);
-    VarVec * varvec = m_var_mgr->get_var_vec();
+    VarVec * varvec = m_var_mgr->getVarVec();
     for (INT i = 0; i <= varvec->get_last_idx(); i++) {
         Var * v = varvec->get(i);
-        if (v == NULL || VAR_is_local(v)) { continue; }
+        if (v == nullptr || VAR_is_local(v)) { continue; }
 
         //User sometime intentionally declare non-allocable
         //global variable to custmized usage.
         //ASSERT0(!VAR_is_unallocable(v));
 
-        if (v->is_string() && genDedicateStrMD() != NULL) {
+        if (v->is_string() && genDedicateStrMD() != nullptr) {
             continue;
         }
 
@@ -196,7 +196,7 @@ VarMgr * RegionMgr::allocVarMgr()
 
 TargInfo * RegionMgr::allocTargInfo()
 {
-    return NULL;
+    return nullptr;
 }
 
 
@@ -228,11 +228,11 @@ Region * RegionMgr::newRegion(REGION_TYPE rt)
 void RegionMgr::addToRegionTab(Region * rg)
 {
     ASSERTN(rg->id() > 0, ("should generate new region via newRegion()"));
-    ASSERT0(getRegion(rg->id()) == NULL);
+    ASSERT0(getRegion(rg->id()) == nullptr);
     ASSERT0(rg->id() < m_ru_count);
     INT pad = xcom::getNearestPowerOf2(rg->id());
     if (m_id2ru.get_last_idx() + 1 < pad) {
-        m_id2ru.set(pad, NULL);
+        m_id2ru.set(pad, nullptr);
     }
     m_id2ru.set(rg->id(), rg);
 }
@@ -243,88 +243,88 @@ bool RegionMgr::verifyPreDefinedInfo()
     checkMaxIRType();
     checkIRDesc();
     checkRoundDesc();
-    ASSERT0_DUMMYUSE(WORD_LENGTH_OF_TARGET_MACHINE <=
-                     sizeof(TMWORD) * HOST_BIT_PER_BYTE);
-    ASSERT0_DUMMYUSE(BIT_PER_BYTE == HOST_BIT_PER_BYTE);
-    ASSERT0_DUMMYUSE(sizeof(INT8) * HOST_BIT_PER_BYTE == 8);
-    ASSERT0_DUMMYUSE(sizeof(UINT8) * HOST_BIT_PER_BYTE == 8);
-    ASSERT0_DUMMYUSE(sizeof(INT16) * HOST_BIT_PER_BYTE == 16);
-    ASSERT0_DUMMYUSE(sizeof(UINT16) * HOST_BIT_PER_BYTE == 16);
-    ASSERT0_DUMMYUSE(sizeof(INT32) * HOST_BIT_PER_BYTE == 32);
-    ASSERT0_DUMMYUSE(sizeof(UINT32) * HOST_BIT_PER_BYTE == 32);
-    ASSERT0_DUMMYUSE(sizeof(INT64) * HOST_BIT_PER_BYTE == 64);
-    ASSERT0_DUMMYUSE(sizeof(UINT64) * HOST_BIT_PER_BYTE == 64);
+    ASSERT0(WORD_LENGTH_OF_TARGET_MACHINE <=
+            sizeof(TMWORD) * HOST_BIT_PER_BYTE);
+    ASSERT0(BIT_PER_BYTE == HOST_BIT_PER_BYTE);
+    ASSERT0(sizeof(INT8) * HOST_BIT_PER_BYTE == 8);
+    ASSERT0(sizeof(UINT8) * HOST_BIT_PER_BYTE == 8);
+    ASSERT0(sizeof(INT16) * HOST_BIT_PER_BYTE == 16);
+    ASSERT0(sizeof(UINT16) * HOST_BIT_PER_BYTE == 16);
+    ASSERT0(sizeof(INT32) * HOST_BIT_PER_BYTE == 32);
+    ASSERT0(sizeof(UINT32) * HOST_BIT_PER_BYTE == 32);
+    ASSERT0(sizeof(INT64) * HOST_BIT_PER_BYTE == 64);
+    ASSERT0(sizeof(UINT64) * HOST_BIT_PER_BYTE == 64);
     #ifdef INT128 //Host type support 128bit signed integer.
-    ASSERT0_DUMMYUSE(sizeof(INT128) * HOST_BIT_PER_BYTE == 128);
+    ASSERT0(sizeof(INT128) * HOST_BIT_PER_BYTE == 128);
     #endif
     #ifdef UINT128 //Host type support 128bit unsigned integer.
-    ASSERT0_DUMMYUSE(sizeof(UINT128) * HOST_BIT_PER_BYTE == 128);
+    ASSERT0(sizeof(UINT128) * HOST_BIT_PER_BYTE == 128);
     #endif
 
-    ASSERT0_DUMMYUSE(!IS_UNSIGN_TY(INT8));
-    ASSERT0_DUMMYUSE(IS_UNSIGN_TY(UINT8));
-    ASSERT0_DUMMYUSE(!IS_UNSIGN_TY(INT16));
-    ASSERT0_DUMMYUSE(IS_UNSIGN_TY(UINT16));
-    ASSERT0_DUMMYUSE(!IS_UNSIGN_TY(INT32));
-    ASSERT0_DUMMYUSE(IS_UNSIGN_TY(UINT32));
-    ASSERT0_DUMMYUSE(!IS_UNSIGN_TY(INT64));
-    ASSERT0_DUMMYUSE(IS_UNSIGN_TY(UINT64));
+    ASSERT0(!IS_UNSIGN_TY(INT8));
+    ASSERT0(IS_UNSIGN_TY(UINT8));
+    ASSERT0(!IS_UNSIGN_TY(INT16));
+    ASSERT0(IS_UNSIGN_TY(UINT16));
+    ASSERT0(!IS_UNSIGN_TY(INT32));
+    ASSERT0(IS_UNSIGN_TY(UINT32));
+    ASSERT0(!IS_UNSIGN_TY(INT64));
+    ASSERT0(IS_UNSIGN_TY(UINT64));
     #ifdef INT128 //Host type support 128bit signed integer.
-    ASSERT0_DUMMYUSE(!IS_UNSIGN_TY(INT128));
+    ASSERT0(!IS_UNSIGN_TY(INT128));
     #endif
     #ifdef UINT128 //Host type support 128bit unsigned integer.
-    ASSERT0_DUMMYUSE(IS_UNSIGN_TY(UINT128));
+    ASSERT0(IS_UNSIGN_TY(UINT128));
     #endif
 
     //Host LONGLONG should not less than HOST_INT,
     //otherwise the integer might be truncated wrongfully.
-    ASSERT0_DUMMYUSE(sizeof(HOST_INT) <= sizeof(LONGLONG));
-    ASSERT0_DUMMYUSE(sizeof(HOST_INT) == sizeof(HOST_UINT));
-    ASSERT0_DUMMYUSE(sizeof(HOST_UINT) >= sizeof(UINT32));
+    ASSERT0(sizeof(HOST_INT) <= sizeof(LONGLONG));
+    ASSERT0(sizeof(HOST_INT) == sizeof(HOST_UINT));
+    ASSERT0(sizeof(HOST_UINT) >= sizeof(UINT32));
 
-    ASSERT0_DUMMYUSE(WORD_LENGTH_OF_HOST_MACHINE ==
-                     (sizeof(HOST_UINT) * HOST_BIT_PER_BYTE));
+    ASSERT0(WORD_LENGTH_OF_HOST_MACHINE ==
+            (sizeof(HOST_UINT) * HOST_BIT_PER_BYTE));
 
-    ASSERT0_DUMMYUSE(sizeof(CHAR) == sizeof(UCHAR) &&
-                     sizeof(SHORT) == sizeof(USHORT) &&
-                     sizeof(INT) == sizeof(UINT) &&
-                     sizeof(LONG) == sizeof(ULONG) &&
-                     sizeof(LONGLONG) == sizeof(ULONGLONG));
+    ASSERT0(sizeof(CHAR) == sizeof(UCHAR) &&
+            sizeof(SHORT) == sizeof(USHORT) &&
+            sizeof(INT) == sizeof(UINT) &&
+            sizeof(LONG) == sizeof(ULONG) &&
+            sizeof(LONGLONG) == sizeof(ULONGLONG));
 
-    ASSERT0_DUMMYUSE(sizeof(CHAR) <= sizeof(SHORT) &&
-                     sizeof(SHORT) <= sizeof(INT) &&
-                     sizeof(INT) <= sizeof(LONG) &&
-                     sizeof(LONG) <= sizeof(LONGLONG));
+    ASSERT0(sizeof(CHAR) <= sizeof(SHORT) &&
+            sizeof(SHORT) <= sizeof(INT) &&
+            sizeof(INT) <= sizeof(LONG) &&
+            sizeof(LONG) <= sizeof(LONGLONG));
 
-    ASSERT0_DUMMYUSE(BYTE_PER_CHAR < BYTE_PER_SHORT &&
-                     BYTE_PER_SHORT < BYTE_PER_INT &&
-                     BYTE_PER_INT <= BYTE_PER_LONG &&
-                     BYTE_PER_LONG <= BYTE_PER_LONGLONG &&
-                     BYTE_PER_FLOAT < BYTE_PER_DOUBLE &&
-                     BYTE_PER_INT <= BYTE_PER_POINTER);
+    ASSERT0(BYTE_PER_CHAR < BYTE_PER_SHORT &&
+            BYTE_PER_SHORT < BYTE_PER_INT &&
+            BYTE_PER_INT <= BYTE_PER_LONG &&
+            BYTE_PER_LONG <= BYTE_PER_LONGLONG &&
+            BYTE_PER_FLOAT < BYTE_PER_DOUBLE &&
+            BYTE_PER_INT <= BYTE_PER_POINTER);
 
-    ASSERT0_DUMMYUSE(BYTE_PER_CHAR < sizeof(ULONGLONG) &&
-                     BYTE_PER_SHORT < sizeof(ULONGLONG) &&
-                     BYTE_PER_INT <= sizeof(ULONGLONG) &&
-                     BYTE_PER_LONG <= sizeof(ULONGLONG) &&
-                     BYTE_PER_FLOAT <= sizeof(ULONGLONG) &&
-                     BYTE_PER_DOUBLE <= sizeof(ULONGLONG) &&
-                     BYTE_PER_POINTER <= sizeof(ULONGLONG) &&
-                     GENERAL_REGISTER_SIZE <= sizeof(ULONGLONG));
+    ASSERT0(BYTE_PER_CHAR < sizeof(ULONGLONG) &&
+            BYTE_PER_SHORT < sizeof(ULONGLONG) &&
+            BYTE_PER_INT <= sizeof(ULONGLONG) &&
+            BYTE_PER_LONG <= sizeof(ULONGLONG) &&
+            BYTE_PER_FLOAT <= sizeof(ULONGLONG) &&
+            BYTE_PER_DOUBLE <= sizeof(ULONGLONG) &&
+            BYTE_PER_POINTER <= sizeof(ULONGLONG) &&
+            GENERAL_REGISTER_SIZE <= sizeof(ULONGLONG));
 
-    ASSERT0_DUMMYUSE(BYTE_PER_CHAR <= sizeof(HOST_INT) &&
-                     BYTE_PER_CHAR <= sizeof(HOST_UINT) &&
-                     BYTE_PER_CHAR <= sizeof(HOST_FP));
+    ASSERT0(BYTE_PER_CHAR <= sizeof(HOST_INT) &&
+            BYTE_PER_CHAR <= sizeof(HOST_UINT) &&
+            BYTE_PER_CHAR <= sizeof(HOST_FP));
 
-    ASSERT0_DUMMYUSE(BYTE_PER_SHORT <= sizeof(HOST_INT) &&
-                     BYTE_PER_SHORT <= sizeof(HOST_UINT) &&
-                     BYTE_PER_SHORT <= sizeof(HOST_FP));
+    ASSERT0(BYTE_PER_SHORT <= sizeof(HOST_INT) &&
+            BYTE_PER_SHORT <= sizeof(HOST_UINT) &&
+            BYTE_PER_SHORT <= sizeof(HOST_FP));
 
-    ASSERT0_DUMMYUSE(BYTE_PER_INT <= sizeof(HOST_INT) &&
-                     BYTE_PER_INT <= sizeof(HOST_UINT) &&
-                     BYTE_PER_INT <= sizeof(HOST_FP));
+    ASSERT0(BYTE_PER_INT <= sizeof(HOST_INT) &&
+            BYTE_PER_INT <= sizeof(HOST_UINT) &&
+            BYTE_PER_INT <= sizeof(HOST_FP));
 
-    ASSERT0_DUMMYUSE(IR_TYPE_NUM <= ((1<<IR_TYPE_BIT_SIZE) - 1));
+    ASSERT0(IR_TYPE_NUM <= ((1<<IR_TYPE_BIT_SIZE) - 1));
     return true;
 }
 
@@ -332,14 +332,14 @@ bool RegionMgr::verifyPreDefinedInfo()
 void RegionMgr::dumpRelationGraph(CHAR const* name)
 {
     if (getNumOfRegion() == 0) { return; }
-    if (name == NULL) {
+    if (name == nullptr) {
         name = "graph_region_relation_graph.vcg";
     }
     UNLINK(name);
     xcom::Graph g;
     for (UINT id = 0; id < getNumOfRegion(); id++) {
         Region * rg = getRegion(id);
-        if (rg == NULL || rg->getParent() == NULL) { continue; }
+        if (rg == nullptr || rg->getParent() == nullptr) { continue; }
         g.addEdge(rg->getParent()->id(), rg->id());
     }
     g.dumpVCG(name);
@@ -354,7 +354,7 @@ void RegionMgr::dump(bool dump_inner_region)
     note(this, "\n==---- DUMP ALL Registered Region ----==");
     for (UINT id = 0; id < getNumOfRegion(); id++) {
         Region * rg = getRegion(id);
-        if (rg == NULL) { continue; }
+        if (rg == nullptr) { continue; }
         rg->dump(dump_inner_region);
     }
 }
@@ -371,7 +371,7 @@ void RegionMgr::deleteRegion(Region * rg, bool collect_id)
     delete rg;
 
     if (collect_id && id != 0) {
-        m_id2ru.set(id, NULL);
+        m_id2ru.set(id, nullptr);
         m_free_ru_id.append_head(id);
     }
 
@@ -391,7 +391,7 @@ void RegionMgr::estimateEV(OUT UINT & num_call,
 {
     for (UINT i = 0; i < getNumOfRegion(); i++) {
         Region * rg = getRegion(i);
-        if (rg == NULL) { continue; }
+        if (rg == nullptr) { continue; }
 
         num_ru++;
 
@@ -400,10 +400,7 @@ void RegionMgr::estimateEV(OUT UINT & num_call,
             rg->scanCallAndReturnList(num_ru, scan_inner_region);
         }
 
-        List<IR const*> * call_list = rg->getCallList();
-        if (call_list != NULL) {
-            num_call += call_list->get_elem_count();
-        }
+        num_call += rg->getCallList()->get_elem_count();
     }
     num_ru = MAX(4, xcom::getNearestPowerOf2(num_ru));
     num_call = MAX(4, xcom::getNearestPowerOf2(num_call));
@@ -420,7 +417,7 @@ void RegionMgr::buildCallGraph(OptCtx & oc,
     UINT vn = 0, en = 0;
     estimateEV(en, vn, scan_call, scan_inner_region);
 
-    if (m_call_graph == NULL) {
+    if (m_call_graph == nullptr) {
         //Construct call graph.
         m_call_graph = allocCallGraph(vn, en);
     }
@@ -435,9 +432,7 @@ bool RegionMgr::processFuncRegion(Region * func, OptCtx * oc)
 {
     ASSERTN(!func->is_blackbox(),
             ("can not generate code for blackbox region"));
-    bool s = func->process(oc);
-    tfree();
-    return s;
+    return func->process(oc);
 }
 
 
@@ -446,9 +441,7 @@ bool RegionMgr::processFuncRegion(Region * func, OptCtx * oc)
 bool RegionMgr::processProgramRegion(Region * program, OptCtx * oc)
 {
     ASSERT0(program && program->is_program());
-    bool s = program->process(oc);
-    tfree();
-    return s;
+    return program->process(oc);
 }
 //END RegionMgr
 

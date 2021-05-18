@@ -31,11 +31,7 @@ IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 author: Su Zhenyu
 @*/
-#include "ltype.h"
-#include "comf.h"
-#include "strbuf.h"
-#include "flty.h"
-#include "math.h"
+#include "xcominc.h"
 
 namespace xcom {
 

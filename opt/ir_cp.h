@@ -85,13 +85,18 @@ private:
     UINT m_prop_kind;
 
 private:
+    void addDUInfoForDupOfCandExp(IR * dup, IR const* cand_exp);
+
     bool checkTypeConsistency(IR const* ir, IR const* cand_expr) const;
 
+    bool doPropUseSet(IRSet * useset, IR * def_stmt,
+                      IR const* prop_value, MDSSAInfo * mdssainfo,
+                      IRListIter cur_iter, IRListIter * next_iter,
+                      IRBB * bb, bool prssadu, bool mdssadu);
     bool doPropToMDPhi(bool prssadu,
                        bool mdssadu,
                        IN IR const* prop_value,
-                       IN IR * use,
-                       MDSSAMgr * mdssamgr);
+                       IN IR * use);
     bool doPropToNormalStmt(IRListIter cur_iter,
                             IRListIter* next_iter,
                             bool prssadu,
@@ -100,21 +105,39 @@ private:
                             IN IR * use,
                             IN IR * use_stmt,
                             IN IRBB * def_bb,
-                            IN OUT IRBB * use_bb,
-                            MDSSAMgr * mdssamgr);
-    bool doProp(IN IRBB * bb, IN DefSBitSetCore * useset, MDSSAMgr * mdssamgr);
+                            IN OUT IRBB * use_bb);
+    bool doProp(IN IRBB * bb, IN IRSet * useset);
     void doFinalRefine(OptCtx & oc);
     void dumpCopyPropagationAction(IR const* def_stmt,
                                    IR const* prop_value,
-                                   IR const* use,
-                                   MDSSAMgr * mdssamgr);
+                                   IR const* use);
 
     bool existMayDefTillBB(IR const* exp,
                            IRBB const* start,
                            IRBB const* meetup) const;
 
+    DefSegMgr  * getSegMgr() const { return getSBSMgr()->getSegMgr(); }
+    DefMiscBitSetMgr  * getSBSMgr() const { return m_rg->getMiscBitSetMgr(); }
+
+    bool isLowCostExp(IR const* ir) const
+    {
+        switch (ir->getCode()) {
+        case IR_LDA:
+        case IR_CONST:
+        case IR_PR:
+            return true;
+        default: return isLowCostCVT(ir);
+        }
+        UNREACHABLE();
+        return false;
+    }
+    //Return true if CVT with simply cvt-exp that can be regard as
+    //copy-propagate candidate.
     bool isSimpCVT(IR const* ir) const;
-    bool isConstCVT(IR const* ir) const;
+    //Return true if ir is CVT with cvt-exp that always include low-cost
+    //expression. These low-cost always profitable and may bring up new
+    //optimization opportunity.
+    bool isLowCostCVT(IR const* ir) const;
     bool is_available(IR const* def_stmt,
                       IR const* prop_value,
                       IR * use_stmt,
@@ -128,30 +151,30 @@ private:
                     IR const* cand_expr,
                     IN OUT CPCtx & ctx,
                     bool stmt_use_ssadu,
-                    bool stmt_use_mdssadu,
-                    MDSSAMgr * mdssamgr);
+                    bool stmt_use_mdssadu);
     void replaceExpViaSSADu(IR * exp,
                             IR const* cand_expr,
                             IN OUT CPCtx & ctx);
+    void removeExpDUInfo(IR * dup, IR * exp);
 
     bool useMDSSADU() const
-    { return m_mdssamgr != NULL && m_mdssamgr->is_valid(); }
+    { return m_mdssamgr != nullptr && m_mdssamgr->is_valid(); }
     bool usePRSSADU() const
-    { return m_prssamgr != NULL && m_prssamgr->is_valid(); }
+    { return m_prssamgr != nullptr && m_prssamgr->is_valid(); }
 
 public:
     CopyProp(Region * rg)
     {
-        ASSERT0(rg != NULL);
+        ASSERT0(rg != nullptr);
         m_rg = rg;
         m_md_sys = rg->getMDSystem();
         m_du = rg->getDUMgr();
         m_cfg = rg->getCFG();
         m_md_set_mgr = rg->getMDSetMgr();
         m_tm = rg->getTypeMgr();
-        m_refine = NULL;
-        m_mdssamgr = NULL;
-        m_prssamgr = NULL;
+        m_refine = nullptr;
+        m_mdssamgr = nullptr;
+        m_prssamgr = nullptr;
         ASSERT0(m_cfg && m_du && m_md_sys && m_tm && m_md_set_mgr);
         m_prop_kind = CP_PROP_UNARY_AND_SIMPLEX;
     }
@@ -180,11 +203,20 @@ public:
             case IR_PR:
                 return true;
             case IR_LD:
+                ASSERT0(ir->getRefMD());
+                return true;
             case IR_ILD:
-                if (ir->getRefMD() != NULL && ir->getRefMD()->is_exact()) {
-                    return true;
+                if (ir->getRefMD() == nullptr || !ir->getRefMD()->is_exact()) {
+                    //TBD:In aggressive mode, we anticipate propagating RHS
+                    //expression even if it is inexact.
+                    //e.g: s is MC type.
+                    //    s = *p
+                    //    *q = s
+                    //  *p can be propagated.
+                    //return false;
                 }
-                return false;
+                ASSERT0(ir->getRefMD() || ir->getRefMDSet());
+                return true;
             default: return isSimpCVT(ir);
             }
         default: UNREACHABLE();

@@ -25,11 +25,11 @@ CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
 OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE
 USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 @*/
-#include "../xcominc.h"
+#include "xcominc.h"
 
 void bs_test(FILE * h)
 {
-    if (h == NULL) { return; }
+    if (h == nullptr) { return; }
     SegMgr<BITS_PER_SEG> sm;
     DBitSet<BITS_PER_SEG> a(&sm);
     DBitSet<BITS_PER_SEG> b(&sm);
@@ -59,7 +59,7 @@ void bs_test(FILE * h)
     x.dump(h);
 
     int n = x.get_elem_count();
-    SC<SEG<BITS_PER_SEG>*>  * ct = NULL;
+    SC<SEG<BITS_PER_SEG>*>  * ct = nullptr;
     n = x.get_first(&ct);
     n = x.get_next(n, &ct);
     n = x.get_next(n, &ct);
@@ -103,7 +103,7 @@ void bs_test(FILE * h)
 
 void bs_test2(FILE * h)
 {
-    if (h == NULL) { return; }
+    if (h == nullptr) { return; }
     SegMgr<BITS_PER_SEG> sm;
     SBitSet<BITS_PER_SEG> a(&sm),b(&sm);
     a.bunion(8);
@@ -137,7 +137,7 @@ void bs_test2(FILE * h)
 
 void bs_test3(FILE * h)
 {
-    if (h == NULL) { return; }
+    if (h == nullptr) { return; }
     fprintf(h, "\n===");
     MiscBitSetMgr<33> mbsm;
     SBitSet<33> x1(mbsm.getSegMgr());
@@ -161,18 +161,31 @@ void bs_test3(FILE * h)
 template <UINT BitsPerSeg>
 void dumpSegMgr(SegMgr<BitsPerSeg> & m, FILE * h)
 {
-    if (h == NULL) { return; }
-    SC<SEG<BitsPerSeg>*> * st = NULL;
+    if (h == nullptr) { return; }
     fprintf(h, "\n====start %d:%d===\n",
             m.get_free_list()->get_elem_count(),
             m.get_seg_count());
     BitSet x;
     SList<SEG<BitsPerSeg>*> const* flst = m.get_free_list();
-    for (flst->get_head(&st); st != flst->end(); st = flst->get_next(st)) {
+    for (SC<SEG<BitsPerSeg>*> * st =flst->get_head();
+         st != flst->end(); st = flst->get_next(st)) {
         SEG<BitsPerSeg> const* s = st->val();
-        prt("%d,", s->id);
+        fprintf(h, "%d,", s->id);
         x.bunion(s->id);
     }
     fflush(h);
     x.dump(h);
+}
+
+int main()
+{
+    FILE * h = fopen("bs.dump", "a+");
+    if (h == nullptr) { return 0; }
+    bs_test(h);
+    bs_test2(h);
+    bs_test3(h);
+    DefMiscBitSetMgr mgr;
+    dumpSegMgr(*mgr.getSegMgr(), h);
+    fclose(h);
+    return 0;
 }

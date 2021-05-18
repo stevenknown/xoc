@@ -57,7 +57,7 @@ public:
     IR * stmt_list;
     IR * last;
     bool has_phi;
-    bool has_high_level_ir;
+    bool has_high_level_ir; //Control Flow Struct are high level IR.
     bool has_error;
     IR_TYPE ircode; //for temporary used
     struct {
@@ -71,15 +71,15 @@ public:
 public:
     ParseCtx()
     {
-        current_region = NULL;
-        returned_exp = NULL;
-        stmt_list = NULL;
-        last = NULL;
+        current_region = nullptr;
+        returned_exp = nullptr;
+        stmt_list = nullptr;
+        last = nullptr;
         has_phi = false;
         has_high_level_ir = false;
         has_error = false;
         ircode = IR_UNDEF;
-        PARSECTX_returned_imm_ty(this) = NULL;
+        PARSECTX_returned_imm_ty(this) = nullptr;
     }
     ~ParseCtx() {}
 
@@ -100,8 +100,8 @@ public:
     {
         *oldvalue1 = stmt_list;
         *oldvalue2 = last;
-        stmt_list = NULL;
-        last = NULL;
+        stmt_list = nullptr;
+        last = nullptr;
     }
 
     void reloadValue(IR * oldvalue1, IR * oldvalue2)
@@ -249,10 +249,10 @@ public:
         atomic = false;
         terminate = false;
         allocable = false;
-        ir_use_list = NULL;
-        ir_def_list = NULL;
-        elemtype = NULL;
-        dim_list = NULL;
+        ir_use_list = nullptr;
+        ir_def_list = nullptr;
+        elemtype = nullptr;
+        dim_list = nullptr;
     }
 
     List<LabelInfo*> & getLabelList() { return m_labellist; }
@@ -364,7 +364,7 @@ protected:
     bool parseExp(ParseCtx * ctx);
     bool parseExpList(ParseCtx * ctx);
 public:
-    IRParser(RegionMgr * rumgr) : m_lexer(NULL), m_rumgr(rumgr)
+    IRParser(RegionMgr * rumgr) : m_lexer(nullptr), m_rumgr(rumgr)
     {
         m_tm = rumgr->getTypeMgr();
         initKeyWordMap();

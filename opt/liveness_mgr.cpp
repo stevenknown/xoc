@@ -48,7 +48,7 @@ void LivenessMgr::dump()
     List<IRBB*> * bbl = m_rg->getBBList();
     FILE * file = getRegion()->getLogMgr()->getFileHandler();
     getRegion()->getLogMgr()->incIndent(2);
-    for (IRBB * bb = bbl->get_head(); bb != NULL; bb = bbl->get_next()) {
+    for (IRBB * bb = bbl->get_head(); bb != nullptr; bb = bbl->get_next()) {
         note(getRegion(), "\n\n\n-- BB%d --", bb->id());
         DefSBitSetCore * live_in = get_livein(bb->id());
         DefSBitSetCore * live_out = get_liveout(bb->id());
@@ -79,7 +79,7 @@ void LivenessMgr::processMay(IR const* pr,
     if (!m_handle_may) { return; }
 
     MDSet const* mds = pr->getRefMDSet();
-    if (mds == NULL) { return; }
+    if (mds == nullptr) { return; }
 
     MD const* prmd = pr->getExactRef();
     ASSERT0(prmd);
@@ -111,7 +111,7 @@ void LivenessMgr::processOpnd(IR const* ir,
                               DefSBitSetCore * gen)
 {
     for (IR const* k = iterInitC(ir, lst);
-         k != NULL; k = iterNextC(lst)) {
+         k != nullptr; k = iterNextC(lst)) {
         if (k->is_pr()) {
             use->bunion(k->getPrno(), m_sbs_mgr);
             processMay(k, gen, use, false);
@@ -126,7 +126,7 @@ void LivenessMgr::computeLocal(IRBB * bb, List<IR const*> & lst)
     DefSBitSetCore * use = get_use(bb->id());
     gen->clean(m_sbs_mgr);
     use->clean(m_sbs_mgr);
-    for (IR * x = BB_last_ir(bb); x != NULL; x = BB_prev_ir(bb)) {
+    for (IR * x = BB_last_ir(bb); x != nullptr; x = BB_prev_ir(bb)) {
         ASSERT0(x->is_stmt());
         switch (x->getCode()) {
         case IR_ST:
@@ -271,11 +271,11 @@ void LivenessMgr::computeGlobal()
 
             xcom::DefSBitSetCore * out = m_liveout.get(bbid);
             xcom::EdgeC const* ec = m_cfg->getVertex(bb->id())->getOutList();
-            if (ec != NULL) {
+            if (ec != nullptr) {
                 news.copy(*m_livein.get(ec->getToId()), m_sbs_mgr);
                 ec = ec->get_next();
 
-                for (; ec != NULL; ec = ec->get_next()) {
+                for (; ec != nullptr; ec = ec->get_next()) {
                     news.bunion(*m_livein.get(ec->getToId()), m_sbs_mgr);
                 }
 
@@ -311,7 +311,7 @@ void LivenessMgr::computeGlobal()
 bool LivenessMgr::perform(OptCtx & oc)
 {
     START_TIMER(t, getPassName());
-    m_rg->checkValidAndRecompute(&oc, PASS_RPO, PASS_UNDEF);
+    m_rg->getPassMgr()->checkValidAndRecompute(&oc, PASS_RPO, PASS_UNDEF);
     List<IRBB*> * bbl = m_rg->getBBList();
     if (bbl->get_elem_count() == 0) { return false; }
     List<IR const*> lst;

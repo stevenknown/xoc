@@ -36,6 +36,8 @@ author: Su Zhenyu
 
 namespace xoc {
 
+class MD;
+class MDSet;
 class DUMgr;
 
 typedef SEGIter * DUIter;
@@ -78,9 +80,9 @@ public:
 
     void clean()
     {
-        md = NULL;
-        mds = NULL;
-        duset = NULL;
+        md = nullptr;
+        mds = nullptr;
+        duset = nullptr;
     }
 };
 

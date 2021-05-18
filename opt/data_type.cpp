@@ -37,30 +37,30 @@ namespace xoc {
 
 TypeDesc const g_type_desc[] = {
     {D_UNDEF, "none",  0},
-    {D_B,     "bool",  8}, //BOOL
-    {D_I8,    "i8",    8}, //signed integer 8 bits
-    {D_I16,   "i16",   16},
-    {D_I32,   "i32",   32},
-    {D_I64,   "i64",   64},
-    {D_I128,  "i128",  128},
+    {D_B, "bool", 8}, //BOOL
+    {D_I8, "i8", 8}, //signed integer 8 bits
+    {D_I16, "i16", 16},
+    {D_I32, "i32", 32},
+    {D_I64, "i64", 64},
+    {D_I128, "i128", 128},
 
-    {D_U8,    "u8",    8},//unsigned integer 8 bits
-    {D_U16,   "u16",   16},
-    {D_U32,   "u32",   32},
-    {D_U64,   "u64",   64},
-    {D_U128,  "u128",  128},
+    {D_U8, "u8", 8}, //unsigned integer 8 bits
+    {D_U16, "u16", 16},
+    {D_U32, "u32", 32},
+    {D_U64, "u64", 64},
+    {D_U128, "u128", 128},
 
-    {D_F32,   "f32",   32}, //float point 32 bits
-    {D_F64,   "f64",   64},
-    {D_F80,   "f80",   80},
-    {D_F128,  "f128",  128},
+    {D_F32, "f32", 32}, //float point 32 bits
+    {D_F64, "f64", 64},
+    {D_F80, "f80", 80},
+    {D_F128, "f128", 128},
 
-    {D_MC,    "mc",    0}, //memory chunk, for structures, default bitsize is 0
-    {D_STR,   "str",   BYTE_PER_POINTER * BIT_PER_BYTE}, //string is pointer
-    {D_PTR,   "*",     BYTE_PER_POINTER * BIT_PER_BYTE}, //pointer
-    {D_VEC,   "vec",   0}, //vector, default bitsize is 0
+    {D_MC, "mc", 0}, //memory chunk, for structures, default bitsize is 0
+    {D_STR, "str", BYTE_PER_POINTER * BIT_PER_BYTE}, //string is pointer
+    {D_PTR, "*", BYTE_PER_POINTER * BIT_PER_BYTE}, //pointer
+    {D_VEC, "vec", 0}, //vector, default bitsize is 0
 
-    {D_ANY,  "void",  0}, //void type, default bitsize is 0
+    {D_ANY, "any", 0}, //void type, default bitsize is 0
     {D_TENSOR, "tensor", 0}, //tensor type, default bitsize is 0
 };
 
@@ -91,10 +91,18 @@ UINT TensorType::getByteSize(TypeMgr const* mgr) const
 
 //Set degree to given dimension.
 //Note degree should not be 0.
-void TensorType::setDegreeOfDim(UINT dim, UINT degree)
+void TensorType::setDegreeOfDim(UINT dim, UINT degree, TypeMgr * mgr)
 {
     ASSERTN(degree != 0, ("Degree of dim%d is 0.", dim));
-    degree_of_dimension.set(dim, degree);
+    degree_of_dimension.set(dim, degree, mgr->get_pool());
+}
+
+
+void TensorType::copy(TensorType const& src, TypeMgr * mgr)
+{
+    Type::copy(src);
+    tensor_elem_type = src.tensor_elem_type;
+    degree_of_dimension.copy(src.degree_of_dimension, mgr->get_pool());
 }
 //END TensorType
 
@@ -233,7 +241,7 @@ TypeContainer const* TypeMgr::registerPointer(Type const* type)
     //    PTR, base_size=128
     //    ...
     TypeContainer const* entry = m_pointer_type_tab.get(type);
-    if (entry != NULL) {
+    if (entry != nullptr) {
         return entry;
     }
 
@@ -258,9 +266,9 @@ TypeContainer const* TypeMgr::registerVector(Type const* type)
             TY_vec_size(type) % getDTypeByteSize(TY_vec_ety(type)) == 0);
 
     VectorElemTypeTab * elemtab = m_vector_type_tab.get(type);
-    if (elemtab != NULL) {
+    if (elemtab != nullptr) {
         TypeContainer const* entry = elemtab->get(type);
-        if (entry != NULL) {
+        if (entry != nullptr) {
             return entry;
         }
     }
@@ -279,7 +287,7 @@ TypeContainer const* TypeMgr::registerVector(Type const* type)
     VectorType * ty = newVectorType();
     TC_type(x) = ty;
     ty->copy((VectorType const&)*type);
-    if (elemtab == NULL) {
+    if (elemtab == nullptr) {
         //Add new vector into table.
         elemtab = new VectorElemTypeTab();
         m_vector_type_tab.set(ty, elemtab);
@@ -301,9 +309,9 @@ TypeContainer const* TypeMgr::registerTensor(Type const* type)
             getDTypeByteSize(TY_tensor_ety(type)) == 0);
 
     TensorElemTypeTab * elemtab = m_tensor_type_tab.get(type);
-    if (elemtab != NULL) {
+    if (elemtab != nullptr) {
         TypeContainer const* entry = elemtab->get(type);
-        if (entry != NULL) {
+        if (entry != nullptr) {
             return entry;
         }
     }
@@ -321,8 +329,8 @@ TypeContainer const* TypeMgr::registerTensor(Type const* type)
     TypeContainer * x = newTC();
     TensorType * ty = newTensorType();
     TC_type(x) = ty;
-    ty->copy((TensorType const&)*type);
-    if (elemtab == NULL) {
+    ty->copy((TensorType const&)*type, this);
+    if (elemtab == nullptr) {
         //Add new tensor into table.
         elemtab = new TensorElemTypeTab();
         m_tensor_type_tab.set(ty, elemtab);
@@ -352,7 +360,7 @@ Type const* TypeMgr::getTensorType(DATA_TYPE elem_ty, UINT dim, ...)
     UINT i = 0;
     while (i < dim) {
         UINT degree = (UINT)va_arg(args, UINT);
-        d.setDegreeOfDim(i, degree);
+        d.setDegreeOfDim(i, degree, this);
         i++;
     }
     va_end(args);
@@ -373,8 +381,9 @@ TypeContainer const* TypeMgr::registerMC(Type const* type)
         return registerVector(type);
     }
 
+    ASSERT0(type->is_mc());
     TypeContainer const* entry = m_memorychunk_type_tab.get(type);
-    if (entry != NULL) {
+    if (entry != nullptr) {
         return entry;
     }
 
@@ -395,7 +404,7 @@ TypeContainer const* TypeMgr::registerSimplex(Type const* type)
 {
     ASSERT0(type);
     TypeContainer ** head = &m_simplex_type[TY_dtype(type)];
-    if (*head == NULL) {
+    if (*head == nullptr) {
         *head = newTC();
         TypeContainer * x = *head;
         Type * ty = newType();
@@ -417,7 +426,12 @@ Type * TypeMgr::registerType(Type const* type)
 
     #ifdef _DEBUG_
     if (type->is_pointer()) {
-        ASSERT0(TY_ptr_base_size(type) != 0);
+        //Some pointer is never participate pointer-arithmetic, it may be
+        //used as just a representation of pointer. Moreover, the base-size of
+        //pointer is always useful when the pointer is regarded as base of
+        //ILD, IST, pointer-arith as well. Thus, we will allow the base-size
+        //is zero here for conveninence.
+        //ASSERT0(TY_ptr_base_size(type) != 0);
     }
 
     if (type->is_vector()) {
@@ -447,7 +461,7 @@ Type * TypeMgr::registerType(Type const* type)
 
     ASSERTN(0, ("unsupport data type"));
 
-    return NULL;
+    return nullptr;
 }
 
 
@@ -488,7 +502,7 @@ UINT TypeMgr::getByteSize(Type const* type) const
 }
 
 
-CHAR const* TypeMgr::dump_type(Type const* type, OUT StrBuf & buf)
+CHAR const* TypeMgr::dump_type(Type const* type, OUT StrBuf & buf) const
 {
     ASSERT0(type);
     DATA_TYPE dt = TY_dtype(type);
@@ -526,9 +540,9 @@ CHAR const* TypeMgr::dump_type(Type const* type, OUT StrBuf & buf)
         break;
     }
     case D_TENSOR: {
-        UINT elem_byte_size = getDTypeByteSize(TY_tensor_ety(type));
-        ASSERT0(elem_byte_size != 0);
-        ASSERT0(getByteSize(type) % elem_byte_size == 0);
+        //Check byte size of element.
+        ASSERT0(getDTypeByteSize(TY_tensor_ety(type)) != 0);
+        ASSERT0(getByteSize(type) % getDTypeByteSize(TY_tensor_ety(type)) == 0);
         buf.strcat("%s:%s<", DTNAME(dt), DTNAME(TY_tensor_ety(type)));
         UINT dim = ((TensorType const*)type)->getDim();
         for (UINT i = 0; i < dim; i++) {
@@ -549,13 +563,13 @@ CHAR const* TypeMgr::dump_type(Type const* type, OUT StrBuf & buf)
 }
 
 
-void TypeMgr::dump_type(UINT tyid)
+void TypeMgr::dump_type(UINT tyid) const
 {
     dump_type(getType(tyid));
 }
 
 
-void TypeMgr::dump_type(Type const* type)
+void TypeMgr::dump_type(Type const* type) const
 {
     if (!getRegionMgr()->isLogMgrInit()) { return; }
     StrBuf buf(64);
@@ -563,7 +577,7 @@ void TypeMgr::dump_type(Type const* type)
 }
 
 
-void TypeMgr::dump_type_tab()
+void TypeMgr::dump_type_tab() const
 {
     StrBuf buf(64);
     if (!getRegionMgr()->isLogMgrInit()) { return; }
@@ -584,7 +598,12 @@ void TypeMgr::dump_type_tab()
 bool Type::verify(TypeMgr const* tm) const
 {
     if (is_pointer()) {
-        ASSERT0(TY_ptr_base_size(this) != 0);
+        //Some pointer is never participate pointer-arithmetic, it may be
+        //used as just a representation of pointer. Moreover, the base-size of
+        //pointer is always useful when the pointer is regarded as base of
+        //ILD, IST, pointer-arith as well. Thus, we will allow the base-size
+        //is zero here for conveninence.
+        //ASSERT0(TY_ptr_base_size(this) != 0);
     } else if (is_mc()) {
         ASSERT0(TY_mc_size(this) != 0);
     } else {
@@ -600,7 +619,7 @@ bool Type::verify(TypeMgr const* tm) const
         ASSERTN(IS_SIMPLEX(TY_vec_ety(this)) || IS_PTR(TY_vec_ety(this)),
                 ("illegal vector elem type"));
         ASSERT0((TY_vec_size(this) >= tm->getDTypeByteSize(TY_vec_ety(this))) &&
-            (TY_vec_size(this) % tm->getDTypeByteSize(TY_vec_ety(this)) == 0));        
+            (TY_vec_size(this) % tm->getDTypeByteSize(TY_vec_ety(this)) == 0));
     }
     return true;
 }

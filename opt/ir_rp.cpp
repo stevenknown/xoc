@@ -58,7 +58,7 @@ public:
             break;
         case IR_ILD:
             for (IR const* x = iterInitC(t, iter);
-                 x != NULL; x = iterNextC(iter)) {
+                 x != nullptr; x = iterNextC(iter)) {
                 UINT v = x->getCode() + (x->getOffset() + 1) +
                     (UINT)(size_t)x->getType();
                 if (x->is_id()) {
@@ -73,7 +73,7 @@ public:
             break;
         case IR_IST:
             for (IR const* x = iterInitC(IST_base(t), iter);
-                 x != NULL; x = iterNextC(iter)) {
+                 x != nullptr; x = iterNextC(iter)) {
                 UINT v = x->getCode() + (x->getOffset() + 1) +
                         (UINT)(size_t)x->getType();
                 if (x->is_id()) {
@@ -86,7 +86,7 @@ public:
             break;
         case IR_ARRAY:
             for (IR const* x = iterInitC(t, iter);
-                 x != NULL; x = iterNextC(iter)) {
+                 x != nullptr; x = iterNextC(iter)) {
                 UINT v = x->getCode() + (x->getOffset() + 1) +
                         (UINT)(size_t)x->getType();
                 if (x->is_id()) {
@@ -118,14 +118,14 @@ public:
 
         IR * s1 = ARR_sub_list(t1);
         IR * s2 = ARR_sub_list(t2);
-        for (; s1 != NULL && s2 != NULL; s1 = IR_next(s1), s2 = IR_next(s2)) {
+        for (; s1 != nullptr && s2 != nullptr; s1 = IR_next(s1), s2 = IR_next(s2)) {
             ASSERT0(m_gvn->mapIR2VN(s1) && m_gvn->mapIR2VN(s2));
             if (m_gvn->mapIR2VN(s1) != m_gvn->mapIR2VN(s2)) {
                 return false;
             }
         }
 
-        if (s1 != NULL || s2 != NULL) { return false; }
+        if (s1 != nullptr || s2 != nullptr) { return false; }
 
         if (ARR_ofst(t1) != ARR_ofst(t2)) { return false; }
 
@@ -139,12 +139,12 @@ public:
         ASSERT0(m_gvn);
         if (t1 == t2) { return true; }
 
-        IR const* base1 = NULL;
+        IR const* base1 = nullptr;
         if (t1->is_ild()) { base1 = ILD_base(t1); }
         else if (t1->is_ist()) { base1 = IST_base(t1); }
         ASSERT0(base1);
 
-        IR const* base2 = NULL;
+        IR const* base2 = nullptr;
         if (t2->is_ild()) { base2 = ILD_base(t2); }
         else if (t2->is_ist()) { base2 = IST_base(t2); }
         ASSERT0(base2);
@@ -212,7 +212,7 @@ public:
     {
         ii.clean();
         for (IR * x = iterInit(ir, ii);
-             x != NULL; x = iterNext(ii)) {
+             x != nullptr; x = iterNext(ii)) {
             bunion(IR_id(x));
         }
     }
@@ -242,10 +242,10 @@ void RegPromot::dumpInexact(TTab<IR*> & access)
 {
     if (!m_rg->isLogMgrInit()) { return; }
     note(getRegion(), "\n---- DUMP inexact access ----");
-    TabIter<IR*> iter;
+    TTabIter<IR*> iter;
     for (IR * ir = access.get_first(iter);
-        ir != NULL; ir = access.get_next(iter)) {
-        dumpIR(ir, m_rg, NULL, IR_DUMP_SRC_LINE | IR_DUMP_INNER_REGION);
+        ir != nullptr; ir = access.get_next(iter)) {
+        dumpIR(ir, m_rg, nullptr, IR_DUMP_SRC_LINE | IR_DUMP_INNER_REGION);
         note(getRegion(), "\n");
     }
     note(getRegion(), "\n");
@@ -259,15 +259,15 @@ void RegPromot::dumpExact(TMap<MD const*, IR*> & access, List<IR*> & occs)
     TMapIter<MD const*, IR*> iter;
     IR * ref;
     for (MD const* md = access.get_first(iter, &ref);
-         ref != NULL; md = access.get_next(iter, &ref)) {
+         ref != nullptr; md = access.get_next(iter, &ref)) {
         md->dump(m_rg->getTypeMgr());
-        dumpIR(ref, m_rg, NULL, IR_DUMP_SRC_LINE | IR_DUMP_INNER_REGION);
+        dumpIR(ref, m_rg, nullptr, IR_DUMP_SRC_LINE | IR_DUMP_INNER_REGION);
         note(getRegion(), "\n");
     }
 
     note(getRegion(), "\n---- DUMP exact occ list ----");
-    for (IR * x = occs.get_head(); x != NULL; x = occs.get_next()) {
-        dumpIR(x, m_rg, NULL, IR_DUMP_SRC_LINE | IR_DUMP_INNER_REGION);
+    for (IR * x = occs.get_head(); x != nullptr; x = occs.get_next()) {
+        dumpIR(x, m_rg, nullptr, IR_DUMP_SRC_LINE | IR_DUMP_INNER_REGION);
         note(getRegion(), "\n");
     }
     note(getRegion(), "\n");
@@ -277,7 +277,7 @@ void RegPromot::dumpExact(TMap<MD const*, IR*> & access, List<IR*> & occs)
 MDLT * RegPromot::getMDLifeTime(MD * md)
 {
     MDLT * lt;
-    if ((lt = m_md2lt_map->get(md)) != NULL) {
+    if ((lt = m_md2lt_map->get(md)) != nullptr) {
         return lt;
     }
     lt = (MDLT*)xmalloc(sizeof(MDLT));
@@ -295,8 +295,8 @@ void RegPromot::cleanLiveBBSet()
     Vector<MDLT*> * bs_vec = m_md2lt_map->get_tgt_elem_vec();
     for (INT i = 0; i <= bs_vec->get_last_idx(); i++) {
         MDLT * lt = bs_vec->get(i);
-        if (lt != NULL) {
-            ASSERT0(MDLT_livebbs(lt) != NULL);
+        if (lt != nullptr) {
+            ASSERT0(MDLT_livebbs(lt) != nullptr);
             MDLT_livebbs(lt)->clean();
         }
     }
@@ -310,7 +310,7 @@ void RegPromot::dump_mdlt()
     xcom::DefMiscBitSetMgr * sbsmgr = getSBSMgr();
     MDLivenessMgr * livemgr = getMDLivenessMgr();
     BBList * bbl = m_rg->getBBList();
-    for (IRBB * bb = bbl->get_head(); bb != NULL; bb = bbl->get_next()) {
+    for (IRBB * bb = bbl->get_head(); bb != nullptr; bb = bbl->get_next()) {
         MDSet * livein = livemgr->getLiveInMDSet(bb);
         MDSet * liveout = livemgr->getLiveOutMDSet(bb);
         if (livein->is_empty() && liveout->is_empty()) { continue; }
@@ -324,18 +324,18 @@ void RegPromot::dump_mdlt()
     MDSetIter iter;
     for (INT i = mdbs.get_first(&iter); i >= 0; i = mdbs.get_next(i, &iter)) {
         MD * md = m_md_sys->getMD(i);
-        ASSERT0(md != NULL);
+        ASSERT0(md != nullptr);
         MDLT * lt = m_md2lt_map->get(md);
-        ASSERT0(lt != NULL);
+        ASSERT0(lt != nullptr);
         xcom::BitSet * livebbs = MDLT_livebbs(lt);
-        ASSERT0(livebbs != NULL);
+        ASSERT0(livebbs != nullptr);
 
         //Print MD name.
         note(getRegion(), "\nMD%d", MD_id(md));
         prt(getRegion(), ":");
 
         //Print live BB.
-        if (livebbs == NULL || livebbs->is_empty()) { continue; }
+        if (livebbs == nullptr || livebbs->is_empty()) { continue; }
         INT start = 0;
         for (INT u = livebbs->get_first(); u >= 0; u = livebbs->get_next(u)) {
             for (INT j = start; j < u; j++) {
@@ -359,7 +359,7 @@ void RegPromot::buildLifeTime()
     //Rebuild life time.
     BBList * bbl = m_rg->getBBList();
     MDLivenessMgr * livemgr = getMDLivenessMgr();
-    for (IRBB * bb = bbl->get_head(); bb != NULL; bb = bbl->get_next()) {
+    for (IRBB * bb = bbl->get_head(); bb != nullptr; bb = bbl->get_next()) {
         MDSet * livein = livemgr->getLiveInMDSet(bb);
         MDSet * liveout = livemgr->getLiveOutMDSet(bb);
         if (livein->is_empty() && liveout->is_empty()) { continue; }
@@ -402,12 +402,12 @@ void RegPromot::addInexactAccess(TTab<IR*> & inexact_access, IR * ir)
 bool RegPromot::checkArrayIsLoopInvariant(IN IR * ir, LI<IRBB> const* li)
 {
     ASSERT0(ir->is_array() && li);
-    for (IR * s = ARR_sub_list(ir); s != NULL; s = s->get_next()) {
-        if (!isLoopInvariant(s, li, m_rg, NULL, true)) {
+    for (IR * s = ARR_sub_list(ir); s != nullptr; s = s->get_next()) {
+        if (!isLoopInvariant(s, li, m_rg, nullptr, true)) {
             return false;
         }
     }
-    if (!isLoopInvariant(ARR_base(ir), li, m_rg, NULL, true)) {
+    if (!isLoopInvariant(ARR_base(ir), li, m_rg, nullptr, true)) {
         return false;
     }
     return true;
@@ -436,7 +436,7 @@ bool RegPromot::handleArrayRef(IN IR * ir,
     }
 
     MD const* mustuse = ir->getRefMD();
-    if (mustuse == NULL || !mustuse->is_effect()) { return false; }
+    if (mustuse == nullptr || !mustuse->is_effect()) { return false; }
 
     if (mustuse->is_volatile()) {
         clobberAccess(ir, exact_access, exact_occs, inexact_access);
@@ -463,9 +463,9 @@ bool RegPromot::handleArrayRef(IN IR * ir,
         return true;
     }
 
-    TabIter<IR*> ti;
+    TTabIter<IR*> ti;
     for (IR * ref = inexact_access.get_first(ti);
-         ref != NULL; ref = inexact_access.get_next(ti)) {
+         ref != nullptr; ref = inexact_access.get_next(ti)) {
         UINT st = analyzeArrayStatus(ir, ref);
         if (st == RP_SAME_ARRAY) { continue; }
         if (st == RP_DIFFERENT_ARRAY) { continue; }
@@ -501,19 +501,19 @@ bool RegPromot::handleGeneralRef(IR * ir,
         //return true;
     }
     MD const* mustref = ir->getRefMD();
-    //if ((mustref == NULL || !mustref->is_effect()) && ir->is_stmt()) {
+    //if ((mustref == nullptr || !mustref->is_effect()) && ir->is_stmt()) {
     //    //It is dispensable to clobber access if entire loop is not analysable.
     //    clobberAccess(ir, exact_access, exact_occs, inexact_access);
     //
     //    //TO BE CONFIRMED:ineffect MD should not lead entire loop unanalyzable.
     //    //return false;
     //}
-    if (mustref != NULL && mustref->is_volatile()) {
+    if (mustref != nullptr && mustref->is_volatile()) {
         clobberAccess(ir, exact_access, exact_occs, inexact_access);
         return true;
     }
-    //if (mustref != NULL && mustref->is_exact()) {
-    //        if (ir != NULL) {
+    //if (mustref != nullptr && mustref->is_exact()) {
+    //        if (ir != nullptr) {
     //            if (ir->is_stmt()) {
     //                //Mark exact memory access to be promotable.
     //                addExactAccess(exact_access, exact_occs, mustref, ir);
@@ -526,12 +526,12 @@ bool RegPromot::handleGeneralRef(IR * ir,
     //        addDontPromote(mustref);
     //    }
     //    //Need to analyze MayRef.
-      
+
     //    //mustref already be in the dont_promot table.
     //    //return true;
     //}
 
-    if (mustref != NULL && m_dont_promote.is_overlap(mustref)) {
+    if (mustref != nullptr && m_dont_promote.is_overlap(mustref)) {
         //If ir should not be promoted, then all the others mem-ref
         //that overlapped with it should not be promoted too.
         clobberAccess(ir, exact_access, exact_occs, inexact_access);
@@ -545,7 +545,7 @@ bool RegPromot::handleGeneralRef(IR * ir,
             return true;
         }
     } else if (ir->is_ld()) {
-        if (!isLoopInvariant(ir, li, m_rg, NULL, true)) {
+        if (!isLoopInvariant(ir, li, m_rg, nullptr, true)) {
             clobberAccess(ir, exact_access, exact_occs, inexact_access);
             return true;
         }
@@ -557,9 +557,9 @@ bool RegPromot::handleGeneralRef(IR * ir,
 
     if (ir->is_stmt()) {
         //Determine wherther current ir clobber elements in access list.
-        TabIter<IR*> ti;
+        TTabIter<IR*> ti;
         for (IR * ref = inexact_access.get_first(ti);
-             ref != NULL; ref = inexact_access.get_next(ti)) {
+             ref != nullptr; ref = inexact_access.get_next(ti)) {
             if (m_gvn->isSameMemLoc(ir, ref)) { continue; }
             if (m_gvn->isDiffMemLoc(ir, ref)) { continue; }
 
@@ -568,14 +568,14 @@ bool RegPromot::handleGeneralRef(IR * ir,
             clobberAccess(ir, exact_access, exact_occs, inexact_access);
             return true;
         }
-        if (mustref == NULL || !mustref->is_exact()) {
+        if (mustref == nullptr || !mustref->is_exact()) {
             addInexactAccess(inexact_access, ir);
-        } else if (mustref != NULL && mustref->is_exact()) {
+        } else if (mustref != nullptr && mustref->is_exact()) {
             if (!m_dont_promote.is_overlap(mustref)) {
                 if (ir->is_stmt()) {
                     //Mark exact memory access to be promotable.
                     addExactAccess(exact_access, exact_occs, mustref, ir);
-                } else if (isLoopInvariant(ir, li, m_rg, NULL, true)) {
+                } else if (isLoopInvariant(ir, li, m_rg, nullptr, true)) {
                     //Mark exact memory access to be promotable.
                     addExactAccess(exact_access, exact_occs, mustref, ir);
                 }
@@ -583,7 +583,7 @@ bool RegPromot::handleGeneralRef(IR * ir,
                 addDontPromote(mustref);
             }
             //Need to analyze MayRef.
-        
+
             //mustref already be in the dont_promot table.
             //return true;
         }
@@ -591,15 +591,15 @@ bool RegPromot::handleGeneralRef(IR * ir,
     }
 
     ASSERT0(ir->is_exp());
-    if (mustref == NULL || !mustref->is_exact()) {
+    if (mustref == nullptr || !mustref->is_exact()) {
         addInexactAccess(inexact_access, ir);
-    } else if (mustref != NULL && mustref->is_exact()) {
+    } else if (mustref != nullptr && mustref->is_exact()) {
         if (!m_dont_promote.is_overlap(mustref)) {
-            if (ir != NULL) {
+            if (ir != nullptr) {
                 if (ir->is_stmt()) {
                     //Mark exact memory access to be promotable.
                     addExactAccess(exact_access, exact_occs, mustref, ir);
-                } else if (isLoopInvariant(ir, li, m_rg, NULL, true)) {
+                } else if (isLoopInvariant(ir, li, m_rg, nullptr, true)) {
                     //Mark exact memory access to be promotable.
                     addExactAccess(exact_access, exact_occs, mustref, ir);
                 }
@@ -608,7 +608,7 @@ bool RegPromot::handleGeneralRef(IR * ir,
             addDontPromote(mustref);
         }
         //Need to analyze MayRef.
-    
+
         //mustref already be in the dont_promot table.
         //return true;
     }
@@ -642,15 +642,15 @@ void RegPromot::clobberAccess(IR * ir,
     MD const* mustref = ir->getRefMD();
     MDSet const* mayref = ir->getRefMDSet();
 
-    if (mustref != NULL) { addDontPromote(mustref); }
-    if (mayref != NULL) { addDontPromote(*mayref); }
+    if (mustref != nullptr) { addDontPromote(mustref); }
+    if (mayref != nullptr) { addDontPromote(*mayref); }
 
     TMapIter<MD const*, IR*> iter;
     Vector<MD const*> need_to_be_removed;
     INT cnt = 0;
-    if (mustref != NULL) {
-        for (MD const* md = exact_access.get_first(iter, NULL);
-             md != NULL; md = exact_access.get_next(iter, NULL)) {
+    if (mustref != nullptr) {
+        for (MD const* md = exact_access.get_first(iter, nullptr);
+             md != nullptr; md = exact_access.get_next(iter, nullptr)) {
             if (mustref == md || mustref->is_overlap(md)) {
                 //Current ir may modify the candidate's md.
                 //We think the candidate is not suite to promot any more.
@@ -659,9 +659,9 @@ void RegPromot::clobberAccess(IR * ir,
             }
         }
     }
-    if (mayref != NULL && !mayref->is_empty()) {
-        for (MD const* md = exact_access.get_first(iter, NULL);
-             md != NULL; md = exact_access.get_next(iter, NULL)) {
+    if (mayref != nullptr && !mayref->is_empty()) {
+        for (MD const* md = exact_access.get_first(iter, nullptr);
+             md != nullptr; md = exact_access.get_next(iter, nullptr)) {
             if (mayref->is_contain(md)) {
                 //Current ir may modify the candidate's md.
                 //We think the candidate is not suite to promot any more.
@@ -679,22 +679,22 @@ void RegPromot::clobberAccess(IR * ir,
         //scanBB() all at once.
     }
 
-    TabIter<IR*> iter2;
+    TTabIter<IR*> iter2;
     Vector<IR*> need_to_be_removed2;
     cnt = 0;
-    if (mustref != NULL) {
+    if (mustref != nullptr) {
         for (IR * acc = inexact_access.get_first(iter2);
-             acc != NULL; acc = inexact_access.get_next(iter2)) {
+             acc != nullptr; acc = inexact_access.get_next(iter2)) {
             MD const* acc_md = acc->getRefMD();
             MDSet const* acc_mds = acc->getRefMDSet();
-            if (acc_md != NULL) {
+            if (acc_md != nullptr) {
                 if (mustref == acc_md || mustref->is_overlap(acc_md)) {
                     //ir is not suite to promot any more, all mds which
                     //overlapped with it are also not promotable.
                     need_to_be_removed2.set(cnt, acc);
                     cnt++;
                 }
-            } else if (acc_mds != NULL && acc_mds->is_overlap(mustref, m_rg)) {
+            } else if (acc_mds != nullptr && acc_mds->is_overlap(mustref, m_rg)) {
                 //ir is not suite to promot any more, all mds which
                 //overlapped with it are also not promotable.
                 need_to_be_removed2.set(cnt, acc);
@@ -702,13 +702,13 @@ void RegPromot::clobberAccess(IR * ir,
             }
         }
     }
-    if (mayref != NULL && !mayref->is_empty()) {
+    if (mayref != nullptr && !mayref->is_empty()) {
         for (IR * acc = inexact_access.get_first(iter2);
-             acc != NULL; acc = inexact_access.get_next(iter2)) {
+             acc != nullptr; acc = inexact_access.get_next(iter2)) {
             MD const* acc_md = acc->getRefMD();
             MDSet const* acc_mds = acc->getRefMDSet();
-            if ((acc_md != NULL && mayref->is_overlap(acc_md, m_rg)) ||
-                (acc_mds != NULL &&
+            if ((acc_md != nullptr && mayref->is_overlap(acc_md, m_rg)) ||
+                (acc_mds != nullptr &&
                  (acc_mds == mayref || mayref->is_intersect(*acc_mds)))) {
                 //ir is not suite to promot any more, all mds which
                 //overlapped with it are also not promotable.
@@ -729,11 +729,11 @@ bool RegPromot::checkIndirectAccessIsLoopInvariant(IN IR * ir, LI<IRBB> const* l
 {
     ASSERT0(li);
     if (ir->is_ild()) {
-        if (!isLoopInvariant(ILD_base(ir), li, m_rg, NULL, true)) {
+        if (!isLoopInvariant(ILD_base(ir), li, m_rg, nullptr, true)) {
             return false;
         }
     } else if (ir->is_ist()) {
-        if (!isLoopInvariant(IST_base(ir), li, m_rg, NULL, true)) {
+        if (!isLoopInvariant(IST_base(ir), li, m_rg, nullptr, true)) {
             return false;
         }
     }
@@ -744,7 +744,7 @@ bool RegPromot::checkIndirectAccessIsLoopInvariant(IN IR * ir, LI<IRBB> const* l
 //Determine whether the memory reference is same object or different.
 UINT RegPromot::analyzeIndirectAccessStatus(IR const* ref1, IR const* ref2)
 {
-    IR const* base1 = NULL;
+    IR const* base1 = nullptr;
     if (ref1->is_ild()) {
         base1 = ILD_base(ref1);
     } else if (ref1->is_ist()) {
@@ -753,7 +753,7 @@ UINT RegPromot::analyzeIndirectAccessStatus(IR const* ref1, IR const* ref2)
         return RP_UNKNOWN;
     }
 
-    IR const* base2 = NULL;
+    IR const* base2 = nullptr;
     if (ref2->is_ild()) {
         base2 = ILD_base(ref2);
     } else if (ref2->is_ist()) {
@@ -768,7 +768,7 @@ UINT RegPromot::analyzeIndirectAccessStatus(IR const* ref1, IR const* ref2)
 
     VN const* vn1 = m_gvn->mapIR2VN(base1);
     VN const* vn2 = m_gvn->mapIR2VN(base2);
-    if (vn1 == NULL || vn2 == NULL) { return RP_UNKNOWN; }
+    if (vn1 == nullptr || vn2 == nullptr) { return RP_UNKNOWN; }
 
     UINT tysz1 = ref1->getTypeSize(m_tm);
     UINT tysz2 = ref2->getTypeSize(m_tm);
@@ -798,7 +798,7 @@ bool RegPromot::scanOpnd(IR * ir,
 {
     ii.clean();
     for (IR * x = iterRhsInit(ir, ii);
-         x != NULL; x = iterRhsNext(ii)) {
+         x != nullptr; x = iterRhsNext(ii)) {
         if (!x->isMemoryOpnd() || x->is_pr()) { continue; }
         if (x->is_array()) {
             if (!handleArrayRef(x, li, exact_access, exact_occs,
@@ -857,13 +857,13 @@ bool RegPromot::scanBB(IN IRBB * bb,
                        IRIter & ii)
 {
     for (IR * ir = BB_last_ir(bb);
-         ir != NULL; ir = BB_prev_ir(bb)) {
+         ir != nullptr; ir = BB_prev_ir(bb)) {
         if (ir->isCallStmt() && !ir->isReadOnly()) {
             return false;
         }
     }
     for (IR * ir = BB_first_ir(bb);
-         ir != NULL; ir = BB_next_ir(bb)) {
+         ir != nullptr; ir = BB_next_ir(bb)) {
         if (!ir->isContainMemRef()) { continue; }
         if (ir->is_region()) { return false; }
         if (!scanResult(ir, li, exact_access, exact_occs, inexact_access)) {
@@ -887,7 +887,7 @@ IRBB * RegPromot::findSingleExitBB(LI<IRBB> const* li)
     if (x->isMultiConditionalBr()) {
         //If the end ir of loop header is multi-conditional-branch, we
         //are not going to handle it.
-        return NULL;
+        return nullptr;
     }
 
     IRBB * check_bb = head;
@@ -907,14 +907,14 @@ IRBB * RegPromot::findSingleExitBB(LI<IRBB> const* li)
                 return succ;
             }
 
-            return NULL;
+            return nullptr;
         }
 
         if (z->isCallStmt() || z->isUnconditionalBr() || z->is_st() ||
             z->is_ist() || z->isWritePR()) {
             if (succs.get_elem_count() > 1) {
                 //Stmt may throw exception.
-                return NULL;
+                return nullptr;
             }
             check_bb = succs.get_head();
             continue;
@@ -923,7 +923,7 @@ IRBB * RegPromot::findSingleExitBB(LI<IRBB> const* li)
         break; //Go out of the loop.
     }
 
-    return NULL;
+    return nullptr;
 }
 
 
@@ -953,20 +953,20 @@ void RegPromot::handleRestore2Mem(
     TMap<IR*, IR*> & delegate2pr,
     TMap<IR*, DUSet*> & delegate2use,
     TMap<IR*, SList<IR*>*> & delegate2has_outside_uses_ir_list,
-    TabIter<IR*> & ti,
+    TTabIter<IR*> & ti,
     IRBB * exit_bb)
 {
     //Restore value from delegate PR to delegate memory object.
     ti.clean();
     for (IR * delegate = restore2mem.get_first(ti);
-         delegate != NULL; delegate = restore2mem.get_next(ti)) {
+         delegate != nullptr; delegate = restore2mem.get_next(ti)) {
         IR * pr = m_rg->dupIRTree(delegate2pr.get(delegate));
         m_rg->allocRefForPR(pr);
 
         IR * stpr = delegate2stpr.get(delegate);
         buildPRDUChain(stpr, pr);
 
-        IR * stmt = NULL;
+        IR * stmt = nullptr;
         switch (delegate->getCode()) {
         case IR_ARRAY:
         case IR_STARRAY: {
@@ -977,8 +977,8 @@ void RegPromot::handleRestore2Mem(
             IR * sublist = m_rg->dupIRTree(ARR_sub_list(delegate));
 
             //Copy DU chain and MD reference.
-            m_du->copyRefAndAddDUChain(base, ARR_base(delegate), true);
-            m_du->copyRefAndAddDUChain(sublist, ARR_sub_list(delegate), true);
+            m_du->addUse(base, ARR_base(delegate));
+            m_du->addUse(sublist, ARR_sub_list(delegate));
 
             //Build Store Array operation.
             stmt = m_rg->buildStoreArray(base, sublist, IR_dt(delegate),
@@ -993,7 +993,7 @@ void RegPromot::handleRestore2Mem(
         }
         case IR_IST: {
             IR * lhs = m_rg->dupIRTree(IST_base(delegate));
-            m_du->copyRefAndAddDUChain(lhs, IST_base(delegate), true);
+            m_du->addUse(lhs, IST_base(delegate));
 
             stmt = m_rg->buildIStore(lhs, pr,
                 IST_ofst(delegate), IR_dt(delegate));
@@ -1007,12 +1007,11 @@ void RegPromot::handleRestore2Mem(
             IR * base = m_rg->dupIRTree(ILD_base(delegate));
             stmt = m_rg->buildIStore(base, pr, ILD_ofst(delegate),
                                      IR_dt(delegate));
-            m_du->copyRefAndAddDUChain(base, ILD_base(delegate), true);
+            m_du->addUse(base, ILD_base(delegate));
             break;
         }
         case IR_LD:
-            stmt = m_rg->buildStore(LD_idinfo(delegate),
-                                    IR_dt(delegate),
+            stmt = m_rg->buildStore(LD_idinfo(delegate), IR_dt(delegate),
                                     LD_ofst(delegate), pr);
             break;
         default: UNREACHABLE(); //Unsupport.
@@ -1022,7 +1021,7 @@ void RegPromot::handleRestore2Mem(
 
         //Compute the DU chain of stmt.
         DUSet const* set = delegate2use.get(delegate);
-        if (set != NULL) {
+        if (set != nullptr) {
             m_du->copyDUSet(stmt, set);
             m_du->unionDef(set, stmt);
         }
@@ -1074,7 +1073,7 @@ bool RegPromot::isPromotable(IR const* ir) const
 //Return true if there is IR be promoted, otherwise return false.
 bool RegPromot::promoteExactAccess(LI<IRBB> const* li,
                                    IRIter & ii,
-                                   TabIter<IR*> & ti,
+                                   TTabIter<IR*> & ti,
                                    IRBB * preheader,
                                    IRBB * exit_bb,
                                    TMap<MD const*, IR*> & exact_access,
@@ -1101,14 +1100,14 @@ bool RegPromot::promoteExactAccess(LI<IRBB> const* li,
     List<IR*> fixup_list; //record the IR that need to fix up duset.
 
     xcom::BitSet * bbset = li->getBodyBBSet();
-    CHECK_DUMMYUSE(bbset);
+    CHECK0_DUMMYUSE(bbset);
     ASSERT0(!bbset->is_empty()); //loop is empty.
 
     DefMiscBitSetMgr * sbs_mgr = m_rg->getMiscBitSetMgr();
 
     TMapIter<MD const*, IR*> mi;
-    IR * delegate = NULL;
-    for (MD const* md = exact_access.get_first(mi, &delegate); md != NULL;) {
+    IR * delegate = nullptr;
+    for (MD const* md = exact_access.get_first(mi, &delegate); md != nullptr;) {
         ASSERT0(delegate);
         if (!isPromotable(delegate)) {
             //Do not promote the reference.
@@ -1121,19 +1120,19 @@ bool RegPromot::promoteExactAccess(LI<IRBB> const* li,
         createDelegateInfo(delegate, delegate2pr,
                            delegate2has_outside_uses_ir_list);
         md = exact_access.get_next(mi, &delegate);
-        ASSERT0(!((md == NULL) ^ (delegate == NULL)));
+        ASSERT0(!((md == nullptr) ^ (delegate == nullptr)));
     }
 
     if (exact_access.get_elem_count() == 0) { return false; }
 
     for (IR * ref = exact_occs.get_head();
-         ref != NULL; ref = exact_occs.get_next()) {
+         ref != nullptr; ref = exact_occs.get_next()) {
          MD const* md = ref->getRefMD();
         ASSERT0(md && md->is_exact());
 
         //Get the unique delegate.
         IR * delegate2 = exact_access.get(md);
-        if (delegate2 == NULL) {
+        if (delegate2 == nullptr) {
             continue;
         }
 
@@ -1143,7 +1142,7 @@ bool RegPromot::promoteExactAccess(LI<IRBB> const* li,
 
     mi.clean();
     for (exact_access.get_first(mi, &delegate);
-         delegate != NULL; exact_access.get_next(mi, &delegate)) {
+         delegate != nullptr; exact_access.get_next(mi, &delegate)) {
         IR * pr = delegate2pr.get(delegate);
         ASSERT0(pr);
         handlePrelog(delegate, pr, delegate2stpr, delegate2def, preheader);
@@ -1160,7 +1159,7 @@ bool RegPromot::promoteExactAccess(LI<IRBB> const* li,
     PromotedTab promoted(m_rg->getMiscBitSetMgr()->getSegMgr());
 
     for (IR * ref = exact_occs.get_head();
-         ref != NULL; ref = exact_occs.get_next()) {
+         ref != nullptr; ref = exact_occs.get_next()) {
         if (promoted.is_contain(IR_id(ref))) { continue; }
 
         MD const* md = ref->getRefMD();
@@ -1168,7 +1167,7 @@ bool RegPromot::promoteExactAccess(LI<IRBB> const* li,
 
         //Get the unique delegate.
         IR * delegate2 = exact_access.get(md);
-        if (delegate2 == NULL) { continue; }
+        if (delegate2 == nullptr) { continue; }
 
         IR * delegate_pr = delegate2pr.get(delegate2);
         ASSERT0(delegate_pr);
@@ -1195,7 +1194,7 @@ bool RegPromot::promoteExactAccess(LI<IRBB> const* li,
     //This is because the ref is one of the kid of some other
     //stmt/exp which has already been freed.
     for (IR * ref = exact_occs.get_head();
-         ref != NULL; ref = exact_occs.get_next()) {
+         ref != nullptr; ref = exact_occs.get_next()) {
         if (ref->is_undef()) {
             //ref is the kid of other stmt/exp, and
             //that stmt/exp has been freed.
@@ -1206,7 +1205,7 @@ bool RegPromot::promoteExactAccess(LI<IRBB> const* li,
         ASSERT0(md);
 
         IR * delegate2 = exact_access.get(md);
-        if (delegate2 == NULL) {
+        if (delegate2 == nullptr) {
             //If delegate2 does not exist, the reference still in its place.
             continue;
         }
@@ -1222,7 +1221,7 @@ bool RegPromot::isMayThrow(IR * ir, IRIter & iter)
 {
     iter.clean();
     IR const* k = iterInit(ir, iter);
-    for (; k != NULL; k = iterNext(iter)) {
+    for (; k != nullptr; k = iterNext(iter)) {
         if (k->isMemoryRef() && !k->isWritePR() && !k->isReadPR()) {
             return true;
         } else if (k->isCallStmt()) {
@@ -1243,11 +1242,11 @@ bool RegPromot::hasLoopOutsideUse(IR const* stmt, LI<IRBB> const* li)
     if (useMDSSADU()) {
         return m_mdssamgr->hasUse(stmt);
     }
-    
-    DUSet const* useset = stmt->readDUSet();
-    if (useset == NULL) { return false; }
 
-    DUIter di = NULL;
+    DUSet const* useset = stmt->readDUSet();
+    if (useset == nullptr) { return false; }
+
+    DUIter di = nullptr;
     for (INT i = useset->get_first(&di);
          i >= 0; i = useset->get_next(i, &di)) {
         IR const* u = m_rg->getIR(i);
@@ -1258,7 +1257,7 @@ bool RegPromot::hasLoopOutsideUse(IR const* stmt, LI<IRBB> const* li)
         if (!li->isInsideLoop(s->getBB()->id())) {
             return true;
         }
-    }    
+    }
     return false;
 }
 
@@ -1269,21 +1268,21 @@ void RegPromot::removeRedundantDUChain(List<IR*> & fixup_list)
 {
     Vector<IR const*> * rmvec = new Vector<IR const*>(10);
     for (IR * ref = fixup_list.get_head();
-         ref != NULL; ref = fixup_list.get_next()) {
+         ref != nullptr; ref = fixup_list.get_next()) {
         ASSERT0(ref->is_stpr() || ref->is_pr());
 
         DUSet const* duset = ref->readDUSet();
-        if (duset == NULL) { continue; }
+        if (duset == nullptr) { continue; }
 
-        DUIter di = NULL;
+        DUIter di = nullptr;
         UINT cnt = 0;
         if (ref->is_stpr()) {
             UINT prno = STPR_no(ref);
 
-            if (STPR_ssainfo(ref) != NULL) {
-                SSAUseIter useiter = NULL;
+            if (STPR_ssainfo(ref) != nullptr) {
+                SSAUseIter useiter = nullptr;
                 for (INT i = SSA_uses(STPR_ssainfo(ref)).get_first(&useiter);
-                     useiter != NULL;
+                     useiter != nullptr;
                      i = SSA_uses(STPR_ssainfo(ref)).get_next(i, &useiter)) {
                     IR const* use = m_rg->getIR(i);
 
@@ -1332,8 +1331,8 @@ void RegPromot::removeRedundantDUChain(List<IR*> & fixup_list)
             ASSERT0(ref->is_pr());
             UINT prno = PR_no(ref);
 
-            if (PR_ssainfo(ref) != NULL) {
-                if (PR_ssainfo(ref)->getDef() != NULL) {
+            if (PR_ssainfo(ref) != nullptr) {
+                if (PR_ssainfo(ref)->getDef() != nullptr) {
                     //SSA def must be same PR_no with the SSA use.
                     ASSERT0(PR_ssainfo(ref)->getDef()->getPrno() == prno);
                 }
@@ -1383,7 +1382,7 @@ void RegPromot::handleAccessInBody(
     IRIter & ii)
 {
     ASSERT0(ref && delegate && delegate_pr && li);
-    IR * stmt = NULL;
+    IR * stmt = nullptr;
     if (ref->is_stmt()) {
         stmt = ref;
     } else {
@@ -1429,13 +1428,13 @@ void RegPromot::handleAccessInBody(
             m_du->changeDef(stpr, ref, m_rg->getMiscBitSetMgr());
             fixup_list.append_tail(stpr);
 
-            ref->setRHS(NULL);
+            ref->setRHS(nullptr);
 
             IRBB * refbb = ref->getBB();
             ASSERT0(refbb);
-            IRListIter ct = NULL;
+            IRListIter ct = nullptr;
             BB_irlist(refbb).find(ref, &ct);
-            ASSERT0(ct != NULL);
+            ASSERT0(ct != nullptr);
 
             BB_irlist(refbb).insert_after(stpr, ct);
             BB_irlist(refbb).remove(ct);
@@ -1486,13 +1485,13 @@ void RegPromot::handleAccessInBody(
             m_du->changeDef(stpr, ref, m_rg->getMiscBitSetMgr());
             fixup_list.append_tail(stpr);
 
-            ref->setRHS(NULL);
+            ref->setRHS(nullptr);
 
             IRBB * stmt_bb = ref->getBB();
             ASSERT0(stmt_bb);
-            IRListIter ct = NULL;
+            IRListIter ct = nullptr;
             BB_irlist(stmt_bb).find(ref, &ct);
-            ASSERT0(ct != NULL);
+            ASSERT0(ct != nullptr);
 
             BB_irlist(stmt_bb).insert_after(stpr, ct);
             BB_irlist(stmt_bb).remove(ct);
@@ -1516,7 +1515,7 @@ void RegPromot::handleAccessInBody(
             //Add du chain between new PR and the generated STPR.
             IR * stpr = delegate2stpr.get(delegate);
             ASSERT0(stpr);
-            if (m_prssamgr != NULL) {
+            if (m_prssamgr != nullptr) {
                 m_prssamgr->buildDUChain(stpr, pr);
             } else {
                 m_du->buildDUChain(stpr, pr);
@@ -1524,7 +1523,7 @@ void RegPromot::handleAccessInBody(
 
             ASSERT0(IR_parent(ref));
             bool r = IR_parent(ref)->replaceKid(ref, pr, false);
-            CHECK_DUMMYUSE(r);
+            CHECK0_DUMMYUSE(r);
 
             if (stmt->isMayThrow() && !isMayThrow(stmt, ii)) {
                 IR_may_throw(stmt) = false;
@@ -1540,41 +1539,39 @@ void RegPromot::handlePrelog(IR * delegate, IR * pr,
                              TMap<IR*, DUSet*> & delegate2def,
                              IRBB * preheader)
 {
-    IR * rhs = NULL;
-    IR * stpr = NULL;
+    IR * rhs = nullptr;
+    IR * stpr = nullptr;
     if (delegate->is_array()) {
         //Load array value into PR.
         rhs = m_rg->dupIRTree(delegate);
-        m_du->copyRefAndAddDUChain(ARR_base(rhs), ARR_base(delegate), true);
-        m_du->copyRefAndAddDUChain(ARR_sub_list(rhs),
-                                   ARR_sub_list(delegate), true);
+        m_du->addUse(ARR_base(rhs), ARR_base(delegate));
+        m_du->addUse(ARR_sub_list(rhs), ARR_sub_list(delegate));
         stpr = m_rg->buildStorePR(PR_no(pr), IR_dt(pr), rhs);
     } else if (delegate->is_starray()) {
         //Load array value into PR.
         rhs = m_rg->buildArray(m_rg->dupIRTree(ARR_base(delegate)),
                                m_rg->dupIRTree(ARR_sub_list(delegate)),
-                               IR_dt(delegate),
-                               ARR_elemtype(delegate),
+                               IR_dt(delegate), ARR_elemtype(delegate),
                                ((CArray*)delegate)->getDimNum(),
                                ARR_elem_num_buf(delegate));
-        m_du->copyRefAndAddDUChain(ARR_base(rhs), ARR_base(delegate), true);
-        m_du->copyRefAndAddDUChain(ARR_sub_list(rhs), ARR_sub_list(delegate), true);
+        m_du->addUse(ARR_base(rhs), ARR_base(delegate));
+        m_du->addUse(ARR_sub_list(rhs), ARR_sub_list(delegate));
         stpr = m_rg->buildStorePR(PR_no(pr), IR_dt(pr), rhs);
     } else if (delegate->is_ist()) {
         //Load indirect value into PR.
         rhs = m_rg->buildILoad(m_rg->dupIRTree(IST_base(delegate)),
                                IST_ofst(delegate), IR_dt(delegate));
-        m_du->copyRefAndAddDUChain(ILD_base(rhs), IST_base(delegate), true);
+        m_du->addUse(ILD_base(rhs), IST_base(delegate));
         stpr = m_rg->buildStorePR(PR_no(pr), IR_dt(pr), rhs);
     } else if (delegate->is_ild()) {
         //Load indirect value into PR.
         rhs = m_rg->dupIRTree(delegate);
-        m_du->copyRefAndAddDUChain(ILD_base(rhs), ILD_base(delegate), true);
+        m_du->addUse(ILD_base(rhs), ILD_base(delegate));
         stpr = m_rg->buildStorePR(PR_no(pr), IR_dt(pr), rhs);
     } else if (delegate->is_ld()) {
         //Load scalar into PR.
         rhs = m_rg->dupIRTree(delegate);
-        m_du->copyRefAndAddDUChain(rhs, delegate, false);
+        m_du->addUse(rhs, delegate);
         stpr = m_rg->buildStorePR(PR_no(pr), IR_dt(pr), rhs);
     } else if (delegate->is_st()) {
         //Load scalar into PR.
@@ -1589,12 +1586,12 @@ void RegPromot::handlePrelog(IR * delegate, IR * pr,
 
     //Build DU chain if there exist outer loop reach-def.
     DUSet const* set = delegate2def.get(delegate);
-    if (set != NULL) {
+    if (set != nullptr) {
         m_du->copyDUSet(rhs, set);
         m_du->unionUse(set, rhs);
     }
     m_rg->allocRefForPR(stpr);
-    ASSERT0(delegate2stpr.get(pr) == NULL);
+    ASSERT0(delegate2stpr.get(pr) == nullptr);
     delegate2stpr.set(delegate, stpr);
     BB_irlist(preheader).append_tail_ex(stpr);
 }
@@ -1609,15 +1606,15 @@ void RegPromot::computeOuterDefUse(IR * ref,
 {
     if (ref->is_ild() || ref->is_ld() || ref->is_array()) {
         //ref is USE.
-        ASSERTN(ref->getSSAInfo() == NULL, ("should not have SSA du"));
+        ASSERTN(ref->getSSAInfo() == nullptr, ("should not have SSA du"));
         DUSet * defset = delegate2def.get(delegate);
         DUSet const* refduset = ref->readDUSet();
-        if (defset == NULL && refduset != NULL) {
+        if (defset == nullptr && refduset != nullptr) {
             defset = (DUSet*)sbs_mgr->allocSBitSetCore();
             delegate2def.set(delegate, defset);
         }
-        if (refduset != NULL) {
-            DUIter di = NULL;
+        if (refduset != nullptr) {
+            DUIter di = nullptr;
             for (INT i = refduset->get_first(&di);
                  i >= 0; i = refduset->get_next(i, &di)) {
                 IR const* d = m_rg->getIR(i);
@@ -1632,12 +1629,12 @@ void RegPromot::computeOuterDefUse(IR * ref,
         ASSERT0(ref->is_st() || ref->is_ist() || ref->is_starray());
         DUSet * set = delegate2use.get(delegate);
         DUSet const* refduset = ref->readDUSet();
-        if (set == NULL && refduset != NULL) {
+        if (set == nullptr && refduset != nullptr) {
             set = (DUSet*)sbs_mgr->allocSBitSetCore();
             delegate2use.set(delegate, set);
         }
-        if (refduset != NULL) {
-            DUIter di = NULL;
+        if (refduset != nullptr) {
+            DUIter di = nullptr;
             for (INT i = refduset->get_first(&di);
                  i >= 0; i = refduset->get_next(i, &di)) {
                 IR const* u = m_rg->getIR(i);
@@ -1662,7 +1659,7 @@ void RegPromot::createDelegateInfo(
 
     //Ref is the delegate of all the semantic equivalent expressions.
     IR * pr = delegate2pr.get(delegate);
-    if (pr == NULL) {
+    if (pr == nullptr) {
         pr = m_rg->buildPR(IR_dt(delegate));
         delegate2pr.set(delegate, pr);
     }
@@ -1675,7 +1672,7 @@ bool RegPromot::promoteInexactAccess(LI<IRBB> const* li,
                                      IRBB * exit_bb,
                                      TTab<IR*> & inexact_access,
                                      IRIter & ii,
-                                     TabIter<IR*> & ti)
+                                     TTabIter<IR*> & ti)
 {
     ASSERT0(li && exit_bb && preheader);
 
@@ -1704,20 +1701,20 @@ bool RegPromot::promoteInexactAccess(LI<IRBB> const* li,
     List<IR*> fixup_list; //record the IR that need to fix up duset.
 
     xcom::BitSet * bbset = li->getBodyBBSet();
-    CHECK_DUMMYUSE(bbset);
+    CHECK0_DUMMYUSE(bbset);
     ASSERT0(!bbset->is_empty()); //loop is empty.
 
     DefMiscBitSetMgr * sbs_mgr = m_rg->getMiscBitSetMgr();
 
     //Prepare delegate table and related information.
     for (IR * ref = inexact_access.get_first(ti);
-         ref != NULL; ref = inexact_access.get_next(ti)) {
+         ref != nullptr; ref = inexact_access.get_next(ti)) {
         bool find = false;
         if (!isPromotable(ref)) {
             //Do not promote the reference.
             continue;
         }
-        IR * delegate = delegate_tab.append(ref, NULL, &find);
+        IR * delegate = delegate_tab.append(ref, nullptr, &find);
         ASSERT0(delegate);
 
         if (!find) {
@@ -1748,12 +1745,12 @@ bool RegPromot::promoteInexactAccess(LI<IRBB> const* li,
     TTab<IR*> restore2mem;
     ti.clean();
     for (IR * ref = inexact_access.get_first(ti);
-         ref != NULL; ref = inexact_access.get_next(ti)) {
+         ref != nullptr; ref = inexact_access.get_next(ti)) {
         //Get the unique delegate.
-        IR * delegate = NULL;
+        IR * delegate = nullptr;
         delegate_tab.find(ref, &delegate);
 
-        if (delegate == NULL) {
+        if (delegate == nullptr) {
             //If delegate does not exist, the reference can not
             //be promoted.
             continue;
@@ -1775,10 +1772,10 @@ bool RegPromot::promoteInexactAccess(LI<IRBB> const* li,
 
     ti.clean();
     for (IR * ref = inexact_access.get_first(ti);
-         ref != NULL; ref = inexact_access.get_next(ti)) {
-        IR * delegate = NULL;
+         ref != nullptr; ref = inexact_access.get_next(ti)) {
+        IR * delegate = nullptr;
         delegate_tab.find(ref, &delegate);
-        if (delegate == NULL) {
+        if (delegate == nullptr) {
             //If delegate does not exist, the reference still in its place.
             continue;
         }
@@ -1798,16 +1795,16 @@ void RegPromot::freeLocalStruct(TMap<IR*, DUSet*> & delegate2use,
     TMapIter<IR*, DUSet*> map_iter2;
     DUSet * duset;
     for (IR * x = delegate2use.get_first(map_iter2, &duset);
-         x != NULL; x = delegate2use.get_next(map_iter2, &duset)) {
-        if (duset != NULL) {
+         x != nullptr; x = delegate2use.get_next(map_iter2, &duset)) {
+        if (duset != nullptr) {
             sbs_mgr->freeSBitSetCore(duset);
         }
     }
 
     map_iter2.clean();
     for (IR * x = delegate2def.get_first(map_iter2, &duset);
-         x != NULL; x = delegate2def.get_next(map_iter2, &duset)) {
-        if (duset != NULL) {
+         x != nullptr; x = delegate2def.get_next(map_iter2, &duset)) {
+        if (duset != nullptr) {
             sbs_mgr->freeSBitSetCore(duset);
         }
     }
@@ -1815,7 +1812,7 @@ void RegPromot::freeLocalStruct(TMap<IR*, DUSet*> & delegate2use,
     TMapIter<IR*, IR*> map_iter;
     IR * pr;
     for (IR * x = delegate2pr.get_first(map_iter, &pr);
-         x != NULL; x = delegate2pr.get_next(map_iter, &pr)) {
+         x != nullptr; x = delegate2pr.get_next(map_iter, &pr)) {
         m_rg->freeIRTree(pr);
     }
 }
@@ -1846,7 +1843,7 @@ UINT RegPromot::analyzeArrayStatus(IR const* ref1, IR const* ref2)
 
     VN const* vn1 = m_gvn->mapIR2VN(base1);
     VN const* vn2 = m_gvn->mapIR2VN(base2);
-    if (vn1 == NULL || vn2 == NULL) { return RP_UNKNOWN; }
+    if (vn1 == nullptr || vn2 == nullptr) { return RP_UNKNOWN; }
     if (vn1 == vn2) { return RP_SAME_ARRAY; }
     return RP_DIFFERENT_ARRAY;
 }
@@ -1857,7 +1854,7 @@ void RegPromot::checkAndRemoveInvalidExactOcc(List<IR*> & exact_occs)
 {
     IRListIter ct;
     IRListIter nct;
-    for (exact_occs.get_head(&ct), nct = ct; ct != NULL; ct = nct) {
+    for (exact_occs.get_head(&ct), nct = ct; ct != nullptr; ct = nct) {
         IR * occ = ct->val();
         exact_occs.get_next(&nct);
 
@@ -1878,22 +1875,22 @@ void RegPromot::checkAndRemoveInvalidExactOcc(List<IR*> & exact_occs)
 bool RegPromot::promote(LI<IRBB> const* li,
                         IRBB * exit_bb,
                         IRIter & ii,
-                        TabIter<IR*> & ti,
+                        TTabIter<IR*> & ti,
                         TMap<MD const*, IR*> & exact_access,
                         TTab<IR*> & inexact_access,
                         List<IR*> & exact_occs)
 {
     bool change = false;
-    IRBB * preheader = NULL;
+    IRBB * preheader = nullptr;
     if (exact_access.get_elem_count() != 0 ||
         inexact_access.get_elem_count() != 0) {
         preheader = findAndInsertPreheader(li, m_rg, m_is_insert_bb, false);
         ASSERT0(preheader);
         IR const* last = BB_last_ir(preheader);
-        if (last != NULL && last->isCallStmt()) {
+        if (last != nullptr && last->isCallStmt()) {
             preheader = findAndInsertPreheader(li, m_rg, m_is_insert_bb, true);
             ASSERT0(preheader);
-            ASSERT0(BB_last_ir(preheader) == NULL);
+            ASSERT0(BB_last_ir(preheader) == nullptr);
         }
     }
 
@@ -1901,7 +1898,7 @@ bool RegPromot::promote(LI<IRBB> const* li,
         #ifdef _DEBUG_
         xcom::BitSet visit;
         for (IR * x = exact_occs.get_head();
-            x != NULL; x = exact_occs.get_next()) {
+            x != nullptr; x = exact_occs.get_next()) {
             ASSERT0(!visit.is_contain(IR_id(x)));
             visit.bunion(IR_id(x));
         }
@@ -1925,7 +1922,7 @@ bool RegPromot::promote(LI<IRBB> const* li,
 bool RegPromot::tryPromote(LI<IRBB> const* li,
                            IRBB * exit_bb,
                            IRIter & ii,
-                           TabIter<IR*> & ti,
+                           TTabIter<IR*> & ti,
                            TMap<MD const*, IR*> & exact_access,
                            TTab<IR*> & inexact_access,
                            List<IR*> & exact_occs)
@@ -1934,7 +1931,7 @@ bool RegPromot::tryPromote(LI<IRBB> const* li,
     exact_access.clean();
     inexact_access.clean();
     exact_occs.clean();
-    m_dont_promote.clean(*getSBSMgr());    
+    m_dont_promote.clean(*getSBSMgr());
     for (INT i = li->getBodyBBSet()->get_first();
          i != -1; i = li->getBodyBBSet()->get_next(i)) {
         IRBB * bb = m_cfg->getBB(i);
@@ -1961,19 +1958,19 @@ bool RegPromot::EvaluableScalarReplacement(List<LI<IRBB> const*> & worklst)
     TTab<IR*> inexact_access;
     List<IR*> exact_occs;
     IRIter ii;
-    TabIter<IR*> ti;
+    TTabIter<IR*> ti;
     bool change = false;
     while (worklst.get_elem_count() > 0) {
         LI<IRBB> const* x = worklst.remove_head();
         IRBB * exit_bb = findSingleExitBB(x);
-        if (exit_bb != NULL) {
+        if (exit_bb != nullptr) {
             //If we did not find a single exit bb, this loop is nontrivial.
             change |= tryPromote(x, exit_bb, ii, ti, exact_access,
                                  inexact_access, exact_occs);
         }
 
         x = x->getInnerList();
-        while (x != NULL) {
+        while (x != nullptr) {
             worklst.append_tail(x);
             x = x->get_next();
         }
@@ -1996,10 +1993,10 @@ bool RegPromot::dump() const
          getPassName(), m_rg->getRegionName());
     //dump_mdlt();
     dumpBBList(m_rg->getBBList(), m_rg);
-    if (m_prssamgr != NULL && m_prssamgr->is_valid()) {
+    if (m_prssamgr != nullptr && m_prssamgr->is_valid()) {
         m_prssamgr->dump();
     }
-    if (m_mdssamgr != NULL && m_mdssamgr->is_valid()) {
+    if (m_mdssamgr != nullptr && m_mdssamgr->is_valid()) {
         m_mdssamgr->dump();
     }
     return true;
@@ -2010,37 +2007,40 @@ bool RegPromot::dump() const
 bool RegPromot::perform(OptCtx & oc)
 {
     BBList * bbl = m_rg->getBBList();
-    if (bbl == NULL || bbl->get_elem_count() == 0) { return false; }
-    if (!OC_is_ref_valid(oc)) { return false; }
-    if (!OC_is_cfg_valid(oc)) { return false; }
+    if (bbl == nullptr || bbl->get_elem_count() == 0) { return false; }
+    if (!oc.is_ref_valid()) { return false; }
+    if (!oc.is_cfg_valid()) { return false; }
     //Check PR DU chain.
     m_prssamgr = (PRSSAMgr*)(m_rg->getPassMgr()->queryPass(PASS_PR_SSA_MGR));
-    if (!OC_is_pr_du_chain_valid(oc) && usePRSSADU()) {
+    if (!oc.is_pr_du_chain_valid() && usePRSSADU()) {
         //At least one kind of DU chain should be avaiable.
         return false;
     }
     //Check NONPR DU chain.
     m_mdssamgr = (MDSSAMgr*)(m_rg->getPassMgr()->queryPass(PASS_MD_SSA_MGR));
-    if (!OC_is_nonpr_du_chain_valid(oc) && useMDSSADU()) {
+    if (!oc.is_nonpr_du_chain_valid() && useMDSSADU()) {
         //At least one kind of DU chain should be avaiable.
         return false;
     }
 
-    START_TIMER(t, getPassName());    
-    m_rg->checkValidAndRecompute(&oc, PASS_LOOP_INFO, PASS_UNDEF);
+    START_TIMER(t, getPassName());
+    m_rg->getPassMgr()->checkValidAndRecompute(&oc, PASS_LOOP_INFO,
+                                               PASS_UNDEF);
     LI<IRBB> const* li = m_cfg->getLoopInfo();
-    if (li == NULL) { return false; }
+    if (li == nullptr) { return false; }
+
     m_gvn = (GVN*)(m_rg->getPassMgr()->queryPass(PASS_GVN));
-    if (m_gvn == NULL) {
+    if (m_gvn == nullptr) {
         //We dependent on gvn to do critical judgement.
         return false;
     }
     if (!m_gvn->is_valid()) {
-        m_gvn->reperform(oc);
+        m_gvn->perform(oc);
     }
-    init();    
+
+    init();
     List<LI<IRBB> const*> worklst;
-    while (li != NULL) {
+    while (li != nullptr) {
         worklst.append_tail(li);
         li = LI_next(li);
     }

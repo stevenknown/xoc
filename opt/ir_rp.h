@@ -191,7 +191,7 @@ private:
         TMap<IR*, IR*> & delegate2pr,
         TMap<IR*, DUSet*> & delegate2use,
         TMap<IR*, SList<IR*>*> & delegate2has_outside_uses_ir_list,
-        TabIter<IR*> & ti,
+        TTabIter<IR*> & ti,
         IRBB * exit_bb);
     void handlePrelog(IR * delegate,
                       IR * pr,
@@ -215,12 +215,12 @@ private:
     bool mayBeGlobalRef(IR * ref)
     {
         MD const* md = ref->getRefMD();
-        if (md != NULL && md->is_global()) { return true; }
+        if (md != nullptr && md->is_global()) { return true; }
 
         MDSet const* mds = ref->getRefMDSet();
-        if (mds == NULL) { return false; }
+        if (mds == nullptr) { return false; }
 
-        MDSetIter iter = NULL;
+        MDSetIter iter = nullptr;
         for (INT i = mds->get_first(&iter);
              i >= 0; i = mds->get_next(i, &iter)) {
             MD const* md2 = m_md_sys->getMD(i);
@@ -253,10 +253,10 @@ private:
                               IRBB * preheader,
                               IRBB * exit_bb,
                               TTab<IR*> & inexact_access,
-                              IRIter & ii, TabIter<IR*> & ti);
+                              IRIter & ii, TTabIter<IR*> & ti);
     bool promoteExactAccess(LI<IRBB> const* li,
                             IRIter & ii,
-                            TabIter<IR*> & ti,
+                            TTabIter<IR*> & ti,
                             IRBB * preheader,
                             IRBB * exit_bb,
                             TMap<MD const*, IR*> & cand_list,
@@ -265,7 +265,7 @@ private:
     bool promote(LI<IRBB> const* li,
                  IRBB * exit_bb,
                  IRIter & ii,
-                 TabIter<IR*> & ti,
+                 TTabIter<IR*> & ti,
                  TMap<MD const*, IR*> & exact_access,
                  TTab<IR*> & inexact_access,
                  List<IR*> & exact_occs);
@@ -276,21 +276,21 @@ private:
     bool tryPromote(LI<IRBB> const* li,
                     IRBB * exit_bb,
                     IRIter & ii,
-                    TabIter<IR*> & ti,
+                    TTabIter<IR*> & ti,
                     TMap<MD const*, IR*> & exact_access,
                     TTab<IR*> & inexact_access,
                     List<IR*> & exact_occs);
 
     bool useMDSSADU() const
-    { return m_mdssamgr != NULL && m_mdssamgr->is_valid(); }
+    { return m_mdssamgr != nullptr && m_mdssamgr->is_valid(); }
     bool usePRSSADU() const
-    { return m_prssamgr != NULL && m_prssamgr->is_valid(); }
+    { return m_prssamgr != nullptr && m_prssamgr->is_valid(); }
 
     void * xmalloc(UINT size)
     {
-        ASSERT0(m_pool != NULL);
+        ASSERT0(m_pool != nullptr);
         void * p = smpoolMalloc(size, m_pool);
-        ASSERT0(p != NULL);
+        ASSERT0(p != nullptr);
         ::memset(p, 0, size);
         return p;
     }
@@ -298,7 +298,7 @@ private:
 public:
     RegPromot(Region * rg) : m_dont_promote(rg)
     {
-        ASSERT0(rg != NULL);
+        ASSERT0(rg != nullptr);
         m_rg = rg;
         m_md_sys = rg->getMDSystem();
         m_cfg = rg->getCFG();
@@ -306,9 +306,9 @@ public:
         m_du = rg->getDUMgr();
         m_mds_mgr = rg->getMDSetMgr();
         m_misc_bs_mgr = rg->getMiscBitSetMgr();
-        m_gvn = NULL;
-        m_prssamgr = NULL;
-        m_mdssamgr = NULL;
+        m_gvn = nullptr;
+        m_prssamgr = nullptr;
+        m_mdssamgr = nullptr;
         m_is_insert_bb = false;
         m_need_rebuild_prssa = false;
         m_liveness_mgr = (MDLivenessMgr*)m_rg->getPassMgr()->registerPass(
@@ -325,7 +325,7 @@ public:
         m_dont_promote.clean(*m_misc_bs_mgr);
 
         delete m_md2lt_map;
-        m_md2lt_map = NULL;
+        m_md2lt_map = nullptr;
         smpoolDelete(m_pool);
         smpoolDelete(m_ir_ptr_pool);
     }
@@ -334,13 +334,13 @@ public:
 
     void cleanLiveBBSet();
 
-    virtual bool dump() const;   
+    virtual bool dump() const;
 
     //Prepare context before doing reg promotion.
     void init();
     //Return true if 'ir' can be promoted.
     //Note ir must be memory reference.
-    virtual bool isPromotable(IR const* ir) const;   
+    virtual bool isPromotable(IR const* ir) const;
 
     Region * getRegion() const { return m_rg; }
     virtual CHAR const* getPassName() const { return "Register Promotion"; }

@@ -42,6 +42,8 @@ class AliasAnalysis;
 class ExprTab;
 class MDSSAMgr;
 class PRSSAMgr;
+class Pass;
+class PassMgr;
 
 //Region MD referrence info.
 #define REF_INFO_maydef(ri) ((ri)->may_def_mds)
@@ -162,16 +164,19 @@ protected:
     //This is a helper function to assignMD.
     void assignMDImpl(IR * x, bool assign_pr, bool assign_nonpr);
 
+    void doBasicAnalysis(OptCtx & oc);
+
     AnalysisInstrument * getAnalysisInstrument() const;
 
-   void scanCallListImpl(OUT UINT & num_inner_region,
+    void scanCallListImpl(OUT UINT & num_inner_region,
                           IR * irlst,
                           OUT List<IR const*> * call_list,
                           OUT List<IR const*> * ret_list,
                           bool scan_inner_region);
     bool processIRList(OptCtx & oc);
     bool processBBList(OptCtx & oc);
-    void prescan(IR const* ir);
+    void prescanIRList(IR const* ir);
+    void prescanBBList(BBList const* bblst);
     bool partitionRegion();
     bool performSimplify(OptCtx & oc);
     void HighProcessImpl(OptCtx & oc);
@@ -205,9 +210,9 @@ public:
 
     void * xmalloc(UINT size)
     {
-        ASSERTN(m_pool != NULL, ("pool does not initialized"));
+        ASSERTN(m_pool != nullptr, ("pool does not initialized"));
         void * p = smpoolMalloc(size, m_pool);
-        ASSERT0(p != NULL);
+        ASSERT0(p != nullptr);
         ::memset(p, 0, size);
         return p;
     }
@@ -229,12 +234,12 @@ public:
     MD const* allocCallResultPRMD(IR * ir);
     MD const* allocSetelemMD(IR * ir);
     MD const* allocGetelemMD(IR * ir);
- 
+
     //The function generates new MD for all operations to PR.
     //It should be called if new PR generated in optimzations.
     inline MD const* allocRefForPR(IR * pr)
     {
-        MD const* md = genMDforPR(pr);
+        MD const* md = genMDForPR(pr);
         pr->setRefMD(md, this);
         pr->cleanRefMDSet();
         return md;
@@ -244,7 +249,7 @@ public:
     //It should be called if LD generated in optimzations.
     inline MD const* allocRefForLoad(IR * ld)
     {
-        MD const* md = genMDforLoad(ld);
+        MD const* md = genMDForLoad(ld);
         ld->setRefMD(md, this);
 
         //Do NOT clean MDSet because transformation may combine ILD(LDA)
@@ -257,7 +262,7 @@ public:
     //It should be called if new PR generated in optimzations.
     inline MD const* allocRefForStore(IR * st)
     {
-        MD const* md = genMDforStore(st);
+        MD const* md = genMDForStore(st);
         st->setRefMD(md, this);
 
         //Do NOT clean MDSet because transformation may combine IST(LDA)
@@ -270,7 +275,7 @@ public:
     inline DU * allocDU()
     {
         DU * du = getAnalysisInstrument()->m_free_du_list.remove_head();
-        if (du == NULL) {
+        if (du == nullptr) {
             du = (DU*)smpoolMallocConstSize(sizeof(DU),
                 getAnalysisInstrument()->m_du_pool);
             ::memset(du, 0, sizeof(DU));
@@ -310,10 +315,10 @@ public:
     //Assign MD for memory reference operations.
     //This function will iterate given ir list.
     //is_only_assign_pr: true if only assign MD for read|write PR operations.
-    void assignMDForIRList(IR * lst,bool assign_pr, bool assign_nonpr);    
+    void assignMDForIRList(IR * lst,bool assign_pr, bool assign_nonpr);
 
     //Note the returned ByteBuf does not need to free by user.
-    ByteBuf * allocByteBuf(UINT bytesize)    
+    ByteBuf * allocByteBuf(UINT bytesize)
     {
         ByteBuf * buf = (ByteBuf*)xmalloc(sizeof(ByteBuf));
         BYTEBUF_size(buf) = bytesize;
@@ -411,7 +416,7 @@ public:
 
     //Build PR that PRNO assiged by Region.
     IR * buildPR(DATA_TYPE dt)
-    { return buildPR(getTypeMgr()->getSimplexType(dt)); }    
+    { return buildPR(getTypeMgr()->getSimplexType(dt)); }
 
     //Generate a PR number by specified prno and type id.
     //This operation will allocate new PR number.
@@ -420,7 +425,7 @@ public:
     //Generate a PR number by specified prno and type id.
     //This operation will allocate new PR number.
     UINT buildPrno(DATA_TYPE dt)
-    { return buildPrno(getTypeMgr()->getSimplexType(dt)); }    
+    { return buildPrno(getTypeMgr()->getSimplexType(dt)); }
 
     //Build IR_TRUEBR or IR_FALSEBR operation.
     IR * buildBranch(bool is_true_br, IR * det, LabelInfo const* lab);
@@ -454,7 +459,7 @@ public:
 
     //Build compare operation.
     IR * buildCmp(IR_TYPE irt, IR * lchild, IR * rchild);
-    //Build judgement operation.    
+    //Build judgement operation.
     //This function build operation that comparing with 0 by NE node.
     //e.g: output is (exp != 0).
     //This function always used as helper function to convient to
@@ -477,7 +482,7 @@ public:
     IR * buildBinaryOp(IR_TYPE irt,
                        DATA_TYPE dt,
                        IN IR * lchild,
-                       IN IR * rchild);    
+                       IN IR * rchild);
 
     //Build unary operation.
     IR * buildUnaryOp(IR_TYPE irt, Type const* type, IN IR * opnd);
@@ -510,6 +515,10 @@ public:
     IR * buildImmFp(HOST_FP fp, Type const* type);
 
     //Build IR_CONST operation.
+    //The expression indicates value with dynamic type.
+    IR * buildImmAny(HOST_INT v);
+
+    //Build IR_CONST operation.
     //The expression indicates a float point number.
     IR * buildImmFp(HOST_FP fp, DATA_TYPE dt)
     { return buildImmFp(fp, getTypeMgr()->getSimplexType(dt)); }
@@ -517,7 +526,7 @@ public:
     //Build IR_LDA operation.
     //var: variable that will be taken address.
     IR * buildLda(Var * var);
-    IR * buildLdaString(CHAR const* varname, Sym * string);
+    IR * buildLdaString(CHAR const* varname, Sym const* string);
     IR * buildLdaString(CHAR const* varname, CHAR const * string);
 
     //Build IR_LD operation.
@@ -584,7 +593,7 @@ public:
     //'rhs: value expected to store.
     IR * buildStorePR(DATA_TYPE dt, IR * rhs)
     { return buildStorePR(getTypeMgr()->getSimplexType(dt), rhs); }
-    
+
     //Build IR_IST operation.
     //'lhs': target memory location pointer.
     //'rhs: value expected to store.
@@ -633,7 +642,7 @@ public:
     //        elem_num points to an array with 2 value, [12, 24].
     //        the 1th dimension has 12 elements, and the 2th dimension has 24
     //        elements, which element type is D_I32.
-    //    Note the parameter may be NULL.
+    //    Note the parameter may be nullptr.
     //'rhs: value expected to store.
     IR * buildStoreArray(IR * base,
                          IR * sublist,
@@ -679,7 +688,7 @@ public:
     //        elem_num points to an array with 2 value, [12, 24].
     //        the 1th dimension has 12 elements, and the 2th dimension has 24
     //        elements, which element type is D_I32.
-    //    Note the parameter may be NULL.
+    //    Note the parameter may be nullptr.
     IR * buildArray(IR * base,
                     IR * sublist,
                     Type const* type,
@@ -739,31 +748,26 @@ public:
     void constructBBList();
 
     //Count memory usage for current object.
-    size_t count_mem();
-    
-    //This function check validation of options in oc, perform
-    //recomputation if it is invalid.
-    //...: the options/passes that anticipated to recompute.
-    void checkValidAndRecompute(OptCtx * oc, ...);
+    size_t count_mem() const;
 
     virtual void destroy();
     void destroyPassMgr();
     IR * dupIR(IR const* ir);
     IR * dupIRTree(IR const* ir);
     IR * dupIRTreeList(IR const* ir);
-    void dumpBBList(bool dump_inner_region = true);
-    void dumpIRList();
-    void dumpAllocatedIR();
-    void dumpVARInRegion();
-    void dumpVarMD(Var * v, UINT indent);
-    void dumpFreeTab();
-    void dumpMemUsage();
-    void dump(bool dump_inner_region);
-    void dumpParameter();
-    void dumpVarTab();
-    void dumpGR(bool dump_inner_region);
-    void dumpRef(UINT indent = 4);
-    void dumpBBRef(IN IRBB * bb, UINT indent);
+    void dumpBBList(bool dump_inner_region = true) const;
+    void dumpIRList() const;
+    void dumpAllocatedIR() const;
+    void dumpVARInRegion() const;
+    void dumpVarMD(Var * v, UINT indent) const;
+    void dumpFreeTab() const;
+    void dumpMemUsage() const;
+    void dump(bool dump_inner_region) const;
+    void dumpParameter() const;
+    void dumpVarTab() const;
+    void dumpGR(bool dump_inner_region) const;
+    void dumpRef(UINT indent = 4) const;
+    void dumpBBRef(IN IRBB * bb, UINT indent) const;
 
     bool evaluateConstInteger(IR const* ir, OUT ULONGLONG * const_value);
 
@@ -773,8 +777,8 @@ public:
     void freeIRTreeList(IRList & irs);
     void freeIRBBList(BBList & bbl);
     void findFormalParam(OUT List<Var const*> & varlst, bool in_decl_order);
-    Var const* findFormalParam(UINT position);
-    Var * findVarViaSymbol(Sym const* sym);
+    Var const* findFormalParam(UINT position) const;
+    Var * findVarViaSymbol(Sym const* sym) const;
 
     REGION_TYPE getRegionType() const { return REGION_type(this); }
 
@@ -855,36 +859,36 @@ public:
     //Return IRCFG.
     IRCFG * getCFG() const
     {
-        return getPassMgr() != NULL ?
-               (IRCFG*)getPassMgr()->queryPass(PASS_CFG) : NULL;
+        return getPassMgr() != nullptr ?
+               (IRCFG*)getPassMgr()->queryPass(PASS_CFG) : nullptr;
     }
 
     //Get Alias Analysis.
     AliasAnalysis * getAA() const
     {
-        return getPassMgr() != NULL ?
-               (AliasAnalysis*)getPassMgr()->queryPass(PASS_AA) : NULL;
+        return getPassMgr() != nullptr ?
+               (AliasAnalysis*)getPassMgr()->queryPass(PASS_AA) : nullptr;
     }
 
     //Return DU info manager.
     DUMgr * getDUMgr() const
     {
-        return getPassMgr() != NULL ?
-               (DUMgr*)getPassMgr()->queryPass(PASS_DU_MGR) : NULL;
+        return getPassMgr() != nullptr ?
+               (DUMgr*)getPassMgr()->queryPass(PASS_DU_MGR) : nullptr;
     }
 
     //Return MDSSA manager.
     MDSSAMgr * getMDSSAMgr() const
     {
-        return getPassMgr() != NULL ?
-               (MDSSAMgr*)getPassMgr()->queryPass(PASS_MD_SSA_MGR) : NULL;
+        return getPassMgr() != nullptr ?
+               (MDSSAMgr*)getPassMgr()->queryPass(PASS_MD_SSA_MGR) : nullptr;
     }
 
     //Return PRSSA manager.
     PRSSAMgr * getPRSSAMgr() const
     {
-        return getPassMgr() != NULL ?
-               (PRSSAMgr*)getPassMgr()->queryPass(PASS_PR_SSA_MGR) : NULL;
+        return getPassMgr() != nullptr ?
+               (PRSSAMgr*)getPassMgr()->queryPass(PASS_PR_SSA_MGR) : nullptr;
     }
 
     Region * getParent() const { return REGION_parent(this); }
@@ -892,44 +896,36 @@ public:
     Region * getFuncRegion();
 
     //Allocate and return all CALLs in the region.
-    inline List<IR const*> * getCallList()
+    inline CIRList * getCallList()
     {
-        if (getAnalysisInstrument()->m_call_list == NULL) {
-            getAnalysisInstrument()->m_call_list = new List<IR const*>();
+        if (getAnalysisInstrument()->m_call_list == nullptr) {
+            getAnalysisInstrument()->m_call_list = new CIRList();
         }
         return getAnalysisInstrument()->m_call_list;
     }
 
-    //Read and return Call list in the Region.
-    List<IR const*> * getCallList() const
-    { return getAnalysisInstrument()->m_call_list; }
-
     //Allocate and return a list of IR_RETURN in current Region.
-    inline List<IR const*> * getReturnList()
+    inline CIRList * getReturnList()
     {
-        if (getAnalysisInstrument()->m_return_list == NULL) {
-            getAnalysisInstrument()->m_return_list = new List<IR const*>();
+        if (getAnalysisInstrument()->m_return_list == nullptr) {
+            getAnalysisInstrument()->m_return_list = new CIRList();
         }
         return getAnalysisInstrument()->m_return_list;
     }
 
-    //Return a list of IR_RETURN in current Region.
-    List<IR const*> * getReturnList() const
-    { return getAnalysisInstrument()->m_return_list; }
-
     //Get the MayDef MDSet of Region.
     MDSet * getMayDef() const
-    { return m_ref_info != NULL ? &REF_INFO_maydef(m_ref_info) : NULL; }
+    { return m_ref_info != nullptr ? &REF_INFO_maydef(m_ref_info) : nullptr; }
 
     //Get the MayUse MDSet of Region.
     MDSet * getMayUse() const
-    { return m_ref_info != NULL ? &REF_INFO_mayuse(m_ref_info) : NULL; }
+    { return m_ref_info != nullptr ? &REF_INFO_mayuse(m_ref_info) : nullptr; }
 
     //Get the top parent level region.
     Region * getTopRegion()
     {
         Region * rg = this;
-        while (rg->getParent() != NULL) {
+        while (rg->getParent() != nullptr) {
             rg = rg->getParent();
         }
         return rg;
@@ -957,7 +953,7 @@ public:
     LabelInfo * genPragmaLabel(Sym const* labsym)
     {
         ASSERT0(labsym);
-        return allocCustomerLabel(labsym, get_pool());
+        return allocPragmaLabel(labsym, get_pool());
     }
 
     LabelInfo * genCustomLabel(CHAR const* lab)
@@ -969,25 +965,25 @@ public:
     }
 
     //Allocate Var for PR.
-    Var * genVARforPR(UINT prno, Type const* type);
+    Var * genVarForPR(UINT prno, Type const* type);
 
     //Allocate MD for PR.
-    MD const* genMDforPR(UINT prno, Type const* type);
+    MD const* genMDForPR(UINT prno, Type const* type);
 
     //Generate MD corresponding to PR load or write.
-    MD const* genMDforPR(IR const* ir)
+    MD const* genMDForPR(IR const* ir)
     {
         ASSERT0(ir->isWritePR() || ir->isReadPR() || ir->isCallStmt());
-        return genMDforPR(ir->getPrno(), ir->getType());
+        return genMDForPR(ir->getPrno(), ir->getType());
     }
 
     //Generate MD for Var.
-    MD const* genMDforVAR(Var * var)
-    { return genMDforVAR(var, var->getType()); }
+    MD const* genMDForVAR(Var * var, UINT offset)
+    { return genMDForVAR(var, var->getType(), offset); }
 
 
     //Generate MD for Var.
-    MD const* genMDforVAR(Var * var, Type const* type)
+    MD const* genMDForVAR(Var * var, Type const* type, UINT offset)
     {
         ASSERT0(var && type);
         MD md;
@@ -998,6 +994,7 @@ public:
         } else {
             MD_size(&md) = getTypeMgr()->getByteSize(type);
             MD_ty(&md) = MD_EXACT;
+            MD_ofst(&md) = offset;
         }
 
         MD const* e = getMDSystem()->registerMD(md);
@@ -1006,24 +1003,24 @@ public:
     }
 
     //Generate MD for IR_ST.
-    MD const* genMDforStore(IR const* ir)
+    MD const* genMDForStore(IR const* ir)
     {
         ASSERT0(ir->is_st());
-        return genMDforVAR(ST_idinfo(ir), ir->getType());
+        return genMDForVAR(ST_idinfo(ir), ir->getType(), ST_ofst(ir));
     }
 
     //Generate MD for IR_LD.
-    MD const* genMDforLoad(IR const* ir)
+    MD const* genMDForLoad(IR const* ir)
     {
         ASSERT0(ir->is_ld());
-        return genMDforVAR(LD_idinfo(ir), ir->getType());
+        return genMDForVAR(LD_idinfo(ir), ir->getType(), LD_ofst(ir));
     }
 
     //Generate MD for IR_ID.
-    MD const* genMDforId(IR const* ir)
+    MD const* genMDForId(IR const* ir)
     {
         ASSERT0(ir->is_id());
-        return genMDforVAR(ID_info(ir), ir->getType());
+        return genMDForVAR(ID_info(ir), ir->getType(), 0);
     }
 
     //Return the tyid for array index, the default is unsigned 32bit.
@@ -1053,7 +1050,7 @@ public:
 
     void initRefInfo()
     {
-        if (m_ref_info != NULL) { return; }
+        if (m_ref_info != nullptr) { return; }
         m_ref_info = (RefInfo*)xmalloc(sizeof(RefInfo));
     }
 
@@ -1133,9 +1130,12 @@ public:
     IR * simpToPR(IR * ir, SimpCtx * ctx);
 
     //Split IR list into list of basic blocks.
-    BBListIter splitIRlistIntoBB(IR * irs,
-                                 BBList * bbl,
-                                 BBListIter ctbb);
+    //'irs': a list of ir.
+    //'bbl': a list of bb.
+    //'ctbb': marker current bb container.
+    //Note if CFG is invalid, it will not be updated.
+    BBListIter splitIRlistIntoBB(IR * irs, BBList * bbl, BBListIter ctbb,
+                                 OptCtx const& oc);
 
     //Series of helper functions to simplify
     //ir according to given specification.
@@ -1148,6 +1148,7 @@ public:
     IR * simplifySwitchSelf(IR * ir, SimpCtx * ctx);
     void simplifySelectKids(IR * ir, SimpCtx * cont);
     IR * simplifyStore(IR * ir, SimpCtx * cont);
+    void simplifyCalleeExp(IR * ir, SimpCtx * ctx);
     IR * simplifyStorePR(IR * ir, SimpCtx * cont);
     IR * simplifyArrayIngredient(IR * ir, SimpCtx * ctx);
     IR * simplifyStoreArray(IR * ir, SimpCtx * ctx);
@@ -1191,7 +1192,7 @@ public:
     void setPRCount(UINT cnt) { getAnalysisInstrument()->m_pr_count = cnt; }
     void setMustRef(IR * ir, MD const* md)
     {
-        ASSERT0(ir != NULL && md);
+        ASSERT0(ir != nullptr && md);
         ir->setRefMD(md, this);
     }
     //mds: record MayMDSet that have to be hashed.
@@ -1234,7 +1235,7 @@ public:
     bool verifyBBlist(BBList & bbl);
     //Ensure that each IR in ir_list must be allocated in crrent region.
     bool verifyIROwnership();
-    //Verify MD reference to stmts and expressions.
+    //Verify MD reference to each stmts and expressions which described memory.
     bool verifyMDRef();
 };
 //END Region

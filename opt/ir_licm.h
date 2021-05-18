@@ -50,7 +50,7 @@ class LICM : public Pass {
     MDSystem * m_md_sys;
     SMemPool * m_pool;
     xcom::List<IR*> m_analysable_stmt_list;
-    xcom::TMap<MD const*, UINT*> m_md2num;    
+    xcom::TMap<MD const*, UINT*> m_md2num;
     //Record if the result of stmt is loop invariant
     //xcom::TTab<IR*> m_invariant_stmt;
     //Record if the result of stmt is loop invariant
@@ -100,7 +100,7 @@ class LICM : public Pass {
     bool is_dom_all_use_in_loop(IR const* ir, LI<IRBB> * li);
     //Return true if stmt is collected into invariant-stmt set.
     bool isInvariantStmt(IR const* ir) const;
-    
+
     //Return true if md modified in loop only once.
     bool isUniqueDef(MD const* md) const;
 
@@ -118,7 +118,7 @@ class LICM : public Pass {
     //  |  |
     //  |  v
     //  |  BB_prehead
-    //  | / 
+    //  | /
     //  |/
     //  v
     //  BB_loophead
@@ -142,15 +142,15 @@ class LICM : public Pass {
     //Try to evaluate the value of loop execution condition.
     //Returnt true if this function evaluated successfully,
     //otherwise return false.
-    bool tryEvalLoopExecCondition(LI<IRBB> const* li,  
+    bool tryEvalLoopExecCondition(LI<IRBB> const* li,
                                   bool & must_true,
                                   bool & must_false) const;
 
     //Scan operand to find invariant candidate.
-    //'isLegal': set to true if loop is legal to perform invariant motion.
-    //           otherwise set to false to prohibit code motion.
+    //islegal: set to true if loop is legal to perform invariant motion.
+    //         otherwise set to false to prohibit code motion.
     //Return true if find loop invariant expression.
-    bool scanOpnd(IN LI<IRBB> * li, bool * isLegal, bool first_scan);
+    bool scanOpnd(IN LI<IRBB> * li, bool * islegal, bool first_scan);
 
     //Propagate invariant property to result.
     //This operation will generate more invariant.
@@ -166,22 +166,22 @@ class LICM : public Pass {
 
     void updateMD2Num(IR * ir);
     bool useMDSSADU() const
-    { return m_mdssamgr != NULL && m_mdssamgr->is_valid(); }
+    { return m_mdssamgr != nullptr && m_mdssamgr->is_valid(); }
     bool usePRSSADU() const
-    { return m_prssamgr != NULL && m_prssamgr->is_valid(); }
+    { return m_prssamgr != nullptr && m_prssamgr->is_valid(); }
 
     void * xmalloc(UINT size)
     {
-        ASSERT0(m_pool != NULL);
+        ASSERT0(m_pool != nullptr);
         void * p = smpoolMallocConstSize(sizeof(UINT), m_pool);
-        ASSERT0(p != NULL);
+        ASSERT0(p != nullptr);
         ::memset(p, 0, size);
         return p;
     }
 public:
     explicit LICM(Region * rg)
     {
-        ASSERT0(rg != NULL);
+        ASSERT0(rg != nullptr);
         m_rg = rg;
         m_du = rg->getDUMgr();
         m_cfg = rg->getCFG();
@@ -189,9 +189,9 @@ public:
         m_md_sys = rg->getMDSystem();
         ASSERT0(m_cfg && m_du && m_md_sys && m_tm);
         m_pool = smpoolCreate(4 * sizeof(UINT), MEM_CONST_SIZE);
-        m_mdssamgr = NULL;
-        m_prssamgr = NULL;
-        m_rce = NULL;
+        m_mdssamgr = nullptr;
+        m_prssamgr = nullptr;
+        m_rce = nullptr;
     }
     virtual ~LICM() { smpoolDelete(m_pool); }
 
@@ -204,7 +204,7 @@ public:
     //Consider whether exp is worth hoisting.
     bool isWorthHoist(IR * exp)
     {
-        CHECK_DUMMYUSE(exp);
+        CHECK0_DUMMYUSE(exp);
         ASSERT0(exp->is_exp());
         //If IR_has_sideeffect(ir) is true, that means exp can not be removed,
         //but still can be moved.

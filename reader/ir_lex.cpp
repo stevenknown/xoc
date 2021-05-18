@@ -199,8 +199,8 @@ static UINT g_keyword_num = sizeof(g_keyword_info)/sizeof(g_keyword_info[0]);
 //Report error with line number.
 void Lexer::error(UINT line_num, CHAR const* msg, ...)
 {
-    if (msg == NULL) { return; }
-    LexErrorMsg * p = NULL;
+    if (msg == nullptr) { return; }
+    LexErrorMsg * p = nullptr;
     xcom::StrBuf sbuf(64);
     va_list arg;
     va_start(arg, msg);
@@ -219,7 +219,7 @@ void Lexer::error(UINT line_num, CHAR const* msg, ...)
 INT Lexer::getLine()
 {
     //Initializing or realloc offset table.
-    if (m_ofst_tab == NULL) {
+    if (m_ofst_tab == nullptr) {
         m_ofst_tab_byte_size = MAX_OFST_BUF_LEN * sizeof(LONG);
         m_ofst_tab = (LONG*)::malloc(m_ofst_tab_byte_size);
         ::memset(m_ofst_tab, 0, m_ofst_tab_byte_size);
@@ -234,17 +234,17 @@ INT Lexer::getLine()
     UINT pos = 0;
     bool is_some_chars_in_cur_line = false;
     for (;;) {
-        if (m_cur_line == NULL) {
+        if (m_cur_line == nullptr) {
             m_cur_line = (CHAR*)::malloc(MAX_BUF_LINE);
             m_cur_line_len = MAX_BUF_LINE;
-            if (m_cur_line == NULL) {
+            if (m_cur_line == nullptr) {
                 goto FAILED;
             }
         }
 
         //Read MAX_BUF_LINE characters from src file.
         if (m_file_buf_pos >= m_last_read_num) {
-            ASSERT0(m_src_file != NULL);
+            ASSERT0(m_src_file != nullptr);
             INT dw = (INT)::fread(m_file_buf, 1, MAX_BUF_LINE, m_src_file);
             if (dw == 0) {
                 if (!is_some_chars_in_cur_line) {
@@ -378,7 +378,7 @@ CHAR Lexer::getNextChar()
 {
     CHAR res = '0';
     INT st = 0;
-    if (m_cur_line == NULL) {
+    if (m_cur_line == nullptr) {
         if ((st = getLine()) == ST_SUCC) {
             res = m_cur_line[m_cur_line_pos];
             m_cur_line_pos++;
@@ -1475,26 +1475,26 @@ void Lexer::dump(CHAR const* input, FILE * output)
 {
     ASSERT0(input && output);
     FILE * h = fopen(input, "r");
-    if (h == NULL) { return; }
+    if (h == nullptr) { return; }
     setSrcFile(h);
     TOKEN tok = getNextToken();
     while (tok != T_END) {
         UINT linenum = getCurrentLineNum();
         CHAR const* curtokstr = getCurrentTokenString();
         if (tok == T_NUL) {
-            if (output != NULL) {
+            if (output != nullptr) {
                 fprintf(output, "ERROR(%d) Str:%s TokName:%s\n",
                     linenum, curtokstr, g_token_info[tok].name);
             }
             break;
         }
-        if (output != NULL) {
+        if (output != nullptr) {
             fprintf(output, "Line(%u) Str:%s TokName:%s\n",
                 linenum, curtokstr, g_token_info[tok].name);
         }
         tok = getNextToken();
     }
-    if (output != NULL) {
+    if (output != nullptr) {
         fprintf(output, "\n\n\n");
         fflush(output);
     }

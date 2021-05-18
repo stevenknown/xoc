@@ -45,14 +45,14 @@ void CDG::dump() const
          m_rg->getRegionName());
     INT c;
     for (xcom::Vertex * v = get_first_vertex(c);
-         v != NULL; v = get_next_vertex(c)) {
+         v != nullptr; v = get_next_vertex(c)) {
         xcom::EdgeC * in = VERTEX_in_list(v);
-        if (in == NULL) {
+        if (in == nullptr) {
             note(getRegion(), "\nBB%d has NO ctrl BB", v->id());
             continue;
         }
         note(getRegion(), "\nBB%d ctrl BB is: ", v->id());
-        while (in != NULL) {
+        while (in != nullptr) {
             xcom::Vertex * pred = in->getFrom();
             prt(getRegion(), "%d,", pred->id());
             in = EC_next(in);
@@ -65,9 +65,9 @@ void CDG::dump() const
 void CDG::get_cd_preds(UINT id, OUT List<xcom::Vertex*> & lst)
 {
     xcom::Vertex * v = getVertex(id);
-    ASSERT0(v != NULL);
+    ASSERT0(v != nullptr);
     xcom::EdgeC * in = VERTEX_in_list(v);
-    while (in != NULL) {
+    while (in != nullptr) {
         xcom::Vertex * pred = in->getFrom();
         lst.append_tail(pred);
         in = EC_next(in);
@@ -80,9 +80,9 @@ bool CDG::is_cd(UINT a, UINT b) const
 {
     ASSERT0(getVertex(b));
     xcom::Vertex * v = getVertex(a);
-    ASSERT0(v != NULL);
+    ASSERT0(v != nullptr);
     xcom::EdgeC * out = VERTEX_out_list(v);
-    while (out != NULL) {
+    while (out != nullptr) {
         if (out->getToId() == b) {
             return true;
         }
@@ -95,9 +95,9 @@ bool CDG::is_cd(UINT a, UINT b) const
 bool CDG::is_only_cd_self(UINT id) const
 {
     xcom::Vertex * v = getVertex(id);
-    ASSERT0(v != NULL);
+    ASSERT0(v != nullptr);
     xcom::EdgeC * out = VERTEX_out_list(v);
-    while (out != NULL) {
+    while (out != nullptr) {
         xcom::Vertex * succ = out->getTo();
         if (succ != v) { return false; }
         out = out->get_next();
@@ -109,9 +109,9 @@ bool CDG::is_only_cd_self(UINT id) const
 void CDG::get_cd_succs(UINT id, OUT List<xcom::Vertex*> & lst)
 {
     xcom::Vertex * v = getVertex(id);
-    ASSERT0(v != NULL);
+    ASSERT0(v != nullptr);
     xcom::EdgeC * out = VERTEX_out_list(v);
-    while (out != NULL) {
+    while (out != nullptr) {
         xcom::Vertex * succ = out->getTo();
         lst.append_tail(succ);
         out = out->get_next();
@@ -131,35 +131,44 @@ void CDG::build(IN OUT OptCtx & oc, xcom::DGraph & cfg)
     if (cfg.getVertexNum() == 0) { return; }
 
     START_TIMER(t, "Build CDG");
-    ASSERT0(OC_is_cfg_valid(oc));
-    m_rg->checkValidAndRecompute(&oc, PASS_PDOM, PASS_UNDEF);
+    ASSERT0(oc.is_cfg_valid());
+    m_rg->getPassMgr()->checkValidAndRecompute(&oc, PASS_PDOM, PASS_UNDEF);
 
+    START_TIMER(t2, "Build CDG: Get Dom Tree");
     xcom::Graph pdom_tree;
     cfg.get_pdom_tree(pdom_tree);
     pdom_tree.reverseEdges();
-    if (pdom_tree.getVertexNum() == 0) { return; }
+    END_TIMER(t2, "Build CDG: Get Dom Tree");
+
+    if (pdom_tree.getVertexNum() == 0) {
+        END_TIMER(t, "Build CDG");
+        return;
+    }
 
     Vector<Vertex*> top_order;
     bool has_cyc = pdom_tree.sortInTopologOrder(top_order);
-    CHECK_DUMMYUSE(!has_cyc);
+    CHECK0_DUMMYUSE(!has_cyc);
 
     xcom::BitSetMgr bs_mgr;
-    //Record vex set that current vex controlled by.
+    //Record vertex set by which current vertex controlled.
     Vector<xcom::BitSet*> cd_set;
     for (INT j = 0; j <= top_order.get_last_idx(); j++) {
         UINT ii = top_order.get(j)->id();
         xcom::Vertex const* v = cfg.getVertex(ii);
-        ASSERT0(v != NULL);
+        ASSERT0(v != nullptr);
         addVertex(v->id());
+
+        //Get control-set of v.
         xcom::BitSet * cd_of_v = cd_set.get(v->id());
-        if (cd_of_v == NULL) {
+        if (cd_of_v == nullptr) {
             cd_of_v = bs_mgr.create();
             cd_set.set(v->id(), cd_of_v);
         }
 
-        //Predecessor control current vex if vex is not ipdom of predecessor.
+        //Predecessor controls current vertex if
+        //vertex is not ipdom of predecessor.
         for (xcom::EdgeC const* in = v->getInList();
-             in != NULL; in = in->get_next()) {
+             in != nullptr; in = in->get_next()) {
             xcom::Vertex const* pred = in->getFrom();
             if (v->id() != cfg.get_ipdom(pred->id())) {
                 cd_of_v->bunion(pred->id());
@@ -167,36 +176,40 @@ void CDG::build(IN OUT OptCtx & oc, xcom::DGraph & cfg)
                     addEdge(pred->id(), v->id());
                 }
             }
-            
         }
 
-        //For each vex that ipdom is current vex.
-        INT c;
-        for (xcom::Vertex const* z = cfg.get_first_vertex(c);
-             z != NULL; z = cfg.get_next_vertex(c)) {
-            if (cfg.get_ipdom(z->id()) != v->id()) {
-                continue;
-            }
+        //Transfer controlling to vertex in control-set of current vertex by
+        //iterating each vertex whose ipdom is current vex.
+        Vertex const* domvex = pdom_tree.getVertex(v->id());
+        ASSERT0(domvex);
+
+        for (xcom::EdgeC const* zec = domvex->getInList();
+             zec != nullptr; zec = zec->get_next()) {
+            Vertex const* z = zec->getFrom();
+            ASSERT0(cfg.get_ipdom(z->id()) == v->id());
+
+            //Get control-set of z.
             xcom::BitSet * cd = cd_set.get(z->id());
-            if (cd == NULL) {
-                cd = bs_mgr.create();
-                cd_set.set(z->id(), cd);
-            }
-            for (INT i = cd->get_first(); i != -1; i = cd->get_next(i)) {
-                if (v->id() != cfg.get_ipdom(i)) {
-                    cd_of_v->bunion(i);
-                    if (m_consider_cycle || i != (INT)v->id()) {
-                        addEdge(i, v->id());
+            if (cd != nullptr) {
+                for (INT i = cd->get_first(); i != -1; i = cd->get_next(i)) {
+                    if (v->id() != cfg.get_ipdom(i)) {
+                        cd_of_v->bunion(i);
+                        if (m_consider_cycle || i != (INT)v->id()) {
+                            addEdge(i, v->id());
+                        }
                     }
                 }
             }
         }
     }
     OC_is_cdg_valid(oc) = true;
-    if (g_is_dump_after_pass && g_dump_opt.isDumpCDG()) {
-        dump();
-    }
     END_TIMER(t, "Build CDG");
+
+    if (g_is_dump_after_pass && g_dump_opt.isDumpCDG()) {
+        START_TIMER(t3, "Build CDG:dump");
+        dump();
+        END_TIMER(t3, "Build CDG:dump");
+    }
 }
 //END CDG
 

@@ -186,7 +186,7 @@ public:
         SIMP_break_label(this) = SIMP_break_label(&s);
         SIMP_continue_label(this) = SIMP_continue_label(&s);
         prop_top_down = s.prop_top_down;
-        SIMP_stmtlist(this) = NULL;
+        SIMP_stmtlist(this) = nullptr;
     }
 
     void init() { clean(); }
@@ -205,10 +205,10 @@ public:
     {
         prop_top_down.flag_value = 0;
         prop_bottom_up.flag_value = 0;
-        ir_stmt_list = NULL;
-        cfs_mgr = NULL;
-        break_label = NULL;
-        continue_label = NULL;
+        ir_stmt_list = nullptr;
+        cfs_mgr = nullptr;
+        break_label = nullptr;
+        continue_label = nullptr;
     }
 
     //Unify the actions which propagated top down

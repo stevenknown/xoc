@@ -54,13 +54,13 @@ public:
     BIRational() { m_num = BigInt(1, 0); m_den = BigInt(1, 1); }
     BIRational(BIRational const& src)
     {
-        //Sometimes, src need not to be initialized always.
+        //Sometimes, src does not need to be initialized always.
         //ASSERTN(src.m_den != 0, ("denominator is 0!"));
         copy(src);
     }
     BIRational(Rational const& src)
     {
-        //Sometimes, src need not to be initialized always.
+        //Sometimes, src does not need to be initialized always.
         //ASSERTN(src.m_den != 0, ("denominator is 0!"));
         m_num.setEqualTo(src.num());
         m_den.setEqualTo(src.den());

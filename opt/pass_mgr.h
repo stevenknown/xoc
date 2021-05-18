@@ -43,7 +43,7 @@ typedef TMapIter<PASS_TYPE, xcom::Graph*> GraphPassTabIter;
 
 class PassMgr {
     COPY_CONSTRUCTOR(PassMgr);
-protected:    
+protected:
     Region * m_rg;
     RegionMgr * m_rumgr;
     TypeMgr * m_tm;
@@ -70,6 +70,7 @@ public:
     virtual Pass * allocIVR();
     virtual Pass * allocLICM();
     virtual Pass * allocDCE();
+    virtual Pass * allocLFTR();
     virtual Pass * allocDSE();
     virtual Pass * allocRCE();
     virtual Pass * allocGVN();
@@ -85,6 +86,12 @@ public:
     virtual Pass * allocScalarOpt();
     virtual Pass * allocMDLivenessMgr();
     virtual Pass * allocRefine();
+    virtual Pass * allocGSCC();
+
+    //This function check validation of options in oc, perform
+    //recomputation if it is invalid.
+    //...: the options/passes that anticipated to recompute.
+    void checkValidAndRecompute(OptCtx * oc, ...);
 
     void destroyAllPass();
     void destroyPass(Pass * pass);

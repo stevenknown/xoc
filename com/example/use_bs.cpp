@@ -1,11 +1,5 @@
 #include "stdio.h"
-#include "ltype.h"
-#include "comf.h"
-#include "smempool.h"
-#include "sstl.h"
-#include "bs.h"
-#include "sbs.h"
-using namespace xcom;
+#include "xcominc.h"
 void bs()
 {
     BitSet bs;

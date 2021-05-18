@@ -85,12 +85,12 @@ void MDLivenessMgr::collectMayUseMDS(IR const* ir, OUT MDSet * mayuse)
     for (IR const* x = iterRhsInitC(ir, ii);
          x != NULL; x = iterRhsNextC(ii)) {
         if (!x->isMemoryOpnd() || x->is_pr()) { continue; }
-        
+
         MD const* t = x->getRefMD();
         if (t != NULL) {
             mayuse->bunion_pure(MD_id(t), *sbsmgr);
         }
-       
+
         MDSet const* mds = x->getRefMDSet();
         if (mds != NULL) {
             mayuse->bunion(*mds, *sbsmgr);
@@ -171,7 +171,7 @@ void MDLivenessMgr::dump(bool with_name) const
     MDLivenessMgr * pthis = const_cast<MDLivenessMgr*>(this);
     BBList * bbl = m_rg->getBBList();
     MDSystem const* sys = m_rg->getMDSystem();
-    CHAR const* fmt = with_name ? "MD%d(%s) " : "MD%d ";    
+    CHAR const* fmt = with_name ? "MD%d(%s) " : "MD%d ";
     for (IRBB * bb = bbl->get_head(); bb != NULL; bb = bbl->get_next()) {
         note(getRegion(), "\n---- BB%d -----", BB_id(bb));
         MDSet * live_in = pthis->getLiveInMDSet(bb);

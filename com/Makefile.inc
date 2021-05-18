@@ -11,4 +11,6 @@ COM_OBJS +=\
 ../com/bigint.o \
 ../com/flty.o \
 ../com/linsys.o \
-../com/bs.o
+../com/diagnostic.o \
+../com/bs.o\
+../com/scc.o

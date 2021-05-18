@@ -26,28 +26,30 @@ ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
 SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 @*/
-#include "cominc.h"
+#include "../com/xcominc.h"
+#include "symtab.h"
 
 namespace xoc {
 
 //Add const string into symbol table.
-Sym * SymTab::add(CHAR const* s)
+Sym const* SymTab::add(CHAR const* s)
 {
+    ASSERT0(s);
     Sym * sym = m_free_one;
-    if (sym == NULL) {
+    if (sym == nullptr) {
         sym = (Sym*)smpoolMalloc(sizeof(Sym), m_pool);
     }
     SYM_name(sym) = const_cast<CHAR*>(s);
-    Sym * appended_one = TTab<Sym*, CompareSymTab>::append(sym);
-    ASSERT0(m_free_one == NULL || m_free_one == sym);
+    Sym const* appended_one = TTab<Sym*, CompareSymTab>::append(sym);
+    ASSERT0(m_free_one == nullptr || m_free_one == sym);
     if (appended_one != sym) {
         //'s' has already been appended.
-        SYM_name(sym) = NULL;
+        SYM_name(sym) = nullptr;
         m_free_one = sym;
     } else {
         //m_free_one has been inserted into table.
         //'s' is a new string so far.
-        m_free_one = NULL;
+        m_free_one = nullptr;
     }
     return appended_one;
 }

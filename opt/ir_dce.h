@@ -46,36 +46,62 @@ public:
     }
 };
 
+typedef TTab<MDDef const*> EffectMDDef;
+
 //Perform dead code and redundant control flow elimination.
 class DeadCodeElim : public Pass {
     COPY_CONSTRUCTOR(DeadCodeElim);
+    BYTE m_is_elim_cfs:1; //Eliminate control flow structure if necessary.
+
+    //Sometime, we might expect to keep PHI there even it does not even have
+    //any USE. Because PHI could make the maintaining of Def-Chain much easy.
+    //e.g:md1v1, md1v2, md1v3, md1v4 are in different BB, PHI is act as
+    //a disjoint-holder to link md1v3 and md1v4.
+    //        md1v1<-
+    //          |
+    //          V
+    //        md1v2<-PHI
+    //       /         |
+    //       V         V
+    //  md1v3<-        md1v4<-
+    //
+    BYTE m_is_reserve_phi:1;
+
+    //Whether utilize MD du chain to find effect stmt.
+    //If the value is false, all memory operations are considered used
+    //except the operations which operate on PR.
+    BYTE m_is_use_md_du:1;
     MDSystem * m_md_sys;
     TypeMgr * m_tm;
     Region * m_rg;
     IRCFG * m_cfg;
     CDG * m_cdg;
-    DUMgr * m_du;
+    DUMgr * m_dumgr;
     MDSSAMgr * m_mdssamgr;
     PRSSAMgr * m_prssamgr;
     ConstIRIter m_citer;
-    bool m_is_elim_cfs; //Eliminate control flow structure if necessary.
     EffectStmt m_is_stmt_effect;
+    EffectMDDef m_is_mddef_effect;
+    //Record if BB is effect. Note the BB effect info is not always
+    //identical to Stmt effect info, one BB may be not be marked as Effect even
+    //if it contains effect stmt.
     xcom::BitSet m_is_bb_effect;
-
-    //Whether utilize MD du chain to find effect stmt.
-    //If the value is false, all memory operations are considered used
-    //except the operations which operate on PR.
-    bool m_is_use_md_du;
 
     bool check_stmt(IR const* ir);
     bool check_call(IR const* ir) const;
     bool collectByPRSSA(IR const* x, IN OUT List<IR const*> * pwlst2);
-    bool collectAllDefThroughDefChain(MDDef const* tdef,
+    bool collectAllDefThroughDefChain(MDDef const* tdef, IR const* use,
                                       IN OUT List<IR const*> * pwlst2);
     bool collectByMDSSA(IR const* x, IN OUT List<IR const*> * pwlst2);
-    bool collectByDU(IR const* x, IN OUT List<IR const*> * pwlst2);
+    bool collectByDUSet(IR const* x, IN OUT List<IR const*> * pwlst2);
 
     void fix_control_flow(List<IRBB*> & bblst, List<C<IRBB*>*> & ctlst);
+    //Return true if there are effect BBs that controlled by ir's BB.
+    //ir: stmt.
+    bool find_effect_kid_condbr(IR const* ir) const;
+    //Return true if there are effect BBs that controlled by ir's BB.
+    //ir: stmt.
+    bool find_effect_kid_uncondbr(IR const* ir) const;
     bool find_effect_kid(IR const* ir) const;
 
     bool is_effect_write(Var * v) const
@@ -100,38 +126,40 @@ class DeadCodeElim : public Pass {
     bool preserve_cd(IN OUT List<IR const*> & act_ir_lst);
 
     void reinit();
-    void reviseSuccForFallthroughBB(IRBB * bb, 
+    void reviseSuccForFallthroughBB(IRBB * bb,
                                     BBListIter bbct,
                                     BBList * bbl) const;
-    bool remove_ineffect_ir() const;
+    bool removeIneffectIR(OUT bool & remove_branch_stmt);
     bool removeRedundantPhi();
 
     //Set control-dep bb to be effective.
     bool setControlDepBBToBeEffect(IRBB const* bb,
                                    IN OUT List<IR const*> & act_ir_lst);
-    void setEffectStmt(IR const* stmt,
-                       IN OUT xcom::BitSet * is_bb_effect,
-                       IN OUT List<IR const*> * act_ir_lst);
+    void setEffectBB(IRBB const* bb) { m_is_bb_effect.bunion(bb->id()); }
+    void setEffectStmt(IR const* stmt, OUT xcom::BitSet * is_bb_effect,
+                       OUT List<IR const*> * act_ir_lst);
+    void setEffectMDDef(MDDef const* mddef, OUT xcom::BitSet * is_bb_effect);
 
     bool useMDSSADU() const
-    { return m_mdssamgr != NULL && m_mdssamgr->is_valid(); }
+    { return m_mdssamgr != nullptr && m_mdssamgr->is_valid(); }
     bool usePRSSADU() const
-    { return m_prssamgr != NULL && m_prssamgr->is_valid(); }
+    { return m_prssamgr != nullptr && m_prssamgr->is_valid(); }
 public:
     explicit DeadCodeElim(Region * rg)
     {
-        ASSERT0(rg != NULL);
+        ASSERT0(rg != nullptr);
         m_rg = rg;
         m_tm = rg->getTypeMgr();
         m_cfg = rg->getCFG();
-        m_du = rg->getDUMgr();
-        m_mdssamgr = NULL;
-        m_prssamgr = NULL;
+        m_dumgr = rg->getDUMgr();
+        m_mdssamgr = nullptr;
+        m_prssamgr = nullptr;
         m_md_sys = rg->getMDSystem();
-        ASSERT0(m_cfg && m_du && m_md_sys && m_tm);
+        ASSERT0(m_cfg && m_dumgr && m_md_sys && m_tm);
         m_is_elim_cfs = true;
+        m_is_reserve_phi = false;
         m_is_use_md_du = true;
-        m_cdg = NULL;
+        m_cdg = nullptr;
     }
     virtual ~DeadCodeElim() {}
 
@@ -142,6 +170,7 @@ public:
     { return "Dead Code Eliminiation"; }
     virtual PASS_TYPE getPassType() const { return PASS_DCE; }
 
+    void set_reserve_phi(bool reserve) { m_is_reserve_phi = reserve; }
     void set_elim_cfs(bool doit) { m_is_elim_cfs = doit; }
     void set_use_md_du(bool use_md_du) { m_is_use_md_du = use_md_du; }
 

@@ -39,22 +39,28 @@ namespace xoc {
 typedef enum {
     L_UNDEF = 0,
     L_CLABEL, //customer defined label
-    L_ILABEL, //internal generated label
+    L_ILABEL, //internal generated label by compiler
     L_PRAGMA, //pragma
 } LABEL_TYPE;
 
-#define PREFIX_OF_LABEL() "_L"
-#define POSTFIX_OF_LABEL() ""
+#define PREFIX_OF_ILABEL() "_$L"
+#define POSTFIX_OF_ILABEL() ""
 #define PREFIX_OF_CLABEL() ""
 #define POSTFIX_OF_CLABEL() ""
+#define PREFIX_OF_PRAGMA() "_PRAGMA"
+
 
 #define ILABEL_STR_FORMAT  "%s%d%s" //prefix label-num postfix
 #define ILABEL_CONT(li) \
-    PREFIX_OF_LABEL(),LABELINFO_num(li),POSTFIX_OF_LABEL()
+    PREFIX_OF_ILABEL(),LABELINFO_num(li),POSTFIX_OF_ILABEL()
 
 #define CLABEL_STR_FORMAT  "%s%s%s" //prefix label-name postfix
 #define CLABEL_CONT(li) \
     PREFIX_OF_CLABEL(), SYM_name(LABELINFO_name(li)), POSTFIX_OF_CLABEL()
+
+#define PRAGMA_STR_FORMAT  "%s%s%s" //prefix label-name postfix
+#define PRAGMA_CONT(li) \
+    PREFIX_OF_PRAGMA(), SYM_name(LABELINFO_name(li)), POSTFIX_OF_CLABEL()
 
 #define LABELINFO_type(l) ((l)->ltype)
 #define LABELINFO_name(l) ((l)->u1.lab_name)
@@ -109,7 +115,8 @@ public:
     void dump(Region const* rg) const;
     void dumpName(Region const* rg) const;
 
-    char const* getName(IN OUT StrBuf * buf) const;
+    CHAR const* getName(IN OUT StrBuf * buf) const;
+    Sym const* getOrgName() const { return LABELINFO_name(this); }
     UINT getNum() const { return LABELINFO_num(this); }
     LABEL_TYPE getType() const { return LABELINFO_type(this); }
     Sym const* getPragma() const { return LABELINFO_pragma(this); }
@@ -117,6 +124,7 @@ public:
     bool is_catch_start() const { return LABELINFO_is_catch_start(this); }
     bool is_try_start() const { return LABELINFO_is_try_start(this); }
     bool is_try_end() const { return LABELINFO_is_try_end(this); }
+    bool is_pragma() const { return LABELINFO_is_pragma(this); }
     bool is_terminate() const { return LABELINFO_is_terminate(this); }
 };
 
@@ -127,7 +135,7 @@ inline UINT computeLabelHashValue(LabelInfo const* li)
 {
     INT v = 0;
     if (LABELINFO_type(li) == L_CLABEL) {
-        CHAR const* p = SYM_name(LABELINFO_name(li));
+        CHAR const* p = li->getOrgName()->getStr();
         while (*p != 0) {
             v += *p;
             p++;

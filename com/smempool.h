@@ -34,6 +34,8 @@ author: Su Zhenyu
 #ifndef __MEM_POOL_H__
 #define __MEM_POOL_H__
 
+namespace xcom {
+
 //MEM POOL utilties.
 #ifndef ST_SUCC
 #define ST_SUCC 0
@@ -53,17 +55,16 @@ typedef enum {
     MEM_CONST_SIZE, //the element in the pool should be in same size.
 } MEMPOOLTYPE;
 
-
-#define MEMPOOL_type(p)                 ((p)->pool_type)
-#define MEMPOOL_next(p)                 ((p)->next)
-#define MEMPOOL_prev(p)                 ((p)->prev)
-#define MEMPOOL_id(p)                   ((p)->mpt_id)
-#define MEMPOOL_grow_size(p)            ((p)->grow_size)
-#define MEMPOOL_start_pos(p)            ((p)->start_pos)
-#define MEMPOOL_pool_size(p)            ((p)->mem_pool_size)
-#define MEMPOOL_pool_ptr(p)             ((p)->ppool)
+#define MEMPOOL_type(p) ((p)->pool_type)
+#define MEMPOOL_next(p) ((p)->next)
+#define MEMPOOL_prev(p) ((p)->prev)
+#define MEMPOOL_id(p) ((p)->mpt_id)
+#define MEMPOOL_grow_size(p) ((p)->grow_size)
+#define MEMPOOL_start_pos(p) ((p)->start_pos)
+#define MEMPOOL_pool_size(p) ((p)->mem_pool_size)
+#define MEMPOOL_pool_ptr(p) ((p)->ppool)
 #ifdef _DEBUG_
-#define MEMPOOL_chunk_id(p)             ((p)->chunk_id)
+#define MEMPOOL_chunk_id(p) ((p)->chunk_id)
 #endif
 
 typedef struct _MemPool {
@@ -81,10 +82,6 @@ typedef struct _MemPool {
     #endif
 } SMemPool;
 
-
-#ifdef __cplusplus
-extern "C" {
-#endif
 //Create memory pool
 //size: the initial byte size of pool. For MEM_CONST_SIZE, 'size'
 //      must be integer multiples of element byte size.
@@ -117,21 +114,9 @@ void smpoolInitPool(); //Initializing pool utilities
 void smpoolFiniPool(); //Finializing pool
 
 void dumpPool(SMemPool * handler, FILE * h);
-#ifdef __cplusplus
-}
-
-//Replacement new-operator allocates memory from common pool.
-inline void * operator new(size_t size, SMemPool * handler)
-{
-    ASSERT0(handler);
-    return smpoolMalloc(size, handler, MEM_COMM);
-}
-
-inline void operator delete(void *, SMemPool * handler)
-{
-    ASSERT0(handler);
-}
-#endif
 
 extern ULONGLONG g_stat_mem_size;
+
+} //namespace xcom
+
 #endif

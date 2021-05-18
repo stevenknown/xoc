@@ -1,9 +1,5 @@
 #include "stdio.h"
-#include "ltype.h"
-#include "comf.h"
-#include "smempool.h"
-#include "sstl.h"
-using namespace xcom;
+#include "xcominc.h"
 class CompareString {
 public:
     bool is_equ(char const* s1, char const* s2) const
@@ -13,12 +9,12 @@ public:
 
     bool is_less(char const* s1, char const* s2) const
     {
-        while (s1 != NULL && s2 != NULL) {
+        while (s1 != nullptr && s2 != nullptr) {
             if (*s1 < *s2) { return true; }
             s1++;
             s2++;
         }
-        if (s1 == NULL) { return true; }
+        if (s1 == nullptr) { return true; }
         return false;
     }
 
@@ -32,10 +28,10 @@ void string_tab()
     tab.append("Jerry");
 
     printf("\nIterate tab:\n");
-    TabIter<char const*> iter;
+    TTabIter<char const*> iter;
 
     for (char const* v = tab.get_first(iter);
-         v != NULL; v = tab.get_next(iter)) {
+         v != nullptr; v = tab.get_next(iter)) {
         printf("%s\n", v);
     }
 
@@ -51,7 +47,7 @@ void int_tab()
     tab.append(345);
 
     printf("\nIterate tab:\n");
-    TabIter<int> iter;
+    TTabIter<int> iter;
 
     //If you are going to use integer to judge if the iteration
     //determinate, you should guarantee 0 is not in the TTab.

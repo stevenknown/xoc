@@ -153,7 +153,7 @@ public:
 #define VAR_is_func_decl(v) ((v)->u2.s1.is_func_decl)
 
 //Variable is aritifical or spurious that used to
-//faciliate optimizations and analysis.
+//facilitate optimizations and analysis.
 #define VAR_is_fake(v) ((v)->u2.s1.is_fake)
 
 //Variable is volatile.
@@ -180,11 +180,12 @@ public:
 //Variable is marked "restrict", and it always be parameter.
 #define VAR_is_restrict(v) ((v)->u2.s1.is_restrict)
 
-//Variable is concrete, and will be output to Code Generator.
+//Variable is not concrete, and will NOT occupy any memory.
 #define VAR_is_unallocable(v) ((v)->u2.s1.is_unallocable)
 
 //Record the alignment.
 #define VAR_align(v) ((v)->align)
+
 class Var {
     COPY_CONSTRUCTOR(Var);
 public:
@@ -290,17 +291,18 @@ public:
     bool hasGRFlag() const
     {
         return (is_unallocable() ||
-            is_func_decl() ||
-            is_private() ||
-            is_readonly() ||
-            is_volatile() ||
-            is_restrict() ||
-            is_fake() ||
-            is_label() ||
-            is_array() ||
-            (is_string() && getString() != NULL) ||
-            getByteValue() != NULL);
+                is_func_decl() ||
+                is_private() ||
+                is_readonly() ||
+                is_volatile() ||
+                is_restrict() ||
+                is_fake() ||
+                is_label() ||
+                is_array() ||
+                (is_string() && getString() != nullptr) ||
+                getByteValue() != nullptr);
     }
+    bool has_init_val() const { return VAR_has_init_val(this); }
 
     UINT get_align() const { return VAR_align(this); }
     Sym const* get_name() const { return VAR_name(this); }
@@ -310,7 +312,7 @@ public:
     UINT getStringLength() const
     {
         ASSERT0(VAR_type(this)->is_string());
-        return VAR_string(this) == NULL ?
+        return VAR_string(this) == nullptr ?
                0 : xstrlen(SYM_name(VAR_string(this)));
     }
     Sym const* getString() const { return VAR_string(this); }
@@ -325,7 +327,7 @@ public:
             dm->getByteSize(VAR_type(this));
     }
 
-    virtual CHAR const* dumpVARDecl(StrBuf &) const { return NULL; }
+    virtual CHAR const* dumpVARDecl(StrBuf &) const { return nullptr; }
     virtual void dump(TypeMgr const* tm) const;
 
     //You must make sure this function will not change any field of Var.
@@ -339,11 +341,10 @@ public:
         VAR_is_local(this) = (UINT)!is_global;
     }
 };
-
 //END Var
 
-typedef TabIter<Var*> VarTabIter;
-typedef TabIter<Var const*> ConstVarTabIter;
+typedef TTabIter<Var*> VarTabIter;
+typedef TTabIter<Var const*> ConstVarTabIter;
 
 class CompareVar {
 public:
@@ -382,8 +383,9 @@ typedef TMap<Sym const*, Var*> ConstSym2Var;
 //Map from Var id to Var.
 typedef Vector<Var*> VarVec;
 
-//This class is responsible for allocation and deallocation of Var.
-//User can only create Var via VarMgr, as well as delete it in the same way.
+//This class is responsible for allocation and deallocation of variable.
+//User can only create variable via VarMgr, as well as delete
+//it in the same way.
 class VarMgr {
     COPY_CONSTRUCTOR(VarMgr);
     size_t m_var_count;
@@ -394,39 +396,50 @@ class VarMgr {
     RegionMgr * m_ru_mgr;
     TypeMgr * m_tm;
 
+    //Assign an unique ID to given variable.
     void assignVarId(Var * v);
+    void dumpFreeIDList() const;
 public:
     explicit VarMgr(RegionMgr * rm);
     virtual ~VarMgr() { destroy(); }
 
+    //Destroy holistic variable manager.
     void destroy();
+    //Destroy specific variable and recycle its ID for next allocation.
     void destroyVar(Var * v); //Free Var memory.
-    void dump();
+    void dump() const;
 
     TypeMgr * getTypeMgr() const { return m_tm; }
-    VarVec * get_var_vec() { return &m_var_vec; }
+    //Returnt the vector that holds all variables registered.
+    VarVec * getVarVec() { return &m_var_vec; }
+    //Get variable via var-id.
     Var * get_var(size_t id) const { return m_var_vec.get((UINT)id); }
 
+    //Find string-variable via specific string content.
     Var * findStringVar(Sym const* str) { return m_str_tab.get(str); }
+    //Find variable by variable's name.
+    //Note there may be multiple variable with same name, this function return
+    //the first one.
     Var * findVarByName(Sym const* name);
-
+    //Return true if the 'name' is the name of recorded unique
+    //dedicated string variable.
     bool isDedicatedStringVar(CHAR const* name) const;
 
     //Interface to target machine.
     //Customer could specify additional attributions for specific purpose.
     virtual Var * allocVAR() { return new Var(); }
 
-    //Create a Var.
+    //Create variable by string name.
     Var * registerVar(CHAR const* varname,
                       Type const* type,
                       UINT align,
                       UINT flag);
+    //Create variable by symbol name.
     Var * registerVar(Sym const* var_name,
                       Type const* type,
                       UINT align,
                       UINT flag);
-
-    //Create a String Var.
+    //Create string variable by name and string-content.
     Var * registerStringVar(CHAR const* var_name, Sym const* s, UINT align);
 };
 

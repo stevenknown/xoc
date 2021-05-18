@@ -42,7 +42,7 @@ public:
     NTREE()
     {
         is_active = false;
-        parent = NULL;
+        parent = nullptr;
         ::memset((CHAR*)kid, 0, sizeof(NTREE) * NTREE_KIDS);
     }
 };
@@ -82,8 +82,8 @@ T Bucket<T>::append(T t)
 
     UINT hashv = bucket_get_hash_value(t);
     HC<T> * elemhc = (HC<T>*)HB_member(Hash<T>::m_bucket[hashv]);
-    if (elemhc != NULL) {
-        while (elemhc != NULL) {
+    if (elemhc != nullptr) {
+        while (elemhc != nullptr) {
             ASSERTN(HC_val(elemhc) != T(0), ("Container is empty"));
             if (bucket_compare(HC_val(elemhc), t)) {
                 break;
@@ -92,10 +92,10 @@ T Bucket<T>::append(T t)
         }
 
         HC<T> * new_insert_one = Hash<T>::newhc();
-        ASSERTN(new_insert_one, ("newhc return NULL"));
+        ASSERTN(new_insert_one, ("newhc return nullptr"));
         HC_val(new_insert_one) = t;
 
-        if (elemhc == NULL) {
+        if (elemhc == nullptr) {
             //Append on tail of element-list
             insertafter((HC<T>**)&(HB_member(Hash<T>::m_bucket[hashv])),
                         new_insert_one);
@@ -111,7 +111,7 @@ T Bucket<T>::append(T t)
         HC_vec_idx(elemhc) = Hash<T>::m_elem_vector.get_free_idx();
     } else {
         elemhc = Hash<T>::newhc();
-        ASSERTN(elemhc, ("newhc return NULL"));
+        ASSERTN(elemhc, ("newhc return nullptr"));
         HC_val(elemhc) = t;
         HB_member(Hash<T>::m_bucket[hashv]) = elemhc;
         HB_count(Hash<T>::m_bucket[hashv])++;
@@ -129,7 +129,7 @@ void Bucket<T>::extract_elem(OUT Vector<T> & data)
     INT j = 0;
     for (UINT i = 0; i < Hash<T>::m_bucket_size; i++) {
         HC<T> * elemhc = (HC<T>*)HB_member(Hash<T>::m_bucket[i]);
-        while (elemhc != NULL) {
+        while (elemhc != nullptr) {
             data[j++] = HC_val(elemhc);
             elemhc = elemhc->next;
         }
@@ -145,7 +145,7 @@ void Bucket<T>::dump()
     for (UINT i = 0; i < Hash<T>::m_bucket_size; i++) {
         printf("\n\tB%d:", i);
         HC<T> * elemhc = (HC<T>*)HB_member(Hash<T>::m_bucket[i]);
-        while (elemhc != NULL) {
+        while (elemhc != nullptr) {
             printf("%f,", HC_val(elemhc));
             elemhc = elemhc->next;
         }
@@ -174,7 +174,7 @@ template <class T> class Sort {
     void * xmalloc(INT size)
     {
         void * p = smpoolMalloc(size, m_pool);
-        if (p == NULL) return NULL;
+        if (p == nullptr) return nullptr;
         ::memset(p, 0, size);
         return p;
     }
@@ -359,7 +359,7 @@ template <class T>
 void Sort<T>::_revise_tree(NTREE<T> * t)
 {
     NTREE<T> * parent = NTREE_parent(t);
-    if (parent == NULL) {
+    if (parent == nullptr) {
         return;
     }
     if (NTREE_val(t) < NTREE_val(parent)) {
@@ -375,14 +375,14 @@ NTREE<T> * Sort<T>::_build_heap(IN OUT Vector<T> & data,
                                 OUT List<NTREE<T>*> & treenode_list)
 {
     if (data.get_last_idx() < 0) {
-        return NULL;
+        return nullptr;
     }
     NTREE<T> * nt = (NTREE<T>*)xmalloc(sizeof(NTREE<T>));
     NTREE_id(nt) = m_tree_id++;
     treenode_list.append_tail(nt);
 
     bool first = true;
-    C<NTREE<T>*> * ct = NULL;
+    C<NTREE<T>*> * ct = nullptr;
     for (INT pos = 0; pos <= data.get_last_idx(); pos++) {
         NTREE<T> * insert_value;
         if (first) {
@@ -405,11 +405,11 @@ NTREE<T> * Sort<T>::_build_heap(IN OUT Vector<T> & data,
     }
 
     //Find root treenode.
-    ASSERT0(NTREE_parent(nt) == NULL);
+    ASSERT0(NTREE_parent(nt) == nullptr);
     #ifdef _DEBUG_
     printf("\n");
     for (NTREE<T> * p = treenode_list.get_head();
-         p != NULL; p = treenode_list.get_next()) {
+         p != nullptr; p = treenode_list.get_next()) {
         printf("(T%d,%s,val:%d),",
                NTREE_id(p),
                NTREE_is_active(p)?"act":"no-act",
@@ -479,7 +479,7 @@ void Sort<T>::heap_sort(IN OUT Vector<T> & data)
     UINT i = 0;
     data.clean();
     for (NTREE<T> * t = treenode_list.get_tail();
-         t != NULL; t = treenode_list.get_prev()) {
+         t != nullptr; t = treenode_list.get_prev()) {
         if (!NTREE_is_active(t)) {
             continue;
         }
@@ -555,14 +555,14 @@ void Sort<T>::_insert_sort(IN OUT Vector<T> & data,
 {
     List<T> list;
     for (UINT i = start_idx; i <= end_idx; i++) {
-        C<T> * ct = NULL;
+        C<T> * ct = nullptr;
         T d = data[i];
         for (T v = list.get_head(&ct); ct; v = list.get_next(&ct)) {
             if (d < v) { //in increment order
                 break;
             }
         }
-        if (ct == NULL) {
+        if (ct == nullptr) {
             list.append_tail(d);
         } else {
             list.insert_before(d, ct);
@@ -605,4 +605,5 @@ void Sort<T>::shell_sort(IN OUT Vector<T> & data)
 }
 
 } //namespace xcom
+
 #endif

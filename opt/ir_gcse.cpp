@@ -78,14 +78,14 @@ void GCSE::elimCseAtStore(IR * use, IR * use_stmt, IR * gen)
     //Add du chain.
     IR * gen_stmt = gen->getStmt();
     ASSERT0(gen_stmt->isPREqual(gen_pr));
-    if (m_ssamgr != NULL) {
+    if (m_ssamgr != nullptr) {
         m_ssamgr->buildDUChain(gen_stmt, newrhs_pr);
     } else {
         m_du->buildDUChain(gen_stmt, newrhs_pr);
     }
 
     //Assign the identical vn to newrhs.
-    if (m_gvn != NULL) {
+    if (m_gvn != nullptr) {
         VN * vn = m_gvn->mapIR2VN(gen);
         ASSERT0(vn);
         m_gvn->setMapIR2VN(newrhs_pr, vn);
@@ -93,12 +93,12 @@ void GCSE::elimCseAtStore(IR * use, IR * use_stmt, IR * gen)
     }
 
     //Assign MD to newrhs.
-    MD const* r_md = m_rg->genMDforPR(newrhs_pr);
+    MD const* r_md = m_rg->genMDForPR(newrhs_pr);
     ASSERT0(r_md);
     newrhs_pr->setRefMD(r_md, m_rg);
 
-    if (m_mdssamgr != NULL) {
-        m_mdssamgr->removeMDSSAUse(use);
+    if (m_mdssamgr != nullptr) {
+        m_mdssamgr->removeMDSSAOcc(use);
     }
     m_rg->freeIRTree(use);
 }
@@ -123,7 +123,7 @@ void GCSE::elimCseAtBranch(IR * use, IR * use_stmt, IN IR * gen)
     IR * gen_stmt = gen->getStmt();
     ASSERT0(gen_stmt->isPREqual(gen_pr));
 
-    if (m_ssamgr != NULL) {
+    if (m_ssamgr != nullptr) {
         m_ssamgr->buildDUChain(gen_stmt, new_pr);
     } else {
         m_du->buildDUChain(gen_stmt, new_pr);
@@ -136,7 +136,7 @@ void GCSE::elimCseAtBranch(IR * use, IR * use_stmt, IN IR * gen)
     m_gvn->setMapIR2VN(new_pr, vn);
 
     //Assign MD to PR.
-    MD const* r_md = m_rg->genMDforPR(new_pr);
+    MD const* r_md = m_rg->genMDForPR(new_pr);
     ASSERT0(r_md);
     new_pr->setRefMD(r_md, m_rg);
 
@@ -146,8 +146,8 @@ void GCSE::elimCseAtBranch(IR * use, IR * use_stmt, IN IR * gen)
     BR_det(use_stmt) = newdet;
     IR_may_throw(use_stmt) = false;
 
-    if (m_mdssamgr != NULL) {
-        m_mdssamgr->removeMDSSAUse(use);
+    if (m_mdssamgr != nullptr) {
+        m_mdssamgr->removeMDSSAOcc(use);
     }
     m_rg->freeIRTree(use);
 }
@@ -187,19 +187,19 @@ void GCSE::elimCseAtCall(IR * use, IR * use_stmt, IR * gen)
     m_gvn->setMapIR2VN(use_pr, vn);
 
     //Allocate MD to use_pr to make up DU manager request.
-    MD const* r_md = m_rg->genMDforPR(use_pr);
+    MD const* r_md = m_rg->genMDForPR(use_pr);
     ASSERT0(r_md);
     use_pr->setRefMD(r_md, m_rg);
 
     //Add du chain from gen_pr's stmt to the use of pr.
     bool f = use_stmt->replaceKid(use, use_pr, false);
-    CHECK_DUMMYUSE(f);
-    if (m_mdssamgr != NULL) {
-        m_mdssamgr->removeMDSSAUse(use);
+    CHECK0_DUMMYUSE(f);
+    if (m_mdssamgr != nullptr) {
+        m_mdssamgr->removeMDSSAOcc(use);
     }
     m_rg->freeIRTree(use);
 
-    if (m_ssamgr != NULL) {
+    if (m_ssamgr != nullptr) {
         m_ssamgr->buildDUChain(gen_stmt, use_pr);
     } else {
         m_du->buildDUChain(gen_stmt, use_pr);
@@ -234,11 +234,11 @@ void GCSE::processCseGen(IN IR * gen, IR * gen_stmt, bool & change)
 {
     ASSERT0(gen->is_exp() && gen_stmt->is_stmt());
     //Move STORE_VAL to temp PR.
-    //e.g: a = 10, expression of store_val is NULL.
+    //e.g: a = 10, expression of store_val is nullptr.
     IRBB * bb = gen_stmt->getBB();
     ASSERT0(bb);
     IR * tmp_pr = m_exp2pr.get(gen);
-    if (tmp_pr != NULL) { return; }
+    if (tmp_pr != nullptr) { return; }
 
     //First process cse generation point.
     if (gen_stmt->is_truebr() || gen_stmt->is_falsebr()) {
@@ -250,7 +250,7 @@ void GCSE::processCseGen(IN IR * gen, IR * gen_stmt, bool & change)
     m_exp2pr.set(gen, tmp_pr);
 
     //Assign MD to PR.
-    MD const* tmp_pr_md = m_rg->genMDforPR(tmp_pr);
+    MD const* tmp_pr_md = m_rg->genMDForPR(tmp_pr);
     ASSERT0(tmp_pr_md);
     tmp_pr->setRefMD(tmp_pr_md, m_rg);
 
@@ -258,7 +258,7 @@ void GCSE::processCseGen(IN IR * gen, IR * gen_stmt, bool & change)
     IR * new_stpr = m_rg->buildStorePR(PR_no(tmp_pr), IR_dt(tmp_pr), gen);
     new_stpr->setRefMD(tmp_pr_md, m_rg);
 
-    if (m_gvn != NULL) {
+    if (m_gvn != nullptr) {
         ASSERT0(m_gvn->mapIR2VN(gen));
         m_gvn->setMapIR2VN(new_stpr, m_gvn->mapIR2VN(gen));
     }
@@ -266,10 +266,10 @@ void GCSE::processCseGen(IN IR * gen, IR * gen_stmt, bool & change)
     copyDbx(new_stpr, gen_stmt, m_rg);
 
     //The 'find()' is fast because it is implemented with hash.
-    IRListIter holder = NULL;
+    IRListIter holder = nullptr;
     bool f = BB_irlist(bb).find(gen_stmt, &holder);
-    CHECK_DUMMYUSE(f);
-    CHECK_DUMMYUSE(holder);
+    CHECK0_DUMMYUSE(f);
+    CHECK0_DUMMYUSE(holder);
     BB_irlist(bb).insert_before(new_stpr, holder);
 
     IR * newkid = tmp_pr;
@@ -280,11 +280,11 @@ void GCSE::processCseGen(IN IR * gen, IR * gen_stmt, bool & change)
     }
 
     bool v = gen_stmt->replaceKid(gen, newkid, false);
-    CHECK_DUMMYUSE(v);
+    CHECK0_DUMMYUSE(v);
 
     //Keep original du unchange, add new du chain for new stmt.
     ASSERT0(tmp_pr->is_pr());
-    if (m_ssamgr != NULL) {
+    if (m_ssamgr != nullptr) {
         m_ssamgr->buildDUChain(new_stpr, tmp_pr);
     } else {
         m_du->buildDUChain(new_stpr, tmp_pr);
@@ -391,7 +391,7 @@ bool GCSE::processCse(IN IR * exp, IN List<IR*> & livexp)
     IRListIter ct;
     bool change = false;
     for (IR * gen = livexp.get_head(&ct);
-         gen != NULL; gen = livexp.get_next(&ct)) {
+         gen != nullptr; gen = livexp.get_next(&ct)) {
         ExpRep * xie = m_expr_tab->map_ir2ir_expr(gen);
         ASSERT0(xie);
         if (irie != xie) { continue; }
@@ -411,14 +411,14 @@ bool GCSE::processCse(IN IR * exp, IN List<IR*> & livexp)
 void GCSE::handleCandidate(IR * exp, IRBB * bb,
                            UINT entry_id, bool & change)
 {
-    VN const* vn = NULL;
-    IR * gen = NULL;
-    if ((vn = m_gvn->mapIR2VN(exp)) != NULL &&
-        (gen = m_vn2exp.get(vn)) != NULL &&
+    VN const* vn = nullptr;
+    IR * gen = nullptr;
+    if ((vn = m_gvn->mapIR2VN(exp)) != nullptr &&
+        (gen = m_vn2exp.get(vn)) != nullptr &&
         findAndElim(exp, gen)) {
         //Found cse and replaced it with pr.
         change = true;
-    } else if (vn != NULL && gen == NULL) {
+    } else if (vn != nullptr && gen == nullptr) {
         if (m_cfg->hasEHEdge()) {
             ASSERT0(m_tg);
             if (m_tg->is_pdom(bb->id(), entry_id)) {
@@ -473,7 +473,7 @@ bool GCSE::doPropInDomTreeOrder(xcom::Graph const* domtree)
     stk.push(root);
     bool changed = false;
     List<IR*> livexp;
-    while ((v = stk.pop()) != NULL) {
+    while ((v = stk.pop()) != nullptr) {
         UINT vid = v->id();
         if (!is_visited.is_contain(vid)) {
             is_visited.bunion(vid);
@@ -486,7 +486,7 @@ bool GCSE::doPropInDomTreeOrder(xcom::Graph const* domtree)
         //Visit children.
         EdgeC * el = VERTEX_out_list(v);
         Vertex * succ;
-        while (el != NULL) {
+        while (el != nullptr) {
             succ = el->getTo();
             if (!is_visited.is_contain(succ->id())) {
                 stk.push(v);
@@ -512,7 +512,7 @@ bool GCSE::doPropVNInDomTreeOrder(xcom::Graph const* domtree)
     Stack<Vertex*> stk;
     stk.push(root);
     bool changed = false;
-    while ((v = stk.pop()) != NULL) {
+    while ((v = stk.pop()) != nullptr) {
         UINT vid = v->id();
         if (!is_visited.is_contain(vid)) {
             is_visited.bunion(vid);
@@ -525,7 +525,7 @@ bool GCSE::doPropVNInDomTreeOrder(xcom::Graph const* domtree)
         //Visit children.
         EdgeC * el = VERTEX_out_list(v);
         Vertex * succ;
-        while (el != NULL) {
+        while (el != nullptr) {
             succ = el->getTo();
             if (!is_visited.is_contain(succ->id())) {
                 stk.push(v);
@@ -545,7 +545,7 @@ bool GCSE::doPropVN(IRBB * bb, UINT entry_id)
     bool change = false;
     IRListIter ct;
     for (IR * ir = BB_irlist(bb).get_head(&ct);
-         ir != NULL; ir = BB_irlist(bb).get_next(&ct)) {
+         ir != nullptr; ir = BB_irlist(bb).get_next(&ct)) {
         switch (ir->getCode()) {
         case IR_ST:
         case IR_STPR:
@@ -560,10 +560,10 @@ bool GCSE::doPropVN(IRBB * bb, UINT entry_id)
         case IR_CALL:
         case IR_ICALL: {
             IR * p = CALL_param_list(ir);
-            IR * next = NULL;
+            IR * next = nullptr;
             bool lchange = false;
             m_newst_lst.clean();
-            while (p != NULL) {
+            while (p != nullptr) {
                 next = p->get_next();
                 if (isCseCandidate(p)) {
                     handleCandidate(p, bb, entry_id, lchange);
@@ -582,7 +582,7 @@ bool GCSE::doPropVN(IRBB * bb, UINT entry_id)
             }
             break;
         case IR_RETURN:
-            if (RET_exp(ir) != NULL && isCseCandidate(RET_exp(ir))) {
+            if (RET_exp(ir) != nullptr && isCseCandidate(RET_exp(ir))) {
                 handleCandidate(RET_exp(ir), bb, entry_id, change);
             }
             break;
@@ -597,8 +597,8 @@ bool GCSE::doPropVN(IRBB * bb, UINT entry_id)
 bool GCSE::doProp(IRBB * bb, List<IR*> & livexp)
 {
     livexp.clean();
-    DefDBitSetCore * x = m_du->genAvailInExpr(bb->id(), NULL);
-    DefSBitSetIter st = NULL;
+    DefDBitSetCore * x = m_du->genAvailInExpr(bb->id(), nullptr);
+    DefSBitSetIter st = nullptr;
     for (INT i = x->get_first(&st); i != -1; i = x->get_next(i, &st)) {
         IR * y = m_rg->getIR(i);
         if (y->is_undef() || y->is_pr()) { continue; }
@@ -610,7 +610,7 @@ bool GCSE::doProp(IRBB * bb, List<IR*> & livexp)
     IRListIter ct;
     MDSet tmp;
     for (IR * ir = BB_irlist(bb).get_head(&ct);
-         ir != NULL; ir = BB_irlist(bb).get_next(&ct)) {
+         ir != nullptr; ir = BB_irlist(bb).get_next(&ct)) {
         switch (ir->getCode()) {
         case IR_ST:
             //Find cse and replace it with properly pr.
@@ -651,8 +651,8 @@ bool GCSE::doProp(IRBB * bb, List<IR*> & livexp)
         case IR_CALL:
         case IR_ICALL: {
             IR * param = CALL_param_list(ir);
-            IR * next = NULL;
-            while (param != NULL) {
+            IR * next = nullptr;
+            while (param != nullptr) {
                 next = param->get_next();
                 if (isCseCandidate(param)) {
                     if (processCse(param, livexp)) {
@@ -680,7 +680,7 @@ bool GCSE::doProp(IRBB * bb, List<IR*> & livexp)
             }
             break;
         case IR_RETURN:
-            if (RET_exp(ir) != NULL &&
+            if (RET_exp(ir) != nullptr &&
                 isCseCandidate(RET_exp(ir)) &&
                 shouldBeCse(RET_exp(ir))) {
                 if (processCse(RET_exp(ir), livexp)) {
@@ -703,11 +703,11 @@ bool GCSE::doProp(IRBB * bb, List<IR*> & livexp)
         case IR_CALL:
         case IR_ICALL: {
             MDSet const* maydef = m_du->getMayDef(ir);
-            if (maydef != NULL && !maydef->is_empty()) {
+            if (maydef != nullptr && !maydef->is_empty()) {
                 IRListIter ct2;
                 IRListIter next;
                 for (livexp.get_head(&ct2), next = ct2;
-                     ct2 != NULL; ct2 = next) {
+                     ct2 != nullptr; ct2 = next) {
                     livexp.get_next(&next);
                     IR * x2 = ct2->val();
                     tmp.clean(m_misc_bs_mgr);
@@ -720,11 +720,11 @@ bool GCSE::doProp(IRBB * bb, List<IR*> & livexp)
             }
 
             MD const* mustdef = m_du->get_must_def(ir);
-            if (mustdef != NULL) {
+            if (mustdef != nullptr) {
                 IRListIter ct2;
                 IRListIter next;
                 for (livexp.get_head(&ct2), next = ct2;
-                     ct2 != NULL; ct2 = next) {
+                     ct2 != nullptr; ct2 = next) {
                     livexp.get_next(&next);
                     IR * x2 = ct2->val();
                     tmp.clean(m_misc_bs_mgr);
@@ -765,45 +765,44 @@ bool GCSE::dump() const
 bool GCSE::perform(OptCtx & oc)
 {
     BBList * bbl = m_rg->getBBList();
-    if (bbl == NULL || bbl->get_elem_count() == 0) { return false; }
-    if (!OC_is_ref_valid(oc)) { return false; }
+    if (bbl == nullptr || bbl->get_elem_count() == 0) { return false; }
+    if (!oc.is_ref_valid()) { return false; }
     //Check PR DU chain.
     PRSSAMgr * ssamgr = (PRSSAMgr*)(m_rg->getPassMgr()->queryPass(
         PASS_PR_SSA_MGR));
-    if (ssamgr != NULL && ssamgr->is_valid()) {
+    if (ssamgr != nullptr && ssamgr->is_valid()) {
         m_ssamgr = ssamgr;
     } else {
-        m_ssamgr = NULL;
+        m_ssamgr = nullptr;
     }
-    if (!OC_is_pr_du_chain_valid(oc) && m_ssamgr == NULL) { 
+    if (!oc.is_pr_du_chain_valid() && m_ssamgr == nullptr) {
         //At least one kind of DU chain should be avaiable.
         return false;
     }
     //Check NONPR DU chain.
     MDSSAMgr * mdssamgr = (MDSSAMgr*)(m_rg->getPassMgr()->queryPass(
         PASS_MD_SSA_MGR));
-    if (mdssamgr != NULL && mdssamgr->is_valid()) {
+    if (mdssamgr != nullptr && mdssamgr->is_valid()) {
         m_mdssamgr = mdssamgr;
     } else {
-        m_mdssamgr = NULL;
+        m_mdssamgr = nullptr;
     }
-    if (!OC_is_nonpr_du_chain_valid(oc) && m_mdssamgr == NULL) {
+    if (!oc.is_nonpr_du_chain_valid() && m_mdssamgr == nullptr) {
         //At least one kind of DU chain should be avaiable.
         return false;
     }
 
     START_TIMER(t, getPassName());
-    if (m_gvn != NULL) {
-        m_rg->checkValidAndRecompute(&oc, PASS_DOM, PASS_PDOM, PASS_UNDEF);
-        if (!m_gvn->is_valid()) {
-            m_gvn->reperform(oc);
-        }
+    if (m_gvn != nullptr) {
+        m_rg->getPassMgr()->checkValidAndRecompute(&oc, PASS_DOM, PASS_PDOM,
+                                                   PASS_GVN, PASS_UNDEF);
+        ASSERT0(m_gvn->is_valid());
         //GVN provide more accurate result of value flow analysis than
         //expression analysis.
-        m_expr_tab = NULL;
+        m_expr_tab = nullptr;
     } else {
-        m_rg->checkValidAndRecompute(&oc, PASS_DOM, PASS_PDOM,
-                                     PASS_EXPR_TAB, PASS_UNDEF);
+        m_rg->getPassMgr()->checkValidAndRecompute(&oc, PASS_DOM, PASS_PDOM,
+                                                   PASS_EXPR_TAB, PASS_UNDEF);
         m_expr_tab = (ExprTab*)m_rg->getPassMgr()->registerPass(PASS_EXPR_TAB);
     }
 
@@ -828,7 +827,7 @@ bool GCSE::perform(OptCtx & oc)
         m_tg->computePdomAndIpdom(root);
     }
 
-    if (m_gvn != NULL) {
+    if (m_gvn != nullptr) {
         m_vn2exp.clean();
         m_exp2pr.clean();
         change |= doPropVNInDomTreeOrder(&domtree);
@@ -837,7 +836,7 @@ bool GCSE::perform(OptCtx & oc)
         //List<xcom::Vertex*> lst;
         //m_cfg->sortDomTreeInPreorder(root, lst);
         //for (xcom::Vertex * v = lst.get_head();
-        //     v != NULL; v = lst.get_next()) {
+        //     v != nullptr; v = lst.get_next()) {
         //    IRBB * bb = m_cfg->getBB(v->id());
         //    ASSERT0(bb);
         //    change |= doPropVN(bb, entry->id());
@@ -852,7 +851,7 @@ bool GCSE::perform(OptCtx & oc)
         //m_cfg->sortDomTreeInPreorder(root, lst);
         ////Access IRBB in preorder on domtree.
         //for (xcom::Vertex * v = lst.get_head();
-        //     v != NULL; v = lst.get_next()) {
+        //     v != nullptr; v = lst.get_next()) {
         //    IRBB * bb = m_cfg->getBB(v->id());
         //    ASSERT0(bb);
         //    change |= doProp(bb, livexp);
@@ -864,15 +863,13 @@ bool GCSE::perform(OptCtx & oc)
     }
     if (change) {
         //no new expr generated, only new pr.
-        OC_is_expr_tab_valid(oc) = false;
         OC_is_aa_valid(oc) = false;
-        OC_is_live_expr_valid(oc) = false;
-        OC_is_reach_def_valid(oc) = false;
+        oc.setInvalidIfDUMgrLiveChanged();
 
         //DU reference and du chain has maintained.
         ASSERT0(m_rg->verifyMDRef());
         ASSERT0(verifyMDDUChain(m_rg));
-        if (m_ssamgr != NULL) {
+        if (m_ssamgr != nullptr) {
             ASSERT0(PRSSAMgr::verifyPRSSAInfo(m_rg));
         }
         //For now, gvn has updated correctly.
@@ -880,9 +877,9 @@ bool GCSE::perform(OptCtx & oc)
     if (m_cfg->hasEHEdge()) {
         ASSERT0(m_tg);
         delete m_tg;
-        m_tg = NULL;
+        m_tg = nullptr;
     }
-    ASSERT0(m_tg == NULL);
+    ASSERT0(m_tg == nullptr);
     ASSERT0(verifyIRandBB(m_rg->getBBList(), m_rg));
     return change;
 }

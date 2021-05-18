@@ -76,14 +76,14 @@ bool DexRegion::HighProcess(OptCtx & oc)
     setIRList(simplifyStmtList(getIRList(), &simp));
 
     ASSERT0(verifySimp(getIRList(), simp));
-    ASSERT0(verifyIRList(getIRList(), NULL, this));
+    ASSERT0(verifyIRList(getIRList(), nullptr, this));
 
     constructBBList();
 
     ASSERT0(verifyIRandBB(getBBList(), this));
 
     //All IRs have been moved to each IRBB.
-    setIRList(NULL);
+    setIRList(nullptr);
 
     HighProcessImpl(oc);
     return true;
@@ -97,9 +97,9 @@ bool DexRegion::verifyRAresult(RA & ra, Prno2Vreg & prno2v)
     Vector<GLT*> * gltv = gltm->get_gltvec();
     for (UINT i = 0; i < gltm->get_num_of_glt(); i++) {
         GLT * g = gltv->get(i);
-        if (g == NULL) { continue; }
+        if (g == nullptr) { continue; }
         ASSERT0(g->has_allocated());
-        if (GLT_bbs(g) == NULL) {
+        if (GLT_bbs(g) == nullptr) {
             //parameter may be have no occ.
             continue;
         }
@@ -109,13 +109,13 @@ bool DexRegion::verifyRAresult(RA & ra, Prno2Vreg & prno2v)
     }
 
     BBList * bbl = getBBList();
-    for (IRBB * bb = bbl->get_head(); bb != NULL; bb = bbl->get_next()) {
+    for (IRBB * bb = bbl->get_head(); bb != nullptr; bb = bbl->get_next()) {
         LTMgr * ltm = gltm->map_bb2ltm(bb);
-        if (ltm == NULL) { continue; }
+        if (ltm == nullptr) { continue; }
         Vector<LT*> * lvec = ltm->get_lt_vec();
         for (INT i = 0; i <= lvec->get_last_idx(); i++) {
             LT * l = lvec->get(i);
-            if (l == NULL) { continue; }
+            if (l == nullptr) { continue; }
             ASSERT0(l->has_allocated());
             bool find;
             prno2v.get(LT_prno(l), &find);
@@ -133,13 +133,13 @@ void DexRegion::updateRAresult(IN RA & ra, OUT Prno2Vreg & prno2v)
     GltMgr * gltm = ra.get_gltm();
     BBList * bbl = getBBList();
     prno2v.clean();
-    for (IRBB * bb = bbl->get_head(); bb != NULL; bb = bbl->get_next()) {
+    for (IRBB * bb = bbl->get_head(); bb != nullptr; bb = bbl->get_next()) {
         LTMgr * ltm = gltm->map_bb2ltm(bb);
-        if (ltm == NULL) { continue; }
+        if (ltm == nullptr) { continue; }
         Vector<LT*> * lvec = ltm->get_lt_vec();
         for (INT i = 0; i <= lvec->get_last_idx(); i++) {
             LT * l = lvec->get(i);
-            if (l == NULL) { continue; }
+            if (l == nullptr) { continue; }
             ASSERT0(l->has_allocated());
             bool find;
             UINT v = prno2v.get(LT_prno(l), &find);
@@ -159,11 +159,9 @@ void DexRegion::updateRAresult(IN RA & ra, OUT Prno2Vreg & prno2v)
 void DexRegion::processSimply()
 {
     LOG("DexRegion::processSimply %s", getRegionName());
-    if (getIRList() == NULL) { return ; }
+    if (getIRList() == nullptr) { return ; }
 
     OptCtx oc;
-    OC_show_comp_time(oc) = g_show_comp_time;
-
     CHAR const* ru_name = getRegionName();
 
     constructBBList();
@@ -171,7 +169,7 @@ void DexRegion::processSimply()
     ASSERT0(verifyIRandBB(getBBList(), this));
 
     //All IRs have been moved to each IRBB.
-    setIRList(NULL);
+    setIRList(nullptr);
 
     PassMgr * passmgr = initPassMgr();
     ASSERT0(passmgr);
@@ -197,8 +195,8 @@ static void addCatchTypeName(DexRegion * rg)
 {
     Dex2IR * d2ir = rg->getDex2IR();
     SymTab * symtab = rg->getRegionMgr()->getSymTab();
-    for (TryInfo * ti = d2ir->getTryInfo(); ti != NULL; ti = ti->next) {
-        for (CatchInfo * ci = ti->catch_list; ci != NULL; ci = ci->next) {
+    for (TryInfo * ti = d2ir->getTryInfo(); ti != nullptr; ti = ti->next) {
+        for (CatchInfo * ci = ti->catch_list; ci != nullptr; ci = ci->next) {
             ASSERT0(ci->kindname);
             symtab->add(ci->kindname);
         }
@@ -209,8 +207,7 @@ static void addCatchTypeName(DexRegion * rg)
 //This function outputs Prno2Vreg after Dex register allocation.
 bool DexRegion::process(OptCtx * oc)
 {
-    if (getIRList() == NULL) { return true; }
-    OC_show_comp_time(*oc) = g_show_comp_time;
+    if (getIRList() == nullptr) { return true; }
     if (!g_silence) {
         LOG("DexRegion process %s", getRegionName());
     }
@@ -225,7 +222,7 @@ bool DexRegion::process(OptCtx * oc)
 
     ASSERT0(getPassMgr());
     PRSSAMgr * ssamgr = (PRSSAMgr*)passmgr->queryPass(PASS_PR_SSA_MGR);
-    if (ssamgr != NULL && ssamgr->is_valid()) {
+    if (ssamgr != nullptr && ssamgr->is_valid()) {
         ssamgr->destruction();
     }
 

@@ -31,41 +31,22 @@ IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 author: Su Zhenyu
 @*/
-#ifndef _COMF_H_
-#define _COMF_H_
+#ifndef _COMMON_FUNCTION_H_
+#define _COMMON_FUNCTION_H_
 
 namespace xcom {
 
-//This macro declare copy constructor for class.
-#define COPY_CONSTRUCTOR(class_name)   \
-    class_name(class_name const&);     \
-    class_name const& operator = (class_name const&)
+//Forward Declaration
+template <class T> class Vector;
 
-//Used to avoid warning: unreferenced variable if set
-//-Werror=unused-variable.
-template <typename T> int dummy_use(T const&) { return 0; }
-#define DUMMYUSE(v) xcom::dummy_use(v)
-
-#ifdef _DEBUG_
-//Do assert at debug mode, and do dummyuse at release mode.
-#define CHECK_DUMMYUSE(a) ASSERT0(a)
-
-//Do both assert and dummyuse at debug mode, do dummyuse at release mode.
-#define ASSERTN_DUMMYUSE(a, b)  \
-    ((a) ? DUMMYUSE(a) : (m522138(__FILE__, __LINE__), m518087 b))
-#define ASSERT0_DUMMYUSE(a)  \
-    ((a) ? DUMMYUSE(a) : (m522138(__FILE__, __LINE__), m518087 ("")))
-#else
-//Do assert at debug mode, and do dummyuse at release mode.
-#define CHECK_DUMMYUSE(a) DUMMYUSE(a)
-
-//Do both assert and dummyuse at debug mode, do dummyuse at release mode.
-#define ASSERTN_DUMMYUSE(a, b) DUMMYUSE(a)
-#define ASSERT0_DUMMYUSE(a) DUMMYUSE(a)
-#endif
-
-
-template <class T, UINT GrowSize> class Vector;
+//Compute the maximum unsigned integer value that type is ValueType.
+//e.g: given bitwidth is 3, return 7 as result.
+//Note ValueType should be unsigned integer type.
+template <class ValueType>
+inline ValueType computeUnsignedMaxValue(UINT bitwidth)
+{
+    return ((((ValueType)1) << bitwidth) - 1);
+}
 
 //Arrangement
 //P(n,m)=n*(n-1)*...*(n-m+1)=n!/(n-m)!
@@ -89,8 +70,15 @@ UINT combin(UINT n, UINT m); //Combination
 //e.g  v=17 , align=4 , the result is 20.
 LONGLONG ceil_align(LONGLONG v, LONGLONG align);
 
-//Caculate the number of bits which longer enough to represent given constant.
-UINT computeConstBitLen(ULONGLONG v);
+//Compute the number of bits which biger enough to represent given value.
+//value: the input value that to be check.
+//e.g: given 00101, it needs at least 3 bits to hold the binary value 101.
+//     and function return 3.
+UINT computeMaxBitSizeForValue(ULONGLONG v);
+
+//Misc Dumps/Dumpf of Vector<T>
+#define DUMPVEC_BOOL 1
+#define DUMPVEC_INT 2
 
 //Dumpf() for Vector<TY>.
 void dumpf_svec(void * vec, UINT ty, CHAR const* name, bool is_del);
@@ -119,7 +107,7 @@ void extractLeftMostSubString(CHAR * tgt, CHAR const* string, CHAR separator);
 INT gcdm(UINT num, ...);
 
 //Great common divisor for values stored in vector.
-INT gcdm(UINT num, Vector<INT, 8> const& a);
+INT gcdm(UINT num, Vector<INT> const& a);
 
 //Compute the nearest power of 2 that not less than v.
 inline UINT getNearestPowerOf2(UINT v)
@@ -181,6 +169,7 @@ float getclockend(LONG start);
 //e.g: given m=0x8, the first '1' index is 3.
 INT getFirstOneAtRightSide(INT m);
 
+//Calculate an integer hash value according to 'n'.
 inline UINT hash32bit(UINT n)
 {
     n = (n+0x7ed55d16) + (n<<12);
@@ -212,9 +201,17 @@ LONG revlong(LONG d);
 
 //Reverse the string.
 UCHAR * reverseString(UCHAR * v);
+
+//Replace letters in 'n' to capital letter.
 CHAR * upper(CHAR * n);
+
+//Replace letters in 'n' to lowercase letter.
 CHAR * lower(CHAR * n);
+
+//Calculate the Great Common Divisor of x and y.
 INT sgcd(INT x, INT y);
+
+//Calculate the Least Common Multiple of x and y.
 INT slcm(INT x, INT y);
 
 //Shift a string to right side or left side.
@@ -223,10 +220,18 @@ INT slcm(INT x, INT y);
 //   means shifting string to left.
 void strshift(CHAR * src, INT ofst);
 
+//The function produce output string according to 'info' as described below,
+//and appends the output the 'buf'.
+//Return a pointer to the resulting string 'buf'.
+//buf: output string buffer.
+//bufl: byte size of 'buf'.
+//info: formatting string.
 CHAR * xstrcat(CHAR * buf, size_t bufl, CHAR const* info, ...);
+
+//Calculates the byte size of string 'p', excluding the terminating byte '\0'.
 UINT xstrlen(CHAR const* p);
 
-//Compare the first 'n' char of two string.
+//Compare the first 'n' characters of two string.
 //Return true if equal.
 bool xstrcmp(CHAR const* p1, CHAR const* p2, INT n);
 
@@ -247,8 +252,24 @@ INT xctoi(CHAR const* cl);
 
 //Convert long to string.
 UCHAR * xltoa(LONG v, OUT UCHAR * buf);
+
+//Cacluates the smallest integral value that is not less than
+//the division of a, b.
+//e.g: xceiling(3,2) is 2.
 INT xceiling(INT a, INT b);
+
+//Cacluates the largest integral value that is not greater than
+//the division of a, b.
+//e.g: xceiling(3,2) is 1.
 INT xfloor(INT a, INT b);
+
+//Find partial string, return the subscript-index if substring found,
+//otherwise return -1.
+//
+//'src': input string.
+//'par': partial string.
+//'i': find the ith partial string. And 'i' get started with 0.
+//     If one only want to find the first partial string, i equals to 0.
 LONG xstrstr(CHAR const* src, CHAR const* par, INT i);
 
 //Split string by given separetor, and return the number of substring.
@@ -256,20 +277,32 @@ LONG xstrstr(CHAR const* src, CHAR const* par, INT i);
 //ret: record each substring which separated by sep.
 //sep: separator.
 //Note caller is responsible for the free of each string memory in ret.
-UINT xsplit(CHAR const* str, OUT Vector<CHAR*, 8> & ret, CHAR const* sep);
+UINT xsplit(CHAR const* str, OUT Vector<CHAR*> & ret, CHAR const* sep);
+
+//The function copies byte size of 'size' of the string pointed to by 'src'
+//to destination 'tgt', including the '\0'.
 void xstrcpy(CHAR * tgt, CHAR const* src, size_t size);
+
+//Return true if 'c' is blank space or TAB character.
 inline bool xisspace(CHAR c) { return c == ' ' || c == '\t'; }
+
+//Return true if 'c' is decimal.
 inline bool xisdigit(CHAR c) { return c >= '0' && c <= '9'; }
+
+//Return true if 'c' is hex decimal.
 inline bool xisdigithex(CHAR d)
 {
     if (xisdigit(d)) { return true; }
     else if ((d >= 'a' && d <= 'f') || (d >= 'A' && d <= 'F')) { return true; }
     return false;
 }
+
+//Return true if 'c' is letter.
 inline bool xisalpha(CHAR c)
 { return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z'); }
-LONGLONG xabs(LONGLONG a);
 
+//Return abs value of 'a'.
+LONGLONG xabs(LONGLONG a);
 
 //Exported Data Structures
 class ASCII {
@@ -280,4 +313,5 @@ public:
 extern ASCII g_asc1[];
 
 } //namespace xcom
-#endif
+
+#endif  //_COMMON_FUNCTION_H_

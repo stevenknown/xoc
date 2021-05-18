@@ -33,31 +33,15 @@ author: Su Zhenyu
 @*/
 #ifndef __COMINC_H__
 #define __COMINC_H__
-
 #include "commoninc.h"
-#include "data_type.h"
-#include "const.h"
-//Middle level included files
-#include "dbg.h"
-#include "var.h"
-#include "md.h"
-#include "pass.h"
-#include "ai.h"
-#include "du.h"
-#include "ir.h"
-#include "loop.h"
-#include "prssainfo.h"
-#include "mdssainfo.h"
-#include "ir_bb.h"
+#include "region_deps.h"
 #include "ir_refine.h"
 #include "ir_simp.h"
-#include "pass_mgr.h"
 #include "ir_high_opt.h"
 #include "ir_middle_opt.h"
 #include "targ_info.h"
-#include "region_mgr.h"
-#include "analysis_instr.h"
-#include "region.h"
+#include "prssainfo.h"
+#include "mdssainfo.h"
 #include "cfg.h"
 #include "ir_cfg.h"
 #include "ir_du.h"
@@ -65,6 +49,8 @@ author: Su Zhenyu
 #include "ir_expr_tab.h"
 #include "callg.h"
 #include "du_helper.h"
+#include "debug_util.h" //only for compiler internal debugging.
+#include "gscc.h"
 
 using namespace xoc;
 #endif

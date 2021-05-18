@@ -31,45 +31,38 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 namespace xoc {
 
-//DU chain operation.
-//Build DU chain : def->use.
-void addDUChain(IR * def, IR * use, Region * rg);
+//The function manipulates DU chain. It adds DU chain from tree 'from' to
+//tree 'to',  and the function will establish new DU chain between DEF of
+//'from' and expression 'to'.
+//to: root expression of target tree.
+//from: root expression of source tree.
+//NOTE: IR tree 'to' and 'from' must be isomorphic structure.
+//Both 'to' and 'from' must be expression.
+void addUse(IR * to, IR const* from, Region * rg);
 
 //DU chain operation.
-//Change Use expression from 'olduse' to 'newuse'.
-//'newuse': indicate the target expression which change to.
-//'olduse': indicate the source expression which will be changed.
-//e.g: given DU chain DEF->'olduse', change to DEF->'newuse'.
+//The function builds DU chain from stmt 'def' to expression 'use'.
+//def: stmt
+//use: expression
+void buildDUChain(IR * def, IR * use, Region * rg);
+
+//DU chain operation.
+//The function changes USE of some DU chain from 'olduse' to 'newuse'.
+//newuse: indicates the target expression which is changed to.
+//olduse: indicates the source expression which will be changed.
+//e.g: given DU chain DEF->'olduse', the result is DEF->'newuse'.
 void changeUse(IR * olduse, IR * newuse, Region * rg);
 
 //DU chain operation.
-//Change Def stmt from 'olddef' to 'newdef'.
-//'olddef': original stmt.
-//'newdef': new stmt.
-//e.g: given 'olddef'->USE, change to 'newdef'->USE.
+//The function changes DEF of some DU chain from 'olddef' to 'newdef'.
+//olddef: original stmt.
+//newdef: new stmt.
+//e.g: given 'olddef'->USE, the result is 'newdef'->USE.
 void changeDef(IR * olddef, IR * newdef, Region * rg);
 
-//Check each USE occurrence of stmt, remove the expired expression which
-//is not reference the memory any more that stmt defined.
-//Return true if DU changed.
-//Note this function does not modify stmt.
-bool removeExpiredDUForStmt(IR * stmt, Region * rg);
-
-//Remove Use-Def chain.
-//e.g: ir = ...
-//        = exp //S1
-//If S1 will be deleted, exp should be removed from its UseSet in MDSSAInfo.
-//NOTE: If exp is an IR tree, e.g: ild(x, ld(y)), remove ild(x) means
-//ld(y) will be removed as well. And ld(y)'s MDSSAInfo will be
-//updated as well.
-void removeUse(IR * exp, Region * rg);
-
-//Remove all DU info of 'stmt'.
-void removeStmt(IR * stmt, Region * rg);
-
-//Coalesce DU chain of 'from' to 'to'.
-//This function replace definition of USE of 'from' to defintion of 'to'.
-//Just like copy-propagation.
+//The function coalesces DU chain of 'from' to 'to'.
+//The function replaces definition of USE of 'from' to defintion of 'to',
+//just behaved like copy-propagation.
 //from: indicates stmt operation, see example for detail.
 //to: indicates expression operation, see example for detail.
 //e.g: to_def =...
@@ -81,21 +74,24 @@ void removeStmt(IR * stmt, Region * rg);
 //     ... = to
 void coalesceDUChain(IR * from, IR * to, Region * rg);
 
-//DU chain and Memory Object reference operation.
-//This function copy MustUse and MayUse mds from tree 'from' to tree 'to'
-//and build new DU chain for 'to'.
-//add_duchain: if true to add DU chain from tree 'from' to tree 'to'.
-//    this operation will establish new DU chain between the DEF of 'from' and
-//    'to'.
-//'to': root expression of target tree.
-//'from': root expression of source tree.
-//NOTE: IR tree 'to' and 'from' must be identical structure.
-//'to' and 'from' must be expression.
-void copyRefAndAddDUChain(IR * to,
-                          IR const* from,
-                          Region * rg,
-                          bool add_duchain);
+//The function collects all USE expressions into 'useset'.
+//This function give priority to PRSSA and MDSSA DU chain and then classic
+//DU chain when doing collection.
+void collectUseSet(IR const* def, MDSSAMgr const* mdssamgr,
+                   OUT IRSet * useset);
 
+//The function collects all DEF expressions of 'use' into 'defset'.
+//This function give priority to PRSSA and MDSSA DU chain and then classic
+//DU chain when doing collection.
+void collectDefSet(IR const* use, MDSSAMgr const* mdssamgr, OUT IRSet * defset);
+
+//The function finds the nearest dominated DEF stmt of 'exp'.
+//Note RPO of BB must be available.
+//exp: given expression.
+//defset: DEF stmt set of 'exp'.
+//omit_self: true if we do not consider the stmt of 'exp' itself.
+IR * findNearestDomDef(IR const* exp, IRSet const& defset, Region const* rg,
+                       bool omit_self);
 
 //Return true if def is killing-def of use.
 //Note this functin does not check if there is DU chain between def and use.
@@ -109,8 +105,28 @@ bool isKillingDef(IR const* def, MD const* usemd);
 //Note this functin does not check if there is DU chain between defmd and usemd.
 bool isKillingDef(MD const* defmd, MD const* usemd);
 
-//Move IR_PHI and MDPhi from 'from' to 'to'.
-//This function often used in updating PHI when adding new dominater BB to 'to'.
+//The function checks each USE occurrence of stmt, remove the expired expression
+//which is not reference the memory any more that stmt defined.
+//Return true if DU changed.
+//Note this function does not modify stmt.
+bool removeExpiredDUForStmt(IR * stmt, Region * rg);
+
+//Remove Use-Def chain for all memory references in IR Tree
+//that rooted by 'exp'.
+//e.g: ir = ...
+//        = exp //S1
+//If S1 will be deleted, exp should be removed from its UseSet in MDSSAInfo.
+//NOTE: If exp is an IR tree, e.g: ild(x, ld(y)), remove ild(x) means
+//ld(y) will be removed as well. And ld(y)'s MDSSAInfo will be
+//updated as well.
+void removeIRTreeUse(IR * exp, Region * rg);
+
+//Remove all DU info of 'stmt'.
+void removeStmt(IR * stmt, Region * rg);
+
+//The function moves IR_PHI and MDPhi from 'from' to 'to'.
+//This function often be used in updating PHI when adding new dominater BB
+//to 'to'.
 void movePhi(IRBB * from, IRBB * to, Region * rg);
 
 } //namespace xoc

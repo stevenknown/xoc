@@ -67,15 +67,15 @@ public:
 
         DUMgr * dumgr = rg->getDUMgr();
 
-        C<IR*> * ct = NULL;
+        C<IR*> * ct = nullptr;
         BB_irlist(stmt_bb).find(stmt, &ct);
-        ASSERT0(ct != NULL);
+        ASSERT0(ct != nullptr);
 
         //Insert stuff code as you need. It will slow down the benchmark.
         UINT num_want_to_insert = 30;
         for (UINT i = 0; i < num_want_to_insert; i++) {
             IR * newref = rg->dupIRTree(ref);
-            dumgr->copyRefAndAddDUChain(newref, ref, true);
+            dumgr->addUse(newref, ref);
             IR * stpr = rg->buildStorePR(rg->buildPrno(newref->getType()),
                                             newref->getType(), newref);
             rg->allocRefForPR(stpr);

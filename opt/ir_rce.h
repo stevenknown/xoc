@@ -52,22 +52,22 @@ protected:
     bool m_use_gvn;
 
     bool useMDSSADU() const
-    { return m_mdssamgr != NULL && m_mdssamgr->is_valid(); }
+    { return m_mdssamgr != nullptr && m_mdssamgr->is_valid(); }
     bool usePRSSADU() const
-    { return m_prssamgr != NULL && m_prssamgr->is_valid(); }
+    { return m_prssamgr != nullptr && m_prssamgr->is_valid(); }
 public:
     RCE(Region * rg, GVN * gvn)
     {
-        ASSERT0(rg != NULL);
+        ASSERT0(rg != nullptr);
         m_rg = rg;
         m_gvn = gvn;
         m_cfg = rg->getCFG();
         m_du = m_rg->getDUMgr();
         ASSERT0(m_cfg && m_du);
         m_use_gvn = true;
-        m_prssamgr = NULL;
-        m_mdssamgr = NULL;
-        m_refine = NULL;
+        m_prssamgr = nullptr;
+        m_mdssamgr = nullptr;
+        m_refine = nullptr;
     }
     virtual ~RCE() {}
 

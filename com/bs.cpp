@@ -31,11 +31,7 @@ IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 author: Su Zhenyu
 @*/
-#include "ltype.h"
-#include "comf.h"
-#include "smempool.h"
-#include "sstl.h"
-#include "bs.h"
+#include "xcominc.h"
 
 namespace xcom {
 
@@ -841,7 +837,7 @@ void * BitSet::realloc(IN void * src, size_t orgsize, size_t newsize)
         return src;
     }
     void * p = ::malloc(newsize);
-    if (src != NULL) {
+    if (src != nullptr) {
         ASSERT0(orgsize > 0);
         ::memcpy(p, src, orgsize);
         ::free(src);
@@ -857,12 +853,12 @@ void * BitSet::realloc(IN void * src, size_t orgsize, size_t newsize)
 void BitSet::alloc(UINT size)
 {
     m_size = size;
-    if (m_ptr != NULL) { ::free(m_ptr); }
+    if (m_ptr != nullptr) { ::free(m_ptr); }
     if (size != 0) {
         m_ptr = (BYTE*)::malloc(size);
         ::memset(m_ptr, 0, m_size);
     } else {
-        m_ptr = NULL;
+        m_ptr = nullptr;
     }
 }
 
@@ -872,8 +868,8 @@ void BitSet::alloc(UINT size)
 void BitSet::bunion(BitSet const& bs)
 {
     ASSERT0(this != &bs);
-    if (bs.m_ptr == NULL) { return; }
-    UINT cp_sz = bs.m_size; //size need to union.
+    if (bs.m_ptr == nullptr) { return; }
+    UINT cp_sz = bs.m_size; //size needs to unifiy
     if (m_size < bs.m_size) {
         //src's last byte pos.
         INT l = bs.get_last();
@@ -920,7 +916,7 @@ void BitSet::diff(UINT elem)
         return;
     }
     elem = MODBPB(elem);
-    ASSERTN(m_ptr != NULL, ("not yet init"));
+    ASSERTN(m_ptr != nullptr, ("not yet init"));
     m_ptr[first_byte] &= (BYTE)(~(1 << elem));
 }
 
@@ -949,7 +945,7 @@ void BitSet::diff(BitSet const& bs)
         }
     }
 
-    ASSERTN(m_ptr != NULL, ("not yet init"));
+    ASSERTN(m_ptr != nullptr, ("not yet init"));
     for (UINT i = num_of_uint * BYTES_PER_UINT; i < minsize; i++) {
         BYTE d = bs.m_ptr[i];
         if (d != 0) {
@@ -963,7 +959,7 @@ void BitSet::diff(BitSet const& bs)
 void BitSet::intersect(BitSet const& bs)
 {
     ASSERT0(this != &bs);
-    if (m_ptr == NULL) { return; }
+    if (m_ptr == nullptr) { return; }
     if (m_size > bs.m_size) {
         for (UINT i = 0; i < bs.m_size; i++) {
             m_ptr[i] &= bs.m_ptr[i];
@@ -982,7 +978,7 @@ void BitSet::intersect(BitSet const& bs)
 //'last_bit_pos': start at 0, e.g:given '101', last bit pos is 2.
 void BitSet::rev(UINT last_bit_pos)
 {
-    ASSERTN(m_ptr != NULL, ("can not reverse empty set"));
+    ASSERTN(m_ptr != nullptr, ("can not reverse empty set"));
     UINT const last_byte_pos = last_bit_pos / BITS_PER_BYTE;
     ASSERT0(last_byte_pos < m_size);
 
@@ -1022,7 +1018,7 @@ void BitSet::complement(BitSet const& univers)
 //effecient loadbyte instructions.
 UINT BitSet::get_elem_count() const
 {
-    if (m_ptr == NULL) { return 0; }
+    if (m_ptr == nullptr) { return 0; }
     UINT count = 0;
 //#define HAMMING_WEIGHT_METHOD
 #ifdef HAMMING_WEIGHT_METHOD
@@ -1103,7 +1099,7 @@ bool BitSet::is_equal(BitSet const& bs) const
 //Return true if this contain elem.
 bool BitSet::is_contain(UINT elem) const
 {
-    if (m_ptr == NULL) { return false; }
+    if (m_ptr == nullptr) { return false; }
     if (elem >= (MULBPB(m_size))) {
         return false;
     }
@@ -1128,7 +1124,7 @@ bool BitSet::is_contain(BitSet const& bs, bool strict) const
     }
     INT const bs_first_bit = bs.get_first();
     if (bs_first_bit == -1) {
-        //NULL set be contained for any set.
+        //nullptr set be contained for any set.
         return true;
     }
 
@@ -1172,7 +1168,7 @@ bool BitSet::is_contain(BitSet const& bs, bool strict) const
 
 bool BitSet::is_empty() const
 {
-    if (m_ptr == NULL) { return true; }
+    if (m_ptr == nullptr) { return true; }
     UINT num_of_uint = m_size / BYTES_PER_UINT;
     UINT * uint_ptr = (UINT*)m_ptr;
     for (UINT i = 0; i < num_of_uint; i++) {
@@ -1562,7 +1558,7 @@ INT BitSet::get_next(UINT elem) const
 
 void BitSet::clean()
 {
-    if (m_ptr == NULL) { return; }
+    if (m_ptr == nullptr) { return; }
     ::memset(m_ptr, 0, m_size);
 }
 
@@ -1576,7 +1572,7 @@ void BitSet::copy(BitSet const& src)
         return;
     }
 
-    UINT cp_sz = src.m_size; //size need to copy.
+    UINT cp_sz = src.m_size; //size needs to copy.
     if (m_size < src.m_size) {
         //src's last byte pos.
         INT l = src.get_last();
@@ -1598,7 +1594,7 @@ void BitSet::copy(BitSet const& src)
         ::memset(m_ptr + cp_sz, 0, m_size - cp_sz);
     }
 
-    ASSERTN(m_ptr != NULL, ("not yet init"));
+    ASSERTN(m_ptr != nullptr, ("not yet init"));
     ::memcpy(m_ptr, src.m_ptr, cp_sz);
 }
 
@@ -1613,14 +1609,14 @@ BitSet const& BitSet::operator = (BitSet const& src)
 
 void BitSet::dump(CHAR const* name, bool is_del, UINT flag, INT last_pos) const
 {
-    if (name == NULL) {
+    if (name == nullptr) {
         name = "zbs.cxx";
     }
     if (is_del) {
         UNLINK(name);
     }
     FILE * h = fopen(name, "a+");
-    ASSERTN(h != NULL, ("%s create failed!!!", name));
+    ASSERTN(h != nullptr, ("%s create failed!!!", name));
     dump(h, flag, last_pos);
     fclose(h);
 }
@@ -1628,7 +1624,7 @@ void BitSet::dump(CHAR const* name, bool is_del, UINT flag, INT last_pos) const
 
 void BitSet::dump(FILE * h, UINT flag, INT last_pos) const
 {
-    if (h == NULL) { return; }
+    if (h == nullptr) { return; }
     ASSERT0(last_pos < 0 || (last_pos / BITS_PER_BYTE) < (INT)m_size);
 
     INT elem = get_last();
@@ -1685,7 +1681,7 @@ void BitSet::dump(FILE * h, UINT flag, INT last_pos) const
 //START BitSetMgr
 //
 //'h': dump mem usage detail to file.
-size_t BitSetMgr::count_mem(FILE * h)
+size_t BitSetMgr::count_mem(FILE * h) const
 {
     size_t count = 0;
     C<BitSet*> * ct;
@@ -1697,7 +1693,7 @@ size_t BitSetMgr::count_mem(FILE * h)
     DUMMYUSE(h);
 
     #ifdef _DEBUG_
-    if (h != NULL) {
+    if (h != nullptr) {
         //Dump mem usage into file.
         List<size_t> lst;
         C<BitSet*> * ct2;
@@ -1706,7 +1702,7 @@ size_t BitSetMgr::count_mem(FILE * h)
             BitSet const* bs = ct2->val();
             size_t c = bs->count_mem();
 
-            C<size_t> * ct3 = NULL;
+            C<size_t> * ct3 = nullptr;
             UINT n = lst.get_elem_count();
             lst.get_head(&ct3);
             UINT i;
@@ -1733,11 +1729,11 @@ size_t BitSetMgr::count_mem(FILE * h)
                 b = 0;
             }
             if (v < 1024) {
-                fprintf(h, "%zuB,", v);
+                fprintf(h, "%uB,", (UINT)v);
             } else if (v < 1024 * 1024) {
-                fprintf(h, "%zuKB,", v/1024);
+                fprintf(h, "%uKB,", (UINT)v/1024);
             } else {
-                fprintf(h, "%zuMB,", v/1024/1024);
+                fprintf(h, "%uMB,", (UINT)v/1024/1024);
             }
         }
         fflush(h);
@@ -1756,7 +1752,7 @@ size_t BitSetMgr::count_mem(FILE * h)
 //and modify 'res' as result.
 BitSet * bs_union(BitSet const& set1, BitSet const& set2, OUT BitSet & res)
 {
-    ASSERTN(set1.m_ptr != NULL && set2.m_ptr != NULL && res.m_ptr != NULL,
+    ASSERTN(set1.m_ptr != nullptr && set2.m_ptr != nullptr && res.m_ptr != nullptr,
             ("not yet init"));
     if (&res == &set1) {
         res.bunion(set2);
@@ -1777,9 +1773,9 @@ BitSet * bs_union(BitSet const& set1, BitSet const& set2, OUT BitSet & res)
 //Returns a new set which is { x : member( x, 'set1' ) & ~ member( x, 'set2' ) }.
 BitSet * bs_diff(BitSet const& set1, BitSet const& set2, OUT BitSet & res)
 {
-    ASSERTN(set1.m_ptr != NULL &&
-            set2.m_ptr != NULL &&
-            res.m_ptr != NULL, ("not yet init"));
+    ASSERTN(set1.m_ptr != nullptr &&
+            set2.m_ptr != nullptr &&
+            res.m_ptr != nullptr, ("not yet init"));
     if (&res == &set1) {
         res.diff(set2);
     } else if (&res == &set2) {
@@ -1797,9 +1793,9 @@ BitSet * bs_diff(BitSet const& set1, BitSet const& set2, OUT BitSet & res)
 //Returns a new set which is intersection of 'set1' and 'set2'.
 BitSet * bs_intersect(BitSet const& set1, BitSet const& set2, OUT BitSet & res)
 {
-    ASSERTN(set1.m_ptr != NULL &&
-            set2.m_ptr != NULL &&
-            res.m_ptr != NULL, ("not yet init"));
+    ASSERTN(set1.m_ptr != nullptr &&
+            set2.m_ptr != nullptr &&
+            res.m_ptr != nullptr, ("not yet init"));
     if (&res == &set1) {
         res.intersect(set2);
     } else if (&res == &set2) {

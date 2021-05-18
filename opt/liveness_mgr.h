@@ -56,7 +56,7 @@ protected:
     DefSBitSetCore * get_def(UINT bbid)
     {
         DefSBitSetCore * set = m_def.get(bbid);
-        if (set == NULL) {
+        if (set == nullptr) {
             set = m_sbs_mgr.allocSBitSetCore();
             m_def.set(bbid, set);
         }
@@ -66,7 +66,7 @@ protected:
     DefSBitSetCore * get_use(UINT bbid)
     {
         DefSBitSetCore * set = m_use.get(bbid);
-        if (set == NULL) {
+        if (set == nullptr) {
             set = m_sbs_mgr.allocSBitSetCore();
             m_use.set(bbid, set);
         }
@@ -89,7 +89,7 @@ public:
         m_rg = rg;
         m_md_sys = rg->getMDSystem();
         m_cfg = rg->getCFG();
-        m_var2pr = NULL;
+        m_var2pr = nullptr;
         m_handle_may = false;
     }
     COPY_CONSTRUCTOR(LivenessMgr);
@@ -97,28 +97,28 @@ public:
     {
         for (INT i = 0; i <= m_def.get_last_idx(); i++) {
             DefSBitSetCore * bs = m_def.get((UINT)i);
-            if (bs != NULL) {
+            if (bs != nullptr) {
                 m_sbs_mgr.freeSBitSetCore(bs);
             }
         }
 
         for (INT i = 0; i <= m_use.get_last_idx(); i++) {
             DefSBitSetCore * bs = m_use.get((UINT)i);
-            if (bs != NULL) {
+            if (bs != nullptr) {
                 m_sbs_mgr.freeSBitSetCore(bs);
             }
         }
 
         for (INT i = 0; i <= m_livein.get_last_idx(); i++) {
             DefSBitSetCore * bs = m_livein.get((UINT)i);
-            if (bs != NULL) {
+            if (bs != nullptr) {
                 m_sbs_mgr.freeSBitSetCore(bs);
             }
         }
 
         for (INT i = 0; i <= m_liveout.get_last_idx(); i++) {
             DefSBitSetCore * bs = m_liveout.get((UINT)i);
-            if (bs != NULL) {
+            if (bs != nullptr) {
                 m_sbs_mgr.freeSBitSetCore(bs);
             }
         }
@@ -137,28 +137,28 @@ public:
 
         for (INT i = 0; i <= m_def.get_last_idx(); i++) {
             DefSBitSetCore * bs = m_def.get((UINT)i);
-            if (bs != NULL) {
+            if (bs != nullptr) {
                 count += bs->count_mem();
             }
         }
 
         for (INT i = 0; i <= m_use.get_last_idx(); i++) {
             DefSBitSetCore * bs = m_use.get((UINT)i);
-            if (bs != NULL) {
+            if (bs != nullptr) {
                 count += bs->count_mem();
             }
         }
 
         for (INT i = 0; i <= m_livein.get_last_idx(); i++) {
             DefSBitSetCore * bs = m_livein.get((UINT)i);
-            if (bs != NULL) {
+            if (bs != nullptr) {
                 count += bs->count_mem();
             }
         }
 
         for (INT i = 0; i <= m_liveout.get_last_idx(); i++) {
             DefSBitSetCore * bs = m_liveout.get((UINT)i);
-            if (bs != NULL) {
+            if (bs != nullptr) {
                 count += bs->count_mem();
             }
         }
@@ -181,7 +181,7 @@ public:
     DefSBitSetCore * get_livein(UINT bbid)
     {
         DefSBitSetCore * x = m_livein.get(bbid);
-        if (x == NULL) {
+        if (x == nullptr) {
             x = m_sbs_mgr.allocSBitSetCore();
             m_livein.set(bbid, x);
         }
@@ -196,7 +196,7 @@ public:
     DefSBitSetCore * get_liveout(UINT bbid)
     {
         DefSBitSetCore * x = m_liveout.get(bbid);
-        if (x == NULL) {
+        if (x == nullptr) {
             x = m_sbs_mgr.allocSBitSetCore();
             m_liveout.set(bbid, x);
         }

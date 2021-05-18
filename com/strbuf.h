@@ -46,7 +46,7 @@ public:
     }
     ~StrBuf()
     {
-        if (buf != NULL) {
+        if (buf != nullptr) {
             ::free(buf);
         }
     }
@@ -56,6 +56,14 @@ public:
         ASSERT0(buf);
         buf[0] = 0;
     }
+
+    //String comparation.
+    //Return true if s equal to current string.
+    bool is_equal(CHAR const* s) const { return ::strcmp(buf, s) == 0; }
+
+    //Return true if string is empty.
+    bool is_empty() const { return buf == nullptr || buf[0] == 0; }
+
     //Composes a string that formed by 'format'.
     void sprint(CHAR const* format, ...);
 
@@ -77,6 +85,7 @@ public:
     void strcat(UINT l, CHAR const* format, va_list args);
 
     //Return byte size of current string.
+    //Note the size does NOT include the end-character '\0'.
     size_t strlen() const { return ::strlen(buf); }
 
     //The functions snprintf() and vsnprintf() do not write more than size

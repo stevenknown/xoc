@@ -263,7 +263,7 @@ protected:
 
     TOKEN getKeyWord(CHAR const* s)
     {
-        if (s == NULL) { return T_NUL; }
+        if (s == nullptr) { return T_NUL; }
         return m_str2token.get(s);
     }
     INT getLine();
@@ -292,10 +292,10 @@ public:
         m_is_dos = true;
         m_enable_true_false_token = true;
         m_use_newline_char = true;
-        m_src_file = NULL;
-        m_cur_line = NULL;
+        m_src_file = nullptr;
+        m_cur_line = nullptr;
         m_cur_line_len = 0;
-        m_ofst_tab = NULL;
+        m_ofst_tab = nullptr;
         m_ofst_tab_byte_size = 0;
         m_file_buf_pos = MAX_BUF_LINE;
         initKeyWordTab();
@@ -307,13 +307,13 @@ public:
     COPY_CONSTRUCTOR(Lexer);
     ~Lexer()
     {
-        if (m_ofst_tab != NULL) {
+        if (m_ofst_tab != nullptr) {
             ::free(m_ofst_tab);
-            m_ofst_tab = NULL;
+            m_ofst_tab = nullptr;
         }
-        if (m_cur_line != NULL) {
+        if (m_cur_line != nullptr) {
             ::free(m_cur_line);
-            m_cur_line = NULL;
+            m_cur_line = nullptr;
         }
         smpoolDelete(m_pool);
         ::free(m_cur_token_string);
@@ -325,10 +325,10 @@ public:
         m_cur_token_string_pos = 0;
         m_cur_token = T_NUL;
         m_src_line_num = 0;
-        if (m_cur_line != NULL) {
+        if (m_cur_line != nullptr) {
             m_cur_line[0] = 0;
         }
-        if (m_cur_token_string != NULL) {
+        if (m_cur_token_string != nullptr) {
             m_cur_token_string[0] = 0;
         }
         m_file_buf[0] = 0;

@@ -32,7 +32,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 namespace xcom {
 
 //Consider the speed of TMap might be better than HMap on average.
-//#define _BIT2NODE_IN_HASH_ 
+//#define _BIT2NODE_IN_HASH_
 #define MD2NODE2_INIT_SZ 8 //The size must be power of 2.
 
 //For given SBitSetCore, mapping MD to its subsequently MD elements via HMap.
@@ -42,7 +42,7 @@ public:
     SBitSetCore<BitsPerSeg> * set; //will be freed by sbs_mgr.
     HMap<UINT, Bit2NodeH*, HashFuncBase2<UINT> > next;
 public:
-    Bit2NodeH(UINT hash_tab_size = 16) : next(hash_tab_size) { set = NULL; }
+    Bit2NodeH(UINT hash_tab_size = 16) : next(hash_tab_size) { set = nullptr; }
     ~Bit2NodeH() {}
     //Count memory usage for current object.
     size_t count_mem() const { return next.count_mem() + sizeof(set); }
@@ -57,16 +57,16 @@ public:
     SBitSetCore<BitsPerSeg> * set; //will be freed by sbs_mgr.
     TMap<UINT, Bit2NodeT*> next;
 public:
-    Bit2NodeT(SMemPool * pool = NULL) : next(pool) { set = NULL; }
+    Bit2NodeT(SMemPool * pool = nullptr) : next(pool) { set = nullptr; }
     ~Bit2NodeT() {}
-    void init(SMemPool * pool = NULL)
+    void init(SMemPool * pool = nullptr)
     {
-        set = NULL;
+        set = nullptr;
         next.init(pool);
     }
     void destroy()
     {
-        set = NULL;
+        set = nullptr;
         next.destroy();
     }
     //Count memory usage for current object.
@@ -85,7 +85,7 @@ template <class Allocator, UINT BitsPerSeg = BITS_PER_SEG>
 class SBitSetCoreHash {
     COPY_CONSTRUCTOR(SBitSetCoreHash);
 protected:
-    SMemPool * m_pool;    
+    SMemPool * m_pool;
     Allocator * m_allocator;
     List<SBitSetCore<BitsPerSeg>*> m_bit2node_set_list;
 
@@ -130,9 +130,9 @@ protected:
         UINT i = 0;
         while (i < indent) { fprintf(h, " "); i++; }
         fprintf(h, "%d", id);
-        if (set == NULL) { return; }
+        if (set == nullptr) { return; }
         fprintf(h, " {");
-        SEGIter * iter = NULL;
+        SEGIter * iter = nullptr;
         for (INT j = set->get_first(&iter); j >= 0;) {
             fprintf(h, "%d", j);
             j = set->get_next((UINT)j, &iter);
@@ -149,7 +149,7 @@ protected:
     {
         INT pos;
         for (B2NType * nextmn = mn->next.get_first_elem(pos);
-             nextmn != NULL; nextmn = mn->next.get_next_elem(pos)) {
+             nextmn != nullptr; nextmn = mn->next.get_next_elem(pos)) {
             dump_helper_set(h, nextmn->set, indent, (UINT)pos);
             ASSERT0(nextmn);
             dump_helper(h, nextmn, indent + 2);
@@ -170,14 +170,14 @@ protected:
         id_stack.push(0);
         indent_stack.push(indent);
 
-        for (; mn_stack.get_top() != NULL;) {
+        for (; mn_stack.get_top() != nullptr;) {
             B2NType * mn2 = mn_stack.pop();
             UINT ind = indent_stack.pop();
             UINT id = id_stack.pop();
             ti.clean();
             dump_helper_set(h, mn2->set, ind, id);
 
-            B2NType * nextmn = NULL;
+            B2NType * nextmn = nullptr;
             for (UINT id2 = mn2->next.get_first(ti, &nextmn);
                  id2 != 0; id2 = mn2->next.get_next(ti, &nextmn)) {
                 ASSERT0(nextmn);
@@ -193,7 +193,7 @@ public:
     {
         ASSERT0(allocator);
         m_allocator = allocator;
-        ASSERTN(allocator, ("Parameter can not be NULL"));
+        ASSERTN(allocator, ("Parameter can not be nullptr"));
         m_pool = smpoolCreate(sizeof(B2NType) * 4, MEM_CONST_SIZE);
 
         #ifdef _DEBUG_
@@ -215,13 +215,13 @@ public:
 
         #ifdef _BIT2NODE_IN_HASH_
         //Nothing to do.
-        //Do not detete m_bit2node, it has already been deleted in destroy().        
+        //Do not detete m_bit2node, it has already been deleted in destroy().
         #else
         smpoolDelete(m_rbtn_pool);
         delete m_bit2node;
         #endif
 
-        m_bit2node = NULL;
+        m_bit2node = nullptr;
         smpoolDelete(m_pool);
     }
 
@@ -237,13 +237,13 @@ public:
         while (wl.get_elem_count() != 0) {
             B2NType * mn = wl.remove_head();
             ASSERT0(mn);
-            B2NType * nextmn = NULL;
+            B2NType * nextmn = nullptr;
             INT pos = 0;
             for (nextmn = mn->next.get_first_elem(pos);
-                 nextmn != NULL; nextmn = mn->next.get_next_elem(pos)) {
+                 nextmn != nullptr; nextmn = mn->next.get_next_elem(pos)) {
                 wl.append_tail(nextmn);
             }
-            if (mn->set != NULL) {
+            if (mn->set != nullptr) {
                 m_allocator->free(mn->set);
             }
             mn->next.destroy();
@@ -268,20 +268,20 @@ public:
         while (wl.get_elem_count() != 0) {
             B2NType * mn = wl.remove_head();
             ASSERT0(mn);
-            B2NType * nextmn = NULL;
+            B2NType * nextmn = nullptr;
             ti.clean();
             for (UINT id = mn->next.get_first(ti, &nextmn);
                  id != 0; id = mn->next.get_next(ti, &nextmn)) {
                 ASSERT0(nextmn);
                 wl.append_tail(nextmn);
             }
-            if (mn->set != NULL) {
+            if (mn->set != nullptr) {
                 m_allocator->free(mn->set);
             }
             mn->next.destroy();
         }
         #else
-        C<SBitSetCore<BitsPerSeg>*> * ct = NULL;
+        C<SBitSetCore<BitsPerSeg>*> * ct = nullptr;
         for (SBitSetCore<BitsPerSeg>* set = m_bit2node_set_list.get_head(&ct);
              ct != m_bit2node_set_list.end();
              set = m_bit2node_set_list.get_next(&ct)) {
@@ -294,11 +294,11 @@ public:
 
     void destroy()
     {
-        #ifdef _BIT2NODE_IN_HASH_    
+        #ifdef _BIT2NODE_IN_HASH_
         destroyBit2NodeH();
         #else
         destroyBit2NodeT();
-        #endif    
+        #endif
     }
 
     inline void checkAndGrow(B2NType * mn)
@@ -321,12 +321,12 @@ public:
 
     SBitSetCore<BitsPerSeg> const* append(SBitSetCore<BitsPerSeg> const& set)
     {
-        SEGIter * iter = NULL;
+        SEGIter * iter = nullptr;
         INT id = set.get_first(&iter);
-        if (id < 0) { return NULL; }
+        if (id < 0) { return nullptr; }
 
         B2NType * mn = m_bit2node->next.get((UINT)id);
-        if (mn == NULL) {
+        if (mn == nullptr) {
             checkAndGrow(m_bit2node);
             mn = allocB2NType();
             m_bit2node->next.set((UINT)id, mn);
@@ -335,7 +335,7 @@ public:
         INT nextid = set.get_next((UINT)id, &iter);
         for (; nextid >= 0; nextid = set.get_next((UINT)nextid, &iter)) {
             B2NType * nextmn = mn->next.get((UINT)nextid);
-            if (nextmn == NULL) {
+            if (nextmn == nullptr) {
                 checkAndGrow(mn);
                 nextmn = allocB2NType();
                 mn->next.set((UINT)nextid, nextmn);
@@ -344,7 +344,7 @@ public:
         }
 
         ASSERT0(mn);
-        if (mn->set == NULL) {
+        if (mn->set == nullptr) {
             SBitSetCore<BitsPerSeg> * s = m_allocator->alloc();
             ASSERT0(s);
             s->copy(set, *m_allocator->getBsMgr());
@@ -370,7 +370,7 @@ public:
     //Dump hash tab as tree style.
     void dump(FILE * h) const
     {
-        if (h == NULL) { return; }
+        if (h == nullptr) { return; }
         fprintf(h, "\n==---- DUMP SBitSetCoreHashHash ----==");
 
         #ifdef _DEBUG_
@@ -385,7 +385,7 @@ public:
     //Dump bitset that hashed.
     void dump_hashed_set(FILE * h) const
     {
-        if (h == NULL) { return; }
+        if (h == nullptr) { return; }
         fprintf(h, "\n==---- DUMP SBitSetCoreHashHash ----==");
 
         List<B2NType*> wl;
@@ -401,12 +401,12 @@ public:
             B2NType * mn = wl.remove_head();
             ASSERT0(mn);
 
-            B2NType * nextmn = NULL;
+            B2NType * nextmn = nullptr;
 
             #ifdef _BIT2NODE_IN_HASH_
             INT pos = 0;
             for (nextmn = mn->next.get_first_elem(pos);
-                 nextmn != NULL; nextmn = mn->next.get_next_elem(pos)) {
+                 nextmn != nullptr; nextmn = mn->next.get_next_elem(pos)) {
                 wl.append_tail(nextmn);
             }
             #else
@@ -418,7 +418,7 @@ public:
             }
             #endif
 
-            if (mn->set != NULL) {
+            if (mn->set != nullptr) {
                 fprintf(h, "\n");
                 mn->set->dump(h);
             }
@@ -447,11 +447,11 @@ public:
             B2NType const* mn = wl.remove_head();
             ASSERT0(mn);
 
-            B2NType * nextmn = NULL;
+            B2NType * nextmn = nullptr;
             #ifdef _BIT2NODE_IN_HASH_
             INT pos = 0;
             for (nextmn = mn->next.get_first_elem(pos);
-                 nextmn != NULL; nextmn = mn->next.get_next_elem(pos)) {
+                 nextmn != nullptr; nextmn = mn->next.get_next_elem(pos)) {
                 wl.append_tail(nextmn);
             }
             #else
@@ -463,7 +463,7 @@ public:
             }
             #endif
 
-            if (mn->set != NULL) {
+            if (mn->set != nullptr) {
                 count++;
             }
         }
@@ -473,23 +473,23 @@ public:
     //Return true if SBitSetCore pointer has been record in the hash.
     bool find(SBitSetCore<BitsPerSeg> const& set) const
     {
-        SEGIter * iter = NULL;
+        SEGIter * iter = nullptr;
         INT id = set.get_first(&iter);
         if (id < 0) { return false; }
 
         B2NType * mn = get_root()->next.get((UINT)id);
-        if (mn == NULL) { return false; }
+        if (mn == nullptr) { return false; }
 
         INT nextid = set.get_next((UINT)id, &iter);
         for (; nextid >= 0; id = nextid,
              nextid = set.get_next((UINT)nextid, &iter)) {
             B2NType * nextmn = mn->next.get((UINT)nextid);
-            if (nextmn == NULL) { return false; }
+            if (nextmn == nullptr) { return false; }
             mn = nextmn;
         }
 
         ASSERT0(mn);
-        if (mn->set == NULL) {
+        if (mn->set == nullptr) {
             return false;
         }
         return mn->set == &set;

@@ -43,7 +43,7 @@ void MDId2MD::dump(Region const* rg) const
     if (!rg->isLogMgrInit()) { return; }
     for (INT i = 0; i <= get_last_idx(); i++) {
         MD * md = Vector<MD*>::get(i);
-        if (md == NULL) { continue; }
+        if (md == nullptr) { continue; }
         ASSERT0(MD_id(md) == (UINT)i);
         prt(rg, "%d,", i);
     }
@@ -103,7 +103,7 @@ bool MD::is_exact_cover(MD const* m) const
 
 //Return true if current md intersect but may be not cover 'm', such as:
 //current md: |-------|
-//m:            |-------| 
+//m:            |-------|
 bool MD::is_overlap(MD const* m) const
 {
     ASSERT0(m && this != m);
@@ -137,7 +137,7 @@ CHAR * MD::dump(StrBuf & buf, TypeMgr * dm) const
 {
     buf.strcat("MD%d -- base:", MD_id(this));
 
-    ASSERT0(MD_base(this) != NULL);
+    ASSERT0(MD_base(this) != nullptr);
     MD_base(this)->dump(buf, dm);
 
     INT lofst = MD_ofst(this);
@@ -168,18 +168,18 @@ void MD::dump(TypeMgr * dm) const
 //Get unique MD that is not fake memory object,
 //but its offset might be invalid.
 //Note the MDSet can only contain one element.
-//Return the effect MD if found, otherwise return NULL.
+//Return the effect MD if found, otherwise return nullptr.
 MD * MDSet::get_effect_md(MDSystem * ms) const
 {
     ASSERT0(ms);
     if (get_elem_count() != 1) {
-        return NULL;
+        return nullptr;
     }
     MDSetIter iter;
     MD * md = ms->getMD(get_first(&iter));
-    ASSERT0(md != NULL);
+    ASSERT0(md != nullptr);
     if (md->get_base()->is_fake()) {
-        return NULL;
+        return nullptr;
     }
     return md;
 }
@@ -256,7 +256,7 @@ bool MDSet::is_contain_only_exact_and_str(MDSystem const* ms) const
     MDSystem * pms = const_cast<MDSystem*>(ms);
     for (INT i = get_first(&iter); i != -1; i = get_next(i, &iter)) {
         MD * tmd = pms->getMD(i);
-        ASSERT0(tmd != NULL);
+        ASSERT0(tmd != nullptr);
         if (!tmd->is_exact() && !MD_base(tmd)->is_string()) {
             return false;
         }
@@ -272,7 +272,7 @@ bool MDSet::is_contain_inexact(MDSystem const* ms) const
     MDSystem * pms = const_cast<MDSystem*>(ms);
     for (INT i = get_first(&iter); i != -1; i = get_next(i, &iter)) {
         MD * tmd = pms->getMD(i);
-        ASSERT0(tmd != NULL);
+        ASSERT0(tmd != nullptr);
 
         //TO BE CONFIRMED: Does it necessary to judge if either current
         //MD or input MD is FULL_MEM?
@@ -324,7 +324,7 @@ bool MDSet::is_contain_only_taken_addr(MD const* md) const
 {
     if (md->is_global() &&
         md->get_base()->is_addr_taken() &&
-        DefSBitSetCore::is_contain(MD_GLOBAL_VAR) &&        
+        DefSBitSetCore::is_contain(MD_GLOBAL_VAR) &&
         MD_id(md) != MD_IMPORT_VAR) {
         return true;
     }
@@ -380,7 +380,7 @@ bool MDSet::is_overlap(MD const* md, Region const* current_ru) const
 
 
 //Return true if md is overlap with the elements in set.
-bool MDSet::is_overlap_only_taken_addr(MD const* md, 
+bool MDSet::is_overlap_only_taken_addr(MD const* md,
                                        Region const* current_ru) const
 {
     ASSERT0(current_ru);
@@ -389,7 +389,7 @@ bool MDSet::is_overlap_only_taken_addr(MD const* md,
 
     if (md->is_global() &&
         base->is_addr_taken() &&
-        DefSBitSetCore::is_contain(MD_GLOBAL_VAR) &&        
+        DefSBitSetCore::is_contain(MD_GLOBAL_VAR) &&
         MD_id(md) != MD_IMPORT_VAR) {
         return true;
     }
@@ -428,7 +428,7 @@ bool MDSet::is_overlap_ex(MD const* md,
     ASSERT0(md && mdsys && current_ru);
     if (MDSet::is_overlap(md, current_ru)) { return true; }
 
-    MDSetIter iter = NULL;
+    MDSetIter iter = nullptr;
     for (INT i = get_first(&iter);
          i >= 0; i = get_next((UINT)i, &iter)) {
         MD const* t = const_cast<MDSystem*>(mdsys)->getMD((UINT)i);
@@ -557,14 +557,14 @@ void MDSetMgr::destroy()
 
     smpoolDelete(m_mds_pool);
     smpoolDelete(m_sc_mds_pool);
-    m_mds_pool = NULL;
-    m_sc_mds_pool = NULL;
+    m_mds_pool = nullptr;
+    m_sc_mds_pool = nullptr;
 }
 
 
 void MDSetMgr::free(MDSet * mds)
 {
-    if (mds == NULL) { return; }
+    if (mds == nullptr) { return; }
 
     #if 0
     //#ifdef _DEBUG_
@@ -573,7 +573,7 @@ void MDSetMgr::free(MDSet * mds)
 
     xcom::SC<MDSet*> * sct;
     for (MDSet * x = m_free_md_set.get_head(&sct);
-         x != NULL; x = m_free_md_set.get_next(&sct)) {
+         x != nullptr; x = m_free_md_set.get_next(&sct)) {
         ASSERTN(x != mds, ("Already have been freed."));
     }
     #endif
@@ -583,7 +583,7 @@ void MDSetMgr::free(MDSet * mds)
 }
 
 
-size_t MDSetMgr::count_mem()
+size_t MDSetMgr::count_mem() const
 {
     size_t count = 0;
     for (xcom::SC<MDSet*> * sc = m_md_set_list.get_head();
@@ -681,7 +681,7 @@ void MD2MDSet::dump(Region * rg)
     ms->getID2MDMap()->dump(rg);
 
     MD2MDSetIter mxiter;
-    MDSet const* pts = NULL;
+    MDSet const* pts = nullptr;
     for (UINT mdid = get_first(mxiter, &pts);
          mdid > 0; mdid = get_next(mxiter, &pts)) {
         MD const* md = ms->getMD(mdid);
@@ -707,19 +707,19 @@ void MD2MDSet::dump(Region * rg)
 
     //Dump set of MD that corresponding to an individual Var.
     note(rg, "\n==-- DUMP the mapping from Var to MDSet --==");
-    VarVec * var_tab = rg->getVarMgr()->get_var_vec();
+    VarVec * var_tab = rg->getVarMgr()->getVarVec();
     Vector<MD const*> mdv;
     ConstMDIter iter;
     for (INT i = 0; i <= var_tab->get_last_idx(); i++) {
         Var * v = var_tab->get(i);
-        if (v == NULL) { continue; }
+        if (v == nullptr) { continue; }
 
         MDTab * mdtab = ms->getMDTab(v);
 
         buf.clean();
         note(rg, "\n\t%s", v->dump(buf, rg->getTypeMgr()));
 
-        if (mdtab == NULL || mdtab->get_elem_count() == 0) { continue; }
+        if (mdtab == nullptr || mdtab->get_elem_count() == 0) { continue; }
 
         mdv.clean();
         iter.clean();
@@ -756,21 +756,21 @@ MD const* MDSystem::registerMD(MD const& m)
     if (MD_id(&m) > 0) {
         //Find the entry in MDTab accroding to m.
         MDTab * mdtab = getMDTab(MD_base(&m));
-        ASSERTN(mdtab != NULL, ("md has not been registered"));
+        ASSERTN(mdtab != nullptr, ("md has not been registered"));
         MD const* entry = mdtab->find(&m);
         ASSERTN(entry, ("md has not been registered"));
         return entry;
     }
 
-    ASSERT0(MD_base(&m) != NULL);
+    ASSERT0(MD_base(&m) != nullptr);
 
     //Check if MD has been registerd.
     MDTab * mdtab = getMDTab(MD_base(&m));
-    if (mdtab != NULL) {
+    if (mdtab != nullptr) {
         //Var-base has been registered, then check md by
         //offset in md-table.
         MD const* hash_entry = mdtab->find(&m);
-        if (hash_entry != NULL) {
+        if (hash_entry != nullptr) {
             //find MD via MD_ofst.
             return hash_entry;
         }
@@ -804,7 +804,7 @@ MD const* MDSystem::registerMD(MD const& m)
         MD_id(entry) = m_md_count++;
     }
     entry->copy(&m);
-    if (mdtab == NULL) {
+    if (mdtab == nullptr) {
         mdtab = allocMDTab();
         m_var2mdtab.set(MD_base(entry), mdtab);
     }
@@ -830,8 +830,8 @@ MD const* MDSystem::registerUnboundMD(Var * var, UINT size)
 //MD for global memory.
 void MDSystem::initGlobalMemMD(VarMgr * vm)
 {
-    m_global_mem = NULL;
-    if (vm == NULL) { return; }
+    m_global_mem = nullptr;
+    if (vm == nullptr) { return; }
 
     m_global_mem = vm->registerVar((CHAR*)".global_mem",
         getTypeMgr()->getMCType(0), 1,
@@ -842,7 +842,7 @@ void MDSystem::initGlobalMemMD(VarMgr * vm)
     MD_ty(&x) = MD_UNBOUND;
     MD_is_may(&x) = true; //MD_GLOBAL_VAR can only be May reference.
     MD const* e = registerMD(x);
-    CHECK_DUMMYUSE(e);
+    CHECK0_DUMMYUSE(e);
     ASSERT0(MD_id(e) == MD_GLOBAL_VAR);
 }
 
@@ -850,8 +850,8 @@ void MDSystem::initGlobalMemMD(VarMgr * vm)
 //MD for imported variables.
 void MDSystem::initImportVar(VarMgr * vm)
 {
-    m_import_var = NULL;
-    if (vm == NULL) { return; }
+    m_import_var = nullptr;
+    if (vm == nullptr) { return; }
 
     //The design goal of IMPORT MD set is attempt to describe non-global variables
     //precisely that located in outer region.
@@ -881,7 +881,7 @@ void MDSystem::initImportVar(VarMgr * vm)
     MD_ty(&x) = MD_UNBOUND;
     MD_is_may(&x) = true; //MD_IMPORT_VAR can only be May reference.
     MD const* e = registerMD(x);
-    CHECK_DUMMYUSE(e);
+    CHECK0_DUMMYUSE(e);
     ASSERT0(MD_id(e) == MD_IMPORT_VAR);
 }
 
@@ -891,8 +891,8 @@ void MDSystem::initImportVar(VarMgr * vm)
 //MD for total memory.
 void MDSystem::initAllMemMD(VarMgr * vm)
 {
-    m_all_mem = NULL;
-    if (vm == NULL) { return; }
+    m_all_mem = nullptr;
+    if (vm == nullptr) { return; }
 
     m_all_mem = vm->registerVar(
                     (CHAR*)".all_mem",
@@ -905,7 +905,7 @@ void MDSystem::initAllMemMD(VarMgr * vm)
     MD_size(&x) = 0;
     MD_ty(&x) = MD_UNBOUND;
     MD const* e = registerMD(x);
-    CHECK_DUMMYUSE(e);
+    CHECK0_DUMMYUSE(e);
     ASSERT0(MD_id(e) == MD_FULL_MEM);
 }
 
@@ -930,7 +930,7 @@ void MDSystem::destroy()
     Var2MDTabIter iter;
     MDTab * mdtab;
     for (Var const* var = m_var2mdtab.get_first(iter, &mdtab);
-         var != NULL; var = m_var2mdtab.get_next(iter, &mdtab)) {
+         var != nullptr; var = m_var2mdtab.get_next(iter, &mdtab)) {
         delete mdtab;
     }
 
@@ -968,10 +968,10 @@ void MDSystem::computeOverlap(Region * current_ru,
     }
 
     MDTab * mdt = getMDTab(MD_base(md));
-    ASSERT0(mdt != NULL);
+    ASSERT0(mdt != nullptr);
 
     MD const* effect_md = mdt->get_effect_md();
-    if (effect_md != NULL && effect_md != md) {
+    if (effect_md != nullptr && effect_md != md) {
         ASSERT0(MD_base(md) == MD_base(effect_md));
         output.bunion(effect_md, mbsmgr);
     }
@@ -982,8 +982,8 @@ void MDSystem::computeOverlap(Region * current_ru,
 
     tabiter.clean();
     bool find_overlapped = false;
-    for (MD const* tmd = ofsttab->get_first(tabiter, NULL);
-         tmd != NULL; tmd = ofsttab->get_next(tabiter, NULL)) {
+    for (MD const* tmd = ofsttab->get_first(tabiter, nullptr);
+         tmd != nullptr; tmd = ofsttab->get_next(tabiter, nullptr)) {
         ASSERT0(MD_base(md) == MD_base(tmd));
         if (tmd == md) { continue; }
         if (md->is_overlap(tmd)) {
@@ -1013,8 +1013,8 @@ void MDSystem::computeOverlapExactMD(
     ASSERT0(ofstab);
     if (ofstab->get_elem_count() > 0) {
         tabiter.clean();
-        for (MD const* t = ofstab->get_first(tabiter, NULL);
-             t != NULL; t = ofstab->get_next(tabiter, NULL)) {
+        for (MD const* t = ofstab->get_first(tabiter, nullptr);
+             t != nullptr; t = ofstab->get_next(tabiter, nullptr)) {
             if (t == md || !t->is_exact()) { continue; }
             if (t->is_overlap(md)) {
                 output->bunion(t, mbsmgr);
@@ -1050,7 +1050,7 @@ void MDSystem::computeOverlap(Region * current_ru,
         MD * md = getMD(i);
         ASSERT0(md);
         MDTab * mdt = getMDTab(MD_base(md));
-        ASSERT0(mdt != NULL);
+        ASSERT0(mdt != nullptr);
         if (md->is_global()) {
             set_global = true;
         } else if (!current_ru->isRegionVAR(md->get_base())) {
@@ -1058,7 +1058,7 @@ void MDSystem::computeOverlap(Region * current_ru,
         }
 
         MD const* effect_md = mdt->get_effect_md();
-        if (effect_md != NULL && !mds.is_contain(effect_md)) {
+        if (effect_md != nullptr && !mds.is_contain(effect_md)) {
             ASSERT0(MD_base(md) == MD_base(effect_md));
             tmpvec.set(count, effect_md);
             count++;
@@ -1067,8 +1067,8 @@ void MDSystem::computeOverlap(Region * current_ru,
         OffsetTab * ofsttab = mdt->get_ofst_tab();
         ASSERT0(ofsttab);
         tabiter.clean();
-        for (MD const* tmd = ofsttab->get_first(tabiter, NULL);
-             tmd != NULL; tmd = ofsttab->get_next(tabiter, NULL)) {
+        for (MD const* tmd = ofsttab->get_first(tabiter, nullptr);
+             tmd != nullptr; tmd = ofsttab->get_next(tabiter, nullptr)) {
             if (((DefSBitSetCore&)mds).is_contain(MD_id(tmd))) {
                 continue;
             }
@@ -1124,7 +1124,7 @@ void MDSystem::computeOverlap(Region * current_ru,
         MD * md = getMD(i);
         ASSERT0(md);
         MDTab * mdt = getMDTab(MD_base(md));
-        ASSERT0(mdt != NULL);
+        ASSERT0(mdt != nullptr);
         if (md->is_global()) {
             set_global = true;
         } else if (!current_ru->isRegionVAR(md->get_base())) {
@@ -1132,7 +1132,7 @@ void MDSystem::computeOverlap(Region * current_ru,
         }
 
         MD const* effect_md = mdt->get_effect_md();
-        if (effect_md != NULL && !mds.is_contain_pure(MD_id(effect_md))) {
+        if (effect_md != nullptr && !mds.is_contain_pure(MD_id(effect_md))) {
             ASSERT0(MD_base(md) == MD_base(effect_md));
             output.bunion_pure(MD_id(effect_md), mbsmgr);
         }
@@ -1140,8 +1140,8 @@ void MDSystem::computeOverlap(Region * current_ru,
         OffsetTab const* ofsttab = mdt->get_ofst_tab();
         ASSERT0(ofsttab);
         tabiter.clean();
-        for (MD const* tmd = ofsttab->get_first(tabiter, NULL);
-             tmd != NULL; tmd = ofsttab->get_next(tabiter, NULL)) {
+        for (MD const* tmd = ofsttab->get_first(tabiter, nullptr);
+             tmd != nullptr; tmd = ofsttab->get_next(tabiter, nullptr)) {
             if (mds.is_contain_pure(MD_id(tmd))) {
                 continue;
             }
@@ -1168,13 +1168,13 @@ void MDSystem::clean()
     Var2MDTabIter iter;
     MDTab * mdtab;
     for (Var const* var = m_var2mdtab.get_first(iter, &mdtab);
-         var != NULL; var = m_var2mdtab.get_next(iter, &mdtab)) {
+         var != nullptr; var = m_var2mdtab.get_next(iter, &mdtab)) {
         mdtab->clean();
     }
 
     for (INT i = 0; i <= m_id2md_map.get_last_idx(); i++) {
         MD * md = m_id2md_map.get(i);
-        if (md == NULL) { continue; }
+        if (md == nullptr) { continue; }
         freeMD(md);
     }
 
@@ -1192,7 +1192,7 @@ void MDSystem::dump(bool only_dump_nonpr_md)
     }
     for (INT i = 0; i <= m_id2md_map.get_last_idx(); i++) {
         MD * md = m_id2md_map.get(i);
-        if (md == NULL ||
+        if (md == nullptr ||
             (only_dump_nonpr_md && MD_is_pr(md))) {
             continue;
         }
@@ -1207,9 +1207,9 @@ void MDSystem::removeMDforVAR(Var const* v, ConstMDIter & iter)
 {
     ASSERT0(v);
     MDTab * mdtab = getMDTab(v);
-    if (mdtab != NULL) {
+    if (mdtab != nullptr) {
         MD const* x = mdtab->get_effect_md();
-        if (x != NULL) {
+        if (x != nullptr) {
             MD * freeone = getMD(MD_id(x));
             freeMD(freeone);
         }
@@ -1218,8 +1218,8 @@ void MDSystem::removeMDforVAR(Var const* v, ConstMDIter & iter)
         ASSERT0(ofstab);
         if (ofstab->get_elem_count() > 0) {
             iter.clean();
-            for (MD const* md = ofstab->get_first(iter, NULL);
-                 md != NULL; md = ofstab->get_next(iter, NULL)) {
+            for (MD const* md = ofstab->get_first(iter, nullptr);
+                 md != nullptr; md = ofstab->get_next(iter, nullptr)) {
                 MD * freeone = getMD(MD_id(md));
                 freeMD(freeone);
             }

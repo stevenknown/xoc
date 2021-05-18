@@ -47,13 +47,13 @@ public:
     IR * ir;
     ExpRep * next;
     ExpRep * prev;
-    IRList occ_list;
+    IREList occ_list;
 
 public:
     ExpRep()
     {
         id = 0;
-        next = prev = NULL;
+        next = prev = nullptr;
     }
     COPY_CONSTRUCTOR(ExpRep);
     ~ExpRep() {}
@@ -89,7 +89,7 @@ class ExprTab : public Pass {
     {
         ASSERT0(IR_parent(ir)->is_ist());
         if (ir->is_array()) {
-            return NULL;
+            return nullptr;
         }
         return encode_expr(ir);
     }
@@ -101,7 +101,7 @@ public:
 
     ExpRep * append_expr(IR * ir);
     void clean_occ_list();
-    size_t count_mem();
+    size_t count_mem() const;
 
     void dump_ir_expr_tab();
     ExpRep * encode_expr(IN IR * ir);

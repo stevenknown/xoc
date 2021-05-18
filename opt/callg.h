@@ -114,7 +114,7 @@ private:
     {
         ASSERT0(rg);
         SYM2CN * sym2cn = m_ru2sym2cn.get(rg);
-        if (sym2cn == NULL) {
+        if (sym2cn == nullptr) {
             sym2cn = new SYM2CN();
             m_ru2sym2cn.set(rg, sym2cn);
         }
@@ -140,10 +140,10 @@ public:
     }
     virtual ~CallGraph()
     {
-        SYM2CN * sym2cn = NULL;
+        SYM2CN * sym2cn = nullptr;
         Region2SYM2CNIter iter;
         for (Region * rg = m_ru2sym2cn.get_first(iter, &sym2cn);
-             rg != NULL; rg = m_ru2sym2cn.get_next(iter, &sym2cn)) {
+             rg != nullptr; rg = m_ru2sym2cn.get_next(iter, &sym2cn)) {
             delete sym2cn;
         }
         smpoolDelete(m_cn_pool);
@@ -161,7 +161,7 @@ public:
     //name: file name if you want to dump VCG to specified file.
     //flag: default is 0xFFFFffff(-1) means doing dumping
     //        with completely information.
-    void dumpVCG(CHAR const* name = NULL, INT flag = -1);
+    void dumpVCG(CHAR const* name = nullptr, INT flag = -1);
 
     RegionMgr * getRegionMgr() const { return m_ru_mgr; }
     CallNode * mapId2CallNode(UINT id) const { return m_cnid2cn.get(id); }
@@ -173,13 +173,13 @@ public:
 
     CallNode * mapSym2CallNode(Sym const* sym, Region * start) const
     {
-        for (; start != NULL; start = start->getParent()) {
+        for (; start != nullptr; start = start->getParent()) {
             SYM2CN * sym2cn = getSYM2CN(start);
-            if (sym2cn == NULL) { continue; }
+            if (sym2cn == nullptr) { continue; }
             CallNode * cn = sym2cn->get(sym);
-            if (cn != NULL) { return cn; }
+            if (cn != nullptr) { return cn; }
         }
-        return NULL;
+        return nullptr;
     }
 
     //Map a call/icall to its target Region.
@@ -188,11 +188,11 @@ public:
     {
         if (ir->is_call()) {
             CallNode * cn = mapSym2CallNode(CALL_idinfo(ir)->get_name(), rg);
-            if (cn != NULL) { return CN_ru(cn); }
-            return NULL;
+            if (cn != nullptr) { return CN_ru(cn); }
+            return nullptr;
         }
         ASSERT0(ir->is_icall());
-        return NULL; //TODO: implement icall analysis.
+        return nullptr; //TODO: implement icall analysis.
     }
 
     void erase()

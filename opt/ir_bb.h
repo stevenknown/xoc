@@ -39,6 +39,7 @@ namespace xoc {
 class IRBB;
 template <class IRBB, class IR> class CFG;
 typedef xcom::C<IR*> * IRListIter;
+typedef IRListIter BBIRListIter;
 #define BBID_UNDEF VERTEX_UNDEF
 
 //
@@ -50,20 +51,20 @@ class BBIRList : public EList<IR*, IR2Holder> {
     IRBB * m_bb;
 
 public:
-    BBIRList() { m_bb = NULL; }
+    BBIRList() { m_bb = nullptr; }
 
     inline IRListIter append_head(IR * ir)
     {
-        if (ir == NULL) { return NULL; }
-        ASSERT0(m_bb != NULL);
+        if (ir == nullptr) { return nullptr; }
+        ASSERT0(m_bb != nullptr);
         ir->setBB(m_bb);
         return xcom::EList<IR*, IR2Holder>::append_head(ir);
     }
 
     inline IRListIter append_tail(IR * ir)
     {
-        if (ir == NULL) { return NULL; }
-        ASSERT0(m_bb != NULL);
+        if (ir == nullptr) { return nullptr; }
+        ASSERT0(m_bb != nullptr);
         ir->setBB(m_bb);
         return xcom::EList<IR*, IR2Holder>::append_tail(ir);
     }
@@ -79,41 +80,43 @@ public:
     }
 
     //Insert 'ir' before 'marker'.
-    inline IRListIter insert_before(IN IR * ir, IN IR * marker)
+    inline IRListIter insert_before(IN IR * ir, IR const* marker)
     {
-        if (ir == NULL) { return NULL; }
-        ASSERT0(marker != NULL);
-        ASSERT0(m_bb != NULL);
+        if (ir == nullptr) { return nullptr; }
+        ASSERT0(marker != nullptr);
+        ASSERT0(m_bb != nullptr);
         ir->setBB(m_bb);
-        return xcom::EList<IR*, IR2Holder>::insert_before(ir, marker);
+        return xcom::EList<IR*, IR2Holder>::insert_before(
+            ir, const_cast<IR*>(marker));
     }
 
     //Insert 'ir' before 'marker'. marker will be modified.
     inline IRListIter insert_before(IN IR * ir, IN IRListIter marker)
     {
-        if (ir == NULL) { return NULL; }
-        ASSERT0(marker != NULL);
-        ASSERT0(m_bb != NULL);
+        if (ir == nullptr) { return nullptr; }
+        ASSERT0(marker != nullptr);
+        ASSERT0(m_bb != nullptr);
         ir->setBB(m_bb);
         return xcom::EList<IR*, IR2Holder>::insert_before(ir, marker);
     }
 
     //Insert 'ir' after 'marker'.
-    inline IRListIter insert_after(IR * ir, IR * marker)
+    inline IRListIter insert_after(IR * ir, IR const* marker)
     {
-        if (ir == NULL) { return NULL; }
-        ASSERT0(marker != NULL);
-        ASSERT0(m_bb != NULL);
+        if (ir == nullptr) { return nullptr; }
+        ASSERT0(marker != nullptr);
+        ASSERT0(m_bb != nullptr);
         ir->setBB(m_bb);
-        return xcom::EList<IR*, IR2Holder>::insert_after(ir, marker);
+        return xcom::EList<IR*, IR2Holder>::insert_after(
+            ir, const_cast<IR*>(marker));
     }
 
     //Insert 'ir' after 'marker'.
     inline IRListIter insert_after(IR * ir, IN IRListIter marker)
     {
-        if (ir == NULL) { return NULL; }
-        ASSERT0(marker != NULL);
-        ASSERT0(m_bb != NULL);
+        if (ir == nullptr) { return nullptr; }
+        ASSERT0(marker != nullptr);
+        ASSERT0(m_bb != nullptr);
         ir->setBB(m_bb);
         return xcom::EList<IR*, IR2Holder>::insert_after(ir, marker);
     }
@@ -121,17 +124,17 @@ public:
     //Remove ir that hold by 'holder'.
     inline IR * remove(IN IRListIter holder)
     {
-        if (holder == NULL) { return NULL; }
+        if (holder == nullptr) { return nullptr; }
         ASSERT0(holder->val());
-        holder->val()->setBB(NULL);
+        holder->val()->setBB(nullptr);
         return xcom::EList<IR*, IR2Holder>::remove(holder);
     }
 
     //Remove ir out of list.
     inline IR * remove(IN IR * ir)
     {
-        if (ir == NULL) { return NULL; }
-        ir->setBB(NULL);
+        if (ir == nullptr) { return nullptr; }
+        ir->setBB(nullptr);
         return xcom::EList<IR*, IR2Holder>::remove(ir);
     }
 
@@ -162,10 +165,6 @@ public:
 class IRBB {
     COPY_CONSTRUCTOR(IRBB);
 public:
-    UINT m_id; //BB's id
-    INT m_rpo; //reverse post order
-    BBIRList ir_list; //IR list
-    List<LabelInfo const*> lab_list; //Record labels attached on BB
     union {
         struct {
             BYTE is_entry:1; //bb is entry of the region.
@@ -178,6 +177,10 @@ public:
         } s1;
         BYTE u1b1;
     } u1;
+    UINT m_id; //BB's id
+    INT m_rpo; //reverse post order
+    BBIRList ir_list; //IR list
+    List<LabelInfo const*> lab_list; //Record labels attached on BB
 
 public:
     IRBB()
@@ -192,7 +195,7 @@ public:
         //BB will be destructed in ~IRBBMgr().
         //No need to free it. Or the ir_list must be clean before
         //the deletion of BB.
-        //for (IR * ir = ir_list.get_head(); ir != NULL; ir = ir_list.get_next()) {
+        //for (IR * ir = ir_list.get_head(); ir != nullptr; ir = ir_list.get_next()) {
         //    m_rg->freeIRTree(ir);
         //}
     }
@@ -219,7 +222,7 @@ public:
             getLabelList().append_tail(li);
         }
     }
-    
+
     //After adding new bb or change bb successor,
     //you need add the related PHI operand if BB successor has PHI stmt.
     void addSuccessorDesignatePhiOpnd(CFG<IRBB, IR> * cfg, IRBB * succ);
@@ -249,13 +252,14 @@ public:
     UINT getNumOfSucc(CFG<IRBB, IR> * cfg) const;
     BBIRList * getIRList() { return &BB_irlist(this); }
     IR * getFirstIR() { return BB_first_ir(this); }
+    IR * getNextIR() { return BB_next_ir(this); }
     IR * getLastIR() { return BB_last_ir(this); }
 
     //Is bb containing such label carried by 'lir'.
     inline bool hasLabel(LabelInfo const* lab)
     {
         for (LabelInfo const* li = getLabelList().get_head();
-             li != NULL; li = getLabelList().get_next()) {
+             li != nullptr; li = getLabelList().get_next()) {
             if (isSameLabel(li, lab)) {
                 return true;
             }
@@ -270,7 +274,7 @@ public:
     {
         BBIRList * irlst = const_cast<BBIRList*>(&BB_irlist(this));
         for (IR * ir = irlst->get_tail();
-             ir != NULL; ir = irlst->get_prev()) {
+             ir != nullptr; ir = irlst->get_prev()) {
             if (ir->isCallStmt()) {
                 return true;
             }
@@ -282,7 +286,7 @@ public:
     {
         BBIRList * irlst = const_cast<BBIRList*>(&BB_irlist(this));
         for (IR * ir = irlst->get_tail();
-             ir != NULL; ir = irlst->get_prev()) {
+             ir != nullptr; ir = irlst->get_prev()) {
             if (ir->is_return()) {
                 return true;
             }
@@ -309,7 +313,7 @@ public:
         bool find = false;
         IRBB * pthis = const_cast<IRBB*>(this);
         for (LabelInfo const* li = pthis->getLabelList().get_head();
-             li != NULL; li = pthis->getLabelList().get_next()) {
+             li != nullptr; li = pthis->getLabelList().get_next()) {
             if (LABELINFO_is_try_start(li)) {
                 find = true;
                 break;
@@ -328,7 +332,7 @@ public:
         bool find = false;
         IRBB * pthis = const_cast<IRBB*>(this);
         for (LabelInfo const* li = pthis->getLabelList().get_head();
-             li != NULL; li = pthis->getLabelList().get_next()) {
+             li != nullptr; li = pthis->getLabelList().get_next()) {
             if (LABELINFO_is_try_end(li)) {
                 find = true;
                 break;
@@ -347,7 +351,7 @@ public:
         bool find = false;
         IRBB * pthis = const_cast<IRBB*>(this);
         for (LabelInfo const* li = pthis->getLabelList().get_head();
-             li != NULL; li = pthis->getLabelList().get_next()) {
+             li != nullptr; li = pthis->getLabelList().get_next()) {
             if (LABELINFO_is_catch_start(li)) {
                 find = true;
                 break;
@@ -366,7 +370,7 @@ public:
         bool find = false;
         IRBB * pthis = const_cast<IRBB*>(this);
         for (LabelInfo const* li = pthis->getLabelList().get_head();
-             li != NULL; li = pthis->getLabelList().get_next()) {
+             li != nullptr; li = pthis->getLabelList().get_next()) {
             if (LABELINFO_is_terminate(li)) {
                 find = true;
                 break;
@@ -379,7 +383,7 @@ public:
 
     //Could ir be looked as a boundary stmt of basic block?
     static bool isBoundary(IR * ir)
-    { return isUpperBoundary(ir) || isDownBoundary(ir); }
+    { return isUpperBoundary(ir) || isLowerBoundary(ir); }
 
     //Could ir be looked as a first stmt in basic block?
     static bool isUpperBoundary(IR const* ir)
@@ -387,12 +391,12 @@ public:
         ASSERTN(ir->isStmtInBB() || ir->is_lab(), ("illegal stmt in bb"));
         return ir->is_lab();
     }
-    static bool isDownBoundary(IR const* ir);
+    static bool isLowerBoundary(IR const* ir);
 
     inline bool isAttachDedicatedLabel()
     {
         for (LabelInfo const* li = getLabelList().get_head();
-             li != NULL; li = getLabelList().get_next()) {
+             li != nullptr; li = getLabelList().get_next()) {
             if (LABELINFO_is_catch_start(li) ||
                 LABELINFO_is_try_start(li) ||
                 LABELINFO_is_try_end(li) ||
@@ -407,7 +411,7 @@ public:
     {
         for (LabelInfo const* li = const_cast<IRBB*>(this)->
                  getLabelList().get_head();
-             li != NULL;
+             li != nullptr;
              li = const_cast<IRBB*>(this)->getLabelList().get_next()) {
             if (li == lab) {
                 return true;
@@ -452,7 +456,7 @@ public:
     {
         IRListIter ct;
         IR * x = BB_irlist(const_cast<IRBB*>(this)).get_tail(&ct);
-        if (x != NULL && x->isMayThrow()) {
+        if (x != nullptr && x->isMayThrow()) {
             return true;
         }
         return false;
@@ -462,7 +466,7 @@ public:
     inline void mergeLabeInfoList(IRBB * src)
     {
         for (LabelInfo const* li = src->getLabelList().get_tail();
-             li != NULL; li = src->getLabelList().get_prev()) {
+             li != nullptr; li = src->getLabelList().get_prev()) {
             addLabel(li, true);
         }
     }
@@ -501,7 +505,7 @@ public:
     ~IRBBMgr()
     {
         for (IRBB * bb = m_bbs_list.get_head();
-             bb != NULL; bb = m_bbs_list.get_next()) {
+             bb != nullptr; bb = m_bbs_list.get_next()) {
             delete bb;
         }
         //BB in free list will also be recorded in m_bbs_list.
@@ -510,7 +514,7 @@ public:
     inline IRBB * allocBB()
     {
         IRBB * bb = m_free_list.remove_head();
-        if (bb == NULL) {
+        if (bb == nullptr) {
             bb = new IRBB();
             BB_id(bb) = m_bb_count++;
             m_bbs_list.append_tail(bb);
@@ -526,11 +530,12 @@ public:
         m_free_list.append_head(bb);
     }
     //Count memory usage for current object.
-    size_t count_mem()
+    size_t count_mem() const
     {
         size_t count = 0;
-        for (IRBB * bb = m_bbs_list.get_head();
-             bb != NULL; bb = m_bbs_list.get_next()) {
+        BBListIter bbit;
+        for (IRBB * bb = m_bbs_list.get_head(&bbit);
+             bb != nullptr; bb = m_bbs_list.get_next(&bbit)) {
             count += bb->count_mem();
         }
         return count;

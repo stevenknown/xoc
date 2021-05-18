@@ -65,7 +65,7 @@ static bool readGR(CHAR * gr_file_name)
             lm->changeFileHandler(gr, b.buf);
             rg->dumpGR(true);
             lm->changeFileHandler(oldh, oldname);
-            ::fclose(gr);            
+            ::fclose(gr);
             xoc::prt2C("\noutput is %s\n", b.buf);
         }
         if (rg->getPassMgr() != NULL) {

@@ -40,7 +40,7 @@ void Region::HighProcessImpl(OptCtx & oc)
 {
     if (g_do_cfg) {
         ASSERT0(g_cst_bb_list);
-        checkValidAndRecompute(&oc, PASS_CFG, PASS_UNDEF);
+        getPassMgr()->checkValidAndRecompute(&oc, PASS_CFG, PASS_UNDEF);
         //Remove empty bb when cfg rebuilted because
         //rebuilding cfg may generate redundant empty bb.
         //It disturbs the computation of entry and exit.
@@ -53,69 +53,32 @@ void Region::HighProcessImpl(OptCtx & oc)
         getCFG()->performMiscOpt(oc);
 
         //Build DOM after CFG be optimized.
-        checkValidAndRecompute(&oc, PASS_DOM, PASS_UNDEF);
+        getPassMgr()->checkValidAndRecompute(&oc, PASS_DOM, PASS_UNDEF);
 
         //Infer pointer arith need loopinfo.
-        checkValidAndRecompute(&oc, PASS_LOOP_INFO, PASS_UNDEF);
+        getPassMgr()->checkValidAndRecompute(&oc, PASS_LOOP_INFO, PASS_UNDEF);
     }
 
     if (g_do_pr_ssa) {
         ASSERT0(getPassMgr());
-        PRSSAMgr * ssamgr =
-            (PRSSAMgr*)getPassMgr()->registerPass(PASS_PR_SSA_MGR);
+        PRSSAMgr * ssamgr = (PRSSAMgr*)getPassMgr()->registerPass(
+            PASS_PR_SSA_MGR);
         ASSERT0(ssamgr);
         if (!ssamgr->is_valid()) {
             ssamgr->construction(oc);
         }
     }
 
-    if (g_do_aa) {
-        ASSERT0(g_cst_bb_list && OC_is_cfg_valid(oc));
-        assignMD(true, true);
-        checkValidAndRecompute(&oc, PASS_AA, PASS_UNDEF);
-    }
-
-    if (g_do_md_du_analysis) {
-        ASSERT0(g_cst_bb_list && OC_is_cfg_valid(oc) && OC_is_aa_valid(oc));
-        ASSERT0(getPassMgr());
-        DUMgr * dumgr = (DUMgr*)getPassMgr()->
-            registerPass(PASS_DU_MGR);
-        ASSERT0(dumgr);
-        UINT f = DUOPT_COMPUTE_PR_REF|DUOPT_COMPUTE_NONPR_REF|
-                 DUOPT_COMPUTE_PR_DU|DUOPT_COMPUTE_NONPR_DU;
-        if (g_compute_available_exp) {
-            f |= DUOPT_SOL_AVAIL_EXPR;
-        }
-
-        if (g_compute_region_imported_defuse_md) {
-            f |= DUOPT_SOL_REGION_REF;
-        }
-
-        if (g_compute_pr_du_chain || g_compute_nonpr_du_chain) {
-            //Compute classic du chain.
-            f |= DUOPT_SOL_REACH_DEF;
-        }
-
-        if (dumgr->perform(oc, f) && OC_is_ref_valid(oc)) {
-            UINT flag = 0;
-            if (g_compute_pr_du_chain) {
-                flag |= DUOPT_COMPUTE_PR_DU;
-            }
-            if (g_compute_nonpr_du_chain) {
-                flag |= DUOPT_COMPUTE_NONPR_DU;
-            }
-            dumgr->computeMDDUChain(oc, false, flag);
-         }
-    }
+    doBasicAnalysis(oc);
 
     if (g_do_expr_tab) {
         ASSERT0(g_cst_bb_list);
-        checkValidAndRecompute(&oc, PASS_EXPR_TAB, PASS_UNDEF);
+        getPassMgr()->checkValidAndRecompute(&oc, PASS_EXPR_TAB, PASS_UNDEF);
     }
 
     if (g_do_cdg) {
         ASSERT0(g_cst_bb_list);
-        checkValidAndRecompute(&oc, PASS_CDG, PASS_UNDEF);
+        getPassMgr()->checkValidAndRecompute(&oc, PASS_CDG, PASS_UNDEF);
     }
 
     if (g_opt_level == OPT_LEVEL0) {
@@ -173,7 +136,7 @@ bool Region::HighProcess(OptCtx & oc)
     if (g_do_cfs_opt) {
         CfsOpt co(this);
         co.perform(simp);
-        ASSERT0(verifyIRList(getIRList(), NULL, this));
+        ASSERT0(verifyIRList(getIRList(), nullptr, this));
     }
 
     if (g_build_cfs) {
@@ -187,12 +150,12 @@ bool Region::HighProcess(OptCtx & oc)
     simp.setSimpCFS();
     setIRList(simplifyStmtList(getIRList(), &simp));
     ASSERT0(verifySimp(getIRList(), simp));
-    ASSERT0(verifyIRList(getIRList(), NULL, this));
+    ASSERT0(verifyIRList(getIRList(), nullptr, this));
 
     if (g_cst_bb_list) {
         constructBBList();
         ASSERT0(verifyIRandBB(getBBList(), this));
-        setIRList(NULL); //All IRs have been moved to each IRBB.
+        setIRList(nullptr); //All IRs have been moved to each IRBB.
     }
 
     HighProcessImpl(oc);

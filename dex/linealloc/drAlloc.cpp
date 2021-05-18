@@ -37,10 +37,10 @@ author: GongKai, JinYue
 #define PIG_SIZE (4096)
 #define DEFAULT_ALLOC_SIZE (PIG_SIZE*32)
 
-static SMemPool * g_d2d_used_pool = NULL;
+static SMemPool * g_d2d_used_pool = nullptr;
 
 bool drLinearInit(void){
-    if (g_d2d_used_pool == NULL) {
+    if (g_d2d_used_pool == nullptr) {
         g_d2d_used_pool = smpoolCreate(DEFAULT_ALLOC_SIZE, MEM_COMM);
     }
     return true;
@@ -56,6 +56,6 @@ void drLinearFree(void)
 {
     ASSERT0(g_d2d_used_pool);
     smpoolDelete(g_d2d_used_pool);
-    g_d2d_used_pool = NULL;
+    g_d2d_used_pool = nullptr;
     return;
 }

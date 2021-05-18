@@ -44,6 +44,7 @@ author: Su Zhenyu
 #include "ir_lcse.h"
 #include "ir_gcse.h"
 #include "ir_dce.h"
+#include "lftr.h"
 #include "ir_rce.h"
 //#include "ir_dse.h"
 //#include "ir_vrp.h"

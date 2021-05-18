@@ -1,16 +1,12 @@
 #include "stdio.h"
-#include "ltype.h"
-#include "comf.h"
-#include "smempool.h"
-#include "sstl.h"
-using namespace xcom;
+#include "xcominc.h"
 void use_slist_core()
 {
     //Single List Core need user declared a mempool.
     SMemPool * pool = smpoolCreate(sizeof(SC<int>), MEM_CONST_SIZE);
 
     //Define a free list
-    SC<int> * free_list = NULL;
+    SC<int> * free_list = nullptr;
 
     //Of course you can use "new" to allocate.
     SListCore<int> * l = (SListCore<int>*)malloc(sizeof(SListCore<int>));

@@ -273,19 +273,19 @@ static void copyProp(IR * ir, PropertySet & cont, ParseCtx * ctx)
 
     if (ir->isMayThrow()) {
         for (LabelInfo * l = cont.getLabelList().get_tail();
-             l != NULL; l = cont.getLabelList().get_prev()) {
+             l != nullptr; l = cont.getLabelList().get_prev()) {
             AIContainer * ai = IR_ai(ir);
-            if (ai == NULL) {
+            if (ai == nullptr) {
                 ai = ctx->current_region->allocAIContainer();
                 IR_ai(ir) = ai;
             }
 
             EHLabelAttachInfo * ehai = (EHLabelAttachInfo*)ai->get(AI_EH_LABEL);
-            if (ehai == NULL) {
+            if (ehai == nullptr) {
                 ehai = (EHLabelAttachInfo*)ctx->current_region->
                            xmalloc(sizeof(EHLabelAttachInfo));
                 ehai->init(ctx->current_region->getSCPool());
-                ai->set(ehai);
+                ai->set(ehai, ctx->current_region);
             }
             ehai->get_labels().append_head(l);
         }
@@ -296,7 +296,7 @@ static void copyProp(IR * ir, PropertySet & cont, ParseCtx * ctx)
 IRParser::~IRParser()
 {
     for (ParseErrorMsg * msg = m_err_list.get_head();
-         msg != NULL; msg = m_err_list.get_next()) {
+         msg != nullptr; msg = m_err_list.get_next()) {
         delete msg;
     }
 }
@@ -348,13 +348,13 @@ Var * IRParser::findVar(ParseCtx * ctx, Sym const* name)
 {
     ASSERT0(ctx && ctx->current_region && name);
     for (Region * region = ctx->current_region;
-         region != NULL; region = region->getParent()) {
+         region != nullptr; region = region->getParent()) {
         Var * var = region->findVarViaSymbol(name);
-        if (var != NULL) {
+        if (var != nullptr) {
             return var;
         }
     }
-    return NULL;
+    return nullptr;
 }
 
 
@@ -412,7 +412,7 @@ void IRParser::error(CHAR const* format, ...)
 
 void IRParser::error(TOKEN tok, CHAR const* format, ...)
 {
-    CHECK_DUMMYUSE(tok);
+    CHECK0_DUMMYUSE(tok);
     StrBuf buf(64);
     va_list arg;
     va_start(arg, format);
@@ -454,8 +454,8 @@ void IRParser::error(X_CODE xcode, CHAR const* format, ...)
 //        return g_real_token == v;
 //    }
 //
-//    CELL * c = g_cell_list.get_head();
-//    if (c != NULL) {
+//    Cell * c = g_cell_list.get_head();
+//    if (c != nullptr) {
 //        //append current real token to 'token-list'
 //        append_tok_head(g_real_token, g_real_token_string, g_real_line_num);
 //
@@ -521,7 +521,7 @@ bool IRParser::declareRegion(ParseCtx * ctx)
         tok = m_lexer->getCurrentToken();
     }
 
-    Region * region = NULL;
+    Region * region = nullptr;
     UINT flag = 0;
     X_CODE code = getXCode(tok, m_lexer->getCurrentTokenString());
     switch (code) {
@@ -562,12 +562,12 @@ bool IRParser::declareRegion(ParseCtx * ctx)
         return false;
     }
     Sym const* sym = m_rumgr->addToSymbolTab(m_lexer->getCurrentTokenString());
-    Var * regionvar = NULL;
-    if (ctx->current_region != NULL) {
+    Var * regionvar = nullptr;
+    if (ctx->current_region != nullptr) {
         regionvar = findVar(ctx, sym);
         REGION_parent(region) = ctx->current_region;
     }
-    if (regionvar == NULL) {
+    if (regionvar == nullptr) {
         regionvar = m_rumgr->getVarMgr()->registerVar(sym,
             m_rumgr->getTypeMgr()->getAny(), 1, flag);
         if (region->is_function() || region->is_program()) {
@@ -576,7 +576,7 @@ bool IRParser::declareRegion(ParseCtx * ctx)
         }
     }
     region->setRegionVar(regionvar);
-    if (ctx->current_region != NULL) {
+    if (ctx->current_region != nullptr) {
         ctx->current_region->addToVarTab(regionvar);
     }
     if (!regionvar->is_func_decl() &&
@@ -607,26 +607,18 @@ bool IRParser::declareRegion(ParseCtx * ctx)
 
         //TODO: build cfg by given parameters.
         if (newctx.has_phi) {
+            //GR can not include CFS when PHI is in used.
             ASSERT0(!newctx.has_high_level_ir);
         }
         if (newctx.has_phi) {
             newctx.current_region->constructBBList();
-            newctx.current_region->setIRList(NULL);
+            newctx.current_region->setIRList(nullptr);
             OptCtx * oc = getRegionMgr()->getAndGenOptCtx(
                               newctx.current_region->id());
             ASSERT0(oc);
             newctx.current_region->initPassMgr();
-            //IRCFG * cfg = newctx.current_region->
-            //    getPassMgr()->registerPass(PASS_CFG);
-            ////Caution: the validation of cfg should maintained by user.
-            //cfg->rebuild(oc);
-            //cfg->removeEmptyBB(oc);
-            //cfg->computeExitList();
-            newctx.current_region->checkValidAndRecompute(oc, PASS_CFG,
-                                                          PASS_UNDEF);
-            newctx.current_region->getCFG()->dumpVCG();
-            dumpBBList(newctx.current_region->getBBList(),
-                       newctx.current_region);
+            newctx.current_region->getPassMgr()->checkValidAndRecompute(oc,
+                PASS_CFG, PASS_UNDEF);
             if (newctx.has_phi) {
                 newctx.current_region->getCFG()->revisePhiEdge(
                     newctx.getIR2Label());
@@ -639,12 +631,15 @@ bool IRParser::declareRegion(ParseCtx * ctx)
             }
         }
     }
+
     if (!newctx.current_region->is_blackbox()) {
         ASSERT0(verifyIRList(newctx.current_region->getIRList(),
-                NULL, newctx.current_region));
+                nullptr, newctx.current_region));
     }
+
     exitRegion(&newctx);
-    if (ctx->current_region != NULL) {
+
+    if (ctx->current_region != nullptr) {
         IR * ir = ctx->current_region->buildRegion(region);
         copyProp(ir, cont, ctx);
         ctx->addIR(ir);
@@ -920,7 +915,7 @@ bool IRParser::parseCase(ParseCtx * ctx)
         tok = m_lexer->getCurrentToken();
     }
 
-    IR * case_det = NULL;
+    IR * case_det = nullptr;
     if (tok == T_IMM) {
         case_det = ctx->current_region->buildImmInt(
             (HOST_INT)xcom::xatoll(m_lexer->getCurrentTokenString(), false),
@@ -928,10 +923,10 @@ bool IRParser::parseCase(ParseCtx * ctx)
                                  sizeof(HOST_INT)*BIT_PER_BYTE, true)));
         tok = m_lexer->getNextToken();
 
-        Type const* ty = NULL;
+        Type const* ty = nullptr;
         if (tok == T_COLON) {
             tok = m_lexer->getNextToken();
-            if (!parseType(ctx, &ty) || ty == NULL) {
+            if (!parseType(ctx, &ty) || ty == nullptr) {
                 error(tok, "illegal data type");
                 return false;
             }
@@ -945,10 +940,10 @@ bool IRParser::parseCase(ParseCtx * ctx)
     } else if (tok == T_FP) {
         HOST_FP val = atof(m_lexer->getCurrentTokenString());
         tok = m_lexer->getNextToken();
-        Type const* ty = NULL;
+        Type const* ty = nullptr;
         if (tok == T_COLON) {
             tok = m_lexer->getNextToken();
-            if (!parseType(ctx, &ty) || ty == NULL) {
+            if (!parseType(ctx, &ty) || ty == nullptr) {
                 error(tok, "illegal data type");
                 return false;
             }
@@ -974,7 +969,7 @@ bool IRParser::parseCase(ParseCtx * ctx)
     }
     Sym const* sym = m_rumgr->addToSymbolTab(m_lexer->getCurrentTokenString());
     LabelInfo * caselab = ctx->mapSym2Label(sym);
-    if (caselab == NULL) {
+    if (caselab == nullptr) {
         caselab = ctx->current_region->genCustomLabel(sym);
         ctx->setMapSym2Label(sym, caselab);
     }
@@ -991,9 +986,9 @@ bool IRParser::parseSelect(ParseCtx * ctx)
 {
     ASSERT0(getCurrentXCode() == X_SELECT);
     TOKEN tok = m_lexer->getNextToken();
-    ctx->returned_exp = NULL;
+    ctx->returned_exp = nullptr;
 
-    Type const* ty = NULL;
+    Type const* ty = nullptr;
     if (tok == T_COLON) {
         tok = m_lexer->getNextToken();
         if (!parseType(ctx, &ty)) {
@@ -1006,7 +1001,7 @@ bool IRParser::parseSelect(ParseCtx * ctx)
         return false;
     }
     IR * det = ctx->returned_exp;
-    ctx->returned_exp = NULL;
+    ctx->returned_exp = nullptr;
     ASSERT0(det);
 
     tok = m_lexer->getCurrentToken();
@@ -1020,7 +1015,7 @@ bool IRParser::parseSelect(ParseCtx * ctx)
         return false;
     }
     IR * truepart = ctx->returned_exp;
-    if (truepart == NULL) {
+    if (truepart == nullptr) {
         error(tok, "select miss true part");
         return false;
     }
@@ -1032,19 +1027,19 @@ bool IRParser::parseSelect(ParseCtx * ctx)
     }
     tok = m_lexer->getNextToken();
 
-    ctx->returned_exp = NULL;
+    ctx->returned_exp = nullptr;
     if (!parseExp(ctx)) {
         return false;
     }
     IR * falsepart = ctx->returned_exp;
     ASSERT0(ctx->current_region);
-    if (falsepart == NULL) {
+    if (falsepart == nullptr) {
         error(tok, "select miss false part");
         return false;
     }
 
     IR * exp = ctx->current_region->buildSelect(det,
-        truepart, falsepart, ty == NULL ? m_tm->getAny() : ty);
+        truepart, falsepart, ty == nullptr ? m_tm->getAny() : ty);
     ctx->returned_exp = exp;
     return true;
 }
@@ -1073,10 +1068,10 @@ bool IRParser::parsePR(ParseCtx * ctx)
     }
 
     TOKEN tok = m_lexer->getNextToken();
-    Type const* ty = NULL;
+    Type const* ty = nullptr;
     if (tok == T_COLON) {
         tok = m_lexer->getNextToken();
-        if (!parseType(ctx, &ty) || ty == NULL) {
+        if (!parseType(ctx, &ty) || ty == nullptr) {
             error(tok, "invalide type of PR");
             return false;
         }
@@ -1148,7 +1143,7 @@ bool IRParser::parseId(ParseCtx * ctx)
     Sym const* sym = m_rumgr->addToSymbolTab(m_lexer->getCurrentTokenString());
     ASSERT0(sym);
     Var * var = findVar(ctx, sym);
-    if (var == NULL) {
+    if (var == nullptr) {
         error(tok, "%s is not declared", m_lexer->getCurrentTokenString());
         return false;
     }
@@ -1192,7 +1187,7 @@ bool IRParser::parseLda(ParseCtx * ctx)
     }
     Var * var = findVar(ctx, m_rumgr->addToSymbolTab(
         m_lexer->getCurrentTokenString()));
-    if (var == NULL) {
+    if (var == nullptr) {
         error(tok, "%s is not declared", m_lexer->getCurrentTokenString());
         return false;
     }
@@ -1211,7 +1206,7 @@ bool IRParser::parseStoreArray(ParseCtx * ctx)
     ASSERT0(getCurrentXCode() == X_STARRAY);
     TOKEN tok = m_lexer->getNextToken();
 
-    Type const* ty = NULL;
+    Type const* ty = nullptr;
     if (tok == T_COLON) {
         //Type
         tok = m_lexer->getNextToken();
@@ -1220,7 +1215,7 @@ bool IRParser::parseStoreArray(ParseCtx * ctx)
             return false;
         }
     }
-    if (ty == NULL) {
+    if (ty == nullptr) {
         ty = m_tm->getAny();
     }
 
@@ -1256,7 +1251,7 @@ bool IRParser::parseStoreArray(ParseCtx * ctx)
     }
 
     Type const* elem_ty = ty;
-    if (cont.elemtype != NULL) {
+    if (cont.elemtype != nullptr) {
         elem_ty = cont.elemtype;
     }
 
@@ -1272,9 +1267,9 @@ bool IRParser::parseStoreArray(ParseCtx * ctx)
     }
     ASSERT0(ctx->returned_exp);
     IR * base = ctx->returned_exp;
-    ctx->returned_exp = NULL;
+    ctx->returned_exp = nullptr;
 
-    if (!base->is_ptr()) {
+    if (!base->isPtr()) {
         error("base expression of starray should be pointer");
         return false;
     }
@@ -1298,7 +1293,7 @@ bool IRParser::parseStoreArray(ParseCtx * ctx)
     }
     ASSERT0(ctx->returned_exp);
     IR * subscript_list = ctx->returned_exp;
-    ctx->returned_exp = NULL;
+    ctx->returned_exp = nullptr;
 
     tok = m_lexer->getCurrentToken();
      if (tok != T_RPAREN) {
@@ -1307,11 +1302,11 @@ bool IRParser::parseStoreArray(ParseCtx * ctx)
     }
     tok = m_lexer->getNextToken();
 
-    TMWORD * elem_dim_buf = NULL;
+    TMWORD * elem_dim_buf = nullptr;
     if (dim_list.get_elem_count() > 0) {
         elem_dim_buf = (TMWORD*)ALLOCA(
             dim_list.get_elem_count() * sizeof(TMWORD));
-        xcom::C<TMWORD> * ct = NULL;
+        xcom::C<TMWORD> * ct = nullptr;
         dim_list.get_head(&ct);
         for (UINT i = 0; i < dim_list.get_elem_count(); i++) {
             elem_dim_buf[i] = ct->val();
@@ -1346,7 +1341,7 @@ bool IRParser::parseStoreArray(ParseCtx * ctx)
     ctx->addIR(ir);
     ARR_ofst(ir) = offset;
     copyProp(ir, cont, ctx);
-    ctx->returned_exp = NULL;
+    ctx->returned_exp = nullptr;
     return true;
 }
 
@@ -1356,10 +1351,10 @@ bool IRParser::parseArray(ParseCtx * ctx)
     ASSERT0(getCurrentXCode() == X_ARRAY);
     TOKEN tok = m_lexer->getNextToken();
 
-    Type const* ty = NULL;
+    Type const* ty = nullptr;
     if (tok == T_COLON) {
         tok = m_lexer->getNextToken();
-        if (!parseType(ctx, &ty) || ty == NULL) {
+        if (!parseType(ctx, &ty) || ty == nullptr) {
             error(tok, "illegal data type");
             return false;
         }
@@ -1395,7 +1390,7 @@ bool IRParser::parseArray(ParseCtx * ctx)
     }
 
     Type const* elem_ty = ty;
-    if (cont.elemtype != NULL) {
+    if (cont.elemtype != nullptr) {
         elem_ty = cont.elemtype;
     }
 
@@ -1405,9 +1400,9 @@ bool IRParser::parseArray(ParseCtx * ctx)
     }
     ASSERT0(ctx->returned_exp);
     IR * base = ctx->returned_exp;
-    ctx->returned_exp = NULL;
+    ctx->returned_exp = nullptr;
 
-    if (!base->is_ptr()) {
+    if (!base->isPtr()) {
         error("base expression of array should be pointer");
         return false;
     }
@@ -1431,7 +1426,7 @@ bool IRParser::parseArray(ParseCtx * ctx)
     }
     ASSERT0(ctx->returned_exp);
     IR * subscript_list = ctx->returned_exp;
-    ctx->returned_exp = NULL;
+    ctx->returned_exp = nullptr;
 
     tok = m_lexer->getCurrentToken();
      if (tok != T_RPAREN) {
@@ -1440,11 +1435,11 @@ bool IRParser::parseArray(ParseCtx * ctx)
     }
     tok = m_lexer->getNextToken();
 
-    TMWORD * elem_dim_buf = NULL;
+    TMWORD * elem_dim_buf = nullptr;
     if (dim_list.get_elem_count() > 0) {
         elem_dim_buf = (TMWORD*)ALLOCA(
             dim_list.get_elem_count() * sizeof(TMWORD));
-        xcom::C<TMWORD> * ct = NULL;
+        xcom::C<TMWORD> * ct = nullptr;
         dim_list.get_head(&ct);
         for (UINT i = 0; i < dim_list.get_elem_count(); i++) {
             elem_dim_buf[i] = ct->val();
@@ -1460,8 +1455,8 @@ bool IRParser::parseArray(ParseCtx * ctx)
     }
 
     IR * array = ctx->current_region->buildArray(base, subscript_list,
-        ty == NULL ? m_tm->getAny() : ty,
-        elem_ty == NULL ? m_tm->getAny() : elem_ty,
+        ty == nullptr ? m_tm->getAny() : ty,
+        elem_ty == nullptr ? m_tm->getAny() : elem_ty,
         xcom::cnt_list(subscript_list), elem_dim_buf);
     ARR_ofst(array) = offset;
     ctx->returned_exp = array;
@@ -1474,7 +1469,7 @@ bool IRParser::parseILd(ParseCtx * ctx)
     ASSERT0(getCurrentXCode() == X_ILD);
     TOKEN tok = m_lexer->getNextToken();
 
-    Type const* ty = NULL;
+    Type const* ty = nullptr;
     if (tok == T_COLON) {
         //Type
         tok = m_lexer->getNextToken();
@@ -1483,7 +1478,7 @@ bool IRParser::parseILd(ParseCtx * ctx)
             return false;
         }
     }
-    if (ty == NULL) {
+    if (ty == nullptr) {
         ty = m_tm->getAny();
     }
 
@@ -1515,14 +1510,14 @@ bool IRParser::parseILd(ParseCtx * ctx)
     if (!parseExp(ctx)) {
         return false;
     }
-    if (ctx->returned_exp == NULL) {
+    if (ctx->returned_exp == nullptr) {
         error(tok, "illegal base expression of ild");
         return false;
     }
     IR * base = ctx->returned_exp;
-    ctx->returned_exp = NULL;
+    ctx->returned_exp = nullptr;
 
-    if (!base->is_ptr()) {
+    if (!base->isPtr()) {
         error("base expression of ild should be pointer");
         return false;
     }
@@ -1540,7 +1535,7 @@ bool IRParser::parseLd(ParseCtx * ctx)
     ASSERT0(getCurrentXCode() == X_LD);
     TOKEN tok = m_lexer->getNextToken();
 
-    Type const* ty = NULL;
+    Type const* ty = nullptr;
     if (tok == T_COLON) {
         tok = m_lexer->getNextToken();
         if (!parseType(ctx, &ty)) {
@@ -1589,13 +1584,13 @@ bool IRParser::parseLd(ParseCtx * ctx)
 
     Var * var = findVar(ctx, m_rumgr->addToSymbolTab(
         m_lexer->getCurrentTokenString()));
-    if (var == NULL) {
+    if (var == nullptr) {
         error(tok, "%s is not declared", m_lexer->getCurrentTokenString());
         return false;
     }
 
     IR * ld = ctx->current_region->buildLoad(var,
-        ty == NULL ? var->getType() : ty);
+        ty == nullptr ? var->getType() : ty);
     LD_ofst(ld) = offset;
     ctx->returned_exp = ld;
     copyProp(ld, cont, ctx);
@@ -1638,10 +1633,10 @@ bool IRParser::parseImmIR(ParseCtx * ctx)
     HOST_INT v = xcom::xatoll(m_lexer->getCurrentTokenString(), false);
     immstr.strcat(m_lexer->getCurrentTokenString());
     TOKEN tok = m_lexer->getNextToken();
-    Type const* ty = NULL;
+    Type const* ty = nullptr;
     if (tok == T_COLON) {
         tok = m_lexer->getNextToken();
-        if (!parseType(ctx, &ty) || ty == NULL) {
+        if (!parseType(ctx, &ty) || ty == nullptr) {
             error(tok, "illegal data type");
             return false;
         }
@@ -1649,7 +1644,7 @@ bool IRParser::parseImmIR(ParseCtx * ctx)
         ty = m_tm->getI32();
     }
 
-    IR * imm = NULL;
+    IR * imm = nullptr;
     if (ty->is_int()) {
         imm = ctx->current_region->buildImmInt(v, ty);
     } else if (ty->is_fp()) {
@@ -1671,15 +1666,15 @@ bool IRParser::parseImmIR(ParseCtx * ctx)
 bool IRParser::parseImmVal(ParseCtx * ctx)
 {
     ASSERT0(m_lexer->getCurrentToken() == T_IMM);
-    ASSERTN(PARSECTX_returned_imm_ty(ctx) == NULL, ("should be clear"));
+    ASSERTN(PARSECTX_returned_imm_ty(ctx) == nullptr, ("should be clear"));
     xcom::StrBuf immstr(8);
     HOST_INT v = xcom::xatoll(m_lexer->getCurrentTokenString(), false);
     immstr.strcat(m_lexer->getCurrentTokenString());
     TOKEN tok = m_lexer->getNextToken();
-    Type const* ty = NULL;
+    Type const* ty = nullptr;
     if (tok == T_COLON) {
         tok = m_lexer->getNextToken();
-        if (!parseType(ctx, &ty) || ty == NULL) {
+        if (!parseType(ctx, &ty) || ty == nullptr) {
             error(tok, "illegal data type");
             return false;
         }
@@ -1707,10 +1702,10 @@ bool IRParser::parseBool(ParseCtx * ctx)
     ctx->returned_exp = ctx->current_region->buildImmInt(
         m_lexer->getCurrentToken() == T_TRUE ? 1 : 0, m_tm->getBool());
     TOKEN tok = m_lexer->getNextToken();
-    Type const* ty = NULL;
+    Type const* ty = nullptr;
     if (tok == T_COLON) {
         tok = m_lexer->getNextToken();
-        if (!parseType(ctx, &ty) || ty == NULL) {
+        if (!parseType(ctx, &ty) || ty == nullptr) {
             error(tok, "illegal data type");
             return false;
         }
@@ -1733,10 +1728,10 @@ bool IRParser::parseString(ParseCtx * ctx)
     ctx->returned_exp = ctx->current_region->buildString(
         m_rumgr->addToSymbolTab(m_lexer->getCurrentTokenString()));
     TOKEN tok = m_lexer->getNextToken();
-    Type const* ty = NULL;
+    Type const* ty = nullptr;
     if (tok == T_COLON) {
         tok = m_lexer->getNextToken();
-        if (!parseType(ctx, &ty) || ty == NULL) {
+        if (!parseType(ctx, &ty) || ty == nullptr) {
             error(tok, "illegal data type");
             return false;
         }
@@ -1758,10 +1753,10 @@ bool IRParser::parseFp(ParseCtx * ctx)
     ASSERT0(m_lexer->getCurrentToken() == T_FP);
     HOST_FP v = ::atof(m_lexer->getCurrentTokenString());
     TOKEN tok = m_lexer->getNextToken();
-    Type const* ty = NULL;
+    Type const* ty = nullptr;
     if (tok == T_COLON) {
         tok = m_lexer->getNextToken();
-        if (!parseType(ctx, &ty) || ty == NULL) {
+        if (!parseType(ctx, &ty) || ty == nullptr) {
             error(tok, "illegal data type");
             return false;
         }
@@ -1776,14 +1771,14 @@ bool IRParser::parseFp(ParseCtx * ctx)
 
 bool IRParser::parseExpList(ParseCtx * ctx)
 {
-    IR * last = NULL;
-    IR * param = NULL;
+    IR * last = nullptr;
+    IR * param = nullptr;
     for (; isExp();) {
         if (!parseExp(ctx)) {
             return false;
         }
         xcom::add_next(&param, &last, ctx->returned_exp);
-        ctx->returned_exp = NULL;
+        ctx->returned_exp = nullptr;
         if (m_lexer->getCurrentToken() == T_COMMA) {
             m_lexer->getNextToken();
         } else {
@@ -1834,7 +1829,7 @@ bool IRParser::parseExp(ParseCtx * ctx)
     default:;
     }
 
-    ctx->returned_exp = NULL;
+    ctx->returned_exp = nullptr;
     return true;
 }
 
@@ -1945,10 +1940,10 @@ bool IRParser::parseBinaryOp(IR_TYPE code, ParseCtx * ctx)
 {
     ASSERT0(isBinaryOp(code));
     TOKEN tok = m_lexer->getNextToken();
-    ctx->returned_exp = NULL;
+    ctx->returned_exp = nullptr;
 
     //Type
-    Type const* ty = NULL;
+    Type const* ty = nullptr;
     if (tok == T_COLON) {
         tok = m_lexer->getNextToken();
         if (!parseType(ctx, &ty)) {
@@ -1975,7 +1970,7 @@ bool IRParser::parseBinaryOp(IR_TYPE code, ParseCtx * ctx)
     }
 
     IR * opnd0 = ctx->returned_exp;
-    if (opnd0 == NULL) {
+    if (opnd0 == nullptr) {
         error(tok, "miss opnd0 for binary operation");
         return false;
     }
@@ -1987,18 +1982,18 @@ bool IRParser::parseBinaryOp(IR_TYPE code, ParseCtx * ctx)
     }
 
     tok = m_lexer->getNextToken();
-    ctx->returned_exp = NULL;
+    ctx->returned_exp = nullptr;
     if (!parseExp(ctx)) {
         return false;
     }
     IR * opnd1 = ctx->returned_exp;
-    if (opnd1 == NULL) {
+    if (opnd1 == nullptr) {
         error(tok, "miss opnd1 for binary operation");
         return false;
     }
 
     ASSERT0(ctx->current_region);
-    if (ty == NULL) {
+    if (ty == nullptr) {
         switch (code) {
         case IR_LT:
         case IR_LE:
@@ -2026,15 +2021,15 @@ bool IRParser::parseCvt(ParseCtx * ctx)
 {
     ASSERT0(getCurrentXCode() == X_CVT);
     TOKEN tok = m_lexer->getNextToken();
-    ctx->returned_exp = NULL;
+    ctx->returned_exp = nullptr;
 
-    Type const* ty = NULL;
+    Type const* ty = nullptr;
     if (tok != T_COLON) {
         error(tok, "miss result type");
         return false;
     }
     tok = m_lexer->getNextToken();
-    if (!parseType(ctx, &ty) || ty == NULL) {
+    if (!parseType(ctx, &ty) || ty == nullptr) {
         error(tok, "illegal result type");
         return false;
     }
@@ -2046,7 +2041,7 @@ bool IRParser::parseCvt(ParseCtx * ctx)
     IR * opnd = ctx->returned_exp;
     ASSERT0(opnd);
 
-    if (ty == NULL) {
+    if (ty == nullptr) {
         ty = m_tm->getAny();
     }
 
@@ -2060,12 +2055,12 @@ bool IRParser::parseUnaryOp(IR_TYPE code, ParseCtx * ctx)
 {
     ASSERT0(isUnaryOp(code));
     TOKEN tok = m_lexer->getNextToken();
-    ctx->returned_exp = NULL;
+    ctx->returned_exp = nullptr;
 
-    Type const* ty = NULL;
+    Type const* ty = nullptr;
     if (tok == T_COLON) {
         tok = m_lexer->getNextToken();
-        if (!parseType(ctx, &ty) || ty == NULL) {
+        if (!parseType(ctx, &ty) || ty == nullptr) {
             error(tok, "illegal data type");
             return false;
         }
@@ -2078,7 +2073,7 @@ bool IRParser::parseUnaryOp(IR_TYPE code, ParseCtx * ctx)
     IR * opnd = ctx->returned_exp;
     ASSERT0(opnd);
 
-    if (ty == NULL) {
+    if (ty == nullptr) {
         ty = m_tm->getAny();
     }
 
@@ -2211,7 +2206,7 @@ bool IRParser::parseStore(ParseCtx * ctx)
     TOKEN tok = m_lexer->getNextToken();
 
     //Type
-    Type const* ty = NULL;
+    Type const* ty = nullptr;
     if (tok == T_COLON) {
         tok = m_lexer->getNextToken();
         if (!parseType(ctx, &ty)) {
@@ -2262,7 +2257,7 @@ bool IRParser::parseStore(ParseCtx * ctx)
 
     Var * var = findVar(ctx, m_rumgr->addToSymbolTab(
         m_lexer->getCurrentTokenString()));
-    if (var == NULL) {
+    if (var == nullptr) {
         error(tok, "%s is not declared", m_lexer->getCurrentTokenString());
         return false;
     }
@@ -2278,15 +2273,15 @@ bool IRParser::parseStore(ParseCtx * ctx)
         return false;
     }
 
-    IR * ir = NULL;
-    if (ty == NULL) {
+    IR * ir = nullptr;
+    if (ty == nullptr) {
         ir = ctx->current_region->buildStore(var, ctx->returned_exp);
     } else {
         ir = ctx->current_region->buildStore(var, ty, ctx->returned_exp);
     }
     ST_ofst(ir) = offset;
     ctx->addIR(ir);
-    ctx->returned_exp = NULL;
+    ctx->returned_exp = nullptr;
     copyProp(ir, cont, ctx);
     return true;
 }
@@ -2309,10 +2304,10 @@ bool IRParser::parseStorePR(ParseCtx * ctx)
 
     //Type
     tok = m_lexer->getNextToken();
-    Type const* ty = NULL;
+    Type const* ty = nullptr;
     if (tok == T_COLON) {
         tok = m_lexer->getNextToken();
-        if (!parseType(ctx, &ty) || ty == NULL) {
+        if (!parseType(ctx, &ty) || ty == nullptr) {
             error(tok, "illegal data type");
             return false;
         }
@@ -2350,7 +2345,7 @@ bool IRParser::parseStorePR(ParseCtx * ctx)
     IR * ir = ctx->current_region->buildStorePR(prno, ty, ctx->returned_exp);
     copyProp(ir, cont, ctx);
     ctx->addIR(ir);
-    ctx->returned_exp = NULL;
+    ctx->returned_exp = nullptr;
     return true;
 }
 
@@ -2369,7 +2364,7 @@ bool IRParser::parseModifyPR(X_CODE code, ParseCtx * ctx)
     }
 
     tok = m_lexer->getNextToken();
-    Type const* ty = NULL;
+    Type const* ty = nullptr;
     if (tok == T_COLON) {
         tok = m_lexer->getNextToken();
         if (!parseType(ctx, &ty)) {
@@ -2377,7 +2372,7 @@ bool IRParser::parseModifyPR(X_CODE code, ParseCtx * ctx)
             return false;
         }
     }
-    if (ty == NULL) {
+    if (ty == nullptr) {
         ty = m_tm->getAny();
     }
 
@@ -2466,7 +2461,7 @@ bool IRParser::parseModifyPR(X_CODE code, ParseCtx * ctx)
         ir = ctx->current_region->buildSetElem(prno, ty, base, val, offset);
     }
     ctx->addIR(ir);
-    ctx->returned_exp = NULL;
+    ctx->returned_exp = nullptr;
     copyProp(ir, cont, ctx);
     return true;
 }
@@ -2477,10 +2472,10 @@ bool IRParser::parseIStore(ParseCtx * ctx)
     ASSERT0(getCurrentXCode() == X_IST);
     TOKEN tok = m_lexer->getNextToken();
 
-    Type const* ty = NULL;
+    Type const* ty = nullptr;
     if (tok == T_COLON) {
         tok = m_lexer->getNextToken();
-        if (!parseType(ctx, &ty) || ty == NULL) {
+        if (!parseType(ctx, &ty) || ty == nullptr) {
             error(tok, "illegal data type");
             return false;
         }
@@ -2527,9 +2522,9 @@ bool IRParser::parseIStore(ParseCtx * ctx)
     }
     ASSERT0(ctx->returned_exp);
     IR * base = ctx->returned_exp;
-    ctx->returned_exp = NULL;
+    ctx->returned_exp = nullptr;
 
-    if (!base->is_ptr()) {
+    if (!base->isPtr()) {
         error("base expression of ist should be pointer");
         return false;
     }
@@ -2546,7 +2541,7 @@ bool IRParser::parseIStore(ParseCtx * ctx)
     }
     ASSERT0(ctx->returned_exp);
     IR * rhs = ctx->returned_exp;
-    ctx->returned_exp = NULL;
+    ctx->returned_exp = nullptr;
 
     IR * ir = ctx->current_region->buildIStore(base, rhs, ty);
     copyProp(ir, cont, ctx);
@@ -2618,7 +2613,7 @@ bool IRParser::parseCallAndICall(bool is_call, ParseCtx * ctx)
         tok = m_lexer->getNextToken();
         if (tok == T_COLON) {
             tok = m_lexer->getNextToken();
-            if (!parseType(ctx, &return_ty) || return_ty == NULL) {
+            if (!parseType(ctx, &return_ty) || return_ty == nullptr) {
                 error(tok, "illegal data type");
                 return false;
             }
@@ -2634,8 +2629,8 @@ bool IRParser::parseCallAndICall(bool is_call, ParseCtx * ctx)
         tok = m_lexer->getNextToken();
     }
 
-    Var * callee_var = NULL;
-    IR * callee_exp = NULL;
+    Var * callee_var = nullptr;
+    IR * callee_exp = nullptr;
     if (is_call) {
         if (tok == T_AT) {
             tok = m_lexer->getNextToken();
@@ -2653,7 +2648,7 @@ bool IRParser::parseCallAndICall(bool is_call, ParseCtx * ctx)
         Sym const* name = m_rumgr->addToSymbolTab(
             m_lexer->getCurrentTokenString());
         callee_var = findVar(ctx, name);
-        if (callee_var == NULL) {
+        if (callee_var == nullptr) {
             error(tok, "can not find region %s", SYM_name(name));
             return false;
         }
@@ -2674,8 +2669,8 @@ bool IRParser::parseCallAndICall(bool is_call, ParseCtx * ctx)
         }
         ASSERT0(ctx->returned_exp);
         callee_exp = ctx->returned_exp;
-        ctx->returned_exp = NULL;
-        if (callee_exp->get_next() != NULL) {
+        ctx->returned_exp = nullptr;
+        if (callee_exp->get_next() != nullptr) {
             error(tok, "multiple callee expression");
             return false;
         }
@@ -2684,7 +2679,7 @@ bool IRParser::parseCallAndICall(bool is_call, ParseCtx * ctx)
             error(tok, "miss ',' after callee expression");
             return false;
         }
-    }    
+    }
 
     tok = m_lexer->getNextToken();
     if (tok != T_LPAREN) {
@@ -2702,7 +2697,7 @@ bool IRParser::parseCallAndICall(bool is_call, ParseCtx * ctx)
     tok = m_lexer->getNextToken();
     IR * param_list = ctx->returned_exp;
 
-    IR * dummy_use_list = NULL;
+    IR * dummy_use_list = nullptr;
     if (tok == T_COLON) {
         //Dummy use.
         tok = m_lexer->getNextToken();
@@ -2723,7 +2718,7 @@ bool IRParser::parseCallAndICall(bool is_call, ParseCtx * ctx)
         DUMMYUSE(dummy_use_list);
     }
 
-    IR * ir = NULL;
+    IR * ir = nullptr;
     if (is_call) {
         ir = ctx->current_region->buildCall(
             callee_var, param_list, return_prno, return_ty);
@@ -2731,13 +2726,13 @@ bool IRParser::parseCallAndICall(bool is_call, ParseCtx * ctx)
         ir = ctx->current_region->buildICall(
             callee_exp, param_list, return_prno, return_ty);
     }
-    if (cont.ir_use_list != NULL) {
+    if (cont.ir_use_list != nullptr) {
         CALL_dummyuse(ir) = cont.ir_use_list;
         ir->setParent(CALL_dummyuse(ir));
     }
     copyProp(ir, cont, ctx);
     ctx->addIR(ir);
-    ctx->returned_exp = NULL;
+    ctx->returned_exp = nullptr;
     return true;
 }
 
@@ -2768,7 +2763,7 @@ bool IRParser::parseGoto(ParseCtx * ctx)
     Sym const* sym = m_rumgr->addToSymbolTab(
         m_lexer->getCurrentTokenString());
     LabelInfo * label = ctx->mapSym2Label(sym);
-    if (label == NULL) {
+    if (label == nullptr) {
         label = ctx->current_region->genCustomLabel(sym);
         ctx->setMapSym2Label(sym, label);
     }
@@ -2776,7 +2771,7 @@ bool IRParser::parseGoto(ParseCtx * ctx)
     ctx->addIR(ir);
     m_lexer->getNextToken();
     copyProp(ir, cont, ctx);
-    ctx->returned_exp = NULL;
+    ctx->returned_exp = nullptr;
     return true;
 }
 
@@ -2804,30 +2799,30 @@ bool IRParser::parseIGoto(ParseCtx * ctx)
     if (!parseExp(ctx)) {
         return false;
     }
-    if (ctx->returned_exp == NULL) {
+    if (ctx->returned_exp == nullptr) {
         error(tok, "miss determinate expression");
         return false;
     }
     IR * det = ctx->returned_exp;
-    ctx->returned_exp = NULL;
-    if (det->get_next() != NULL) {
+    ctx->returned_exp = nullptr;
+    if (det->get_next() != nullptr) {
         error(tok, "multiple determinate expression");
         return false;
     }
 
     //Case list
-    IR * case_list = NULL;
-    IR * last = NULL;
+    IR * case_list = nullptr;
+    IR * last = nullptr;
     for (;;) {
         if (!parseExp(ctx)) {
             error(tok, "illegal case expression");
             return false;
         }
         IR * case_exp = ctx->returned_exp;
-        if (case_exp == NULL) {
+        if (case_exp == nullptr) {
             break;
         }
-        ctx->returned_exp = NULL;
+        ctx->returned_exp = nullptr;
 
         xcom::add_next(&case_list, &last, case_exp);
 
@@ -2842,7 +2837,7 @@ bool IRParser::parseIGoto(ParseCtx * ctx)
             return false;
         }
     }
-    if (case_list == NULL) {
+    if (case_list == nullptr) {
         error(tok, "miss case list");
         return false;
     }
@@ -2906,12 +2901,12 @@ bool IRParser::parseDoWhile(ParseCtx * ctx)
     }
     IR * det = ctx->returned_exp;
     ASSERT0(det);
-    ctx->returned_exp = NULL;
+    ctx->returned_exp = nullptr;
 
     IR * ir = ctx->current_region->buildDoWhile(det, body);
     ctx->addIR(ir);
     copyProp(ir, cont, ctx);
-    ctx->returned_exp = NULL;
+    ctx->returned_exp = nullptr;
     return true;
 }
 
@@ -2940,7 +2935,7 @@ bool IRParser::parseWhileDo(ParseCtx * ctx)
     }
     IR * det = ctx->returned_exp;
     ASSERT0(det);
-    ctx->returned_exp = NULL;
+    ctx->returned_exp = nullptr;
 
     //body
     tok = m_lexer->getCurrentToken();
@@ -2967,7 +2962,7 @@ bool IRParser::parseWhileDo(ParseCtx * ctx)
     IR * ir = ctx->current_region->buildWhileDo(det, body);
     ctx->addIR(ir);
     copyProp(ir, cont, ctx);
-    ctx->returned_exp = NULL;
+    ctx->returned_exp = nullptr;
     return true;
 }
 
@@ -3003,11 +2998,11 @@ bool IRParser::parseDoLoop(ParseCtx * ctx)
     }
     ASSERT0(ctx->returned_exp);
     IR * iv = ctx->returned_exp;
-    ctx->returned_exp = NULL;
+    ctx->returned_exp = nullptr;
     if (!iv->is_id() && !iv->is_pr()) {
         error(tok, "induction variable must be ID or PR");
         return false;
-    } else if (iv->get_next() != NULL) {
+    } else if (iv->get_next() != nullptr) {
         error(tok, "multiple induction variable expression");
         return false;
     }
@@ -3025,8 +3020,8 @@ bool IRParser::parseDoLoop(ParseCtx * ctx)
     }
     ASSERT0(ctx->returned_exp);
     IR * init = ctx->returned_exp;
-    ctx->returned_exp = NULL;
-    if (init->get_next() != NULL) {
+    ctx->returned_exp = nullptr;
+    if (init->get_next() != nullptr) {
         error(tok, "multiple initial value expression");
         return false;
     }
@@ -3044,8 +3039,8 @@ bool IRParser::parseDoLoop(ParseCtx * ctx)
     }
     ASSERT0(ctx->returned_exp);
     IR * det = ctx->returned_exp;
-    ctx->returned_exp = NULL;
-    if (det->get_next() != NULL) {
+    ctx->returned_exp = nullptr;
+    if (det->get_next() != nullptr) {
         error(tok, "multiple determinate expression");
         return false;
     }
@@ -3072,8 +3067,8 @@ bool IRParser::parseDoLoop(ParseCtx * ctx)
     }
     ASSERT0(ctx->returned_exp);
     IR * step = ctx->returned_exp;
-    ctx->returned_exp = NULL;
-    if (step->get_next() != NULL) {
+    ctx->returned_exp = nullptr;
+    if (step->get_next() != nullptr) {
         error(tok, "multiple step expression");
         return false;
     }
@@ -3181,7 +3176,7 @@ bool IRParser::parseLabel(ParseCtx * ctx)
     }
     Sym const* sym = m_rumgr->addToSymbolTab(m_lexer->getCurrentTokenString());
     LabelInfo * label = ctx->mapSym2Label(sym);
-    if (label == NULL) {
+    if (label == nullptr) {
         label = ctx->current_region->genCustomLabel(sym);
         ctx->setMapSym2Label(sym, label);
     }
@@ -3196,7 +3191,7 @@ bool IRParser::parseLabel(ParseCtx * ctx)
     IR * ir = ctx->current_region->buildLabel(label);
     ctx->addIR(ir);
     copyProp(ir, cont, ctx);
-    ctx->returned_exp = NULL;
+    ctx->returned_exp = nullptr;
     return true;
 }
 
@@ -3226,11 +3221,11 @@ bool IRParser::parseBranch(bool is_truebr, ParseCtx * ctx)
     }
     IR * det = ctx->returned_exp;
     ASSERT0(det);
-    if (det->get_next() != NULL) {
+    if (det->get_next() != nullptr) {
         error(tok, "multiple determinate-expression");
         return false;
     }
-    ctx->returned_exp = NULL;
+    ctx->returned_exp = nullptr;
 
     tok = m_lexer->getCurrentToken();
     if (tok != T_COMMA) {
@@ -3246,7 +3241,7 @@ bool IRParser::parseBranch(bool is_truebr, ParseCtx * ctx)
     Sym const* sym = m_rumgr->addToSymbolTab(
         m_lexer->getCurrentTokenString());
     LabelInfo * label = ctx->mapSym2Label(sym);
-    if (label == NULL) {
+    if (label == nullptr) {
         label = ctx->current_region->genCustomLabel(sym);
         ctx->setMapSym2Label(sym, label);
     }
@@ -3255,7 +3250,7 @@ bool IRParser::parseBranch(bool is_truebr, ParseCtx * ctx)
     IR * ir = ctx->current_region->buildBranch(is_truebr, det, label);
     ctx->addIR(ir);
     copyProp(ir, cont, ctx);
-    ctx->returned_exp = NULL;
+    ctx->returned_exp = nullptr;
     return true;
 }
 
@@ -3277,10 +3272,10 @@ bool IRParser::parsePhi(ParseCtx * ctx)
     }
 
     tok = m_lexer->getNextToken();
-    Type const* ty = NULL;
+    Type const* ty = nullptr;
     if (tok == T_COLON) {
         tok = m_lexer->getNextToken();
-        if (!parseType(ctx, &ty) || ty == NULL) {
+        if (!parseType(ctx, &ty) || ty == nullptr) {
             error(tok, "illegal data type");
             return false;
         }
@@ -3295,8 +3290,8 @@ bool IRParser::parsePhi(ParseCtx * ctx)
     }
     tok = m_lexer->getNextToken();
 
-    IR * opnd_list = NULL;
-    IR * last = NULL;
+    IR * opnd_list = nullptr;
+    IR * last = nullptr;
     for (;;) {
         if (tok != T_LPAREN) {
             error(tok, "phi operand should be bracketed by '()'");
@@ -3310,7 +3305,7 @@ bool IRParser::parsePhi(ParseCtx * ctx)
         }
         ASSERT0(ctx->returned_exp);
         IR * opnd = ctx->returned_exp;
-        ctx->returned_exp = NULL;
+        ctx->returned_exp = nullptr;
         if (!opnd->is_pr() && !opnd->is_const()) {
             error(tok, "phi operand should be $PR or constant");
             return false;
@@ -3332,7 +3327,7 @@ bool IRParser::parsePhi(ParseCtx * ctx)
         Sym const* sym = m_rumgr->addToSymbolTab(
             m_lexer->getCurrentTokenString());
         LabelInfo * label = ctx->mapSym2Label(sym);
-        if (label == NULL) {
+        if (label == nullptr) {
             label = ctx->current_region->genCustomLabel(sym);
             ctx->setMapSym2Label(sym, label);
         }
@@ -3353,7 +3348,7 @@ bool IRParser::parsePhi(ParseCtx * ctx)
             break;
         } else {
             error(tok, "illegal %s in phi operation declaration",
-                m_lexer->getCurrentTokenString());
+                  m_lexer->getCurrentTokenString());
         }
     }
 
@@ -3387,7 +3382,7 @@ bool IRParser::parseIf(ParseCtx * ctx)
     }
     IR * det = ctx->returned_exp;
     ASSERT0(det);
-    ctx->returned_exp = NULL;
+    ctx->returned_exp = nullptr;
     tok = m_lexer->getCurrentToken();
 
     //truebody
@@ -3410,7 +3405,7 @@ bool IRParser::parseIf(ParseCtx * ctx)
         return false;
     }
 
-    IR * falsebody = NULL;
+    IR * falsebody = nullptr;
     tok = m_lexer->getNextToken();
     if (tok == T_IDENTIFIER && getCurrentXCode() == X_ELSE) {
         tok = m_lexer->getNextToken();
@@ -3438,7 +3433,7 @@ bool IRParser::parseIf(ParseCtx * ctx)
     IR * ir = ctx->current_region->buildIf(det, truebody, falsebody);
     ctx->addIR(ir);
     copyProp(ir, cont, ctx);
-    ctx->returned_exp = NULL;
+    ctx->returned_exp = nullptr;
     return true;
 }
 
@@ -3456,13 +3451,13 @@ bool IRParser::parseReturn(ParseCtx * ctx)
 {
     ASSERT0(getCurrentXCode() == X_RETURN);
     m_lexer->getNextToken();
-    ctx->returned_exp = NULL;
+    ctx->returned_exp = nullptr;
     if (!parseExp(ctx)) {
         return false;
     }
     IR * ir = ctx->current_region->buildReturn(ctx->returned_exp);
     ctx->addIR(ir);
-    ctx->returned_exp = NULL;
+    ctx->returned_exp = nullptr;
     return true;
 }
 
@@ -3501,16 +3496,16 @@ bool IRParser::parseSwitch(ParseCtx * ctx)
     }
     ASSERT0(ctx->returned_exp);
     IR * det = ctx->returned_exp;
-    ctx->returned_exp = NULL;
-    if (det->get_next() != NULL) {
+    ctx->returned_exp = nullptr;
+    if (det->get_next() != nullptr) {
         error(tok, "multiple determinate expression");
         return false;
     }
 
     //Case list and default label.
-    IR * case_list = NULL;
-    IR * last = NULL;
-    LabelInfo * deflab = NULL;
+    IR * case_list = nullptr;
+    IR * last = nullptr;
+    LabelInfo * deflab = nullptr;
     for (;;) {
         if (getCurrentXCode() == X_DEFAULT) {
             tok = m_lexer->getNextToken();
@@ -3521,7 +3516,7 @@ bool IRParser::parseSwitch(ParseCtx * ctx)
             Sym const* sym = m_rumgr->addToSymbolTab(
                 m_lexer->getCurrentTokenString());
             deflab = ctx->mapSym2Label(sym);
-            if (deflab == NULL) {
+            if (deflab == nullptr) {
                 deflab = ctx->current_region->genCustomLabel(sym);
                 ctx->setMapSym2Label(sym, deflab);
             }
@@ -3532,11 +3527,11 @@ bool IRParser::parseSwitch(ParseCtx * ctx)
                 return false;
             }
             IR * case_exp = ctx->returned_exp;
-            if (case_exp != NULL) {
+            if (case_exp != nullptr) {
                 xcom::add_next(&case_list, &last, case_exp);
                 //break;
             }
-            ctx->returned_exp = NULL;
+            ctx->returned_exp = nullptr;
         }
         tok = m_lexer->getCurrentToken();
         if (tok == T_COMMA) {
@@ -3552,7 +3547,7 @@ bool IRParser::parseSwitch(ParseCtx * ctx)
 
     //Switch body
     tok = m_lexer->getCurrentToken();
-    IR * body = NULL;
+    IR * body = nullptr;
     if (tok != T_SEMI) {
         if (tok != T_LLPAREN) {
             error(tok, "miss '{' before switch body");
@@ -3575,11 +3570,10 @@ bool IRParser::parseSwitch(ParseCtx * ctx)
         m_lexer->getNextToken();
     }
 
-    if (body != NULL) {
+    if (body != nullptr) {
         ctx->has_high_level_ir = true;
     }
-    IR * ir = ctx->current_region->buildSwitch(
-        det, case_list, body, deflab);
+    IR * ir = ctx->current_region->buildSwitch(det, case_list, body, deflab);
     copyProp(ir, cont, ctx);
     ctx->addIR(ir);
     return true;
@@ -3597,7 +3591,7 @@ bool IRParser::parseParameterList(ParseCtx * ctx)
 
     UINT i = 0;
     for (; tok != T_RPAREN && tok != T_END && tok != T_NUL; i++) {
-        Var * v = NULL;
+        Var * v = nullptr;
         if (getCurrentXCode() == X_UNDEFINED) {
             //The parameter is reserved.
             tok = m_lexer->getNextToken();
@@ -3739,8 +3733,8 @@ bool IRParser::parseType(ParseCtx * ctx, Type const** ty)
             }
 
             tok = m_lexer->getNextToken();
-            Type const* elem_type = NULL;
-            if (!parseType(ctx, &elem_type) || elem_type == NULL) {
+            Type const* elem_type = nullptr;
+            if (!parseType(ctx, &elem_type) || elem_type == nullptr) {
                 error(tok, "illegal element type");
                 return false;
             }
@@ -3967,7 +3961,7 @@ bool IRParser::parseByteValue(Var * var, ParseCtx * ctx)
     xcom::Vector<BYTE> buf;
     UINT bytesize = 0;
     for (; tok != T_RPAREN && !isTerminator(tok);) {
-        if (!parseImmVal(ctx) || PARSECTX_returned_imm_ty(ctx) == NULL) {
+        if (!parseImmVal(ctx) || PARSECTX_returned_imm_ty(ctx) == nullptr) {
             error(tok, "illegal literal");
             return false;
         }
@@ -3976,7 +3970,7 @@ bool IRParser::parseByteValue(Var * var, ParseCtx * ctx)
             return false;
         }
         buf.set(bytesize, (BYTE)PARSECTX_returned_imm_intval(ctx));
-        PARSECTX_returned_imm_ty(ctx) = NULL;
+        PARSECTX_returned_imm_ty(ctx) = nullptr;
         bytesize++;
         tok = m_lexer->getCurrentToken();
         if (tok != T_COMMA && tok != T_RPAREN) {
@@ -4045,7 +4039,7 @@ bool IRParser::parseUseProperty(PropertySet & cont, ParseCtx * ctx)
     }
     m_lexer->getNextToken();
     cont.ir_use_list = ctx->returned_exp;
-    ctx->returned_exp = NULL;
+    ctx->returned_exp = nullptr;
     return true;
 }
 
@@ -4054,7 +4048,7 @@ bool IRParser::parseElemTypeProperty(PropertySet & cont, ParseCtx * ctx)
 {
     ASSERT0(getCurrentXCode() == X_ELEMTYPE);
     TOKEN tok = m_lexer->getNextToken();
-    Type const* elemtype = NULL;
+    Type const* elemtype = nullptr;
     if (tok != T_COLON) {
         error(tok, "miss ':' after elemtype");
         return false;
@@ -4062,7 +4056,7 @@ bool IRParser::parseElemTypeProperty(PropertySet & cont, ParseCtx * ctx)
 
     //Array element type
     tok = m_lexer->getNextToken();
-    if (!parseType(ctx, &elemtype) || elemtype == NULL) {
+    if (!parseType(ctx, &elemtype) || elemtype == nullptr) {
         error(tok, "illegal elemtype");
         return false;
     }
@@ -4109,7 +4103,7 @@ bool IRParser::parseDefProperty(PropertySet & cont, ParseCtx * ctx)
     }
     m_lexer->getNextToken();
     cont.ir_def_list = ctx->returned_exp;
-    ctx->returned_exp = NULL;
+    ctx->returned_exp = nullptr;
     return true;
 }
 
@@ -4132,7 +4126,7 @@ bool IRParser::parseThrowTarget(PropertySet & cont, ParseCtx * ctx)
         Sym const* sym = m_rumgr->addToSymbolTab(
             m_lexer->getCurrentTokenString());
         LabelInfo * label = ctx->mapSym2Label(sym);
-        if (label == NULL) {
+        if (label == nullptr) {
             label = ctx->current_region->genCustomLabel(sym);
             ctx->setMapSym2Label(sym, label);
         }
@@ -4151,7 +4145,7 @@ bool IRParser::parseThrowTarget(PropertySet & cont, ParseCtx * ctx)
         return false;
     }
     m_lexer->getNextToken();
-    ctx->returned_exp = NULL;
+    ctx->returned_exp = nullptr;
     return true;
 }
 
@@ -4311,7 +4305,7 @@ bool IRParser::declareVar(ParseCtx * ctx, Var ** var)
 
     //Type
     tok = m_lexer->getNextToken();
-    Type const* ty = NULL;
+    Type const* ty = nullptr;
     if (tok == T_COLON) {
         tok = m_lexer->getNextToken();
         if (!parseType(ctx, &ty)) {
@@ -4319,12 +4313,12 @@ bool IRParser::declareVar(ParseCtx * ctx, Var ** var)
             return false;
         }
     }
-    if (ty == NULL) {
+    if (ty == nullptr) {
         ty = m_tm->getAny();
     }
 
     ASSERT0(ctx->current_region);
-    Var * v = NULL;
+    Var * v = nullptr;
     if (m_rumgr->getVarMgr()->isDedicatedStringVar(SYM_name(sym))) {
         MD const* md = m_rumgr->genDedicateStrMD();
         v = md->get_base();
@@ -4364,7 +4358,7 @@ bool IRParser::parse()
     ASSERT0(m_lexer);
     TOKEN tok = T_NUL;
     //Get first token.
-    //CASE: There are T_NUL token return.    
+    //CASE: There are T_NUL token return.
     while ((tok = m_lexer->getNextToken()) == T_NUL) {;}
     for (;; tok = m_lexer->getNextToken()) {
         switch (tok) {

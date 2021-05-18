@@ -214,7 +214,7 @@ public:
 
         for (INT i = 0; i <= get_last_idx(); i++) {
             IR * pr = get(i);
-            if (pr == NULL) {
+            if (pr == nullptr) {
                 note(rg, "\nv%d -> --", i);
             }
             note(rg, "\nv%d -> PR%u", i, pr->getPrno());
@@ -249,7 +249,7 @@ public:
 };
 
 
-class OffsetVec : public Vector<UINT, 16> {
+class OffsetVec : public Vector<UINT> {
 public:
 };
 

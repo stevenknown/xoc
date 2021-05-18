@@ -25,11 +25,7 @@ CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
 OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE
 USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 @*/
-#include "ltype.h"
-#include "comf.h"
-#include "smempool.h"
-#include "sstl.h"
-#include "bigint.h"
+#include "xcominc.h"
 
 #define GET_HIGH_PART(val) \
     ((BigIntElemType)(val >> SHIFT_BIT_SIZE_OF_HIGH_PART))
@@ -108,7 +104,7 @@ bool BigInt::isAllElemEqual(BigIntElemType elem) const
 void BigInt::dump(CHAR const* name, bool is_seg_hex) const
 {
     #define BS_NAME "bigint.dump"
-    if (name == NULL) {
+    if (name == nullptr) {
         name = BS_NAME;
     }
     FILE * h = fopen(name, "a+");
@@ -129,7 +125,7 @@ void BigInt::dump(bool is_seg_hex) const
 //with_newline: true to dump a '\n' before content.
 void BigInt::dump(FILE * h, bool with_newline, bool is_seg_hex) const
 {
-    ASSERTN(h, ("need file handler"));
+    ASSERTN(h, ("require file handler"));
     if (getSigPos() >= 0 && with_newline) {
         fprintf(h, "\n");
     }
@@ -195,7 +191,7 @@ bool BigInt::verify(UINT elemnum, ...)
     for (; i < elemnum; i++) {
         BigIntElemType expected_val = va_arg(ptr, BigIntElemType);
         BigIntElemType val = get(i);
-        ASSERT0(val == expected_val);
+        CHECK0_DUMMYUSE(val == expected_val);
     }
     va_end(ptr);
     return true;
@@ -245,8 +241,8 @@ bool operator != (BigInt const& a, BigInt const& b)
 
 bool operator == (BigInt const& a, BigInt const& b)
 {
-    BigInt const* longer = NULL;
-    BigInt const* shorter = NULL;
+    BigInt const* longer = nullptr;
+    BigInt const* shorter = nullptr;
     if (b.getSigPos() > a.getSigPos()) {
         //b's length > a's length
         longer = &b;
@@ -391,7 +387,7 @@ bool operator == (BigInt const& a, BigIntElemType v)
     vv.set_vec(&v, 1);
     vv.setSigPos(0);
     bool res = a == vv;
-    vv.set_vec(NULL, 0);
+    vv.set_vec(nullptr, 0);
     return res;
 
     //INT i = 0;
@@ -434,7 +430,7 @@ bool operator < (BigInt const& a, BigIntElemType v)
     vv.set_vec(&v, 1);
     vv.setSigPos(0);
     bool res = a < vv;
-    vv.set_vec(NULL, 0);
+    vv.set_vec(nullptr, 0);
     return res;
 
     //for (INT i = 0; i <= a.getSigPos(); i++) {
@@ -476,7 +472,7 @@ bool operator <= (BigInt const& a, BigIntElemType v)
     vv.set_vec(&v, 1);
     vv.setSigPos(0);
     bool res = a <= vv;
-    vv.set_vec(NULL, 0);
+    vv.set_vec(nullptr, 0);
     return res;
 
     //for (INT i = 0; i <= a.getSigPos(); i++) {
@@ -507,8 +503,8 @@ BigInt& bisAdd(IN BigInt const& a, IN BigInt const& b, IN OUT BigInt & res)
     ASSERT0(sizeof(SuperElemType) >= 2 * sizeof(BigIntElemType));
     ASSERTN(b.getSigPos() >= 0, ("Miss significant elem"));
     ASSERTN(a.getSigPos() >= 0, ("Miss significant elem"));
-    BigInt const* longer = NULL;
-    BigInt const* shorter = NULL;
+    BigInt const* longer = nullptr;
+    BigInt const* shorter = nullptr;
     if (b.getSigPos() > a.getSigPos()) {
         //b's length > a's length
         longer = &b;
@@ -565,8 +561,8 @@ BigInt& biuAdd(IN BigInt const& a, IN BigInt const& b, IN OUT BigInt & res)
     ASSERT0(sizeof(SuperUElemType) >= 2 * sizeof(BigIntUElemType));
     ASSERTN(b.getSigPos() >= 0, ("Miss significant elem"));
     ASSERTN(a.getSigPos() >= 0, ("Miss significant elem"));
-    BigInt const* longer = NULL;
-    BigInt const* shorter = NULL;
+    BigInt const* longer = nullptr;
+    BigInt const* shorter = nullptr;
     if (b.getSigPos() > a.getSigPos()) {
         //b's length > a's length
         longer = &b;

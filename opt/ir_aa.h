@@ -37,6 +37,7 @@ author: Su Zhenyu
 namespace xoc {
 
 class IRCFG;
+class GSCC;
 
 //PtPair
 #define PP_id(pp) ((pp)->id)
@@ -116,7 +117,7 @@ public:
     //Count memory usage for current object.
     size_t count_mem() const;
 
-    DefMiscBitSetMgr * getSBSMgr() { return &m_misc_bs_mgr; }    
+    DefMiscBitSetMgr * getSBSMgr() { return &m_misc_bs_mgr; }
 };
 
 
@@ -149,8 +150,8 @@ class PtPairMgr {
 public:
     PtPairMgr()
     {
-        m_pool_pt_pair = NULL;
-        m_pool_tmap = NULL;
+        m_pool_pt_pair = nullptr;
+        m_pool_tmap = nullptr;
         init();
     }
     COPY_CONSTRUCTOR(PtPairMgr);
@@ -158,7 +159,7 @@ public:
 
     void init()
     {
-        if (m_pool_pt_pair != NULL) { return; }
+        if (m_pool_pt_pair != nullptr) { return; }
         m_pp_count = 1;
         m_pool_pt_pair = smpoolCreate(sizeof(PtPair), MEM_CONST_SIZE);
         m_pool_tmap = smpoolCreate(sizeof(TMap<UINT, PtPair*>),
@@ -167,20 +168,20 @@ public:
 
     void destroy()
     {
-        if (m_pool_pt_pair == NULL) { return; }
+        if (m_pool_pt_pair == nullptr) { return; }
 
         TMapIter<UINT, TMap<UINT, PtPair*>*> ti;
-        TMap<UINT, PtPair*> * v = NULL;
+        TMap<UINT, PtPair*> * v = nullptr;
         for (m_from_tmap.get_first(ti, &v);
-             v != NULL; m_from_tmap.get_next(ti, &v)) {
+             v != nullptr; m_from_tmap.get_next(ti, &v)) {
             v->destroy();
         }
         m_pp_count = 0;
 
         smpoolDelete(m_pool_pt_pair);
         smpoolDelete(m_pool_tmap);
-        m_pool_pt_pair = NULL;
-        m_pool_tmap = NULL;
+        m_pool_pt_pair = nullptr;
+        m_pool_tmap = nullptr;
     }
 
     void clean()
@@ -255,7 +256,7 @@ public:
     void copy(AACtx const& ic)
     {
         u1.i1 = ic.u1.i1;
-        AC_returned_pts(this) = NULL;
+        AC_returned_pts(this) = nullptr;
     }
 
     //Only copy top down flag.
@@ -263,17 +264,17 @@ public:
     {
         AC_comp_pt(this) = AC_comp_pt(&ic);
         AC_is_lda_base(this) = AC_is_lda_base(&ic);
-        AC_returned_pts(this) = NULL;
+        AC_returned_pts(this) = nullptr;
     }
 
-    void clean() { u1.i1 = 0; AC_returned_pts(this) = NULL; }
+    void clean() { u1.i1 = 0; AC_returned_pts(this) = nullptr; }
 
     //Clean these flag when processing each individiual IR trees.
     inline void cleanBottomUpFlag()
     {
         AC_has_comp_lda(this) = 0;
         AC_is_mds_mod(this) = 0;
-        AC_returned_pts(this) = NULL;
+        AC_returned_pts(this) = nullptr;
     }
 
     //Collect the bottom-up flag and use them to direct parent action.
@@ -302,6 +303,7 @@ typedef TMap<IR const*, MD const*> IR2Heapobj;
 class AliasAnalysis : public Pass {
 protected:
     IRCFG * m_cfg;
+    GSCC * m_scc;
     VarMgr * m_var_mgr;
     TypeMgr * m_tm;
     Region * m_rg;
@@ -355,7 +357,7 @@ protected:
     inline MD2MDSet * genMD2MDSetForBB(UINT bbid)
     {
         MD2MDSet * mx = m_md2mds_vec.get(bbid);
-        if (mx == NULL) {
+        if (mx == nullptr) {
             mx = (MD2MDSet*)xmalloc(sizeof(MD2MDSet));
             mx->init();
             m_md2mds_vec.set(bbid, mx);
@@ -485,7 +487,7 @@ protected:
                                IR const* opnd1,
                                IN OUT MDSet & mds,
                                bool * changed);
-          
+
     void recomputeDataType(AACtx const& ic, IR const* ir, OUT MDSet & pts);
     void reviseMDSize(IN OUT MDSet & mds, UINT size);
 
@@ -513,12 +515,12 @@ public:
     //Attemp to compute the type based may point to MD set.
     //Return true if this function find the point-to MD set, otherwise
     //return false.
-    virtual MD const* computePointToViaType(IR const*) { return NULL; }
+    virtual MD const* computePointToViaType(IR const*) { return nullptr; }
 
     void clean();
     void cleanSBSMgr();
     void cleanPointTo(UINT mdid, IN OUT MD2MDSet & ctx)
-    { ctx.setAlways(mdid, NULL); }
+    { ctx.setAlways(mdid, nullptr); }
 
     //Compute and update point_to_set with TBAA info.
     //pointer: IR expression that pointed to memory.
@@ -535,10 +537,10 @@ public:
                            DefMiscBitSetMgr & sbsmgr);
     void computeMayPointTo(IR * pointer, OUT MDSet & mds);
     //Count memory usage for current object.
-    size_t count_mem();
-    size_t countMD2MDSetMemory();
+    size_t count_mem() const;
+    size_t countMD2MDSetMemory() const;
     void cleanContext(OptCtx & oc);
-   
+
     void destroyContext(OptCtx & oc);
     void dumpMD2MDSet(MD2MDSet const* mx, bool dump_ptg) const;
     void dumpMD2MDSet(MD const* md, MD2MDSet const* mx) const;
@@ -581,7 +583,7 @@ public:
 
     void initAliasAnalysis();
     //Return true if Alias Analysis has initialized.
-    bool is_init() const { return m_maypts != NULL; }
+    bool is_init() const { return m_maypts != nullptr; }
     bool isFlowSensitive() const { return m_flow_sensitive; }
     bool isValidStmtToAA(IR const* ir) const;
     bool isHeapMem(UINT mdid) const
@@ -633,7 +635,7 @@ public:
     {
         MDSet tmp;
         MDSet const* pts = getPointTo(pointer_mdid, ctx);
-        if (pts != NULL) {
+        if (pts != nullptr) {
             if (pts->is_contain(newmd)) {
                 ASSERT0(m_mds_hash->find(*pts));
                 //setPointTo(pointer_mdid, ctx, pts);
@@ -656,7 +658,7 @@ public:
     {
         ASSERT0(m_mds_hash->find(pt_set));
         MDSet const* pts = getPointTo(pointer_mdid, ctx);
-        if (pts == NULL) {
+        if (pts == nullptr) {
             setPointTo(pointer_mdid, ctx, &pt_set);
             return;
         }

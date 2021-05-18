@@ -35,29 +35,29 @@ author: Su Zhenyu
 
 namespace xoc {
 
-DbxMgr * g_dbx_mgr = NULL;
+DbxMgr * g_dbx_mgr = nullptr;
 
 void setLineNum(IR * ir, UINT lineno, Region * rg)
 {
-    DbxAttachInfo * da = NULL;
+    DbxAttachInfo * da = nullptr;
     ASSERT0(rg);
-    if (IR_ai(ir) == NULL) {
+    if (IR_ai(ir) == nullptr) {
         IR_ai(ir) = rg->allocAIContainer();
         da = (DbxAttachInfo*)smpoolMalloc(sizeof(DbxAttachInfo),
                                           rg->get_pool());
         ASSERT0(da);
         da->init();
-        IR_ai(ir)->set((BaseAttachInfo*)da);
+        IR_ai(ir)->set((BaseAttachInfo*)da, rg);
     } else {
         IR_ai(ir)->init();
         da = (DbxAttachInfo*)IR_ai(ir)->get(AI_DBX);
-        if (da == NULL) {
-            da = (DbxAttachInfo*)smpoolMalloc(
-                sizeof(DbxAttachInfo), rg->get_pool());
+        if (da == nullptr) {
+            da = (DbxAttachInfo*)smpoolMalloc(sizeof(DbxAttachInfo),
+                                              rg->get_pool());
             ASSERT0(da);
             da->init();
             ASSERT0(da);
-            IR_ai(ir)->set((BaseAttachInfo*)da);
+            IR_ai(ir)->set((BaseAttachInfo*)da, rg);
         }
     }
     DBX_lineno(&da->dbx) = lineno;
@@ -67,9 +67,9 @@ void setLineNum(IR * ir, UINT lineno, Region * rg)
 //Get line number in source code that corresponding to the IR.
 UINT getLineNum(IR const* ir)
 {
-    if (IR_ai(ir) == NULL || !IR_ai(ir)->is_init()) { return 0; }
+    if (IR_ai(ir) == nullptr || !IR_ai(ir)->is_init()) { return 0; }
     DbxAttachInfo * da = (DbxAttachInfo*)IR_ai(ir)->get(AI_DBX);
-    if (da == NULL) { return 0; }
+    if (da == nullptr) { return 0; }
     return DBX_lineno(&da->dbx);
 }
 
@@ -85,26 +85,26 @@ UINT getLineNum(Dbx const* dbx)
 void copyDbx(IR * tgt, IR const* src, Region * rg)
 {
     ASSERT0(rg);
-    if (IR_ai(src) == NULL) {
+    if (IR_ai(src) == nullptr) {
         if (g_is_search_and_copy_dbx &&
             src->is_exp() &&
-            src->getParent() != NULL) {
+            src->getParent() != nullptr) {
             //Attempt to copy nearest debug-info.
-            //IR exp's parent might be NULL during simplification.
+            //IR exp's parent might be nullptr during simplification.
             copyDbx(tgt, src->getParent(), rg);
         }
         return;
     }
 
     DbxAttachInfo * src_da = (DbxAttachInfo*)IR_ai(src)->get(AI_DBX);
-    if (IR_ai(tgt) == NULL) {
-        if (src_da == NULL) {
+    if (IR_ai(tgt) == nullptr) {
+        if (src_da == nullptr) {
             if (src->is_stmt()) {
                 return;
             }
-            if (g_is_search_and_copy_dbx && src->getParent() != NULL) {
+            if (g_is_search_and_copy_dbx && src->getParent() != nullptr) {
                 //Attempt to copy nearest debug-info.
-                //IR exp's parent might be NULL during simplification.
+                //IR exp's parent might be nullptr during simplification.
                 copyDbx(tgt, src->getParent(), rg);
             }
             return;
@@ -112,18 +112,18 @@ void copyDbx(IR * tgt, IR const* src, Region * rg)
         IR_ai(tgt) = rg->allocAIContainer();
     }
     ASSERT0(IR_ai(tgt));
-    if (src_da == NULL) {
+    if (src_da == nullptr) {
         IR_ai(tgt)->clean(AI_DBX);
         return;
     }
 
     DbxAttachInfo * tgt_da = (DbxAttachInfo*)IR_ai(tgt)->get(AI_DBX);
-    if (tgt_da == NULL) {
+    if (tgt_da == nullptr) {
         tgt_da = (DbxAttachInfo*)smpoolMalloc(sizeof(DbxAttachInfo),
                                               rg->get_pool());
         ASSERT0(tgt_da);
         tgt_da->init();
-        IR_ai(tgt)->set((BaseAttachInfo*)tgt_da);
+        IR_ai(tgt)->set((BaseAttachInfo*)tgt_da, rg);
     }
     tgt_da->dbx.copy(src_da->dbx);
 }
@@ -131,9 +131,9 @@ void copyDbx(IR * tgt, IR const* src, Region * rg)
 
 Dbx * getDbx(IR const* ir)
 {
-    if (IR_ai(ir) == NULL) { return NULL; }
+    if (IR_ai(ir) == nullptr) { return nullptr; }
     DbxAttachInfo * da = (DbxAttachInfo*)IR_ai(ir)->get(AI_DBX);
-    if (da == NULL) { return NULL; }
+    if (da == nullptr) { return nullptr; }
     return &da->dbx;
 }
 
@@ -144,10 +144,10 @@ Dbx * getDbx(IR const* ir)
 void DbxMgr::printSrcLine(IR const* ir, PrtCtx * ctx)
 {
     ASSERT0(ir);
-    if (ctx->getLogMgr() == NULL || !ctx->getLogMgr()->is_init()) { return; }
+    if (ctx->getLogMgr() == nullptr || !ctx->getLogMgr()->is_init()) { return; }
     if (!ir->is_stmt()) { return; }
     Dbx * dbx = ::getDbx(ir);
-    if (dbx != NULL) {
+    if (dbx != nullptr) {
         printSrcLine(dbx, ctx);
     }
 }
@@ -158,7 +158,7 @@ void DbxMgr::printSrcLine(xcom::StrBuf & output, IR const* ir, PrtCtx * ctx)
     ASSERT0(ir);
     if (!ir->is_stmt()) { return; }
     Dbx * dbx = ::getDbx(ir);
-    if (dbx != NULL) {
+    if (dbx != nullptr) {
         printSrcLine(output, dbx, ctx);
     }
 }

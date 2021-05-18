@@ -66,17 +66,17 @@ public:
 public:
     DexRegion(REGION_TYPE rt, RegionMgr * rm) : Region(rt, rm)
     {
-        m_dex2ir = NULL;
-        m_prno2v = NULL;
-        m_type_index_rep = NULL;
+        m_dex2ir = nullptr;
+        m_prno2v = nullptr;
+        m_type_index_rep = nullptr;
         m_paramnum = 0;
         m_org_vregnum = 0;
         m_src_path;
-        m_dexfile = NULL;
-        m_dexmethod = NULL;
-        m_classname = NULL;
-        m_funcname = NULL;
-        m_functype = NULL;
+        m_dexfile = nullptr;
+        m_dexmethod = nullptr;
+        m_classname = nullptr;
+        m_funcname = nullptr;
+        m_functype = nullptr;
         m_sc_pool = smpoolCreate(sizeof(SC<LabelInfo*>), MEM_CONST_SIZE);
     }
     virtual ~DexRegion() { smpoolDelete(m_sc_pool); }

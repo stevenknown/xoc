@@ -173,6 +173,19 @@ public:
 
     //Return true if data type is boolean.
     bool is_bool() const { return TY_dtype(this) == D_B; }
+    bool is_i8() const { return TY_dtype(this) == D_I8; }
+    bool is_i16() const { return TY_dtype(this) == D_I16; }
+    bool is_i32() const { return TY_dtype(this) == D_I32; }
+    bool is_i64() const { return TY_dtype(this) == D_I64; }
+    bool is_i128() const { return TY_dtype(this) == D_I128; }
+    bool is_u8() const { return TY_dtype(this) == D_U8; }
+    bool is_u16() const { return TY_dtype(this) == D_U16; }
+    bool is_u32() const { return TY_dtype(this) == D_U32; }
+    bool is_u64() const { return TY_dtype(this) == D_U64; }
+    bool is_u128() const { return TY_dtype(this) == D_U128; }
+    bool is_f32() const { return TY_dtype(this) == D_F32; }
+    bool is_f64() const { return TY_dtype(this) == D_F64; }
+    bool is_f128() const { return TY_dtype(this) == D_F128; }
 
     //Return true if data type is primitive.
     bool is_scalar() const
@@ -288,10 +301,11 @@ public:
 class TensorType : public Type {
     COPY_CONSTRUCTOR(TensorType);
 public:
+    friend class TypeMgr;
     //Record the degree of each dimension.
     //e.g: <3x2x7x1>, the degree of dimension 0 is 3,
     //degree of dimension 1 is 2, degree of dimension 2 is 7, etc.
-    xcom::SimpleVec<UINT, 3> degree_of_dimension;
+    xcom::SimpleVector<UINT, 3, 64> degree_of_dimension;
 
     //Record data type of element in tensor.
     DATA_TYPE tensor_elem_type;
@@ -302,15 +316,10 @@ public:
         tensor_elem_type = D_UNDEF;
     }
 
+    void copy(TensorType const& src, TypeMgr * mgr);
+
     void init() { degree_of_dimension.init(); }
     void destroy() { degree_of_dimension.destroy(); }
-
-    void copy(TensorType const& src)
-    {
-        Type::copy(src);
-        tensor_elem_type = src.tensor_elem_type;
-        degree_of_dimension.copy(src.degree_of_dimension);
-    }
 
     //Get data type of element in tensor.
     DATA_TYPE getElemDataType() const { return tensor_elem_type; }
@@ -323,7 +332,7 @@ public:
     UINT getByteSize(TypeMgr const* mgr) const;
 
     //Set degree to given dimension.
-    void setDegreeOfDim(UINT dim, UINT degree);
+    void setDegreeOfDim(UINT dim, UINT degree, TypeMgr * mgr);
 };
 
 
@@ -482,6 +491,8 @@ public:
 extern TypeDesc const g_type_desc[];
 class TypeMgr {
     COPY_CONSTRUCTOR(TypeMgr);
+    friend class TensorType;
+
     RegionMgr * m_rm;
     xcom::Vector<Type*> m_type_tab;
     SMemPool * m_pool;
@@ -538,6 +549,9 @@ class TypeMgr {
     TypeContainer * newTC()
     { return (TypeContainer*)xmalloc(sizeof(TypeContainer)); }
 
+protected:
+    SMemPool * get_pool() const { return m_pool; }
+
 public:
     TypeMgr(RegionMgr * rm)
     {
@@ -569,12 +583,12 @@ public:
     ~TypeMgr()
     {
         smpoolDelete(m_pool);
-        m_pool = NULL;
+        m_pool = nullptr;
 
         VectorElemTypeTabIter iter;
         VectorElemTypeTab * tab;
         for (Type const* d = m_vector_type_tab.get_first(iter, &tab);
-             d != NULL; d = m_vector_type_tab.get_next(iter, &tab)) {
+             d != nullptr; d = m_vector_type_tab.get_next(iter, &tab)) {
             ASSERT0(tab);
             delete tab;
         }
@@ -582,7 +596,7 @@ public:
         TensorElemTypeTabIter iter2;
         TensorElemTypeTab * tab2;
         for (Type const* d = m_tensor_type_tab.get_first(iter2, &tab2);
-             d != NULL; d = m_tensor_type_tab.get_next(iter2, &tab2)) {
+             d != nullptr; d = m_tensor_type_tab.get_next(iter2, &tab2)) {
             ASSERT0(tab2);
             delete tab2;
         }
@@ -605,10 +619,10 @@ public:
     //Return data type that registered in m_type_tab.
     Type * registerType(Type const* dtd);
 
-    CHAR const* dump_type(Type const* dtd, OUT StrBuf & buf);
-    void dump_type(Type const* dtd);
-    void dump_type(UINT tyid);
-    void dump_type_tab();
+    CHAR const* dump_type(Type const* dtd, OUT StrBuf & buf) const;
+    void dump_type(Type const* dtd) const;
+    void dump_type(UINT tyid) const;
+    void dump_type_tab() const;
 
     DATA_TYPE hoistBSdtype(UINT bit_size, bool is_signed) const;
     DATA_TYPE hoistDtype(UINT bit_size, OUT UINT * hoisted_data_size);
@@ -680,7 +694,7 @@ public:
     { return get_int_dtype(BYTE_PER_POINTER * BIT_PER_BYTE, false); }
 
     //Return the byte size of pointer's base.
-    UINT getPointerBaseByteSize(Type const* type)
+    UINT getPointerBaseByteSize(Type const* type) const
     {
         ASSERT0(type->is_pointer());
         return TY_ptr_base_size(type);
@@ -778,13 +792,14 @@ public:
         return TC_type(registerVector(&d));
     }
 
-    //Register and return pointer type tyid accroding to pointer-base-size.
+    //Register and return pointer type accroding to pt_base_size.
+    //pt_base_sz: byte size of pointer's base type.
     Type const* getPointerType(UINT pt_base_sz)
     {
-        //Pointer base size can be zero.
+        //Pointer base size could be zero.
         //Note if pointer base size is 0, that means the pointer can not
         //do any arthimetic, because pointer arithmetic may use pointer
-        //base size as addend.
+        //base size as an addend.
         //ASSERT0(pt_base_sz != 0);
         PointerType d;
         TY_dtype(&d) = D_PTR;

@@ -44,10 +44,10 @@ void CallGraph::computeEntryList(List<CallNode*> & elst)
     elst.clean();
     INT c;
     for (xcom::Vertex * v = get_first_vertex(c);
-         v != NULL; v = get_next_vertex(c)) {
-        if (VERTEX_in_list(v) == NULL) {
+         v != nullptr; v = get_next_vertex(c)) {
+        if (VERTEX_in_list(v) == nullptr) {
             CallNode * cn = m_cnid2cn.get(v->id());
-            ASSERT0(cn != NULL);
+            ASSERT0(cn != nullptr);
             elst.append_tail(cn);
         }
     }
@@ -59,10 +59,10 @@ void CallGraph::computeExitList(List<CallNode*> & elst)
     elst.clean();
     INT c;
     for (xcom::Vertex * v = get_first_vertex(c);
-         v != NULL; v = get_next_vertex(c)) {
-        if (VERTEX_out_list(v) == NULL) {
+         v != nullptr; v = get_next_vertex(c)) {
+        if (VERTEX_out_list(v) == nullptr) {
             CallNode * cn = m_cnid2cn.get(v->id());
-            ASSERT0(cn != NULL);
+            ASSERT0(cn != nullptr);
             elst.append_tail(cn);
         }
     }
@@ -74,12 +74,12 @@ void CallGraph::computeExitList(List<CallNode*> & elst)
 //      with completely information.
 void CallGraph::dumpVCG(CHAR const* name, INT flag)
 {
-    if (name == NULL) {
+    if (name == nullptr) {
         name = "graph_call_graph.vcg";
     }
     UNLINK(name);
     FILE * h = fopen(name, "a+");
-    ASSERTN(h != NULL, ("%s create failed!!!",name));
+    ASSERTN(h != nullptr, ("%s create failed!!!",name));
     UINT org = getRegionMgr()->getLogMgr()->getIndent();
     getRegionMgr()->getLogMgr()->decIndent(org);
 
@@ -129,20 +129,20 @@ void CallGraph::dumpVCG(CHAR const* name, INT flag)
             "edge.color: darkgreen\n");
 
     //Dump graph vertex.
-    getRegionMgr()->getLogMgr()->push(h, name); 
-    INT c;
+    getRegionMgr()->getLogMgr()->push(h, name);
+    VertexIter itv = VERTEX_UNDEF;
     List<Var const*> formalparamlst;
-    for (xcom::Vertex * v = m_vertices.get_first(c);
-         v != NULL; v = m_vertices.get_next(c)) {
+    for (xcom::Vertex * v = get_first_vertex(itv);
+         v != nullptr; v = get_next_vertex(itv)) {
         INT id = v->id();
         CallNode * cn = m_cnid2cn.get(id);
-        ASSERT0(cn != NULL);
+        ASSERT0(cn != nullptr);
         fprintf(h, "\nnode: { title:\"%d\" shape:box color:gold "
                    "fontname:\"courB\" label:\"", id);
 
-        CHAR const* cnname = CN_sym(cn) != NULL ?
+        CHAR const* cnname = CN_sym(cn) != nullptr ?
                              SYM_name(CN_sym(cn)) : "IndirectCall";
-        if (cn->region() != NULL) {
+        if (cn->region() != nullptr) {
             fprintf(h, "CN(%d):Region(%d):%s\n",
                     cn->id(), cn->region()->id(), cnname);
         } else {
@@ -150,21 +150,21 @@ void CallGraph::dumpVCG(CHAR const* name, INT flag)
         }
 
         fprintf(h, "\n");
-        if (dump_ir_detail && cn->region() != NULL) {
+        if (dump_ir_detail && cn->region() != nullptr) {
             //Dump formal paramters.
             formalparamlst.clean();
             cn->region()->findFormalParam(formalparamlst, true);
-            for (Var const* param = formalparamlst.get_head(); param != NULL;
+            for (Var const* param = formalparamlst.get_head(); param != nullptr;
                  param = formalparamlst.get_next()) {
                 param->dump(m_tm);
             }
 
             IR * irs = cn->region()->getIRList();
-            if (irs != NULL) {
-                for (; irs != NULL; irs = irs->get_next()) {
+            if (irs != nullptr) {
+                for (; irs != nullptr; irs = irs->get_next()) {
                     //fprintf(h, "%s\n", dump_ir_buf(ir, buf));
                     //TODO: implement dump_ir_buf();
-                    dumpIR(irs, cn->region(), NULL, IR_DUMP_KID|
+                    dumpIR(irs, cn->region(), nullptr, IR_DUMP_KID|
                            (dump_src_line ? IR_DUMP_SRC_LINE : 0)|
                            (dump_inner_region ? IR_DUMP_INNER_REGION : 0));
                 }
@@ -177,14 +177,15 @@ void CallGraph::dumpVCG(CHAR const* name, INT flag)
     }
 
     //Dump graph edge
-    for (xcom::Edge * e = m_edges.get_first(c);
-         e != NULL; e = m_edges.get_next(c)) {
+    EdgeIter ite;
+    for (xcom::Edge * e = get_first_edge(ite);
+         e != nullptr; e = get_next_edge(ite)) {
         xcom::Vertex * from = EDGE_from(e);
         xcom::Vertex * to = EDGE_to(e);
         fprintf(h, "\nedge: { sourcename:\"%d\" targetname:\"%d\" %s}",
                 from->id(), to->id(),  "");
     }
-    getRegionMgr()->getLogMgr()->pop(); 
+    getRegionMgr()->getLogMgr()->pop();
     getRegionMgr()->getLogMgr()->incIndent(org);
     fprintf(h, "\n}\n");
     fclose(h);
@@ -201,7 +202,7 @@ CallNode * CallGraph::newCallNode(IR const* ir, Region * rg)
     if (ir->is_call()) {
         Sym const* name = CALL_idinfo(ir)->get_name();
         CallNode * cn  = mapSym2CallNode(name, rg);
-        if (cn != NULL) { return cn; }
+        if (cn != nullptr) { return cn; }
 
         //ir invoked imported region.
         cn = allocCallNode();
@@ -226,7 +227,7 @@ CallNode * CallGraph::newCallNode(Region * rg)
     Sym const* name = rg->getRegionVar()->get_name();
     if (rg->is_program()) {
         CallNode * cn = mapRegion2CallNode(rg);
-        if (cn != NULL) {
+        if (cn != nullptr) {
             ASSERTN(cn->region() == rg, ("more than 2 rg with same id"));
             return cn;
         }
@@ -246,7 +247,7 @@ CallNode * CallGraph::newCallNode(Region * rg)
     CN_id(cn) = m_cn_count++;
     CN_ru(cn) = rg;
     genSYM2CN(rg->getParent())->set(name, cn);
-    ASSERT0(m_ruid2cn.get(rg->id()) == NULL);
+    ASSERT0(m_ruid2cn.get(rg->id()) == nullptr);
     m_ruid2cn.set(rg->id(), cn);
     return cn;
 }
@@ -257,10 +258,10 @@ bool CallGraph::build(RegionMgr * rumgr)
 {
     for (UINT i = 0; i < rumgr->getNumOfRegion(); i++) {
         Region * rg = rumgr->getRegion(i);
-        if (rg == NULL) { continue; }
+        if (rg == nullptr) { continue; }
         ASSERT0(rg->is_function() || rg->is_program());
 
-        if (rg->getParent() != NULL) {
+        if (rg->getParent() != nullptr) {
             SYM2CN * sym2cn = genSYM2CN(rg->getParent());
             ASSERT0(sym2cn);
 
@@ -268,8 +269,8 @@ bool CallGraph::build(RegionMgr * rumgr)
             ASSERT0(name);
 
             CallNode * cn = sym2cn->get(name);
-            if (cn != NULL) {
-                if (cn->region() == NULL) {
+            if (cn != nullptr) {
+                if (cn->region() == nullptr) {
                     CN_ru(cn) = rg;
                     m_ruid2cn.set(rg->id(), cn);
                 }
@@ -289,19 +290,19 @@ bool CallGraph::build(RegionMgr * rumgr)
 
     for (UINT i = 0; i < rumgr->getNumOfRegion(); i++) {
         Region * rg = rumgr->getRegion(i);
-        if (rg == NULL) { continue; }
+        if (rg == nullptr) { continue; }
 
         ASSERT0(rg->is_function() || rg->is_program());
         CallNode * caller = mapRegion2CallNode(rg);
         ASSERT0(caller);
         addNode(caller);
-        List<IR const*> * call_list = rg->getCallList();
+        CIRList * call_list = rg->getCallList();
         ASSERT0(call_list);
         if (call_list->get_elem_count() == 0) { continue; }
 
         xcom::C<IR const*> * ct;
         for (call_list->get_head(&ct);
-             ct != NULL; ct = call_list->get_next(ct)) {
+             ct != nullptr; ct = call_list->get_next(ct)) {
             IR const* ir = ct->val();
             ASSERT0(ir && ir->isCallStmt());
             ASSERT0(!CALL_is_intrinsic(ir));

@@ -31,15 +31,14 @@ IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 author: Su Zhenyu
 @*/
-#include "ltype.h"
-#include "comf.h"
-#include "smempool.h"
-#include "sstl.h"
+#include "xcominc.h"
+
+namespace xcom {
 
 #define msg
-#define MAGIC_NUM         0xFC
-#define BOUNDARY_NUM      0xAA
-#define END_BOUND_BYTE     4
+#define MAGIC_NUM 0xFC
+#define BOUNDARY_NUM 0xAA
+#define END_BOUND_BYTE 4
 
 using xcom::Hash;
 
@@ -54,8 +53,8 @@ public:
 };
 
 
-static MEMPOOL_HASH * g_mem_pool_hash_tab = NULL;
-static SMemPool * g_mem_pool=NULL;
+static MEMPOOL_HASH * g_mem_pool_hash_tab = nullptr;
+static SMemPool * g_mem_pool=nullptr;
 static UINT g_mem_pool_count = 0;
 #ifdef _DEBUG_
 static UINT g_mem_pool_chunk_count = 0;
@@ -72,16 +71,16 @@ ULONGLONG g_stat_mem_size = 0;
 
 void dumpPool(SMemPool * handler, FILE * h)
 {
-    if (h == NULL) { return; }
+    if (h == nullptr) { return; }
     fprintf(h, "\n= SMP, total size:%u ",
             (UINT)smpoolGetPoolSize(handler));
-    while (handler != NULL) {
+    while (handler != nullptr) {
         fprintf(h, "<T%u R%u>",
                 (UINT)MEMPOOL_pool_size(handler),
                 (UINT)(MEMPOOL_pool_size(handler) -
                        MEMPOOL_start_pos(handler)));
         handler = MEMPOOL_next(handler);
-        if (handler != NULL) {
+        if (handler != nullptr) {
             fprintf(h, ", ");
         }
     }
@@ -116,20 +115,20 @@ static SMemPool * new_mem_pool(size_t size, MEMPOOLTYPE mpt)
 
 inline static void remove_smp(SMemPool * t)
 {
-    if (t == NULL) return;
-    ASSERTN(t->prev != NULL, ("t should not be first."));
+    if (t == nullptr) return;
+    ASSERTN(t->prev != nullptr, ("t should not be first."));
     t->prev->next = t->next;
-    if (t->next != NULL) {
+    if (t->next != nullptr) {
         t->next->prev = t->prev;
     }
-    t->next = t->prev = NULL;
+    t->next = t->prev = nullptr;
 }
 
 
 inline static void append_head_smp(SMemPool ** head, SMemPool * t)
 {
     ASSERTN(t && head, ("Mem pool internal error 1"));
-    t->prev = NULL;
+    t->prev = nullptr;
     t->next = *head;
     *head = t;
 }
@@ -138,9 +137,9 @@ inline static void append_head_smp(SMemPool ** head, SMemPool * t)
 inline static void append_after_smp(SMemPool * marker, SMemPool * tlst)
 {
     ASSERTN(marker && tlst && marker != tlst, ("Mem pool internal error 2"));
-    if (marker->next != NULL) {
+    if (marker->next != nullptr) {
         SMemPool * last = tlst;
-        while (last != NULL && last->next != NULL) {
+        while (last != nullptr && last->next != nullptr) {
             last = last->next;
         }
         marker->next->prev = last;
@@ -168,11 +167,11 @@ void smpoolInitPool()
         SMemPool * mp = g_mem_pool;
 
         //Record pool list into hash.
-        while (mp != NULL) {
+        while (mp != nullptr) {
             //Mainly hash addr of 'mp' into hash
             //table corresponding to 'mpt_idx'.
             ASSERTN(g_mem_pool_hash_tab->find(
-                (xcom::OBJTY)MEMPOOL_id(mp)) == NULL,
+                (xcom::OBJTY)MEMPOOL_id(mp)) == nullptr,
                 ("Repetitive pool idx"));
             g_mem_pool_hash_tab->append(mp);
             mp = MEMPOOL_next(mp);
@@ -180,10 +179,10 @@ void smpoolInitPool()
 
         //Clean up chain info
         mp = g_mem_pool;
-        while (g_mem_pool != NULL) {
+        while (g_mem_pool != nullptr) {
             mp = g_mem_pool;
             g_mem_pool = g_mem_pool->next;
-            mp->prev = mp->next = NULL;
+            mp->prev = mp->next = nullptr;
         }
     }
     g_is_pool_init = true;
@@ -195,30 +194,30 @@ void smpoolInitPool()
 void smpoolFiniPool()
 {
     if (g_is_pool_init && g_is_pool_hashed) {
-        ASSERTN(g_mem_pool == NULL, ("illegal init process"));
-        SMemPool * next = NULL;
+        ASSERTN(g_mem_pool == nullptr, ("illegal init process"));
+        SMemPool * next = nullptr;
         INT c;
         for (SMemPool * mp = g_mem_pool_hash_tab->get_first(c);
-             mp != NULL; mp = next) {
+             mp != nullptr; mp = next) {
             next = g_mem_pool_hash_tab->get_next(c);
-            g_mem_pool_hash_tab->removed(mp);
+            g_mem_pool_hash_tab->remove(mp);
             xcom::add_next(&g_mem_pool, mp);
         }
         //Code must be placed here! The flag must be reset
         //before the call of pool_hash_tab.destroy().
         g_is_pool_init = false;
         delete g_mem_pool_hash_tab;
-        g_mem_pool_hash_tab = NULL;
+        g_mem_pool_hash_tab = nullptr;
     }
 
     g_is_pool_init = false;
     SMemPool * mp = g_mem_pool;
-    while (mp != NULL) {
+    while (mp != nullptr) {
         SMemPool * tmp = mp;
         mp = MEMPOOL_next(mp);
         smpoolDeleteViaPoolIndex(MEMPOOL_id(tmp));
     }
-    g_mem_pool = NULL;
+    g_mem_pool = nullptr;
     g_mem_pool_count = 0;
 }
 
@@ -229,8 +228,8 @@ void smpoolFiniPool()
 //mpt: pool type.
 SMemPool * smpoolCreate(size_t size, MEMPOOLTYPE mpt)
 {
-    SMemPool * mp = NULL;
-    if (size == 0 || mpt == MEM_NONE) { return NULL; }
+    SMemPool * mp = nullptr;
+    if (size == 0 || mpt == MEM_NONE) { return nullptr; }
     mp = new_mem_pool(size, mpt);
     return mp;
 }
@@ -243,7 +242,7 @@ SMemPool * smpoolCreate(size_t size, MEMPOOLTYPE mpt)
 //mpt: pool type.
 MEMPOOLIDX smpoolCreatePoolIndex(size_t size, MEMPOOLTYPE mpt)
 {
-    SMemPool * mp = NULL;
+    SMemPool * mp = nullptr;
 
     if (size <=0 || mpt == MEM_NONE)
         return 0;
@@ -253,7 +252,7 @@ MEMPOOLIDX smpoolCreatePoolIndex(size_t size, MEMPOOLTYPE mpt)
         idx = (MEMPOOLIDX)rand();
         do {
             if (idx != 0 &&
-                g_mem_pool_hash_tab->find((xcom::OBJTY)(size_t)idx) == NULL) {
+                g_mem_pool_hash_tab->find((xcom::OBJTY)(size_t)idx) == nullptr) {
                  //Unique pool idx
                 break;
             }
@@ -271,7 +270,7 @@ MEMPOOLIDX smpoolCreatePoolIndex(size_t size, MEMPOOLTYPE mpt)
     } else {
         mp = smpoolCreate(size, mpt);
         MEMPOOL_id(mp) = ++g_mem_pool_count;
-        if (g_mem_pool == NULL) {
+        if (g_mem_pool == nullptr) {
             g_mem_pool = mp;
         } else {
             mp->next = g_mem_pool;
@@ -286,13 +285,13 @@ MEMPOOLIDX smpoolCreatePoolIndex(size_t size, MEMPOOLTYPE mpt)
 //Destroy memory pool totally.
 INT smpoolDelete(SMemPool * handler)
 {
-    if (handler == NULL) {
+    if (handler == nullptr) {
         return ST_NO_SUCH_MEMPOOL_FIND;
     }
 
     //Free local pool list
     SMemPool * tmp = handler;
-    while (tmp != NULL) {
+    while (tmp != nullptr) {
         SMemPool * d_tmp = tmp;
         tmp = MEMPOOL_next(tmp);
         free(d_tmp);
@@ -311,7 +310,7 @@ INT smpoolDeleteViaPoolIndex(MEMPOOLIDX mpt_idx)
     //Searching the mempool which indicated with 'mpt_idx'
     if (g_is_pool_hashed && g_is_pool_init) {
         mp = g_mem_pool_hash_tab->find((xcom::OBJTY)(size_t)mpt_idx);
-        if (mp == NULL) {
+        if (mp == nullptr) {
             //Sometimes, mem pool is manipulated by user, but
             //is not due to destructer.
             //Therefore, the same mem pool idx will be free
@@ -320,30 +319,30 @@ INT smpoolDeleteViaPoolIndex(MEMPOOLIDX mpt_idx)
             return ST_NO_SUCH_MEMPOOL_FIND;
         }
         //Remove pool from pool table.
-        g_mem_pool_hash_tab->removed(mp);
+        g_mem_pool_hash_tab->remove(mp);
     } else {
-        while (mp != NULL) {
+        while (mp != nullptr) {
             if (MEMPOOL_id(mp) == mpt_idx) {
                 break;
             }
             mp = mp->next;
         }
 
-        if (mp == NULL) {
+        if (mp == nullptr) {
             return ST_NO_SUCH_MEMPOOL_FIND;
         }
 
-        if (mp->prev != NULL) {
+        if (mp->prev != nullptr) {
             mp->prev->next = mp->next;
         }
-        if (mp->next != NULL) {
+        if (mp->next != nullptr) {
             mp->next->prev = mp->prev;
         }
         if (mp == g_mem_pool) {
-            if (mp->next != NULL) {
+            if (mp->next != nullptr) {
                 g_mem_pool = mp->next;
             } else {
-                g_mem_pool = NULL;
+                g_mem_pool = nullptr;
             }
         }
     }
@@ -381,7 +380,7 @@ void * smpoolMallocConstSize(size_t elem_size, IN SMemPool * handler)
     }
 
     SMemPool * rest = MEMPOOL_next(handler);
-    if (rest != NULL) {
+    if (rest != nullptr) {
         //Search free block in the first rest pool.
         ASSERTN(MEMPOOL_pool_size(rest) >= MEMPOOL_start_pos(rest),
             ("exception occurs during mempool function"));
@@ -406,7 +405,7 @@ void * smpoolMallocConstSize(size_t elem_size, IN SMemPool * handler)
     MEMPOOL_prev(newpool) = handler;
     MEMPOOL_next(handler) = newpool;
     MEMPOOL_next(newpool) = rest;
-    if (rest != NULL) {
+    if (rest != nullptr) {
         MEMPOOL_prev(rest) = newpool;
     }
     void * addr = (size_t*)(((CHAR*)MEMPOOL_pool_ptr(newpool)) +
@@ -430,10 +429,10 @@ void * smpoolMalloc(size_t size, IN SMemPool * handler, size_t grow_size)
     }
 
     //Search free block in the pool.
-    void * addr = NULL;
-    SMemPool * tmp_rest = handler, * last = NULL;
-    SMemPool * full_head = NULL;
-    while (tmp_rest != NULL) {
+    void * addr = nullptr;
+    SMemPool * tmp_rest = handler, * last = nullptr;
+    SMemPool * full_head = nullptr;
+    while (tmp_rest != nullptr) {
         ASSERTN(MEMPOOL_pool_size(tmp_rest) >= MEMPOOL_start_pos(tmp_rest),
             ("exception occurs during mempool function"));
         ASSERTN(MEMPOOL_pool_size(tmp_rest) > 0,
@@ -454,7 +453,7 @@ void * smpoolMalloc(size_t size, IN SMemPool * handler, size_t grow_size)
             last = cur;
         }
     }
-    ASSERTN(last && MEMPOOL_next(last) == NULL, ("Mempool internal error 3"));
+    ASSERTN(last && MEMPOOL_next(last) == nullptr, ("Mempool internal error 3"));
 
     //We lack free blocks, and quering new mem block.
     tmp_rest = last;
@@ -476,7 +475,7 @@ void * smpoolMalloc(size_t size, IN SMemPool * handler, size_t grow_size)
     addr = (size_t*)(((CHAR*)MEMPOOL_pool_ptr(tmp_rest)) +
         MEMPOOL_start_pos(tmp_rest));
 FIN:
-    if (full_head != NULL) {
+    if (full_head != nullptr) {
         append_after_smp(tmp_rest, full_head);
     }
     MEMPOOL_start_pos(tmp_rest) += size;
@@ -496,7 +495,7 @@ void * smpoolMallocViaPoolIndex(size_t size, MEMPOOLIDX mpt_idx, size_t grow_siz
     if (g_is_pool_hashed && g_is_pool_init) {
         mp = g_mem_pool_hash_tab->find((xcom::OBJTY)(size_t)mpt_idx);
     } else {
-        while (mp != NULL) {
+        while (mp != nullptr) {
             if (MEMPOOL_id(mp) == mpt_idx) {
                 break;
             }
@@ -504,9 +503,9 @@ void * smpoolMallocViaPoolIndex(size_t size, MEMPOOLIDX mpt_idx, size_t grow_siz
         }
     }
 
-    if (mp == NULL) {
+    if (mp == nullptr) {
         //Mem pool of Index %lu does not exist", (ULONG)mpt_idx);
-        return NULL;
+        return nullptr;
     }
 
     return smpoolMalloc(size, mp, grow_size);
@@ -516,10 +515,10 @@ void * smpoolMallocViaPoolIndex(size_t size, MEMPOOLIDX mpt_idx, size_t grow_siz
 //Get total pool byte-size.
 size_t smpoolGetPoolSize(SMemPool const* handle)
 {
-    if (handle == NULL) return 0;
+    if (handle == nullptr) return 0;
     SMemPool const* mp = handle;
     size_t size = 0;
-    while (mp != NULL) {
+    while (mp != nullptr) {
         size += mp->mem_pool_size;
         mp = MEMPOOL_next(mp);
     }
@@ -536,7 +535,7 @@ size_t smpoolGetPoolSizeViaIndex(MEMPOOLIDX mpt_idx)
         mp = g_mem_pool_hash_tab->find((xcom::OBJTY)(size_t)mpt_idx);
     } else {
         //Searching the mempool which indicated with 'mpt_idx'
-        while (mp!=NULL) {
+        while (mp!=nullptr) {
             if(MEMPOOL_id(mp) == mpt_idx ){
                 break;
             }
@@ -544,7 +543,7 @@ size_t smpoolGetPoolSizeViaIndex(MEMPOOLIDX mpt_idx)
         }
     }
 
-    if (mp == NULL) {
+    if (mp == nullptr) {
         return 0;
     }
 
@@ -553,3 +552,4 @@ size_t smpoolGetPoolSizeViaIndex(MEMPOOLIDX mpt_idx)
     return smpoolGetPoolSize(mp);
 }
 
+} //namespace xcom

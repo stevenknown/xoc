@@ -47,7 +47,7 @@ public:
     {
         m_edge_hash_size = edge_hash_size;
         m_vex_hash_size = vex_hash_size;
-        m_spath_mat = NULL;
+        m_spath_mat = nullptr;
     }
 
     AGraph(AGraph & g) : Graph(g)
@@ -59,23 +59,23 @@ public:
 
     virtual ~AGraph()
     {
-        if (m_spath_mat != NULL) {
+        if (m_spath_mat != nullptr) {
             delete m_spath_mat;//Delete shortest path matrix
-            m_spath_mat = NULL;
+            m_spath_mat = nullptr;
         }
     }
 
     void clone(AGraph & src)
     {
-        if (src.m_spath_mat != NULL) {
-            if (m_spath_mat == NULL) {
+        if (src.m_spath_mat != nullptr) {
+            if (m_spath_mat == nullptr) {
                 m_spath_mat = new Matrix<UINT>(*src.m_spath_mat);
             } else {
                 m_spath_mat->copy(*src.m_spath_mat);
             }
         } else {
             delete m_spath_mat;
-            m_spath_mat = NULL;
+            m_spath_mat = nullptr;
         }
     }
 
@@ -83,7 +83,7 @@ public:
     size_t count_mem() const
     {
         size_t count = Graph::count_mem();
-        if (m_spath_mat != NULL) {
+        if (m_spath_mat != nullptr) {
             count += m_spath_mat->count_mem();
         }
         return count;
@@ -95,13 +95,13 @@ public:
     //except for mempool, freelist.
     void erase()
     {
-        if (m_spath_mat != NULL) {
+        if (m_spath_mat != nullptr) {
             delete m_spath_mat; //Delete shortest path matrix
-            m_spath_mat = NULL;
+            m_spath_mat = nullptr;
         }
         Graph::erase();
     }
 };
 
-}
+} //namespace xcom
 #endif
