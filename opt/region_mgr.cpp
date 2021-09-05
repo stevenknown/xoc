@@ -45,8 +45,8 @@ RegionMgr::RegionMgr() : m_type_mgr(this)
     #ifdef _DEBUG_
     m_num_allocated = 0;
     #endif
-    m_ru_count = 1;
-    m_label_count = 1;
+    m_ru_count = REGION_ID_UNDEF + 1;
+    m_label_count = LABEL_ID_UNDEF + 1;
     m_var_mgr = nullptr;
     m_md_sys = nullptr;
     m_is_regard_str_as_same_md = true;
@@ -214,7 +214,7 @@ Region * RegionMgr::newRegion(REGION_TYPE rt)
 
     Region * rg = allocRegion(rt);
     UINT free_id = m_free_ru_id.remove_head();
-    if (free_id == 0) {
+    if (free_id == REGION_ID_UNDEF) {
         REGION_id(rg) = m_ru_count++;
     } else {
         REGION_id(rg) = free_id;
@@ -370,7 +370,7 @@ void RegionMgr::deleteRegion(Region * rg, bool collect_id)
     ASSERTN(getRegion(id), ("not registered region"));
     delete rg;
 
-    if (collect_id && id != 0) {
+    if (collect_id && id != REGION_ID_UNDEF) {
         m_id2ru.set(id, nullptr);
         m_free_ru_id.append_head(id);
     }
@@ -384,10 +384,8 @@ void RegionMgr::deleteRegion(Region * rg, bool collect_id)
 }
 
 
-void RegionMgr::estimateEV(OUT UINT & num_call,
-                           OUT UINT & num_ru,
-                           bool scan_call,
-                           bool scan_inner_region)
+void RegionMgr::estimateEV(OUT UINT & num_call, OUT UINT & num_ru,
+                           bool scan_call, bool scan_inner_region)
 {
     for (UINT i = 0; i < getNumOfRegion(); i++) {
         Region * rg = getRegion(i);
@@ -409,8 +407,7 @@ void RegionMgr::estimateEV(OUT UINT & num_call,
 
 //Scan call site and build call graph.
 //Return true if building graph successfully, otherwise return false.
-void RegionMgr::buildCallGraph(OptCtx & oc,
-                               bool scan_call,
+void RegionMgr::buildCallGraph(OptCtx & oc, bool scan_call,
                                bool scan_inner_region)
 {
     //Generate call-list and return-list.

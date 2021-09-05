@@ -119,14 +119,14 @@ void CDG::get_cd_succs(UINT id, OUT List<xcom::Vertex*> & lst)
 }
 
 
-void CDG::rebuild(IN OUT OptCtx & oc, xcom::DGraph & cfg)
+void CDG::rebuild(MOD OptCtx & oc, xcom::DGraph & cfg)
 {
     erase();
     build(oc, cfg);
 }
 
 
-void CDG::build(IN OUT OptCtx & oc, xcom::DGraph & cfg)
+void CDG::build(MOD OptCtx & oc, xcom::DGraph & cfg)
 {
     if (cfg.getVertexNum() == 0) { return; }
 

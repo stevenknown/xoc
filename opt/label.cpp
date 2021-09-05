@@ -86,7 +86,7 @@ void LabelInfo::dumpName(Region const* rg) const
 }
 
 
-char const* LabelInfo::getName(IN OUT StrBuf * buf) const
+char const* LabelInfo::getName(MOD StrBuf * buf) const
 {
     if (LABELINFO_type(this) == L_ILABEL) {
         buf->sprint(ILABEL_STR_FORMAT, ILABEL_CONT(this));

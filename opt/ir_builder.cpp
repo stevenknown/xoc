@@ -174,7 +174,8 @@ IR * Region::buildLdaString(CHAR const* varname, CHAR const * string)
 IR * Region::buildLdaString(CHAR const* varname, Sym const* string)
 {
     ASSERT0(string);
-    Var * v = getVarMgr()->registerStringVar(varname, string, MEMORY_ALIGNMENT);
+    Var * v = getVarMgr()->registerStringVar(varname, string,
+                                             MEMORY_ALIGNMENT);
     return buildLda(v);
 }
 
@@ -268,7 +269,7 @@ IR * Region::buildCvt(IR * exp, Type const* tgt_ty)
 
 
 //Build IR_PHI operation.
-//'res': result pr of PHI.
+//res: result pr of PHI.
 IR * Region::buildPhi(UINT prno, Type const* type, UINT num_opnd)
 {
     ASSERT0(type);
@@ -289,7 +290,7 @@ IR * Region::buildPhi(UINT prno, Type const* type, UINT num_opnd)
 
 
 //Build IR_PHI operation.
-//'res': result pr of PHI.
+//res: result pr of PHI.
 IR * Region::buildPhi(UINT prno, Type const* type, IR * opnd_list)
 {
     ASSERT0(type);
@@ -310,13 +311,11 @@ IR * Region::buildPhi(UINT prno, Type const* type, IR * opnd_list)
 
 
 //Build IR_CALL operation.
-//'res_list': reture value list.
-//'result_prno': indicate the result PR which hold the return value.
+//res_list: reture value list.
+//result_prno: indicate the result PR which hold the return value.
 //    0 means the call does not have a return value.
-//'type': result PR data type.
-IR * Region::buildCall(Var * callee,
-                       IR * param_list,
-                       UINT result_prno,
+//type: result PR data type.
+IR * Region::buildCall(Var * callee, IR * param_list, UINT result_prno,
                        Type const* type)
 {
     ASSERT0(type);
@@ -335,10 +334,10 @@ IR * Region::buildCall(Var * callee,
 
 
 //Build IR_ICALL operation.
-//'res_list': reture value list.
-//'result_prno': indicate the result PR which hold the return value.
+//res_list: reture value list.
+//result_prno: indicate the result PR which hold the return value.
 //    0 means the call does not have a return value.
-//'type': result PR data type.
+//type: result PR data type.
 //    0 means the call does not have a return value.
 IR * Region::buildICall(IR * callee,
                         IR * param_list,
@@ -422,30 +421,25 @@ IR * Region::buildGoto(LabelInfo const* li)
 
 
 //Build IR_LD operation.
-IR * Region::buildLoad(IN Var * var)
-{
-    ASSERT0(var);
-    return buildLoad(var, VAR_type(var));
-}
-
-
-//Build IR_LD operation.
 //Load value from variable with type 'type'.
-//'type': result value type.
-IR * Region::buildLoad(Var * var, Type const* type)
+//var: indicates the variable which value will be loaded.
+//ofst: memory byte offset relative to var.
+//type: result type of value.
+IR * Region::buildLoad(Var * var, UINT ofst, Type const* type)
 {
     ASSERT0(type);
     ASSERT0(var);
     IR * ir = allocIR(IR_LD);
     LD_idinfo(ir) = var;
+    LD_ofst(ir) = ofst;
     IR_dt(ir) = type;
     if (g_is_hoist_type) {
         //Hoisting I16/U16/I8/U8 to I32, to utilize whole register.
         DATA_TYPE dt = ir->getDType();
         if (IS_SIMPLEX(dt)) {
             //Hoist data-type from less than INT to INT.
-            IR_dt(ir) =
-                getTypeMgr()->getSimplexTypeEx(getTypeMgr()->hoistDtype(dt));
+            IR_dt(ir) = getTypeMgr()->getSimplexTypeEx(
+                getTypeMgr()->hoistDtype(dt));
         }
     }
     return ir;
@@ -455,8 +449,8 @@ IR * Region::buildLoad(Var * var, Type const* type)
 //Build IR_ILD operation.
 //Result is either register or memory chunk, and the size of ILD
 //result equals to 'pointer_base_size' of 'addr'.
-//'base': memory address of ILD.
-//'ptbase_or_mc_size': if result of ILD is pointer, this parameter records
+//base: memory address of ILD.
+//ptbase_or_mc_size: if result of ILD is pointer, this parameter records
 //    pointer_base_size; or if result is memory chunk, it records
 //    the size of memory chunk.
 //NOTICE: The ofst of ILD requires to maintain when after return.
@@ -483,10 +477,10 @@ IR * Region::buildILoad(IR * base, UINT ofst, Type const* type)
 
 
 //Build store operation to get value from 'base', and store the result PR.
-//'prno': result prno.
-//'type': data type of targe pr.
-//'offset': byte offset to the start of PR.
-//'base: hold the value that expected to extract.
+//prno: result prno.
+//type: data type of targe pr.
+//offset: byte offset to the start of PR.
+//base: hold the value that expected to extract.
 IR * Region::buildGetElem(UINT prno, Type const* type, IR * base, IR * offset)
 {
     ASSERT0(type && offset && base && prno != PRNO_UNDEF && base->is_exp());
@@ -502,9 +496,9 @@ IR * Region::buildGetElem(UINT prno, Type const* type, IR * base, IR * offset)
 
 
 //Build store operation to get value from 'rhs', and store the result PR.
-//'type': data type of targe pr.
-//'offset': byte offset to the start of rhs PR.
-//'base: hold the value that expected to extract.
+//type: data type of targe pr.
+//offset: byte offset to the start of rhs PR.
+//base: hold the value that expected to extract.
 IR * Region::buildGetElem(Type const* type, IR * base, IR * offset)
 {
     ASSERT0(type && base && base->is_exp());
@@ -517,12 +511,12 @@ IR * Region::buildGetElem(Type const* type, IR * base, IR * offset)
 
 //Build store operation to store 'rhs' to store value to be one of the
 //element of a PR.
-//'prno': target prno.
-//'type': data type of targe pr.
+//prno: target prno.
+//type: data type of targe pr.
 //base: base of source.
 //value: value that need to be set.
-//'offset': byte offset to the start of result PR.
-//'rhs: value expected to store.
+//offset: byte offset to the start of result PR.
+//rhs: value expected to store.
 IR * Region::buildSetElem(UINT prno,
                           Type const* type,
                           IR * base,
@@ -545,9 +539,9 @@ IR * Region::buildSetElem(UINT prno,
 
 //Build store operation to store 'rhs' to store value to be one of the
 //element of a PR.
-//'type': data type of targe pr.
-//'offset': byte offset to the start of result PR.
-//'rhs: value expected to store.
+//type: data type of targe pr.
+//offset: byte offset to the start of result PR.
+//rhs: value expected to store.
 IR * Region::buildSetElem(Type const* type,
                           IR * base,
                           IR * val,
@@ -563,9 +557,9 @@ IR * Region::buildSetElem(Type const* type,
 
 
 //Build store operation to store 'rhs' to new pr with type and prno.
-//'prno': target prno.
-//'type': data type of targe pr.
-//'rhs: value expected to store.
+//prno: target prno.
+//type: data type of targe pr.
+//rhs: value expected to store.
 IR * Region::buildStorePR(UINT prno, Type const* type, IR * rhs)
 {
     ASSERT0(type && prno != PRNO_UNDEF && rhs && rhs->is_exp());
@@ -579,8 +573,8 @@ IR * Region::buildStorePR(UINT prno, Type const* type, IR * rhs)
 
 
 //Build store operation to store 'rhs' to new pr with type.
-//'type': data type of targe pr.
-//'rhs: value expected to store.
+//type: data type of targe pr.
+//rhs: value expected to store.
 IR * Region::buildStorePR(Type const* type, IR * rhs)
 {
     ASSERT0(type && rhs && rhs->is_exp());
@@ -592,8 +586,8 @@ IR * Region::buildStorePR(Type const* type, IR * rhs)
 
 
 //Build IR_ST operation.
-//'lhs': memory variable, described target memory location.
-//'rhs: value expected to store.
+//lhs: memory variable, described target memory location.
+//rhs: value expected to store.
 IR * Region::buildStore(Var * lhs, IR * rhs)
 {
     ASSERT0(lhs && rhs);
@@ -602,9 +596,9 @@ IR * Region::buildStore(Var * lhs, IR * rhs)
 
 
 //Build IR_ST operation.
-//'lhs': target memory location.
-//'type: result data type.
-//'rhs: value expected to store.
+//lhs: target memory location.
+//type: result data type.
+//rhs: value expected to store.
 IR * Region::buildStore(Var * lhs, Type const* type, IR * rhs)
 {
     ASSERT0(type);
@@ -620,10 +614,10 @@ IR * Region::buildStore(Var * lhs, Type const* type, IR * rhs)
 
 
 //Build IR_ST operation.
-//'lhs': target memory location.
-//'type: result data type.
-//'ofst': memory byte offset relative to lhs.
-//'rhs: value expected to store.
+//lhs: target memory location.
+//type: result data type.
+//ofst: memory byte offset relative to lhs.
+//rhs: value expected to store.
 IR * Region::buildStore(Var * lhs, Type const* type, UINT ofst, IR * rhs)
 {
     ASSERT0(type);
@@ -644,9 +638,9 @@ IR * Region::buildIStore(IR * base, IR * rhs, UINT ofst, Type const* type)
 
 
 //Build IR_IST operation.
-//'lhs': target memory location pointer.
-//'rhs: value expected to store.
-//'type': result type of indirect memory operation, note type is not the
+//lhs: target memory location pointer.
+//rhs: value expected to store.
+//type: result type of indirect memory operation, note type is not the
 //data type of lhs.
 IR * Region::buildIStore(IR * base, IR * rhs, Type const* type)
 {
@@ -664,9 +658,9 @@ IR * Region::buildIStore(IR * base, IR * rhs, Type const* type)
 
 
 //Build IR_ARRAY operation.
-//'base': base of array operation, it is either LDA or pointer.
-//'sublist': subscript expression list.
-//'type': result type of array operator.
+//base: base of array operation, it is either LDA or pointer.
+//sublist: subscript expression list.
+//type: result type of array operator.
 //    Note that type may NOT be equal to elem_tyid, accroding to
 //    ARR_ofst(). If ARR_ofst() is not zero, that means array
 //    elem is MC, or VECTOR, and type should be type of member
@@ -677,7 +671,7 @@ IR * Region::buildIStore(IR * base, IR * rhs, Type const* type)
 //        type should be int rather than struct S.
 //        and elem_tyid should be struct S.
 //
-//'elem_tyid': record element-data-type.
+//elem_tyid: record element-data-type.
 //    e.g:vector<int,8> g[100];
 //        elem_size is sizeof(vector<int,8>) = 32
 //        elem_type is vector.
@@ -690,8 +684,8 @@ IR * Region::buildIStore(IR * base, IR * rhs, Type const* type)
 //        elem_size is sizeof(struct S)
 //        elem_type is struct S
 //
-//'dims': indicate the array dimension.
-//'elem_num': point to an integer array that indicate
+//dims: indicate the array dimension.
+//elem_num: point to an integer array that indicate
 //    the number of element for each dimension. The length of the integer
 //    array should be equal to 'dims'.
 //    e.g: int g[12][24];
@@ -732,9 +726,9 @@ IR * Region::buildArray(IR * base,
 
 
 //Build IR_STARRAY operation.
-//'base': base of array operation, it is either LDA or pointer.
-//'sublist': subscript expression list.
-//'type': result type of array operator.
+//base: base of array operation, it is either LDA or pointer.
+//sublist: subscript expression list.
+//type: result type of array operator.
 //    Note that type may NOT be equal to elem_tyid, accroding to
 //    ARR_ofst(). If ARR_ofst() is not zero, that means array
 //    elem is MC, or VECTOR, and type should be type of member
@@ -745,7 +739,7 @@ IR * Region::buildArray(IR * base,
 //        type should be int rather than struct S.
 //        and elem_tyid should be struct S.
 //
-//'elem_tyid': record element-data-type.
+//elem_tyid: record element-data-type.
 //    e.g:vector<int,8> g[100];
 //        elem_size is sizeof(vector<int,8>) = 32
 //        elem_type is vector.
@@ -758,8 +752,8 @@ IR * Region::buildArray(IR * base,
 //        elem_size is sizeof(struct S)
 //        elem_type is struct S
 //
-//'dims': indicate the array dimension.
-//'elem_num': point to an integer array that indicate
+//dims: indicate the array dimension.
+//elem_num: point to an integer array that indicate
 //    the number of element for in dimension.
 //    The length of the integer array should be equal to 'dims'.
 //    e.g: int g[12][24];
@@ -767,14 +761,10 @@ IR * Region::buildArray(IR * base,
 //        the 1th dimension has 12 elements, and the 2th dimension has 24
 //        elements, which element type is D_I32.
 //    Note the parameter may be nullptr.
-//'rhs: value expected to store.
-IR * Region::buildStoreArray(IR * base,
-                             IR * sublist,
-                             Type const* type,
-                             Type const* elemtype,
-                             UINT dims,
-                             TMWORD const* elem_num_buf,
-                             IR * rhs)
+//rhs: value expected to store.
+IR * Region::buildStoreArray(IR * base, IR * sublist, Type const* type,
+                             Type const* elemtype, UINT dims,
+                             TMWORD const* elem_num_buf, IR * rhs)
 {
     ASSERT0(base && sublist && type);
     ASSERT0(base->is_exp() && base->isPtr());
@@ -859,11 +849,11 @@ IR * Region::buildCase(IR * casev_exp, LabelInfo const* jump_lab)
 
 
 //Build Do Loop stmt.
-//'iv': induction variable.
-//'det': determinate expression.
-//'loop_body': stmt list.
-//'init': record the stmt that initialize iv.
-//'step': record the stmt that update iv.
+//iv: induction variable.
+//det: determinate expression.
+//loop_body: stmt list.
+//init: record the stmt that initialize iv.
+//step: record the stmt that update iv.
 IR * Region::buildDoLoop(IR * iv,
                          IR * init,
                          IR * det,
@@ -906,8 +896,8 @@ IR * Region::buildDoLoop(IR * iv,
 
 
 //Build Do While stmt.
-//'det': determinate expression.
-//'loop_body': stmt list.
+//det: determinate expression.
+//loop_body: stmt list.
 IR * Region::buildDoWhile(IR * det, IR * loop_body)
 {
     ASSERT0(det && det->is_judge());
@@ -929,8 +919,8 @@ IR * Region::buildDoWhile(IR * det, IR * loop_body)
 
 
 //Build While Do stmt.
-//'det': determinate expression.
-//'loop_body': stmt list.
+//det: determinate expression.
+//loop_body: stmt list.
 IR * Region::buildWhileDo(IR * det, IR * loop_body)
 {
     ASSERT0(det && det->is_judge());
@@ -952,9 +942,9 @@ IR * Region::buildWhileDo(IR * det, IR * loop_body)
 
 
 //Build IF stmt.
-//'det': determinate expression.
-//'true_body': stmt list.
-//'false_body': stmt list.
+//det: determinate expression.
+//true_body: stmt list.
+//false_body: stmt list.
 IR * Region::buildIf(IR * det, IR * true_body, IR * false_body)
 {
     ASSERT0(det && det->is_judge());
@@ -984,16 +974,14 @@ IR * Region::buildIf(IR * det, IR * true_body, IR * false_body)
 
 
 //Build SWITCH multi-select stmt.
-//'vexp': expression to determine which case entry will be target.
-//'case_list': case entry list. case entry is consist of expression and label.
+//vexp: expression to determine which case entry will be target.
+//case_list: case entry list. case entry is consist of expression and label.
 //    Note that case list is optional.
-//'body': stmt list.
-//'default_lab': label indicates the default choice, the label is optional.
+//body: stmt list.
+//default_lab: label indicates the default choice, the label is optional.
 //
 //NOTE: Do not set parent for stmt in 'body'.
-IR * Region::buildSwitch(IR * vexp,
-                         IR * case_list,
-                         IR * body,
+IR * Region::buildSwitch(IR * vexp, IR * case_list, IR * body,
                          LabelInfo const* default_lab)
 {
     ASSERT0(vexp && vexp->is_exp());
@@ -1070,8 +1058,8 @@ IR * Region::buildImmAny(HOST_INT v)
 
 //Build IR_CONST operation.
 //The expression indicates an integer.
-//'v': value of integer.
-//'type': integer type.
+//v: value of integer.
+//type: integer type.
 IR * Region::buildImmInt(HOST_INT v, Type const* type)
 {
     ASSERT0(type);
@@ -1148,18 +1136,18 @@ IR * Region::buildPointerOp(IR_TYPE irt, IR * lchild, IR * rchild)
     ASSERT0(lchild && rchild);
     if (!lchild->is_ptr() && rchild->is_ptr()) {
         ASSERTN(irt == IR_ADD ||
-               irt == IR_MUL ||
-               irt == IR_XOR ||
-               irt == IR_BAND ||
-               irt == IR_BOR ||
-               irt == IR_LT ||
-               irt == IR_GT ||
-               irt == IR_LE ||
-               irt == IR_GE ||
-               irt == IR_EQ ||
-               irt == IR_NE, ("illegal pointer operation"));
+                irt == IR_MUL ||
+                irt == IR_XOR ||
+                irt == IR_BAND ||
+                irt == IR_BOR ||
+                irt == IR_LT ||
+                irt == IR_GT ||
+                irt == IR_LE ||
+                irt == IR_GE ||
+                irt == IR_EQ ||
+                irt == IR_NE, ("illegal pointer operation"));
         ASSERTN(lchild->is_int() || lchild->is_mc() || lchild->is_any(),
-               ("illegal pointer addend"));
+                ("illegal pointer addend"));
         return buildPointerOp(irt, rchild, lchild);
     }
 
@@ -1185,9 +1173,9 @@ IR * Region::buildPointerOp(IR_TYPE irt, IR * lchild, IR * rchild)
                 IR * div = allocIR(IR_DIV);
                 BIN_opnd0(div) = ret;
                 BIN_opnd1(div) = buildImmInt(TY_ptr_base_size(d0),
-                    ret->getType());
-                IR_dt(div) = dm->getSimplexTypeEx(
-                    dm->getDType(WORD_BITSIZE, true));
+                                             ret->getType());
+                IR_dt(div) = dm->getSimplexTypeEx(dm->getDType(WORD_BITSIZE,
+                                                               true));
                 ret = div;
             }
 
@@ -1213,7 +1201,10 @@ IR * Region::buildPointerOp(IR_TYPE irt, IR * lchild, IR * rchild)
         default: ASSERTN(0, ("illegal pointers operation"));
         }
         ASSERTN(0, ("can not get here."));
-    } else if (lchild->is_ptr() && !rchild->is_ptr()) {
+        return nullptr;
+    }
+
+    if (lchild->is_ptr() && !rchild->is_ptr()) {
         //Result is pointer type.
         //CASE:
         //  int * p;
@@ -1327,13 +1318,10 @@ IR * Region::buildUnaryOp(IR_TYPE irt, Type const* type, IN IR * opnd)
 
 
 //Build binary operation without considering pointer arithmetic.
-IR * Region::buildBinaryOpSimp(IR_TYPE irt,
-                               Type const* type,
-                               IR * lchild,
-                               IR * rchild)
+IR * Region::buildBinaryOpSimp(IR_TYPE irt, Type const* type,
+                               IR * lchild, IR * rchild)
 {
     ASSERT0(type);
-
     if (lchild->is_const() && !rchild->is_const() &&
         (irt == IR_ADD ||
          irt == IR_MUL ||
@@ -1358,10 +1346,7 @@ IR * Region::buildBinaryOpSimp(IR_TYPE irt,
 }
 
 
-IR * Region::buildBinaryOp(IR_TYPE irt,
-                           DATA_TYPE dt,
-                           IN IR * lchild,
-                           IN IR * rchild)
+IR * Region::buildBinaryOp(IR_TYPE irt, DATA_TYPE dt, IR * lchild, IR * rchild)
 {
     return buildBinaryOp(irt, getTypeMgr()->getSimplexType(dt), lchild, rchild);
 }
@@ -1370,9 +1355,7 @@ IR * Region::buildBinaryOp(IR_TYPE irt,
 //Build binary operation.
 //If rchild/lchild is pointer, the function will attemp to generate pointer
 //arithmetic operation instead of normal binary operation.
-IR * Region::buildBinaryOp(IR_TYPE irt,
-                           Type const* type,
-                           IR * lchild,
+IR * Region::buildBinaryOp(IR_TYPE irt, Type const* type, IR * lchild,
                            IR * rchild)
 {
     ASSERT0(type);

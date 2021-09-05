@@ -498,7 +498,7 @@ bool operator >= (BigInt const& a, BigIntElemType v)
 
 //BigInt Signed Addition.
 //e.g: res = a + b;
-BigInt& bisAdd(IN BigInt const& a, IN BigInt const& b, IN OUT BigInt & res)
+BigInt& bisAdd(IN BigInt const& a, IN BigInt const& b, MOD BigInt & res)
 {
     ASSERT0(sizeof(SuperElemType) >= 2 * sizeof(BigIntElemType));
     ASSERTN(b.getSigPos() >= 0, ("Miss significant elem"));
@@ -556,7 +556,7 @@ BigInt& bisAdd(IN BigInt const& a, IN BigInt const& b, IN OUT BigInt & res)
 //e.g: res = a + b;
 //Note unsigned addition support in-situ operation.
 //e.g: res = res + b is legal.
-BigInt& biuAdd(IN BigInt const& a, IN BigInt const& b, IN OUT BigInt & res)
+BigInt& biuAdd(IN BigInt const& a, IN BigInt const& b, MOD BigInt & res)
 {
     ASSERT0(sizeof(SuperUElemType) >= 2 * sizeof(BigIntUElemType));
     ASSERTN(b.getSigPos() >= 0, ("Miss significant elem"));
@@ -616,7 +616,7 @@ BigInt& biuAdd(IN BigInt const& a, IN BigInt const& b, IN OUT BigInt & res)
 //e.g: res = a - b;
 //Note substraction does not support in-situ operation.
 //e.g: res = res - b is not legal.
-BigInt& biSub(IN BigInt const& a, IN BigInt const& b, IN OUT BigInt & res)
+BigInt& biSub(IN BigInt const& a, IN BigInt const& b, MOD BigInt & res)
 {
     ASSERT0(sizeof(SuperElemType) >= 2 * sizeof(BigIntElemType));
     ASSERTN(b.getSigPos() >= 0, ("Miss significant elem"));
@@ -643,7 +643,7 @@ BigInt& biSub(IN BigInt const& a, IN BigInt const& b, IN OUT BigInt & res)
 
 //BigInt Unsigned Mutiplification.
 //e.g: res = a * b;
-BigInt& biuMul(IN BigInt const& a, IN BigInt const& b, IN OUT BigInt & res)
+BigInt& biuMul(IN BigInt const& a, IN BigInt const& b, MOD BigInt & res)
 {
     ASSERT0(sizeof(SuperUElemType) >= 2 * sizeof(BigIntUElemType));
     ASSERTN(b.getSigPos() >= 0, ("Miss significant elem"));
@@ -695,7 +695,7 @@ BigInt& biuMul(IN BigInt const& a, IN BigInt const& b, IN OUT BigInt & res)
 
 //BigInt Signed Mutiplification.
 //e.g: res = a * b;
-BigInt& bisMul(IN BigInt const& a, IN BigInt const& b, IN OUT BigInt & res)
+BigInt& bisMul(IN BigInt const& a, IN BigInt const& b, MOD BigInt & res)
 {
     BigInt const* pa = &a;
     BigInt const* pb = &b;
@@ -730,7 +730,7 @@ BigInt& bisMul(IN BigInt const& a, IN BigInt const& b, IN OUT BigInt & res)
 //Return quotient and remainder of a divided by b.
 //The quotient and remainder respect a = quo * b + rem.
 void biDivRem(IN BigInt const& a, IN BigInt const& b,
-              IN OUT BigInt & quo, IN OUT BigInt & rem)
+              MOD BigInt & quo, MOD BigInt & rem)
 
 {
     bool is_a_neg = a.is_neg();
@@ -765,7 +765,7 @@ void biDivRem(IN BigInt const& a, IN BigInt const& b,
 //Return quotient and remainder of a divided by b.
 //The quotient and remainder respect a = quo * b + rem.
 void biuDivRem(IN BigInt const& a, IN BigInt const& b,
-               IN OUT BigInt & quo, IN OUT BigInt & rem)
+               MOD BigInt & quo, MOD BigInt & rem)
 {
 
     if (a < b) {

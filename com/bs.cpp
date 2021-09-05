@@ -1752,8 +1752,8 @@ size_t BitSetMgr::count_mem(FILE * h) const
 //and modify 'res' as result.
 BitSet * bs_union(BitSet const& set1, BitSet const& set2, OUT BitSet & res)
 {
-    ASSERTN(set1.m_ptr != nullptr && set2.m_ptr != nullptr && res.m_ptr != nullptr,
-            ("not yet init"));
+    ASSERTN(set1.m_ptr != nullptr && set2.m_ptr != nullptr &&
+            res.m_ptr != nullptr, ("not yet init"));
     if (&res == &set1) {
         res.bunion(set2);
     } else if (&res == &set2) {
@@ -1773,8 +1773,7 @@ BitSet * bs_union(BitSet const& set1, BitSet const& set2, OUT BitSet & res)
 //Returns a new set which is { x : member( x, 'set1' ) & ~ member( x, 'set2' ) }.
 BitSet * bs_diff(BitSet const& set1, BitSet const& set2, OUT BitSet & res)
 {
-    ASSERTN(set1.m_ptr != nullptr &&
-            set2.m_ptr != nullptr &&
+    ASSERTN(set1.m_ptr != nullptr && set2.m_ptr != nullptr &&
             res.m_ptr != nullptr, ("not yet init"));
     if (&res == &set1) {
         res.diff(set2);
@@ -1793,8 +1792,7 @@ BitSet * bs_diff(BitSet const& set1, BitSet const& set2, OUT BitSet & res)
 //Returns a new set which is intersection of 'set1' and 'set2'.
 BitSet * bs_intersect(BitSet const& set1, BitSet const& set2, OUT BitSet & res)
 {
-    ASSERTN(set1.m_ptr != nullptr &&
-            set2.m_ptr != nullptr &&
+    ASSERTN(set1.m_ptr != nullptr && set2.m_ptr != nullptr &&
             res.m_ptr != nullptr, ("not yet init"));
     if (&res == &set1) {
         res.intersect(set2);

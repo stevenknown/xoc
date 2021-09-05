@@ -387,8 +387,7 @@ Pass * PassMgr::registerPass(PASS_TYPE opty)
 //...: the options/passes that anticipated to recompute.
 void PassMgr::checkValidAndRecompute(OptCtx * oc, ...)
 {
-    BitSet opts;
-    List<PASS_TYPE> optlist;
+    PassTypeList optlist;
     UINT num = 0;
     va_list ptr;
     va_start(ptr, oc);
@@ -396,26 +395,41 @@ void PassMgr::checkValidAndRecompute(OptCtx * oc, ...)
     while (opty != PASS_UNDEF && num < 1000) {
         ASSERTN(opty < PASS_NUM,
                 ("You should append PASS_UNDEF to pass list."));
-        opts.bunion(opty);
         optlist.append_tail(opty);
         num++;
         opty = (PASS_TYPE)va_arg(ptr, UINT);
     }
     va_end(ptr);
-    ASSERTN(num < 1000, ("too many pass queried or miss ending placeholder"));
-    if (num == 0) { return; }
+    checkValidAndRecompute(oc, optlist);
+}
+
+
+void PassMgr::checkValidAndRecompute(OptCtx * oc, PassTypeList & optlist)
+{
+    ASSERTN(optlist.get_elem_count() < 1000,
+            ("too many pass queried or miss ending placeholder"));
+    if (optlist.get_elem_count() == 0) { return; }
+
+    BitSet opts;
+    C<PASS_TYPE> * it;
+    for (optlist.get_head(&it); it != nullptr; optlist.get_next(&it)) {
+        PASS_TYPE opty = it->val();
+        if (opty == PASS_UNDEF) { continue; }
+        ASSERTN(opty < PASS_NUM,
+                ("You should append PASS_UNDEF to pass list."));
+        opts.bunion(opty);
+    }
 
     IRCFG * cfg = (IRCFG*)queryPass(PASS_CFG);
     AliasAnalysis * aa = nullptr;
     DUMgr * dumgr = nullptr;
 
-    C<PASS_TYPE> * it = nullptr;
     for (optlist.get_head(&it); it != optlist.end();
          it = optlist.get_next(it)) {
         PASS_TYPE pt = it->val();
         switch (pt) {
         case PASS_CFG:
-            if (!OC_is_cfg_valid(*oc)) {
+            if (!oc->is_cfg_valid()) {
                 if (cfg == nullptr) {
                     //CFG is not constructed.
                     cfg = (IRCFG*)registerPass(PASS_CFG);
@@ -427,30 +441,30 @@ void PassMgr::checkValidAndRecompute(OptCtx * oc, ...)
             }
             break;
         case PASS_CDG:
-            if (!OC_is_cdg_valid(*oc)) {
+            if (!oc->is_cdg_valid()) {
                 CDG * cdg = (CDG*)registerPass(PASS_CDG);
                 ASSERT0(cdg); //cdg is not enable.
-                ASSERTN(cfg && OC_is_cfg_valid(*oc),
+                ASSERTN(cfg && oc->is_cfg_valid(),
                         ("You should make CFG available first."));
                 cdg->rebuild(*oc, *cfg);
             }
             break;
         case PASS_DOM:
-            if (!OC_is_dom_valid(*oc)) {
-                ASSERTN(cfg && OC_is_cfg_valid(*oc),
+            if (!oc->is_dom_valid()) {
+                ASSERTN(cfg && oc->is_cfg_valid(),
                         ("You should make CFG available first."));
                 cfg->computeDomAndIdom(*oc);
             }
             break;
         case PASS_PDOM:
-            if (!OC_is_pdom_valid(*oc)) {
-                ASSERTN(cfg && OC_is_cfg_valid(*oc),
+            if (!oc->is_pdom_valid()) {
+                ASSERTN(cfg && oc->is_cfg_valid(),
                         ("You should make CFG available first."));
                 cfg->computePdomAndIpdom(*oc);
             }
             break;
         case PASS_EXPR_TAB:
-            if (!OC_is_expr_tab_valid(*oc) &&
+            if (!oc->is_expr_tab_valid() &&
                 m_rg->getBBList() != nullptr &&
                 m_rg->getBBList()->get_elem_count() != 0) {
                 ExprTab * exprtab = (ExprTab*)registerPass(PASS_EXPR_TAB);
@@ -459,24 +473,24 @@ void PassMgr::checkValidAndRecompute(OptCtx * oc, ...)
             }
             break;
         case PASS_LOOP_INFO:
-            if (!OC_is_loopinfo_valid(*oc)) {
-                ASSERTN(cfg && OC_is_cfg_valid(*oc),
+            if (!oc->is_loopinfo_valid()) {
+                ASSERTN(cfg && oc->is_cfg_valid(),
                         ("You should make CFG available first."));
                 cfg->LoopAnalysis(*oc);
             }
             break;
         case PASS_RPO:
-            ASSERTN(cfg && OC_is_cfg_valid(*oc),
+            ASSERTN(cfg && oc->is_cfg_valid(),
                     ("You should make CFG available first."));
-            if (!OC_is_rpo_valid(*oc) || cfg->getRPOBBList() == nullptr) {
+            if (!oc->is_rpo_valid() || cfg->getRPOBBList() == nullptr) {
                 cfg->computeRPO(*oc);
             } else {
                 ASSERT0(cfg->verifyRPO(*oc));
             }
             break;
         case PASS_GSCC:
-            if (!OC_is_scc_valid(*oc)) {
-                ASSERTN(cfg && OC_is_cfg_valid(*oc),
+            if (!oc->is_scc_valid()) {
+                ASSERTN(cfg && oc->is_cfg_valid(),
                         ("You should make CFG available first."));
                 GSCC * gscc = (GSCC*)registerPass(PASS_GSCC);
                 ASSERT0(gscc); //scc is not enable.
@@ -490,32 +504,32 @@ void PassMgr::checkValidAndRecompute(OptCtx * oc, ...)
         case PASS_AVAIL_REACH_DEF: {
             BBList * bbl = m_rg->getBBList();
             UINT f = 0;
-            if (opts.is_contain(PASS_DU_REF) && !OC_is_ref_valid(*oc)) {
+            if (opts.is_contain(PASS_DU_REF) && !oc->is_ref_valid()) {
                 f |= DUOPT_COMPUTE_PR_REF|DUOPT_COMPUTE_NONPR_REF;
             }
             if (opts.is_contain(PASS_LIVE_EXPR) &&
-                !OC_is_live_expr_valid(*oc)) {
+                !oc->is_live_expr_valid()) {
                 f |= DUOPT_SOL_AVAIL_EXPR;
             }
             if (opts.is_contain(PASS_AVAIL_REACH_DEF) &&
-                !OC_is_avail_reach_def_valid(*oc)) {
+                !oc->is_avail_reach_def_valid()) {
                 f |= DUOPT_SOL_AVAIL_REACH_DEF;
             }
             if (opts.is_contain(PASS_REACH_DEF) &&
-                !OC_is_reach_def_valid(*oc)) {
+                !oc->is_reach_def_valid()) {
                 f |= DUOPT_SOL_REACH_DEF;
             }
             if (opts.is_contain(PASS_DU_CHAIN) &&
-                (!OC_is_pr_du_chain_valid(*oc) ||
-                 !OC_is_nonpr_du_chain_valid(*oc)) &&
-                !OC_is_reach_def_valid(*oc)) {
+                (!oc->is_pr_du_chain_valid() ||
+                 !oc->is_nonpr_du_chain_valid()) &&
+                !oc->is_reach_def_valid()) {
                 f |= DUOPT_SOL_REACH_DEF;
             }
             if (opts.is_contain(PASS_AA) &&
-                !OC_is_aa_valid(*oc) &&
+                !oc->is_aa_valid() &&
                 bbl != nullptr &&
                 bbl->get_elem_count() != 0) {
-                ASSERTN(cfg && OC_is_cfg_valid(*oc),
+                ASSERTN(cfg && oc->is_cfg_valid(),
                         ("You should make CFG available first."));
                 if (aa == nullptr) {
                     aa = (AliasAnalysis*)registerPass(PASS_AA);
@@ -558,14 +572,34 @@ void PassMgr::checkValidAndRecompute(OptCtx * oc, ...)
             break;
         }
         case PASS_DU_CHAIN: {
+            if (oc->is_pr_du_chain_valid() && oc->is_nonpr_du_chain_valid()) {
+                break;
+            }
+
             BBList * bbl = m_rg->getBBList();
             if (bbl != nullptr && bbl->get_elem_count() != 0) {
                 if (dumgr == nullptr) {
                     dumgr = (DUMgr*)registerPass(PASS_DU_MGR);
                 }
 
+                PassTypeList optlist;
+                if (!oc->is_ref_valid()) {
+                    optlist.append_tail(PASS_RPO);
+                    optlist.append_tail(PASS_DOM);
+                    optlist.append_tail(PASS_DU_REF);
+                }
+                if (!oc->is_reach_def_valid()) {
+                    optlist.append_tail(PASS_RPO);
+                    optlist.append_tail(PASS_DOM);
+                    optlist.append_tail(PASS_DU_REF);
+                    optlist.append_tail(PASS_REACH_DEF);
+                }
+                if (optlist.get_elem_count() != 0) {
+                    m_rg->getPassMgr()->checkValidAndRecompute(oc, optlist);
+                }
+
                 UINT flag = DUOPT_UNDEF;
-                if (!OC_is_nonpr_du_chain_valid(*oc)) {
+                if (!oc->is_nonpr_du_chain_valid()) {
                     flag |= DUOPT_COMPUTE_NONPR_DU;
                 }
 
@@ -573,7 +607,7 @@ void PassMgr::checkValidAndRecompute(OptCtx * oc, ...)
                 //DU chain doesn't make any sense.
                 PRSSAMgr * ssamgr = (PRSSAMgr*)queryPass(PASS_PR_SSA_MGR);
                 if ((ssamgr == nullptr || !ssamgr->is_valid()) &&
-                    !OC_is_pr_du_chain_valid(*oc)) {
+                    !oc->is_pr_du_chain_valid()) {
                     flag |= DUOPT_COMPUTE_PR_DU;
                 }
 

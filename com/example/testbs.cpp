@@ -159,7 +159,7 @@ void bs_test3(FILE * h)
 
 
 template <UINT BitsPerSeg>
-void dumpSegMgr(SegMgr<BitsPerSeg> & m, FILE * h)
+void dumpLocSegMgr(SegMgr<BitsPerSeg> & m, FILE * h)
 {
     if (h == nullptr) { return; }
     fprintf(h, "\n====start %d:%d===\n",
@@ -185,7 +185,7 @@ int main()
     bs_test2(h);
     bs_test3(h);
     DefMiscBitSetMgr mgr;
-    dumpSegMgr(*mgr.getSegMgr(), h);
+    dumpLocSegMgr(*mgr.getSegMgr(), h);
     fclose(h);
     return 0;
 }

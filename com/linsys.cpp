@@ -341,7 +341,7 @@ void Lineq::ConvexHullUnionAndIntersect(OUT RMat & res,
 //        e.g: x <= 10 , x <= 20. the former will be kept.
 //    3. Check for inconsistent bound.
 //        e.g: x <= 9, x >= 10, there is no solution!
-bool Lineq::reduce(IN OUT RMat & m, UINT rhs_idx, bool is_intersect)
+bool Lineq::reduce(MOD RMat & m, UINT rhs_idx, bool is_intersect)
 {
     ASSERTN(m_is_init == true, ("not yet initialize."));
     ASSERTN(m.size() != 0 && rhs_idx < m.getColSize(), ("illegal param"));
@@ -794,8 +794,7 @@ FIN:
 //i>=0, j>=0, etc.
 //Note for the sake of the xcom math library rules, we represent
 //inequality relation in form of -i<=0.
-void Lineq::initVarConstraint(Vector<INT> const& sign,
-                              IN OUT RMat & vc,
+void Lineq::initVarConstraint(Vector<INT> const& sign, MOD RMat & vc,
                               UINT rhs_idx)
 {
     UINT nvar = rhs_idx;
@@ -1078,7 +1077,7 @@ void Lineq::formatBound(UINT u, OUT RMat & ineqt_of_u)
 //
 //NOTICE:
 //    Column describes the variable.
-bool Lineq::calcBound(IN OUT List<RMat*> & limits)
+bool Lineq::calcBound(MOD List<RMat*> & limits)
 {
     ASSERTN(m_is_init == true, ("not yet initialized"));
     ASSERTN(m_coeff != nullptr && limits.get_elem_count() == (UINT)m_rhs_idx,
@@ -1127,7 +1126,7 @@ bool Lineq::calcBound(IN OUT List<RMat*> & limits)
 //'last_var': the last variable index to be moved.
 //'first_sym_idx': the index of the first symbol at RHS.
 //'last_sym_idx': the index of the last symbol at RHS. */
-void Lineq::move2cstsym(IN OUT RMat & ieq,
+void Lineq::move2cstsym(MOD RMat & ieq,
                         UINT rhs_idx,
                         UINT first_var,
                         UINT last_var,
@@ -1159,7 +1158,7 @@ void Lineq::move2cstsym(IN OUT RMat & ieq,
 //
 //'p': each row indicates polynomial
 //'sub_var': index of variable to substitute.
-void Lineq::substituteAndExpand(IN OUT RMat & coeff,
+void Lineq::substituteAndExpand(MOD RMat & coeff,
                                 UINT rhs_idx,
                                 RMat const& p,
                                 UINT sub_var)
@@ -1207,7 +1206,7 @@ void Lineq::substituteAndExpand(IN OUT RMat & coeff,
 //NOTICE:
 //    The column 'rhs_idx' does not belong to constant symbols.
 //    e.g: i < 10 + j + k, the first symbol is j, then 'first_sym' is 0.
-void Lineq::move2var(IN OUT RMat & ieq,
+void Lineq::move2var(MOD RMat & ieq,
                      UINT rhs_idx,
                      UINT first_sym,
                      UINT last_sym,
@@ -1238,7 +1237,7 @@ void Lineq::move2var(IN OUT RMat & ieq,
 //    3, 4, 5
 //    1, 2, 3
 //    The third row will be removed.
-void Lineq::removeIdenRow(IN OUT RMat & m)
+void Lineq::removeIdenRow(MOD RMat & m)
 {
     Vector<Rational> sum;
     Vector<bool> removed;
@@ -1647,7 +1646,7 @@ bool Lineq::convertConstraint2Ray(OUT INTMat & gmat,
 //=>
 //  1 0 0 2 3  0  4  3 10
 void Lineq::combineRays(OUT INTMat & res,
-                        IN OUT INTMat & coeff,
+                        MOD INTMat & coeff,
                         UINT r1,
                         UINT r2,
                         UINT lc,
@@ -1676,7 +1675,7 @@ void Lineq::combineRays(OUT INTMat & res,
 }
 
 
-void Lineq::removeRedRow(IN OUT INTMat & cs,
+void Lineq::removeRedRow(MOD INTMat & cs,
                          INTMat const& org_cone,
                          UINT rhs_part)
 {

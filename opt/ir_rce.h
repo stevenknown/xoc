@@ -101,8 +101,8 @@ public:
 
     IR * processStore(IR * ir);
     IR * processStorePR(IR * ir);
-    IR * processBranch(IR * ir, IN OUT bool * cfg_mod);
-    bool performSimplyRCE(IN OUT bool * cfg_mod);
+    IR * processBranch(IR * ir, MOD bool * cfg_mod);
+    bool performSimplyRCE(MOD bool * cfg_mod);
     virtual bool perform(OptCtx & oc);
 };
 

@@ -345,12 +345,12 @@ protected:
     void reviseLTCase1(LT * lt);
     void revise_special_lt(List<LT*> * lts);
     void process_rg(LT * lt);
-    void processLiveout(IN OUT BitSet & lived_lt, UINT pos,
+    void processLiveout(MOD BitSet & lived_lt, UINT pos,
                          bool always_consider_glt);
-    void processLivein(IN OUT BitSet & lived_lt, UINT pos,
+    void processLivein(MOD BitSet & lived_lt, UINT pos,
                         bool always_consider_glt);
-    void processExitBB(IN OUT List<LT*> * liveout_exitbb,
-                              IN OUT BitSet & lived_lt,
+    void processExitBB(MOD List<LT*> * liveout_exitbb,
+                              MOD BitSet & lived_lt,
                               BitSet const& retval_regset, UINT pos);
     void processUse(IN IR * ir, ConstIRIter & cii, INT pos,
                      OUT BitSet & lived_lt, bool group_part);

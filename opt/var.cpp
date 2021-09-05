@@ -251,7 +251,8 @@ void Var::dumpProp(xcom::StrBuf & buf, bool grmode) const
             local_string = local_buf;
         }
         buf.strcat("string(\"%s\")", local_string);
-        if (local_buf != nullptr && len >= HOST_STACK_MAX_USABLE_MEMORY_BYTE_SIZE) {
+        if (local_buf != nullptr &&
+            len >= HOST_STACK_MAX_USABLE_MEMORY_BYTE_SIZE) {
             ::free(local_buf);
         }
     } else if (VAR_has_init_val(this)) {

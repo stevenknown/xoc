@@ -40,6 +40,7 @@ typedef TMap<PASS_TYPE, Pass*> PassTab;
 typedef TMapIter<PASS_TYPE, Pass*> PassTabIter;
 typedef TMap<PASS_TYPE, xcom::Graph*> GraphPassTab;
 typedef TMapIter<PASS_TYPE, xcom::Graph*> GraphPassTabIter;
+typedef List<PASS_TYPE> PassTypeList;
 
 class PassMgr {
     COPY_CONSTRUCTOR(PassMgr);
@@ -92,6 +93,7 @@ public:
     //recomputation if it is invalid.
     //...: the options/passes that anticipated to recompute.
     void checkValidAndRecompute(OptCtx * oc, ...);
+    void checkValidAndRecompute(OptCtx * oc, PassTypeList & optlist);
 
     void destroyAllPass();
     void destroyPass(Pass * pass);

@@ -556,7 +556,7 @@ void DX_MGR::dump_dx(DXC const& dc, FILE * h, INT ofst)
 
 
 //Disassemble DEX instruction.
-void DX_MGR::decode_dx(USHORT const* cptr, IN OUT DXC & dc)
+void DX_MGR::decode_dx(USHORT const* cptr, MOD DXC & dc)
 {
     USHORT insn = *cptr;
     dc.opc = (DX_OPC)(insn & 0xFF);

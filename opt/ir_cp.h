@@ -82,38 +82,33 @@ private:
     PRSSAMgr * m_prssamgr;
     MDSSAMgr * m_mdssamgr;
     Refine * m_refine;
+    GVN const* m_gvn;
     UINT m_prop_kind;
 
 private:
-    void addDUInfoForDupOfCandExp(IR * dup, IR const* cand_exp);
+    //Return true if CP allows propagating memory object with inexact MD.
+    bool allowInexactMD() const
+    { return m_prop_kind == CP_PROP_UNARY_AND_SIMPLEX; }
 
-    bool checkTypeConsistency(IR const* ir, IR const* cand_expr) const;
+    bool checkTypeConsistency(IR const* ir, IR const* cand_exp) const;
 
     bool doPropUseSet(IRSet * useset, IR * def_stmt,
                       IR const* prop_value, MDSSAInfo * mdssainfo,
                       IRListIter cur_iter, IRListIter * next_iter,
-                      IRBB * bb, bool prssadu, bool mdssadu);
-    bool doPropToMDPhi(bool prssadu,
-                       bool mdssadu,
-                       IN IR const* prop_value,
-                       IN IR * use);
-    bool doPropToNormalStmt(IRListIter cur_iter,
-                            IRListIter* next_iter,
-                            bool prssadu,
-                            bool mdssadu,
-                            IN IR const* prop_value,
-                            IN IR * use,
-                            IN IR * use_stmt,
-                            IN IRBB * def_bb,
-                            IN OUT IRBB * use_bb);
-    bool doProp(IN IRBB * bb, IN IRSet * useset);
+                      bool prssadu, bool mdssadu);
+    bool doPropForMDPhi(IR const* prop_value, IN IR * use);
+    bool doPropForNormalStmt(IRListIter cur_iter, IRListIter* next_iter,
+                             IR const* prop_value, IN IR * use,
+                             IRBB * def_bb);
+    //useset: for local used.
+    bool doPropIR(IR * def_stmt, IN IRSet * useset,
+                  IRListIter cur_iter, IRListIter * next_iter);
+    bool doPropBB(IN IRBB * bb, IN IRSet * useset);
     void doFinalRefine(OptCtx & oc);
-    void dumpCopyPropagationAction(IR const* def_stmt,
-                                   IR const* prop_value,
+    void dumpCopyPropagationAction(IR const* def_stmt, IR const* prop_value,
                                    IR const* use);
 
-    bool existMayDefTillBB(IR const* exp,
-                           IRBB const* start,
+    bool existMayDefTillBB(IR const* exp, IRBB const* start,
                            IRBB const* meetup) const;
 
     DefSegMgr  * getSegMgr() const { return getSBSMgr()->getSegMgr(); }
@@ -138,24 +133,18 @@ private:
     //expression. These low-cost always profitable and may bring up new
     //optimization opportunity.
     bool isLowCostCVT(IR const* ir) const;
-    bool is_available(IR const* def_stmt,
-                      IR const* prop_value,
-                      IR * use_stmt,
-                      MDPhi * use_phi,
-                      IRBB * usebb);
+    bool is_available(IR const* def_stmt, IR const* prop_value,
+                      IR * use_stmt, MDPhi * use_phi, IRBB * usebb) const;
     inline bool isCopyOR(IR * ir) const;
 
     bool performDomTree(IN xcom::Vertex * v, IN xcom::Graph & domtree);
+    //repexp: the expression that is expected to be replaced.
+    IR const* pickupCandExp(IR const* prop_value, IR const* repexp,
+                            IR const* def_stmt, MDSSAInfo const* mdssainfo,
+                            bool prssadu, bool mdssadu) const;
 
-    void replaceExp(IR * exp,
-                    IR const* cand_expr,
-                    IN OUT CPCtx & ctx,
-                    bool stmt_use_ssadu,
-                    bool stmt_use_mdssadu);
-    void replaceExpViaSSADu(IR * exp,
-                            IR const* cand_expr,
-                            IN OUT CPCtx & ctx);
-    void removeExpDUInfo(IR * dup, IR * exp);
+    void replaceExp(IR * exp, IR const* cand_exp, MOD CPCtx & ctx);
+    void replaceExpViaSSADu(IR * exp, IR const* cand_exp, MOD CPCtx & ctx);
 
     bool useMDSSADU() const
     { return m_mdssamgr != nullptr && m_mdssamgr->is_valid(); }
@@ -173,6 +162,7 @@ public:
         m_md_set_mgr = rg->getMDSetMgr();
         m_tm = rg->getTypeMgr();
         m_refine = nullptr;
+        m_gvn = nullptr;
         m_mdssamgr = nullptr;
         m_prssamgr = nullptr;
         ASSERT0(m_cfg && m_du && m_md_sys && m_tm && m_md_set_mgr);

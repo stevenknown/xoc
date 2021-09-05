@@ -33,6 +33,7 @@ namespace xoc {
 #define MAX_PRNO 0xffffFF
 
 class Lexer;
+class IRParser;
 class Region;
 class RegionMgr;
 
@@ -53,6 +54,7 @@ class ParseCtx {
     xcom::TMap<IR*, LabelInfo*> m_ir2label;
 public:
     Region * current_region;
+    IRParser * parser;
     IR * returned_exp;
     IR * stmt_list;
     IR * last;
@@ -69,8 +71,10 @@ public:
     } s1;
 
 public:
-    ParseCtx()
+    ParseCtx(IRParser * p)
     {
+        ASSERT0(p);
+        parser = p;
         current_region = nullptr;
         returned_exp = nullptr;
         stmt_list = nullptr;
@@ -83,14 +87,13 @@ public:
     }
     ~ParseCtx() {}
 
-    void addIR(IR * stmt) { xcom::add_next(&stmt_list, &last, stmt); }
+    void addIR(IR * stmt);
 
     xcom::TMap<IR*, LabelInfo*> & getIR2Label() { return m_ir2label; }
 
     LabelInfo * mapSym2Label(Sym const* sym) const
     { return m_sym2label.get(sym); }
-    LabelInfo * mapIR2Label(IR * ir) const
-    { return m_ir2label.get(ir); }
+    LabelInfo * mapIR2Label(IR * ir) const { return m_ir2label.get(ir); }
 
     void setMapSym2Label(Sym const* sym, LabelInfo * label)
     { m_sym2label.set(sym, label); }
@@ -272,6 +275,9 @@ protected:
     List<ParseErrorMsg*> m_err_list;
     TMap<Sym const*, UINT> m_id2prno;
 protected:
+    //The function checks label for GR syntax legality.
+    bool checkLabel(IR const* irlist);
+
     bool declareType(ParseCtx * ctx);
     bool declareVarProperty(Var * var, ParseCtx * ctx);
     bool declareVar(ParseCtx * ctx, Var ** var);
@@ -279,6 +285,7 @@ protected:
 
     void enterRegion(ParseCtx *) {}
     void exitRegion(ParseCtx *) {}
+    void error(UINT lineno, CHAR const* format, ...);
     void error(TOKEN tok, CHAR const* format, ...);
     void error(X_CODE xcode, CHAR const* format, ...);
     void error(CHAR const* format, ...);
@@ -377,6 +384,7 @@ public:
     RegionMgr * getRegionMgr() { return m_rumgr; }
     List<ParseErrorMsg*> & getErrorMsgList() { return m_err_list; }
     CHAR const* getKeywordName(X_CODE code);
+    Lexer * getLexer() const { return m_lexer; }
 
     void setLexer(Lexer * l) { m_lexer = l; }
 

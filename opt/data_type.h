@@ -233,6 +233,9 @@ public:
     bool is_ptr_addend() const
     { return !is_fp() && !is_mc() && !is_bool() && !is_pointer(); }
 
+    //Return true if the type can be regarded as pointer.
+    bool isPointer() const { return is_pointer() || is_any(); }
+
     bool verify(TypeMgr const* tm) const;
 };
 
@@ -279,7 +282,8 @@ public:
     //Record the BYTE size of total vector.
     UINT total_vector_size;
 
-    //Record the vector elem size if ir represent a vector.
+    //Record the vector element type.
+    //Note the element can only be simplex type.
     DATA_TYPE vector_elem_type;
 public:
     VectorType()

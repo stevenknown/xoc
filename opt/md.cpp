@@ -297,8 +297,7 @@ bool MDSet::is_contain_inexact(MDSystem const* ms) const
 //Return true if set contained md.
 bool MDSet::is_contain(MD const* md) const
 {
-    if (md->is_global() &&
-        DefSBitSetCore::is_contain(MD_GLOBAL_VAR) &&
+    if (md->is_global() && DefSBitSetCore::is_contain(MD_GLOBAL_VAR) &&
         MD_id(md) != MD_IMPORT_VAR) {
         return true;
     }
@@ -322,8 +321,7 @@ bool MDSet::is_contain(MD const* md) const
 //Return true if set only contained the md that has been taken address.
 bool MDSet::is_contain_only_taken_addr(MD const* md) const
 {
-    if (md->is_global() &&
-        md->get_base()->is_addr_taken() &&
+    if (md->is_global() && md->get_base()->is_addr_taken() &&
         DefSBitSetCore::is_contain(MD_GLOBAL_VAR) &&
         MD_id(md) != MD_IMPORT_VAR) {
         return true;
@@ -350,8 +348,7 @@ bool MDSet::is_overlap(MD const* md, Region const* current_ru) const
 {
     ASSERT0(current_ru);
 
-    if (md->is_global() &&
-        DefSBitSetCore::is_contain(MD_GLOBAL_VAR) &&
+    if (md->is_global() && DefSBitSetCore::is_contain(MD_GLOBAL_VAR) &&
         MD_id(md) != MD_IMPORT_VAR) {
         return true;
     }
@@ -387,8 +384,7 @@ bool MDSet::is_overlap_only_taken_addr(MD const* md,
     Var const* base = md->get_base();
     ASSERT0(base);
 
-    if (md->is_global() &&
-        base->is_addr_taken() &&
+    if (md->is_global() && base->is_addr_taken() &&
         DefSBitSetCore::is_contain(MD_GLOBAL_VAR) &&
         MD_id(md) != MD_IMPORT_VAR) {
         return true;
@@ -421,8 +417,7 @@ bool MDSet::is_overlap_only_taken_addr(MD const* md,
 //Return true if 'md' overlapped with element in current MDSet.
 //Note this function will iterate elements in current MDSet which is costly.
 //Use it carefully.
-bool MDSet::is_overlap_ex(MD const* md,
-                          Region const* current_ru,
+bool MDSet::is_overlap_ex(MD const* md, Region const* current_ru,
                           MDSystem const* mdsys) const
 {
     ASSERT0(md && mdsys && current_ru);
@@ -469,8 +464,7 @@ void MDSet::bunion(MDSet const& mds, DefMiscBitSetMgr & mbsmgr)
 //This function will walk through whole current MDSet and differenciate
 //overlapped elements.
 //Note this function is very costly.
-void MDSet::diffAllOverlapped(UINT id,
-                              DefMiscBitSetMgr & m,
+void MDSet::diffAllOverlapped(UINT id, DefMiscBitSetMgr & m,
                               MDSystem const* sys)
 {
     MDSetIter iter;
@@ -833,9 +827,9 @@ void MDSystem::initGlobalMemMD(VarMgr * vm)
     m_global_mem = nullptr;
     if (vm == nullptr) { return; }
 
-    m_global_mem = vm->registerVar((CHAR*)".global_mem",
-        getTypeMgr()->getMCType(0), 1,
-        VAR_GLOBAL|VAR_FAKE|VAR_IS_UNALLOCABLE);
+    m_global_mem = vm->registerVar((CHAR const*)".global_mem",
+                                   getTypeMgr()->getMCType(0), 1,
+                                   VAR_GLOBAL|VAR_FAKE|VAR_IS_UNALLOCABLE);
     MD x;
     MD_base(&x) = m_global_mem;
     MD_size(&x) = 0;
@@ -853,11 +847,11 @@ void MDSystem::initImportVar(VarMgr * vm)
     m_import_var = nullptr;
     if (vm == nullptr) { return; }
 
-    //The design goal of IMPORT MD set is attempt to describe non-global variables
-    //precisely that located in outer region.
-    //WORKAROUND: In order to speedup analysis, and shrink POINT-TO set size, set
-    //IMPORT MD to be GLOBAL, which means GLOBAL variable and IMPORT variable are
-    //the same.
+    //The design goal of IMPORT MD set is attempt to describe non-global
+    //variables precisely that located in outer region.
+    //WORKAROUND: In order to speedup analysis, and shrink POINT-TO set size,
+    //set IMPORT MD to be GLOBAL, which means GLOBAL variable and IMPORT
+    //variable are the same.
     //Primitive design of IMPORT variable is using a fake variable to stand for
     //those local variables that are not located in current region. says outer
     //region.
@@ -873,8 +867,9 @@ void MDSystem::initImportVar(VarMgr * vm)
     //      }
     //    }
     //  }
-    m_import_var = vm->registerVar((CHAR*)".import_var",
-        getTypeMgr()->getMCType(0), 1, VAR_GLOBAL|VAR_FAKE|VAR_IS_UNALLOCABLE);
+    m_import_var = vm->registerVar((CHAR const*)".import_var",
+                                   getTypeMgr()->getMCType(0), 1,
+                                   VAR_GLOBAL|VAR_FAKE|VAR_IS_UNALLOCABLE);
     MD x;
     MD_base(&x) = m_import_var;
     MD_size(&x) = 0;
@@ -886,19 +881,15 @@ void MDSystem::initImportVar(VarMgr * vm)
 }
 
 
-
-
 //MD for total memory.
 void MDSystem::initAllMemMD(VarMgr * vm)
 {
     m_all_mem = nullptr;
     if (vm == nullptr) { return; }
 
-    m_all_mem = vm->registerVar(
-                    (CHAR*)".all_mem",
-                    getTypeMgr()->getMCType(0),
-                    1,
-                    VAR_GLOBAL|VAR_FAKE|VAR_IS_UNALLOCABLE);
+    m_all_mem = vm->registerVar((CHAR const*)".all_mem",
+                                getTypeMgr()->getMCType(0),
+                                1, VAR_GLOBAL|VAR_FAKE|VAR_IS_UNALLOCABLE);
     MD x;
     MD_base(&x) = m_all_mem;
     MD_is_may(&x) = true;  //MD_FULL_MEM can only be May reference.
@@ -939,30 +930,25 @@ void MDSystem::destroy()
 }
 
 
-//Compute all other md which are overlapped with 'md', the output
+//Compute all other MD which are overlapped with 'md', the output
 //will include 'md' itself if there are overlapped MDs.
 //e.g: given md1, and md1 overlapped with md2, md3,
 //then output set is {md1, md2, md3}.
-//
-//'md': input to compute the overlapped md-set.
-//'tmpvec': for local use.
-//'tabiter': for local use.
-//'strictly': set to true to compute if md may be overlapped
+//md: input to compute the overlapped md-set.
+//tabiter: for local use.
+//strictly: set to true to compute if md may be overlapped
 //            with global variables or import variables.
-//
 //Note this function does NOT clean output, and will append result to output.
-void MDSystem::computeOverlap(Region * current_ru,
-                              MD const* md,
-                              MDSet & output,
-                              ConstMDIter & tabiter,
-                              DefMiscBitSetMgr & mbsmgr,
-                              bool strictly)
+void MDSystem::computeOverlap(Region * current_ru, MD const* md,
+                              OUT MDSet & output, ConstMDIter & tabiter,
+                              DefMiscBitSetMgr & mbsmgr, bool strictly)
 {
     ASSERT0(md && current_ru);
     if (strictly) {
         if (md->is_global()) {
             output.bunion(MD_GLOBAL_VAR, mbsmgr);
         } else if (!current_ru->isRegionVAR(md->get_base())) {
+            //'md' indicates local memory but not belong to current region.
             output.bunion(MD_IMPORT_VAR, mbsmgr);
         }
     }
@@ -999,11 +985,9 @@ void MDSystem::computeOverlap(Region * current_ru,
 
 //Compute overlapped Exact MD with x, then add result to output.
 //Note this function does NOT clean output, and will append result to output.
-void MDSystem::computeOverlapExactMD(
-        MD const* md,
-        OUT MDSet * output,
-        ConstMDIter & tabiter,
-        DefMiscBitSetMgr & mbsmgr)
+void MDSystem::computeOverlapExactMD(MD const* md, OUT MDSet * output,
+                                     ConstMDIter & mditer,
+                                     DefMiscBitSetMgr & mbsmgr)
 {
     ASSERT0(md && md->is_exact());
     MDTab * mdt = getMDTab(MD_base(md));
@@ -1012,9 +996,9 @@ void MDSystem::computeOverlapExactMD(
     OffsetTab * ofstab = mdt->get_ofst_tab();
     ASSERT0(ofstab);
     if (ofstab->get_elem_count() > 0) {
-        tabiter.clean();
-        for (MD const* t = ofstab->get_first(tabiter, nullptr);
-             t != nullptr; t = ofstab->get_next(tabiter, nullptr)) {
+        mditer.clean();
+        for (MD const* t = ofstab->get_first(mditer, nullptr);
+             t != nullptr; t = ofstab->get_next(mditer, nullptr)) {
             if (t == md || !t->is_exact()) { continue; }
             if (t->is_overlap(md)) {
                 output->bunion(t, mbsmgr);
@@ -1024,24 +1008,21 @@ void MDSystem::computeOverlapExactMD(
 }
 
 
-//Compute all other md which are overlapped with MD in set 'mds'.
+//Compute all other MD which are overlapped with MD in set 'mds'.
 //e.g: mds contains {md1}, and md1 overlapped with md2, md3,
-//then output set is {md1, md2, md3}.
-//
-//'mds': it is not only input but also output buffer.
-//'tmpvec': for local use.
-//'tabiter': for local use.
-//'strictly': set to true to compute if md may be overlapped with global memory.
-void MDSystem::computeOverlap(Region * current_ru,
-                              IN OUT MDSet & mds,
-                              Vector<MD const*> & tmpvec,
-                              ConstMDIter & tabiter,
-                              DefMiscBitSetMgr & mbsmgr,
-                              bool strictly)
+//then output set 'mds' is {md1, md2, md3}.
+//mds: it is not only input but also output buffer.
+//added: records the new MD that added into 'mds'.
+//mditer: for local use.
+//strictly: set to true to compute if md may be overlapped with global memory.
+void MDSystem::computeOverlap(Region * current_ru, MOD MDSet & mds,
+                              MOD Vector<MD const*> & added,
+                              ConstMDIter & mditer,
+                              DefMiscBitSetMgr & mbsmgr, bool strictly)
 {
     ASSERT0(current_ru);
     UINT count = 0;
-    tmpvec.clean();
+    added.clean();
     bool set_global = false;
     bool set_import_var = false;
     MDSetIter iter;
@@ -1060,21 +1041,21 @@ void MDSystem::computeOverlap(Region * current_ru,
         MD const* effect_md = mdt->get_effect_md();
         if (effect_md != nullptr && !mds.is_contain(effect_md)) {
             ASSERT0(MD_base(md) == MD_base(effect_md));
-            tmpvec.set(count, effect_md);
+            added.set(count, effect_md);
             count++;
         }
 
         OffsetTab * ofsttab = mdt->get_ofst_tab();
         ASSERT0(ofsttab);
-        tabiter.clean();
-        for (MD const* tmd = ofsttab->get_first(tabiter, nullptr);
-             tmd != nullptr; tmd = ofsttab->get_next(tabiter, nullptr)) {
+        mditer.clean();
+        for (MD const* tmd = ofsttab->get_first(mditer, nullptr);
+             tmd != nullptr; tmd = ofsttab->get_next(mditer, nullptr)) {
             if (((DefSBitSetCore&)mds).is_contain(MD_id(tmd))) {
                 continue;
             }
             ASSERT0(MD_base(md) == MD_base(tmd));
             if (md->is_overlap(tmd)) {
-                tmpvec.set(count, tmd);
+                added.set(count, tmd);
                 count++;
             }
         }
@@ -1089,30 +1070,25 @@ void MDSystem::computeOverlap(Region * current_ru,
         }
     }
 
-    for (INT i = 0; i <= tmpvec.get_last_idx(); i++) {
-        MD const* t = tmpvec.get(i);
+    for (INT i = 0; i <= added.get_last_idx(); i++) {
+        MD const* t = added.get(i);
         ASSERT0(t && t->is_effect());
         mds.bunion(t, mbsmgr);
     }
 }
 
 
-//Compute all other md which are overlapped with MD in set 'mds'.
+//Compute all other MD which are overlapped with MD in set 'mds'.
 //e.g: mds contains {md1}, and md1 overlapped with md2, md3,
 //then output is {md2, md3}.
-//
-//'mds': it is not only input but also output buffer.
-//'output': output md set.
-//'tabiter': for local use.
-//'strictly': set to true to compute if md may be overlapped with global memory.
-//
+//mds: it is readonly input.
+//output: output MD set.
+//mditer: for local use.
+//strictly: set to true to compute if MD may be overlapped with global memory.
 //Note output do not need to clean before invoke this function.
-void MDSystem::computeOverlap(Region * current_ru,
-                              MDSet const& mds,
-                              OUT MDSet & output,
-                              ConstMDIter & tabiter,
-                              DefMiscBitSetMgr & mbsmgr,
-                              bool strictly)
+void MDSystem::computeOverlap(Region * current_ru, MDSet const& mds,
+                              OUT MDSet & output, ConstMDIter & mditer,
+                              DefMiscBitSetMgr & mbsmgr, bool strictly)
 {
     ASSERT0(&mds != &output);
     ASSERT0(current_ru);
@@ -1139,9 +1115,9 @@ void MDSystem::computeOverlap(Region * current_ru,
 
         OffsetTab const* ofsttab = mdt->get_ofst_tab();
         ASSERT0(ofsttab);
-        tabiter.clean();
-        for (MD const* tmd = ofsttab->get_first(tabiter, nullptr);
-             tmd != nullptr; tmd = ofsttab->get_next(tabiter, nullptr)) {
+        mditer.clean();
+        for (MD const* tmd = ofsttab->get_first(mditer, nullptr);
+             tmd != nullptr; tmd = ofsttab->get_next(mditer, nullptr)) {
             if (mds.is_contain_pure(MD_id(tmd))) {
                 continue;
             }

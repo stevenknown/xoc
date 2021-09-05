@@ -38,140 +38,199 @@ author: Su Zhenyu
 namespace xoc {
 
 //Use do-while to supress warning: value computed is not used
-#define PADDR(ir) \
+#define DUMPADDR(ir) \
   do { int a = dump_addr ? prt(rg, " 0x%p", (ir)) : 0; DUMMYUSE(a); } while (0)
 
 IRDesc const g_ir_desc[] = {
-    { IR_UNDEF,    "undef",        0x0, 0, 0,
+    { IR_UNDEF, "undef", 0x0, 0, 0,
       0,},
-    { IR_CONST,    "const",        0x0, 0, sizeof(CConst),
+
+    { IR_CONST, "const", CConst::kid_map, CConst::kid_num, sizeof(CConst),
       IRT_IS_LEAF,},
-    { IR_ID,       "id",           0x0, 0, sizeof(CId),
+
+    { IR_ID, "id", CId::kid_map, CId::kid_num, sizeof(CId),
       IRT_HAS_IDINFO|IRT_IS_LEAF|IRT_IS_NON_PR_MEMREF|
       IRT_IS_MEM_OPND|IRT_HAS_DU },
-    { IR_LD,       "ld",           0x0, 0, sizeof(CLd),
+
+    { IR_LD, "ld", CLd::kid_map, CLd::kid_num, sizeof(CLd),
       IRT_HAS_IDINFO|IRT_IS_MEM_REF|IRT_IS_MEM_OPND|IRT_IS_LEAF|
       IRT_IS_NON_PR_MEMREF|IRT_HAS_DU|IRT_HAS_OFFSET },
-    { IR_ILD,      "ild",          0x1, 1, sizeof(CILd),
+
+    { IR_ILD, "ild", CILd::kid_map, CILd::kid_num, sizeof(CILd),
       IRT_IS_UNA|IRT_IS_MEM_REF|IRT_IS_MEM_OPND|
       IRT_IS_NON_PR_MEMREF|IRT_HAS_DU|IRT_HAS_OFFSET },
-    { IR_PR,       "pr",           0x0, 0, sizeof(CPr),
+
+    { IR_PR, "pr", CPr::kid_map, CPr::kid_num, sizeof(CPr),
       IRT_IS_MEM_REF|IRT_IS_MEM_OPND|IRT_IS_LEAF|IRT_HAS_DU },
-    { IR_ARRAY,    "array",        0x3, 2, sizeof(CArray),
+
+    { IR_ARRAY, "array", CArray::kid_map, CArray::kid_num, sizeof(CArray),
       IRT_IS_MEM_REF|IRT_IS_MEM_OPND|IRT_IS_NON_PR_MEMREF|
       IRT_HAS_DU|IRT_HAS_OFFSET },
-    { IR_ST,       "st",           0x1, 1, sizeof(CSt),
+
+    { IR_ST, "st", CSt::kid_map, CSt::kid_num, sizeof(CSt),
       IRT_HAS_IDINFO|IRT_IS_STMT|IRT_IS_MEM_REF|IRT_HAS_RESULT|
       IRT_IS_STMT_IN_BB|IRT_IS_NON_PR_MEMREF|IRT_HAS_DU|IRT_HAS_OFFSET },
-    { IR_STPR,     "stpr",         0x1, 1, sizeof(CStpr),
+
+    { IR_STPR, "stpr", CStpr::kid_map, CStpr::kid_num, sizeof(CStpr),
       IRT_IS_STMT|IRT_IS_MEM_REF|IRT_HAS_RESULT|
       IRT_IS_STMT_IN_BB|IRT_HAS_DU|IRT_WRITE_PR|IRT_WRITE_WHOLE_PR },
-    { IR_STARRAY,  "starray",      0x7, 3, sizeof(CStArray),
+
+    { IR_STARRAY, "starray", CStArray::kid_map, CStArray::kid_num,
+      sizeof(CStArray),
       IRT_IS_STMT|IRT_IS_MEM_REF|IRT_HAS_RESULT|
       IRT_IS_STMT_IN_BB|IRT_IS_NON_PR_MEMREF|IRT_HAS_DU|IRT_HAS_OFFSET },
-    { IR_IST,      "ist",          0x3, 2, sizeof(CISt),
+
+    { IR_IST, "ist", CISt::kid_map, CISt::kid_num, sizeof(CISt),
       IRT_IS_STMT|IRT_IS_MEM_REF|IRT_HAS_RESULT|
       IRT_IS_STMT_IN_BB|IRT_IS_NON_PR_MEMREF|IRT_HAS_DU|IRT_HAS_OFFSET },
-    { IR_SETELEM,  "setelem",      0x7, 3, sizeof(CSetElem),
+
+    { IR_SETELEM, "setelem", CSetElem::kid_map, CSetElem::kid_num,
+      sizeof(CSetElem),
       IRT_IS_STMT|IRT_IS_MEM_REF|IRT_HAS_RESULT|
       IRT_IS_STMT_IN_BB|IRT_HAS_DU|IRT_WRITE_PR },
-    { IR_GETELEM,  "getelem",      0x3, 2, sizeof(CGetElem),
+
+    { IR_GETELEM, "getelem", CGetElem::kid_map, CGetElem::kid_num,
+      sizeof(CGetElem),
       IRT_IS_STMT|IRT_IS_MEM_REF|IRT_HAS_RESULT|
       IRT_IS_STMT_IN_BB|IRT_HAS_DU|IRT_WRITE_PR|IRT_WRITE_WHOLE_PR },
-    { IR_CALL,     "call",         0x3, 2, sizeof(CCall),
+
+    //CALL might not def PR if there is not return value.
+    { IR_CALL, "call", CCall::kid_map, CCall::kid_num, sizeof(CCall),
       IRT_IS_STMT|IRT_IS_MEM_REF|IRT_HAS_RESULT|
-      IRT_HAS_IDINFO|IRT_IS_STMT_IN_BB|IRT_HAS_DU }, //CALL might not def PR if
-                                                     //there is not return
-                                                     //value.
-    { IR_ICALL,    "icall",        0x7, 3, sizeof(CICall),
+      IRT_HAS_IDINFO|IRT_IS_STMT_IN_BB|IRT_HAS_DU },
+
+    { IR_ICALL, "icall", CICall::kid_map, CICall::kid_num, sizeof(CICall),
       IRT_IS_STMT|IRT_IS_MEM_REF|IRT_HAS_RESULT|
       IRT_IS_STMT_IN_BB|IRT_HAS_DU }, //ICALL might not def PR if
                                       //there is not return value.
-    { IR_LDA,      "lda",          0x0, 0, sizeof(CLda),
+
+    { IR_LDA, "lda", CLda::kid_map, CLda::kid_num, sizeof(CLda),
       IRT_HAS_IDINFO|IRT_IS_UNA|IRT_IS_LEAF|IRT_HAS_OFFSET },
-    { IR_ADD,      "add",          0x3, 2, sizeof(CBin),
+
+    { IR_ADD, "add", CBin::kid_map, CBin::kid_num, sizeof(CBin),
       IRT_IS_BIN|IRT_IS_ASSOCIATIVE|IRT_IS_COMMUTATIVE },
-    { IR_SUB,      "sub",          0x3, 2, sizeof(CBin),
+
+    { IR_SUB, "sub", CBin::kid_map, CBin::kid_num, sizeof(CBin),
       IRT_IS_BIN|IRT_IS_ASSOCIATIVE },
-    { IR_MUL,      "mul",          0x3, 2, sizeof(CBin),
+
+    { IR_MUL, "mul", CBin::kid_map, CBin::kid_num, sizeof(CBin),
       IRT_IS_BIN|IRT_IS_ASSOCIATIVE|IRT_IS_COMMUTATIVE },
-    { IR_DIV,      "div",          0x3, 2, sizeof(CBin),
+
+    { IR_DIV, "div", CBin::kid_map, CBin::kid_num, sizeof(CBin),
       IRT_IS_BIN },
-    { IR_REM,      "rem",          0x3, 2, sizeof(CBin),
+
+    { IR_REM, "rem", CBin::kid_map, CBin::kid_num, sizeof(CBin),
       IRT_IS_BIN },
-    { IR_MOD,      "mod",          0x3, 2, sizeof(CBin),
+
+    { IR_MOD, "mod", CBin::kid_map, CBin::kid_num, sizeof(CBin),
       IRT_IS_BIN },
-    { IR_LAND,     "land",         0x3, 2, sizeof(CBin),
+
+    { IR_LAND, "land", CBin::kid_map, CBin::kid_num, sizeof(CBin),
       IRT_IS_BIN|IRT_IS_LOGICAL },
-    { IR_LOR,      "lor",          0x3, 2, sizeof(CBin),
+
+    { IR_LOR, "lor", CBin::kid_map, CBin::kid_num, sizeof(CBin),
       IRT_IS_BIN|IRT_IS_LOGICAL },
-    { IR_BAND,     "band",         0x3, 2, sizeof(CBin),
+
+    { IR_BAND, "band", CBin::kid_map, CBin::kid_num, sizeof(CBin),
       IRT_IS_BIN|IRT_IS_ASSOCIATIVE|IRT_IS_COMMUTATIVE },
-    { IR_BOR,      "bor",          0x3, 2, sizeof(CBin),
+
+    { IR_BOR, "bor", CBin::kid_map, CBin::kid_num, sizeof(CBin),
       IRT_IS_BIN|IRT_IS_ASSOCIATIVE },
-    { IR_XOR,      "xor",          0x3, 2, sizeof(CBin),
+
+    { IR_XOR, "xor", CBin::kid_map, CBin::kid_num, sizeof(CBin),
       IRT_IS_BIN|IRT_IS_ASSOCIATIVE|IRT_IS_COMMUTATIVE },
-    { IR_ASR,      "asr",          0x3, 2, sizeof(CBin),
+
+    { IR_ASR, "asr", CBin::kid_map, CBin::kid_num, sizeof(CBin),
       IRT_IS_BIN },
-    { IR_LSR,      "lsr",          0x3, 2, sizeof(CBin),
+
+    { IR_LSR, "lsr", CBin::kid_map, CBin::kid_num, sizeof(CBin),
       IRT_IS_BIN },
-    { IR_LSL,      "lsl",          0x3, 2, sizeof(CBin),
+
+    { IR_LSL, "lsl", CBin::kid_map, CBin::kid_num, sizeof(CBin),
       IRT_IS_BIN },
-    { IR_LT,       "lt",           0x3, 2, sizeof(CBin),
+
+    { IR_LT, "lt", CBin::kid_map, CBin::kid_num, sizeof(CBin),
       IRT_IS_BIN|IRT_IS_RELATION },
-    { IR_LE,       "le",           0x3, 2, sizeof(CBin),
+
+    { IR_LE, "le", CBin::kid_map, CBin::kid_num, sizeof(CBin),
       IRT_IS_BIN|IRT_IS_RELATION },
-    { IR_GT,       "gt",           0x3, 2, sizeof(CBin),
+
+    { IR_GT, "gt", CBin::kid_map, CBin::kid_num, sizeof(CBin),
       IRT_IS_BIN|IRT_IS_RELATION },
-    { IR_GE,       "ge",           0x3, 2, sizeof(CBin),
+
+    { IR_GE, "ge", CBin::kid_map, CBin::kid_num, sizeof(CBin),
       IRT_IS_BIN|IRT_IS_RELATION },
-    { IR_EQ,       "eq",           0x3, 2, sizeof(CBin),
+
+    { IR_EQ, "eq", CBin::kid_map, CBin::kid_num, sizeof(CBin),
       IRT_IS_BIN|IRT_IS_ASSOCIATIVE|IRT_IS_COMMUTATIVE|IRT_IS_RELATION },
-    { IR_NE,       "ne",           0x3, 2, sizeof(CBin),
+
+    { IR_NE, "ne", CBin::kid_map, CBin::kid_num, sizeof(CBin),
       IRT_IS_BIN|IRT_IS_ASSOCIATIVE|IRT_IS_COMMUTATIVE|IRT_IS_RELATION },
-    { IR_BNOT,     "bnot",         0x1, 1, sizeof(CUna),
+
+    { IR_BNOT, "bnot", CUna::kid_map, CUna::kid_num, sizeof(CUna),
       IRT_IS_UNA },
-    { IR_LNOT,     "lnot",         0x1, 1, sizeof(CUna),
+
+    { IR_LNOT, "lnot", CUna::kid_map, CUna::kid_num, sizeof(CUna),
       IRT_IS_UNA|IRT_IS_LOGICAL },
-    { IR_NEG,      "neg",          0x1, 1, sizeof(CUna),
+
+    { IR_NEG, "neg", CUna::kid_map, CUna::kid_num, sizeof(CUna),
       IRT_IS_UNA },
-    { IR_CVT,      "cvt",          0x1, 1, sizeof(CCvt),
+
+    { IR_CVT, "cvt", CCvt::kid_map, CCvt::kid_num, sizeof(CCvt),
       IRT_IS_UNA },
-    { IR_GOTO,     "goto",         0x0, 0, sizeof(CGoto),
+
+    { IR_GOTO, "goto", CGoto::kid_map, CGoto::kid_num, sizeof(CGoto),
       IRT_IS_STMT|IRT_IS_STMT_IN_BB },
-    { IR_IGOTO,    "igoto",        0x3, 2, sizeof(CIGoto),
+
+    { IR_IGOTO, "igoto", CIGoto::kid_map, CIGoto::kid_num, sizeof(CIGoto),
       IRT_IS_STMT|IRT_IS_STMT_IN_BB },
-    { IR_DO_WHILE, "dowhile",      0x3, 2, sizeof(CDoWhile),
+
+    { IR_DO_WHILE, "dowhile", CDoWhile::kid_map, CDoWhile::kid_num,
+      sizeof(CDoWhile), IRT_IS_STMT },
+
+    { IR_WHILE_DO, "whiledo", CWhileDo::kid_map, CWhileDo::kid_num,
+      sizeof(CWhileDo), IRT_IS_STMT },
+
+    { IR_DO_LOOP, "doloop", CDoLoop::kid_map, CDoLoop::kid_num,
+       sizeof(CDoLoop), IRT_IS_STMT },
+
+    { IR_IF, "if", CIf::kid_map, CIf::kid_num, sizeof(CIf),
       IRT_IS_STMT },
-    { IR_WHILE_DO, "whiledo",      0x3, 2, sizeof(CWhileDo),
+
+    { IR_LABEL, "label", CLab::kid_map, CLab::kid_num, sizeof(CLab),
       IRT_IS_STMT },
-    { IR_DO_LOOP,  "doloop",       0x1F,5, sizeof(CDoLoop),
-      IRT_IS_STMT },
-    { IR_IF,       "if",           0x7, 3, sizeof(CIf),
-      IRT_IS_STMT },
-    { IR_LABEL,    "label",        0x0, 0, sizeof(CLab),
-      IRT_IS_STMT },
-    { IR_SWITCH,   "switch",       0x7, 3, sizeof(CSwitch),
+
+    { IR_SWITCH, "switch", CSwitch::kid_map, CSwitch::kid_num, sizeof(CSwitch),
       IRT_IS_STMT|IRT_IS_STMT_IN_BB },
-    { IR_CASE,     "case",         0x1, 1, sizeof(CCase),
+
+    { IR_CASE, "case", CCase::kid_map, CCase::kid_num, sizeof(CCase),
       0, },
-    { IR_TRUEBR,   "truebr",       0x1, 1, sizeof(CTruebr),
+
+    { IR_TRUEBR, "truebr", CTruebr::kid_map, CTruebr::kid_num, sizeof(CTruebr),
       IRT_IS_STMT|IRT_IS_STMT_IN_BB },
-    { IR_FALSEBR,  "falsebr",      0x1, 1, sizeof(CFalsebr),
+
+    { IR_FALSEBR, "falsebr", CFalsebr::kid_map, CFalsebr::kid_num,
+      sizeof(CFalsebr), IRT_IS_STMT|IRT_IS_STMT_IN_BB },
+
+    { IR_RETURN, "return", CRet::kid_map, CRet::kid_num, sizeof(CRet),
       IRT_IS_STMT|IRT_IS_STMT_IN_BB },
-    { IR_RETURN,   "return",       0x1, 1, sizeof(CRet),
-      IRT_IS_STMT|IRT_IS_STMT_IN_BB },
-    { IR_SELECT,   "select",       0x7, 3, sizeof(CSelect),
+
+    { IR_SELECT, "select", CSelect::kid_map, CSelect::kid_num, sizeof(CSelect),
       0, },
-    { IR_BREAK,    "break",        0x0, 0, sizeof(CBreak),
+
+    { IR_BREAK, "break", CBreak::kid_map, CBreak::kid_num, sizeof(CBreak),
       IRT_IS_STMT },
-    { IR_CONTINUE, "continue",     0x0, 0, sizeof(CContinue),
-      IRT_IS_STMT },
-    { IR_PHI,      "phi",          0x1, 1, sizeof(CPhi),
+
+    { IR_CONTINUE, "continue", CContinue::kid_map, CContinue::kid_num,
+      sizeof(CContinue), IRT_IS_STMT },
+
+    { IR_PHI, "phi", CPhi::kid_map, CPhi::kid_num, sizeof(CPhi),
       IRT_IS_STMT|IRT_HAS_RESULT|IRT_IS_MEM_REF|
       IRT_IS_STMT_IN_BB|IRT_HAS_DU|IRT_WRITE_PR|IRT_WRITE_WHOLE_PR },
-    { IR_REGION,   "region",       0x0, 0, sizeof(CRegion),
+
+    { IR_REGION, "region", CRegion::kid_map, CRegion::kid_num, sizeof(CRegion),
       IRT_IS_STMT|IRT_IS_STMT_IN_BB },
+
     { IR_TYPE_NUM, "LAST IR Code", 0x0, 0, 0, 0, },
 };
 
@@ -568,15 +627,15 @@ static void dumpAttachInfo(OUT CHAR * buf, IR const* ir)
     AIContainer const* ai = ir->getAI();
     if (ai == nullptr) { return; }
 
-    AICont const& cont = ai->read_cont();
+    AICont const* cont = ai->getContainer();
 
-    if (!cont.is_init()) { return; }
+    if (!cont->is_init()) { return; }
 
     strcat(buf, " attachinfo:");
     CHAR * p = buf + strlen(buf);
     bool not_first = false;
-    for (UINT i = 0; i < cont.get_capacity(); i++) {
-        BaseAttachInfo * ac = cont.get(i);
+    for (UINT i = 0; i < cont->get_capacity(); i++) {
+        BaseAttachInfo const* ac = cont->get(i);
         if (ac == nullptr) { continue; }
 
         if (!not_first) {
@@ -586,7 +645,7 @@ static void dumpAttachInfo(OUT CHAR * buf, IR const* ir)
             p = p + strlen(p);
         }
 
-        sprintf(p, "%s", ai->getAIName(ac->type));
+        sprintf(p, "%s", ai->getAIName(ac->getType()));
         p = p + strlen(p);
     }
 }
@@ -618,22 +677,20 @@ void dumpConst(IR const* ir, Region const* rg)
         #else
         #error "Need to support";
         #endif
-        prt(rg, intfmt, xtm->dump_type(d, buf),
-            CONST_int_val(ir), CONST_int_val(ir));
+        prt(rg, intfmt, xtm->dump_type(d, buf), CONST_int_val(ir),
+            CONST_int_val(ir));
         return;
     }
 
     if (ir->is_fp()) {
         CHAR fpformat[128];
-        ::snprintf(fpformat, 127, "fpconst:%%s %%.%df",
-                   CONST_fp_mant(ir));
+        ::snprintf(fpformat, 127, "fpconst:%%s %%.%df", CONST_fp_mant(ir));
         prt(rg, fpformat, xtm->dump_type(d, buf), CONST_fp_val(ir));
         return;
     }
 
     if (ir->is_bool()) {
-        prt(rg, "boolconst:%s %d", xtm->dump_type(d, buf),
-            CONST_int_val(ir));
+        prt(rg, "boolconst:%s %d", xtm->dump_type(d, buf), CONST_int_val(ir));
         return;
     }
 
@@ -689,6 +746,7 @@ void dumpIR(IR const* ir, Region const* rg, IN CHAR * attr, UINT dumpflag)
     bool dump_kid = HAVE_FLAG(dumpflag, IR_DUMP_KID);
     bool dump_inner_region = HAVE_FLAG(dumpflag, IR_DUMP_INNER_REGION);
     bool dump_var_decl = HAVE_FLAG(dumpflag, IR_DUMP_VAR_DECL);
+    bool dump_newline = !HAVE_FLAG(dumpflag, IR_DUMP_NO_NEWLINE);
     DUMMYUSE(dump_src_line);
     DUMMYUSE(dump_kid);
     DUMMYUSE(dump_addr);
@@ -746,7 +804,6 @@ void dumpIR(IR const* ir, Region const* rg, IN CHAR * attr, UINT dumpflag)
     //Record type info and var decl.
     StrBuf buf(64);
     StrBuf buf2(64);
-
     if (g_dbx_mgr != nullptr && dump_src_line) {
         DbxMgr::PrtCtx prtctx;
         prtctx.logmgr = lm;
@@ -756,6 +813,10 @@ void dumpIR(IR const* ir, Region const* rg, IN CHAR * attr, UINT dumpflag)
     Type const* d = nullptr;
     if (ir->getType() != nullptr) {
         d = ir->getType();
+    }
+    if (dump_newline) {
+        //Dump newline before root ir.
+        prt(rg, "\n");
     }
 
     TypeMgr * xtm = const_cast<TypeMgr*>(tm);
@@ -767,7 +828,7 @@ void dumpIR(IR const* ir, Region const* rg, IN CHAR * attr, UINT dumpflag)
         SYM_name(ST_idinfo(ir)->get_name()));
 
         //Dump operator and variable name.
-        note(rg, "\nst:%s", xtm->dump_type(d, buf));
+        note(rg, "st:%s", xtm->dump_type(d, buf));
         if (ST_ofst(ir) != 0) {
             prt(rg, ":offset(%d)", ST_ofst(ir));
         }
@@ -779,7 +840,7 @@ void dumpIR(IR const* ir, Region const* rg, IN CHAR * attr, UINT dumpflag)
             prt(rg, " decl:%s", buf.buf);
         }
 
-        PADDR(ir);
+        DUMPADDR(ir);
         prt(rg, "%s", attr);
 
         if (dump_kid) {
@@ -790,8 +851,8 @@ void dumpIR(IR const* ir, Region const* rg, IN CHAR * attr, UINT dumpflag)
         break;
     }
     case IR_STPR:
-        note(rg, "\nstpr $%d:%s", STPR_no(ir), xtm->dump_type(d, buf));
-        PADDR(ir);
+        note(rg, "stpr $%d:%s", STPR_no(ir), xtm->dump_type(d, buf));
+        DUMPADDR(ir);
         prt(rg, "%s", attr);
 
         if (dump_kid) {
@@ -801,8 +862,8 @@ void dumpIR(IR const* ir, Region const* rg, IN CHAR * attr, UINT dumpflag)
         }
         break;
     case IR_SETELEM:
-        note(rg, "\nsetelem $%d:%s", SETELEM_prno(ir), xtm->dump_type(d, buf));
-        PADDR(ir);
+        note(rg, "setelem $%d:%s", SETELEM_prno(ir), xtm->dump_type(d, buf));
+        DUMPADDR(ir);
         prt(rg, "%s", attr);
         if (dump_kid) {
             lm->incIndent(dn);
@@ -813,8 +874,8 @@ void dumpIR(IR const* ir, Region const* rg, IN CHAR * attr, UINT dumpflag)
         }
         break;
     case IR_GETELEM:
-        note(rg, "\ngetelem $%d:%s", GETELEM_prno(ir), xtm->dump_type(d, buf));
-        PADDR(ir);
+        note(rg, "getelem $%d:%s", GETELEM_prno(ir), xtm->dump_type(d, buf));
+        DUMPADDR(ir);
         prt(rg, "%s", attr);
         if (dump_kid) {
             lm->incIndent(dn);
@@ -825,17 +886,17 @@ void dumpIR(IR const* ir, Region const* rg, IN CHAR * attr, UINT dumpflag)
         break;
     case IR_STARRAY:
         if (ARR_ofst(ir) != 0) {
-            note(rg, "\nstarray (%s:offset(%d), ety:%s)",
+            note(rg, "starray (%s:offset(%d), ety:%s)",
                  xtm->dump_type(d, buf),
                  ARR_ofst(ir),
                  xtm->dump_type(ARR_elemtype(ir), buf2));
         } else {
-            note(rg, "\nstarray (%s, ety:%s)",
+            note(rg, "starray (%s, ety:%s)",
                  xtm->dump_type(d, buf),
                  xtm->dump_type(ARR_elemtype(ir), buf2));
         }
 
-        PADDR(ir);
+        DUMPADDR(ir);
         prt(rg, "%s", attr);
         if (ARR_sub_list(ir) != nullptr && dump_kid) {
             //Dump elem number.
@@ -875,13 +936,13 @@ void dumpIR(IR const* ir, Region const* rg, IN CHAR * attr, UINT dumpflag)
         break;
     case IR_IST:
         if (IST_ofst(ir) != 0) {
-            note(rg, "\nist:%s:offset(%d)", xtm->dump_type(d, buf), IST_ofst(ir));
+            note(rg, "ist:%s:offset(%d)", xtm->dump_type(d, buf), IST_ofst(ir));
         } else {
-            note(rg, "\nist:%s", xtm->dump_type(d, buf));
+            note(rg, "ist:%s", xtm->dump_type(d, buf));
         }
 
         //Dump IR address.
-        PADDR(ir);
+        DUMPADDR(ir);
         prt(rg, "%s", attr);
 
         if (dump_kid) {
@@ -900,10 +961,10 @@ void dumpIR(IR const* ir, Region const* rg, IN CHAR * attr, UINT dumpflag)
             SYM_name(LD_idinfo(ir)->get_name()));
 
         if (LD_ofst(ir) != 0) {
-            note(rg, "\nld:%s:offset(%d) '%s'",
+            note(rg, "ld:%s:offset(%d) '%s'",
                  xtm->dump_type(d, buf), LD_ofst(ir), name);
         } else {
-            note(rg, "\nld:%s '%s'", xtm->dump_type(d, buf), name);
+            note(rg, "ld:%s '%s'", xtm->dump_type(d, buf), name);
         }
 
         //Dump declaration if frontend supplied.
@@ -913,19 +974,19 @@ void dumpIR(IR const* ir, Region const* rg, IN CHAR * attr, UINT dumpflag)
         }
 
         //Dump IR address.
-        PADDR(ir);
+        DUMPADDR(ir);
         prt(rg, "%s", attr);
         break;
     }
     case IR_ILD:
         if (ILD_ofst(ir) != 0) {
-            note(rg, "\nild:%s:offset(%d)",
+            note(rg, "ild:%s:offset(%d)",
                  xtm->dump_type(d, buf), ILD_ofst(ir));
         } else {
-            note(rg, "\nild:%s", xtm->dump_type(d, buf));
+            note(rg, "ild:%s", xtm->dump_type(d, buf));
         }
 
-        PADDR(ir);
+        DUMPADDR(ir);
         prt(rg, "%s", attr);
         if (dump_kid) {
             lm->incIndent(dn);
@@ -934,8 +995,8 @@ void dumpIR(IR const* ir, Region const* rg, IN CHAR * attr, UINT dumpflag)
         }
         break;
     case IR_PR:
-        note(rg, "\n$%d:%s", PR_no(ir), xtm->dump_type(d, buf));
-        PADDR(ir);
+        note(rg, "$%d:%s", PR_no(ir), xtm->dump_type(d, buf));
+        DUMPADDR(ir);
         prt(rg, "%s", attr);
         break;
     case IR_ID: {
@@ -945,7 +1006,7 @@ void dumpIR(IR const* ir, Region const* rg, IN CHAR * attr, UINT dumpflag)
         //Dump ID name.
         CHAR * name =
             xstrcat(tt, 40, "%s", SYM_name(ID_info(ir)->get_name()));
-        note(rg, "\nid:%s '%s'", xtm->dump_type(d, buf), name);
+        note(rg, "id:%s '%s'", xtm->dump_type(d, buf), name);
 
         buf.clean();
         if (dump_var_decl && ID_info(ir)->dumpVARDecl(buf) != nullptr) {
@@ -953,23 +1014,23 @@ void dumpIR(IR const* ir, Region const* rg, IN CHAR * attr, UINT dumpflag)
         }
 
         //Dump IR address.
-        PADDR(ir);
+        DUMPADDR(ir);
         prt(rg, "%s", attr);
         break;
     }
     case IR_CONST:
-        note(rg, "\n");
+        note(rg, "");
         dumpConst(ir, rg);
-        PADDR(ir);
+        DUMPADDR(ir);
         prt(rg, "%s", attr);
         break;
     SWITCH_CASE_BIN:
     SWITCH_CASE_UNA:
-        note(rg, "\n%s:%s", IRNAME(ir), xtm->dump_type(d, buf));
+        note(rg, "%s:%s", IRNAME(ir), xtm->dump_type(d, buf));
         if (ir->is_cvt() && CVT_round(ir) != ROUND_UNDEF) {
           prt(rg, ":round(%s)", ROUND_NAME(CVT_round(ir)));
         }
-        PADDR(ir);
+        DUMPADDR(ir);
         prt(rg, "%s", attr);
         if (dump_kid) {
             lm->incIndent(dn);
@@ -982,8 +1043,8 @@ void dumpIR(IR const* ir, Region const* rg, IN CHAR * attr, UINT dumpflag)
         }
         break;
     case IR_IF:
-        note(rg, "\nif");
-        PADDR(ir);
+        note(rg, "if");
+        DUMPADDR(ir);
         prt(rg, "%s", attr);
         if (dump_kid) {
             lm->incIndent(dn);
@@ -1007,8 +1068,8 @@ void dumpIR(IR const* ir, Region const* rg, IN CHAR * attr, UINT dumpflag)
         }
         break;
     case IR_DO_WHILE:
-        note(rg, "\ndowhile");
-        PADDR(ir);
+        note(rg, "dowhile");
+        DUMPADDR(ir);
         prt(rg, "%s", attr);
         if (dump_kid) {
             note(rg, "\nbody:");
@@ -1025,8 +1086,8 @@ void dumpIR(IR const* ir, Region const* rg, IN CHAR * attr, UINT dumpflag)
         }
         break;
     case IR_WHILE_DO:
-        note(rg, "\nwhiledo");
-        PADDR(ir);
+        note(rg, "whiledo");
+        DUMPADDR(ir);
         prt(rg, "%s", attr);
 
         if (dump_kid) {
@@ -1045,8 +1106,8 @@ void dumpIR(IR const* ir, Region const* rg, IN CHAR * attr, UINT dumpflag)
         }
         break;
     case IR_DO_LOOP:
-        note(rg, "\ndoloop");
-        PADDR(ir);
+        note(rg, "doloop");
+        DUMPADDR(ir);
         prt(rg, "%s", attr);
         if (dump_kid) {
             note(rg, "\niv:");
@@ -1078,18 +1139,18 @@ void dumpIR(IR const* ir, Region const* rg, IN CHAR * attr, UINT dumpflag)
         }
         break;
     case IR_BREAK:
-        note(rg, "\nbreak");
-        PADDR(ir);
+        note(rg, "break");
+        DUMPADDR(ir);
         prt(rg, "%s", attr);
         break;
     case IR_CONTINUE:
-        note(rg, "\ncontinue");
-        PADDR(ir);
+        note(rg, "continue");
+        DUMPADDR(ir);
         prt(rg, "%s", attr);
         break;
     case IR_RETURN:
-        note(rg, "\nreturn");
-        PADDR(ir);
+        note(rg, "return");
+        DUMPADDR(ir);
         prt(rg, "%s", attr);
         if (dump_kid) {
             lm->incIndent(dn);
@@ -1098,14 +1159,14 @@ void dumpIR(IR const* ir, Region const* rg, IN CHAR * attr, UINT dumpflag)
         }
         break;
     case IR_GOTO:
-        note(rg, "\ngoto ");
+        note(rg, "goto ");
         dump_lab_decl(ir->getLabel(), rm);
-        PADDR(ir);
+        DUMPADDR(ir);
         prt(rg, "%s", attr);
         break;
     case IR_IGOTO:
-        note(rg, "\nigoto");
-        PADDR(ir);
+        note(rg, "igoto");
+        DUMPADDR(ir);
         prt(rg, "%s", attr);
         if (dump_kid) {
             lm->incIndent(dn);
@@ -1121,17 +1182,17 @@ void dumpIR(IR const* ir, Region const* rg, IN CHAR * attr, UINT dumpflag)
     case IR_LABEL: {
         LabelInfo const* li = LAB_lab(ir);
         if (LABELINFO_type(li) == L_ILABEL) {
-            note(rg, "\nlabel " ILABEL_STR_FORMAT "",
+            note(rg, "label " ILABEL_STR_FORMAT "",
                  ILABEL_CONT(LAB_lab(ir)));
         } else if (LABELINFO_type(li) == L_CLABEL) {
-            note(rg, "\nlabel " CLABEL_STR_FORMAT "",
+            note(rg, "label " CLABEL_STR_FORMAT "",
                  CLABEL_CONT(LAB_lab(ir)));
         } else if (LABELINFO_type(li) == L_PRAGMA) {
             ASSERT0(LABELINFO_pragma(LAB_lab(ir)));
-            note(rg, "\npragma %s", SYM_name(LABELINFO_pragma(LAB_lab(ir))));
+            note(rg, "pragma %s", SYM_name(LABELINFO_pragma(LAB_lab(ir))));
         } else { UNREACHABLE(); }
 
-        PADDR(ir);
+        DUMPADDR(ir); //dump runtime address on host machine.
 
         if (LABELINFO_b1(li) != 0) {
             prt(rg, "(");
@@ -1161,8 +1222,8 @@ void dumpIR(IR const* ir, Region const* rg, IN CHAR * attr, UINT dumpflag)
         break;
     }
     case IR_SELECT: //formulized log_OR_exp?exp:cond_exp
-        note(rg, "\nselect:%s", xtm->dump_type(d, buf));
-        PADDR(ir);
+        note(rg, "select:%s", xtm->dump_type(d, buf));
+        DUMPADDR(ir);
         prt(rg, "%s", attr);
         if (dump_kid) {
             lm->incIndent(dn);
@@ -1186,10 +1247,10 @@ void dumpIR(IR const* ir, Region const* rg, IN CHAR * attr, UINT dumpflag)
         CHAR * name = xstrcat(tt, 40, "%s",
             SYM_name(LDA_idinfo(ir)->get_name()));
         if (LDA_ofst(ir) != 0) {
-            note(rg, "\nlda:%s:offset(%d) '%s'",
+            note(rg, "lda:%s:offset(%d) '%s'",
                  xtm->dump_type(d, buf), LDA_ofst(ir), name);
         } else {
-            note(rg, "\nlda:%s '%s'", xtm->dump_type(d, buf), name);
+            note(rg, "lda:%s '%s'", xtm->dump_type(d, buf), name);
         }
 
         //Dump declaration if frontend supplied.
@@ -1199,14 +1260,14 @@ void dumpIR(IR const* ir, Region const* rg, IN CHAR * attr, UINT dumpflag)
         }
 
         //Dump IR address.
-        PADDR(ir);
+        DUMPADDR(ir);
         prt(rg, "%s", attr);
         break;
     }
     case IR_PHI:
-        note(rg, "\n$%d:%s = phi", PHI_prno(ir), xtm->dump_type(d, buf));
+        note(rg, "$%d:%s = phi", PHI_prno(ir), xtm->dump_type(d, buf));
 
-        PADDR(ir);
+        DUMPADDR(ir);
         prt(rg, "%s", attr);
         if (dump_kid) {
             lm->incIndent(dn);
@@ -1219,12 +1280,12 @@ void dumpIR(IR const* ir, Region const* rg, IN CHAR * attr, UINT dumpflag)
         }
         break;
     case IR_SWITCH:
-        note(rg, "\nswitch");
+        note(rg, "switch");
         if (SWITCH_deflab(ir) != nullptr) {
             prt(rg, ", deflab: ");
             dump_lab_decl(ir->getLabel(), rm);
         }
-        PADDR(ir);
+        DUMPADDR(ir);
         prt(rg, "%s", attr);
         if (dump_kid) {
             lm->incIndent(dn);
@@ -1247,8 +1308,8 @@ void dumpIR(IR const* ir, Region const* rg, IN CHAR * attr, UINT dumpflag)
     case IR_CASE:
         ASSERT0(CASE_vexp(ir));
         ASSERT0(CASE_lab(ir));
-        note(rg, "\ncase");
-        PADDR(ir);
+        note(rg, "case");
+        DUMPADDR(ir);
         prt(rg, "%s", attr);
 
         lm->incIndent(dn);
@@ -1259,17 +1320,17 @@ void dumpIR(IR const* ir, Region const* rg, IN CHAR * attr, UINT dumpflag)
         break;
     case IR_ARRAY:
         if (ARR_ofst(ir) != 0) {
-            note(rg, "\narray (%s:offset(%d), ety:%s)",
+            note(rg, "array (%s:offset(%d), ety:%s)",
                  xtm->dump_type(d, buf),
                  ARR_ofst(ir),
                  xtm->dump_type(ARR_elemtype(ir), buf2));
         } else {
-            note(rg, "\narray (%s, ety:%s)",
+            note(rg, "array (%s, ety:%s)",
                  xtm->dump_type(d, buf),
                  xtm->dump_type(ARR_elemtype(ir), buf2));
         }
 
-        PADDR(ir);
+        DUMPADDR(ir);
         prt(rg, "%s", attr);
         if (ARR_sub_list(ir) != nullptr && dump_kid) {
             //Dump element number if it exist.
@@ -1310,11 +1371,8 @@ void dumpIR(IR const* ir, Region const* rg, IN CHAR * attr, UINT dumpflag)
     case IR_CALL:
     case IR_ICALL: {
         if (ir->hasReturnValue()) {
-            note(rg, "\n$%d:%s = ", CALL_prno(ir), xtm->dump_type(d, buf));
-        } else {
-            note(rg, "\n");
+            note(rg, "$%d:%s = ", CALL_prno(ir), xtm->dump_type(d, buf));
         }
-
         if (ir->is_call()) {
             CHAR tt[44];
             tt[0] = 0;
@@ -1332,7 +1390,7 @@ void dumpIR(IR const* ir, Region const* rg, IN CHAR * attr, UINT dumpflag)
             prt(rg, "icall ");
         }
 
-        PADDR(ir);
+        DUMPADDR(ir);
         prt(rg, "%s", attr);
 
         if (dump_kid) {
@@ -1369,9 +1427,9 @@ void dumpIR(IR const* ir, Region const* rg, IN CHAR * attr, UINT dumpflag)
         break;
     }
     case IR_TRUEBR:
-        note(rg, "\ntruebr ");
+        note(rg, "truebr ");
         dump_lab_decl(ir->getLabel(), rm);
-        PADDR(ir);
+        DUMPADDR(ir);
         prt(rg, "%s", attr);
         if (dump_kid) {
             lm->incIndent(dn);
@@ -1380,9 +1438,9 @@ void dumpIR(IR const* ir, Region const* rg, IN CHAR * attr, UINT dumpflag)
         }
         break;
     case IR_FALSEBR:
-        note(rg, "\nfalsebr ");
+        note(rg, "falsebr ");
         dump_lab_decl(ir->getLabel(), rm);
-        PADDR(ir);
+        DUMPADDR(ir);
         prt(rg, "%s", attr);
         if (dump_kid) {
             lm->incIndent(dn);
@@ -1391,7 +1449,7 @@ void dumpIR(IR const* ir, Region const* rg, IN CHAR * attr, UINT dumpflag)
         }
         break;
     case IR_REGION:
-        note(rg, "\nregion");
+        note(rg, "region");
         if (REGION_ru(ir)->getRegionVar() != nullptr) {
             Var * ruvar = REGION_ru(ir)->getRegionVar();
             CHAR tt[40];
@@ -1402,7 +1460,7 @@ void dumpIR(IR const* ir, Region const* rg, IN CHAR * attr, UINT dumpflag)
             prt(rg, " \'%s\',id:%d", tt, REGION_ru(ir)->id());
         }
 
-        PADDR(ir); //Dump IR address.
+        DUMPADDR(ir); //Dump IR address.
         prt(rg, "%s", attr); //Dump attributes.
 
         if (dump_inner_region) {
@@ -1415,8 +1473,8 @@ void dumpIR(IR const* ir, Region const* rg, IN CHAR * attr, UINT dumpflag)
         }
         break;
     case IR_UNDEF:
-        note(rg, "\nundef!");
-        PADDR(ir);
+        note(rg, "undef!");
+        DUMPADDR(ir);
         prt(rg, "%s", attr);
         break;
     default:
@@ -1562,6 +1620,7 @@ bool IR::verify(Region const* rg) const
             !is_bool() &&
             !is_mc() &&
             !is_any() &&
+            !is_ptr() && //immediate can be pointer, e.g: int * p = 0;
             !is_str()) {
             ASSERTN(0, ("unsupport immediate value DATA_TYPE:%d", getDType()));
         }
@@ -1662,8 +1721,8 @@ bool IR::verify(Region const* rg) const
         ASSERT0(CALL_idinfo(this));
 
         //result type of call is the type of return value if it exist.
-        //The result type may be VOID.
-        if (CALL_prno(this) != 0) { ASSERT0(d); }
+        //The result type may be ANY.
+        if (CALL_prno(this) != PRNO_UNDEF) { ASSERT0(d); }
 
         //Parameters should be expression.
         for (IR * p = CALL_param_list(this); p != nullptr; p = p->get_next()) {
@@ -1677,10 +1736,10 @@ bool IR::verify(Region const* rg) const
         break;
     case IR_ICALL:
         //result type of call is the type of return value if it exist.
-        //Note return-value type may be VOID.
+        //Note return-value type may be ANY.
 
         //rtype of icall is the type of IR in return-value-list.
-        ASSERT0(ICALL_callee(this) && ICALL_callee(this)->is_ptr());
+        ASSERT0(ICALL_callee(this) && ICALL_callee(this)->isPtr());
         ASSERT0(ICALL_callee(this)->is_single());
 
         for (IR * p = CALL_param_list(this); p != nullptr; p = p->get_next()) {
@@ -1807,7 +1866,7 @@ bool IR::verify(Region const* rg) const
     case IR_ARRAY:
         ASSERT0(d);
         ASSERT0(TY_dtype(d) != D_UNDEF);
-        ASSERT0(ARR_base(this)->is_ptr() || ARR_base(this)->is_any());
+        ASSERT0(ARR_base(this)->isPtr());
         ASSERT0(ARR_elemtype(this));
         if (ARR_ofst(this) != 0 && !ARR_elemtype(this)->is_any()) {
             UINT elem_data_size = tm->getByteSize(ARR_elemtype(this));
@@ -2132,7 +2191,7 @@ bool IR::isMemRefEqual(IR const* src) const
     case IR_SETELEM:
     case IR_GETELEM:
     case IR_PHI:
-        if (src->isReadPR() || src->isWritePR() || src->isCallStmt()) {
+        if (src->isPROp()) {
             return getPrno() == src->getPrno();
         }
         return false;
@@ -2505,23 +2564,41 @@ void IR::invertLor(Region * rg)
 }
 
 
+//Clean all DU-Chain and Defined/Used-MD reference info.
+void IR::freeDUset(DUMgr * dumgr)
+{
+    ASSERT0(dumgr);
+    DU * du = getDU();
+    if (du == nullptr || DU_duset(du) == nullptr) { return; }
+
+    //Free DUSet back to DefSegMgr, or it will
+    //complain and make an assertion.
+    dumgr->getSBSMgr()->freeSBitSetCore(DU_duset(du));
+    DU_duset(du) = nullptr;
+}
+
+
 //This function only handle Call/ICall stmt, it find PR and remove
 //them out of UseSet.
 //Note this function does not maintain DU chain between call and its use.
-void IR::removePRFromUseset(DefMiscBitSetMgr & sbs_mgr, Region * rg)
+void IR::removePRFromUseset(Region * rg)
 {
     ASSERT0(isCallStmt() && rg);
+    DUMgr * dumgr = rg->getDUMgr();
     DUSet * useset = getDUSet();
     if (useset == nullptr) { return; }
 
-    DUIter di = nullptr;
+    DefMiscBitSetMgr * sbs_mgr = dumgr->getSBSMgr();
+    DUSetIter di = nullptr;
     INT lnext = -1;
     for (INT i = useset->get_first(&di); i >= 0; i = lnext) {
         lnext = useset->get_next(i, &di);
         IR const* exp = rg->getIR(i);
         ASSERT0(exp->is_exp());
         if (!exp->isReadPR()) { continue; }
-        useset->remove(i, sbs_mgr);
+
+        ASSERT0(dumgr);
+        useset->remove(i, *sbs_mgr);
     }
 }
 
@@ -2580,6 +2657,7 @@ void IR::copyRef(IR const* src, Region * rg)
         //PR operation does not have MDSet reference.
         return;
     }
+    //CALL stmt may have MDSet.
     setRefMDSet(src->getRefMDSet(), rg);
 }
 
@@ -2588,10 +2666,19 @@ void IR::copyRef(IR const* src, Region * rg)
 void IR::copyAI(IR const* src, Region * rg)
 {
     if (src->getAI() == nullptr) { return; }
+    if (!src->getAI()->is_init()) {
+        //Destroy current AI to be consistent with src's AI status.
+        if (IR_ai(this) != nullptr) {
+            IR_ai(this)->destroy();
+        }
+        return;
+    }
     if (IR_ai(this) == nullptr) {
         IR_ai(this) = rg->allocAIContainer();
     }
-    IR_ai(this)->copy(src->getAI(), rg);
+    //Note AI of current IR may not yet be initialized.
+    ASSERT0(rg->getAttachInfoMgr());
+    rg->getAttachInfoMgr()->copyAI(this, src);
 }
 
 
@@ -2617,7 +2704,7 @@ void IR::dumpRef(Region * rg, UINT indent)
     //MustDef
     bool prt_mustdef = false;
     if (md != nullptr) {
-        note(rg, "\nMMD%d", MD_id(md));
+        note(rg, "\n%sMD%d", md->is_exact() ? "E" : "",  md->id());
         prt_mustdef = true;
     }
 
@@ -3196,7 +3283,7 @@ void dumpGR(IR const* ir, TypeMgr * tm, DumpGRCtx * ctx)
         note(lm, "\n%s $%d:%s = ", IRNAME(ir),
              PHI_prno(ir), tm->dump_type(d, buf));
         lm->incIndent(dn);
-        ASSERT0(ctx->cfg && ir->getBB());
+        ASSERT0(ctx && ctx->cfg && ir->getBB());
         {
             List<IRBB*> preds;
             ctx->cfg->get_preds(preds, ir->getBB());
@@ -3441,35 +3528,52 @@ bool IR::isNotOverlapViaMDRef(IR const* ir2) const
     MD const* must2 = ir2->getRefMD();
     MDSet const* may1 = getRefMDSet();
     MDSet const* may2 = ir2->getRefMDSet();
-    if (must1 != nullptr && must2 != nullptr && must1->is_overlap(must2)) {
-        return false;
+    if (must1 != nullptr && must2 != nullptr) {
+        if (!must1->is_may() && !must2->is_may()) {
+            //CASE: the MustRef of ID may be GLOBAL_MEM or IMPORT_MEM.
+            return !(must1 == must2 || must1->is_overlap(must2));
+        }
+        //Need to do more judgement.
     }
-    if (must1 != nullptr &&
-        may2 != nullptr &&
+    if (must1 != nullptr && may2 != nullptr &&
         may2->is_contain_only_taken_addr(must1)) {
         return false;
     }
-    if (must2 != nullptr &&
-        may1 != nullptr &&
+    if (must2 != nullptr && may1 != nullptr &&
         may1->is_contain_only_taken_addr(must2)) {
         return false;
     }
-    if (may1 != nullptr && may2 != nullptr && may1->is_intersect(*may2)) {
+    if (may1 != nullptr && may2 != nullptr &&
+        (may1 == may2 || may1->is_intersect(*may2))) {
         return false;
     }
     return true;
 }
 
 
-bool IR::isNotOverlap(IR const* ir2, Region * rg) const
+//The function compare the memory object that 'this' and 'ir2' accessed,
+//and return true if 'this' object is NOT overlapped with 'ir2',
+//otherwise return false.
+//ir2: stmt or expression to be compared.
+//e.g: this and ir2 are overlapped:
+//     'this' object: |--------|
+//     'ir2'  object:        |----|
+//e.g: this and ir2 are NOT overlapped:
+//     'this' object: |------|
+//     'ir2'  object:        |----|
+//
+//Note: The function will NOT consider the different pattern
+// of 'this' and ir2.
+// The function does not require RefMD information.
+// The function just determine overlapping of given two IR according to
+// their data-type and offset.
+bool IR::isNotOverlap(IR const* ir2, Region const* rg) const
 {
     ASSERT0(rg);
     IR const* ir1 = this;
     ASSERT0(ir1 && ir2);
-    if (!ir1->getType()->is_scalar() ||
-        !ir2->getType()->is_scalar() ||
-        !ir1->hasOffset() ||
-        !ir2->hasOffset()) {
+    if (!ir1->getType()->is_scalar() | !ir2->getType()->is_scalar() ||
+        !ir1->hasOffset() || !ir2->hasOffset()) {
         return false;
     }
     UINT offset1 = ir1->getOffset();
@@ -3477,6 +3581,38 @@ bool IR::isNotOverlap(IR const* ir2, Region * rg) const
     UINT size1 = rg->getTypeMgr()->getByteSize(ir1->getType());
     UINT size2 = rg->getTypeMgr()->getByteSize(ir2->getType());
     if ((offset1 + size1 <= offset2) || (offset2 + size2 <= offset1)) {
+        return true;
+    }
+    return false;
+}
+
+
+//The function compare the memory object that 'this' and 'ir2' accessed,
+//and return true if 'this' object is conver 'ir2',
+//otherwise return false.
+//ir2: stmt or expression to be compared.
+//e.g: 'this' covers ir2:
+//     'this' object: |------|
+//     'ir2'  object:   |----|
+//e.g: this is NOT cover ir2:
+//     'this' object: |------|
+//     'ir2'  object:        |----|
+//
+//Note: The function will NOT consider the different pattern
+// of 'this' and ir2.
+// The function does not require RefMD information.
+// The function just determine overlapping of given two IR according to
+// their data-type and offset.
+bool IR::isCover(IR const* ir2, Region const* rg) const
+{
+    ASSERT0(rg);
+    IR const* ir1 = this;
+    ASSERT0(ir1 && ir2);
+    UINT offset1 = ir1->getOffset();
+    UINT offset2 = ir2->getOffset();
+    UINT size1 = rg->getTypeMgr()->getByteSize(ir1->getType());
+    UINT size2 = rg->getTypeMgr()->getByteSize(ir2->getType());
+    if ((offset1 <= offset2) && (offset1 + size1 >= offset2 + size2)) {
         return true;
     }
     return false;
@@ -3494,6 +3630,123 @@ void IR::setPrnoConsiderSSAInfo(UINT prno)
     setPrno(prno);
 }
 //END IR
+
+
+//
+//START CLd
+//
+IR * CLd::dupIRTreeByStmt(IR const* src, Region * rg)
+{
+    ASSERT0(src->is_st());
+    IR * ld = rg->buildLoad(ST_idinfo(src), src->getOffset(), src->getType());
+    ld->copyRef(src, rg);
+    return ld;
+}
+//END CLd
+
+
+//
+//START CPr
+//
+IR * CPr::dupIRTreeByStmt(IR const* src, Region * rg)
+{
+    ASSERT0(src->is_stpr());
+    IR * pr = rg->buildPRdedicated(STPR_no(src), src->getType());
+    pr->copyRef(src, rg);
+    return pr;
+}
+//END CPr
+
+
+//
+//START CILd
+//
+IR * CILd::dupIRTreeByStmt(IR const* src, Region * rg)
+{
+    ASSERT0(src->is_ist());
+    IR * ild = rg->buildILoad(rg->dupIRTree(IST_base(src)),
+                              IST_ofst(src), src->getType());
+    ild->copyRef(src, rg);
+    return ild;
+}
+//END CILd
+
+
+//
+//START CArray
+//
+IR * CArray::dupIRTreeByStmt(IR const* src, Region * rg)
+{
+    ASSERT0(src->is_starray());
+    IR * arr = rg->buildArray(rg->dupIRTree(ARR_base(src)),
+                              rg->dupIRTreeList(ARR_sub_list(src)),
+                              src->getType(), ARR_elemtype(src),
+                              ((CStArray*)src)->getDimNum(),
+                              ARR_elem_num_buf(src));
+    arr->setOffset(src->getOffset());
+    arr->copyRef(src, rg);
+    return arr;
+}
+//END CArray
+
+
+//
+//START CStArray
+//
+IR * CStArray::dupIRTreeByExp(IR const* src, IR * rhs, Region * rg)
+{
+    ASSERT0(src->is_array());
+    IR * starr = rg->buildStoreArray(rg->dupIRTree(ARR_base(src)),
+                                     rg->dupIRTreeList(ARR_sub_list(src)),
+                                     src->getType(), ARR_elemtype(src),
+                                     ((CStArray*)src)->getDimNum(),
+                                     ARR_elem_num_buf(src), rhs);
+    starr->setOffset(src->getOffset());
+    starr->copyRef(src, rg);
+    return starr;
+}
+//END CStArray
+
+
+//
+//START CISt
+//
+IR * CISt::dupIRTreeByExp(IR const* src, IR * rhs, Region * rg)
+{
+    ASSERT0(src->is_ild());
+    IR * ist = rg->buildIStore(rg->dupIRTree(ILD_base(src)), rhs,
+                               src->getOffset(), src->getType());
+    ist->copyRef(src, rg);
+    return ist;
+}
+//END CISt
+
+
+//
+//START CSt
+//
+IR * CSt::dupIRTreeByExp(IR const* src, IR * rhs, Region * rg)
+{
+    ASSERT0(src->is_ld());
+    IR * st = rg->buildStore(LD_idinfo(src), src->getType(), src->getOffset(),
+                              rhs);
+    st->copyRef(src, rg);
+    return st;
+}
+//END CSt
+
+
+//
+//START CStpr
+//
+IR * CStpr::dupIRTreeByExp(IR const* src, IR * rhs, Region * rg)
+{
+    ASSERT0(src->is_pr());
+    IR * stpr = rg->buildStorePR(PR_no(src), src->getType(), rhs);
+    stpr->copyRef(src, rg);
+    return stpr;
+}
+//END CStpr
 
 
 //The function only invoked at debug mode.
@@ -3608,7 +3861,31 @@ void CSwitch::addToBody(UINT num, ...)
     }
     va_end(ptr);
 }
+
+
+//The function collects the LabelInfo for each branch-target.
+//Note the default-label is collected too.
+void CSwitch::collectLabel(OUT List<LabelInfo const*> & lst) const
+{
+    lst.append_tail(getDefLab());
+    for (IR const* cs = getCaseList(); cs != nullptr; cs = cs->get_next()) {
+        lst.append_tail(CASE_lab(cs));
+    }
+}
 //END CSwitch
+
+
+//
+//START CIGoto
+//
+//The function collects the LabelInfo for each branch-target.
+void CIGoto::collectLabel(OUT List<LabelInfo const*> & lst) const
+{
+    for (IR const* cs = getCaseList(); cs != nullptr; cs = cs->get_next()) {
+        lst.append_tail(CASE_lab(cs));
+    }
+}
+//END CIGoto
 
 
 //

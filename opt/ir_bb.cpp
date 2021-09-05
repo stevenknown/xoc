@@ -38,8 +38,31 @@ namespace xoc {
 //
 //START BBIRList
 //
+//Insert ir after phi operations.
+IRListIter BBIRList::append_head_ex(IR * ir)
+{
+    if (ir == nullptr) { return nullptr; }
+
+    IRListIter ct;
+    for (List<IR*>::get_head(&ct);
+         ct != List<IR*>::end(); ct = List<IR*>::get_next(ct)) {
+        if (!ct->val()->is_phi()) {
+            break;
+        }
+    }
+
+    ASSERT0(m_bb);
+    ir->setBB(m_bb);
+    if (ct == nullptr) {
+        //The only stmt of BB is phi or bb is empty.
+        return EList<IR*, IR2Holder>::append_tail(ir);
+    }
+    return EList<IR*, IR2Holder>::insert_before(ir, ct);
+}
+
+
 //Insert ir prior to cond_br, uncond_br, call, return.
-C<IR*> * BBIRList::append_tail_ex(IR * ir)
+IRListIter BBIRList::append_tail_ex(IR * ir)
 {
     if (ir == nullptr) { return nullptr; }
 
@@ -127,9 +150,9 @@ bool IRBB::is_fallthrough() const
         return true;
     case IR_REGION:
         return true;
-    default: ;
+    default: ASSERT0(!last->isBranch());
     }
-    return false;
+    return true;
 }
 
 
@@ -200,15 +223,19 @@ bool IRBB::successorHasPhi(CFG<IRBB, IR> * cfg)
 {
     xcom::Vertex * vex = cfg->getVertex(id());
     ASSERT0(vex);
+    MDSSAMgr * mdssamgr = ((IRCFG*)cfg)->getRegion()->getMDSSAMgr();
+    if (mdssamgr != nullptr && !mdssamgr->is_valid()) {
+        mdssamgr = nullptr;
+    }
     for (xcom::EdgeC * out = vex->getOutList();
          out != nullptr; out = out->get_next()) {
         xcom::Vertex * succ_vex = out->getTo();
         IRBB * succ = cfg->getBB(succ_vex->id());
         ASSERT0(succ);
-        for (IR * ir = BB_first_ir(succ);
-             ir != nullptr; ir = BB_next_ir(succ)) {
-            if (ir->is_phi()) { return true; }
-        }
+        if ((mdssamgr != nullptr && mdssamgr->hasPhi(succ)) ||
+            PRSSAMgr::hasPhi(succ)) {
+            return true;
+        } 
     }
     return false;
 }
@@ -300,8 +327,8 @@ void IRBB::removeSuccessorDesignatePhiOpnd(CFG<IRBB, IR> * cfg, IRBB * succ)
 }
 
 
-//After adding BB or change bb successor,
-//you need add the related PHI operand if BB successor has PHI stmt.
+//After adding BB or change bb successor, you need to add the related PHI
+//operand as well if the successor of BB has a PHI stmt.
 void IRBB::addSuccessorDesignatePhiOpnd(CFG<IRBB, IR> * cfg, IRBB * succ)
 {
     IRCFG * ircfg = (IRCFG*)cfg;
@@ -335,7 +362,7 @@ void IRBB::removeAllSuccessorsPhiOpnd(CFG<IRBB, IR> * cfg)
 //END IRBB
 
 
-void dumpBBLabel(List<LabelInfo const*> & lablist, Region const* rg)
+void dumpBBLabel(LabelInfoList & lablist, Region const* rg)
 {
     FILE * h = rg->getLogMgr()->getFileHandler();
     ASSERT0(h);
@@ -381,19 +408,29 @@ void dumpBBLabel(List<LabelInfo const*> & lablist, Region const* rg)
 }
 
 
-void dumpBBList(BBList const* bbl,
-                Region const* rg,
+//filename: dump BB list into given filename.
+void dumpBBList(CHAR const* filename, BBList const* bbl, Region const* rg,
                 bool dump_inner_region)
 {
+    ASSERT0(filename);
+    FILE * h = fopen(filename, "a+");
+    rg->getLogMgr()->push(h, filename);
+    dumpBBList(bbl, rg, dump_inner_region);
+    rg->getLogMgr()->pop();
+    fclose(h);
+}
+
+
+void dumpBBList(BBList const* bbl, Region const* rg, bool dump_inner_region)
+{
     ASSERT0(rg && bbl);
-    if (!rg->isLogMgrInit()) { return; }
-    if (bbl->get_elem_count() != 0) {
-        note(rg, "\n==---- DUMP IRBBList '%s' ----==", rg->getRegionName());
-        C<IRBB*> * ct = nullptr;
-        for (IRBB * bb = bbl->get_head(&ct);
-             bb != nullptr; bb = bbl->get_next(&ct)) {
-            bb->dump(rg, dump_inner_region);
-        }
+    if (!rg->isLogMgrInit() || bbl->get_elem_count() == 0) { return; }
+
+    note(rg, "\n==---- DUMP IRBBList '%s' ----==", rg->getRegionName());
+    xcom::C<IRBB*> * ct = nullptr;
+    for (IRBB * bb = bbl->get_head(&ct);
+         bb != nullptr; bb = bbl->get_next(&ct)) {
+        bb->dump(rg, dump_inner_region);
     }
 }
 

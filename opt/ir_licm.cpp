@@ -77,8 +77,8 @@ bool LICM::scanOpnd(IN LI<IRBB> * li, bool * islegal, bool first_scan)
             if (!ir->isContainMemRef() || ir->isNoMove()) { continue; }
             if ((ir->isCallStmt() && !ir->isReadOnly()) ||
                 ir->is_region() || ir->is_phi()) {
-                //TODO: support call/region.and phi.
-                *islegal = false;
+                //TODO: support call/region and phi.
+                *islegal = false; //prevent loop hoisting.
                 return false;
             }
             if (first_scan) { updateMD2Num(ir); }
@@ -498,7 +498,7 @@ bool LICM::is_dom_all_use_in_loop(IR const* ir, LI<IRBB> * li)
     MDSSAMgr * mdssamgr = m_rg->getMDSSAMgr();
     if (mdssamgr != nullptr &&
         mdssamgr->is_valid() &&
-        ir->isMemoryRefNotOperatePR()) {
+        ir->isMemoryRefNonPR()) {
         return mdssamgr->isStmtDomAllUseInsideLoop(ir, li);
     }
 
@@ -543,7 +543,7 @@ bool LICM::handleDefByDUChain(IR const* exp,
     DUMgr * dumgr = m_rg->getDUMgr();
     DUSet const* defset = exp->readDUSet();
     if (dumgr != nullptr && defset != nullptr) {
-        DUIter di = nullptr;
+        DUSetIter di = nullptr;
         for (INT i = defset->get_first(&di);
              i >= 0; i = defset->get_next(i, &di)) {
             IR * def = m_rg->getIR(i);
@@ -666,7 +666,7 @@ IRBB * LICM::insertGuardBB(IRBB * prehead, IRBB * loophead)
     IR * det = m_rg->dupIRTree(BR_det(br));
 
     //Remember maintaining the DU chain of generated IR.
-    xoc::addUse(det, BR_det(br), m_rg);
+    xoc::addUseForTree(det, BR_det(br), m_rg);
 
     if (br->is_truebr()) {
         //Make sure the guard-branch is FALSEBR because FALSEBR uses

@@ -552,7 +552,7 @@ bool CfsOpt::hoistIf(IR ** head, IR ** ir)
 }
 
 
-bool CfsOpt::doCfsOpt(IN OUT IR ** ir_list, SimpCtx const& sc)
+bool CfsOpt::doCfsOpt(MOD IR ** ir_list, SimpCtx const& sc)
 {
     bool change = false;
     for (IR * ir = *ir_list; ir != nullptr;) {

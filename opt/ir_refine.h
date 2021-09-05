@@ -198,11 +198,17 @@ class Refine : public Pass {
     IR * refineDet(IR * ir_list, bool & change, RefineCtx & rc);
     IR * refineStore(IR * ir, bool & change, RefineCtx & rc);
     IR * refineStoreArray(IR * ir, bool & change, RefineCtx & rc);
+    IR * refineIStore1(IR * ir, bool & change, RefineCtx & rc);
     IR * refineIStore(IR * ir, bool & change, RefineCtx & rc);
-    bool refineStmtList(IN OUT BBIRList & ir_list, RefineCtx & rc);
+    bool refineStmtList(MOD BBIRList & ir_list, RefineCtx & rc);
     IR * reassociation(IR * ir, bool & change);
 
-    IR * StrengthReduce(IN OUT IR * ir, IN OUT bool & change);
+    IR * StrengthReduce(MOD IR * ir, MOD bool & change);
+
+    //The function will attempt to recompute the MD reference for given 'ir'.
+    //Note the computation require that DUMgr has been ready.
+    void recomputeMayRef(IR * ir);
+
 protected:
     Region * m_rg;
     TypeMgr * m_tm;
@@ -211,12 +217,15 @@ public:
     explicit Refine(Region * rg);
     virtual ~Refine() {}
 
+    virtual bool dump() const;
+
     //Perform const-folding.
     //Return updated ir if optimization performed.
     IR * foldConst(IR * ir, bool & change);
 
-    virtual CHAR const* getPassName() const { return "IR Refining"; }
+    virtual CHAR const* getPassName() const { return "IR Refinement"; }
     virtual PASS_TYPE getPassType() const { return PASS_REFINE; }
+    Region * getRegion() const { return m_rg; }
 
     //Invert condition for relation operation.
     static void invertCondition(IR ** cond, Region * rg);
@@ -229,7 +238,7 @@ public:
     IR * refineIR(IR * ir, bool & change, RefineCtx & rc);
     //Perform peephole optimization to BB list.
     //Return updated BB list if optimization performed.
-    bool refineBBlist(IN OUT BBList * ir_bb_list, RefineCtx & rc, OptCtx & oc);
+    bool refineBBlist(MOD BBList * ir_bb_list, RefineCtx & rc, OptCtx & oc);
 
     virtual bool perform(OptCtx & oc);
 };

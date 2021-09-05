@@ -47,7 +47,7 @@ class CDG : public xcom::Graph {
     Region * m_rg;
 public:
     CDG(Region * rg) : m_consider_cycle(false) { m_rg = rg; }
-    void build(IN OUT OptCtx & oc, xcom::DGraph & cfg);
+    void build(MOD OptCtx & oc, xcom::DGraph & cfg);
 
     void dump() const;
 
@@ -57,7 +57,7 @@ public:
 
     bool is_only_cd_self(UINT id) const;
     bool is_cd(UINT a, UINT b) const;
-    void rebuild(IN OUT OptCtx & oc, xcom::DGraph & cfg);
+    void rebuild(MOD OptCtx & oc, xcom::DGraph & cfg);
     void set_consider_cycle(bool doit) { m_consider_cycle = doit; }
 };
 

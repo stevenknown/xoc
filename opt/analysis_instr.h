@@ -35,11 +35,31 @@ namespace xoc {
 #define MAX_OFFSET_AT_FREE_TABLE (sizeof(CICall) - sizeof(IR))
 
 //Analysis Instrument.
+#define ANA_INS_pr_count(a) ((a)->m_pr_count)
+#define ANA_INS_du_pool(a) ((a)->m_du_pool)
+#define ANA_INS_sc_labelinfo_pool(a) ((a)->m_sc_labelinfo_pool)
+#define ANA_INS_ir_list(a) ((a)->m_ir_list)
+#define ANA_INS_call_list(a) ((a)->m_call_list)
+#define ANA_INS_return_list(a) ((a)->m_return_list)
+#define ANA_INS_ir_free_tab(a) ((a)->m_free_tab)
+#define ANA_INS_prno2var(a) ((a)->m_prno2var)
+#define ANA_INS_ir_vec(a) ((a)->m_ir_vector)
+#define ANA_INS_bs_mgr(a) ((a)->m_bs_mgr)
+#define ANA_INS_sbs_mgr(a) ((a)->m_sbs_mgr)
+#define ANA_INS_mds_mgr(a) ((a)->m_mds_mgr)
+#define ANA_INS_mds_hash_allocator(a) ((a)->m_mds_hash_allocator)
+#define ANA_INS_mds_hash(a) ((a)->m_mds_hash)
+#define ANA_INS_free_du_list(a) ((a)->m_free_du_list)
+#define ANA_INS_ir_bb_mgr(a) ((a)->m_ir_bb_mgr)
+#define ANA_INS_ir_bb_list(a) ((a)->m_ir_bb_list)
+
 //Record Data structure for IR analysis and transformation.
 #define ANA_INS_pass_mgr(a) ((a)->m_pass_mgr)
+#define ANA_INS_ai_mgr(a) ((a)->m_attachinfo_mgr)
 class AnalysisInstrument {
+    friend class Region;
     COPY_CONSTRUCTOR(AnalysisInstrument);
-public:
+protected:
     UINT m_pr_count; //counter of IR_PR.
     Region * m_rg;
     SMemPool * m_du_pool;
@@ -49,6 +69,7 @@ public:
     List<IR const*> * m_call_list; //record CALL/ICALL in region.
     List<IR const*> * m_return_list; //record RETURN in region.
     PassMgr * m_pass_mgr; //PASS manager.
+    AttachInfoMgr * m_attachinfo_mgr; //AttachInfo manager.
     IR * m_free_tab[MAX_OFFSET_AT_FREE_TABLE + 1];
     Vector<Var*> m_prno2var; //map prno to related Var. prno is dense integer.
     Vector<IR*> m_ir_vector; //record IR which have allocated. ir id is dense
@@ -65,11 +86,14 @@ public:
     xcom::BitSet m_has_been_freed_irs;
     #endif
 
+protected:
+    //Count memory usage for current object.
+    size_t count_mem() const;
+    PassMgr * getPassMgr() const { return ANA_INS_pass_mgr(this); }
+    AttachInfoMgr * getAttachInfoMgr() const { return ANA_INS_ai_mgr(this); }
 public:
     explicit AnalysisInstrument(Region * rg);
     ~AnalysisInstrument();
-    //Count memory usage for current object.
-    size_t count_mem() const;
 };
 
 } //namespace xoc

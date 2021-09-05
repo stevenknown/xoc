@@ -274,7 +274,7 @@ bool LFTR::insertComputingInitValCode(IRBB * preheader,
         IR * comp_init_val = m_rg->buildStorePR(info->lf_exp->getType(),
                                                 newrhs);
         m_rg->allocRefForPR(comp_init_val);
-        xoc::addUse(newrhs, info->lf_exp, m_rg);
+        xoc::addUseForTree(newrhs, info->lf_exp, m_rg);
         preheader->getIRList()->append_tail_ex(comp_init_val);
 
         //Record initialization of IV.
@@ -439,7 +439,7 @@ bool LFTR::replaceCandByIV()
         ASSERT0(info->lf_exp->is_exp());
         info->lf_exp->getStmt()->replaceKid(info->lf_exp, genNewIVRef(info),
                                             true);
-        xoc::removeIRTreeUse(info->lf_exp, m_rg);
+        xoc::removeUseForTree(info->lf_exp, m_rg);
         changed = true;
     }
     return changed;

@@ -597,13 +597,15 @@ bool GCSE::doPropVN(IRBB * bb, UINT entry_id)
 bool GCSE::doProp(IRBB * bb, List<IR*> & livexp)
 {
     livexp.clean();
-    DefDBitSetCore * x = m_du->genAvailInExpr(bb->id(), nullptr);
+    DefDBitSetCore * x = m_du->getSolveSet()->getAvailInExpr(bb->id());
     DefSBitSetIter st = nullptr;
-    for (INT i = x->get_first(&st); i != -1; i = x->get_next(i, &st)) {
-        IR * y = m_rg->getIR(i);
-        if (y->is_undef() || y->is_pr()) { continue; }
-        ASSERT0(y && y->is_exp());
-        livexp.append_tail(y);
+    if (x != nullptr) {
+        for (INT i = x->get_first(&st); i != -1; i = x->get_next(i, &st)) {
+            IR * y = m_rg->getIR(i);
+            if (y->is_undef() || y->is_pr()) { continue; }
+            ASSERT0(y && y->is_exp());
+            livexp.append_tail(y);
+        }
     }
 
     bool change = false;
@@ -702,7 +704,7 @@ bool GCSE::doProp(IRBB * bb, List<IR*> & livexp)
         case IR_IST:
         case IR_CALL:
         case IR_ICALL: {
-            MDSet const* maydef = m_du->getMayDef(ir);
+            MDSet const* maydef = ir->getMayRef();
             if (maydef != nullptr && !maydef->is_empty()) {
                 IRListIter ct2;
                 IRListIter next;
@@ -719,7 +721,7 @@ bool GCSE::doProp(IRBB * bb, List<IR*> & livexp)
                 }
             }
 
-            MD const* mustdef = m_du->get_must_def(ir);
+            MD const* mustdef = ir->getMustRef();
             if (mustdef != nullptr) {
                 IRListIter ct2;
                 IRListIter next;

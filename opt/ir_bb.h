@@ -40,6 +40,10 @@ class IRBB;
 template <class IRBB, class IR> class CFG;
 typedef xcom::C<IR*> * IRListIter;
 typedef IRListIter BBIRListIter;
+typedef List<LabelInfo const*> LabelInfoList;
+typedef C<LabelInfo const*> * LabelInfoListIter;
+typedef TMap<IR const*, UINT> IROrder;
+
 #define BBID_UNDEF VERTEX_UNDEF
 
 //
@@ -71,6 +75,8 @@ public:
 
     //Insert ir prior to cond_br, uncond_br, call, return.
     IRListIter append_tail_ex(IR * ir);
+    //Insert ir after phi operations.
+    IRListIter append_head_ex(IR * ir);
 
     //Count up memory size of BBIRList
     size_t count_mem() const
@@ -165,22 +171,23 @@ public:
 class IRBB {
     COPY_CONSTRUCTOR(IRBB);
 public:
+    typedef BYTE BitUnion;
     union {
         struct {
-            BYTE is_entry:1; //bb is entry of the region.
-            BYTE is_exit:1; //bb is exit of the region.
-            BYTE is_target:1; //bb is branch target.
-            BYTE is_catch_start:1; //bb is entry of catch block.
-            BYTE is_terminate:1; //bb terminate the control flow.
-            BYTE is_try_start:1; //bb is entry of try block.
-            BYTE is_try_end:1; //bb is exit of try block.
+            BitUnion is_entry:1; //bb is entry of the region.
+            BitUnion is_exit:1; //bb is exit of the region.
+            BitUnion is_target:1; //bb is branch target.
+            BitUnion is_catch_start:1; //bb is entry of catch block.
+            BitUnion is_terminate:1; //bb terminate the control flow.
+            BitUnion is_try_start:1; //bb is entry of try block.
+            BitUnion is_try_end:1; //bb is exit of try block.
         } s1;
-        BYTE u1b1;
+        BitUnion u1b1;
     } u1;
     UINT m_id; //BB's id
     INT m_rpo; //reverse post order
     BBIRList ir_list; //IR list
-    List<LabelInfo const*> lab_list; //Record labels attached on BB
+    LabelInfoList lab_list; //Record labels attached on BB
 
 public:
     IRBB()
@@ -203,19 +210,9 @@ public:
     inline void addLabel(LabelInfo const* li, bool at_head = false)
     {
         ASSERT0(li);
-        if (getLabelList().find(li)) { return; }
-        if (LABELINFO_is_catch_start(li)) {
-            BB_is_catch_start(this) = true;
-        }
-        if (LABELINFO_is_try_start(li)) {
-            BB_is_try_start(this) = true;
-        }
-        if (LABELINFO_is_try_end(li)) {
-            BB_is_try_end(this) = true;
-        }
-        if (LABELINFO_is_terminate(li)) {
-            BB_is_terminate(this) = true;
-        }
+        ASSERTN(!getLabelList().find(li),
+                ("query CFG::lab2bb first to avoid duplicated insertion"));
+        copyAttr(li);
         if (at_head) {
             getLabelList().append_head(li);
         } else {
@@ -240,12 +237,20 @@ public:
 
     //Clean attached label.
     void cleanLabelInfoList() { getLabelList().clean(); }
+    void copyAttr(LabelInfo const* li)
+    {
+        ASSERT0(li);
+        BB_is_catch_start(this) |= LABELINFO_is_catch_start(li);
+        BB_is_try_start(this) |= LABELINFO_is_try_start(li);
+        BB_is_try_end(this) |= LABELINFO_is_try_end(li);
+        BB_is_terminate(this) |= LABELINFO_is_terminate(li);
+    }
 
     void dump(Region const* rg, bool dump_inner_region) const;
     void dupSuccessorPhiOpnd(CFG<IRBB, IR> * cfg, Region * rg, UINT opnd_pos);
 
-    List<LabelInfo const*> & getLabelList() { return lab_list; }
-    List<LabelInfo const*> const& getLabelListConst() const
+    LabelInfoList & getLabelList() { return lab_list; }
+    LabelInfoList const& getLabelListConst() const
     { return lab_list; }
     UINT getNumOfIR() const { return BB_irlist(this).get_elem_count(); }
     UINT getNumOfPred(CFG<IRBB, IR> * cfg) const;
@@ -424,6 +429,24 @@ public:
     bool isTarget(IR const* ir) const
     { ASSERT0(ir->getLabel()); return isContainLabel(ir->getLabel()); }
 
+    inline bool is_dom(IR const* ir1, IR const* ir2, IROrder const& order,
+                       bool is_strict) const
+    {
+        ASSERT0(ir1 && ir2 && ir1->is_stmt() && ir2->is_stmt() &&
+                ir1->getBB() == this && ir2->getBB() == this);
+        if (is_strict && ir1 == ir2) {
+            return false;
+        }
+        UINT ir1order = order.get(ir1);
+        UINT ir2order = order.get(ir2);
+        ASSERTN(ir1order != 0 || ir2order != 0,
+                 ("Neither ir1 nor ir2 has an order set ")); 
+        if (ir1order == 0) { return false; }
+        if (ir2order == 0) { return true; }
+        ASSERT0(ir1order != ir2order);
+        return ir1order < ir2order;
+    }
+
     //Return true if ir1 dominates ir2 in current bb.
     //Function will modify the IR container of bb.
     //'is_strict': true if ir1 should not equal to ir2.
@@ -463,12 +486,16 @@ public:
     }
 
     //Add all Labels attached on src BB to current BB.
-    inline void mergeLabeInfoList(IRBB * src)
+    void mergeLabeInfoList(IRBB * src)
     {
-        for (LabelInfo const* li = src->getLabelList().get_tail();
-             li != nullptr; li = src->getLabelList().get_prev()) {
-            addLabel(li, true);
+        LabelInfoListIter it;
+        for (src->getLabelList().get_head(&it);
+             it != nullptr; it = src->getLabelList().get_next(it)) {
+            copyAttr(it->val());
         }
+        //Note src's labellist will be moved to current BB.
+        getLabelList().move_head(src->getLabelList());
+        ASSERT0(src->getLabelList().get_elem_count() == 0);
     }
 
     //Return true if one of bb's successor has a phi.
@@ -546,9 +573,11 @@ public:
 //END IRBBMgr
 
 //Exported Functions
-void dumpBBLabel(List<LabelInfo const*> & lablist, Region const* rg);
-void dumpBBList(BBList const* bbl,
-                Region const* rg,
+void dumpBBLabel(LabelInfoList & lablist, Region const* rg);
+void dumpBBList(BBList const* bbl, Region const* rg,
+                bool dump_inner_region = true);
+//filename: dump BB list into given filename.
+void dumpBBList(CHAR const* filename, BBList const* bbl, Region const* rg,
                 bool dump_inner_region = true);
 
 } //namespace xoc

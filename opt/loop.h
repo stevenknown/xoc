@@ -208,7 +208,7 @@ LI<IRBB> const* iterInitLoopInfoC(LI<IRBB> const* li, OUT CLoopInfoIter & it);
 //This function return the next LoopInfo accroding to 'it'.
 //'it': iterator.
 //Readonly function.
-LI<IRBB> const* iterNextLoopInfoC(IN OUT CLoopInfoIter & it);
+LI<IRBB> const* iterNextLoopInfoC(MOD CLoopInfoIter & it);
 
 } //namespace xoc
 #endif

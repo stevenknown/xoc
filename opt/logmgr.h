@@ -121,6 +121,8 @@ public:
 
     //Save current log file handler and name into stack, and set given handler
     //and filename as current.
+    //h: file handler
+    //filename: file name of h
     void push(FILE * h, CHAR const* filename);
     void push(LogCtx const& ctx);
     //Restore file handler and filename that is in top of stack.

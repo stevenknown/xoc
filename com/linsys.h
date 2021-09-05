@@ -90,7 +90,7 @@ class Lineq {
                  UINT lc,
                  UINT pos);
     void combineRays(OUT INTMat & res,
-                     IN OUT INTMat & coeff,
+                     MOD INTMat & coeff,
                      UINT r1,
                      UINT r2,
                      UINT lc,
@@ -101,7 +101,7 @@ class Lineq {
               UINT rhs_part,
               Vector<UINT> const& combined,
               Vector<UINT> const& noneg);
-    void removeRedRow(IN OUT INTMat & cs,
+    void removeRedRow(MOD INTMat & cs,
                       INTMat const& org_cone,
                       UINT rhs_part);
 public:
@@ -120,7 +120,7 @@ public:
     //Set index of const column and coeff matrix.
     void setParam(RMat * m, INT rhs_idx = -1);
     void set_dump(bool is_dump) { m_is_dump = is_dump; }
-    bool reduce(IN OUT RMat & m, UINT rhs_idx, bool is_intersect);
+    bool reduce(MOD RMat & m, UINT rhs_idx, bool is_intersect);
     void ConvexHullUnionAndIntersect(OUT RMat & res,
                                      IN List<RMat*> & chulls,
                                      UINT rhs_idx,
@@ -136,9 +136,9 @@ public:
                       bool is_int_sol,
                       bool is_unique_sol);
     void initVarConstraint(Vector<INT> const& sign,
-                           IN OUT RMat & vc,
+                           MOD RMat & vc,
                            UINT rhs_idx);
-    void substituteAndExpand(IN OUT RMat & coeff,
+    void substituteAndExpand(MOD RMat & coeff,
                              UINT rhs_idx,
                              RMat const& p,
                              UINT sub_var);
@@ -146,7 +146,7 @@ public:
     //    ak*xk <= const + F(x) + a0x0 + a1x1 + ... + a(k-1)x(k-1) +
     //             a(k+1)x(k+1) + ... + anxn.
     void formatBound(UINT u, OUT RMat & ineqt_of_u);
-    bool calcBound(IN OUT List<RMat*> & limits);
+    bool calcBound(MOD List<RMat*> & limits);
 
     void move2cstsym(IN RMat & ieq,
                      UINT rhs_idx,
@@ -160,7 +160,7 @@ public:
                   UINT last_sym,
                   OUT UINT * first_var_idx,
                   OUT UINT * last_var_idx);
-    void removeIdenRow(IN OUT RMat & m);
+    void removeIdenRow(MOD RMat & m);
 
     //Polyhedra operation
     bool convertConstraint2Ray(OUT INTMat & gmat,

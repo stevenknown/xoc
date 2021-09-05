@@ -89,11 +89,11 @@ class DeadCodeElim : public Pass {
 
     bool check_stmt(IR const* ir);
     bool check_call(IR const* ir) const;
-    bool collectByPRSSA(IR const* x, IN OUT List<IR const*> * pwlst2);
+    bool collectByPRSSA(IR const* x, MOD List<IR const*> * pwlst2);
     bool collectAllDefThroughDefChain(MDDef const* tdef, IR const* use,
-                                      IN OUT List<IR const*> * pwlst2);
-    bool collectByMDSSA(IR const* x, IN OUT List<IR const*> * pwlst2);
-    bool collectByDUSet(IR const* x, IN OUT List<IR const*> * pwlst2);
+                                      MOD List<IR const*> * pwlst2);
+    bool collectByMDSSA(IR const* x, MOD List<IR const*> * pwlst2);
+    bool collectByDUSet(IR const* x, MOD List<IR const*> * pwlst2);
 
     void fix_control_flow(List<IRBB*> & bblst, List<C<IRBB*>*> & ctlst);
     //Return true if there are effect BBs that controlled by ir's BB.
@@ -119,11 +119,11 @@ class DeadCodeElim : public Pass {
         }
         return false;
     }
-    void iter_collect(IN OUT List<IR const*> & work_list);
+    void iter_collect(MOD List<IR const*> & work_list);
 
-    void mark_effect_ir(IN OUT List<IR const*> & work_list);
+    void mark_effect_ir(MOD List<IR const*> & work_list);
 
-    bool preserve_cd(IN OUT List<IR const*> & act_ir_lst);
+    bool preserve_cd(MOD List<IR const*> & act_ir_lst);
 
     void reinit();
     void reviseSuccForFallthroughBB(IRBB * bb,
@@ -134,7 +134,7 @@ class DeadCodeElim : public Pass {
 
     //Set control-dep bb to be effective.
     bool setControlDepBBToBeEffect(IRBB const* bb,
-                                   IN OUT List<IR const*> & act_ir_lst);
+                                   MOD List<IR const*> & act_ir_lst);
     void setEffectBB(IRBB const* bb) { m_is_bb_effect.bunion(bb->id()); }
     void setEffectStmt(IR const* stmt, OUT xcom::BitSet * is_bb_effect,
                        OUT List<IR const*> * act_ir_lst);

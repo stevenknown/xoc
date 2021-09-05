@@ -148,24 +148,18 @@ public:
     }
     ~CfsMgr() { smpoolDelete(m_pool); }
 
-    AbsNode * constructAbsLoop(
-            IN IRBB * entry,
-            IN AbsNode * parent,
-            IN xcom::BitSet * cur_region,
-            IN xcom::Graph & cur_graph,
-            IN OUT xcom::BitSet & visited);
-    AbsNode * constructAbsIf(
-            IN IRBB * entry,
-            IN AbsNode * parent,
-            IN xcom::Graph & cur_graph,
-            IN OUT xcom::BitSet & visited);
+    AbsNode * constructAbsLoop(IN IRBB * entry, IN AbsNode * parent,
+                               IN xcom::BitSet * cur_region,
+                               IN xcom::Graph & cur_graph,
+                               MOD xcom::BitSet & visited);
+    AbsNode * constructAbsIf(IN IRBB * entry, IN AbsNode * parent,
+                             IN xcom::Graph & cur_graph,
+                             MOD xcom::BitSet & visited);
     AbsNode * constructAbsBB(IN IRBB * bb, IN AbsNode * parent);
-    AbsNode * constructAbsTree(
-            IN IRBB * entry,
-            IN AbsNode * parent,
-            IN xcom::BitSet * cur_region,
-            IN xcom::Graph & cur_graph,
-            IN OUT xcom::BitSet & visited);
+    AbsNode * constructAbsTree(IN IRBB * entry, IN AbsNode * parent,
+                               IN xcom::BitSet * cur_region,
+                               IN xcom::Graph & cur_graph,
+                               MOD xcom::BitSet & visited);
     AbsNode * constructAbstractControlFlowStruct();
 
     void dump_indent(UINT indent);

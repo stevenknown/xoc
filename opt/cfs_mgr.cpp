@@ -151,11 +151,10 @@ void CfsMgr::set_map_bb2abs(IRBB const* bb, AbsNode * abs)
 }
 
 
-AbsNode * CfsMgr::constructAbsLoop(IN IRBB * entry,
-                                   IN AbsNode * parent,
+AbsNode * CfsMgr::constructAbsLoop(IN IRBB * entry, IN AbsNode * parent,
                                    IN xcom::BitSet * cur_region,
                                    IN xcom::Graph & cur_graph,
-                                   IN OUT xcom::BitSet & visited)
+                                   MOD xcom::BitSet & visited)
 {
     DUMMYUSE(cur_region);
     ASSERT0(cur_region == nullptr || cur_region->is_contain(entry->id()));
@@ -187,10 +186,9 @@ AbsNode * CfsMgr::constructAbsLoop(IN IRBB * entry,
 
 
 //'cur_region' covered 'entry'.
-AbsNode * CfsMgr::constructAbsIf(IN IRBB * entry,
-                                 IN AbsNode * parent,
+AbsNode * CfsMgr::constructAbsIf(IN IRBB * entry, IN AbsNode * parent,
                                  IN xcom::Graph & cur_graph,
-                                 IN OUT xcom::BitSet & visited)
+                                 MOD xcom::BitSet & visited)
 {
     AbsNode * node = new_abs_node(ABS_IF);
     set_map_bb2abs(entry, node);
@@ -226,11 +224,10 @@ AbsNode * CfsMgr::constructAbsBB(IN IRBB * bb, IN AbsNode * parent)
 }
 
 
-AbsNode * CfsMgr::constructAbsTree(IN IRBB * entry,
-                                   IN AbsNode * parent,
+AbsNode * CfsMgr::constructAbsTree(IN IRBB * entry, IN AbsNode * parent,
                                    IN xcom::BitSet * cur_region,
                                    IN xcom::Graph & cur_graph,
-                                   IN OUT xcom::BitSet & visited)
+                                   MOD xcom::BitSet & visited)
 {
     IRCFG * cfg = m_rg->getCFG();
     AbsNode * lst = nullptr;

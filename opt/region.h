@@ -51,15 +51,13 @@ class PassMgr;
 class RefInfo {
     COPY_CONSTRUCTOR(RefInfo);
 public:
-    MDSet may_def_mds; //Record the MD set for Region usage
-    MDSet may_use_mds; //Record the MD set for Region usage
+    MDSet * may_def_mds; //Record the MD set for Region usage
+    MDSet * may_use_mds; //Record the MD set for Region usage
 public:
     //Count memory usage for current object.
     size_t count_mem()
     {
         size_t c = sizeof(RefInfo);
-        c += may_def_mds.count_mem();
-        c += may_use_mds.count_mem();
         return c;
     }
 };
@@ -70,7 +68,7 @@ public:
 //
 //Record unique id in RegionMgr.
 #define REGION_id(r) ((r)->m_id)
-#define REGION_type(r) ((r)->m_ru_type)
+#define REGION_type(r) ((r)->m_rg_type)
 #define REGION_parent(r) ((r)->m_parent)
 #define REGION_region_mgr(r) ((r)->m_region_mgr)
 
@@ -88,6 +86,9 @@ public:
 //This property is very useful if region is a blackbox.
 //And readonly region will alleviate the burden of optimizor.
 #define REGION_is_readonly(r) ((r)->m_u2.s1.is_readonly)
+
+//Record memory reference for region.
+#define REGION_refinfo(r) ((r)->m_ref_info)
 
 //This class is base class to describe Region.
 //A program organized in a set of region, each region has it own IR stmt
@@ -139,7 +140,7 @@ public:
 //  XOC apply interprocedural analysis and optimization and inlining
 //  on program unit.
 class Region {
-friend class RegionMgr;
+    friend class RegionMgr;
     COPY_CONSTRUCTOR(Region);
 protected:
     //Record the binary data for black box region.
@@ -151,14 +152,16 @@ protected:
         void * m_blx_data; //Black box data.
     } m_u1;
 
-    //Record vars defined in current region,
-    //include the subregion defined variables.
-    //All LOCAL vars in the tab will be destroyed during region destruction.
-    VarTab m_ru_var_tab;
+    //Record vars defined in current region, include the subregion defined
+    //variables. All LOCAL vars in the tab will be destroyed at region
+    //destruction.
+    VarTab m_rg_var_tab;
     SMemPool * m_pool;
 protected:
     //Allocate PassMgr
     virtual PassMgr * allocPassMgr();
+    //Allocate AttachInfoMgr
+    virtual AttachInfoMgr * allocAttachInfoMgr();
     //Allocate an IR.
     IR * allocIR(IR_TYPE irt);
     //This is a helper function to assignMD.
@@ -168,8 +171,7 @@ protected:
 
     AnalysisInstrument * getAnalysisInstrument() const;
 
-    void scanCallListImpl(OUT UINT & num_inner_region,
-                          IR * irlst,
+    void scanCallListImpl(OUT UINT & num_inner_region, IR * irlst,
                           OUT List<IR const*> * call_list,
                           OUT List<IR const*> * ret_list,
                           bool scan_inner_region);
@@ -182,7 +184,7 @@ protected:
     void HighProcessImpl(OptCtx & oc);
 
 public:
-    REGION_TYPE m_ru_type; //region type.
+    REGION_TYPE m_rg_type; //region type.
     UINT m_id; //region unique id.
     Var * m_var; //record Var if RU has.
     Region * m_parent; //record parent region.
@@ -219,11 +221,11 @@ public:
 
     //Add var which used inside current or inner Region.
     //Once the region destructing, all local vars are deleted.
-    void addToVarTab(Var * v) { m_ru_var_tab.append(v); }
+    void addToVarTab(Var * v) { m_rg_var_tab.append(v); }
 
     //Add irs into IR list of current region.
     void addToIRList(IR * irs)
-    { xcom::add_next(&getAnalysisInstrument()->m_ir_list, irs); }
+    { xcom::add_next(&ANA_INS_ir_list(getAnalysisInstrument()), irs); }
     MD const* allocStoreMD(IR * ir);
     MD const* allocIdMD(IR * ir);
     MD const* allocLoadMD(IR * ir);
@@ -274,10 +276,10 @@ public:
     //Allocate DU reference that describes memory reference to IR.
     inline DU * allocDU()
     {
-        DU * du = getAnalysisInstrument()->m_free_du_list.remove_head();
+        DU * du = ANA_INS_free_du_list(getAnalysisInstrument()).remove_head();
         if (du == nullptr) {
             du = (DU*)smpoolMallocConstSize(sizeof(DU),
-                getAnalysisInstrument()->m_du_pool);
+                ANA_INS_du_pool(getAnalysisInstrument()));
             ::memset(du, 0, sizeof(DU));
         }
         return du;
@@ -287,17 +289,21 @@ public:
     IRBB * allocBB() { return getBBMgr()->allocBB(); }
 
     //Allocate AIContainer that describes attach info to IR.
-    inline AIContainer * allocAIContainer()
+    AIContainer * allocAIContainer()
     {
-        AIContainer * ai = (AIContainer*)xmalloc(sizeof(AIContainer));
-        ASSERT0(ai);
-        ai->init();
-        return ai;
+        ASSERT0(getAnalysisInstrument()->getAttachInfoMgr());
+        return getAnalysisInstrument()->getAttachInfoMgr()->allocAIContainer();
     }
 
     //Assign MD for memory reference operations.
     //is_only_assign_pr: true if only assign MD for read|write PR operations.
     void assignMD(bool assign_pr, bool assign_nonpr);
+
+    //Assign MD for ST/LD/ReadPR/WritePR operations.
+    //irlist: a list of IR to be assigned.
+    //is_assign_pr: true if assign MD for each ReadPR/WritePR operations.
+    //is_assign_nonpr: true if assign MD for each Non-PR memory operations.
+    void assignMD(IR * irlist, bool assign_pr, bool assign_nonpr);
 
     //Assign MD for memory reference operations.
     //This function will iterate given bblist.
@@ -307,9 +313,7 @@ public:
     //Assign MD for memory reference operations.
     //This function will iterate ir list in given bb.
     //is_only_assign_pr: true if only assign MD for read|write PR operations.
-    void assignMDForBB(IRBB * bb,
-                       IRIter & ii,
-                       bool assign_pr,
+    void assignMDForBB(IRBB * bb, IRIter & ii, bool assign_pr,
                        bool assign_nonpr);
 
     //Assign MD for memory reference operations.
@@ -328,36 +332,33 @@ public:
 
     //Build store operation to store 'rhs' to store value to be one of the
     //element of a PR.
-    //'type': data type of targe pr.
-    //'offset': byte offset to the start of result PR.
-    //'rhs: value expected to store.
+    //type: data type of targe pr.
+    //offset: byte offset to the start of result PR.
+    //rhs: value expected to store.
     IR * buildSetElem(Type const* type, IR * base, IR * val, IR * offset);
 
     //Build store operation to store 'rhs' to store value to be one of the
     //element of a PR.
-    //'prno': target prno.
-    //'type': data type of targe pr.
+    //prno: target prno.
+    //type: data type of targe pr.
     //base: base of source.
     //value: value that need to be set.
-    //'offset': byte offset to the start of result PR.
-    //'rhs: value expected to store.
-    IR * buildSetElem(UINT prno,
-                      Type const* type,
-                      IR * base,
-                      IR * val,
+    //offset: byte offset to the start of result PR.
+    //rhs: value expected to store.
+    IR * buildSetElem(UINT prno, Type const* type, IR * base, IR * val,
                       IR * offset);
 
     //Build store operation to get value from 'base', and store the result PR.
-    //'prno': result prno.
-    //'type': data type of targe pr.
-    //'offset': byte offset to the start of PR.
-    //'base: hold the value that expected to extract.
+    //prno: result prno.
+    //type: data type of targe pr.
+    //offset: byte offset to the start of PR.
+    //base: hold the value that expected to extract.
     IR * buildGetElem(UINT prno, Type const* type, IR * base, IR * offset);
 
     //Build store operation to get value from 'rhs', and store the result PR.
-    //'type': data type of targe pr.
-    //'offset': byte offset to the start of rhs PR.
-    //'base: hold the value that expected to extract.
+    //type: data type of targe pr.
+    //offset: byte offset to the start of rhs PR.
+    //base: hold the value that expected to extract.
     IR * buildGetElem(Type const* type, IR * base, IR * offset);
 
     //Build IR_CONTINUE operation.
@@ -370,40 +371,38 @@ public:
     IR * buildCase(IR * casev_exp, LabelInfo const* case_br_lab);
 
     //Build Do Loop stmt.
-    //'iv': induction variable.
-    //'det': determinate expression.
-    //'loop_body': stmt list.
-    //'init': record the stmt that initialize iv.
-    //'step': record the stmt that update iv.
+    //iv: induction variable.
+    //det: determinate expression.
+    //loop_body: stmt list.
+    //init: record the stmt that initialize iv.
+    //step: record the stmt that update iv.
     IR * buildDoLoop(IR * iv, IR * init, IR * det, IR * step, IR * loop_body);
 
     //Build Do While stmt.
-    //'det': determinate expression.
-    //'loop_body': stmt list.
+    //det: determinate expression.
+    //loop_body: stmt list.
     IR * buildDoWhile(IR * det, IR * loop_body);
 
     //Build While Do stmt.
-    //'det': determinate expression.
-    //'loop_body': stmt list.
+    //det: determinate expression.
+    //loop_body: stmt list.
     IR * buildWhileDo(IR * det, IR * loop_body);
 
     //Build IF stmt.
-    //'det': determinate expression.
-    //'true_body': stmt list.
-    //'false_body': stmt list.
+    //det: determinate expression.
+    //true_body: stmt list.
+    //false_body: stmt list.
     IR * buildIf(IR * det, IR * true_body, IR * false_body);
 
     //Build SWITCH multi-select stmt.
-    //'vexp': expression to determine which case entry will be target.
-    //'case_list': case entry list. case entry is consist of expression and label.
+    //vexp: expression to determine which case entry will be target.
+    //case_list: case entry list. case entry is consist of expression and label.
     //    Note that case list is optional.
-    //'body': stmt list.
-    //'default_lab': label indicates the default choice, the label is optional.
+    //body: stmt list.
+    //default_lab: label indicates the default choice, the label is optional.
     //
     //NOTE: Do not set parent for stmt in 'body'.
-    IR * buildSwitch(IR * vexp,
-                     IR * case_list,
-                     IR * body,
+    IR * buildSwitch(IR * vexp, IR * case_list, IR * body,
                      LabelInfo const* default_lab);
 
     //Build PR and assign dedicated PRNO.
@@ -467,21 +466,15 @@ public:
     IR * buildJudge(IR * exp);
 
     //Build binary operation without considering pointer arithmetic.
-    IR * buildBinaryOpSimp(IR_TYPE irt,
-                           Type const* type,
-                           IR * lchild,
+    IR * buildBinaryOpSimp(IR_TYPE irt, Type const* type, IR * lchild,
                            IR * rchild);
 
     //Build binary operation.
     //If rchild/lchild is pointer, the function will attemp to generate pointer
     //arithmetic operation instead of normal binary operation.
-    IR * buildBinaryOp(IR_TYPE irt,
-                       Type const* type,
-                       IN IR * lchild,
+    IR * buildBinaryOp(IR_TYPE irt, Type const* type, IN IR * lchild,
                        IN IR * rchild);
-    IR * buildBinaryOp(IR_TYPE irt,
-                       DATA_TYPE dt,
-                       IN IR * lchild,
+    IR * buildBinaryOp(IR_TYPE irt, DATA_TYPE dt, IN IR * lchild,
                        IN IR * rchild);
 
     //Build unary operation.
@@ -499,14 +492,14 @@ public:
 
     //Build IR_CONST operation.
     //The expression indicates an integer.
-    //'v': value of integer.
-    //'type': integer type.
+    //v: value of integer.
+    //type: integer type.
     IR * buildImmInt(HOST_INT v, Type const* type);
 
     //Build IR_CONST operation.
     //The expression indicates an integer.
-    //'v': value of integer.
-    //'type': integer type.
+    //v: value of integer.
+    //type: integer type.
     IR * buildImmInt(HOST_INT v, DATA_TYPE dt)
     { return buildImmInt(v, getTypeMgr()->getSimplexType(dt)); }
 
@@ -531,73 +524,83 @@ public:
 
     //Build IR_LD operation.
     //Load value from variable with type 'type'.
-    //'var': indicates the variable which value will be loaded.
-    //'type': result type of value.
-    IR * buildLoad(Var * var, Type const* type);
+    //var: indicates the variable which value will be loaded.
+    //ofst: memory byte offset relative to var.
+    //type: result type of value.
+    IR * buildLoad(Var * var, UINT ofst, Type const* type);
 
     //Build IR_LD operation.
     //Load value from variable with type 'type'.
-    //'var': indicates the variable which value will be loaded.
+    //var: indicates the variable which value will be loaded.
+    //type: result type of value.
+    IR * buildLoad(Var * var, Type const* type)
+    { return buildLoad(var, 0, type); }
+
+    //Build IR_LD operation.
+    //Load value from variable with type 'type'.
+    //var: indicates the variable which value will be loaded.
     //Result type of value is the type of variable carried.
-    IR * buildLoad(Var * var);
+    IR * buildLoad(Var * var)
+    { ASSERT0(var); return buildLoad(var, VAR_type(var)); }
 
     //Build IR_ILD operation.
     //Result is either register or memory chunk, and the size of ILD
     //result equals to 'pointer_base_size' of 'addr'.
-    //'base': memory address of ILD.
-    //'ptbase_or_mc_size': if result of ILD is pointer, this parameter records
-    //    pointer_base_size; or if result is memory chunk, it records
-    //    the size of memory chunk.
+    //base: memory address of ILD.
+    //ofst: memory byte offset relative to base.
+    //ptbase_or_mc_size: if result of ILD is pointer, this parameter records
+    //   pointer_base_size; or if result is memory chunk, it records
+    //   the size of memory chunk.
     //NOTICE: The ofst of ILD requires to maintain when after return.
     IR * buildILoad(IR * base, Type const* type);
     IR * buildILoad(IR * base, UINT ofst, Type const* type);
 
     //Build IR_ST operation.
-    //'lhs': memory variable, described target memory location.
-    //'rhs: value expected to store.
+    //lhs: memory variable, described target memory location.
+    //rhs: value expected to store.
     IR * buildStore(Var * lhs, IR * rhs);
 
     //Build IR_ST operation.
-    //'lhs': target memory location.
-    //'type: result data type.
-    //'rhs: value expected to store.
+    //lhs: target memory location.
+    //type: result data type.
+    //rhs: value expected to store.
     IR * buildStore(Var * lhs, Type const* type, IR * rhs);
 
     //Build IR_ST operation.
-    //'lhs': target memory location.
-    //'type: result data type.
-    //'ofst': memory byte offset relative to lhs.
-    //'rhs: value expected to store.
+    //lhs: target memory location.
+    //type: result data type.
+    //ofst: memory byte offset relative to lhs.
+    //rhs: value expected to store.
     IR * buildStore(Var * lhs, Type const* type, UINT ofst, IR * rhs);
 
     //Build store operation to store 'rhs' to new pr with type and prno.
-    //'prno': target prno.
-    //'type': data type of targe pr.
-    //'rhs: value expected to store.
+    //prno: target prno.
+    //type: data type of targe pr.
+    //rhs: value expected to store.
     IR * buildStorePR(UINT prno, Type const* type, IR * rhs);
 
     //Build store operation to store 'rhs' to new pr with type and prno.
-    //'prno': target prno.
-    //'dt': the simplex data type of targe pr.
-    //'rhs: value expected to store.
+    //prno: target prno.
+    //dt: the simplex data type of targe pr.
+    //rhs: value expected to store.
     IR * buildStorePR(UINT prno, DATA_TYPE dt, IR * rhs)
     { return buildStorePR(prno, getTypeMgr()->getSimplexType(dt), rhs); }
 
     //Build store operation to store 'rhs' to new pr with type.
-    //'type': data type of targe pr.
-    //'rhs: value expected to store.
+    //type: data type of targe pr.
+    //rhs: value expected to store.
     IR * buildStorePR(Type const* type, IR * rhs);
 
     //Build store operation to store 'rhs' to new pr with type.
-    //'dt': the simplex data type of targe pr.
-    //'rhs: value expected to store.
+    //dt: the simplex data type of targe pr.
+    //rhs: value expected to store.
     IR * buildStorePR(DATA_TYPE dt, IR * rhs)
     { return buildStorePR(getTypeMgr()->getSimplexType(dt), rhs); }
 
     //Build IR_IST operation.
-    //'lhs': target memory location pointer.
-    //'rhs: value expected to store.
-    //'type': result type of indirect memory operation, note type is not the
+    //lhs: target memory location pointer.
+    //rhs: value expected to store.
+    //type: result type of indirect memory operation, note type is not the
     //data type of lhs.
     IR * buildIStore(IR * base, IR * rhs, Type const* type);
     IR * buildIStore(IR * base, IR * rhs, UINT ofst, Type const* type);
@@ -608,9 +611,9 @@ public:
 
     //Build IR_STARRAY operation.
     //STARRAY will write value that indicated by 'rhs' into element of array.
-    //'base': base of array operation, it is either LDA or pointer.
-    //'sublist': subscript expression list.
-    //'type': result type of array operator.
+    //base: base of array operation, it is either LDA or pointer.
+    //sublist: subscript expression list.
+    //type: result type of array operator.
     //    Note that type may NOT be equal to elem_tyid, accroding to
     //    ARR_ofst(). If ARR_ofst() is not zero, that means array
     //    elem is MC, or VECTOR, and type should be type of member
@@ -621,7 +624,7 @@ public:
     //        type should be int rather than struct S.
     //        and elem_tyid should be struct S.
     //
-    //'elem_tyid': record element-data-type.
+    //elem_tyid: record element-data-type.
     //    e.g:vector<int,8> g[100];
     //        elem_size is sizeof(vector<int,8>) = 32
     //        elem_type is vector.
@@ -634,8 +637,8 @@ public:
     //        elem_size is sizeof(struct S)
     //        elem_type is struct S
     //
-    //'dims': indicate the array dimension.
-    //'elem_num': point to an integer array that indicate
+    //dims: indicate the array dimension.
+    //elem_num: point to an integer array that indicate
     //    the number of element for in dimension.
     //    The length of the integer array should be equal to 'dims'.
     //    e.g: int g[12][24];
@@ -643,20 +646,16 @@ public:
     //        the 1th dimension has 12 elements, and the 2th dimension has 24
     //        elements, which element type is D_I32.
     //    Note the parameter may be nullptr.
-    //'rhs: value expected to store.
-    IR * buildStoreArray(IR * base,
-                         IR * sublist,
-                         Type const* type,
-                         Type const* elemtype,
-                         UINT dims,
-                         TMWORD const* elem_num_buf,
-                         IR * rhs);
+    //rhs: value expected to store.
+    IR * buildStoreArray(IR * base, IR * sublist, Type const* type,
+                         Type const* elemtype, UINT dims,
+                         TMWORD const* elem_num_buf, IR * rhs);
 
     //Build ARRAY operation.
     //ARRAY will load an element.
-    //'base': base of array operation, it is either LDA or pointer.
-    //'sublist': subscript expression list.
-    //'type': result type of array operator.
+    //base: base of array operation, it is either LDA or pointer.
+    //sublist: subscript expression list.
+    //type: result type of array operator.
     //    Note that type may NOT be equal to elem_tyid, accroding to
     //    ARR_ofst(). If ARR_ofst() is not zero, that means array
     //    elem is MC, or VECTOR, and type should be type of member
@@ -667,7 +666,7 @@ public:
     //        type should be int rather than struct S.
     //        and elem_tyid should be struct S.
     //
-    //'elem_tyid': record element-data-type.
+    //elem_tyid: record element-data-type.
     //    e.g:vector<int,8> g[100];
     //        elem_size is sizeof(vector<int,8>) = 32
     //        elem_type is vector.
@@ -680,8 +679,8 @@ public:
     //        elem_size is sizeof(struct S)
     //        elem_type is struct S
     //
-    //'dims': indicate the array dimension.
-    //'elem_num': point to an integer array that indicate
+    //dims: indicate the array dimension.
+    //elem_num: point to an integer array that indicate
     //    the number of element for in dimension.
     //    The length of the integer array should be equal to 'dims'.
     //    e.g: int g[12][24];
@@ -689,11 +688,8 @@ public:
     //        the 1th dimension has 12 elements, and the 2th dimension has 24
     //        elements, which element type is D_I32.
     //    Note the parameter may be nullptr.
-    IR * buildArray(IR * base,
-                    IR * sublist,
-                    Type const* type,
-                    Type const* elemtype,
-                    UINT dims,
+    IR * buildArray(IR * base, IR * sublist, Type const* type,
+                    Type const* elemtype, UINT dims,
                     TMWORD const* elem_num_buf);
 
     //Build IR_RETURN operation.
@@ -706,7 +702,7 @@ public:
     IR * buildSelect(IR * det, IR * true_exp, IR * false_exp, Type const* type);
 
     //Build IR_PHI operation.
-    //'res': result pr of PHI.
+    //res: result pr of PHI.
     IR * buildPhi(UINT prno, Type const* type, IR * opnd_list);
     IR * buildPhi(UINT prno, Type const* type, UINT num_opnd);
 
@@ -714,26 +710,22 @@ public:
     IR * buildRegion(Region * rg);
 
     //Build IR_ICALL operation.
-    //'res_list': reture value list.
-    //'result_prno': indicate the result PR which hold the return value.
+    //res_list: reture value list.
+    //result_prno: indicate the result PR which hold the return value.
     //    0 means the call does not have a return value.
-    //'type': result PR data type.
+    //type: result PR data type.
     //    0 means the call does not have a return value.
-    IR * buildICall(IR * callee,
-                    IR * param_list,
-                    UINT result_prno,
+    IR * buildICall(IR * callee, IR * param_list, UINT result_prno,
                     Type const* type);
     IR * buildICall(IR * callee, IR * param_list)
     { return buildICall(callee, param_list, 0, getTypeMgr()->getAny()); }
 
     //Build IR_CALL operation.
-    //'res_list': reture value list.
-    //'result_prno': indicate the result PR which hold the return value.
+    //res_list: reture value list.
+    //result_prno: indicate the result PR which hold the return value.
     //    0 means the call does not have a return value.
-    //'type': result PR data type.
-    IR * buildCall(Var * callee,
-                   IR * param_list,
-                   UINT result_prno,
+    //type: result PR data type.
+    IR * buildCall(Var * callee, IR * param_list, UINT result_prno,
                    Type const* type);
     IR * buildCall(Var * callee,  IR * param_list)
     { return buildCall(callee, param_list, 0, getTypeMgr()->getAny()); }
@@ -750,13 +742,19 @@ public:
     //Count memory usage for current object.
     size_t count_mem() const;
 
+    //The funtion enables reallocating resource without by destructing region
+    //object. Note the function should work together with init() to complete
+    //the reallocation of resource.
     virtual void destroy();
     void destroyPassMgr();
+    void destroyAttachInfoMgr();
     IR * dupIR(IR const* ir);
     IR * dupIRTree(IR const* ir);
     IR * dupIRTreeList(IR const* ir);
+    //filename: dump BB list into given filename.
+    void dumpBBList(CHAR const* filename, bool dump_inner_region = true) const;
     void dumpBBList(bool dump_inner_region = true) const;
-    void dumpIRList() const;
+    void dumpIRList(UINT dumpflag = IR_DUMP_COMBINE) const;
     void dumpAllocatedIR() const;
     void dumpVARInRegion() const;
     void dumpVarMD(Var * v, UINT indent) const;
@@ -798,11 +796,11 @@ public:
 
     //Get memory pool to allocate Single-List-Container.
     SMemPool * getSCPool() const
-    { return getAnalysisInstrument()->m_sc_labelinfo_pool; }
+    { return ANA_INS_sc_labelinfo_pool(getAnalysisInstrument()); }
 
     //Get the maximum PR no.
-    UINT getPRCount() const
-    { return getAnalysisInstrument()->m_pr_count; }
+    UINT getPRCount() const 
+    { return ANA_INS_pr_count(getAnalysisInstrument()); }
 
     //Get the variable which represent current region.
     Var * getRegionVar() const { return m_var; }
@@ -811,7 +809,7 @@ public:
     RegionMgr * getRegionMgr() const { return REGION_region_mgr(this); }
 
     //Get IR list if any.
-    IR * getIRList() const { return getAnalysisInstrument()->m_ir_list; }
+    IR * getIRList() const { return ANA_INS_ir_list(getAnalysisInstrument()); }
 
     //Get the VarMgr related to current RegionMgr.
     VarMgr * getVarMgr() const
@@ -819,42 +817,47 @@ public:
 
     //Get a variable table that includes all variables
     //declared in current region.
-    VarTab * getVarTab() { return &m_ru_var_tab; }
+    VarTab * getVarTab() { return &m_rg_var_tab; }
 
     //Get BitSetMgr of current region.
     xcom::BitSetMgr * getBitSetMgr() const
-    { return &getAnalysisInstrument()->m_bs_mgr; }
+    { return &ANA_INS_bs_mgr(getAnalysisInstrument()); }
 
     //Get Sparse|Dense BitSetMgr of current region.
     xcom::DefMiscBitSetMgr * getMiscBitSetMgr() const
-    { return &getAnalysisInstrument()->m_sbs_mgr; }
+    { return &ANA_INS_sbs_mgr(getAnalysisInstrument()); }
 
     //Get MDSetMgr of current region.
     MDSetMgr * getMDSetMgr() const
-    { return &getAnalysisInstrument()->m_mds_mgr; }
+    { return &ANA_INS_mds_mgr(getAnalysisInstrument()); }
 
     //Get IRBB list if any.
     BBList * getBBList() const
-    { return &getAnalysisInstrument()->m_ir_bb_list; }
+    { return &ANA_INS_ir_bb_list(getAnalysisInstrument()); }
 
     //Get IRBBMgr of current region.
-    IRBBMgr * getBBMgr() const { return &getAnalysisInstrument()->m_ir_bb_mgr; }
+    IRBBMgr * getBBMgr() const
+    { return &ANA_INS_ir_bb_mgr(getAnalysisInstrument()); }
 
     //Get MDSetHash.
     MDSetHash * getMDSetHash() const
-    { return &getAnalysisInstrument()->m_mds_hash; }
+    { return &ANA_INS_mds_hash(getAnalysisInstrument()); }
 
     //Return IR pointer via the unique IR_id.
     IR * getIR(UINT irid) const
-    { return getAnalysisInstrument()->m_ir_vector.get(irid); }
+    { return ANA_INS_ir_vec(getAnalysisInstrument()).get(irid); }
 
     //Return the vector that record all allocated IRs.
     Vector<IR*> * getIRVec() const
-    { return &getAnalysisInstrument()->m_ir_vector; }
+    { return &ANA_INS_ir_vec(getAnalysisInstrument()); }
 
     //Return PassMgr.
     PassMgr * getPassMgr() const
-    { return getAnalysisInstrument()->m_pass_mgr; }
+    { return ANA_INS_pass_mgr(getAnalysisInstrument()); }
+
+    //Return AttachInfoMgr.
+    AttachInfoMgr * getAttachInfoMgr() const
+    { return ANA_INS_ai_mgr(getAnalysisInstrument()); }
 
     //Return IRCFG.
     IRCFG * getCFG() const
@@ -898,28 +901,44 @@ public:
     //Allocate and return all CALLs in the region.
     inline CIRList * getCallList()
     {
-        if (getAnalysisInstrument()->m_call_list == nullptr) {
-            getAnalysisInstrument()->m_call_list = new CIRList();
+        if (ANA_INS_call_list(getAnalysisInstrument()) == nullptr) {
+            ANA_INS_call_list(getAnalysisInstrument()) = new CIRList();
         }
-        return getAnalysisInstrument()->m_call_list;
+        return ANA_INS_call_list(getAnalysisInstrument());
     }
 
     //Allocate and return a list of IR_RETURN in current Region.
     inline CIRList * getReturnList()
     {
-        if (getAnalysisInstrument()->m_return_list == nullptr) {
-            getAnalysisInstrument()->m_return_list = new CIRList();
+        if (ANA_INS_return_list(getAnalysisInstrument()) == nullptr) {
+            ANA_INS_return_list(getAnalysisInstrument()) = new CIRList();
         }
-        return getAnalysisInstrument()->m_return_list;
+        return ANA_INS_return_list(getAnalysisInstrument());
     }
 
     //Get the MayDef MDSet of Region.
     MDSet * getMayDef() const
-    { return m_ref_info != nullptr ? &REF_INFO_maydef(m_ref_info) : nullptr; }
+    { return m_ref_info != nullptr ? REF_INFO_maydef(m_ref_info) : nullptr; }
+
+    //Generate the MayDef MDSet of Region.
+    MDSet * genMayDef()
+    {
+        if (m_ref_info == nullptr) { return nullptr; }
+        REF_INFO_maydef(m_ref_info) = getMDSetMgr()->alloc();
+        return REF_INFO_maydef(m_ref_info);
+    }
 
     //Get the MayUse MDSet of Region.
     MDSet * getMayUse() const
-    { return m_ref_info != nullptr ? &REF_INFO_mayuse(m_ref_info) : nullptr; }
+    { return m_ref_info != nullptr ? REF_INFO_mayuse(m_ref_info) : nullptr; }
+
+    //Generate the MayUse MDSet of Region.
+    MDSet * genMayUse()
+    {
+        if (m_ref_info == nullptr) { return nullptr; }
+        REF_INFO_mayuse(m_ref_info) = getMDSetMgr()->alloc();
+        return REF_INFO_mayuse(m_ref_info);
+    }
 
     //Get the top parent level region.
     Region * getTopRegion()
@@ -973,7 +992,7 @@ public:
     //Generate MD corresponding to PR load or write.
     MD const* genMDForPR(IR const* ir)
     {
-        ASSERT0(ir->isWritePR() || ir->isReadPR() || ir->isCallStmt());
+        ASSERT0(ir->isPROp());
         return genMDForPR(ir->getPrno(), ir->getType());
     }
 
@@ -1046,6 +1065,9 @@ public:
     UINT id() const { return REGION_id(this); }
 
     //Initialze Region.
+    //The funtion enables reallocating resource without by destructing region
+    //object. Note the function should work together with destroy() to complete
+    //the reallocation of resource.
     void init(REGION_TYPE rt, RegionMgr * rm);
 
     void initRefInfo()
@@ -1055,7 +1077,9 @@ public:
     }
 
     //Allocate and initialize pass manager.
-    PassMgr * initPassMgr();
+    PassMgr * initPassMgr();    
+    //Allocate and initialize attachinfo manager.
+    AttachInfoMgr * initAttachInfoMgr();
     bool isSafeToOptimize(IR const* ir);
 
     //Return true if ir belongs to current region.
@@ -1116,11 +1140,7 @@ public:
 
     //Map from prno to related Var.
     Var * mapPR2Var(UINT prno)
-    { return getAnalysisInstrument()->m_prno2var.get(prno); }
-
-    //Return the Call list of current region.
-    List<IR const*> const* readCallList() const
-    { return getAnalysisInstrument()->m_call_list; }
+    { return ANA_INS_prno2var(getAnalysisInstrument()).get(prno); }
 
     //Construct BB list by destructing CFG.
     bool reconstructBBList(OptCtx & oc);
@@ -1130,9 +1150,9 @@ public:
     IR * simpToPR(IR * ir, SimpCtx * ctx);
 
     //Split IR list into list of basic blocks.
-    //'irs': a list of ir.
-    //'bbl': a list of bb.
-    //'ctbb': marker current bb container.
+    //irs: a list of ir.
+    //bbl: a list of bb.
+    //ctbb: marker current bb container.
     //Note if CFG is invalid, it will not be updated.
     BBListIter splitIRlistIntoBB(IR * irs, BBList * bbl, BBListIter ctbb,
                                  OptCtx const& oc);
@@ -1184,25 +1204,15 @@ public:
 
     //Assign variable to given PR.
     void setMapPR2Var(UINT prno, Var * pr_var)
-    { getAnalysisInstrument()->m_prno2var.set(prno, pr_var); }
+    { ANA_INS_prno2var(getAnalysisInstrument()).set(prno, pr_var); }
 
     //Set the counter of PR.
     //Note 'cnt' will be assigned to next new PR, so it should have not be
     //referenced.
-    void setPRCount(UINT cnt) { getAnalysisInstrument()->m_pr_count = cnt; }
-    void setMustRef(IR * ir, MD const* md)
-    {
-        ASSERT0(ir != nullptr && md);
-        ir->setRefMD(md, this);
-    }
-    //mds: record MayMDSet that have to be hashed.
-    void setMayRef(IR * ir, MDSet const* mds)
-    {
-        ASSERT0(ir && mds && !mds->is_empty());
-        ir->setRefMDSet(mds, this);
-    }
+    void setPRCount(UINT cnt)
+    { ANA_INS_pr_count(getAnalysisInstrument()) = cnt; }
     void setRegionVar(Var * v) { m_var = v; }
-    void setIRList(IR * irs) { getAnalysisInstrument()->m_ir_list = irs; }
+    void setIRList(IR * irs) { ANA_INS_ir_list(getAnalysisInstrument()) = irs; }
     void setBlackBoxData(void * d) { REGION_blackbox_data(this) = d; }
 
     //Collect information of CALL and RETURN in current region.

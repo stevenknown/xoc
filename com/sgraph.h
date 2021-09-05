@@ -444,7 +444,7 @@ public:
         return m_sparse_vertex->append(newVertex(vid));
     }
 
-    void computeRpoNoRecursive(IN OUT Vertex * root,
+    void computeRpoNoRecursive(MOD Vertex * root,
                                OUT List<Vertex const*> & vlst);
     bool clone(Graph const& src, bool clone_edge_info, bool clone_vex_info);
     //Count memory usage for current object.
@@ -520,13 +520,19 @@ public:
     //except for EdgeInfo and VertexInfo.
     void erase();
 
-    bool getNeighborList(IN OUT List<UINT> & ni_list, UINT vid) const;
+    bool getNeighborList(MOD List<UINT> & ni_list, UINT vid) const;
     bool getNeighborSet(OUT DefSBitSet & niset, UINT vid) const;
     UINT getDegree(UINT vid) const
     {
         ASSERTN(m_ec_pool != nullptr, ("not yet initialized."));
         return getDegree(getVertex(vid));
     }
+
+    //Return the vertex that is the source-vertex of No.'n' in-edge.
+    Vertex const* getInVertexNth(Vertex const* v, UINT n) const;
+
+    //Return the vertex that is the sink-vertex of No.'n' out-edge.
+    Vertex const* getOutVertexNth(Vertex const* v, UINT n) const;
     UINT getDegree(Vertex const* vex) const;
     UINT getInDegree(Vertex const* vex) const;
     UINT getOutDegree(Vertex const* vex) const;

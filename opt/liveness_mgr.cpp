@@ -223,7 +223,7 @@ void LivenessMgr::computeLocal(IRBB * bb, List<IR const*> & lst)
 }
 
 
-//Note this function does not consider PHI effect.
+//Note this function still not consider PHI effect properly.
 //e.g:  BB1:          BB2:
 //      st $4 = 0     st $3 = 1
 //           \        /

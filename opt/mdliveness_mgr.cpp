@@ -35,7 +35,7 @@ MDSet * MDLivenessMgr::getLiveInMDSet(IRBB * bb)
 {
     MDSet * set = m_livein_mds_vec.get(BB_id(bb));
     if (set == NULL) {
-        set = getMdsMgr()->create();
+        set = getMdsMgr()->alloc();
         m_livein_mds_vec.set(BB_id(bb), set);
     }
     return set;
@@ -46,7 +46,7 @@ MDSet * MDLivenessMgr::getLiveOutMDSet(IRBB * bb)
 {
     MDSet * set = m_liveout_mds_vec.get(BB_id(bb));
     if (set == NULL) {
-        set = getMdsMgr()->create();
+        set = getMdsMgr()->alloc();
         m_liveout_mds_vec.set(BB_id(bb), set);
     }
     return set;
@@ -57,7 +57,7 @@ MDSet * MDLivenessMgr::getDefMDSet(IRBB * bb)
 {
     MDSet * set = m_def_mds_vec.get(BB_id(bb));
     if (set == NULL) {
-        set = getMdsMgr()->create();
+        set = getMdsMgr()->alloc();
         m_def_mds_vec.set(BB_id(bb), set);
     }
     return set;
@@ -68,7 +68,7 @@ MDSet * MDLivenessMgr::getUseMDSet(IRBB * bb)
 {
     MDSet * set = m_use_mds_vec.get(BB_id(bb));
     if (set == NULL) {
-        set = getMdsMgr()->create();
+        set = getMdsMgr()->alloc();
         m_use_mds_vec.set(BB_id(bb), set);
     }
     return set;
@@ -112,11 +112,7 @@ void MDLivenessMgr::computeLocalLiveness(IRBB * bb)
         if (def != NULL) {
             gen->bunion(def->id(), *sbsmgr);
             use->diffAllOverlapped(def->id(), *sbsmgr, mdsys);
-        }
-
-        //Note mustuse must use SBSMgr of DUMgr because collectMustUsedMDs
-        //reference SBSMgr of DUMgr.
-        //m_dumgr->collectMustUsedMDs(ir, *use);
+        }        
         collectMayUseMDS(ir, use);
     }
 }

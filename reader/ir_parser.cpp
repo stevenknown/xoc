@@ -254,6 +254,22 @@ static X_CODE g_type_code [] = {
 };
 
 //
+//START ParseCtx
+//
+void ParseCtx::addIR(IR * stmt)
+{
+    ASSERT0(stmt->is_stmt());
+    xcom::add_next(&stmt_list, &last, stmt);
+
+    //Set lineno for debug info.
+    ASSERT0(current_region);
+    xoc::setLineNum(stmt, parser->getLexer()->getCurrentLineNum(),
+                    current_region);
+}
+//END ParseCtx
+
+
+//
 //START IRParser
 //
 static void copyProp(IR * ir, PropertySet & cont, ParseCtx * ctx)
@@ -396,6 +412,20 @@ X_CODE IRParser::getCurrentXCode()
 }
 
 
+void IRParser::error(UINT lineno, CHAR const* format, ...)
+{
+    StrBuf buf(64);
+    va_list arg;
+    va_start(arg, format);
+    buf.vsprint(format, arg);
+    prt2C("\nerror(%d):%s", lineno, buf.buf);
+    va_end(arg);
+
+    ParseErrorMsg * msg = new ParseErrorMsg(10);
+    m_err_list.append_tail(msg);
+}
+
+
 void IRParser::error(CHAR const* format, ...)
 {
     StrBuf buf(64);
@@ -501,6 +531,55 @@ void IRParser::error(X_CODE xcode, CHAR const* format, ...)
 //}
 
 
+//The function checks label for GR syntax legality.
+bool IRParser::checkLabel(IR const* irlist)
+{
+    ConstIRIter it;
+    xcom::TMap<LabelInfo const*, IR const*> labtab;
+    for (IR const* ir = iterInitC(irlist, it);
+         ir != nullptr; ir = iterNextC(it)) {
+        if (!ir->is_label()) { continue; }
+
+        LabelInfo const* lab = ir->getLabel();
+        bool find;
+        IR const* mapped = labtab.get(lab, &find);
+        if (find) {
+            ASSERT0(mapped);
+            StrBuf buf(32);
+            error(xoc::getLineNum(ir),
+                  "duplicated label %s, and has been defined at line:%d",
+                  lab->getName(&buf), xoc::getLineNum(mapped));
+            return false;
+        }
+
+        labtab.set(lab, ir);
+    }
+
+    for (IR const* ir = iterInitC(irlist, it);
+         ir != nullptr; ir = iterNextC(it)) {
+        if (ir->is_label()) { continue; }
+
+        LabelInfo const* lab = ir->getLabel();
+        if (lab == nullptr) { continue; }
+
+        bool find;
+        labtab.get(lab, &find);
+        if (!find) {
+            StrBuf buf(32);
+            IR const* stmt;
+            if (ir->is_stmt()) { stmt = ir; }
+            else { stmt = ir->getStmt(); }
+            ASSERT0(stmt && stmt->is_stmt());
+            error(xoc::getLineNum(stmt), "use undefined label %s",
+                  lab->getName(&buf));
+            return false;
+        }
+    }
+ 
+    return true;
+}
+
+
 bool IRParser::declareRegion(ParseCtx * ctx)
 {
     ASSERT0(getCurrentXCode() == X_REGION);
@@ -527,14 +606,17 @@ bool IRParser::declareRegion(ParseCtx * ctx)
     switch (code) {
     case X_FUNC:
         region = m_rumgr->newRegion(REGION_FUNC);
+        region->initAttachInfoMgr();
         SET_FLAG(flag, VAR_LOCAL);
         break;
     case X_PROGRAM:
         region = m_rumgr->newRegion(REGION_PROGRAM);
+        region->initAttachInfoMgr();
         SET_FLAG(flag, VAR_GLOBAL);
         break;
     case X_INNER:
         region = m_rumgr->newRegion(REGION_INNER);
+        region->initAttachInfoMgr();
         SET_FLAG(flag, VAR_LOCAL);
         break;
     case X_BLACKBOX:
@@ -584,7 +666,7 @@ bool IRParser::declareRegion(ParseCtx * ctx)
         error("var %s should be func_decl", SYM_name(sym));
     }
 
-    ParseCtx newctx;
+    ParseCtx newctx(this);
     newctx.current_region = region;
     enterRegion(&newctx);
 
@@ -601,6 +683,10 @@ bool IRParser::declareRegion(ParseCtx * ctx)
         return false;
     }
     END_TIMER(w, "");
+
+    if (!checkLabel(newctx.stmt_list)) {
+        return false;
+    }
 
     if (!newctx.has_error && !newctx.current_region->is_blackbox()) {
         newctx.current_region->setIRList(newctx.stmt_list);
@@ -803,7 +889,7 @@ bool IRParser::parseStmtList(ParseCtx * ctx)
         if (!res) {
             ctx->has_error = true;
             //Error recovery.
-            for (; tok != T_SEMI; tok = m_lexer->getNextToken()) {}
+            for (; !isTerminator(tok); tok = m_lexer->getNextToken()) {}
         }
 
         for (tok = m_lexer->getCurrentToken();
@@ -1107,7 +1193,8 @@ bool IRParser::parseArrayDimension(List<TMWORD> & elem_dim)
         if (tok != T_COMMA && tok != T_RSPAREN) {
             error(tok, "miss ',' in dimension declaration");
             return false;
-        } else if (tok == T_COMMA) {
+        }
+        if (tok == T_COMMA) {
             tok = m_lexer->getNextToken();
         }
     }
@@ -2830,13 +2917,16 @@ bool IRParser::parseIGoto(ParseCtx * ctx)
         if (tok == T_COMMA) {
             tok = m_lexer->getNextToken();
             continue;
-        } else if (isTerminator(tok)) {
-            break;
-        } else {
-            error(tok, "illegal case list");
-            return false;
         }
+
+        if (isTerminator(tok)) {
+            break;
+        }
+
+        error(tok, "illegal case list");
+        return false;
     }
+
     if (case_list == nullptr) {
         error(tok, "miss case list");
         return false;
@@ -2996,13 +3086,16 @@ bool IRParser::parseDoLoop(ParseCtx * ctx)
     if (!parseExp(ctx)) {
         return false;
     }
+
     ASSERT0(ctx->returned_exp);
     IR * iv = ctx->returned_exp;
     ctx->returned_exp = nullptr;
     if (!iv->is_id() && !iv->is_pr()) {
         error(tok, "induction variable must be ID or PR");
         return false;
-    } else if (iv->get_next() != nullptr) {
+    }
+
+    if (iv->get_next() != nullptr) {
         error(tok, "multiple induction variable expression");
         return false;
     }
@@ -3139,13 +3232,15 @@ bool IRParser::parseLabelProperty(LabelInfo * label)
         if (tok == T_COMMA) {
             m_lexer->getNextToken();
             continue;
-        } else if (tok == T_RPAREN) {
+        }
+
+        if (tok == T_RPAREN) {
             m_lexer->getNextToken();
             break;
-        } else {
-            error(tok, "illegal label declaration or miss ','");
-            return false;
         }
+
+        error(tok, "illegal label declaration or miss ','");
+        return false;
     }
     return true;
 }
@@ -3344,12 +3439,14 @@ bool IRParser::parsePhi(ParseCtx * ctx)
         if (tok == T_COMMA) {
             tok = m_lexer->getNextToken();
             continue;
-        } else if (tok == T_SEMI) {
-            break;
-        } else {
-            error(tok, "illegal %s in phi operation declaration",
-                  m_lexer->getCurrentTokenString());
         }
+
+        if (tok == T_SEMI) {
+            break;
+        }
+
+        error(tok, "illegal %s in phi operation declaration",
+              m_lexer->getCurrentTokenString());
     }
 
     IR * ir = ctx->current_region->buildPhi(prno, ty, opnd_list);
@@ -3537,12 +3634,14 @@ bool IRParser::parseSwitch(ParseCtx * ctx)
         if (tok == T_COMMA) {
             tok = m_lexer->getNextToken();
             continue;
-        } else if (tok == T_LLPAREN || tok == T_SEMI) {
-            break;
-        } else {
-            error(tok, "illegal case list");
-            return false;
         }
+
+        if (tok == T_LLPAREN || tok == T_SEMI) {
+            break;
+        }
+
+        error(tok, "illegal case list");
+        return false;
     }
 
     //Switch body
@@ -3976,7 +4075,8 @@ bool IRParser::parseByteValue(Var * var, ParseCtx * ctx)
         if (tok != T_COMMA && tok != T_RPAREN) {
             error(tok, "miss ','");
             return false;
-        } else if (tok == T_COMMA) {
+        }
+        if (tok == T_COMMA) {
             tok = m_lexer->getNextToken();
         }
     }
@@ -4116,6 +4216,7 @@ bool IRParser::parseThrowTarget(PropertySet & cont, ParseCtx * ctx)
         error(tok, "miss '(' after 'throw'");
         return false;
     }
+
     tok = m_lexer->getNextToken();
     cont.getLabelList().clean();
     for (; tok != T_RPAREN && !isTerminator(tok);) {
@@ -4136,14 +4237,17 @@ bool IRParser::parseThrowTarget(PropertySet & cont, ParseCtx * ctx)
         if (tok != T_COMMA && tok != T_RPAREN) {
             error(tok, "miss ',' in dimension declaration");
             return false;
-        } else if (tok == T_COMMA) {
+        }
+        if (tok == T_COMMA) {
             tok = m_lexer->getNextToken();
         }
     }
+
     if (m_lexer->getCurrentToken() != T_RPAREN) {
         error(tok, "miss ')'");
         return false;
     }
+
     m_lexer->getNextToken();
     ctx->returned_exp = nullptr;
     return true;
@@ -4372,7 +4476,7 @@ bool IRParser::parse()
             X_CODE code = getCurrentXCode();
             switch (code) {
             case X_REGION: {
-                ParseCtx ctx;
+                ParseCtx ctx(this);
                 bool succ = declareRegion(&ctx);
                 ASSERT0(succ || getErrorMsgList().get_elem_count() > 0);
                 DUMMYUSE(succ);

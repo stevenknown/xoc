@@ -44,6 +44,7 @@ author: Su Zhenyu
 #include "mdssainfo.h"
 #include "cfg.h"
 #include "ir_cfg.h"
+#include "solve_set.h"
 #include "ir_du.h"
 #include "ir_aa.h"
 #include "ir_expr_tab.h"

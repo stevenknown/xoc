@@ -669,7 +669,7 @@ LIR * IR2Dex::buildUniOp(IN IR ** ir)
 }
 
 
-LIR * IR2Dex::convertStoreVar(IN OUT IR ** ir, IN IR2DexCtx * cont)
+LIR * IR2Dex::convertStoreVar(MOD IR ** ir, IN IR2DexCtx * cont)
 {
     IR * tir = *ir;
     ASSERT0(tir->is_st());
@@ -683,7 +683,7 @@ LIR * IR2Dex::convertStoreVar(IN OUT IR ** ir, IN IR2DexCtx * cont)
 }
 
 
-LIR * IR2Dex::convertStorePR(IN OUT IR ** ir, IN IR2DexCtx * cont)
+LIR * IR2Dex::convertStorePR(MOD IR ** ir, IN IR2DexCtx * cont)
 {
     IR * tir = *ir;
     ASSERT0(tir->is_stpr());
@@ -739,7 +739,7 @@ LIR * IR2Dex::convertStorePR(IN OUT IR ** ir, IN IR2DexCtx * cont)
 
 
 //Bulid aput: res -> op0(array base), op1(subscript)
-LIR * IR2Dex::convertStoreArray(IN OUT IR ** ir, IN IR2DexCtx * cont)
+LIR * IR2Dex::convertStoreArray(MOD IR ** ir, IN IR2DexCtx * cont)
 {
     IR * tir = *ir;
     ASSERT0(tir->is_starray());
@@ -768,7 +768,7 @@ LIR * IR2Dex::convertStoreArray(IN OUT IR ** ir, IN IR2DexCtx * cont)
 
 
 //Bulid iput: res -> op0(obj-ptr), op1(ofst)
-LIR * IR2Dex::convertIStore(IN OUT IR ** ir, IN IR2DexCtx * cont)
+LIR * IR2Dex::convertIStore(MOD IR ** ir, IN IR2DexCtx * cont)
 {
     IR * tir = *ir;
     ASSERT0(tir->is_ist());
@@ -1147,7 +1147,7 @@ LIR * IR2Dex::buildCmpBias(IN IR ** ir)
 }
 
 
-LIR * IR2Dex::convertCall(IN OUT IR ** ir, IN IR2DexCtx * cont)
+LIR * IR2Dex::convertCall(MOD IR ** ir, IN IR2DexCtx * cont)
 {
     IR const* tir = *ir;
     if (is_builtin(tir)) {
@@ -1175,7 +1175,7 @@ LIR * IR2Dex::convertCall(IN OUT IR ** ir, IN IR2DexCtx * cont)
 }
 
 
-LIR * IR2Dex::convertICall(IN OUT IR ** ir, IN IR2DexCtx * cont)
+LIR * IR2Dex::convertICall(MOD IR ** ir, IN IR2DexCtx * cont)
 {
     *ir = IR_next(*ir);
     return nullptr;
@@ -1183,7 +1183,7 @@ LIR * IR2Dex::convertICall(IN OUT IR ** ir, IN IR2DexCtx * cont)
 
 
 //return vAA
-LIR * IR2Dex::convertReturn(IN OUT IR ** ir, IN IR2DexCtx * cont)
+LIR * IR2Dex::convertReturn(MOD IR ** ir, IN IR2DexCtx * cont)
 {
     LIRAOp * lir = (LIRAOp*)ymalloc(sizeof(LIRAOp));
     lir->opcode = LOP_RETURN;
@@ -1214,7 +1214,7 @@ LIR * IR2Dex::convertReturn(IN OUT IR ** ir, IN IR2DexCtx * cont)
 
 
 //AABBBBBBBB
-LIR * IR2Dex::convertGoto(IN OUT IR ** ir, IN IR2DexCtx * cont)
+LIR * IR2Dex::convertGoto(MOD IR ** ir, IN IR2DexCtx * cont)
 {
     LIRGOTOOp * lir = (LIRGOTOOp*)ymalloc(sizeof(LIRGOTOOp));
     lir->opcode = LOP_GOTO;
@@ -1230,7 +1230,7 @@ LIR * IR2Dex::convertGoto(IN OUT IR ** ir, IN IR2DexCtx * cont)
 
 
 //ABCCCC
-LIR * IR2Dex::convertBranch(bool is_truebr, IN OUT IR ** ir, IN IR2DexCtx * cont)
+LIR * IR2Dex::convertBranch(bool is_truebr, MOD IR ** ir, IN IR2DexCtx * cont)
 {
     LIR * lir = nullptr;
     IR * det = BR_det(*ir);
@@ -1283,7 +1283,7 @@ LIR * IR2Dex::convertBranch(bool is_truebr, IN OUT IR ** ir, IN IR2DexCtx * cont
 
 
 //AABBBBBBBB
-LIR * IR2Dex::convertSwitch(IN OUT IR ** ir, IN IR2DexCtx * cont)
+LIR * IR2Dex::convertSwitch(MOD IR ** ir, IN IR2DexCtx * cont)
 {
     LIRSwitchOp * lir = (LIRSwitchOp*)ymalloc(sizeof(LIRSwitchOp));
     IR * vexp = SWITCH_vexp(*ir);
@@ -1360,7 +1360,7 @@ LIR * IR2Dex::convertSwitch(IN OUT IR ** ir, IN IR2DexCtx * cont)
 }
 
 
-LIR * IR2Dex::convert(IN OUT IR ** ir, IN IR2DexCtx * cont)
+LIR * IR2Dex::convert(MOD IR ** ir, IN IR2DexCtx * cont)
 {
     ASSERT0((*ir)->is_stmt());
     switch ((*ir)->getCode()) {

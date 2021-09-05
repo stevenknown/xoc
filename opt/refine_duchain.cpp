@@ -47,27 +47,6 @@ bool RefineDUChain::dump() const
 }
 
 
-//This function try to require VN of base of ir.
-//Return the VN if found, and the indirect operation level.
-//e.g: given ILD(ILD(p)), return p and indirect_level is 2.
-//e.g2: given IST(ILD(q)), return q and indirect_level is 2.
-VN const* RefineDUChain::getVNOfIndirectOp(IR const* ir, UINT * indirect_level)
-{
-    ASSERT0(ir && (ir->is_ild() || ir->is_ist()));
-    ASSERT0(m_gvn);
-    IR const* base = ir;
-    *indirect_level = 1;
-    for (; base != nullptr && !base->is_ild() && !base->is_ist();
-         base = base->is_ild() ? ILD_base(base) : IST_base(base)) {
-        (*indirect_level)++;
-    }
-    ASSERT0(base);
-
-    //Get the VN of base expression.
-    return const_cast<GVN*>(m_gvn)->mapIR2VN(base);
-}
-
-
 //Return true if DU chain changed.
 bool RefineDUChain::processBB(IRBB const* bb)
 {
@@ -93,6 +72,53 @@ bool RefineDUChain::processBB(IRBB const* bb)
 }
 
 
+//Return true if indirect operation ir1 has same base expression with ir2.
+//TODO: use gvn to utilize value flow.
+bool RefineDUChain::hasSameBase(IR const* ir1, IR const* ir2)
+{
+    ASSERT0(ir1 && ir2);
+    if (!ir1->isIndirectMemOp() || !ir2->isIndirectMemOp()) {
+        //TODO: support more complex patterns.
+        return false;
+    }
+
+    IR const* base1 = ir1->getBase();
+    IR const* base2 = ir2->getBase();
+    MD const* basemd1 = base1->getRefMD();
+    MD const* basemd2 = base2->getRefMD();
+    if (basemd1 == nullptr || basemd2 == nullptr) {
+        //One of them is not memory object.
+        //TODO: use gvn to utilize value flow.
+        return false;
+    }
+
+    if (basemd1 != basemd2) {
+        //TODO: the value comparison between different MD should through GVN.
+        return false;
+    }
+
+    MDSSAInfo * basemdssa1 = m_mdssamgr->getMDSSAInfoIfAny(base1);
+    if (basemdssa1 == nullptr) { return false; }
+    MDSSAInfo * basemdssa2 = m_mdssamgr->getMDSSAInfoIfAny(base2);
+    if (basemdssa2 == nullptr) { return false; }
+    if (basemdssa1 == basemdssa2) {
+        //MDSSAInfo is stored at AI, it may be different between IR.
+        ASSERT0(basemdssa1->getVOpndForMD(basemd1->id(), m_mdssamgr));
+        return true;
+    }
+
+    //Check whether the MD has different version.
+    VMD const* basevmd1 = (VMD const*)basemdssa1->getVOpndForMD(basemd1->id(),
+                                                                m_mdssamgr);
+    if (basevmd1 == nullptr) { return false; }
+    VMD const* basevmd2 = (VMD const*)basemdssa2->getVOpndForMD(basemd2->id(),
+                                                                m_mdssamgr);
+    if (basevmd2 == nullptr) { return false; }
+    if (basevmd1 == basevmd2) { return true; }
+    return false;
+}
+
+
 //Return true if DU chain changed.
 bool RefineDUChain::processExpressionViaMDSSA(IR const* exp)
 {
@@ -110,7 +136,8 @@ bool RefineDUChain::processExpressionViaMDSSA(IR const* exp)
         VMD const* t = (VMD const*)m_mdssamgr->getUseDefMgr()->getVOpnd(i);
         ASSERT0(t && t->is_md());
         if (t->getDef() == nullptr) {
-            ASSERTN(t->version() == 0, ("Only zero version MD has no DEF"));
+            ASSERTN(t->version() == MDSSA_INIT_VERSION,
+                    ("Only zero version MD has no DEF"));
             continue;
         }
         if (t->getDef()->is_phi()) {
@@ -119,10 +146,13 @@ bool RefineDUChain::processExpressionViaMDSSA(IR const* exp)
         }
         IR const* defstmt = t->getDef()->getOcc();
         ASSERT0(defstmt);
+        if (!hasSameBase(exp, defstmt)) {
+            continue;
+        }
+
         if (exp->isNotOverlap(defstmt, m_rg)) {
             //Remove DU chain if we can guarantee ILD and its DEF stmt
             //are independent.
-            //mdssainfo->getVOpndSet()->remove(t, *m_sbs_mgr);
             m_mdssamgr->removeDUChain(defstmt, exp);
 
             //removeDUChain may remove VOpnd that indicated by 'next_i'.
@@ -141,11 +171,11 @@ bool RefineDUChain::processExpressionViaGVN(IR const* exp)
     ASSERT0(exp->is_exp());
     //Find the base expression that is not ILD.
     //e.g: given ILD(ILD(ILD(p))), the following loop will
-    //find out 'p'.
+    //reason out 'p'.
     UINT ild_star_level = 0;
-    VN const* vn_of_ild_base = getVNOfIndirectOp(exp, &ild_star_level);
+    VN const* vn_of_ild_base = getVNOfIndirectOp(exp, &ild_star_level, m_gvn);
     if (vn_of_ild_base == nullptr) {
-        //It is no need to analyze DEF set with have no VN.
+        //No need to analyze DEF set if there is no VN provided.
         return false;
     }
 
@@ -154,7 +184,7 @@ bool RefineDUChain::processExpressionViaGVN(IR const* exp)
 
     //Iterate each DEF stmt of 'exp'.
     bool change = false;
-    DUIter di = nullptr;
+    DUSetIter di = nullptr;
     INT next_i = -1;
     for (INT i = defset->get_first(&di); i >= 0; i = next_i) {
         next_i = defset->get_next(i, &di);
@@ -165,7 +195,8 @@ bool RefineDUChain::processExpressionViaGVN(IR const* exp)
 
         //Get VN of IST's base expression.
         UINT ist_star_level = 0;
-        VN const* vn_of_ist_base = getVNOfIndirectOp(stmt, &ist_star_level);
+        VN const* vn_of_ist_base = getVNOfIndirectOp(stmt, &ist_star_level,
+                                                     m_gvn);
         if (vn_of_ist_base == nullptr) {
             //It is no need to analyze DEF stmt with have no VN.
             continue;
@@ -215,6 +246,7 @@ bool RefineDUChain::perform(OptCtx & oc)
         //At least one kind of DU chain should be avaiable.
         return false;
     }
+
     if (m_is_use_gvn) {
         m_gvn = (GVN const*)m_rg->getPassMgr()->queryPass(PASS_GVN);
         if (m_gvn == nullptr || !m_gvn->is_valid()) {
@@ -223,12 +255,14 @@ bool RefineDUChain::perform(OptCtx & oc)
     } else {
         //Use MDSSA.
     }
+
     START_TIMER(t, getPassName());
     bool change = process();
     END_TIMER(t, getPassName());
     if (g_is_dump_after_pass && g_dump_opt.isDumpRefineDUChain()) {
         dump();
     }
+
     //This pass does not affect IR stmt/exp, but DU chain may be changed.
     return change;
 }

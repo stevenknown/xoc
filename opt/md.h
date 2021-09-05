@@ -180,7 +180,6 @@ public:
     Var * get_base() const { return MD_base(this); }
     UINT getBitOfst() const { return MD_ofst(this); }
     UINT getByteOfst() const { return MD_ofst(this); }
-    UINT getBitSize() const { return MD_size(this); }
     UINT getByteSize() const { return MD_size(this); }
     MD_TYPE getType() const { return (MD_TYPE)MD_ty(this); }
 
@@ -203,6 +202,10 @@ public:
     //current md: |-------|
     //m:            |-------|
     bool is_overlap(MD const* m) const;
+
+    //Return true if md can ONLY be put in MayDef or MayUse.
+    //And the md should NOT be effect MD.
+    bool is_may() const { return MD_is_may(this); }
 
     //Return true if md represent real object that would be emitted to
     //target machine. Fake object is not effect object.
@@ -424,8 +427,7 @@ public:
     //Return true if md overlaps with element in current MDSet.
     //Note this function will iterate all elements which is costly.
     //Use it carefully.
-    bool is_overlap_ex(MD const* md,
-                       Region const* current_ru,
+    bool is_overlap_ex(MD const* md, Region const* current_ru,
                        MDSystem const* mdsys) const;
     bool is_contain_inexact(MDSystem const* ms) const;
     bool is_contain_only_exact_and_str(MDSystem const* ms) const;
@@ -525,17 +527,8 @@ public:
     MDSetMgr(Region * rg, DefMiscBitSetMgr * mbsm);
     ~MDSetMgr() { destroy(); }
 
-    //Clean and give it back to md set manager.
-    //Do not destroy mds.
-    void free(MDSet * mds);
-
-    Region * getRegion() const { return m_rg; }
-    inline MDSet * get_free() { return m_free_md_set.remove_head(); }
-    UINT get_mdset_count() const { return m_md_set_list.get_elem_count(); }
-    UINT get_free_mdset_count() const { return m_free_md_set.get_elem_count(); }
-
-    //Create new MDSet.
-    MDSet * create()
+    //Allocate a new MDSet.
+    MDSet * alloc()
     {
         MDSet * mds = get_free();
         if (mds == nullptr) {
@@ -547,11 +540,21 @@ public:
         return mds;
     }
 
+    //Count memory usage for current object.
+    size_t count_mem() const;
+
     //Destroy MDSet manager.
     void destroy();
     void dump();
-    //Count memory usage for current object.
-    size_t count_mem() const;
+
+    //Clean and give it back to md set manager.
+    //Do not destroy mds.
+    void free(MDSet * mds);
+
+    Region * getRegion() const { return m_rg; }
+    inline MDSet * get_free() { return m_free_md_set.remove_head(); }
+    UINT get_mdset_count() const { return m_md_set_list.get_elem_count(); }
+    UINT get_free_mdset_count() const { return m_free_md_set.get_elem_count(); }
 };
 
 
@@ -650,28 +653,48 @@ public:
 
     void init(VarMgr * vm);
     void clean();
-    void computeOverlapExactMD(MD const* md,
-                               OUT MDSet * output,
-                               ConstMDIter & tabiter,
+    void computeOverlapExactMD(MD const* md, OUT MDSet * output,
+                               ConstMDIter & mditer,
                                DefMiscBitSetMgr & mbsmgr);
-    void computeOverlap(Region * current_ru,
-                        MD const* md,
-                        MDSet & output,
-                        ConstMDIter & tabiter,
-                        DefMiscBitSetMgr & mbsmgr,
-                        bool strictly);
-    void computeOverlap(Region * current_ru,
-                        IN OUT MDSet & mds,
-                        Vector<MD const*> & tmpvec,
-                        ConstMDIter & tabiter,
-                        DefMiscBitSetMgr & mbsmgr,
-                        bool strictly);
-    void computeOverlap(Region * current_ru,
-                        MDSet const& mds,
-                        OUT MDSet & output,
-                        ConstMDIter & tabiter,
-                        DefMiscBitSetMgr & mbsmgr,
-                        bool strictly);
+
+    //Compute all other MD which are overlapped with 'md', the output
+    //will include 'md' itself if there are overlapped MDs.
+    //e.g: given md1, and md1 overlapped with md2, md3,
+    //then output set is {md1, md2, md3}.
+    //md: input to compute the overlapped md-set.
+    //tabiter: for local use.
+    //strictly: set to true to compute if md may be overlapped
+    //            with global variables or import variables.
+    //Note this function does NOT clean output, and will append result to
+    //output.
+    void computeOverlap(Region * current_ru, MD const* md,
+                        OUT MDSet & output, ConstMDIter & mditer,
+                        DefMiscBitSetMgr & mbsmgr, bool strictly);
+
+    //Compute all other MD which are overlapped with MD in set 'mds'.
+    //e.g: mds contains {md1}, and md1 overlapped with md2, md3,
+    //then output set 'mds' is {md1, md2, md3}.
+    //mds: it is not only input but also output buffer.
+    //added: records the new MD that added into 'mds'.
+    //mditer: for local use.
+    //strictly: set to true to compute if md may be overlapped with global
+    //memory.
+    void computeOverlap(Region * current_ru, MOD MDSet & mds,
+                        OUT Vector<MD const*> & added, ConstMDIter & mditer,
+                        DefMiscBitSetMgr & mbsmgr, bool strictly);
+
+    //Compute all other MD which are overlapped with MD in set 'mds'.
+    //e.g: mds contains {md1}, and md1 overlapped with md2, md3,
+    //then output is {md2, md3}.
+    //mds: it is readonly input.
+    //output: output MD set.
+    //mditer: for local use.
+    //strictly: set to true to compute if MD may be overlapped with global
+    //memory.
+    //Note output do not need to clean before invoke this function.
+    void computeOverlap(Region * current_ru, MDSet const& mds,
+                        OUT MDSet & output, ConstMDIter & mditer,
+                        DefMiscBitSetMgr & mbsmgr, bool strictly);
 
     //Dump all registered MDs.
     void dump(bool only_dump_nonpr_md);
@@ -764,5 +787,18 @@ public:
 
     void dump(Region * rg);
 };
+
+inline bool isGlobalSideEffectMD(UINT id)
+{
+    return id == MD_GLOBAL_VAR || id == MD_IMPORT_VAR || id == MD_FULL_MEM;
+}
+
+inline bool isContainGlobalSideEffectMD(MDSet const& set)
+{
+    DefSBitSetCore const& lset = (DefSBitSetCore const&)set;
+    return lset.is_contain(MD_GLOBAL_VAR) || lset.is_contain(MD_IMPORT_VAR) ||
+           lset.is_contain(MD_FULL_MEM);
+}
+
 } //namespace xoc
 #endif

@@ -36,16 +36,17 @@ author: Su Zhenyu
 
 namespace xoc {
 
-typedef TMap<LabelInfo const*, IRBB*> LAB2BB;
+typedef TMap<LabelInfo const*, IRBB*> Lab2BB;
 
 //NOTICE:
 //1. For accelerating perform operation of each vertex, e.g
 //   compute dominator, please try best to add vertex with
 //   topological order.
 class IRCFG : public Pass, public CFG<IRBB, IR> {
+    COPY_CONSTRUCTOR(IRCFG);
 protected:
     Vector<IRBB*> m_bb_vec;
-    LAB2BB m_lab2bb;
+    Lab2BB m_lab2bb;
     Region * m_rg;
     TypeMgr * m_tm;
     CFG_SHAPE m_cs;
@@ -72,11 +73,18 @@ protected:
     bool removeTrampolinEdgeCase2(BBListIter bbct);
 
 public:
-    enum { DUMP_DETAIL = 0x1, DUMP_EH = 0x2, DUMP_MDSSA = 0x4 };
+    enum {
+        DUMP_DEF = 0x0, //the default dump option.
+        DUMP_DETAIL = 0x1, //Dump BB details, includes IR, AttachInfo, etc.
+        DUMP_EH = 0x2, //Dump exception handling info.
+        DUMP_MDSSA = 0x4, //Dump MDSSA info.
+
+        //Kind of combination of dump options.
+        DUMP_COMBINE = DUMP_DETAIL|DUMP_EH|DUMP_MDSSA,
+    };
 
     IRCFG(CFG_SHAPE cs, BBList * bbl, Region * rg,
           UINT edge_hash_size = 16, UINT vertex_hash_size = 16);
-    COPY_CONSTRUCTOR(IRCFG);
     virtual ~IRCFG() {}
 
     //Add LABEL to bb, and establish map between label and bb.
@@ -120,9 +128,8 @@ public:
     void build(OptCtx & oc);
 
     virtual void cf_opt();
-    void computeDomAndIdom(IN OUT OptCtx & oc, xcom::BitSet const* uni = nullptr);
-    void computePdomAndIpdom(IN OUT OptCtx & oc,
-                             xcom::BitSet const* uni = nullptr);
+    void computeDomAndIdom(MOD OptCtx & oc, BitSet const* uni = nullptr);
+    void computePdomAndIpdom(MOD OptCtx & oc, BitSet const* uni = nullptr);
 
     //Record the Exit BB here.
     virtual void computeExitList()
@@ -149,11 +156,9 @@ public:
         }
     }
 
-    void dumpVCG(CHAR const* name = nullptr,
-                 UINT flag = DUMP_DETAIL|DUMP_EH|DUMP_MDSSA);
-    void dumpDOT(CHAR const* name = nullptr,
-                 UINT flag = DUMP_DETAIL|DUMP_EH|DUMP_MDSSA);
-    void dumpDOT(FILE * h, UINT flag = DUMP_DETAIL|DUMP_EH|DUMP_MDSSA);
+    void dumpVCG(CHAR const* name = nullptr, UINT flag = DUMP_COMBINE);
+    void dumpDOT(CHAR const* name = nullptr, UINT flag = DUMP_COMBINE);
+    void dumpDOT(FILE * h, UINT flag);
 
     void erase();
 
@@ -187,10 +192,8 @@ public:
 
     //Return the inserted trampolining BB if exist.
     //This function will break fallthrough edge of 'to' if necessary.
-    IRBB * insertBBbetween(IN IRBB * from,
-                           IN BBListIter from_ct,
-                           IN IRBB * to,
-                           IN BBListIter to_ct,
+    IRBB * insertBBbetween(IN IRBB * from, IN BBListIter from_ct,
+                           IN IRBB * to, IN BBListIter to_ct,
                            IN IRBB * newbb);
     bool inverseAndRemoveTrampolineBranch();
     bool isRPOValid() const;
@@ -209,10 +212,29 @@ public:
         return BB_last_ir(bb);
     }
 
+    //Return the IRBB that is the No.'n' precedessor of given 'bb'.
+    IRBB * getPredBBNth(IRBB const* bb, UINT n) const
+    {
+        Vertex const* v = getInVertexNth(getVertex(bb->id()), n);
+        ASSERT0(v);
+        return getBB(v->id());
+    }
+
+    //Return the IRBB that is the No.'n' successor of given 'bb'.
+    IRBB * getSuccBBNth(IRBB const* bb, UINT n) const
+    {
+        Vertex const* v = getOutVertexNth(getVertex(bb->id()), n);
+        ASSERT0(v);
+        return getBB(v->id());
+    }
     Region * getRegion() { return m_rg; }
     UINT getNumOfBB() const { return getVertexNum(); }
+    UINT getNumOfSucc(IRBB const* bb) const
+    { return getOutDegree(getVertex(bb->id())); }
+    UINT getNumOfPred(IRBB const* bb) const
+    { return getInDegree(getVertex(bb->id())); }
     BBList * getBBList() { return m_bb_list; }
-    LAB2BB * getLabel2BBMap() { return &m_lab2bb; }
+    Lab2BB * getLabel2BBMap() { return &m_lab2bb; }
     IRBB * getBB(UINT id) const { return m_bb_vec.get(id); }
     virtual bool goto_opt(IRBB * bb);
     virtual CHAR const* getPassName() const { return "CFG"; }
@@ -243,7 +265,6 @@ public:
         }
 
         CHECK0_DUMMYUSE(find); //pred should be a predecessor of bb.
-
         return n;
     }
 
@@ -272,6 +293,8 @@ public:
         from->removeSuccessorDesignatePhiOpnd(this, to);
         CFG<IRBB, IR>::removeEdge(from, to);
     }
+    //The function remove labels that no one referenced.
+    bool removeRedundantLabel();
     bool removeTrampolinEdge();
     bool removeTrampolinBB();
     bool removeRedundantBranch();
@@ -302,10 +325,10 @@ public:
     //marker.
     //Return true if this function find a properly RPO for 'newbb', otherwise
     //return false.
-    bool tryUpdateRPO(IRBB * newbb,
-                      IRBB const* marker,
+    bool tryUpdateRPO(IRBB * newbb, IRBB const* marker,
                       bool newbb_prior_marker);
 
+    //Move all Labels which attached on src BB to tgt BB.
     virtual void moveLabels(IRBB * src, IRBB * tgt);
 
     virtual bool perform(OptCtx & oc) { build(oc); return false; }
@@ -316,9 +339,14 @@ public:
     //the trampolin branch.
     bool performMiscOpt(OptCtx & oc);
 
+    //The function verify whether the branch target is match to the BB.
+    bool verifyBranchTarget() const;
+    //The function verify the relationship between BB and LabelInfo.
+    bool verifyLabel2BB() const;
     //Verification at building SSA mode by ir parser.
     bool verifyPhiEdge(IR * phi, TMap<IR*, LabelInfo*> & ir2label) const;
     bool verifyRPO(OptCtx const& oc) const;
+    bool verify() const;
 };
 
 } //namespace xoc

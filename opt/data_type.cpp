@@ -60,7 +60,8 @@ TypeDesc const g_type_desc[] = {
     {D_PTR, "*", BYTE_PER_POINTER * BIT_PER_BYTE}, //pointer
     {D_VEC, "vec", 0}, //vector, default bitsize is 0
 
-    {D_ANY, "any", 0}, //void type, default bitsize is 0
+    //void type, default bitsize is as long as pointer type.
+    {D_ANY, "any", BYTE_PER_POINTER * BIT_PER_BYTE},
     {D_TENSOR, "tensor", 0}, //tensor type, default bitsize is 0
 };
 

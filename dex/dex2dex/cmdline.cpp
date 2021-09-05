@@ -80,7 +80,7 @@ static bool is_dex_source_file(CHAR const* fn)
 }
 
 
-static bool create_dump_file(UINT argc, CHAR const* argv[], IN OUT UINT & i)
+static bool create_dump_file(UINT argc, CHAR const* argv[], MOD UINT & i)
 {
     CHAR const* dumpfile = nullptr;
     if (i + 1 < argc && argv[i + 1] != nullptr) {
@@ -95,7 +95,7 @@ static bool create_dump_file(UINT argc, CHAR const* argv[], IN OUT UINT & i)
 
 
 //Return true if command line is valid, otherwise return false.
-static bool process_prefix_dump(UINT argc, CHAR const* argv[], IN OUT UINT & i)
+static bool process_prefix_dump(UINT argc, CHAR const* argv[], MOD UINT & i)
 {
     if (strcmp(argv[i], "-dump") == 0) {
         return create_dump_file(argc, argv, i);
@@ -106,7 +106,7 @@ static bool process_prefix_dump(UINT argc, CHAR const* argv[], IN OUT UINT & i)
 
 
 //Return true if command line is valid, otherwise return false.
-static bool process_silence(UINT argc, CHAR const* argv[], IN OUT UINT & i)
+static bool process_silence(UINT argc, CHAR const* argv[], MOD UINT & i)
 {
     if (strcmp(argv[i], "-silence") == 0) {
         g_silence = true;
@@ -118,7 +118,7 @@ static bool process_silence(UINT argc, CHAR const* argv[], IN OUT UINT & i)
 }
 
 
-static bool process_o(UINT argc, CHAR const* argv[], IN OUT UINT & i)
+static bool process_o(UINT argc, CHAR const* argv[], MOD UINT & i)
 {
     CHAR const* output = nullptr;
     if (i + 1 < argc && argv[i + 1] != nullptr) {

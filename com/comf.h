@@ -59,7 +59,7 @@ void af2i(IN CHAR * f, OUT BYTE * buf, INT buflen, bool is_double);
 //array: sorted in incremental order.
 //n: elements size of array.
 //v: search v in array.
-bool binsearch(INT array[], UINT n, INT v, IN OUT UINT * ppos);
+bool binsearch(INT array[], UINT n, INT v, MOD UINT * ppos);
 
 //Combination
 //C(n,m)=(n*(n-1)*...*(n-m+1))/m! = n!/m!(n-m)!
@@ -93,8 +93,8 @@ INT exgcd(INT a, INT b, OUT INT & x, OUT INT & y);
 //Factorial of n, namely, requiring n!.
 UINT fact(UINT n);
 
-//Searchs for sub-string.
-INT findstr(CHAR * src, CHAR * s);
+//Find sub-string in 'src'.
+bool findsubstr(CHAR const* src, CHAR const* substr);
 
 //Extract the right most sub-string which separated by 'separator' from string.
 //e.g: Given string is a\b\c, separator is '\', return c;
@@ -187,6 +187,14 @@ bool isIntegerF(float f);
 //Judge if 'd' is integer conform to IEEE754 spec.
 bool isIntegerD(double d);
 
+//Return true if 'f' represents a finite floating-point value.
+//f: is conform to IEEE754 spec.
+bool isFiniteD(double f);
+
+//Return true if 'f' represents a finite floating-point value.
+//f: is conform to IEEE754 spec.
+bool isFiniteF(float f);
+
 //inline is necessary to avoid multiple define.
 inline bool isPowerOf2(ULONGLONG x) { return (x != 0 && (x & (x-1)) == 0); }
 bool isPowerOf5(double f);
@@ -238,7 +246,7 @@ bool xstrcmp(CHAR const* p1, CHAR const* p2, INT n);
 //Format string and record in buf.
 //'buf': output buffer record string.
 //'stack_start': point to the first args.
-CHAR * xsprintf(IN OUT CHAR * buf, UINT buflen, CHAR const* format, ...);
+CHAR * xsprintf(MOD CHAR * buf, UINT buflen, CHAR const* format, ...);
 
 //Convert a string into long integer.
 //e.g: cl = '1','2','3','4','5'

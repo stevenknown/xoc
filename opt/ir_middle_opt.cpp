@@ -130,6 +130,11 @@ bool Region::performSimplify(OptCtx & oc)
         }
         if (need_rebuild_prssa) {
             prssamgr->construction(oc);
+            if (getDUMgr() != nullptr && !oc.is_du_chain_valid()) {
+                //PRSSAMgr will destruct classic DU-chain.
+                getDUMgr()->cleanDUSet();
+                oc.setInvalidDUChain();
+            }
         }
 
         getCFG()->performMiscOpt(oc);
@@ -198,6 +203,11 @@ void Region::doBasicAnalysis(OptCtx & oc)
             ASSERT0(ssamgr);
             if (!ssamgr->is_valid()) {
                 ssamgr->construction(oc);
+                if (getDUMgr() != nullptr && !oc.is_du_chain_valid()) {
+                    //PRSSAMgr will destruct classic DU-chain.
+                    getDUMgr()->cleanDUSet();
+                    oc.setInvalidDUChain();
+                }
             }
         }
         if (g_do_md_ssa) {

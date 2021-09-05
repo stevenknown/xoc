@@ -273,6 +273,8 @@ void LogMgr::fini()
 
 //Save current log file handler and name into stack, and set given handler
 //and filename as current.
+//h: file handler
+//filename: file name of h
 void LogMgr::push(FILE * h, CHAR const* filename)
 {
     LogCtx ctx;
