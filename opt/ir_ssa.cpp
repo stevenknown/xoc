@@ -763,7 +763,7 @@ IR * PRSSAMgr::insertOpndAt(IR * phi, UINT pos, IRBB const* pred)
         ASSERT0(def);
         newopnd = m_rg->buildPRdedicated(def->getResultPR()->getPrno(),
                                          def->getType());
-        m_rg->allocPRMD(newopnd);
+        m_rg->getMDMgr()->allocPRMD(newopnd);
         newopnd->setSSAInfo(livein_def);
 
         //Add USE to SSAInfo.
@@ -772,7 +772,7 @@ IR * PRSSAMgr::insertOpndAt(IR * phi, UINT pos, IRBB const* pred)
         ASSERT0(init_version && init_version->is_init_version());
         newopnd = m_rg->buildPRdedicated(init_version->orgprno(),
                                          init_version->orgpr_type());
-        m_rg->allocPRMD(newopnd);
+        m_rg->getMDMgr()->allocPRMD(newopnd);
         newopnd->setSSAInfo(init_version);
 
         //Add USE to SSAInfo.
@@ -1436,7 +1436,8 @@ void PRSSAMgr::stripPhi(IR * phi, IRListIter phict)
 
     //Temprarory RP to hold the result of PHI.
     IR * phicopy = m_rg->buildPR(phi->getType());
-    phicopy->setMustRef(m_rg->genMDForPR(PR_no(phicopy), phicopy->getType()),
+    phicopy->setMustRef(m_rg->getMDMgr()->genMDForPR(PR_no(phicopy),
+                                                     phicopy->getType()),
                         m_rg);
     phicopy->cleanMayRef();
     IR * opnd = PHI_opnd_list(phi);
@@ -2077,7 +2078,7 @@ void PRSSAMgr::stripSpecifiedVP(VPR * vp)
     IR * replaced_one = replace_res_pr(def, vp->orgprno(), newprno, newprty);
     ASSERT0(replaced_one);
 
-    MD const* md = m_rg->genMDForPR(newprno, newprty);
+    MD const* md = m_rg->getMDMgr()->genMDForPR(newprno, newprty);
     replaced_one->setMustRef(md, m_rg);
     if (replaced_one->isCallStmt()) {
         //Call stmts may have sideeffect modify MDSet.

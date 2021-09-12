@@ -132,6 +132,15 @@ class DeadCodeElim : public Pass {
     bool removeIneffectIR(OUT bool & remove_branch_stmt);
     bool removeRedundantPhi();
 
+    bool tryMarkBranch(IRBB const* bb, OUT List<IR const*> & act_ir_lst);
+    bool tryMarkUnconditionalBranch(IRBB const* bb,
+                                    MOD List<IR const*> & act_ir_lst);
+
+    //The function marks possible predecessor in CFG to be effect BB, e.g back-edge.
+    bool markCFGPred(IRBB const* bb);
+    bool markControlPredAndStmt(IRBB const* bb,
+                                OUT List<IR const*> & act_ir_lst);
+
     //Set control-dep bb to be effective.
     bool setControlDepBBToBeEffect(IRBB const* bb,
                                    MOD List<IR const*> & act_ir_lst);
@@ -159,7 +168,6 @@ public:
         m_is_elim_cfs = true;
         m_is_reserve_phi = false;
         m_is_use_md_du = true;
-        m_cdg = nullptr;
     }
     virtual ~DeadCodeElim() {}
 

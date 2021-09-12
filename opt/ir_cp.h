@@ -146,6 +146,13 @@ private:
     void replaceExp(IR * exp, IR const* cand_exp, MOD CPCtx & ctx);
     void replaceExpViaSSADu(IR * exp, IR const* cand_exp, MOD CPCtx & ctx);
 
+    //Check if the CVT can be discarded and the cvt-expression will be regarded
+    //as the recommended propagate value.
+    //prop_value: indicates the value that will be propagated, must be CVT.
+    //Note that user can implement target dependent interface to enable
+    //more policies.
+    virtual IR const* tryDiscardCVT(IR const* prop_value) const;
+
     bool useMDSSADU() const
     { return m_mdssamgr != nullptr && m_mdssamgr->is_valid(); }
     bool usePRSSADU() const

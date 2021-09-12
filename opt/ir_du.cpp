@@ -1426,6 +1426,16 @@ void DUMgr::coalesceDUChain(IR * from, IR * to)
     //Def stmt set of 'to'.
     DUSet * defs = to->getDUSet();
     defs->remove(from->id(), *getSBSMgr());
+   
+    //Iterate each DEF of 'to', remove 'to' from their UseSet.
+    DUSetIter it = nullptr;
+    for (INT i = defs->get_first(&it); i >= 0; i = defs->get_next(i, &it)) {
+        IR const* def = m_rg->getIR((UINT)i);
+        ASSERT0(def && def->isMemoryRef());
+        DUSet * useset = def->getDUSet();
+        ASSERT0(useset);
+        useset->removeUse(to, *getSBSMgr());
+    }
 
     //Iterate USE of 'from', change each USE's definition to to_def.
     DUSetIter it1 = nullptr;

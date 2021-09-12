@@ -42,6 +42,7 @@ author: Su Zhenyu
 #include "targ_info.h"
 #include "prssainfo.h"
 #include "mdssainfo.h"
+#include "cdg.h"
 #include "cfg.h"
 #include "ir_cfg.h"
 #include "solve_set.h"

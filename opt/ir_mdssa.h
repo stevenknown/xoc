@@ -1,5 +1,5 @@
 /*@
-Copyright (c) 2013-2014, Su Zhenyu steven.known@gmail.com
+Copyright (c) 2013-2021, Su Zhenyu steven.known@gmail.com
 
 All rights reserved.
 
@@ -152,9 +152,15 @@ protected:
                           xcom::List<IR*> & lst,
                           xcom::List<IR*> & opnd_lst) const;
     void dumpBBRef(IN IRBB * bb, UINT indent);
+    void dumpIRWithMDSSAForStmt(IR const* ir, UINT flag,
+                                bool & parting_line) const;
+    void dumpIRWithMDSSAForExp(IR const* ir, UINT flag,
+                               bool & parting_line) const;
     bool doOpndHaveValidDef(MDPhi const* phi) const;
     bool doOpndHaveSameDef(MDPhi const* phi, OUT VMD ** common_def) const;
 
+    //Replace opnd of PHI of 'succ' with top SSA version.
+    void handlePhiInSuccBB(IRBB * succ, UINT opnd_idx);
     void handleBBRename(IRBB * bb, xcom::DefSBitSet const& effect_mds,
                         IN DefSBitSet & defed_mds,
                         MOD BB2VMDMap & bb2vmdmap);
@@ -169,6 +175,7 @@ protected:
 
     xcom::Stack<VMD*> * mapMD2VMDStack(UINT mdid);
 
+    void renamePhiOpndInSuccBB(IRBB * bb);
     void renamePhiResult(IN IRBB * bb);
     void renameUse(IR * ir);
     void renameDef(IR * ir, IRBB * bb);
@@ -179,8 +186,15 @@ protected:
     void renameInDomTreeOrder(xcom::DefSBitSet const& effect_mds,
                               IRBB * root, xcom::Graph & dtree,
                               Vector<DefSBitSet*> & defed_mds_vec);
-    //The function remove 'vopnd' from MDSSAInfo for each ir in the 'irset'.
-    void removeVOpndFromUseSet(VOpnd const* vopnd, IRSet const* irset);
+    //The function remove 'vopnd' from MDSSAInfo of each ir in its UsetSet.
+    //Note the UseSet will be clean.
+    void removeVOpndForAllUse(MOD VMD * vopnd);
+
+    //The function change VOpnd from 'from' to 'to', for each IR ir in 'from'
+    //UseSet.
+    //Note the UseSet of 'from' will be clean.
+    void replaceVOpndForAllUse(MOD VMD * to, MOD VMD * from);
+
     //The function remove and clean all information of 'vmd' from MDSSAMgr.
     void removeVMD(VMD * vmd) { getUseDefMgr()->removeVMD(vmd); }
 
@@ -220,6 +234,8 @@ protected:
     //Union successors in NextSet from 'from' to 'to'.
     void unionSuccessors(MDDef const* from, MDDef const* to);
 
+    bool verifyDUChainAndOccForPhi(MDPhi const* phi) const;
+    bool verifyPhiOpndList(MDPhi const* phi, UINT prednum) const;
     bool verifyMDSSAInfoUniqueness() const;
     void verifyDef(MDDef const* def, VMD const* vopnd) const;
     //Check SSA uses.
@@ -324,6 +340,8 @@ public:
     //Dump MDSSA DU stmt graph.
     void dumpSSAGraph(CHAR * name = nullptr);
     //Dump IR tree and MDSSAInfo if any.
+    //ir: can be stmt or expression.
+    //flag: the flag to dump IR.
     void dumpIRWithMDSSA(IR const* ir, UINT flag = IR_DUMP_COMBINE) const;
 
     //Find killing must-def for expression ir.

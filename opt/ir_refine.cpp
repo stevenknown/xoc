@@ -275,15 +275,17 @@ IR * Refine::refineILoad1(IR * ir, bool & change, RefineCtx & rc)
 
     ld->copyRef(ir, m_rg);
     //Consider the ir->getOffset() and copying MDSet info from 'ir' to 'ld.
-    MD const* t = m_rg->allocRefForLoad(ld);
+    m_rg->allocRefForLoad(ld);
     recomputeMayRef(ld);
     //The new MustRef may be not overlapped with the MayRef.
-    //CHECK0_DUMMYUSE(checkMDSetContain(ld, t));
+    //CHECK0_DUMMYUSE(checkMDSetContain(ld, ld->getMustRef()));
     ld->copyAI(ir, m_rg);
 
     //Note: the recomputation of MustRef may generate new MD that not
     //versioned by MDSSAMgr. Use MDSSA API to fix the SSA information.
-    xoc::changeUse(ir, ld, m_rg);
+    //xoc::changeUse(ir, ld, m_rg);
+    xoc::copyAndAddMDSSAOcc(ld, ir, m_rg);
+    xoc::removeUseForTree(ir, m_rg);
     xoc::removeExpiredDU(ld, m_rg);
 
     m_rg->freeIRTree(ir);
@@ -308,15 +310,17 @@ IR * Refine::refineILoad2(IR * ir, bool & change, RefineCtx & rc)
     LD_ofst(ld) = LDA_ofst(base) + ILD_ofst(ir);
     copyDbx(ld, ir, m_rg);
     ld->copyRef(ir, m_rg);
-    MD const* t = m_rg->allocRefForLoad(ld);
+    m_rg->allocRefForLoad(ld);
     recomputeMayRef(ld);
     //The new MustRef may be not overlapped with the MayRef.
-    CHECK0_DUMMYUSE(checkMDSetContain(ld, t));
+    //CHECK0_DUMMYUSE(checkMDSetContain(ld, ld->getMustRef()));
     ld->copyAI(ir, m_rg);
 
     //Note: the recomputation of MustRef may generate new MD that not
     //versioned by MDSSAMgr. Use MDSSA API to fix the SSA information.
-    xoc::changeUse(ir, ld, m_rg);
+    //xoc::changeUse(ir, ld, m_rg);
+    xoc::copyAndAddMDSSAOcc(ld, ir, m_rg);
+    xoc::removeUseForTree(ir, m_rg);
     xoc::removeExpiredDU(ld, m_rg);
 
     m_rg->freeIRTree(ir);
@@ -517,7 +521,8 @@ IR * Refine::refineIStore(IR * ir, bool & change, RefineCtx & rc)
         //3. IST(LDA(var,ofst))=X to ST(var, ofst)=X
         //4. IST(LDA(var,ofst1), ofst2)=X to ST(var, ofst1+ofst2)=X
         IR * newir = m_rg->buildStore(LDA_idinfo(base), ir->getType(),
-            LDA_ofst(base) + IST_ofst(ir), IST_rhs(ir));
+                                      LDA_ofst(base) + IST_ofst(ir),
+                                      IST_rhs(ir));
         newir->copyRef(ir, m_rg);
         MD const* newmd = m_rg->allocRefForStore(newir);
         recomputeMayRef(ir);
@@ -528,7 +533,7 @@ IR * Refine::refineIStore(IR * ir, bool & change, RefineCtx & rc)
         //modified.
         //e.g: p = &a; p = &b;
         //IST(p, 10), IST may be defined a, b;
-        //After change to ST(a, 10), ST only define a, and is not
+        //After change to ST(a, 10), ST only define a, and will not
         //define b any more.
         xoc::changeDef(ir, newir, m_rg);
         xoc::removeExpiredDU(newir, m_rg);
@@ -549,10 +554,10 @@ IR * Refine::refineIStore(IR * ir, bool & change, RefineCtx & rc)
         copyDbx(newrhs, rhs, m_rg);
         newrhs->copyRef(rhs, m_rg);
 
-        MD const* newmd = m_rg->allocRefForLoad(newrhs);
-        //The new MustRef may be not overlapped with the MayRef.
-        CHECK0_DUMMYUSE(checkMDSetContain(newrhs, newmd));
+        m_rg->allocRefForLoad(newrhs);
         recomputeMayRef(newrhs);
+        //The new MustRef may be not overlapped with the MayRef.
+        //CHECK0_DUMMYUSE(checkMDSetContain(newrhs, newrhs->getMustRef()));
         newrhs->copyAI(rhs, m_rg);
 
         //Note: the recomputation of MustRef may generate new MD that not
@@ -604,7 +609,7 @@ IR * Refine::refineStore(IR * ir, bool & change, RefineCtx & rc)
         ir->is_stpr() &&
         PR_no(rhs) == STPR_no(ir)) {
         //Remove pr1 = pr1.
-        coalesceDUChain(ir, rhs, m_rg);
+        xoc::coalesceDUChain(ir, rhs, m_rg);
 
         IRBB * bb = ir->getBB();
         if (bb != nullptr) {
@@ -632,7 +637,7 @@ IR * Refine::refineStore(IR * ir, bool & change, RefineCtx & rc)
                 ;
             } else {
                 change = true;
-                coalesceDUChain(ir, rhs, m_rg);
+                xoc::coalesceDUChain(ir, rhs, m_rg);
                 IRBB * bb = ir->getBB();
                 if (bb != nullptr) {
                     BB_irlist(bb).remove(ir);
@@ -1832,7 +1837,7 @@ IR * Refine::refineStoreArray(IR * ir, bool & change, RefineCtx & rc)
                 ;
             } else {
                 change = true;
-                coalesceDUChain(ir, newrhs, m_rg);
+                xoc::coalesceDUChain(ir, newrhs, m_rg);
 
                 IRBB * bb = ir->getBB();
                 if (bb != nullptr) {

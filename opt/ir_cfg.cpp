@@ -2225,10 +2225,10 @@ bool IRCFG::performMiscOpt(OptCtx & oc)
         if (g_is_dump_after_pass && g_dump_opt.isDumpCFGOpt()) {
             dumpDOT(getRegion()->getLogMgr()->getFileHandler(), DUMP_COMBINE);
         }
+        ASSERT0(verifyIRandBB(getBBList(), m_rg));
+        ASSERT0(verifyRPO(oc));
     }
 
-    ASSERT0(verifyIRandBB(getBBList(), m_rg));
-    ASSERT0(verifyRPO(oc));
     END_TIMER(t, "CFG Optimizations");
     return change;
 }

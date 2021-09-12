@@ -1,5 +1,5 @@
 /*@
-Copyright (c) 2013-2014, Su Zhenyu steven.known@gmail.com
+Copyright (c) 2013-2021, Su Zhenyu steven.known@gmail.com
 
 All rights reserved.
 
@@ -51,6 +51,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include "loop.h"
 #include "pass_mgr.h"
 #include "attachinfo_mgr.h"
+#include "md_mgr.h"
 #include "region_mgr.h"
 #include "analysis_instr.h"
 #include "region.h"

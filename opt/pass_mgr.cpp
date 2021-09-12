@@ -178,7 +178,7 @@ Pass * PassMgr::allocMDSSAMgr()
 }
 
 
-xcom::Graph * PassMgr::allocCDG()
+Pass * PassMgr::allocCDG()
 {
     return new CDG(m_rg);
 }
@@ -270,7 +270,7 @@ xcom::Graph * PassMgr::registerGraphBasedPass(PASS_TYPE opty)
     xcom::Graph * pass = nullptr;
     switch (opty) {
     case PASS_CDG:
-        pass = allocCDG();
+        //pass = allocCDG();
         break;
     default: ASSERTN(0, ("Unsupport Optimization."));
     }
@@ -342,7 +342,8 @@ Pass * PassMgr::registerPass(PASS_TYPE opty)
         pass = allocCCP();
         break;
     case PASS_CDG:
-        return (Pass*)registerGraphBasedPass(opty);
+        pass = allocCDG();
+        break;
     case PASS_EXPR_TAB:
         pass = allocExprTab();
         break;
@@ -446,7 +447,7 @@ void PassMgr::checkValidAndRecompute(OptCtx * oc, PassTypeList & optlist)
                 ASSERT0(cdg); //cdg is not enable.
                 ASSERTN(cfg && oc->is_cfg_valid(),
                         ("You should make CFG available first."));
-                cdg->rebuild(*oc, *cfg);
+                cdg->perform(*oc);
             }
             break;
         case PASS_DOM:

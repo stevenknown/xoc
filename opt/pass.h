@@ -31,8 +31,8 @@ IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 author: Su Zhenyu
 @*/
-#ifndef __IR_OPT_H__
-#define __IR_OPT_H__
+#ifndef __PASS_H__
+#define __PASS_H__
 
 namespace xoc {
 

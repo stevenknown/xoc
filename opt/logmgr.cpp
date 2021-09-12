@@ -1,5 +1,5 @@
 /*@
-Copyright (c) 2013-2014, Su Zhenyu steven.known@gmail.com
+Copyright (c) 2013-2021, Su Zhenyu steven.known@gmail.com
 
 All rights reserved.
 
@@ -271,6 +271,34 @@ void LogMgr::fini()
 }
 
 
+//The function will create LogCtx according to given filename, and push on the
+//stack.
+//is_del: true to delete the same name file.
+bool LogMgr::pushAndCreate(CHAR const* filename, bool is_del)
+{
+    ASSERT0(filename);
+    if (is_del) {
+        UNLINK(filename);
+    }
+    FILE * h = ::fopen(filename, "a+");
+    if (h == nullptr) { return false; }
+    push(h, filename);
+    return true;
+}
+
+
+//The function will pop and discard the top object on the stack and destroy
+//the related resource.
+void LogMgr::popAndDestroy()
+{
+    LogCtx lc = getCurrentCtx();
+    pop();
+    if (lc.logfile != nullptr) {
+        ::fclose(lc.logfile);
+    }
+}
+
+
 //Save current log file handler and name into stack, and set given handler
 //and filename as current.
 //h: file handler
@@ -293,7 +321,8 @@ void LogMgr::push(LogCtx const& ctx)
 }
 
 
-//Restore file handler and filename that is in top of stack.
+//The function discard the current CTX object that is on the top of stack, and
+//restore file handler and filename.
 void LogMgr::pop()
 {
     m_ctx = m_ctx_stack.pop();

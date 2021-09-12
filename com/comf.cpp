@@ -762,7 +762,6 @@ bool findsubstr(CHAR const* src, CHAR const* substr)
                 if (q[l] != substr[l]) { break; }
                 l++;
             }
-
             if (substr[l] == 0) { //match seacrching
                 return true;
             }

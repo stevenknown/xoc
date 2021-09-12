@@ -1,5 +1,5 @@
 /*@
-Copyright (c) 2013-2014, Su Zhenyu steven.known@gmail.com
+Copyright (c) 2013-2021, Su Zhenyu steven.known@gmail.com
 
 All rights reserved.
 
@@ -190,6 +190,7 @@ public:
     VMD();
     VMD(xcom::DefSegMgr * sm);
     ~VMD();
+    //Add an USE occurrence.
     void addUse(IR const* ir) { VMD_occs(this).append(ir); }
 
     void clean();

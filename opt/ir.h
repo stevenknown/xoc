@@ -2091,11 +2091,7 @@ public:
     UINT getDimNum() const
     {
         ASSERT0(isArrayOp());
-        UINT dim = 0;
-        for (IR const* s = ARR_sub_list(this); s != nullptr; s = s->get_next()) {
-            dim++;
-        }
-        return dim;
+        return xcom::cnt_list(ARR_sub_list(this));
     }
 
     //Return the number of element in given dimension.

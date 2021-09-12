@@ -1,5 +1,5 @@
 /*@
-Copyright (c) 2013-2014, Su Zhenyu steven.known@gmail.com
+Copyright (c) 2013-2021, Su Zhenyu steven.known@gmail.com
 
 All rights reserved.
 
@@ -99,6 +99,7 @@ public:
     //LogMgr operate the correct IO resource when using 'push' and 'pop'.
     void fini();
 
+    LogCtx const& getCurrentCtx() const { return m_ctx; }
     FILE * getFileHandler() const { return m_ctx.logfile; }
     CHAR const* getFileName() const { return m_ctx.logfile_name; }
     INT getIndent() const { return m_ctx.indent; }
@@ -125,6 +126,13 @@ public:
     //filename: file name of h
     void push(FILE * h, CHAR const* filename);
     void push(LogCtx const& ctx);
+    //The function will create LogCtx according to given filename, and
+    //push on the stack.
+    //is_del: true to delete the same name file.
+    bool pushAndCreate(CHAR const* filename, bool is_del);
+    //The function will pop and discard the top object on the stack and destroy
+    //the related resource.
+    void popAndDestroy();
     //Restore file handler and filename that is in top of stack.
     void pop();
 

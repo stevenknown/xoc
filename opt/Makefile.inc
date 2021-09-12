@@ -53,5 +53,6 @@ OPT_OBJS +=\
 ../opt/ai.o\
 ../opt/gscc.o\
 ../opt/lftr.o\
-../opt/ir_ivr.o
+../opt/ir_ivr.o\
+../opt/md_mgr.o
 

@@ -36,6 +36,8 @@ author: Su Zhenyu
 
 namespace xoc {
 
+class CDG;
+
 //Sort Sequence
 typedef enum {
     SEQ_UNDEF = 0,
@@ -484,6 +486,7 @@ public:
         return succ;
     }
 
+    //Perform verification if BB has been removed.
     bool verifyIfBBRemoved(CDG const* cdg, OptCtx const& oc) const;
     bool verify() const
     {
@@ -611,7 +614,7 @@ void CFG<BB, XR>::dumpLoopTree(LI<BB> const* looplist, UINT indent,
 }
 
 
-//Do verification while BB removed.
+//Perform verification if BB has been removed.
 template <class BB, class XR>
 bool CFG<BB, XR>::verifyIfBBRemoved(CDG const* cdg, OptCtx const& oc) const
 {
@@ -654,7 +657,7 @@ bool CFG<BB, XR>::verifyIfBBRemoved(CDG const* cdg, OptCtx const& oc) const
                     continue;
                 }
 
-                if (!cdg->is_cd(bb->id(), succ->id())) {
+                if (!cdg->is_control(bb->id(), succ->id())) {
                     //bb should not be empty, requires GOTO at least.
                     UNREACHABLE();
                 }

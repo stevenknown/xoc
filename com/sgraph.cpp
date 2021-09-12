@@ -1417,6 +1417,7 @@ bool DGraph::computePdomByRpo(Vertex * root, BitSet const* uni)
 
 //Vertices should have been sorted in topological order.
 //We access them by reverse-topological order.
+//Note the graph may NOT have an exit vertex.
 bool DGraph::computePdom(List<Vertex const*> const* vlst)
 {
     ASSERT0(vlst);
@@ -1426,7 +1427,7 @@ bool DGraph::computePdom(List<Vertex const*> const* vlst)
         Vertex const* u = ct->val();
         ASSERT0(u);
         uni.bunion(VERTEX_id(u));
-    }
+    }    
     return computePdom(vlst, &uni);
 }
 
@@ -1435,6 +1436,7 @@ bool DGraph::computePdom(List<Vertex const*> const* vlst)
 //And we access them by reverse-topological order.
 //vlst: vertex list.
 //uni: universe.
+//Note the graph may NOT have an exit vertex.
 bool DGraph::computePdom(List<Vertex const*> const* vlst, BitSet const* uni)
 {
     ASSERT0(vlst && uni);
@@ -1445,6 +1447,7 @@ bool DGraph::computePdom(List<Vertex const*> const* vlst, BitSet const* uni)
         Vertex const* v = ct->val();
         ASSERT0(v);
         if (is_graph_exit(v)) {
+            //Note the graph may NOT have an exit vertex.
             BitSet * pdom = get_pdom_set(v);
             pdom->clean();
             pdom->bunion(VERTEX_id(v));
@@ -1468,6 +1471,7 @@ bool DGraph::computePdom(List<Vertex const*> const* vlst, BitSet const* uni)
             ASSERT0(v);
             UINT vid = VERTEX_id(v);
             if (is_graph_exit(v)) {
+                //Note the graph may NOT have an exit vertex.
                 continue;
             }
 
@@ -1511,7 +1515,7 @@ bool DGraph::computeDom2(List<Vertex const*> const& vlst)
         doms->clean();
         ASSERT0(doms);
         for (UINT idom = get_idom(VERTEX_id(v));
-             idom != 0; idom = get_idom(idom)) {
+             idom != VERTEX_UNDEF; idom = get_idom(idom)) {
             if (avail.is_contain(idom)) {
                 BitSet const* idom_doms = get_dom_set(idom);
                 doms->copy(*idom_doms);
@@ -1560,7 +1564,7 @@ bool DGraph::computeIdom2(List<Vertex const*> const& vlst)
                 Vertex const* pred = ec->getFrom();
                 UINT pid = VERTEX_id(pred);
 
-                if (m_idom_set.get(pid) == 0) {
+                if (m_idom_set.get(pid) == VERTEX_UNDEF) {
                     ec = EC_next(ec);
                     continue;
                 }
@@ -1605,8 +1609,8 @@ bool DGraph::computeIdom2(List<Vertex const*> const& vlst)
             }
 
             if (idom == nullptr) {
-                if (m_idom_set.get(v->id()) != 0) {
-                    m_idom_set.set(v->id(), 0);
+                if (m_idom_set.get(v->id()) != VERTEX_UNDEF) {
+                    m_idom_set.set(v->id(), VERTEX_UNDEF);
                     change = true;
                 }
             } else if ((UINT)m_idom_set.get(v->id()) != idom->id()) {
@@ -1621,7 +1625,7 @@ bool DGraph::computeIdom2(List<Vertex const*> const& vlst)
         Vertex const* v = ct->val();
         ASSERT0(v);
         if (is_graph_entry(v)) {
-            m_idom_set.set(v->id(), 0);
+            m_idom_set.set(v->id(), VERTEX_UNDEF);
             nentry--;
             if (nentry == 0) { break; }
         }
@@ -1649,7 +1653,7 @@ bool DGraph::computeIdom()
             ASSERTN(p != nullptr, ("should compute dom first"));
             if (p->get_elem_count() == 1) {
                 //There is no idom if 'dom' set only contain itself.
-                ASSERT0(m_idom_set.get(cur_id) == 0);
+                ASSERT0(m_idom_set.get(cur_id) == VERTEX_UNDEF);
                 continue;
             }
             p->diff(cur_id);
@@ -1658,7 +1662,7 @@ bool DGraph::computeIdom()
             INT i;
             for (i = p->get_first(); i != -1; i = p->get_next((UINT)i)) {
                 if (m_dom_set.get((UINT)i)->is_equal(*p)) {
-                    ASSERT0(m_idom_set.get(cur_id) == 0);
+                    ASSERT0(m_idom_set.get(cur_id) == VERTEX_UNDEF);
                     m_idom_set.set(cur_id, i);
                     break;
                 }
@@ -1681,7 +1685,7 @@ bool DGraph::computeIdom()
             }
             i = tmp.get_first();
             ASSERTN(i != -1, ("cannot find idom of BB:%d", cur_id));
-            ASSERTN(m_idom_set.get(cur_id) == 0,
+            ASSERTN(m_idom_set.get(cur_id) == VERTEX_UNDEF,
                     ("recompute idom for BB:%d", cur_id));
             m_idom_set.set(cur_id, i);
             #endif
@@ -1781,7 +1785,7 @@ bool DGraph::computeIpdom()
         ASSERTN(p != nullptr, ("should compute pdom first"));
         if (p->get_elem_count() == 1) {
             //There is no ipdom if 'pdom' set only contain itself.
-            ASSERT0(m_ipdom_set.get(cur_id) == 0);
+            ASSERT0(m_ipdom_set.get(cur_id) == VERTEX_UNDEF);
             continue;
         }
 
@@ -1789,7 +1793,7 @@ bool DGraph::computeIpdom()
         INT i;
         for (i = p->get_first(); i != -1; i = p->get_next((UINT)i)) {
             if (m_pdom_set.get((UINT)i)->is_equal(*p)) {
-                ASSERT0(m_ipdom_set.get(cur_id) == 0);
+                ASSERT0(m_ipdom_set.get(cur_id) == VERTEX_UNDEF);
                 m_ipdom_set.set(cur_id, i);
                 break;
             }
@@ -1809,7 +1813,7 @@ void DGraph::get_dom_tree(OUT Graph & dom)
          v != nullptr; v = get_next_vertex(c)) {
         UINT vid = VERTEX_id(v);
         dom.addVertex(vid);
-        if (m_idom_set.get(vid) != 0) {
+        if (m_idom_set.get(vid) != VERTEX_UNDEF) {
             dom.addEdge((UINT)m_idom_set.get(vid), vid);
         }
     }
@@ -1822,9 +1826,9 @@ void DGraph::get_pdom_tree(OUT Graph & pdom)
     VertexIter c = VERTEX_UNDEF;
     for (Vertex * v = get_first_vertex(c);
          v != nullptr; v = get_next_vertex(c)) {
-        UINT vid = VERTEX_id(v);
+        UINT vid = v->id();
         pdom.addVertex(vid);
-        if (m_ipdom_set.get(vid) != 0) { //id of bb starting at 1.
+        if (m_ipdom_set.get(vid) != VERTEX_UNDEF) { //id of bb starting at 1.
             pdom.addEdge((UINT)m_ipdom_set.get(vid), vid);
         }
     }
@@ -1865,13 +1869,13 @@ void DGraph::dump_dom(FILE * h, bool dump_dom_tree)
             }
         }
 
-        if (m_idom_set.get(vid) != 0) {
+        if (m_idom_set.get(vid) != VERTEX_UNDEF) {
             fprintf(h, "\n     idom: %d", m_idom_set.get(vid));
         } else {
             fprintf(h, "\n");
         }
 
-        if (m_ipdom_set.get(vid) != 0) {
+        if (m_ipdom_set.get(vid) != VERTEX_UNDEF) {
             fprintf(h, "\n     ipdom: %d", m_ipdom_set.get(vid));
         } else {
             fprintf(h, "\n");

@@ -253,8 +253,8 @@ public:
     LabelInfoList const& getLabelListConst() const
     { return lab_list; }
     UINT getNumOfIR() const { return BB_irlist(this).get_elem_count(); }
-    UINT getNumOfPred(CFG<IRBB, IR> * cfg) const;
-    UINT getNumOfSucc(CFG<IRBB, IR> * cfg) const;
+    UINT getNumOfPred(CFG<IRBB, IR> const* cfg) const;
+    UINT getNumOfSucc(CFG<IRBB, IR> const* cfg) const;
     BBIRList * getIRList() { return &BB_irlist(this); }
     IR * getFirstIR() { return BB_first_ir(this); }
     IR * getNextIR() { return BB_next_ir(this); }

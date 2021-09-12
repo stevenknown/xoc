@@ -1168,14 +1168,6 @@ Programming Guides
       copy_referred_mds
       clean_use_mds
       clean_def_mds
-      getMayDef
-      getMustUse
-      getMayUse
-      get_must_def
-      get_effect_def_md
-      get_exact_def_md
-      get_effect_use_md
-      get_exact_use_md
       get_exact_unique_def
       free_mds
       map_call2mayuse
@@ -1195,7 +1187,6 @@ Programming Guides
       get_du
       get_du_c
       free_du_info
-      is_du_exist
       union_use
       union_useset
       union_def

@@ -132,7 +132,7 @@ void CopyProp::replaceExpViaSSADu(IR * exp, IR const* cand_exp, MOD CPCtx & ctx)
 }
 
 
-//Check and replace 'ir' with 'cand_exp' if they are
+//Check and replace 'exp' with 'cand_exp' if they are
 //equal, and update DU info. If 'cand_exp' is NOT leaf,
 //that will create redundant computation, and
 //depends on later Redundancy Elimination to reverse back.
@@ -506,6 +506,10 @@ void CopyProp::dumpCopyPropagationAction(IR const* def_stmt,
 
 
 //repexp: the expression that is expected to be replaced.
+//mdssainfo: the MDSSAInfo of 'def_stmt'.
+//The layout of parameters is:
+//  def_stmt <- prop_value
+//  ........ <- repexp
 IR const* CopyProp::pickupCandExp(IR const* prop_value, IR const* repexp,
                                   IR const* def_stmt,
                                   MDSSAInfo const* mdssainfo, bool prssadu,
@@ -542,7 +546,8 @@ IR const* CopyProp::pickupCandExp(IR const* prop_value, IR const* repexp,
         return nullptr;
     }
 
-    if (repexp->getExactRef() == nullptr && !repexp->isReadPR()) {
+    if (repexp->getExactRef() == nullptr && !repexp->isPROp()) {
+        //repexp is inexact.
         if (!allowInexactMD()) {
             //Do NOT progate value to inexact memory reference, except PR.
             return nullptr;
@@ -550,6 +555,8 @@ IR const* CopyProp::pickupCandExp(IR const* prop_value, IR const* repexp,
         if (!xoc::isKillingDef(def_stmt, repexp, m_gvn)) {
             return nullptr;
         }
+    } else if (!xoc::isKillingDef(def_stmt, repexp, m_gvn)) {
+        return nullptr;
     }
 
     if (mdssainfo != nullptr &&
@@ -575,7 +582,7 @@ IR const* CopyProp::pickupCandExp(IR const* prop_value, IR const* repexp,
 
     if (!is_available(def_stmt, prop_value, use_stmt, use_phi, use_bb)) {
         //The value that will be propagated can
-        //not be killed during 'ir' and 'use_stmt'.
+        //not be killed during 'def_stmt' and 'use_stmt'.
         //e.g:
         //    g = a; //S1
         //    if (...) {
@@ -601,14 +608,35 @@ IR const* CopyProp::pickupCandExp(IR const* prop_value, IR const* repexp,
     }
 
     if (prop_value->is_cvt()) {
-        IR const* leaf = ((CCvt*)prop_value)->getLeafExp();
-        if (!leaf->is_lda() && !leaf->is_const()) {
-            //Regard leaf expression as the propagate candidate.
-            return leaf;
-        }
+        return tryDiscardCVT(prop_value);
     }
 
     return prop_value;
+}
+
+
+//Check if the CVT can be discarded and the cvt-expression will be regarded
+//as the recommended propagate value.
+//prop_value: indicates the value that will be propagated, must be CVT.
+//Note that user can implement target dependent interface to enable
+//more policies.
+IR const* CopyProp::tryDiscardCVT(IR const* prop_value) const
+{
+    ASSERT0(prop_value->is_cvt());
+    IR const* leaf = ((CCvt*)prop_value)->getLeafExp();
+    if (leaf->is_lda() || leaf->is_const()) {
+        //CASE: If the different type of LDA and CONST progagated into
+        //unsuitable IR tree, the combination of IR tree may complain and
+        //report assertion. For now, we do not progagate these cases.
+        return prop_value;
+    }
+    if ((prop_value->is_int() && leaf->is_fp()) ||
+        (prop_value->is_fp() && leaf->is_int())) {
+        //TBD:Can we safely discard the float<->integer conversion?
+        //return prop_value;
+    }
+    //Regard leaf expression as the propagate candidate.
+    return leaf;
 }
 
 

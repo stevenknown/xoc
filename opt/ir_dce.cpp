@@ -223,6 +223,7 @@ bool DeadCodeElim::find_effect_kid_condbr(IR const* ir) const
     IRBB const* bb = ir->getBB();
     ASSERT0(bb);
     ASSERT0(ir->isConditionalBr() || ir->isMultiConditionalBr());
+    //Mark the sucsessor on CFG and related stmts to be effect if needed.
     for (xcom::EdgeC const* ec = m_cfg->getVertex(bb->id())->getOutList();
          ec != nullptr; ec = ec->get_next()) {
         IRBB * succ = m_cfg->getBB(ec->getToId());
@@ -333,45 +334,121 @@ bool DeadCodeElim::find_effect_kid(IR const* ir) const
 }
 
 
-//Try to set controlling BB of 'bb' to be effective.
-//act_ir_lst: collect stmts that become effect marked by this function.
-bool DeadCodeElim::setControlDepBBToBeEffect(IRBB const* bb,
-                                             OUT List<IR const*> & act_ir_lst)
+bool DeadCodeElim::markControlPredAndStmt(IRBB const* bb,
+                                          OUT List<IR const*> & act_ir_lst)
 {
-    ASSERT0(bb->rpo() >= 0);
+    ASSERT0(m_cdg);
+    UINT bbid = bb->id();
+    bool change = false;
+    for (xcom::EdgeC const* ec = m_cdg->getVertex(bbid)->getInList();
+         ec != nullptr; ec = ec->get_next()) {
+        IRBB const* pred = m_cfg->getBB(ec->getFromId());
+        ASSERT0(pred);
+        if (!m_is_bb_effect.is_contain(pred->id())) {
+            setEffectBB(pred);
+            change = true;
+        }
+
+        //Mark the last IR of controlling BB to be effect.
+        IR * last_ir = const_cast<IRBB*>(pred)->getLastIR(); //last IR of BB.
+        if (last_ir == nullptr || !last_ir->isBranch()) {
+            //CASE: the last ir of controlling-predecessor may NOT be branch in
+            //some denormal CFG. e.g:
+            //  int g;
+            //  int n;
+            //  int foo(int b)
+            //  {
+            //      int i;
+            //      switch (n) {
+            //      case 1: b = 10; break;
+            //      case 3: b = 13; break;
+            //      }
+            //      n = 10;
+            //      L1:
+            //      i = 20;
+            //      L2:
+            //      g = b;
+            //      goto L1;
+            //      return g + n;
+            //  }
+            continue;
+        }
+        if (!m_is_stmt_effect.is_contain(last_ir->id())) {
+            setEffectStmt(last_ir, nullptr, &act_ir_lst);
+            change = true;
+        }
+    }
+    return change;
+}
+
+
+//The function marks possible predecessor in CFG to be effect BB, e.g back-edge.
+bool DeadCodeElim::markCFGPred(IRBB const* bb)
+{
     bool change = false;
     UINT bbid = bb->id();
+    ASSERT0(bb->rpo() > RPO_UNDEF);
     for (xcom::EdgeC const* ec = m_cfg->getVertex(bbid)->getInList();
          ec != nullptr; ec = ec->get_next()) {
         UINT predid = ec->getFromId();
         if (m_is_bb_effect.is_contain(predid)) { continue; }
 
         IRBB const* pred = m_cfg->getBB(predid);
-        if (m_cfg->isControlPred(pred, bb)) {
-            setEffectBB(pred);
-            change = true;
-            continue;
-        }
-
+        ASSERT0(pred->rpo() > RPO_UNDEF);
         if (pred->rpo() > (INT)bb->rpo()) {
             //Predecessor is lexicographical back of bb.
             setEffectBB(pred);
             change = true;
         }
     }
+    return change;
+}
 
-    IR * ir = const_cast<IRBB*>(bb)->getLastIR(); //last IR of BB.
-    if (ir == nullptr) { return change; }
 
-    //If last ir is branch operation, try to mark effect stmt that controlled
-    //by current bb.
-    if (ir->isBranch() &&
-        !m_is_stmt_effect.is_contain(ir->id()) &&
-        find_effect_kid(ir)) {
-        //IR_SWTICH might have multiple successors BB.
-        setEffectStmt(ir, nullptr, &act_ir_lst);
-        change = true;
+bool DeadCodeElim::tryMarkUnconditionalBranch(IRBB const* bb,
+                                              MOD List<IR const*> & act_ir_lst)
+{
+    IR * last_ir = const_cast<IRBB*>(bb)->getLastIR(); //last IR of BB.
+    if (last_ir != nullptr && last_ir->isUnconditionalBr() &&
+        !m_is_stmt_effect.is_contain(last_ir->id()) &&
+        find_effect_kid(last_ir)) {
+        //TO BE COMFIRED: Does effect_kid of last_ir have to be considered?
+        setEffectStmt(last_ir, &m_is_bb_effect, &act_ir_lst);
+        return true;
     }
+    return false;
+}
+
+
+bool DeadCodeElim::tryMarkBranch(IRBB const* bb,
+                                 OUT List<IR const*> & act_ir_lst)
+{
+    //If last ir of effect BB is branch operation, try to mark effect stmts
+    //that controlled by current bb.
+    IR * last_ir = const_cast<IRBB*>(bb)->getLastIR(); //last IR of BB.
+    if (last_ir != nullptr && last_ir->isBranch() &&
+        !m_is_stmt_effect.is_contain(last_ir->id()) &&
+        find_effect_kid(last_ir)) {
+        //IR_SWTICH might have multiple successors BB.
+        setEffectStmt(last_ir, nullptr, &act_ir_lst);
+        return true;
+    }
+    return false;
+}
+
+
+//Try to set controlling BB of 'bb' to be effective.
+//bb: given effect BB.
+//act_ir_lst: collect stmts that become effect marked by this function.
+bool DeadCodeElim::setControlDepBBToBeEffect(IRBB const* bb,
+                                             OUT List<IR const*> & act_ir_lst)
+{
+    bool change = markControlPredAndStmt(bb, act_ir_lst);
+    change |= markCFGPred(bb);
+
+    //If last ir of effect BB is branch operation, try to mark effect stmts
+    //that controlled by current bb.
+    change |= tryMarkBranch(bb, act_ir_lst);
     return change;
 }
 
@@ -394,16 +471,7 @@ bool DeadCodeElim::preserve_cd(MOD List<IR const*> & act_ir_lst)
         //  BB1:goto L1
         //  BB3:L1: ...
         //Note BB3 is ineffective, but 'goto' can not be removed!
-        IR * last_ir = bb->getLastIR(); //last IR of BB.
-        if (last_ir == nullptr) { continue; }
-
-        if (last_ir->isUnconditionalBr() &&
-            !m_is_stmt_effect.is_contain(last_ir->id()) &&
-            find_effect_kid(last_ir)) {
-            //TO BE COMFIRED: Does effect_kid of last_ir have to be considered?
-            setEffectStmt(last_ir, &m_is_bb_effect, &act_ir_lst);
-            change = true;
-        }
+        change |= tryMarkUnconditionalBranch(bb, act_ir_lst);
     }
     return change;
 }
@@ -639,7 +707,9 @@ void DeadCodeElim::iter_collect(MOD List<IR const*> & work_list)
     bool change = true;
     bool usemdssa = useMDSSADU();
     List<IRBB*> succs;
-    while (change) {
+    UINT const maxtry = 0xFFFF;
+    UINT count = 0;
+    while (change && count < maxtry) {
         change = false;
         for (IR const* ir = pwlst1->get_head();
              ir != nullptr; ir = pwlst1->get_next()) {
@@ -670,7 +740,9 @@ void DeadCodeElim::iter_collect(MOD List<IR const*> & work_list)
         List<IR const*> * tmp = pwlst1;
         pwlst1 = pwlst2;
         pwlst2 = tmp;
+        count++;
     }
+    ASSERT0(count < maxtry);
 }
 
 
@@ -679,6 +751,7 @@ void DeadCodeElim::iter_collect(MOD List<IR const*> & work_list)
 void DeadCodeElim::fix_control_flow(List<IRBB*> & bblst,
                                     List<C<IRBB*>*> & ctlst)
 {
+    ASSERT0(m_cdg);
     BBList * bbl = m_rg->getBBList();
     BBListIter ct = ctlst.get_head();
     BBListIter bbct;
@@ -713,7 +786,7 @@ void DeadCodeElim::fix_control_flow(List<IRBB*> & bblst,
                 continue;
             }
 
-            if (!m_cdg->is_cd(bb->id(), s->id())) {
+            if (!m_cdg->is_control(bb->id(), s->id())) {
                 //See dce.c:lexrun(), bb5 control bb6, but not control bb8.
                 //if bb5 is empty, insert goto to bb8.
                 IRBB * tgt = m_cfg->getBB(s->id());
@@ -878,7 +951,13 @@ bool DeadCodeElim::perform(OptCtx & oc)
 
     START_TIMER(t, getPassName());
     if (m_is_elim_cfs) {
-        m_rg->getPassMgr()->checkValidAndRecompute(&oc, PASS_PDOM, PASS_UNDEF);
+        m_rg->getPassMgr()->checkValidAndRecompute(&oc, PASS_PDOM, PASS_CDG,
+                                                   PASS_UNDEF);
+        ASSERT0(oc.is_cdg_valid());
+        m_cdg = (CDG*)m_rg->getPassMgr()->queryPass(PASS_CDG);
+        ASSERT0(m_cdg);
+    } else {
+        m_cdg = nullptr;
     }
     reinit();
 
@@ -906,7 +985,6 @@ bool DeadCodeElim::perform(OptCtx & oc)
         m_is_stmt_effect.clean();
         m_is_mddef_effect.clean();
         m_is_bb_effect.clean();
-
         if (m_cfg->performMiscOpt(oc)) {
             //CFG has been changed, thus remove empty BB to produce more
             //optimization opportunities.

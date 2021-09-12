@@ -962,7 +962,8 @@ VN * GVN::computeVN(IR const* exp, bool & change)
         VN * basevn = nullptr;
         if (v->is_string()) {
             if (m_is_comp_lda_string) {
-                MD const* emd = m_rg->genMDForVAR(v, LDA_ofst(exp));
+                MD const* emd = m_rg->getMDMgr()->genMDForVAR(
+                    v, LDA_ofst(exp));
                 ASSERTN(emd && emd->is_effect(),
                         ("string should have effect MD"));
                 basevn = registerVNviaMD(emd);
@@ -970,7 +971,7 @@ VN * GVN::computeVN(IR const* exp, bool & change)
                 basevn = nullptr;
             }
         } else {
-            MD const* emd = m_rg->genMDForVAR(v, LDA_ofst(exp));
+            MD const* emd = m_rg->getMDMgr()->genMDForVAR(v, LDA_ofst(exp));
             ASSERTN(emd && emd->is_effect(), ("string should have effect MD"));
             basevn = registerVNviaMD(emd);
         }

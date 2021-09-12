@@ -48,7 +48,6 @@ protected:
     Region * m_rg;
     RegionMgr * m_rumgr;
     TypeMgr * m_tm;
-    CDG * m_cdg;
     PassTab m_registered_pass;
     GraphPassTab m_registered_graph_based_pass;
 
@@ -59,7 +58,7 @@ public:
     PassMgr(Region * rg);
     virtual ~PassMgr() { destroyAllPass(); }
 
-    virtual xcom::Graph * allocCDG();
+    virtual Pass * allocCDG();
     virtual Pass * allocCFG();
     virtual Pass * allocAA();
     virtual Pass * allocDUMgr();
@@ -101,13 +100,7 @@ public:
 
     Pass * registerPass(PASS_TYPE opty);
 
-    Pass * queryPass(PASS_TYPE opty)
-    {
-        if (opty == PASS_CDG) {
-            return (Pass*)m_registered_graph_based_pass.get(opty);
-        }
-        return m_registered_pass.get(opty);
-    }
+    Pass * queryPass(PASS_TYPE opty) { return m_registered_pass.get(opty); }
 };
 
 } //namespace xoc

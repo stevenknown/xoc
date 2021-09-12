@@ -143,7 +143,7 @@ bool Region::performSimplify(OptCtx & oc)
         if (g_do_cdg) {
             ASSERT0(getPassMgr());
             CDG * cdg = (CDG*)getPassMgr()->registerPass(PASS_CDG);
-            cdg->rebuild(oc, *getCFG());
+            cdg->perform(oc);
         }
     } else {
         ASSERT0((!g_do_md_du_analysis && !g_do_md_ssa) || verifyMDRef());
@@ -168,7 +168,7 @@ void Region::doBasicAnalysis(OptCtx & oc)
     if (g_do_aa) {
         ASSERT0(g_cst_bb_list && oc.is_cfg_valid());
         if (!oc.is_ref_valid()) {
-            assignMD(true, true);
+            getMDMgr()->assignMD(true, true);
         }
         if (!oc.is_aa_valid()) {
             getPassMgr()->checkValidAndRecompute(&oc, PASS_DOM, PASS_LOOP_INFO,

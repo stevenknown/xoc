@@ -1,5 +1,5 @@
 /*@
-Copyright (c) 2013-2014, Su Zhenyu steven.known@gmail.com
+Copyright (c) 2013-2021, Su Zhenyu steven.known@gmail.com
 
 All rights reserved.
 
@@ -104,6 +104,10 @@ void coalesceDUChain(IR * from, IR * to, Region * rg);
 //DU chain when doing collection.
 void collectUseSet(IR const* def, MDSSAMgr const* mdssamgr,
                    OUT IRSet * useset);
+
+//The function copy MDSSAInfo from 'src' to 'tgt'. Then add 'tgt' as an USE of
+//the new MDSSAInfo.
+void copyAndAddMDSSAOcc(IR * tgt, IR const* src, Region * rg);
 
 //The function collects all DEF expressions of 'use' into 'defset'.
 //This function give priority to PRSSA and MDSSA DU chain and then classic

@@ -38,9 +38,28 @@ namespace xoc {
 //
 //START CDG
 //
-void CDG::dump() const
+void CDG::dumpDOT(CHAR const* name) const
 {
-    if (!getRegion()->isLogMgrInit()) { return; }
+    if (name == nullptr) {
+        name = "graph_cdg.dot";
+    }
+    Graph::dumpDOT(name);
+}
+
+
+void CDG::dumpVCG(CHAR const* name) const
+{
+    ASSERTN(m_ec_pool != nullptr, ("not yet initialized."));
+    if (name == nullptr) {
+        name = "graph_cdg.vcg";
+    }
+    Graph::dumpVCG(name);
+}
+
+
+bool CDG::dump() const
+{
+    if (!getRegion()->isLogMgrInit()) { return true; }
     note(getRegion(), "\n==---- DUMP Control Dependence '%s' ----==",
          m_rg->getRegionName());
     INT c;
@@ -59,6 +78,7 @@ void CDG::dump() const
         }
     }
     note(getRegion(), "\n");
+    return true;
 }
 
 
@@ -75,15 +95,19 @@ void CDG::get_cd_preds(UINT id, OUT List<xcom::Vertex*> & lst)
 }
 
 
-//Return true if b is control dependent on a.
-bool CDG::is_cd(UINT a, UINT b) const
+//Return true if vertex b is control dependent on vertex a.
+//e.g:a
+//    |\
+//    | b
+//    |/
+//    end
+// a controls b.
+bool CDG::is_control(Vertex const* a, Vertex const* b) const
 {
-    ASSERT0(getVertex(b));
-    xcom::Vertex * v = getVertex(a);
-    ASSERT0(v != nullptr);
-    xcom::EdgeC * out = VERTEX_out_list(v);
+    ASSERT0(a && b);
+    xcom::EdgeC * out = a->getOutList();
     while (out != nullptr) {
-        if (out->getToId() == b) {
+        if (out->getTo() == b) {
             return true;
         }
         out = out->get_next();
@@ -92,11 +116,12 @@ bool CDG::is_cd(UINT a, UINT b) const
 }
 
 
-bool CDG::is_only_cd_self(UINT id) const
+//Return true if vertex is only control itself.
+bool CDG::is_only_control_self(UINT vid) const
 {
-    xcom::Vertex * v = getVertex(id);
-    ASSERT0(v != nullptr);
-    xcom::EdgeC * out = VERTEX_out_list(v);
+    Vertex const* v = getVertex(vid);
+    ASSERT0(v);
+    xcom::EdgeC * out = v->getOutList();
     while (out != nullptr) {
         xcom::Vertex * succ = out->getTo();
         if (succ != v) { return false; }
@@ -170,34 +195,32 @@ void CDG::build(MOD OptCtx & oc, xcom::DGraph & cfg)
         for (xcom::EdgeC const* in = v->getInList();
              in != nullptr; in = in->get_next()) {
             xcom::Vertex const* pred = in->getFrom();
-            if (v->id() != cfg.get_ipdom(pred->id())) {
-                cd_of_v->bunion(pred->id());
-                if (m_consider_cycle || pred != v) {
-                    addEdge(pred->id(), v->id());
-                }
+            if (v->id() == cfg.get_ipdom(pred->id())) { continue; }
+            cd_of_v->bunion(pred->id());
+            if (m_allow_cycle || pred != v) {
+                addEdge(pred->id(), v->id());
             }
         }
 
         //Transfer controlling to vertex in control-set of current vertex by
         //iterating each vertex whose ipdom is current vex.
-        Vertex const* domvex = pdom_tree.getVertex(v->id());
-        ASSERT0(domvex);
+        Vertex const* z = pdom_tree.getVertex(v->id());
+        ASSERT0(z);
 
-        for (xcom::EdgeC const* zec = domvex->getInList();
+        for (xcom::EdgeC const* zec = z->getInList();
              zec != nullptr; zec = zec->get_next()) {
-            Vertex const* z = zec->getFrom();
-            ASSERT0(cfg.get_ipdom(z->id()) == v->id());
+            Vertex const* pred = zec->getFrom();
+            ASSERT0(cfg.get_ipdom(pred->id()) == v->id());
 
-            //Get control-set of z.
-            xcom::BitSet * cd = cd_set.get(z->id());
-            if (cd != nullptr) {
-                for (INT i = cd->get_first(); i != -1; i = cd->get_next(i)) {
-                    if (v->id() != cfg.get_ipdom(i)) {
-                        cd_of_v->bunion(i);
-                        if (m_consider_cycle || i != (INT)v->id()) {
-                            addEdge(i, v->id());
-                        }
-                    }
+            //Get control-set of pred.
+            xcom::BitSet * cd_of_pred = cd_set.get(pred->id());
+            if (cd_of_pred == nullptr) { continue; }
+            for (INT i = cd_of_pred->get_first(); i != -1;
+                 i = cd_of_pred->get_next(i)) {
+                if (v->id() == cfg.get_ipdom(i)) { continue; }
+                cd_of_v->bunion(i);
+                if (m_allow_cycle || i != (INT)v->id()) {
+                    addEdge(i, v->id());
                 }
             }
         }
@@ -210,6 +233,15 @@ void CDG::build(MOD OptCtx & oc, xcom::DGraph & cfg)
         dump();
         END_TIMER(t3, "Build CDG:dump");
     }
+}
+
+
+bool CDG::perform(OptCtx & oc)
+{
+    IRCFG * cfg = m_rg->getCFG();
+    if (cfg == nullptr) { return false; }
+    rebuild(oc, *cfg);
+    return false;
 }
 //END CDG
 

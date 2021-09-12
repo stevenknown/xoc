@@ -403,9 +403,13 @@ protected:
     void initFlowSensitiveEntryPtset(PPSetMgr & ppsetmgr);
     void initEntryPtset(PPSetMgr & ppsetmgr);
     void initGlobalAndParameterVarPtSet(Var * v, MD2MDSet * mx);
+    void inferPointerArithByHashedPTS(IR const* ir, OUT MDSet & mds,
+                                      MOD AACtx * opnd0_ic);
+    void inferPointerArithByUnHashedPTS(IR const* ir, OUT MDSet & mds,
+                                        MDSet const& opnd0_mds);
     void inferPointerArith(IR const* ir, OUT MDSet & mds,
-                           MDSet const& opnd0_mds,
-                           MOD AACtx * opnd0_ic, MOD MD2MDSet * mx);
+                           MDSet const& opnd0_mds, MOD AACtx * opnd0_ic,
+                           MOD MD2MDSet * mx);
     //rhs: RHS of ir, ir should be stmt. It's reference MD will be computed.
     void inferRHSAndUpdateLHS(IR const* ir, IR * rhs, MD const* mustref,
                               MDSet const* mayref, AACtx const* ic,
@@ -466,6 +470,10 @@ protected:
     //mds: MDSet that may NOT be hashed.
     void setIRRef(IR * ir, MDSet const* mds);
 
+    //Return true if new POINT_TO info generated.
+    bool tryToEvaluateConstOffset(IR const* ir, OUT MDSet & mds,
+                                  MDSet const& opnd0_mds,
+                                  MOD AACtx * opnd0_ic);
     //Reshape MD in 'mds' if one of them need to be reshape.
     //Record reshaped MD in 'newmds' and return true.
     //This function will iterate MD in 'mds', new MD will be generated either

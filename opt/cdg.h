@@ -39,26 +39,45 @@ namespace xoc {
 class Region;
 
 //Control Dependence Graph
-class CDG : public xcom::Graph {
+class CDG : public Pass, public xcom::Graph {
     COPY_CONSTRUCTOR(CDG);
     //Set to true if CDG presents control-edge to cyclic control flow.
     //e.g: given loop, the control BB of loop-header includes itself.
-    bool m_consider_cycle;
+    bool m_allow_cycle;
     Region * m_rg;
+
+    bool is_control(Vertex const* a, Vertex const* b) const;
+    void rebuild(MOD OptCtx & oc, xcom::DGraph & cfg);
 public:
-    CDG(Region * rg) : m_consider_cycle(false) { m_rg = rg; }
+    CDG(Region * rg) : m_allow_cycle(false) { m_rg = rg; }
     void build(MOD OptCtx & oc, xcom::DGraph & cfg);
 
-    void dump() const;
+    void dumpDOT(CHAR const* name = nullptr) const;
+    void dumpVCG(CHAR const* name = nullptr) const;
+    virtual bool dump() const;
 
     Region * getRegion() const { return m_rg; }
     void get_cd_preds(UINT id, OUT List<xcom::Vertex*> & lst);
     void get_cd_succs(UINT id, OUT List<xcom::Vertex*> & lst);
+    virtual CHAR const* getPassName() const { return "CDG"; }
+    virtual PASS_TYPE getPassType() const { return PASS_CDG; }
 
-    bool is_only_cd_self(UINT id) const;
-    bool is_cd(UINT a, UINT b) const;
-    void rebuild(MOD OptCtx & oc, xcom::DGraph & cfg);
-    void set_consider_cycle(bool doit) { m_consider_cycle = doit; }
+    //Return true if vertex is only control itself.
+    bool is_only_control_self(UINT vid) const;
+
+    //Return true if vertex b is control dependent on vertex a.
+    //e.g:a
+    //    |\
+    //    | b
+    //    |/
+    //    end
+    // a controls b.
+    bool is_control(UINT a, UINT b) const
+    { return is_control(getVertex(a), getVertex(b)); }
+ 
+    virtual bool perform(OptCtx & oc);
+
+    void set_allow_cycle(bool doit) { m_allow_cycle = doit; }
 };
 
 } //namespace xoc

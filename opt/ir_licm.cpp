@@ -681,7 +681,7 @@ IRBB * LICM::insertGuardBB(IRBB * prehead, IRBB * loophead)
     IR * guard_br = m_rg->buildBranch(false, det, li);
 
     //Assign MD for all generated new IRs.
-    m_rg->assignMDForIRList(guard_br, true, true);
+    m_rg->getMDMgr()->assignMDForIRList(guard_br, true, true);
     ASSERT0(guard->getNumOfIR() == 0);
 
     //Insert the guard-branch into guard-BB.
@@ -808,7 +808,7 @@ bool LICM::hoistCandHelper(OUT bool & insert_guard_bb,
     IR * stpr = m_rg->buildStorePR(PR_no(t), t->getType(), cand_exp);
 
     //Revise MD info.
-    MD const* tmd = m_rg->genMDForPR(t);
+    MD const* tmd = m_rg->getMDMgr()->genMDForPR(t);
     t->setRefMD(tmd, m_rg);
     stpr->setRefMD(tmd, m_rg);
 
@@ -820,8 +820,7 @@ bool LICM::hoistCandHelper(OUT bool & insert_guard_bb,
 
 //Try to move and check that each definitions of candidate has been
 //already hoisted from loop.
-bool LICM::tryMoveAllDefStmtOutFromLoop(IR const* c,
-                                        IRBB * prehead,
+bool LICM::tryMoveAllDefStmtOutFromLoop(IR const* c, IRBB * prehead,
                                         OUT LI<IRBB> * li)
 {
     m_iriter.clean();

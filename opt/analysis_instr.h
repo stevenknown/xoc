@@ -1,5 +1,5 @@
 /*@
-Copyright (c) 2013-2014, Su Zhenyu steven.known@gmail.com
+Copyright (c) 2013-2021, Su Zhenyu steven.known@gmail.com
 
 All rights reserved.
 
@@ -47,6 +47,7 @@ namespace xoc {
 #define ANA_INS_bs_mgr(a) ((a)->m_bs_mgr)
 #define ANA_INS_sbs_mgr(a) ((a)->m_sbs_mgr)
 #define ANA_INS_mds_mgr(a) ((a)->m_mds_mgr)
+#define ANA_INS_md_mgr(a) ((a)->m_md_mgr)
 #define ANA_INS_mds_hash_allocator(a) ((a)->m_mds_hash_allocator)
 #define ANA_INS_mds_hash(a) ((a)->m_mds_hash)
 #define ANA_INS_free_du_list(a) ((a)->m_free_du_list)
@@ -75,6 +76,7 @@ protected:
     Vector<IR*> m_ir_vector; //record IR which have allocated. ir id is dense
     xcom::BitSetMgr m_bs_mgr;
     xcom::DefMiscBitSetMgr m_sbs_mgr;
+    MDMgr m_md_mgr;
     MDSetMgr m_mds_mgr;
     MDSetHashAllocator m_mds_hash_allocator;
     MDSetHash m_mds_hash;

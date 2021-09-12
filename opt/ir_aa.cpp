@@ -418,7 +418,7 @@ MD const* AliasAnalysis::processLda(IR * ir, MOD AACtx * ic)
     MD const* t = nullptr;
     Var * v = LDA_idinfo(ir);
     if (v->is_string()) {
-        t = m_rg->allocStringMD(v->get_name());
+        t = m_rg->getMDMgr()->allocStringMD(v->get_name());
         if (t->is_exact()) {
             //Adjust size of MD of LDA to be pointer size.
             MD t2(*t);
@@ -428,7 +428,7 @@ MD const* AliasAnalysis::processLda(IR * ir, MOD AACtx * ic)
             ASSERT0(t->id() > MD_UNDEF);
         }
     } else {
-        t = m_rg->genMDForVAR(v, ir->getType(), LDA_ofst(ir));
+        t = m_rg->getMDMgr()->genMDForVAR(v, ir->getType(), LDA_ofst(ir));
     }
 
     if (!m_is_visit.is_contain(ir->id())) {
@@ -1108,8 +1108,8 @@ bool AliasAnalysis::tryComputeConstOffset(IR const* ir,
             entry = m_md_sys->registerMD(x);
             ASSERT0(entry->id() > MD_UNDEF);
             mds.bunion(entry, *getSBSMgr());
+            *changed = true;
         }
-        *changed = true;
         return true;
     }
 
@@ -1135,9 +1135,151 @@ bool AliasAnalysis::tryComputeConstOffset(IR const* ir,
         entry = m_md_sys->registerMD(x);
         ASSERT0(entry->id() > MD_UNDEF);
         mds.bunion(entry, *getSBSMgr());
+        *changed = true;
     }
-    *changed = true;
     return true;
+}
+
+
+//Return true if new POINT_TO info generated.
+bool AliasAnalysis::tryToEvaluateConstOffset(IR const* ir, OUT MDSet & mds,
+                                             MDSet const& opnd0_mds,
+                                             MOD AACtx * opnd0_ic)
+{
+    ASSERT0(opnd0_ic->is_comp_pts());
+    ASSERT0(ir->is_add() || ir->is_sub());
+    IR * opnd0 = BIN_opnd0(ir);
+    if (!opnd0->is_lda() && !evaluateFromLda(opnd0)) {
+        return false;
+    }
+
+    MDSet const* in = nullptr;
+    if (opnd0_ic->get_hashed() != nullptr) {
+        ASSERT0(!opnd0_ic->get_hashed()->is_empty());
+        ASSERT0(opnd0_mds.is_empty());
+        in = opnd0_ic->get_hashed();
+    } else {
+        ASSERT0(!opnd0_mds.is_empty());
+        in = &opnd0_mds;
+    }
+
+    bool changed = false;
+    IR * opnd1 = BIN_opnd1(ir);
+    if (!tryComputeConstOffset(ir, *in, opnd1, mds, &changed)) {
+        return false;
+    }
+
+    if (changed) {
+        //POINT_TO set changed, thus disregard the alternative POINT_TO.
+        //mds recorded the expected POINT_TO.
+        AC_hashed_mds(opnd0_ic) = nullptr;
+        ASSERT0(!mds.is_empty());
+        return true;
+    }
+
+    //'in' recorded the expected POINT_TO.
+    ASSERT0(!in->is_empty());
+
+    //Note that tryComputeConstOffset already have unify elements into 'mds'.
+    //Thus there is no need to copy 'in' again.
+    ASSERT0(mds.is_equal(*in));
+    //mds.copy(*in, *getSBSMgr());
+
+    return true;
+}
+
+
+void AliasAnalysis::inferPointerArithByUnHashedPTS(IR const* ir,
+                                                   OUT MDSet & mds,
+                                                   MDSet const& opnd0_mds)
+{
+    if (isInLoop(ir->getStmt())) {
+        //Pointer arithmetic causes ambiguous memory access.
+        //e.g: while (...) { p = p+1 }
+        //Where is p pointing to at all?
+        //Set each MD of opnd0 to be UNBOUND even if it is exact
+        //to keep the conservation.
+        convertExact2Unbound(opnd0_mds, &mds);
+        ASSERT0(!mds.is_empty()); //mds record the expected info.
+        return;
+    }
+
+    bool changed = false;
+    IR * opnd1 = BIN_opnd1(ir);
+    if (!tryComputeConstOffset(ir, opnd0_mds, opnd1, mds, &changed)) {
+        convertExact2Unbound(opnd0_mds, &mds);
+        ASSERT0(!mds.is_empty());
+        return;
+    }
+
+    if (changed) {
+        //POINT_TO set changed, thus disregard the alternative POINT_TO.
+        //mds record the expected info.
+        ASSERT0(!mds.is_empty()); //mds record the expected info.
+        return;
+    }
+
+    //Note that tryComputeConstOffset already have unify elements into
+    //'mds'.
+    //mds record the expected info.
+    //Thus there is no need to copy 'opnd0_mds' again.
+    ASSERT0(!opnd0_mds.is_empty());
+    //mds.copy(opnd0_mds, *getSBSMgr());
+    ASSERT0(mds.is_equal(opnd0_mds));
+}
+
+
+void AliasAnalysis::inferPointerArithByHashedPTS(IR const* ir, OUT MDSet & mds,
+                                                 MOD AACtx * opnd0_ic)
+{
+    ASSERT0(opnd0_ic->get_hashed());
+    if (isWorstCase(opnd0_ic->get_hashed())) {
+        //Point-To set of opnd0 of binary-op is MayPointToSet.
+        //Compute constant offset does not make sense to the worst case.
+        return;
+    }
+
+    if (isInLoop(ir->getStmt())) {
+        //Pointer arithmetic causes ambiguous memory access.
+        //e.g: while (...) { p = p+1 }
+        //Where is p pointing to at all?
+        //Set each MD of opnd0 to be UNBOUND even if it is exact
+        //to keep the conservation.
+        convertExact2Unbound(*opnd0_ic->get_hashed(), &mds);
+        AC_hashed_mds(opnd0_ic) = nullptr;
+        ASSERT0(!mds.is_empty()); //mds record the expected info.
+        return;
+    }
+
+    bool changed = false;
+    IR * opnd1 = BIN_opnd1(ir);
+    if (!tryComputeConstOffset(ir, *opnd0_ic->get_hashed(),
+                               opnd1, mds, &changed)) {
+        convertExact2Unbound(*opnd0_ic->get_hashed(), &mds);
+        AC_hashed_mds(opnd0_ic) = nullptr;
+        ASSERT0(!mds.is_empty()); //mds record the expected info.
+        return;
+    }
+
+    if (changed) {
+        //POINT_TO set changed, thus disregard the alternative POINT_TO.
+        //mds record the expected info.
+        AC_hashed_mds(opnd0_ic) = nullptr;
+        ASSERT0(!mds.is_empty());
+        return;
+    }
+
+    //AC_hashed_mds record the expected info.
+    ASSERT0(opnd0_ic->get_hashed() &&
+            !opnd0_ic->get_hashed()->is_empty());
+
+    //Note that tryComputeConstOffset already have unify elements into
+    //'mds'.
+    ASSERT0(mds.is_equal(*opnd0_ic->get_hashed()));
+
+    //Because the caller function will invoke is_legal_set() to verify
+    //mds and hashed_pts, clean the mds to avoid the assertion.
+    mds.clean(*getSBSMgr());
 }
 
 
@@ -1152,21 +1294,9 @@ void AliasAnalysis::inferPointerArith(IR const* ir, OUT MDSet & mds,
                                       MOD AACtx * opnd0_ic,
                                       MOD MD2MDSet * mx)
 {
+    ASSERT0(opnd0_ic->is_comp_pts());
     ASSERT0(ir->is_add() || ir->is_sub());
-    IR * opnd1 = BIN_opnd1(ir);
-    bool changed = false;
-    if ((BIN_opnd0(ir)->is_lda() || evaluateFromLda(BIN_opnd0(ir))) &&
-        tryComputeConstOffset(ir, opnd0_mds, opnd1, mds, &changed)) {
-        if (changed) {
-            //mds record the expected info.
-            AC_hashed_mds(opnd0_ic) = nullptr;
-            ASSERT0(!mds.is_empty());
-        } else {
-            //opnd0_mds record the expected info.
-            ASSERT0(mds.is_empty() && !opnd0_mds.is_empty());
-            ASSERT0(opnd0_ic->get_hashed() == nullptr);
-            mds.copy(opnd0_mds, *getSBSMgr());
-        }
+    if (tryToEvaluateConstOffset(ir, mds, opnd0_mds, opnd0_ic)) {
         return;
     }
 
@@ -1174,6 +1304,7 @@ void AliasAnalysis::inferPointerArith(IR const* ir, OUT MDSet & mds,
     AACtx opnd1_tic(*opnd0_ic);
     opnd1_tic.cleanBottomUpFlag();
     AC_comp_pts(&opnd1_tic) = false; //PointToSet of addon is useless.
+    IR * opnd1 = BIN_opnd1(ir);
     inferExpression(opnd1, mds, &opnd1_tic, mx);
 
     //Bottom-up flag of opnd1 is useless to its parent.
@@ -1187,72 +1318,12 @@ void AliasAnalysis::inferPointerArith(IR const* ir, OUT MDSet & mds,
     }
 
     if (opnd0_mds.is_empty()) {
-        ASSERT0(opnd0_ic->get_hashed());
-        if (isWorstCase(opnd0_ic->get_hashed())) {
-            //Point-To set of opnd0 of binary-op is MayPointToSet.
-            //Compute constant offset does not make sense to the worst case.
-            return;
-        }
-
-        if (isInLoop(ir->getStmt())) {
-            //Pointer arithmetic causes ambiguous memory access.
-            //e.g: while (...) { p = p+1 }
-            //Where is p pointing to at all?
-            //Set each MD of opnd0 to be UNBOUND even if it is exact
-            //to keep the conservation.
-            convertExact2Unbound(*opnd0_ic->get_hashed(), &mds);
-            AC_hashed_mds(opnd0_ic) = nullptr;
-            ASSERT0(!mds.is_empty()); //mds record the expected info.
-            return;
-        }
-
-        bool changed = false;
-        if (!tryComputeConstOffset(ir, *opnd0_ic->get_hashed(),
-                                   opnd1, mds, &changed)) {
-            convertExact2Unbound(*opnd0_ic->get_hashed(), &mds);
-            AC_hashed_mds(opnd0_ic) = nullptr;
-            ASSERT0(!mds.is_empty()); //mds record the expected info.
-            return;
-        }
-        if (changed) {
-            //mds record the expected info.
-            AC_hashed_mds(opnd0_ic) = nullptr;
-            ASSERT0(!mds.is_empty());
-        } else {
-            //AC_hashed_mds record the expected info.
-            ASSERT0(mds.is_empty());
-            ASSERT0(opnd0_ic->get_hashed() &&
-                    !opnd0_ic->get_hashed()->is_empty());
-        }
+        inferPointerArithByHashedPTS(ir, mds, opnd0_ic);
         return;
     }
 
     ASSERT0(opnd0_ic->get_hashed() == nullptr);
-
-    if (isInLoop(ir->getStmt())) {
-        //Pointer arithmetic causes ambiguous memory access.
-        //e.g: while (...) { p = p+1 }
-        //Where is p pointing to at all?
-        //Set each MD of opnd0 to be UNBOUND even if it is exact
-        //to keep the conservation.
-        convertExact2Unbound(opnd0_mds, &mds);
-        ASSERT0(!mds.is_empty()); //mds record the expected info.
-        return;
-    }
-
-    changed = false;
-    if (!tryComputeConstOffset(ir, opnd0_mds, opnd1, mds, &changed)) {
-        convertExact2Unbound(opnd0_mds, &mds);
-        ASSERT0(!mds.is_empty());
-        return;
-    }
-    if (changed) {
-        ASSERT0(!mds.is_empty()); //mds record the expected info.
-    } else {
-        //opnd0_mds record the expected info.
-        ASSERT0(mds.is_empty() && !opnd0_mds.is_empty());
-        mds.copy(opnd0_mds, *getSBSMgr());
-    }
+    inferPointerArithByUnHashedPTS(ir, mds, opnd0_mds);
 }
 
 
@@ -1390,7 +1461,8 @@ MD const* AliasAnalysis::assignPRMD(IR * ir, MOD MDSet * mds, MOD AACtx * ic,
     ASSERT0(mx);
     MDSet const* pts = getPointTo(tmp->id(), *mx);
     MD const* typed_md = nullptr;
-    if (pts != nullptr && !pts->is_empty()) {
+    if (pts != nullptr) {
+        ASSERTN(!pts->is_empty(), ("should not exist empty hashed set"));
         if (pts->is_contain_global() &&
             (typed_md = queryTBAA(ir)) != nullptr) {
             setPointToUniqueMD(tmp->id(), *mx, typed_md);
@@ -1710,7 +1782,7 @@ void AliasAnalysis::processConst(IR * ir, MOD MDSet & mds, MOD AACtx * ic)
         //'ir' describes memory address of string const.
         //Add a new Var to describe the string.
         //'mds' : record memory descriptor of 'ir'.
-        m_rg->allocStringMD(CONST_str_val(ir));
+        m_rg->getMDMgr()->allocStringMD(CONST_str_val(ir));
         if (!m_is_visit.is_contain(ir->id())) {
             m_is_visit.bunion(ir->id());
             AC_is_mds_mod(ic) = true;
@@ -2491,7 +2563,7 @@ void AliasAnalysis::processCall(IN IR * ir, IN MD2MDSet * mx)
             MD const* t;
             if (!m_is_visit.is_contain(ir->id())) {
                 m_is_visit.bunion(ir->id());
-                t = m_rg->allocCallResultPRMD(ir);
+                t = m_rg->getMDMgr()->allocCallResultPRMD(ir);
             } else {
                 t = ir->getMustRef();
             }
@@ -2510,7 +2582,7 @@ void AliasAnalysis::processCall(IN IR * ir, IN MD2MDSet * mx)
         MD const* t = nullptr;
         if (!m_is_visit.is_contain(ir->id())) {
             m_is_visit.bunion(ir->id());
-            t = m_rg->allocCallResultPRMD(ir);
+            t = m_rg->getMDMgr()->allocCallResultPRMD(ir);
         } else {
             t = ir->getMustRef();
         }
@@ -3987,6 +4059,7 @@ bool AliasAnalysis::perform(MOD OptCtx & oc)
         ASSERT0(tbbl->get_elem_count() == m_rg->getBBList()->get_elem_count());
 
         START_TIMER_FMT(t2, ("%s:flow sensitive analysis", getPassName()));
+
         bool is_succ = computeFlowSensitive(*tbbl, ppsetmgr);
         END_TIMER_FMT(t2, ("%s:flow sensitive analysis", getPassName()));
 

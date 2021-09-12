@@ -1,5 +1,5 @@
 /*@
-Copyright (c) 2013-2014, Su Zhenyu steven.known@gmail.com
+Copyright (c) 2013-2021, Su Zhenyu steven.known@gmail.com
 
 All rights reserved.
 
@@ -35,7 +35,7 @@ void changeDef(IR * olddef, IR * newdef, Region * rg)
 {
     ASSERT0(olddef->is_stmt() && newdef->is_stmt());
     MDSSAMgr * mdssamgr = rg->getMDSSAMgr();
-    if (mdssamgr != nullptr) {
+    if (mdssamgr != nullptr && mdssamgr->is_valid()) {
         mdssamgr->changeDef(olddef, newdef);
     }
 
@@ -153,7 +153,7 @@ void changeUse(IR * olduse, IR * newuse, Region * rg)
 {
     ASSERT0(olduse->is_exp() && newuse->is_exp());
     MDSSAMgr * mdssamgr = rg->getMDSSAMgr();
-    if (mdssamgr != nullptr) {
+    if (mdssamgr != nullptr && mdssamgr->is_valid()) {
         ASSERT0(!(mdssamgr->hasMDSSAInfo(olduse) ^
                   mdssamgr->hasMDSSAInfo(newuse)));
         if (!mdssamgr->hasMDSSAInfo(olduse)) {
@@ -252,6 +252,7 @@ bool removeExpiredDU(IR * ir, Region * rg)
 
 
 //Coalesce DU chain of 'from' to 'to'.
+//'from' and 'to' refered the same md.
 //This function replace definition of USE of 'from' to defintion of 'to'.
 //Just like copy-propagation.
 //e.g: to_def =...
@@ -273,7 +274,7 @@ void coalesceDUChain(IR * from, IR * to, Region * rg)
     if (from->isMemoryRefNonPR()) {
         ASSERT0(to->isMemoryRefNonPR());
         MDSSAMgr * mdssamgr = rg->getMDSSAMgr();
-        if (mdssamgr != nullptr) {
+        if (mdssamgr != nullptr && mdssamgr->is_valid()) {
             mdssamgr->coalesceDUChain(from, to);
         }
     }
@@ -299,7 +300,7 @@ void removeUseForTree(IR * exp, Region * rg)
     }
 
     MDSSAMgr * mdssamgr = rg->getMDSSAMgr();
-    if (mdssamgr != nullptr) {
+    if (mdssamgr != nullptr && mdssamgr->is_valid()) {
         mdssamgr->removeMDSSAOcc(exp);
     }
 }
@@ -317,7 +318,7 @@ void removeStmt(IR * stmt, Region * rg)
     PRSSAMgr::removePRSSAOcc(stmt);
 
     MDSSAMgr * mdssamgr = rg->getMDSSAMgr();
-    if (mdssamgr != nullptr) {
+    if (mdssamgr != nullptr && mdssamgr->is_valid()) {
         //Remove stmt and its RHS.
         mdssamgr->removeMDSSAOcc(stmt);
     }
@@ -365,17 +366,18 @@ void addUse(IR * to, IR const* from, Region * rg)
         return;
     }
 
-    MDSSAMgr * mdssamgr = rg->getMDSSAMgr();
-    bool use_mdssa = mdssamgr != nullptr && mdssamgr->is_valid();
     PRSSAMgr * prssamgr = rg->getPRSSAMgr();
-    bool use_prssa = prssamgr != nullptr && prssamgr->is_valid();
-    DUMgr * dumgr = rg->getDUMgr();
-    if (use_prssa && from->isReadPR()) {
+    if (prssamgr != nullptr && prssamgr->is_valid() && from->isReadPR()) {
         addUseInPRSSAMode(to, from);
     }
-    if (use_mdssa && from->isMemoryRefNonPR()) {
+
+    MDSSAMgr * mdssamgr = rg->getMDSSAMgr();
+    if (mdssamgr != nullptr && mdssamgr->is_valid() &&
+        from->isMemoryRefNonPR()) {
         addUseInMDSSAMode(to, from, mdssamgr, rg);
     }
+
+    DUMgr * dumgr = rg->getDUMgr();
     if (dumgr != nullptr) {
         dumgr->addUse(to, from);
     }
@@ -555,7 +557,7 @@ void movePhi(IRBB * from, IRBB * to, Region * rg)
     PRSSAMgr::movePhi(from, to);
 
     MDSSAMgr * mdssamgr = rg->getMDSSAMgr();
-    if (mdssamgr != nullptr) {
+    if (mdssamgr != nullptr && mdssamgr->is_valid()) {
         mdssamgr->movePhi(from, to);
     }
 }
@@ -685,6 +687,20 @@ IR * findNearestDomDef(IR const* exp, IRSet const& defset, Region const* rg,
     }
     ASSERT0(last != stmt_of_exp);
     return last;
+}
+
+
+//The function copy MDSSAInfo from 'src' to 'tgt'. Then add 'tgt' as an USE of
+//the new MDSSAInfo.
+void copyAndAddMDSSAOcc(IR * tgt, IR const* src, Region * rg)
+{
+    MDSSAMgr * mdssamgr = rg->getMDSSAMgr();
+    if (mdssamgr != nullptr && mdssamgr->is_valid()) {
+        MDSSAInfo const* src_mdssainfo = MDSSAMgr::getMDSSAInfoIfAny(src);
+        if (src_mdssainfo != nullptr) {
+            mdssamgr->copyAndAddMDSSAOcc(tgt, src_mdssainfo);
+        }
+    }
 }
 
 } //namespace xoc

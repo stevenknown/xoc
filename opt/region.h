@@ -164,8 +164,6 @@ protected:
     virtual AttachInfoMgr * allocAttachInfoMgr();
     //Allocate an IR.
     IR * allocIR(IR_TYPE irt);
-    //This is a helper function to assignMD.
-    void assignMDImpl(IR * x, bool assign_pr, bool assign_nonpr);
 
     void doBasicAnalysis(OptCtx & oc);
 
@@ -226,22 +224,12 @@ public:
     //Add irs into IR list of current region.
     void addToIRList(IR * irs)
     { xcom::add_next(&ANA_INS_ir_list(getAnalysisInstrument()), irs); }
-    MD const* allocStoreMD(IR * ir);
-    MD const* allocIdMD(IR * ir);
-    MD const* allocLoadMD(IR * ir);
-    MD const* allocStringMD(Sym const* string);
-    MD const* allocPRMD(IR * ir);
-    MD const* allocPhiMD(IR * phi);
-    MD const* allocStorePRMD(IR * ir);
-    MD const* allocCallResultPRMD(IR * ir);
-    MD const* allocSetelemMD(IR * ir);
-    MD const* allocGetelemMD(IR * ir);
 
     //The function generates new MD for all operations to PR.
     //It should be called if new PR generated in optimzations.
     inline MD const* allocRefForPR(IR * pr)
     {
-        MD const* md = genMDForPR(pr);
+        MD const* md = getMDMgr()->genMDForPR(pr);
         pr->setRefMD(md, this);
         pr->cleanRefMDSet();
         return md;
@@ -251,7 +239,7 @@ public:
     //It should be called if LD generated in optimzations.
     inline MD const* allocRefForLoad(IR * ld)
     {
-        MD const* md = genMDForLoad(ld);
+        MD const* md = getMDMgr()->genMDForLoad(ld);
         ld->setRefMD(md, this);
 
         //Do NOT clean MDSet because transformation may combine ILD(LDA)
@@ -264,7 +252,7 @@ public:
     //It should be called if new PR generated in optimzations.
     inline MD const* allocRefForStore(IR * st)
     {
-        MD const* md = genMDForStore(st);
+        MD const* md = getMDMgr()->genMDForStore(st);
         st->setRefMD(md, this);
 
         //Do NOT clean MDSet because transformation may combine IST(LDA)
@@ -294,32 +282,6 @@ public:
         ASSERT0(getAnalysisInstrument()->getAttachInfoMgr());
         return getAnalysisInstrument()->getAttachInfoMgr()->allocAIContainer();
     }
-
-    //Assign MD for memory reference operations.
-    //is_only_assign_pr: true if only assign MD for read|write PR operations.
-    void assignMD(bool assign_pr, bool assign_nonpr);
-
-    //Assign MD for ST/LD/ReadPR/WritePR operations.
-    //irlist: a list of IR to be assigned.
-    //is_assign_pr: true if assign MD for each ReadPR/WritePR operations.
-    //is_assign_nonpr: true if assign MD for each Non-PR memory operations.
-    void assignMD(IR * irlist, bool assign_pr, bool assign_nonpr);
-
-    //Assign MD for memory reference operations.
-    //This function will iterate given bblist.
-    //is_only_assign_pr: true if only assign MD for read|write PR operations.
-    void assignMDForBBList(BBList * lst, bool assign_pr, bool assign_nonpr);
-
-    //Assign MD for memory reference operations.
-    //This function will iterate ir list in given bb.
-    //is_only_assign_pr: true if only assign MD for read|write PR operations.
-    void assignMDForBB(IRBB * bb, IRIter & ii, bool assign_pr,
-                       bool assign_nonpr);
-
-    //Assign MD for memory reference operations.
-    //This function will iterate given ir list.
-    //is_only_assign_pr: true if only assign MD for read|write PR operations.
-    void assignMDForIRList(IR * lst,bool assign_pr, bool assign_nonpr);
 
     //Note the returned ByteBuf does not need to free by user.
     ByteBuf * allocByteBuf(UINT bytesize)
@@ -786,6 +748,7 @@ public:
 
     MDSystem * getMDSystem() const { return getRegionMgr()->getMDSystem(); }
     TypeMgr * getTypeMgr() const { return getRegionMgr()->getTypeMgr(); }
+    MDMgr * getMDMgr() { return &ANA_INS_md_mgr(getAnalysisInstrument()); }
 
     //Get TargInfo that describes current target machine.
     TargInfo * getTargInfo() const
@@ -985,62 +948,6 @@ public:
 
     //Allocate Var for PR.
     Var * genVarForPR(UINT prno, Type const* type);
-
-    //Allocate MD for PR.
-    MD const* genMDForPR(UINT prno, Type const* type);
-
-    //Generate MD corresponding to PR load or write.
-    MD const* genMDForPR(IR const* ir)
-    {
-        ASSERT0(ir->isPROp());
-        return genMDForPR(ir->getPrno(), ir->getType());
-    }
-
-    //Generate MD for Var.
-    MD const* genMDForVAR(Var * var, UINT offset)
-    { return genMDForVAR(var, var->getType(), offset); }
-
-
-    //Generate MD for Var.
-    MD const* genMDForVAR(Var * var, Type const* type, UINT offset)
-    {
-        ASSERT0(var && type);
-        MD md;
-        MD_base(&md) = var;
-
-        if (type->is_any()) {
-            MD_ty(&md) = MD_UNBOUND;
-        } else {
-            MD_size(&md) = getTypeMgr()->getByteSize(type);
-            MD_ty(&md) = MD_EXACT;
-            MD_ofst(&md) = offset;
-        }
-
-        MD const* e = getMDSystem()->registerMD(md);
-        ASSERT0(MD_id(e) > 0);
-        return e;
-    }
-
-    //Generate MD for IR_ST.
-    MD const* genMDForStore(IR const* ir)
-    {
-        ASSERT0(ir->is_st());
-        return genMDForVAR(ST_idinfo(ir), ir->getType(), ST_ofst(ir));
-    }
-
-    //Generate MD for IR_LD.
-    MD const* genMDForLoad(IR const* ir)
-    {
-        ASSERT0(ir->is_ld());
-        return genMDForVAR(LD_idinfo(ir), ir->getType(), LD_ofst(ir));
-    }
-
-    //Generate MD for IR_ID.
-    MD const* genMDForId(IR const* ir)
-    {
-        ASSERT0(ir->is_id());
-        return genMDForVAR(ID_info(ir), ir->getType(), 0);
-    }
 
     //Return the tyid for array index, the default is unsigned 32bit.
     inline Type const* getTargetMachineArrayIndexType()

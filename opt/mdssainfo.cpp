@@ -1,5 +1,5 @@
 /*@
-Copyright (c) 2013-2014, Su Zhenyu steven.known@gmail.com
+Copyright (c) 2013-2021, Su Zhenyu steven.known@gmail.com
 
 All rights reserved.
 
@@ -272,7 +272,7 @@ void MDSSAInfo::removeUse(IR const* exp, IN UseDefMgr * mgr)
          i >= 0; i = getVOpndSet()->get_next(i, &iter)) {
         VMD * vopnd = (VMD*)mgr->getVOpnd(i);
         ASSERT0(vopnd && vopnd->is_md());
-        vopnd->getUseSet()->diff(exp->id());
+        vopnd->removeUse(exp);
     }
 }
 
@@ -294,7 +294,7 @@ void MDSSAInfo::addUse(IR const* exp, IN UseDefMgr * mgr)
          i >= 0; i = getVOpndSet()->get_next(i, &iter)) {
         VMD * vopnd = (VMD*)mgr->getVOpnd(i);
         ASSERT0(vopnd && vopnd->is_md());
-        vopnd->getUseSet()->bunion(exp->id());
+        vopnd->addUse(exp);
     }
 }
 
@@ -478,11 +478,11 @@ VMD * MDPhi::getOpndVMD(IR const* opnd, UseDefMgr const* mgr) const
         return nullptr;
     }
 
-    ASSERT0(mdssainfo->getVOpndSet()->get_elem_count() == 1);
     VOpndSetIter iter = nullptr;
-    VMD * vopnd = (VMD*)mgr->getVOpnd(mgr->getMDSSAInfo(opnd)->
-        getVOpndSet()->get_first(&iter));
+    VMD * vopnd = (VMD*)mgr->getVOpnd(mdssainfo->getVOpndSet()->
+        get_first(&iter));
     ASSERT0(vopnd->is_md());
+    ASSERT0(mdssainfo->getVOpndSet()->get_elem_count() == 1);
     return vopnd;
 }
 
