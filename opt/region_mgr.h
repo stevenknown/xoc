@@ -36,6 +36,9 @@ author: Su Zhenyu
 
 namespace xoc {
 
+#define REGION_ID_UNDEF 0
+#define LABEL_ID_UNDEF 0
+
 typedef enum {
     REGION_UNDEF = 0,
 
@@ -96,10 +99,8 @@ protected:
     LogMgr * m_logmgr;
 
 protected:
-    void estimateEV(OUT UINT & num_call,
-                    OUT UINT & num_ru,
-                    bool scan_call,
-                    bool scan_inner_region);
+    void estimateEV(OUT UINT & num_call, OUT UINT & num_ru,
+                    bool scan_call, bool scan_inner_region);
 
     void * xmalloc(UINT size);
 
@@ -151,8 +152,9 @@ public:
     OptCtx * getAndGenOptCtx(UINT id);
 
     //Register exact MD for each global variable.
-    //Note you should call this function as early as possible, e.g, before process
-    //all regions. Because that will assign smaller MD id to global variable.
+    //Note you should call this function as early as possible, e.g, before
+    //process all regions. Because that will assign smaller MD id to global
+    //variable.
     void registerGlobalMD();
 
     //Initialize VarMgr structure and MD system.

@@ -103,10 +103,9 @@ bool LoopCvt::try_convert(LI<IRBB> * li, IRBB * gobackbb,
 
     //Copy ir in header to gobackbb.
     IR * last_cond_br = nullptr;
-    DUIter di = nullptr;
+    DUSetIter di = nullptr;
     Vector<IR*> rmvec;
-    for (IR * ir = BB_first_ir(head);
-         ir != nullptr; ir = BB_next_ir(head)) {
+    for (IR * ir = BB_first_ir(head); ir != nullptr; ir = BB_next_ir(head)) {
         IR * newir = m_rg->dupIRTree(ir);
         m_du->addUse(newir, ir);
 

@@ -39,6 +39,9 @@ namespace xoc {
 class IR;
 class Type;
 class TypeMgr;
+class VectorType;
+class StreamType;
+class TensorType;
 class RegionMgr;
 
 #define UNDEF_TYID 0
@@ -49,6 +52,7 @@ class RegionMgr;
 #define IS_BOOL(t) ((t) == D_B)
 #define IS_MC(t) ((t) == D_MC)
 #define IS_VEC(t) ((t) == D_VEC)
+#define IS_STREAM(t) ((t) == D_STREAM)
 #define IS_PTR(t) ((t) == D_PTR)
 #define IS_SIMPLEX(t) (IS_INT(t) || IS_FP(t) || IS_BOOL(t) || \
                       t == D_STR || t == D_ANY)
@@ -93,7 +97,8 @@ typedef enum _DATA_TYPE {
     D_VEC = 19, //Vector
     D_ANY = 20, //Any
     D_TENSOR = 21, //Tensor
-    D_LAST = 22,
+    D_STREAM = 22, //Stream
+    D_LAST = 23,
     ///////////////////////////////////////////////////////////////////////////
     //Note:Extend IR::rtype bit length if it extends type value large than 31//
     ///////////////////////////////////////////////////////////////////////////
@@ -140,6 +145,9 @@ Type const* checkType(Type const* ty, DATA_TYPE dt);
 //Indicate the tensor element data type.
 #define TY_tensor_ety(d) (((TensorType*)CK_TY(d, D_TENSOR))->tensor_elem_type)
 
+//Indicate the stream element data type.
+#define TY_stream_ety(d) (((StreamType*)CK_TY(d, D_STREAM))->stream_elem_type)
+
 //Date Type Description.
 class Type {
     COPY_CONSTRUCTOR(Type);
@@ -150,11 +158,26 @@ public:
 
     void copy(Type const& src) { data_type = src.data_type; }
 
+    //Return the number of elements in the vector.
+    UINT getVectorElemNum(TypeMgr const* tm) const;
+
+    //Return element type of element.
+    DATA_TYPE getVectorElemType() const;
+
+    //Return byte size of element.
+    UINT getVectorElemSize(TypeMgr const* tm) const;
+
+    //Return element type of element.
+    DATA_TYPE getStreamElemType() const;
+
     //Return true if data type is simplex type.
     bool is_simplex() const { return IS_SIMPLEX(TY_dtype(this)); }
 
     //Return true if data type is vector.
     bool is_vector() const { return TY_dtype(this) == D_VEC; }
+
+    //Return true if data type is stream.
+    bool is_stream() const { return TY_dtype(this) == D_STREAM; }
 
     //Return true if data type is pointer.
     bool is_pointer() const { return TY_dtype(this) == D_PTR; }
@@ -206,7 +229,8 @@ public:
         if ((TY_dtype(this) >= D_U8 && TY_dtype(this) <= D_U128) ||
             TY_dtype(this) == D_STR ||
             TY_dtype(this) == D_PTR ||
-            TY_dtype(this) == D_VEC) {
+            TY_dtype(this) == D_VEC ||
+            TY_dtype(this) == D_STREAM) {
             return true;
         }
         return false;
@@ -232,6 +256,9 @@ public:
     //pointer's addend. e.g:The pointer arith, int * p; p = p + (type)value.
     bool is_ptr_addend() const
     { return !is_fp() && !is_mc() && !is_bool() && !is_pointer(); }
+
+    //Return true if the type can be regarded as pointer.
+    bool isPointer() const { return is_pointer() || is_any(); }
 
     bool verify(TypeMgr const* tm) const;
 };
@@ -279,7 +306,8 @@ public:
     //Record the BYTE size of total vector.
     UINT total_vector_size;
 
-    //Record the vector elem size if ir represent a vector.
+    //Record the vector element type.
+    //Note the element can only be simplex type.
     DATA_TYPE vector_elem_type;
 public:
     VectorType()
@@ -294,6 +322,28 @@ public:
         Type::copy(src);
         total_vector_size = src.total_vector_size;
         vector_elem_type = src.vector_elem_type;
+    }
+};
+
+
+//The class represents variable-length Stream Data Type.
+class StreamType : public Type {
+    COPY_CONSTRUCTOR(StreamType);
+public:
+    //Record the stream element type.
+    //Note the element can only be simplex type.
+    DATA_TYPE stream_elem_type;
+public:
+    StreamType()
+    {
+        TY_dtype(this) = D_STREAM;
+        stream_elem_type = D_UNDEF;
+    }
+
+    void copy(StreamType const& src)
+    {
+        Type::copy(src);
+        stream_elem_type = src.stream_elem_type;
     }
 };
 
@@ -394,6 +444,19 @@ public:
 };
 
 
+//Comparison of data type of element in stream.
+class CompareTypeStreamElemType {
+public:
+    bool is_less(Type const* t1, Type const* t2) const
+    { return TY_stream_ety(t1) < TY_stream_ety(t2); }
+
+    bool is_equ(Type const* t1, Type const* t2) const
+    { return TY_stream_ety(t1) == TY_stream_ety(t2); }
+
+    Type const* createKey(Type const* t) { return t; }
+};
+
+
 //Comparison of data type of element in tensor.
 class CompareTypeTensorElemType {
 public:
@@ -454,6 +517,10 @@ class VectorElemTypeTab : public
     TMap<Type const*, TypeContainer const*, CompareTypeVectoElemType> {
 };
 
+class StreamElemTypeTab : public
+    TMap<Type const*, TypeContainer const*, CompareTypeStreamElemType> {
+};
+
 class TensorElemTypeTab : public
     TMap<Type const*, TypeContainer const*, CompareTypeTensorElemType> {
 };
@@ -480,7 +547,6 @@ class VectorTab : public
 public:
 };
 
-
 //Type Table that record all registered tensor type.
 class TensorTab : public
   xcom::TMap<Type const*, TensorElemTypeTab*, CompareTypeTensor> {
@@ -499,6 +565,7 @@ class TypeMgr {
     PointerTab m_pointer_type_tab;
     MCTab m_memorychunk_type_tab;
     VectorTab m_vector_type_tab;
+    StreamElemTypeTab m_stream_type_tab;
     TensorTab m_tensor_type_tab;
     TypeContainer * m_simplex_type[D_LAST];
     UINT m_type_count;
@@ -532,6 +599,9 @@ class TypeMgr {
 
     VectorType * newVectorType()
     { return (VectorType*)xmalloc(sizeof(VectorType)); }
+
+    StreamType * newStreamType()
+    { return (StreamType*)xmalloc(sizeof(StreamType)); }
 
     TensorType * newTensorType()
     {
@@ -605,9 +675,13 @@ public:
     //Register a memory-chunk data type.
     TypeContainer const* registerMC(Type const* ty);
     //Register a vector data type.
-    //'type': it must be D_MC type, and the vector-element-type can not D_UNDEF,
+    //type: it must be D_VEC type, and the vector-element-type can not D_UNDEF,
     //e.g: vector<I8,I8,I8,I8> type, which mc_size is 32 byte, vec-type is D_I8.
     TypeContainer const* registerVector(Type const* ty);
+    //Register a stream data type.
+    //ty: it must be D_STREAM type, and the stream-element-type can not D_UNDEF,
+    //e.g: stream<I8> type, which stream-element-type is D_I8.
+    TypeContainer const* registerStream(Type const* ty);
     //Register a tensor data type.
     //'type': it must be D_TENSOR type, and the
     //tensor-element-type can not D_UNDEF.
@@ -693,6 +767,11 @@ public:
     DATA_TYPE getPointerSizeDtype() const
     { return get_int_dtype(BYTE_PER_POINTER * BIT_PER_BYTE, false); }
 
+    //Return Type that has identical byte-size to pointer.
+    //e.g: 32bit processor return U4, 64bit processor return U8.
+    Type const* getPointerSizeType() const
+    { return getSimplexTypeEx(getPointerSizeDtype()); }
+
     //Return the byte size of pointer's base.
     UINT getPointerBaseByteSize(Type const* type) const
     {
@@ -735,7 +814,7 @@ public:
     Type const* getString() const { return m_str; }
     Type const* getAny() const { return m_any; }
 
-    //Return tyid accroding to DATA_TYPE.
+    //Generate and return type accroding to given DATA_TYPE.
     Type const* getSimplexType(DATA_TYPE dt)
     {
         ASSERT0(IS_SIMPLEX(dt));
@@ -744,7 +823,7 @@ public:
         return registerType(&d);
     }
 
-    //Return tyid accroding to DATA_TYPE.
+    //Return existing type accroding to given DATA_TYPE.
     inline Type const* getSimplexTypeEx(DATA_TYPE dt) const
     {
         switch (dt) {
@@ -790,6 +869,18 @@ public:
         TY_vec_size(&d) = vec_elem_num * getDTypeByteSize(vec_elem_ty);
         TY_vec_ety(&d) = vec_elem_ty;
         return TC_type(registerVector(&d));
+    }
+
+    //Return stream type, which element type is 'elem_ty'.
+    //e.g: stream<D_I32> means this is a stream type with each element is I32,
+    //and the stream has variable-length.
+    Type const* getStreamType(DATA_TYPE elem_ty)
+    {
+        ASSERT0(elem_ty != D_UNDEF);
+        StreamType d;
+        TY_dtype(&d) = D_STREAM;
+        TY_stream_ety(&d) = elem_ty;
+        return TC_type(registerStream(&d));
     }
 
     //Register and return pointer type accroding to pt_base_size.

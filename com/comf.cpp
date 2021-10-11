@@ -38,6 +38,7 @@ author: Su Zhenyu
 #include <sys/time.h>
 #endif
 
+#include "math.h"
 #include "xcominc.h"
 
 namespace xcom {
@@ -741,37 +742,33 @@ UINT getLookupPopCount(ULONGLONG v)
 }
 
 
-//Searchs for sub-string.
-INT findstr(CHAR * src, CHAR * s)
+//Find sub-string in 'src'.
+bool findsubstr(CHAR const* src, CHAR const* substr)
 {
-    if (src == nullptr || s == nullptr) { return 0; }
+    if (src == nullptr || substr == nullptr) { return false; }
 
     // can't have empty or nullptr 'old'
     INT srclen = -1;
-    CHAR * startp = src, * p, * q;
+    CHAR const* startp = src, * p, * q;
     INT l = 0;
     INT i = 0;
-    srclen = (INT)strlen(src);
+    srclen = (INT)::strlen(src);
     p = startp;
     while (p[i] != 0) {
-        if (p[i] == s[0]) {
+        if (p[i] == substr[0]) {
             q = &p[i];
             l = 0;
             while (l < srclen && q[l] != 0) {
-                if (q[l] != s[l]) { break; }
+                if (q[l] != substr[l]) { break; }
                 l++;
             }
-
-            if (s[l] == 0) {//match seacrching
-                goto FIND;
+            if (substr[l] == 0) { //match seacrching
+                return true;
             }
         }
         i++;
     }
-    return 0;
-
-FIND:
-    return 1;
+    return false;
 }
 
 
@@ -816,7 +813,7 @@ CHAR * getfilepath(CHAR const* n, OUT CHAR * buf, UINT bufl)
 //ofst: great than zero means shifting string to right side,
 //   and the displacement is abs(ofst); negative
 //   means shifting string to left.
-void strshift(IN OUT CHAR * string, INT ofst)
+void strshift(MOD CHAR * string, INT ofst)
 {
     INT len = (INT)strlen(string), i;
     if (string == nullptr) { return; }
@@ -1002,11 +999,11 @@ INT getFirstOneAtRightSide(INT m)
 bool isIntegerF(float f)
 {
     //0000 0000 0111 1111 1111 1111 1111 1111 //mantissa
-    //0111 1111 1000 0000 0000 0000 0000 0000 //exp
+    //0111 1111 1000 0000 0000 0000 0000 0000 //exponential
     float * p = &f;
     INT i = *(INT*)p;
     INT m = i & 0x007FFFFF; //mantissa
-    INT n = ((i & 0x7F800000) >> 23) - 127; //number of exp
+    INT n = ((i & 0x7F800000) >> 23) - 127; //number of exponential
     INT j = getFirstOneAtRightSide(m);
     return 23 - j <= n;
 }
@@ -1019,7 +1016,7 @@ bool isIntegerD(double d)
     double * p = &d;
     LONGLONG i = *(LONGLONG*)p;
     LONGLONG m = i & 0x000FFFFFffffffffull; //mantissa
-    INT n = (INT)((i & 0xFFF0000000000000ull) >> 52) - 1023; //number of exp
+    INT n = (INT)((i & 0x7FF0000000000000ull) >> 52) - 1023; //number of exponential
     INT j = 0;
     while (j < 52) {
         if ((m & 0x1) == 1) { break; }
@@ -1030,10 +1027,36 @@ bool isIntegerD(double d)
 }
 
 
+//Return true if 'f' represents a finite floating-point value.
+//f: is conform to IEEE754 spec.
+bool isFiniteD(double f)
+{
+    //0000 0000 0000 1111 1111 1111 1111 1111 1111 1111 1111 1111 1111 1111 1111 1111 //mantissa
+    //11111111111111 0000000000000000000000000000000000000000000000000000000000000000 //exponential
+    double * p = &f;
+    LONGLONG i = *(LONGLONG*)p;
+    LONGLONG mask = 0x7FF0000000000000ull; //mask indicates bits of infinite.
+    return (i & mask) != mask;
+}
+
+
+//Return true if 'f' represents a finite floating-point value.
+//f: is conform to IEEE754 spec.
+bool isFiniteF(float f)
+{
+    //0000 0000 0111 1111 1111 1111 1111 1111 //mantissa
+    //0111 1111 1000 0000 0000 0000 0000 0000 //exponential
+    float * p = &f;
+    INT i = *(INT*)p;
+    INT mask = 0x7F800000; //mask indicates bits of infinite.
+    return (i & mask) != mask;
+}
+
+
 bool isPowerOf5(double f)
 {
     ASSERT0(f >= 0.0);
-    if (f == 0.0) { return false; }
+    if (f == 0.0 || !::isFiniteD(f)) { return false; }
     while (f >= 5.0) {
         f = f / 5.0;
         if (f == 1.0) {
@@ -1048,7 +1071,7 @@ bool isPowerOf5(double f)
 //array: sorted in incremental order.
 //n: elements size of array.
 //v: search v in array.
-bool binsearch(INT array[], UINT n, INT v, IN OUT UINT * ppos)
+bool binsearch(INT array[], UINT n, INT v, MOD UINT * ppos)
 {
     if (n == 0) { return false; }
     if (n == 1 && array[0] != v) { return false; }
@@ -1241,11 +1264,8 @@ static bool is_exist_mark(CHAR const* format)
 
 
 //Parse string that starts with '%'.
-static bool percent(CHAR * buf,
-                    UINT buflen,
-                    IN OUT UINT * bufpos,
-                    IN OUT CHAR const** format,
-                    va_list stack_start)
+static bool percent(CHAR * buf, UINT buflen, MOD UINT * bufpos,
+                    MOD CHAR const** format, va_list stack_start)
 {
     //The info related to %, e.g:'%d', can not longer than 255.
     CHAR sbuf[255];
@@ -1443,10 +1463,8 @@ OVER: //We got some problems, and going to the xsprintf.
 }
 
 
-static bool back_slash(CHAR * buf,
-                       UINT buflen,
-                       IN OUT UINT * bufpos,
-                       IN OUT CHAR const** format)
+static bool back_slash(CHAR * buf, UINT buflen, MOD UINT * bufpos,
+                       MOD CHAR const** format)
 {
     CHAR const* pos = *format;
     CHAR ch = *pos++;
@@ -1482,7 +1500,7 @@ OVER: //Get some problems.
 //Format string and record in buf.
 //buf: output buffer that record string.
 //buflen: length of output buffer.
-CHAR * xsprintf(IN OUT CHAR * buf, UINT buflen, CHAR const* format, ...)
+CHAR * xsprintf(MOD CHAR * buf, UINT buflen, CHAR const* format, ...)
 {
     UINT bufpos = 0;
     CHAR ch = *format;

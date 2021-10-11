@@ -36,10 +36,26 @@ author: Su Zhenyu
 
 namespace xoc {
 class VN;
-typedef Vector<VN*> VEC1;
-typedef Vector<VEC1*> VEC2;
-typedef Vector<VEC2*> VEC3;
-typedef Vector<VEC3*> VEC4;
+
+typedef xcom::TMapIter<UINT, VN*> Tab1Iter;
+
+class Tab1 : public xcom::TMap<UINT, VN*> {
+};
+
+typedef xcom::TMapIter<UINT, Tab1*> Tab2Iter;
+
+class Tab2 : public xcom::TMap<UINT, Tab1*> {
+};
+
+typedef xcom::TMapIter<UINT, Tab2*> Tab3Iter;
+
+class Tab3 : public xcom::TMap<UINT, Tab2*> {
+};
+
+typedef xcom::TMapIter<UINT, Tab3*> Tab4Iter;
+
+class Tab4 : public xcom::TMap<UINT, Tab3*> {
+};
 
 typedef enum _VN_TYPE {
     VN_UNKNOWN = 0,
@@ -49,24 +65,23 @@ typedef enum _VN_TYPE {
     VN_FP,
     VN_STR,
     VN_MC_INT,
+    VN_NUM,
 } VN_TYPE;
 
 
-#define VN_id(v) ((v)->id)
-#define VN_type(v) ((v)->vn_type)
+#define VN_id(v) ((v)->m_id)
+#define VN_type(v) ((v)->m_vn_type)
 #define VN_int_val(v) ((v)->u1.iv)
 #define VN_fp_val(v) ((v)->u1.dv)
 #define VN_str_val(v) ((v)->u1.str)
 #define VN_op(v) ((v)->u1.op)
-#define VN_is_cst(v) (VN_type(v) == VN_INT || \
-                      VN_type(v) == VN_MC_INT || \
-                      VN_type(v) == VN_FP || \
-                      VN_type(v) == VN_STR)
+#define VN_is_cst(v) (VN_type(v) == VN_INT || VN_type(v) == VN_MC_INT || \
+                      VN_type(v) == VN_FP || VN_type(v) == VN_STR)
 class VN {
     COPY_CONSTRUCTOR(VN);
 public:
-    UINT id;
-    VN_TYPE vn_type; //value type
+    UINT m_id;
+    VN_TYPE m_vn_type; //value type
     union {
         LONGLONG iv;
         double dv;
@@ -76,19 +91,24 @@ public:
 
 public:
     VN() { clean(); }
+
     void clean()
     {
-        id = 0;
-        vn_type = VN_UNKNOWN;
+        m_id = 0;
+        m_vn_type = VN_UNKNOWN;
         u1.iv = 0;
     }
+
+    UINT id() const { return VN_id(this); }
+
+    VN_TYPE getType() const { return VN_type(this); }
 };
 
 
 class DoubleHashFunc : public HashFuncBase<double> {
+    COPY_CONSTRUCTOR(DoubleHashFunc);
 public:
     DoubleHashFunc() {}
-    COPY_CONSTRUCTOR(DoubleHashFunc);
     UINT get_hash_value(double d, UINT bucket_size) const
     {
         double * p = &d;
@@ -104,17 +124,18 @@ typedef HMap<MD const*, VN*> MD2VN_MAP;
 
 //Note: SymbolHashFunc request bucket size must be the power of 2.
 class SYM2VN_MAP : public HMap<Sym const*, VN*, SymbolHashFunc> {
+    COPY_CONSTRUCTOR(SYM2VN_MAP);
 public:
     SYM2VN_MAP() : HMap<Sym const*, VN*, SymbolHashFunc>(0) {}
-    COPY_CONSTRUCTOR(SYM2VN_MAP);
 };
 
 
-class IR2VN : public Vector<VN*> {
+typedef TMapIter<UINT, VN*> IR2VNIter;
+
+class IR2VN : public TMap<UINT, VN*> {
+    COPY_CONSTRUCTOR(IR2VN);
 public:
     IR2VN() {}
-    COPY_CONSTRUCTOR(IR2VN);
-    void set(INT i, VN * elem) { Vector<VN*>::set(i, elem); }
 };
 
 
@@ -134,20 +155,11 @@ public:
         sz = s;
     }
 
-    bool is_equ(VNE_SC & ve)
-    {
-        return mdid == ve.mdid &&
-               ofst == ve.ofst &&
-               sz == ve.sz;
-    }
+    bool is_equ(VNE_SC const& ve) const
+    { return mdid == ve.mdid && ofst == ve.ofst && sz == ve.sz; }
 
-    void copy(VNE_SC & ve) { *this = ve; }
-    void clean()
-    {
-        mdid = 0;
-        ofst = 0;
-        sz = 0;
-    }
+    void copy(VNE_SC const& ve) { *this = ve; }
+    void clean() { mdid = 0; ofst = 0; sz = 0; }
 };
 
 
@@ -206,15 +218,16 @@ public:
 };
 
 
+//VN Expression of Hash Function
 class VNE_SC_HF {
+    COPY_CONSTRUCTOR(VNE_SC_HF);
 public:
     VNE_SC_HF() {}
-    COPY_CONSTRUCTOR(VNE_SC_HF);
 
     UINT get_hash_value(VNE_SC * x, UINT bucket_size) const
     {
         UINT n = (x->mdid << 20) | (x->ofst << 10) | x->sz;
-        ASSERT0(isPowerOf2(bucket_size));
+        ASSERT0(xcom::isPowerOf2(bucket_size));
         return hash32bit(n) & (bucket_size - 1);
     }
 
@@ -230,6 +243,7 @@ public:
 
 
 class SCVNE2VN : public HMap<VNE_SC*, VN*, VNE_SC_HF> {
+    COPY_CONSTRUCTOR(SCVNE2VN);
 protected:
     SMemPool * m_pool;
     List<VNE_SC*> m_free_lst;
@@ -241,7 +255,6 @@ public:
         ASSERT0(pool);
         m_pool = pool;
     }
-    COPY_CONSTRUCTOR(SCVNE2VN);
     virtual ~SCVNE2VN() {}
 
     virtual VNE_SC * create(OBJTY v)
@@ -266,15 +279,16 @@ public:
 };
 
 
+//VN Expression of Hash Function
 class VNE_ILD_HF {
+    COPY_CONSTRUCTOR(VNE_ILD_HF);
 public:
     VNE_ILD_HF() {}
-    COPY_CONSTRUCTOR(VNE_ILD_HF);
 
     UINT get_hash_value(VNE_ILD * x, UINT bucket_size) const
     {
         UINT n = (x->base_vn_id << 20) | (x->ofst << 10) | x->sz;
-        ASSERT0(isPowerOf2(bucket_size));
+        ASSERT0(xcom::isPowerOf2(bucket_size));
         return hash32bit(n) & (bucket_size - 1);
     }
 
@@ -290,6 +304,7 @@ public:
 
 
 class ILD_VNE2VN : public HMap<VNE_ILD*, VN*, VNE_ILD_HF> {
+    COPY_CONSTRUCTOR(ILD_VNE2VN);
 protected:
     SMemPool * m_pool;
     List<VNE_ILD*> m_free_lst;
@@ -301,8 +316,10 @@ public:
         ASSERT0(pool);
         m_pool = pool;
     }
-    COPY_CONSTRUCTOR(ILD_VNE2VN);
-    virtual ~ILD_VNE2VN() {}
+    virtual ~ILD_VNE2VN()
+    {
+        //All elements are allocated in external mempool. Nothing to do.
+    }
 
     virtual VNE_ILD * create(OBJTY v)
     {
@@ -327,63 +344,79 @@ public:
 
 
 class IR2SCVNE : public TMap<IR const*, SCVNE2VN*> {
+    COPY_CONSTRUCTOR(IR2SCVNE);
 public:
     IR2SCVNE() {}
-    COPY_CONSTRUCTOR(IR2SCVNE);
-    ~IR2SCVNE()
+    ~IR2SCVNE() { destroy(); }
+
+    void destroy()
     {
         TMapIter<IR const*, SCVNE2VN*> ii;
         SCVNE2VN * v;
         for (get_first(ii, &v); v != nullptr; get_next(ii, &v)) {
             delete v;
         }
+        TMap<IR const*, SCVNE2VN*>::destroy();
     }
 
     void clean()
     {
-        TMapIter<IR const*, SCVNE2VN*> ii;
-        SCVNE2VN * v;
-        for (get_first(ii, &v); v != nullptr; get_next(ii, &v)) {
-            v->clean();
-        }
+        //TMapIter<IR const*, SCVNE2VN*> ii;
+        //SCVNE2VN * v;
+        //for (get_first(ii, &v); v != nullptr; get_next(ii, &v)) {
+        //    v->clean();
+        //}
+        //In order to free memory as soon as possible, replace clean with
+        //destroy.
+        destroy();
+        TMap<IR const*, SCVNE2VN*>::init();
     }
 };
 
 
 class IR2ILDVNE : public TMap<IR const*, ILD_VNE2VN*> {
+    COPY_CONSTRUCTOR(IR2ILDVNE);
 public:
     IR2ILDVNE() {}
-    COPY_CONSTRUCTOR(IR2ILDVNE);
-    ~IR2ILDVNE()
+    ~IR2ILDVNE() { destroy(); }
+
+    void destroy()
     {
         TMapIter<IR const*, ILD_VNE2VN*> ii;
         ILD_VNE2VN * vne2vn;
         for (get_first(ii, &vne2vn); vne2vn != nullptr; get_next(ii, &vne2vn)) {
             delete vne2vn;
         }
+        TMap<IR const*, ILD_VNE2VN*>::destroy();
     }
 
     void clean()
     {
-        TMapIter<IR const*, ILD_VNE2VN*> ii;
-        ILD_VNE2VN * vne2vn;
-        for (get_first(ii, &vne2vn); vne2vn != nullptr; get_next(ii, &vne2vn)) {
-            vne2vn->clean();
-        }
+        //TMapIter<IR const*, ILD_VNE2VN*> ii;
+        //ILD_VNE2VN * vne2vn;
+        //for (get_first(ii, &vne2vn); vne2vn != nullptr;
+        //     get_next(ii, &vne2vn)) {
+        //    vne2vn->clean();
+        //}
+
+        //In order to free memory as soon as possible, replace clean with
+        //destroy.
+        destroy();
+        TMap<IR const*, ILD_VNE2VN*>::init();
     }
 };
 
 
 class VNE_ARR_HF {
+    COPY_CONSTRUCTOR(VNE_ARR_HF);
 public:
     VNE_ARR_HF() {}
-    COPY_CONSTRUCTOR(VNE_ARR_HF);
 
     UINT get_hash_value(VNE_ARR * x, UINT bucket_size) const
     {
         UINT n = (x->base_vn_id << 24) | (x->ofst_vn_id << 16) |
                  (x->ofst << 8) | x->sz;
-        ASSERT0(isPowerOf2(bucket_size));
+        ASSERT0(xcom::isPowerOf2(bucket_size));
         return hash32bit(n) & (bucket_size - 1);
     }
 
@@ -399,6 +432,7 @@ public:
 
 
 class ARR_VNE2VN : public HMap<VNE_ARR*, VN*, VNE_ARR_HF> {
+    COPY_CONSTRUCTOR(ARR_VNE2VN);
 protected:
     SMemPool * m_pool;
     List<VNE_ARR*> m_free_lst;
@@ -410,7 +444,6 @@ public:
         ASSERT0(pool);
         m_pool = pool;
     }
-    COPY_CONSTRUCTOR(ARR_VNE2VN);
     virtual ~ARR_VNE2VN() {}
 
     VNE_ARR * create(OBJTY v)
@@ -436,17 +469,10 @@ public:
 
 
 class IR2ARRVNE : public TMap<IR const*, ARR_VNE2VN*> {
+    COPY_CONSTRUCTOR(IR2ARRVNE);
 public:
     IR2ARRVNE() {}
-    COPY_CONSTRUCTOR(IR2ARRVNE);
-    virtual ~IR2ARRVNE()
-    {
-        TMapIter<IR const*, ARR_VNE2VN*> ii;
-        ARR_VNE2VN * v;
-        for (get_first(ii, &v); v != nullptr; get_next(ii, &v)) {
-            delete v;
-        }
-    }
+    virtual ~IR2ARRVNE() { clean(); } 
 
     void clean()
     {
@@ -455,20 +481,22 @@ public:
         for (get_first(ii, &v); v != nullptr; get_next(ii, &v)) {
             delete v;
         }
+        TMap<IR const*, ARR_VNE2VN*>::destroy();
+        TMap<IR const*, ARR_VNE2VN*>::init();
     }
 };
 
 
-class IR2IR : public HMap<IR const*, IR const*,
-                          HashFuncBase2<IR const*> > {
+class IR2IR : public HMap<IR const*, IR const*, HashFuncBase2<IR const*> > {
+    COPY_CONSTRUCTOR(IR2IR);
 public:
     IR2IR() : HMap<IR const*, IR const*, HashFuncBase2<IR const*> >(0) {}
-    COPY_CONSTRUCTOR(IR2IR);
 };
 
 
 //Perform Global Value Numbering.
 class GVN : public Pass {
+    COPY_CONSTRUCTOR(GVN);
 protected:
     BYTE m_is_vn_fp:1; //true if compute VN for float type.
     BYTE m_is_comp_ild_vn_by_du:1;
@@ -496,15 +524,14 @@ protected:
     SMemPool * m_pool;
     UINT m_vn_count;
     IR2VN m_ir2vn;
-    VEC3 m_irt_vec;
+    Vector<void*> m_irt_vec;
     LONGLONG2VN_MAP m_ll2vn;
     LONGLONGMC2VN_MAP m_llmc2vn;
     FP2VN_MAP m_fp2vn;
     SYM2VN_MAP m_str2vn;
     List<IR const*> m_tmp;
     List<VN*> m_free_lst;
-    List<Vector<VN*>*> m_vec_lst;
-    List<Vector<VN*>*> m_vnvec_lst;
+    List<Tab1*> m_tab_lst;
     MD2VN_MAP m_md2vn;
     IR2ILDVNE m_def2ildtab;
     IR2ARRVNE m_def2arrtab;
@@ -514,20 +541,17 @@ protected:
 protected:
     VN * allocLiveinVN(IR const* exp, MD const* emd, bool & change);
 
+    void cleanIR2VN();
     void clean();
-    VN * computeScalarByAnonDomDef(IR const* ild,
-                                   IR const* domdef,
+    VN * computeScalarByAnonDomDef(IR const* ild, IR const* domdef,
                                    bool & change);
-    VN * computeILoadByAnonDomDef(IR const* ild,
-                                  VN const* mlvn,
-                                  IR const* domdef,
+    VN * computeILoadByAnonDomDef(IR const* ild, VN const* mlvn,
+                                  IR const* domdef, bool & change);
+    VN * computeArrayByAnonDomDef(IR const* arr, VN const* basevn,
+                                  VN const* ofstvn, IR const* domdef,
                                   bool & change);
-    VN * computeArrayByAnonDomDef(IR const* arr,
-                                  VN const* basevn,
-                                  VN const* ofstvn,
-                                  IR const* domdef,
-                                  bool & change);
-    IR const* computeDomDef(IR const* exp, IR const* exp_stmt, SList<IR*> * defs);
+    IR const* computeDomDef(IR const* exp, IR const* exp_stmt,
+                            SList<IR*> * defs);
     void computeArrayAddrRef(IR const* ir, bool & change);
     VN * computeArray(IR const* exp, bool & change);
     VN * computeScalar(IR const* exp, bool & change);
@@ -535,6 +559,9 @@ protected:
     VN * computeExactMemory(IR const* exp, bool & change);
     VN * computePR(IR const* exp, bool & change);
     VN * computeVN(IR const* exp, bool & change);
+
+    void dump_h1(IR const* k, VN const* x) const;
+    void destroyLocalUsed();
 
     void * xmalloc(UINT size)
     {
@@ -544,14 +571,9 @@ protected:
         return p;
     }
 
-    VN * registerQuadVN(IR_TYPE irt,
-                        VN const* v0,
-                        VN const* v1,
-                        VN const* v2,
-                        VN const* v3);
-    VN * registerTripleVN(IR_TYPE irt,
-                          VN const* v0,
-                          VN const* v1,
+    VN * registerQuadVN(IR_TYPE irt, VN const* v0, VN const* v1,
+                        VN const* v2, VN const* v3);
+    VN * registerTripleVN(IR_TYPE irt, VN const* v0, VN const* v1,
                           VN const* v2);
     VN * registerBinVN(IR_TYPE irt, VN const* v0, VN const* v1);
     VN * registerUnaVN(IR_TYPE irt, VN const* v0);
@@ -573,8 +595,6 @@ protected:
         return vn;
     }
 
-    void dump_h1(IR const* k, VN const* x) const;
-
     void processBB(IRBB * bb, bool & change);
     void processCall(IR const* ir, bool & change);
     void processRegion(IR const* ir, bool & change);
@@ -587,15 +607,18 @@ protected:
 
 public:
     explicit GVN(Region * rg);
-    COPY_CONSTRUCTOR(GVN);
     virtual ~GVN();
+
+    void init();
+    void destroy();
 
     //Return true if GVN is able to determine the result of 'ir', otherwise
     //return false that GVN know nothing about ir.
-    bool calcCondMustVal(IR const* ir,
-                         bool & must_true,
+    bool calcCondMustVal(IR const* ir, bool & must_true,
                          bool & must_false) const;
+    void cleanIRTreeVN(IR const* ir);
 
+    void dumpVNHash() const;
     bool dump() const;
     void dumpBB(UINT bbid) const;
     void dumpIR2VN() const;
@@ -616,13 +639,22 @@ public:
     bool isDiffMemLoc(IR const* ir1, IR const* ir2) const
     { return ir1->isDiffMemLoc(ir2); }
 
+    //Get VN of ir.
     VN * mapIR2VN(IR const* ir) const { return m_ir2vn.get(ir->id()); }
+    //Get VN of ir. Readonly function.
+    VN const* mapIR2VNConst(IR const* ir) const
+    { return m_ir2vn.get(ir->id()); }
 
-    void setMapIR2VN(IR const* ir, VN * vn) { m_ir2vn.set(ir->id(), vn); }
+    //Set VN to ir.
+    void setMapIR2VN(IR const* ir, VN * vn)
+    { m_ir2vn.setAlways(ir->id(), vn); }
+
+    //Update VN to ir if ir has been mapped.
+    void setMapIR2VNIfFind(IR const* ir, VN * vn)
+    { m_ir2vn.setIfFind(ir->id(), vn); }
     void setComputeVNForFP(bool doit) { m_is_vn_fp = doit; }
     void setComputeILoadVNviaDU(bool doit) { m_is_comp_ild_vn_by_du = doit; }
 
-    bool verify();
     virtual bool perform(OptCtx & oc);
 };
 

@@ -850,12 +850,10 @@ static void processClass(DexFile* pDexFile, D2Dpool* pool, char const* dexfilena
             rumgr->getLogMgr()->init(g_logfile_name, true);
         }
         topru = rumgr->newRegion(REGION_PROGRAM);
+        topru->initAttachInfoMgr();
         rumgr->addToRegionTab(topru);
-            topru->setRegionVar(rumgr->getVarMgr()->registerVar(
-                ".dex",
-                rumgr->getTypeMgr()->getMCType(0),
-                0,
-                VAR_GLOBAL|VAR_FAKE));
+        topru->setRegionVar(rumgr->getVarMgr()->registerVar(
+            ".dex", rumgr->getTypeMgr()->getMCType(0), 0, VAR_GLOBAL|VAR_FAKE));
         rumgr->addBuiltinVarToTab();
     }
 

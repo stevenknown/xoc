@@ -40,11 +40,7 @@ bool RCE::dump() const
 {
     if (!m_rg->isLogMgrInit()) { return false; }
     note(getRegion(), "\n\n==---- DUMP RCE ----==\n");
-
-    BBList * bbl = m_rg->getBBList();
-    for (IRBB * bb = bbl->get_head(); bb != nullptr; bb = bbl->get_next()) {
-        //TODO:
-    }
+    getRegion()->dump(false);
     return true;
 }
 
@@ -53,8 +49,7 @@ bool RCE::dump() const
 //always false, set 'must_false'.
 //Return true if this function is able to determine the result of 'ir',
 //otherwise return false that it does know nothing about ir.
-bool RCE::calcCondMustVal(IR const* ir,
-                          OUT bool & must_true,
+bool RCE::calcCondMustVal(IR const* ir, OUT bool & must_true,
                           OUT bool & must_false) const
 {
     must_true = false;
@@ -129,13 +124,13 @@ IR * RCE::calcCondMustVal(IN IR * ir,
                 if (must_true) {
                     ASSERT0(!must_false);
                     Type const* type = ir->getType();
-                    removeIRTreeUse(ir, m_rg);
+                    removeUseForTree(ir, m_rg);
                     m_rg->freeIRTree(ir);
                     return m_rg->buildImmInt(1, type);
                 } else {
                     ASSERT0(must_false);
                     Type const* type = ir->getType();
-                    removeIRTreeUse(ir, m_rg);
+                    removeUseForTree(ir, m_rg);
                     m_rg->freeIRTree(ir);
                     return m_rg->buildImmInt(0, type);
                 }
@@ -149,7 +144,7 @@ IR * RCE::calcCondMustVal(IN IR * ir,
 }
 
 
-IR * RCE::processBranch(IR * ir, IN OUT bool * cfg_mod)
+IR * RCE::processBranch(IR * ir, MOD bool * cfg_mod)
 {
     ASSERT0(ir->isConditionalBr());
     bool must_true, must_false, changed = false;
@@ -232,7 +227,7 @@ IR * RCE::processStore(IR * ir)
 {
     ASSERT0(ir->is_st());
     if (ST_rhs(ir)->getExactRef() == ir->getExactRef()) {
-        removeIRTreeUse(ir, m_rg);
+        removeUseForTree(ir, m_rg);
         return nullptr;
     }
     return ir;
@@ -244,7 +239,7 @@ IR * RCE::processStorePR(IR * ir)
 {
     ASSERT0(ir->is_stpr());
     if (STPR_rhs(ir)->getExactRef() == ir->getExactRef()) {
-        removeIRTreeUse(ir, m_rg);
+        removeUseForTree(ir, m_rg);
         return nullptr;
     }
     return ir;
@@ -254,7 +249,7 @@ IR * RCE::processStorePR(IR * ir)
 //e.g:
 //1. if (a == a) { ... } , remove redundant comparation.
 //2. b = b; remove redundant store.
-bool RCE::performSimplyRCE(IN OUT bool * cfg_mod)
+bool RCE::performSimplyRCE(MOD bool * cfg_mod)
 {
     BBList * bbl = m_rg->getBBList();
     bool change = false;
@@ -340,6 +335,11 @@ bool RCE::perform(OptCtx & oc)
         ASSERT0(PRSSAMgr::verifyPRSSAInfo(m_rg));
         ASSERT0(MDSSAMgr::verifyMDSSAInfo(m_rg));
     }
+
+    if (g_is_dump_after_pass && g_dump_opt.isDumpRCE()) {
+        dump();
+    }
+
     END_TIMER(t, getPassName());
     return change;
 }

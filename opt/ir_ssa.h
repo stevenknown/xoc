@@ -146,7 +146,7 @@ class PRSSAMgr : public Pass {
     void destructionInDomTreeOrder(IRBB * root, xcom::Graph & domtree);
 
     void handleBBRename(IRBB * bb, DefSBitSet const& defined_prs,
-                        IN OUT BB2VPMap & bb2vp);
+                        MOD BB2VPMap & bb2vp);
 
     xcom::Stack<VPR*> * mapPRNO2VPStack(UINT prno);
     IR * mapPRNO2IR(UINT prno) { return m_prno2ir.get(prno); }
@@ -182,7 +182,7 @@ class PRSSAMgr : public Pass {
     void placePhiForPR(UINT prno, IN List<IRBB*> * defbbs,
                        DfMgr const& dfm, xcom::BitSet & visited,
                        List<IRBB*> & wl, Vector<DefSBitSet*> & defined_prs_vec);
-    void placePhi(DfMgr const& dfm, IN OUT DefSBitSet & effect_prs,
+    void placePhi(DfMgr const& dfm, MOD DefSBitSet & effect_prs,
                   DefMiscBitSetMgr & bs_mgr,
                   Vector<DefSBitSet*> & defined_prs_vec,
                   List<IRBB*> & wl);
@@ -263,6 +263,13 @@ public:
     virtual CHAR const* getPassName() const { return "PRSSA Manager"; }
     PASS_TYPE getPassType() const { return PASS_PR_SSA_MGR; }
 
+    //Return true if bb has PHI.
+    static bool hasPhi(IRBB const* bb)
+    {
+        IR const* ir = BB_first_ir(const_cast<IRBB*>(bb));
+        return ir != nullptr && ir->is_phi();
+    }
+
     IR * initVP(IN IR * ir);
     void insertPhi(UINT prno, IN IRBB * bb);
 
@@ -319,12 +326,23 @@ public:
     //Return true if DU changed.
     static bool removeExpiredDUForStmt(IR * stmt, Region * rg);
 
+    //Check each USE of stmt, remove the expired one which is not reference
+    //the memory any more that stmt defined.
+    static bool removeExpiredDU(IR * ir, Region * rg);
+
     bool verifyPhi(bool is_vpinfo_avail, bool before_strip_version) const;
     bool verifySSAInfo() const; //Can be used in any module.
     static bool verifyPRSSAInfo(Region const* rg);
 
     virtual bool perform(OptCtx & oc) { construction(oc); return true; }
 };
+
+inline void copySSAInfo(IR * tgt, IR const* src)
+{
+    ASSERT0(tgt && src);
+    ASSERT0(tgt->isPROp() && src->isPROp());
+    tgt->setSSAInfo(src->getSSAInfo());
+}
 
 } //namespace xoc
 #endif

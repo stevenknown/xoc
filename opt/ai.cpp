@@ -1,5 +1,5 @@
 /*@
-Copyright (c) 2013-2014, Su Zhenyu steven.known@gmail.com
+Copyright (c) 2013-2021, Su Zhenyu steven.known@gmail.com
 
 All rights reserved.
 
@@ -38,19 +38,20 @@ namespace xoc {
 //
 void AIContainer::copy(AIContainer const* ai, Region * rg)
 {
-    ASSERT0(ai);
-    if (!ai->is_init()) { return; }
-    cont.copy(ai->cont, rg->get_pool());
+    ASSERT0(ai && ai->is_init());
+    //Copy of cont will do initialization if needed.
+    cont.copy(ai->cont, rg->getAttachInfoMgr()->get_pool());
 }
 
 
+//The function formats string name for XOC recognized attach-info.
 CHAR const* AIContainer::getAIName(AI_TYPE type) const
 {
     switch (type) {
     case AI_UNDEF: return "Undef";
     case AI_DBX: return "Dbx";
     case AI_PROF: return "Prof";
-    case AI_TBAA: return "Tbaa";
+    case AI_TBAA: return "TBAA";
     case AI_EH_LABEL: return "EH";
     case AI_USER_DEF: return "UserDef";
     case AI_MD_SSA: return "MDSSA";
@@ -64,33 +65,37 @@ CHAR const* AIContainer::getAIName(AI_TYPE type) const
 void AIContainer::set(BaseAttachInfo * c, Region * rg)
 {
     ASSERTN(c, ("Can not set empty AI"));
+    ASSERT0(is_init());
 
-    INT emptyslot = -1;
-    if (!cont.is_init()) { cont.init(); }
-
-    AI_TYPE type = c->type;
+    AI_TYPE type = c->getType();
     ASSERT0(type > AI_UNDEF && type < AI_LAST);
 
     UINT i = 0;
+    INT emptyslot = -1;
+    INT existslot = -1;
     for (; i < cont.get_capacity(); i++) {
         BaseAttachInfo * ac = cont.get(i);
         if (ac == nullptr) {
             emptyslot = (INT)i;
-        } else if (ac->type != type) {
-            continue;
+        } else if (ac->getType() == type) {
+            existslot = (INT)i;
+            break;
         }
+    }
 
+    if (existslot != -1) {
         //Note c will override the prior AIContainer that has same type.
-        cont.set(i, c, rg->get_pool());
+        cont.set((UINT)existslot, c, rg->getAttachInfoMgr()->get_pool());
         return;
     }
 
     if (emptyslot != -1) {
-        cont.set((UINT)emptyslot, c, rg->get_pool());
-    } else {
-        //AIContainer buffer will grow bigger.
-        cont.set(i, c, rg->get_pool());
+        cont.set((UINT)emptyslot, c, rg->getAttachInfoMgr()->get_pool());
+        return;
     }
+
+    //AIContainer buffer will grow bigger.
+    cont.set(i, c, rg->getAttachInfoMgr()->get_pool());
 }
 //END
 

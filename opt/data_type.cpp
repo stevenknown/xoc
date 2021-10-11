@@ -60,7 +60,8 @@ TypeDesc const g_type_desc[] = {
     {D_PTR, "*", BYTE_PER_POINTER * BIT_PER_BYTE}, //pointer
     {D_VEC, "vec", 0}, //vector, default bitsize is 0
 
-    {D_ANY, "any", 0}, //void type, default bitsize is 0
+    //void type, default bitsize is as long as pointer type.
+    {D_ANY, "any", BYTE_PER_POINTER * BIT_PER_BYTE},
     {D_TENSOR, "tensor", 0}, //tensor type, default bitsize is 0
 };
 
@@ -293,6 +294,36 @@ TypeContainer const* TypeMgr::registerVector(Type const* type)
         m_vector_type_tab.set(ty, elemtab);
     }
     elemtab->set(ty, x);
+    TC_typeid(x) = m_type_count++;
+    m_type_tab.set(TC_typeid(x), ty);
+    return x;
+}
+
+
+//Register a stream data type.
+//ty: it must be D_STREAM type, and the stream-element-type can not D_UNDEF,
+//e.g: stream<I8> type, which stream-element-type is D_I8.
+TypeContainer const* TypeMgr::registerStream(Type const* type)
+{
+    ASSERT0(type->is_stream() && TY_stream_ety(type) != D_UNDEF);
+    TypeContainer const* entry = m_stream_type_tab.get(type);
+    if (entry != nullptr) {
+        return entry;
+    }
+
+    //Add new element type into vector.
+    //e.g:
+    //    STREAM,vec_ty=D_UNDEF
+    //        STREAM,vec_ty=D_I8
+    //        STREAM,vec_ty=D_U8 //I8<U8
+    //        STREAM,vec_ty=D_F32
+    //    ...
+    TypeContainer * x = newTC();
+    StreamType * ty = newStreamType();
+    TC_type(x) = ty;
+    ty->copy((StreamType const&)*type);
+    //Add new vector into table.
+    m_stream_type_tab.set(ty, x);
     TC_typeid(x) = m_type_count++;
     m_type_tab.set(TC_typeid(x), ty);
     return x;
@@ -622,6 +653,34 @@ bool Type::verify(TypeMgr const* tm) const
             (TY_vec_size(this) % tm->getDTypeByteSize(TY_vec_ety(this)) == 0));
     }
     return true;
+}
+
+
+//Return the number of elements in the vector.
+UINT Type::getVectorElemNum(TypeMgr const* tm) const
+{
+    return TY_vec_size(this) / tm->getDTypeByteSize(TY_vec_ety(this));
+}
+
+
+//Return byte size of element.
+UINT Type::getVectorElemSize(TypeMgr const* tm) const
+{
+    return tm->getDTypeByteSize(TY_vec_ety(this));
+}
+
+
+//Return element type of element.
+DATA_TYPE Type::getVectorElemType() const
+{
+    return TY_vec_ety(this);
+}
+
+
+//Return element type of element.
+DATA_TYPE Type::getStreamElemType() const
+{
+    return TY_vec_ety(this);
 }
 //END Type
 

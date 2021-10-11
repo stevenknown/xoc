@@ -268,6 +268,8 @@ public:
         return VAR_type(this)->is_pointer();
     }
 
+    bool isPointer() const { return is_any() || is_pointer(); }
+
     //Return true if variable type is memory chunk.
     bool is_mc() const
     {
@@ -327,6 +329,8 @@ public:
             dm->getByteSize(VAR_type(this));
     }
 
+    //The interface to dump declaration information when current
+    //variable dumpped. This is target dependent code.
     virtual CHAR const* dumpVARDecl(StrBuf &) const { return nullptr; }
     virtual void dump(TypeMgr const* tm) const;
 

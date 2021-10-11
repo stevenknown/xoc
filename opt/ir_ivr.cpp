@@ -161,7 +161,7 @@ bool IVR::findInitVal(IRSet const& defset, OUT BIV * iv)
     if (m_is_only_handle_exact_md) {
         emd = domdef->getExactRef();
     } else {
-        emd = domdef->getEffectRef();
+        emd = domdef->getMustRef();
     }
 
     if (emd == nullptr || emd != iv->getOccMD()) {
@@ -424,7 +424,7 @@ bool IVR::hasMultiDefInLoop(IR const* ir, LI<IRBB> const* li,
     MDSSAInfo const* ssainfo = m_mdssamgr->getMDSSAInfoIfAny(exp);
     if (ssainfo == nullptr) { return false; }
 
-    collectDefSet(exp, m_mdssamgr, set);
+    xoc::collectDefSet(exp, m_mdssamgr, true, set);
     IRSetIter it = nullptr;
     for (INT i = set->get_first(&it); i >= 0; i = set->get_next(i, &it)) {
         IR * stmt = m_rg->getIR(i);
@@ -492,7 +492,7 @@ bool IVR::isSelfModByDUSet(IR const* ir) const
     //SelfMod pattern under SSA mode.
     // x<-SelfModOP(x, 1)
     //Iterate all USEs to check if the stmt of USE is identical to 'ir'.
-    DUIter it = nullptr;
+    DUSetIter it = nullptr;
     for (INT i = useset->get_first(&it);
          i >= 0; i = useset->get_next(i, &it)) {
         IR const* use = m_rg->getIR(i);
@@ -878,7 +878,6 @@ void IVR::findDIV(LI<IRBB> const* li, BIVList const& bivlst)
                     !hasMultiDefInLoop(ir, li, &set)) {
                     //ir is DIV.
                     ASSERT0(linrep.is_valid());
-                    linrep.dump(m_rg);
                     LinearRep * r = allocLinearRep();
                     r->copy(linrep);
                     recordDIV(li, ir, r);

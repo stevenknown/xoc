@@ -48,119 +48,6 @@ class PassMgr;
 #define VERIFY_LEVEL_2 2 //do more aggressive check.
 #define VERIFY_LEVEL_3 3 //do all verifications.
 
-//Optimization Context
-//This class record and propagate auxiliary information to optimizations.
-//These options brief describe state of Passes following an optimization
-//perform. When an optimization pass is run, it can change results of other
-//pass. Set the valid/invalid option to inform that results were preserved by
-//that optimization pass.es must be done explicitly.
-#define OC_is_ref_valid(o) ((o).u1.s1.is_du_ref_valid)
-#define OC_is_pr_du_chain_valid(o) ((o).u1.s1.is_pr_du_chain_valid)
-#define OC_is_nonpr_du_chain_valid(o) ((o).u1.s1.is_nonpr_du_chain_valid)
-#define OC_is_live_expr_valid(o) ((o).u1.s1.is_live_expr_valid)
-#define OC_is_reach_def_valid(o) ((o).u1.s1.is_reach_def_valid)
-#define OC_is_avail_reach_def_valid(o) ((o).u1.s1.is_avail_reach_def_valid)
-#define OC_is_cfg_valid(o) ((o).u1.s1.is_cfg_valid)
-#define OC_is_scc_valid(o) ((o).u1.s1.is_scc_valid)
-#define OC_is_aa_valid(o) ((o).u1.s1.is_aa_result_valid)
-#define OC_is_expr_tab_valid(o) ((o).u1.s1.is_ir_expr_tab)
-#define OC_is_cdg_valid(o) ((o).u1.s1.is_cdg_valid)
-#define OC_is_dom_valid(o) ((o).u1.s1.is_dom_valid)
-#define OC_is_pdom_valid(o) ((o).u1.s1.is_pdom_valid)
-#define OC_is_rpo_valid(o) ((o).u1.s1.is_rpo_valid)
-#define OC_is_loopinfo_valid(o) ((o).u1.s1.is_loopinfo_valid)
-#define OC_is_callg_valid(o) ((o).u1.s1.is_callg_valid)
-class OptCtx {
-public:
-    union {
-        UINT int1;
-        struct {
-            //Record MUST-DEF, MAY-DEF, MAY-USE MDSet for each IR STMT/EXP.
-            UINT is_du_ref_valid:1;
-
-            //Record DEF/USE IR stmt/exp for PR operation.
-            UINT is_pr_du_chain_valid:1;
-            //Record DEF/USE IR stmt/exp for NON-PR operation.
-            UINT is_nonpr_du_chain_valid:1;
-            UINT is_live_expr_valid:1;
-            UINT is_reach_def_valid:1;
-            UINT is_avail_reach_def_valid:1;
-            UINT is_aa_result_valid:1; //POINT TO info is avaiable.
-            UINT is_ir_expr_tab:1; //Liveness of ExpRep is avaliable.
-            UINT is_cfg_valid:1; //CFG is avaliable.
-            UINT is_scc_valid:1; //SCC of CFG is avaliable.
-            UINT is_cdg_valid:1; //CDG is avaliable.
-
-            //Dominator Set, Immediate Dominator are avaliable.
-            UINT is_dom_valid:1;
-
-            //Post Dominator Set, Post Immediate Dominator are avaiable.
-            UINT is_pdom_valid:1;
-
-            UINT is_loopinfo_valid:1; //Loop info is avaiable.
-
-            UINT is_callg_valid:1; //Call graph is available.
-
-            UINT is_rpo_valid:1; //Rporder is available.
-        } s1;
-    } u1;
-
-public:
-    OptCtx() { set_all_invalid(); }
-    OptCtx const& operator = (OptCtx const&);
-
-    bool is_ref_valid() const { return OC_is_ref_valid(*this); }
-    bool is_pr_du_chain_valid() const
-    { return OC_is_pr_du_chain_valid(*this); }
-    bool is_nonpr_du_chain_valid() const
-    { return OC_is_nonpr_du_chain_valid(*this); }
-    bool is_live_expr_valid() const { return OC_is_live_expr_valid(*this); }
-    bool is_reach_def_valid() const { return OC_is_reach_def_valid(*this); }
-    bool is_avail_reach_def_valid() const
-    { return OC_is_avail_reach_def_valid(*this); }
-    bool is_cfg_valid() const { return OC_is_cfg_valid(*this); }
-    bool is_scc_valid() const { return OC_is_scc_valid(*this); }
-    bool is_aa_valid() const { return OC_is_aa_valid(*this); }
-    bool is_expr_tab_valid() const { return OC_is_expr_tab_valid(*this); }
-    bool is_cdg_valid() const { return OC_is_cdg_valid(*this); }
-    bool is_dom_valid() const { return OC_is_dom_valid(*this); }
-    bool is_pdom_valid() const { return OC_is_pdom_valid(*this); }
-    bool is_rpo_valid() const { return OC_is_rpo_valid(*this); }
-    bool is_loopinfo_valid() const { return OC_is_loopinfo_valid(*this); }
-    bool is_callg_valid() const { return OC_is_callg_valid(*this); }
-
-    void set_all_valid() { u1.int1 = (UINT)-1; }
-    void set_all_invalid() { u1.int1 = 0; }
-
-    //This function reset the flag if control flow changed.
-    void setInvalidIfCFGChanged()
-    {
-        //OC_is_cfg_valid(*this) = false; CFG should always be maintained.
-        OC_is_scc_valid(*this) = false;
-        OC_is_cdg_valid(*this) = false;
-        OC_is_dom_valid(*this) = false;
-        OC_is_pdom_valid(*this) = false;
-        OC_is_rpo_valid(*this) = false;
-        OC_is_loopinfo_valid(*this) = false;
-        OC_is_scc_valid(*this) = false;
-    }
-
-    void setDomValid(bool valid)
-    {
-        OC_is_dom_valid(*this) = valid;
-        OC_is_pdom_valid(*this) = valid;
-    }
-
-    void setInvalidIfDUMgrLiveChanged()
-    {
-        OC_is_expr_tab_valid(*this) = false;
-        OC_is_live_expr_valid(*this) = false;
-        OC_is_reach_def_valid(*this) = false;
-        OC_is_avail_reach_def_valid(*this) = false;
-    }
-};
-
-
 class DumpOpt {
 public:
     //Dump all information.
@@ -175,6 +62,7 @@ public:
                         //by AA and DU Manager.
     bool is_dump_mdset_hash; //Dump MD Set Hash Table.
     bool is_dump_cfg; //Dump CFG.
+    bool is_dump_cfgopt; //Dump CFG after CFG optimizations.
     bool is_dump_dom; //Dump Dom/Pdom/Idom/Pidom.
     bool is_dump_cp; //Dump Copy Propagation.
     bool is_dump_rp; //Dump Register Promotion.
@@ -208,6 +96,7 @@ public:
     bool isDumpDUMgr() const;
     bool isDumpMDSetHash() const;
     bool isDumpCFG() const;
+    bool isDumpCFGOpt() const;
     bool isDumpDOM() const;
     bool isDumpCP() const;
     bool isDumpRP() const;
@@ -299,13 +188,15 @@ extern bool g_is_opt_float; //Optimize float point operation.
 extern bool g_is_lower_to_pr_mode; //Lower IR to PR mode.
 
 //Enable XOC support dynamic type.
-//That means the type of IR_ST, IR_LD, IR_STPR, IR_PR may be VOID.
+//That means the type of IR_ST, IR_LD, IR_STPR, IR_PR may be ANY.
 extern bool g_is_support_dynamic_type;
 extern bool g_do_pr_ssa; //Do optimization in SSA.
 extern bool g_do_md_ssa; //Do optimization in Memory SSA.
 extern bool g_do_cfg; //Build control flow graph.
 extern bool g_do_rpo; //Compute reverse-post-order.
 extern bool g_do_loop_ana; //loop analysis.
+//Perform cfg optimization: remove labels that no one referenced.
+extern bool g_do_cfg_remove_redundant_label;
 //Perform cfg optimization: remove empty bb.
 extern bool g_do_cfg_remove_empty_bb;
 //Perform cfg optimization: remove unreachable bb from entry.

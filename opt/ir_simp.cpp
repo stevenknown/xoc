@@ -1642,7 +1642,7 @@ IR * Region::simplifyStoreArray(IR * ir, SimpCtx * ctx)
     ret->copyRef(ir, this);
     copyDbx(ret, ir, this);
     ret->copyAI(ir, this);
-    changeDef(ir, ret, this);
+    xoc::changeDef(ir, ret, this);
     freeIRTree(ir);
 FIN:
     xcom::add_next(&ret_list, &last, ret);

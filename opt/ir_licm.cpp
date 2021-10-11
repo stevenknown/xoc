@@ -77,8 +77,8 @@ bool LICM::scanOpnd(IN LI<IRBB> * li, bool * islegal, bool first_scan)
             if (!ir->isContainMemRef() || ir->isNoMove()) { continue; }
             if ((ir->isCallStmt() && !ir->isReadOnly()) ||
                 ir->is_region() || ir->is_phi()) {
-                //TODO: support call/region.and phi.
-                *islegal = false;
+                //TODO: support call/region and phi.
+                *islegal = false; //prevent loop hoisting.
                 return false;
             }
             if (first_scan) { updateMD2Num(ir); }
@@ -498,7 +498,7 @@ bool LICM::is_dom_all_use_in_loop(IR const* ir, LI<IRBB> * li)
     MDSSAMgr * mdssamgr = m_rg->getMDSSAMgr();
     if (mdssamgr != nullptr &&
         mdssamgr->is_valid() &&
-        ir->isMemoryRefNotOperatePR()) {
+        ir->isMemoryRefNonPR()) {
         return mdssamgr->isStmtDomAllUseInsideLoop(ir, li);
     }
 
@@ -543,7 +543,7 @@ bool LICM::handleDefByDUChain(IR const* exp,
     DUMgr * dumgr = m_rg->getDUMgr();
     DUSet const* defset = exp->readDUSet();
     if (dumgr != nullptr && defset != nullptr) {
-        DUIter di = nullptr;
+        DUSetIter di = nullptr;
         for (INT i = defset->get_first(&di);
              i >= 0; i = defset->get_next(i, &di)) {
             IR * def = m_rg->getIR(i);
@@ -666,7 +666,7 @@ IRBB * LICM::insertGuardBB(IRBB * prehead, IRBB * loophead)
     IR * det = m_rg->dupIRTree(BR_det(br));
 
     //Remember maintaining the DU chain of generated IR.
-    xoc::addUse(det, BR_det(br), m_rg);
+    xoc::addUseForTree(det, BR_det(br), m_rg);
 
     if (br->is_truebr()) {
         //Make sure the guard-branch is FALSEBR because FALSEBR uses
@@ -681,7 +681,7 @@ IRBB * LICM::insertGuardBB(IRBB * prehead, IRBB * loophead)
     IR * guard_br = m_rg->buildBranch(false, det, li);
 
     //Assign MD for all generated new IRs.
-    m_rg->assignMDForIRList(guard_br, true, true);
+    m_rg->getMDMgr()->assignMDForIRList(guard_br, true, true);
     ASSERT0(guard->getNumOfIR() == 0);
 
     //Insert the guard-branch into guard-BB.
@@ -808,7 +808,7 @@ bool LICM::hoistCandHelper(OUT bool & insert_guard_bb,
     IR * stpr = m_rg->buildStorePR(PR_no(t), t->getType(), cand_exp);
 
     //Revise MD info.
-    MD const* tmd = m_rg->genMDForPR(t);
+    MD const* tmd = m_rg->getMDMgr()->genMDForPR(t);
     t->setRefMD(tmd, m_rg);
     stpr->setRefMD(tmd, m_rg);
 
@@ -820,8 +820,7 @@ bool LICM::hoistCandHelper(OUT bool & insert_guard_bb,
 
 //Try to move and check that each definitions of candidate has been
 //already hoisted from loop.
-bool LICM::tryMoveAllDefStmtOutFromLoop(IR const* c,
-                                        IRBB * prehead,
+bool LICM::tryMoveAllDefStmtOutFromLoop(IR const* c, IRBB * prehead,
                                         OUT LI<IRBB> * li)
 {
     m_iriter.clean();

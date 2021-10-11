@@ -118,7 +118,7 @@ void ExprTab::dump_ir_expr_tab()
         for (IR * occ = EXPR_occ_list(ie).get_head();
              occ != nullptr; occ = EXPR_occ_list(ie).get_next()) {
             prt(getRegion(), "IR%d", IR_id(occ));
-            MDSet const* use_mds = du_mgr->getMayUse(occ);
+            MDSet const* use_mds = occ->getMayRef();
             if (use_mds != nullptr) {
                 prt(getRegion(), "(use:");
                 use_mds->dump(m_rg->getMDSystem());
@@ -549,7 +549,7 @@ void ExprTab::encode_bb(IRBB * bb)
 }
 
 
-void ExprTab::reperform(IN OUT OptCtx & oc)
+void ExprTab::reperform(MOD OptCtx & oc)
 {
     clean_occ_list();
     perform(oc);
@@ -560,7 +560,7 @@ void ExprTab::reperform(IN OUT OptCtx & oc)
 //Scan IR statement literally, and encoding it for generating
 //the unique id for each individual expressions, and update
 //the 'GEN-SET' and 'KILL-SET' of IR-EXPR for BB as well as.
-bool ExprTab::perform(IN OUT OptCtx & oc)
+bool ExprTab::perform(MOD OptCtx & oc)
 {
     BBList * bbl = m_rg->getBBList();
     if (bbl->get_elem_count() == 0) { return false; }

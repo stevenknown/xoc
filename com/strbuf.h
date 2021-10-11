@@ -1,5 +1,5 @@
 /*@
-Copyright (c) 2013-2014, Su Zhenyu steven.known@gmail.com
+Copyright (c) 2013-2021, Su Zhenyu steven.known@gmail.com
 All rights reserved.
 
 Redistribution and use in source and binary forms, with or without
@@ -33,10 +33,12 @@ namespace xcom {
 class StrBuf {
     COPY_CONSTRUCTOR(StrBuf);
 public:
-    CHAR * buf;
-    UINT buflen;
-
+    CHAR * buf; //the buffer that holds the string.
+    UINT buflen; //the byte length of the buffer. Note the buffer may longer
+                 //than the string needed.
 public:
+    //initsize: the byte size that string buffer expected to be.
+    //Note the buffer may be longer than a string needed.
     StrBuf(UINT initsize)
     {
         ASSERT0(initsize > 0);
@@ -55,6 +57,18 @@ public:
     {
         ASSERT0(buf);
         buf[0] = 0;
+    }
+    void copy(StrBuf const& src)
+    {
+        if (buflen < src.buflen) {
+            buflen = src.buflen;            
+            ASSERT0(buf);
+            ::free(buf);
+            buf = (CHAR*)::malloc(buflen);            
+        }
+        buf[0] = 0;
+        ASSERT0(src.buf);
+        ::memcpy(buf, src.buf, buflen);
     }
 
     //String comparation.

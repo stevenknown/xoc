@@ -1,5 +1,5 @@
 /*@
-Copyright (c) 2013-2014, Su Zhenyu steven.known@gmail.com
+Copyright (c) 2013-2021, Su Zhenyu steven.known@gmail.com
 All rights reserved.
 
 Redistribution and use in source and binary forms, with or without
@@ -223,10 +223,10 @@ template <class Mat, class T> class SIX : public Element<T> {
     UINT m_max_iter;
     PivotPairTab * m_ppt;
 
-    INT findPivotBV(UINT pivot_nv, IN OUT PVParam<Mat> & pp);
+    INT findPivotBV(UINT pivot_nv, MOD PVParam<Mat> & pp);
     INT findPivotNVandBVPair(OUT INT & nvidx,
                              OUT INT & bvidx,
-                             IN OUT PVParam<Mat> & pp);
+                             MOD PVParam<Mat> & pp);
 
     bool isConstItermFeasible(Mat & newleq, INT rhs_idx) const;
 
@@ -240,7 +240,7 @@ template <class Mat, class T> class SIX : public Element<T> {
                   Mat const& leq,
                   Mat const& tgtf);
 
-    void pivot(UINT nv, UINT bv, IN OUT PVParam<Mat> & pp);
+    void pivot(UINT nv, UINT bv, MOD PVParam<Mat> & pp);
 
     INT stage1(OUT Mat & newleq,
                OUT Mat & newvc,
@@ -249,21 +249,21 @@ template <class Mat, class T> class SIX : public Element<T> {
                OUT Vector<bool> & bvset,
                Vector<INT> & bv2eqmap,
                Vector<INT> & eq2bvmap,
-               IN OUT INT & new_rhs_idx);
-    UINT solveSlackForm(IN OUT Mat & tgtf,
-                        IN OUT Mat & eqc,
-                        IN OUT Mat & vc,
+               MOD INT & new_rhs_idx);
+    UINT solveSlackForm(MOD Mat & tgtf,
+                        MOD Mat & eqc,
+                        MOD Mat & vc,
                         OUT T & maxv,
                         OUT Mat & sol,
-                        IN OUT Vector<bool> & nvset,
-                        IN OUT Vector<bool> & bvset,
-                        IN OUT Vector<INT> & bv2eqmap,
-                        IN OUT Vector<INT> & eq2bvmap,
+                        MOD Vector<bool> & nvset,
+                        MOD Vector<bool> & bvset,
+                        MOD Vector<INT> & bv2eqmap,
+                        MOD Vector<INT> & eq2bvmap,
                         INT rhs_idx);
-    void slack(IN OUT Mat & tgtf,
-               IN OUT Mat & leq,
-               IN OUT Mat & vc,
-               IN OUT INT & rhs_idx);
+    void slack(MOD Mat & tgtf,
+               MOD Mat & leq,
+               MOD Mat & vc,
+               MOD INT & rhs_idx);
 
     void checkAndInitConst(Mat const& leq,
                            Mat const& eq,
@@ -334,22 +334,22 @@ public:
                       INT rhs_idx);
     void calcFinalSolution(OUT Mat & sol,
                            OUT T & v,
-                           IN OUT Mat & slack_sol,
+                           MOD Mat & slack_sol,
                            IN INTMat & vcmap,
                            Mat const& orignal_tgtf,
                            INT rhs_idx);
     void convertEq2Ineq(OUT Mat & leq, Mat const& eq);
-    bool calcSolution(IN OUT Mat & sol,
+    bool calcSolution(MOD Mat & sol,
                       Vector<bool> const& has_val,
                       Mat const& eqc, INT rhs_idx);
-    bool constructBasicFeasibleSolution(IN OUT Mat & leq,
-                                        IN OUT Mat & tgtf,
-                                        IN OUT Mat & vc,
-                                        IN OUT Vector<bool> & nvset,
-                                        IN OUT Vector<bool> & bvset,
-                                        IN OUT Vector<INT> & bv2eqmap,
-                                        IN OUT Vector<INT> & eq2bvmap,
-                                        IN OUT INT & rhs_idx);
+    bool constructBasicFeasibleSolution(MOD Mat & leq,
+                                        MOD Mat & tgtf,
+                                        MOD Mat & vc,
+                                        MOD Vector<bool> & nvset,
+                                        MOD Vector<bool> & bvset,
+                                        MOD Vector<INT> & bv2eqmap,
+                                        MOD Vector<INT> & eq2bvmap,
+                                        MOD INT & rhs_idx);
 
     FILE * dump_open_file() const;
     bool dump_prt_indent(FILE * h) const;
@@ -360,21 +360,21 @@ public:
                      bool is_eqc,
                      Mat const& vc,
                      INT rhs_idx) const;
-    void reviseTargetFunc(IN OUT Mat & tgtf,
+    void reviseTargetFunc(MOD Mat & tgtf,
                           Mat const& eq,
                           Mat const& leq,
                           INT rhs_idx);
 
-    UINT TwoStageMethod(IN OUT Mat & newleq,
-                        IN OUT Mat & newvc,
-                        IN OUT Mat & newtgtf,
-                        IN OUT Mat & slack_sol,
-                        IN OUT T & maxv,
-                        IN OUT Vector<bool> & nvset,
-                        IN OUT Vector<bool> & bvset,
-                        IN OUT Vector<INT> & bv2eqmap,
-                        IN OUT Vector<INT> & eq2bvmap,
-                        IN OUT INT & new_rhs_idx);
+    UINT TwoStageMethod(MOD Mat & newleq,
+                        MOD Mat & newvc,
+                        MOD Mat & newtgtf,
+                        MOD Mat & slack_sol,
+                        MOD T & maxv,
+                        MOD Vector<bool> & nvset,
+                        MOD Vector<bool> & bvset,
+                        MOD Vector<INT> & bv2eqmap,
+                        MOD Vector<INT> & eq2bvmap,
+                        MOD INT & new_rhs_idx);
 };
 
 
@@ -457,7 +457,7 @@ bool SIX<Mat, T>::dump_str(CHAR const* format, ...) const
 //vc: variable constraints
 //rhs_idx: column index indicates the constant-column.
 template <class Mat, class T>
-bool SIX<Mat, T>::calcSolution(IN OUT Mat & sol,
+bool SIX<Mat, T>::calcSolution(MOD Mat & sol,
                                Vector<bool> const& has_val,
                                Mat const& eqc,
                                INT rhs_idx)
@@ -552,7 +552,7 @@ bool SIX<Mat, T>::calcSolution(IN OUT Mat & sol,
 //    specifical basic variable, the value of basic variable is
 //    also the slack range of 'pivot_nv'.
 template <class Mat, class T>
-INT SIX<Mat, T>::findPivotBV(UINT pivot_nv, IN OUT PVParam<Mat> & pp)
+INT SIX<Mat, T>::findPivotBV(UINT pivot_nv, MOD PVParam<Mat> & pp)
 {
     ASSERTN(m_is_init, ("not yet initialize"));
     Mat const& eqc = *pp.eq;
@@ -672,12 +672,12 @@ INT SIX<Mat, T>::findPivotBV(UINT pivot_nv, IN OUT PVParam<Mat> & pp)
 template <class Mat, class T>
 INT SIX<Mat, T>::findPivotNVandBVPair(OUT INT & nvidx,
                                       OUT INT & bvidx,
-                                      IN OUT PVParam<Mat> & pp)
+                                      MOD PVParam<Mat> & pp)
 {
     ASSERTN(m_is_init, ("not yet initialize"));
     Mat const& tgtf = *pp.tgtf;
-    IN OUT Vector<bool> & nvset = *pp.nvset;
-    IN OUT Vector<bool> & bvset = *pp.bvset;
+    MOD Vector<bool> & nvset = *pp.nvset;
+    MOD Vector<bool> & bvset = *pp.bvset;
     DUMMYUSE(nvset);
     DUMMYUSE(bvset);
     PivotPairTab & ppt = *pp.ppt;
@@ -833,14 +833,14 @@ bool SIX<Mat, T>::is_feasible(Mat const& sol,
 //    And if L' has a maximum feasible solution: max(-x0)=0, x0=0,
 //    the slack form exists a feasible solution and L also has a solution.
 template <class Mat, class T>
-bool SIX<Mat, T>::constructBasicFeasibleSolution(IN OUT Mat & leq,
-                                                 IN OUT Mat & tgtf,
-                                                 IN OUT Mat & vc,
-                                                 IN OUT Vector<bool> & nvset,
-                                                 IN OUT Vector<bool> & bvset,
-                                                 IN OUT Vector<INT> & bv2eqmap,
-                                                 IN OUT Vector<INT> & eq2bvmap,
-                                                 IN OUT INT & rhs_idx)
+bool SIX<Mat, T>::constructBasicFeasibleSolution(MOD Mat & leq,
+                                                 MOD Mat & tgtf,
+                                                 MOD Mat & vc,
+                                                 MOD Vector<bool> & nvset,
+                                                 MOD Vector<bool> & bvset,
+                                                 MOD Vector<INT> & bv2eqmap,
+                                                 MOD Vector<INT> & eq2bvmap,
+                                                 MOD INT & rhs_idx)
 {
     ASSERTN(m_is_init, ("not yet initialize"));
     ASSERTN(rhs_idx > 0, ("illegal info"));
@@ -999,15 +999,15 @@ bool SIX<Mat, T>::constructBasicFeasibleSolution(IN OUT Mat & leq,
 //    and variable constraint:
 //        x,y,z,s1,s2,s3 >= 0
 template <class Mat, class T>
-UINT SIX<Mat, T>::solveSlackForm(IN OUT Mat & tgtf,
-                                 IN OUT Mat & eqc,
-                                 IN OUT Mat & vc,
+UINT SIX<Mat, T>::solveSlackForm(MOD Mat & tgtf,
+                                 MOD Mat & eqc,
+                                 MOD Mat & vc,
                                  OUT T & maxv,
                                  OUT Mat & sol,
-                                 IN OUT Vector<bool> & nvset,
-                                 IN OUT Vector<bool> & bvset,
-                                 IN OUT Vector<INT> & bv2eqmap,
-                                 IN OUT Vector<INT> & eq2bvmap,
+                                 MOD Vector<bool> & nvset,
+                                 MOD Vector<bool> & bvset,
+                                 MOD Vector<INT> & bv2eqmap,
+                                 MOD Vector<INT> & eq2bvmap,
                                  INT rhs_idx)
 {
     ASSERTN(m_is_init, ("not yet initialize"));
@@ -1393,10 +1393,10 @@ INT SIX<Mat, T>::normalize(OUT Mat & newleq,
 //  the else two constraints as: f + s = c, s >= 0, where s is
 //  slack variable.
 template <class Mat, class T>
-void SIX<Mat, T>::slack(IN OUT Mat & tgtf,
-                        IN OUT Mat & leq,
-                        IN OUT Mat & vc,
-                        IN OUT INT & rhs_idx)
+void SIX<Mat, T>::slack(MOD Mat & tgtf,
+                        MOD Mat & leq,
+                        MOD Mat & vc,
+                        MOD INT & rhs_idx)
 {
     ASSERTN(m_is_init, ("not yet initialize"));
     UINT orig_leqs = leq.getRowSize();
@@ -1442,7 +1442,7 @@ void SIX<Mat, T>::slack(IN OUT Mat & tgtf,
 //    one division, m*n-1 multiplication, m*n-m-n+1 addition and n-1
 //    sign change.
 template <class Mat, class T>
-void SIX<Mat, T>::pivot(UINT nv, UINT bv, IN OUT PVParam<Mat> & pp)
+void SIX<Mat, T>::pivot(UINT nv, UINT bv, MOD PVParam<Mat> & pp)
 {
     ASSERTN(m_is_init, ("not yet initialize"));
     Mat & eq = *pp.eq;
@@ -1578,7 +1578,7 @@ UINT SIX<Mat, T>::calcDualMaxm(OUT T & dual_maxv,
                                OUT INT & dual_rhs_idx,
                                OUT INT & dual_num_nv,
                                Mat const& tgtf,
-                               IN OUT Mat &, //vc
+                               MOD Mat &, //vc
                                Mat const& leq,
                                INT rhs_idx)
 {
@@ -1786,7 +1786,7 @@ INT SIX<Mat, T>::stage1(OUT Mat & newleq,
                         OUT Vector<bool> & bvset,
                         Vector<INT> & bv2eqmap,
                         Vector<INT> & eq2bvmap,
-                        IN OUT INT & new_rhs_idx)
+                        MOD INT & new_rhs_idx)
 {
     bool has_pos_coeff_var = false;
     for (UINT i = 0; i < (UINT)new_rhs_idx; i++) {
@@ -1851,7 +1851,7 @@ INT SIX<Mat, T>::stage1(OUT Mat & newleq,
 template <class Mat, class T>
 void SIX<Mat, T>::calcFinalSolution(OUT Mat & sol,
                                     OUT T & v,
-                                    IN OUT Mat & slack_sol,
+                                    MOD Mat & slack_sol,
                                     IN INTMat & vcmap,
                                     Mat const& orignal_tgtf,
                                     INT rhs_idx)
@@ -1906,16 +1906,16 @@ void SIX<Mat, T>::calcFinalSolution(OUT Mat & sol,
 //nvset: indicate if variable is non-basic.
 //bvset: indicate if variable is basic.
 template <class Mat, class T>
-UINT SIX<Mat, T>::TwoStageMethod(IN OUT Mat & newleq,
-                                 IN OUT Mat & newvc,
-                                 IN OUT Mat & newtgtf,
-                                 IN OUT Mat & slack_sol,
-                                 IN OUT T & maxv,
-                                 IN OUT Vector<bool> & nvset,
-                                 IN OUT Vector<bool> & bvset,
-                                 IN OUT Vector<INT> & bv2eqmap,
-                                 IN OUT Vector<INT> & eq2bvmap,
-                                 IN OUT INT & new_rhs_idx)
+UINT SIX<Mat, T>::TwoStageMethod(MOD Mat & newleq,
+                                 MOD Mat & newvc,
+                                 MOD Mat & newtgtf,
+                                 MOD Mat & slack_sol,
+                                 MOD T & maxv,
+                                 MOD Vector<bool> & nvset,
+                                 MOD Vector<bool> & bvset,
+                                 MOD Vector<INT> & bv2eqmap,
+                                 MOD Vector<INT> & eq2bvmap,
+                                 MOD INT & new_rhs_idx)
 {
     UINT status = stage1(newleq, newvc, newtgtf, nvset, bvset,
                          bv2eqmap, eq2bvmap, new_rhs_idx);
@@ -2061,7 +2061,7 @@ UINT SIX<Mat, T>::maxm(OUT T & maxv,
 //  Set the coefficient of variable in 'tgtf' to be 0 if no
 //  constraints related with it.
 template <class Mat, class T>
-void SIX<Mat, T>::reviseTargetFunc(IN OUT Mat & tgtf,
+void SIX<Mat, T>::reviseTargetFunc(MOD Mat & tgtf,
                                    Mat const& eq,
                                    Mat const& leq,
                                    INT rhs_idx)
@@ -2170,7 +2170,7 @@ public:
                       bool is_bin = false,
                       IN BMat * rational_indicator = nullptr,
                       INT rhs_idx = -1); //Linear maximum solution
-    void reviseTargetFunc(IN OUT Mat & tgtf,
+    void reviseTargetFunc(MOD Mat & tgtf,
                           Mat const& eq,
                           Mat const& leq,
                           INT rhs_idx);
@@ -2408,7 +2408,7 @@ bool MIP<Mat, T>::is_satisfying(OUT UINT & row,
 
 
 template <class Mat, class T>
-void MIP<Mat, T>::reviseTargetFunc(IN OUT Mat & tgtf,
+void MIP<Mat, T>::reviseTargetFunc(MOD Mat & tgtf,
                                    Mat const& eq,
                                    Mat const& leq,
                                    INT rhs_idx)

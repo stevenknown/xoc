@@ -1,5 +1,5 @@
 /*@
-Copyright (c) 2013-2014, Su Zhenyu steven.known@gmail.com
+Copyright (c) 2013-2021, Su Zhenyu steven.known@gmail.com
 
 All rights reserved.
 
@@ -190,8 +190,11 @@ public:
     VMD();
     VMD(xcom::DefSegMgr * sm);
     ~VMD();
+    //Add an USE occurrence.
+    void addUse(IR const* ir) { VMD_occs(this).append(ir); }
 
     void clean();
+    void cleanUseSet() { VMD_occs(this).clean(); }
 
     void init(xcom::DefSegMgr * sm)
     {
@@ -211,11 +214,18 @@ public:
     //Return true if current VOpnd should have DEF stmt.
     bool hasDef() const { return version() != MDSSA_INIT_VERSION; }
 
+    //Return true if VMD is live-in version to current Region.
+    bool isLiveIn() const { return version() == MDSSA_INIT_VERSION; }
+
     UINT mdid() const
     {
         ASSERT0(is_md());
         return VMD_mdid(this);
     }
+
+    //Remove given IR expression from occurence set.
+    //exp: IR expression to be removed.
+    void removeUse(IR const* exp) { VMD_occs(this).remove(exp); }
 
     UINT version() const
     {
@@ -256,8 +266,19 @@ typedef xcom::SEGIter * VOpndSetIter;
 //Generate MDSSAInfo for individual memory-ref IR stmt/exp since each IR
 //has its own specific MDSSA Memory Reference information.
 //It sounds there might be some waste to memory if many IRs mdssa-reference
-//could be represented by same MDSSAInfo. Nevertheless, the postulation
-//is quite experimentally, and in practical very rarelly.
+//could be represented by same MDSSAInfo.
+//e.g: ... = ld x; //S1
+//  where x has been assigned MDSSAInfo.
+//  If you duplicate x at other occurrence, MDSSAInfo will be duplicated too.
+//     ... = ld x; //S1
+//     some stmts;
+//     ... = ld x; //S2
+//  Otherwise, if x at S1 and S2 shared the same MDSSAInfo object.
+//  When some pass is going to remove S1, then the pass will remove VOpnd of x
+//  from VOpndSet of MDSSAInfo. This will incur MDSSAInfo at S2 changed too.
+//  This is incorrect for S2, and will lead assertion during verify().
+//Nevertheless, the postulation is quite experimentally, and in practical
+//very rarelly.
 class MDSSAInfo : public MDSSAInfoAttachInfo {
     COPY_CONSTRUCTOR(MDSSAInfo);
 protected:
@@ -268,16 +289,26 @@ public:
 
     //Add given IR expression to occurence set.
     //exp: IR expression to be added.
-    void addUse(IR const* exp, IN UseDefMgr * udmgr);
+    void addUse(IR const* exp, UseDefMgr * mgr);
+    void addUseSet(MDSSAInfo const* src, UseDefMgr * mgr);
+    void addVOpnd(VOpnd const* vopnd, UseDefMgr * mgr);
 
     //Collect all USE, where USE is IR expression.
+    //The function will not go through MDPhi operation.
+    //Note the function will not clear 'set' because caller may perform unify
+    //operation.
     void collectUse(UseDefMgr const* udmgr, OUT IRSet * set) const;
+    void cleanVOpndSet(UseDefMgr * mgr);
+    void copy(MDSSAInfo const& src, UseDefMgr * mgr);
+
     //Collect all DEF that overlapped with 'ref', where DEF is IR expression.
     //Note the function will not clear 'set' because caller may perform unify
     //operation.
     //ref: given MD, if it is NULL, the function will collect all DEFs.
+    //iter_phi_opnd: true if the collection will keep iterating DEF of PHI
+    //operand.
     void collectDef(MDSSAMgr const* mdssamgr, MD const* ref,
-                    OUT IRSet * set) const;
+                    bool iter_phi_opnd, OUT IRSet * set) const;
 
     void init() { BaseAttachInfo::init(AI_MD_SSA); }
     bool isUseReachable(UseDefMgr const* udmgr, IR const* exp) const;
@@ -286,12 +317,16 @@ public:
     void dump(MDSSAMgr const* mgr) const;
 
     VOpndSet * getVOpndSet() { return &m_vopnd_set; }
+    VOpnd * getVOpndForMD(UINT mdid, MDSSAMgr const* mgr) const;
 
     VOpndSet const* readVOpndSet() const { return &m_vopnd_set; }
 
     //Remove given IR expression from occurence set.
     //exp: IR expression to be removed.
     void removeUse(IR const* exp, IN UseDefMgr * udmgr);
+
+    //Remove vopnd from current MDSSAInfo.
+    void removeVOpnd(VOpnd const* vopnd, UseDefMgr * mgr);
 };
 
 
@@ -307,26 +342,23 @@ public:
 #define MDDEF_occ(m) (((MDDef*)m)->m_occ)
 class MDDef {
     COPY_CONSTRUCTOR(MDDef);
-public:
-    BYTE m_is_phi:1; //is MDPhi.
-    UINT m_id;
-    VMD * m_result; //the MD defined.
-
-    //The nearest previous MDDef. Note MDPhi does not have prev-def.
-    MDDef * m_prev;
-    MDDefSet * m_nextset; //the nearest next MDDefs.
-    IRBB * m_bb; //the BB in which phi placed.
-    IR * m_occ; //record IR stmt.
-
-    //Note user should erase DEFstmt info before clean().
     void eraseDefInfo()
     {
         ASSERT0(getResult()->getDef() == this);
         VMD_def(getResult()) = nullptr;
     }
 public:
-    MDDef();
+    BYTE m_is_phi:1; //true if MDDef indicates MDPhi.
+    UINT m_id; //the unique ID.
+    VMD * m_result; //the VMD defined.
 
+    //The nearest previous MDDef. Note MDPhi does not have previous DEF.
+    MDDef * m_prev;
+    MDDefSet * m_nextset; //the nearest next MDDefs.
+    IRBB * m_bb; //the BB in which phi placed.
+    IR * m_occ; //record the real IR stmt. For MDPhi, it is NULL.
+public:
+    MDDef();
     //Before destruction, invoke clean() of m_nextset
     //to free memory resource.
     ~MDDef();
@@ -338,6 +370,7 @@ public:
         //TBD:Keep id unchanged to facilitate MDDef dump.
         //MDDEF_id(this) = MDDEF_UNDEF;
     }
+    void cleanNextSet(UseDefMgr * mgr);
 
     IRBB * getBB() const { return MDDEF_bb(this); }
     VMD * getResult() const { return MDDEF_result(this); }
@@ -350,6 +383,9 @@ public:
     //Return true if n is the Next DEF of current DEF.
     bool isNext(MDDef const* n) const;
 
+    //Return true if n is the Next DEF, and n may not be the immediate-next-def to
+    //current DEF. The function will access all next DEFs recursively.
+    bool isInNextSet(MDDef const* n, UseDefMgr const* mgr) const;
     UINT id() const { return MDDEF_id(this); }
     void init(bool is_phi)
     {
@@ -398,6 +434,8 @@ public:
 #define MDPHI_opnd_list(p) (((MDPhi*)p)->m_opnd_list)
 class MDPhi : public MDDef {
     COPY_CONSTRUCTOR(MDPhi);
+    void dumpOpnd(IR const* opnd, IRBB const* pred, Region const* rg,
+                  UseDefMgr const* mgr) const;
 public:
     IR * m_opnd_list;
 public:
@@ -451,6 +489,8 @@ class UseDefMgr {
     COPY_CONSTRUCTOR(UseDefMgr);
 friend class MDSSAMgr;
 protected:
+    UINT m_def_count;
+    UINT m_vopnd_count;
     SMemPool * m_phi_pool;
     SMemPool * m_def_pool;
     SMemPool * m_defset_pool;
@@ -462,16 +502,14 @@ protected:
     SMemPool * m_mdssainfo_pool;
     Region * m_rg;
     MDSystem * m_md_sys;
-    xcom::DefMiscBitSetMgr * m_sbs_mgr;
+    MDSSAMgr * m_mdssa_mgr;
     xcom::SC<VOpnd*> * m_free_sc_list;
-    UINT m_def_count;
-    UINT m_vopnd_count;
+    xcom::DefMiscBitSetMgr * m_sbs_mgr;
     xcom::Vector<MDSSAInfo*> m_mdssainfo_vec;
-    MDDefVec m_def_vec;
     xcom::Vector<VOpnd*> m_vopnd_vec;
     xcom::Vector<MDPhiList*> m_philist_vec; //record the Phi list of BB.
+    MDDefVec m_def_vec;
     UINT2VMDVec m_map_md2vmd; //record version for each MD.
-    MDSSAMgr * m_mdssa_mgr;
 
 protected:
     void cleanOrDestroy(bool is_reinit);
@@ -519,6 +557,7 @@ public:
 
     //Get Versioned MD object by giving MD id and MD version.
     VMD * getVMD(UINT mdid, UINT version) const;
+    xcom::DefMiscBitSetMgr * getSBSMgr() const { return m_sbs_mgr;  }
 
     void reinit() { cleanOrDestroy(true); }
     //The function remove and clean all information of 'vmd' from MDSSAMgr.

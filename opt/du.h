@@ -40,20 +40,13 @@ class MD;
 class MDSet;
 class DUMgr;
 
-typedef SEGIter * DUIter;
+typedef SEGIter * DUSetIter;
 
 class DUSet : public DefSBitSetCore {
     COPY_CONSTRUCTOR(DUSet);
 protected:
     friend class DUMgr;
-
-public:
-    DUSet() {}
-    ~DUSet()
-    {
-        //Do not free ref here. They are allocated in mempool,
-        //and the memory is freed when the pool destructed.
-    }
+    friend class IR;
 
     void add(UINT irid, DefMiscBitSetMgr & m) { bunion(irid, m); }
     void addDef(IR const* stmt, DefMiscBitSetMgr & m);
@@ -62,6 +55,14 @@ public:
     void remove(UINT irid, DefMiscBitSetMgr & m) { diff(irid, m); }
     void removeUse(IR const* exp, DefMiscBitSetMgr & m);
     void removeDef(IR const* stmt, DefMiscBitSetMgr & m);
+
+public:
+    DUSet() {}
+    ~DUSet()
+    {
+        //Do not free ref here. They are allocated in mempool,
+        //and the memory is freed when the pool destructed.
+    }
 };
 
 //Record DU info for ir.

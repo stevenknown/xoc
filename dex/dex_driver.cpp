@@ -464,7 +464,7 @@ static void parseDebugInfo(
 static void handleRegion(
         IN DexRegion * func_ru,
         IN DexFile * df,
-        IN OUT LIRCode * lircode,
+        MOD LIRCode * lircode,
         D2Dpool * fupool,
         DexMethod const* dexm,
         DexCode const* dexcode,
@@ -601,7 +601,7 @@ static void dump_all_method_name(CHAR const* runame)
 //Optimizer for LIR.
 //Return true if compilation is successful.
 bool compileFunc(
-        IN OUT RegionMgr * rumgr,
+        MOD RegionMgr * rumgr,
         OUT D2Dpool * fupool,
         IN LIRCode * lircode,
         IN DexFile * df,
@@ -658,6 +658,7 @@ bool compileFunc(
 
     //Generate Program region.
     DexRegion * func_ru = (DexRegion*)rm->newRegion(REGION_FUNC);
+    func_ru->initAttachInfoMgr();
 
     if (g_do_ipa) {
         ASSERT0(rumgr);

@@ -1,5 +1,5 @@
 /*@
-Copyright (c) 2013-2014, Su Zhenyu steven.known@gmail.com
+Copyright (c) 2013-2021, Su Zhenyu steven.known@gmail.com
 
 All rights reserved.
 
@@ -35,6 +35,12 @@ namespace xcom {
 #define DEBUG_SEG
 #endif
 
+#ifdef DEBUG_SEG
+#define EXEC_LOG(c) ASSERT0(c)
+#else
+#define EXEC_LOG(c)
+#endif
+
 #define BITS_PER_SEG 512
 
 class BitSet;
@@ -52,19 +58,15 @@ template <UINT BitsPerSeg> class MiscBitSetMgr;
 template <UINT BitsPerSeg = BITS_PER_SEG>
 class SEG {
 public:
-    #ifdef DEBUG_SEG
-    UINT id;
-    #endif
     UINT start;
     BitSet bs;
+    #ifdef DEBUG_SEG
+    UINT id;
+    UINT gid;
+    #endif
 
-    SEG()
-    {
-        #ifdef DEBUG_SEG
-        id = 0;
-        #endif
-        start = 0;
-    }
+public:
+    SEG() { clean(); }
     SEG(SEG const& src) { copy(src); }
 
     inline void copy(SEG const& src)
@@ -74,12 +76,7 @@ public:
     }
     //Count memory usage for current object.
     size_t count_mem() const { return sizeof(start) + bs.count_mem(); }
-
-    inline void clean()
-    {
-        start = 0;
-        bs.clean();
-    }
+    void clean() { start = 0; bs.clean(); }
 
     inline bool is_contain(UINT elem)
     {
@@ -100,60 +97,136 @@ public:
 };
 
 
+//The class is used to debug allocation and free of SegMgr.
+extern UINT g_segmgr_log_count;
+
+template <UINT BitsPerSeg = BITS_PER_SEG>
+class SegMgrLog {
+public:
+    //Record the object that is allocated by current mgr.
+    TTab<void*> m_segtab;
+    UINT seg_count;
+    BSVec<SEG<BitsPerSeg> const*> allocated;
+    static UINT g_seg_count;
+
+public:
+    bool allocExist(SEG<BitsPerSeg> const* s)
+    { allocated.set(s->id, s); return true; }
+    bool allocNew(SEG<BitsPerSeg> * s)
+    {
+        seg_count++;
+        g_segmgr_log_count++;
+        s->id = seg_count;
+        s->gid = g_segmgr_log_count;
+        allocated.set(s->id, s);
+        recordObj(s);
+        return true;
+    }
+
+    //Return true if 'obj' is allocated by current mgr.
+    //The function always used in Debug Mode.
+    bool belongToCurrentMgr(void * obj) const { return m_segtab.find(obj); }
+
+    bool checkLeak(UINT expected_seg_num)
+    {
+        ///////////////////////////////////////////////////////////////
+        //NOTE: SBitSet or SBitSetCore's clean() should be invoked   //
+        //before destruction, otherwise it will lead SegMgr          //
+        //to complain leaking.                                       //
+        ///////////////////////////////////////////////////////////////
+        if (seg_count != expected_seg_num) {
+            //If seg_count < m_free_list.get_elem_count(), user mix in
+            //unmanaged segment that is not allocated by current segment mgr.
+            dump();
+            ASSERTN(0, ("MemLeak! There still are SEGs not freed"));
+        }
+        m_segtab.clean();
+        return true;
+    }
+
+    //Dump Segs to help find leaks.
+    void dump()
+    {
+        FILE * h = ::fopen("dump_seg.txt", "a+");
+        fprintf(h, "\n==---- DUMP NOT FREED SEG: ----==");
+        fprintf(h, "\nTOTAL SEG COUNT:%u\n", g_segmgr_log_count);
+        for (UINT i = 0; i <= seg_count; i++) {
+            if (allocated.is_contain(i)) {
+                //Seg i still not be freed.
+                SEG<BitsPerSeg> const* s = allocated.get(i);
+                ASSERT0(s->id == i);
+                fprintf(h, "<id:%d,gid:%d> ", s->id, s->gid);
+            }
+        }
+        ::fclose(h);
+    }
+
+    //Decrease seg_count.
+    void dec_seg_count() { seg_count--; }
+
+    bool destroySeg(SEG<BitsPerSeg> const* s)
+    {
+        dec_seg_count();
+        allocated.remove(s->id);
+        return true;
+    }
+
+    bool freeSeg(SEG<BitsPerSeg> const* s)
+    {
+        ASSERT0(belongToCurrentMgr(const_cast<void*>((void const*)s)));
+        allocated.remove(s->id);
+        return true;
+    }
+
+    UINT get_seg_count() const { return seg_count; }
+
+    bool init()
+    {
+        seg_count = 0;
+        allocated.clean();
+        m_segtab.clean();
+        return true;
+    }
+
+    //Record 'obj' is allocated by current mgr.
+    //The function always used in Debug Mode.
+    bool recordObj(void * obj) { m_segtab.append(obj); return true; }
+};
+
+
 //Segment Manager.
 //This class is responsible to allocate and destroy SEG object.
 //Note this class only handle Default SEG.
 template <UINT BitsPerSeg = BITS_PER_SEG>
 class SegMgr {
     COPY_CONSTRUCTOR(SegMgr);
+    MiscBitSetMgr<BitsPerSeg> * m_sbs_mgr;
     SList<SEG<BitsPerSeg>*> m_free_list;
 
-#ifdef DEBUG_SEG
-    void debugSegMgr()
-    {
-        //Dump Segs to help find leaks.
-        //DefSegMgr * segmgr = m_sbs_mgr.getSegMgr();
-        //dumpSegMgr(segmgr, g_tfile);
-        FILE * h = fopen("dump_seg.txt", "a+");
-        dumpSegMgr(this, h);
-        fclose(h);
-    }
 public:
-    UINT seg_count;
-    BitSet allocated;
-#endif
-
+    #ifdef DEBUG_SEG
+    SegMgrLog<BitsPerSeg> logger;
+    #endif
 public:
-    SegMgr() { init(); }
+    SegMgr(MiscBitSetMgr<BitsPerSeg> * mgr) { m_sbs_mgr = mgr; init(); }
     ~SegMgr() { destroy(); }
 
     SEG<BitsPerSeg> * allocSEG()
     {
         SEG<BitsPerSeg> * s = m_free_list.remove_head();
         if (s != nullptr) {
-            #ifdef DEBUG_SEG
-            allocated.bunion(s->id);
-            #endif
+            EXEC_LOG(logger.allocExist(s));
             return s;
         }
         s = new SEG<BitsPerSeg>();
-
-        #ifdef DEBUG_SEG
-        seg_count++;
-        s->id = seg_count;
-        allocated.bunion(s->id);
-        #endif
-
+        EXEC_LOG(logger.allocNew(s));
         return s;
     }
 
     void init()
     {
         if (m_free_list.get_pool() != nullptr) { return; }
-        #ifdef DEBUG_SEG
-        seg_count = 0;
-        allocated.clean();
-        #endif
+        EXEC_LOG(logger.init());
         SMemPool * p = smpoolCreate(sizeof(TSEGIter) * 4, MEM_CONST_SIZE);
         m_free_list.set_pool(p);
     }
@@ -162,17 +235,7 @@ public:
     {
         if (m_free_list.get_pool() == nullptr) { return; }
 
-        #ifdef DEBUG_SEG
-        ///////////////////////////////////////////////////////////////
-        //NOTE: SBitSet or SBitSetCore's clean() should be invoked   //
-        //before destruction, otherwise it will lead SegMgr          //
-        //to complain leaking.                                       //
-        ///////////////////////////////////////////////////////////////
-        if (seg_count != m_free_list.get_elem_count()) {
-            debugSegMgr();
-            ASSERTN(0, ("MemLeak! There still are SEGs not freed"));
-        }        
-        #endif
+        EXEC_LOG(logger.checkLeak(m_free_list.get_elem_count()));
 
         for (TSEGIter * sc = m_free_list.get_head();
              sc != m_free_list.end(); sc = m_free_list.get_next(sc)) {
@@ -181,8 +244,8 @@ public:
             delete s;
         }
 
-        //Note member of m_free_list is allocated in pool,
-        //thus delete pool at first.
+        //Note member of m_free_list is allocated in pool which is in
+        //m_free_list. Thus delete pool at first.
         m_free_list.clean();
         ASSERTN(m_free_list.get_pool(), ("miss pool"));
         smpoolDelete(m_free_list.get_pool());
@@ -191,10 +254,7 @@ public:
 
     void freeSEG(SEG<BitsPerSeg> * s)
     {
-        #ifdef DEBUG_SEG
-        allocated.diff(s->id);
-        #endif
-
+        EXEC_LOG(logger.freeSeg(s));
         s->clean();
         m_free_list.append_head(s);
     }
@@ -214,14 +274,9 @@ public:
         return count;
     }
 
-    #ifdef DEBUG_SEG
-    UINT get_seg_count() const { return seg_count; }
-    //Decrease seg_count.
-    void dec_seg_count() { seg_count--; }
-    #endif
-
     SList<SEG<BitsPerSeg>*> const* get_free_list() const
     { return &m_free_list; }
+    MiscBitSetMgr<BitsPerSeg> * getSBSMgr() const { return m_sbs_mgr; }
 };
 
 
@@ -251,13 +306,9 @@ public:
         //otherwise it will incur SegMgr assertion.
     }
 
-    void bunion(SBitSetCore<BitsPerSeg> const& src,
-                SegMgr<BitsPerSeg> * sm,
-                TSEGIter ** free_list,
-                SMemPool * pool);
-    void bunion(UINT elem,
-                SegMgr<BitsPerSeg> * sm,
-                TSEGIter ** free_list,
+    void bunion(SBitSetCore<BitsPerSeg> const& src, SegMgr<BitsPerSeg> * sm,
+                TSEGIter ** free_list, SMemPool * pool);
+    void bunion(UINT elem, SegMgr<BitsPerSeg> * sm, TSEGIter ** free_list,
                 SMemPool * pool);
     void bunion(UINT elem, MiscBitSetMgr<BitsPerSeg> & m)
     { bunion(elem, &m.sm, &m.scflst, m.ptr_pool); }
@@ -268,10 +319,8 @@ public:
 
     void clean(MiscBitSetMgr<BitsPerSeg> & m) { clean(&m.sm, &m.scflst); }
     void clean(SegMgr<BitsPerSeg> * sm, TSEGIter ** free_list);
-    void copy(SBitSetCore<BitsPerSeg> const& src,
-              SegMgr<BitsPerSeg> * sm,
-              TSEGIter ** free_list,
-              SMemPool * pool)
+    void copy(SBitSetCore<BitsPerSeg> const& src, SegMgr<BitsPerSeg> * sm,
+              TSEGIter ** free_list, SMemPool * pool)
     {
         ASSERTN(this != &src, ("operate on same set"));
         clean(sm, free_list);
@@ -286,7 +335,8 @@ public:
         }
     }
 
-    void copy(SBitSetCore<BitsPerSeg> const& src, MiscBitSetMgr<BitsPerSeg> & m)
+    void copy(SBitSetCore<BitsPerSeg> const& src,
+              MiscBitSetMgr<BitsPerSeg> & m)
     { copy(src, &m.sm, &m.scflst, m.ptr_pool); }
     //Count memory usage for current object.
     size_t count_mem() const;
@@ -311,8 +361,7 @@ public:
     INT get_next(UINT elem, TSEGIter ** cur) const;
 
     void init() { segs.init(); }
-    void intersect(SBitSetCore<BitsPerSeg> const& src,
-                   SegMgr<BitsPerSeg> * sm,
+    void intersect(SBitSetCore<BitsPerSeg> const& src, SegMgr<BitsPerSeg> * sm,
                    TSEGIter ** free_list);
     void intersect(SBitSetCore<BitsPerSeg> const& src,
                    MiscBitSetMgr<BitsPerSeg> & m)
@@ -328,16 +377,20 @@ public:
 
 //Sparse BitSet
 //This class encapsulates operations of SBitSetCore, and
-//simply the use of them.
+//simply the usage of them.
 //e.g1:
 //    MiscBitSetMgr<47> mbsm;
 //    SBitSet<47> x(mbsm.getSegMgr());
 //    x.bunion(100);
+//    //No need to explicit invoke x.clean() to free resource, destructor of x
+//    //will do it automatically.
+//
 //e.g2:
 //    MiscBitSetMgr<47> mbsm;
 //    SBitSet<47> * x = new SBitSet<47>(mbsm.getSegMgr());
 //    x->bunion(100);
-//    x->clean(); //Very Important! User should free resource to mbsm.
+//    x->clean(); //Very Important! User should free resource if without
+//                //explicit deleting or destroy of x.
 template <UINT BitsPerSeg = BITS_PER_SEG>
 class SBitSet : public SBitSetCore<BitsPerSeg> {
     COPY_CONSTRUCTOR(SBitSet);
@@ -454,8 +507,7 @@ protected:
     }
 
     //Get BitSet, alloc BitSet if it not exist.
-    BitSet * alloc_bs(SegMgr<BitsPerSeg> * sm,
-                      TSEGIter ** flst,
+    BitSet * alloc_bs(SegMgr<BitsPerSeg> * sm, TSEGIter ** flst,
                       SMemPool * pool)
     {
         ASSERTN(!m_is_sparse, ("only used by dense bitset"));
@@ -485,21 +537,19 @@ public:
     DBitSetCore(bool is_sparse) { set_sparse(is_sparse); }
     ~DBitSetCore() {}
 
-    void bunion(DBitSetCore<BitsPerSeg> const& src,
-                SegMgr<BitsPerSeg> * sm,
-                TSEGIter ** free_list,
-                SMemPool * pool)
+    void bunion(DBitSetCore<BitsPerSeg> const& src, SegMgr<BitsPerSeg> * sm,
+                TSEGIter ** free_list, SMemPool * pool)
     {
         ASSERTN(this != &src, ("operate on same set"));
         ASSERTN(m_is_sparse == src.m_is_sparse, ("diff set type"));
         if (m_is_sparse) {
             SBitSetCore<BitsPerSeg>::bunion(src, sm, free_list, pool);
-        } else {
-            BitSet const* srcbs = src.read_bs();
-            if (srcbs == nullptr) { return; }
-            BitSet * tgtbs = alloc_bs(sm, free_list, pool);
-            tgtbs->bunion(*srcbs);
+            return;
         }
+        BitSet const* srcbs = src.read_bs();
+        if (srcbs == nullptr) { return; }
+        BitSet * tgtbs = alloc_bs(sm, free_list, pool);
+        tgtbs->bunion(*srcbs);
     }
 
     void bunion(DBitSetCore<BitsPerSeg> const& src,
@@ -509,46 +559,44 @@ public:
     void bunion(UINT elem, MiscBitSetMgr<BitsPerSeg> & m)
     { bunion(elem, &m.sm, &m.scflst, m.ptr_pool); }
 
-    void copy(DBitSetCore<BitsPerSeg> const& src, MiscBitSetMgr<BitsPerSeg> & m)
+    void copy(DBitSetCore<BitsPerSeg> const& src,
+              MiscBitSetMgr<BitsPerSeg> & m)
     { copy(src, &m.sm, &m.scflst, m.ptr_pool); }
 
     void diff(UINT elem, MiscBitSetMgr<BitsPerSeg> & m)
     { diff(elem, &m.sm, &m.scflst); }
 
-    void diff(DBitSetCore<BitsPerSeg> const& src, MiscBitSetMgr<BitsPerSeg> & m)
+    void diff(DBitSetCore<BitsPerSeg> const& src,
+              MiscBitSetMgr<BitsPerSeg> & m)
     { diff(src, &m.sm, &m.scflst); }
 
-    void bunion(UINT elem,
-                SegMgr<BitsPerSeg> * sm,
-                TSEGIter ** free_list,
+    void bunion(UINT elem, SegMgr<BitsPerSeg> * sm, TSEGIter ** free_list,
                 SMemPool * pool)
     {
         if (m_is_sparse) {
             SBitSetCore<BitsPerSeg>::bunion(elem, sm, free_list, pool);
-        } else {
-            BitSet * tgtbs = alloc_bs(sm, free_list, pool);
-            tgtbs->bunion(elem);
+            return;
         }
+        BitSet * tgtbs = alloc_bs(sm, free_list, pool);
+        tgtbs->bunion(elem);
     }
 
-    void copy(DBitSetCore<BitsPerSeg> const& src,
-              SegMgr<BitsPerSeg> * sm,
-              TSEGIter ** free_list,
-              SMemPool * pool)
+    void copy(DBitSetCore<BitsPerSeg> const& src, SegMgr<BitsPerSeg> * sm,
+              TSEGIter ** free_list, SMemPool * pool)
     {
         ASSERTN(this != &src, ("operate on same set"));
         ASSERTN(m_is_sparse == src.m_is_sparse, ("diff set type"));
         if (m_is_sparse) {
             SBitSetCore<BitsPerSeg>::copy(src, sm, free_list, pool);
-        } else {
-            BitSet const* srcbs = src.read_bs();
-            if (srcbs == nullptr) {
-                SBitSetCore<BitsPerSeg>::clean(sm, free_list);
-                return;
-            }
-            BitSet * tgtbs = alloc_bs(sm, free_list, pool);
-            tgtbs->copy(*srcbs);
+            return;
         }
+        BitSet const* srcbs = src.read_bs();
+        if (srcbs == nullptr) {
+            SBitSetCore<BitsPerSeg>::clean(sm, free_list);
+            return;
+        }
+        BitSet * tgtbs = alloc_bs(sm, free_list, pool);
+        tgtbs->copy(*srcbs);
     }
     //Count memory usage for current object.
     size_t count_mem() const
@@ -558,27 +606,26 @@ public:
     {
         if (m_is_sparse) {
             SBitSetCore<BitsPerSeg>::diff(elem, sm, free_list);
-        } else {
-            BitSet * tgtbs = get_bs();
-            if (tgtbs == nullptr) { return; }
-            tgtbs->diff(elem);
+            return;
         }
+        BitSet * tgtbs = get_bs();
+        if (tgtbs == nullptr) { return; }
+        tgtbs->diff(elem);
     }
-    void diff(DBitSetCore<BitsPerSeg> const& src,
-              SegMgr<BitsPerSeg> * sm,
+    void diff(DBitSetCore<BitsPerSeg> const& src, SegMgr<BitsPerSeg> * sm,
               TSEGIter ** free_list)
     {
         ASSERTN(this != &src, ("operate on same set"));
         ASSERTN(m_is_sparse == src.m_is_sparse, ("diff set type"));
         if (m_is_sparse) {
             SBitSetCore<BitsPerSeg>::diff(src, sm, free_list);
-        } else {
-            BitSet const* srcbs = src.read_bs();
-            if (srcbs == nullptr) { return; }
-            BitSet * tgtbs = get_bs();
-            if (tgtbs == nullptr) { return; }
-            tgtbs->diff(*srcbs);
+            return;
         }
+        BitSet const* srcbs = src.read_bs();
+        if (srcbs == nullptr) { return; }
+        BitSet * tgtbs = get_bs();
+        if (tgtbs == nullptr) { return; }
+        tgtbs->diff(*srcbs);
     }
 
     void intersect(DBitSetCore<BitsPerSeg> const& src,
@@ -586,23 +633,22 @@ public:
     { intersect(src, &m.sm, &m.scflst); }
 
     void intersect(DBitSetCore<BitsPerSeg> const& src,
-                   SegMgr<BitsPerSeg> * sm,
-                   TSEGIter ** free_list)
+                   SegMgr<BitsPerSeg> * sm, TSEGIter ** free_list)
     {
         ASSERTN(this != &src, ("operate on same set"));
         ASSERTN(m_is_sparse == src.m_is_sparse, ("diff set type"));
         if (m_is_sparse) {
             SBitSetCore<BitsPerSeg>::intersect(src, sm, free_list);
-        } else {
-            BitSet const* srcbs = src.read_bs();
-            if (srcbs == nullptr) {
-                SBitSetCore<BitsPerSeg>::clean(sm, free_list);
-                return;
-            }
-            BitSet * tgtbs = get_bs();
-            if (tgtbs == nullptr) { return; }
-            tgtbs->intersect(*srcbs);
+            return;
         }
+        BitSet const* srcbs = src.read_bs();
+        if (srcbs == nullptr) {
+            SBitSetCore<BitsPerSeg>::clean(sm, free_list);
+            return;
+        }
+        BitSet * tgtbs = get_bs();
+        if (tgtbs == nullptr) { return; }
+        tgtbs->intersect(*srcbs);
     }
 
     bool is_contain(UINT elem) const
@@ -771,6 +817,10 @@ public:
 
 template <UINT BitsPerSeg = BITS_PER_SEG>
 class MiscBitSetMgr {
+    friend class SegMgr<BitsPerSeg>;
+    friend class SBitSetCore<BitsPerSeg>;
+    friend class SBitSet<BitsPerSeg>;
+    friend class DBitSet<BitsPerSeg>;
     COPY_CONSTRUCTOR(MiscBitSetMgr);
 protected:
     SList<SBitSet<BitsPerSeg>*> m_sbitset_list;
@@ -781,8 +831,20 @@ protected:
     SList<DBitSetCore<BitsPerSeg>*> m_free_dbitsetcore_list;
     SMemPool * m_sbitsetcore_pool;
     SMemPool * m_dbitsetcore_pool;
-
+    TTab<void const*> m_settab; //record the object that is allocated by
+                                //current mgr.
 protected:
+    //Return true if 'obj' is allocated by current mgr.
+    //The function always used in Debug Mode.
+    bool belongToCurrentMgr(void const* obj) const
+    { return m_settab.find(obj); }
+    
+    //Record 'obj' is allocated by current mgr.
+    //The function always used in Debug Mode.
+    bool recordObj(void const* obj) { m_settab.append(obj); return true; }
+
+    MiscBitSetMgr * self() { return this; }
+
     SBitSetCore<BitsPerSeg> * xmalloc_sbitsetc()
     {
         ASSERTN(m_sbitsetcore_pool, ("not yet initialized."));
@@ -815,7 +877,7 @@ public:
     SMemPool * ptr_pool;
 
 public:
-    MiscBitSetMgr() { ptr_pool = nullptr; init(); }
+    MiscBitSetMgr() : sm(self()) { ptr_pool = nullptr; init(); }
     ~MiscBitSetMgr() { destroy(); }
 
     void init()
@@ -823,14 +885,13 @@ public:
         if (ptr_pool != nullptr) { return; }
 
         ptr_pool = smpoolCreate(sizeof(TSEGIter) * 10, MEM_CONST_SIZE);
-        m_sbitsetcore_pool = smpoolCreate(
-            sizeof(SBitSetCore<BitsPerSeg>) * 10, MEM_CONST_SIZE);
-        m_dbitsetcore_pool = smpoolCreate(
-            sizeof(DBitSetCore<BitsPerSeg>) * 10, MEM_CONST_SIZE);
+        m_sbitsetcore_pool = smpoolCreate(sizeof(SBitSetCore<BitsPerSeg>) * 10,
+                                          MEM_CONST_SIZE);
+        m_dbitsetcore_pool = smpoolCreate(sizeof(DBitSetCore<BitsPerSeg>) * 10,
+                                          MEM_CONST_SIZE);
 
         m_sbitset_list.set_pool(ptr_pool);
         m_dbitset_list.set_pool(ptr_pool);
-
         m_free_sbitsetcore_list.set_pool(ptr_pool);
         m_free_sbitset_list.set_pool(ptr_pool);
         m_free_dbitset_list.set_pool(ptr_pool);
@@ -860,11 +921,17 @@ public:
             delete d;
         }
 
+        m_sbitset_list.clean();
+        m_dbitset_list.clean();
+        m_free_sbitset_list.clean();
+        m_free_dbitset_list.clean();
+        m_free_sbitsetcore_list.clean();
+        m_free_dbitsetcore_list.clean();
+
         smpoolDelete(m_sbitsetcore_pool);
         smpoolDelete(m_dbitsetcore_pool);
         smpoolDelete(ptr_pool);
         sm.destroy();
-
         ptr_pool = nullptr;
         m_sbitsetcore_pool = nullptr;
         m_dbitsetcore_pool = nullptr;
@@ -878,6 +945,7 @@ public:
             p = new SBitSet<BitsPerSeg>(&sm);
             m_sbitset_list.append_head(p);
         }
+        ASSERT0(recordObj((void*)p));
         return p;
     }
 
@@ -887,6 +955,7 @@ public:
         if (p == nullptr) {
             p = xmalloc_sbitsetc();
         }
+        ASSERT0(recordObj((void*)p));
         return p;
     }
 
@@ -897,6 +966,7 @@ public:
             p = new DBitSet<BitsPerSeg>(&sm);
             m_dbitset_list.append_head(p);
         }
+        ASSERT0(recordObj((void*)p));
         return p;
     }
 
@@ -907,6 +977,7 @@ public:
             p = xmalloc_dbitsetc();
             p->set_sparse(true);
         }
+        ASSERT0(recordObj((void*)p));
         return p;
     }
 
@@ -919,6 +990,7 @@ public:
     inline void freeSBitSet(SBitSet<BitsPerSeg> * bs)
     {
         if (bs == nullptr) { return; }
+        ASSERT0(belongToCurrentMgr((void*)bs));
         bs->clean();
         m_free_sbitset_list.append_head(bs);
     }
@@ -927,6 +999,7 @@ public:
     inline void freeSBitSetCore(SBitSetCore<BitsPerSeg> * bs)
     {
         if (bs == nullptr) { return; }
+        ASSERT0(belongToCurrentMgr((void*)bs));
         bs->clean(*this);
         m_free_sbitsetcore_list.append_head(bs);
     }
@@ -935,6 +1008,7 @@ public:
     inline void freeDBitSet(DBitSet<BitsPerSeg> * bs)
     {
         if (bs == nullptr) { return; }
+        ASSERT0(belongToCurrentMgr((void*)bs));
         bs->clean();
         m_free_dbitset_list.append_head(bs);
     }
@@ -943,6 +1017,7 @@ public:
     inline void freeDBitSetCore(DBitSetCore<BitsPerSeg> * bs)
     {
         if (bs == nullptr) { return; }
+        ASSERT0(belongToCurrentMgr((void*)bs));
         bs->clean(&sm, &scflst);
         m_free_dbitsetcore_list.append_head(bs);
     }
@@ -952,6 +1027,7 @@ public:
     inline void destroySEGandFreeDBitSetCore(DBitSetCore<BitsPerSeg> * bs)
     {
         if (bs == nullptr) { return; }
+        ASSERT0(belongToCurrentMgr((void*)bs));
         bs->destroySEGandClean(&sm, &scflst);
 
         //Recycle bitset.

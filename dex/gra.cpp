@@ -2143,7 +2143,7 @@ void LTMgr::process_rg(LT * lt)
 void LTMgr::processResult(
         IN IR * ir,
         INT pos,
-        IN OUT BitSet & lived_lt,
+        MOD BitSet & lived_lt,
         bool group_part)
 {
     ASSERT0(ir->is_stmt());
@@ -2214,7 +2214,7 @@ void LTMgr::processUse(
         IN IR * ir,
         ConstIRIter & cii,
         INT pos,
-        IN OUT BitSet & lived_lt,
+        MOD BitSet & lived_lt,
         bool group_part)
 {
     ASSERT0(ir->is_stmt());
@@ -2276,8 +2276,8 @@ IR * LTMgr::genDedicatePR(UINT phy)
 
 //Process the function/region exit BB.
 void LTMgr::processExitBB(
-        IN OUT List<LT*> * liveout_exitbb,
-        IN OUT BitSet & lived_lt,
+        MOD List<LT*> * liveout_exitbb,
+        MOD BitSet & lived_lt,
         BitSet const& retval_regset,
         UINT pos)
 {
@@ -2340,7 +2340,7 @@ void LTMgr::processLivein(
 
 
 void LTMgr::processLiveout(
-        IN OUT BitSet & lived_lt,
+        MOD BitSet & lived_lt,
         UINT pos,
         bool always_consider_glt)
 {

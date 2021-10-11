@@ -24,6 +24,7 @@ using namespace xcom;
 #include "birational.h"
 #include "matt_dump.h"
 #include "matt.h"
+#include "birmat.h"
 #include "xmat.h"
 #include "agraph.h"
 #include "linsys.h"

@@ -376,11 +376,15 @@ extern RoundDesc const g_round_desc[];
 #define CKID_ARR(ir, n) CK_KID_NUM_ARR(ir, n, __FILE__, __LINE__)
 
 //Used by all IR.
-#define IR_DUMP_KID 0x1
-#define IR_DUMP_SRC_LINE 0x2
-#define IR_DUMP_ADDR 0x4
-#define IR_DUMP_INNER_REGION 0x8
-#define IR_DUMP_VAR_DECL 0x10
+#define IR_DUMP_DEF 0x0 //default options to dump ir
+#define IR_DUMP_KID 0x1 //dump ir's kid
+#define IR_DUMP_SRC_LINE 0x2 //dump source line if dbx info is valid.
+#define IR_DUMP_ADDR 0x4 //dump host address of each IR
+#define IR_DUMP_INNER_REGION 0x8 //dump inner region.
+#define IR_DUMP_VAR_DECL 0x10 //dump variable declaration if exist that given
+                              //by user.
+#define IR_DUMP_NO_NEWLINE 0x20 //Do NOT dump newline
+#define IR_DUMP_COMBINE (IR_DUMP_KID|IR_DUMP_SRC_LINE|IR_DUMP_VAR_DECL)
 
 //The maximum integer value that can described by bits of IR_TYPE_BIT_SIZE
 //should larger than IR_TYPE_NUM.
@@ -575,6 +579,9 @@ public:
         DU_mds(du) = nullptr;
     }
 
+    void cleanMayRef() { cleanRefMDSet(); }
+    void cleanMustRef() { cleanRefMD(); }
+
     void cleanRef()
     {
         DU * du = getDU();
@@ -619,19 +626,13 @@ public:
         }
     }
 
-    void dumpRef(Region * ru, UINT indent);
+    //The function collects the LabelInfo for each branch-target.
+    inline void collectLabel(OUT List<LabelInfo const*> & lst) const;
+
+    void dumpRef(Region * rg, UINT indent);
 
     //Clean all DU-Chain and Defined/Used-MD reference info.
-    inline void freeDUset(DefMiscBitSetMgr & sbs_mgr)
-    {
-        DU * du = getDU();
-        if (du == nullptr || DU_duset(du) == nullptr) { return; }
-
-        //Free DUSet back to DefSegMgr, or it will
-        //complain and make an assertion.
-        sbs_mgr.freeSBitSetCore(DU_duset(du));
-        DU_duset(du) = nullptr;
-    }
+    void freeDUset(DUMgr * dumgr);
 
     IR_TYPE getCode() const { return (IR_TYPE)IR_code(this); }
     IR * get_next() const { return IR_next(this); }
@@ -729,10 +730,10 @@ public:
     }
 
     //Return the Memory Descriptor Set for given ir may describe.
-    MDSet const* getMayRef() { return getRefMDSet(); }
+    MDSet const* getMayRef() const { return getRefMDSet(); }
 
     //Return the MemoryAddr for 'ir' must be.
-    MD const* getMustRef() { return getRefMD(); }
+    MD const* getMustRef() const { return getRefMD(); }
 
     //Get the MD that IR referrenced.
     MD const* getRefMD() const
@@ -755,15 +756,11 @@ public:
         return (md == nullptr || !md->is_exact()) ? nullptr : md;
     }
 
-    MD const* getEffectRef() const
-    {
-        MD const* md = getRefMD();
-        ASSERT0(md == nullptr || !MD_is_may(md));
-        return md;
-    }
-
     //Return determinate expression if any.
     inline IR * getJudgeDet() const;
+
+    //Return expression if stmt has CASE list.
+    inline IR * getCaseList() const;
 
     //Return true if ir carried sideeffect property.
     bool hasSideEffect() const { return IR_has_sideeffect(this); }
@@ -783,21 +780,57 @@ public:
     //Return true if stmt has judge determinate expression.
     inline bool hasJudgeDet() const;
 
+    //Return true if stmt has CASE list as kid.
+    inline bool hasCaseList() const;
+
     //Return true if ir is call and does have a return value.
     inline bool hasReturnValue() const;
+
+    //Return true if ir is branch op and has multiple jump targets.
+    inline bool hasMultiTarget() const;
 
     UINT id() const { return IR_id(this); }
     void invertLand(Region * rg);
     void invertLor(Region * rg);
 
-    //Return true if current ir does not overlap to ir2.
+    //The function compare the memory object that 'this' and 'ir2' accessed,
+    //and return true if 'this' object is NOT overlapped with 'ir2',
+    //otherwise return false.
     //ir2: stmt or expression to be compared.
-    //Note this function does not require RefMD information.
-    //It just determine overlapping of given two IR according to
-    //their data-type and offset.
-    bool isNotOverlap(IR const* ir2, Region * rg) const;
+    //e.g: this and ir2 are overlapped:
+    //     'this' object: |--------| 
+    //     'ir2'  object:        |----|
+    //e.g: this and ir2 are NOT overlapped:
+    //     'this' object: |------| 
+    //     'ir2'  object:        |----|
+    //
+    //Note: The function will NOT consider the different pattern
+    // of 'this' and ir2.
+    // The function does not require RefMD information.
+    // The function just determine overlapping of given two IR according to
+    // their data-type and offset.
+    bool isNotOverlap(IR const* ir2, Region const* rg) const;
     bool isNotOverlapViaMDRef(IR const* ir2) const;
     bool isNoMove() const { return IR_no_move(this); }
+
+    //The function compare the memory object that 'this' and 'ir2' accessed,
+    //and return true if 'this' object is conver 'ir2',
+    //otherwise return false.
+    //ir2: stmt or expression to be compared.
+    //e.g: 'this' covers ir2:
+    //     'this' object: |------| 
+    //     'ir2'  object:   |----|
+    //e.g: this is NOT cover ir2:
+    //     'this' object: |------| 
+    //     'ir2'  object:        |----|
+    //
+    //Note: The function will NOT consider the different pattern
+    // of 'this' and ir2.
+    // The function does not require RefMD information.
+    // The function just determine overlapping of given two IR according to
+    // their data-type and offset.
+    bool isCover(IR const* ir2, Region const* rg) const;
+
     //Return true if current IR may contain memory reference.
     bool isContainMemRef() const
     {
@@ -881,7 +914,7 @@ public:
     { return is_st() || is_stpr() || is_ist() || is_starray(); }
 
     //Return true if current ir is valid type to be phi operand.
-    bool is_phi_opnd() const { return is_pr() || is_const(); }
+    bool isPhiOpnd() const { return is_pr() || is_lda() || isConstExp(); }
 
     //Return true if current ir is stmt.
     //Only statement can be chained.
@@ -1002,13 +1035,13 @@ public:
     //Return true if ir is base expression of array operation.
     inline bool isArrayBase(IR const* ir) const;
 
-    //Return true if ir may jump to multiple target.
+    //Return true if ir may jump to multiple targets.
     bool isMultiConditionalBr() const { return is_switch(); }
 
     //Return true if ir is unconditional branch.
     bool isUnconditionalBr() const { return is_goto() || is_igoto(); }
 
-    //Return true if ir is indirect jump to multiple target.
+    //Return true if ir is indirect jump to multiple targets.
     bool isIndirectBr() const { return is_igoto(); }
 
     //Return true if ir is branch stmt.
@@ -1019,11 +1052,17 @@ public:
     //Return true if ir is indirect memory operation.
     bool isIndirectMemOp() const { return is_ist() || is_ild(); }
 
+    //Return true if ir is direct memory operation.
+    bool isDirectMemOp() const { return is_st() || is_ld(); }
+
     bool isCallStmt() const { return is_call() || is_icall(); }
 
     //Return true if ir is a call and has a return value.
     bool isCallHasRetVal() const
     { return isCallStmt() && hasReturnValue(); }
+
+    //Return true if ir is intrinsic operation.
+    inline bool isIntrinsicOp() const;
 
     //Return true if stmt modify PR.
     //CALL/ICALL may modify PR if it has a return value.
@@ -1058,7 +1097,7 @@ public:
 
     //Return true if current operation references memory except
     //the PR memory.
-    bool isMemoryRefNotOperatePR() const
+    bool isMemoryRefNonPR() const
     { return IRDES_is_non_pr_memref(g_ir_desc[getCode()]); }
 
     //Return true if current ir and ir2 represent different memory location,
@@ -1124,8 +1163,7 @@ public:
     }
 
     //Return true if current ir can be placed in BB.
-    bool isStmtInBB() const
-    { return IRDES_is_stmt_in_bb(g_ir_desc[getCode()]); }
+    inline bool isStmtInBB() const;
 
     //Return true if current stmt must modify 'md'.
     inline bool isExactDef(MD const* md) const;
@@ -1169,6 +1207,18 @@ public:
     void setRefMD(MD const* md, Region * rg);
     void setRefMDSet(MDSet const* mds, Region * rg);
 
+    void setMustRef(MD const* md, Region * rg)
+    {
+        ASSERT0(md);
+        setRefMD(md, rg);
+    }
+    //mds: record MayMDSet that have to be hashed.
+    void setMayRef(MDSet const* mds, Region * rg)
+    {
+        ASSERT0(mds && !mds->is_empty());
+        setRefMDSet(mds, rg);
+    }
+
     //Find and substitute 'newk' for 'oldk'.
     //Return true if replaced the 'oldk'.
     //'recur': set to true if function recusively perform
@@ -1209,7 +1259,7 @@ public:
     //This function only handle Call/ICall stmt, it find PR and remove
     //them out of UseSet.
     //Note this function does not maintain DU chain between call and its use.
-    void removePRFromUseset(DefMiscBitSetMgr & sbs_mgr, Region * rg);
+    void removePRFromUseset(Region * rg);
 
     bool verify(Region const* rg) const;
     bool verifyKids() const;
@@ -1253,6 +1303,9 @@ public:
         void * anonymous_value;
     } u1;
 
+    static BYTE const kid_map = 0x0;
+    static BYTE const kid_num = 0x0;
+
 public:
     HOST_FP getFP() const { return CONST_fp_val(this); }
     BYTE getMantissa() const { return CONST_fp_mant(this); }
@@ -1289,7 +1342,8 @@ class CId : public DuProp, public VarProp {
     COPY_CONSTRUCTOR(CId);
 public:
     MDPhi * phi; //record the MD PHI dummy stmt if ID is operand of MD PHI.
-
+    static BYTE const kid_map = 0x0;
+    static BYTE const kid_num = 0x0;
 public:
     MDPhi * getMDPhi() const { return ID_phi(this); }
 };
@@ -1324,6 +1378,10 @@ public:
 #define LD_du(ir) (((CLd*)CK_IRT(ir, IR_LD))->du)
 class CLd : public DuProp, public VarProp, public OffsetProp {
     COPY_CONSTRUCTOR(CLd);
+public:
+    static BYTE const kid_map = 0;
+    static BYTE const kid_num = 0;
+    static IR * dupIRTreeByStmt(IR const* src, Region * rg);
 };
 
 
@@ -1342,8 +1400,12 @@ class CILd : public DuProp, public OffsetProp {
     COPY_CONSTRUCTOR(CILd);
 public:
     IR * opnd[1];
+    static BYTE const kid_map = 0x1;
+    static BYTE const kid_num = 1;
 
 public:
+    static IR * dupIRTreeByStmt(IR const* src, Region * rg);
+
     IR * getKid(UINT idx) const { return ILD_kid(this, idx); }
     IR * getBase() const { return ILD_base(this); }
 };
@@ -1375,10 +1437,13 @@ class CSt: public CLd, public StmtProp {
     COPY_CONSTRUCTOR(CSt);
 public:
     IR * opnd[1];
+    static BYTE const kid_map = 0x1;
+    static BYTE const kid_num = 1;
 
 public:
     IR * getKid(UINT idx) const { return ST_kid(this, idx); }
     IR * getRHS() const { return ST_rhs(this); }
+    static IR * dupIRTreeByExp(IR const* src, IR * rhs, Region * rg);
 };
 
 
@@ -1397,10 +1462,13 @@ public:
     UINT prno; //PR number.
     SSAInfo * ssainfo; //Present ssa def and use set.
     IR * opnd[1];
+    static BYTE const kid_map = 0x1;
+    static BYTE const kid_num = 1;
 
 public:
     IR * getKid(UINT idx) const { return STPR_kid(this, idx); }
     IR * getRHS() const { return STPR_rhs(this); }
+    static IR * dupIRTreeByExp(IR const* src, IR * rhs, Region * rg);
 };
 
 
@@ -1433,6 +1501,8 @@ public:
     UINT prno; //PR number.
     SSAInfo * ssainfo; //Present ssa def and use set.
     IR * opnd[3];
+    static BYTE const kid_map = 0x7;
+    static BYTE const kid_num = 3;
 
 public:
     IR * getKid(UINT idx) const { return SETELEM_kid(this, idx); }
@@ -1467,6 +1537,8 @@ public:
     //Note this field only avaiable if SSA information is maintained.
     SSAInfo * ssainfo;
     IR * opnd[2];
+    static BYTE const kid_map = 0x3;
+    static BYTE const kid_num = 2;
 
 public:
     IR * getKid(UINT idx) const { return GETELEM_kid(this, idx); }
@@ -1493,11 +1565,14 @@ class CISt : public DuProp, public OffsetProp, public StmtProp {
     COPY_CONSTRUCTOR(CISt);
 public:
     IR * opnd[2];
+    static BYTE const kid_map = 0x3;
+    static BYTE const kid_num = 2;
 
 public:
     IR * getKid(UINT idx) const { return IST_kid(this, idx); }
     IR * getRHS() const { return IST_rhs(this); }
     IR * getBase() const { return IST_base(this); }
+    static IR * dupIRTreeByExp(IR const* src, IR * rhs, Region * rg);
 };
 
 
@@ -1512,6 +1587,9 @@ public:
 #define LDA_idinfo(ir) (((CLda*)CK_IRT(ir, IR_LDA))->id_info)
 class CLda : public IR, public VarProp, public OffsetProp {
     COPY_CONSTRUCTOR(CLda);
+public:
+    static BYTE const kid_map = 0x0;
+    static BYTE const kid_num = 0;
 };
 
 
@@ -1578,6 +1656,8 @@ public:
 
     //NOTE: 'opnd' must be the last member.
     IR * opnd[2];
+    static BYTE const kid_map = 0x3;
+    static BYTE const kid_num = 2;
 
 public:
     //Build dummyuse expression to represent potential memory objects that
@@ -1635,6 +1715,8 @@ public:
 
     //True if current call is readonly.
     BYTE m_is_readonly:1;
+    static BYTE const kid_map = 0x7;
+    static BYTE const kid_num = 3;
 
 public:
     IR * getKid(UINT idx) const { return ICALL_kid(this, idx); }
@@ -1653,6 +1735,8 @@ class CBin : public IR {
     COPY_CONSTRUCTOR(CBin);
 public:
     IR * opnd[2];
+    static BYTE const kid_map = 0x3;
+    static BYTE const kid_num = 2;
 
 public:
     IR * getKid(UINT idx) const { return BIN_kid(this, idx); }
@@ -1668,6 +1752,8 @@ class CUna : public IR {
     COPY_CONSTRUCTOR(CUna);
 public:
     IR * opnd[1];
+    static BYTE const kid_map = 0x1;
+    static BYTE const kid_num = 1;
 
 public:
     IR * getKid(UINT idx) const { return UNA_kid(this, idx); }
@@ -1682,6 +1768,8 @@ class CGoto : public IR, public StmtProp {
     COPY_CONSTRUCTOR(CGoto);
 public:
     LabelInfo const* jump_target_lab;
+    static BYTE const kid_map = 0x0;
+    static BYTE const kid_num = 0;
 
 public:
     LabelInfo const* getLab() const { return GOTO_lab(this); }
@@ -1705,6 +1793,12 @@ class CIGoto : public IR, public StmtProp {
     COPY_CONSTRUCTOR(CIGoto);
 public:
     IR * opnd[2];
+    static BYTE const kid_map = 0x3;
+    static BYTE const kid_num = 2;
+public:
+    //The function collects the LabelInfo for each branch-target.
+    void collectLabel(OUT List<LabelInfo const*> & lst) const;
+    IR * getCaseList() const { return IGOTO_case_list(this); }
 };
 
 
@@ -1727,7 +1821,10 @@ class CWhileDo : public IR {
 public:
     //NOTE: 'opnd' must be the last member of CWhileDo.
     IR * opnd[2];
+    static BYTE const kid_map = 0x3;
+    static BYTE const kid_num = 2;
 
+public:
     //num: the number of IR added.
     void addToBody(UINT num, ...);
 
@@ -1742,6 +1839,9 @@ public:
 //    } while (det)
 class CDoWhile : public CWhileDo {
     COPY_CONSTRUCTOR(CDoWhile);
+public:
+    static BYTE const kid_map = 0x3;
+    static BYTE const kid_num = 2;
 };
 
 
@@ -1785,6 +1885,8 @@ class CDoLoop : public CWhileDo {
 public:
     //NOTE: 'opnd_pad' must be the first member of CDoLoop.
     IR * opnd_pad[3];
+    static BYTE const kid_map = 0x1F;
+    static BYTE const kid_num = 5;
 
 public:
     IR * getIV() const { return LOOP_iv(this); }
@@ -1812,6 +1914,8 @@ class CIf : public IR {
     COPY_CONSTRUCTOR(CIf);
 public:
     IR * opnd[3];
+    static BYTE const kid_map = 0x7;
+    static BYTE const kid_num = 3;
 
 public:
     //num: the number of IR added.
@@ -1832,6 +1936,8 @@ class CLab : public IR {
     COPY_CONSTRUCTOR(CLab);
 public:
     LabelInfo const* label_info;
+    static BYTE const kid_map = 0x0;
+    static BYTE const kid_num = 0;
 
 public:
     LabelInfo const* getLab() const { return LAB_lab(this); }
@@ -1868,10 +1974,15 @@ class CSwitch : public IR, public StmtProp {
 public:
     IR * opnd[3];
     LabelInfo const* default_label;
-
+    static BYTE const kid_map = 0x7;
+    static BYTE const kid_num = 3;
 public:
     //num: the number of IR added.
     void addToBody(UINT num, ...);
+
+    //The function collects the LabelInfo for each branch-target.
+    //Note the default-label is collected too.
+    void collectLabel(OUT List<LabelInfo const*> & lst) const;
 
     LabelInfo const* getDefLab() const { return SWITCH_deflab(this); }
     IR * getKid(UINT idx) const { return SWITCH_kid(this, idx); }
@@ -1893,6 +2004,8 @@ class CCase : public IR {
 public:
     IR * opnd[1]; //case-value
     LabelInfo const* jump_target_label; //jump lable for case.
+    static BYTE const kid_map = 0x1;
+    static BYTE const kid_num = 1;
 
 public:
     LabelInfo const* getLab() const { return CASE_lab(this); }
@@ -1968,16 +2081,17 @@ public:
 
     //NOTE: 'opnd' must be the last member of CArray.
     IR * opnd[2];
+    static BYTE const kid_map = 0x3;
+    static BYTE const kid_num = 2;
+
 public:
+    static IR * dupIRTreeByStmt(IR const* src, Region * rg);
+
     //Return the number of dimensions.
     UINT getDimNum() const
     {
         ASSERT0(isArrayOp());
-        UINT dim = 0;
-        for (IR const* s = ARR_sub_list(this); s != nullptr; s = s->get_next()) {
-            dim++;
-        }
-        return dim;
+        return xcom::cnt_list(ARR_sub_list(this));
     }
 
     //Return the number of element in given dimension.
@@ -2036,6 +2150,9 @@ public:
 
     //DO NOT PLACE MEMBER BEFORE opnd_pad
     StmtProp stmtprop;
+    static BYTE const kid_map = 0x7;
+    static BYTE const kid_num = 3;
+    static IR * dupIRTreeByExp(IR const* src, IR * rhs, Region * rg);
 };
 
 
@@ -2048,6 +2165,9 @@ class CCvt : public CUna {
     COPY_CONSTRUCTOR(CCvt);
 public:
     ROUND_TYPE round;
+    static BYTE const kid_map = 0x1;
+    static BYTE const kid_num = 1;
+
 public:
     //Get the leaf expression.
     //e.g: cvt:i32(cvt:u8(x)), this function will return x;
@@ -2082,6 +2202,9 @@ public:
     //versioned presentation or ssa def and use list in ssa mode.
     //Note this field only avaiable if SSA information is maintained.
     SSAInfo * ssainfo;
+    static BYTE const kid_map = 0x0;
+    static BYTE const kid_num = 0;
+    static IR * dupIRTreeByStmt(IR const* src, Region * rg);
 };
 
 
@@ -2100,6 +2223,8 @@ class CTruebr : public IR, public StmtProp {
 public:
     IR * opnd[1];
     LabelInfo const* jump_target_lab; //jump target label.
+    static BYTE const kid_map = 0x1;
+    static BYTE const kid_num = 1;
 
 public:
     LabelInfo const* getLab() const { return BR_lab(this); }
@@ -2114,6 +2239,9 @@ public:
 //NOTE: the lay out of truebr should same as falsebr.
 class CFalsebr : public CTruebr {
     COPY_CONSTRUCTOR(CFalsebr);
+public:
+    static BYTE const kid_map = 0x1;
+    static BYTE const kid_num = 1;
 };
 
 
@@ -2127,6 +2255,8 @@ class CRet : public IR, public StmtProp {
     COPY_CONSTRUCTOR(CRet);
 public:
     IR * opnd[1];
+    static BYTE const kid_map = 0x1;
+    static BYTE const kid_num = 1;
 
 public:
     IR * getKid(UINT idx) const { return RET_kid(this, idx); }
@@ -2157,6 +2287,8 @@ class CSelect : public IR {
     COPY_CONSTRUCTOR(CSelect);
 public:
     IR * opnd[3];
+    static BYTE const kid_map = 0x7;
+    static BYTE const kid_num = 3;
 
 public:
     IR * getKid(UINT idx) const { return SELECT_kid(this, idx); }
@@ -2172,6 +2304,9 @@ public:
 //This operation is used by do-loop, do-while, while-do.
 class CBreak : public IR {
     COPY_CONSTRUCTOR(CBreak);
+public:
+    static BYTE const kid_map = 0x0;
+    static BYTE const kid_num = 0;
 };
 
 
@@ -2181,6 +2316,9 @@ class CBreak : public IR {
 //This operation is used by do-loop, do-while, while-do.
 class CContinue : public IR {
     COPY_CONSTRUCTOR(CContinue);
+public:
+    static BYTE const kid_map = 0x0;
+    static BYTE const kid_num = 0;
 };
 
 
@@ -2196,6 +2334,9 @@ public:
     UINT prno; //PR number.
     SSAInfo * ssainfo; //Present ssa def and use set.
     IR * opnd[1];
+    static BYTE const kid_map = 0x1;
+    static BYTE const kid_num = 1;
+
 public:
     void removeOpnd(IR * ir)
     {
@@ -2235,6 +2376,9 @@ class CRegion : public IR, public StmtProp {
     COPY_CONSTRUCTOR(CRegion);
 public:
     Region * rg;
+    static BYTE const kid_map = 0x0;
+    static BYTE const kid_num = 0;
+
 public:
     //True if region is readonly.
     //This property is very useful if region is a blackbox.
@@ -2274,13 +2418,20 @@ bool IR::isArrayBase(IR const* ir) const
 UINT IR::getPrno() const
 {
     switch (getCode()) {
-    case IR_PR: ASSERT0(PR_no(this) != 0); return PR_no(this);
-    case IR_STPR: ASSERT0(STPR_no(this) != 0); return STPR_no(this);
-    case IR_GETELEM: ASSERT0(GETELEM_prno(this) != 0); return GETELEM_prno(this);
-    case IR_SETELEM: ASSERT0(SETELEM_prno(this) != 0); return SETELEM_prno(this);
+    case IR_PR:
+        ASSERT0(PR_no(this) != PRNO_UNDEF);
+        return PR_no(this);
+    case IR_STPR: ASSERT0(STPR_no(this) != PRNO_UNDEF); return STPR_no(this);
+    case IR_GETELEM:
+        ASSERT0(GETELEM_prno(this) != PRNO_UNDEF);
+        return GETELEM_prno(this);
+    case IR_SETELEM:
+        ASSERT0(SETELEM_prno(this) != PRNO_UNDEF);
+        return SETELEM_prno(this);
     case IR_CALL:
-    case IR_ICALL: ASSERT0(CALL_prno(this) != 0); return CALL_prno(this);
-    case IR_PHI: ASSERT0(PHI_prno(this) != 0); return PHI_prno(this);
+    case IR_ICALL:
+        ASSERT0(CALL_prno(this) != PRNO_UNDEF); return CALL_prno(this);
+    case IR_PHI: ASSERT0(PHI_prno(this) != PRNO_UNDEF); return PHI_prno(this);
     default: UNREACHABLE();
     }
     return 0;
@@ -2446,6 +2597,31 @@ LabelInfo const* IR::getLabel() const
 }
 
 
+//Return true if ir is branch op and has multiple jump target.
+bool IR::hasMultiTarget() const
+{
+    switch (getCode()) {
+    case IR_SWITCH: {
+        UINT numoftgt = 0;
+        if (SWITCH_deflab(this) != nullptr) {
+            numoftgt++;
+        }
+
+        if (getCaseList() != nullptr) { numoftgt++;}
+        return numoftgt > 1;
+    }
+    case IR_IGOTO: {
+        IR const* caselst = getCaseList();
+        ASSERT0(caselst);
+        if (caselst->get_next() != nullptr) { return true; }
+        return false;
+    }
+    default:;
+    }
+    return false;
+}
+
+
 UINT IR::getArrayElemDtSize(TypeMgr const* tm) const
 {
     ASSERT0(is_array() || is_starray());
@@ -2599,7 +2775,7 @@ void IR::setSSAInfo(SSAInfo * ssa)
     case IR_GETELEM: GETELEM_ssainfo(this) = ssa; return;
     case IR_CALL:
     case IR_ICALL:
-        ASSERTN(CALL_prno(this) != 0, ("does not have return value"));
+        ASSERTN(CALL_prno(this) != PRNO_UNDEF, ("does not have return value"));
         CALL_ssainfo(this) = ssa;
         return;
     case IR_PHI: PHI_ssainfo(this) = ssa; return;
@@ -2751,20 +2927,20 @@ bool IR::is_lhs(IR const* k) const
 }
 
 
-//Return true if ir exactly modified 'md' or element in MDSet 'mds'.
+//Return true if ir exactly modified 'md' or elements in MDSet 'mds'.
+//md: given md, may be nullptr.
+//mds: given MDSet, may be nullptr.
 bool IR::isExactDef(MD const* md, MDSet const* mds) const
 {
     ASSERT0(is_stmt());
-
     MD const* cur_ir_defined_md = getRefMD();
-
     if (cur_ir_defined_md != nullptr && cur_ir_defined_md->is_exact()) {
         if (md != nullptr &&
             (cur_ir_defined_md == md || cur_ir_defined_md->is_overlap(md))) {
             return true;
         }
 
-        if (mds != nullptr && mds->is_contain_pure(MD_id(cur_ir_defined_md))) {
+        if (mds != nullptr && mds->is_contain_pure(cur_ir_defined_md->id())) {
             return true;
         }
     }
@@ -2787,6 +2963,14 @@ bool IR::isExactDef(MD const* md) const
         return true;
     }
     return false;
+}
+
+
+//Return true if current ir can be placed in BB.
+bool IR::isStmtInBB() const
+{
+    if (is_switch() && SWITCH_body(this) != nullptr) { return false; }
+    return IRDES_is_stmt_in_bb(g_ir_desc[getCode()]);
 }
 
 
@@ -2861,7 +3045,7 @@ IR * IR::getResultPR()
 bool IR::hasReturnValue() const
 {
     ASSERT0(isCallStmt());
-    return CALL_prno(this) != 0;
+    return CALL_prno(this) != PRNO_UNDEF;
 }
 
 
@@ -2881,6 +3065,12 @@ bool IR::isConstIntValueEqualTo(HOST_INT value) const
 }
 
 
+bool IR::isIntrinsicOp() const
+{
+    return isCallStmt() && CALL_is_intrinsic(this);
+}
+
+
 DU * IR::getDU() const
 {
     return hasDU() ? DUPROP_du(this) : nullptr;
@@ -2890,6 +3080,44 @@ DU * IR::getDU() const
 void IR::setDU(DU * du)
 {
     hasDU() ? DUPROP_du(this) = du : 0;
+}
+
+
+//Return true if stmt has judge determinate expression.
+bool IR::hasCaseList() const
+{
+    //Both stmt and exp.
+    switch (getCode()) {
+    case IR_SWITCH:
+    case IR_IGOTO:
+        return true;
+    default: return false;
+    }
+    return false;
+}
+
+
+//Return expression if stmt has CASE list.
+IR * IR::getCaseList() const
+{
+    //Both stmt and exp.
+    switch (getCode()) {
+    case IR_SWITCH: return SWITCH_case_list(this);
+    case IR_IGOTO: return IGOTO_case_list(this);
+    default: UNREACHABLE();
+    }
+    return nullptr;
+}
+
+
+//The function collects the LabelInfo for each branch-target.
+void IR::collectLabel(OUT List<LabelInfo const*> & lst) const
+{
+    switch (getCode()) {
+    case IR_SWITCH: ((CSwitch*)this)->collectLabel(lst); break;
+    case IR_IGOTO: ((CIGoto*)this)->collectLabel(lst); break;
+    default: UNREACHABLE();
+    }
 }
 
 
@@ -2932,286 +3160,7 @@ IR * IR::getJudgeDet() const
     }
     return nullptr;
 }
-
 //END IR
 
-
-//Exported Functions.
-CHAR const* compositeName(Sym const* n, xcom::StrBuf & buf);
-void dumpConst(IR const* ir, Region const* rg);
-void dumpIR(IR const* ir,
-            Region const* rg,
-            CHAR * attr = nullptr,
-            UINT dumpflag = IR_DUMP_KID|IR_DUMP_SRC_LINE|IR_DUMP_INNER_REGION|
-                            IR_DUMP_VAR_DECL);
-void dumpIRListH(IR const* ir_list, Region const* rg,
-                 CHAR * attr = nullptr,
-                 UINT dumpflag = IR_DUMP_KID|
-                                 IR_DUMP_SRC_LINE|
-                                 IR_DUMP_INNER_REGION|
-                                 IR_DUMP_VAR_DECL);
-void dumpIRList(IR const* ir_list,
-                Region const* rg,
-                CHAR * attr = nullptr,
-                UINT dumpflag = IR_DUMP_KID|
-                                IR_DUMP_SRC_LINE|
-                                IR_DUMP_INNER_REGION|
-                                IR_DUMP_VAR_DECL);
-void dumpIRList(IRList const& ir_list, Region const* rg);
-
-class DumpGRCtx {
-public:
-    //Dump string literal and ignore the \n.
-    bool dump_string_in_one_line;
-    bool dump_inner_region;
-    IRCFG * cfg;
-
-    DumpGRCtx() { ::memset(this, 0, sizeof(DumpGRCtx)); }
-};
-void dumpGR(IR const* ir, TypeMgr * tm, DumpGRCtx * ctx);
-void dumpGRInBBList(List<IRBB*> * bblist, TypeMgr * tm, DumpGRCtx * ctx);
-void dumpGRList(IR * irlist, TypeMgr * tm, DumpGRCtx * ctx);
-
-bool verifyIRList(IR * ir, BitSet * irh, Region const* rg);
-bool verifyIRandBB(BBList * ir_bb_list, Region const* rg);
-bool verifySimp(IR * ir, SimpCtx & simp);
-
-//Iterative access ir tree. This funtion initialize the iterator.
-//'ir': the root ir of the tree.
-//'it': iterator. It should be clean already.
-//Readonly function.
-inline IR const* iterInitC(IR const* ir, OUT ConstIRIter & it)
-{
-    if (ir == nullptr) { return nullptr; }
-    for (UINT i = 0; i < IR_MAX_KID_NUM(ir); i++) {
-        IR * kid = ir->getKid(i);
-        if (kid != nullptr) {
-            it.append_tail(kid);
-        }
-    }
-    if (ir->get_next() != nullptr) {
-        it.append_tail(ir->get_next());
-    }
-    return ir;
-}
-
-
-//Iterative access ir tree.
-//This function return the next IR node accroding to 'it'.
-//'it': iterator.
-//Readonly function.
-inline IR const* iterNextC(IN OUT ConstIRIter & it)
-{
-    IR const* ir = it.remove_head();
-    if (ir == nullptr) { return nullptr; }
-    for (UINT i = 0; i < IR_MAX_KID_NUM(ir); i++) {
-        IR * kid = ir->getKid(i);
-        if (kid != nullptr) {
-            it.append_tail(kid);
-        }
-    }
-    if (ir->get_next() != nullptr) {
-        it.append_tail(ir->get_next());
-    }
-    return ir;
-}
-
-
-//Iterative access the right-hand-side expression of stmt.
-//This funtion initialize the iterator.
-//'ir': the root ir of the tree, it must be stmt.
-//'it': iterator.
-//This function is a readonly function.
-//Use iterRhsNextC to iter next IR.
-inline IR const* iterRhsInitC(IR const* ir, OUT ConstIRIter & it)
-{
-    if (ir == nullptr) { return nullptr; }
-
-    ASSERT0(ir->is_stmt());
-
-    //Other stmt.
-    IR const* firstkid = nullptr;
-    for (UINT i = 0; i < IR_MAX_KID_NUM(ir); i++) {
-        IR const* kid = ir->getKid(i);
-        if (kid == nullptr) { continue; }
-        if (firstkid == nullptr) {
-            firstkid = kid;
-            continue;
-        }
-        it.append_tail(kid);
-    }
-
-    //IR const* x = it.remove_head();
-    //if (x == nullptr) { return nullptr; }
-
-    if (firstkid == nullptr) { return nullptr; }
-
-    for (UINT i = 0; i < IR_MAX_KID_NUM(firstkid); i++) {
-        IR const* kid = firstkid->getKid(i);
-        if (kid != nullptr) {
-            it.append_tail(kid);
-        }
-    }
-    if (IR_next(firstkid) != nullptr) {
-        it.append_tail(IR_next(firstkid));
-    }
-    return firstkid;
-}
-
-
-//Iterative access the expression.
-//This funtion initialize the iterator.
-//'ir': the root ir of the tree, it must be expression.
-//'it': iterator.
-//Readonly function.
-//Use iterRhsNextC to iter next IR.
-inline IR const* iterExpInitC(IR const* ir, OUT ConstIRIter & it)
-{
-    if (ir == nullptr) { return nullptr; }
-    ASSERT0(ir->is_exp());
-    for (UINT i = 0; i < IR_MAX_KID_NUM(ir); i++) {
-        IR * kid = ir->getKid(i);
-        if (kid == nullptr) { continue; }
-        it.append_tail(kid);
-    }
-    if (ir->get_next() != nullptr) {
-        ASSERTN(!ir->get_next()->is_stmt(), ("ir can not be stmt list"));
-        it.append_tail(ir->get_next());
-    }
-    return ir;
-}
-
-
-//Iterative access the right-hand-side expression of stmt.
-//This function return the next IR node accroding to 'it'.
-//'it': iterator.
-//Readonly function.
-inline IR const* iterRhsNextC(IN OUT ConstIRIter & it)
-{
-    return iterNextC(it);
-}
-
-
-//Iterative access the ir tree that start with 'ir'.
-//This funtion initialize the iterator.
-//'ir': the root ir of the tree, it may be either stmt or expression.
-//'it': iterator. It should be clean already.
-//Note this function is NOT readonly, the returnd IR may be modified.
-inline IR * iterInit(IN IR * ir, OUT IRIter & it)
-{
-    if (ir == nullptr) { return nullptr; }
-    for (UINT i = 0; i < IR_MAX_KID_NUM(ir); i++) {
-        IR * kid = ir->getKid(i);
-        if (kid != nullptr) {
-            it.append_tail(kid);
-        }
-    }
-    if (ir->get_next() != nullptr) {
-        it.append_tail(ir->get_next());
-    }
-    return ir;
-}
-
-
-//Iterative access the ir tree.
-//This funtion return the next IR node accroding to 'it'.
-//'it': iterator.
-//Note this function is NOT readonly, the returnd IR may be modified.
-inline IR * iterNext(IN OUT IRIter & it)
-{
-    IR * ir = it.remove_head();
-    if (ir == nullptr) { return nullptr; }
-    for (UINT i = 0; i < IR_MAX_KID_NUM(ir); i++) {
-        IR * kid = ir->getKid(i);
-        if (kid != nullptr) {
-            it.append_tail(kid);
-        }
-    }
-    if (ir->get_next() != nullptr) {
-        it.append_tail(ir->get_next());
-    }
-    return ir;
-}
-
-
-//Iterative access the right-hand-side expression of stmt.
-//This funtion initialize the iterator.
-//'ir': the root ir of the tree, it must be stmt.
-//'it': iterator. It should be clean already.
-//Use iterRhsNextC to iter next IR.
-inline IR * iterRhsInit(IR * ir, OUT IRIter & it)
-{
-    if (ir == nullptr) { return nullptr; }
-
-    ASSERT0(ir->is_stmt());
-
-    //Other stmt.
-    IR * firstkid = nullptr;
-    for (UINT i = 0; i < IR_MAX_KID_NUM(ir); i++) {
-        IR * kid = ir->getKid(i);
-        if (kid == nullptr) { continue; }
-        if (firstkid == nullptr) {
-            firstkid = kid;
-            continue;
-        }
-        it.append_tail(kid);
-    }
-
-    if (firstkid == nullptr) { return nullptr; }
-
-    for (UINT i = 0; i < IR_MAX_KID_NUM(firstkid); i++) {
-        IR * kid = firstkid->getKid(i);
-        if (kid != nullptr) {
-            it.append_tail(kid);
-        }
-    }
-    if (IR_next(firstkid) != nullptr) {
-        it.append_tail(IR_next(firstkid));
-    }
-
-    return firstkid;
-}
-
-
-//Iterative access the right-hand-side expression of stmt.
-//This function return the next IR node accroding to 'it'.
-//'it': iterator.
-//This is a readonly function.
-inline IR * iterRhsNext(IN OUT IRIter & it)
-{
-    return iterNext(it);
-}
-
-
-inline bool is_commutative(IR_TYPE irt)
-{ return IRDES_is_commutative(g_ir_desc[irt]); }
-
-inline bool isBinaryOp(IR_TYPE irt)
-{ return IRDES_is_bin(g_ir_desc[irt]); }
-
-inline bool isUnaryOp(IR_TYPE irt)
-{ return IRDES_is_una(g_ir_desc[irt]); }
-
-inline IR_TYPE invertIRType(IR_TYPE src)
-{
-    switch(src) {
-    case IR_LT: return IR_GE;
-    case IR_LE: return IR_GT;
-    case IR_GT: return IR_LE;
-    case IR_GE: return IR_LT;
-    case IR_EQ: return IR_NE;
-    case IR_NE: return IR_EQ;
-    default: ASSERTN(0, ("unsupport"));
-    }
-    return IR_UNDEF;
-}
-
-void setParentPointerForIRList(IR * ir_list);
-UINT getArithPrecedence(IR_TYPE ty);
-bool allBeExp(IR * irlst);
-bool allBeStmt(IR * irlst);
-bool checkMaxIRType();
-bool checkIRDesc();
-bool checkRoundDesc();
 } //namespace xoc
 #endif

@@ -1,5 +1,5 @@
 /*@
-Copyright (c) 2013-2014, Su Zhenyu steven.known@gmail.com
+Copyright (c) 2013-2021, Su Zhenyu steven.known@gmail.com
 All rights reserved.
 
 Redistribution and use in source and binary forms, with or without
@@ -55,6 +55,7 @@ size_t MiscBitSetMgr<BitsPerSeg>::count_mem(FILE * h) const
     count += smpoolGetPoolSize(m_dbitsetcore_pool);
     count += smpoolGetPoolSize(ptr_pool);
     count += sm.count_mem();
+    count += m_settab.count_mem();
 
     DUMMYUSE(h);
     #ifdef _DEBUG_
@@ -118,8 +119,7 @@ size_t MiscBitSetMgr<BitsPerSeg>::count_mem(FILE * h) const
 template <UINT BitsPerSeg>
 void SBitSetCore<BitsPerSeg>::bunion(SBitSetCore<BitsPerSeg> const& src,
                                      SegMgr<BitsPerSeg> * sm,
-                                     TSEGIter ** free_list,
-                                     SMemPool * pool)
+                                     TSEGIter ** free_list, SMemPool * pool)
 {
     ASSERTN(this != &src, ("operate on same set"));
     TSEGIter * tgtst = segs.get_head();
@@ -172,10 +172,8 @@ void SBitSetCore<BitsPerSeg>::bunion(SBitSetCore<BitsPerSeg> const& src,
 //'free_list': free list for TSEGIter
 //'pool': be used to alloc TSEGIter
 template <UINT BitsPerSeg>
-void SBitSetCore<BitsPerSeg>::bunion(UINT elem,
-                                     SegMgr<BitsPerSeg> * sm,
-                                     TSEGIter ** free_list,
-                                     SMemPool * pool)
+void SBitSetCore<BitsPerSeg>::bunion(UINT elem, SegMgr<BitsPerSeg> * sm,
+                                     TSEGIter ** free_list, SMemPool * pool)
 {
     TSEGIter * prev_sct = nullptr;
     TSEGIter * sct = segs.get_head();
@@ -215,7 +213,7 @@ void SBitSetCore<BitsPerSeg>::clean(SegMgr<BitsPerSeg> * sm,
     for (TSEGIter * st = segs.get_head();
          st != segs.end(); st = segs.get_next(st)) {
         SEG<BitsPerSeg> * s = st->val();
-        ASSERT0(s);        
+        ASSERT0(s);
         sm->freeSEG(s);
     }
     //Free the list of container of SEG* back to SegMgr<BitsPerSeg>.
@@ -234,12 +232,7 @@ void SBitSetCore<BitsPerSeg>::destroySEGandClean(SegMgr<BitsPerSeg> * sm,
         SEG<BitsPerSeg> * s = st->val();
         ASSERT0(s);
         DUMMYUSE(sm);
-
-        #ifdef DEBUG_SEG
-        sm->dec_seg_count();
-        sm->allocated.diff(s->id);
-        #endif
-
+        EXEC_LOG(sm->logger.destroySeg(s));
         delete s;
     }
 
@@ -265,8 +258,7 @@ size_t SBitSetCore<BitsPerSeg>::count_mem() const
 
 
 template <UINT BitsPerSeg>
-void SBitSetCore<BitsPerSeg>::diff(UINT elem,
-                                   SegMgr<BitsPerSeg> * sm,
+void SBitSetCore<BitsPerSeg>::diff(UINT elem, SegMgr<BitsPerSeg> * sm,
                                    TSEGIter ** free_list)
 {
     TSEGIter * sct = segs.get_head();
@@ -541,7 +533,7 @@ bool SBitSetCore<BitsPerSeg>::is_intersect(
         }
 
         //srcst's start > tgtst's start
-        tgtst = segs.get_next(tgtst);        
+        tgtst = segs.get_next(tgtst);
     }
     return false;
 }
@@ -717,7 +709,7 @@ void dumpSegMgr(SegMgr<BitsPerSeg> * segmgr, FILE * h)
 {
     if (h == nullptr) { return; }
     fprintf(h, "\nNot freed seg:");
-    for (UINT i = 0; i < segmgr->seg_count; i++) {
+    for (UINT i = 0; i <= segmgr->seg_count; i++) {
         if (segmgr->allocated.is_contain(i)) {
             fprintf(h, "%d,", i); //Seg i still not be freed.
         }

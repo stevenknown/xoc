@@ -42,29 +42,6 @@ namespace xoc {
 //be initial version.
 #define PRSSA_INIT_VERSION 0
 
-typedef xcom::SEGIter * IRSetIter;
-
-class IRSet : public DefSBitSet {
-    COPY_CONSTRUCTOR(IRSet);
-public:
-    IRSet(DefSegMgr * sm) : DefSBitSet(sm) {}
-
-    void append(IR const* v) { DefSBitSet::bunion(IR_id(v)); }
-
-    bool find(IR const* v) const
-    {
-        ASSERT0(v);
-        return DefSBitSet::is_contain(IR_id(v));
-    }
-
-    void remove(IR const* v)
-    {
-        ASSERT0(v);
-        DefSBitSet::diff(IR_id(v));
-    }
-};
-
-
 //Verisoned Presentation.
 //For each version of each prno, VPR is unique.
 typedef SEGIter * SSAUseIter;
@@ -113,6 +90,7 @@ public:
     }
     void initNoClean(DefSegMgr * sm) { SSA_uses(this).init(sm); }
 
+    void dump(Region const* rg) const;
     void destroy() { SSA_uses(this).destroy(); }
 
     //Return true if 'ir' is an USE reference.

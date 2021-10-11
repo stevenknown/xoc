@@ -1,5 +1,5 @@
 /*@
-Copyright (c) 2013-2014, Su Zhenyu steven.known@gmail.com
+Copyright (c) 2013-2021, Su Zhenyu steven.known@gmail.com
 
 All rights reserved.
 
@@ -35,28 +35,149 @@ void changeDef(IR * olddef, IR * newdef, Region * rg)
 {
     ASSERT0(olddef->is_stmt() && newdef->is_stmt());
     MDSSAMgr * mdssamgr = rg->getMDSSAMgr();
-    if (mdssamgr != nullptr) {
+    if (mdssamgr != nullptr && mdssamgr->is_valid()) {
         mdssamgr->changeDef(olddef, newdef);
     }
 
     DUMgr * dumgr = rg->getDUMgr();
     if (dumgr != nullptr) {
-        dumgr->changeDef(newdef, olddef, dumgr->getSBSMgr());
+        dumgr->changeDef(newdef, olddef);
     }
 }
 
 
+static IR * getUniqueDef(IRSet const* defset, Region * rg)
+{
+    //In the situation, the function just utilizes the Definition
+    //Informations to build DU chain between 'newuse' and these
+    //definitions.
+    ASSERT0(defset);
+    IR * unique_def = nullptr;
+    IRSetIter it;
+    for (INT i = defset->get_first(&it); i != -1;
+         i = defset->get_next(i, &it)) {
+        IR * def = rg->getIR(i);
+        ASSERT0(def && def->is_stmt());
+        if (unique_def == nullptr) {
+            unique_def = def;
+        } else {
+            //Not unique
+            return nullptr;
+        }
+    }
+    return unique_def;
+}
+
+
+//DU chain operation.
+//The function changes USE of some DU chain from 'olduse' to 'newuse'.
+//newuse: indicates the target expression which is changed to.
+//olduse: indicates the source expression which will be changed.
+//defset: if the function meets CASE3, the defst will supply the Definition
+//        Stmt Set that will be 'newuse'. The defset may NOT come
+//        from 'olduse'.
+//e.g: given DU chain DEF->'olduse', the result is DEF->'newuse'.
+//Note the function allows NonPR->PR or PR->NonPR.
+//The function is an extended version of 'changeUse'. The function will handle
+//the combination of different category of Memory Reference, e.g: PR<->NonPR.
+void changeUseEx(IR * olduse, IR * newuse, IRSet const* defset, Region * rg)
+{
+    ASSERT0(olduse->is_exp() && newuse->is_exp());
+    if (newuse->isMemoryOpnd()) {
+        ASSERT0(olduse->isMemoryOpnd());
+        if (olduse->isMemoryRefNonPR() && newuse->isMemoryRefNonPR()) {
+            //CASE1:ld x -> ld y
+            xoc::changeUse(olduse, newuse, rg);
+            return;
+        }
+ 
+        if (olduse->isReadPR() && newuse->isReadPR()) {
+            //CASE1:$x -> $y
+            if (olduse->getSSAInfo() != nullptr &&
+                newuse->getSSAInfo() == nullptr) {
+                //CASE:olduse and newuse are both in PRSSA mode, but newuse
+                //lacked PRSSAInfo for unknown reason.
+                //The method that attempt to find PRSSAInfo for 
+                //newuse is under the prerequisite that the DEF of newuse is
+                //also in PRSSA mode, namely an unique DEF, then regard the
+                //PRSSAInfo of the unique DEF as it were of newuse.
+                IR * unique_def = getUniqueDef(defset, rg);
+                ASSERT0(unique_def && unique_def->getSSAInfo());
+                xoc::copySSAInfo(newuse, unique_def); 
+            }
+            xoc::changeUse(olduse, newuse, rg);
+            return;
+        }
+ 
+        if ((olduse->isMemoryRefNonPR() && newuse->isReadPR()) ||
+            (newuse->isMemoryRefNonPR() && olduse->isReadPR())) {
+            //CASE2:ld x -> $y
+            //      $x -> ld y
+            //In the situation, the function just utilizes the Definition
+            //Informations to build DU chain between 'newuse' and these
+            //definitions.
+            ASSERT0(defset);
+            xoc::removeUseForTree(olduse, rg);
+
+            IRSetIter it;
+            for (INT i = defset->get_first(&it); i != -1;
+                 i = defset->get_next(i, &it)) {
+                IR * def = rg->getIR(i);
+                ASSERT0(def && def->is_stmt());
+                xoc::buildDUChain(def, newuse, rg);
+            }
+            return;
+        }
+
+        UNREACHABLE();
+    }
+
+    ASSERT0(newuse->is_const() || newuse->is_lda() ||
+            (newuse->is_cvt() &&
+             (((CCvt*)newuse)->getLeafExp()->is_const() ||
+              ((CCvt*)newuse)->getLeafExp()->is_lda())));
+    //CASE3:ld x -> const|lda
+    //      $x -> const|lda
+    //      id -> const|lda
+    xoc::removeUseForTree(olduse, rg);
+}
+
+
+//DU chain operation.
+//The function changes USE of some DU chain from 'olduse' to 'newuse'.
+//newuse: indicates the target expression which is changed to.
+//olduse: indicates the source expression which will be changed.
+//e.g: given DU chain DEF->'olduse', the result is DEF->'newuse'.
+//Note the function does NOT allow NonPR->PR or PR->NonPR.
 void changeUse(IR * olduse, IR * newuse, Region * rg)
 {
     ASSERT0(olduse->is_exp() && newuse->is_exp());
     MDSSAMgr * mdssamgr = rg->getMDSSAMgr();
-    if (mdssamgr != nullptr) {
-        mdssamgr->changeUse(olduse, newuse);
+    if (mdssamgr != nullptr && mdssamgr->is_valid()) {
+        ASSERT0(!(mdssamgr->hasMDSSAInfo(olduse) ^
+                  mdssamgr->hasMDSSAInfo(newuse)));
+        if (!mdssamgr->hasMDSSAInfo(olduse)) {
+            ASSERT0(!mdssamgr->hasMDSSAInfo(newuse));
+            //nothing to do
+        } else {
+            mdssamgr->changeUse(olduse, newuse);
+        }
     }
 
     DUMgr * dumgr = rg->getDUMgr();
     if (dumgr != nullptr) {
-        dumgr->changeUse(newuse, olduse, dumgr->getSBSMgr());
+        dumgr->changeUse(newuse, olduse);
+    }
+
+    if (olduse->isPROp() || newuse->isPROp()) {
+        PRSSAMgr * prssamgr = rg->getPRSSAMgr();
+        if (prssamgr != nullptr && prssamgr->is_valid()) {
+            SSAInfo * oldssainfo = olduse->getSSAInfo();
+            SSAInfo * newssainfo = newuse->getSSAInfo();
+            ASSERT0(oldssainfo && newssainfo);
+            oldssainfo->removeUse(olduse);
+            newssainfo->addUse(newuse);
+        }
     }
 }
 
@@ -68,16 +189,19 @@ void changeUse(IR * olduse, IR * newuse, Region * rg)
 void buildDUChain(IR * def, IR * use, Region * rg)
 {
     ASSERT0(def && use && def->is_stmt() && use->is_exp());
-    if  (def->isMemoryRefNotOperatePR()) {
+    if  (def->isMemoryRefNonPR()) {
         MDSSAMgr * mdssamgr = rg->getMDSSAMgr();
         if (mdssamgr != nullptr && mdssamgr->is_valid()) {
+            ASSERT0(use->isMemoryRefNonPR());
             MDSSAInfo * info = mdssamgr->getMDSSAInfoIfAny(def);
             ASSERTN(info, ("def stmt even not in MDSSA system"));
-            mdssamgr->addMDSSAOcc(use, info);
+            //mdssamgr->addMDSSAOcc(use, info);
+            mdssamgr->copyAndAddMDSSAOcc(use, info);
         }
     }
 
-    if (def->isWritePR() || def->isCallStmt()) {
+    if (def->isPROp()) {
+        ASSERT0(use->isPROp());
         PRSSAMgr * prssamgr = rg->getPRSSAMgr();
         if (prssamgr != nullptr && prssamgr->is_valid()) {
             prssamgr->buildDUChain(def, use);
@@ -91,29 +215,44 @@ void buildDUChain(IR * def, IR * use, Region * rg)
 }
 
 
-//Check each USE of stmt, remove the expired one which is not reference
-//the memory any more that stmt defined.
-bool removeExpiredDUForStmt(IR * stmt, Region * rg)
+//The function checks each DEF|USE occurrence of ir, remove the expired
+//expression which is not reference the memory any more that ir referenced.
+//Return true if DU changed.
+//Note this function does not modify ir.
+//e.g: stpr1 = ... //S1
+//     ..... = pr2 //S2
+//  If there is DU between S1 and S2, cutoff the DU chain.
+//stmt: PR write operation.
+//exp: PR read operation.
+bool removeExpiredDU(IR * ir, Region * rg)
 {
-    ASSERT0(stmt->is_stmt());
-    bool change = PRSSAMgr::removeExpiredDUForStmt(stmt, rg);
+    ASSERT0(ir);
+    bool change = false;
+    if (ir->isPROp()) {
+        PRSSAMgr * prssamgr = rg->getPRSSAMgr();
+        if (prssamgr != nullptr && prssamgr->is_valid()) {
+            change |= PRSSAMgr::removeExpiredDU(ir, rg);
+        }
+    }
 
     DUMgr * dumgr = rg->getDUMgr();
     if (dumgr != nullptr) {
-        change |= dumgr->removeExpiredDUForStmt(stmt);
+        change |= dumgr->removeExpiredDU(ir);
     }
 
     MDSSAMgr * mdssamgr = rg->getMDSSAMgr();
-    if (mdssamgr != nullptr) {
-        ASSERTN(mdssamgr->getMDSSAInfoIfAny(stmt),
+    if (mdssamgr != nullptr && mdssamgr->is_valid() &&
+        ir->isMemoryRefNonPR()) {
+        ASSERTN(mdssamgr->getMDSSAInfoIfAny(ir),
                 ("def stmt even not in MDSSA system"));
-        change |= mdssamgr->removeExpiredDUForStmt(stmt);
+        change |= mdssamgr->removeExpiredDU(ir);
     }
     return change;
 }
 
 
 //Coalesce DU chain of 'from' to 'to'.
+//'from' and 'to' refered the same md.
 //This function replace definition of USE of 'from' to defintion of 'to'.
 //Just like copy-propagation.
 //e.g: to_def =...
@@ -132,10 +271,10 @@ void coalesceDUChain(IR * from, IR * to, Region * rg)
         dumgr->coalesceDUChain(from, to);
     }
 
-    if (from->isMemoryRefNotOperatePR()) {
-        ASSERT0(to->isMemoryRefNotOperatePR());
+    if (from->isMemoryRefNonPR()) {
+        ASSERT0(to->isMemoryRefNonPR());
         MDSSAMgr * mdssamgr = rg->getMDSSAMgr();
-        if (mdssamgr != nullptr) {
+        if (mdssamgr != nullptr && mdssamgr->is_valid()) {
             mdssamgr->coalesceDUChain(from, to);
         }
     }
@@ -143,15 +282,16 @@ void coalesceDUChain(IR * from, IR * to, Region * rg)
 
 
 //Remove Use-Def chain.
+//exp: it is the root of IR tree that to be removed.
 //e.g: ir = ...
 //    = ir //S1
 //If S1 will be deleted, ir should be removed from its useset in MDSSAInfo.
 //NOTE: If ir is a IR tree, e.g: ild(x, ld(y)), remove ild(x) means
 //ld(y) will be removed as well. And ld(y)'s MDSSAInfo will be
 //updated as well.
-void removeIRTreeUse(IR * exp, Region * rg)
+void removeUseForTree(IR * exp, Region * rg)
 {
-    ASSERT0(exp && exp->is_exp());
+    ASSERT0(exp && exp->is_exp()); //exp is the root of IR tree.
     PRSSAMgr::removePRSSAOcc(exp);
 
     DUMgr * dumgr = rg->getDUMgr();
@@ -160,7 +300,7 @@ void removeIRTreeUse(IR * exp, Region * rg)
     }
 
     MDSSAMgr * mdssamgr = rg->getMDSSAMgr();
-    if (mdssamgr != nullptr) {
+    if (mdssamgr != nullptr && mdssamgr->is_valid()) {
         mdssamgr->removeMDSSAOcc(exp);
     }
 }
@@ -178,7 +318,7 @@ void removeStmt(IR * stmt, Region * rg)
     PRSSAMgr::removePRSSAOcc(stmt);
 
     MDSSAMgr * mdssamgr = rg->getMDSSAMgr();
-    if (mdssamgr != nullptr) {
+    if (mdssamgr != nullptr && mdssamgr->is_valid()) {
         //Remove stmt and its RHS.
         mdssamgr->removeMDSSAOcc(stmt);
     }
@@ -199,17 +339,52 @@ static void addUseInPRSSAMode(IR * to_ir, IR const* from_ir)
 }
 
 
+//The function only process single IR rather than IR tree.
 static void addUseInMDSSAMode(IR * to_ir, IR const* from_ir,
                               MDSSAMgr * mdssamgr, Region * rg)
 {
-    ASSERT0(from_ir->isMemoryRefNotOperatePR());
+    ASSERT0(to_ir->isMemoryRefNonPR() && from_ir->isMemoryRefNonPR());
     MDSSAInfo * info = mdssamgr->getMDSSAInfoIfAny(from_ir);
-    if (info == nullptr) { return; }
-    mdssamgr->addMDSSAOcc(to_ir, info);
+    ASSERT0(info);
+    mdssamgr->copyAndAddMDSSAOcc(to_ir, info);
+    return;
 }
 
 
+//The function manipulates DU chain. It adds DU chain from 'from' to
+//'to',  and the function will establish new DU chain between DEF of
+//'from' and expression 'to'.
+//to: target IR expression.
+//from: source IR expression.
+//Both 'to' and 'from' must be expression.
 void addUse(IR * to, IR const* from, Region * rg)
+{
+    if (to == from) { return; }
+    ASSERT0(to->is_exp() && from->is_exp());
+    if (!to->isMemoryRef() && !to->is_id()) {
+        //Copy MD for IR_ID, some Passes require it, e.g. GVN.
+        return;
+    }
+
+    PRSSAMgr * prssamgr = rg->getPRSSAMgr();
+    if (prssamgr != nullptr && prssamgr->is_valid() && from->isReadPR()) {
+        addUseInPRSSAMode(to, from);
+    }
+
+    MDSSAMgr * mdssamgr = rg->getMDSSAMgr();
+    if (mdssamgr != nullptr && mdssamgr->is_valid() &&
+        from->isMemoryRefNonPR()) {
+        addUseInMDSSAMode(to, from, mdssamgr, rg);
+    }
+
+    DUMgr * dumgr = rg->getDUMgr();
+    if (dumgr != nullptr) {
+        dumgr->addUse(to, from);
+    }
+}
+
+
+void addUseForTree(IR * to, IR const* from, Region * rg)
 {
     if (to == from) { return; }
 
@@ -235,7 +410,7 @@ void addUse(IR * to, IR const* from, Region * rg)
         if (use_prssa && from_ir->isReadPR()) {
             addUseInPRSSAMode(to_ir, from_ir);
         }
-        if (use_mdssa && from_ir->isMemoryRefNotOperatePR()) {
+        if (use_mdssa && from_ir->isMemoryRefNonPR()) {
             addUseInMDSSAMode(to_ir, from_ir, mdssamgr, rg);
         }
         if (dumgr != nullptr) {
@@ -246,14 +421,104 @@ void addUse(IR * to, IR const* from, Region * rg)
 }
 
 
+//This function try to require VN of base of ir.
+//Return the VN if found, and the indirect operation level.
+//e.g: given ILD(ILD(p)), return p and indirect_level is 2.
+//e.g2: given IST(ILD(q)), return q and indirect_level is 2.
+VN const* getVNOfIndirectOp(IR const* ir, UINT * indirect_level,
+                            GVN const* gvn)
+{
+    ASSERT0(ir && ir->isIndirectMemOp());
+    ASSERT0(gvn && gvn->is_valid());
+    IR const* base = ir;
+    *indirect_level = 0;
+    for (; base != nullptr && base->isIndirectMemOp();
+         base = base->getBase()) {
+        (*indirect_level)++;
+    }
+    ASSERT0(base);
+
+    //Get the VN of base expression.
+    return const_cast<GVN*>(gvn)->mapIR2VNConst(base);
+}
+
+
+static bool hasSameValueArrayOp(IR const* ir1, IR const* ir2, GVN const* gvn)
+{
+    ASSERT0(gvn && gvn->is_valid());
+    ASSERT0(ir1->isArrayOp() && ir2->isArrayOp());
+    IR const* sub1 = ARR_sub_list(ir1);
+    IR const* sub2 = ARR_sub_list(ir2);
+    for (; sub1 != nullptr && sub2 != nullptr;
+         sub1 = sub1->get_next(), sub2 = sub2->get_next()) {
+        VN const* v1 = gvn->mapIR2VNConst(sub1);
+        VN const* v2 = gvn->mapIR2VNConst(sub2);
+        if (v1 != v2) { return false; }
+    }
+
+    VN const* v1 = gvn->mapIR2VNConst(ARR_base(ir1));
+    VN const* v2 = gvn->mapIR2VNConst(ARR_base(ir2));
+    if (v1 != v2) { return false; }
+
+    if (ir1->isCover(ir2, gvn->getRegion())) {
+        return true;
+    }
+    return false; 
+}
+
+
+static bool hasSameValueIndirectOp(IR const* ir1, IR const* ir2, GVN const* gvn)
+{
+    //Find the base expression that is not IndirectOp.
+    //e.g: given ILD(ILD(ILD(p))), the function will reason out 'p'.
+
+    //The number of indirect operation.
+    //e.g: given ILD(ILD(ILD(p))), indirect_num is 3.
+    UINT indirect_num1 = 0;
+    VN const* basevn1 = getVNOfIndirectOp(ir1, &indirect_num1, gvn);
+    if (basevn1 == nullptr) {
+        //No need to keep analyzing if there is no VN provided.
+        return false;
+    }
+
+    UINT indirect_num2 = 0;
+    VN const* basevn2 = getVNOfIndirectOp(ir2, &indirect_num2, gvn);
+    if (basevn2 == nullptr) {
+        //No need to keep analyzing if there is no VN provided.
+        return false;
+    }
+
+    //VN is not match OR indirect level is not match
+    if (basevn1 == basevn2 && indirect_num1 == indirect_num2) {
+        return true;
+    }
+    return false; 
+}
+
+
 //Return true if def is killing-def of use.
 //Note this functin does not check if there is DU chain between def and use.
-bool isKillingDef(IR const* def, IR const* use)
+//gvn: if it is not NULL, the function will attempt to reason out the
+//     relation between 'def' and 'use' through gvn info.
+bool isKillingDef(IR const* def, IR const* use, GVN const* gvn)
 {
     ASSERT0(def && use);
     MD const* mustusemd = use->getRefMD();
-    if (mustusemd == nullptr) { return false; }
-    return isKillingDef(def, mustusemd);
+    if (mustusemd != nullptr && isKillingDef(def, mustusemd)) {
+        return true;
+    }
+
+    if (gvn == nullptr || !gvn->is_valid()) { return false; }
+
+    if (def->isIndirectMemOp() && use->isIndirectMemOp()) {
+        return hasSameValueIndirectOp(def, use, gvn);
+    }
+
+    if (def->isArrayOp() && use->isArrayOp()) {
+        return hasSameValueArrayOp(def, use, gvn);
+    }
+ 
+    return false;
 }
 
 
@@ -292,7 +557,7 @@ void movePhi(IRBB * from, IRBB * to, Region * rg)
     PRSSAMgr::movePhi(from, to);
 
     MDSSAMgr * mdssamgr = rg->getMDSSAMgr();
-    if (mdssamgr != nullptr) {
+    if (mdssamgr != nullptr && mdssamgr->is_valid()) {
         mdssamgr->movePhi(from, to);
     }
 }
@@ -337,13 +602,16 @@ void collectUseSet(IR const* def, MDSSAMgr const* mdssamgr, OUT IRSet * useset)
 //Collect all DEF expressions of 'use' into 'defset'.
 //This function give priority to PRSSA and MDSSA DU chain and then classic
 //DU chain in doing collection.
-void collectDefSet(IR const* use, MDSSAMgr const* mdssamgr, OUT IRSet * defset)
+//iter_phi_opnd: true if the collection will keep iterating DEF of PHI operand.
+void collectDefSet(IR const* use, MDSSAMgr const* mdssamgr, bool iter_phi_opnd,
+                   OUT IRSet * defset)
 {
     ASSERT0(defset && use->is_exp());
     defset->clean();
 
     SSAInfo const* prssainfo = use->getSSAInfo();
-    if (prssainfo != nullptr) {
+    if (prssainfo != nullptr &&
+        prssainfo->getDef()) { //PR may not have a DEF, e.g: parameter PR.
         defset->bunion(prssainfo->getDef()->id());
         return;
     }
@@ -353,7 +621,7 @@ void collectDefSet(IR const* use, MDSSAMgr const* mdssamgr, OUT IRSet * defset)
         mdssainfo = mdssamgr->getMDSSAInfoIfAny(use);
     }
     if (mdssainfo != nullptr) {
-        mdssainfo->collectDef(mdssamgr, use->getRefMD(), defset);
+        mdssainfo->collectDef(mdssamgr, use->getRefMD(), iter_phi_opnd, defset);
         return;
     }
 
@@ -419,6 +687,20 @@ IR * findNearestDomDef(IR const* exp, IRSet const& defset, Region const* rg,
     }
     ASSERT0(last != stmt_of_exp);
     return last;
+}
+
+
+//The function copy MDSSAInfo from 'src' to 'tgt'. Then add 'tgt' as an USE of
+//the new MDSSAInfo.
+void copyAndAddMDSSAOcc(IR * tgt, IR const* src, Region * rg)
+{
+    MDSSAMgr * mdssamgr = rg->getMDSSAMgr();
+    if (mdssamgr != nullptr && mdssamgr->is_valid()) {
+        MDSSAInfo const* src_mdssainfo = MDSSAMgr::getMDSSAInfoIfAny(src);
+        if (src_mdssainfo != nullptr) {
+            mdssamgr->copyAndAddMDSSAOcc(tgt, src_mdssainfo);
+        }
+    }
 }
 
 } //namespace xoc

@@ -157,17 +157,17 @@ public:
     LIR * buildInvoke(IN IR ** ir);
     LIR * buildUniOp(IN IR ** ir);
 
-    LIR * convertSwitch(IN OUT IR ** ir, IN IR2DexCtx * cont);
-    LIR * convertBranch(bool is_truebr, IN OUT IR ** ir, IN IR2DexCtx * cont);
-    LIR * convertGoto(IN OUT IR ** ir, IN IR2DexCtx * cont);
-    LIR * convertReturn(IN OUT IR ** ir, IN IR2DexCtx * cont);
-    LIR * convertStoreVar(IN OUT IR ** ir, IN IR2DexCtx * cont);
-    LIR * convertStorePR(IN OUT IR ** ir, IN IR2DexCtx * cont);
-    LIR * convertStoreArray(IN OUT IR ** ir, IN IR2DexCtx * cont);
-    LIR * convertIStore(IN OUT IR ** ir, IN IR2DexCtx * cont);
-    LIR * convertCall(IN OUT IR ** ir, IN IR2DexCtx * cont);
-    LIR * convertICall(IN OUT IR ** ir, IN IR2DexCtx * cont);
-    LIR * convert(IN OUT IR ** ir, IN IR2DexCtx * cont);
+    LIR * convertSwitch(MOD IR ** ir, IN IR2DexCtx * cont);
+    LIR * convertBranch(bool is_truebr, MOD IR ** ir, IN IR2DexCtx * cont);
+    LIR * convertGoto(MOD IR ** ir, IN IR2DexCtx * cont);
+    LIR * convertReturn(MOD IR ** ir, IN IR2DexCtx * cont);
+    LIR * convertStoreVar(MOD IR ** ir, IN IR2DexCtx * cont);
+    LIR * convertStorePR(MOD IR ** ir, IN IR2DexCtx * cont);
+    LIR * convertStoreArray(MOD IR ** ir, IN IR2DexCtx * cont);
+    LIR * convertIStore(MOD IR ** ir, IN IR2DexCtx * cont);
+    LIR * convertCall(MOD IR ** ir, IN IR2DexCtx * cont);
+    LIR * convertICall(MOD IR ** ir, IN IR2DexCtx * cont);
+    LIR * convert(MOD IR ** ir, IN IR2DexCtx * cont);
     void convert(IN IR * ir_list, OUT List<LIR*> & newlirs);
 
     void dump_output(List<LIR*> & newlirs, Prno2Vreg const& prno2v);

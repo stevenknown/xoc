@@ -93,7 +93,7 @@ void GCSE::elimCseAtStore(IR * use, IR * use_stmt, IR * gen)
     }
 
     //Assign MD to newrhs.
-    MD const* r_md = m_rg->genMDForPR(newrhs_pr);
+    MD const* r_md = m_rg->getMDMgr()->genMDForPR(newrhs_pr);
     ASSERT0(r_md);
     newrhs_pr->setRefMD(r_md, m_rg);
 
@@ -136,7 +136,7 @@ void GCSE::elimCseAtBranch(IR * use, IR * use_stmt, IN IR * gen)
     m_gvn->setMapIR2VN(new_pr, vn);
 
     //Assign MD to PR.
-    MD const* r_md = m_rg->genMDForPR(new_pr);
+    MD const* r_md = m_rg->getMDMgr()->genMDForPR(new_pr);
     ASSERT0(r_md);
     new_pr->setRefMD(r_md, m_rg);
 
@@ -187,7 +187,7 @@ void GCSE::elimCseAtCall(IR * use, IR * use_stmt, IR * gen)
     m_gvn->setMapIR2VN(use_pr, vn);
 
     //Allocate MD to use_pr to make up DU manager request.
-    MD const* r_md = m_rg->genMDForPR(use_pr);
+    MD const* r_md = m_rg->getMDMgr()->genMDForPR(use_pr);
     ASSERT0(r_md);
     use_pr->setRefMD(r_md, m_rg);
 
@@ -250,7 +250,7 @@ void GCSE::processCseGen(IN IR * gen, IR * gen_stmt, bool & change)
     m_exp2pr.set(gen, tmp_pr);
 
     //Assign MD to PR.
-    MD const* tmp_pr_md = m_rg->genMDForPR(tmp_pr);
+    MD const* tmp_pr_md = m_rg->getMDMgr()->genMDForPR(tmp_pr);
     ASSERT0(tmp_pr_md);
     tmp_pr->setRefMD(tmp_pr_md, m_rg);
 
@@ -597,13 +597,15 @@ bool GCSE::doPropVN(IRBB * bb, UINT entry_id)
 bool GCSE::doProp(IRBB * bb, List<IR*> & livexp)
 {
     livexp.clean();
-    DefDBitSetCore * x = m_du->genAvailInExpr(bb->id(), nullptr);
+    DefDBitSetCore * x = m_du->getSolveSet()->getAvailInExpr(bb->id());
     DefSBitSetIter st = nullptr;
-    for (INT i = x->get_first(&st); i != -1; i = x->get_next(i, &st)) {
-        IR * y = m_rg->getIR(i);
-        if (y->is_undef() || y->is_pr()) { continue; }
-        ASSERT0(y && y->is_exp());
-        livexp.append_tail(y);
+    if (x != nullptr) {
+        for (INT i = x->get_first(&st); i != -1; i = x->get_next(i, &st)) {
+            IR * y = m_rg->getIR(i);
+            if (y->is_undef() || y->is_pr()) { continue; }
+            ASSERT0(y && y->is_exp());
+            livexp.append_tail(y);
+        }
     }
 
     bool change = false;
@@ -702,7 +704,7 @@ bool GCSE::doProp(IRBB * bb, List<IR*> & livexp)
         case IR_IST:
         case IR_CALL:
         case IR_ICALL: {
-            MDSet const* maydef = m_du->getMayDef(ir);
+            MDSet const* maydef = ir->getMayRef();
             if (maydef != nullptr && !maydef->is_empty()) {
                 IRListIter ct2;
                 IRListIter next;
@@ -719,7 +721,7 @@ bool GCSE::doProp(IRBB * bb, List<IR*> & livexp)
                 }
             }
 
-            MD const* mustdef = m_du->get_must_def(ir);
+            MD const* mustdef = ir->getMustRef();
             if (mustdef != nullptr) {
                 IRListIter ct2;
                 IRListIter next;

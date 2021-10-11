@@ -115,11 +115,18 @@ public:
     void dump(Region const* rg) const;
     void dumpName(Region const* rg) const;
 
-    CHAR const* getName(IN OUT StrBuf * buf) const;
+    CHAR const* getName(MOD StrBuf * buf) const;
     Sym const* getOrgName() const { return LABELINFO_name(this); }
     UINT getNum() const { return LABELINFO_num(this); }
     LABEL_TYPE getType() const { return LABELINFO_type(this); }
     Sym const* getPragma() const { return LABELINFO_pragma(this); }
+
+    //Return true if label can not be removed.
+    bool hasSideEffect() const
+    {
+        return is_catch_start() || is_try_start() || is_try_end() ||
+               is_pragma() || is_terminate();
+    }
 
     bool is_catch_start() const { return LABELINFO_is_catch_start(this); }
     bool is_try_start() const { return LABELINFO_is_try_start(this); }

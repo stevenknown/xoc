@@ -36,9 +36,6 @@ author: Su Zhenyu
 
 namespace xoc {
 
-//Record memory reference for region.
-#define REGION_refinfo(r) ((r)->m_ref_info)
-
 static void set_irt_size(IR * ir, UINT)
 {
     #ifdef CONST_IRT_SZ
@@ -60,180 +57,26 @@ static UINT getIRTypeSize(IR const* ir)
 
 
 //
-//START AnalysisInstrument
-//
-AnalysisInstrument::AnalysisInstrument(Region * rg) :
-    m_mds_mgr(rg, &m_sbs_mgr),
-    m_mds_hash_allocator(&m_sbs_mgr),
-    m_mds_hash(&m_mds_hash_allocator)
-{
-    m_rg = rg;
-    m_call_list = nullptr;
-    m_return_list = nullptr;
-    m_ir_list = nullptr;
-    m_pass_mgr = nullptr;
-
-    //Counter of IR_PR, and do not use '0' as prno.
-    m_pr_count = PRNO_UNDEF + 1;
-    m_du_pool = smpoolCreate(sizeof(DU) * 4, MEM_CONST_SIZE);
-    m_sc_labelinfo_pool = smpoolCreate(sizeof(xcom::SC<LabelInfo*>) * 4,
-        MEM_CONST_SIZE);
-    ::memset(m_free_tab, 0, sizeof(m_free_tab));
-}
-
-
-#ifdef _DEBUG_
-static bool verifyVar(Region * rg, VarMgr * vm, Var * v)
-{
-    CHECK0_DUMMYUSE(v);
-    CHECK0_DUMMYUSE(vm);
-    if (rg->is_function() || rg->is_eh() ||
-        rg->getRegionType() == REGION_INNER) {
-        //If var is global but unallocable, it often be
-        //used as placeholder or auxilary var.
-
-        //For these kind of regions, there are only local variable or
-        //unablable global variable is legal.
-        ASSERT0(VAR_is_local(v) || VAR_is_unallocable(v));
-    } else if (rg->is_program()) {
-        //Theoretically, only global variable is legal in program region.
-        //However even if the program region there may be local
-        //variables, e.g: PR, a kind of local variable.
-        //ASSERT0(VAR_is_global(v));
-    } else {
-        ASSERTN(0, ("unsupport variable type."));
-    }
-    return true;
-}
-#endif
-
-
-//Free md's id and local-var's id back to MDSystem and VarMgr.
-//The index of MD and Var is important resource if there
-//are a lot of REGIONs in RegionMgr.
-//Note this function does NOT process GLOBAL variable.
-static void destroyVARandMD(Region * rg)
-{
-    VarMgr * varmgr = rg->getVarMgr();
-    MDSystem * mdsys = rg->getMDSystem();
-    VarTabIter c;
-    ConstMDIter iter;
-    VarTab * vartab = rg->getVarTab();
-    ASSERT0(vartab);
-    for (Var * v = vartab->get_first(c); v != nullptr; v = vartab->get_next(c)) {
-        ASSERT0(verifyVar(rg, varmgr, v));
-        mdsys->removeMDforVAR(v, iter);
-        varmgr->destroyVar(v);
-    }
-}
-
-
-AnalysisInstrument::~AnalysisInstrument()
-{
-    #ifdef DEBUG_SEG
-    //Just dump the seg info if you really need to see.
-    //DefSegMgr * segmgr = m_sbs_mgr.getSegMgr();
-    //dumpSegMgr(segmgr, getRegion()->getLogMgr()->getFileHandler());
-    #endif
-
-    //Destroy pass manager.
-    if (m_pass_mgr != nullptr) {
-        delete m_pass_mgr;
-        m_pass_mgr = nullptr;
-    }
-
-    //Free AIContainer's internal structure.
-    //The vector of AIContainer must be destroyed explicitly.
-    INT l = m_ir_vector.get_last_idx();
-    for (INT i = 1; i <= l; i++) {
-        IR * ir = m_ir_vector.get(i);
-        ASSERT0(ir);
-        //if (ir->is_region()) {
-        //    //All region should be deleted by regionmgr.
-        //    m_ru_mgr->deleteRegion(REGION_ru(ir));
-        //}
-        ir->freeDUset(m_sbs_mgr);
-    }
-
-    //Free local Var id and related MD id, and destroy the memory.
-    destroyVARandMD(m_rg);
-
-    //Destroy reference info.
-    if (REGION_refinfo(m_rg) != nullptr) {
-        REF_INFO_mayuse(REGION_refinfo(m_rg)).clean(m_sbs_mgr);
-        REF_INFO_maydef(REGION_refinfo(m_rg)).clean(m_sbs_mgr);
-
-        //REGION_refinfo allocated in pool.
-        REGION_refinfo(m_rg) = nullptr;
-    }
-
-    //Destory CALL list.
-    if (m_call_list != nullptr) {
-        delete m_call_list;
-        m_call_list = nullptr;
-    }
-
-    //Destory RETURN list.
-    if (m_return_list != nullptr) {
-        delete m_return_list;
-        m_return_list = nullptr;
-    }
-
-    ////////////////////////////////////////////////////////////
-    //Do NOT destroy member which allocated in pool after here//
-    ////////////////////////////////////////////////////////////
-    //Destroy all DUSet which allocated in the du_pool.
-    smpoolDelete(m_du_pool);
-    smpoolDelete(m_sc_labelinfo_pool);
-    m_du_pool = nullptr;
-    m_sc_labelinfo_pool = nullptr;
-    m_ir_list = nullptr;
-}
-
-
-size_t AnalysisInstrument::count_mem() const
-{
-    size_t count = sizeof(*this);
-    if (m_call_list != nullptr) {
-        count += m_call_list->count_mem();
-    }
-    count += smpoolGetPoolSize(m_du_pool);
-    count += smpoolGetPoolSize(m_sc_labelinfo_pool);
-    count += m_ir_bb_mgr.count_mem();
-    count += m_prno2var.count_mem();
-    count += m_bs_mgr.count_mem();
-    count += m_sbs_mgr.count_mem();
-    count += m_mds_mgr.count_mem();
-    count += m_mds_hash.count_mem();
-    count += m_ir_vector.count_mem();
-    count += m_ir_bb_list.count_mem();
-    //m_free_du_list has been counted in m_du_pool.
-    return count;
-}
-//END AnalysisInstrument
-
-
-//
 //START Region
 //
 void Region::init(REGION_TYPE rt, RegionMgr * rm)
 {
     m_u2.s1b1 = 0;
+    m_var = nullptr;
+    m_pool = smpoolCreate(256, MEM_COMM);
     REGION_type(this) = rt;
     REGION_blackbox_data(this) = nullptr;
-    m_var = nullptr;
-    m_region_mgr = nullptr;
-    REGION_id(this) = 0;
+    REGION_region_mgr(this) = rm;
+    REGION_id(this) = REGION_ID_UNDEF;
     REGION_parent(this) = nullptr;
     REGION_refinfo(this) = nullptr;
-    REGION_analysis_instrument(this) = nullptr;
     if (is_program() || is_function() || is_eh() || is_inner()) {
         //All these Regions could involve ir stmt list.
         REGION_analysis_instrument(this) = new AnalysisInstrument(this);
+    } else {
+        REGION_analysis_instrument(this) = nullptr;
     }
-    REGION_region_mgr(this) = rm;
-    m_pool = smpoolCreate(256, MEM_COMM);
-    m_ru_var_tab.init();
+    m_rg_var_tab.init();
 }
 
 
@@ -241,21 +84,25 @@ void Region::destroy()
 {
     if (!is_blackbox()) {
         destroyPassMgr();
+        destroyAttachInfoMgr();
         if (getAnalysisInstrument() != nullptr) {
             delete REGION_analysis_instrument(this);
         }
     }
-    REGION_analysis_instrument(this) = nullptr;
     //MDSET destroied by MDSetMgr.
+    REGION_analysis_instrument(this) = nullptr;
     REGION_refinfo(this) = nullptr;
-    REGION_id(this) = 0;
+    REGION_id(this) = REGION_ID_UNDEF;
     REGION_parent(this) = nullptr;
     REGION_type(this) = REGION_UNDEF;
+
     //Destroy all IR. IR allocated in the pool.
     smpoolDelete(m_pool);
     m_pool = nullptr;
+
     m_var = nullptr;
-    m_ru_var_tab.destroy();
+
+    m_rg_var_tab.destroy();
 }
 
 
@@ -268,8 +115,8 @@ size_t Region::count_mem() const
         getAnalysisInstrument() != nullptr) {
         count += getAnalysisInstrument()->count_mem();
     }
-    count += m_ru_var_tab.count_mem();
-    count -= sizeof(m_ru_var_tab);
+    count += m_rg_var_tab.count_mem();
+    count -= sizeof(m_rg_var_tab);
     if (m_ref_info != nullptr) {
         count += m_ref_info->count_mem();
     }
@@ -440,7 +287,7 @@ bool Region::evaluateConstInteger(IR const* ir, OUT ULONGLONG * const_value)
                 return false;
             }
 
-            DUIter di = nullptr;
+            DUSetIter di = nullptr;
             defstmt = getIR(defset->get_first(&di));
             ASSERT0(defstmt && defstmt->is_stmt());
 
@@ -755,30 +602,6 @@ Var * Region::genVarForPR(UINT prno, Type const* type)
 }
 
 
-//Generate MD corresponding to PR load or write.
-MD const* Region::genMDForPR(UINT prno, Type const* type)
-{
-    ASSERT0(type);
-    Var * pr_var = mapPR2Var(prno);
-    if (pr_var == nullptr) {
-        pr_var = genVarForPR(prno, type);
-    }
-
-    MD md;
-    MD_base(&md) = pr_var; //correspond to Var
-    MD_ofst(&md) = 0;
-    if (pr_var->getType()->is_any()) {
-        MD_ty(&md) = MD_UNBOUND;
-    } else {
-        MD_ty(&md) = MD_EXACT;
-        MD_size(&md) = getTypeMgr()->getByteSize(pr_var->getType());
-    }
-    MD const* e = getMDSystem()->registerMD(md);
-    ASSERT0(MD_id(e) > 0);
-    return e;
-}
-
-
 //Get function unit.
 Region * Region::getFuncRegion()
 {
@@ -962,16 +785,16 @@ void Region::freeIRTree(IR * ir)
 //Note that this function does NOT free ir's kids and siblings.
 void Region::freeIR(IR * ir)
 {
-    ASSERT0(ir);
-    ASSERTN(ir->is_single(), ("chain list should be cut off"));
+    ASSERTN(ir && ir->is_single(), ("chain list should be cut off"));
     #ifdef _DEBUG_
     ASSERT0(!getAnalysisInstrument()->
             m_has_been_freed_irs.is_contain(ir->id()));
     getAnalysisInstrument()->m_has_been_freed_irs.bunion(ir->id());
     #endif
 
-    ASSERT0(getMiscBitSetMgr());
-    ir->freeDUset(*getMiscBitSetMgr());
+    if (getDUMgr() != nullptr) {
+        ir->freeDUset(getDUMgr());
+    }
 
     AIContainer * res_ai = IR_ai(ir);
     if (res_ai != nullptr) {
@@ -1078,185 +901,10 @@ Var const* Region::findFormalParam(UINT position) const
 }
 
 
-//The function generates new MD for given PR.
-//It should be called if new PR generated in optimzations.
-MD const* Region::allocPRMD(IR * pr)
+//Allocate AttachInfoMgr
+AttachInfoMgr * Region::allocAttachInfoMgr()
 {
-    ASSERT0(pr->is_pr());
-    MD const* md = genMDForPR(pr);
-    setMustRef(pr, md);
-    pr->cleanRefMDSet();
-    return md;
-}
-
-
-//The function generates new MD for given PR.
-//It should be called if new PR generated in optimzations.
-MD const* Region::allocPhiMD(IR * phi)
-{
-    ASSERT0(phi->is_phi());
-    MD const* md = genMDForPR(phi);
-    setMustRef(phi, md);
-    phi->cleanRefMDSet();
-    return md;
-}
-
-
-MD const* Region::allocIdMD(IR * ir)
-{
-    ASSERT0(ir->is_id());
-    MD const* t = genMDForId(ir);
-    setMustRef(ir, t);
-    ir->cleanRefMDSet();
-    return t;
-}
-
-
-MD const* Region::allocLoadMD(IR * ir)
-{
-    ASSERT0(ir->is_ld());
-    MD const* t = genMDForLoad(ir);
-    ASSERT0(t);
-    ir->cleanRefMDSet();
-
-    //TO BE REMOVED: genMDForLoad has consider the Offset of ir.
-    //if (LD_ofst(ir) != 0) {
-    //    MD t2(*t);
-    //    ASSERT0(t2.is_exact());
-    //    MD_ofst(&t2) += LD_ofst(ir);
-    //    MD_size(&t2) = ir->getTypeSize(getTypeMgr());
-    //    MD const* entry = getMDSystem()->registerMD(t2);
-    //    ASSERTN(MD_id(entry) > 0, ("Not yet registered"));
-    //    t = entry; //regard MD with offset as return result.
-    //}
-
-    setMustRef(ir, t);
-    return t;
-}
-
-
-MD const* Region::allocStorePRMD(IR * ir)
-{
-    ASSERT0(ir->is_stpr());
-    MD const* md = genMDForPR(ir);
-    setMustRef(ir, md);
-    ir->cleanRefMDSet();
-    return md;
-}
-
-
-MD const* Region::allocCallResultPRMD(IR * ir)
-{
-    ASSERT0(ir->isCallStmt());
-    MD const* md = genMDForPR(ir);
-    setMustRef(ir, md);
-    ir->cleanRefMDSet();
-    return md;
-}
-
-
-MD const* Region::allocSetelemMD(IR * ir)
-{
-    ASSERT0(ir->is_setelem());
-    MD const* md = genMDForPR(ir);
-    IR const* ofst = SETELEM_ofst(ir);
-    ASSERT0(ofst);
-    if (md->is_exact()) {
-        if (ofst->is_const()) {
-            ASSERTN(ofst->is_int(), ("offset of SETELEM must be integer."));
-
-            //Accumulating offset of identifier.
-            //e.g: struct {int a,b; } s; s.a = 10
-            //generate: st s:offset(4) = 10;
-            MD t(*md);
-            ASSERT0(ir->getTypeSize(getTypeMgr()) > 0);
-            MD_ofst(&t) += (UINT)CONST_int_val(ofst);
-            MD_size(&t) = ir->getTypeSize(getTypeMgr());
-            MD const* entry = getMDSystem()->registerMD(t);
-            ASSERTN(MD_id(entry) > 0, ("Not yet registered"));
-            md = entry; //regard MD with offset as return result.
-        } else {
-            //Offset is variable.
-            //e.g: vector<4xi32> v; v[i] = 34;
-            //will generate:
-            //    st $1 = ld v;
-            //    setelem $1 = 34, ld i;
-            //    st v = $1;
-
-            MD t(*md);
-            ASSERT0(ir->getTypeSize(getTypeMgr()) > 0);
-            MD_ty(&t) = MD_RANGE;
-            MD_ofst(&t) = 0;
-            MD_size(&t) = ir->getTypeSize(getTypeMgr());
-            MD const* entry = getMDSystem()->registerMD(t);
-            ASSERTN(MD_id(entry) > 0, ("Not yet registered"));
-            md = entry; //regard MD with range as return result.
-        }
-    }
-
-    setMustRef(ir, md);
-    ir->cleanRefMDSet();
-    return md;
-}
-
-
-MD const* Region::allocGetelemMD(IR * ir)
-{
-    ASSERT0(ir->is_getelem());
-    MD const* md = genMDForPR(ir);
-    setMustRef(ir, md);
-    ir->cleanRefMDSet();
-    return md;
-}
-
-
-MD const* Region::allocStoreMD(IR * ir)
-{
-    ASSERT0(ir->is_st());
-    MD const* md = genMDForStore(ir);
-    ASSERT0(md);
-    ir->cleanRefMDSet();
-
-    //TO BE REMOVED: genMDForStore has considered the Offset of ir.
-    //if (ST_ofst(ir) != 0) {
-    //    //Accumulating offset of identifier.
-    //    //e.g: struct {int a,b; } s; s.a = 10
-    //    //generate: st('s', ofst:4) = 10
-    //    MD t(*md);
-    //    ASSERT0(t.is_exact());
-    //    ASSERT0(ir->getTypeSize(getTypeMgr()) > 0);
-    //    MD_ofst(&t) += ST_ofst(ir);
-    //    MD_size(&t) = ir->getTypeSize(getTypeMgr());
-    //    MD const* entry = getMDSystem()->registerMD(t);
-    //    ASSERTN(MD_id(entry) > 0, ("Not yet registered"));
-    //    md = entry; //regard MD with offset as return result.
-    //}
-
-    setMustRef(ir, md);
-    return md;
-}
-
-
-//Alloc MD for const string.
-MD const* Region::allocStringMD(Sym const* string)
-{
-    ASSERT0(string);
-    MD const* strmd = getRegionMgr()->genDedicateStrMD();
-    if (strmd != nullptr) { return strmd; }
-
-    Var * v = getVarMgr()->registerStringVar(nullptr, string, MEMORY_ALIGNMENT);
-    //Set string address to be taken only if it is base of LDA.
-    //VAR_is_addr_taken(v) = true;
-    MD md;
-    MD_base(&md) = v;
-    MD_size(&md) = (UINT)strlen(SYM_name(string)) + 1;
-    MD_ofst(&md) = 0;
-    MD_ty(&md) = MD_EXACT;
-    ASSERT0(v->is_string());
-
-    MD const* e = getMDSystem()->registerMD(md);
-    ASSERT0(MD_id(e) > 0);
-    return e;
+    return new AttachInfoMgr(this);
 }
 
 
@@ -1267,12 +915,20 @@ PassMgr * Region::allocPassMgr()
 }
 
 
-void Region::dumpIRList() const
+void Region::dumpIRList(UINT dumpflag) const
 {
     if (!isLogMgrInit()) { return; }
     note(this, "\n==---- DUMP IR LIST '%s' ----==", getRegionName());
     if (getIRList() == nullptr) { return; }
-    xoc::dumpIRList(getIRList(), this);
+    xoc::dumpIRList(getIRList(), this, nullptr, dumpflag);
+}
+
+
+//filename: dump BB list into given filename.
+void Region::dumpBBList(CHAR const* filename, bool dump_inner_region) const
+{
+    if (getBBList() == nullptr) { return; }
+    xoc::dumpBBList(filename, getBBList(), this, dump_inner_region);
 }
 
 
@@ -1310,128 +966,6 @@ void Region::dumpFreeTab() const
         for (IR * ir = lst; ir != nullptr; ir = ir->get_next()) {
             ASSERT0(getIRTypeSize(ir) == sz);
             prt(this, "ir(%d),", ir->id());
-        }
-    }
-}
-
-
-void Region::assignMDImpl(IR * x, bool assign_pr, bool assign_nonpr)
-{
-    ASSERT0(x);
-    switch (x->getCode()) {
-    case IR_PR:
-        if (assign_pr) {
-            allocPRMD(x);
-        }
-        break;
-    case IR_STPR:
-        if (assign_pr) {
-            allocStorePRMD(x);
-        }
-        break;
-    case IR_GETELEM:
-        if (assign_pr) {
-            allocGetelemMD(x);
-        }
-        break;
-    case IR_SETELEM:
-        if (assign_pr) {
-            allocSetelemMD(x);
-        }
-        break;
-    case IR_PHI:
-        if (assign_pr) {
-            allocPhiMD(x);
-        }
-        break;
-    case IR_CALL:
-    case IR_ICALL:
-        if (assign_pr && x->hasReturnValue()) {
-            allocCallResultPRMD(x);
-        }
-        break;
-    case IR_ST:
-        if (assign_nonpr) {
-            allocStoreMD(x);
-        }
-        break;
-    case IR_LD:
-        if (assign_nonpr) {
-            allocLoadMD(x);
-        }
-        break;
-    case IR_ID:
-        if (assign_nonpr) {
-            if (ID_info(x)->is_string()) {
-                allocStringMD(ID_info(x)->get_name());
-            } else {
-                allocIdMD(x);
-            }
-        }
-        break;
-    default: ASSERT0(!x->isReadPR() && !x->isWritePR());
-    }
-}
-
-
-//Assign MD for ST/LD/ReadPR/WritePR operations.
-//is_only_assign_pr: true if assign MD for each ReadPR/WritePR operations.
-void Region::assignMD(bool assign_pr, bool assign_nonpr)
-{
-    if (getIRList() != nullptr) {
-        assignMDForIRList(getIRList(), assign_pr, assign_nonpr);
-        return;
-    }
-    if (getBBList() != nullptr) {
-        assignMDForBBList(getBBList(), assign_pr, assign_nonpr);
-    }
-}
-
-
-void Region::assignMDForBBList(BBList * lst, bool assign_pr, bool assign_nonpr)
-{
-    ASSERT0(lst);
-    IRIter ii;
-    for (IRBB * bb = lst->get_head(); bb != nullptr; bb = lst->get_next()) {
-        assignMDForBB(bb, ii, assign_pr, assign_nonpr);
-    }
-}
-
-
-void Region::assignMDForBB(IRBB * bb,
-                           IRIter & ii,
-                           bool assign_pr,
-                           bool assign_nonpr)
-{
-    BBIRListIter ct;
-    for (xoc::IR * ir = bb->getIRList()->get_head(&ct);
-         ir != nullptr; ir = bb->getIRList()->get_next(&ct)) {
-        for (IR * x = iterInit(ir, ii);
-           x != nullptr; x = iterNext(ii)) {
-           assignMDImpl(x, assign_pr, assign_nonpr);
-        }
-    }
-}
-
-
-void Region::assignMDForIRList(IR * lst, bool assign_pr, bool assign_nonpr)
-{
-    for (IR * ir = lst; ir != nullptr; ir = ir->get_next()) {
-        switch (ir->getCode()) {
-        case IR_PR:
-        case IR_LD:
-        case IR_ID:
-            assignMDImpl(ir, assign_pr, assign_nonpr);
-            break;
-        default: {
-            //Iterate rest of ir in lst.
-            IRIter ii;
-            for (IR * x = iterInit(lst, ii);
-                 x != nullptr; x = iterNext(ii)) {
-                assignMDImpl(x, assign_pr, assign_nonpr);
-            }
-            return;
-        }
         }
     }
 }
@@ -1541,20 +1075,15 @@ IR * Region::dupIR(IR const* src)
     IR_next(res) = IR_prev(res) = IR_parent(res) = nullptr;
     res->cleanDU(); //Do not copy DU info.
     res->clearSSAInfo(); //Do not copy SSA info.
-    if (IR_ai(src) != nullptr) { //need to copy AIContainer.
-        if (IR_ai(res) == nullptr) {
-            IR_ai(res) = allocAIContainer();
-        }
-        IR_ai(res)->copy(IR_ai(src), this);
-    }
+    res->copyAI(src, this);
     if (res->isMemoryRef()) {
         res->copyRef(src, this);
     }
     return res;
 }
 
-void Region::scanCallListImpl(OUT UINT & num_inner_region,
-                              IR * irlst,
+
+void Region::scanCallListImpl(OUT UINT & num_inner_region, IR * irlst,
                               OUT List<IR const*> * call_list,
                               OUT List<IR const*> * ret_list,
                               bool scan_inner_region)
@@ -2133,11 +1662,21 @@ void Region::dumpBBRef(IN IRBB * bb, UINT indent) const
 
 PassMgr * Region::initPassMgr()
 {
-    if (getAnalysisInstrument()->m_pass_mgr != nullptr) {
-        return getAnalysisInstrument()->m_pass_mgr;
+    if (getAnalysisInstrument()->getPassMgr() != nullptr) {
+        return getAnalysisInstrument()->getPassMgr();
     }
-    getAnalysisInstrument()->m_pass_mgr = allocPassMgr();
-    return getAnalysisInstrument()->m_pass_mgr;
+    ANA_INS_pass_mgr(getAnalysisInstrument()) = allocPassMgr();
+    return getAnalysisInstrument()->getPassMgr();
+}
+
+
+AttachInfoMgr * Region::initAttachInfoMgr()
+{
+    if (getAnalysisInstrument()->getAttachInfoMgr() != nullptr) {
+        return getAnalysisInstrument()->getAttachInfoMgr();
+    }
+    ANA_INS_ai_mgr(getAnalysisInstrument()) = allocAttachInfoMgr();
+    return getAnalysisInstrument()->getAttachInfoMgr();
 }
 
 
@@ -2152,6 +1691,17 @@ void Region::destroyPassMgr()
 }
 
 
+void Region::destroyAttachInfoMgr()
+{
+    if (getAnalysisInstrument() == nullptr ||
+        ANA_INS_ai_mgr(getAnalysisInstrument()) == nullptr) {
+        return;
+    }
+    delete ANA_INS_ai_mgr(getAnalysisInstrument());
+    ANA_INS_ai_mgr(getAnalysisInstrument()) = nullptr;
+}
+
+
 static bool verifyMDRefForIR(IR const* ir, ConstIRIter & cii, Region * rg)
 {
     for (IR const* t = iterInitC(ir, cii); t != nullptr; t = iterNextC(cii)) {
@@ -2163,8 +1713,8 @@ static bool verifyMDRefForIR(IR const* ir, ConstIRIter & cii, Region * rg)
             break;
         case IR_LD:
             if (g_is_support_dynamic_type) {
-                ASSERTN(t->getEffectRef(), ("type is at least effect"));
-                ASSERTN(!t->getEffectRef()->is_pr(),
+                ASSERTN(t->getMustRef(), ("type is at least effect"));
+                ASSERTN(!t->getMustRef()->is_pr(),
                         ("MD can not present a PR."));
             } else {
                 ASSERTN(t->getExactRef(), ("type must be exact"));
@@ -2182,19 +1732,19 @@ static bool verifyMDRefForIR(IR const* ir, ConstIRIter & cii, Region * rg)
             break;
         case IR_PR:
             if (g_is_support_dynamic_type) {
-                ASSERTN(t->getEffectRef(), ("type is at least effect"));
-                ASSERTN(t->getEffectRef()->is_pr(),
+                ASSERTN(t->getMustRef(), ("type is at least effect"));
+                ASSERTN(t->getMustRef()->is_pr(),
                         ("MD must present a PR."));
             } else {
                 ASSERTN(t->getExactRef(), ("type must be exact"));
                 ASSERTN(t->getExactRef()->is_pr(),
                         ("MD must present a PR."));
             }
-            ASSERT0(t->getRefMDSet() == nullptr);
+            ASSERT0(t->getMayRef() == nullptr);
             break;
         case IR_STARRAY: {
-            MD const* must = t->getEffectRef();
-            MDSet const* may = t->getRefMDSet();
+            MD const* must = t->getMustRef();
+            MDSet const* may = t->getMayRef();
             DUMMYUSE(must);
             DUMMYUSE(may);
             ASSERT0(must || (may && !may->is_empty()));
@@ -2219,8 +1769,8 @@ static bool verifyMDRefForIR(IR const* ir, ConstIRIter & cii, Region * rg)
         }
         case IR_ARRAY:
         case IR_ILD: {
-            MD const* mustuse = t->getEffectRef();
-            MDSet const* mayuse = t->getRefMDSet();
+            MD const* mustuse = t->getMustRef();
+            MDSet const* mayuse = t->getMayRef();
             DUMMYUSE(mustuse);
             DUMMYUSE(mayuse);
             ASSERT0(mustuse || (mayuse && !mayuse->is_empty()));
@@ -2245,9 +1795,8 @@ static bool verifyMDRefForIR(IR const* ir, ConstIRIter & cii, Region * rg)
         case IR_ST: {
             ASSERT0(!t->getRefMD()->get_base()->is_readonly());
             if (g_is_support_dynamic_type) {
-                ASSERTN(t->getEffectRef(),
-                        ("type is at least effect"));
-                ASSERTN(!t->getEffectRef()->is_pr(),
+                ASSERTN(t->getMustRef(), ("type is at least effect"));
+                ASSERTN(!t->getMustRef()->is_pr(),
                         ("MD can not present a PR."));
             } else {
                 ASSERTN(t->getExactRef(), ("type must be exact"));
@@ -2262,11 +1811,11 @@ static bool verifyMDRefForIR(IR const* ir, ConstIRIter & cii, Region * rg)
         }
         case IR_SETELEM:
             if (g_is_support_dynamic_type) {
-                ASSERTN(t->getEffectRef(), ("type is at least effect"));
-                ASSERTN(t->getEffectRef()->is_pr(),
+                ASSERTN(t->getMustRef(), ("type is at least effect"));
+                ASSERTN(t->getMustRef()->is_pr(),
                         ("MD must present a PR."));
             } else {
-                MD const* md = t->getEffectRef();
+                MD const* md = t->getMustRef();
                 ASSERT0(md);
                 if (!md->is_exact()) {
                     ASSERTN(md->is_range(), ("type must be range"));
@@ -2278,8 +1827,8 @@ static bool verifyMDRefForIR(IR const* ir, ConstIRIter & cii, Region * rg)
         case IR_STPR:
         case IR_GETELEM:
             if (g_is_support_dynamic_type) {
-                ASSERTN(t->getEffectRef(), ("type is at least effect"));
-                ASSERTN(t->getEffectRef()->is_pr(),
+                ASSERTN(t->getMustRef(), ("type is at least effect"));
+                ASSERTN(t->getMustRef()->is_pr(),
                         ("MD must present a PR."));
             } else {
                 ASSERTN(t->getExactRef(), ("type must be exact"));
@@ -2315,13 +1864,27 @@ static bool verifyMDRefForIR(IR const* ir, ConstIRIter & cii, Region * rg)
             break;
         }
         case IR_CALL:
-        case IR_ICALL:
+        case IR_ICALL: {
             if (t->getRefMDSet() != nullptr) {
                 ASSERT0(rg->getMDSetHash()->find(*t->getRefMDSet()));
             }
+            MD const* ref = t->getRefMD();
+            ASSERT0(ref == nullptr || ref->is_pr());
+
+            MDSet const* may = t->getRefMDSet();
+            if (may != nullptr) {
+                //MayRef of call should not contain PR.
+                MDSetIter iter;
+                for (INT i = may->get_first(&iter);
+                     i >= 0; i = may->get_next((UINT)i, &iter)) {
+                    MD * md = rg->getMDSystem()->getMD(i);
+                    ASSERTN(md && !md->is_pr(), ("PR should not in MaySet"));
+                }
+            }
             break;
+        }
         case IR_PHI:
-            ASSERT0(t->getEffectRef() && t->getEffectRef()->is_pr());
+            ASSERT0(t->getMustRef() && t->getMustRef()->is_pr());
             ASSERT0(t->getRefMDSet() == nullptr);
             break;
         SWITCH_CASE_BIN:
@@ -2382,7 +1945,7 @@ bool Region::verifyIROwnership()
 //Verify cond/uncond target label.
 bool Region::verifyBBlist(BBList & bbl)
 {
-    LAB2BB lab2bb;
+    Lab2BB lab2bb;
     for (IRBB * bb = bbl.get_head(); bb != nullptr; bb = bbl.get_next()) {
         for (LabelInfo const* li = bb->getLabelList().get_head();
              li != nullptr; li = bb->getLabelList().get_next()) {
@@ -2397,7 +1960,10 @@ bool Region::verifyBBlist(BBList & bbl)
         if (last->isConditionalBr()) {
             ASSERTN(lab2bb.get(BR_lab(last)),
                     ("branch target cannot be nullptr"));
-        } else if (last->isMultiConditionalBr()) {
+            continue;
+        }
+
+        if (last->isMultiConditionalBr()) {
             ASSERT0(last->is_switch());
             for (IR * c = SWITCH_case_list(last);
                  c != nullptr; c = c->get_next()) {
@@ -2408,14 +1974,18 @@ bool Region::verifyBBlist(BBList & bbl)
                 ASSERTN(lab2bb.get(SWITCH_deflab(last)),
                         ("default target cannot be nullptr"));
             }
-        } else if (last->isUnconditionalBr()) {
+            continue;
+        }
+
+        if (last->isUnconditionalBr()) {
             if (last->is_goto()) {
-                ASSERTN(lab2bb.get(GOTO_lab(last)), ("target cannot be nullptr"));
+                ASSERTN(lab2bb.get(GOTO_lab(last)), ("use undefined label"));
             } else {
-                for (IR * caseexp = IGOTO_case_list(last); caseexp != nullptr;
+                ASSERT0(last->is_igoto());
+                for (IR * caseexp = last->getCaseList(); caseexp != nullptr;
                     caseexp = caseexp->get_next()) {
                     ASSERTN(lab2bb.get(CASE_lab(caseexp)),
-                            ("target cannot be nullptr"));
+                            ("use undefined label"));
                 }
             }
         }
@@ -2640,7 +2210,7 @@ bool Region::partitionRegion()
 //Check and rescan call list of region if one of elements in list changed.
 void Region::updateCallAndReturnList(bool scan_inner_region)
 {
-    if (readCallList() == nullptr) { return; }
+    if (getCallList() == nullptr) { return; }
     UINT num_inner_region = 0;
     CIRList * clst = getCallList();
     if (clst->get_elem_count() == 0) { return; }
@@ -2701,8 +2271,16 @@ bool Region::processIRList(OptCtx & oc)
         note(this, "\n==--- DUMP PRIMITIVE IR LIST ----==");
         dumpIRList();
     }
+
     if (!HighProcess(oc)) { return false; }
-    ASSERT0(verifyMDDUChain(this));
+
+    if (getDUMgr() != nullptr && !oc.is_du_chain_valid()) {
+        getDUMgr()->cleanDUSet();
+        oc.setInvalidDUChain();
+    } else {
+        //PRSSA may destruct classic DU chain.
+        ASSERT0(verifyMDDUChain(this));
+    }
 
     if (g_opt_level != OPT_LEVEL0) {
         //O0 does not build DU ref and DU chain.
@@ -2734,7 +2312,7 @@ static void post_process(Region * rg, OptCtx * oc)
         rg->destroyPassMgr();
     }
 
-    oc->set_all_invalid();
+    oc->setAllInvalid();
     rg->updateCallAndReturnList(true);
 }
 
@@ -2777,6 +2355,7 @@ bool Region::process(OptCtx * oc)
     }
 
     initPassMgr();
+    initAttachInfoMgr();
     if (g_do_inline && is_program()) {
         do_inline(this, oc);
     }
@@ -2799,7 +2378,7 @@ bool Region::process(OptCtx * oc)
 
 ERR_RETURN:
     post_process(this, oc);
-    oc->set_all_invalid();
+    oc->setAllInvalid();
     return false;
 }
 //END Region

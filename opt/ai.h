@@ -64,39 +64,46 @@ typedef enum _AI_TYPE {
     AI_LAST,      //The number of ai type.
 } AI_TYPE;
 
+#define AI_type(ai) ((ai)->m_type)
 
 class BaseAttachInfo {
     COPY_CONSTRUCTOR(BaseAttachInfo);
-public:
-    AI_TYPE type;
+protected:
+    AI_TYPE m_type;
 
 public:
     explicit BaseAttachInfo(AI_TYPE t) { init(t); }
     ~BaseAttachInfo() {}
-    void init(AI_TYPE t) { type = t; }
+    void init(AI_TYPE t) { m_type = t; }
+    AI_TYPE getType() const { return m_type; }
 };
 
 
 typedef xcom::SimpleVector<BaseAttachInfo*, 1, 64> AICont;
 
+#define AICT_cont(ai) ((ai)->cont)
+
 //This class represents container of miscellaneous AttachInfo.
+//The whole object including its field 'cont' are allocated in AttachInfoMgr.
+//Note the content which recorded in container should managed by user themself.
 class AIContainer {
+    friend class AttachInfoMgr;
     COPY_CONSTRUCTOR(AIContainer);
 protected:
     AICont cont;
-
 public:
     AIContainer() { init(); }
     ~AIContainer() {}
 
     void copy(AIContainer const* ai, Region * rg);
+    void cleanContainer() { cont.clean(); }
     void clean(AI_TYPE type)
     {
-        if (!cont.is_init()) { return; }
+        ASSERT0(is_init());
         ASSERT0(type > AI_UNDEF && type < AI_LAST);
         for (UINT i = 0; i < cont.get_capacity(); i++) {
             BaseAttachInfo * ac = cont.get(i);
-            if (ac != nullptr && ac->type == type) {
+            if (ac != nullptr && ac->getType() == type) {
                 cont[i] = nullptr;
                 return;
             }
@@ -105,27 +112,28 @@ public:
 
     void destroy() { cont.destroy(); }
 
-    void init()
-    {
-        if (cont.is_init()) { return; }
-        cont.init();
-    }
+    void init() { cont.init(); }
+    void init(UINT size, SMemPool * pool) { cont.init(size, pool); }
     INT is_init() const { return cont.is_init(); }
 
+    //The function formats string name for XOC recognized attach-info.
     CHAR const* getAIName(AI_TYPE type) const;
     BaseAttachInfo * get(AI_TYPE type) const
     {
-        if (!cont.is_init()) { return nullptr; }
+        if (!is_init()) {
+            //To faciliate the use of getAI(), disable the assertion of init.
+            return nullptr;
+        }
         for (UINT i = 0; i < cont.get_capacity(); i++) {
             BaseAttachInfo * ac = cont.get(i);
-            if (ac != nullptr && ac->type == type) {
+            if (ac != nullptr && ac->getType() == type) {
                 return ac;
             }
         }
         return nullptr;
     }
 
-    AICont const& read_cont() const { return cont; }
+    AICont const* getContainer() const { return &cont; }
 
     void set(BaseAttachInfo * c, Region * rg);
 };

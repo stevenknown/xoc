@@ -70,7 +70,7 @@ IR * LCSE::hoist_cse(IN IRBB * bb, IN IR * ir_pos, IN ExpRep * ie)
         if (tie != nullptr && tie == ie) {
             //e.g: a = 10, expression of store_val is nullptr.
             ret = m_rg->buildPR(IR_dt(rhs));
-            ret->setRefMD(m_rg->genMDForPR(ret), m_rg);
+            ret->setRefMD(m_rg->getMDMgr()->genMDForPR(ret), m_rg);
             IR * new_st = m_rg->buildStorePR(PR_no(ret), ret->getType(), rhs);
 
             //Insert into IR list of BB.
@@ -86,7 +86,7 @@ IR * LCSE::hoist_cse(IN IRBB * bb, IN IR * ir_pos, IN ExpRep * ie)
                 if (ret == nullptr) {
                     IR * x = IST_base(ir_pos);
                     ret = m_rg->buildPR(IR_dt(x));
-                    ret->setRefMD(m_rg->genMDForPR(ret), m_rg);
+                    ret->setRefMD(m_rg->getMDMgr()->genMDForPR(ret), m_rg);
                     IR * new_st = m_rg->buildStorePR(PR_no(ret),
                         ret->getType(), m_rg->dupIRTree(x));
                     new_st->setRefMD(ret->getRefMD(), m_rg);
@@ -115,7 +115,7 @@ IR * LCSE::hoist_cse(IN IRBB * bb, IN IR * ir_pos, IN ExpRep * ie)
                 bool insert_st;
                 if (ret == nullptr) {
                     ret = m_rg->buildPR(IR_dt(p));
-                    ret->setRefMD(m_rg->genMDForPR(ret), m_rg);
+                    ret->setRefMD(m_rg->getMDMgr()->genMDForPR(ret), m_rg);
                     xcom::replace(&CALL_param_list(ir_pos), p, ret);
                     insert_st = true;
                 } else {
@@ -154,7 +154,7 @@ IR * LCSE::hoist_cse(IN IRBB * bb, IN IR * ir_pos, IN ExpRep * ie)
         if (tie != nullptr && tie == ie) {
             IR * x = BR_det(ir_pos);
             IR * ret = m_rg->buildPR(IR_dt(x));
-            ret->setRefMD(m_rg->genMDForPR(ret), m_rg);
+            ret->setRefMD(m_rg->getMDMgr()->genMDForPR(ret), m_rg);
             IR * new_st = m_rg->buildStorePR(PR_no(ret), ret->getType(), x);
             new_st->setRefMD(ret->getRefMD(), m_rg);
             BB_irlist(bb).insert_before(new_st, pos_holder);
@@ -169,7 +169,7 @@ IR * LCSE::hoist_cse(IN IRBB * bb, IN IR * ir_pos, IN ExpRep * ie)
         if (tie != nullptr && tie == ie) {
             IR * x = IGOTO_vexp(ir_pos);
             IR * ret = m_rg->buildPR(IR_dt(x));
-            ret->setRefMD(m_rg->genMDForPR(ret), m_rg);
+            ret->setRefMD(m_rg->getMDMgr()->genMDForPR(ret), m_rg);
             IR * new_st = m_rg->buildStorePR(PR_no(ret), ret->getType(), x);
             new_st->setRefMD(ret->getRefMD(), m_rg);
             BB_irlist(bb).insert_before(new_st, pos_holder);
@@ -184,7 +184,7 @@ IR * LCSE::hoist_cse(IN IRBB * bb, IN IR * ir_pos, IN ExpRep * ie)
         if (tie != nullptr && tie == ie) {
             IR * x = SWITCH_vexp(ir_pos);
             IR * ret = m_rg->buildPR(IR_dt(x));
-            ret->setRefMD(m_rg->genMDForPR(ret), m_rg);
+            ret->setRefMD(m_rg->getMDMgr()->genMDForPR(ret), m_rg);
             IR * new_st = m_rg->buildStorePR(PR_no(ret), ret->getType(), x);
             new_st->setRefMD(ret->getRefMD(), m_rg);
             BB_irlist(bb).insert_before(new_st, pos_holder);
@@ -199,7 +199,7 @@ IR * LCSE::hoist_cse(IN IRBB * bb, IN IR * ir_pos, IN ExpRep * ie)
         if (tie != nullptr && tie == ie) {
             IR * x = RET_exp(ir_pos);
             IR * ret = m_rg->buildPR(IR_dt(x));
-            ret->setRefMD(m_rg->genMDForPR(ret), m_rg);
+            ret->setRefMD(m_rg->getMDMgr()->genMDForPR(ret), m_rg);
             IR * new_st = m_rg->buildStorePR(PR_no(ret), ret->getType(), x);
             new_st->setRefMD(ret->getRefMD(), m_rg);
             BB_irlist(bb).insert_before(new_st, pos_holder);
@@ -216,11 +216,10 @@ IR * LCSE::hoist_cse(IN IRBB * bb, IN IR * ir_pos, IN ExpRep * ie)
 }
 
 
-bool LCSE::processBranch(IN IRBB * bb,
-                         IN IR * ir,
-                         IN OUT xcom::BitSet & avail_ir_expr,
-                         IN OUT Vector<IR*> & map_expr2avail_pos,
-                         IN OUT Vector<IR*> & map_expr2avail_pr)
+bool LCSE::processBranch(IN IRBB * bb, IN IR * ir,
+                         MOD xcom::BitSet & avail_ir_expr,
+                         MOD Vector<IR*> & map_expr2avail_pos,
+                         MOD Vector<IR*> & map_expr2avail_pr)
 {
     ASSERT0(ir->isConditionalBr());
     bool change = false;
@@ -266,12 +265,10 @@ bool LCSE::processBranch(IN IRBB * bb,
 //    return p1 as new expression.
 //'ie': cse candidate expression indicator.
 //'stmt': the stmt contains 'exp'.
-IR * LCSE::processExp(IN IRBB * bb,
-                      IN ExpRep * ie,
-                      IN IR * stmt,
-                      IN OUT xcom::BitSet & avail_ir_expr,
-                      IN OUT Vector<IR*> & map_expr2avail_pos,
-                      IN OUT Vector<IR*> & map_expr2avail_pr)
+IR * LCSE::processExp(IN IRBB * bb, IN ExpRep * ie, IN IR * stmt,
+                      MOD xcom::BitSet & avail_ir_expr,
+                      MOD Vector<IR*> & map_expr2avail_pos,
+                      MOD Vector<IR*> & map_expr2avail_pr)
 {
     ASSERT0(ie);
     avail_ir_expr.bunion(EXPR_id(ie));
@@ -329,11 +326,10 @@ bool LCSE::canBeCandidate(IR * ir)
 }
 
 
-bool LCSE::processRhsOfStore(IN IRBB * bb,
-                             IN IR * ir,
-                             IN OUT xcom::BitSet & avail_ir_expr,
-                             IN OUT xcom::Vector<IR*> & map_expr2avail_pos,
-                             IN OUT xcom::Vector<IR*> & map_expr2avail_pr)
+bool LCSE::processRhsOfStore(IN IRBB * bb, IN IR * ir,
+                             MOD xcom::BitSet & avail_ir_expr,
+                             MOD xcom::Vector<IR*> & map_expr2avail_pos,
+                             MOD xcom::Vector<IR*> & map_expr2avail_pr)
 {
     ASSERT0(ir->is_st() || ir->is_ist() || ir->is_stpr());
     bool change = false;
@@ -406,11 +402,10 @@ bool LCSE::processRhsOfStore(IN IRBB * bb,
 }
 
 
-bool LCSE::processParamList(IN IRBB * bb,
-                            IN IR * ir,
-                            IN OUT xcom::BitSet & avail_ir_expr,
-                            IN OUT Vector<IR*> & map_expr2avail_pos,
-                            IN OUT Vector<IR*> & map_expr2avail_pr)
+bool LCSE::processParamList(IN IRBB * bb, IN IR * ir,
+                            MOD xcom::BitSet & avail_ir_expr,
+                            MOD Vector<IR*> & map_expr2avail_pos,
+                            MOD Vector<IR*> & map_expr2avail_pr)
 {
     bool change = false;
     bool lchange = true;
@@ -438,11 +433,10 @@ bool LCSE::processParamList(IN IRBB * bb,
 }
 
 
-bool LCSE::processUse(IN IRBB * bb,
-                      IN IR * ir,
-                      IN OUT xcom::BitSet & avail_ir_expr,
-                      IN OUT Vector<IR*> & map_expr2avail_pos,
-                      IN OUT Vector<IR*> & map_expr2avail_pr)
+bool LCSE::processUse(IN IRBB * bb, IN IR * ir,
+                      MOD xcom::BitSet & avail_ir_expr,
+                      MOD Vector<IR*> & map_expr2avail_pos,
+                      MOD Vector<IR*> & map_expr2avail_pr)
 {
     bool change = false;
     switch (ir->getCode()) {
@@ -548,11 +542,10 @@ bool LCSE::processUse(IN IRBB * bb,
 
 
 //Return true if common expression has been substituted.
-bool LCSE::processDef(IN IRBB * bb,
-                      IN IR * ir,
-                      IN OUT xcom::BitSet & avail_ir_expr,
-                      IN OUT Vector<IR*> & map_expr2avail_pos,
-                      IN OUT Vector<IR*> & map_expr2avail_pr,
+bool LCSE::processDef(IN IRBB * bb, IN IR * ir,
+                      MOD xcom::BitSet & avail_ir_expr,
+                      MOD Vector<IR*> & map_expr2avail_pos,
+                      MOD Vector<IR*> & map_expr2avail_pr,
                       IN MDSet & tmp)
 {
     bool change = false;
@@ -564,8 +557,8 @@ bool LCSE::processDef(IN IRBB * bb,
     case IR_ICALL:
     case IR_RETURN: {
         //Compute killed ir-expr.
-        MDSet const* maydef = m_du->getMayDef(ir);
-        MD const* mustdef = m_du->get_must_def(ir);
+        MDSet const* maydef = ir->getMayRef();
+        MD const* mustdef = ir->getMustRef();
         if ((maydef == nullptr || maydef->is_empty()) && mustdef == nullptr) {
             break;
         }

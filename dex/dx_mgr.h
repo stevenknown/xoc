@@ -451,7 +451,7 @@ inline bool is_inline_data(USHORT const* ptr)
 class DX_MGR  {
 public:
     virtual ~DX_MGR() {}
-    void decode_dx(USHORT const* cptr, IN OUT DXC & dc);
+    void decode_dx(USHORT const* cptr, MOD DXC & dc);
     void dump_dx(DXC const& dc, FILE * h, INT ofst);
     void dump_method(IN DX_INFO const& dxinfo, IN FILE * h);
     virtual CHAR const* get_string(UINT str_idx) { UNREACHABLE(); return nullptr; }

@@ -42,7 +42,7 @@ bool g_is_opt_float = true;
 bool g_is_lower_to_pr_mode = false;
 
 //Enable XOC support dynamic type.
-//That means the type of IR_ST may be VOID.
+//That means the type of IR_ST may be ANY.
 bool g_is_support_dynamic_type = false;
 
 //If true to hoist short type to integer type.
@@ -70,6 +70,9 @@ bool g_do_refine_auto_insert_cvt = false;
 
 //Perform loop analysis.
 bool g_do_loop_ana = true;
+
+//Perform cfg optimization: remove labels that no one referenced.
+bool g_do_cfg_remove_redundant_label = true;
 
 //Perform cfg optimization: remove empty bb.
 bool g_do_cfg_remove_empty_bb = true;
@@ -354,6 +357,12 @@ bool DumpOpt::isDumpCFG() const
 }
 
 
+bool DumpOpt::isDumpCFGOpt() const
+{
+    return is_dump_all || (!is_dump_nothing && is_dump_cfgopt);
+}
+
+
 bool DumpOpt::isDumpDOM() const
 {
     return is_dump_all || (!is_dump_nothing && is_dump_dom);
@@ -375,6 +384,12 @@ bool DumpOpt::isDumpRP() const
 bool DumpOpt::isDumpDCE() const
 {
     return is_dump_all || (!is_dump_nothing && is_dump_dce);
+}
+
+
+bool DumpOpt::isDumpRCE() const
+{
+    return is_dump_all || (!is_dump_nothing && is_dump_rce);
 }
 
 

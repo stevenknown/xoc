@@ -1,5 +1,5 @@
 /*@
-Copyright (c) 2013-2014, Su Zhenyu steven.known@gmail.com
+Copyright (c) 2013-2021, Su Zhenyu steven.known@gmail.com
 
 All rights reserved.
 
@@ -42,12 +42,6 @@ protected:
     bool m_is_use_gvn;
     DefMiscBitSetMgr * m_sbs_mgr;
 protected:
-    //This function try to require VN of base of ir.
-    //Return the VN if found, and the indirect operation level.
-    //e.g: given ILD(ILD(p)), return p and ist_star_level is 2.
-    //e.g2: given IST(ILD(q)), return q and ist_star_level is 2.
-    VN const* getVNOfIndirectOp(IR const* ir, UINT * indirect_level);
-
     bool processExpressionViaMDSSA(IR const* exp);
     bool processExpressionViaGVN(IR const* exp);
     bool processBB(IRBB const* bb);
@@ -69,6 +63,10 @@ public:
     virtual ~RefineDUChain() {}
 
     virtual bool dump() const;
+
+    //Return true if indirect operation ir1 has same base expression with ir2.
+    //TODO: use gvn to utilize value flow.
+    bool hasSameBase(IR const* ir1, IR const* ir2);
 
     //True to use GVN and classic DU chain to perform optimization.
     void setUseGvn(bool use_gvn) { m_is_use_gvn = use_gvn; }

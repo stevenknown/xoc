@@ -1,5 +1,5 @@
 /*@
-Copyright (c) 2013-2014, Su Zhenyu steven.known@gmail.com
+Copyright (c) 2013-2021, Su Zhenyu steven.known@gmail.com
 All rights reserved.
 
 Redistribution and use in source and binary forms, with or without
@@ -165,11 +165,11 @@ template <class T> class Sort {
                      INT end_idx,
                      OUT Vector<T> & output);
     void _revise_tree(NTREE<T> * t);
-    NTREE<T> * _build_heap(IN OUT Vector<T> & data,
+    NTREE<T> * _build_heap(MOD Vector<T> & data,
                            OUT List<NTREE<T>*> & treenode_list);
     void _min_heapify(NTREE<T> * t);
-    bool _bucket_sort_check(IN OUT Vector<T> & data);
-    void _insert_sort(IN OUT Vector<T> & data, UINT start_idx, UINT end_idx);
+    bool _bucket_sort_check(MOD Vector<T> & data);
+    void _insert_sort(MOD Vector<T> & data, UINT start_idx, UINT end_idx);
 
     void * xmalloc(INT size)
     {
@@ -181,13 +181,13 @@ template <class T> class Sort {
 public:
     Sort() { m_pool = smpoolCreate(64, MEM_COMM); }
     ~Sort() { smpoolDelete(m_pool); }
-    void shell_sort(IN OUT Vector<T> & data);
-    void bucket_sort(IN OUT Vector<T> & data);
-    void counting_sort(IN OUT Vector<T> & data);
-    void heap_sort(IN OUT Vector<T> & data);
-    void merge_sort(IN OUT Vector<T> & data);
-    void bubble_sort(IN OUT Vector<T> & data);
-    void qsort(IN OUT Vector<T> & data);
+    void shell_sort(MOD Vector<T> & data);
+    void bucket_sort(MOD Vector<T> & data);
+    void counting_sort(MOD Vector<T> & data);
+    void heap_sort(MOD Vector<T> & data);
+    void merge_sort(MOD Vector<T> & data);
+    void bubble_sort(MOD Vector<T> & data);
+    void qsort(MOD Vector<T> & data);
 };
 
 
@@ -253,7 +253,7 @@ FROM_RIGHT:
 //Quick Sort.
 //The output data will be ordered increment.
 template <class T>
-void Sort<T>::qsort(IN OUT Vector<T> & data)
+void Sort<T>::qsort(MOD Vector<T> & data)
 {
     if (data.get_last_idx() < 0 || data.get_last_idx() == 0) {
         return;
@@ -265,7 +265,7 @@ void Sort<T>::qsort(IN OUT Vector<T> & data)
 //Bubble Sort.
 //The output data will be ordered increment.
 template <class T>
-void Sort<T>::bubble_sort(IN OUT Vector<T> & data)
+void Sort<T>::bubble_sort(MOD Vector<T> & data)
 {
     INT n = data.get_last_idx();
     for (INT i = 0; i <= n; i++) {
@@ -344,7 +344,7 @@ void Sort<T>::_merge_sort(Vector<T> const& data,
 //Merge Sort.
 //The output data will be ordered increment.
 template <class T>
-void Sort<T>::merge_sort(IN OUT Vector<T> & data)
+void Sort<T>::merge_sort(MOD Vector<T> & data)
 {
     Vector<T> output;
     _merge_sort(data, 0, data.get_last_idx(), output);
@@ -371,7 +371,7 @@ void Sort<T>::_revise_tree(NTREE<T> * t)
 
 //Build min-heap, and construct complete binary tree.
 template <class T>
-NTREE<T> * Sort<T>::_build_heap(IN OUT Vector<T> & data,
+NTREE<T> * Sort<T>::_build_heap(MOD Vector<T> & data,
                                 OUT List<NTREE<T>*> & treenode_list)
 {
     if (data.get_last_idx() < 0) {
@@ -470,7 +470,7 @@ void Sort<T>::_min_heapify(NTREE<T> * t)
 //Merge Sort.
 //The output data will be ordered increment.
 template <class T>
-void Sort<T>::heap_sort(IN OUT Vector<T> & data)
+void Sort<T>::heap_sort(MOD Vector<T> & data)
 {
     m_tree_id = 0;
     List<NTREE<T>*> treenode_list;
@@ -493,7 +493,7 @@ void Sort<T>::heap_sort(IN OUT Vector<T> & data)
 
 //Counting Sort.
 template <class T>
-void Sort<T>::counting_sort(IN OUT Vector<T> & data)
+void Sort<T>::counting_sort(MOD Vector<T> & data)
 {
     Vector<T> c; //for tmp use.
     INT n = data.get_last_idx();
@@ -527,7 +527,7 @@ void Sort<T>::counting_sort(IN OUT Vector<T> & data)
 
 
 template <class T>
-bool Sort<T>::_bucket_sort_check(IN OUT Vector<T> & data)
+bool Sort<T>::_bucket_sort_check(MOD Vector<T> & data)
 {
     for (INT i = 0; i <= data.get_last_idx(); i++) {
         T v = data[i];
@@ -538,7 +538,7 @@ bool Sort<T>::_bucket_sort_check(IN OUT Vector<T> & data)
 
 
 template <class T>
-void Sort<T>::bucket_sort(IN OUT Vector<T> & data)
+void Sort<T>::bucket_sort(MOD Vector<T> & data)
 {
     Bucket<T> bk(data.get_last_idx() + 1);
     ASSERT0(_bucket_sort_check(data));
@@ -550,7 +550,7 @@ void Sort<T>::bucket_sort(IN OUT Vector<T> & data)
 
 
 template <class T>
-void Sort<T>::_insert_sort(IN OUT Vector<T> & data,
+void Sort<T>::_insert_sort(MOD Vector<T> & data,
                            UINT start_idx, UINT end_idx)
 {
     List<T> list;
@@ -579,7 +579,7 @@ void Sort<T>::_insert_sort(IN OUT Vector<T> & data,
 
 
 template <class T>
-void Sort<T>::shell_sort(IN OUT Vector<T> & data)
+void Sort<T>::shell_sort(MOD Vector<T> & data)
 {
     INT n = data.get_last_idx() + 1;
     if (n <= 1) {

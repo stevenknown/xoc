@@ -1,5 +1,5 @@
 /*@
-Copyright (c) 2013-2014, Su Zhenyu steven.known@gmail.com
+Copyright (c) 2013-2021, Su Zhenyu steven.known@gmail.com
 
 All rights reserved.
 
@@ -31,12 +31,23 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 namespace xoc {
 
+class VN;
+class GVN;
+
 //The function manipulates DU chain. It adds DU chain from tree 'from' to
 //tree 'to',  and the function will establish new DU chain between DEF of
 //'from' and expression 'to'.
 //to: root expression of target tree.
 //from: root expression of source tree.
 //NOTE: IR tree 'to' and 'from' must be isomorphic structure.
+//Both 'to' and 'from' must be expression.
+void addUseForTree(IR * to, IR const* from, Region * rg);
+
+//The function manipulates DU chain. It adds DU chain from 'from' to
+//'to',  and the function will establish new DU chain between DEF of
+//'from' and expression 'to'.
+//to: target IR expression.
+//from: source IR expression.
 //Both 'to' and 'from' must be expression.
 void addUse(IR * to, IR const* from, Region * rg);
 
@@ -51,7 +62,21 @@ void buildDUChain(IR * def, IR * use, Region * rg);
 //newuse: indicates the target expression which is changed to.
 //olduse: indicates the source expression which will be changed.
 //e.g: given DU chain DEF->'olduse', the result is DEF->'newuse'.
+//Note the function does NOT allow NonPR->PR or PR->NonPR.
 void changeUse(IR * olduse, IR * newuse, Region * rg);
+
+//DU chain operation.
+//The function changes USE of some DU chain from 'olduse' to 'newuse'.
+//newuse: indicates the target expression which is changed to.
+//olduse: indicates the source expression which will be changed.
+//defset: if the function meets CASE3, the defst will supply the Definition
+//        Stmt Set that will be 'newuse'. The defset may NOT come
+//        from 'olduse'.
+//e.g: given DU chain DEF->'olduse', the result is DEF->'newuse'.
+//Note the function allows NonPR->PR or PR->NonPR.
+//The function is an extended version of 'changeUse'. The function will handle
+//the combination of different category of Memory Reference, e.g: PR<->NonPR.
+void changeUseEx(IR * olduse, IR * newuse, IRSet const* defset, Region * rg);
 
 //DU chain operation.
 //The function changes DEF of some DU chain from 'olddef' to 'newdef'.
@@ -80,10 +105,16 @@ void coalesceDUChain(IR * from, IR * to, Region * rg);
 void collectUseSet(IR const* def, MDSSAMgr const* mdssamgr,
                    OUT IRSet * useset);
 
+//The function copy MDSSAInfo from 'src' to 'tgt'. Then add 'tgt' as an USE of
+//the new MDSSAInfo.
+void copyAndAddMDSSAOcc(IR * tgt, IR const* src, Region * rg);
+
 //The function collects all DEF expressions of 'use' into 'defset'.
 //This function give priority to PRSSA and MDSSA DU chain and then classic
 //DU chain when doing collection.
-void collectDefSet(IR const* use, MDSSAMgr const* mdssamgr, OUT IRSet * defset);
+//iter_phi_opnd: true if the collection will keep iterating DEF of PHI operand.
+void collectDefSet(IR const* use, MDSSAMgr const* mdssamgr, bool iter_phi_opnd,
+                   OUT IRSet * defset);
 
 //The function finds the nearest dominated DEF stmt of 'exp'.
 //Note RPO of BB must be available.
@@ -93,33 +124,47 @@ void collectDefSet(IR const* use, MDSSAMgr const* mdssamgr, OUT IRSet * defset);
 IR * findNearestDomDef(IR const* exp, IRSet const& defset, Region const* rg,
                        bool omit_self);
 
+//This function try to require VN of base of ir.
+//Return the VN if found, and the indirect operation level.
+//e.g: given ILD(ILD(p)), return p and indirect_level is 2.
+//e.g2: given IST(ILD(q)), return q and indirect_level is 2.
+VN const* getVNOfIndirectOp(IR const* ir, UINT * indirect_level,
+                            GVN const* gvn);
+
 //Return true if def is killing-def of use.
-//Note this functin does not check if there is DU chain between def and use.
-bool isKillingDef(IR const* def, IR const* use);
+//Note this function does not check if there is DU chain between def and use.
+//gvn: if it is not NULL, the function will attempt to reason out the
+//     relation between 'def' and 'use' through gvn info.
+bool isKillingDef(IR const* def, IR const* use, GVN const* gvn);
 
 //Return true if def is killing-def of usemd.
-//Note this functin does not check if there is DU chain between def and usemd.
+//Note this function does not check if there is DU chain between def and usemd.
 bool isKillingDef(IR const* def, MD const* usemd);
 
 //Return true if defmd is killing-def MD of usemd.
-//Note this functin does not check if there is DU chain between defmd and usemd.
+//Note this function does not check if there is DU chain between defmd and usemd.
 bool isKillingDef(MD const* defmd, MD const* usemd);
 
-//The function checks each USE occurrence of stmt, remove the expired expression
-//which is not reference the memory any more that stmt defined.
+//The function checks each DEF|USE occurrence of ir, remove the expired expression
+//which is not reference the memory any more that ir referenced.
 //Return true if DU changed.
-//Note this function does not modify stmt.
-bool removeExpiredDUForStmt(IR * stmt, Region * rg);
+//Note this function does not modify ir.
+//e.g: stpr1 = ... //S1
+//     ..... = pr2 //S2
+//  If there is DU between S1 and S2, cutoff the DU chain.
+//stmt: PR write operation.
+//exp: PR read operation.
+bool removeExpiredDU(IR * ir, Region * rg);
 
-//Remove Use-Def chain for all memory references in IR Tree
-//that rooted by 'exp'.
+//Remove Use-Def chain for all memory references in IR Tree that rooted by exp.
+//exp: it is the root of IR tree that to be removed.
 //e.g: ir = ...
 //        = exp //S1
 //If S1 will be deleted, exp should be removed from its UseSet in MDSSAInfo.
 //NOTE: If exp is an IR tree, e.g: ild(x, ld(y)), remove ild(x) means
 //ld(y) will be removed as well. And ld(y)'s MDSSAInfo will be
 //updated as well.
-void removeIRTreeUse(IR * exp, Region * rg);
+void removeUseForTree(IR * exp, Region * rg);
 
 //Remove all DU info of 'stmt'.
 void removeStmt(IR * stmt, Region * rg);

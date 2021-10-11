@@ -69,7 +69,7 @@ public:
     ~CfsOpt() {}
 
     bool dump() const { return true; }
-    bool doCfsOpt(IN OUT IR ** ir_list, SimpCtx const& sc);
+    bool doCfsOpt(MOD IR ** ir_list, SimpCtx const& sc);
 
     virtual CHAR const* getPassName() const { return "CfsOpt"; }
 

@@ -1,5 +1,5 @@
 /*@
-Copyright (c) 2013-2014, Su Zhenyu steven.known@gmail.com
+Copyright (c) 2013-2021, Su Zhenyu steven.known@gmail.com
 
 All rights reserved.
 
@@ -30,6 +30,59 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include "comopt.h"
 
 namespace xoc {
+
+//
+//START SSAInfo
+//
+void SSAInfo::dump(Region const* rg) const
+{
+    //VPR info is only usful during SSA construction.
+    VPR * vpr = ((VPR*)this);
+    note(rg, "\nid%d:$%dv%d$%d: ", id(), vpr->orgprno(),
+         vpr->version(), vpr->newprno());
+    IR * def = getDef();
+    if (vpr->version() != PRSSA_INIT_VERSION) {
+        //After renaming, version is meaningless, thus it is only visible
+        //to VPR.
+        //For convenient purpose, tolerate the pathological SSA form.
+        //ASSERT0(def);
+    }
+
+    //PR SSAInfo
+    if (def != nullptr) {
+        ASSERT0(def->is_stmt());
+        if (def->isWritePR()) {
+            prt(rg, "DEF:%s ($%d,id:%d)", IRNAME(def),
+                def->getPrno(), def->id());
+        } else if (def->isCallStmt()) {
+            prt(rg, "DEF:%s", IRNAME(def));
+            if (def->hasReturnValue()) {
+                prt(rg, " ($%d,id:%d)", def->getPrno(), def->id());
+            } else {
+                prt(rg, " NoRetVal??");
+            }
+        } else {
+            ASSERTN(0, ("not def stmt of PR"));
+        }
+    } else {
+        prt(rg, "DEF:---");
+    }
+
+    prt(rg, "\tUSE:");
+    SSAUseIter vit = nullptr;
+    INT nexti = 0;
+    for (INT i2 = SSA_uses(this).get_first(&vit); vit != nullptr; i2 = nexti) {
+        nexti = SSA_uses(this).get_next(i2, &vit);
+        IR * use = rg->getIR(i2);
+        ASSERT0(use->is_pr());
+        prt(rg, "($%d,id:%d)", use->getPrno(), use->id());
+        if (nexti >= 0) {
+            prt(rg, ",");
+        }
+    }
+}
+//END SSAInfo
+
 
 //
 //START VPRVec

@@ -1,5 +1,5 @@
 /*@
-Copyright (c) 2013-2014, Su Zhenyu steven.known@gmail.com
+Copyright (c) 2013-2021, Su Zhenyu steven.known@gmail.com
 
 All rights reserved.
 
@@ -89,6 +89,7 @@ public:
 //USE set in paticular virtual MD, and remove the virtual MD from current
 //IR's MDSSAInfo.
 class MDSSAMgr : public Pass {
+    friend class MDPhi;
     COPY_CONSTRUCTOR(MDSSAMgr);
 protected:
     BYTE m_is_valid:1;
@@ -97,8 +98,8 @@ protected:
     MDSystem * m_md_sys;
     TypeMgr * m_tm;
     IRCFG * m_cfg;
-    xcom::DefSegMgr * m_seg_mgr;
     xcom::DefMiscBitSetMgr * m_sbs_mgr;
+    xcom::DefSegMgr * m_seg_mgr;
     IRIter m_iter; //for tmp use.
 
     //Record version stack during renaming.
@@ -109,16 +110,16 @@ protected:
 
     UseDefMgr m_usedef_mgr;
 protected:
+    //Add ir to given mdssainfo as an USE.
+    //ir: occurence to be added.
+    //mdssainfo: add ir to the UseSet of VOpnd that recorded in 'mdssainfo'.
+    //Note mdssainfo must be unique for each IR.
+    void addUseToMDSSAInfo(IR const* ir, MDSSAInfo * mdssainfo);
     void addDefChain(MDDef * def1, MDDef * def2);
 
     //NOTE this function only be called at constructor.
     void cleanInConstructor()
     {
-        m_rg = nullptr;
-        m_tm = nullptr;
-        m_seg_mgr = nullptr;
-        m_sbs_mgr = nullptr;
-        m_cfg = nullptr;
         m_is_valid = false;
         m_is_semi_pruned = true;
     }
@@ -126,9 +127,12 @@ protected:
     void cleanMDSSAInfoAI();
     void cutoffDefChain(MDDef * def);
     void cleanMD2Stack();
+    //The function destroy data structures that allocated during SSA
+    //construction, and these data structures are only useful in construction.
+    void cleanLocalUsedData();
     void collectDefinedMDAndInitVMD(IN IRBB * bb, OUT DefSBitSet & mustdef_pr);
     void collectUseMD(IR const* ir, OUT LiveInMDTab & livein_md);
-    //'maydef_md': record MDs that defined in 'bb'.
+    //maydef_md: record MDs that defined in 'bb'.
     void computeLiveInMD(IRBB const* bb, OUT LiveInMDTab & livein_md);
 
     void freeBBPhiList(IRBB * bb);
@@ -136,21 +140,30 @@ protected:
 
     void destructBBSSAInfo(IRBB * bb);
     void destructionInDomTreeOrder(IRBB * root, xcom::Graph & domtree);
-    void dumpDefChain(List<MDDef const*> & wl,
-                      IRSet & visited,
-                      VMD const* vopnd);
-    void dumpExpDUChainIter(IR const* ir,
-                            List<IR const*> & lst,
-                            List<IR const*> & opnd_lst,
-                            OUT bool * parting_line);
+    //The function dump all possible DEF of 'vopnd' by walking through the
+    //Def Chain.
+    void dumpDefByWalkDefChain(List<MDDef const*> & wl, IRSet & visited,
+                               VMD const* vopnd) const;
+    void dumpExpDUChainIter(IR const* ir, List<IR*> & lst,
+                            List<IR*> & opnd_lst,
+                            OUT bool * parting_line) const;
+    void dumpDUChainForStmt(IR const* ir, bool & parting_line) const;
+    void dumpDUChainForIR(IR const* ir,
+                          xcom::List<IR*> & lst,
+                          xcom::List<IR*> & opnd_lst) const;
     void dumpBBRef(IN IRBB * bb, UINT indent);
+    void dumpIRWithMDSSAForStmt(IR const* ir, UINT flag,
+                                bool & parting_line) const;
+    void dumpIRWithMDSSAForExp(IR const* ir, UINT flag,
+                               bool & parting_line) const;
     bool doOpndHaveValidDef(MDPhi const* phi) const;
     bool doOpndHaveSameDef(MDPhi const* phi, OUT VMD ** common_def) const;
 
-    void handleBBRename(IRBB * bb,
-                        xcom::DefSBitSet const& effect_mds,
+    //Replace opnd of PHI of 'succ' with top SSA version.
+    void handlePhiInSuccBB(IRBB * succ, UINT opnd_idx);
+    void handleBBRename(IRBB * bb, xcom::DefSBitSet const& effect_mds,
                         IN DefSBitSet & defed_mds,
-                        IN OUT BB2VMDMap & bb2vmdmap);
+                        MOD BB2VMDMap & bb2vmdmap);
 
     void init()
     {
@@ -162,6 +175,7 @@ protected:
 
     xcom::Stack<VMD*> * mapMD2VMDStack(UINT mdid);
 
+    void renamePhiOpndInSuccBB(IRBB * bb);
     void renamePhiResult(IN IRBB * bb);
     void renameUse(IR * ir);
     void renameDef(IR * ir, IRBB * bb);
@@ -172,8 +186,15 @@ protected:
     void renameInDomTreeOrder(xcom::DefSBitSet const& effect_mds,
                               IRBB * root, xcom::Graph & dtree,
                               Vector<DefSBitSet*> & defed_mds_vec);
-    //The function remove 'vopnd' from MDSSAInfo for each ir in the 'irset'.
-    void removeVOpndFromUseSet(VOpnd const* vopnd, IRSet const* irset);
+    //The function remove 'vopnd' from MDSSAInfo of each ir in its UsetSet.
+    //Note the UseSet will be clean.
+    void removeVOpndForAllUse(MOD VMD * vopnd);
+
+    //The function change VOpnd from 'from' to 'to', for each IR ir in 'from'
+    //UseSet.
+    //Note the UseSet of 'from' will be clean.
+    void replaceVOpndForAllUse(MOD VMD * to, MOD VMD * from);
+
     //The function remove and clean all information of 'vmd' from MDSSAMgr.
     void removeVMD(VMD * vmd) { getUseDefMgr()->removeVMD(vmd); }
 
@@ -197,14 +218,15 @@ protected:
 
     bool prunePhi(List<IRBB*> & wl);
     bool prunePhiForBB(IRBB const* bb, List<IRBB*> * wl);
-    void placePhiForMD(UINT mdid,
-                       List<IRBB*> const* defbbs,
-                       DfMgr const& dfm,
-                       xcom::BitSet & visited,
+
+    //Insert phi for VMD.
+    //defbbs: record BBs which defined the VMD identified by 'mdid'.
+    //visited: record visited BB id
+    void placePhiForMD(UINT mdid, List<IRBB*> const* defbbs,
+                       DfMgr const& dfm, xcom::BitSet & visited,
                        List<IRBB*> & wl,
                        Vector<DefSBitSet*> & defmds_vec);
-    void placePhi(DfMgr const& dfm,
-                  IN OUT DefSBitSet & effect_md,
+    void placePhi(DfMgr const& dfm, MOD DefSBitSet & effect_md,
                   DefMiscBitSetMgr & bs_mgr,
                   Vector<DefSBitSet*> & defined_md_vec,
                   List<IRBB*> & wl);
@@ -212,12 +234,18 @@ protected:
     //Union successors in NextSet from 'from' to 'to'.
     void unionSuccessors(MDDef const* from, MDDef const* to);
 
+    bool verifyDUChainAndOccForPhi(MDPhi const* phi) const;
+    bool verifyPhiOpndList(MDPhi const* phi, UINT prednum) const;
+    bool verifyMDSSAInfoUniqueness() const;
     void verifyDef(MDDef const* def, VMD const* vopnd) const;
     //Check SSA uses.
     void verifyUseSet(VMD const* vopnd) const;
-    void verifySSAInfo(IR const* ir) const;
+    void verifyMDSSAInfoForIR(IR const* ir) const;
 public:
-    explicit MDSSAMgr(Region * rg) : m_usedef_mgr(rg, this)
+    explicit MDSSAMgr(Region * rg) :
+        m_sbs_mgr(rg->getMiscBitSetMgr()),
+        m_seg_mgr(rg->getMiscBitSetMgr()->getSegMgr()),
+        m_usedef_mgr(rg, this)
     {
         cleanInConstructor();
         ASSERT0(rg);
@@ -225,8 +253,6 @@ public:
         m_tm = rg->getTypeMgr();
         ASSERT0(m_tm);
         ASSERT0(rg->getMiscBitSetMgr());
-        m_sbs_mgr = rg->getMiscBitSetMgr();
-        m_seg_mgr = rg->getMiscBitSetMgr()->getSegMgr();
         ASSERT0(m_seg_mgr);
         m_cfg = rg->getCFG();
         ASSERTN(m_cfg, ("cfg is not available."));
@@ -247,10 +273,6 @@ public:
     //ref: the reference that is isomorphic to 'ir'.
     //     It is used to retrieve MDSSAInfo.
     void addMDSSAOcc(IR * ir, IR const* ref);
-    //Add occurence to each vopnd in mdssainfo.
-    //ir: occurence to be added.
-    //mdssainfo: add ir to it.
-    void addMDSSAOcc(IR * ir, MDSSAInfo * mdssainfo);
     //After adding BB or change BB successor,
     //you need add the related PHI operand if BB successor has PHI stmt.
     void addSuccessorDesignatePhiOpnd(IRBB * bb, IRBB * succ);
@@ -264,15 +286,15 @@ public:
 
     //DU chain operation.
     //Change Def stmt from 'olddef' to 'newdef'.
-    //'olddef': source stmt.
-    //'newdef': target stmt.
+    //olddef: source stmt.
+    //newdef: target stmt.
     //e.g: given oldef->USE, change to newdef->USE.
     void changeDef(IR * olddef, IR * newdef);
 
     //DU chain operation.
     //Change Use expression from 'olduse' to 'newuse'.
-    //'olduse': source expression.
-    //'newuse': target expression.
+    //olduse: source expression.
+    //newuse: target expression.
     //e.g: Change MDSSA DU chain DEF->olduse to DEF->newuse.
     void changeUse(IR * olduse, IR * newuse);
 
@@ -291,6 +313,11 @@ public:
     void coalesceDUChain(IR const* src, IR const* tgt);
     void cleanMDSSAInfo(IR * ir) { getUseDefMgr()->cleanMDSSAInfo(ir); }
 
+    //The function copy MDSSAInfo from 'src' to ir. Then add ir as an USE of the
+    //new MDSSAInfo.
+    void copyAndAddMDSSAOcc(IR * ir, MDSSAInfo const* src);
+    void copyMDSSAInfo(IR * tgt, IR const* src);
+
     //Destroy memory in MDSSAMgr.
     void destroy();
     //Destruction of MDSSA.
@@ -302,7 +329,9 @@ public:
     //Dump MDSSA reference info.
     virtual bool dump() const;
     //Dump MDSSA DU chain.
-    void dumpDUChain();
+    void dumpDUChain() const;
+    //Dump MDSSA VOpnd reference.
+    void dumpVOpndRef() const;
     //This function dumps VMD structure and SSA DU info.
     void dumpAllVMD();
     //Dump VMD info into given buffer.
@@ -310,43 +339,60 @@ public:
     CHAR * dumpVMD(IN VMD * v, OUT CHAR * buf);
     //Dump MDSSA DU stmt graph.
     void dumpSSAGraph(CHAR * name = nullptr);
-    //Dump IR tree's MD reference, where ir may be stmt or exp.
-    void dumpRef(UINT indent);
     //Dump IR tree and MDSSAInfo if any.
-    void dumpIRWithMDSSA(IR const* ir,
-                         UINT flag = IR_DUMP_KID|IR_DUMP_SRC_LINE|
-                                     IR_DUMP_INNER_REGION|
-                                     IR_DUMP_VAR_DECL) const;
+    //ir: can be stmt or expression.
+    //flag: the flag to dump IR.
+    void dumpIRWithMDSSA(IR const* ir, UINT flag = IR_DUMP_COMBINE) const;
 
     //Find killing must-def for expression ir.
-    MDDef * findKillingDef(IR const* ir);
+    MDDef * findKillingDef(IR const* ir) const;
     //Find nearest virtual DEF in VOpndSet of 'ir'.
-    MDDef * findNearestDef(IR const* ir);
+    MDDef * findNearestDef(IR const* ir) const;
 
     Region * getRegion() const { return m_rg; }
     UseDefMgr * getUseDefMgr() { return &m_usedef_mgr; }
+
     //Get specific virtual operand.
     VOpnd * getVOpnd(UINT i) const { return m_usedef_mgr.getVOpnd(i); }
     virtual CHAR const* getPassName() const { return "MDSSA Manager"; }
     PASS_TYPE getPassType() const { return PASS_MD_SSA_MGR; }
+
     //Get MDSSAInfo if exist.
     static MDSSAInfo * getMDSSAInfoIfAny(IR const* ir)
     { return hasMDSSAInfo(ir) ? UseDefMgr::getMDSSAInfo(ir) : nullptr; }
-    MDPhiList const* getPhiList(IRBB const* bb) const
+    MDPhiList * getPhiList(IRBB const* bb) const
     { return m_usedef_mgr.getBBPhiList(bb->id()); }
-    MDPhiList * getPhiList(IRBB const* bb)
-    { return m_usedef_mgr.getBBPhiList(bb->id()); }
+    xcom::DefMiscBitSetMgr * getSBSMgr() const { return m_sbs_mgr; }
+
     //Generate both MDSSAInfo and VOpnd for related MD.
     MDSSAInfo * genMDSSAInfoAndVOpnd(IR * ir, UINT version);
-
+    MDSSAInfo * genMDSSAInfo(IR * ir)
+    { return getUseDefMgr()->genMDSSAInfo(ir); }
+    //The function will generate new version which is used to idenify MD.
+    UINT genNewVersion(UINT mdid)
+    {
+        UINT newversion = m_max_version.get(mdid) + 1;
+        m_max_version.set(mdid, newversion);
+        return newversion;
+    }
+    //The function generates new VMD with initial version.
+    VMD * genInitVersionVMD(UINT mdid)
+    { return getUseDefMgr()->allocVMD(mdid, MDSSA_INIT_VERSION); }
     //Return true if ir might have MDSSAInfo.
     static bool hasMDSSAInfo(IR const* ir)
-    { return ir->isMemoryRefNotOperatePR() || ir->isCallStmt(); }
+    { return ir->isMemoryRefNonPR() || ir->isCallStmt(); }
     //Return true if exist USE to 'ir'.
     //This is a helper function to provid simple query, an example to
     //show how to retrieval VOpnd and USE occurences as well.
     //ir: stmt
     bool hasUse(IR const* ir) const;
+
+    //Return true if bb has PHI.
+    bool hasPhi(IRBB const* bb) const
+    {
+        return getPhiList(bb) != nullptr &&
+               getPhiList(bb)->get_elem_count() > 0;
+    }
 
     //Return true if MDSSA is constructed.
     //This flag will direct the behavior of optimizations.
@@ -355,22 +401,27 @@ public:
 
     //Iterative access MDDef chain.
     //This funtion initialize the iterator.
-    //'def': the beginning MDDef of the chain.
-    //'it': iterator. It should be clean already.
+    //When the iterator meets MDPhi, it will keep iterating the DEF of each
+    //operand of MDPhi.
+    //PHI.
+    //def: the beginning MDDef of the chain.
+    //it: iterator. It should be clean already.
     //Readonly function.
     MDDef const* iterDefInitC(MDDef const* def, OUT ConstMDDefIter & it) const;
 
     //Iterative access MDDef chain.
     //This function return the next MDDef node accroding to 'it'.
-    //'it': iterator.
+    //When the iterator meets MDPhi, it will keep iterating the DEF of each
+    //operand of MDPhi.
+    //it: iterator.
     //Readonly function.
-    MDDef const* iterDefNextC(IN OUT ConstMDDefIter & it) const;
+    MDDef const* iterDefNextC(MOD ConstMDDefIter & it) const;
 
     //Iterative access USE in MDSSAInfo. The USE always an IR occurrence that
     //describes a memory expression.
     //This funtion initialize the iterator.
-    //'def': the MDDef of the chain.
-    //'it': iterator. It should be clean already.
+    //def: the MDDef of the chain.
+    //it: iterator. It should be clean already.
     //Readonly function.
     //Note this function may iterate same IR multiple times because it may
     //belong different VOpnd.
@@ -386,7 +437,7 @@ public:
     //Iterative access USE in MDSSAInfo. The USE always an IR occurrence that
     //describes a memory expression.
     //This function return the next USE accroding to 'it'.
-    //'it': iterator.
+    //it: iterator.
     //Readonly function.
     //Note this function may iterate same IR multiple times because it may
     //belong different VOpnd.
@@ -397,24 +448,28 @@ public:
     //  --DEFREF:(MD2V2, PrevDEF:MD2V1, NextDEF : MD2V3) | UsedBy : ld b(id:15)
     //  --DEFREF : (MD5V2, PrevDEF:MD5V1) | UsedBy : ld b(id:15), id(id:23)
     //  ld b is both USE of VOpnd(MD2V2) and VOpnd(MD5V2).
-    IR const* iterUseNextC(IN OUT ConstMDSSAUSEIRIter & it) const;
+    IR const* iterUseNextC(MOD ConstMDSSAUSEIRIter & it) const;
 
     //Iterative access MDDef chain.
     //This funtion initialize the iterator.
-    //'def': the beginning MDDef of the chain.
-    //'use': indicate the USE expression of the 'def'.
-    //'it': iterator. It should be clean already.
+    //When the iterator meets MDPhi, it will keep iterating the DEF of each
+    //operand of MDPhi.
+    //def: the beginning MDDef of the chain.
+    //use: indicate the USE expression of the 'def'.
+    //it: iterator. It should be clean already.
     //Readonly function.
     MDDef const* iterDefInitCTillKillingDef(MDDef const* def, IR const* use,
                                             OUT ConstMDDefIter & it) const;
 
     //Iterative access MDDef chain.
     //This function return the next MDDef node accroding to 'it'.
-    //'it': iterator.
-    //'use': indicate the USE expression of the 'def'.
+    //When the iterator meets MDPhi, it will keep iterating the DEF of each
+    //operand of MDPhi.
+    //it: iterator.
+    //use: indicate the USE expression of the 'def'.
     //Readonly function.
     MDDef const* iterDefNextCTillKillingDef(IR const* use,
-                                            IN OUT ConstMDDefIter & it) const;
+                                            MOD ConstMDDefIter & it) const;
 
     //Return true if stmt dominate use's stmt, otherwise return false.
     bool isStmtDomUseInsideLoop(IR const* stmt, IR const* use,
@@ -449,7 +504,7 @@ public:
     void removeDUChain(IR const* stmt, IR const* exp);
 
     //Remove all virtual USEs of 'stmt'.
-    //'stmt' will have not any USE expression when function returned.
+    //stmt' will have not any USE expression when function returned.
     void removeAllUse(IR const* stmt);
 
     //Remove all MDSSAInfo of 'stmt' from MDSSAMgr.
@@ -481,6 +536,8 @@ public:
     void removePhiFromDDChain(MDPhi * phi, MDDef * prev);
     bool removeRedundantPhi(IRBB const* bb)
     { return prunePhiForBB(bb, nullptr); }
+    //Return true if any PHI was removed.
+    bool removeRedundantPhi();
 
     //Before removing bb or change bb successor,
     //you need remove the related PHI operand if BB successor has PHI stmt.
@@ -489,19 +546,19 @@ public:
     //Check each USE of stmt, remove the expired expression which is not
     //reference the memory any more that stmt defined.
     //Return true if DU changed.
-    bool removeExpiredDUForStmt(IR * stmt);
+    bool removeExpiredDU(IR * ir);
 
     bool verifyDUChainAndOcc() const;
     bool verifyDDChain() const;
-    bool verifyPhi(bool is_vpinfo_avail) const;
+    //The function verify the operand and VMD info for MDPhi.
+    //NOTE: some pass, e.g:DCE, will remove MDPhi step by step, thus
+    //do NOT invoke the function during the removing.
+    bool verifyPhi() const;
     bool verifyVMD() const;
     bool verify() const;
     static bool verifyMDSSAInfo(Region const* rg);
 
     virtual bool perform(OptCtx & oc) { construction(oc); return true; }
-    //Remove redundant phi.
-    //Return true if any PHI was removed.
-    bool prunePhi();
 };
 
 } //namespace xoc

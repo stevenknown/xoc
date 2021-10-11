@@ -1,5 +1,5 @@
 /*@
-Copyright (c) 2013-2014, Su Zhenyu steven.known@gmail.com
+Copyright (c) 2013-2021, Su Zhenyu steven.known@gmail.com
 All rights reserved.
 
 Redistribution and use in source and binary forms, with or without
@@ -70,37 +70,37 @@ bool operator >= (BigIntElemType v, BigInt const& a);
 //e.g: res = a + b;
 //Note addition support in-suitate operation.
 //e.g: res = res + b is legal.
-BigInt& biuAdd(IN BigInt const& a, IN BigInt const& b, IN OUT BigInt & res);
+BigInt& biuAdd(IN BigInt const& a, IN BigInt const& b, MOD BigInt & res);
 
 //BigInt Signed Addition.
 //e.g: res = a + b;
-BigInt& bisAdd(IN BigInt const& a, IN BigInt const& b, IN OUT BigInt & res);
+BigInt& bisAdd(IN BigInt const& a, IN BigInt const& b, MOD BigInt & res);
 
 //BigInt substraction.
 //e.g: res = a - b;
 //Note substraction does not support in-suitate operation.
 //e.g: res = res - b is not legal.
-BigInt& biSub(IN BigInt const& a, IN BigInt const& b, IN OUT BigInt & res);
+BigInt& biSub(IN BigInt const& a, IN BigInt const& b, MOD BigInt & res);
 
 //BigInt Signed Mutiplification.
 //e.g: res = a * b;
-BigInt& bisMul(IN BigInt const& a, IN BigInt const& b, IN OUT BigInt & res);
+BigInt& bisMul(IN BigInt const& a, IN BigInt const& b, MOD BigInt & res);
 
 //BigInt Unsigned Mutiplification.
 //e.g: res = a * b;
-BigInt& biuMul(IN BigInt const& a, IN BigInt const& b, IN OUT BigInt & res);
+BigInt& biuMul(IN BigInt const& a, IN BigInt const& b, MOD BigInt & res);
 
 //BigInt Signed Division.
 //Return quotient and remainder of a divided by b.
 //The quotient and remainder respect a = quo * b + rem.
 void biDivRem(IN BigInt const& a, IN BigInt const& b,
-              IN OUT BigInt & quo, IN OUT BigInt & rem);
+              MOD BigInt & quo, MOD BigInt & rem);
 
 //BigInt Signed Division.
 //Return quotient and remainder of a divided by b.
 //The quotient and remainder respect a = quo * b + rem.
 void biuDivRem(IN BigInt const& a, IN BigInt const& b,
-               IN OUT BigInt & quo, IN OUT BigInt & rem);
+               MOD BigInt & quo, MOD BigInt & rem);
 
 class BigInt : public xcom::Vector<BigIntElemType> {
     friend bool operator != (BigInt const& a, BigInt const& b);
@@ -122,21 +122,11 @@ class BigInt : public xcom::Vector<BigIntElemType> {
     friend bool operator > (BigIntElemType v, BigInt const& a);
     friend bool operator > (BigInt const& a, BigInt const& b);
 
-    friend BigInt& biuAdd(IN BigInt const& a,
-                          IN BigInt const& b,
-                          IN OUT BigInt & res);
-    friend BigInt& bisAdd(IN BigInt const& a,
-                          IN BigInt const& b,
-                          IN OUT BigInt & res);
-    friend BigInt& biSub(IN BigInt const& a,
-                         IN BigInt const& b,
-                         IN OUT BigInt & res);
-    friend BigInt& bisMul(IN BigInt const& a,
-                          IN BigInt const& b,
-                          IN OUT BigInt & res);
-    friend BigInt& biuMul(IN BigInt const& a,
-                          IN BigInt const& b,
-                          IN OUT BigInt & res);
+    friend BigInt& biuAdd(BigInt const& a, BigInt const& b, MOD BigInt & res);
+    friend BigInt& bisAdd(BigInt const& a, BigInt const& b, MOD BigInt & res);
+    friend BigInt& biSub(BigInt const& a, BigInt const& b, MOD BigInt & res);
+    friend BigInt& bisMul(BigInt const& a, BigInt const& b, MOD BigInt & res);
+    friend BigInt& biuMul(BigInt const& a, BigInt const& b, MOD BigInt & res);
 
 
 private:

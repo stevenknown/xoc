@@ -421,45 +421,7 @@ void PRSSAMgr::dumpAllVPR() const
     for (INT i = PRNO_UNDEF + 1; i <= vpr_vec->get_last_idx(); i++) {
         VPR * v = vpr_vec->get(i);
         ASSERT0(v != nullptr);
-        note(getRegion(), "\nid%d:$%dv%d$%d: ", v->id(), v->orgprno(),
-             v->version(), v->newprno());
-        IR * def = SSA_def(v);
-        if (v->version() != PRSSA_INIT_VERSION) {
-            //After renaming, version is meaningless.
-            //For convenient purpose, tolerate the pathological SSA form.
-            //ASSERT0(def);
-        }
-        if (def != nullptr) {
-            ASSERT0(def->is_stmt());
-            if (def->isWritePR()) {
-                prt(getRegion(), "DEF:%s ($%d,id:%d)", IRNAME(def),
-                    def->getPrno(), def->id());
-            } else if (def->isCallStmt()) {
-                prt(getRegion(), "DEF:%s", IRNAME(def));
-                if (def->hasReturnValue()) {
-                    prt(getRegion(), " ($%d,id:%d)", def->getPrno(), def->id());
-                } else {
-                    prt(getRegion(), " NoRetVal??");
-                }
-            } else {
-                ASSERTN(0, ("not def stmt of PR"));
-            }
-        } else {
-            prt(getRegion(), "DEF:---");
-        }
-
-        prt(getRegion(), "\tUSE:");
-        SSAUseIter vit = nullptr;
-        INT nexti = 0;
-        for (INT i2 = SSA_uses(v).get_first(&vit); vit != nullptr; i2 = nexti) {
-            nexti = SSA_uses(v).get_next(i2, &vit);
-            IR * use = m_rg->getIR(i2);
-            ASSERT0(use->is_pr());
-            prt(getRegion(), "($%d,id:%d)", use->getPrno(), IR_id(use));
-            if (nexti >= 0) {
-                prt(getRegion(), ",");
-            }
-        }
+        v->dump(getRegion());
     }
 }
 
@@ -505,19 +467,25 @@ void PRSSAMgr::buildDUChain(IR * def, IR * use)
 {
     ASSERT0(def->isWritePR() || def->isCallHasRetVal());
     ASSERT0(use->isReadPR());
-    SSAInfo * ssainfo = def->getSSAInfo();
-    if (ssainfo == nullptr) {
-        ssainfo = allocSSAInfo(def->getPrno());
-        def->setSSAInfo(ssainfo);
-        SSA_def(ssainfo) = def;
+    SSAInfo * defssainfo = def->getSSAInfo();
+    if (defssainfo == nullptr) {
+        defssainfo = allocSSAInfo(def->getPrno());
+        def->setSSAInfo(defssainfo);
+        SSA_def(defssainfo) = def;
     }
 
     //Apply new SSAInfo directly, it will displace original ssainfo.
     //You may be set multiple defs for use.
     //Or you should removeSSAUse for original 'use' first.
-    ASSERTN(use->getSSAInfo() == nullptr, ("use already has SSA info."));
-    use->setSSAInfo(ssainfo);
-    ssainfo->addUse(use);
+    if (use->getSSAInfo() != nullptr) {
+        ASSERTN(use->getSSAInfo() == defssainfo,
+                ("use already has SSA info."));
+        ASSERT0(use->getSSAInfo()->findUse(use));
+        return;
+    }
+
+    use->setSSAInfo(defssainfo);
+    defssainfo->addUse(use);
 }
 
 
@@ -592,8 +560,12 @@ bool PRSSAMgr::dump() const
             note(getRegion(), "\nVP:");
             if (res != nullptr) {
                 VPR * vp = (VPR*)res->getSSAInfo();
-                ASSERT0(vp);
-                prt(getRegion(), "$%dv%d$%d ", vp->orgprno(), vp->version(), vp->newprno());
+                if (vp == nullptr) {
+                    prt(getRegion(), "NOSSAINFO!!");
+                } else {
+                    prt(getRegion(), "$%dv%d$%d ", vp->orgprno(),
+                        vp->version(), vp->newprno());
+                }
             } else {
                 prt(getRegion(), "--");
             }
@@ -603,9 +575,12 @@ bool PRSSAMgr::dump() const
                 for (IR const* opnd = opnd_lst.get_head(); opnd != nullptr;
                      opnd = opnd_lst.get_next(), i++) {
                     VPR * vp = (VPR*)PR_ssainfo(opnd);
-                    ASSERT0(vp);
-                    prt(getRegion(), "$%dv%d$%d", vp->orgprno(),
-                        vp->version(), vp->newprno());
+                    if (vp == nullptr) {
+                        prt(getRegion(), "NOSSAINFO!!");
+                    } else {
+                        prt(getRegion(), "$%dv%d$%d", vp->orgprno(),
+                            vp->version(), vp->newprno());
+                    }
                     if (i < n) { prt(getRegion(), ","); }
                 }
             } else {
@@ -788,6 +763,7 @@ IR * PRSSAMgr::insertOpndAt(IR * phi, UINT pos, IRBB const* pred)
         ASSERT0(def);
         newopnd = m_rg->buildPRdedicated(def->getResultPR()->getPrno(),
                                          def->getType());
+        m_rg->getMDMgr()->allocPRMD(newopnd);
         newopnd->setSSAInfo(livein_def);
 
         //Add USE to SSAInfo.
@@ -796,6 +772,7 @@ IR * PRSSAMgr::insertOpndAt(IR * phi, UINT pos, IRBB const* pred)
         ASSERT0(init_version && init_version->is_init_version());
         newopnd = m_rg->buildPRdedicated(init_version->orgprno(),
                                          init_version->orgpr_type());
+        m_rg->getMDMgr()->allocPRMD(newopnd);
         newopnd->setSSAInfo(init_version);
 
         //Add USE to SSAInfo.
@@ -837,7 +814,6 @@ void PRSSAMgr::addSuccessorDesignatePhiOpnd(IRBB * bb, IRBB * succ)
         if (!ir->is_phi()) { break; }
         insertOpndAt(ir, pos, bb);
         ASSERT0(xcom::cnt_list(PHI_opnd_list(ir)) == succ->getNumOfPred(m_cfg));
-        //addMDSSAOcc(opnd);
     }
 }
 
@@ -909,7 +885,7 @@ bool PRSSAMgr::isRedundantPHI(IR const* phi, OUT IR ** common_def) const
     bool same_def = true; //indicate all DEF of operands are the same stmt.
     for (IR const* opnd = PHI_opnd_list(phi);
          opnd != nullptr; opnd = opnd->get_next()) {
-        ASSERT0(opnd->is_phi_opnd());
+        ASSERT0(opnd->isPhiOpnd());
 
         if (!opnd->is_pr()) { continue; }
 
@@ -1084,6 +1060,32 @@ void PRSSAMgr::removePRSSAOcc(IR * ir)
 
 //Check each USE of stmt, remove the expired one which is not reference
 //the memory any more that stmt defined.
+bool PRSSAMgr::removeExpiredDU(IR * ir, Region * rg)
+{
+    ASSERT0(ir && ir->isPROp());
+    SSAInfo * ssainfo = ir->getSSAInfo();
+    if (ssainfo == nullptr || SSA_def(ssainfo) == nullptr) { return false; }
+
+    UINT prno = SSA_def(ssainfo)->getPrno();
+
+    //Check if use referenced the PR which defined by SSA_def.
+    INT ni = -1;
+    bool change = false;
+    SSAUseIter si;
+    for (INT i = SSA_uses(ssainfo).get_first(&si); si != nullptr; i = ni) {
+        ni = SSA_uses(ssainfo).get_next(i, &si);
+        IR const* use = rg->getIR(i);
+        if (use->is_pr() && PR_no(use) == prno) { continue; }
+
+        ssainfo->removeUse(use);
+        change = true;
+    }
+    return change;
+}
+
+
+//Check each USE of stmt, remove the expired one which is not reference
+//the memory any more that stmt defined.
 bool PRSSAMgr::removeExpiredDUForStmt(IR * stmt, Region * rg)
 {
     ASSERT0(stmt->is_stmt());
@@ -1169,9 +1171,8 @@ static void destoryPRNO2VP(UINT bbid, PRNO2VP * prno2vp, BB2VPMap & bb2vpmap)
 }
 
 
-void PRSSAMgr::handleBBRename(IRBB * bb,
-                              DefSBitSet const& defined_prs,
-                              IN OUT BB2VPMap & bb2vp)
+void PRSSAMgr::handleBBRename(IRBB * bb, DefSBitSet const& defined_prs,
+                              MOD BB2VPMap & bb2vp)
 {
     ASSERT0(bb2vp.get(bb->id()) == nullptr);
     PRNO2VP * prno2vp = allocPRNO2VP(bb->id(), bb2vp);
@@ -1435,9 +1436,10 @@ void PRSSAMgr::stripPhi(IR * phi, IRListIter phict)
 
     //Temprarory RP to hold the result of PHI.
     IR * phicopy = m_rg->buildPR(phi->getType());
-    phicopy->setRefMD(m_rg->genMDForPR(PR_no(phicopy),
-                      phicopy->getType()), m_rg);
-    phicopy->cleanRefMDSet();
+    phicopy->setMustRef(m_rg->getMDMgr()->genMDForPR(PR_no(phicopy),
+                                                     phicopy->getType()),
+                        m_rg);
+    phicopy->cleanMayRef();
     IR * opnd = PHI_opnd_list(phi);
 
     //opnd may be CONST, LDA, PR.
@@ -1864,13 +1866,12 @@ bool PRSSAMgr::refinePhi()
 }
 
 
-//This function revise phi data type, and remove redundant phi.
+//The function revises phi data type, and remove redundant phi.
 //wl: work list for temporary used.
 //Return true if there is phi removed.
 bool PRSSAMgr::refinePhi(List<IRBB*> & wl)
 {
     START_TIMER(t, "PRSSA: Refine phi");
-
     BBList * bblst = m_rg->getBBList();
     BBListIter ct = nullptr;
 
@@ -1908,7 +1909,7 @@ bool PRSSAMgr::refinePhi(List<IRBB*> & wl)
             //PHI is redundant, revise SSAInfo before remove the PHI.
             for (IR const* opnd = PHI_opnd_list(ir);
                  opnd != nullptr; opnd = opnd->get_next()) {
-                ASSERT0(opnd->is_phi_opnd());
+                ASSERT0(opnd->isPhiOpnd());
                 if (!opnd->is_pr()) { continue; }
 
                 SSAInfo * si = PR_ssainfo(opnd);
@@ -1937,12 +1938,6 @@ bool PRSSAMgr::refinePhi(List<IRBB*> & wl)
                 //All operands of PHI are defined by same alternative stmt,
                 //just call it common_def. Replace the SSA_def of
                 //current SSAInfo to the common_def.
-
-                //TO BE CONFIRMED:Why did you say the result PR of common-def
-                //have to be same with PHI?
-                //ASSERT0(common_def->getResultPR(PHI_prno(ir)));
-                //ASSERTN(common_def->getResultPR(PHI_prno(ir))->getPrno()
-                //        == PHI_prno(ir), ("not same PR"));
 
                 IR * respr = common_def->getResultPR();
                 ASSERT0(respr);
@@ -2051,13 +2046,11 @@ void PRSSAMgr::stripVersionForBBList()
 
 
 //Return the replaced one.
-static IR * replace_res_pr(IR * stmt,
-                           UINT oldprno,
-                           UINT newprno,
+static IR * replace_res_pr(IR * stmt, UINT oldprno, UINT newprno,
                            Type const* newprty)
 {
     DUMMYUSE(oldprno);
-    //newprty may be VOID.
+    //newprty may be ANY.
     ASSERT0(newprno != PRNO_UNDEF);
 
     //Replace stmt PR and DATA_TYPE info.
@@ -2085,16 +2078,11 @@ void PRSSAMgr::stripSpecifiedVP(VPR * vp)
     IR * replaced_one = replace_res_pr(def, vp->orgprno(), newprno, newprty);
     ASSERT0(replaced_one);
 
-    MD const* md = m_rg->genMDForPR(newprno, newprty);
-    replaced_one->setRefMD(md, m_rg);
+    MD const* md = m_rg->getMDMgr()->genMDForPR(newprno, newprty);
+    replaced_one->setMustRef(md, m_rg);
     if (replaced_one->isCallStmt()) {
         //Call stmts may have sideeffect modify MDSet.
-        replaced_one->removePRFromUseset(*m_rg->getMiscBitSetMgr(), m_rg);
-    } else {
-        //PR changed, whereas DU changed.
-        //DUSet is useless, free them for other use.
-        def->freeDUset(*m_rg->getMiscBitSetMgr());
-        replaced_one->cleanRefMDSet();
+        replaced_one->removePRFromUseset(m_rg);
     }
 
     SSAUseIter vit = nullptr;
@@ -2109,12 +2097,8 @@ void PRSSAMgr::stripSpecifiedVP(VPR * vp)
         //Keep the data type of reference unchanged.
         //IR_dt(use) = newprty;
 
-        //PR changed, whereas DU changed.
-        //DUSet is useless, free them for other use.
-        use->freeDUset(*m_rg->getMiscBitSetMgr());
-
         //Update MD reference to new PR.
-        use->setRefMD(md, m_rg);
+        use->setMustRef(md, m_rg);
     }
 
     //Set VPR original prno to the new prno to avoid verifyVPR() assertion.
@@ -2150,9 +2134,6 @@ void PRSSAMgr::stripStmtVersion(IR * stmt, xcom::BitSet & visited)
         if (!visited.is_contain(SSA_id(vp))) {
             //Version may be zero if there is not any DEF for k.
             //ASSERT0(VPR_version(vp) != 0);
-
-            //MD DU is useless. Free it for other use.
-            k->freeDUset(*m_rg->getMiscBitSetMgr());
 
             //Avoid restriping again.
             visited.bunion(SSA_id(vp));
@@ -2239,6 +2220,9 @@ void PRSSAMgr::construction(OptCtx & oc)
         return;
     }
     set_valid(true);
+
+    //Note PRSSA will destruct DUSet which built by DUMgr.
+    OC_is_pr_du_chain_valid(oc) = false;
 }
 
 
@@ -2286,8 +2270,7 @@ bool PRSSAMgr::construction(DomTree & domtree)
 
 
 //Return true if stmt dominates use's stmt, otherwise return false.
-bool PRSSAMgr::isStmtDomUseInsideLoop(IR const* stmt,
-                                      IR const* use,
+bool PRSSAMgr::isStmtDomUseInsideLoop(IR const* stmt, IR const* use,
                                       LI<IRBB> const* li) const
 {
     IRBB const* usestmtbb = nullptr;
@@ -2338,7 +2321,6 @@ bool PRSSAMgr::isStmtDomAllUseInsideLoop(IR const* ir, LI<IRBB> const* li) const
     }
     return true;
 }
-//END PRSSAMgr
 
 
 //Move IR_PHI from 'from' to 'to'.
@@ -2382,5 +2364,6 @@ bool PRSSAMgr::verifyPRSSAInfo(Region const* rg)
     }
     return true;
 }
+//END PRSSAMgr
 
 } //namespace xoc

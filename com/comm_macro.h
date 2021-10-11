@@ -1,5 +1,5 @@
 /*@
-Copyright (c) 2013-2014, Su Zhenyu steven.known@gmail.com
+Copyright (c) 2013-2021, Su Zhenyu steven.known@gmail.com
 All rights reserved.
 
 Redistribution and use in source and binary forms, with or without
@@ -81,6 +81,9 @@ namespace xcom {
 
 #undef OUT
 #define OUT //indicate output argument
+
+#undef MOD
+#define MOD //indicate modified argument
 
 //This macro declare copy constructor for class.
 #define COPY_CONSTRUCTOR(class_name) \

@@ -118,7 +118,7 @@ public:
     IR * remove_occ(IR * occ);
     void remove_occs(IR * ir);
     ExpRep * remove_expr(IR * ir);
-    void reperform(IN OUT OptCtx & oc);
+    void reperform(MOD OptCtx & oc);
 
     void set_map_ir2ir_expr(IR const* ir, ExpRep * ie);
 
@@ -126,7 +126,7 @@ public:
     PASS_TYPE getPassType() const { return PASS_EXPR_TAB; }
     virtual CHAR const* getPassName() const { return "Expr Table"; }
 
-    virtual bool perform(IN OUT OptCtx & oc);
+    virtual bool perform(MOD OptCtx & oc);
 };
 
 } //namespace xoc
