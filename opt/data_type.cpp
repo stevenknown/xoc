@@ -517,8 +517,13 @@ UINT TypeMgr::getByteSize(Type const* type) const
     case D_F80:
     case D_F128:
     case D_STR:
-    case D_ANY:
         return getDTypeByteSize(dt);
+    case D_ANY:
+        ASSERTN(0, ("can not query bytesize for ANY type"));
+        //We intend to give the same size as PTR type as the placeholder size
+        //of ANY type, because ANY type always be represented by Object Pointer
+        //in runtime system.
+        return 0;
     case D_PTR:
         return getPointerByteSize();
     case D_MC:
@@ -681,6 +686,12 @@ DATA_TYPE Type::getVectorElemType() const
 DATA_TYPE Type::getStreamElemType() const
 {
     return TY_vec_ety(this);
+}
+
+
+void Type::dump(TypeMgr const* tm) const
+{
+    tm->dump_type(this);
 }
 //END Type
 

@@ -68,6 +68,7 @@ public:
     bool is_dump_rp; //Dump Register Promotion.
     bool is_dump_rce; //Dump light weight Redundant Code Elimination.
     bool is_dump_dce; //Dump Dead Code Elimination.
+    bool is_dump_infertype; //Dump Infer Type.
     bool is_dump_lftr; //Dump Linear Function Test Replacement.
     bool is_dump_gvn; //Dump Global Value Numbering.
     bool is_dump_gcse; //Dump Global Common Subscript Expression.
@@ -81,6 +82,7 @@ public:
     bool is_dump_ra; //Dump Register Allocation.
     bool is_dump_memusage; //Dump memory usage.
     bool is_dump_livenessmgr; //Dump LivenessMgr.
+    bool is_dump_irparser; //Dump IRParser.
     bool is_dump_refine_duchain; //Dump RefineDUChain.
     bool is_dump_refine; //Dump Refinement.
     bool is_dump_gscc; //Dump GSCC.
@@ -102,6 +104,7 @@ public:
     bool isDumpRP() const;
     bool isDumpRCE() const;
     bool isDumpDCE() const;
+    bool isDumpInferType() const;
     bool isDumpLFTR() const;
     bool isDumpGVN() const;
     bool isDumpGCSE() const;
@@ -115,6 +118,7 @@ public:
     bool isDumpRA() const;
     bool isDumpMemUsage() const;
     bool isDumpLivenessMgr() const;
+    bool isDumpIRParser() const;
     bool isDumpRefineDUChain() const;
     bool isDumpRefine() const;
     bool isDumpGSCC() const;
@@ -139,6 +143,7 @@ typedef enum _PASS_TYPE {
     PASS_SCEV,
     PASS_LICM,
     PASS_DCE,
+    PASS_INFER_TYPE,
     PASS_LFTR,
     PASS_DSE,
     PASS_RCE,
@@ -185,7 +190,24 @@ extern bool g_show_time; //If true to show compilation time.
 extern bool g_do_inline; //Perform function inline.
 extern UINT g_inline_threshold; //Record the limit to inline.
 extern bool g_is_opt_float; //Optimize float point operation.
-extern bool g_is_lower_to_pr_mode; //Lower IR to PR mode.
+
+//Lower IR to PR mode.
+//The simplification will guarrantee that all value in computation will be
+//stored in PR. The behavior is just like a RISC machine.
+//e.g: given st a = add ld b, ld c; will be simplied to
+//  stpr $1 = ld a;
+//  stpr $2 = ld b;
+//  stpr $3 = add $1, $2;
+//  st a = $3;
+extern bool g_is_lower_to_pr_mode;
+
+//Lower IR to the lowest tree height.
+//Note the lowest height means tree height is more than 2.
+//e.g: st a = add ld b, ld c; will not changed.
+//e.g2: st a = add ld b, (add ld c, ld d); will be simplied to
+// stpr $1 = add ld c, ld d;
+// st a = add ld b, $1;
+extern bool g_is_lower_to_lowest_height;
 
 //Enable XOC support dynamic type.
 //That means the type of IR_ST, IR_LD, IR_STPR, IR_PR may be ANY.
@@ -197,12 +219,12 @@ extern bool g_do_rpo; //Compute reverse-post-order.
 extern bool g_do_loop_ana; //loop analysis.
 //Perform cfg optimization: remove labels that no one referenced.
 extern bool g_do_cfg_remove_redundant_label;
-//Perform cfg optimization: remove empty bb.
+//Perform cfg optimization: remove empty BB.
 extern bool g_do_cfg_remove_empty_bb;
-//Perform cfg optimization: remove unreachable bb from entry.
+//Perform cfg optimization: remove unreachable BB from entry.
 extern bool g_do_cfg_remove_unreach_bb;
 
-//Perform cfg optimization: remove redundant trampoline bb.
+//Perform cfg optimization: remove redundant trampoline BB.
 //e.g:
 //    BB1: goto L1
 //    BB2, L1: goto L2
@@ -223,7 +245,7 @@ extern bool g_do_cfg_remove_trampolin_bb;
 extern bool g_do_cfg_remove_redundant_branch;
 
 //Perform cfg optimization: invert branch condition and
-//remove redundant trampoline bb.
+//remove redundant trampoline BB.
 //e.g:
 //    truebr L4 | false L4
 //    goto L3
@@ -251,6 +273,8 @@ extern bool g_compute_region_imported_defuse_md;
 extern bool g_do_expr_tab;
 //Perform dead code elimination.
 extern bool g_do_dce;
+//Perform type inference.
+extern bool g_infer_type;
 
 //Set true to eliminate control-flow-structures.
 //Note this option may incur user unexpected result:

@@ -107,7 +107,7 @@ bool MD::is_exact_cover(MD const* m) const
 bool MD::is_overlap(MD const* m) const
 {
     ASSERT0(m && this != m);
-    //TO BE CONFIRMED: Does it necessary to judge if either current
+    //TBD: Does it necessary to judge if either current
     //MD or input MD is FULL_MEM?
     //As we observed, passes that utilize MD relationship add
     //MD2 to accroding IR's MDSet, which can keep global variables
@@ -187,7 +187,7 @@ MD * MDSet::get_effect_md(MDSystem * ms) const
 
 void MDSet::bunion(UINT mdid, DefMiscBitSetMgr & mbsmgr)
 {
-    //TO BE CONFIRMED: Does it necessary to judge if either current
+    //TBD: Does it necessary to judge if either current
     //MD or input MD is FULL_MEM?
     //As we observed, passes that utilize MD relationship add
     //MD2 to accroding IR's MDSet, which can keep global variables
@@ -274,7 +274,7 @@ bool MDSet::is_contain_inexact(MDSystem const* ms) const
         MD * tmd = pms->getMD(i);
         ASSERT0(tmd != nullptr);
 
-        //TO BE CONFIRMED: Does it necessary to judge if either current
+        //TBD: Does it necessary to judge if either current
         //MD or input MD is FULL_MEM?
         //As we observed, passes that utilize MD relationship add
         //MD2 to accroding IR's MDSet, which can keep global variables
@@ -302,7 +302,7 @@ bool MDSet::is_contain(MD const* md) const
         return true;
     }
 
-    //TO BE CONFIRMED: Does it necessary to judge if either current
+    //TBD: Does it necessary to judge if either current
     //MD or input MD is FULL_MEM?
     //As we observed, passes that utilize MD relationship add
     //MD2 to accroding IR's MDSet, which can keep global variables
@@ -327,7 +327,7 @@ bool MDSet::is_contain_only_taken_addr(MD const* md) const
         return true;
     }
 
-    //TO BE CONFIRMED: Does it necessary to judge if either current
+    //TBD: Does it necessary to judge if either current
     //MD or input MD is FULL_MEM?
     //As we observed, passes that utilize MD relationship add
     //MD2 to accroding IR's MDSet, which can keep global variables
@@ -353,7 +353,7 @@ bool MDSet::is_overlap(MD const* md, Region const* current_ru) const
         return true;
     }
 
-    //TO BE CONFIRMED: Does it necessary to judge if either current
+    //TBD: Does it necessary to judge if either current
     //MD or input MD is FULL_MEM?
     //As we observed, passes that utilize MD relationship add
     //MD2 to accroding IR's MDSet, which can keep global variables
@@ -390,7 +390,7 @@ bool MDSet::is_overlap_only_taken_addr(MD const* md,
         return true;
     }
 
-    //TO BE CONFIRMED: Does it necessary to judge if either current
+    //TBD: Does it necessary to judge if either current
     //MD or input MD is FULL_MEM?
     //As we observed, passes that utilize MD relationship add
     //MD2 to accroding IR's MDSet, which can keep global variables
@@ -440,7 +440,7 @@ void MDSet::bunion(MDSet const& mds, DefMiscBitSetMgr & mbsmgr)
 
     ASSERT0(!((DefSBitSetCore&)mds).is_contain(0));
 
-    //TO BE CONFIRMED: Does it necessary to judge if either current
+    //TBD: Does it necessary to judge if either current
     //MD or input MD is FULL_MEM?
     //As we observed, passes that utilize MD relationship add
     //MD2 to accroding IR's MDSet, which can keep global variables
@@ -769,7 +769,7 @@ MD const* MDSystem::registerMD(MD const& m)
             return hash_entry;
         }
 
-        //TO BE CONFIRMED: Does it necessary to judge if either current
+        //TBD: Does it necessary to judge if either current
         //MD or input MD is FULL_MEM?
         //As we observed, passes that utilize MD relationship add
         //MD2 to accroding IR's MDSet, which can keep global variables

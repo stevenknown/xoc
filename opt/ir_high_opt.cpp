@@ -160,7 +160,6 @@ bool Region::HighProcess(OptCtx & oc)
     if (g_cst_bb_list) {
         constructBBList();
         ASSERT0(verifyIRandBB(getBBList(), this));
-        setIRList(nullptr); //All IRs have been moved to each IRBB.
     }
 
     HighProcessImpl(oc);

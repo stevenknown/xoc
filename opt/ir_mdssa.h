@@ -43,22 +43,23 @@ typedef TTabIter<UINT> LiveInMDTabIter;
 class ConstMDSSAUSEIRIter {
     COPY_CONSTRUCTOR(ConstMDSSAUSEIRIter);
 public:
-    ConstMDSSAUSEIRIter() : vopndset_iter(nullptr), current_pos_in_vopndset(-1),
-        useset_iter(nullptr), current_pos_in_useset(-1),
+    ConstMDSSAUSEIRIter() : vopndset_iter(nullptr),
+        current_pos_in_vopndset(-1),
+        current_pos_in_useset(-1),
         current_useset(nullptr) {}
 
     VOpndSet * vopndset;
     VOpndSetIter vopndset_iter;
     INT current_pos_in_vopndset;
-    IRSetIter useset_iter;
+    VMD::UseSetIter useset_iter;
     INT current_pos_in_useset;
-    IRSet const* current_useset;
+    VMD::UseSet const* current_useset;
 
     void clean()
     {
         vopndset_iter = nullptr;
         current_pos_in_vopndset = -1;
-        useset_iter = nullptr;
+        useset_iter.clean();
         current_pos_in_useset = -1;
         current_useset = nullptr;
     }

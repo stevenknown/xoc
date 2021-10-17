@@ -335,7 +335,7 @@ protected:
     IR2Heapobj m_ir2heapobj;
     Vector<PtPairSet*> m_in_pp_set;
     Vector<PtPairSet*> m_out_pp_set;
-    Var2MD m_var2md;
+    Var2MD m_dedicated_var2md; //Record MD to individual variables.
     PtPairMgr m_ppmgr;
     xcom::BitSet m_is_visit;
     xcom::BitSet m_id2heap_md_map;
@@ -400,9 +400,9 @@ protected:
     //Determine if flow sensitive analysis is properly.
     bool isFlowSensitiveProperly();
     void initBBPPSet(PPSetMgr & ppsetmgr);
-    void initFlowSensitiveEntryPtset(PPSetMgr & ppsetmgr);
-    void initEntryPtset(PPSetMgr & ppsetmgr);
-    void initGlobalAndParameterVarPtSet(Var * v, MD2MDSet * mx);
+    void initFlowSensitiveEntryPTS(PPSetMgr & ppsetmgr);
+    void initEntryPTS(PPSetMgr & ppsetmgr);
+    void initGlobalAndParameterPTS(Var * v, MD2MDSet * mx);
     void inferPointerArithByHashedPTS(IR const* ir, OUT MDSet & mds,
                                       MOD AACtx * opnd0_ic);
     void inferPointerArithByUnHashedPTS(IR const* ir, OUT MDSet & mds,
@@ -590,11 +590,11 @@ public:
 
     //For given MD2MDSet, set the point-to set to 'md'.
     //ctx: context of point-to analysis.
-    void setPointTo(UINT mdid, MD2MDSet & ctx, MDSet const* ptset)
+    void setPointTo(UINT mdid, MD2MDSet & ctx, MDSet const* pts)
     {
-        ASSERT0(ptset);
-        ASSERTN(m_mds_hash->find(*ptset), ("ptset should be in hash"));
-        ctx.setAlways(mdid, ptset);
+        ASSERT0(pts);
+        ASSERTN(m_mds_hash->find(*pts), ("pts should be in hash"));
+        ctx.setAlways(mdid, pts);
     }
 
     //Set pointer points to 'target'.

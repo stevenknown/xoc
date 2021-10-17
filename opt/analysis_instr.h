@@ -34,6 +34,8 @@ namespace xoc {
 //Make sure IR_ICALL is the largest ir.
 #define MAX_OFFSET_AT_FREE_TABLE (sizeof(CICall) - sizeof(IR))
 
+#define IRID_UNDEF 0 //The undefined value of IR's id.
+
 //Analysis Instrument.
 #define ANA_INS_pr_count(a) ((a)->m_pr_count)
 #define ANA_INS_du_pool(a) ((a)->m_du_pool)

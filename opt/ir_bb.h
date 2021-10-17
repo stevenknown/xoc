@@ -43,6 +43,7 @@ typedef IRListIter BBIRListIter;
 typedef List<LabelInfo const*> LabelInfoList;
 typedef C<LabelInfo const*> * LabelInfoListIter;
 typedef TMap<IR const*, UINT> IROrder;
+typedef TMap<LabelInfo const*, IRBB*> Lab2BB;
 
 #define BBID_UNDEF VERTEX_UNDEF
 
@@ -314,7 +315,7 @@ public:
     inline bool isTryStart() const
     {
         bool r = BB_is_try_start(this);
-     #ifdef _DEBUG_
+        #ifdef _DEBUG_
         bool find = false;
         IRBB * pthis = const_cast<IRBB*>(this);
         for (LabelInfo const* li = pthis->getLabelList().get_head();
@@ -325,7 +326,7 @@ public:
             }
         }
         ASSERT0(r == find);
-     #endif
+        #endif
         return r;
     }
 
@@ -333,7 +334,7 @@ public:
     inline bool isTryEnd() const
     {
         bool r = BB_is_try_end(this);
- #ifdef _DEBUG_
+        #ifdef _DEBUG_
         bool find = false;
         IRBB * pthis = const_cast<IRBB*>(this);
         for (LabelInfo const* li = pthis->getLabelList().get_head();
@@ -344,7 +345,7 @@ public:
             }
         }
         ASSERT0(r == find);
- #endif
+        #endif
         return r;
     }
 
@@ -511,7 +512,8 @@ public:
     //you need remove the related PHI operand if BB successor has PHI stmt.
     void removeSuccessorDesignatePhiOpnd(CFG<IRBB, IR> * cfg, IRBB * succ);
 
-    void verify();
+    bool verifyBranchLabel(Lab2BB const& lab2bb) const;
+    bool verify(Region const* rg) const;
 };
 //END IRBB
 
@@ -579,6 +581,8 @@ void dumpBBList(BBList const* bbl, Region const* rg,
 //filename: dump BB list into given filename.
 void dumpBBList(CHAR const* filename, BBList const* bbl, Region const* rg,
                 bool dump_inner_region = true);
+
+bool verifyIRandBB(BBList * bbl, Region const* rg);
 
 } //namespace xoc
 #endif

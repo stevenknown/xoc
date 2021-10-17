@@ -36,8 +36,6 @@ author: Su Zhenyu
 
 namespace xoc {
 
-typedef TMap<LabelInfo const*, IRBB*> Lab2BB;
-
 //NOTICE:
 //1. For accelerating perform operation of each vertex, e.g
 //   compute dominator, please try best to add vertex with
@@ -87,7 +85,7 @@ public:
           UINT edge_hash_size = 16, UINT vertex_hash_size = 16);
     virtual ~IRCFG() {}
 
-    //Add LABEL to bb, and establish map between label and bb.
+    //Add Label to BB, and establish map between Label and BB.
     void addLabel(IRBB * src, LabelInfo const* li)
     {
         src->addLabel(li);
@@ -195,7 +193,23 @@ public:
     IRBB * insertBBbetween(IN IRBB * from, IN BBListIter from_ct,
                            IN IRBB * to, IN BBListIter to_ct,
                            IN IRBB * newbb);
-    bool inverseAndRemoveTrampolineBranch();
+    //Combine trampoline branch.
+    //Note the pass is different from what removeTrampolinEdge() does.
+    //e.g:L2:
+    //    truebr L4 | false L4
+    //    goto L3 //redundant jump
+    //    L4
+    //    st = ... 
+    //    L3:
+    //    ...
+    //=>
+    //    L2:
+    //    falsebr L3 | truebr L3
+    //    EMPTY BB
+    //    L4:
+    //    st = ...
+    //    L3:
+    bool invertAndRemoveTrampolineBranch();
     bool isRPOValid() const;
 
     //Return the first operation of 'bb'.

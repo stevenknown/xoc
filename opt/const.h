@@ -36,7 +36,7 @@ author: Su Zhenyu
 
 namespace xoc {
 
-#define PRNO_UNDEF 0
+#define PRNO_UNDEF 0 //The undefined value of prno.
 
 } //namespace xoc
 

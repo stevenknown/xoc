@@ -483,9 +483,9 @@ bool LFTR::perform(OptCtx & oc)
     if (bbl == nullptr || bbl->get_elem_count() == 0) { return false; }
 
     if (!oc.is_ref_valid()) { return false; }
-    m_mdssamgr = (MDSSAMgr*)m_rg->getPassMgr()->queryPass(PASS_MD_SSA_MGR);
-    m_prssamgr = (PRSSAMgr*)m_rg->getPassMgr()->queryPass(PASS_PR_SSA_MGR);
-    m_dumgr = (DUMgr*)m_rg->getPassMgr()->queryPass(PASS_DU_MGR);
+    m_mdssamgr = m_rg->getMDSSAMgr();
+    m_prssamgr = m_rg->getPRSSAMgr();
+    m_dumgr = m_rg->getDUMgr();
 
     if (!oc.is_pr_du_chain_valid() && !usePRSSADU()) {
         //LFTR use either classic PR DU chain or PRSSA.

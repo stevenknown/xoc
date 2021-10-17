@@ -169,18 +169,20 @@ protected:
 
     AnalysisInstrument * getAnalysisInstrument() const;
 
+    void HighProcessImpl(OptCtx & oc);
+
     void scanCallListImpl(OUT UINT & num_inner_region, IR * irlst,
                           OUT List<IR const*> * call_list,
                           OUT List<IR const*> * ret_list,
                           bool scan_inner_region);
+
+    virtual void postSimplify(SimpCtx const& simp, MOD OptCtx & oc);
     bool processIRList(OptCtx & oc);
     bool processBBList(OptCtx & oc);
     void prescanIRList(IR const* ir);
     void prescanBBList(BBList const* bblst);
     bool partitionRegion();
     bool performSimplify(OptCtx & oc);
-    void HighProcessImpl(OptCtx & oc);
-
 public:
     REGION_TYPE m_rg_type; //region type.
     UINT m_id; //region unique id.
@@ -203,7 +205,6 @@ public:
         } s1;
         BYTE s1b1;
     } m_u2;
-
 public:
     explicit Region(REGION_TYPE rt, RegionMgr * rm) { init(rt, rm); }
     virtual ~Region() { destroy(); }
@@ -1061,8 +1062,8 @@ public:
     //bbl: a list of bb.
     //ctbb: marker current bb container.
     //Note if CFG is invalid, it will not be updated.
-    BBListIter splitIRlistIntoBB(IR * irs, BBList * bbl, BBListIter ctbb,
-                                 OptCtx const& oc);
+    BBListIter splitIRlistIntoBB(IN IR * irs, OUT BBList * bbl,
+                                 BBListIter ctbb, OptCtx const& oc);
 
     //Series of helper functions to simplify
     //ir according to given specification.
@@ -1100,6 +1101,7 @@ public:
     IR * simplifyStmtList(IR * ir, SimpCtx * cont);
     void simplifyBB(IRBB * bb, SimpCtx * cont);
     void simplifyBBlist(BBList * bbl, SimpCtx * cont);
+    void simplifyIRList(SimpCtx * cont);
     IR * simplifyLogicalNot(IN IR * ir, SimpCtx * cont);
     IR * simplifyLogicalOrAtFalsebr(IN IR * ir, LabelInfo const* tgt_label);
     IR * simplifyLogicalOrAtTruebr(IN IR * ir, LabelInfo const* tgt_label);
@@ -1145,11 +1147,10 @@ public:
     //This function is main entry to process current region.
     virtual bool process(OptCtx * oc);
 
-    //Check and rescan call list of region if one of elements in list changed.
+    //The function collect information that IPA may used.
+    //Check and rescan call-list of region if something changed.
     void updateCallAndReturnList(bool scan_inner_region);
 
-    //Verify cond|uncond target label.
-    bool verifyBBlist(BBList & bbl);
     //Ensure that each IR in ir_list must be allocated in crrent region.
     bool verifyIROwnership();
     //Verify MD reference to each stmts and expressions which described memory.

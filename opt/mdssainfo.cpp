@@ -114,7 +114,7 @@ bool MDSSAInfo::isUseReachable(UseDefMgr const* udmgr, IR const* exp) const
          i >= 0; i = pthis->getVOpndSet()->get_next(i, &iter)) {
         VMD * vopnd = (VMD*)udmgr->getVOpnd(i);
         ASSERT0(vopnd && vopnd->is_md());
-        if (!vopnd->getUseSet()->find(exp)) {
+        if (!vopnd->findUse(exp)) {
             return false;
         }
     }
@@ -149,18 +149,12 @@ void MDSSAInfo::collectUse(UseDefMgr const* udmgr, OUT IRSet * set) const
          i >= 0; i = pthis->getVOpndSet()->get_next(i, &iter)) {
         VMD * vopnd = (VMD*)udmgr->getVOpnd(i);
         ASSERT0(vopnd && vopnd->is_md());
-
-        #ifdef _DEBUG_
         Region * rg = udmgr->getRegion();
-        IRSetIter vit = nullptr;
-        for (INT i2 = vopnd->getUseSet()->get_first(&vit);
-            i2 >= 0; i2 = vopnd->getUseSet()->get_next(i2, &vit)) {
-            IR * use = rg->getIR(i2);
-            ASSERT0(use && (use->isMemoryRef() || use->is_id()));
+        VMD::UseSetIter vit;
+        for (INT i2 = vopnd->getUseSet()->get_first(vit);
+             !vit.end(); i2 = vopnd->getUseSet()->get_next(vit)) {
+            set->bunion(i2);
         }
-        #endif
-
-        set->bunion(*vopnd->getUseSet());
     }
 }
 
@@ -426,11 +420,11 @@ void VMD::dump(Region const* rg, UseDefMgr const* mgr) const
 
     //Dump OccSet
     prt(rg, "|USESET:");
-    IRSetIter vit = nullptr;
     bool first = true;
     VMD * pthis = const_cast<VMD*>(this);
-    for (INT i2 = pthis->getUseSet()->get_first(&vit);
-        i2 >= 0; i2 = pthis->getUseSet()->get_next(i2, &vit)) {
+    VMD::UseSetIter vit;
+    for (INT i2 = pthis->getUseSet()->get_first(vit);
+         !vit.end(); i2 = pthis->getUseSet()->get_next(vit)) {
         if (first) {
             first = false;
         } else {
@@ -530,9 +524,9 @@ static void dumpUseSet(VMD const* vmd, Region * rg)
 {
     ASSERT0(vmd);
     note(rg, "|USESET:");
-    IRSetIter vit = nullptr;
-    for (INT i = const_cast<VMD*>(vmd)->getUseSet()->get_first(&vit);
-        i >= 0; i = const_cast<VMD*>(vmd)->getUseSet()->get_next(i, &vit)) {
+    VMD::UseSetIter vit;
+    for (INT i = const_cast<VMD*>(vmd)->getUseSet()->get_first(vit);
+         !vit.end(); i = const_cast<VMD*>(vmd)->getUseSet()->get_next(vit)) {
         IR const* use = rg->getIR(i);
         ASSERT0(use && (use->isMemoryRef() || use->is_id()));
         prt(rg, "(%s id:%d) ", IRNAME(use), use->id());
@@ -917,7 +911,7 @@ VMD * UseDefMgr::allocVMD(UINT mdid, UINT version)
     v = (VMD*)smpoolMallocConstSize(sizeof(VMD), m_vmd_pool);
     ASSERT0(v);
     ::memset(v, 0, sizeof(VMD));
-    v->init(m_rg->getMiscBitSetMgr()->getSegMgr());
+    v->init();
     VOPND_code(v) = VOPND_MD;
     VOPND_id(v) = m_vopnd_count++;
     VMD_mdid(v) = mdid;

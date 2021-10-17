@@ -41,6 +41,9 @@ bool g_is_opt_float = true;
 //Lower IR tree to PR mode.
 bool g_is_lower_to_pr_mode = false;
 
+//Lower IR tree to the lowest tree height.
+bool g_is_lower_to_lowest_height = false;
+
 //Enable XOC support dynamic type.
 //That means the type of IR_ST may be ANY.
 bool g_is_support_dynamic_type = false;
@@ -53,7 +56,7 @@ CHAR * g_func_or_bb_option = nullptr;
 //Represent optimization level.
 INT g_opt_level = OPT_LEVEL0;
 
-//Construct bb list.
+//Construct BB list.
 bool g_cst_bb_list = true;
 
 //Build control flow graph.
@@ -74,13 +77,13 @@ bool g_do_loop_ana = true;
 //Perform cfg optimization: remove labels that no one referenced.
 bool g_do_cfg_remove_redundant_label = true;
 
-//Perform cfg optimization: remove empty bb.
+//Perform cfg optimization: remove empty BB.
 bool g_do_cfg_remove_empty_bb = true;
 
-//Perform cfg optimization: remove unreachable bb from entry.
+//Perform cfg optimization: remove unreachable BB from entry.
 bool g_do_cfg_remove_unreach_bb = true;
 
-//Perform cfg optimization: remove redundant trampoline bb.
+//Perform cfg optimization: remove redundant trampoline BB.
 //e.g:
 //    BB1: goto L1
 //    BB2, L1: goto L2
@@ -89,7 +92,7 @@ bool g_do_cfg_remove_unreach_bb = true;
 bool g_do_cfg_remove_trampolin_bb = true;
 
 //Perform cfg optimization: invert branch condition and
-//remove redundant trampoline bb.
+//remove redundant trampoline BB.
 //e.g:
 //    truebr L4 | false L4
 //    goto L3
@@ -163,6 +166,9 @@ bool g_do_dce = false;
 
 //Perform aggressive dead code elimination.
 bool g_do_dce_aggressive = false;
+
+//Perform type inference.
+bool g_infer_type = true;
 
 //Perform linear function test replacement.
 bool g_do_lftr = false;
@@ -314,6 +320,7 @@ DumpOpt::DumpOpt()
     is_dump_ra = false;
     is_dump_memusage = false;
     is_dump_livenessmgr = false;
+    is_dump_irparser = false;
 }
 
 
@@ -378,6 +385,12 @@ bool DumpOpt::isDumpCP() const
 bool DumpOpt::isDumpRP() const
 {
     return is_dump_all || (!is_dump_nothing && is_dump_rp);
+}
+
+
+bool DumpOpt::isDumpInferType() const
+{
+    return is_dump_all || (!is_dump_nothing && is_dump_infertype);
 }
 
 
@@ -480,6 +493,13 @@ bool DumpOpt::isDumpLivenessMgr() const
 {
     return is_dump_all || (!is_dump_nothing && is_dump_livenessmgr);
 }
+
+
+bool DumpOpt::isDumpIRParser() const
+{
+    return is_dump_all || (!is_dump_nothing && is_dump_irparser);
+}
+
 
 bool DumpOpt::isDumpRefineDUChain() const
 {

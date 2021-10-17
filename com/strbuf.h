@@ -85,6 +85,12 @@ public:
     //args: a list of argument store in stack.
     void vsprint(CHAR const* format, va_list args);
 
+    //Find sub-string in 'source', return the index if sub-string found,
+    //otherwise return -1.
+    //source: input string.
+    //substring: partial string.
+    LONG findsubstr(CHAR const* source, CHAR const* substring);
+
     //Concatenate original string and new strings.
     //Appends a copy of the source string to the current string buffer,
     //the new string is consist of original string and the string formed

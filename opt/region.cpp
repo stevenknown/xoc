@@ -131,7 +131,7 @@ size_t Region::count_mem() const
 //'bbl': a list of bb.
 //'ctbb': marker current bb container.
 //Note if CFG is invalid, it will not be updated.
-BBListIter Region::splitIRlistIntoBB(IR * irs, BBList * bbl,
+BBListIter Region::splitIRlistIntoBB(IN IR * irs, OUT BBList * bbl,
                                      BBListIter ctbb, OptCtx const& oc)
 {
     bool cfg_is_valid = false;
@@ -155,9 +155,11 @@ BBListIter Region::splitIRlistIntoBB(IR * irs, BBList * bbl,
                 cfg->addBB(newbb);
             }
             ctbb = bbl->insert_after(newbb, ctbb);
-        } else if (IRBB::isUpperBoundary(ir)) {
-            ASSERT0(ir->is_label());
+            continue;
+        }
 
+        if (IRBB::isUpperBoundary(ir)) {
+            ASSERT0(ir->is_label());
             newbb = allocBB();
             if (cfg_is_valid) {
                 cfg->addBB(newbb);
@@ -167,17 +169,21 @@ BBListIter Region::splitIRlistIntoBB(IR * irs, BBList * bbl,
             //Regard label-info as add-on info that attached on newbb, and
             //'ir' will be dropped off.
             LabelInfo const* li = ir->getLabel();
-            newbb->addLabel(li);
             if (cfg_is_valid) {
                 cfg->addLabel(newbb, li);
+            } else {
+                //CFG is NOT available if control flow info is not necessary,
+                //only maintain BB list.
+                newbb->addLabel(li);
             }
             if (!LABELINFO_is_try_start(li) && !LABELINFO_is_pragma(li)) {
                 BB_is_target(newbb) = true;
             }
             freeIRTree(ir); //free label ir.
-        } else {
-            BB_irlist(newbb).append_tail(ir);
+            continue;
         }
+
+        BB_irlist(newbb).append_tail(ir);
     }
     return ctbb;
 }
@@ -355,8 +361,7 @@ bool Region::reconstructBBList(OptCtx & oc)
     for (bbl->get_head(&ctbb); ctbb != nullptr; bbl->get_next(&ctbb)) {
         IRBB * bb = ctbb->val();
         IRListIter ctir;
-        BBIRList * irlst = &BB_irlist(bb);
-
+        BBIRList * irlst = bb->getIRList();
         IR * tail = irlst->get_tail();
         for (irlst->get_head(&ctir); ctir != nullptr; irlst->get_next(&ctir)) {
             IR * ir = ctir->val();
@@ -376,7 +381,8 @@ bool Region::reconstructBBList(OptCtx & oc)
 
                 ctbb = splitIRlistIntoBB(restirs, bbl, ctbb, oc);
                 break;
-            } else if (IRBB::isUpperBoundary(ir)) {
+            }
+            if (IRBB::isUpperBoundary(ir)) {
                 ASSERT0(ir->is_label());
                 change = true;
                 IR * restirs = nullptr; //record rest part in bb list after 'ir'.
@@ -515,6 +521,9 @@ void Region::constructBBList()
 
     ASSERT0(cur_bb != nullptr);
     getBBList()->append_tail(cur_bb);
+
+    //All IRs have been moved to each IRBB.
+    setIRList(nullptr);
 
     //cur_bb is the last bb, it is also the exit bb.
     //IR_BB_is_func_exit(cur_bb) = true;
@@ -1010,6 +1019,7 @@ IR * Region::allocIR(IR_TYPE irt)
     if (ir == nullptr) {
         ir = (IR*)xmalloc(IRTSIZE(irt));
         INT v = MAX(getIRVec()->get_last_idx(), 0);
+        //0 should not be used as id.
         IR_id(ir) = (UINT)(v+1);
         getIRVec()->set(ir->id(), ir);
         set_irt_size(ir, IRTSIZE(irt));
@@ -1942,58 +1952,6 @@ bool Region::verifyIROwnership()
 }
 
 
-//Verify cond/uncond target label.
-bool Region::verifyBBlist(BBList & bbl)
-{
-    Lab2BB lab2bb;
-    for (IRBB * bb = bbl.get_head(); bb != nullptr; bb = bbl.get_next()) {
-        for (LabelInfo const* li = bb->getLabelList().get_head();
-             li != nullptr; li = bb->getLabelList().get_next()) {
-            lab2bb.set(li, bb);
-        }
-    }
-
-    for (IRBB * bb = bbl.get_head(); bb != nullptr; bb = bbl.get_next()) {
-        IR * last = BB_last_ir(bb);
-        if (last == nullptr) { continue; }
-
-        if (last->isConditionalBr()) {
-            ASSERTN(lab2bb.get(BR_lab(last)),
-                    ("branch target cannot be nullptr"));
-            continue;
-        }
-
-        if (last->isMultiConditionalBr()) {
-            ASSERT0(last->is_switch());
-            for (IR * c = SWITCH_case_list(last);
-                 c != nullptr; c = c->get_next()) {
-                ASSERTN(lab2bb.get(CASE_lab(last)),
-                        ("case branch target cannot be nullptr"));
-            }
-            if (SWITCH_deflab(last) != nullptr) {
-                ASSERTN(lab2bb.get(SWITCH_deflab(last)),
-                        ("default target cannot be nullptr"));
-            }
-            continue;
-        }
-
-        if (last->isUnconditionalBr()) {
-            if (last->is_goto()) {
-                ASSERTN(lab2bb.get(GOTO_lab(last)), ("use undefined label"));
-            } else {
-                ASSERT0(last->is_igoto());
-                for (IR * caseexp = last->getCaseList(); caseexp != nullptr;
-                    caseexp = caseexp->get_next()) {
-                    ASSERTN(lab2bb.get(CASE_lab(caseexp)),
-                            ("use undefined label"));
-                }
-            }
-        }
-    }
-    return true;
-}
-
-
 //Dump all MD that related to Var.
 void Region::dumpVarMD(Var * v, UINT indent) const
 {
@@ -2025,12 +1983,96 @@ void Region::dumpVarMD(Var * v, UINT indent) const
 }
 
 
+static void dumpParam(Region const* rg)
+{
+    note(rg, "\nFORMAL PARAMETERS:");
+    VarTabIter c;
+    Vector<Var*> fpvec;
+    LogMgr * lm = rg->getLogMgr();
+    StrBuf buf(64);
+    Region * prg = const_cast<Region*>(rg);
+    for (Var * v = prg->getVarTab()->get_first(c);
+         v != nullptr; v = prg->getVarTab()->get_next(c)) {
+        if (VAR_is_formal_param(v)) {
+            fpvec.set(v->getFormalParamPos(), v);
+        }
+    }
+    for (INT i = 0; i <= fpvec.get_last_idx(); i++) {
+        Var * v = fpvec.get(i);
+        if (v == nullptr) {
+            //This position may be reserved for other use.
+            //ASSERT0(v);
+            lm->incIndent(2);
+            note(rg, "\n--");
+            prt(rg, " param%d", i);
+            lm->decIndent(2);
+            continue;
+        }
+        buf.clean();
+        v->dump(buf, rg->getTypeMgr());
+        lm->incIndent(2);
+        note(rg, "\n%s", buf.buf);
+        prt(rg, " param%d", i);
+        lm->incIndent(2);
+        rg->dumpVarMD(v, lm->getIndent());
+        lm->decIndent(2);
+        lm->decIndent(2);
+    }
+}
+
+
+//Dump region local varibles.
+static void dumpLocalVar(Region const* rg)
+{
+    Region * prg = const_cast<Region*>(rg);
+    VarTab * vt = prg->getVarTab();
+    if (vt->get_elem_count() == 0) { return; }
+
+    note(rg, "\nVARIABLES:%d", vt->get_elem_count());
+    LogMgr * lm = rg->getLogMgr();
+    lm->incIndent(2);
+    VarTabIter c;
+
+    //Sort Var in ascending order because test tools will compare
+    //Var dump information and require all variable have to be ordered.
+    xcom::List<Var*> varlst;
+    for (Var * v = vt->get_first(c); v != nullptr; v = vt->get_next(c)) {
+        C<Var*> * ct = nullptr;
+        bool find = false;
+        for (varlst.get_head(&ct); ct != nullptr;
+             ct = varlst.get_next(ct)) {
+            Var * v_in_lst = C_val(ct);
+            if (v_in_lst->id() > v->id()) {
+                varlst.insert_before(v, ct);
+                find = true;
+                break;
+            }
+        }
+        if (!find) {
+            varlst.append_tail(v);
+        }
+    }
+
+    C<Var*> * ct = nullptr;
+    StrBuf buf(64);
+    for (varlst.get_head(&ct); ct != nullptr; ct = varlst.get_next(ct)) {
+        Var * v = C_val(ct);
+        buf.clean();
+        v->dump(buf, rg->getTypeMgr());
+        note(rg, "\n%s", buf.buf);
+        lm->incIndent(2);
+        rg->dumpVarMD(v, lm->getIndent());
+        lm->decIndent(2);
+    }
+    lm->decIndent(2);
+} 
+
+
 //Dump each Var in current region's Var table.
 void Region::dumpVARInRegion() const
 {
     if (!isLogMgrInit()) { return; }
     StrBuf buf(64);
-    LogMgr * lm = getLogMgr();
 
     //Dump Region name.
     if (getRegionVar() != nullptr) {
@@ -2053,79 +2095,9 @@ void Region::dumpVARInRegion() const
                 break;
             }
         }
-
-        if (has_param) {
-            note(this, "\nFORMAL PARAMETERS:");
-            c.clean();
-            Vector<Var*> fpvec;
-            for (Var * v = pthis->getVarTab()->get_first(c);
-                 v != nullptr; v = pthis->getVarTab()->get_next(c)) {
-                if (VAR_is_formal_param(v)) {
-                    fpvec.set(v->getFormalParamPos(), v);
-                }
-            }
-            for (INT i = 0; i <= fpvec.get_last_idx(); i++) {
-                Var * v = fpvec.get(i);
-                if (v == nullptr) {
-                    //This position may be reserved for other use.
-                    //ASSERT0(v);
-                    lm->incIndent(2);
-                    note(this, "\n--");
-                    prt(this, " param%d", i);
-                    lm->decIndent(2);
-                    continue;
-                }
-                buf.clean();
-                v->dump(buf, getTypeMgr());
-                lm->incIndent(2);
-                note(this, "\n%s", buf.buf);
-                prt(this, " param%d", i);
-                lm->incIndent(2);
-                dumpVarMD(v, lm->getIndent());
-                lm->decIndent(2);
-                lm->decIndent(2);
-            }
-        }
+        if (has_param) { dumpParam(this); }
     }
-
-    //Dump local varibles.
-    VarTab * vt = pthis->getVarTab();
-    if (vt->get_elem_count() > 0) {
-        note(this, "\nVARIABLES:%d", vt->get_elem_count());
-        lm->incIndent(2);
-        VarTabIter c;
-
-        //Sort Var in ascending order because test tools will compare
-        //Var dump information and require all variable have to be ordered.
-        xcom::List<Var*> varlst;
-        for (Var * v = vt->get_first(c); v != nullptr; v = vt->get_next(c)) {
-            C<Var*> * ct = nullptr;
-            bool find = false;
-            for (varlst.get_head(&ct); ct != nullptr;
-                 ct = varlst.get_next(ct)) {
-                Var * v_in_lst = C_val(ct);
-                if (v_in_lst->id() > v->id()) {
-                    varlst.insert_before(v, ct);
-                    find = true;
-                    break;
-                }
-            }
-            if (!find) {
-                varlst.append_tail(v);
-            }
-        }
-        C<Var*> * ct = nullptr;
-        for (varlst.get_head(&ct); ct != nullptr; ct = varlst.get_next(ct)) {
-            Var * v = C_val(ct);
-            buf.clean();
-            v->dump(buf, getTypeMgr());
-            note(this, "\n%s", buf.buf);
-            lm->incIndent(2);
-            dumpVarMD(v, lm->getIndent());
-            lm->decIndent(2);
-        }
-        lm->decIndent(2);
-    }
+    dumpLocalVar(this);
 }
 
 
@@ -2207,7 +2179,8 @@ bool Region::partitionRegion()
 }
 
 
-//Check and rescan call list of region if one of elements in list changed.
+//The function collect information that IPA may used.
+//Check and rescan call-list of region if something changed.
 void Region::updateCallAndReturnList(bool scan_inner_region)
 {
     if (getCallList() == nullptr) { return; }
@@ -2308,12 +2281,18 @@ static void post_process(Region * rg, OptCtx * oc)
         rg->getPassMgr()->destroyPass(mdssamgr);
     }
 
+    if (!oc->is_ref_valid()) {
+        //Assign Var for PR.
+        //O0 may not assign Var and MD for PR, but CG need PR's Var.
+        rg->getMDMgr()->assignMD(true, false);
+    }
+    oc->setAllInvalid();
+
+    rg->updateCallAndReturnList(true);
+
     if (!g_retain_pass_mgr_for_region) {
         rg->destroyPassMgr();
     }
-
-    oc->setAllInvalid();
-    rg->updateCallAndReturnList(true);
 }
 
 
@@ -2370,10 +2349,11 @@ bool Region::process(OptCtx * oc)
     if (g_do_ipa && is_program()) {
         do_ipa(this, oc);
     }
+    if (g_infer_type) {
+        getPassMgr()->registerPass(PASS_INFER_TYPE)->perform(*oc);
+    }
 
     post_process(this, oc);
-    //oc->set_all_invalid();
-
     return true;
 
 ERR_RETURN:

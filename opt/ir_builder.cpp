@@ -692,11 +692,8 @@ IR * Region::buildIStore(IR * base, IR * rhs, Type const* type)
 //        elem_num points to an array with 2 value, [12, 24].
 //        the 1th dimension has 12 elements, and the 2th dimension has 24
 //        elements, which element type is D_I32.
-IR * Region::buildArray(IR * base,
-                        IR * sublist,
-                        Type const* type,
-                        Type const* elemtype,
-                        UINT dims,
+IR * Region::buildArray(IR * base, IR * sublist, Type const* type,
+                        Type const* elemtype, UINT dims,
                         TMWORD const* elem_num_buf)
 {
     ASSERT0(type);

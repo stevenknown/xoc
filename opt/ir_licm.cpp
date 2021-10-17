@@ -55,6 +55,10 @@ void LICM::addInvariantExp(IR * exp)
 
 
 //Scan operand to find invariant candidate.
+//Note in order to reduce the complexity of LICM, the function only handle the
+//scenario that whole RHS of stmt is loop-invariant. For cases that
+//anticipating to scan and hoist kid IR tree in RHS, will be handled in
+//Register Promotion.
 //islegal: set to true if loop is legal to perform invariant motion.
 //         otherwise set to false to prohibit code motion.
 //Return true if find loop invariant expression.
@@ -73,6 +77,7 @@ bool LICM::scanOpnd(IN LI<IRBB> * li, bool * islegal, bool first_scan)
 
         IRBB * bb = m_cfg->getBB(i);
         ASSERT0(bb && m_cfg->getVertex(i));
+        ConstIRIter irit;
         for (IR * ir = BB_first_ir(bb); ir != nullptr; ir = BB_next_ir(bb)) {
             if (!ir->isContainMemRef() || ir->isNoMove()) { continue; }
             if ((ir->isCallStmt() && !ir->isReadOnly()) ||
@@ -83,13 +88,12 @@ bool LICM::scanOpnd(IN LI<IRBB> * li, bool * islegal, bool first_scan)
             }
             if (first_scan) { updateMD2Num(ir); }
 
-            //Check whether all RHS are loop invariants.
+            //Only check whether all RHS are loop invariants.
             bool is_cand = true;
-            m_iriter.clean();
-            for (IR const* x = iterRhsInitC(ir, m_iriter);
-                 x != nullptr; x = iterRhsNextC(m_iriter)) {
-                if (!x->isMemoryOpnd() ||
-                    x->isReadOnly() ||
+            irit.clean();
+            for (IR const* x = iterRhsInitC(ir, irit);
+                 x != nullptr; x = iterRhsNextC(irit)) {
+                if (!x->isMemoryOpnd() || x->isReadOnly() ||
                     m_invariant_exp.find(const_cast<IR*>(x))) {
                     continue;
                 }
@@ -102,7 +106,8 @@ bool LICM::scanOpnd(IN LI<IRBB> * li, bool * islegal, bool first_scan)
 
             if (!is_cand) { continue; }
 
-            //ir stmt is loop invariant.
+            //ir stmt can be loop invariant. And whole RHS expressions
+            //of the stmt are invariants.
             change |= chooseExpAndStmt(ir);
         }
     }
@@ -823,9 +828,8 @@ bool LICM::hoistCandHelper(OUT bool & insert_guard_bb,
 bool LICM::tryMoveAllDefStmtOutFromLoop(IR const* c, IRBB * prehead,
                                         OUT LI<IRBB> * li)
 {
-    m_iriter.clean();
-    for (IR const* x = iterInitC(c, m_iriter);
-         x != nullptr; x = iterNextC(m_iriter)) {
+    ConstIRIter irit;
+    for (IR const* x = iterInitC(c, irit); x != nullptr; x = iterNextC(irit)) {
         if (!handleDefByDUChain(x, prehead, li)) {
             //x's DEF can not be hoisted.
             return false;
@@ -969,8 +973,8 @@ bool LICM::perform(OptCtx & oc)
     }
 
     if (!oc.is_ref_valid()) { return false; }
-    m_mdssamgr = (MDSSAMgr*)m_rg->getPassMgr()->queryPass(PASS_MD_SSA_MGR);
-    m_prssamgr = (PRSSAMgr*)m_rg->getPassMgr()->queryPass(PASS_PR_SSA_MGR);
+    m_mdssamgr = m_rg->getMDSSAMgr();
+    m_prssamgr = m_rg->getPRSSAMgr();
     if (!oc.is_pr_du_chain_valid() && !usePRSSADU()) {
         //DCE use either classic PR DU chain or PRSSA.
         //At least one kind of DU chain should be avaiable.
@@ -1024,7 +1028,8 @@ bool LICM::perform(OptCtx & oc)
         ASSERT0(m_rg->verifyMDRef());
         ASSERT0(verifyMDDUChain(m_rg));
         if (g_is_dump_after_pass && g_dump_opt.isDumpLICM()) {
-            dump();
+            //Invariant info has been dumpped.
+            //dump();
         }
     }
     END_TIMER(t, getPassName());

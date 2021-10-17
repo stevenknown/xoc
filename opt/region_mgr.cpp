@@ -60,12 +60,12 @@ RegionMgr::RegionMgr() : m_type_mgr(this)
 
 RegionMgr::~RegionMgr()
 {
-    for (INT id = 0; id <= m_id2ru.get_last_idx(); id++) {
-        Region * rg = m_id2ru.get(id);
+    for (INT id = 0; id <= m_id2rg.get_last_idx(); id++) {
+        Region * rg = m_id2rg.get(id);
         if (rg == nullptr) { continue; }
         deleteRegion(rg, false);
     }
-    m_id2ru.clean();
+    m_id2rg.clean();
 
     #ifdef _DEBUG_
     ASSERTN(m_num_allocated == 0, ("there is still region leave out"));
@@ -158,6 +158,7 @@ void RegionMgr::registerGlobalMD()
     for (INT i = 0; i <= varvec->get_last_idx(); i++) {
         Var * v = varvec->get(i);
         if (v == nullptr || VAR_is_local(v)) { continue; }
+        //Note Var is regarded as VAR_GLOBAL by default if VAR_LOCAL not set.
 
         //User sometime intentionally declare non-allocable
         //global variable to custmized usage.
@@ -172,8 +173,8 @@ void RegionMgr::registerGlobalMD()
         MD md;
         MD_base(&md) = v;
         MD_ofst(&md) = 0;
-        MD_size(&md) = v->getByteSize(getTypeMgr());
-        if (VAR_is_fake(v) || VAR_is_func_decl(v)) {
+        MD_size(&md) = v->is_any() ? 0 : v->getByteSize(getTypeMgr());
+        if (v->is_fake() || v->is_func_decl() || v->is_any()) {
             MD_ty(&md) = MD_UNBOUND;
         } else {
             MD_ty(&md) = MD_EXACT;
@@ -231,10 +232,10 @@ void RegionMgr::addToRegionTab(Region * rg)
     ASSERT0(getRegion(rg->id()) == nullptr);
     ASSERT0(rg->id() < m_ru_count);
     INT pad = xcom::getNearestPowerOf2(rg->id());
-    if (m_id2ru.get_last_idx() + 1 < pad) {
-        m_id2ru.set(pad, nullptr);
+    if (m_id2rg.get_last_idx() + 1 < pad) {
+        m_id2rg.set(pad, nullptr);
     }
-    m_id2ru.set(rg->id(), rg);
+    m_id2rg.set(rg->id(), rg);
 }
 
 
@@ -371,7 +372,7 @@ void RegionMgr::deleteRegion(Region * rg, bool collect_id)
     delete rg;
 
     if (collect_id && id != REGION_ID_UNDEF) {
-        m_id2ru.set(id, nullptr);
+        m_id2rg.set(id, nullptr);
         m_free_ru_id.append_head(id);
     }
 

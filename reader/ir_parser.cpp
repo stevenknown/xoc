@@ -346,16 +346,25 @@ void IRParser::initKeyWordMap()
 }
 
 
-CHAR const* IRParser::getKeywordName(X_CODE code)
+CHAR const* IRParser::getKeywordName(X_CODE code) const
 {
     ASSERT0(code >= X_UNDEF && code < X_LAST);
     return g_keyword_info[code].name;
 }
 
 
-void IRParser::dump()
+bool IRParser::dump() const
 {
-    ASSERT0(0);
+    if (!getRegionMgr()->isLogMgrInit()) { return false; }
+    START_TIMER_FMT(t, ("DUMP %s", getPassName()));
+    note(getRegionMgr(), "\n==---- DUMP %s ----==", getPassName());
+    for (UINT i = 0; i < m_rumgr->getNumOfRegion(); i++) {
+        Region const* rg = m_rumgr->getRegion(i);
+        if (rg == nullptr) { continue; }
+        rg->dump(false);
+    }
+    END_TIMER_FMT(t, ("DUMP %s", getPassName()));
+    return true;
 }
 
 
@@ -698,9 +707,8 @@ bool IRParser::declareRegion(ParseCtx * ctx)
         }
         if (newctx.has_phi) {
             newctx.current_region->constructBBList();
-            newctx.current_region->setIRList(nullptr);
             OptCtx * oc = getRegionMgr()->getAndGenOptCtx(
-                              newctx.current_region->id());
+                newctx.current_region->id());
             ASSERT0(oc);
             newctx.current_region->initPassMgr();
             newctx.current_region->getPassMgr()->checkValidAndRecompute(oc,
@@ -2346,6 +2354,13 @@ bool IRParser::parseStore(ParseCtx * ctx)
         m_lexer->getCurrentTokenString()));
     if (var == nullptr) {
         error(tok, "%s is not declared", m_lexer->getCurrentTokenString());
+        return false;
+    }
+
+    if (var->is_readonly()) {
+        ASSERT0(var->get_name());
+        error("can not write readonly variable '%s'",
+              var->get_name()->getStr());
         return false;
     }
 
@@ -4423,14 +4438,13 @@ bool IRParser::declareVar(ParseCtx * ctx, Var ** var)
 
     ASSERT0(ctx->current_region);
     Var * v = nullptr;
-    if (m_rumgr->getVarMgr()->isDedicatedStringVar(SYM_name(sym))) {
+    if (m_rumgr->getVarMgr()->isDedicatedStringVar(sym->getStr())) {
         MD const* md = m_rumgr->genDedicateStrMD();
         v = md->get_base();
     } else {
-        v = m_rumgr->getVarMgr()->registerVar(
-            sym, ty, 1,//default alignment is 1.
-            ctx->current_region->is_program() ?
-                VAR_GLOBAL : VAR_LOCAL);
+        v = m_rumgr->getVarMgr()->registerVar(sym, ty,
+            1, //default alignment is 1.
+            ctx->current_region->is_program() ? VAR_GLOBAL : VAR_LOCAL);
     }
     ctx->current_region->addToVarTab(v);
     *var = v;
@@ -4454,7 +4468,7 @@ bool IRParser::declareVar(ParseCtx * ctx, Var ** var)
 }
 
 
-//This function parse token that returned by lexer untill meeting file end.
+//This function parses tokens that returned by lexer untill meeting file end.
 //Return true if no error occur.
 bool IRParser::parse()
 {
@@ -4501,7 +4515,11 @@ bool IRParser::parse()
     }
 END:
     END_TIMER(t, "IR Parser");
-    return getErrorMsgList().get_elem_count() == 0;
+    bool parse_succ = getErrorMsgList().get_elem_count() == 0;
+   if (parse_succ && g_is_dump_after_pass && g_dump_opt.isDumpIRParser()) {
+        dump();
+    }
+    return parse_succ;
 }
 //END IRParser
 

@@ -100,12 +100,26 @@ public:
 //User need to initialize DbxMgr before compilation.
 extern DbxMgr * g_dbx_mgr;
 
-//Copy Dbx from src.
+//Copy Dbx information from 'src' to 'tgt'.
 void copyDbx(IR * tgt, IR const* src, Region * rg);
-void setLineNum(IR * ir, UINT lineno, Region * rg);
+
+//Copy dbx from 'src' to each element in 'tgt_list'.
+void copyDbxForList(IR * tgt_list, IR const* src, Region * rg);
+
+//Get source file line number of 'ir'.
 UINT getLineNum(IR const* ir);
+
+//Get source file line number in 'dbx'.
 UINT getLineNum(Dbx const* dbx);
+
+//Return the dbx of 'ir'.
 Dbx * getDbx(IR const* ir);
+
+//Set source file line number to 'ir'.
+void setLineNum(IR * ir, UINT lineno, Region * rg);
+
+//Set dbx to 'ir'.
+void setDbx(IR * ir, Dbx * dbx, Region * rg);
 
 } //namespace xoc
 #endif

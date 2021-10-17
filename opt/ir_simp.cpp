@@ -68,6 +68,8 @@ static bool isLowest(IR const* ir)
 
 
 //At lowest mode, the predicator, trueexp, falseexp must be leaf.
+//Note the lowest height means tree height is more than 2.
+//e.g: ... = add ld a, ld b; ADD is the lowest height.
 bool Region::isLowestHeightSelect(IR const* ir) const
 {
     ASSERT0(ir->is_select());
@@ -1170,6 +1172,86 @@ IR * Region::simplifySwitchSelf(IR * ir, SimpCtx * ctx)
 }
 
 
+//The function return a subscript expression to linearize array accessing.
+static IR * simplifySubExpList(IR * ir, Region * rg, SimpCtx * ctx)
+{
+    ASSERT0(ir->isArrayOp());
+    //For n dimension array, elemnum records the number
+    //of elements at 0~(n-1) dimension.
+    UINT elemnum = 0;
+    UINT dim = 0;
+    TMWORD const* elemnumbuf = ARR_elem_num_buf(ir);
+    Type const* indextyid = rg->getTargetMachineArrayIndexType();
+    IR * ofst_exp = nullptr;
+    for (IR * s = xcom::removehead(&ARR_sub_list(ir));
+         s != nullptr; dim++, s = xcom::removehead(&ARR_sub_list(ir))) {
+        SimpCtx tcont(*ctx);
+        SIMP_ret_array_val(&tcont) = true;
+        IR * newsub = rg->simplifyExpression(s, &tcont);
+        Dbx * dbx = xoc::getDbx(s);
+        ctx->appendStmt(tcont);
+        ctx->unionBottomupFlag(tcont);
+
+        //'ir' is exact array.
+        //CASE1: elem-type v[n]
+        //    can simply to: &v + n*sizeof(BASETYPE)
+        //CASE2: a = (*p)[n]
+        //can simply to: (*p) + n*sizeof(BASETYPE)
+        //
+        //CASE3: struct S {int a, b;} s[10];
+        //  the elem_ty is struct S.
+        //  s[1].b has ARR_ofst(ir)==4
+        //  can simply to: &s + 1*sizeof(struct S) + offset(4)
+        if (newsub->is_const() && newsub->is_int()) {
+            //Subexp is const.
+            if (elemnum != 0) {
+                IR * t = rg->buildImmInt(((HOST_INT)elemnum) *
+                                         CONST_int_val(newsub), indextyid);
+                rg->freeIRTree(newsub);
+                newsub = t;
+            }
+        } else {
+            if (elemnum != 0) {
+                newsub = rg->buildBinaryOp(IR_MUL, indextyid, newsub,
+                                           rg->buildImmInt(elemnum, indextyid));
+
+                if (dbx != nullptr) { 
+                    xoc::copyDbxForList(newsub, s, rg);
+                }
+            }
+        }
+
+        if (ofst_exp == nullptr) {
+            ofst_exp = newsub;
+        } else {
+            ofst_exp = rg->buildBinaryOpSimp(IR_ADD, indextyid,
+                                             ofst_exp, newsub);
+            if (dbx != nullptr) { 
+                xoc::copyDbxForList(ofst_exp, s, rg);
+            }
+        }
+
+        if (elemnumbuf == nullptr) { continue; }
+
+        if (dim == 0) {
+            //The element-size of dim0 may be zero.
+            //e.g: User can define an array with zero size.
+            //     In C-language: struct { int buf[]; };
+            elemnum = (UINT)elemnumbuf[dim];
+            continue;
+        }
+
+        //The higher dimesion size should not be zero, otherwise
+        //we could not generate the address computation expression to
+        //linearize the array, because it needs to know how many total
+        //elements in dimension 0 to dimension dim-1.
+        ASSERTN(elemnumbuf[dim - 1] != 0, ("Incomplete array dimension"));
+        elemnum *= (UINT)elemnumbuf[dim];
+    }
+    return ofst_exp;
+}
+
+
 //Simplify array operator IR_ARRAY to a list of address computing expressions.
 //ir: the IR_ARRAY/IR_STARRAY that to be simplified.
 //Note this function does not free ir becase ir's Reference info and
@@ -1196,80 +1278,19 @@ IR * Region::simplifyArrayAddrExp(IR * ir, SimpCtx * ctx)
 
     TypeMgr * dm = getTypeMgr(); //may generate new pointer type.
     ASSERT0(ir->getTypeSize(dm) > 0);
-
-    //For n dimension array, enumb record the number
-    //of elements at 0~n-1 dimension.
-    UINT enumb = 0;
+    IR * ofst_exp = simplifySubExpList(ir, this, ctx);
+    ASSERT0(ofst_exp && ofst_exp->is_single());
+    Dbx * subexpdbx = getDbx(ofst_exp);
 
     Type const* indextyid = getTargetMachineArrayIndexType();
-    UINT dim = 0;
-    IR * ofst_exp = nullptr;
-    TMWORD const* elemnumbuf = ARR_elem_num_buf(ir);
-
-    for (IR * s = xcom::removehead(&ARR_sub_list(ir));
-         s != nullptr; dim++, s = xcom::removehead(&ARR_sub_list(ir))) {
-        SimpCtx tcont(*ctx);
-        SIMP_ret_array_val(&tcont) = true;
-        IR * newsub = simplifyExpression(s, &tcont);
-        ctx->appendStmt(tcont);
-        ctx->unionBottomupFlag(tcont);
-
-        //'ir' is exact array.
-        //CASE1: elem-type v[n]
-        //    can simply to: &v + n*sizeof(BASETYPE)
-        //CASE2: a = (*p)[n]
-        //can simply to: (*p) + n*sizeof(BASETYPE)
-        //
-        //CASE3: struct S {int a, b;} s[10];
-        //  the elem_ty is struct S.
-        //  s[1].b has ARR_ofst(ir)==4
-        //  can simply to: &s + 1*sizeof(struct S) + offset(4)
-        if (newsub->is_const() && newsub->is_int()) {
-            //Subexp is const.
-            if (enumb != 0) {
-                IR * t = buildImmInt(((HOST_INT)enumb) *
-                    CONST_int_val(newsub), indextyid);
-                freeIRTree(newsub);
-                newsub = t;
-            }
-        } else {
-            if (enumb != 0) {
-                newsub = buildBinaryOp(IR_MUL, indextyid,
-                    newsub, buildImmInt(enumb, indextyid));
-            }
-        }
-
-        if (ofst_exp == nullptr) {
-            ofst_exp = newsub;
-        } else {
-            ofst_exp = buildBinaryOpSimp(IR_ADD, indextyid, ofst_exp, newsub);
-        }
-
-        if (elemnumbuf != nullptr) {
-            if (dim == 0) {
-                //The element-size of dim0 may be zero.
-                //e.g: User can define an array with zero size.
-                //     In C-language: struct { int buf[]; };
-                enumb = (UINT)elemnumbuf[dim];
-            } else {
-                //The higher dimesion size should not be zero, otherwise
-                //we could not generate the address computation expression to
-                //linearize the array.
-                ASSERTN(elemnumbuf[dim] != 0,
-                        ("Incomplete array dimension, we need to "
-                         "know how many elements in dimension %d.", dim));
-                enumb *= (UINT)elemnumbuf[dim];
-            }
-        }
-    }
-
-    ASSERT0(ofst_exp);
-
     UINT elemsize = dm->getByteSize(ARR_elemtype(ir));
     if (elemsize != 1) {
         //e.g: short g[i], subexp is i*sizeof(short)
-        ofst_exp = buildBinaryOp(IR_MUL, indextyid,
-            ofst_exp, buildImmInt(elemsize, indextyid));
+        ofst_exp = buildBinaryOp(IR_MUL, indextyid, ofst_exp,
+                                 buildImmInt(elemsize, indextyid));
+        if (subexpdbx != nullptr) {
+            xoc::setDbx(ofst_exp, subexpdbx, this);
+        }
     }
 
     if (ARR_ofst(ir) != 0) {
@@ -1279,6 +1300,9 @@ IR * Region::simplifyArrayAddrExp(IR * ir, SimpCtx * ctx)
         //can simply to: 1*sizeof(struct S) + offset(4) + LDA(s).
         IR * imm = buildImmInt((HOST_INT)(ARR_ofst(ir)), indextyid);
         ofst_exp = buildBinaryOpSimp(IR_ADD, indextyid, ofst_exp, imm);
+        if (subexpdbx != nullptr) {
+            xoc::setDbx(ofst_exp, subexpdbx, this);
+        }
     }
 
     ASSERT0(ARR_base(ir) &&
@@ -1300,6 +1324,9 @@ IR * Region::simplifyArrayAddrExp(IR * ir, SimpCtx * ctx)
     //operation will be generated.
     IR * array_addr = buildBinaryOpSimp(IR_ADD,
         dm->getPointerType(ir->getTypeSize(dm)), newbase, ofst_exp);
+    if (subexpdbx != nullptr) {
+        xoc::setDbx(array_addr, subexpdbx, this);
+    }
 
     if (SIMP_to_pr_mode(ctx) && !array_addr->is_pr()) {
         SimpCtx ttcont(*ctx);
@@ -1758,21 +1785,19 @@ IR * Region::simplifyCall(IR * ir, SimpCtx * ctx)
         IR * p = xcom::removehead(&CALL_param_list(ir));
 
         if (g_is_simplify_parameter && !p->isMemoryOpnd() && !p->is_lda()) {
-            //We always simplify parameters to lowest height to
+            //We always simplify parameters to the lowest height to
             //facilitate the query of point-to set.
-            //e.g: DUMgr is going to compute may point-to while
-            //ADD is pointer type. But only MD has point-to set.
+            //e.g: DUMgr is going to compute may-point-to while
+            //ADD is pointer type. But only MD can hold point-to set.
             //The query of point-to to ADD(id:6) is failed.
             //So we need to store the add's value to a PR,
-            //and it will reserved the point-to set information.
-            //
-            //    call 'getNeighbour'
-            //       add (ptr<24>) param4 id:6
-            //           lda (ptr<96>) id:31
-            //               id (mc<96>, 'pix_a')
-            //           mul (u32) id:13
-            //               ld (i32 'i')
-            //               intconst 24|0x18 (u32) id:14
+            //so as to it could reserve point-to set.
+            //e.g: call 'getNeighbour'
+            //       add ptr<24> id:6
+            //         lda ptr<96> 'pix_a'
+            //         mul u32 id:13
+            //           ld i32 'i'
+            //           intconst 24 u32 id:14
             SIMP_to_lowest_height(&tcont) = true;
         }
 
@@ -1944,8 +1969,7 @@ IR * Region::simplifyIStore(IR * ir, SimpCtx * ctx)
         xcom::add_next(&ret_list, &last, SIMP_stmtlist(&basectx));
     }
 
-    if (SIMP_to_lowest_height(ctx) &&
-        IST_base(ir)->is_ild() &&
+    if (SIMP_to_lowest_height(ctx) && IST_base(ir)->is_ild() &&
         SIMP_ild_ist(ctx)) {
         //Handle a special case, the following tree is obscure,
         //transform it to be more understandable.
@@ -2362,6 +2386,14 @@ void Region::simplifyBB(IRBB * bb, SimpCtx * ctx)
         }
     }
     BB_irlist(bb).copy(new_ir_list);
+}
+
+
+void Region::simplifyIRList(SimpCtx * ctx)
+{
+    setIRList(simplifyStmtList(getIRList(), ctx));
+    ASSERT0(verifySimp(getIRList(), *ctx));
+    ASSERT0(verifyIRList(getIRList(), nullptr, this));
 }
 
 

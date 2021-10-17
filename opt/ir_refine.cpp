@@ -1059,7 +1059,7 @@ IR * Refine::refineDiv(IR * ir, bool & change, RefineCtx & rc)
     if (op1->is_const() && op1->is_int() &&
         xcom::isPowerOf2(CONST_int_val(op1)) &&
         RC_refine_div_const(rc)) {
-        //X/2^power => X>>power, arith shift right.
+        //X/2^power => X>>power, arith shift right to floor-division.
         if (op0->is_sint()) {
             IR_code(ir) = IR_ASR;
         } else if (op0->is_uint()) {
@@ -2360,7 +2360,7 @@ IR * Refine::insertCvtForFloat(IR * parent, IR * kid, bool &)
 }
 
 
-//Insert CVT if need.
+//Insert CVT between 'parent' and 'kid' if need, otherwise return kid.
 IR * Refine::insertCvt(IR * parent, IR * kid, bool & change)
 {
     switch (parent->getCode()) {
@@ -2419,7 +2419,10 @@ IR * Refine::insertCvt(IR * parent, IR * kid, bool & change)
     case IR_RETURN:
     case IR_SELECT: {
         Type const* tgt_ty = parent->getType();
-        if (tgt_ty->is_any()) { return kid; }
+        if (tgt_ty->is_any() || kid->getType()->is_any()) {
+            //Nothing need to do if converting to ANY.
+            return kid;
+        }
 
         UINT tgt_size = parent->getTypeSize(m_tm);
         UINT src_size = kid->getTypeSize(m_tm);
@@ -2439,8 +2442,7 @@ IR * Refine::insertCvt(IR * parent, IR * kid, bool & change)
             return kid;
         }
 
-        if (parent->is_ptr() &&
-            parent->is_add() &&
+        if (parent->is_ptr() && parent->is_add() &&
             BIN_opnd0(parent)->is_ptr()) {
             //Skip pointer arithmetics.
             return kid;

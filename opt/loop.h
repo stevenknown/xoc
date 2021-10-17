@@ -125,6 +125,17 @@ public:
         LI_next(this) = nullptr;
         LI_prev(this) = nullptr;
     }
+
+    void dump(Region * rg) const
+    {
+        note(rg, "\nLOOP%u HEAD:BB%u, BODY:", id(), getLoopHead()->id());
+        if (getBodyBBSet() != nullptr) {
+            for (INT i = getBodyBBSet()->get_first();
+                 i != -1; i = getBodyBBSet()->get_next((UINT)i)) {
+                prt(rg, "%u,", i);
+            }
+        }
+    }
 };
 
 

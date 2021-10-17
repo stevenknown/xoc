@@ -37,6 +37,10 @@ author: Su Zhenyu
 namespace xoc {
 
 //Loop Invariant code Motion.
+//Note in order to reduce the complexity of LICM, the pass only handle the
+//scenario that whole RHS of stmt is loop-invariant. For cases that
+//anticipating to scan and hoist kid IR tree in RHS, will be handled in
+//Register Promotion.
 class LICM : public Pass {
     COPY_CONSTRUCTOR(LICM);
     Region * m_rg;
@@ -45,7 +49,6 @@ class LICM : public Pass {
     RCE * m_rce;
     MDSSAMgr * m_mdssamgr;
     PRSSAMgr * m_prssamgr;
-    ConstIRIter m_iriter;
     TypeMgr * m_tm;
     MDSystem * m_md_sys;
     SMemPool * m_pool;

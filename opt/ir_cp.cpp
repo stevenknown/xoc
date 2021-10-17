@@ -783,8 +783,8 @@ bool CopyProp::perform(OptCtx & oc)
 
     m_gvn = (GVN const*)m_rg->getPassMgr()->queryPass(PASS_GVN);
     m_refine = (Refine*)m_rg->getPassMgr()->registerPass(PASS_REFINE);
-    m_mdssamgr = (MDSSAMgr*)m_rg->getPassMgr()->queryPass(PASS_MD_SSA_MGR);
-    m_prssamgr = (PRSSAMgr*)m_rg->getPassMgr()->queryPass(PASS_PR_SSA_MGR);
+    m_mdssamgr = m_rg->getMDSSAMgr();
+    m_prssamgr = m_rg->getPRSSAMgr();
     if (!oc.is_pr_du_chain_valid() && !usePRSSADU()) {
         //DCE use either classic PR DU chain or PRSSA.
         //At least one kind of DU chain should be avaiable.

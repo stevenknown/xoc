@@ -42,7 +42,7 @@ namespace xoc {
 #define SOL_SET_IS_SPARSE (true)
 
 //Iterative methodology.
-//In practical scenario, work-list based algorithm does not perform better
+//TBD: In practical scenario, work-list based algorithm does not perform better
 //than RPO based algorithm.
 //#define WORK_LIST_DRIVE
 
@@ -307,12 +307,11 @@ bool SolveSet::ForAvailReachDef(UINT bbid, List<IRBB*> & preds,
         #ifdef WORK_LIST_DRIVE
         ASSERT0(lst);
         xcom::Vertex * bbv = m_cfg->getVertex(bbid);
-        xcom::EdgeC const* ecs = VERTEX_out_list(bbv);
-        while (ecs != nullptr) {
+        for (xcom::EdgeC const* ecs = bbv->getOutList();
+             ecs != nullptr;ecs = EC_next(ecs);) {
             INT succ = ecs->getToId();
             ASSERT0(succ >= 0 && m_cfg->getBB(succ));
             lst->append_tail(m_cfg->getBB(succ));
-            ecs = EC_next(ecs);
         }
         #endif
     }
@@ -368,12 +367,11 @@ bool SolveSet::ForReachDef(UINT bbid, List<IRBB*> & preds, List<IRBB*> * lst,
         #ifdef WORK_LIST_DRIVE
         ASSERT0(lst);
         xcom::Vertex * bbv = m_cfg->getVertex(bbid);
-        xcom::EdgeC const* ecs = VERTEX_out_list(bbv);
-        while (ecs != nullptr) {
+        for (xcom::EdgeC const* ecs = bbv->getOutList();
+             ecs != nullptr; ecs = ecs->get_next()) {
             INT succ = ecs->getToId();
             ASSERT0(succ >= 0 && m_cfg->getBB(succ));
             lst->append_tail(m_cfg->getBB(succ));
-            ecs = EC_next(ecs);
         }
         #endif
     }
@@ -418,12 +416,11 @@ bool SolveSet::ForAvailExpression(UINT bbid, List<IRBB*> & preds,
         #ifdef WORK_LIST_DRIVE
         ASSERT0(lst);
         xcom::Vertex * bbv = m_cfg->getVertex(bbid);
-        xcom::EdgeC const* ecs = VERTEX_out_list(bbv);
-        while (ecs != nullptr) {
+        for (xcom::EdgeC const* ecs = bbv->getOutList();
+             ecs != nullptr; ecs = ecs->get_next()) {
             INT succ = ecs->getToId();
             ASSERT0(succ >= 0 && m_cfg->getBB(succ));
             lst->append_tail(m_cfg->getBB(succ));
-            ecs = EC_next(ecs);
         }
         #endif
     }
@@ -432,11 +429,76 @@ bool SolveSet::ForAvailExpression(UINT bbid, List<IRBB*> & preds,
 }
 
 
+void SolveSet::solveByRPO(List<IRBB*> * tbbl, UINT const flag,
+                          MOD DefMiscBitSetMgr & bsmgr)
+{
+    List<IRBB*> preds;
+    bool change;
+    UINT count = 0;
+    do {
+        change = false;
+        BBListIter ct;
+        for (tbbl->get_head(&ct); ct != tbbl->end(); ct = tbbl->get_next(ct)) {
+            IRBB * bb = ct->val();
+            UINT bbid = bb->id();
+            preds.clean();
+            m_cfg->get_preds(preds, bb);
+            if (HAVE_FLAG(flag, DUOPT_SOL_AVAIL_REACH_DEF)) {
+                change |= ForAvailReachDef(bbid, preds, nullptr, bsmgr);
+            }
+            if (HAVE_FLAG(flag, DUOPT_SOL_REACH_DEF)) {
+                change |= ForReachDef(bbid, preds, nullptr, bsmgr);
+            }
+            if (HAVE_FLAG(flag, DUOPT_SOL_AVAIL_EXPR)) {
+                change |= ForAvailExpression(bbid, preds, nullptr, bsmgr);
+            }
+        }
+        count++;
+    } while (change && count < 20);
+    //UINT i = count * tbbl->get_elem_count(); //time of bb accessed.
+    ASSERT0(!change);
+}
+
+
+void SolveSet::solveByWorkList(List<IRBB*> * tbbl, UINT const flag,
+                               MOD DefMiscBitSetMgr & bsmgr)
+{
+    BBListIter ct;
+    List<IRBB*> lst;
+    for (tbbl->get_head(&ct); ct != tbbl->end(); ct = tbbl->get_next(ct)) {
+        IRBB * p = ct->val();
+        lst.append_tail(p);
+    }
+
+    List<IRBB*> preds;
+    UINT count = tbbl->get_elem_count() * 20;
+    UINT i = 0; //time of bb accessed.
+    do {
+        IRBB * bb = lst.remove_head();
+        UINT bbid = bb->id();
+        preds.clean();
+        m_cfg->get_preds(preds, bb);
+        if (HAVE_FLAG(flag, DUOPT_SOL_AVAIL_REACH_DEF)) {
+            ForAvailReachDef(bbid, preds, &lst, bsmgr);
+        }
+        if (HAVE_FLAG(flag, DUOPT_SOL_REACH_DEF)) {
+            ForReachDef(bbid, preds, &lst, bsmgr);
+        }
+        if (HAVE_FLAG(flag, DUOPT_SOL_AVAIL_EXPR)) {
+            ForAvailExpression(bbid, preds, &lst, bsmgr);
+        }
+        i++;
+    } while (lst.get_elem_count() != 0);
+    ASSERT0(i < count);
+    DUMMYUSE(count);
+}
+
+
 //Solve reaching definitions problem for IR STMT and
 //computing LIVE IN and LIVE OUT IR expressions.
 //'expr_univers': the Universal SET for ExpRep.
 void SolveSet::solve(DefDBitSetCore const& expr_univers, UINT const flag,
-                     DefMiscBitSetMgr & bsmgr)
+                     MOD DefMiscBitSetMgr & bsmgr)
 {
     START_TIMER(t7, "Solve DU set");
     BBList * bbl = m_rg->getBBList();
@@ -479,61 +541,11 @@ void SolveSet::solve(DefDBitSetCore const& expr_univers, UINT const flag,
     List<IRBB*> * tbbl = m_cfg->getRPOBBList();
     ASSERT0(tbbl);
     ASSERT0(tbbl->get_elem_count() == bbl->get_elem_count());
-    List<IRBB*> preds;
-    List<IRBB*> lst;
-#ifdef WORK_LIST_DRIVE
-    BBListIter ct;
-    for (tbbl->get_head(&ct); ct != tbbl->end(); ct = tbbl->get_next(ct)) {
-        IRBB * p = ct->val();
-        lst.append_tail(p);
-    }
-
-    UINT count = tbbl->get_elem_count() * 20;
-    UINT i = 0; //time of bb accessed.
-    do {
-        IRBB * bb = lst.remove_head();
-        UINT bbid = bb->id();
-        preds.clean();
-        m_cfg->get_preds(preds, bb);
-        if (HAVE_FLAG(flag, DUOPT_SOL_AVAIL_REACH_DEF)) {
-            ForAvailReachDef(bbid, preds, &lst, bsmgr);
-        }
-        if (HAVE_FLAG(flag, DUOPT_SOL_REACH_DEF)) {
-            ForReachDef(bbid, preds, &lst, bsmgr);
-        }
-        if (HAVE_FLAG(flag, DUOPT_SOL_AVAIL_EXPR)) {
-            ForAvailExpression(bbid, preds, &lst, bsmgr);
-        }
-        i++;
-    } while (lst.get_elem_count() != 0);
-    ASSERT0(i < count);
-    DUMMYUSE(count);
-#else
-    bool change;
-    UINT count = 0;
-    do {
-        change = false;
-        BBListIter ct;
-        for (tbbl->get_head(&ct); ct != tbbl->end(); ct = tbbl->get_next(ct)) {
-            IRBB * bb = ct->val();
-            UINT bbid = bb->id();
-            preds.clean();
-            m_cfg->get_preds(preds, bb);
-            if (HAVE_FLAG(flag, DUOPT_SOL_AVAIL_REACH_DEF)) {
-                change |= ForAvailReachDef(bbid, preds, nullptr, bsmgr);
-            }
-            if (HAVE_FLAG(flag, DUOPT_SOL_REACH_DEF)) {
-                change |= ForReachDef(bbid, preds, nullptr, bsmgr);
-            }
-            if (HAVE_FLAG(flag, DUOPT_SOL_AVAIL_EXPR)) {
-                change |= ForAvailExpression(bbid, preds, nullptr, bsmgr);
-            }
-        }
-        count++;
-    } while (change && count < 20);
-    //UINT i = count * tbbl->get_elem_count(); //time of bb accessed.
-    ASSERT0(!change);
-#endif
+    #ifdef WORK_LIST_DRIVE
+    solveByWorkList(tbbl, flag, bsmgr);
+    #else
+    solveByRPO(tbbl, flag, bsmgr);
+    #endif
     END_TIMER(t7, "Solve DU set");
 }
 
@@ -849,7 +861,7 @@ void SolveSet::computeMustExactDefMayDefMayUse(OUT Vector<MDSet*> * mustdefmds,
         }
 
         computeMustExactDefMayDefMayUseForBB(bb, mditer,
-                                             mustdefmds, maydefmds, 
+                                             mustdefmds, maydefmds,
                                              mayusemds, bb_mustdefmds,
                                              bb_maydefmds, mustgen_stmt,
                                              maygen_stmt, flag, *lsbsmgr);
