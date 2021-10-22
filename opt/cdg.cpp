@@ -174,9 +174,10 @@ void CDG::build(MOD OptCtx & oc, xcom::DGraph & cfg)
     bool has_cyc = pdom_tree.sortInTopologOrder(top_order);
     CHECK0_DUMMYUSE(!has_cyc);
 
-    xcom::BitSetMgr bs_mgr;
+    xcom::DefMiscBitSetMgr bs_mgr;
+
     //Record vertex set by which current vertex controlled.
-    Vector<xcom::BitSet*> cd_set;
+    Vector<xcom::DefSBitSet*> cd_set;
     for (INT j = 0; j <= top_order.get_last_idx(); j++) {
         UINT ii = top_order.get(j)->id();
         xcom::Vertex const* v = cfg.getVertex(ii);
@@ -184,9 +185,9 @@ void CDG::build(MOD OptCtx & oc, xcom::DGraph & cfg)
         addVertex(v->id());
 
         //Get control-set of v.
-        xcom::BitSet * cd_of_v = cd_set.get(v->id());
+        xcom::DefSBitSet * cd_of_v = cd_set.get(v->id());
         if (cd_of_v == nullptr) {
-            cd_of_v = bs_mgr.create();
+            cd_of_v = bs_mgr.allocSBitSet();
             cd_set.set(v->id(), cd_of_v);
         }
 
@@ -213,10 +214,11 @@ void CDG::build(MOD OptCtx & oc, xcom::DGraph & cfg)
             ASSERT0(cfg.get_ipdom(pred->id()) == v->id());
 
             //Get control-set of pred.
-            xcom::BitSet * cd_of_pred = cd_set.get(pred->id());
+            xcom::DefSBitSet * cd_of_pred = cd_set.get(pred->id());
             if (cd_of_pred == nullptr) { continue; }
-            for (INT i = cd_of_pred->get_first(); i != -1;
-                 i = cd_of_pred->get_next(i)) {
+            xcom::DefSBitSetIter it = nullptr;
+            for (INT i = cd_of_pred->get_first(&it); i != -1;
+                 i = cd_of_pred->get_next(i, &it)) {
                 if (v->id() == cfg.get_ipdom(i)) { continue; }
                 cd_of_v->bunion(i);
                 if (m_allow_cycle || i != (INT)v->id()) {
@@ -228,6 +230,12 @@ void CDG::build(MOD OptCtx & oc, xcom::DGraph & cfg)
     OC_is_cdg_valid(oc) = true;
     END_TIMER(t, "Build CDG");
 
+    for (INT i = 0; i <= cd_set.get_last_idx(); i++) {
+        xcom::DefSBitSet * sbs = cd_set.get(i);
+        if (sbs != nullptr) {
+            sbs->clean();
+        }
+    }
     if (g_is_dump_after_pass && g_dump_opt.isDumpCDG()) {
         START_TIMER(t3, "Build CDG:dump");
         dump();

@@ -54,5 +54,9 @@ OPT_OBJS +=\
 ../opt/gscc.o\
 ../opt/lftr.o\
 ../opt/ir_ivr.o\
-../opt/md_mgr.o
+../opt/md_mgr.o\
+../opt/solve_set.o\
+../opt/infer_type.o\
+../opt/attachinfo_mgr.o\
+../opt/analysis_instr.o
 

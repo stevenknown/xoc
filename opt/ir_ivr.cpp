@@ -552,9 +552,9 @@ bool IVR::isSelfModByMDSSA(IR const* ir) const
         VMD * vopnd = (VMD*)m_mdssamgr->getVOpnd(u);
         ASSERT0(vopnd && vopnd->is_md());
 
-        IRSetIter vit = nullptr;
-        for (INT i = vopnd->getUseSet()->get_first(&vit);
-            i >= 0; i = vopnd->getUseSet()->get_next(i, &vit)) {
+        VMD::UseSetIter vit;
+        for (INT i = vopnd->getUseSet()->get_first(vit);
+             !vit.end(); i = vopnd->getUseSet()->get_next(vit)) {
             IR * use = m_rg->getIR(i);
             ASSERT0(use && (use->isMemoryRef() || use->is_id()));
 
@@ -1030,8 +1030,8 @@ bool IVR::perform(OptCtx & oc)
     if (bbl == nullptr || bbl->get_elem_count() == 0) { return false; }
 
     if (!oc.is_ref_valid()) { return false; }
-    m_mdssamgr = (MDSSAMgr*)m_rg->getPassMgr()->queryPass(PASS_MD_SSA_MGR);
-    m_prssamgr = (PRSSAMgr*)m_rg->getPassMgr()->queryPass(PASS_PR_SSA_MGR);
+    m_mdssamgr = m_rg->getMDSSAMgr();
+    m_prssamgr = m_rg->getPRSSAMgr();
 
     if (!oc.is_pr_du_chain_valid() && !usePRSSADU()) {
         //DCE use either classic PR DU chain or PRSSA.

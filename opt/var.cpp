@@ -61,7 +61,7 @@ void ConstVarTab::dump(TypeMgr * tm)
 VarMgr::VarMgr(RegionMgr * rm)
 {
     ASSERT0(rm);
-    m_var_count = 1; //for enjoying bitset util
+    m_var_count = VAR_ID_UNDEF + 1; //for enjoying bitset.
     m_str_count = 1;
     m_ru_mgr = rm;
     m_tm = rm->getTypeMgr();
@@ -114,6 +114,8 @@ void Var::dumpProp(xcom::StrBuf & buf, bool grmode) const
             buf.strcat("global");
         } else if (HAVE_FLAG(VAR_flag(this), VAR_LOCAL)) {
             buf.strcat("local");
+        } else if (HAVE_FLAG(VAR_flag(this), VAR_FAKE)) {
+            buf.strcat("fake");
         } else {
             UNREACHABLE();
         }
@@ -318,7 +320,11 @@ CHAR const* Var::dump(StrBuf & buf, TypeMgr const* dm) const
 
     buf.strcat(",%s", dm->getDTypeName(TY_dtype(ltype)));
     if (TY_dtype(ltype) > D_F128) {
-        buf.strcat(",mem_size:%d", getByteSize(dm));
+        if (ltype->is_any()) {
+            buf.strcat(",mem_size:ANY");
+        } else {
+            buf.strcat(",mem_size:%d", getByteSize(dm));
+        }
     }
 
     buf.strcat(",decl:'");
@@ -356,12 +362,13 @@ CHAR const* Var::dump(StrBuf & buf, TypeMgr const* dm) const
 //Free Var memory.
 void VarMgr::destroyVar(Var * v)
 {
-    ASSERT0(VAR_id(v) != 0);
-    m_freelist_of_varid.bunion(VAR_id(v), *m_ru_mgr->get_sbs_mgr());
-    m_var_vec.set(VAR_id(v), nullptr);
-    if (v->is_string()) {
-        ASSERT0(VAR_string(v));
-        m_str_tab.remove(VAR_string(v));
+    ASSERT0(v->id() != VAR_ID_UNDEF);
+    m_freelist_of_varid.bunion(v->id(), *m_ru_mgr->get_sbs_mgr());
+    m_var_vec.set(v->id(), nullptr);
+    if (v->is_string() && v->getString() != nullptr) {
+        //User may declare a empty string.
+        //e.g: var gc:str:(fake,align(4));
+        m_str_tab.remove(v->getString());
     }
     delete v;
 }
@@ -389,14 +396,15 @@ void VarMgr::assignVarId(Var * v)
 {
     DefSBitSetIter iter = nullptr;
     INT id = m_freelist_of_varid.get_first(&iter);
-    ASSERT0(id != 0);
+    ASSERT0(id != VAR_ID_UNDEF);
     if (id > 0) {
         m_freelist_of_varid.diff(id, *m_ru_mgr->get_sbs_mgr());
         VAR_id(v) = id;
     } else {
         VAR_id(v) = (UINT)m_var_count++;
     }
-    ASSERTN(VAR_id(v) < 5000000, ("too many variables"));
+
+    ASSERTN(VAR_id(v) < VAR_ID_MAX, ("too many variables"));
     ASSERT0(m_var_vec.get(VAR_id(v)) == nullptr);
     m_var_vec.set(VAR_id(v), v);
 }

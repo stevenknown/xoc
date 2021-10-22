@@ -2086,7 +2086,7 @@ void AliasAnalysis::updateLHSPointToSet(bool is_lhs_pointer,
                                         MD2MDSet * mx)
 {
     if (rhs_taken_address || is_lhs_pointer) {
-        //If result type of IST is pointer, and the ptset is empty, then
+        //If result type of IST is pointer, and the pts is empty, then
         //it might point to anywhere.
         //e.g:
         //p = q, q is array base (e.g:q[100]), add p->q.
@@ -2108,7 +2108,7 @@ void AliasAnalysis::updateLHSPointToSet(bool is_lhs_pointer,
             //POINT-TO set may include element which also have been in
             //getWorstCase().
             //CASE: =&g[i] violate this constraint.
-            //ASSERT0(!ptset->is_intersect(getWorstCase()));
+            //ASSERT0(!pts->is_intersect(getWorstCase()));
         }
 
         //'rhsrefmds' should record the POINT-TO set of 'rhs'.
@@ -2446,7 +2446,7 @@ MD const* AliasAnalysis::allocHeapobj(IR * ir)
 
     CHAR name[128];
     sprintf(name, "heap_obj%d", m_ir2heapobj.get_elem_count());
-    ASSERT0(strlen(name) < 128);
+    ASSERT0(::strlen(name) < 128);
     Var * tv = m_rg->getVarMgr()->registerVar(name, m_tm->getMCType(0),
                                               0, VAR_GLOBAL);
 
@@ -2462,6 +2462,8 @@ MD const* AliasAnalysis::allocHeapobj(IR * ir)
 
     MD md;
     MD_base(&md) = tv;
+    //Use UNBOUND to guarrantee the abstract heap object will not be
+    //regared as must-exact object that will confuse killing computation.
     MD_ty(&md) = MD_UNBOUND;
     MD const* entry = m_md_sys->registerMD(md);
     ASSERT0(entry->id() > MD_UNDEF);
@@ -2567,6 +2569,7 @@ void AliasAnalysis::processCall(IN IR * ir, IN MD2MDSet * mx)
             } else {
                 t = ir->getMustRef();
             }
+            ASSERT0(t);
             setPointToUniqueMD(t->id(), *mx, allocHeapobj(ir));
         }
 
@@ -3741,13 +3744,13 @@ bool AliasAnalysis::computeFlowSensitive(List<IRBB*> const& bbl,
 //The pointer includes global pointer and formal parameter pointer.
 //'param': formal parameter.
 //Note May-POINT-TO set must be available before call this function.
-void AliasAnalysis::initGlobalAndParameterVarPtSet(Var * param, MD2MDSet * mx)
+void AliasAnalysis::initGlobalAndParameterPTS(Var * param, MD2MDSet * mx)
 {
     MD const* dmd = nullptr; //record dedicated MD which parameter pointed to.
     if (VAR_is_restrict(param)) {
         //If parameter is restrict, we allocate an individual variable to
         //distinguish its point-to set with other parameters.
-        dmd = m_var2md.get(param);
+        dmd = m_dedicated_var2md.get(param);
         if (dmd == nullptr) {
             CHAR name[64];
             SNPRINTF(name, 63, "DummyGlobalVarPointedByVAR%u", param->id());
@@ -3770,7 +3773,7 @@ void AliasAnalysis::initGlobalAndParameterVarPtSet(Var * param, MD2MDSet * mx)
             MD_ty(&md) = MD_EXACT;
             dmd = m_md_sys->registerMD(md);
             ASSERT0(dmd->id() > MD_UNDEF);
-            m_var2md.set(param, dmd);
+            m_dedicated_var2md.set(param, dmd);
         }
     }
 
@@ -3829,7 +3832,7 @@ bool AliasAnalysis::isFlowSensitiveProperly()
 {
     ASSERT0(m_cfg->getEntry());
     MD2MDSet * mx = genMD2MDSetForBB(m_cfg->getEntry()->id());
-    ASSERTN(mx, ("invoke initEntryPtset before here"));
+    ASSERTN(mx, ("invoke initEntryPTS before here"));
     UINT num_of_tgt_md = mx->computePtPairNum(*m_md_sys);
     num_of_tgt_md = (num_of_tgt_md * mx->get_elem_count() /
                     HOST_BIT_PER_BYTE + 1) *
@@ -3858,7 +3861,7 @@ void AliasAnalysis::initBBPPSet(PPSetMgr & ppsetmgr)
 }
 
 
-void AliasAnalysis::initFlowSensitiveEntryPtset(PPSetMgr & ppsetmgr)
+void AliasAnalysis::initFlowSensitiveEntryPTS(PPSetMgr & ppsetmgr)
 {
     ASSERT0(m_cfg->verify());
     ASSERT0(m_rg->getBBList()->get_elem_count() != 0);
@@ -3885,7 +3888,7 @@ void AliasAnalysis::initFlowSensitiveEntryPtset(PPSetMgr & ppsetmgr)
         //instead of initializing point-set at once.
         //if (!v->is_pointer() && !v->is_any()) { continue; }
 
-        initGlobalAndParameterVarPtSet(v, mx);
+        initGlobalAndParameterPTS(v, mx);
     }
     convertMD2MDSet2PT(getInPtPairSet(entry), m_ppmgr, ppsetmgr, mx);
 }
@@ -3899,11 +3902,11 @@ void AliasAnalysis::initFlowSensitiveEntryPtset(PPSetMgr & ppsetmgr)
 //        *p=0;
 //    }
 //    where p and q are entry MD.
-//ptset_arr: used to record all the PtPair set. It will be deleted by caller.
-void AliasAnalysis::initEntryPtset(PPSetMgr & ppsetmgr)
+//pts_arr: used to record all the PtPair set. It will be deleted by caller.
+void AliasAnalysis::initEntryPTS(PPSetMgr & ppsetmgr)
 {
     if (m_flow_sensitive) {
-        initFlowSensitiveEntryPtset(ppsetmgr);
+        initFlowSensitiveEntryPTS(ppsetmgr);
         return;
     }
     VarTab * vt = m_rg->getVarTab();
@@ -3925,7 +3928,7 @@ void AliasAnalysis::initEntryPtset(PPSetMgr & ppsetmgr)
         //instead of initializing point-set at once.
         //if (!v->is_pointer() && !v->is_any()) { continue; }
 
-        initGlobalAndParameterVarPtSet(v, &m_unique_md2mds);
+        initGlobalAndParameterPTS(v, &m_unique_md2mds);
     }
 }
 
@@ -4045,14 +4048,14 @@ bool AliasAnalysis::perform(MOD OptCtx & oc)
             ("infer pointer arith need loop info"));
     ASSERT0(oc.is_scc_valid());
     m_scc = (GSCC*)m_rg->getPassMgr()->queryPass(PASS_GSCC);
-    m_prssamgr = (PRSSAMgr*)m_rg->getPassMgr()->queryPass(PASS_PR_SSA_MGR);
+    m_prssamgr = m_rg->getPRSSAMgr();
     ASSERT0(m_scc);
 
     //We allocate PtPairSet at each call of AA,
     //because AA would not be invoked frequently.
     if (m_flow_sensitive) {
         PPSetMgr ppsetmgr;
-        initEntryPtset(ppsetmgr);
+        initEntryPTS(ppsetmgr);
         m_rg->getPassMgr()->checkValidAndRecompute(&oc, PASS_RPO, PASS_UNDEF);
         List<IRBB*> * tbbl = m_cfg->getRPOBBList();
         ASSERT0(tbbl);
@@ -4068,14 +4071,14 @@ bool AliasAnalysis::perform(MOD OptCtx & oc)
             m_flow_sensitive = false;
             START_TIMER_FMT(t4, ("%s:flow insensitive analysis",
                                  getPassName()));
-            initEntryPtset(ppsetmgr);
+            initEntryPTS(ppsetmgr);
             computeFlowInsensitive();
             END_TIMER_FMT(t4, ("%s:flow insensitive analysis", getPassName()));
         }
     } else {
         PPSetMgr ppsetmgr;
         START_TIMER_FMT(t3, ("%s:flow insensitive analysis", getPassName()));
-        initEntryPtset(ppsetmgr);
+        initEntryPTS(ppsetmgr);
         computeFlowInsensitive();
         END_TIMER_FMT(t3, ("%s:flow insensitive analysis", getPassName()));
     }
@@ -4087,8 +4090,8 @@ bool AliasAnalysis::perform(MOD OptCtx & oc)
     ASSERT0(verify());
 
     //DU info does not depend on these data structures.
-    //Since AA is not always used, we destroy the data
-    //structure to release memory.
+    //Since AA info is not always be queried after perform(), we destroy the
+    //data structure to release memory.
     m_ppmgr.clean();
     cleanSBSMgr();
     destroyContext();

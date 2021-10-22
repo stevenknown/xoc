@@ -379,11 +379,12 @@ public:
     COPY_CONSTRUCTOR(IRParser);
     ~IRParser();
 
-    void dump();
+    bool dump() const;
 
-    RegionMgr * getRegionMgr() { return m_rumgr; }
+    CHAR const* getPassName() const { return "IRParser"; }
+    RegionMgr * getRegionMgr() const { return m_rumgr; }
     List<ParseErrorMsg*> & getErrorMsgList() { return m_err_list; }
-    CHAR const* getKeywordName(X_CODE code);
+    CHAR const* getKeywordName(X_CODE code) const;
     Lexer * getLexer() const { return m_lexer; }
 
     void setLexer(Lexer * l) { m_lexer = l; }

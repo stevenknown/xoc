@@ -293,11 +293,15 @@ private:
     void setKilledIRExpr(UINT bbid, DefDBitSetCore * set);
     void setMayKilledDef(UINT bbid, DefDBitSetCore * set);
     void setMustKilledDef(UINT bbid, DefDBitSetCore * set);
+    void solveByRPO(List<IRBB*> * tbbl, UINT const flag,
+                    MOD DefMiscBitSetMgr & bsmgr);
+    void solveByWorkList(List<IRBB*> * tbbl, UINT const flag,
+                         MOD DefMiscBitSetMgr & bsmgr);
     //Solve reaching definitions problem for IR STMT and
     //computing LIVE IN and LIVE OUT IR expressions.
     //'expr_univers': the Universal SET for ExpRep.
     void solve(DefDBitSetCore const& expr_universe, UINT const flag,
-               DefMiscBitSetMgr & bsmgr);
+               MOD DefMiscBitSetMgr & bsmgr);
 public:
     SolveSet(Region * rg)
     {

@@ -1027,6 +1027,33 @@ void Graph::dumpVexVector(Vector<Vertex*> const& vec, FILE * h)
 }
 
 
+void Graph::dumpVertex(FILE * h, Vertex const* v) const
+{
+    fprintf(h, "\nnode%d [shape = Mrecord, label=\"{V%d}\"];",
+            VERTEX_id(v), VERTEX_id(v));
+}
+
+
+void Graph::dumpEdge(FILE * h, Edge const* e) const
+{
+    fprintf(h, "\nnode%d->node%d", e->from()->id(), e->to()->id());
+    fprintf(h, "[");
+    bool prt_comma = false;
+    if (!is_direction()) {
+        if (prt_comma) { fprintf(h, ","); }
+        fprintf(h, "dir=none");
+        prt_comma = true;
+    }
+    {
+        //Print label.
+        if (prt_comma) { fprintf(h, ","); }
+        fprintf(h, "label=\"%s\"", "");
+        prt_comma = true;
+    }
+    fprintf(h, "]");
+}
+
+
 void Graph::dumpDOT(CHAR const* name) const
 {
     if (name == nullptr) {
@@ -1041,29 +1068,14 @@ void Graph::dumpDOT(CHAR const* name) const
     VertexIter itv = VERTEX_UNDEF;
     for (Vertex const* v = get_first_vertex(itv);
          v != nullptr; v = get_next_vertex(itv)) {
-        fprintf(h, "\nnode%d [shape = Mrecord, label=\"{V%d}\"];",
-                VERTEX_id(v), VERTEX_id(v));
+        dumpVertex(h, v);
     }
 
     //Print edge
     EdgeIter ite;
     for (Edge const* e = get_first_edge(ite);
          e != nullptr; e = get_next_edge(ite)) {
-        fprintf(h, "\nnode%d->node%d", e->from()->id(), e->to()->id());
-        fprintf(h, "[");
-        bool prt_comma = false;
-        if (!is_direction()) {
-            if (prt_comma) { fprintf(h, ","); }
-            fprintf(h, "dir=none");
-            prt_comma = true;
-        }
-        {
-            //Print label.
-            if (prt_comma) { fprintf(h, ","); }
-            fprintf(h, "label=\"%s\"", "");
-            prt_comma = true;
-        }
-        fprintf(h, "]");
+        dumpEdge(h, e);
     }
     fprintf(h, "\n}\n");
     fclose(h);

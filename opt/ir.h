@@ -190,6 +190,20 @@ typedef enum {
     case IR_LDA: \
     case IR_CONST
 
+//Defined the enty for memory load access.
+#define SWITCH_CASE_EXP_MEM_ACC \
+    case IR_LD: \
+    case IR_PR: \
+    case IR_ILD: \
+    case IR_ARRAY
+
+//Defined the enty for memory write access.
+#define SWITCH_CASE_STMT_MEM_ACC \
+    case IR_ST: \
+    case IR_STPR: \
+    case IR_IST: \
+    case IR_STARRAY
+
 //Describe miscellaneous information for IR.
 #define IRT_IS_STMT 0x1 //statement.
 #define IRT_IS_BIN 0x2 //binary operation.
@@ -2016,48 +2030,46 @@ public:
 
 //This class represents array operation.
 //Base of array can be LDA, or other computational expression.
-//This operation do not perform any array bound diagnositc.
-//
-//If array base is LDA, it denotes that the array's base is variable with
+//This operation do not perform any array bound diagnosis.
+//If array base is LDA, it denotes that the array's base is a variable with
 //array type,
-//    e.g: char p[N]; (&p)[i] = ...
+//e.g: char p[N]; (&p)[i] = ...
 //
 //If array base is computational expression, it denotes that the array's
-//base is pointer, and the pointer point to an array.
-//    e.g: char * p; (p+1)[i] = ...
+//base is pointer, and the pointer points to an array.
+//e.g: char * p; (p+1)[i] = ...
 //
-//'elem_ty' represents the type of array element.
-//Moreover, element may be array as well.
-//
-//'elem_num' represents the number of array element in current dimension.
-//
+//ARR_elem_ty represents the type of array element. Moreover, element may be
+//array as well.
+#define ARR_elemtype(ir) (((CArray*)CK_IRT_ARR(ir))->elemtype)
 #define ARR_ofst(ir) (((CArray*)CK_IRT_ARR(ir))->field_offset)
 #define ARR_du(ir) (((CArray*)CK_IRT_ARR(ir))->du)
-#define ARR_elemtype(ir) (((CArray*)CK_IRT_ARR(ir))->elemtype)
 
 //Get the number of element in each dimension.
-//Note the lowest dimension, which iterates most slowly, is at the most left
-//of 'ARR_elem_num_buf'.
+//ARR_elem_num represents the number of array element in current dimension.
+//Note the lowest dimension, which iterates most fastly, is at the 0th position
+//in 'ARR_elem_num_buf'.
 //e.g: Given array D_I32 A[10][20], the 0th dimension is the lowest dimension,
 //it has 20 elements, each element has type D_I32;
 //the 1th dimension has 10 elements, each element has type [D_I32*20], and
-//the ARR_elem_num_buf will be [20, 10],
-//that is the lowest dimension at the position 0 of the buffer.
-//If we have an array accessing, such as A[i][j], the sublist will be
-//ld(j)->ld(i), and elem_num list will be 20->10.
-//the fininal access address will be (j + 20 * i) * sizeof(D_I32) + lda(A).
-//
-//Note that if the ARR_elem_num of a dimension is 0, means we can not determine
-//the number of element at the dimension.
+//the ARR_elem_num_buf will be [20, 10], the lowest dimension at the position 0
+//in the buffer.
+//Note that if the ARR_elem_num of a dimension is 0, that means we can not
+//determine the number of element at the dimension.
 #define ARR_elem_num(ir, dim) \
     (((CArray*)CK_IRT_ARR(ir))->elem_num[CK_ARRAY_DIM(ir, dim)])
 #define ARR_elem_num_buf(ir) (((CArray*)CK_IRT_ARR(ir))->elem_num)
 
+//Array subscript expression list.
+//If we have an array accessing, such as A[i][j], the ARR_sub_list will be
+//ld(j)->ld(i), the first expression represents the accessing of the lowest
+//dimension. By given the example, if ARR_elem_num is [20, 10].
+//the fininal accessing address will be lda(A) + (20 * i + j) * sizeof(D_I32).
+#define ARR_sub_list(ir) ARR_kid(ir, 1)
+
 //Array base expression.
 #define ARR_base(ir) ARR_kid(ir, 0)
 
-//Array subscript expression.
-#define ARR_sub_list(ir) ARR_kid(ir, 1)
 #define ARR_kid(ir, idx) (((CArray*)ir)->opnd[CKID_ARR(ir, idx)])
 class CArray : public DuProp, public OffsetProp {
     COPY_CONSTRUCTOR(CArray);
@@ -2124,7 +2136,7 @@ public:
 //The most operations and properties are same as CArray.
 //
 //Base of array can be LDA, or other computational expression.
-//This operation do not perform any array bound diagnositc.
+//This operation do not perform any array bound diagnosis.
 //
 //If array base is IR_LDA, it denotes that the array's base is variable with
 //array type,

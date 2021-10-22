@@ -60,3 +60,4 @@ author: Su Zhenyu
 #include "inliner.h"
 #include "refine_duchain.h"
 #include "scalar_opt.h"
+#include "infer_type.h"

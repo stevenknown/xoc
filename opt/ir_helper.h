@@ -328,7 +328,6 @@ inline bool isUnaryOp(IR_TYPE irt)
 
 void setParentPointerForIRList(IR * ir_list);
 bool verifyIRList(IR * ir, BitSet * irh, Region const* rg);
-bool verifyIRandBB(BBList * ir_bb_list, Region const* rg);
 bool verifySimp(IR * ir, SimpCtx & simp);
 
 } //namespace xoc

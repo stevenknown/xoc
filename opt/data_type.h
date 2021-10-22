@@ -157,6 +157,8 @@ public:
     Type() { data_type = D_UNDEF; }
 
     void copy(Type const& src) { data_type = src.data_type; }
+    
+    void dump(TypeMgr const* tm) const;
 
     //Return the number of elements in the vector.
     UINT getVectorElemNum(TypeMgr const* tm) const;
@@ -739,6 +741,11 @@ public:
         return D_MC;
     }
 
+    //Return Integer Type according to given bit size and sign.
+    //e.g: given bitsize is 32, is_signed is true, return D_I32 type.
+    Type const* getIntType(UINT bitsize, bool is_signed) const
+    { return getSimplexTypeEx(get_int_dtype(bitsize, is_signed)); }
+
     //Return DATA-Type according to given bit size and sign.
     //Note the bit size will be aligned to power of 2.
     DATA_TYPE getDType(UINT bit_size, bool is_signed) const
@@ -761,6 +768,11 @@ public:
     //Return byte size of a pointer.
     //e.g: 32bit processor return 4, 64bit processor return 8.
     UINT getPointerByteSize() const { return BYTE_PER_POINTER; }
+
+    //Return bit size of a pointer.
+    //e.g: 32bit processor return 32, 64bit processor return 64.
+    UINT getPointerBitSize() const
+    { return getPointerByteSize() * BIT_PER_BYTE; }
 
     //Return DATA-Type that has identical byte-size to pointer.
     //e.g: 32bit processor return U4, 64bit processor return U8.

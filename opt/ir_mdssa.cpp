@@ -164,10 +164,10 @@ void MDSSAMgr::dumpAllVMD()
 
         //Print USEs.
         prt(getRegion(), "\tUSE:");
-        IRSetIter it = nullptr;
+        VMD::UseSetIter it;
         INT nexti = 0;
-        for (INT j = v->getUseSet()->get_first(&it); it != nullptr; j = nexti) {
-            nexti = v->getUseSet()->get_next(j, &it);
+        for (INT j = v->getUseSet()->get_first(it); !it.end(); j = nexti) {
+            nexti = v->getUseSet()->get_next(it);
             IR * use = m_rg->getIR(j);
             ASSERT0(use && !use->isReadPR());
             prt(getRegion(), "(%s,id:%d)", IRNAME(use), use->id());
@@ -764,9 +764,9 @@ void MDSSAMgr::dumpExpDUChainIter(IR const* ir, List<IR*> & lst,
 static void dumpUseSet(VMD const* vmd, Region * rg)
 {
     ASSERT0(vmd);
-    IRSetIter vit = nullptr;
-    for (INT i = const_cast<VMD*>(vmd)->getUseSet()->get_first(&vit);
-        i >= 0; i = const_cast<VMD*>(vmd)->getUseSet()->get_next(i, &vit)) {
+    VMD::UseSetIter vit;
+    for (INT i = const_cast<VMD*>(vmd)->getUseSet()->get_first(vit);
+         !vit.end(); i = const_cast<VMD*>(vmd)->getUseSet()->get_next(vit)) {
         IR const* use = rg->getIR(i);
         ASSERT0(use && (use->isMemoryRef() || use->is_id()));
         prt(rg, "(%s id:%d) ", IRNAME(use), use->id());
@@ -1241,9 +1241,9 @@ void MDSSAMgr::renameUse(IR * ir)
             //vopnd may be ver0.
             //Current ir does not refer the old version VMD any more.
             ASSERT0(vopnd->version() == MDSSA_INIT_VERSION ||
-                    vopnd->getUseSet()->find(ir));
+                    vopnd->findUse(ir));
             ASSERT0(vopnd->version() == MDSSA_INIT_VERSION || vopnd->getDef());
-            ASSERT0(!topv->getUseSet()->find(ir));
+            ASSERT0(!topv->findUse(ir));
 
             set->remove(vopnd, *m_sbs_mgr);
             added.append(topv, *m_sbs_mgr);
@@ -1857,10 +1857,10 @@ void MDSSAMgr::verifyDef(MDDef const* def, VMD const* vopnd) const
 void MDSSAMgr::verifyUseSet(VMD const* vopnd) const
 {
     //Check if USE of vopnd references the correct MD/MDSet.
-    IRSetIter iter2;
-    for (INT j = const_cast<VMD*>(vopnd)->getUseSet()->get_first(&iter2);
-         j >= 0;
-         j = const_cast<VMD*>(vopnd)->getUseSet()->get_next(j, &iter2)) {
+    VMD::UseSetIter iter2;
+    for (INT j = const_cast<VMD*>(vopnd)->getUseSet()->get_first(iter2);
+         !iter2.end();
+         j = const_cast<VMD*>(vopnd)->getUseSet()->get_next(iter2)) {
         IR const* use = (IR*)m_rg->getIR(j);
         ASSERT0(use);
         ASSERT0(use->isMemoryRef() || use->is_id());
@@ -1926,7 +1926,7 @@ void MDSSAMgr::verifyMDSSAInfoForIR(IR const* ir) const
 
         //ir is expression.
         if (def != nullptr) {
-            ASSERT0(vopnd->getUseSet()->find(ir));
+            ASSERT0(vopnd->findUse(ir));
         } else {
             //The DEF of vopnd is NULL, it should be initial version of MD.
             ASSERT0(vopnd->version() == MDSSA_INIT_VERSION);
@@ -2076,7 +2076,7 @@ void MDSSAMgr::changeUse(IR * olduse, IR * newuse)
         next = oldmdssainfo->getVOpndSet()->get_next(i, &iter);
         VMD * oldvopnd = (VMD*)getUseDefMgr()->getVOpnd(i);
         ASSERT0(oldvopnd && oldvopnd->is_md());
-        if (!oldvopnd->getUseSet()->find(olduse)) { continue; }
+        if (!oldvopnd->findUse(olduse)) { continue; }
 
         //Update VOpnd's UseSet for olduse's MDSSAInfo.
         oldvopnd->removeUse(olduse);
@@ -2229,7 +2229,7 @@ void MDSSAMgr::removeMDSSAOcc(IR * ir)
         }
     }
 
-    //TO BE CONFIRMED:Why do you remove PRSSA info in MDSSAMgr.
+    //TBD: Why do you remove PRSSA info in MDSSAMgr.
     //if ((prssainfo = ir->getSSAInfo()) != nullptr) {
     //    //Whole IR tree may be removed via this function recursively.
     //    //Maintain the SSAInfo of read-pr/write-pr operation.
@@ -2307,9 +2307,9 @@ void MDSSAMgr::replaceVOpndForAllUse(MOD VMD * to, MOD VMD * from)
 {
     ASSERT0(to->is_md() && from->is_md());
     //Replace the USE of src to tgt.
-    IRSetIter it = nullptr;
-    for (INT k = from->getUseSet()->get_first(&it);
-         k >= 0; k = from->getUseSet()->get_next(k, &it)) {
+    VMD::UseSetIter it;
+    for (INT k = from->getUseSet()->get_first(it);
+         !it.end(); k = from->getUseSet()->get_next(it)) {
         IR const* use = (IR*)m_rg->getIR(k);
         MDSSAInfo * use_mdssainfo = getMDSSAInfoIfAny(use);
         ASSERTN(use_mdssainfo, ("use miss MDSSAInfo"));
@@ -2326,10 +2326,10 @@ void MDSSAMgr::replaceVOpndForAllUse(MOD VMD * to, MOD VMD * from)
 void MDSSAMgr::removeVOpndForAllUse(MOD VMD * vopnd)
 {
     ASSERT0(vopnd->is_md());
-    IRSet * useset = vopnd->getUseSet();
-    IRSetIter vit = nullptr;
-    for (INT i = useset->get_first(&vit);
-         i >= 0; i = useset->get_next(i, &vit)) {
+    VMD::UseSet * useset = vopnd->getUseSet();
+    VMD::UseSetIter vit;
+    for (INT i = useset->get_first(vit);
+         !vit.end(); i = useset->get_next(vit)) {
         IR * ir = m_rg->getIR(i);
         ASSERT0(ir && (ir->isMemoryRef() || ir->is_id()));
         MDSSAInfo * mdssainfo = getMDSSAInfoIfAny(ir);
@@ -2944,13 +2944,13 @@ IR const* MDSSAMgr::iterUseInitC(IR const* def,
             it.current_pos_in_vopndset);
         ASSERT0(vopnd && vopnd->is_md());
         it.current_useset = vopnd->getUseSet();
-        it.useset_iter = nullptr;
+        it.useset_iter.clean();
         //Find the first iter and position in UseSet.
         for (it.current_pos_in_useset = it.current_useset->get_first(
-                 &it.useset_iter);
-             it.useset_iter != nullptr;
+                 it.useset_iter);
+             !it.useset_iter.end();
              it.current_pos_in_useset = it.current_useset->get_next(
-                 it.current_pos_in_useset, &it.useset_iter)) {
+                 it.useset_iter)) {
             IR * use = m_rg->getIR(it.current_pos_in_useset);
             ASSERT0(use && !use->isReadPR());
             return use;
@@ -2978,21 +2978,20 @@ IR const* MDSSAMgr::iterUseNextC(OUT ConstMDSSAUSEIRIter & it) const
 {
     MDSSAMgr * pthis = const_cast<MDSSAMgr*>(this);
     //Update iter and position in UseSet.
-    for (; it.useset_iter != nullptr; UNREACHABLE()) {
-        IR * use = m_rg->getIR(it.current_pos_in_useset);
-        ASSERT0(use && !use->isReadPR());
-
-        //Prepare next USE.
-        it.current_pos_in_useset = it.current_useset->get_next(
-            it.current_pos_in_useset, &it.useset_iter);
-
-        if (it.useset_iter == nullptr) {
+    for (; !it.useset_iter.end(); UNREACHABLE()) {
+        //Find next USE.
+        it.current_pos_in_useset = it.current_useset->get_next(it.useset_iter);
+        if (it.useset_iter.end()) {
             //Prepare next VOpnd.
             it.current_pos_in_vopndset = it.vopndset->get_next(
                 it.current_pos_in_vopndset, &it.vopndset_iter);
+            //Step into next VOpnd.
+            break;
+        } else {
+            IR * use = m_rg->getIR(it.current_pos_in_useset);
+            ASSERT0(use && !use->isReadPR());
+            return use;
         }
-
-        return use;
     }
 
     //Update iter and position in VOpndSet.
@@ -3003,24 +3002,13 @@ IR const* MDSSAMgr::iterUseNextC(OUT ConstMDSSAUSEIRIter & it) const
             it.current_pos_in_vopndset);
         ASSERT0(vopnd && vopnd->is_md());
         it.current_useset = vopnd->getUseSet();
-        it.useset_iter = nullptr;
+        it.useset_iter.clean();
         //Find the first iter and position in UseSet.
         for (it.current_pos_in_useset = it.current_useset->get_first(
-                 &it.useset_iter);
-             it.useset_iter != nullptr; UNREACHABLE()) {
+                 it.useset_iter);
+             !it.useset_iter.end(); UNREACHABLE()) {
             IR * use = m_rg->getIR(it.current_pos_in_useset);
             ASSERT0(use && !use->isReadPR());
-
-            //Prepare next USE.
-            it.current_pos_in_useset = it.current_useset->get_next(
-                it.current_pos_in_useset, &it.useset_iter);
-
-            if (it.useset_iter == nullptr) {
-                //Prepare next VOpnd.
-                it.current_pos_in_vopndset = it.vopndset->get_next(
-                    it.current_pos_in_vopndset, &it.vopndset_iter);
-            }
-
             return use;
         }
     }

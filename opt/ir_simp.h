@@ -224,6 +224,9 @@ public:
     void copyBottomupFlag(SimpCtx const& c)
     { prop_bottom_up.flag_value = c.prop_bottom_up.flag_value; }
 
+    //Return the stmt list that recorded in the context.
+    IR * getStmtList() { return SIMP_stmtlist(this); }
+
     //Unify the actions which propagated bottom up
     //during processing IR tree.
     void unionBottomupFlag(SimpCtx const& c)
@@ -232,6 +235,9 @@ public:
         SIMP_need_recon_bblist(this) |= SIMP_need_recon_bblist(&c);
         SIMP_need_rebuild_du_chain(this) |= SIMP_need_rebuild_du_chain(&c);
     }
+
+    //Return true if BB list need to be reconstructed.
+    bool needReconBBList() const { return SIMP_need_recon_bblist(this); }
 
     //Set action flags to simplify control flow structure.
     void setSimpCFS()
@@ -277,12 +283,12 @@ public:
     //Simplify IR_LNOT operation.
     void setSimpLnot() { SIMP_lnot(this) = true; }
 
-    //Simplify IR tree to be the tree with lowest height.
+    //Simplify IR tree to be the tree with the lowest height.
     //e.g: The height of 'a + b' is 2, the lowest height,
     //whereas 'a + b + c' is not.
     //Note that if ARRAY/STARRAY/ILD/IST/SELECT are not demanded to be
-    //lowered, regarding it as a whole node.
-    //e.g: Treat a[1][2] + b to be the lowest height.
+    //simplied, regarding it as a whole node.
+    //e.g: regard 'a[1][2] + b' to be the lowest height.
     void setSimpToLowestHeight()
     {
         ASSERTN(SIMP_lor_land(this) && SIMP_lnot(this),

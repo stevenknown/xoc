@@ -36,20 +36,22 @@ author: Su Zhenyu
 
 namespace xoc {
 
+#define VAR_ID_UNDEF 0
+#define VAR_ID_MAX 5000000
+
 class RegionMgr;
 
 //
 //START Var
 //
 
-//The size of Var does not be recorded, because the memory size processed is
-//to be changed dynamically, so the size is related with the corresponding
-//IR's type that referred the Var.
+//The size of Var is unnecessary to be recorded, because the memory size
+//processed is to be changed dynamically, so the size is related with
+//the corresponding IR's type that referred the Var.
 
-///////////////////////////////////////////////////////
-//NOTE: Do *NOT* forget modify the bit-field in Var if
-//you remove/add flag here.
-///////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////
+//NOTE: Do *NOT* forget modify the bit-field in Var if you remove/add flag here.
+////////////////////////////////////////////////////////////////////////////////
 #define DEDICATED_STRING_VAR_NAME "#DedicatedStringVar"
 #define VAR_UNDEF 0x0
 
@@ -154,6 +156,8 @@ public:
 
 //Variable is aritifical or spurious that used to
 //facilitate optimizations and analysis.
+//Note a fake variable can not be taken address, it is always used to
+//represent some relations between STMT/EXP, or be regarded as a placeholder.
 #define VAR_is_fake(v) ((v)->u2.s1.is_fake)
 
 //Variable is volatile.
@@ -324,9 +328,8 @@ public:
     UINT getByteSize(TypeMgr const* dm) const
     {
         //Length of string var should include '\0'.
-        return is_string() ?
-            getStringLength() + 1:
-            dm->getByteSize(VAR_type(this));
+        return is_string() ? getStringLength() + 1:
+                             dm->getByteSize(VAR_type(this));
     }
 
     //The interface to dump declaration information when current

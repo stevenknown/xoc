@@ -231,6 +231,7 @@ bool IRCFG::verifyLabel2BB() const
              li != nullptr; li = bb->getLabelList().get_next()) {
             ASSERT0(m_lab2bb.get(li) == bb);
         }
+        bb->verifyBranchLabel(m_lab2bb);
     }
     return true;
 }
@@ -1066,11 +1067,12 @@ void IRCFG::resetMapBetweenLabelAndBB(IRBB * bb)
 
 
 //Combine trampoline branch.
+//Note the pass is different from what removeTrampolinEdge() does.
 //e.g:L2:
 //    truebr L4 | false L4
 //    goto L3 //redundant jump
 //    L4
-//    ...
+//    st = ... 
 //    L3:
 //    ...
 //=>
@@ -1078,9 +1080,9 @@ void IRCFG::resetMapBetweenLabelAndBB(IRBB * bb)
 //    falsebr L3 | truebr L3
 //    EMPTY BB
 //    L4:
-//    ...
+//    st = ...
 //    L3:
-bool IRCFG::inverseAndRemoveTrampolineBranch()
+bool IRCFG::invertAndRemoveTrampolineBranch()
 {
     bool changed = false;
     BBListIter ct;
@@ -2193,7 +2195,7 @@ bool IRCFG::performMiscOpt(OptCtx & oc)
             lchange |= res;
         }
         if (g_do_cfg_invert_condition_and_remove_trampolin_bb) {
-            bool res = inverseAndRemoveTrampolineBranch();
+            bool res = invertAndRemoveTrampolineBranch();
             lchange |= res;
         }
         if (lchange) {

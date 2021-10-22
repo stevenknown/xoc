@@ -72,6 +72,67 @@ void Region::lowerIRTreeToLowestHeight(OptCtx & oc)
 }
 
 
+void Region::postSimplify(SimpCtx const& simp, MOD OptCtx & oc)
+{
+    if (!g_do_cfg || !g_cst_bb_list || !simp.needReconBBList()) { return; }
+
+    bool changed = reconstructBBList(oc);
+    if (!changed) {
+        ASSERT0((!g_do_md_du_analysis && !g_do_md_ssa) || verifyMDRef());
+        return;
+    }
+
+    //Simplification may generate new memory operations.
+    if (g_opt_level != OPT_LEVEL0) {
+        //O0 does not build DU ref.
+        ASSERT0(verifyMDRef());
+    }
+
+    bool need_rebuild_mdssa = false;
+    bool need_rebuild_prssa = false;
+    MDSSAMgr * mdssamgr = (MDSSAMgr*)getPassMgr()->queryPass(
+        PASS_MD_SSA_MGR);
+    if (mdssamgr != nullptr && mdssamgr->is_valid()) {
+        need_rebuild_mdssa = true;
+        mdssamgr->destruction(&oc);
+    }
+
+    PRSSAMgr * prssamgr = (PRSSAMgr*)getPassMgr()->queryPass(
+        PASS_PR_SSA_MGR);
+    if (prssamgr != nullptr && prssamgr->is_valid()) {
+        need_rebuild_prssa = true;
+        prssamgr->destruction(&oc);
+    }
+
+    //Before CFG rebuilding.
+    getCFG()->removeEmptyBB(oc);
+    getCFG()->rebuild(oc);
+    ASSERT0(getCFG()->verify());
+
+    if (need_rebuild_mdssa) {
+        mdssamgr->construction(oc);
+    }
+
+    if (need_rebuild_prssa) {
+        prssamgr->construction(oc);
+        if (getDUMgr() != nullptr && !oc.is_du_chain_valid()) {
+            //PRSSAMgr will destruct classic DU-chain.
+            getDUMgr()->cleanDUSet();
+            oc.setInvalidDUChain();
+        }
+    }
+
+    getCFG()->performMiscOpt(oc);
+    oc.setInvalidIfCFGChanged();
+
+    if (g_do_cdg) {
+        ASSERT0(getPassMgr());
+        CDG * cdg = (CDG*)getPassMgr()->registerPass(PASS_CDG);
+        cdg->perform(oc);
+    }
+}
+
+
 //Simplification will maintain MD SSA, DU Ref information.
 bool Region::performSimplify(OptCtx & oc)
 {
@@ -91,70 +152,13 @@ bool Region::performSimplify(OptCtx & oc)
         ASSERT0(verifyMDRef());
     }
     simplifyBBlist(getBBList(), &simp);
-    if (g_do_cfg &&
-        g_cst_bb_list &&
-        SIMP_need_recon_bblist(&simp) &&
-        reconstructBBList(oc)) {
-
-        //Simplification may generate new memory operations.
-        if (g_opt_level != OPT_LEVEL0) {
-            //O0 does not build DU ref.
-            ASSERT0(verifyMDRef());
-        }
-
-        bool need_rebuild_mdssa = false;
-        bool need_rebuild_prssa = false;
-        MDSSAMgr * mdssamgr = (MDSSAMgr*)getPassMgr()->queryPass(
-            PASS_MD_SSA_MGR);
-        if (mdssamgr != nullptr && mdssamgr->is_valid()) {
-            need_rebuild_mdssa = true;
-            mdssamgr->destruction(&oc);
-        }
-
-        PRSSAMgr * prssamgr = (PRSSAMgr*)getPassMgr()->queryPass(
-            PASS_PR_SSA_MGR);
-        if (prssamgr != nullptr && prssamgr->is_valid()) {
-            need_rebuild_prssa = true;
-            prssamgr->destruction(&oc);
-        }
-
-        //Before CFG building.
-        getCFG()->removeEmptyBB(oc);
-
-        getCFG()->rebuild(oc);
-
-        ASSERT0(getCFG()->verify());
-
-        if (need_rebuild_mdssa) {
-            mdssamgr->construction(oc);
-        }
-        if (need_rebuild_prssa) {
-            prssamgr->construction(oc);
-            if (getDUMgr() != nullptr && !oc.is_du_chain_valid()) {
-                //PRSSAMgr will destruct classic DU-chain.
-                getDUMgr()->cleanDUSet();
-                oc.setInvalidDUChain();
-            }
-        }
-
-        getCFG()->performMiscOpt(oc);
-
-        oc.setInvalidIfCFGChanged();
-        if (g_do_cdg) {
-            ASSERT0(getPassMgr());
-            CDG * cdg = (CDG*)getPassMgr()->registerPass(PASS_CDG);
-            cdg->perform(oc);
-        }
-    } else {
-        ASSERT0((!g_do_md_du_analysis && !g_do_md_ssa) || verifyMDRef());
-    }
+    postSimplify(simp, oc);
 
     if (g_verify_level >= VERIFY_LEVEL_3 &&
         oc.is_pr_du_chain_valid() &&
         oc.is_nonpr_du_chain_valid()) {
         ASSERT0(verifyMDDUChain(this));
     }
-
     if (g_is_dump_after_pass && g_dump_opt.isDumpALL()) {
         note(this, "\n==---- DUMP AFTER SIMPLIFY IRBB LIST ----==");
         dumpBBList();
@@ -269,11 +273,8 @@ bool Region::MiddleProcess(OptCtx & oc)
         doBasicAnalysis(oc);
     }
 
-    if (getPassMgr() != nullptr &&
-        (getPassMgr()->queryPass(PASS_PR_SSA_MGR) != nullptr &&
-         ((PRSSAMgr*)getPassMgr()->queryPass(PASS_PR_SSA_MGR))->is_valid())) {
-        ;
-    } else {
+    if (getPRSSAMgr() == nullptr || !getPRSSAMgr()->is_valid() ||
+        g_is_lower_to_lowest_height) {
         performSimplify(oc);
     }
 

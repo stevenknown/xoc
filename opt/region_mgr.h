@@ -74,13 +74,16 @@ class TargInfo;
 //Region Manager is the top level manager.
 #define RM_label_count(r) ((r)->m_label_count)
 class RegionMgr {
+public:
+    typedef Vector<Region*> RegionTab;
+private:
     COPY_CONSTRUCTOR(RegionMgr);
     friend class Region;
 protected:
 #ifdef _DEBUG_
     UINT m_num_allocated;
 #endif
-    Vector<Region*> m_id2ru;
+    RegionTab m_id2rg;
     Vector<OptCtx*> m_id2optctx;
     xcom::BitSetMgr m_bs_mgr;
     xcom::DefMiscBitSetMgr m_sbs_mgr;
@@ -138,8 +141,9 @@ public:
 
     xcom::BitSetMgr * getBitSetMgr() { return &m_bs_mgr; }
     xcom::DefMiscBitSetMgr * get_sbs_mgr() { return &m_sbs_mgr; }
-    virtual Region * getRegion(UINT id) { return m_id2ru.get(id); }
-    UINT getNumOfRegion() const { return (UINT)(m_id2ru.get_last_idx() + 1); }
+    virtual Region * getRegion(UINT id) { return m_id2rg.get(id); }
+    UINT getNumOfRegion() const { return (UINT)(m_id2rg.get_last_idx() + 1); }
+    RegionTab * getRegionTab() { return &m_id2rg; }
     VarMgr * getVarMgr() { return m_var_mgr; }
     MD const* genDedicateStrMD();
     MDSystem * getMDSystem() { return m_md_sys; }

@@ -4083,6 +4083,7 @@ public:
         m_num_of_tn = 0;
         m_free_list = nullptr;
     }
+    bool is_empty() const { return get_elem_count() == 0; }
 
     void destroy()
     {
@@ -4437,6 +4438,10 @@ class TMapIter : public List<RBTNode<Tsrc, Ttgt>*> {
     COPY_CONSTRUCTOR(TMapIter);
 public:
     TMapIter() {}
+
+    //Return true if the iteration is at the end.
+    bool end() const
+    { return List<RBTNode<Tsrc, Ttgt>*>::get_elem_count() == 0; }
 };
 
 
@@ -4452,6 +4457,10 @@ public:
 public:
     TMapIter2(SMemPool * pool) : SList<RBTNode<Tsrc, Ttgt>*>(pool)
     { ASSERT0(pool); }
+
+    //Return true if the iteration is at the end.
+    bool end() const
+    { return SList<RBTNode<Tsrc, Ttgt>*>::get_elem_count() == 0; }
 };
 
 
@@ -4595,6 +4604,9 @@ class TTabIter : public List<RBTNode<T, T>*> {
     COPY_CONSTRUCTOR(TTabIter);
 public:
     TTabIter() {}
+
+    //Return true if the iteration is at the end.
+    bool end() const { return List<RBTNode<T, T>*>::get_elem_count() == 0; }
 };
 
 template <class T, class CompareKey = CompareKeyBase<T> >
@@ -4918,7 +4930,7 @@ public:
 //       as element.
 //    2. DMapEx Object's memory can be allocated by malloc() dynamically.
 template <class Tsrc, class Ttgt>
-class DMapEx : public DMap<Tsrc, Ttgt, TMap<Tsrc, Ttgt>, TMap<Ttgt, Tsrc>> {
+class DMapEx : public DMap<Tsrc, Ttgt, TMap<Tsrc, Ttgt>, TMap<Ttgt, Tsrc> > {
     COPY_CONSTRUCTOR(DMapEx);
 public:
     typedef TMap<Tsrc, Ttgt> Tsrc2Ttgt;
@@ -4933,13 +4945,13 @@ public:
     //iter should be clean by caller.
     Tsrc get_first(Tsrc2TtgtIter & iter, Ttgt * mapped = nullptr) const
     {
-        return DMap<Tsrc, Ttgt, TMap<Tsrc, Ttgt>, TMap<Ttgt, Tsrc>>::
+        return DMap<Tsrc, Ttgt, TMap<Tsrc, Ttgt>, TMap<Ttgt, Tsrc> >::
                m_src2tgt_map.get_first(iter, mapped);
     }
 
     Tsrc get_next(Tsrc2TtgtIter & iter, Ttgt * mapped = nullptr) const
     {
-        return DMap<Tsrc, Ttgt, TMap<Tsrc, Ttgt>, TMap<Ttgt, Tsrc>>::
+        return DMap<Tsrc, Ttgt, TMap<Tsrc, Ttgt>, TMap<Ttgt, Tsrc> >::
                m_src2tgt_map.get_next(iter, mapped);
     }
 };

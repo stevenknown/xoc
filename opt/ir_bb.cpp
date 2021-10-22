@@ -190,7 +190,7 @@ void IRBB::dump(Region const* rg, bool dump_inner_region) const
     rg->getLogMgr()->incIndent(3);
     for (IR * ir = BB_first_ir(pthis);
          ir != nullptr; ir = BB_irlist(pthis).get_next()) {
-        ASSERT0(ir->is_single() && ir->getBB() == this);
+        ASSERT0(ir->is_single());
         dumpIR(ir, rg, nullptr, IR_DUMP_KID | IR_DUMP_SRC_LINE |
                (dump_inner_region ? IR_DUMP_INNER_REGION : 0));
     }
@@ -200,21 +200,33 @@ void IRBB::dump(Region const* rg, bool dump_inner_region) const
 
 
 //Check that all basic blocks should only end with terminator IR.
-void IRBB::verify()
+bool IRBB::verify(Region const* rg) const
 {
     UINT c = 0;
     IRListIter ct;
+    BitSet irset;
+    bool should_not_phi = false;
     for (IR * ir = BB_irlist(this).get_head(&ct);
          ir != nullptr; ir = BB_irlist(this).get_next(&ct)) {
         ASSERT0(ir->is_single());
         ASSERT0(ir->getBB() == this);
+        ASSERT0(ir->getParent() == nullptr);
         ASSERT0(ir->isStmtInBB());
         if (IRBB::isLowerBoundary(ir)) {
-            ASSERTN(ir == BB_last_ir(this), ("invalid BB down boundary."));
+            ASSERTN(ir == const_cast<IRBB*>(this)->getLastIR(),
+                    ("invalid BB down boundary."));
         }
+        if (!ir->is_phi()) {
+            should_not_phi = true;
+        }
+        if (should_not_phi) {
+            ASSERT0(!ir->is_phi());
+        }
+        verifyIRList(ir, &irset, rg);
         c++;
     }
     ASSERT0(c == getNumOfIR());
+    return true;
 }
 
 
@@ -313,14 +325,12 @@ UINT IRBB::getNumOfSucc(CFG<IRBB, IR> const* cfg) const
 void IRBB::removeSuccessorDesignatePhiOpnd(CFG<IRBB, IR> * cfg, IRBB * succ)
 {
     IRCFG * ircfg = (IRCFG*)cfg;
-    PRSSAMgr * prssamgr = (PRSSAMgr*)ircfg->getRegion()->getPassMgr()->
-        queryPass(PASS_PR_SSA_MGR);
+    PRSSAMgr * prssamgr = ircfg->getRegion()->getPRSSAMgr();
     if (prssamgr != nullptr && prssamgr->is_valid()) {
         prssamgr->removeSuccessorDesignatePhiOpnd(this, succ);
     }
 
-    MDSSAMgr * mdssamgr = (MDSSAMgr*)ircfg->getRegion()->getPassMgr()->
-        queryPass(PASS_MD_SSA_MGR);
+    MDSSAMgr * mdssamgr = ircfg->getRegion()->getMDSSAMgr();
     if (mdssamgr != nullptr && mdssamgr->is_valid()) {
         mdssamgr->removeSuccessorDesignatePhiOpnd(this, succ);
     }
@@ -332,14 +342,12 @@ void IRBB::removeSuccessorDesignatePhiOpnd(CFG<IRBB, IR> * cfg, IRBB * succ)
 void IRBB::addSuccessorDesignatePhiOpnd(CFG<IRBB, IR> * cfg, IRBB * succ)
 {
     IRCFG * ircfg = (IRCFG*)cfg;
-    PRSSAMgr * prssamgr = (PRSSAMgr*)ircfg->getRegion()->getPassMgr()->
-        queryPass(PASS_PR_SSA_MGR);
+    PRSSAMgr * prssamgr = ircfg->getRegion()->getPRSSAMgr();
     if (prssamgr != nullptr && prssamgr->is_valid()) {
         prssamgr->addSuccessorDesignatePhiOpnd(this, succ);
     }
 
-    MDSSAMgr * mdssamgr = (MDSSAMgr*)ircfg->getRegion()->getPassMgr()->
-        queryPass(PASS_MD_SSA_MGR);
+    MDSSAMgr * mdssamgr = ircfg->getRegion()->getMDSSAMgr();
     if (mdssamgr != nullptr && mdssamgr->is_valid()) {
         mdssamgr->addSuccessorDesignatePhiOpnd(this, succ);
     }
@@ -358,6 +366,48 @@ void IRBB::removeAllSuccessorsPhiOpnd(CFG<IRBB, IR> * cfg)
         ASSERT0(succ);
         removeSuccessorDesignatePhiOpnd(cfg, succ);
     }
+}
+
+
+bool IRBB::verifyBranchLabel(Lab2BB const& lab2bb) const
+{
+    //Verify branch target label.
+    IR * last = const_cast<IRBB*>(this)->getLastIR();
+    if (last == nullptr) { return true; }
+
+    if (last->isConditionalBr()) {
+        ASSERTN(lab2bb.get(BR_lab(last)),
+                ("branch target cannot be nullptr"));
+        return true;
+    }
+
+    if (last->isMultiConditionalBr()) {
+        ASSERT0(last->is_switch());
+        for (IR * c = SWITCH_case_list(last);
+             c != nullptr; c = c->get_next()) {
+            ASSERTN(lab2bb.get(CASE_lab(last)),
+                    ("case branch target cannot be nullptr"));
+        }
+        if (SWITCH_deflab(last) != nullptr) {
+            ASSERTN(lab2bb.get(SWITCH_deflab(last)),
+                    ("default target cannot be nullptr"));
+        }
+        return true;
+    }
+
+    if (last->isUnconditionalBr()) {
+        if (last->is_goto()) {
+            ASSERTN(lab2bb.get(GOTO_lab(last)), ("use undefined label"));
+        } else {
+            ASSERT0(last->is_igoto());
+            for (IR * caseexp = last->getCaseList(); caseexp != nullptr;
+                caseexp = caseexp->get_next()) {
+                ASSERTN(lab2bb.get(CASE_lab(caseexp)),
+                        ("use undefined label"));
+            }
+        }
+    }
+    return true;
 }
 //END IRBB
 
@@ -432,6 +482,26 @@ void dumpBBList(BBList const* bbl, Region const* rg, bool dump_inner_region)
          bb != nullptr; bb = bbl->get_next(&ct)) {
         bb->dump(rg, dump_inner_region);
     }
+}
+
+
+//Check for IR and IRBB sanity and uniqueness.
+//Ensure that all IRs must be embedded into a basic block.
+//Ensure that PHI must be the first stmt in basic block.
+bool verifyIRandBB(BBList * bbl, Region const* rg)
+{
+    Lab2BB lab2bb;
+    for (IRBB * bb = bbl->get_head(); bb != nullptr; bb = bbl->get_next()) {
+        for (LabelInfo const* li = bb->getLabelList().get_head();
+             li != nullptr; li = bb->getLabelList().get_next()) {
+            lab2bb.set(li, bb);
+        }
+    }
+    for (IRBB * bb = bbl->get_head(); bb != nullptr; bb = bbl->get_next()) {
+        bb->verify(rg);
+        bb->verifyBranchLabel(lab2bb);
+    }
+    return true;
 }
 
 } //namespace xoc

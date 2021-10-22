@@ -456,28 +456,30 @@ LONGLONG xabs(LONGLONG a)
 
 //Find partial string, return the subscript-index if substring found,
 //otherwise return -1.
-//
-//'src': input string.
-//'par': partial string.
-//'i': find the ith partial string. And 'i' get started with 0.
-//    If one only want to find the first partial string, i equals to 0.
-LONG xstrstr(CHAR const* src, CHAR const* par, INT i)
+//src: input string.
+//par: partial string.
+LONG xstrstr(CHAR const* src, CHAR const* par)
 {
-    CHAR const* s = src;
-    while (*s != 0) {
+    for (CHAR const* seg = src; *seg != 0;) {
+        size_t span = 0;
         CHAR const* p = par;
-        CHAR const* q = s;
-        while (*p != 0 && *p == *q) {
-            p++;
-            q++;
-        }
-        if (*p == 0) {
-            if (i == 0) {
-                return (LONG)(s - src);
+        CHAR const* s = seg;
+        for (; *p != 0 && *s != 0 && *s == *p; p++, s++) {
+            if (span == 0 && *s == par[0]) {
+                span = s - seg;
             }
-            i--;
         }
+        if (*p == 0) { return (INT)(seg - src); }
+        //Now, s is pointing to the last different char.
         s++;
+        if (span == 0 && *s == par[0]) {
+            span = s - seg;
+        }
+        if (span != 0) {
+            seg += span;
+        } else {
+            seg = s;
+        }
     }
     return -1;
 }
@@ -604,84 +606,8 @@ void prim(INT m, OUT INT * buf)
 }
 
 
-//Dumpf() for Vector<TY>.
-void dumpf_svec(void * vec, UINT ty, CHAR const* name, bool is_del)
-{
-    if (name == nullptr) {
-        name = "matrix.tmp";
-    }
-
-    if (is_del) {
-        UNLINK(name);
-    }
-
-    static INT g_count = 0;
-    FILE * h = fopen(name, "a+");
-    ASSERTN(h, ("%s create failed!!!", name));
-    fprintf(h, "\nSVECOTR dump id:%d\n", g_count++);
-
-    ///
-    switch (ty) {
-    case DUMPVEC_BOOL: {
-        Vector<bool> *p = (Vector<bool> *)vec;
-        for (INT i = 0; i <= p->get_last_idx(); i++) {
-            fprintf(h, "%d", (INT)p->get(i));
-            if (i != p->get_last_idx()) {
-                fprintf(h, ", ");
-            }
-        }
-        break;
-    }
-    case DUMPVEC_INT: {
-        Vector<INT> * p = (Vector<INT> *)vec;
-        for (INT i = 0; i <= p->get_last_idx(); i++) {
-            fprintf(h, "%d", (INT)p->get(i));
-            if (i != p->get_last_idx()) {
-                fprintf(h, ", ");
-            }
-        }
-        break;
-    }
-    default: ASSERTN(0, ("illegal ty"));
-    }
-    fprintf(h, "\n");
-    fclose(h);
-}
-
-
-//Dumps() for Vector<TY>.
-void dumps_svec(void * vec, UINT ty)
-{
-    printf("\n");
-    switch (ty) {
-    case DUMPVEC_BOOL: {
-        Vector<bool> *p = (Vector<bool> *)vec;
-        for (INT i = 0; i <= p->get_last_idx(); i++) {
-            printf("%d", (INT)p->get(i));
-            if (i != p->get_last_idx()) {
-                printf(", ");
-            }
-        }
-        break;
-    }
-    case DUMPVEC_INT: {
-        Vector<INT> *p = (Vector<INT> *)vec;
-        for (INT i = 0; i <= p->get_last_idx(); i++) {
-            printf("%d", (INT)p->get(i));
-            if (i != p->get_last_idx()) {
-                printf(", ");
-            }
-        }
-        break;
-    }
-    default: { ASSERTN(0, ("illegal ty")); }
-    } //end switch
-    printf("\n");
-}
-
-
-//Reverse a DWORD by lexicalgraph.
-//e.g:if 'd' is 0x12345678, return 0x78563412
+//Reverse a LONG type integer by lexicalgraph.
+//e.g: if 'd' is 0x12345678, return 0x78563412.
 LONG revlong(LONG d)
 {
     CHAR * c = (CHAR*)&d, m;
@@ -739,36 +665,6 @@ UINT getLookupPopCount(ULONGLONG v)
            g_bit_count[p[2]] + g_bit_count[p[3]] +
            g_bit_count[p[4]] + g_bit_count[p[5]] +
            g_bit_count[p[6]] + g_bit_count[p[7]];
-}
-
-
-//Find sub-string in 'src'.
-bool findsubstr(CHAR const* src, CHAR const* substr)
-{
-    if (src == nullptr || substr == nullptr) { return false; }
-
-    // can't have empty or nullptr 'old'
-    INT srclen = -1;
-    CHAR const* startp = src, * p, * q;
-    INT l = 0;
-    INT i = 0;
-    srclen = (INT)::strlen(src);
-    p = startp;
-    while (p[i] != 0) {
-        if (p[i] == substr[0]) {
-            q = &p[i];
-            l = 0;
-            while (l < srclen && q[l] != 0) {
-                if (q[l] != substr[l]) { break; }
-                l++;
-            }
-            if (substr[l] == 0) { //match seacrching
-                return true;
-            }
-        }
-        i++;
-    }
-    return false;
 }
 
 

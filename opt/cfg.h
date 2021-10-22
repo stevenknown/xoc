@@ -1336,7 +1336,7 @@ void CFG<BB, XR>::build(OptCtx & oc)
         }
 
         if (last->isConditionalBr()) {
-            //Add fall-through edge
+            //Add fall-through edge.
             //The last bb may not be terminated by 'return' stmt.
             if (next != nullptr && !next->is_terminate()) {
                 DGraph::addEdge(bb->id(), next->id());

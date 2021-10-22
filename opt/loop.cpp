@@ -450,6 +450,7 @@ static bool isRealMDDefInvariant(MDDef const* mddef,
 }
 
 
+//Return true if 'use' is loop invariant.
 static bool isMDPhiInvariant(MDDef const* start,
                              IR const* use,
                              LI<IRBB> const* li,

@@ -81,6 +81,40 @@ UINT getLineNum(Dbx const* dbx)
 }
 
 
+//Copy dbx from 'src' to each element in 'tgt_list'.
+void copyDbxForList(IR * tgt_list, IR const* src, Region * rg)
+{
+    for (IR * tgt = tgt_list; tgt != nullptr; tgt = tgt->get_next()) {
+        copyDbx(tgt, src, rg);
+    }
+}
+
+
+//Set dbx to 'ir'.
+void setDbx(IR * ir, Dbx * dbx, Region * rg)
+{
+    ASSERT0(ir && dbx && rg);    
+    if (ir->getAI() == nullptr) {
+        IR_ai(ir) = rg->allocAIContainer();
+    } else {
+        IR_ai(ir)->init();
+    }
+    ASSERT0(IR_ai(ir));
+    DbxAttachInfo * ir_da = nullptr;
+    if (ir->getAI()->is_init()) {
+        ir_da = (DbxAttachInfo*)ir->getAI()->get(AI_DBX);
+    }
+    if (ir_da == nullptr) {
+        ir_da = (DbxAttachInfo*)smpoolMalloc(sizeof(DbxAttachInfo),
+                                              rg->get_pool());
+        ASSERT0(ir_da);
+        ir_da->init();
+        IR_ai(ir)->set((BaseAttachInfo*)ir_da, rg);
+    }
+    ir_da->dbx.copy(*dbx);
+}
+
+
 //Copy dbx from 'src' to 'tgt'.
 void copyDbx(IR * tgt, IR const* src, Region * rg)
 {

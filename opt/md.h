@@ -209,9 +209,9 @@ public:
 
     //Return true if md represent real object that would be emitted to
     //target machine. Fake object is not effect object.
-    //NOTE: Effect MD inexact represent the memory object which may or may
-    //not occur at run time. If stmt modified effect but inexact MD,
-    //it is non-killing definition.
+    //NOTE: Effect inexact MD represents the memory object which may or may
+    //not exist. If some stmt modified effect but inexact MD, it will be
+    //non-killing definition.
     bool is_effect() const { return !VAR_is_fake(MD_base(this)); }
 
     //Return true if md is exact object.
@@ -445,7 +445,7 @@ public:
         //    return true;
         //}
 
-        //TO BE CONFIRMED: Does it necessary to judge if either current
+        //TBD: Does it necessary to judge if either current
         //MD or input MD is FULL_MEM?
         //As we observed, passes that utilize MD relationship add
         //MD2 to accroding IR's MDSet, which can keep global variables
@@ -473,7 +473,7 @@ public:
         ASSERT0(this != &mds);
         ASSERTN(!DefSBitSetCore::is_contain(MD_FULL_MEM), ("low performance"));
 
-        //TO BE CONFIRMED: Does it necessary to judge if either current
+        //TBD: Does it necessary to judge if either current
         //MD or input MD is FULL_MEM?
         //As we observed, passes that utilize MD relationship add
         //MD2 to accroding IR's MDSet, which can keep global variables

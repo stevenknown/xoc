@@ -79,11 +79,7 @@ bool DexRegion::HighProcess(OptCtx & oc)
     ASSERT0(verifyIRList(getIRList(), nullptr, this));
 
     constructBBList();
-
     ASSERT0(verifyIRandBB(getBBList(), this));
-
-    //All IRs have been moved to each IRBB.
-    setIRList(nullptr);
 
     HighProcessImpl(oc);
     return true;
@@ -165,11 +161,7 @@ void DexRegion::processSimply()
     CHAR const* ru_name = getRegionName();
 
     constructBBList();
-
     ASSERT0(verifyIRandBB(getBBList(), this));
-
-    //All IRs have been moved to each IRBB.
-    setIRList(nullptr);
 
     PassMgr * passmgr = initPassMgr();
     ASSERT0(passmgr);
@@ -221,7 +213,7 @@ bool DexRegion::process(OptCtx * oc)
     MiddleProcess(*oc);
 
     ASSERT0(getPassMgr());
-    PRSSAMgr * ssamgr = (PRSSAMgr*)passmgr->queryPass(PASS_PR_SSA_MGR);
+    PRSSAMgr * ssamgr = getPRSSAMgr();
     if (ssamgr != nullptr && ssamgr->is_valid()) {
         ssamgr->destruction();
     }

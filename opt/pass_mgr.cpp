@@ -141,6 +141,12 @@ Pass * PassMgr::allocLFTR()
 }
 
 
+Pass * PassMgr::allocInferType()
+{
+    return new InferType(m_rg);
+}
+
+
 Pass * PassMgr::allocDSE()
 {
     //return new DSE(m_rg);
@@ -373,6 +379,9 @@ Pass * PassMgr::registerPass(PASS_TYPE opty)
         break;
     case PASS_LFTR:
         pass = allocLFTR();
+        break;
+    case PASS_INFER_TYPE:
+        pass = allocInferType();
         break;
     default: ASSERTN(0, ("Unsupport Optimization."));
     }

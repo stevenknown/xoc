@@ -53,7 +53,7 @@ bool ScalarOpt::perform(OptCtx & oc)
     }
 
     bool in_ssa_form = false;
-    PRSSAMgr * ssamgr = (PRSSAMgr*)m_pass_mgr->queryPass(PASS_PR_SSA_MGR);
+    PRSSAMgr * ssamgr = m_rg->getPRSSAMgr();
     if (ssamgr != nullptr && ssamgr->is_valid()) {
         in_ssa_form = true;
     }

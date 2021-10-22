@@ -71,6 +71,7 @@ public:
     virtual Pass * allocLICM();
     virtual Pass * allocDCE();
     virtual Pass * allocLFTR();
+    virtual Pass * allocInferType();
     virtual Pass * allocDSE();
     virtual Pass * allocRCE();
     virtual Pass * allocGVN();

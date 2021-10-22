@@ -76,25 +76,9 @@ LONGLONG ceil_align(LONGLONG v, LONGLONG align);
 //     and function return 3.
 UINT computeMaxBitSizeForValue(ULONGLONG v);
 
-//Misc Dumps/Dumpf of Vector<T>
-#define DUMPVEC_BOOL 1
-#define DUMPVEC_INT 2
-
-//Dumpf() for Vector<TY>.
-void dumpf_svec(void * vec, UINT ty, CHAR const* name, bool is_del);
-
-//Dumps() for Vector<TY>.
-void dumps_svec(void * vec, UINT ty);
-
 //Extended Euclid Method.
 //    ax + by = ay' + b(x' -floor(a/b)*y') = gcd(a,b) = gcd(b, a%b)
 INT exgcd(INT a, INT b, OUT INT & x, OUT INT & y);
-
-//Factorial of n, namely, requiring n!.
-UINT fact(UINT n);
-
-//Find sub-string in 'src'.
-bool findsubstr(CHAR const* src, CHAR const* substr);
 
 //Extract the right most sub-string which separated by 'separator' from string.
 //e.g: Given string is a\b\c, separator is '\', return c;
@@ -103,6 +87,10 @@ CHAR const* extractRightMostSubString(CHAR const* string, CHAR separator);
 //Extract the left most sub-string which separated by 'separator' from string.
 //e.g: Given string is a\b\c, separator is '\', return a;
 void extractLeftMostSubString(CHAR * tgt, CHAR const* string, CHAR separator);
+
+//Factorial of n, namely, requiring n!.
+UINT fact(UINT n);
+
 //Great common divisor for number of values.
 INT gcdm(UINT num, ...);
 
@@ -110,6 +98,7 @@ INT gcdm(UINT num, ...);
 INT gcdm(UINT num, Vector<INT> const& a);
 
 //Compute the nearest power of 2 that not less than v.
+//e.g: given v is 60, return 64.
 inline UINT getNearestPowerOf2(UINT v)
 {
     v--;
@@ -138,9 +127,11 @@ inline ULONGLONG getNearestPowerOf2(ULONGLONG v)
 }
 
 //Compute the number of 1.
+//e.g: given 0xa, return 2.
 UINT getLookupPopCount(ULONGLONG v);
 
 //Compute the number of 1.
+//e.g: given 0xa, return 2.
 UINT getSparsePopCount(ULONGLONG v);
 
 //Compute the power of 2, return the result.
@@ -203,8 +194,8 @@ bool isPowerOf5(double f);
 //e.g: 435234 = 251 * 17 * 17 * 3 * 2.
 void prim(INT m, OUT INT * buf);
 
-//Reverse a DWORD by lexicalgraph.
-//e.g:if 'd' is 0x12345678, return 0x78563412.
+//Reverse a LONG type integer by lexicalgraph.
+//e.g: if 'd' is 0x12345678, return 0x78563412.
 LONG revlong(LONG d);
 
 //Reverse the string.
@@ -273,12 +264,9 @@ INT xfloor(INT a, INT b);
 
 //Find partial string, return the subscript-index if substring found,
 //otherwise return -1.
-//
-//'src': input string.
-//'par': partial string.
-//'i': find the ith partial string. And 'i' get started with 0.
-//     If one only want to find the first partial string, i equals to 0.
-LONG xstrstr(CHAR const* src, CHAR const* par, INT i);
+//src: input string.
+//par: partial string.
+LONG xstrstr(CHAR const* src, CHAR const* par);
 
 //Split string by given separetor, and return the number of substring.
 //str: input string.

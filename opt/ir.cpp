@@ -475,40 +475,6 @@ static void verifyIR(IR * ir, BitSet * irh, Region const* rg)
 }
 
 
-//Check for IR and IRBB sanity and uniqueness.
-//Ensure that all IRs must be embedded into a basic block.
-//Ensure that PHI must be the first stmt in basic block.
-bool verifyIRandBB(BBList * bblst, Region const* rg)
-{
-    //IRAddressHash irh;
-    BitSet irh;
-    for (IRBB * bb = bblst->get_head();
-         bb != nullptr; bb = bblst->get_next()) {
-        bool should_not_phi = false;
-        IRListIter irct;
-        for (IR * ir = BB_irlist(bb).get_head(&irct);
-             ir != nullptr; ir = BB_irlist(bb).get_next(&irct)) {
-            ASSERT0(ir->is_single());
-            ASSERT0(IR_parent(ir) == nullptr);
-            ASSERT0(ir->getBB() == bb);
-
-            if (!ir->is_phi()) {
-                should_not_phi = true;
-            }
-
-            if (should_not_phi) {
-                ASSERT0(!ir->is_phi());
-            }
-
-            verifyIRList(ir, &irh, rg);
-            ASSERT0(ir->isStmtInBB());
-        }
-        bb->verify();
-    }
-    return true;
-}
-
-
 //Function to verify stmt info after IR simplified.
 bool verifySimp(IR * ir_list, SimpCtx & simp)
 {

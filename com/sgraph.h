@@ -99,6 +99,7 @@ public:
     { prev = nullptr, next = nullptr, in_list = nullptr, out_list = nullptr,
       _id = VERTEX_UNDEF, _rpo = RPO_UNDEF, _info = nullptr; }
     UINT id() const { return VERTEX_id(this); }
+    void * info() const { return VERTEX_info(this); }
 
     EdgeC * getOutList() const { return VERTEX_out_list(this); }
     EdgeC * getInList() const { return VERTEX_in_list(this); }
@@ -450,6 +451,8 @@ public:
     //Count memory usage for current object.
     size_t count_mem() const;
 
+    virtual void dumpVertex(FILE * h, Vertex const* v) const;
+    virtual void dumpEdge(FILE * h, Edge const* e) const;
     void dumpDOT(CHAR const* name = nullptr) const;
     void dumpVCG(CHAR const* name = nullptr) const;
     void dumpVexVector(Vector<Vertex*> const& vec, FILE * h);

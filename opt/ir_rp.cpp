@@ -679,7 +679,6 @@ IR * DelegateMgr::genRestoreStmt(IR const* delegate, IR * pr)
         stmt = CStArray::dupIRTreeByExp(delegate, pr, m_rg);
         break;
     case IR_STARRAY:
-        ASSERTN(delegate->getOffset() == 0, ("TODO: not yet support."));
         //Prepare base and subscript expression list.
         stmt = m_rg->buildStoreArray(m_rg->dupIRTree(ARR_base(delegate)),
             m_rg->dupIRTreeList(ARR_sub_list(delegate)),
@@ -1828,7 +1827,7 @@ void RegPromot::addDUChainForInexactAccDele(IR const* dele,
     //addDUChainForIntraDef(occ2newocc, restore_stmt, deflst, li);
 
     if (usePRSSADU()) {
-        //TODO: hack
+        //TODO: hack remove!
         //insertPhi(dele, init_stmt, occ2newocc, exact_tab, deflst);
     }
 }
@@ -1960,7 +1959,7 @@ void RegPromot::addDUChainForExactAccDele(IR const* dele,
     addDUChainForIntraDef(occ2newocc, restore_stmt, deflst, li);
 
     if (usePRSSADU()) {
-        //TODO: hack
+        //TODO: hack remove!
         //insertPhi(dele, init_stmt, occ2newocc, exact_tab, deflst);
     }
 }
@@ -2179,9 +2178,6 @@ bool RegPromot::tryPromote(LI<IRBB> const* li, IRBB * exit_bb, IRIter & ii,
                            InexactAccTab & inexact_acc, MOD RPCtx & ctx)
 {
     ASSERT0(li && exit_bb);
-    exact_acc.clean();
-    inexact_acc.clean();
-    m_dont_promote.clean();
     for (INT i = li->getBodyBBSet()->get_first();
          i != -1; i = li->getBodyBBSet()->get_next(i)) {
         IRBB * bb = m_cfg->getBB(i);
@@ -2193,6 +2189,12 @@ bool RegPromot::tryPromote(LI<IRBB> const* li, IRBB * exit_bb, IRIter & ii,
         if (!scanBB(bb, li, exact_acc, inexact_acc)) {
             return false;
         }
+    }
+    if (g_is_dump_after_pass && g_dump_opt.isDumpRP()) {
+        note(m_rg, "\n==-- DUMP LoopInfo --==");
+        li->dump(m_rg);
+        exact_acc.dump(m_rg);
+        inexact_acc.dump(m_rg);
     }
     return promote(li, exit_bb, ii, exact_acc, inexact_acc, ctx);
 }
@@ -2207,11 +2209,18 @@ bool RegPromot::EvaluableScalarReplacement(List<LI<IRBB> const*> & worklst,
     InexactAccTab inexact_acc;
     IRIter ii;
     bool change = false;
+    if (g_is_dump_after_pass && g_dump_opt.isDumpRP()) {
+        note(m_rg, "\n==---- DUMP Register Promotion '%s' ----==",
+             m_rg->getRegionName());
+    }
     while (worklst.get_elem_count() > 0) {
         LI<IRBB> const* x = worklst.remove_head();
         IRBB * exit_bb = m_cfg->findSingleExitBB(x);
         if (exit_bb != nullptr) {
             //If we did not find a single exit bb, this loop is nontrivial.
+            exact_acc.clean();
+            inexact_acc.clean();
+            m_dont_promote.clean();
             change |= tryPromote(x, exit_bb, ii, exact_acc,
                                  inexact_acc, ctx);
         }
@@ -2253,15 +2262,15 @@ bool RegPromot::perform(OptCtx & oc)
     if (!oc.is_ref_valid()) { return false; }
     if (!oc.is_cfg_valid()) { return false; }
     //Check PR DU chain.
-    m_prssamgr = (PRSSAMgr*)(m_rg->getPassMgr()->queryPass(PASS_PR_SSA_MGR));
-    if (!oc.is_pr_du_chain_valid() && usePRSSADU()) {
-        //At least one kind of DU chain should be avaiable.
+    m_prssamgr = m_rg->getPRSSAMgr();
+    if (!oc.is_pr_du_chain_valid() && !usePRSSADU()) {
+        //At least one kind of DU chain should be available.
         return false;
     }
     //Check NONPR DU chain.
-    m_mdssamgr = (MDSSAMgr*)(m_rg->getPassMgr()->queryPass(PASS_MD_SSA_MGR));
-    if (!oc.is_nonpr_du_chain_valid() && useMDSSADU()) {
-        //At least one kind of DU chain should be avaiable.
+    m_mdssamgr = m_rg->getMDSSAMgr();
+    if (!oc.is_nonpr_du_chain_valid() && !useMDSSADU()) {
+        //At least one kind of DU chain should be available.
         return false;
     }
 
@@ -2279,6 +2288,7 @@ bool RegPromot::perform(OptCtx & oc)
     if (!m_gvn->is_valid()) {
         m_gvn->perform(oc);
     }
+    if (!m_gvn->is_valid()) { return false; }
 
     init();
     List<LI<IRBB> const*> worklst;
@@ -2322,7 +2332,8 @@ bool RegPromot::perform(OptCtx & oc)
     clean();
 
     if (g_is_dump_after_pass && g_dump_opt.isDumpRP()) {
-        dump();
+        //Exact and Inexact Acc info has been dumpped.
+        //dump();
     }
     END_TIMER(t, getPassName());
     return change;

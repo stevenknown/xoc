@@ -30,29 +30,6 @@ USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 namespace xcom {
 
-#define NTREE_KIDS 2
-template <class T> class NTREE {
-public:
-    T val;
-    UINT id;
-    bool is_active; //treenode holds value.
-    NTREE * kid[NTREE_KIDS];
-    NTREE * parent;
-
-    NTREE()
-    {
-        is_active = false;
-        parent = nullptr;
-        ::memset((CHAR*)kid, 0, sizeof(NTREE) * NTREE_KIDS);
-    }
-};
-#define NTREE_id(t) ((t)->id)
-#define NTREE_kid(t, n) ((t)->kid[n])
-#define NTREE_parent(t) ((t)->parent)
-#define NTREE_is_active(t) ((t)->is_active)
-#define NTREE_val(t) ((t)->val)
-
-
 //
 //START Bucket
 //
@@ -154,157 +131,213 @@ void Bucket<T>::dump()
 //END Bucket
 
 
-//NOTICE: compare() operator of type 'T' is necessary.
-template <class T> class Sort {
-    SMemPool * m_pool;
-    UINT m_tree_id;
-
-    void _qsort(IN Vector<T> & data, INT first_idx, INT last_idx);
-    void _merge_sort(Vector<T> const& data,
-                     INT start_idx,
-                     INT end_idx,
-                     OUT Vector<T> & output);
-    void _revise_tree(NTREE<T> * t);
-    NTREE<T> * _build_heap(MOD Vector<T> & data,
-                           OUT List<NTREE<T>*> & treenode_list);
-    void _min_heapify(NTREE<T> * t);
-    bool _bucket_sort_check(MOD Vector<T> & data);
-    void _insert_sort(MOD Vector<T> & data, UINT start_idx, UINT end_idx);
-
-    void * xmalloc(INT size)
+template <class T> class HeapSort {
+public:
+    template <class U> class HeapValVector : public Vector<U> {
+        U const operator[](UINT index) const;
+        U & operator[](UINT index);
+     
+        Vector<U> * m_data;
+    public:
+        HeapValVector(Vector<U> & data) { m_data = &data; }
+    
+        //Return the first index in vector of legal heap value. 
+        UINT get_begin_idx() const { return 1; }
+        UINT get_end_idx() const { return 1 + get_elem_count() - 1; }
+        U get(UINT idx)
+        {
+            ASSERTN(idx > 0, ("head value start from 1"));
+            return m_data->get(idx - 1);
+        }
+    
+        void set(UINT idx, U val)
+        {
+            ASSERTN(idx > 0, ("head value start from 1"));
+            return m_data->set(idx - 1, val);
+        }
+    
+        UINT get_elem_count() const
+        { return m_data->get_last_idx() < 0 ? 0 : m_data->get_last_idx() + 1; }
+    };
+private:
+    //The floor of integer division.
+    UINT parent(UINT i) { return i / 2; }
+    UINT lchild(UINT i) { return i * 2; }
+    UINT rchild(UINT i) { return i * 2 + 1; }
+    //The last (len/2)+1 nodes are kid.
+    //The floor of integer division.
+    UINT last_parent(UINT len) { return len / 2; }
+    void swap(MOD HeapValVector<T> & data, UINT i, UINT j)
     {
-        void * p = smpoolMalloc(size, m_pool);
-        if (p == nullptr) return nullptr;
-        ::memset(p, 0, size);
-        return p;
+        INT tmpval = data.get(i);
+        data.set(i, data.get(j));
+        data.set(j, tmpval);
+    }
+
+    void min_heapify(MOD HeapValVector<T> & data, UINT start, UINT end)
+    {
+        ASSERT0(end > 0);
+        UINT l = lchild(start);
+        UINT r = rchild(start);
+        UINT minor = l <= end ? l : 0;
+        if (r <= end && minor != 0) {
+            minor = data.get(l) > data.get(r) ? r : l;
+        }
+        if (minor == 0 || //no kid
+            data.get(start) <= data.get(minor)) { //already be min-heap
+            return;
+        }
+        swap(data, start, minor);
+        min_heapify(data, minor, end);
+    }
+
+    void max_heapify(MOD HeapValVector<T> & data, UINT start, UINT end)
+    {
+        ASSERT0(start > 0 && end > 0);
+        UINT l = lchild(start);
+        UINT r = rchild(start);
+        ASSERT0(l > start && r > start);
+        UINT major = l <= end ? l : 0;
+        if (r <= end && major != 0) {
+            major = data.get(l) < data.get(r) ? r : l;
+        }
+        if (major == 0 || //no kid
+            data.get(start) >= data.get(major)) { //already be max-heap
+            return;
+        }
+        swap(data, start, major);
+        max_heapify(data, major, end);
+    }
+
+    //Reorder value in 'data' to build min-heap.
+    void build_min_heap(MOD Vector<T> & data)
+    {
+        HeapValVector<T> hdata(data);
+        for (UINT i = last_parent(hdata.get_end_idx());
+             i >= hdata.get_begin_idx(); i--) {
+            min_heapify(hdata, i, hdata.get_end_idx());
+        }
+    }
+
+    //Reorder value in 'data' to build min-heap.
+    void build_max_heap(MOD Vector<T> & data)
+    {
+        HeapValVector<T> hdata(data);
+        for (UINT i = last_parent(hdata.get_end_idx());
+             i >= hdata.get_begin_idx(); i--) {
+            max_heapify(hdata, i, hdata.get_end_idx());
+        }
     }
 public:
-    Sort() { m_pool = smpoolCreate(64, MEM_COMM); }
-    ~Sort() { smpoolDelete(m_pool); }
-    void shell_sort(MOD Vector<T> & data);
-    void bucket_sort(MOD Vector<T> & data);
-    void counting_sort(MOD Vector<T> & data);
-    void heap_sort(MOD Vector<T> & data);
-    void merge_sort(MOD Vector<T> & data);
-    void bubble_sort(MOD Vector<T> & data);
-    void qsort(MOD Vector<T> & data);
+    //Sort value in 'data' incrementally.
+    void sort(MOD Vector<T> & data)
+    {
+        build_max_heap(data);
+        HeapValVector<T> hdata(data);
+        UINT end = hdata.get_end_idx();
+        swap(hdata, hdata.get_begin_idx(), end);
+        end--;
+        for (UINT i = hdata.get_begin_idx(); i <= end; end--) {
+            max_heapify(hdata, i, end);
+            swap(hdata, i, end);
+        }
+    }
 };
 
 
-template <class T>
-void Sort<T>::_qsort(Vector<T> & data, INT first_idx, INT last_idx)
-{
-    if (first_idx >= last_idx || first_idx < 0 || last_idx < 0) {
-        return;
-    }
-    INT mid_idx = (first_idx + last_idx + 1) / 2;
-    T first_data = data[first_idx];
-    T last_data = data[last_idx];
-    T mid_data = data[mid_idx];
-
-    //Choose the mid-one to avoid worst case.
-    //At worst case, stack may be bursted.
-    T key_val = MIN(MAX(first_data, mid_data), last_data);
-    INT key_idx;
-    if (key_val == first_data) {
-        key_idx = first_idx;
-    } else if (key_val == mid_data) {
-        key_idx = mid_idx;
-    } else {
-        key_idx = last_idx;
-    }
-
-    INT right_start_idx = last_idx;
-    INT left_start_idx = first_idx;
-FROM_LEFT:
-    //Search from left_start_idx to 'key_idx' - 1
-    //to find the larger one and swapping with 'key_val'.
-    for (INT i = left_start_idx; i <= key_idx - 1; i++) {
-        T v = data.get(i);
-        if (v > key_val) {
-            //Swapping
-            data.set(key_idx, v);
-            data.set(i, key_val);
-            key_idx = i;
-            left_start_idx = key_idx + 1;
-            goto FROM_RIGHT;
+template <class T> class QuickSort {
+    void _qsort(Vector<T> & data, INT first_idx, INT last_idx)
+    {
+        if (first_idx >= last_idx || first_idx < 0 || last_idx < 0) {
+            return;
         }
-    }
-
-FROM_RIGHT:
-    //Search from right_start_idx to 'key_idx' + 1
-    //to find the less one and swapping with 'key_val'.
-    for (INT j = right_start_idx; j >= key_idx + 1; j--) {
-        T v = data.get(j);
-        if (v < key_val) {
-            //Swapping
-            data.set(key_idx, v);
-            data.set(j, key_val);
-            key_idx = j;
-            right_start_idx = key_idx - 1;
-            goto FROM_LEFT;
+        INT mid_idx = (first_idx + last_idx + 1) / 2;
+        T first_data = data[first_idx];
+        T last_data = data[last_idx];
+        T mid_data = data[mid_idx];
+    
+        //Choose the mid-one to avoid worst case.
+        //At worst case, stack may be bursted.
+        T key_val = MIN(MAX(first_data, mid_data), last_data);
+        INT key_idx;
+        if (key_val == first_data) {
+            key_idx = first_idx;
+        } else if (key_val == mid_data) {
+            key_idx = mid_idx;
+        } else {
+            key_idx = last_idx;
         }
-    }
-    _qsort(data, first_idx, key_idx - 1);
-    _qsort(data, key_idx + 1, last_idx);
-}
-
-
-//Quick Sort.
-//The output data will be ordered increment.
-template <class T>
-void Sort<T>::qsort(MOD Vector<T> & data)
-{
-    if (data.get_last_idx() < 0 || data.get_last_idx() == 0) {
-        return;
-    }
-    _qsort(data, 0, data.get_last_idx());
-}
-
-
-//Bubble Sort.
-//The output data will be ordered increment.
-template <class T>
-void Sort<T>::bubble_sort(MOD Vector<T> & data)
-{
-    INT n = data.get_last_idx();
-    for (INT i = 0; i <= n; i++) {
-        for (INT j = i+1; j <= n; j++) {
-            if (data.get(i) > data.get(j)) {
-                //Swap
-                T v(data.get(i));
-                data.set(i, data.get(j));
-                data.set(j, v);
+    
+        INT right_start_idx = last_idx;
+        INT left_start_idx = first_idx;
+    FROM_LEFT:
+        //Search from left_start_idx to 'key_idx' - 1
+        //to find the larger one and swapping with 'key_val'.
+        for (INT i = left_start_idx; i <= key_idx - 1; i++) {
+            T v = data.get(i);
+            if (v > key_val) {
+                //Swapping
+                data.set(key_idx, v);
+                data.set(i, key_val);
+                key_idx = i;
+                left_start_idx = key_idx + 1;
+                goto FROM_RIGHT;
             }
         }
-    }
-}
-
-
-//2-ways merger sort.
-template <class T>
-void Sort<T>::_merge_sort(Vector<T> const& data,
-                          INT start_idx,
-                          INT end_idx,
-                          OUT Vector<T> & output)
-{
-    if (start_idx > end_idx) {
-        return;
-    }
-    if (start_idx == end_idx) {
-        output.set(0, data.get(start_idx));
-        return;
-    }
-    if (start_idx + 1 == end_idx) {
-        if (data.get(start_idx) <= data.get(end_idx)) {
-            output.set(0, data.get(start_idx));
-            output.set(1, data.get(end_idx));
-        } else {
-            output.set(0, data.get(end_idx));
-            output.set(1, data.get(start_idx));
+    
+    FROM_RIGHT:
+        //Search from right_start_idx to 'key_idx' + 1
+        //to find the less one and swapping with 'key_val'.
+        for (INT j = right_start_idx; j >= key_idx + 1; j--) {
+            T v = data.get(j);
+            if (v < key_val) {
+                //Swapping
+                data.set(key_idx, v);
+                data.set(j, key_val);
+                key_idx = j;
+                right_start_idx = key_idx - 1;
+                goto FROM_LEFT;
+            }
         }
-        return;
-    } else {
+        _qsort(data, first_idx, key_idx - 1);
+        _qsort(data, key_idx + 1, last_idx);
+    }
+public:
+    //Quick Sort.
+    //The output data will be ordered increment.
+    void sort(MOD Vector<T> & data)
+    {
+        if (data.get_last_idx() < 0 || data.get_last_idx() == 0) {
+            return;
+        }
+        _qsort(data, 0, data.get_last_idx());
+    }
+};
+
+
+template <class T> class MergeSort {
+    //2-ways Merge Sort.
+    void _merge_sort(Vector<T> const& data, INT start_idx, INT end_idx,
+                     OUT Vector<T> & output)
+    {
+        if (start_idx > end_idx) {
+            return;
+        }
+        if (start_idx == end_idx) {
+            output.set(0, data.get(start_idx));
+            return;
+        }
+        if (start_idx + 1 == end_idx) {
+            if (data.get(start_idx) <= data.get(end_idx)) {
+                output.set(0, data.get(start_idx));
+                output.set(1, data.get(end_idx));
+            } else {
+                output.set(0, data.get(end_idx));
+                output.set(1, data.get(start_idx));
+            }
+            return;
+        }
+    
         INT mid_idx = (start_idx + end_idx + 1) / 2;
         Vector<T> left_output;
         Vector<T> right_output;
@@ -324,169 +357,68 @@ void Sort<T>::_merge_sort(Vector<T> const& data,
                     }
                     break;
                 }
-            } else {
-                output.set(i, right_output.get(ridx));
-                ridx++;
-                if (ridx >= rlen) {
+                continue;
+            }
+    
+            output.set(i, right_output.get(ridx));
+            ridx++;
+            if (ridx >= rlen) {
+                i++;
+                for (INT j = lidx; j <= left_output.get_last_idx(); j++) {
+                    output.set(i, left_output.get(j));
                     i++;
-                    for (INT j = lidx; j <= left_output.get_last_idx(); j++) {
-                        output.set(i, left_output.get(j));
-                        i++;
-                    }
-                    break;
                 }
+                break;
             }
         }
     }
-}
+public:
+    //Merge Sort.
+    //The output data will be ordered incrementally.
+    void sort(MOD Vector<T> & data)
+    {
+        Vector<T> output;
+        _merge_sort(data, 0, data.get_last_idx(), output);
+        data.copy(output);
+    }
+};
 
 
-//Merge Sort.
+//NOTICE: compare() operator of type 'T' is necessary.
+template <class T> class Sort {
+    bool _bucket_sort_check(MOD Vector<T> & data);
+    void _insert_sort(MOD Vector<T> & data, UINT start_idx, UINT end_idx);
+
+public:
+    void shell_sort(MOD Vector<T> & data);
+    void bucket_sort(MOD Vector<T> & data);
+    void counting_sort(MOD Vector<T> & data);
+    //Heap Sort.
+    //The output data will be ordered incrementally.
+    void heap_sort(MOD Vector<T> & data) { HeapSort<T> hs; hs.sort(data); }
+    void merge_sort(MOD Vector<T> & data) { MergeSort<T> ms; ms.sort(data); }
+    void bubble_sort(MOD Vector<T> & data);
+    //Quick Sort.
+    //The output data will be ordered incrementally.
+    void quick_sort(MOD Vector<T> & data) { QuickSort<T> qs; qs.sort(data); }
+};
+
+
+//Bubble Sort.
 //The output data will be ordered increment.
 template <class T>
-void Sort<T>::merge_sort(MOD Vector<T> & data)
+void Sort<T>::bubble_sort(MOD Vector<T> & data)
 {
-    Vector<T> output;
-    _merge_sort(data, 0, data.get_last_idx(), output);
-    data.copy(output);
-}
-
-
-#define SWAP(a, b) do { T v(NTREE_val(a)); \
-    NTREE_val(a) = NTREE_val(b); \
-    NTREE_val(b) = v; } while (0)
-template <class T>
-void Sort<T>::_revise_tree(NTREE<T> * t)
-{
-    NTREE<T> * parent = NTREE_parent(t);
-    if (parent == nullptr) {
-        return;
-    }
-    if (NTREE_val(t) < NTREE_val(parent)) {
-        SWAP(t, parent);
-        _revise_tree(parent);
-    }
-}
-
-
-//Build min-heap, and construct complete binary tree.
-template <class T>
-NTREE<T> * Sort<T>::_build_heap(MOD Vector<T> & data,
-                                OUT List<NTREE<T>*> & treenode_list)
-{
-    if (data.get_last_idx() < 0) {
-        return nullptr;
-    }
-    NTREE<T> * nt = (NTREE<T>*)xmalloc(sizeof(NTREE<T>));
-    NTREE_id(nt) = m_tree_id++;
-    treenode_list.append_tail(nt);
-
-    bool first = true;
-    C<NTREE<T>*> * ct = nullptr;
-    for (INT pos = 0; pos <= data.get_last_idx(); pos++) {
-        NTREE<T> * insert_value;
-        if (first) {
-            first = false;
-            insert_value = treenode_list.get_head(&ct);
-        } else {
-            insert_value = treenode_list.get_next(&ct);
+    INT n = data.get_last_idx();
+    for (INT i = 0; i <= n; i++) {
+        for (INT j = i+1; j <= n; j++) {
+            if (data.get(i) > data.get(j)) {
+                //Swap
+                T v(data.get(i));
+                data.set(i, data.get(j));
+                data.set(j, v);
+            }
         }
-        for (INT i = 0; i < NTREE_KIDS; i++) {
-            NTREE<T> * kid = (NTREE<T>*)xmalloc(sizeof(NTREE<T>));
-            NTREE_id(kid) = m_tree_id++;
-            treenode_list.append_tail(kid);
-
-            NTREE_kid(insert_value, i) = kid;
-            NTREE_parent(kid) = insert_value;
-        }
-        NTREE_val(insert_value) = data.get(pos);
-        NTREE_is_active(insert_value) = 1;
-        _revise_tree(insert_value);
-    }
-
-    //Find root treenode.
-    ASSERT0(NTREE_parent(nt) == nullptr);
-    #ifdef _DEBUG_
-    printf("\n");
-    for (NTREE<T> * p = treenode_list.get_head();
-         p != nullptr; p = treenode_list.get_next()) {
-        printf("(T%d,%s,val:%d),",
-               NTREE_id(p),
-               NTREE_is_active(p)?"act":"no-act",
-               NTREE_val(p));
-    }
-    printf("\n");
-    #endif
-    return nt;
-}
-
-
-template <class T>
-void Sort<T>::_min_heapify(NTREE<T> * t)
-{
-    ASSERT0(NTREE_KIDS == 2);
-    NTREE<T> * left = NTREE_kid(t, 0);
-    NTREE<T> * right = NTREE_kid(t, 1);
-    ASSERT0(left && right);
-    if (NTREE_is_active(left) && NTREE_is_active(right)) {
-        T v = MIN(MIN(NTREE_val(t), NTREE_val(left)), NTREE_val(right));
-        if (NTREE_val(t) == v) {
-            //t already be min-heap.
-            return;
-        } else if (NTREE_val(left) == v) {
-            SWAP(t, left);
-            _min_heapify(left);
-        } else {
-            SWAP(t, right);
-            _min_heapify(right);
-        }
-        return;
-    }
-
-    if (!NTREE_is_active(left) && !NTREE_is_active(right)) {
-        return;
-    }
-
-    if (!NTREE_is_active(left)) {
-        if (NTREE_val(t) < NTREE_val(right)) {
-            return;
-        } else {
-            SWAP(t, right);
-            _min_heapify(right);
-            return;
-        }
-    } else if (!NTREE_is_active(right)) {
-        if (NTREE_val(t) < NTREE_val(left)) {
-            return;
-        } else {
-            SWAP(t, left);
-            _min_heapify(left);
-            return;
-        }
-    }
-}
-
-
-//Merge Sort.
-//The output data will be ordered increment.
-template <class T>
-void Sort<T>::heap_sort(MOD Vector<T> & data)
-{
-    m_tree_id = 0;
-    List<NTREE<T>*> treenode_list;
-    NTREE<T> * root = _build_heap(data, treenode_list);
-
-    UINT i = 0;
-    data.clean();
-    for (NTREE<T> * t = treenode_list.get_tail();
-         t != nullptr; t = treenode_list.get_prev()) {
-        if (!NTREE_is_active(t)) {
-            continue;
-        }
-        data.set(i++, NTREE_val(root));
-        SWAP(root, t);
-        NTREE_is_active(t) = false;
-        _min_heapify(root);
     }
 }
 
@@ -605,5 +537,4 @@ void Sort<T>::shell_sort(MOD Vector<T> & data)
 }
 
 } //namespace xcom
-
 #endif

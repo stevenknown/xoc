@@ -181,33 +181,33 @@ public:
 class VMD : public VOpnd {
     COPY_CONSTRUCTOR(VMD);
 public:
+    typedef TTab<UINT> UseSet;
+    typedef TTabIter<UINT> UseSetIter;
+
     UINT m_version; //unique version of MD.
     UINT m_mdid; //id of current virtual MD.
     MDDef * m_def_stmt; //each versioned MD has an unique Definition.
-    IRSet m_occs; //each versioned MD has a set of USE occurrences.
+    UseSet m_occs; //each versioned MD has a set of USE occurrences.
 
 public:
-    VMD();
-    VMD(xcom::DefSegMgr * sm);
-    ~VMD();
     //Add an USE occurrence.
-    void addUse(IR const* ir) { VMD_occs(this).append(ir); }
+    void addUse(IR const* ir) { VMD_occs(this).append(ir->id()); }
 
     void clean();
     void cleanUseSet() { VMD_occs(this).clean(); }
 
-    void init(xcom::DefSegMgr * sm)
-    {
-        clean();
-        VMD_occs(this).init(sm);
-    }
+    void init() { VMD_occs(this).init(); clean(); }
 
     void destroy() { VMD_occs(this).destroy(); }
     void dump(Region const* rg) const; //Concisely dump
     void dump(Region const* rg, UseDefMgr const* udmgr) const;
 
+    //Return true 'exp' is in the UseSet.
+    //exp: IR expression to be found.
+    bool findUse(IR const* exp) { return VMD_occs(this).find(exp->id()); }
+
     MDDef * getDef() const { return VMD_def(this); }
-    IRSet * getUseSet() { return &VMD_occs(this); }
+    UseSet * getUseSet() { return &VMD_occs(this); }
     MD const* getMD(MDSystem const* sys) const
     { return const_cast<MDSystem*>(sys)->getMD(mdid()); }
 
@@ -225,7 +225,7 @@ public:
 
     //Remove given IR expression from occurence set.
     //exp: IR expression to be removed.
-    void removeUse(IR const* exp) { VMD_occs(this).remove(exp); }
+    void removeUse(IR const* exp) { VMD_occs(this).remove(exp->id()); }
 
     UINT version() const
     {

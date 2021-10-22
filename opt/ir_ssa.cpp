@@ -2354,8 +2354,7 @@ void PRSSAMgr::movePhi(IRBB * from, IRBB * to)
 
 bool PRSSAMgr::verifyPRSSAInfo(Region const* rg)
 {
-    PRSSAMgr const* ssamgr = (PRSSAMgr*)(rg->getPassMgr()->
-        queryPass(PASS_PR_SSA_MGR));
+    PRSSAMgr const* ssamgr = rg->getPRSSAMgr();
     if (ssamgr != nullptr && ssamgr->is_valid()) {
         ASSERT0(ssamgr->verifySSAInfo());
         ASSERT0(ssamgr->verifyPhi(false, false));
