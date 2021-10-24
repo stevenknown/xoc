@@ -47,6 +47,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include "du.h"
 #include "ir.h"
 #include "ir_helper.h"
+#include "gr_helper.h"
 #include "ir_bb.h"
 #include "loop.h"
 #include "pass_mgr.h"

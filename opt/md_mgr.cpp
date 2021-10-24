@@ -171,11 +171,11 @@ MD const* MDMgr::genMDForPR(UINT prno, Type const* type)
     MD md;
     MD_base(&md) = pr_var; //correspond to Var
     MD_ofst(&md) = 0;
-    if (pr_var->getType()->is_any()) {
+    if (type->is_any()) {
         MD_ty(&md) = MD_UNBOUND;
     } else {
         MD_ty(&md) = MD_EXACT;
-        MD_size(&md) = m_tm->getByteSize(pr_var->getType());
+        MD_size(&md) = m_tm->getByteSize(type);
     }
     MD const* e = m_mdsys->registerMD(md);
     ASSERT0(MD_id(e) > 0);

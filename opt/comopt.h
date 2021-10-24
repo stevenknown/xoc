@@ -61,3 +61,4 @@ author: Su Zhenyu
 #include "refine_duchain.h"
 #include "scalar_opt.h"
 #include "infer_type.h"
+#include "invert_brtgt.h"

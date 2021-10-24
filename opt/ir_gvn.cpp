@@ -669,7 +669,13 @@ VN * GVN::computeILoad(IR const* exp, bool & change)
             m_stmt2domdef.set(exp_stmt, domdef);
         }
     }
-    if (domdef == nullptr) { return nullptr; }
+    if (domdef == nullptr) {
+        return nullptr;
+    }
+    if (domdef->getMustRef() == nullptr || exp->getMustRef() == nullptr ||
+        !domdef->getMustRef()->is_exact() || !exp->getMustRef()->is_exact()) {
+        return nullptr;
+    }
 
     //ofst will be distinguished in computeILoadByAnonDomDef(), so
     //we do not need to differentiate the various offset of ild and ist.
@@ -791,6 +797,10 @@ VN * GVN::computeArray(IR const* exp, bool & change)
     if (domdef == nullptr) {
         return nullptr;
     }
+    if (domdef->getMustRef() == nullptr || exp->getMustRef() == nullptr ||
+        !domdef->getMustRef()->is_exact() || !exp->getMustRef()->is_exact()) {
+        return nullptr;
+    }
     if (domdef->is_starray() && ARR_ofst(domdef) != ARR_ofst(exp)) {
         return nullptr;
     }
@@ -882,13 +892,16 @@ VN * GVN::computeScalar(IR const* exp, bool & change)
 
     IR const* exp_stmt = const_cast<IR*>(exp)->getStmt();
     IR const* domdef = m_du->findNearestDomDef(exp, exp_stmt, du);
-
-    if (domdef == nullptr) { return nullptr; }
-
+    if (domdef == nullptr) {
+        return nullptr;
+    }
+    if (domdef->getMustRef() == nullptr || exp->getMustRef() == nullptr ||
+        !domdef->getMustRef()->is_exact() || !exp->getMustRef()->is_exact()) {
+        return nullptr;
+    }
     if (domdef->is_st() && ST_ofst(domdef) != exp->getOffset()) {
         return nullptr;
     }
-
     if (!domdef->is_st() && !domdef->is_stpr()) {
         return computeScalarByAnonDomDef(exp, domdef, change);
     }

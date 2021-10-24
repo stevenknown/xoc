@@ -1006,7 +1006,7 @@ IR * Refine::refineNot(IR * ir, bool & change, RefineCtx & rc)
         case IR_GE:
         case IR_EQ:
         case IR_NE:
-            op0->invertIRType(m_rg);
+            op0 = IR::invertIRType(op0, m_rg);
             lchange = true;
             break;
         default: break;
@@ -1058,7 +1058,7 @@ IR * Refine::refineDiv(IR * ir, bool & change, RefineCtx & rc)
     }
     if (op1->is_const() && op1->is_int() &&
         xcom::isPowerOf2(CONST_int_val(op1)) &&
-        RC_refine_div_const(rc)) {
+        rc.refine_div_const()) {
         //X/2^power => X>>power, arith shift right to floor-division.
         if (op0->is_sint()) {
             IR_code(ir) = IR_ASR;

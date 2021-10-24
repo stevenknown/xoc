@@ -247,8 +247,7 @@ void prtIndent(Region const* rg, UINT indent)
 //START LogMgr
 void LogMgr::init(CHAR const* logfilename, bool is_del)
 {
-    if (m_ctx.logfile != nullptr) { return; }
-    if (logfilename == nullptr) { return; }
+    if (m_ctx.logfile != nullptr || logfilename == nullptr) { return; }
     if (is_del) {
         UNLINK(logfilename);
     }

@@ -2736,8 +2736,10 @@ void DUMgr::updateDefWithMustEffectMD(IR * ir, MD const* musteffect)
 
 void DUMgr::cleanDUSet(UINT irid, DUSet * set)
 {
-    if (!m_is_init->is_contain(irid)) {
-        m_is_init->bunion(irid);
+    ASSERTN(m_is_init, ("it is allocated at each perform()"));
+    ASSERT0(irid != IRID_UNDEF);
+    if (!m_is_init->find(irid)) {
+        m_is_init->append(irid);
         if (set != nullptr) {
             set->clean(*getSBSMgr());
         }
@@ -3294,8 +3296,7 @@ void DUMgr::computeMDDUChain(MOD OptCtx & oc, bool retain_reach_def,
     //Record IRs which may defined these referred MDs.
     ASSERT0(m_md2irs == nullptr && m_is_init == nullptr);
     m_md2irs = new MD2IRSet(m_rg);
-    m_is_init = new xcom::BitSet(MAX(1, (m_rg->getIRVec()->
-        get_last_idx()/BITS_PER_BYTE)+1));
+    m_is_init = new xcom::TTab<UINT>();
 
     //Compute the DU chain linearly.
     BBListIter ct;

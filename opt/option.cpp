@@ -91,16 +91,23 @@ bool g_do_cfg_remove_unreach_bb = true;
 //    BB1: goto L2
 bool g_do_cfg_remove_trampolin_bb = true;
 
-//Perform cfg optimization: invert branch condition and
-//remove redundant trampoline BB.
-//e.g:
+//Remove trampoline branch.
+//Note the pass is different from what removeTrampolinEdge() does.
+//e.g:L2:
 //    truebr L4 | false L4
-//    goto L3
+//    goto L3 //redundant jump
 //    L4
-//    ...
+//    st = ...
 //    L3:
 //    ...
-bool g_do_cfg_invert_condition_and_remove_trampolin_bb = true;
+//=>
+//    L2:
+//    falsebr L3 | truebr L3
+//    EMPTY BB
+//    L4:
+//    st = ...
+//    L3:
+bool g_do_cfg_remove_trampolin_branch = true;
 
 //Perform cfg optimization: remove redundant branch.
 //e.g:
@@ -169,6 +176,9 @@ bool g_do_dce_aggressive = false;
 
 //Perform type inference.
 bool g_infer_type = true;
+
+//Perform cfg optimization: invert branch condition and target.
+bool g_invert_brtgt = true;
 
 //Perform linear function test replacement.
 bool g_do_lftr = false;
@@ -321,10 +331,11 @@ DumpOpt::DumpOpt()
     is_dump_memusage = false;
     is_dump_livenessmgr = false;
     is_dump_irparser = false;
+    is_dump_ir_id = true;
 }
 
 
-bool DumpOpt::isDumpALL() const
+bool DumpOpt::isDumpAll() const
 {
     //is_dump_all and is_dump_nothing can not all be true.
     ASSERT0(!(is_dump_nothing & is_dump_all));
@@ -391,6 +402,12 @@ bool DumpOpt::isDumpRP() const
 bool DumpOpt::isDumpInferType() const
 {
     return is_dump_all || (!is_dump_nothing && is_dump_infertype);
+}
+
+
+bool DumpOpt::isDumpInvertBrTgt() const
+{
+    return is_dump_all || (!is_dump_nothing && is_dump_invert_brtgt);
 }
 
 
@@ -498,6 +515,12 @@ bool DumpOpt::isDumpLivenessMgr() const
 bool DumpOpt::isDumpIRParser() const
 {
     return is_dump_all || (!is_dump_nothing && is_dump_irparser);
+}
+
+
+bool DumpOpt::isDumpIRID() const
+{
+    return is_dump_all || (!is_dump_nothing && is_dump_ir_id);
 }
 
 

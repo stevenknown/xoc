@@ -2065,7 +2065,7 @@ static void dumpLocalVar(Region const* rg)
         lm->decIndent(2);
     }
     lm->decIndent(2);
-} 
+}
 
 
 //Dump each Var in current region's Var table.
@@ -2224,11 +2224,12 @@ bool Region::processBBList(OptCtx & oc)
     START_TIMER(t, "PreScan");
     prescanBBList(getBBList());
     END_TIMER(t, "PreScan");
-    if (g_is_dump_after_pass && g_dump_opt.isDumpALL()) {
+    if (g_is_dump_after_pass && g_dump_opt.isDumpAll()) {
         note(this, "\n==--- DUMP PRIMITIVE IRBB LIST ----==");
         dumpBBList();
     }
 
+    HighProcessImpl(oc);
     return MiddleProcess(oc);
 }
 
@@ -2240,7 +2241,7 @@ bool Region::processIRList(OptCtx & oc)
     START_TIMER(t, "PreScan");
     prescanIRList(getIRList());
     END_TIMER(t, "PreScan");
-    if (g_is_dump_after_pass && g_dump_opt.isDumpALL()) {
+    if (g_is_dump_after_pass && g_dump_opt.isDumpAll()) {
         note(this, "\n==--- DUMP PRIMITIVE IR LIST ----==");
         dumpIRList();
     }
@@ -2260,8 +2261,7 @@ bool Region::processIRList(OptCtx & oc)
         ASSERT0(verifyMDRef());
     }
 
-    if (!MiddleProcess(oc)) { return false; }
-    return true;
+    return MiddleProcess(oc);
 }
 
 

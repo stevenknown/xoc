@@ -50,9 +50,9 @@ protected:
     CFG_SHAPE m_cs;
 
 protected:
-    void dump_node(bool detail, bool dump_mdssa);
-    void dump_head(FILE * h);
-    void dump_edge(bool dump_eh);
+    void dump_node(bool detail, bool dump_mdssa) const;
+    void dump_head(FILE * h) const;
+    void dump_edge(bool dump_eh) const;
 
     void remove_bb_impl(IRBB * bb);
     //CASE: Given pred1->bb, fallthrough edge,
@@ -70,12 +70,32 @@ protected:
     bool removeTrampolinEdgeCase1(BBListIter bbct);
     bool removeTrampolinEdgeCase2(BBListIter bbct);
 
+    //Remove trampoline branch.
+    //Note the pass is different from what removeTrampolinEdge() does.
+    //e.g:L2:
+    //    truebr L4 | false L4
+    //    goto L3 //redundant jump
+    //    L4
+    //    st = ... 
+    //    L3:
+    //    ...
+    //=>
+    //    L2:
+    //    falsebr L3 | truebr L3
+    //    EMPTY BB
+    //    L4:
+    //    st = ...
+    //    L3:
+    bool removeTrampolinBranch();
+
+    //Sort the order of predecessor of given BB according to PHI operand layout.
+    void sortPred(IRBB const* bb, IR * ir, TMap<IR*, LabelInfo*> & ir2label);
 public:
     enum {
-        DUMP_DEF = 0x0, //the default dump option.
-        DUMP_DETAIL = 0x1, //Dump BB details, includes IR, AttachInfo, etc.
-        DUMP_EH = 0x2, //Dump exception handling info.
-        DUMP_MDSSA = 0x4, //Dump MDSSA info.
+        DUMP_DEF = 0x0U, //the default dump option.
+        DUMP_DETAIL = 0x1U, //Dump BB details, includes IR, AttachInfo, etc.
+        DUMP_EH = 0x2U, //Dump exception handling info.
+        DUMP_MDSSA = 0x4U, //Dump MDSSA info.
 
         //Kind of combination of dump options.
         DUMP_COMBINE = DUMP_DETAIL|DUMP_EH|DUMP_MDSSA,
@@ -154,9 +174,10 @@ public:
         }
     }
 
-    void dumpVCG(CHAR const* name = nullptr, UINT flag = DUMP_COMBINE);
-    void dumpDOT(CHAR const* name = nullptr, UINT flag = DUMP_COMBINE);
-    void dumpDOT(FILE * h, UINT flag);
+    void dumpVCG(CHAR const* name = nullptr, UINT flag = DUMP_COMBINE) const;
+    void dumpDOT(CHAR const* name = nullptr, UINT flag = DUMP_COMBINE) const;
+    void dumpDOT(FILE * h, UINT flag) const;
+    virtual bool dump() const;
 
     void erase();
 
@@ -193,23 +214,6 @@ public:
     IRBB * insertBBbetween(IN IRBB * from, IN BBListIter from_ct,
                            IN IRBB * to, IN BBListIter to_ct,
                            IN IRBB * newbb);
-    //Combine trampoline branch.
-    //Note the pass is different from what removeTrampolinEdge() does.
-    //e.g:L2:
-    //    truebr L4 | false L4
-    //    goto L3 //redundant jump
-    //    L4
-    //    st = ... 
-    //    L3:
-    //    ...
-    //=>
-    //    L2:
-    //    falsebr L3 | truebr L3
-    //    EMPTY BB
-    //    L4:
-    //    st = ...
-    //    L3:
-    bool invertAndRemoveTrampolineBranch();
     bool isRPOValid() const;
 
     //Return the first operation of 'bb'.
@@ -241,7 +245,7 @@ public:
         ASSERT0(v);
         return getBB(v->id());
     }
-    Region * getRegion() { return m_rg; }
+    Region * getRegion() const { return m_rg; }
     UINT getNumOfBB() const { return getVertexNum(); }
     UINT getNumOfSucc(IRBB const* bb) const
     { return getOutDegree(getVertex(bb->id())); }
@@ -351,6 +355,8 @@ public:
     //Include remove dead bb which is unreachable, remove empty bb as many
     //as possible, simplify and remove the branch like "if (x==x)", remove
     //the trampolin branch.
+    //Note these optimizations performed in the function should NOT use DOM,
+    //PDOM, LOOPINFO, or RPO information.
     bool performMiscOpt(OptCtx & oc);
 
     //The function verify whether the branch target is match to the BB.

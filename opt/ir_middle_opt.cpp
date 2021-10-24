@@ -122,9 +122,13 @@ void Region::postSimplify(SimpCtx const& simp, MOD OptCtx & oc)
         }
     }
 
-    getCFG()->performMiscOpt(oc);
-    oc.setInvalidIfCFGChanged();
+    if (g_invert_brtgt) {
+        getPassMgr()->registerPass(PASS_INVERT_BRTGT)->perform(oc);
+    }
 
+    getCFG()->performMiscOpt(oc);
+
+    oc.setInvalidIfCFGChanged();
     if (g_do_cdg) {
         ASSERT0(getPassMgr());
         CDG * cdg = (CDG*)getPassMgr()->registerPass(PASS_CDG);
@@ -159,7 +163,7 @@ bool Region::performSimplify(OptCtx & oc)
         oc.is_nonpr_du_chain_valid()) {
         ASSERT0(verifyMDDUChain(this));
     }
-    if (g_is_dump_after_pass && g_dump_opt.isDumpALL()) {
+    if (g_is_dump_after_pass && g_dump_opt.isDumpAll()) {
         note(this, "\n==---- DUMP AFTER SIMPLIFY IRBB LIST ----==");
         dumpBBList();
     }
@@ -280,6 +284,9 @@ bool Region::MiddleProcess(OptCtx & oc)
 
     if (g_opt_level > OPT_LEVEL0) {
         getPassMgr()->registerPass(PASS_SCALAR_OPT)->perform(oc);
+        if (g_invert_brtgt) {
+            getPassMgr()->registerPass(PASS_INVERT_BRTGT)->perform(oc);
+        }
     }
 
     ASSERT0(getCFG() && getCFG()->verifyRPO(oc));

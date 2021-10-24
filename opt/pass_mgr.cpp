@@ -147,6 +147,12 @@ Pass * PassMgr::allocInferType()
 }
 
 
+Pass * PassMgr::allocInvertBrTgt()
+{
+    return new InvertBrTgt(m_rg);
+}
+
+
 Pass * PassMgr::allocDSE()
 {
     //return new DSE(m_rg);
@@ -382,6 +388,9 @@ Pass * PassMgr::registerPass(PASS_TYPE opty)
         break;
     case PASS_INFER_TYPE:
         pass = allocInferType();
+        break;
+    case PASS_INVERT_BRTGT:
+        pass = allocInvertBrTgt();
         break;
     default: ASSERTN(0, ("Unsupport Optimization."));
     }

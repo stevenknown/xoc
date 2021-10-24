@@ -190,19 +190,24 @@ typedef enum {
     case IR_LDA: \
     case IR_CONST
 
-//Defined the enty for memory load access.
+//Defined the entry for memory load access.
 #define SWITCH_CASE_EXP_MEM_ACC \
     case IR_LD: \
     case IR_PR: \
     case IR_ILD: \
     case IR_ARRAY
 
-//Defined the enty for memory write access.
+//Defined the entry for memory write access.
 #define SWITCH_CASE_STMT_MEM_ACC \
     case IR_ST: \
     case IR_STPR: \
     case IR_IST: \
     case IR_STARRAY
+
+//Defined the entry for function call.
+#define SWITCH_CASE_CALL \
+    case IR_CALL: \
+    case IR_ICALL
 
 //Describe miscellaneous information for IR.
 #define IRT_IS_STMT 0x1 //statement.
@@ -812,10 +817,10 @@ public:
     //otherwise return false.
     //ir2: stmt or expression to be compared.
     //e.g: this and ir2 are overlapped:
-    //     'this' object: |--------| 
+    //     'this' object: |--------|
     //     'ir2'  object:        |----|
     //e.g: this and ir2 are NOT overlapped:
-    //     'this' object: |------| 
+    //     'this' object: |------|
     //     'ir2'  object:        |----|
     //
     //Note: The function will NOT consider the different pattern
@@ -832,10 +837,10 @@ public:
     //otherwise return false.
     //ir2: stmt or expression to be compared.
     //e.g: 'this' covers ir2:
-    //     'this' object: |------| 
+    //     'this' object: |------|
     //     'ir2'  object:   |----|
     //e.g: this is NOT cover ir2:
-    //     'this' object: |------| 
+    //     'this' object: |------|
     //     'ir2'  object:        |----|
     //
     //Note: The function will NOT consider the different pattern
@@ -1155,27 +1160,20 @@ public:
     inline bool isDirectArrayRef() const;
 
     //This function invert the operation accroding to it semantics.
-    inline void invertIRType(Region * rg)
+    inline static IR * invertIRType(IR * ir, Region * rg);
+    static IR_TYPE invertIRType(IR_TYPE src)
     {
-        switch (getCode()) {
-        case IR_LT: IR_code(this) = IR_GE; break;
-        case IR_LE: IR_code(this) = IR_GT; break;
-        case IR_GT: IR_code(this) = IR_LE; break;
-        case IR_GE: IR_code(this) = IR_LT; break;
-        case IR_EQ: IR_code(this) = IR_NE; break;
-        case IR_NE: IR_code(this) = IR_EQ; break;
-        case IR_TRUEBR: IR_code(this) = IR_FALSEBR; break;
-        case IR_FALSEBR: IR_code(this) = IR_TRUEBR; break;
-        case IR_LOR:
-            invertLor(rg);
-            break;
-        case IR_LAND:
-            invertLand(rg);
-            break;
+        switch(src) {
+        case IR_LT: return IR_GE;
+        case IR_LE: return IR_GT;
+        case IR_GT: return IR_LE;
+        case IR_GE: return IR_LT;
+        case IR_EQ: return IR_NE;
+        case IR_NE: return IR_EQ;
         default: ASSERTN(0, ("unsupport"));
         }
+        return IR_UNDEF;
     }
-
     //Return true if current ir can be placed in BB.
     inline bool isStmtInBB() const;
 
@@ -1740,8 +1738,8 @@ public:
 };
 
 
-//Binary Operations, include add, sub, mul, div, rem, mod,
-//land, lor, band, bor, xor, lt, le, gt, ge, eq, ne, asr, lsr, lsl.
+//Binary Operation, includes ADD, SUB, MUL, DIV, REM, MOD,
+//LAND, LOR, BAND, BOR, XOR, LT, LE, GT, GE, EQ, NE, ASR, LSR, LSL.
 #define BIN_opnd0(ir) BIN_kid(ir, 0)
 #define BIN_opnd1(ir) BIN_kid(ir, 1)
 #define BIN_kid(ir, idx) (((CBin*)ir)->opnd[CKID_BIN(ir, idx)])
@@ -1759,7 +1757,7 @@ public:
 };
 
 
-//Unary Operations, include neg, bnot, lnot.
+//Unary Operation, includes NEG, BNOT, LNOT.
 #define UNA_opnd(ir) UNA_kid(ir, 0)
 #define UNA_kid(ir, idx) (((CUna*)ir)->opnd[CKID_UNA(ir, idx)])
 class CUna : public IR {
@@ -2115,8 +2113,8 @@ public:
     TMWORD const* getElemNumBuf() const { return ARR_elem_num_buf(this); }
     Type const* getElemType() const { return ARR_elemtype(this); }
     IR * getKid(UINT idx) const { return ARR_kid(this, idx); }
-    IR * getBase() const { return ARR_base(this); } 
-    IR * getSubList() const { return ARR_sub_list(this); } 
+    IR * getBase() const { return ARR_base(this); }
+    IR * getSubList() const { return ARR_sub_list(this); }
 
     //Return true if exp is array base.
     bool is_base(IR const* exp) const { return exp == ARR_base(this); }
@@ -2397,7 +2395,7 @@ public:
     //And readonly region will alleviate the burden of optimizor.
     bool is_readonly() const;
 
-    Region * getRegion() const { return REGION_ru(this); } 
+    Region * getRegion() const { return REGION_ru(this); }
 };
 
 
@@ -3171,6 +3169,31 @@ IR * IR::getJudgeDet() const
     default: UNREACHABLE();
     }
     return nullptr;
+}
+
+
+//This function invert the operation accroding to it semantics.
+inline IR * IR::invertIRType(IR * ir, Region * rg)
+{
+    switch (ir->getCode()) {
+    case IR_LT: IR_code(ir) = IR_GE; break;
+    case IR_LE: IR_code(ir) = IR_GT; break;
+    case IR_GT: IR_code(ir) = IR_LE; break;
+    case IR_GE: IR_code(ir) = IR_LT; break;
+    case IR_EQ: IR_code(ir) = IR_NE; break;
+    case IR_NE: IR_code(ir) = IR_EQ; break;
+    case IR_TRUEBR: IR_code(ir) = IR_FALSEBR; break;
+    case IR_FALSEBR: IR_code(ir) = IR_TRUEBR; break;
+    case IR_LNOT: ir = UNA_opnd(ir); break;
+    case IR_LOR:
+        ir->invertLor(rg);
+        break;
+    case IR_LAND:
+        ir->invertLand(rg);
+        break;
+    default: ASSERTN(0, ("unsupport"));
+    }
+    return ir;
 }
 //END IR
 

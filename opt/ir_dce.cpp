@@ -75,7 +75,7 @@ bool DeadCodeElim::dump() const
     BBList * bbl = m_rg->getBBList();
     for (IRBB * bb = bbl->get_head(); bb != nullptr; bb = bbl->get_next()) {
         note(getRegion(), "\n--0- BB%d", bb->id());
-        if (!m_is_bb_effect.is_contain(bb->id())) {
+        if (!isEffectBB(bb)) {
             prt(getRegion(), "\t\tineffect BB!");
         }
     }
@@ -232,7 +232,7 @@ bool DeadCodeElim::find_effect_kid_condbr(IR const* ir) const
 
         for (IR * r = BB_irlist(succ).get_head();
              r != nullptr; r = BB_irlist(succ).get_next()) {
-            if (m_is_stmt_effect.is_contain(r->id())) {
+            if (isEffectStmt(r)) {
                 return true;
             }
         }
@@ -264,13 +264,13 @@ bool DeadCodeElim::find_effect_kid_uncondbr(IR const* ir) const
         if (!m_cfg->isControlPred(pred, bb)) { continue; }
 
         bool control_bb_has_effect_stmt = false;
-        if (m_is_bb_effect.is_contain(pred->id())) {
+        if (isEffectBB(pred)) {
             control_bb_has_effect_stmt = true;
         } else {
             BBIRListIter irit;
             for (IR * r = BB_irlist(pred).get_head(&irit);
                  r != nullptr; r = BB_irlist(pred).get_next(&irit)) {
-                if (m_is_stmt_effect.is_contain(r->id())) {
+                if (isEffectStmt(r)) {
                     control_bb_has_effect_stmt = true;
                     break;
                 }
@@ -288,7 +288,7 @@ bool DeadCodeElim::find_effect_kid_uncondbr(IR const* ir) const
 
             for (IR * r = BB_irlist(succ).get_head();
                  r != nullptr; r = BB_irlist(succ).get_next()) {
-                if (m_is_stmt_effect.is_contain(r->id())) {
+                if (isEffectStmt(r)) {
                     return true;
                 }
             }
@@ -305,12 +305,13 @@ bool DeadCodeElim::find_effect_kid_uncondbr(IR const* ir) const
          ec != nullptr; ec = ec->get_next()) {
         IRBB const* succ = m_cfg->getBB(ec->getToId());
         ASSERT0(succ);
-        if (m_is_bb_effect.is_contain(succ->id())) { return true; }
+        if (isEffectBB(succ)) { return true; }
+        if (succ == bb) { continue; }
         
         BBIRListIter irit;
         for (IR const* r = BB_irlist(succ).get_head(&irit);
              r != nullptr; r = BB_irlist(succ).get_next(&irit)) {
-            if (m_is_stmt_effect.is_contain(r->id())) {
+            if (isEffectStmt(r)) {
                 return true;
             }
         }
@@ -344,7 +345,7 @@ bool DeadCodeElim::markControlPredAndStmt(IRBB const* bb,
          ec != nullptr; ec = ec->get_next()) {
         IRBB const* pred = m_cfg->getBB(ec->getFromId());
         ASSERT0(pred);
-        if (!m_is_bb_effect.is_contain(pred->id())) {
+        if (!isEffectBB(pred)) {
             setEffectBB(pred);
             change = true;
         }
@@ -373,7 +374,7 @@ bool DeadCodeElim::markControlPredAndStmt(IRBB const* bb,
             //  }
             continue;
         }
-        if (!m_is_stmt_effect.is_contain(last_ir->id())) {
+        if (!isEffectStmt(last_ir)) {
             setEffectStmt(last_ir, nullptr, &act_ir_lst);
             change = true;
         }
@@ -391,7 +392,7 @@ bool DeadCodeElim::markCFGPred(IRBB const* bb)
     for (xcom::EdgeC const* ec = m_cfg->getVertex(bbid)->getInList();
          ec != nullptr; ec = ec->get_next()) {
         UINT predid = ec->getFromId();
-        if (m_is_bb_effect.is_contain(predid)) { continue; }
+        if (isEffectBB(predid)) { continue; }
 
         IRBB const* pred = m_cfg->getBB(predid);
         ASSERT0(pred->rpo() > RPO_UNDEF);
@@ -410,9 +411,8 @@ bool DeadCodeElim::tryMarkUnconditionalBranch(IRBB const* bb,
 {
     IR * last_ir = const_cast<IRBB*>(bb)->getLastIR(); //last IR of BB.
     if (last_ir != nullptr && last_ir->isUnconditionalBr() &&
-        !m_is_stmt_effect.is_contain(last_ir->id()) &&
-        find_effect_kid(last_ir)) {
-        //TO BE COMFIRED: Does effect_kid of last_ir have to be considered?
+        !isEffectStmt(last_ir) && find_effect_kid(last_ir)) {
+        //TBD: Does effect_kid of last_ir have to be considered?
         setEffectStmt(last_ir, &m_is_bb_effect, &act_ir_lst);
         return true;
     }
@@ -427,8 +427,7 @@ bool DeadCodeElim::tryMarkBranch(IRBB const* bb,
     //that controlled by current bb.
     IR * last_ir = const_cast<IRBB*>(bb)->getLastIR(); //last IR of BB.
     if (last_ir != nullptr && last_ir->isBranch() &&
-        !m_is_stmt_effect.is_contain(last_ir->id()) &&
-        find_effect_kid(last_ir)) {
+        !isEffectStmt(last_ir) && find_effect_kid(last_ir)) {
         //IR_SWTICH might have multiple successors BB.
         setEffectStmt(last_ir, nullptr, &act_ir_lst);
         return true;
@@ -463,7 +462,7 @@ bool DeadCodeElim::preserve_cd(MOD List<IR const*> & act_ir_lst)
     for (bbl->get_head(&ct); ct != bbl->end(); ct = bbl->get_next(ct)) {
         IRBB * bb = ct->val();
         ASSERT0(bb);
-        if (m_is_bb_effect.is_contain(bb->id())) {
+        if (isEffectBB(bb)) {
             change |= setControlDepBBToBeEffect(bb, act_ir_lst);
         }
 
@@ -484,7 +483,7 @@ bool DeadCodeElim::collectByPRSSA(IR const* x, MOD List<IR const*> * pwlst2)
     if (d == nullptr) { return false; }
     ASSERT0(d->is_stmt());
     ASSERT0(d->isWritePR() || d->isCallHasRetVal());
-    if (m_is_stmt_effect.is_contain(d->id())) { return false; }
+    if (isEffectStmt(d)) { return false; }
     setEffectStmt(d, &m_is_bb_effect, pwlst2);
     return true;
 }
@@ -512,7 +511,7 @@ bool DeadCodeElim::collectAllDefThroughDefChain(
         //traverse the same DEF many times. Apply DP like algo to reduce
         //the traversal time.
 
-        if (m_is_stmt_effect.is_contain(stmt->id())) {
+        if (isEffectStmt(stmt)) {
             continue; //Check all previous DEF in debug mode.
         }
         change = true;
@@ -569,7 +568,7 @@ bool DeadCodeElim::collectByMDSSA(IR const* x, MOD List<IR const*> * pwlst2)
             mustuse->is_exact() &&
             mustdef->is_exact()) {
             if (mustdef == mustuse || mustdef->is_overlap(mustuse)) {
-                if (m_is_stmt_effect.is_contain(defstmt->id())) { continue; }
+                if (isEffectStmt(defstmt)) { continue; }
                 setEffectStmt(defstmt, &m_is_bb_effect, pwlst2);
                 change = true;
             }
@@ -613,7 +612,7 @@ bool DeadCodeElim::collectByDUSet(IR const* x, MOD List<IR const*> * pwlst2)
     for (INT i = defs->get_first(&di); i >= 0; i = defs->get_next(i, &di)) {
         IR const* d = m_rg->getIR(i);
         ASSERT0(d->is_stmt());
-        if (!m_is_stmt_effect.is_contain(d->id())) {
+        if (!isEffectStmt(d)) {
             change = true;
             setEffectStmt(d, &m_is_bb_effect, pwlst2);
         }
@@ -638,7 +637,7 @@ bool DeadCodeElim::removeIneffectIR(OUT bool & remove_branch_stmt)
              ctir != nullptr; ctir = next) {
             IR * stmt = ctir->val();
             BB_irlist(bb).get_next(&next);
-            if (!m_is_stmt_effect.is_contain(stmt->id())) {
+            if (!isEffectStmt(stmt)) {
                 //Could not just remove the SSA def, you should consider
                 //the SSA_uses and make sure they are all removable.
                 //Use SSA related API.

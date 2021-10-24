@@ -186,7 +186,12 @@ IR * Region::buildLda(Var * var)
     ASSERT0(var);
     IR * ir = allocIR(IR_LDA);
     LDA_idinfo(ir) = var;
-    IR_dt(ir) = getTypeMgr()->getPointerType(var->getByteSize(getTypeMgr()));
+    if (var->is_any()) {
+        IR_dt(ir) = getTypeMgr()->getPointerType(1);
+    } else {
+        IR_dt(ir) = getTypeMgr()->getPointerType(
+            var->getByteSize(getTypeMgr()));
+    }
     return ir;
 }
 
@@ -1114,6 +1119,10 @@ IR * Region::buildImmInt(HOST_INT v, Type const* type)
         case D_U128:
             ASSERTN(0, ("TODO:unsupport 128 bit integer"));
             break;
+        case D_ANY:
+            //If IR_CONST operation has ANY type, that indicates the constant
+            //value with dynamic type.
+            ASSERTN(0, ("should invoke buildImmAny()"));
         default: ASSERTN(0, ("TODO:unsupport integer type"));
         }
     } else {

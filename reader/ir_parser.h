@@ -275,8 +275,13 @@ protected:
     List<ParseErrorMsg*> m_err_list;
     TMap<Sym const*, UINT> m_id2prno;
 protected:
+    bool checkPhiOpndLabel(IR const* ir,
+        xcom::TMap<LabelInfo const*, IR const*> const& labtab,
+        ParseCtx const& ctx);
     //The function checks label for GR syntax legality.
-    bool checkLabel(IR const* irlist);
+    bool checkLabel(IR const* irlist, ParseCtx const& ctx);
+    //Return false if there is error occur.
+    bool constructSSAIfNeed(ParseCtx * ctx);
 
     bool declareType(ParseCtx * ctx);
     bool declareVarProperty(Var * var, ParseCtx * ctx);
@@ -313,15 +318,18 @@ protected:
 
     UINT mapID2Prno(CHAR const* prid, ParseCtx * ctx);
 
-    bool parseDimProperty(PropertySet & cont, ParseCtx * ctx);
-    bool parseElemTypeProperty(PropertySet & cont, ParseCtx * ctx);
+    bool parseRegionName(Region * region, UINT flag, ParseCtx * ctx);
+    bool parseRegionProp(OUT PropertySet & ps, ParseCtx * ctx);
+    bool parseRegionType(Region ** region, UINT * flag, ParseCtx * ctx);
+    bool parseDimProperty(PropertySet & ps, ParseCtx * ctx);
+    bool parseElemTypeProperty(PropertySet & ps, ParseCtx * ctx);
     bool parseAlign(Var * var, ParseCtx * ctx);
     bool parseByteValue(Var * var, ParseCtx * ctx);
     bool parseStringValue(Var * var, ParseCtx * ctx);
-    bool parseThrowTarget(PropertySet & cont, ParseCtx * ctx);
-    bool parseDefProperty(PropertySet & cont, ParseCtx * ctx);
-    bool parseUseProperty(PropertySet & cont, ParseCtx * ctx);
-    bool parseProperty(PropertySet & cont, ParseCtx * ctx);
+    bool parseThrowTarget(PropertySet & ps, ParseCtx * ctx);
+    bool parseDefProperty(PropertySet & ps, ParseCtx * ctx);
+    bool parseUseProperty(PropertySet & ps, ParseCtx * ctx);
+    bool parseProperty(PropertySet & ps, ParseCtx * ctx);
     bool parseCvt(ParseCtx * ctx);
     bool parseCase(ParseCtx * ctx);
     bool parseId(ParseCtx * ctx);

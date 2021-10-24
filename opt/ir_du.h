@@ -144,7 +144,7 @@ protected:
     MDSetMgr * m_mds_mgr;
     MDSetHash * m_mds_hash;
     //Used by DU chain.
-    xcom::BitSet * m_is_init; //for tmp use.
+    xcom::TTab<UINT> * m_is_init; //for tmp use.
     MD2IRSet * m_md2irs; //for tmp use.
     OptCtx * m_oc;
     ConstIRIter m_citer; //for tmp use.

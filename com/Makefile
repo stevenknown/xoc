@@ -3,6 +3,7 @@ include ./Makefile.inc
 ifeq ($(CFLAGS),)
 CFLAGS = \
     -D_DEBUG_ \
+    -D_SUPPORT_C11_ \
     -DFOR_DEX \
 	-Wno-write-strings \
 	-Wsign-promo \
@@ -26,6 +27,8 @@ CFLAGS = \
 	-Wstrict-overflow \
 	-finline-limit=10000000
 endif
+
+SRC = ..
 
 libxcom: com_objs 
 	ar rvs libxcom.a $(COM_OBJS)

@@ -148,7 +148,8 @@ bool LoopCvt::try_convert(LI<IRBB> * li, IRBB * gobackbb,
         if (newir->isConditionalBr()) {
             ASSERT0(ir == BB_last_ir(head));
             last_cond_br = newir;
-            newir->invertIRType(m_rg);
+            newir = IR::invertIRType(newir, m_rg);
+            ASSERTN(last_cond_br == newir, ("stmt pointer changed"));
         }
     }
 

@@ -50,7 +50,11 @@ void Region::HighProcessImpl(OptCtx & oc)
         getCFG()->computeExitList();
         ASSERT0(getCFG()->verify());
 
+        bool org = g_do_cfg_remove_unreach_bb;
+        //Unreachable BB have to removed before RPO compuatation.
+        g_do_cfg_remove_unreach_bb = true;
         getCFG()->performMiscOpt(oc);
+        g_do_cfg_remove_unreach_bb = org;
 
         //Build DOM after CFG be optimized.
         getPassMgr()->checkValidAndRecompute(&oc, PASS_DOM, PASS_UNDEF);

@@ -1,9 +1,7 @@
 /*@
-XOC Release License
+Copyright (c) 2013-2021, Su Zhenyu steven.known@gmail.com
 
-Copyright (c) 2013-2014, Alibaba Group, All rights reserved.
-
-    compiler@aliexpress.com
+All rights reserved.
 
 Redistribution and use in source and binary forms, with or without
 modification, are permitted provided that the following conditions are met:
@@ -17,72 +15,208 @@ modification, are permitted provided that the following conditions are met:
       may be used to endorse or promote products derived from this software
       without specific prior written permission.
 
-THIS SOFTWARE IS PROVIDED "AS IS" AND ANY EXPRESS OR IMPLIED
-WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES
-OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
-DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS
-BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
-CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT
-OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR
-BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY,
-WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR
-OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN
-IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-
-author: Su Zhenyu
+THIS SOFTWARE IS PROVIDED "AS IS" AND ANY
+EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+DISCLAIMED. IN NO EVENT SHALL THE CONTRIBUTORS BE LIABLE FOR ANY
+DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
+(INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
+LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND
+ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+(INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
+SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 @*/
 #include "cominc.h"
 #include "comopt.h"
 
 namespace xoc {
 
+static Type const* meetType(Type const* t1, Type const* t2, TypeMgr * tm)
+{
+    //Upbound and Lowerbound is ANY type.
+    Type const* newty = tm->getAny();
+    if (t1->is_any()) {
+        if (t2->is_any()) { return t2; }
+        return t2;
+    }
+    if (t2->is_any()) {
+        if (t1->is_any()) { return t1; }
+        return t1;
+    }
+    UINT sz1 = tm->getBitSize(t1);
+    UINT sz2 = tm->getBitSize(t2);
+    return sz1 > sz2 ? t1 : t2;
+}
+
+
 //
 //START InferType
 //
 
-void InferType::addDump(IR const* ir) const
+void InferType::addDump(Var const* var) const
 {
-    m_changed_irlist->append_tail(ir);
+    if (m_changed_varlist != nullptr) {
+        m_changed_varlist->append_tail(var);
+    }
 }
 
 
-bool InferType::inferStmtMemAcc(IR * ir) const
+void InferType::addChanged(IR * ir)
+{
+    m_wl.append_tail(ir);
+}
+
+
+void InferType::addDump(IR const* ir) const
+{
+    if (m_changed_irlist != nullptr) {
+        m_changed_irlist->append_tail(ir);
+    }
+}
+
+
+//Infer variable's type.
+bool InferType::inferVarTypeByIRType(IR const* ir) const
+{
+    if (ir->is_any()) { return false; }
+    switch (ir->getCode()) {
+    case IR_PR:
+    case IR_LD:
+    case IR_CALL:
+    case IR_ICALL:
+    case IR_PHI:
+    case IR_STPR:
+    case IR_ST: {
+        MD const* ref = ir->getRefMD();
+        if (ref == nullptr) { return false; }
+        Var * var = ref->get_base();
+        if (!var->is_any()) { return false; }
+        Type const* newtype = meetType(var->getType(), ir->getType(), m_tm);
+        if (newtype != var->getType()) {
+            VAR_type(var) = newtype;
+            addDump(var);
+            return true;
+        }
+        return false;
+    }
+    default:;
+    }
+    return false;
+}
+
+
+bool InferType::inferStmtCall(IR * ir) const
+{
+    ASSERT0(ir->isCallStmt());
+    return inferVarTypeByIRType(ir);
+}
+
+
+bool InferType::inferStmtPhi(IR * ir) const
+{
+    ASSERT0(ir->is_phi());
+    return inferVarTypeByIRType(ir);
+}
+
+
+bool InferType::inferStmtMemAcc(IR * ir)
 {
     ASSERT0(ir->isMemoryRef() && ir->is_stmt());
     ASSERT0(ir->getRHS());
-    if (ir->getRHS()->is_any()) { return false; }
-    IR_dt(ir) = ir->getRHS()->getType();
-    addDump(ir);
+    bool changed = false;
+    if (ir->getRHS()->is_any()) {
+        if (ir->is_any()) { return false; }
+        IR_dt(ir->getRHS()) = ir->getType();
+        addDump(ir->getRHS());
+        addChanged(ir->getRHS());
+        changed = true;
+    } else if (ir->is_any()) {
+        IR_dt(ir) = ir->getRHS()->getType();
+        changed = true;
+        addDump(ir);
+        addChanged(ir);
+    }
+    changed |= inferVarTypeByIRType(ir);
     return true;
 }
 
 
-bool InferType::inferExpMemAcc(IR * ir) const
+bool InferType::inferLeafExpMemAcc(IR * ir)
+{
+    ASSERT0(ir->isMemoryOpnd() && ir->is_exp() && ir->is_leaf());
+    if (ir->is_any()) {
+        MD const* ref = ir->getRefMD();
+        if (ref != nullptr && !ref->get_base()->is_any()) {
+            IR_dt(ir) = ref->get_base()->getType();
+            addDump(ir);
+            addChanged(ir);
+            return true;
+        }
+        return false;
+    }
+    return inferVarTypeByIRType(ir);
+}
+
+
+bool InferType::inferArray(IR * ir) const
+{
+    ASSERT0(ir->is_array());
+    if (!ir->is_any()) { return false; }
+    //TODO: infer the array operator type via array base type.
+    return false; 
+}
+
+
+bool InferType::inferIld(IR * ir)
+{
+    ASSERT0(ir->is_ild());
+    if (!ir->is_any()) { return false; }
+
+    IR const* base = ir->getBase();
+    ASSERT0(base);
+    if (!base->is_ptr()) { return false; }
+
+    IR_dt(ir) = m_tm->getUIntType(m_tm->getPointerBaseByteSize(
+        base->getType()));
+    addDump(ir);
+    addChanged(ir);
+    return true;
+}
+
+
+bool InferType::inferExpMemAcc(IR * ir)
 {
     ASSERT0(ir->isMemoryOpnd() && ir->is_exp());
-    if (ir->is_leaf()) { return false; }
-    ASSERT0(ir->getBase());
-    if (ir->getBase()->is_any()) { return false; }
-    IR_dt(ir) = ir->getBase()->getType();
-    addDump(ir);
-    return true;
+    if (ir->is_leaf()) {
+        return inferLeafExpMemAcc(ir);
+    }
+    if (ir->is_ild()) {
+        return inferIld(ir);
+    }
+    if (ir->is_array()) {
+        return inferArray(ir);
+    }
+    return false;
 }
 
 
-bool InferType::inferUnaOP(IR * ir) const
+bool InferType::inferUnaOP(IR * ir)
 {
-    ASSERT0(ir->isUnaryOp() && ir->is_any());
+    if (!ir->is_any()) { return false; }
+    ASSERT0(ir->isUnaryOp());
     IR * op = UNA_opnd(ir);
     if (op->is_any()) { return false; }
     IR_dt(ir) = op->getType();
     addDump(ir);
+    addChanged(ir);
     return true;
 }
 
 
-bool InferType::inferSelect(IR * ir) const
+bool InferType::inferSelect(IR * ir)
 {
-    ASSERT0(ir->is_select() && ir->is_any());
+    if (!ir->is_any()) { return false; }
+    ASSERT0(ir->is_select());
     IR * texp = SELECT_trueexp(ir);
     IR * fexp = SELECT_falseexp(ir);
     if (texp->is_any() || fexp->is_any()) { return false; }
@@ -104,13 +238,15 @@ bool InferType::inferSelect(IR * ir) const
     ASSERT0(rety);
     IR_dt(ir) = rety;
     addDump(ir);
+    addChanged(ir);
     return true;
 }
 
 
-bool InferType::inferBinOP(IR * ir) const
+bool InferType::inferBinOP(IR * ir)
 {
-    ASSERT0(ir->isBinaryOp() && ir->is_any());
+    if (!ir->is_any()) { return false; }
+    ASSERT0(ir->isBinaryOp());
     IR * op0 = BIN_opnd0(ir);
     IR * op1 = BIN_opnd1(ir);
     if (op0->is_any() || op1->is_any()) { return false; }
@@ -132,12 +268,13 @@ bool InferType::inferBinOP(IR * ir) const
     ASSERT0(rety);
     IR_dt(ir) = rety;
     addDump(ir);
+    addChanged(ir);
     return true;
 }
 
 
 //The function attempts to infer ANY type recursively.
-bool InferType::inferIR(IR * ir) const
+bool InferType::inferIR(IR * ir)
 {
     bool changed = false;
     for (UINT i = 0; i < IR_MAX_KID_NUM(ir); i++) {
@@ -145,8 +282,6 @@ bool InferType::inferIR(IR * ir) const
         if (kid == nullptr) { continue; }
         changed |= inferIR(kid);
     }
-    if (!ir->is_any()) { return changed; }
-
     switch (ir->getCode()) {
     case IR_SELECT:
         changed |= inferSelect(ir);
@@ -163,13 +298,19 @@ bool InferType::inferIR(IR * ir) const
     SWITCH_CASE_STMT_MEM_ACC:
         changed |= inferStmtMemAcc(ir);
         return changed;
+    SWITCH_CASE_CALL:
+        changed |= inferStmtCall(ir);
+        return changed;
+    case IR_PHI:
+        changed |= inferStmtPhi(ir);
+        return changed;
     default:;
     }
     return changed;
 }
 
 
-bool InferType::inferBBList(BBList const* bbl) const
+bool InferType::inferBBList(BBList const* bbl)
 {
     bool changed = false;
     BBListIter bbit;
@@ -186,7 +327,7 @@ bool InferType::inferBBList(BBList const* bbl) const
 }
 
 
-bool InferType::inferIRList(IR * irl) const
+bool InferType::inferIRList(IR * irl)
 {
     bool changed = false;
     for (IR * ir = irl; ir != nullptr; ir = ir->get_next()) {
@@ -196,18 +337,41 @@ bool InferType::inferIRList(IR * irl) const
 }
 
 
+bool InferType::inferChangedList()
+{
+    bool changed = false;
+    IRListIter it;
+    for (IR * ir = m_wl.get_head(&it);
+         ir != nullptr; ir = m_wl.get_next(&it)) {
+        changed |= inferIR(ir);
+    }
+    return changed;
+}
+
+
+
+
 void InferType::dumpInit()
 {
-    ASSERT0(m_changed_irlist == nullptr);
-    m_changed_irlist = new CIRList();
+    if (g_is_dump_after_pass && g_dump_opt.isDumpInferType()) {
+        ASSERT0(m_changed_irlist == nullptr);
+        m_changed_irlist = new CIRList();
+        ASSERT0(m_changed_varlist == nullptr);
+        m_changed_varlist = new List<Var const*>();
+    }
 }
 
 
 void InferType::dumpFini()
 {
-    ASSERT0(m_changed_irlist);
-    delete m_changed_irlist;
-    m_changed_irlist = nullptr;
+    if (m_changed_irlist != nullptr) {
+        delete m_changed_irlist;
+        m_changed_irlist = nullptr;
+    }
+    if (m_changed_varlist != nullptr) {
+        delete m_changed_varlist;
+        m_changed_varlist = nullptr;
+    }
 }
 
 
@@ -217,9 +381,17 @@ bool InferType::dump() const
     note(getRegion(), "\n==---- DUMP %s '%s' ----==",
          getPassName(), m_rg->getRegionName());
     ASSERT0(m_changed_irlist);
+    note(getRegion(), "\n==-- CHANGED IR --==");
     for (IR const* ir = m_changed_irlist->get_head();
          ir != nullptr; ir = m_changed_irlist->get_next()) {
         dumpIR(ir, m_rg);
+    }
+
+    note(getRegion(), "\n==-- CHANGED VAR --==");
+    ASSERT0(m_changed_varlist);
+    for (Var const* var = m_changed_varlist->get_head();
+         var != nullptr; var = m_changed_varlist->get_next()) {
+        var->dump(m_tm);
     }
     note(getRegion(), "\n");
     return true;
@@ -233,12 +405,20 @@ bool InferType::perform(OptCtx & oc)
     START_TIMER(t, getPassName());
     dumpInit();
     bool changed = false;
-    if (bbl != nullptr && bbl->get_elem_count() != 0) {
-        changed = inferBBList(bbl);
-    } else if (irl != nullptr) {
-        changed = inferIRList(irl);
-    }
+    do {
+        m_wl.destroy();
+        m_wl.init();
+        //TODO: iteratively infering type via DU chain.
+        if (bbl != nullptr && bbl->get_elem_count() != 0) {
+            changed = inferBBList(bbl);
+        }
+        else if (irl != nullptr) {
+            changed = inferIRList(irl);
+        }
+        changed |= inferChangedList();
+    } while (m_wl.get_elem_count() != 0);
     if (!changed) {
+        dumpFini();
         END_TIMER(t, getPassName());
         return false;
     }
