@@ -1070,7 +1070,7 @@ bool IVR::perform(OptCtx & oc)
         }
     }
 
-    if (g_is_dump_after_pass && g_dump_opt.isDumpIVR()) {
+    if (g_dump_opt.isDumpAfterPass() && g_dump_opt.isDumpIVR()) {
         dump();
     }
     set_valid(true);

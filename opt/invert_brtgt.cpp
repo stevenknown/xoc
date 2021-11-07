@@ -45,7 +45,7 @@ void InvertBrTgt::addDump(IR const* ir) const
 
 void InvertBrTgt::dumpInit()
 {
-    if (g_is_dump_after_pass && g_dump_opt.isDumpInvertBrTgt()) {
+    if (g_dump_opt.isDumpAfterPass() && g_dump_opt.isDumpInvertBrTgt()) {
         ASSERT0(m_changed_irlist == nullptr);
         m_changed_irlist = new CIRList();
     }
@@ -203,7 +203,7 @@ bool InvertBrTgt::perform(OptCtx & oc)
         END_TIMER(t, getPassName());
         return false;
     }
-    if (g_is_dump_after_pass && g_dump_opt.isDumpInvertBrTgt()) {
+    if (g_dump_opt.isDumpAfterPass() && g_dump_opt.isDumpInvertBrTgt()) {
         dump();
     }
     dumpFini();

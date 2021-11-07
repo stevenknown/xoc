@@ -268,19 +268,21 @@ public:
         destroy();
     }
 
-    void addStmtToMDSSAMgr(IR * ir, IR const* ref);
     //Add occurence to each vopnd in mdssainfo.
     //ir: occurence to be added.
     //ref: the reference that is isomorphic to 'ir'.
     //     It is used to retrieve MDSSAInfo.
     void addMDSSAOcc(IR * ir, IR const* ref);
+
     //After adding BB or change BB successor,
     //you need add the related PHI operand if BB successor has PHI stmt.
     void addSuccessorDesignatePhiOpnd(IRBB * bb, IRBB * succ);
+    void addStmtToMDSSAMgr(IR * ir, IR const* ref);
 
     //Construction of MDSSA form.
     //Note: Non-SSA DU Chains will be maintained after construction.
     void construction(OptCtx & oc);
+
     //Construction of MDSSA form.
     bool construction(DomTree & domtree);
     size_t count_mem() const;
@@ -321,34 +323,69 @@ public:
 
     //Destroy memory in MDSSAMgr.
     void destroy();
+
     //Destruction of MDSSA.
     void destruction(DomTree & domtree);
+
     //Destruction of MDSSA.
     void destruction(OptCtx * oc);
+
     //Dump Phi List.
     void dumpPhiList(MDPhiList const* philist) const;
+
     //Dump MDSSA reference info.
     virtual bool dump() const;
+
     //Dump MDSSA DU chain.
     void dumpDUChain() const;
+
     //Dump MDSSA VOpnd reference.
     void dumpVOpndRef() const;
+
     //This function dumps VMD structure and SSA DU info.
     void dumpAllVMD();
+
     //Dump VMD info into given buffer.
     //Note the buffer have to at least 128 bytes.
     CHAR * dumpVMD(IN VMD * v, OUT CHAR * buf);
+
     //Dump MDSSA DU stmt graph.
     void dumpSSAGraph(CHAR * name = nullptr);
+
     //Dump IR tree and MDSSAInfo if any.
     //ir: can be stmt or expression.
     //flag: the flag to dump IR.
     void dumpIRWithMDSSA(IR const* ir, UINT flag = IR_DUMP_COMBINE) const;
 
-    //Find killing must-def for expression ir.
-    MDDef * findKillingDef(IR const* ir) const;
+    //Find killing must-def IR stmt for expression ir.
+    //Return the IR stmt if found.
+    //e.g: g is global variable, it is exact.
+    //x is a pointer that we do not know where it pointed to.
+    //    1. *x += 1; # *x may overlapped with g
+    //    2. g = 0; # exactly defined g
+    //    3. call foo(); # foo may overlapped with g
+    //    4. return g;
+    //In the case, the last reference of g in stmt 4 may be defined by
+    //stmt 1, 2, 3, there is no nearest killing def.
+    IR * findKillingDefStmt(IR const* ir) const;
+
+    //Find killing must-def Virtual-DEF for expression ir.
+    //Return the MDDef if found.
+    //e.g: g is global variable, it is exact.
+    //x is a pointer that we do not know where it pointed to.
+    //    1. *x += 1; # *x may overlapped with g
+    //    2. g = 0; # exactly defined g
+    //    3. call foo(); # foo may overlapped with g
+    //    4. return g;
+    //In the case, the last reference of g in stmt 4 may be defined by
+    //stmt 1, 2, 3, there is no nearest killing def.
+    MDDef * findKillingMDDef(IR const* ir) const;
+
     //Find nearest virtual DEF in VOpndSet of 'ir'.
     MDDef * findNearestDef(IR const* ir) const;
+
+    //Find the MustDef of in VOpndSet of 'ir'.
+    MDDef * findMustDef(IR const* ir) const;
 
     Region * getRegion() const { return m_rg; }
     UseDefMgr * getUseDefMgr() { return &m_usedef_mgr; }

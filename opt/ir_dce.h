@@ -175,6 +175,14 @@ public:
     }
     virtual ~DeadCodeElim() {}
 
+    //The function dump pass relative information before performing the pass.
+    //The dump information is always used to detect what the pass did.
+    //Return true if dump successed, otherwise false.
+    virtual bool dumpBeforePass() const;
+
+    //The function dump pass relative information.
+    //The dump information is always used to detect what the pass did.
+    //Return true if dump successed, otherwise false.
     virtual bool dump() const;
 
     Region * getRegion() const { return m_rg; }

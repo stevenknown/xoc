@@ -703,7 +703,7 @@ bool IRParser::constructSSAIfNeed(ParseCtx * ctx)
     ctx->current_region->initPassMgr();
     ctx->current_region->getPassMgr()->checkValidAndRecompute(oc,
         PASS_CFG, PASS_UNDEF);
-    ctx->current_region->getCFG()->revisePhiEdge(
+    ctx->current_region->getCFG()->reorderPhiEdge(
         ctx->getIR2Label());
     PRSSAMgr * prssamgr = (PRSSAMgr*)ctx->current_region->
         getPassMgr()->registerPass(PASS_PR_SSA_MGR);
@@ -4545,7 +4545,7 @@ bool IRParser::parse()
 END:
     END_TIMER(t, "IR Parser");
     bool parse_succ = getErrorMsgList().get_elem_count() == 0;
-    if (parse_succ && g_is_dump_after_pass && g_dump_opt.isDumpIRParser()) {
+    if (parse_succ && g_dump_opt.isDumpAfterPass() && g_dump_opt.isDumpIRParser()) {
         dump();
     }
     return parse_succ;

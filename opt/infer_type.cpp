@@ -79,27 +79,33 @@ void InferType::addDump(IR const* ir) const
 bool InferType::inferVarTypeByIRType(IR const* ir) const
 {
     if (ir->is_any()) { return false; }
+    Var * var = nullptr;
     switch (ir->getCode()) {
-    case IR_PR:
-    case IR_LD:
     case IR_CALL:
     case IR_ICALL:
     case IR_PHI:
     case IR_STPR:
-    case IR_ST: {
+    case IR_PR: {
         MD const* ref = ir->getRefMD();
-        if (ref == nullptr) { return false; }
-        Var * var = ref->get_base();
-        if (!var->is_any()) { return false; }
-        Type const* newtype = meetType(var->getType(), ir->getType(), m_tm);
-        if (newtype != var->getType()) {
-            VAR_type(var) = newtype;
-            addDump(var);
-            return true;
+        if (ref != nullptr) {
+            var = ref->get_base();
+            break;
         }
-        return false;
+        var = m_rg->mapPR2Var(ir->getPrno());
+        break;
     }
+    case IR_LD:
+    case IR_ST:
+        var = ir->getIdinfo();
+        break;
     default:;
+    }
+    if (var == nullptr || !var->is_any()) { return false; }
+    Type const* newtype = meetType(var->getType(), ir->getType(), m_tm);
+    if (newtype != var->getType()) {
+        VAR_type(var) = newtype;
+        addDump(var);
+        return true;
     }
     return false;
 }
@@ -148,6 +154,15 @@ bool InferType::inferLeafExpMemAcc(IR * ir)
         MD const* ref = ir->getRefMD();
         if (ref != nullptr && !ref->get_base()->is_any()) {
             IR_dt(ir) = ref->get_base()->getType();
+            addDump(ir);
+            addChanged(ir);
+            return true;
+        }
+        Var const* v;
+        if (ir->is_pr() &&
+            (v = m_rg->mapPR2Var(PR_no(ir))) != nullptr &&
+            !v->is_any()) {
+            IR_dt(ir) = v->getType();
             addDump(ir);
             addChanged(ir);
             return true;
@@ -349,11 +364,9 @@ bool InferType::inferChangedList()
 }
 
 
-
-
 void InferType::dumpInit()
 {
-    if (g_is_dump_after_pass && g_dump_opt.isDumpInferType()) {
+    if (g_dump_opt.isDumpAfterPass() && g_dump_opt.isDumpInferType()) {
         ASSERT0(m_changed_irlist == nullptr);
         m_changed_irlist = new CIRList();
         ASSERT0(m_changed_varlist == nullptr);
@@ -381,17 +394,21 @@ bool InferType::dump() const
     note(getRegion(), "\n==---- DUMP %s '%s' ----==",
          getPassName(), m_rg->getRegionName());
     ASSERT0(m_changed_irlist);
-    note(getRegion(), "\n==-- CHANGED IR --==");
-    for (IR const* ir = m_changed_irlist->get_head();
-         ir != nullptr; ir = m_changed_irlist->get_next()) {
-        dumpIR(ir, m_rg);
+    if (m_changed_irlist->get_elem_count() > 0) {
+        note(getRegion(), "\n==-- CHANGED IR --==");
+        for (IR const* ir = m_changed_irlist->get_head();
+             ir != nullptr; ir = m_changed_irlist->get_next()) {
+            dumpIR(ir, m_rg);
+        }
     }
 
-    note(getRegion(), "\n==-- CHANGED VAR --==");
     ASSERT0(m_changed_varlist);
-    for (Var const* var = m_changed_varlist->get_head();
-         var != nullptr; var = m_changed_varlist->get_next()) {
-        var->dump(m_tm);
+    if (m_changed_varlist->get_elem_count() > 0) {
+        note(getRegion(), "\n==-- CHANGED VAR --==");
+        for (Var const* var = m_changed_varlist->get_head();
+             var != nullptr; var = m_changed_varlist->get_next()) {
+            var->dump(m_tm);
+        }
     }
     note(getRegion(), "\n");
     return true;
@@ -422,7 +439,7 @@ bool InferType::perform(OptCtx & oc)
         END_TIMER(t, getPassName());
         return false;
     }
-    if (g_is_dump_after_pass && g_dump_opt.isDumpInferType()) {
+    if (g_dump_opt.isDumpAfterPass() && g_dump_opt.isDumpInferType()) {
         dump();
     }
     dumpFini();

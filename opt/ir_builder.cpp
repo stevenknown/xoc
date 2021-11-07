@@ -104,6 +104,9 @@ IR * Region::buildPRdedicated(UINT prno, Type const* type)
     IR * ir = allocIR(IR_PR);
     PR_no(ir) = prno;
     IR_dt(ir) = type;
+    if (g_generate_var_for_pr) {
+        genVarForPR(PR_no(ir), type);
+    }
     return ir;
 }
 
@@ -112,15 +115,13 @@ IR * Region::buildPRdedicated(UINT prno, Type const* type)
 IR * Region::buildPR(Type const* type)
 {
     ASSERT0(type);
-    IR * ir = allocIR(IR_PR);
-    PR_no(ir) = buildPrno(type);
-    IR_dt(ir) = type;
-    return ir;
+    return buildPRdedicated(buildPrno(type), type);
 }
 
 
 //Generate a PR number by specified prno and type id.
 //This operation will allocate new PR number.
+//Note the function does NOT generate Var for generated PR no.
 UINT Region::buildPrno(Type const* type)
 {
     ASSERT0(type);

@@ -65,6 +65,26 @@ void DeadCodeElim::setEffectMDDef(MDDef const* mddef,
 }
 
 
+bool DeadCodeElim::dumpBeforePass() const
+{
+    if (!getRegion()->isLogMgrInit()) { return false; }
+    START_TIMER_FMT(t, ("DUMP BEFORE %s", getPassName()));
+    note(getRegion(), "\n==---- DUMP BEFORE %s '%s' ----==",
+         getPassName(), m_rg->getRegionName());
+    note(getRegion(), "\n");
+    dumpBBList(m_rg->getBBList(), m_rg);
+    if (usePRSSADU()) {
+        m_prssamgr->dump();
+    }
+    if (useMDSSADU()) {
+        m_mdssamgr->dump();
+    }
+    END_TIMER_FMT(t, ("DUMP BEFORE %s", getPassName()));
+    return true;
+
+}
+
+
 bool DeadCodeElim::dump() const
 {
     if (!getRegion()->isLogMgrInit()) { return false; }
@@ -959,6 +979,9 @@ bool DeadCodeElim::perform(OptCtx & oc)
     }
     reinit();
 
+    if (g_dump_opt.isDumpBeforePass() && g_dump_opt.isDumpDCE()) {
+        dumpBeforePass();
+    }
     bool change = false;
     bool removed = true;
     UINT count = 0;
@@ -989,6 +1012,7 @@ bool DeadCodeElim::perform(OptCtx & oc)
             //TODO: DO not recompute whole SSA/MDSSA. Instead, update
             //SSA/MDSSA info especially PHI operands incrementally.
         }
+
         removed |= removeRedundantPhi();
         ASSERT0(m_rg->verifyMDRef());
         ASSERT0(PRSSAMgr::verifyPRSSAInfo(m_rg));
@@ -1002,12 +1026,14 @@ bool DeadCodeElim::perform(OptCtx & oc)
         return false;
     }
 
-    if (g_is_dump_after_pass && g_dump_opt.isDumpDCE()) {
+    if (g_dump_opt.isDumpAfterPass() && g_dump_opt.isDumpDCE()) {
         dump();
     }
 
     //DU chain and DU reference should be maintained.
-    ASSERT0(m_rg->verifyMDRef() && verifyMDDUChain(m_rg));
+    ASSERT0(m_rg->verifyMDRef());
+    ASSERT0(verifyMDDUChain(m_rg));
+
     if (remove_branch_stmt) {
         //Branch stmt will effect control-flow-data-structure.
         oc.setInvalidIfCFGChanged();

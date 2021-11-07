@@ -319,7 +319,7 @@ public:
     void rebuild(OptCtx & oc);
     virtual void resetMapBetweenLabelAndBB(IRBB * bb);
     //Construct CFG edge for BB has phi.
-    void revisePhiEdge(TMap<IR*, LabelInfo*> & ir2label);
+    void reorderPhiEdge(TMap<IR*, LabelInfo*> & ir2label);
 
     virtual void setRPO(IRBB * bb, INT order) { BB_rpo(bb) = order; }
     //Split BB into two BBs.
@@ -352,6 +352,7 @@ public:
     virtual bool perform(OptCtx & oc) { build(oc); return false; }
 
     //Perform miscellaneous control flow optimizations.
+    //Return true if CFG changed.
     //Include remove dead bb which is unreachable, remove empty bb as many
     //as possible, simplify and remove the branch like "if (x==x)", remove
     //the trampolin branch.

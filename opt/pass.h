@@ -47,7 +47,21 @@ public:
     Pass() { m_is_valid = false; }
     virtual ~Pass() {}
 
+    //The function dump pass relative information.
+    //The dump information is always used to detect what the pass did.
+    //Return true if dump successed, otherwise false.
     virtual bool dump() const
+    {
+        ASSERTN(0, ("Optimization Dependent Code"));
+        //The recommended dump format is:
+        //\n==---- DUMP PassName 'RegionName' ----==
+        return true;
+    }
+
+    //The function dump pass relative information before performing the pass.
+    //The dump information is always used to detect what the pass did.
+    //Return true if dump successed, otherwise false.
+    virtual bool dumpBeforePass() const
     {
         ASSERTN(0, ("Optimization Dependent Code"));
         //The recommended dump format is:

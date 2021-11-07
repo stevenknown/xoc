@@ -164,6 +164,9 @@ class PRSSAMgr : public Pass {
     //Walk through rhs expression of 'ir' to rename PR's VPR.
     //bb: the BB that ir belongs to.
     void renameRHS(IR * ir, IRBB * bb);
+    bool refinePhiImpl(MOD IRBB * bb, MOD IR * ir,
+                       MOD List<IRBB*> & wl, MOD BitSet & in_list,
+                       IRListIter irct);
     bool refinePhi(List<IRBB*> & wl);
     void rename(DefSBitSet const& effect_prs,
                 Vector<DefSBitSet*> const& defined_prs_vec,
@@ -234,6 +237,8 @@ public:
     //use: use expression that reads PR.
     //Note caller should guarrentee 'use' does not belong to other Def-Use
     //chain.
+    //Note the function does NOT check the consistency of Prno if def or use
+    //operate on PR.
     void buildDUChain(IR * def, IR * use);
 
     //Note: Non-SSA DU Chains of read/write PR will be clean and

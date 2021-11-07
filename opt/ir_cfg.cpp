@@ -281,7 +281,7 @@ void IRCFG::sortPred(IRBB const* bb, IR * ir, TMap<IR*, LabelInfo*> & ir2label)
                 break;
             }
         }
-        ASSERTN(q, ("can not find needed xcom::EdgeC"));
+        ASSERTN(q, ("can not find expected in-edge for BB%d", bb->id()));
         xcom::swap(&VERTEX_in_list(bbvex), opnd_pred, q);
         opnd_pred = q->get_next();
     }
@@ -292,7 +292,7 @@ void IRCFG::sortPred(IRBB const* bb, IR * ir, TMap<IR*, LabelInfo*> & ir2label)
 
 //Revise CFG edge for BB has phi.
 //NOTE:CFG should have been built before revise Vertex order.
-void IRCFG::revisePhiEdge(xcom::TMap<IR*, LabelInfo*> & ir2label)
+void IRCFG::reorderPhiEdge(xcom::TMap<IR*, LabelInfo*> & ir2label)
 {
     ASSERTN(m_bb_list, ("bb_list is emt"));
     BBListIter ct;
@@ -408,6 +408,27 @@ void IRCFG::build(OptCtx & oc)
 }
 
 
+static LabelInfo const* useFirstAvailLabel(IR * ir, LabelInfo const* li,
+                                           IRCFG const* cfg)
+{
+    if (li->hasSideEffect()) { return li; }
+    IRBB * tgt = cfg->findBBbyLabel(li);
+    ASSERT0(tgt);
+    LabelInfoListIter liit;
+    LabelInfoList & lst = tgt->getLabelList();
+    for (lst.get_head(&liit); liit != nullptr; liit = lst.get_next(liit)) {
+        LabelInfo const* tli = liit->val();
+        if (tli->hasSideEffect()) { continue; }
+        if (tli != li) {
+            ir->setLabel(tli);
+        }
+        return tli;
+    }
+    UNREACHABLE();
+    return nullptr;
+}
+
+
 //The function remove labels that nobody referrenced.
 bool IRCFG::removeRedundantLabel()
 {
@@ -422,17 +443,20 @@ bool IRCFG::removeRedundantLabel()
 
         LabelInfo const* li = last_xr->getLabel();
         if (li != nullptr) {
+            li = useFirstAvailLabel(last_xr, li, this);
             useful.append(li);
             continue;
         }
 
         if (!last_xr->hasCaseList()) { continue; }
 
-        IR const* caselst = last_xr->getCaseList();
+        IR * caselst = last_xr->getCaseList();
         ASSERT0(caselst);
-        for (IR const* cs = caselst; cs != nullptr; cs = cs->get_next()) {
+        for (IR * cs = caselst; cs != nullptr; cs = cs->get_next()) {
             ASSERT0(cs->is_case());
-            useful.append(cs->getLabel());
+            LabelInfo const* li = cs->getLabel();
+            li = useFirstAvailLabel(cs, li, this);
+            useful.append(li);
         }
     }
 
@@ -440,7 +464,7 @@ bool IRCFG::removeRedundantLabel()
          bb = getBBList()->get_next(&it)) {
         LabelInfoListIter liit;
         LabelInfoListIter liit_next;
-        LabelInfoList & lst =  bb->getLabelList();
+        LabelInfoList & lst = bb->getLabelList();
         for (lst.get_head(&liit); liit != nullptr; liit = liit_next) {
             liit_next = lst.get_next(liit);
             LabelInfo const* li = liit->val();
@@ -527,7 +551,7 @@ void IRCFG::initCfg(OptCtx & oc)
     //cfg->removeEmptyBB();
     build(oc);
     buildEHEdge();
-    if (g_is_dump_after_pass && g_dump_opt.isDumpCFG()) {
+    if (g_dump_opt.isDumpAfterPass() && g_dump_opt.isDumpCFG()) {
         dump();
     }
 
@@ -574,7 +598,7 @@ void IRCFG::initCfg(OptCtx & oc)
         count++;
     }
     ASSERT0(!change);
-    if (doopt && g_is_dump_after_pass && g_dump_opt.isDumpCFGOpt()) {
+    if (doopt && g_dump_opt.isDumpAfterPass() && g_dump_opt.isDumpCFGOpt()) {
         dump();
     }
     ASSERT0(verify());
@@ -2021,7 +2045,7 @@ void IRCFG::computeDomAndIdom(MOD OptCtx & oc, xcom::BitSet const* uni)
 
     OC_is_dom_valid(oc) = true;
     END_TIMER(t, "Compute Dom, IDom");
-    if (g_is_dump_after_pass && g_dump_opt.isDumpDOM()) {
+    if (g_dump_opt.isDumpAfterPass() && g_dump_opt.isDumpDOM()) {
         dump_dom(getRegion()->getLogMgr()->getFileHandler(), false);
     }
 }
@@ -2170,6 +2194,7 @@ bool IRCFG::removeTrampolinBranch()
 
 
 //Perform miscellaneous control flow optimizations.
+//Return true if CFG changed.
 //Include removing dead bb which is unreachable, removing empty bb as many
 //as possible, simplify and remove the branch like "if (x==x)", removing
 //the trampolin branch.
@@ -2234,7 +2259,7 @@ bool IRCFG::performMiscOpt(OptCtx & oc)
         //ASSERT0(PRSSAMgr::verifyPRSSAInfo(m_rg));
         //ASSERT0(MDSSAMgr::verifyMDSSAInfo(m_rg));
 
-        if (g_is_dump_after_pass && g_dump_opt.isDumpCFGOpt()) {
+        if (g_dump_opt.isDumpAfterPass() && g_dump_opt.isDumpCFGOpt()) {
             dumpDOT();
         }
         ASSERT0(verifyIRandBB(getBBList(), m_rg));

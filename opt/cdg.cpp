@@ -236,7 +236,7 @@ void CDG::build(MOD OptCtx & oc, xcom::DGraph & cfg)
             sbs->clean();
         }
     }
-    if (g_is_dump_after_pass && g_dump_opt.isDumpCDG()) {
+    if (g_dump_opt.isDumpAfterPass() && g_dump_opt.isDumpCDG()) {
         START_TIMER(t3, "Build CDG:dump");
         dump();
         END_TIMER(t3, "Build CDG:dump");

@@ -37,9 +37,24 @@ namespace xoc {
 void SSAInfo::dump(Region const* rg) const
 {
     //VPR info is only usful during SSA construction.
+    note(rg, "\nVPR%d:", id());
+
     VPR * vpr = ((VPR*)this);
-    note(rg, "\nid%d:$%dv%d$%d: ", id(), vpr->orgprno(),
-         vpr->version(), vpr->newprno());
+    if (vpr->orgprno() != PRNO_UNDEF) {
+        note(rg, "$%d", vpr->orgprno());
+    } else {
+        note(rg, "--");
+    }
+
+    note(rg, "v%d", vpr->version());
+
+    if (vpr->newprno() != PRNO_UNDEF) {
+        note(rg, "$%d", vpr->newprno());
+    } else {
+        note(rg, "--");
+    }
+    note(rg, ": ");
+
     IR * def = getDef();
     if (vpr->version() != PRSSA_INIT_VERSION) {
         //After renaming, version is meaningless, thus it is only visible

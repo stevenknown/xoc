@@ -920,7 +920,7 @@ bool LICM::doLoopTree(LI<IRBB> * li,
                               insert_bb, oc);
         analysis(tli);
 
-        if (g_is_dump_after_pass && g_dump_opt.isDumpLICM()) {
+        if (g_dump_opt.isDumpAfterPass() && g_dump_opt.isDumpLICM()) {
             //Dump invariant info here because they will be replaced soon.
             dumpInvariantExpStmt(tli);
         }
@@ -1027,7 +1027,7 @@ bool LICM::perform(OptCtx & oc)
         //DU chain and du ref is maintained.
         ASSERT0(m_rg->verifyMDRef());
         ASSERT0(verifyMDDUChain(m_rg));
-        if (g_is_dump_after_pass && g_dump_opt.isDumpLICM()) {
+        if (g_dump_opt.isDumpAfterPass() && g_dump_opt.isDumpLICM()) {
             //Invariant info has been dumpped.
             //dump();
         }

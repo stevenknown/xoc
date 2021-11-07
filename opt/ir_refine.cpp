@@ -775,14 +775,24 @@ IR * Refine::refineReturn(IR * ir, bool & change, RefineCtx & rc)
 }
 
 
+//Prefer usety which is the type in USE point. Use opndty if usety is ANY.
+static Type const* evalImmType(Type const* usety, Type const* opndty)
+{
+    if (!usety->is_any()) { return usety; }
+    return opndty;
+}
+
+
 //IR already has built ssa info.
 IR * Refine::refinePhi(IR * ir, bool & change, RefineCtx & rc)
 {
     //phi(1, 1, ...) => 1
     bool all_be_same_const = true;
+    IR * immopnd = nullptr;
     IR * opnd = PHI_opnd_list(ir);
     HOST_INT val = 0;
     if (opnd->is_const() && opnd->is_int()) {
+        immopnd = opnd;
         val = CONST_int_val(opnd);
         for (opnd = opnd->get_next(); opnd != nullptr; opnd = opnd->get_next()) {
             if (opnd->is_const() && opnd->is_int() &&
@@ -807,7 +817,8 @@ IR * Refine::refinePhi(IR * ir, bool & change, RefineCtx & rc)
          u >= 0; u = SSA_uses(ssainfo).get_next(u, &sc)) {
         IR * use = m_rg->getIR(u);
         ASSERT0(use && use->is_pr());
-        IR * lit = m_rg->buildImmInt(val, use->getType());
+        IR * lit = m_rg->buildImmInt(val, evalImmType(use->getType(),
+                                                      immopnd->getType()));
         ASSERT0(IR_parent(use));
         IR_parent(use)->replaceKid(use, lit,  false);
         m_rg->freeIR(use);
@@ -2948,7 +2959,7 @@ bool Refine::perform(OptCtx & oc)
         IR * irs = refineIRlist(m_rg->getIRList(), change, rc);
         ASSERT0(xoc::verifyIRList(irs, nullptr, m_rg));
         m_rg->setIRList(irs);
-        if (g_is_dump_after_pass && g_dump_opt.isDumpRefine()) {
+        if (g_dump_opt.isDumpAfterPass() && g_dump_opt.isDumpRefine()) {
             dump();
         }
         END_TIMER(t, "Do Primitive Refinement");
@@ -2959,7 +2970,7 @@ bool Refine::perform(OptCtx & oc)
     START_TIMER(t, "Do Primitive Refinement");
     RefineCtx rf;
     change = refineBBlist(m_rg->getBBList(), rf, oc);
-    if (g_is_dump_after_pass && g_dump_opt.isDumpRefine()) {
+    if (g_dump_opt.isDumpAfterPass() && g_dump_opt.isDumpRefine()) {
         dump();
     }
     END_TIMER(t, "Do Primitive Refinement");

@@ -407,8 +407,7 @@ IRBB * findAndInsertPreheader(LI<IRBB> const* li, Region * rg,
 }
 
 
-static bool isLoopInvariantInPRSSA(IR const* ir,
-                                   LI<IRBB> const* li,
+static bool isLoopInvariantInPRSSA(IR const* ir, LI<IRBB> const* li,
                                    InvStmtList const* invariant_stmt)
 {
     ASSERT0(ir->is_pr());
@@ -430,8 +429,7 @@ static bool isLoopInvariantInPRSSA(IR const* ir,
 }
 
 
-static bool isRealMDDefInvariant(MDDef const* mddef,
-                                 LI<IRBB> const* li,
+static bool isRealMDDefInvariant(MDDef const* mddef, LI<IRBB> const* li,
                                  InvStmtList const* invariant_stmt,
                                  MDSSAMgr const* mdssamgr)
 {
@@ -473,8 +471,7 @@ static bool isMDPhiInvariant(MDDef const* start,
 }
 
 
-static bool isLoopInvariantInMDSSA(IR const* ir,
-                                   LI<IRBB> const* li,
+static bool isLoopInvariantInMDSSA(IR const* ir, LI<IRBB> const* li,
                                    InvStmtList const* invariant_stmt,
                                    MDSSAMgr const* mdssamgr)
 {

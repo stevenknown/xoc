@@ -275,6 +275,8 @@ public:
 
     //Build DU chain : def->use.
     //Build DU chain from stmt 'def' to expression 'use'.
+    //Note the function does NOT check the consistency of Prno if def or use
+    //operate on PR.
     void buildDUChain(IR * def, IR * use)
     {
         ASSERT0(def && def->is_stmt() && use && use->is_exp());

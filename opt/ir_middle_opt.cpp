@@ -163,7 +163,7 @@ bool Region::performSimplify(OptCtx & oc)
         oc.is_nonpr_du_chain_valid()) {
         ASSERT0(verifyMDDUChain(this));
     }
-    if (g_is_dump_after_pass && g_dump_opt.isDumpAll()) {
+    if (g_dump_opt.isDumpAfterPass() && g_dump_opt.isDumpAll()) {
         note(this, "\n==---- DUMP AFTER SIMPLIFY IRBB LIST ----==");
         dumpBBList();
     }

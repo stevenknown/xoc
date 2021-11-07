@@ -53,6 +53,10 @@ public:
     //Dump all information.
     //Note is_dump_all and is_dump_nothing can not all be true.
     bool is_dump_all;
+    //Dump after pass.
+    bool is_dump_after_pass;
+    //Dump before pass.
+    bool is_dump_before_pass;
     //Do not dump anything.
     //Note is_dump_all and is_dump_nothing can not all be true.
     bool is_dump_nothing;
@@ -79,8 +83,6 @@ public:
     bool is_dump_simplification; //Dump IR simplification.
     bool is_dump_prssamgr; //Dump PRSSAMgr.
     bool is_dump_mdssamgr; //Dump MDSSAMgr.
-    bool is_dump_cg; //Dump CodeGeneration.
-    bool is_dump_ra; //Dump Register Allocation.
     bool is_dump_memusage; //Dump memory usage.
     bool is_dump_livenessmgr; //Dump LivenessMgr.
     bool is_dump_irparser; //Dump IRParser.
@@ -88,7 +90,6 @@ public:
     bool is_dump_refine; //Dump Refinement.
     bool is_dump_gscc; //Dump GSCC.
     bool is_dump_cdg; //Dump Control Dependence Graph.
-    bool is_dump_lis; //Dump LIS.
     //The option determines whether IR dumper dumps the IR's id when dumpIR()
     //invoked. It should be set to false when the dump information is used in
     //basedump file in testsuite, because the id may be different in different
@@ -100,6 +101,8 @@ public:
 
     bool isDumpAll() const;
     bool isDumpNothing() const;
+    bool isDumpBeforePass() const;
+    bool isDumpAfterPass() const;
     bool isDumpAA() const;
     bool isDumpDUMgr() const;
     bool isDumpMDSetHash() const;
@@ -382,15 +385,12 @@ extern UINT g_verify_level;
 //of parameters of call can be left out if the flag set to false.
 extern bool g_is_simplify_parameter;
 
-//Dump after each pass.
-extern bool g_is_dump_after_pass;
-
-//Dump before each pass.
-extern bool g_is_dump_before_pass;
-
 //Set true to enable searching debug-info from expression bottom up
 //to nearest stmt.
 extern bool g_is_search_and_copy_dbx;
+
+//Set true to generate variable when building a PR.
+extern bool g_generate_var_for_pr;
 
 //Record dump options for each Pass.
 extern DumpOpt g_dump_opt;

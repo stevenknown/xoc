@@ -97,13 +97,13 @@ void changeUseEx(IR * olduse, IR * newuse, IRSet const* defset, Region * rg)
                 newuse->getSSAInfo() == nullptr) {
                 //CASE:olduse and newuse are both in PRSSA mode, but newuse
                 //lacked PRSSAInfo for unknown reason.
-                //The method that attempt to find PRSSAInfo for 
+                //The method that attempt to find PRSSAInfo for
                 //newuse is under the prerequisite that the DEF of newuse is
                 //also in PRSSA mode, namely an unique DEF, then regard the
                 //PRSSAInfo of the unique DEF as it were of newuse.
                 IR * unique_def = getUniqueDef(defset, rg);
                 ASSERT0(unique_def && unique_def->getSSAInfo());
-                xoc::copySSAInfo(newuse, unique_def); 
+                xoc::copySSAInfo(newuse, unique_def);
             }
             xoc::changeUse(olduse, newuse, rg);
             return;
@@ -292,7 +292,11 @@ void coalesceDUChain(IR * from, IR * to, Region * rg)
 void removeUseForTree(IR * exp, Region * rg)
 {
     ASSERT0(exp && exp->is_exp()); //exp is the root of IR tree.
-    PRSSAMgr::removePRSSAOcc(exp);
+    PRSSAMgr * prssamgr = rg->getPRSSAMgr();
+    if (prssamgr != nullptr && prssamgr->is_valid()) {
+        //Access whole IR tree root at 'exp'.
+        PRSSAMgr::removePRSSAOcc(exp);
+    }
 
     DUMgr * dumgr = rg->getDUMgr();
     if (dumgr != nullptr) {
@@ -301,6 +305,7 @@ void removeUseForTree(IR * exp, Region * rg)
 
     MDSSAMgr * mdssamgr = rg->getMDSSAMgr();
     if (mdssamgr != nullptr && mdssamgr->is_valid()) {
+        //Access whole IR tree root at 'exp'.
         mdssamgr->removeMDSSAOcc(exp);
     }
 }
@@ -463,7 +468,7 @@ static bool hasSameValueArrayOp(IR const* ir1, IR const* ir2, GVN const* gvn)
     if (ir1->isCover(ir2, gvn->getRegion())) {
         return true;
     }
-    return false; 
+    return false;
 }
 
 
@@ -492,7 +497,47 @@ static bool hasSameValueIndirectOp(IR const* ir1, IR const* ir2, GVN const* gvn)
     if (basevn1 == basevn2 && indirect_num1 == indirect_num2) {
         return true;
     }
-    return false; 
+    return false;
+}
+
+
+//The function try to find the killing-def for 'use'.
+//To find the killing-def, the function prefer use SSA info.
+IR * findKillingDef(IR const* exp, Region * rg)
+{
+    ASSERT0(exp->is_exp() && exp->isMemoryOpnd());
+    //Prefer PRSSA and MDSSA DU.
+    if (exp->isReadPR()) {
+        PRSSAMgr * prssamgr = rg->getPRSSAMgr();
+        if (prssamgr != nullptr && prssamgr->is_valid()) {
+            IR * d = PR_ssainfo(exp)->getDef();
+            if (d != nullptr && d->getExactRef() != nullptr) {
+                return d;
+            }
+            return nullptr;
+        }
+        //Try classic DU.
+        goto CLASSIC_DU;
+    }
+    if (exp->isMemoryRefNonPR()) {
+        MDSSAMgr * mdssamgr = rg->getMDSSAMgr();
+        if (mdssamgr != nullptr && mdssamgr->is_valid()) {
+            ASSERTN(mdssamgr->getMDSSAInfoIfAny(exp),
+                    ("exp does not have MDSSAInfo"));
+            return mdssamgr->findKillingDefStmt(exp);
+        }
+        //Try classic DU.
+        goto CLASSIC_DU;
+    }
+CLASSIC_DU:
+    if (rg->getDUMgr() != nullptr) {
+        DUSet const* du = exp->readDUSet();
+        if (du != nullptr && !du->is_empty()) {
+            IR const* exp_stmt = const_cast<IR*>(exp)->getStmt();
+            return rg->getDUMgr()->findNearestDomDef(exp, exp_stmt, du);
+        }
+    }
+    return nullptr;
 }
 
 

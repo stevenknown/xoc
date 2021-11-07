@@ -283,15 +283,12 @@ UINT g_verify_level = VERIFY_LEVEL_2;
 //               intconst 24|0x18 (u32) id:14
 bool g_is_simplify_parameter = true;
 
-//Dump after each pass.
-bool g_is_dump_after_pass = true;
-
-//Dump before each pass.
-bool g_is_dump_before_pass = true;
-
 //Set true to enable searching debug-info from expression bottom up
 //to nearest stmt.
 bool g_is_search_and_copy_dbx = true;
+
+//Set true to generate variable when building a PR.
+bool g_generate_var_for_pr = true;
 
 //Record dump options for each Pass.
 DumpOpt g_dump_opt;
@@ -309,6 +306,9 @@ DumpOpt::DumpOpt()
 {
     is_dump_all = false;
     is_dump_nothing = false;
+    //In most cases, dump-after-pass is sufficient.
+    is_dump_before_pass = false;
+    is_dump_after_pass = true;
     is_dump_aa = false;
     is_dump_dumgr = false;
     is_dump_mdset_hash = false;
@@ -326,8 +326,6 @@ DumpOpt::DumpOpt()
     is_dump_simplification = false;
     is_dump_prssamgr = false;
     is_dump_mdssamgr = false;
-    is_dump_cg = false;
-    is_dump_ra = false;
     is_dump_memusage = false;
     is_dump_livenessmgr = false;
     is_dump_irparser = false;
@@ -348,6 +346,18 @@ bool DumpOpt::isDumpNothing() const
     //is_dump_all and is_dump_nothing can not all be true.
     ASSERT0(!(is_dump_nothing & is_dump_all));
     return is_dump_nothing;
+}
+
+
+bool DumpOpt::isDumpBeforePass() const
+{    
+    return is_dump_before_pass;
+}
+
+
+bool DumpOpt::isDumpAfterPass() const
+{    
+    return is_dump_after_pass;
 }
 
 
@@ -429,12 +439,6 @@ bool DumpOpt::isDumpLFTR() const
 }
 
 
-bool DumpOpt::isDumpLIS() const
-{
-    return is_dump_all || (!is_dump_nothing && is_dump_lis);
-}
-
-
 bool DumpOpt::isDumpCDG() const
 {
     return is_dump_all || (!is_dump_nothing && is_dump_cdg);
@@ -486,18 +490,6 @@ bool DumpOpt::isDumpPRSSAMgr() const
 bool DumpOpt::isDumpMDSSAMgr() const
 {
     return is_dump_all || (!is_dump_nothing && is_dump_mdssamgr);
-}
-
-
-bool DumpOpt::isDumpCG() const
-{
-    return is_dump_all || (!is_dump_nothing && is_dump_cg);
-}
-
-
-bool DumpOpt::isDumpRA() const
-{
-    return is_dump_all || (!is_dump_nothing && is_dump_ra);
 }
 
 

@@ -62,6 +62,10 @@ bool CopyProp::checkTypeConsistency(IR const* ir, IR const* cand_exp) const
     if (t1->isPointer() && t2->isPointer()) {
         return true;
     }
+    if (t1->is_any() || t2->is_any()) {
+        //ANY is not consistent with other type.
+        return false;
+    }
     return m_tm->getByteSize(t1) >= m_tm->getByteSize(t2);
 }
 
@@ -657,7 +661,7 @@ bool CopyProp::doPropUseSet(IRSet * useset, IR * def_stmt,
                                                  mdssainfo, prssadu, mdssadu);
         if (new_prop_value == nullptr) { continue; }
 
-        if (g_is_dump_after_pass && g_dump_opt.isDumpCP()) {
+        if (g_dump_opt.isDumpAfterPass() && g_dump_opt.isDumpCP()) {
             dumpCopyPropagationAction(def_stmt, new_prop_value, use);
         }
 
@@ -820,7 +824,6 @@ bool CopyProp::perform(OptCtx & oc)
     END_TIMER(t, getPassName());
 
     if (!change) { return false; }
-
     OC_is_expr_tab_valid(oc) = false;
     OC_is_aa_valid(oc) = false;
     OC_is_ref_valid(oc) = true; //already update.

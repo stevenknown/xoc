@@ -40,6 +40,7 @@ class GVN;
 //to: root expression of target tree.
 //from: root expression of source tree.
 //NOTE: IR tree 'to' and 'from' must be isomorphic structure.
+//The function will iterate IR list if exist.
 //Both 'to' and 'from' must be expression.
 void addUseForTree(IR * to, IR const* from, Region * rg);
 
@@ -144,6 +145,9 @@ bool isKillingDef(IR const* def, MD const* usemd);
 //Return true if defmd is killing-def MD of usemd.
 //Note this function does not check if there is DU chain between defmd and usemd.
 bool isKillingDef(MD const* defmd, MD const* usemd);
+
+//The function try to find the killing-def for 'use'.
+IR * findKillingDef(IR const* use, Region * rg);
 
 //The function checks each DEF|USE occurrence of ir, remove the expired expression
 //which is not reference the memory any more that ir referenced.
