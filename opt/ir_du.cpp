@@ -2736,8 +2736,10 @@ void DUMgr::updateDefWithMustEffectMD(IR * ir, MD const* musteffect)
 
 void DUMgr::cleanDUSet(UINT irid, DUSet * set)
 {
-    if (!m_is_init->is_contain(irid)) {
-        m_is_init->bunion(irid);
+    ASSERTN(m_is_init, ("it is allocated at each perform()"));
+    ASSERT0(irid != IRID_UNDEF);
+    if (!m_is_init->find(irid)) {
+        m_is_init->append(irid);
         if (set != nullptr) {
             set->clean(*getSBSMgr());
         }
@@ -3164,18 +3166,20 @@ IR * DUMgr::findNearestDomDef(IR const* exp, IR const* exp_stmt,
             lastrpo = dbb->rpo();
         }
     }
-
     if (last == nullptr) { return nullptr; }
+
     IRBB const* last_bb = last->getBB();
     IRBB const* exp_bb = exp_stmt->getBB();
-    if (!m_cfg->is_dom(last_bb->id(), exp_bb->id())) {
-        return nullptr;
+    if (exp_bb == last_bb) {
+        if (!exp_bb->is_dom(last, exp_stmt, true)) {
+            //e.g: *p = *p + 1
+            //Def and Use in same stmt, in this situation,
+            //the stmt can not be regarded as dom-def.
+            return nullptr;
+        }
+        return last;
     }
-
-    //e.g: *p = *p + 1
-    //Def and Use in same stmt, in this situation,
-    //the stmt can not be regarded as dom-def.
-    if (exp_bb == last_bb && !exp_bb->is_dom(last, exp_stmt, true)) {
+    if (!m_cfg->is_dom(last_bb->id(), exp_bb->id())) {
         return nullptr;
     }
     ASSERT0(last != exp_stmt);
@@ -3294,8 +3298,7 @@ void DUMgr::computeMDDUChain(MOD OptCtx & oc, bool retain_reach_def,
     //Record IRs which may defined these referred MDs.
     ASSERT0(m_md2irs == nullptr && m_is_init == nullptr);
     m_md2irs = new MD2IRSet(m_rg);
-    m_is_init = new xcom::BitSet(MAX(1, (m_rg->getIRVec()->
-        get_last_idx()/BITS_PER_BYTE)+1));
+    m_is_init = new xcom::TTab<UINT>();
 
     //Compute the DU chain linearly.
     BBListIter ct;
@@ -3321,7 +3324,7 @@ void DUMgr::computeMDDUChain(MOD OptCtx & oc, bool retain_reach_def,
         OC_is_nonpr_du_chain_valid(oc) = true;
     }
     END_TIMER(t, "Build DU chain");
-    if (g_is_dump_after_pass && g_dump_opt.isDumpDUMgr()) {
+    if (g_dump_opt.isDumpAfterPass() && g_dump_opt.isDumpDUMgr()) {
         START_TIMER_FMT(t, ("DUMP DU Chain"));
         note(getRegion(), "\n==---- DUMP %s '%s' ----==", getPassName(),
              m_rg->getRegionName());
@@ -3388,7 +3391,7 @@ bool DUMgr::perform(MOD OptCtx & oc, UINT flag)
         solveSet(oc, flag);
     }
 
-    if (g_is_dump_after_pass && g_dump_opt.isDumpDUMgr()) {
+    if (g_dump_opt.isDumpAfterPass() && g_dump_opt.isDumpDUMgr()) {
         dump();
     }
     return true;

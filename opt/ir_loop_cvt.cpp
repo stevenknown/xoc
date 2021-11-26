@@ -148,7 +148,8 @@ bool LoopCvt::try_convert(LI<IRBB> * li, IRBB * gobackbb,
         if (newir->isConditionalBr()) {
             ASSERT0(ir == BB_last_ir(head));
             last_cond_br = newir;
-            newir->invertIRType(m_rg);
+            newir = IR::invertIRType(newir, m_rg);
+            ASSERTN(last_cond_br == newir, ("stmt pointer changed"));
         }
     }
 
@@ -213,7 +214,7 @@ bool LoopCvt::perform(OptCtx & oc)
 
     bool change = find_and_convert(worklst);
     if (change) {
-        if (g_is_dump_after_pass && g_dump_opt.isDumpLoopCVT()) {
+        if (g_dump_opt.isDumpAfterPass() && g_dump_opt.isDumpLoopCVT()) {
             note(getRegion(), "\n==---- DUMP %s '%s' ----==",
                  getPassName(), m_rg->getRegionName());
             dumpBBList(m_rg->getBBList(), m_rg);

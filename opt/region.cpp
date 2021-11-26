@@ -284,7 +284,7 @@ bool Region::evaluateConstInteger(IR const* ir, OUT ULONGLONG * const_value)
         SSAInfo const* ssainfo = PR_ssainfo(ir);
         if (ssainfo != nullptr) {
             defstmt = SSA_def(ssainfo);
-            if (defstmt != nullptr && !defstmt->is_stpr()) {
+            if (defstmt == nullptr || !defstmt->is_stpr()) {
                 return false;
             }
         } else {
@@ -298,6 +298,11 @@ bool Region::evaluateConstInteger(IR const* ir, OUT ULONGLONG * const_value)
             ASSERT0(defstmt && defstmt->is_stmt());
 
             if (!defstmt->is_stpr()) { return false; }
+        }
+        ASSERT0(defstmt);
+        if (defstmt == ir->getStmt()) {
+            //CASE:PR is self-modified operation, e.g: $1=$1+0x2;
+            return false;
         }
         return evaluateConstInteger(STPR_rhs(defstmt), const_value);
     }
@@ -1515,6 +1520,13 @@ void Region::dumpParameter() const
 void Region::dump(bool dump_inner_region) const
 {
     if (!isLogMgrInit()) { return; }
+    if (getRegionVar() != nullptr) {
+        note(this, "\n==---- DUMP REGION(%d):%s: ----==", id(),
+             getRegionName());
+    } else {
+        note(this, "\n==---- DUMP REGION(%d): ----==", id());
+    }
+
     dumpVARInRegion();
 
     //Dump imported variables referenced.
@@ -2065,27 +2077,28 @@ static void dumpLocalVar(Region const* rg)
         lm->decIndent(2);
     }
     lm->decIndent(2);
-} 
+}
 
 
 //Dump each Var in current region's Var table.
 void Region::dumpVARInRegion() const
 {
     if (!isLogMgrInit()) { return; }
-    StrBuf buf(64);
 
-    //Dump Region name.
     if (getRegionVar() != nullptr) {
-        note(this, "\n==---- REGION(%d):%s:", id(), getRegionName());
-        getRegionVar()->dumpVARDecl(buf);
-        prt(this, "%s ----==", buf.buf);
-    } else {
-        note(this, "\n==---- REGION(%d): ----==", id());
+        //Dump Region Var.
+        LogMgr * lm = getLogMgr();
+        note(this, "\nREGION VAR:");
+        StrBuf buf(64);
+        getRegionVar()->dump(buf, getTypeMgr());
+        lm->incIndent(2);
+        note(this, "\n%s", buf.buf);
+        lm->decIndent(2);
     }
 
     Region * pthis = const_cast<Region*>(this);
-    //Dump formal parameter list.
     if (is_function()) {
+        //Dump formal parameter list.
         bool has_param = false;
         VarTabIter c;
         for (Var * v = pthis->getVarTab()->get_first(c);
@@ -2224,11 +2237,12 @@ bool Region::processBBList(OptCtx & oc)
     START_TIMER(t, "PreScan");
     prescanBBList(getBBList());
     END_TIMER(t, "PreScan");
-    if (g_is_dump_after_pass && g_dump_opt.isDumpALL()) {
+    if (g_dump_opt.isDumpAfterPass() && g_dump_opt.isDumpAll()) {
         note(this, "\n==--- DUMP PRIMITIVE IRBB LIST ----==");
         dumpBBList();
     }
 
+    HighProcessImpl(oc);
     return MiddleProcess(oc);
 }
 
@@ -2240,7 +2254,7 @@ bool Region::processIRList(OptCtx & oc)
     START_TIMER(t, "PreScan");
     prescanIRList(getIRList());
     END_TIMER(t, "PreScan");
-    if (g_is_dump_after_pass && g_dump_opt.isDumpALL()) {
+    if (g_dump_opt.isDumpAfterPass() && g_dump_opt.isDumpAll()) {
         note(this, "\n==--- DUMP PRIMITIVE IR LIST ----==");
         dumpIRList();
     }
@@ -2260,8 +2274,7 @@ bool Region::processIRList(OptCtx & oc)
         ASSERT0(verifyMDRef());
     }
 
-    if (!MiddleProcess(oc)) { return false; }
-    return true;
+    return MiddleProcess(oc);
 }
 
 

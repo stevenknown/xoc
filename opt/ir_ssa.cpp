@@ -463,10 +463,14 @@ VPR * PRSSAMgr::allocVPR(UINT prno, UINT version, Type const* orgtype)
 //def: def stmt that writes PR.
 //use: use expression that reads PR.
 //Note caller should guarrentee 'use' does not belong to other Def-Use chain.
+//Note the function does NOT check the consistency of Prno if def or use
+//operate on PR.
 void PRSSAMgr::buildDUChain(IR * def, IR * use)
 {
     ASSERT0(def->isWritePR() || def->isCallHasRetVal());
     ASSERT0(use->isReadPR());
+    //TBD:Do def and use have to be same Prno?
+    ASSERT0(def->getPrno() == use->getPrno());
     SSAInfo * defssainfo = def->getSSAInfo();
     if (defssainfo == nullptr) {
         defssainfo = allocSSAInfo(def->getPrno());
@@ -887,7 +891,11 @@ bool PRSSAMgr::isRedundantPHI(IR const* phi, OUT IR ** common_def) const
          opnd != nullptr; opnd = opnd->get_next()) {
         ASSERT0(opnd->isPhiOpnd());
 
-        if (!opnd->is_pr()) { continue; }
+        if (!opnd->is_pr()) {
+            //CASE: phi=(10, opnd0)
+            //Note leave the redundant case:phi=(10) to IR Refinement.
+            return false;
+        }
 
         SSAInfo const* si = PR_ssainfo(opnd);
         ASSERT0(si);
@@ -1866,6 +1874,90 @@ bool PRSSAMgr::refinePhi()
 }
 
 
+bool PRSSAMgr::refinePhiImpl(MOD IRBB * bb, MOD IR * ir,
+                             MOD List<IRBB*> & wl, MOD BitSet & in_list,
+                             IRListIter irct)
+{
+    IR * common_def = nullptr;
+    if (!isRedundantPHI(ir, &common_def)) {
+        revisePhiDataType(ir, m_rg);
+        return false;
+    }
+
+    //PHI is redundant, revise SSAInfo before remove the PHI.
+    for (IR const* opnd = PHI_opnd_list(ir);
+         opnd != nullptr; opnd = opnd->get_next()) {
+        ASSERT0(opnd->isPhiOpnd());
+        if (!opnd->is_pr()) {
+            //CASE: phi=(10, opnd0)
+            //Note leave the redundant case:phi=(10) to IR Refinement.
+            continue;
+        }
+
+        SSAInfo * si = PR_ssainfo(opnd);
+        ASSERTN(si, ("Miss SSAInfo."));
+
+        si->removeUse(opnd);
+
+        if (SSA_def(si) == nullptr || !SSA_def(si)->is_phi()) {
+            continue;
+        }
+
+        IRBB * defbb = SSA_def(si)->getBB();
+        ASSERTN(defbb, ("defbb does not belong to any BB"));
+        wl.append_tail(defbb);
+        if (!in_list.is_contain(defbb->id())) {
+            wl.append_tail(defbb);
+            in_list.bunion(defbb->id());
+        }
+    }
+
+    SSAInfo * curphi_ssainfo = PHI_ssainfo(ir);
+    ASSERT0(curphi_ssainfo);
+    ASSERT0(SSA_def(curphi_ssainfo) == ir);
+
+    if (common_def != nullptr && ir != common_def) {
+        //All operands of PHI are defined by same alternative stmt,
+        //just call it common_def. Replace the SSA_def of
+        //current SSAInfo to the common_def.
+
+        IR * respr = common_def->getResultPR();
+        ASSERT0(respr);
+
+        SSAInfo * commdef_ssainfo = respr->getSSAInfo();
+        ASSERT0(commdef_ssainfo);
+
+        SSA_uses(commdef_ssainfo).bunion(SSA_uses(curphi_ssainfo));
+
+        SSAUseIter si = nullptr;
+        for (INT i = SSA_uses(curphi_ssainfo).get_first(&si);
+             si != nullptr;
+             i = SSA_uses(curphi_ssainfo).get_next(i, &si)) {
+            IR * use = m_rg->getIR(i);
+            ASSERT0(use->is_pr());
+
+            ASSERT0(PR_ssainfo(use) &&
+                    PR_ssainfo(use) == curphi_ssainfo);
+
+            PR_ssainfo(use) = commdef_ssainfo;
+            PR_no(use) = respr->getPrno();
+        }
+    }
+
+    ((VPR*)curphi_ssainfo)->cleanMember();
+    curphi_ssainfo->cleanDU();
+
+    //Revise DU chains.
+    //Note if SSA form is available, it still need to maintain
+    //DU chain of PR in DU manager counterpart.
+    xoc::removeStmt(ir, m_rg);
+
+    BB_irlist(bb).remove(irct);
+    m_rg->freeIR(ir);
+    return true; 
+}
+
+
 //The function revises phi data type, and remove redundant phi.
 //wl: work list for temporary used.
 //Return true if there is phi removed.
@@ -1899,74 +1991,7 @@ bool PRSSAMgr::refinePhi(List<IRBB*> & wl)
             nextirct = BB_irlist(bb).get_next(nextirct);
             IR * ir = irct->val();
             if (!ir->is_phi()) { break; }
-
-            IR * common_def = nullptr;
-            if (!isRedundantPHI(ir, &common_def)) {
-                revisePhiDataType(ir, m_rg);
-                continue;
-            }
-
-            //PHI is redundant, revise SSAInfo before remove the PHI.
-            for (IR const* opnd = PHI_opnd_list(ir);
-                 opnd != nullptr; opnd = opnd->get_next()) {
-                ASSERT0(opnd->isPhiOpnd());
-                if (!opnd->is_pr()) { continue; }
-
-                SSAInfo * si = PR_ssainfo(opnd);
-                ASSERTN(si, ("Miss SSAInfo."));
-
-                si->removeUse(opnd);
-
-                if (SSA_def(si) == nullptr || !SSA_def(si)->is_phi()) {
-                    continue;
-                }
-
-                IRBB * defbb = SSA_def(si)->getBB();
-                ASSERTN(defbb, ("defbb does not belong to any BB"));
-                wl.append_tail(defbb);
-                if (!in_list.is_contain(defbb->id())) {
-                    wl.append_tail(defbb);
-                    in_list.bunion(defbb->id());
-                }
-            }
-
-            SSAInfo * curphi_ssainfo = PHI_ssainfo(ir);
-            ASSERT0(curphi_ssainfo);
-            ASSERT0(SSA_def(curphi_ssainfo) == ir);
-
-            if (common_def != nullptr && ir != common_def) {
-                //All operands of PHI are defined by same alternative stmt,
-                //just call it common_def. Replace the SSA_def of
-                //current SSAInfo to the common_def.
-
-                IR * respr = common_def->getResultPR();
-                ASSERT0(respr);
-
-                SSAInfo * commdef_ssainfo = respr->getSSAInfo();
-                ASSERT0(commdef_ssainfo);
-
-                SSA_uses(commdef_ssainfo).bunion(SSA_uses(curphi_ssainfo));
-
-                SSAUseIter si = nullptr;
-                for (INT i = SSA_uses(curphi_ssainfo).get_first(&si);
-                     si != nullptr;
-                     i = SSA_uses(curphi_ssainfo).get_next(i, &si)) {
-                    IR * use = m_rg->getIR(i);
-                    ASSERT0(use->is_pr());
-
-                    ASSERT0(PR_ssainfo(use) &&
-                            PR_ssainfo(use) == curphi_ssainfo);
-
-                    PR_ssainfo(use) = commdef_ssainfo;
-                    PR_no(use) = respr->getPrno();
-                }
-            }
-
-            ((VPR*)curphi_ssainfo)->cleanMember();
-            curphi_ssainfo->cleanDU();
-            BB_irlist(bb).remove(irct);
-            m_rg->freeIR(ir);
-            remove = true;
+            remove |= refinePhiImpl(bb, ir, wl, in_list, irct);
         }
     }
     END_TIMER(t, "PRSSA: Refine phi");
@@ -2255,7 +2280,7 @@ bool PRSSAMgr::construction(DomTree & domtree)
 
     stripVersionForBBList();
 
-    if (g_is_dump_after_pass && g_dump_opt.isDumpPRSSAMgr()) {
+    if (g_dump_opt.isDumpAfterPass() && g_dump_opt.isDumpPRSSAMgr()) {
         START_TIMER(tdump, "PRSSA: Dump After Pass");
         dump();
         dfm.dump((xcom::DGraph&)*m_cfg, getRegion());

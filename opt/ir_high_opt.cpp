@@ -50,7 +50,13 @@ void Region::HighProcessImpl(OptCtx & oc)
         getCFG()->computeExitList();
         ASSERT0(getCFG()->verify());
 
+        bool org = g_do_cfg_remove_unreach_bb;
+        //Unreachable BB have to removed before RPO computation.
+        g_do_cfg_remove_unreach_bb = true;
+
         getCFG()->performMiscOpt(oc);
+
+        g_do_cfg_remove_unreach_bb = org;
 
         //Build DOM after CFG be optimized.
         getPassMgr()->checkValidAndRecompute(&oc, PASS_DOM, PASS_UNDEF);
@@ -72,6 +78,10 @@ void Region::HighProcessImpl(OptCtx & oc)
                 oc.setInvalidDUChain();
             }
         }
+    }
+
+    if (g_infer_type) {
+        getPassMgr()->registerPass(PASS_INFER_TYPE)->perform(oc);
     }
 
     doBasicAnalysis(oc);

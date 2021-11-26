@@ -133,7 +133,7 @@ bool LFTR::doLoopTree(LI<IRBB> * li, OUT bool & du_set_info_changed,
         analysis(tli);
         if (m_cand_list.get_elem_count() == 0) { continue; }
 
-        if (g_is_dump_after_pass && g_dump_opt.isDumpLFTR()) {
+        if (g_dump_opt.isDumpAfterPass() && g_dump_opt.isDumpLFTR()) {
             dump(tli);
         }
 

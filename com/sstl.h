@@ -3961,7 +3961,7 @@ protected:
         t->prev = t->next = t->parent = nullptr;
         t->key = T(0);
         t->mapped = Ttgt(0);
-        insertbefore_one(&m_free_list, m_free_list, t);
+        xcom::insertbefore_one(&m_free_list, m_free_list, t);
     }
 
     void rleft(RBTNType * x)
@@ -4311,21 +4311,23 @@ public:
     {
         RBTNType * z = find_rbtn(t);
         if (z == nullptr) { return Ttgt(0); }
-        return remove(z);
+        Ttgt mapped = z->mapped;
+        remove(z);
+        return mapped;
     }
 
-    Ttgt remove(RBTNType * z)
+    void remove(RBTNType * z)
     {
-        if (z == nullptr) { return Ttgt(0); }
+        if (z == nullptr) { return; }
         if (m_num_of_tn == 1) {
             ASSERTN(z == m_root, ("z is not the node of tree"));
             ASSERTN(z->rchild == nullptr && z->lchild == nullptr,
                     ("z is the last node"));
-            Ttgt mapped = z->mapped;
+            //The mapped object that will be removed is recorded in z.
             free_rbt(z);
             m_num_of_tn--;
             m_root = nullptr;
-            return mapped;
+            return;
         }
 
         RBTNType * y;
@@ -4387,10 +4389,10 @@ public:
             }
         }
 
-        Ttgt mapped = y->mapped;
+        //The mapped object that will be removed might not be recorded in y.
         free_rbt(y);
         m_num_of_tn--;
-        return mapped;
+        return;
     }
 
     //iter should be clean by caller.

@@ -537,6 +537,38 @@ VN * GVN::computePR(IR const* exp, bool & change)
 }
 
 
+////The function try to find the must-killing def for 'exp'.
+//IR * GVN::getExactAndUniqueDef(IR const* exp)
+//{
+//    ASSERT0(exp->is_exp());
+//    //Prefer PRSSA and MDSSA DU. 
+//    if (exp->isReadPR() && usePRSSADU()) {
+//        IR const* d = PR_ssainfo(exp)->getDef();
+//        if (d != nullptr && d->getExactRef() != nullptr) {
+//            return d;
+//        }
+//        return nullptr;
+//    }
+//    if (exp->isMemRefNonPR() && useMDSSADU()) {
+//        MDSSAInfo * mdssainfo = m_mdssamgr->getMDSSAInfoIfAny(exp);
+//        if (mdssainfo == nullptr ||
+//            mdssainfo->readVOpndSet() == nullptr ||
+//            mdssainfo->readVOpndSet()->is_empty()) {
+//            return nullptr;
+//        }
+//    }
+//    if (m_du != nullptr) {
+//        DUSet const* du = exp->readDUSet();
+//        ASSERTN(du,
+//                ("If exact MD DU is empty, should assigned region LiveIn VN"));
+//        ASSERT0(du->get_elem_count() > 0);
+//        IR const* exp_stmt = const_cast<IR*>(exp)->getStmt();
+//        return m_du->findNearestDomDef(exp, exp_stmt, du);
+//    }
+//    return nullptr;
+//}
+
+
 //Only compute memory operation's vn.
 VN * GVN::computeExactMemory(IR const* exp, bool & change)
 {
@@ -544,7 +576,8 @@ VN * GVN::computeExactMemory(IR const* exp, bool & change)
     MD const* emd = exp->getExactRef();
     if (emd == nullptr) { return nullptr; }
 
-    IR const* ed = m_du->getExactAndUniqueDef(exp);
+    //IR const* ed = m_du->getExactAndUniqueDef(exp);
+    IR const* ed = xoc::findKillingDef(exp, m_rg);
     if (ed != nullptr) {
         VN * defvn = nullptr;
         IR const* exp_stmt = exp->getStmt();
@@ -652,8 +685,8 @@ VN * GVN::computeILoad(IR const* exp, bool & change)
     evn = computeExactMemory(exp, change);
     if (evn != nullptr) { return evn; }
 
-    DUSet const* defset = exp->readDUSet();
-    if (defset == nullptr || defset->get_elem_count() == 0) {
+    DUSet const* du = exp->readDUSet();
+    if (du == nullptr || du->get_elem_count() == 0) {
         VN * v = registerTripleVN(IR_ILD, mlvn,
                                   registerVNviaINT(ILD_ofst(exp)),
                                   registerVNviaINT(exp->getTypeSize(m_tm)));
@@ -664,12 +697,18 @@ VN * GVN::computeILoad(IR const* exp, bool & change)
     IR const* exp_stmt = const_cast<IR*>(exp)->getStmt();
     IR const* domdef = m_stmt2domdef.get(exp_stmt);
     if (domdef == nullptr) {
-        domdef = m_du->findNearestDomDef(exp, exp_stmt, defset);
+        domdef = m_du->findNearestDomDef(exp, exp_stmt, du);
         if (domdef != nullptr) {
             m_stmt2domdef.set(exp_stmt, domdef);
         }
     }
-    if (domdef == nullptr) { return nullptr; }
+    if (domdef == nullptr) {
+        return nullptr;
+    }
+    if (domdef->getMustRef() == nullptr || exp->getMustRef() == nullptr ||
+        !domdef->getMustRef()->is_exact() || !exp->getMustRef()->is_exact()) {
+        return nullptr;
+    }
 
     //ofst will be distinguished in computeILoadByAnonDomDef(), so
     //we do not need to differentiate the various offset of ild and ist.
@@ -791,6 +830,10 @@ VN * GVN::computeArray(IR const* exp, bool & change)
     if (domdef == nullptr) {
         return nullptr;
     }
+    if (domdef->getMustRef() == nullptr || exp->getMustRef() == nullptr ||
+        !domdef->getMustRef()->is_exact() || !exp->getMustRef()->is_exact()) {
+        return nullptr;
+    }
     if (domdef->is_starray() && ARR_ofst(domdef) != ARR_ofst(exp)) {
         return nullptr;
     }
@@ -877,18 +920,23 @@ VN * GVN::computeScalar(IR const* exp, bool & change)
     }
 
     DUSet const* du = exp->readDUSet();
-    ASSERTN(du, ("If exact MD DU is empty, should assigned region LiveIn VN"));
-    ASSERT0(du->get_elem_count() > 0);
-
-    IR const* exp_stmt = const_cast<IR*>(exp)->getStmt();
-    IR const* domdef = m_du->findNearestDomDef(exp, exp_stmt, du);
-
-    if (domdef == nullptr) { return nullptr; }
-
-    if (domdef->is_st() && ST_ofst(domdef) != exp->getOffset()) {
+    if (du == nullptr || du->get_elem_count() == 0) {
+        //If exact MD DU is empty, should assigned region LiveIn VN.
         return nullptr;
     }
 
+    IR const* exp_stmt = const_cast<IR*>(exp)->getStmt();
+    IR const* domdef = m_du->findNearestDomDef(exp, exp_stmt, du);
+    if (domdef == nullptr) {
+        return nullptr;
+    }
+    if (domdef->getMustRef() == nullptr || exp->getMustRef() == nullptr ||
+        !domdef->getMustRef()->is_exact() || !exp->getMustRef()->is_exact()) {
+        return nullptr;
+    }
+    if (domdef->is_st() && ST_ofst(domdef) != exp->getOffset()) {
+        return nullptr;
+    }
     if (!domdef->is_st() && !domdef->is_stpr()) {
         return computeScalarByAnonDomDef(exp, domdef, change);
     }
@@ -1464,15 +1512,11 @@ bool GVN::perform(OptCtx & oc)
         //At least one kind of DU chain should be avaiable.
         return false;
     }
-    if (!oc.is_pr_du_chain_valid() || !oc.is_nonpr_du_chain_valid()) {
-        //TODO: enable GVN using PRSSA and MDSSA.
-        return false;
-    }
 
     START_TIMER(t, getPassName());
     clean();
-    m_rg->getPassMgr()->checkValidAndRecompute(&oc, PASS_RPO, PASS_DU_CHAIN,
-                                               PASS_DOM, PASS_UNDEF);
+    m_rg->getPassMgr()->checkValidAndRecompute(&oc, PASS_RPO, PASS_DOM,
+                                               PASS_UNDEF);
     List<IRBB*> * tbbl = m_cfg->getRPOBBList();
     ASSERT0(tbbl);
     ASSERT0(tbbl->get_elem_count() == bbl->get_elem_count());
@@ -1490,7 +1534,7 @@ bool GVN::perform(OptCtx & oc)
     destroyLocalUsed();
     END_TIMER(t, getPassName());
 
-    if (g_is_dump_after_pass && g_dump_opt.isDumpGVN()) {
+    if (g_dump_opt.isDumpAfterPass() && g_dump_opt.isDumpGVN()) {
        dump();
     }
     set_valid(true);

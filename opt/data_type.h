@@ -163,6 +163,9 @@ public:
     //Return the number of elements in the vector.
     UINT getVectorElemNum(TypeMgr const* tm) const;
 
+    //Return data type.
+    DATA_TYPE getDType() const { return TY_dtype(this); }
+
     //Return element type of element.
     DATA_TYPE getVectorElemType() const;
 
@@ -746,6 +749,13 @@ public:
     Type const* getIntType(UINT bitsize, bool is_signed) const
     { return getSimplexTypeEx(get_int_dtype(bitsize, is_signed)); }
 
+    //Return Unsigned Integer or MemoryChunk Type according to given byte size.
+    Type const* getUIntType(UINT bytesize)
+    {
+        DATA_TYPE dt = get_int_dtype(bytesize * BITS_PER_BYTE, false);
+        return dt == D_MC ? getMCType(bytesize) : getSimplexTypeEx(dt);
+    }
+
     //Return DATA-Type according to given bit size and sign.
     //Note the bit size will be aligned to power of 2.
     DATA_TYPE getDType(UINT bit_size, bool is_signed) const
@@ -911,11 +921,12 @@ public:
     }
 
     //Return memory chunk tyid accroding to chunk size and vector element tyid.
-    Type const* getMCType(UINT mc_sz)
+    //mc_bytesize: the byte size of memory chunk.
+    Type const* getMCType(UINT mc_bytesize)
     {
         MCType d;
         TY_dtype(&d) = D_MC;
-        TY_mc_size(&d) = mc_sz;
+        TY_mc_size(&d) = mc_bytesize;
         return TC_type(registerMC(&d));
     }
 

@@ -114,13 +114,13 @@ public:
     }
     RefineCtx const& operator = (RefineCtx const&);
 
-    bool doUpdateMDRef() const { return RC_update_mdref(*this); }
-    bool doInsertCVT() const { return RC_insert_cvt(*this); }
-    bool doFoldConst() const { return RC_do_fold_const(*this); }
-    bool doRefineStmt() const { return RC_refine_stmt(*this); }
-    bool doHoistLnot() const { return RC_hoist_to_lnot(*this); }
-    bool doRefineDivConst() const { return RC_refine_div_const(*this); }
-    bool doRefineMulConst() const { return RC_refine_mul_const(*this); }
+    bool fold_const() const { return RC_do_fold_const(*this); }
+    bool hoist_to_lnot() const { return RC_hoist_to_lnot(*this); }
+    bool insert_cvt() const { return RC_insert_cvt(*this); }
+    bool refine_stmt() const { return RC_refine_stmt(*this); }
+    bool refine_div_const() const { return RC_refine_div_const(*this); }
+    bool refind_mul_const() const { return RC_refine_mul_const(*this); }
+    bool update_mdref() const { return RC_update_mdref(*this); }
 
     //Set flag to disable following optimizations.
     void setUnOptFlag()

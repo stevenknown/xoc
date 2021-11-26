@@ -903,13 +903,10 @@ bool CFG<BB, XR>::removeRedundantBranchCase1(BB *RESTRICT bb,
 {
     ASSERT0(bb && xr);
     //CASE:
-    //    BB1:
-    //    falsebr L0 //S1
-    //
-    //    BB2:
-    //    L0  //S2
-    //    ... //S3
-    //
+    //  BB1:
+    //    falsebr BB2 //S1
+    //  BB2:
+    //  some-code;
     //S1 is redundant branch.
     xcom::Vertex * v = getVertex(bb->id());
     xcom::EdgeC * last_el = nullptr;
@@ -979,11 +976,10 @@ bool CFG<BB, XR>::removeRedundantBranch()
         }
         if (xr->isUnconditionalBr() && !xr->isIndirectBr()) {
             //BB1:
-            //    ...
-            //    goto L1  <--- redundant branch
-            //
+            //  some-code;
+            //  goto L1  <--- redundant branch
             //BB2:
-            //    L1:
+            //  L1:
             BB * tgt_bb = findBBbyLabel(xr->getLabel());
             ASSERT0(tgt_bb != nullptr);
             if (tgt_bb == next_bb) {

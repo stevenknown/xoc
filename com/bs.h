@@ -638,14 +638,11 @@ extern inline BitSet * bs_create(BitSetMgr & bs_mgr)
 {
     return bs_mgr.create();
 }
-extern BitSet * bs_union(BitSet const& set1,
-                         BitSet const& set2,
+extern BitSet * bs_union(BitSet const& set1, BitSet const& set2,
                          OUT BitSet & res);
-extern BitSet * bs_diff(BitSet const& set1,
-                        BitSet const& set2,
+extern BitSet * bs_diff(BitSet const& set1, BitSet const& set2,
                         OUT BitSet & res);
-extern BitSet * bs_intersect(BitSet const& set1,
-                             BitSet const& set2,
+extern BitSet * bs_intersect(BitSet const& set1, BitSet const& set2,
                              OUT BitSet & res);
 } //namespace xcom
 #endif

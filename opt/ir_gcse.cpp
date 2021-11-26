@@ -860,7 +860,7 @@ bool GCSE::perform(OptCtx & oc)
         //}
     }
     END_TIMER(t, getPassName());
-    if (g_is_dump_after_pass && g_dump_opt.isDumpGCSE()) {
+    if (g_dump_opt.isDumpAfterPass() && g_dump_opt.isDumpGCSE()) {
         dump();
     }
     if (change) {

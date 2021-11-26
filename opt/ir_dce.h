@@ -104,6 +104,10 @@ class DeadCodeElim : public Pass {
     bool find_effect_kid_uncondbr(IR const* ir) const;
     bool find_effect_kid(IR const* ir) const;
 
+    bool isEffectStmt(IR const* ir) const
+    { return m_is_stmt_effect.is_contain(ir->id()); }
+    bool isEffectBB(UINT id) const { return m_is_bb_effect.is_contain(id); }
+    bool isEffectBB(IRBB const* bb) const { return isEffectBB(bb->id()); }
     bool is_effect_write(Var * v) const
     { return VAR_is_global(v) || VAR_is_volatile(v); }
     bool is_effect_read(Var * v) const { return VAR_is_volatile(v); }
@@ -126,8 +130,7 @@ class DeadCodeElim : public Pass {
     bool preserve_cd(MOD List<IR const*> & act_ir_lst);
 
     void reinit();
-    void reviseSuccForFallthroughBB(IRBB * bb,
-                                    BBListIter bbct,
+    void reviseSuccForFallthroughBB(IRBB * bb, BBListIter bbct,
                                     BBList * bbl) const;
     bool removeIneffectIR(OUT bool & remove_branch_stmt);
     bool removeRedundantPhi();
@@ -136,7 +139,8 @@ class DeadCodeElim : public Pass {
     bool tryMarkUnconditionalBranch(IRBB const* bb,
                                     MOD List<IR const*> & act_ir_lst);
 
-    //The function marks possible predecessor in CFG to be effect BB, e.g back-edge.
+    //The function marks possible predecessor in CFG to be effect BB,
+    //e.g back-edge.
     bool markCFGPred(IRBB const* bb);
     bool markControlPredAndStmt(IRBB const* bb,
                                 OUT List<IR const*> & act_ir_lst);
@@ -171,6 +175,14 @@ public:
     }
     virtual ~DeadCodeElim() {}
 
+    //The function dump pass relative information before performing the pass.
+    //The dump information is always used to detect what the pass did.
+    //Return true if dump successed, otherwise false.
+    virtual bool dumpBeforePass() const;
+
+    //The function dump pass relative information.
+    //The dump information is always used to detect what the pass did.
+    //Return true if dump successed, otherwise false.
     virtual bool dump() const;
 
     Region * getRegion() const { return m_rg; }

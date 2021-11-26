@@ -44,7 +44,7 @@ void MDId2MD::dump(Region const* rg) const
     for (INT i = 0; i <= get_last_idx(); i++) {
         MD * md = Vector<MD*>::get(i);
         if (md == nullptr) { continue; }
-        ASSERT0(MD_id(md) == (UINT)i);
+        ASSERT0(MD_id(md) == (MDIdx)i);
         prt(rg, "%d,", i);
     }
 }
@@ -185,7 +185,7 @@ MD * MDSet::get_effect_md(MDSystem * ms) const
 }
 
 
-void MDSet::bunion(UINT mdid, DefMiscBitSetMgr & mbsmgr)
+void MDSet::bunion(MDIdx mdid, DefMiscBitSetMgr & mbsmgr)
 {
     //TBD: Does it necessary to judge if either current
     //MD or input MD is FULL_MEM?
@@ -425,8 +425,8 @@ bool MDSet::is_overlap_ex(MD const* md, Region const* current_ru,
 
     MDSetIter iter = nullptr;
     for (INT i = get_first(&iter);
-         i >= 0; i = get_next((UINT)i, &iter)) {
-        MD const* t = const_cast<MDSystem*>(mdsys)->getMD((UINT)i);
+         i >= 0; i = get_next((MDIdx)i, &iter)) {
+        MD const* t = const_cast<MDSystem*>(mdsys)->getMD((MDIdx)i);
         ASSERT0(t);
         if (t->is_overlap(md)) { return true; }
     }
@@ -464,7 +464,7 @@ void MDSet::bunion(MDSet const& mds, DefMiscBitSetMgr & mbsmgr)
 //This function will walk through whole current MDSet and differenciate
 //overlapped elements.
 //Note this function is very costly.
-void MDSet::diffAllOverlapped(UINT id, DefMiscBitSetMgr & m,
+void MDSet::diffAllOverlapped(MDIdx id, DefMiscBitSetMgr & m,
                               MDSystem const* sys)
 {
     MDSetIter iter;
@@ -676,7 +676,7 @@ void MD2MDSet::dump(Region * rg)
 
     MD2MDSetIter mxiter;
     MDSet const* pts = nullptr;
-    for (UINT mdid = get_first(mxiter, &pts);
+    for (MDIdx mdid = get_first(mxiter, &pts);
          mdid > 0; mdid = get_next(mxiter, &pts)) {
         MD const* md = ms->getMD(mdid);
         ASSERT0(md);
@@ -794,7 +794,7 @@ MD const* MDSystem::registerMD(MD const& m)
 
     //Generate a new MD and record it in md-table accroding to its id.
     MD * entry = allocMD();
-    if (MD_id(entry) == 0) {
+    if (MD_id(entry) == MD_UNDEF) {
         MD_id(entry) = m_md_count++;
     }
     entry->copy(&m);
@@ -1172,7 +1172,7 @@ void MDSystem::dump(bool only_dump_nonpr_md)
             (only_dump_nonpr_md && MD_is_pr(md))) {
             continue;
         }
-        ASSERT0(MD_id(md) == (UINT)i);
+        ASSERT0(MD_id(md) == (MDIdx)i);
         md->dump(getTypeMgr());
     }
 }

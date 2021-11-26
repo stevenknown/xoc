@@ -26,61 +26,40 @@ ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
 SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 @*/
-#ifndef _INFER_TYPE_H_
-#define _INFER_TYPE_H_
+#ifndef _INVERT_BRTGT_H_
+#define _INVERT_BRTGT_H_
 
 namespace xoc {
 
-//Perform type inference for IR.
-class InferType : public Pass {
-    COPY_CONSTRUCTOR(InferType);
-    TypeMgr * m_tm;
-    Region * m_rg;
-    IRCFG * m_cfg;
-    IRList m_wl;
-    CIRList * m_changed_irlist; //used for dump
-    List<Var const*> * m_changed_varlist; //used for dump
-protected:
-    void addChanged(IR * ir);
-    void addDump(IR const* ir) const;
-    void addDump(Var const* var) const;
+class InvertBrTgt;
 
+//The optimization attempt to invert branch target.
+class InvertBrTgt : public Pass {
+    COPY_CONSTRUCTOR(InvertBrTgt);
+    Region * m_rg;
+    CIRList * m_changed_irlist; //used for dump
+protected:
+    void addDump(IR const* ir) const;
     void dumpInit();
     void dumpFini();
-
-    //Infer variable's type.
-    bool inferVarTypeByIRType(IR const* ir) const;
-    bool inferLeafExpMemAcc(IR * ir);
-    bool inferIld(IR * ir);
-    bool inferArray(IR * ir) const;
-    bool inferStmtCall(IR * ir) const;
-    bool inferStmtPhi(IR * ir) const;
-    bool inferStmtMemAcc(IR * ir);
-    bool inferExpMemAcc(IR * ir);
-    bool inferUnaOP(IR * ir);
-    bool inferBinOP(IR * ir);
-    bool inferSelect(IR * ir);
-    bool inferIR(IR * ir);
-    bool inferBBList(BBList const* bbl);
-    bool inferIRList(IR * irl);
-    bool inferChangedList();
 public:
-    explicit InferType(Region * rg)
+    explicit InvertBrTgt(Region * rg)
     {
         ASSERT0(rg != nullptr);
         m_rg = rg;
-        m_tm = rg->getTypeMgr();
-        m_cfg = rg->getCFG();
         m_changed_irlist = nullptr;
-        m_changed_varlist = nullptr;
     }
-    virtual ~InferType() { dumpFini(); }
+    virtual ~InvertBrTgt() { dumpFini(); }
 
     virtual bool dump() const;
 
     Region * getRegion() const { return m_rg; }
-    virtual CHAR const* getPassName() const { return "Infer Type"; }
-    virtual PASS_TYPE getPassType() const { return PASS_INFER_TYPE; }
+    virtual CHAR const* getPassName() const
+    { return "Invert Branch Target"; }
+    virtual PASS_TYPE getPassType() const { return PASS_INVERT_BRTGT; }
+
+    static bool invertLoop(InvertBrTgt * invt, IR * br, IRBB * br_tgt,
+                             IR * jmp, IRBB * jmp_tgt);
 
     virtual bool perform(OptCtx & oc);
 };

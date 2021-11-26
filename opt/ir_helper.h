@@ -54,25 +54,6 @@ public:
 };
 
 
-//The class represents options during GR dump.
-class DumpGRCtx {
-public:
-    //Propagate info top down.
-    //Set to true to dump string literal and ignore the \n.
-    BYTE dump_string_in_one_line:1;
-
-    //Propagate info top down.
-    //Set to true to dump inner region.
-    BYTE dump_inner_region:1;
-
-    //Propagate info top down.
-    //Supply CFG when dumpping PHI.
-    IRCFG * cfg;
-public:
-    DumpGRCtx() { ::memset(this, 0, sizeof(DumpGRCtx)); }
-};
-
-
 //Iterative access ir tree. This funtion initialize the iterator.
 //'ir': the root ir of the tree.
 //'it': iterator. It should be clean already.
@@ -279,27 +260,14 @@ inline IR * iterRhsNext(MOD IRIter & it)
     return iterNext(it);
 }
 
-
-inline IR_TYPE invertIRType(IR_TYPE src)
-{
-    switch(src) {
-    case IR_LT: return IR_GE;
-    case IR_LE: return IR_GT;
-    case IR_GT: return IR_LE;
-    case IR_GE: return IR_LT;
-    case IR_EQ: return IR_NE;
-    case IR_NE: return IR_EQ;
-    default: ASSERTN(0, ("unsupport"));
-    }
-    return IR_UNDEF;
-}
-
 bool allBeExp(IR * irlst);
 bool allBeStmt(IR * irlst);
+
 bool checkMaxIRType();
 bool checkIRDesc();
 bool checkRoundDesc();
 CHAR const* compositeName(Sym const* n, xcom::StrBuf & buf);
+
 void dumpConst(IR const* ir, Region const* rg);
 void dumpIR(IR const* ir, Region const* rg, CHAR * attr = nullptr,
             UINT dumpflag = IR_DUMP_COMBINE);
@@ -308,12 +276,8 @@ void dumpIRListH(IR const* ir_list, Region const* rg, CHAR * attr = nullptr,
 void dumpIRList(IR const* ir_list, Region const* rg, CHAR * attr = nullptr,
                 UINT dumpflag = IR_DUMP_COMBINE);
 void dumpIRList(IRList const& ir_list, Region const* rg);
-
-//ctx: it can be NULL if user is not going to control the dumpping.
-//     But it must be given if 'ir' is PHI because dump PHI will using CFG.
-void dumpGR(IR const* ir, TypeMgr * tm, DumpGRCtx * ctx);
-void dumpGRInBBList(List<IRBB*> * bblist, TypeMgr * tm, DumpGRCtx * ctx);
-void dumpGRList(IR * irlist, TypeMgr * tm, DumpGRCtx * ctx);
+void dumpLabelDecl(LabelInfo const* li, RegionMgr const* rm, bool for_gr);
+void dumpLabelName(LabelInfo const* li, RegionMgr const* rm, bool for_gr);
 
 UINT getArithPrecedence(IR_TYPE ty);
 
@@ -325,6 +289,9 @@ inline bool isBinaryOp(IR_TYPE irt)
 
 inline bool isUnaryOp(IR_TYPE irt)
 { return IRDES_is_una(g_ir_desc[irt]); }
+
+//CASE:_$L9 is non-identifier char because of '$'.
+bool isContainNonIdentifierChar(CHAR const* name);
 
 void setParentPointerForIRList(IR * ir_list);
 bool verifyIRList(IR * ir, BitSet * irh, Region const* rg);

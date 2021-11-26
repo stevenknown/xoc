@@ -144,7 +144,7 @@ protected:
     MDSetMgr * m_mds_mgr;
     MDSetHash * m_mds_hash;
     //Used by DU chain.
-    xcom::BitSet * m_is_init; //for tmp use.
+    xcom::TTab<UINT> * m_is_init; //for tmp use.
     MD2IRSet * m_md2irs; //for tmp use.
     OptCtx * m_oc;
     ConstIRIter m_citer; //for tmp use.
@@ -275,6 +275,8 @@ public:
 
     //Build DU chain : def->use.
     //Build DU chain from stmt 'def' to expression 'use'.
+    //Note the function does NOT check the consistency of Prno if def or use
+    //operate on PR.
     void buildDUChain(IR * def, IR * use)
     {
         ASSERT0(def && def->is_stmt() && use && use->is_exp());

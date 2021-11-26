@@ -124,13 +124,13 @@ IR * RCE::calcCondMustVal(IN IR * ir,
                 if (must_true) {
                     ASSERT0(!must_false);
                     Type const* type = ir->getType();
-                    removeUseForTree(ir, m_rg);
+                    xoc::removeUseForTree(ir, m_rg);
                     m_rg->freeIRTree(ir);
                     return m_rg->buildImmInt(1, type);
                 } else {
                     ASSERT0(must_false);
                     Type const* type = ir->getType();
-                    removeUseForTree(ir, m_rg);
+                    xoc::removeUseForTree(ir, m_rg);
                     m_rg->freeIRTree(ir);
                     return m_rg->buildImmInt(0, type);
                 }
@@ -227,7 +227,7 @@ IR * RCE::processStore(IR * ir)
 {
     ASSERT0(ir->is_st());
     if (ST_rhs(ir)->getExactRef() == ir->getExactRef()) {
-        removeUseForTree(ir, m_rg);
+        xoc::removeUseForTree(ir, m_rg);
         return nullptr;
     }
     return ir;
@@ -239,7 +239,7 @@ IR * RCE::processStorePR(IR * ir)
 {
     ASSERT0(ir->is_stpr());
     if (STPR_rhs(ir)->getExactRef() == ir->getExactRef()) {
-        removeUseForTree(ir, m_rg);
+        xoc::removeUseForTree(ir, m_rg);
         return nullptr;
     }
     return ir;
@@ -318,15 +318,12 @@ bool RCE::perform(OptCtx & oc)
     }
 
     START_TIMER(t, getPassName());
-    if (!m_gvn->is_valid() && is_use_gvn()) {
-        m_gvn->perform(oc);
-    }
-
+    if (!m_gvn->is_valid() && is_use_gvn()) { return false; }
     bool cfg_mod = false;
     bool change = performSimplyRCE(&cfg_mod);
     if (cfg_mod) {
         ASSERT0(change);
-        m_cfg->performMiscOpt(oc);
+        change |= m_cfg->performMiscOpt(oc);
     }
     if (change) {
         //CFG changed, remove empty BB.
@@ -336,7 +333,7 @@ bool RCE::perform(OptCtx & oc)
         ASSERT0(MDSSAMgr::verifyMDSSAInfo(m_rg));
     }
 
-    if (g_is_dump_after_pass && g_dump_opt.isDumpRCE()) {
+    if (g_dump_opt.isDumpAfterPass() && g_dump_opt.isDumpRCE()) {
         dump();
     }
 

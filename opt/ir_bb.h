@@ -403,10 +403,8 @@ public:
     {
         for (LabelInfo const* li = getLabelList().get_head();
              li != nullptr; li = getLabelList().get_next()) {
-            if (LABELINFO_is_catch_start(li) ||
-                LABELINFO_is_try_start(li) ||
-                LABELINFO_is_try_end(li) ||
-                LABELINFO_is_pragma(li)) {
+            if (li->is_catch_start() || li->is_try_start() ||
+                li->is_try_end() || li->is_pragma()) {
                 return true;
             }
         }

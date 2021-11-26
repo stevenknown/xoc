@@ -490,10 +490,34 @@ bool MDSSAMgr::dump() const
 }
 
 
+//Find the MustDef of in VOpndSet of 'ir'.
+MDDef * MDSSAMgr::findMustDef(IR const* ir) const
+{
+    ASSERT0(ir && ir->is_exp() && ir->isMemoryOpnd());
+    MD const* mustuse = ir->getMustRef();
+    if (mustuse == nullptr || (!mustuse->is_exact() && !mustuse->is_range())) {
+        return nullptr;
+    }
+    MDSSAInfo const* mdssainfo = getMDSSAInfoIfAny(ir);
+    ASSERTN(mdssainfo, ("miss MDSSAInfo"));
+    VOpndSetIter iter = nullptr;
+    for (INT i = mdssainfo->readVOpndSet()->get_first(&iter);
+         i >= 0; i = mdssainfo->readVOpndSet()->get_next(i, &iter)) {
+        VMD * t = (VMD*)m_usedef_mgr.getVOpnd(i);
+        ASSERT0(t && t->is_md());
+        MDDef * tdef = t->getDef();
+        if (tdef != nullptr && tdef->getResultMD(m_md_sys) == mustuse) {
+            return tdef;
+        }
+    }
+    return nullptr;
+}
+
+
 //Find nearest virtual DEF in VOpndSet of 'ir'.
 MDDef * MDSSAMgr::findNearestDef(IR const* ir) const
 {
-    ASSERT0(ir);
+    ASSERT0(ir && ir->is_exp() && ir->isMemoryOpnd());
     MDSSAInfo const* mdssainfo = getMDSSAInfoIfAny(ir);
     ASSERTN(mdssainfo, ("miss MDSSAInfo"));
     VOpndSetIter iter = nullptr;
@@ -564,7 +588,8 @@ MDDef * MDSSAMgr::findNearestDef(IR const* ir) const
 }
 
 
-//Find killing must-def for expression ir.
+//Find killing must-def IR stmt for expression ir.
+//Return the IR stmt if found.
 //e.g: g is global variable, it is exact.
 //x is a pointer that we do not know where it pointed to.
 //    1. *x += 1; # *x may overlapped with g
@@ -573,14 +598,40 @@ MDDef * MDSSAMgr::findNearestDef(IR const* ir) const
 //    4. return g;
 //In the case, the last reference of g in stmt 4 may be defined by
 //stmt 1, 2, 3, there is no nearest killing def.
-MDDef * MDSSAMgr::findKillingDef(IR const* ir) const
+
+IR * MDSSAMgr::findKillingDefStmt(IR const* ir) const
+{
+    MDDef * mddef = findKillingMDDef(ir);
+    if (mddef != nullptr && !mddef->is_phi()) {
+        ASSERT0(mddef->getOcc());
+        return mddef->getOcc();
+    }
+    return nullptr;
+}
+
+
+//Find killing must-def Virtual-DEF for expression ir.
+//Return the MDDef if found.
+//e.g: g is global variable, it is exact.
+//x is a pointer that we do not know where it pointed to.
+//    1. *x += 1; # *x may overlapped with g
+//    2. g = 0; # exactly defined g
+//    3. call foo(); # foo may overlapped with g
+//    4. return g;
+//In the case, the last reference of g in stmt 4 may be defined by
+//stmt 1, 2, 3, there is no nearest killing def.
+MDDef * MDSSAMgr::findKillingMDDef(IR const* ir) const
 {
     ASSERT0(ir && ir->is_exp() && ir->isMemoryOpnd());
+    MD const* opndmd = ir->getMustRef();
+    if (opndmd == nullptr || (!opndmd->is_exact() && !opndmd->is_range())) {
+        //TBD: For those exp who do not have MustRef, must they not
+        //have killing-def?
+        return nullptr;
+    }
 
-    MD const* opndmd = ir->getRefMD();
-    if (opndmd == nullptr || !opndmd->is_exact()) { return nullptr; }
-
-    MDDef * def = findNearestDef(ir);
+    MDDef * def = findMustDef(ir);
+    //MDDef * def = findNearestDef(ir);
     if (def == nullptr || def->is_phi()) { return nullptr; }
 
     ASSERT0(def->getOcc());
@@ -735,7 +786,7 @@ void MDSSAMgr::dumpExpDUChainIter(IR const* ir, List<IR*> & lst,
             continue;
         }
 
-        MDDef * kdef = findKillingDef(opnd);
+        MDDef * kdef = findKillingMDDef(opnd);
         if (kdef != nullptr) {
             prt(getRegion(), " KDEF:%s(id:%d)", IRNAME(kdef->getOcc()),
                 kdef->getOcc()->id());
@@ -1416,7 +1467,7 @@ void MDSSAMgr::renamePhiOpndInSuccBB(IRBB * bb)
         ASSERTN(sel, ("not found related pred"));
         //Replace opnd of PHI of 'succ' with top SSA version.
         handlePhiInSuccBB(m_cfg->getBB(succv->id()), opnd_idx);
-    } 
+    }
 }
 
 
@@ -2317,7 +2368,7 @@ void MDSSAMgr::replaceVOpndForAllUse(MOD VMD * to, MOD VMD * from)
         use_mdssainfo->addVOpnd(to, getUseDefMgr());
         to->addUse(use);
     }
-    from->cleanUseSet(); 
+    from->cleanUseSet();
 }
 
 
@@ -3146,7 +3197,7 @@ bool MDSSAMgr::construction(DomTree & domtree)
     prunePhi(wl);
     cleanLocalUsedData();
 
-    if (g_is_dump_after_pass && g_dump_opt.isDumpMDSSAMgr()) {
+    if (g_dump_opt.isDumpAfterPass() && g_dump_opt.isDumpMDSSAMgr()) {
         dump();
     }
 

@@ -4084,7 +4084,7 @@ bool AliasAnalysis::perform(MOD OptCtx & oc)
     }
     OC_is_aa_valid(oc) = true;
 
-    if (g_is_dump_after_pass && g_dump_opt.isDumpAA()) {
+    if (g_dump_opt.isDumpAfterPass() && g_dump_opt.isDumpAA()) {
         dump();
     }
     ASSERT0(verify());

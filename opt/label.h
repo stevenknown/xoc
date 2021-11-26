@@ -128,10 +128,12 @@ public:
                is_pragma() || is_terminate();
     }
 
+    bool is_clabel() const { return getType() == L_CLABEL; }
+    bool is_ilabel() const { return getType() == L_ILABEL; }
+    bool is_pragma() const { return getType() == L_PRAGMA; }
     bool is_catch_start() const { return LABELINFO_is_catch_start(this); }
     bool is_try_start() const { return LABELINFO_is_try_start(this); }
     bool is_try_end() const { return LABELINFO_is_try_end(this); }
-    bool is_pragma() const { return LABELINFO_is_pragma(this); }
     bool is_terminate() const { return LABELINFO_is_terminate(this); }
 };
 

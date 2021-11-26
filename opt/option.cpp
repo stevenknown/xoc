@@ -91,16 +91,23 @@ bool g_do_cfg_remove_unreach_bb = true;
 //    BB1: goto L2
 bool g_do_cfg_remove_trampolin_bb = true;
 
-//Perform cfg optimization: invert branch condition and
-//remove redundant trampoline BB.
-//e.g:
+//Remove trampoline branch.
+//Note the pass is different from what removeTrampolinEdge() does.
+//e.g:L2:
 //    truebr L4 | false L4
-//    goto L3
+//    goto L3 //redundant jump
 //    L4
-//    ...
+//    st = ...
 //    L3:
 //    ...
-bool g_do_cfg_invert_condition_and_remove_trampolin_bb = true;
+//=>
+//    L2:
+//    falsebr L3 | truebr L3
+//    EMPTY BB
+//    L4:
+//    st = ...
+//    L3:
+bool g_do_cfg_remove_trampolin_branch = true;
 
 //Perform cfg optimization: remove redundant branch.
 //e.g:
@@ -169,6 +176,9 @@ bool g_do_dce_aggressive = false;
 
 //Perform type inference.
 bool g_infer_type = true;
+
+//Perform cfg optimization: invert branch condition and target.
+bool g_invert_brtgt = true;
 
 //Perform linear function test replacement.
 bool g_do_lftr = false;
@@ -273,15 +283,12 @@ UINT g_verify_level = VERIFY_LEVEL_2;
 //               intconst 24|0x18 (u32) id:14
 bool g_is_simplify_parameter = true;
 
-//Dump after each pass.
-bool g_is_dump_after_pass = true;
-
-//Dump before each pass.
-bool g_is_dump_before_pass = true;
-
 //Set true to enable searching debug-info from expression bottom up
 //to nearest stmt.
 bool g_is_search_and_copy_dbx = true;
+
+//Set true to generate variable when building a PR.
+bool g_generate_var_for_pr = true;
 
 //Record dump options for each Pass.
 DumpOpt g_dump_opt;
@@ -299,6 +306,9 @@ DumpOpt::DumpOpt()
 {
     is_dump_all = false;
     is_dump_nothing = false;
+    //In most cases, dump-after-pass is sufficient.
+    is_dump_before_pass = false;
+    is_dump_after_pass = true;
     is_dump_aa = false;
     is_dump_dumgr = false;
     is_dump_mdset_hash = false;
@@ -316,15 +326,14 @@ DumpOpt::DumpOpt()
     is_dump_simplification = false;
     is_dump_prssamgr = false;
     is_dump_mdssamgr = false;
-    is_dump_cg = false;
-    is_dump_ra = false;
     is_dump_memusage = false;
     is_dump_livenessmgr = false;
     is_dump_irparser = false;
+    is_dump_ir_id = true;
 }
 
 
-bool DumpOpt::isDumpALL() const
+bool DumpOpt::isDumpAll() const
 {
     //is_dump_all and is_dump_nothing can not all be true.
     ASSERT0(!(is_dump_nothing & is_dump_all));
@@ -337,6 +346,18 @@ bool DumpOpt::isDumpNothing() const
     //is_dump_all and is_dump_nothing can not all be true.
     ASSERT0(!(is_dump_nothing & is_dump_all));
     return is_dump_nothing;
+}
+
+
+bool DumpOpt::isDumpBeforePass() const
+{    
+    return is_dump_before_pass;
+}
+
+
+bool DumpOpt::isDumpAfterPass() const
+{    
+    return is_dump_after_pass;
 }
 
 
@@ -394,6 +415,12 @@ bool DumpOpt::isDumpInferType() const
 }
 
 
+bool DumpOpt::isDumpInvertBrTgt() const
+{
+    return is_dump_all || (!is_dump_nothing && is_dump_invert_brtgt);
+}
+
+
 bool DumpOpt::isDumpDCE() const
 {
     return is_dump_all || (!is_dump_nothing && is_dump_dce);
@@ -409,12 +436,6 @@ bool DumpOpt::isDumpRCE() const
 bool DumpOpt::isDumpLFTR() const
 {
     return is_dump_all || (!is_dump_nothing && is_dump_lftr);
-}
-
-
-bool DumpOpt::isDumpLIS() const
-{
-    return is_dump_all || (!is_dump_nothing && is_dump_lis);
 }
 
 
@@ -472,18 +493,6 @@ bool DumpOpt::isDumpMDSSAMgr() const
 }
 
 
-bool DumpOpt::isDumpCG() const
-{
-    return is_dump_all || (!is_dump_nothing && is_dump_cg);
-}
-
-
-bool DumpOpt::isDumpRA() const
-{
-    return is_dump_all || (!is_dump_nothing && is_dump_ra);
-}
-
-
 bool DumpOpt::isDumpMemUsage() const
 {
     return is_dump_all || (!is_dump_nothing && is_dump_memusage);
@@ -498,6 +507,12 @@ bool DumpOpt::isDumpLivenessMgr() const
 bool DumpOpt::isDumpIRParser() const
 {
     return is_dump_all || (!is_dump_nothing && is_dump_irparser);
+}
+
+
+bool DumpOpt::isDumpIRID() const
+{
+    return is_dump_all || (!is_dump_nothing && is_dump_ir_id);
 }
 
 

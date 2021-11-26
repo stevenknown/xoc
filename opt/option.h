@@ -53,6 +53,10 @@ public:
     //Dump all information.
     //Note is_dump_all and is_dump_nothing can not all be true.
     bool is_dump_all;
+    //Dump after pass.
+    bool is_dump_after_pass;
+    //Dump before pass.
+    bool is_dump_before_pass;
     //Do not dump anything.
     //Note is_dump_all and is_dump_nothing can not all be true.
     bool is_dump_nothing;
@@ -69,6 +73,7 @@ public:
     bool is_dump_rce; //Dump light weight Redundant Code Elimination.
     bool is_dump_dce; //Dump Dead Code Elimination.
     bool is_dump_infertype; //Dump Infer Type.
+    bool is_dump_invert_brtgt; //Dump Invert Branch Target.
     bool is_dump_lftr; //Dump Linear Function Test Replacement.
     bool is_dump_gvn; //Dump Global Value Numbering.
     bool is_dump_gcse; //Dump Global Common Subscript Expression.
@@ -78,8 +83,6 @@ public:
     bool is_dump_simplification; //Dump IR simplification.
     bool is_dump_prssamgr; //Dump PRSSAMgr.
     bool is_dump_mdssamgr; //Dump MDSSAMgr.
-    bool is_dump_cg; //Dump CodeGeneration.
-    bool is_dump_ra; //Dump Register Allocation.
     bool is_dump_memusage; //Dump memory usage.
     bool is_dump_livenessmgr; //Dump LivenessMgr.
     bool is_dump_irparser; //Dump IRParser.
@@ -87,13 +90,19 @@ public:
     bool is_dump_refine; //Dump Refinement.
     bool is_dump_gscc; //Dump GSCC.
     bool is_dump_cdg; //Dump Control Dependence Graph.
-    bool is_dump_lis; //Dump LIS.
+    //The option determines whether IR dumper dumps the IR's id when dumpIR()
+    //invoked. It should be set to false when the dump information is used in
+    //basedump file in testsuite, because the id may be different in different
+    //compilation.
+    bool is_dump_ir_id;
 public:
     DumpOpt();
     DumpOpt const& operator = (DumpOpt const&); //Disable operator =.
 
-    bool isDumpALL() const;
+    bool isDumpAll() const;
     bool isDumpNothing() const;
+    bool isDumpBeforePass() const;
+    bool isDumpAfterPass() const;
     bool isDumpAA() const;
     bool isDumpDUMgr() const;
     bool isDumpMDSetHash() const;
@@ -105,6 +114,7 @@ public:
     bool isDumpRCE() const;
     bool isDumpDCE() const;
     bool isDumpInferType() const;
+    bool isDumpInvertBrTgt() const;
     bool isDumpLFTR() const;
     bool isDumpGVN() const;
     bool isDumpGCSE() const;
@@ -124,6 +134,7 @@ public:
     bool isDumpGSCC() const;
     bool isDumpCDG() const;
     bool isDumpLIS() const;
+    bool isDumpIRID() const;
 };
 
 
@@ -144,6 +155,7 @@ typedef enum _PASS_TYPE {
     PASS_LICM,
     PASS_DCE,
     PASS_INFER_TYPE,
+    PASS_INVERT_BRTGT,
     PASS_LFTR,
     PASS_DSE,
     PASS_RCE,
@@ -232,6 +244,24 @@ extern bool g_do_cfg_remove_unreach_bb;
 //    BB1: goto L2
 extern bool g_do_cfg_remove_trampolin_bb;
 
+//Remove trampoline branch.
+//Note the pass is different from what removeTrampolinEdge() does.
+//e.g:L2:
+//    truebr L4 | false L4
+//    goto L3 //redundant jump
+//    L4
+//    st = ...
+//    L3:
+//    ...
+//=>
+//    L2:
+//    falsebr L3 | truebr L3
+//    EMPTY BB
+//    L4:
+//    st = ...
+//    L3:
+extern bool g_do_cfg_remove_trampolin_branch;
+
 //Perform cfg optimization: remove redundant branch.
 //e.g:
 //    BB1:
@@ -243,38 +273,38 @@ extern bool g_do_cfg_remove_trampolin_bb;
 //
 //S1 is redundant branch.
 extern bool g_do_cfg_remove_redundant_branch;
-
-//Perform cfg optimization: invert branch condition and
-//remove redundant trampoline BB.
-//e.g:
-//    truebr L4 | false L4
-//    goto L3
-//    L4
-//    ...
-//    L3:
-//    ...
-extern bool g_do_cfg_invert_condition_and_remove_trampolin_bb;
 extern bool g_do_cfg_dom; //Build dominator tree.
 extern bool g_do_cfg_pdom; //Build post dominator tree.
 extern bool g_do_cdg; //Build post dominator tree.
 extern bool g_do_aa; //Perform default alias analysis.
+
 //Perform DU analysis for MD to build du chain.
 extern bool g_do_md_du_analysis;
+
 //Compute PR DU chain in classic method.
 extern bool g_compute_pr_du_chain;
+
 //Compute NONPR DU chain in classic method.
 extern bool g_compute_nonpr_du_chain;
+
 //Computem available expression during du analysis to
 //build more precise du chain.
 extern bool g_compute_available_exp;
+
 //Computem imported MD which are defined and used in region.
 extern bool g_compute_region_imported_defuse_md;
+
 //Build expression table to record lexicographic equally IR expression.
 extern bool g_do_expr_tab;
+
 //Perform dead code elimination.
 extern bool g_do_dce;
+
 //Perform type inference.
 extern bool g_infer_type;
+
+//Perform cfg optimization: invert branch condition and target.
+extern bool g_invert_brtgt;
 
 //Set true to eliminate control-flow-structures.
 //Note this option may incur user unexpected result:
@@ -355,15 +385,12 @@ extern UINT g_verify_level;
 //of parameters of call can be left out if the flag set to false.
 extern bool g_is_simplify_parameter;
 
-//Dump after each pass.
-extern bool g_is_dump_after_pass;
-
-//Dump before each pass.
-extern bool g_is_dump_before_pass;
-
 //Set true to enable searching debug-info from expression bottom up
 //to nearest stmt.
 extern bool g_is_search_and_copy_dbx;
+
+//Set true to generate variable when building a PR.
+extern bool g_generate_var_for_pr;
 
 //Record dump options for each Pass.
 extern DumpOpt g_dump_opt;

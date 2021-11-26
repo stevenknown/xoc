@@ -382,6 +382,7 @@ public:
 
     //Generate a PR number by specified prno and type id.
     //This operation will allocate new PR number.
+    //Note the function does NOT generate Var for generated PR no.
     UINT buildPrno(Type const* type);
 
     //Generate a PR number by specified prno and type id.

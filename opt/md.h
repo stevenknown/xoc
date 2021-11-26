@@ -45,6 +45,7 @@ typedef enum _MD_TYPE {
     MD_EXACT = 1,
     MD_RANGE = 2,
 } MD_TYPE;
+typedef UINT MDIdx;
 
 #define MD_UNDEF 0 //Undefined.
 #define MD_FULL_MEM 1 //Represent all program memory.
@@ -146,7 +147,7 @@ typedef enum _MD_TYPE {
 
 class MD {
 public:
-    UINT uid; //unique id.
+    MDIdx uid; //unique id.
     UINT ofst; //byte offsets relative to 'base'
     UINT size; //byte size of the memory block
     Var * base;
@@ -183,7 +184,7 @@ public:
     UINT getByteSize() const { return MD_size(this); }
     MD_TYPE getType() const { return (MD_TYPE)MD_ty(this); }
 
-    UINT id() const { return MD_id(this); }
+    MDIdx id() const { return MD_id(this); }
     //Return true if current md may cover 'm', such as:
     //current md: |-...-----...---|
     //m:            |---...-|
@@ -361,7 +362,7 @@ public:
     MD const* get_effect_md() { return m_invalid_ofst_md; }
     void get_elems(OUT Vector<MD const*> & mdv, ConstMDIter & iter)
     {
-        UINT idx = 0;
+        MDIdx idx = MD_UNDEF;
         if (m_invalid_ofst_md != nullptr) {
             mdv.set(idx++, m_invalid_ofst_md);
         }
@@ -386,13 +387,13 @@ public:
     void bunion(MDSet const& pt, DefMiscBitSetMgr & mbsmgr);
     void bunion(MD const* md, DefMiscBitSetMgr & mbsmgr)
     { bunion(MD_id(md), mbsmgr); }
-    void bunion(UINT mdid, DefMiscBitSetMgr & mbsmgr);
-    void bunion_pure(UINT mdid, DefMiscBitSetMgr & m)
+    void bunion(MDIdx mdid, DefMiscBitSetMgr & mbsmgr);
+    void bunion_pure(MDIdx mdid, DefMiscBitSetMgr & m)
     { DefSBitSetCore::bunion(mdid, m); }
     void bunion_pure(MDSet const& mds, DefMiscBitSetMgr & m)
     { DefSBitSetCore::bunion(mds, m); }
 
-    bool is_contain_pure(UINT mdid) const
+    bool is_contain_pure(MDIdx mdid) const
     { return DefSBitSetCore::is_contain(mdid); }
 
     //Return true if set contained global variable.
@@ -467,7 +468,7 @@ public:
         ASSERT0(md);
         DefSBitSetCore::diff(MD_id(md), m);
     }
-    void diff(UINT id, DefMiscBitSetMgr & m) { DefSBitSetCore::diff(id, m); }
+    void diff(MDIdx id, DefMiscBitSetMgr & m) { DefSBitSetCore::diff(id, m); }
     void diff(MDSet const& mds, DefMiscBitSetMgr & m)
     {
         ASSERT0(this != &mds);
@@ -490,7 +491,7 @@ public:
     //This function will walk through whole current MDSet and differenciate
     //overlapped elements.
     //Note this function is very costly.
-    void diffAllOverlapped(UINT id, DefMiscBitSetMgr & m, MDSystem const* sys);
+    void diffAllOverlapped(MDIdx id, DefMiscBitSetMgr & m, MDSystem const* sys);
     void dump(MDSystem * ms, bool detail = false) const;
 
     //Get unique MD that is effective, and offset must be valid.
@@ -565,7 +566,7 @@ class MDId2MD : public Vector<MD*> {
 public:
     MDId2MD() { m_count = 0; }
 
-    void remove(UINT mdid)
+    void remove(MDIdx mdid)
     {
         ASSERT0(mdid != 0); //0 is illegal mdid.
         ASSERT0(get(mdid) != nullptr);
@@ -573,7 +574,7 @@ public:
         m_count--;
     }
 
-    void set(UINT mdid, MD * md)
+    void set(MDIdx mdid, MD * md)
     {
         ASSERTN(Vector<MD*>::get(mdid) == nullptr, ("already mapped"));
         Vector<MD*>::set(mdid, md);
@@ -704,17 +705,17 @@ public:
 
     //Get registered MD.
     //NOTICE: DO NOT free the return value, because it is the registered one.
-    MD * getMD(UINT id)
+    MD * getMD(MDIdx id)
     {
-        ASSERT0(id != 0);
+        ASSERT0(id != MD_UNDEF);
         MD * md = m_id2md_map.get(id);
         ASSERT0(md == nullptr || MD_id(md) == id);
         return md;
     }
 
-    MD const* readMD(UINT id) const
+    MD const* readMD(MDIdx id) const
     {
-        ASSERT0(id != 0);
+        ASSERT0(id != MD_UNDEF);
         MD * md = m_id2md_map.get(id);
         ASSERT0(md == nullptr || MD_id(md) == id);
         return md;
@@ -735,7 +736,7 @@ public:
     {
         if (md == nullptr) { return; }
         m_id2md_map.remove(MD_id(md));
-        UINT mdid = MD_id(md);
+        MDIdx mdid = MD_id(md);
         ::memset(md, 0, sizeof(MD));
         MD_id(md) = mdid;
         m_free_md_list.append_head(md);
@@ -751,12 +752,12 @@ public:
     void removeMDforVAR(Var const* v, IN ConstMDIter & iter);
 };
 
-typedef TMapIter<UINT, MDSet const*> MD2MDSetIter;
+typedef TMapIter<MDIdx, MDSet const*> MD2MDSetIter;
 
 //MD2MD_SET_MAP
 //Record MD->MDS relations.
 //Note MD may mapped to nullptr, means the MD does not point to anything.
-class MD2MDSet : public TMap<UINT, MDSet const*> {
+class MD2MDSet : public TMap<MDIdx, MDSet const*> {
     COPY_CONSTRUCTOR(MD2MDSet);
 public:
     MD2MDSet() {}
@@ -767,14 +768,14 @@ public:
     }
 
     //Clean each MD->MDSet, but do not free MDSet.
-    void clean() { TMap<UINT, MDSet const*>::clean(); }
+    void clean() { TMap<MDIdx, MDSet const*>::clean(); }
     //Compute the number of PtPair that recorded in current MD2MDSet.
     UINT computePtPairNum(MDSystem const& mdsys) const
     {
         UINT num_of_tgt_md = 0;
         MD2MDSetIter mxiter;
         MDSet const* from_md_pts = nullptr;
-        for (UINT fromid = get_first(mxiter, &from_md_pts);
+        for (MDIdx fromid = get_first(mxiter, &from_md_pts);
             fromid > 0; fromid = get_next(mxiter, &from_md_pts)) {
             ASSERT0(const_cast<MDSystem&>(mdsys).getMD(fromid));
             if (from_md_pts == nullptr || from_md_pts->is_contain_fullmem()) {
@@ -788,7 +789,7 @@ public:
     void dump(Region * rg);
 };
 
-inline bool isGlobalSideEffectMD(UINT id)
+inline bool isGlobalSideEffectMD(MDIdx id)
 {
     return id == MD_GLOBAL_VAR || id == MD_IMPORT_VAR || id == MD_FULL_MEM;
 }

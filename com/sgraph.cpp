@@ -227,7 +227,8 @@ void Graph::erase()
 //Sort vertice by rporder, and update rpo of vertex.
 //Record sorted vertex into vlst in incremental order of rpo.
 //NOTE: rpo start at 1, and 0 means undefined.
-void Graph::computeRpoNoRecursive(Vertex * root, OUT List<Vertex const*> & vlst)
+void Graph::computeRpoNoRecursive(Vertex * root,
+                                  OUT List<Vertex const*> & vlst)
 {
     ASSERT0(root && is_graph_entry(root));
     BitSet is_visited;
@@ -251,7 +252,8 @@ void Graph::computeRpoNoRecursive(Vertex * root, OUT List<Vertex const*> & vlst)
         if (!find) {
             stk.pop();
             vlst.append_head(v);
-            VERTEX_rpo(v) = order -= RPO_INTERVAL;
+            order -= RPO_INTERVAL;
+            VERTEX_rpo(v) = order;
         }
     }
 

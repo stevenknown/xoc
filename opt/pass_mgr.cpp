@@ -147,6 +147,12 @@ Pass * PassMgr::allocInferType()
 }
 
 
+Pass * PassMgr::allocInvertBrTgt()
+{
+    return new InvertBrTgt(m_rg);
+}
+
+
 Pass * PassMgr::allocDSE()
 {
     //return new DSE(m_rg);
@@ -383,6 +389,9 @@ Pass * PassMgr::registerPass(PASS_TYPE opty)
     case PASS_INFER_TYPE:
         pass = allocInferType();
         break;
+    case PASS_INVERT_BRTGT:
+        pass = allocInvertBrTgt();
+        break;
     default: ASSERTN(0, ("Unsupport Optimization."));
     }
 
@@ -612,15 +621,22 @@ void PassMgr::checkValidAndRecompute(OptCtx * oc, PassTypeList & optlist)
                 if (!oc->is_nonpr_du_chain_valid()) {
                     flag |= DUOPT_COMPUTE_NONPR_DU;
                 }
-
-                //If PRs have already been in SSA form, compute
-                //DU chain doesn't make any sense.
-                PRSSAMgr * ssamgr = (PRSSAMgr*)queryPass(PASS_PR_SSA_MGR);
-                if ((ssamgr == nullptr || !ssamgr->is_valid()) &&
-                    !oc->is_pr_du_chain_valid()) {
+                if (!oc->is_pr_du_chain_valid()) {
                     flag |= DUOPT_COMPUTE_PR_DU;
                 }
-
+    
+                //TBD: compute classic DU without considering PRSSA.
+                ////If PRs have already been in SSA form, compute
+                ////DU chain doesn't make any sense.
+                //PRSSAMgr * ssamgr = (PRSSAMgr*)queryPass(PASS_PR_SSA_MGR);
+                //if ((ssamgr == nullptr || !ssamgr->is_valid()) &&
+                //    !oc->is_pr_du_chain_valid()) {
+                //    flag |= DUOPT_COMPUTE_PR_DU;
+                //}
+                if (flag == DUOPT_UNDEF) {
+                    //Nothing need to compute.
+                    break;
+                }
                 if (opts.is_contain(PASS_REACH_DEF)) {
                     dumgr->computeMDDUChain(*oc, true, flag);
                 } else {
