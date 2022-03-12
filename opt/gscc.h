@@ -35,12 +35,10 @@ class Region;
 //This class perform peephole optimizations.
 class GSCC : public Pass {
     COPY_CONSTRUCTOR(GSCC);
-    Region * m_rg;
     SCC m_scc;
-
+private:
     //Verify that LoopInfo of CFG should be consistent with SCC info.
     bool verify();
-
 public:
     explicit GSCC(Region * rg);
     virtual ~GSCC() {}

@@ -36,12 +36,49 @@ author: Su Zhenyu
 
 namespace xoc {
 
-bool RCE::dump() const
+static void dumpInit(RCE const* pass)
 {
-    if (!m_rg->isLogMgrInit()) { return false; }
-    note(getRegion(), "\n\n==---- DUMP RCE ----==\n");
-    getRegion()->dump(false);
-    return true;
+    Region * rg = pass->getRegion();
+    if (!rg->isLogMgrInit()) { return; }
+    note(rg, "\n\n==---- DUMP %s ----==", pass->getPassName());
+    rg->getLogMgr()->incIndent(2);
+}
+
+
+static void dumpFini(RCE const* pass)
+{
+    Region * rg = pass->getRegion();
+    if (!rg->isLogMgrInit()) { return; }
+    rg->getLogMgr()->decIndent(2);
+}
+
+
+static void dumpRemovedIR(IR const* ir, RCE const* pass)
+{
+    Region * rg = pass->getRegion();
+    if (!rg->isLogMgrInit()) { return; }
+    note(rg, "\nREMOVE IR:");
+    dumpIR(ir, rg, IR_DUMP_KID);
+}
+
+
+static void dumpRemovedEdge(IRBB const* from, IRBB const* to, RCE const* pass)
+{
+    Region * rg = pass->getRegion();
+    if (!rg->isLogMgrInit()) { return; }
+    note(rg, "\nREMOVE EDGE: BB%d->BB%d", from->id(), to->id());
+}
+
+
+static void dumpChangedIR(IR const* oldir, IR const* newir, RCE const* pass)
+{
+    Region * rg = pass->getRegion();
+    if (!rg->isLogMgrInit()) { return; }
+    note(rg, "\nCHANGE:");
+    note(rg, "\nOLD:");
+    dumpIR(oldir, rg, IR_DUMP_KID);
+    note(rg, "\nNEW:");
+    dumpIR(newir, rg, IR_DUMP_KID);
 }
 
 
@@ -87,10 +124,8 @@ bool RCE::calcCondMustVal(IR const* ir, OUT bool & must_true,
 //If 'ir' is always true, set 'must_true', or if it is
 //always false, set 'must_false'.
 //Return the changed ir.
-IR * RCE::calcCondMustVal(IN IR * ir,
-                          OUT bool & must_true,
-                          OUT bool & must_false,
-                          bool & changed)
+IR * RCE::calcCondMustVal(IN IR * ir, OUT bool & must_true,
+                          OUT bool & must_false, OUT bool & changed)
 {
     must_true = false;
     must_false = false;
@@ -144,10 +179,11 @@ IR * RCE::calcCondMustVal(IN IR * ir,
 }
 
 
-IR * RCE::processBranch(IR * ir, MOD bool * cfg_mod)
+IR * RCE::processBranch(IR * ir, MOD RCECtx & ctx)
 {
     ASSERT0(ir->isConditionalBr());
     bool must_true, must_false, changed = false;
+    IR * old_det = BR_det(ir);
     IR * new_det = calcCondMustVal(BR_det(ir), must_true, must_false, changed);
     BR_det(ir) = nullptr;
     if (ir->is_truebr()) {
@@ -157,12 +193,15 @@ IR * RCE::processBranch(IR * ir, MOD bool * cfg_mod)
             IRBB * to = m_cfg->getFallThroughBB(from);
             ASSERT0(from != nullptr && to != nullptr);
             IR * newbr = m_rg->buildGoto(BR_lab(ir));
-            removeStmt(ir, m_rg);
+            xoc::removeStmt(ir, m_rg);
 
             //Revise the PHI operand to fallthrough successor.
             //Revise cfg. remove fallthrough edge.
+            if (g_dump_opt.isDumpRCE()) { dumpRemovedEdge(from, to, this); }
             m_cfg->removeEdge(from, to);
-            *cfg_mod = true;
+            ctx.cfg_mod = true;
+            ctx.oc->setDomValid(false);
+            OC_is_rpo_valid(*ctx.oc) = false;
             return newbr;
         } else if (must_false) {
             //TRUEBR(0x0), never jump.
@@ -170,11 +209,14 @@ IR * RCE::processBranch(IR * ir, MOD bool * cfg_mod)
             IRBB * from = ir->getBB();
             IRBB * to = m_cfg->findBBbyLabel(BR_lab(ir));
             ASSERT0(from && to);
-            removeStmt(ir, m_rg);
+            xoc::removeStmt(ir, m_rg);
 
             //Revise the PHI operand to target successor.
+            if (g_dump_opt.isDumpRCE()) { dumpRemovedEdge(from, to, this); }
             m_cfg->removeEdge(from, to);
-            *cfg_mod = true;
+            ctx.cfg_mod = true;
+            ctx.oc->setDomValid(false);
+            OC_is_rpo_valid(*ctx.oc) = false;
             return nullptr;
         }
     } else {
@@ -184,11 +226,14 @@ IR * RCE::processBranch(IR * ir, MOD bool * cfg_mod)
             IRBB * from = ir->getBB();
             IRBB * to = m_cfg->getTargetBB(from);
             ASSERT0(from != nullptr && to != nullptr);
-            removeStmt(ir, m_rg);
+            xoc::removeStmt(ir, m_rg);
 
             //Revise the PHI operand to target successor.
+            if (g_dump_opt.isDumpRCE()) { dumpRemovedEdge(from, to, this); }
             m_cfg->removeEdge(from, to);
-            *cfg_mod = true;
+            ctx.cfg_mod = true;
+            ctx.oc->setDomValid(false);
+            OC_is_rpo_valid(*ctx.oc) = false;
             return nullptr;
         } else if (must_false) {
             //FALSEBR(0x0), always jump.
@@ -197,27 +242,32 @@ IR * RCE::processBranch(IR * ir, MOD bool * cfg_mod)
             ASSERT0(from != nullptr && to != nullptr);
 
             IR * newbr = m_rg->buildGoto(BR_lab(ir));
-            removeStmt(ir, m_rg);
+            xoc::removeStmt(ir, m_rg);
 
             //Revise the PHI operand to fallthrough successor.
             //Revise m_cfg. remove fallthrough edge.
+            if (g_dump_opt.isDumpRCE()) { dumpRemovedEdge(from, to, this); }
             m_cfg->removeEdge(from, to);
-            *cfg_mod = true;
+            ctx.cfg_mod = true;
+            ctx.oc->setDomValid(false);
+            OC_is_rpo_valid(*ctx.oc) = false;
             return newbr;
         }
     }
 
-    ASSERT0(!BR_det(ir));
+    ASSERT0(BR_det(ir) == nullptr);
     if (changed) {
         if (!new_det->is_judge()) {
             new_det = m_rg->buildJudge(new_det);
         }
         BR_det(ir) = new_det;
         ir->setParent(new_det);
-    } else {
-        //Resume original det.
-        BR_det(ir) = new_det;
+        if (g_dump_opt.isDumpRCE()) { dumpChangedIR(old_det, new_det, this); }
+        return ir;
     }
+
+    //Resume original det.
+    BR_det(ir) = new_det;
     return ir;
 }
 
@@ -227,6 +277,7 @@ IR * RCE::processStore(IR * ir)
 {
     ASSERT0(ir->is_st());
     if (ST_rhs(ir)->getExactRef() == ir->getExactRef()) {
+        if (g_dump_opt.isDumpRCE()) { dumpRemovedIR(ir, this); }
         xoc::removeUseForTree(ir, m_rg);
         return nullptr;
     }
@@ -239,6 +290,7 @@ IR * RCE::processStorePR(IR * ir)
 {
     ASSERT0(ir->is_stpr());
     if (STPR_rhs(ir)->getExactRef() == ir->getExactRef()) {
+        if (g_dump_opt.isDumpRCE()) { dumpRemovedIR(ir, this); }
         xoc::removeUseForTree(ir, m_rg);
         return nullptr;
     }
@@ -246,51 +298,59 @@ IR * RCE::processStorePR(IR * ir)
 }
 
 
+bool RCE::performSimplyRCEForBB(IRBB * bb, MOD RCECtx & ctx)
+{
+    bool change = false;
+    BBIRList * ir_list = &BB_irlist(bb);
+    IRListIter ct;
+    IRListIter next_ct;
+    for (ir_list->get_head(&next_ct), ct = next_ct;
+         ct != nullptr; ct = next_ct) {
+        IR * ir = ct->val();
+        ir_list->get_next(&next_ct);
+        if (ir->hasSideEffect(true)) { continue; }
+
+        IR * newir = ir;
+        switch (ir->getCode()) {
+        case IR_TRUEBR:
+        case IR_FALSEBR:
+            newir = processBranch(ir, ctx);
+            break;
+
+        //This case has been dealt in ir_refine.
+        //case IR_ST:
+        //    newir = processStore(ir);
+        //    break;
+        default:;
+        }
+        if (newir == ir) { continue; }
+        if (g_dump_opt.isDumpRCE()) { dumpChangedIR(ir, newir, this); }
+        ir_list->remove(ct);
+        m_rg->freeIRTree(ir);
+        if (newir != nullptr) {
+            if (next_ct != nullptr) {
+                ir_list->insert_before(newir, next_ct);
+            } else {
+                ir_list->append_tail(newir);
+            }
+        }
+        change = true;
+    }
+    return change;
+}
+
+
 //e.g:
 //1. if (a == a) { ... } , remove redundant comparation.
 //2. b = b; remove redundant store.
-bool RCE::performSimplyRCE(MOD bool * cfg_mod)
+bool RCE::performSimplyRCE(MOD RCECtx & ctx)
 {
     BBList * bbl = m_rg->getBBList();
     bool change = false;
     BBListIter ct_bb;
     for (IRBB * bb = bbl->get_head(&ct_bb);
          bb != nullptr; bb = bbl->get_next(&ct_bb)) {
-        BBIRList * ir_list = &BB_irlist(bb);
-        IRListIter ct;
-        IRListIter next_ct;
-        for (ir_list->get_head(&next_ct), ct = next_ct;
-             ct != nullptr; ct = next_ct) {
-            IR * ir = ct->val();
-            ir_list->get_next(&next_ct);
-            if (ir->hasSideEffect()) { continue; }
-
-            IR * newIR = ir;
-            switch (ir->getCode()) {
-            case IR_TRUEBR:
-            case IR_FALSEBR:
-                newIR = processBranch(ir, cfg_mod);
-                break;
-
-            //This case has been dealt in ir_refine.
-            //case IR_ST:
-            //    newIR = processStore(ir);
-            //    break;
-            default:;
-            }
-
-            if (newIR == ir) { continue; }
-            ir_list->remove(ct);
-            m_rg->freeIRTree(ir);
-            if (newIR != nullptr) {
-                if (next_ct != nullptr) {
-                    ir_list->insert_before(newIR, next_ct);
-                } else {
-                    ir_list->append_tail(newIR);
-                }
-            }
-            change = true;
-        }
+        change |= performSimplyRCEForBB(bb, ctx);
     }
     return change;
 }
@@ -318,10 +378,14 @@ bool RCE::perform(OptCtx & oc)
     }
 
     START_TIMER(t, getPassName());
-    if (!m_gvn->is_valid() && is_use_gvn()) { return false; }
-    bool cfg_mod = false;
-    bool change = performSimplyRCE(&cfg_mod);
-    if (cfg_mod) {
+    if (m_gvn == nullptr || (!m_gvn->is_valid() && is_use_gvn())) {
+        return false;
+    }
+    m_rg->getLogMgr()->startBuffer();
+    dumpInit(this);
+    RCECtx ctx(&oc);
+    bool change = performSimplyRCE(ctx);
+    if (ctx.cfg_mod) {
         ASSERT0(change);
         change |= m_cfg->performMiscOpt(oc);
     }
@@ -331,12 +395,13 @@ bool RCE::perform(OptCtx & oc)
         //SSA/MDSSA info especially PHI operands incrementally.
         ASSERT0(PRSSAMgr::verifyPRSSAInfo(m_rg));
         ASSERT0(MDSSAMgr::verifyMDSSAInfo(m_rg));
+        ASSERT0(m_cfg->verifyRPO(oc));
+        ASSERT0(m_cfg->verifyDomAndPdom(oc));
+    } else {
+        m_rg->getLogMgr()->cleanBuffer();
     }
-
-    if (g_dump_opt.isDumpAfterPass() && g_dump_opt.isDumpRCE()) {
-        dump();
-    }
-
+    dumpFini(this);
+    m_rg->getLogMgr()->endBuffer();
     END_TIMER(t, getPassName());
     return change;
 }

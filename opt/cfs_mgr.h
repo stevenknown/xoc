@@ -129,9 +129,7 @@ protected:
     xcom::BitSetMgr m_bs_mgr; //xcom::BitSet manager.
     SMemPool * m_pool;
     Vector<CFS_INFO*> m_map_ir2cfsinfo;
-    Region * m_rg;
     Vector<AbsNode*> m_map_bb2abs;
-
 protected:
     void * xmalloc(size_t size)
     {
@@ -141,11 +139,7 @@ protected:
         return p;
     }
 public:
-    CfsMgr(Region * rg)
-    {
-        m_rg = rg;
-        m_pool = smpoolCreate(64, MEM_COMM);
-    }
+    CfsMgr(Region * rg) : Pass(rg) { m_pool = smpoolCreate(64, MEM_COMM); }
     ~CfsMgr() { smpoolDelete(m_pool); }
 
     AbsNode * constructAbsLoop(IN IRBB * entry, IN AbsNode * parent,
@@ -177,10 +171,8 @@ public:
 
     void recordStmt(IR * ir, xcom::BitSet & irset);
 
-    Region * getRegion() const { return m_rg; }
     virtual CHAR const* getPassName() const
     { return "Control Flow Structure MGR"; }
-
     virtual PASS_TYPE getPassType() const { return PASS_CFS_MGR; }
 };
 

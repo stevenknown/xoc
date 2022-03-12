@@ -68,10 +68,12 @@ public:
     bool is_dump_cfg; //Dump CFG.
     bool is_dump_cfgopt; //Dump CFG after CFG optimizations.
     bool is_dump_dom; //Dump Dom/Pdom/Idom/Pidom.
+    bool is_dump_rpo; //Dump RPO.
     bool is_dump_cp; //Dump Copy Propagation.
     bool is_dump_rp; //Dump Register Promotion.
     bool is_dump_rce; //Dump light weight Redundant Code Elimination.
     bool is_dump_dce; //Dump Dead Code Elimination.
+    bool is_dump_vrp; //Dump Value Range Propagation.
     bool is_dump_infertype; //Dump Infer Type.
     bool is_dump_invert_brtgt; //Dump Invert Branch Target.
     bool is_dump_lftr; //Dump Linear Function Test Replacement.
@@ -109,10 +111,12 @@ public:
     bool isDumpCFG() const;
     bool isDumpCFGOpt() const;
     bool isDumpDOM() const;
+    bool isDumpRPO() const;
     bool isDumpCP() const;
     bool isDumpRP() const;
     bool isDumpRCE() const;
     bool isDumpDCE() const;
+    bool isDumpVRP() const;
     bool isDumpInferType() const;
     bool isDumpInvertBrTgt() const;
     bool isDumpLFTR() const;
@@ -185,8 +189,10 @@ typedef enum _PASS_TYPE {
     PASS_REFINE_DUCHAIN,
     PASS_SCALAR_OPT,
     PASS_MDLIVENESS_MGR,
+    PASS_MDSSALIVE_MGR,
     PASS_REFINE,
     PASS_GSCC,
+    PASS_IRSIMP,
     PASS_NUM,
 } PASS_TYPE;
 
@@ -299,6 +305,9 @@ extern bool g_do_expr_tab;
 
 //Perform dead code elimination.
 extern bool g_do_dce;
+
+//Perform value range propagation.
+extern bool g_do_vrp;
 
 //Perform type inference.
 extern bool g_infer_type;

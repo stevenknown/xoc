@@ -36,11 +36,12 @@ author: Su Zhenyu
 
 namespace xcom {
 
-#define BS_ZERO           0
-#define BS_DUMP_BITSET    1
-#define BS_DUMP_POS       2
-#define BITS_PER_BYTE     8
-#define BYTES_PER_UINT    4
+#define BS_UNDEF -1
+#define BS_ZERO 0
+#define BS_DUMP_BITSET 1
+#define BS_DUMP_POS 2
+#define BITS_PER_BYTE 8
+#define BYTES_PER_UINT 4
 
 class BitSet;
 class BitSetMgr;
@@ -354,7 +355,8 @@ public:
             ASSERTN(x && x != bs, ("Already have been freed."));
         }
         #endif
-        bs->clean();
+        bs->destroy();
+        bs->init();
         m_free_list.append_head(bs);
     }
 };

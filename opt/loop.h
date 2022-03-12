@@ -40,6 +40,9 @@ class IRBB;
 class Region;
 class IRCFG;
 
+//
+//START LI<BB>
+//
 //This file represent loop tree structure and relate algorithms.
 //e.g:
 //for (i) { #Loop1
@@ -92,12 +95,26 @@ public:
 public:
     LI() {}
 
-    //Find the bb that is the start of the unqiue backedge of loop.
+    //Add bbid to the body BB set of all outer loop.
+    void addBBToAllOuterLoop(UINT bbid) const;
+
+    //Find the BB that is the start of the unqiue backedge of loop.
     //  BB1: loop start bb
     //  BB2: body
     //  BB3: goto loop start bb
     //BB3 is the backedge start bb.
     UINT findBackedgeStartBB(xcom::Graph * cfg) const;
+
+    //Find the first BB that is the END of loop. The end BB is outside of loop.
+    //Note there could be multiple end BB if the last IR of head is
+    //multipl-conditional branch, namely, SWTICH or IGOTO.
+    //  BB1: loop start bb
+    //       falsebr END
+    //  BB2: body
+    //  BB3: goto loop start bb
+    //  BB4: END
+    //BB4 is the loopend bb.
+    UINT findFirstLoopEndBB(xcom::Graph * cfg) const;
 
     LI<BB> * getOuter() const { return outer; }
     LI<BB> * getInnerList() const { return inner_list; }
@@ -139,7 +156,17 @@ public:
 };
 
 
-//Find the bb that is the START of the unqiue backedge of loop.
+//Add bbid to the body BB set of all outer loop.
+template <class BB>
+void LI<BB>::addBBToAllOuterLoop(UINT bbid) const
+{
+    for (LI<BB> * tli = getOuter(); tli != nullptr; tli = tli->getOuter()) {
+        tli->getBodyBBSet()->bunion(bbid);
+    }
+}
+
+
+//Find the BB that is the START of the unqiue backedge of loop.
 //  BB1: loop-start bb
 //  BB2: body
 //  BB3: goto loop-start bb
@@ -169,21 +196,70 @@ UINT LI<BB>::findBackedgeStartBB(xcom::Graph * cfg) const
 }
 
 
+//Find the first BB that is the END of loop. The end BB is outside of loop.
+//Note there could be multiple end BB if the last IR of head is
+//multipl-conditional branch, namely, SWTICH or IGOTO.
+//  BB1: loop start bb
+//       falsebr END
+//  BB2: body
+//  BB3: goto loop start bb
+//  BB4: END
+//BB4 is the loopend bb.
+template <class BB>
+UINT LI<BB>::findFirstLoopEndBB(xcom::Graph * cfg) const
+{
+    ASSERT0(cfg);
+    BB * head = getLoopHead();
+    for (xcom::EdgeC const* ec = cfg->getVertex(head->id())->getOutList();
+         ec != nullptr; ec = ec->get_next()) {
+        UINT succ = ec->getToId();
+        if (!isInsideLoop(succ)) {
+            return succ;
+        }
+    }
+    return BBID_UNDEF;
+}
+//END LI<BB>
+
+
 //Find the bb that is the START of the unqiue backedge of loop.
 //  BB1: loop-start bb
 //  BB2: body
 //  BB3: goto loop-start bb
-//
 //BB3 is the backedge-start bb.
 IRBB * findBackedgeStartBB(LI<IRBB> const* li, IRCFG * cfg);
-IRBB * findAndInsertPreheader(LI<IRBB> const* li,
-                              Region * rg,
-                              OUT bool & insert_bb,
-                              bool force);
-bool findTwoSuccessorBBOfLoopHeader(LI<IRBB> const* li,
-                                    IRCFG * cfg,
-                                    UINT * succ1,
-                                    UINT * succ2);
+
+//Find the first BB that is the END of loop. The end BB is outside of loop.
+//Note there could be multiple end BB if the last IR of head is
+//multipl-conditional branch, namely, SWTICH or IGOTO.
+//  BB1: loop start bb
+//       falsebr END
+//  BB2: body
+//  BB3: goto loop start bb
+//  BB4: END
+//BB4 is the loopend bb.
+IRBB * findFirstLoopEndBB(LI<IRBB> const* li, IRCFG * cfg);
+
+//Find preheader BB. If it does not exist, insert one before loop 'li'.
+//Return the preheader BB.
+//insert_bb: return true if this function insert a new bb before loop,
+//           otherwise return false.
+//force: force to insert preheader BB whatever it has been exist.
+//       Return the new BB if insertion is successful.
+//Note if we find the preheader, the last IR of it may be call.
+//So if you are going to insert IR at the tail of preheader, the best choose is
+//force the function to insert a new bb.
+//The function will try to maintain the RPO.
+IRBB * findAndInsertPreheader(LI<IRBB> const* li, Region * rg,
+                              OUT bool & insert_bb, bool force);
+
+//Find the bb that is the start of the unqiue backedge of loop.
+//  BB1: loop start bb
+//  BB2: body start bb
+//  BB3: goto loop start bb
+//BB2 is the loop header fallthrough bb.
+bool findTwoSuccessorBBOfLoopHeader(LI<IRBB> const* li, IRCFG * cfg,
+                                    UINT * succ1, UINT * succ2);
 
 //List of invariant stmt.
 typedef xcom::EList<IR*, IR2Holder> InvStmtList;
@@ -193,21 +269,27 @@ typedef xcom::List<LI<IRBB> const*> CLoopInfoIter;
 //ir: root node of IR
 //li: loop structure
 //check_tree: true to perform check recusively for entire IR tree.
-//invariant_stmt: a table that record the stmt that is invariant in loop.
+//invariant_stmt: a list that records the stmt that is invariant in loop.
 //    e.g:loop() {
 //          a = b; //S1
 //       }
 //    stmt S1 is invariant because b is invariant.
-//Note this function does not check the sibling node of 'ir'.
+//Note the function does not check the sibling node of 'ir'.
 bool isLoopInvariant(IR const* ir, LI<IRBB> const* li, Region * rg,
                      InvStmtList const* invariant_stmt, bool check_tree);
 
 //Try inserting preheader BB of loop 'li'.
-//insert_bb: set to true if inserting a new BB before loop, otherwise false.
-//Note if we find the preheader, the last IR of it may be call.
-//So if you are going to insert IR at the tail of preheader, the best is
-//force to insert a new bb.
-bool insertPreheader(LI<IRBB> * li, Region * rg, OUT IRBB ** preheader);
+//The function will try to maintain the RPO, DOM, and
+//updating PHI at loophead and preheader, after inserting preheader.
+//preheader: record the preheader either inserted BB or existed BB.
+//force: force to insert preheader BB whatever it has been exist.
+//       Return the new BB if insertion is successful.
+//Return true if inserting a new BB before loop, otherwise false.
+//CASE: if we find a preheader, the last IR in it may be CallStmt.
+//So if you are going to insert IR at the tail of preheader, the best choose
+//is force the function to insert a new phreader.
+bool insertPreheader(LI<IRBB> const* li, Region * rg, OUT IRBB ** preheader,
+                     MOD OptCtx & oc, bool force);
 
 //Iterative access LoopInfo tree. This funtion initialize the iterator.
 //'li': the root of the LoopInfo tree.
@@ -220,6 +302,25 @@ LI<IRBB> const* iterInitLoopInfoC(LI<IRBB> const* li, OUT CLoopInfoIter & it);
 //'it': iterator.
 //Readonly function.
 LI<IRBB> const* iterNextLoopInfoC(MOD CLoopInfoIter & it);
+
+//Return true if need to insert PHI into preheader if there are multiple
+//loop outside predecessor BB of loophead, whereas loophead has PHI.
+//e.g: If insert a preheader before BB_loophead, one have to insert PHI at
+//     preheader if loophead has PHI.
+//   BB_2---
+//   |     |
+//   v     |
+//   BB_4  |    ----
+//   |     |   |    |
+//   v     v   v    |
+//   BB_loophead    |
+//   |              |
+//   v              |
+//   BB_loopbody ---  loophead has PHI.
+//bool needInsertPhiToPreheader(LI<IRBB> const* li, IRCFG const* cfg);
+
+//Return true if stmt dominates all USE that are inside loop.
+bool isStmtDomAllUseInsideLoop(IR const* stmt, LI<IRBB> const* li, Region * rg);
 
 } //namespace xoc
 #endif

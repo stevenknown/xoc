@@ -40,33 +40,34 @@ class CfsMgr;
 
 #define MAX_SIMP_WORD_LEN  1
 
-#define SIMP_if(s)                 (s)->prop_top_down.s1.simp_if
-#define SIMP_doloop(s)             (s)->prop_top_down.s1.simp_do_loop
-#define SIMP_dowhile(s)            (s)->prop_top_down.s1.simp_do_while
-#define SIMP_whiledo(s)            (s)->prop_top_down.s1.simp_while_do
-#define SIMP_switch(s)             (s)->prop_top_down.s1.simp_switch
-#define SIMP_select(s)             (s)->prop_top_down.s1.simp_select
-#define SIMP_array(s)              (s)->prop_top_down.s1.simp_array
-#define SIMP_break(s)              (s)->prop_top_down.s1.simp_break
-#define SIMP_continue(s)           (s)->prop_top_down.s1.simp_continue
-#define SIMP_lor_land(s)           (s)->prop_top_down.s1.simp_logcial_or_and
-#define SIMP_lnot(s)               (s)->prop_top_down.s1.simp_logcial_not
-#define SIMP_ild_ist(s)            (s)->prop_top_down.s1.simp_ild_ist
-#define SIMP_to_pr_mode(s)         (s)->prop_top_down.s1.simp_to_pr_mode
-#define SIMP_array_to_pr_mode(s)   (s)->prop_top_down.s1.simp_array_to_pr_mode
-#define SIMP_to_lowest_height(s)   (s)->prop_top_down.s1.simp_to_lowest_height
-#define SIMP_ret_array_val(s)      (s)->prop_top_down.s1.simp_to_get_array_value
-#define SIMP_cfs_only(s)           (s)->prop_top_down.s1.simp_cfs_only
-#define SIMP_is_record_cfs(s)      (s)->prop_top_down.s1.is_record_cfs
-#define SIMP_stmtlist(s)           (s)->ir_stmt_list
-#define SIMP_break_label(s)        (s)->break_label
-#define SIMP_continue_label(s)     (s)->continue_label
-#define SIMP_changed(s)            (s)->prop_bottom_up.s1.something_has_changed
+#define SIMP_if(s) (s)->prop_top_down.s1.simp_if
+#define SIMP_doloop(s) (s)->prop_top_down.s1.simp_do_loop
+#define SIMP_dowhile(s) (s)->prop_top_down.s1.simp_do_while
+#define SIMP_whiledo(s) (s)->prop_top_down.s1.simp_while_do
+#define SIMP_switch(s) (s)->prop_top_down.s1.simp_switch
+#define SIMP_select(s) (s)->prop_top_down.s1.simp_select
+#define SIMP_array(s) (s)->prop_top_down.s1.simp_array
+#define SIMP_break(s) (s)->prop_top_down.s1.simp_break
+#define SIMP_continue(s) (s)->prop_top_down.s1.simp_continue
+#define SIMP_lor_land(s) (s)->prop_top_down.s1.simp_logcial_or_and
+#define SIMP_lnot(s) (s)->prop_top_down.s1.simp_logcial_not
+#define SIMP_ild_ist(s) (s)->prop_top_down.s1.simp_ild_ist
+#define SIMP_to_pr_mode(s) (s)->prop_top_down.s1.simp_to_pr_mode
+#define SIMP_array_to_pr_mode(s) (s)->prop_top_down.s1.simp_array_to_pr_mode
+#define SIMP_to_lowest_height(s) (s)->prop_top_down.s1.simp_to_lowest_height
+#define SIMP_ret_array_val(s) (s)->prop_top_down.s1.simp_to_get_array_value
+#define SIMP_cfs_only(s) (s)->prop_top_down.s1.simp_cfs_only
+#define SIMP_is_record_cfs(s) (s)->prop_top_down.s1.is_record_cfs
+#define SIMP_stmtlist(s) (s)->ir_stmt_list
+#define SIMP_break_label(s) (s)->break_label
+#define SIMP_continue_label(s) (s)->continue_label
+#define SIMP_optctx(s) (s)->optctx
+#define SIMP_changed(s) (s)->prop_bottom_up.s1.something_has_changed
 #define SIMP_need_recon_bblist(s) \
     (s)->prop_bottom_up.s1.need_to_reconstruct_bb_list
 #define SIMP_need_rebuild_du_chain(s) \
     (s)->prop_bottom_up.s1.need_to_rebuild_du_chain
-#define SIMP_cfs_mgr(s)            (s)->cfs_mgr
+#define SIMP_cfs_mgr(s) (s)->cfs_mgr
 class SimpCtx {
 public:
     union {
@@ -173,6 +174,7 @@ public:
     //Record label info for context.
     LabelInfo const* break_label; //record the current LOOP/IF/SWITCH end label.
     LabelInfo const* continue_label; //record the current LOOP start label.
+    OptCtx const* optctx; //record current OptCtx for region.
 
 public:
     SimpCtx() { init(); }
@@ -226,6 +228,9 @@ public:
 
     //Return the stmt list that recorded in the context.
     IR * getStmtList() { return SIMP_stmtlist(this); }
+
+    //Return the OptCtx that used in current region.
+    OptCtx const* getOptCtx() const { return SIMP_optctx(this); }
 
     //Unify the actions which propagated bottom up
     //during processing IR tree.
@@ -322,6 +327,105 @@ public:
         note(rg, "\n==---- DUMP SimpCtx IR List ----==");
         dumpIRList(ir_stmt_list, rg);
     }
+};
+
+
+class IRSimp : public Pass {
+    COPY_CONSTRUCTOR(IRSimp);
+private:
+    TypeMgr * m_tm;
+private:
+    //Return true if the tree height is not great than 2.
+    //e.g: tree a + b is lowest height , but a + b + c is not.
+    //Note that if ARRAY or ILD still not be lowered at the moment, regarding
+    //it as a whole node. e.g: a[1][2] + b is the lowest height.
+    bool isLowestHeight(IR const* ir, SimpCtx const* ctx) const;
+    bool isLowestHeightExp(IR const* ir, SimpCtx const* ctx) const;
+
+    //At lowest mode, the predicator, trueexp, falseexp must be leaf.
+    //Note the lowest height means tree height is more than 2.
+    //e.g: ... = add ld a, ld b; ADD is the lowest height.
+    bool isLowestHeightSelect(IR const* ir) const;
+
+    //At lowest mode, the array base, array subscript-expression must be leaf.
+    bool isLowestHeightArrayOp(IR const* ir) const;
+
+    void simplifyStoreArrayRHS(IR * ir,
+                               OUT IR ** ret_list,
+                               OUT IR ** last,
+                               SimpCtx * ctx);
+    IR * simplifyStoreArrayAddr(IR * ir,
+                                OUT IR ** ret_list,
+                                OUT IR ** last,
+                                SimpCtx * ctx);
+    IR * simplifyStoreArrayLHS(IR * ir,
+                               OUT IR ** ret_list,
+                               OUT IR ** last,
+                               SimpCtx * ctx);
+    IR * simplifyArraySelf(IR * ir, IR * array_addr, SimpCtx * ctx);
+    IR * simplifyArrayLowestHeight(IR * ir, IR * array_addr, SimpCtx * ctx);
+    IR * simplifyArrayPRMode(IR * ir, IR * array_addr, SimpCtx * ctx);
+    IR * simplifyArrayAddrID(IR * ir, IR * array_addr, SimpCtx * ctx);
+    bool simplifyCallParamList(IR * ir, IR ** ret_list, IR ** last,
+                               SimpCtx * ctx);
+public:
+    explicit IRSimp(Region * rg) : Pass(rg) { m_tm = rg->getTypeMgr(); }
+    virtual ~IRSimp() {}
+
+    virtual CHAR const* getPassName() const
+    { return "IR Simplification"; }
+    virtual PASS_TYPE getPassType() const { return PASS_IRSIMP; }
+
+    //Series of helper functions to simplify
+    //ir according to given specification.
+    IR * simplifyLoopIngredient(IR * ir, SimpCtx * ctx);
+    IR * simplifyBranch(IR * ir, SimpCtx * ctx);
+    IR * simplifyIfSelf(IR * ir, SimpCtx * ctx);
+    IR * simplifyDoWhileSelf(IR * ir, SimpCtx * ctx);
+    IR * simplifyWhileDoSelf(IR * ir, SimpCtx * ctx);
+    IR * simplifyDoLoopSelf(IR * ir, SimpCtx * ctx);
+    IR * simplifySwitchSelf(IR * ir, SimpCtx * ctx);
+    void simplifySelectKids(IR * ir, SimpCtx * cont);
+    IR * simplifyStore(IR * ir, SimpCtx * cont);
+    void simplifyCalleeExp(IR * ir, SimpCtx * ctx);
+    IR * simplifyStorePR(IR * ir, SimpCtx * cont);
+    IR * simplifyArrayIngredient(IR * ir, SimpCtx * ctx);
+    IR * simplifyStoreArray(IR * ir, SimpCtx * ctx);
+    IR * simplifySetelem(IR * ir, SimpCtx * ctx);
+    IR * simplifyGetelem(IR * ir, SimpCtx * ctx);
+    IR * simplifyIStore(IR * ir, SimpCtx * cont);
+    IR * simplifyCall(IR * ir, SimpCtx * cont);
+    IR * simplifyIf(IR * ir, SimpCtx * cont);
+    IR * simplifyWhileDo(IR * ir, SimpCtx * cont);
+    IR * simplifyDoWhile (IR * ir, SimpCtx * cont);
+    IR * simplifyDoLoop(IR * ir, SimpCtx * cont);
+    IR * simplifyDet(IR * ir, SimpCtx * cont);
+    IR * simplifyJudgeDet(IR * ir, SimpCtx * cont);
+    IR * simplifySelect(IR * ir, SimpCtx * cont);
+    IR * simplifySwitch (IR * ir, SimpCtx * cont);
+    IR * simplifyIgoto(IR * ir, SimpCtx * cont);
+    IR * simplifyArrayAddrExp(IR * ir, SimpCtx * cont);
+    IR * simplifyArray(IR * ir, SimpCtx * cont);
+    IR * simplifyExpression(IR * ir, SimpCtx * cont);
+    IR * simplifyBinAndUniExpression(IR * ir, SimpCtx * ctx);
+    IR * simplifyStmt(IR * ir, SimpCtx * cont);
+    IR * simplifyStmtList(IR * ir, SimpCtx * cont);
+    void simplifyBB(IRBB * bb, SimpCtx * cont);
+    void simplifyBBlist(BBList * bbl, SimpCtx * cont);
+    void simplifyIRList(SimpCtx * cont);
+    IR * simplifyLogicalNot(IN IR * ir, SimpCtx * cont);
+    IR * simplifyLogicalOrAtFalsebr(IN IR * ir, LabelInfo const* tgt_label);
+    IR * simplifyLogicalOrAtTruebr(IN IR * ir, LabelInfo const* tgt_label);
+    IR * simplifyLogicalOr(IN IR * ir, SimpCtx * cont);
+    IR * simplifyLogicalAndAtTruebr(IN IR * ir, LabelInfo const* tgt_label);
+    IR * simplifyLogicalAndAtFalsebr(IN IR * ir, LabelInfo const* tgt_label);
+    IR * simplifyLogicalAnd(IN IR * ir, SimpCtx * cont);
+    IR * simplifyLogicalDet(IR * ir, SimpCtx * cont);
+
+    //Simplify ir to PR mode.
+    IR * simpToPR(IR * ir, SimpCtx * ctx);
+
+    virtual bool perform(OptCtx & oc) { return false; }
 };
 
 } //namespace xoc

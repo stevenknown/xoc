@@ -98,7 +98,7 @@ void GCSE::elimCseAtStore(IR * use, IR * use_stmt, IR * gen)
     newrhs_pr->setRefMD(r_md, m_rg);
 
     if (m_mdssamgr != nullptr) {
-        m_mdssamgr->removeMDSSAOcc(use);
+        m_mdssamgr->removeMDSSAOccForTree(use);
     }
     m_rg->freeIRTree(use);
 }
@@ -147,7 +147,7 @@ void GCSE::elimCseAtBranch(IR * use, IR * use_stmt, IN IR * gen)
     IR_may_throw(use_stmt) = false;
 
     if (m_mdssamgr != nullptr) {
-        m_mdssamgr->removeMDSSAOcc(use);
+        m_mdssamgr->removeMDSSAOccForTree(use);
     }
     m_rg->freeIRTree(use);
 }
@@ -195,7 +195,7 @@ void GCSE::elimCseAtCall(IR * use, IR * use_stmt, IR * gen)
     bool f = use_stmt->replaceKid(use, use_pr, false);
     CHECK0_DUMMYUSE(f);
     if (m_mdssamgr != nullptr) {
-        m_mdssamgr->removeMDSSAOcc(use);
+        m_mdssamgr->removeMDSSAOccForTree(use);
     }
     m_rg->freeIRTree(use);
 
@@ -760,7 +760,7 @@ bool GCSE::dump() const
         }
         note(getRegion(), "id:%d", m_elimed.get(i));
     }
-    return true;
+    return Pass::dump();
 }
 
 
@@ -816,8 +816,8 @@ bool GCSE::perform(OptCtx & oc)
     bool change = false;
     IRBB * entry = m_cfg->getEntry();
     ASSERTN(entry && BB_is_entry(entry), ("Not find CFG entry"));
-    xcom::Graph domtree;
-    m_cfg->get_dom_tree(domtree);
+    xcom::DomTree domtree;
+    m_cfg->genDomTree(domtree);
     xcom::Vertex * root = domtree.getVertex(entry->id());
     if (m_cfg->hasEHEdge()) {
         //Initialize Temp CFG and pick out exception-edge.

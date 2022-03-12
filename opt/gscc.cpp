@@ -30,7 +30,7 @@ USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 namespace xoc {
 
-GSCC::GSCC(Region * rg) : m_rg(rg), m_scc(rg->getCFG()) {}
+GSCC::GSCC(Region * rg) : Pass(rg), m_scc(rg->getCFG()) {}
 
 //Verify that LoopInfo of CFG should be consistent with SCC info.
 bool GSCC::verify()

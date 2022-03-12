@@ -328,22 +328,20 @@ inline void insertbefore_one(T ** head, T * marker, T * t)
 {
     if (t == nullptr) { return; }
     ASSERTN(head, ("absent parameter"));
-    if (t == marker) return;
+    ASSERTN(t != marker, ("t and marker should not be same"));
     if (*head == nullptr) {
         ASSERTN(marker == nullptr, ("marker must be nullptr"));
         *head = t;
         return;
     }
-
     if (marker == *head) {
-        //'marker' is head, and replace head.
+        //'marker' is head, replace head.
         t->prev = nullptr;
         t->next = marker;
         marker->prev = t;
         *head = t;
         return;
     }
-
     ASSERTN(marker->prev != nullptr, ("marker is head"));
     marker->prev->next = t;
     t->prev = marker->prev;
@@ -360,27 +358,22 @@ inline void insertbefore(T ** head, T * marker, T * t)
 {
     if (t == nullptr) { return; }
     ASSERTN(head, ("absent parameter"));
-    if (t == marker) { return; }
+    ASSERTN(t != marker, ("t and marker should not be same"));
     if (*head == nullptr) {
         ASSERTN(marker == nullptr, ("marker must be nullptr"));
         *head = t;
         return;
     }
-
+    ASSERT0(marker);
     if (marker == *head) {
-        //'marker' is head, and replace head.
-        ASSERTN(t->prev == nullptr, ("t is not the first element"));
-        add_next(&t, *head);
+        //'marker' is head, replace head.
+        ASSERTN(t->prev == nullptr, ("t should be the first element"));
+        add_next(&t, marker);
         *head = t;
         return;
     }
-
-    ASSERTN(marker->prev != nullptr, ("marker should not be head"));
-    if (marker->prev != nullptr) {
-        marker->prev->next = t;
-        t->prev = marker->prev;
-    }
-
+    marker->prev->next = t;
+    t->prev = marker->prev;
     t = get_last(t);
     t->next = marker;
     marker->prev = t;
@@ -395,7 +388,7 @@ template <class T>
 inline void insertafter_one(T ** marker, T * t)
 {
     if (marker == nullptr || t == nullptr) { return; }
-    if (t == *marker) { return; }
+    ASSERTN(t != *marker, ("t and marker should not be same"));
     if (*marker == nullptr) {
         *marker = t;
         return;
@@ -421,7 +414,6 @@ inline void append_head(T ** head, T * t)
         *head = t;
         return;
     }
-
     T * last = get_last(t);
     (*head)->prev = last;
     last->next = *head;
@@ -436,12 +428,11 @@ template <class T>
 inline void insertafter(T ** marker, T * t)
 {
     if (marker == nullptr || t == nullptr) { return; }
-    if (t == *marker) { return; }
+    ASSERTN(t != *marker, ("t and marker should not be same"));
     if (*marker == nullptr) {
         *marker = t;
         return;
     }
-
     if ((*marker)->next != nullptr) {
         T * last = get_last(t);
         (*marker)->next->prev = last;
@@ -602,8 +593,10 @@ public:
 //    allocate a new container memory space, record your elements in
 //    container, then APPEND it at list.
 template <class T, class Allocator = allocator<T> > class List {
-    COPY_CONSTRUCTOR(List);
+public:
+    typedef C<T>* Iter;
 protected:
+    COPY_CONSTRUCTOR(List);
     UINT m_elem_count;
     C<T> * m_head;
     C<T> * m_tail;
@@ -619,7 +612,7 @@ public:
     List() { init(); }
     ~List() { destroy(); }
 
-    void init()
+    inline void init()
     {
         m_elem_count = 0;
         m_head = m_tail = m_cur = nullptr;
@@ -627,7 +620,7 @@ public:
         m_free_list.set_clean(false);
     }
 
-    void destroy()
+    inline void destroy()
     {
         C<T> * ct = m_free_list.m_tail;
         while (ct != nullptr) {
@@ -712,7 +705,7 @@ public:
         return count;
     }
 
-    C<T> * append_tail(T t)
+    inline C<T> * append_tail(T t)
     {
         C<T> * c = newc();
         ASSERTN(c != nullptr, ("newc return nullptr"));
@@ -721,12 +714,12 @@ public:
         return c;
     }
 
-    void append_tail(C<T> * c)
+    inline void append_tail(C<T> * c)
     {
         if (m_head == nullptr) {
             ASSERTN(m_tail == nullptr, ("tail should be nullptr"));
             m_head = m_tail = c;
-            C_next(m_head) = C_prev(m_head) = nullptr;
+            ASSERT0(C_next(m_head) == nullptr && C_prev(m_head) == nullptr);
             m_elem_count = 1;
             return;
         }
@@ -770,7 +763,7 @@ public:
     }
 
     //Append value t to head of list.
-    C<T> * append_head(T t)
+    inline C<T> * append_head(T t)
     {
         C<T> * c  = newc();
         ASSERTN(c, ("newc return nullptr"));
@@ -780,22 +773,19 @@ public:
     }
 
     //Append container to head of list.
-    void append_head(C<T> * c)
+    inline void append_head(C<T> * c)
     {
         if (m_head == nullptr) {
             ASSERTN(m_tail == nullptr, ("tail should be nullptr"));
             m_head = m_tail = c;
-            C_next(m_head) = C_prev(m_head) = nullptr;
+            ASSERT0(C_next(m_head) == nullptr && C_prev(m_head) == nullptr);
             m_elem_count = 1;
             return;
         }
         C_next(c) = m_head;
         C_prev(m_head) = c;
         m_head = c;
-
         ASSERT0(C_prev(c) == nullptr);
-        //C_prev(m_head) = nullptr;
-
         m_elem_count++;
         return;
     }
@@ -811,7 +801,6 @@ public:
             C<T> * c  = newc();
             ASSERT0(c);
             C_val(c) = C_val(t);
-
             ASSERTN(m_tail == nullptr, ("tail should be nullptr"));
             m_head = m_tail = c;
             ASSERT0(C_next(c) == nullptr && C_prev(c) == nullptr);
@@ -833,9 +822,8 @@ public:
     //This function will remove all elements in 'src' and
     //append to current list head.
     //Note 'src' will be clean.
-    void move_head(MOD List<T> & src)
+    inline void move_head(MOD List<T> & src)
     {
-        if (src.m_head == nullptr) { return; }
         if (m_tail == nullptr) {
             m_head = src.m_head;
             m_tail = src.m_tail;
@@ -846,7 +834,7 @@ public:
             return;
         }
 
-        ASSERT0(src.m_tail);
+        if (src.m_head == nullptr) { return; }
         C_prev(m_head) = src.m_tail;
         C_next(src.m_tail) = m_head;
         m_elem_count += src.m_elem_count;
@@ -859,9 +847,8 @@ public:
     //This function will remove all elements in 'src' and
     //append to tail of current list.
     //Note 'src' will be clean.
-    void move_tail(MOD List<T> & src)
+    inline void move_tail(MOD List<T> & src)
     {
-        if (src.m_head == nullptr) { return; }
         if (m_tail == nullptr) {
             m_head = src.m_head;
             m_tail = src.m_tail;
@@ -872,6 +859,7 @@ public:
             return;
         }
 
+        if (src.m_head == nullptr) { return; }
         C_next(m_tail) = src.m_head;
         C_prev(src.m_head) = m_tail;
         m_elem_count += src.m_elem_count;
@@ -965,7 +953,7 @@ public:
     }
 
     //Insert 't' into list before the 'marker'.
-    C<T> * insert_before(T t, IN C<T> * marker)
+    inline C<T> * insert_before(T t, IN C<T> * marker)
     {
         C<T> * c = newc();
         ASSERTN(c, ("newc return nullptr"));
@@ -1016,9 +1004,9 @@ public:
 
     //Insert 'list' before 'marker', and return the CONTAINER
     //of list head and list tail.
-    void insert_and_copy_before(List<T> const& list, T marker,
-                                OUT C<T> ** list_head_ct = nullptr,
-                                OUT C<T> ** list_tail_ct = nullptr)
+    inline void insert_and_copy_before(List<T> const& list, T marker,
+                                       OUT C<T> ** list_head_ct = nullptr,
+                                       OUT C<T> ** list_tail_ct = nullptr)
     {
         C<T> * ct = nullptr;
         find(marker, &ct);
@@ -1051,6 +1039,9 @@ public:
         }
     }
 
+    //Insert value t after marker.
+    //Note this function will do searching for t and marker, so it is
+    //a costly function, and used it be carefully.
     C<T> * insert_after(T t, T marker)
     {
         ASSERTN(t != marker,("element of list cannot be identical"));
@@ -1114,7 +1105,7 @@ public:
     }
 
     //Insert 't' into list after the 'marker'.
-    C<T> * insert_after(T t, IN C<T> * marker)
+    inline C<T> * insert_after(T t, IN C<T> * marker)
     {
         C<T> * c = newc();
         ASSERTN(c != nullptr, ("newc return nullptr"));
@@ -1165,9 +1156,9 @@ public:
 
     //Insert 'list' after 'marker', and return the CONTAINER
     //of list head and list tail.
-    void insert_and_copy_after(List<T> const& list, T marker,
-                               OUT C<T> ** list_head_ct = nullptr,
-                               OUT C<T> ** list_tail_ct = nullptr)
+    inline void insert_and_copy_after(List<T> const& list, T marker,
+                                      OUT C<T> ** list_head_ct = nullptr,
+                                      OUT C<T> ** list_tail_ct = nullptr)
     {
         C<T> * ct = nullptr;
         find(marker, &ct);
@@ -1205,14 +1196,14 @@ public:
 
     UINT get_elem_count() const { return m_elem_count; }
 
-    T get_cur() const
+    inline T get_cur() const
     {
         if (m_cur == nullptr) { return T(0); }
         return m_cur->val();
     }
 
     //Return m_cur and related container, and it does not modify m_cur.
-    T get_cur(MOD C<T> ** holder) const
+    inline T get_cur(MOD C<T> ** holder) const
     {
         if (m_cur == nullptr) {
             *holder = nullptr;
@@ -1225,7 +1216,7 @@ public:
 
     //Get tail of list, return the CONTAINER.
     //This function does not modify m_cur.
-    T get_tail(OUT C<T> ** holder) const
+    inline T get_tail(OUT C<T> ** holder) const
     {
         ASSERT0(holder);
         *holder = m_tail;
@@ -1237,7 +1228,7 @@ public:
 
     //Get tail of list, return the CONTAINER.
     //This function will modify m_cur.
-    T get_tail()
+    inline T get_tail()
     {
         m_cur = m_tail;
         if (m_tail != nullptr) {
@@ -1248,7 +1239,7 @@ public:
 
     //Get head of list, return the CONTAINER.
     //This function will modify m_cur.
-    T get_head()
+    inline T get_head()
     {
         m_cur = m_head;
         if (m_head != nullptr) {
@@ -1259,7 +1250,7 @@ public:
 
     //Get head of list, return the CONTAINER.
     //This function does not modify m_cur.
-    T get_head(OUT C<T> ** holder) const
+    inline T get_head(OUT C<T> ** holder) const
     {
         ASSERT0(holder);
         *holder = m_head;
@@ -1271,7 +1262,7 @@ public:
 
     //Get element next to m_cur.
     //This function will modify m_cur.
-    T get_next()
+    inline T get_next()
     {
         if (m_cur == nullptr || m_cur->next == nullptr) {
             m_cur = nullptr;
@@ -1284,7 +1275,7 @@ public:
     //Return next container.
     //Caller could get the element via C_val or val().
     //This function does not modify m_cur.
-    C<T> * get_next(IN C<T> * holder) const
+    inline C<T> * get_next(IN C<T> * holder) const
     {
         ASSERT0(holder);
         return C_next(holder);
@@ -1292,7 +1283,7 @@ public:
 
     //Return list member and update holder to next member.
     //This function does not modify m_cur.
-    T get_next(MOD C<T> ** holder) const
+    inline T get_next(MOD C<T> ** holder) const
     {
         ASSERT0(holder && *holder);
         *holder = C_next(*holder);
@@ -1304,7 +1295,7 @@ public:
 
     //Get element previous to m_cur.
     //This function will modify m_cur.
-    T get_prev()
+    inline T get_prev()
     {
         if (m_cur == nullptr || m_cur->prev == nullptr) {
             m_cur = nullptr;
@@ -1316,7 +1307,7 @@ public:
 
     //Return list member and update holder to prev member.
     //This function does not modify m_cur.
-    T get_prev(MOD C<T> ** holder) const
+    inline T get_prev(MOD C<T> ** holder) const
     {
         ASSERT0(holder && *holder);
         *holder = C_prev(*holder);
@@ -1329,7 +1320,7 @@ public:
     //Return prev container.
     //Caller could get the element via C_val or val().
     //This function does not modify m_cur.
-    C<T> * get_prev(IN C<T> * holder) const
+    inline C<T> * get_prev(IN C<T> * holder) const
     {
         ASSERT0(holder);
         return C_prev(holder);
@@ -1463,7 +1454,7 @@ public:
         return holder->val();
     }
 
-    //Remove from list, and searching for 't' begin at head
+    //Remove from list, and searching for 't' begin at head.
     T remove(T t)
     {
         if (m_head == nullptr) { return T(0); }
@@ -1925,8 +1916,8 @@ public:
 //END SListCoreEx
 
 
-//Single List
-//This class defined general single list operations.
+//Single Linked List
+//This class defined general single linked list operations.
 //For convenient purpose, this class uses a free list to recycle containers
 //when you remove element from list.
 //It grows dynamically when insert new element.
@@ -2031,7 +2022,8 @@ public:
         return SListCore<T>::remove(t, &m_free_list);
     }
 
-    //Remove elemlent that contained in 'holder' from current single list.
+    //Remove elemlent that contained in 'holder' from current single
+    //linked list.
     //Return element removed.
     //'prev': the holder of previous element of 'holder'.
     //Note both holders must belong to current SList.
@@ -2057,13 +2049,13 @@ public:
 //END SList
 
 
-//The Extended Single List.
+//The Extended Single Linked List.
 //
-//This kind of single list has a tail pointer that allows you access
+//This kind of single linked list has a tail pointer that allows you access
 //tail element directly via get_tail(). This will be useful if you
-//are going to append element at the tail of single list.
+//are going to append element at the tail of single linked list.
 //
-//Encapsulate most operations for single list.
+//Encapsulate most operations for single linked list.
 //
 //Note the single linked list is different with dual linked list.
 //the dual linked list does not use mempool to hold the container.
@@ -3880,6 +3872,7 @@ typedef enum _RBT_RED {
     RBT_NON = 0,
     RBRED = 1,
     RBBLACK = 2,
+    RBGRAY = 3,
 } RBCOL;
 
 template <class T, class Ttgt>
@@ -3961,6 +3954,7 @@ protected:
         t->prev = t->next = t->parent = nullptr;
         t->key = T(0);
         t->mapped = Ttgt(0);
+        t->color = RBGRAY;
         xcom::insertbefore_one(&m_free_list, m_free_list, t);
     }
 
@@ -4395,6 +4389,7 @@ public:
         return;
     }
 
+    //The function will get the first key-value and mapped object.
     //iter should be clean by caller.
     T get_first(List<RBTNType*> & iter, Ttgt * mapped = nullptr) const
     {
@@ -4407,6 +4402,12 @@ public:
         return m_root->key;
     }
 
+    //The function will get the next key-value and mapped object.
+    //Note if one remove some key-value before invoke the function, it may
+    //lead to iterate same key-value multiple times. 
+    //e.g: given key-value in RBTree [112, 115, 109, 3], if one remove 115
+    //while iterating these values, the access order is [112, 115, 109, 3, 3].
+    //The last 3 will be accessed twice.
     T get_next(List<RBTNType*> & iter, Ttgt * mapped = nullptr) const
     {
         RBTNType * x = iter.remove_head();
@@ -4414,13 +4415,25 @@ public:
             if (mapped != nullptr) { *mapped = Ttgt(0); }
             return T(0);
         }
+        if (x->color == RBGRAY) {
+            while ((x = iter.get_head()) != nullptr && x->color == RBGRAY) {
+                iter.remove_head();
+            }   
+            if (x == nullptr) {
+                if (mapped != nullptr) { *mapped = Ttgt(0); }
+                return T(0);
+            }
+            ASSERT0(x->color != RBGRAY);
+        }
         if (x->rchild != nullptr) {
             iter.append_tail(x->rchild);
         }
         if (x->lchild != nullptr) {
             iter.append_tail(x->lchild);
         }
-        x = iter.get_head();
+        while ((x = iter.get_head()) != nullptr && x->color == RBGRAY) {
+            iter.remove_head();
+        }
         if (x == nullptr) {
             if (mapped != nullptr) { *mapped = Ttgt(0); }
             return T(0);

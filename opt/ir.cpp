@@ -45,7 +45,7 @@ IRDesc const g_ir_desc[] = {
       IRT_IS_LEAF,},
 
     { IR_ID, "id", CId::kid_map, CId::kid_num, sizeof(CId),
-      IRT_HAS_IDINFO|IRT_IS_LEAF|IRT_IS_NON_PR_MEMREF|
+      IRT_HAS_IDINFO|IRT_IS_MEM_REF|IRT_IS_LEAF|IRT_IS_NON_PR_MEMREF|
       IRT_IS_MEM_OPND|IRT_HAS_DU },
 
     { IR_LD, "ld", CLd::kid_map, CLd::kid_num, sizeof(CLd),
@@ -1139,85 +1139,81 @@ bool IR::isMemRefEqual(IR const* src) const
 }
 
 
-//Return true if current ir tree is equivalent to src.
-//src: root of IR tree.
-//is_cmp_kid: it is true if comparing kids as well.
-//Note the function does not compare the siblings of 'src'.
-bool IR::isIREqual(IR const* src, bool is_cmp_kid) const
+static bool isIRIsomorphic(IR const* ir, IR const* src,
+                           bool is_cmp_kid, bool identical)
 {
-    ASSERT0(src);
-    if (getCode() != src->getCode()) { return false; }
+    if (ir == src) { return true; }
+    if (identical && ir->getCode() != src->getCode()) { return false; }
     switch (src->getCode()) {
     case IR_CONST: //Constant value: include integer, float, string.
-        if (CONST_int_val(this) != CONST_int_val(src)) { return false; }
+        if (CONST_int_val(ir) != CONST_int_val(src)) { return false; }
         break;
     case IR_ID:
-        if (ID_info(this) != ID_info(src)) { return false; }
-        break;
-    case IR_LD:
-        if (LD_idinfo(this) != LD_idinfo(src) ||
-            LD_ofst(this) != LD_ofst(src) ||
-            getType() != src->getType()) {
-            return false;
-        }
-        break;
-    case IR_ILD:
-        if (ILD_ofst(this) != ILD_ofst(src) || getType() != src->getType()) {
-            return false;
-        }
+        if (ID_info(ir) != ID_info(src)) { return false; }
         break;
      case IR_ST:
-        if (ST_idinfo(this) != ST_idinfo(src) ||
-            ST_ofst(this) != ST_ofst(src) ||
-            getType() != src->getType()) {
+    case IR_LD:
+        if (!ir->is_st() && !ir->is_ld()) { return false; }
+        if (ir->getIdinfo() != src->getIdinfo() ||
+            ir->getOffset() != src->getOffset() ||
+            ir->getType() != src->getType()) {
+            return false;
+        }
+        break;
+    case IR_IST:
+    case IR_ILD:
+        if (!ir->is_ist() && !ir->is_ild()) { return false; }
+        if (ir->getOffset() != src->getOffset() ||
+            ir->getType() != src->getType()) {
             return false;
         }
         break;
     case IR_STPR:
-        if (getType() != src->getType() || STPR_no(this) != STPR_no(src)) {
+    case IR_PR:
+        if (!ir->is_stpr() && !ir->is_pr()) { return false; }
+        if (ir->getType() != src->getType() ||
+            ir->getPrno() != src->getPrno()) {
             return false;
         }
         break;
     case IR_STARRAY:
-        if (ARR_ofst(this) != ARR_ofst(src) || getType() != src->getType()) {
+    case IR_ARRAY:
+        if (!ir->is_starray() && !ir->is_array()) { return false; }
+        if (ARR_ofst(ir) != ARR_ofst(src) ||
+            ir->getType() != src->getType()) {
             return false;
         }
         if ((ARR_elem_num_buf(src) != nullptr) ^
-            (ARR_elem_num_buf(this) != nullptr)) {
+            (ARR_elem_num_buf(ir) != nullptr)) {
             return false;
         }
         if (ARR_elem_num_buf(src) != nullptr) {
-            ASSERT0(ARR_elem_num_buf(this));
-            TMWORD dimnum = ((CStArray*)this)->getDimNum();
-            ASSERT0(((CStArray*)src)->getDimNum() == dimnum);
+            ASSERT0(ARR_elem_num_buf(ir));
+            TMWORD dimnum = ((CArray*)ir)->getDimNum();
+            if (((CArray*)src)->getDimNum() != dimnum) { return false; }
             for (UINT i = 0; i < dimnum; i++) {
-                if (((CStArray*)this)->getElementNumOfDim(i) !=
-                    ((CStArray*)src)->getElementNumOfDim(i)) {
+                if (((CArray*)ir)->getElementNumOfDim(i) !=
+                    ((CArray*)src)->getElementNumOfDim(i)) {
                     return false;
                 }
             }
         }
         break;
-    case IR_IST:
-        if (IST_ofst(this) != IST_ofst(src) || getType() != src->getType()) {
-            return false;
-        }
-        break;
     case IR_LDA:
-        if (LDA_idinfo(this) != LDA_idinfo(src) ||
-            LDA_ofst(this) != LDA_ofst(src) ||
-            getType() != src->getType()) {
+        if (LDA_idinfo(ir) != LDA_idinfo(src) ||
+            LDA_ofst(ir) != LDA_ofst(src) ||
+            ir->getType() != src->getType()) {
             return false;
         }
         break;
     case IR_CALL:
-        if (CALL_idinfo(this) != CALL_idinfo(src)) { return false; }
+        if (CALL_idinfo(ir) != CALL_idinfo(src)) { return false; }
         break;
     case IR_ICALL:
         break;
     SWITCH_CASE_BIN:
     SWITCH_CASE_UNA:
-        if (getType() != src->getType()) { return false; }
+        if (ir->getType() != src->getType()) { return false; }
         break;
     case IR_GOTO:
     case IR_IGOTO:
@@ -1227,42 +1223,15 @@ bool IR::isIREqual(IR const* src, bool is_cmp_kid) const
     case IR_IF:
         break;
     case IR_LABEL:
-        if (LAB_lab(this) != LAB_lab(src)) { return false; }
+        if (LAB_lab(ir) != LAB_lab(src)) { return false; }
         break;
     case IR_SWITCH:
     case IR_CASE:
         break;
-    case IR_ARRAY:
-        if (ARR_ofst(this) != ARR_ofst(src) || getType() != src->getType()) {
-            return false;
-        }
-        if ((ARR_elem_num_buf(src) != nullptr) ^
-            (ARR_elem_num_buf(this) != nullptr)) {
-            return false;
-        }
-        if (ARR_elem_num_buf(src) != nullptr) {
-            ASSERT0(ARR_elem_num_buf(this));
-            TMWORD dimnum = ((CArray*)this)->getDimNum();
-            if (((CArray*)src)->getDimNum() != dimnum) {
-                return false;
-            }
-            for (UINT i = 0; i < dimnum; i++) {
-                if (((CArray*)this)->getElementNumOfDim(i) !=
-                    ((CArray*)src)->getElementNumOfDim(i)) {
-                    return false;
-                }
-            }
-        }
-        break;
-    case IR_PR:
-        if (getType() != src->getType() || PR_no(this) != PR_no(src)) {
-            return false;
-        }
-        break;
     case IR_TRUEBR:
     case IR_FALSEBR:
     case IR_SELECT:
-        if (getType() != src->getType()) {
+        if (ir->getType() != src->getType()) {
             return false;
         }
         break;
@@ -1282,12 +1251,13 @@ bool IR::isIREqual(IR const* src, bool is_cmp_kid) const
     if (!is_cmp_kid) { return true; }
 
     //Compare kids.
-    for (INT i = 0; i < IR_MAX_KID_NUM(this); i++) {
-        IR * kid1 = getKid(i);
+    for (INT i = 0;
+         i < IR_MAX_KID_NUM(ir) && i < IR_MAX_KID_NUM(src); i++) {
+        IR * kid1 = ir->getKid(i);
         IR * kid2 = src->getKid(i);
 
         if (src->isCallStmt() &&
-            (kid1 == CALL_dummyuse(this) ||
+            (kid1 == CALL_dummyuse(ir) ||
              kid2 == CALL_dummyuse(src))) {
             //Do NOT check the equality of dummyuses.
             continue;
@@ -1301,6 +1271,26 @@ bool IR::isIREqual(IR const* src, bool is_cmp_kid) const
         }
     }
     return true;
+}
+
+
+//Return true if current ir tree is isomorphic to src.
+//src: root of IR tree.
+//is_cmp_kid: it is true if comparing kids as well.
+//Note the function does not compare the siblings of 'src'.
+bool IR::isIRIsomo(IR const* src, bool is_cmp_kid) const
+{
+    return isIRIsomorphic(this, src, is_cmp_kid, false);
+}
+
+
+//Return true if current ir tree is equivalent to src.
+//src: root of IR tree.
+//is_cmp_kid: it is true if comparing kids as well.
+//Note the function does not compare the siblings of 'src'.
+bool IR::isIREqual(IR const* src, bool is_cmp_kid) const
+{
+    return isIRIsomorphic(this, src, is_cmp_kid, true);
 }
 
 
@@ -1346,8 +1336,8 @@ IR * IR::getOpndPR(UINT prno, IRIter & it) const
 {
     ASSERT0(is_stmt());
     it.clean();
-    for (IR * k = iterInit(const_cast<IR*>(this), it);
-         k != nullptr; k = iterNext(it)) {
+    for (IR * k = xoc::iterInit(const_cast<IR*>(this), it);
+         k != nullptr; k = xoc::iterNext(it)) {
         if (k->is_pr() && PR_no(k) == prno && is_rhs(k)) {
             return k;
         }
@@ -1584,7 +1574,7 @@ void IR::removeSSAUse()
 
 
 //Copy memory reference only for current ir node.
-//'src': copy MD reference from 'src', it may be different to current ir.
+//src: copy MD reference from 'src', it should be not same with current ir.
 void IR::copyRef(IR const* src, Region * rg)
 {
     ASSERT0(src && rg && this != src);
@@ -1855,10 +1845,10 @@ IR * CLd::dupIRTreeByStmt(IR const* src, Region * rg)
 //
 //START CPr
 //
-IR * CPr::dupIRTreeByStmt(IR const* src, Region * rg)
+IR * CPr::dupIRTreeByRef(IR const* src, Region * rg)
 {
-    ASSERT0(src->is_stpr());
-    IR * pr = rg->buildPRdedicated(STPR_no(src), src->getType());
+    ASSERT0(src->isPROp());
+    IR * pr = rg->buildPRdedicated(src->getPrno(), src->getType());
     pr->copyRef(src, rg);
     return pr;
 }
@@ -1874,6 +1864,7 @@ IR * CILd::dupIRTreeByStmt(IR const* src, Region * rg)
     IR * ild = rg->buildILoad(rg->dupIRTree(IST_base(src)),
                               IST_ofst(src), src->getType());
     ild->copyRef(src, rg);
+    ILD_base(ild)->copyRefForTree(IST_base(src), rg);
     return ild;
 }
 //END CILd
@@ -1892,6 +1883,8 @@ IR * CArray::dupIRTreeByStmt(IR const* src, Region * rg)
                               ARR_elem_num_buf(src));
     arr->setOffset(src->getOffset());
     arr->copyRef(src, rg);
+    ARR_base(arr)->copyRefForTree(ARR_base(src), rg);
+    ARR_sub_list(arr)->copyRefForTree(ARR_sub_list(src), rg);
     return arr;
 }
 //END CArray
@@ -1910,6 +1903,8 @@ IR * CStArray::dupIRTreeByExp(IR const* src, IR * rhs, Region * rg)
                                      ARR_elem_num_buf(src), rhs);
     starr->setOffset(src->getOffset());
     starr->copyRef(src, rg);
+    ARR_base(starr)->copyRefForTree(ARR_base(src), rg);
+    ARR_sub_list(starr)->copyRefForTree(ARR_sub_list(src), rg);
     return starr;
 }
 //END CStArray
@@ -1924,6 +1919,7 @@ IR * CISt::dupIRTreeByExp(IR const* src, IR * rhs, Region * rg)
     IR * ist = rg->buildIStore(rg->dupIRTree(ILD_base(src)), rhs,
                                src->getOffset(), src->getType());
     ist->copyRef(src, rg);
+    IST_base(ist)->copyRefForTree(ILD_base(src), rg);
     return ist;
 }
 //END CISt
@@ -2109,5 +2105,81 @@ void CCall::addDummyUse(Region * rg)
     xcom::insertbefore(&CALL_dummyuse(this), CALL_dummyuse(this), newdummyuse);
 }
 //END CCall
+
+
+//
+//START CPhi
+//
+IR * CPhi::getOpnd(UINT idx) const
+{
+    UINT i = 0;
+    IR * x = PHI_opnd_list(this);
+    for (; x != nullptr && i < idx; x = x->get_next(), i++) {;}
+    return x;
+}
+
+
+IR * CPhi::dupIRTreeByRef(IR const* src, Region * rg)
+{
+    ASSERT0(src->isPROp());
+    IR * phi = rg->buildPhi(src->getPrno(), src->getType(), nullptr);
+    phi->copyRef(src, rg);
+    return phi;
+}
+
+
+void CPhi::insertOpndAt(UINT pos, IR * exp)
+{
+    IR * marker = PHI_opnd_list(this);
+    IR * last = nullptr;
+    UINT i = 0;
+    for (; marker != nullptr && i <= pos; marker = marker->get_next(), i++) {
+        last = marker;
+    }
+    if (marker != nullptr) {
+        //Insert phi operand into operand-list before 'marker'.
+        insertOpndBefore(marker, exp);
+        return;
+    }
+
+    //Append a new phi operand to tail of operand-list.
+    ASSERT0(i == pos);
+    //'last' may be nullptr, because the operand list may be empty before
+    //insertion. During several CFG edge removing and building,
+    //there may appear single operand PHI.
+    //If CFG optimization perform removing single edge then
+    //adding a new edge, the PHI operand is empty when adding the new edge.
+    xcom::add_next(&PHI_opnd_list(this), &last, exp);
+    setParent(exp);
+}
+//END CPhi
+
+
+//
+//START CRegion
+//
+MDSet * CRegion::getMayDef() const
+{
+    return REGION_ru(this)->getMayDef();
+}
+
+
+MDSet * CRegion::getMayUse() const
+{
+    return REGION_ru(this)->getMayUse();
+}
+
+
+MDSet * CRegion::genMayDef() const
+{
+    return REGION_ru(this)->genMayDef();
+}
+
+
+MDSet * CRegion::genMayUse() const
+{
+    return REGION_ru(this)->genMayUse();
+}
+//END CRegion
 
 } //namespace xoc

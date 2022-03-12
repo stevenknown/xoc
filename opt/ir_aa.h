@@ -316,7 +316,6 @@ protected:
     GSCC * m_scc;
     VarMgr * m_var_mgr;
     TypeMgr * m_tm;
-    Region * m_rg;
     RegionMgr * m_rgmgr;
     MDSystem * m_md_sys;
     SMemPool * m_pool;
@@ -356,20 +355,12 @@ protected:
                                OUT MDSet * united, OUT MDSet const** hashed);
     void computeResultSet(MDSet const& input_mds, MDSet const* input_hashed,
                           OUT MDSet & output_mds, OUT AACtx * output_ic);
-
-    //Function return the POINT-TO pair for each BB.
-    //Only used in flow-sensitive analysis.
-    inline MD2MDSet * genMD2MDSetForBB(UINT bbid)
-    {
-        MD2MDSet * mx = m_md2mds_vec.get(bbid);
-        if (mx == nullptr) {
-            mx = (MD2MDSet*)xmalloc(sizeof(MD2MDSet));
-            mx->init();
-            m_md2mds_vec.set(bbid, mx);
-        }
-        return mx;
-    }
-
+    //Return false if flow sensitive analysis is inproperly.
+    bool computeFlowSensitiveBB(IRBB const* bb, PPSetMgr & ppsetmgr,
+                                DefMiscBitSetMgr * sbsmgr,
+                                BitSet & is_bb_changed,
+                                PtPairSet * tmp, bool first,
+                                OUT bool & change);
     void convertPT2MD2MDSet(PtPairSet const& pps, PtPairMgr const& ppmgr,
                             MOD MD2MDSet * ctx);
     bool convertMD2MDSet2PT(OUT PtPairSet * pps, IN PtPairMgr & ppmgr,
@@ -391,6 +382,18 @@ protected:
         ASSERTN(m_out_pp_set.get(bb->id()),
                 ("OUT set is not yet initialized for BB%d", bb->id()));
         return m_out_pp_set.get(bb->id());
+    }
+    //Function return the POINT-TO pair for each BB.
+    //Only used in flow-sensitive analysis.
+    inline MD2MDSet * genMD2MDSetForBB(UINT bbid)
+    {
+        MD2MDSet * mx = m_md2mds_vec.get(bbid);
+        if (mx == nullptr) {
+            mx = (MD2MDSet*)xmalloc(sizeof(MD2MDSet));
+            mx->init();
+            m_md2mds_vec.set(bbid, mx);
+        }
+        return mx;
     }
 
     //Return true if POINT-TO is evaluated from LDA.
@@ -525,7 +528,7 @@ public:
     //Return true if pointer pointed to MAY-POINT-TO set.
     MDSet const* computeMayPointToViaTBAA(IR const* pointer,
                                           MDSet const* point_to_set);
-    bool computeFlowSensitive(List<IRBB*> const& bbl, PPSetMgr & ppsetmgr);
+    bool computeFlowSensitive(RPOVexList const& vexlst, PPSetMgr & ppsetmgr);
     void computeStmt(IRBB const* bb, MOD MD2MDSet * mx);
     void computeFlowInsensitive();
     //Count memory usage for current object.
@@ -540,9 +543,16 @@ public:
     void dumpIRPointToForBB(IRBB const* bb, bool dump_kid) const;
     void dumpIRPointToForRegion(bool dump_kid) const;
     void dumpPtPairSet(PtPairSet const& pps) const;
-    void dumpInOutPointToSetForBB() const;
     void dumpMD2MDSetForRegion(bool dump_pt_graph) const;
-    void dumpMayPointTo() const;
+
+    //The function dump pass relative information before performing the pass.
+    //The dump information is always used to detect what the pass did.
+    //Return true if dump successed, otherwise false.
+    virtual bool dumpBeforePass() const { return Pass::dumpBeforePass(); }
+
+    //The function dump pass relative information.
+    //The dump information is always used to detect what the pass did.
+    //Return true if dump successed, otherwise false.
     virtual bool dump() const;
 
     void ElemUnionPointTo(MDSet const& mds, MDSet const& in_set,
@@ -555,7 +565,6 @@ public:
     void ElemCleanPointTo(MDSet const& mds, IN MD2MDSet * mx);
     void ElemCleanExactPointTo(MDSet const& mds, IN MD2MDSet * mx);
 
-    Region * getRegion() const { return m_rg; }
     virtual CHAR const* getPassName() const { return "Alias Analysis"; }
     virtual PASS_TYPE getPassType() const { return PASS_AA; }
     DefMiscBitSetMgr * getSBSMgr() { return &m_sbs_mgr; }
@@ -583,8 +592,7 @@ public:
     //Return true if the MD of each PR corresponded is unique.
     void initMayPointToSet();
     //Return true if the set indicates the worst case of MD reference set.
-    bool isWorstCase(MDSet const* set) const
-    { return set == getMayPointToMDSet(); }
+    bool isWorstCase(MDSet const* set) const { return set == getWorstCase(); }
 
     void setMayPointToMDSet(MDSet const* set) { m_maypts = set; }
 

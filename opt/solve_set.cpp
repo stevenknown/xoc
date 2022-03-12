@@ -429,7 +429,7 @@ bool SolveSet::ForAvailExpression(UINT bbid, List<IRBB*> & preds,
 }
 
 
-void SolveSet::solveByRPO(List<IRBB*> * tbbl, UINT const flag,
+void SolveSet::solveByRPO(RPOVexList const* rpovexlst, UINT const flag,
                           MOD DefMiscBitSetMgr & bsmgr)
 {
     List<IRBB*> preds;
@@ -437,9 +437,10 @@ void SolveSet::solveByRPO(List<IRBB*> * tbbl, UINT const flag,
     UINT count = 0;
     do {
         change = false;
-        BBListIter ct;
-        for (tbbl->get_head(&ct); ct != tbbl->end(); ct = tbbl->get_next(ct)) {
-            IRBB * bb = ct->val();
+        RPOVexListIter ct;
+        for (rpovexlst->get_head(&ct); ct != rpovexlst->end();
+             ct = rpovexlst->get_next(ct)) {
+            IRBB * bb = m_cfg->getBB(ct->val()->id());
             UINT bbid = bb->id();
             preds.clean();
             m_cfg->get_preds(preds, bb);
@@ -538,13 +539,13 @@ void SolveSet::solve(DefDBitSetCore const& expr_univers, UINT const flag,
     }
 
     //Rpo already checked to be available. Here double check again.
-    List<IRBB*> * tbbl = m_cfg->getRPOBBList();
-    ASSERT0(tbbl);
-    ASSERT0(tbbl->get_elem_count() == bbl->get_elem_count());
+    RPOVexList * vexlst = m_cfg->getRPOVexList();
+    ASSERT0(vexlst);
+    ASSERT0(vexlst->get_elem_count() == bbl->get_elem_count());
     #ifdef WORK_LIST_DRIVE
-    solveByWorkList(tbbl, flag, bsmgr);
+    solveByWorkList(vexlst, flag, bsmgr);
     #else
-    solveByRPO(tbbl, flag, bsmgr);
+    solveByRPO(vexlst, flag, bsmgr);
     #endif
     END_TIMER(t7, "Solve DU set");
 }
@@ -1097,8 +1098,7 @@ void SolveSet::computeMustExactDef(IR const* ir,
 
         //Add MD which is exact and overlapped with x.
         m_md_sys->computeOverlapExactMD(x, bb_mustdefmds, mditer, bsmgr);
-    } else if (ir->isWritePR() ||
-               (ir->isCallStmt() && ir->hasReturnValue())) {
+    } else if (ir->isWritePR() || ir->isCallHasRetVal()) {
         ASSERT0(ir->getRefMD());
         bb_mustdefmds->bunion(ir->getRefMD(), bsmgr);
     }
@@ -1122,15 +1122,16 @@ void SolveSet::computeLiveInBB(DefMiscBitSetMgr & bsmgr)
 {
     START_TIMER(t4, "Compute LiveInBB");
     bool change = true;
-    BBList const* bbl = m_cfg->getRPOBBList();
-    ASSERT0(bbl);
+    RPOVexList const* vexlst = m_cfg->getRPOVexList();
+    ASSERT0(vexlst);
     DefSBitSetCore tmp;
     UINT count = 0;
     while (change && count < 20) {
         change = false;
-        BBListIter ct;
-        for (bbl->get_head(&ct); ct != bbl->end(); ct = bbl->get_next(ct)) {
-            IRBB const* bb = ct->val();
+        RPOVexListIter it;
+        for (vexlst->get_head(&it); it != vexlst->end();
+             it = vexlst->get_next(it)) {
+            IRBB const* bb = m_cfg->getBB(it->val()->id());
             DefSBitSetCore * bs = genLiveInBB(bb->id());
             tmp.clean(bsmgr);
             for (xcom::EdgeC * el = m_cfg->getVertex(bb->id())->getInList();

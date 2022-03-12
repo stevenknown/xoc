@@ -71,17 +71,17 @@ bool DeadCodeElim::dumpBeforePass() const
     START_TIMER_FMT(t, ("DUMP BEFORE %s", getPassName()));
     note(getRegion(), "\n==---- DUMP BEFORE %s '%s' ----==",
          getPassName(), m_rg->getRegionName());
-    note(getRegion(), "\n");
+    getRegion()->getLogMgr()->incIndent(2);
     dumpBBList(m_rg->getBBList(), m_rg);
     if (usePRSSADU()) {
-        m_prssamgr->dump();
+        m_prssamgr->dumpBrief();
     }
     if (useMDSSADU()) {
         m_mdssamgr->dump();
     }
+    getRegion()->getLogMgr()->decIndent(2);
     END_TIMER_FMT(t, ("DUMP BEFORE %s", getPassName()));
     return true;
-
 }
 
 
@@ -100,13 +100,17 @@ bool DeadCodeElim::dump() const
         }
     }
     note(getRegion(), "\n");
+
+    m_rg->getLogMgr()->incIndent(2);
     dumpBBList(m_rg->getBBList(), m_rg);
     if (usePRSSADU()) {
-        m_prssamgr->dump();
+        m_prssamgr->dumpBrief();
     }
     if (useMDSSADU()) {
         m_mdssamgr->dump();
     }
+    Pass::dump();
+    m_rg->getLogMgr()->decIndent(2);
     END_TIMER_FMT(t, ("DUMP %s", getPassName()));
     return true;
 }
@@ -115,7 +119,7 @@ bool DeadCodeElim::dump() const
 //Return true if ir can be optimized.
 bool DeadCodeElim::check_stmt(IR const* ir)
 {
-    if (ir->isMayThrow() || ir->hasSideEffect() || ir->isNoMove()) {
+    if (ir->isMayThrow(true) || ir->hasSideEffect(true) || ir->isNoMove(true)) {
         return true;
     }
 
@@ -144,8 +148,8 @@ bool DeadCodeElim::check_stmt(IR const* ir)
     }
 
     m_citer.clean();
-    for (IR const* x = iterRhsInitC(ir, m_citer);
-         x != nullptr; x = iterRhsNextC(m_citer)) {
+    for (IR const* x = iterExpInitC(ir, m_citer);
+         x != nullptr; x = iterExpNextC(m_citer)) {
         if (!m_is_use_md_du && x->isMemoryRefNonPR()) {
             return true;
         }
@@ -361,7 +365,9 @@ bool DeadCodeElim::markControlPredAndStmt(IRBB const* bb,
     ASSERT0(m_cdg);
     UINT bbid = bb->id();
     bool change = false;
-    for (xcom::EdgeC const* ec = m_cdg->getVertex(bbid)->getInList();
+    Vertex const* cdgv = m_cdg->getVertex(bbid);
+    ASSERTN(cdgv, ("CDG is unmatch to CFG"));
+    for (xcom::EdgeC const* ec = cdgv->getInList();
          ec != nullptr; ec = ec->get_next()) {
         IRBB const* pred = m_cfg->getBB(ec->getFromId());
         ASSERT0(pred);
@@ -546,17 +552,14 @@ bool DeadCodeElim::collectByMDSSA(IR const* x, MOD List<IR const*> * pwlst2)
     ASSERT0(x->isMemoryRefNonPR() && useMDSSADU());
     ASSERT0(x->is_exp());
     MDSSAInfo * mdssainfo = m_mdssamgr->getMDSSAInfoIfAny(x);
-    if (mdssainfo == nullptr ||
-        mdssainfo->readVOpndSet() == nullptr ||
-        mdssainfo->readVOpndSet()->is_empty()) {
+    if (mdssainfo == nullptr) {
         return false;
     }
     bool change = false;
     VOpndSetIter iter = nullptr;
     MD const* mustuse = x->getRefMD();
-
-    for (INT i = mdssainfo->readVOpndSet()->get_first(&iter);
-         i >= 0; i = mdssainfo->readVOpndSet()->get_next(i, &iter)) {
+    for (INT i = mdssainfo->readVOpndSet().get_first(&iter);
+         i >= 0; i = mdssainfo->readVOpndSet().get_next(i, &iter)) {
         VOpnd const* t = m_mdssamgr->getVOpnd(i);
         if (t == nullptr) {
             //VOpnd may have been removed.
@@ -641,53 +644,57 @@ bool DeadCodeElim::collectByDUSet(IR const* x, MOD List<IR const*> * pwlst2)
 }
 
 
+static bool removeIneffectIRImpl(DeadCodeElim * dce, IRBB * bb,
+                                 BBListIter & bbit,
+                                 OUT bool & remove_branch_stmt)
+{
+    IRListIter ctir = nullptr;
+    IRListIter next = nullptr;
+    bool tobecheck = false;
+    Region * rg = dce->getRegion();
+    for (BB_irlist(bb).get_head(&ctir), next = ctir;
+         ctir != nullptr; ctir = next) {
+        IR * stmt = ctir->val();
+        BB_irlist(bb).get_next(&next);
+        if (dce->isEffectStmt(stmt)) { continue; }
+        //Could not just remove the SSA def, you should consider
+        //the SSA_uses and make sure they are all removable.
+        //Use SSA related API.
+        //ASSERT0(stmt->getSSAInfo() == nullptr);
+
+        //Revise DU chains.
+        //TODO: If SSA form is available, it doesn't need to maintain
+        //DU chain of PR in DU manager counterpart.
+        xoc::removeStmt(stmt, rg);
+
+        if (stmt->isConditionalBr() ||
+            stmt->isUnconditionalBr() ||
+            stmt->isMultiConditionalBr()) {
+            remove_branch_stmt = true;
+            dce->getCFG()->reviseOutEdgeForFallthroughBB(bb, bbit);
+            //No need verify PHI here, because SSA will rebuild
+            //after this function.
+            //ASSERT0(m_mdssamgr->verifyPhi(true));
+        }
+        //Now, stmt is safe to free.
+        rg->freeIRTree(stmt);
+
+        //Remove stmt from BB.
+        BB_irlist(bb).remove(ctir);
+        tobecheck = true;
+    }
+    return tobecheck;
+}
+
+
 bool DeadCodeElim::removeIneffectIR(OUT bool & remove_branch_stmt)
 {
-    BBListIter ctbb = nullptr;
-    List<IRBB*> bblst;
+    BBListIter bbit = nullptr;
     List<IRBB*> * bbl = m_rg->getBBList();
-    List<C<IRBB*>*> ctlst;
     bool change = false;
-    for (IRBB * bb = bbl->get_head(&ctbb);
-         bb != nullptr; bb = bbl->get_next(&ctbb)) {
-        IRListIter ctir = nullptr;
-        IRListIter next = nullptr;
-        bool tobecheck = false;
-        for (BB_irlist(bb).get_head(&ctir), next = ctir;
-             ctir != nullptr; ctir = next) {
-            IR * stmt = ctir->val();
-            BB_irlist(bb).get_next(&next);
-            if (!isEffectStmt(stmt)) {
-                //Could not just remove the SSA def, you should consider
-                //the SSA_uses and make sure they are all removable.
-                //Use SSA related API.
-                //ASSERT0(stmt->getSSAInfo() == nullptr);
-
-                //Revise DU chains.
-                //TODO: If SSA form is available, it doesn't need to maintain
-                //DU chain of PR in DU manager counterpart.
-                xoc::removeStmt(stmt, m_rg);
-                if (stmt->isConditionalBr() ||
-                    stmt->isUnconditionalBr() ||
-                    stmt->isMultiConditionalBr()) {
-                    remove_branch_stmt = true;
-                    reviseSuccForFallthroughBB(bb, ctbb, bbl);
-                    //No need verify PHI here, because SSA will rebuild
-                    //after this function.
-                    //ASSERT0(m_mdssamgr->verifyPhi(true));
-                }
-
-                //Now, stmt is safe to free.
-                m_rg->freeIRTree(stmt);
-
-                //Remove stmt from BB.
-                BB_irlist(bb).remove(ctir);
-
-                change = true;
-                tobecheck = true;
-            }
-        }
-
+    for (IRBB * bb = bbl->get_head(&bbit);
+         bb != nullptr; bb = bbl->get_next(&bbit)) {
+        change |= removeIneffectIRImpl(this, bb, bbit, remove_branch_stmt);
         if (useMDSSADU()) {
             //TBD:Do we need to remove MDPHI which witout any USE?
             //I think keeping PHI there could maintain Def-Chain, e.g:
@@ -703,16 +710,24 @@ bool DeadCodeElim::removeIneffectIR(OUT bool & remove_branch_stmt)
             //  md1v3<-        md1v4<-
             if (!m_is_reserve_phi && m_mdssamgr->removeRedundantPhi(bb)) {
                 change = true;
-                tobecheck = true;
             }
-        }
-
-        if (tobecheck) {
-            bblst.append_tail(bb);
-            ctlst.append_tail(ctbb);
         }
     }
     return change;
+}
+
+
+bool DeadCodeElim::collectByDU(IR const* x, MOD List<IR const*> * pwlst2,
+                               bool usemdssa, bool useprssa)
+{
+    ASSERT0(x->is_exp());
+    if (x->isReadPR() && useprssa) {
+        return collectByPRSSA(x, pwlst2);
+    }
+    if (x->isMemoryRefNonPR() && usemdssa) {
+        return collectByMDSSA(x, pwlst2);
+    }
+    return collectByDUSet(x, pwlst2);
 }
 
 
@@ -725,6 +740,7 @@ void DeadCodeElim::iter_collect(MOD List<IR const*> & work_list)
     List<IR const*> * pwlst2 = &work_list2;
     bool change = true;
     bool usemdssa = useMDSSADU();
+    bool useprssa = usePRSSADU();
     List<IRBB*> succs;
     UINT const maxtry = 0xFFFF;
     UINT count = 0;
@@ -733,20 +749,11 @@ void DeadCodeElim::iter_collect(MOD List<IR const*> & work_list)
         for (IR const* ir = pwlst1->get_head();
              ir != nullptr; ir = pwlst1->get_next()) {
             m_citer.clean();
-
-            for (IR const* x = iterRhsInitC(ir, m_citer);
-                 x != nullptr; x = iterRhsNextC(m_citer)) {
+            for (IR const* x = iterExpInitC(ir, m_citer);
+                 x != nullptr; x = iterExpNextC(m_citer)) {
                 if (!x->isMemoryOpnd()) { continue; }
-                if (x->isReadPR() && PR_ssainfo(x) != nullptr) {
-                    change |= collectByPRSSA(x, pwlst2);
-                    continue;
-                }
-                if (usemdssa && m_mdssamgr->getMDSSAInfoIfAny(x) != nullptr) {
-                    change |= collectByMDSSA(x, pwlst2);
-                    continue;
-                }
-                change |= collectByDUSet(x, pwlst2);
-            }
+                change |= collectByDU(x, pwlst2, usemdssa, useprssa);
+           }
         }
 
         //dumpIRList((IREList&)*pwlst2);
@@ -854,69 +861,6 @@ void DeadCodeElim::fix_control_flow(List<IRBB*> & bblst,
 }
 
 
-//Fix control flow edge if BB will become fallthrough BB.
-//Remove out edges of bb except the fallthrough edge.
-//Note it is illegal if empty BB has non-taken branch.
-void DeadCodeElim::reviseSuccForFallthroughBB(IRBB * bb, BBListIter bbct,
-                                              BBList * bbl) const
-{
-    ASSERT0(bb && bbct);
-    xcom::EdgeC * ec = m_cfg->getVertex(bb->id())->getOutList();
-    if (ec == nullptr) { return; }
-
-    ASSERT0(!bb->is_empty());
-    BBListIter next_ct = bbct;
-    bbl->get_next(&next_ct);
-    IRBB * next_bb = nullptr;
-    if (next_ct != nullptr) {
-        next_bb = next_ct->val();
-    }
-
-    bool has_fallthrough = false;
-    xcom::EdgeC * next_ec = nullptr;
-    for (; ec != nullptr; ec = next_ec) {
-        next_ec = ec->get_next();
-
-        xcom::Edge * e = ec->getEdge();
-        if (e->info() != nullptr && CFGEI_is_eh((CFGEdgeInfo*)e->info())) {
-            continue;
-        }
-
-        IRBB * succ = m_cfg->getBB(e->to()->id());
-        ASSERT0(succ);
-        if (succ == next_bb) {
-            //Do not remove the fall-throught edge.
-            has_fallthrough = true;
-            ec = ec->get_next();
-            continue;
-        }
-
-        //Note IRCFG::removeEdge() will invoke removeSuccessorDesignatePhiOpnd()
-        //to update PHI, whereas in-edge of succ changed, and operands of phi
-        //maintained as well.
-        m_cfg->removeEdge(bb, succ);
-    }
-
-    //Add edge between bb and next_bb if bb is empty.
-    //e.g:BB2->BB3,BB2->BB5,BB3->BB2
-    //    Add edge BB3->BB5 if BB3 is empty.
-    //     ____
-    //     |   |
-    //     V   |
-    //  __BB2  |
-    //  |  |   |
-    //  |  V   |
-    //  | BB3  |
-    //  |  |___|
-    //  |
-    //  |->BB5
-    if (next_bb != nullptr && !has_fallthrough) {
-        //Note the function will add operands of PHI if 'next_bb' has PHI.
-        m_cfg->addEdge(bb, next_bb);
-    }
-}
-
-
 void DeadCodeElim::reinit()
 {
     UINT irnum = m_rg->getIRVec()->get_elem_count() / BITS_PER_BYTE + 1;
@@ -977,21 +921,27 @@ bool DeadCodeElim::perform(OptCtx & oc)
     } else {
         m_cdg = nullptr;
     }
-    reinit();
 
+    m_rg->getLogMgr()->startBuffer();
+    reinit();
     if (g_dump_opt.isDumpBeforePass() && g_dump_opt.isDumpDCE()) {
         dumpBeforePass();
     }
     bool change = false;
-    bool removed = true;
+    bool removed = false;
     UINT count = 0;
     List<IR const*> work_list;
     UINT const max_iter = 0xFFFF;
     bool remove_branch_stmt = false;
-    while (removed && count < max_iter) {
+    CfgOptCtx ctx;
+    if (useMDSSADU()) {
+        //CFG opt will maintain MDSSA information that need to update DOM info
+        //in time.
+        CFGOPTCTX_update_dominfo(&ctx) = true;
+    }
+    do {
         removed = false;
         count++;
-
         //Mark effect IRs.
         work_list.clean();
         mark_effect_ir(work_list);
@@ -999,46 +949,47 @@ bool DeadCodeElim::perform(OptCtx & oc)
 
         //Remove ineffect IRs.
         removed = removeIneffectIR(remove_branch_stmt);
-        if (!removed) { break; }
 
         //Reinit intra-used data structure.
-        change = true;
         m_is_stmt_effect.clean();
         m_is_mddef_effect.clean();
         m_is_bb_effect.clean();
-        if (m_cfg->performMiscOpt(oc)) {
+        if (m_cfg->performMiscOpt(oc, ctx)) {
+            //Note DOM info will changed without maintaining.
             //CFG has been changed, thus remove empty BB to produce more
             //optimization opportunities.
             //TODO: DO not recompute whole SSA/MDSSA. Instead, update
             //SSA/MDSSA info especially PHI operands incrementally.
+            removed = true;
         }
-
         removed |= removeRedundantPhi();
         ASSERT0(m_rg->verifyMDRef());
         ASSERT0(PRSSAMgr::verifyPRSSAInfo(m_rg));
         ASSERT0(MDSSAMgr::verifyMDSSAInfo(m_rg));
         //fix_control_flow(bblst, ctlst);
-    }
+        change |= removed;
+    } while (removed && count < max_iter);
     ASSERT0(!removed);
-
     if (!change) {
+        m_rg->getLogMgr()->cleanBuffer();
+        m_rg->getLogMgr()->endBuffer();
         END_TIMER(t, getPassName());
         return false;
     }
-
+    m_rg->getLogMgr()->endBuffer();
     if (g_dump_opt.isDumpAfterPass() && g_dump_opt.isDumpDCE()) {
         dump();
     }
 
     //DU chain and DU reference should be maintained.
     ASSERT0(m_rg->verifyMDRef());
-    ASSERT0(verifyMDDUChain(m_rg));
 
     if (remove_branch_stmt) {
         //Branch stmt will effect control-flow-data-structure.
         oc.setInvalidIfCFGChanged();
     }
     oc.setInvalidIfDUMgrLiveChanged();
+    ASSERT0(verifyMDDUChain(m_rg, oc));
     ASSERT0(PRSSAMgr::verifyPRSSAInfo(m_rg));
     ASSERT0(MDSSAMgr::verifyMDSSAInfo(m_rg));
     END_TIMER(t, getPassName());

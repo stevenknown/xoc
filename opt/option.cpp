@@ -177,6 +177,9 @@ bool g_do_dce_aggressive = false;
 //Perform type inference.
 bool g_infer_type = true;
 
+//Perform value range propagation.
+bool g_do_vrp = false;
+
 //Perform cfg optimization: invert branch condition and target.
 bool g_invert_brtgt = true;
 
@@ -314,9 +317,11 @@ DumpOpt::DumpOpt()
     is_dump_mdset_hash = false;
     is_dump_cfg = false;
     is_dump_dom = false;
+    is_dump_rpo = false;
     is_dump_cp = false;
     is_dump_rp = false;
     is_dump_dce = false;
+    is_dump_vrp = false;
     is_dump_lftr = false;
     is_dump_gvn = false;
     is_dump_gcse = false;
@@ -329,7 +334,7 @@ DumpOpt::DumpOpt()
     is_dump_memusage = false;
     is_dump_livenessmgr = false;
     is_dump_irparser = false;
-    is_dump_ir_id = true;
+    is_dump_ir_id = false; //Do not dump IR's id by default.
 }
 
 
@@ -397,6 +402,12 @@ bool DumpOpt::isDumpDOM() const
 }
 
 
+bool DumpOpt::isDumpRPO() const
+{
+    return is_dump_all || (!is_dump_nothing && is_dump_rpo);
+}
+
+
 bool DumpOpt::isDumpCP() const
 {
     return is_dump_all || (!is_dump_nothing && is_dump_cp);
@@ -418,6 +429,12 @@ bool DumpOpt::isDumpInferType() const
 bool DumpOpt::isDumpInvertBrTgt() const
 {
     return is_dump_all || (!is_dump_nothing && is_dump_invert_brtgt);
+}
+
+
+bool DumpOpt::isDumpVRP() const
+{
+    return is_dump_all || (!is_dump_nothing && is_dump_vrp);
 }
 
 

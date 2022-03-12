@@ -26,48 +26,62 @@ ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
 SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 @*/
-#ifndef _INVERT_BRTGT_H_
-#define _INVERT_BRTGT_H_
+#include "cominc.h"
+#include "comopt.h"
 
 namespace xoc {
 
-class InvertBrTgt;
+void MDSSALiveMgr::allocDomTree()
+{
+    ASSERT0(m_domtree == nullptr);
+    m_domtree = new DomTree();
+}
 
-//The optimization attempt to invert branch target.
-class InvertBrTgt : public Pass {
-    COPY_CONSTRUCTOR(InvertBrTgt);
-    CIRList * m_changed_irlist; //used for dump
-protected:
-    void addDump(IR const* ir) const;
-    void dumpInit();
-    void dumpFini();
-public:
-    explicit InvertBrTgt(Region * rg) : Pass(rg)
-    {
-        ASSERT0(rg != nullptr);
-        m_changed_irlist = nullptr;
+
+MDSSALiveMgr::~MDSSALiveMgr()
+{
+    clean();
+}
+
+
+bool MDSSALiveMgr::dump() const
+{
+    if (!m_rg->isLogMgrInit()) { return true; }
+    note(getRegion(), "\n==---- DUMP %s '%s' ----==\n",
+         getPassName(), m_rg->getRegionName());
+    m_rg->getLogMgr()->incIndent(2);
+    //...dump something.
+    m_rg->getLogMgr()->decIndent(2);
+    return true;
+}
+
+
+void MDSSALiveMgr::clean()
+{
+    if (m_domtree != nullptr) {
+        delete m_domtree;
+        m_domtree = nullptr;
     }
-    virtual ~InvertBrTgt() { dumpFini(); }
+}
 
-    //The function dump pass relative information before performing the pass.
-    //The dump information is always used to detect what the pass did.
-    //Return true if dump successed, otherwise false.
-    virtual bool dumpBeforePass() const { return Pass::dumpBeforePass(); }
 
-    //The function dump pass relative information.
-    //The dump information is always used to detect what the pass did.
-    //Return true if dump successed, otherwise false.
-    virtual bool dump() const;
+//Get livein VMD of 'mdid' in given 'bb'.
+VMD * MDSSALiveMgr::getLiveinVMD(MDIdx mdid, IRBB const* bb) const
+{
+    ASSERT0(0);
+    return nullptr; 
+}
 
-    virtual CHAR const* getPassName() const
-    { return "Invert Branch Target"; }
-    virtual PASS_TYPE getPassType() const { return PASS_INVERT_BRTGT; }
-
-    static bool invertLoop(InvertBrTgt * invt, IR * br, IRBB * br_tgt,
-                             IR * jmp, IRBB * jmp_tgt);
-
-    virtual bool perform(OptCtx & oc);
-};
+ 
+bool MDSSALiveMgr::perform(OptCtx & oc)
+{
+    m_rg->getPassMgr()->checkValidAndRecompute(&oc, PASS_DOM, PASS_UNDEF);
+    ASSERT0(oc.is_dom_valid());
+    clean();
+    allocDomTree();
+    m_rg->getCFG()->genDomTree(*m_domtree);
+    set_valid(true);
+    return false;
+}
 
 } //namespace xoc
-#endif

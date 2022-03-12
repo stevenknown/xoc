@@ -33,7 +33,6 @@ namespace xoc {
 
 class MDLivenessMgr : public Pass {
     COPY_CONSTRUCTOR(MDLivenessMgr);
-    Region * m_rg;
     xcom::DefMiscBitSetMgr m_sbs_mgr;
     MDSetMgr m_mds_mgr;
     DUMgr * m_dumgr;
@@ -50,9 +49,8 @@ class MDLivenessMgr : public Pass {
 
     MDSet * getDefMDSet(IRBB * bb);
     MDSet * getUseMDSet(IRBB * bb);
-
 public:
-    MDLivenessMgr(Region * rg) : m_rg(rg), m_mds_mgr(rg, &m_sbs_mgr)
+    MDLivenessMgr(Region * rg) : Pass(rg), m_mds_mgr(rg, &m_sbs_mgr)
     { m_dumgr = rg->getDUMgr(); }
     ~MDLivenessMgr()
     {
@@ -81,10 +79,18 @@ public:
         }
     }
 
-    void dump(bool with_name = false) const;
+    //The function dump pass relative information before performing the pass.
+    //The dump information is always used to detect what the pass did.
+    //Return true if dump successed, otherwise false.
+    virtual bool dumpBeforePass() const { return Pass::dumpBeforePass(); }
+
+    //The function dump pass relative information.
+    //The dump information is always used to detect what the pass did.
+    //Return true if dump successed, otherwise false.
+    virtual bool dump() const { return Pass::dump(); }
+    void dump(bool with_name) const;
 
     MDSetMgr * getMdsMgr() { return &m_mds_mgr; }
-    Region * getRegion() const { return m_rg; }
     xcom::DefMiscBitSetMgr * getSBSMgr() { return &m_sbs_mgr; }
     MDSet * getLiveInMDSet(IRBB * bb);
     MDSet * getLiveOutMDSet(IRBB * bb);

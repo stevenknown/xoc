@@ -53,7 +53,7 @@ void Region::lowerIRTreeToLowestHeight(OptCtx & oc)
     }
 
     //Simplify IR tree if it is needed.
-    simplifyBBlist(getBBList(), &simp);
+    getIRSimp()->simplifyBBlist(getBBList(), &simp);
 
     if (SIMP_need_recon_bblist(&simp)) {
         //New BB boundary IR generated, rebuilding CFG.
@@ -81,6 +81,8 @@ void Region::postSimplify(SimpCtx const& simp, MOD OptCtx & oc)
         ASSERT0((!g_do_md_du_analysis && !g_do_md_ssa) || verifyMDRef());
         return;
     }
+    OC_is_cfg_valid(oc) = false;
+    oc.setInvalidIfCFGChanged();
 
     //Simplification may generate new memory operations.
     if (g_opt_level != OPT_LEVEL0) {
@@ -105,7 +107,8 @@ void Region::postSimplify(SimpCtx const& simp, MOD OptCtx & oc)
     }
 
     //Before CFG rebuilding.
-    getCFG()->removeEmptyBB(oc);
+    CfgOptCtx ctx;
+    getCFG()->removeEmptyBB(oc, ctx);
     getCFG()->rebuild(oc);
     ASSERT0(getCFG()->verify());
 
@@ -118,7 +121,7 @@ void Region::postSimplify(SimpCtx const& simp, MOD OptCtx & oc)
         if (getDUMgr() != nullptr && !oc.is_du_chain_valid()) {
             //PRSSAMgr will destruct classic DU-chain.
             getDUMgr()->cleanDUSet();
-            oc.setInvalidDUChain();
+            oc.setInvalidClassicDUChain();
         }
     }
 
@@ -127,13 +130,6 @@ void Region::postSimplify(SimpCtx const& simp, MOD OptCtx & oc)
     }
 
     getCFG()->performMiscOpt(oc);
-
-    oc.setInvalidIfCFGChanged();
-    if (g_do_cdg) {
-        ASSERT0(getPassMgr());
-        CDG * cdg = (CDG*)getPassMgr()->registerPass(PASS_CDG);
-        cdg->perform(oc);
-    }
 }
 
 
@@ -155,7 +151,8 @@ bool Region::performSimplify(OptCtx & oc)
         //O0 does not build DU ref.
         ASSERT0(verifyMDRef());
     }
-    simplifyBBlist(getBBList(), &simp);
+    SIMP_optctx(&simp) = &oc;
+    getIRSimp()->simplifyBBlist(getBBList(), &simp);
     postSimplify(simp, oc);
 
     if (g_verify_level >= VERIFY_LEVEL_3 &&
@@ -214,7 +211,7 @@ void Region::doBasicAnalysis(OptCtx & oc)
                 if (getDUMgr() != nullptr && !oc.is_du_chain_valid()) {
                     //PRSSAMgr will destruct classic DU-chain.
                     getDUMgr()->cleanDUSet();
-                    oc.setInvalidDUChain();
+                    oc.setInvalidClassicDUChain();
                 }
             }
         }

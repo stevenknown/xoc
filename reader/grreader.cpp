@@ -74,7 +74,7 @@ bool readGRAndConstructRegion(RegionMgr * rumgr, CHAR const* grfile)
     //reader.getLexer()->dump(grfile, nullptr);
     //END_TIMER(t, "lexer dump");
 
-    FILE * h = fopen(grfile, "r");
+    FILE * h = ::fopen(grfile, "r");
     if (h == nullptr) {
         return false;
     }

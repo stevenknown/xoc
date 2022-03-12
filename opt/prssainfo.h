@@ -66,12 +66,25 @@ public:
     SSAInfo(DefSegMgr * sm) : use_exp_set(sm) { cleanMember(); }
 
     //Add an USE reference.
-    //This function build DU chain between DEF and 'ir'.
-    void addUse(IR const* ir)
+    //This function build DU chain between DEF and 'use'.
+    void addUse(IR const* use)
     {
-        ASSERT0(ir && ir->isReadPR());
-        ASSERT0(ir->getSSAInfo() == this);
-        SSA_uses(this).append(ir);
+        ASSERT0(use && use->isReadPR());
+        ASSERT0(use->getSSAInfo() == this);
+        SSA_uses(this).append(use);
+    }
+
+    //Add an USE reference.
+    //This function build DU chain between DEF and 'use'.
+    void addUseAndSSAInfo(IR * use)
+    {
+        ASSERT0(use && use->isReadPR());
+        if (use->getSSAInfo() == nullptr) {
+            use->setSSAInfo(this);
+        } else {
+            ASSERT0(use->getSSAInfo() == this);
+        }
+        SSA_uses(this).append(use);
     }
 
     //This function guarantee all memory resource recycled.
@@ -80,6 +93,7 @@ public:
         SSA_def(this) = nullptr;
         SSA_uses(this).clean();
     }
+    void cleanUseSet() { SSA_uses(this).clean(); }
 
     //Get SSAInfo id.
     UINT id() const { return uid; }
@@ -104,6 +118,8 @@ public:
     IR * getDef() const { return SSA_def(this); }
     //Get the USE set of expressions.
     IRSet const& getUses() const { return SSA_uses(this); }
+
+    bool hasUse() const { return !getUses().is_empty(); }
 
     //Remove 'ir' from USE set.
     //This function cut off DU chain between DEF and 'ir'.
@@ -166,15 +182,17 @@ class VPRVec : public Vector<VPR*> {
     COPY_CONSTRUCTOR(VPRVec);
 public:
     VPRVec() {}
+
     //Find the VPR that have PR defined at given BB.
     VPR * findVPR(UINT bbid) const;
+
     //Find the initial version VPR.
-    VPR * findInitVersion() const;
+    VPR * getInitVersion() const;
 };
 
 
 //Mapping from PRNO to vector of VPR.
-typedef Vector<VPRVec*> UINT2VPVec;
+typedef Vector<VPRVec*> UINT2VPRVec;
 
 //Mapping from PRNO id to Stack of VPR.
 typedef Vector<Stack<VPR*>*> UINT2VPRStack;

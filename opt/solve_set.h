@@ -293,7 +293,7 @@ private:
     void setKilledIRExpr(UINT bbid, DefDBitSetCore * set);
     void setMayKilledDef(UINT bbid, DefDBitSetCore * set);
     void setMustKilledDef(UINT bbid, DefDBitSetCore * set);
-    void solveByRPO(List<IRBB*> * tbbl, UINT const flag,
+    void solveByRPO(RPOVexList const* rpovexlst, UINT const flag,
                     MOD DefMiscBitSetMgr & bsmgr);
     void solveByWorkList(List<IRBB*> * tbbl, UINT const flag,
                          MOD DefMiscBitSetMgr & bsmgr);

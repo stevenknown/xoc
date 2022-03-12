@@ -31,18 +31,45 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 namespace xoc {
 
+static bool checkChange(Region const* rg, bool mdssa_changed,
+                        bool prssa_changed, bool classic_du_changed)
+{
+    if (rg->getMDSSAMgr() != nullptr || rg->getPRSSAMgr() != nullptr ||
+        rg->getDUMgr() != nullptr) {
+        //At least one kind of DU exist.
+        ASSERTN(mdssa_changed || prssa_changed || classic_du_changed,
+                ("DU Chain is not available"));
+    }
+    return true;
+}
+
+
 void changeDef(IR * olddef, IR * newdef, Region * rg)
 {
     ASSERT0(olddef->is_stmt() && newdef->is_stmt());
+    ASSERTN(olddef->isMemoryRef() && newdef->isMemoryRef(),
+            ("should not query its DU"));
+    bool mdssa_changed = false;
+    bool prssa_changed = false;
+    bool classic_du_changed = false;
+
     MDSSAMgr * mdssamgr = rg->getMDSSAMgr();
-    if (mdssamgr != nullptr && mdssamgr->is_valid()) {
+    if (mdssamgr != nullptr && mdssamgr->is_valid() &&
+        olddef->isMemoryRefNonPR()) {
         mdssamgr->changeDef(olddef, newdef);
+        mdssa_changed = true;
     }
 
     DUMgr * dumgr = rg->getDUMgr();
     if (dumgr != nullptr) {
-        dumgr->changeDef(newdef, olddef);
+        DUSet * oldduset = olddef->getDUSet();
+        if (oldduset != nullptr) {
+            dumgr->changeDef(newdef, olddef);
+            classic_du_changed = true;
+        }
     }
+
+    ASSERT0(checkChange(rg, mdssa_changed, prssa_changed, classic_du_changed));
 }
 
 
@@ -152,8 +179,15 @@ void changeUseEx(IR * olduse, IR * newuse, IRSet const* defset, Region * rg)
 void changeUse(IR * olduse, IR * newuse, Region * rg)
 {
     ASSERT0(olduse->is_exp() && newuse->is_exp());
+    ASSERTN(olduse->isMemoryRef() && newuse->isMemoryRef(),
+            ("should not query its DU"));
+    bool mdssa_changed = false;
+    bool prssa_changed = false;
+    bool classic_du_changed = false;
+
     MDSSAMgr * mdssamgr = rg->getMDSSAMgr();
-    if (mdssamgr != nullptr && mdssamgr->is_valid()) {
+    if (mdssamgr != nullptr && mdssamgr->is_valid() &&
+        olduse->isMemoryRefNonPR()) {
         ASSERT0(!(mdssamgr->hasMDSSAInfo(olduse) ^
                   mdssamgr->hasMDSSAInfo(newuse)));
         if (!mdssamgr->hasMDSSAInfo(olduse)) {
@@ -162,11 +196,13 @@ void changeUse(IR * olduse, IR * newuse, Region * rg)
         } else {
             mdssamgr->changeUse(olduse, newuse);
         }
+        mdssa_changed = true;
     }
 
     DUMgr * dumgr = rg->getDUMgr();
-    if (dumgr != nullptr) {
+    if (dumgr != nullptr && olduse->getDUSet() != nullptr) {
         dumgr->changeUse(newuse, olduse);
+        classic_du_changed = true;
     }
 
     if (olduse->isPROp() || newuse->isPROp()) {
@@ -177,8 +213,11 @@ void changeUse(IR * olduse, IR * newuse, Region * rg)
             ASSERT0(oldssainfo && newssainfo);
             oldssainfo->removeUse(olduse);
             newssainfo->addUse(newuse);
+            prssa_changed = true;
         }
     }
+
+    ASSERT0(checkChange(rg, mdssa_changed, prssa_changed, classic_du_changed));
 }
 
 
@@ -189,14 +228,17 @@ void changeUse(IR * olduse, IR * newuse, Region * rg)
 void buildDUChain(IR * def, IR * use, Region * rg)
 {
     ASSERT0(def && use && def->is_stmt() && use->is_exp());
-    if  (def->isMemoryRefNonPR()) {
+    bool mdssa_changed = false;
+    bool prssa_changed = false;
+    bool classic_du_changed = false;
+    if (def->isMemoryRefNonPR()) {
         MDSSAMgr * mdssamgr = rg->getMDSSAMgr();
         if (mdssamgr != nullptr && mdssamgr->is_valid()) {
             ASSERT0(use->isMemoryRefNonPR());
             MDSSAInfo * info = mdssamgr->getMDSSAInfoIfAny(def);
             ASSERTN(info, ("def stmt even not in MDSSA system"));
-            //mdssamgr->addMDSSAOcc(use, info);
             mdssamgr->copyAndAddMDSSAOcc(use, info);
+            mdssa_changed = true;
         }
     }
 
@@ -205,39 +247,47 @@ void buildDUChain(IR * def, IR * use, Region * rg)
         PRSSAMgr * prssamgr = rg->getPRSSAMgr();
         if (prssamgr != nullptr && prssamgr->is_valid()) {
             prssamgr->buildDUChain(def, use);
+            prssa_changed = true;
         }
     }
 
     DUMgr * dumgr = rg->getDUMgr();
     if (dumgr != nullptr) {
         dumgr->buildDUChain(def, use);
+        classic_du_changed = true;
     }
+
+    ASSERT0(checkChange(rg, mdssa_changed, prssa_changed, classic_du_changed));
 }
 
 
 //The function checks each DEF|USE occurrence of ir, remove the expired
 //expression which is not reference the memory any more that ir referenced.
 //Return true if DU changed.
-//Note this function does not modify ir.
 //e.g: stpr1 = ... //S1
 //     ..... = pr2 //S2
 //  If there is DU between S1 and S2, cutoff the DU chain.
 //stmt: PR write operation.
 //exp: PR read operation.
-bool removeExpiredDU(IR * ir, Region * rg)
+bool removeExpiredDU(IR const* ir, Region * rg)
 {
     ASSERT0(ir);
+    bool mdssa_changed = false;
+    bool prssa_changed = false;
+    bool classic_du_changed = false;
     bool change = false;
     if (ir->isPROp()) {
         PRSSAMgr * prssamgr = rg->getPRSSAMgr();
         if (prssamgr != nullptr && prssamgr->is_valid()) {
             change |= PRSSAMgr::removeExpiredDU(ir, rg);
+            prssa_changed = true;
         }
     }
 
     DUMgr * dumgr = rg->getDUMgr();
     if (dumgr != nullptr) {
         change |= dumgr->removeExpiredDU(ir);
+        classic_du_changed = true;
     }
 
     MDSSAMgr * mdssamgr = rg->getMDSSAMgr();
@@ -246,7 +296,10 @@ bool removeExpiredDU(IR * ir, Region * rg)
         ASSERTN(mdssamgr->getMDSSAInfoIfAny(ir),
                 ("def stmt even not in MDSSA system"));
         change |= mdssamgr->removeExpiredDU(ir);
+        mdssa_changed = true;
     }
+
+    ASSERT0(checkChange(rg, mdssa_changed, prssa_changed, classic_du_changed));
     return change;
 }
 
@@ -266,9 +319,14 @@ void coalesceDUChain(IR * from, IR * to, Region * rg)
 {
     ASSERT0(from && to);
     ASSERT0(from->is_stmt() && to->is_exp() && to->getStmt() == from);
+    bool mdssa_changed = false;
+    bool prssa_changed = false;
+    bool classic_du_changed = false;
+
     DUMgr * dumgr = rg->getDUMgr();
     if (dumgr != nullptr) {
         dumgr->coalesceDUChain(from, to);
+        classic_du_changed = true;
     }
 
     if (from->isMemoryRefNonPR()) {
@@ -276,8 +334,11 @@ void coalesceDUChain(IR * from, IR * to, Region * rg)
         MDSSAMgr * mdssamgr = rg->getMDSSAMgr();
         if (mdssamgr != nullptr && mdssamgr->is_valid()) {
             mdssamgr->coalesceDUChain(from, to);
+            mdssa_changed = true;
         }
     }
+
+    ASSERT0(checkChange(rg, mdssa_changed, prssa_changed, classic_du_changed));
 }
 
 
@@ -292,22 +353,31 @@ void coalesceDUChain(IR * from, IR * to, Region * rg)
 void removeUseForTree(IR * exp, Region * rg)
 {
     ASSERT0(exp && exp->is_exp()); //exp is the root of IR tree.
+    bool mdssa_changed = false;
+    bool prssa_changed = false;
+    bool classic_du_changed = false;
+
     PRSSAMgr * prssamgr = rg->getPRSSAMgr();
     if (prssamgr != nullptr && prssamgr->is_valid()) {
         //Access whole IR tree root at 'exp'.
         PRSSAMgr::removePRSSAOcc(exp);
+        prssa_changed = true;
     }
 
     DUMgr * dumgr = rg->getDUMgr();
     if (dumgr != nullptr) {
         dumgr->removeUseFromDefset(exp);
+        classic_du_changed = true;
     }
 
     MDSSAMgr * mdssamgr = rg->getMDSSAMgr();
     if (mdssamgr != nullptr && mdssamgr->is_valid()) {
         //Access whole IR tree root at 'exp'.
-        mdssamgr->removeMDSSAOcc(exp);
+        mdssamgr->removeMDSSAOccForTree(exp);
+        mdssa_changed = true;
     }
+
+    ASSERT0(checkChange(rg, mdssa_changed, prssa_changed, classic_du_changed));
 }
 
 
@@ -315,18 +385,30 @@ void removeUseForTree(IR * exp, Region * rg)
 void removeStmt(IR * stmt, Region * rg)
 {
     ASSERT0(stmt->is_stmt());
+    bool mdssa_changed = false;
+    bool prssa_changed = false;
+    bool classic_du_changed = false;
+
     DUMgr * dumgr = rg->getDUMgr();
     if (dumgr != nullptr) {
         dumgr->removeIRFromDUMgr(stmt);
+        classic_du_changed = true;
     }
 
-    PRSSAMgr::removePRSSAOcc(stmt);
+    PRSSAMgr * prssamgr = rg->getPRSSAMgr();
+    if (prssamgr != nullptr && prssamgr->is_valid()) {
+        PRSSAMgr::removePRSSAOcc(stmt);
+        prssa_changed = true;
+    }
 
     MDSSAMgr * mdssamgr = rg->getMDSSAMgr();
     if (mdssamgr != nullptr && mdssamgr->is_valid()) {
         //Remove stmt and its RHS.
-        mdssamgr->removeMDSSAOcc(stmt);
+        mdssamgr->removeMDSSAOccForTree(stmt);
+        mdssa_changed = true;
     }
+
+    ASSERT0(checkChange(rg, mdssa_changed, prssa_changed, classic_du_changed));
 }
 
 
@@ -334,9 +416,8 @@ static void addUseInPRSSAMode(IR * to_ir, IR const* from_ir)
 {
     SSAInfo * ssainfo = from_ir->getSSAInfo();
     if (ssainfo == nullptr) { return; }
-
     if (from_ir->isWritePR() || from_ir->isCallHasRetVal()) {
-        ASSERTN(0, ("SSA only has one def"));
+        ASSERTN(0, ("PRSSA only has one def"));
     }
     ASSERT0(to_ir->isReadPR());
     PR_ssainfo(to_ir) = ssainfo;
@@ -371,21 +452,30 @@ void addUse(IR * to, IR const* from, Region * rg)
         return;
     }
 
+    bool mdssa_changed = false;
+    bool prssa_changed = false;
+    bool classic_du_changed = false;
+
     PRSSAMgr * prssamgr = rg->getPRSSAMgr();
     if (prssamgr != nullptr && prssamgr->is_valid() && from->isReadPR()) {
         addUseInPRSSAMode(to, from);
+        prssa_changed = true;
     }
 
     MDSSAMgr * mdssamgr = rg->getMDSSAMgr();
     if (mdssamgr != nullptr && mdssamgr->is_valid() &&
         from->isMemoryRefNonPR()) {
         addUseInMDSSAMode(to, from, mdssamgr, rg);
+        mdssa_changed = true;
     }
 
     DUMgr * dumgr = rg->getDUMgr();
     if (dumgr != nullptr) {
-        dumgr->addUse(to, from);
+        dumgr->addUseForTree(to, from);
+        classic_du_changed = true;
     }
+
+    ASSERT0(checkChange(rg, mdssa_changed, prssa_changed, classic_du_changed));
 }
 
 
@@ -404,9 +494,10 @@ void addUseForTree(IR * to, IR const* from, Region * rg)
     DUMgr * dumgr = rg->getDUMgr();
     ConstIRIter cit;
     IRIter it;
-    IR const* from_ir = iterInitC(from, cit);
-    for (IR * to_ir = iterInit(to, it);
-         to_ir != nullptr; to_ir = iterNext(it), from_ir = iterNextC(cit)) {
+    IR const* from_ir = iterInitC(from, cit, true);
+    for (IR * to_ir = xoc::iterInit(to, it, true);
+         to_ir != nullptr;
+         to_ir = xoc::iterNext(it), from_ir = xoc::iterNextC(cit)) {
         ASSERT0(to_ir->isIREqual(from_ir, true));
         if (!to_ir->isMemoryRef() && !to_ir->is_id()) {
             //Copy MD for IR_ID, some Passes require it, e.g. GVN.
@@ -419,7 +510,7 @@ void addUseForTree(IR * to, IR const* from, Region * rg)
             addUseInMDSSAMode(to_ir, from_ir, mdssamgr, rg);
         }
         if (dumgr != nullptr) {
-            dumgr->addUse(to_ir, from_ir);
+            dumgr->addUseForTree(to_ir, from_ir);
         }
     }
     ASSERT0(cit.get_elem_count() == 0 && it.get_elem_count() == 0);
@@ -505,7 +596,8 @@ static bool hasSameValueIndirectOp(IR const* ir1, IR const* ir2, GVN const* gvn)
 //To find the killing-def, the function prefer use SSA info.
 IR * findKillingDef(IR const* exp, Region * rg)
 {
-    ASSERT0(exp->is_exp() && exp->isMemoryOpnd());
+    ASSERT0(exp->is_exp());
+    ASSERTN(exp->isMemoryOpnd(), ("should not query its DU"));
     //Prefer PRSSA and MDSSA DU.
     if (exp->isReadPR()) {
         PRSSAMgr * prssamgr = rg->getPRSSAMgr();
@@ -519,6 +611,7 @@ IR * findKillingDef(IR const* exp, Region * rg)
         //Try classic DU.
         goto CLASSIC_DU;
     }
+
     if (exp->isMemoryRefNonPR()) {
         MDSSAMgr * mdssamgr = rg->getMDSSAMgr();
         if (mdssamgr != nullptr && mdssamgr->is_valid()) {
@@ -529,14 +622,18 @@ IR * findKillingDef(IR const* exp, Region * rg)
         //Try classic DU.
         goto CLASSIC_DU;
     }
+
 CLASSIC_DU:
     if (rg->getDUMgr() != nullptr) {
         DUSet const* du = exp->readDUSet();
-        if (du != nullptr && !du->is_empty()) {
+        if (du != nullptr) {
             IR const* exp_stmt = const_cast<IR*>(exp)->getStmt();
             return rg->getDUMgr()->findNearestDomDef(exp, exp_stmt, du);
         }
+        return nullptr;
     }
+
+    ASSERTN(0, ("DU Chain is not available"));
     return nullptr;
 }
 
@@ -548,6 +645,9 @@ CLASSIC_DU:
 bool isKillingDef(IR const* def, IR const* use, GVN const* gvn)
 {
     ASSERT0(def && use);
+    ASSERTN(def->isMemoryRef() && use->isMemoryRef(),
+            ("should not query its DU"));
+
     MD const* mustusemd = use->getRefMD();
     if (mustusemd != nullptr && isKillingDef(def, mustusemd)) {
         return true;
@@ -599,7 +699,10 @@ bool isKillingDef(MD const* defmd, MD const* usemd)
 void movePhi(IRBB * from, IRBB * to, Region * rg)
 {
     ASSERT0(from && to);
-    PRSSAMgr::movePhi(from, to);
+    PRSSAMgr * prssamgr = rg->getPRSSAMgr();
+    if (prssamgr != nullptr && prssamgr->is_valid()) {
+        PRSSAMgr::movePhi(from, to);
+    }
 
     MDSSAMgr * mdssamgr = rg->getMDSSAMgr();
     if (mdssamgr != nullptr && mdssamgr->is_valid()) {
@@ -614,6 +717,7 @@ void movePhi(IRBB * from, IRBB * to, Region * rg)
 void collectUseSet(IR const* def, MDSSAMgr const* mdssamgr, OUT IRSet * useset)
 {
     ASSERT0(def->is_stmt());
+    ASSERTN(def->isMemoryRef(), ("should not query its DU"));
     useset->clean();
 
     SSAInfo const* prssainfo = def->getSSAInfo();
@@ -628,30 +732,33 @@ void collectUseSet(IR const* def, MDSSAMgr const* mdssamgr, OUT IRSet * useset)
         return;
     }
 
-    MDSSAInfo const* mdssainfo = nullptr;
     if (mdssamgr != nullptr && mdssamgr->is_valid()) {
-        mdssainfo = mdssamgr->getMDSSAInfoIfAny(def);
-    }
-    if (mdssainfo != nullptr) {
-        mdssainfo->collectUse(const_cast<MDSSAMgr*>(mdssamgr)->getUseDefMgr(),
-                              useset);
-        return;
+        MDSSAInfo const* mdssainfo = mdssamgr->getMDSSAInfoIfAny(def);
+        if (mdssainfo != nullptr) {
+            CollectCtx ctx(COLLECT_CROSS_PHI);
+            mdssainfo->collectUse(
+                const_cast<MDSSAMgr*>(mdssamgr)->getUseDefMgr(), ctx, useset);
+            return;
+        }
     }
 
     if (def->readDUSet() != nullptr) {
         useset->copy((DefSBitSetCore&)*def->readDUSet());
+        return;
     }
+
+    ASSERTN(0, ("DU Chain is not available"));
 }
 
 
 //Collect all DEF expressions of 'use' into 'defset'.
 //This function give priority to PRSSA and MDSSA DU chain and then classic
 //DU chain in doing collection.
-//iter_phi_opnd: true if the collection will keep iterating DEF of PHI operand.
-void collectDefSet(IR const* use, MDSSAMgr const* mdssamgr, bool iter_phi_opnd,
-                   OUT IRSet * defset)
+//The function will keep iterating DEF of PHI operand.
+void collectDefSet(IR const* use, MDSSAMgr const* mdssamgr, OUT IRSet * defset)
 {
     ASSERT0(defset && use->is_exp());
+    ASSERTN(use->isMemoryRef(), ("should not query its DU"));
     defset->clean();
 
     SSAInfo const* prssainfo = use->getSSAInfo();
@@ -666,13 +773,17 @@ void collectDefSet(IR const* use, MDSSAMgr const* mdssamgr, bool iter_phi_opnd,
         mdssainfo = mdssamgr->getMDSSAInfoIfAny(use);
     }
     if (mdssainfo != nullptr) {
-        mdssainfo->collectDef(mdssamgr, use->getRefMD(), iter_phi_opnd, defset);
+        mdssainfo->collectDef(mdssamgr, use->getRefMD(),
+                              CollectCtx(COLLECT_CROSS_PHI), defset);
         return;
     }
 
     if (use->readDUSet() != nullptr) {
         defset->copy((DefSBitSetCore&)*use->readDUSet());
+        return;
     }
+
+    ASSERTN(0, ("DU Chain is not available"));
 }
 
 
@@ -746,6 +857,62 @@ void copyAndAddMDSSAOcc(IR * tgt, IR const* src, Region * rg)
             mdssamgr->copyAndAddMDSSAOcc(tgt, src_mdssainfo);
         }
     }
+}
+
+
+//Return true if ir1 is may overlap to phi.
+bool isDependent(IR const* ir, MDPhi const* phi)
+{
+    MD const* irmust = ir->getMustRef();
+    MDSet const* irmay = ir->getMayRef();
+    MDIdx phimdid = phi->getResult()->mdid();
+    ASSERT0(phimdid != MD_UNDEF);
+    if ((irmust != nullptr && irmust->id() == phimdid) ||
+        (irmay != nullptr && irmay->is_contain_pure(phimdid))) {
+        return true;
+    }
+    return false;
+}
+
+
+//Return true if ir1 is may overlap to ir2.
+bool isDependent(IR const* ir1, IR const* ir2, Region const* rg)
+{
+    MD const* ir1must = ir1->getMustRef();
+    MD const* ir2must = ir2->getMustRef();
+    MDSet const* ir1may = ir1->getMayRef();
+    MDSet const* ir2may = ir2->getMayRef();
+    if (ir1must != nullptr && ir2must != nullptr) {
+        return ir1must == ir2must ? true : ir1must->is_overlap(ir2must);
+    }
+    if (ir1must != nullptr) {
+        //ir2must is empty.
+        if (ir2may != nullptr) {
+            if (ir2may->is_overlap(ir1must, rg)) {
+                return true;
+            }
+            if (ir1may != nullptr) {
+                return ir1may == ir2may ? true : ir1may->is_intersect(*ir2may);
+            }
+            return false;
+        }
+        ASSERTN(0, ("ir2 does not have MDRef"));
+    }
+    if (ir2must != nullptr) {
+        //ir1must is empty.
+        if (ir1may != nullptr) {
+            if (ir1may->is_overlap(ir2must, rg)) {
+                return true;
+            }
+            if (ir2may != nullptr) {
+                return ir1may == ir2may ? true : ir2may->is_intersect(*ir1may);
+            }
+            return false;
+        }
+        ASSERTN(0, ("ir1 does not have MDRef"));
+    }
+    ASSERT0(ir1may && ir2may);
+    return ir1may == ir2may ? true : ir2may->is_intersect(*ir1may);
 }
 
 } //namespace xoc

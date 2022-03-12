@@ -36,6 +36,9 @@ author: Su Zhenyu
 
 namespace xoc {
 
+class AliasAnalysis;
+class DUMgr;
+
 typedef TMap<PASS_TYPE, Pass*> PassTab;
 typedef TMapIter<PASS_TYPE, Pass*> PassTabIter;
 typedef TMap<PASS_TYPE, xcom::Graph*> GraphPassTab;
@@ -50,10 +53,14 @@ protected:
     TypeMgr * m_tm;
     PassTab m_registered_pass;
     GraphPassTab m_registered_graph_based_pass;
-
 protected:
+    void checkAndRecomputeDUChain(OptCtx * oc, DUMgr * dumgr,
+                                  BitSet const& opts);
+    void checkAndRecomputeAAandDU(OptCtx * oc, IRCFG * cfg,
+                                  AliasAnalysis *& aa,
+                                  DUMgr *& dumgr,
+                                  BitSet const& opts);
     xcom::Graph * registerGraphBasedPass(PASS_TYPE opty);
-
 public:
     PassMgr(Region * rg);
     virtual ~PassMgr() { destroyAllPass(); }
@@ -73,6 +80,7 @@ public:
     virtual Pass * allocLFTR();
     virtual Pass * allocInferType();
     virtual Pass * allocInvertBrTgt();
+    virtual Pass * allocVRP();
     virtual Pass * allocDSE();
     virtual Pass * allocRCE();
     virtual Pass * allocGVN();
@@ -87,8 +95,10 @@ public:
     virtual Pass * allocRefineDUChain();
     virtual Pass * allocScalarOpt();
     virtual Pass * allocMDLivenessMgr();
+    virtual Pass * allocMDSSALiveMgr();
     virtual Pass * allocRefine();
     virtual Pass * allocGSCC();
+    virtual Pass * allocIRSimp();
 
     //This function check validation of options in oc, perform
     //recomputation if it is invalid.
@@ -100,9 +110,10 @@ public:
     void destroyPass(Pass * pass);
     void destroyPass(PASS_TYPE passtype);
 
-    Pass * registerPass(PASS_TYPE opty);
+    virtual Pass * registerPass(PASS_TYPE opty);
 
-    Pass * queryPass(PASS_TYPE opty) { return m_registered_pass.get(opty); }
+    virtual Pass * queryPass(PASS_TYPE opty)
+    { return m_registered_pass.get(opty); }
 };
 
 } //namespace xoc

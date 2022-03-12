@@ -35,7 +35,6 @@ namespace xoc {
 class InferType : public Pass {
     COPY_CONSTRUCTOR(InferType);
     TypeMgr * m_tm;
-    Region * m_rg;
     IRCFG * m_cfg;
     IRList m_wl;
     CIRList * m_changed_irlist; //used for dump
@@ -65,10 +64,9 @@ protected:
     bool inferIRList(IR * irl);
     bool inferChangedList();
 public:
-    explicit InferType(Region * rg)
+    explicit InferType(Region * rg) : Pass(rg)
     {
         ASSERT0(rg != nullptr);
-        m_rg = rg;
         m_tm = rg->getTypeMgr();
         m_cfg = rg->getCFG();
         m_changed_irlist = nullptr;
@@ -76,9 +74,16 @@ public:
     }
     virtual ~InferType() { dumpFini(); }
 
+    //The function dump pass relative information before performing the pass.
+    //The dump information is always used to detect what the pass did.
+    //Return true if dump successed, otherwise false.
+    virtual bool dumpBeforePass() const { return Pass::dumpBeforePass(); }
+
+    //The function dump pass relative information.
+    //The dump information is always used to detect what the pass did.
+    //Return true if dump successed, otherwise false.
     virtual bool dump() const;
 
-    Region * getRegion() const { return m_rg; }
     virtual CHAR const* getPassName() const { return "Infer Type"; }
     virtual PASS_TYPE getPassType() const { return PASS_INFER_TYPE; }
 

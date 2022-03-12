@@ -156,17 +156,8 @@ bool IRBB::is_fallthrough() const
 }
 
 
-void IRBB::dump(Region const* rg, bool dump_inner_region) const
+void IRBB::dumpAttr(Region const* rg) const
 {
-    if (!rg->isLogMgrInit()) { return; }
-
-    note(rg, "\n----- BB%d --- rpo:%d -----", id(), rpo());
-    IRBB * pthis = const_cast<IRBB*>(this);
-    if (pthis->getLabelList().get_elem_count() > 0) {
-        note(rg, "\nLABEL:");
-        dumpBBLabel(pthis->getLabelList(), rg);
-    }
-
     //Attributes
     note(rg, "\nATTR:");
     if (is_entry()) {
@@ -184,10 +175,14 @@ void IRBB::dump(Region const* rg, bool dump_inner_region) const
     if (is_target()) {
         prt(rg, "branch_target ");
     }
+}
 
-    //IR list
+
+void IRBB::dumpIRList(Region const* rg, bool dump_inner_region) const
+{
     note(rg, "\nSTMT NUM:%d", getNumOfIR());
     rg->getLogMgr()->incIndent(3);
+    IRBB * pthis = const_cast<IRBB*>(this);
     for (IR * ir = BB_first_ir(pthis);
          ir != nullptr; ir = BB_irlist(pthis).get_next()) {
         ASSERT0(ir->is_single());
@@ -196,6 +191,26 @@ void IRBB::dump(Region const* rg, bool dump_inner_region) const
     }
     rg->getLogMgr()->decIndent(3);
     note(rg, "\n");
+}
+
+
+void IRBB::dumpLabelList(Region const* rg) const
+{
+    IRBB * pthis = const_cast<IRBB*>(this);
+    if (pthis->getLabelList().get_elem_count() > 0) {
+        note(rg, "\nLABEL:");
+        dumpBBLabel(pthis->getLabelList(), rg);
+    }
+}
+
+
+void IRBB::dump(Region const* rg, bool dump_inner_region) const
+{
+    if (!rg->isLogMgrInit()) { return; }
+    note(rg, "\n----- BB%d --- rpo:%d -----", id(), rpo());
+    dumpLabelList(rg);
+    dumpAttr(rg);
+    dumpIRList(rg, dump_inner_region);
 }
 
 
@@ -317,56 +332,6 @@ UINT IRBB::getNumOfSucc(CFG<IRBB, IR> const* cfg) const
          out != nullptr; out = EC_next(out), n++);
     return n;
 }
-//END IRBB
-
-
-//Before removing BB or change BB successor,
-//you need remove the related PHI operand if BB successor has PHI stmt.
-void IRBB::removeSuccessorDesignatePhiOpnd(CFG<IRBB, IR> * cfg, IRBB * succ)
-{
-    IRCFG * ircfg = (IRCFG*)cfg;
-    PRSSAMgr * prssamgr = ircfg->getRegion()->getPRSSAMgr();
-    if (prssamgr != nullptr && prssamgr->is_valid()) {
-        prssamgr->removeSuccessorDesignatePhiOpnd(this, succ);
-    }
-
-    MDSSAMgr * mdssamgr = ircfg->getRegion()->getMDSSAMgr();
-    if (mdssamgr != nullptr && mdssamgr->is_valid()) {
-        mdssamgr->removeSuccessorDesignatePhiOpnd(this, succ);
-    }
-}
-
-
-//After adding BB or change bb successor, you need to add the related PHI
-//operand as well if the successor of BB has a PHI stmt.
-void IRBB::addSuccessorDesignatePhiOpnd(CFG<IRBB, IR> * cfg, IRBB * succ)
-{
-    IRCFG * ircfg = (IRCFG*)cfg;
-    PRSSAMgr * prssamgr = ircfg->getRegion()->getPRSSAMgr();
-    if (prssamgr != nullptr && prssamgr->is_valid()) {
-        prssamgr->addSuccessorDesignatePhiOpnd(this, succ);
-    }
-
-    MDSSAMgr * mdssamgr = ircfg->getRegion()->getMDSSAMgr();
-    if (mdssamgr != nullptr && mdssamgr->is_valid()) {
-        mdssamgr->addSuccessorDesignatePhiOpnd(this, succ);
-    }
-}
-
-
-//Before removing current BB or change BB's successor,
-//you need remove the related PHI operand if BB successor has PHI.
-void IRBB::removeAllSuccessorsPhiOpnd(CFG<IRBB, IR> * cfg)
-{
-    xcom::Vertex * vex = cfg->getVertex(id());
-    ASSERT0(vex);
-    for (xcom::EdgeC * out = vex->getOutList();
-         out != nullptr; out = EC_next(out)) {
-        IRBB * succ = ((IRCFG*)cfg)->getBB(out->getToId());
-        ASSERT0(succ);
-        removeSuccessorDesignatePhiOpnd(cfg, succ);
-    }
-}
 
 
 bool IRBB::verifyBranchLabel(Lab2BB const& lab2bb) const
@@ -408,6 +373,13 @@ bool IRBB::verifyBranchLabel(Lab2BB const& lab2bb) const
         }
     }
     return true;
+}
+
+
+bool IRBB::hasMDPhi(CFG<IRBB, IR> const* cfg) const
+{
+    MDSSAMgr * mgr = ((IRCFG*)cfg)->getRegion()->getMDSSAMgr();
+    return mgr != nullptr && mgr->hasPhi(this);
 }
 //END IRBB
 

@@ -59,7 +59,6 @@ protected:
     };
 
     SMemPool * m_pool;
-    Region * m_rg;
     IVR * m_ivr;
     IRCFG * m_cfg;
     PRSSAMgr * m_prssamgr;
@@ -72,11 +71,12 @@ protected:
     typedef TMapIter<IR const*, LFRInfo*> LFRInfoMapIter;
     typedef TMap<IR const*, LFRInfo*> LFRInfoMap;
     LFRInfoMap m_cand_occ2info;
-
 protected:
     void analyzeBB(LI<IRBB> * li, IRBB * bb);
     void analysis(LI<IRBB> * li);
     LFRInfo * allocLFRInfo() { return (LFRInfo*)xmalloc(sizeof(LFRInfo)); }
+    void addDUChainForRHSOfInitDef(IR * newrhs, IR const* oldrhs,
+                                   LI<IRBB> const* li);
 
     void buildClassicDUForRed(IR * init, IR * red);
 
@@ -109,14 +109,11 @@ protected:
     IR * insertPhiForRed(LI<IRBB> const* li, IR * init, IR * red);
     bool insertReductionCode(List<LFRInfo*> & lfrinfo_list);
     bool insertComputingInitValCode(IRBB * preheader,
-                                    List<LFRInfo*> const& lfrinfo_list);
+                                    List<LFRInfo*> const& lfrinfo_list,
+                                    LI<IRBB> const* li);
 
     void pickupProperCandidate(OUT List<LFRInfo*> & lfrinfo_list);
     bool replaceCandByIV();
-
-    //doReplacement may append stmt into BB which has down-boundary stmt.
-    //That makes BB invalid. Split such invalid BB into two or more BBs.
-    bool splitBBIfNeeded(IRBB * bb);
 
     void * xmalloc(INT size)
     {
@@ -132,7 +129,7 @@ protected:
     { return m_prssamgr != nullptr && m_prssamgr->is_valid(); }
 public:
     explicit LFTR(Region * rg) :
-        m_pool(nullptr), m_rg(rg), m_ivr(nullptr), m_prssamgr(nullptr),
+        Pass(rg), m_pool(nullptr), m_ivr(nullptr), m_prssamgr(nullptr),
         m_mdssamgr(nullptr)
     {
         ASSERT0(rg != nullptr);
@@ -143,7 +140,6 @@ public:
 
     bool dump(LI<IRBB> const* li) const;
 
-    Region * getRegion() const { return m_rg; }
     virtual CHAR const* getPassName() const
     { return "Linear Function Test Replacement"; }
     PASS_TYPE getPassType() const { return PASS_LFTR; }

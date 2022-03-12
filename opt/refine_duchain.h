@@ -34,7 +34,6 @@ namespace xoc {
 class RefineDUChain : public Pass {
     COPY_CONSTRUCTOR(RefineDUChain);
 protected:
-    Region * m_rg;
     DUMgr * m_du;
     GVN const* m_gvn;
     PRSSAMgr * m_prssamgr;
@@ -53,7 +52,7 @@ protected:
     { return m_prssamgr != nullptr && m_prssamgr->is_valid(); }
 public:
     explicit RefineDUChain(Region * rg) :
-        m_rg(rg), m_gvn(nullptr), m_prssamgr(nullptr), m_mdssamgr(nullptr),
+        Pass(rg), m_gvn(nullptr), m_prssamgr(nullptr), m_mdssamgr(nullptr),
         m_is_use_gvn(false)
     {
         ASSERT0(rg != nullptr);
@@ -68,13 +67,13 @@ public:
     //TODO: use gvn to utilize value flow.
     bool hasSameBase(IR const* ir1, IR const* ir2);
 
-    //True to use GVN and classic DU chain to perform optimization.
-    void setUseGvn(bool use_gvn) { m_is_use_gvn = use_gvn; }
-
-    Region * getRegion() const { return m_rg; }
     virtual CHAR const* getPassName() const
     { return "Refine DefUse Chain"; }
     PASS_TYPE getPassType() const { return PASS_PRE; }
+
+    //True to use GVN and classic DU chain to perform optimization.
+    void setUseGvn(bool use_gvn) { m_is_use_gvn = use_gvn; }
+
     virtual bool perform(OptCtx & oc);
 };
 

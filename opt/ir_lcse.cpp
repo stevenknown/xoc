@@ -39,10 +39,9 @@ namespace xoc {
 //
 //START LCSE
 //
-LCSE::LCSE(Region * rg)
+LCSE::LCSE(Region * rg) : Pass(rg)
 {
     ASSERT0(rg != nullptr);
-    m_rg = rg;
     m_tm = rg->getTypeMgr();
     m_du = m_rg->getDUMgr();
     ASSERT0(m_du && m_tm);
@@ -667,7 +666,7 @@ bool LCSE::perform(OptCtx & oc)
         for (BB_irlist(bb).get_head(&ct);
              ct != BB_irlist(bb).end(); ct = BB_irlist(bb).get_next(ct)) {
             IR * ir = ct->val();
-            if (ir->hasSideEffect()) { continue; }
+            if (ir->hasSideEffect(true)) { continue; }
             change |= processUse(bb, ir, avail_ir_expr,
                                  map_expr2avail_pos, map_expr2avail_pr);
             if (!ir->hasResult()) { continue; }

@@ -62,6 +62,7 @@ bool CDG::dump() const
     if (!getRegion()->isLogMgrInit()) { return true; }
     note(getRegion(), "\n==---- DUMP Control Dependence '%s' ----==",
          m_rg->getRegionName());
+    getRegion()->getLogMgr()->incIndent(2);
     INT c;
     for (xcom::Vertex * v = get_first_vertex(c);
          v != nullptr; v = get_next_vertex(c)) {
@@ -78,6 +79,7 @@ bool CDG::dump() const
         }
     }
     note(getRegion(), "\n");
+    getRegion()->getLogMgr()->decIndent(2);
     return true;
 }
 
@@ -160,8 +162,8 @@ void CDG::build(MOD OptCtx & oc, xcom::DGraph & cfg)
     m_rg->getPassMgr()->checkValidAndRecompute(&oc, PASS_PDOM, PASS_UNDEF);
 
     START_TIMER(t2, "Build CDG: Get Dom Tree");
-    xcom::Graph pdom_tree;
-    cfg.get_pdom_tree(pdom_tree);
+    xcom::DomTree pdom_tree;
+    cfg.genPDomTree(pdom_tree);
     pdom_tree.reverseEdges();
     END_TIMER(t2, "Build CDG: Get Dom Tree");
 
@@ -179,8 +181,9 @@ void CDG::build(MOD OptCtx & oc, xcom::DGraph & cfg)
     //Record vertex set by which current vertex controlled.
     Vector<xcom::DefSBitSet*> cd_set;
     for (INT j = 0; j <= top_order.get_last_idx(); j++) {
-        UINT ii = top_order.get(j)->id();
-        xcom::Vertex const* v = cfg.getVertex(ii);
+        Vertex const* vv = top_order.get(j);
+        ASSERTN(vv, ("there exist cycles in graph"));
+        xcom::Vertex const* v = cfg.getVertex(vv->id());
         ASSERT0(v != nullptr);
         addVertex(v->id());
 

@@ -41,7 +41,7 @@ class DumpHeap : public Graph {
     void * xmalloc(INT size)
     {
         void * p = smpoolMalloc(size, m_pool);
-        if (p == nullptr) return nullptr;
+        if (p == nullptr) { return nullptr; }
         ::memset(p, 0, size);
         return p;
     }
@@ -54,7 +54,9 @@ public:
     DumpHeap(Vector<T> & data)
     {
         if (data.get_last_idx() < 0) { return; }
-        HeapSort::HeapValVector<T> hdata(data);
+        //Using typedef template type to workaround MSVC compiler's flaw.
+        typedef HeapSort<T>::template HeapValVector<T> TT;
+        TT hdata(data);
         m_pool = smpoolCreate(64, MEM_COMM);
         UINT node_count = 1;
         for (UINT i = hdata.get_begin_idx(); i <= hdata.get_end_idx(); i++) {

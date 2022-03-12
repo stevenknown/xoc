@@ -30,6 +30,26 @@ USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 namespace xoc {
 
+static void set_irt_size(IR * ir, UINT)
+{
+    #ifdef CONST_IRT_SZ
+    IR_irt_size(ir) = irt_sz;
+    #else
+    DUMMYUSE(ir);
+    #endif
+}
+
+
+static inline UINT getIRTypeSize(IR const* ir)
+{
+    #ifdef CONST_IRT_SZ
+    return IR_irt_size(ir);
+    #else
+    return IRTSIZE(ir->getCode());
+    #endif
+}
+
+
 #ifdef _DEBUG_
 static bool isReduction(IR const* ir)
 {
@@ -95,6 +115,227 @@ static bool checkLogicalOp(IR_TYPE irt, Type const* type, TypeMgr * tm)
     return true;
 }
 #endif
+
+
+//
+//START Region
+//
+//Generate IR, invoke freeIR() or freeIRTree() if it is useless.
+//NOTE: Do NOT invoke ::free() to free IR, because all
+//    IR are allocated in the pool.
+IR * Region::allocIR(IR_TYPE irt)
+{
+    IR * ir = nullptr;
+    UINT idx = IRTSIZE(irt) - sizeof(IR);
+    ASSERTN(idx < 1000, ("weird index"));
+    bool lookup = false; //lookup freetab will save more memory, but slower.
+
+    #ifndef CONST_IRT_SZ
+    //If one is going to lookup freetab, IR_irt_size() must be defined.
+    ASSERT0(!lookup);
+    #endif
+
+    if (lookup) {
+        for (; idx <= MAX_OFFSET_AT_FREE_TABLE; idx++) {
+            ir = getAnalysisInstrument()->m_free_tab[idx];
+            if (ir == nullptr) { continue; }
+
+            getAnalysisInstrument()->m_free_tab[idx] = ir->get_next();
+            if (ir->get_next() != nullptr) {
+                IR_prev(ir->get_next()) = nullptr;
+            }
+            break;
+        }
+    } else {
+        ir = getAnalysisInstrument()->m_free_tab[idx];
+        if (ir != nullptr) {
+            getAnalysisInstrument()->m_free_tab[idx] = ir->get_next();
+            if (ir->get_next() != nullptr) {
+                IR_prev(ir->get_next()) = nullptr;
+            }
+        }
+    }
+
+    if (ir == nullptr) {
+        ir = (IR*)xmalloc(IRTSIZE(irt));
+        INT v = MAX(getIRVec()->get_last_idx(), 0);
+        //0 should not be used as id.
+        IR_id(ir) = (UINT)(v+1);
+        getIRVec()->set(ir->id(), ir);
+        set_irt_size(ir, IRTSIZE(irt));
+    } else {
+        ASSERT0(ir->get_prev() == nullptr);
+        IR_next(ir) = nullptr;
+        #ifdef _DEBUG_
+        getAnalysisInstrument()->m_has_been_freed_irs.diff(ir->id());
+        #endif
+    }
+    IR_code(ir) = irt;
+    return ir;
+}
+
+
+//This function erases all informations of ir and
+//append it into free_list for next allocation.
+//If Attach Info exist, this function will erase it rather than delete.
+//If DU info exist, this function will retrieve it back
+//to region for next allocation.
+//Note that this function does NOT free ir's kids and siblings.
+void Region::freeIR(IR * ir)
+{
+    ASSERTN(ir && ir->is_single(), ("chain list should be cut off"));
+    #ifdef _DEBUG_
+    ASSERT0(!getAnalysisInstrument()->
+            m_has_been_freed_irs.is_contain(ir->id()));
+    getAnalysisInstrument()->m_has_been_freed_irs.bunion(ir->id());
+    #endif
+
+    if (getDUMgr() != nullptr) {
+        ir->freeDUset(getDUMgr());
+    }
+
+    AIContainer * res_ai = IR_ai(ir);
+    if (res_ai != nullptr) {
+        //AICont will be reinitialized till next setting.
+        res_ai->destroy();
+    }
+
+    DU * du = ir->cleanDU();
+    if (du != nullptr) {
+        DU_md(du) = nullptr;
+        DU_mds(du) = nullptr;
+        getAnalysisInstrument()->m_free_du_list.append_head(du);
+    }
+
+    //Zero clearing all data fields.
+    UINT res_id = ir->id();
+    UINT res_irt_sz = getIRTypeSize(ir);
+    ::memset(ir, 0, res_irt_sz);
+    IR_id(ir) = res_id;
+    IR_ai(ir) = res_ai;
+    set_irt_size(ir, res_irt_sz);
+
+    UINT idx = res_irt_sz - sizeof(IR);
+    IR * head = getAnalysisInstrument()->m_free_tab[idx];
+    if (head != nullptr) {
+        IR_next(ir) = head;
+        IR_prev(head) = ir;
+    }
+    getAnalysisInstrument()->m_free_tab[idx] = ir;
+}
+
+
+//Free ir and all its kids, except its sibling node.
+//We can only utilizing the function to free the
+//IR which allocated by 'allocIR'.
+void Region::freeIRTree(IR * ir)
+{
+    if (ir == nullptr) { return; }
+    ASSERTN(!ir->is_undef(), ("ir has been freed"));
+    ASSERTN(ir->is_single(), ("chain list should be cut off"));
+    for (INT i = 0; i < IR_MAX_KID_NUM(ir); i++) {
+        IR * kid = ir->getKid(i);
+        if (kid != nullptr) {
+            freeIRTreeList(kid);
+        }
+    }
+    freeIR(ir);
+}
+
+
+//Free ir, and all its kids.
+//We can only utilizing the function to free
+//the IR which allocated by 'allocIR'.
+void Region::freeIRTreeList(IRList & irs)
+{
+    IRListIter next;
+    IRListIter ct;
+    for (irs.get_head(&ct); ct != irs.end(); ct = next) {
+        IR * ir = ct->val();
+        next = irs.get_next(ct);
+        ASSERTN(ir->is_single(),
+                ("do not allow sibling node, need to simplify"));
+        irs.remove(ir);
+        freeIRTree(ir);
+    }
+}
+
+
+//Free ir, ir's sibling, and all its kids.
+//We can only utilizing the function to free the IR
+//which allocated by 'allocIR'.
+//NOTICE: If ir's sibling is not nullptr, that means the IR is
+//a high level type. IRBB consists of only middle/low level IR.
+void Region::freeIRTreeList(IR * ir)
+{
+    if (ir == nullptr) { return; }
+    IR * head = ir, * next = nullptr;
+    while (ir != nullptr) {
+        next = ir->get_next();
+        xcom::remove(&head, ir);
+        freeIRTree(ir);
+        ir = next;
+    }
+}
+
+
+//Duplication all contents of 'src', includes AttachInfo, except DU info,
+//SSA info, kids and siblings IR.
+IR * Region::dupIR(IR const* src)
+{
+    if (src == nullptr) { return nullptr; }
+    IR_TYPE irt = src->getCode();
+    IR * res = allocIR(irt);
+    ASSERTN(res != nullptr && src != nullptr, ("res/src is nullptr"));
+
+    UINT res_id = IR_id(res);
+    AIContainer * res_ai = IR_ai(res);
+    UINT res_irt_sz = getIRTypeSize(res);
+    ::memcpy(res, src, IRTSIZE(irt));
+    IR_id(res) = res_id;
+    IR_ai(res) = res_ai;
+    set_irt_size(res, res_irt_sz);
+    IR_next(res) = IR_prev(res) = IR_parent(res) = nullptr;
+    res->cleanDU(); //Do not copy DU info.
+    res->cleanSSAInfo(); //Do not copy SSA info.
+    res->copyAI(src, this);
+    if (res->isMemoryRef()) {
+        res->copyRef(src, this);
+    }
+    return res;
+}
+
+
+//Duplicate 'ir' and its kids, but without ir's sibiling node.
+//The duplication includes AI, except DU info, SSA info.
+IR * Region::dupIRTree(IR const* ir)
+{
+    if (ir == nullptr) { return nullptr; }
+    IR * newir = dupIR(ir);
+    for (UINT i = 0; i < IR_MAX_KID_NUM(ir); i++) {
+        IR * kid = ir->getKid(i);
+        if (kid != nullptr) {
+            IR * newkid_list = dupIRTreeList(kid);
+            newir->setKid(i, newkid_list);
+        } else { ASSERT0(newir->getKid(i) == nullptr); }
+    }
+    return newir;
+}
+
+
+//Duplication 'ir' and kids, and its sibling, return list of new ir.
+//Duplicate irs start from 'ir' to the end of list.
+//The duplication includes AI, except DU info, SSA info.
+IR * Region::dupIRTreeList(IR const* ir)
+{
+    IR * new_list = nullptr;
+    while (ir != nullptr) {
+        IR * newir = dupIRTree(ir);
+        xcom::add_next(&new_list, newir);
+        ir = ir->get_next();
+    }
+    return new_list;
+}
 
 
 //Build IR_PR operation by specified prno and type id.
@@ -1385,5 +1626,6 @@ IR * Region::buildBinaryOp(IR_TYPE irt, Type const* type, IR * lchild,
 
     return buildBinaryOpSimp(irt, type, lchild, rchild);
 }
+//END Region
 
 } //namespace xoc

@@ -37,24 +37,30 @@ class RegionMgr;
 #define LOGMGR_INDENT_CHAR ' '
 #define LOGMGR_NEWLINE_CHAR '\n'
 #define DUMP_INDENT_NUM 4
+#define LOGCTX_DEFAULT_BUFFER_SIZE 4 //bytes
 
 //This class permits copy-constructing operations.
 class LogCtx {
 public:
     BYTE replace_newline:1;
     BYTE prt_srcline:1;
+    BYTE enable_buffer:1;
     CHAR indent_char;
     INT indent;
     FILE * logfile;
     CHAR const* logfile_name;
-
+    StrBuf * buffer;
 public:
-    LogCtx() : replace_newline(false), prt_srcline(true),
-               indent_char(LOGMGR_INDENT_CHAR), indent(0),
-               logfile(nullptr), logfile_name(nullptr) {}
-    LogCtx(UINT) { clean(); } //Used as UNDEFINED value in Stack<T>
+    LogCtx()
+        : replace_newline(false), prt_srcline(true), enable_buffer(false),
+          indent_char(LOGMGR_INDENT_CHAR), indent(0),
+          logfile(nullptr), logfile_name(nullptr),
+          buffer(nullptr) {}
+    LogCtx(UINT) : buffer(nullptr)
+    { clean(); } //Used as UNDEFINED value in Stack<T>
     LogCtx(bool p_replace_newline,
            bool p_prt_srcline,
+           bool p_enable_buffer,
            CHAR p_indent_char,
            INT p_indent,
            FILE * p_logfile,
@@ -62,20 +68,26 @@ public:
     {
         replace_newline = p_replace_newline;
         prt_srcline = p_prt_srcline;
+        enable_buffer = p_enable_buffer;
         indent_char = p_indent_char;
         indent = p_indent;
         logfile = p_logfile;
         logfile_name = p_logfile_name;
+        buffer = nullptr;
     }
 
     void clean()
     {
         replace_newline = false;
         prt_srcline = true;
+        enable_buffer = false;
         indent_char = LOGMGR_INDENT_CHAR;
         indent = 0;
         logfile = nullptr;
         logfile_name = nullptr;
+        if (buffer != nullptr) {
+            buffer->clean();
+        }
     }
 };
 
@@ -85,13 +97,21 @@ class LogMgr {
 protected:
     LogCtx m_ctx;
     Stack<LogCtx> m_ctx_stack;
+    TTab<StrBuf*> m_buftab;
 public:
     LogMgr() { init(nullptr, false); }
     LogMgr(CHAR const* logfilename, bool is_del) { init(logfilename, is_del); }
     ~LogMgr() { fini(); }
 
+    //Clean the dump buffer.
+    void cleanBuffer();
+
     //Decrease indent by value v.
     void decIndent(UINT v) { m_ctx.indent -= (INT)v; }
+    void dumpBuffer();
+
+    //Disable the dump buffer and output the buffer content into file.
+    void endBuffer();
 
     //Finalize log file.
     //Note after finialization, log mgr will not dump any information.
@@ -99,11 +119,15 @@ public:
     //LogMgr operate the correct IO resource when using 'push' and 'pop'.
     void fini();
 
+    //The function flush buffer content to file, whereas clean the buffer.
+    void flushBuffer();
+
     LogCtx const& getCurrentCtx() const { return m_ctx; }
     FILE * getFileHandler() const { return m_ctx.logfile; }
     CHAR const* getFileName() const { return m_ctx.logfile_name; }
     INT getIndent() const { return m_ctx.indent; }
     CHAR getIndentChar() const { return m_ctx.indent_char; }
+    StrBuf * getBuffer() { return m_ctx.buffer; }
 
     //Return true if replace 'newline' charactor with '\l' when
     //dumpping DOT file.
@@ -120,27 +144,37 @@ public:
     //Return true if LogMgr has initialized.
     bool is_init() const { return m_ctx.logfile != nullptr; }
 
+    //Return true if LogMgr enable dump buffer.
+    bool isEnableBuffer() const { return m_ctx.enable_buffer; }
+
     //Save current log file handler and name into stack, and set given handler
     //and filename as current.
     //h: file handler
     //filename: file name of h
     void push(FILE * h, CHAR const* filename);
     void push(LogCtx const& ctx);
+
     //The function will create LogCtx according to given filename, and
     //push on the stack.
     //is_del: true to delete the same name file.
     bool pushAndCreate(CHAR const* filename, bool is_del);
+
     //The function will pop and discard the top object on the stack and destroy
     //the related resource.
     void popAndDestroy();
+
     //Restore file handler and filename that is in top of stack.
     void pop();
 
     //Set indent by value v.
     void setIndent(UINT v) { m_ctx.indent = (INT)v; }
+
     //Replace 'newline' charactor with '\l' when dumpping DOT file when
     //replace is true.
     void setReplaceNewline(bool replace) { m_ctx.replace_newline = replace; }
+
+    //Enable and clean the dump buffer.
+    void startBuffer();
 };
 
 //Print string with indent chars.
@@ -151,7 +185,7 @@ void note(RegionMgr const* rm, CHAR const* format, ...);
 
 //Print string with indent chars.
 //lm: Log manager
-void note(LogMgr const* lm, CHAR const* format, ...);
+void note(LogMgr * lm, CHAR const* format, ...);
 
 //Print string with indent chars.
 //h: file handler.
@@ -165,7 +199,7 @@ bool prt(RegionMgr const* rm, CHAR const* format, ...);
 
 //Helper function to dump formatted string to logfile without indent.
 //lm: Log manager
-bool prt(LogMgr const* lm, CHAR const* format, ...);
+bool prt(LogMgr * lm, CHAR const* format, ...);
 
 //Print indent chars.
 void prtIndent(Region const* rg, UINT indent);

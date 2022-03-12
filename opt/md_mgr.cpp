@@ -338,10 +338,10 @@ void MDMgr::assignMDForBB(IRBB * bb, IRIter & ii,
                            bool assign_pr, bool assign_nonpr)
 {
     BBIRListIter ct;
-    for (xoc::IR * ir = bb->getIRList()->get_head(&ct);
-         ir != nullptr; ir = bb->getIRList()->get_next(&ct)) {
-        for (IR * x = iterInit(ir, ii);
-           x != nullptr; x = iterNext(ii)) {
+    for (xoc::IR * ir = bb->getIRList().get_head(&ct);
+         ir != nullptr; ir = bb->getIRList().get_next(&ct)) {
+        for (IR * x = xoc::iterInit(ir, ii);
+             x != nullptr; x = xoc::iterNext(ii)) {
            assignMDImpl(x, assign_pr, assign_nonpr);
         }
     }
@@ -360,8 +360,8 @@ void MDMgr::assignMDForIRList(IR * lst, bool assign_pr, bool assign_nonpr)
         default: {
             //Iterate rest of ir in lst.
             IRIter ii;
-            for (IR * x = iterInit(lst, ii);
-                 x != nullptr; x = iterNext(ii)) {
+            for (IR * x = xoc::iterInit(lst, ii);
+                 x != nullptr; x = xoc::iterNext(ii)) {
                 assignMDImpl(x, assign_pr, assign_nonpr);
             }
             return;

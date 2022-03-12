@@ -110,8 +110,12 @@ author: Su Zhenyu
 #define HAS_PREDICATE_REGISTER false
 
 //Define the max/min integer value range of target machine.
+#ifndef MIN_HOST_INT_VALUE
 #define MIN_HOST_INT_VALUE 0x80000000
+#endif
+#ifndef MAX_HOST_INT_VALUE
 #define MAX_HOST_INT_VALUE 0x7fffFFFF
+#endif
 #define EPSILON 0.000001
 
 //Defined the threshold of Dominator Frontier Density.

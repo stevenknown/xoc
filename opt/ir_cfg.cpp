@@ -39,9 +39,8 @@ namespace xoc {
 //IRCFG
 IRCFG::IRCFG(CFG_SHAPE cs, BBList * bbl, Region * rg,
              UINT edge_hash_size, UINT vertex_hash_size)
-    : CFG<IRBB, IR>(bbl, edge_hash_size, vertex_hash_size)
+    : Pass(rg), CFG<IRBB, IR>(bbl, edge_hash_size, vertex_hash_size)
 {
-    m_rg = rg;
     m_tm = rg->getTypeMgr();
     m_cs = cs;
     setBitSetMgr(rg->getBitSetMgr());
@@ -75,8 +74,8 @@ void IRCFG::buildEHEdge()
          bbit != m_bb_list->end(); bbit = m_bb_list->get_next(bbit)) {
         IRBB const* bb = bbit->val();
         IRListIter irit;
-        IR * x = const_cast<IRBB*>(bb)->getIRList()->get_tail(&irit);
-        if (x != nullptr && x->isMayThrow() && x->getAI() != nullptr) {
+        IR * x = const_cast<IRBB*>(bb)->getIRList().get_tail(&irit);
+        if (x != nullptr && x->isMayThrow(true) && x->getAI() != nullptr) {
             EHLabelAttachInfo const* ehlab =
                 (EHLabelAttachInfo const*)x->getAI()->get(AI_EH_LABEL);
             if (ehlab == nullptr) { continue; }
@@ -173,8 +172,8 @@ bool IRCFG::verifyBranchTarget() const
         if (last->isConditionalBr()) {
             LabelInfo const* lab = last->getLabel();
             ASSERT0(lab);
-            IRBB * succ0 = getSuccBBNth(bb, 0);
-            IRBB * succ1 = getSuccBBNth(bb, 1);
+            IRBB * succ0 = getNthSucc(bb, 0);
+            IRBB * succ1 = getNthSucc(bb, 1);
             ASSERT0(succ0 && succ1);
             BBListIter next_it = it;
             lst->get_next(&next_it);
@@ -190,7 +189,7 @@ bool IRCFG::verifyBranchTarget() const
         }
         if (last->isUnconditionalBr()) {
             LabelInfo const* lab = last->getLabel();
-            IRBB * succ0 = getSuccBBNth(bb, 0);
+            IRBB * succ0 = getNthSucc(bb, 0);
             ASSERT0(succ0);
             //Find the taken-branch-target and check whether the label is over
             //there.
@@ -258,13 +257,13 @@ bool IRCFG::verifyPhiEdge(IR * phi, TMap<IR*, LabelInfo*> & ir2label) const
 
 
 //Sort the order of predecessor of given BB according to PHI operand layout.
-void IRCFG::sortPred(IRBB const* bb, IR * ir, TMap<IR*, LabelInfo*> & ir2label)
+void IRCFG::sortPred(IRBB const* bb, IR * phi, TMap<IR*, LabelInfo*> & ir2label)
 {
     //Sort in-edge of bb to guarantee the order of them are same
     //with the phi-operands.
     xcom::Vertex * bbvex = getVertex(bb->id());
     xcom::EdgeC * opnd_pred = bbvex->getInList();
-    for (IR * opnd = PHI_opnd_list(ir);
+    for (IR * opnd = PHI_opnd_list(phi);
          opnd != nullptr; opnd = opnd->get_next()) {
         LabelInfo * opnd_label = ir2label.get(opnd);
         IRBB * incoming_bb = findBBbyLabel(opnd_label);
@@ -286,7 +285,53 @@ void IRCFG::sortPred(IRBB const* bb, IR * ir, TMap<IR*, LabelInfo*> & ir2label)
         opnd_pred = q->get_next();
     }
 
-    ASSERT0(verifyPhiEdge(ir, ir2label));
+    ASSERT0(verifyPhiEdge(phi, ir2label));
+}
+
+
+//The function replaces original predecessor with a list of
+//new predecessors.
+//bb: the predecessor will be replaced.
+//succ: the target BB.
+//newpreds: list of new predecessors.
+//Return the position of 'from' that is in the predecessor list of 'to'.
+UINT IRCFG::replacePred(IRBB const* bb, IRBB const* succ,
+                        List<UINT> const& newpreds)
+{
+    UINT orgpos = WhichPred(bb, succ);
+    UINT orgnum = getPredsNum(succ);
+    UINT newpredstartpos = CFG<IRBB, IR>::replacePred(bb, succ, newpreds);
+    PRSSAMgr * prssamgr = getRegion()->getPRSSAMgr();
+    MDSSAMgr * mdssamgr = getRegion()->getMDSSAMgr();
+    bool useprssa = prssamgr != nullptr && prssamgr->is_valid();
+    bool usemdssa = mdssamgr != nullptr && mdssamgr->is_valid();
+    if (newpreds.get_elem_count() <= 1) {
+        if (getPredsNum(succ) != orgnum) {
+            ASSERT0(newpredstartpos == orgpos);
+            if (useprssa) {
+                //Remove phi information before modify CFG.
+                prssamgr->removeSuccessorDesignatedPhiOpnd(succ,
+                                                           newpredstartpos);
+            }
+            if (usemdssa) {
+                //Remove phi information before modify CFG.
+                mdssamgr->removeSuccessorDesignatedPhiOpnd(succ,
+                                                           newpredstartpos);
+            }
+        }
+        //No need to duplicate operand if there is only one predecessor.
+        return newpredstartpos;
+    }
+
+    //Update phi operation.
+    if (useprssa) {
+        prssamgr->dupAndInsertPhiOpnd(succ, newpredstartpos,
+                                      newpreds.get_elem_count());
+    }
+    if (usemdssa) {
+        ASSERT0(0);//TODO
+    }
+    return newpredstartpos;
 }
 
 
@@ -321,8 +366,7 @@ void IRCFG::reorderPhiEdge(xcom::TMap<IR*, LabelInfo*> & ir2label)
             //Verify whether the others PHI's operands are in correct order.
             ASSERTN((UINT)phi_opnd_num == xcom::cnt_list(PHI_opnd_list(x)),
                     ("the number of operand is inconsistent"));
-            ASSERT0((UINT)phi_opnd_num ==
-                    getInDegree(getVertex(bb->id())));
+            ASSERT0((UINT)phi_opnd_num == getVertex(bb->id())->getInDegree());
             ASSERT0(verifyPhiEdge(x, ir2label));
         }
     }
@@ -429,6 +473,23 @@ static LabelInfo const* useFirstAvailLabel(IR * ir, LabelInfo const* li,
 }
 
 
+//You should clean the relation between Label and BB before removing BB.
+void IRCFG::removeBB(C<IRBB*> * bbct, CfgOptCtx const& ctx)
+{
+    ASSERT0(bbct && m_bb_list->in_list(bbct));
+    IRBB * bb = bbct->val();
+    removeAllMDPhi(bb);
+    if (ctx.need_update_dominfo()) {
+        removeDomInfo(bb->id());
+    }
+    removeRPO(bb);
+    //Note Label2BB should has been mainated before come to the function.
+    removeVertex(bb->id());
+    m_bb_vec.set(bb->id(), nullptr);
+    m_bb_list->remove(bbct);
+}
+
+
 //The function remove labels that nobody referrenced.
 bool IRCFG::removeRedundantLabel()
 {
@@ -491,7 +552,9 @@ void IRCFG::rebuild(OptCtx & oc)
     //Remove empty BB after cfg rebuilding because
     //rebuilding cfg may generate empty BB, it
     //disturb the computation of entry and exit.
-    removeEmptyBB(oc);
+    CfgOptCtx ctx;
+    CFGOPTCTX_update_dominfo(&ctx) = false;
+    removeEmptyBB(oc, ctx);
 
     //Compute exit BB while CFG rebuilt.
     computeExitList();
@@ -500,11 +563,11 @@ void IRCFG::rebuild(OptCtx & oc)
     UINT count = 0;
     while (change && count < 20) {
         change = false;
-        if (g_do_cfg_remove_empty_bb && removeEmptyBB(oc)) {
+        if (g_do_cfg_remove_empty_bb && removeEmptyBB(oc, ctx)) {
             computeExitList();
             change = true;
         }
-        if (g_do_cfg_remove_unreach_bb && removeUnreachBB()) {
+        if (g_do_cfg_remove_unreach_bb && removeUnreachBB(ctx)) {
             computeExitList();
             change = true;
         }
@@ -512,11 +575,11 @@ void IRCFG::rebuild(OptCtx & oc)
             computeExitList();
             change = true;
         }
-        if (g_do_cfg_remove_unreach_bb && removeUnreachBB()) {
+        if (g_do_cfg_remove_unreach_bb && removeUnreachBB(ctx)) {
             computeExitList();
             change = true;
         }
-        if (g_do_cfg_remove_trampolin_bb && removeTrampolinBB()) {
+        if (g_do_cfg_remove_trampolin_bb && removeTrampolinBB(ctx)) {
             computeExitList();
             change = true;
         }
@@ -557,7 +620,9 @@ void IRCFG::initCfg(OptCtx & oc)
 
     //Rebuild cfg may generate redundant empty bb, it
     //disturb the computation of entry and exit.
-    removeEmptyBB(oc);
+    CfgOptCtx ctx;
+    CFGOPTCTX_update_dominfo(&ctx) = false;
+    removeEmptyBB(oc, ctx);
     computeExitList();
 
     bool change = true;
@@ -565,12 +630,12 @@ void IRCFG::initCfg(OptCtx & oc)
     bool doopt = false;
     while (change && count < 20) {
         change = false;
-        if (g_do_cfg_remove_empty_bb && removeEmptyBB(oc)) {
+        if (g_do_cfg_remove_empty_bb && removeEmptyBB(oc, ctx)) {
             computeExitList();
             change = true;
             doopt = true;
         }
-        if (g_do_cfg_remove_unreach_bb && removeUnreachBB()) {
+        if (g_do_cfg_remove_unreach_bb && removeUnreachBB(ctx)) {
             computeExitList();
             change = true;
             doopt = true;
@@ -580,12 +645,12 @@ void IRCFG::initCfg(OptCtx & oc)
             change = true;
             doopt = true;
         }
-        if (g_do_cfg_remove_unreach_bb && removeUnreachBB()) {
+        if (g_do_cfg_remove_unreach_bb && removeUnreachBB(ctx)) {
             computeExitList();
             change = true;
             doopt = true;
         }
-        if (g_do_cfg_remove_trampolin_bb && removeTrampolinBB()) {
+        if (g_do_cfg_remove_trampolin_bb && removeTrampolinBB(ctx)) {
             computeExitList();
             change = true;
             doopt = true;
@@ -806,17 +871,17 @@ IRBB * IRCFG::findBBbyLabel(LabelInfo const* lab) const
 //    split_point; //the last ir in bb.
 //    newbb:
 //    ...
-IRBB * IRCFG::splitBB(IRBB * bb, IRListIter split_point)
+IRBB * IRCFG::splitBB(IRBB * bb, IRListIter split_point, OptCtx & oc)
 {
     IRBB * newbb = m_rg->allocBB();
 
     //Move rest IRs from bb to newbb.
-    for (bb->getIRList()->get_next(&split_point); split_point != nullptr;) {
+    for (bb->getIRList().get_next(&split_point); split_point != nullptr;) {
         IRListIter rm = split_point;
-        bb->getIRList()->get_next(&split_point);
-        bb->getIRList()->remove(rm);
+        bb->getIRList().get_next(&split_point);
+        bb->getIRList().remove(rm);
         ASSERT0(rm->val());
-        newbb->getIRList()->append_tail(rm->val());
+        newbb->getIRList().append_tail(rm->val());
     }
 
     //Update CFG info.
@@ -848,20 +913,31 @@ IRBB * IRCFG::splitBB(IRBB * bb, IRListIter split_point)
 
     addEdge(bb->id(), newbb->id());
 
-    //Update RPO
-    INT rpo = bb->rpo() + 1;
-    if (rpo < minsuccrpo && xcom::Graph::isValidRPO(rpo)) {
-        BB_rpo(newbb) = rpo;
-        xcom::Vertex * v = getVertex(newbb->id());
-        VERTEX_rpo(v) = rpo;
-    } else {
-        BB_rpo(newbb) = RPO_UNDEF;
-        xcom::Vertex * v = getVertex(newbb->id());
-        VERTEX_rpo(v) = RPO_UNDEF;
+    if (!oc.is_rpo_valid() || tryUpdateRPO(newbb, bb, false)) {
+        OC_is_rpo_valid(oc) = false;
+    }
+    if (oc.is_dom_valid()) {
+        addDomInfoByNewIPDom(bb->id(), newbb->id());
     }
     return newbb;
 }
 
+
+//Some optimization may append stmt into BB which has down-boundary stmt.
+//That makes BB invalid. Split such invalid BB into two or more BBs.
+//The function will try to maintain RPO and DOM info.
+bool IRCFG::splitBBIfNeeded(IRBB * bb, OptCtx & oc)
+{
+    IRListIter it;
+    for (bb->getIRList().get_head(&it); it != nullptr;) {
+        IRListIter cur = it; bb->getIRList().get_next(&it);
+        if (IRBB::isLowerBoundary(cur->val()) && it != nullptr) {
+            splitBB(bb, cur, oc);
+            return true;
+        }
+    }
+    return false;
+}
 
 //Try to update RPO of newbb accroding to RPO of marker.
 //newbb_prior_marker: true if newbb's lexicographical order is prior to marker.
@@ -870,6 +946,7 @@ IRBB * IRCFG::splitBB(IRBB * bb, IRListIter split_point)
 bool IRCFG::tryUpdateRPO(IRBB * newbb, IRBB const* marker,
                          bool newbb_prior_marker)
 {
+    ASSERT0(newbb != marker);
     xcom::Vertex const* v = getVertex(marker->id());
     ASSERT0(v);
     INT rpo = RPO_UNDEF;
@@ -884,10 +961,12 @@ bool IRCFG::tryUpdateRPO(IRBB * newbb, IRBB const* marker,
             if (pred != marker->id()) {
                 IRBB const* predbb = getBB(pred);
                 ASSERT0(predbb);
-                if (xcom::Graph::isValidRPO(predbb->rpo())) {
+                if (predbb == newbb) { continue; }
+                if (predbb->rpo() == RPO_UNDEF) {
                     //Exist invalid rpo, recompute them first.
                     return false;
                 }
+                if (predbb->rpo() >= marker->rpo()) { continue; }
                 maxpredrpo = MAX(predbb->rpo(), maxpredrpo);
             }
         }
@@ -906,10 +985,12 @@ bool IRCFG::tryUpdateRPO(IRBB * newbb, IRBB const* marker,
             if (succ != marker->id()) {
                 IRBB const* succbb = getBB(succ);
                 ASSERT0(succbb);
-                if (xcom::Graph::isValidRPO(succbb->rpo())) {
+                if (succbb == newbb) { continue; }
+                if (succbb->rpo() == RPO_UNDEF) {
                     //Exist invalid rpo, recompute them first.
                     return false;
                 }
+                if (succbb->rpo() <= marker->rpo()) { continue; }
                 minsuccrpo = MIN(succbb->rpo(), minsuccrpo);
             }
         }
@@ -920,11 +1001,19 @@ bool IRCFG::tryUpdateRPO(IRBB * newbb, IRBB const* marker,
     }
 
     //Try to update RPO
-    if (rpo != RPO_UNDEF && xcom::Graph::isValidRPO(rpo)) {
+    if (rpo != RPO_UNDEF && xcom::Graph::isUsableRPO(rpo)) {
         BB_rpo(newbb) = rpo;
         xcom::Vertex * nv = getVertex(newbb->id());
         ASSERTN(nv, ("newbb should be added to graph first"));
         VERTEX_rpo(nv) = rpo;
+        RPOVexList * vlst = getRPOVexList();
+        if (newbb_prior_marker) {
+            vlst->insert_before(getVertex(newbb->id()),
+                                getVertex(marker->id()));
+        } else {
+            vlst->insert_after(getVertex(newbb->id()),
+                               getVertex(marker->id()));
+        }
         return true;
     }
     BB_rpo(newbb) = RPO_UNDEF;
@@ -972,7 +1061,7 @@ void IRCFG::insertBBbefore(IN IRBB * bb, IN IRBB * newbb)
 }
 
 
-//Return the inserted trampolining BB if exist.
+//Return the newbb or the inserted trampolining BB in addition to newbb.
 //This function will break fallthrough edge of 'to' if necessary.
 IRBB * IRCFG::insertBBbetween(IN IRBB * from, IN BBListIter from_ct,
                               IN IRBB * to, IN BBListIter to_ct,
@@ -988,7 +1077,7 @@ IRBB * IRCFG::insertBBbetween(IN IRBB * from, IN BBListIter from_ct,
         bblst->insert_after(newbb, from_ct);
         addBB(newbb);
         insertVertexBetween(from->id(), to->id(), newbb->id());
-        return nullptr;
+        return newbb;
     }
 
     //Second, from->to is jump-edge.
@@ -1056,7 +1145,7 @@ IRBB * IRCFG::insertBBbetween(IN IRBB * from, IN BBListIter from_ct,
     //When we get here, there are NOT any fallthrough in-edges of 'to'.
     bblst->insert_before(newbb, to_ct);
     insertVertexBetween(from->id(), to->id(), newbb->id());
-    return inserted_tramp_bb;
+    return inserted_tramp_bb != nullptr ? inserted_tramp_bb : newbb;
 }
 
 
@@ -1079,7 +1168,37 @@ void IRCFG::moveLabels(IRBB * src, IRBB * tgt)
 }
 
 
-//Cut off the mapping relation bwteen Labels and BB.
+void IRCFG::removeSuccDesignatedPhiOpnd(IRBB const* succ, UINT pos)
+{
+    //Before removing bb or change bb successor,
+    //you need remove the related PHI operand if BB 'succ' has PHI stmt.
+    PRSSAMgr * prssamgr = getRegion()->getPRSSAMgr();
+    if (prssamgr != nullptr && prssamgr->is_valid()) {
+        prssamgr->removeSuccessorDesignatedPhiOpnd(succ, pos);
+    }
+    MDSSAMgr * mdssamgr = getRegion()->getMDSSAMgr();
+    if (mdssamgr != nullptr && mdssamgr->is_valid()) {
+        mdssamgr->removeSuccessorDesignatedPhiOpnd(succ, pos);
+    }
+}
+
+
+//Remove related PHI operand from successor BB.
+//Before removing current BB or change BB's successor,
+//you need remove the related PHI operand if BB successor has PHI.
+void IRCFG::removeSuccPhiOpnd(IRBB const* bb)
+{
+    UINT pos = 0;
+    for (EdgeC const* ec = getVertex(bb->id())->getOutList();
+         ec != nullptr; ec = ec->get_next(), pos++) {
+        ASSERT0(ec->getFromId() == bb->id());
+        IRBB * succ = getBB(ec->getToId());
+        removeSuccDesignatedPhiOpnd(succ, pos);
+    }
+}
+
+
+//Cut off the mapping relation between Labels and BB.
 void IRCFG::resetMapBetweenLabelAndBB(IRBB * bb)
 {
     LabelInfoListIter it;
@@ -1104,12 +1223,76 @@ bool IRCFG::isRPOValid() const
 }
 
 
-void IRCFG::remove_bb_impl(IRBB * bb)
+//The function remove all MDPhis in 'bb'.
+//Note caller should guarrantee phi is useless and removable.
+void IRCFG::removeAllMDPhi(IRBB * bb)
 {
-    ASSERT0(bb);
-    //Note Label2BB should has been mainated before come to the function.
-    m_bb_vec.set(bb->id(), nullptr);
-    removeVertex(bb->id());
+    MDSSAMgr * mgr = m_rg->getMDSSAMgr();
+    if (mgr != nullptr && mgr->is_valid()) {
+        mgr->removePhiFromBB(bb);
+    }
+}
+
+
+//Before removing current BB or change BB's successor,
+//you need remove the related PHI operand if BB successor has PHI.
+void IRCFG::removeRelatedSuccBBPhiOpnd(IRBB * bb)
+{
+    xcom::Vertex * vex = getVertex(bb->id());
+    ASSERT0(vex);
+    bool update_prssa = false;
+    bool update_mdssa = false;
+    PRSSAMgr * prssamgr = getRegion()->getPRSSAMgr();
+    if (prssamgr != nullptr && prssamgr->is_valid()) {
+        update_prssa = true;
+    }
+    MDSSAMgr * mdssamgr = getRegion()->getMDSSAMgr();
+    if (mdssamgr != nullptr && mdssamgr->is_valid()) {
+        update_mdssa = true;
+    }
+    if (!update_prssa && !update_mdssa) { return; }
+    for (xcom::EdgeC * out = vex->getOutList();
+         out != nullptr; out = out->get_next()) {
+        IRBB * succ = getBB(out->getToId());
+        ASSERT0(succ);
+        UINT pos = WhichPred(bb, succ);
+        if (update_prssa) {
+            prssamgr->removeSuccessorDesignatedPhiOpnd(succ, pos);
+        }
+        if (update_mdssa) {
+            mdssamgr->removeSuccessorDesignatedPhiOpnd(succ, pos);
+        }
+    }
+}
+
+
+void IRCFG::removeEdge(IRBB * from, IRBB * to)
+{
+    removeSuccDesignatedPhiOpnd(to, WhichPred(from, to));
+    CFG<IRBB, IR>::removeEdge(from, to);
+}
+
+
+xcom::Edge * IRCFG::addEdge(IRBB * from, IRBB * to)
+{
+    PRSSAInfoCollect col(m_rg);
+    PRSSAMgr * prssamgr = getRegion()->getPRSSAMgr();
+    bool useprssa = prssamgr != nullptr && prssamgr->is_valid();
+    if (useprssa) {
+        col.collect(from, to);
+    }
+
+    xcom::Edge * e = DGraph::addEdge(from->id(), to->id());
+    //After adding BB or change bb successor, you need to add the related PHI
+    //operand as well if the successor of BB has a PHI stmt.
+    if (useprssa) {
+        prssamgr->addSuccessorDesignatedPhiOpnd(from, to, col);
+    }
+    MDSSAMgr * mdssamgr = getRegion()->getMDSSAMgr();
+    if (mdssamgr != nullptr && mdssamgr->is_valid()) {
+        mdssamgr->addSuccessorDesignatedPhiOpnd(from, to);
+    }
+    return e;
 }
 
 
@@ -1124,7 +1307,7 @@ void IRCFG::remove_bb_impl(IRBB * bb)
 //    ...
 //Remove bb and revise CFG.
 //ct: container in m_bb_list of CFG. It will be updated if related BB removed.
-bool IRCFG::removeTrampolinBBCase1(BBListIter * ct)
+bool IRCFG::removeTrampolinBBCase1(BBListIter * ct, CfgOptCtx const& ctx)
 {
     List<IRBB*> preds;
     IRBB * bb = (*ct)->val();
@@ -1142,7 +1325,7 @@ bool IRCFG::removeTrampolinBBCase1(BBListIter * ct)
 
     Vertex const* vex = getVertex(next->id());
     ASSERT0(vex);
-    if (getInDegree(vex) > 1) {
+    if (vex->getInDegree() > 1) {
         //successor is not just the branch target of 'bb', thus it
         //can not be removed.
         return false;
@@ -1203,9 +1386,10 @@ bool IRCFG::removeTrampolinBBCase1(BBListIter * ct)
         }
     } //end for each pred of BB.
 
-    //The map between Labels and BB has been maintained.
+    //The mapping between Labels and BB has been maintained by above code.
     //resetMapBetweenLabelAndBB(bb);
-    removeBB(bb);
+
+    removeBB(*ct, ctx);
 
     //Update ct to reprocess BB list from beginning.
     m_bb_list->get_head(ct);
@@ -1232,7 +1416,7 @@ bool IRCFG::removeTrampolinBBCase1(BBListIter * ct)
 //        remove edge pred->BB.
 //        add edge pred->BB's next.
 //    end for
-bool IRCFG::removeTrampolinBB()
+bool IRCFG::removeTrampolinBB(CfgOptCtx const& ctx)
 {
     bool removed = false;
     BBListIter ct;
@@ -1249,7 +1433,7 @@ bool IRCFG::removeTrampolinBB()
             bb->getNumOfIR() != 1) {
             continue;
         }
-        removed |= removeTrampolinBBCase1(&ct);
+        removed |= removeTrampolinBBCase1(&ct, ctx);
     }
     return removed;
 }
@@ -1311,10 +1495,7 @@ bool IRCFG::removeTrampolinEdgeCase2(BBListIter bbct)
             //      goto L2
             BB_irlist(pred).append_tail(m_rg->dupIRTree(last_xr));
             removeEdge(pred, bb);
-
             addEdge(pred, succ);
-            //bb->dupSuccessorPhiOpnd(this, m_rg, WhichPred(bb, succ));
-
             removed = true;
             continue;
         }
@@ -1349,9 +1530,7 @@ bool IRCFG::removeTrampolinEdgeCase2(BBListIter bbct)
 
             GOTO_lab(last_xr_of_pred) = tgt_li;
             removeEdge(pred, bb);
-
             addEdge(pred, succ);
-
             removed = true;
             continue;
         } //end if
@@ -1420,7 +1599,7 @@ bool IRCFG::removeTrampolinEdgeCase1(BBListIter bbct)
     if (target == next_ct->val()) {
         Vertex const* vex = getVertex(target->id());
         ASSERT0(vex);
-        if (getInDegree(vex) > 1) {
+        if (vex->getInDegree() > 1) {
             //'target' is not just the branch target of 'bb', thus
             //it can not be removed.
             return false;
@@ -1469,7 +1648,7 @@ bool IRCFG::removeTrampolinEdge()
         }
         IR * last_xr = get_last_xr(bb);
         ASSERT0(last_xr);
-        if (last_xr->hasSideEffect() ||
+        if (last_xr->hasSideEffect(true) ||
             !last_xr->is_goto() ||
             bb->isAttachDedicatedLabel()) {
             //BB has sideeffect and should not be processed.
@@ -1497,7 +1676,7 @@ bool IRCFG::removeRedundantBranch()
         IR * last_xr = get_last_xr(bb);
         if (last_xr == nullptr ||
             !last_xr->isConditionalBr() ||
-            last_xr->hasSideEffect()) {
+            last_xr->hasSideEffect(true)) {
             continue;
         }
 
@@ -1559,14 +1738,31 @@ bool IRCFG::removeRedundantBranch()
 }
 
 
+bool IRCFG::verifyDomAndPdom(OptCtx const& oc) const
+{
+    bool succ = false;
+    if (oc.is_dom_valid()) {
+        if (!DGraph::verifyDom()) {
+            return false;
+        }
+    }
+    if (oc.is_pdom_valid()) {
+        if (!DGraph::verifyPdom()) {
+            return false;
+        }
+    }
+    return true;
+}
+
+
 bool IRCFG::verifyRPO(OptCtx const& oc) const
 {
     if (!OC_is_rpo_valid(oc)) { return true; }
     IRCFG * pthis = const_cast<IRCFG*>(this);
     ASSERT0(pthis->getBBList());
     ASSERTN(isRPOValid(), ("Miss RPO info or set rpo invalid in OptCtx"));
-    if (pthis->getRPOBBList() != nullptr) {
-        ASSERTN(pthis->getRPOBBList()->get_elem_count() ==
+    if (pthis->getRPOVexList() != nullptr) {
+        ASSERTN(pthis->getRPOVexList()->get_elem_count() ==
                 pthis->getBBList()->get_elem_count(),
                 ("RPO info need to be fixed or set rpo invalid in OptCtx"));
     }
@@ -1592,54 +1788,26 @@ void IRCFG::dumpDOT(CHAR const* name, UINT flag) const
 }
 
 
-void IRCFG::dumpDOT(FILE * h, UINT flag) const
+//Note the function will use \l instead of \n to avoid DOT complaint.
+static void dumpDotNode(FILE * h, UINT flag, IRCFG const* cfg)
 {
-    if (!getRegion()->isLogMgrInit() || h == nullptr) { return; }
-    getRegion()->getLogMgr()->push(h, "");
-
-    bool detail = HAVE_FLAG(flag, DUMP_DETAIL);
-    bool dump_eh = HAVE_FLAG(flag, DUMP_EH);
-    bool dump_mdssa = HAVE_FLAG(flag, DUMP_MDSSA);
-    if (detail) {
-        //Print comment
-        fprintf(h, "\n/******************************");
-        dumpBBList(m_bb_list, m_rg);
-        fprintf(h, "\n******************************/\n");
-    }
-
-    //Start to dump DOT.
-    fprintf(h, "digraph G {\n");
-
-    //fprintf(h, "rankdir=LR;\n"); //Layout from Left to Right.
-    //fprintf(h, "rankdir=TB;\n");
-    //fprintf(h, "rankdir=BT;\n");
-
-    //Print carriage return for dot file.
-    bool org_replace = getRegion()->getLogMgr()->isReplaceNewline();
-    getRegion()->getLogMgr()->setReplaceNewline(true);
-
-    //Print Region name.
-    fprintf(h,
-            "\nstartnode [fontsize=24,style=filled, "
-            "color=gold,shape=none,label=\"RegionName:%s\"];",
-            m_rg->getRegionName());
-
-    MDSSAMgr const* mdssamgr = (MDSSAMgr const*)m_rg->getPassMgr()->queryPass(
-                               PASS_MD_SSA_MGR);
+    bool detail = HAVE_FLAG(flag, IRCFG::DUMP_DETAIL);
+    bool dump_eh = HAVE_FLAG(flag, IRCFG::DUMP_EH);
+    bool dump_mdssa = HAVE_FLAG(flag, IRCFG::DUMP_MDSSA);
+    MDSSAMgr const* mdssamgr = (MDSSAMgr const*)cfg->getRegion()->getMDSSAMgr();
     if (mdssamgr == nullptr || !mdssamgr->is_valid()) {
         dump_mdssa = false;
     }
-
     //Print node
     VertexIter c = VERTEX_UNDEF;
-    for (xcom::Vertex * v = get_first_vertex(c);
-         v != nullptr; v = get_next_vertex(c)) {
+    for (xcom::Vertex * v = cfg->get_first_vertex(c);
+         v != nullptr; v = cfg->get_next_vertex(c)) {
         CHAR const* shape = "box";
         CHAR const* font = "courB";
         CHAR const* color = "black";
         CHAR const* style = "bold";
         UINT fontsize = 12;
-        IRBB * bb = getBB(v->id());
+        IRBB * bb = cfg->getBB(v->id());
         ASSERT0(bb);
         if (BB_is_catch_start(bb)) {
             font = "Times Bold";
@@ -1660,7 +1828,7 @@ void IRCFG::dumpDOT(FILE * h, UINT flag) const
                     "shape=%s,style=%s,label=\"BB%d ",
                     v->id(), font, fontsize, color, shape, style, v->id());
 
-            dumpBBLabel(bb->getLabelList(), getRegion());
+            dumpBBLabel(bb->getLabelList(), cfg->getRegion());
             fprintf(h, " ");
             fprintf(h, "rpo:%d ", bb->rpo());
 
@@ -1682,7 +1850,7 @@ void IRCFG::dumpDOT(FILE * h, UINT flag) const
                 if (dump_mdssa) {
                     mdssamgr->dumpIRWithMDSSA(ir, IR_DUMP_KID);
                 } else {
-                    dumpIR(ir, m_rg, nullptr, IR_DUMP_KID);
+                    dumpIR(ir, cfg->getRegion(), nullptr, IR_DUMP_KID);
                 }
             }
 
@@ -1702,12 +1870,18 @@ void IRCFG::dumpDOT(FILE * h, UINT flag) const
                 v->id(), font, fontsize, color, shape, style, v->id());
         fflush(h);
     }
+}
 
-    //Print edge
+
+//Note the function will use \l instead of \n to avoid DOT complaint.
+static void dumpDotEdge(FILE * h, UINT flag, IRCFG const* cfg)
+{
+    bool detail = HAVE_FLAG(flag, IRCFG::DUMP_DETAIL);
+    bool dump_eh = HAVE_FLAG(flag, IRCFG::DUMP_EH);
     VertexIter c2 = VERTEX_UNDEF;
     TTab<xcom::Edge const*> visited;
-    for (xcom::Vertex * v = get_first_vertex(c2);
-         v != nullptr; v = get_next_vertex(c2)) {
+    for (xcom::Vertex * v = cfg->get_first_vertex(c2);
+         v != nullptr; v = cfg->get_next_vertex(c2)) {
         //Print in-edge list.
         UINT pos = 0;
         for (xcom::EdgeC const* ec = v->getInList();
@@ -1739,8 +1913,8 @@ void IRCFG::dumpDOT(FILE * h, UINT flag) const
 
     //Print rest of edges.
     EdgeIter ite;
-    for (xcom::Edge const* e = get_first_edge(ite);
-         e != nullptr;  e = get_next_edge(ite)) {
+    for (xcom::Edge const* e = cfg->get_first_edge(ite);
+         e != nullptr;  e = cfg->get_next_edge(ite)) {
         if (visited.find(e)) { continue; }
 
         CFGEdgeInfo * ei = (CFGEdgeInfo*)EDGE_info(e);
@@ -1761,35 +1935,113 @@ void IRCFG::dumpDOT(FILE * h, UINT flag) const
         }
         ASSERTN(0, ("unsupport CFGEdgeInfo"));
     }
+}
+
+
+void IRCFG::dumpDOT(FILE * h, UINT flag) const
+{
+    if (!getRegion()->isLogMgrInit() || h == nullptr) { return; }
+    getRegion()->getLogMgr()->push(h, "");
+
+    bool detail = HAVE_FLAG(flag, DUMP_DETAIL);
+    if (detail) {
+        //Print comment
+        note(getRegion(), "\n/******************************");
+        dumpBBList(m_bb_list, m_rg);
+        note(getRegion(), "\n******************************/\n");
+    }
+
+    //Start to dump DOT.
+    note(getRegion(), "digraph G {\n");
+
+    //fprintf(h, "rankdir=LR;\n"); //Layout from Left to Right.
+    //fprintf(h, "rankdir=TB;\n");
+    //fprintf(h, "rankdir=BT;\n");
+
+    //Print Region name.
+    note(getRegion(),
+         "\nstartnode [fontsize=24,style=filled, "
+         "color=gold,shape=none,label=\"RegionName:%s\"];",
+         m_rg->getRegionName());
+
+    //Print carriage-return for DOT file, use \l instead of \n to
+    //avoid DOT complaint.
+    bool org_carr = getRegion()->getLogMgr()->isReplaceNewline();
+    getRegion()->getLogMgr()->setReplaceNewline(true);
+    dumpDotNode(h, flag, this);
+    dumpDotEdge(h, flag, this);
     getRegion()->getLogMgr()->pop();
-    getRegion()->getLogMgr()->setReplaceNewline(org_replace);
+    getRegion()->getLogMgr()->setReplaceNewline(org_carr);
     fprintf(h,"\n}\n");
     fflush(h);
 }
 
 
-void IRCFG::dump_node(bool detail, bool dump_mdssa) const
+static void dumpVCGNodeWithDetail(CHAR const* shape, CHAR const* font,
+                                  CHAR const* color,
+                                  UINT vertical_order,
+                                  INT scale,
+                                  UINT flag,
+                                  IRBB const* bb,
+                                  IRCFG const* cfg)
 {
-    FILE * h = getRegion()->getLogMgr()->getFileHandler();
-    ASSERT0(h);
-    ASSERT0(m_bb_list);
-    MDSSAMgr const* mdssamgr = (MDSSAMgr const*)m_rg->getPassMgr()->queryPass(
-                               PASS_MD_SSA_MGR);
-    if (mdssamgr == nullptr && !mdssamgr->is_valid()) {
+    bool dump_mdssa = HAVE_FLAG(flag, IRCFG::DUMP_MDSSA);
+    MDSSAMgr const* mdssamgr = (MDSSAMgr const*)cfg->getRegion()->getMDSSAMgr();
+    if (mdssamgr == nullptr || !mdssamgr->is_valid()) {
         dump_mdssa = false;
     }
+    FILE * h = cfg->getRegion()->getLogMgr()->getFileHandler();
+    ASSERT0(h);
+    fprintf(h,
+            "\nnode: {title:\"%d\" vertical_order:%d shape:%s color:%s "
+            "fontname:\"%s\" scaling:%d label:\"",
+            bb->id(), vertical_order++, shape, color, font, scale);
+    fprintf(h, "   BB%d ", bb->rpo());
+    fprintf(h, " rpo:%d ", bb->rpo());
+    dumpBBLabel(const_cast<IRBB*>(bb)->getLabelList(), cfg->getRegion());
+    fprintf(h, "\n");
 
+    //Dump MDSSA Phi List.
+    if (dump_mdssa) {
+        MDPhiList const* philist = mdssamgr->getPhiList(bb);
+        if (philist != nullptr) {
+            mdssamgr->dumpPhiList(philist);
+        }
+    }
+
+    //Dump IR list.
+    for (IR * ir = BB_first_ir(const_cast<IRBB*>(bb));
+         ir != nullptr; ir = BB_next_ir(const_cast<IRBB*>(bb))) {
+        //fprintf(h, "%s\n", dump_ir_buf(ir, buf));
+
+        //TODO: implement dump_ir_buf();
+        if (dump_mdssa) {
+            mdssamgr->dumpIRWithMDSSA(ir, IR_DUMP_KID);
+        } else {
+            dumpIR(ir, cfg->getRegion(), nullptr, IR_DUMP_KID);
+        }
+    }
+
+    fprintf(h, "\"}");
+    fflush(h);
+}
+
+
+static void dumpVCGNode(UINT flag, IRCFG const* cfg)
+{
+    bool detail = HAVE_FLAG(flag, IRCFG::DUMP_DETAIL);
+    FILE * h = cfg->getRegion()->getLogMgr()->getFileHandler();
+    ASSERT0(h);
     UINT vertical_order = 1;
     INT c;
-    for (xcom::Vertex const* v = get_first_vertex(c);
-        v != nullptr; v = get_next_vertex(c)) {
-        IRBB * bb = getBB(v->id());
+    for (xcom::Vertex const* v = cfg->get_first_vertex(c);
+        v != nullptr; v = cfg->get_next_vertex(c)) {
+        IRBB * bb = cfg->getBB(v->id());
         ASSERTN(bb, ("Not find BB%d", v->id()));
         CHAR const* shape = "box";
         CHAR const* font = "courB";
         CHAR const* color = "gold";
         INT scale = 1;
-
         if (BB_is_catch_start(bb)) {
             shape = "uptrapezoid";
         }
@@ -1798,43 +2050,11 @@ void IRCFG::dump_node(bool detail, bool dump_mdssa) const
             scale = 2;
             color = "cyan";
         }
-
         if (detail) {
-            fprintf(h,
-                    "\nnode: {title:\"%d\" vertical_order:%d shape:%s color:%s "
-                    "fontname:\"%s\" scaling:%d label:\"",
-                    v->id(), vertical_order++, shape, color, font, scale);
-            fprintf(h, "   BB%d ", bb->rpo());
-            fprintf(h, " rpo:%d ", VERTEX_rpo(v));
-            dumpBBLabel(bb->getLabelList(), getRegion());
-            fprintf(h, "\n");
-
-            //Dump MDSSA Phi List.
-            if (dump_mdssa) {
-                MDPhiList const* philist = mdssamgr->getPhiList(bb);
-                if (philist != nullptr) {
-                    mdssamgr->dumpPhiList(philist);
-                }
-            }
-
-            //Dump IR list.
-            for (IR * ir = BB_first_ir(bb);
-                 ir != nullptr; ir = BB_next_ir(bb)) {
-                //fprintf(h, "%s\n", dump_ir_buf(ir, buf));
-
-                //TODO: implement dump_ir_buf();
-                if (dump_mdssa) {
-                    mdssamgr->dumpIRWithMDSSA(ir, IR_DUMP_KID);
-                } else {
-                    dumpIR(ir, m_rg, nullptr, IR_DUMP_KID);
-                }
-            }
-
-            fprintf(h, "\"}");
-            fflush(h);
+            dumpVCGNodeWithDetail(shape, font, color, vertical_order, scale,
+                                  flag, bb, cfg);
             continue;
         }
-
         //Dump node without detail.
         fprintf(h,
                 "\nnode: {title:\"%d\" vertical_order:%d shape:%s color:%s "
@@ -1847,7 +2067,7 @@ void IRCFG::dump_node(bool detail, bool dump_mdssa) const
 
 
 //Print graph structure description.
-void IRCFG::dump_head(FILE * h) const
+static void dumpVCGHead(FILE * h)
 {
     ASSERT0(h);
     fprintf(h,
@@ -1888,15 +2108,16 @@ void IRCFG::dump_head(FILE * h) const
 }
 
 
-void IRCFG::dump_edge(bool dump_eh) const
+static void dumpVCGEdge(UINT flag, IRCFG const* cfg)
 {
-    FILE * h = getRegion()->getLogMgr()->getFileHandler();
+    bool dump_eh = HAVE_FLAG(flag, IRCFG::DUMP_EH);
+    FILE * h = cfg->getRegion()->getLogMgr()->getFileHandler();
     ASSERT0(h);
     INT c2;
     TTab<xcom::Edge const*> visited;
     UINT pos = 0;
-    for (xcom::Vertex * v = get_first_vertex(c2);
-         v != nullptr; v = get_next_vertex(c2), pos++) {
+    for (xcom::Vertex * v = cfg->get_first_vertex(c2);
+         v != nullptr; v = cfg->get_next_vertex(c2), pos++) {
         //Print in-edge list.
         UINT pos2 = 0;
         for (xcom::EdgeC const* ec = v->getInList();
@@ -1934,8 +2155,8 @@ void IRCFG::dump_edge(bool dump_eh) const
 
     //Print rest of edges.
     EdgeIter c;
-    for (xcom::Edge * e = get_first_edge(c);
-         e != nullptr; e = get_next_edge(c)) {
+    for (xcom::Edge * e = cfg->get_first_edge(c);
+         e != nullptr; e = cfg->get_next_edge(c)) {
         if (visited.find(e)) { continue; }
 
         CFGEdgeInfo * ei = (CFGEdgeInfo*)EDGE_info(e);
@@ -1970,11 +2191,6 @@ void IRCFG::dumpVCG(CHAR const* name, UINT flag) const
 {
     if (!getRegion()->isLogMgrInit()) { return; }
     ASSERT0(m_rg);
-
-    bool detail = HAVE_FLAG(flag, DUMP_DETAIL);
-    bool dump_eh = HAVE_FLAG(flag, DUMP_EH);
-    bool dump_mdssa = HAVE_FLAG(flag, DUMP_MDSSA);
-
     if (name == nullptr) { name = "graph_cfg.vcg"; }
 
     //Note this function does not use LogMgr as output.
@@ -1982,7 +2198,7 @@ void IRCFG::dumpVCG(CHAR const* name, UINT flag) const
     UNLINK(name);
     FILE * h = fopen(name, "a+");
     ASSERTN(h != nullptr, ("%s create failed!!!",name));
-    dump_head(h);
+    dumpVCGHead(h);
 
     //Start to dump VCG.
     //Print Region name.
@@ -1992,8 +2208,8 @@ void IRCFG::dumpVCG(CHAR const* name, UINT flag) const
             "scaling:2 label:\"RegionName:%s\" }",
             m_rg->getRegionName());
     getRegion()->getLogMgr()->push(h, "");
-    dump_node(detail, dump_mdssa);
-    dump_edge(dump_eh);
+    dumpVCGNode(flag, this);
+    dumpVCGEdge(flag, this);
     getRegion()->getLogMgr()->pop();
     fprintf(h, "\n}\n");
     fclose(h);
@@ -2006,9 +2222,37 @@ bool IRCFG::dump() const
     START_TIMER_FMT(t, ("DUMP %s", getPassName()));
     note(getRegion(), "\n==---- DUMP %s '%s' ----==",
          getPassName(), m_rg->getRegionName());
+    m_rg->getLogMgr()->incIndent(2);
     dumpDOT(getRegion()->getLogMgr()->getFileHandler(), DUMP_COMBINE);
+    m_rg->getLogMgr()->decIndent(2);
     END_TIMER_FMT(t, ("DUMP %s", getPassName()));
     return true;
+}
+
+
+//Record the Exit BB here.
+void IRCFG::computeExitList()
+{
+    //Clean the Exit flag.
+    BBListIter ct = nullptr;
+    for (m_exit_list.get_head(&ct);
+         ct != m_exit_list.end();
+         ct = m_exit_list.get_next(ct)) {
+        IRBB * bb = ct->val();
+        ASSERT0(bb);
+        BB_is_exit(bb) = false;
+    }
+
+    CFG<IRBB, IR>::computeExitList();
+
+    //Record the Exit flag as BB attribute to speed up accessing.
+    for (m_exit_list.get_head(&ct);
+         ct != m_exit_list.end();
+         ct = m_exit_list.get_next(ct)) {
+        IRBB * bb = ct->val();
+        ASSERT0(bb);
+        BB_is_exit(bb) = true;
+    }
 }
 
 
@@ -2022,31 +2266,44 @@ void IRCFG::computeDomAndIdom(MOD OptCtx & oc, xcom::BitSet const* uni)
     ASSERTN(m_entry, ("ONLY support SESE or SEME"));
 
     m_rg->getPassMgr()->checkValidAndRecompute(&oc, PASS_RPO, PASS_UNDEF);
-    List<IRBB*> * bblst = getRPOBBList();
-    ASSERT0(bblst);
-    ASSERT0(bblst->get_elem_count() == m_rg->getBBList()->get_elem_count());
-
-    List<xcom::Vertex const*> vlst;
-    for (IRBB * bb = bblst->get_head(); bb != nullptr; bb = bblst->get_next()) {
-        ASSERT0(bb->id() != 0);
-        vlst.append_tail(getVertex(bb->id()));
-    }
-
+    RPOVexList * vlst = getRPOVexList();
+    ASSERT0(vlst);
+    ASSERT0(vlst->get_elem_count() == m_rg->getBBList()->get_elem_count());
     //xcom::DGraph::computeDom(&vlst, uni);
     //xcom::DGraph::computeIdom();
-
-    bool f = xcom::DGraph::computeIdom2(vlst);
+    bool f = xcom::DGraph::computeIdom2(*vlst);
     DUMMYUSE(f);
     ASSERT0(f);
 
-    f = xcom::DGraph::computeDom2(vlst);
+    f = xcom::DGraph::computeDom2(*vlst);
     DUMMYUSE(f);
     ASSERT0(f);
 
     OC_is_dom_valid(oc) = true;
     END_TIMER(t, "Compute Dom, IDom");
     if (g_dump_opt.isDumpAfterPass() && g_dump_opt.isDumpDOM()) {
-        dump_dom(getRegion()->getLogMgr()->getFileHandler(), false);
+        note(m_rg, "\n==---- DUMP DOM&IDOM IN IRCFG ----==");
+        dumpDom();
+    }
+}
+
+
+static void dumpRPO(Region const* rg, BBList const* bblst)
+{
+    note(rg, "\n==---- DUMP RPO ----==");
+    BBListIter it;
+    for (IRBB const* bb = bblst->get_head(&it);
+         bb != nullptr; bb = bblst->get_next(&it)) {
+        note(rg, "\n-- BB%d -- rpo:%d --", bb->id(), bb->rpo());
+    }
+}
+
+
+void IRCFG::computeRPO(OptCtx & oc)
+{
+    CFG<IRBB, IR>::computeRPO(oc);
+    if (g_dump_opt.isDumpAfterPass() && g_dump_opt.isDumpRPO()) {
+        dumpRPO(m_rg, getBBList());
     }
 }
 
@@ -2054,26 +2311,25 @@ void IRCFG::computeDomAndIdom(MOD OptCtx & oc, xcom::BitSet const* uni)
 void IRCFG::computePdomAndIpdom(MOD OptCtx & oc, xcom::BitSet const* uni)
 {
     if (getBBList()->get_elem_count() == 0) { return; }
-
     START_TIMER(t, "Compute PDom,IPDom");
     ASSERT0(oc.is_cfg_valid());
 
     m_rg->getPassMgr()->checkValidAndRecompute(&oc, PASS_RPO, PASS_UNDEF);
-    List<IRBB*> * bblst = getRPOBBList();
-    ASSERT0(bblst);
-    ASSERT0(bblst->get_elem_count() == m_rg->getBBList()->get_elem_count());
+    RPOVexList * vexlst = getRPOVexList();
+    ASSERT0(vexlst);
+    ASSERT0(vexlst->get_elem_count() == m_rg->getBBList()->get_elem_count());
 
     List<xcom::Vertex const*> vlst;
-    for (IRBB * bb = bblst->get_tail(); bb != nullptr; bb = bblst->get_prev()) {
-        ASSERT0(bb->id() != 0 && getVertex(bb->id()));
-        vlst.append_tail(getVertex(bb->id()));
+    for (Vertex const* v = vexlst->get_tail(); v != nullptr;
+         v = vexlst->get_prev()) {
+        ASSERT0(v->id() != VERTEX_UNDEF);
+        vlst.append_tail(v);
     }
-
     bool f = false;
     if (uni != nullptr) {
-        f = xcom::DGraph::computePdom(&vlst, uni);
+        f = xcom::DGraph::computePdom(vlst, uni);
     } else {
-        f = xcom::DGraph::computePdom(&vlst);
+        f = xcom::DGraph::computePdom(vlst);
     }
     DUMMYUSE(f);
     ASSERT0(f);
@@ -2083,6 +2339,10 @@ void IRCFG::computePdomAndIpdom(MOD OptCtx & oc, xcom::BitSet const* uni)
 
     OC_is_pdom_valid(oc) = true;
     END_TIMER(t, "Compute PDom,IPDom");
+    if (g_dump_opt.isDumpAfterPass() && g_dump_opt.isDumpDOM()) {
+        note(m_rg, "\n==---- DUMP PDOM&IPDOM IN IRCFG ----==");
+        dumpDom();
+    }
 }
 
 
@@ -2122,7 +2382,8 @@ bool IRCFG::removeTrampolinBranch()
         if (bb->isExceptionHandler()) { continue; }
 
         IR * br = get_last_xr(bb);
-        if (br == nullptr || !br->isConditionalBr() || br->hasSideEffect()) {
+        if (br == nullptr || !br->isConditionalBr() ||
+            br->hasSideEffect(true)) {
             continue;
         }
 
@@ -2193,6 +2454,70 @@ bool IRCFG::removeTrampolinBranch()
 }
 
 
+//Fix out-edges if BB becomes fallthrough BB.
+//The function will remove out-edges of bb except the fallthrough edge, and
+//try adding fallthrough edge if it doesn't exist.
+//Note it is illegal if empty BB has non-taken branch.
+void IRCFG::reviseOutEdgeForFallthroughBB(IRBB * bb, BBListIter & bbit)
+{
+    ASSERT0(bb && bbit);
+    xcom::EdgeC * ec = getVertex(bb->id())->getOutList();
+    if (ec == nullptr) { return; }
+
+    ASSERT0(!bb->is_empty());
+    BBListIter next_ct = bbit;
+    BBList * bbl = getBBList();
+    bbl->get_next(&next_ct);
+    IRBB * next_bb = nullptr;
+    if (next_ct != nullptr) {
+        next_bb = next_ct->val();
+    }
+
+    bool has_fallthrough = false;
+    xcom::EdgeC * next_ec = nullptr;
+    for (; ec != nullptr; ec = next_ec) {
+        next_ec = ec->get_next();
+
+        xcom::Edge * e = ec->getEdge();
+        if (e->info() != nullptr && CFGEI_is_eh((CFGEdgeInfo*)e->info())) {
+            continue;
+        }
+
+        IRBB * succ = getBB(e->to()->id());
+        ASSERT0(succ);
+        if (succ == next_bb) {
+            //Keep the fall-throught edge unchanged.
+            has_fallthrough = true;
+            ec = ec->get_next();
+            continue;
+        }
+
+        //Note removeEdge() will update PHI, whereas in-edge of succ changed,
+        //and operands of phi maintained as well.
+        removeEdge(bb, succ);
+    }
+
+    //Add edge between bb and next_bb if fallthrough edge miss.
+    //e.g: Add edge BB->BB_next.
+    //      _______
+    //     |       |
+    //     V       |
+    //   _BB       |
+    //  |  |       |
+    //  |  V       |
+    //  | BB_next  |
+    //  |  |_______|
+    //  |
+    //   ->BB5
+    if (next_bb != nullptr && !has_fallthrough) {
+        //Note the function will add operands of PHI if 'next_bb' has PHI.
+        addEdge(bb, next_bb);
+    }
+}
+
+
+
+
 //Perform miscellaneous control flow optimizations.
 //Return true if CFG changed.
 //Include removing dead bb which is unreachable, removing empty bb as many
@@ -2200,7 +2525,7 @@ bool IRCFG::removeTrampolinBranch()
 //the trampolin branch.
 //Note these optimizations performed in the function should NOT use DOM, PDOM,
 //LOOPINFO, or RPO information.
-bool IRCFG::performMiscOpt(OptCtx & oc)
+bool IRCFG::performMiscOpt(OptCtx & oc, CfgOptCtx const& ctx)
 {
     START_TIMER(t, "CFG Optimizations");
     bool change = false;
@@ -2210,7 +2535,7 @@ bool IRCFG::performMiscOpt(OptCtx & oc)
     do {
         lchange = false;
         if (g_do_cfg_remove_unreach_bb) {
-            bool res = removeUnreachBB();
+            bool res = removeUnreachBB(ctx);
             lchange |= res;
         }
         if (g_do_cfg_remove_redundant_label &&
@@ -2218,7 +2543,7 @@ bool IRCFG::performMiscOpt(OptCtx & oc)
             change = true;
         }
         if (g_do_cfg_remove_empty_bb) {
-            bool res = removeEmptyBB(oc);
+            bool res = removeEmptyBB(oc, ctx);
             lchange |= res;
         }
         if (g_do_cfg_remove_redundant_branch) {
@@ -2240,10 +2565,8 @@ bool IRCFG::performMiscOpt(OptCtx & oc)
         count++;
     } while (lchange && count < 1000);
     ASSERTN(!lchange, ("CFG optimization iterated too many times."));
-
     if (change) {
         computeExitList();
-
         if (org_oc.is_cdg_valid()) {
             m_rg->getPassMgr()->checkValidAndRecompute(&oc, PASS_CDG,
                                                        PASS_UNDEF);
@@ -2253,19 +2576,16 @@ bool IRCFG::performMiscOpt(OptCtx & oc)
 
         //SSAInfo is invalid by adding new-edge to BB.
         //This will confuse phi insertion.
-        //Note Revise operand information
-        //after the function returned. For the sake of compilation speed,
-        //CFG will not perform the revises here.
-        //ASSERT0(PRSSAMgr::verifyPRSSAInfo(m_rg));
-        //ASSERT0(MDSSAMgr::verifyMDSSAInfo(m_rg));
-
+        //CFG optimization should maintain Phi information.
+        ASSERT0(PRSSAMgr::verifyPRSSAInfo(m_rg));
+        ASSERT0(MDSSAMgr::verifyMDSSAInfo(m_rg));
         if (g_dump_opt.isDumpAfterPass() && g_dump_opt.isDumpCFGOpt()) {
-            dumpDOT();
+            dump();
         }
         ASSERT0(verifyIRandBB(getBBList(), m_rg));
         ASSERT0(verifyRPO(oc));
+        ASSERT0(verifyDomAndPdom(oc));
     }
-
     END_TIMER(t, "CFG Optimizations");
     return change;
 }

@@ -26,45 +26,29 @@ ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
 SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 @*/
-#ifndef _INVERT_BRTGT_H_
-#define _INVERT_BRTGT_H_
+#ifndef __MDSSALIVE_MGR_H__
+#define __MDSSALIVE_MGR_H__
 
 namespace xoc {
 
-class InvertBrTgt;
-
-//The optimization attempt to invert branch target.
-class InvertBrTgt : public Pass {
-    COPY_CONSTRUCTOR(InvertBrTgt);
-    CIRList * m_changed_irlist; //used for dump
-protected:
-    void addDump(IR const* ir) const;
-    void dumpInit();
-    void dumpFini();
+class MDSSALiveMgr : public Pass {
+    COPY_CONSTRUCTOR(MDSSALiveMgr);
+    Region * m_rg;
+    DomTree * m_domtree;
+private:
+    void allocDomTree();
+    void clean();
 public:
-    explicit InvertBrTgt(Region * rg) : Pass(rg)
-    {
-        ASSERT0(rg != nullptr);
-        m_changed_irlist = nullptr;
-    }
-    virtual ~InvertBrTgt() { dumpFini(); }
+    MDSSALiveMgr(Region * rg) : m_rg(rg), m_domtree(nullptr) {}
+    ~MDSSALiveMgr();
 
-    //The function dump pass relative information before performing the pass.
-    //The dump information is always used to detect what the pass did.
-    //Return true if dump successed, otherwise false.
-    virtual bool dumpBeforePass() const { return Pass::dumpBeforePass(); }
-
-    //The function dump pass relative information.
-    //The dump information is always used to detect what the pass did.
-    //Return true if dump successed, otherwise false.
     virtual bool dump() const;
 
-    virtual CHAR const* getPassName() const
-    { return "Invert Branch Target"; }
-    virtual PASS_TYPE getPassType() const { return PASS_INVERT_BRTGT; }
-
-    static bool invertLoop(InvertBrTgt * invt, IR * br, IRBB * br_tgt,
-                             IR * jmp, IRBB * jmp_tgt);
+    //Get livein VMD of 'mdid' in given 'bb'.
+    VMD * getLiveinVMD(MDIdx mdid, IRBB const* bb) const;
+    Region * getRegion() const { return m_rg; }
+    virtual CHAR const* getPassName() const { return "MDSSALiveMgr"; }
+    PASS_TYPE getPassType() const { return PASS_MDSSALIVE_MGR; }
 
     virtual bool perform(OptCtx & oc);
 };

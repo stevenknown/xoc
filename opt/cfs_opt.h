@@ -38,10 +38,9 @@ namespace xoc {
 
 class CfsOpt : public Pass {
     COPY_CONSTRUCTOR(CfsOpt);
-    Region * m_rg;
     TypeMgr * m_tm;
     Refine * m_rf;
-
+private:
     Refine * getRefiner()
     {
         if (m_rf == nullptr) {
@@ -58,11 +57,9 @@ class CfsOpt : public Pass {
     bool transformIf5(IR ** head, IR ** ir);
     bool hoistLoop(IR ** head, IR ** ir);
     bool hoistIf(IR ** head, IR ** ir);
-
 public:
-    CfsOpt(Region * rg)
+    CfsOpt(Region * rg) : Pass(rg)
     {
-        m_rg = rg;
         m_tm = rg->getTypeMgr();
         m_rf = nullptr;
     }

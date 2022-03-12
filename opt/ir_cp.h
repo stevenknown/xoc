@@ -73,7 +73,6 @@ public:
 class CopyProp : public Pass {
     COPY_CONSTRUCTOR(CopyProp);
 private:
-    Region * m_rg;
     MDSystem * m_md_sys;
     DUMgr * m_du;
     IRCFG * m_cfg;
@@ -81,7 +80,6 @@ private:
     TypeMgr * m_tm;
     PRSSAMgr * m_prssamgr;
     MDSSAMgr * m_mdssamgr;
-    Refine * m_refine;
     GVN const* m_gvn;
     UINT m_prop_kind;
 
@@ -90,11 +88,13 @@ private:
     bool allowInexactMD() const
     { return m_prop_kind == CP_PROP_UNARY_AND_SIMPLEX; }
 
+    bool computeUseSet(IR const* def_stmt, OUT IRSet * useset,
+                       bool & prssadu, bool & mdssadu);
     bool checkTypeConsistency(IR const* ir, IR const* cand_exp) const;
 
-    bool doPropUseSet(IRSet * useset, IR * def_stmt,
-                      IR const* prop_value, MDSSAInfo * mdssainfo,
-                      IRListIter cur_iter, IRListIter * next_iter,
+    bool doPropUseSet(IRSet const* useset, IR const* def_stmt,
+                      IR const* prop_value, IRListIter cur_iter,
+                      IRListIter * next_iter,
                       bool prssadu, bool mdssadu);
     bool doPropForMDPhi(IR const* prop_value, IN IR * use);
     bool doPropForNormalStmt(IRListIter cur_iter, IRListIter* next_iter,
@@ -140,7 +140,7 @@ private:
     bool performDomTree(IN xcom::Vertex * v, IN xcom::Graph & domtree);
     //repexp: the expression that is expected to be replaced.
     IR const* pickupCandExp(IR const* prop_value, IR const* repexp,
-                            IR const* def_stmt, MDSSAInfo const* mdssainfo,
+                            IR const* def_stmt,
                             bool prssadu, bool mdssadu) const;
 
     void replaceExp(IR * exp, IR const* cand_exp, MOD CPCtx & ctx);
@@ -159,16 +159,13 @@ private:
     { return m_prssamgr != nullptr && m_prssamgr->is_valid(); }
 
 public:
-    CopyProp(Region * rg)
+    CopyProp(Region * rg) : Pass(rg)
     {
-        ASSERT0(rg != nullptr);
-        m_rg = rg;
         m_md_sys = rg->getMDSystem();
         m_du = rg->getDUMgr();
         m_cfg = rg->getCFG();
         m_md_set_mgr = rg->getMDSetMgr();
         m_tm = rg->getTypeMgr();
-        m_refine = nullptr;
         m_gvn = nullptr;
         m_mdssamgr = nullptr;
         m_prssamgr = nullptr;
@@ -220,7 +217,6 @@ public:
         }
         return false;
     }
-    Region * getRegion() const { return m_rg; }
     virtual CHAR const* getPassName() const { return "Copy Propagation"; }
     virtual PASS_TYPE getPassType() const { return PASS_CP; }
     IR const* getSimpCVTValue(IR const* ir) const;

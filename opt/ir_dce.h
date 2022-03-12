@@ -73,7 +73,6 @@ class DeadCodeElim : public Pass {
     BYTE m_is_use_md_du:1;
     MDSystem * m_md_sys;
     TypeMgr * m_tm;
-    Region * m_rg;
     IRCFG * m_cfg;
     CDG * m_cdg;
     DUMgr * m_dumgr;
@@ -89,6 +88,8 @@ class DeadCodeElim : public Pass {
 
     bool check_stmt(IR const* ir);
     bool check_call(IR const* ir) const;
+    bool collectByDU(IR const* x, MOD List<IR const*> * pwlst2,
+                     bool usemdssa, bool useprssa);
     bool collectByPRSSA(IR const* x, MOD List<IR const*> * pwlst2);
     bool collectAllDefThroughDefChain(MDDef const* tdef, IR const* use,
                                       MOD List<IR const*> * pwlst2);
@@ -104,8 +105,6 @@ class DeadCodeElim : public Pass {
     bool find_effect_kid_uncondbr(IR const* ir) const;
     bool find_effect_kid(IR const* ir) const;
 
-    bool isEffectStmt(IR const* ir) const
-    { return m_is_stmt_effect.is_contain(ir->id()); }
     bool isEffectBB(UINT id) const { return m_is_bb_effect.is_contain(id); }
     bool isEffectBB(IRBB const* bb) const { return isEffectBB(bb->id()); }
     bool is_effect_write(Var * v) const
@@ -130,8 +129,6 @@ class DeadCodeElim : public Pass {
     bool preserve_cd(MOD List<IR const*> & act_ir_lst);
 
     void reinit();
-    void reviseSuccForFallthroughBB(IRBB * bb, BBListIter bbct,
-                                    BBList * bbl) const;
     bool removeIneffectIR(OUT bool & remove_branch_stmt);
     bool removeRedundantPhi();
 
@@ -158,10 +155,9 @@ class DeadCodeElim : public Pass {
     bool usePRSSADU() const
     { return m_prssamgr != nullptr && m_prssamgr->is_valid(); }
 public:
-    explicit DeadCodeElim(Region * rg)
+    explicit DeadCodeElim(Region * rg) : Pass(rg)
     {
         ASSERT0(rg != nullptr);
-        m_rg = rg;
         m_tm = rg->getTypeMgr();
         m_cfg = rg->getCFG();
         m_dumgr = rg->getDUMgr();
@@ -185,10 +181,13 @@ public:
     //Return true if dump successed, otherwise false.
     virtual bool dump() const;
 
-    Region * getRegion() const { return m_rg; }
+    IRCFG * getCFG() const { return m_cfg; }
     virtual CHAR const* getPassName() const
     { return "Dead Code Eliminiation"; }
     virtual PASS_TYPE getPassType() const { return PASS_DCE; }
+
+    bool isEffectStmt(IR const* ir) const
+    { return m_is_stmt_effect.is_contain(ir->id()); }
 
     void set_reserve_phi(bool reserve) { m_is_reserve_phi = reserve; }
     void set_elim_cfs(bool doit) { m_is_elim_cfs = doit; }

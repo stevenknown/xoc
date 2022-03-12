@@ -39,11 +39,11 @@ namespace xoc {
 //LCSE
 //Perform Local Common Subexpression Elimination.
 class LCSE : public Pass {
+    COPY_CONSTRUCTOR(LCSE);
 protected:
     bool m_enable_filter; //filter determines which expression can be CSE.
     PRSSAMgr * m_ssamgr;
     MDSSAMgr * m_mdssamgr;
-    Region * m_rg;
     TypeMgr * m_tm;
     ExprTab * m_expr_tab;
     DUMgr * m_du;
@@ -79,13 +79,22 @@ protected:
 
 public:
     explicit LCSE(Region * rg);
-    COPY_CONSTRUCTOR(LCSE);
     virtual ~LCSE() {}
 
     bool canBeCandidate(IR * ir);
+
+    //The function dump pass relative information before performing the pass.
+    //The dump information is always used to detect what the pass did.
+    //Return true if dump successed, otherwise false.
+    virtual bool dumpBeforePass() const { return Pass::dumpBeforePass(); }
+
+    //The function dump pass relative information.
+    //The dump information is always used to detect what the pass did.
+    //Return true if dump successed, otherwise false.
+    virtual bool dump() const { return Pass::dump(); }
+
     virtual CHAR const* getPassName() const
     { return "Local Command Subexpression Elimination"; }
-
     PASS_TYPE getPassType() const { return PASS_LCSE; }
 
     void set_enable_filter(bool is_enable) { m_enable_filter = is_enable; }

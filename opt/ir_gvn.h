@@ -472,7 +472,7 @@ class IR2ARRVNE : public TMap<IR const*, ARR_VNE2VN*> {
     COPY_CONSTRUCTOR(IR2ARRVNE);
 public:
     IR2ARRVNE() {}
-    virtual ~IR2ARRVNE() { clean(); } 
+    virtual ~IR2ARRVNE() { clean(); }
 
     void clean()
     {
@@ -512,7 +512,6 @@ protected:
     //ID("yyy") will refer to same MD, and the MD is inexact.
     BYTE m_is_comp_lda_string:1;
 
-    Region * m_rg;
     DUMgr * m_du;
     TypeMgr * m_tm;
     MDSystem * m_md_sys;
@@ -537,7 +536,6 @@ protected:
     IR2ARRVNE m_def2arrtab;
     IR2SCVNE m_def2sctab;
     IR2IR m_stmt2domdef;
-
 protected:
     VN * allocLiveinVN(IR const* exp, MD const* emd, bool & change);
 
@@ -560,6 +558,9 @@ protected:
     VN * computePR(IR const* exp, bool & change);
     VN * computeVN(IR const* exp, bool & change);
 
+    void dumpBB(UINT bbid) const;
+    void dumpIR2VN() const;
+    void dumpVNHash() const;
     void dump_h1(IR const* k, VN const* x) const;
     void destroyLocalUsed();
 
@@ -604,7 +605,6 @@ protected:
     { return m_mdssamgr != nullptr && m_mdssamgr->is_valid(); }
     bool usePRSSADU() const
     { return m_prssamgr != nullptr && m_prssamgr->is_valid(); }
-
 public:
     explicit GVN(Region * rg);
     virtual ~GVN();
@@ -618,12 +618,16 @@ public:
                          bool & must_false) const;
     void cleanIRTreeVN(IR const* ir);
 
-    void dumpVNHash() const;
-    bool dump() const;
-    void dumpBB(UINT bbid) const;
-    void dumpIR2VN() const;
+    //The function dump pass relative information before performing the pass.
+    //The dump information is always used to detect what the pass did.
+    //Return true if dump successed, otherwise false.
+    virtual bool dumpBeforePass() const { return Pass::dumpBeforePass(); }
 
-    Region * getRegion() const { return m_rg; }
+    //The function dump pass relative information.
+    //The dump information is always used to detect what the pass did.
+    //Return true if dump successed, otherwise false.
+    virtual bool dump() const;
+
     virtual CHAR const* getPassName() const { return "Global Value Numbering"; }
     PASS_TYPE getPassType() const { return PASS_GVN; }
 

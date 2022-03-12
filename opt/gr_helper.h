@@ -44,19 +44,36 @@ public:
 
     //Propagate info top down.
     //Supply CFG when dumpping PHI.
-    IRCFG * cfg;
+    IRCFG const* cfg;
 public:
     DumpGRCtx() { ::memset(this, 0, sizeof(DumpGRCtx)); }
 };
 
+class GRDump {
+    COPY_CONSTRUCTOR(GRDump);
+    Region const* m_rg;
+    RegionMgr const* m_rm;
+    TypeMgr const* m_tm;
+    IRCFG const* m_cfg;
+    LogMgr * m_lm; //LogMgr's Buffer may modified.
+private:
+    void dumpOffset(IR const* ir) const;
+    void dumpProp(IR const* ir, DumpGRCtx const* ctx) const;
+    void dumpArrSubList(IR const* ir, UINT dn, DumpGRCtx const* ctx) const;
+    void dumpConst(IR const* ir, DumpGRCtx const* ctx) const;
+    void dumpPhi(IR const* ir, DumpGRCtx const* ctx) const;
+public:
+    GRDump(Region const* rg);
 
-CHAR const* compositeName(Sym const* n, xcom::StrBuf & buf);
+    static CHAR const* compositeName(Sym const* n, xcom::StrBuf & buf);
 
-//ctx: it can be NULL if user is not going to control the dumpping.
-//     But it must be given if 'ir' is PHI because dump PHI will using CFG.
-void dumpGR(IR const* ir, TypeMgr * tm, DumpGRCtx * ctx);
-void dumpGRInBBList(List<IRBB*> * bblist, TypeMgr * tm, DumpGRCtx * ctx);
-void dumpGRList(IR * irlist, TypeMgr * tm, DumpGRCtx * ctx);
+    //ctx: it can be NULL if user is not going to control the dumpping.
+    //     But it must be given if 'ir' is PHI because dump PHI will using CFG.
+    void dumpIR(IR const* ir, DumpGRCtx const* ctx) const;
+    void dumpIRList(IR const* irlist, DumpGRCtx const* ctx) const;
+    void dumpBBList(BBList const* bblist, DumpGRCtx const* ctx) const;
+    void dumpRegion(bool dump_inner_region) const;
+};
 
 } //namespace xoc
 #endif

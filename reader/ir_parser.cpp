@@ -286,7 +286,7 @@ static void copyProp(IR * ir, PropertySet & ps, ParseCtx * ctx)
     if (ir->is_region()) {
         REGION_is_readonly(REGION_ru(ir)) = ps.readonly;
     }
-    if (!ir->isMayThrow()) { return; }
+    if (!ir->isMayThrow(false)) { return; }
 
     for (LabelInfo * l = ps.getLabelList().get_tail();
          l != nullptr; l = ps.getLabelList().get_prev()) {
@@ -357,11 +357,13 @@ bool IRParser::dump() const
     if (!getRegionMgr()->isLogMgrInit()) { return false; }
     START_TIMER_FMT(t, ("DUMP %s", getPassName()));
     note(getRegionMgr(), "\n==---- DUMP %s ----==", getPassName());
+    getRegionMgr()->getLogMgr()->incIndent(2);
     for (UINT i = 0; i < m_rumgr->getNumOfRegion(); i++) {
         Region const* rg = m_rumgr->getRegion(i);
         if (rg == nullptr) { continue; }
         rg->dump(false);
     }
+    getRegionMgr()->getLogMgr()->decIndent(2);
     END_TIMER_FMT(t, ("DUMP %s", getPassName()));
     return true;
 }
@@ -697,20 +699,17 @@ bool IRParser::constructSSAIfNeed(ParseCtx * ctx)
     if (!ctx->has_phi) { return true; }
 
     ctx->current_region->constructBBList();
-    OptCtx * oc = getRegionMgr()->getAndGenOptCtx(
-        ctx->current_region->id());
+    OptCtx * oc = getRegionMgr()->getAndGenOptCtx(ctx->current_region->id());
     ASSERT0(oc);
     ctx->current_region->initPassMgr();
-    ctx->current_region->getPassMgr()->checkValidAndRecompute(oc,
-        PASS_CFG, PASS_UNDEF);
-    ctx->current_region->getCFG()->reorderPhiEdge(
-        ctx->getIR2Label());
+    ctx->current_region->getPassMgr()->checkValidAndRecompute(oc, PASS_CFG,
+                                                              PASS_UNDEF);
+    ctx->current_region->getCFG()->reorderPhiEdge(ctx->getIR2Label());
     PRSSAMgr * prssamgr = (PRSSAMgr*)ctx->current_region->
         getPassMgr()->registerPass(PASS_PR_SSA_MGR);
     ASSERT0(prssamgr);
-    prssamgr->computeSSAInfo();
-    prssamgr->verifySSAInfo();
-    prssamgr->verifyPhi(false, false);
+    prssamgr->genSSAInfoForRegion();
+    ASSERT0(PRSSAMgr::verifyPRSSAInfo(ctx->current_region));
     return true;
 }
 
@@ -4545,7 +4544,8 @@ bool IRParser::parse()
 END:
     END_TIMER(t, "IR Parser");
     bool parse_succ = getErrorMsgList().get_elem_count() == 0;
-    if (parse_succ && g_dump_opt.isDumpAfterPass() && g_dump_opt.isDumpIRParser()) {
+    if (parse_succ && g_dump_opt.isDumpAfterPass() &&
+        g_dump_opt.isDumpIRParser()) {
         dump();
     }
     return parse_succ;

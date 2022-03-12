@@ -331,10 +331,10 @@ bool InferType::inferBBList(BBList const* bbl)
     BBListIter bbit;
     for (IRBB * bb = bbl->get_head(&bbit); bb != nullptr;
          bb = bbl->get_next(&bbit)) {
-        BBIRList * irlist = bb->getIRList();
+        BBIRList & irlist = bb->getIRList();
         BBIRListIter irit;
-        for (IR * ir = irlist->get_head(&irit); ir != nullptr;
-             ir = irlist->get_next(&irit)) {
+        for (IR * ir = irlist.get_head(&irit); ir != nullptr;
+             ir = irlist.get_next(&irit)) {
             changed |= inferIR(ir);
         }
     }
@@ -393,6 +393,7 @@ bool InferType::dump() const
     if (!getRegion()->isLogMgrInit()) { return false; }
     note(getRegion(), "\n==---- DUMP %s '%s' ----==",
          getPassName(), m_rg->getRegionName());
+    getRegion()->getLogMgr()->incIndent(2);
     ASSERT0(m_changed_irlist);
     if (m_changed_irlist->get_elem_count() > 0) {
         note(getRegion(), "\n==-- CHANGED IR --==");
@@ -411,7 +412,9 @@ bool InferType::dump() const
         }
     }
     note(getRegion(), "\n");
-    return true;
+    bool res = Pass::dump();
+    getRegion()->getLogMgr()->decIndent(2);
+    return res;
 }
 
 
@@ -420,6 +423,7 @@ bool InferType::perform(OptCtx & oc)
     IR * irl = m_rg->getIRList();
     BBList * bbl = m_rg->getBBList();
     START_TIMER(t, getPassName());
+    m_rg->getLogMgr()->startBuffer();
     dumpInit();
     bool changed = false;
     do {
@@ -435,10 +439,13 @@ bool InferType::perform(OptCtx & oc)
         changed |= inferChangedList();
     } while (m_wl.get_elem_count() != 0);
     if (!changed) {
+        m_rg->getLogMgr()->cleanBuffer();
+        m_rg->getLogMgr()->endBuffer();
         dumpFini();
         END_TIMER(t, getPassName());
         return false;
     }
+    m_rg->getLogMgr()->endBuffer();
     if (g_dump_opt.isDumpAfterPass() && g_dump_opt.isDumpInferType()) {
         dump();
     }

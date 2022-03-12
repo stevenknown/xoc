@@ -121,7 +121,8 @@ public:
         INT cur = 0;
         for (IR const* dele = get_first(cur);
              cur >= 0; dele = get_next(cur)) {
-            dumpIR(dele, rg);
+            //Dump IR tree for complex delegate.
+            dumpIR(dele, rg, nullptr, IR_DUMP_DEF|IR_DUMP_KID);
         }
     }
 
@@ -131,27 +132,60 @@ public:
 
 class DelegateMgr {
     COPY_CONSTRUCTOR(DelegateMgr);
+    //True if DUChain of restore has been built.
+    bool m_is_restore_duchain_built;
     RegPromot * m_rp;
     //Record a delegate to IR expressions which have same value in
     //array base and subexpression.
     RefTab m_deletab;
+
+    class CompareFuncOfIR {
+    public:
+        bool is_less(IR * t1, IR * t2) const { return t1->id() < t2->id(); }
+        bool is_equ(IR * t1, IR * t2) const { return t1 == t2; }
+        IR * createKey(IR * t) { return t; }
+    };
 
     //Map IR expression to promoted PR.
     //Each delegate has its own delegated PR.
     //A delegated PR will used to replace occurrences of delegate.
     //Note the delegated PR is always used as a duplication, thus do NOT
     //insert it into IR tree directly.
-    TMap<IR*, IR*> m_dele2pr;
+    TMap<IR*, IR*, CompareFuncOfIR> m_dele2pr;
 
     //Map IR expression to STPR which generates the initialized value.
     //The initialized STPR should be placed in preheader BB.
-    TMap<IR*, IR*> m_dele2init;
+    TMap<IR*, IR*, CompareFuncOfIR> m_dele2init;
 
     //Map IR expression to STMT which restore the PR into memory.
     //The restore STMT should be placed in epilog BB.
-    TMap<IR*, IR*> m_dele2restore;
+    TMap<IR*, IR*, CompareFuncOfIR> m_dele2restore;
 protected:
     void clean();
+    void collectOutsideLoopDef(IR const* delegate, IRSet const& set,
+                               LI<IRBB> const* li);
+    void collectOutsideLoopUse(IR const* delegate, IRSet const& set,
+                               LI<IRBB> const* li);
+
+    DUSet * genOutsideDefSet(IR const* delegate)
+    {
+        DUSet * defset = m_dele2outsidedefset.get(delegate);
+        if (defset == nullptr) {
+            defset = (DUSet*)getSBSMgr()->allocSBitSetCore();
+            m_dele2outsidedefset.set(delegate, defset);
+        }
+        return defset;
+    }
+    DUSet * genOutsideUseSet(IR const* delegate)
+    {
+        DUSet * useset = m_dele2outsideuseset.get(delegate);
+        if (useset == nullptr) {
+            useset = (DUSet*)getSBSMgr()->allocSBitSetCore();
+            m_dele2outsideuseset.set(delegate, useset);
+        }
+        return useset;
+    }
+
     void * xmalloc(UINT size)
     {
         ASSERT0(m_pool);
@@ -179,6 +213,7 @@ public:
     DelegateMgr(RegPromot * rp, Region * rg, GVN * gvn, UINT acc_num) :
         m_deletab(acc_num)
     {
+        m_is_restore_duchain_built = false;
         m_rp = rp;
         m_rg = rg;
         m_deletab.initMem(gvn);
@@ -190,7 +225,8 @@ public:
 
     void addToOutsideUseSet(IR const* delegate, IR * ir);
 
-    void collectOutsideLoopDefUse(IR * ref, IR * delegate, LI<IRBB> const* li);
+    void collectOutsideLoopDefUse(IR const* occ, IR const* delegate,
+                                  LI<IRBB> const* li);
 
     //The function add delegate using straightforward strategy. Note user must
     //ensure the delegate is unique.
@@ -199,7 +235,8 @@ public:
     //The function using RefTab to create delegate for 'ref' to keep the
     //delegate is unique. Note the delegate may be 'ref' itself.
     IR * createUniqueDelegate(IR * ref);
-
+    
+    void dumpDele2Restore() const;
     bool dump() const;
 
     //Get promoted PR for given delegate.
@@ -225,9 +262,21 @@ public:
     IR * getRestoreStmt(IR const* delegate) const
     { return m_dele2restore.get(const_cast<IR*>(delegate)); }
 
+    bool hasLoopOutsideUse(IR const* delegate) const
+    {
+        ASSERT0(delegate);
+        DUSet const* useset = getOutsideUseSet(delegate);
+        return useset != nullptr && !useset->is_empty();
+    }
+
     //Return true if dele is a delegate.
     bool isDelegate(IR const* dele) const
     { return getInitStmt(dele) != nullptr; }
+    //Return true if DUChain of restore has been built.
+    bool isRestoreDUChainBuilt() const { return m_is_restore_duchain_built; }
+
+    void setRestoreDUChainBuilt(bool has_built)
+    { m_is_restore_duchain_built = has_built; }
 };
 
 
@@ -267,6 +316,10 @@ public:
         m_md2occlst.clean();
         TMap<MD const*, IR*>::clean();
     }
+    //Collect outside loop DefUse information.
+    void collectOutsideLoopDU(MD const* md, IR const* delegate,
+                              LI<IRBB> const* li,
+                              MOD DelegateMgr & delemgr);
 
     void dump(Region const* rg) const;
 
@@ -303,13 +356,34 @@ class RegPromot : public Pass {
     typedef DMapEx<IR*, IR*>::Tsrc2TtgtIter Occ2OccIter;
     class RPCtx {
     public:
+        bool need_rebuild_domtree;
+        DomTree * domtree;
         OptCtx * oc;
-        RPCtx(OptCtx * t) : oc(t) {}
+    public:
+        RPCtx(OptCtx * t) : need_rebuild_domtree(false),
+            domtree(nullptr), oc(t) {}
+        ~RPCtx()
+        {
+            if (domtree != nullptr) {
+                delete domtree;
+                domtree = nullptr;
+            }
+        }
+        void buildDomTree(IRCFG * cfg)
+        {
+            ASSERT0(oc->is_dom_valid());
+            if (domtree == nullptr) {
+                domtree = new DomTree();
+            } else {
+                domtree->erase();
+            }
+            cfg->genDomTree(*domtree);
+            need_rebuild_domtree = false;
+        }
     };
 
 private:
     MD2MDLifeTime * m_md2lt_map;
-    Region * m_rg;
     UINT m_mdlt_count;
     SMemPool * m_pool;
     MDSystem * m_md_sys;
@@ -326,6 +400,13 @@ private:
     MDLivenessMgr * m_liveness_mgr;
 
 private:
+    //Return true if the loop is promotable.
+    bool analyszLoop(LI<IRBB> const* li, ExactAccTab & exact_tab,
+                     InexactAccTab & inexact_tab);
+    void addDUChainForExpTree(IR * root, IR * startir, IRBB * startbb);
+    void addSSADUChainForExpOfRestore(IR const* dele,
+                                      DelegateMgr const& delemgr);
+    void addDUChainForRHSOfInitDef(IR const* dele, IR * init_stmt);
     //Build DU chain for initialization-def and outside loop exposed-use.
     void addDUChainForInitDefAndExposedUse(IR const* dele,
                                            IR * init_stmt,
@@ -333,8 +414,7 @@ private:
     //Build DU chain for intra-loop-def and its USE.
     void addDUChainForIntraDefAndUseSet(Occ2Occ const& occ2newocc,
                                         IRSet const& useset,
-                                        LI<IRBB> const* li,
-                                        IR * restore_stmt, IR * newocc_def);
+                                        IR * newocc_def);
     //Process inexact access tab.
     //Build DU chain for initialization-def and intra-loop-use.
     void addDUChainForInitDef(IR const* dele, IR * init_stmt,
@@ -349,10 +429,9 @@ private:
                               OUT IRList & deflst);
     //Build DU chain for intra-loop-def and its USE.
     void addDUChainForIntraDef(Occ2Occ const& occ2newocc,
-                               IR * restore_stmt, IRList const& deflst,
-                               LI<IRBB> const* li);
-    void addDUChainForRestoreStmt(DelegateMgr & delemgr,
-                                  ConstIRTab const& restore2mem);
+                               IRList const& deflst);
+    void addDUChainForRestoreToOutsideUse(IR const* dele,
+                                          DelegateMgr const& delemgr);
     UINT analyzeIndirectAccessStatus(IR const* ref1, IR const* ref2);
     UINT analyzeArrayStatus(IR const* ref1, IR const* ref2);
     void addExactAccess(OUT ExactAccTab & exact_tab,
@@ -361,16 +440,36 @@ private:
     void addDUChainForInexactAcc(DelegateMgr const& delemgr,
                                  Occ2Occ const& occ2newocc,
                                  InexactAccTab const& inexact_tab,
-                                 LI<IRBB> const* li);
+                                 LI<IRBB> const* li,
+                                 IRBB * preheader,
+                                 MOD RPCtx & ctx);
     void addDUChainForInexactAccDele(IR const* dele,
                                      DelegateMgr const& delemgr,
                                      Occ2Occ const& occ2newocc,
                                      InexactAccTab const& inexact_tab,
-                                     LI<IRBB> const* li);
+                                     MOD RPCtx & ctx);
     void addDUChainForExactAccDele(IR const* dele, Occ2Occ const& occ2newocc,
                                    DelegateMgr const& delemgr,
                                    ExactAccTab const& exact_tab,
+                                   MOD RPCtx & ctx,
+                                   IRBB * preheader,
                                    LI<IRBB> const* li);
+
+    void buildDUChainOnDemandForPROp(IR * def, IR * use);
+    void buildDUChainOnDemand(IR * def, IR * use);
+    //Return true if success.
+    bool buildPRSSADUChainForInexactAcc(Occ2Occ const& occ2newocc,
+                                        DelegateMgr const& delemgr,
+                                        LI<IRBB> const* li,
+                                        IRBB * preheader,
+                                        MOD RPCtx & ctx);
+    bool buildPRSSADUChainForExactAcc(IR const* dele,
+                                      Occ2Occ const& occ2newocc,
+                                      DelegateMgr const& delemgr,
+                                      LI<IRBB> const* li,
+                                      IRBB * preheader,
+                                      MOD RPCtx & ctx);
+
     void clean();
     void cleanLiveBBSet();
     void checkAndRemoveInvalidExactOcc(ExactAccTab & acctab);
@@ -382,12 +481,12 @@ private:
     bool checkArrayIsLoopInvariant(IN IR * ir, LI<IRBB> const* li);
     bool checkIndirectAccessIsLoopInvariant(IR const* ir, LI<IRBB> const* li);
 
-    void dump_mdlt();
-    void dumpInexact(InexactAccTab & access);
-
     bool EvaluableScalarReplacement(List<LI<IRBB> const*> & worklst,
                                     MOD RPCtx & ctx);
 
+    void findAndRecordRestore(IR * occ, IR const* delegate,
+                              MOD DelegateMgr & delemgr,
+                              OUT ConstIRTab & restore2mem);
     IRBB * findSingleExitBB(LI<IRBB> const* li);
     void freeLocalStruct(TMap<IR*, DUSet*> & delegate2use,
                          TMap<IR*, DUSet*> & m_delegate2def,
@@ -399,30 +498,51 @@ private:
     MDLivenessMgr * getMDLivenessMgr() const { return m_liveness_mgr; }
     MDLT * getMDLifeTime(MD * md);
 
-    //fixup_list: record the IR that need to fix up duset.
+    void handleInexactAccOcc(MOD DelegateMgr & delemgr,
+                             InexactAccTab & inexact_tab,
+                             OUT ConstIRTab & restore2mem,
+                             OUT Occ2Occ & occ2newocc,
+                             InexactAccTabIter & ti);
+    void handleExactAccOcc(IR const* dele,
+                           MOD DelegateMgr & delemgr,
+                           LI<IRBB> const* li,
+                           OUT ConstIRTab & restore2mem,
+                           OUT Occ2Occ & occ2newocc,
+                           IRIter & ii,
+                           ExactAccTab & exact_tab);
     void handleExpInBody(IR * ref, IR const* delegate,
                          DelegateMgr const& delemgr,
-                         OUT Occ2Occ & occ2newocc, IRIter & ii);
+                         OUT Occ2Occ & occ2newocc);
 
-    //fixup_list: record the IR that need to fix up duset.
     //restore2mem: record the delegate that need to restore.
     void handleStmtInBody(IR * ref, IR const* delegate,
                           MOD DelegateMgr & delemgr,
                           OUT ConstIRTab & restore2mem,
-                          OUT Occ2Occ & occ2newocc,
-                          LI<IRBB> const* li);
+                          OUT Occ2Occ & occ2newocc);
 
-    //fixup_list: record the IR that need to fix up duset.
     //restore2mem: record the delegate that need to restore.
     void handleAccessInBody(IR * ref, IR const* delegate,
                             MOD DelegateMgr & delemgr,
                             OUT ConstIRTab & restore2mem,
-                            OUT Occ2Occ & occ2newocc,
-                            LI<IRBB> const* li, IRIter & ii);
+                            OUT Occ2Occ & occ2newocc);
 
     //Generate code to fulfill epilog of delegate.
     void handleEpilog(ConstIRTab const& restore2mem, DelegateMgr & delemgr,
-                      IRBB * exit_bb);
+                      IRBB * exit_bb, MOD RPCtx & ctx);
+
+    //The function generates iniailization code of promoted PR.
+    //Note the function leaves the work that to build DU chain of PR and STPR
+    //to the sebsequent function, it will be done at
+    //buildDUChainForDeleRelatedPR().
+    void handlePrologForExp(IR const* delegate, IR const* promoted_pr,
+                            DelegateMgr & delemgr, IRBB * preheader);
+
+    //The function generates iniailization code of promoted PR.
+    //Note the function leaves the work that to build DU chain of PR and STPR
+    //to the sebsequent function, it will be done at
+    //buildDUChainForDeleRelatedPR().
+    void handlePrologForStmt(IR const* delegate, IR const* promoted_pr,
+                             DelegateMgr & delemgr, IRBB * preheader);
 
     //The function generates iniailization code of PR that is corresponding to
     //each delegate. And building DU chain between all USE occurrences of
@@ -514,36 +634,53 @@ private:
                 OUT ExactAccTab & exact_tab,
                 OUT InexactAccTab & inexact_tab);
 
-    //Return true if there is IR to be promoted, otherwise return false.
+    //The function promote IR.
     //dele: the delegate which indicates an exact-accessing reference.
-    bool promoteExactAccessDelegate(IR const* dele, DelegateMgr & delemgr,
+    void promoteExactAccessDelegate(IR const* dele, DelegateMgr & delemgr,
                                     LI<IRBB> const* li, IRIter & ii,
                                     IRBB * preheader, IRBB * exit_bb,
-                                    ExactAccTab & exact_tab);
+                                    ExactAccTab & exact_tab,
+                                    MOD RPCtx & ctx);
     //Return true if IR is promoted, otherwise false.
     bool promoteInexactAccessDelegate(DelegateMgr & delemgr,
                                       LI<IRBB> const* li,
                                       IRBB * preheader,
                                       IRBB * exit_bb,
                                       InexactAccTab & inexact_tab,
-                                      IRIter & ii);
-    bool promoteInexactAccess(LI<IRBB> const* li, IRBB * preheader,
+                                      IRIter & ii,
+                                      MOD RPCtx & ctx);
+    void promoteInexactAccess(LI<IRBB> const* li, IRBB * preheader,
                               IRBB * exit_bb, InexactAccTab & inexact_tab,
-                              IRIter & ii);
-    bool promoteExactAccess(LI<IRBB> const* li, IRIter & ii, IRBB * preheader,
-                            IRBB * exit_bb, ExactAccTab & exact_tab);
-    //Return true if there are memory locations have been promoted.
-    bool promote(LI<IRBB> const* li, IRBB * exit_bb, IRIter & ii,
-                 ExactAccTab & exact_tab, InexactAccTab & inexact_tab,
-                 MOD RPCtx & ctx);
-
-    void removeRedundantDUChain(Occ2Occ & occ2newocc);
-
-    bool tryInsertPreheader(LI<IRBB> const* li, OUT IRBB ** preheader,
+                              IRIter & ii, MOD RPCtx & ctx);
+    void promoteExactAccess(LI<IRBB> const* li, IRIter & ii, IRBB * preheader,
+                            IRBB * exit_bb, ExactAccTab & exact_tab,
                             MOD RPCtx & ctx);
-    bool tryPromote(LI<IRBB> const* li, IRBB * exit_bb, IRIter & ii,
-                    ExactAccTab & exact_tab, InexactAccTab & inexact_tab,
-                    MOD RPCtx & ctx);
+    //The function will promote occ in exact_tab or inexact_tab.
+    void promote(LI<IRBB> const* li, IRBB * exit_bb, IRBB * preheader,
+                 IRIter & ii, ExactAccTab & exact_tab,
+                 InexactAccTab & inexact_tab, MOD RPCtx & ctx);
+
+    //Fixup DU chain if there is untrue dependence.
+    //occ2newocc: record the IR stmt/exp that need to fixup.
+    void removeDUChainForOrgOcc(Occ2Occ & occ2newocc);
+    void removeMDPhiDUChain(IR const* dele, LI<IRBB> const* li,
+                            DelegateMgr const& delemgr);
+    void removeMDPhiForInexactAcc(DelegateMgr const& delemgr,
+                                  InexactAccTab & inexact_tab,
+                                  LI<IRBB> const* li);
+    void removeRedundantDUForInexactAcc(Occ2Occ & occ2newocc,
+                                        DelegateMgr const& delemgr,
+                                        InexactAccTab & inexact_tab,
+                                        LI<IRBB> const* li);
+
+    void setNewDefForExpOfRestore(IR * restore);
+
+    //The function try to insert stub-BB before 'exit_bb' if there is MDPhi in
+    //the BB.
+    IRBB * tryInsertStubExitBB(IRBB * exit_bb, xcom::Edge const* exitedge,
+                               MOD RPCtx & ctx);
+    //Return true if there are memory locations have been promoted.
+    bool tryPromoteLoop(LI<IRBB> const* li, IRIter & ii, MOD RPCtx & ctx);
 
     void * xmalloc(UINT size)
     {
@@ -555,10 +692,9 @@ private:
     }
 
 public:
-    RegPromot(Region * rg) : m_dont_promote(rg)
+    RegPromot(Region * rg) : Pass(rg), m_dont_promote(rg)
     {
         ASSERT0(rg != nullptr);
-        m_rg = rg;
         m_md_sys = rg->getMDSystem();
         m_cfg = rg->getCFG();
         m_tm = rg->getTypeMgr();
@@ -601,7 +737,6 @@ public:
     //Note ir must be memory reference.
     virtual bool isPromotable(IR const* ir) const;
 
-    Region * getRegion() const { return m_rg; }
     virtual CHAR const* getPassName() const { return "Register Promotion"; }
     PASS_TYPE getPassType() const { return PASS_RP; }
 
