@@ -215,8 +215,9 @@ void InsertPhiHelper::makePRSSAPhi(IR const* phi)
 {
     ASSERT0(phi->is_phi());
     //Generate PHI.
+    //Type cast if host compiler does NOT support C11.
     IR * newphi = m_rg->buildPhi(m_rg->buildPrno(phi->getType()),
-                                 phi->getType(), nullptr);
+                                 phi->getType(), (IR*)nullptr);
     m_rg->allocRefForPR(newphi);
     m_prssa_phis.append_tail(newphi);
     //BB_irlist(preheader).append_head(phi);

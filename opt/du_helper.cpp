@@ -773,8 +773,8 @@ void collectDefSet(IR const* use, MDSSAMgr const* mdssamgr, OUT IRSet * defset)
         mdssainfo = mdssamgr->getMDSSAInfoIfAny(use);
     }
     if (mdssainfo != nullptr) {
-        mdssainfo->collectDef(mdssamgr, use->getRefMD(),
-                              CollectCtx(COLLECT_CROSS_PHI), defset);
+        CollectCtx ctx(COLLECT_CROSS_PHI);
+        mdssainfo->collectDef(mdssamgr, use->getRefMD(), ctx, defset);
         return;
     }
 

@@ -2122,7 +2122,8 @@ IR * CPhi::getOpnd(UINT idx) const
 IR * CPhi::dupIRTreeByRef(IR const* src, Region * rg)
 {
     ASSERT0(src->isPROp());
-    IR * phi = rg->buildPhi(src->getPrno(), src->getType(), nullptr);
+    //Type cast if host compiler does NOT support C11.
+    IR * phi = rg->buildPhi(src->getPrno(), src->getType(), (IR*)nullptr);
     phi->copyRef(src, rg);
     return phi;
 }

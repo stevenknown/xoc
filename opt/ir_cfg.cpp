@@ -1193,7 +1193,7 @@ void IRCFG::removeSuccPhiOpnd(IRBB const* bb)
          ec != nullptr; ec = ec->get_next(), pos++) {
         ASSERT0(ec->getFromId() == bb->id());
         IRBB * succ = getBB(ec->getToId());
-        removeSuccDesignatedPhiOpnd(succ, pos);
+        removeSuccDesignatedPhiOpnd(succ, WhichPred(bb, succ));
     }
 }
 

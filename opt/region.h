@@ -693,7 +693,7 @@ public:
     IR * buildSelect(IR * det, IR * true_exp, IR * false_exp, Type const* type);
 
     //Build IR_PHI operation.
-    //res: result pr of PHI.
+    //prno: result PR of PHI.
     IR * buildPhi(UINT prno, Type const* type, IR * opnd_list);
     IR * buildPhi(UINT prno, Type const* type, UINT num_opnd);
 
