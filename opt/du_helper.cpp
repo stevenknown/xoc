@@ -494,10 +494,11 @@ void addUseForTree(IR * to, IR const* from, Region * rg)
     DUMgr * dumgr = rg->getDUMgr();
     ConstIRIter cit;
     IRIter it;
-    IR const* from_ir = iterInitC(from, cit, true);
-    for (IR * to_ir = xoc::iterInit(to, it, true);
-         to_ir != nullptr;
-         to_ir = xoc::iterNext(it), from_ir = xoc::iterNextC(cit)) {
+    IR const* from_ir = xoc::iterInitC(from, cit, false);
+    IR * to_ir = xoc::iterInit(to, it, false);
+    ASSERT0(cit.get_elem_count() == it.get_elem_count());
+    for (; to_ir != nullptr;
+         to_ir = xoc::iterNext(it, true), from_ir = xoc::iterNextC(cit, true)) {
         ASSERT0(to_ir->isIREqual(from_ir, true));
         if (!to_ir->isMemoryRef() && !to_ir->is_id()) {
             //Copy MD for IR_ID, some Passes require it, e.g. GVN.

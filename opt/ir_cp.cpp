@@ -71,72 +71,6 @@ bool CopyProp::checkTypeConsistency(IR const* ir, IR const* cand_exp) const
 
 
 //Check and replace 'exp' with 'cand_exp' if they are
-//equal, and update SSA info. If 'cand_exp' is NOT leaf,
-//that will create redundant computation, and
-//depends on later Redundancy Elimination to reverse back.
-//
-//'cand_exp': substitute cand_exp for exp.
-//    e.g: exp is pr1 of S2, cand_exp is 10.
-//        pr1 = 10 //S1
-//        g = pr1 //S2
-//    =>
-//        pr1 = 10
-//        g = 10
-//
-//NOTE: Do NOT handle stmt.
-void CopyProp::replaceExpViaSSADu(IR * exp, IR const* cand_exp, MOD CPCtx & ctx)
-{
-    ASSERT0(exp && exp->is_exp() && cand_exp && cand_exp->is_exp());
-    ASSERT0(exp->getExactRef());
-
-    if (!checkTypeConsistency(exp, cand_exp)) {
-        return;
-    }
-
-    IR * parent = IR_parent(exp);
-    if (parent->is_ild()) {
-        CPC_need_recomp_aa(ctx) = true;
-    } else if (parent->is_ist() && exp == IST_base(parent)) {
-        if (!cand_exp->is_ld() && !cand_exp->is_pr() && !cand_exp->is_lda()) {
-            return;
-        }
-        CPC_need_recomp_aa(ctx) = true;
-    }
-
-    IR * newir = m_rg->dupIRTree(cand_exp);
-
-    if (cand_exp->isReadPR() && PR_ssainfo(cand_exp) != nullptr) {
-        PR_ssainfo(newir) = PR_ssainfo(cand_exp);
-        PR_ssainfo(newir)->addUse(newir);
-    } else {
-        m_du->addUseForTree(newir, cand_exp);
-    }
-
-    //cand_exp may be IR tree. And there might be PR or LD on the tree.
-    newir->copyRefForTree(cand_exp, m_rg);
-
-    //Add SSA use for new exp.
-    SSAInfo * cand_ssainfo = nullptr;
-    if ((cand_ssainfo = cand_exp->getSSAInfo()) != nullptr) {
-        cand_ssainfo->addUse(newir);
-    }
-
-    //Remove old exp SSA use.
-    SSAInfo * exp_ssainfo = exp->getSSAInfo();
-    ASSERT0(exp_ssainfo && exp_ssainfo->findUse(exp));
-    exp_ssainfo->removeUse(exp);
-
-    CPC_change(ctx) = true;
-
-    ASSERT0(exp->getStmt());
-    bool doit = parent->replaceKid(exp, newir, false);
-    ASSERT0(doit);
-    DUMMYUSE(doit);
-    m_rg->freeIRTree(exp);
-}
-
-
-//Check and replace 'exp' with 'cand_exp' if they are
 //equal, and update DU info. If 'cand_exp' is NOT leaf,
 //that will create redundant computation, and
 //depends on later Redundancy Elimination to reverse back.
@@ -233,7 +167,7 @@ bool CopyProp::existMayDefTillBB(IR const* exp, IRBB const* start,
         IRListIter tir_holder = nullptr;
         for (IR const* tir = BB_irlist(t).get_head(&tir_holder);
              tir != nullptr; tir = BB_irlist(t).get_next(&tir_holder)) {
-            if (m_du->isMayDef(tir, exp, false)) {
+            if (m_du->isMayDef(tir, exp, true)) {
                 return true;
             }
         }
@@ -260,13 +194,24 @@ bool CopyProp::existMayDefTillBB(IR const* exp, IRBB const* start,
 //
 //def_stmt: ir stmt.
 //prop_value: expression that will be propagated.
-//use_stmt: stmt in use-list of 'def_stmt'.
-//use_phi: stmt in use-list of 'def_stmt'.
-//use_bb: IRBB that use_stm or use_phi be placed in.
 //Note either use_phi or use_stmt is nullptr.
 bool CopyProp::is_available(IR const* def_stmt, IR const* prop_value,
-                            IR * use_stmt, MDPhi * use_phi, IRBB * usebb) const
+                            IR const* repexp) const
 {
+    IR * use_stmt = nullptr;
+    MDPhi * use_phi = nullptr;
+    IRBB * usebb = nullptr;
+    if (repexp->is_id()) {
+        ASSERT0(ID_phi(repexp));
+        usebb = ID_phi(repexp)->getBB();
+        use_phi = ID_phi(repexp);
+        ASSERT0(use_phi && use_phi->is_phi());
+    } else {
+        use_stmt = repexp->getStmt();
+        ASSERT0(use_stmt->is_stmt() && use_stmt->getBB());
+        usebb = use_stmt->getBB();
+        use_phi = nullptr;
+    }
     ASSERT0(usebb);
     ASSERT0(use_stmt || use_phi);
     if (def_stmt == use_stmt) { return false; }
@@ -500,14 +445,15 @@ void CopyProp::dumpCopyPropagationAction(IR const* def_stmt,
 }
 
 
+//prop_value: the expression that is going to propagate.
 //repexp: the expression that is expected to be replaced.
-//mdssainfo: the MDSSAInfo of 'def_stmt'.
+//def_stmt: the stmt of prop_value.
 //The layout of parameters is:
 //  def_stmt <- prop_value
 //  ........ <- repexp
 IR const* CopyProp::pickupCandExp(IR const* prop_value, IR const* repexp,
-                                  IR const* def_stmt,
-                                  bool prssadu, bool mdssadu) const
+                                  IR const* def_stmt, bool prssadu,
+                                  bool mdssadu) const
 {
     if (repexp->is_id()) {
         if (!prop_value->is_const()) {
@@ -553,30 +499,7 @@ IR const* CopyProp::pickupCandExp(IR const* prop_value, IR const* repexp,
         return nullptr;
     }
 
-    MDSSAInfo const* mdssainfo = mdssadu ?
-        m_mdssamgr->getMDSSAInfoIfAny(def_stmt) : nullptr;
-    if (mdssainfo != nullptr &&
-        !mdssainfo->isUseReachable(m_mdssamgr->getUseDefMgr(), repexp)) {
-        return nullptr;
-    }
-
-    IR * use_stmt = nullptr;
-    MDPhi * use_phi = nullptr;
-    IRBB * use_bb = nullptr;
-
-    if (repexp->is_id()) {
-        ASSERT0(ID_phi(repexp));
-        use_bb = ID_phi(repexp)->getBB();
-        use_phi = ID_phi(repexp);
-        ASSERT0(use_phi && use_phi->is_phi());
-    } else {
-        use_stmt = repexp->getStmt();
-        ASSERT0(use_stmt->is_stmt() && use_stmt->getBB());
-        use_bb = use_stmt->getBB();
-        use_phi = nullptr;
-    }
-
-    if (!is_available(def_stmt, prop_value, use_stmt, use_phi, use_bb)) {
+    if (!is_available(def_stmt, prop_value, repexp)) {
         //The value that will be propagated can
         //not be killed during 'def_stmt' and 'use_stmt'.
         //e.g:
@@ -589,8 +512,7 @@ IR const* CopyProp::pickupCandExp(IR const* prop_value, IR const* repexp,
         return nullptr;
     }
 
-    if (!prssadu && !mdssadu &&
-        !m_du->isExactAndUniqueDef(def_stmt, repexp)) {
+    if (!prssadu && !mdssadu && !m_du->isExactAndUniqueDef(def_stmt, repexp)) {
         //Only single definition is allowed.
         //e.g:
         //    g = 20; //S3
@@ -637,13 +559,10 @@ IR const* CopyProp::tryDiscardCVT(IR const* prop_value) const
 
 
 bool CopyProp::computeUseSet(IR const* def_stmt, OUT IRSet * useset,
-                             bool & prssadu, bool & mdssadu)
+                             OUT bool & prssadu, OUT bool & mdssadu)
 {
-    SSAInfo * ssainfo = def_stmt->getSSAInfo();
-    MDSSAInfo * mdssainfo = useMDSSADU() ?
-        m_mdssamgr->getMDSSAInfoIfAny(def_stmt) : nullptr;
-    DUSet const* duset = nullptr;
     useset->clean();
+    SSAInfo * ssainfo = def_stmt->getSSAInfo();
     if (ssainfo != nullptr) {
         //Record use_stmt in another vector to facilitate this function
         //if it is not in use-list any more after copy-propagation.
@@ -658,6 +577,9 @@ bool CopyProp::computeUseSet(IR const* def_stmt, OUT IRSet * useset,
         prssadu = true;
         return true;
     }
+
+    MDSSAInfo * mdssainfo = useMDSSADU() ?
+        m_mdssamgr->getMDSSAInfoIfAny(def_stmt) : nullptr;
     if (mdssainfo != nullptr) {
         if (def_stmt->getRefMD() == nullptr ||
             !def_stmt->getRefMD()->is_exact()) {
@@ -667,11 +589,13 @@ bool CopyProp::computeUseSet(IR const* def_stmt, OUT IRSet * useset,
                 return false;
             }
         }
-        CollectCtx ctx;
+        CollectCtx ctx(COLLECT_UNDEF); //Do NOT do collection crossing PHI.
         mdssainfo->collectUse(m_mdssamgr->getUseDefMgr(), ctx, useset);
         mdssadu = true;
         return true;
     }
+
+    DUSet const* duset = nullptr;
     if ((duset = def_stmt->readDUSet()) != nullptr && !duset->is_empty()) {
         if (def_stmt->getRefMD() == nullptr ||
             !def_stmt->getRefMD()->is_exact()) {
@@ -752,7 +676,7 @@ bool CopyProp::doPropIR(IR * def_stmt, MOD IRSet * useset,
 }
 
 
-//'useset': for local used.
+//useset: for local used.
 bool CopyProp::doPropBB(IN IRBB * bb, MOD IRSet * useset)
 {
     bool change = false;

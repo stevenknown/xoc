@@ -290,7 +290,7 @@ public:
     TTab<UINT> m_visited;
     UINT flag;
 public:
-    CollectCtx(UINT f = COLLECT_CROSS_PHI) : flag(f) {}
+    CollectCtx(UINT f) : flag(f) {}
     void clean() { m_visited.clean(); }
     bool is_visited(UINT id) const { return m_visited.find(id); }
     void set_visited(UINT id) { m_visited.append(id); }
@@ -356,7 +356,9 @@ public:
     bool containSpecificMDOnly(MDIdx mdid, UseDefMgr const* udmgr) const;
 
     void init() { BaseAttachInfo::init(AI_MD_SSA); }
-    bool isUseReachable(UseDefMgr const* udmgr, IR const* exp) const;
+
+    //Return true if all definition of vopnds can reach 'exp'.
+    bool isMustDef(UseDefMgr const* udmgr, IR const* exp) const;
 
     void destroy(xcom::DefMiscBitSetMgr & m) { m_vopnd_set.clean(m); }
     void dump(MDSSAMgr const* mgr) const;

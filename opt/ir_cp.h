@@ -89,7 +89,7 @@ private:
     { return m_prop_kind == CP_PROP_UNARY_AND_SIMPLEX; }
 
     bool computeUseSet(IR const* def_stmt, OUT IRSet * useset,
-                       bool & prssadu, bool & mdssadu);
+                       OUT bool & prssadu, OUT bool & mdssadu);
     bool checkTypeConsistency(IR const* ir, IR const* cand_exp) const;
 
     bool doPropUseSet(IRSet const* useset, IR const* def_stmt,
@@ -133,18 +133,34 @@ private:
     //expression. These low-cost always profitable and may bring up new
     //optimization opportunity.
     bool isLowCostCVT(IR const* ir) const;
+
+    //Return true if 'prop_value' does not be modified till meeting 'use_stmt'.
+    //e.g:xx = prop_value //def_stmt
+    //    ..
+    //    ..
+    //    use_bb:
+    //    yy = xx  //use_stmt|use_phi
+    //
+    //def_stmt: ir stmt.
+    //prop_value: expression that will be propagated.
+    //Note either use_phi or use_stmt is nullptr.
     bool is_available(IR const* def_stmt, IR const* prop_value,
-                      IR * use_stmt, MDPhi * use_phi, IRBB * usebb) const;
+                      IR const* repexp) const;
     inline bool isCopyOR(IR * ir) const;
 
     bool performDomTree(IN xcom::Vertex * v, IN xcom::Graph & domtree);
+
+    //prop_value: the expression that is going to propagate.
     //repexp: the expression that is expected to be replaced.
+    //def_stmt: the stmt of prop_value.
+    //The layout of parameters is:
+    //  def_stmt <- prop_value
+    //       ... <- repexp
     IR const* pickupCandExp(IR const* prop_value, IR const* repexp,
                             IR const* def_stmt,
                             bool prssadu, bool mdssadu) const;
 
     void replaceExp(IR * exp, IR const* cand_exp, MOD CPCtx & ctx);
-    void replaceExpViaSSADu(IR * exp, IR const* cand_exp, MOD CPCtx & ctx);
 
     //Check if the CVT can be discarded and the cvt-expression will be regarded
     //as the recommended propagate value.

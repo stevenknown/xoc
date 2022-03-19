@@ -44,8 +44,8 @@ void Region::HighProcessImpl(OptCtx & oc)
         //Remove empty bb when cfg rebuilted because
         //rebuilding cfg may generate redundant empty bb.
         //It disturbs the computation of entry and exit.
-        CfgOptCtx ctx;
-        getCFG()->removeEmptyBB(oc, ctx);
+        CfgOptCtx ctx(oc);
+        getCFG()->removeEmptyBB(ctx);
 
         //Compute exit bb while cfg rebuilt.
         getCFG()->computeExitList();

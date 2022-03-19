@@ -55,6 +55,7 @@ static void dumpFini(RCE const* pass)
 
 static void dumpRemovedIR(IR const* ir, RCE const* pass)
 {
+    if (!g_dump_opt.isDumpRCE()) { return; }
     Region * rg = pass->getRegion();
     if (!rg->isLogMgrInit()) { return; }
     note(rg, "\nREMOVE IR:");
@@ -64,6 +65,7 @@ static void dumpRemovedIR(IR const* ir, RCE const* pass)
 
 static void dumpRemovedEdge(IRBB const* from, IRBB const* to, RCE const* pass)
 {
+    if (!g_dump_opt.isDumpRCE()) { return; }
     Region * rg = pass->getRegion();
     if (!rg->isLogMgrInit()) { return; }
     note(rg, "\nREMOVE EDGE: BB%d->BB%d", from->id(), to->id());
@@ -72,6 +74,7 @@ static void dumpRemovedEdge(IRBB const* from, IRBB const* to, RCE const* pass)
 
 static void dumpChangedIR(IR const* oldir, IR const* newir, RCE const* pass)
 {
+    if (!g_dump_opt.isDumpRCE()) { return; }
     Region * rg = pass->getRegion();
     if (!rg->isLogMgrInit()) { return; }
     note(rg, "\nCHANGE:");
@@ -121,6 +124,36 @@ bool RCE::calcCondMustVal(IR const* ir, OUT bool & must_true,
 }
 
 
+static bool regardAsMustTrue(IR const* ir)
+{
+    ASSERT0(ir->is_const());
+    if (ir->is_int() || ir->is_ptr()) {
+        if (CONST_int_val(ir) != 0) { return true; }
+        return false;
+    }
+    if (ir->is_str() || ir->is_vec() || ir->is_mc()) { return true; }
+    if (g_is_opt_float && ::fabs(CONST_fp_val(ir) - (HOST_FP)0.0) > EPSILON) {
+        return true;
+    }
+    return false;
+}
+
+
+static bool regardAsMustFalse(IR const* ir)
+{
+    ASSERT0(ir->is_const());
+    if (ir->is_int() || ir->is_ptr()) {
+        if (CONST_int_val(ir) == 0) { return true; }
+        return false;
+    }
+    if (ir->is_str() || ir->is_vec() || ir->is_mc()) { return false; }
+    if (g_is_opt_float && ::fabs(CONST_fp_val(ir) - (HOST_FP)0.0) <= EPSILON) {
+        return true;
+    }
+    return false;
+}
+
+
 //If 'ir' is always true, set 'must_true', or if it is
 //always false, set 'must_false'.
 //Return the changed ir.
@@ -141,18 +174,20 @@ IR * RCE::calcCondMustVal(IN IR * ir, OUT bool & must_true,
     case IR_LOR:
     case IR_LNOT: {
         ir = m_refine->foldConst(ir, changed);
-        if (changed) {
-            ASSERT0(ir->is_const() &&
-                    (CONST_int_val(ir) == 0 || CONST_int_val(ir) == 1));
-            if (CONST_int_val(ir) == 1) {
+        if (changed && ir->is_const()) {
+            if (regardAsMustTrue(ir)) {
                 must_true = true;
-            } else if (CONST_int_val(ir) == 0) {
+            } else if (regardAsMustFalse(ir)) {
                 must_false = true;
             }
             return ir;
         }
 
         if (m_gvn != nullptr && m_gvn->is_valid()) {
+            if (changed) {
+                bool vn_changed = false;
+                m_gvn->computeVN(ir, vn_changed);
+            }
             bool succ = m_gvn->calcCondMustVal(ir, must_true, must_false);
             if (succ) {
                 changed = true;
@@ -179,80 +214,56 @@ IR * RCE::calcCondMustVal(IN IR * ir, OUT bool & must_true,
 }
 
 
-IR * RCE::processBranch(IR * ir, MOD RCECtx & ctx)
+IR * RCE::processFalsebr(IR * ir, IR * new_det, bool must_true,
+                         bool must_false, bool changed, MOD RCECtx & ctx)
 {
-    ASSERT0(ir->isConditionalBr());
-    bool must_true, must_false, changed = false;
     IR * old_det = BR_det(ir);
-    IR * new_det = calcCondMustVal(BR_det(ir), must_true, must_false, changed);
     BR_det(ir) = nullptr;
-    if (ir->is_truebr()) {
-        if (must_true) {
-            //TRUEBR(0x1), always jump.
-            IRBB * from = ir->getBB();
-            IRBB * to = m_cfg->getFallThroughBB(from);
-            ASSERT0(from != nullptr && to != nullptr);
-            IR * newbr = m_rg->buildGoto(BR_lab(ir));
-            xoc::removeStmt(ir, m_rg);
+    if (must_true) {
+        //FALSEBR(0x1), never jump.
+        //Revise m_cfg. remove branch edge.
+        IRBB * from = ir->getBB();
+        IRBB * to = m_cfg->getTargetBB(from);
+        ASSERT0(from != nullptr && to != nullptr);
+        xoc::removeStmt(ir, m_rg);
 
-            //Revise the PHI operand to fallthrough successor.
-            //Revise cfg. remove fallthrough edge.
-            if (g_dump_opt.isDumpRCE()) { dumpRemovedEdge(from, to, this); }
-            m_cfg->removeEdge(from, to);
-            ctx.cfg_mod = true;
-            ctx.oc->setDomValid(false);
-            OC_is_rpo_valid(*ctx.oc) = false;
-            return newbr;
-        } else if (must_false) {
-            //TRUEBR(0x0), never jump.
-            //Revise cfg. remove branch edge.
-            IRBB * from = ir->getBB();
-            IRBB * to = m_cfg->findBBbyLabel(BR_lab(ir));
-            ASSERT0(from && to);
-            xoc::removeStmt(ir, m_rg);
+        //Revise the PHI operand to target successor.
+        dumpRemovedEdge(from, to, this);
+        m_cfg->removeEdge(from, to);
+        ctx.cfg_mod = true;
+        //RPO is unchanged if only removing branch-edge.
+        //DOM may changed.
+        // BB1--->BB3------
+        //  |      |       |
+        //  |      v       v
+        //   ----BB2----->BB4
+        // If removing 3->4, idom of BB4 changed.
+        ctx.oc->setDomValid(false);
+        return nullptr;
+    }
+    if (must_false) {
+        //FALSEBR(0x0), always jump.
+        IRBB * from = ir->getBB();
+        IRBB * to = m_cfg->getFallThroughBB(from);
+        ASSERT0(from != nullptr && to != nullptr);
 
-            //Revise the PHI operand to target successor.
-            if (g_dump_opt.isDumpRCE()) { dumpRemovedEdge(from, to, this); }
-            m_cfg->removeEdge(from, to);
-            ctx.cfg_mod = true;
-            ctx.oc->setDomValid(false);
-            OC_is_rpo_valid(*ctx.oc) = false;
-            return nullptr;
-        }
-    } else {
-        if (must_true) {
-            //FALSEBR(0x1), never jump.
-            //Revise m_cfg. remove branch edge.
-            IRBB * from = ir->getBB();
-            IRBB * to = m_cfg->getTargetBB(from);
-            ASSERT0(from != nullptr && to != nullptr);
-            xoc::removeStmt(ir, m_rg);
+        IR * newbr = m_rg->buildGoto(BR_lab(ir));
+        xoc::removeStmt(ir, m_rg);
 
-            //Revise the PHI operand to target successor.
-            if (g_dump_opt.isDumpRCE()) { dumpRemovedEdge(from, to, this); }
-            m_cfg->removeEdge(from, to);
-            ctx.cfg_mod = true;
-            ctx.oc->setDomValid(false);
-            OC_is_rpo_valid(*ctx.oc) = false;
-            return nullptr;
-        } else if (must_false) {
-            //FALSEBR(0x0), always jump.
-            IRBB * from = ir->getBB();
-            IRBB * to = m_cfg->getFallThroughBB(from);
-            ASSERT0(from != nullptr && to != nullptr);
-
-            IR * newbr = m_rg->buildGoto(BR_lab(ir));
-            xoc::removeStmt(ir, m_rg);
-
-            //Revise the PHI operand to fallthrough successor.
-            //Revise m_cfg. remove fallthrough edge.
-            if (g_dump_opt.isDumpRCE()) { dumpRemovedEdge(from, to, this); }
-            m_cfg->removeEdge(from, to);
-            ctx.cfg_mod = true;
-            ctx.oc->setDomValid(false);
-            OC_is_rpo_valid(*ctx.oc) = false;
-            return newbr;
-        }
+        //Revise the PHI operand to fallthrough successor.
+        //Revise m_cfg. remove fallthrough edge.
+        dumpRemovedEdge(from, to, this);
+        m_cfg->removeEdge(from, to);
+        ctx.cfg_mod = true;
+        //RPO is unchanged if only removing branch-edge.
+        //DOM may changed.
+        // BB1--->BB3------
+        //  |      |       |
+        //  |      v       v
+        //   ----BB2----->BB4
+        // If removing 3->4, idom of BB4 changed.
+        ctx.oc->setDomValid(false);
+        return newbr;
     }
 
     ASSERT0(BR_det(ir) == nullptr);
@@ -262,7 +273,7 @@ IR * RCE::processBranch(IR * ir, MOD RCECtx & ctx)
         }
         BR_det(ir) = new_det;
         ir->setParent(new_det);
-        if (g_dump_opt.isDumpRCE()) { dumpChangedIR(old_det, new_det, this); }
+        dumpChangedIR(old_det, new_det, this);
         return ir;
     }
 
@@ -272,12 +283,93 @@ IR * RCE::processBranch(IR * ir, MOD RCECtx & ctx)
 }
 
 
+IR * RCE::processTruebr(IR * ir, IR * new_det, bool must_true,
+                        bool must_false, bool changed, MOD RCECtx & ctx)
+{
+    IR * old_det = BR_det(ir);
+    BR_det(ir) = nullptr;
+    if (must_true) {
+        //TRUEBR(0x1), always jump.
+        IRBB * from = ir->getBB();
+        IRBB * to = m_cfg->getFallThroughBB(from);
+        ASSERT0(from != nullptr && to != nullptr);
+        IR * newbr = m_rg->buildGoto(BR_lab(ir));
+        xoc::removeStmt(ir, m_rg);
+
+        //Revise the PHI operand to fallthrough successor.
+        //Revise cfg. remove fallthrough edge.
+        dumpRemovedEdge(from, to, this);
+        m_cfg->removeEdge(from, to);
+        ctx.cfg_mod = true;
+        //RPO is unchanged if only removing branch-edge.
+        //DOM may changed.
+        // BB1--->BB3------
+        //  |      |       |
+        //  |      v       v
+        //   ----BB2----->BB4
+        // If removing 3->4, idom of BB4 changed.
+        ctx.oc->setDomValid(false);
+        return newbr;
+    }
+    if (must_false) {
+        //TRUEBR(0x0), never jump.
+        //Revise cfg. remove branch edge.
+        IRBB * from = ir->getBB();
+        IRBB * to = m_cfg->findBBbyLabel(BR_lab(ir));
+        ASSERT0(from && to);
+        xoc::removeStmt(ir, m_rg);
+
+        //Revise the PHI operand to target successor.
+        dumpRemovedEdge(from, to, this);
+        m_cfg->removeEdge(from, to);
+        ctx.cfg_mod = true;
+        //RPO is unchanged if only removing branch-edge.
+        //DOM may changed.
+        // BB1--->BB3------
+        //  |      |       |
+        //  |      v       v
+        //   ----BB2----->BB4
+        // If removing 3->4, idom of BB4 changed.
+        ctx.oc->setDomValid(false);
+        return nullptr;
+    }
+
+    ASSERT0(BR_det(ir) == nullptr);
+    if (changed) {
+        if (!new_det->is_judge()) {
+            new_det = m_rg->buildJudge(new_det);
+        }
+        BR_det(ir) = new_det;
+        ir->setParent(new_det);
+        dumpChangedIR(old_det, new_det, this);
+        return ir;
+    }
+
+    //Resume original det.
+    BR_det(ir) = new_det;
+    return ir; 
+}
+
+
+IR * RCE::processBranch(IR * ir, MOD RCECtx & ctx)
+{
+    ASSERT0(ir->isConditionalBr());
+    bool must_true, must_false, changed = false;
+    IR * new_det = calcCondMustVal(BR_det(ir), must_true, must_false, changed);
+    if (ir->is_truebr()) {
+        return processTruebr(ir, new_det, must_true, must_false, changed, ctx);
+    }
+    ASSERT0(ir->is_falsebr()); 
+    return processFalsebr(ir, new_det, must_true, must_false, changed, ctx);
+}
+
+
 //Perform dead store elmination: x = x;
 IR * RCE::processStore(IR * ir)
 {
     ASSERT0(ir->is_st());
     if (ST_rhs(ir)->getExactRef() == ir->getExactRef()) {
-        if (g_dump_opt.isDumpRCE()) { dumpRemovedIR(ir, this); }
+        dumpRemovedIR(ir, this);
         xoc::removeUseForTree(ir, m_rg);
         return nullptr;
     }
@@ -290,7 +382,7 @@ IR * RCE::processStorePR(IR * ir)
 {
     ASSERT0(ir->is_stpr());
     if (STPR_rhs(ir)->getExactRef() == ir->getExactRef()) {
-        if (g_dump_opt.isDumpRCE()) { dumpRemovedIR(ir, this); }
+        dumpRemovedIR(ir, this);
         xoc::removeUseForTree(ir, m_rg);
         return nullptr;
     }
@@ -324,7 +416,7 @@ bool RCE::performSimplyRCEForBB(IRBB * bb, MOD RCECtx & ctx)
         default:;
         }
         if (newir == ir) { continue; }
-        if (g_dump_opt.isDumpRCE()) { dumpChangedIR(ir, newir, this); }
+        dumpChangedIR(ir, newir, this);
         ir_list->remove(ct);
         m_rg->freeIRTree(ir);
         if (newir != nullptr) {
@@ -387,6 +479,7 @@ bool RCE::perform(OptCtx & oc)
     bool change = performSimplyRCE(ctx);
     if (ctx.cfg_mod) {
         ASSERT0(change);
+        //DOM and RPO may changed, rebuild them when you need.
         change |= m_cfg->performMiscOpt(oc);
     }
     if (change) {

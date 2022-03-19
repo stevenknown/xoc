@@ -193,6 +193,8 @@ protected:
     IRCFG * m_cfg;
     xcom::DefMiscBitSetMgr * m_sbs_mgr;
     xcom::DefSegMgr * m_seg_mgr;
+    //Record OptCtx in used. It is always updated in perform().
+    OptCtx const* m_oc;
     IRIter m_iter; //for tmp use.
 
     //Record version stack during renaming.
@@ -257,6 +259,12 @@ protected:
     bool doOpndHaveValidDef(MDPhi const* phi) const;
     bool doOpndHaveSameDef(MDPhi const* phi, OUT VMD ** common_def) const;
 
+    OptCtx const* getOptCtx() const { return m_oc; }
+
+    //id: input ID.
+    //ssainfo: MDSSAInfo of id.
+    //olddef: old DEF of id.
+    void findNewDefForID(IR * id, MDSSAInfo * ssainfo, MDDef * olddef);
     void freeBBPhiList(IRBB * bb);
     void freePhiList();
 
@@ -275,6 +283,7 @@ protected:
     {
         if (m_usedef_mgr.m_mdssainfo_pool != nullptr) { return; }
         m_is_valid = false;
+        m_oc = nullptr;
     }
     void initVMD(IN IR * ir, OUT DefMDSet & maydef);
     void insertPhi(UINT mdid, IN IRBB * bb);
@@ -367,6 +376,7 @@ public:
         m_cfg = rg->getCFG();
         ASSERTN(m_cfg, ("cfg is not available."));
         m_md_sys = rg->getMDSystem();
+        m_oc = nullptr;
     }
     ~MDSSAMgr()
     {
@@ -397,7 +407,7 @@ public:
     void construction(OptCtx & oc);
 
     //Construction of MDSSA form.
-    bool construction(DomTree & domtree);
+    bool construction(DomTree & domtree, OptCtx const& oc);
     size_t count_mem() const;
 
     //DU chain operation.
@@ -741,6 +751,9 @@ public:
     bool isStmtDomAllUseInsideLoop(IR const* ir, LI<IRBB> const* li) const;
     void insertDefStmt(IR * stmt, DomTree const& domtree);
     bool isDom(MDDef const* def1, MDDef const* def2) const;
+
+    //Return true if all vopnds of 'def' can reach 'exp'.
+    bool isMustDef(IR const* def, IR const* exp) const;
 
     //Move PHI from 'from' to 'to'.
     //The function often used in updating PHI when adding new dominater

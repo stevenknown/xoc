@@ -66,6 +66,7 @@ public:
 #define CFGOPTCTX_update_dominfo(x) ((x)->u1.s1.m_update_dominfo)
 class CfgOptCtx {
 public:
+    OptCtx & oc;
     union {
         BYTE m_flags;
         struct {
@@ -73,7 +74,7 @@ public:
         } s1;
     } u1;
 public:
-    CfgOptCtx() { u1.m_flags = 0; }
+    CfgOptCtx(OptCtx & toc) : oc(toc) { u1.m_flags = 0; }
 
     //Return true if caller asks CFG optimizer have to update DomInfo.
     bool need_update_dominfo() const { return CFGOPTCTX_update_dominfo(this); }
@@ -478,8 +479,8 @@ public:
     }
     //Remove empty bb, and merger label info.
     //Note remove BB will not affect the usage of RPO.
-    bool removeEmptyBB(OptCtx & oc, CfgOptCtx const& ctx);
-    bool removeEmptyBB(BB * bb, OptCtx & oc, CfgOptCtx const& ctx);
+    bool removeEmptyBB(CfgOptCtx const& ctx);
+    bool removeEmptyBB(BB * bb, CfgOptCtx const& ctx);
     bool removeUnreachBB(CfgOptCtx const& ctx);
     bool removeRedundantBranch();
     void removeLoopInfo(LI<BB>* loop);
@@ -503,6 +504,8 @@ public:
     virtual void remove_xr(BB *, XR *) = 0;
 
     //You should clean the relation between Label and BB before remove BB.
+    virtual void removeDomInfo(xcom::C<BB*> * bbcontainer,
+                               CfgOptCtx const& ctx) = 0;
     virtual void removeBB(BB * bb, CfgOptCtx const& ctx) = 0;
     virtual void removeBB(xcom::C<BB*> * bbcontainer,
                           CfgOptCtx const& ctx) = 0;
@@ -801,6 +804,7 @@ bool CFG<BB, XR>::removeEmptyBBHelper(BB * bb, BB * next_bb,
         //Some redundant CFG has multi BB which satifies cfg-entry condition.
         if (bb->getLabelList().get_elem_count() == 0 && !isRegionExit(bb)) {
             //BB does not have any label.
+            removeDomInfo(bbct, ctx);
             removeBB(bbct, ctx);
             return true;
         }
@@ -824,12 +828,13 @@ bool CFG<BB, XR>::removeEmptyBBHelper(BB * bb, BB * next_bb,
     //Move labels of bb to next_bb.
     moveLabels(bb, next_bb);
     ASSERT0(getNthSucc(bb, 0) == next_bb);
+    removeDomInfo(bbct, ctx);
     List<UINT> newpreds;
     get_preds(newpreds, bb);
     replacePred(bb, next_bb, newpreds);
 
     //Invoke interface to remove related BB and Vertex.
-    //The map between bb and labels should have maintained.
+    //The map between bb and labels should have maintained in above code.
     removeBB(bbct, ctx);
     return true;
 }
@@ -838,7 +843,7 @@ bool CFG<BB, XR>::removeEmptyBBHelper(BB * bb, BB * next_bb,
 //Remove empty bb, and merger label info.
 //Note remove BB will not affect the usage of RPO.
 template <class BB, class XR>
-bool CFG<BB, XR>::removeEmptyBB(BB * bb, OptCtx & oc, CfgOptCtx const& ctx)
+bool CFG<BB, XR>::removeEmptyBB(BB * bb, CfgOptCtx const& ctx)
 {
     START_TIMER(t, "Remove Single Empty BB");
     ASSERT0(isEmptyBB(bb) && !isRegionEntry(bb) && !bb->isExceptionHandler());
@@ -851,7 +856,7 @@ bool CFG<BB, XR>::removeEmptyBB(BB * bb, OptCtx & oc, CfgOptCtx const& ctx)
     if (next_ct != nullptr) {
         next_bb = next_ct->val();
     }
-    bool is_cfg_valid = oc.is_cfg_valid();
+    bool is_cfg_valid = ctx.oc.is_cfg_valid();
     bool doit = removeEmptyBBHelper(bb, next_bb, ct, next_ct, preds,
                                     is_cfg_valid, ctx);
     END_TIMER(t, "Remove Single Empty BB");
@@ -862,13 +867,13 @@ bool CFG<BB, XR>::removeEmptyBB(BB * bb, OptCtx & oc, CfgOptCtx const& ctx)
 //Remove empty bb, and merger label info.
 //Note remove BB will not affect the usage of RPO.
 template <class BB, class XR>
-bool CFG<BB, XR>::removeEmptyBB(OptCtx & oc, CfgOptCtx const& ctx)
+bool CFG<BB, XR>::removeEmptyBB(CfgOptCtx const& ctx)
 {
     START_TIMER(t, "Remove Empty BB");
     xcom::C<BB*> * ct, * next_ct;
     bool doit = false;
     List<BB*> preds;
-    bool is_cfg_valid = oc.is_cfg_valid();
+    bool is_cfg_valid = ctx.oc.is_cfg_valid();
     for (m_bb_list->get_head(&ct), next_ct = ct; ct != nullptr; ct = next_ct) {
         next_ct = m_bb_list->get_next(next_ct);
         BB * bb = ct->val();
@@ -1219,6 +1224,7 @@ bool CFG<BB, XR>::removeUnreachBB(CfgOptCtx const& ctx)
 
             resetMapBetweenLabelAndBB(bb);
             removeSuccPhiOpnd(bb);
+            removeDomInfo(ct, ctx);
             removeBB(ct, ctx);
             removed = true;
         }

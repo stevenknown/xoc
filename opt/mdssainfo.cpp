@@ -169,8 +169,8 @@ bool VMDVec::hasDefInBB(UINT bbid) const
 //
 //START MDSSAInfo
 //
-//Return true if all definition of vopnd can reach 'exp'.
-bool MDSSAInfo::isUseReachable(UseDefMgr const* udmgr, IR const* exp) const
+//Return true if all definition of vopnds can reach 'exp'.
+bool MDSSAInfo::isMustDef(UseDefMgr const* udmgr, IR const* exp) const
 {
     ASSERT0(udmgr && exp && exp->is_exp());
     VOpndSetIter iter = nullptr;

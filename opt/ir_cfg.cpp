@@ -473,15 +473,20 @@ static LabelInfo const* useFirstAvailLabel(IR * ir, LabelInfo const* li,
 }
 
 
+void IRCFG::removeDomInfo(C<IRBB*> * bbct, CfgOptCtx const& ctx)
+{
+    if (ctx.need_update_dominfo()) {
+        DGraph::removeDomInfo(bbct->val()->id());
+    }
+}
+
+
 //You should clean the relation between Label and BB before removing BB.
 void IRCFG::removeBB(C<IRBB*> * bbct, CfgOptCtx const& ctx)
 {
     ASSERT0(bbct && m_bb_list->in_list(bbct));
     IRBB * bb = bbct->val();
     removeAllMDPhi(bb);
-    if (ctx.need_update_dominfo()) {
-        removeDomInfo(bb->id());
-    }
     removeRPO(bb);
     //Note Label2BB should has been mainated before come to the function.
     removeVertex(bb->id());
@@ -552,9 +557,9 @@ void IRCFG::rebuild(OptCtx & oc)
     //Remove empty BB after cfg rebuilding because
     //rebuilding cfg may generate empty BB, it
     //disturb the computation of entry and exit.
-    CfgOptCtx ctx;
+    CfgOptCtx ctx(oc);
     CFGOPTCTX_update_dominfo(&ctx) = false;
-    removeEmptyBB(oc, ctx);
+    removeEmptyBB(ctx);
 
     //Compute exit BB while CFG rebuilt.
     computeExitList();
@@ -563,7 +568,7 @@ void IRCFG::rebuild(OptCtx & oc)
     UINT count = 0;
     while (change && count < 20) {
         change = false;
-        if (g_do_cfg_remove_empty_bb && removeEmptyBB(oc, ctx)) {
+        if (g_do_cfg_remove_empty_bb && removeEmptyBB(ctx)) {
             computeExitList();
             change = true;
         }
@@ -583,7 +588,7 @@ void IRCFG::rebuild(OptCtx & oc)
             computeExitList();
             change = true;
         }
-        if (g_do_cfg_remove_trampolin_branch && removeTrampolinBranch()) {
+        if (g_do_cfg_remove_trampolin_branch && removeTrampolinBranch(ctx)) {
              computeExitList();
              change = true;
         }
@@ -620,9 +625,9 @@ void IRCFG::initCfg(OptCtx & oc)
 
     //Rebuild cfg may generate redundant empty bb, it
     //disturb the computation of entry and exit.
-    CfgOptCtx ctx;
+    CfgOptCtx ctx(oc);
     CFGOPTCTX_update_dominfo(&ctx) = false;
-    removeEmptyBB(oc, ctx);
+    removeEmptyBB(ctx);
     computeExitList();
 
     bool change = true;
@@ -630,7 +635,7 @@ void IRCFG::initCfg(OptCtx & oc)
     bool doopt = false;
     while (change && count < 20) {
         change = false;
-        if (g_do_cfg_remove_empty_bb && removeEmptyBB(oc, ctx)) {
+        if (g_do_cfg_remove_empty_bb && removeEmptyBB(ctx)) {
             computeExitList();
             change = true;
             doopt = true;
@@ -655,7 +660,7 @@ void IRCFG::initCfg(OptCtx & oc)
             change = true;
             doopt = true;
         }
-        if (g_do_cfg_remove_trampolin_branch && removeTrampolinBranch()) {
+        if (g_do_cfg_remove_trampolin_branch && removeTrampolinBranch(ctx)) {
             computeExitList();
             change = true;
             doopt = true;
@@ -2225,6 +2230,9 @@ bool IRCFG::dump() const
     m_rg->getLogMgr()->incIndent(2);
     dumpDOT(getRegion()->getLogMgr()->getFileHandler(), DUMP_COMBINE);
     m_rg->getLogMgr()->decIndent(2);
+    if (g_dump_opt.isDumpDOM()) {
+        dumpDom();
+    }
     END_TIMER_FMT(t, ("DUMP %s", getPassName()));
     return true;
 }
@@ -2355,6 +2363,120 @@ void IRCFG::remove_xr(IRBB * bb, IR * ir)
 }
 
 
+bool IRCFG::removeTrampolinBranchForBB(BBListIter & it, CfgOptCtx const& ctx)
+{
+    IRBB * bb = it->val();
+    if (bb->isExceptionHandler()) { return false; }
+
+    IR * br = get_last_xr(bb);
+    if (br == nullptr || !br->isConditionalBr() ||
+        br->hasSideEffect(true)) {
+        return false;
+    }
+
+    BBListIter nextbbit = it;
+    IRBB * next = m_bb_list->get_next(&nextbbit);
+    IR * jmp = nullptr;
+    if (next == nullptr || //bb may be the last BB in bb-list.
+        (jmp = get_first_xr(next)) == nullptr || //bb can not be empty
+        !jmp->is_goto()) { //the only IR must be GOTO
+        return false;
+    }
+
+    if (next->isExceptionHandler()) { return false; }
+
+    //Get br's target BB, it should be the next of next.
+    IRBB * nextnext = m_bb_list->get_next(&nextbbit);
+    if (nextnext == nullptr || !nextnext->isContainLabel(BR_lab(br))) {
+        //Label is not suited to the case.
+        return false;
+    }
+
+    IRBB * jmp_tgt = findBBbyLabel(GOTO_lab(jmp));
+    xcom::Edge const* e_of_jmp = getEdge(next->id(), jmp_tgt->id());
+    ASSERT0(e_of_jmp);
+    CFGEdgeInfo * ei = (CFGEdgeInfo*)EDGE_info(e_of_jmp);
+    if (ei != nullptr && CFGEI_is_eh(ei)) {
+        //Do not remove exception edge.
+        return false;
+    }
+
+    xcom::Edge const* e_of_bb = getEdge(bb->id(), nextnext->id());
+    ASSERT0(e_of_bb);
+    CFGEdgeInfo * ei2 = (CFGEdgeInfo*)EDGE_info(e_of_bb);
+    if (ei2 != nullptr && CFGEI_is_eh(ei2)) {
+        //Do not remove exception edge.
+        return false;
+    }
+
+    //Begin to displace.
+    //Change bb outedge. Make 'next' to empty BB.
+    if (br->is_truebr()) {
+        IR_code(br) = IR_FALSEBR;
+    } else {
+        ASSERT0(br->is_falsebr());
+        IR_code(br) = IR_TRUEBR;
+    }
+    br->setLabel(GOTO_lab(jmp));
+
+    //Change 'next' to be empty BB.
+    remove_xr(next, jmp);
+
+    //Remove jmp->jmp_tgt.
+    removeEdge(next, jmp_tgt);
+
+    //Add next->nextnext, actually jmp->nextnext because 'next' is empty.
+    xcom::Edge * newe = addEdge(next, nextnext);
+    EDGE_info(newe) = ei;
+
+    //Remove bb->nextnext.
+    removeEdge(bb, nextnext);
+
+    //Add bb->jmp_tgt.
+    xcom::Edge * newe2 = addEdge(bb, jmp_tgt);
+    EDGE_info(newe2) = ei2;
+
+    if (ctx.oc.is_dom_valid()) {
+        //Maintain DOM info.
+        //e.g:
+        //  --BB26
+        // |  |
+        // |  v
+        // |  BB27-----
+        // |           |
+        // -> BB29--   |
+        //    |     |  |
+        //    v     |  |
+        //    BB30  |  |
+        //    |    _|  |
+        //    |   /    |
+        //    v  v     |
+        //    BB34 <---
+        //After removing:
+        //    BB26-----
+        //    |        |
+        //    v        |
+        //    BB27     |
+        //    |        |
+        //    v        |
+        //    BB29--   |
+        //    |     |  |
+        //    v     |  |
+        //    BB30  |  |
+        //    |    _|  |
+        //    |   /    |
+        //    v  v     |
+        //    BB34 <---
+        ASSERT0(next && nextnext);
+        set_ipdom(next->id(), nextnext->id());
+        set_idom(nextnext->id(), next->id());
+        get_dom_set(nextnext->id())->bunion(next->id()); 
+        get_pdom_set(next->id())->diff(jmp_tgt->id());
+    }
+    return true;
+}
+
+
 //Remove trampoline branch.
 //Note the pass is different from what removeTrampolinEdge() does.
 //e.g:L2:
@@ -2371,84 +2493,13 @@ void IRCFG::remove_xr(IRBB * bb, IR * ir)
 //    L4:
 //    st = ...
 //    L3:
-bool IRCFG::removeTrampolinBranch()
+bool IRCFG::removeTrampolinBranch(CfgOptCtx const& ctx)
 {
     bool changed = false;
-    BBListIter ct;
-    List<IRBB*> succs;
-    List<IRBB*> preds;
-    for (IRBB * bb = m_bb_list->get_head(&ct);
-         bb != nullptr; bb = m_bb_list->get_next(&ct)) {
-        if (bb->isExceptionHandler()) { continue; }
-
-        IR * br = get_last_xr(bb);
-        if (br == nullptr || !br->isConditionalBr() ||
-            br->hasSideEffect(true)) {
-            continue;
-        }
-
-        BBListIter nextbbct = ct;
-        IRBB * next = m_bb_list->get_next(&nextbbct);
-        IR * jmp = nullptr;
-        if (next == nullptr || //bb may be the last BB in bb-list.
-            (jmp = get_first_xr(next)) == nullptr || //bb can not be empty
-            !jmp->is_goto()) { //the only IR must be GOTO
-            continue;
-        }
-
-        if (next->isExceptionHandler()) { continue; }
-
-        //Get br's target BB, it should be the next of next.
-        IRBB * nextnext = m_bb_list->get_next(&nextbbct);
-        if (nextnext == nullptr || !nextnext->isContainLabel(BR_lab(br))) {
-            //Label is not suited to the case.
-            continue;
-        }
-
-        IRBB * jmp_tgt = findBBbyLabel(GOTO_lab(jmp));
-        xcom::Edge const* e_of_jmp = getEdge(next->id(), jmp_tgt->id());
-        ASSERT0(e_of_jmp);
-        CFGEdgeInfo * ei = (CFGEdgeInfo*)EDGE_info(e_of_jmp);
-        if (ei != nullptr && CFGEI_is_eh(ei)) {
-            //Do not remove exception edge.
-            continue;
-        }
-
-        xcom::Edge const* e_of_bb = getEdge(bb->id(), nextnext->id());
-        ASSERT0(e_of_bb);
-        CFGEdgeInfo * ei2 = (CFGEdgeInfo*)EDGE_info(e_of_bb);
-        if (ei2 != nullptr && CFGEI_is_eh(ei2)) {
-            //Do not remove exception edge.
-            continue;
-        }
-
-        //Displacement
-        if (br->is_truebr()) {
-            IR_code(br) = IR_FALSEBR;
-        } else {
-            ASSERT0(br->is_falsebr());
-            IR_code(br) = IR_TRUEBR;
-        }
-        br->setLabel(GOTO_lab(jmp));
-
-        //Change 'next' to be empty BB.
-        remove_xr(next, jmp);
-
-        //Remove jmp->jmp_tgt.
-        removeEdge(next, jmp_tgt);
-
-        //Add next->nextnext, actually jmp->nextnext because 'next' is empty.
-        xcom::Edge * newe = addEdge(next, nextnext);
-        EDGE_info(newe) = ei;
-
-        //Remove bb->nextnext.
-        removeEdge(bb, nextnext);
-
-        //Add bb->jmp_tgt.
-        xcom::Edge * newe2 = addEdge(bb, jmp_tgt);
-        EDGE_info(newe2) = ei2;
-
-        changed = true;
+    BBListIter it;
+    for (IRBB * bb = m_bb_list->get_head(&it);
+         bb != nullptr; bb = m_bb_list->get_next(&it)) {
+        changed |= removeTrampolinBranchForBB(it, ctx);
     }
     return changed;
 }
@@ -2525,25 +2576,25 @@ void IRCFG::reviseOutEdgeForFallthroughBB(IRBB * bb, BBListIter & bbit)
 //the trampolin branch.
 //Note these optimizations performed in the function should NOT use DOM, PDOM,
 //LOOPINFO, or RPO information.
-bool IRCFG::performMiscOpt(OptCtx & oc, CfgOptCtx const& ctx)
+bool IRCFG::performMiscOpt(CfgOptCtx const& ctx)
 {
     START_TIMER(t, "CFG Optimizations");
     bool change = false;
     bool lchange = false;
     UINT count = 0;
-    OptCtx org_oc(oc);
+    OptCtx org_oc(ctx.oc);
     do {
         lchange = false;
         if (g_do_cfg_remove_unreach_bb) {
             bool res = removeUnreachBB(ctx);
             lchange |= res;
         }
-        if (g_do_cfg_remove_redundant_label &&
-            removeRedundantLabel()) {
-            change = true;
+        if (g_do_cfg_remove_redundant_label) {
+            bool res = removeRedundantLabel();
+            lchange |= res;
         }
         if (g_do_cfg_remove_empty_bb) {
-            bool res = removeEmptyBB(oc, ctx);
+            bool res = removeEmptyBB(ctx);
             lchange |= res;
         }
         if (g_do_cfg_remove_redundant_branch) {
@@ -2555,11 +2606,11 @@ bool IRCFG::performMiscOpt(OptCtx & oc, CfgOptCtx const& ctx)
             lchange |= res;
         }
         if (g_do_cfg_remove_trampolin_branch) {
-            bool res = removeTrampolinBranch();
+            bool res = removeTrampolinBranch(ctx);
             lchange |= res;
         }
         if (lchange) {
-            oc.setInvalidIfCFGChanged();
+            ctx.oc.setInvalidIfCFGChanged();
         }
         change |= lchange;
         count++;
@@ -2568,10 +2619,10 @@ bool IRCFG::performMiscOpt(OptCtx & oc, CfgOptCtx const& ctx)
     if (change) {
         computeExitList();
         if (org_oc.is_cdg_valid()) {
-            m_rg->getPassMgr()->checkValidAndRecompute(&oc, PASS_CDG,
+            m_rg->getPassMgr()->checkValidAndRecompute(&ctx.oc, PASS_CDG,
                                                        PASS_UNDEF);
             ASSERT0(verifyIfBBRemoved((CDG*)m_rg->getPassMgr()->
-                                      queryPass(PASS_CDG), oc));
+                                      queryPass(PASS_CDG), ctx.oc));
         }
 
         //SSAInfo is invalid by adding new-edge to BB.
@@ -2583,8 +2634,8 @@ bool IRCFG::performMiscOpt(OptCtx & oc, CfgOptCtx const& ctx)
             dump();
         }
         ASSERT0(verifyIRandBB(getBBList(), m_rg));
-        ASSERT0(verifyRPO(oc));
-        ASSERT0(verifyDomAndPdom(oc));
+        ASSERT0(verifyRPO(ctx.oc));
+        ASSERT0(verifyDomAndPdom(ctx.oc));
     }
     END_TIMER(t, "CFG Optimizations");
     return change;

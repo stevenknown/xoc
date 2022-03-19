@@ -96,6 +96,7 @@ GVN::GVN(Region * rg) : Pass(rg)
     m_is_vn_fp = false;
     m_is_comp_ild_vn_by_du = true;
     m_is_comp_lda_string = false;
+    m_is_alloc_livein_vn = false;
     m_pool = nullptr;
     init();
 }
@@ -517,21 +518,20 @@ VN * GVN::computePR(IR const* exp, bool & change)
 {
     SSAInfo * ssainfo = PR_ssainfo(exp);
     ASSERT0(exp->isReadPR() && ssainfo);
-
     IR const* def = ssainfo->getDef();
     if (def == nullptr) {
         ASSERT0(exp->getRefMD());
-        return allocLiveinVN(exp, exp->getRefMD(), change);
+        if (isAllocLiveinVN()) {
+            return allocLiveinVN(exp, exp->getRefMD(), change);
+        }
+        return nullptr;
     }
-
     VN * defvn = m_ir2vn.get(def->id());
-
     VN * ux = m_ir2vn.get(exp->id());
     if (defvn != ux) {
         m_ir2vn.setAlways(exp->id(), defvn);
         change = true;
     }
-
     return defvn;
 }
 
@@ -566,7 +566,10 @@ VN * GVN::computeExactMemory(IR const* exp, bool & change)
 
     DUSet const* defset = exp->readDUSet();
     if (defset == nullptr) {
-        return allocLiveinVN(exp, emd, change);
+        if (isAllocLiveinVN()) {
+            return allocLiveinVN(exp, emd, change);
+        }
+        return nullptr;
     }
 
     //Check if some may-def or overlapped-def disrupts the emd.
@@ -598,7 +601,10 @@ VN * GVN::computeExactMemory(IR const* exp, bool & change)
             return nullptr;
         }
     }
-    return allocLiveinVN(exp, emd, change);
+    if (isAllocLiveinVN()) {
+        return allocLiveinVN(exp, emd, change);
+    }
+    return nullptr;
 }
 
 
@@ -887,7 +893,7 @@ VN * GVN::computeScalar(IR const* exp, bool & change)
 
     DUSet const* du = exp->readDUSet();
     if (du == nullptr || du->get_elem_count() == 0) {
-        //If exact MD DU is empty, should assigned region LiveIn VN.
+        //If exact MD DU is empty, should keep it as unknown status.
         return nullptr;
     }
 
@@ -943,14 +949,14 @@ VN * GVN::computeVN(IR const* exp, bool & change)
         VN * vn2 = computeVN(BIN_opnd1(exp), change);
         if (vn1 == nullptr || vn2 == nullptr) {
             if (m_ir2vn.get(exp->id()) != nullptr) {
-                m_ir2vn.set(exp->id(), nullptr);
+                m_ir2vn.setAlways(exp->id(), nullptr);
                 change = true;
             }
             return nullptr;
         }
         VN * x = registerBinVN(exp->getCode(), vn1, vn2);
         if (m_ir2vn.get(exp->id()) != x) {
-            m_ir2vn.set(exp->id(), x);
+            m_ir2vn.setAlways(exp->id(), x);
             change = true;
         }
         return x;
@@ -966,7 +972,7 @@ VN * GVN::computeVN(IR const* exp, bool & change)
         }
         x = registerUnaVN(exp->getCode(), x);
         if (m_ir2vn.get(exp->id()) != x) {
-            m_ir2vn.set(exp->id(), x);
+            m_ir2vn.setAlways(exp->id(), x);
             change = true;
         }
         return x;
@@ -992,7 +998,7 @@ VN * GVN::computeVN(IR const* exp, bool & change)
 
         if (basevn == nullptr) {
             if (m_ir2vn.get(exp->id()) != nullptr) {
-                m_ir2vn.set(exp->id(), nullptr);
+                m_ir2vn.setAlways(exp->id(), nullptr);
                 change = true;
             }
             return nullptr;
@@ -1001,7 +1007,7 @@ VN * GVN::computeVN(IR const* exp, bool & change)
         VN * ofstvn = registerVNviaINT(LDA_ofst(exp));
         VN * x = registerBinVN(IR_LDA, basevn, ofstvn);
         if (m_ir2vn.get(exp->id()) != x) {
-            m_ir2vn.set(exp->id(), x);
+            m_ir2vn.setAlways(exp->id(), x);
             change = true;
         }
         return x;
@@ -1038,7 +1044,7 @@ VN * GVN::computeVN(IR const* exp, bool & change)
         }
 
         ASSERT0(x);
-        m_ir2vn.set(exp->id(), x);
+        m_ir2vn.setAlways(exp->id(), x);
         change = true;
         return x;
     }

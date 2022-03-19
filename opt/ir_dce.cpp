@@ -921,7 +921,6 @@ bool DeadCodeElim::perform(OptCtx & oc)
     } else {
         m_cdg = nullptr;
     }
-
     m_rg->getLogMgr()->startBuffer();
     reinit();
     if (g_dump_opt.isDumpBeforePass() && g_dump_opt.isDumpDCE()) {
@@ -933,7 +932,7 @@ bool DeadCodeElim::perform(OptCtx & oc)
     List<IR const*> work_list;
     UINT const max_iter = 0xFFFF;
     bool remove_branch_stmt = false;
-    CfgOptCtx ctx;
+    CfgOptCtx ctx(oc);
     if (useMDSSADU()) {
         //CFG opt will maintain MDSSA information that need to update DOM info
         //in time.
@@ -954,7 +953,7 @@ bool DeadCodeElim::perform(OptCtx & oc)
         m_is_stmt_effect.clean();
         m_is_mddef_effect.clean();
         m_is_bb_effect.clean();
-        if (m_cfg->performMiscOpt(oc, ctx)) {
+        if (m_cfg->performMiscOpt(ctx)) {
             //Note DOM info will changed without maintaining.
             //CFG has been changed, thus remove empty BB to produce more
             //optimization opportunities.

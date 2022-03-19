@@ -155,7 +155,8 @@ Pass * PassMgr::allocInvertBrTgt()
 
 Pass * PassMgr::allocVRP()
 {
-    return new VRP(m_rg);
+    //return new VRP(m_rg);
+    return nullptr;
 }
 
 

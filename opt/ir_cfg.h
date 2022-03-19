@@ -81,7 +81,8 @@ protected:
     //    L4:
     //    st = ...
     //    L3:
-    bool removeTrampolinBranch();
+    bool removeTrampolinBranchForBB(BBListIter & it, CfgOptCtx const& ctx);
+    bool removeTrampolinBranch(CfgOptCtx const& ctx);
 
     //The function remove all MDPhis in 'bb'.
     //Note caller should guarrantee phi is useless and removable.
@@ -234,6 +235,8 @@ public:
         return Graph::WhichPred(pred->id(), bb_vex);
     }
 
+    virtual void removeDomInfo(C<IRBB*> * bbct, CfgOptCtx const& ctx);
+
     //You should clean the relation between Label and BB before removing BB.
     virtual void removeBB(C<IRBB*> * bbct, CfgOptCtx const& ctx);
 
@@ -326,11 +329,11 @@ public:
     //PDOM, LOOPINFO, or RPO information.
     bool performMiscOpt(OptCtx & oc)
     {
-        CfgOptCtx ctx;
+        CfgOptCtx ctx(oc);
         CFGOPTCTX_update_dominfo(&ctx) = true;
-        return performMiscOpt(oc, ctx);
+        return performMiscOpt(ctx);
     }
-    bool performMiscOpt(OptCtx & oc, CfgOptCtx const& ctx);
+    bool performMiscOpt(CfgOptCtx const& ctx);
 
     //The function verify whether the branch target is match to the BB.
     bool verifyBranchTarget() const;

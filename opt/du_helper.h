@@ -39,8 +39,8 @@ class GVN;
 //'from' and expression 'to'.
 //to: root expression of target tree.
 //from: root expression of source tree.
-//NOTE: IR tree 'to' and 'from' must be isomorphic structure.
-//The function will iterate IR list if exist.
+//NOTE:IR tree 'to' and 'from' must be isomorphic structure.
+//     The function will NOT iterate sibling IR if 'from' is a list.
 //Both 'to' and 'from' must be expression.
 void addUseForTree(IR * to, IR const* from, Region * rg);
 

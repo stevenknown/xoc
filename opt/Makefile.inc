@@ -62,5 +62,4 @@ $(SRC)/opt/analysis_instr.o\
 $(SRC)/opt/invert_brtgt.o\
 $(SRC)/opt/ir_helper.o\
 $(SRC)/opt/gr_helper.o\
-$(SRC)/opt/mdssalive_mgr.o\
-$(SRC)/opt/ir_vrp.o
+$(SRC)/opt/mdssalive_mgr.o

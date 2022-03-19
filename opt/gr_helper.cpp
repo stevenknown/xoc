@@ -804,7 +804,7 @@ void GRDump::dumpBBList(BBList const* bblist, DumpGRCtx const* ctx) const
 
 void GRDump::dumpRegion(bool dump_inner_region) const
 {
-    note(m_rg, "\n//====---- Dump region '%s' ----====", m_rg->getRegionName());
+    note(m_rg, "\n//==---- DUMP Region '%s' ----==", m_rg->getRegionName());
     note(m_rg, "\nregion ");
     switch (m_rg->getRegionType()) {
     case REGION_PROGRAM: prt(m_rg, "program "); break;

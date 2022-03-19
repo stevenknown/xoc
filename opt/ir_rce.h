@@ -58,6 +58,10 @@ protected:
     //Note that compute GVN is expensive.
     bool m_use_gvn;
 private:
+    IR * processTruebr(IR * ir, IR * new_det, bool must_true,
+                       bool must_false, bool changed, MOD RCECtx & ctx);
+    IR * processFalsebr(IR * ir, IR * new_det, bool must_true,
+                        bool must_false, bool changed, MOD RCECtx & ctx);
     bool performSimplyRCEForBB(IRBB * bb, MOD RCECtx & ctx);
 
     bool useMDSSADU() const

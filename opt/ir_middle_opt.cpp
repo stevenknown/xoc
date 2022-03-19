@@ -107,8 +107,8 @@ void Region::postSimplify(SimpCtx const& simp, MOD OptCtx & oc)
     }
 
     //Before CFG rebuilding.
-    CfgOptCtx ctx;
-    getCFG()->removeEmptyBB(oc, ctx);
+    CfgOptCtx ctx(oc);
+    getCFG()->removeEmptyBB(ctx);
     getCFG()->rebuild(oc);
     ASSERT0(getCFG()->verify());
 
