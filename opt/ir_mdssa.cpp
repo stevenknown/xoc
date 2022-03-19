@@ -4031,6 +4031,44 @@ bool MDSSAMgr::verifyMDSSAInfo(Region const* rg)
 }
 
 
+//Duplicate Phi operand that is at the given position, and insert after
+//given position sequently.
+//pos: given position
+//num: the number of duplication.
+//Note caller should guarrentee the number of operand is equal to the
+//number predecessors of BB of Phi.
+void MDSSAMgr::dupAndInsertPhiOpnd(IRBB const* bb, UINT pos, UINT num)
+{
+    ASSERT0(bb && num >= 1);
+    MDPhiList * philist = getPhiList(bb);
+    if (philist == nullptr || philist->get_elem_count() == 0) {
+        return;
+    }
+    ASSERTN(0, ("TO BE CHECK"));
+    for (MDPhiListIter it = philist->get_head();
+         it != philist->end(); it = philist->get_next(it)) {
+        MDPhi * phi = it->val();
+        ASSERT0(xcom::cnt_list(phi->getOpndList()) == bb->getNumOfPred(m_cfg));
+        UINT lpos = pos;
+        IR * opnd = phi->getOpndList();
+        for (; lpos != 0; opnd = opnd->get_next()) {
+            ASSERT0(opnd);
+            lpos--;
+        }
+        ASSERTN(opnd, ("MDPHI does not contain such many operands."));
+        MDSSAInfo * opndinfo = getMDSSAInfoIfAny(opnd);
+        ASSERT0(opndinfo || !opnd->is_id());
+        for (UINT i = 0; i < num; i++) {
+            IR * newopnd = m_rg->dupIR(opnd);
+            phi->insertOpndAfter(opnd, newopnd);
+            if (opndinfo != nullptr) {
+                addUseToMDSSAInfo(newopnd, opndinfo);
+            }
+        }
+    }
+}
+
+
 //Return true if stmt dominates use's stmt, otherwise return false.
 bool MDSSAMgr::isStmtDomUseInsideLoop(IR const* stmt, IR const* use,
                                       LI<IRBB> const* li) const
@@ -4490,9 +4528,6 @@ void RenameTillNextDef::renameFollowUseInterBBTillNextDef(
 
             IRBB * vbb = m_cfg->getBB(v->id());
             ASSERT0(vbb);
-if(vbb->id()==23){
-int a=0;
-}
             BBIRListIter irlistit;
             vbb->getIRList().get_head(&irlistit);
             renameUseInBBTillNextDef(v, vbb, irlistit, *tliveset);

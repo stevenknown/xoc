@@ -400,6 +400,7 @@ public:
     inline Var * getIdinfo() const; //Get idinfo if any.
     IR * getParent() const { return IR_parent(this); }
     inline IR * getKid(UINT idx) const;
+    UINT getKidNum() const { return IR_MAX_KID_NUM(this); }
     inline IRBB * getBB() const;
     inline DU * getDU() const;
 

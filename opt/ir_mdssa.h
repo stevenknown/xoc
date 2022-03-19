@@ -503,6 +503,14 @@ public:
     //flag: the flag to dump IR.
     void dumpIRWithMDSSA(IR const* ir, UINT flag = IR_DUMP_COMBINE) const;
 
+    //Duplicate Phi operand that is at the given position, and insert after
+    //given position sequently.
+    //pos: given position
+    //num: the number of duplication.
+    //Note caller should guarrentee the number of operand is equal to the
+    //number predecessors of BB of Phi.
+    void dupAndInsertPhiOpnd(IRBB const* bb, UINT pos, UINT num);
+
     //Find killing must-def IR stmt for expression ir.
     //Return the IR stmt if found.
     //e.g: g is global variable, it is exact.

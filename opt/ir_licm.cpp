@@ -274,11 +274,21 @@ bool LICM::chooseCallStmt(LI<IRBB> * li, IR * ir, IRIter & irit)
 static bool isJudgeHoistCand(IR const* ir)
 {
     ASSERT0(ir->is_judge());
-    IR const* op0 = BIN_opnd0(ir);
-    IR const* op1 = BIN_opnd1(ir);
-    bool op0_simp = op0->isReadPR() || op0->is_const();
-    bool op1_simp = op1->isReadPR() || op1->is_const();
-    return !(op0_simp && op1_simp);
+    switch (ir->getKidNum()) {
+    case 1: {
+        IR const* op = UNA_opnd(ir);
+        return !(op->isReadPR() || op->is_const());
+    }
+    case 2: {
+        IR const* op0 = BIN_opnd0(ir);
+        IR const* op1 = BIN_opnd1(ir);
+        bool op0_simp = op0->isReadPR() || op0->is_const();
+        bool op1_simp = op1->isReadPR() || op1->is_const();
+        return !(op0_simp && op1_simp);
+    }
+    default: ASSERTN(0, ("TODO"));
+    }
+    return false;
 }
 
 

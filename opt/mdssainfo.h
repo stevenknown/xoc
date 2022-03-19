@@ -534,6 +534,15 @@ public:
     UINT getOpndNum() const { return xcom::cnt_list(getOpndList()); }
     VMD * getOpndVMD(IR const* opnd, UseDefMgr const* mgr) const;
 
+    void insertOpndAfter(IR * marker, IR * exp)
+    {
+        ASSERT0(marker && exp);
+        ASSERT0(xcom::in_list(MDPHI_opnd_list(this), marker));
+        ASSERT0(!xcom::in_list(MDPHI_opnd_list(this), exp));
+        ASSERT0(exp->getRefMD() && exp->getRefMDSet() == nullptr);
+        xcom::insertafter(&marker, exp);
+        ID_phi(exp) = this; //Record ID's host PHI.
+    }
     //Insert operand at given position.
     IR * insertOpndAt(MDSSAMgr * mgr, UINT pos, IRBB const* pred);
 

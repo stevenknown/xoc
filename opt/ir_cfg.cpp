@@ -322,14 +322,16 @@ UINT IRCFG::replacePred(IRBB const* bb, IRBB const* succ,
         //No need to duplicate operand if there is only one predecessor.
         return newpredstartpos;
     }
-
     //Update phi operation.
+    //Copy the operand that is in the replacement position. The original
+    //livein value of the operand should livein from new predecessors as well.
     if (useprssa) {
         prssamgr->dupAndInsertPhiOpnd(succ, newpredstartpos,
                                       newpreds.get_elem_count());
     }
     if (usemdssa) {
-        ASSERT0(0);//TODO
+        mdssamgr->dupAndInsertPhiOpnd(succ, newpredstartpos,
+                                      newpreds.get_elem_count());
     }
     return newpredstartpos;
 }
