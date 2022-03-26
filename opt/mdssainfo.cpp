@@ -594,7 +594,7 @@ void VMD::dump(Region const* rg, UseDefMgr const* mgr) const
 //
 //START MDPhi
 //
-void MDPhi::replaceOpnd(IR * oldopnd, IR * newopnd)
+void MDPhi::replaceOpnd(MOD IR * oldopnd, MOD IR * newopnd)
 {
     ASSERT0(oldopnd && newopnd);
     xcom::replace(&MDPHI_opnd_list(this), oldopnd, newopnd);

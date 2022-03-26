@@ -3019,7 +3019,7 @@ void MDSSAMgr::addMDSSAOccForTree(IR * ir, IR const* ref)
 //ld(y) will be removed as well. Therefore ld(y)'s MDSSAInfo will be
 //updated as well.
 //The function does NOT deal with sibling node of ir.
-void MDSSAMgr::removeMDSSAOccForTree(IR * ir)
+void MDSSAMgr::removeMDSSAOccForTree(IR const* ir)
 {
     if (hasMDSSAInfo(ir)) {
         if (ir->is_stmt()) {

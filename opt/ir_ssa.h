@@ -540,7 +540,7 @@ public:
     //NOTE: If ir is an IR tree, e.g: add(pr1, pr2), removing 'add' means
     //pr1 and pr2 will be removed as well. Therefore pr1 pr2's SSAInfo will be
     //updated as well.
-    static void removePRSSAOcc(IR * ir);
+    static void removePRSSAOcc(IR const* ir);
 
     //Check each USE of stmt, remove the expired one which is not reference
     //the memory any more that stmt defined.

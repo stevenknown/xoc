@@ -153,6 +153,15 @@ bool isDependent(IR const* ir, MDPhi const* phi);
 //The function try to find the killing-def for 'use'.
 IR * findKillingDef(IR const* use, Region * rg);
 
+//Note DOM info must be available.
+//exp: the expression that expected to set livein.
+//startir: the start position in 'startbb', it can be NULL.
+//         If it is NULL, the function first finding the Phi list of
+//         'startbb', then keep finding its predecessors until the
+//         CFG entry.
+//startbb: the BB that begin to do searching.
+void findAndSetLiveInDef(IR * root, IR * startir, IRBB * startbb, Region * rg);
+
 //The function checks each DEF|USE occurrence of ir, remove the expired expression
 //which is not reference the memory any more that ir referenced.
 //Return true if DU changed.
@@ -171,7 +180,7 @@ bool removeExpiredDU(IR const* ir, Region * rg);
 //NOTE: If exp is an IR tree, e.g: ild(x, ld(y)), remove ild(x) means
 //ld(y) will be removed as well. And ld(y)'s MDSSAInfo will be
 //updated as well.
-void removeUseForTree(IR * exp, Region * rg);
+void removeUseForTree(IR const* exp, Region * rg);
 
 //Remove all DU info of 'stmt'.
 void removeStmt(IR * stmt, Region * rg);

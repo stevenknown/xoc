@@ -324,10 +324,19 @@ public:
     //Return true if BB has a fall through successor.
     //Note conditional branch always has fallthrough successor.
     bool is_fallthrough() const;
+
+    //Return true if BB has only fall through successor.
+    //Note the function does not take exception-edge into consider.
+    bool is_only_fallthrough() const;
     bool is_target() const { return BB_is_target(this); }
     bool is_catch_start() const { return BB_is_catch_start(this); }
     bool is_try_start() const { return BB_is_try_start(this); }
     bool is_try_end() const { return BB_is_try_end(this); }
+
+    //Return true if 'prev' is the previous BB of current BB in BBList.
+    //it: BBListIter of current BB.
+    bool isPrevBB(IRBB const* prev, BBListIter const it,
+                  BBList const* bblst) const;
 
     //Return true if BB is an entry BB of TRY block.
     inline bool isTryStart() const

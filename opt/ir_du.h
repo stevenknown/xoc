@@ -451,7 +451,7 @@ public:
     //     ...=to
     //from: stmt
     //to: expression
-    void coalesceDUChain(IR * from, IR * to);
+    void coalesceDUChain(IR const* from, IR const* to);
 
     void dumpMemUsageForMDRef() const;
     void dumpDUChain() const;
@@ -610,7 +610,7 @@ public:
     void removeDef(IR const* ir, IR const* def);
 
     //Remove all DU info of 'ir' from DU mgr.
-    void removeIRFromDUMgr(IR * ir);
+    void removeIRFromDUMgr(IR const* ir);
 
     //The function check all USE of memory references of ir tree and
     //cut its du-chain. 'ir' may be stmt or expression, if ir is stmt,
@@ -619,14 +619,15 @@ public:
     //'ir': indicate the root of IR tree.
     //e.g: d1, d2 are def-stmt of stmt's operands.
     //the functin cut off du-chain between d1, d2 and their use.
-    void removeUseFromDefset(IR * ir);
+    void removeUseFromDefset(IR const* ir);
+
     //Note that do NOT use the function to remove SSA def.
     //The function handle the MD DU chain and cut
     //off the DU chain between MD def and its MD use expression.
     //Remove 'def' from its use's def-list.
     //e.g:u1, u2 are its use expressions.
     //cut off the du chain between def->u1 and def->u2.
-    void removeDefFromUseset(IR * def);
+    void removeDefFromUseset(IR const* def);
 
     bool verifyLiveinExp();
 

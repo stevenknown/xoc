@@ -189,11 +189,16 @@ public:
     //        BB4
     void insertBBbefore(IN IRBB * bb, IN IRBB * newbb);
 
-    //Return the newbb or the inserted trampolining BB in addition to newbb.
-    //This function will break fallthrough edge of 'to' if necessary.
-    IRBB * insertBBbetween(IN IRBB * from, IN BBListIter from_ct,
-                           IN IRBB * to, IN BBListIter to_ct,
-                           IN IRBB * newbb);
+    //The function insert newbb bewteen 'from' and 'to'. As a result, the
+    //function may break up fallthrough edge of 'to' if necessary.
+    void insertBBbetween(IN IRBB * from, IN BBListIter from_it,
+                         IN IRBB * to, IN BBListIter to_it,
+                         IN IRBB * newbb);
+    //The function insert a tampolining BB bewteen prev and bb, that will
+    //make prev no longer fallthrough to bb.
+    //prev: the previous BB of bb, note prev must fallthrough to bb.
+    IRBB * insertTrampolinBB(IRBB * prev, MOD IRBB * bb, BBListIter const bbit,
+                             MOD BBList * bblst);
     bool isRPOValid() const;
 
     //Return the first operation of 'bb'.

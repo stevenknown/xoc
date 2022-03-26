@@ -781,7 +781,7 @@ public:
     //ld(y) will be removed as well. And ld(y)'s MDSSAInfo will be
     //updated as well.
     //The function does NOT deal with sibling node of ir.
-    void removeMDSSAOccForTree(IR * ir);
+    void removeMDSSAOccForTree(IR const* ir);
 
     //Remove DEF-USE chain if exist in between 'stmt' and 'exp'.
     //The function will remove 'exp' from occurence set.

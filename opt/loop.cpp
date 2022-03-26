@@ -408,7 +408,7 @@ static IR * tryAppendGotoToJumpToBB(IRBB * from, IRBB * to, Region * rg)
 }
 
 
-//Fix up edge relation when preheader inserted.
+//Fixup edge that come from loop-inside BB when preheader inserted.
 //pred: predecessor of head which is inside loop body.
 static void fixupInnerLoopEdgeBetweenHeadAndPreheader(LI<IRBB> const* li,
                                                       Region * rg,
@@ -465,10 +465,11 @@ static void fixupInnerLoopEdgeBetweenHeadAndPreheader(LI<IRBB> const* li,
 
 
 //Return true if inserted a new BB.
-//insert_preheader: true if preheader has been inserted.
-static void updateOutterLoopEdgeBetweenHeadAndPreheader(
-    LI<IRBB> const* li, Region * rg, IRBB * pred, IRBB * preheader,
-    MOD LabelInfo const** preheader_lab, bool & insert_preheader)
+//insert_preheader: true if preheader has been inserted, otherwise do insertion.
+static void insertAndUpdateOutterLoopEdge(
+    LI<IRBB> const* li, Region * rg, IRBB * pred, BBListIter head_it,
+    IRBB * preheader, MOD LabelInfo const** preheader_lab,
+    OUT bool & insert_preheader)
 {
     IRBB * head = li->getLoopHead();
     IRCFG * cfg = rg->getCFG();
@@ -476,6 +477,9 @@ static void updateOutterLoopEdgeBetweenHeadAndPreheader(
     if (!insert_preheader) {
         //Insert preheader in front of head.
         //Note preheader must fallthrough to head.
+        BBListIter pred_it;
+        cfg->getBBList()->find(pred, &pred_it);
+        ASSERT0(pred_it);
         cfg->insertVertexBetween(pred->id(), head->id(), preheader->id());
         bool succ = cfg->tryFindLessRPO(preheader, head);
         CHECK0_DUMMYUSE(succ);
@@ -484,34 +488,26 @@ static void updateOutterLoopEdgeBetweenHeadAndPreheader(
     }
 
     //CASE1:
-    //  BB_pred
-    //   |
-    //   v
-    //  BB_head
-    //Have to get the last IR of BB and judge if it is conditional branch.
-    //if (BB_is_fallthrough(p)) {
-    //    //Nothing to do.
-    //    continue;
-    //}
-    //----------------------------------
-    //CASE2:
-    //  BB_pred(goto lab1)
-    //   |
-    //   v
-    //  BB_head(lab1)
+    //  BB_pred(goto BB_head)---
+    //                          |
+    //  BB_head <---------------
     //=>
-    //  BB_pred(goto lab2)
-    //   |
-    //   v
-    //  BB_preheader(lab2)
+    //  BB_pred(goto BB_preheader)---
+    //                               |
+    //  BB_preheader <---------------
     //   |  //fallthrough
     //   v
     //  BB_head(lab1)
     //Try to update the target-label of the last IR of predecessor, and
-    //remove edge p->header, add edge p->preheader.
+    //remove edge pred->header, add edge pred->preheader as well.
     IR * last_ir = BB_last_ir(pred);
     if (last_ir == nullptr || !last_ir->isBranch()) {
-        //Nothing to update.
+        if (!inserted_by_cur_time) {
+            //Original pred is fallthrough to head.
+            //Maintain pred and preheader's edge.
+            cfg->removeEdge(pred, head);
+            cfg->addEdge(pred, preheader);
+        }
         return;
     }
 
@@ -519,7 +515,7 @@ static void updateOutterLoopEdgeBetweenHeadAndPreheader(
             ("TODO"));
     if (cfg->findBBbyLabel(last_ir->getLabel()) != head) { return; }
 
-    //Update branch-target of last ir.
+    //Update branch-target of last IR.
     if (*preheader_lab == nullptr) {
         //Preheader needs a label to be branch-target.
         *preheader_lab = rg->genILabel();
@@ -537,15 +533,19 @@ static void updateOutterLoopEdgeBetweenHeadAndPreheader(
         ASSERT0(cfg->getEdge(pred->id(), preheader->id()));
         return;
     }
+
     //Maintain pred and preheader's edge.
     cfg->removeEdge(pred, head);
     cfg->addEdge(pred, preheader);
 }
 
 
-//Return true if inserted a new preheader.
-static bool updateEdgeBetweenHeadAndPreheader(LI<IRBB> const* li, Region * rg,
-                                              IRBB * preheader)
+//The function will do inserton of preheader and update edges between
+//heads and preheader.
+//Return true if inserted a new preheader, otherwise there is no loop-outside
+//BB.
+static bool insertAndUpdateEdge(LI<IRBB> const* li, Region * rg,
+                                BBListIter head_it, IRBB * preheader)
 {
     IRCFG * cfg = rg->getCFG();
     List<IRBB*> preds;
@@ -560,9 +560,8 @@ static bool updateEdgeBetweenHeadAndPreheader(LI<IRBB> const* li, Region * rg,
             fixupInnerLoopEdgeBetweenHeadAndPreheader(li, rg, p);
             continue;
         }
-        updateOutterLoopEdgeBetweenHeadAndPreheader(li, rg, p, preheader,
-                                                    &preheader_lab,
-                                                    insert_preheader);
+        insertAndUpdateOutterLoopEdge(li, rg, p, head_it, preheader,
+                                      &preheader_lab, insert_preheader);
     }
     return insert_preheader;
 }
@@ -746,10 +745,10 @@ IRBB * findAndInsertPreheader(LI<IRBB> const* li, Region * rg,
     BBList * bblst = rg->getBBList();
     IRBB * head = li->getLoopHead();
 
-    BBListIter bbholder = nullptr;
-    bblst->find(head, &bbholder);
-    ASSERT0(bbholder);
-    BBListIter tt = bbholder;
+    BBListIter head_it = nullptr;
+    bblst->find(head, &head_it);
+    ASSERT0(head_it);
+    BBListIter tt = head_it;
     IRBB * prev = bblst->get_prev(&tt);
     IRBB * appropriate_prev_bb = findAppropriatePreheader(li, cfg, prev);
     if (!force) {
@@ -762,8 +761,10 @@ IRBB * findAndInsertPreheader(LI<IRBB> const* li, Region * rg,
 
     IRBB * preheader = rg->allocBB();
     cfg->addBB(preheader);
-    bblst->insert_before(preheader, bbholder);
-    insert_bb |= updateEdgeBetweenHeadAndPreheader(li, rg, preheader);
+    //Guarrantee preheader is fallthrough to head.
+    bblst->insert_before(preheader, head_it);
+    insert_bb |= insertAndUpdateEdge(li, rg, head_it, preheader);
+    ASSERT0(cfg->getBBList()->find(preheader));
     tryMoveLabelFromHeadToPreheader(li, cfg, preheader);
     return preheader;
 }

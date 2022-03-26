@@ -124,6 +124,39 @@ bool IRBB::isLowerBoundary(IR const* ir)
 }
 
 
+//Return true if BB has only fall through successor.
+//Note the function does not take exception-edge into consider.
+bool IRBB::is_only_fallthrough() const
+{
+    IR * last = const_cast<IRBB*>(this)->getLastIR();
+    if (last == nullptr) { return true; }
+    switch (last->getCode()) {
+    case IR_CALL:
+    case IR_ICALL:
+        return true;
+    case IR_TRUEBR:
+    case IR_FALSEBR:
+    case IR_SWITCH:
+        return false;
+    case IR_IGOTO:
+    case IR_GOTO:
+        //We have no knowledge about whether target BB of GOTO/IGOTO
+        //will be followed subsequently on current BB.
+        //Leave this problem to CFG builder, and the related
+        //attribute should be set at that time.
+        return false;
+    case IR_RETURN:
+        //Succeed stmt of 'ir' may be DEAD code
+        //IR_BB_is_func_exit(cur_bb) = true;
+        return true;
+    case IR_REGION:
+        return true;
+    default: ASSERT0(!last->isBranch());
+    }
+    return true;
+}
+
+
 //Return true if BB has a fall through successor.
 //Note conditional branch always has fallthrough successor.
 bool IRBB::is_fallthrough() const

@@ -350,7 +350,7 @@ void coalesceDUChain(IR * from, IR * to, Region * rg)
 //NOTE: If ir is a IR tree, e.g: ild(x, ld(y)), remove ild(x) means
 //ld(y) will be removed as well. And ld(y)'s MDSSAInfo will be
 //updated as well.
-void removeUseForTree(IR * exp, Region * rg)
+void removeUseForTree(IR const* exp, Region * rg)
 {
     ASSERT0(exp && exp->is_exp()); //exp is the root of IR tree.
     bool mdssa_changed = false;
@@ -914,6 +914,26 @@ bool isDependent(IR const* ir1, IR const* ir2, Region const* rg)
     }
     ASSERT0(ir1may && ir2may);
     return ir1may == ir2may ? true : ir2may->is_intersect(*ir1may);
+}
+
+
+void findAndSetLiveInDef(IR * root, IR * startir, IRBB * startbb, Region * rg)
+{
+    ASSERT0(root->is_exp());
+    PRSSAMgr * prssamgr = rg->getPRSSAMgr();
+    MDSSAMgr * mdssamgr = rg->getMDSSAMgr();
+    bool use_prssa = prssamgr != nullptr && prssamgr->is_valid();
+    bool use_mdssa = mdssamgr != nullptr && mdssamgr->is_valid();
+    if (!use_prssa && !use_mdssa) { return; }
+    IRIter it;
+    for (IR * x = iterInit(root, it);
+         x != nullptr; x = iterNext(it)) {
+        if (use_mdssa && x->isMemoryRefNonPR()) {
+            mdssamgr->findAndSetDomLiveInDef(x, startir, startbb);
+        } else if (use_prssa && x->isReadPR()) {
+            prssamgr->findAndSetLiveinDef(x);
+        }
+    }
 }
 
 } //namespace xoc

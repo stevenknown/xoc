@@ -2499,7 +2499,7 @@ IRBB * RegPromot::tryInsertStubExitBB(IRBB * exit_bb,
 
     IRBB * stub = m_rg->allocBB();
     m_cfg->addBB(stub);
-    stub = m_cfg->insertBBbetween(pred, pred_it, exit_bb, exit_bb_it, stub);
+    m_cfg->insertBBbetween(pred, pred_it, exit_bb, exit_bb_it, stub);
     if (!m_cfg->tryUpdateRPO(stub, exit_bb, true)) {
         OC_is_rpo_valid(*ctx.oc) = false;
         OC_is_cdg_valid(*ctx.oc) = false;

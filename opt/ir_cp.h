@@ -96,9 +96,9 @@ private:
                       IR const* prop_value, IRListIter cur_iter,
                       IRListIter * next_iter,
                       bool prssadu, bool mdssadu);
-    bool doPropForMDPhi(IR const* prop_value, IN IR * use);
+    bool doPropForMDPhi(IR const* prop_value, MOD IR * use);
     bool doPropForNormalStmt(IRListIter cur_iter, IRListIter* next_iter,
-                             IR const* prop_value, IN IR * use,
+                             IR const* prop_value, MOD IR * use,
                              IRBB * def_bb);
     //useset: for local used.
     bool doPropIR(IR * def_stmt, IN IRSet * useset,
@@ -160,7 +160,7 @@ private:
                             IR const* def_stmt,
                             bool prssadu, bool mdssadu) const;
 
-    void replaceExp(IR * exp, IR const* cand_exp, MOD CPCtx & ctx);
+    void replaceExp(MOD IR * exp, IR const* cand_exp, MOD CPCtx & ctx);
 
     //Check if the CVT can be discarded and the cvt-expression will be regarded
     //as the recommended propagate value.

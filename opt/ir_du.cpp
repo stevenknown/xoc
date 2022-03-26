@@ -1288,7 +1288,7 @@ bool DUMgr::removeExpiredDUIRTree(IR const* stmt)
 //'ir': indicate the root of IR tree.
 //e.g: d1, d2 are def-stmt of stmt's operands.
 //The functin cutoff DU chain between d1, d2 and their use.
-void DUMgr::removeUseFromDefset(IR * ir)
+void DUMgr::removeUseFromDefset(IR const* ir)
 {
     m_citer.clean();
     IR const* k;
@@ -1337,7 +1337,7 @@ void DUMgr::removeUseFromDefset(IR * ir)
 //Remove 'def' from its use's def-list.
 //e.g:u1, u2 are its use expressions.
 //cutoff the DU chain between def->u1 and def->u2.
-void DUMgr::removeDefFromUseset(IR * def)
+void DUMgr::removeDefFromUseset(IR const* def)
 {
     ASSERT0(def->is_stmt());
 
@@ -1371,7 +1371,7 @@ void DUMgr::removeDefFromUseset(IR * def)
 
 
 //Remove all DU info of 'ir' from DU mgr.
-void DUMgr::removeIRFromDUMgr(IR * ir)
+void DUMgr::removeIRFromDUMgr(IR const* ir)
 {
     ASSERT0(ir->is_stmt());
     removeUseFromDefset(ir);
@@ -1416,7 +1416,7 @@ size_t DUMgr::count_mem_duset()
 //     to_def = ...
 //     ------ //removed
 //     ... = to
-void DUMgr::coalesceDUChain(IR * from, IR * to)
+void DUMgr::coalesceDUChain(IR const* from, IR const* to)
 {
     ASSERT0(from && to);
     ASSERT0(from->is_stmt() && to->is_exp() && to->getStmt() == from);

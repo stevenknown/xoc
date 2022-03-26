@@ -546,7 +546,7 @@ public:
     //Insert operand at given position.
     IR * insertOpndAt(MDSSAMgr * mgr, UINT pos, IRBB const* pred);
 
-    void replaceOpnd(IR * oldopnd, IR * newopnd);
+    void replaceOpnd(MOD IR * oldopnd, MOD IR * newopnd);
     void removeOpnd(IR * ir)
     {
         ASSERT0(xcom::in_list(getOpndList(), ir));

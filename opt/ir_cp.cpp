@@ -80,7 +80,7 @@ bool CopyProp::checkTypeConsistency(IR const* ir, IR const* cand_exp) const
 //        *p(MD3) = 10 //p point to MD3
 //        ...
 //        g = *q(MD3) //q point to MD3
-void CopyProp::replaceExp(IR * exp, IR const* cand_exp, MOD CPCtx & ctx)
+void CopyProp::replaceExp(MOD IR * exp, IR const* cand_exp, MOD CPCtx & ctx)
 {
     ASSERT0(exp && exp->is_exp() && cand_exp);
     ASSERT0(exp->getExactRef() || allowInexactMD() ||
@@ -119,6 +119,11 @@ void CopyProp::replaceExp(IR * exp, IR const* cand_exp, MOD CPCtx & ctx)
         DUMMYUSE(doit);
     }
     m_rg->freeIRTree(exp);
+
+    //Fixup DUChain.
+    IR * stmt = newir->getStmt();
+    IRBB * stmtbb = stmt->getBB();
+    xoc::findAndSetLiveInDef(newir, stmtbb->getPrevIR(stmt), stmtbb, m_rg);
 }
 
 
@@ -359,7 +364,7 @@ inline static IR * get_propagated_value(IR * stmt)
 
 
 //'usevec': for local used.
-bool CopyProp::doPropForMDPhi(IR const* prop_value, IN IR * use)
+bool CopyProp::doPropForMDPhi(IR const* prop_value, MOD IR * use)
 {
     CPCtx lchange;
     replaceExp(use, prop_value, lchange);
@@ -367,9 +372,8 @@ bool CopyProp::doPropForMDPhi(IR const* prop_value, IN IR * use)
 }
 
 
-//'usevec': for local used.
 bool CopyProp::doPropForNormalStmt(IRListIter cur_iter, IRListIter * next_iter,
-                                   IR const* prop_value, IR * use,
+                                   IR const* prop_value, MOD IR * use,
                                    IRBB * def_bb)
 {
     IR * use_stmt = use->getStmt();
@@ -636,7 +640,6 @@ bool CopyProp::doPropUseSet(IRSet const* useset, IR const* def_stmt,
         IR const* new_prop_value = pickupCandExp(prop_value, use, def_stmt,
                                                  prssadu, mdssadu);
         if (new_prop_value == nullptr) { continue; }
-
         if (g_dump_opt.isDumpAfterPass() && g_dump_opt.isDumpCP()) {
             dumpCopyPropagationAction(def_stmt, new_prop_value, use);
         }

@@ -1068,23 +1068,78 @@ void IRCFG::insertBBbefore(IN IRBB * bb, IN IRBB * newbb)
 }
 
 
-//Return the newbb or the inserted trampolining BB in addition to newbb.
-//This function will break fallthrough edge of 'to' if necessary.
-IRBB * IRCFG::insertBBbetween(IN IRBB * from, IN BBListIter from_ct,
-                              IN IRBB * to, IN BBListIter to_ct,
-                              IN IRBB * newbb)
+//The function insert a tampolining BB bewteen prev and bb, that will
+//make prev no longer fallthrough to bb.
+//prev: the previous BB of bb, note prev must fallthrough to bb.
+IRBB * IRCFG::insertTrampolinBB(IRBB * prev, MOD IRBB * bb,
+                                BBListIter const bbit, MOD BBList * bblst)
 {
+    BBListIter tmp = bbit;
+    ASSERT0(prev == bblst->get_prev(&tmp));
+    //Given 'to' has a fallthrough in-edge. Insert a tmp BB
+    //e.g:Given following edges,
+    //    from->bb1->bb2->to, where all edges are fallthrough edges;
+    //    from->to is jump-edge
+    //    bb1->to is jump-edge
+    //
+    //We got it and have to revise the fallthrough edge 'bb2->to',
+    //the result is from->bb1->bb2->inserted_tramp_bb, where all
+    //edges are fallthrough, inserted_tramp_bb->to becomes jump-edge
+    //    from->to is jump-edge
+    //    bb1->to is jump-edge
+    //    bb2->inserted_tramp_bb, tmp_tramp_bb->to, both are jump-edge.
+    //    ir-list of inserted_tramp_bb is:
+    //        goto L1:
+    //
+    //    ir-list of 'to' is:
+    //        L1:
+    //        ...
+    IRBB * tramp_bb = m_rg->allocBB();
+    LabelInfo * li = m_rg->genILabel();
+    IR * goto_ir = m_rg->buildGoto(li);
+    BB_irlist(tramp_bb).append_tail(goto_ir);
+    addLabel(bb, li);
+    addBB(tramp_bb);
+    bblst->insert_after(tramp_bb, prev);
+
+    //Insert a trampolining BB between the previous BB of 'to'
+    //that contains a jump IR.
+    insertVertexBetween(prev->id(), bb->id(), tramp_bb->id());
+
+    //Now, fallthrough edge bb2->to has been broken, we can insert
+    //'newbb' before 'to' correctly.
+    return tramp_bb;
+}
+
+
+//Return true if 'prev' is the previous BB of current BB in BBList.
+//it: BBListIter of current BB.
+bool IRBB::isPrevBB(IRBB const* prev, BBListIter const it,
+                    BBList const* bblst) const
+{
+    BBListIter tmp = it;
+    return prev == bblst->get_prev(&tmp);
+}
+
+
+//The function insert newbb bewteen 'from' and 'to'. As a result, the
+//function may break up fallthrough edge of 'to' if necessary.
+void IRCFG::insertBBbetween(IN IRBB * from, IN BBListIter from_it,
+                            IN IRBB * to, IN BBListIter to_it,
+                            IN IRBB * newbb)
+{
+    ASSERT0(from_it->val() == from && to_it->val() == to);
     //Revise BB list, note that 'from' is either fall-through to 'to',
     //or jumping to 'to'.
     BBList * bblst = getBBList();
 
     //First, processing edge if 'from'->'to' is fallthrough.
-    BBListIter tmp_ct = from_ct;
-    if (from->is_fallthrough() && bblst->get_next(&tmp_ct) == to) {
-        bblst->insert_after(newbb, from_ct);
+    BBListIter tmp_it = from_it;
+    if (from->is_fallthrough() && bblst->get_next(&tmp_it) == to) {
+        bblst->insert_after(newbb, from_it);
         addBB(newbb);
         insertVertexBetween(from->id(), to->id(), newbb->id());
-        return newbb;
+        return;
     }
 
     //Second, from->to is jump-edge.
@@ -1095,44 +1150,11 @@ IRBB * IRCFG::insertBBbetween(IN IRBB * from, IN BBListIter from_ct,
     //Third, find the fallthrough previous BB of 'to'. If find it, insert
     //a trampolining BB between the previous BB of 'to' that contains a jump
     //IR.
-    IRBB * inserted_tramp_bb = nullptr;
+    IRBB * tramp_bb = nullptr;
     for (IRBB * pred = preds.get_head(&pred_ct);
          pred != nullptr; pred = preds.get_next(&pred_ct)) {
-        BBListIter tmp_ct2 = to_ct;
-        if (pred->is_fallthrough() && bblst->get_prev(&tmp_ct2) == pred) {
-            //Given 'to' has a fallthrough in-edge. Insert a tmp BB
-            //e.g:Given following edges,
-            //    from->bb1->bb2->to, where all edges are fallthrough edges;
-            //    from->to is jump-edge
-            //    bb1->to is jump-edge
-            //
-            //We got it and have to revise the fallthrough edge 'bb2->to',
-            //the result is from->bb1->bb2->inserted_tramp_bb, where all
-            //edges are fallthrough, inserted_tramp_bb->to becomes jump-edge
-            //    from->to is jump-edge
-            //    bb1->to is jump-edge
-            //    bb2->inserted_tramp_bb, tmp_tramp_bb->to, both are jump-edge.
-            //    ir-list of inserted_tramp_bb is:
-            //        goto L1:
-            //
-            //    ir-list of 'to' is:
-            //        L1:
-            //        ...
-            //        ...
-            inserted_tramp_bb = m_rg->allocBB();
-            LabelInfo * li = m_rg->genILabel();
-            IR * goto_ir = m_rg->buildGoto(li);
-            BB_irlist(inserted_tramp_bb).append_tail(goto_ir);
-            addLabel(to, li);
-            addBB(inserted_tramp_bb);
-            bblst->insert_after(inserted_tramp_bb, pred);
-
-            //Insert a trampolining BB between the previous BB of 'to'
-            //that contains a jump IR.
-            insertVertexBetween(pred->id(), to->id(), inserted_tramp_bb->id());
-
-            //Now, fallthrough edge bb2->to has been broken, we can insert
-            //'newbb' before 'to' correctly.
+        if (pred->is_fallthrough() && to->isPrevBB(pred, to_it ,bblst)) {
+            tramp_bb = insertTrampolinBB(pred, to, to_it, bblst);
             break;
         }
     }
@@ -1150,9 +1172,8 @@ IRBB * IRCFG::insertBBbetween(IN IRBB * from, IN BBListIter from_ct,
     addLabel(newbb, li);
 
     //When we get here, there are NOT any fallthrough in-edges of 'to'.
-    bblst->insert_before(newbb, to_ct);
+    bblst->insert_before(newbb, to_it);
     insertVertexBetween(from->id(), to->id(), newbb->id());
-    return inserted_tramp_bb != nullptr ? inserted_tramp_bb : newbb;
 }
 
 

@@ -1234,7 +1234,7 @@ void PRSSAMgr::renameRHS(MOD IR * ir, PRSet const* prset)
 //NOTE: If ir is an IR tree, e.g: add(pr1, pr2), removing 'add' means
 //pr1 and pr2 will be removed as well. Therefore pr1 pr2's SSAInfo will be
 //updated as well.
-void PRSSAMgr::removePRSSAOcc(IR * ir)
+void PRSSAMgr::removePRSSAOcc(IR const* ir)
 {
     if (ir->is_stmt()) {
         if (ir->isWritePR() || ir->isCallStmt()) {
