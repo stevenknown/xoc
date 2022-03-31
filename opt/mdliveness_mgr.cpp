@@ -82,8 +82,8 @@ void MDLivenessMgr::collectMayUseMDS(IR const* ir, OUT MDSet * mayuse)
     ASSERT0(ir->is_stmt());
     ConstIRIter ii;
     xcom::DefMiscBitSetMgr * sbsmgr = getSBSMgr();
-    for (IR const* x = iterRhsInitC(ir, ii);
-         x != NULL; x = iterRhsNextC(ii)) {
+    for (IR const* x = iterExpInitC(ir, ii);
+         x != NULL; x = iterExpNextC(ii)) {
         if (!x->isMemoryOpnd() || x->is_pr()) { continue; }
 
         MD const* t = x->getRefMD();
@@ -212,6 +212,7 @@ void MDLivenessMgr::dump(bool with_name) const
         }
     }
     m_rg->getLogMgr()->decIndent(2);
+    Pass::dump();
 }
 
 

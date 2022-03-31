@@ -135,7 +135,6 @@ class DUMgr : public Pass {
     friend class MD2IRSet;
     friend class DUSet;
 protected:
-    Region * m_rg;
     TypeMgr * m_tm;
     AliasAnalysis * m_aa;
     IRCFG * m_cfg;
@@ -146,7 +145,7 @@ protected:
     //Used by DU chain.
     xcom::TTab<UINT> * m_is_init; //for tmp use.
     MD2IRSet * m_md2irs; //for tmp use.
-    OptCtx * m_oc;
+    OptCtx * m_oc; //used for tmp, and should be initialized before any use.
     ConstIRIter m_citer; //for tmp use.
     ConstIRIter m_citer2; //for tmp use.
     IRIter m_iter; //for tmp use.
@@ -244,7 +243,7 @@ protected:
 
     bool hasSingleDefToMD(DUSet const& defset, MD const* md) const;
 
-    void initMD2IRSet(IRBB * bb);
+    void initMD2IRSet(IRBB const* bb);
     void inferRegion(IR * ir, bool ruinfo_avail, IN MDSet * tmp);
     void inferIStore(IR * ir, UINT duflag);
     void inferStore(IR * ir, UINT duflag);
@@ -303,7 +302,7 @@ public:
 
     void computeGenForBB(IN IRBB * bb, OUT DefDBitSetCore & expr_univers,
                          DefMiscBitSetMgr & bsmgr);
-    void computeMDDUforBB(IRBB * bb, UINT flag);
+    void computeMDDUforBB(IRBB const* bb, UINT flag);
     void computeCallRef(UINT duflag);
     virtual void computeAtomMDRef(IR * ir);
     void computeMDRef(MOD OptCtx & oc, UINT duflag);
@@ -323,7 +322,7 @@ public:
     //The function will free DUSet for all IRs in region.
     void cleanDUSet() { freeDUSetForAllIR(); }
 
-    //This function copy MustUse and MayUse mds from tree 'from' to tree 'to'
+    //The function copy MustUse and MayUse mds from tree 'from' to tree 'to'
     //and build new DU chain for 'to'.
     //The function will establish new DU chain between the DEF of 'from'
     //and 'to'.
@@ -331,7 +330,7 @@ public:
     //from: root expression of source tree.
     //NOTE: IR tree 'to' and 'from' must be isomorphic structure.
     //Both 'to' and 'from' must be expression.
-    void addUse(IR * to, IR const* from);
+    void addUseForTree(IR * to, IR const* from);
 
     //Count the memory usage to DUMgr.
     size_t count_mem() const;
@@ -442,7 +441,7 @@ public:
     }
 
     //Coalesce DU chain of 'from' to 'to'.
-    //This function replace definition of USE of 'from' to DEF of 'to'.
+    //The function replace definition of USE of 'from' to DEF of 'to'.
     //e.g: to_def=...
     //     from=to
     //     ...=from_use
@@ -452,13 +451,22 @@ public:
     //     ...=to
     //from: stmt
     //to: expression
-    void coalesceDUChain(IR * from, IR * to);
+    void coalesceDUChain(IR const* from, IR const* to);
 
     void dumpMemUsageForMDRef() const;
     void dumpDUChain() const;
     void dumpDUChainDetail() const;
     void dumpBBDUChainDetail(UINT bbid) const;
     void dumpBBDUChainDetail(IRBB * bb) const;
+
+    //The function dump pass relative information before performing the pass.
+    //The dump information is always used to detect what the pass did.
+    //Return true if dump successed, otherwise false.
+    virtual bool dumpBeforePass() const { return Pass::dumpBeforePass(); }
+
+    //The function dump pass relative information.
+    //The dump information is always used to detect what the pass did.
+    //Return true if dump successed, otherwise false.
     virtual bool dump() const;
 
     virtual CHAR const* getPassName() const { return "DU Manager"; }
@@ -470,7 +478,6 @@ public:
     xcom::DefMiscBitSetMgr * getSBSMgr() { return &m_sbs_mgr; }
     SolveSet * getSolveSet() { return &m_solve_set; }
     IR const* getExactAndUniqueDef(IR const* exp) const;
-    Region * getRegion() const { return m_rg; }
 
     static bool isOverlappedDefUse(MD const* mustdef, MDSet const* maydef,
                                    IR const* use);
@@ -510,7 +517,7 @@ public:
     //Return true if ir dominates all its USE expressions which inside loop.
     bool isStmtDomAllUseInsideLoop(IR const* ir, LI<IRBB> const* li) const;
 
-    //This equation needs May Kill Def and Must Gen Def.
+    //The equation needs May Kill Def and Must Gen Def.
     bool ForAvailReachDef(UINT bbid, List<IRBB*> & preds, List<IRBB*> * lst,
                           DefMiscBitSetMgr & bsmgr);
     bool ForReachDef(UINT bbid, List<IRBB*> & preds, List<IRBB*> * lst,
@@ -573,13 +580,13 @@ public:
     //where S1 is DEF, S2 is USE, after ir refinement, x in S2
     //is removed, remove the data dependence between S1
     //and S2's operand.
-    bool removeExpiredDUForOperand(IR * stmt);
+    bool removeExpiredDUForOperand(IR const* stmt);
 
     //Check DEF|USE of stmt, remove the expired one which is not reference
     //the memory any more that ir referenced.
     //Return true if DU changed.
     //Note the function only process ir, not include its kid and sibling.
-    bool removeExpiredDU(IR * ir);
+    bool removeExpiredDU(IR const* ir);
 
     //The function handles entire IR tree rooted by 'stmt'.
     //Check if the DEF of stmt's operands still modify the same memory object.
@@ -597,29 +604,30 @@ public:
     //where S1 is DEF, S2 is USE, after ir refinement, x in S2
     //is removed, remove the data dependence between S1
     //and S2's operand.
-    bool removeExpiredDUIRTree(IR * stmt);
+    bool removeExpiredDUIRTree(IR const* stmt);
 
     //Remove 'def' out of ir's DEF set. ir is exp.
     void removeDef(IR const* ir, IR const* def);
 
     //Remove all DU info of 'ir' from DU mgr.
-    void removeIRFromDUMgr(IR * ir);
+    void removeIRFromDUMgr(IR const* ir);
 
-    //This function check all USE of memory references of ir tree and
+    //The function check all USE of memory references of ir tree and
     //cut its du-chain. 'ir' may be stmt or expression, if ir is stmt,
     //check its right-hand-side.
-    //This function will process SSA info if it exists.
+    //The function will process SSA info if it exists.
     //'ir': indicate the root of IR tree.
     //e.g: d1, d2 are def-stmt of stmt's operands.
-    //this functin cut off du-chain between d1, d2 and their use.
-    void removeUseFromDefset(IR * ir);
-    //Note that do NOT use this function to remove SSA def.
-    //This function handle the MD DU chain and cut
+    //the functin cut off du-chain between d1, d2 and their use.
+    void removeUseFromDefset(IR const* ir);
+
+    //Note that do NOT use the function to remove SSA def.
+    //The function handle the MD DU chain and cut
     //off the DU chain between MD def and its MD use expression.
     //Remove 'def' from its use's def-list.
     //e.g:u1, u2 are its use expressions.
     //cut off the du chain between def->u1 and def->u2.
-    void removeDefFromUseset(IR * def);
+    void removeDefFromUseset(IR const* def);
 
     bool verifyLiveinExp();
 
@@ -641,6 +649,7 @@ public:
 //Verify if DU chain is correct between each Def and Use of MD.
 bool verifyMDDUChain(Region * rg, UINT duflag = DUOPT_COMPUTE_PR_DU |
                                                 DUOPT_COMPUTE_NONPR_DU);
+bool verifyMDDUChain(Region * rg, OptCtx const& oc);
 
 } //namespace xoc
 #endif

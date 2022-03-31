@@ -37,6 +37,7 @@ bool ScalarOpt::perform(OptCtx & oc)
     List<Pass*> passlist;
     SimpCtx simp;
     if (g_do_gvn) { m_pass_mgr->registerPass(PASS_GVN); }
+    if (g_do_vrp) { m_pass_mgr->registerPass(PASS_VRP); }
 
     if (g_do_pre) {
         //Do PRE individually.

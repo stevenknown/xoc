@@ -153,6 +153,13 @@ Pass * PassMgr::allocInvertBrTgt()
 }
 
 
+Pass * PassMgr::allocVRP()
+{
+    //return new VRP(m_rg);
+    return nullptr;
+}
+
+
 Pass * PassMgr::allocDSE()
 {
     //return new DSE(m_rg);
@@ -199,6 +206,12 @@ Pass * PassMgr::allocCDG()
 Pass * PassMgr::allocGSCC()
 {
     return new GSCC(m_rg);
+}
+
+
+Pass * PassMgr::allocIRSimp()
+{
+    return new IRSimp(m_rg);
 }
 
 
@@ -262,6 +275,12 @@ Pass * PassMgr::allocRefineDUChain()
 Pass * PassMgr::allocScalarOpt()
 {
     return new ScalarOpt(m_rg);
+}
+
+
+Pass * PassMgr::allocMDSSALiveMgr()
+{
+    return new MDSSALiveMgr(m_rg);
 }
 
 
@@ -377,11 +396,17 @@ Pass * PassMgr::registerPass(PASS_TYPE opty)
     case PASS_MDLIVENESS_MGR:
         pass = allocMDLivenessMgr();
         break;
+    case PASS_MDSSALIVE_MGR:
+        pass = allocMDSSALiveMgr();
+        break;
     case PASS_REFINE:
         pass = allocRefine();
         break;
     case PASS_GSCC:
         pass = allocGSCC();
+        break;
+    case PASS_IRSIMP:
+        pass = allocIRSimp();
         break;
     case PASS_LFTR:
         pass = allocLFTR();
@@ -391,6 +416,9 @@ Pass * PassMgr::registerPass(PASS_TYPE opty)
         break;
     case PASS_INVERT_BRTGT:
         pass = allocInvertBrTgt();
+        break;
+    case PASS_VRP:
+        pass = allocVRP();
         break;
     default: ASSERTN(0, ("Unsupport Optimization."));
     }
@@ -423,6 +451,132 @@ void PassMgr::checkValidAndRecompute(OptCtx * oc, ...)
 }
 
 
+void PassMgr::checkAndRecomputeDUChain(OptCtx * oc, DUMgr * dumgr,
+                                       BitSet const& opts)
+{
+    if (oc->is_pr_du_chain_valid() && oc->is_nonpr_du_chain_valid()) {
+        return;
+    }
+    BBList * bbl = m_rg->getBBList();
+    if (bbl == nullptr || bbl->get_elem_count() == 0) { return; }
+    if (dumgr == nullptr) {
+        dumgr = (DUMgr*)registerPass(PASS_DU_MGR);
+    }
+
+    PassTypeList optlist;
+    if (!oc->is_ref_valid()) {
+        optlist.append_tail(PASS_RPO);
+        optlist.append_tail(PASS_DOM);
+        optlist.append_tail(PASS_DU_REF);
+    }
+    if (!oc->is_reach_def_valid()) {
+        optlist.append_tail(PASS_RPO);
+        optlist.append_tail(PASS_DOM);
+        optlist.append_tail(PASS_DU_REF);
+        optlist.append_tail(PASS_REACH_DEF);
+    }
+    if (optlist.get_elem_count() != 0) {
+        m_rg->getPassMgr()->checkValidAndRecompute(oc, optlist);
+    }
+
+    UINT flag = DUOPT_UNDEF;
+    if (!oc->is_nonpr_du_chain_valid()) {
+        flag |= DUOPT_COMPUTE_NONPR_DU;
+    }
+    if (!oc->is_pr_du_chain_valid()) {
+        flag |= DUOPT_COMPUTE_PR_DU;
+    }
+
+    //TBD: compute classic DU without considering PRSSA.
+    ////If PRs have already been in SSA form, compute
+    ////DU chain doesn't make any sense.
+    //PRSSAMgr * ssamgr = (PRSSAMgr*)queryPass(PASS_PR_SSA_MGR);
+    //if ((ssamgr == nullptr || !ssamgr->is_valid()) &&
+    //    !oc->is_pr_du_chain_valid()) {
+    //    flag |= DUOPT_COMPUTE_PR_DU;
+    //}
+    if (flag == DUOPT_UNDEF) {
+        //Nothing need to compute.
+        return;
+    }
+    if (opts.is_contain(PASS_REACH_DEF)) {
+        dumgr->computeMDDUChain(*oc, true, flag);
+    } else {
+        dumgr->computeMDDUChain(*oc, false, flag);
+    }
+}
+
+
+void PassMgr::checkAndRecomputeAAandDU(OptCtx * oc, IRCFG * cfg,
+                                       AliasAnalysis *& aa,
+                                       DUMgr *& dumgr,
+                                       BitSet const& opts)
+{
+    BBList * bbl = m_rg->getBBList();
+    UINT f = 0;
+    if (opts.is_contain(PASS_DU_REF) && !oc->is_ref_valid()) {
+        f |= DUOPT_COMPUTE_PR_REF|DUOPT_COMPUTE_NONPR_REF;
+    }
+    if (opts.is_contain(PASS_LIVE_EXPR) && !oc->is_live_expr_valid()) {
+        f |= DUOPT_SOL_AVAIL_EXPR;
+    }
+    if (opts.is_contain(PASS_AVAIL_REACH_DEF) &&
+        !oc->is_avail_reach_def_valid()) {
+        f |= DUOPT_SOL_AVAIL_REACH_DEF;
+    }
+    if (opts.is_contain(PASS_REACH_DEF) && !oc->is_reach_def_valid()) {
+        f |= DUOPT_SOL_REACH_DEF;
+    }
+    if (opts.is_contain(PASS_DU_CHAIN) &&
+        (!oc->is_pr_du_chain_valid() || !oc->is_nonpr_du_chain_valid()) &&
+        !oc->is_reach_def_valid()) {
+        f |= DUOPT_SOL_REACH_DEF;
+    }
+    if (opts.is_contain(PASS_AA) &&
+        !oc->is_aa_valid() &&
+        bbl != nullptr &&
+        bbl->get_elem_count() != 0) {
+        ASSERTN(cfg && oc->is_cfg_valid(),
+                ("You should make CFG available first."));
+        if (aa == nullptr) {
+            aa = (AliasAnalysis*)registerPass(PASS_AA);
+            if (!aa->is_init()) {
+                aa->initAliasAnalysis();
+            }
+        }
+        UINT numir = 0;
+        UINT max_numir_in_bb = 0;
+        for (IRBB * bb = bbl->get_head();
+            bb != nullptr; bb = bbl->get_next()) {
+            numir += bb->getNumOfIR();
+            max_numir_in_bb = MAX(max_numir_in_bb, bb->getNumOfIR());
+        }
+        if (numir > g_thres_opt_ir_num ||
+            max_numir_in_bb > g_thres_opt_ir_num_in_bb) {
+            aa->set_flow_sensitive(false);
+        }
+        //NOTE: assignMD(false) must be called before AA.
+        aa->perform(*oc);
+    }
+    if (f != DUOPT_UNDEF && bbl != nullptr && bbl->get_elem_count() != 0) {
+        if (dumgr == nullptr) {
+            dumgr = (DUMgr*)registerPass(PASS_DU_MGR);
+        }
+        if (opts.is_contain(PASS_DU_REF)) {
+            f |= DUOPT_COMPUTE_NONPR_DU|DUOPT_COMPUTE_PR_DU;
+        }
+        dumgr->perform(*oc, f);
+        if (HAVE_FLAG(f, DUOPT_COMPUTE_PR_REF) ||
+            HAVE_FLAG(f, DUOPT_COMPUTE_NONPR_REF)) {
+            ASSERT0(m_rg->verifyMDRef());
+        }
+        if (HAVE_FLAG(f, DUOPT_SOL_AVAIL_EXPR)) {
+            ASSERT0(dumgr->verifyLiveinExp());
+        }
+    }
+}
+
+
 void PassMgr::checkValidAndRecompute(OptCtx * oc, PassTypeList & optlist)
 {
     ASSERTN(optlist.get_elem_count() < 1000,
@@ -437,6 +591,11 @@ void PassMgr::checkValidAndRecompute(OptCtx * oc, PassTypeList & optlist)
         ASSERTN(opty < PASS_NUM,
                 ("You should append PASS_UNDEF to pass list."));
         opts.bunion(opty);
+    }
+    if (opts.is_contain(PASS_DOM) || opts.is_contain(PASS_PDOM)) {
+        //Incremental DOM info update need both DOM and PDOM available.
+        opts.bunion(PASS_DOM);
+        opts.bunion(PASS_PDOM);
     }
 
     IRCFG * cfg = (IRCFG*)queryPass(PASS_CFG);
@@ -469,13 +628,12 @@ void PassMgr::checkValidAndRecompute(OptCtx * oc, PassTypeList & optlist)
             }
             break;
         case PASS_DOM:
+        case PASS_PDOM:
             if (!oc->is_dom_valid()) {
                 ASSERTN(cfg && oc->is_cfg_valid(),
                         ("You should make CFG available first."));
                 cfg->computeDomAndIdom(*oc);
             }
-            break;
-        case PASS_PDOM:
             if (!oc->is_pdom_valid()) {
                 ASSERTN(cfg && oc->is_cfg_valid(),
                         ("You should make CFG available first."));
@@ -501,7 +659,7 @@ void PassMgr::checkValidAndRecompute(OptCtx * oc, PassTypeList & optlist)
         case PASS_RPO:
             ASSERTN(cfg && oc->is_cfg_valid(),
                     ("You should make CFG available first."));
-            if (!oc->is_rpo_valid() || cfg->getRPOBBList() == nullptr) {
+            if (!oc->is_rpo_valid() || cfg->getRPOVexList() == nullptr) {
                 cfg->computeRPO(*oc);
             } else {
                 ASSERT0(cfg->verifyRPO(*oc));
@@ -520,131 +678,12 @@ void PassMgr::checkValidAndRecompute(OptCtx * oc, PassTypeList & optlist)
         case PASS_DU_REF:
         case PASS_LIVE_EXPR:
         case PASS_REACH_DEF:
-        case PASS_AVAIL_REACH_DEF: {
-            BBList * bbl = m_rg->getBBList();
-            UINT f = 0;
-            if (opts.is_contain(PASS_DU_REF) && !oc->is_ref_valid()) {
-                f |= DUOPT_COMPUTE_PR_REF|DUOPT_COMPUTE_NONPR_REF;
-            }
-            if (opts.is_contain(PASS_LIVE_EXPR) &&
-                !oc->is_live_expr_valid()) {
-                f |= DUOPT_SOL_AVAIL_EXPR;
-            }
-            if (opts.is_contain(PASS_AVAIL_REACH_DEF) &&
-                !oc->is_avail_reach_def_valid()) {
-                f |= DUOPT_SOL_AVAIL_REACH_DEF;
-            }
-            if (opts.is_contain(PASS_REACH_DEF) &&
-                !oc->is_reach_def_valid()) {
-                f |= DUOPT_SOL_REACH_DEF;
-            }
-            if (opts.is_contain(PASS_DU_CHAIN) &&
-                (!oc->is_pr_du_chain_valid() ||
-                 !oc->is_nonpr_du_chain_valid()) &&
-                !oc->is_reach_def_valid()) {
-                f |= DUOPT_SOL_REACH_DEF;
-            }
-            if (opts.is_contain(PASS_AA) &&
-                !oc->is_aa_valid() &&
-                bbl != nullptr &&
-                bbl->get_elem_count() != 0) {
-                ASSERTN(cfg && oc->is_cfg_valid(),
-                        ("You should make CFG available first."));
-                if (aa == nullptr) {
-                    aa = (AliasAnalysis*)registerPass(PASS_AA);
-                    if (!aa->is_init()) {
-                        aa->initAliasAnalysis();
-                    }
-                }
-                UINT numir = 0;
-                UINT max_numir_in_bb = 0;
-                for (IRBB * bb = bbl->get_head();
-                    bb != nullptr; bb = bbl->get_next()) {
-                    numir += bb->getNumOfIR();
-                    max_numir_in_bb = MAX(max_numir_in_bb, bb->getNumOfIR());
-                }
-                if (numir > g_thres_opt_ir_num ||
-                    max_numir_in_bb > g_thres_opt_ir_num_in_bb) {
-                    aa->set_flow_sensitive(false);
-                }
-                //NOTE: assignMD(false) must be called before AA.
-                aa->perform(*oc);
-            }
-            if (f != DUOPT_UNDEF &&
-                bbl != nullptr &&
-                bbl->get_elem_count() != 0) {
-                if (dumgr == nullptr) {
-                    dumgr = (DUMgr*)registerPass(PASS_DU_MGR);
-                }
-                if (opts.is_contain(PASS_DU_REF)) {
-                    f |= DUOPT_COMPUTE_NONPR_DU|DUOPT_COMPUTE_PR_DU;
-                }
-                dumgr->perform(*oc, f);
-                if (HAVE_FLAG(f, DUOPT_COMPUTE_PR_REF) ||
-                    HAVE_FLAG(f, DUOPT_COMPUTE_NONPR_REF)) {
-                    ASSERT0(m_rg->verifyMDRef());
-                }
-                if (HAVE_FLAG(f, DUOPT_SOL_AVAIL_EXPR)) {
-                    ASSERT0(dumgr->verifyLiveinExp());
-                }
-            }
+        case PASS_AVAIL_REACH_DEF:
+            checkAndRecomputeAAandDU(oc, cfg, aa, dumgr, opts);
             break;
-        }
-        case PASS_DU_CHAIN: {
-            if (oc->is_pr_du_chain_valid() && oc->is_nonpr_du_chain_valid()) {
-                break;
-            }
-
-            BBList * bbl = m_rg->getBBList();
-            if (bbl != nullptr && bbl->get_elem_count() != 0) {
-                if (dumgr == nullptr) {
-                    dumgr = (DUMgr*)registerPass(PASS_DU_MGR);
-                }
-
-                PassTypeList optlist;
-                if (!oc->is_ref_valid()) {
-                    optlist.append_tail(PASS_RPO);
-                    optlist.append_tail(PASS_DOM);
-                    optlist.append_tail(PASS_DU_REF);
-                }
-                if (!oc->is_reach_def_valid()) {
-                    optlist.append_tail(PASS_RPO);
-                    optlist.append_tail(PASS_DOM);
-                    optlist.append_tail(PASS_DU_REF);
-                    optlist.append_tail(PASS_REACH_DEF);
-                }
-                if (optlist.get_elem_count() != 0) {
-                    m_rg->getPassMgr()->checkValidAndRecompute(oc, optlist);
-                }
-
-                UINT flag = DUOPT_UNDEF;
-                if (!oc->is_nonpr_du_chain_valid()) {
-                    flag |= DUOPT_COMPUTE_NONPR_DU;
-                }
-                if (!oc->is_pr_du_chain_valid()) {
-                    flag |= DUOPT_COMPUTE_PR_DU;
-                }
-    
-                //TBD: compute classic DU without considering PRSSA.
-                ////If PRs have already been in SSA form, compute
-                ////DU chain doesn't make any sense.
-                //PRSSAMgr * ssamgr = (PRSSAMgr*)queryPass(PASS_PR_SSA_MGR);
-                //if ((ssamgr == nullptr || !ssamgr->is_valid()) &&
-                //    !oc->is_pr_du_chain_valid()) {
-                //    flag |= DUOPT_COMPUTE_PR_DU;
-                //}
-                if (flag == DUOPT_UNDEF) {
-                    //Nothing need to compute.
-                    break;
-                }
-                if (opts.is_contain(PASS_REACH_DEF)) {
-                    dumgr->computeMDDUChain(*oc, true, flag);
-                } else {
-                    dumgr->computeMDDUChain(*oc, false, flag);
-                }
-            }
+        case PASS_DU_CHAIN:
+            checkAndRecomputeDUChain(oc, dumgr, opts);
             break;
-        }
         default: {
             Pass * pass = registerPass(pt);
             if (pass != nullptr || !pass->is_valid()) {

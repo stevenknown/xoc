@@ -167,12 +167,15 @@ static bool isAllElementDerivedFromSameEffectVar(MDSet const& mds,
 {
     ASSERT0(!mds.is_empty() && mustref);
     MDSetIter iter = nullptr;
+    UINT ofst = (UINT)-1;
+    UINT size = 0;
     INT i = mds.get_first(&iter);
     MD const* md = mdsys->getMD((UINT)i);
     if (!md->is_effect() || md->is_may()) {
         return false;
     }
-
+    ofst = MIN(ofst, md->getByteOfst());
+    size = MAX(size, (md->getByteOfst() + md->getByteSize()));
     Var * base = md->get_base();
     i = mds.get_next((UINT)i, &iter);
     for (; i >= 0; i = mds.get_next((UINT)i, &iter)) {
@@ -180,15 +183,22 @@ static bool isAllElementDerivedFromSameEffectVar(MDSet const& mds,
         if (md2->get_base() != base || !md2->is_effect() || md2->is_may()) {
             return false;
         }
+        ofst = MIN(ofst, md2->getByteOfst());
+        size = MAX(size, (md->getByteOfst() + md->getByteSize()));
         if (md2->is_unbound()) {
             *mustref = md2;
         }
     }
 
-    if (*mustref == nullptr) {
-        ASSERT0(base);
-        *mustref = mdsys->registerUnboundMD(base, 1);
+    MD tmp(*md);
+    if (*mustref != nullptr) {
+        MD_ty(&tmp) = MD_UNBOUND;
+    } else {
+        MD_ty(&tmp) = MD_RANGE;
     }
+    MD_size(&tmp) = size;
+    MD_ofst(&tmp) = ofst;
+    *mustref = mdsys->registerMD(tmp);
     return true;
 }
 
@@ -196,15 +206,14 @@ static bool isAllElementDerivedFromSameEffectVar(MDSet const& mds,
 //
 //START AliasAnalysis
 //
-AliasAnalysis::AliasAnalysis(Region * rg)
+AliasAnalysis::AliasAnalysis(Region * rg) : Pass(rg)
 {
     ASSERT0(rg);
     m_cfg = rg->getCFG();
     m_var_mgr = rg->getVarMgr();
-    m_rg = rg;
     m_rgmgr = rg->getRegionMgr();
     m_tm = rg->getTypeMgr();
-    m_md_sys = rg->getMDSystem();    
+    m_md_sys = rg->getMDSystem();
     m_mds_hash = rg->getMDSetHash();
     ASSERT0(m_cfg && m_mds_hash && m_md_sys && m_tm);
     m_flow_sensitive = true;
@@ -574,7 +583,7 @@ static MD const* regardAsSingleMD(MDSet const* mds, Region * rg)
           get_first(&iter)))->is_may()) {
         return x;
     }
-    return nullptr; 
+    return nullptr;
 }
 
 
@@ -589,7 +598,7 @@ void AliasAnalysis::setIRRefHashed(IR * ir, MDSet const* hashed_mds)
         ir->setMustRef(x, m_rg);
         ir->cleanMayRef();
         return;
-    } 
+    }
     ir->cleanMustRef();
     ir->setMayRef(hashed_mds, m_rg);
 }
@@ -673,7 +682,7 @@ MD const* AliasAnalysis::queryTBAA(IR const* ir)
     MD const* typed_md;
     if (ir->getAI() != nullptr &&
         (typed_md = computePointToViaType(ir)) != nullptr) {
-        return typed_md; 
+        return typed_md;
     }
     return nullptr;
 }
@@ -900,7 +909,7 @@ void AliasAnalysis::processArrayHashed(IR * ir, MDSet const* hashed,
 
         //Update 'hashed' content when it has been changed and recorded in
         //'tmp'.
-        hashed = ir->getMayRef(); 
+        hashed = ir->getMayRef();
         ASSERT0(hashed);
     } else {
         setIRRefHashed(ir, hashed);
@@ -1010,7 +1019,7 @@ bool AliasAnalysis::evaluateFromLda(IR const* ir)
     if (defstmt == nullptr || !defstmt->is_stpr() ||
         ir->getStmt() == defstmt) {
         return false;
-    } 
+    }
 
     IR const* rhs = STPR_rhs(defstmt);
     switch (rhs->getCode()) {
@@ -1123,7 +1132,7 @@ bool AliasAnalysis::tryComputeConstOffset(IR const* ir,
         MD const* entry = nullptr;
         MD x(*imd);
         //case: &x - ofst.
-        //Keep offset validation unchanged.
+        //Keep offset validatiohanged.
         INT s = ((INT)MD_ofst(&x)) - (INT)const_offset;
         if (s < 0) {
             MD_ty(&x) = MD_UNBOUND;
@@ -1340,6 +1349,7 @@ void AliasAnalysis::convertExact2Unbound(MDSet const& src, MDSet * tgt)
 
         MD x(*imd);
         MD_ty(&x) = MD_UNBOUND;
+        MD_ofst(&x) = 0;
         MD const* entry = m_md_sys->registerMD(x);
         ASSERT0(entry->id() > MD_UNDEF);
         tgt->bunion_pure(entry->id(), *getSBSMgr());
@@ -1467,7 +1477,7 @@ MD const* AliasAnalysis::assignPRMD(IR * ir, MOD MDSet * mds, MOD AACtx * ic,
             (typed_md = queryTBAA(ir)) != nullptr) {
             setPointToUniqueMD(tmp->id(), *mx, typed_md);
             mds->bunion(typed_md, *getSBSMgr());
-        } else if (pts == getWorstCase()) {
+        } else if (isWorstCase(pts)) {
             AC_hashed_mds(ic) = getWorstCase();
         } else {
             //CASE: Do we have to copy a well-hashed POINT-TO set to
@@ -2891,26 +2901,7 @@ void AliasAnalysis::ElemCleanPointTo(MDSet const& mds, IN MD2MDSet * mx)
 }
 
 
-//Dump IR's point-to of each BB.
-void AliasAnalysis::dumpInOutPointToSetForBB() const
-{
-    if (!m_rg->isLogMgrInit()) { return; }
-    note(getRegion(), "\n==---- DUMP POINT TO INFO ----==");
-    BBList * bbl = m_cfg->getBBList();
-    AliasAnalysis * pthis = const_cast<AliasAnalysis*>(this);
-    for (IRBB * bb = bbl->get_head(); bb != nullptr; bb = bbl->get_next()) {
-        PtPairSet * in_set = pthis->getInPtPairSet(bb);
-        PtPairSet * out_set = pthis->getOutPtPairSet(bb);
-        note(getRegion(), "\n--- BB%d ---", bb->id());
-        note(getRegion(), "\nIN-SET::");
-        dumpPtPairSet(*in_set);
-        note(getRegion(), "\n\nOUT-SET::");
-        dumpPtPairSet(*out_set);
-    }
-}
-
-
-//Dump POINT-TO pair record in 'pps'.
+//Dump POINT-TO Pair record in 'pps'.
 void AliasAnalysis::dumpPtPairSet(PtPairSet const& pps) const
 {
     if (!m_rg->isLogMgrInit()) { return; }
@@ -3031,7 +3022,7 @@ void AliasAnalysis::dumpIRPointToForBB(IRBB const* bb, bool dump_kid) const
     }
 
     note(getRegion(), "\n-- MD2MDSet: --", bb->id());
-    dumpMD2MDSet(mx, true);
+    dumpMD2MDSet(mx, false);
 
     if (BB_irlist(bb).get_head(&ct) != nullptr) {
         note(getRegion(), "\n\n-- IR POINT-TO: --");
@@ -3253,32 +3244,14 @@ void AliasAnalysis::dumpIRPointToForBB(IRBB const* bb, bool dump_kid) const
 void AliasAnalysis::dumpIRPointToForRegion(bool dump_kid) const
 {
     if (!m_rg->isLogMgrInit()) { return; }
-    note(getRegion(), "\n==---- DUMP AliasAnalysis '%s' ----==",
-         m_rg->getRegionName());
-    m_md_sys->dump(false);
-
-    note(getRegion(), "\n-- DUMP MAY-POINT-TO SET --\n");
+    note(getRegion(), "\n-- DUMP WORSTCASE POINT-TO --\n");
     ASSERT0(getWorstCase());
     getWorstCase()->dump(m_md_sys, true);
 
-    note(getRegion(), "\n-- DUMP IR POINT-TO: --");
+    note(getRegion(), "\n-- DUMP IR POINT-TO FOR BB --");
     BBList * bbl = m_cfg->getBBList();
     for (IRBB * bb = bbl->get_head(); bb != nullptr; bb = bbl->get_next()) {
         dumpIRPointToForBB(bb, dump_kid);
-    }
-}
-
-
-void AliasAnalysis::dumpMayPointTo() const
-{
-    if (!m_rg->isLogMgrInit() || getWorstCase() == nullptr) { return; }
-
-    MDSetIter iter;
-    for (INT j = getWorstCase()->get_first(&iter);
-         j >= 0; j = getWorstCase()->get_next((UINT)j, &iter)) {
-        MD * mmd = m_md_sys->getMD((UINT)j);
-        ASSERT0(mmd != nullptr);
-        prt(getRegion(), "MD%u,", mmd->id());
     }
 }
 
@@ -3289,10 +3262,12 @@ bool AliasAnalysis::dump() const
     START_TIMER_FMT(t, ("DUMP %s", getPassName()));
     note(getRegion(), "\n==---- DUMP %s '%s' ----==", getPassName(),
          m_rg->getRegionName());
+    m_rg->getLogMgr()->incIndent(2);
     m_md_sys->dump(false);
     dumpMD2MDSetForRegion(false);
-    //dumpInOutPointToSetForBB();
     dumpIRPointToForRegion(true);
+    m_rg->getLogMgr()->decIndent(2);
+    Pass::dump();
     END_TIMER_FMT(t, ("DUMP %s", getPassName()));
     return true;
 }
@@ -3312,12 +3287,12 @@ void AliasAnalysis::dumpMD2MDSetForRegion(bool dump_pt_graph) const
             dumpMD2MDSet(mapBBtoMD2MDSet(bb->id()),
                         false); //each BB has its own graph.
         }
-    } else {
-        note(getRegion(),
-             "\n==---- DUMP POINT-TO OUT-SET (FLOW-INSENSITIVE) '%s' ----==",
-             m_rg->getRegionName());
-        dumpMD2MDSet(&m_unique_md2mds, dump_pt_graph);
+        return;
     }
+    note(getRegion(),
+         "\n==---- DUMP POINT-TO OUT-SET (FLOW-INSENSITIVE) '%s' ----==",
+         m_rg->getRegionName());
+    dumpMD2MDSet(&m_unique_md2mds, dump_pt_graph);
 }
 
 
@@ -3408,16 +3383,16 @@ bool AliasAnalysis::convertMD2MDSet2PT(OUT PtPairSet * pps,
             PtPair const* pp = ppmgr.add(fromid, MD_FULL_MEM);
             ASSERT0(pp);
             pps->bunion(PP_id(pp), *ppsetmgr.getSBSMgr());
-        } else {
-            MDSetIter segiter;
-            for (INT toid = from_md_pts->get_first(&segiter);
-                 toid >= 0;
-                 toid = from_md_pts->get_next((UINT)toid, &segiter)) {
-                ASSERT0(m_md_sys->getMD((UINT)toid));
-                PtPair const* pp = ppmgr.add(fromid, (UINT)toid);
-                ASSERT0(pp);
-                pps->bunion(PP_id(pp), *ppsetmgr.getSBSMgr());
-            }
+            continue;
+        }
+        MDSetIter segiter;
+        for (INT toid = from_md_pts->get_first(&segiter);
+             toid >= 0;
+             toid = from_md_pts->get_next((UINT)toid, &segiter)) {
+            ASSERT0(m_md_sys->getMD((UINT)toid));
+            PtPair const* pp = ppmgr.add(fromid, (UINT)toid);
+            ASSERT0(pp);
+            pps->bunion(PP_id(pp), *ppsetmgr.getSBSMgr());
         }
     }
     return true;
@@ -3635,12 +3610,94 @@ bool AliasAnalysis::verify()
 }
 
 
+//Return false if flow sensitive analysis is inproperly.
+bool AliasAnalysis::computeFlowSensitiveBB(IRBB const* bb, PPSetMgr & ppsetmgr,
+                                           DefMiscBitSetMgr * sbsmgr,
+                                           BitSet & is_bb_changed,
+                                           PtPairSet * tmp, bool first,
+                                           OUT bool & change)
+{
+    #ifdef PARTIAL_UPDATE
+    if (!is_bb_changed.is_contain(bb->id())) { return true; }
+    #endif
+    PtPairSet * pps = getInPtPairSet(bb);
+    MD2MDSet * md2mds = genMD2MDSetForBB(bb->id());
+    tmp->clean(*sbsmgr);
+    xcom::EdgeC * el = m_cfg->getVertex(bb->id())->getInList();
+    bool compute = true;
+    if (el != nullptr) {
+        for (; el != nullptr; el = el->get_next()) {
+            IRBB * p = m_cfg->getBB(el->getFromId());
+            ASSERT0(p);
+            tmp->bunion(*getOutPtPairSet(p), *sbsmgr);
+        }
+
+        #ifdef PARTIAL_UPDATE
+        compute = !pps->is_equal(*tmp);
+        if (compute || first) {
+            //BB's info may not be changed even if input changed.
+            pps->copy(*tmp, *sbsmgr);
+            change = true;
+
+            //Regard 'mx' as a reservation table to hold
+            //the tmp info for MD->MDSet during each iteration.
+            //Note that we must preserve MD->MDSet at the last
+            //iteration. And it will be used during computing POINT-TO
+            //info and DU analysis.
+            md2mds->clean();
+            convertPT2MD2MDSet(*pps, m_ppmgr, md2mds);
+        } else {
+            is_bb_changed.diff(bb->id());
+        }
+        #else
+        if (!pps->is_equal(*tmp)) {
+            pps->copy(*tmp, *sbsmgr);
+            change = true;
+
+            //Regard 'mx' as a reservation table to hold
+            //the tmp info for MD->MDSet during each iteration.
+            //Note that we must preserve MD->MDSet at the last
+            //iteration. And it will be used during computing POINT-TO
+            //info and DU analysis.
+            md2mds->clean();
+            convertPT2MD2MDSet(*pps, m_ppmgr, md2mds);
+        }
+        #endif
+    }
+    if (!compute && !first) { return true; }
+
+    computeStmt(bb, md2mds);
+    tmp->clean(*sbsmgr);
+    if (!convertMD2MDSet2PT(tmp, m_ppmgr, ppsetmgr, md2mds)) {
+        return false;
+    }
+
+    #ifdef _DEBUG_
+    //MD2MDSet x;
+    //convertPT2MD2MDSet(tmp, m_ppmgr, &x);
+    //dumpMD2MDSet(&x, false);
+    #endif
+    pps = getOutPtPairSet(bb);
+    if (!pps->is_equal(*tmp)) {
+        pps->copy(*tmp, *sbsmgr);
+        change = true;
+        for (xcom::EdgeC * el = m_cfg->getVertex(bb->id())->getOutList();
+             el != nullptr; el = el->get_next()) {
+            IRBB * s = m_cfg->getBB(el->getToId());
+            ASSERT0(s);
+            is_bb_changed.bunion(s->id());
+        }
+    }
+    return true;
+}
+
+
 //This method is accurate than Andersen's algo.
 //NOTICE: Do NOT clean 'md2mds' of BB at the last iter,
 //it supplied the POINT TO information for subsequently
 //optimizations.
 //Return false if flow sensitive analysis is inproperly.
-bool AliasAnalysis::computeFlowSensitive(List<IRBB*> const& bbl,
+bool AliasAnalysis::computeFlowSensitive(RPOVexList const& vexlst,
                                          PPSetMgr & ppsetmgr)
 {
     bool change = true;
@@ -3654,87 +3711,16 @@ bool AliasAnalysis::computeFlowSensitive(List<IRBB*> const& bbl,
         count++;
         bool first = count == 1;
         change = false;
-        BBListIter ct = nullptr;
-        for (IRBB const* bb = bbl.get_head(&ct);
-             bb != nullptr; bb = bbl.get_next(&ct)) {
-            #ifdef PARTIAL_UPDATE
-            if (!is_bb_changed.is_contain(bb->id())) { continue; }
-            #endif
-
-            PtPairSet * pps = getInPtPairSet(bb);
-            MD2MDSet * md2mds = genMD2MDSetForBB(bb->id());
-            tmp->clean(*sbsmgr);
-            xcom::EdgeC * el = m_cfg->getVertex(bb->id())->getInList();
-            bool compute = true;
-            if (el != nullptr) {
-                for (; el != nullptr; el = el->get_next()) {
-                    IRBB * p = m_cfg->getBB(el->getFromId());
-                    ASSERT0(p);
-                    tmp->bunion(*getOutPtPairSet(p), *sbsmgr);
-                }
-
-                #ifdef PARTIAL_UPDATE
-
-                compute = !pps->is_equal(*tmp);
-                if (compute || first) {
-                    //BB's info may not be changed even if input changed.
-                    pps->copy(*tmp, *sbsmgr);
-                    change = true;
-
-                    //Regard 'mx' as a reservation table to hold
-                    //the tmp info for MD->MDSet during each iteration.
-                    //Note that we must preserve MD->MDSet at the last
-                    //iteration. And it will be used during computing POINT-TO
-                    //info and DU analysis.
-                    md2mds->clean();
-                    convertPT2MD2MDSet(*pps, m_ppmgr, md2mds);
-                } else {
-                    is_bb_changed.diff(bb->id());
-                }
-
-                #else
-
-                if (!pps->is_equal(*tmp)) {
-                    pps->copy(*tmp, *sbsmgr);
-                    change = true;
-
-                    //Regard 'mx' as a reservation table to hold
-                    //the tmp info for MD->MDSet during each iteration.
-                    //Note that we must preserve MD->MDSet at the last
-                    //iteration. And it will be used during computing POINT-TO
-                    //info and DU analysis.
-                    md2mds->clean();
-                    convertPT2MD2MDSet(*pps, m_ppmgr, md2mds);
-                }
-                #endif
+        RPOVexListIter it = nullptr;
+        for (Vertex const* v = vexlst.get_head(&it);
+             v != nullptr; v = vexlst.get_next(&it)) {
+            if (!computeFlowSensitiveBB(m_cfg->getBB(v->id()), ppsetmgr,
+                                        sbsmgr, is_bb_changed, tmp, first,
+                                        change)) {
+                return true;
             }
-
-            if (!compute && !first) { continue; }
-            computeStmt(bb, md2mds);
-            tmp->clean(*sbsmgr);
-            if (!convertMD2MDSet2PT(tmp, m_ppmgr, ppsetmgr, md2mds)) {
-                return false;
-            }
-
-            #ifdef _DEBUG_
-            //MD2MDSet x;
-            //convertPT2MD2MDSet(tmp, m_ppmgr, &x);
-            //dumpMD2MDSet(&x, false);
-            #endif
-            pps = getOutPtPairSet(bb);
-            if (!pps->is_equal(*tmp)) {
-                pps->copy(*tmp, *sbsmgr);
-                change = true;
-                for (xcom::EdgeC * el = m_cfg->getVertex(bb->id())->
-                        getOutList();
-                     el != nullptr; el = el->get_next()) {
-                    IRBB * s = m_cfg->getBB(el->getToId());
-                    ASSERT0(s);
-                    is_bb_changed.bunion(s->id());
-                }
-            }
-        } //for each BB
-    } //each iter
+        }
+    }
     ASSERTN(!change, ("Iterate too many times"));
     return true;
 }
@@ -4057,7 +4043,7 @@ bool AliasAnalysis::perform(MOD OptCtx & oc)
         PPSetMgr ppsetmgr;
         initEntryPTS(ppsetmgr);
         m_rg->getPassMgr()->checkValidAndRecompute(&oc, PASS_RPO, PASS_UNDEF);
-        List<IRBB*> * tbbl = m_cfg->getRPOBBList();
+        RPOVexList * tbbl = m_cfg->getRPOVexList();
         ASSERT0(tbbl);
         ASSERT0(tbbl->get_elem_count() == m_rg->getBBList()->get_elem_count());
 

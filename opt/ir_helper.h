@@ -39,6 +39,9 @@ public:
     IRSet(DefSegMgr * sm) : DefSBitSet(sm) {}
 
     void append(IR const* v) { DefSBitSet::bunion(IR_id(v)); }
+    bool allElemBeExp(Region const* rg) const;
+
+    void dump(Region const* rg) const;
 
     bool find(IR const* v) const
     {
@@ -53,211 +56,96 @@ public:
     }
 };
 
-
 //Iterative access ir tree. This funtion initialize the iterator.
 //'ir': the root ir of the tree.
 //'it': iterator. It should be clean already.
 //Readonly function.
-inline IR const* iterInitC(IR const* ir, OUT ConstIRIter & it)
-{
-    if (ir == nullptr) { return nullptr; }
-    for (UINT i = 0; i < IR_MAX_KID_NUM(ir); i++) {
-        IR * kid = ir->getKid(i);
-        if (kid != nullptr) {
-            it.append_tail(kid);
-        }
-    }
-    if (ir->get_next() != nullptr) {
-        it.append_tail(ir->get_next());
-    }
-    return ir;
-}
-
+IR const* iterInitC(IR const* ir, OUT ConstIRIter & it,
+                    bool iter_next = true);
 
 //Iterative access ir tree.
 //This function return the next IR node accroding to 'it'.
 //'it': iterator.
 //Readonly function.
-inline IR const* iterNextC(MOD ConstIRIter & it)
-{
-    IR const* ir = it.remove_head();
-    if (ir == nullptr) { return nullptr; }
-    for (UINT i = 0; i < IR_MAX_KID_NUM(ir); i++) {
-        IR * kid = ir->getKid(i);
-        if (kid != nullptr) {
-            it.append_tail(kid);
-        }
-    }
-    if (ir->get_next() != nullptr) {
-        it.append_tail(ir->get_next());
-    }
-    return ir;
-}
+IR const* iterNextC(MOD ConstIRIter & it, bool iter_next = true);
 
-
-//Iterative access the right-hand-side expression of stmt.
+//Iterative access the expression of stmt.
 //This funtion initialize the iterator.
-//'ir': the root ir of the tree, it must be stmt.
-//'it': iterator.
-//This function is a readonly function.
-//Use iterRhsNextC to iter next IR.
-inline IR const* iterRhsInitC(IR const* ir, OUT ConstIRIter & it)
-{
-    if (ir == nullptr) { return nullptr; }
-
-    ASSERT0(ir->is_stmt());
-
-    //Other stmt.
-    IR const* firstkid = nullptr;
-    for (UINT i = 0; i < IR_MAX_KID_NUM(ir); i++) {
-        IR const* kid = ir->getKid(i);
-        if (kid == nullptr) { continue; }
-        if (firstkid == nullptr) {
-            firstkid = kid;
-            continue;
-        }
-        it.append_tail(kid);
-    }
-
-    //IR const* x = it.remove_head();
-    //if (x == nullptr) { return nullptr; }
-
-    if (firstkid == nullptr) { return nullptr; }
-
-    for (UINT i = 0; i < IR_MAX_KID_NUM(firstkid); i++) {
-        IR const* kid = firstkid->getKid(i);
-        if (kid != nullptr) {
-            it.append_tail(kid);
-        }
-    }
-    if (IR_next(firstkid) != nullptr) {
-        it.append_tail(IR_next(firstkid));
-    }
-    return firstkid;
-}
-
-
-//Iterative access the expression.
-//This funtion initialize the iterator.
-//'ir': the root ir of the tree, it must be expression.
-//'it': iterator.
-//Readonly function.
-//Use iterRhsNextC to iter next IR.
-inline IR const* iterExpInitC(IR const* ir, OUT ConstIRIter & it)
-{
-    if (ir == nullptr) { return nullptr; }
-    ASSERT0(ir->is_exp());
-    for (UINT i = 0; i < IR_MAX_KID_NUM(ir); i++) {
-        IR * kid = ir->getKid(i);
-        if (kid == nullptr) { continue; }
-        it.append_tail(kid);
-    }
-    if (ir->get_next() != nullptr) {
-        ASSERTN(!ir->get_next()->is_stmt(), ("ir can not be stmt list"));
-        it.append_tail(ir->get_next());
-    }
-    return ir;
-}
-
+//ir: the root ir of the tree, it must be stmt.
+//it: iterator. It should be clean already.
+//The function is a readonly function.
+//Use iterExpNextC to iter next IR.
+IR const* iterExpInitC(IR const* ir, OUT ConstIRIter & it,
+                       bool iter_next = true);
 
 //Iterative access the right-hand-side expression of stmt.
 //This function return the next IR node accroding to 'it'.
 //'it': iterator.
 //Readonly function.
-inline IR const* iterRhsNextC(MOD ConstIRIter & it)
+inline IR const* iterExpNextC(MOD ConstIRIter & it, bool iter_next = true)
 {
-    return iterNextC(it);
+    return iterNextC(it, iter_next);
 }
-
 
 //Iterative access the ir tree that start with 'ir'.
 //This funtion initialize the iterator.
 //'ir': the root ir of the tree, it may be either stmt or expression.
 //'it': iterator. It should be clean already.
 //Note this function is NOT readonly, the returnd IR may be modified.
-inline IR * iterInit(IN IR * ir, OUT IRIter & it)
-{
-    if (ir == nullptr) { return nullptr; }
-    for (UINT i = 0; i < IR_MAX_KID_NUM(ir); i++) {
-        IR * kid = ir->getKid(i);
-        if (kid != nullptr) {
-            it.append_tail(kid);
-        }
-    }
-    if (ir->get_next() != nullptr) {
-        it.append_tail(ir->get_next());
-    }
-    return ir;
-}
-
+IR * iterInit(IN IR * ir, OUT IRIter & it, bool iter_next = true);
 
 //Iterative access the ir tree.
 //This funtion return the next IR node accroding to 'it'.
 //'it': iterator.
 //Note this function is NOT readonly, the returnd IR may be modified.
-inline IR * iterNext(MOD IRIter & it)
-{
-    IR * ir = it.remove_head();
-    if (ir == nullptr) { return nullptr; }
-    for (UINT i = 0; i < IR_MAX_KID_NUM(ir); i++) {
-        IR * kid = ir->getKid(i);
-        if (kid != nullptr) {
-            it.append_tail(kid);
-        }
-    }
-    if (ir->get_next() != nullptr) {
-        it.append_tail(ir->get_next());
-    }
-    return ir;
-}
-
+IR * iterNext(MOD IRIter & it, bool iter_next = true);
 
 //Iterative access the right-hand-side expression of stmt.
 //This funtion initialize the iterator.
-//'ir': the root ir of the tree, it must be stmt.
-//'it': iterator. It should be clean already.
-//Use iterRhsNextC to iter next IR.
-inline IR * iterRhsInit(IR * ir, OUT IRIter & it)
-{
-    if (ir == nullptr) { return nullptr; }
-
-    ASSERT0(ir->is_stmt());
-
-    //Other stmt.
-    IR * firstkid = nullptr;
-    for (UINT i = 0; i < IR_MAX_KID_NUM(ir); i++) {
-        IR * kid = ir->getKid(i);
-        if (kid == nullptr) { continue; }
-        if (firstkid == nullptr) {
-            firstkid = kid;
-            continue;
-        }
-        it.append_tail(kid);
-    }
-
-    if (firstkid == nullptr) { return nullptr; }
-
-    for (UINT i = 0; i < IR_MAX_KID_NUM(firstkid); i++) {
-        IR * kid = firstkid->getKid(i);
-        if (kid != nullptr) {
-            it.append_tail(kid);
-        }
-    }
-    if (IR_next(firstkid) != nullptr) {
-        it.append_tail(IR_next(firstkid));
-    }
-
-    return firstkid;
-}
-
+//ir: the root ir of the tree, it must be stmt.
+//it: iterator. It should be clean already.
+//Use iterExpNextC to iter next IR.
+IR * iterExpInit(IR * ir, OUT IRIter & it, bool iter_next = true);
 
 //Iterative access the right-hand-side expression of stmt.
 //This function return the next IR node accroding to 'it'.
 //'it': iterator.
 //This is a readonly function.
-inline IR * iterRhsNext(MOD IRIter & it)
+inline IR * iterExpNext(MOD IRIter & it, bool iter_next = true)
 {
-    return iterNext(it);
+    return iterNext(it, iter_next);
+}
+
+//Iterative access the expression kid of stmt itself.
+//This funtion initialize the iterator.
+//ir: the stmt ir.
+//it: iterator. It should be clean by caller.
+//Use iterExpOfStmtNext to iter next IR.
+IR * iterExpOfStmtInit(IR * ir, OUT IRIter & it);
+
+//Iterative access the right-hand-side expression of stmt.
+//This function return the next IR node accroding to 'it'.
+//'it': iterator.
+//Readonly function.
+inline IR * iterExpOfStmtNext(MOD IRIter & it)
+{
+    return iterNext(it, true);
+}
+
+//Iterative access the expression kid of stmt itself.
+//This funtion initialize the iterator.
+//ir: the stmt ir.
+//it: iterator. It should be clean by caller.
+//Use iterExpOfStmtNextC to iter next IR.
+IR const* iterExpOfStmtInitC(IR * ir, OUT ConstIRIter & it);
+
+//Iterative access the right-hand-side expression of stmt.
+//This function return the next IR node accroding to 'it'.
+//'it': iterator.
+//Readonly function.
+inline IR const* iterExpOfStmtNextC(MOD ConstIRIter & it)
+{
+    return iterNextC(it, true);
 }
 
 bool allBeExp(IR * irlst);
@@ -266,11 +154,15 @@ bool allBeStmt(IR * irlst);
 bool checkMaxIRType();
 bool checkIRDesc();
 bool checkRoundDesc();
-CHAR const* compositeName(Sym const* n, xcom::StrBuf & buf);
 
 void dumpConst(IR const* ir, Region const* rg);
+
 void dumpIR(IR const* ir, Region const* rg, CHAR * attr = nullptr,
             UINT dumpflag = IR_DUMP_COMBINE);
+inline void dumpIR(IR const* ir, Region const* rg, UINT dumpflag)
+{
+    dumpIR(ir, rg, nullptr, dumpflag);
+}
 void dumpIRListH(IR const* ir_list, Region const* rg, CHAR * attr = nullptr,
                  UINT dumpflag = IR_DUMP_COMBINE);
 void dumpIRList(IR const* ir_list, Region const* rg, CHAR * attr = nullptr,

@@ -38,12 +38,16 @@ bool RefineDUChain::dump() const
          m_rg->getRegionName());
     if (m_is_use_gvn) {
         ASSERT0(m_du);
+        m_rg->getLogMgr()->incIndent(2);
         m_du->dumpDUChainDetail();
+        m_rg->getLogMgr()->decIndent(2);
     } else {
         ASSERT0(m_mdssamgr);
+        m_rg->getLogMgr()->incIndent(2);
         m_mdssamgr->dumpDUChain();
+        m_rg->getLogMgr()->decIndent(2);
     }
-    return true;
+    return Pass::dump();
 }
 
 
@@ -57,8 +61,8 @@ bool RefineDUChain::processBB(IRBB const* bb)
     for (IR * ir = BB_irlist(bb).get_head(&ct);
          ir != nullptr; ir = BB_irlist(bb).get_next(&ct)) {
         ii.clean();
-        for (IR const* exp = iterRhsInitC(ir, ii);
-             exp != nullptr; exp = iterRhsNextC(ii)) {
+        for (IR const* exp = iterExpInitC(ir, ii);
+             exp != nullptr; exp = iterExpNextC(ii)) {
             if (!exp->is_ild()) { continue; }
             if (m_is_use_gvn) {
                 change |= processExpressionViaGVN(exp);
@@ -130,9 +134,9 @@ bool RefineDUChain::processExpressionViaMDSSA(IR const* exp)
     VOpndSetIter iter = nullptr;
     INT next_i = -1;
     bool change = false;
-    for (INT i = mdssainfo->readVOpndSet()->get_first(&iter);
+    for (INT i = mdssainfo->readVOpndSet().get_first(&iter);
          i >= 0; i = next_i) {
-        next_i = mdssainfo->readVOpndSet()->get_next(i, &iter);
+        next_i = mdssainfo->readVOpndSet().get_next(i, &iter);
         VMD const* t = (VMD const*)m_mdssamgr->getUseDefMgr()->getVOpnd(i);
         ASSERT0(t && t->is_md());
         if (t->getDef() == nullptr) {
@@ -157,7 +161,7 @@ bool RefineDUChain::processExpressionViaMDSSA(IR const* exp)
 
             //removeDUChain may remove VOpnd that indicated by 'next_i'.
             //We have to recompute next_i to avoid redundnant iteration.
-            next_i = mdssainfo->readVOpndSet()->get_first(&iter);
+            next_i = mdssainfo->readVOpndSet().get_first(&iter);
             change = true;
         }
     }
@@ -266,6 +270,5 @@ bool RefineDUChain::perform(OptCtx & oc)
     //This pass does not affect IR stmt/exp, but DU chain may be changed.
     return change;
 }
-//END PRE
 
 } //namespace xoc

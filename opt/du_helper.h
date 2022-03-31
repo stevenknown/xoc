@@ -39,8 +39,8 @@ class GVN;
 //'from' and expression 'to'.
 //to: root expression of target tree.
 //from: root expression of source tree.
-//NOTE: IR tree 'to' and 'from' must be isomorphic structure.
-//The function will iterate IR list if exist.
+//NOTE:IR tree 'to' and 'from' must be isomorphic structure.
+//     The function will NOT iterate sibling IR if 'from' is a list.
 //Both 'to' and 'from' must be expression.
 void addUseForTree(IR * to, IR const* from, Region * rg);
 
@@ -103,8 +103,7 @@ void coalesceDUChain(IR * from, IR * to, Region * rg);
 //The function collects all USE expressions into 'useset'.
 //This function give priority to PRSSA and MDSSA DU chain and then classic
 //DU chain when doing collection.
-void collectUseSet(IR const* def, MDSSAMgr const* mdssamgr,
-                   OUT IRSet * useset);
+void collectUseSet(IR const* def, MDSSAMgr const* mdssamgr, OUT IRSet * useset);
 
 //The function copy MDSSAInfo from 'src' to 'tgt'. Then add 'tgt' as an USE of
 //the new MDSSAInfo.
@@ -113,9 +112,8 @@ void copyAndAddMDSSAOcc(IR * tgt, IR const* src, Region * rg);
 //The function collects all DEF expressions of 'use' into 'defset'.
 //This function give priority to PRSSA and MDSSA DU chain and then classic
 //DU chain when doing collection.
-//iter_phi_opnd: true if the collection will keep iterating DEF of PHI operand.
-void collectDefSet(IR const* use, MDSSAMgr const* mdssamgr, bool iter_phi_opnd,
-                   OUT IRSet * defset);
+//The function will keep iterating DEF of PHI operand.
+void collectDefSet(IR const* use, MDSSAMgr const* mdssamgr, OUT IRSet * defset);
 
 //The function finds the nearest dominated DEF stmt of 'exp'.
 //Note RPO of BB must be available.
@@ -146,19 +144,33 @@ bool isKillingDef(IR const* def, MD const* usemd);
 //Note this function does not check if there is DU chain between defmd and usemd.
 bool isKillingDef(MD const* defmd, MD const* usemd);
 
+//Return true if ir1 reference is may overlap to ir2.
+bool isDependent(IR const* ir1, IR const* ir2, Region const* rg);
+
+//Return true if ir1 is may overlap to phi.
+bool isDependent(IR const* ir, MDPhi const* phi);
+
 //The function try to find the killing-def for 'use'.
 IR * findKillingDef(IR const* use, Region * rg);
+
+//Note DOM info must be available.
+//exp: the expression that expected to set livein.
+//startir: the start position in 'startbb', it can be NULL.
+//         If it is NULL, the function first finding the Phi list of
+//         'startbb', then keep finding its predecessors until the
+//         CFG entry.
+//startbb: the BB that begin to do searching.
+void findAndSetLiveInDef(IR * root, IR * startir, IRBB * startbb, Region * rg);
 
 //The function checks each DEF|USE occurrence of ir, remove the expired expression
 //which is not reference the memory any more that ir referenced.
 //Return true if DU changed.
-//Note this function does not modify ir.
 //e.g: stpr1 = ... //S1
 //     ..... = pr2 //S2
 //  If there is DU between S1 and S2, cutoff the DU chain.
 //stmt: PR write operation.
 //exp: PR read operation.
-bool removeExpiredDU(IR * ir, Region * rg);
+bool removeExpiredDU(IR const* ir, Region * rg);
 
 //Remove Use-Def chain for all memory references in IR Tree that rooted by exp.
 //exp: it is the root of IR tree that to be removed.
@@ -168,7 +180,7 @@ bool removeExpiredDU(IR * ir, Region * rg);
 //NOTE: If exp is an IR tree, e.g: ild(x, ld(y)), remove ild(x) means
 //ld(y) will be removed as well. And ld(y)'s MDSSAInfo will be
 //updated as well.
-void removeUseForTree(IR * exp, Region * rg);
+void removeUseForTree(IR const* exp, Region * rg);
 
 //Remove all DU info of 'stmt'.
 void removeStmt(IR * stmt, Region * rg);

@@ -41,9 +41,9 @@ namespace xoc {
 //
 //START LivenessMgr
 //
-void LivenessMgr::dump()
+bool LivenessMgr::dump() const
 {
-    if (!getRegion()->isLogMgrInit()) { return; }
+    if (!getRegion()->isLogMgrInit()) { return true; }
     note(getRegion(), "\n==---- DUMP LivenessMgr : liveness of PR ----==\n");
     List<IRBB*> * bbl = m_rg->getBBList();
     FILE * file = getRegion()->getLogMgr()->getFileHandler();
@@ -68,6 +68,7 @@ void LivenessMgr::dump()
         use->dump(file);
     }
     getRegion()->getLogMgr()->decIndent(2);
+    return Pass::dump();
 }
 
 
@@ -243,17 +244,18 @@ void LivenessMgr::computeGlobal()
     ASSERT0(m_cfg->getEntry() && BB_is_entry(m_cfg->getEntry()));
 
     //Rpo should be available.
-    List<IRBB*> * vlst = m_cfg->getRPOBBList();
+    RPOVexList * vlst = m_cfg->getRPOVexList();
     ASSERT0(vlst);
     ASSERT0(vlst->get_elem_count() == m_rg->getBBList()->get_elem_count());
 
-    C<IRBB*> * ct;
-    for (vlst->get_head(&ct); ct != vlst->end(); ct = vlst->get_next(ct)) {
-        IRBB * bb = ct->val();
+    RPOVexListIter it;
+    for (vlst->get_head(&it); it != vlst->end(); it = vlst->get_next(it)) {
+        Vertex const* v = it->val();
+        IRBB * bb = m_cfg->getBB(v->id());
         ASSERT0(bb);
         UINT bbid = bb->id();
-        get_livein(bbid)->clean(m_sbs_mgr);
-        get_liveout(bbid)->clean(m_sbs_mgr);
+        gen_livein(bbid)->clean(m_sbs_mgr);
+        gen_liveout(bbid)->clean(m_sbs_mgr);
     }
 
     bool change;
@@ -262,10 +264,10 @@ void LivenessMgr::computeGlobal()
     DefSBitSetCore news;
     do {
         change = false;
-        C<IRBB*> * ct2;
+        RPOVexListIter ct2;
         for (vlst->get_tail(&ct2);
              ct2 != vlst->end(); ct2 = vlst->get_prev(ct2)) {
-            IRBB * bb = ct2->val();
+            IRBB * bb = m_cfg->getBB(ct2->val()->id());
             ASSERT0(bb);
             UINT bbid = bb->id();
 

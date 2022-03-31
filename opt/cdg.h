@@ -44,19 +44,17 @@ class CDG : public Pass, public xcom::Graph {
     //Set to true if CDG presents control-edge to cyclic control flow.
     //e.g: given loop, the control BB of loop-header includes itself.
     bool m_allow_cycle;
-    Region * m_rg;
-
+private:
     bool is_control(Vertex const* a, Vertex const* b) const;
     void rebuild(MOD OptCtx & oc, xcom::DGraph & cfg);
 public:
-    CDG(Region * rg) : m_allow_cycle(false) { m_rg = rg; }
+    CDG(Region * rg) : Pass(rg), m_allow_cycle(false) {}
     void build(MOD OptCtx & oc, xcom::DGraph & cfg);
 
     void dumpDOT(CHAR const* name = nullptr) const;
     void dumpVCG(CHAR const* name = nullptr) const;
     virtual bool dump() const;
 
-    Region * getRegion() const { return m_rg; }
     void get_cd_preds(UINT id, OUT List<xcom::Vertex*> & lst);
     void get_cd_succs(UINT id, OUT List<xcom::Vertex*> & lst);
     virtual CHAR const* getPassName() const { return "CDG"; }

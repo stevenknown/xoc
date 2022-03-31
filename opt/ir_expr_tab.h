@@ -66,8 +66,8 @@ public:
 #define IR_EXPR_TAB_LEVEL1_HASH_BUCKET 256
 #define IR_EXPR_TAB_LEVEL2_HASH_BUCKET 128
 class ExprTab : public Pass {
+    COPY_CONSTRUCTOR(ExprTab);
     UINT m_expr_count; //the encode-number expression.
-    Region * m_rg;
     TypeMgr * m_tm;
     BSVec<ExpRep*> m_ir_expr_vec;
 
@@ -93,10 +93,8 @@ class ExprTab : public Pass {
         }
         return encode_expr(ir);
     }
-
 public:
-    explicit ExprTab(Region * rg);
-    COPY_CONSTRUCTOR(ExprTab);
+    explicit ExprTab(Region * rg);    
     ~ExprTab();
 
     ExpRep * append_expr(IR * ir);
@@ -122,7 +120,6 @@ public:
 
     void set_map_ir2ir_expr(IR const* ir, ExpRep * ie);
 
-    Region * getRegion() const { return m_rg; }
     PASS_TYPE getPassType() const { return PASS_EXPR_TAB; }
     virtual CHAR const* getPassName() const { return "Expr Table"; }
 

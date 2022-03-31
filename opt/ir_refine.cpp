@@ -244,10 +244,9 @@ static double calcFloatVal(IR_TYPE ty, double v0, double v1)
 //
 //START Refine
 //
-Refine::Refine(Region * rg)
+Refine::Refine(Region * rg) : Pass(rg)
 {
     ASSERT0(rg != nullptr);
-    m_rg = rg;
     m_tm = rg->getTypeMgr();
 }
 
@@ -283,9 +282,7 @@ IR * Refine::refineILoad1(IR * ir, bool & change, RefineCtx & rc)
 
     //Note: the recomputation of MustRef may generate new MD that not
     //versioned by MDSSAMgr. Use MDSSA API to fix the SSA information.
-    //xoc::changeUse(ir, ld, m_rg);
-    xoc::copyAndAddMDSSAOcc(ld, ir, m_rg);
-    xoc::removeUseForTree(ir, m_rg);
+    xoc::changeUse(ir, ld, m_rg);
     xoc::removeExpiredDU(ld, m_rg);
 
     m_rg->freeIRTree(ir);
@@ -318,9 +315,7 @@ IR * Refine::refineILoad2(IR * ir, bool & change, RefineCtx & rc)
 
     //Note: the recomputation of MustRef may generate new MD that not
     //versioned by MDSSAMgr. Use MDSSA API to fix the SSA information.
-    //xoc::changeUse(ir, ld, m_rg);
-    xoc::copyAndAddMDSSAOcc(ld, ir, m_rg);
-    xoc::removeUseForTree(ir, m_rg);
+    xoc::changeUse(ir, ld, m_rg);
     xoc::removeExpiredDU(ld, m_rg);
 
     m_rg->freeIRTree(ir);
@@ -794,12 +789,12 @@ IR * Refine::refinePhi(IR * ir, bool & change, RefineCtx & rc)
     if (opnd->is_const() && opnd->is_int()) {
         immopnd = opnd;
         val = CONST_int_val(opnd);
-        for (opnd = opnd->get_next(); opnd != nullptr; opnd = opnd->get_next()) {
+        for (opnd = opnd->get_next(); opnd != nullptr;
+             opnd = opnd->get_next()) {
             if (opnd->is_const() && opnd->is_int() &&
                 val == CONST_int_val(opnd)) {
                 continue;
             }
-
             all_be_same_const = false;
             break;
         }
@@ -2017,7 +2012,7 @@ IR * Refine::refineIR(IR * ir, bool & change, RefineCtx & rc)
 {
     if (!g_do_refine) { return ir; }
     if (ir == nullptr) { return nullptr; }
-    if (ir->hasSideEffect()) { return ir; }
+    if (ir->hasSideEffect(false)) { return ir; }
     bool tmpc = false;
     switch (ir->getCode()) {
     case IR_CONST:
@@ -2940,11 +2935,13 @@ bool Refine::dump() const
     if (!getRegion()->isLogMgrInit()) { return false; }
     note(getRegion(), "\n==---- DUMP %s '%s' ----==",
          getPassName(), m_rg->getRegionName());
+    m_rg->getLogMgr()->incIndent(2);
     if (m_rg->getIRList() != nullptr) {
         dumpIRList(m_rg->getIRList(), m_rg);
     } else if (m_rg->getBBList() != nullptr) {
         dumpBBList(m_rg->getBBList(), m_rg);
     }
+    m_rg->getLogMgr()->decIndent(2);
     return true;
 }
 

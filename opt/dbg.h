@@ -41,15 +41,21 @@ class Region;
 //Describe debug information.
 //Note line number can not be 0.
 #define DBX_lineno(d) ((d)->lineno)
-class Dbx {
-    COPY_CONSTRUCTOR(Dbx);
-public:
-    UINT lineno; //Note line number can not be 0.
+#define DBX_col_offst(d) ((d)->col_offset)
+//Note file index can not be 0.
+#define DBX_file_index(d) ((d)->file_index)
 
+class Dbx {
+    Dbx(Dbx const&);
+public:
+    //16bits is large enough to column and files. If it is not, extend it.
+    UINT32 col_offset:16;
+    UINT32 file_index:16;
+    UINT32 lineno; //Note line number can not be 0.
 public:
     Dbx() {}
-    void clean() { lineno = 0; }
-    void copy(Dbx const& dbx) { lineno = dbx.lineno; }
+    void clean() { lineno = 0; col_offset = 0; file_index = 0; }
+    void copy(Dbx const& dbx) { *this = dbx; }
 };
 
 

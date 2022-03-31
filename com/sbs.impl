@@ -259,9 +259,8 @@ size_t SBitSetCore<BitsPerSeg>::count_mem() const
 
 template <UINT BitsPerSeg>
 void SBitSetCore<BitsPerSeg>::diff(UINT elem, SegMgr<BitsPerSeg> * sm,
-                                   TSEGIter ** free_list)
+                                   TSEGIter ** free_list, TSEGIter * sct)
 {
-    TSEGIter * sct = segs.get_head();
     TSEGIter * next_sct = sct;
     TSEGIter * prev_sct = nullptr;
     for (; sct != segs.end(); prev_sct = sct, sct = next_sct) {
@@ -281,6 +280,14 @@ void SBitSetCore<BitsPerSeg>::diff(UINT elem, SegMgr<BitsPerSeg> * sm,
             return;
         }
     }
+}
+
+
+template <UINT BitsPerSeg>
+void SBitSetCore<BitsPerSeg>::diff(UINT elem, SegMgr<BitsPerSeg> * sm,
+                                   TSEGIter ** free_list)
+{
+    diff(elem, sm, free_list, segs.get_head());
 }
 
 
@@ -395,7 +402,7 @@ INT SBitSetCore<BitsPerSeg>::get_first(TSEGIter ** cur) const
     if (sc == segs.end()) {
         ASSERT0(segs.get_elem_count() == 0);
         *cur = nullptr;
-        return -1;
+        return BS_UNDEF;
     }
     *cur = sc;
     ASSERT0(sc->val());
@@ -415,7 +422,7 @@ INT SBitSetCore<BitsPerSeg>::get_last(TSEGIter ** cur) const
     if (sc == segs.end()) {
         ASSERT0(segs.get_elem_count() == 0);
         *cur = nullptr;
-        return -1;
+        return BS_UNDEF;
     }
     *cur = sc;
     ASSERT0(sc->val());
@@ -445,7 +452,7 @@ INT SBitSetCore<BitsPerSeg>::get_next(UINT elem, TSEGIter ** cur) const
 
                 st = segs.get_next(st);
                 if (st == nullptr) {
-                    return -1;
+                    return BS_UNDEF;
                 }
 
                 start = st->val()->get_start();
@@ -454,11 +461,11 @@ INT SBitSetCore<BitsPerSeg>::get_next(UINT elem, TSEGIter ** cur) const
                 return (INT)(start + (UINT)n);
             }
         }
-        return -1;
+        return BS_UNDEF;
     }
 
     TSEGIter * st = *cur;
-    if (st == nullptr) { return -1; }
+    if (st == nullptr) { return BS_UNDEF; }
 
     UINT start = st->val()->get_start();
     INT n = st->val()->bs.get_next(elem - start);
@@ -469,7 +476,7 @@ INT SBitSetCore<BitsPerSeg>::get_next(UINT elem, TSEGIter ** cur) const
     st = segs.get_next(st);
     if (st == segs.end()) {
         *cur = nullptr;
-        return -1;
+        return BS_UNDEF;
     }
 
     //Update container.
@@ -694,6 +701,15 @@ size_t SBitSet<BitsPerSeg>::count_mem() const
     c += SBitSetCore<BitsPerSeg>::segs.count_mem();
     c += smpoolGetPoolSize(m_pool);
     return c;
+}
+
+
+template <UINT BitsPerSeg>
+void SBitSet<BitsPerSeg>::bunion(BitSet const& src)
+{
+    for (INT i = src.get_first(); i >= 0; i = src.get_next(i)) {
+        bunion((UINT)i);
+    }
 }
 //END SBitSet
 

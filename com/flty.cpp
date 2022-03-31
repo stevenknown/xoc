@@ -129,7 +129,7 @@ void Float::dump() const
 {
     StrBuf buf(16);
     format(buf);
-    fprintf(stdout, buf.buf);
+    fprintf(stdout, "%s", buf.buf);
 }
 
 } //namespace xcom

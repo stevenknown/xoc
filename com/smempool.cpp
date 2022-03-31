@@ -68,20 +68,19 @@ static bool g_is_pool_init = false;
 static bool g_is_pool_hashed = true;
 ULONGLONG g_stat_mem_size = 0;
 
-
 void dumpPool(SMemPool * handler, FILE * h)
 {
     if (h == nullptr) { return; }
-    fprintf(h, "\n= SMP, total size:%u ",
+    fprintf(h, "\nMEMPOOL TOTAL SIZE:%u(BYTE) ",
             (UINT)smpoolGetPoolSize(handler));
     while (handler != nullptr) {
-        fprintf(h, "<T%u R%u>",
+        fprintf(h, "<T%u,R%u>",
                 (UINT)MEMPOOL_pool_size(handler),
                 (UINT)(MEMPOOL_pool_size(handler) -
                        MEMPOOL_start_pos(handler)));
         handler = MEMPOOL_next(handler);
         if (handler != nullptr) {
-            fprintf(h, ", ");
+            fprintf(h, " ");
         }
     }
     fflush(h);
@@ -98,14 +97,14 @@ static SMemPool * new_mem_pool(size_t size, MEMPOOLTYPE mpt)
     SMemPool * mp = (SMemPool*)malloc(size_mp + size + END_BOUND_BYTE);
     ASSERTN(mp, ("create mem pool failed, no enough memory"));
     ::memset(mp, 0, size_mp);
-    ::memset(((CHAR*)mp) + size_mp + size, BOUNDARY_NUM, END_BOUND_BYTE);
+    ::memset(((BYTE*)mp) + size_mp + size, BOUNDARY_NUM, END_BOUND_BYTE);
 
     MEMPOOL_type(mp) = mpt;
     #ifdef _DEBUG_
     g_stat_mem_size += size_mp + size; //Only for statistic purpose
     MEMPOOL_chunk_id(mp) = ++g_mem_pool_chunk_count;
     #endif
-    MEMPOOL_pool_ptr(mp) = ((CHAR*)mp) + size_mp;
+    MEMPOOL_pool_ptr(mp) = ((BYTE*)mp) + size_mp;
     MEMPOOL_pool_size(mp) = size;
     MEMPOOL_start_pos(mp) = 0;
     MEMPOOL_grow_size(mp) = size;
@@ -158,9 +157,7 @@ inline static void append_after_smp(SMemPool * marker, SMemPool * tlst)
 //smpoolCreatePoolIndex or smpoolMalloc.
 void smpoolInitPool()
 {
-    if (g_is_pool_init) {
-        return;
-    }
+    if (g_is_pool_init) { return; }
 
     if (g_is_pool_hashed) {
         g_mem_pool_hash_tab = new MEMPOOL_HASH();
@@ -237,15 +234,14 @@ SMemPool * smpoolCreate(size_t size, MEMPOOLTYPE mpt)
 
 //Create new memory pool, return the pool idx.
 #define MAX_TRY 1024
+
 //size: the initial byte size of pool. For MEM_CONST_SIZE, 'size'
 //      must be integer multiples of element byte size.
 //mpt: pool type.
 MEMPOOLIDX smpoolCreatePoolIndex(size_t size, MEMPOOLTYPE mpt)
 {
     SMemPool * mp = nullptr;
-
-    if (size <=0 || mpt == MEM_NONE)
-        return 0;
+    if (size <= 0 || mpt == MEM_NONE) { return 0; }
 
     if (g_is_pool_hashed && g_is_pool_init) {
         MEMPOOLIDX idx,i = 0;
@@ -261,7 +257,7 @@ MEMPOOLIDX smpoolCreatePoolIndex(size_t size, MEMPOOLTYPE mpt)
         } while (i < MAX_TRY);
 
         if (i >= MAX_TRY) {
-            ASSERTN(0, ("Not any available mempool can be created."));
+            ASSERTN(0, ("not any available mempool can be created."));
             return 0;
         }
         mp = smpoolCreate(size, mpt);
@@ -358,24 +354,23 @@ INT smpoolDeleteViaPoolIndex(MEMPOOLIDX mpt_idx)
 void * smpoolMallocConstSize(size_t elem_size, IN SMemPool * handler)
 {
     ASSERTN(elem_size > 0, ("elem size can not be 0"));
-    ASSERTN(handler, ("need mempool handler"));
-    ASSERTN(MEMPOOL_type(handler) == MEM_CONST_SIZE, ("Need const size pool"));
+    ASSERTN(handler, ("mempool handler is null"));
+    ASSERTN(MEMPOOL_type(handler) == MEM_CONST_SIZE, ("need const size pool"));
     ASSERTN(MEMPOOL_pool_size(handler) >= elem_size &&
-        (MEMPOOL_pool_size(handler) % elem_size) == 0,
-        ("Pool size must be multiples of element size."));
+            (MEMPOOL_pool_size(handler) % elem_size) == 0,
+            ("pool size must be multiples of element size."));
 
     //Search free block in the pool.
     ASSERTN(MEMPOOL_pool_size(handler) >= MEMPOOL_start_pos(handler),
-        ("exception occurs during mempool function"));
-    ASSERTN(MEMPOOL_pool_size(handler) > 0,
-        ("exception occurs during mempool function"));
+            ("start_pos overflow the pool size"));
+    ASSERTN(MEMPOOL_pool_size(handler) > 0, ("pool size is zero"));
     size_t s = MEMPOOL_pool_size(handler) - MEMPOOL_start_pos(handler);
     if (elem_size <= s) {
         void * addr = (size_t*)(((BYTE*)MEMPOOL_pool_ptr(handler)) +
-            MEMPOOL_start_pos(handler));
+                                MEMPOOL_start_pos(handler));
         MEMPOOL_start_pos(handler) += elem_size;
         ASSERTN(MEMPOOL_pool_size(handler) >= MEMPOOL_start_pos(handler),
-            ("\nexception occurs in handling of pool growing\n"));
+                ("start_pos overflow the pool size"));
         return addr;
     }
 
@@ -383,21 +378,20 @@ void * smpoolMallocConstSize(size_t elem_size, IN SMemPool * handler)
     if (rest != nullptr) {
         //Search free block in the first rest pool.
         ASSERTN(MEMPOOL_pool_size(rest) >= MEMPOOL_start_pos(rest),
-            ("exception occurs during mempool function"));
-        ASSERTN(MEMPOOL_pool_size(rest) > 0,
-            ("exception occurs during mempool function"));
+                ("start_pos overflow the pool size"));
+        ASSERTN(MEMPOOL_pool_size(rest) > 0, ("pool size is zero"));
         size_t s2 = MEMPOOL_pool_size(rest) - MEMPOOL_start_pos(rest);
         if (elem_size <= s2) {
             void * addr = (size_t*)(((BYTE*)MEMPOOL_pool_ptr(rest)) +
-                MEMPOOL_start_pos(rest));
+                                    MEMPOOL_start_pos(rest));
             MEMPOOL_start_pos(rest) += elem_size;
             ASSERTN(MEMPOOL_pool_size(rest) >= MEMPOOL_start_pos(rest),
-                ("\nexception occurs in handling of pool growing\n"));
+                    ("start_pos overflow the pool size"));
             return addr;
         }
     }
 
-    ASSERTN(MEMPOOL_grow_size(handler) > 0, ("Mempool's growsize is 0"));
+    ASSERTN(MEMPOOL_grow_size(handler) > 0, ("growsize is 0"));
 
     size_t grow_size = MAX(elem_size * 4, MEMPOOL_grow_size(handler) * 4);
     MEMPOOL_grow_size(handler) = grow_size;
@@ -408,11 +402,11 @@ void * smpoolMallocConstSize(size_t elem_size, IN SMemPool * handler)
     if (rest != nullptr) {
         MEMPOOL_prev(rest) = newpool;
     }
-    void * addr = (size_t*)(((CHAR*)MEMPOOL_pool_ptr(newpool)) +
-        MEMPOOL_start_pos(newpool));
+    void * addr = (size_t*)(((BYTE*)MEMPOOL_pool_ptr(newpool)) +
+                            MEMPOOL_start_pos(newpool));
     MEMPOOL_start_pos(newpool) += elem_size;
     ASSERTN(MEMPOOL_pool_size(newpool) >= MEMPOOL_start_pos(newpool),
-        ("\nexception occurs in handling of pool growing\n"));
+            ("start_pos overflow the pool size"));
     return addr;
 }
 
@@ -422,8 +416,7 @@ void * smpoolMallocConstSize(size_t elem_size, IN SMemPool * handler)
 void * smpoolMalloc(size_t size, IN SMemPool * handler, size_t grow_size)
 {
     ASSERTN(size > 0, ("query size can not be 0"));
-    ASSERTN(handler, ("need mempool handler"));
-
+    ASSERTN(handler, ("mempool handler is null"));
     if (size % WORD_ALIGN) {
         size = (size / WORD_ALIGN + 1) * WORD_ALIGN;
     }
@@ -434,13 +427,12 @@ void * smpoolMalloc(size_t size, IN SMemPool * handler, size_t grow_size)
     SMemPool * full_head = nullptr;
     while (tmp_rest != nullptr) {
         ASSERTN(MEMPOOL_pool_size(tmp_rest) >= MEMPOOL_start_pos(tmp_rest),
-            ("exception occurs during mempool function"));
-        ASSERTN(MEMPOOL_pool_size(tmp_rest) > 0,
-            ("exception occurs during mempool function"));
+                ("start_pos overflow the pool size"));
+        ASSERTN(MEMPOOL_pool_size(tmp_rest) > 0, ("pool size is zero"));
         size_t s = MEMPOOL_pool_size(tmp_rest) - MEMPOOL_start_pos(tmp_rest);
         if (size <= s) {
             addr = (size_t*)(((BYTE*)MEMPOOL_pool_ptr(tmp_rest)) +
-                MEMPOOL_start_pos(tmp_rest));
+                             MEMPOOL_start_pos(tmp_rest));
             goto FIN;
         }
 
@@ -453,12 +445,13 @@ void * smpoolMalloc(size_t size, IN SMemPool * handler, size_t grow_size)
             last = cur;
         }
     }
-    ASSERTN(last && MEMPOOL_next(last) == nullptr, ("Mempool internal error 3"));
+    ASSERTN(last && MEMPOOL_next(last) == nullptr,
+            ("mempool internal error 3"));
 
     //We lack free blocks, and quering new mem block.
     tmp_rest = last;
     if (grow_size == 0) {
-        ASSERTN(MEMPOOL_grow_size(handler), ("grow size is 0"));
+        ASSERTN(MEMPOOL_grow_size(handler) > 0, ("grow size is 0"));
         grow_size = MEMPOOL_grow_size(handler) * 4;
         MEMPOOL_grow_size(handler) = grow_size;
     }
@@ -472,15 +465,15 @@ void * smpoolMalloc(size_t size, IN SMemPool * handler, size_t grow_size)
 
     MEMPOOL_prev(MEMPOOL_next(tmp_rest)) = tmp_rest;
     tmp_rest = MEMPOOL_next(tmp_rest);
-    addr = (size_t*)(((CHAR*)MEMPOOL_pool_ptr(tmp_rest)) +
-        MEMPOOL_start_pos(tmp_rest));
+    addr = (size_t*)(((BYTE*)MEMPOOL_pool_ptr(tmp_rest)) +
+                     MEMPOOL_start_pos(tmp_rest));
 FIN:
     if (full_head != nullptr) {
         append_after_smp(tmp_rest, full_head);
     }
     MEMPOOL_start_pos(tmp_rest) += size;
     ASSERTN(MEMPOOL_pool_size(tmp_rest) >= MEMPOOL_start_pos(tmp_rest),
-        ("\nexception occurs in handling of pool growing\n"));
+            ("\nstart_pos overflow the pool size\n"));
     return addr;
 }
 
@@ -488,7 +481,7 @@ FIN:
 //Quering memory space from pool via pool index.
 void * smpoolMallocViaPoolIndex(size_t size, MEMPOOLIDX mpt_idx, size_t grow_size)
 {
-    ASSERTN(size > 0, ("Request size can not be 0"));
+    ASSERTN(size > 0, ("request size can not be 0"));
     SMemPool * mp = g_mem_pool;
 
     //Searching the mempool which indicated with 'mpt_idx'
@@ -515,7 +508,7 @@ void * smpoolMallocViaPoolIndex(size_t size, MEMPOOLIDX mpt_idx, size_t grow_siz
 //Get total pool byte-size.
 size_t smpoolGetPoolSize(SMemPool const* handle)
 {
-    if (handle == nullptr) return 0;
+    if (handle == nullptr) { return 0; }
     SMemPool const* mp = handle;
     size_t size = 0;
     while (mp != nullptr) {
@@ -530,7 +523,6 @@ size_t smpoolGetPoolSize(SMemPool const* handle)
 size_t smpoolGetPoolSizeViaIndex(MEMPOOLIDX mpt_idx)
 {
     SMemPool * mp = g_mem_pool;
-
     if (g_is_pool_hashed && g_is_pool_init) {
         mp = g_mem_pool_hash_tab->find((xcom::OBJTY)(size_t)mpt_idx);
     } else {

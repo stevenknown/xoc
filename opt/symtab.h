@@ -43,7 +43,7 @@ class Sym {
     COPY_CONSTRUCTOR(Sym);
 public:
     CHAR * s;
-
+public:
     CHAR const* getStr() const { return s; }
 };
 

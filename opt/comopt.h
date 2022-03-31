@@ -36,6 +36,7 @@ author: Su Zhenyu
 #include "mdliveness_mgr.h"
 #include "ir_ssa.h"
 #include "ir_mdssa.h"
+#include "mdssalive_mgr.h"
 #include "cfs_mgr.h"
 #include "cfs_opt.h"
 #include "goto_opt.h"

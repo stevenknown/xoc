@@ -120,7 +120,7 @@ void Bucket<T>::dump()
     INT j = 0;
     printf("\nBUCKET");
     for (UINT i = 0; i < Hash<T>::m_bucket_size; i++) {
-        printf("\n\tB%d:", i);
+        printf("\n\tB%ud:", i);
         HC<T> * elemhc = (HC<T>*)HB_member(Hash<T>::m_bucket[i]);
         while (elemhc != nullptr) {
             printf("%f,", HC_val(elemhc));

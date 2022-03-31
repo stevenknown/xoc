@@ -44,6 +44,7 @@ class MDSSAMgr;
 class PRSSAMgr;
 class Pass;
 class PassMgr;
+class IRSimp;
 
 //Region MD referrence info.
 #define REF_INFO_maydef(ri) ((ri)->may_def_mds)
@@ -160,9 +161,13 @@ protected:
 protected:
     //Allocate PassMgr
     virtual PassMgr * allocPassMgr();
+
     //Allocate AttachInfoMgr
     virtual AttachInfoMgr * allocAttachInfoMgr();
-    //Allocate an IR.
+
+    //Generate IR, invoke freeIR() or freeIRTree() if it is useless.
+    //NOTE: Do NOT invoke ::free() to free IR, because all
+    //    IR are allocated in the pool.
     IR * allocIR(IR_TYPE irt);
 
     void doBasicAnalysis(OptCtx & oc);
@@ -260,6 +265,28 @@ public:
         //into ST and carry MDSet from IST.
         //st->cleanRefMDSet();
         return md;
+    }
+
+    //The function generates new MD for given ST.
+    //It should be called if new PR generated in optimzations.
+    inline MD const* allocRefForId(IR * id)
+    {
+        MD const* md = getMDMgr()->genMDForId(id);
+        id->setRefMD(md, this);
+        id->cleanRefMDSet();
+        return md;
+    }
+
+    inline MD const* allocRef(IR * ir)
+    {
+        switch (ir->getCode()) {
+        case IR_PR: return allocRefForPR(ir);
+        case IR_LD: return allocRefForLoad(ir);
+        case IR_ST: return allocRefForStore(ir);
+        case IR_ID: return allocRefForId(ir);
+        default: UNREACHABLE();
+        }
+        return nullptr;
     }
 
     //Allocate DU reference that describes memory reference to IR.
@@ -666,7 +693,7 @@ public:
     IR * buildSelect(IR * det, IR * true_exp, IR * false_exp, Type const* type);
 
     //Build IR_PHI operation.
-    //res: result pr of PHI.
+    //prno: result PR of PHI.
     IR * buildPhi(UINT prno, Type const* type, IR * opnd_list);
     IR * buildPhi(UINT prno, Type const* type, UINT num_opnd);
 
@@ -712,34 +739,95 @@ public:
     virtual void destroy();
     void destroyPassMgr();
     void destroyAttachInfoMgr();
+
+    //Duplication all contents of 'src', includes AttachInfo, except DU info,
+    //SSA info, kids and siblings IR.
     IR * dupIR(IR const* ir);
+
+    //Duplicate 'ir' and its kids, but without ir's sibiling node.
+    //The duplication includes AI, except DU info, SSA info.
     IR * dupIRTree(IR const* ir);
+
+    //Duplication 'ir' and kids, and its sibling, return list of new ir.
+    //Duplicate irs start from 'ir' to the end of list.
+    //The duplication includes AI, except DU info, SSA info.
     IR * dupIRTreeList(IR const* ir);
+
     //filename: dump BB list into given filename.
     void dumpBBList(CHAR const* filename, bool dump_inner_region = true) const;
     void dumpBBList(bool dump_inner_region = true) const;
     void dumpIRList(UINT dumpflag = IR_DUMP_COMBINE) const;
+
+    //Dump all irs and ordering by IR_id.
     void dumpAllocatedIR() const;
+
+    //Dump each Var in current region's Var table.
     void dumpVARInRegion() const;
+
+    //Dump all MD that related to Var.
     void dumpVarMD(Var * v, UINT indent) const;
     void dumpFreeTab() const;
+
+    //Dump IR and memory usage.
     void dumpMemUsage() const;
-    void dump(bool dump_inner_region) const;
+
+    //Dump formal parameter list.
     void dumpParameter() const;
     void dumpVarTab() const;
-    void dumpGR(bool dump_inner_region) const;
+
+    //Dump GR through LogMgr.
+    void dumpGR(bool dump_inner_region = true) const;
+
+    //Dump Region's IR BB list.
+    //DUMP ALL BBList DEF/USE/OVERLAP_DEF/OVERLAP_USE.
     void dumpRef(UINT indent = 4) const;
     void dumpBBRef(IN IRBB * bb, UINT indent) const;
+    void dump(bool dump_inner_region) const;
 
     bool evaluateConstInteger(IR const* ir, OUT ULONGLONG * const_value);
 
+    //This function erases all informations of ir and
+    //append it into free_list for next allocation.
+    //If Attach Info exist, this function will erase it rather than delete.
+    //If DU info exist, this function will retrieve it back
+    //to region for next allocation.
+    //Note that this function does NOT free ir's kids and siblings.
     void freeIR(IR * ir);
+
+    //Free ir and all its kids, except its sibling node.
+    //We can only utilizing the function to free the
+    //IR which allocated by 'allocIR'.
     void freeIRTree(IR * ir);
+
+    //Free ir, ir's sibling, and all its kids.
+    //We can only utilizing the function to free the IR
+    //which allocated by 'allocIR'.
+    //NOTICE: If ir's sibling is not nullptr, that means the IR is
+    //a high level type. IRBB consists of only middle/low level IR.
     void freeIRTreeList(IR * ir);
+
+    //Free ir, and all its kids.
+    //We can only utilizing the function to free
+    //the IR which allocated by 'allocIR'.
     void freeIRTreeList(IRList & irs);
+
+    //Free IRBB list.
+    //We can only utilizing the function to free the IRBB
+    //which allocated by 'allocBB'.
+    //NOTICE: bb will not be destroyed, it is just recycled.
     void freeIRBBList(BBList & bbl);
+
+    //This function iterate Var table of current region to
+    //find all Var which are formal parameter.
+    //in_decl_order: if it is true, this function will sort the formal
+    //parameters in the Left to Right order according to their declaration.
+    //e.g: foo(a, b, c), varlst will be {a, b, c}.
     void findFormalParam(OUT List<Var const*> & varlst, bool in_decl_order);
+
+    //This function find the formal parameter variable by given position.
     Var const* findFormalParam(UINT position) const;
+
+    //This function find Var via iterating Var table of current region.
     Var * findVarViaSymbol(Sym const* sym) const;
 
     REGION_TYPE getRegionType() const { return REGION_type(this); }
@@ -823,6 +911,13 @@ public:
     //Return AttachInfoMgr.
     AttachInfoMgr * getAttachInfoMgr() const
     { return ANA_INS_ai_mgr(getAnalysisInstrument()); }
+
+    //Return IRSimp.
+    IRSimp * getIRSimp() const
+    {
+        return getPassMgr() != nullptr ?
+               (IRSimp*)getPassMgr()->registerPass(PASS_IRSIMP) : nullptr;
+    }
 
     //Return IRCFG.
     IRCFG * getCFG() const
@@ -997,15 +1092,6 @@ public:
     //Return true if Var belongs to current region.
     bool isRegionVAR(Var const* var) const;
 
-    //Return true if the tree height is not great than 2.
-    //e.g: tree a + b is lowest height , but a + b + c is not.
-    //Note that if ARRAY or ILD still not be lowered at the moment, regarding
-    //it as a whole node. e.g: a[1][2] + b is the lowest height.
-    bool isLowestHeight(IR const* ir, SimpCtx const* ctx) const;
-    bool isLowestHeightExp(IR const* ir, SimpCtx const* ctx) const;
-    bool isLowestHeightSelect(IR const* ir) const;
-    bool isLowestHeightArrayOp(IR const* ir) const;
-
     //Return true if Region name is equivalent to 'n'.
     //This function is helper function to faciltate user identify Region.
     bool isRegionName(CHAR const* n) const
@@ -1055,9 +1141,6 @@ public:
     bool reconstructBBList(OptCtx & oc);
     void registerGlobalVAR();
 
-    //Simplify ir to PR mode.
-    IR * simpToPR(IR * ir, SimpCtx * ctx);
-
     //Split IR list into list of basic blocks.
     //irs: a list of ir.
     //bbl: a list of bb.
@@ -1065,52 +1148,6 @@ public:
     //Note if CFG is invalid, it will not be updated.
     BBListIter splitIRlistIntoBB(IN IR * irs, OUT BBList * bbl,
                                  BBListIter ctbb, OptCtx const& oc);
-
-    //Series of helper functions to simplify
-    //ir according to given specification.
-    IR * simplifyLoopIngredient(IR * ir, SimpCtx * ctx);
-    IR * simplifyBranch(IR * ir, SimpCtx * ctx);
-    IR * simplifyIfSelf(IR * ir, SimpCtx * ctx);
-    IR * simplifyDoWhileSelf(IR * ir, SimpCtx * ctx);
-    IR * simplifyWhileDoSelf(IR * ir, SimpCtx * ctx);
-    IR * simplifyDoLoopSelf(IR * ir, SimpCtx * ctx);
-    IR * simplifySwitchSelf(IR * ir, SimpCtx * ctx);
-    void simplifySelectKids(IR * ir, SimpCtx * cont);
-    IR * simplifyStore(IR * ir, SimpCtx * cont);
-    void simplifyCalleeExp(IR * ir, SimpCtx * ctx);
-    IR * simplifyStorePR(IR * ir, SimpCtx * cont);
-    IR * simplifyArrayIngredient(IR * ir, SimpCtx * ctx);
-    IR * simplifyStoreArray(IR * ir, SimpCtx * ctx);
-    IR * simplifySetelem(IR * ir, SimpCtx * ctx);
-    IR * simplifyGetelem(IR * ir, SimpCtx * ctx);
-    IR * simplifyIStore(IR * ir, SimpCtx * cont);
-    IR * simplifyCall(IR * ir, SimpCtx * cont);
-    IR * simplifyIf (IR * ir, SimpCtx * cont);
-    IR * simplifyWhileDo(IR * ir, SimpCtx * cont);
-    IR * simplifyDoWhile (IR * ir, SimpCtx * cont);
-    IR * simplifyDoLoop(IR * ir, SimpCtx * cont);
-    IR * simplifyDet(IR * ir, SimpCtx * cont);
-    IR * simplifyJudgeDet(IR * ir, SimpCtx * cont);
-    IR * simplifySelect(IR * ir, SimpCtx * cont);
-    IR * simplifySwitch (IR * ir, SimpCtx * cont);
-    IR * simplifyIgoto(IR * ir, SimpCtx * cont);
-    IR * simplifyArrayAddrExp(IR * ir, SimpCtx * cont);
-    IR * simplifyArray(IR * ir, SimpCtx * cont);
-    IR * simplifyExpression(IR * ir, SimpCtx * cont);
-    IR * simplifyBinAndUniExpression(IR * ir, SimpCtx * ctx);
-    IR * simplifyStmt(IR * ir, SimpCtx * cont);
-    IR * simplifyStmtList(IR * ir, SimpCtx * cont);
-    void simplifyBB(IRBB * bb, SimpCtx * cont);
-    void simplifyBBlist(BBList * bbl, SimpCtx * cont);
-    void simplifyIRList(SimpCtx * cont);
-    IR * simplifyLogicalNot(IN IR * ir, SimpCtx * cont);
-    IR * simplifyLogicalOrAtFalsebr(IN IR * ir, LabelInfo const* tgt_label);
-    IR * simplifyLogicalOrAtTruebr(IN IR * ir, LabelInfo const* tgt_label);
-    IR * simplifyLogicalOr(IN IR * ir, SimpCtx * cont);
-    IR * simplifyLogicalAndAtTruebr(IN IR * ir, LabelInfo const* tgt_label);
-    IR * simplifyLogicalAndAtFalsebr(IN IR * ir, LabelInfo const* tgt_label);
-    IR * simplifyLogicalAnd(IN IR * ir, SimpCtx * cont);
-    IR * simplifyLogicalDet(IR * ir, SimpCtx * cont);
 
     //Assign variable to given PR.
     void setMapPR2Var(UINT prno, Var * pr_var)
@@ -1154,6 +1191,7 @@ public:
 
     //Ensure that each IR in ir_list must be allocated in crrent region.
     bool verifyIROwnership();
+
     //Verify MD reference to each stmts and expressions which described memory.
     bool verifyMDRef();
 };

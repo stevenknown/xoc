@@ -76,7 +76,7 @@ bool InvertBrTgt::dump() const
     m_rg->getCFG()->dumpDOT(m_rg->getLogMgr()->getFileHandler(),
                             IRCFG::DUMP_DEF);
     note(getRegion(), "\n");
-    return true;
+    return Pass::dump();
 }
 
 
@@ -146,7 +146,7 @@ static bool tryInvertLoop(InvertBrTgt * invt, IRCFG * cfg, LI<IRBB> const* li)
     }
 
     IR * br = cfg->get_last_xr(prev);
-    if (br == nullptr || !br->isConditionalBr() || br->hasSideEffect()) {
+    if (br == nullptr || !br->isConditionalBr() || br->hasSideEffect(true)) {
         return false;
     }
 

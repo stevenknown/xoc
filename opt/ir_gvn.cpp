@@ -85,10 +85,9 @@ static bool isBinaryIRType(IR_TYPE irt)
 //
 //START GVN
 //
-GVN::GVN(Region * rg)
+GVN::GVN(Region * rg) : Pass(rg)
 {
     ASSERT0(rg != nullptr);
-    m_rg = rg;
     m_md_sys = m_rg->getMDSystem();
     m_du = m_rg->getDUMgr();
     m_tm = m_rg->getTypeMgr();
@@ -97,6 +96,7 @@ GVN::GVN(Region * rg)
     m_is_vn_fp = false;
     m_is_comp_ild_vn_by_du = true;
     m_is_comp_lda_string = false;
+    m_is_alloc_livein_vn = false;
     m_pool = nullptr;
     init();
 }
@@ -518,55 +518,22 @@ VN * GVN::computePR(IR const* exp, bool & change)
 {
     SSAInfo * ssainfo = PR_ssainfo(exp);
     ASSERT0(exp->isReadPR() && ssainfo);
-
     IR const* def = ssainfo->getDef();
     if (def == nullptr) {
         ASSERT0(exp->getRefMD());
-        return allocLiveinVN(exp, exp->getRefMD(), change);
+        if (isAllocLiveinVN()) {
+            return allocLiveinVN(exp, exp->getRefMD(), change);
+        }
+        return nullptr;
     }
-
     VN * defvn = m_ir2vn.get(def->id());
-
     VN * ux = m_ir2vn.get(exp->id());
     if (defvn != ux) {
         m_ir2vn.setAlways(exp->id(), defvn);
         change = true;
     }
-
     return defvn;
 }
-
-
-////The function try to find the must-killing def for 'exp'.
-//IR * GVN::getExactAndUniqueDef(IR const* exp)
-//{
-//    ASSERT0(exp->is_exp());
-//    //Prefer PRSSA and MDSSA DU. 
-//    if (exp->isReadPR() && usePRSSADU()) {
-//        IR const* d = PR_ssainfo(exp)->getDef();
-//        if (d != nullptr && d->getExactRef() != nullptr) {
-//            return d;
-//        }
-//        return nullptr;
-//    }
-//    if (exp->isMemRefNonPR() && useMDSSADU()) {
-//        MDSSAInfo * mdssainfo = m_mdssamgr->getMDSSAInfoIfAny(exp);
-//        if (mdssainfo == nullptr ||
-//            mdssainfo->readVOpndSet() == nullptr ||
-//            mdssainfo->readVOpndSet()->is_empty()) {
-//            return nullptr;
-//        }
-//    }
-//    if (m_du != nullptr) {
-//        DUSet const* du = exp->readDUSet();
-//        ASSERTN(du,
-//                ("If exact MD DU is empty, should assigned region LiveIn VN"));
-//        ASSERT0(du->get_elem_count() > 0);
-//        IR const* exp_stmt = const_cast<IR*>(exp)->getStmt();
-//        return m_du->findNearestDomDef(exp, exp_stmt, du);
-//    }
-//    return nullptr;
-//}
 
 
 //Only compute memory operation's vn.
@@ -576,7 +543,6 @@ VN * GVN::computeExactMemory(IR const* exp, bool & change)
     MD const* emd = exp->getExactRef();
     if (emd == nullptr) { return nullptr; }
 
-    //IR const* ed = m_du->getExactAndUniqueDef(exp);
     IR const* ed = xoc::findKillingDef(exp, m_rg);
     if (ed != nullptr) {
         VN * defvn = nullptr;
@@ -600,7 +566,10 @@ VN * GVN::computeExactMemory(IR const* exp, bool & change)
 
     DUSet const* defset = exp->readDUSet();
     if (defset == nullptr) {
-        return allocLiveinVN(exp, emd, change);
+        if (isAllocLiveinVN()) {
+            return allocLiveinVN(exp, emd, change);
+        }
+        return nullptr;
     }
 
     //Check if some may-def or overlapped-def disrupts the emd.
@@ -632,7 +601,10 @@ VN * GVN::computeExactMemory(IR const* exp, bool & change)
             return nullptr;
         }
     }
-    return allocLiveinVN(exp, emd, change);
+    if (isAllocLiveinVN()) {
+        return allocLiveinVN(exp, emd, change);
+    }
+    return nullptr;
 }
 
 
@@ -921,7 +893,7 @@ VN * GVN::computeScalar(IR const* exp, bool & change)
 
     DUSet const* du = exp->readDUSet();
     if (du == nullptr || du->get_elem_count() == 0) {
-        //If exact MD DU is empty, should assigned region LiveIn VN.
+        //If exact MD DU is empty, should keep it as unknown status.
         return nullptr;
     }
 
@@ -977,14 +949,14 @@ VN * GVN::computeVN(IR const* exp, bool & change)
         VN * vn2 = computeVN(BIN_opnd1(exp), change);
         if (vn1 == nullptr || vn2 == nullptr) {
             if (m_ir2vn.get(exp->id()) != nullptr) {
-                m_ir2vn.set(exp->id(), nullptr);
+                m_ir2vn.setAlways(exp->id(), nullptr);
                 change = true;
             }
             return nullptr;
         }
         VN * x = registerBinVN(exp->getCode(), vn1, vn2);
         if (m_ir2vn.get(exp->id()) != x) {
-            m_ir2vn.set(exp->id(), x);
+            m_ir2vn.setAlways(exp->id(), x);
             change = true;
         }
         return x;
@@ -1000,7 +972,7 @@ VN * GVN::computeVN(IR const* exp, bool & change)
         }
         x = registerUnaVN(exp->getCode(), x);
         if (m_ir2vn.get(exp->id()) != x) {
-            m_ir2vn.set(exp->id(), x);
+            m_ir2vn.setAlways(exp->id(), x);
             change = true;
         }
         return x;
@@ -1026,7 +998,7 @@ VN * GVN::computeVN(IR const* exp, bool & change)
 
         if (basevn == nullptr) {
             if (m_ir2vn.get(exp->id()) != nullptr) {
-                m_ir2vn.set(exp->id(), nullptr);
+                m_ir2vn.setAlways(exp->id(), nullptr);
                 change = true;
             }
             return nullptr;
@@ -1035,7 +1007,7 @@ VN * GVN::computeVN(IR const* exp, bool & change)
         VN * ofstvn = registerVNviaINT(LDA_ofst(exp));
         VN * x = registerBinVN(IR_LDA, basevn, ofstvn);
         if (m_ir2vn.get(exp->id()) != x) {
-            m_ir2vn.set(exp->id(), x);
+            m_ir2vn.setAlways(exp->id(), x);
             change = true;
         }
         return x;
@@ -1072,7 +1044,7 @@ VN * GVN::computeVN(IR const* exp, bool & change)
         }
 
         ASSERT0(x);
-        m_ir2vn.set(exp->id(), x);
+        m_ir2vn.setAlways(exp->id(), x);
         change = true;
         return x;
     }
@@ -1317,7 +1289,7 @@ void GVN::dumpBB(UINT bbid) const
         prt(getRegion(), " <- {");
         ii.clean();
         bool dumped = false;
-        for (IR const* k = iterRhsInitC(ir, ii);
+        for (IR const* k = iterExpInitC(ir, ii);
              k != nullptr; k = iterNextC(ii)) {
             dumped = true;
             VN const* vn = m_ir2vn.get(k->id());
@@ -1337,10 +1309,13 @@ bool GVN::dump() const
     START_TIMER_FMT(t, ("DUMP %s", getPassName()));
     note(getRegion(), "\n==---- DUMP %s '%s' ----==",
          getPassName(), m_rg->getRegionName());
+    getRegion()->getLogMgr()->incIndent(2);
     BBList * bbl = m_rg->getBBList();
     for (IRBB * bb = bbl->get_head(); bb != nullptr; bb = bbl->get_next()) {
         dumpBB(bb->id());
     }
+    Pass::dump();
+    getRegion()->getLogMgr()->decIndent(2);
     END_TIMER_FMT(t, ("DUMP %s", getPassName()));
     return true;
 }
@@ -1348,7 +1323,7 @@ bool GVN::dump() const
 
 //Return true if GVN is able to determine the result of 'ir', otherwise
 //return false that GVN know nothing about ir.
-bool GVN::calcCondMustVal(IR const* ir, bool & must_true, 
+bool GVN::calcCondMustVal(IR const* ir, bool & must_true,
                           bool & must_false) const
 {
     must_true = false;
@@ -1517,16 +1492,16 @@ bool GVN::perform(OptCtx & oc)
     clean();
     m_rg->getPassMgr()->checkValidAndRecompute(&oc, PASS_RPO, PASS_DOM,
                                                PASS_UNDEF);
-    List<IRBB*> * tbbl = m_cfg->getRPOBBList();
-    ASSERT0(tbbl);
-    ASSERT0(tbbl->get_elem_count() == bbl->get_elem_count());
+    RPOVexList * vlst = m_cfg->getRPOVexList();
+    ASSERT0(vlst);
+    ASSERT0(vlst->get_elem_count() == bbl->get_elem_count());
     UINT count = 0;
     bool change = true;
     while (change && count < 100) {
         change = false;
-        for (IRBB * bb = tbbl->get_head();
-             bb != nullptr; bb = tbbl->get_next()) {
-            processBB(bb, change);
+        for (Vertex const* v = vlst->get_head();
+             v != nullptr; v = vlst->get_next()) {
+            processBB(m_cfg->getBB(v->id()), change);
         }
         count++;
     }

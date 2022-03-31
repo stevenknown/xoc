@@ -35,13 +35,21 @@ class ScalarOpt : public Pass {
     COPY_CONSTRUCTOR(ScalarOpt);
 protected:
     PassMgr * m_pass_mgr;
-    Region * m_rg;
     IRCFG * m_cfg;
-
 public:
-    explicit ScalarOpt(Region * rg) : m_rg(rg)
+    explicit ScalarOpt(Region * rg) : Pass(rg)
     { m_pass_mgr = rg->getPassMgr(); m_cfg = rg->getCFG(); }
     virtual ~ScalarOpt() {}
+
+    //The function dump pass relative information before performing the pass.
+    //The dump information is always used to detect what the pass did.
+    //Return true if dump successed, otherwise false.
+    virtual bool dumpBeforePass() const { return Pass::dumpBeforePass(); }
+
+    //The function dump pass relative information.
+    //The dump information is always used to detect what the pass did.
+    //Return true if dump successed, otherwise false.
+    virtual bool dump() const { return Pass::dump(); }
 
     virtual CHAR const* getPassName() const
     { return "Scalar Optimizations"; }

@@ -33,7 +33,7 @@ namespace xoc {
 
 //Use do-while to supress warning: value computed is not used
 #define DUMPADDR(ir) \
-  do { int a = dump_addr ? prt(rg, " 0x%p", (ir)) : 0; DUMMYUSE(a); } while (0)
+  do { int x = dump_addr ? prt(rg, " 0x%p", (ir)) : 0; DUMMYUSE(x); } while (0)
 
 //Dump IR list with a logging header-notation.
 //Dump both its kids and siblings.
@@ -183,6 +183,9 @@ void dumpLabelName(LabelInfo const* li, RegionMgr const* rm, bool for_gr)
         }
 
         if (non_id) { prt(rm, "\""); }
+        if (for_gr) {
+            prt(rm, "%s", PREFIX_OF_ILABEL_IN_GR);
+        }
         prt(rm, ILABEL_STR_FORMAT, ILABEL_CONT(li));
         if (non_id) { prt(rm, "\""); }
         return;
@@ -302,6 +305,943 @@ static void dumpAttachInfo(OUT CHAR * buf, IR const* ir)
 
         sprintf(p, "%s", ai->getAIName(ac->getType()));
         p = p + strlen(p);
+    }
+}
+
+
+void dumpGETELEM(IR const* ir, Region const* rg, UINT dn, UINT dumpflag,
+                 CHAR * attr)
+{
+    bool dump_addr = HAVE_FLAG(dumpflag, IR_DUMP_ADDR);
+    bool dump_kid = HAVE_FLAG(dumpflag, IR_DUMP_KID);
+    bool dump_var_decl = HAVE_FLAG(dumpflag, IR_DUMP_VAR_DECL);
+    StrBuf buf(64);
+    TypeMgr const* xtm = rg->getTypeMgr();
+    Type const* d = ir->getType();
+    LogMgr * lm = rg->getLogMgr();
+ 
+    note(rg, "getelem $%d:%s", GETELEM_prno(ir), xtm->dump_type(d, buf));
+    DUMPADDR(ir);
+    prt(rg, "%s", attr);
+    if (!dump_kid) { return; }
+
+    lm->incIndent(dn);
+    dumpIRList(GETELEM_base(ir), rg, (CHAR*)" base", dumpflag);
+    dumpIRList(GETELEM_ofst(ir), rg, (CHAR*)" offset", dumpflag);
+    lm->decIndent(dn);
+}
+
+
+void dumpSETELEM(IR const* ir, Region const* rg, UINT dn, UINT dumpflag,
+                 CHAR * attr)
+{
+    bool dump_addr = HAVE_FLAG(dumpflag, IR_DUMP_ADDR);
+    bool dump_kid = HAVE_FLAG(dumpflag, IR_DUMP_KID);
+    bool dump_var_decl = HAVE_FLAG(dumpflag, IR_DUMP_VAR_DECL);
+    StrBuf buf(64);
+    TypeMgr const* xtm = rg->getTypeMgr();
+    Type const* d = ir->getType();
+    LogMgr * lm = rg->getLogMgr();
+ 
+    note(rg, "setelem $%d:%s", SETELEM_prno(ir), xtm->dump_type(d, buf));
+    DUMPADDR(ir);
+    prt(rg, "%s", attr);
+    if (!dump_kid) { return; }
+
+    lm->incIndent(dn);
+    dumpIRList(SETELEM_base(ir), rg, nullptr, dumpflag);
+    dumpIRList(SETELEM_val(ir), rg, nullptr, dumpflag);
+    dumpIRList(SETELEM_ofst(ir), rg, (CHAR*)" offset", dumpflag);
+    lm->decIndent(dn);
+}
+
+
+void dumpBREAK(IR const* ir, Region const* rg, UINT dn, UINT dumpflag,
+               CHAR * attr)
+{
+    bool dump_addr = HAVE_FLAG(dumpflag, IR_DUMP_ADDR);
+    note(rg, "break");
+    DUMPADDR(ir);
+    prt(rg, "%s", attr);
+}
+
+
+void dumpCONTINUE(IR const* ir, Region const* rg, UINT dn, UINT dumpflag,
+                  CHAR * attr)
+{
+    bool dump_addr = HAVE_FLAG(dumpflag, IR_DUMP_ADDR);
+    note(rg, "continue");
+    DUMPADDR(ir);
+    prt(rg, "%s", attr);
+}
+
+
+void dumpGOTO(IR const* ir, Region const* rg, UINT dn, UINT dumpflag,
+              CHAR * attr)
+{
+    bool dump_addr = HAVE_FLAG(dumpflag, IR_DUMP_ADDR);
+    note(rg, "goto ");
+    dumpLabelDecl(ir->getLabel(), rg->getRegionMgr(), false);
+    DUMPADDR(ir);
+    prt(rg, "%s", attr); 
+}
+
+
+void dumpRETURN(IR const* ir, Region const* rg, UINT dn, UINT dumpflag,
+                CHAR * attr)
+{
+    bool dump_addr = HAVE_FLAG(dumpflag, IR_DUMP_ADDR);
+    bool dump_kid = HAVE_FLAG(dumpflag, IR_DUMP_KID);
+    LogMgr * lm = rg->getLogMgr();
+    note(rg, "return");
+    DUMPADDR(ir);
+    prt(rg, "%s", attr);
+    if (!dump_kid) { return; }
+
+    lm->incIndent(dn);
+    dumpIR(RET_exp(ir), rg, nullptr, dumpflag);
+    lm->decIndent(dn);
+}
+
+
+void dumpREGION(IR const* ir, Region const* rg, UINT dn, UINT dumpflag,
+                CHAR * attr)
+{
+    bool dump_addr = HAVE_FLAG(dumpflag, IR_DUMP_ADDR);
+    bool dump_kid = HAVE_FLAG(dumpflag, IR_DUMP_KID);
+    bool dump_inner_region = HAVE_FLAG(dumpflag, IR_DUMP_INNER_REGION);
+    LogMgr * lm = rg->getLogMgr();
+    note(rg, "region");
+    if (REGION_ru(ir)->getRegionVar() != nullptr) {
+        Var * ruvar = REGION_ru(ir)->getRegionVar();
+        CHAR tt[40];
+        tt[0] = 0;
+
+        //Dump variable info.
+        xstrcat(tt, 40, "%s", SYM_name(ruvar->get_name()));
+        prt(rg, " \'%s\',id:%d", tt, REGION_ru(ir)->id());
+    }
+
+    DUMPADDR(ir); //Dump IR address.
+    prt(rg, "%s", attr); //Dump attributes.
+
+    if (dump_inner_region) {
+        //Inner region.
+        ASSERT0(REGION_ru(ir));
+        lm->incIndent(dn);
+        note(rg, "\nregion-info:");
+        REGION_ru(ir)->dump(dump_inner_region);
+        lm->decIndent(dn);
+    }
+}
+
+
+void dumpFALSEBR(IR const* ir, Region const* rg, UINT dn, UINT dumpflag,
+                 CHAR * attr)
+{
+    bool dump_addr = HAVE_FLAG(dumpflag, IR_DUMP_ADDR);
+    bool dump_kid = HAVE_FLAG(dumpflag, IR_DUMP_KID);
+    LogMgr * lm = rg->getLogMgr();
+    note(rg, "falsebr ");
+    dumpLabelDecl(ir->getLabel(), rg->getRegionMgr(), false);
+    DUMPADDR(ir);
+    prt(rg, "%s", attr);
+    if (!dump_kid) { return; }
+
+    lm->incIndent(dn);
+    dumpIRList(BR_det(ir), rg, nullptr, dumpflag);
+    lm->decIndent(dn);
+}
+
+
+void dumpTRUEBR(IR const* ir, Region const* rg, UINT dn, UINT dumpflag,
+                CHAR * attr)
+{
+    bool dump_addr = HAVE_FLAG(dumpflag, IR_DUMP_ADDR);
+    bool dump_kid = HAVE_FLAG(dumpflag, IR_DUMP_KID);
+    LogMgr * lm = rg->getLogMgr();
+    note(rg, "truebr ");
+    dumpLabelDecl(ir->getLabel(), rg->getRegionMgr(), false);
+    DUMPADDR(ir);
+    prt(rg, "%s", attr);
+    if (!dump_kid) { return; }
+
+    lm->incIndent(dn);
+    dumpIRList(BR_det(ir), rg, nullptr, dumpflag);
+    lm->decIndent(dn);
+}
+
+
+void dumpARRAY(IR const* ir, Region const* rg, UINT dn, UINT dumpflag,
+               CHAR * attr)
+{
+    bool dump_addr = HAVE_FLAG(dumpflag, IR_DUMP_ADDR);
+    bool dump_kid = HAVE_FLAG(dumpflag, IR_DUMP_KID);
+    bool dump_var_decl = HAVE_FLAG(dumpflag, IR_DUMP_VAR_DECL);
+    StrBuf buf(64);
+    TypeMgr const* xtm = rg->getTypeMgr();
+    Type const* d = ir->getType();
+    LogMgr * lm = rg->getLogMgr();
+ 
+    StrBuf buf2(64);
+    if (ARR_ofst(ir) != 0) {
+        note(rg, "array (%s:offset(%d), ety:%s)",
+             xtm->dump_type(d, buf),
+             ARR_ofst(ir),
+             xtm->dump_type(ARR_elemtype(ir), buf2));
+    } else {
+        note(rg, "array (%s, ety:%s)",
+             xtm->dump_type(d, buf),
+             xtm->dump_type(ARR_elemtype(ir), buf2));
+    }
+
+    DUMPADDR(ir);
+    prt(rg, "%s", attr);
+    if (ARR_sub_list(ir) != nullptr && dump_kid) {
+        //Dump element number if it exist.
+        lm->incIndent(dn);
+
+        if (ARR_elem_num_buf(ir) != nullptr) {
+            UINT dim = 0;
+            note(rg, "\nelemnum[");
+            for (IR const* sub = ARR_sub_list(ir); sub != nullptr;) {
+                prt(rg, "%d", ARR_elem_num(ir, dim));
+                sub = sub->get_next();
+                if (sub != nullptr) {
+                    prt(rg, ",");
+                }
+                dim++;
+            }
+            prt(rg, "]");
+        } else { note(rg, "\nelemnum[--]"); }
+
+        //Dump subscript expressions in each dimension.
+        UINT dim = 0;
+        for (IR const* sub = ARR_sub_list(ir);
+             sub != nullptr; sub = sub->get_next()) {
+            CHAR tt[40];
+            sprintf(tt, " dim%d", dim);
+            dumpIR(sub, rg, (CHAR*)tt, dumpflag);
+            dim++;
+        }
+        lm->decIndent(dn);
+    }
+
+    if (!dump_kid) { return; }
+
+    lm->incIndent(dn);
+    dumpIRList(ARR_base(ir), rg, (CHAR*)" array_base", dumpflag);
+    lm->decIndent(dn);
+}
+
+
+void dumpCASE(IR const* ir, Region const* rg, UINT dn, UINT dumpflag,
+              CHAR * attr)
+{
+    bool dump_addr = HAVE_FLAG(dumpflag, IR_DUMP_ADDR);
+    bool dump_kid = HAVE_FLAG(dumpflag, IR_DUMP_KID);
+    bool dump_var_decl = HAVE_FLAG(dumpflag, IR_DUMP_VAR_DECL);
+    LogMgr * lm = rg->getLogMgr();
+ 
+    ASSERT0(CASE_vexp(ir));
+    ASSERT0(CASE_lab(ir));
+    note(rg, "case");
+    DUMPADDR(ir);
+    prt(rg, "%s", attr);
+
+    lm->incIndent(dn);
+    dumpIRList(CASE_vexp(ir), rg, nullptr, dumpflag);
+    note(rg, "\n");
+    dumpLabelDecl(ir->getLabel(), rg->getRegionMgr(), false);
+    lm->decIndent(dn);
+}
+
+
+void dumpSWITCH(IR const* ir, Region const* rg, UINT dn, UINT dumpflag,
+                CHAR * attr)
+{
+    bool dump_addr = HAVE_FLAG(dumpflag, IR_DUMP_ADDR);
+    bool dump_kid = HAVE_FLAG(dumpflag, IR_DUMP_KID);
+    bool dump_var_decl = HAVE_FLAG(dumpflag, IR_DUMP_VAR_DECL);
+    LogMgr * lm = rg->getLogMgr();
+
+    note(rg, "switch");
+    if (SWITCH_deflab(ir) != nullptr) {
+        prt(rg, ", deflab: ");
+        dumpLabelDecl(ir->getLabel(), rg->getRegionMgr(), false);
+    }
+    DUMPADDR(ir);
+    prt(rg, "%s", attr);
+    if (!dump_kid) { return; }
+
+    lm->incIndent(dn);
+    dumpIRList(SWITCH_vexp(ir), rg, nullptr, dumpflag);
+    lm->decIndent(dn);
+
+    if (SWITCH_case_list(ir) != nullptr) {
+        dumpIRList(SWITCH_case_list(ir), rg, nullptr, dumpflag);
+    }
+
+    if (SWITCH_body(ir) != nullptr) {
+        note(rg, "\nbody:");
+        lm->incIndent(dn);
+        dumpIRList(SWITCH_body(ir), rg, nullptr, dumpflag);
+        lm->decIndent(dn);
+    }
+    note(rg, "\nend_switch");
+}
+
+
+void dumpPHI(IR const* ir, Region const* rg, UINT dn, UINT dumpflag,
+             CHAR * attr)
+{
+    bool dump_addr = HAVE_FLAG(dumpflag, IR_DUMP_ADDR);
+    bool dump_kid = HAVE_FLAG(dumpflag, IR_DUMP_KID);
+    bool dump_var_decl = HAVE_FLAG(dumpflag, IR_DUMP_VAR_DECL);
+    StrBuf buf(64);
+    TypeMgr const* xtm = rg->getTypeMgr();
+    Type const* d = ir->getType();
+    LogMgr * lm = rg->getLogMgr();
+ 
+    note(rg, "%s $%d:%s", IRNAME(ir), PHI_prno(ir),
+         xtm->dump_type(d, buf));
+
+    DUMPADDR(ir);
+    prt(rg, "%s", attr);
+    if (!dump_kid) { return; }
+
+    prt(rg, " = ", attr);
+    lm->incIndent(dn);
+    IR * opnd = PHI_opnd_list(ir);
+    while (opnd != nullptr) {
+        dumpIR(opnd, rg, nullptr, dumpflag);
+        opnd = opnd->get_next();
+    }
+    lm->decIndent(dn);
+}
+
+
+void dumpLDA(IR const* ir, Region const* rg, UINT dn, UINT dumpflag,
+             CHAR * attr)
+{
+    bool dump_addr = HAVE_FLAG(dumpflag, IR_DUMP_ADDR);
+    bool dump_kid = HAVE_FLAG(dumpflag, IR_DUMP_KID);
+    bool dump_var_decl = HAVE_FLAG(dumpflag, IR_DUMP_VAR_DECL);
+    StrBuf buf(64);
+    TypeMgr const* xtm = rg->getTypeMgr();
+    Type const* d = ir->getType();
+    LogMgr * lm = rg->getLogMgr();
+ 
+    CHAR tt[40];
+    tt[0] = 0;
+
+    //Dump variable info.
+    CHAR * name = xstrcat(tt, 40, "%s",
+        SYM_name(LDA_idinfo(ir)->get_name()));
+    if (LDA_ofst(ir) != 0) {
+        note(rg, "lda:%s:offset(%d) '%s'",
+             xtm->dump_type(d, buf), LDA_ofst(ir), name);
+    } else {
+        note(rg, "lda:%s '%s'", xtm->dump_type(d, buf), name);
+    }
+
+    //Dump declaration if frontend supplied.
+    buf.clean();
+    if (dump_var_decl && LDA_idinfo(ir)->dumpVARDecl(buf) != nullptr) {
+        prt(rg, " decl:%s", buf.buf);
+    }
+
+    //Dump IR address.
+    DUMPADDR(ir);
+    prt(rg, "%s", attr);
+}
+
+
+void dumpSELECT(IR const* ir, Region const* rg, UINT dn, UINT dumpflag,
+                CHAR * attr)
+{
+    bool dump_addr = HAVE_FLAG(dumpflag, IR_DUMP_ADDR);
+    bool dump_kid = HAVE_FLAG(dumpflag, IR_DUMP_KID);
+    bool dump_var_decl = HAVE_FLAG(dumpflag, IR_DUMP_VAR_DECL);
+    StrBuf buf(64);
+    TypeMgr const* xtm = rg->getTypeMgr();
+    Type const* d = ir->getType();
+    LogMgr * lm = rg->getLogMgr();
+ 
+    note(rg, "select:%s", xtm->dump_type(d, buf));
+    DUMPADDR(ir);
+    prt(rg, "%s", attr);
+    if (!dump_kid) { return; }
+
+    lm->incIndent(dn);
+    dumpIRList(SELECT_pred(ir), rg, nullptr, dumpflag);
+    lm->decIndent(dn);
+
+    lm->incIndent(dn);
+    dumpIRList(SELECT_trueexp(ir), rg, (CHAR*)" true_exp", dumpflag);
+    lm->decIndent(dn);
+
+    lm->incIndent(dn);
+    dumpIRList(SELECT_falseexp(ir), rg, (CHAR*)" false_exp", dumpflag);
+    lm->decIndent(dn);
+}
+
+
+void dumpLABEL(IR const* ir, Region const* rg, UINT dn, UINT dumpflag,
+               CHAR * attr)
+{
+    bool dump_addr = HAVE_FLAG(dumpflag, IR_DUMP_ADDR);
+    bool dump_kid = HAVE_FLAG(dumpflag, IR_DUMP_KID);
+    bool dump_var_decl = HAVE_FLAG(dumpflag, IR_DUMP_VAR_DECL);
+    LogMgr * lm = rg->getLogMgr();
+    LabelInfo const* li = LAB_lab(ir);
+    if (LABELINFO_type(li) == L_ILABEL) {
+        note(rg, "label " ILABEL_STR_FORMAT "",
+             ILABEL_CONT(LAB_lab(ir)));
+    } else if (LABELINFO_type(li) == L_CLABEL) {
+        note(rg, "label " CLABEL_STR_FORMAT "",
+             CLABEL_CONT(LAB_lab(ir)));
+    } else if (LABELINFO_type(li) == L_PRAGMA) {
+        ASSERT0(LABELINFO_pragma(LAB_lab(ir)));
+        note(rg, "pragma %s", SYM_name(LABELINFO_pragma(LAB_lab(ir))));
+    } else { UNREACHABLE(); }
+
+    DUMPADDR(ir); //dump runtime address on host machine.
+
+    if (LABELINFO_b1(li) != 0) {
+        prt(rg, "(");
+    }
+
+    if (LABELINFO_is_try_start(li)) {
+        prt(rg, "try_start ");
+    }
+
+    if (LABELINFO_is_try_end(li)) {
+        prt(rg, "try_end ");
+    }
+
+    if (LABELINFO_is_catch_start(li)) {
+        prt(rg, "catch_start ");
+    }
+
+    if (LABELINFO_is_terminate(li)) {
+        prt(rg, "terminate ");
+    }
+
+    if (LABELINFO_b1(li) != 0) {
+        prt(rg, ")");
+    }
+
+    prt(rg, "%s", attr);
+}
+
+
+void dumpIGOTO(IR const* ir, Region const* rg, UINT dn, UINT dumpflag,
+               CHAR * attr)
+{
+    bool dump_addr = HAVE_FLAG(dumpflag, IR_DUMP_ADDR);
+    bool dump_kid = HAVE_FLAG(dumpflag, IR_DUMP_KID);
+    bool dump_var_decl = HAVE_FLAG(dumpflag, IR_DUMP_VAR_DECL);
+    LogMgr * lm = rg->getLogMgr();
+    note(rg, "igoto");
+    DUMPADDR(ir);
+    prt(rg, "%s", attr);
+    if (!dump_kid) { return; }
+
+    lm->incIndent(dn);
+    dumpIRList(IGOTO_vexp(ir), rg, nullptr, dumpflag);
+    lm->decIndent(dn);
+
+    note(rg, "\ncase_list");
+    lm->incIndent(dn);
+    dumpIRList(IGOTO_case_list(ir), rg, nullptr, dumpflag);
+    lm->decIndent(dn);
+}
+
+
+void dumpDOLOOP(IR const* ir, Region const* rg, UINT dn, UINT dumpflag,
+                CHAR * attr)
+{
+    bool dump_addr = HAVE_FLAG(dumpflag, IR_DUMP_ADDR);
+    bool dump_kid = HAVE_FLAG(dumpflag, IR_DUMP_KID);
+    bool dump_var_decl = HAVE_FLAG(dumpflag, IR_DUMP_VAR_DECL);
+    LogMgr * lm = rg->getLogMgr();
+    note(rg, "doloop");
+    DUMPADDR(ir);
+    prt(rg, "%s", attr);
+    if (!dump_kid) { return; }
+
+    note(rg, "\niv:");
+    lm->incIndent(dn);
+    dumpIRList(LOOP_iv(ir), rg, nullptr, dumpflag);
+    lm->decIndent(dn);
+
+    note(rg, "\ninit:");
+    lm->incIndent(dn);
+    dumpIRList(LOOP_init(ir), rg, nullptr, dumpflag);
+    lm->decIndent(dn);
+
+    note(rg, "\ndet:");
+    lm->incIndent(dn);
+    dumpIRList(LOOP_det(ir), rg, nullptr, dumpflag);
+    lm->decIndent(dn);
+
+    note(rg, "\nstep:");
+    lm->incIndent(dn);
+    dumpIRList(LOOP_step(ir), rg, nullptr, dumpflag);
+    lm->decIndent(dn);
+
+    note(rg, "\nbody:");
+    lm->incIndent(dn);
+    dumpIRList(LOOP_body(ir), rg, nullptr, dumpflag);
+    lm->decIndent(dn);
+
+    note(rg, "\nend_doloop");
+}
+
+
+void dumpWHILEDO(IR const* ir, Region const* rg, UINT dn, UINT dumpflag,
+                 CHAR * attr)
+{
+    bool dump_addr = HAVE_FLAG(dumpflag, IR_DUMP_ADDR);
+    bool dump_kid = HAVE_FLAG(dumpflag, IR_DUMP_KID);
+    bool dump_var_decl = HAVE_FLAG(dumpflag, IR_DUMP_VAR_DECL);
+    LogMgr * lm = rg->getLogMgr();
+    note(rg, "whiledo");
+    DUMPADDR(ir);
+    prt(rg, "%s", attr);
+    if (!dump_kid) { return; }
+
+    note(rg, "\ndet:");
+    lm->incIndent(dn);
+    dumpIRList(LOOP_det(ir), rg, nullptr, dumpflag);
+    lm->decIndent(dn);
+
+    note(rg, "\nbody:");
+
+    lm->incIndent(dn);
+    dumpIRList(LOOP_body(ir), rg, nullptr, dumpflag);
+    lm->decIndent(dn);
+
+    note(rg, "\nend_whiledo");
+}
+
+
+void dumpDOWHILE(IR const* ir, Region const* rg, UINT dn, UINT dumpflag,
+                 CHAR * attr)
+{
+    bool dump_addr = HAVE_FLAG(dumpflag, IR_DUMP_ADDR);
+    bool dump_kid = HAVE_FLAG(dumpflag, IR_DUMP_KID);
+    bool dump_var_decl = HAVE_FLAG(dumpflag, IR_DUMP_VAR_DECL);
+    LogMgr * lm = rg->getLogMgr();
+    note(rg, "dowhile");
+    DUMPADDR(ir);
+    prt(rg, "%s", attr);
+    if (!dump_kid) { return; }
+
+    note(rg, "\nbody:");
+    lm->incIndent(dn);
+    dumpIRList(LOOP_body(ir), rg, nullptr, dumpflag);
+    lm->decIndent(dn);
+
+    note(rg, "\ndet:");
+    lm->incIndent(dn);
+    dumpIRList(LOOP_det(ir), rg, nullptr, dumpflag);
+    lm->decIndent(dn);
+
+    note(rg, "\nend_dowhile");
+}
+
+
+void dumpIF(IR const* ir, Region const* rg, UINT dn, UINT dumpflag,
+            CHAR * attr)
+{
+    bool dump_addr = HAVE_FLAG(dumpflag, IR_DUMP_ADDR);
+    bool dump_kid = HAVE_FLAG(dumpflag, IR_DUMP_KID);
+    bool dump_var_decl = HAVE_FLAG(dumpflag, IR_DUMP_VAR_DECL);
+    LogMgr * lm = rg->getLogMgr();
+    note(rg, "if");
+    DUMPADDR(ir);
+    prt(rg, "%s", attr);
+    if (dump_kid) {
+        lm->incIndent(dn);
+        dumpIRList(IF_det(ir), rg, nullptr, dumpflag);
+        lm->decIndent(dn);
+
+        note(rg, "\n{");
+        lm->incIndent(dn);
+        dumpIRList(IF_truebody(ir), rg, nullptr, dumpflag);
+        lm->decIndent(dn);
+        note(rg, "\n}");
+
+        if (IF_falsebody(ir)) {
+            note(rg, "\nelse");
+            note(rg, "\n{");
+            lm->incIndent(dn);
+            dumpIRList(IF_falsebody(ir), rg, nullptr, dumpflag);
+            lm->decIndent(dn);
+            note(rg, "\n}");
+        }
+    }
+}
+
+
+void dumpBinAndUna(IR const* ir, Region const* rg, UINT dn, UINT dumpflag,
+                   CHAR * attr)
+{
+    bool dump_addr = HAVE_FLAG(dumpflag, IR_DUMP_ADDR);
+    bool dump_kid = HAVE_FLAG(dumpflag, IR_DUMP_KID);
+    bool dump_var_decl = HAVE_FLAG(dumpflag, IR_DUMP_VAR_DECL);
+    StrBuf buf(64);
+    TypeMgr const* xtm = rg->getTypeMgr();
+    Type const* d = ir->getType();
+    LogMgr * lm = rg->getLogMgr();
+ 
+    note(rg, "%s:%s", IRNAME(ir), xtm->dump_type(d, buf));
+    if (ir->is_cvt() && CVT_round(ir) != ROUND_UNDEF) {
+      prt(rg, ":round(%s)", ROUND_NAME(CVT_round(ir)));
+    }
+    DUMPADDR(ir);
+    prt(rg, "%s", attr);
+    if (dump_kid) {
+        lm->incIndent(dn);
+        for (UINT i = 0; i < IR_MAX_KID_NUM(ir); i++) {
+            IR * k = ir->getKid(i);
+            if (k == nullptr) { continue; }
+            dumpIRList(k, rg, nullptr, dumpflag);
+        }
+        lm->decIndent(dn);
+    }
+}
+
+
+void dumpID(IR const* ir, Region const* rg, UINT dn, UINT dumpflag,
+            CHAR * attr)
+{
+    bool dump_addr = HAVE_FLAG(dumpflag, IR_DUMP_ADDR);
+    bool dump_kid = HAVE_FLAG(dumpflag, IR_DUMP_KID);
+    bool dump_var_decl = HAVE_FLAG(dumpflag, IR_DUMP_VAR_DECL);
+    StrBuf buf(64);
+    TypeMgr const* xtm = rg->getTypeMgr();
+    Type const* d = ir->getType();
+    LogMgr * lm = rg->getLogMgr();
+ 
+    CHAR tt[40];
+    tt[0] = 0;
+
+    //Dump ID name.
+    CHAR * name =
+        xstrcat(tt, 40, "%s", SYM_name(ID_info(ir)->get_name()));
+    note(rg, "id:%s '%s'", xtm->dump_type(d, buf), name);
+
+    buf.clean();
+    if (dump_var_decl && ID_info(ir)->dumpVARDecl(buf) != nullptr) {
+        prt(rg, " decl:%s", buf.buf);
+    }
+
+    //Dump IR address.
+    DUMPADDR(ir);
+    prt(rg, "%s", attr);
+}
+
+
+void dumpPR(IR const* ir, Region const* rg, UINT dn, UINT dumpflag,
+            CHAR * attr)
+{
+    bool dump_addr = HAVE_FLAG(dumpflag, IR_DUMP_ADDR);
+    bool dump_kid = HAVE_FLAG(dumpflag, IR_DUMP_KID);
+    StrBuf buf(64);
+    TypeMgr const* xtm = rg->getTypeMgr();
+    Type const* d = ir->getType();
+    LogMgr * lm = rg->getLogMgr();
+ 
+    note(rg, "$%d:%s", PR_no(ir), xtm->dump_type(d, buf));
+    DUMPADDR(ir);
+    prt(rg, "%s", attr);
+}
+
+
+void dumpILD(IR const* ir, Region const* rg, UINT dn, UINT dumpflag,
+             CHAR * attr)
+{
+    bool dump_addr = HAVE_FLAG(dumpflag, IR_DUMP_ADDR);
+    bool dump_kid = HAVE_FLAG(dumpflag, IR_DUMP_KID);
+    bool dump_var_decl = HAVE_FLAG(dumpflag, IR_DUMP_VAR_DECL);
+    StrBuf buf(64);
+    TypeMgr const* xtm = rg->getTypeMgr();
+    Type const* d = ir->getType();
+    LogMgr * lm = rg->getLogMgr();
+ 
+    if (ILD_ofst(ir) != 0) {
+        note(rg, "ild:%s:offset(%d)",
+             xtm->dump_type(d, buf), ILD_ofst(ir));
+    } else {
+        note(rg, "ild:%s", xtm->dump_type(d, buf));
+    }
+
+    DUMPADDR(ir);
+    prt(rg, "%s", attr);
+    if (dump_kid) {
+        lm->incIndent(dn);
+        dumpIRList(ILD_base(ir), rg, nullptr, dumpflag);
+        lm->decIndent(dn);
+    }
+}
+
+
+void dumpLD(IR const* ir, Region const* rg, UINT dn, UINT dumpflag,
+            CHAR * attr)
+{
+    bool dump_addr = HAVE_FLAG(dumpflag, IR_DUMP_ADDR);
+    bool dump_kid = HAVE_FLAG(dumpflag, IR_DUMP_KID);
+    bool dump_var_decl = HAVE_FLAG(dumpflag, IR_DUMP_VAR_DECL);
+    StrBuf buf(64);
+    TypeMgr const* xtm = rg->getTypeMgr();
+    Type const* d = ir->getType();
+    LogMgr * lm = rg->getLogMgr();
+ 
+    CHAR tt[40];
+    tt[0] = 0;
+
+    //Dump variable info.
+    CHAR * name = xstrcat(tt, 40, "%s",
+        SYM_name(LD_idinfo(ir)->get_name()));
+
+    if (LD_ofst(ir) != 0) {
+        note(rg, "ld:%s:offset(%d) '%s'",
+             xtm->dump_type(d, buf), LD_ofst(ir), name);
+    } else {
+        note(rg, "ld:%s '%s'", xtm->dump_type(d, buf), name);
+    }
+
+    //Dump declaration if frontend supplied.
+    buf.clean();
+    if (dump_var_decl && LD_idinfo(ir)->dumpVARDecl(buf) != nullptr) {
+        prt(rg, " decl:%s", buf.buf);
+    }
+
+    //Dump IR address.
+    DUMPADDR(ir);
+    prt(rg, "%s", attr);
+}
+
+
+void dumpIST(IR const* ir, Region const* rg, UINT dn, UINT dumpflag,
+             CHAR * attr)
+{
+    bool dump_addr = HAVE_FLAG(dumpflag, IR_DUMP_ADDR);
+    bool dump_kid = HAVE_FLAG(dumpflag, IR_DUMP_KID);
+    bool dump_var_decl = HAVE_FLAG(dumpflag, IR_DUMP_VAR_DECL);
+    StrBuf buf(64);
+    TypeMgr const* xtm = rg->getTypeMgr();
+    Type const* d = ir->getType();
+    LogMgr * lm = rg->getLogMgr();
+ 
+    if (IST_ofst(ir) != 0) {
+        note(rg, "ist:%s:offset(%d)", xtm->dump_type(d, buf), IST_ofst(ir));
+    } else {
+        note(rg, "ist:%s", xtm->dump_type(d, buf));
+    }
+
+    //Dump IR address.
+    DUMPADDR(ir);
+    prt(rg, "%s", attr);
+
+    if (dump_kid) {
+        lm->incIndent(dn);
+        dumpIRList(IST_base(ir), rg, (CHAR*)" base", dumpflag);
+        dumpIRList(IST_rhs(ir), rg, nullptr, dumpflag);
+        lm->decIndent(dn);
+    }
+}
+
+
+void dumpSTARRAY(IR const* ir, Region const* rg, UINT dn, UINT dumpflag,
+                 CHAR * attr)
+{
+    bool dump_addr = HAVE_FLAG(dumpflag, IR_DUMP_ADDR);
+    bool dump_kid = HAVE_FLAG(dumpflag, IR_DUMP_KID);
+    bool dump_var_decl = HAVE_FLAG(dumpflag, IR_DUMP_VAR_DECL);
+    StrBuf buf(64);
+    TypeMgr const* xtm = rg->getTypeMgr();
+    Type const* d = ir->getType();
+    LogMgr * lm = rg->getLogMgr();
+
+    StrBuf buf2(64); 
+    if (ARR_ofst(ir) != 0) {
+        note(rg, "starray (%s:offset(%d), ety:%s)",
+             xtm->dump_type(d, buf),
+             ARR_ofst(ir),
+             xtm->dump_type(ARR_elemtype(ir), buf2));
+    } else {
+        note(rg, "starray (%s, ety:%s)",
+             xtm->dump_type(d, buf),
+             xtm->dump_type(ARR_elemtype(ir), buf2));
+    }
+
+    DUMPADDR(ir);
+    prt(rg, "%s", attr);
+    if (ARR_sub_list(ir) != nullptr && dump_kid) {
+        //Dump elem number.
+        lm->incIndent(dn);
+        UINT dim = 0;
+        if (ARR_elem_num_buf(ir) != nullptr) {
+            note(rg, "\nelem_num[");
+            for (IR const* sub = ARR_sub_list(ir); sub != nullptr;) {
+                prt(rg, "%d",
+                    ((CArray*)ir)->getElementNumOfDim(dim));
+                sub = sub->get_next();
+                if (sub != nullptr) {
+                    prt(rg, ",");
+                }
+                dim++;
+            }
+            prt(rg, "]");
+        } else { note(rg, "\nelem_num[--]"); }
+
+        //Dump sub exp list.
+        dim = 0;
+        for (IR const* sub = ARR_sub_list(ir);
+             sub != nullptr; sub = sub->get_next()) {
+            CHAR tt[40];
+            sprintf(tt, " dim%d", dim);
+            dumpIR(sub, rg, (CHAR*)tt, dumpflag);
+            dim++;
+        }
+        lm->decIndent(dn);
+    }
+    if (dump_kid) {
+        lm->incIndent(dn);
+        dumpIRList(ARR_base(ir), rg, (CHAR*)" array_base", dumpflag);
+        dumpIRList(STARR_rhs(ir), rg, (CHAR*)" rhs", dumpflag);
+        lm->decIndent(dn);
+    }
+}
+
+
+void dumpSTPR(IR const* ir, Region const* rg, UINT dn, UINT dumpflag,
+              CHAR * attr)
+{
+    bool dump_addr = HAVE_FLAG(dumpflag, IR_DUMP_ADDR);
+    bool dump_kid = HAVE_FLAG(dumpflag, IR_DUMP_KID);
+    bool dump_var_decl = HAVE_FLAG(dumpflag, IR_DUMP_VAR_DECL);
+    StrBuf buf(64);
+    TypeMgr const* xtm = rg->getTypeMgr();
+    Type const* d = ir->getType();
+    LogMgr * lm = rg->getLogMgr();
+ 
+    note(rg, "stpr $%d:%s", STPR_no(ir), xtm->dump_type(d, buf));
+    DUMPADDR(ir);
+    prt(rg, "%s", attr);
+    if (dump_kid) {
+        lm->incIndent(dn);
+        dumpIRList(STPR_rhs(ir), rg, nullptr, dumpflag);
+        lm->decIndent(dn);
+    }
+}
+
+
+void dumpST(IR const* ir, Region const* rg, UINT dn, UINT dumpflag,
+            CHAR * attr)
+{
+    bool dump_addr = HAVE_FLAG(dumpflag, IR_DUMP_ADDR);
+    bool dump_kid = HAVE_FLAG(dumpflag, IR_DUMP_KID);
+    bool dump_var_decl = HAVE_FLAG(dumpflag, IR_DUMP_VAR_DECL);
+    StrBuf buf(64);
+    TypeMgr const* xtm = rg->getTypeMgr();
+    Type const* d = ir->getType();
+    LogMgr * lm = rg->getLogMgr();
+    CHAR tt[40];
+    tt[0] = 0;
+    CHAR * name = xstrcat(tt, 40, "%s",
+    SYM_name(ST_idinfo(ir)->get_name()));
+
+    //Dump operator and variable name.
+    note(rg, "st:%s", xtm->dump_type(d, buf));
+    if (ST_ofst(ir) != 0) {
+        prt(rg, ":offset(%d)", ST_ofst(ir));
+    }
+    prt(rg, " '%s'", name);
+
+    //Dump declaration info if the frontend supplied.
+    buf.clean();
+    if (dump_var_decl && ST_idinfo(ir)->dumpVARDecl(buf) != nullptr) {
+        prt(rg, " decl:%s", buf.buf);
+    }
+
+    DUMPADDR(ir);
+    prt(rg, "%s", attr);
+
+    if (dump_kid) {
+        lm->incIndent(dn);
+        dumpIRList(ST_rhs(ir), rg, nullptr, dumpflag);
+        lm->decIndent(dn);
+    }
+}
+
+
+void dumpCallStmt(IR const* ir, Region const* rg, UINT dn, UINT dumpflag,
+                  CHAR * attr)
+{
+    bool dump_addr = HAVE_FLAG(dumpflag, IR_DUMP_ADDR);
+    bool dump_kid = HAVE_FLAG(dumpflag, IR_DUMP_KID);
+    bool dump_var_decl = HAVE_FLAG(dumpflag, IR_DUMP_VAR_DECL);
+    StrBuf buf(64);
+    TypeMgr const* xtm = rg->getTypeMgr();
+    Type const* d = ir->getType();
+    LogMgr * lm = rg->getLogMgr();
+    if (ir->hasReturnValue()) {
+        note(rg, "$%d:%s = ", CALL_prno(ir), xtm->dump_type(d, buf));
+    }
+    if (ir->is_call()) {
+        CHAR tt[44];
+        tt[0] = 0;
+        CHAR const* string = SYM_name(CALL_idinfo(ir)->get_name());
+        CHAR * name = xstrcat(tt, 40, "%s", string);
+        if (strlen(string) > 40) {
+            strcat(tt, "...");
+        }
+        prt(rg, "%s '%s' ", IRNAME(ir), name);
+        buf.clean();
+        if (dump_var_decl && CALL_idinfo(ir)->dumpVARDecl(buf) != nullptr) {
+            prt(rg, "decl:%s", buf.buf);
+        }
+    } else {
+        prt(rg, "%s ", IRNAME(ir));
+    }
+
+    DUMPADDR(ir);
+    prt(rg, "%s", attr);
+    if (!dump_kid) { return; }
+
+    if (ir->is_icall()) {
+        lm->incIndent(dn);
+        dumpIR(ICALL_callee(ir), rg, (CHAR*)" callee", dumpflag);
+        lm->decIndent(dn);
+    }
+
+    CHAR tmpbuf[30];
+    UINT i = 0;
+
+    //Dump parameter list.
+    for (IR * p2 = CALL_param_list(ir);
+         p2 != nullptr; p2 = p2->get_next()) {
+        sprintf(tmpbuf, " param%d", i);
+        lm->incIndent(dn);
+        dumpIR(p2, rg, tmpbuf, dumpflag);
+        lm->decIndent(dn);
+        i++;
+    }
+
+    //Dump dummy use.
+    i = 0;
+    for (IR * p2 = CALL_dummyuse(ir);
+         p2 != nullptr; p2 = p2->get_next()) {
+        sprintf(tmpbuf, " dummy%d", i);
+        lm->incIndent(dn);
+        dumpIR(p2, rg, tmpbuf, dumpflag);
+        lm->decIndent(dn);
+        i++;
     }
 }
 
@@ -431,7 +1371,7 @@ void dumpIR(IR const* ir, Region const* rg, IN CHAR * attr, UINT dumpflag)
     if (g_dump_opt.isDumpIRID()) {
         sprintf(p, " id:%d", ir->id());
     }
-    if (ir->isMayThrow()) {
+    if (ir->isMayThrow(false)) {
         strcat(p, " throw");
     }
     if (ir->is_terminate()) {
@@ -443,10 +1383,10 @@ void dumpIR(IR const* ir, Region const* rg, IN CHAR * attr, UINT dumpflag)
     if (ir->is_rmw()) {
         strcat(p, " rmw");
     }
-    if (ir->hasSideEffect()) {
+    if (ir->hasSideEffect(false)) {
         strcat(p, " sideeffect");
     }
-    if (ir->isNoMove()) {
+    if (ir->isNoMove(false)) {
         strcat(p, " nomove");
     }
     if (ir->isReadOnly()) {
@@ -476,205 +1416,37 @@ void dumpIR(IR const* ir, Region const* rg, IN CHAR * attr, UINT dumpflag)
         prt(rg, "\n");
     }
 
-    TypeMgr * xtm = const_cast<TypeMgr*>(tm);
     switch (ir->getCode()) {
-    case IR_ST: {
-        CHAR tt[40];
-        tt[0] = 0;
-        CHAR * name = xstrcat(tt, 40, "%s",
-        SYM_name(ST_idinfo(ir)->get_name()));
-
-        //Dump operator and variable name.
-        note(rg, "st:%s", xtm->dump_type(d, buf));
-        if (ST_ofst(ir) != 0) {
-            prt(rg, ":offset(%d)", ST_ofst(ir));
-        }
-        prt(rg, " '%s'", name);
-
-        //Dump declaration info if the frontend supplied.
-        buf.clean();
-        if (dump_var_decl && ST_idinfo(ir)->dumpVARDecl(buf) != nullptr) {
-            prt(rg, " decl:%s", buf.buf);
-        }
-
-        DUMPADDR(ir);
-        prt(rg, "%s", attr);
-
-        if (dump_kid) {
-            lm->incIndent(dn);
-            dumpIRList(ST_rhs(ir), rg, nullptr, dumpflag);
-            lm->decIndent(dn);
-        }
+    case IR_ST:
+        dumpST(ir, rg, dn, dumpflag, attr);
         break;
-    }
     case IR_STPR:
-        note(rg, "stpr $%d:%s", STPR_no(ir), xtm->dump_type(d, buf));
-        DUMPADDR(ir);
-        prt(rg, "%s", attr);
-
-        if (dump_kid) {
-            lm->incIndent(dn);
-            dumpIRList(STPR_rhs(ir), rg, nullptr, dumpflag);
-            lm->decIndent(dn);
-        }
+        dumpSTPR(ir, rg, dn, dumpflag, attr);
         break;
     case IR_SETELEM:
-        note(rg, "setelem $%d:%s", SETELEM_prno(ir), xtm->dump_type(d, buf));
-        DUMPADDR(ir);
-        prt(rg, "%s", attr);
-        if (dump_kid) {
-            lm->incIndent(dn);
-            dumpIRList(SETELEM_base(ir), rg, nullptr, dumpflag);
-            dumpIRList(SETELEM_val(ir), rg, nullptr, dumpflag);
-            dumpIRList(SETELEM_ofst(ir), rg, (CHAR*)" offset", dumpflag);
-            lm->decIndent(dn);
-        }
+        dumpSETELEM(ir, rg, dn, dumpflag, attr);
         break;
     case IR_GETELEM:
-        note(rg, "getelem $%d:%s", GETELEM_prno(ir), xtm->dump_type(d, buf));
-        DUMPADDR(ir);
-        prt(rg, "%s", attr);
-        if (dump_kid) {
-            lm->incIndent(dn);
-            dumpIRList(GETELEM_base(ir), rg, (CHAR*)" base", dumpflag);
-            dumpIRList(GETELEM_ofst(ir), rg, (CHAR*)" offset", dumpflag);
-            lm->decIndent(dn);
-        }
+        dumpGETELEM(ir, rg, dn, dumpflag, attr);
         break;
     case IR_STARRAY:
-        if (ARR_ofst(ir) != 0) {
-            note(rg, "starray (%s:offset(%d), ety:%s)",
-                 xtm->dump_type(d, buf),
-                 ARR_ofst(ir),
-                 xtm->dump_type(ARR_elemtype(ir), buf2));
-        } else {
-            note(rg, "starray (%s, ety:%s)",
-                 xtm->dump_type(d, buf),
-                 xtm->dump_type(ARR_elemtype(ir), buf2));
-        }
-
-        DUMPADDR(ir);
-        prt(rg, "%s", attr);
-        if (ARR_sub_list(ir) != nullptr && dump_kid) {
-            //Dump elem number.
-            lm->incIndent(dn);
-            UINT dim = 0;
-            if (ARR_elem_num_buf(ir) != nullptr) {
-                note(rg, "\nelem_num[");
-                for (IR const* sub = ARR_sub_list(ir); sub != nullptr;) {
-                    prt(rg, "%d",
-                        ((CArray*)ir)->getElementNumOfDim(dim));
-                    sub = sub->get_next();
-                    if (sub != nullptr) {
-                        prt(rg, ",");
-                    }
-                    dim++;
-                }
-                prt(rg, "]");
-            } else { note(rg, "\nelem_num[--]"); }
-
-            //Dump sub exp list.
-            dim = 0;
-            for (IR const* sub = ARR_sub_list(ir);
-                 sub != nullptr; sub = sub->get_next()) {
-                CHAR tt[40];
-                sprintf(tt, " dim%d", dim);
-                dumpIR(sub, rg, (CHAR*)tt, dumpflag);
-                dim++;
-            }
-            lm->decIndent(dn);
-        }
-        if (dump_kid) {
-            lm->incIndent(dn);
-            dumpIRList(ARR_base(ir), rg, (CHAR*)" array_base", dumpflag);
-            dumpIRList(STARR_rhs(ir), rg, (CHAR*)" rhs", dumpflag);
-            lm->decIndent(dn);
-        }
+        dumpSTARRAY(ir, rg, dn, dumpflag, attr);
         break;
     case IR_IST:
-        if (IST_ofst(ir) != 0) {
-            note(rg, "ist:%s:offset(%d)", xtm->dump_type(d, buf), IST_ofst(ir));
-        } else {
-            note(rg, "ist:%s", xtm->dump_type(d, buf));
-        }
-
-        //Dump IR address.
-        DUMPADDR(ir);
-        prt(rg, "%s", attr);
-
-        if (dump_kid) {
-            lm->incIndent(dn);
-            dumpIRList(IST_base(ir), rg, (CHAR*)" base", dumpflag);
-            dumpIRList(IST_rhs(ir), rg, nullptr, dumpflag);
-            lm->decIndent(dn);
-        }
+        dumpIST(ir, rg, dn, dumpflag, attr);
         break;
-    case IR_LD: {
-        CHAR tt[40];
-        tt[0] = 0;
-
-        //Dump variable info.
-        CHAR * name = xstrcat(tt, 40, "%s",
-            SYM_name(LD_idinfo(ir)->get_name()));
-
-        if (LD_ofst(ir) != 0) {
-            note(rg, "ld:%s:offset(%d) '%s'",
-                 xtm->dump_type(d, buf), LD_ofst(ir), name);
-        } else {
-            note(rg, "ld:%s '%s'", xtm->dump_type(d, buf), name);
-        }
-
-        //Dump declaration if frontend supplied.
-        buf.clean();
-        if (dump_var_decl && LD_idinfo(ir)->dumpVARDecl(buf) != nullptr) {
-            prt(rg, " decl:%s", buf.buf);
-        }
-
-        //Dump IR address.
-        DUMPADDR(ir);
-        prt(rg, "%s", attr);
+    case IR_LD:
+        dumpLD(ir, rg, dn, dumpflag, attr);
         break;
-    }
     case IR_ILD:
-        if (ILD_ofst(ir) != 0) {
-            note(rg, "ild:%s:offset(%d)",
-                 xtm->dump_type(d, buf), ILD_ofst(ir));
-        } else {
-            note(rg, "ild:%s", xtm->dump_type(d, buf));
-        }
-
-        DUMPADDR(ir);
-        prt(rg, "%s", attr);
-        if (dump_kid) {
-            lm->incIndent(dn);
-            dumpIRList(ILD_base(ir), rg, nullptr, dumpflag);
-            lm->decIndent(dn);
-        }
+        dumpILD(ir, rg, dn, dumpflag, attr);
         break;
     case IR_PR:
-        note(rg, "$%d:%s", PR_no(ir), xtm->dump_type(d, buf));
-        DUMPADDR(ir);
-        prt(rg, "%s", attr);
+        dumpPR(ir, rg, dn, dumpflag, attr);
         break;
-    case IR_ID: {
-        CHAR tt[40];
-        tt[0] = 0;
-
-        //Dump ID name.
-        CHAR * name =
-            xstrcat(tt, 40, "%s", SYM_name(ID_info(ir)->get_name()));
-        note(rg, "id:%s '%s'", xtm->dump_type(d, buf), name);
-
-        buf.clean();
-        if (dump_var_decl && ID_info(ir)->dumpVARDecl(buf) != nullptr) {
-            prt(rg, " decl:%s", buf.buf);
-        }
-
-        //Dump IR address.
-        DUMPADDR(ir);
-        prt(rg, "%s", attr);
+    case IR_ID:
+        dumpID(ir, rg, dn, dumpflag, attr);
         break;
-    }
     case IR_CONST:
         note(rg, "");
         dumpConst(ir, rg);
@@ -683,451 +1455,69 @@ void dumpIR(IR const* ir, Region const* rg, IN CHAR * attr, UINT dumpflag)
         break;
     SWITCH_CASE_BIN:
     SWITCH_CASE_UNA:
-        note(rg, "%s:%s", IRNAME(ir), xtm->dump_type(d, buf));
-        if (ir->is_cvt() && CVT_round(ir) != ROUND_UNDEF) {
-          prt(rg, ":round(%s)", ROUND_NAME(CVT_round(ir)));
-        }
-        DUMPADDR(ir);
-        prt(rg, "%s", attr);
-        if (dump_kid) {
-            lm->incIndent(dn);
-            for (UINT i = 0; i < IR_MAX_KID_NUM(ir); i++) {
-                IR * k = ir->getKid(i);
-                if (k == nullptr) { continue; }
-                dumpIRList(k, rg, nullptr, dumpflag);
-            }
-            lm->decIndent(dn);
-        }
+        dumpBinAndUna(ir, rg, dn, dumpflag, attr);
         break;
     case IR_IF:
-        note(rg, "if");
-        DUMPADDR(ir);
-        prt(rg, "%s", attr);
-        if (dump_kid) {
-            lm->incIndent(dn);
-            dumpIRList(IF_det(ir), rg, nullptr, dumpflag);
-            lm->decIndent(dn);
-
-            note(rg, "\n{");
-            lm->incIndent(dn);
-            dumpIRList(IF_truebody(ir), rg, nullptr, dumpflag);
-            lm->decIndent(dn);
-            note(rg, "\n}");
-
-            if (IF_falsebody(ir)) {
-                note(rg, "\nelse");
-                note(rg, "\n{");
-                lm->incIndent(dn);
-                dumpIRList(IF_falsebody(ir), rg, nullptr, dumpflag);
-                lm->decIndent(dn);
-                note(rg, "\n}");
-            }
-        }
+        dumpIF(ir, rg, dn, dumpflag, attr);
         break;
     case IR_DO_WHILE:
-        note(rg, "dowhile");
-        DUMPADDR(ir);
-        prt(rg, "%s", attr);
-        if (dump_kid) {
-            note(rg, "\nbody:");
-            lm->incIndent(dn);
-            dumpIRList(LOOP_body(ir), rg, nullptr, dumpflag);
-            lm->decIndent(dn);
-
-            note(rg, "\ndet:");
-            lm->incIndent(dn);
-            dumpIRList(LOOP_det(ir), rg, nullptr, dumpflag);
-            lm->decIndent(dn);
-
-            note(rg, "\nend_dowhile");
-        }
+        dumpDOWHILE(ir, rg, dn, dumpflag, attr);
         break;
     case IR_WHILE_DO:
-        note(rg, "whiledo");
-        DUMPADDR(ir);
-        prt(rg, "%s", attr);
-
-        if (dump_kid) {
-            note(rg, "\ndet:");
-            lm->incIndent(dn);
-            dumpIRList(LOOP_det(ir), rg, nullptr, dumpflag);
-            lm->decIndent(dn);
-
-            note(rg, "\nbody:");
-
-            lm->incIndent(dn);
-            dumpIRList(LOOP_body(ir), rg, nullptr, dumpflag);
-            lm->decIndent(dn);
-
-            note(rg, "\nend_whiledo");
-        }
+        dumpWHILEDO(ir, rg, dn, dumpflag, attr);
         break;
     case IR_DO_LOOP:
-        note(rg, "doloop");
-        DUMPADDR(ir);
-        prt(rg, "%s", attr);
-        if (dump_kid) {
-            note(rg, "\niv:");
-            lm->incIndent(dn);
-            dumpIRList(LOOP_iv(ir), rg, nullptr, dumpflag);
-            lm->decIndent(dn);
-
-            note(rg, "\ninit:");
-            lm->incIndent(dn);
-            dumpIRList(LOOP_init(ir), rg, nullptr, dumpflag);
-            lm->decIndent(dn);
-
-            note(rg, "\ndet:");
-            lm->incIndent(dn);
-            dumpIRList(LOOP_det(ir), rg, nullptr, dumpflag);
-            lm->decIndent(dn);
-
-            note(rg, "\nstep:");
-            lm->incIndent(dn);
-            dumpIRList(LOOP_step(ir), rg, nullptr, dumpflag);
-            lm->decIndent(dn);
-
-            note(rg, "\nbody:");
-            lm->incIndent(dn);
-            dumpIRList(LOOP_body(ir), rg, nullptr, dumpflag);
-            lm->decIndent(dn);
-
-            note(rg, "\nend_doloop");
-        }
+        dumpDOLOOP(ir, rg, dn, dumpflag, attr);
         break;
     case IR_BREAK:
-        note(rg, "break");
-        DUMPADDR(ir);
-        prt(rg, "%s", attr);
+        dumpBREAK(ir, rg, dn, dumpflag, attr);
         break;
     case IR_CONTINUE:
-        note(rg, "continue");
-        DUMPADDR(ir);
-        prt(rg, "%s", attr);
+        dumpCONTINUE(ir, rg, dn, dumpflag, attr);
         break;
     case IR_RETURN:
-        note(rg, "return");
-        DUMPADDR(ir);
-        prt(rg, "%s", attr);
-        if (dump_kid) {
-            lm->incIndent(dn);
-            dumpIR(RET_exp(ir), rg, nullptr, dumpflag);
-            lm->decIndent(dn);
-        }
+        dumpRETURN(ir, rg, dn, dumpflag, attr);
         break;
     case IR_GOTO:
-        note(rg, "goto ");
-        dumpLabelDecl(ir->getLabel(), rm, false);
-        DUMPADDR(ir);
-        prt(rg, "%s", attr);
+        dumpGOTO(ir, rg, dn, dumpflag, attr);
         break;
     case IR_IGOTO:
-        note(rg, "igoto");
-        DUMPADDR(ir);
-        prt(rg, "%s", attr);
-        if (dump_kid) {
-            lm->incIndent(dn);
-            dumpIRList(IGOTO_vexp(ir), rg, nullptr, dumpflag);
-            lm->decIndent(dn);
-
-            note(rg, "\ncase_list");
-            lm->incIndent(dn);
-            dumpIRList(IGOTO_case_list(ir), rg, nullptr, dumpflag);
-            lm->decIndent(dn);
-        }
+        dumpIGOTO(ir, rg, dn, dumpflag, attr);
         break;
-    case IR_LABEL: {
-        LabelInfo const* li = LAB_lab(ir);
-        if (LABELINFO_type(li) == L_ILABEL) {
-            note(rg, "label " ILABEL_STR_FORMAT "",
-                 ILABEL_CONT(LAB_lab(ir)));
-        } else if (LABELINFO_type(li) == L_CLABEL) {
-            note(rg, "label " CLABEL_STR_FORMAT "",
-                 CLABEL_CONT(LAB_lab(ir)));
-        } else if (LABELINFO_type(li) == L_PRAGMA) {
-            ASSERT0(LABELINFO_pragma(LAB_lab(ir)));
-            note(rg, "pragma %s", SYM_name(LABELINFO_pragma(LAB_lab(ir))));
-        } else { UNREACHABLE(); }
-
-        DUMPADDR(ir); //dump runtime address on host machine.
-
-        if (LABELINFO_b1(li) != 0) {
-            prt(rg, "(");
-        }
-
-        if (LABELINFO_is_try_start(li)) {
-            prt(rg, "try_start ");
-        }
-
-        if (LABELINFO_is_try_end(li)) {
-            prt(rg, "try_end ");
-        }
-
-        if (LABELINFO_is_catch_start(li)) {
-            prt(rg, "catch_start ");
-        }
-
-        if (LABELINFO_is_terminate(li)) {
-            prt(rg, "terminate ");
-        }
-
-        if (LABELINFO_b1(li) != 0) {
-            prt(rg, ")");
-        }
-
-        prt(rg, "%s", attr);
+    case IR_LABEL:
+        dumpLABEL(ir, rg, dn, dumpflag, attr);
         break;
-    }
     case IR_SELECT: //formulized log_OR_exp?exp:cond_exp
-        note(rg, "select:%s", xtm->dump_type(d, buf));
-        DUMPADDR(ir);
-        prt(rg, "%s", attr);
-        if (dump_kid) {
-            lm->incIndent(dn);
-            dumpIRList(SELECT_pred(ir), rg, nullptr, dumpflag);
-            lm->decIndent(dn);
-
-            lm->incIndent(dn);
-            dumpIRList(SELECT_trueexp(ir), rg, (CHAR*)" true_exp", dumpflag);
-            lm->decIndent(dn);
-
-            lm->incIndent(dn);
-            dumpIRList(SELECT_falseexp(ir), rg, (CHAR*)" false_exp", dumpflag);
-            lm->decIndent(dn);
-        }
+        dumpSELECT(ir, rg, dn, dumpflag, attr);
         break;
-    case IR_LDA: { //Get address of a symbol
-        CHAR tt[40];
-        tt[0] = 0;
-
-        //Dump variable info.
-        CHAR * name = xstrcat(tt, 40, "%s",
-            SYM_name(LDA_idinfo(ir)->get_name()));
-        if (LDA_ofst(ir) != 0) {
-            note(rg, "lda:%s:offset(%d) '%s'",
-                 xtm->dump_type(d, buf), LDA_ofst(ir), name);
-        } else {
-            note(rg, "lda:%s '%s'", xtm->dump_type(d, buf), name);
-        }
-
-        //Dump declaration if frontend supplied.
-        buf.clean();
-        if (dump_var_decl && LDA_idinfo(ir)->dumpVARDecl(buf) != nullptr) {
-            prt(rg, " decl:%s", buf.buf);
-        }
-
-        //Dump IR address.
-        DUMPADDR(ir);
-        prt(rg, "%s", attr);
+    case IR_LDA: //Get address of a symbol
+        dumpLDA(ir, rg, dn, dumpflag, attr);
         break;
-    }
     case IR_PHI:
-        note(rg, "$%d:%s = phi", PHI_prno(ir), xtm->dump_type(d, buf));
-
-        DUMPADDR(ir);
-        prt(rg, "%s", attr);
-        if (dump_kid) {
-            lm->incIndent(dn);
-            IR * opnd = PHI_opnd_list(ir);
-            while (opnd != nullptr) {
-                dumpIR(opnd, rg, nullptr, dumpflag);
-                opnd = opnd->get_next();
-            }
-            lm->decIndent(dn);
-        }
+        //Dump PHI function. 
+        dumpPHI(ir, rg, dn, dumpflag, attr);
         break;
     case IR_SWITCH:
-        note(rg, "switch");
-        if (SWITCH_deflab(ir) != nullptr) {
-            prt(rg, ", deflab: ");
-            dumpLabelDecl(ir->getLabel(), rm, false);
-        }
-        DUMPADDR(ir);
-        prt(rg, "%s", attr);
-        if (dump_kid) {
-            lm->incIndent(dn);
-            dumpIRList(SWITCH_vexp(ir), rg, nullptr, dumpflag);
-            lm->decIndent(dn);
-
-            if (SWITCH_case_list(ir) != nullptr) {
-                dumpIRList(SWITCH_case_list(ir), rg, nullptr, dumpflag);
-            }
-
-            if (SWITCH_body(ir) != nullptr) {
-                note(rg, "\nbody:");
-                lm->incIndent(dn);
-                dumpIRList(SWITCH_body(ir), rg, nullptr, dumpflag);
-                lm->decIndent(dn);
-            }
-            note(rg, "\nend_switch");
-        }
+        dumpSWITCH(ir, rg, dn, dumpflag, attr);
         break;
     case IR_CASE:
-        ASSERT0(CASE_vexp(ir));
-        ASSERT0(CASE_lab(ir));
-        note(rg, "case");
-        DUMPADDR(ir);
-        prt(rg, "%s", attr);
-
-        lm->incIndent(dn);
-        dumpIRList(CASE_vexp(ir), rg, nullptr, dumpflag);
-        note(rg, "\n");
-        dumpLabelDecl(ir->getLabel(), rm, false);
-        lm->decIndent(dn);
+        dumpCASE(ir, rg, dn, dumpflag, attr);
         break;
     case IR_ARRAY:
-        if (ARR_ofst(ir) != 0) {
-            note(rg, "array (%s:offset(%d), ety:%s)",
-                 xtm->dump_type(d, buf),
-                 ARR_ofst(ir),
-                 xtm->dump_type(ARR_elemtype(ir), buf2));
-        } else {
-            note(rg, "array (%s, ety:%s)",
-                 xtm->dump_type(d, buf),
-                 xtm->dump_type(ARR_elemtype(ir), buf2));
-        }
-
-        DUMPADDR(ir);
-        prt(rg, "%s", attr);
-        if (ARR_sub_list(ir) != nullptr && dump_kid) {
-            //Dump element number if it exist.
-            lm->incIndent(dn);
-
-            if (ARR_elem_num_buf(ir) != nullptr) {
-                UINT dim = 0;
-                note(rg, "\nelemnum[");
-                for (IR const* sub = ARR_sub_list(ir); sub != nullptr;) {
-                    prt(rg, "%d", ARR_elem_num(ir, dim));
-                    sub = sub->get_next();
-                    if (sub != nullptr) {
-                        prt(rg, ",");
-                    }
-                    dim++;
-                }
-                prt(rg, "]");
-            } else { note(rg, "\nelemnum[--]"); }
-
-            //Dump subscript expressions in each dimension.
-            UINT dim = 0;
-            for (IR const* sub = ARR_sub_list(ir);
-                 sub != nullptr; sub = sub->get_next()) {
-                CHAR tt[40];
-                sprintf(tt, " dim%d", dim);
-                dumpIR(sub, rg, (CHAR*)tt, dumpflag);
-                dim++;
-            }
-            lm->decIndent(dn);
-        }
-
-        if (dump_kid) {
-            lm->incIndent(dn);
-            dumpIRList(ARR_base(ir), rg, (CHAR*)" array_base", dumpflag);
-            lm->decIndent(dn);
-        }
-        break;
+        dumpARRAY(ir, rg, dn, dumpflag, attr);
+       break;
     case IR_CALL:
-    case IR_ICALL: {
-        if (ir->hasReturnValue()) {
-            note(rg, "$%d:%s = ", CALL_prno(ir), xtm->dump_type(d, buf));
-        }
-        if (ir->is_call()) {
-            CHAR tt[44];
-            tt[0] = 0;
-            CHAR const* string = SYM_name(CALL_idinfo(ir)->get_name());
-            CHAR * name = xstrcat(tt, 40, "%s", string);
-            if (strlen(string) > 40) {
-                strcat(tt, "...");
-            }
-            prt(rg, "call '%s' ", name);
-            buf.clean();
-            if (dump_var_decl && CALL_idinfo(ir)->dumpVARDecl(buf) != nullptr) {
-                prt(rg, "decl:%s", buf.buf);
-            }
-        } else {
-            prt(rg, "icall ");
-        }
-
-        DUMPADDR(ir);
-        prt(rg, "%s", attr);
-
-        if (dump_kid) {
-            if (ir->is_icall()) {
-                lm->incIndent(dn);
-                dumpIR(ICALL_callee(ir), rg, (CHAR*)" callee", dumpflag);
-                lm->decIndent(dn);
-            }
-
-            CHAR tmpbuf[30];
-            UINT i = 0;
-
-            //Dump parameter list.
-            for (IR * p2 = CALL_param_list(ir);
-                 p2 != nullptr; p2 = p2->get_next()) {
-                sprintf(tmpbuf, " param%d", i);
-                lm->incIndent(dn);
-                dumpIR(p2, rg, tmpbuf, dumpflag);
-                lm->decIndent(dn);
-                i++;
-            }
-
-            //Dump dummy use.
-            i = 0;
-            for (IR * p2 = CALL_dummyuse(ir);
-                 p2 != nullptr; p2 = p2->get_next()) {
-                sprintf(tmpbuf, " dummy%d", i);
-                lm->incIndent(dn);
-                dumpIR(p2, rg, tmpbuf, dumpflag);
-                lm->decIndent(dn);
-                i++;
-            }
-        }
+    case IR_ICALL:
+        dumpCallStmt(ir, rg, dn, dumpflag, attr);
         break;
-    }
     case IR_TRUEBR:
-        note(rg, "truebr ");
-        dumpLabelDecl(ir->getLabel(), rm, false);
-        DUMPADDR(ir);
-        prt(rg, "%s", attr);
-        if (dump_kid) {
-            lm->incIndent(dn);
-            dumpIRList(BR_det(ir), rg, nullptr, dumpflag);
-            lm->decIndent(dn);
-        }
+        dumpTRUEBR(ir, rg, dn, dumpflag, attr);
         break;
     case IR_FALSEBR:
-        note(rg, "falsebr ");
-        dumpLabelDecl(ir->getLabel(), rm, false);
-        DUMPADDR(ir);
-        prt(rg, "%s", attr);
-        if (dump_kid) {
-            lm->incIndent(dn);
-            dumpIRList(BR_det(ir), rg, nullptr, dumpflag);
-            lm->decIndent(dn);
-        }
+        dumpFALSEBR(ir, rg, dn, dumpflag, attr);
         break;
     case IR_REGION:
-        note(rg, "region");
-        if (REGION_ru(ir)->getRegionVar() != nullptr) {
-            Var * ruvar = REGION_ru(ir)->getRegionVar();
-            CHAR tt[40];
-            tt[0] = 0;
-
-            //Dump variable info.
-            xstrcat(tt, 40, "%s", SYM_name(ruvar->get_name()));
-            prt(rg, " \'%s\',id:%d", tt, REGION_ru(ir)->id());
-        }
-
-        DUMPADDR(ir); //Dump IR address.
-        prt(rg, "%s", attr); //Dump attributes.
-
-        if (dump_inner_region) {
-            //Inner region.
-            ASSERT0(REGION_ru(ir));
-            lm->incIndent(dn);
-            note(rg, "\nregion-info:");
-            REGION_ru(ir)->dump(dump_inner_region);
-            lm->decIndent(dn);
-        }
+        dumpREGION(ir, rg, dn, dumpflag, attr);
         break;
     case IR_UNDEF:
         note(rg, "undef!");
@@ -1139,5 +1529,244 @@ void dumpIR(IR const* ir, Region const* rg, IN CHAR * attr, UINT dumpflag)
         return ;
     }
 }
+
+
+//Iterative access ir tree. This funtion initialize the iterator.
+//'ir': the root ir of the tree.
+//'it': iterator. It should be clean already.
+//Readonly function.
+IR const* iterInitC(IR const* ir, OUT ConstIRIter & it, bool iter_next)
+{
+    if (ir == nullptr) { return nullptr; }
+    for (UINT i = 0; i < IR_MAX_KID_NUM(ir); i++) {
+        IR * kid = ir->getKid(i);
+        if (kid != nullptr) {
+            it.append_tail(kid);
+        }
+    }
+    if (iter_next && ir->get_next() != nullptr) {
+        it.append_tail(ir->get_next());
+    }
+    return ir;
+}
+
+
+//Iterative access ir tree.
+//This function return the next IR node accroding to 'it'.
+//'it': iterator.
+//Readonly function.
+IR const* iterNextC(MOD ConstIRIter & it, bool iter_next)
+{
+    IR const* ir = it.remove_head();
+    if (ir == nullptr) { return nullptr; }
+    for (UINT i = 0; i < IR_MAX_KID_NUM(ir); i++) {
+        IR * kid = ir->getKid(i);
+        if (kid != nullptr) {
+            it.append_tail(kid);
+        }
+    }
+    if (iter_next && ir->get_next() != nullptr) {
+        it.append_tail(ir->get_next());
+    }
+    return ir;
+}
+
+
+//Iterative access the expression of stmt.
+//This funtion initialize the iterator.
+//ir: the root ir of the tree, it must be stmt.
+//it: iterator. It should be clean already.
+//The function is a readonly function.
+//Use iterExpNextC to iter next IR.
+IR const* iterExpInitC(IR const* ir, OUT ConstIRIter & it, bool iter_next)
+{
+    if (ir == nullptr) { return nullptr; }
+    ASSERT0(ir->is_stmt());
+    //Other stmt.
+    IR const* firstkid = nullptr;
+    for (UINT i = 0; i < IR_MAX_KID_NUM(ir); i++) {
+        IR const* kid = ir->getKid(i);
+        if (kid == nullptr) { continue; }
+        if (firstkid == nullptr) {
+            firstkid = kid;
+            continue;
+        }
+        it.append_tail(kid);
+    }
+
+    if (firstkid == nullptr) { return nullptr; }
+
+    for (UINT i = 0; i < IR_MAX_KID_NUM(firstkid); i++) {
+        IR const* kid = firstkid->getKid(i);
+        if (kid != nullptr) {
+            it.append_tail(kid);
+        }
+    }
+    if (iter_next && IR_next(firstkid) != nullptr) {
+        it.append_tail(IR_next(firstkid));
+    }
+    return firstkid;
+}
+
+
+//Iterative access the ir tree that start with 'ir'.
+//This funtion initialize the iterator.
+//'ir': the root ir of the tree, it may be either stmt or expression.
+//'it': iterator. It should be clean already.
+//Note this function is NOT readonly, the returnd IR may be modified.
+IR * iterInit(IN IR * ir, OUT IRIter & it, bool iter_next)
+{
+    if (ir == nullptr) { return nullptr; }
+    for (UINT i = 0; i < IR_MAX_KID_NUM(ir); i++) {
+        IR * kid = ir->getKid(i);
+        if (kid != nullptr) {
+            it.append_tail(kid);
+        }
+    }
+    if (iter_next && ir->get_next() != nullptr) {
+        it.append_tail(ir->get_next());
+    }
+    return ir;
+}
+
+//Iterative access the ir tree.
+//This funtion return the next IR node accroding to 'it'.
+//'it': iterator.
+//Note this function is NOT readonly, the returnd IR may be modified.
+IR * iterNext(MOD IRIter & it, bool iter_next)
+{
+    IR * ir = it.remove_head();
+    if (ir == nullptr) { return nullptr; }
+    for (UINT i = 0; i < IR_MAX_KID_NUM(ir); i++) {
+        IR * kid = ir->getKid(i);
+        if (kid != nullptr) {
+            it.append_tail(kid);
+        }
+    }
+    if (iter_next && ir->get_next() != nullptr) {
+        it.append_tail(ir->get_next());
+    }
+    return ir;
+}
+
+
+//Iterative access the right-hand-side expression of stmt.
+//This funtion initialize the iterator.
+//ir: the root ir of the tree, it must be stmt.
+//it: iterator. It should be clean already.
+//Use iterExpNextC to iter next IR.
+IR * iterExpInit(IR * ir, OUT IRIter & it, bool iter_next)
+{
+    if (ir == nullptr) { return nullptr; }
+    ASSERT0(ir->is_stmt());
+
+    //Other stmt.
+    IR * firstkid = nullptr;
+    for (UINT i = 0; i < IR_MAX_KID_NUM(ir); i++) {
+        IR * kid = ir->getKid(i);
+        if (kid == nullptr) { continue; }
+        if (firstkid == nullptr) {
+            firstkid = kid;
+            continue;
+        }
+        it.append_tail(kid);
+    }
+
+    if (firstkid == nullptr) { return nullptr; }
+
+    for (UINT i = 0; i < IR_MAX_KID_NUM(firstkid); i++) {
+        IR * kid = firstkid->getKid(i);
+        if (kid != nullptr) {
+            it.append_tail(kid);
+        }
+    }
+    if (iter_next && IR_next(firstkid) != nullptr) {
+        it.append_tail(IR_next(firstkid));
+    }
+
+    return firstkid;
+}
+
+
+//Iterative access the right-hand-side expression of stmt.
+//This funtion initialize the iterator.
+//ir: the root ir of the tree, it must be stmt.
+//it: iterator. It should be clean already.
+//Use iterExpNextC to iter next IR.
+IR * iterExpOfStmtInit(IR * ir, OUT IRIter & it)
+{
+    ASSERT0(ir->is_stmt());
+    IR * firstkid = nullptr;
+    switch (ir->getCode()) {
+    case IR_IST:
+        ASSERT0(IST_base(ir));
+        firstkid = IST_base(ir);
+        it.append_tail(firstkid);
+        break;
+    case IR_STARRAY:
+        ASSERT0(STARR_base(ir));
+        firstkid = STARR_base(ir);
+        it.append_tail(firstkid);
+        if (STARR_sub_list(ir) != nullptr) {
+            it.append_tail(STARR_sub_list(ir));
+        }
+        break;
+    default:;
+    }
+    return firstkid;
+}
+
+
+//Iterative access the right-hand-side expression of stmt.
+//This funtion initialize the iterator.
+//ir: the root ir of the tree, it must be stmt.
+//it: iterator. It should be clean already.
+//Use iterExpNextC to iter next IR.
+IR const* iterExpOfStmtInitC(IR * ir, OUT ConstIRIter & it)
+{
+    ASSERT0(ir->is_stmt());
+    IR const* firstkid = nullptr;
+    switch (ir->getCode()) {
+    case IR_IST:
+        ASSERT0(IST_base(ir));
+        firstkid = IST_base(ir);
+        it.append_tail(firstkid);
+        break;
+    case IR_STARRAY:
+        ASSERT0(STARR_base(ir));
+        firstkid = STARR_base(ir);
+        it.append_tail(firstkid);
+        if (STARR_sub_list(ir) != nullptr) {
+            it.append_tail(STARR_sub_list(ir));
+        }
+        break;
+    default:;
+    }
+    return firstkid;
+}
+
+
+//
+//START IRSet
+//
+void IRSet::dump(Region const* rg) const
+{
+    if (!rg->isLogMgrInit()) { return; }
+    DefSBitSet::dump(rg->getLogMgr()->getFileHandler());
+}
+
+
+bool IRSet::allElemBeExp(Region const* rg) const
+{
+    IRSetIter it;
+    for (INT i = get_first(&it); i != BS_UNDEF; i = get_next(i, &it)) {
+        IR * e = rg->getIR(i);
+        if (e == nullptr || !e->is_exp()) {
+            return false;
+        }
+    }
+    return true;
+}
+//END IRSet
 
 } //namespace xoc

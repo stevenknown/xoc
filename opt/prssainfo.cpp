@@ -41,19 +41,19 @@ void SSAInfo::dump(Region const* rg) const
 
     VPR * vpr = ((VPR*)this);
     if (vpr->orgprno() != PRNO_UNDEF) {
-        note(rg, "$%d", vpr->orgprno());
+        prt(rg, "$%d", vpr->orgprno());
     } else {
-        note(rg, "--");
+        prt(rg, "--");
     }
 
-    note(rg, "v%d", vpr->version());
+    prt(rg, "v%d", vpr->version());
 
     if (vpr->newprno() != PRNO_UNDEF) {
-        note(rg, "$%d", vpr->newprno());
+        prt(rg, "$%d", vpr->newprno());
     } else {
-        note(rg, "--");
+        prt(rg, "--");
     }
-    note(rg, ": ");
+    prt(rg, ": ");
 
     IR * def = getDef();
     if (vpr->version() != PRSSA_INIT_VERSION) {
@@ -64,33 +64,41 @@ void SSAInfo::dump(Region const* rg) const
     }
 
     //PR SSAInfo
+    UINT defprno = PRNO_UNDEF;
     if (def != nullptr) {
         ASSERT0(def->is_stmt());
+        prt(rg, "DEF:%s", IRNAME(def));
         if (def->isWritePR()) {
-            prt(rg, "DEF:%s ($%d,id:%d)", IRNAME(def),
-                def->getPrno(), def->id());
+            defprno = def->getPrno();
+            prt(rg, "($%d,id:%d)", def->getPrno(), def->id());
         } else if (def->isCallStmt()) {
-            prt(rg, "DEF:%s", IRNAME(def));
             if (def->hasReturnValue()) {
-                prt(rg, " ($%d,id:%d)", def->getPrno(), def->id());
+                defprno = def->getPrno();
+                prt(rg, "($%d,id:%d)", def->getPrno(), def->id());
             } else {
-                prt(rg, " NoRetVal??");
+                prt(rg, "NoRetVal??");
             }
         } else {
             ASSERTN(0, ("not def stmt of PR"));
         }
     } else {
-        prt(rg, "DEF:---");
+        prt(rg, "DEF:--");
     }
 
-    prt(rg, "\tUSE:");
+    if (!hasUse()) {
+        prt(rg, " USE:--");
+        return;
+    }
+    prt(rg, " USE:");
     SSAUseIter vit = nullptr;
     INT nexti = 0;
     for (INT i2 = SSA_uses(this).get_first(&vit); vit != nullptr; i2 = nexti) {
         nexti = SSA_uses(this).get_next(i2, &vit);
         IR * use = rg->getIR(i2);
         ASSERT0(use->is_pr());
-        prt(rg, "($%d,id:%d)", use->getPrno(), use->id());
+        ASSERTN(defprno == PRNO_UNDEF || defprno == use->getPrno(),
+                ("unmatched PR"));
+        prt(rg, "id:%d", use->id());
         if (nexti >= 0) {
             prt(rg, ",");
         }
@@ -105,7 +113,6 @@ void SSAInfo::dump(Region const* rg) const
 //Find the VPR that have PR defined at given BB.
 VPR * VPRVec::findVPR(UINT bbid) const
 {
-
     for (INT i = 0; i <= get_last_idx(); i++) {
         VPR * vpr = get(i);
         if (vpr == nullptr || vpr->getDef() == nullptr) { continue; }
@@ -119,15 +126,9 @@ VPR * VPRVec::findVPR(UINT bbid) const
 
 
 //Find the initial version VPR.
-VPR * VPRVec::findInitVersion() const
+VPR * VPRVec::getInitVersion() const
 {
-    for (INT i = 0; i <= get_last_idx(); i++) {
-        VPR * vpr = get(i);
-        if (vpr != nullptr && vpr->version() == PRSSA_INIT_VERSION) {
-            return vpr;
-        }
-    }
-    return nullptr;
+    return get(PRSSA_INIT_VERSION);
 }
 //END VPRVec
 

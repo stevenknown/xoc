@@ -537,9 +537,9 @@ Programming Guides
       e.g:
           Semantics: given p is pointer, load the value that p pointed to,
           and store it to a.
-          In C syntax: int a = *p;
+          In C syntax: int x = *p;
           And the corresponding IR tree is:
-             st:i32, a
+             st:i32, x
                ild:i32
                  ld:ptr p
 

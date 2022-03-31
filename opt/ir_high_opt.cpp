@@ -44,7 +44,8 @@ void Region::HighProcessImpl(OptCtx & oc)
         //Remove empty bb when cfg rebuilted because
         //rebuilding cfg may generate redundant empty bb.
         //It disturbs the computation of entry and exit.
-        getCFG()->removeEmptyBB(oc);
+        CfgOptCtx ctx(oc);
+        getCFG()->removeEmptyBB(ctx);
 
         //Compute exit bb while cfg rebuilt.
         getCFG()->computeExitList();
@@ -75,7 +76,7 @@ void Region::HighProcessImpl(OptCtx & oc)
             if (getDUMgr() != nullptr && !oc.is_du_chain_valid()) {
                 //PRSSAMgr will destruct classic DU-chain.
                 getDUMgr()->cleanDUSet();
-                oc.setInvalidDUChain();
+                oc.setInvalidClassicDUChain();
             }
         }
     }
@@ -163,7 +164,7 @@ bool Region::HighProcess(OptCtx & oc)
     }
 
     simp.setSimpCFS();
-    setIRList(simplifyStmtList(getIRList(), &simp));
+    setIRList(getIRSimp()->simplifyStmtList(getIRList(), &simp));
     ASSERT0(verifySimp(getIRList(), simp));
     ASSERT0(verifyIRList(getIRList(), nullptr, this));
 

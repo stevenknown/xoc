@@ -43,8 +43,10 @@ class Pass {
     COPY_CONSTRUCTOR(Pass);
 protected:
     BYTE m_is_valid:1; //True if current pass information is available.
+    Region * m_rg;
 public:
-    Pass() { m_is_valid = false; }
+    Pass() : m_is_valid(false), m_rg(nullptr) {}
+    Pass(Region * rg) : m_is_valid(false), m_rg(rg) {}
     virtual ~Pass() {}
 
     //The function dump pass relative information.
@@ -52,9 +54,9 @@ public:
     //Return true if dump successed, otherwise false.
     virtual bool dump() const
     {
-        ASSERTN(0, ("Optimization Dependent Code"));
+        //ASSERTN(0, ("Optimization Dependent Code"));
         //The recommended dump format is:
-        //\n==---- DUMP PassName 'RegionName' ----==
+        //\n==---- DUMP PassName 'RegionName' ----==        
         return true;
     }
 
@@ -63,12 +65,13 @@ public:
     //Return true if dump successed, otherwise false.
     virtual bool dumpBeforePass() const
     {
-        ASSERTN(0, ("Optimization Dependent Code"));
+        //ASSERTN(0, ("Optimization Dependent Code"));
         //The recommended dump format is:
         //\n==---- DUMP PassName 'RegionName' ----==
         return true;
     }
 
+    Region * getRegion() const { return m_rg; }
     virtual CHAR const* getPassName() const
     {
         ASSERTN(0, ("Optimization Dependent Code"));

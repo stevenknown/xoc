@@ -282,7 +282,7 @@ CHAR const* Var::dumpGR(StrBuf & buf, TypeMgr * dm) const
 {
     xcom::StrBuf buf2(32);
     xcom::StrBuf buf3(32);
-    buf.strcat("var %s:%s", compositeName(VAR_name(this), buf3),
+    buf.strcat("var %s:%s", GRDump::compositeName(VAR_name(this), buf3),
         dm->dump_type(getType(), buf2));
     if (hasGRFlag() || get_align() > 1) {
         buf.strcat(":(");
@@ -294,7 +294,7 @@ CHAR const* Var::dumpGR(StrBuf & buf, TypeMgr * dm) const
 
 
 //You must make sure this function will not change any field of Var.
-CHAR const* Var::dump(StrBuf & buf, TypeMgr const* dm) const
+CHAR const* Var::dump(OUT StrBuf & buf, TypeMgr const* dm) const
 {
     CHAR * lname = SYM_name(VAR_name(this));
     CHAR tt[43];

@@ -107,11 +107,11 @@ bool LoopCvt::try_convert(LI<IRBB> * li, IRBB * gobackbb,
     Vector<IR*> rmvec;
     for (IR * ir = BB_first_ir(head); ir != nullptr; ir = BB_next_ir(head)) {
         IR * newir = m_rg->dupIRTree(ir);
-        m_du->addUse(newir, ir);
+        m_du->addUseForTree(newir, ir);
 
         m_ii.clean();
-        for (IR * x = iterRhsInit(ir, m_ii);
-             x != nullptr; x = iterRhsNext(m_ii)) {
+        for (IR const* x = xoc::iterExpInitC(ir, m_ii);
+             x != nullptr; x = xoc::iterExpNextC(m_ii)) {
             if (!x->isMemoryRef()) { continue; }
 
             UINT cnt = 0;

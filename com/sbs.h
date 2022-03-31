@@ -343,11 +343,14 @@ public:
 
     void destroySEGandClean(SegMgr<BitsPerSeg> * sm, TSEGIter ** free_list);
     void diff(UINT elem, SegMgr<BitsPerSeg> * sm, TSEGIter ** free_list);
-    void diff(SBitSetCore<BitsPerSeg> const& src,
-              SegMgr<BitsPerSeg> * sm,
-              TSEGIter ** free_list);
+    void diff(UINT elem, SegMgr<BitsPerSeg> * sm, TSEGIter ** free_list,
+              TSEGIter * sct);
     void diff(UINT elem, MiscBitSetMgr<BitsPerSeg> & m)
     { diff(elem, &m.sm, &m.scflst); }
+    void diff(UINT elem, TSEGIter * sct, MiscBitSetMgr<BitsPerSeg> & m)
+    { diff(elem, &m.sm, &m.scflst, sct); }
+    void diff(SBitSetCore<BitsPerSeg> const& src, SegMgr<BitsPerSeg> * sm,
+              TSEGIter ** free_list);
     void diff(SBitSetCore<BitsPerSeg> const& src,
               MiscBitSetMgr<BitsPerSeg> & m)
     { diff(src, &m.sm, &m.scflst); }
@@ -435,9 +438,9 @@ public:
         m_pool = nullptr;
     }
 
+    void bunion(BitSet const& src);
     void bunion(SBitSet<BitsPerSeg> const& src)
     { SBitSetCore<BitsPerSeg>::bunion(src, m_sm, &m_flst, m_pool);    }
-
     void bunion(UINT elem)
     { SBitSetCore<BitsPerSeg>::bunion(elem, m_sm, &m_flst, m_pool); }
 
@@ -691,7 +694,7 @@ public:
         if (sc == SBitSetCore<BitsPerSeg>::segs.end()) {
             ASSERT0(SBitSetCore<BitsPerSeg>::segs.get_elem_count() == 0);
             *cur = nullptr;
-            return -1;
+            return BS_UNDEF;
         }
 
         *cur = sc;
@@ -710,7 +713,7 @@ public:
         if (sc == SBitSetCore<BitsPerSeg>::segs.end()) {
             ASSERT0(SBitSetCore<BitsPerSeg>::segs.get_elem_count() == 0);
             *cur = nullptr;
-            return -1;
+            return BS_UNDEF;
         }
 
         ASSERT0(cur);

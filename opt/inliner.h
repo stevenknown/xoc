@@ -103,16 +103,24 @@ public:
     bool do_inline_c(Region * caller, Region * callee);
     void do_inline(Region * cand);
 
+    //The function dump pass relative information before performing the pass.
+    //The dump information is always used to detect what the pass did.
+    //Return true if dump successed, otherwise false.
+    virtual bool dumpBeforePass() const { return Pass::dumpBeforePass(); }
+
+    //The function dump pass relative information.
+    //The dump information is always used to detect what the pass did.
+    //Return true if dump successed, otherwise false.
+    virtual bool dump() const { return Pass::dump(); }
+
     inline bool is_call_site(IR * call, Region * rg);
 
     virtual PASS_TYPE getPassType() const { return PASS_INLINER; }
     virtual CHAR const* getPassName() const { return "Inliner"; }
 
-    IR * replaceReturn(
-            Region * caller,
-            IR * caller_call,
-            IR * new_irs,
-            InlineInfo * ii);
+    IR * replaceReturn(Region * caller, IR * caller_call, IR * new_irs,
+                       InlineInfo * ii);
+
     virtual bool perform(OptCtx & oc);
 };
 

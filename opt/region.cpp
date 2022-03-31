@@ -36,17 +36,7 @@ author: Su Zhenyu
 
 namespace xoc {
 
-static void set_irt_size(IR * ir, UINT)
-{
-    #ifdef CONST_IRT_SZ
-    IR_irt_size(ir) = irt_sz;
-    #else
-    DUMMYUSE(ir);
-    #endif
-}
-
-
-static UINT getIRTypeSize(IR const* ir)
+static inline UINT getIRTypeSize(IR const* ir)
 {
     #ifdef CONST_IRT_SZ
     return IR_irt_size(ir);
@@ -366,21 +356,21 @@ bool Region::reconstructBBList(OptCtx & oc)
     for (bbl->get_head(&ctbb); ctbb != nullptr; bbl->get_next(&ctbb)) {
         IRBB * bb = ctbb->val();
         IRListIter ctir;
-        BBIRList * irlst = bb->getIRList();
-        IR * tail = irlst->get_tail();
-        for (irlst->get_head(&ctir); ctir != nullptr; irlst->get_next(&ctir)) {
+        BBIRList & irlst = bb->getIRList();
+        IR * tail = irlst.get_tail();
+        for (irlst.get_head(&ctir); ctir != nullptr; irlst.get_next(&ctir)) {
             IR * ir = ctir->val();
             if (IRBB::isLowerBoundary(ir) && ir != tail) {
                 change = true;
 
                 IR * restirs = nullptr; //record rest part in bb list after 'ir'.
                 IR * last = nullptr;
-                irlst->get_next(&ctir);
+                irlst.get_next(&ctir);
 
                 for (C<IR*> * next_ctir = ctir;
                      ctir != nullptr; ctir = next_ctir) {
-                    irlst->get_next(&next_ctir);
-                    irlst->remove(ctir);
+                    irlst.get_next(&next_ctir);
+                    irlst.remove(ctir);
                     xcom::add_next(&restirs, &last, ctir->val());
                 }
 
@@ -394,8 +384,8 @@ bool Region::reconstructBBList(OptCtx & oc)
                 IR * last = nullptr;
                 for (C<IR*> * next_ctir = ctir;
                      ctir != nullptr; ctir = next_ctir) {
-                    irlst->get_next(&next_ctir);
-                    irlst->remove(ctir);
+                    irlst.get_next(&next_ctir);
+                    irlst.remove(ctir);
                     xcom::add_next(&restirs, &last, ctir->val());
                 }
 
@@ -510,7 +500,7 @@ void Region::constructBBList()
             continue;
         }
 
-        if (cur_ir->isMayThrow()) {
+        if (cur_ir->isMayThrow(false)) {
             BB_irlist(cur_bb).append_tail(cur_ir);
 
             //Generate new BB.
@@ -722,25 +712,6 @@ HOST_INT Region::getMinInteger(UINT bitsize, bool is_signed) const
 }
 
 
-//Free ir, ir's sibling, and all its kids.
-//We can only utilizing the function to free the IR
-//which allocated by 'allocIR'.
-//
-//NOTICE: If ir's sibling is not nullptr, that means the IR is
-//a high level type. IRBB consists of only middle/low level IR.
-void Region::freeIRTreeList(IR * ir)
-{
-    if (ir == nullptr) { return; }
-    IR * head = ir, * next = nullptr;
-    while (ir != nullptr) {
-        next = ir->get_next();
-        xcom::remove(&head, ir);
-        freeIRTree(ir);
-        ir = next;
-    }
-}
-
-
 //Free IRBB list.
 //We can only utilizing the function to free the IRBB
 //which allocated by 'allocBB'.
@@ -752,92 +723,6 @@ void Region::freeIRBBList(BBList & bbl)
         mgr->freeBB(bb);
     }
     bbl.clean();
-}
-
-
-//Free ir, and all its kids.
-//We can only utilizing the function to free
-//the IR which allocated by 'allocIR'.
-void Region::freeIRTreeList(IRList & irs)
-{
-    IRListIter next;
-    IRListIter ct;
-    for (irs.get_head(&ct); ct != irs.end(); ct = next) {
-        IR * ir = ct->val();
-        next = irs.get_next(ct);
-        ASSERTN(ir->is_single(),
-                ("do not allow sibling node, need to simplify"));
-        irs.remove(ir);
-        freeIRTree(ir);
-    }
-}
-
-
-//Free ir and all its kids, except its sibling node.
-//We can only utilizing the function to free the
-//IR which allocated by 'allocIR'.
-void Region::freeIRTree(IR * ir)
-{
-    if (ir == nullptr) { return; }
-    ASSERTN(!ir->is_undef(), ("ir has been freed"));
-    ASSERTN(ir->is_single(), ("chain list should be cut off"));
-    for (INT i = 0; i < IR_MAX_KID_NUM(ir); i++) {
-        IR * kid = ir->getKid(i);
-        if (kid != nullptr) {
-            freeIRTreeList(kid);
-        }
-    }
-    freeIR(ir);
-}
-
-
-//This function erases all informations of ir and
-//append it into free_list for next allocation.
-//If Attach Info exist, this function will erase it rather than delete.
-//If DU info exist, this function will retrieve it back
-//to region for next allocation.
-//Note that this function does NOT free ir's kids and siblings.
-void Region::freeIR(IR * ir)
-{
-    ASSERTN(ir && ir->is_single(), ("chain list should be cut off"));
-    #ifdef _DEBUG_
-    ASSERT0(!getAnalysisInstrument()->
-            m_has_been_freed_irs.is_contain(ir->id()));
-    getAnalysisInstrument()->m_has_been_freed_irs.bunion(ir->id());
-    #endif
-
-    if (getDUMgr() != nullptr) {
-        ir->freeDUset(getDUMgr());
-    }
-
-    AIContainer * res_ai = IR_ai(ir);
-    if (res_ai != nullptr) {
-        //AICont will be reinitialized till next setting.
-        res_ai->destroy();
-    }
-
-    DU * du = ir->cleanDU();
-    if (du != nullptr) {
-        DU_md(du) = nullptr;
-        DU_mds(du) = nullptr;
-        getAnalysisInstrument()->m_free_du_list.append_head(du);
-    }
-
-    //Zero clearing all data fields.
-    UINT res_id = ir->id();
-    UINT res_irt_sz = getIRTypeSize(ir);
-    ::memset(ir, 0, res_irt_sz);
-    IR_id(ir) = res_id;
-    IR_ai(ir) = res_ai;
-    set_irt_size(ir, res_irt_sz);
-
-    UINT idx = res_irt_sz - sizeof(IR);
-    IR * head = getAnalysisInstrument()->m_free_tab[idx];
-    if (head != nullptr) {
-        IR_next(ir) = head;
-        IR_prev(head) = ir;
-    }
-    getAnalysisInstrument()->m_free_tab[idx] = ir;
 }
 
 
@@ -985,119 +870,6 @@ void Region::dumpFreeTab() const
 }
 
 
-//Generate IR, invoke freeIR() or freeIRTree() if it is useless.
-//NOTE: Do NOT invoke ::free() to free IR, because all
-//    IR are allocated in the pool.
-IR * Region::allocIR(IR_TYPE irt)
-{
-    IR * ir = nullptr;
-    UINT idx = IRTSIZE(irt) - sizeof(IR);
-    ASSERTN(idx < 1000, ("weird index"));
-    bool lookup = false; //lookup freetab will save more memory, but slower.
-
-    #ifndef CONST_IRT_SZ
-    //If one is going to lookup freetab, IR_irt_size() must be defined.
-    ASSERT0(!lookup);
-    #endif
-
-    if (lookup) {
-        for (; idx <= MAX_OFFSET_AT_FREE_TABLE; idx++) {
-            ir = getAnalysisInstrument()->m_free_tab[idx];
-            if (ir == nullptr) { continue; }
-
-            getAnalysisInstrument()->m_free_tab[idx] = ir->get_next();
-            if (ir->get_next() != nullptr) {
-                IR_prev(ir->get_next()) = nullptr;
-            }
-            break;
-        }
-    } else {
-        ir = getAnalysisInstrument()->m_free_tab[idx];
-        if (ir != nullptr) {
-            getAnalysisInstrument()->m_free_tab[idx] = ir->get_next();
-            if (ir->get_next() != nullptr) {
-                IR_prev(ir->get_next()) = nullptr;
-            }
-        }
-    }
-
-    if (ir == nullptr) {
-        ir = (IR*)xmalloc(IRTSIZE(irt));
-        INT v = MAX(getIRVec()->get_last_idx(), 0);
-        //0 should not be used as id.
-        IR_id(ir) = (UINT)(v+1);
-        getIRVec()->set(ir->id(), ir);
-        set_irt_size(ir, IRTSIZE(irt));
-    } else {
-        ASSERT0(ir->get_prev() == nullptr);
-        IR_next(ir) = nullptr;
-        #ifdef _DEBUG_
-        getAnalysisInstrument()->m_has_been_freed_irs.diff(ir->id());
-        #endif
-    }
-    IR_code(ir) = irt;
-    return ir;
-}
-
-
-//Duplication 'ir' and kids, and its sibling, return list of new ir.
-//Duplicate irs start from 'ir' to the end of list.
-//The duplication includes AI, except DU info, SSA info.
-IR * Region::dupIRTreeList(IR const* ir)
-{
-    IR * new_list = nullptr;
-    while (ir != nullptr) {
-        IR * newir = dupIRTree(ir);
-        xcom::add_next(&new_list, newir);
-        ir = ir->get_next();
-    }
-    return new_list;
-}
-
-//Duplicate 'ir' and its kids, but without ir's sibiling node.
-//The duplication includes AI, except DU info, SSA info.
-IR * Region::dupIRTree(IR const* ir)
-{
-    if (ir == nullptr) { return nullptr; }
-    IR * newir = dupIR(ir);
-    for (UINT i = 0; i < IR_MAX_KID_NUM(ir); i++) {
-        IR * kid = ir->getKid(i);
-        if (kid != nullptr) {
-            IR * newkid_list = dupIRTreeList(kid);
-            newir->setKid(i, newkid_list);
-        } else { ASSERT0(newir->getKid(i) == nullptr); }
-    }
-    return newir;
-}
-
-
-//Duplication all contents of 'src', includes AI, except DU info,
-//SSA info, kids and siblings IR.
-IR * Region::dupIR(IR const* src)
-{
-    if (src == nullptr) { return nullptr; }
-    IR_TYPE irt = src->getCode();
-    IR * res = allocIR(irt);
-    ASSERTN(res != nullptr && src != nullptr, ("res/src is nullptr"));
-
-    UINT res_id = IR_id(res);
-    AIContainer * res_ai = IR_ai(res);
-    UINT res_irt_sz = getIRTypeSize(res);
-    ::memcpy(res, src, IRTSIZE(irt));
-    IR_id(res) = res_id;
-    IR_ai(res) = res_ai;
-    set_irt_size(res, res_irt_sz);
-    IR_next(res) = IR_prev(res) = IR_parent(res) = nullptr;
-    res->cleanDU(); //Do not copy DU info.
-    res->clearSSAInfo(); //Do not copy SSA info.
-    res->copyAI(src, this);
-    if (res->isMemoryRef()) {
-        res->copyRef(src, this);
-    }
-    return res;
-}
-
-
 void Region::scanCallListImpl(OUT UINT & num_inner_region, IR * irlst,
                               OUT List<IR const*> * call_list,
                               OUT List<IR const*> * ret_list,
@@ -1189,10 +961,10 @@ void Region::prescanBBList(BBList const* bblst)
     for (IRBB const* bb = bblst->get_head(&bbit);
          bb != nullptr; bb = bblst->get_next(&bbit)) {
         BBIRListIter irct;
-        for (IR const* ir = const_cast<IRBB*>(bb)->getIRList()->
+        for (IR const* ir = const_cast<IRBB*>(bb)->getIRList().
                  get_head(&irct);
              ir != nullptr;
-             ir = const_cast<IRBB*>(bb)->getIRList()->get_next(&irct)) {
+             ir = const_cast<IRBB*>(bb)->getIRList().get_next(&irct)) {
             prescanIRList(ir);
         }
     }
@@ -1407,42 +1179,6 @@ void Region::dumpMemUsage() const
          ncvt, ((double)ncvt) / ((double)total) * 100,
          ncbr, ((double)ncbr) / ((double)total) * 100,
          nncbr, ((double)ncbr) / ((double)total) * 100);
-}
-
-
-void Region::dumpGR(bool dump_inner_region) const
-{
-    note(this, "\n//====---- Dump region '%s' ----====", getRegionName());
-    note(this, "\nregion ");
-    switch (getRegionType()) {
-    case REGION_PROGRAM: prt(this, "program "); break;
-    case REGION_BLACKBOX: prt(this, "blackbox "); break;
-    case REGION_FUNC: prt(this, "func "); break;
-    case REGION_INNER: prt(this, "inner "); break;
-    default: ASSERT0(0); //TODO
-    }
-    if (getRegionVar() != nullptr) {
-        xcom::StrBuf buf(32);
-        prt(this, "%s ", compositeName(getRegionVar()->get_name(), buf));
-    }
-    prt(this, "(");
-    dumpParameter();
-    prt(this, ")");
-    prt(this, " {\n");
-    getLogMgr()->incIndent(DUMP_INDENT_NUM);
-    dumpVarTab();
-    if (!is_blackbox()) {
-        DumpGRCtx ctx;
-        ctx.dump_inner_region = dump_inner_region;
-        ctx.cfg = getCFG();
-        if (getIRList() != nullptr) {
-            dumpGRList(getIRList(), getTypeMgr(), &ctx);
-        } else {
-            dumpGRInBBList(getBBList(), getTypeMgr(), &ctx);
-        }
-    }
-    getLogMgr()->decIndent(DUMP_INDENT_NUM);
-    note(this, "\n}");
 }
 
 
@@ -1679,6 +1415,13 @@ void Region::dumpBBRef(IN IRBB * bb, UINT indent) const
     for (IR * ir = BB_first_ir(bb); ir != nullptr; ir = BB_next_ir(bb)) {
         ir->dumpRef(const_cast<Region*>(this), indent);
     }
+}
+
+
+void Region::dumpGR(bool dump_inner_region) const
+{
+    GRDump gd(this);
+    gd.dumpRegion(dump_inner_region);
 }
 
 
@@ -2256,14 +1999,16 @@ bool Region::processIRList(OptCtx & oc)
     END_TIMER(t, "PreScan");
     if (g_dump_opt.isDumpAfterPass() && g_dump_opt.isDumpAll()) {
         note(this, "\n==--- DUMP PRIMITIVE IR LIST ----==");
+        getLogMgr()->incIndent(2);
         dumpIRList();
+        getLogMgr()->decIndent(2);
     }
 
     if (!HighProcess(oc)) { return false; }
 
     if (getDUMgr() != nullptr && !oc.is_du_chain_valid()) {
         getDUMgr()->cleanDUSet();
-        oc.setInvalidDUChain();
+        oc.setInvalidClassicDUChain();
     } else {
         //PRSSA may destruct classic DU chain.
         ASSERT0(verifyMDDUChain(this));

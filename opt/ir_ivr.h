@@ -169,7 +169,6 @@ protected:
     BYTE m_is_strictly_match_pattern:1;
 
     //True if IV information is available.
-    Region * m_rg;
     MDSystem * m_mdsys;
     TypeMgr * m_tm;
     DUMgr * m_du;
@@ -189,7 +188,6 @@ protected:
     Vector<BIVList*> m_li2bivlst;
     Vector<DIVList*> m_li2divlst;
     DefMiscBitSetMgr m_sbs_mgr;
-
 protected:
     LinearRep * allocLinearRep()
     { return (LinearRep*)xmalloc(sizeof(LinearRep)); }
@@ -279,10 +277,9 @@ protected:
     bool usePRSSADU() const
     { return m_prssamgr != nullptr && m_prssamgr->is_valid(); }
 public:
-    explicit IVR(Region * rg)
+    explicit IVR(Region * rg) : Pass(rg)
     {
         ASSERT0(rg != nullptr);
-        m_rg = rg;
         m_mdsys = rg->getMDSystem();
         m_du = rg->getDUMgr();
         m_cfg = rg->getCFG();
@@ -310,7 +307,6 @@ public:
     BIVList const* getBIVList(LI<IRBB*> const* li) const
     { return getBIVList(li->id()); }
 
-    Region * getRegion() const { return m_rg; }
     virtual CHAR const* getPassName() const
     { return "Induction Variable Recogization"; }
     PASS_TYPE getPassType() const { return PASS_IVR; }

@@ -55,7 +55,7 @@ class RegionMgr;
 #define DEDICATED_STRING_VAR_NAME "#DedicatedStringVar"
 #define VAR_UNDEF 0x0
 
-//This attribute describe the scope of variable.
+//This attribute describes the scope of variable.
 //A variable can be seen by all regions if it is GLOBAL.
 #define VAR_GLOBAL 0x1
 
@@ -64,12 +64,12 @@ class RegionMgr;
 //It always be allocated in stack or thread local storage(TLS).
 #define VAR_LOCAL 0x2
 
-//This attribute describe the scope of variable.
+//This attribute describes the scope of variable.
 //A private variable which is GLOBAL can ONLY be seen in
 //current and inner region.
 #define VAR_PRIVATE 0x4
 
-//This attribute describe the access authority of variable.
+//This attribute describes the access authority of variable.
 //A readonly variable guarantees that no operation can modify the memory.
 #define VAR_READONLY 0x8 //var is readonly
 #define VAR_VOLATILE 0x10 //var is volatile
@@ -122,8 +122,9 @@ public:
 #define VAR_is_label(v) ((v)->u2.s1.is_label)
 
 //Variable is global.
-//This attribute describe the scope of variable.
+//The attribute describes the scope of variable.
 //A variable can be seen by all regions if it is GLOBAL.
+//The global attribute is conform to definition of MD_GLOBAL_VAR of MD.
 #define VAR_is_global(v) ((v)->u2.s1.is_global)
 
 //Variable is local.
@@ -132,13 +133,13 @@ public:
 //It always be allocated in stack or thread local storage(TLS).
 #define VAR_is_local(v) ((v)->u2.s1.is_local)
 
-//This attribute describe the scope of variable.
+//This attribute describes the scope of variable.
 //A private variable which is GLOBAL can ONLY be seen in
 //current and inner region.
 #define VAR_is_private(v) ((v)->u2.s1.is_private)
 
 //Variable is readonly.
-//This attribute describe the access authority of variable.
+//This attribute describes the access authority of variable.
 //A readonly variable guarantees that no operation can modify the memory.
 #define VAR_is_readonly(v) ((v)->u2.s1.is_readonly)
 
@@ -146,7 +147,7 @@ public:
 #define VAR_byte_val(v) ((v)->u1.byte_val)
 
 //Record prno if variable represent a PR.
-#define VAR_prno(v) ((v)->u1.prno)
+#define VAR_prno(v) ((v)->prno)
 
 //Variable has initial value.
 #define VAR_has_init_val(v) ((v)->u2.s1.has_init_val)
@@ -193,28 +194,28 @@ public:
 class Var {
     COPY_CONSTRUCTOR(Var);
 public:
-    UINT uid; //unique id;
-    Type const* type; //Data type.
-    UINT align; //memory alignment of var.
-    Sym const* name;
+    UINT uid; //unique id.
+    Type const* type; //data type.
+    UINT align; //memory alignment of Var.
+    Sym const* name; //record name of Var.
 
     //Record the formal parameter position if Var is parameter.
-    //Start from 0.
+    //The position start from 0.
     UINT formal_parameter_pos;
 
+    //Record prno if Var indicates a PR location.
+    UINT prno;
+
     union {
-        //Record string contents if Var is const string.
+        //Record string contents if Var is a constant string.
         Sym const* string;
 
         //Record byte code if Var has constant initial value.
         ByteBuf * byte_val;
 
-        //Record labelinfo if Var is label.
+        //Record label related info if Var indicates a label.
         LabelInfo * labinfo;
-
-        //Record Prno if Var is pr.
-        UINT prno;
-    } u1;
+    } u1; //record the properties that are exclusive.
 
     union {
         UINT flag; //Record variant properties of Var.
@@ -238,8 +239,8 @@ public:
             //True if variable should NOT be allocated in memory and
             //it is only being a placeholder in essence.
             UINT is_unallocable:1;
-        } s1;
-    } u2;
+        } s1; //Record variant properties of Var.
+    } u2; //Record variant properties of Var.
 public:
     Var();
     virtual ~Var() {}
@@ -266,27 +267,31 @@ public:
         return VAR_type(this)->is_any();
     }
 
+    //Return true if variable is pointer data type.
     bool is_pointer() const
     {
         ASSERT0(VAR_type(this));
         return VAR_type(this)->is_pointer();
     }
 
+    //Return true if variable is regarded as a pointer.
     bool isPointer() const { return is_any() || is_pointer(); }
 
-    //Return true if variable type is memory chunk.
+    //Return true if variable type is memory chunk data type.
     bool is_mc() const
     {
         ASSERT0(VAR_type(this));
         return VAR_type(this)->is_mc();
     }
 
+    //Return true if variable type is string data type.
     bool is_string() const
     {
         ASSERT0(VAR_type(this));
         return VAR_type(this)->is_string();
     }
 
+    //Return true if variable type is vector data type.
     bool is_vector() const
     {
         ASSERT0(VAR_type(this));
@@ -308,20 +313,29 @@ public:
                 (is_string() && getString() != nullptr) ||
                 getByteValue() != nullptr);
     }
+
+    //Return true if variable has initial value.
     bool has_init_val() const { return VAR_has_init_val(this); }
 
+    //Get byte alignment.
     UINT get_align() const { return VAR_align(this); }
     Sym const* get_name() const { return VAR_name(this); }
     Type const* getType() const { return VAR_type(this); }
     DATA_TYPE getDType() const { return TY_dtype(getType()); }
     UINT getFormalParamPos() const { return VAR_formal_param_pos(this); }
+
+    //Get byte length if variable records string contents.
     UINT getStringLength() const
     {
-        ASSERT0(VAR_type(this)->is_string());
-        return VAR_string(this) == nullptr ?
-               0 : xstrlen(SYM_name(VAR_string(this)));
+        ASSERT0(getType()->is_string());
+        return getString() == nullptr ?
+               0 : xcom::xstrlen(getString()->getStr());
     }
+
+    //Get string contents.
     Sym const* getString() const { return VAR_string(this); }
+
+    //Get initial value.
     ByteBuf const* getByteValue() const { return VAR_byte_val(this); }
 
     //Return the byte size of variable accroding type.
@@ -338,10 +352,13 @@ public:
     virtual void dump(TypeMgr const* tm) const;
 
     //You must make sure this function will not change any field of Var.
-    virtual CHAR const* dump(StrBuf & buf, TypeMgr const* dm) const;
-    void dumpProp(xcom::StrBuf & buf, bool grmode) const;
-    CHAR const* dumpGR(StrBuf & buf, TypeMgr * dm) const;
+    //The information will be dumpped into 'buf'.
+    virtual CHAR const* dump(OUT StrBuf & buf, TypeMgr const* dm) const;
+    void dumpProp(OUT StrBuf & buf, bool grmode) const;
+    CHAR const* dumpGR(OUT StrBuf & buf, TypeMgr * dm) const;
 
+    //Set variable is global scope.
+    //The global attribute is conform to definition of MD_GLOBAL_VAR of MD.
     void setToGlobal(bool is_global)
     {
         VAR_is_global(this) = (UINT)is_global;

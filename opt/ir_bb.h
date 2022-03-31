@@ -86,6 +86,16 @@ public:
                ((xcom::EList<IR*, IR2Holder>*)this)->count_mem();
     }
 
+    IR * getPrevIR(IR const* ir) const
+    {
+        ASSERT0(ir->is_stmt());
+        IRListIter irit;
+        find(const_cast<IR*>(ir), &irit);
+        ASSERTN(irit, ("ir is not belong to current BB"));
+        irit = get_prev(irit);
+        return irit == nullptr ? nullptr : irit->val();
+    }
+
     //Insert 'ir' before 'marker'.
     inline IRListIter insert_before(IN IR * ir, IR const* marker)
     {
@@ -221,10 +231,6 @@ public:
         }
     }
 
-    //After adding new bb or change bb successor,
-    //you need add the related PHI operand if BB successor has PHI stmt.
-    void addSuccessorDesignatePhiOpnd(CFG<IRBB, IR> * cfg, IRBB * succ);
-
     size_t count_mem() const;
     void clean()
     {
@@ -247,6 +253,9 @@ public:
         BB_is_terminate(this) |= LABELINFO_is_terminate(li);
     }
 
+    void dumpLabelList(Region const* rg) const;
+    void dumpAttr(Region const* rg) const;
+    void dumpIRList(Region const* rg, bool dump_inner_region) const;
     void dump(Region const* rg, bool dump_inner_region) const;
     void dupSuccessorPhiOpnd(CFG<IRBB, IR> * cfg, Region * rg, UINT opnd_pos);
 
@@ -256,16 +265,25 @@ public:
     UINT getNumOfIR() const { return BB_irlist(this).get_elem_count(); }
     UINT getNumOfPred(CFG<IRBB, IR> const* cfg) const;
     UINT getNumOfSucc(CFG<IRBB, IR> const* cfg) const;
-    BBIRList * getIRList() { return &BB_irlist(this); }
+    BBIRList & getIRList() { return BB_irlist(this); }
     IR * getFirstIR() { return BB_first_ir(this); }
     IR * getNextIR() { return BB_next_ir(this); }
     IR * getLastIR() { return BB_last_ir(this); }
+    IR * getPrevIR(IR const* ir) const
+    {
+        ASSERT0(ir->is_stmt());
+        return const_cast<IRBB*>(this)->getIRList().getPrevIR(ir);
+    }
+
+    bool hasMDPhi(CFG<IRBB, IR> const* cfg) const;
 
     //Is bb containing such label carried by 'lir'.
-    inline bool hasLabel(LabelInfo const* lab)
+    inline bool hasLabel(LabelInfo const* lab) const
     {
-        for (LabelInfo const* li = getLabelList().get_head();
-             li != nullptr; li = getLabelList().get_next()) {
+        LabelInfoListIter it;
+        IRBB * pthis = const_cast<IRBB*>(this);
+        for (LabelInfo const* li = pthis->getLabelList().get_head(&it);
+             li != nullptr; li = pthis->getLabelList().get_next(&it)) {
             if (isSameLabel(li, lab)) {
                 return true;
             }
@@ -306,10 +324,19 @@ public:
     //Return true if BB has a fall through successor.
     //Note conditional branch always has fallthrough successor.
     bool is_fallthrough() const;
+
+    //Return true if BB has only fall through successor.
+    //Note the function does not take exception-edge into consider.
+    bool is_only_fallthrough() const;
     bool is_target() const { return BB_is_target(this); }
     bool is_catch_start() const { return BB_is_catch_start(this); }
     bool is_try_start() const { return BB_is_try_start(this); }
     bool is_try_end() const { return BB_is_try_end(this); }
+
+    //Return true if 'prev' is the previous BB of current BB in BBList.
+    //it: BBListIter of current BB.
+    bool isPrevBB(IRBB const* prev, BBListIter const it,
+                  BBList const* bblst) const;
 
     //Return true if BB is an entry BB of TRY block.
     inline bool isTryStart() const
@@ -452,7 +479,7 @@ public:
     inline bool is_dom(IR const* ir1, IR const* ir2, bool is_strict) const
     {
         ASSERT0(ir1 && ir2 && ir1->is_stmt() && ir2->is_stmt() &&
-            ir1->getBB() == this && ir2->getBB() == this);
+                ir1->getBB() == this && ir2->getBB() == this);
         if (is_strict && ir1 == ir2) {
             return false;
         }
@@ -478,7 +505,7 @@ public:
     {
         IRListIter ct;
         IR * x = BB_irlist(const_cast<IRBB*>(this)).get_tail(&ct);
-        if (x != nullptr && x->isMayThrow()) {
+        if (x != nullptr && x->isMayThrow(true)) {
             return true;
         }
         return false;
@@ -501,14 +528,6 @@ public:
     bool successorHasPhi(CFG<IRBB, IR> * cfg);
 
     INT rpo() const { return BB_rpo(this); }
-
-    //Before removing bb or change bb successor,
-    //you need remove the related PHI operand if BB successor has PHI stmt.
-    void removeAllSuccessorsPhiOpnd(CFG<IRBB, IR> * cfg);
-
-    //Before removing bb or change bb successor,
-    //you need remove the related PHI operand if BB successor has PHI stmt.
-    void removeSuccessorDesignatePhiOpnd(CFG<IRBB, IR> * cfg, IRBB * succ);
 
     bool verifyBranchLabel(Lab2BB const& lab2bb) const;
     bool verify(Region const* rg) const;

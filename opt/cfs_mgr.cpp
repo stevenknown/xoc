@@ -298,7 +298,7 @@ AbsNode * CfsMgr::constructAbsTree(IN IRBB * entry, IN AbsNode * parent,
 
         IRBB * cand = nullptr;
         for (v = g.get_first_vertex(c); v != nullptr; v = g.get_next_vertex(c)) {
-            if (g.getInDegree(v) == 0) {
+            if (v->getInDegree() == 0) {
                 ASSERTN(cand == nullptr, ("multiple immediate-post-dominators"));
                 cand = cfg->getBB(v->id());
             }

@@ -38,10 +38,9 @@ namespace xoc {
 //
 //START ExprTab
 //
-ExprTab::ExprTab(Region * rg)
+ExprTab::ExprTab(Region * rg) : Pass(rg)
 {
     m_expr_count = 0;
-    m_rg = rg;
     m_tm = rg->getTypeMgr();
     ::memset(m_level1_hash_tab, 0,
         sizeof(ExpRep*) * IR_EXPR_TAB_LEVEL1_HASH_BUCKET);

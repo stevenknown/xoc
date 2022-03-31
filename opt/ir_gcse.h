@@ -71,7 +71,7 @@ public:
 
     inline void computePdomAndIpdom(xcom::Vertex * root)
     {
-        if (!computePdomByRpo(root, nullptr)) { UNREACHABLE(); }
+        if (!computePdomByRPO(root, nullptr)) { UNREACHABLE(); }
         if (!computeIpdom()) { UNREACHABLE(); }
     }
 };
@@ -81,7 +81,6 @@ class GCSE : public Pass {
 private:
     bool m_enable_filter; //filter determines which expression can be CSE.
     bool m_is_in_ssa_form; //Set to true if PR is in SSA form.
-    Region * m_rg;
     IRCFG * m_cfg;
     DUMgr * m_du;
     AliasAnalysis * m_aa;
@@ -99,7 +98,6 @@ private:
     //ONLY USED FOR DEBUG PURPOSE
     UINT m_num_of_elim;
     Vector<UINT> m_elimed;
-
 private:
     bool doProp(IRBB * bb, List<IR*> & livexp);
     bool doPropVN(IRBB * bb, UINT entry_id);
@@ -116,12 +114,10 @@ private:
     void processCseGen(IR * cse, IR * cse_stmt, bool & change);
     bool processCse(IR * ir, List<IR*> & livexp);
     bool shouldBeCse(IR * det);
-
 public:
-    GCSE(Region * rg, GVN * gvn)
+    GCSE(Region * rg, GVN * gvn) : Pass(rg)
     {
         ASSERT0(rg);
-        m_rg = rg;
         m_cfg = rg->getCFG();
         m_du = rg->getDUMgr();
         m_aa = rg->getAA();
@@ -138,9 +134,16 @@ public:
     COPY_CONSTRUCTOR(GCSE);
     virtual ~GCSE() {}
 
+    //The function dump pass relative information before performing the pass.
+    //The dump information is always used to detect what the pass did.
+    //Return true if dump successed, otherwise false.
+    virtual bool dumpBeforePass() const { return Pass::dumpBeforePass(); }
+
+    //The function dump pass relative information.
+    //The dump information is always used to detect what the pass did.
+    //Return true if dump successed, otherwise false.
     virtual bool dump() const;
 
-    Region * getRegion() const { return m_rg; }
     virtual CHAR const* getPassName() const
     { return "Global Command Subexpression Elimination"; }
     PASS_TYPE getPassType() const { return PASS_GCSE; }

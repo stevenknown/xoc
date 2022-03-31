@@ -52,19 +52,36 @@ static INT find_newline_pos(StrBuf const& buf, UINT buflen, UINT start)
 
 //Print leading '\n'.
 //Return the byte offset of content that related to string buffer.
-static size_t prt_leading_newline(LogMgr const* lm, StrBuf const& buf,
+static size_t prt_leading_newline(LogMgr * lm, StrBuf const& buf,
                                   UINT buflen, UINT start)
 {
     size_t i = start;
     ASSERT0(buf.strlen() <= buflen);
+    CHAR const* terminate_line_r = nullptr;
+    CHAR const* terminate_line = "\n";
+    if (lm->isReplaceNewline()) {
+        //Print terminate lines that are left
+        //justified in DOT file.
+        terminate_line_r = "\\l";
+    } else {
+        terminate_line_r = "\n";
+    }
     while (i < buflen) {
         if (buf.buf[i] == LOGMGR_NEWLINE_CHAR) {
             if (lm->isReplaceNewline()) {
                 //Print terminate lines that are left
                 //justified in DOT file.
-                fprintf(lm->getFileHandler(), "\\l");
+                if (lm->isEnableBuffer()) {
+                    lm->getBuffer()->strcat(terminate_line_r);
+                } else {
+                    fprintf(lm->getFileHandler(), terminate_line_r);
+                }
             } else {
-                fprintf(lm->getFileHandler(), "\n");
+                if (lm->isEnableBuffer()) {
+                    lm->getBuffer()->strcat(terminate_line);
+                } else {
+                    fprintf(lm->getFileHandler(), terminate_line);
+                }
             }
         } else {
             break;
@@ -75,28 +92,28 @@ static size_t prt_leading_newline(LogMgr const* lm, StrBuf const& buf,
 }
 
 
-static void prt_indent(LogMgr const* lm)
+static void prt_indent(LogMgr * lm)
 {
     if (lm->getFileHandler() == nullptr) { return; }
     UINT indent = lm->getIndent();
     for (; indent > 0; indent--) {
-        fprintf(lm->getFileHandler(), "%c", lm->getIndentChar());
+        if (lm->isEnableBuffer()) {
+            lm->getBuffer()->strcat("%c", lm->getIndentChar());
+        } else {
+            fprintf(lm->getFileHandler(), "%c", lm->getIndentChar());
+        }
     }
-    fflush(lm->getFileHandler());
+    if (!lm->isEnableBuffer()) {
+        fflush(lm->getFileHandler());
+    }
 }
 
 
-static void note_helper(LogMgr const* lm, CHAR const* format, va_list args)
+static void note_helper(LogMgr * lm, StrBuf const& buf)
 {
     ASSERT0(lm);
     FILE * h = lm->getFileHandler();
-    if (h == nullptr || format == nullptr) { return; }
-
-    va_list targs;
-    va_copy(targs, args);
-    StrBuf buf(64);
-    buf.vstrcat(format, targs);
-    va_end(targs);
+    if (h == nullptr && !lm->isEnableBuffer()) { return; }
 
     UINT const buflen = (UINT)buf.strlen();
     //Print leading \n.
@@ -116,7 +133,11 @@ static void note_helper(LogMgr const* lm, CHAR const* format, va_list args)
         }
         if (cont_pos != buflen) {
             ASSERT0(cont_pos < buflen);
-            fprintf(h, "%s", buf.buf + cont_pos);
+            if (lm->isEnableBuffer()) {
+                lm->getBuffer()->strcat("%s", buf.buf + cont_pos);
+            } else {
+                fprintf(h, "%s", buf.buf + cont_pos);
+            }
         } else {
             break;
         }
@@ -132,16 +153,31 @@ static void note_helper(LogMgr const* lm, CHAR const* format, va_list args)
         }
     } while (newline_pos != -1);
 
-    fflush(h);
+    if (!lm->isEnableBuffer()) {
+        fflush(h);
+    }
+}
+
+
+static void note_helper(LogMgr * lm, CHAR const* format, va_list args)
+{
+    va_list targs;
+    va_copy(targs, args);
+    StrBuf buf(64);
+    buf.vstrcat(format, targs);
+    va_end(targs);
+    note_helper(lm, buf);
 }
 
 
 //Print string with indent chars.
-static void prt_helper(LogMgr const* lm, CHAR const* format, va_list args)
+static void prt_helper(LogMgr * lm, CHAR const* format, va_list args)
 {
     ASSERT0(lm);
     FILE * h = lm->getFileHandler();
-    if (h == nullptr || format == nullptr) { return; }
+    if ((h == nullptr && !lm->isEnableBuffer()) || format == nullptr) {
+        return;
+    }
 
     va_list targs;
     va_copy(targs, args);
@@ -152,9 +188,15 @@ static void prt_helper(LogMgr const* lm, CHAR const* format, va_list args)
     UINT buflen = (UINT)buf.strlen();
     size_t i = prt_leading_newline(lm, buf, buflen, 0);
     if (i != buflen) {
-        fprintf(h, "%s", buf.buf + i);
+        if (lm->isEnableBuffer()) {
+            lm->getBuffer()->strcat("%s", buf.buf + i);
+        } else {
+            fprintf(h, "%s", buf.buf + i);
+        }
     }
-    fflush(h);
+    if (!lm->isEnableBuffer()) {
+        fflush(h);
+    }
 }
 
 
@@ -181,7 +223,7 @@ bool prt(RegionMgr const* rm, CHAR const* format, ...)
 
 
 //Helper function to dump formatted string to logfile without indent.
-bool prt(LogMgr const* lm, CHAR const* format, ...)
+bool prt(LogMgr * lm, CHAR const* format, ...)
 {
     va_list args;
     va_start(args, format);
@@ -213,7 +255,7 @@ void note(RegionMgr const* rm, CHAR const* format, ...)
 
 //Print string with indent chars.
 //lm: Log manager
-void note(LogMgr const* lm, CHAR const* format, ...)
+void note(LogMgr * lm, CHAR const* format, ...)
 {
     ASSERT0(lm);
     va_list args;
@@ -243,8 +285,67 @@ void prtIndent(Region const* rg, UINT indent)
     prt_indent(rg->getLogMgr());
 }
 
-
+//
 //START LogMgr
+//
+//If buffer still enabled, the function will dump buffer into buffer
+//again. To dump to file, disable the option first.
+void LogMgr::dumpBuffer()
+{
+    if (isEnableBuffer() || m_ctx.buffer == nullptr) {
+        //Buffer still enabled, the function will dump buffer into buffer
+        //again. To dump to file, disable the LogMgr's option at first.
+        return;
+    }
+    note_helper(this, *m_ctx.buffer);
+}
+
+
+void LogMgr::startBuffer()
+{
+    m_ctx.enable_buffer = true;
+    if (m_ctx.buffer != nullptr) {
+        m_ctx.buffer->clean();
+        return;
+    }
+    m_ctx.buffer = new StrBuf(LOGCTX_DEFAULT_BUFFER_SIZE);
+    m_buftab.append(m_ctx.buffer);
+}
+
+
+void LogMgr::endBuffer()
+{
+    m_ctx.enable_buffer = false;
+    dumpBuffer();
+    if (m_ctx.buffer != nullptr) {
+        m_buftab.remove(m_ctx.buffer);
+        delete m_ctx.buffer;
+        m_ctx.buffer = nullptr;
+    }
+}
+
+
+void LogMgr::cleanBuffer()
+{
+    if (m_ctx.buffer != nullptr) {
+        m_ctx.buffer->clean();
+    }
+}
+
+
+void LogMgr::flushBuffer()
+{
+    if (!isEnableBuffer() || m_ctx.buffer == nullptr) {
+        //Buffer is not enabled.
+        return;
+    }
+    m_ctx.enable_buffer = false;
+    dumpBuffer();
+    cleanBuffer();
+    m_ctx.enable_buffer = true;
+}
+
+
 void LogMgr::init(CHAR const* logfilename, bool is_del)
 {
     if (m_ctx.logfile != nullptr || logfilename == nullptr) { return; }
@@ -267,6 +368,13 @@ void LogMgr::fini()
         fclose(m_ctx.logfile);
         m_ctx.clean();
     }
+
+    TTabIter<StrBuf*> it;
+    for (StrBuf * buf = m_buftab.get_first(it);
+         buf != nullptr; buf = m_buftab.get_next(it)) {
+        delete buf;
+    }
+    m_buftab.clean();
 }
 
 
@@ -307,6 +415,8 @@ void LogMgr::push(FILE * h, CHAR const* filename)
     LogCtx ctx;
     ctx.logfile = h;
     ctx.logfile_name = filename;
+    ctx.indent = m_ctx.indent;
+    ctx.indent_char = m_ctx.indent_char;
     push(ctx);
 }
 

@@ -2227,8 +2227,8 @@ void LTMgr::processUse(
     }
 
     cii.clean();
-    for (IR const* k = iterRhsInitC(ir, cii);
-         k != nullptr; k = iterRhsNextC(cii)) {
+    for (IR const* k = iterExpInitC(ir, cii);
+         k != nullptr; k = iterExpNextC(cii)) {
         if (!k->is_pr()) { continue; }
 
         if (group_part) {
@@ -4112,7 +4112,8 @@ void RA::allocLocalSpec(List<UINT> & nis)
         need_to_alloc.clean();
         UINT idx = 0;
         bool need_rebuild = false;
-        for (IR * k = iterInit(lastir, m_ii); k != nullptr; k = iterNext(m_ii)) {
+        for (IR * k = xoc::iterInit(lastir, m_ii);
+             k != nullptr; k = xoc::iterNext(m_ii)) {
             if (!k->is_pr()) { continue; }
 
             LT * l = ltm->map_pr2lt(PR_no(k));
@@ -4431,8 +4432,7 @@ UINT RA::computeReserveRegister(IRIter & ii, List<IR*> & resolve_list)
     for (IRBB * bb = bbl->get_head(); bb != nullptr; bb = bbl->get_next()) {
         LTMgr * ltm = m_gltm.get_ltm(bb->id());
         if (ltm == nullptr) { continue; }
-        for (IR * ir = BB_first_ir(bb);
-             ir != nullptr; ir = BB_next_ir(bb)) {
+        for (IR * ir = BB_first_ir(bb); ir != nullptr; ir = BB_next_ir(bb)) {
             ii.clean();
             FMT fmt = m_rsc.get_fmt(ir);
             ASSERT0(fmt != FUNDEF);
@@ -4452,8 +4452,8 @@ UINT RA::computeReserveRegister(IRIter & ii, List<IR*> & resolve_list)
                 }
             }
 
-            for (IR * k = iterRhsInit(ir, ii);
-                 k != nullptr; k = iterRhsNext(ii)) {
+            for (IR * k = xoc::iterExpInit(ir, ii);
+                 k != nullptr; k = xoc::iterExpNext(ii)) {
                 if (!k->is_pr()) { continue; }
 
                 LT * l = ltm->map_pr2lt(PR_no(k));
@@ -4548,8 +4548,8 @@ void RA::reviseRSC()
             }
         }
 
-        for (IR * k = iterRhsInit(ir, m_ii);
-             k != nullptr; k = iterRhsNext(m_ii)) {
+        for (IR * k = xoc::iterExpInit(ir, m_ii);
+             k != nullptr; k = xoc::iterExpNext(m_ii)) {
             if (!k->is_pr()) { continue; }
 
             LT * l = ltm->map_pr2lt(PR_no(k));

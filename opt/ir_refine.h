@@ -52,45 +52,44 @@ class RefineCtx {
 public:
     union {
         struct {
-            //Pass info topdown. True to do following refinement.
+            //Pass info top-down. True to do following refinement.
             //e.g: int a; a/2 => a>>1
             UINT refine_div_const:1;
 
-            //Pass info topdown. True to do following refinement.
+            //Pass info top-down. True to do following refinement.
             //e.g: int a; a*2 => a<<1
             //     int b; b*2 => b+b
             UINT refine_mul_const:1;
 
-            //Pass info topdown. True to do following refinement.
+            //Pass info top-down. True to do following refinement.
             UINT refine_stmt:1;
 
-            //Pass info topdown. True to do following refinement.
+            //Pass info top-down. True to do following refinement.
             //e.g: int a; a=2+3 => a=5
             UINT do_fold_const:1;
 
-            //Pass info topdown.
+            //Pass info top-down.
             //If the flag is true, the process will insert IR_CVT
             //if kid's type size is smaller then parent's type size.
             //e.g: parent:I32 = kid:I8 will be
             //     parent:I32 = cvt:I32 (kid:I8)
             UINT insertCvt:1;
 
-            //Pass info topdown. True to transform comparison stmt to lnot
+            //Pass info top-down. True to transform comparison stmt to lnot
             //e.g: transform $1!=0?0:1 to lnot($1),
             //where lnot indicates logical-not.
             UINT hoist_to_lnot:1;
 
-            //Pass info topdown. True to compute and update MD reference
+            //Pass info top-down. True to compute and update MD reference
             //when memory operation generated or modified.
             UINT update_mdref:1;
 
-            //Collect information bottom up to inform caller function
+            //Collect information bottom-up to inform caller function
             //that current stmt has been removed from the BB.
             //This flag may prevent the illegal removal when refinement
-            //back from IR expression process.
+            //return back from IR expression processing.
             UINT stmt_has_been_removed:1;
         } s1;
-
         UINT i1;
     } u1;
 
@@ -208,11 +207,8 @@ class Refine : public Pass {
     //The function will attempt to recompute the MD reference for given 'ir'.
     //Note the computation require that DUMgr has been ready.
     void recomputeMayRef(IR * ir);
-
 protected:
-    Region * m_rg;
     TypeMgr * m_tm;
-
 public:
     explicit Refine(Region * rg);
     virtual ~Refine() {}
@@ -225,7 +221,6 @@ public:
 
     virtual CHAR const* getPassName() const { return "IR Refinement"; }
     virtual PASS_TYPE getPassType() const { return PASS_REFINE; }
-    Region * getRegion() const { return m_rg; }
 
     //Invert condition for relation operation.
     static void invertCondition(IR ** cond, Region * rg);

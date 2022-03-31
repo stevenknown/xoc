@@ -127,11 +127,10 @@ public:
         //OC_is_cfg_valid(*this) = false; CFG should always be maintained.
         OC_is_scc_valid(*this) = false;
         OC_is_cdg_valid(*this) = false;
-        OC_is_dom_valid(*this) = false;
-        OC_is_pdom_valid(*this) = false;
         OC_is_rpo_valid(*this) = false;
         OC_is_loopinfo_valid(*this) = false;
         OC_is_scc_valid(*this) = false;
+        setDomValid(false);
     }
 
     //The function will invalidate flags which may be affected when dominator
@@ -154,7 +153,7 @@ public:
 
     //The function will invalidate flags which may be affected when DU chain
     //changed.
-    void setInvalidDUChain()
+    void setInvalidClassicDUChain()
     {
         OC_is_pr_du_chain_valid(*this) = false;
         OC_is_nonpr_du_chain_valid(*this) = false;

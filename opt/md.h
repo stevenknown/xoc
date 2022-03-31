@@ -50,8 +50,7 @@ typedef UINT MDIdx;
 #define MD_UNDEF 0 //Undefined.
 #define MD_FULL_MEM 1 //Represent all program memory.
 #define MD_FIRST MD_FULL_MEM
-#define MD_GLOBAL_VAR 2 //Represent variables that
-                        //allocated at program region
+#define MD_GLOBAL_VAR 2 //Represent variables that allocated at program region
                         //by explicit definition.
 #define MD_IMPORT_VAR 3 //Represent variables allocated at outer region
                         //which nor program region.
@@ -395,6 +394,8 @@ public:
 
     bool is_contain_pure(MDIdx mdid) const
     { return DefSBitSetCore::is_contain(mdid); }
+    bool is_contain_pure(MDSet const& mds) const
+    { return DefSBitSetCore::is_contain(mds); }
 
     //Return true if set contained global variable.
     bool is_contain_global() const

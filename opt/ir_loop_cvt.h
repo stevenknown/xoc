@@ -60,10 +60,9 @@ namespace xoc {
 //        ...
 class LoopCvt : public Pass {
 protected:
-    Region * m_rg;
     IRCFG * m_cfg;
     DUMgr * m_du;
-    IRIter m_ii;
+    ConstIRIter m_ii;
 
     bool is_while_do(LI<IRBB> const* li, IRBB ** gobackbb,
                     UINT * succ1, UINT * succ2);
@@ -72,10 +71,9 @@ protected:
     bool find_and_convert(List<LI<IRBB>*> & worklst);
 
 public:
-    explicit LoopCvt(Region * rg)
+    explicit LoopCvt(Region * rg) : Pass(rg)
     {
         ASSERT0(rg != nullptr);
-        m_rg = rg;
         m_du = rg->getDUMgr();
         m_cfg = m_rg->getCFG();
         ASSERT0(m_cfg && m_du);
@@ -83,7 +81,16 @@ public:
     COPY_CONSTRUCTOR(LoopCvt);
     virtual ~LoopCvt() {}
 
-    Region * getRegion() const { return m_rg; }
+    //The function dump pass relative information before performing the pass.
+    //The dump information is always used to detect what the pass did.
+    //Return true if dump successed, otherwise false.
+    virtual bool dumpBeforePass() const { return Pass::dumpBeforePass(); }
+
+    //The function dump pass relative information.
+    //The dump information is always used to detect what the pass did.
+    //Return true if dump successed, otherwise false.
+    virtual bool dump() const { return Pass::dump(); }
+
     virtual CHAR const* getPassName() const { return "Loop Convertion"; }
     PASS_TYPE getPassType() const { return PASS_LOOP_CVT; }
 

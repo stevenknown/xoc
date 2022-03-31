@@ -61,6 +61,7 @@ static bool verifyVar(Region * rg, VarMgr * vm, Var * v)
 //START AnalysisInstrument
 //
 AnalysisInstrument::AnalysisInstrument(Region * rg) :
+    m_rg(rg),
     m_md_mgr(rg),
     m_mds_mgr(rg, &m_sbs_mgr),
     m_mds_hash_allocator(&m_sbs_mgr),

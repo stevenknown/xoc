@@ -424,7 +424,7 @@ bool IVR::hasMultiDefInLoop(IR const* ir, LI<IRBB> const* li,
     MDSSAInfo const* ssainfo = m_mdssamgr->getMDSSAInfoIfAny(exp);
     if (ssainfo == nullptr) { return false; }
 
-    xoc::collectDefSet(exp, m_mdssamgr, true, set);
+    xoc::collectDefSet(exp, m_mdssamgr, set);
     IRSetIter it = nullptr;
     for (INT i = set->get_first(&it); i >= 0; i = set->get_next(i, &it)) {
         IR * stmt = m_rg->getIR(i);
@@ -1005,7 +1005,7 @@ bool IVR::dump() const
     note(getRegion(), "\n==---- DUMP %s '%s' ----==",
          getPassName(), m_rg->getRegionName());
     dump_recur(m_cfg->getLoopInfo(), 0);
-    return true;
+    return Pass::dump();
 }
 
 

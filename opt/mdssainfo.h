@@ -49,7 +49,8 @@ class VMDVec : public Vector<VMD*> {
 public:
     VMDVec() {}
     //Find the VMD that have MD defined at given BB.
-    VMD * findVMD(UINT bbid) const;
+    //Return true if the function find DEF in given BB.
+    bool hasDefInBB(UINT bbid) const;
 };
 
 
@@ -93,9 +94,6 @@ public:
     void set(UINT mdid, VMDVec * vmdvec);
 };
 
-
-//Mapping from MD id to Stack of VMD.
-typedef Vector<Stack<VMD*>*> UINT2VMDStack;
 
 typedef enum _VOPND_CODE {
     VOPND_UNDEF = 0,
@@ -181,7 +179,15 @@ public:
 class VMD : public VOpnd {
     COPY_CONSTRUCTOR(VMD);
 public:
-    typedef TTab<UINT> UseSet;
+    class UseSet : public TTab<UINT> {
+    public:
+        UINT append(UINT irid)
+        {
+            ASSERT0(irid != IR_UNDEF);
+            return TTab<UINT>::append(irid);
+        }
+        void dump(Region const* rg) const;
+    };
     typedef TTabIter<UINT> UseSetIter;
 
     UINT m_version; //unique version of MD.
@@ -248,6 +254,9 @@ public:
     void append(VOpnd const* v, xcom::DefMiscBitSetMgr & m)
     { xcom::DefSBitSetCore::bunion(v->id(), m); }
 
+    void copy(VOpndSet const& src, xcom::DefMiscBitSetMgr & m)
+    { xcom::DefSBitSetCore::copy(src, m); }
+
     bool find(VOpnd const* v) const
     {
         ASSERT0(v);
@@ -259,9 +268,34 @@ public:
         ASSERT0(v);
         xcom::DefSBitSetCore::diff(v->id(), m);
     }
+    void remove(VOpnd const* v, VOpndSetIter it, xcom::DefMiscBitSetMgr & m)
+    {
+        ASSERT0(v);
+        xcom::DefSBitSetCore::diff(v->id(), it, m);
+    }
 };
 
 typedef xcom::SEGIter * VOpndSetIter;
+
+#define COLLECT_UNDEF 0x0
+#define COLLECT_MAY_USE 0x1
+#define COLLECT_MAY_DEF 0x2
+#define COLLECT_MUST_USE 0x4
+#define COLLECT_MUST_DEF 0x8
+#define COLLECT_CROSS_PHI 0x10
+
+//The class represents the context information to collection.
+class CollectCtx {
+public:
+    TTab<UINT> m_visited;
+    UINT flag;
+public:
+    CollectCtx(UINT f) : flag(f) {}
+    void clean() { m_visited.clean(); }
+    bool is_visited(UINT id) const { return m_visited.find(id); }
+    void set_visited(UINT id) { m_visited.append(id); }
+};
+
 
 //Generate MDSSAInfo for individual memory-ref IR stmt/exp since each IR
 //has its own specific MDSSA Memory Reference information.
@@ -294,24 +328,37 @@ public:
     void addVOpnd(VOpnd const* vopnd, UseDefMgr * mgr);
 
     //Collect all USE, where USE is IR expression.
-    //The function will not go through MDPhi operation.
     //Note the function will not clear 'set' because caller may perform unify
     //operation.
-    void collectUse(UseDefMgr const* udmgr, OUT IRSet * set) const;
+    //ctx: indicates the terminating condition that the function should
+    //     stop and behaviors what the collector should take when
+    //     meeting specific IR operator.
+    void collectUse(UseDefMgr const* udmgr, CollectCtx & ctx,
+                    OUT IRSet * set) const;
     void cleanVOpndSet(UseDefMgr * mgr);
-    void copy(MDSSAInfo const& src, UseDefMgr * mgr);
+    void copyVOpndSet(VOpndSet const& src, UseDefMgr * mgr);
+    void copy(MDSSAInfo const& src, UseDefMgr * mgr)
+    {
+        ASSERT0(this != &src);
+        copyVOpndSet(src.readVOpndSet(), mgr);
+    }
 
     //Collect all DEF that overlapped with 'ref', where DEF is IR expression.
     //Note the function will not clear 'set' because caller may perform unify
     //operation.
     //ref: given MD, if it is NULL, the function will collect all DEFs.
-    //iter_phi_opnd: true if the collection will keep iterating DEF of PHI
-    //operand.
+    //collect_flag: if the collection will keep iterating DEF by crossing PHI
+    //              operand.
     void collectDef(MDSSAMgr const* mdssamgr, MD const* ref,
-                    bool iter_phi_opnd, OUT IRSet * set) const;
+                    CollectCtx const& ctx, OUT IRSet * set) const;
+
+    //Return true if current MDSSAInfo contains given MD only.
+    bool containSpecificMDOnly(MDIdx mdid, UseDefMgr const* udmgr) const;
 
     void init() { BaseAttachInfo::init(AI_MD_SSA); }
-    bool isUseReachable(UseDefMgr const* udmgr, IR const* exp) const;
+
+    //Return true if all definition of vopnds can reach 'exp'.
+    bool isMustDef(UseDefMgr const* udmgr, IR const* exp) const;
 
     void destroy(xcom::DefMiscBitSetMgr & m) { m_vopnd_set.clean(m); }
     void dump(MDSSAMgr const* mgr) const;
@@ -319,11 +366,21 @@ public:
     VOpndSet * getVOpndSet() { return &m_vopnd_set; }
     VOpnd * getVOpndForMD(UINT mdid, MDSSAMgr const* mgr) const;
 
-    VOpndSet const* readVOpndSet() const { return &m_vopnd_set; }
+    VOpndSet const& readVOpndSet() const { return m_vopnd_set; }
 
     //Remove given IR expression from occurence set.
     //exp: IR expression to be removed.
     void removeUse(IR const* exp, IN UseDefMgr * udmgr);
+
+    //Remove given IR expression from UseSet of each vopnd in MDSSAInfo.
+    //Note current MDSSAInfo is the SSA info of 'exp'.
+    //exp: IR expression to be removed.
+    void removeSpecificUse(IR const* exp, MDIdx mdid, UseDefMgr * mgr);
+
+    //Return true if there is VMD renamed.
+    //Note current MDSSAInfo is the SSA info of 'exp', the VOpndSet will be
+    //vmd: intent to be swap-in.
+    bool renameSpecificUse(IR const* exp, MOD VMD * vmd, UseDefMgr * mgr);
 
     //Remove vopnd from current MDSSAInfo.
     void removeVOpnd(VOpnd const* vopnd, UseDefMgr * mgr);
@@ -380,6 +437,9 @@ public:
     MD const* getResultMD(MDSystem const* sys) const
     { return getResult()->getMD(sys); }
 
+    //Note real-use does not include IR_ID.
+    bool hasOutsideLoopRealUse(LI<IRBB> const* li, Region const* rg) const;
+
     //Return true if n is the Next DEF of current DEF.
     bool isNext(MDDef const* n) const;
 
@@ -398,6 +458,9 @@ public:
     }
     bool is_phi() const { return MDDEF_is_phi(this); }
     bool is_valid() const { return id() != MDDEF_UNDEF; }
+    //Return true if MDDef's result referenced given 'mdid'.
+    bool isRefMD(MDIdx mdid) const { return getResult()->mdid() == mdid; }
+    bool isRefSameMDWith(IR const* ir) const;
 };
 
 
@@ -421,6 +484,9 @@ public:
         ASSERT0(v);
         return xcom::DefSBitSetCore::is_contain(v->id());
     }
+
+    //Return true if there is at least one element in set dominate v.
+    bool isElemDom(MDDef const* v, MDSSAMgr const* mgr) const;
 
     void remove(MDDef const* v, xcom::DefMiscBitSetMgr & m)
     {
@@ -452,14 +518,35 @@ public:
 
     void dump(Region const* rg, UseDefMgr const* mgr) const;
 
+    //Return true if MDPhi has given number of operand at least.
+    bool hasNumOfOpndAtLeast(UINT n) const
+    {
+        IR * o = getOpndList();
+        UINT i;
+        for (i = 0; i < n && o != nullptr;
+             i++, o = o->get_next()) {}
+        return i == n;
+    }
+
+    //Get the No.idx operand.
+    IR * getOpnd(UINT idx) const;
     IR * getOpndList() const { return m_opnd_list; }
     UINT getOpndNum() const { return xcom::cnt_list(getOpndList()); }
     VMD * getOpndVMD(IR const* opnd, UseDefMgr const* mgr) const;
 
+    void insertOpndAfter(IR * marker, IR * exp)
+    {
+        ASSERT0(marker && exp);
+        ASSERT0(xcom::in_list(MDPHI_opnd_list(this), marker));
+        ASSERT0(!xcom::in_list(MDPHI_opnd_list(this), exp));
+        ASSERT0(exp->getRefMD() && exp->getRefMDSet() == nullptr);
+        xcom::insertafter(&marker, exp);
+        ID_phi(exp) = this; //Record ID's host PHI.
+    }
     //Insert operand at given position.
     IR * insertOpndAt(MDSSAMgr * mgr, UINT pos, IRBB const* pred);
 
-    void replaceOpnd(IR * oldopnd, IR * newopnd);
+    void replaceOpnd(MOD IR * oldopnd, MOD IR * newopnd);
     void removeOpnd(IR * ir)
     {
         ASSERT0(xcom::in_list(getOpndList(), ir));
@@ -512,6 +599,7 @@ protected:
     UINT2VMDVec m_map_md2vmd; //record version for each MD.
 
 protected:
+    void buildMDPhiOpnd(MDPhi * phi, UINT mdid, UINT num_operands);
     void cleanOrDestroy(bool is_reinit);
     void destroyMD2VMDVec();
 
@@ -519,6 +607,9 @@ public:
     UseDefMgr(Region * rg, MDSSAMgr * mgr);
     ~UseDefMgr() { cleanOrDestroy(false); }
 
+    //Allocate MDPhi and initialize with the number of operands.
+    //Each operands has zero version to mdid.
+    MDPhi * allocMDPhi(UINT mdid);
     MDSSAInfo * allocMDSSAInfo();
     MDPhi * allocMDPhi(UINT mdid, UINT num_operands);
     MDDef * allocMDDef();
@@ -558,6 +649,7 @@ public:
     //Get Versioned MD object by giving MD id and MD version.
     VMD * getVMD(UINT mdid, UINT version) const;
     xcom::DefMiscBitSetMgr * getSBSMgr() const { return m_sbs_mgr;  }
+    MDSSAMgr * getMDSSAMgr() const { return m_mdssa_mgr; }
 
     void reinit() { cleanOrDestroy(true); }
     //The function remove and clean all information of 'vmd' from MDSSAMgr.

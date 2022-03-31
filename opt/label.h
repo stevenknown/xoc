@@ -48,7 +48,7 @@ typedef enum {
 #define PREFIX_OF_CLABEL() ""
 #define POSTFIX_OF_CLABEL() ""
 #define PREFIX_OF_PRAGMA() "_PRAGMA"
-
+#define PREFIX_OF_ILABEL_IN_GR "_GR_"
 
 #define ILABEL_STR_FORMAT  "%s%d%s" //prefix label-num postfix
 #define ILABEL_CONT(li) \
