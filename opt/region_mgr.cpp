@@ -246,6 +246,7 @@ bool RegionMgr::verifyPreDefinedInfo()
     checkRoundDesc();
     ASSERT0(WORD_LENGTH_OF_TARGET_MACHINE <=
             sizeof(TMWORD) * HOST_BIT_PER_BYTE);
+    ASSERT0(sizeof(TMWORD) <= sizeof(HOST_UINT));
     ASSERT0(BIT_PER_BYTE == HOST_BIT_PER_BYTE);
     ASSERT0(sizeof(INT8) * HOST_BIT_PER_BYTE == 8);
     ASSERT0(sizeof(UINT8) * HOST_BIT_PER_BYTE == 8);

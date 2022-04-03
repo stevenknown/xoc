@@ -588,8 +588,8 @@ static void tryMoveLabelFromHeadToPreheader(LI<IRBB> const* li, IRCFG * cfg,
     }
 
     //Mark labels that can not be moved to preheader BB.
-    for (INT i = li->getBodyBBSet()->get_first();
-         i >= 0; i = li->getBodyBBSet()->get_next(i)) {
+    for (BSIdx i = li->getBodyBBSet()->get_first();
+         i != BS_UNDEF; i = li->getBodyBBSet()->get_next(i)) {
         IRBB * bb = cfg->getBB(i);
         ASSERT0(bb);
         for (IR const* ir = BB_first_ir(bb);

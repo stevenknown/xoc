@@ -774,6 +774,7 @@ public:
     bool changeDomInfoByAddBypassEdge(UINT vex);
 
     void dumpDom(FILE * h, bool dump_dom_tree = true) const;
+    void dumpDom(CHAR const* name, bool dump_dom_tree = true) const;
 
     //Note graph entry node does not have idom.
     //id: vertex id.

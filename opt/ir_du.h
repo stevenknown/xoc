@@ -621,6 +621,14 @@ public:
     //the functin cut off du-chain between d1, d2 and their use.
     void removeUseFromDefset(IR const* ir);
 
+    //Remove Use-Def chain.
+    //exp: the expression to be removed.
+    //e.g: ir = ...
+    //    = ir //S1
+    //If S1 will be deleted, ir should be removed from its useset in MDSSAInfo.
+    //NOTE: the function only process exp itself.
+    void removeUse(IR const* ir);
+
     //Note that do NOT use the function to remove SSA def.
     //The function handle the MD DU chain and cut
     //off the DU chain between MD def and its MD use expression.

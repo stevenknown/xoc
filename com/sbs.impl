@@ -366,8 +366,8 @@ void SBitSetCore<BitsPerSeg>::dump(FILE * h) const
         ASSERT0(s);
 
         fprintf(h, " [");
-        INT n;
-        for (INT i = s->bs.get_first(); i >= 0; i = n) {
+        BSIdx n;
+        for (BSIdx i = s->bs.get_first(); i != BS_UNDEF; i = n) {
             n = s->bs.get_next((UINT)i);
             fprintf(h, "%d", ((UINT)i) + s->get_start());
             if (n >= 0) {
@@ -395,7 +395,7 @@ UINT SBitSetCore<BitsPerSeg>::get_elem_count() const
 
 //*cur will be set to nullptr if set is empty.
 template <UINT BitsPerSeg>
-INT SBitSetCore<BitsPerSeg>::get_first(TSEGIter ** cur) const
+BSIdx SBitSetCore<BitsPerSeg>::get_first(TSEGIter ** cur) const
 {
     ASSERT0(cur);
     TSEGIter * sc = segs.get_head();
@@ -409,13 +409,13 @@ INT SBitSetCore<BitsPerSeg>::get_first(TSEGIter ** cur) const
 
     SEG<BitsPerSeg> * s = sc->val();
     ASSERTN(!s->bs.is_empty(), ("empty SEG should not exist."));
-    return (INT)s->get_start() + s->bs.get_first();
+    return (BSIdx)s->get_start() + s->bs.get_first();
 }
 
 
 //*cur will be set to nullptr if set is empty.
 template <UINT BitsPerSeg>
-INT SBitSetCore<BitsPerSeg>::get_last(TSEGIter ** cur) const
+BSIdx SBitSetCore<BitsPerSeg>::get_last(TSEGIter ** cur) const
 {
     ASSERT0(cur);
     TSEGIter * sc = segs.get_tail();
@@ -435,7 +435,7 @@ INT SBitSetCore<BitsPerSeg>::get_last(TSEGIter ** cur) const
 
 //Note *cur must be initialized.
 template <UINT BitsPerSeg>
-INT SBitSetCore<BitsPerSeg>::get_next(UINT elem, TSEGIter ** cur) const
+BSIdx SBitSetCore<BitsPerSeg>::get_next(UINT elem, TSEGIter ** cur) const
 {
     if (cur == nullptr) {
         for (TSEGIter * st = segs.get_head();
@@ -447,8 +447,8 @@ INT SBitSetCore<BitsPerSeg>::get_next(UINT elem, TSEGIter ** cur) const
             if (elem < start) { continue; }
             UINT last = s->get_end();
             if (elem <= last) {
-                INT n = s->bs.get_next(elem - start);
-                if (n >= 0) { return (INT)(start + (UINT)n); }
+                BSIdx n = s->bs.get_next(elem - start);
+                if (n >= 0) { return (BSIdx)(start + (UINT)n); }
 
                 st = segs.get_next(st);
                 if (st == nullptr) {
@@ -457,8 +457,8 @@ INT SBitSetCore<BitsPerSeg>::get_next(UINT elem, TSEGIter ** cur) const
 
                 start = st->val()->get_start();
                 n = st->val()->bs.get_first();
-                ASSERT0(n >= 0);
-                return (INT)(start + (UINT)n);
+                ASSERT0(n != BS_UNDEF);
+                return (BSIdx)(start + (UINT)n);
             }
         }
         return BS_UNDEF;
@@ -468,9 +468,9 @@ INT SBitSetCore<BitsPerSeg>::get_next(UINT elem, TSEGIter ** cur) const
     if (st == nullptr) { return BS_UNDEF; }
 
     UINT start = st->val()->get_start();
-    INT n = st->val()->bs.get_next(elem - start);
+    BSIdx n = st->val()->bs.get_next(elem - start);
     if (n >= 0) {
-        return (INT)(start + (UINT)n);
+        return (BSIdx)(start + (UINT)n);
     }
 
     st = segs.get_next(st);
@@ -483,8 +483,8 @@ INT SBitSetCore<BitsPerSeg>::get_next(UINT elem, TSEGIter ** cur) const
     *cur = st;
     start = st->val()->get_start();
     n = st->val()->bs.get_first();
-    ASSERT0(n >= 0);
-    return (INT)(start + (UINT)n);
+    ASSERT0(n != BS_UNDEF);
+    return (BSIdx)(start + (UINT)n);
 }
 
 
@@ -707,7 +707,7 @@ size_t SBitSet<BitsPerSeg>::count_mem() const
 template <UINT BitsPerSeg>
 void SBitSet<BitsPerSeg>::bunion(BitSet const& src)
 {
-    for (INT i = src.get_first(); i >= 0; i = src.get_next(i)) {
+    for (BSIdx i = src.get_first(); i != BS_UNDEF; i = src.get_next(i)) {
         bunion((UINT)i);
     }
 }

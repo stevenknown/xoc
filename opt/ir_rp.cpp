@@ -1266,8 +1266,8 @@ UINT RegPromot::analyzeIndirectAccessStatus(IR const* ref1, IR const* ref2)
 
     UINT tysz1 = ref1->getTypeSize(m_tm);
     UINT tysz2 = ref2->getTypeSize(m_tm);
-    UINT ofst1 = ref1->getOffset();
-    UINT ofst2 = ref2->getOffset();
+    TMWORD ofst1 = ref1->getOffset();
+    TMWORD ofst2 = ref2->getOffset();
     if ((ofst1 + tysz1) <= ofst2 || (ofst2 + tysz2) <= ofst1) {
         return RP_DIFFERENT_OBJ;
     }
@@ -1585,8 +1585,8 @@ void RegPromot::removeMDPhiDUChain(IR const* dele, LI<IRBB> const* li,
                                    DelegateMgr const& delemgr)
 {
     if (!useMDSSADU()) { return; }
-    for (INT i = li->getBodyBBSet()->get_first();
-         i != -1; i = li->getBodyBBSet()->get_next(i)) {
+    for (BSIdx i = li->getBodyBBSet()->get_first();
+         i != BS_UNDEF; i = li->getBodyBBSet()->get_next(i)) {
         IRBB * bb = m_cfg->getBB(i);
         MDPhiList * philst = m_mdssamgr->getPhiList(bb);
         if (philst == nullptr) { continue; }
@@ -2498,7 +2498,6 @@ IRBB * RegPromot::tryInsertStubExitBB(IRBB * exit_bb,
     ASSERT0(pred_it);
 
     IRBB * stub = m_rg->allocBB();
-    m_cfg->addBB(stub);
     m_cfg->insertBBbetween(pred, pred_it, exit_bb, exit_bb_it, stub);
     if (!m_cfg->tryUpdateRPO(stub, exit_bb, true)) {
         OC_is_rpo_valid(*ctx.oc) = false;
@@ -2517,8 +2516,8 @@ bool RegPromot::analyszLoop(LI<IRBB> const* li, ExactAccTab & exact_tab,
                             InexactAccTab & inexact_tab)
 {
     ASSERT0(li);
-    for (INT i = li->getBodyBBSet()->get_first();
-         i != -1; i = li->getBodyBBSet()->get_next(i)) {
+    for (BSIdx i = li->getBodyBBSet()->get_first();
+         i != BS_UNDEF; i = li->getBodyBBSet()->get_next(i)) {
         IRBB * bb = m_cfg->getBB(i);
         ASSERT0(bb && m_cfg->getVertex(bb->id()));
         if (bb->hasReturn()) {
@@ -2646,6 +2645,8 @@ bool RegPromot::perform(OptCtx & oc)
         oc.setInvalidIfDUMgrLiveChanged();
         ASSERT0(!prssa_valid || PRSSAMgr::verifyPRSSAInfo(m_rg));
         ASSERT0(!mdssa_valid || MDSSAMgr::verifyMDSSAInfo(m_rg));
+        ASSERT0(m_cfg->verifyRPO(oc));
+        ASSERT0(m_cfg->verifyDomAndPdom(oc));
         if (g_dump_opt.isDumpAfterPass() && g_dump_opt.isDumpRP()) {
             //Exact and Inexact Acc info has been dumpped during promotion.
             dump();

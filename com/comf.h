@@ -161,7 +161,7 @@ float getclockend(LONG start);
 INT getFirstOneAtRightSide(INT m);
 
 //Calculate an integer hash value according to 'n'.
-inline UINT hash32bit(UINT n)
+inline UINT32 hash32bit(UINT32 n)
 {
     n = (n+0x7ed55d16) + (n<<12);
     n = (n^0xc761c23c) ^ (n>>19);

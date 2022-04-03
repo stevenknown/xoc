@@ -473,6 +473,11 @@ public:
     void collectDefinedMDForBBList(MOD DefMiscBitSetMgr & bs_mgr,
                                    OUT BB2DefMDSet & bb2defmds) const;
 
+    //Return true if VMDs of stmt cross version when moving stmt previous to
+    //marker at tgtbb.
+    bool crossVersion(IR const* stmt, IRBB const* tgtbb, IR const* marker,
+                      OptCtx const& oc) const;
+
     //Destroy all objects in MDSSAMgr.
     void destroy();
 
@@ -800,7 +805,16 @@ public:
     //Note current MDSSAInfo is the SSA info of 'exp', the VOpndSet will be
     //emtpy when exp is removed from all VOpnd's useset.
     //exp: IR expression to be removed.
+    //NOTE: the function only process exp itself.
     void removeExpFromAllVOpnd(IR const* exp);
+
+    //Remove Use-Def chain.
+    //exp: the expression to be removed.
+    //e.g: ir = ...
+    //    = ir //S1
+    //If S1 will be deleted, ir should be removed from its useset in MDSSAInfo.
+    //NOTE: the function only process exp itself.
+    void removeUse(IR const* exp);
 
     //The function remove 'phi' out from MDSSA system.
     //It will cut off DU chain of phi's operands, and the DU chain of phi

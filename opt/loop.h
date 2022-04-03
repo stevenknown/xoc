@@ -147,8 +147,8 @@ public:
     {
         note(rg, "\nLOOP%u HEAD:BB%u, BODY:", id(), getLoopHead()->id());
         if (getBodyBBSet() != nullptr) {
-            for (INT i = getBodyBBSet()->get_first();
-                 i != -1; i = getBodyBBSet()->get_next((UINT)i)) {
+            for (BSIdx i = getBodyBBSet()->get_first();
+                 i != BS_UNDEF; i = getBodyBBSet()->get_next((UINT)i)) {
                 prt(rg, "%u,", i);
             }
         }

@@ -396,7 +396,7 @@ public:
     IR * get_next() const { return IR_next(this); }
     IR * get_prev() const { return IR_prev(this); }
     inline IR * getBase() const; //Get base expression if exist.
-    inline UINT getOffset() const; //Get byte offset if any.
+    inline TMWORD getOffset() const; //Get byte offset if any.
     inline Var * getIdinfo() const; //Get idinfo if any.
     IR * getParent() const { return IR_parent(this); }
     inline IR * getKid(UINT idx) const;
@@ -942,7 +942,7 @@ public:
     //Set prno, and update SSAInfo meanwhile.
     void setPrnoConsiderSSAInfo(UINT prno);
     inline void setPrno(UINT prno);
-    inline void setOffset(UINT ofst);
+    inline void setOffset(TMWORD ofst);
     inline void setIdinfo(Var * idinfo);
     inline void setLabel(LabelInfo const* li);
     inline void setBB(IRBB * bb);
@@ -1133,7 +1133,7 @@ public:
     //    LDA<ofst:3>('x')                => pr = &x + 3
     //    ARRAY<ofst:3>(LDA('x'), OFST:5) => *(&x[5] + 3) = pr or
     //                                       pr = *(&x[5] + 3)
-    UINT field_offset;
+    TMWORD field_offset;
 };
 
 
@@ -2356,7 +2356,7 @@ void IR::setIdinfo(Var * idinfo)
 }
 
 
-UINT IR::getOffset() const
+TMWORD IR::getOffset() const
 {
     //DO NOT ASSERT even if current IR has no offset.
     switch (getCode()) {
@@ -2539,7 +2539,7 @@ void IR::setRHS(IR * rhs)
 }
 
 
-void IR::setOffset(UINT ofst)
+void IR::setOffset(TMWORD ofst)
 {
     ASSERT0(hasOffset());
     switch (getCode()) {

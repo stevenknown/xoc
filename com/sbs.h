@@ -359,9 +359,9 @@ public:
     void dump2(FILE * h) const;
 
     UINT get_elem_count() const;
-    INT get_first(TSEGIter ** cur) const;
-    INT get_last(TSEGIter ** cur) const;
-    INT get_next(UINT elem, TSEGIter ** cur) const;
+    BSIdx get_first(TSEGIter ** cur) const;
+    BSIdx get_last(TSEGIter ** cur) const;
+    BSIdx get_next(UINT elem, TSEGIter ** cur) const;
 
     void init() { segs.init(); }
     void intersect(SBitSetCore<BitsPerSeg> const& src, SegMgr<BitsPerSeg> * sm,
@@ -686,7 +686,7 @@ public:
     }
 
     //*cur will be set to nullptr if set is empty.
-    INT get_first(TSEGIter ** cur) const
+    BSIdx get_first(TSEGIter ** cur) const
     {
         ASSERT0(cur);
 
@@ -707,7 +707,7 @@ public:
     }
 
     //*cur will be set to nullptr if set is empty.
-    INT get_last(TSEGIter ** cur) const
+    BSIdx get_last(TSEGIter ** cur) const
     {
         TSEGIter * sc = SBitSetCore<BitsPerSeg>::segs.get_tail();
         if (sc == SBitSetCore<BitsPerSeg>::segs.end()) {

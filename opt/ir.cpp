@@ -541,7 +541,7 @@ bool IR::verify(Region const* rg) const
     Type const* d = getType();
     ASSERT0(d && d->verify(tm));
     if (d->is_vector()) {
-        UINT ofst = getOffset();
+        TMWORD ofst = getOffset();
         if (ofst != 0) {
             ASSERT0((ofst % tm->getDTypeByteSize(d->getVectorElemType())) == 0);
         }
@@ -1773,8 +1773,8 @@ bool IR::isNotOverlap(IR const* ir2, Region const* rg) const
         !ir1->hasOffset() || !ir2->hasOffset()) {
         return false;
     }
-    UINT offset1 = ir1->getOffset();
-    UINT offset2 = ir2->getOffset();
+    TMWORD offset1 = ir1->getOffset();
+    TMWORD offset2 = ir2->getOffset();
     UINT size1 = rg->getTypeMgr()->getByteSize(ir1->getType());
     UINT size2 = rg->getTypeMgr()->getByteSize(ir2->getType());
     if ((offset1 + size1 <= offset2) || (offset2 + size2 <= offset1)) {
@@ -1805,8 +1805,8 @@ bool IR::isCover(IR const* ir2, Region const* rg) const
     ASSERT0(rg);
     IR const* ir1 = this;
     ASSERT0(ir1 && ir2);
-    UINT offset1 = ir1->getOffset();
-    UINT offset2 = ir2->getOffset();
+    TMWORD offset1 = ir1->getOffset();
+    TMWORD offset2 = ir2->getOffset();
     UINT size1 = rg->getTypeMgr()->getByteSize(ir1->getType());
     UINT size2 = rg->getTypeMgr()->getByteSize(ir2->getType());
     if ((offset1 <= offset2) && (offset1 + size1 >= offset2 + size2)) {

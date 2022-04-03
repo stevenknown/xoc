@@ -561,8 +561,8 @@ bool LCSE::processDef(IN IRBB * bb, IN IR * ir,
         if ((maydef == nullptr || maydef->is_empty()) && mustdef == nullptr) {
             break;
         }
-        for (INT j = avail_ir_expr.get_first();
-             j != -1; j = avail_ir_expr.get_next(j)) {
+        for (BSIdx j = avail_ir_expr.get_first();
+             j != BS_UNDEF; j = avail_ir_expr.get_next(j)) {
             ExpRep * ie = m_expr_vec->get(j);
             ASSERT0(ie != nullptr);
             for (IR * occ = EXPR_occ_list(ie).get_head();

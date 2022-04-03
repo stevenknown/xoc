@@ -118,6 +118,16 @@ typedef unsigned int UINT;
 typedef unsigned int BOOL;
 typedef long LONG;
 typedef unsigned long ULONG;
+typedef char INT8;
+typedef signed short INT16;
+typedef signed int INT32;
+typedef signed long long INT64;
+typedef signed long long INT128;
+typedef unsigned char UINT8;
+typedef unsigned short UINT16;
+typedef unsigned int UINT32;
+typedef unsigned long long UINT64;
+typedef unsigned long long UINT128;
 
 #ifdef _ON_WINDOWS_
     typedef __int64 LONGLONG;

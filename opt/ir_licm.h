@@ -185,31 +185,23 @@ private:
 
     bool doLoopTree(LI<IRBB> * li, OUT HoistCtx & ctx);
 
+    void hoistStmt(MOD IR * def, MOD IRBB * prehead, OUT HoistCtx & ctx);
+
     //Return true if gurard BB of LOOP 'li' has been inserted.
     bool hasInsertedGuardBB(LI<IRBB> const* li) const;
 
     //Return true if any stmt that is related to invariant stmt
     //is moved outside from loop, return false if there is stmt that
     //prevents 'exp' from being hoisted from the loop.
-    bool handleDefByDUChain(IR const* exp,
-                            OUT IRBB * prehead,
-                            OUT LI<IRBB> * li);
-    void hoistWholeStmt(IR * cand_exp,
-                        OUT IRBB * prehead,
-                        OUT LI<IRBB> * li,
-                        OUT HoistCtx & ctx);
-    //Return true if any stmt is moved outside from loop.
-    bool hoistInvariantStmt(MOD IR * stmt,
-                            MOD IRBB * prehead,
-                            MOD LI<IRBB> * li);
+    bool hoistDefByDUChain(IR const* exp, OUT IRBB * prehead,
+                           OUT LI<IRBB> * li, MOD HoistCtx & ctx);
+
     //Hoist candidate IR to preheader BB.
-    void hoistCand(OUT IRBB * prehead, OUT LI<IRBB> * li, OUT HoistCtx & ctx);
-    //This function will maintain RPO of generated guard BB.
+    bool hoistCand(OUT IRBB * prehead, OUT LI<IRBB> * li, OUT HoistCtx & ctx);
+
     //Return true if BB or STMT changed.
-    bool hoistCandHelper(OUT IR * cand_exp,
-                         OUT IRBB * prehead,
-                         OUT LI<IRBB> * li,
-                         OUT HoistCtx & ctx);
+    bool hoistCandHelper(OUT IR * cand_exp, OUT IRBB * prehead,
+                         OUT LI<IRBB> * li, OUT HoistCtx & ctx);
 
     //Return true if stmt is marked and collected into invariant-stmt set.
     bool markedAsInvStmt(IR const* ir) const;
@@ -219,11 +211,6 @@ private:
     //Return true if md modified in loop only once.
     bool isUniqueDef(MD const* md) const;
 
-    //Insert guard controlling BB to predominate the execution of 'prehead'.
-    //This function will maintain RPO of generated guard BB.
-    //prehead: preheader BB of loop.
-    IRBB * insertGuardBB(LI<IRBB> const* li, IRBB * prehead, HoistCtx & ctx);
-
     //Return true if loop body is executed conditionally which is in charged of
     //the judgement stmt in loophead BB.
     //e.g:Return true for while-do loop, and false for do-while loop.
@@ -231,18 +218,17 @@ private:
 
     //Try to move and check that each definitions of candidate has been
     //already hoisted from loop.
-    bool tryMoveAllDefStmtOutFromLoop(IR const* c,
-                                     IRBB * prehead,
-                                     OUT LI<IRBB> * li);
+    bool tryMoveAllDefStmtOutFromLoop(IR const* c, IRBB * prehead,
+                                     OUT LI<IRBB> * li, MOD HoistCtx & ctx);
 
     //Return true if any stmt is moved outside from loop.
-    bool tryHoistDefStmt(MOD IR * def, MOD IRBB * prehead, MOD LI<IRBB> * li);
+    bool tryHoistDefStmt(MOD IR * def, MOD IRBB * prehead, MOD LI<IRBB> * li,
+                         MOD HoistCtx & ctx);
 
     //Try to evaluate the value of loop execution condition.
     //Returnt true if this function evaluated successfully,
     //otherwise return false.
-    bool tryEvalLoopExecCondition(LI<IRBB> const* li,
-                                  OUT bool & must_true,
+    bool tryEvalLoopExecCondition(LI<IRBB> const* li, OUT bool & must_true,
                                   OUT bool & must_false) const;
 
     //Scan expression to find invariant candidate.
@@ -269,6 +255,10 @@ private:
     //hoistCand may append stmt into BB which has down-boundary stmt.
     //That makes BB invalid. Split such invalid BB into two or more BBs.
     bool splitBBIfNeeded(IRBB * bb, OptCtx & oc);
+
+    //Return true if any stmt is moved outside from loop.
+    bool tryHoistStmt(IR * stmt, OUT IRBB * prehead, OUT LI<IRBB> * li,
+                      OUT HoistCtx & ctx);
 
     void updateMD2Num(IR * ir);
     bool useMDSSADU() const

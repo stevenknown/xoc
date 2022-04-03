@@ -1014,12 +1014,14 @@ bool IRCFG::tryUpdateRPO(IRBB * newbb, IRBB const* marker,
         ASSERTN(nv, ("newbb should be added to graph first"));
         VERTEX_rpo(nv) = rpo;
         RPOVexList * vlst = getRPOVexList();
-        if (newbb_prior_marker) {
-            vlst->insert_before(getVertex(newbb->id()),
-                                getVertex(marker->id()));
-        } else {
-            vlst->insert_after(getVertex(newbb->id()),
-                               getVertex(marker->id()));
+        if (vlst != nullptr) {
+            if (newbb_prior_marker) {
+                vlst->insert_before(getVertex(newbb->id()),
+                                    getVertex(marker->id()));
+            } else {
+                vlst->insert_after(getVertex(newbb->id()),
+                                   getVertex(marker->id()));
+            }
         }
         return true;
     }
@@ -1133,11 +1135,11 @@ void IRCFG::insertBBbetween(IN IRBB * from, IN BBListIter from_it,
     //or jumping to 'to'.
     BBList * bblst = getBBList();
 
+    addBB(newbb);
     //First, processing edge if 'from'->'to' is fallthrough.
     BBListIter tmp_it = from_it;
     if (from->is_fallthrough() && bblst->get_next(&tmp_it) == to) {
         bblst->insert_after(newbb, from_it);
-        addBB(newbb);
         insertVertexBetween(from->id(), to->id(), newbb->id());
         return;
     }
@@ -2588,8 +2590,6 @@ void IRCFG::reviseOutEdgeForFallthroughBB(IRBB * bb, BBListIter & bbit)
         addEdge(bb, next_bb);
     }
 }
-
-
 
 
 //Perform miscellaneous control flow optimizations.

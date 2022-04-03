@@ -672,7 +672,7 @@ IR * Region::buildGoto(LabelInfo const* li)
 //var: indicates the variable which value will be loaded.
 //ofst: memory byte offset relative to var.
 //type: result type of value.
-IR * Region::buildLoad(Var * var, UINT ofst, Type const* type)
+IR * Region::buildLoad(Var * var, TMWORD ofst, Type const* type)
 {
     ASSERT0(type);
     ASSERT0(var);
@@ -714,7 +714,7 @@ IR * Region::buildILoad(IR * base, Type const* type)
 
 
 //Build IR_ILD operation.
-IR * Region::buildILoad(IR * base, UINT ofst, Type const* type)
+IR * Region::buildILoad(IR * base, TMWORD ofst, Type const* type)
 {
     ASSERT0(type);
     IR * ir = buildILoad(base, type);
@@ -865,7 +865,7 @@ IR * Region::buildStore(Var * lhs, Type const* type, IR * rhs)
 //type: result data type.
 //ofst: memory byte offset relative to lhs.
 //rhs: value expected to store.
-IR * Region::buildStore(Var * lhs, Type const* type, UINT ofst, IR * rhs)
+IR * Region::buildStore(Var * lhs, Type const* type, TMWORD ofst, IR * rhs)
 {
     ASSERT0(type);
     IR * ir = buildStore(lhs, type, rhs);
@@ -875,7 +875,7 @@ IR * Region::buildStore(Var * lhs, Type const* type, UINT ofst, IR * rhs)
 
 
 //Build IR_IST operation.
-IR * Region::buildIStore(IR * base, IR * rhs, UINT ofst, Type const* type)
+IR * Region::buildIStore(IR * base, IR * rhs, TMWORD ofst, Type const* type)
 {
     ASSERT0(type);
     IR * ir = buildIStore(base, rhs, type);

@@ -101,11 +101,11 @@ public:
     }
 
     //Generate MD for Var.
-    MD const* genMDForVAR(Var * var, UINT offset)
+    MD const* genMDForVAR(Var * var, TMWORD offset)
     { return genMDForVAR(var, var->getType(), offset); }
 
     //Generate MD for Var.
-    MD const* genMDForVAR(Var * var, Type const* type, UINT offset)
+    MD const* genMDForVAR(Var * var, Type const* type, TMWORD offset)
     {
         ASSERT0(var && type);
         MD md;

@@ -30,7 +30,7 @@ USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 namespace xoc {
 
-#define MAX_PRNO 0xffffFF
+#define MAX_PRNO 0x7fffFFFF
 
 class Lexer;
 class IRParser;
@@ -275,6 +275,15 @@ protected:
     List<ParseErrorMsg*> m_err_list;
     TMap<Sym const*, UINT> m_id2prno;
 protected:
+    //Return true if GRReader allows user defined dedicated PRNO in GR file.
+    //e.g: stpr $200 = 0;
+    //     GRReader will directly assign Prno 200 to the stmt as a result.
+    //TODO: GRReader has to use string and immediate mapping to support the
+    //assignment to avoid both string-literal Prno and customized Prno in use.
+    //e.g: stpr $200 = 0;
+    //          ...  = $xyz;
+    bool allowCustomizePrno() { return false; }
+
     bool checkPhiOpndLabel(IR const* ir,
         xcom::TMap<LabelInfo const*, IR const*> const& labtab,
         ParseCtx const& ctx);
@@ -318,6 +327,8 @@ protected:
 
     UINT mapID2Prno(CHAR const* prid, ParseCtx * ctx);
 
+    bool parseCustomizedPrno(UINT * prno, ParseCtx * ctx);
+    bool parseStringLiteralPrno(UINT * prno, CHAR const* str, ParseCtx * ctx);
     bool parseRegionName(Region * region, UINT flag, ParseCtx * ctx);
     bool parseRegionProp(OUT PropertySet & ps, ParseCtx * ctx);
     bool parseRegionType(Region ** region, UINT * flag, ParseCtx * ctx);

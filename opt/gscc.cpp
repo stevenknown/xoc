@@ -44,7 +44,7 @@ bool GSCC::verify()
     for (; li != nullptr; li = li->get_next()) {
         BitSet * bbs = li->getBodyBBSet();
         ASSERT0(bbs);
-        for (INT i = bbs->get_first(); i != -1; i = bbs->get_next(i)) {
+        for (BSIdx i = bbs->get_first(); i != BS_UNDEF; i = bbs->get_next(i)) {
             ASSERT0(m_scc.isInSCC((UINT)i));
         }
     }

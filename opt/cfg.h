@@ -678,8 +678,8 @@ void CFG<BB, XR>::dumpLoopTree(LI<BB> const* looplist, UINT indent,
         prt(rg, "LOOP%d HEAD:BB%d, BODY:", looplist->id(),
             LI_loop_head(looplist)->id());
         if (LI_bb_set(looplist) != nullptr) {
-            for (INT i = LI_bb_set(looplist)->get_first();
-                 i != -1; i = LI_bb_set(looplist)->get_next((UINT)i)) {
+            for (BSIdx i = LI_bb_set(looplist)->get_first();
+                 i != BS_UNDEF; i = LI_bb_set(looplist)->get_next((UINT)i)) {
                 prt(rg, "%d,", i);
             }
         }
@@ -1449,7 +1449,8 @@ void CFG<BB, XR>::collectLoopInfoRecur(LI<BB> * li)
     //So we just use 'bb_set' for now. (see loop.h)
     xcom::BitSet * bbset = li->getBodyBBSet();
     ASSERT0(bbset != nullptr);
-    for (INT id = bbset->get_first(); id != -1; id = bbset->get_next(id)) {
+    for (BSIdx id = bbset->get_first(); id != BS_UNDEF;
+         id = bbset->get_next(id)) {
         BB * bb = getBB(id);
         ASSERT0(bb != nullptr);
         if (bb->hasCall()) {
@@ -1553,7 +1554,8 @@ bool CFG<BB, XR>::insertLoopTree(LI<BB> ** lilist, LI<BB>* loop)
 template <class BB, class XR>
 void CFG<BB, XR>::addBreakOutLoop(BB * loop_head, xcom::BitSet & body_set)
 {
-    for (INT i = body_set.get_first(); i >= 0; i = body_set.get_next((UINT)i)) {
+    for (BSIdx i = body_set.get_first();
+         i != BS_UNDEF; i = body_set.get_next((UINT)i)) {
         if (i == (INT)loop_head->id()) { continue; }
         xcom::Vertex * v = getVertex((UINT)i);
         ASSERT0(v);
@@ -1639,7 +1641,8 @@ BB * CFG<BB, XR>::findSingleExitBB(LI<BB> const* li, Edge const** exitedge)
     xcom::BitSet * bbset = li->getBodyBBSet();
     ASSERT0(bbset);
     INT exit = -1;
-    for (INT id = bbset->get_first(); id != -1; id = bbset->get_next(id)) {
+    for (BSIdx id = bbset->get_first(); id != BS_UNDEF;
+         id = bbset->get_next(id)) {
         Vertex const* vex = getVertex(id);
         ASSERT0(vex);
         for (EdgeC const* ec = vex->getOutList(); ec != nullptr;

@@ -143,10 +143,11 @@ void ExprTab::set_map_ir2ir_expr(IR const* ir, ExpRep * ie)
 }
 
 
-UINT ExprTab::compute_hash_key(IR const* ir)
+HOST_UINT ExprTab::compute_hash_key(IR const* ir)
 {
     ASSERT0(ir != nullptr);
-    UINT hval = ir->getCode() + (ir->getOffset() + 1) + (UINT)(size_t)IR_dt(ir);
+    HOST_UINT hval = ir->getCode() + (ir->getOffset() + 1) +
+                  (UINT)(size_t)IR_dt(ir);
     if (ir->isReadPR()) {
         hval += ir->getPrno();
     }
@@ -158,9 +159,9 @@ UINT ExprTab::compute_hash_key(IR const* ir)
 }
 
 
-UINT ExprTab::compute_hash_key_for_tree(IR * ir)
+HOST_UINT ExprTab::compute_hash_key_for_tree(IR * ir)
 {
-    UINT hval = 0;
+    HOST_UINT hval = 0;
     m_iter.clean();
     for (IR const* x = iterInitC(ir, m_iter);
          x != nullptr; x = iterNextC(m_iter)) {
@@ -176,10 +177,10 @@ UINT ExprTab::compute_hash_key_for_tree(IR * ir)
 ExpRep * ExprTab::append_expr(IR * ir)
 {
     if (ir == nullptr) { return nullptr; }
-    UINT key = compute_hash_key_for_tree(ir);
+    HOST_UINT key = compute_hash_key_for_tree(ir);
 
     //First level hashing.
-    UINT level1_hashv = key % IR_EXPR_TAB_LEVEL1_HASH_BUCKET;
+    HOST_UINT level1_hashv = key % IR_EXPR_TAB_LEVEL1_HASH_BUCKET;
     ExpRep ** level2_hash_tab = m_level1_hash_tab[level1_hashv];
     if (level2_hash_tab == nullptr) {
         //Generate level2
@@ -194,13 +195,13 @@ ExpRep * ExprTab::append_expr(IR * ir)
         m_ir_expr_vec.set(EXPR_id(ie), ie);
 
         //Enter into 'ir'
-        UINT level2_hashv = key % IR_EXPR_TAB_LEVEL2_HASH_BUCKET;
+        HOST_UINT level2_hashv = key % IR_EXPR_TAB_LEVEL2_HASH_BUCKET;
         level2_hash_tab[level2_hashv] = ie;
         return ie;
     }
 
     //Scanning in level2 hash tab.
-    UINT level2_hashv = key % IR_EXPR_TAB_LEVEL2_HASH_BUCKET;
+    HOST_UINT level2_hashv = key % IR_EXPR_TAB_LEVEL2_HASH_BUCKET;
     ExpRep * ie = level2_hash_tab[level2_hashv];
     if (ie == nullptr) {
         //Generate copy of 'ir'.
@@ -329,7 +330,7 @@ void ExprTab::remove_occs(IR * ir)
 //entry-info if it was existed.
 ExpRep * ExprTab::remove_expr(IR * ir)
 {
-    UINT key = compute_hash_key_for_tree(ir);
+    HOST_UINT key = compute_hash_key_for_tree(ir);
 
     //First level hashing.
     UINT level1_hashv = key % IR_EXPR_TAB_LEVEL1_HASH_BUCKET;
@@ -339,7 +340,7 @@ ExpRep * ExprTab::remove_expr(IR * ir)
     }
 
     //Scanning in level2 hash tab.
-    UINT level2_hashv = key % IR_EXPR_TAB_LEVEL2_HASH_BUCKET;
+    HOST_UINT level2_hashv = key % IR_EXPR_TAB_LEVEL2_HASH_BUCKET;
     ExpRep * ie = level2_hash_tab[level2_hashv];
     if (ie == nullptr) {
         return nullptr;
@@ -363,7 +364,7 @@ ExpRep * ExprTab::remove_expr(IR * ir)
 ExpRep * ExprTab::find_expr(IR * ir)
 {
     if (ir == nullptr) { return nullptr; }
-    UINT key = compute_hash_key_for_tree(ir);
+    HOST_UINT key = compute_hash_key_for_tree(ir);
 
     //First level hashing.
     UINT level1_hashv = key % IR_EXPR_TAB_LEVEL1_HASH_BUCKET;

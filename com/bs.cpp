@@ -872,8 +872,8 @@ void BitSet::bunion(BitSet const& bs)
     UINT cp_sz = bs.m_size; //size needs to unifiy
     if (m_size < bs.m_size) {
         //src's last byte pos.
-        INT l = bs.get_last();
-        if (l < 0) { return; }
+        BSIdx l = bs.get_last();
+        if (l == BS_UNDEF) { return; }
         cp_sz = l / BITS_PER_BYTE + 1;
         if (m_size < cp_sz) {
             m_ptr = (BYTE*)realloc(m_ptr, m_size, cp_sz);
@@ -1025,7 +1025,7 @@ UINT BitSet::get_elem_count() const
     ASSERT0(BYTES_PER_UINT == 4);
     UINT const m = m_size / BYTES_PER_UINT;
     for (UINT i = 0; i < m; i++) {
-        INT v = ((INT*)(m_ptr))[i];
+        UINT v = ((UINT*)(m_ptr))[i];
         v = v - ((v >> 1) & 0x55555555);
         v = (v & 0x33333333) + ((v >> 2) & 0x33333333);
         count += (((v + (v >> 4)) & 0x0F0F0F0F) * 0x01010101) >> 24;
@@ -1118,12 +1118,12 @@ bool BitSet::is_contain(BitSet const& bs, bool strict) const
 {
     ASSERT0(this != &bs);
     bool scon = false; //Set to true if 'this' strictly contained 'bs'.
-    INT const first_bit = get_first();
-    if (first_bit == -1) {
+    BSIdx const first_bit = get_first();
+    if (first_bit == BS_UNDEF) {
         return false;
     }
-    INT const bs_first_bit = bs.get_first();
-    if (bs_first_bit == -1) {
+    BSIdx const bs_first_bit = bs.get_first();
+    if (bs_first_bit == BS_UNDEF) {
         //nullptr set be contained for any set.
         return true;
     }
@@ -1134,23 +1134,23 @@ bool BitSet::is_contain(BitSet const& bs, bool strict) const
         scon = true;
     }
 
-    INT const start_bit = MAX(first_bit, bs_first_bit);
-    INT const start_byte = DIVBPB(start_bit);
+    BSIdx const start_bit = MAX(first_bit, bs_first_bit);
+    UINT const start_byte = DIVBPB(start_bit);
 
     if (m_size < bs.m_size) {//'this' is smaller
-        if (bs.get_next(MULBPB(m_size) - 1) != -1) {
+        if (bs.get_next(MULBPB(m_size) - 1) != BS_UNDEF) {
             //'bs' has more elements than 'this'.
             return false;
         }
     } else if (strict && m_size > bs.m_size) {//'bs' is smaller
-        if (get_next(MULBPB(bs.m_size) - 1) != -1) {
+        if (get_next(MULBPB(bs.m_size) - 1) != BS_UNDEF) {
             //'this' has more elements than 'this'.
             scon = true;
         }
     }
 
-    INT const minsize = MIN(m_size, bs.m_size);
-    for (INT i = start_byte; i < minsize; i++) {
+    UINT const minsize = MIN(m_size, bs.m_size);
+    for (UINT i = start_byte; i < minsize; i++) {
         if ((m_ptr[i] & bs.m_ptr[i]) != bs.m_ptr[i]) {
             return false;
         }
@@ -1188,12 +1188,12 @@ bool BitSet::is_empty() const
 bool BitSet::is_intersect(BitSet const& bs) const
 {
     ASSERT0(this != &bs);
-    INT const first_bit = get_first();
-    if (first_bit == -1) {
+    BSIdx const first_bit = get_first();
+    if (first_bit == BS_UNDEF) {
         return false;
     }
-    INT const bs_first_bit = bs.get_first();
-    if (bs_first_bit == -1) { //Empty set
+    BSIdx const bs_first_bit = bs.get_first();
+    if (bs_first_bit == BS_UNDEF) { //Empty set
         return false;
     }
 
@@ -1216,11 +1216,11 @@ bool BitSet::is_intersect(BitSet const& bs) const
 bool BitSet::is_contained_in_range(UINT low, UINT high, bool strict) const
 {
     ASSERTN(low <= high, ("Invalid bit set"));
-    INT const set_low = get_first();
-    if (set_low == -1) {
+    BSIdx const set_low = get_first();
+    if (set_low == BS_UNDEF) {
         return false;
     }
-    INT const set_high = get_last();
+    BSIdx const set_high = get_last();
     //In case:
     // low                           high
     // |---------------------------|     given range
@@ -1243,11 +1243,11 @@ bool BitSet::is_contained_in_range(UINT low, UINT high, bool strict) const
 bool BitSet::is_contain_range(UINT low, UINT high, bool strict) const
 {
     ASSERTN(low <= high, ("Invalid bit set"));
-    INT const set_low = get_first();
-    if (set_low == -1) {
+    BSIdx const set_low = get_first();
+    if (set_low == BS_UNDEF) {
         return false;
     }
-    INT const set_high = get_last();
+    BSIdx const set_high = get_last();
     //In case:
     //         low              high
     //          |--------------|            //given range
@@ -1272,11 +1272,11 @@ bool BitSet::is_contain_range(UINT low, UINT high, bool strict) const
 bool BitSet::is_overlapped(UINT low, UINT high) const
 {
     ASSERTN(low <= high, ("Invalid bit set"));
-    INT const set_low = get_first();
-    if (set_low == -1) {
+    BSIdx const set_low = get_first();
+    if (set_low == BS_UNDEF) {
         return false;
     }
-    INT const set_high = get_last();
+    BSIdx const set_high = get_last();
 
     //In case:
     // low                           high
@@ -1321,19 +1321,19 @@ bool BitSet::is_overlapped(UINT low, UINT high) const
 bool BitSet::has_elem_in_range(UINT low, UINT high) const
 {
     ASSERTN(low <= high, ("out of boundary"));
-    INT const first_bit = get_first();
-    if (first_bit == -1 || (UINT)first_bit > high) {
+    BSIdx const first_bit = get_first();
+    if (first_bit == BS_UNDEF || (UINT)first_bit > high) {
         return false;
     }
     if ((UINT)first_bit >= low && (UINT)first_bit <= high) {
         return true;
     }
-    INT const last_bit = get_last();
+    BSIdx const last_bit = get_last();
     if ((UINT)last_bit < low) {
         return false;
     }
-    INT const start_bit = low;
-    INT const end_bit = MIN((UINT)last_bit, high);
+    BSIdx const start_bit = low;
+    BSIdx const end_bit = MIN((UINT)last_bit, high);
     if (is_contain(start_bit)) {
         return true;
     }
@@ -1345,14 +1345,14 @@ bool BitSet::has_elem_in_range(UINT low, UINT high) const
 
 
 //Return position of first element, start from '0'.
-//Return -1 if the bitset is empty.
-INT BitSet::get_first() const
+//Return BS_UNDEF if the bitset is empty.
+BSIdx BitSet::get_first() const
 {
-    if (m_size == 0) { return -1; }
+    if (m_size == 0) { return BS_UNDEF; }
     UINT i = 0;
     UINT m = m_size / BYTES_PER_UINT * BYTES_PER_UINT;
     for (UINT const* uint_ptr = ((UINT const*)(m_ptr));
-         i < m; uint_ptr++, i += 4) {
+         i < m; uint_ptr++, i += BYTES_PER_UINT) {
         if (*uint_ptr == 0) { continue; }
         for (BYTE const* bptr = ((BYTE*)(uint_ptr));
              i < m; bptr++, i++) {
@@ -1370,41 +1370,46 @@ INT BitSet::get_first() const
             return g_first_one[byte] + (MULBPB(i));
         }
     }
-    return -1;
+    return BS_UNDEF;
 }
 
 
 //Get bit postition of the last element ONE.
-//Return -1 if bitset is empty.
-INT BitSet::get_last() const
+//Return BS_UNDEF if bitset is empty.
+BSIdx BitSet::get_last() const
 {
-    if (m_size == 0) { return -1; }
-    INT i = m_size - 1;
+    if (m_size == 0) { return BS_UNDEF; }
     UINT m = m_size % BYTES_PER_UINT;
-    if (m == 0) {
-        m = BYTES_PER_UINT;
-    }
-    for (; i >= (INT)(m_size - m); i--) {
-        BYTE byte = m_ptr[i];
-        if (byte != (BYTE)0) {
-            return g_last_one[byte] + (MULBPB(i));
+    UINT i = m_size - 1;
+    if (m != 0) {
+        for (UINT j = 0; j < m; j++) {
+            BYTE byte = m_ptr[i - j];
+            if (byte != (BYTE)0) {
+                return g_last_one[byte] + (MULBPB(i - j));
+            }
         }
+        if (m_size <= BYTES_PER_UINT) {
+            return BS_UNDEF;
+        }
+        i -= m;
     }
-    if (i < 0) { return -1; }
+
     UINT const* uint_ptr;
+    UINT j = 0;
     for (uint_ptr = ((UINT const*)(m_ptr)) + i / BYTES_PER_UINT;
-         i >= 0; uint_ptr--, i -= 4) {
+         j <= i; uint_ptr--, j += BYTES_PER_UINT) {
         if (*uint_ptr == 0) { continue; }
-        for (BYTE const* bptr = ((BYTE*)(uint_ptr)) + BYTES_PER_UINT - 1;
-             i >= 0; bptr--, i--) {
+        INT k = BYTES_PER_UINT - 1;
+        for (BYTE const* bptr = ((BYTE*)(uint_ptr)) + k; k >= 0; bptr--, k--) {
             BYTE byte = *bptr;
             if (byte != (BYTE)0) {
-                return g_last_one[byte] + (MULBPB(i));
+                return g_last_one[byte] +
+                       (MULBPB(i - j - (BYTES_PER_UINT - 1 - k)));
             }
         }
     }
     ASSERT0(m_ptr == ((BYTE*)uint_ptr) + sizeof(UINT));
-    return -1;
+    return BS_UNDEF;
 }
 
 
@@ -1415,11 +1420,11 @@ BitSet * BitSet::get_subset_in_range(UINT low, UINT high, OUT BitSet & subset)
     ASSERTN(&subset != this, ("overlapped!"));
 
     subset.clean();
-    INT first_bit = get_first();
-    if (first_bit == -1) {
+    BSIdx first_bit = get_first();
+    if (first_bit == BS_UNDEF) {
         return &subset;
     }
-    INT last_bit = get_last();
+    BSIdx last_bit = get_last();
     if ((low > (UINT)last_bit) || (high < (UINT)first_bit)) {
         return &subset;
     }
@@ -1434,7 +1439,7 @@ BitSet * BitSet::get_subset_in_range(UINT low, UINT high, OUT BitSet & subset)
 
     //START and END byte-pos of duplication and which apart from
     //the first and last byte of the extracted range.
-    INT start, end;
+    UINT start, end;
     if (first_byte > sb_first_byte) {
         //'this':             first_byte, ...
         //subset: first_byte, ...
@@ -1443,8 +1448,7 @@ BitSet * BitSet::get_subset_in_range(UINT low, UINT high, OUT BitSet & subset)
             //'this': last_byte,
             //subset:       ,...,last_byte
             end = last_byte;
-            ::memcpy(subset.m_ptr + start,
-                    m_ptr + start, end - start + 1);
+            ::memcpy(subset.m_ptr + start, m_ptr + start, end - start + 1);
         } else {
             //'this':         ,...,last_byte
             //subset: last_byte,
@@ -1452,11 +1456,10 @@ BitSet * BitSet::get_subset_in_range(UINT low, UINT high, OUT BitSet & subset)
             //'this': last_byte,
             //subset: last_byte,
             end = sb_last_byte - 1;
-            if (end >= start) {
-                //Copy the content of 'this', except for
-                //the first and last byte.
-                ::memcpy(subset.m_ptr + start,
-                        m_ptr + start, end - start + 1);
+            if ((INT)end >= (INT)start) {
+                //Copy the content of 'this', except for the first and last
+                //byte.
+                ::memcpy(subset.m_ptr + start, m_ptr + start, end - start + 1);
             }
             BYTE byte = m_ptr[sb_last_byte];
             UINT ofst = MODBPB(high);
@@ -1465,73 +1468,73 @@ BitSet * BitSet::get_subset_in_range(UINT low, UINT high, OUT BitSet & subset)
             byte >>= ofst;
             subset.m_ptr[sb_last_byte] = byte;
         }
-    } else {
-        //'this': first_byte, ...,
-        //subset:             first_byte, ...
-        //or:
-        //'this': first_byte, ...
-        //subset: first_byte, ...
-        BYTE byte = m_ptr[sb_first_byte];
-        UINT ofst = MODBPB(low);
-        byte >>= ofst;
-        byte <<= ofst;
-        subset.m_ptr[sb_first_byte] = byte;
+        return &subset;
+    }
 
-        start = sb_first_byte + 1;
-        if (last_byte < sb_last_byte) {
-            //'this': last_byte,
-            //subset:          ,...,last_byte
-            end = last_byte;
+    //'this': first_byte, ...,
+    //subset:             first_byte, ...
+    //or:
+    //'this': first_byte, ...
+    //subset: first_byte, ...
+    BYTE byte = m_ptr[sb_first_byte];
+    UINT ofst = MODBPB(low);
+    byte >>= ofst;
+    byte <<= ofst;
+    subset.m_ptr[sb_first_byte] = byte;
+
+    start = sb_first_byte + 1;
+    if (last_byte < sb_last_byte) {
+        //'this': last_byte,
+        //subset:          ,...,last_byte
+        end = last_byte;
+        ::memcpy(subset.m_ptr + start, m_ptr + start, end - start + 1);
+    } else {
+        //'this':          ,...,last_byte
+        //subset: last_byte,
+        //or:
+        //'this': last_byte,
+        //subset: last_byte,
+        end = sb_last_byte - 1;
+        BYTE byte2 = 0;
+        if ((INT)end >= (INT)start) {
+            //Copy the content of 'this', except for the first and last
+            //byte.
             ::memcpy(subset.m_ptr + start, m_ptr + start, end - start + 1);
+            byte2 = m_ptr[sb_last_byte];
         } else {
-            //'this':          ,...,last_byte
-            //subset: last_byte,
-            //or:
-            //'this': last_byte,
-            //subset: last_byte,
-            end = sb_last_byte - 1;
-            BYTE byte2 = 0;
-            if (end >= start) {
-                //Copy the content of 'this', except
-                //for the first and last byte.
-                ::memcpy(subset.m_ptr + start,
-                        m_ptr + start, end - start + 1);
+            //There are two cases:
+            //CASE1: Both subset's first and last byte are the same one.
+            //    'this': first/last_byte,
+            //    subset: first/last_byte,
+            //CASE2: first and last byte are sibling.
+            //    'this': first_byte, last_byte,
+            //    subset: first_byte, last_byte,
+            if (sb_first_byte == sb_last_byte) {
+                byte2 = subset.m_ptr[sb_last_byte];
+            } else if (sb_first_byte + 1 == sb_last_byte) {
                 byte2 = m_ptr[sb_last_byte];
             } else {
-                //There are two cases:
-                //CASE1: Both subset's first and last byte are the same one.
-                //    'this': first/last_byte,
-                //    subset: first/last_byte,
-                //CASE2: first and last byte are sibling.
-                //    'this': first_byte, last_byte,
-                //    subset: first_byte, last_byte,
-                if (sb_first_byte == sb_last_byte) {
-                    byte2 = subset.m_ptr[sb_last_byte];
-                } else if (sb_first_byte + 1 == sb_last_byte) {
-                    byte2 = m_ptr[sb_last_byte];
-                } else {
-                    UNREACHABLE();
-                }
+                UNREACHABLE();
             }
-            UINT ofst2 = MODBPB(high);
-            ofst2 = BITS_PER_BYTE - ofst2 - 1;
-            byte2 <<= ofst2;
-            byte2 >>= ofst2;
-            subset.m_ptr[sb_last_byte] = byte2;
         }
+        UINT ofst2 = MODBPB(high);
+        ofst2 = BITS_PER_BYTE - ofst2 - 1;
+        byte2 <<= ofst2;
+        byte2 >>= ofst2;
+        subset.m_ptr[sb_last_byte] = byte2;
     }
     return &subset;
 }
 
 
-//Return -1 if it has no other element.
+//Return BS_UNDEF if it has no other element.
 //'elem': return next one to current element.
-INT BitSet::get_next(UINT elem) const
+BSIdx BitSet::get_next(UINT elem) const
 {
-    if (m_size == 0) { return -1; }
-    INT first_byte = DIVBPB(elem);
+    if (m_size == 0) { return BS_UNDEF; }
+    UINT first_byte = DIVBPB(elem);
     if (((UINT)first_byte + 1) > m_size) {
-        return -1;
+        return BS_UNDEF;
     }
     BYTE byte = m_ptr[first_byte];
     elem = MODBPB(elem) + 1; //index in 'first_byte'.
@@ -1549,7 +1552,7 @@ INT BitSet::get_next(UINT elem) const
             i++;
         }
         if (byte == 0) {
-            return -1;
+            return BS_UNDEF;
         }
     }
     return g_first_one[byte] + (MULBPB(first_byte));
@@ -1575,8 +1578,8 @@ void BitSet::copy(BitSet const& src)
     UINT cp_sz = src.m_size; //size needs to copy.
     if (m_size < src.m_size) {
         //src's last byte pos.
-        INT l = src.get_last();
-        if (l < 0) {
+        BSIdx l = src.get_last();
+        if (l == BS_UNDEF) {
             ::memset(m_ptr, 0, m_size);
             return;
         }
@@ -1607,7 +1610,8 @@ BitSet const& BitSet::operator = (BitSet const& src)
 }
 
 
-void BitSet::dump(CHAR const* name, bool is_del, UINT flag, INT last_pos) const
+void BitSet::dump(CHAR const* name, bool is_del, UINT flag,
+                  BSIdx last_pos) const
 {
     if (name == nullptr) {
         name = "zbs.cxx";
@@ -1622,16 +1626,16 @@ void BitSet::dump(CHAR const* name, bool is_del, UINT flag, INT last_pos) const
 }
 
 
-void BitSet::dump(FILE * h, UINT flag, INT last_pos) const
+void BitSet::dump(FILE * h, UINT flag, BSIdx last_pos) const
 {
     if (h == nullptr) { return; }
-    ASSERT0(last_pos < 0 || (last_pos / BITS_PER_BYTE) < (INT)m_size);
+    ASSERT0(last_pos == BS_UNDEF || ((UINT)last_pos / BITS_PER_BYTE) < m_size);
 
-    INT elem = get_last();
-    if (last_pos != -1) {
+    BSIdx elem = get_last();
+    if (last_pos != BS_UNDEF) {
         elem = last_pos;
     }
-    if (elem < 0) {
+    if (elem == BS_UNDEF) {
         if (HAVE_FLAG(flag, BS_DUMP_BITSET)) {
             fprintf(h, "\nbitset:[]");
         }
@@ -1639,7 +1643,7 @@ void BitSet::dump(FILE * h, UINT flag, INT last_pos) const
             fprintf(h, "\npos(start at 0):");
         }
     } else {
-        INT i = 0;
+        BSIdx i = 0;
         //fprintf(h, "\nbitset(hex):\n\t");
         //fprintf(h, "[0x");
         //for (BYTE byte = m_ptr[i]; i <= DIVBPB(elem); byte = m_ptr[++i]) {

@@ -518,7 +518,7 @@ public:
     //var: indicates the variable which value will be loaded.
     //ofst: memory byte offset relative to var.
     //type: result type of value.
-    IR * buildLoad(Var * var, UINT ofst, Type const* type);
+    IR * buildLoad(Var * var, TMWORD ofst, Type const* type);
 
     //Build IR_LD operation.
     //Load value from variable with type 'type'.
@@ -544,7 +544,7 @@ public:
     //   the size of memory chunk.
     //NOTICE: The ofst of ILD requires to maintain when after return.
     IR * buildILoad(IR * base, Type const* type);
-    IR * buildILoad(IR * base, UINT ofst, Type const* type);
+    IR * buildILoad(IR * base, TMWORD ofst, Type const* type);
 
     //Build IR_ST operation.
     //lhs: memory variable, described target memory location.
@@ -562,7 +562,7 @@ public:
     //type: result data type.
     //ofst: memory byte offset relative to lhs.
     //rhs: value expected to store.
-    IR * buildStore(Var * lhs, Type const* type, UINT ofst, IR * rhs);
+    IR * buildStore(Var * lhs, Type const* type, TMWORD ofst, IR * rhs);
 
     //Build store operation to store 'rhs' to new pr with type and prno.
     //prno: target prno.
@@ -594,7 +594,7 @@ public:
     //type: result type of indirect memory operation, note type is not the
     //data type of lhs.
     IR * buildIStore(IR * base, IR * rhs, Type const* type);
-    IR * buildIStore(IR * base, IR * rhs, UINT ofst, Type const* type);
+    IR * buildIStore(IR * base, IR * rhs, TMWORD ofst, Type const* type);
 
     //Build IR_CONST operation.
     //The result IR indicates a string.

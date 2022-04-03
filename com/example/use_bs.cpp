@@ -8,7 +8,8 @@ void bs()
     bs.bunion(3);
 
     printf("Iter element:\n");
-    for (int elem = bs.get_first(); elem != -1; elem = bs.get_next(elem)) {
+    for (BSIdx elem = bs.get_first(); elem != BS_UNDEF;
+         elem = bs.get_next(elem)) {
         printf("%d\n", elem);
     }
 

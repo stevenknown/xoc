@@ -265,7 +265,7 @@ IR * Refine::refineILoad1(IR * ir, bool & change, RefineCtx & rc)
     ASSERTN(base->is_lda() && LDA_ofst(base) == 0, ("not the case"));
 
     //ILD offset may not be 0.
-    INT ild_ofst = ILD_ofst(ir);
+    TMWORD ild_ofst = ILD_ofst(ir);
 
     IR * ld = m_rg->buildLoad(LDA_idinfo(base), ir->getType());
     copyDbx(ld, base, m_rg);

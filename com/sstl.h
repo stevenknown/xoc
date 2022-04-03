@@ -2679,7 +2679,7 @@ public:
         m_is_init = false;
         init();
     }
-    explicit Vector(INT size)
+    explicit Vector(UINT size)
     {
         m_is_init = false;
         init();

@@ -1535,6 +1535,17 @@ bool DGraph::computePdom(List<Vertex const*> const& vlst, DomSet const* uni)
 
     //Initialize pdom for each bb
     C<Vertex const*> * ct;
+    bool find_exit = false;
+    for (vlst.get_head(&ct); ct != vlst.end(); ct = vlst.get_next(ct)) {
+        Vertex const* v = ct->val();
+        ASSERT0(v);
+        get_pdom_set(v)->clean();
+        if (is_graph_exit(v)) {
+            find_exit = true;
+            break;
+        }
+    }
+    if (!find_exit) { return true; }
     for (vlst.get_head(&ct); ct != vlst.end(); ct = vlst.get_next(ct)) {
         Vertex const* v = ct->val();
         ASSERT0(v);
@@ -1543,6 +1554,7 @@ bool DGraph::computePdom(List<Vertex const*> const& vlst, DomSet const* uni)
             DomSet * pdom = get_pdom_set(v);
             pdom->clean();
             pdom->bunion(VERTEX_id(v));
+            find_exit = true;
         } else {
             get_pdom_set(v)->copy(*uni);
         }
@@ -1851,8 +1863,8 @@ bool DGraph::computeIdom()
             p->diff(cur_id);
 
             #ifdef MAGIC_METHOD
-            INT i;
-            for (i = p->get_first(); i != -1; i = p->get_next((UINT)i)) {
+            BSIdx i;
+            for (i = p->get_first(); i != BS_UNDEF; i = p->get_next((UINT)i)) {
                 if (m_dom_set.get((UINT)i)->is_equal(*p)) {
                     ASSERT0(m_idom_set.get(cur_id) == VERTEX_UNDEF);
                     m_idom_set.set(cur_id, i);
@@ -1861,9 +1873,10 @@ bool DGraph::computeIdom()
             }
             ASSERTN(i != -1, ("not find idom?"));
             #else
-            INT i;
-            for (i = tmp.get_first(); i != -1; i = tmp.get_next(i)) {
-                for (INT j = tmp.get_first(); j != -1; j = tmp.get_next(j)) {
+            BSIdx i;
+            for (i = tmp.get_first(); i != BS_UNDEF; i = tmp.get_next(i)) {
+                for (BSIdx j = tmp.get_first(); j != BS_UNDEF;
+                     j = tmp.get_next(j)) {
                     if (i == j) {
                         continue;
                     }
@@ -1982,8 +1995,8 @@ bool DGraph::computeIpdom()
         }
 
         p->diff(cur_id);
-        INT i;
-        for (i = p->get_first(); i != -1; i = p->get_next((UINT)i)) {
+        BSIdx i;
+        for (i = p->get_first(); i != BS_UNDEF; i = p->get_next((UINT)i)) {
             if (m_pdom_set.get((UINT)i)->is_equal(*p)) {
                 ASSERT0(m_ipdom_set.get(cur_id) == VERTEX_UNDEF);
                 m_ipdom_set.set(cur_id, i);
@@ -2029,6 +2042,19 @@ void DGraph::genPDomTree(OUT DomTree & pdt) const
 }
 
 
+void DGraph::dumpDom(CHAR const* name, bool dump_dom_tree) const
+{
+    if (name == nullptr) {
+        name = "graph_dom.txt";
+    }
+    UNLINK(name);
+    FILE * h = fopen(name, "a+");
+    ASSERTN(h, ("%s create failed!!!",name));
+    dumpDom(h, dump_dom_tree);
+    fclose(h);
+}
+
+
 //Dump dom set, pdom set, idom, ipdom.
 //'dump_dom_tree': set to be true to dump dominate
 //  tree, and post dominate Tree.
@@ -2044,8 +2070,8 @@ void DGraph::dumpDom(FILE * h, bool dump_dom_tree) const
         fprintf(h, "\nVERTEX(%d)", vid);
         fprintf(h, "\n  domset:");
         if ((bs = m_dom_set.get(vid)) != nullptr) {
-            for (INT id = bs->get_first();
-                 id != -1 ; id = bs->get_next((UINT)id)) {
+            for (BSIdx id = bs->get_first();
+                 id != BS_UNDEF ; id = bs->get_next((UINT)id)) {
                 if ((UINT)id != vid) {
                     fprintf(h, "%d ", id);
                 }
@@ -2054,8 +2080,8 @@ void DGraph::dumpDom(FILE * h, bool dump_dom_tree) const
 
         fprintf(h, "\n  pdomset:");
         if ((bs = m_pdom_set.get(vid)) != nullptr) {
-            for (INT id = bs->get_first();
-                 id != -1; id = bs->get_next((UINT)id)) {
+            for (BSIdx id = bs->get_first();
+                 id != BS_UNDEF; id = bs->get_next((UINT)id)) {
                 if ((UINT)id != vid) {
                     fprintf(h, "%d ", id);
                 }
@@ -2421,6 +2447,13 @@ static void addVexToDomAndPdomSet(DGraph * g, Vertex const* vex, UINT newid,
         }
     }
 
+    //If the succ of vex is also the pred, then it has been mark visited.
+    //Unmark the succ in order to handle more subsequent successors.
+    for (EdgeC const* ec = vex->getInList(); ec != nullptr;
+         ec = ec->get_next()) {
+        Vertex const* v = ec->getFrom();
+        visited.diff(v->id());
+    }
     wl.append_tail(vex);
     for (Vertex const* v = wl.remove_head(); v != nullptr;
          v = wl.remove_head()) {
@@ -2473,7 +2506,10 @@ void DGraph::addDomInfoByNewIPDom(Vertex const* vex, Vertex const* newipdom)
             set_idom(ipdom, newipdomid);
         }
     }
-    set_idom(newipdomid, vexid);
+    if (!get_dom_set(vexid)->is_empty()) {
+        //idom is meanlingless if there is no entry in graph.
+        set_idom(newipdomid, vexid);
+    }
     if (read_dom_set(newipdomid) == nullptr) {
         //Copy Dom, PDom info from vex to newidom.
         DomSet const* ds = read_dom_set(vexid);
@@ -2508,7 +2544,10 @@ void DGraph::addDomInfoByNewIDom(Vertex const* vex, Vertex const* newidom)
             set_ipdom(idom, newidomid);
         }
     }
-    set_ipdom(newidomid, vexid);
+    if (!get_pdom_set(vexid)->is_empty()) {
+        //ipdom is meanlingless if there is no exit in graph.
+        set_ipdom(newidomid, vexid);
+    }
     if (read_dom_set(newidomid) == nullptr) {
         //Copy Dom, PDom info from vex to newidom.
         DomSet const* ds = read_dom_set(vexid);

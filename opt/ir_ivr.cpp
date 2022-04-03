@@ -595,8 +595,8 @@ void IVR::findBIV(LI<IRBB> const* li, IDTab & tmp)
     }
 
     IRSet set(getSegMgr()); //for tmp used, it must be clean before return.
-    for (INT i = li->getBodyBBSet()->get_first();
-         i != -1; i = li->getBodyBBSet()->get_next(i)) {
+    for (BSIdx i = li->getBodyBBSet()->get_first();
+         i != BS_UNDEF; i = li->getBodyBBSet()->get_next(i)) {
         //if ((UINT)i == headi) { continue; }
         IRBB * bb = m_cfg->getBB(i);
         ASSERT0(bb && m_cfg->getVertex(bb->id()));
@@ -858,8 +858,8 @@ void IVR::findDIV(LI<IRBB> const* li, BIVList const& bivlst)
     if (bivlst.get_elem_count() == 0) { return; }
 
     IRSet set(getSegMgr());
-    for (INT i = li->getBodyBBSet()->get_first();
-         i != -1; i = li->getBodyBBSet()->get_next(i)) {
+    for (BSIdx i = li->getBodyBBSet()->get_first();
+         i != BS_UNDEF; i = li->getBodyBBSet()->get_next(i)) {
         IRBB * bb = m_cfg->getBB(i);
         ASSERT0(bb && m_cfg->getVertex(bb->id()));
         for (IR * ir = BB_first_ir(bb); ir != nullptr; ir = BB_next_ir(bb)) {
@@ -900,8 +900,8 @@ void IVR::dump_recur(LI<IRBB> const* li, UINT indent) const
         for (UINT i = 0; i < indent; i++) { prt(getRegion(), " "); }
         prt(getRegion(), "LI%d:BB%d", li->id(), li->getLoopHead()->id());
         prt(getRegion(), ",BODY:");
-        for (INT i = li->getBodyBBSet()->get_first();
-             i != -1; i = li->getBodyBBSet()->get_next(i)) {
+        for (BSIdx i = li->getBodyBBSet()->get_first();
+             i != BS_UNDEF; i = li->getBodyBBSet()->get_next(i)) {
             prt(getRegion(), "%d,", i);
         }
 

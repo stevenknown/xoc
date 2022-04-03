@@ -147,8 +147,8 @@ typedef UINT MDIdx;
 class MD {
 public:
     MDIdx uid; //unique id.
-    UINT ofst; //byte offsets relative to 'base'
-    UINT size; //byte size of the memory block
+    TMWORD ofst; //byte offsets relative to 'base'
+    TMWORD size; //byte size of the memory block
     Var * base;
     union {
         struct {
@@ -178,9 +178,9 @@ public:
     }
 
     Var * get_base() const { return MD_base(this); }
-    UINT getBitOfst() const { return MD_ofst(this); }
-    UINT getByteOfst() const { return MD_ofst(this); }
-    UINT getByteSize() const { return MD_size(this); }
+    TMWORD getBitOfst() const { return MD_ofst(this); }
+    TMWORD getByteOfst() const { return MD_ofst(this); }
+    TMWORD getByteSize() const { return MD_size(this); }
     MD_TYPE getType() const { return (MD_TYPE)MD_ty(this); }
 
     MDIdx id() const { return MD_id(this); }
@@ -747,7 +747,7 @@ public:
     MD const* registerMD(MD const& m);
 
     //Register an effectively unbound MD that base is 'var'.
-    MD const* registerUnboundMD(Var * var, UINT size);
+    MD const* registerUnboundMD(Var * var, TMWORD size);
 
     //Remove all MDs related to specific variable 'v'.
     void removeMDforVAR(Var const* v, IN ConstMDIter & iter);

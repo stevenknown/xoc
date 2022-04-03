@@ -162,8 +162,8 @@ IR * findKillingDef(IR const* use, Region * rg);
 //startbb: the BB that begin to do searching.
 void findAndSetLiveInDef(IR * root, IR * startir, IRBB * startbb, Region * rg);
 
-//The function checks each DEF|USE occurrence of ir, remove the expired expression
-//which is not reference the memory any more that ir referenced.
+//The function checks each DEF|USE occurrence of ir, remove the expired
+//expression which is not reference the memory any more that ir referenced.
 //Return true if DU changed.
 //e.g: stpr1 = ... //S1
 //     ..... = pr2 //S2
@@ -181,6 +181,14 @@ bool removeExpiredDU(IR const* ir, Region * rg);
 //ld(y) will be removed as well. And ld(y)'s MDSSAInfo will be
 //updated as well.
 void removeUseForTree(IR const* exp, Region * rg);
+
+//Remove Use-Def chain.
+//exp: the expression to be removed.
+//e.g: ir = ...
+//    = ir //S1
+//If S1 will be deleted, ir should be removed from its useset in MDSSAInfo.
+//NOTE: the function only process exp itself.
+void removeUse(IR const* exp, Region * rg);
 
 //Remove all DU info of 'stmt'.
 void removeStmt(IR * stmt, Region * rg);

@@ -501,6 +501,9 @@ void MDSSAMgr::dumpIRWithMDSSAForStmt(IR const* ir, UINT flag,
     if (mdssainfo == nullptr) {
         prt(getRegion(), "%s", g_msg_no_mdssainfo);
     } else {
+if(ir->id()==58){
+int a=0;;//hack
+}
         for (INT i = mdssainfo->getVOpndSet()->get_first(&iter);
             i >= 0; i = mdssainfo->getVOpndSet()->get_next(i, &iter)) {
             note(getRegion(), "\n--DEF:");
@@ -1276,7 +1279,8 @@ void MDSSAMgr::placePhiForMD(UINT mdid, List<IRBB*> const* defbbs,
         xcom::BitSet const* dfcs = dfm.getDFControlSet(bb->id());
         if (dfcs == nullptr) { continue; }
 
-        for (INT i = dfcs->get_first(); i >= 0; i = dfcs->get_next(i)) {
+        for (BSIdx i = dfcs->get_first(); i != BS_UNDEF;
+             i = dfcs->get_next(i)) {
             if (visited.is_contain(i)) {
                 //Already insert phi for 'mdid' into BB i.
                 //TODO:ensure the phi for same PR does NOT be
@@ -1600,6 +1604,59 @@ void MDSSAMgr::cutoffDefChain(MDDef * def)
 }
 
 
+//Return true if VMDs of stmt cross version when moving stmt previous to marker
+//at tgtbb.
+bool MDSSAMgr::crossVersion(IR const* stmt, IRBB const* tgtbb, IR const* marker,
+                            OptCtx const& oc) const
+{
+    ASSERT0(oc.is_dom_valid());
+    ASSERT0(stmt->is_stmt());
+    MDSSAInfo * info = getMDSSAInfoIfAny(stmt);
+    if (info == nullptr) { return false; }
+    VOpndSet const& vmdset = info->readVOpndSet();
+    UseDefMgr const* udmgr = const_cast<MDSSAMgr*>(this)->getUseDefMgr();
+    if (marker == nullptr) {
+        ASSERT0(const_cast<IRBB*>(tgtbb)->getIRList().is_empty());
+        VOpndSetIter vit = nullptr;
+        for (INT i = vmdset.get_first(&vit);
+             i >= 0; i = vmdset.get_next(i, &vit)) {
+            VMD const* t = (VMD*)udmgr->getVOpnd(i);
+            ASSERT0(t && t->is_md());
+            if (t->getDef() == nullptr) { continue; }
+            MDDef const* prev = t->getDef()->getPrev();
+            if (prev == nullptr) { continue; }
+            if (m_cfg->is_dom(tgtbb->id(), prev->getBB()->id())) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    ASSERT0(marker->getBB() == tgtbb);
+    VOpndSetIter vit = nullptr;
+    for (INT i = vmdset.get_first(&vit);
+         i >= 0; i = vmdset.get_next(i, &vit)) {
+        VMD const* t = (VMD*)udmgr->getVOpnd(i);
+        ASSERT0(t && t->is_md());
+        if (t->getDef() == nullptr) { continue; }
+        MDDef const* prev = t->getDef()->getPrev();
+        if (prev == nullptr) { continue; }
+        if (m_cfg->is_dom(tgtbb->id(), prev->getBB()->id())) {
+            return true;
+        }
+        if (prev->getBB() != tgtbb) { continue; }
+        if (prev->is_phi()) {
+            //Phi always prior to marker.
+            continue;
+        }
+        if (!prev->getBB()->is_dom(prev->getOcc(), marker, true)) {
+            return false;
+        }
+    }
+    return false;
+}
+
+
 //Insert def1 in front of def2.
 //Note def1 should dominate def2.
 void MDSSAMgr::insertDefChain(MDDef * def1, MDDef * def2)
@@ -1629,7 +1686,8 @@ void MDSSAMgr::insertDefChain(MDDef * def1, MDDef * def2)
         prev->getNextSet()->remove(def2, *getSBSMgr());
         prev->getNextSet()->append(def1, *getSBSMgr());
 
-        ASSERT0(isDom(prev, def1));
+        ASSERTN(isDom(prev, def1),
+                ("def1 must be placed between prev and def2"));
         MDDEF_prev(def1) = prev;
         if (MDDEF_nextset(def1) == nullptr) {
             MDDEF_nextset(def1) = m_usedef_mgr.allocMDDefSet();
@@ -3259,6 +3317,7 @@ void MDSSAMgr::removePhiFromBB(IRBB * bb)
 //Note current MDSSAInfo is the SSA info of 'exp', the VOpndSet will be
 //emtpy when exp is removed from all VOpnd's useset.
 //exp: IR expression to be removed.
+//NOTE: the function only process exp itself.
 void MDSSAMgr::removeExpFromAllVOpnd(IR const* exp)
 {
     ASSERT0(exp && exp->is_exp() && hasMDSSAInfo(exp));
@@ -3274,6 +3333,20 @@ void MDSSAMgr::removeExpFromAllVOpnd(IR const* exp)
         vopnd->removeUse(exp);
     }
     expssainfo->cleanVOpndSet(mgr);
+}
+
+
+//Remove Use-Def chain.
+//exp: the expression to be removed.
+//e.g: ir = ...
+//    = ir //S1
+//If S1 will be deleted, ir should be removed from its useset in MDSSAInfo.
+//NOTE: the function only process exp itself.
+void MDSSAMgr::removeUse(IR const* exp)
+{
+    if (hasMDSSAInfo(exp)) {
+        removeExpFromAllVOpnd(exp);
+    }
 }
 
 

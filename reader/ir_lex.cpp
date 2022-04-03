@@ -499,7 +499,7 @@ FIN:
         //e.g: 1.0F, float
         if (t == T_IMM) {
             error(m_real_line_num, "invalid suffix \"%c\" on integer constant",
-                m_cur_char);
+                  m_cur_char);
         } else {
             ASSERT0(t == T_FP);
             m_cur_char = getNextChar();

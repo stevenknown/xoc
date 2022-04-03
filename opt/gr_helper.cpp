@@ -197,37 +197,25 @@ void GRDump::dumpConst(IR const* ir, DumpGRCtx const* ctx) const
     UINT dn = DUMP_INDENT_NUM;
     ASSERT0(ctx);
     if (ir->is_sint()) {
-        #if WORD_LENGTH_OF_HOST_MACHINE==32
-        //Prefer print imm according to its type.
-        CHAR const* intfmt = "%d:%s";
- 
         //WORKAROUND:GR parser has bug in parsing large negative number.
-        //CHAR const* intfmt = "%x:%s";
-        #elif WORD_LENGTH_OF_HOST_MACHINE==64
+        //CHAR const* intfmt = getIntFormat(true);
         //Prefer print imm according to its type.
-        CHAR const* intfmt = "%lld:%s";
- 
-        //WORKAROUND:GR parser has bug in parsing large negative number.
-        //CHAR const* intfmt = "0x%llx:%s";
-        #else
-        #error "Need to support";
-        #endif
+        StrBuf fmt(16);
+        fmt.strcat("%s:%%s", getIntFormat(false));
         m_lm->incIndent(dn);
-        prt(m_lm, intfmt, CONST_int_val(ir), m_tm->dump_type(d, buf));
+        prt(m_lm, fmt.buf, CONST_int_val(ir), m_tm->dump_type(d, buf));
         m_lm->decIndent(dn);
         return;
     }
     
     if (ir->is_uint()) {
-        #if WORD_LENGTH_OF_HOST_MACHINE==32
-        CHAR const* intfmt = "%u:%s";
-        #elif WORD_LENGTH_OF_HOST_MACHINE==64
-        CHAR const* intfmt = "%llu:%s";
-        #else
-        #error "Need to support";
-        #endif
+        //WORKAROUND:GR parser has bug in parsing large negative number.
+        //CHAR const* intfmt = getIntFormat(true);
+        //Prefer print imm according to its type.
+        StrBuf fmt(16);
+        fmt.strcat("%s:%%s", getUIntFormat(false));
         m_lm->incIndent(dn);
-        prt(m_lm, intfmt, CONST_int_val(ir), m_tm->dump_type(d, buf));
+        prt(m_lm, fmt.buf, CONST_int_val(ir), m_tm->dump_type(d, buf));
         m_lm->decIndent(dn);
         return;
     }
@@ -270,16 +258,13 @@ void GRDump::dumpConst(IR const* ir, DumpGRCtx const* ctx) const
     }
 
     if (ir->is_mc()) {
-        //Imm may be MC type.
-        #if WORD_LENGTH_OF_HOST_MACHINE==32
-        CHAR const* intfmt = "%u:%s";
-        #elif WORD_LENGTH_OF_HOST_MACHINE==64
-        CHAR const* intfmt = "%llu:%s";
-        #else
-        #error "Need to support";
-        #endif
+        //WORKAROUND:GR parser has bug in parsing large negative number.
+        //CHAR const* intfmt = getIntFormat(true);
+        //Prefer print imm according to its type.
+        StrBuf fmt(16);
+        fmt.strcat("%s:%%s", getUIntFormat(false));
         m_lm->incIndent(dn);
-        prt(m_lm, intfmt, CONST_int_val(ir), m_tm->dump_type(d, buf));
+        prt(m_lm, fmt.buf, CONST_int_val(ir), m_tm->dump_type(d, buf));
         m_lm->decIndent(dn);
         return;
     }
@@ -288,15 +273,10 @@ void GRDump::dumpConst(IR const* ir, DumpGRCtx const* ctx) const
     //leave the sanity check to verify().
     //Note the dump format may extend or truncate the real value.
     //Imm may be MC type.
-    #if WORD_LENGTH_OF_HOST_MACHINE==32
-    CHAR const* intfmt = "%u:%s";
-    #elif WORD_LENGTH_OF_HOST_MACHINE==64
-    CHAR const* intfmt = "%llu:%s";
-    #else
-    #error "Need to support";
-    #endif
+    StrBuf fmt(16);
+    fmt.strcat("%s:%%s", getUIntFormat(false));
     m_lm->incIndent(dn);
-    prt(m_lm, intfmt, CONST_int_val(ir), m_tm->dump_type(d, buf));
+    prt(m_lm, fmt.buf, CONST_int_val(ir), m_tm->dump_type(d, buf));
     m_lm->decIndent(dn);
 }
 

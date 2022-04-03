@@ -710,6 +710,7 @@ bool IRParser::constructSSAIfNeed(ParseCtx * ctx)
     ASSERT0(prssamgr);
     prssamgr->genSSAInfoForRegion();
     ASSERT0(PRSSAMgr::verifyPRSSAInfo(ctx->current_region));
+    prssamgr->refinePhi();
     return true;
 }
 
@@ -1083,6 +1084,9 @@ bool IRParser::parseCase(ParseCtx * ctx)
 
     IR * case_det = nullptr;
     if (tok == T_IMM) {
+        //Note if literal is larger than LONGLONG, one have to use longer type
+        //instead of LONGLONG.
+        ASSERT0(sizeof(HOST_INT) <= sizeof(LONGLONG));
         case_det = ctx->current_region->buildImmInt(
             (HOST_INT)xcom::xatoll(m_lexer->getCurrentTokenString(), false),
             m_tm->getSimplexType(m_tm->get_int_dtype(
@@ -1216,8 +1220,7 @@ UINT IRParser::mapID2Prno(CHAR const* prid, ParseCtx * ctx)
     Sym const* sym = m_rumgr->addToSymbolTab(prid);
     UINT prno = m_id2prno.get(sym);
     if (prno == PRNO_UNDEF) {
-        prno = ctx->current_region->getPRCount() + 1;
-        ctx->current_region->setPRCount(prno);
+        prno = ctx->current_region->buildPrno(m_tm->getAny());
         m_id2prno.set(sym, prno);
     }
     return prno;
@@ -1228,7 +1231,7 @@ bool IRParser::parsePR(ParseCtx * ctx)
 {
     ASSERTN(m_lexer->getCurrentToken() == T_DOLLAR,
             ("miss $ before PR expression"));
-    UINT prno = 0;
+    UINT prno = PRNO_UNDEF;
     if (!parsePrno(&prno, ctx)) {
         return false;
     }
@@ -1265,6 +1268,9 @@ bool IRParser::parseArrayDimension(List<TMWORD> & elem_dim)
             error(tok, "dimension must be integer");
             return false;
         }
+        //Note if literal is larger than LONGLONG, one have to use longer type
+        //instead of LONGLONG.
+        ASSERT0(sizeof(TMWORD) <= sizeof(LONGLONG));
         TMWORD dim = (TMWORD)xcom::xatoll(
             m_lexer->getCurrentTokenString(), false);
         tok = m_lexer->getNextToken();
@@ -1319,7 +1325,7 @@ bool IRParser::parseLda(ParseCtx * ctx)
     ASSERT0(getCurrentXCode() == X_LDA);
     TOKEN tok = m_lexer->getNextToken();
 
-    UINT offset = 0;
+    TMWORD offset = 0;
     if (tok == T_COLON) {
         //Offset
         tok = m_lexer->getNextToken();
@@ -1327,7 +1333,10 @@ bool IRParser::parseLda(ParseCtx * ctx)
             error(tok, "illegal offset declaration, offset must be integer");
             return false;
         }
-        offset = (UINT)xcom::xatoll(m_lexer->getCurrentTokenString(), false);
+        //Note if literal is larger than LONGLONG, one have to use longer type
+        //instead of LONGLONG.
+        ASSERT0(sizeof(TMWORD) <= sizeof(LONGLONG));
+        offset = (TMWORD)xcom::xatoll(m_lexer->getCurrentTokenString(), false);
         tok = m_lexer->getNextToken();
     }
 
@@ -1372,7 +1381,7 @@ bool IRParser::parseStoreArray(ParseCtx * ctx)
     }
 
     tok = m_lexer->getCurrentToken();
-    UINT offset = 0;
+    TMWORD offset = 0;
     if (tok == T_COLON) {
         //Offset
         tok = m_lexer->getNextToken();
@@ -1380,7 +1389,10 @@ bool IRParser::parseStoreArray(ParseCtx * ctx)
             error(tok, "illegal offset declaration, offset must be integer");
             return false;
         }
-        offset = (UINT)xcom::xatoll(m_lexer->getCurrentTokenString(), false);
+        //Note if literal is larger than LONGLONG, one have to use longer type
+        //instead of LONGLONG.
+        ASSERT0(sizeof(TMWORD) <= sizeof(LONGLONG));
+        offset = (TMWORD)xcom::xatoll(m_lexer->getCurrentTokenString(), false);
         tok = m_lexer->getNextToken();
     }
 
@@ -1513,7 +1525,7 @@ bool IRParser::parseArray(ParseCtx * ctx)
     }
 
     tok = m_lexer->getCurrentToken();
-    UINT offset = 0;
+    TMWORD offset = 0;
     if (tok == T_COLON) {
         //Offset
         tok = m_lexer->getNextToken();
@@ -1521,7 +1533,10 @@ bool IRParser::parseArray(ParseCtx * ctx)
             error(tok, "illegal offset declaration, offset must be integer");
             return false;
         }
-        offset = (UINT)xcom::xatoll(m_lexer->getCurrentTokenString(), false);
+        //Note if literal is larger than LONGLONG, one have to use longer type
+        //instead of LONGLONG.
+        ASSERT0(sizeof(TMWORD) <= sizeof(LONGLONG));
+        offset = (TMWORD)xcom::xatoll(m_lexer->getCurrentTokenString(), false);
         tok = m_lexer->getNextToken();
     }
 
@@ -1697,14 +1712,17 @@ bool IRParser::parseLd(ParseCtx * ctx)
     }
 
     tok = m_lexer->getCurrentToken();
-    UINT offset = 0;
+    TMWORD offset = 0;
     if (tok == T_COLON) {
         tok = m_lexer->getNextToken();
         if (tok != T_IMM) {
             error(tok, "illegal offset declaration, offset must be integer");
             return false;
         }
-        offset = (UINT)xcom::xatoll(m_lexer->getCurrentTokenString(), false);
+        //Note if literal is larger than LONGLONG, one have to use longer type
+        //instead of LONGLONG.
+        ASSERT0(sizeof(TMWORD) <= sizeof(LONGLONG));
+        offset = (TMWORD)xcom::xatoll(m_lexer->getCurrentTokenString(), false);
         tok = m_lexer->getNextToken();
     }
 
@@ -1774,6 +1792,9 @@ bool IRParser::parseImmIR(ParseCtx * ctx)
     ASSERT0(m_lexer->getCurrentToken() == T_IMM);
 
     StrBuf immstr(8);
+    //Note if literal is larger than LONGLONG, one have to use longer type
+    //instead of LONGLONG.
+    ASSERT0(sizeof(HOST_INT) <= sizeof(LONGLONG));
     HOST_INT v = xcom::xatoll(m_lexer->getCurrentTokenString(), false);
     immstr.strcat(m_lexer->getCurrentTokenString());
     TOKEN tok = m_lexer->getNextToken();
@@ -1814,6 +1835,9 @@ bool IRParser::parseImmVal(ParseCtx * ctx)
     ASSERT0(m_lexer->getCurrentToken() == T_IMM);
     ASSERTN(PARSECTX_returned_imm_ty(ctx) == nullptr, ("should be clear"));
     xcom::StrBuf immstr(8);
+    //Note if literal is larger than LONGLONG, one have to use longer type
+    //instead of LONGLONG.
+    ASSERT0(sizeof(HOST_INT) <= sizeof(LONGLONG));
     HOST_INT v = xcom::xatoll(m_lexer->getCurrentTokenString(), false);
     immstr.strcat(m_lexer->getCurrentTokenString());
     TOKEN tok = m_lexer->getNextToken();
@@ -2363,14 +2387,17 @@ bool IRParser::parseStore(ParseCtx * ctx)
 
     //Offset
     tok = m_lexer->getCurrentToken();
-    UINT offset = 0;
+    TMWORD offset = 0;
     if (tok == T_COLON) {
         tok = m_lexer->getNextToken();
         if (tok != T_IMM) {
             error(tok, "illegal offset declaration, offset must be integer");
             return false;
         }
-        offset = (UINT)xcom::xatoll(m_lexer->getCurrentTokenString(), false);
+        //Note if literal is larger than LONGLONG, one have to use longer type
+        //instead of LONGLONG.
+        ASSERT0(sizeof(TMWORD) <= sizeof(LONGLONG));
+        offset = (TMWORD)xcom::xatoll(m_lexer->getCurrentTokenString(), false);
         tok = m_lexer->getNextToken();
     }
 
@@ -2442,7 +2469,7 @@ bool IRParser::parseStorePR(ParseCtx * ctx)
     }
 
     //PR no
-    UINT prno = 0;
+    UINT prno = PRNO_UNDEF;
     if (!parsePrno(&prno, ctx)) {
         return false;
     }
@@ -2503,7 +2530,7 @@ bool IRParser::parseModifyPR(X_CODE code, ParseCtx * ctx)
         error(tok, "miss '$' specifier after %s", getKeywordName(code));
         return false;
     }
-    UINT prno = 0;
+    UINT prno = PRNO_UNDEF;
     if (!parsePrno(&prno, ctx)) {
         return false;
     }
@@ -2630,14 +2657,17 @@ bool IRParser::parseIStore(ParseCtx * ctx)
 
     //Offset
     tok = m_lexer->getCurrentToken();
-    UINT offset = 0;
+    TMWORD offset = 0;
     if (tok == T_COLON) {
         tok = m_lexer->getNextToken();
         if (tok != T_IMM) {
             error(tok, "illegal offset declaration, offset must be integer");
             return false;
         }
-        offset = (UINT)xcom::xatoll(m_lexer->getCurrentTokenString(), false);
+        //Note if literal is larger than LONGLONG, one have to use longer type
+        //instead of LONGLONG.
+        ASSERT0(sizeof(TMWORD) <= sizeof(LONGLONG));
+        offset = (TMWORD)xcom::xatoll(m_lexer->getCurrentTokenString(), false);
         tok = m_lexer->getNextToken();
     }
 
@@ -2696,35 +2726,58 @@ bool IRParser::parseIStore(ParseCtx * ctx)
 }
 
 
+bool IRParser::parseStringLiteralPrno(UINT * prno, CHAR const* str,
+                                      ParseCtx * ctx)
+{
+    *prno = mapID2Prno(str, ctx);
+    if (*prno == PRNO_UNDEF) {
+        error("use invalid PR number %u", *prno);
+        return false;
+    }
+    return true;
+}
+
+
+bool IRParser::parseCustomizedPrno(UINT * prno, ParseCtx * ctx)
+{
+    *prno = (UINT)xcom::xatoll(m_lexer->getCurrentTokenString(), false);
+    if (*prno > MAX_PRNO) {
+        error("too large PR number %u", *prno);
+        return false;
+    }
+    ctx->current_region->setPRCount(
+        MAX(ctx->current_region->getPRCount(), *prno + 1));
+    if (*prno == PRNO_UNDEF) {
+        error("use invalid PR number %u", *prno);
+        return false;
+    }
+    return true;
+}
+
+
 bool IRParser::parsePrno(UINT * prno, ParseCtx * ctx)
 {
     ASSERTN(m_lexer->getCurrentToken() == T_DOLLAR,
             ("miss $ before PR expression"));
     TOKEN tok = m_lexer->getNextToken();
-    *prno = 0;
+    *prno = PRNO_UNDEF;
     if (tok == T_IMM) {
-        *prno = (UINT)xcom::xatoll(m_lexer->getCurrentTokenString(), false);
-        if (*prno > MAX_PRNO) {
-            error("too large PR number %u", *prno);
-            return false;
+        if (allowCustomizePrno()) {
+            return parseCustomizedPrno(prno, ctx);
         }
-        ctx->current_region->setPRCount(
-            MAX(ctx->current_region->getPRCount(), *prno + 1));
-        if (*prno == PRNO_UNDEF) {
-            error("use invalid PR number %u", *prno);
-            return false;
-        }
-    } else if (tok == T_IDENTIFIER) {
-        *prno = mapID2Prno(m_lexer->getCurrentTokenString(), ctx);
-        if (*prno == PRNO_UNDEF) {
-            error("use invalid PR number %u", *prno);
-            return false;
-        }
-    } else {
-        error(tok, "not PR number");
-        return false;
+        //Regard customized Prno as string literal.
+        StrBuf buf(8);
+        UINT x = (UINT)xcom::xatoll(m_lexer->getCurrentTokenString(),
+                                    false);
+        buf.strcat("%d", x);
+        return parseStringLiteralPrno(prno, buf.buf, ctx);
     }
-    return true;
+    if (tok == T_IDENTIFIER) {
+        return parseStringLiteralPrno(prno, m_lexer->getCurrentTokenString(),
+                                      ctx);
+    }
+    error(tok, "not PR number");
+    return false;
 }
 
 
@@ -2747,7 +2800,7 @@ bool IRParser::parseCallAndICall(bool is_call, ParseCtx * ctx)
     }
     tok = m_lexer->getCurrentToken();
 
-    UINT return_prno = 0;
+    UINT return_prno = PRNO_UNDEF;
     Type const* return_ty = m_tm->getAny();
     if (tok == T_DOLLAR) {
         //Expect return value.
@@ -2857,11 +2910,11 @@ bool IRParser::parseCallAndICall(bool is_call, ParseCtx * ctx)
 
     IR * ir = nullptr;
     if (is_call) {
-        ir = ctx->current_region->buildCall(
-            callee_var, param_list, return_prno, return_ty);
+        ir = ctx->current_region->buildCall(callee_var, param_list,
+                                            return_prno, return_ty);
     } else {
-        ir = ctx->current_region->buildICall(
-            callee_exp, param_list, return_prno, return_ty);
+        ir = ctx->current_region->buildICall(callee_exp, param_list,
+                                             return_prno, return_ty);
     }
     if (ps.ir_use_list != nullptr) {
         CALL_dummyuse(ir) = ps.ir_use_list;
@@ -3412,7 +3465,7 @@ bool IRParser::parsePhi(ParseCtx * ctx)
         return false;
     }
 
-    UINT prno = 0;
+    UINT prno = PRNO_UNDEF;
     if (!parsePrno(&prno, ctx)) {
         return false;
     }

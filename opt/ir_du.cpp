@@ -1281,6 +1281,33 @@ bool DUMgr::removeExpiredDUIRTree(IR const* stmt)
 }
 
 
+//Remove Use-Def chain.
+//exp: the expression to be removed.
+//e.g: ir = ...
+//    = ir //S1
+//If S1 will be deleted, ir should be removed from its useset in MDSSAInfo.
+//NOTE: the function only process exp itself.
+void DUMgr::removeUse(IR const* ir)
+{
+    DUSet * defset = ir->getDUSet();
+    if (defset == nullptr) { return; }
+    DUSetIter di = nullptr;
+    bool doclean = false;
+    for (INT i = defset->get_first(&di);
+         i >= 0; i = defset->get_next(i, &di)) {
+        doclean = true;
+        IR const* stmt = m_rg->getIR(i);
+        ASSERT0(stmt->is_stmt());
+        DUSet * useset = stmt->getDUSet();
+        if (useset == nullptr) { continue; }
+        useset->removeUse(ir, *getSBSMgr());
+    }
+    if (doclean) {
+        defset->clean(*getSBSMgr());
+    }
+}
+
+
 //The function checks all USE of memory references of entire IR tree and
 //cutoff its DU chain. 'ir' may be stmt or expression, if ir is stmt,
 //check its right-hand-side.
@@ -1297,35 +1324,9 @@ void DUMgr::removeUseFromDefset(IR const* ir)
     } else {
         k = iterInitC(ir, m_citer);
     }
-
     for (; k != nullptr; k = iterExpNextC(m_citer)) {
-        if (!k->isMemoryOpnd()) { continue; }
-
-        //SSAInfo has been processed in PRSSAMgr::removeUse().
-        //SSAInfo * ssainfo;
-        //if ((ssainfo = k->getSSAInfo()) != nullptr) {
-        //    ASSERT0(k->is_pr());
-        //    ssainfo->removeUse(k);
-        //    continue;
-        //}
-
-        DUSet * defset = k->getDUSet();
-        if (defset == nullptr) { continue; }
-
-        DUSetIter di = nullptr;
-        bool doclean = false;
-        for (INT i = defset->get_first(&di);
-             i >= 0; i = defset->get_next(i, &di)) {
-            doclean = true;
-            IR const* stmt = m_rg->getIR(i);
-            ASSERT0(stmt->is_stmt());
-
-            DUSet * useset = stmt->getDUSet();
-            if (useset == nullptr) { continue; }
-            useset->removeUse(k, *getSBSMgr());
-        }
-        if (doclean) {
-            defset->clean(*getSBSMgr());
+        if (k->isMemoryOpnd()) {
+            DUMgr::removeUse(k);
         }
     }
 }

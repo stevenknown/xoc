@@ -1252,27 +1252,21 @@ void dumpConst(IR const* ir, Region const* rg)
     TypeMgr const* xtm = rg->getTypeMgr();
     Type const* d = ir->getType();
     if (ir->is_sint()) {
-        #if WORD_LENGTH_OF_HOST_MACHINE==32
-        CHAR const* intfmt = "intconst:%s %d|0x%x";
-        #elif WORD_LENGTH_OF_HOST_MACHINE==64
-        CHAR const* intfmt = "intconst:%s %lld|0x%llx";
-        #else
-        #error "Need to support";
-        #endif
-        prt(rg, intfmt, xtm->dump_type(d, buf),
+        CHAR const* intfmt = getIntFormat(false);
+        CHAR const* hexintfmt = getIntFormat(true);
+        StrBuf fmt(16);
+        fmt.strcat("intconst:%%s %s|0x%s", intfmt, hexintfmt);
+        prt(rg, fmt.buf, xtm->dump_type(d, buf),
             CONST_int_val(ir), CONST_int_val(ir));
         return;
     }
 
     if (ir->is_uint()) {
-        #if WORD_LENGTH_OF_HOST_MACHINE==32
-        CHAR const* intfmt = "intconst:%s %u|0x%x";
-        #elif WORD_LENGTH_OF_HOST_MACHINE==64
-        CHAR const* intfmt = "intconst:%s %llu|0x%llx";
-        #else
-        #error "Need to support";
-        #endif
-        prt(rg, intfmt, xtm->dump_type(d, buf), CONST_int_val(ir),
+        CHAR const* intfmt = getUIntFormat(false);
+        CHAR const* hexintfmt = getUIntFormat(true);
+        StrBuf fmt(16);
+        fmt.strcat("intconst:%%s %s|0x%s", intfmt, hexintfmt);
+        prt(rg, fmt.buf, xtm->dump_type(d, buf), CONST_int_val(ir),
             CONST_int_val(ir));
         return;
     }
@@ -1312,14 +1306,11 @@ void dumpConst(IR const* ir, Region const* rg)
 
     if (ir->is_mc()) {
         //Imm may be MC type.
-        #if WORD_LENGTH_OF_HOST_MACHINE==32
-        CHAR const* intfmt = "intconst:%s %u|0x%x";
-        #elif WORD_LENGTH_OF_HOST_MACHINE==64
-        CHAR const* intfmt = "intconst:%s %llu|0x%llx";
-        #else
-        #error "Need to support";
-        #endif
-        prt(rg, intfmt, xtm->dump_type(d, buf),
+        CHAR const* intfmt = getUIntFormat(false);
+        CHAR const* hexintfmt = getUIntFormat(true);
+        StrBuf fmt(16);
+        fmt.strcat("intconst:%%s %s|0x%s", intfmt, hexintfmt);
+        prt(rg, fmt.buf, xtm->dump_type(d, buf),
             CONST_int_val(ir), CONST_int_val(ir));
         return;
     }

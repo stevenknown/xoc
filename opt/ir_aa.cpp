@@ -167,8 +167,8 @@ static bool isAllElementDerivedFromSameEffectVar(MDSet const& mds,
 {
     ASSERT0(!mds.is_empty() && mustref);
     MDSetIter iter = nullptr;
-    UINT ofst = (UINT)-1;
-    UINT size = 0;
+    TMWORD ofst = (TMWORD)-1;
+    TMWORD size = 0;
     INT i = mds.get_first(&iter);
     MD const* md = mdsys->getMD((UINT)i);
     if (!md->is_effect() || md->is_may()) {
@@ -2249,7 +2249,7 @@ bool AliasAnalysis::tryReshapeMDSet(IR const* ir, MDSet const* mds,
                                     OUT MDSet * newmds)
 {
     if (ir->is_any()) { return false; }
-    UINT newofst = ir->getOffset();
+    TMWORD newofst = ir->getOffset();
     UINT newsize = ir->getTypeSize(m_tm);
     ASSERT0(newsize > 0);
     ASSERT0(mds && newmds);

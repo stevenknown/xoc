@@ -343,6 +343,41 @@ void coalesceDUChain(IR * from, IR * to, Region * rg)
 
 
 //Remove Use-Def chain.
+//exp: the expression to be removed.
+//e.g: ir = ...
+//    = ir //S1
+//If S1 will be deleted, ir should be removed from its useset in MDSSAInfo.
+//NOTE: the function only process exp itself.
+void removeUse(IR const* exp, Region * rg)
+{
+    ASSERT0(exp && exp->is_exp()); //exp is the root of IR tree.
+    bool mdssa_changed = false;
+    bool prssa_changed = false;
+    bool classic_du_changed = false;
+
+    PRSSAMgr * prssamgr = rg->getPRSSAMgr();
+    if (prssamgr != nullptr && prssamgr->is_valid()) {
+        PRSSAMgr::removeUse(exp);
+        prssa_changed = true;
+    }
+
+    DUMgr * dumgr = rg->getDUMgr();
+    if (dumgr != nullptr) {
+        dumgr->removeUse(exp);
+        classic_du_changed = true;
+    }
+
+    MDSSAMgr * mdssamgr = rg->getMDSSAMgr();
+    if (mdssamgr != nullptr && mdssamgr->is_valid()) {
+        mdssamgr->removeUse(exp);
+        mdssa_changed = true;
+    }
+
+    ASSERT0(checkChange(rg, mdssa_changed, prssa_changed, classic_du_changed));
+}
+
+
+//Remove Use-Def chain.
 //exp: it is the root of IR tree that to be removed.
 //e.g: ir = ...
 //    = ir //S1

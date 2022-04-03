@@ -80,8 +80,8 @@ void LFTR::analysis(LI<IRBB> * li)
 {
     IRBB * head = li->getLoopHead();
     UINT headid = head->id();
-    for (INT i = li->getBodyBBSet()->get_first();
-         i != -1; i = li->getBodyBBSet()->get_next(i)) {
+    for (BSIdx i = li->getBodyBBSet()->get_first();
+         i != BS_UNDEF; i = li->getBodyBBSet()->get_next(i)) {
         if (i != (INT)headid && !m_cfg->is_dom(headid, i)) {
             //Loop head should anticipate into analysis as well.
             //The candidate BB must dominate all other loop body BBs.

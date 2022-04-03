@@ -136,15 +136,18 @@ bool MD::is_overlap(MD const* m) const
 CHAR * MD::dump(StrBuf & buf, TypeMgr * dm) const
 {
     buf.strcat("MD%d -- base:", MD_id(this));
-
     ASSERT0(MD_base(this) != nullptr);
     MD_base(this)->dump(buf, dm);
-
-    INT lofst = MD_ofst(this);
+    CHAR const* ofstfmt = getUIntFormat(false);
+    TMWORD lofst = MD_ofst(this);
     if (MD_ty(this) == MD_EXACT) {
-        buf.strcat(" -- ofst:%d -- size:%u", lofst, MD_size(this));
+        StrBuf fmt(16);
+        fmt.strcat(" -- ofst:%s -- size:%s", ofstfmt, ofstfmt);
+        buf.strcat(fmt.buf, lofst, MD_size(this));
     } else if (MD_ty(this) == MD_RANGE) {
-        buf.strcat(" -- start:%d -- end:%u", lofst, lofst + MD_size(this));
+        StrBuf fmt(16);
+        fmt.strcat(" -- start:%s -- end:%s", ofstfmt, ofstfmt);
+        buf.strcat(fmt.buf, lofst, lofst + MD_size(this));
         buf.strcat(" -- range");
     } else {
         buf.strcat(" -- ofst:unbound");
@@ -811,7 +814,7 @@ MD const* MDSystem::registerMD(MD const& m)
 
 
 //Register an effectively unbound MD that base is 'var'.
-MD const* MDSystem::registerUnboundMD(Var * var, UINT size)
+MD const* MDSystem::registerUnboundMD(Var * var, TMWORD size)
 {
     MD md;
     MD_base(&md) = var;

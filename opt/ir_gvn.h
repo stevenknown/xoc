@@ -144,11 +144,11 @@ class VNE_SC {
     //COPY_CONSTRUCTOR(VNE_SC);
 public:
     UINT mdid;
-    UINT ofst;
+    TMWORD ofst;
     UINT sz;
 
 public:
-    VNE_SC(UINT id, UINT o, UINT s)
+    VNE_SC(UINT id, TMWORD o, UINT s)
     {
         mdid = id;
         ofst = o;
@@ -167,11 +167,11 @@ public:
 class VNE_ILD {
 public:
     UINT base_vn_id;
-    UINT ofst;
+    TMWORD ofst;
     UINT sz;
 
 public:
-    VNE_ILD(UINT vnid, UINT o, UINT s)
+    VNE_ILD(UINT vnid, TMWORD o, UINT s)
     {
         base_vn_id = vnid;
         ofst = o;
@@ -202,7 +202,7 @@ public:
     UINT ofst_vn_id;
 
 public:
-    VNE_ARR(UINT bvnid, UINT ovnid, UINT o, UINT s) : VNE_ILD(bvnid, o, s)
+    VNE_ARR(UINT bvnid, UINT ovnid, TMWORD o, UINT s) : VNE_ILD(bvnid, o, s)
     { ofst_vn_id = ovnid; }
     //COPY_CONSTRUCTOR(VNE_ARR);
 
@@ -226,9 +226,9 @@ public:
 
     UINT get_hash_value(VNE_SC * x, UINT bucket_size) const
     {
-        UINT n = (x->mdid << 20) | (x->ofst << 10) | x->sz;
+        HOST_UINT n = (x->mdid << 20) | (x->ofst << 10) | x->sz;
         ASSERT0(xcom::isPowerOf2(bucket_size));
-        return hash32bit(n) & (bucket_size - 1);
+        return xcom::hash32bit((UINT32)n) & (bucket_size - 1);
     }
 
     UINT get_hash_value(OBJTY v, UINT bucket_size) const
@@ -287,9 +287,9 @@ public:
 
     UINT get_hash_value(VNE_ILD * x, UINT bucket_size) const
     {
-        UINT n = (x->base_vn_id << 20) | (x->ofst << 10) | x->sz;
+        HOST_UINT n = (x->base_vn_id << 20) | (x->ofst << 10) | x->sz;
         ASSERT0(xcom::isPowerOf2(bucket_size));
-        return hash32bit(n) & (bucket_size - 1);
+        return xcom::hash32bit((UINT32)n) & (bucket_size - 1);
     }
 
     UINT get_hash_value(OBJTY v, UINT bucket_size) const
@@ -414,10 +414,10 @@ public:
 
     UINT get_hash_value(VNE_ARR * x, UINT bucket_size) const
     {
-        UINT n = (x->base_vn_id << 24) | (x->ofst_vn_id << 16) |
-                 (x->ofst << 8) | x->sz;
+        HOST_UINT n = (x->base_vn_id << 24) | (x->ofst_vn_id << 16) |
+                      (x->ofst << 8) | x->sz;
         ASSERT0(xcom::isPowerOf2(bucket_size));
-        return hash32bit(n) & (bucket_size - 1);
+        return xcom::hash32bit((UINT32)n) & (bucket_size - 1);
     }
 
     UINT get_hash_value(OBJTY v, UINT bucket_size) const

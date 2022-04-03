@@ -657,11 +657,12 @@ static bool removeIneffectIRImpl(DeadCodeElim * dce, IRBB * bb,
         IR * stmt = ctir->val();
         BB_irlist(bb).get_next(&next);
         if (dce->isEffectStmt(stmt)) { continue; }
+
         //Could not just remove the SSA def, you should consider
         //the SSA_uses and make sure they are all removable.
         //Use SSA related API.
         //ASSERT0(stmt->getSSAInfo() == nullptr);
-
+        //
         //Revise DU chains.
         //TODO: If SSA form is available, it doesn't need to maintain
         //DU chain of PR in DU manager counterpart.

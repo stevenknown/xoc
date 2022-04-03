@@ -155,7 +155,8 @@ void DfMgr::dump(xcom::DGraph const& g, Region * rg) const
         note(rg, "\nBB%d DF set:", vid);
         xcom::BitSet const* df = m_df_vec.get(vid);
         if (df != nullptr) {
-            for (INT i = df->get_first(); i >= 0; i = df->get_next(i)) {
+            for (BSIdx i = df->get_first(); i != BS_UNDEF;
+                 i = df->get_next(i)) {
                 prt(rg, "%d,", i);
             }
         }
@@ -164,8 +165,7 @@ void DfMgr::dump(xcom::DGraph const& g, Region * rg) const
 
 
 //This function compute dominance frontier to graph g.
-void DfMgr::buildRecur(xcom::Vertex const* v,
-                       xcom::DGraph const& g,
+void DfMgr::buildRecur(xcom::Vertex const* v, xcom::DGraph const& g,
                        DomTree const& domtree)
 {
     UINT vid = v->id();
@@ -197,7 +197,8 @@ void DfMgr::buildRecur(xcom::Vertex const* v,
          ec != nullptr; ec = EC_next(ec)) {
         xcom::Vertex const* succ_domtree = ec->getTo();
         xcom::BitSet * succ_df = genDFControlSet(succ_domtree->id());
-        for (INT p = succ_df->get_first(); p >= 0; p = succ_df->get_next(p)) {
+        for (BSIdx p = succ_df->get_first(); p != BS_UNDEF;
+             p = succ_df->get_next(p)) {
             if (g.get_idom((UINT)p) != vid) {
                 df->bunion(p);
             }
@@ -228,7 +229,8 @@ bool DfMgr::hasHighDFDensityVertex(xcom::DGraph const& g)
          v != nullptr; v = g.get_next_vertex(c)) {
         xcom::BitSet const* dfset = getDFControlSet(v->id());
         if (dfset == nullptr) { continue; }
-        for (INT i = dfset->get_first(); i >= 0; i = dfset->get_next(i)) {
+        for (BSIdx i = dfset->get_first(); i != BS_UNDEF;
+             i = dfset->get_next(i)) {
             UINT cc = counter_of_vex.get(i) + 1;
             if (cc >= m_thres) {
                 return true;
@@ -262,8 +264,8 @@ void DfMgr::build(xcom::DGraph const& g)
 
             xcom::BitSet const* pred_dom = g.read_dom_set(pred->id());
             ASSERT0(pred_dom != nullptr);
-            for (INT i = pred_dom->get_first();
-                 i >= 0; i = pred_dom->get_next(i)) {
+            for (BSIdx i = pred_dom->get_first();
+                 i != BS_UNDEF; i = pred_dom->get_next(i)) {
                 if (!v_dom->is_contain(i)) {
                     ASSERT0(g.getVertex(i));
                     genDFControlSet(i)->bunion(vid);
@@ -326,6 +328,9 @@ void PRSSAInfoCollect::collect(IRBB const* from, IRBB const* to)
             continue;
         }
         EdgeC const* ec = m_cfg->getVertex(to->id())->getInList();
+        //In the middle stage of optimization, e.g DCE, may transform the CFG
+        //into a legal but insane CFG. In the case, ec and Phi operand may be
+        //empty.
         for (IR const* opnd = PHI_opnd_list(ir); opnd != nullptr;
              opnd = opnd->get_next(), ec = ec->get_next()) {
             ASSERT0(ec);
@@ -953,17 +958,19 @@ void PRSSAMgr::addSuccessorDesignatedPhiOpnd(IRBB * bb, IRBB * succ,
                 ((CPhi*)ir)->insertOpndAt(pos, newopnd);
                 continue;
             }
-            ASSERT0(ref->isConstExp());
+            ASSERT0(ref->isPhiOpnd());
             ((CPhi*)ir)->insertOpndAt(pos, m_rg->dupIRTree(ref));
             continue;
         }
 
-        ASSERTN(0, ("Can this happen?"));
+        //In the middle stage of optimization, e.g DCE, may transform the CFG
+        //into a legal but insane CFG. In the case, the CFG may isolate to
+        //serveral different part. Thus there is no livein path from entry
+        //to current bb.
+        //ASSERTN(0, ("Can this happen?"));
         IR * newopnd = m_rg->buildPR(ir->getType());
         m_rg->getMDMgr()->allocPRMD(newopnd);
-        SSAInfo * info = allocSSAInfo(newopnd->getPrno(), newopnd->getType());
-        newopnd->setSSAInfo(info);
-        info->addUse(newopnd);
+        genSSAInfoForExp(newopnd);
         ((CPhi*)ir)->insertOpndAt(pos, newopnd);
     }
 }
@@ -996,7 +1003,8 @@ void PRSSAMgr::placePhiForPR(UINT prno,
         xcom::BitSet const* dfcs = dfm.getDFControlSet(bb->id());
         if (dfcs == nullptr) { continue; }
 
-        for (INT i = dfcs->get_first(); i >= 0; i = dfcs->get_next(i)) {
+        for (BSIdx i = dfcs->get_first(); i != BS_UNDEF;
+             i = dfcs->get_next(i)) {
             if (visited.is_contain(i)) {
                 //Already insert phi for 'prno' into BB i.
                 //TODO:ensure the phi for same PR does NOT be
@@ -1023,16 +1031,13 @@ void PRSSAMgr::placePhiForPR(UINT prno,
 
 //Return true if all DEF of operands are the same stmt.
 //common_def: record the same stmt.
+//            Note if the same stmt indicates a region livein DEF, it will be
+//            NULL.
 //common_livein: record the livein PR if all opnd are the same livein PR.
-//Note if the same stmt indicates a region livein DEF, it is NULL.
 static bool hasCommonDef(IR const* phi, OUT IR ** common_def,
                          OUT IR ** common_livein)
 {
     ASSERT0(phi->is_phi());
-    VPR * vp = (VPR*)PHI_ssainfo(phi);
-    ASSERT0(vp);
-    if (SSA_uses(vp).get_elem_count() == 0) { return true; }
-
     IR * liveinopnd = nullptr;
     IR * effectdef = nullptr;
     bool same_def = true; //indicate all DEF of operands are the same stmt.
@@ -1093,6 +1098,9 @@ static bool hasCommonDef(IR const* phi, OUT IR ** common_def,
 static bool isRedundantPHI(IR const* phi, OUT IR ** common_def,
                            OUT IR ** common_livein)
 {
+    VPR * vp = (VPR*)PHI_ssainfo(phi);
+    ASSERT0(vp);
+    if (SSA_uses(vp).get_elem_count() == 0) { return true; }
     return hasCommonDef(phi, common_def, common_livein);
 }
 
@@ -1254,6 +1262,39 @@ void PRSSAMgr::removePRSSAOcc(IR const* ir)
     for (UINT i = 0; i < IR_MAX_KID_NUM(ir); i++) {
         for (IR * x = ir->getKid(i); x != nullptr; x = x->get_next()) {
             removePRSSAOcc(x);
+        }
+    }
+}
+
+
+//Remove Use-Def chain.
+//exp: the expression to be removed.
+//e.g: ir = ...
+//    = ir //S1
+//If S1 will be deleted, ir should be removed from its useset in MDSSAInfo.
+//NOTE: the function only process exp itself.
+void PRSSAMgr::removeUse(IR const* ir)
+{
+    SSAInfo * info = ir->getSSAInfo();
+    if (info != nullptr) {
+        info->removeUse(ir);
+    }
+}
+
+
+//Remove Use-Def chain.
+//exp: the expression to be removed.
+//e.g: ir = ...
+//    = ir //S1
+//If S1 will be deleted, ir should be removed from its useset in MDSSAInfo.
+//NOTE: the function only process exp itself.
+void PRSSAMgr::removeUseForTree(IR const* ir)
+{
+    ConstIRIter it;
+    for (IR const* x = iterInitC(ir, it, false);
+         x != nullptr; x = iterNextC(it, true)) {
+        if (x->isPROp()) {
+            PRSSAMgr::removeUse(x);
         }
     }
 }
@@ -2281,8 +2322,11 @@ bool PRSSAMgr::refinePhiImpl(MOD IRBB * bb, MOD IR * ir,
         revisePhiDataType(ir, m_rg);
         return false;
     }
+    if (common_def == nullptr && common_livein == nullptr) {
+        //The redundant phi can not be optimized if no common-def found.
+        return false;
+    }
     iterCollectPhi(ir, wl, in_list);
-    if (common_def == nullptr && common_livein == nullptr) { return false; }
     replaceCommonDef(ir, common_def, common_livein, m_rg);
 
     //Revise DU chains.
@@ -2323,13 +2367,19 @@ bool PRSSAMgr::refinePhi()
         in_list.diff(bb->id());
         IRListIter irct = nullptr;
         IRListIter nextirct = nullptr;
+        bool lremove = false;
+        UINT oldcount = wl.get_elem_count();
         for (BB_irlist(bb).get_head(&nextirct), irct = nextirct;
              irct != BB_irlist(bb).end(); irct = nextirct) {
             nextirct = BB_irlist(bb).get_next(nextirct);
             IR * ir = irct->val();
             if (!ir->is_phi()) { break; }
-            remove |= refinePhiImpl(bb, ir, wl, in_list, irct);
+            lremove |= refinePhiImpl(bb, ir, wl, in_list, irct);
         }
+        if (!lremove && wl.get_elem_count() > oldcount) {
+            ASSERTN(0, ("Add more unoptimized phi"));
+        }
+        remove |= lremove;        
     }
     END_TIMER(t, "PRSSA: Refine phi");
     return remove;
@@ -2642,6 +2692,22 @@ SSAInfo * PRSSAMgr::genSSAInfoForStmt(IR * stmt)
             ("multidefinition in for PR%d", stmt->getPrno()));
     SSA_def(ssainfo) = stmt;
     stmt->setSSAInfo(ssainfo);
+    return ssainfo;
+}
+
+
+SSAInfo * PRSSAMgr::genSSAInfoForExp(IR * exp)
+{
+    ASSERT0(exp->is_exp() && exp->isPROp());
+    ASSERT0(exp->getSSAInfo() == nullptr);
+
+    //Check if same PR has been defined multiple times.
+    ASSERTN(getSSAInfoByPRNO(exp->getPrno()) == nullptr,
+            ("found duplicated SSAInfo for same PRNO"));
+    SSAInfo * ssainfo = allocSSAInfo(exp->getPrno(), exp->getType());
+    ASSERT0(SSA_def(ssainfo) == nullptr);
+    exp->setSSAInfo(ssainfo);
+    ssainfo->addUse(exp);
     return ssainfo;
 }
 

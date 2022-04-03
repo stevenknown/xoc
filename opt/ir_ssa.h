@@ -287,6 +287,7 @@ private:
     void destructionInDomTreeOrder(IRBB * root, xcom::Graph & domtree);
 
     void genSSAInfoForExp();
+    SSAInfo * genSSAInfoForExp(IR * exp);
     void genSSAInfoForStmt();
 
     //The function rename PR in BB.
@@ -522,6 +523,7 @@ public:
     //This function revise phi data type, and remove redundant phi.
     //Return true if there is phi removed.
     bool refinePhi();
+
     //Reinitialize SSA manager.
     //This function will clean all informations and recreate them.
     inline void reinit()
@@ -541,6 +543,25 @@ public:
     //pr1 and pr2 will be removed as well. Therefore pr1 pr2's SSAInfo will be
     //updated as well.
     static void removePRSSAOcc(IR const* ir);
+
+    //Remove Use-Def chain.
+    //exp: the expression to be removed.
+    //e.g: ir = ...
+    //    = ir //S1
+    //If S1 will be deleted, ir should be removed from its useset in MDSSAInfo.
+    //NOTE: the function only process exp itself.
+    static void removeUse(IR const* ir);
+
+    //Remove Use-Def chain for all memory references in IR Tree that rooted by
+    //exp.
+    //exp: it is the root of IR tree that to be removed.
+    //e.g: ir = ...
+    //        = exp //S1
+    //If S1 will be deleted, exp should be removed from its UseSet in MDSSAInfo.
+    //NOTE: If exp is an IR tree, e.g: ild(x, ld(y)), remove ild(x) means
+    //ld(y) will be removed as well. And ld(y)'s MDSSAInfo will be
+    //updated as well.
+    static void removeUseForTree(IR const* ir);
 
     //Check each USE of stmt, remove the expired one which is not reference
     //the memory any more that stmt defined.
