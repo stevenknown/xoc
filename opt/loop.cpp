@@ -465,10 +465,11 @@ static void fixupInnerLoopEdgeBetweenHeadAndPreheader(LI<IRBB> const* li,
 
 //Return true if inserted a new BB.
 //insert_preheader: true if preheader has been inserted, otherwise do insertion.
-static void insertAndUpdateOutterLoopEdge(
-    LI<IRBB> const* li, Region * rg, IRBB * pred, BBListIter head_it,
-    IRBB * preheader, MOD LabelInfo const** preheader_lab,
-    OUT bool & insert_preheader)
+static void insertAndUpdateOutterLoopEdge(LI<IRBB> const* li, Region * rg,
+                                          IRBB * pred, BBListIter head_it,
+                                          IRBB * preheader,
+                                          MOD LabelInfo const** preheader_lab,
+                                          OUT bool & insert_preheader)
 {
     IRBB * head = li->getLoopHead();
     IRCFG * cfg = rg->getCFG();
@@ -521,7 +522,9 @@ static void insertAndUpdateOutterLoopEdge(
     }
 
     //Add the new label to preheader if not exist.
-    cfg->addLabel(preheader, *preheader_lab);
+    if (!preheader->hasLabel(*preheader_lab)) {
+        cfg->addLabel(preheader, *preheader_lab);
+    }
 
     //Update branch-target of last IR of predecessor.
     last_ir->setLabel(*preheader_lab);

@@ -350,7 +350,7 @@ Lexer::STATUS Lexer::getLine()
                 goto FAILED;
             }
         }
-        if (m_file_buf_pos <= m_last_read_num) {
+        if (m_file_buf_pos >= m_last_read_num) {
             Lexer::STATUS st = readLineBuf(is_some_chars_in_cur_line);
             if (st == LEX_EOF) { goto FEOF; }
             if (st == LEX_SUCC) { goto FIN; }
@@ -1241,6 +1241,7 @@ START:
         m_cur_char = getNextChar();
         token = T_COLON;
         m_cur_token_string[m_cur_token_string_pos] = 0;
+        break;
     case '>':
         token = t_lead_by_gt();
         break;
