@@ -417,6 +417,7 @@ void removeUseForTree(IR const* exp, Region * rg)
 
 
 //Remove all DU info of 'stmt'.
+//Note do NOT remove stmt from BBIRList before call the function.
 void removeStmt(IR * stmt, Region * rg)
 {
     ASSERT0(stmt->is_stmt());
@@ -571,7 +572,7 @@ VN const* getVNOfIndirectOp(IR const* ir, UINT * indirect_level,
     ASSERT0(base);
 
     //Get the VN of base expression.
-    return const_cast<GVN*>(gvn)->mapIR2VNConst(base);
+    return const_cast<GVN*>(gvn)->getConstVN(base);
 }
 
 
@@ -583,13 +584,13 @@ static bool hasSameValueArrayOp(IR const* ir1, IR const* ir2, GVN const* gvn)
     IR const* sub2 = ARR_sub_list(ir2);
     for (; sub1 != nullptr && sub2 != nullptr;
          sub1 = sub1->get_next(), sub2 = sub2->get_next()) {
-        VN const* v1 = gvn->mapIR2VNConst(sub1);
-        VN const* v2 = gvn->mapIR2VNConst(sub2);
+        VN const* v1 = gvn->getConstVN(sub1);
+        VN const* v2 = gvn->getConstVN(sub2);
         if (v1 != v2) { return false; }
     }
 
-    VN const* v1 = gvn->mapIR2VNConst(ARR_base(ir1));
-    VN const* v2 = gvn->mapIR2VNConst(ARR_base(ir2));
+    VN const* v1 = gvn->getConstVN(ARR_base(ir1));
+    VN const* v2 = gvn->getConstVN(ARR_base(ir2));
     if (v1 != v2) { return false; }
 
     if (ir1->isCover(ir2, gvn->getRegion())) {

@@ -64,24 +64,6 @@ CHAR const* VNTypeDesc::getVTName(VN_TYPE vt)
 }
 
 
-static bool isUnaryIRType(IR_TYPE irt)
-{
-    switch (irt) {
-    SWITCH_CASE_UNA:
-        return true;
-    default: break;
-    }
-    return false;
-}
-
-
-static bool isBinaryIRType(IR_TYPE irt)
-{
-    //Regard LDA as binary op.
-    return xoc::isBinaryOp(irt) || irt == IR_LDA;
-}
-
-
 //
 //START GVN
 //
@@ -94,7 +76,6 @@ GVN::GVN(Region * rg) : Pass(rg)
     m_cfg = m_rg->getCFG();
     ASSERT0(m_cfg && m_du && m_md_sys && m_tm);
     m_is_vn_fp = false;
-    m_is_comp_ild_vn_by_du = true;
     m_is_comp_lda_string = false;
     m_is_alloc_livein_vn = false;
     m_pool = nullptr;
@@ -105,6 +86,36 @@ GVN::GVN(Region * rg) : Pass(rg)
 GVN::~GVN()
 {
     destroy();
+}
+
+
+bool GVN::isUnary(IR_TYPE irt) const
+{
+    switch (irt) {
+    SWITCH_CASE_UNA:
+        return true;
+    default: break;
+    }
+    return false;
+}
+
+
+bool GVN::isBinary(IR_TYPE irt) const
+{
+    //Regard LDA as binary op.
+    return xoc::isBinaryOp(irt) || irt == IR_LDA;
+}
+
+
+bool GVN::isTriple(IR_TYPE irt) const
+{
+    return irt == IR_ILD || irt == IR_SETELEM || irt == IR_SELECT;
+}
+
+
+bool GVN::isQuad(IR_TYPE irt) const
+{
+    return irt == IR_ARRAY;
 }
 
 
@@ -177,7 +188,7 @@ void GVN::cleanIRTreeVN(IR const* ir)
         }
     }
     //Do NOT insert ir into mapping table if it does not have a VN.
-    setMapIR2VNIfFind(ir, nullptr);
+    setVNIfFind(ir, nullptr);
 }
 
 
@@ -211,7 +222,7 @@ void GVN::dumpVNHash() const
     Tab2Iter it2;
     Tab3Iter it3;
     for (INT i = 0; i <= m_irt_vec.get_last_idx(); i++) {
-        if (isBinaryIRType((IR_TYPE)i)) {
+        if (isBinary((IR_TYPE)i)) {
             Tab2 * tab2 = (Tab2*)m_irt_vec.get(i);
             if (tab2 == nullptr) { continue; }
 
@@ -224,13 +235,13 @@ void GVN::dumpVNHash() const
             continue;
         }
 
-        if (isUnaryIRType((IR_TYPE)i)) {
+        if (isUnary((IR_TYPE)i)) {
             Tab1 * tab1 = (Tab1*)m_irt_vec.get(i);
             if (tab1 == nullptr) { continue; }
             continue;
         }
 
-        if (is_triple((IR_TYPE)i)) {
+        if (isTriple((IR_TYPE)i)) {
             Tab3 * tab3 = (Tab3*)m_irt_vec.get(i);
             if (tab3 == nullptr) { continue; }
 
@@ -242,7 +253,7 @@ void GVN::dumpVNHash() const
             continue;
         }
 
-        if (is_quad((IR_TYPE)i)) {
+        if (isQuad((IR_TYPE)i)) {
             continue;
         }
 
@@ -359,7 +370,7 @@ VN * GVN::registerVNviaFP(double v)
 
 VN * GVN::registerUnaVN(IR_TYPE irt, VN const* v0)
 {
-    ASSERT0(isUnaryIRType(irt));
+    ASSERT0(isUnary(irt));
     Tab1 * tab1 = (Tab1*)m_irt_vec.get(irt);
     if (tab1 == nullptr) {
         tab1 = new Tab1();
@@ -381,7 +392,7 @@ VN * GVN::registerUnaVN(IR_TYPE irt, VN const* v0)
 VN * GVN::registerBinVN(IR_TYPE irt, VN const* v0, VN const* v1)
 {
     ASSERT0(v0 && v1);
-    ASSERT0(isBinaryIRType(irt));
+    ASSERT0(isBinary(irt));
     if (xoc::isCommutative(irt) && (VN_id(v0) > VN_id(v1))) {
         return registerBinVN(irt, v1, v0);
     }
@@ -421,7 +432,7 @@ VN * GVN::registerTripleVN(IR_TYPE irt, VN const* v0, VN const* v1,
                            VN const* v2)
 {
     ASSERT0(v0 && v1 && v2);
-    ASSERT0(is_triple(irt));
+    ASSERT0(isTriple(irt));
     Tab3 * tab3 = (Tab3*)m_irt_vec.get(irt);
     if (tab3 == nullptr) {
         tab3 = new Tab3();
@@ -458,7 +469,7 @@ VN * GVN::registerQuadVN(IR_TYPE irt, VN const* v0, VN const* v1,
                          VN const* v2, VN const* v3)
 {
     ASSERT0(v0 && v1 && v2 && v3);
-    ASSERT0(is_quad(irt));
+    ASSERT0(isQuad(irt));
     Tab4 * tab4 = (Tab4*)m_irt_vec.get(irt);
     if (tab4 == nullptr) {
         tab4 = new Tab4();
@@ -940,78 +951,142 @@ VN * GVN::computeScalar(IR const* exp, bool & change)
 }
 
 
+VN * GVN::computeSelect(IR const* exp, bool & change)
+{
+    VN * vn1 = computeVN(SELECT_pred(exp), change);
+    VN * vn2 = computeVN(SELECT_trueexp(exp), change);
+    VN * vn3 = computeVN(SELECT_falseexp(exp), change);
+    if (vn1 == nullptr || vn2 == nullptr || vn3 == nullptr) {
+        if (getVN(exp) != nullptr) {
+            setVN(exp, nullptr);
+            change = true;
+        }
+        return nullptr;
+    }
+    VN * x = registerTripleVN(exp->getCode(), vn1, vn2, vn3);
+    if (getVN(exp) != x) {
+        setVN(exp, x);
+        change = true;
+    }
+    return x;
+}
+
+
+VN * GVN::computeBin(IR const* exp, bool & change)
+{
+    VN * vn1 = computeVN(BIN_opnd0(exp), change);
+    VN * vn2 = computeVN(BIN_opnd1(exp), change);
+    if (vn1 == nullptr || vn2 == nullptr) {
+        if (m_ir2vn.get(exp->id()) != nullptr) {
+            m_ir2vn.setAlways(exp->id(), nullptr);
+            change = true;
+        }
+        return nullptr;
+    }
+    VN * x = registerBinVN(exp->getCode(), vn1, vn2);
+    if (m_ir2vn.get(exp->id()) != x) {
+        m_ir2vn.setAlways(exp->id(), x);
+        change = true;
+    }
+    return x;
+}
+
+
+VN * GVN::computeConst(IR const* exp, bool & change)
+{
+    VN * x = m_ir2vn.get(exp->id());
+    if (x != nullptr) { return x; }
+
+    if (exp->is_int()) {
+        x = registerVNviaINT(CONST_int_val(exp));
+    } else if (exp->is_mc()) {
+        x = registerVNviaMC(CONST_int_val(exp));
+    } else if (exp->is_fp()) {
+        if (!m_is_vn_fp) {
+            return nullptr;
+        }
+        x = registerVNviaFP(CONST_fp_val(exp));
+    } else if (exp->is_str()) {
+        x = registerVNviaSTR(CONST_str_val(exp));
+    } else if (exp->is_any()) {
+        return nullptr;
+    } else  {
+        ASSERTN(0, ("unsupport const type"));
+    }
+
+    ASSERT0(x);
+    m_ir2vn.setAlways(exp->id(), x);
+    change = true;
+    return x;
+}
+
+
+VN * GVN::computeLda(IR const* exp, bool & change)
+{
+    Var * v = LDA_idinfo(exp);
+    VN * basevn = nullptr;
+    if (v->is_string()) {
+        if (m_is_comp_lda_string) {
+            MD const* emd = m_rg->getMDMgr()->genMDForVAR(v, LDA_ofst(exp));
+            ASSERTN(emd && emd->is_effect(),
+                    ("string should have effect MD"));
+            basevn = registerVNviaMD(emd);
+        } else {
+            basevn = nullptr;
+        }
+    } else {
+        MD const* emd = m_rg->getMDMgr()->genMDForVAR(v, LDA_ofst(exp));
+        ASSERTN(emd && emd->is_effect(), ("string should have effect MD"));
+        basevn = registerVNviaMD(emd);
+    }
+
+    if (basevn == nullptr) {
+        if (m_ir2vn.get(exp->id()) != nullptr) {
+            m_ir2vn.setAlways(exp->id(), nullptr);
+            change = true;
+        }
+        return nullptr;
+    }
+
+    VN * ofstvn = registerVNviaINT(LDA_ofst(exp));
+    VN * x = registerBinVN(IR_LDA, basevn, ofstvn);
+    if (m_ir2vn.get(exp->id()) != x) {
+        m_ir2vn.setAlways(exp->id(), x);
+        change = true;
+    }
+    return x;
+}
+
+
+VN * GVN::computeUna(IR const* exp, bool & change)
+{
+    VN * x = computeVN(UNA_opnd(exp), change);
+    if (x == nullptr) {
+        if (m_ir2vn.get(exp->id()) != nullptr) {
+            m_ir2vn.set(exp->id(), nullptr);
+            change = true;
+        }
+        return nullptr;
+    }
+    x = registerUnaVN(exp->getCode(), x);
+    if (m_ir2vn.get(exp->id()) != x) {
+        m_ir2vn.setAlways(exp->id(), x);
+        change = true;
+    }
+    return x;
+}
+
+
 VN * GVN::computeVN(IR const* exp, bool & change)
 {
     ASSERT0(exp);
     switch (exp->getCode()) {
-    SWITCH_CASE_BIN: {
-        VN * vn1 = computeVN(BIN_opnd0(exp), change);
-        VN * vn2 = computeVN(BIN_opnd1(exp), change);
-        if (vn1 == nullptr || vn2 == nullptr) {
-            if (m_ir2vn.get(exp->id()) != nullptr) {
-                m_ir2vn.setAlways(exp->id(), nullptr);
-                change = true;
-            }
-            return nullptr;
-        }
-        VN * x = registerBinVN(exp->getCode(), vn1, vn2);
-        if (m_ir2vn.get(exp->id()) != x) {
-            m_ir2vn.setAlways(exp->id(), x);
-            change = true;
-        }
-        return x;
-    }
-    SWITCH_CASE_UNA: {
-        VN * x = computeVN(UNA_opnd(exp), change);
-        if (x == nullptr) {
-            if (m_ir2vn.get(exp->id()) != nullptr) {
-                m_ir2vn.set(exp->id(), nullptr);
-                change = true;
-            }
-            return nullptr;
-        }
-        x = registerUnaVN(exp->getCode(), x);
-        if (m_ir2vn.get(exp->id()) != x) {
-            m_ir2vn.setAlways(exp->id(), x);
-            change = true;
-        }
-        return x;
-    }
-    case IR_LDA: {
-        Var * v = LDA_idinfo(exp);
-        VN * basevn = nullptr;
-        if (v->is_string()) {
-            if (m_is_comp_lda_string) {
-                MD const* emd = m_rg->getMDMgr()->genMDForVAR(
-                    v, LDA_ofst(exp));
-                ASSERTN(emd && emd->is_effect(),
-                        ("string should have effect MD"));
-                basevn = registerVNviaMD(emd);
-            } else {
-                basevn = nullptr;
-            }
-        } else {
-            MD const* emd = m_rg->getMDMgr()->genMDForVAR(v, LDA_ofst(exp));
-            ASSERTN(emd && emd->is_effect(), ("string should have effect MD"));
-            basevn = registerVNviaMD(emd);
-        }
-
-        if (basevn == nullptr) {
-            if (m_ir2vn.get(exp->id()) != nullptr) {
-                m_ir2vn.setAlways(exp->id(), nullptr);
-                change = true;
-            }
-            return nullptr;
-        }
-
-        VN * ofstvn = registerVNviaINT(LDA_ofst(exp));
-        VN * x = registerBinVN(IR_LDA, basevn, ofstvn);
-        if (m_ir2vn.get(exp->id()) != x) {
-            m_ir2vn.setAlways(exp->id(), x);
-            change = true;
-        }
-        return x;
-    }
+    SWITCH_CASE_BIN:
+        return computeBin(exp, change);
+    SWITCH_CASE_UNA:
+        return computeUna(exp, change);
+    case IR_LDA:
+        return computeLda(exp, change);
     //case IR_ID:
     //Note IR_ID should not participate in GVN analysis because it does not
     //represent a real operation.
@@ -1022,32 +1097,10 @@ VN * GVN::computeVN(IR const* exp, bool & change)
         return computeArray(exp, change);
     case IR_ILD:
         return computeILoad(exp, change);
-    case IR_CONST: {
-        VN * x = m_ir2vn.get(exp->id());
-        if (x != nullptr) { return x; }
-
-        if (exp->is_int()) {
-            x = registerVNviaINT(CONST_int_val(exp));
-        } else if (exp->is_mc()) {
-            x = registerVNviaMC(CONST_int_val(exp));
-        } else if (exp->is_fp()) {
-            if (!m_is_vn_fp) {
-                return nullptr;
-            }
-            x = registerVNviaFP(CONST_fp_val(exp));
-        } else if (exp->is_str()) {
-            x = registerVNviaSTR(CONST_str_val(exp));
-        } else if (exp->is_any()) {
-            return nullptr;
-        } else  {
-            ASSERTN(0, ("unsupport const type"));
-        }
-
-        ASSERT0(x);
-        m_ir2vn.setAlways(exp->id(), x);
-        change = true;
-        return x;
-    }
+    case IR_SELECT:
+        return computeSelect(exp, change);
+    case IR_CONST:
+        return computeConst(exp, change);
     default: break;
     }
     return nullptr;
@@ -1070,8 +1123,8 @@ void GVN::processPhi(IR const* ir, bool & change)
         }
     }
 
-    if (m_ir2vn.get(ir->id()) != phivn) {
-        ASSERT0(m_ir2vn.get(ir->id()) == nullptr);
+    if (getConstVN(ir) != phivn) {
+        ASSERT0(getConstVN(ir) == nullptr);
         m_ir2vn.set(ir->id(), phivn);
         change = true;
     }
@@ -1083,8 +1136,7 @@ void GVN::processCall(IR const* ir, bool & change)
     for (IR const* p = CALL_param_list(ir); p != nullptr; p = p->get_next()) {
         computeVN(p, change);
     }
-
-    VN * x = m_ir2vn.get(ir->id());
+    VN * x = getVN(ir);
     if (x == nullptr) {
         x = newVN();
         VN_type(x) = VN_VAR;
@@ -1118,8 +1170,8 @@ bool GVN::isSameMemLoc(IR const* ir1, IR const* ir2) const
         IR const* irbase1 = const_cast<IR*>(ir1)->getBase();
         IR const* irbase2 = const_cast<IR*>(ir2)->getBase();
         ASSERT0(irbase1 && irbase2);
-        VN const* base1 = mapIR2VNConst(irbase1);
-        VN const* base2 = mapIR2VNConst(irbase2);
+        VN const* base1 = getConstVN(irbase1);
+        VN const* base2 = getConstVN(irbase2);
         return base1 == base2;
     }
 
@@ -1127,8 +1179,8 @@ bool GVN::isSameMemLoc(IR const* ir1, IR const* ir2) const
         IR const* irbase1 = const_cast<IR*>(ir1)->getBase();
         IR const* irbase2 = const_cast<IR*>(ir2)->getBase();
         ASSERT0(irbase1 && irbase2);
-        VN const* base1 = mapIR2VNConst(irbase1);
-        VN const* base2 = mapIR2VNConst(irbase2);
+        VN const* base1 = getConstVN(irbase1);
+        VN const* base2 = getConstVN(irbase2);
         if (base1 != base2) {
             return false;
         }
@@ -1137,8 +1189,8 @@ bool GVN::isSameMemLoc(IR const* ir1, IR const* ir2) const
         for (IR const* s1 = ARR_sub_list(ir1); s1 != nullptr;
              s1 = s1->get_next(), s2 = s2->get_next()) {
             ASSERT0(s2);
-            VN const* vs1 = mapIR2VNConst(s1);
-            VN const* vs2 = mapIR2VNConst(s2);
+            VN const* vs1 = getConstVN(s1);
+            VN const* vs2 = getConstVN(s2);
             if (vs1 != vs2) {
                 return false;
             }
@@ -1152,6 +1204,86 @@ bool GVN::isSameMemLoc(IR const* ir1, IR const* ir2) const
 }
 
 
+void GVN::processGETELEM(IR * ir, bool & change)
+{
+    VN * v1 = computeVN(GETELEM_base(ir), change);
+    VN * v2 = computeVN(GETELEM_ofst(ir), change);
+    if (v1 == nullptr || v2 == nullptr) { return; }
+    VN * x = registerBinVN(IR_GETELEM, v1, v2);
+    if (getConstVN(ir) != x) {
+        setVN(ir, x);
+        change = true;
+    }
+}
+
+
+void GVN::processSETELEM(IR * ir, bool & change)
+{
+    VN * v1 = computeVN(SETELEM_base(ir), change);
+    VN * v2 = computeVN(SETELEM_val(ir), change);
+    VN * v3 = computeVN(SETELEM_ofst(ir), change);
+    if (v1 == nullptr || v2 == nullptr || v3 == nullptr) { return; }
+
+    //Do NOT clean ir's VN, because its VN may be set by its dominated
+    //use-stmt ILD.
+    VN * x = registerTripleVN(ir->getCode(), v1, v2, v3);
+    if (getConstVN(ir) != x) {
+        setVN(ir, x);
+        change = true;
+    }
+}
+
+
+void GVN::processSTandSTPR(IR * ir, bool & change)
+{
+    VN * x = computeVN(ir->getRHS(), change);
+    if (x == nullptr) { return; }
+
+    //Do NOT clean ir's VN, because its VN may be set by its dominated
+    //use-stmt ILD.
+    if (getConstVN(ir) != x) {
+        //ir2vn is nullptr only the first iteration computation.
+        //ASSERT0(getConstVN(ir) == nullptr);
+        m_ir2vn.setAlways(ir->id(), x);
+        change = true;
+    }
+}
+
+
+void GVN::processIST(IR * ir, bool & change)
+{
+    computeVN(IST_base(ir), change);
+    VN * x = computeVN(ir->getRHS(), change);
+    if (x == nullptr) { return; }
+
+    //Do NOT clean ir's VN, because its VN may be set by its dominated
+    //use-stmt ILD.
+    if (getConstVN(ir) != x) {
+        //ir2vn is nullptr only the first iteration computation.
+        //ASSERT0(getConstVN(ir) == nullptr);
+        m_ir2vn.setAlways(ir->id(), x);
+        change = true;
+    }
+}
+
+
+void GVN::processSTARRAY(IR * ir, bool & change)
+{
+    computeArrayAddrRef(ir, change);
+    VN * x = computeVN(STARR_rhs(ir), change);
+    if (x == nullptr) { return; }
+
+    //Do NOT clean ir's VN, because its VN may be set by its dominated
+    //use-stmt ILD.
+    if (getConstVN(ir) != x) {
+        //ir2vn is nullptr only the first iteration computation.
+        //ASSERT0(getConstVN(ir) == nullptr);
+        m_ir2vn.setAlways(ir->id(), x);
+        change = true;
+    }
+}
+
+
 void GVN::processBB(IRBB * bb, bool & change)
 {
     IRListIter ct;
@@ -1161,51 +1293,15 @@ void GVN::processBB(IRBB * bb, bool & change)
         ASSERT0(ir);
         switch (ir->getCode()) {
         case IR_ST:
-        case IR_STPR: {
-            VN * x = computeVN(ir->getRHS(), change);
-            if (x == nullptr) { break; }
-
-            //ST's vn may be set by its dominated use-stmt ILD.
-            if (m_ir2vn.get(ir->id()) != x) {
-                //ir2vn is nullptr only the first iteration computation.
-                //ASSERT0(m_ir2vn.get(ir->id()) == nullptr);
-                m_ir2vn.setAlways(ir->id(), x);
-                change = true;
-            }
-            //return; keep going BB irlist.
+        case IR_STPR:
+            processSTandSTPR(ir, change);
             break;
-        }
-        case IR_STARRAY: {
-            computeArrayAddrRef(ir, change);
-
-            VN * x = computeVN(STARR_rhs(ir), change);
-            if (x == nullptr) { break; }
-
-            //STARRAY's vn may be set by its dominated use-stmt ILD.
-            if (m_ir2vn.get(ir->id()) != x) {
-                //ir2vn is nullptr only the first iteration computation.
-                //ASSERT0(m_ir2vn.get(ir->id()) == nullptr);
-                m_ir2vn.setAlways(ir->id(), x);
-                change = true;
-            }
-            //return; keep going BB irlist.
+        case IR_STARRAY:
+            processSTARRAY(ir, change);
             break;
-        }
-        case IR_IST: {
-            computeVN(IST_base(ir), change);
-
-            VN * x = computeVN(ir->getRHS(), change);
-            if (x == nullptr) { break; }
-
-            //IST's vn may be set by its dominated use-stmt ILD.
-            if (m_ir2vn.get(ir->id()) != x) {
-                //ir2vn is nullptr only the first iteration computation.
-                //ASSERT0(m_ir2vn.get(ir->id()) == nullptr);
-                m_ir2vn.setAlways(ir->id(), x);
-                change = true;
-            }
+        case IR_IST:
+            processIST(ir, change);
             break;
-        }
         case IR_CALL:
         case IR_ICALL:
             processCall(ir, change);
@@ -1230,6 +1326,12 @@ void GVN::processBB(IRBB * bb, bool & change)
             break;
         case IR_PHI:
             processPhi(ir, change);
+            break;
+        case IR_SETELEM:
+            processSETELEM(ir, change);
+            break;
+        case IR_GETELEM:
+            processGETELEM(ir, change);
             break;
         case IR_GOTO: break;
         default: UNREACHABLE();
@@ -1281,7 +1383,7 @@ void GVN::dumpBB(UINT bbid) const
     for (IR * ir = BB_first_ir(bb); ir != nullptr; ir = BB_next_ir(bb)) {
         dumpIR(ir, m_rg);
         note(getRegion(), "\n");
-        VN * x = m_ir2vn.get(ir->id());
+        VN const* x = getConstVN(ir);
         if (x != nullptr) {
             prt(getRegion(), "vn%d", VN_id(x));
         }

@@ -266,6 +266,13 @@ void ParseCtx::addIR(IR * stmt)
     xoc::setLineNum(stmt, parser->getLexer()->getCurrentLineNum(),
                     current_region);
 }
+
+
+void ParseCtx::clean()
+{
+    m_id2prno.destroy();
+    m_id2prno.init();
+}
 //END ParseCtx
 
 
@@ -345,7 +352,7 @@ void IRParser::initKeyWordMap()
 }
 
 
-CHAR const* IRParser::getKeywordName(X_CODE code) const
+CHAR const* IRParser::getKeyWordName(X_CODE code) const
 {
     ASSERT0(code >= X_UNDEF && code < X_LAST);
     return g_keyword_info[code].name;
@@ -473,7 +480,8 @@ void IRParser::error(X_CODE xcode, CHAR const* format, ...)
     va_list arg;
     va_start(arg, format);
     buf.vsprint(format, arg);
-    prt2C("\nerror(%d):%s", m_lexer->getCurrentLineNum(), buf.buf);
+    prt2C("\nerror(%d):parse %s: %s", m_lexer->getCurrentLineNum(),
+          getKeyWordName(xcode), buf.buf);
     va_end(arg);
 
     ParseErrorMsg * msg = new ParseErrorMsg(10);
@@ -691,25 +699,31 @@ bool IRParser::constructSSAIfNeed(ParseCtx * ctx)
     if (ctx->has_error || ctx->current_region->is_blackbox()) { return true; }
     ctx->current_region->setIRList(ctx->stmt_list);
 
-    //TODO: build cfg by given parameters.
+    //TODO: build CFG by given parameters.
     if (ctx->has_phi) {
-        //GR can not include CFS when PHI is in used.
+        //GR should not include CFS when PHI is in used.
         ASSERT0(!ctx->has_high_level_ir);
     }
     if (!ctx->has_phi) { return true; }
-
-    ctx->current_region->constructBBList();
+    Region * rg = ctx->current_region;
+    rg->constructBBList();
     OptCtx * oc = getRegionMgr()->getAndGenOptCtx(ctx->current_region->id());
     ASSERT0(oc);
-    ctx->current_region->initPassMgr();
-    ctx->current_region->getPassMgr()->checkValidAndRecompute(oc, PASS_CFG,
-                                                              PASS_UNDEF);
-    ctx->current_region->getCFG()->reorderPhiEdge(ctx->getIR2Label());
-    PRSSAMgr * prssamgr = (PRSSAMgr*)ctx->current_region->
-        getPassMgr()->registerPass(PASS_PR_SSA_MGR);
+    rg->initPassMgr();
+    PassMgr * pm = rg->getPassMgr();
+    OptCtx loc(*oc);
+
+    //Do NOT merge label of empty BB before construct SSA mode, because the
+    //empty BB may be predecessor of PHI, and merging label will incur the
+    //function can not find the phi operand related predecessor.
+    OC_do_merge_label(*oc) = false;
+    pm->checkValidAndRecompute(oc, PASS_CFG, PASS_UNDEF);
+    OC_do_merge_label(*oc) = loc.do_merge_label();
+    rg->getCFG()->reorderPhiEdge(ctx->getIR2Label());
+    PRSSAMgr * prssamgr = (PRSSAMgr*)pm->registerPass(PASS_PR_SSA_MGR);
     ASSERT0(prssamgr);
     prssamgr->genSSAInfoForRegion();
-    ASSERT0(PRSSAMgr::verifyPRSSAInfo(ctx->current_region));
+    ASSERT0(PRSSAMgr::verifyPRSSAInfo(rg));
     prssamgr->refinePhi();
     return true;
 }
@@ -752,7 +766,7 @@ bool IRParser::declareRegion(ParseCtx * ctx)
 {
     ASSERT0(getCurrentXCode() == X_REGION);
     ASSERT0(ctx);
-    TOKEN tok = m_lexer->getNextToken();
+    m_lexer->getNextToken();
 
     //Properties
     PropertySet ps;
@@ -1218,10 +1232,10 @@ bool IRParser::parseSelect(ParseCtx * ctx)
 UINT IRParser::mapID2Prno(CHAR const* prid, ParseCtx * ctx)
 {
     Sym const* sym = m_rumgr->addToSymbolTab(prid);
-    UINT prno = m_id2prno.get(sym);
+    UINT prno = ctx->mapSym2Prno(sym);
     if (prno == PRNO_UNDEF) {
         prno = ctx->current_region->buildPrno(m_tm->getAny());
-        m_id2prno.set(sym, prno);
+        ctx->setMapSym2Prno(sym, prno);
     }
     return prno;
 }
@@ -1254,7 +1268,7 @@ bool IRParser::parsePR(ParseCtx * ctx)
 
 bool IRParser::isTerminator(TOKEN tok)
 {
-    return tok == T_END || tok == T_NUL || tok == T_SEMI;
+    return tok == T_END || tok == T_UNDEF || tok == T_SEMI;
 }
 
 
@@ -2527,7 +2541,7 @@ bool IRParser::parseModifyPR(X_CODE code, ParseCtx * ctx)
     ASSERT0(code == X_SETELEM || code == X_GETELEM);
     TOKEN tok = m_lexer->getNextToken();
     if (tok != T_DOLLAR) {
-        error(tok, "miss '$' specifier after %s", getKeywordName(code));
+        error(tok, "miss '$' specifier after %s", getKeyWordName(code));
         return false;
     }
     UINT prno = PRNO_UNDEF;
@@ -2604,7 +2618,7 @@ bool IRParser::parseModifyPR(X_CODE code, ParseCtx * ctx)
         //Parse comma.
         tok = m_lexer->getCurrentToken();
         if (tok != T_COMMA) {
-            error(tok, "miss ','");
+            error(code, "miss ','", getKeyWordName(code));
             return false;
         }
 
@@ -2618,7 +2632,7 @@ bool IRParser::parseModifyPR(X_CODE code, ParseCtx * ctx)
         //Parse comma.
         tok = m_lexer->getCurrentToken();
         if (tok != T_COMMA) {
-            error(tok, "miss ','");
+            error(code, "miss ','");
             return false;
         }
 
@@ -3045,11 +3059,11 @@ bool IRParser::parseIGoto(ParseCtx * ctx)
 bool IRParser::parseDoWhile(ParseCtx * ctx)
 {
     ASSERT0(getCurrentXCode() == X_DO);
-    TOKEN tok = m_lexer->getNextToken();
+    m_lexer->getNextToken();
 
     //Properties
     PropertySet ps;
-    tok = m_lexer->getCurrentToken();
+    TOKEN tok = m_lexer->getCurrentToken();
     if (tok == T_COLON) {
         tok = m_lexer->getNextToken();
         ctx->ircode = IR_DO_WHILE;
@@ -3793,7 +3807,7 @@ bool IRParser::parseParameterList(ParseCtx * ctx)
     tok = m_lexer->getNextToken();
 
     UINT i = 0;
-    for (; tok != T_RPAREN && tok != T_END && tok != T_NUL; i++) {
+    for (; tok != T_RPAREN && tok != T_END && tok != T_UNDEF; i++) {
         Var * v = nullptr;
         if (getCurrentXCode() == X_UNDEFINED) {
             //The parameter is reserved.
@@ -4041,7 +4055,7 @@ bool IRParser::declareVarProperty(Var * var, ParseCtx * ctx)
             tok = m_lexer->getNextToken();
             break;
         case T_RPAREN:
-        case T_NUL:
+        case T_UNDEF:
         case T_END:
             break;
         case T_IDENTIFIER:
@@ -4370,7 +4384,7 @@ bool IRParser::parseProperty(PropertySet & ps, ParseCtx * ctx)
     for (;;) {
         switch (tok) {
         case T_RPAREN:
-        case T_NUL:
+        case T_UNDEF:
         case T_END:
             break;
         case T_IDENTIFIER:
@@ -4555,16 +4569,16 @@ bool IRParser::parse()
 {
     START_TIMER(t, "IR Parser");
     ASSERT0(m_lexer);
-    TOKEN tok = T_NUL;
+    TOKEN tok = T_UNDEF;
     //Get first token.
-    //CASE: There are T_NUL token return.
-    while ((tok = m_lexer->getNextToken()) == T_NUL) {;}
+    //CASE: There are T_UNDEF token return.
+    while ((tok = m_lexer->getNextToken()) == T_UNDEF) {;}
     for (;; tok = m_lexer->getNextToken()) {
         switch (tok) {
         case T_END:
             //Mee the file end.
             goto END;
-        case T_NUL:
+        case T_UNDEF:
             //There may be error occurred, terminate parsing.
             goto END;
         case T_IDENTIFIER: {

@@ -31,6 +31,17 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 namespace xoc {
 
+//Used by all IR.
+#define IR_DUMP_DEF 0x0 //default options to dump ir
+#define IR_DUMP_KID 0x1 //dump ir's kid
+#define IR_DUMP_SRC_LINE 0x2 //dump source line if dbx info is valid.
+#define IR_DUMP_ADDR 0x4 //dump host address of each IR
+#define IR_DUMP_INNER_REGION 0x8 //dump inner region.
+#define IR_DUMP_VAR_DECL 0x10 //dump variable declaration if exist that given
+                              //by user.
+#define IR_DUMP_NO_NEWLINE 0x20 //Do NOT dump newline
+#define IR_DUMP_COMBINE (IR_DUMP_KID|IR_DUMP_SRC_LINE|IR_DUMP_VAR_DECL)
+
 typedef xcom::SEGIter * IRSetIter;
 
 class IRSet : public DefSBitSet {

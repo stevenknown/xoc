@@ -410,10 +410,12 @@ void IRCFG::initEntryAndExit(CFG_SHAPE cs)
     switch (cs) {
     case C_SESE: {
         //Make sure the region has the unique entry.
+        //Note we always create entry BB because original CFG may only
+        //contain cyclic graph.
         m_entry = m_rg->allocBB();
-        BB_is_entry(m_entry) = true;
         addBB(m_entry);
         m_bb_list->append_head(m_entry);
+        BB_is_entry(m_entry) = true;
 
         //Create logical exit BB.
         //NOTICE: In actually, the logical exit BB is ONLY
@@ -426,20 +428,12 @@ void IRCFG::initEntryAndExit(CFG_SHAPE cs)
         break;
     }
     case C_SEME: {
-        //Create entry BB.
+        //Note we always create entry BB because original CFG may only
+        //contain cyclic graph.
         m_entry = m_rg->allocBB();
-        BB_is_entry(m_entry) = true;
-        //BB_is_fallthrough(entry) = true;
         addBB(m_entry);
         m_bb_list->append_head(m_entry);
-
-        //Collect exit BB.
-        //for (IRBB * bb = m_bb_list->get_head();
-        //     bb != nullptr; bb = m_bb_list->get_next()) {
-        //    if (IR_BB_is_func_exit(bb)) {
-        //        m_exit_list.append_tail(bb);
-        //    }
-        //}
+        BB_is_entry(m_entry) = true;
         break;
     }
     default: ASSERTN(0, ("strang shape of CFG"));
@@ -617,7 +611,6 @@ void IRCFG::initCfg(OptCtx & oc)
         //oc.is_cfg_valid() = true;
         return;
     }
-
     //cfg->removeEmptyBB();
     build(oc);
     buildEHEdge();
@@ -629,9 +622,9 @@ void IRCFG::initCfg(OptCtx & oc)
     //disturb the computation of entry and exit.
     CfgOptCtx ctx(oc);
     CFGOPTCTX_update_dominfo(&ctx) = false;
+    CFGOPTCTX_do_merge_label(&ctx) = oc.do_merge_label();
     removeEmptyBB(ctx);
     computeExitList();
-
     bool change = true;
     UINT count = 0;
     bool doopt = false;
@@ -1770,7 +1763,6 @@ bool IRCFG::removeRedundantBranch()
 
 bool IRCFG::verifyDomAndPdom(OptCtx const& oc) const
 {
-    bool succ = false;
     if (oc.is_dom_valid()) {
         if (!DGraph::verifyDom()) {
             return false;
@@ -1822,7 +1814,6 @@ void IRCFG::dumpDOT(CHAR const* name, UINT flag) const
 static void dumpDotNode(FILE * h, UINT flag, IRCFG const* cfg)
 {
     bool detail = HAVE_FLAG(flag, IRCFG::DUMP_DETAIL);
-    bool dump_eh = HAVE_FLAG(flag, IRCFG::DUMP_EH);
     bool dump_mdssa = HAVE_FLAG(flag, IRCFG::DUMP_MDSSA);
     MDSSAMgr const* mdssamgr = (MDSSAMgr const*)cfg->getRegion()->getMDSSAMgr();
     if (mdssamgr == nullptr || !mdssamgr->is_valid()) {
@@ -1906,7 +1897,6 @@ static void dumpDotNode(FILE * h, UINT flag, IRCFG const* cfg)
 //Note the function will use \l instead of \n to avoid DOT complaint.
 static void dumpDotEdge(FILE * h, UINT flag, IRCFG const* cfg)
 {
-    bool detail = HAVE_FLAG(flag, IRCFG::DUMP_DETAIL);
     bool dump_eh = HAVE_FLAG(flag, IRCFG::DUMP_EH);
     VertexIter c2 = VERTEX_UNDEF;
     TTab<xcom::Edge const*> visited;
@@ -2412,7 +2402,7 @@ bool IRCFG::removeTrampolinBranchForBB(BBListIter & it, CfgOptCtx const& ctx)
 
     //Get br's target BB, it should be the next of next.
     IRBB * nextnext = m_bb_list->get_next(&nextbbit);
-    if (nextnext == nullptr || !nextnext->isContainLabel(BR_lab(br))) {
+    if (nextnext == nullptr || !nextnext->hasLabel(BR_lab(br))) {
         //Label is not suited to the case.
         return false;
     }

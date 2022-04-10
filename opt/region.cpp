@@ -96,6 +96,16 @@ void Region::destroy()
 }
 
 
+void * Region::xmalloc(UINT size)
+{
+    ASSERTN(m_pool != nullptr, ("pool does not initialized"));
+    void * p = smpoolMalloc(size, m_pool);
+    ASSERT0(p != nullptr);
+    ::memset(p, 0, size);
+    return p;
+}
+
+
 size_t Region::count_mem() const
 {
     //Because analysis_instrument is pointer, sizeof(Region) does
@@ -454,10 +464,6 @@ void Region::constructBBList()
     IRBB * cur_bb = nullptr;
     IR * pointer = getIRList();
     while (pointer != nullptr) {
-        if (cur_bb == nullptr) {
-            cur_bb = allocBB();
-        }
-
         //Insert IR into individual BB.
         ASSERT0(pointer->isStmtInBB() || pointer->is_lab());
         IR * cur_ir = pointer;
@@ -465,6 +471,7 @@ void Region::constructBBList()
         IR_next(cur_ir) = IR_prev(cur_ir) = nullptr;
 
         if (IRBB::isLowerBoundary(cur_ir)) {
+            if (cur_bb == nullptr) { cur_bb = allocBB(); }
             BB_irlist(cur_bb).append_tail(cur_ir);
             //Generate new BB.
             getBBList()->append_tail(cur_bb);
@@ -473,8 +480,9 @@ void Region::constructBBList()
         }
 
         if (cur_ir->is_label()) {
-            getBBList()->append_tail(cur_bb);
-
+            if (cur_bb != nullptr) {
+                getBBList()->append_tail(cur_bb);
+            }
             //Generate new BB.
             cur_bb = allocBB();
 
@@ -501,6 +509,7 @@ void Region::constructBBList()
         }
 
         if (cur_ir->isMayThrow(false)) {
+            if (cur_bb == nullptr) { cur_bb = allocBB(); }
             BB_irlist(cur_bb).append_tail(cur_ir);
 
             //Generate new BB.
@@ -511,9 +520,9 @@ void Region::constructBBList()
 
         //Note that PHI should be placed followed after a LABEL immediately.
         //That is a invalid phi if it has only one operand.
+        if (cur_bb == nullptr) { cur_bb = allocBB(); }
         BB_irlist(cur_bb).append_tail(cur_ir);
-    } //end while
-
+    }
     ASSERT0(cur_bb != nullptr);
     getBBList()->append_tail(cur_bb);
 
@@ -2011,7 +2020,7 @@ bool Region::processIRList(OptCtx & oc)
         oc.setInvalidClassicDUChain();
     } else {
         //PRSSA may destruct classic DU chain.
-        ASSERT0(verifyMDDUChain(this));
+        ASSERT0(verifyMDDUChain(this, oc));
     }
 
     if (g_opt_level != OPT_LEVEL0) {

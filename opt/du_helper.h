@@ -191,6 +191,7 @@ void removeUseForTree(IR const* exp, Region * rg);
 void removeUse(IR const* exp, Region * rg);
 
 //Remove all DU info of 'stmt'.
+//Note do NOT remove stmt from BBIRList before call the function.
 void removeStmt(IR * stmt, Region * rg);
 
 //The function moves IR_PHI and MDPhi from 'from' to 'to'.

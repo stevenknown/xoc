@@ -34,7 +34,6 @@ namespace xoc {
 static Type const* meetType(Type const* t1, Type const* t2, TypeMgr * tm)
 {
     //Upbound and Lowerbound is ANY type.
-    Type const* newty = tm->getAny();
     if (t1->is_any()) {
         if (t2->is_any()) { return t2; }
         return t2;

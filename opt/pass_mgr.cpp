@@ -155,8 +155,11 @@ Pass * PassMgr::allocInvertBrTgt()
 
 Pass * PassMgr::allocVRP()
 {
-    //return new VRP(m_rg);
+    #ifdef FOR_IP
+    return new VRP(m_rg);
+    #else
     return nullptr;
+    #endif
 }
 
 

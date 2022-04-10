@@ -111,6 +111,7 @@ OptCtx * RegionMgr::getAndGenOptCtx(UINT id)
     OptCtx * oc = m_id2optctx.get(id);
     if (oc == nullptr) {
         oc = (OptCtx*)xmalloc(sizeof(OptCtx));
+        oc->init();
         m_id2optctx.set(id, oc);
     }
     return oc;

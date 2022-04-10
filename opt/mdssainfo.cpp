@@ -622,9 +622,6 @@ IR * MDPhi::insertOpndAt(MDSSAMgr * mgr, UINT pos, IRBB const* pred)
     ASSERT0(opnd->getRefMDSet() == nullptr);
     ID_phi(opnd) = this; //Record ID's host PHI.
 
-    VMDVec * vmdvec = mgr->getUseDefMgr()->getVMDVec(res->id());
-    IRCFG * cfg = rg->getCFG();
-
     //Find the latest live-in version of PHI's operand MD.
     VMD * livein_def = mgr->findDomLiveInDefFrom(res->id(),
         const_cast<IRBB*>(pred)->getLastIR(), pred);

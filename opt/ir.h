@@ -133,25 +133,9 @@ typedef enum {
 #include "ir_desc.h"
 #include "ir_debug_check.h"
 
-//Used by all IR.
-#define IR_DUMP_DEF 0x0 //default options to dump ir
-#define IR_DUMP_KID 0x1 //dump ir's kid
-#define IR_DUMP_SRC_LINE 0x2 //dump source line if dbx info is valid.
-#define IR_DUMP_ADDR 0x4 //dump host address of each IR
-#define IR_DUMP_INNER_REGION 0x8 //dump inner region.
-#define IR_DUMP_VAR_DECL 0x10 //dump variable declaration if exist that given
-                              //by user.
-#define IR_DUMP_NO_NEWLINE 0x20 //Do NOT dump newline
-#define IR_DUMP_COMBINE (IR_DUMP_KID|IR_DUMP_SRC_LINE|IR_DUMP_VAR_DECL)
-
 //The maximum integer value that can described by bits of IR_TYPE_BIT_SIZE
 //should larger than IR_TYPE_NUM.
 #define IR_TYPE_BIT_SIZE 6
-
-#define IRNAME(ir) (IRDES_name(g_ir_desc[IR_code(ir)]))
-#define IRTNAME(irt) (IRDES_name(g_ir_desc[irt]))
-#define IRTSIZE(irt) (IRDES_size(g_ir_desc[irt]))
-#define IR_MAX_KID_NUM(ir) (IRDES_kid_num(g_ir_desc[IR_code(ir)]))
 
 //Each IR at same Region has it own unique id.
 #define IR_id(ir) ((ir)->uid)
@@ -291,16 +275,16 @@ public:
     #endif
 
     UINT uid; //Each IR has unique id.
-    //The type of IR can be void, and depend on
-    //the dynamic behavior of program.
+
+    //The type of IR can be ANY that depend on the dynamic behavior of program.
     Type const* result_data_type;
 
-    //Both of 'next' and 'prev' used by the process of
+    //Both of 'next' and 'prev' used by the processing of
     //complicated tree level IR construction.
     IR * next;
     IR * prev;
 
-    //Used in all processs at all level IR.
+    //Used in all processing at all level IR.
     //This field should be nullptr if IR is the top level of stmt.
     IR * parent;
 
@@ -361,28 +345,7 @@ public:
     //Copy each memory reference for whole ir tree.
     //'src': copy MD reference from 'src', it must be equal to current ir tree.
     //'copy_kid_ref': copy MD reference for kid recursively.
-    void copyRefForTree(IR const* src, Region * rg)
-    {
-        ASSERT0(src && isIREqual(src, true) && rg);
-        ASSERT0(src != this);
-        if (isMemoryRef()) {
-            setRefMD(src->getRefMD(), rg);
-            setRefMDSet(src->getRefMDSet(), rg);
-        }
-
-        for (UINT i = 0; i < IR_MAX_KID_NUM(this); i++) {
-            IR * kid = getKid(i);
-            if (kid == nullptr) { continue; }
-
-            IR * srckid = src->getKid(i);
-            ASSERT0(srckid);
-            for (; kid != nullptr;
-                 kid = IR_next(kid), srckid = IR_next(srckid)) {
-                ASSERT0(srckid);
-                kid->copyRefForTree(srckid, rg);
-            }
-        }
-    }
+    void copyRefForTree(IR const* src, Region * rg);
 
     //The function collects the LabelInfo for each branch-target.
     inline void collectLabel(OUT List<LabelInfo const*> & lst) const;
@@ -527,7 +490,7 @@ public:
     //This function recursively iterate the IR tree to
     //retrieve whether the IR has side effect.
     //Return true if ir carried sideeffect property.
-    inline bool hasSideEffect(bool recur) const;
+    bool hasSideEffect(bool recur) const;
 
     //Return true if ir compute produce a result.
     bool hasResult() const { return IRDES_has_result(g_ir_desc[getCode()]); }
@@ -551,7 +514,7 @@ public:
     inline bool hasReturnValue() const;
 
     //Return true if ir is branch op and has multiple jump targets.
-    inline bool hasMultiTarget() const;
+    bool hasMultiTarget() const;
 
     UINT id() const { return IR_id(this); }
     void invertLand(Region * rg);
@@ -578,7 +541,7 @@ public:
 
     //This function recursively iterate the IR tree to
     //retrieve whether the IR is no-movable.
-    inline bool isNoMove(bool recur) const;
+    bool isNoMove(bool recur) const;
 
     //The function compare the memory object that 'this' and 'ir2' accessed,
     //and return true if 'this' object is conver 'ir2',
@@ -706,7 +669,7 @@ public:
     bool is_terminate() const { return IR_is_terminate(this); }
 
     //Return true if ir is volatile.
-    inline bool is_volatile() const;
+    bool is_volatile() const;
 
     //Return true if given array has same dimension structure with current ir.
     bool isSameArrayStruct(IR const* ir) const;
@@ -714,7 +677,7 @@ public:
     //This function recursively iterate the IR tree to
     //retrieve whether the IR is may-throw.
     //Record if ir might throw exception.
-    inline bool isMayThrow(bool recur) const;
+    bool isMayThrow(bool recur) const;
 
     //Return true if current ir is binary operation.
     bool isBinaryOp() const { return IRDES_is_bin(g_ir_desc[getCode()]); }
@@ -731,7 +694,7 @@ public:
     //If ir is call, this function indicates that function does not modify any
     //global memory or any memory object that passed through pointer
     //arguments.
-    inline bool isReadOnly() const;
+    bool isReadOnly() const;
 
     //True if store to specified element of pseduo register.
     //The pseduo register must be D_MC or vector type.
@@ -870,7 +833,7 @@ public:
 
     //Return true if current ir is integer constant, and the number
     //is equal to 'value'.
-    inline bool isConstIntValueEqualTo(HOST_INT value) const;
+    bool isConstIntValueEqualTo(HOST_INT value) const;
 
     //Return true if current operation references memory except
     //the PR memory.
@@ -908,7 +871,7 @@ public:
     bool is_leaf() const { return IRDES_is_leaf(g_ir_desc[getCode()]); }
 
     //Return true if kid is the kid node of current ir.
-    inline bool is_kids(IR const* exp) const;
+    bool is_kids(IR const* exp) const;
 
     //Return true if array base is IR_LDA. This exactly clerifies which array
     //we are accessing. In contrast to direct array reference,
@@ -936,17 +899,17 @@ public:
     inline bool isStmtInBB() const;
 
     //Return true if current stmt must modify 'md'.
-    inline bool isExactDef(MD const* md) const;
-    inline bool isExactDef(MD const* md, MDSet const* mds) const;
+    bool isExactDef(MD const* md) const;
+    bool isExactDef(MD const* md, MDSet const* mds) const;
 
     //Set prno, and update SSAInfo meanwhile.
     void setPrnoConsiderSSAInfo(UINT prno);
+    void setRHS(IR * rhs);
     inline void setPrno(UINT prno);
     inline void setOffset(TMWORD ofst);
     inline void setIdinfo(Var * idinfo);
     inline void setLabel(LabelInfo const* li);
     inline void setBB(IRBB * bb);
-    inline void setRHS(IR * rhs);
     inline void setSSAInfo(SSAInfo * ssa);
     inline void setDU(DU * du);
 
@@ -993,29 +956,7 @@ public:
     //Return true if replaced the 'oldk'.
     //'recur': set to true if function recusively perform
     //replacement for 'oldk'.
-    bool replaceKid(IR * oldk, IR * newk, bool recur)
-    {
-        for (UINT i = 0; i < IR_MAX_KID_NUM(this); i++) {
-            IR * kid = getKid(i);
-            if (kid == nullptr) { continue; }
-            for (IR * x = kid; x != nullptr; x = x->get_next()) {
-                if (x == oldk) {
-                    xcom::replace(&kid, oldk, newk);
-                    if (IR_prev(newk) == nullptr) {
-                        //oldk is the header, and update the kid i.
-                        setKid(i, kid);
-                    } else {
-                        IR_parent(newk) = IR_parent(oldk);
-                    }
-                    return true;
-                }
-                if (recur && x->replaceKid(oldk, newk, true)) {
-                    return true;
-                }
-            }
-        }
-        return false;
-    }
+    bool replaceKid(IR * oldk, IR * newk, bool recur);
 
     //Get the MD DefUse Set. This function is readonly.
     DUSet const* readDUSet() const { return getDUSet(); }
@@ -2404,31 +2345,6 @@ LabelInfo const* IR::getLabel() const
 }
 
 
-//Return true if ir is branch op and has multiple jump target.
-bool IR::hasMultiTarget() const
-{
-    switch (getCode()) {
-    case IR_SWITCH: {
-        UINT numoftgt = 0;
-        if (SWITCH_deflab(this) != nullptr) {
-            numoftgt++;
-        }
-
-        if (getCaseList() != nullptr) { numoftgt++;}
-        return numoftgt > 1;
-    }
-    case IR_IGOTO: {
-        IR const* caselst = getCaseList();
-        ASSERT0(caselst);
-        if (caselst->get_next() != nullptr) { return true; }
-        return false;
-    }
-    default:;
-    }
-    return false;
-}
-
-
 UINT IR::getArrayElemDtSize(TypeMgr const* tm) const
 {
     ASSERT0(is_array() || is_starray());
@@ -2440,36 +2356,6 @@ bool IR::isConstExp() const
 {
     if (is_const()) { return true; }
     if (is_cvt()) { return CVT_exp(this)->isConstExp(); }
-    return false;
-}
-
-
-bool IR::isReadOnly() const
-{
-    switch (getCode()) {
-    case IR_CALL: return CALL_is_readonly(this);
-    case IR_ICALL: return ICALL_is_readonly(this);
-    case IR_CVT: return CVT_exp(this)->isReadOnly();
-    case IR_LD:
-        if (VAR_is_readonly(LD_idinfo(this)) &&
-            !VAR_is_volatile(LD_idinfo(this))) {
-            return true;
-        }
-        return false;
-    default:;
-    }
-    return false;
-}
-
-
-bool IR::is_volatile() const
-{
-    //Describing if IR's address has been taken.
-    if (is_id()) {
-        Var * id_info = ID_info(this);
-        ASSERT0(id_info != nullptr);
-        return VAR_is_volatile(id_info);
-    }
     return false;
 }
 
@@ -2503,38 +2389,6 @@ void IR::setBB(IRBB * bb)
         //Do not assert to facilitate coding. Just return.
         //ASSERTN(0, ("Not stmt type"));
         return;
-    }
-}
-
-
-void IR::setRHS(IR * rhs)
-{
-    switch (getCode()) {
-    case IR_ST:
-        ST_rhs(this) = rhs;
-        if (rhs != nullptr) {
-            IR_parent(rhs) = this;
-        }
-        return;
-    case IR_STPR:
-        STPR_rhs(this) = rhs;
-        if (rhs != nullptr) {
-            IR_parent(rhs) = this;
-        }
-        return;
-    case IR_STARRAY:
-        STARR_rhs(this) = rhs;
-        if (rhs != nullptr) {
-            IR_parent(rhs) = this;
-        }
-        return;
-    case IR_IST:
-        IST_rhs(this) = rhs;
-        if (rhs != nullptr) {
-            IR_parent(rhs) = this;
-        }
-        return;
-    default: ASSERTN(0, ("not store operation."));
     }
 }
 
@@ -2671,82 +2525,6 @@ bool IR::isPREqual(IR const* src) const
 }
 
 
-//This function recursively iterate the IR tree to
-//retrieve whether the IR is may-throw.
-//Record if ir might throw exception.
-bool IR::isMayThrow(bool recur) const
-{
-    if (IR_may_throw(this)) { return true; }
-    if (!recur) { return false; }
-    for (UINT i = 0; i < IR_MAX_KID_NUM(this); i++) {
-        IR const* tmp = getKid(i);
-        if (tmp == nullptr) { continue; }
-        if (IR_may_throw(tmp)) {
-            return true;
-        }
-        if (tmp->isMayThrow(true)) { return true; }
-    }
-    return false;
-}
-
-
-bool IR::hasSideEffect(bool recur) const
-{
-    if (IR_has_sideeffect(this)) { return true; }
-    if (!recur) { return false; }
-    for (UINT i = 0; i < IR_MAX_KID_NUM(this); i++) {
-        IR const* tmp = getKid(i);
-        if (tmp == nullptr) { continue; }
-        if (IR_has_sideeffect(tmp)) {
-            return true;
-        }
-        if (tmp->hasSideEffect(true)) { return true; }
-    }
-    return false;
-} 
-
-
-//This function recursively iterate the IR tree to
-//retrieve whether the IR is no-movable.
-bool IR::isNoMove(bool recur) const
-{
-    if (IR_no_move(this)) { return true; }
-    if (!recur) { return false; }
-    for (UINT i = 0; i < IR_MAX_KID_NUM(this); i++) {
-        IR const* tmp = getKid(i);
-        if (tmp == nullptr) { continue; }
-        if (IR_no_move(tmp)) {
-            return true;
-        }
-        if (tmp->isNoMove(true)) { return true; }
-    }
-    return false;
-}
-
-
-//Check if 'exp' is child or grandchildren of current ir.
-//Here we only compare equality of two IR pointer to determine and apply
-//the DFS searching in tree.
-bool IR::is_kids(IR const* exp) const
-{
-    if (exp == nullptr) { return false; }
-    IR * tmp;
-    for (UINT i = 0; i < IR_MAX_KID_NUM(this); i++) {
-        tmp = getKid(i);
-        while (tmp != nullptr) {
-            if (exp == tmp) {
-                return true;
-            }
-            if (tmp->is_kids(exp)) {
-                return true;
-            }
-            tmp = IR_next(tmp);
-        } //end while
-    } //end for
-    return false;
-}
-
-
 //Return true if k is the kid node of current ir.
 bool IR::is_lhs(IR const* k) const
 {
@@ -2783,45 +2561,6 @@ bool IR::is_lhs(IR const* k) const
         return false;
     default: UNREACHABLE();
     } //end switch
-    return false;
-}
-
-
-//Return true if ir exactly modified 'md' or elements in MDSet 'mds'.
-//md: given md, may be nullptr.
-//mds: given MDSet, may be nullptr.
-bool IR::isExactDef(MD const* md, MDSet const* mds) const
-{
-    ASSERT0(is_stmt());
-    MD const* cur_ir_defined_md = getRefMD();
-    if (cur_ir_defined_md != nullptr && cur_ir_defined_md->is_exact()) {
-        if (md != nullptr &&
-            (cur_ir_defined_md == md || cur_ir_defined_md->is_overlap(md))) {
-            return true;
-        }
-
-        if (mds != nullptr && mds->is_contain_pure(cur_ir_defined_md->id())) {
-            return true;
-        }
-    }
-
-    //We can not determine whether current ir is
-    //exactly modified md or mds.
-    return false;
-}
-
-
-bool IR::isExactDef(MD const* md) const
-{
-    ASSERT0(is_stmt() && md);
-    if (!md->is_exact()) { return false; }
-
-    MD const* cur_ir_defined_md = getRefMD();
-    if (cur_ir_defined_md != nullptr &&
-        cur_ir_defined_md->is_exact() &&
-        (cur_ir_defined_md == md || cur_ir_defined_md->is_overlap(md))) {
-        return true;
-    }
     return false;
 }
 
@@ -2906,22 +2645,6 @@ bool IR::hasReturnValue() const
 {
     ASSERT0(isCallStmt());
     return CALL_prno(this) != PRNO_UNDEF;
-}
-
-
-//Return true if current ir is integer constant, and the number
-//is equal to 'value'.
-bool IR::isConstIntValueEqualTo(HOST_INT value) const
-{
-    if (!isConstExp()) { return false; }
-
-    IR const* p = this;
-    while (!p->is_const()) {
-        ASSERTN(p->is_cvt(), ("const expression only include CVT and CONST."));
-        p = CVT_exp(p);
-        ASSERT0(p);
-    }
-    return p->is_int() && CONST_int_val(p) == value;
 }
 
 

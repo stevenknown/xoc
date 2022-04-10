@@ -113,13 +113,18 @@ public:
     }
     RefineCtx const& operator = (RefineCtx const&);
 
+    //Clean the actions which propagated bottom up during refinement.
+    void cleanBottomupFlag() { RC_stmt_removed(*this) = false; }
+
     bool fold_const() const { return RC_do_fold_const(*this); }
+
     bool hoist_to_lnot() const { return RC_hoist_to_lnot(*this); }
+
     bool insert_cvt() const { return RC_insert_cvt(*this); }
+
     bool refine_stmt() const { return RC_refine_stmt(*this); }
     bool refine_div_const() const { return RC_refine_div_const(*this); }
     bool refind_mul_const() const { return RC_refine_mul_const(*this); }
-    bool update_mdref() const { return RC_update_mdref(*this); }
 
     //Set flag to disable following optimizations.
     void setUnOptFlag()
@@ -138,6 +143,8 @@ public:
         RC_stmt_removed(*this) = false;
         RC_hoist_to_lnot(*this) = false;
     }
+
+    bool update_mdref() const { return RC_update_mdref(*this); }
 };
 
 

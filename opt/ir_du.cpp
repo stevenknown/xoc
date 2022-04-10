@@ -373,7 +373,6 @@ IR const* DUMgr::getExactAndUniqueDef(IR const* exp) const
 bool DUMgr::hasSingleDefToMD(DUSet const& defset, MD const* md) const
 {
     UINT count = 0;
-    DUMgr * pthis = const_cast<DUMgr*>(this);
     DUSetIter di = nullptr;
     for (INT i = defset.get_first(&di); i >= 0; i = defset.get_next(i, &di)) {
         IR * def = m_rg->getIR(i);
@@ -708,7 +707,6 @@ void DUMgr::dumpMemUsageForMDRef() const
     size_t count = 0;
     CHAR const* str = nullptr;
     ConstIRIter citer;
-    DUMgr * pthis = const_cast<DUMgr*>(this);
     for (IRBB * bb = bbs->get_head(); bb != nullptr; bb = bbs->get_next()) {
         note(getRegion(), "\n--- BB%d ---", bb->id());
         for (IR * ir = BB_first_ir(bb);
@@ -2085,13 +2083,15 @@ void DUMgr::computeAtomMDRef(IR * ir)
 {
     ASSERT0(ir->is_atomic());
     //By default, RMW could be simulated by IR_CALL with 3 arguments, e.g:
-    //call Opcode:i32, OldValueMemory:<valuetype>, NewValue:valuetype;
+    //call Opcode:i32, OldValueMemory:<valuetype>, NewValue:<valuetype>;
     //where Opcode defined the RMW operations, OldValueMemory indicates
     //the memory location with valuetype that hold oldvalue, and NewValue
     //is the value to be set.
-    ASSERTN(!ir->is_call(), ("Target Dependent Code"));
+    ASSERTN(ir->is_call(), ("Target Dependent Code"));
     IR const* oldvaluemem = CALL_param_list(ir);
     ASSERTN(oldvaluemem, ("Target Dependent Code"));
+    IR const* newvaluemem = oldvaluemem->get_next();
+    ASSERTN(newvaluemem, ("Target Dependent Code"));
     MDSet atomdefmds;
     if (ir->getRefMD() != nullptr) {
         atomdefmds.bunion(ir->getRefMD(), *getSBSMgr());
@@ -2104,6 +2104,12 @@ void DUMgr::computeAtomMDRef(IR * ir)
     }
     if (oldvaluemem->getRefMDSet() != nullptr) {
         atomdefmds.bunion(*oldvaluemem->getRefMDSet(), *getSBSMgr());
+    }
+    if (newvaluemem->getRefMD() != nullptr) {
+        atomdefmds.bunion(newvaluemem->getRefMD(), *getSBSMgr());
+    }
+    if (newvaluemem->getRefMDSet() != nullptr) {
+        atomdefmds.bunion(*newvaluemem->getRefMDSet(), *getSBSMgr());
     }
     ir->setMayRef(m_mds_hash->append(atomdefmds), m_rg);
     atomdefmds.clean(*getSBSMgr());

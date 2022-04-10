@@ -105,7 +105,6 @@ void ExprTab::dump_ir_expr_tab()
 {
     if (!m_rg->isLogMgrInit()) { return; }
     note(getRegion(), "\n==---- DUMP ExprTab ----==");
-    DUMgr * du_mgr = m_rg->getDUMgr();
     INT last = m_ir_expr_vec.get_last_idx();
     for (INT i = 0; i <= last; i++) {
         ExpRep * ie = m_ir_expr_vec.get(i);

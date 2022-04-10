@@ -45,6 +45,7 @@ class PRSSAMgr;
 class Pass;
 class PassMgr;
 class IRSimp;
+class CDG;
 
 //Region MD referrence info.
 #define REF_INFO_maydef(ri) ((ri)->may_def_mds)
@@ -213,15 +214,6 @@ public:
 public:
     explicit Region(REGION_TYPE rt, RegionMgr * rm) { init(rt, rm); }
     virtual ~Region() { destroy(); }
-
-    void * xmalloc(UINT size)
-    {
-        ASSERTN(m_pool != nullptr, ("pool does not initialized"));
-        void * p = smpoolMalloc(size, m_pool);
-        ASSERT0(p != nullptr);
-        ::memset(p, 0, size);
-        return p;
-    }
 
     //Add var which used inside current or inner Region.
     //Once the region destructing, all local vars are deleted.
@@ -919,6 +911,13 @@ public:
                (IRSimp*)getPassMgr()->registerPass(PASS_IRSIMP) : nullptr;
     }
 
+    //Return CDG.
+    CDG * getCDG() const
+    {
+        return getPassMgr() != nullptr ?
+               (CDG*)getPassMgr()->queryPass(PASS_CDG) : nullptr;
+    }
+
     //Return IRCFG.
     IRCFG * getCFG() const
     {
@@ -1194,6 +1193,9 @@ public:
 
     //Verify MD reference to each stmts and expressions which described memory.
     bool verifyMDRef();
+
+    //Allocate memory from region pool.
+    void * xmalloc(UINT size);
 };
 //END Region
 

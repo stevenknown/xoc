@@ -63,18 +63,29 @@ public:
 };
 
 
+#define CFGOPTCTX_do_merge_label(x) ((x)->u1.s1.m_do_merge_label)
 #define CFGOPTCTX_update_dominfo(x) ((x)->u1.s1.m_update_dominfo)
 class CfgOptCtx {
+    void reset() { u1.m_flags = 0; }
 public:
     OptCtx & oc;
     union {
         BYTE m_flags;
         struct {
             BYTE m_update_dominfo:1;
+
+            //If it is true, CFG optimizer will attempt to merge label to
+            //next BB if current BB is empty. Default is true.
+            BYTE m_do_merge_label:1;
         } s1;
     } u1;
 public:
-    CfgOptCtx(OptCtx & toc) : oc(toc) { u1.m_flags = 0; }
+    CfgOptCtx(OptCtx & toc) : oc(toc)
+    { reset(); CFGOPTCTX_do_merge_label(this); }
+
+    //If it is true, CFG optimizer will attempt to merge label to
+    //next BB if current BB is empty. Default is true.
+    bool do_merge_label() const { return CFGOPTCTX_do_merge_label(this); }
 
     //Return true if caller asks CFG optimizer have to update DomInfo.
     bool need_update_dominfo() const { return CFGOPTCTX_update_dominfo(this); }
@@ -814,6 +825,7 @@ bool CFG<BB, XR>::removeEmptyBBHelper(BB * bb, BB * next_bb,
     //Only apply restricted removing if CFG is invalid.
     //Especially BB list is ready, whereas CFG is not.
     if (!is_cfg_valid) { return false; }
+    if (!ctx.do_merge_label() && bb->hasLabel()) { return false; }
 
     ASSERT0(getSuccsNum(bb) == 1);
     //Revise edge.
@@ -1655,7 +1667,7 @@ BB * CFG<BB, XR>::findSingleExitBB(LI<BB> const* li, Edge const** exitedge)
                     if (exitedge != nullptr) {
                         *exitedge = ec->getEdge();
                     }
-                } else if (exit != succ) {
+                } else if ((UINT)exit != succ) {
                     //There are more than one exit BB for current loop.
                     return nullptr;
                 }

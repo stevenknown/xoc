@@ -218,7 +218,7 @@ void IRBB::dumpIRList(Region const* rg, bool dump_inner_region) const
     IRBB * pthis = const_cast<IRBB*>(this);
     for (IR * ir = BB_first_ir(pthis);
          ir != nullptr; ir = BB_irlist(pthis).get_next()) {
-        ASSERT0(ir->is_single());
+        ASSERT0(ir->is_single() || ir->is_undef());
         dumpIR(ir, rg, nullptr, IR_DUMP_KID | IR_DUMP_SRC_LINE |
                (dump_inner_region ? IR_DUMP_INNER_REGION : 0));
     }

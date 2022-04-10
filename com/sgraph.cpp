@@ -1764,7 +1764,7 @@ bool DGraph::verifyPdom(DGraph & g,
 bool DGraph::verifyDom(DGraph & g,
                        List<Vertex const*> const& rpovlst) const
 {
-    bool f = g.computeIdom2(rpovlst);
+    g.computeIdom2(rpovlst);
     for (INT i = 0; i <= m_idom_set.get_last_idx(); i++) {
         UINT cur = m_idom_set.get(i);
         UINT anti = g.m_idom_set.get(i);
@@ -2253,12 +2253,12 @@ void DGraph::_removeUnreachNode(UINT id, BitSet & visited)
 
 void DGraph::freeDomPdomSet(UINT vid)
 {
-    BitSet * domset = get_dom_set(vid);
+    DomSet * domset = get_dom_set(vid);
     if (domset != nullptr) {
         m_bs_mgr->free(domset);
         m_dom_set.set(vid, nullptr);
     }
-    BitSet * pdomset = get_pdom_set(vid);
+    DomSet * pdomset = get_pdom_set(vid);
     if (pdomset != nullptr) {
         m_bs_mgr->free(pdomset);
         m_pdom_set.set(vid, nullptr);
@@ -2270,16 +2270,16 @@ void DGraph::freeDomPdomSet(UINT vid)
 static void removeVexFromDomAndPdomSet(DGraph * g, Vertex const* marker,
                                        UINT vexid)
 {
-    BitSet visited;
+    DomSet visited;
     List<Vertex const*> wl;
     wl.append_tail(marker);
     for (Vertex const* v = wl.remove_head(); v != nullptr;
          v = wl.remove_head()) {
         visited.bunion(v->id());
         if (v->id() != vexid) {
-            BitSet * domset = g->get_dom_set(v->id());
+            DomSet * domset = g->get_dom_set(v->id());
             domset->diff(vexid);
-            BitSet * pdomset = g->get_pdom_set(v->id());
+            DomSet * pdomset = g->get_pdom_set(v->id());
             pdomset->diff(vexid);
         }
         for (EdgeC const* ec = v->getInList(); ec != nullptr;
@@ -2297,9 +2297,9 @@ static void removeVexFromDomAndPdomSet(DGraph * g, Vertex const* marker,
          v = wl.remove_head()) {
         visited.bunion(v->id());
         if (v->id() != vexid) {
-            BitSet * domset = g->get_dom_set(v->id());
+            DomSet * domset = g->get_dom_set(v->id());
             domset->diff(vexid);
-            BitSet * pdomset = g->get_pdom_set(v->id());
+            DomSet * pdomset = g->get_pdom_set(v->id());
             pdomset->diff(vexid);
         }
         for (EdgeC const* ec = v->getOutList(); ec != nullptr;
@@ -2412,15 +2412,15 @@ static void addVexToDomAndPdomSet(DGraph * g, Vertex const* vex, UINT newid,
                                   bool is_dom)
 {
     UINT vexid = vex->id();
-    BitSet visited;
+    DomSet visited;
     List<Vertex const*> wl;
     wl.append_tail(vex);
     for (Vertex const* v = wl.remove_head(); v != nullptr;
          v = wl.remove_head()) {
         visited.bunion(v->id());
         if (v->id() != vexid && v->id() != newid) {
-            BitSet * domset = g->get_dom_set(v->id());
-            BitSet * pdomset = g->get_pdom_set(v->id());
+            DomSet * domset = g->get_dom_set(v->id());
+            DomSet * pdomset = g->get_pdom_set(v->id());
             if (is_dom) {
                 if (domset->is_contain(vexid)) {
                     domset->bunion(newid);
@@ -2459,8 +2459,8 @@ static void addVexToDomAndPdomSet(DGraph * g, Vertex const* vex, UINT newid,
          v = wl.remove_head()) {
         visited.bunion(v->id());
         if (v->id() != vexid && v->id() != newid) {
-            BitSet * domset = g->get_dom_set(v->id());
-            BitSet * pdomset = g->get_pdom_set(v->id());
+            DomSet * domset = g->get_dom_set(v->id());
+            DomSet * pdomset = g->get_pdom_set(v->id());
             if (is_dom) {
                 if (domset->is_contain(vexid)) {
                     domset->bunion(newid);
@@ -2576,7 +2576,7 @@ void DGraph::removeDomInfo(Vertex const* vex)
     set_idom(vexid, VERTEX_UNDEF);
     set_ipdom(vexid, VERTEX_UNDEF);
     //Update domset, pdomset.
-    BitSet visited;
+    DomSet visited;
     List<Vertex const*> wl;
     wl.append_tail(vex);
     for (Vertex const* v = wl.remove_head(); v != nullptr;

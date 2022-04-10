@@ -322,8 +322,8 @@ bool RefHashFunc::compareArray(IR * t1, IR * t2) const
     ASSERT0(m_gvn);
     if (t1 == t2) { return true; }
 
-    VN const* vn1 = m_gvn->mapIR2VNConst(ARR_base(t1));
-    VN const* vn2 = m_gvn->mapIR2VNConst(ARR_base(t2));
+    VN const* vn1 = m_gvn->getConstVN(ARR_base(t1));
+    VN const* vn2 = m_gvn->getConstVN(ARR_base(t2));
     if (vn1 != vn2 || vn1 == nullptr) {
         return false;
     }
@@ -336,8 +336,8 @@ bool RefHashFunc::compareArray(IR * t1, IR * t2) const
     IR * s2 = ARR_sub_list(t2);
     for (; s1 != nullptr && s2 != nullptr;
          s1 = IR_next(s1), s2 = IR_next(s2)) {
-        VN const* vn1 = m_gvn->mapIR2VNConst(s1);
-        VN const* vn2 = m_gvn->mapIR2VNConst(s2);
+        VN const* vn1 = m_gvn->getConstVN(s1);
+        VN const* vn2 = m_gvn->getConstVN(s2);
         if (vn1 == nullptr || vn1 != vn2) {
             return false;
         }
@@ -361,8 +361,8 @@ bool RefHashFunc::compareIndirectAccess(IR * t1, IR * t2) const
     IR const* base2 = t2->getBase();
     ASSERT0(base2);
 
-    VN const* vn1 = m_gvn->mapIR2VNConst(base1);
-    VN const* vn2 = m_gvn->mapIR2VNConst(base2);
+    VN const* vn1 = m_gvn->getConstVN(base1);
+    VN const* vn2 = m_gvn->getConstVN(base2);
     if (vn1 != vn2 || vn1 == nullptr) {
         return false;
     }
@@ -377,8 +377,8 @@ bool RefHashFunc::compareDirectAccess(IR * t1, IR * t2) const
     ASSERT0(m_gvn);
     if (t1 == t2) { return true; }
 
-    VN const* vn1 = m_gvn->mapIR2VNConst(t1);
-    VN const* vn2 = m_gvn->mapIR2VNConst(t2);
+    VN const* vn1 = m_gvn->getConstVN(t1);
+    VN const* vn2 = m_gvn->getConstVN(t2);
     if (vn1 != vn2 || vn1 == nullptr) {
         return false;
     }
@@ -1260,8 +1260,8 @@ UINT RegPromot::analyzeIndirectAccessStatus(IR const* ref1, IR const* ref2)
 
     ASSERT0(m_gvn);
 
-    VN const* vn1 = m_gvn->mapIR2VNConst(base1);
-    VN const* vn2 = m_gvn->mapIR2VNConst(base2);
+    VN const* vn1 = m_gvn->getConstVN(base1);
+    VN const* vn2 = m_gvn->getConstVN(base2);
     if (vn1 == nullptr || vn2 == nullptr) { return RP_UNKNOWN; }
 
     UINT tysz1 = ref1->getTypeSize(m_tm);
@@ -1674,7 +1674,7 @@ void RegPromot::handleExpInBody(IR * occ, IR const* delegate,
     CHECK0_DUMMYUSE(r);
 
     pr->copyAI(occ, m_rg);
-    m_gvn->setMapIR2VN(pr, m_gvn->mapIR2VN(occ));
+    m_gvn->setVN(pr, m_gvn->getVN(occ));
 
     //DU chain between init-stmt and delegated-pr will be maintained in
     //addDUChainForInitDef().
@@ -1721,7 +1721,7 @@ void RegPromot::handleStmtInBody(IR * occ, IR const* delegate,
                                    delegate_pr->getType(), occrhs);
     m_rg->allocRefForPR(stpr);
     stpr->copyAI(occ, m_rg);
-    m_gvn->setMapIR2VN(stpr, m_gvn->mapIR2VN(occ));
+    m_gvn->setVN(stpr, m_gvn->getVN(occ));
 
     IRBB * refbb = occ->getBB();
     ASSERT0(refbb);
@@ -2375,8 +2375,8 @@ UINT RegPromot::analyzeArrayStatus(IR const* ref1, IR const* ref2)
     ASSERT0(base1->is_ptr() && base2->is_ptr());
     ASSERT0(m_gvn);
 
-    VN const* vn1 = m_gvn->mapIR2VNConst(base1);
-    VN const* vn2 = m_gvn->mapIR2VNConst(base2);
+    VN const* vn1 = m_gvn->getConstVN(base1);
+    VN const* vn2 = m_gvn->getConstVN(base2);
     if (vn1 == nullptr || vn2 == nullptr) { return RP_UNKNOWN; }
     if (vn1 == vn2) { return RP_SAME_ARRAY; }
     return RP_DIFFERENT_ARRAY;

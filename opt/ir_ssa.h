@@ -342,6 +342,7 @@ private:
                               PRSet const* prset);
     void removePhiFromBB();
 
+    void setVPR(UINT prno, VPR * vp);
     void stripVersionForBBSet(BBSet const& bbset, PRSet const* prset);
     void stripVersionForBBList(BBList const& bblst);
     void stripPhi(IR * phi, IRListIter phict);

@@ -305,9 +305,9 @@ protected:
     //Note the UseSet will be clean.
     void removeVOpndForAllUse(MOD VMD * vopnd);
 
-    //The function change VOpnd from 'from' to 'to', for each IR in from's
+    //The function changes VOpnd of 'from' to 'to', for each elements in 'from'
     //UseSet.
-    //Note the UseSet of 'from' will be clean.
+    //Note all elements in UseSet of 'from' will be removed.
     void replaceVOpndForAllUse(MOD VMD * to, MOD VMD * from);
 
     //The function remove and clean all informations of 'vmd' from MDSSAMgr.
@@ -448,15 +448,18 @@ public:
     //e.g: Change MDSSA DU chain DEF->olduse to DEF->newuse.
     void changeUseForTree(IR * olduse, IR * newuse);
 
-    //Coalesce version of MD from 'src' to 'tgt'.
-    //The function replace definitiond of USE of src to tgt's defintion.
-    //e.g: p0=...
-    //     p1=p0
-    //     ...=p1
+    //Coalesce DU chain, actually the version of MD, from 'src' to 'tgt'.
+    //'src' and 'tgt' refered the same MD.
+    //This function replace definition of USE of src to tgt's defintion.
+    //There is always removeStmt() following the function call.
+    //'src' and 'tgt' is the form of copy operation.
+    //e.g: p0 =...
+    //     p1 = p0
+    //     ...= p1
     //=> after coalescing, p1 is src, p0 is tgt
-    //     p0=...
+    //     p0 = ...
     //     ------ //removed
-    //     ...=p0
+    //     ... = p0
     void coalesceDUChain(IR const* src, IR const* tgt);
     void cleanMDSSAInfo(IR * ir) { getUseDefMgr()->cleanMDSSAInfo(ir); }
 
@@ -778,14 +781,15 @@ public:
     void reinit();
 
     //Remove MDSSA Use-Def chain.
-    //Note the function will remove ir tree from all VOpnd and MDSSAMgr.
-    //e.g: ir = ...
-    //    = ir //S1
-    //If S1 will be deleted, ir should be removed from its useset in MDSSAInfo.
-    //NOTE: If ir is a IR tree, e.g: ild(x, ld(y)), remove ild(x) means
-    //ld(y) will be removed as well. And ld(y)'s MDSSAInfo will be
-    //updated as well.
+    //Note the function will remove IR tree from all VOpnds and MDSSAMgr.
+    //And do NOT remove stmt from BBIRList before call the function.
     //The function does NOT deal with sibling node of ir.
+    //e.g:ir = ...
+    //       = ir //S1
+    //If S1 will be deleted, ir should be removed from its UseSet in MDSSAInfo.
+    //NOTE: If ir is a IR tree, say ild(x, ld(y)), remove ild(x) means
+    //ld(y) will be removed too. Meanwhile ld(y)'s MDSSAInfo will be
+    //updated as well.
     void removeMDSSAOccForTree(IR const* ir);
 
     //Remove DEF-USE chain if exist in between 'stmt' and 'exp'.

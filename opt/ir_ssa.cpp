@@ -287,6 +287,12 @@ void DfMgr::build(xcom::DGraph const& g)
 bool PRSSAInfoCollect::isDomLiveinBBFromPred(UINT bb, UINT pred, UINT meetup)
 {
     ASSERT0(bb != BBID_UNDEF && meetup != BBID_UNDEF && pred != BBID_UNDEF);
+    //TODO:Check the algo.
+    //DomSet const* ds = m_cfg->get_dom_set(pred);
+    //if (ds->is_contain(bb)) { return false; }
+    //if (ds->is_contain(meetup)) { return true; }
+    //return false;
+
     xcom::List<UINT> wl;
     wl.append_tail(pred);
     xcom::TTab<UINT> visited;
@@ -533,6 +539,12 @@ size_t PRSSAMgr::count_mem() const
 }
 
 
+void PRSSAMgr::setVPR(UINT prno, VPR * vp)
+{
+    m_prno2vpr.set(prno, vp);
+}
+
+
 //Clean version stack.
 void PRSSAMgr::cleanPRNO2VPRStack()
 {
@@ -615,7 +627,7 @@ SSAInfo * PRSSAMgr::allocSSAInfo(UINT prno, Type const* type)
     ASSERT0(getSSAInfoByPRNO(prno) == nullptr);
     SSAInfo * ssainfo = allocVPRImpl(prno, prno, PRSSA_INIT_VERSION + 1,
                                      type, nullptr);
-    m_prno2vpr.set(prno, (VPR*)ssainfo);
+    setVPR(prno, (VPR*)ssainfo);
     return ssainfo;
 }
 
@@ -2548,7 +2560,7 @@ void PRSSAMgr::stripSpecificVPR(VPR * vp)
     UINT orgprno = vp->orgprno();
     if (def == nullptr) {
         ASSERT0(VPR_version(vp) == PRSSA_INIT_VERSION);
-        m_prno2vpr.set(orgprno, vp);
+        setVPR(orgprno, vp);
         return;
     }
 
@@ -2592,7 +2604,7 @@ void PRSSAMgr::stripSpecificVPR(VPR * vp)
     //However, checking VPR_orgprno after strip_version is dispensable.
     //Original prno will useful when PHI operand update incrementally.
     VPR_newprno(vp) = newprno;
-    m_prno2vpr.set(newprno, vp);
+    setVPR(newprno, vp);
 }
 
 
@@ -2918,6 +2930,7 @@ bool PRSSAMgr::construction(DomTree & domtree)
 
     //Recompute the map if ssa needs reconstruct.
     cleanPRNO2Type();
+
     stripVersionForBBList(*m_rg->getBBList());
     refinePhi();
     if (g_dump_opt.isDumpAfterPass() && g_dump_opt.isDumpPRSSAMgr()) {

@@ -222,7 +222,7 @@ bool LoopCvt::perform(OptCtx & oc)
 
         //DU reference and du chain has maintained.
         ASSERT0(m_rg->verifyMDRef());
-        ASSERT0(verifyMDDUChain(m_rg));
+        ASSERT0(verifyMDDUChain(m_rg, oc));
 
         //All these changed.
         OC_is_reach_def_valid(oc) = false;

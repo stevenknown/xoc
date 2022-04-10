@@ -93,6 +93,11 @@ public:
 };
 
 
+#define IRNAME(ir) (IRDES_name(g_ir_desc[IR_code(ir)]))
+#define IRTNAME(irt) (IRDES_name(g_ir_desc[irt]))
+#define IRTSIZE(irt) (IRDES_size(g_ir_desc[irt]))
+#define IR_MAX_KID_NUM(ir) (IRDES_kid_num(g_ir_desc[IR_code(ir)]))
+
 //Defined rounding type that CVT operation used.
 typedef enum _ROUND_TYPE {
     ROUND_UNDEF = 0,

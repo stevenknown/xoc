@@ -98,8 +98,8 @@ void CDG::get_cd_preds(UINT id, OUT List<xcom::Vertex*> & lst)
 
 
 //Return true if vertex b is control dependent on vertex a.
-//e.g:a
-//    |\
+//e.g:a_
+//    | |
 //    | b
 //    |/
 //    end

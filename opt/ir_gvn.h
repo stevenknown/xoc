@@ -499,7 +499,6 @@ class GVN : public Pass {
     COPY_CONSTRUCTOR(GVN);
 protected:
     BYTE m_is_vn_fp:1; //true if compute VN for float type.
-    BYTE m_is_comp_ild_vn_by_du:1;
 
     //Set true if we want to compute the vn for LDA(ID(str)).
     //And it's default value is false.
@@ -550,6 +549,11 @@ protected:
 
     void cleanIR2VN();
     void clean();
+    VN * computeSelect(IR const* exp, bool & change);
+    VN * computeBin(IR const* exp, bool & change);
+    VN * computeConst(IR const* exp, bool & change);
+    VN * computeLda(IR const* exp, bool & change);
+    VN * computeUna(IR const* exp, bool & change);
     VN * computeScalarByAnonDomDef(IR const* ild, IR const* domdef,
                                    bool & change);
     VN * computeILoadByAnonDomDef(IR const* ild, VN const* mlvn,
@@ -571,6 +575,11 @@ protected:
     void dumpVNHash() const;
     void dump_h1(IR const* k, VN const* x) const;
     void destroyLocalUsed();
+
+    virtual bool isUnary(IR_TYPE irt) const;
+    virtual bool isBinary(IR_TYPE irt) const;
+    virtual bool isTriple(IR_TYPE irt) const;
+    virtual bool isQuad(IR_TYPE irt) const;
 
     void * xmalloc(UINT size)
     {
@@ -604,10 +613,15 @@ protected:
         return vn;
     }
 
+    void processGETELEM(IR * ir, bool & change);
+    void processSETELEM(IR * ir, bool & change);
     void processBB(IRBB * bb, bool & change);
     void processCall(IR const* ir, bool & change);
     void processRegion(IR const* ir, bool & change);
     void processPhi(IR const* ir, bool & change);
+    void processIST(IR * ir, bool & change);
+    void processSTARRAY(IR * ir, bool & change);
+    void processSTandSTPR(IR * ir, bool & change);
 
     bool useMDSSADU() const
     { return m_mdssamgr != nullptr && m_mdssamgr->is_valid(); }
@@ -643,8 +657,6 @@ public:
     virtual CHAR const* getPassName() const { return "Global Value Numbering"; }
     PASS_TYPE getPassType() const { return PASS_GVN; }
 
-    bool is_triple(IR_TYPE i) const { return i == IR_ILD; }
-    bool is_quad(IR_TYPE i) const { return i == IR_ARRAY; }
     //Return true if ir1 and ir2 represent identical memory location.
     //Note this function does NOT consider data type
     //that ir1 or ir2 referrenced.
@@ -659,23 +671,22 @@ public:
     bool isAllocLiveinVN() const { return m_is_alloc_livein_vn; }
 
     //Get VN of ir.
-    VN * mapIR2VN(IR const* ir) const { return m_ir2vn.get(ir->id()); }
+    VN * getVN(IR const* ir) const { return m_ir2vn.get(ir->id()); }
+
     //Get VN of ir. Readonly function.
-    VN const* mapIR2VNConst(IR const* ir) const
-    { return m_ir2vn.get(ir->id()); }
+    VN const* getConstVN(IR const* ir) const { return m_ir2vn.get(ir->id()); }
 
     //Set true if you intend to alloc different VN for livein variable.
     void setAllocLiveinVN(bool doit) { m_is_alloc_livein_vn = doit; }
 
     //Set VN to ir.
-    void setMapIR2VN(IR const* ir, VN * vn)
-    { m_ir2vn.setAlways(ir->id(), vn); }
+    void setVN(IR const* ir, VN * vn) { m_ir2vn.setAlways(ir->id(), vn); }
 
     //Update VN to ir if ir has been mapped.
-    void setMapIR2VNIfFind(IR const* ir, VN * vn)
-    { m_ir2vn.setIfFind(ir->id(), vn); }
+    void setVNIfFind(IR const* ir, VN * vn) { m_ir2vn.setIfFind(ir->id(), vn); }
+
+    //Ask GVN to compute VN for IR with FP type.
     void setComputeVNForFP(bool doit) { m_is_vn_fp = doit; }
-    void setComputeILoadVNviaDU(bool doit) { m_is_comp_ild_vn_by_du = doit; }
 
     virtual bool perform(OptCtx & oc);
 };

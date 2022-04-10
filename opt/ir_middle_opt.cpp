@@ -158,7 +158,7 @@ bool Region::performSimplify(OptCtx & oc)
     if (g_verify_level >= VERIFY_LEVEL_3 &&
         oc.is_pr_du_chain_valid() &&
         oc.is_nonpr_du_chain_valid()) {
-        ASSERT0(verifyMDDUChain(this));
+        ASSERT0(verifyMDDUChain(this, oc));
     }
     if (g_dump_opt.isDumpAfterPass() && g_dump_opt.isDumpAll()) {
         note(this, "\n==---- DUMP AFTER SIMPLIFY IRBB LIST ----==");
@@ -266,7 +266,7 @@ bool Region::MiddleProcess(OptCtx & oc)
     if (bbl->get_elem_count() == 0) { return true; }
 
     if (g_verify_level >= VERIFY_LEVEL_3) {
-        ASSERT0(verifyMDDUChain(this));
+        ASSERT0(verifyMDDUChain(this, oc));
     }
 
     if (g_opt_level > OPT_LEVEL0) {
@@ -294,7 +294,7 @@ bool Region::MiddleProcess(OptCtx & oc)
             if (g_verify_level >= VERIFY_LEVEL_3 &&
                 oc.is_pr_du_chain_valid() &&
                 oc.is_nonpr_du_chain_valid()) {
-                ASSERT0(verifyMDDUChain(this));
+                ASSERT0(verifyMDDUChain(this, oc));
             }
             return true;
         }

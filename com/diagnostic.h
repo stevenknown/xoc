@@ -63,13 +63,14 @@ namespace xcom {
     EXTERN_C INT m518087(CHAR const* info, ...) CLANG_ANALYZER_NORETURN;
     EXTERN_C INT m522138(CHAR const* filename, INT line) CLANG_ANALYZER_NORETURN;
 
-    #define ASSERTN(a, b)  \
-        ((a) ? 0 : (m522138(__FILE__, __LINE__), m518087 b))
-    #define ASSERTL(a, filename, line, b)  \
-        ((a) ? 0 : (m522138(filename, line), m518087 b))
-    #define ASSERT0(a)  ((a) ? 0 : (m522138(__FILE__, __LINE__), m518087 ("")))
-    #define ASSERTL0(a, filename, line)  \
-        ((a) ? 0 : (m522138(filename, line), m518087 ("")))
+    #define ASSERTN(a, b) \
+        ((a) ? (void)0 : (void)(m522138(__FILE__, __LINE__), m518087 b))
+    #define ASSERTL(a, filename, line, b) \
+        ((a) ? (void)0 : (void)(m522138(filename, line), m518087 b))
+    #define ASSERT0(a) \
+        ((a) ? (void)0 : (void)(m522138(__FILE__, __LINE__), m518087 ("")))
+    #define ASSERTL0(a, filename, line) \
+        ((a) ? (void)0 : (void)(m522138(filename, line), m518087 ("")))
 #else
     #define ASSERTN(a, b)
     #define ASSERTL(a, filename, line, b)

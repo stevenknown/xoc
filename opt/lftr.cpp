@@ -523,7 +523,7 @@ bool LFTR::perform(OptCtx & oc)
     //This pass does not devastate IVR information. However, new IV might be
     //inserted.
     //DU chain and DU reference should be maintained.
-    ASSERT0(m_rg->verifyMDRef() && verifyMDDUChain(m_rg));
+    ASSERT0(m_rg->verifyMDRef() && verifyMDDUChain(m_rg, oc));
     oc.setInvalidIfDUMgrLiveChanged();
     ASSERT0(PRSSAMgr::verifyPRSSAInfo(m_rg));
     ASSERT0(MDSSAMgr::verifyMDSSAInfo(m_rg));

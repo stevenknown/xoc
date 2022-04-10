@@ -1163,7 +1163,7 @@ bool LICM::hoistDefByDUChain(IR const* exp, OUT IRBB * prehead,
         return true;
     }
 
-    if (exp->isMemoryOpnd() && useMDSSADU()) {
+    if (exp->isMemoryRefNonPR() && useMDSSADU()) {
         MDSSAInfo * info = m_mdssamgr->getMDSSAInfoIfAny(exp);
         ASSERTN(info, ("def stmt even not in MDSSA system"));
         VOpndSetIter it = nullptr;
@@ -1651,9 +1651,9 @@ bool LICM::perform(OptCtx & oc)
         }
         m_cfg->performMiscOpt(oc);
 
-        //DU chain and du ref is maintained.
+        //DU chain and DU ref is maintained.
         ASSERT0(m_rg->verifyMDRef());
-        ASSERT0(verifyMDDUChain(m_rg));
+        ASSERT0(verifyMDDUChain(m_rg, oc));
         if (g_dump_opt.isDumpAfterPass() && g_dump_opt.isDumpLICM()) {
             dump();
         }

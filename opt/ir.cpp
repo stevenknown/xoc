@@ -1826,6 +1826,281 @@ void IR::setPrnoConsiderSSAInfo(UINT prno)
     }
     setPrno(prno);
 }
+
+
+void IR::copyRefForTree(IR const* src, Region * rg)
+{
+    ASSERT0(src && isIREqual(src, true) && rg);
+    ASSERT0(src != this);
+    if (isMemoryRef()) {
+        setRefMD(src->getRefMD(), rg);
+        setRefMDSet(src->getRefMDSet(), rg);
+    }
+
+    for (UINT i = 0; i < IR_MAX_KID_NUM(this); i++) {
+        IR * kid = getKid(i);
+        if (kid == nullptr) { continue; }
+
+        IR * srckid = src->getKid(i);
+        ASSERT0(srckid);
+        for (; kid != nullptr;
+             kid = IR_next(kid), srckid = IR_next(srckid)) {
+            ASSERT0(srckid);
+            kid->copyRefForTree(srckid, rg);
+        }
+    }
+}
+
+
+void IR::setRHS(IR * rhs)
+{
+    switch (getCode()) {
+    case IR_ST:
+        ST_rhs(this) = rhs;
+        if (rhs != nullptr) {
+            IR_parent(rhs) = this;
+        }
+        return;
+    case IR_STPR:
+        STPR_rhs(this) = rhs;
+        if (rhs != nullptr) {
+            IR_parent(rhs) = this;
+        }
+        return;
+    case IR_STARRAY:
+        STARR_rhs(this) = rhs;
+        if (rhs != nullptr) {
+            IR_parent(rhs) = this;
+        }
+        return;
+    case IR_IST:
+        IST_rhs(this) = rhs;
+        if (rhs != nullptr) {
+            IR_parent(rhs) = this;
+        }
+        return;
+    default: ASSERTN(0, ("not store operation."));
+    }
+}
+
+
+//This function recursively iterate the IR tree to
+//retrieve whether the IR is may-throw.
+//Record if ir might throw exception.
+bool IR::isMayThrow(bool recur) const
+{
+    if (IR_may_throw(this)) { return true; }
+    if (!recur) { return false; }
+    for (UINT i = 0; i < IR_MAX_KID_NUM(this); i++) {
+        IR const* tmp = getKid(i);
+        if (tmp == nullptr) { continue; }
+        if (IR_may_throw(tmp)) {
+            return true;
+        }
+        if (tmp->isMayThrow(true)) { return true; }
+    }
+    return false;
+}
+
+
+bool IR::hasSideEffect(bool recur) const
+{
+    if (IR_has_sideeffect(this)) { return true; }
+    if (!recur) { return false; }
+    for (UINT i = 0; i < IR_MAX_KID_NUM(this); i++) {
+        IR const* tmp = getKid(i);
+        if (tmp == nullptr) { continue; }
+        if (IR_has_sideeffect(tmp)) {
+            return true;
+        }
+        if (tmp->hasSideEffect(true)) { return true; }
+    }
+    return false;
+}
+
+
+//This function recursively iterate the IR tree to
+//retrieve whether the IR is no-movable.
+bool IR::isNoMove(bool recur) const
+{
+    if (IR_no_move(this)) { return true; }
+    if (!recur) { return false; }
+    for (UINT i = 0; i < IR_MAX_KID_NUM(this); i++) {
+        IR const* tmp = getKid(i);
+        if (tmp == nullptr) { continue; }
+        if (IR_no_move(tmp)) {
+            return true;
+        }
+        if (tmp->isNoMove(true)) { return true; }
+    }
+    return false;
+}
+
+
+//Check if 'exp' is child or grandchildren of current ir.
+//Here we only compare equality of two IR pointer to determine and apply
+//the DFS searching in tree.
+bool IR::is_kids(IR const* exp) const
+{
+    if (exp == nullptr) { return false; }
+    IR * tmp;
+    for (UINT i = 0; i < IR_MAX_KID_NUM(this); i++) {
+        tmp = getKid(i);
+        while (tmp != nullptr) {
+            if (exp == tmp) {
+                return true;
+            }
+            if (tmp->is_kids(exp)) {
+                return true;
+            }
+            tmp = IR_next(tmp);
+        } //end while
+    } //end for
+    return false;
+}
+
+
+//Return true if ir exactly modified 'md' or elements in MDSet 'mds'.
+//md: given md, may be nullptr.
+//mds: given MDSet, may be nullptr.
+bool IR::isExactDef(MD const* md, MDSet const* mds) const
+{
+    ASSERT0(is_stmt());
+    MD const* cur_ir_defined_md = getRefMD();
+    if (cur_ir_defined_md != nullptr && cur_ir_defined_md->is_exact()) {
+        if (md != nullptr &&
+            (cur_ir_defined_md == md || cur_ir_defined_md->is_overlap(md))) {
+            return true;
+        }
+
+        if (mds != nullptr && mds->is_contain_pure(cur_ir_defined_md->id())) {
+            return true;
+        }
+    }
+
+    //We can not determine whether current ir is
+    //exactly modified md or mds.
+    return false;
+}
+
+
+bool IR::isExactDef(MD const* md) const
+{
+    ASSERT0(is_stmt() && md);
+    if (!md->is_exact()) { return false; }
+
+    MD const* cur_ir_defined_md = getRefMD();
+    if (cur_ir_defined_md != nullptr &&
+        cur_ir_defined_md->is_exact() &&
+        (cur_ir_defined_md == md || cur_ir_defined_md->is_overlap(md))) {
+        return true;
+    }
+    return false;
+}
+
+
+//Return true if current ir is integer constant, and the number
+//is equal to 'value'.
+bool IR::isConstIntValueEqualTo(HOST_INT value) const
+{
+    if (!isConstExp()) { return false; }
+
+    IR const* p = this;
+    while (!p->is_const()) {
+        ASSERTN(p->is_cvt(), ("const expression only include CVT and CONST."));
+        p = CVT_exp(p);
+        ASSERT0(p);
+    }
+    return p->is_int() && CONST_int_val(p) == value;
+}
+
+
+//Find and substitute 'newk' for 'oldk'.
+//Return true if replaced the 'oldk'.
+//'recur': set to true if function recusively perform
+//replacement for 'oldk'.
+bool IR::replaceKid(IR * oldk, IR * newk, bool recur)
+{
+    for (UINT i = 0; i < IR_MAX_KID_NUM(this); i++) {
+        IR * kid = getKid(i);
+        if (kid == nullptr) { continue; }
+        for (IR * x = kid; x != nullptr; x = x->get_next()) {
+            if (x == oldk) {
+                xcom::replace(&kid, oldk, newk);
+                if (IR_prev(newk) == nullptr) {
+                    //oldk is the header, and update the kid i.
+                    setKid(i, kid);
+                } else {
+                    IR_parent(newk) = IR_parent(oldk);
+                }
+                return true;
+            }
+            if (recur && x->replaceKid(oldk, newk, true)) {
+                return true;
+            }
+        }
+    }
+    return false;
+}
+
+
+//Return true if ir is branch op and has multiple jump target.
+bool IR::hasMultiTarget() const
+{
+    switch (getCode()) {
+    case IR_SWITCH: {
+        UINT numoftgt = 0;
+        if (SWITCH_deflab(this) != nullptr) {
+            numoftgt++;
+        }
+
+        if (getCaseList() != nullptr) { numoftgt++;}
+        return numoftgt > 1;
+    }
+    case IR_IGOTO: {
+        IR const* caselst = getCaseList();
+        ASSERT0(caselst);
+        if (caselst->get_next() != nullptr) { return true; }
+        return false;
+    }
+    default:;
+    }
+    return false;
+}
+
+
+bool IR::isReadOnly() const
+{
+    switch (getCode()) {
+    case IR_CALL: return CALL_is_readonly(this);
+    case IR_ICALL: return ICALL_is_readonly(this);
+    case IR_CVT: return CVT_exp(this)->isReadOnly();
+    case IR_LD:
+        if (VAR_is_readonly(LD_idinfo(this)) &&
+            !VAR_is_volatile(LD_idinfo(this))) {
+            return true;
+        }
+        return false;
+    default:;
+    }
+    return false;
+}
+
+
+bool IR::is_volatile() const
+{
+    //Describing if IR's address has been taken.
+    if (is_id()) {
+        Var * id_info = ID_info(this);
+        ASSERT0(id_info != nullptr);
+        return VAR_is_volatile(id_info);
+    }
+    return false;
+}
+
+
+
+
 //END IR
 
 

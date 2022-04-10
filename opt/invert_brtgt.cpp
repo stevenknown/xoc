@@ -114,7 +114,6 @@ bool InvertBrTgt::invertLoop(InvertBrTgt * invt, IR * br, IRBB * br_tgt,
 
 static bool tryInvertLoop(InvertBrTgt * invt, IRCFG * cfg, LI<IRBB> const* li)
 {
-    bool changed = false;
     IRBB * head = li->getLoopHead();
     ASSERT0(head && cfg->getVertex(head->id()));
     UINT backedge_pred = VERTEX_UNDEF;
@@ -135,7 +134,7 @@ static bool tryInvertLoop(InvertBrTgt * invt, IRCFG * cfg, LI<IRBB> const* li)
     IR * jmp = cfg->get_first_xr(const_cast<IRBB*>(backedge_start));
     ASSERT0(jmp);
     if (!jmp->is_goto()) { return false; }
-    if (!head->isContainLabel(GOTO_lab(jmp))) { return false; }
+    if (!head->hasLabel(GOTO_lab(jmp))) { return false; }
 
     BBListIter bbct;
     cfg->getBBList()->find(const_cast<IRBB*>(backedge_start), &bbct);

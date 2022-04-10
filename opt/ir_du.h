@@ -655,8 +655,7 @@ public:
 
 //Verify DU chain's sanity.
 //Verify if DU chain is correct between each Def and Use of MD.
-bool verifyMDDUChain(Region * rg, UINT duflag = DUOPT_COMPUTE_PR_DU |
-                                                DUOPT_COMPUTE_NONPR_DU);
+bool verifyMDDUChain(Region * rg, UINT duflag);
 bool verifyMDDUChain(Region * rg, OptCtx const& oc);
 
 } //namespace xoc

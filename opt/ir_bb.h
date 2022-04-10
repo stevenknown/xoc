@@ -90,8 +90,8 @@ public:
     {
         ASSERT0(ir->is_stmt());
         IRListIter irit;
-        find(const_cast<IR*>(ir), &irit);
-        ASSERTN(irit, ("ir is not belong to current BB"));
+        bool succ = find(const_cast<IR*>(ir), &irit);
+        CHECKN_DUMMYUSE(succ, ("ir is not belong to current BB"));
         irit = get_prev(irit);
         return irit == nullptr ? nullptr : irit->val();
     }
@@ -279,7 +279,11 @@ public:
 
     bool hasMDPhi(CFG<IRBB, IR> const* cfg) const;
 
-    //Is bb containing such label carried by 'lir'.
+    //Return true if BB has any label attached.
+    bool hasLabel() const
+    { return const_cast<IRBB*>(this)->getLabelList().get_elem_count() != 0; }
+
+    //Is bb containing given label.
     inline bool hasLabel(LabelInfo const* lab) const
     {
         LabelInfoListIter it;
@@ -440,22 +444,9 @@ public:
         return false;
     }
 
-    inline bool isContainLabel(LabelInfo const* lab) const
-    {
-        for (LabelInfo const* li = const_cast<IRBB*>(this)->
-                 getLabelList().get_head();
-             li != nullptr;
-             li = const_cast<IRBB*>(this)->getLabelList().get_next()) {
-            if (li == lab) {
-                return true;
-            }
-        }
-        return false;
-    }
-
     //Return true if current BB is the target of 'ir'.
     bool isTarget(IR const* ir) const
-    { ASSERT0(ir->getLabel()); return isContainLabel(ir->getLabel()); }
+    { ASSERT0(ir->getLabel()); return hasLabel(ir->getLabel()); }
 
     inline bool is_dom(IR const* ir1, IR const* ir2, IROrder const& order,
                        bool is_strict) const

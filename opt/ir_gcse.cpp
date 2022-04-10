@@ -86,10 +86,10 @@ void GCSE::elimCseAtStore(IR * use, IR * use_stmt, IR * gen)
 
     //Assign the identical vn to newrhs.
     if (m_gvn != nullptr) {
-        VN * vn = m_gvn->mapIR2VN(gen);
+        VN * vn = m_gvn->getVN(gen);
         ASSERT0(vn);
-        m_gvn->setMapIR2VN(newrhs_pr, vn);
-        m_gvn->setMapIR2VN(use_stmt, vn);
+        m_gvn->setVN(newrhs_pr, vn);
+        m_gvn->setVN(use_stmt, vn);
     }
 
     //Assign MD to newrhs.
@@ -131,9 +131,9 @@ void GCSE::elimCseAtBranch(IR * use, IR * use_stmt, IN IR * gen)
 
     //Assign the idential vn to r.
     ASSERT0(m_gvn);
-    VN * vn = m_gvn->mapIR2VN(gen);
+    VN * vn = m_gvn->getVN(gen);
     ASSERT0(vn);
-    m_gvn->setMapIR2VN(new_pr, vn);
+    m_gvn->setVN(new_pr, vn);
 
     //Assign MD to PR.
     MD const* r_md = m_rg->getMDMgr()->genMDForPR(new_pr);
@@ -182,9 +182,9 @@ void GCSE::elimCseAtCall(IR * use, IR * use_stmt, IR * gen)
     //Set identical vn to use_pr with CSE.
     IR * gen_stmt = gen->getStmt();
     ASSERT0(m_gvn);
-    VN * vn = m_gvn->mapIR2VN(gen);
+    VN * vn = m_gvn->getVN(gen);
     ASSERT0(vn);
-    m_gvn->setMapIR2VN(use_pr, vn);
+    m_gvn->setVN(use_pr, vn);
 
     //Allocate MD to use_pr to make up DU manager request.
     MD const* r_md = m_rg->getMDMgr()->genMDForPR(use_pr);
@@ -259,8 +259,8 @@ void GCSE::processCseGen(IN IR * gen, IR * gen_stmt, bool & change)
     new_stpr->setRefMD(tmp_pr_md, m_rg);
 
     if (m_gvn != nullptr) {
-        ASSERT0(m_gvn->mapIR2VN(gen));
-        m_gvn->setMapIR2VN(new_stpr, m_gvn->mapIR2VN(gen));
+        ASSERT0(m_gvn->getVN(gen));
+        m_gvn->setVN(new_stpr, m_gvn->getVN(gen));
     }
 
     copyDbx(new_stpr, gen_stmt, m_rg);
@@ -413,7 +413,7 @@ void GCSE::handleCandidate(IR * exp, IRBB * bb,
 {
     VN const* vn = nullptr;
     IR * gen = nullptr;
-    if ((vn = m_gvn->mapIR2VN(exp)) != nullptr &&
+    if ((vn = m_gvn->getVN(exp)) != nullptr &&
         (gen = m_vn2exp.get(vn)) != nullptr &&
         findAndElim(exp, gen)) {
         //Found cse and replaced it with pr.
@@ -870,7 +870,7 @@ bool GCSE::perform(OptCtx & oc)
 
         //DU reference and du chain has maintained.
         ASSERT0(m_rg->verifyMDRef());
-        ASSERT0(verifyMDDUChain(m_rg));
+        ASSERT0(verifyMDDUChain(m_rg, oc));
         if (m_ssamgr != nullptr) {
             ASSERT0(PRSSAMgr::verifyPRSSAInfo(m_rg));
         }

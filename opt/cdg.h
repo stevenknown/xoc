@@ -64,8 +64,8 @@ public:
     bool is_only_control_self(UINT vid) const;
 
     //Return true if vertex b is control dependent on vertex a.
-    //e.g:a
-    //    |\
+    //e.g:a_
+    //    | |
     //    | b
     //    |/
     //    end

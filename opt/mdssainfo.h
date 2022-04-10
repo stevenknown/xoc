@@ -220,6 +220,9 @@ public:
     //Return true if current VOpnd should have DEF stmt.
     bool hasDef() const { return version() != MDSSA_INIT_VERSION; }
 
+    //Return true if current VOpnd has at least one USE.
+    bool hasUse() const { return VMD_occs(this).get_elem_count() > 0; }
+
     //Return true if VMD is live-in version to current Region.
     bool isLiveIn() const { return version() == MDSSA_INIT_VERSION; }
 

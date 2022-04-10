@@ -226,6 +226,15 @@ public:
     void copyBottomupFlag(SimpCtx const& c)
     { prop_bottom_up.flag_value = c.prop_bottom_up.flag_value; }
 
+    //Clean the actions which propagated bottom up
+    //during processing IR tree.
+    void cleanBottomupFlag()
+    {
+        SIMP_changed(this) = false;
+        SIMP_need_recon_bblist(this) = false;
+        SIMP_need_rebuild_du_chain(this) = false;
+    }
+
     //Return the stmt list that recorded in the context.
     IR * getStmtList() { return SIMP_stmtlist(this); }
 

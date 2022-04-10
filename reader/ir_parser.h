@@ -50,8 +50,10 @@ public:
 #define PARSECTX_returned_imm_fpval(p) ((p)->s1.u1.returned_imm_fpval)
 #define PARSECTX_returned_imm_ty(p) ((p)->s1.returned_imm_ty)
 class ParseCtx {
+    COPY_CONSTRUCTOR(ParseCtx);
     xcom::TMap<Sym const*, LabelInfo*> m_sym2label;
     xcom::TMap<IR*, LabelInfo*> m_ir2label;
+    xcom::TMap<Sym const*, UINT> m_id2prno;
 public:
     Region * current_region;
     IRParser * parser;
@@ -89,16 +91,20 @@ public:
 
     void addIR(IR * stmt);
 
+    void clean();
+
     xcom::TMap<IR*, LabelInfo*> & getIR2Label() { return m_ir2label; }
 
     LabelInfo * mapSym2Label(Sym const* sym) const
     { return m_sym2label.get(sym); }
     LabelInfo * mapIR2Label(IR * ir) const { return m_ir2label.get(ir); }
+    UINT mapSym2Prno(Sym const* sym) const { return m_id2prno.get(sym); }
 
     void setMapSym2Label(Sym const* sym, LabelInfo * label)
     { m_sym2label.set(sym, label); }
     void setMapIR2Label(IR * ir, LabelInfo * label)
     { m_ir2label.set(ir, label); }
+    void setMapSym2Prno(Sym const* sym, UINT prno) { m_id2prno.set(sym, prno); }
     void storeValue(IR ** oldvalue1, IR ** oldvalue2)
     {
         *oldvalue1 = stmt_list;
@@ -298,7 +304,7 @@ protected:
     bool declareRegion(ParseCtx * ctx);
 
     void enterRegion(ParseCtx *) {}
-    void exitRegion(ParseCtx *) {}
+    void exitRegion(ParseCtx * ctx) { ctx->clean(); }
     void error(UINT lineno, CHAR const* format, ...);
     void error(TOKEN tok, CHAR const* format, ...);
     void error(X_CODE xcode, CHAR const* format, ...);
@@ -403,7 +409,7 @@ public:
     CHAR const* getPassName() const { return "IRParser"; }
     RegionMgr * getRegionMgr() const { return m_rumgr; }
     List<ParseErrorMsg*> & getErrorMsgList() { return m_err_list; }
-    CHAR const* getKeywordName(X_CODE code) const;
+    CHAR const* getKeyWordName(X_CODE code) const;
     Lexer * getLexer() const { return m_lexer; }
 
     void setLexer(Lexer * l) { m_lexer = l; }

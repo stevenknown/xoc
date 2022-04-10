@@ -188,7 +188,7 @@ void InsertPhiHelper::makeMDSSAPhi(MDPhi const* phi)
     for (IR * opnd = MDPHI_opnd_list(phi);
          opnd != nullptr; opnd = opnd->get_next(), i++) {
         if (c == m_pred_pos.get_elem_count()) { break; }
-        INT pos = m_pred_pos.get(c);
+        UINT pos = m_pred_pos.get(c);
         if (i != pos) { continue; }
         MDSSAInfo const* oldmdssainfo = m_mdssamgr->getMDSSAInfoIfAny(opnd);
         ASSERT0(oldmdssainfo);
@@ -230,7 +230,7 @@ void InsertPhiHelper::makePRSSAPhi(IR const* phi)
     for (IR * opnd = PHI_opnd_list(phi); opnd != nullptr; opnd = next, i++) {
         next = opnd->get_next();
         if (c == m_pred_pos.get_elem_count()) { break; }
-        INT pos = m_pred_pos.get(c);
+        UINT pos = m_pred_pos.get(c);
         if (i != pos) { continue; }
         IR * newopnd = m_rg->dupIRTree(opnd);
         ASSERT0(newopnd->getMustRef() && opnd->getSSAInfo());
@@ -259,7 +259,6 @@ void InsertPhiHelper::makePRSSAPhiForPreheader(IRBB const* head)
 
 void InsertPhiHelper::makeMDSSAPhiForPreheader(IRBB * head)
 {
-    IRBB * phead = const_cast<IRBB*>(head);
     MDPhiList const* lst = m_mdssamgr->getPhiList(head);
     if (lst == nullptr) { return; }
     for (MDPhiListIter it = lst->get_head();
@@ -1012,6 +1011,8 @@ bool insertPreheader(LI<IRBB> const* li, Region * rg, OUT IRBB ** preheader,
         OC_is_rpo_valid(oc) = false;
         OC_is_cdg_valid(oc) = false;
     }
+    //TODO:try update CDG
+    OC_is_cdg_valid(oc) = false;
     return true;
 }
 

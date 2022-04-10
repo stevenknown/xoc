@@ -53,6 +53,7 @@ namespace xoc {
 #define OC_is_rpo_valid(o) ((o).u1.s1.is_rpo_valid)
 #define OC_is_loopinfo_valid(o) ((o).u1.s1.is_loopinfo_valid)
 #define OC_is_callg_valid(o) ((o).u1.s1.is_callg_valid)
+#define OC_do_merge_label(o) ((o).u1.s1.do_merge_label)
 class OptCtx {
 public:
     union {
@@ -85,13 +86,20 @@ public:
             UINT is_callg_valid:1; //Call graph is available.
 
             UINT is_rpo_valid:1; //Rporder is available.
+
+            //If it is true, CFG optimizer will attempt to merge label to
+            //next BB if current BB is empty. Default is true.
+            UINT do_merge_label:1;
         } s1;
     } u1;
 
 public:
-    OptCtx() { setAllInvalid(); }
+    OptCtx() { init(); }
     OptCtx const& operator = (OptCtx const&);
 
+    bool do_merge_label() const { return OC_do_merge_label(*this); }
+
+    void init() { setAllInvalid(); OC_do_merge_label(*this) = true; } 
     bool is_ref_valid() const { return OC_is_ref_valid(*this); }
     bool is_du_chain_valid() const
     { return is_pr_du_chain_valid() && is_nonpr_du_chain_valid(); }

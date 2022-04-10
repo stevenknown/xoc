@@ -379,7 +379,6 @@ bool CopyProp::doPropForNormalStmt(IRListIter cur_iter, IRListIter * next_iter,
     IR * use_stmt = use->getStmt();
     ASSERT0(use_stmt && use_stmt->is_stmt() && use_stmt->getBB());
     IRBB * use_bb = use_stmt->getBB();
-    bool change = false;
     CPCtx lchange;
     IR * old_use_stmt = use_stmt;
     replaceExp(use, prop_value, lchange);
@@ -741,7 +740,7 @@ bool CopyProp::perform(OptCtx & oc)
     m_cfg->sortDomTreeInPreorder(root, lst);
     IRSet useset(getSegMgr()); //for local used
     bool lchanged = false;
-    UINT count = 20;
+    UINT count = 0;
     do {
         lchanged = false;
         for (xcom::Vertex * v = lst.get_head();
@@ -757,8 +756,8 @@ bool CopyProp::perform(OptCtx & oc)
             refinement(m_rg, oc);
             ASSERT0(verifyMDDUChain(m_rg, oc));
         }
-        count--;
-    } while (lchanged && count > 0);
+        count++;
+    } while (lchanged && count < 50);
     ASSERT0(!lchanged);
     END_TIMER(t, getPassName());
 
