@@ -951,7 +951,9 @@ bool RegPromot::handleInexactOrMayRef(IR * ir, LI<IRBB> const* li,
     if (ir->isArrayOp()) {
         return handleArrayRef(ir, li, exact_tab, inexact_tab, added);
     }
-    UNREACHABLE();
+    ASSERTN(ir->is_st(), ("after optimizations, ST's ref may be unbound"));
+    inexact_tab.addOcc(ir);
+    *added = true;
     return true;
 }
 

@@ -3,6 +3,9 @@ ifndef CC
   CC = $(if $(shell which clang), clang, gcc)
 endif
 
+TARG=FOR_DEX
+CFLAGS += -Wall
+
 include reader/Makefile.inc
 include com/Makefile.inc
 include opt/Makefile.inc
@@ -12,14 +15,28 @@ ifdef WIN
 CFLAGS += -D_ON_WINDOWS_
 endif
 
-CFLAGS += -DFOR_DEX -D_DEBUG_ -D_SUPPORT_C11_ -O2 -g2 -Wno-unknown-pragmas \
-          -Wno-write-strings -Wsign-promo -Wsign-compare -Wpointer-arith \
-          -Wno-multichar -Winit-self -Wswitch
+CFLAGS +=\
+   -D$(TARG) \
+   -D_DEBUG_ \
+   -O2 \
+   -g2 \
+   -Wno-unknown-pragmas \
+   -Wno-write-strings \
+   -Wsign-promo \
+   -Wparentheses \
+   -Wformat \
+   -Wsign-compare \
+   -Wpointer-arith \
+   -Wno-multichar \
+   -Winit-self \
+   -Wconversion \
+   -Wswitch \
+   -D_SUPPORT_C11_
 
 SRC = .
 
 ifneq (,$(filter $(CC),g++ gcc))
-	CFLAGS += -Wstrict-aliasing=3 -finline-limit=10000000
+	CFLAGS += -Wno-strict-aliasing -finline-limit=10000000
 endif
 
 all: com_objs opt_objs reader_objs
