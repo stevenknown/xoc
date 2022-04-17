@@ -140,7 +140,7 @@ void SolveSet::resetKillSet()
     Vector<DefDBitSetCore*> * ptr = nullptr;
 
     ptr = &m_must_killed_def;
-    for (INT i = 0; i <= ptr->get_last_idx(); i++) {
+    for (VecIdx i = 0; i <= ptr->get_last_idx(); i++) {
         DefDBitSetCore * dset = ptr->get(i);
         if (dset != nullptr) { dset->clean(*bsmgr); }
     }
@@ -148,7 +148,7 @@ void SolveSet::resetKillSet()
     ptr->init();
 
     ptr = &m_may_killed_def;
-    for (INT i = 0; i <= ptr->get_last_idx(); i++) {
+    for (VecIdx i = 0; i <= ptr->get_last_idx(); i++) {
         DefDBitSetCore * dset = ptr->get(i);
         if (dset != nullptr) { dset->clean(*bsmgr); }
     }
@@ -156,7 +156,7 @@ void SolveSet::resetKillSet()
     ptr->init();
 
     ptr = &m_killed_ir_exp;
-    for (INT i = 0; i <= ptr->get_last_idx(); i++) {
+    for (VecIdx i = 0; i <= ptr->get_last_idx(); i++) {
         DefDBitSetCore * dset = ptr->get(i);
         if (dset != nullptr) { dset->clean(*bsmgr); }
     }
@@ -172,7 +172,7 @@ void SolveSet::resetLocalSet()
     Vector<DefDBitSetCore*> * ptr = nullptr;
 
     ptr = &m_avail_in_reach_def;
-    for (INT i = 0; i <= ptr->get_last_idx(); i++) {
+    for (VecIdx i = 0; i <= ptr->get_last_idx(); i++) {
         DefDBitSetCore * dset = ptr->get(i);
         if (dset != nullptr) { dset->clean(*bsmgr); }
     }
@@ -180,7 +180,7 @@ void SolveSet::resetLocalSet()
     ptr->init();
 
     ptr = &m_avail_out_reach_def;
-    for (INT i = 0; i <= ptr->get_last_idx(); i++) {
+    for (VecIdx i = 0; i <= ptr->get_last_idx(); i++) {
         DefDBitSetCore * dset = ptr->get(i);
         if (dset != nullptr) { dset->clean(*bsmgr); }
     }
@@ -190,7 +190,7 @@ void SolveSet::resetLocalSet()
     //Note that only reach-def in is useful for computing DU chain.
     //reach-def out can be destroied.
     ptr = &m_out_reach_def;
-    for (INT i = 0; i <= ptr->get_last_idx(); i++) {
+    for (VecIdx i = 0; i <= ptr->get_last_idx(); i++) {
         DefDBitSetCore * dset = ptr->get(i);
         if (dset != nullptr) { dset->clean(*bsmgr); }
     }
@@ -198,7 +198,7 @@ void SolveSet::resetLocalSet()
     ptr->init();
 
     ptr = &m_may_gen_def;
-    for (INT i = 0; i <= ptr->get_last_idx(); i++) {
+    for (VecIdx i = 0; i <= ptr->get_last_idx(); i++) {
         DefDBitSetCore * dset = ptr->get(i);
         if (dset != nullptr) { dset->clean(*bsmgr); }
     }
@@ -206,7 +206,7 @@ void SolveSet::resetLocalSet()
     ptr->init();
 
     ptr = &m_must_gen_def;
-    for (INT i = 0; i <= ptr->get_last_idx(); i++) {
+    for (VecIdx i = 0; i <= ptr->get_last_idx(); i++) {
         DefDBitSetCore * dset = ptr->get(i);
         if (dset != nullptr) { dset->clean(*bsmgr); }
     }
@@ -214,7 +214,7 @@ void SolveSet::resetLocalSet()
     ptr->init();
 
     ptr = &m_gen_ir_exp;
-    for (INT i = 0; i <= ptr->get_last_idx(); i++) {
+    for (VecIdx i = 0; i <= ptr->get_last_idx(); i++) {
         DefDBitSetCore * dset = ptr->get(i);
         if (dset != nullptr) { dset->clean(*bsmgr); }
     }
@@ -222,7 +222,7 @@ void SolveSet::resetLocalSet()
     ptr->init();
 
     ptr = &m_avail_in_exp;
-    for (INT i = 0; i <= ptr->get_last_idx(); i++) {
+    for (VecIdx i = 0; i <= ptr->get_last_idx(); i++) {
         DefDBitSetCore * dset = ptr->get(i);
         if (dset != nullptr) { dset->clean(*bsmgr); }
     }
@@ -230,7 +230,7 @@ void SolveSet::resetLocalSet()
     ptr->init();
 
     ptr = &m_avail_out_exp;
-    for (INT i = 0; i <= ptr->get_last_idx(); i++) {
+    for (VecIdx i = 0; i <= ptr->get_last_idx(); i++) {
         DefDBitSetCore * dset = ptr->get(i);
         if (dset != nullptr) { dset->clean(*bsmgr); }
     }
@@ -247,7 +247,7 @@ void SolveSet::resetLocalSet()
 
 void SolveSet::resetLiveInBB()
 {
-    for (INT i = 0; i <= m_livein_bb.get_last_idx(); i++) {
+    for (VecIdx i = 0; i <= m_livein_bb.get_last_idx(); i++) {
         DefSBitSetCore * bs = m_livein_bb.get(i);
         if (bs == nullptr) { continue; }
         bs->clean(*getLocalSBSMgr());
@@ -259,7 +259,7 @@ void SolveSet::resetLiveInBB()
 
 void SolveSet::resetReachDefInSet()
 {
-    for (INT i = 0; i <= m_in_reach_def.get_last_idx(); i++) {
+    for (VecIdx i = 0; i <= m_in_reach_def.get_last_idx(); i++) {
         DefDBitSetCore * bs = m_in_reach_def.get(i);
         if (bs == nullptr) { continue; }
         getGlobalSBSMgr()->destroySEGandFreeDBitSetCore(bs);
@@ -309,8 +309,8 @@ bool SolveSet::ForAvailReachDef(UINT bbid, List<IRBB*> & preds,
         xcom::Vertex * bbv = m_cfg->getVertex(bbid);
         for (xcom::EdgeC const* ecs = bbv->getOutList();
              ecs != nullptr;ecs = EC_next(ecs);) {
-            INT succ = ecs->getToId();
-            ASSERT0(succ >= 0 && m_cfg->getBB(succ));
+            UINT succ = ecs->getToId();
+            ASSERT0(m_cfg->getBB(succ));
             lst->append_tail(m_cfg->getBB(succ));
         }
         #endif
@@ -369,8 +369,8 @@ bool SolveSet::ForReachDef(UINT bbid, List<IRBB*> & preds, List<IRBB*> * lst,
         xcom::Vertex * bbv = m_cfg->getVertex(bbid);
         for (xcom::EdgeC const* ecs = bbv->getOutList();
              ecs != nullptr; ecs = ecs->get_next()) {
-            INT succ = ecs->getToId();
-            ASSERT0(succ >= 0 && m_cfg->getBB(succ));
+            UINT succ = ecs->getToId();
+            ASSERT0(m_cfg->getBB(succ));
             lst->append_tail(m_cfg->getBB(succ));
         }
         #endif
@@ -418,8 +418,8 @@ bool SolveSet::ForAvailExpression(UINT bbid, List<IRBB*> & preds,
         xcom::Vertex * bbv = m_cfg->getVertex(bbid);
         for (xcom::EdgeC const* ecs = bbv->getOutList();
              ecs != nullptr; ecs = ecs->get_next()) {
-            INT succ = ecs->getToId();
-            ASSERT0(succ >= 0 && m_cfg->getBB(succ));
+            UINT succ = ecs->getToId();
+            ASSERT0(m_cfg->getBB(succ));
             lst->append_tail(m_cfg->getBB(succ));
         }
         #endif
@@ -989,8 +989,8 @@ void SolveSet::computeMayDef(IR const* ir, MDSet * bb_maydefmds,
     //The computation of reach-definition problem is conservative.
     //If we can not say whether a DEF is killed, regard it as lived STMT.
     DefSBitSetIter st = nullptr;
-    INT ni;
-    for (INT i = maygen_stmt->get_first(&st); i != -1; i = ni) {
+    BSIdx ni;
+    for (BSIdx i = maygen_stmt->get_first(&st); i != BS_UNDEF; i = ni) {
         ni = maygen_stmt->get_next(i, &st);
         IR * gened_ir = m_rg->getIR(i);
         ASSERT0(gened_ir != nullptr && gened_ir->is_stmt());
@@ -1105,8 +1105,8 @@ void SolveSet::computeMustExactDef(IR const* ir,
 
     //Computing Must GEN set of reach-definition.
     DefSBitSetIter st = nullptr;
-    INT ni;
-    for (INT i = mustgen_stmt->get_first(&st); i != -1; i = ni) {
+    BSIdx ni;
+    for (BSIdx i = mustgen_stmt->get_first(&st); i != BS_UNDEF; i = ni) {
         ni = mustgen_stmt->get_next(i, &st);
         IR * gened_ir = m_rg->getIR(i);
         ASSERT0(gened_ir != nullptr && gened_ir->is_stmt());
@@ -1201,14 +1201,14 @@ void SolveSet::computeKillSet(DefDBitSetCoreReserveTab & dbitsetchash,
         DefSBitSetCore const* livein_bbs = genLiveInBB(bbid);
         ASSERT0(livein_bbs);
         DefSBitSetIter st = nullptr;
-        for (INT b = livein_bbs->get_first(&st);
-             b != -1; b = livein_bbs->get_next(b, &st)) {
-            if (b == (INT)bbid) { continue; }
+        for (BSIdx b = livein_bbs->get_first(&st);
+             b != BS_UNDEF; b = livein_bbs->get_next(b, &st)) {
+            if (b == (BSIdx)bbid) { continue; }
             DefDBitSetCore const* livein_maygendef = genMayGenDef(
                 m_cfg->getBB(b)->id());
             ASSERT0(livein_maygendef);
-            for (INT i = livein_maygendef->get_first(&st);
-                 i != -1; i = livein_maygendef->get_next(i, &st)) {
+            for (BSIdx i = livein_maygendef->get_first(&st);
+                 i != BS_UNDEF; i = livein_maygendef->get_next(i, &st)) {
                 IR const* stmt = m_rg->getIR(i);
                 ASSERT0(stmt->is_stmt());
                 if (comp_must) {
@@ -1330,8 +1330,8 @@ void SolveSet::computeGenForBB(IRBB * bb,
                 MD const* mustdef = ir->getMustRef();
                 if (maydef != nullptr || mustdef != nullptr) {
                     DefSBitSetIter st = nullptr;
-                    for (INT j = gen_ir_exprs->get_first(&st), nj;
-                         j != -1; j = nj) {
+                    for (BSIdx j = gen_ir_exprs->get_first(&st), nj;
+                         j != BS_UNDEF; j = nj) {
                         nj = gen_ir_exprs->get_next(j, &st);
 
                         IR * tir = m_rg->getIR(j);
@@ -1386,8 +1386,8 @@ void SolveSet::computeGenForBB(IRBB * bb,
             MD const* mustdef = ir->getMustRef();
             if (maydef != nullptr || mustdef != nullptr) {
                 DefSBitSetIter st = nullptr;
-                for (INT j = gen_ir_exprs->get_first(&st), nj;
-                     j != -1; j = nj) {
+                for (BSIdx j = gen_ir_exprs->get_first(&st), nj;
+                     j != BS_UNDEF; j = nj) {
                     nj = gen_ir_exprs->get_next(j, &st);
                     IR * tir = m_rg->getIR(j);
                     ASSERT0(tir != nullptr);
@@ -1493,8 +1493,8 @@ void SolveSet::computeAuxSetForExpression(DefDBitSetCoreReserveTab & bshash,
         ASSERT0(bb_maydef != nullptr);
 
         DefSBitSetIter st = nullptr;
-        for (INT i = expr_universe->get_first(&st);
-             i != -1; i = expr_universe->get_next(i, &st)) {
+        for (BSIdx i = expr_universe->get_first(&st);
+             i != BS_UNDEF; i = expr_universe->get_next(i, &st)) {
             IR * ir = m_rg->getIR(i);
             ASSERT0(ir->is_exp());
             if (ir->is_lda() || ir->is_const()) { continue; }
@@ -1546,8 +1546,8 @@ void SolveSet::computeRegionMDDU(Vector<MDSet*> const* mustexactdef_mds,
         MDSet const* mds = mustexactdef_mds->get(bb->id());
         ASSERT0(mds != nullptr);
         MDSetIter iter;
-        for (INT i = mds->get_first(&iter);
-             i >= 0; i = mds->get_next(i, &iter)) {
+        for (BSIdx i = mds->get_first(&iter);
+             i != BS_UNDEF; i = mds->get_next(i, &iter)) {
             MD const* md = m_md_sys->getMD(i);
             ASSERT0(md->get_base());
             if (!md->is_pr() && !vtab->find(md->get_base())) {
@@ -1558,8 +1558,8 @@ void SolveSet::computeRegionMDDU(Vector<MDSet*> const* mustexactdef_mds,
 
         mds = maydef_mds->get(bb->id());
         ASSERT0(mds != nullptr);
-        for (INT i = mds->get_first(&iter);
-             i >= 0; i = mds->get_next(i, &iter)) {
+        for (BSIdx i = mds->get_first(&iter);
+             i != BS_UNDEF; i = mds->get_next(i, &iter)) {
             MD const* md = m_md_sys->getMD(i);
             ASSERT0(md->get_base());
             if (!md->is_pr() && !vtab->find(md->get_base())) {
@@ -1570,8 +1570,8 @@ void SolveSet::computeRegionMDDU(Vector<MDSet*> const* mustexactdef_mds,
     }
 
     MDSetIter iter = nullptr;
-    for (INT i = mayuse_mds->get_first(&iter);
-         i >= 0; i = mayuse_mds->get_next(i, &iter)) {
+    for (BSIdx i = mayuse_mds->get_first(&iter);
+         i != BS_UNDEF; i = mayuse_mds->get_next(i, &iter)) {
         MD const* md = m_md_sys->getMD(i);
         ASSERT0(md->get_base());
         if (!md->is_pr() && !vtab->find(md->get_base())) {
@@ -1616,8 +1616,8 @@ void SolveSet::dump(bool is_bs) const
         if (def_in != nullptr) {
             note(getRegion(), "\nREACH-DEF IN STMT: %lu byte ",
                  (ULONG)def_in->count_mem());
-            for (INT i = def_in->get_first(&st);
-                 i != -1; i = def_in->get_next(i, &st)) {
+            for (BSIdx i = def_in->get_first(&st);
+                 i != BS_UNDEF; i = def_in->get_next(i, &st)) {
                 IR * ir = m_rg->getIR(i);
                 ASSERT0(ir != nullptr);
                 prt(getRegion(), "%s(%d), ", IRNAME(ir), ir->id());
@@ -1631,8 +1631,8 @@ void SolveSet::dump(bool is_bs) const
         if (def_out != nullptr) {
             note(getRegion(), "\nREACH-DEF OUT STMT: %lu byte ",
                  (ULONG)def_out->count_mem());
-            for (INT i = def_out->get_first(&st);
-                 i != -1; i = def_out->get_next(i, &st)) {
+            for (BSIdx i = def_out->get_first(&st);
+                 i != BS_UNDEF; i = def_out->get_next(i, &st)) {
                 IR * ir = m_rg->getIR(i);
                 ASSERT0(ir != nullptr);
                 prt(getRegion(), "%s(%d), ", IRNAME(ir), ir->id());
@@ -1646,8 +1646,8 @@ void SolveSet::dump(bool is_bs) const
         if (avail_def_in != nullptr) {
             note(getRegion(), "\nAVAIL-REACH-DEF IN STMT: %lu byte ",
                  (ULONG)avail_def_in->count_mem());
-            for (INT i = avail_def_in->get_first(&st);
-                 i != -1; i = avail_def_in->get_next(i, &st)) {
+            for (BSIdx i = avail_def_in->get_first(&st);
+                 i != BS_UNDEF; i = avail_def_in->get_next(i, &st)) {
                 IR * ir = m_rg->getIR(i);
                 ASSERT0(ir != nullptr);
                 prt(getRegion(), "%s(%d), ", IRNAME(ir), ir->id());
@@ -1661,8 +1661,8 @@ void SolveSet::dump(bool is_bs) const
         if (avail_def_out != nullptr) {
             note(getRegion(), "\nAVAIL-REACH-DEF OUT STMT: %lu byte ",
                  (ULONG)avail_def_out->count_mem());
-            for (INT i = avail_def_out->get_first(&st);
-                 i != -1; i = avail_def_out->get_next(i, &st)) {
+            for (BSIdx i = avail_def_out->get_first(&st);
+                 i != BS_UNDEF; i = avail_def_out->get_next(i, &st)) {
                 IR * ir = m_rg->getIR(i);
                 ASSERT0(ir != nullptr);
                 prt(getRegion(), "%s(%d), ", IRNAME(ir), ir->id());
@@ -1676,8 +1676,8 @@ void SolveSet::dump(bool is_bs) const
         if (must_def_gen != nullptr) {
             note(getRegion(), "\nMUST GEN STMT: %lu byte ",
                  (ULONG)must_def_gen->count_mem());
-            for (INT i = must_def_gen->get_first(&st);
-                 i != -1; i = must_def_gen->get_next(i, &st)) {
+            for (BSIdx i = must_def_gen->get_first(&st);
+                 i != BS_UNDEF; i = must_def_gen->get_next(i, &st)) {
                 IR * ir = m_rg->getIR(i);
                 ASSERT0(ir != nullptr);
                 prt(getRegion(), "%s(%d), ", IRNAME(ir), ir->id());
@@ -1691,8 +1691,8 @@ void SolveSet::dump(bool is_bs) const
         if (must_killed != nullptr) {
             note(getRegion(), "\nMUST KILLED STMT: %lu byte ",
                  (ULONG)must_killed->count_mem());
-            for (INT i = must_killed->get_first(&st);
-                 i != -1; i = must_killed->get_next(i, &st)) {
+            for (BSIdx i = must_killed->get_first(&st);
+                 i != BS_UNDEF; i = must_killed->get_next(i, &st)) {
                 IR * ir = m_rg->getIR(i);
                 ASSERT0(ir != nullptr);
                 prt(getRegion(), "%s(%d), ", IRNAME(ir), ir->id());
@@ -1706,8 +1706,8 @@ void SolveSet::dump(bool is_bs) const
         if (may_def_kill != nullptr) {
             note(getRegion(), "\nMAY KILLED STMT: %lu byte ",
                  (ULONG)may_def_kill->count_mem());
-            for (INT i = may_def_kill->get_first(&st);
-                 i != -1; i = may_def_kill->get_next(i, &st)) {
+            for (BSIdx i = may_def_kill->get_first(&st);
+                 i != BS_UNDEF; i = may_def_kill->get_next(i, &st)) {
                 IR * ir = m_rg->getIR(i);
                 ASSERT0(ir != nullptr);
                 prt(getRegion(), "%s(%d), ", IRNAME(ir), ir->id());
@@ -1721,8 +1721,8 @@ void SolveSet::dump(bool is_bs) const
         if (livein_ir != nullptr) {
             note(getRegion(), "\nLIVE IN EXPR: %lu byte ",
                  (ULONG)livein_ir->count_mem());
-            for (INT i = livein_ir->get_first(&st);
-                 i != -1; i = livein_ir->get_next(i, &st)) {
+            for (BSIdx i = livein_ir->get_first(&st);
+                 i != BS_UNDEF; i = livein_ir->get_next(i, &st)) {
                 IR * ir = m_rg->getIR(i);
                 ASSERT0(ir != nullptr);
                 prt(getRegion(), "%s(%d), ", IRNAME(ir), ir->id());
@@ -1736,8 +1736,8 @@ void SolveSet::dump(bool is_bs) const
         if (liveout_ir != nullptr) {
             note(getRegion(), "\nLIVE OUT EXPR: %lu byte ",
                  (ULONG)liveout_ir->count_mem());
-            for (INT i = liveout_ir->get_first(&st);
-                 i != -1; i = liveout_ir->get_next(i, &st)) {
+            for (BSIdx i = liveout_ir->get_first(&st);
+                 i != BS_UNDEF; i = liveout_ir->get_next(i, &st)) {
                 IR * ir = m_rg->getIR(i);
                 ASSERT0(ir != nullptr);
                 prt(getRegion(), "%s(%d), ", IRNAME(ir), ir->id());
@@ -1751,8 +1751,8 @@ void SolveSet::dump(bool is_bs) const
         if (gen_ir != nullptr) {
             note(getRegion(), "\nGEN EXPR: %lu byte ",
                  (ULONG)gen_ir->count_mem());
-            for (INT i = gen_ir->get_first(&st);
-                 i != -1; i = gen_ir->get_next(i, &st)) {
+            for (BSIdx i = gen_ir->get_first(&st);
+                 i != BS_UNDEF; i = gen_ir->get_next(i, &st)) {
                 IR * ir = m_rg->getIR(i);
                 ASSERT0(ir != nullptr);
                 prt(getRegion(), "%s(%d), ", IRNAME(ir), ir->id());
@@ -1766,8 +1766,8 @@ void SolveSet::dump(bool is_bs) const
         if (killed_exp != nullptr) {
             note(getRegion(), "\nKILLED EXPR: %lu byte ",
                  (ULONG)killed_exp->count_mem());
-            for (INT i = killed_exp->get_first(&st);
-                 i != -1; i = killed_exp->get_next(i, &st)) {
+            for (BSIdx i = killed_exp->get_first(&st);
+                 i != BS_UNDEF; i = killed_exp->get_next(i, &st)) {
                 IR * ir = m_rg->getIR(i);
                 ASSERT0(ir != nullptr);
                 prt(getRegion(), "%s(%d), ", IRNAME(ir), ir->id());
@@ -1950,7 +1950,7 @@ size_t SolveSet::count_mem() const
 
     count += m_avail_in_reach_def.count_mem();
     ptr = &m_avail_in_reach_def;
-    for (INT i = 0; i <= ptr->get_last_idx(); i++) {
+    for (VecIdx i = 0; i <= ptr->get_last_idx(); i++) {
         DefDBitSetCore * dset = ptr->get(i);
         if (dset != nullptr) {
             count += dset->count_mem();
@@ -1959,7 +1959,7 @@ size_t SolveSet::count_mem() const
 
     count += m_avail_out_reach_def.count_mem();
     ptr = &m_avail_out_reach_def;
-    for (INT i = 0; i <= ptr->get_last_idx(); i++) {
+    for (VecIdx i = 0; i <= ptr->get_last_idx(); i++) {
         DefDBitSetCore * dset = ptr->get(i);
         if (dset != nullptr) {
             count += dset->count_mem();
@@ -1968,7 +1968,7 @@ size_t SolveSet::count_mem() const
 
     count += m_in_reach_def.count_mem();
     ptr = &m_in_reach_def;
-    for (INT i = 0; i <= ptr->get_last_idx(); i++) {
+    for (VecIdx i = 0; i <= ptr->get_last_idx(); i++) {
         DefDBitSetCore * dset = ptr->get(i);
         if (dset != nullptr) {
             count += dset->count_mem();
@@ -1977,7 +1977,7 @@ size_t SolveSet::count_mem() const
 
     count += m_out_reach_def.count_mem();
     ptr = &m_out_reach_def;
-    for (INT i = 0; i <= ptr->get_last_idx(); i++) {
+    for (VecIdx i = 0; i <= ptr->get_last_idx(); i++) {
         DefDBitSetCore * dset = ptr->get(i);
         if (dset != nullptr) {
             count += dset->count_mem();
@@ -1986,7 +1986,7 @@ size_t SolveSet::count_mem() const
 
     count += m_may_gen_def.count_mem();
     ptr = &m_may_gen_def;
-    for (INT i = 0; i <= ptr->get_last_idx(); i++) {
+    for (VecIdx i = 0; i <= ptr->get_last_idx(); i++) {
         DefDBitSetCore * dset = ptr->get(i);
         if (dset != nullptr) {
             count += dset->count_mem();
@@ -1995,7 +1995,7 @@ size_t SolveSet::count_mem() const
 
     count += m_must_gen_def.count_mem();
     ptr = &m_must_gen_def;
-    for (INT i = 0; i <= ptr->get_last_idx(); i++) {
+    for (VecIdx i = 0; i <= ptr->get_last_idx(); i++) {
         DefDBitSetCore * dset = ptr->get(i);
         if (dset != nullptr) {
             count += dset->count_mem();
@@ -2003,7 +2003,7 @@ size_t SolveSet::count_mem() const
     }
 
     count += m_must_killed_def.count_mem();
-    for (INT i = 0; i <= m_must_killed_def.get_last_idx(); i++) {
+    for (VecIdx i = 0; i <= m_must_killed_def.get_last_idx(); i++) {
         DefDBitSetCore const* dset = m_must_killed_def.get(i);
         if (dset != nullptr) {
             count += dset->count_mem();
@@ -2011,7 +2011,7 @@ size_t SolveSet::count_mem() const
     }
 
     count += m_may_killed_def.count_mem();
-    for (INT i = 0; i <= m_must_killed_def.get_last_idx(); i++) {
+    for (VecIdx i = 0; i <= m_must_killed_def.get_last_idx(); i++) {
         DefDBitSetCore const* dset = m_must_killed_def.get(i);
         if (dset != nullptr) {
             count += dset->count_mem();
@@ -2020,7 +2020,7 @@ size_t SolveSet::count_mem() const
 
     count += m_gen_ir_exp.count_mem();
     ptr = &m_gen_ir_exp;
-    for (INT i = 0; i <= ptr->get_last_idx(); i++) {
+    for (VecIdx i = 0; i <= ptr->get_last_idx(); i++) {
         DefDBitSetCore * dset = ptr->get(i);
         if (dset != nullptr) {
             count += dset->count_mem();
@@ -2028,7 +2028,7 @@ size_t SolveSet::count_mem() const
     }
 
     count += m_killed_ir_exp.count_mem();
-    for (INT i = 0; i <= m_killed_ir_exp.get_last_idx(); i++) {
+    for (VecIdx i = 0; i <= m_killed_ir_exp.get_last_idx(); i++) {
         DefDBitSetCore const* dset = m_killed_ir_exp.get(i);
         if (dset != nullptr) {
             count += dset->count_mem();
@@ -2037,7 +2037,7 @@ size_t SolveSet::count_mem() const
 
     count += m_avail_in_exp.count_mem();
     ptr = &m_avail_in_exp;
-    for (INT i = 0; i <= ptr->get_last_idx(); i++) {
+    for (VecIdx i = 0; i <= ptr->get_last_idx(); i++) {
         DefDBitSetCore * dset = ptr->get(i);
         if (dset != nullptr) {
             count += dset->count_mem();
@@ -2046,7 +2046,7 @@ size_t SolveSet::count_mem() const
 
     count += m_avail_out_exp.count_mem();
     ptr = &m_avail_out_exp;
-    for (INT i = 0; i <= ptr->get_last_idx(); i++) {
+    for (VecIdx i = 0; i <= ptr->get_last_idx(); i++) {
         DefDBitSetCore * dset = ptr->get(i);
         if (dset != nullptr) {
             count += dset->count_mem();

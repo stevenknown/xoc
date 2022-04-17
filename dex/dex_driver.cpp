@@ -179,7 +179,7 @@ static void updateTryInfo(LIRCode * lircode, Dex2IR & d2ir, IR2Dex & ir2d)
 
     //Regenerate try-block and catch-block informations.
     ASSERT0(lircode->trys);
-    INT i = 0;
+    VecIdx i = 0;
     for (; i <= tivec.get_last_idx(); i++) {
         TryInfo * ti = tivec[i];
         ASSERT0(ti);

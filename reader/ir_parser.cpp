@@ -1243,6 +1243,7 @@ UINT IRParser::mapID2Prno(CHAR const* prid, ParseCtx * ctx)
 
 bool IRParser::parsePR(ParseCtx * ctx)
 {
+    ASSERT0(xcom::StrBuf::is_equal(PR_TYPE_CHAR, '$'));
     ASSERTN(m_lexer->getCurrentToken() == T_DOLLAR,
             ("miss $ before PR expression"));
     UINT prno = PRNO_UNDEF;

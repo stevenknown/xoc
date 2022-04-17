@@ -156,8 +156,7 @@ public:
             return m_data->set(idx - 1, val);
         }
     
-        UINT get_elem_count() const
-        { return m_data->get_last_idx() < 0 ? 0 : m_data->get_last_idx() + 1; }
+        UINT get_elem_count() const { return m_data->get_elem_count(); }
     };
 private:
     //The floor of integer division.
@@ -307,7 +306,7 @@ public:
     //The output data will be ordered increment.
     void sort(MOD Vector<T> & data)
     {
-        if (data.get_last_idx() < 0 || data.get_last_idx() == 0) {
+        if (data.get_last_idx() == VEC_UNDEF || data.get_last_idx() == 0) {
             return;
         }
         _qsort(data, 0, data.get_last_idx());
@@ -317,7 +316,7 @@ public:
 
 template <class T> class MergeSort {
     //2-ways Merge Sort.
-    void _merge_sort(Vector<T> const& data, INT start_idx, INT end_idx,
+    void _merge_sort(Vector<T> const& data, VecIdx start_idx, VecIdx end_idx,
                      OUT Vector<T> & output)
     {
         if (start_idx > end_idx) {
@@ -338,20 +337,21 @@ template <class T> class MergeSort {
             return;
         }
     
-        INT mid_idx = (start_idx + end_idx + 1) / 2;
+        VecIdx mid_idx = (start_idx + end_idx + 1) / 2;
         Vector<T> left_output;
         Vector<T> right_output;
         _merge_sort(data, start_idx, mid_idx - 1, left_output);
         _merge_sort(data, mid_idx, end_idx, right_output);
-        INT lidx = 0, ridx = 0;
-        INT llen = mid_idx - start_idx, rlen = end_idx - mid_idx + 1;
+        VecIdx lidx = 0, ridx = 0;
+        VecIdx llen = mid_idx - start_idx, rlen = end_idx - mid_idx + 1;
         for (INT i = 0; i < llen + rlen; i++) {
             if (left_output.get(lidx) <= right_output.get(ridx)) {
                 output.set(i, left_output.get(lidx));
                 lidx++;
                 if (lidx >= llen) {
                     i++;
-                    for (INT j = ridx; j <= right_output.get_last_idx(); j++) {
+                    for (VecIdx j = ridx; j <= right_output.get_last_idx();
+                         j++) {
                         output.set(i, right_output.get(j));
                         i++;
                     }
@@ -364,7 +364,7 @@ template <class T> class MergeSort {
             ridx++;
             if (ridx >= rlen) {
                 i++;
-                for (INT j = lidx; j <= left_output.get_last_idx(); j++) {
+                for (VecIdx j = lidx; j <= left_output.get_last_idx(); j++) {
                     output.set(i, left_output.get(j));
                     i++;
                 }
@@ -409,9 +409,9 @@ public:
 template <class T>
 void Sort<T>::bubble_sort(MOD Vector<T> & data)
 {
-    INT n = data.get_last_idx();
-    for (INT i = 0; i <= n; i++) {
-        for (INT j = i+1; j <= n; j++) {
+    VecIdx n = data.get_last_idx();
+    for (VecIdx i = 0; i <= n; i++) {
+        for (VecIdx j = i+1; j <= n; j++) {
             if (data.get(i) > data.get(j)) {
                 //Swap
                 T v(data.get(i));
@@ -428,27 +428,23 @@ template <class T>
 void Sort<T>::counting_sort(MOD Vector<T> & data)
 {
     Vector<T> c; //for tmp use.
-    INT n = data.get_last_idx();
-    if (n <= 0) {
-        return;
-    }
-
-    //
-    for (INT i = 0; i <= n; i++) {
+    VecIdx n = data.get_last_idx();
+    if (n <= 0) { return; }
+    for (VecIdx i = 0; i <= n; i++) {
         T v = data[i];
         ASSERTN(v >= 0, ("key value should be larger than 0"));
         c[v] = c[v] + 1;
     }
 
     //Calclate the number of element whose value less or equal 'j'.
-    for (INT j = 1; j <= c.get_last_idx(); j++) {
+    for (VecIdx j = 1; j <= c.get_last_idx(); j++) {
         c[j] = c[j - 1] + c[j];
     }
 
-    //Sort..
+    //Sort.
     Vector<T> res;
     //Utilize relation between value and index.
-    for (INT k = n; k >= 0; k--) {
+    for (VecIdx k = n; !IS_VECUNDEF(k); k--) {
         T v = data[k];
         INT idx = c[v]; //value of each input-data is index in 'c'
         res[idx] = v;
@@ -461,7 +457,7 @@ void Sort<T>::counting_sort(MOD Vector<T> & data)
 template <class T>
 bool Sort<T>::_bucket_sort_check(MOD Vector<T> & data)
 {
-    for (INT i = 0; i <= data.get_last_idx(); i++) {
+    for (VecIdx i = 0; i <= data.get_last_idx(); i++) {
         T v = data[i];
         ASSERTN(v < 1 && v >= 0, ("The range of elem-value should be [0,1)"));
     }
@@ -472,9 +468,9 @@ bool Sort<T>::_bucket_sort_check(MOD Vector<T> & data)
 template <class T>
 void Sort<T>::bucket_sort(MOD Vector<T> & data)
 {
-    Bucket<T> bk(data.get_last_idx() + 1);
+    Bucket<T> bk(data.get_elem_count());
     ASSERT0(_bucket_sort_check(data));
-    for (INT i = 0; i <= data.get_last_idx(); i++) {
+    for (VecIdx i = 0; i <= data.get_last_idx(); i++) {
         bk.append(data[i]);
     }
     bk.extract_elem(data);
@@ -513,7 +509,7 @@ void Sort<T>::_insert_sort(MOD Vector<T> & data,
 template <class T>
 void Sort<T>::shell_sort(MOD Vector<T> & data)
 {
-    INT n = data.get_last_idx() + 1;
+    VecIdx n = data.get_elem_count();
     if (n <= 1) {
         return;
     }

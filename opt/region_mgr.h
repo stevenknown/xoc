@@ -142,7 +142,7 @@ public:
     xcom::BitSetMgr * getBitSetMgr() { return &m_bs_mgr; }
     xcom::DefMiscBitSetMgr * get_sbs_mgr() { return &m_sbs_mgr; }
     virtual Region * getRegion(UINT id) { return m_id2rg.get(id); }
-    UINT getNumOfRegion() const { return (UINT)(m_id2rg.get_last_idx() + 1); }
+    UINT getNumOfRegion() const { return m_id2rg.get_elem_count(); }
     RegionTab * getRegionTab() { return &m_id2rg; }
     VarMgr * getVarMgr() { return m_var_mgr; }
     MD const* genDedicateStrMD();

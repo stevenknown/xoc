@@ -519,7 +519,7 @@ public:
 
     void clean();
     void cleanSBSMgr();
-    void cleanPointTo(UINT mdid, MOD MD2MDSet & ctx)
+    void cleanPointTo(MDIdx mdid, MOD MD2MDSet & ctx)
     { ctx.setAlways(mdid, nullptr); }
 
     //Compute and update point_to_set with TBAA info.
@@ -571,7 +571,7 @@ public:
 
     //For given MD2MDSet, return the MDSet that 'md' pointed to.
     //ctx: context of point-to analysis.
-    MDSet const* getPointTo(UINT mdid, MD2MDSet const& ctx) const
+    MDSet const* getPointTo(MDIdx mdid, MD2MDSet const& ctx) const
     { return ctx.get(mdid); }
 
     //Return the may-point-to Memory Descriptor Set.
@@ -629,7 +629,7 @@ public:
 
     //Set pointer points to new MDSet by appending a new element 'newmd'
     //in the context.
-    inline void setPointToMDSetByAddMD(UINT pointer_mdid, MD2MDSet & ctx,
+    inline void setPointToMDSetByAddMD(MDIdx pointer_mdid, MD2MDSet & ctx,
                                        MD const* newmd)
     {
         MDSet tmp;
@@ -650,7 +650,7 @@ public:
 
     //Set pointer points to MD set by appending a MDSet.
     //pt_set: POINT-TO set that has been hashed.
-    inline void setPointToMDSetByAddMDSet(UINT pointer_mdid, MD2MDSet & ctx,
+    inline void setPointToMDSetByAddMDSet(MDIdx pointer_mdid, MD2MDSet & ctx,
                                           MDSet const& pt_set)
     {
         ASSERT0(m_mds_hash->find(pt_set));

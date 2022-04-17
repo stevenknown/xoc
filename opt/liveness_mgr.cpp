@@ -78,14 +78,14 @@ void LivenessMgr::processMay(IR const* pr,
                              bool is_lhs)
 {
     if (!m_handle_may) { return; }
-
     MDSet const* mds = pr->getRefMDSet();
     if (mds == nullptr) { return; }
 
     MD const* prmd = pr->getExactRef();
     ASSERT0(prmd);
     MDSetIter iter;
-    for (INT i = mds->get_first(&iter); i >= 0; i = mds->get_next(i, &iter)) {
+    for (BSIdx i = mds->get_first(&iter);
+         i != BS_UNDEF; i = mds->get_next(i, &iter)) {
         MD const* md = m_md_sys->getMD(i);
         ASSERT0(md);
         if (MD_base(md) == MD_base(prmd)) { continue; }
@@ -114,7 +114,7 @@ void LivenessMgr::processOpnd(IR const* ir,
     for (IR const* k = iterInitC(ir, lst);
          k != nullptr; k = iterNextC(lst)) {
         if (k->is_pr()) {
-            use->bunion(k->getPrno(), m_sbs_mgr);
+            use->bunion((BSIdx)k->getPrno(), m_sbs_mgr);
             processMay(k, gen, use, false);
         }
     }
@@ -135,16 +135,16 @@ void LivenessMgr::computeLocal(IRBB * bb, List<IR const*> & lst)
             processOpnd(ST_rhs(x), lst, use, gen);
             break;
         case IR_STPR:
-            gen->bunion(STPR_no(x), m_sbs_mgr);
-            use->diff(STPR_no(x), m_sbs_mgr);
+            gen->bunion((BSIdx)STPR_no(x), m_sbs_mgr);
+            use->diff((BSIdx)STPR_no(x), m_sbs_mgr);
             processMay(x, gen, use, true);
 
             lst.clean();
             processOpnd(STPR_rhs(x), lst, use, gen);
             break;
         case IR_SETELEM:
-            gen->bunion(SETELEM_prno(x), m_sbs_mgr);
-            use->diff(SETELEM_prno(x), m_sbs_mgr);
+            gen->bunion((BSIdx)SETELEM_prno(x), m_sbs_mgr);
+            use->diff((BSIdx)SETELEM_prno(x), m_sbs_mgr);
             processMay(x, gen, use, true);
 
             lst.clean();
@@ -157,8 +157,8 @@ void LivenessMgr::computeLocal(IRBB * bb, List<IR const*> & lst)
             processOpnd(SETELEM_ofst(x), lst, use, gen);
             break;
         case IR_GETELEM:
-            gen->bunion(GETELEM_prno(x), m_sbs_mgr);
-            use->diff(GETELEM_prno(x), m_sbs_mgr);
+            gen->bunion((BSIdx)GETELEM_prno(x), m_sbs_mgr);
+            use->diff((BSIdx)GETELEM_prno(x), m_sbs_mgr);
             processMay(x, gen, use, true);
 
             lst.clean();
@@ -187,8 +187,8 @@ void LivenessMgr::computeLocal(IRBB * bb, List<IR const*> & lst)
         case IR_CALL:
         case IR_ICALL:
             if (x->hasReturnValue()) {
-                gen->bunion(CALL_prno(x), m_sbs_mgr);
-                use->diff(CALL_prno(x), m_sbs_mgr);
+                gen->bunion((BSIdx)CALL_prno(x), m_sbs_mgr);
+                use->diff((BSIdx)CALL_prno(x), m_sbs_mgr);
                 processMay(x, gen, use, true);
             }
 
@@ -196,7 +196,7 @@ void LivenessMgr::computeLocal(IRBB * bb, List<IR const*> & lst)
             processOpnd(CALL_param_list(x), lst, use, gen);
 
             if (x->is_icall() && ICALL_callee(x)->is_pr()) {
-                use->bunion(PR_no(ICALL_callee(x)), m_sbs_mgr);
+                use->bunion((BSIdx)PR_no(ICALL_callee(x)), m_sbs_mgr);
                 processMay(ICALL_callee(x), gen, use, false);
             }
             break;
@@ -210,8 +210,8 @@ void LivenessMgr::computeLocal(IRBB * bb, List<IR const*> & lst)
             processOpnd(RET_exp(x), lst, use, gen);
             break;
         case IR_PHI:
-            gen->bunion(PHI_prno(x), m_sbs_mgr);
-            use->diff(PHI_prno(x), m_sbs_mgr);
+            gen->bunion((BSIdx)PHI_prno(x), m_sbs_mgr);
+            use->diff((BSIdx)PHI_prno(x), m_sbs_mgr);
             processMay(x, gen, use, true);
 
             lst.clean();

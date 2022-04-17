@@ -71,7 +71,7 @@ typedef HMap<IR*, DUSet*> IR2DU;
 
 //Mapping from MD to IR list, and to be responsible for
 //allocating and destroy List<IR*> objects.
-class MD2IRSet : public TMap<UINT, DefSBitSetCore*> {
+class MD2IRSet : public TMap<MDIdx, DefSBitSetCore*> {
     COPY_CONSTRUCTOR(MD2IRSet);
     //Indicate if there exist stmt which only have MayDef.
     BYTE m_are_stmts_defed_ineffect_md:1;
@@ -92,12 +92,12 @@ public:
         append(MD_id(md), ir->id());
     }
     void append(MD const* md, UINT irid) { append(MD_id(md), irid); }
-    void append(UINT mdid, IR * ir)
+    void append(MDIdx mdid, IR * ir)
     {
         ASSERT0(ir);
         append(mdid, ir->id());
     }
-    void append(UINT mdid, UINT irid);
+    void append(MDIdx mdid, UINT irid);
 
     void clean();
 
@@ -107,7 +107,7 @@ public:
 
     bool hasIneffectDef() const { return m_are_stmts_defed_ineffect_md; }
 
-    void set(UINT mdid, IR * ir);
+    void set(MDIdx mdid, IR * ir);
     void setIneffectDef() { m_are_stmts_defed_ineffect_md = true; }
 };
 
@@ -367,9 +367,9 @@ public:
                 useset_of_to && useset_of_from && m);
         if (to == from) { return; }
         DUSetIter di = nullptr;
-        for (INT i = useset_of_from->get_first(&di);
-             di != nullptr; i = useset_of_from->get_next((UINT)i, &di)) {
-            IR const* exp = m_rg->getIR((UINT)i);
+        for (BSIdx i = useset_of_from->get_first(&di);
+             di != nullptr; i = useset_of_from->get_next(i, &di)) {
+            IR const* exp = m_rg->getIR(i);
             ASSERT0(exp->is_exp() && exp->isMemoryRef());
             DUSet * defset = exp->getDUSet();
             if (defset == nullptr) { continue; }
@@ -410,9 +410,9 @@ public:
                 defset_of_from && defset_of_to && m);
         if (to == from) { return; }
         DUSetIter di = nullptr;
-        for (INT i = defset_of_from->get_first(&di);
-             di != nullptr; i = defset_of_from->get_next((UINT)i, &di)) {
-            IR * stmt = m_rg->getIR((UINT)i);
+        for (BSIdx i = defset_of_from->get_first(&di);
+             di != nullptr; i = defset_of_from->get_next(i, &di)) {
+            IR * stmt = m_rg->getIR(i);
             ASSERT0(stmt->is_stmt());
             DUSet * useset = stmt->getDUSet();
             if (useset == nullptr) { continue; }

@@ -132,10 +132,10 @@ bool RefineDUChain::processExpressionViaMDSSA(IR const* exp)
 
     //Iterate each VOpnd.
     VOpndSetIter iter = nullptr;
-    INT next_i = -1;
+    BSIdx next_i = BS_UNDEF;
     bool change = false;
-    for (INT i = mdssainfo->readVOpndSet().get_first(&iter);
-         i >= 0; i = next_i) {
+    for (BSIdx i = mdssainfo->readVOpndSet().get_first(&iter);
+         i != BS_UNDEF; i = next_i) {
         next_i = mdssainfo->readVOpndSet().get_next(i, &iter);
         VMD const* t = (VMD const*)m_mdssamgr->getUseDefMgr()->getVOpnd(i);
         ASSERT0(t && t->is_md());
@@ -189,8 +189,8 @@ bool RefineDUChain::processExpressionViaGVN(IR const* exp)
     //Iterate each DEF stmt of 'exp'.
     bool change = false;
     DUSetIter di = nullptr;
-    INT next_i = -1;
-    for (INT i = defset->get_first(&di); i >= 0; i = next_i) {
+    BSIdx next_i = BS_UNDEF;
+    for (BSIdx i = defset->get_first(&di); i != BS_UNDEF; i = next_i) {
         next_i = defset->get_next(i, &di);
         IR const* stmt = m_rg->getIR(i);
         ASSERT0(stmt->is_stmt());

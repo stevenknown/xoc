@@ -327,7 +327,7 @@ public:
     //value: value that need to be set.
     //offset: byte offset to the start of result PR.
     //rhs: value expected to store.
-    IR * buildSetElem(UINT prno, Type const* type, IR * base, IR * val,
+    IR * buildSetElem(PRNO prno, Type const* type, IR * base, IR * val,
                       IR * offset);
 
     //Build store operation to get value from 'base', and store the result PR.
@@ -335,7 +335,7 @@ public:
     //type: data type of targe pr.
     //offset: byte offset to the start of PR.
     //base: hold the value that expected to extract.
-    IR * buildGetElem(UINT prno, Type const* type, IR * base, IR * offset);
+    IR * buildGetElem(PRNO prno, Type const* type, IR * base, IR * offset);
 
     //Build store operation to get value from 'rhs', and store the result PR.
     //type: data type of targe pr.
@@ -389,7 +389,7 @@ public:
 
     //Build PR and assign dedicated PRNO.
     //Return IR_PR operation by specified prno and type id.
-    IR * buildPRdedicated(UINT prno, Type const* type);
+    IR * buildPRdedicated(PRNO prno, Type const* type);
 
     //Build PR that PRNO assiged by Region.
     //Return IR_PR operation by specified type id.
@@ -560,13 +560,13 @@ public:
     //prno: target prno.
     //type: data type of targe pr.
     //rhs: value expected to store.
-    IR * buildStorePR(UINT prno, Type const* type, IR * rhs);
+    IR * buildStorePR(PRNO prno, Type const* type, IR * rhs);
 
     //Build store operation to store 'rhs' to new pr with type and prno.
     //prno: target prno.
     //dt: the simplex data type of targe pr.
     //rhs: value expected to store.
-    IR * buildStorePR(UINT prno, DATA_TYPE dt, IR * rhs)
+    IR * buildStorePR(PRNO prno, DATA_TYPE dt, IR * rhs)
     { return buildStorePR(prno, getTypeMgr()->getSimplexType(dt), rhs); }
 
     //Build store operation to store 'rhs' to new pr with type.
@@ -686,8 +686,8 @@ public:
 
     //Build IR_PHI operation.
     //prno: result PR of PHI.
-    IR * buildPhi(UINT prno, Type const* type, IR * opnd_list);
-    IR * buildPhi(UINT prno, Type const* type, UINT num_opnd);
+    IR * buildPhi(PRNO prno, Type const* type, IR * opnd_list);
+    IR * buildPhi(PRNO prno, Type const* type, UINT num_opnd);
 
     //Build IR_REGION operation.
     IR * buildRegion(Region * rg);
@@ -1043,7 +1043,7 @@ public:
     }
 
     //Allocate Var for PR.
-    Var * genVarForPR(UINT prno, Type const* type);
+    Var * genVarForPR(PRNO prno, Type const* type);
 
     //Return the tyid for array index, the default is unsigned 32bit.
     inline Type const* getTargetMachineArrayIndexType()
@@ -1133,8 +1133,8 @@ public:
     virtual bool MiddleProcess(OptCtx & oc);
 
     //Map from prno to related Var.
-    Var * mapPR2Var(UINT prno)
-    { return ANA_INS_prno2var(getAnalysisInstrument()).get(prno); }
+    Var * mapPR2Var(PRNO prno)
+    { return ANA_INS_prno2var(getAnalysisInstrument()).get((VecIdx)prno); }
 
     //Construct BB list by destructing CFG.
     bool reconstructBBList(OptCtx & oc);
@@ -1149,8 +1149,8 @@ public:
                                  BBListIter ctbb, OptCtx const& oc);
 
     //Assign variable to given PR.
-    void setMapPR2Var(UINT prno, Var * pr_var)
-    { ANA_INS_prno2var(getAnalysisInstrument()).set(prno, pr_var); }
+    void setMapPR2Var(PRNO prno, Var * pr_var)
+    { ANA_INS_prno2var(getAnalysisInstrument()).set((VecIdx)prno, pr_var); }
 
     //Set the counter of PR.
     //Note 'cnt' will be assigned to next new PR, so it should have not be

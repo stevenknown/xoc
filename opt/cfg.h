@@ -1153,7 +1153,7 @@ void CFG<BB, XR>::sortByTopological()
         return;
     }
     m_bb_list->clean();
-    for (INT i = 0; i <= vex_vec.get_last_idx(); i++) {
+    for (VecIdx i = 0; i <= vex_vec.get_last_idx(); i++) {
         Vertex * v = vex_vec.get(i);
         ASSERT0(v);
         m_bb_list->append_tail(getBB(v->id()));
@@ -1568,7 +1568,7 @@ void CFG<BB, XR>::addBreakOutLoop(BB * loop_head, xcom::BitSet & body_set)
 {
     for (BSIdx i = body_set.get_first();
          i != BS_UNDEF; i = body_set.get_next((UINT)i)) {
-        if (i == (INT)loop_head->id()) { continue; }
+        if (i == (BSIdx)loop_head->id()) { continue; }
         xcom::Vertex * v = getVertex((UINT)i);
         ASSERT0(v);
         xcom::EdgeC * out = VERTEX_out_list(v);
@@ -1652,7 +1652,7 @@ BB * CFG<BB, XR>::findSingleExitBB(LI<BB> const* li, Edge const** exitedge)
     //A BB Set is used in the LoopInfo to describing the loop body BB set.
     xcom::BitSet * bbset = li->getBodyBBSet();
     ASSERT0(bbset);
-    INT exit = -1;
+    BSIdx exit = BS_UNDEF;
     for (BSIdx id = bbset->get_first(); id != BS_UNDEF;
          id = bbset->get_next(id)) {
         Vertex const* vex = getVertex(id);
@@ -1661,7 +1661,7 @@ BB * CFG<BB, XR>::findSingleExitBB(LI<BB> const* li, Edge const** exitedge)
              ec = ec->get_next()) {
             UINT succ = ec->getTo()->id();
             if (!bbset->is_contain(succ)) {
-                if (exit == -1) {
+                if (exit == BS_UNDEF) {
                     //Record the exit BB has been found.
                     exit = succ;
                     if (exitedge != nullptr) {
@@ -1674,7 +1674,7 @@ BB * CFG<BB, XR>::findSingleExitBB(LI<BB> const* li, Edge const** exitedge)
             }
         }
     }
-    return exit != -1 ? getBB(exit) : nullptr;
+    return exit != BS_UNDEF ? getBB(exit) : nullptr;
 }
 
 

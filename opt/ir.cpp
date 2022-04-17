@@ -866,7 +866,7 @@ bool IR::verify(Region const* rg) const
         ASSERT0(d);
         ASSERT0(d->getDType() != D_UNDEF);
         ASSERT0(getDType() != D_UNDEF);
-        ASSERT0(PHI_prno(this) > 0);
+        ASSERT0(PHI_prno(this) != PRNO_UNDEF);
 
         //PHI must have at least one opnd.
         ASSERT0(PHI_opnd_list(this) != nullptr);
@@ -1315,7 +1315,7 @@ void IR::setParentPointer(bool recur)
 
 //Find the first PR related to 'prno'.
 //This function iterate IR tree nonrecursively.
-IR * IR::getOpndPRList(UINT prno) const
+IR * IR::getOpndPRList(PRNO prno) const
 {
     IR * pr = nullptr;
     IR * p = const_cast<IR*>(this); //this is header of list.
@@ -1332,7 +1332,7 @@ IR * IR::getOpndPRList(UINT prno) const
 //Find the first PR related to 'prno'.
 //This function iterate IR tree nonrecursively.
 //'it': iterator.
-IR * IR::getOpndPR(UINT prno, IRIter & it) const
+IR * IR::getOpndPR(PRNO prno, IRIter & it) const
 {
     ASSERT0(is_stmt());
     it.clean();
@@ -1349,7 +1349,7 @@ IR * IR::getOpndPR(UINT prno, IRIter & it) const
 //This function recursively iterate the IR tree to
 //retrieve the PR whose PR_no is equal to given 'prno'.
 //Otherwise return nullptr.
-IR * IR::getOpndPR(UINT prno) const
+IR * IR::getOpndPR(PRNO prno) const
 {
     if (isReadPR() && getPrno() == prno) {
         return const_cast<IR*>(this);
@@ -1390,7 +1390,7 @@ IR * IR::getOpndMem(MD const* md) const
 //Get the Stmt accroding to given prno.
 //The stmt must write to PR as a result.
 //This function can not be const because it will return itself.
-IR * IR::getResultPR(UINT prno)
+IR * IR::getResultPR(PRNO prno)
 {
     switch (getCode()) {
     case IR_STPR:
@@ -1518,8 +1518,8 @@ void IR::removePRFromUseset(Region * rg)
 
     DefMiscBitSetMgr * sbs_mgr = dumgr->getSBSMgr();
     DUSetIter di = nullptr;
-    INT lnext = -1;
-    for (INT i = useset->get_first(&di); i >= 0; i = lnext) {
+    BSIdx lnext = BS_UNDEF;
+    for (BSIdx i = useset->get_first(&di); i != BS_UNDEF; i = lnext) {
         lnext = useset->get_next(i, &di);
         IR const* exp = rg->getIR(i);
         ASSERT0(exp->is_exp());
@@ -1817,7 +1817,7 @@ bool IR::isCover(IR const* ir2, Region const* rg) const
 
 
 //Set prno, and update SSAInfo meanwhile.
-void IR::setPrnoConsiderSSAInfo(UINT prno)
+void IR::setPrnoConsiderSSAInfo(PRNO prno)
 {
     ASSERT0(prno != getPrno());
     if (getSSAInfo() != nullptr) {

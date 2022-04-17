@@ -131,13 +131,13 @@ public:
 ///        data[i] = in[i];
 ///    }
 ///    printf("\nfootest2:\n");
-///    for (int i = 0; i < data.get_last_idx() + 1; i++) { printf("%d ", data[i]); }
+///    for (int i = 0; i < data.get_elem_count(); i++) { printf("%d ", data[i]); }
 ///    DumpHeap<INT> dh2(data);
 ///
 ///    HeapSort<INT> hs;
 ///    hs.sort(data);
 ///    printf("\nfootest5:\n");
-///    for (int i = 0; i < data.get_last_idx() + 1; i++) { printf("%d ", data[i]); }
+///    for (int i = 0; i < data.get_elem_count(); i++) { printf("%d ", data[i]); }
 ///    DumpHeap<INT> dh5(data);
 ///
 ///    return 0;

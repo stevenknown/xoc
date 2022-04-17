@@ -82,7 +82,7 @@ void LFTR::analysis(LI<IRBB> * li)
     UINT headid = head->id();
     for (BSIdx i = li->getBodyBBSet()->get_first();
          i != BS_UNDEF; i = li->getBodyBBSet()->get_next(i)) {
-        if (i != (INT)headid && !m_cfg->is_dom(headid, i)) {
+        if (i != (BSIdx)headid && !m_cfg->is_dom(headid, i)) {
             //Loop head should anticipate into analysis as well.
             //The candidate BB must dominate all other loop body BBs.
             continue;
@@ -335,7 +335,7 @@ IR * LFTR::insertPhiForRed(LI<IRBB> const* li, IR * init, IR * red)
     //    PR_1 = PR_1, ...
     IR * opnd_list = nullptr;
     for (UINT i = 0; i < 2; i++) {
-        UINT prno = defarr[i]->getPrno();
+        PRNO prno = defarr[i]->getPrno();
         ASSERT0(prno != PRNO_UNDEF);
         IR * opnd = m_rg->buildPRdedicated(prno, defarr[i]->getType());
         m_rg->allocRefForPR(opnd);

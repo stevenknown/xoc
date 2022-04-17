@@ -463,7 +463,7 @@ bool LICM::scanLoopBody(IN LI<IRBB> * li, bool * islegal, bool first_scan)
     UINT headid = head->id();
     for (BSIdx i = li->getBodyBBSet()->get_first();
          i != BS_UNDEF; i = li->getBodyBBSet()->get_next(i)) {
-        if (i != (INT)headid && !m_cfg->is_dom(headid, i)) {
+        if (i != (BSIdx)headid && !m_cfg->is_dom(headid, i)) {
             //Loop head should anticipate into analysis as well.
             //The candidate BB must dominate all other loop body BBs.
             continue;
@@ -993,8 +993,8 @@ void LICM::updateMD2Num(IR * ir)
         MDSet const* mds = ir->getRefMDSet();
         if (mds != nullptr) {
             MDSetIter iter;
-            for (INT i = mds->get_first(&iter);
-                 i >= 0; i = mds->get_next(i, &iter)) {
+            for (BSIdx i = mds->get_first(&iter);
+                 i != BS_UNDEF; i = mds->get_next(i, &iter)) {
                 MD * md2 = m_md_sys->getMD(i);
                 UINT * n = m_md2num.get(md2);
                 if (n == nullptr) {
@@ -1021,8 +1021,8 @@ void LICM::updateMD2Num(IR * ir)
         MDSet const* mds = ir->getRefMDSet();
         if (mds != nullptr) {
             MDSetIter iter;
-            for (INT i = mds->get_first(&iter);
-                 i >= 0; i = mds->get_next(i, &iter)) {
+            for (BSIdx i = mds->get_first(&iter);
+                 i != BS_UNDEF; i = mds->get_next(i, &iter)) {
                 MD * md2 = m_md_sys->getMD(i);
                 UINT * n = m_md2num.get(md2);
                 if (n == nullptr) {
@@ -1169,7 +1169,8 @@ bool LICM::hoistDefByDUChain(IR const* exp, OUT IRBB * prehead,
         VOpndSetIter it = nullptr;
         VOpndSet const& vset = info->readVOpndSet();
         UseDefMgr const* udmgr = m_mdssamgr->getUseDefMgr();
-        for (INT i = vset.get_first(&it); i >= 0; i = vset.get_next(i, &it)) {
+        for (BSIdx i = vset.get_first(&it);
+             i != BS_UNDEF; i = vset.get_next(i, &it)) {
             VMD const* vmd = (VMD*)udmgr->getVOpnd(i);
             ASSERT0(vmd && vmd->is_md());
             MDDef const* def = vmd->getDef();
@@ -1195,8 +1196,8 @@ bool LICM::hoistDefByDUChain(IR const* exp, OUT IRBB * prehead,
     DUSet const* defset = exp->readDUSet();
     if (defset != nullptr) {
         DUSetIter di = nullptr;
-        for (INT i = defset->get_first(&di);
-             i >= 0; i = defset->get_next(i, &di)) {
+        for (BSIdx i = defset->get_first(&di);
+             i != BS_UNDEF; i = defset->get_next(i, &di)) {
             IR * def = m_rg->getIR(i);
             ASSERT0(def);
             if (!tryHoistDefStmt(def, prehead, li, ctx)) {

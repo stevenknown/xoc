@@ -24,13 +24,13 @@ Truly open.
 
 XOC is a compiler infrastructure that provides multi-level operations,
 flexibility, and the capability of representing almost all popular languages.
-There are two level IR representations used throughout all phases of the
-compilation.
+There are multiple level IR representations used throughout all phases of the
+compilation. Do IR simplification whenever you want in your process.
 
 XOC IR is designed to be used in three forms:
   1. in-memory IR that used by compiler components and optimizations
   2. on-disk bitcode representation.
-  3. human readable high-level language representation.
+  3. human readable highest-level language representation.
 
 The third human readable representation allows user to use XOC IR as a special
 high-level language that provides many conveninet control flow structures, such

@@ -110,7 +110,7 @@ public:
     {
         for (;;) {
             need_expand_gap = false;
-            for (INT i = 0; i <= input.get_last_idx(); i++) {
+            for (VecIdx i = 0; i <= input.get_last_idx(); i++) {
                 offset_in_vec = i;
                 set(input.get(i), i);
                 if (need_expand_gap) {
@@ -134,11 +134,13 @@ public:
 
 void findPerfectHash(xcom::Vector<CHAR const*> & input)
 {
-    INT str_num = input.get_last_idx() + 1;
+    VecIdx str_num = input.get_elem_count();
     ASSERT0(str_num > 0);
     g_bucket_sz = str_num + 5;
     g_gap = 10;
-    UINT bucket_sz = g_bucket_sz + g_gap; //xcom::getNearestPowerOf2((UINT)g_bucket_sz);
+
+    //xcom::getNearestPowerOf2((UINT)g_bucket_sz);    
+    UINT bucket_sz = g_bucket_sz + g_gap;
     PerfectStringHashMap pshmap(bucket_sz);
     pshmap.addAllString(input);
     pshmap.dump_intersp(g_tfile);

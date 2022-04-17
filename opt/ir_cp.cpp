@@ -570,8 +570,8 @@ bool CopyProp::computeUseSet(IR const* def_stmt, OUT IRSet * useset,
         //Record use_stmt in another vector to facilitate this function
         //if it is not in use-list any more after copy-propagation.
         SSAUseIter sc;
-        for (INT u = SSA_uses(ssainfo).get_first(&sc);
-             u >= 0; u = SSA_uses(ssainfo).get_next(u, &sc)) {
+        for (BSIdx u = SSA_uses(ssainfo).get_first(&sc);
+             u != BS_UNDEF; u = SSA_uses(ssainfo).get_next(u, &sc)) {
             IR * use = m_rg->getIR(u);
             ASSERT0(use);
             useset->bunion(use->id());
@@ -628,7 +628,7 @@ bool CopyProp::doPropUseSet(IRSet const* useset, IR const* def_stmt,
     bool change = false;
     IRSetIter it;
     ASSERT0(useset->allElemBeExp(m_rg));
-    for (INT i = useset->get_first(&it); i != BS_UNDEF;
+    for (BSIdx i = useset->get_first(&it); i != BS_UNDEF;
          i = useset->get_next(i, &it)) {
         IR * use = m_rg->getIR(i); //the expression that to be replaced.
         ASSERT0(use);

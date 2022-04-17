@@ -796,8 +796,8 @@ IR * Refine::refinePhi(IR * ir, bool & change, RefineCtx & rc)
     ASSERT0(ssainfo);
 
     SSAUseIter sc;
-    for (INT u = SSA_uses(ssainfo).get_first(&sc);
-         u >= 0; u = SSA_uses(ssainfo).get_next(u, &sc)) {
+    for (BSIdx u = SSA_uses(ssainfo).get_first(&sc);
+         u != BS_UNDEF; u = SSA_uses(ssainfo).get_next(u, &sc)) {
         IR * use = m_rg->getIR(u);
         ASSERT0(use && use->is_pr());
         IR * lit = m_rg->buildImmInt(val, evalImmType(use->getType(),

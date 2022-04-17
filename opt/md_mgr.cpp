@@ -160,7 +160,7 @@ MD const* MDMgr::allocSetelemMD(IR * ir)
 
 
 //Generate MD corresponding to PR load or write.
-MD const* MDMgr::genMDForPR(UINT prno, Type const* type)
+MD const* MDMgr::genMDForPR(PRNO prno, Type const* type)
 {
     ASSERT0(type);
     Var * pr_var = m_rg->mapPR2Var(prno);

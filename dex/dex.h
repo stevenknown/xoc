@@ -118,49 +118,50 @@ public:
 };
 
 
-class Prno2Vreg : public HMap<UINT, UINT, HashFuncBase2<UINT> > {
+class Prno2Vreg : public HMap<PRNO, UINT, HashFuncBase2<PRNO> > {
 public:
     INT maxreg; //record the max vreg used.
     UINT paramnum; //record the number of parameter.
 
-    Prno2Vreg(UINT sz = 0) : HMap<UINT, UINT, HashFuncBase2<UINT> >(sz)
+    Prno2Vreg(UINT sz = 0) : HMap<PRNO, UINT, HashFuncBase2<PRNO> >(sz)
     {
         maxreg = -1;
         paramnum = 0;
     }
     virtual ~Prno2Vreg() {}
 
-    UINT get(UINT prno)
+    UINT get(PRNO prno)
     {
         bool find = false;
-        UINT x = HMap<UINT, UINT, HashFuncBase2<UINT> >::get(prno, &find);
+        UINT x = HMap<PRNO, UINT, HashFuncBase2<PRNO> >::get(prno, &find);
         ASSERT0(find);
         return x;
     }
 
-    UINT get_mapped_vreg(UINT prno)
+    UINT get_mapped_vreg(PRNO prno)
     {
-        UINT mapped = 0;
-        bool f = HMap<UINT, UINT, HashFuncBase2<UINT> >::find(prno, &mapped);
+        bool f = false;
+        UINT mapped = HMap<PRNO, UINT, HashFuncBase2<PRNO> >::get(prno, &f);
         DUMMYUSE(f);
         ASSERTN(f, ("prno should be mapped with vreg in dex2ir"));
-        //return HMap<UINT, UINT, HashFuncBase2<UINT> >::get(prno);
+        //return HMap<PRNO, UINT, HashFuncBase2<PRNO> >::get(prno);
         return mapped;
     }
 
-    UINT get(UINT prno, bool * find)
-    { return HMap<UINT, UINT, HashFuncBase2<UINT> >::get(prno, find); }
+    UINT get(PRNO prno, bool * find)
+    { return HMap<PRNO, UINT, HashFuncBase2<PRNO> >::get(prno, find); }
 
-    void set(UINT prno, UINT v)
+    void set(PRNO prno, UINT v)
     {
         ASSERT0(prno > 0);
-        HMap<UINT, UINT, HashFuncBase2<UINT> >::set(prno, v);
+        HMap<PRNO, UINT, HashFuncBase2<PRNO> >::set(prno, v);
     }
 
     void copy(Prno2Vreg & src)
     {
         INT cur;
-        for (UINT prno = src.get_first(cur); cur >= 0; prno = src.get_next(cur)) {
+        for (PRNO prno = src.get_first(cur); cur >= 0;
+             prno = src.get_next(cur)) {
             UINT v = src.get(prno);
             set(prno, v);
         }
@@ -177,7 +178,7 @@ public:
         if (maxreg < 0) {
             note(rg, "\n==------ PR to Vreg is unordered ------==");
             INT cur;
-            for (UINT prno = get_first(cur); cur >= 0; prno = get_next(cur)) {
+            for (PRNO prno = get_first(cur); cur >= 0; prno = get_next(cur)) {
                 UINT v = get(prno);
                 note(rg, "\nPR%d->v%d", prno, v);
             }
@@ -185,7 +186,7 @@ public:
             INT cur;
             for (INT i = 0; i <= maxreg; i++) {
                 bool find = false;
-                for (UINT prno = get_first(cur); cur >= 0; prno = get_next(cur)) {
+                for (PRNO prno = get_first(cur); cur >= 0; prno = get_next(cur)) {
                     UINT v = get(prno);
                     if (v == (UINT)i) {
                         note(rg, "\nPR%d -> v%d", prno, v);
@@ -212,7 +213,7 @@ public:
 
         note(rg, "\n==---- DUMP Prno2Vreg ----==");
 
-        for (INT i = 0; i <= get_last_idx(); i++) {
+        for (VecIdx i = 0; i <= get_last_idx(); i++) {
             IR * pr = get(i);
             if (pr == nullptr) {
                 note(rg, "\nv%d -> --", i);

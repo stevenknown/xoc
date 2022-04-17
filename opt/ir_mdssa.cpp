@@ -97,7 +97,7 @@ void MD2VMDStack::dump(Region const* rg) const
 {
     if (!rg->isLogMgrInit()) { return; }
     note(rg, "\n==-- DUMP MD2VMDStack --==");
-    for (INT i = MD_UNDEF + 1; i <= get_last_idx(); i++) {
+    for (VecIdx i = MD_UNDEF + 1; i <= get_last_idx(); i++) {
         xcom::Stack<VMD*> * s = get(i);
         note(rg, "\nMD%u:", i);
         if (s == nullptr) {
@@ -113,7 +113,7 @@ void MD2VMDStack::dump(Region const* rg) const
 
 void MD2VMDStack::destroy()
 {
-    for (INT i = 0; i <= get_last_idx(); i++) {
+    for (VecIdx i = 0; i <= get_last_idx(); i++) {
         xcom::Stack<VMD*> * s = get(i);
         if (s != nullptr) { delete s; }
     }
@@ -228,7 +228,7 @@ void MDSSAMgr::dumpAllVMD()
     note(getRegion(), "\n\n==---- DUMP MDSSAMgr: ALL VMD '%s'----==",
          m_rg->getRegionName());
     VOpndVec * vec = getUseDefMgr()->getVOpndVec();
-    for (INT i = 1; i <= vec->get_last_idx(); i++) {
+    for (VecIdx i = 1; i <= vec->get_last_idx(); i++) {
         VMD * v = (VMD*)vec->get(i);
         if (v == nullptr) {
             //Some pass, e.g:ir_refinement, will remove ir and related VMD.
@@ -260,13 +260,13 @@ void MDSSAMgr::dumpAllVMD()
         //Print USEs.
         prt(getRegion(), "\tUSE:");
         VMD::UseSetIter it;
-        INT nexti = 0;
+        BSIdx nexti = 0;
         for (BSIdx j = v->getUseSet()->get_first(it); !it.end(); j = nexti) {
             nexti = v->getUseSet()->get_next(it);
             IR * use = m_rg->getIR(j);
             ASSERT0(use && !use->isReadPR());
             prt(getRegion(), "(%s,id:%d)", IRNAME(use), use->id());
-            if (nexti >= 0) {
+            if (nexti != BS_UNDEF) {
                 prt(getRegion(), ",");
             }
         }
@@ -658,7 +658,7 @@ MDDef * MDSSAMgr::findNearestDef(IR const* ir) const
     MDSSAInfo const* mdssainfo = getMDSSAInfoIfAny(ir);
     ASSERTN(mdssainfo, ("miss MDSSAInfo"));
     VOpndSetIter iter = nullptr;
-    INT lastrpo = -1;
+    INT lastrpo = RPO_UNDEF;
     MDDef * last = nullptr;
     for (BSIdx i = mdssainfo->readVOpndSet().get_first(&iter);
          i != BS_UNDEF; i = mdssainfo->readVOpndSet().get_next(i, &iter)) {
@@ -670,7 +670,7 @@ MDDef * MDSSAMgr::findNearestDef(IR const* ir) const
                 last = tdef;
                 ASSERT0(tdef->getBB());
                 lastrpo = BB_rpo(last->getBB());
-                ASSERT0(lastrpo >= 0);
+                ASSERT0(lastrpo != RPO_UNDEF);
             } else {
                 ASSERT0(t->isLiveIn());
                 //Regard the virtual def at the entry of region,
@@ -685,7 +685,7 @@ MDDef * MDSSAMgr::findNearestDef(IR const* ir) const
 
         IRBB * tbb = tdef->getBB();
         ASSERT0(tbb);
-        ASSERT0(BB_rpo(tbb) >= 0);
+        ASSERT0(BB_rpo(tbb) != RPO_UNDEF);
         if (BB_rpo(tbb) > lastrpo) {
             //tdef is near more than 'last', then update 'last'.
             last = tdef;
@@ -1431,20 +1431,20 @@ void MDSSAMgr::placePhi(DfMgr const& dfm, OUT DefMDSet & effect_md,
 
     //Place phi for lived MD.
     xcom::BitSet visited((bblst->get_elem_count() / BITS_PER_BYTE) + 1);
-    DefSBitSetIter cur = nullptr;
+    DefMDSetIter cur = nullptr;
     for (BSIdx i = effect_md.get_first(&cur);
          i != BS_UNDEF; i = effect_md.get_next(i, &cur)) {
         //effect_md includes MDs that have not been defined. These MDs's
         //defbbs is empty.
-        List<IRBB*> const* defbbs = md2defbb.get(i);
+        List<IRBB*> const* defbbs = md2defbb.get((MDIdx)i);
         if (defbbs != nullptr) {
-            placePhiForMD(i, defbbs, dfm, visited, wl, defined_md_vec);
+            placePhiForMD((MDIdx)i, defbbs, dfm, visited, wl, defined_md_vec);
         }
     }
     END_TIMER(t, "MDSSA: Place phi");
 
     //Free local used objects.
-    for (INT i = 0; i <= md2defbb.get_last_idx(); i++) {
+    for (VecIdx i = 0; i <= md2defbb.get_last_idx(); i++) {
         List<IRBB*> * bbs = md2defbb.get(i);
         if (bbs == nullptr) { continue; }
         delete bbs;
@@ -1841,8 +1841,8 @@ void MDSSAMgr::handleBBRename(IRBB * bb, DefMDSet const& effect_mds,
     ASSERT0(bb2vmdmap.get(bb->id()) == nullptr);
     MD2VMD * mdid2vmd = bb2vmdmap.gen(bb->id());
     DefMDSetIter it = nullptr;
-    for (INT mdid = defed_mds.get_first(&it);
-         mdid >= 0; mdid = defed_mds.get_next(mdid, &it)) {
+    for (BSIdx mdid = defed_mds.get_first(&it);
+         mdid != BS_UNDEF; mdid = defed_mds.get_next(mdid, &it)) {
         VMD * vmd = md2vmdstk.get_top(mdid);
         ASSERT0(vmd || !effect_mds.is_contain(mdid));
         if (vmd != nullptr) {
@@ -1927,9 +1927,9 @@ void MDSSAMgr::rename(DefMDSet const& effect_mds,
     if (bblst->get_elem_count() == 0) { return; }
 
     DefMDSetIter it = nullptr;
-    for (INT mdid = effect_mds.get_first(&it);
-         mdid >= 0; mdid = effect_mds.get_next(mdid, &it)) {
-        md2vmdstk.push(mdid, genInitVersionVMD(mdid));
+    for (BSIdx i = effect_mds.get_first(&it);
+         i != BS_UNDEF; i = effect_mds.get_next(i, &it)) {
+        md2vmdstk.push(i, genInitVersionVMD((MDIdx)i));
     }
 
     ASSERT0(m_cfg->getEntry());
@@ -2026,7 +2026,7 @@ bool MDSSAMgr::verifyDDChain() const
     START_TIMER(tverify, "MDSSA: Verify DefDef Chain");
     MDSSAMgr * pthis = const_cast<MDSSAMgr*>(this);
     MDDefVec const* mddefvec = pthis->getUseDefMgr()->getMDDefVec();
-    for (INT i = 0; i <= mddefvec->get_last_idx(); i++) {
+    for (VecIdx i = 0; i <= mddefvec->get_last_idx(); i++) {
         MDDef const* mddef = mddefvec->get(i);
         if (mddef == nullptr) { continue; }
 
@@ -2315,9 +2315,9 @@ static void recordTopVer(IRBB const* bb, DefMDSet const* defed_mds,
     ASSERT0(bb2vmd.get(bb->id()) == nullptr);
     MD2VMD * mdid2vmd = bb2vmd.gen(bb->id());
     DefMDSetIter it = nullptr;
-    for (INT mdid = defed_mds->get_first(&it);
-         mdid >= 0; mdid = defed_mds->get_next(mdid, &it)) {
-        VMD * vmd = md2verstk.get_top(mdid);
+    for (BSIdx mdid = defed_mds->get_first(&it);
+         mdid != BS_UNDEF; mdid = defed_mds->get_next(mdid, &it)) {
+        VMD * vmd = md2verstk.get_top((MDIdx)mdid);
         if (vmd != nullptr) {
             mdid2vmd->set(vmd->mdid(), vmd);
         }
@@ -2414,7 +2414,7 @@ bool MDSSAMgr::verifyVMD() const
     //Check version for each VMD.
     xcom::BitSet defset;
     VOpndVec * vec = pthis->getUseDefMgr()->getVOpndVec();
-    for (INT i = 1; i <= vec->get_last_idx(); i++) {
+    for (VecIdx i = 1; i <= vec->get_last_idx(); i++) {
         VMD * v = (VMD*)vec->get(i);
         if (v == nullptr) {
             //VMD may have been removed.
@@ -2586,7 +2586,7 @@ void MDSSAMgr::verifyMDSSAInfoForIR(IR const* ir) const
 bool MDSSAMgr::verifyMDSSAInfoUniqueness() const
 {
     xcom::TMap<MDSSAInfo const*, IR const*> ir2mdssainfo;
-    for (INT i = 0; i <= m_rg->getIRVec()->get_last_idx(); i++) {
+    for (VecIdx i = 0; i <= m_rg->getIRVec()->get_last_idx(); i++) {
         IR const* ir = m_rg->getIR(i);
         if (ir == nullptr) { continue; }
         MDSSAInfo const* mdssainfo = getMDSSAInfoIfAny(ir);
@@ -3114,7 +3114,7 @@ void MDSSAMgr::removeDUChain(IR const* stmt, IR const* exp)
     MDSSAInfo * mdssainfo = getMDSSAInfoIfAny(exp);
     if (mdssainfo == nullptr) { return; }
     VOpndSetIter iter = nullptr;
-    INT next_i = -1;
+    BSIdx next_i = BS_UNDEF;
     for (BSIdx i = mdssainfo->getVOpndSet()->get_first(&iter);
          i != BS_UNDEF; i = next_i) {
         next_i = mdssainfo->getVOpndSet()->get_next(i, &iter);
@@ -3141,7 +3141,7 @@ void MDSSAMgr::removeAllUse(IR const* stmt)
     if (mdssainfo == nullptr) { return; }
 
     VOpndSetIter iter = nullptr;
-    INT next_i = -1;
+    BSIdx next_i = BS_UNDEF;
     for (BSIdx i = mdssainfo->getVOpndSet()->get_first(&iter);
          i != BS_UNDEF; i = next_i) {
         next_i = mdssainfo->getVOpndSet()->get_next(i, &iter);
@@ -3370,7 +3370,7 @@ void MDSSAMgr::removeStmtFromMDSSAMgr(IR const* stmt)
     MDSSAInfo * stmtmdssainfo = getMDSSAInfoIfAny(stmt);
     ASSERT0(stmtmdssainfo);
     VOpndSetIter iter = nullptr;
-    INT next_i = -1;
+    BSIdx next_i = BS_UNDEF;
     for (BSIdx i = stmtmdssainfo->getVOpndSet()->get_first(&iter);
          i != BS_UNDEF; i = next_i) {
         next_i = stmtmdssainfo->getVOpndSet()->get_next(i, &iter);
@@ -3487,8 +3487,8 @@ void MDSSAMgr::removeDefFromDDChainHelper(MDDef * mddef, MDDef * prev)
 
     //Update successor's predecesor.
     MDDefSetIter nit = nullptr;
-    for (INT w = mddef->getNextSet()->get_first(&nit);
-         w >= 0; w = mddef->getNextSet()->get_next(w, &nit)) {
+    for (BSIdx w = mddef->getNextSet()->get_first(&nit);
+         w != BS_UNDEF; w = mddef->getNextSet()->get_next(w, &nit)) {
         MDDef const* use = getUseDefMgr()->getMDDef(w);
         ASSERTN(use->getPrev() == mddef, ("insanity DD chain"));
         MDDEF_prev(use) = prev;
@@ -3893,7 +3893,7 @@ IR const* MDSSAMgr::iterUseInitC(IR const* def,
     //Find the first iter and position in VOpndSet.
     for (it.current_pos_in_vopndset = it.vopndset->get_first(
             &it.vopndset_iter);
-         it.current_pos_in_vopndset >= 0;
+         it.current_pos_in_vopndset != BS_UNDEF;
          it.current_pos_in_vopndset = it.vopndset->get_next(
             it.current_pos_in_vopndset, &it.vopndset_iter)) {
         VMD * vopnd = (VMD*)pthis->getUseDefMgr()->getVOpnd(
@@ -3951,7 +3951,7 @@ IR const* MDSSAMgr::iterUseNextC(OUT ConstMDSSAUSEIRIter & it) const
     }
 
     //Update iter and position in VOpndSet.
-    for (; it.current_pos_in_vopndset >= 0;
+    for (; it.current_pos_in_vopndset != BS_UNDEF;
          it.current_pos_in_vopndset = it.vopndset->get_next(
              it.current_pos_in_vopndset, &it.vopndset_iter)) {
         VMD * vopnd = (VMD*)pthis->getUseDefMgr()->getVOpnd(
@@ -4036,7 +4036,7 @@ MDDef const* MDSSAMgr::iterDefNextCTillKillingDef(IR const* use,
 //Clean MDSSAInfo AI of all IR.
 void MDSSAMgr::cleanMDSSAInfoAI()
 {
-    for (INT i = 0; i <= m_rg->getIRVec()->get_last_idx(); i++) {
+    for (VecIdx i = 0; i <= m_rg->getIRVec()->get_last_idx(); i++) {
         IR * ir = m_rg->getIR(i);
         if (ir != nullptr && ir->getAI() != nullptr &&
             ir->getAI()->is_init()) {
@@ -4435,7 +4435,7 @@ bool RenameTillNextDef::tryInsertDDChainForStmt(IR * ir, MOD LiveSet & liveset)
     UseDefMgr * udmgr = m_mgr->getUseDefMgr();
     bool inserted = false;
     VOpndSet const& vmdset = liveset.getSet();
-    INT nexti;
+    BSIdx nexti;
     for (BSIdx i = vmdset.get_first(&it); i != BS_UNDEF; i = nexti) {
         nexti = vmdset.get_next(i, &it); //i may be removed.
         VMD * t = (VMD*)udmgr->getVOpnd(i);

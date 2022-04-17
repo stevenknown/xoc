@@ -109,7 +109,7 @@ bool DexRegion::verifyRAresult(RA & ra, Prno2Vreg & prno2v)
         LTMgr * ltm = gltm->map_bb2ltm(bb);
         if (ltm == nullptr) { continue; }
         Vector<LT*> * lvec = ltm->get_lt_vec();
-        for (INT i = 0; i <= lvec->get_last_idx(); i++) {
+        for (VecIdx i = 0; i <= lvec->get_last_idx(); i++) {
             LT * l = lvec->get(i);
             if (l == nullptr) { continue; }
             ASSERT0(l->has_allocated());
@@ -133,7 +133,7 @@ void DexRegion::updateRAresult(IN RA & ra, OUT Prno2Vreg & prno2v)
         LTMgr * ltm = gltm->map_bb2ltm(bb);
         if (ltm == nullptr) { continue; }
         Vector<LT*> * lvec = ltm->get_lt_vec();
-        for (INT i = 0; i <= lvec->get_last_idx(); i++) {
+        for (VecIdx i = 0; i <= lvec->get_last_idx(); i++) {
             LT * l = lvec->get(i);
             if (l == nullptr) { continue; }
             ASSERT0(l->has_allocated());

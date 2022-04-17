@@ -41,7 +41,7 @@ namespace xoc {
 void MDId2MD::dump(Region const* rg) const
 {
     if (!rg->isLogMgrInit()) { return; }
-    for (INT i = 0; i <= get_last_idx(); i++) {
+    for (VecIdx i = 0; i <= get_last_idx(); i++) {
         MD * md = Vector<MD*>::get(i);
         if (md == nullptr) { continue; }
         ASSERT0(MD_id(md) == (MDIdx)i);
@@ -425,10 +425,9 @@ bool MDSet::is_overlap_ex(MD const* md, Region const* current_ru,
 {
     ASSERT0(md && mdsys && current_ru);
     if (MDSet::is_overlap(md, current_ru)) { return true; }
-
     MDSetIter iter = nullptr;
-    for (INT i = get_first(&iter);
-         i >= 0; i = get_next((MDIdx)i, &iter)) {
+    for (BSIdx i = get_first(&iter);
+         i != BS_UNDEF; i = get_next(i, &iter)) {
         MD const* t = const_cast<MDSystem*>(mdsys)->getMD((MDIdx)i);
         ASSERT0(t);
         if (t->is_overlap(md)) { return true; }
@@ -472,8 +471,8 @@ void MDSet::diffAllOverlapped(MDIdx id, DefMiscBitSetMgr & m,
 {
     MDSetIter iter;
     MD const* srcmd = const_cast<MDSystem*>(sys)->getMD(id);
-    INT next_i;
-    for (INT i = get_first(&iter); i >= 0; i = next_i) {
+    BSIdx next_i;
+    for (BSIdx i = get_first(&iter); i != BS_UNDEF; i = next_i) {
         next_i = get_next(i, &iter);
         MD const* tgtmd = const_cast<MDSystem*>(sys)->getMD(i);
         ASSERT0(tgtmd);
@@ -488,18 +487,18 @@ void MDSet::dump(MDSystem * ms, bool detail) const
 {
     if (!ms->getRegionMgr()->isLogMgrInit()) { return; }
     ASSERT0(ms);
-
     MDSetIter iter;
-    for (INT i = get_first(&iter); i >= 0;) {
+    for (BSIdx i = get_first(&iter); i != BS_UNDEF;) {
         prt(ms->getRegionMgr(), "MD%d", i);
         i = get_next(i, &iter);
-        if (i >= 0) {
+        if (i != BS_UNDEF) {
             prt(ms->getRegionMgr(), ",");
         }
     }
     if (detail) {
-        for (INT i = get_first(&iter); i != -1; i = get_next(i, &iter)) {
-            MD const* md = ms->getMD(i);
+        for (BSIdx i = get_first(&iter);
+             i != BS_UNDEF; i = get_next(i, &iter)) {
+            MD const* md = ms->getMD((MDIdx)i);
             ASSERT0(md);
             md->dump(ms->getTypeMgr());
         }
@@ -692,9 +691,9 @@ void MD2MDSet::dump(Region * rg)
         ASSERT0(pts);
         note(rg, "\n\t\tPOINT TO:\n");
         MDSetIter iter_j;
-        for (INT j = pts->get_first(&iter_j);
-             j >= 0; j = pts->get_next(j, &iter_j)) {
-            MD * mmd = ms->getMD(j);
+        for (BSIdx j = pts->get_first(&iter_j);
+             j != BS_UNDEF; j = pts->get_next(j, &iter_j)) {
+            MD * mmd = ms->getMD((MDIdx)j);
             ASSERT0(mmd);
             buf.clean();
             prt(rg, "\t\t\t%s\n",
@@ -707,7 +706,7 @@ void MD2MDSet::dump(Region * rg)
     VarVec * var_tab = rg->getVarMgr()->getVarVec();
     Vector<MD const*> mdv;
     ConstMDIter iter;
-    for (INT i = 0; i <= var_tab->get_last_idx(); i++) {
+    for (VecIdx i = 0; i <= var_tab->get_last_idx(); i++) {
         Var * v = var_tab->get(i);
         if (v == nullptr) { continue; }
 
@@ -722,7 +721,7 @@ void MD2MDSet::dump(Region * rg)
         iter.clean();
         mdtab->get_elems(mdv, iter);
 
-        for (INT i2 = 0; i2 <= mdv.get_last_idx(); i2++) {
+        for (VecIdx i2 = 0; i2 <= mdv.get_last_idx(); i2++) {
             MD const* md = mdv.get(i2);
             buf.clean();
             note(rg, "\n\t\t%s", md->dump(buf, rg->getTypeMgr()));
@@ -1029,9 +1028,9 @@ void MDSystem::computeOverlap(Region * current_ru, MOD MDSet & mds,
     bool set_global = false;
     bool set_import_var = false;
     MDSetIter iter;
-    for (INT i = mds.get_first(&iter);
-         i >= 0; i = mds.get_next(i, &iter)) {
-        MD * md = getMD(i);
+    for (BSIdx i = mds.get_first(&iter);
+         i != BS_UNDEF; i = mds.get_next(i, &iter)) {
+        MD * md = getMD((MDIdx)i);
         ASSERT0(md);
         MDTab * mdt = getMDTab(MD_base(md));
         ASSERT0(mdt != nullptr);
@@ -1073,7 +1072,7 @@ void MDSystem::computeOverlap(Region * current_ru, MOD MDSet & mds,
         }
     }
 
-    for (INT i = 0; i <= added.get_last_idx(); i++) {
+    for (VecIdx i = 0; i <= added.get_last_idx(); i++) {
         MD const* t = added.get(i);
         ASSERT0(t && t->is_effect());
         mds.bunion(t, mbsmgr);
@@ -1095,12 +1094,12 @@ void MDSystem::computeOverlap(Region * current_ru, MDSet const& mds,
 {
     ASSERT0(&mds != &output);
     ASSERT0(current_ru);
-
     bool set_global = false;
     bool set_import_var = false;
     MDSetIter iter;
-    for (INT i = mds.get_first(&iter); i >= 0; i = mds.get_next(i, &iter)) {
-        MD * md = getMD(i);
+    for (BSIdx i = mds.get_first(&iter);
+         i != BS_UNDEF; i = mds.get_next(i, &iter)) {
+        MD * md = getMD((MDIdx)i);
         ASSERT0(md);
         MDTab * mdt = getMDTab(MD_base(md));
         ASSERT0(mdt != nullptr);
@@ -1150,13 +1149,11 @@ void MDSystem::clean()
          var != nullptr; var = m_var2mdtab.get_next(iter, &mdtab)) {
         mdtab->clean();
     }
-
-    for (INT i = 0; i <= m_id2md_map.get_last_idx(); i++) {
+    for (VecIdx i = 0; i <= m_id2md_map.get_last_idx(); i++) {
         MD * md = m_id2md_map.get(i);
         if (md == nullptr) { continue; }
         freeMD(md);
     }
-
     m_md_count = 2; //Index 0 is reserved, index 1 is all-mem-id.
 }
 
@@ -1169,7 +1166,7 @@ void MDSystem::dump(bool only_dump_nonpr_md)
     } else {
         note(getTypeMgr()->getRegionMgr(), "\n==---- DUMP ALL MD ----==");
     }
-    for (INT i = 0; i <= m_id2md_map.get_last_idx(); i++) {
+    for (VecIdx i = 0; i <= m_id2md_map.get_last_idx(); i++) {
         MD * md = m_id2md_map.get(i);
         if (md == nullptr ||
             (only_dump_nonpr_md && MD_is_pr(md))) {

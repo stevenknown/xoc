@@ -51,6 +51,9 @@ typedef xcom::C<IR*> * IRListIter;
 typedef xcom::List<IR const*> CIRList;
 typedef xcom::C<IR const*> * CIRListIter;
 
+//Type to describe the Prno of PR operation.
+typedef UINT PRNO;
+
 //
 //These macros defined helper dispatch interface to related IR.
 //

@@ -392,7 +392,8 @@ bool IVR::hasMultiDefInLoop(IR const* ir, LI<IRBB> const* li,
         //Find an USE of 'ir' that is inside in loop 'li'.
         collectUseSet(ir, m_mdssamgr, set);
         IRSetIter it = nullptr;
-        for (INT i = set->get_first(&it); i >= 0; i = set->get_next(i, &it)) {
+        for (BSIdx i = set->get_first(&it);
+             i != BS_UNDEF; i = set->get_next(i, &it)) {
             IR * e = m_rg->getIR(i);
             ASSERT0(e || e->is_exp());
             IRBB const* bb = nullptr;
@@ -426,7 +427,8 @@ bool IVR::hasMultiDefInLoop(IR const* ir, LI<IRBB> const* li,
 
     xoc::collectDefSet(exp, m_mdssamgr, set);
     IRSetIter it = nullptr;
-    for (INT i = set->get_first(&it); i >= 0; i = set->get_next(i, &it)) {
+    for (BSIdx i = set->get_first(&it);
+         i != BS_UNDEF; i = set->get_next(i, &it)) {
         IR * stmt = m_rg->getIR(i);
         ASSERT0(stmt || stmt->is_stmt());
         if (stmt != stmt_of_exp && li->isInsideLoop(stmt->getBB()->id())) {
@@ -493,8 +495,8 @@ bool IVR::isSelfModByDUSet(IR const* ir) const
     // x<-SelfModOP(x, 1)
     //Iterate all USEs to check if the stmt of USE is identical to 'ir'.
     DUSetIter it = nullptr;
-    for (INT i = useset->get_first(&it);
-         i >= 0; i = useset->get_next(i, &it)) {
+    for (BSIdx i = useset->get_first(&it);
+         i != BS_UNDEF; i = useset->get_next(i, &it)) {
         IR const* use = m_rg->getIR(i);
         ASSERT0(use->is_exp());
 
@@ -520,8 +522,8 @@ bool IVR::isSelfModByPRSSA(IR const* ir) const
     // pr4<-PHI(pr3, pr5)
     // pr5<-SelfModOP(pr4, 1)
     SSAUseIter it;
-    for (INT u = SSA_uses(ssainfo).get_first(&it);
-         u >= 0; u = SSA_uses(ssainfo).get_next(u, &it)) {
+    for (BSIdx u = SSA_uses(ssainfo).get_first(&it);
+         u != BS_UNDEF; u = SSA_uses(ssainfo).get_next(u, &it)) {
         IR const* use = m_rg->getIR(u);
         ASSERT0(use && use->is_exp());
 
@@ -545,10 +547,10 @@ bool IVR::isSelfModByMDSSA(IR const* ir) const
     // md4<-PHI(md3, md5)
     // md5<-SelfModOP(md4, 1)
     VOpndSetIter it;
-    for (INT u = const_cast<MDSSAInfo*>(ssainfo)->getVOpndSet()->get_first(&it);
-         u >= 0;
-         u = const_cast<MDSSAInfo*>(ssainfo)->
-            getVOpndSet()->get_next(u, &it)) {
+    for (BSIdx u = const_cast<MDSSAInfo*>(ssainfo)->getVOpndSet()->
+             get_first(&it);
+         u != BS_UNDEF; u = const_cast<MDSSAInfo*>(ssainfo)->
+             getVOpndSet()->get_next(u, &it)) {
         VMD * vopnd = (VMD*)m_mdssamgr->getVOpnd(u);
         ASSERT0(vopnd && vopnd->is_md());
 
@@ -1011,12 +1013,12 @@ bool IVR::dump() const
 
 void IVR::clean()
 {
-    for (INT i = 0; i <= m_li2bivlst.get_last_idx(); i++) {
+    for (VecIdx i = 0; i <= m_li2bivlst.get_last_idx(); i++) {
         BIVList * ivlst = m_li2bivlst.get(i);
         if (ivlst == nullptr) { continue; }
         ivlst->clean();
     }
-    for (INT i = 0; i <= m_li2divlst.get_last_idx(); i++) {
+    for (VecIdx i = 0; i <= m_li2divlst.get_last_idx(); i++) {
         DIVList * ivlst = m_li2divlst.get(i);
         if (ivlst == nullptr) { continue; }
         ivlst->clean();

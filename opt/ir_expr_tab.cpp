@@ -90,8 +90,8 @@ void * ExprTab::xmalloc(INT size)
 
 void ExprTab::clean_occ_list()
 {
-    INT last = m_ir_expr_vec.get_last_idx();
-    for (INT i = 0; i <= last; i++) {
+    VecIdx last = m_ir_expr_vec.get_last_idx();
+    for (VecIdx i = 0; i <= last; i++) {
         ExpRep * ie = m_ir_expr_vec.get(i);
         if (ie == nullptr) { continue; }
         ASSERT0(EXPR_id(ie) == (UINT)i);
@@ -105,8 +105,8 @@ void ExprTab::dump_ir_expr_tab()
 {
     if (!m_rg->isLogMgrInit()) { return; }
     note(getRegion(), "\n==---- DUMP ExprTab ----==");
-    INT last = m_ir_expr_vec.get_last_idx();
-    for (INT i = 0; i <= last; i++) {
+    VecIdx last = m_ir_expr_vec.get_last_idx();
+    for (VecIdx i = 0; i <= last; i++) {
         ExpRep * ie = m_ir_expr_vec.get(i);
         if (ie == nullptr) { continue; }
         ASSERT0(EXPR_id(ie) == (UINT)i);
@@ -148,7 +148,7 @@ HOST_UINT ExprTab::compute_hash_key(IR const* ir)
     HOST_UINT hval = ir->getCode() + (ir->getOffset() + 1) +
                   (UINT)(size_t)IR_dt(ir);
     if (ir->isReadPR()) {
-        hval += ir->getPrno();
+        hval += (HOST_UINT)ir->getPrno();
     }
     if (ir->is_id()) {
         Var * var = ID_info(ir);

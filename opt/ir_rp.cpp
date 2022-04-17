@@ -428,7 +428,8 @@ void DelegateMgr::collectOutsideLoopUse(IR const* delegate, IRSet const& set,
 {
     DUSet * useset = nullptr;
     IRSetIter di = nullptr;
-    for (INT i = set.get_first(&di); i >= 0; i = set.get_next(i, &di)) {
+    for (BSIdx i = set.get_first(&di);
+         i != BS_UNDEF; i = set.get_next(i, &di)) {
         IR * u = m_rg->getIR(i);
         ASSERT0(u->is_exp());
         if (u->is_id()) {
@@ -457,7 +458,8 @@ void DelegateMgr::collectOutsideLoopDef(IR const* delegate, IRSet const& set,
 {
     DUSet * defset = nullptr;
     IRSetIter di = nullptr;
-    for (INT i = set.get_first(&di); i >= 0; i = set.get_next(i, &di)) {
+    for (BSIdx i = set.get_first(&di);
+         i != BS_UNDEF; i = set.get_next(i, &di)) {
         IR * d = m_rg->getIR(i);
         ASSERT0(d->is_stmt());
         if (!li->isInsideLoop(d->getBB()->id())) {
@@ -637,7 +639,7 @@ bool DelegateMgr::dump() const
         note(m_rg, "\nOutsideDefSet:");
         m_rg->getLogMgr()->incIndent(2);
         DUSetIter di = nullptr;
-        for (INT i = set->get_first(&di); i >= 0;
+        for (BSIdx i = set->get_first(&di); i != BS_UNDEF;
              i = set->get_next(i, &di)) {
             IR * ir = m_rg->getIR(i);
             ASSERT0(ir);
@@ -659,7 +661,7 @@ bool DelegateMgr::dump() const
         note(m_rg, "\nOutsideUseSet:");
         m_rg->getLogMgr()->incIndent(2);
         DUSetIter di = nullptr;
-        for (INT i = set2->get_first(&di); i >= 0;
+        for (BSIdx i = set2->get_first(&di); i != BS_UNDEF;
              i = set2->get_next(i, &di)) {
             IR * ir = m_rg->getIR(i);
             ASSERT0(ir);
@@ -762,7 +764,7 @@ void RegPromot::cleanLiveBBSet()
 {
     //Clean.
     Vector<MDLT*> * bs_vec = m_md2lt_map->get_tgt_elem_vec();
-    for (INT i = 0; i <= bs_vec->get_last_idx(); i++) {
+    for (VecIdx i = 0; i <= bs_vec->get_last_idx(); i++) {
         MDLT * lt = bs_vec->get(i);
         if (lt != nullptr) {
             ASSERT0(MDLT_livebbs(lt) != nullptr);
@@ -793,12 +795,12 @@ void RegPromot::buildLifeTime()
         if (livein->is_empty() && liveout->is_empty()) { continue; }
 
         MDSetIter it;
-        for (INT i = livein->get_first(&it);
-             i >= 0; i = livein->get_next(i, &it)) {
+        for (BSIdx i = livein->get_first(&it);
+             i != BS_UNDEF; i = livein->get_next(i, &it)) {
             MDLT_livebbs(getMDLifeTime(m_md_sys->getMD(i)))->bunion(bb->id());
         }
-        for (INT i = liveout->get_first(&it);
-             i >= 0; i = liveout->get_next(i, &it)) {
+        for (BSIdx i = liveout->get_first(&it);
+             i != BS_UNDEF; i = liveout->get_next(i, &it)) {
             MDLT_livebbs(getMDLifeTime(m_md_sys->getMD(i)))->bunion(bb->id());
         }
     }
@@ -997,7 +999,7 @@ void RegPromot::sweepOutExactAccess(IR * ir, MOD ExactAccTab & exact_tab)
     MDSet const* mayref = ir->getMayRef();
     ExactAccTabIter it;
     Vector<MD const*> need_to_be_removed;
-    INT cnt = 0;
+    VecIdx cnt = 0;
     if (mustref != nullptr) {
         for (MD const* md = exact_tab.get_first(it, nullptr);
              md != nullptr; md = exact_tab.get_next(it, nullptr)) {
@@ -1018,8 +1020,9 @@ void RegPromot::sweepOutExactAccess(IR * ir, MOD ExactAccTab & exact_tab)
             }
         }
     }
-    for (cnt = cnt - 1; cnt >= 0; cnt--) {
+    for (cnt = cnt - 1; !IS_VECUNDEF(cnt); cnt--) {
         MD const* md = need_to_be_removed.get(cnt);
+        ASSERT0(md);
         exact_tab.remove(md);
     }
 }
@@ -1035,7 +1038,7 @@ void RegPromot::sweepOutInexactAccess(IR * ir, MOD InexactAccTab & inexact_tab)
     MDSet const* mayref = ir->getMayRef();
     InexactAccTabIter iter2;
     Vector<IR*> need_to_be_removed2;
-    INT cnt = 0;
+    VecIdx cnt = 0;
     if (mustref != nullptr) {
         for (IR * acc = inexact_tab.get_first(iter2);
              acc != nullptr; acc = inexact_tab.get_next(iter2)) {
@@ -1091,7 +1094,7 @@ void RegPromot::sweepOutInexactAccess(IR * ir, MOD InexactAccTab & inexact_tab)
         }
     }
 
-    for (cnt = cnt - 1; cnt >= 0; cnt--) {
+    for (cnt = cnt - 1; !IS_VECUNDEF(cnt); cnt--) {
         IR * e = need_to_be_removed2.get(cnt);
         inexact_tab.remove(e);
     }
@@ -1117,7 +1120,7 @@ void RegPromot::clobberExactAccess(IR const* ir, MOD ExactAccTab & exact_tab)
     MDSet const* mayref = ir->getMayRef();
     ExactAccTabIter it;
     Vector<MD const*> need_to_be_removed;
-    INT cnt = 0;
+    VecIdx cnt = 0;
     if (mustref != nullptr) {
         for (MD const* md = exact_tab.get_first(it, nullptr);
              md != nullptr; md = exact_tab.get_next(it, nullptr)) {
@@ -1142,7 +1145,7 @@ void RegPromot::clobberExactAccess(IR const* ir, MOD ExactAccTab & exact_tab)
         }
     }
 
-    for (cnt = cnt - 1; cnt >= 0; cnt--) {
+    for (cnt = cnt - 1; !IS_VECUNDEF(cnt); cnt--) {
         MD const* md = need_to_be_removed.get(cnt);
         exact_tab.remove(md);
     }
@@ -1156,7 +1159,7 @@ void RegPromot::clobberInexactAccess(IR const* ir,
     MDSet const* mayref = ir->getMayRef();
     InexactAccTabIter iter;
     Vector<IR*> need_to_be_removed;
-    INT cnt = 0;
+    VecIdx cnt = 0;
     if (mustref != nullptr) {
         for (IR * acc = inexact_tab.get_first(iter);
              acc != nullptr; acc = inexact_tab.get_next(iter)) {
@@ -1206,7 +1209,7 @@ void RegPromot::clobberInexactAccess(IR const* ir,
         }
     }
 
-    for (cnt = cnt - 1; cnt >= 0; cnt--) {
+    for (cnt = cnt - 1; !IS_VECUNDEF(cnt); cnt--) {
         IR * e = need_to_be_removed.get(cnt);
         inexact_tab.remove(e);
     }
@@ -1880,13 +1883,13 @@ bool RegPromot::buildPRSSADUChainForInexactAcc(Occ2Occ const& occ2newocc,
     RefTab const* deletab = const_cast<DelegateMgr&>(delemgr).getDelegateTab();
     RefTabIter it;
     for (IR const* dele = deletab->get_first(it);
-         it >= 0; dele = deletab->get_next(it)) {
+         !IS_VECUNDEF(it); dele = deletab->get_next(it)) {
         IR * init = delemgr.getInitStmt(dele);
         if (init == nullptr) { continue; }
 
         IR const* pr = delemgr.getPR(dele);
         ASSERT0(pr);
-        UINT deleprno = pr->getPrno();
+        PRNO deleprno = pr->getPrno();
         ssarg.add(deleprno, init);
 
         IR * rest = delemgr.getRestoreStmt(dele);
@@ -1928,7 +1931,7 @@ bool RegPromot::buildPRSSADUChainForExactAcc(IR const* dele,
     if (!usePRSSADU()) { return false; }
     IR const* pr = delemgr.getPR(dele);
     ASSERT0(pr && m_prssamgr);
-    UINT deleprno = pr->getPrno();
+    PRNO deleprno = pr->getPrno();
     PRSSARegion ssarg(getSBSMgr());
     ssarg.add(*li->getBodyBBSet());
     IR * init = delemgr.getInitStmt(dele);
@@ -1969,7 +1972,7 @@ void RegPromot::addDUChainForInexactAcc(DelegateMgr const& delemgr,
     if (deletab->get_elem_count() == 0) { return; }
     RefTabIter it;
     for (IR * dele = deletab->get_first(it);
-         it >= 0; dele = deletab->get_next(it)) {
+         !IS_VECUNDEF(it); dele = deletab->get_next(it)) {
         if (delemgr.getInitStmt(dele) != nullptr) {
             addDUChainForInexactAccDele(dele, delemgr, occ2newocc,
                                         inexact_tab, ctx);
@@ -2131,7 +2134,8 @@ void RegPromot::addDUChainForIntraDefAndUseSet(Occ2Occ const& occ2newocc,
 {
     ASSERT0(newocc_def->is_stpr());
     IRSetIter di = nullptr;
-    for (INT i = useset.get_first(&di); i >= 0; i = useset.get_next(i, &di)) {
+    for (BSIdx i = useset.get_first(&di);
+         i != BS_UNDEF; i = useset.get_next(i, &di)) {
         IR * use = m_rg->getIR(i);
         ASSERT0(use->is_exp() && use->isMemoryRefNonPR());
         IR * newocc_use = const_cast<Occ2Occ&>(occ2newocc).get(use);
@@ -2194,7 +2198,8 @@ void RegPromot::addDUChainForRestoreToOutsideUse(IR const* dele,
     DUSet const* useset = delemgr.getOutsideUseSet(dele);
     if (useset == nullptr) { return; }
     DUSetIter it;
-    for (INT i = useset->get_first(&it); i >= 0; i = useset->get_next(i, &it)) {
+    for (BSIdx i = useset->get_first(&it);
+         i != BS_UNDEF; i = useset->get_next(i, &it)) {
         IR * u = m_rg->getIR(i);
         ASSERT0(u->is_exp());
         xoc::removeUseForTree(u, m_rg);

@@ -42,7 +42,7 @@ namespace xoc {
 void CallGraph::computeEntryList(List<CallNode*> & elst)
 {
     elst.clean();
-    INT c;
+    VertexIter c;
     for (xcom::Vertex * v = get_first_vertex(c);
          v != nullptr; v = get_next_vertex(c)) {
         if (VERTEX_in_list(v) == nullptr) {
@@ -57,7 +57,7 @@ void CallGraph::computeEntryList(List<CallNode*> & elst)
 void CallGraph::computeExitList(List<CallNode*> & elst)
 {
     elst.clean();
-    INT c;
+    VertexIter c;
     for (xcom::Vertex * v = get_first_vertex(c);
          v != nullptr; v = get_next_vertex(c)) {
         if (VERTEX_out_list(v) == nullptr) {

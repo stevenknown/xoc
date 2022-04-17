@@ -582,7 +582,7 @@ bool Region::isRegionVAR(Var const* var) const
 bool Region::isRegionIR(IR const* ir) const
 {
     Vector<IR*> * vec = getIRVec();
-    for (INT i = 0; i <= vec->get_last_idx(); i++) {
+    for (VecIdx i = 0; i <= vec->get_last_idx(); i++) {
         if (ir == vec->get(i)) { return true; }
     }
     return false;
@@ -590,7 +590,7 @@ bool Region::isRegionIR(IR const* ir) const
 
 
 //Generate Var corresponding to PR load or write.
-Var * Region::genVarForPR(UINT prno, Type const* type)
+Var * Region::genVarForPR(PRNO prno, Type const* type)
 {
     ASSERT0(type);
     Var * pr_var = mapPR2Var(prno);
@@ -598,7 +598,7 @@ Var * Region::genVarForPR(UINT prno, Type const* type)
 
     //Create a new PR Var.
     CHAR name[128];
-    sprintf(name, "pr%d", prno);
+    sprintf(name, "pr%u", prno);
     ASSERT0(strlen(name) < 128);
     pr_var = getVarMgr()->registerVar(name, type, 0, VAR_LOCAL | VAR_IS_PR);
     setMapPR2Var(prno, pr_var);
@@ -1127,7 +1127,7 @@ void Region::dumpMemUsage() const
     UINT ncvt = 0;
     UINT ncbr = 0;
     UINT nncbr = 0;
-    for (int i = 0; i <= v->get_last_idx(); i++) {
+    for (VecIdx i = 0; i <= v->get_last_idx(); i++) {
         IR * ir = v->get(i);
         if (ir == nullptr) { continue; }
 
@@ -1149,7 +1149,7 @@ void Region::dumpMemUsage() const
         else if (ir->isUnaryOp()) nuna++;
     }
 
-    UINT total = (v->get_last_idx() + 1);
+    UINT total = v->get_elem_count();
     if (total == 0) {
         note(this, "\nThe number of IR Total:0");
         return;
@@ -1219,7 +1219,8 @@ void Region::dumpVarTab() const
         set.bunion(v->id());
     }
     DefSBitSetIter cur = nullptr;
-    for (INT id = set.get_first(&cur); id >= 0; id = set.get_next(id, &cur)) {
+    for (BSIdx id = set.get_first(&cur);
+         id != BS_UNDEF; id = set.get_next(id, &cur)) {
         Var * v = getVarMgr()->get_var(id);
         ASSERT0(v);
         buf.clean();
@@ -1245,7 +1246,7 @@ void Region::dumpParameter() const
     }
     if (fpvec.get_last_idx() < 0) { return; }
     StrBuf buf(32);
-    for (INT i = 0; i <= fpvec.get_last_idx(); i++) {
+    for (VecIdx i = 0; i <= fpvec.get_last_idx(); i++) {
         Var * v = fpvec.get(i);
         if (i != 0) {
             prt(this, ",");
@@ -1307,8 +1308,8 @@ void Region::dumpAllocatedIR() const
 {
     if (!isLogMgrInit()) { return; }
     note(this, "\n==---- DUMP ALL IR INFO ----==");
-    INT n = getIRVec()->get_last_idx();
-    INT i = 1;
+    VecIdx n = getIRVec()->get_last_idx();
+    VecIdx i = 1;
     getLogMgr()->incIndent(2);
     UINT num_has_du = 0;
 
@@ -1530,8 +1531,8 @@ static bool verifyMDRefForIR(IR const* ir, ConstIRIter & cii, Region * rg)
             if (may != nullptr) {
                 //PR can not be accessed by indirect operation.
                 MDSetIter iter;
-                for (INT i = may->get_first(&iter);
-                     i >= 0; i = may->get_next(i, &iter)) {
+                for (BSIdx i = may->get_first(&iter);
+                     i != BS_UNDEF; i = may->get_next(i, &iter)) {
                     MD const* x = rg->getMDSystem()->getMD(i);
                     DUMMYUSE(x);
                     ASSERT0(x && !x->is_pr());
@@ -1556,8 +1557,8 @@ static bool verifyMDRefForIR(IR const* ir, ConstIRIter & cii, Region * rg)
             if (mayuse != nullptr) {
                 //PR can not be accessed by indirect operation.
                 MDSetIter iter;
-                for (INT i = mayuse->get_first(&iter);
-                     i >= 0; i = mayuse->get_next(i, &iter)) {
+                for (BSIdx i = mayuse->get_first(&iter);
+                     i != BS_UNDEF; i = mayuse->get_next(i, &iter)) {
                     MD const* x = rg->getMDSystem()->getMD(i);
                     DUMMYUSE(x);
                     ASSERT0(x && !x->is_pr());
@@ -1627,8 +1628,8 @@ static bool verifyMDRefForIR(IR const* ir, ConstIRIter & cii, Region * rg)
             if (maydef != nullptr) {
                 //PR can not be accessed by indirect operation.
                 MDSetIter iter;
-                for (INT i = maydef->get_first(&iter);
-                     i >= 0; i = maydef->get_next(i, &iter)) {
+                for (BSIdx i = maydef->get_first(&iter);
+                     i != BS_UNDEF; i = maydef->get_next(i, &iter)) {
                     MD const* x = rg->getMDSystem()->getMD(i);
                     DUMMYUSE(x);
                     ASSERT0(x && !x->is_pr());
@@ -1649,8 +1650,8 @@ static bool verifyMDRefForIR(IR const* ir, ConstIRIter & cii, Region * rg)
             if (may != nullptr) {
                 //MayRef of call should not contain PR.
                 MDSetIter iter;
-                for (INT i = may->get_first(&iter);
-                     i >= 0; i = may->get_next((UINT)i, &iter)) {
+                for (BSIdx i = may->get_first(&iter);
+                     i != BS_UNDEF; i = may->get_next((UINT)i, &iter)) {
                     MD * md = rg->getMDSystem()->getMD(i);
                     ASSERTN(md && !md->is_pr(), ("PR should not in MaySet"));
                 }
@@ -1761,7 +1762,7 @@ static void dumpParam(Region const* rg)
             fpvec.set(v->getFormalParamPos(), v);
         }
     }
-    for (INT i = 0; i <= fpvec.get_last_idx(); i++) {
+    for (VecIdx i = 0; i <= fpvec.get_last_idx(); i++) {
         Var * v = fpvec.get(i);
         if (v == nullptr) {
             //This position may be reserved for other use.

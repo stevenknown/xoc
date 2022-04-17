@@ -269,7 +269,7 @@ public:
 
     virtual void clean()
     {
-        INT c;
+        VecIdx c;
         for (VNE_SC * ve = get_first(c); ve != nullptr; ve = get_next(c)) {
             ve->clean();
             m_free_lst.append_head(ve);
@@ -333,7 +333,7 @@ public:
 
     virtual void clean()
     {
-        INT c;
+        VecIdx c;
         for (VNE_ILD * ve = get_first(c); ve != nullptr; ve = get_next(c)) {
             ve->clean();
             m_free_lst.append_head(ve);
@@ -458,7 +458,7 @@ public:
 
     void clean()
     {
-        INT c;
+        VecIdx c;
         for (VNE_ARR * ve = get_first(c); ve != nullptr; ve = get_next(c)) {
             ve->clean();
             m_free_lst.append_head(ve);

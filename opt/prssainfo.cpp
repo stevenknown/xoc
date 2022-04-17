@@ -41,7 +41,7 @@ void SSAInfo::dump(Region const* rg) const
 
     VPR * vpr = ((VPR*)this);
     if (vpr->orgprno() != PRNO_UNDEF) {
-        prt(rg, "$%d", vpr->orgprno());
+        prt(rg, "%s%d", PR_TYPE_CHAR, vpr->orgprno());
     } else {
         prt(rg, "--");
     }
@@ -49,7 +49,7 @@ void SSAInfo::dump(Region const* rg) const
     prt(rg, "v%d", vpr->version());
 
     if (vpr->newprno() != PRNO_UNDEF) {
-        prt(rg, "$%d", vpr->newprno());
+        prt(rg, "%s%d", PR_TYPE_CHAR, vpr->newprno());
     } else {
         prt(rg, "--");
     }
@@ -64,17 +64,18 @@ void SSAInfo::dump(Region const* rg) const
     }
 
     //PR SSAInfo
-    UINT defprno = PRNO_UNDEF;
+    PRNO defprno = PRNO_UNDEF;
     if (def != nullptr) {
         ASSERT0(def->is_stmt());
         prt(rg, "DEF:%s", IRNAME(def));
         if (def->isWritePR()) {
             defprno = def->getPrno();
-            prt(rg, "($%d,id:%d)", def->getPrno(), def->id());
+            prt(rg, "(%s%d,id:%d)", PR_TYPE_CHAR, def->getPrno(), def->id());
         } else if (def->isCallStmt()) {
             if (def->hasReturnValue()) {
                 defprno = def->getPrno();
-                prt(rg, "($%d,id:%d)", def->getPrno(), def->id());
+                prt(rg, "(%s%d,id:%d)", PR_TYPE_CHAR, def->getPrno(),
+                    def->id());
             } else {
                 prt(rg, "NoRetVal??");
             }
@@ -91,15 +92,16 @@ void SSAInfo::dump(Region const* rg) const
     }
     prt(rg, " USE:");
     SSAUseIter vit = nullptr;
-    INT nexti = 0;
-    for (INT i2 = SSA_uses(this).get_first(&vit); vit != nullptr; i2 = nexti) {
+    BSIdx nexti = 0;
+    for (BSIdx i2 = SSA_uses(this).get_first(&vit);
+         vit != nullptr; i2 = nexti) {
         nexti = SSA_uses(this).get_next(i2, &vit);
         IR * use = rg->getIR(i2);
         ASSERT0(use->is_pr());
         ASSERTN(defprno == PRNO_UNDEF || defprno == use->getPrno(),
                 ("unmatched PR"));
         prt(rg, "id:%d", use->id());
-        if (nexti >= 0) {
+        if (nexti != BS_UNDEF) {
             prt(rg, ",");
         }
     }
@@ -113,7 +115,7 @@ void SSAInfo::dump(Region const* rg) const
 //Find the VPR that have PR defined at given BB.
 VPR * VPRVec::findVPR(UINT bbid) const
 {
-    for (INT i = 0; i <= get_last_idx(); i++) {
+    for (VecIdx i = 0; i <= get_last_idx(); i++) {
         VPR * vpr = get(i);
         if (vpr == nullptr || vpr->getDef() == nullptr) { continue; }
         ASSERT0(vpr->getDef() && vpr->getDef()->getBB());

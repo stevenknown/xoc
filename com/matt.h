@@ -2787,7 +2787,7 @@ void Matrix<T>::insertRowsBefore(UINT ridx,
         *this = tmp;
         return;
     }
-    inner(tmp, 0, 0, ridx-1, m_col_size - 1);
+    inner(tmp, 0, 0, ridx - 1, m_col_size - 1);
     tmp.growRow(m, mfrom, mto);
     tmp.growRow(*this, ridx, m_row_size - 1);
     *this = tmp;
@@ -2896,7 +2896,7 @@ void Matrix<T>::innerRow(OUT Matrix<T> & in, UINT from, UINT to) const
 {
     ASSERTN(m_is_init, ("not yet initialize."));
     ASSERTN(from <= to && to < m_row_size, ("illegal parameter"));
-    inner(in, from, 0, to, m_col_size -1);
+    inner(in, from, 0, to, m_col_size - 1);
 }
 
 

@@ -35,12 +35,12 @@ namespace xcom {
 //#define _BIT2NODE_IN_HASH_
 #define MD2NODE2_INIT_SZ 8 //The size must be power of 2.
 
-//For given SBitSetCore, mapping MD to its subsequently MD elements via HMap.
+//For given SBitSetCore, mapping MDIdx to its subsequently MD elements via HMap.
 template <UINT BitsPerSeg = BITS_PER_SEG>
 class Bit2NodeH {
 public:
     SBitSetCore<BitsPerSeg> * set; //will be freed by sbs_mgr.
-    HMap<UINT, Bit2NodeH*, HashFuncBase2<UINT> > next;
+    HMap<BSIdx, Bit2NodeH*, HashFuncBase2<BSIdx> > next;
 public:
     Bit2NodeH(UINT hash_tab_size = 16) : next(hash_tab_size) { set = nullptr; }
     ~Bit2NodeH() {}
@@ -54,8 +54,16 @@ template <UINT BitsPerSeg = BITS_PER_SEG>
 class Bit2NodeT {
     COPY_CONSTRUCTOR(Bit2NodeT);
 public:
+    class NextSet : public TMap<BSIdx, Bit2NodeT<BitsPerSeg>*> {
+    public:
+        NextSet(SMemPool * pool) : TMap<BSIdx, Bit2NodeT<BitsPerSeg>*>(pool) {}
+    };
+    class NextSetIter : public TMapIter<BSIdx, Bit2NodeT<BitsPerSeg>*> {
+    public:
+        NextSetIter() {}
+    };
     SBitSetCore<BitsPerSeg> * set; //will be freed by sbs_mgr.
-    TMap<UINT, Bit2NodeT*> next;
+    NextSet next;
 public:
     Bit2NodeT(SMemPool * pool = nullptr) : next(pool) { set = nullptr; }
     ~Bit2NodeT() {}
@@ -121,22 +129,20 @@ protected:
     }
 
     //dump_helper for SBitSetCore.
-    void dump_helper_set(FILE * h,
-                         SBitSetCore<BitsPerSeg> const* set,
-                         UINT indent,
-                         UINT id) const
+    void dump_helper_set(FILE * h, SBitSetCore<BitsPerSeg> const* set,
+                         UINT indent, VecIdx id) const
     {
         fprintf(h, "\n");
         UINT i = 0;
         while (i < indent) { fprintf(h, " "); i++; }
-        fprintf(h, "%d", id);
+        fprintf(h, "%u", id);
         if (set == nullptr) { return; }
         fprintf(h, " {");
         SEGIter * iter = nullptr;
-        for (INT j = set->get_first(&iter); j >= 0;) {
+        for (BSIdx j = set->get_first(&iter); j != BS_UNDEF;) {
             fprintf(h, "%d", j);
-            j = set->get_next((UINT)j, &iter);
-            if (j >= 0) {
+            j = set->get_next(j, &iter);
+            if (j != BS_UNDEF) {
                 fprintf(h, ",");
             }
         }
@@ -147,10 +153,10 @@ protected:
     //dump_helper for Bit2NodeH.
     void dump_helper(FILE * h, B2NType * mn, UINT indent) const
     {
-        INT pos;
+        VecIdx pos;
         for (B2NType * nextmn = mn->next.get_first_elem(pos);
              nextmn != nullptr; nextmn = mn->next.get_next_elem(pos)) {
-            dump_helper_set(h, nextmn->set, indent, (UINT)pos);
+            dump_helper_set(h, nextmn->set, indent, pos);
             ASSERT0(nextmn);
             dump_helper(h, nextmn, indent + 2);
         }
@@ -160,12 +166,10 @@ protected:
     void dump_helper(FILE * h, B2NType * mn, UINT indent) const
     {
         ASSERT0(mn);
-
-        TMapIter<UINT, B2NType*> ti;
+        class B2NType::NextSetIter ti;
         Stack<B2NType*> mn_stack;
         Stack<UINT> indent_stack;
         Stack<UINT> id_stack;
-
         mn_stack.push(mn);
         id_stack.push(0);
         indent_stack.push(indent);
@@ -178,7 +182,7 @@ protected:
             dump_helper_set(h, mn2->set, ind, id);
 
             B2NType * nextmn = nullptr;
-            for (UINT id2 = mn2->next.get_first(ti, &nextmn);
+            for (BSIdx id2 = mn2->next.get_first(ti, &nextmn);
                  id2 != 0; id2 = mn2->next.get_next(ti, &nextmn)) {
                 ASSERT0(nextmn);
                 mn_stack.push(nextmn);
@@ -204,7 +208,7 @@ public:
         m_bit2node = new B2NType(MD2NODE2_INIT_SZ);
         #else
         m_rbtn_pool = smpoolCreate(
-            sizeof(RBTNode<UINT, Bit2NodeT<BitsPerSeg>*>) * 4,
+            sizeof(RBTNode<BSIdx, Bit2NodeT<BitsPerSeg>*>) * 4,
             MEM_CONST_SIZE);
         m_bit2node = new B2NType();
         #endif
@@ -263,14 +267,14 @@ public:
         //#define ITER_EACH_BIT2NODE_TO_FREE_SET
         #ifdef ITER_EACH_BIT2NODE_TO_FREE_SET
         List<B2NType*> wl;
-        TMapIter<UINT, B2NType*> ti;
+        class B2NType::NextSetIter ti;
         wl.append_tail(get_root());
         while (wl.get_elem_count() != 0) {
             B2NType * mn = wl.remove_head();
             ASSERT0(mn);
             B2NType * nextmn = nullptr;
             ti.clean();
-            for (UINT id = mn->next.get_first(ti, &nextmn);
+            for (BSIdx id = mn->next.get_first(ti, &nextmn);
                  id != 0; id = mn->next.get_next(ti, &nextmn)) {
                 ASSERT0(nextmn);
                 wl.append_tail(nextmn);
@@ -322,23 +326,23 @@ public:
     SBitSetCore<BitsPerSeg> const* append(SBitSetCore<BitsPerSeg> const& set)
     {
         SEGIter * iter = nullptr;
-        INT id = set.get_first(&iter);
-        if (id < 0) { return nullptr; }
+        BSIdx id = set.get_first(&iter);
+        if (id == BS_UNDEF) { return nullptr; }
 
-        B2NType * mn = m_bit2node->next.get((UINT)id);
+        B2NType * mn = m_bit2node->next.get(id);
         if (mn == nullptr) {
             checkAndGrow(m_bit2node);
             mn = allocB2NType();
-            m_bit2node->next.set((UINT)id, mn);
+            m_bit2node->next.set(id, mn);
         }
 
-        INT nextid = set.get_next((UINT)id, &iter);
-        for (; nextid >= 0; nextid = set.get_next((UINT)nextid, &iter)) {
-            B2NType * nextmn = mn->next.get((UINT)nextid);
+        BSIdx nextid = set.get_next(id, &iter);
+        for (; nextid != BS_UNDEF; nextid = set.get_next(nextid, &iter)) {
+            B2NType * nextmn = mn->next.get(nextid);
             if (nextmn == nullptr) {
                 checkAndGrow(mn);
                 nextmn = allocB2NType();
-                mn->next.set((UINT)nextid, nextmn);
+                mn->next.set(nextid, nextmn);
             }
             mn = nextmn;
         }
@@ -393,7 +397,7 @@ public:
         #ifdef _BIT2NODE_IN_HASH_
         //Do nothing.
         #else
-        TMapIter<UINT, B2NType*> ti;
+        class B2NType::NextSetIter ti;
         #endif
 
         wl.append_tail(get_root());
@@ -404,14 +408,14 @@ public:
             B2NType * nextmn = nullptr;
 
             #ifdef _BIT2NODE_IN_HASH_
-            INT pos = 0;
+            VecIdx pos = 0;
             for (nextmn = mn->next.get_first_elem(pos);
                  nextmn != nullptr; nextmn = mn->next.get_next_elem(pos)) {
                 wl.append_tail(nextmn);
             }
             #else
             ti.clean();
-            for (UINT id = mn->next.get_first(ti, &nextmn);
+            for (BSIdx id = mn->next.get_first(ti, &nextmn);
                  id != 0; id = mn->next.get_next(ti, &nextmn)) {
                 ASSERT0(nextmn);
                 wl.append_tail(nextmn);
@@ -439,7 +443,7 @@ public:
         #ifdef _BIT2NODE_IN_HASH_
         //Do nothing.
         #else
-        TMapIter<UINT, B2NType*> ti;
+        class B2NType::NextSetIter ti;
         #endif
 
         wl.append_tail(get_root());
@@ -456,7 +460,7 @@ public:
             }
             #else
             ti.clean();
-            for (UINT id = mn->next.get_first(ti, &nextmn);
+            for (BSIdx id = mn->next.get_first(ti, &nextmn);
                  id != 0; id = mn->next.get_next(ti, &nextmn)) {
                 ASSERT0(nextmn);
                 wl.append_tail(nextmn);
@@ -474,16 +478,16 @@ public:
     bool find(SBitSetCore<BitsPerSeg> const& set) const
     {
         SEGIter * iter = nullptr;
-        INT id = set.get_first(&iter);
-        if (id < 0) { return false; }
+        BSIdx id = set.get_first(&iter);
+        if (id == BS_UNDEF) { return false; }
 
-        B2NType * mn = get_root()->next.get((UINT)id);
+        B2NType * mn = get_root()->next.get(id);
         if (mn == nullptr) { return false; }
 
-        INT nextid = set.get_next((UINT)id, &iter);
-        for (; nextid >= 0; id = nextid,
-             nextid = set.get_next((UINT)nextid, &iter)) {
-            B2NType * nextmn = mn->next.get((UINT)nextid);
+        BSIdx nextid = set.get_next(id, &iter);
+        for (; nextid != BS_UNDEF; id = nextid,
+             nextid = set.get_next(nextid, &iter)) {
+            B2NType * nextmn = mn->next.get(nextid);
             if (nextmn == nullptr) { return false; }
             mn = nextmn;
         }

@@ -376,7 +376,7 @@ void VarMgr::destroyVar(Var * v)
 
 void VarMgr::destroy()
 {
-    for (INT i = 0; i <= m_var_vec.get_last_idx(); i++) {
+    for (VecIdx i = 0; i <= m_var_vec.get_last_idx(); i++) {
         Var * v = m_var_vec.get((UINT)i);
         if (v == nullptr) { continue; }
         delete v;
@@ -395,15 +395,14 @@ bool VarMgr::isDedicatedStringVar(CHAR const* name) const
 void VarMgr::assignVarId(Var * v)
 {
     DefSBitSetIter iter = nullptr;
-    INT id = m_freelist_of_varid.get_first(&iter);
+    BSIdx id = m_freelist_of_varid.get_first(&iter);
     ASSERT0(id != VAR_ID_UNDEF);
-    if (id > 0) {
+    if (IS_BSUNDEF(id)) {
+        VAR_id(v) = (UINT)m_var_count++;
+    } else {
         m_freelist_of_varid.diff(id, *m_ru_mgr->get_sbs_mgr());
         VAR_id(v) = id;
-    } else {
-        VAR_id(v) = (UINT)m_var_count++;
     }
-
     ASSERTN(VAR_id(v) < VAR_ID_MAX, ("too many variables"));
     ASSERT0(m_var_vec.get(VAR_id(v)) == nullptr);
     m_var_vec.set(VAR_id(v), v);
@@ -415,7 +414,7 @@ void VarMgr::assignVarId(Var * v)
 //the first.
 Var * VarMgr::findVarByName(Sym const* name)
 {
-    for (INT i = 0; i <= m_var_vec.get_last_idx(); i++) {
+    for (VecIdx i = 0; i <= m_var_vec.get_last_idx(); i++) {
         Var * v = m_var_vec.get(i);
         if (v == nullptr) { continue; }
         if (v->get_name() == name) {
@@ -502,8 +501,8 @@ void VarMgr::dumpFreeIDList() const
     prt(rm, "\nVarMgr: FREE VAR ID:");
     DefSBitSetIter iter = nullptr;
     bool first = true;
-    for (INT id = m_freelist_of_varid.get_first(&iter);
-         id != -1; id = m_freelist_of_varid.get_next(id, &iter)) {
+    for (BSIdx id = m_freelist_of_varid.get_first(&iter);
+         id != BS_UNDEF; id = m_freelist_of_varid.get_next(id, &iter)) {
         if (!first) { prt(rm, ","); }
         prt(rm, "%d", id);
         first = false;
@@ -518,7 +517,7 @@ void VarMgr::dump() const
     prt(rm, "\n\nVAR to Decl Mapping:");
 
     StrBuf buf(64);
-    for (INT i = 0; i <= m_var_vec.get_last_idx(); i++) {
+    for (VecIdx i = 0; i <= m_var_vec.get_last_idx(); i++) {
         Var * v = m_var_vec.get(i);
         if (v == nullptr) { continue; }
 

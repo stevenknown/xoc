@@ -204,7 +204,7 @@ public:
     UINT formal_parameter_pos;
 
     //Record prno if Var indicates a PR location.
-    UINT prno;
+    PRNO prno;
 
     union {
         //Record string contents if Var is a constant string.
@@ -364,6 +364,7 @@ public:
         VAR_is_global(this) = (UINT)is_global;
         VAR_is_local(this) = (UINT)!is_global;
     }
+    void setToFormalParam() { SET_FLAG(VAR_flag(this), VAR_IS_FORMAL_PARAM); }
 };
 //END Var
 

@@ -43,7 +43,7 @@ static TokenInfo g_token_info[] = {
     { T_IMMU, "unsigned imm", },
     { T_IMMUL, "unsigned long imm", },
     { T_FP, "double decimal", },
-    { T_FPF,"float decimal", },
+    { T_FPF, "float decimal", },
     { T_FPLD, "long double decimal", },
     { T_STRING, "string", },
     { T_CHAR_LIST, "char list", },
@@ -142,9 +142,9 @@ static TokenInfo g_token_info[] = {
     { T_NEWLINE, "\\n", },
     { T_DOLLAR, "$" , },
 
-    ///////////////////////////////////////
-    //DO NOT ADD Enum AFTER THIS LINE./////
-    ///////////////////////////////////////
+    ///////////////////////////////////
+    //DO NOT ADD ENUM AFTER THIS LINE//
+    ///////////////////////////////////
     { T_END, "", },
 };
 

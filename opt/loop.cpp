@@ -844,8 +844,8 @@ static bool isLoopInvariantInMDSSA(IR const* ir, LI<IRBB> const* li,
     MDSSAInfo * mdssainfo = UseDefMgr::getMDSSAInfo(ir);
     ASSERT0(mdssainfo);
     VOpndSetIter iter = nullptr;
-    for (INT i = mdssainfo->getVOpndSet()->get_first(&iter);
-         i >= 0; i = mdssainfo->getVOpndSet()->get_next(i, &iter)) {
+    for (BSIdx i = mdssainfo->getVOpndSet()->get_first(&iter);
+         i != BS_UNDEF; i = mdssainfo->getVOpndSet()->get_next(i, &iter)) {
         VMD const* vopnd = (VMD const*)mdssamgr->getVOpnd(i);
         ASSERT0(vopnd && vopnd->is_md());
         if (!vopnd->hasDef()) { continue; }
@@ -877,8 +877,8 @@ static bool isLoopInvariantInDUMgr(IR const* ir,
     if (duset == nullptr) { return true; }
 
     DUSetIter dui = nullptr;
-    for (INT i = duset->get_first(&dui);
-         i >= 0; i = duset->get_next(i, &dui)) {
+    for (BSIdx i = duset->get_first(&dui);
+         i != BS_UNDEF; i = duset->get_next(i, &dui)) {
         IR const* def = const_cast<Region*>(rg)->getIR(i);
         ASSERT0(def->is_stmt());
         IRBB const* defbb = def->getBB();

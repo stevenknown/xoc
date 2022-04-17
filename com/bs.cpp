@@ -874,30 +874,30 @@ void BitSet::bunion(BitSet const& bs)
         //src's last byte pos.
         BSIdx l = bs.get_last();
         if (l == BS_UNDEF) { return; }
-        cp_sz = l / BITS_PER_BYTE + 1;
+        cp_sz = (UINT)(l / BITS_PER_BYTE) + 1;
         if (m_size < cp_sz) {
             m_ptr = (BYTE*)realloc(m_ptr, m_size, cp_sz);
             m_size = cp_sz;
         }
     }
-    UINT const num_of_uint = cp_sz / BYTES_PER_UINT; //floor-div.
+    UINT const num_of_unit = cp_sz / BYTES_PER_UNIT; //floor-div.
     ASSERTN(m_ptr, ("not yet init"));
-    UINT * uint_ptr_this = (UINT*)m_ptr;
-    UINT * uint_ptr_bs = (UINT*)bs.m_ptr;
-    for (UINT i = 0; i < num_of_uint; i++) {
+    BSUNIT * uint_ptr_this = (BSUNIT*)m_ptr;
+    BSUNIT * uint_ptr_bs = (BSUNIT*)bs.m_ptr;
+    for (UINT i = 0; i < num_of_unit; i++) {
         uint_ptr_this[i] |= uint_ptr_bs[i];
     }
-    for (UINT i = num_of_uint * BYTES_PER_UINT; i < cp_sz; i++) {
+    for (UINT i = num_of_unit * BYTES_PER_UNIT; i < cp_sz; i++) {
         m_ptr[i] |= bs.m_ptr[i];
     }
 }
 
 
 //Add a element which corresponding to 'elem' bit, and set this bit.
-void BitSet::bunion(UINT elem)
+void BitSet::bunion(BSIdx elem)
 {
     UINT const first_byte = DIVBPB(elem);
-    if (m_size < (first_byte+1)) {
+    if (m_size < (first_byte + 1)) {
         m_ptr = (BYTE*)realloc(m_ptr, m_size, first_byte + 1);
         m_size = first_byte+1;
     }
@@ -909,7 +909,7 @@ void BitSet::bunion(UINT elem)
 //The difference operation calculates the elements that
 //distinguish one set from another.
 //Remove a element which map with 'elem' bit, and clean this bit.
-void BitSet::diff(UINT elem)
+void BitSet::diff(BSIdx elem)
 {
     UINT first_byte = DIVBPB(elem);
     if ((first_byte + 1) > m_size) {
@@ -935,10 +935,10 @@ void BitSet::diff(BitSet const& bs)
     //for (UINT i = 0; i < minsize; i++) {
     //    m_ptr[i] &= ~bs.m_ptr[i];
     //}
-    UINT num_of_uint = minsize / BYTES_PER_UINT;
-    UINT * uint_ptr_this = (UINT*)m_ptr;
-    UINT * uint_ptr_bs = (UINT*)bs.m_ptr;
-    for (UINT i = 0; i < num_of_uint; i++) {
+    UINT num_of_unit = minsize / BYTES_PER_UNIT;
+    BSUNIT * uint_ptr_this = (BSUNIT*)m_ptr;
+    BSUNIT * uint_ptr_bs = (BSUNIT*)bs.m_ptr;
+    for (UINT i = 0; i < num_of_unit; i++) {
         UINT d = uint_ptr_bs[i];
         if (d != 0) {
             uint_ptr_this[i] &= ~d;
@@ -946,7 +946,7 @@ void BitSet::diff(BitSet const& bs)
     }
 
     ASSERTN(m_ptr != nullptr, ("not yet init"));
-    for (UINT i = num_of_uint * BYTES_PER_UINT; i < minsize; i++) {
+    for (UINT i = num_of_unit * BYTES_PER_UNIT; i < minsize; i++) {
         BYTE d = bs.m_ptr[i];
         if (d != 0) {
             m_ptr[i] &= ~d;
@@ -976,25 +976,26 @@ void BitSet::intersect(BitSet const& bs)
 //Reverse each bit.
 //e.g: 1001 to 0110
 //'last_bit_pos': start at 0, e.g:given '101', last bit pos is 2.
-void BitSet::rev(UINT last_bit_pos)
+void BitSet::rev(BSIdx last_bit_pos)
 {
     ASSERTN(m_ptr != nullptr, ("can not reverse empty set"));
-    UINT const last_byte_pos = last_bit_pos / BITS_PER_BYTE;
+    ASSERT0(last_bit_pos != BS_UNDEF);
+    UINT const last_byte_pos = ((BSUNIT)last_bit_pos) / (BSUNIT)BITS_PER_BYTE;
     ASSERT0(last_byte_pos < m_size);
 
-    UINT const n = last_byte_pos / BYTES_PER_UINT;
+    UINT const n = (BSUNIT)last_byte_pos / (BSUNIT)BYTES_PER_UNIT;
     for (UINT i = 0; i < n; i++) {
-        ((UINT*)m_ptr)[i] = ~(((UINT*)m_ptr)[i]);
+        ((BSUNIT*)m_ptr)[i] = ~(((BSUNIT*)m_ptr)[i]);
     }
 
-    for (UINT i = n * BYTES_PER_UINT; i < last_byte_pos; i++) {
+    for (UINT i = n * BYTES_PER_UNIT; i < last_byte_pos; i++) {
         m_ptr[i] = ~m_ptr[i];
     }
 
     //Here we use UINT type to avoid byte truncate operation.
     UINT last_byte = m_ptr[last_byte_pos];
 
-    UINT const mask = (1 << (last_bit_pos % BITS_PER_BYTE + 1)) - 1;
+    UINT const mask = (1 << (((BSUNIT)last_bit_pos) % BITS_PER_BYTE + 1)) - 1;
     UINT const rev_last_byte = (~last_byte) & mask;
     last_byte = (last_byte & (~mask)) | rev_last_byte;
 
@@ -1022,15 +1023,15 @@ UINT BitSet::get_elem_count() const
     UINT count = 0;
 //#define HAMMING_WEIGHT_METHOD
 #ifdef HAMMING_WEIGHT_METHOD
-    ASSERT0(BYTES_PER_UINT == 4);
-    UINT const m = m_size / BYTES_PER_UINT;
+    ASSERT0(BYTES_PER_UNIT == 4);
+    UINT const m = m_size / BYTES_PER_UNIT;
     for (UINT i = 0; i < m; i++) {
-        UINT v = ((UINT*)(m_ptr))[i];
+        BSUNIT v = ((BSUNIT*)(m_ptr))[i];
         v = v - ((v >> 1) & 0x55555555);
         v = (v & 0x33333333) + ((v >> 2) & 0x33333333);
         count += (((v + (v >> 4)) & 0x0F0F0F0F) * 0x01010101) >> 24;
     }
-    for (UINT i = m * BYTES_PER_UINT; i < m_size; i++) {
+    for (UINT i = m * BYTES_PER_UNIT; i < m_size; i++) {
         count += g_bit_count[m_ptr[i]];
     }
 #else
@@ -1068,8 +1069,8 @@ bool BitSet::is_equal(BitSet const& bs) const
         size2 = tmp1;
     }
 
-    UINT v1 = *(UINT*)ptr1;
-    UINT v2 = *(UINT*)ptr2;
+    BSUNIT v1 = *(BSUNIT*)ptr1;
+    BSUNIT v2 = *(BSUNIT*)ptr2;
     switch (size1) {
     case 1:
         if ((v1&0xff) != (v2&0xff)) { return false; }
@@ -1097,10 +1098,10 @@ bool BitSet::is_equal(BitSet const& bs) const
 
 
 //Return true if this contain elem.
-bool BitSet::is_contain(UINT elem) const
+bool BitSet::is_contain(BSIdx elem) const
 {
     if (m_ptr == nullptr) { return false; }
-    if (elem >= (MULBPB(m_size))) {
+    if (((BSUNIT)elem) >= (MULBPB(m_size))) {
         return false;
     }
     if ((m_ptr[DIVBPB(elem)] & (1 << (MODBPB(elem)))) != 0) {
@@ -1169,14 +1170,14 @@ bool BitSet::is_contain(BitSet const& bs, bool strict) const
 bool BitSet::is_empty() const
 {
     if (m_ptr == nullptr) { return true; }
-    UINT num_of_uint = m_size / BYTES_PER_UINT;
-    UINT * uint_ptr = (UINT*)m_ptr;
-    for (UINT i = 0; i < num_of_uint; i++) {
+    UINT num_of_unit = m_size / BYTES_PER_UNIT;
+    BSUNIT * uint_ptr = (BSUNIT*)m_ptr;
+    for (UINT i = 0; i < num_of_unit; i++) {
         if (uint_ptr[i] != 0) {
              return false;
         }
     }
-    for (UINT i = num_of_uint * BYTES_PER_UINT; i < m_size; i++) {
+    for (UINT i = num_of_unit * BYTES_PER_UNIT; i < m_size; i++) {
         if (m_ptr[i] != (BYTE)0) {
              return false;
         }
@@ -1197,8 +1198,8 @@ bool BitSet::is_intersect(BitSet const& bs) const
         return false;
     }
 
-    UINT const start_bit = MAX(first_bit, bs_first_bit);
-    UINT const end_bit = MIN(get_last(), bs.get_last());
+    BSIdx const start_bit = MAX(first_bit, bs_first_bit);
+    BSIdx const end_bit = MIN(get_last(), bs.get_last());
     UINT const start_byte = DIVBPB(start_bit);
     UINT const end_byte = DIVBPB(end_bit);
 
@@ -1213,7 +1214,7 @@ bool BitSet::is_intersect(BitSet const& bs) const
 
 //Return true if 'this' contained in range between 'low' and 'high'.
 //'strict': 'this' strictly contained in range.
-bool BitSet::is_contained_in_range(UINT low, UINT high, bool strict) const
+bool BitSet::is_contained_in_range(BSIdx low, BSIdx high, bool strict) const
 {
     ASSERTN(low <= high, ("Invalid bit set"));
     BSIdx const set_low = get_first();
@@ -1227,11 +1228,11 @@ bool BitSet::is_contained_in_range(UINT low, UINT high, bool strict) const
     //     set_low        set_high
     //        |--------------|           given bitset
     if (strict) {
-        if ((UINT)set_low > low && (UINT)set_high < high) {
+        if (set_low > low && set_high < high) {
             return true;
         }
     } else {
-        if ((UINT)set_low >= low && (UINT)set_high <= high) {
+        if (set_low >= low && set_high <= high) {
             return true;
         }
     }
@@ -1240,7 +1241,7 @@ bool BitSet::is_contained_in_range(UINT low, UINT high, bool strict) const
 
 
 //Return true if 'this' contained range between 'low' and 'high'.
-bool BitSet::is_contain_range(UINT low, UINT high, bool strict) const
+bool BitSet::is_contain_range(BSIdx low, BSIdx high, bool strict) const
 {
     ASSERTN(low <= high, ("Invalid bit set"));
     BSIdx const set_low = get_first();
@@ -1254,11 +1255,11 @@ bool BitSet::is_contain_range(UINT low, UINT high, bool strict) const
     // set_low                     set_high
     //    |---------------------------|        //given set
     if (strict) {
-        if ((UINT)set_low < low && (UINT)set_high > high) {
+        if (set_low < low && set_high > high) {
             return true;
         }
     } else {
-        if ((UINT)set_low <= low && (UINT)set_high >= high) {
+        if (set_low <= low && set_high >= high) {
             return true;
         }
     }
@@ -1269,7 +1270,7 @@ bool BitSet::is_contain_range(UINT low, UINT high, bool strict) const
 //Return true if range between first_bit of 'this' and
 //last_bit of 'this' overlapped with the range between
 //'low' and 'high'.
-bool BitSet::is_overlapped(UINT low, UINT high) const
+bool BitSet::is_overlapped(BSIdx low, BSIdx high) const
 {
     ASSERTN(low <= high, ("Invalid bit set"));
     BSIdx const set_low = get_first();
@@ -1283,7 +1284,7 @@ bool BitSet::is_overlapped(UINT low, UINT high) const
     // |---------------------------|     given range
     //     set_low        set_high
     //        |--------------|           given bitset
-    if ((UINT)set_low >= low && (UINT)set_high <= high) {
+    if (set_low >= low && set_high <= high) {
         return true;
     }
 
@@ -1292,7 +1293,7 @@ bool BitSet::is_overlapped(UINT low, UINT high) const
     //          |--------------|
     // set_low                     set_high
     //    |---------------------------|
-    if ((UINT)set_low <= low && (UINT)set_high >= high) {
+    if (set_low <= low && set_high >= high) {
         return true;
     }
 
@@ -1301,7 +1302,7 @@ bool BitSet::is_overlapped(UINT low, UINT high) const
     //          |--------------|
     // set_low        set_high
     //    |--------------|
-    if ((UINT)set_high >= low && (UINT)set_high <= high) {
+    if (set_high >= low && set_high <= high) {
         return true;
     }
 
@@ -1310,7 +1311,7 @@ bool BitSet::is_overlapped(UINT low, UINT high) const
     //        |--------------|
     //            set_low          set_high
     //               |----------------|
-    if ((UINT)set_low >= low && (UINT)set_low <= high) {
+    if (set_low >= low && set_low <= high) {
         return true;
     }
     return false;
@@ -1318,22 +1319,22 @@ bool BitSet::is_overlapped(UINT low, UINT high) const
 
 
 //Return true if there is elements in the range between 'low' and 'high'.
-bool BitSet::has_elem_in_range(UINT low, UINT high) const
+bool BitSet::has_elem_in_range(BSIdx low, BSIdx high) const
 {
     ASSERTN(low <= high, ("out of boundary"));
     BSIdx const first_bit = get_first();
-    if (first_bit == BS_UNDEF || (UINT)first_bit > high) {
+    if (first_bit == BS_UNDEF || first_bit > high) {
         return false;
     }
-    if ((UINT)first_bit >= low && (UINT)first_bit <= high) {
+    if (first_bit >= low && first_bit <= high) {
         return true;
     }
     BSIdx const last_bit = get_last();
-    if ((UINT)last_bit < low) {
+    if (last_bit < low) {
         return false;
     }
     BSIdx const start_bit = low;
-    BSIdx const end_bit = MIN((UINT)last_bit, high);
+    BSIdx const end_bit = MIN(last_bit, high);
     if (is_contain(start_bit)) {
         return true;
     }
@@ -1350,9 +1351,9 @@ BSIdx BitSet::get_first() const
 {
     if (m_size == 0) { return BS_UNDEF; }
     UINT i = 0;
-    UINT m = m_size / BYTES_PER_UINT * BYTES_PER_UINT;
-    for (UINT const* uint_ptr = ((UINT const*)(m_ptr));
-         i < m; uint_ptr++, i += BYTES_PER_UINT) {
+    UINT m = m_size / BYTES_PER_UNIT * BYTES_PER_UNIT;
+    for (BSUNIT const* uint_ptr = (BSUNIT const*)m_ptr;
+         i < m; uint_ptr++, i += BYTES_PER_UNIT) {
         if (*uint_ptr == 0) { continue; }
         for (BYTE const* bptr = ((BYTE*)(uint_ptr));
              i < m; bptr++, i++) {
@@ -1379,7 +1380,7 @@ BSIdx BitSet::get_first() const
 BSIdx BitSet::get_last() const
 {
     if (m_size == 0) { return BS_UNDEF; }
-    UINT m = m_size % BYTES_PER_UINT;
+    UINT m = m_size % BYTES_PER_UNIT;
     UINT i = m_size - 1;
     if (m != 0) {
         for (UINT j = 0; j < m; j++) {
@@ -1388,33 +1389,33 @@ BSIdx BitSet::get_last() const
                 return g_last_one[byte] + (MULBPB(i - j));
             }
         }
-        if (m_size <= BYTES_PER_UINT) {
+        if (m_size <= BYTES_PER_UNIT) {
             return BS_UNDEF;
         }
         i -= m;
     }
 
-    UINT const* uint_ptr;
+    BSUNIT const* unit_ptr;
     UINT j = 0;
-    for (uint_ptr = ((UINT const*)(m_ptr)) + i / BYTES_PER_UINT;
-         j <= i; uint_ptr--, j += BYTES_PER_UINT) {
-        if (*uint_ptr == 0) { continue; }
-        INT k = BYTES_PER_UINT - 1;
-        for (BYTE const* bptr = ((BYTE*)(uint_ptr)) + k; k >= 0; bptr--, k--) {
+    for (unit_ptr = ((BSUNIT const*)(m_ptr)) + i / BYTES_PER_UNIT;
+         j <= i; unit_ptr--, j += BYTES_PER_UNIT) {
+        if (*unit_ptr == 0) { continue; }
+        INT k = BYTES_PER_UNIT - 1;
+        for (BYTE const* bptr = ((BYTE*)(unit_ptr)) + k; k >= 0; bptr--, k--) {
             BYTE byte = *bptr;
             if (byte != (BYTE)0) {
                 return g_last_one[byte] +
-                       (MULBPB(i - j - (BYTES_PER_UINT - 1 - k)));
+                       (MULBPB(i - j - (BYTES_PER_UNIT - 1 - k)));
             }
         }
     }
-    ASSERT0(m_ptr == ((BYTE*)uint_ptr) + sizeof(UINT));
+    ASSERT0(m_ptr == ((BYTE*)unit_ptr) + sizeof(UINT));
     return BS_UNDEF;
 }
 
 
 //Extract subset in range between 'low' and 'high'.
-BitSet * BitSet::get_subset_in_range(UINT low, UINT high, OUT BitSet & subset)
+BitSet * BitSet::get_subset_in_range(BSIdx low, BSIdx high, OUT BitSet & subset)
 {
     ASSERTN(low <= high, ("Invalid bit set"));
     ASSERTN(&subset != this, ("overlapped!"));
@@ -1425,7 +1426,7 @@ BitSet * BitSet::get_subset_in_range(UINT low, UINT high, OUT BitSet & subset)
         return &subset;
     }
     BSIdx last_bit = get_last();
-    if ((low > (UINT)last_bit) || (high < (UINT)first_bit)) {
+    if ((low > last_bit) || (high < first_bit)) {
         return &subset;
     }
 
@@ -1529,7 +1530,7 @@ BitSet * BitSet::get_subset_in_range(UINT low, UINT high, OUT BitSet & subset)
 
 //Return BS_UNDEF if it has no other element.
 //'elem': return next one to current element.
-BSIdx BitSet::get_next(UINT elem) const
+BSIdx BitSet::get_next(BSIdx elem) const
 {
     if (m_size == 0) { return BS_UNDEF; }
     UINT first_byte = DIVBPB(elem);
@@ -1584,7 +1585,7 @@ void BitSet::copy(BitSet const& src)
             return;
         }
 
-        cp_sz = l / BITS_PER_BYTE + 1;
+        cp_sz = (UINT)(l / BITS_PER_BYTE) + 1;
         if (m_size < cp_sz) {
             ::free(m_ptr);
             m_ptr = (BYTE*)::malloc(cp_sz);
@@ -1671,7 +1672,7 @@ void BitSet::dump(FILE * h, UINT flag, BSIdx last_pos) const
             fprintf(h, "\npos(start at 0):");
             elem = get_first();
             do {
-                fprintf(h, "%d ", elem);
+                fprintf(h, "%u ", elem);
                 elem = get_next(elem);
             } while (elem >= 0);
         }

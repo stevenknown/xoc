@@ -74,7 +74,8 @@ static bool hasElemPointToWorstCase(MDSet const& mds, AliasAnalysis const* aa,
                                     MD2MDSet const& mx)
 {
     MDSetIter it;
-    for (INT i = mds.get_first(&it); i >= 0; i = mds.get_next((UINT)i, &it)) {
+    for (BSIdx i = mds.get_first(&it);
+         i != BS_UNDEF; i = mds.get_next(i, &it)) {
         MDSet const* pts = aa->getPointTo((UINT)i, mx);
         if (pts != nullptr && aa->isWorstCase(pts)) {
             return true;
@@ -169,7 +170,7 @@ static bool isAllElementDerivedFromSameEffectVar(MDSet const& mds,
     MDSetIter iter = nullptr;
     TMWORD ofst = (TMWORD)-1;
     TMWORD size = 0;
-    INT i = mds.get_first(&iter);
+    BSIdx i = mds.get_first(&iter);
     MD const* md = mdsys->getMD((UINT)i);
     if (!md->is_effect() || md->is_may()) {
         return false;
@@ -177,9 +178,9 @@ static bool isAllElementDerivedFromSameEffectVar(MDSet const& mds,
     ofst = MIN(ofst, md->getByteOfst());
     size = MAX(size, (md->getByteOfst() + md->getByteSize()));
     Var * base = md->get_base();
-    i = mds.get_next((UINT)i, &iter);
-    for (; i >= 0; i = mds.get_next((UINT)i, &iter)) {
-        MD const* md2 = mdsys->getMD((UINT)i);
+    i = mds.get_next(i, &iter);
+    for (; i != BS_UNDEF; i = mds.get_next(i, &iter)) {
+        MD const* md2 = mdsys->getMD((MDIdx)i);
         if (md2->get_base() != base || !md2->is_effect() || md2->is_may()) {
             return false;
         }
@@ -288,7 +289,7 @@ size_t AliasAnalysis::countMD2MDSetMemory() const
 //If you query sideeffect md or mdset, these data structure must be recomputed.
 void AliasAnalysis::destroyContext()
 {
-    for (INT i = 0; i <= m_md2mds_vec.get_last_idx(); i++) {
+    for (VecIdx i = 0; i <= m_md2mds_vec.get_last_idx(); i++) {
         MD2MDSet * mx = m_md2mds_vec.get((UINT)i);
         if (mx == nullptr) { continue; }
         mx->destroy();
@@ -304,7 +305,7 @@ void AliasAnalysis::destroyContext()
 //Clean but not destory context data structures.
 void AliasAnalysis::cleanContext()
 {
-    for (INT i = 0; i <= m_md2mds_vec.get_last_idx(); i++) {
+    for (VecIdx i = 0; i <= m_md2mds_vec.get_last_idx(); i++) {
         MD2MDSet * mx = m_md2mds_vec.get((UINT)i);
         if (mx == nullptr) { continue; }
         mx->destroy();
@@ -354,9 +355,9 @@ void AliasAnalysis::reviseMDSize(MOD MDSet & mds, UINT size)
     UINT num = 0;
     bool change = false;
     MDSetIter iter = nullptr;
-    for (INT i = mds.get_first(&iter);
-         i >= 0; i = mds.get_next((UINT)i, &iter)) {
-        MD * md = m_md_sys->getMD((UINT)i);
+    for (BSIdx i = mds.get_first(&iter);
+         i != BS_UNDEF; i = mds.get_next(i, &iter)) {
+        MD * md = m_md_sys->getMD((MDIdx)i);
         ASSERT0(md && md->is_effect());
 
         //We have to register a new MD which size is equal to pointer's base.
@@ -378,8 +379,8 @@ void AliasAnalysis::reviseMDSize(MOD MDSet & mds, UINT size)
     }
     if (change) {
         mds.clean(*getSBSMgr());
-        for (INT i = ((INT)num) - 1; i >= 0; i--) {
-            mds.bunion(res.get((UINT)i), *getSBSMgr());
+        for (VecIdx i = ((VecIdx)num) - 1; i != VEC_UNDEF; i--) {
+            mds.bunion(res.get(i), *getSBSMgr());
         }
     }
 }
@@ -501,10 +502,10 @@ void AliasAnalysis::processCvt(IR const* ir, MOD MDSet & mds,
 
     MDSetIter iter;
     UINT size = ir->getTypeSize(m_tm); //cvt's tgt byte size.
-    INT next;
-    for (INT i = mds.get_first(&iter); i >= 0; i = next) {
-        next = mds.get_next((UINT)i, &iter);
-        MD const* l = m_md_sys->getMD((UINT)i);
+    BSIdx next;
+    for (BSIdx i = mds.get_first(&iter); i != BS_UNDEF; i = next) {
+        next = mds.get_next(i, &iter);
+        MD const* l = m_md_sys->getMD((MDIdx)i);
         ASSERT0(l);
 
         if (l->is_exact() && MD_size(l) != size) {
@@ -529,8 +530,9 @@ void AliasAnalysis::inferArrayInfinite(INT ofst, bool is_ofst_pred,
                                        OUT MDSet & out)
 {
     MDSetIter iter;
-    for (INT i = in.get_first(&iter); i >= 0; i = in.get_next((UINT)i, &iter)) {
-        MD const* org = m_md_sys->getMD((UINT)i);
+    for (BSIdx i = in.get_first(&iter);
+         i != BS_UNDEF; i = in.get_next(i, &iter)) {
+        MD const* org = m_md_sys->getMD((MDIdx)i);
         MD tmd(*org);
         if (is_ofst_pred && tmd.is_exact()) {
             MD_ofst(&tmd) += ofst;
@@ -611,9 +613,9 @@ void AliasAnalysis::collectPointToForElem(MDSet const& mds, MD2MDSet const* mx,
 {
     ASSERT0(united && hashed);
     MDSetIter iter;
-    for (INT i = mds.get_first(&iter);
-         i >= 0; i = mds.get_next((UINT)i, &iter)) {
-        MDSet const* pts = getPointTo((UINT)i, *mx);
+    for (BSIdx i = mds.get_first(&iter);
+         i != BS_UNDEF; i = mds.get_next(i, &iter)) {
+        MDSet const* pts = getPointTo((MDIdx)i, *mx);
         if (pts != nullptr && isWorstCase(pts)) {
             //We do NOT known where p[...] pointed to, use the
             //conservative solution.
@@ -625,9 +627,9 @@ void AliasAnalysis::collectPointToForElem(MDSet const& mds, MD2MDSet const* mx,
 
     //Collect the POINT-TO of each elements in MDSet.
     *hashed = nullptr;
-    for (INT i = mds.get_first(&iter);
-         i >= 0; i = mds.get_next((UINT)i, &iter)) {
-        MDSet const* pts = getPointTo((UINT)i, *mx);
+    for (BSIdx i = mds.get_first(&iter);
+         i != BS_UNDEF; i = mds.get_next(i, &iter)) {
+        MDSet const* pts = getPointTo((MDIdx)i, *mx);
         if (pts != nullptr) {
             united->bunion(*pts, *getSBSMgr());
         }
@@ -741,9 +743,9 @@ void AliasAnalysis::inferArrayExpBase(IR * ir, IR * array_base,
     mds.clean(*getSBSMgr());
     UINT mdsz = ir->getTypeSize(m_tm);
     MDSetIter iter;
-    for (INT i = tmp.get_first(&iter);
-         i >= 0; i = tmp.get_next((UINT)i, &iter)) {
-        ASSERT0(m_md_sys->getMD((UINT)i));
+    for (BSIdx i = tmp.get_first(&iter);
+         i != BS_UNDEF; i = tmp.get_next(i, &iter)) {
+        ASSERT0(m_md_sys->getMD((MDIdx)i));
 
         //Get to know where the base pointed to.
         MDSet const* pts = getPointTo((UINT)i, *mx);
@@ -1101,9 +1103,9 @@ bool AliasAnalysis::tryComputeConstOffset(IR const* ir,
     mds.clean(*getSBSMgr());
     MDSetIter iter;
     if (ir->is_add()) {
-        for (INT i = opnd0_mds.get_first(&iter);
-            i >= 0; i = opnd0_mds.get_next((UINT)i, &iter)) {
-            MD * imd = m_md_sys->getMD((UINT)i);
+        for (BSIdx i = opnd0_mds.get_first(&iter);
+            i != BS_UNDEF; i = opnd0_mds.get_next(i, &iter)) {
+            MD * imd = m_md_sys->getMD((MDIdx)i);
             if (!imd->is_exact()) {
                 mds.bunion(imd, *getSBSMgr());
                 continue;
@@ -1122,9 +1124,9 @@ bool AliasAnalysis::tryComputeConstOffset(IR const* ir,
         return true;
     }
 
-    for (INT i = opnd0_mds.get_first(&iter);
-         i >= 0; i = opnd0_mds.get_next((UINT)i, &iter)) {
-        MD * imd = m_md_sys->getMD((UINT)i);
+    for (BSIdx i = opnd0_mds.get_first(&iter);
+         i != BS_UNDEF; i = opnd0_mds.get_next(i, &iter)) {
+        MD * imd = m_md_sys->getMD((MDIdx)i);
         if (!imd->is_exact()) {
             mds.bunion(imd, *getSBSMgr());
             continue;
@@ -1339,9 +1341,9 @@ void AliasAnalysis::inferPointerArith(IR const* ir, OUT MDSet & mds,
 void AliasAnalysis::convertExact2Unbound(MDSet const& src, MDSet * tgt)
 {
     MDSetIter iter;
-    for (INT i = src.get_first(&iter);
-        i >= 0; i = src.get_next((UINT)i, &iter)) {
-        MD * imd = m_md_sys->getMD((UINT)i);
+    for (BSIdx i = src.get_first(&iter);
+        i != BS_UNDEF; i = src.get_next(i, &iter)) {
+        MD * imd = m_md_sys->getMD((MDIdx)i);
         if (!imd->is_exact()) {
             tgt->bunion(imd, *getSBSMgr());
             continue;
@@ -1610,9 +1612,9 @@ MDSet const* AliasAnalysis::unifyPointToSet(MDSet const& mds,
 
     MDSet tmp;
     iter = nullptr;
-    for (INT i = mds.get_first(&iter);
-         i >= 0; i = mds.get_next((UINT)i, &iter)) {
-        MDSet const* pts = getPointTo((UINT)i, *const_cast<MD2MDSet*>(mx));
+    for (BSIdx i = mds.get_first(&iter);
+         i != BS_UNDEF; i = mds.get_next(i, &iter)) {
+        MDSet const* pts = getPointTo((MDIdx)i, *const_cast<MD2MDSet*>(mx));
         if (pts != nullptr && !pts->is_empty()) {
             tmp.bunion(*pts, *getSBSMgr());
         } else {
@@ -1771,8 +1773,9 @@ void AliasAnalysis::processILoad(IR * ir, MOD MDSet & mds,
     MDSet tmp;
     MDSetIter it;
     //'mds' represents the may-address of current ILD.
-    for (INT i = mds.get_first(&it); i >= 0; i = mds.get_next((UINT)i, &it)) {
-        MDSet const* pts = getPointTo((UINT)i, *mx);
+    for (BSIdx i = mds.get_first(&it);
+         i != BS_UNDEF; i = mds.get_next(i, &it)) {
+        MDSet const* pts = getPointTo((MDIdx)i, *mx);
         ASSERT0(pts && !isWorstCase(pts));
         tmp.bunion(*pts, *getSBSMgr());
     }
@@ -2257,9 +2260,9 @@ bool AliasAnalysis::tryReshapeMDSet(IR const* ir, MDSet const* mds,
     MDSetIter iter = nullptr;
     //Note if ir's type is ANY, then the size is 1, see details in data_type.h.
     //Thus MD indicates an object that is p + ild_ofst + 0.
-    for (INT i = mds->get_first(&iter);
-         i >= 0; i = mds->get_next((UINT)i, &iter)) {
-        MD const* l = m_md_sys->getMD((UINT)i);
+    for (BSIdx i = mds->get_first(&iter);
+         i != BS_UNDEF; i = mds->get_next(i, &iter)) {
+        MD const* l = m_md_sys->getMD((MDIdx)i);
         ASSERT0(l);
         if (l->is_exact() && (l->getByteSize() != newsize || newofst != 0)) {
             //Reshape MD in IR reference.
@@ -2394,7 +2397,7 @@ void AliasAnalysis::processRegionSideeffect(MOD MD2MDSet & mx)
     //Set all mds which are global pointers or parameters which taken
     //address point to maypts.
     MDId2MD const* id2md = m_md_sys->getID2MDMap();
-    for (INT j = MD_FIRST; j <= id2md->get_last_idx(); j++) {
+    for (VecIdx j = MD_FIRST; j <= id2md->get_last_idx(); j++) {
         MD * t = id2md->get((UINT)j);
         if (t == nullptr) {
             //MD j has been allocated but freed and record in free-list.
@@ -2430,7 +2433,7 @@ void AliasAnalysis::processCallSideeffect(MOD MD2MDSet & mx,
     //Set all elem in MDSet which are global pointers or parameters which be
     //taken address points to maypts.
     MDId2MD const* id2md = m_md_sys->getID2MDMap();
-    for (INT j = MD_FIRST; j <= id2md->get_last_idx(); j++) {
+    for (VecIdx j = MD_FIRST; j <= id2md->get_last_idx(); j++) {
         MD const* t = id2md->get((UINT)j);
         if (t == nullptr) { continue; }
 
@@ -2803,10 +2806,10 @@ void AliasAnalysis::ElemUnionPointTo(MDSet const& mds, MDSet const& pt_set,
 {
     ASSERT0(m_mds_hash->find(pt_set));
     MDSetIter iter;
-    for (INT i = mds.get_first(&iter);
-         i >= 0; i = mds.get_next((UINT)i, &iter)) {
-        ASSERT0(m_md_sys->getMD((UINT)i));
-        setPointToMDSetByAddMDSet((UINT)i, *mx, pt_set);
+    for (BSIdx i = mds.get_first(&iter);
+         i != BS_UNDEF; i = mds.get_next(i, &iter)) {
+        ASSERT0(m_md_sys->getMD((MDIdx)i));
+        setPointToMDSetByAddMDSet((MDIdx)i, *mx, pt_set);
     }
 }
 
@@ -2817,10 +2820,10 @@ void AliasAnalysis::ElemUnionPointTo(MDSet const& mds, MD const* pt_elem,
                                      IN MD2MDSet * mx)
 {
     MDSetIter iter;
-    for (INT i = mds.get_first(&iter);
-         i >= 0; i = mds.get_next((UINT)i, &iter)) {
-        ASSERT0(m_md_sys->getMD((UINT)i));
-        setPointToMDSetByAddMD((UINT)i, *mx, pt_elem);
+    for (BSIdx i = mds.get_first(&iter);
+         i != BS_UNDEF; i = mds.get_next(i, &iter)) {
+        ASSERT0(m_md_sys->getMD((MDIdx)i));
+        setPointToMDSetByAddMD((MDIdx)i, *mx, pt_elem);
     }
 }
 
@@ -2837,9 +2840,9 @@ void AliasAnalysis::ElemCopyAndUnionPointTo(MDSet const& mds,
     ASSERT0(m_mds_hash->find(pt_set));
     if (isWorstCase(&pt_set)) {
         MDSetIter iter = nullptr;
-        for (INT i = mds.get_first(&iter);
-             i >= 0; i = mds.get_next((UINT)i, &iter)) {
-            ASSERT0(m_md_sys->getMD((UINT)i));
+        for (BSIdx i = mds.get_first(&iter);
+             i != BS_UNDEF; i = mds.get_next(i, &iter)) {
+            ASSERT0(m_md_sys->getMD((MDIdx)i));
             //Both exact and inexact MD points to MayPointToSet.
             setPointTo((UINT)i, *mx, getWorstCase());
         }
@@ -2847,11 +2850,11 @@ void AliasAnalysis::ElemCopyAndUnionPointTo(MDSet const& mds,
     }
 
     MDSetIter iter = nullptr;
-    for (INT i = mds.get_first(&iter);
-         i >= 0; i = mds.get_next((UINT)i, &iter)) {
-        ASSERT0(m_md_sys->getMD((UINT)i));
-        if (m_md_sys->getMD((UINT)i)->is_exact()) {
-            setPointTo((UINT)i, *mx, &pt_set);
+    for (BSIdx i = mds.get_first(&iter);
+         i != BS_UNDEF; i = mds.get_next(i, &iter)) {
+        ASSERT0(m_md_sys->getMD((MDIdx)i));
+        if (m_md_sys->getMD((MDIdx)i)->is_exact()) {
+            setPointTo((MDIdx)i, *mx, &pt_set);
             continue;
         }
         setPointToMDSetByAddMDSet((UINT)i, *mx, pt_set);
@@ -2865,10 +2868,10 @@ void AliasAnalysis::ElemCopyPointToAndMayPointTo(MDSet const& mds,
                                                  IN MD2MDSet * mx)
 {
     MDSetIter iter = nullptr;
-    for (INT i = mds.get_first(&iter);
-         i >= 0; i = mds.get_next((UINT)i, &iter)) {
-        ASSERT0(m_md_sys->getMD((UINT)i));
-        setPointTo((UINT)i, *mx, getWorstCase());
+    for (BSIdx i = mds.get_first(&iter);
+         i != BS_UNDEF; i = mds.get_next(i, &iter)) {
+        ASSERT0(m_md_sys->getMD((MDIdx)i));
+        setPointTo((MDIdx)i, *mx, getWorstCase());
     }
 }
 
@@ -2878,11 +2881,11 @@ void AliasAnalysis::ElemCopyPointToAndMayPointTo(MDSet const& mds,
 void AliasAnalysis::ElemCleanExactPointTo(MDSet const& mds, IN MD2MDSet * mx)
 {
     MDSetIter iter = nullptr;
-    for (INT i = mds.get_first(&iter);
-         i >= 0; i = mds.get_next((UINT)i, &iter)) {
-        ASSERT0(m_md_sys->getMD((UINT)i));
-        if (m_md_sys->getMD((UINT)i)->is_exact()) {
-            cleanPointTo((UINT)i, *mx);
+    for (BSIdx i = mds.get_first(&iter);
+         i != BS_UNDEF; i = mds.get_next(i, &iter)) {
+        ASSERT0(m_md_sys->getMD((MDIdx)i));
+        if (m_md_sys->getMD((MDIdx)i)->is_exact()) {
+            cleanPointTo((MDIdx)i, *mx);
         }
     }
 }
@@ -2893,10 +2896,10 @@ void AliasAnalysis::ElemCleanExactPointTo(MDSet const& mds, IN MD2MDSet * mx)
 void AliasAnalysis::ElemCleanPointTo(MDSet const& mds, IN MD2MDSet * mx)
 {
     MDSetIter iter = nullptr;
-    for (INT i = mds.get_first(&iter);
-         i >= 0; i = mds.get_next((UINT)i, &iter)) {
-        ASSERT0(m_md_sys->getMD((UINT)i));
-        cleanPointTo((UINT)i, *mx);
+    for (BSIdx i = mds.get_first(&iter);
+         i != BS_UNDEF; i = mds.get_next(i, &iter)) {
+        ASSERT0(m_md_sys->getMD((MDIdx)i));
+        cleanPointTo((MDIdx)i, *mx);
     }
 }
 
@@ -2910,8 +2913,8 @@ void AliasAnalysis::dumpPtPairSet(PtPairSet const& pps) const
     bool detail = true;
     PtPairSetIter iter;
     PtPairMgr & pptmgr = const_cast<PtPairMgr&>(m_ppmgr);
-    for (INT i = pps.get_first(&iter);
-         i >= 0; i = pps.get_next((UINT)i, &iter), k++) {
+    for (BSIdx i = pps.get_first(&iter);
+         i != BS_UNDEF; i = pps.get_next(i, &iter), k++) {
         PtPair * pp = pptmgr.get((UINT)i);
         ASSERT0(pp);
         note(getRegion(), "\nMD%u->MD%u,  ", PP_from(pp), PP_to(pp));
@@ -2970,9 +2973,9 @@ void AliasAnalysis::dumpIRPointTo(IR const* ir,
     default:
         if (may != nullptr) {
             MDSetIter iter;
-            for (INT i = may->get_first(&iter);
-                 i >= 0; i = may->get_next((UINT)i, &iter)) {
-                MD * md = m_md_sys->getMD((UINT)i);
+            for (BSIdx i = may->get_first(&iter);
+                 i != BS_UNDEF; i = may->get_next(i, &iter)) {
+                MD * md = m_md_sys->getMD((MDIdx)i);
                 ASSERT0(md);
                 dumpMD2MDSet(md, mx);
             }
@@ -3303,17 +3306,17 @@ void AliasAnalysis::dumpMD2MDSet(MD2MDSet const* mx, bool dump_ptg) const
     if (!m_rg->isLogMgrInit() || mx == nullptr) { return; }
     xcom::Graph g;
     MDId2MD const* id2md = m_md_sys->getID2MDMap();
-    for (INT i = MD_FIRST; i <= id2md->get_last_idx(); i++) {
+    for (VecIdx i = MD_FIRST; i <= id2md->get_last_idx(); i++) {
         if (id2md->get((UINT)i) == nullptr) { continue; }
 
         MDSet const* mds = getPointTo((UINT)i, *mx);
         if (mds != nullptr) {
             note(getRegion(), "\nMD%u -- PT_SET: ", (UINT)i);
             MDSetIter iter;
-            for (INT j = mds->get_first(&iter);
-                 j >= 0; j = mds->get_next((UINT)j, &iter)) {
-                ASSERT0(m_md_sys->getMD((UINT)j));
-                prt(getRegion(), "MD%u,", (UINT)j);
+            for (BSIdx j = mds->get_first(&iter);
+                 j != BS_UNDEF; j = mds->get_next(j, &iter)) {
+                ASSERT0(m_md_sys->getMD((MDIdx)j));
+                prt(getRegion(), "MD%u,", (MDIdx)j);
                 if (dump_ptg) {
                     g.addEdge((UINT)i, (UINT)j);
                 }
@@ -3346,9 +3349,9 @@ void AliasAnalysis::dumpMD2MDSet(MD const* md, MD2MDSet const* mx) const
         ASSERT0(!pts->is_empty());
         MDSetIter iter;
         m_rg->getLogMgr()->incIndent(2);
-        for (INT j = pts->get_first(&iter);
-             j >= 0; j = pts->get_next((UINT)j, &iter)) {
-            MD const* mmd = m_md_sys->getMD((UINT)j);
+        for (BSIdx j = pts->get_first(&iter);
+             j != BS_UNDEF; j = pts->get_next(j, &iter)) {
+            MD const* mmd = m_md_sys->getMD((MDIdx)j);
             ASSERT0(mmd);
             buf.clean();
             note(getRegion(), "\n%s", mmd->dump(buf, m_tm));
@@ -3386,10 +3389,10 @@ bool AliasAnalysis::convertMD2MDSet2PT(OUT PtPairSet * pps,
             continue;
         }
         MDSetIter segiter;
-        for (INT toid = from_md_pts->get_first(&segiter);
-             toid >= 0;
-             toid = from_md_pts->get_next((UINT)toid, &segiter)) {
-            ASSERT0(m_md_sys->getMD((UINT)toid));
+        for (BSIdx toid = from_md_pts->get_first(&segiter);
+             toid != BS_UNDEF;
+             toid = from_md_pts->get_next(toid, &segiter)) {
+            ASSERT0(m_md_sys->getMD((MDIdx)toid));
             PtPair const* pp = ppmgr.add(fromid, (UINT)toid);
             ASSERT0(pp);
             pps->bunion(PP_id(pp), *ppsetmgr.getSBSMgr());
@@ -3404,8 +3407,8 @@ void AliasAnalysis::convertPT2MD2MDSet(PtPairSet const& pps,
                                        MOD MD2MDSet * ctx)
 {
     PtPairSetIter iter;
-    for (INT i = pps.get_first(&iter);
-         i >= 0; i = pps.get_next((UINT)i, &iter)) {
+    for (BSIdx i = pps.get_first(&iter);
+         i != BS_UNDEF; i = pps.get_next(i, &iter)) {
         PtPair * pp = const_cast<PtPairMgr&>(ppmgr).get((UINT)i);
         ASSERT0(pp != nullptr);
         setPointToMDSetByAddMD(PP_from(pp), *ctx, m_md_sys->getMD(PP_to(pp)));
@@ -3525,9 +3528,9 @@ bool AliasAnalysis::verifyIR(IR * ir)
             ASSERT0(!mayref->is_empty());
             //PR's address can not be taken.
             MDSetIter iter;
-            for (INT i = mayref->get_first(&iter);
-                 i >= 0; i = mayref->get_next((UINT)i, &iter)) {
-                MD const* x = m_md_sys->getMD((UINT)i);
+            for (BSIdx i = mayref->get_first(&iter);
+                 i != BS_UNDEF; i = mayref->get_next(i, &iter)) {
+                MD const* x = m_md_sys->getMD((MDIdx)i);
                 CHECK0_DUMMYUSE(x);
                 ASSERT0(!x->is_pr());
             }
@@ -3557,9 +3560,9 @@ bool AliasAnalysis::verifyIR(IR * ir)
         if (mayref != nullptr && !mayref->is_empty()) {
             //PR's address can not be taken.
             MDSetIter iter;
-            for (INT i = mayref->get_first(&iter);
-                 i >= 0; i = mayref->get_next((UINT)i, &iter)) {
-                MD const* x = m_md_sys->getMD((UINT)i);
+            for (BSIdx i = mayref->get_first(&iter);
+                 i != BS_UNDEF; i = mayref->get_next(i, &iter)) {
+                MD const* x = m_md_sys->getMD((MDIdx)i);
                 CHECK0_DUMMYUSE(x);
                 ASSERT0(!x->is_pr());
             }

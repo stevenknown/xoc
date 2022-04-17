@@ -81,7 +81,7 @@ static IR * getUniqueDef(IRSet const* defset, Region * rg)
     ASSERT0(defset);
     IR * unique_def = nullptr;
     IRSetIter it;
-    for (INT i = defset->get_first(&it); i != -1;
+    for (BSIdx i = defset->get_first(&it); i != BS_UNDEF;
          i = defset->get_next(i, &it)) {
         IR * def = rg->getIR(i);
         ASSERT0(def && def->is_stmt());
@@ -147,7 +147,7 @@ void changeUseEx(IR * olduse, IR * newuse, IRSet const* defset, Region * rg)
             xoc::removeUseForTree(olduse, rg);
 
             IRSetIter it;
-            for (INT i = defset->get_first(&it); i != -1;
+            for (BSIdx i = defset->get_first(&it); i != BS_UNDEF;
                  i = defset->get_next(i, &it)) {
                 IR * def = rg->getIR(i);
                 ASSERT0(def && def->is_stmt());
@@ -761,8 +761,8 @@ void collectUseSet(IR const* def, MDSSAMgr const* mdssamgr, OUT IRSet * useset)
     if (prssainfo != nullptr) {
         SSAUseIter sc;
         Region * rg = mdssamgr->getRegion();
-        for (INT u = SSA_uses(prssainfo).get_first(&sc);
-             u >= 0; u = SSA_uses(prssainfo).get_next(u, &sc)) {
+        for (BSIdx u = SSA_uses(prssainfo).get_first(&sc);
+             u != BS_UNDEF; u = SSA_uses(prssainfo).get_next(u, &sc)) {
             ASSERT0(rg->getIR(u));
             useset->bunion(u);
         }
@@ -839,7 +839,8 @@ IR * findNearestDomDef(IR const* exp, IRSet const& defset, Region const* rg,
     IR * last = nullptr;
     INT lastrpo = RPO_UNDEF;
     IRSetIter it = nullptr;
-    for (INT i = defset.get_first(&it); i >= 0; i = defset.get_next(i, &it)) {
+    for (BSIdx i = defset.get_first(&it);
+         i != BS_UNDEF; i = defset.get_next(i, &it)) {
         IR * d = rg->getIR(i);
         ASSERT0(d->is_stmt());
         if (omit_self && d == stmt_of_exp) {

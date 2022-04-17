@@ -996,7 +996,7 @@ void Graph::removeTransitiveEdge()
     TMap<UINT, DefSBitSetCore*> reachset_map;
     BitSet is_visited;
     //Scanning vertices in topological order.
-    for (INT i = 0; i <= vex_vec.get_last_idx(); i++) {
+    for (VecIdx i = 0; i <= vex_vec.get_last_idx(); i++) {
         Vertex const* fromvex = vex_vec.get(i);
         ASSERT0(fromvex);
         if (is_dense()) {
@@ -1009,7 +1009,7 @@ void Graph::removeTransitiveEdge()
     }
 
     if (is_dense()) {
-        for (INT i = 0; i <= reachset_vec.get_last_idx(); i++) {
+        for (VecIdx i = 0; i <= reachset_vec.get_last_idx(); i++) {
             DefSBitSetCore * bs = reachset_vec.get(i);
             if (bs != nullptr) {
                 bs->clean(bs_mgr);
@@ -1094,7 +1094,7 @@ void Graph::dumpVexVector(Vector<Vertex*> const& vec, FILE * h)
 {
     if (h == nullptr) { return; }
     fprintf(h, "\n");
-    for (INT i = 0; i <= vec.get_last_idx(); i++) {
+    for (VecIdx i = 0; i <= vec.get_last_idx(); i++) {
         Vertex const* x = vec.get(i);
         if (x != nullptr) {
             if (i != 0) { fprintf(h, ","); }
@@ -1752,7 +1752,7 @@ bool DGraph::verifyPdom(DGraph & g,
     CHECK0_DUMMYUSE(f1);
     bool f2 = g.computeIpdom();
     CHECK0_DUMMYUSE(f2);
-    for (INT i = 0; i <= m_idom_set.get_last_idx(); i++) {
+    for (VecIdx i = 0; i <= m_idom_set.get_last_idx(); i++) {
         UINT cur = m_ipdom_set.get(i);
         UINT anti = g.m_ipdom_set.get(i);
         ASSERTN(cur == anti, ("unmatch ipdom"));
@@ -1765,7 +1765,7 @@ bool DGraph::verifyDom(DGraph & g,
                        List<Vertex const*> const& rpovlst) const
 {
     g.computeIdom2(rpovlst);
-    for (INT i = 0; i <= m_idom_set.get_last_idx(); i++) {
+    for (VecIdx i = 0; i <= m_idom_set.get_last_idx(); i++) {
         UINT cur = m_idom_set.get(i);
         UINT anti = g.m_idom_set.get(i);
         ASSERTN(cur == anti, ("unmatch idom"));
@@ -1871,7 +1871,7 @@ bool DGraph::computeIdom()
                     break;
                 }
             }
-            ASSERTN(i != -1, ("not find idom?"));
+            ASSERTN(i != BS_UNDEF, ("not find idom?"));
             #else
             BSIdx i;
             for (i = tmp.get_first(); i != BS_UNDEF; i = tmp.get_next(i)) {
@@ -1889,7 +1889,7 @@ bool DGraph::computeIdom()
                 }
             }
             i = tmp.get_first();
-            ASSERTN(i != -1, ("cannot find idom of BB:%d", cur_id));
+            ASSERTN(i != BS_UNDEF, ("cannot find idom of BB:%d", cur_id));
             ASSERTN(m_idom_set.get(cur_id) == VERTEX_UNDEF,
                     ("recompute idom for BB:%d", cur_id));
             m_idom_set.set(cur_id, i);
@@ -1905,7 +1905,7 @@ Vertex * Graph::get_last_vertex(VertexIter & cur) const
 {
     ASSERTN(m_ec_pool != nullptr, ("not yet initialized."));
     if (is_dense()) {
-        for (INT i = m_dense_vertex->get_last_idx(); i >= 0; i--) {
+        for (VecIdx i = m_dense_vertex->get_last_idx(); !IS_VECUNDEF(i); i--) {
             Vertex * vex = m_dense_vertex->get(i);
             if (vex != nullptr) {
                 cur = i;
@@ -1922,7 +1922,7 @@ Vertex * Graph::get_prev_vertex(VertexIter & cur) const
 {
     ASSERTN(m_ec_pool != nullptr, ("not yet initialized."));
     if (is_dense()) {
-        for (INT i = cur - 1; i >= 0; i--) {
+        for (VecIdx i = cur - 1; !IS_VECUNDEF(i); i--) {
             Vertex * vex = m_dense_vertex->get(i);
             if (vex != nullptr) {
                 cur = i;
@@ -1939,7 +1939,7 @@ Vertex * Graph::get_first_vertex(VertexIter & cur) const
 {
     ASSERTN(m_ec_pool != nullptr, ("not yet initialized."));
     if (is_dense()) {
-        for (INT i = VERTEX_UNDEF + 1;
+        for (VecIdx i = VERTEX_UNDEF + 1;
              i <= m_dense_vertex->get_last_idx(); i++) {
             Vertex * vex = m_dense_vertex->get(i);
             if (vex != nullptr) {
@@ -1957,7 +1957,7 @@ Vertex * Graph::get_next_vertex(VertexIter & cur) const
 {
     ASSERTN(m_ec_pool != nullptr, ("not yet initialized."));
     if (is_dense()) {
-        for (INT i = cur + 1; i <= m_dense_vertex->get_last_idx(); i++) {
+        for (VecIdx i = cur + 1; i <= m_dense_vertex->get_last_idx(); i++) {
             Vertex * vex = m_dense_vertex->get(i);
             if (vex != nullptr) {
                 cur = i;
@@ -1996,14 +1996,14 @@ bool DGraph::computeIpdom()
 
         p->diff(cur_id);
         BSIdx i;
-        for (i = p->get_first(); i != BS_UNDEF; i = p->get_next((UINT)i)) {
-            if (m_pdom_set.get((UINT)i)->is_equal(*p)) {
+        for (i = p->get_first(); i != BS_UNDEF; i = p->get_next(i)) {
+            if (m_pdom_set.get(i)->is_equal(*p)) {
                 ASSERT0(m_ipdom_set.get(cur_id) == VERTEX_UNDEF);
                 m_ipdom_set.set(cur_id, i);
                 break;
             }
         }
-        //ASSERTN(i != -1, ("not find ipdom")); //Not find.
+        //ASSERTN(i != BS_UNDEF, ("not find ipdom")); //Not find.
         p->bunion(cur_id);
     }
     return true;
@@ -2073,7 +2073,7 @@ void DGraph::dumpDom(FILE * h, bool dump_dom_tree) const
             for (BSIdx id = bs->get_first();
                  id != BS_UNDEF ; id = bs->get_next((UINT)id)) {
                 if ((UINT)id != vid) {
-                    fprintf(h, "%d ", id);
+                    fprintf(h, "%u ", id);
                 }
             }
         }
@@ -2083,19 +2083,19 @@ void DGraph::dumpDom(FILE * h, bool dump_dom_tree) const
             for (BSIdx id = bs->get_first();
                  id != BS_UNDEF; id = bs->get_next((UINT)id)) {
                 if ((UINT)id != vid) {
-                    fprintf(h, "%d ", id);
+                    fprintf(h, "%u ", id);
                 }
             }
         }
 
         if (m_idom_set.get(vid) != VERTEX_UNDEF) {
-            fprintf(h, "\n  idom:%d", m_idom_set.get(vid));
+            fprintf(h, "\n  idom:%u", m_idom_set.get(vid));
         } else {
             fprintf(h, "\n");
         }
 
         if (m_ipdom_set.get(vid) != VERTEX_UNDEF) {
-            fprintf(h, "\n  ipdom:%d", m_ipdom_set.get(vid));
+            fprintf(h, "\n  ipdom:%u", m_ipdom_set.get(vid));
         } else {
             fprintf(h, "\n");
         }

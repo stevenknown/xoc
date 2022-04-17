@@ -86,8 +86,8 @@ void IPA::createCallDummyuse(IR * call, Region * callru)
 
     MDSetIter iter;
     IR * last = nullptr;
-    for (INT j = mayuse->get_first(&iter);
-         j >= 0; j = mayuse->get_next(j, &iter)) {
+    for (BSIdx j = mayuse->get_first(&iter);
+         j != BS_UNDEF; j = mayuse->get_next(j, &iter)) {
         MD const* md = m_mdsys->getMD(j);
         ASSERT0(md);
         if (!md->is_effect() || !callermaydef->is_contain(md)) {

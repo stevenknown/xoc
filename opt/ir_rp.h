@@ -107,7 +107,7 @@ public:
 };
 
 
-typedef INT RefTabIter;
+typedef VecIdx RefTabIter;
 class RefTab : public Hash<IR*, RefHashFunc> {
 public:
     RefTab(UINT bucksize) : Hash<IR*, RefHashFunc>(bucksize) {}
@@ -118,9 +118,9 @@ public:
         if (!rg->isLogMgrInit()) { return; }
 
         note(rg, "\n==---- DUMP Delegate Table ----==");
-        INT cur = 0;
+        VecIdx cur = 0;
         for (IR const* dele = get_first(cur);
-             cur >= 0; dele = get_next(cur)) {
+             !IS_VECUNDEF(cur); dele = get_next(cur)) {
             //Dump IR tree for complex delegate.
             dumpIR(dele, rg, nullptr, IR_DUMP_DEF|IR_DUMP_KID);
         }
@@ -582,9 +582,9 @@ private:
         if (mds == nullptr) { return false; }
 
         MDSetIter iter = nullptr;
-        for (INT i = mds->get_first(&iter);
-             i >= 0; i = mds->get_next(i, &iter)) {
-            MD const* md2 = m_md_sys->getMD(i);
+        for (BSIdx i = mds->get_first(&iter);
+             i != BS_UNDEF; i = mds->get_next(i, &iter)) {
+            MD const* md2 = m_md_sys->getMD((MDIdx)i);
             ASSERT0(md2);
             if (md2->is_global()) { return true; }
         }

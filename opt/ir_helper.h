@@ -31,6 +31,8 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 namespace xoc {
 
+#define PR_TYPE_CHAR "$"
+
 //Used by all IR.
 #define IR_DUMP_DEF 0x0 //default options to dump ir
 #define IR_DUMP_KID 0x1 //dump ir's kid

@@ -412,7 +412,7 @@ public:
     inline IR * getRHS() const;
 
     //Return the PR no if exist.
-    inline UINT getPrno() const;
+    inline PRNO getPrno() const;
 
     //Return the SSAInfo if exist.
     inline SSAInfo * getSSAInfo() const;
@@ -423,21 +423,21 @@ public:
     //Get the stmt accroding to given prno if the stmt writes PR as a result.
     //Otherwise return nullptr.
     //This function can not be const because it will return itself.
-    IR * getResultPR(UINT prno);
+    IR * getResultPR(PRNO prno);
 
     //Find the first PR related to 'prno'. Otherwise return nullptr.
     //This function iterate IR tree nonrecursively.
-    IR * getOpndPRList(UINT prno) const;
+    IR * getOpndPRList(PRNO prno) const;
 
     //Find the first PR related to 'prno'.
     //This function iterate IR tree nonrecursively.
     //'it': iterator.
-    IR * getOpndPR(UINT prno, IRIter & it) const; //Nonrecursively.
+    IR * getOpndPR(PRNO prno, IRIter & it) const; //Nonrecursively.
 
     //This function recursively iterate the IR tree to
     //retrieve the PR whose PR_no is equal to given 'prno'.
     //Otherwise return nullptr.
-    IR * getOpndPR(UINT prno) const;
+    IR * getOpndPR(PRNO prno) const;
 
     //This function recursively iterate the IR tree to
     //retrieve the memory-ref IR whose MD is equal to given 'md'.
@@ -903,9 +903,9 @@ public:
     bool isExactDef(MD const* md, MDSet const* mds) const;
 
     //Set prno, and update SSAInfo meanwhile.
-    void setPrnoConsiderSSAInfo(UINT prno);
+    void setPrnoConsiderSSAInfo(PRNO prno);
     void setRHS(IR * rhs);
-    inline void setPrno(UINT prno);
+    inline void setPrno(PRNO prno);
     inline void setOffset(TMWORD ofst);
     inline void setIdinfo(Var * idinfo);
     inline void setLabel(LabelInfo const* li);
@@ -1170,7 +1170,7 @@ public:
 class CStpr: public DuProp, public StmtProp {
     COPY_CONSTRUCTOR(CStpr);
 public:
-    UINT prno; //PR number.
+    PRNO prno; //PR number.
     SSAInfo * ssainfo; //Present ssa def and use set.
     IR * opnd[1];
     static BYTE const kid_map = 0x1;
@@ -1209,7 +1209,7 @@ public:
 class CSetElem: public DuProp, public StmtProp {
     COPY_CONSTRUCTOR(CSetElem);
 public:
-    UINT prno; //PR number.
+    PRNO prno; //PR number.
     SSAInfo * ssainfo; //Present ssa def and use set.
     IR * opnd[3];
     static BYTE const kid_map = 0x7;
@@ -1242,7 +1242,7 @@ public:
 class CGetElem : public DuProp, public StmtProp {
     COPY_CONSTRUCTOR(CGetElem);
 public:
-    UINT prno; //PR number.
+    PRNO prno; //PR number.
 
     //versioned presentation or ssa def and use list in ssa mode.
     //Note this field only avaiable if SSA information is maintained.
@@ -1361,7 +1361,7 @@ public:
     //Record the intrinsic operation.
     UINT intrinsic_op;
 
-    UINT prno; //Result PR number if any.
+    PRNO prno; //Result PR number if any.
 
     SSAInfo * prssainfo; //indicates PR ssa def and use set.
 
@@ -1914,7 +1914,7 @@ public:
 class CPr : public DuProp {
     COPY_CONSTRUCTOR(CPr);
 public:
-    UINT prno; //PR number.
+    PRNO prno; //PR number.
 
     //versioned presentation or ssa def and use list in ssa mode.
     //Note this field only avaiable if SSA information is maintained.
@@ -2048,7 +2048,7 @@ public:
 class CPhi : public DuProp, public StmtProp {
     COPY_CONSTRUCTOR(CPhi);
 public:
-    UINT prno; //PR number.
+    PRNO prno; //PR number.
     SSAInfo * ssainfo; //Present ssa def and use set.
     IR * opnd[1];
     static BYTE const kid_map = 0x1;
@@ -2163,7 +2163,7 @@ bool IR::isArrayBase(IR const* ir) const
 }
 
 
-UINT IR::getPrno() const
+PRNO IR::getPrno() const
 {
     switch (getCode()) {
     case IR_PR:
@@ -2445,7 +2445,7 @@ void IR::setSSAInfo(SSAInfo * ssa)
 }
 
 
-void IR::setPrno(UINT prno)
+void IR::setPrno(PRNO prno)
 {
     switch (getCode()) {
     case IR_PR: PR_no(this) = prno; return;

@@ -319,7 +319,8 @@ void dumpGETELEM(IR const* ir, Region const* rg, UINT dn, UINT dumpflag,
     Type const* d = ir->getType();
     LogMgr * lm = rg->getLogMgr();
  
-    note(rg, "getelem $%d:%s", GETELEM_prno(ir), xtm->dump_type(d, buf));
+    note(rg, "getelem %s%d:%s", PR_TYPE_CHAR, GETELEM_prno(ir),
+         xtm->dump_type(d, buf));
     DUMPADDR(ir);
     prt(rg, "%s", attr);
     if (!dump_kid) { return; }
@@ -339,9 +340,9 @@ void dumpSETELEM(IR const* ir, Region const* rg, UINT dn, UINT dumpflag,
     StrBuf buf(64);
     TypeMgr const* xtm = rg->getTypeMgr();
     Type const* d = ir->getType();
-    LogMgr * lm = rg->getLogMgr();
- 
-    note(rg, "setelem $%d:%s", SETELEM_prno(ir), xtm->dump_type(d, buf));
+    LogMgr * lm = rg->getLogMgr(); 
+    note(rg, "setelem %s%d:%s", PR_TYPE_CHAR, SETELEM_prno(ir),
+         xtm->dump_type(d, buf));
     DUMPADDR(ir);
     prt(rg, "%s", attr);
     if (!dump_kid) { return; }
@@ -595,7 +596,7 @@ void dumpPHI(IR const* ir, Region const* rg, UINT dn, UINT dumpflag,
     Type const* d = ir->getType();
     LogMgr * lm = rg->getLogMgr();
  
-    note(rg, "%s $%d:%s", IRNAME(ir), PHI_prno(ir),
+    note(rg, "%s %s%d:%s", IRNAME(ir), PR_TYPE_CHAR, PHI_prno(ir),
          xtm->dump_type(d, buf));
 
     DUMPADDR(ir);
@@ -927,7 +928,7 @@ void dumpPR(IR const* ir, Region const* rg, UINT dn, UINT dumpflag,
     StrBuf buf(64);
     TypeMgr const* xtm = rg->getTypeMgr();
     Type const* d = ir->getType();
-    note(rg, "$%d:%s", PR_no(ir), xtm->dump_type(d, buf));
+    note(rg, "%s%d:%s", PR_TYPE_CHAR, PR_no(ir), xtm->dump_type(d, buf));
     DUMPADDR(ir);
     prt(rg, "%s", attr);
 }
@@ -1093,7 +1094,7 @@ void dumpSTPR(IR const* ir, Region const* rg, UINT dn, UINT dumpflag,
     Type const* d = ir->getType();
     LogMgr * lm = rg->getLogMgr();
  
-    note(rg, "stpr $%d:%s", STPR_no(ir), xtm->dump_type(d, buf));
+    note(rg, "stpr %s%d:%s", PR_TYPE_CHAR, STPR_no(ir), xtm->dump_type(d, buf));
     DUMPADDR(ir);
     prt(rg, "%s", attr);
     if (dump_kid) {
@@ -1154,7 +1155,8 @@ void dumpCallStmt(IR const* ir, Region const* rg, UINT dn, UINT dumpflag,
     Type const* d = ir->getType();
     LogMgr * lm = rg->getLogMgr();
     if (ir->hasReturnValue()) {
-        note(rg, "$%d:%s = ", CALL_prno(ir), xtm->dump_type(d, buf));
+        note(rg, "%s%d:%s = ", PR_TYPE_CHAR, CALL_prno(ir),
+             xtm->dump_type(d, buf));
     }
     if (ir->is_call()) {
         CHAR tt[44];
@@ -1701,7 +1703,7 @@ void IRSet::dump(Region const* rg) const
 bool IRSet::allElemBeExp(Region const* rg) const
 {
     IRSetIter it;
-    for (INT i = get_first(&it); i != BS_UNDEF; i = get_next(i, &it)) {
+    for (BSIdx i = get_first(&it); i != BS_UNDEF; i = get_next(i, &it)) {
         IR * e = rg->getIR(i);
         if (e == nullptr || !e->is_exp()) {
             return false;

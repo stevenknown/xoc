@@ -52,7 +52,7 @@ class BB2VMDMap : public Vector<MD2VMD*> {
     bool checkClean()
     {
         //Verify if vpmap of each BB has been deleted.
-        for (INT i = 0; i <= get_last_idx(); i++) {
+        for (VecIdx i = 0; i <= get_last_idx(); i++) {
             ASSERT0(get(i) == nullptr);
         }
         return true;
@@ -107,23 +107,23 @@ class ConstMDSSAUSEIRIter {
     COPY_CONSTRUCTOR(ConstMDSSAUSEIRIter);
 public:
     ConstMDSSAUSEIRIter() : vopndset_iter(nullptr),
-        current_pos_in_vopndset(-1),
-        current_pos_in_useset(-1),
+        current_pos_in_vopndset(BS_UNDEF),
+        current_pos_in_useset(BS_UNDEF),
         current_useset(nullptr) {}
 
     VOpndSet * vopndset;
     VOpndSetIter vopndset_iter;
-    INT current_pos_in_vopndset;
+    BSIdx current_pos_in_vopndset;
     VMD::UseSetIter useset_iter;
-    INT current_pos_in_useset;
+    BSIdx current_pos_in_useset;
     VMD::UseSet const* current_useset;
 
     void clean()
     {
         vopndset_iter = nullptr;
-        current_pos_in_vopndset = -1;
+        current_pos_in_vopndset = BS_UNDEF;
         useset_iter.clean();
-        current_pos_in_useset = -1;
+        current_pos_in_useset = BS_UNDEF;
         current_useset = nullptr;
     }
 };

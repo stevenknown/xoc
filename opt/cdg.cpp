@@ -63,7 +63,7 @@ bool CDG::dump() const
     note(getRegion(), "\n==---- DUMP Control Dependence '%s' ----==",
          m_rg->getRegionName());
     getRegion()->getLogMgr()->incIndent(2);
-    INT c;
+    VertexIter c;
     for (xcom::Vertex * v = get_first_vertex(c);
          v != nullptr; v = get_next_vertex(c)) {
         xcom::EdgeC * in = VERTEX_in_list(v);
@@ -180,7 +180,7 @@ void CDG::build(MOD OptCtx & oc, xcom::DGraph & cfg)
 
     //Record vertex set by which current vertex controlled.
     Vector<xcom::DefSBitSet*> cd_set;
-    for (INT j = 0; j <= top_order.get_last_idx(); j++) {
+    for (VecIdx j = 0; j <= top_order.get_last_idx(); j++) {
         Vertex const* vv = top_order.get(j);
         ASSERTN(vv, ("there exist cycles in graph"));
         xcom::Vertex const* v = cfg.getVertex(vv->id());
@@ -233,7 +233,7 @@ void CDG::build(MOD OptCtx & oc, xcom::DGraph & cfg)
     OC_is_cdg_valid(oc) = true;
     END_TIMER(t, "Build CDG");
 
-    for (INT i = 0; i <= cd_set.get_last_idx(); i++) {
+    for (VecIdx i = 0; i <= cd_set.get_last_idx(); i++) {
         xcom::DefSBitSet * sbs = cd_set.get(i);
         if (sbs != nullptr) {
             sbs->clean();

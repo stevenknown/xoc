@@ -286,7 +286,7 @@ void GRDump::dumpPhi(IR const* ir, DumpGRCtx const* ctx) const
     TypeMgr * tm = const_cast<TypeMgr*>(m_tm);
     Type const* d = ir->getType();
     StrBuf buf(64);
-    note(m_lm, "\n%s $%d:%s = ", IRNAME(ir), PHI_prno(ir),
+    note(m_lm, "\n%s %s%d:%s = ", PR_TYPE_CHAR, IRNAME(ir), PHI_prno(ir),
          tm->dump_type(d, buf));
     UINT dn = DUMP_INDENT_NUM;
     m_lm->incIndent(dn);
@@ -342,7 +342,8 @@ void GRDump::dumpIR(IR const* ir, DumpGRCtx const* ctx) const
         break;
     case IR_STPR:
         note(m_lm, "\n%s", IRNAME(ir));
-        prt(m_lm, " $%d:%s", STPR_no(ir), m_tm->dump_type(d, buf));
+        prt(m_lm, " %s%d:%s", PR_TYPE_CHAR, STPR_no(ir),
+            m_tm->dump_type(d, buf));
         dumpProp(ir, ctx);
         prt(m_lm, " = ");
         m_lm->incIndent(dn);
@@ -352,7 +353,8 @@ void GRDump::dumpIR(IR const* ir, DumpGRCtx const* ctx) const
         break;
     case IR_SETELEM:
         note(m_lm, "\n%s", IRNAME(ir));
-        prt(m_lm, " $%d:%s", SETELEM_prno(ir), m_tm->dump_type(d, buf));
+        prt(m_lm, " %s%d:%s", PR_TYPE_CHAR, SETELEM_prno(ir),
+            m_tm->dump_type(d, buf));
         dumpProp(ir, ctx);
         prt(m_lm, " = ");
         m_lm->incIndent(dn);
@@ -366,7 +368,8 @@ void GRDump::dumpIR(IR const* ir, DumpGRCtx const* ctx) const
         break;
     case IR_GETELEM:
         note(m_lm, "\n%s", IRNAME(ir));
-        prt(m_lm, " $%d:%s", GETELEM_prno(ir), m_tm->dump_type(d, buf));
+        prt(m_lm, " %s%d:%s", PR_TYPE_CHAR, GETELEM_prno(ir),
+            m_tm->dump_type(d, buf));
         dumpProp(ir, ctx);
         prt(m_lm, " = ");
         m_lm->incIndent(dn);
@@ -674,7 +677,8 @@ void GRDump::dumpIR(IR const* ir, DumpGRCtx const* ctx) const
         dumpProp(ir, ctx);
         prt(m_lm, " ");
         if (ir->hasReturnValue()) {
-            prt(m_lm, "$%d:%s = ", CALL_prno(ir), m_tm->dump_type(d, buf));
+            prt(m_lm, "%s%d:%s = ", PR_TYPE_CHAR, CALL_prno(ir),
+                m_tm->dump_type(d, buf));
         }
         if (ir->is_icall()) {
             m_lm->incIndent(dn);

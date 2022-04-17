@@ -176,8 +176,8 @@ void MDLivenessMgr::dump(bool with_name) const
         MDSet * use = pthis->getUseMDSet(bb);
         note(getRegion(), "\nLIVE-IN: ");
         MDSetIter iter;
-        for (INT i = live_in->get_first(&iter);
-             i != -1; i = live_in->get_next(i, &iter)) {
+        for (BSIdx i = live_in->get_first(&iter);
+             i != BS_UNDEF; i = live_in->get_next(i, &iter)) {
             MD const* md = const_cast<MDSystem*>(sys)->getMD(i);
             ASSERT0(md);
             prt(getRegion(), fmt, i, with_name ?
@@ -185,8 +185,8 @@ void MDLivenessMgr::dump(bool with_name) const
         }
 
         note(getRegion(), "\nLIVE-OUT: ");
-        for (INT i = live_out->get_first(&iter);
-             i != -1; i = live_out->get_next(i, &iter)) {
+        for (BSIdx i = live_out->get_first(&iter);
+             i != BS_UNDEF; i = live_out->get_next(i, &iter)) {
             MD const* md = const_cast<MDSystem*>(sys)->getMD(i);
             ASSERT0(md);
             prt(getRegion(), fmt, i, with_name ?
@@ -194,8 +194,8 @@ void MDLivenessMgr::dump(bool with_name) const
         }
 
         note(getRegion(), "\nDEF: ");
-        for (INT i = def->get_first(&iter);
-             i != -1; i = def->get_next(i, &iter)) {
+        for (BSIdx i = def->get_first(&iter);
+             i != BS_UNDEF; i = def->get_next(i, &iter)) {
             MD const* md = const_cast<MDSystem*>(sys)->getMD(i);
             ASSERT0(md);
             prt(getRegion(), fmt, i, with_name ?
@@ -203,8 +203,8 @@ void MDLivenessMgr::dump(bool with_name) const
         }
 
         note(getRegion(), "\nUSE: ");
-        for (INT i = use->get_first(&iter);
-             i != -1; i = use->get_next(i, &iter)) {
+        for (BSIdx i = use->get_first(&iter);
+             i != BS_UNDEF; i = use->get_next(i, &iter)) {
             MD const* md = const_cast<MDSystem*>(sys)->getMD(i);
             ASSERT0(md);
             prt(getRegion(), fmt, i, with_name ?

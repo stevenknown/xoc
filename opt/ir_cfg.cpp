@@ -386,7 +386,7 @@ void IRCFG::initEntryAndExit(CFG_SHAPE cs)
     }
 
     //Add BB into graph.
-    //ASSERT0(m_bb_vec.get_last_idx() == -1);
+    //ASSERT0(m_bb_vec.get_last_idx() == VEC_UNDEF);
     for (IRBB * bb = m_bb_list->get_tail();
          bb != nullptr; bb = m_bb_list->get_prev()) {
         m_bb_vec.set(bb->id(), bb);
@@ -2053,7 +2053,7 @@ static void dumpVCGNode(UINT flag, IRCFG const* cfg)
     FILE * h = cfg->getRegion()->getLogMgr()->getFileHandler();
     ASSERT0(h);
     UINT vertical_order = 1;
-    INT c;
+    VertexIter c;
     for (xcom::Vertex const* v = cfg->get_first_vertex(c);
         v != nullptr; v = cfg->get_next_vertex(c)) {
         IRBB * bb = cfg->getBB(v->id());
@@ -2133,7 +2133,7 @@ static void dumpVCGEdge(UINT flag, IRCFG const* cfg)
     bool dump_eh = HAVE_FLAG(flag, IRCFG::DUMP_EH);
     FILE * h = cfg->getRegion()->getLogMgr()->getFileHandler();
     ASSERT0(h);
-    INT c2;
+    VertexIter c2;
     TTab<xcom::Edge const*> visited;
     UINT pos = 0;
     for (xcom::Vertex * v = cfg->get_first_vertex(c2);

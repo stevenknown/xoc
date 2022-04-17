@@ -89,7 +89,7 @@ IR * Inliner::replaceReturnImpl(
                 caller->freeIRTree(x);
             } else {
                 IR * send = RET_exp(x);
-                UINT receive = CALL_prno(caller_call);
+                PRNO receive = CALL_prno(caller_call);
                 IR * mv_lst = nullptr;
                 if (send != nullptr) {
                     IR * mv = caller->buildStorePR(receive,

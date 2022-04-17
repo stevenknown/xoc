@@ -221,7 +221,7 @@ void GVN::dumpVNHash() const
 {
     Tab2Iter it2;
     Tab3Iter it3;
-    for (INT i = 0; i <= m_irt_vec.get_last_idx(); i++) {
+    for (VecIdx i = 0; i <= m_irt_vec.get_last_idx(); i++) {
         if (isBinary((IR_TYPE)i)) {
             Tab2 * tab2 = (Tab2*)m_irt_vec.get(i);
             if (tab2 == nullptr) { continue; }
@@ -588,8 +588,8 @@ VN * GVN::computeExactMemory(IR const* exp, bool & change)
     //with emd.
     DUSetIter di = nullptr;
     UINT defcount = 0;
-    for (INT i = defset->get_first(&di);
-         i >= 0; i = defset->get_next(i, &di), defcount++) {
+    for (BSIdx i = defset->get_first(&di);
+         i != BS_UNDEF; i = defset->get_next(i, &di), defcount++) {
         IR const* dir = m_rg->getIR(i);
         ASSERT0(dir->is_stmt());
         MD const* xd = const_cast<IR*>(dir)->getMustRef();

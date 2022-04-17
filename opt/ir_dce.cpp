@@ -136,8 +136,8 @@ bool DeadCodeElim::check_stmt(IR const* ir)
         MDSet const* maydefs = ir->getRefMDSet();
         if (maydefs != nullptr) {
             MDSetIter iter;
-            for (INT i = maydefs->get_first(&iter);
-                 i >= 0; i = maydefs->get_next(i, &iter)) {
+            for (BSIdx i = maydefs->get_first(&iter);
+                 i != BS_UNDEF; i = maydefs->get_next(i, &iter)) {
                 MD * md = m_md_sys->getMD(i);
                 ASSERT0(md);
                 if (is_effect_write(md->get_base())) {
@@ -168,8 +168,8 @@ bool DeadCodeElim::check_stmt(IR const* ir)
             MDSet const* mds = x->getRefMDSet();
             if (mds != nullptr) {
                 MDSetIter iter;
-                for (INT i = mds->get_first(&iter);
-                     i != -1; i = mds->get_next(i, &iter)) {
+                for (BSIdx i = mds->get_first(&iter);
+                     i != BS_UNDEF; i = mds->get_next(i, &iter)) {
                     MD * md2 = m_md_sys->getMD(i);
                     ASSERT0(md2 != nullptr);
                     if (is_effect_read(md2->get_base())) {
@@ -558,8 +558,8 @@ bool DeadCodeElim::collectByMDSSA(IR const* x, MOD List<IR const*> * pwlst2)
     bool change = false;
     VOpndSetIter iter = nullptr;
     MD const* mustuse = x->getRefMD();
-    for (INT i = mdssainfo->readVOpndSet().get_first(&iter);
-         i >= 0; i = mdssainfo->readVOpndSet().get_next(i, &iter)) {
+    for (BSIdx i = mdssainfo->readVOpndSet().get_first(&iter);
+         i != BS_UNDEF; i = mdssainfo->readVOpndSet().get_next(i, &iter)) {
         VOpnd const* t = m_mdssamgr->getVOpnd(i);
         if (t == nullptr) {
             //VOpnd may have been removed.
@@ -632,7 +632,8 @@ bool DeadCodeElim::collectByDUSet(IR const* x, MOD List<IR const*> * pwlst2)
     if (defs == nullptr) { return false; }
     DUSetIter di = nullptr;
     bool change = false;
-    for (INT i = defs->get_first(&di); i >= 0; i = defs->get_next(i, &di)) {
+    for (BSIdx i = defs->get_first(&di);
+         i != BS_UNDEF; i = defs->get_next(i, &di)) {
         IR const* d = m_rg->getIR(i);
         ASSERT0(d->is_stmt());
         if (!isEffectStmt(d)) {

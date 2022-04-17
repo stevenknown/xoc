@@ -37,8 +37,7 @@ author: Su Zhenyu
 namespace xoc {
 
 class PRSSAMgr;
-typedef TMap<UINT, VPR*> PRNO2VPR;
-typedef Vector<VPR*> UINT2VPR;
+typedef TMap<PRNO, VPR*> PRNO2VPR;
 typedef TMap<UINT, VPR*> VertexID2VP;
 typedef DefSBitSet PRSet;
 typedef DefSBitSetIter PRSetIter;
@@ -64,7 +63,7 @@ public:
         m_bbset(sbs->getSegMgr()), m_root(nullptr) {}
 
     //Find PR in 'ir' and add them that has 'prno' into SSA construction region.
-    void add(UINT prno, IR * ir);
+    void add(PRNO prno, IR * ir);
 
     //Add ir that expected to transform to SSA mode.
     //Note ir must be PR op.
@@ -180,12 +179,12 @@ class PRSSAMgr : public Pass {
             if (prs == nullptr) { return; }
             //Record which BB defined these effect prs.
             DefSBitSetIter cur = nullptr;
-            for (INT j = prs->get_first(&cur);
-                 j >= 0; j = prs->get_next(j, &cur)) {
-                List<IRBB*> * bbs = m_pr2defbblst.get(j);
+            for (BSIdx j = prs->get_first(&cur);
+                 j != BS_UNDEF; j = prs->get_next(j, &cur)) {
+                List<IRBB*> * bbs = m_pr2defbblst.get((VecIdx)j);
                 if (bbs == nullptr) {
                     bbs = new List<IRBB*>();
-                    m_pr2defbblst.set(j, bbs);
+                    m_pr2defbblst.set((VecIdx)j, bbs);
                 }
                 bbs->append_tail(bb);
             }
@@ -195,9 +194,9 @@ class PRSSAMgr : public Pass {
                     Region * rg)
         {
             BBSetIter it;
-            for (INT i = bbset.get_first(&it); i >= 0;
+            for (BSIdx i = bbset.get_first(&it); i != BS_UNDEF;
                  i = bbset.get_next(i, &it)) {
-                IRBB * bb = rg->getCFG()->getBB(i);
+                IRBB * bb = rg->getCFG()->getBB((UINT)i);
                 ASSERT0(bb);
                 init(bb, bb2definedprs);
             }
@@ -212,32 +211,40 @@ class PRSSAMgr : public Pass {
         }
         ~PR2DefBBSet()
         {
-            for (INT i = 0; i <= m_pr2defbblst.get_last_idx(); i++) {
+            for (VecIdx i = 0; i <= m_pr2defbblst.get_last_idx(); i++) {
                 List<IRBB*> * bbs = m_pr2defbblst.get(i);
                 if (bbs != nullptr) {
                     delete bbs;
                 }
             }
         }
-        List<IRBB*> * get(UINT prno) const { return m_pr2defbblst.get(prno); }
+        List<IRBB*> * get(PRNO prno) const
+        { return m_pr2defbblst.get((VecIdx)prno); }
     };
     COPY_CONSTRUCTOR(PRSSAMgr);
+    BYTE m_is_semi_pruned:1;
+    UINT m_vp_count;
     SMemPool * m_vp_pool;
     TypeMgr * m_tm;
     IRCFG * m_cfg;
     DefSegMgr * m_seg_mgr;
-    UINT m_vp_count;
     IRIter m_iter; //for tmp use.
+
     //Record virtual PR for each PR.
-    UINT2VPRVec m_prno2vprvec;
+    PRNO2VPRVec m_prno2vprvec;
+
     //Record version stack during renaming.
-    UINT2VPRStack m_prno2stack;
+    PRNO2VPRStack m_prno2stack;
+
     //Record virutal PR that indexed by VPR id.
     VPRVec m_vpr_vec;
+
     //Record virutal PR that indexed by PRNO.
-    UINT2VPR m_prno2vpr;
+    VPRVec m_prno2vpr;
+
     //Record version number counter for PR that indexed by PRNO.
     Vector<UINT> m_prno2maxversion;
+
     //Record data type for each prno, which is used to generate Phi
     PRNO2Type m_prno2type;
 private:
@@ -249,7 +256,7 @@ private:
         ::memset(p, 0, sizeof(VPR));
         return p;
     }
-    VPR * allocVPRImpl(UINT orgprno, UINT newprno, UINT version,
+    VPR * allocVPRImpl(PRNO orgprno, PRNO newprno, UINT version,
                        Type const* orgtype, VPRVec * vprvec);
 
     void clean()
@@ -264,6 +271,7 @@ private:
         //If SSA constructed, DU mananger should not compute information
         //for PR any more.
         m_is_valid = false;
+        m_is_semi_pruned = true;
         m_vp_pool = nullptr;
     }
     void cleanPRNO2MaxVersion();
@@ -271,17 +279,14 @@ private:
     void cleanPRNO2VPRStack();
     void cleanPRNO2Type();
     void collectPRAndInitVPRForBB(IRBB const* bb, OUT PRSet & mustdef_pr);
-    void collectPRAndInitVPRForList(IRList const& irlist,
-                                    BBSet const& bbset,
+    void collectPRAndInitVPRForList(IRList const& irlist, BBSet const& bbset,
                                     MOD DefMiscBitSetMgr & sm,
                                     OUT BB2PRSet & bb2definedprs,
                                     OUT PRSet & prset);
     void constructMDDUChainForPR();
-    void computeDefinedPR(IRList const& irlist,
-                          MOD DefMiscBitSetMgr & sm,
+    void computeDefinedPR(IRList const& irlist, MOD DefMiscBitSetMgr & sm,
                           OUT BB2PRSet & bb2definedprs,
-                          OUT PRSet & prset,
-                          OUT BBSet & bbset);
+                          OUT PRSet & prset, OUT BBSet & bbset);
 
     void destructBBSSAInfo(IRBB * bb);
     void destructionInDomTreeOrder(IRBB * root, xcom::Graph & domtree);
@@ -308,16 +313,16 @@ private:
         m_prno2maxversion.set(m_rg->getPRCount(), 0);
         m_vp_pool = smpoolCreate(sizeof(VPR)*2, MEM_CONST_SIZE);
     }
-    void initMapInfo(DefMiscBitSetMgr & bs_mgr,
-                     OUT BB2PRSet & bb2definedprs,
+    void initMapInfo(DefMiscBitSetMgr & bs_mgr, OUT BB2PRSet & bb2definedprs,
                      OUT PRSet & prset);
     void initVPRStack(PRSet const& prset);
     //The function generate Phi with 'prno' and insert into 'bb'.
     //Note the function does not perform renaming of PR.
-    IR * insertPhi(UINT prno, IN IRBB * bb);
+    IR * insertPhi(PRNO prno, IN IRBB * bb);
 
-    xcom::Stack<VPR*> * mapPRNO2VPRStack(UINT prno);
-    Type const* mapPRNO2Type(UINT prno) { return m_prno2type.get(prno); }
+    xcom::Stack<VPR*> * mapPRNO2VPRStack(PRNO prno);
+    Type const* mapPRNO2Type(PRNO prno)
+    { return m_prno2type.get((VecIdx)prno); }
 
     //Rename opnd, except PHI.
     //Walk through RHS expression of 'ir' to rename PR's VPR.
@@ -327,22 +332,19 @@ private:
     bool refinePhiImpl(MOD IRBB * bb, MOD IR * ir,
                        MOD List<IRBB*> & wl, MOD BitSet & in_list,
                        IRListIter irct);
-    void rename(PRSet const& effect_prs,
-                BB2PRSet const& bb2definedprs,
+    void rename(PRSet const& effect_prs, BB2PRSet const& bb2definedprs,
                 xcom::Graph const& domtree);
     void renameBB(IRBB const* bb, PRSet const* prset);
     //Linear renaming algorithm.
     //bb2definedprs: for each BB, indicate PRs which has been defined.
     //bbset: if not null, indicates perform the renaming inside designated
     //       BB set.
-    void renameInDomTreeOrder(MOD IRBB * root,
-                              xcom::Graph const& domtree,
+    void renameInDomTreeOrder(MOD IRBB * root, xcom::Graph const& domtree,
                               BB2PRSet const& bb2definedprs,
-                              BBSet const* bbset,
-                              PRSet const* prset);
+                              BBSet const* bbset, PRSet const* prset);
     void removePhiFromBB();
 
-    void setVPR(UINT prno, VPR * vp);
+    void setVPR(PRNO prno, VPR * vp);
     void stripVersionForBBSet(BBSet const& bbset, PRSet const* prset);
     void stripVersionForBBList(BBList const& bblst);
     void stripPhi(IR * phi, IRListIter phict);
@@ -353,25 +355,25 @@ private:
     //Place phi and assign the v0 for each PR.
     //prset: record set of PR which need to version.
     void placePhiHelper(DfMgr const& dfm, PRSet const& prset,
-                        BBSet const* bbset,
-                        PR2DefBBSet const& pr2defbbset,
+                        BBSet const* bbset, PR2DefBBSet const& pr2defbbset,
                         BB2PRSet const& bb2definedprs);
-    void placePhiForPR(UINT prno, List<IRBB*> const* defbbs,
+
+    //Insert phi for PR.
+    //defbbs: record a list of BB that defined given PR identified by 'prno'.
+    void placePhiForPR(PRNO prno, List<IRBB*> const* defbbs,
                        DfMgr const& dfm, xcom::BitSet & visited,
                        List<IRBB*> & wl, BB2PRSet const& bb2definedprs,
                        BBSet const* bbset);
+
     //Place phi and assign the v0 for each PR.
     //prset: record set of PR which need to version.
     void placePhi(DfMgr const& dfm, PRSet const& prset,
-                  BBList const& bblist,
-                  BB2PRSet const& bb2definedprs);
+                  BBList const& bblist, BB2PRSet const& bb2definedprs);
     void placePhi(DfMgr const& dfm, PRSet const& prset,
-                  BBSet const& bbset,
-                  BB2PRSet const& bb2definedprs);
+                  BBSet const& bbset, BB2PRSet const& bb2definedprs);
 
     void verifyPhiResult(IR const* ir, List<IRBB*> const& preds,
-                         bool is_vpinfo_avail,
-                         bool before_strip_version) const;
+                         bool is_vpinfo_avail, bool before_strip_version) const;
     bool verifyPrnoOfVPR() const; //Only used in PRSSAMgr.
     bool verifyVPR() const; //Only used in PRSSAMgr.
 public:
@@ -397,12 +399,12 @@ public:
     //orgprno: describ the PRNO that expect to be versioned.
     //version: current version of Versioned PR
     //orgtype: data type of orginal prno
-    VPR * allocVPR(UINT orgprno, UINT version, Type const* orgtype);
+    VPR * allocVPR(PRNO orgprno, UINT version, Type const* orgtype);
 
     //Allocate SSAInfo and ensure it is unique according to prno.
     //prno: the function will generate SSAInfo for the prno.
     //type: data type of prno.
-    SSAInfo * allocSSAInfo(UINT prno, Type const* type);
+    SSAInfo * allocSSAInfo(PRNO prno, Type const* type);
 
     //After adding BB or change BB successor,
     //you need add the related PHI operand if BB successor has PHI stmt.
@@ -470,20 +472,21 @@ public:
     void genSSAInfoForRegion();
     SSAInfo * genSSAInfoForStmt(IR * stmt);
     VPRVec const * getVPRVec() const { return &m_vpr_vec; }
-    VPR * getVPRByPRNO(UINT prno) const { return m_prno2vpr.get(prno); }
+    VPR * getVPRByPRNO(PRNO prno) const
+    { return m_prno2vpr.get((VecIdx)prno); }
     VPR * getVPR(UINT id) const { return m_vpr_vec.get(id); }
-    VPR * getVPR(UINT prno, UINT version) const
+    VPR * getVPR(PRNO prno, UINT version) const
     {
         VPRVec const* vprvec = getVPRVecByPRNO(prno);
         return vprvec != nullptr ? vprvec->get(version) : nullptr;
     }
-    SSAInfo * getSSAInfoByPRNO(UINT prno) const { return getVPRByPRNO(prno); }
+    SSAInfo * getSSAInfoByPRNO(PRNO prno) const { return getVPRByPRNO(prno); }
     virtual CHAR const* getPassName() const { return "PRSSA Manager"; }
     PASS_TYPE getPassType() const { return PASS_PR_SSA_MGR; }
 
     //Map PRNO to VPRVec that recorded all VPR during SSA.
-    VPRVec const* getVPRVecByPRNO(UINT prno) const
-    { return m_prno2vprvec.get(prno); }
+    VPRVec const* getVPRVecByPRNO(PRNO prno) const
+    { return m_prno2vprvec.get((VecIdx)prno); }
 
     //Generate Label for the predecessor BB that corresponding to the specific
     //phi operand.

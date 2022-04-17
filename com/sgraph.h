@@ -40,7 +40,7 @@ namespace xcom {
 #define VERTEX_UNDEF 0
 #define RPO_INTERVAL 5
 #define RPO_INIT_VAL 0
-#define RPO_UNDEF -1
+#define RPO_UNDEF ((INT)-1)
 
 class Vertex;
 class Edge;
@@ -269,7 +269,7 @@ public:
 };
 
 typedef EdgeTabIter EdgeIter;
-typedef INT VertexIter;
+typedef VecIdx VertexIter;
 typedef C<Vertex const*> * RPOVexListIter;
 class RPOVexList : public List<Vertex const*> {
 };
@@ -536,7 +536,7 @@ public:
     //Return true if rpo is available to assign to a new vertex.
     //And the rpo will not repeat with other vertex.
     static bool isUsableRPO(INT rpo)
-    { return rpo >= 0 && ((rpo % RPO_INTERVAL) != 0); }
+    { return rpo != RPO_UNDEF && ((rpo % RPO_INTERVAL) != 0); }
 
     //Erasing graph, include all nodes and edges,
     //except for EdgeInfo and VertexInfo.
@@ -699,8 +699,8 @@ class DGraph : public Graph {
 protected:
     Vector<BitSet*> m_dom_set; //record dominator-set of each vertex.
     Vector<BitSet*> m_pdom_set; //record post-dominator-set of each vertex.
-    Vector<INT> m_idom_set; //immediate dominator.
-    Vector<INT> m_ipdom_set; //immediate post dominator.
+    Vector<UINT> m_idom_set; //immediate dominator.
+    Vector<UINT> m_ipdom_set; //immediate post dominator.
     BitSetMgr * m_bs_mgr;
     void _removeUnreachNode(UINT id, BitSet & visited);
     void freeDomPdomSet(UINT vid);

@@ -54,25 +54,25 @@ public:
     { m_dumgr = rg->getDUMgr(); }
     ~MDLivenessMgr()
     {
-        for (INT i = 0; i <= m_livein_mds_vec.get_last_idx(); i++) {
+        for (VecIdx i = 0; i <= m_livein_mds_vec.get_last_idx(); i++) {
             MDSet * mds = m_livein_mds_vec.get(i);
             if (mds == NULL) { continue; }
             m_mds_mgr.free(mds);
         }
 
-        for (INT i = 0; i <= m_liveout_mds_vec.get_last_idx(); i++) {
+        for (VecIdx i = 0; i <= m_liveout_mds_vec.get_last_idx(); i++) {
             MDSet * mds = m_liveout_mds_vec.get(i);
             if (mds == NULL) { continue; }
             m_mds_mgr.free(mds);
         }
 
-        for (INT i = 0; i <= m_def_mds_vec.get_last_idx(); i++) {
+        for (VecIdx i = 0; i <= m_def_mds_vec.get_last_idx(); i++) {
             MDSet * mds = m_def_mds_vec.get(i);
             if (mds == NULL) { continue; }
             m_mds_mgr.free(mds);
         }
 
-        for (INT i = 0; i <= m_use_mds_vec.get_last_idx(); i++) {
+        for (VecIdx i = 0; i <= m_use_mds_vec.get_last_idx(); i++) {
             MDSet * mds = m_use_mds_vec.get(i);
             if (mds == NULL) { continue; }
             m_mds_mgr.free(mds);

@@ -91,7 +91,7 @@ public:
     void assignMDForIRList(IR * lst, bool assign_pr, bool assign_nonpr);
 
     //Allocate MD for PR.
-    MD const* genMDForPR(UINT prno, Type const* type);
+    MD const* genMDForPR(PRNO prno, Type const* type);
 
     //Generate MD corresponding to PR load or write.
     MD const* genMDForPR(IR const* ir)

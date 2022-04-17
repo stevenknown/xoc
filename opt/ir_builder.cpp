@@ -158,7 +158,7 @@ IR * Region::allocIR(IR_TYPE irt)
 
     if (ir == nullptr) {
         ir = (IR*)xmalloc(IRTSIZE(irt));
-        INT v = MAX(getIRVec()->get_last_idx(), 0);
+        VecIdx v = MAX(getIRVec()->get_last_idx(), 0);
         //0 should not be used as id.
         IR_id(ir) = (UINT)(v+1);
         getIRVec()->set(ir->id(), ir);
@@ -339,7 +339,7 @@ IR * Region::dupIRTreeList(IR const* ir)
 
 
 //Build IR_PR operation by specified prno and type id.
-IR * Region::buildPRdedicated(UINT prno, Type const* type)
+IR * Region::buildPRdedicated(PRNO prno, Type const* type)
 {
     ASSERT0(type);
     IR * ir = allocIR(IR_PR);
@@ -517,7 +517,7 @@ IR * Region::buildCvt(IR * exp, Type const* tgt_ty)
 
 //Build IR_PHI operation.
 //res: result pr of PHI.
-IR * Region::buildPhi(UINT prno, Type const* type, UINT num_opnd)
+IR * Region::buildPhi(PRNO prno, Type const* type, UINT num_opnd)
 {
     ASSERT0(type);
     ASSERT0(prno != PRNO_UNDEF);
@@ -538,7 +538,7 @@ IR * Region::buildPhi(UINT prno, Type const* type, UINT num_opnd)
 
 //Build IR_PHI operation.
 //res: result pr of PHI.
-IR * Region::buildPhi(UINT prno, Type const* type, IR * opnd_list)
+IR * Region::buildPhi(PRNO prno, Type const* type, IR * opnd_list)
 {
     ASSERT0(type);
     ASSERT0(prno != PRNO_UNDEF);
@@ -680,14 +680,14 @@ IR * Region::buildLoad(Var * var, TMWORD ofst, Type const* type)
     LD_idinfo(ir) = var;
     LD_ofst(ir) = ofst;
     IR_dt(ir) = type;
-    if (g_is_hoist_type) {
-        //Hoisting I16/U16/I8/U8 to I32, to utilize whole register.
-        DATA_TYPE dt = ir->getDType();
-        if (IS_SIMPLEX(dt)) {
-            //Hoist data-type from less than INT to INT.
-            IR_dt(ir) = getTypeMgr()->getSimplexTypeEx(
-                getTypeMgr()->hoistDtype(dt));
-        }
+    if (!g_is_hoist_type) { return ir; }
+
+    //Hoisting I16/U16/I8/U8 to I32, to utilize whole register.
+    DATA_TYPE dt = ir->getDType();
+    if (IS_SIMPLEX(dt)) {
+        //Hoist data-type from less than INT to INT.
+        IR_dt(ir) = getTypeMgr()->getSimplexTypeEx(getTypeMgr()->
+                                                   hoistDtype(dt));
     }
     return ir;
 }
@@ -728,7 +728,7 @@ IR * Region::buildILoad(IR * base, TMWORD ofst, Type const* type)
 //type: data type of targe pr.
 //offset: byte offset to the start of PR.
 //base: hold the value that expected to extract.
-IR * Region::buildGetElem(UINT prno, Type const* type, IR * base, IR * offset)
+IR * Region::buildGetElem(PRNO prno, Type const* type, IR * base, IR * offset)
 {
     ASSERT0(type && offset && base && prno != PRNO_UNDEF && base->is_exp());
     IR * ir = allocIR(IR_GETELEM);
@@ -750,7 +750,7 @@ IR * Region::buildGetElem(Type const* type, IR * base, IR * offset)
 {
     ASSERT0(type && base && base->is_exp());
     IR * ir = buildGetElem(getAnalysisInstrument()->m_pr_count,
-        type, base, offset);
+                           type, base, offset);
     getAnalysisInstrument()->m_pr_count++;
     return ir;
 }
@@ -764,10 +764,7 @@ IR * Region::buildGetElem(Type const* type, IR * base, IR * offset)
 //value: value that need to be set.
 //offset: byte offset to the start of result PR.
 //rhs: value expected to store.
-IR * Region::buildSetElem(UINT prno,
-                          Type const* type,
-                          IR * base,
-                          IR * val,
+IR * Region::buildSetElem(PRNO prno, Type const* type, IR * base, IR * val,
                           IR * offset)
 {
     ASSERT0(type && offset && val && prno != PRNO_UNDEF && val->is_exp());
@@ -789,15 +786,12 @@ IR * Region::buildSetElem(UINT prno,
 //type: data type of targe pr.
 //offset: byte offset to the start of result PR.
 //rhs: value expected to store.
-IR * Region::buildSetElem(Type const* type,
-                          IR * base,
-                          IR * val,
-                          IR * offset)
+IR * Region::buildSetElem(Type const* type, IR * base, IR * val, IR * offset)
 {
     ASSERT0(type && base && val && val->is_exp() &&
-        offset && offset->is_exp());
+            offset && offset->is_exp());
     IR * ir = buildSetElem(getAnalysisInstrument()->m_pr_count,
-        type, base, val, offset);
+                           type, base, val, offset);
     getAnalysisInstrument()->m_pr_count++;
     return ir;
 }
@@ -807,7 +801,7 @@ IR * Region::buildSetElem(Type const* type,
 //prno: target prno.
 //type: data type of targe pr.
 //rhs: value expected to store.
-IR * Region::buildStorePR(UINT prno, Type const* type, IR * rhs)
+IR * Region::buildStorePR(PRNO prno, Type const* type, IR * rhs)
 {
     ASSERT0(type && prno != PRNO_UNDEF && rhs && rhs->is_exp());
     IR * ir = allocIR(IR_STPR);

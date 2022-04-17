@@ -600,7 +600,8 @@ bool GCSE::doProp(IRBB * bb, List<IR*> & livexp)
     DefDBitSetCore * x = m_du->getSolveSet()->getAvailInExpr(bb->id());
     DefSBitSetIter st = nullptr;
     if (x != nullptr) {
-        for (INT i = x->get_first(&st); i != -1; i = x->get_next(i, &st)) {
+        for (BSIdx i = x->get_first(&st);
+             i != BS_UNDEF; i = x->get_next(i, &st)) {
             IR * y = m_rg->getIR(i);
             if (y->is_undef() || y->is_pr()) { continue; }
             ASSERT0(y && y->is_exp());
@@ -754,7 +755,7 @@ bool GCSE::dump() const
          getPassName(), m_rg->getRegionName());
     note(getRegion(), "\nNumOfEliminatedCSE:%d", m_elimed.get_elem_count());
     note(getRegion(), "\nEliminated IR: ");
-    for (INT i = 0; i <= m_elimed.get_last_idx(); i++) {
+    for (VecIdx i = 0; i <= m_elimed.get_last_idx(); i++) {
         if (i != 0) {
             note(getRegion(), ",");
         }

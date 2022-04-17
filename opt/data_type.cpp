@@ -618,7 +618,7 @@ void TypeMgr::dump_type_tab() const
     StrBuf buf(64);
     if (!getRegionMgr()->isLogMgrInit()) { return; }
     note(getRegionMgr(), "\n==---- DUMP Type Table ----==\n");
-    for (INT i = 1; i <= m_type_tab.get_last_idx(); i++) {
+    for (VecIdx i = 1; i <= m_type_tab.get_last_idx(); i++) {
         buf.clean();
         Type * d = m_type_tab.get(i);
         ASSERT0(d);

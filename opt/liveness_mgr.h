@@ -88,25 +88,25 @@ public:
     }
     ~LivenessMgr()
     {
-        for (INT i = 0; i <= m_def.get_last_idx(); i++) {
+        for (VecIdx i = 0; i <= m_def.get_last_idx(); i++) {
             DefSBitSetCore * bs = m_def.get((UINT)i);
             if (bs != nullptr) {
                 m_sbs_mgr.freeSBitSetCore(bs);
             }
         }
-        for (INT i = 0; i <= m_use.get_last_idx(); i++) {
+        for (VecIdx i = 0; i <= m_use.get_last_idx(); i++) {
             DefSBitSetCore * bs = m_use.get((UINT)i);
             if (bs != nullptr) {
                 m_sbs_mgr.freeSBitSetCore(bs);
             }
         }
-        for (INT i = 0; i <= m_livein.get_last_idx(); i++) {
+        for (VecIdx i = 0; i <= m_livein.get_last_idx(); i++) {
             DefSBitSetCore * bs = m_livein.get((UINT)i);
             if (bs != nullptr) {
                 m_sbs_mgr.freeSBitSetCore(bs);
             }
         }
-        for (INT i = 0; i <= m_liveout.get_last_idx(); i++) {
+        for (VecIdx i = 0; i <= m_liveout.get_last_idx(); i++) {
             DefSBitSetCore * bs = m_liveout.get((UINT)i);
             if (bs != nullptr) {
                 m_sbs_mgr.freeSBitSetCore(bs);
@@ -123,25 +123,25 @@ public:
         count += m_use.count_mem();
         count += m_livein.count_mem();
         count += m_liveout.count_mem();
-        for (INT i = 0; i <= m_def.get_last_idx(); i++) {
+        for (VecIdx i = 0; i <= m_def.get_last_idx(); i++) {
             DefSBitSetCore * bs = m_def.get((UINT)i);
             if (bs != nullptr) {
                 count += bs->count_mem();
             }
         }
-        for (INT i = 0; i <= m_use.get_last_idx(); i++) {
+        for (VecIdx i = 0; i <= m_use.get_last_idx(); i++) {
             DefSBitSetCore * bs = m_use.get((UINT)i);
             if (bs != nullptr) {
                 count += bs->count_mem();
             }
         }
-        for (INT i = 0; i <= m_livein.get_last_idx(); i++) {
+        for (VecIdx i = 0; i <= m_livein.get_last_idx(); i++) {
             DefSBitSetCore * bs = m_livein.get((UINT)i);
             if (bs != nullptr) {
                 count += bs->count_mem();
             }
         }
-        for (INT i = 0; i <= m_liveout.get_last_idx(); i++) {
+        for (VecIdx i = 0; i <= m_liveout.get_last_idx(); i++) {
             DefSBitSetCore * bs = m_liveout.get((UINT)i);
             if (bs != nullptr) {
                 count += bs->count_mem();
@@ -192,8 +192,8 @@ public:
     //Set map structure.
     void setVAR2PR(VAR2PR * v2p) { m_var2pr = v2p; }
 
-    void setPRToBeLiveout(IRBB * bb, UINT prno)
-    { gen_liveout(bb->id())->bunion(prno, m_sbs_mgr); }
+    void setPRToBeLiveout(IRBB * bb, PRNO prno)
+    { gen_liveout(bb->id())->bunion((BSIdx)prno, m_sbs_mgr); }
 
     virtual bool perform(OptCtx & oc);
 };

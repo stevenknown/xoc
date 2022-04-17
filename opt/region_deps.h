@@ -38,14 +38,15 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #include "data_type.h"
 #include "const.h"
-//Middle level included files
+
+//FOLLOWING FILES ARE MIDDLE LEVEL INCLUDED FILES
+#include "ir_utils.h"
 #include "dbg.h"
 #include "var.h"
 #include "md.h"
 #include "pass.h"
 #include "ai.h"
 #include "du.h"
-#include "ir_utils.h"
 #include "ir.h"
 #include "ir_helper.h"
 #include "gr_helper.h"

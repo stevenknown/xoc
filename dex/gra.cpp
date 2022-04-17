@@ -144,8 +144,8 @@ UINT GLT::computeNumOfOcc(GltMgr & gltm)
     if (livebbs == nullptr) { return 0; }
     SEGIter * cur = nullptr;
     UINT n = 0;
-    for (INT i = livebbs->get_first(&cur);
-         i >= 0; i = livebbs->get_next(i, &cur)) {
+    for (BSIdx i = livebbs->get_first(&cur);
+         i != BS_UNDEF; i = livebbs->get_next(i, &cur)) {
         LTMgr * ltm = gltm.get_ltm(i);
         ASSERT0(ltm);
         LT * l = ltm->map_pr2lt(prno);
@@ -161,8 +161,8 @@ UINT GLT::computeNumOfOcc(GltMgr & gltm)
 void GLT::set_local_usable(GltMgr & gltm)
 {
     SEGIter * sc = nullptr;
-    for (INT j = livebbs->get_first(&sc);
-         j >= 0; j = livebbs->get_next(j, &sc)) {
+    for (BSIdx j = livebbs->get_first(&sc);
+         j != BS_UNDEF; j = livebbs->get_next(j, &sc)) {
         LTMgr * ltm = gltm.get_ltm(j);
         if (ltm == nullptr) { continue; }
         LT * l = ltm->map_pr2lt(prno);
@@ -177,8 +177,8 @@ void GLT::set_local(GltMgr & gltm)
 {
     if (livebbs == nullptr) { return; }
     SEGIter * cur = nullptr;
-    for (INT i = livebbs->get_first(&cur);
-         i >= 0; i = livebbs->get_next(i, &cur)) {
+    for (BSIdx i = livebbs->get_first(&cur);
+         i != BS_UNDEF; i = livebbs->get_next(i, &cur)) {
         LTMgr * ltm = gltm.get_ltm(i);
         ASSERTN(ltm, ("miss local part"));
         LT * l = ltm->map_pr2lt(prno);
@@ -228,9 +228,8 @@ GLT * LT::set_global(GltMgr & gltm)
 bool LT::has_branch(LTMgr * ltm) const
 {
     if (occ == nullptr) { return false; }
-    INT i = occ->get_last();
-    if (i < 0) { return false; }
-
+    BSIdx i = occ->get_last();
+    if (i != BS_UNDEF) { return false; }
     IR * locc = ltm->getIR(i);
     if (locc->isConditionalBr() || locc->isUnconditionalBr() ||
         locc->isMultiConditionalBr()) {
@@ -665,29 +664,27 @@ void RSC::dump_glt_usable()
     note(getRegion(), "\n=== DUMP GLT Usable Regs: ===");
     Vector<GLT*> * gltv = m_gltm->get_gltvec();
     bool dump_bit = false;
-    for (INT i = 0; i <= gltv->get_last_idx(); i++) {
+    for (VecIdx i = 0; i <= gltv->get_last_idx(); i++) {
         GLT * g = gltv->get(i);
         if (g == nullptr) { continue; }
         note(getRegion(), "\nGLT%d(pr%d):", GLT_id(g), GLT_prno(g));
         if (GLT_prefer_reg(g) != REG_UNDEF) {
             prt(getRegion(), "prefer_reg=%d", LT_prefer_reg(g));
-        } else {
-            BitSet const* usable = GLT_usable(g);
-            if (usable == nullptr || usable->is_empty()) {
-                prt(getRegion(), "--");
-                continue;
-            }
-
-            if (dump_bit) {
-                for (INT i2 = usable->get_first();
-                     i2 >= 0; i2 = usable->get_next(i2)) {
-                    prt(getRegion(), "%d,", i2);
-                }
-            } else {
-                prt(getRegion(), "%d~%d",
-                        usable->get_first(), usable->get_last());
-            }
+            continue;
         }
+        BitSet const* usable = GLT_usable(g);
+        if (usable == nullptr || usable->is_empty()) {
+            prt(getRegion(), "--");
+            continue;
+        }
+        if (dump_bit) {
+            for (BSIdx i2 = usable->get_first();
+                 i2 != BS_UNDEF; i2 = usable->get_next(i2)) {
+                prt(getRegion(), "%d,", i2);
+            }
+            continue;
+        }
+        prt(getRegion(), "%d~%d", usable->get_first(), usable->get_last());
     }
     note(getRegion(), "\n");
 }
@@ -701,27 +698,27 @@ void RSC::dump_bb(UINT bbid)
     ASSERT0(ltm);
     Vector<LT*> * ltvec = ltm->get_lt_vec();
     bool dump_bit = false;
-    for (INT i = 0; i <= ltvec->get_last_idx(); i++) {
+    for (VecIdx i = 0; i <= ltvec->get_last_idx(); i++) {
         LT const* lt = ltvec->get(i);
         if (lt == nullptr) { continue; }
         note(getRegion(), "\nLT%d(pr%d):", LT_uid(lt), LT_prno(lt));
         if (LT_prefer_reg(lt) != REG_UNDEF) {
             prt(getRegion(), "prefer_reg=%d", LT_prefer_reg(lt));
-        } else {
-            BitSet const* usable = LT_usable(lt);
-            if (usable == nullptr || usable->is_empty()) {
-                prt(getRegion(), "--");
-                continue;
-            }
-            if (dump_bit) {
-                for (INT i2 = usable->get_first();
-                     i2 >= 0; i2 = usable->get_next(i2)) {
-                    prt(getRegion(), "%d,", i2);
-                }
-            } else {
-                prt(getRegion(), "%d~%d", usable->get_first(), usable->get_last());
-            }
+            continue;
         }
+        BitSet const* usable = LT_usable(lt);
+        if (usable == nullptr || usable->is_empty()) {
+            prt(getRegion(), "--");
+            continue;
+        }
+        if (dump_bit) {
+            for (BSIdx i2 = usable->get_first();
+                 i2 != BS_UNDEF; i2 = usable->get_next(i2)) {
+                prt(getRegion(), "%u,", i2);
+            }
+            continue;
+        }
+        prt(getRegion(), "%u~%u", usable->get_first(), usable->get_last());
     }
 }
 
@@ -808,7 +805,7 @@ void RSC::comp_lt_usable(LT * lt, LTMgr * ltm)
 
     BitSet const* usable = nullptr;
     bool first_alloc = true;
-    for (INT i = occ->get_first(); i >= 0; i = occ->get_next(i)) {
+    for (BSIdx i = occ->get_first(); i != BS_UNDEF; i = occ->get_next(i)) {
         IR const* ir = ltm->getIR(i);
         ASSERT0(ir);
         BitSet * x = get_usable(get_fmt(ir), lt->is_def(i));
@@ -820,7 +817,9 @@ void RSC::comp_lt_usable(LT * lt, LTMgr * ltm)
             } else {
                 ;//usable is empty!
             }
-        } else if (usable == x || usable->is_contain(*x, true)) {
+            continue;
+        }
+        if (usable == x || usable->is_contain(*x, true)) {
             //Shrink
             usable = x;
         }
@@ -837,9 +836,9 @@ void RSC::comp_lt_usable(LT * lt, LTMgr * ltm)
         //Note all local part of global lt will be set after local computation
         //complete. The assignment to LT_usable() may be redundant.
         LT_usable(lt) = GLT_usable(glt);
-    } else {
-        LT_usable(lt) = usable;
+        return;
     }
+    LT_usable(lt) = usable;
 }
 
 
@@ -864,7 +863,7 @@ bool RSC::verify_fmt()
 void RSC::comp_local_usage(LTMgr * ltm, bool only_local, bool omit_constrain)
 {
     Vector<LT*> * ltvec = ltm->get_lt_vec();
-    for (INT i = 1; i <= ltvec->get_last_idx(); i++) {
+    for (VecIdx i = 1; i <= ltvec->get_last_idx(); i++) {
         LT * lt = ltvec->get(i);
         if (lt == nullptr) { continue; }
         if (only_local && LT_is_global(lt)) { continue; }
@@ -886,7 +885,7 @@ void RSC::perform(bool omit_constrain)
 
     //Initialize global lt usable-regs.
     Vector<GLT*> * gltv = m_gltm->get_gltvec();
-    for (INT i = 1; i <= gltv->get_last_idx(); i++) {
+    for (VecIdx i = 1; i <= gltv->get_last_idx(); i++) {
         GLT * g = gltv->get(i);
         if (g == nullptr) { continue; }
         GLT_usable(g) = get_16();
@@ -900,7 +899,7 @@ void RSC::perform(bool omit_constrain)
     }
     if (omit_constrain) { return; }
 
-    for (INT i = 1; i <= gltv->get_last_idx(); i++) {
+    for (VecIdx i = 1; i <= gltv->get_last_idx(); i++) {
         GLT * g = gltv->get(i);
         if (g == nullptr) { continue; }
         g->set_local(*m_gltm);
@@ -932,17 +931,18 @@ void GltMgr::localize(GLT * g)
     DefDBitSetCore * bbs = GLT_bbs(g);
     ASSERTN(bbs, ("should not localize an empty glt"));
     SEGIter * sc = nullptr;
-    UINT prno = GLT_prno(g);
-    for (INT j = bbs->get_first(&sc); j >= 0; j = bbs->get_next(j, &sc)) {
+    PRNO prno = GLT_prno(g);
+    for (BSIdx j = bbs->get_first(&sc);
+         j != BS_UNDEF; j = bbs->get_next(j, &sc)) {
         LTMgr * ltm = get_ltm(j);
         if (ltm == nullptr) { continue; }
         DefSBitSetCore * livein = m_liveness_mgr->get_livein(j);
         DefSBitSetCore * liveout = m_liveness_mgr->get_liveout(j);
         if (livein != nullptr) {
-            livein->diff(prno, *m_liveness_mgr->getSBSMgr());
+            livein->diff((BSIdx)prno, *m_liveness_mgr->getSBSMgr());
         }
         if (liveout != nullptr) {
-            liveout->diff(prno, *m_liveness_mgr->getSBSMgr());
+            liveout->diff((BSIdx)prno, *m_liveness_mgr->getSBSMgr());
         }
         LT * gl = ltm->map_pr2lt(prno);
         ASSERT0(gl); //glt miss local part.
@@ -962,15 +962,14 @@ void GltMgr::localize(GLT * g)
         ltm->get_ig()->erase();
         ltm->get_ig()->build();
         //m_rsc->comp_local_usage(ltm, true); Does it need?
+        if (!has_occ) { continue; }
 
-        if (has_occ) {
-            //Set perfer reg.
-            gl = ltm->map_pr2lt(prno); //recheck
-            ASSERT0(!LT_is_global(gl));
-            LT_prefer_reg(gl) = FIRST_PHY_REG;
-        }
+        //Set perfer reg.
+        gl = ltm->map_pr2lt(prno); //recheck
+        ASSERT0(!LT_is_global(gl));
+        LT_prefer_reg(gl) = FIRST_PHY_REG;
     }
-    m_pr2glt.set(prno, nullptr);
+    m_pr2glt.set((VecIdx)prno, nullptr);
     m_gltid2glt_map.set(GLT_id(g), nullptr);
     m_sbs_mgr.freeDBitSetCore(bbs);
 }
@@ -986,16 +985,17 @@ GLT * GltMgr::buildGltLike(IR * pr, GLT * cand)
         GLT_bbs(newglt) = m_sbs_mgr.allocDBitSetCore();
         GLT_bbs(newglt)->copy(*bbs, m_sbs_mgr);
         SEGIter * sc = nullptr;
-        UINT candprno = GLT_prno(cand);
-        UINT prno = GLT_prno(newglt);
-        for (INT j = bbs->get_first(&sc); j >= 0; j = bbs->get_next(j, &sc)) {
+        PRNO candprno = GLT_prno(cand);
+        PRNO prno = GLT_prno(newglt);
+        for (BSIdx j = bbs->get_first(&sc);
+             j != BS_UNDEF; j = bbs->get_next(j, &sc)) {
             DefSBitSetCore * livein = m_liveness_mgr->get_livein(j);
             DefSBitSetCore * liveout = m_liveness_mgr->get_liveout(j);
-            if (livein != nullptr && livein->is_contain(candprno)) {
-                livein->bunion(prno, *m_liveness_mgr->getSBSMgr());
+            if (livein != nullptr && livein->is_contain((BSIdx)candprno)) {
+                livein->bunion((BSIdx)prno, *m_liveness_mgr->getSBSMgr());
             }
-            if (liveout != nullptr && liveout->is_contain(candprno)) {
-                liveout->bunion(prno, *m_liveness_mgr->getSBSMgr());
+            if (liveout != nullptr && liveout->is_contain((BSIdx)candprno)) {
+                liveout->bunion((BSIdx)prno, *m_liveness_mgr->getSBSMgr());
             }
         }
     }
@@ -1006,12 +1006,12 @@ GLT * GltMgr::buildGltLike(IR * pr, GLT * cand)
 //Verify the consistency of global lt and local part.
 bool GltMgr::verify()
 {
-    for (INT i = 1; i <= m_gltid2glt_map.get_last_idx(); i++) {
+    for (VecIdx i = 1; i <= m_gltid2glt_map.get_last_idx(); i++) {
         GLT * g = m_gltid2glt_map.get(i);
         if (g == nullptr || GLT_bbs(g) == nullptr) { continue; }
         SEGIter * cur = nullptr;
-        for (INT j = GLT_bbs(g)->get_first(&cur);
-             j >= 0; j = GLT_bbs(g)->get_next(j, &cur)) {
+        for (BSIdx j = GLT_bbs(g)->get_first(&cur);
+             j != BS_UNDEF; j = GLT_bbs(g)->get_next(j, &cur)) {
             LTMgr * ltm = m_bb2ltmgr.get(j);
             ASSERT0(ltm);
             LT * l = ltm->map_pr2lt(GLT_prno(g));
@@ -1040,15 +1040,15 @@ void GltMgr::dumpg()
             for (IR const* k = iterInitC(o, m_cii);
                  k != nullptr; k = iterNextC(m_cii)) {
                 if (k->is_pr()) {
-                    prs.bunion(PR_no(k));
+                    prs.bunion((BSIdx)PR_no(k));
                 }
             }
         }
     }
-    INT maxprno = MAX(0, prs.get_last());
+    BSIdx maxprno = MAX(0, prs.get_last());
 
     UINT maxr = 0;
-    for (INT i = prs.get_first(); i >= 0; i = prs.get_next(i)) {
+    for (BSIdx i = prs.get_first(); i != BS_UNDEF; i = prs.get_next(i)) {
         GLT * g = map_pr2glt(i);
         if (g != nullptr && g->has_allocated()) {
             maxr = MAX(maxr, GLT_phy(g));
@@ -1075,11 +1075,11 @@ void GltMgr::dumpg()
          m_ra->m_maxreg, m_ra->m_param_num);
     if (m_ra->m_param_num > 0) {
         prt(getRegion(), "{");
-        for (INT i = 0; i <= m_params.get_last_idx(); i++) {
-            INT pr = m_params.get(i);
-            if (pr != 0) {
-                prt(getRegion(), "pr%d", pr);
-                GLT * g = map_pr2glt(pr);
+        for (VecIdx i = 0; i <= m_params.get_last_idx(); i++) {
+            PRNO prno = m_params.get(i);
+            if (prno != 0) {
+                prt(getRegion(), "pr%d", prno);
+                GLT * g = map_pr2glt(prno);
                 ASSERT0(g); //may be pr is local.
                 if (g->has_allocated()) {
                     prt(getRegion(), "(v%d)", GLT_phy(g));
@@ -1094,7 +1094,7 @@ void GltMgr::dumpg()
     note(getRegion(), "\n");
 
     StrBuf buf(32);
-    for (INT i = prs.get_first(); i >= 0; i = prs.get_next(i)) {
+    for (BSIdx i = prs.get_first(); i != BS_UNDEF; i = prs.get_next(i)) {
         GLT * g = map_pr2glt(i);
         if (g == nullptr) { continue; }
 
@@ -1121,11 +1121,11 @@ void GltMgr::dumpg()
         //Print live BB.
         DefDBitSetCore * livebbs = GLT_bbs(g);
         if (livebbs == nullptr || livebbs->is_empty()) { continue; }
-        INT start = 0;
+        BSIdx start = 0;
         SEGIter * sc = nullptr;
-        for (INT u = livebbs->get_first(&sc);
-             u >= 0; u = livebbs->get_next(u, &sc)) {
-            for (INT j = start; j < u; j++) {
+        for (BSIdx u = livebbs->get_first(&sc);
+             u != BS_UNDEF; u = livebbs->get_next(u, &sc)) {
+            for (BSIdx j = start; j < u; j++) {
                 buf.sprint("%d,", j);
                 for (UINT k = 0; k < buf.strlen(); k++) {
                     prt(getRegion(), " ");
@@ -1177,7 +1177,7 @@ LTMgr * GltMgr::map_bb2ltm(IRBB * bb)
 
 //Every OR which refering sr must be assigned to same cluster, therefore
 //the only time to record cluster information is the first meeting with sr.
-GLT * GltMgr::new_glt(UINT prno)
+GLT * GltMgr::new_glt(PRNO prno)
 {
     GLT * glt = (GLT*)xmalloc(sizeof(GLT));
     GLT_id(glt) = m_glt_count++;
@@ -1186,7 +1186,7 @@ GLT * GltMgr::new_glt(UINT prno)
     GLT_prefer_reg(glt) = REG_UNDEF;
     GLT_rg_sz(glt) = 1;
     GLT_freq(glt) = 1.0;
-    m_pr2glt.set(prno, glt);
+    m_pr2glt.set((VecIdx)prno, glt);
     m_gltid2glt_map.set(GLT_id(glt), glt);
     return glt;
 }
@@ -1197,9 +1197,8 @@ void GltMgr::renameGLT(GLT * g)
     IR * newpr = nullptr;
     SEGIter * cur = nullptr;
     if (GLT_bbs(g) == nullptr) { return; }
-
-    for (INT i = GLT_bbs(g)->get_first(&cur);
-         i >= 0; i = GLT_bbs(g)->get_next(i, &cur)) {
+    for (BSIdx i = GLT_bbs(g)->get_first(&cur);
+         i != BS_UNDEF; i = GLT_bbs(g)->get_next(i, &cur)) {
         LTMgr * ltm = m_bb2ltmgr.get(i);
         ASSERT0(ltm);
         LT * l = ltm->map_pr2lt(GLT_prno(g));
@@ -1208,7 +1207,7 @@ void GltMgr::renameGLT(GLT * g)
     }
     if (newpr != nullptr) {
         GLT_prno(g) = PR_no(newpr);
-        m_pr2glt.set(GLT_prno(g), g);
+        m_pr2glt.set((VecIdx)GLT_prno(g), g);
     }
     m_rg->freeIR(newpr);
 }
@@ -1218,7 +1217,7 @@ void GltMgr::renameGLT(GLT * g)
 //If there are multiple local lifetime corresponded to same PR, rename them.
 void GltMgr::renameLocal()
 {
-    TMap<UINT, LT*> prno2lt;
+    TMap<PRNO, LT*> prno2lt;
     BitSet met;
     List<IRBB*> * bbl = m_rg->getBBList();
     for (IRBB * bb = bbl->get_head(); bb != nullptr; bb = bbl->get_next()) {
@@ -1232,8 +1231,8 @@ void GltMgr::renameLocal()
 void GltMgr::rename()
 {
     renameLocal();
-    TMap<UINT, GLT*> prno2glt;
-    for (INT i = 1; i <= m_gltid2glt_map.get_last_idx(); i++) {
+    TMap<PRNO, GLT*> prno2glt;
+    for (VecIdx i = 1; i <= m_gltid2glt_map.get_last_idx(); i++) {
         GLT * g = m_gltid2glt_map.get(i);
         ASSERT0(g);
         GLT * prior = prno2glt.get(GLT_prno(g));
@@ -1250,7 +1249,7 @@ void GltMgr::rename()
 void GltMgr::build(bool build_group_part)
 {
     List<IRBB*> * bbl = m_rg->getBBList();
-    INT vreg =     m_ra->m_vregnum - m_ra->m_param_num;
+    INT vreg = m_ra->m_vregnum - m_ra->m_param_num;
     for (UINT i = 0; i < m_ra->m_param_num; i++, vreg++) {
         ASSERT0(vreg >= 0 && vreg < (INT)m_ra->m_vregnum);
         IR * pr = m_ra->m_v2pr->get(vreg);
@@ -1258,7 +1257,7 @@ void GltMgr::build(bool build_group_part)
             //Some parameter has no use.
             continue;
         }
-        UINT prno = PR_no(pr);
+        PRNO prno = PR_no(pr);
         GLT * glt = map_pr2glt(prno);
         if (glt == nullptr) {
             glt = new_glt(prno);
@@ -1272,8 +1271,8 @@ void GltMgr::build(bool build_group_part)
         DefSBitSetCore * liveout = m_liveness_mgr->get_liveout(bb->id());
         if (livein != nullptr) {
             SEGIter * cur = nullptr;
-            for (INT i = livein->get_first(&cur);
-                 i >= 0; i = livein->get_next(i, &cur)) {
+            for (BSIdx i = livein->get_first(&cur);
+                 i != BS_UNDEF; i = livein->get_next(i, &cur)) {
                 GLT * glt = map_pr2glt(i);
                 if (glt == nullptr) {
                     glt = new_glt(i);
@@ -1287,8 +1286,8 @@ void GltMgr::build(bool build_group_part)
 
         if (liveout != nullptr) {
             SEGIter * cur = nullptr;
-            for (INT i = liveout->get_first(&cur);
-                 i >= 0; i = liveout->get_next(i, &cur)) {
+            for (BSIdx i = liveout->get_first(&cur);
+                 i != BS_UNDEF; i = liveout->get_next(i, &cur)) {
                 GLT * glt = map_pr2glt(i);
                 if (glt == nullptr) {
                     glt = new_glt(i);
@@ -1401,15 +1400,12 @@ bool GIG::is_interf_with_neighbour(GLT * g, DefSBitSet & nis, UINT phy)
     nis.clean();
     getNeighborSet(nis, GLT_id(g));
     SEGIter * cur = nullptr;
-    for (INT ltid = nis.get_first(&cur);
-         ltid >= 0; ltid = nis.get_next(ltid, &cur)) {
+    for (BSIdx ltid = nis.get_first(&cur);
+         ltid != BS_UNDEF; ltid = nis.get_next(ltid, &cur)) {
         GLT * g2 = m_gltm->get_glt(ltid);
         ASSERT0(g2);
-
         if (!g2->has_allocated()) { continue; }
-
         if (GLT_phy(g2) == phy) { return true; }
-
         if (GLT_rg_sz(g2) > 1) {
             ASSERT0(GLT_rg_sz(g2) == RG_PAIR_SZ);
             if ((UINT)GLT_phy(g2) + 1 == phy) { return true; }
@@ -1431,10 +1427,11 @@ bool GIG::is_interf(IN GLT * glt1, IN GLT * glt2)
     if (!m_is_consider_local_interf) { return true; }
     DefDBitSetCore * bs1 = GLT_bbs(glt1);
     DefDBitSetCore * bs2 = GLT_bbs(glt2);
-    UINT pr1 = GLT_prno(glt1);
-    UINT pr2 = GLT_prno(glt2);
+    PRNO pr1 = GLT_prno(glt1);
+    PRNO pr2 = GLT_prno(glt2);
     SEGIter * sc = nullptr;
-    for (INT i = bs1->get_first(&sc); i >= 0; i = bs1->get_next(i, &sc)) {
+    for (BSIdx i = bs1->get_first(&sc);
+         i != BS_UNDEF; i = bs1->get_next(i, &sc)) {
         if (!bs2->is_contain(i)) { continue; }
         IRBB * bb = m_cfg->getBB(i);
         ASSERT0(bb != nullptr);
@@ -1467,12 +1464,12 @@ void GIG::build()
 {
     //Check interference
     Vector<GLT*> * pr2glt = m_gltm->get_pr2glt_map();
-    INT n = pr2glt->get_last_idx();
-    for (INT i = 0; i <= n; i++) {
+    VecIdx n = pr2glt->get_last_idx();
+    for (VecIdx i = 0; i <= n; i++) {
         GLT * lt1 = pr2glt->get(i);
         if (lt1 == nullptr) { continue; }
         addVertex(GLT_id(lt1));
-        for (INT j = i + 1; j <= n; j++) {
+        for (VecIdx j = i + 1; j <= n; j++) {
             GLT * lt2 = pr2glt->get(j);
             if (lt2 == nullptr) { continue; }
             if (is_interf(lt1, lt2)) {
@@ -1504,12 +1501,12 @@ void IG::build()
 {
     ASSERT0(m_ltm);
     Vector<LT*> * vec = m_ltm->get_lt_vec();
-    INT n = vec->get_last_idx();
-    for (INT i = 1; i <= n; i++) {
+    VecIdx n = vec->get_last_idx();
+    for (VecIdx i = 1; i <= n; i++) {
         LT const* lt1 = vec->get(i);
         if (lt1 == nullptr) { continue; }
         addVertex(LT_uid(lt1));
-        for (INT j = i + 1; j <= n; j++) {
+        for (VecIdx j = i + 1; j <= n; j++) {
             LT const* lt2 = vec->get(j);
             if (lt2 == nullptr) { continue; }
             if (is_interf(lt1, lt2)) {
@@ -1701,7 +1698,7 @@ IR * LTMgr::genSpill(LT * lt, INT pos)
 //    =>
 //     [spill_loc] = pr2 + 3
 //     pr1 = [spill_loc]
-IR * LTMgr::genSpillSwap(IR * stmt, UINT prno, Type const* prty, IR * spill_loc)
+IR * LTMgr::genSpillSwap(IR * stmt, PRNO prno, Type const* prty, IR * spill_loc)
 {
     ASSERT0(stmt && (stmt->is_stpr() || stmt->isCallStmt()) && prty);
 
@@ -1732,7 +1729,7 @@ IR * LTMgr::genSpillSwap(IR * stmt, UINT prno, Type const* prty, IR * spill_loc)
 //    =>
 //     pr1 = pr2 + 3
 //     [spill_loc] = pr1
-IR * LTMgr::genSpill(UINT prno, Type const* type, IR * marker, IR * spill_loc)
+IR * LTMgr::genSpill(PRNO prno, Type const* type, IR * marker, IR * spill_loc)
 {
     ASSERT0(prno > 0 && type && marker && marker->is_stmt());
     if (spill_loc == nullptr) {
@@ -1851,7 +1848,7 @@ IR * LTMgr::genReloadSwap(IR * orgpr, IR * marker)
 
 //Every OR which refering sr must be assigned to same cluster, therefore
 //the only time to record cluster information is the first meeting with sr.
-LT * LTMgr::newLT(UINT prno)
+LT * LTMgr::newLT(PRNO prno)
 {
     ASSERTN(m_max_lt_len > 0, ("Life time length is overrange."));
     ASSERT0(prno >= 1);
@@ -1878,11 +1875,11 @@ void LTMgr::recordPhyRegOcc(LT * lt, UINT pos, IN BitSet & lived_lt)
     if (lt->has_allocated()) {
         //Record the occurrence before the lived life-time be
         //removed out of 'lived_lt'.
-        for (INT i = lived_lt.get_first(); i >= 0; i = lived_lt.get_next(i)) {
+        for (BSIdx i = lived_lt.get_first();
+             i != BS_UNDEF; i = lived_lt.get_next(i)) {
             LT * lived = getLifeTime(i);
             ASSERT0(lived);
-            if (lt->has_allocated() &&
-                LT_phy(lived) == LT_phy(lt)) {
+            if (lt->has_allocated() && LT_phy(lived) == LT_phy(lt)) {
                 //Lifetime of lt died at current position.
                 LT_range(lived)->bunion(pos);
             }
@@ -1929,7 +1926,7 @@ void LTMgr::processResultGroupPart(IR const* ir, UINT pos, OUT BitSet & lived_lt
 }
 
 
-LT * LTMgr::processResultPR(UINT prno, UINT pos, OUT BitSet & lived_lt)
+LT * LTMgr::processResultPR(PRNO prno, UINT pos, OUT BitSet & lived_lt)
 {
     LT * lt = map_pr2lt(prno);
     if (lt == nullptr) {
@@ -1945,7 +1942,8 @@ LT * LTMgr::processResultPR(UINT prno, UINT pos, OUT BitSet & lived_lt)
 
     //Phy register definition.
     if (lt->has_allocated()) {
-        for (INT i = lived_lt.get_first(); i >= 0; i = lived_lt.get_next(i)) {
+        for (BSIdx i = lived_lt.get_first();
+             i != BS_UNDEF; i = lived_lt.get_next(i)) {
             LT const* lived = getLifeTime(i);
             ASSERT0(lived);
             if (lived->has_allocated() &&
@@ -2105,7 +2103,7 @@ void LTMgr::processUseGroupPart(IR const* ir, UINT pos, OUT BitSet & lived_lt)
 LT * LTMgr::processUsePR(IR const* ir, UINT pos, OUT BitSet & lived_lt)
 {
     ASSERT0(ir->is_pr());
-    UINT prno = PR_no(ir);
+    PRNO prno = PR_no(ir);
     LT * lt = map_pr2lt(prno);
     if (lt == nullptr) {
         lt = newLT(prno);
@@ -2128,7 +2126,7 @@ void LTMgr::process_rg(LT * lt)
     ASSERT0(lt);
     LT_rg_sz(lt) = RG_PAIR_SZ;
     if (LT_is_global(lt)) {
-        GLT * g = m_gltm->m_pr2glt.get(LT_prno(lt));
+        GLT * g = m_gltm->m_pr2glt.get((VecIdx)LT_prno(lt));
         ASSERT0(g);
 
         //If global lt has allocate, then local part need to
@@ -2140,16 +2138,13 @@ void LTMgr::process_rg(LT * lt)
 }
 
 
-void LTMgr::processResult(
-        IN IR * ir,
-        INT pos,
-        MOD BitSet & lived_lt,
-        bool group_part)
+void LTMgr::processResult(IN IR * ir, INT pos, MOD BitSet & lived_lt,
+                          bool group_part)
 {
     ASSERT0(ir->is_stmt());
-
     //Keep the track of live points at DEF for each lived PR.
-    for (INT i = lived_lt.get_first(); i >= 0; i = lived_lt.get_next(i)) {
+    for (BSIdx i = lived_lt.get_first();
+         i != BS_UNDEF; i = lived_lt.get_next(i)) {
          LT * lt = getLifeTime(i);
         ASSERT0(lt);
         LT_range(lt)->bunion(pos);
@@ -2210,39 +2205,32 @@ void LTMgr::processResult(
 
 //'group_part': set to true if user is going to scan and handle
 //group register info.
-void LTMgr::processUse(
-        IN IR * ir,
-        ConstIRIter & cii,
-        INT pos,
-        MOD BitSet & lived_lt,
-        bool group_part)
+void LTMgr::processUse(IN IR * ir, ConstIRIter & cii, INT pos,
+                       MOD BitSet & lived_lt, bool group_part)
 {
     ASSERT0(ir->is_stmt());
-
     //Keep the track of live points at USE for each live sr
-    for (INT i = lived_lt.get_first(); i >= 0; i = lived_lt.get_next(i)) {
+    for (BSIdx i = lived_lt.get_first();
+         i != BS_UNDEF; i = lived_lt.get_next(i)) {
         LT * lt = getLifeTime(i);
         ASSERT0(lt);
         LT_range(lt)->bunion(pos);
     }
-
     cii.clean();
     for (IR const* k = iterExpInitC(ir, cii);
          k != nullptr; k = iterExpNextC(cii)) {
         if (!k->is_pr()) { continue; }
-
         if (group_part) {
             if (is_pair(k)) {
                 processUseGroupPart(k, pos, lived_lt);
             }
-        } else {
-            LT * lt = processUsePR(k, pos, lived_lt);
-            if (is_pair(k)) {
-                process_rg(lt);
-            }
+            continue;
+        }
+        LT * lt = processUsePR(k, pos, lived_lt);
+        if (is_pair(k)) {
+            process_rg(lt);
         }
     }
-
     if (is_range_call(ir)) {
         genRangeCallGroup(ir);
     }
@@ -2275,23 +2263,21 @@ IR * LTMgr::genDedicatePR(UINT phy)
 
 
 //Process the function/region exit BB.
-void LTMgr::processExitBB(
-        MOD List<LT*> * liveout_exitbb,
-        MOD BitSet & lived_lt,
-        BitSet const& retval_regset,
-        UINT pos)
+void LTMgr::processExitBB(MOD List<LT*> * liveout_exitbb,
+                          MOD BitSet & lived_lt,
+                          BitSet const& retval_regset, UINT pos)
 {
     ASSERT0(liveout_exitbb);
-    for (INT phy = retval_regset.get_first();
-         phy != -1; phy = retval_regset.get_next(phy)) {
+    for (BSIdx phy = retval_regset.get_first();
+         phy != BS_UNDEF; phy = retval_regset.get_next(phy)) {
         IR * x = genDedicatePR(phy);
         //TODO: map PR to phy.
-        UINT prno = PR_no(x);
+        PRNO prno = PR_no(x);
         LT * lt = map_pr2lt(prno);
         if (lt == nullptr) {
             lt = newLT(prno);
         }
-        lived_lt.bunion(prno);
+        lived_lt.bunion((BSIdx)prno);
         LT_range(lt)->bunion(pos);
         liveout_exitbb->append_tail(lt);
         m_liveness_mgr->setPRToBeLiveout(m_bb, prno);
@@ -2302,15 +2288,13 @@ void LTMgr::processExitBB(
 //Process the live in sr.
 //'always_consider_glt': true if build local lt for global lt
 //        even if glt has not assigned register.
-void LTMgr::processLivein(
-        OUT BitSet & lived_lt,
-        UINT pos,
-        bool always_consider_glt)
+void LTMgr::processLivein(OUT BitSet & lived_lt, UINT pos,
+                          bool always_consider_glt)
 {
     DefSBitSetCore * livein = m_liveness_mgr->get_livein(m_bb->id());
     SEGIter * cur = nullptr;
-    for (INT i = livein->get_first(&cur);
-         i != -1; i = livein->get_next(i, &cur)) {
+    for (BSIdx i = livein->get_first(&cur);
+         i != BS_UNDEF; i = livein->get_next(i, &cur)) {
         GLT * glt = m_gltm->map_pr2glt(i);
         ASSERT0(glt);
         if (glt->has_allocated() || always_consider_glt) {
@@ -2331,7 +2315,8 @@ void LTMgr::processLivein(
     }
 
     //Keep tracking of live points for each lived PR.
-    for (INT i = lived_lt.get_first(); i >= 0; i = lived_lt.get_next(i)) {
+    for (BSIdx i = lived_lt.get_first();
+         i != BS_UNDEF; i = lived_lt.get_next(i)) {
         LT * lt = getLifeTime(i);
         ASSERT0(lt);
         LT_range(lt)->bunion(pos);
@@ -2339,16 +2324,13 @@ void LTMgr::processLivein(
 }
 
 
-void LTMgr::processLiveout(
-        MOD BitSet & lived_lt,
-        UINT pos,
-        bool always_consider_glt)
+void LTMgr::processLiveout(MOD BitSet & lived_lt, UINT pos,
+                           bool always_consider_glt)
 {
     DefSBitSetCore * liveout = m_liveness_mgr->get_liveout(m_bb->id());
-
     SEGIter * cur = nullptr;
-    for (INT i = liveout->get_first(&cur);
-         i != -1; i = liveout->get_next(i, &cur)) {
+    for (BSIdx i = liveout->get_first(&cur);
+         i != BS_UNDEF; i = liveout->get_next(i, &cur)) {
         GLT * glt = m_gltm->map_pr2glt(i);
         ASSERT0(glt);
         if (glt->has_allocated() || always_consider_glt) {
@@ -2367,7 +2349,8 @@ void LTMgr::processLiveout(
     }
 
     //Keep tracking of live points for each lived PR.
-    for (INT i = lived_lt.get_first(); i >= 0; i = lived_lt.get_next(i)) {
+    for (BSIdx i = lived_lt.get_first();
+         i != BS_UNDEF; i = lived_lt.get_next(i)) {
         LT * lt = getLifeTime(i);
         ASSERT0(lt);
         LT_range(lt)->bunion(pos);
@@ -2442,7 +2425,8 @@ void LTMgr::build(
     processLivein(*lived_lt, pos, consider_glt);
 
     //Append the FIRST_POS to complete all remainder life times.
-    //for (INT i = lived_lt.get_first(); i >= 0; i = lived_lt.get_next(i)) {
+    //for (BSIdx i = lived_lt.get_first();
+    //     i != BS_UNDEF; i = lived_lt.get_next(i)) {
     //     LT * lt = getLifeTime(i);
     //    ASSERT0(lt);
     //    LT_pos(lt)->bunion(pos);
@@ -2450,7 +2434,7 @@ void LTMgr::build(
 
     #ifdef _DEBUG_
     //Life time verification.
-    for (INT i = 0; i <= m_lt_vec.get_last_idx(); i++) {
+    for (VecIdx i = 0; i <= m_lt_vec.get_last_idx(); i++) {
         LT * lt = m_lt_vec.get(i);
         if (lt == nullptr) { continue; }
         if (!LT_is_global(lt) && !lt->has_allocated()) {
@@ -2479,7 +2463,7 @@ void LTMgr::build(
 
 void LTMgr::clean()
 {
-    for (INT i = 0; i <= m_lt_vec.get_last_idx(); i++) {
+    for (VecIdx i = 0; i <= m_lt_vec.get_last_idx(); i++) {
         LT * lt = m_lt_vec.get(i);
         if (lt == nullptr) { continue; }
         lt->clean();
@@ -2492,8 +2476,8 @@ void LTMgr::clean()
 void LTMgr::reviseLTCase1(LT * lt)
 {
     bool is_def;
-    INT f = LT_range(lt)->get_first();
-    INT first_concrete_occ = lt->getForwardOcc(f, &is_def, f);
+    BSIdx f = LT_range(lt)->get_first();
+    BSIdx first_concrete_occ = lt->getForwardOcc(f, &is_def, f);
     ASSERTN(first_concrete_occ > (INT)get_first_pos(),
             ("empty life tiem, have no any occ!"));
     BitSet * tmp = m_gltm->m_bs_mgr.create();
@@ -2508,7 +2492,7 @@ void LTMgr::reviseLTCase1(LT * lt)
 void LTMgr::revise_special_lt(List<LT*> * lts)
 {
     INT firstpos = get_first_pos();
-    for (INT i = 0; i <= m_lt_vec.get_last_idx(); i++) {
+    for (VecIdx i = 0; i <= m_lt_vec.get_last_idx(); i++) {
         LT * lt = m_lt_vec.get(i);
         if (lt == nullptr) { continue; }
         if (!LT_is_global(lt) &&
@@ -2575,8 +2559,7 @@ void LTMgr::renameUse(IR * ir, LT * l, IR ** newpr)
                         replace(&CALL_param_list(ir), p, newp);
                         IR_parent(newp) = ir;
                         m_rg->freeIR(p);
-                    } else if (gr != nullptr &&
-                               gr->is_member(PR_no(p))) {
+                    } else if (gr != nullptr && gr->is_member(PR_no(p))) {
                         if (*newpr == nullptr) {
                             *newpr = m_rg->buildPR(IR_dt(p));
                         }
@@ -2606,8 +2589,7 @@ void LTMgr::renameUse(IR * ir, LT * l, IR ** newpr)
                     RET_exp(ir) = x;
                     IR_parent(x) = ir;
                     m_rg->freeIR(rv);
-                } else if (gr != nullptr &&
-                           gr->is_member(PR_no(rv))) {
+                } else if (gr != nullptr && gr->is_member(PR_no(rv))) {
                     if (*newpr == nullptr) {
                         *newpr = m_rg->buildPR(IR_dt(rv));
                     }
@@ -2674,14 +2656,14 @@ void LTMgr::renameLT(LT * l, IR ** newpr)
     ASSERT0(l && newpr);
     BitSet * occ = LT_occ(l);
     if (occ == nullptr) { return; }
-    for (INT i = occ->get_first(); i >= 0; i = occ->get_next(i)) {
+    for (BSIdx i = occ->get_first(); i != BS_UNDEF; i = occ->get_next(i)) {
         IR * ir = m_pos2ir.get(i);
         ASSERT0(ir);
         if (l->is_def(i)) {
             switch (ir->getCode()) {
             case IR_STPR:
                 {
-                    UINT prno = ir->getPrno();
+                    PRNO prno = ir->getPrno();
                     if (prno == LT_prno(l)) {
                         if (*newpr == nullptr) {
                             //Generate new PR no.
@@ -2729,28 +2711,28 @@ void LTMgr::renameLT(LT * l, IR ** newpr)
 
 //If local PR is same as global PR, rename local PR.
 //If there are multiple local lifetime corresponded to same PR, rename them.
-void LTMgr::rename(TMap<UINT, LT*> & prno2lt, BitSet & met)
+void LTMgr::rename(TMap<PRNO, LT*> & prno2lt, BitSet & met)
 {
     prno2lt.clean(); //for tmp use
-    for (INT i = 1; i <= m_lt_vec.get_last_idx(); i++) {
+    for (VecIdx i = 1; i <= m_lt_vec.get_last_idx(); i++) {
         LT * l = m_lt_vec.get(i);
         if (l == nullptr) { continue; }
         if (!LT_is_global(l)) {
-            if (m_gltm->m_pr2glt.get(LT_prno(l)) != nullptr) {
+            if (m_gltm->m_pr2glt.get((VecIdx)LT_prno(l)) != nullptr) {
                 //local lifetime has same PR with global lifetime.
                 IR * newpr = nullptr;
                 renameLT(l, &newpr);
                 if (newpr != nullptr) {
-                    met.bunion(PR_no(newpr));
+                    met.bunion((BSIdx)PR_no(newpr));
                 }
                 continue;
             }
-            if (met.is_contain(LT_prno(l))) {
+            if (met.is_contain((BSIdx)LT_prno(l))) {
                 //local lifetime has same PR with local lifetime in other bb.
                 IR * newpr = nullptr;
                 renameLT(l, &newpr);
                 if (newpr != nullptr) {
-                    met.bunion(PR_no(newpr));
+                    met.bunion((BSIdx)PR_no(newpr));
                 }
                 continue;
             }
@@ -2759,7 +2741,7 @@ void LTMgr::rename(TMap<UINT, LT*> & prno2lt, BitSet & met)
         LT * prior = prno2lt.get(LT_prno(l));
         if (prior == nullptr) {
             prno2lt.set(LT_prno(l), l);
-            met.bunion(LT_prno(l));
+            met.bunion((BSIdx)LT_prno(l));
         } else if (prior != l) {
             //Do not rename global lifetime in LTMgr.
             IR * newpr = nullptr;
@@ -2772,7 +2754,7 @@ void LTMgr::rename(TMap<UINT, LT*> & prno2lt, BitSet & met)
                 renameLT(l, &newpr);
             }
             if (newpr != nullptr) {
-                met.bunion(PR_no(newpr));
+                met.bunion((BSIdx)PR_no(newpr));
             }
             m_rg->freeIR(newpr);
         }
@@ -2797,7 +2779,7 @@ void LTMgr::dump_allocated(FILE * h, BitSet & visited)
     //Print local life time.
     //Position start from 0, end at maxlen-1.
     fprintf(h, "\nPOS:");
-    for (INT i = 1; i <= m_lt_vec.get_last_idx(); i++) {
+    for (VecIdx i = 1; i <= m_lt_vec.get_last_idx(); i++) {
         LT * lt = m_lt_vec.get(i);
         if (lt == nullptr) { continue; }
         visited.bunion(LT_uid(lt));
@@ -2810,8 +2792,8 @@ void LTMgr::dump_allocated(FILE * h, BitSet & visited)
         //Collects position info.
         CHAR * pos_marker = (CHAR*)::malloc(m_max_lt_len);
         ::memset(pos_marker, 0, sizeof(CHAR) * m_max_lt_len);
-        for (INT j = LT_range(lt)->get_first();
-             j >= 0; j = LT_range(lt)->get_next(j)) {
+        for (BSIdx j = LT_range(lt)->get_first();
+             j != BS_UNDEF; j = LT_range(lt)->get_next(j)) {
             ASSERT0(j < (INT)m_max_lt_len);
             pos_marker[j] = 1;
         }
@@ -2827,7 +2809,7 @@ void LTMgr::dump_allocated(FILE * h, BitSet & visited)
         free(pos_marker);
 
         //Dump prno, phy.
-        fprintf(h, "    [pr%d]", LT_prno(lt));
+        fprintf(h, "    [pr%u]", LT_prno(lt));
         if (lt->has_allocated()) {
             fprintf(h, "(");
             for (INT z = 0; z < LT_rg_sz(lt); z++) {
@@ -2861,10 +2843,10 @@ void LTMgr::dump_allocated(FILE * h, BitSet & visited)
 
             //Dump ltg's prno, ltid, phy.
             fprintf(h, "<");
-            for (INT i2 = 0; i2 <= ltg->get_last_idx(); i2++) {
+            for (VecIdx i2 = 0; i2 <= ltg->get_last_idx(); i2++) {
                 LT * l = ltg->get(i2);
                 ASSERT0(l);
-                fprintf(h, "pr%d(lt%d)", LT_prno(l), LT_uid(l));
+                fprintf(h, "pr%u(lt%u)", LT_prno(l), LT_uid(l));
                 if (l->has_allocated()) {
                     INT sz = LT_rg_sz(l);
 
@@ -2885,7 +2867,7 @@ void LTMgr::dump_allocated(FILE * h, BitSet & visited)
     }
 
     fprintf(h, "\nDESC:");
-    for (INT i = 0; i <= m_lt_vec.get_last_idx(); i++) {
+    for (VecIdx i = 0; i <= m_lt_vec.get_last_idx(); i++) {
         LT * lt = m_lt_vec.get(i);
         if (lt == nullptr) { continue; }
         if (LT_is_global(lt)) {
@@ -2895,8 +2877,8 @@ void LTMgr::dump_allocated(FILE * h, BitSet & visited)
         }
 
         //Dump occurrences.
-        INT start = LT_range(lt)->get_first();
-        INT end = LT_range(lt)->get_last();
+        BSIdx start = LT_range(lt)->get_first();
+        BSIdx end = LT_range(lt)->get_last();
         for (INT j = get_first_pos(); j < (INT)m_max_lt_len; j++) {
             if (LT_occ(lt) != nullptr && LT_occ(lt)->is_contain(j)) {
                 if (lt->is_def(j)) {
@@ -2914,7 +2896,7 @@ void LTMgr::dump_allocated(FILE * h, BitSet & visited)
         }
 
         //Dump prno, phy.
-        fprintf(h, "    [pr%d]", LT_prno(lt));
+        fprintf(h, "    [pr%u]", LT_prno(lt));
         if (lt->has_allocated()) {
             fprintf(h, "(");
             for (INT z = 0; z < LT_rg_sz(lt); z++) {
@@ -2948,10 +2930,10 @@ void LTMgr::dump_allocated(FILE * h, BitSet & visited)
 
             //Dump ltg's prno, ltid, phy.
             fprintf(h, "<");
-            for (INT i2 = 0; i2 <= ltg->get_last_idx(); i2++) {
+            for (VecIdx i2 = 0; i2 <= ltg->get_last_idx(); i2++) {
                 LT * l = ltg->get(i2);
                 ASSERT0(l);
-                fprintf(h, "pr%d(lt%d)", LT_prno(l), LT_uid(l));
+                fprintf(h, "pr%u(lt%u)", LT_prno(l), LT_uid(l));
                 if (l->has_allocated()) {
                     INT sz = LT_rg_sz(l);
 
@@ -2977,7 +2959,7 @@ void LTMgr::dump_unallocated(FILE * h, BitSet & visited)
 {
     //Print unallocated life time.
     bool doit = false;
-    for (INT i = 0; i <= m_lt_vec.get_last_idx(); i++) {
+    for (VecIdx i = 0; i <= m_lt_vec.get_last_idx(); i++) {
         LT * lt = m_lt_vec.get(i);
         if (lt == nullptr) { continue; }
         if (!visited.is_contain(LT_uid(lt))) {
@@ -2988,7 +2970,7 @@ void LTMgr::dump_unallocated(FILE * h, BitSet & visited)
     if (!doit) { return; }
 
     fprintf(h, "\nUnallocated:");
-    for (INT i = 0; i <= m_lt_vec.get_last_idx(); i++) {
+    for (VecIdx i = 0; i <= m_lt_vec.get_last_idx(); i++) {
         LT * lt = m_lt_vec.get(i);
         if (lt == nullptr) { continue; }
         if (visited.is_contain(LT_uid(lt))) { continue; }
@@ -2998,8 +2980,8 @@ void LTMgr::dump_unallocated(FILE * h, BitSet & visited)
         //Collects position info.
         CHAR * pos_marker = (CHAR*)::malloc(m_max_lt_len);
         ::memset(pos_marker, 0, sizeof(CHAR) * m_max_lt_len);
-        for (INT j = LT_range(lt)->get_first();
-             j >= 0; j = LT_range(lt)->get_next(j)) {
+        for (BSIdx j = LT_range(lt)->get_first();
+             j != BS_UNDEF; j = LT_range(lt)->get_next(j)) {
             ASSERT0(j < (INT)m_max_lt_len);
             pos_marker[j] = 1;
         }
@@ -3013,18 +2995,18 @@ void LTMgr::dump_unallocated(FILE * h, BitSet & visited)
             }
         }
         free(pos_marker);
-        fprintf(h, "    [pr%d]", LT_prno(lt));
+        fprintf(h, "    [pr%u]", LT_prno(lt));
 
         //Collects position info
         if (LT_occ(lt) == nullptr) { continue; }
-        INT last_idx = LT_occ(lt)->get_last();
+        BSIdx last_idx = LT_occ(lt)->get_last();
         DUMMYUSE(last_idx);
         ASSERTN(last_idx == -1 || last_idx < (INT)m_max_lt_len,
                 ("Depiction of life time long than the finial position"));
 
         fprintf(h, "\nDESC:");
-        INT start = LT_occ(lt)->get_first();
-        INT end = LT_occ(lt)->get_last();
+        BSIdx start = LT_occ(lt)->get_first();
+        BSIdx end = LT_occ(lt)->get_last();
         for (INT j = get_first_pos(); j < (INT)m_max_lt_len; j++) {
             if (LT_occ(lt) != nullptr && LT_occ(lt)->is_contain(j)) {
                 if (lt->is_def(j)) {
@@ -3040,7 +3022,7 @@ void LTMgr::dump_unallocated(FILE * h, BitSet & visited)
                 }
             }
         }
-        fprintf(h, "    [pr%d]", LT_prno(lt));
+        fprintf(h, "    [pr%u]", LT_prno(lt));
     } //end for
 }
 
@@ -3054,22 +3036,22 @@ void LTMgr::dump()
     note(getRegion(), "\nlivein:");
     DefSBitSetCore * livein = m_liveness_mgr->get_livein(m_bb->id());
     SEGIter * cur = nullptr;
-    for (INT i = livein->get_first(&cur);
-         i != -1; i = livein->get_next(i, &cur)) {
+    for (BSIdx i = livein->get_first(&cur);
+         i != BS_UNDEF; i = livein->get_next(i, &cur)) {
         prt(getRegion(), "pr%d, ", i);
     }
 
     //Print live-out PR.
     note(getRegion(), "\nliveout:");
     DefSBitSetCore * liveout = m_liveness_mgr->get_liveout(m_bb->id());
-    for (INT i = liveout->get_first(&cur);
-         i != -1; i = liveout->get_next(i, &cur)) {
+    for (BSIdx i = liveout->get_first(&cur);
+         i != BS_UNDEF; i = liveout->get_next(i, &cur)) {
         prt(getRegion(), "pr%d, ", i);
     }
 
     //Print local life times base info.
     UINT c = 0;
-    for (INT i = 0; i <= m_lt_vec.get_last_idx(); i++) {
+    for (VecIdx i = 0; i <= m_lt_vec.get_last_idx(); i++) {
         LT * lt = m_lt_vec.get(i);
         if (lt == nullptr) { continue; }
         c = MAX(c, LT_uid(lt));
@@ -3268,7 +3250,8 @@ bool BBRA::assignRegister(LT * l, List<UINT> & nis)
     //BitSet const* anti = m_ltm->get_anti_regs(l, false);
     //if (anti != nullptr) {
     //    //Allocate register that 'g' anticipated.
-    //    for (INT r = anti->get_first(); r >= 0; r = anti->get_next(r)) {
+    //    for (BSIdx r = anti->get_first();
+    //         r != BS_UNDEF; r = anti->get_next(r)) {
     //        if (usable->is_contain(r)) {
     //            LT_phy(l) = r;
     //            return true;
@@ -3278,7 +3261,7 @@ bool BBRA::assignRegister(LT * l, List<UINT> & nis)
 
     //Fine, you can allocate any register for it except the unusables.
     //Preferred the minmum.
-    INT m = usable->get_last();
+    BSIdx m = usable->get_last();
     bool succ = false;
     for (INT i = FIRST_PHY_REG; i <= m; i++) {
         if (!unusable->is_contain(i)) {
@@ -3308,10 +3291,10 @@ bool BBRA::canBeSplit(LT const* lt) const
     UINT c = LT_range(lt)->get_elem_count();
     if (c == 1) { return false; }
     if (c == 2) {
-        INT pos1 = LT_occ(lt)->get_first();
-        INT pos2 = LT_occ(lt)->get_next(pos1);
-        ASSERT0(pos1 != -1 && pos2 != -1);
-        ASSERTN(LT_occ(lt)->get_next(pos2) == -1, ("More than 2"));
+        BSIdx pos1 = LT_occ(lt)->get_first();
+        BSIdx pos2 = LT_occ(lt)->get_next(pos1);
+        ASSERT0(pos1 != BS_UNDEF && pos2 != BS_UNDEF);
+        ASSERTN(LT_occ(lt)->get_next(pos2) == BS_UNDEF, ("More than 2"));
         if (pos2 == pos1 + 1) {
             //We canot benefit from spilling this lifetime.
             return false;
@@ -3323,28 +3306,29 @@ bool BBRA::canBeSplit(LT const* lt) const
 
 //Return true if there is hole in lifetime of 'lt',
 //and 'startpos', 'endpos' represented the start and end position of hole.
-bool BBRA::getMaxHole(OUT INT * startpos, OUT INT * endpos, LT const* lt)
+bool BBRA::getMaxHole(OUT BSIdx * startpos, OUT BSIdx * endpos, LT const* lt)
 {
     *startpos = 0;
     *endpos = 0;
 
     INT maxlen = 0;
-    INT next_i = -1;
-    INT first = m_ltm->get_first_pos();
-    INT last = m_ltm->get_last_pos();
-    INT range_last = LT_range(lt)->get_last();
-    for (INT i = LT_range(lt)->get_first(), start = i;
-         i >= 0 && i <= range_last; i = next_i) {
-
+    BSIdx next_i = BS_UNDEF;
+    UINT first = m_ltm->get_first_pos();
+    UINT last = m_ltm->get_last_pos();
+    BSIdx range_last = LT_range(lt)->get_last();
+    for (BSIdx i = LT_range(lt)->get_first(), start = i;
+         i != BS_UNDEF && i <= range_last; i = next_i) {
         next_i = i + 1;
         if (!LT_range(lt)->is_contain(i)) {
-            next_i = LT_range(lt)->get_next(i); //'next_i' may be -1
+            next_i = LT_range(lt)->get_next(i); //'next_i' may be BS_UNDEF
             start = next_i;
             continue;
         }
 
-        if ((i == first && LT_range(lt)->is_contain(first)) || //life time live in.
-            (i == last && LT_range(lt)->is_contain(last)) || //life time live out.
+        if ((i == first &&
+             LT_range(lt)->is_contain(first)) || //life time live in.
+            (i == last &&
+             LT_range(lt)->is_contain(last)) || //life time live out.
             (LT_occ(lt) != nullptr && LT_occ(lt)->is_contain(i))) {
             if (i > start) {
                 if (maxlen < (i - start)) {
@@ -3375,7 +3359,7 @@ void BBRA::computeLTResideInHole(OUT List<LT*> & reside_in, LT const* lt)
     LT_range(lt)->get_subset_in_range(hole_startpos, hole_endpos, *hole);
 
     Vector<LT*> * ltvec = m_ltm->get_lt_vec();
-    for (INT i = 1; i <= ltvec->get_last_idx(); i++) {
+    for (VecIdx i = 1; i <= ltvec->get_last_idx(); i++) {
         LT * l = ltvec->get(i);
         if (l == nullptr) { continue; }
         if (l == lt) { continue; }
@@ -3471,8 +3455,7 @@ LT * BBRA::computeSplitCand(LT * lt, bool & has_hole, List<LT*> * tmp,
 
     //Selecting policy.
     //2. Choosing the best one as split-candidate that
-    //     constains the most life times
-    //   which unallocated register till now.
+    //   constains the most life times which unallocated register till now.
     INT most = 0, most_idx = -1;
     INT minor = 0, minor_idx = -1;
     i = 0;
@@ -3562,17 +3545,13 @@ LT * BBRA::computeSplitCand(LT * lt, bool & has_hole, List<LT*> * tmp,
 
 //Return true if there is hole in lifetime of 'owner' that
 //'inner' can be lived in, and 'startpos','endpos' represented the hole.
-bool BBRA::find_hole(
-        OUT INT & startpos,
-        OUT INT & endpos,
-        LT const* owner,
-        LT const* inner)
+bool BBRA::find_hole(OUT BSIdx & startpos, OUT BSIdx & endpos,
+                     LT const* owner, LT const* inner)
 {
     startpos = 0;
     endpos = 0;
-
     BitSet * owner_range = LT_range(owner);
-    INT lastbit = owner_range->get_last();
+    BSIdx lastbit = owner_range->get_last();
     INT firstpos = m_ltm->get_first_pos();
     INT lastpos = m_ltm->get_last_pos();
     IR const* lastir = BB_last_ir(m_bb);
@@ -3584,14 +3563,14 @@ bool BBRA::find_hole(
     }
 
     BitSet * owner_occ = LT_occ(owner);
-    INT next_i;
-    for (INT i = owner_range->get_first(), start = i;
-         i >= 0 && i <= lastbit; i = next_i) {
+    BSIdx next_i;
+    for (BSIdx i = owner_range->get_first(), start = i;
+         i != BS_UNDEF && i <= lastbit; i = next_i) {
         next_i = i + 1;
 
         //Current pos is not a point of life time.
         if (!owner_range->is_contain(i)) {
-            next_i = owner_range->get_next(i); //'next_i' may be -1
+            next_i = owner_range->get_next(i); //'next_i' may be BS_UNDEF 
             start = next_i;
             continue;
         }
@@ -3609,8 +3588,8 @@ bool BBRA::find_hole(
                 }
             }
             start = i;
-        }//end if
-    }//end for
+        }
+    }
     return false;
 }
 
@@ -3627,16 +3606,15 @@ bool BBRA::find_hole(
 //    We need to find the DEF to insert the spill code. And choosing
 //    the best USE between 'pos1' and 'pos2' to insert reload code.
 //    While both positions are useless, we do not insert any code in
-//    those positions, and set 'pos1' and 'pos2' to -1.
-void BBRA::selectReasonableSplitPos(
-        OUT INT & pos1,
-        OUT INT & pos2,
-        OUT bool & is_pos1_spill,
-        OUT bool & is_pos2_spill,
-        LT * lt)
+//    those positions, and set 'pos1' and 'pos2' to BS_UNDEF.
+void BBRA::selectReasonableSplitPos(OUT BSIdx & pos1, OUT BSIdx & pos2,
+                                    OUT bool & is_pos1_spill,
+                                    OUT bool & is_pos2_spill,
+                                    LT * lt)
 {
-    ASSERTN(lt && pos1 >= 0 && pos2 > 0 && pos1 < pos2, ("Illegal hole"));
-    INT p1 = pos1, p2 = pos2;
+    ASSERTN(lt && pos1 != BS_UNDEF && pos2 > 0 && pos1 < pos2,
+            ("Illegal hole"));
+    BSIdx p1 = pos1, p2 = pos2;
     bool is_p1_def = false, is_p2_def = false;
 
     INT firstpos = m_ltm->get_first_pos();
@@ -3746,19 +3724,19 @@ void BBRA::selectReasonableSplitPos(
         is_pos2_spill = false; //need reload
         return;
     } else if (is_p1_def && is_p2_def) { //def ... def
-        pos1 = pos2 = -1; //do not need spill and reload.
+        pos1 = pos2 = BS_UNDEF; //do not need spill and reload.
         return;
     } else if (!is_p1_def) {
         if (is_p2_def) {                 //use ... def
             //pos2 do not need reload.
-            pos2 = -1;
+            pos2 = BS_UNDEF;
         } else {                         //use ... use
             is_pos2_spill = false; //need reload at pos2
         }
 
         //Find the DEF of pos1.
         pos1 = lt->getBackwardOccForDEF(p1, firstpos);
-        if (pos1 != -1) {
+        if (pos1 != BS_UNDEF) {
             is_pos1_spill = true; //spill at pos1
         } else if ( //LT_is_dedicated(lt) ||
                    LT_is_global(lt)) { //Might be live-in lifetime
@@ -3783,7 +3761,7 @@ bool BBRA::isOpndSameWithResult(IR *)
 }
 
 
-void BBRA::renameResult(IR *, UINT old_prno, IR * newpr)
+void BBRA::renameResult(IR *, PRNO old_prno, IR * newpr)
 {
     DUMMYUSE(newpr);
     DUMMYUSE(old_prno);
@@ -3791,7 +3769,7 @@ void BBRA::renameResult(IR *, UINT old_prno, IR * newpr)
 }
 
 
-void BBRA::renameOpnd(IR *, UINT old_prno, IR * newpr)
+void BBRA::renameOpnd(IR *, PRNO old_prno, IR * newpr)
 {
     DUMMYUSE(newpr);
     DUMMYUSE(old_prno);
@@ -3802,14 +3780,14 @@ void BBRA::renameOpnd(IR *, UINT old_prno, IR * newpr)
 //Rename opnds in between 'start' and 'end' occurrencens within lifetime.
 //'start': start pos in lifetime, can NOT be the livein pos.
 //'end': end pos in lifetime, can NOT be the liveout pos.
-void BBRA::renameOpndInRange(LT * lt, IR * newpr, INT start, INT end)
+void BBRA::renameOpndInRange(LT * lt, IR * newpr, BSIdx start, BSIdx end)
 {
     ASSERT0(lt && newpr && newpr->is_pr());
     UNREACHABLE();
     INT firstpos = m_ltm->get_first_pos();
     INT lastpos = m_ltm->get_last_pos();
-    if (start == -1) { start = firstpos; }
-    if (end == -1) { end = lastpos; }
+    if (start == BS_UNDEF) { start = firstpos; }
+    if (end == BS_UNDEF) { end = lastpos; }
     ASSERT0(start >= firstpos && start <= lastpos);
     ASSERT0(end >= firstpos && end <= lastpos);
     ASSERT0(start <= end);
@@ -3821,9 +3799,9 @@ void BBRA::renameOpndInRange(LT * lt, IR * newpr, INT start, INT end)
     if (!occ->is_contain(start)) {
         start = occ->get_next(start);
     }
-    if (start == -1) { return; }
-    for (INT i = start; i <= end; i = occ->get_next(i)) {
-        ASSERTN(i >= 0, ("out of boundary"));
+    if (start == BS_UNDEF) { return; }
+    for (BSIdx i = start; i <= end; i = occ->get_next(i)) {
+        ASSERTN(i != BS_UNDEF, ("out of boundary"));
         IR * ir = m_ltm->getIR(i);
         ASSERT0(ir);
         if (lt->is_def(i)) {
@@ -3838,19 +3816,15 @@ void BBRA::renameOpndInRange(LT * lt, IR * newpr, INT start, INT end)
 //Generate spilling and reloading code at position 'start' and 'end'
 //of life time 'lt' respectively.
 //'lt': split candidate, may be local and global lifetimes.
-//NOTICE: Neglact 'start' if it equals -1, and similar for 'end'.
-void BBRA::splitLTAt(
-        INT start,
-        INT end,
-        bool is_start_spill,
-        bool is_end_spill,
-        LT * lt)
+//NOTICE: Neglact 'start' if it equals BS_UNDEF, and similar for 'end'.
+void BBRA::splitLTAt(BSIdx start, BSIdx end, bool is_start_spill,
+                     bool is_end_spill, LT * lt)
 {
     ASSERT0(lt);
-    INT firstpos = m_ltm->get_first_pos();
-    INT lastpos = m_ltm->get_last_pos();
+    UINT firstpos = m_ltm->get_first_pos();
+    UINT lastpos = m_ltm->get_last_pos();
     IR * spill_loc = nullptr;
-    if (start != -1) {
+    if (start != BS_UNDEF) {
         if (start == firstpos) {
             spill_loc = m_ltm->genSpill(lt, start);
         } else {
@@ -3865,7 +3839,7 @@ void BBRA::splitLTAt(
         }
     }
 
-    if (end != -1) {
+    if (end != BS_UNDEF) {
         if (end == lastpos) {
             ASSERT0(spill_loc);
             IR * newpr = m_ltm->genReload(lt, end, spill_loc);
@@ -3887,10 +3861,10 @@ void BBRA::splitLTAt(
                 IR * newpr = m_ltm->genReload(lt, end, spill_loc);
                 if (PR_no(newpr) != LT_prno(lt)) {
                     //Do renaming.
-                    INT forward_def = lt->getForwardOccForDEF(end, firstpos);
+                    BSIdx forward_def = lt->getForwardOccForDEF(end, firstpos);
 
                     //May be same result as operand.
-                    if (forward_def != -1 && forward_def == (end + 1)) {
+                    if (forward_def != BS_UNDEF && forward_def == (end + 1)) {
                         IR * occ = m_ltm->getIR(end);
                         ASSERTN(m_ltm->getIR(forward_def) == occ,
                                 ("o should be same result and operand."));
@@ -3900,12 +3874,12 @@ void BBRA::splitLTAt(
                         }
 
                         //Rename all follows REFs.
-                        forward_def = -1;
+                        forward_def = BS_UNDEF;
                     }
-                    if (forward_def != -1) {
+                    if (forward_def != BS_UNDEF) {
                         renameOpndInRange(lt, newpr, end, forward_def - 1);
                     } else {
-                        renameOpndInRange(lt, newpr, end, -1);
+                        renameOpndInRange(lt, newpr, end, BS_UNDEF);
                     }
                 }
             }
@@ -3921,12 +3895,12 @@ bool BBRA::split(LT * lt)
     LT * cand = computeSplitCand(lt, has_hole, m_tmp_lts, m_tmp_lts2);
     ASSERT0(cand);
     if (has_hole && cand != lt) {
-        INT start, end;
+        BSIdx start, end;
         bool find = find_hole(start, end, cand, lt);
         if (find) {
             bool is_start_spill, is_end_spill;
             selectReasonableSplitPos(start, end, is_start_spill,
-                                        is_end_spill, cand);
+                                     is_end_spill, cand);
             splitLTAt(start, end, is_start_spill, is_end_spill, cand);
             return true;
         }
@@ -3936,7 +3910,7 @@ bool BBRA::split(LT * lt)
     //bool has_hole = false;
     //LifeTime * cand = computeBestSpillCand(lt, ig, mgr, true, &has_hole);
     //
-    //INT hole_startpos, hole_endpos;
+    //BSIdx hole_startpos, hole_endpos;
     //bool split_hole = false;
     //if (has_hole && cand != lt) {
     //    split_hole = getResideinHole(&hole_startpos,
@@ -4041,7 +4015,7 @@ void BBRA::collectUnalloc(List<LT*> & unalloc)
 {
     Vector<LT*> * vec = m_ltm->get_lt_vec();
     unalloc.clean();
-    for (INT i = 1; i <= vec->get_last_idx(); i++) {
+    for (VecIdx i = 1; i <= vec->get_last_idx(); i++) {
         LT * lt = vec->get(i);
         if (lt == nullptr || lt->has_allocated()) { continue; }
         ASSERTN(!LT_is_global(lt), ("glt should be allocated already"));
@@ -4175,7 +4149,8 @@ float RA::computePrio(GLT * g)
     UINT cross_branch = 0;
     DefDBitSetCore * bbs = GLT_bbs(g);
     SEGIter * sc = nullptr;
-    for (INT j = bbs->get_first(&sc); j >= 0; j = bbs->get_next(j, &sc)) {
+    for (BSIdx j = bbs->get_first(&sc);
+         j != BS_UNDEF; j = bbs->get_next(j, &sc)) {
         LTMgr * ltm = m_gltm.get_ltm(j);
         ASSERT0(ltm); //glt miss local part.
         LT * gl = ltm->map_pr2lt(GLT_prno(g));
@@ -4216,7 +4191,7 @@ float RA::computePrio(GLT * g)
 void RA::buildPrioList(OUT List<GLT*> & prios)
 {
     Vector<GLT*> * gltv = m_gltm.get_gltvec();
-    for (INT i = 1; i <= gltv->get_last_idx(); i++) {
+    for (VecIdx i = 1; i <= gltv->get_last_idx(); i++) {
         GLT * g = gltv->get(i);
         if (g == nullptr || GLT_is_param(g) || g->has_allocated()) {
             //Allocate parameter elsewhere.
@@ -4245,9 +4220,9 @@ void RA::diffLocalNeighbourUsed(GLT * g, List<UINT> & nis, BitSet * unusable)
 {
     DefDBitSetCore * bbs = GLT_bbs(g);
     if (bbs == nullptr) { return; }
-
     SEGIter * sc = nullptr;
-    for (INT j = bbs->get_first(&sc); j >= 0; j = bbs->get_next(j, &sc)) {
+    for (BSIdx j = bbs->get_first(&sc);
+         j != BS_UNDEF; j = bbs->get_next(j, &sc)) {
         LTMgr * ltm = m_gltm.get_ltm(j);
         ASSERT0(ltm); //glt miss local part.
 
@@ -4374,7 +4349,8 @@ bool RA::assignRegister(GLT * g, List<UINT> & nis, List<UINT> & nis2)
     //BitSet * anti = m_gltm.get_anti_regs(g, false);
     //if (anti != nullptr) {
     //    //Allocate register that 'g' anticipated.
-    //    for (INT r = anti->get_first(); r >= 0; r = anti->get_next(r)) {
+    //    for (BSIdx r = anti->get_first(); r != BS_UNDEF;
+    //         r = anti->get_next(r)) {
     //        if (usable->is_contain(r)) {
     //            GLT_phy(g) = r;
     //            return true;
@@ -4383,7 +4359,7 @@ bool RA::assignRegister(GLT * g, List<UINT> & nis, List<UINT> & nis2)
     //}
 
     bool succ = false;
-    INT m = usable->get_last();
+    BSIdx m = usable->get_last();
     for (INT i = FIRST_PHY_REG; i <= m; i++) {
         if (!unusable->is_contain(i)) {
             if (GLT_rg_sz(g) != 1) {
@@ -4412,7 +4388,7 @@ void RA::allocParameter()
     UINT vreg = m_maxreg;
     m_param_reg_start = m_maxreg;
     for (UINT i = 0; i < m_param_num; i++, vreg++) {
-        UINT prno = m_gltm.m_params.get(i);
+        PRNO prno = m_gltm.m_params.get(i);
         if (prno == 0) { continue; }
         GLT * g = m_gltm.map_pr2glt(prno);
         ASSERT0(g && !g->has_allocated());
@@ -4483,7 +4459,7 @@ UINT RA::computeReserveRegister(IRIter & ii, List<IR*> & resolve_list)
 
 
 //Return true if PR need to be spilled.
-bool RA::checkIfNeedSpill(UINT prno, FMT fmt, LTMgr const* ltm)
+bool RA::checkIfNeedSpill(PRNO prno, FMT fmt, LTMgr const* ltm)
 {
     LT * l = ltm->map_pr2lt(prno);
     BitSet const* usable = m_rsc.get_usable(fmt, true);
@@ -4538,7 +4514,7 @@ void RA::reviseRSC()
 
         if (ir->is_stpr() || ir->isCallHasRetVal()) {
             ASSERTN(lhsn < 1, ("multiple def"));
-            UINT prno = ir->getPrno();
+            PRNO prno = ir->getPrno();
             if (checkIfNeedSpill(prno, fmt, ltm)) {
                 IR * spill_loc = ltm->genSpillSwap(ir, prno, IR_dt(ir), nullptr);
                 ASSERT0(spill_loc->getStmt());
@@ -4579,8 +4555,8 @@ void RA::reviseRSC()
     }
 
     //Rebuild lt for new PR which generated by above step.
-    for (INT bbid = visitbb.get_first();
-         bbid >= 0; bbid = visitbb.get_next(bbid)) {
+    for (BSIdx bbid = visitbb.get_first();
+         bbid != BS_UNDEF; bbid = visitbb.get_next(bbid)) {
         LTMgr * ltm = m_gltm.get_ltm(bbid);
         ASSERT0(ltm);
         ltm->clean();
@@ -4616,7 +4592,7 @@ void RA::shiftReg(UINT ofst)
         LTMgr * ltm = m_gltm.map_bb2ltm(bb);
         if (ltm == nullptr) { continue; }
         Vector<LT*> * lvec = ltm->get_lt_vec();
-        for (INT i = 0; i <= lvec->get_last_idx(); i++) {
+        for (VecIdx i = 0; i <= lvec->get_last_idx(); i++) {
             LT * l = lvec->get(i);
             if (l == nullptr) { continue; }
             ASSERT0(l->has_allocated());
@@ -4625,7 +4601,7 @@ void RA::shiftReg(UINT ofst)
     }
 
     Vector<GLT*> * gltv = m_gltm.get_gltvec();
-    for (INT i = 1; i <= gltv->get_last_idx(); i++) {
+    for (VecIdx i = 1; i <= gltv->get_last_idx(); i++) {
         GLT * g = gltv->get(i);
         if (g == nullptr) { continue; }
         ASSERT0(g->has_allocated());
@@ -4639,7 +4615,7 @@ void RA::shiftReg(UINT ofst)
 void RA::rotateReg()
 {
     ASSERT0(m_param_reg_start == 0);
-    if (m_param_num == 0 || m_gltm.m_params.get_last_idx() == -1) {
+    if (m_param_num == 0 || m_gltm.m_params.get_last_idx() == VEC_UNDEF) {
         return;
     }
     BBList * bbl = m_rg->getBBList();
@@ -4648,7 +4624,7 @@ void RA::rotateReg()
         LTMgr * ltm = m_gltm.map_bb2ltm(bb);
         if (ltm == nullptr) { continue; }
         Vector<LT*> * lvec = ltm->get_lt_vec();
-        for (INT i = 0; i <= lvec->get_last_idx(); i++) {
+        for (VecIdx i = 0; i <= lvec->get_last_idx(); i++) {
             LT * l = lvec->get(i);
             if (l == nullptr) { continue; }
             ASSERT0(l->has_allocated());
@@ -4661,11 +4637,10 @@ void RA::rotateReg()
         }
     }
     Vector<GLT*> * gltv = m_gltm.get_gltvec();
-    for (INT i = 1; i <= gltv->get_last_idx(); i++) {
+    for (VecIdx i = 1; i <= gltv->get_last_idx(); i++) {
         GLT * g = gltv->get(i);
         if (g == nullptr) { continue; }
         ASSERT0(g->has_allocated());
-
         if (GLT_phy(g) < m_param_num) {
             GLT_phy(g) = (USHORT)(regn - m_param_num) + GLT_phy(g);
         } else {
@@ -4679,7 +4654,7 @@ void RA::reviseParam()
 {
     if (m_param_num == 0 ||
         m_param_reg_start + m_param_num - 1 == m_maxreg ||
-        m_gltm.m_params.get_last_idx() == -1) { //not any param in use.
+        m_gltm.m_params.get_last_idx() == VEC_UNDEF) { //not any param in use.
         //Parameter already in place.
         return;
     }
@@ -4695,24 +4670,25 @@ void RA::reviseParam()
     #ifdef _DEBUG_
     BitSet params;
     for (UINT i = 0; i < m_param_num; i++) {
-        UINT prno = m_gltm.m_params.get(i);
-        params.bunion(prno);
+        PRNO prno = m_gltm.m_params.get(i);
+        params.bunion((BSIdx)prno);
     }
     #endif
 
     //Swap phy for each lived bb.
     UINT i;
     for (i = 0; vreg <= m_maxreg; i++, vreg++) {
-        UINT prno = m_gltm.m_params.get(i);
+        PRNO prno = m_gltm.m_params.get(i);
         if (prno == 0) { continue; }
         GLT * g = m_gltm.map_pr2glt(prno);
         ASSERT0(g && g->has_allocated());
         DefDBitSetCore * bbs = GLT_bbs(g);
         if (bbs == nullptr) { continue; }
-        SEGIter * sc = nullptr;
 
+        SEGIter * sc = nullptr;
         UINT gphy = GLT_phy(g);
-        for (INT j = bbs->get_first(&sc); j >= 0; j = bbs->get_next(j, &sc)) {
+        for (BSIdx j = bbs->get_first(&sc);
+             j != BS_UNDEF; j = bbs->get_next(j, &sc)) {
             LTMgr * ltm = m_gltm.get_ltm(j);
             if (ltm == nullptr) { continue; }
             LT * gl = ltm->map_pr2lt(GLT_prno(g));
@@ -4725,12 +4701,12 @@ void RA::reviseParam()
                 LT_phy(ni) = (USHORT)gphy;
                 #ifdef _DEBUG_
                 //This neighbour should not be parameter.
-                ASSERT0(!params.is_contain(LT_prno(ni)));
+                ASSERT0(!params.is_contain((BSIdx)LT_prno(ni)));
                 #endif
-                if (LT_is_global(ni) && !visit.is_contain(LT_prno(ni))) {
+                if (LT_is_global(ni) && !visit.is_contain((BSIdx)LT_prno(ni))) {
                     GLT * niglt = ni->set_global(m_gltm);
                     niglt->set_local(m_gltm);
-                    visit.bunion(LT_prno(ni));
+                    visit.bunion((BSIdx)LT_prno(ni));
                 }
             }
         }
@@ -4740,7 +4716,7 @@ void RA::reviseParam()
 
     //Settle the remainder parameters in.
     for (; i < m_param_num; i++) {
-        UINT prno = m_gltm.m_params.get(i);
+        PRNO prno = m_gltm.m_params.get(i);
         if (prno == 0) { continue; }
         GLT * g = m_gltm.map_pr2glt(prno);
         ASSERT0(g && g->has_allocated());
@@ -4782,14 +4758,15 @@ IR * RA::split(GLT * g)
     ASSERTN(bbs, ("should not select an empty candidate to split"));
     SEGIter * sc = nullptr;
     IR * spill_loc = nullptr;
-    for (INT j = bbs->get_first(&sc); j >= 0; j = bbs->get_next(j, &sc)) {
+    for (BSIdx j = bbs->get_first(&sc);
+         j != BS_UNDEF; j = bbs->get_next(j, &sc)) {
         LTMgr * ltm = m_gltm.get_ltm(j);
         if (ltm == nullptr) { continue; }
         LT * gl = ltm->map_pr2lt(GLT_prno(g));
         ASSERT0(gl); //glt miss local part.
         if (LT_occ(gl) == nullptr) { continue; }
-        for (INT i = LT_occ(gl)->get_first();
-             i >= 0; i = LT_occ(gl)->get_next(i)) {
+        for (BSIdx i = LT_occ(gl)->get_first();
+             i != BS_UNDEF; i = LT_occ(gl)->get_next(i)) {
             IR * occ = ltm->getIR(i);
             ASSERTN(occ, ("illegal occ info."));
             if (gl->is_def(i)) {
@@ -4848,7 +4825,7 @@ void RA::solveConflict(OUT List<GLT*> & unalloc, List<UINT> & nis)
 void RA::updateLocal()
 {
     Vector<GLT*> * gltv = m_gltm.get_gltvec();
-    for (INT i = 1; i <= gltv->get_last_idx(); i++) {
+    for (VecIdx i = 1; i <= gltv->get_last_idx(); i++) {
         GLT * g = gltv->get(i);
         if (g == nullptr) { continue; }
         g->set_local(m_gltm);
@@ -4862,7 +4839,7 @@ bool RA::verify_glt(bool check_alloc)
 {
     DUMMYUSE(check_alloc);
     Vector<GLT*> * gltv = m_gltm.get_gltvec();
-    for (INT i = 1; i <= gltv->get_last_idx(); i++) {
+    for (VecIdx i = 1; i <= gltv->get_last_idx(); i++) {
         GLT * g = gltv->get(i);
         if (g == nullptr) { continue; }
         ASSERT0(!check_alloc || g->has_allocated());
@@ -4871,7 +4848,8 @@ bool RA::verify_glt(bool check_alloc)
         if (bbs == nullptr) { continue; }
 
         SEGIter * sc = nullptr;
-        for (INT j = bbs->get_first(&sc); j >= 0; j = bbs->get_next(j, &sc)) {
+        for (BSIdx j = bbs->get_first(&sc);
+             j != BS_UNDEF; j = bbs->get_next(j, &sc)) {
             LTMgr * ltm = m_gltm.get_ltm(j);
 
             //If local part not exist, remove the bit out of lived-bbs.
@@ -4902,13 +4880,10 @@ bool RA::overlapParam(LT const* l) const
 //satisfied register group constraints when range starts at 'rangestart'.
 //'occupied': phy that has assigned to neighbours of ltg member.
 //'assigend': phy that has assigned to ltg member.
-UINT RA::computeSatisfiedNumRegister(
-        UINT rangestart,
-        LTG const* ltg,
-        UINT rgsz,
-        BitSet const& occupied,
-        BitSet const& assigned,
-        BitSet const& liveout_phy)
+UINT RA::computeSatisfiedNumRegister(UINT rangestart, LTG const* ltg,
+                                     UINT rgsz, BitSet const& occupied,
+                                     BitSet const& assigned,
+                                     BitSet const& liveout_phy)
 {
     DUMMYUSE(liveout_phy);
 
@@ -4917,11 +4892,10 @@ UINT RA::computeSatisfiedNumRegister(
     if (is_cross_param(rangestart, rgsz)) {
         return 0;
     }
-
     UINT start = rangestart;
     UINT end = rangestart + rgsz - 1;
     UINT ofst;
-    for (INT i = 0; i <= ltg->get_last_idx(); i++, rangestart += ofst) {
+    for (VecIdx i = 0; i <= ltg->get_last_idx(); i++, rangestart += ofst) {
         LT * l = ltg->get(i);
         ASSERT0(l);
         ofst = LT_rg_sz(l);
@@ -4969,20 +4943,16 @@ UINT RA::computeSatisfiedNumRegister(
 //group constraints when range starts at 'rangestart'.
 //NOTE: This function must find a legal range even if
 //inserting move.
-UINT RA::computeNumRegister(
-        UINT rangestart,
-        UINT rangeend,
-        LTG const* ltg,
-        BitSet const& occupied,
-        BitSet const& assigned,
-        BitSet const& liveout_phy)
+UINT RA::computeNumRegister(UINT rangestart, UINT rangeend, LTG const* ltg,
+                            BitSet const& occupied, BitSet const& assigned,
+                            BitSet const& liveout_phy)
 {
     DUMMYUSE(liveout_phy);
 
     ASSERT0(rangestart != REG_UNDEF);
     UINT start = rangestart;
     UINT nsat = 0;
-    for (INT i = 0; i <= ltg->get_last_idx(); i++) {
+    for (VecIdx i = 0; i <= ltg->get_last_idx(); i++) {
         LT * l = ltg->get(i);
         ASSERT0(l);
         if (occupied.is_contain(rangestart)) {
@@ -5045,18 +5015,15 @@ bool RA::is_cross_liveout_phy(UINT reg_start, UINT rgsz, BitSet const& liveout_p
 
 
 //Try to find a properly range from those lts which has assigned register.
-INT RA::tryReuseAppeared(
-        LTG const* ltg,
-        BitSet const& occupied,
-        BitSet const& assigned,
-        BitSet const& liveout_phy)
+INT RA::tryReuseAppeared(LTG const* ltg, BitSet const& occupied,
+                         BitSet const& assigned, BitSet const& liveout_phy)
 {
     UINT best_nsat = 0; //The most number of satisfied.
     INT best_range_start = -1;
     INT phyofst = 0;
     UINT rgsz = ltg->get_rg_sz();
     INT frac_start = ((INT)FIRST_PHY_REG) - 1;
-    for (INT i = 0; i <= ltg->get_last_idx(); i++) {
+    for (VecIdx i = 0; i <= ltg->get_last_idx(); i++) {
         LT const* l = ltg->get(i);
         ASSERT0(l);
         INT rangestart = -1;
@@ -5104,11 +5071,8 @@ INT RA::tryReuseAppeared(
 }
 
 
-INT RA::tryExtend(
-        LTG const* ltg,
-        BitSet const& occupied,
-        BitSet const& liveout_phy,
-        BitSet const& assigned)
+INT RA::tryExtend(LTG const* ltg, BitSet const& occupied,
+                  BitSet const& liveout_phy, BitSet const& assigned)
 {
     //There is not any properly range can be allocated.
     UINT tryrangestart = m_param_reg_start + m_param_num;
@@ -5173,13 +5137,13 @@ void RA::remedyLTG(
     while (param != nullptr && !param->is_pr()) { param = IR_next(param); }
     ASSERT0(param && xcom::cnt_list(param) == ((UINT)ltg->get_last_idx()) + 1);
 
-    TMap<UINT, UINT> prno2phy;
+    TMap<PRNO, UINT> prno2phy;
     bool insert = false;
     IR * next = nullptr;
     visited.clean();
     UINT org_rangestart = rangestart;
 
-    for (INT i = 0; i <= ltg->get_last_idx(); i++, param = next) {
+    for (VecIdx i = 0; i <= ltg->get_last_idx(); i++, param = next) {
         next = IR_next(param);
         LT * l = ltg->get(i);
         ASSERT0(l);
@@ -5204,7 +5168,7 @@ void RA::remedyLTG(
     while (param != nullptr && !param->is_pr()) { param = IR_next(param); }
     ASSERT0(param && xcom::cnt_list(param) == ((UINT)ltg->get_last_idx()) + 1);
 
-    for (INT i = 0; i <= ltg->get_last_idx(); i++, param = next) {
+    for (VecIdx i = 0; i <= ltg->get_last_idx(); i++, param = next) {
         next = IR_next(param);
         LT * l = ltg->get(i);
         ASSERT0(l && LT_usable(l));
@@ -5219,7 +5183,7 @@ void RA::remedyLTG(
         if (l->has_allocated()) {
             #ifdef _DEBUG_
             bool find = false;
-            for (INT w = 0; w <= ltg->get_last_idx(); w++) {
+            for (VecIdx w = 0; w <= ltg->get_last_idx(); w++) {
                 LT * wl = ltg->get(w);
                 if (LT_prno(wl) == LT_prno(l)) {
                     find = true;
@@ -5278,9 +5242,9 @@ void RA::remedyLTG(
         ltm->build(true, nullptr, m_cii);
         ltm->get_ig()->erase();
         ltm->get_ig()->build();
-        TMapIter<UINT, UINT> iter2;
+        TMapIter<PRNO, UINT> iter2;
         UINT phy;
-        for (UINT prno = prno2phy.get_first(iter2, &phy);
+        for (PRNO prno = prno2phy.get_first(iter2, &phy);
              prno != 0; prno = prno2phy.get_next(iter2, &phy)) {
             LT * l = ltm->map_pr2lt(prno);
             ASSERT0(l);
@@ -5328,8 +5292,7 @@ void RA::assignLTG(LTG * ltg, IR * ir)
     IG * ig = ltm->get_ig();
     ASSERT0(ig);
     BitSet liveout_phy;
-
-    for (INT i = 0; i <= ltg->get_last_idx(); i++) {
+    for (VecIdx i = 0; i <= ltg->get_last_idx(); i++) {
         LT * l = ltg->get(i);
         ASSERT0(l);
         ig->getNeighborSet(nis, LT_uid(l));
@@ -5365,7 +5328,7 @@ void RA::assignLTG(LTG * ltg, IR * ir)
         //Check if continuous.
         INT rangestart = -1;
         bool is_cont = true;
-        for (INT i = 0; i <= ltg->get_last_idx(); i++) {
+        for (VecIdx i = 0; i <= ltg->get_last_idx(); i++) {
             LT * l = ltg->get(i);
             ASSERT0(l && l->has_allocated());
             if (i != 0 && LT_phy(l) != rangestart) {
@@ -5388,8 +5351,8 @@ void RA::assignLTG(LTG * ltg, IR * ir)
     SEGIter * cur = nullptr;
 
     //Compute the phy occupied by local neighbours.
-    for (INT ltid = nis.get_first(&cur);
-         ltid >= 0; ltid = nis.get_next(ltid, &cur)) {
+    for (BSIdx ltid = nis.get_first(&cur);
+         ltid != BS_UNDEF; ltid = nis.get_next(ltid, &cur)) {
         LT * l = ltm->getLifeTime(ltid);
         ASSERT0(l);
         if (!l->has_allocated()) { continue; }
@@ -5400,8 +5363,8 @@ void RA::assignLTG(LTG * ltg, IR * ir)
         }
     }
 
-    //for (INT gltid = gnis.get_first(&cur);
-    //     gltid >= 0; gltid = gnis.get_next(gltid, &cur)) {
+    //for (BSIdx gltid = gnis.get_first(&cur);
+    //     gltid != BS_UNDEF; gltid = gnis.get_next(gltid, &cur)) {
     //    GLT * g = m_gltm.get_glt(gltid);
     //    ASSERT0(g);
     //    if (!g->has_allocated()) { continue; }
@@ -5415,19 +5378,20 @@ void RA::assignLTG(LTG * ltg, IR * ir)
     //}
 
     //Compute the phy occupied by global neighbours.
-    for (INT i = 0; i <= ltg->get_last_idx(); i++) {
+    for (VecIdx i = 0; i <= ltg->get_last_idx(); i++) {
         LT * l = ltg->get(i);
         ASSERT0(l);
         if (!LT_is_global(l)) { continue; }
 
         GLT * g = m_gltm.map_pr2glt(LT_prno(l));
         ASSERT0(g);
-        UINT prno = GLT_prno(g);
+        PRNO prno = GLT_prno(g);
         SEGIter * sc = nullptr;
         DefDBitSetCore * bbs = GLT_bbs(g);
         if (bbs == nullptr) { continue; }
 
-        for (INT j = bbs->get_first(&sc); j >= 0; j = bbs->get_next(j, &sc)) {
+        for (BSIdx j = bbs->get_first(&sc);
+             j != BS_UNDEF; j = bbs->get_next(j, &sc)) {
             LTMgr * nltm = m_gltm.get_ltm(j);
             if (nltm == nullptr) { continue; }
 
@@ -5440,8 +5404,8 @@ void RA::assignLTG(LTG * ltg, IR * ir)
 
             //Compute the phy occupied by local part.
             SEGIter * cur2 = nullptr;
-            for (INT ltid = nis.get_first(&cur2);
-                 ltid >= 0; ltid = nis.get_next(ltid, &cur2)) {
+            for (BSIdx ltid = nis.get_first(&cur2);
+                 ltid != BS_UNDEF; ltid = nis.get_next(ltid, &cur2)) {
                 LT * l2 = nltm->getLifeTime(ltid);
                 ASSERT0(l2);
                 if (!l2->has_allocated()) { continue; }
@@ -5478,15 +5442,15 @@ bool RA::verify_rsc()
         if (ltm == nullptr) { continue; }
 
         Vector<LT*> * lvec = ltm->get_lt_vec();
-        for (INT i = 0; i <= lvec->get_last_idx(); i++) {
+        for (VecIdx i = 0; i <= lvec->get_last_idx(); i++) {
             LT * l = lvec->get(i);
             if (l == nullptr) { continue; }
             ASSERT0(l->has_allocated());
             if (LT_occ(l) == nullptr) { continue; }
 
             //Do more check for each occ of lt.
-            for (INT j = LT_occ(l)->get_first();
-                 j >= 0; j = LT_occ(l)->get_next(j)) {
+            for (BSIdx j = LT_occ(l)->get_first();
+                 j != BS_UNDEF; j = LT_occ(l)->get_next(j)) {
                 IR * occ = ltm->getIR(j);
                 ASSERTN(occ, ("occ and pos info are not match."));
                 FMT fmt = m_rsc.m_ir2fmt.get(IR_id(occ));
@@ -5512,7 +5476,7 @@ bool RA::verify_usable()
         LTMgr * ltm = m_gltm.map_bb2ltm(bb);
         if (ltm == nullptr) { continue; }
         Vector<LT*> * lvec = ltm->get_lt_vec();
-        for (INT i = 0; i <= lvec->get_last_idx(); i++) {
+        for (VecIdx i = 0; i <= lvec->get_last_idx(); i++) {
             LT * l = lvec->get(i);
             if (l == nullptr) { continue; }
             if (LT_occ(l) != nullptr) {
@@ -5542,7 +5506,7 @@ bool RA::verify_reg(bool check_usable, bool check_alloc)
     Prno2Vreg prno2v(getNearestPowerOf2((UINT)57));
     UINT maxreg = 0;
     Vector<GLT*> * gltv = m_gltm.get_gltvec();
-    for (INT i = 1; i <= gltv->get_last_idx(); i++) {
+    for (VecIdx i = 1; i <= gltv->get_last_idx(); i++) {
         GLT * g = gltv->get(i);
         if (g == nullptr) { continue; }
         if (!check_alloc && !g->has_allocated())  { continue; }
@@ -5560,7 +5524,7 @@ bool RA::verify_reg(bool check_usable, bool check_alloc)
         LTMgr * ltm = m_gltm.map_bb2ltm(bb);
         if (ltm == nullptr) { continue; }
         Vector<LT*> * lvec = ltm->get_lt_vec();
-        for (INT i = 0; i <= lvec->get_last_idx(); i++) {
+        for (VecIdx i = 0; i <= lvec->get_last_idx(); i++) {
             LT * l = lvec->get(i);
             if (l == nullptr) { continue; }
             if (!check_alloc && !l->has_allocated())  { continue; }
@@ -5610,7 +5574,7 @@ void RA::allocGroup()
 //Build local BB interference graph.
 void RA::buildLocalIG()
 {
-    for (INT i = 0; i <= m_gltm.m_bb2ltmgr.get_last_idx(); i++) {
+    for (VecIdx i = 0; i <= m_gltm.m_bb2ltmgr.get_last_idx(); i++) {
         LTMgr * ltm = m_gltm.m_bb2ltmgr.get(i);
         if (ltm == nullptr) { continue; }
         ltm->get_ig()->build();
@@ -5624,7 +5588,7 @@ void RA::buildLocalIG()
 bool RA::verify_lt_occ()
 {
     Vector<GLT*> * gltv = m_gltm.get_gltvec();
-    for (INT i = 1; i <= gltv->get_last_idx(); i++) {
+    for (VecIdx i = 1; i <= gltv->get_last_idx(); i++) {
         GLT * g = gltv->get(i);
         if (g == nullptr) { continue; }
 
@@ -5632,14 +5596,16 @@ bool RA::verify_lt_occ()
         if (bbs == nullptr) { continue; }
 
         SEGIter * sc = nullptr;
-        UINT prno = GLT_prno(g);
+        PRNO prno = GLT_prno(g);
         DUMMYUSE(prno);
-        for (INT j = bbs->get_first(&sc); j >= 0; j = bbs->get_next(j, &sc)) {
+        for (BSIdx j = bbs->get_first(&sc);
+             j != BS_UNDEF; j = bbs->get_next(j, &sc)) {
             DefSBitSetCore * livein = m_liveness_mgr.get_livein(j);
             DefSBitSetCore * liveout = m_liveness_mgr.get_liveout(j);
             CHECK0_DUMMYUSE(livein);
             CHECK0_DUMMYUSE(liveout);
-            ASSERT0(livein->is_contain(prno) || liveout->is_contain(prno));
+            ASSERT0(livein->is_contain((BSIdx)prno) ||
+                    liveout->is_contain((BSIdx)prno));
         }
     }
 
@@ -5648,15 +5614,16 @@ bool RA::verify_lt_occ()
         LTMgr * ltm = m_gltm.get_ltm(bb->id());
         if (ltm == nullptr) { continue; }
         Vector<LT*> * ltvec = ltm->get_lt_vec();
-        for (INT i = 1; i <= ltvec->get_last_idx(); i++) {
+        for (VecIdx i = 1; i <= ltvec->get_last_idx(); i++) {
             LT * l = ltvec->get(i);
             if (l == nullptr) { continue; }
 
             BitSet * occ = LT_occ(l);
             if (occ == nullptr) { continue; }
 
-            UINT prno = LT_prno(l);
-            for (INT j = occ->get_first(); j >= 0; j = occ->get_next(j)) {
+            PRNO prno = LT_prno(l);
+            for (BSIdx j = occ->get_first();
+                 j != BS_UNDEF; j = occ->get_next(j)) {
                 IR * ir = ltm->getIR(j);
                 ASSERT0(ir);
                 if (l->is_def(j)) {
@@ -5698,7 +5665,7 @@ bool RA::verify_interf()
     List<UINT> nis;
     Vector<GLT*> * gltv = m_gltm.get_gltvec();
     BitSet nisregs;
-    for (INT i = 1; i <= gltv->get_last_idx(); i++) {
+    for (VecIdx i = 1; i <= gltv->get_last_idx(); i++) {
         GLT * g = gltv->get(i);
         if (g == nullptr || !g->has_allocated()) { continue; }
 
@@ -5732,7 +5699,7 @@ bool RA::verify_interf()
         LTMgr * ltm = m_gltm.map_bb2ltm(bb);
         if (ltm == nullptr) { continue; }
         Vector<LT*> * lvec = ltm->get_lt_vec();
-        for (INT i = 0; i <= lvec->get_last_idx(); i++) {
+        for (VecIdx i = 0; i <= lvec->get_last_idx(); i++) {
             LT * l = lvec->get(i);
             if (l == nullptr || !l->has_allocated()) { continue; }
 
@@ -5785,7 +5752,7 @@ bool RA::verify_ltg()
         ASSERTN(arg, ("No PR parameter exist."));
 
         UINT phy = 0;
-        for (INT i = 0; i <= ltg->get_last_idx(); i++, arg = IR_next(arg)) {
+        for (VecIdx i = 0; i <= ltg->get_last_idx(); i++, arg = IR_next(arg)) {
             ASSERTN(arg, ("%dth parameter not exist.", i));
             ASSERTN(arg->is_pr(), ("%dth parameter must be PR.", i));
             LT * l = ltg->get(i);

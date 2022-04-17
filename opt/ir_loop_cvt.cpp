@@ -125,8 +125,8 @@ bool LoopCvt::try_convert(LI<IRBB> * li, IRBB * gobackbb,
                 DUSet const* defset = x->readDUSet();
                 if (defset == nullptr) { continue; }
 
-                for (INT d = defset->get_first(&di);
-                     d >= 0; d = defset->get_next(d, &di)) {
+                for (BSIdx d = defset->get_first(&di);
+                     d != BS_UNDEF; d = defset->get_next(d, &di)) {
                     IR * def = m_rg->getIR(d);
 
                     ASSERT0(def->getBB());

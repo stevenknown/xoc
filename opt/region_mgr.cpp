@@ -60,7 +60,7 @@ RegionMgr::RegionMgr() : m_type_mgr(this)
 
 RegionMgr::~RegionMgr()
 {
-    for (INT id = 0; id <= m_id2rg.get_last_idx(); id++) {
+    for (VecIdx id = 0; id <= m_id2rg.get_last_idx(); id++) {
         Region * rg = m_id2rg.get(id);
         if (rg == nullptr) { continue; }
         deleteRegion(rg, false);
@@ -156,7 +156,7 @@ void RegionMgr::registerGlobalMD()
     //Only top region can do initialize MD for global variable.
     ASSERT0(m_var_mgr);
     VarVec * varvec = m_var_mgr->getVarVec();
-    for (INT i = 0; i <= varvec->get_last_idx(); i++) {
+    for (VecIdx i = 0; i <= varvec->get_last_idx(); i++) {
         Var * v = varvec->get(i);
         if (v == nullptr || VAR_is_local(v)) { continue; }
         //Note Var is regarded as VAR_GLOBAL by default if VAR_LOCAL not set.
@@ -232,8 +232,8 @@ void RegionMgr::addToRegionTab(Region * rg)
     ASSERTN(rg->id() > 0, ("should generate new region via newRegion()"));
     ASSERT0(getRegion(rg->id()) == nullptr);
     ASSERT0(rg->id() < m_ru_count);
-    INT pad = xcom::getNearestPowerOf2(rg->id());
-    if (m_id2rg.get_last_idx() + 1 < pad) {
+    UINT pad = xcom::getNearestPowerOf2(rg->id());
+    if (m_id2rg.get_elem_count() < pad) {
         m_id2rg.set(pad, nullptr);
     }
     m_id2rg.set(rg->id(), rg);

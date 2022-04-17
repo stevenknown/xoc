@@ -241,7 +241,7 @@ AbsNode * CfsMgr::constructAbsTree(IN IRBB * entry, IN AbsNode * parent,
             visited.clean();
             return nullptr;
         }
-        INT c;
+        VertexIter c;
         for (v = g.get_first_vertex(c); v != nullptr; v = next) {
             next = g.get_next_vertex(c);
             if (cur_region->is_contain(v->id())) {
@@ -287,7 +287,7 @@ AbsNode * CfsMgr::constructAbsTree(IN IRBB * entry, IN AbsNode * parent,
         visited.bunion(loc_visited);
         //Remove visited vertex.
         next = nullptr;
-        INT c;
+        VertexIter c;
         for (v = g.get_first_vertex(c); v != nullptr; v = next) {
             next = g.get_next_vertex(c);
             if (!loc_visited.is_contain(v->id())) {
@@ -297,9 +297,11 @@ AbsNode * CfsMgr::constructAbsTree(IN IRBB * entry, IN AbsNode * parent,
         }
 
         IRBB * cand = nullptr;
-        for (v = g.get_first_vertex(c); v != nullptr; v = g.get_next_vertex(c)) {
+        for (v = g.get_first_vertex(c);
+             v != nullptr; v = g.get_next_vertex(c)) {
             if (v->getInDegree() == 0) {
-                ASSERTN(cand == nullptr, ("multiple immediate-post-dominators"));
+                ASSERTN(cand == nullptr,
+                        ("multiple immediate-post-dominators"));
                 cand = cfg->getBB(v->id());
             }
         }
